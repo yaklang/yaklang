@@ -18,6 +18,7 @@ func TestMUSTPASS_SyntaxFlowRuleUpdate(t *testing.T) {
 
 	yakit.DelKey(consts.GetGormProfileDatabase(), consts.EmbedSfBuildInRuleKey)
 	update, err := client.CheckSyntaxFlowRuleUpdate(context.Background(), &ypb.CheckSyntaxFlowRuleUpdateRequest{})
+	spew.Dump(update)
 	require.NoError(t, err)
 	require.True(t, update.GetNeedUpdate())
 	stream, err := client.ApplySyntaxFlowRuleUpdate(context.Background(), &ypb.ApplySyntaxFlowRuleUpdateRequest{})

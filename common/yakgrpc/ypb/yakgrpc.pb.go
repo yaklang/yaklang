@@ -22902,13 +22902,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -32040,8 +32040,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -42375,15 +42375,16 @@ type SyntaxFlowRuleFilter struct {
 	Tag        []string               `protobuf:"bytes,6,rep,name=Tag,proto3" json:"Tag,omitempty"`
 	Keyword    string                 `protobuf:"bytes,7,opt,name=Keyword,proto3" json:"Keyword,omitempty"`
 	// 是否包含作为库的规则  这些规则只提供相关数据并被其他规则引用 默认不包含
-	IncludeLibraryRule bool `protobuf:"varint,8,opt,name=includeLibraryRule,proto3" json:"includeLibraryRule,omitempty"` // default false
+	IncludeLibraryRule bool `protobuf:"varint,8,opt,name=includeLibraryRule,proto3" json:"includeLibraryRule,omitempty"` // default false // 废弃
 	// for infinite list
-	FromId         int64  `protobuf:"varint,9,opt,name=FromId,proto3" json:"FromId,omitempty"`    // 废弃
-	UntilId        int64  `protobuf:"varint,10,opt,name=UntilId,proto3" json:"UntilId,omitempty"` // 废弃
-	AfterId        int64  `protobuf:"varint,11,opt,name=AfterId,proto3" json:"AfterId,omitempty"`
-	BeforeId       int64  `protobuf:"varint,12,opt,name=BeforeId,proto3" json:"BeforeId,omitempty"`
-	FilterRuleKind string `protobuf:"bytes,13,opt,name=FilterRuleKind,proto3" json:"FilterRuleKind,omitempty"` // "buildIn"内置规则，"unBuildIn"非内置规则组, 空为所有规则
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	FromId            int64  `protobuf:"varint,9,opt,name=FromId,proto3" json:"FromId,omitempty"`    // 废弃
+	UntilId           int64  `protobuf:"varint,10,opt,name=UntilId,proto3" json:"UntilId,omitempty"` // 废弃
+	AfterId           int64  `protobuf:"varint,11,opt,name=AfterId,proto3" json:"AfterId,omitempty"`
+	BeforeId          int64  `protobuf:"varint,12,opt,name=BeforeId,proto3" json:"BeforeId,omitempty"`
+	FilterRuleKind    string `protobuf:"bytes,13,opt,name=FilterRuleKind,proto3" json:"FilterRuleKind,omitempty"`       // "buildIn"内置规则，"unBuildIn"非内置规则组, 空为所有规则
+	FilterLibRuleKind string `protobuf:"bytes,14,opt,name=FilterLibRuleKind,proto3" json:"FilterLibRuleKind,omitempty"` // "lib"library规则，"noLib"非library规则，空为所有规则
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *SyntaxFlowRuleFilter) Reset() {
@@ -42503,6 +42504,13 @@ func (x *SyntaxFlowRuleFilter) GetBeforeId() int64 {
 func (x *SyntaxFlowRuleFilter) GetFilterRuleKind() string {
 	if x != nil {
 		return x.FilterRuleKind
+	}
+	return ""
+}
+
+func (x *SyntaxFlowRuleFilter) GetFilterLibRuleKind() string {
+	if x != nil {
+		return x.FilterLibRuleKind
 	}
 	return ""
 }
@@ -43341,6 +43349,182 @@ func (x *DeleteSyntaxFlowRuleRequest) GetFilter() *SyntaxFlowRuleFilter {
 	return nil
 }
 
+type CheckSyntaxFlowRuleUpdateRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckSyntaxFlowRuleUpdateRequest) Reset() {
+	*x = CheckSyntaxFlowRuleUpdateRequest{}
+	mi := &file_yakgrpc_proto_msgTypes[601]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckSyntaxFlowRuleUpdateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckSyntaxFlowRuleUpdateRequest) ProtoMessage() {}
+
+func (x *CheckSyntaxFlowRuleUpdateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_yakgrpc_proto_msgTypes[601]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckSyntaxFlowRuleUpdateRequest.ProtoReflect.Descriptor instead.
+func (*CheckSyntaxFlowRuleUpdateRequest) Descriptor() ([]byte, []int) {
+	return file_yakgrpc_proto_rawDescGZIP(), []int{601}
+}
+
+type CheckSyntaxFlowRuleUpdateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NeedUpdate    bool                   `protobuf:"varint,1,opt,name=NeedUpdate,proto3" json:"NeedUpdate,omitempty"` // 是否需要更新
+	State         string                 `protobuf:"bytes,2,opt,name=State,proto3" json:"State,omitempty"`            // 更新状态，没有规则"empty",规则需要更新"to_update"
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckSyntaxFlowRuleUpdateResponse) Reset() {
+	*x = CheckSyntaxFlowRuleUpdateResponse{}
+	mi := &file_yakgrpc_proto_msgTypes[602]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckSyntaxFlowRuleUpdateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckSyntaxFlowRuleUpdateResponse) ProtoMessage() {}
+
+func (x *CheckSyntaxFlowRuleUpdateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_yakgrpc_proto_msgTypes[602]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckSyntaxFlowRuleUpdateResponse.ProtoReflect.Descriptor instead.
+func (*CheckSyntaxFlowRuleUpdateResponse) Descriptor() ([]byte, []int) {
+	return file_yakgrpc_proto_rawDescGZIP(), []int{602}
+}
+
+func (x *CheckSyntaxFlowRuleUpdateResponse) GetNeedUpdate() bool {
+	if x != nil {
+		return x.NeedUpdate
+	}
+	return false
+}
+
+func (x *CheckSyntaxFlowRuleUpdateResponse) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+type ApplySyntaxFlowRuleUpdateRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApplySyntaxFlowRuleUpdateRequest) Reset() {
+	*x = ApplySyntaxFlowRuleUpdateRequest{}
+	mi := &file_yakgrpc_proto_msgTypes[603]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApplySyntaxFlowRuleUpdateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApplySyntaxFlowRuleUpdateRequest) ProtoMessage() {}
+
+func (x *ApplySyntaxFlowRuleUpdateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_yakgrpc_proto_msgTypes[603]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApplySyntaxFlowRuleUpdateRequest.ProtoReflect.Descriptor instead.
+func (*ApplySyntaxFlowRuleUpdateRequest) Descriptor() ([]byte, []int) {
+	return file_yakgrpc_proto_rawDescGZIP(), []int{603}
+}
+
+type ApplySyntaxFlowRuleUpdateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Percent       float64                `protobuf:"fixed64,1,opt,name=Percent,proto3" json:"Percent,omitempty"` // 更新进度百分比
+	Message       string                 `protobuf:"bytes,2,opt,name=Message,proto3" json:"Message,omitempty"`   // 更新状态信息
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApplySyntaxFlowRuleUpdateResponse) Reset() {
+	*x = ApplySyntaxFlowRuleUpdateResponse{}
+	mi := &file_yakgrpc_proto_msgTypes[604]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApplySyntaxFlowRuleUpdateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApplySyntaxFlowRuleUpdateResponse) ProtoMessage() {}
+
+func (x *ApplySyntaxFlowRuleUpdateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_yakgrpc_proto_msgTypes[604]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApplySyntaxFlowRuleUpdateResponse.ProtoReflect.Descriptor instead.
+func (*ApplySyntaxFlowRuleUpdateResponse) Descriptor() ([]byte, []int) {
+	return file_yakgrpc_proto_rawDescGZIP(), []int{604}
+}
+
+func (x *ApplySyntaxFlowRuleUpdateResponse) GetPercent() float64 {
+	if x != nil {
+		return x.Percent
+	}
+	return 0
+}
+
+func (x *ApplySyntaxFlowRuleUpdateResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 type SyntaxFlowRuleGroupFilter struct {
 	state      protoimpl.MessageState `protogen:"open.v1"`
 	GroupNames []string               `protobuf:"bytes,2,rep,name=GroupNames,proto3" json:"GroupNames,omitempty"`
@@ -43353,7 +43537,7 @@ type SyntaxFlowRuleGroupFilter struct {
 
 func (x *SyntaxFlowRuleGroupFilter) Reset() {
 	*x = SyntaxFlowRuleGroupFilter{}
-	mi := &file_yakgrpc_proto_msgTypes[601]
+	mi := &file_yakgrpc_proto_msgTypes[605]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43365,7 +43549,7 @@ func (x *SyntaxFlowRuleGroupFilter) String() string {
 func (*SyntaxFlowRuleGroupFilter) ProtoMessage() {}
 
 func (x *SyntaxFlowRuleGroupFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[601]
+	mi := &file_yakgrpc_proto_msgTypes[605]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -43378,7 +43562,7 @@ func (x *SyntaxFlowRuleGroupFilter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyntaxFlowRuleGroupFilter.ProtoReflect.Descriptor instead.
 func (*SyntaxFlowRuleGroupFilter) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{601}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{605}
 }
 
 func (x *SyntaxFlowRuleGroupFilter) GetGroupNames() []string {
@@ -43413,7 +43597,7 @@ type SyntaxFlowGroup struct {
 
 func (x *SyntaxFlowGroup) Reset() {
 	*x = SyntaxFlowGroup{}
-	mi := &file_yakgrpc_proto_msgTypes[602]
+	mi := &file_yakgrpc_proto_msgTypes[606]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43425,7 +43609,7 @@ func (x *SyntaxFlowGroup) String() string {
 func (*SyntaxFlowGroup) ProtoMessage() {}
 
 func (x *SyntaxFlowGroup) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[602]
+	mi := &file_yakgrpc_proto_msgTypes[606]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -43438,7 +43622,7 @@ func (x *SyntaxFlowGroup) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyntaxFlowGroup.ProtoReflect.Descriptor instead.
 func (*SyntaxFlowGroup) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{602}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{606}
 }
 
 func (x *SyntaxFlowGroup) GetGroupName() string {
@@ -43472,7 +43656,7 @@ type QuerySyntaxFlowRuleGroupRequest struct {
 
 func (x *QuerySyntaxFlowRuleGroupRequest) Reset() {
 	*x = QuerySyntaxFlowRuleGroupRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[603]
+	mi := &file_yakgrpc_proto_msgTypes[607]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43484,7 +43668,7 @@ func (x *QuerySyntaxFlowRuleGroupRequest) String() string {
 func (*QuerySyntaxFlowRuleGroupRequest) ProtoMessage() {}
 
 func (x *QuerySyntaxFlowRuleGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[603]
+	mi := &file_yakgrpc_proto_msgTypes[607]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -43497,7 +43681,7 @@ func (x *QuerySyntaxFlowRuleGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuerySyntaxFlowRuleGroupRequest.ProtoReflect.Descriptor instead.
 func (*QuerySyntaxFlowRuleGroupRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{603}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{607}
 }
 
 func (x *QuerySyntaxFlowRuleGroupRequest) GetFilter() *SyntaxFlowRuleGroupFilter {
@@ -43524,7 +43708,7 @@ type QuerySyntaxFlowRuleGroupResponse struct {
 
 func (x *QuerySyntaxFlowRuleGroupResponse) Reset() {
 	*x = QuerySyntaxFlowRuleGroupResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[604]
+	mi := &file_yakgrpc_proto_msgTypes[608]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43536,7 +43720,7 @@ func (x *QuerySyntaxFlowRuleGroupResponse) String() string {
 func (*QuerySyntaxFlowRuleGroupResponse) ProtoMessage() {}
 
 func (x *QuerySyntaxFlowRuleGroupResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[604]
+	mi := &file_yakgrpc_proto_msgTypes[608]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -43549,7 +43733,7 @@ func (x *QuerySyntaxFlowRuleGroupResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuerySyntaxFlowRuleGroupResponse.ProtoReflect.Descriptor instead.
 func (*QuerySyntaxFlowRuleGroupResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{604}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{608}
 }
 
 func (x *QuerySyntaxFlowRuleGroupResponse) GetGroup() []*SyntaxFlowGroup {
@@ -43575,7 +43759,7 @@ type CreateSyntaxFlowGroupRequest struct {
 
 func (x *CreateSyntaxFlowGroupRequest) Reset() {
 	*x = CreateSyntaxFlowGroupRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[605]
+	mi := &file_yakgrpc_proto_msgTypes[609]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43587,7 +43771,7 @@ func (x *CreateSyntaxFlowGroupRequest) String() string {
 func (*CreateSyntaxFlowGroupRequest) ProtoMessage() {}
 
 func (x *CreateSyntaxFlowGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[605]
+	mi := &file_yakgrpc_proto_msgTypes[609]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -43600,7 +43784,7 @@ func (x *CreateSyntaxFlowGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateSyntaxFlowGroupRequest.ProtoReflect.Descriptor instead.
 func (*CreateSyntaxFlowGroupRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{605}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{609}
 }
 
 func (x *CreateSyntaxFlowGroupRequest) GetGroupName() string {
@@ -43620,7 +43804,7 @@ type UpdateSyntaxFlowRuleGroupRequest struct {
 
 func (x *UpdateSyntaxFlowRuleGroupRequest) Reset() {
 	*x = UpdateSyntaxFlowRuleGroupRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[606]
+	mi := &file_yakgrpc_proto_msgTypes[610]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43632,7 +43816,7 @@ func (x *UpdateSyntaxFlowRuleGroupRequest) String() string {
 func (*UpdateSyntaxFlowRuleGroupRequest) ProtoMessage() {}
 
 func (x *UpdateSyntaxFlowRuleGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[606]
+	mi := &file_yakgrpc_proto_msgTypes[610]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -43645,7 +43829,7 @@ func (x *UpdateSyntaxFlowRuleGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateSyntaxFlowRuleGroupRequest.ProtoReflect.Descriptor instead.
 func (*UpdateSyntaxFlowRuleGroupRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{606}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{610}
 }
 
 func (x *UpdateSyntaxFlowRuleGroupRequest) GetOldGroupName() string {
@@ -43674,7 +43858,7 @@ type UpdateSyntaxFlowRuleAndGroupRequest struct {
 
 func (x *UpdateSyntaxFlowRuleAndGroupRequest) Reset() {
 	*x = UpdateSyntaxFlowRuleAndGroupRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[607]
+	mi := &file_yakgrpc_proto_msgTypes[611]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43686,7 +43870,7 @@ func (x *UpdateSyntaxFlowRuleAndGroupRequest) String() string {
 func (*UpdateSyntaxFlowRuleAndGroupRequest) ProtoMessage() {}
 
 func (x *UpdateSyntaxFlowRuleAndGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[607]
+	mi := &file_yakgrpc_proto_msgTypes[611]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -43699,7 +43883,7 @@ func (x *UpdateSyntaxFlowRuleAndGroupRequest) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use UpdateSyntaxFlowRuleAndGroupRequest.ProtoReflect.Descriptor instead.
 func (*UpdateSyntaxFlowRuleAndGroupRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{607}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{611}
 }
 
 func (x *UpdateSyntaxFlowRuleAndGroupRequest) GetFilter() *SyntaxFlowRuleFilter {
@@ -43739,7 +43923,7 @@ type QuerySyntaxFlowSameGroupRequest struct {
 
 func (x *QuerySyntaxFlowSameGroupRequest) Reset() {
 	*x = QuerySyntaxFlowSameGroupRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[608]
+	mi := &file_yakgrpc_proto_msgTypes[612]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43751,7 +43935,7 @@ func (x *QuerySyntaxFlowSameGroupRequest) String() string {
 func (*QuerySyntaxFlowSameGroupRequest) ProtoMessage() {}
 
 func (x *QuerySyntaxFlowSameGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[608]
+	mi := &file_yakgrpc_proto_msgTypes[612]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -43764,7 +43948,7 @@ func (x *QuerySyntaxFlowSameGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuerySyntaxFlowSameGroupRequest.ProtoReflect.Descriptor instead.
 func (*QuerySyntaxFlowSameGroupRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{608}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{612}
 }
 
 func (x *QuerySyntaxFlowSameGroupRequest) GetFilter() *SyntaxFlowRuleFilter {
@@ -43783,7 +43967,7 @@ type QuerySyntaxFlowSameGroupResponse struct {
 
 func (x *QuerySyntaxFlowSameGroupResponse) Reset() {
 	*x = QuerySyntaxFlowSameGroupResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[609]
+	mi := &file_yakgrpc_proto_msgTypes[613]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43795,7 +43979,7 @@ func (x *QuerySyntaxFlowSameGroupResponse) String() string {
 func (*QuerySyntaxFlowSameGroupResponse) ProtoMessage() {}
 
 func (x *QuerySyntaxFlowSameGroupResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[609]
+	mi := &file_yakgrpc_proto_msgTypes[613]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -43808,7 +43992,7 @@ func (x *QuerySyntaxFlowSameGroupResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuerySyntaxFlowSameGroupResponse.ProtoReflect.Descriptor instead.
 func (*QuerySyntaxFlowSameGroupResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{609}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{613}
 }
 
 func (x *QuerySyntaxFlowSameGroupResponse) GetGroup() []*SyntaxFlowGroup {
@@ -43827,7 +44011,7 @@ type DeleteSyntaxFlowRuleGroupRequest struct {
 
 func (x *DeleteSyntaxFlowRuleGroupRequest) Reset() {
 	*x = DeleteSyntaxFlowRuleGroupRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[610]
+	mi := &file_yakgrpc_proto_msgTypes[614]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43839,7 +44023,7 @@ func (x *DeleteSyntaxFlowRuleGroupRequest) String() string {
 func (*DeleteSyntaxFlowRuleGroupRequest) ProtoMessage() {}
 
 func (x *DeleteSyntaxFlowRuleGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[610]
+	mi := &file_yakgrpc_proto_msgTypes[614]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -43852,7 +44036,7 @@ func (x *DeleteSyntaxFlowRuleGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteSyntaxFlowRuleGroupRequest.ProtoReflect.Descriptor instead.
 func (*DeleteSyntaxFlowRuleGroupRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{610}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{614}
 }
 
 func (x *DeleteSyntaxFlowRuleGroupRequest) GetFilter() *SyntaxFlowRuleGroupFilter {
@@ -43880,7 +44064,7 @@ type SyntaxFlowScanRequest struct {
 
 func (x *SyntaxFlowScanRequest) Reset() {
 	*x = SyntaxFlowScanRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[611]
+	mi := &file_yakgrpc_proto_msgTypes[615]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43892,7 +44076,7 @@ func (x *SyntaxFlowScanRequest) String() string {
 func (*SyntaxFlowScanRequest) ProtoMessage() {}
 
 func (x *SyntaxFlowScanRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[611]
+	mi := &file_yakgrpc_proto_msgTypes[615]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -43905,7 +44089,7 @@ func (x *SyntaxFlowScanRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyntaxFlowScanRequest.ProtoReflect.Descriptor instead.
 func (*SyntaxFlowScanRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{611}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{615}
 }
 
 func (x *SyntaxFlowScanRequest) GetControlMode() string {
@@ -43960,7 +44144,7 @@ type QuerySyntaxFlowScanTaskRequest struct {
 
 func (x *QuerySyntaxFlowScanTaskRequest) Reset() {
 	*x = QuerySyntaxFlowScanTaskRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[612]
+	mi := &file_yakgrpc_proto_msgTypes[616]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43972,7 +44156,7 @@ func (x *QuerySyntaxFlowScanTaskRequest) String() string {
 func (*QuerySyntaxFlowScanTaskRequest) ProtoMessage() {}
 
 func (x *QuerySyntaxFlowScanTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[612]
+	mi := &file_yakgrpc_proto_msgTypes[616]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -43985,7 +44169,7 @@ func (x *QuerySyntaxFlowScanTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuerySyntaxFlowScanTaskRequest.ProtoReflect.Descriptor instead.
 func (*QuerySyntaxFlowScanTaskRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{612}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{616}
 }
 
 func (x *QuerySyntaxFlowScanTaskRequest) GetPagination() *Paging {
@@ -44017,7 +44201,7 @@ type SyntaxFlowScanTaskFilter struct {
 
 func (x *SyntaxFlowScanTaskFilter) Reset() {
 	*x = SyntaxFlowScanTaskFilter{}
-	mi := &file_yakgrpc_proto_msgTypes[613]
+	mi := &file_yakgrpc_proto_msgTypes[617]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44029,7 +44213,7 @@ func (x *SyntaxFlowScanTaskFilter) String() string {
 func (*SyntaxFlowScanTaskFilter) ProtoMessage() {}
 
 func (x *SyntaxFlowScanTaskFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[613]
+	mi := &file_yakgrpc_proto_msgTypes[617]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -44042,7 +44226,7 @@ func (x *SyntaxFlowScanTaskFilter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyntaxFlowScanTaskFilter.ProtoReflect.Descriptor instead.
 func (*SyntaxFlowScanTaskFilter) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{613}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{617}
 }
 
 func (x *SyntaxFlowScanTaskFilter) GetPrograms() []string {
@@ -44105,7 +44289,7 @@ type QuerySyntaxFlowScanTaskResponse struct {
 
 func (x *QuerySyntaxFlowScanTaskResponse) Reset() {
 	*x = QuerySyntaxFlowScanTaskResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[614]
+	mi := &file_yakgrpc_proto_msgTypes[618]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44117,7 +44301,7 @@ func (x *QuerySyntaxFlowScanTaskResponse) String() string {
 func (*QuerySyntaxFlowScanTaskResponse) ProtoMessage() {}
 
 func (x *QuerySyntaxFlowScanTaskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[614]
+	mi := &file_yakgrpc_proto_msgTypes[618]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -44130,7 +44314,7 @@ func (x *QuerySyntaxFlowScanTaskResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuerySyntaxFlowScanTaskResponse.ProtoReflect.Descriptor instead.
 func (*QuerySyntaxFlowScanTaskResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{614}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{618}
 }
 
 func (x *QuerySyntaxFlowScanTaskResponse) GetPagination() *Paging {
@@ -44180,7 +44364,7 @@ type SyntaxFlowScanTask struct {
 
 func (x *SyntaxFlowScanTask) Reset() {
 	*x = SyntaxFlowScanTask{}
-	mi := &file_yakgrpc_proto_msgTypes[615]
+	mi := &file_yakgrpc_proto_msgTypes[619]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44192,7 +44376,7 @@ func (x *SyntaxFlowScanTask) String() string {
 func (*SyntaxFlowScanTask) ProtoMessage() {}
 
 func (x *SyntaxFlowScanTask) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[615]
+	mi := &file_yakgrpc_proto_msgTypes[619]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -44205,7 +44389,7 @@ func (x *SyntaxFlowScanTask) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyntaxFlowScanTask.ProtoReflect.Descriptor instead.
 func (*SyntaxFlowScanTask) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{615}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{619}
 }
 
 func (x *SyntaxFlowScanTask) GetId() uint64 {
@@ -44323,7 +44507,7 @@ type DeleteSyntaxFlowScanTaskRequest struct {
 
 func (x *DeleteSyntaxFlowScanTaskRequest) Reset() {
 	*x = DeleteSyntaxFlowScanTaskRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[616]
+	mi := &file_yakgrpc_proto_msgTypes[620]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44335,7 +44519,7 @@ func (x *DeleteSyntaxFlowScanTaskRequest) String() string {
 func (*DeleteSyntaxFlowScanTaskRequest) ProtoMessage() {}
 
 func (x *DeleteSyntaxFlowScanTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[616]
+	mi := &file_yakgrpc_proto_msgTypes[620]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -44348,7 +44532,7 @@ func (x *DeleteSyntaxFlowScanTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteSyntaxFlowScanTaskRequest.ProtoReflect.Descriptor instead.
 func (*DeleteSyntaxFlowScanTaskRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{616}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{620}
 }
 
 func (x *DeleteSyntaxFlowScanTaskRequest) GetDeleteAll() bool {
@@ -44381,7 +44565,7 @@ type SyntaxFlowScanResponse struct {
 
 func (x *SyntaxFlowScanResponse) Reset() {
 	*x = SyntaxFlowScanResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[617]
+	mi := &file_yakgrpc_proto_msgTypes[621]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44393,7 +44577,7 @@ func (x *SyntaxFlowScanResponse) String() string {
 func (*SyntaxFlowScanResponse) ProtoMessage() {}
 
 func (x *SyntaxFlowScanResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[617]
+	mi := &file_yakgrpc_proto_msgTypes[621]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -44406,7 +44590,7 @@ func (x *SyntaxFlowScanResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyntaxFlowScanResponse.ProtoReflect.Descriptor instead.
 func (*SyntaxFlowScanResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{617}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{621}
 }
 
 func (x *SyntaxFlowScanResponse) GetTaskID() string {
@@ -44469,7 +44653,7 @@ type SyntaxFlowResultFilter struct {
 
 func (x *SyntaxFlowResultFilter) Reset() {
 	*x = SyntaxFlowResultFilter{}
-	mi := &file_yakgrpc_proto_msgTypes[618]
+	mi := &file_yakgrpc_proto_msgTypes[622]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44481,7 +44665,7 @@ func (x *SyntaxFlowResultFilter) String() string {
 func (*SyntaxFlowResultFilter) ProtoMessage() {}
 
 func (x *SyntaxFlowResultFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[618]
+	mi := &file_yakgrpc_proto_msgTypes[622]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -44494,7 +44678,7 @@ func (x *SyntaxFlowResultFilter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyntaxFlowResultFilter.ProtoReflect.Descriptor instead.
 func (*SyntaxFlowResultFilter) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{618}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{622}
 }
 
 func (x *SyntaxFlowResultFilter) GetTaskIDs() []string {
@@ -44577,7 +44761,7 @@ type QuerySyntaxFlowResultRequest struct {
 
 func (x *QuerySyntaxFlowResultRequest) Reset() {
 	*x = QuerySyntaxFlowResultRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[619]
+	mi := &file_yakgrpc_proto_msgTypes[623]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44589,7 +44773,7 @@ func (x *QuerySyntaxFlowResultRequest) String() string {
 func (*QuerySyntaxFlowResultRequest) ProtoMessage() {}
 
 func (x *QuerySyntaxFlowResultRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[619]
+	mi := &file_yakgrpc_proto_msgTypes[623]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -44602,7 +44786,7 @@ func (x *QuerySyntaxFlowResultRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuerySyntaxFlowResultRequest.ProtoReflect.Descriptor instead.
 func (*QuerySyntaxFlowResultRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{619}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{623}
 }
 
 func (x *QuerySyntaxFlowResultRequest) GetPagination() *Paging {
@@ -44631,7 +44815,7 @@ type QuerySyntaxFlowResultResponse struct {
 
 func (x *QuerySyntaxFlowResultResponse) Reset() {
 	*x = QuerySyntaxFlowResultResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[620]
+	mi := &file_yakgrpc_proto_msgTypes[624]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44643,7 +44827,7 @@ func (x *QuerySyntaxFlowResultResponse) String() string {
 func (*QuerySyntaxFlowResultResponse) ProtoMessage() {}
 
 func (x *QuerySyntaxFlowResultResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[620]
+	mi := &file_yakgrpc_proto_msgTypes[624]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -44656,7 +44840,7 @@ func (x *QuerySyntaxFlowResultResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuerySyntaxFlowResultResponse.ProtoReflect.Descriptor instead.
 func (*QuerySyntaxFlowResultResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{620}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{624}
 }
 
 func (x *QuerySyntaxFlowResultResponse) GetPagination() *Paging {
@@ -44712,7 +44896,7 @@ type SyntaxFlowResult struct {
 
 func (x *SyntaxFlowResult) Reset() {
 	*x = SyntaxFlowResult{}
-	mi := &file_yakgrpc_proto_msgTypes[621]
+	mi := &file_yakgrpc_proto_msgTypes[625]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44724,7 +44908,7 @@ func (x *SyntaxFlowResult) String() string {
 func (*SyntaxFlowResult) ProtoMessage() {}
 
 func (x *SyntaxFlowResult) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[621]
+	mi := &file_yakgrpc_proto_msgTypes[625]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -44737,7 +44921,7 @@ func (x *SyntaxFlowResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyntaxFlowResult.ProtoReflect.Descriptor instead.
 func (*SyntaxFlowResult) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{621}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{625}
 }
 
 func (x *SyntaxFlowResult) GetResultID() uint64 {
@@ -44842,7 +45026,7 @@ type DeleteSyntaxFlowResultRequest struct {
 
 func (x *DeleteSyntaxFlowResultRequest) Reset() {
 	*x = DeleteSyntaxFlowResultRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[622]
+	mi := &file_yakgrpc_proto_msgTypes[626]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44854,7 +45038,7 @@ func (x *DeleteSyntaxFlowResultRequest) String() string {
 func (*DeleteSyntaxFlowResultRequest) ProtoMessage() {}
 
 func (x *DeleteSyntaxFlowResultRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[622]
+	mi := &file_yakgrpc_proto_msgTypes[626]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -44867,7 +45051,7 @@ func (x *DeleteSyntaxFlowResultRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteSyntaxFlowResultRequest.ProtoReflect.Descriptor instead.
 func (*DeleteSyntaxFlowResultRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{622}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{626}
 }
 
 func (x *DeleteSyntaxFlowResultRequest) GetDeleteContainRisk() bool {
@@ -44900,7 +45084,7 @@ type DeleteSyntaxFlowResultResponse struct {
 
 func (x *DeleteSyntaxFlowResultResponse) Reset() {
 	*x = DeleteSyntaxFlowResultResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[623]
+	mi := &file_yakgrpc_proto_msgTypes[627]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44912,7 +45096,7 @@ func (x *DeleteSyntaxFlowResultResponse) String() string {
 func (*DeleteSyntaxFlowResultResponse) ProtoMessage() {}
 
 func (x *DeleteSyntaxFlowResultResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[623]
+	mi := &file_yakgrpc_proto_msgTypes[627]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -44925,7 +45109,7 @@ func (x *DeleteSyntaxFlowResultResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteSyntaxFlowResultResponse.ProtoReflect.Descriptor instead.
 func (*DeleteSyntaxFlowResultResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{623}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{627}
 }
 
 func (x *DeleteSyntaxFlowResultResponse) GetMessage() *DbOperateMessage {
@@ -44944,7 +45128,7 @@ type QueryPluginEnvRequest struct {
 
 func (x *QueryPluginEnvRequest) Reset() {
 	*x = QueryPluginEnvRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[624]
+	mi := &file_yakgrpc_proto_msgTypes[628]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44956,7 +45140,7 @@ func (x *QueryPluginEnvRequest) String() string {
 func (*QueryPluginEnvRequest) ProtoMessage() {}
 
 func (x *QueryPluginEnvRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[624]
+	mi := &file_yakgrpc_proto_msgTypes[628]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -44969,7 +45153,7 @@ func (x *QueryPluginEnvRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryPluginEnvRequest.ProtoReflect.Descriptor instead.
 func (*QueryPluginEnvRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{624}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{628}
 }
 
 func (x *QueryPluginEnvRequest) GetKey() []string {
@@ -44988,7 +45172,7 @@ type PluginEnvData struct {
 
 func (x *PluginEnvData) Reset() {
 	*x = PluginEnvData{}
-	mi := &file_yakgrpc_proto_msgTypes[625]
+	mi := &file_yakgrpc_proto_msgTypes[629]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45000,7 +45184,7 @@ func (x *PluginEnvData) String() string {
 func (*PluginEnvData) ProtoMessage() {}
 
 func (x *PluginEnvData) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[625]
+	mi := &file_yakgrpc_proto_msgTypes[629]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -45013,7 +45197,7 @@ func (x *PluginEnvData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PluginEnvData.ProtoReflect.Descriptor instead.
 func (*PluginEnvData) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{625}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{629}
 }
 
 func (x *PluginEnvData) GetEnv() []*KVPair {
@@ -45033,7 +45217,7 @@ type DeletePluginEnvRequest struct {
 
 func (x *DeletePluginEnvRequest) Reset() {
 	*x = DeletePluginEnvRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[626]
+	mi := &file_yakgrpc_proto_msgTypes[630]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45045,7 +45229,7 @@ func (x *DeletePluginEnvRequest) String() string {
 func (*DeletePluginEnvRequest) ProtoMessage() {}
 
 func (x *DeletePluginEnvRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[626]
+	mi := &file_yakgrpc_proto_msgTypes[630]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -45058,7 +45242,7 @@ func (x *DeletePluginEnvRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeletePluginEnvRequest.ProtoReflect.Descriptor instead.
 func (*DeletePluginEnvRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{626}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{630}
 }
 
 func (x *DeletePluginEnvRequest) GetKey() string {
@@ -45084,7 +45268,7 @@ type GetAllFuzztagInfoRequest struct {
 
 func (x *GetAllFuzztagInfoRequest) Reset() {
 	*x = GetAllFuzztagInfoRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[627]
+	mi := &file_yakgrpc_proto_msgTypes[631]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45096,7 +45280,7 @@ func (x *GetAllFuzztagInfoRequest) String() string {
 func (*GetAllFuzztagInfoRequest) ProtoMessage() {}
 
 func (x *GetAllFuzztagInfoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[627]
+	mi := &file_yakgrpc_proto_msgTypes[631]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -45109,7 +45293,7 @@ func (x *GetAllFuzztagInfoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAllFuzztagInfoRequest.ProtoReflect.Descriptor instead.
 func (*GetAllFuzztagInfoRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{627}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{631}
 }
 
 func (x *GetAllFuzztagInfoRequest) GetKey() string {
@@ -45128,7 +45312,7 @@ type GetAllFuzztagInfoResponse struct {
 
 func (x *GetAllFuzztagInfoResponse) Reset() {
 	*x = GetAllFuzztagInfoResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[628]
+	mi := &file_yakgrpc_proto_msgTypes[632]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45140,7 +45324,7 @@ func (x *GetAllFuzztagInfoResponse) String() string {
 func (*GetAllFuzztagInfoResponse) ProtoMessage() {}
 
 func (x *GetAllFuzztagInfoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[628]
+	mi := &file_yakgrpc_proto_msgTypes[632]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -45153,7 +45337,7 @@ func (x *GetAllFuzztagInfoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAllFuzztagInfoResponse.ProtoReflect.Descriptor instead.
 func (*GetAllFuzztagInfoResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{628}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{632}
 }
 
 func (x *GetAllFuzztagInfoResponse) GetData() []*FuzztagInfo {
@@ -45177,7 +45361,7 @@ type FuzztagArgumentType struct {
 
 func (x *FuzztagArgumentType) Reset() {
 	*x = FuzztagArgumentType{}
-	mi := &file_yakgrpc_proto_msgTypes[629]
+	mi := &file_yakgrpc_proto_msgTypes[633]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45189,7 +45373,7 @@ func (x *FuzztagArgumentType) String() string {
 func (*FuzztagArgumentType) ProtoMessage() {}
 
 func (x *FuzztagArgumentType) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[629]
+	mi := &file_yakgrpc_proto_msgTypes[633]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -45202,7 +45386,7 @@ func (x *FuzztagArgumentType) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FuzztagArgumentType.ProtoReflect.Descriptor instead.
 func (*FuzztagArgumentType) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{629}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{633}
 }
 
 func (x *FuzztagArgumentType) GetName() string {
@@ -45260,7 +45444,7 @@ type FuzztagInfo struct {
 
 func (x *FuzztagInfo) Reset() {
 	*x = FuzztagInfo{}
-	mi := &file_yakgrpc_proto_msgTypes[630]
+	mi := &file_yakgrpc_proto_msgTypes[634]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45272,7 +45456,7 @@ func (x *FuzztagInfo) String() string {
 func (*FuzztagInfo) ProtoMessage() {}
 
 func (x *FuzztagInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[630]
+	mi := &file_yakgrpc_proto_msgTypes[634]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -45285,7 +45469,7 @@ func (x *FuzztagInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FuzztagInfo.ProtoReflect.Descriptor instead.
 func (*FuzztagInfo) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{630}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{634}
 }
 
 func (x *FuzztagInfo) GetName() string {
@@ -45334,7 +45518,7 @@ type GenerateFuzztagRequest struct {
 
 func (x *GenerateFuzztagRequest) Reset() {
 	*x = GenerateFuzztagRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[631]
+	mi := &file_yakgrpc_proto_msgTypes[635]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45346,7 +45530,7 @@ func (x *GenerateFuzztagRequest) String() string {
 func (*GenerateFuzztagRequest) ProtoMessage() {}
 
 func (x *GenerateFuzztagRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[631]
+	mi := &file_yakgrpc_proto_msgTypes[635]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -45359,7 +45543,7 @@ func (x *GenerateFuzztagRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GenerateFuzztagRequest.ProtoReflect.Descriptor instead.
 func (*GenerateFuzztagRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{631}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{635}
 }
 
 func (x *GenerateFuzztagRequest) GetName() string {
@@ -45393,7 +45577,7 @@ type GenerateFuzztagResponse struct {
 
 func (x *GenerateFuzztagResponse) Reset() {
 	*x = GenerateFuzztagResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[632]
+	mi := &file_yakgrpc_proto_msgTypes[636]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45405,7 +45589,7 @@ func (x *GenerateFuzztagResponse) String() string {
 func (*GenerateFuzztagResponse) ProtoMessage() {}
 
 func (x *GenerateFuzztagResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[632]
+	mi := &file_yakgrpc_proto_msgTypes[636]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -45418,7 +45602,7 @@ func (x *GenerateFuzztagResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GenerateFuzztagResponse.ProtoReflect.Descriptor instead.
 func (*GenerateFuzztagResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{632}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{636}
 }
 
 func (x *GenerateFuzztagResponse) GetStatus() *GeneralResponse {
@@ -45446,7 +45630,7 @@ type FuzzTagSuggestionRequest struct {
 
 func (x *FuzzTagSuggestionRequest) Reset() {
 	*x = FuzzTagSuggestionRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[633]
+	mi := &file_yakgrpc_proto_msgTypes[637]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45458,7 +45642,7 @@ func (x *FuzzTagSuggestionRequest) String() string {
 func (*FuzzTagSuggestionRequest) ProtoMessage() {}
 
 func (x *FuzzTagSuggestionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[633]
+	mi := &file_yakgrpc_proto_msgTypes[637]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -45471,7 +45655,7 @@ func (x *FuzzTagSuggestionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FuzzTagSuggestionRequest.ProtoReflect.Descriptor instead.
 func (*FuzzTagSuggestionRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{633}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{637}
 }
 
 func (x *FuzzTagSuggestionRequest) GetHotPatchCode() string {
@@ -45533,7 +45717,7 @@ type SSARisk struct {
 
 func (x *SSARisk) Reset() {
 	*x = SSARisk{}
-	mi := &file_yakgrpc_proto_msgTypes[634]
+	mi := &file_yakgrpc_proto_msgTypes[638]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45545,7 +45729,7 @@ func (x *SSARisk) String() string {
 func (*SSARisk) ProtoMessage() {}
 
 func (x *SSARisk) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[634]
+	mi := &file_yakgrpc_proto_msgTypes[638]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -45558,7 +45742,7 @@ func (x *SSARisk) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SSARisk.ProtoReflect.Descriptor instead.
 func (*SSARisk) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{634}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{638}
 }
 
 func (x *SSARisk) GetId() int64 {
@@ -45786,7 +45970,7 @@ type SSARisksFilter struct {
 
 func (x *SSARisksFilter) Reset() {
 	*x = SSARisksFilter{}
-	mi := &file_yakgrpc_proto_msgTypes[635]
+	mi := &file_yakgrpc_proto_msgTypes[639]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45798,7 +45982,7 @@ func (x *SSARisksFilter) String() string {
 func (*SSARisksFilter) ProtoMessage() {}
 
 func (x *SSARisksFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[635]
+	mi := &file_yakgrpc_proto_msgTypes[639]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -45811,7 +45995,7 @@ func (x *SSARisksFilter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SSARisksFilter.ProtoReflect.Descriptor instead.
 func (*SSARisksFilter) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{635}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{639}
 }
 
 func (x *SSARisksFilter) GetID() []int64 {
@@ -45922,7 +46106,7 @@ type QuerySSARisksRequest struct {
 
 func (x *QuerySSARisksRequest) Reset() {
 	*x = QuerySSARisksRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[636]
+	mi := &file_yakgrpc_proto_msgTypes[640]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45934,7 +46118,7 @@ func (x *QuerySSARisksRequest) String() string {
 func (*QuerySSARisksRequest) ProtoMessage() {}
 
 func (x *QuerySSARisksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[636]
+	mi := &file_yakgrpc_proto_msgTypes[640]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -45947,7 +46131,7 @@ func (x *QuerySSARisksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuerySSARisksRequest.ProtoReflect.Descriptor instead.
 func (*QuerySSARisksRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{636}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{640}
 }
 
 func (x *QuerySSARisksRequest) GetPagination() *Paging {
@@ -45975,7 +46159,7 @@ type QuerySSARisksResponse struct {
 
 func (x *QuerySSARisksResponse) Reset() {
 	*x = QuerySSARisksResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[637]
+	mi := &file_yakgrpc_proto_msgTypes[641]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45987,7 +46171,7 @@ func (x *QuerySSARisksResponse) String() string {
 func (*QuerySSARisksResponse) ProtoMessage() {}
 
 func (x *QuerySSARisksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[637]
+	mi := &file_yakgrpc_proto_msgTypes[641]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -46000,7 +46184,7 @@ func (x *QuerySSARisksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuerySSARisksResponse.ProtoReflect.Descriptor instead.
 func (*QuerySSARisksResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{637}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{641}
 }
 
 func (x *QuerySSARisksResponse) GetPagination() *Paging {
@@ -46033,7 +46217,7 @@ type QueryNewSSARisksRequest struct {
 
 func (x *QueryNewSSARisksRequest) Reset() {
 	*x = QueryNewSSARisksRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[638]
+	mi := &file_yakgrpc_proto_msgTypes[642]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46045,7 +46229,7 @@ func (x *QueryNewSSARisksRequest) String() string {
 func (*QueryNewSSARisksRequest) ProtoMessage() {}
 
 func (x *QueryNewSSARisksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[638]
+	mi := &file_yakgrpc_proto_msgTypes[642]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -46058,7 +46242,7 @@ func (x *QueryNewSSARisksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryNewSSARisksRequest.ProtoReflect.Descriptor instead.
 func (*QueryNewSSARisksRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{638}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{642}
 }
 
 func (x *QueryNewSSARisksRequest) GetAfterID() int64 {
@@ -46080,7 +46264,7 @@ type QueryNewSSARisksResponse struct {
 
 func (x *QueryNewSSARisksResponse) Reset() {
 	*x = QueryNewSSARisksResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[639]
+	mi := &file_yakgrpc_proto_msgTypes[643]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46092,7 +46276,7 @@ func (x *QueryNewSSARisksResponse) String() string {
 func (*QueryNewSSARisksResponse) ProtoMessage() {}
 
 func (x *QueryNewSSARisksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[639]
+	mi := &file_yakgrpc_proto_msgTypes[643]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -46105,7 +46289,7 @@ func (x *QueryNewSSARisksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryNewSSARisksResponse.ProtoReflect.Descriptor instead.
 func (*QueryNewSSARisksResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{639}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{643}
 }
 
 func (x *QueryNewSSARisksResponse) GetData() []*SSARisk {
@@ -46145,7 +46329,7 @@ type DeleteSSARisksRequest struct {
 
 func (x *DeleteSSARisksRequest) Reset() {
 	*x = DeleteSSARisksRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[640]
+	mi := &file_yakgrpc_proto_msgTypes[644]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46157,7 +46341,7 @@ func (x *DeleteSSARisksRequest) String() string {
 func (*DeleteSSARisksRequest) ProtoMessage() {}
 
 func (x *DeleteSSARisksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[640]
+	mi := &file_yakgrpc_proto_msgTypes[644]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -46170,7 +46354,7 @@ func (x *DeleteSSARisksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteSSARisksRequest.ProtoReflect.Descriptor instead.
 func (*DeleteSSARisksRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{640}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{644}
 }
 
 func (x *DeleteSSARisksRequest) GetFilter() *SSARisksFilter {
@@ -46190,7 +46374,7 @@ type UpdateSSARiskTagsRequest struct {
 
 func (x *UpdateSSARiskTagsRequest) Reset() {
 	*x = UpdateSSARiskTagsRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[641]
+	mi := &file_yakgrpc_proto_msgTypes[645]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46202,7 +46386,7 @@ func (x *UpdateSSARiskTagsRequest) String() string {
 func (*UpdateSSARiskTagsRequest) ProtoMessage() {}
 
 func (x *UpdateSSARiskTagsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[641]
+	mi := &file_yakgrpc_proto_msgTypes[645]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -46215,7 +46399,7 @@ func (x *UpdateSSARiskTagsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateSSARiskTagsRequest.ProtoReflect.Descriptor instead.
 func (*UpdateSSARiskTagsRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{641}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{645}
 }
 
 func (x *UpdateSSARiskTagsRequest) GetID() int64 {
@@ -46243,7 +46427,7 @@ type SSARiskFieldGroupResponse struct {
 
 func (x *SSARiskFieldGroupResponse) Reset() {
 	*x = SSARiskFieldGroupResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[642]
+	mi := &file_yakgrpc_proto_msgTypes[646]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46255,7 +46439,7 @@ func (x *SSARiskFieldGroupResponse) String() string {
 func (*SSARiskFieldGroupResponse) ProtoMessage() {}
 
 func (x *SSARiskFieldGroupResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[642]
+	mi := &file_yakgrpc_proto_msgTypes[646]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -46268,7 +46452,7 @@ func (x *SSARiskFieldGroupResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SSARiskFieldGroupResponse.ProtoReflect.Descriptor instead.
 func (*SSARiskFieldGroupResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{642}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{646}
 }
 
 func (x *SSARiskFieldGroupResponse) GetFileField() []*FieldGroup {
@@ -46301,7 +46485,7 @@ type NewSSARiskReadRequest struct {
 
 func (x *NewSSARiskReadRequest) Reset() {
 	*x = NewSSARiskReadRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[643]
+	mi := &file_yakgrpc_proto_msgTypes[647]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46313,7 +46497,7 @@ func (x *NewSSARiskReadRequest) String() string {
 func (*NewSSARiskReadRequest) ProtoMessage() {}
 
 func (x *NewSSARiskReadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[643]
+	mi := &file_yakgrpc_proto_msgTypes[647]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -46326,7 +46510,7 @@ func (x *NewSSARiskReadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NewSSARiskReadRequest.ProtoReflect.Descriptor instead.
 func (*NewSSARiskReadRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{643}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{647}
 }
 
 func (x *NewSSARiskReadRequest) GetFilter() *SSARisksFilter {
@@ -46344,7 +46528,7 @@ type NewSSARiskReadResponse struct {
 
 func (x *NewSSARiskReadResponse) Reset() {
 	*x = NewSSARiskReadResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[644]
+	mi := &file_yakgrpc_proto_msgTypes[648]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46356,7 +46540,7 @@ func (x *NewSSARiskReadResponse) String() string {
 func (*NewSSARiskReadResponse) ProtoMessage() {}
 
 func (x *NewSSARiskReadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[644]
+	mi := &file_yakgrpc_proto_msgTypes[648]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -46369,7 +46553,7 @@ func (x *NewSSARiskReadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NewSSARiskReadResponse.ProtoReflect.Descriptor instead.
 func (*NewSSARiskReadResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{644}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{648}
 }
 
 type SSARiskFeedbackToOnlineRequest struct {
@@ -46382,7 +46566,7 @@ type SSARiskFeedbackToOnlineRequest struct {
 
 func (x *SSARiskFeedbackToOnlineRequest) Reset() {
 	*x = SSARiskFeedbackToOnlineRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[645]
+	mi := &file_yakgrpc_proto_msgTypes[649]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46394,7 +46578,7 @@ func (x *SSARiskFeedbackToOnlineRequest) String() string {
 func (*SSARiskFeedbackToOnlineRequest) ProtoMessage() {}
 
 func (x *SSARiskFeedbackToOnlineRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[645]
+	mi := &file_yakgrpc_proto_msgTypes[649]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -46407,7 +46591,7 @@ func (x *SSARiskFeedbackToOnlineRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SSARiskFeedbackToOnlineRequest.ProtoReflect.Descriptor instead.
 func (*SSARiskFeedbackToOnlineRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{645}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{649}
 }
 
 func (x *SSARiskFeedbackToOnlineRequest) GetToken() string {
@@ -46435,7 +46619,7 @@ type ExportSyntaxFlowsRequest struct {
 
 func (x *ExportSyntaxFlowsRequest) Reset() {
 	*x = ExportSyntaxFlowsRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[646]
+	mi := &file_yakgrpc_proto_msgTypes[650]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46447,7 +46631,7 @@ func (x *ExportSyntaxFlowsRequest) String() string {
 func (*ExportSyntaxFlowsRequest) ProtoMessage() {}
 
 func (x *ExportSyntaxFlowsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[646]
+	mi := &file_yakgrpc_proto_msgTypes[650]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -46460,7 +46644,7 @@ func (x *ExportSyntaxFlowsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportSyntaxFlowsRequest.ProtoReflect.Descriptor instead.
 func (*ExportSyntaxFlowsRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{646}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{650}
 }
 
 func (x *ExportSyntaxFlowsRequest) GetFilter() *SyntaxFlowRuleFilter {
@@ -46494,7 +46678,7 @@ type ImportSyntaxFlowsRequest struct {
 
 func (x *ImportSyntaxFlowsRequest) Reset() {
 	*x = ImportSyntaxFlowsRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[647]
+	mi := &file_yakgrpc_proto_msgTypes[651]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46506,7 +46690,7 @@ func (x *ImportSyntaxFlowsRequest) String() string {
 func (*ImportSyntaxFlowsRequest) ProtoMessage() {}
 
 func (x *ImportSyntaxFlowsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[647]
+	mi := &file_yakgrpc_proto_msgTypes[651]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -46519,7 +46703,7 @@ func (x *ImportSyntaxFlowsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImportSyntaxFlowsRequest.ProtoReflect.Descriptor instead.
 func (*ImportSyntaxFlowsRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{647}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{651}
 }
 
 func (x *ImportSyntaxFlowsRequest) GetInputPath() string {
@@ -46548,7 +46732,7 @@ type SyntaxflowsProgress struct {
 
 func (x *SyntaxflowsProgress) Reset() {
 	*x = SyntaxflowsProgress{}
-	mi := &file_yakgrpc_proto_msgTypes[648]
+	mi := &file_yakgrpc_proto_msgTypes[652]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46560,7 +46744,7 @@ func (x *SyntaxflowsProgress) String() string {
 func (*SyntaxflowsProgress) ProtoMessage() {}
 
 func (x *SyntaxflowsProgress) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[648]
+	mi := &file_yakgrpc_proto_msgTypes[652]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -46573,7 +46757,7 @@ func (x *SyntaxflowsProgress) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyntaxflowsProgress.ProtoReflect.Descriptor instead.
 func (*SyntaxflowsProgress) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{648}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{652}
 }
 
 func (x *SyntaxflowsProgress) GetProgress() float64 {
@@ -46602,7 +46786,7 @@ type HotPatchTemplate struct {
 
 func (x *HotPatchTemplate) Reset() {
 	*x = HotPatchTemplate{}
-	mi := &file_yakgrpc_proto_msgTypes[649]
+	mi := &file_yakgrpc_proto_msgTypes[653]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46614,7 +46798,7 @@ func (x *HotPatchTemplate) String() string {
 func (*HotPatchTemplate) ProtoMessage() {}
 
 func (x *HotPatchTemplate) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[649]
+	mi := &file_yakgrpc_proto_msgTypes[653]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -46627,7 +46811,7 @@ func (x *HotPatchTemplate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HotPatchTemplate.ProtoReflect.Descriptor instead.
 func (*HotPatchTemplate) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{649}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{653}
 }
 
 func (x *HotPatchTemplate) GetName() string {
@@ -46663,7 +46847,7 @@ type HotPatchTemplateRequest struct {
 
 func (x *HotPatchTemplateRequest) Reset() {
 	*x = HotPatchTemplateRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[650]
+	mi := &file_yakgrpc_proto_msgTypes[654]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46675,7 +46859,7 @@ func (x *HotPatchTemplateRequest) String() string {
 func (*HotPatchTemplateRequest) ProtoMessage() {}
 
 func (x *HotPatchTemplateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[650]
+	mi := &file_yakgrpc_proto_msgTypes[654]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -46688,7 +46872,7 @@ func (x *HotPatchTemplateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HotPatchTemplateRequest.ProtoReflect.Descriptor instead.
 func (*HotPatchTemplateRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{650}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{654}
 }
 
 func (x *HotPatchTemplateRequest) GetId() []int64 {
@@ -46729,7 +46913,7 @@ type UpdateHotPatchTemplateRequest struct {
 
 func (x *UpdateHotPatchTemplateRequest) Reset() {
 	*x = UpdateHotPatchTemplateRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[651]
+	mi := &file_yakgrpc_proto_msgTypes[655]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46741,7 +46925,7 @@ func (x *UpdateHotPatchTemplateRequest) String() string {
 func (*UpdateHotPatchTemplateRequest) ProtoMessage() {}
 
 func (x *UpdateHotPatchTemplateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[651]
+	mi := &file_yakgrpc_proto_msgTypes[655]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -46754,7 +46938,7 @@ func (x *UpdateHotPatchTemplateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateHotPatchTemplateRequest.ProtoReflect.Descriptor instead.
 func (*UpdateHotPatchTemplateRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{651}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{655}
 }
 
 func (x *UpdateHotPatchTemplateRequest) GetCondition() *HotPatchTemplateRequest {
@@ -46781,7 +46965,7 @@ type DeleteHotPatchTemplateRequest struct {
 
 func (x *DeleteHotPatchTemplateRequest) Reset() {
 	*x = DeleteHotPatchTemplateRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[652]
+	mi := &file_yakgrpc_proto_msgTypes[656]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46793,7 +46977,7 @@ func (x *DeleteHotPatchTemplateRequest) String() string {
 func (*DeleteHotPatchTemplateRequest) ProtoMessage() {}
 
 func (x *DeleteHotPatchTemplateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[652]
+	mi := &file_yakgrpc_proto_msgTypes[656]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -46806,7 +46990,7 @@ func (x *DeleteHotPatchTemplateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteHotPatchTemplateRequest.ProtoReflect.Descriptor instead.
 func (*DeleteHotPatchTemplateRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{652}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{656}
 }
 
 func (x *DeleteHotPatchTemplateRequest) GetCondition() *HotPatchTemplateRequest {
@@ -46832,7 +47016,7 @@ type CreateHotPatchTemplateResponse struct {
 
 func (x *CreateHotPatchTemplateResponse) Reset() {
 	*x = CreateHotPatchTemplateResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[653]
+	mi := &file_yakgrpc_proto_msgTypes[657]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46844,7 +47028,7 @@ func (x *CreateHotPatchTemplateResponse) String() string {
 func (*CreateHotPatchTemplateResponse) ProtoMessage() {}
 
 func (x *CreateHotPatchTemplateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[653]
+	mi := &file_yakgrpc_proto_msgTypes[657]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -46857,7 +47041,7 @@ func (x *CreateHotPatchTemplateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateHotPatchTemplateResponse.ProtoReflect.Descriptor instead.
 func (*CreateHotPatchTemplateResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{653}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{657}
 }
 
 func (x *CreateHotPatchTemplateResponse) GetMessage() *DbOperateMessage {
@@ -46876,7 +47060,7 @@ type DeleteHotPatchTemplateResponse struct {
 
 func (x *DeleteHotPatchTemplateResponse) Reset() {
 	*x = DeleteHotPatchTemplateResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[654]
+	mi := &file_yakgrpc_proto_msgTypes[658]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46888,7 +47072,7 @@ func (x *DeleteHotPatchTemplateResponse) String() string {
 func (*DeleteHotPatchTemplateResponse) ProtoMessage() {}
 
 func (x *DeleteHotPatchTemplateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[654]
+	mi := &file_yakgrpc_proto_msgTypes[658]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -46901,7 +47085,7 @@ func (x *DeleteHotPatchTemplateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteHotPatchTemplateResponse.ProtoReflect.Descriptor instead.
 func (*DeleteHotPatchTemplateResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{654}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{658}
 }
 
 func (x *DeleteHotPatchTemplateResponse) GetMessage() *DbOperateMessage {
@@ -46920,7 +47104,7 @@ type UpdateHotPatchTemplateResponse struct {
 
 func (x *UpdateHotPatchTemplateResponse) Reset() {
 	*x = UpdateHotPatchTemplateResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[655]
+	mi := &file_yakgrpc_proto_msgTypes[659]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46932,7 +47116,7 @@ func (x *UpdateHotPatchTemplateResponse) String() string {
 func (*UpdateHotPatchTemplateResponse) ProtoMessage() {}
 
 func (x *UpdateHotPatchTemplateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[655]
+	mi := &file_yakgrpc_proto_msgTypes[659]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -46945,7 +47129,7 @@ func (x *UpdateHotPatchTemplateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateHotPatchTemplateResponse.ProtoReflect.Descriptor instead.
 func (*UpdateHotPatchTemplateResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{655}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{659}
 }
 
 func (x *UpdateHotPatchTemplateResponse) GetMessage() *DbOperateMessage {
@@ -46965,7 +47149,7 @@ type QueryHotPatchTemplateResponse struct {
 
 func (x *QueryHotPatchTemplateResponse) Reset() {
 	*x = QueryHotPatchTemplateResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[656]
+	mi := &file_yakgrpc_proto_msgTypes[660]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46977,7 +47161,7 @@ func (x *QueryHotPatchTemplateResponse) String() string {
 func (*QueryHotPatchTemplateResponse) ProtoMessage() {}
 
 func (x *QueryHotPatchTemplateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[656]
+	mi := &file_yakgrpc_proto_msgTypes[660]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -46990,7 +47174,7 @@ func (x *QueryHotPatchTemplateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryHotPatchTemplateResponse.ProtoReflect.Descriptor instead.
 func (*QueryHotPatchTemplateResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{656}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{660}
 }
 
 func (x *QueryHotPatchTemplateResponse) GetMessage() *DbOperateMessage {
@@ -47016,7 +47200,7 @@ type QueryHotPatchTemplateListRequest struct {
 
 func (x *QueryHotPatchTemplateListRequest) Reset() {
 	*x = QueryHotPatchTemplateListRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[657]
+	mi := &file_yakgrpc_proto_msgTypes[661]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47028,7 +47212,7 @@ func (x *QueryHotPatchTemplateListRequest) String() string {
 func (*QueryHotPatchTemplateListRequest) ProtoMessage() {}
 
 func (x *QueryHotPatchTemplateListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[657]
+	mi := &file_yakgrpc_proto_msgTypes[661]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -47041,7 +47225,7 @@ func (x *QueryHotPatchTemplateListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryHotPatchTemplateListRequest.ProtoReflect.Descriptor instead.
 func (*QueryHotPatchTemplateListRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{657}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{661}
 }
 
 func (x *QueryHotPatchTemplateListRequest) GetType() string {
@@ -47062,7 +47246,7 @@ type QueryHotPatchTemplateListResponse struct {
 
 func (x *QueryHotPatchTemplateListResponse) Reset() {
 	*x = QueryHotPatchTemplateListResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[658]
+	mi := &file_yakgrpc_proto_msgTypes[662]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47074,7 +47258,7 @@ func (x *QueryHotPatchTemplateListResponse) String() string {
 func (*QueryHotPatchTemplateListResponse) ProtoMessage() {}
 
 func (x *QueryHotPatchTemplateListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[658]
+	mi := &file_yakgrpc_proto_msgTypes[662]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -47087,7 +47271,7 @@ func (x *QueryHotPatchTemplateListResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use QueryHotPatchTemplateListResponse.ProtoReflect.Descriptor instead.
 func (*QueryHotPatchTemplateListResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{658}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{662}
 }
 
 func (x *QueryHotPatchTemplateListResponse) GetPagination() *Paging {
@@ -47122,7 +47306,7 @@ type GroupTableColumnRequest struct {
 
 func (x *GroupTableColumnRequest) Reset() {
 	*x = GroupTableColumnRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[659]
+	mi := &file_yakgrpc_proto_msgTypes[663]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47134,7 +47318,7 @@ func (x *GroupTableColumnRequest) String() string {
 func (*GroupTableColumnRequest) ProtoMessage() {}
 
 func (x *GroupTableColumnRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[659]
+	mi := &file_yakgrpc_proto_msgTypes[663]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -47147,7 +47331,7 @@ func (x *GroupTableColumnRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GroupTableColumnRequest.ProtoReflect.Descriptor instead.
 func (*GroupTableColumnRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{659}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{663}
 }
 
 func (x *GroupTableColumnRequest) GetDatabaseName() string {
@@ -47180,7 +47364,7 @@ type GroupTableColumnResponse struct {
 
 func (x *GroupTableColumnResponse) Reset() {
 	*x = GroupTableColumnResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[660]
+	mi := &file_yakgrpc_proto_msgTypes[664]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47192,7 +47376,7 @@ func (x *GroupTableColumnResponse) String() string {
 func (*GroupTableColumnResponse) ProtoMessage() {}
 
 func (x *GroupTableColumnResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[660]
+	mi := &file_yakgrpc_proto_msgTypes[664]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -47205,7 +47389,7 @@ func (x *GroupTableColumnResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GroupTableColumnResponse.ProtoReflect.Descriptor instead.
 func (*GroupTableColumnResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{660}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{664}
 }
 
 func (x *GroupTableColumnResponse) GetData() []string {
@@ -47226,7 +47410,7 @@ type UploadHotPatchTemplateToOnlineRequest struct {
 
 func (x *UploadHotPatchTemplateToOnlineRequest) Reset() {
 	*x = UploadHotPatchTemplateToOnlineRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[661]
+	mi := &file_yakgrpc_proto_msgTypes[665]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47238,7 +47422,7 @@ func (x *UploadHotPatchTemplateToOnlineRequest) String() string {
 func (*UploadHotPatchTemplateToOnlineRequest) ProtoMessage() {}
 
 func (x *UploadHotPatchTemplateToOnlineRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[661]
+	mi := &file_yakgrpc_proto_msgTypes[665]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -47251,7 +47435,7 @@ func (x *UploadHotPatchTemplateToOnlineRequest) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use UploadHotPatchTemplateToOnlineRequest.ProtoReflect.Descriptor instead.
 func (*UploadHotPatchTemplateToOnlineRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{661}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{665}
 }
 
 func (x *UploadHotPatchTemplateToOnlineRequest) GetToken() string {
@@ -47285,7 +47469,7 @@ type DownloadHotPatchTemplateRequest struct {
 
 func (x *DownloadHotPatchTemplateRequest) Reset() {
 	*x = DownloadHotPatchTemplateRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[662]
+	mi := &file_yakgrpc_proto_msgTypes[666]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47297,7 +47481,7 @@ func (x *DownloadHotPatchTemplateRequest) String() string {
 func (*DownloadHotPatchTemplateRequest) ProtoMessage() {}
 
 func (x *DownloadHotPatchTemplateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[662]
+	mi := &file_yakgrpc_proto_msgTypes[666]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -47310,7 +47494,7 @@ func (x *DownloadHotPatchTemplateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DownloadHotPatchTemplateRequest.ProtoReflect.Descriptor instead.
 func (*DownloadHotPatchTemplateRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{662}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{666}
 }
 
 func (x *DownloadHotPatchTemplateRequest) GetName() string {
@@ -47339,7 +47523,7 @@ type ExportHTTPFlowStreamRequest struct {
 
 func (x *ExportHTTPFlowStreamRequest) Reset() {
 	*x = ExportHTTPFlowStreamRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[663]
+	mi := &file_yakgrpc_proto_msgTypes[667]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47351,7 +47535,7 @@ func (x *ExportHTTPFlowStreamRequest) String() string {
 func (*ExportHTTPFlowStreamRequest) ProtoMessage() {}
 
 func (x *ExportHTTPFlowStreamRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[663]
+	mi := &file_yakgrpc_proto_msgTypes[667]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -47364,7 +47548,7 @@ func (x *ExportHTTPFlowStreamRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportHTTPFlowStreamRequest.ProtoReflect.Descriptor instead.
 func (*ExportHTTPFlowStreamRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{663}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{667}
 }
 
 func (x *ExportHTTPFlowStreamRequest) GetFilter() *QueryHTTPFlowRequest {
@@ -47405,7 +47589,7 @@ type ExportHTTPFlowStreamResponse struct {
 
 func (x *ExportHTTPFlowStreamResponse) Reset() {
 	*x = ExportHTTPFlowStreamResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[664]
+	mi := &file_yakgrpc_proto_msgTypes[668]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47417,7 +47601,7 @@ func (x *ExportHTTPFlowStreamResponse) String() string {
 func (*ExportHTTPFlowStreamResponse) ProtoMessage() {}
 
 func (x *ExportHTTPFlowStreamResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[664]
+	mi := &file_yakgrpc_proto_msgTypes[668]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -47430,7 +47614,7 @@ func (x *ExportHTTPFlowStreamResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportHTTPFlowStreamResponse.ProtoReflect.Descriptor instead.
 func (*ExportHTTPFlowStreamResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{664}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{668}
 }
 
 func (x *ExportHTTPFlowStreamResponse) GetPercent() float64 {
@@ -47456,7 +47640,7 @@ type ImportHTTPFlowStreamRequest struct {
 
 func (x *ImportHTTPFlowStreamRequest) Reset() {
 	*x = ImportHTTPFlowStreamRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[665]
+	mi := &file_yakgrpc_proto_msgTypes[669]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47468,7 +47652,7 @@ func (x *ImportHTTPFlowStreamRequest) String() string {
 func (*ImportHTTPFlowStreamRequest) ProtoMessage() {}
 
 func (x *ImportHTTPFlowStreamRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[665]
+	mi := &file_yakgrpc_proto_msgTypes[669]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -47481,7 +47665,7 @@ func (x *ImportHTTPFlowStreamRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImportHTTPFlowStreamRequest.ProtoReflect.Descriptor instead.
 func (*ImportHTTPFlowStreamRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{665}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{669}
 }
 
 func (x *ImportHTTPFlowStreamRequest) GetInputPath() string {
@@ -47501,7 +47685,7 @@ type ImportHTTPFlowStreamResponse struct {
 
 func (x *ImportHTTPFlowStreamResponse) Reset() {
 	*x = ImportHTTPFlowStreamResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[666]
+	mi := &file_yakgrpc_proto_msgTypes[670]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47513,7 +47697,7 @@ func (x *ImportHTTPFlowStreamResponse) String() string {
 func (*ImportHTTPFlowStreamResponse) ProtoMessage() {}
 
 func (x *ImportHTTPFlowStreamResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[666]
+	mi := &file_yakgrpc_proto_msgTypes[670]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -47526,7 +47710,7 @@ func (x *ImportHTTPFlowStreamResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImportHTTPFlowStreamResponse.ProtoReflect.Descriptor instead.
 func (*ImportHTTPFlowStreamResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{666}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{670}
 }
 
 func (x *ImportHTTPFlowStreamResponse) GetPercent() float64 {
@@ -47556,7 +47740,7 @@ type Note struct {
 
 func (x *Note) Reset() {
 	*x = Note{}
-	mi := &file_yakgrpc_proto_msgTypes[667]
+	mi := &file_yakgrpc_proto_msgTypes[671]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47568,7 +47752,7 @@ func (x *Note) String() string {
 func (*Note) ProtoMessage() {}
 
 func (x *Note) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[667]
+	mi := &file_yakgrpc_proto_msgTypes[671]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -47581,7 +47765,7 @@ func (x *Note) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Note.ProtoReflect.Descriptor instead.
 func (*Note) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{667}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{671}
 }
 
 func (x *Note) GetId() uint64 {
@@ -47631,7 +47815,7 @@ type NoteContent struct {
 
 func (x *NoteContent) Reset() {
 	*x = NoteContent{}
-	mi := &file_yakgrpc_proto_msgTypes[668]
+	mi := &file_yakgrpc_proto_msgTypes[672]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47643,7 +47827,7 @@ func (x *NoteContent) String() string {
 func (*NoteContent) ProtoMessage() {}
 
 func (x *NoteContent) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[668]
+	mi := &file_yakgrpc_proto_msgTypes[672]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -47656,7 +47840,7 @@ func (x *NoteContent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NoteContent.ProtoReflect.Descriptor instead.
 func (*NoteContent) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{668}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{672}
 }
 
 func (x *NoteContent) GetNote() *Note {
@@ -47698,7 +47882,7 @@ type NoteFilter struct {
 
 func (x *NoteFilter) Reset() {
 	*x = NoteFilter{}
-	mi := &file_yakgrpc_proto_msgTypes[669]
+	mi := &file_yakgrpc_proto_msgTypes[673]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47710,7 +47894,7 @@ func (x *NoteFilter) String() string {
 func (*NoteFilter) ProtoMessage() {}
 
 func (x *NoteFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[669]
+	mi := &file_yakgrpc_proto_msgTypes[673]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -47723,7 +47907,7 @@ func (x *NoteFilter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NoteFilter.ProtoReflect.Descriptor instead.
 func (*NoteFilter) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{669}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{673}
 }
 
 func (x *NoteFilter) GetId() []uint64 {
@@ -47757,7 +47941,7 @@ type CreateNoteRequest struct {
 
 func (x *CreateNoteRequest) Reset() {
 	*x = CreateNoteRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[670]
+	mi := &file_yakgrpc_proto_msgTypes[674]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47769,7 +47953,7 @@ func (x *CreateNoteRequest) String() string {
 func (*CreateNoteRequest) ProtoMessage() {}
 
 func (x *CreateNoteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[670]
+	mi := &file_yakgrpc_proto_msgTypes[674]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -47782,7 +47966,7 @@ func (x *CreateNoteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateNoteRequest.ProtoReflect.Descriptor instead.
 func (*CreateNoteRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{670}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{674}
 }
 
 func (x *CreateNoteRequest) GetTitle() string {
@@ -47809,7 +47993,7 @@ type CreateNoteResponse struct {
 
 func (x *CreateNoteResponse) Reset() {
 	*x = CreateNoteResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[671]
+	mi := &file_yakgrpc_proto_msgTypes[675]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47821,7 +48005,7 @@ func (x *CreateNoteResponse) String() string {
 func (*CreateNoteResponse) ProtoMessage() {}
 
 func (x *CreateNoteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[671]
+	mi := &file_yakgrpc_proto_msgTypes[675]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -47834,7 +48018,7 @@ func (x *CreateNoteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateNoteResponse.ProtoReflect.Descriptor instead.
 func (*CreateNoteResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{671}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{675}
 }
 
 func (x *CreateNoteResponse) GetMessage() *DbOperateMessage {
@@ -47864,7 +48048,7 @@ type UpdateNoteRequest struct {
 
 func (x *UpdateNoteRequest) Reset() {
 	*x = UpdateNoteRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[672]
+	mi := &file_yakgrpc_proto_msgTypes[676]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47876,7 +48060,7 @@ func (x *UpdateNoteRequest) String() string {
 func (*UpdateNoteRequest) ProtoMessage() {}
 
 func (x *UpdateNoteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[672]
+	mi := &file_yakgrpc_proto_msgTypes[676]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -47889,7 +48073,7 @@ func (x *UpdateNoteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateNoteRequest.ProtoReflect.Descriptor instead.
 func (*UpdateNoteRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{672}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{676}
 }
 
 func (x *UpdateNoteRequest) GetFilter() *NoteFilter {
@@ -47936,7 +48120,7 @@ type DeleteNoteRequest struct {
 
 func (x *DeleteNoteRequest) Reset() {
 	*x = DeleteNoteRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[673]
+	mi := &file_yakgrpc_proto_msgTypes[677]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47948,7 +48132,7 @@ func (x *DeleteNoteRequest) String() string {
 func (*DeleteNoteRequest) ProtoMessage() {}
 
 func (x *DeleteNoteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[673]
+	mi := &file_yakgrpc_proto_msgTypes[677]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -47961,7 +48145,7 @@ func (x *DeleteNoteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteNoteRequest.ProtoReflect.Descriptor instead.
 func (*DeleteNoteRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{673}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{677}
 }
 
 func (x *DeleteNoteRequest) GetFilter() *NoteFilter {
@@ -47981,7 +48165,7 @@ type QueryNoteRequest struct {
 
 func (x *QueryNoteRequest) Reset() {
 	*x = QueryNoteRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[674]
+	mi := &file_yakgrpc_proto_msgTypes[678]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47993,7 +48177,7 @@ func (x *QueryNoteRequest) String() string {
 func (*QueryNoteRequest) ProtoMessage() {}
 
 func (x *QueryNoteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[674]
+	mi := &file_yakgrpc_proto_msgTypes[678]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -48006,7 +48190,7 @@ func (x *QueryNoteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryNoteRequest.ProtoReflect.Descriptor instead.
 func (*QueryNoteRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{674}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{678}
 }
 
 func (x *QueryNoteRequest) GetFilter() *NoteFilter {
@@ -48034,7 +48218,7 @@ type QueryNoteResponse struct {
 
 func (x *QueryNoteResponse) Reset() {
 	*x = QueryNoteResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[675]
+	mi := &file_yakgrpc_proto_msgTypes[679]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -48046,7 +48230,7 @@ func (x *QueryNoteResponse) String() string {
 func (*QueryNoteResponse) ProtoMessage() {}
 
 func (x *QueryNoteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[675]
+	mi := &file_yakgrpc_proto_msgTypes[679]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -48059,7 +48243,7 @@ func (x *QueryNoteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryNoteResponse.ProtoReflect.Descriptor instead.
 func (*QueryNoteResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{675}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{679}
 }
 
 func (x *QueryNoteResponse) GetPagination() *Paging {
@@ -48093,7 +48277,7 @@ type SearchNoteContentRequest struct {
 
 func (x *SearchNoteContentRequest) Reset() {
 	*x = SearchNoteContentRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[676]
+	mi := &file_yakgrpc_proto_msgTypes[680]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -48105,7 +48289,7 @@ func (x *SearchNoteContentRequest) String() string {
 func (*SearchNoteContentRequest) ProtoMessage() {}
 
 func (x *SearchNoteContentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[676]
+	mi := &file_yakgrpc_proto_msgTypes[680]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -48118,7 +48302,7 @@ func (x *SearchNoteContentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchNoteContentRequest.ProtoReflect.Descriptor instead.
 func (*SearchNoteContentRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{676}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{680}
 }
 
 func (x *SearchNoteContentRequest) GetKeyword() string {
@@ -48146,7 +48330,7 @@ type SearchNoteContentResponse struct {
 
 func (x *SearchNoteContentResponse) Reset() {
 	*x = SearchNoteContentResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[677]
+	mi := &file_yakgrpc_proto_msgTypes[681]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -48158,7 +48342,7 @@ func (x *SearchNoteContentResponse) String() string {
 func (*SearchNoteContentResponse) ProtoMessage() {}
 
 func (x *SearchNoteContentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[677]
+	mi := &file_yakgrpc_proto_msgTypes[681]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -48171,7 +48355,7 @@ func (x *SearchNoteContentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchNoteContentResponse.ProtoReflect.Descriptor instead.
 func (*SearchNoteContentResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{677}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{681}
 }
 
 func (x *SearchNoteContentResponse) GetPagination() *Paging {
@@ -48204,7 +48388,7 @@ type ImportNoteRequest struct {
 
 func (x *ImportNoteRequest) Reset() {
 	*x = ImportNoteRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[678]
+	mi := &file_yakgrpc_proto_msgTypes[682]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -48216,7 +48400,7 @@ func (x *ImportNoteRequest) String() string {
 func (*ImportNoteRequest) ProtoMessage() {}
 
 func (x *ImportNoteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[678]
+	mi := &file_yakgrpc_proto_msgTypes[682]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -48229,7 +48413,7 @@ func (x *ImportNoteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImportNoteRequest.ProtoReflect.Descriptor instead.
 func (*ImportNoteRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{678}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{682}
 }
 
 func (x *ImportNoteRequest) GetTargetPath() string {
@@ -48250,7 +48434,7 @@ type ImportNoteResponse struct {
 
 func (x *ImportNoteResponse) Reset() {
 	*x = ImportNoteResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[679]
+	mi := &file_yakgrpc_proto_msgTypes[683]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -48262,7 +48446,7 @@ func (x *ImportNoteResponse) String() string {
 func (*ImportNoteResponse) ProtoMessage() {}
 
 func (x *ImportNoteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[679]
+	mi := &file_yakgrpc_proto_msgTypes[683]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -48275,7 +48459,7 @@ func (x *ImportNoteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImportNoteResponse.ProtoReflect.Descriptor instead.
 func (*ImportNoteResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{679}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{683}
 }
 
 func (x *ImportNoteResponse) GetPercent() float64 {
@@ -48309,7 +48493,7 @@ type ExportNoteRequest struct {
 
 func (x *ExportNoteRequest) Reset() {
 	*x = ExportNoteRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[680]
+	mi := &file_yakgrpc_proto_msgTypes[684]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -48321,7 +48505,7 @@ func (x *ExportNoteRequest) String() string {
 func (*ExportNoteRequest) ProtoMessage() {}
 
 func (x *ExportNoteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[680]
+	mi := &file_yakgrpc_proto_msgTypes[684]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -48334,7 +48518,7 @@ func (x *ExportNoteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportNoteRequest.ProtoReflect.Descriptor instead.
 func (*ExportNoteRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{680}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{684}
 }
 
 func (x *ExportNoteRequest) GetFilter() *NoteFilter {
@@ -48361,7 +48545,7 @@ type ExportNoteResponse struct {
 
 func (x *ExportNoteResponse) Reset() {
 	*x = ExportNoteResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[681]
+	mi := &file_yakgrpc_proto_msgTypes[685]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -48373,7 +48557,7 @@ func (x *ExportNoteResponse) String() string {
 func (*ExportNoteResponse) ProtoMessage() {}
 
 func (x *ExportNoteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[681]
+	mi := &file_yakgrpc_proto_msgTypes[685]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -48386,7 +48570,7 @@ func (x *ExportNoteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportNoteResponse.ProtoReflect.Descriptor instead.
 func (*ExportNoteResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{681}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{685}
 }
 
 func (x *ExportNoteResponse) GetPercent() float64 {
@@ -48412,7 +48596,7 @@ type ListAiModelRequest struct {
 
 func (x *ListAiModelRequest) Reset() {
 	*x = ListAiModelRequest{}
-	mi := &file_yakgrpc_proto_msgTypes[682]
+	mi := &file_yakgrpc_proto_msgTypes[686]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -48424,7 +48608,7 @@ func (x *ListAiModelRequest) String() string {
 func (*ListAiModelRequest) ProtoMessage() {}
 
 func (x *ListAiModelRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[682]
+	mi := &file_yakgrpc_proto_msgTypes[686]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -48437,7 +48621,7 @@ func (x *ListAiModelRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAiModelRequest.ProtoReflect.Descriptor instead.
 func (*ListAiModelRequest) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{682}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{686}
 }
 
 func (x *ListAiModelRequest) GetConfig() string {
@@ -48456,7 +48640,7 @@ type ListAiModelResponse struct {
 
 func (x *ListAiModelResponse) Reset() {
 	*x = ListAiModelResponse{}
-	mi := &file_yakgrpc_proto_msgTypes[683]
+	mi := &file_yakgrpc_proto_msgTypes[687]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -48468,7 +48652,7 @@ func (x *ListAiModelResponse) String() string {
 func (*ListAiModelResponse) ProtoMessage() {}
 
 func (x *ListAiModelResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_yakgrpc_proto_msgTypes[683]
+	mi := &file_yakgrpc_proto_msgTypes[687]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -48481,7 +48665,7 @@ func (x *ListAiModelResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAiModelResponse.ProtoReflect.Descriptor instead.
 func (*ListAiModelResponse) Descriptor() ([]byte, []int) {
-	return file_yakgrpc_proto_rawDescGZIP(), []int{683}
+	return file_yakgrpc_proto_rawDescGZIP(), []int{687}
 }
 
 func (x *ListAiModelResponse) GetModelName() []string {
@@ -52186,7 +52370,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"GroupNames\x18\x05 \x03(\tR\n" +
 	"GroupNames\x12 \n" +
-	"\vDescription\x18\x06 \x01(\tR\vDescription\"\x92\x03\n" +
+	"\vDescription\x18\x06 \x01(\tR\vDescription\"\xc0\x03\n" +
 	"\x14SyntaxFlowRuleFilter\x12\x1c\n" +
 	"\tRuleNames\x18\x01 \x03(\tR\tRuleNames\x12\x1a\n" +
 	"\bLanguage\x18\x02 \x03(\tR\bLanguage\x12\x1e\n" +
@@ -52203,7 +52387,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	" \x01(\x03R\aUntilId\x12\x18\n" +
 	"\aAfterId\x18\v \x01(\x03R\aAfterId\x12\x1a\n" +
 	"\bBeforeId\x18\f \x01(\x03R\bBeforeId\x12&\n" +
-	"\x0eFilterRuleKind\x18\r \x01(\tR\x0eFilterRuleKind\"\xa8\x03\n" +
+	"\x0eFilterRuleKind\x18\r \x01(\tR\x0eFilterRuleKind\x12,\n" +
+	"\x11FilterLibRuleKind\x18\x0e \x01(\tR\x11FilterLibRuleKind\"\xa8\x03\n" +
 	"\n" +
 	"SSAProgram\x12\x1a\n" +
 	"\bCreateAt\x18\x01 \x01(\x03R\bCreateAt\x12\x1a\n" +
@@ -52269,7 +52454,17 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x04Rule\x18\x03 \x03(\v2\x13.ypb.SyntaxFlowRuleR\x04Rule\x12\x14\n" +
 	"\x05Total\x18\x04 \x01(\x04R\x05Total\"P\n" +
 	"\x1bDeleteSyntaxFlowRuleRequest\x121\n" +
-	"\x06Filter\x18\x01 \x01(\v2\x19.ypb.SyntaxFlowRuleFilterR\x06Filter\"\x7f\n" +
+	"\x06Filter\x18\x01 \x01(\v2\x19.ypb.SyntaxFlowRuleFilterR\x06Filter\"\"\n" +
+	" CheckSyntaxFlowRuleUpdateRequest\"Y\n" +
+	"!CheckSyntaxFlowRuleUpdateResponse\x12\x1e\n" +
+	"\n" +
+	"NeedUpdate\x18\x01 \x01(\bR\n" +
+	"NeedUpdate\x12\x14\n" +
+	"\x05State\x18\x02 \x01(\tR\x05State\"\"\n" +
+	" ApplySyntaxFlowRuleUpdateRequest\"W\n" +
+	"!ApplySyntaxFlowRuleUpdateResponse\x12\x18\n" +
+	"\aPercent\x18\x01 \x01(\x01R\aPercent\x12\x18\n" +
+	"\aMessage\x18\x02 \x01(\tR\aMessage\"\x7f\n" +
 	"\x19SyntaxFlowRuleGroupFilter\x12\x1e\n" +
 	"\n" +
 	"GroupNames\x18\x02 \x03(\tR\n" +
@@ -52695,7 +52890,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tAesBase64\x10\x03\x12\n" +
 	"\n" +
 	"\x06XorRaw\x10\x04\x12\r\n" +
-	"\tXorBase64\x10\x052\xf3\x88\x02\n" +
+	"\tXorBase64\x10\x052͊\x02\n" +
 	"\x03Yak\x12+\n" +
 	"\aVersion\x12\n" +
 	".ypb.Empty\x1a\x14.ypb.VersionResponse\x12H\n" +
@@ -53279,7 +53474,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x16CreateSyntaxFlowRuleEx\x12 .ypb.CreateSyntaxFlowRuleRequest\x1a!.ypb.CreateSyntaxFlowRuleResponse\x12O\n" +
 	"\x14UpdateSyntaxFlowRule\x12 .ypb.UpdateSyntaxFlowRuleRequest\x1a\x15.ypb.DbOperateMessage\x12]\n" +
 	"\x16UpdateSyntaxFlowRuleEx\x12 .ypb.UpdateSyntaxFlowRuleRequest\x1a!.ypb.UpdateSyntaxFlowRuleResponse\x12O\n" +
-	"\x14DeleteSyntaxFlowRule\x12 .ypb.DeleteSyntaxFlowRuleRequest\x1a\x15.ypb.DbOperateMessage\x12g\n" +
+	"\x14DeleteSyntaxFlowRule\x12 .ypb.DeleteSyntaxFlowRuleRequest\x1a\x15.ypb.DbOperateMessage\x12j\n" +
+	"\x19CheckSyntaxFlowRuleUpdate\x12%.ypb.CheckSyntaxFlowRuleUpdateRequest\x1a&.ypb.CheckSyntaxFlowRuleUpdateResponse\x12l\n" +
+	"\x19ApplySyntaxFlowRuleUpdate\x12%.ypb.ApplySyntaxFlowRuleUpdateRequest\x1a&.ypb.ApplySyntaxFlowRuleUpdateResponse0\x01\x12g\n" +
 	"\x18QuerySyntaxFlowRuleGroup\x12$.ypb.QuerySyntaxFlowRuleGroupRequest\x1a%.ypb.QuerySyntaxFlowRuleGroupResponse\x12Y\n" +
 	"\x19DeleteSyntaxFlowRuleGroup\x12%.ypb.DeleteSyntaxFlowRuleGroupRequest\x1a\x15.ypb.DbOperateMessage\x12U\n" +
 	"\x19CreateSyntaxFlowRuleGroup\x12!.ypb.CreateSyntaxFlowGroupRequest\x1a\x15.ypb.DbOperateMessage\x12Y\n" +
@@ -53360,7 +53557,7 @@ func file_yakgrpc_proto_rawDescGZIP() []byte {
 }
 
 var file_yakgrpc_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_yakgrpc_proto_msgTypes = make([]protoimpl.MessageInfo, 690)
+var file_yakgrpc_proto_msgTypes = make([]protoimpl.MessageInfo, 694)
 var file_yakgrpc_proto_goTypes = []any{
 	(ShellType)(0),   // 0: ypb.ShellType
 	(ShellScript)(0), // 1: ypb.ShellScript
@@ -53967,95 +54164,99 @@ var file_yakgrpc_proto_goTypes = []any{
 	(*UpdateSyntaxFlowRuleResponse)(nil),                      // 602: ypb.UpdateSyntaxFlowRuleResponse
 	(*QuerySyntaxFlowRuleResponse)(nil),                       // 603: ypb.QuerySyntaxFlowRuleResponse
 	(*DeleteSyntaxFlowRuleRequest)(nil),                       // 604: ypb.DeleteSyntaxFlowRuleRequest
-	(*SyntaxFlowRuleGroupFilter)(nil),                         // 605: ypb.SyntaxFlowRuleGroupFilter
-	(*SyntaxFlowGroup)(nil),                                   // 606: ypb.SyntaxFlowGroup
-	(*QuerySyntaxFlowRuleGroupRequest)(nil),                   // 607: ypb.QuerySyntaxFlowRuleGroupRequest
-	(*QuerySyntaxFlowRuleGroupResponse)(nil),                  // 608: ypb.QuerySyntaxFlowRuleGroupResponse
-	(*CreateSyntaxFlowGroupRequest)(nil),                      // 609: ypb.CreateSyntaxFlowGroupRequest
-	(*UpdateSyntaxFlowRuleGroupRequest)(nil),                  // 610: ypb.UpdateSyntaxFlowRuleGroupRequest
-	(*UpdateSyntaxFlowRuleAndGroupRequest)(nil),               // 611: ypb.UpdateSyntaxFlowRuleAndGroupRequest
-	(*QuerySyntaxFlowSameGroupRequest)(nil),                   // 612: ypb.QuerySyntaxFlowSameGroupRequest
-	(*QuerySyntaxFlowSameGroupResponse)(nil),                  // 613: ypb.QuerySyntaxFlowSameGroupResponse
-	(*DeleteSyntaxFlowRuleGroupRequest)(nil),                  // 614: ypb.DeleteSyntaxFlowRuleGroupRequest
-	(*SyntaxFlowScanRequest)(nil),                             // 615: ypb.SyntaxFlowScanRequest
-	(*QuerySyntaxFlowScanTaskRequest)(nil),                    // 616: ypb.QuerySyntaxFlowScanTaskRequest
-	(*SyntaxFlowScanTaskFilter)(nil),                          // 617: ypb.SyntaxFlowScanTaskFilter
-	(*QuerySyntaxFlowScanTaskResponse)(nil),                   // 618: ypb.QuerySyntaxFlowScanTaskResponse
-	(*SyntaxFlowScanTask)(nil),                                // 619: ypb.SyntaxFlowScanTask
-	(*DeleteSyntaxFlowScanTaskRequest)(nil),                   // 620: ypb.DeleteSyntaxFlowScanTaskRequest
-	(*SyntaxFlowScanResponse)(nil),                            // 621: ypb.SyntaxFlowScanResponse
-	(*SyntaxFlowResultFilter)(nil),                            // 622: ypb.SyntaxFlowResultFilter
-	(*QuerySyntaxFlowResultRequest)(nil),                      // 623: ypb.QuerySyntaxFlowResultRequest
-	(*QuerySyntaxFlowResultResponse)(nil),                     // 624: ypb.QuerySyntaxFlowResultResponse
-	(*SyntaxFlowResult)(nil),                                  // 625: ypb.SyntaxFlowResult
-	(*DeleteSyntaxFlowResultRequest)(nil),                     // 626: ypb.DeleteSyntaxFlowResultRequest
-	(*DeleteSyntaxFlowResultResponse)(nil),                    // 627: ypb.DeleteSyntaxFlowResultResponse
-	(*QueryPluginEnvRequest)(nil),                             // 628: ypb.QueryPluginEnvRequest
-	(*PluginEnvData)(nil),                                     // 629: ypb.PluginEnvData
-	(*DeletePluginEnvRequest)(nil),                            // 630: ypb.DeletePluginEnvRequest
-	(*GetAllFuzztagInfoRequest)(nil),                          // 631: ypb.GetAllFuzztagInfoRequest
-	(*GetAllFuzztagInfoResponse)(nil),                         // 632: ypb.GetAllFuzztagInfoResponse
-	(*FuzztagArgumentType)(nil),                               // 633: ypb.FuzztagArgumentType
-	(*FuzztagInfo)(nil),                                       // 634: ypb.FuzztagInfo
-	(*GenerateFuzztagRequest)(nil),                            // 635: ypb.GenerateFuzztagRequest
-	(*GenerateFuzztagResponse)(nil),                           // 636: ypb.GenerateFuzztagResponse
-	(*FuzzTagSuggestionRequest)(nil),                          // 637: ypb.FuzzTagSuggestionRequest
-	(*SSARisk)(nil),                                           // 638: ypb.SSARisk
-	(*SSARisksFilter)(nil),                                    // 639: ypb.SSARisksFilter
-	(*QuerySSARisksRequest)(nil),                              // 640: ypb.QuerySSARisksRequest
-	(*QuerySSARisksResponse)(nil),                             // 641: ypb.QuerySSARisksResponse
-	(*QueryNewSSARisksRequest)(nil),                           // 642: ypb.QueryNewSSARisksRequest
-	(*QueryNewSSARisksResponse)(nil),                          // 643: ypb.QueryNewSSARisksResponse
-	(*DeleteSSARisksRequest)(nil),                             // 644: ypb.DeleteSSARisksRequest
-	(*UpdateSSARiskTagsRequest)(nil),                          // 645: ypb.UpdateSSARiskTagsRequest
-	(*SSARiskFieldGroupResponse)(nil),                         // 646: ypb.SSARiskFieldGroupResponse
-	(*NewSSARiskReadRequest)(nil),                             // 647: ypb.NewSSARiskReadRequest
-	(*NewSSARiskReadResponse)(nil),                            // 648: ypb.NewSSARiskReadResponse
-	(*SSARiskFeedbackToOnlineRequest)(nil),                    // 649: ypb.SSARiskFeedbackToOnlineRequest
-	(*ExportSyntaxFlowsRequest)(nil),                          // 650: ypb.ExportSyntaxFlowsRequest
-	(*ImportSyntaxFlowsRequest)(nil),                          // 651: ypb.ImportSyntaxFlowsRequest
-	(*SyntaxflowsProgress)(nil),                               // 652: ypb.SyntaxflowsProgress
-	(*HotPatchTemplate)(nil),                                  // 653: ypb.HotPatchTemplate
-	(*HotPatchTemplateRequest)(nil),                           // 654: ypb.HotPatchTemplateRequest
-	(*UpdateHotPatchTemplateRequest)(nil),                     // 655: ypb.UpdateHotPatchTemplateRequest
-	(*DeleteHotPatchTemplateRequest)(nil),                     // 656: ypb.DeleteHotPatchTemplateRequest
-	(*CreateHotPatchTemplateResponse)(nil),                    // 657: ypb.CreateHotPatchTemplateResponse
-	(*DeleteHotPatchTemplateResponse)(nil),                    // 658: ypb.DeleteHotPatchTemplateResponse
-	(*UpdateHotPatchTemplateResponse)(nil),                    // 659: ypb.UpdateHotPatchTemplateResponse
-	(*QueryHotPatchTemplateResponse)(nil),                     // 660: ypb.QueryHotPatchTemplateResponse
-	(*QueryHotPatchTemplateListRequest)(nil),                  // 661: ypb.QueryHotPatchTemplateListRequest
-	(*QueryHotPatchTemplateListResponse)(nil),                 // 662: ypb.QueryHotPatchTemplateListResponse
-	(*GroupTableColumnRequest)(nil),                           // 663: ypb.GroupTableColumnRequest
-	(*GroupTableColumnResponse)(nil),                          // 664: ypb.GroupTableColumnResponse
-	(*UploadHotPatchTemplateToOnlineRequest)(nil),             // 665: ypb.UploadHotPatchTemplateToOnlineRequest
-	(*DownloadHotPatchTemplateRequest)(nil),                   // 666: ypb.DownloadHotPatchTemplateRequest
-	(*ExportHTTPFlowStreamRequest)(nil),                       // 667: ypb.ExportHTTPFlowStreamRequest
-	(*ExportHTTPFlowStreamResponse)(nil),                      // 668: ypb.ExportHTTPFlowStreamResponse
-	(*ImportHTTPFlowStreamRequest)(nil),                       // 669: ypb.ImportHTTPFlowStreamRequest
-	(*ImportHTTPFlowStreamResponse)(nil),                      // 670: ypb.ImportHTTPFlowStreamResponse
-	(*Note)(nil),                                              // 671: ypb.Note
-	(*NoteContent)(nil),                                       // 672: ypb.NoteContent
-	(*NoteFilter)(nil),                                        // 673: ypb.NoteFilter
-	(*CreateNoteRequest)(nil),                                 // 674: ypb.CreateNoteRequest
-	(*CreateNoteResponse)(nil),                                // 675: ypb.CreateNoteResponse
-	(*UpdateNoteRequest)(nil),                                 // 676: ypb.UpdateNoteRequest
-	(*DeleteNoteRequest)(nil),                                 // 677: ypb.DeleteNoteRequest
-	(*QueryNoteRequest)(nil),                                  // 678: ypb.QueryNoteRequest
-	(*QueryNoteResponse)(nil),                                 // 679: ypb.QueryNoteResponse
-	(*SearchNoteContentRequest)(nil),                          // 680: ypb.SearchNoteContentRequest
-	(*SearchNoteContentResponse)(nil),                         // 681: ypb.SearchNoteContentResponse
-	(*ImportNoteRequest)(nil),                                 // 682: ypb.ImportNoteRequest
-	(*ImportNoteResponse)(nil),                                // 683: ypb.ImportNoteResponse
-	(*ExportNoteRequest)(nil),                                 // 684: ypb.ExportNoteRequest
-	(*ExportNoteResponse)(nil),                                // 685: ypb.ExportNoteResponse
-	(*ListAiModelRequest)(nil),                                // 686: ypb.ListAiModelRequest
-	(*ListAiModelResponse)(nil),                               // 687: ypb.ListAiModelResponse
-	nil,                                                       // 688: ypb.ExtractDataToFileRequest.DataEntry
-	nil,                                                       // 689: ypb.YsoClassGeneraterOptionsWithVerbose.BindOptionsEntry
-	nil,                                                       // 690: ypb.WebShell.HeadersEntry
-	nil,                                                       // 691: ypb.WebShell.PostsEntry
-	nil,                                                       // 692: ypb.UpdateWebShellRequest.HeadersEntry
-	nil,                                                       // 693: ypb.UpdateWebShellRequest.PostsEntry
+	(*CheckSyntaxFlowRuleUpdateRequest)(nil),                  // 605: ypb.CheckSyntaxFlowRuleUpdateRequest
+	(*CheckSyntaxFlowRuleUpdateResponse)(nil),                 // 606: ypb.CheckSyntaxFlowRuleUpdateResponse
+	(*ApplySyntaxFlowRuleUpdateRequest)(nil),                  // 607: ypb.ApplySyntaxFlowRuleUpdateRequest
+	(*ApplySyntaxFlowRuleUpdateResponse)(nil),                 // 608: ypb.ApplySyntaxFlowRuleUpdateResponse
+	(*SyntaxFlowRuleGroupFilter)(nil),                         // 609: ypb.SyntaxFlowRuleGroupFilter
+	(*SyntaxFlowGroup)(nil),                                   // 610: ypb.SyntaxFlowGroup
+	(*QuerySyntaxFlowRuleGroupRequest)(nil),                   // 611: ypb.QuerySyntaxFlowRuleGroupRequest
+	(*QuerySyntaxFlowRuleGroupResponse)(nil),                  // 612: ypb.QuerySyntaxFlowRuleGroupResponse
+	(*CreateSyntaxFlowGroupRequest)(nil),                      // 613: ypb.CreateSyntaxFlowGroupRequest
+	(*UpdateSyntaxFlowRuleGroupRequest)(nil),                  // 614: ypb.UpdateSyntaxFlowRuleGroupRequest
+	(*UpdateSyntaxFlowRuleAndGroupRequest)(nil),               // 615: ypb.UpdateSyntaxFlowRuleAndGroupRequest
+	(*QuerySyntaxFlowSameGroupRequest)(nil),                   // 616: ypb.QuerySyntaxFlowSameGroupRequest
+	(*QuerySyntaxFlowSameGroupResponse)(nil),                  // 617: ypb.QuerySyntaxFlowSameGroupResponse
+	(*DeleteSyntaxFlowRuleGroupRequest)(nil),                  // 618: ypb.DeleteSyntaxFlowRuleGroupRequest
+	(*SyntaxFlowScanRequest)(nil),                             // 619: ypb.SyntaxFlowScanRequest
+	(*QuerySyntaxFlowScanTaskRequest)(nil),                    // 620: ypb.QuerySyntaxFlowScanTaskRequest
+	(*SyntaxFlowScanTaskFilter)(nil),                          // 621: ypb.SyntaxFlowScanTaskFilter
+	(*QuerySyntaxFlowScanTaskResponse)(nil),                   // 622: ypb.QuerySyntaxFlowScanTaskResponse
+	(*SyntaxFlowScanTask)(nil),                                // 623: ypb.SyntaxFlowScanTask
+	(*DeleteSyntaxFlowScanTaskRequest)(nil),                   // 624: ypb.DeleteSyntaxFlowScanTaskRequest
+	(*SyntaxFlowScanResponse)(nil),                            // 625: ypb.SyntaxFlowScanResponse
+	(*SyntaxFlowResultFilter)(nil),                            // 626: ypb.SyntaxFlowResultFilter
+	(*QuerySyntaxFlowResultRequest)(nil),                      // 627: ypb.QuerySyntaxFlowResultRequest
+	(*QuerySyntaxFlowResultResponse)(nil),                     // 628: ypb.QuerySyntaxFlowResultResponse
+	(*SyntaxFlowResult)(nil),                                  // 629: ypb.SyntaxFlowResult
+	(*DeleteSyntaxFlowResultRequest)(nil),                     // 630: ypb.DeleteSyntaxFlowResultRequest
+	(*DeleteSyntaxFlowResultResponse)(nil),                    // 631: ypb.DeleteSyntaxFlowResultResponse
+	(*QueryPluginEnvRequest)(nil),                             // 632: ypb.QueryPluginEnvRequest
+	(*PluginEnvData)(nil),                                     // 633: ypb.PluginEnvData
+	(*DeletePluginEnvRequest)(nil),                            // 634: ypb.DeletePluginEnvRequest
+	(*GetAllFuzztagInfoRequest)(nil),                          // 635: ypb.GetAllFuzztagInfoRequest
+	(*GetAllFuzztagInfoResponse)(nil),                         // 636: ypb.GetAllFuzztagInfoResponse
+	(*FuzztagArgumentType)(nil),                               // 637: ypb.FuzztagArgumentType
+	(*FuzztagInfo)(nil),                                       // 638: ypb.FuzztagInfo
+	(*GenerateFuzztagRequest)(nil),                            // 639: ypb.GenerateFuzztagRequest
+	(*GenerateFuzztagResponse)(nil),                           // 640: ypb.GenerateFuzztagResponse
+	(*FuzzTagSuggestionRequest)(nil),                          // 641: ypb.FuzzTagSuggestionRequest
+	(*SSARisk)(nil),                                           // 642: ypb.SSARisk
+	(*SSARisksFilter)(nil),                                    // 643: ypb.SSARisksFilter
+	(*QuerySSARisksRequest)(nil),                              // 644: ypb.QuerySSARisksRequest
+	(*QuerySSARisksResponse)(nil),                             // 645: ypb.QuerySSARisksResponse
+	(*QueryNewSSARisksRequest)(nil),                           // 646: ypb.QueryNewSSARisksRequest
+	(*QueryNewSSARisksResponse)(nil),                          // 647: ypb.QueryNewSSARisksResponse
+	(*DeleteSSARisksRequest)(nil),                             // 648: ypb.DeleteSSARisksRequest
+	(*UpdateSSARiskTagsRequest)(nil),                          // 649: ypb.UpdateSSARiskTagsRequest
+	(*SSARiskFieldGroupResponse)(nil),                         // 650: ypb.SSARiskFieldGroupResponse
+	(*NewSSARiskReadRequest)(nil),                             // 651: ypb.NewSSARiskReadRequest
+	(*NewSSARiskReadResponse)(nil),                            // 652: ypb.NewSSARiskReadResponse
+	(*SSARiskFeedbackToOnlineRequest)(nil),                    // 653: ypb.SSARiskFeedbackToOnlineRequest
+	(*ExportSyntaxFlowsRequest)(nil),                          // 654: ypb.ExportSyntaxFlowsRequest
+	(*ImportSyntaxFlowsRequest)(nil),                          // 655: ypb.ImportSyntaxFlowsRequest
+	(*SyntaxflowsProgress)(nil),                               // 656: ypb.SyntaxflowsProgress
+	(*HotPatchTemplate)(nil),                                  // 657: ypb.HotPatchTemplate
+	(*HotPatchTemplateRequest)(nil),                           // 658: ypb.HotPatchTemplateRequest
+	(*UpdateHotPatchTemplateRequest)(nil),                     // 659: ypb.UpdateHotPatchTemplateRequest
+	(*DeleteHotPatchTemplateRequest)(nil),                     // 660: ypb.DeleteHotPatchTemplateRequest
+	(*CreateHotPatchTemplateResponse)(nil),                    // 661: ypb.CreateHotPatchTemplateResponse
+	(*DeleteHotPatchTemplateResponse)(nil),                    // 662: ypb.DeleteHotPatchTemplateResponse
+	(*UpdateHotPatchTemplateResponse)(nil),                    // 663: ypb.UpdateHotPatchTemplateResponse
+	(*QueryHotPatchTemplateResponse)(nil),                     // 664: ypb.QueryHotPatchTemplateResponse
+	(*QueryHotPatchTemplateListRequest)(nil),                  // 665: ypb.QueryHotPatchTemplateListRequest
+	(*QueryHotPatchTemplateListResponse)(nil),                 // 666: ypb.QueryHotPatchTemplateListResponse
+	(*GroupTableColumnRequest)(nil),                           // 667: ypb.GroupTableColumnRequest
+	(*GroupTableColumnResponse)(nil),                          // 668: ypb.GroupTableColumnResponse
+	(*UploadHotPatchTemplateToOnlineRequest)(nil),             // 669: ypb.UploadHotPatchTemplateToOnlineRequest
+	(*DownloadHotPatchTemplateRequest)(nil),                   // 670: ypb.DownloadHotPatchTemplateRequest
+	(*ExportHTTPFlowStreamRequest)(nil),                       // 671: ypb.ExportHTTPFlowStreamRequest
+	(*ExportHTTPFlowStreamResponse)(nil),                      // 672: ypb.ExportHTTPFlowStreamResponse
+	(*ImportHTTPFlowStreamRequest)(nil),                       // 673: ypb.ImportHTTPFlowStreamRequest
+	(*ImportHTTPFlowStreamResponse)(nil),                      // 674: ypb.ImportHTTPFlowStreamResponse
+	(*Note)(nil),                                              // 675: ypb.Note
+	(*NoteContent)(nil),                                       // 676: ypb.NoteContent
+	(*NoteFilter)(nil),                                        // 677: ypb.NoteFilter
+	(*CreateNoteRequest)(nil),                                 // 678: ypb.CreateNoteRequest
+	(*CreateNoteResponse)(nil),                                // 679: ypb.CreateNoteResponse
+	(*UpdateNoteRequest)(nil),                                 // 680: ypb.UpdateNoteRequest
+	(*DeleteNoteRequest)(nil),                                 // 681: ypb.DeleteNoteRequest
+	(*QueryNoteRequest)(nil),                                  // 682: ypb.QueryNoteRequest
+	(*QueryNoteResponse)(nil),                                 // 683: ypb.QueryNoteResponse
+	(*SearchNoteContentRequest)(nil),                          // 684: ypb.SearchNoteContentRequest
+	(*SearchNoteContentResponse)(nil),                         // 685: ypb.SearchNoteContentResponse
+	(*ImportNoteRequest)(nil),                                 // 686: ypb.ImportNoteRequest
+	(*ImportNoteResponse)(nil),                                // 687: ypb.ImportNoteResponse
+	(*ExportNoteRequest)(nil),                                 // 688: ypb.ExportNoteRequest
+	(*ExportNoteResponse)(nil),                                // 689: ypb.ExportNoteResponse
+	(*ListAiModelRequest)(nil),                                // 690: ypb.ListAiModelRequest
+	(*ListAiModelResponse)(nil),                               // 691: ypb.ListAiModelResponse
+	nil,                                                       // 692: ypb.ExtractDataToFileRequest.DataEntry
+	nil,                                                       // 693: ypb.YsoClassGeneraterOptionsWithVerbose.BindOptionsEntry
+	nil,                                                       // 694: ypb.WebShell.HeadersEntry
+	nil,                                                       // 695: ypb.WebShell.PostsEntry
+	nil,                                                       // 696: ypb.UpdateWebShellRequest.HeadersEntry
+	nil,                                                       // 697: ypb.UpdateWebShellRequest.PostsEntry
 }
 var file_yakgrpc_proto_depIdxs = []int32{
 	537, // 0: ypb.ExecBatchYakScriptRequest.ExtraParams:type_name -> ypb.ExecParamItem
@@ -54182,7 +54383,7 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	428, // 121: ypb.QueryYakScriptByNamesResponse.Data:type_name -> ypb.YakScript
 	428, // 122: ypb.QueryYakScriptByIsCoreResponse.Data:type_name -> ypb.YakScript
 	239, // 123: ypb.YakScriptRiskTypeListResponse.Data:type_name -> ypb.RiskTypeLists
-	688, // 124: ypb.ExtractDataToFileRequest.Data:type_name -> ypb.ExtractDataToFileRequest.DataEntry
+	692, // 124: ypb.ExtractDataToFileRequest.Data:type_name -> ypb.ExtractDataToFileRequest.DataEntry
 	527, // 125: ypb.MITMContentReplacers.Rules:type_name -> ypb.MITMContentReplacer
 	424, // 126: ypb.ExecYakitPluginsByYakScriptFilterRequest.Filter:type_name -> ypb.QueryYakScriptRequest
 	537, // 127: ypb.ExecYakitPluginsByYakScriptFilterRequest.ExtraParams:type_name -> ypb.ExecParamItem
@@ -54196,7 +54397,7 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	265, // 135: ypb.RiskTableStats.RiskLevelStats:type_name -> ypb.Fields
 	264, // 136: ypb.Fields.Values:type_name -> ypb.FieldName
 	266, // 137: ypb.YsoOptionsWithVerbose.Options:type_name -> ypb.YsoOption
-	689, // 138: ypb.YsoClassGeneraterOptionsWithVerbose.BindOptions:type_name -> ypb.YsoClassGeneraterOptionsWithVerbose.BindOptionsEntry
+	693, // 138: ypb.YsoClassGeneraterOptionsWithVerbose.BindOptions:type_name -> ypb.YsoClassGeneraterOptionsWithVerbose.BindOptionsEntry
 	269, // 139: ypb.YsoClassOptionsResponseWithVerbose.Options:type_name -> ypb.YsoClassGeneraterOptionsWithVerbose
 	271, // 140: ypb.YsoClassOptionsResponse.Options:type_name -> ypb.YsoClassGeneraterOptions
 	269, // 141: ypb.YsoOptionsRequerstWithVerbose.Options:type_name -> ypb.YsoClassGeneraterOptionsWithVerbose
@@ -54208,8 +54409,8 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	286, // 147: ypb.HistoryHTTPFuzzerTasksResponse.Data:type_name -> ypb.HistoryHTTPFuzzerTaskDetail
 	491, // 148: ypb.HistoryHTTPFuzzerTasksResponse.Pagination:type_name -> ypb.Paging
 	491, // 149: ypb.QueryHistoryHTTPFuzzerTaskExParams.Pagination:type_name -> ypb.Paging
-	690, // 150: ypb.WebShell.Headers:type_name -> ypb.WebShell.HeadersEntry
-	691, // 151: ypb.WebShell.Posts:type_name -> ypb.WebShell.PostsEntry
+	694, // 150: ypb.WebShell.Headers:type_name -> ypb.WebShell.HeadersEntry
+	695, // 151: ypb.WebShell.Posts:type_name -> ypb.WebShell.PostsEntry
 	295, // 152: ypb.WebShell.ShellOptions:type_name -> ypb.ShellOptions
 	2,   // 153: ypb.ShellGenerate.EncMode:type_name -> ypb.EncMode
 	1,   // 154: ypb.ShellGenerate.Script:type_name -> ypb.ShellScript
@@ -54217,8 +54418,8 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	491, // 156: ypb.QueryWebShellsResponse.Pagination:type_name -> ypb.Paging
 	293, // 157: ypb.QueryWebShellsResponse.Data:type_name -> ypb.WebShell
 	295, // 158: ypb.UpdateWebShellRequest.ShellOptions:type_name -> ypb.ShellOptions
-	692, // 159: ypb.UpdateWebShellRequest.Headers:type_name -> ypb.UpdateWebShellRequest.HeadersEntry
-	693, // 160: ypb.UpdateWebShellRequest.Posts:type_name -> ypb.UpdateWebShellRequest.PostsEntry
+	696, // 159: ypb.UpdateWebShellRequest.Headers:type_name -> ypb.UpdateWebShellRequest.HeadersEntry
+	697, // 160: ypb.UpdateWebShellRequest.Posts:type_name -> ypb.UpdateWebShellRequest.PostsEntry
 	306, // 161: ypb.QueryDNSLogByTokenResponse.Events:type_name -> ypb.DNSLogEvent
 	310, // 162: ypb.AvailableLocalAddrResponse.Interfaces:type_name -> ypb.NetInterface
 	328, // 163: ypb.ConfigGlobalReverseParams.ConnectParams:type_name -> ypb.GetTunnelServerExternalIPParams
@@ -54419,72 +54620,72 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	579, // 358: ypb.QuerySyntaxFlowRuleResponse.DbMessage:type_name -> ypb.DbOperateMessage
 	589, // 359: ypb.QuerySyntaxFlowRuleResponse.Rule:type_name -> ypb.SyntaxFlowRule
 	591, // 360: ypb.DeleteSyntaxFlowRuleRequest.Filter:type_name -> ypb.SyntaxFlowRuleFilter
-	605, // 361: ypb.QuerySyntaxFlowRuleGroupRequest.Filter:type_name -> ypb.SyntaxFlowRuleGroupFilter
+	609, // 361: ypb.QuerySyntaxFlowRuleGroupRequest.Filter:type_name -> ypb.SyntaxFlowRuleGroupFilter
 	491, // 362: ypb.QuerySyntaxFlowRuleGroupRequest.Pagination:type_name -> ypb.Paging
-	606, // 363: ypb.QuerySyntaxFlowRuleGroupResponse.Group:type_name -> ypb.SyntaxFlowGroup
+	610, // 363: ypb.QuerySyntaxFlowRuleGroupResponse.Group:type_name -> ypb.SyntaxFlowGroup
 	491, // 364: ypb.QuerySyntaxFlowRuleGroupResponse.Pagination:type_name -> ypb.Paging
 	591, // 365: ypb.UpdateSyntaxFlowRuleAndGroupRequest.Filter:type_name -> ypb.SyntaxFlowRuleFilter
 	591, // 366: ypb.QuerySyntaxFlowSameGroupRequest.Filter:type_name -> ypb.SyntaxFlowRuleFilter
-	606, // 367: ypb.QuerySyntaxFlowSameGroupResponse.Group:type_name -> ypb.SyntaxFlowGroup
-	605, // 368: ypb.DeleteSyntaxFlowRuleGroupRequest.Filter:type_name -> ypb.SyntaxFlowRuleGroupFilter
+	610, // 367: ypb.QuerySyntaxFlowSameGroupResponse.Group:type_name -> ypb.SyntaxFlowGroup
+	609, // 368: ypb.DeleteSyntaxFlowRuleGroupRequest.Filter:type_name -> ypb.SyntaxFlowRuleGroupFilter
 	591, // 369: ypb.SyntaxFlowScanRequest.Filter:type_name -> ypb.SyntaxFlowRuleFilter
 	590, // 370: ypb.SyntaxFlowScanRequest.RuleInput:type_name -> ypb.SyntaxFlowRuleInput
 	491, // 371: ypb.QuerySyntaxFlowScanTaskRequest.Pagination:type_name -> ypb.Paging
-	617, // 372: ypb.QuerySyntaxFlowScanTaskRequest.Filter:type_name -> ypb.SyntaxFlowScanTaskFilter
+	621, // 372: ypb.QuerySyntaxFlowScanTaskRequest.Filter:type_name -> ypb.SyntaxFlowScanTaskFilter
 	491, // 373: ypb.QuerySyntaxFlowScanTaskResponse.Pagination:type_name -> ypb.Paging
-	619, // 374: ypb.QuerySyntaxFlowScanTaskResponse.Data:type_name -> ypb.SyntaxFlowScanTask
-	615, // 375: ypb.SyntaxFlowScanTask.Config:type_name -> ypb.SyntaxFlowScanRequest
-	617, // 376: ypb.DeleteSyntaxFlowScanTaskRequest.Filter:type_name -> ypb.SyntaxFlowScanTaskFilter
+	623, // 374: ypb.QuerySyntaxFlowScanTaskResponse.Data:type_name -> ypb.SyntaxFlowScanTask
+	619, // 375: ypb.SyntaxFlowScanTask.Config:type_name -> ypb.SyntaxFlowScanRequest
+	621, // 376: ypb.DeleteSyntaxFlowScanTaskRequest.Filter:type_name -> ypb.SyntaxFlowScanTaskFilter
 	539, // 377: ypb.SyntaxFlowScanResponse.ExecResult:type_name -> ypb.ExecResult
-	625, // 378: ypb.SyntaxFlowScanResponse.Result:type_name -> ypb.SyntaxFlowResult
+	629, // 378: ypb.SyntaxFlowScanResponse.Result:type_name -> ypb.SyntaxFlowResult
 	314, // 379: ypb.SyntaxFlowScanResponse.risks:type_name -> ypb.Risk
-	638, // 380: ypb.SyntaxFlowScanResponse.SSARisks:type_name -> ypb.SSARisk
+	642, // 380: ypb.SyntaxFlowScanResponse.SSARisks:type_name -> ypb.SSARisk
 	491, // 381: ypb.QuerySyntaxFlowResultRequest.Pagination:type_name -> ypb.Paging
-	622, // 382: ypb.QuerySyntaxFlowResultRequest.Filter:type_name -> ypb.SyntaxFlowResultFilter
+	626, // 382: ypb.QuerySyntaxFlowResultRequest.Filter:type_name -> ypb.SyntaxFlowResultFilter
 	491, // 383: ypb.QuerySyntaxFlowResultResponse.Pagination:type_name -> ypb.Paging
 	579, // 384: ypb.QuerySyntaxFlowResultResponse.DbMessage:type_name -> ypb.DbOperateMessage
-	625, // 385: ypb.QuerySyntaxFlowResultResponse.Results:type_name -> ypb.SyntaxFlowResult
-	622, // 386: ypb.DeleteSyntaxFlowResultRequest.Filter:type_name -> ypb.SyntaxFlowResultFilter
+	629, // 385: ypb.QuerySyntaxFlowResultResponse.Results:type_name -> ypb.SyntaxFlowResult
+	626, // 386: ypb.DeleteSyntaxFlowResultRequest.Filter:type_name -> ypb.SyntaxFlowResultFilter
 	579, // 387: ypb.DeleteSyntaxFlowResultResponse.Message:type_name -> ypb.DbOperateMessage
 	484, // 388: ypb.PluginEnvData.Env:type_name -> ypb.KVPair
-	634, // 389: ypb.GetAllFuzztagInfoResponse.Data:type_name -> ypb.FuzztagInfo
-	633, // 390: ypb.FuzztagInfo.ArgumentTypes:type_name -> ypb.FuzztagArgumentType
+	638, // 389: ypb.GetAllFuzztagInfoResponse.Data:type_name -> ypb.FuzztagInfo
+	637, // 390: ypb.FuzztagInfo.ArgumentTypes:type_name -> ypb.FuzztagArgumentType
 	166, // 391: ypb.GenerateFuzztagRequest.Range:type_name -> ypb.Range
 	6,   // 392: ypb.GenerateFuzztagResponse.Status:type_name -> ypb.GeneralResponse
 	491, // 393: ypb.QuerySSARisksRequest.Pagination:type_name -> ypb.Paging
-	639, // 394: ypb.QuerySSARisksRequest.Filter:type_name -> ypb.SSARisksFilter
+	643, // 394: ypb.QuerySSARisksRequest.Filter:type_name -> ypb.SSARisksFilter
 	491, // 395: ypb.QuerySSARisksResponse.Pagination:type_name -> ypb.Paging
-	638, // 396: ypb.QuerySSARisksResponse.Data:type_name -> ypb.SSARisk
-	638, // 397: ypb.QueryNewSSARisksResponse.Data:type_name -> ypb.SSARisk
-	639, // 398: ypb.DeleteSSARisksRequest.Filter:type_name -> ypb.SSARisksFilter
+	642, // 396: ypb.QuerySSARisksResponse.Data:type_name -> ypb.SSARisk
+	642, // 397: ypb.QueryNewSSARisksResponse.Data:type_name -> ypb.SSARisk
+	643, // 398: ypb.DeleteSSARisksRequest.Filter:type_name -> ypb.SSARisksFilter
 	321, // 399: ypb.SSARiskFieldGroupResponse.FileField:type_name -> ypb.FieldGroup
 	264, // 400: ypb.SSARiskFieldGroupResponse.SeverityField:type_name -> ypb.FieldName
 	264, // 401: ypb.SSARiskFieldGroupResponse.RiskTypeField:type_name -> ypb.FieldName
-	639, // 402: ypb.NewSSARiskReadRequest.Filter:type_name -> ypb.SSARisksFilter
-	639, // 403: ypb.SSARiskFeedbackToOnlineRequest.Filter:type_name -> ypb.SSARisksFilter
+	643, // 402: ypb.NewSSARiskReadRequest.Filter:type_name -> ypb.SSARisksFilter
+	643, // 403: ypb.SSARiskFeedbackToOnlineRequest.Filter:type_name -> ypb.SSARisksFilter
 	591, // 404: ypb.ExportSyntaxFlowsRequest.Filter:type_name -> ypb.SyntaxFlowRuleFilter
-	654, // 405: ypb.UpdateHotPatchTemplateRequest.Condition:type_name -> ypb.HotPatchTemplateRequest
-	653, // 406: ypb.UpdateHotPatchTemplateRequest.Data:type_name -> ypb.HotPatchTemplate
-	654, // 407: ypb.DeleteHotPatchTemplateRequest.Condition:type_name -> ypb.HotPatchTemplateRequest
+	658, // 405: ypb.UpdateHotPatchTemplateRequest.Condition:type_name -> ypb.HotPatchTemplateRequest
+	657, // 406: ypb.UpdateHotPatchTemplateRequest.Data:type_name -> ypb.HotPatchTemplate
+	658, // 407: ypb.DeleteHotPatchTemplateRequest.Condition:type_name -> ypb.HotPatchTemplateRequest
 	579, // 408: ypb.CreateHotPatchTemplateResponse.Message:type_name -> ypb.DbOperateMessage
 	579, // 409: ypb.DeleteHotPatchTemplateResponse.Message:type_name -> ypb.DbOperateMessage
 	579, // 410: ypb.UpdateHotPatchTemplateResponse.Message:type_name -> ypb.DbOperateMessage
 	579, // 411: ypb.QueryHotPatchTemplateResponse.Message:type_name -> ypb.DbOperateMessage
-	653, // 412: ypb.QueryHotPatchTemplateResponse.Data:type_name -> ypb.HotPatchTemplate
+	657, // 412: ypb.QueryHotPatchTemplateResponse.Data:type_name -> ypb.HotPatchTemplate
 	491, // 413: ypb.QueryHotPatchTemplateListResponse.Pagination:type_name -> ypb.Paging
 	496, // 414: ypb.ExportHTTPFlowStreamRequest.Filter:type_name -> ypb.QueryHTTPFlowRequest
-	671, // 415: ypb.NoteContent.Note:type_name -> ypb.Note
+	675, // 415: ypb.NoteContent.Note:type_name -> ypb.Note
 	579, // 416: ypb.CreateNoteResponse.Message:type_name -> ypb.DbOperateMessage
-	673, // 417: ypb.UpdateNoteRequest.Filter:type_name -> ypb.NoteFilter
-	673, // 418: ypb.DeleteNoteRequest.Filter:type_name -> ypb.NoteFilter
-	673, // 419: ypb.QueryNoteRequest.Filter:type_name -> ypb.NoteFilter
+	677, // 417: ypb.UpdateNoteRequest.Filter:type_name -> ypb.NoteFilter
+	677, // 418: ypb.DeleteNoteRequest.Filter:type_name -> ypb.NoteFilter
+	677, // 419: ypb.QueryNoteRequest.Filter:type_name -> ypb.NoteFilter
 	491, // 420: ypb.QueryNoteRequest.Pagination:type_name -> ypb.Paging
 	491, // 421: ypb.QueryNoteResponse.Pagination:type_name -> ypb.Paging
-	671, // 422: ypb.QueryNoteResponse.Data:type_name -> ypb.Note
+	675, // 422: ypb.QueryNoteResponse.Data:type_name -> ypb.Note
 	491, // 423: ypb.SearchNoteContentRequest.Pagination:type_name -> ypb.Paging
 	491, // 424: ypb.SearchNoteContentResponse.Pagination:type_name -> ypb.Paging
-	672, // 425: ypb.SearchNoteContentResponse.Data:type_name -> ypb.NoteContent
-	673, // 426: ypb.ExportNoteRequest.Filter:type_name -> ypb.NoteFilter
+	676, // 425: ypb.SearchNoteContentResponse.Data:type_name -> ypb.NoteContent
+	677, // 426: ypb.ExportNoteRequest.Filter:type_name -> ypb.NoteFilter
 	241, // 427: ypb.ExtractDataToFileRequest.DataEntry.value:type_name -> ypb.ExtractableData
 	270, // 428: ypb.YsoClassGeneraterOptionsWithVerbose.BindOptionsEntry.value:type_name -> ypb.YsoClassOptionsResponseWithVerbose
 	4,   // 429: ypb.Yak.Version:input_type -> ypb.Empty
@@ -54633,7 +54834,7 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	179, // 572: ypb.Yak.YaklangCompileAndFormat:input_type -> ypb.YaklangCompileAndFormatRequest
 	168, // 573: ypb.Yak.YaklangLanguageSuggestion:input_type -> ypb.YaklangLanguageSuggestionRequest
 	168, // 574: ypb.Yak.YaklangLanguageFind:input_type -> ypb.YaklangLanguageSuggestionRequest
-	637, // 575: ypb.Yak.FuzzTagSuggestion:input_type -> ypb.FuzzTagSuggestionRequest
+	641, // 575: ypb.Yak.FuzzTagSuggestion:input_type -> ypb.FuzzTagSuggestionRequest
 	167, // 576: ypb.Yak.YaklangInspectInformation:input_type -> ypb.YaklangInspectInformationRequest
 	177, // 577: ypb.Yak.YaklangGetCliCodeFromDatabase:input_type -> ypb.YaklangGetCliCodeFromDatabaseRequest
 	535, // 578: ypb.Yak.YaklangTerminal:input_type -> ypb.Input
@@ -54870,7 +55071,7 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	562, // 809: ypb.Yak.EvaluateMultiExpression:input_type -> ypb.EvaluateMultiExpressionRequest
 	4,   // 810: ypb.Yak.GetThirdPartyAppConfigTemplate:input_type -> ypb.Empty
 	4,   // 811: ypb.Yak.CheckHahValidAiConfig:input_type -> ypb.Empty
-	686, // 812: ypb.Yak.ListAiModel:input_type -> ypb.ListAiModelRequest
+	690, // 812: ypb.Yak.ListAiModel:input_type -> ypb.ListAiModelRequest
 	567, // 813: ypb.Yak.GetFingerprint:input_type -> ypb.GetFingerprintRequest
 	569, // 814: ypb.Yak.AddFingerprint:input_type -> ypb.AddFingerprintRequest
 	571, // 815: ypb.Yak.ModifyFingerprint:input_type -> ypb.ModifyFingerprintRequest
@@ -54887,510 +55088,514 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	601, // 826: ypb.Yak.UpdateSyntaxFlowRule:input_type -> ypb.UpdateSyntaxFlowRuleRequest
 	601, // 827: ypb.Yak.UpdateSyntaxFlowRuleEx:input_type -> ypb.UpdateSyntaxFlowRuleRequest
 	604, // 828: ypb.Yak.DeleteSyntaxFlowRule:input_type -> ypb.DeleteSyntaxFlowRuleRequest
-	607, // 829: ypb.Yak.QuerySyntaxFlowRuleGroup:input_type -> ypb.QuerySyntaxFlowRuleGroupRequest
-	614, // 830: ypb.Yak.DeleteSyntaxFlowRuleGroup:input_type -> ypb.DeleteSyntaxFlowRuleGroupRequest
-	609, // 831: ypb.Yak.CreateSyntaxFlowRuleGroup:input_type -> ypb.CreateSyntaxFlowGroupRequest
-	610, // 832: ypb.Yak.UpdateSyntaxFlowRuleGroup:input_type -> ypb.UpdateSyntaxFlowRuleGroupRequest
-	611, // 833: ypb.Yak.UpdateSyntaxFlowRuleAndGroup:input_type -> ypb.UpdateSyntaxFlowRuleAndGroupRequest
-	612, // 834: ypb.Yak.QuerySyntaxFlowSameGroup:input_type -> ypb.QuerySyntaxFlowSameGroupRequest
-	615, // 835: ypb.Yak.SyntaxFlowScan:input_type -> ypb.SyntaxFlowScanRequest
-	616, // 836: ypb.Yak.QuerySyntaxFlowScanTask:input_type -> ypb.QuerySyntaxFlowScanTaskRequest
-	620, // 837: ypb.Yak.DeleteSyntaxFlowScanTask:input_type -> ypb.DeleteSyntaxFlowScanTaskRequest
-	623, // 838: ypb.Yak.QuerySyntaxFlowResult:input_type -> ypb.QuerySyntaxFlowResultRequest
-	626, // 839: ypb.Yak.DeleteSyntaxFlowResult:input_type -> ypb.DeleteSyntaxFlowResultRequest
-	595, // 840: ypb.Yak.QuerySSAPrograms:input_type -> ypb.QuerySSAProgramRequest
-	596, // 841: ypb.Yak.UpdateSSAProgram:input_type -> ypb.UpdateSSAProgramRequest
-	597, // 842: ypb.Yak.DeleteSSAPrograms:input_type -> ypb.DeleteSSAProgramRequest
-	640, // 843: ypb.Yak.QuerySSARisks:input_type -> ypb.QuerySSARisksRequest
-	642, // 844: ypb.Yak.QueryNewSSARisks:input_type -> ypb.QueryNewSSARisksRequest
-	644, // 845: ypb.Yak.DeleteSSARisks:input_type -> ypb.DeleteSSARisksRequest
-	645, // 846: ypb.Yak.UpdateSSARiskTags:input_type -> ypb.UpdateSSARiskTagsRequest
-	4,   // 847: ypb.Yak.GetSSARiskFieldGroup:input_type -> ypb.Empty
-	647, // 848: ypb.Yak.NewSSARiskRead:input_type -> ypb.NewSSARiskReadRequest
-	649, // 849: ypb.Yak.SSARiskFeedbackToOnline:input_type -> ypb.SSARiskFeedbackToOnlineRequest
-	4,   // 850: ypb.Yak.GetAllPluginEnv:input_type -> ypb.Empty
-	628, // 851: ypb.Yak.QueryPluginEnv:input_type -> ypb.QueryPluginEnvRequest
-	629, // 852: ypb.Yak.CreatePluginEnv:input_type -> ypb.PluginEnvData
-	629, // 853: ypb.Yak.SetPluginEnv:input_type -> ypb.PluginEnvData
-	630, // 854: ypb.Yak.DeletePluginEnv:input_type -> ypb.DeletePluginEnvRequest
-	631, // 855: ypb.Yak.GetAllFuzztagInfo:input_type -> ypb.GetAllFuzztagInfoRequest
-	635, // 856: ypb.Yak.GenerateFuzztag:input_type -> ypb.GenerateFuzztagRequest
-	650, // 857: ypb.Yak.ExportSyntaxFlows:input_type -> ypb.ExportSyntaxFlowsRequest
-	651, // 858: ypb.Yak.ImportSyntaxFlows:input_type -> ypb.ImportSyntaxFlowsRequest
-	653, // 859: ypb.Yak.CreateHotPatchTemplate:input_type -> ypb.HotPatchTemplate
-	656, // 860: ypb.Yak.DeleteHotPatchTemplate:input_type -> ypb.DeleteHotPatchTemplateRequest
-	655, // 861: ypb.Yak.UpdateHotPatchTemplate:input_type -> ypb.UpdateHotPatchTemplateRequest
-	654, // 862: ypb.Yak.QueryHotPatchTemplate:input_type -> ypb.HotPatchTemplateRequest
-	661, // 863: ypb.Yak.QueryHotPatchTemplateList:input_type -> ypb.QueryHotPatchTemplateListRequest
-	663, // 864: ypb.Yak.GroupTableColumn:input_type -> ypb.GroupTableColumnRequest
-	665, // 865: ypb.Yak.UploadHotPatchTemplateToOnline:input_type -> ypb.UploadHotPatchTemplateToOnlineRequest
-	666, // 866: ypb.Yak.DownloadHotPatchTemplate:input_type -> ypb.DownloadHotPatchTemplateRequest
-	521, // 867: ypb.Yak.SetMITMHijackFilter:input_type -> ypb.SetMITMFilterRequest
-	4,   // 868: ypb.Yak.GetMITMHijackFilter:input_type -> ypb.Empty
-	4,   // 869: ypb.Yak.ResetMITMHijackFilter:input_type -> ypb.Empty
-	667, // 870: ypb.Yak.ExportHTTPFlowStream:input_type -> ypb.ExportHTTPFlowStreamRequest
-	669, // 871: ypb.Yak.ImportHTTPFlowStream:input_type -> ypb.ImportHTTPFlowStreamRequest
-	674, // 872: ypb.Yak.CreateNote:input_type -> ypb.CreateNoteRequest
-	676, // 873: ypb.Yak.UpdateNote:input_type -> ypb.UpdateNoteRequest
-	677, // 874: ypb.Yak.DeleteNote:input_type -> ypb.DeleteNoteRequest
-	678, // 875: ypb.Yak.QueryNote:input_type -> ypb.QueryNoteRequest
-	680, // 876: ypb.Yak.SearchNoteContent:input_type -> ypb.SearchNoteContentRequest
-	682, // 877: ypb.Yak.ImportNote:input_type -> ypb.ImportNoteRequest
-	684, // 878: ypb.Yak.ExportNote:input_type -> ypb.ExportNoteRequest
-	15,  // 879: ypb.Yak.StartAITask:input_type -> ypb.AIInputEvent
-	5,   // 880: ypb.Yak.Version:output_type -> ypb.VersionResponse
-	6,   // 881: ypb.Yak.YakVersionAtLeast:output_type -> ypb.GeneralResponse
-	534, // 882: ypb.Yak.Echo:output_type -> ypb.EchoResposne
-	13,  // 883: ypb.Yak.VerifySystemCertificate:output_type -> ypb.VerifySystemCertificateResponse
-	529, // 884: ypb.Yak.MITM:output_type -> ypb.MITMResponse
-	522, // 885: ypb.Yak.SetMITMFilter:output_type -> ypb.SetMITMFilterResponse
-	521, // 886: ypb.Yak.GetMITMFilter:output_type -> ypb.SetMITMFilterRequest
-	521, // 887: ypb.Yak.ResetMITMFilter:output_type -> ypb.SetMITMFilterRequest
-	263, // 888: ypb.Yak.DownloadMITMCert:output_type -> ypb.MITMCert
-	536, // 889: ypb.Yak.OpenPort:output_type -> ypb.Output
-	539, // 890: ypb.Yak.Exec:output_type -> ypb.ExecResult
-	463, // 891: ypb.Yak.QueryExecHistory:output_type -> ypb.ExecHistoryRecordResponse
-	4,   // 892: ypb.Yak.RemoveExecHistory:output_type -> ypb.Empty
-	4,   // 893: ypb.Yak.LoadNucleiTemplates:output_type -> ypb.Empty
-	539, // 894: ypb.Yak.AutoUpdateYakModule:output_type -> ypb.ExecResult
-	539, // 895: ypb.Yak.ExecYakScript:output_type -> ypb.ExecResult
-	9,   // 896: ypb.Yak.ExecBatchYakScript:output_type -> ypb.ExecBatchYakScriptResult
-	211, // 897: ypb.Yak.GetExecBatchYakScriptUnfinishedTask:output_type -> ypb.GetExecBatchYakScriptUnfinishedTaskResponse
-	8,   // 898: ypb.Yak.GetExecBatchYakScriptUnfinishedTaskByUid:output_type -> ypb.ExecBatchYakScriptRequest
-	8,   // 899: ypb.Yak.PopExecBatchYakScriptUnfinishedTaskByUid:output_type -> ypb.ExecBatchYakScriptRequest
-	9,   // 900: ypb.Yak.RecoverExecBatchYakScriptUnfinishedTask:output_type -> ypb.ExecBatchYakScriptResult
-	426, // 901: ypb.Yak.QueryYakScript:output_type -> ypb.QueryYakScriptResponse
-	428, // 902: ypb.Yak.QueryYakScriptByYakScriptName:output_type -> ypb.YakScript
-	428, // 903: ypb.Yak.SaveYakScript:output_type -> ypb.YakScript
-	4,   // 904: ypb.Yak.DeleteYakScript:output_type -> ypb.Empty
-	428, // 905: ypb.Yak.GetYakScriptById:output_type -> ypb.YakScript
-	428, // 906: ypb.Yak.GetYakScriptByName:output_type -> ypb.YakScript
-	428, // 907: ypb.Yak.GetYakScriptByOnlineID:output_type -> ypb.YakScript
-	4,   // 908: ypb.Yak.IgnoreYakScript:output_type -> ypb.Empty
-	4,   // 909: ypb.Yak.UnIgnoreYakScript:output_type -> ypb.Empty
-	364, // 910: ypb.Yak.ExportYakScript:output_type -> ypb.ExportYakScriptResponse
-	539, // 911: ypb.Yak.ExportYakScriptStream:output_type -> ypb.ExecResult
-	539, // 912: ypb.Yak.ImportYakScriptStream:output_type -> ypb.ExecResult
-	539, // 913: ypb.Yak.ExecutePacketYakScript:output_type -> ypb.ExecResult
-	9,   // 914: ypb.Yak.ExecuteBatchPacketYakScript:output_type -> ypb.ExecBatchYakScriptResult
-	227, // 915: ypb.Yak.GetYakScriptTags:output_type -> ypb.GetYakScriptTagsResponse
-	230, // 916: ypb.Yak.QueryYakScriptLocalAndUser:output_type -> ypb.QueryYakScriptLocalAndUserResponse
-	230, // 917: ypb.Yak.QueryYakScriptByOnlineGroup:output_type -> ypb.QueryYakScriptLocalAndUserResponse
-	230, // 918: ypb.Yak.QueryYakScriptLocalAll:output_type -> ypb.QueryYakScriptLocalAndUserResponse
-	234, // 919: ypb.Yak.QueryYakScriptByNames:output_type -> ypb.QueryYakScriptByNamesResponse
-	235, // 920: ypb.Yak.QueryYakScriptByIsCore:output_type -> ypb.QueryYakScriptByIsCoreResponse
-	237, // 921: ypb.Yak.QueryYakScriptRiskDetailByCWE:output_type -> ypb.QueryYakScriptRiskDetailByCWEResponse
-	238, // 922: ypb.Yak.YakScriptRiskTypeList:output_type -> ypb.YakScriptRiskTypeListResponse
-	428, // 923: ypb.Yak.SaveNewYakScript:output_type -> ypb.YakScript
-	432, // 924: ypb.Yak.SaveYakScriptToOnline:output_type -> ypb.SaveYakScriptToOnlineResponse
-	435, // 925: ypb.Yak.ExportLocalYakScript:output_type -> ypb.ExportLocalYakScriptResponse
-	436, // 926: ypb.Yak.ExportLocalYakScriptStream:output_type -> ypb.ExportYakScriptLocalResponse
-	438, // 927: ypb.Yak.ImportYakScript:output_type -> ypb.ImportYakScriptResult
-	4,   // 928: ypb.Yak.SetYakScriptSkipUpdate:output_type -> ypb.Empty
-	440, // 929: ypb.Yak.QueryYakScriptSkipUpdate:output_type -> ypb.QueryYakScriptSkipUpdateResponse
-	442, // 930: ypb.Yak.QueryYakScriptGroup:output_type -> ypb.QueryYakScriptGroupResponse
-	4,   // 931: ypb.Yak.SaveYakScriptGroup:output_type -> ypb.Empty
-	4,   // 932: ypb.Yak.RenameYakScriptGroup:output_type -> ypb.Empty
-	4,   // 933: ypb.Yak.DeleteYakScriptGroup:output_type -> ypb.Empty
-	447, // 934: ypb.Yak.GetYakScriptGroup:output_type -> ypb.GetYakScriptGroupResponse
-	4,   // 935: ypb.Yak.ResetYakScriptGroup:output_type -> ypb.Empty
-	4,   // 936: ypb.Yak.SetGroup:output_type -> ypb.Empty
-	509, // 937: ypb.Yak.GetHTTPFlowByHash:output_type -> ypb.HTTPFlow
-	509, // 938: ypb.Yak.GetHTTPFlowById:output_type -> ypb.HTTPFlow
-	511, // 939: ypb.Yak.GetHTTPFlowBodyById:output_type -> ypb.GetHTTPFlowBodyByIdResponse
-	508, // 940: ypb.Yak.GetHTTPFlowByIds:output_type -> ypb.HTTPFlows
-	512, // 941: ypb.Yak.QueryHTTPFlows:output_type -> ypb.QueryHTTPFlowResponse
-	4,   // 942: ypb.Yak.DeleteHTTPFlows:output_type -> ypb.Empty
-	4,   // 943: ypb.Yak.SetTagForHTTPFlow:output_type -> ypb.Empty
-	506, // 944: ypb.Yak.QueryHTTPFlowsIds:output_type -> ypb.QueryHTTPFlowsIdsResponse
-	514, // 945: ypb.Yak.HTTPFlowsFieldGroup:output_type -> ypb.HTTPFlowsFieldGroupResponse
-	516, // 946: ypb.Yak.HTTPFlowsShare:output_type -> ypb.HTTPFlowsShareResponse
-	4,   // 947: ypb.Yak.HTTPFlowsExtract:output_type -> ypb.Empty
-	544, // 948: ypb.Yak.GetHTTPFlowBare:output_type -> ypb.HTTPFlowBareResponse
-	512, // 949: ypb.Yak.ExportHTTPFlows:output_type -> ypb.QueryHTTPFlowResponse
-	4,   // 950: ypb.Yak.HTTPFlowsToOnline:output_type -> ypb.Empty
-	503, // 951: ypb.Yak.QueryHTTPFlowsProcessNames:output_type -> ypb.QueryHTTPFlowsProcessNamesResponse
-	499, // 952: ypb.Yak.AnalyzeHTTPFlow:output_type -> ypb.AnalyzeHTTPFlowResponse
-	487, // 953: ypb.Yak.ExtractUrl:output_type -> ypb.ExtractedUrl
-	286, // 954: ypb.Yak.GetHistoryHTTPFuzzerTask:output_type -> ypb.HistoryHTTPFuzzerTaskDetail
-	288, // 955: ypb.Yak.QueryHistoryHTTPFuzzerTask:output_type -> ypb.HistoryHTTPFuzzerTasks
-	289, // 956: ypb.Yak.QueryHistoryHTTPFuzzerTaskEx:output_type -> ypb.HistoryHTTPFuzzerTasksResponse
-	4,   // 957: ypb.Yak.DeleteHistoryHTTPFuzzerTask:output_type -> ypb.Empty
-	489, // 958: ypb.Yak.HTTPFuzzer:output_type -> ypb.FuzzerResponse
-	488, // 959: ypb.Yak.HTTPFuzzerSequence:output_type -> ypb.FuzzerSequenceResponse
-	479, // 960: ypb.Yak.PreloadHTTPFuzzerParams:output_type -> ypb.PreloadHTTPFuzzerParamsResponse
-	472, // 961: ypb.Yak.RenderVariables:output_type -> ypb.RenderVariablesResponse
-	474, // 962: ypb.Yak.MatchHTTPResponse:output_type -> ypb.MatchHTTPResponseResult
-	476, // 963: ypb.Yak.ExtractHTTPResponse:output_type -> ypb.ExtractHTTPResponseResult
-	489, // 964: ypb.Yak.RedirectRequest:output_type -> ypb.FuzzerResponse
-	339, // 965: ypb.Yak.HTTPRequestMutate:output_type -> ypb.MutateResult
-	339, // 966: ypb.Yak.HTTPResponseMutate:output_type -> ypb.MutateResult
-	221, // 967: ypb.Yak.FixUploadPacket:output_type -> ypb.FixUploadPacketResponse
-	222, // 968: ypb.Yak.IsMultipartFormDataRequest:output_type -> ypb.IsMultipartFormDataRequestResult
-	156, // 969: ypb.Yak.GenerateExtractRule:output_type -> ypb.GenerateExtractRuleResponse
-	144, // 970: ypb.Yak.ExtractData:output_type -> ypb.ExtractDataResponse
-	546, // 971: ypb.Yak.ImportHTTPFuzzerTaskFromYaml:output_type -> ypb.ImportHTTPFuzzerTaskFromYamlResponse
-	548, // 972: ypb.Yak.ExportHTTPFuzzerTaskToYaml:output_type -> ypb.ExportHTTPFuzzerTaskToYamlResponse
-	550, // 973: ypb.Yak.RenderHTTPFuzzerPacket:output_type -> ypb.RenderHTTPFuzzerPacketResponse
-	4,   // 974: ypb.Yak.SaveFuzzerLabel:output_type -> ypb.Empty
-	146, // 975: ypb.Yak.QueryFuzzerLabel:output_type -> ypb.QueryFuzzerLabelResponse
-	4,   // 976: ypb.Yak.DeleteFuzzerLabel:output_type -> ypb.Empty
-	579, // 977: ypb.Yak.SaveFuzzerConfig:output_type -> ypb.DbOperateMessage
-	151, // 978: ypb.Yak.QueryFuzzerConfig:output_type -> ypb.QueryFuzzerConfigResponse
-	579, // 979: ypb.Yak.DeleteFuzzerConfig:output_type -> ypb.DbOperateMessage
-	159, // 980: ypb.Yak.QueryHTTPFuzzerResponseByTaskId:output_type -> ypb.QueryHTTPFuzzerResponseByTaskIdResponse
-	163, // 981: ypb.Yak.CreateWebsocketFuzzer:output_type -> ypb.ClientWebsocketResponse
-	519, // 982: ypb.Yak.QueryWebsocketFlowByHTTPFlowWebsocketHash:output_type -> ypb.WebsocketFlows
-	4,   // 983: ypb.Yak.DeleteWebsocketFlowByHTTPFlowWebsocketHash:output_type -> ypb.Empty
-	4,   // 984: ypb.Yak.DeleteWebsocketFlowAll:output_type -> ypb.Empty
-	509, // 985: ypb.Yak.ConvertFuzzerResponseToHTTPFlow:output_type -> ypb.HTTPFlow
-	466, // 986: ypb.Yak.StringFuzzer:output_type -> ypb.StringFuzzerResponse
-	469, // 987: ypb.Yak.HTTPRequestAnalyzer:output_type -> ypb.HTTPRequestAnalysis
-	458, // 988: ypb.Yak.Codec:output_type -> ypb.CodecResponse
-	458, // 989: ypb.Yak.NewCodec:output_type -> ypb.CodecResponse
-	459, // 990: ypb.Yak.GetAllCodecMethods:output_type -> ypb.CodecMethods
-	4,   // 991: ypb.Yak.SaveCodecFlow:output_type -> ypb.Empty
-	4,   // 992: ypb.Yak.DeleteCodecFlow:output_type -> ypb.Empty
-	457, // 993: ypb.Yak.GetAllCodecFlow:output_type -> ypb.GetCodecFlowResponse
-	53,  // 994: ypb.Yak.PacketPrettifyHelper:output_type -> ypb.PacketPrettifyHelperResponse
-	419, // 995: ypb.Yak.QueryPayload:output_type -> ypb.QueryPayloadResponse
-	417, // 996: ypb.Yak.QueryPayloadFromFile:output_type -> ypb.QueryPayloadFromFileResponse
-	4,   // 997: ypb.Yak.DeletePayloadByFolder:output_type -> ypb.Empty
-	4,   // 998: ypb.Yak.DeletePayloadByGroup:output_type -> ypb.Empty
-	4,   // 999: ypb.Yak.DeletePayload:output_type -> ypb.Empty
-	4,   // 1000: ypb.Yak.SavePayload:output_type -> ypb.Empty
-	183, // 1001: ypb.Yak.SavePayloadStream:output_type -> ypb.SavePayloadProgress
-	183, // 1002: ypb.Yak.SavePayloadToFileStream:output_type -> ypb.SavePayloadProgress
-	183, // 1003: ypb.Yak.SaveLargePayloadToFileStream:output_type -> ypb.SavePayloadProgress
-	4,   // 1004: ypb.Yak.RenamePayloadFolder:output_type -> ypb.Empty
-	4,   // 1005: ypb.Yak.RenamePayloadGroup:output_type -> ypb.Empty
-	4,   // 1006: ypb.Yak.UpdatePayload:output_type -> ypb.Empty
-	4,   // 1007: ypb.Yak.UpdatePayloadToFile:output_type -> ypb.Empty
-	4,   // 1008: ypb.Yak.BackUpOrCopyPayloads:output_type -> ypb.Empty
-	408, // 1009: ypb.Yak.GetAllPayloadGroup:output_type -> ypb.GetAllPayloadGroupResponse
-	4,   // 1010: ypb.Yak.UpdateAllPayloadGroup:output_type -> ypb.Empty
-	422, // 1011: ypb.Yak.GetAllPayload:output_type -> ypb.GetAllPayloadResponse
-	423, // 1012: ypb.Yak.GetAllPayloadFromFile:output_type -> ypb.GetAllPayloadFromFileResponse
-	422, // 1013: ypb.Yak.ExportAllPayload:output_type -> ypb.GetAllPayloadResponse
-	422, // 1014: ypb.Yak.ExportAllPayloadFromFile:output_type -> ypb.GetAllPayloadResponse
-	4,   // 1015: ypb.Yak.CreatePayloadFolder:output_type -> ypb.Empty
-	183, // 1016: ypb.Yak.RemoveDuplicatePayloads:output_type -> ypb.SavePayloadProgress
-	183, // 1017: ypb.Yak.CoverPayloadGroupToDatabase:output_type -> ypb.SavePayloadProgress
-	183, // 1018: ypb.Yak.ConvertPayloadGroupToDatabase:output_type -> ypb.SavePayloadProgress
-	183, // 1019: ypb.Yak.MigratePayloads:output_type -> ypb.SavePayloadProgress
-	400, // 1020: ypb.Yak.GetYakitCompletionRaw:output_type -> ypb.YakitCompletionRawResponse
-	404, // 1021: ypb.Yak.GetYakVMBuildInMethodCompletion:output_type -> ypb.GetYakVMBuildInMethodCompletionResponse
-	182, // 1022: ypb.Yak.StaticAnalyzeError:output_type -> ypb.StaticAnalyzeErrorResponse
-	180, // 1023: ypb.Yak.YaklangCompileAndFormat:output_type -> ypb.YaklangCompileAndFormatResponse
-	171, // 1024: ypb.Yak.YaklangLanguageSuggestion:output_type -> ypb.YaklangLanguageSuggestionResponse
-	172, // 1025: ypb.Yak.YaklangLanguageFind:output_type -> ypb.YaklangLanguageFindResponse
-	171, // 1026: ypb.Yak.FuzzTagSuggestion:output_type -> ypb.YaklangLanguageSuggestionResponse
-	173, // 1027: ypb.Yak.YaklangInspectInformation:output_type -> ypb.YaklangInspectInformationResponse
-	176, // 1028: ypb.Yak.YaklangGetCliCodeFromDatabase:output_type -> ypb.YaklangGetCliCodeFromDatabaseResponse
-	536, // 1029: ypb.Yak.YaklangTerminal:output_type -> ypb.Output
-	539, // 1030: ypb.Yak.PortScan:output_type -> ypb.ExecResult
-	391, // 1031: ypb.Yak.ViewPortScanCode:output_type -> ypb.SimpleScript
-	539, // 1032: ypb.Yak.SimpleDetect:output_type -> ypb.ExecResult
-	4,   // 1033: ypb.Yak.SaveCancelSimpleDetect:output_type -> ypb.Empty
-	539, // 1034: ypb.Yak.SimpleDetectCreatReport:output_type -> ypb.ExecResult
-	217, // 1035: ypb.Yak.QuerySimpleDetectUnfinishedTask:output_type -> ypb.QueryUnfinishedTaskResponse
-	393, // 1036: ypb.Yak.GetSimpleDetectRecordRequestById:output_type -> ypb.RecordPortScanRequest
-	4,   // 1037: ypb.Yak.DeleteSimpleDetectUnfinishedTask:output_type -> ypb.Empty
-	539, // 1038: ypb.Yak.RecoverSimpleDetectTask:output_type -> ypb.ExecResult
-	212, // 1039: ypb.Yak.GetSimpleDetectUnfinishedTask:output_type -> ypb.GetSimpleDetectUnfinishedTaskResponse
-	393, // 1040: ypb.Yak.GetSimpleDetectUnfinishedTaskByUid:output_type -> ypb.RecordPortScanRequest
-	393, // 1041: ypb.Yak.PopSimpleDetectUnfinishedTaskByUid:output_type -> ypb.RecordPortScanRequest
-	539, // 1042: ypb.Yak.RecoverSimpleDetectUnfinishedTask:output_type -> ypb.ExecResult
-	398, // 1043: ypb.Yak.QueryPorts:output_type -> ypb.QueryPortsResponse
-	4,   // 1044: ypb.Yak.DeletePorts:output_type -> ypb.Empty
-	342, // 1045: ypb.Yak.QueryHosts:output_type -> ypb.QueryHostsResponse
-	4,   // 1046: ypb.Yak.DeleteHosts:output_type -> ypb.Empty
-	345, // 1047: ypb.Yak.QueryDomains:output_type -> ypb.QueryDomainsResponse
-	4,   // 1048: ypb.Yak.DeleteDomains:output_type -> ypb.Empty
-	347, // 1049: ypb.Yak.QueryPortsGroup:output_type -> ypb.QueryPortsGroupResponse
-	4,   // 1050: ypb.Yak.UpdateFromYakitResource:output_type -> ypb.Empty
-	4,   // 1051: ypb.Yak.UpdateFromGithub:output_type -> ypb.Empty
-	4,   // 1052: ypb.Yak.AddToMenu:output_type -> ypb.Empty
-	4,   // 1053: ypb.Yak.RemoveFromMenu:output_type -> ypb.Empty
-	4,   // 1054: ypb.Yak.YakScriptIsInMenu:output_type -> ypb.Empty
-	374, // 1055: ypb.Yak.GetAllMenuItem:output_type -> ypb.MenuByGroup
-	4,   // 1056: ypb.Yak.DeleteAllMenuItem:output_type -> ypb.Empty
-	4,   // 1057: ypb.Yak.ImportMenuItem:output_type -> ypb.Empty
-	381, // 1058: ypb.Yak.ExportMenuItem:output_type -> ypb.ExportMenuItemResult
-	370, // 1059: ypb.Yak.GetMenuItemById:output_type -> ypb.MenuItem
-	368, // 1060: ypb.Yak.QueryGroupsByYakScriptId:output_type -> ypb.GroupNames
-	4,   // 1061: ypb.Yak.AddMenus:output_type -> ypb.Empty
-	374, // 1062: ypb.Yak.QueryAllMenuItem:output_type -> ypb.MenuByGroup
-	4,   // 1063: ypb.Yak.DeleteAllMenu:output_type -> ypb.Empty
-	4,   // 1064: ypb.Yak.AddToNavigation:output_type -> ypb.Empty
-	386, // 1065: ypb.Yak.GetAllNavigationItem:output_type -> ypb.GetAllNavigationItemResponse
-	4,   // 1066: ypb.Yak.DeleteAllNavigation:output_type -> ypb.Empty
-	4,   // 1067: ypb.Yak.AddOneNavigation:output_type -> ypb.Empty
-	368, // 1068: ypb.Yak.QueryNavigationGroups:output_type -> ypb.GroupNames
-	4,   // 1069: ypb.Yak.SaveMarkdownDocument:output_type -> ypb.Empty
-	365, // 1070: ypb.Yak.GetMarkdownDocument:output_type -> ypb.GetMarkdownDocumentResponse
-	4,   // 1071: ypb.Yak.DeleteMarkdownDocument:output_type -> ypb.Empty
-	539, // 1072: ypb.Yak.StartBasicCrawler:output_type -> ypb.ExecResult
-	391, // 1073: ypb.Yak.ViewBasicCrawlerCode:output_type -> ypb.SimpleScript
-	356, // 1074: ypb.Yak.GenerateWebsiteTree:output_type -> ypb.GenerateWebsiteTreeResponse
-	355, // 1075: ypb.Yak.QueryYakScriptExecResult:output_type -> ypb.QueryYakScriptExecResultResponse
-	353, // 1076: ypb.Yak.QueryYakScriptNameInExecResult:output_type -> ypb.YakScriptNames
-	4,   // 1077: ypb.Yak.DeleteYakScriptExecResult:output_type -> ypb.Empty
-	4,   // 1078: ypb.Yak.DeleteYakScriptExec:output_type -> ypb.Empty
-	539, // 1079: ypb.Yak.StartBrute:output_type -> ypb.ExecResult
-	335, // 1080: ypb.Yak.GetAvailableBruteTypes:output_type -> ypb.GetAvailableBruteTypesResponse
-	329, // 1081: ypb.Yak.GetTunnelServerExternalIP:output_type -> ypb.GetTunnelServerExternalIPResponse
-	327, // 1082: ypb.Yak.VerifyTunnelServerDomain:output_type -> ypb.VerifyTunnelServerDomainResponse
-	539, // 1083: ypb.Yak.StartFacades:output_type -> ypb.ExecResult
-	539, // 1084: ypb.Yak.StartFacadesWithYsoObject:output_type -> ypb.ExecResult
-	4,   // 1085: ypb.Yak.ApplyClassToFacades:output_type -> ypb.Empty
-	280, // 1086: ypb.Yak.BytesToBase64:output_type -> ypb.BytesToBase64Response
-	4,   // 1087: ypb.Yak.ConfigGlobalReverse:output_type -> ypb.Empty
-	309, // 1088: ypb.Yak.AvailableLocalAddr:output_type -> ypb.AvailableLocalAddrResponse
-	308, // 1089: ypb.Yak.GetGlobalReverseServer:output_type -> ypb.GetGlobalReverseServerResponse
-	316, // 1090: ypb.Yak.QueryRisks:output_type -> ypb.QueryRisksResponse
-	314, // 1091: ypb.Yak.QueryRisk:output_type -> ypb.Risk
-	4,   // 1092: ypb.Yak.DeleteRisk:output_type -> ypb.Empty
-	265, // 1093: ypb.Yak.QueryAvailableRiskType:output_type -> ypb.Fields
-	265, // 1094: ypb.Yak.QueryAvailableRiskLevel:output_type -> ypb.Fields
-	262, // 1095: ypb.Yak.QueryRiskTableStats:output_type -> ypb.RiskTableStats
-	4,   // 1096: ypb.Yak.ResetRiskTableStats:output_type -> ypb.Empty
-	265, // 1097: ypb.Yak.QueryAvailableTarget:output_type -> ypb.Fields
-	318, // 1098: ypb.Yak.QueryNewRisk:output_type -> ypb.QueryNewRiskResponse
-	4,   // 1099: ypb.Yak.NewRiskRead:output_type -> ypb.Empty
-	4,   // 1100: ypb.Yak.UploadRiskToOnline:output_type -> ypb.Empty
-	4,   // 1101: ypb.Yak.SetTagForRisk:output_type -> ypb.Empty
-	319, // 1102: ypb.Yak.QueryRiskTags:output_type -> ypb.QueryRiskTagsResponse
-	320, // 1103: ypb.Yak.RiskFieldGroup:output_type -> ypb.RiskFieldGroupResponse
-	4,   // 1104: ypb.Yak.RiskFeedbackToOnline:output_type -> ypb.Empty
-	252, // 1105: ypb.Yak.QueryReports:output_type -> ypb.QueryReportsResponse
-	254, // 1106: ypb.Yak.QueryReport:output_type -> ypb.Report
-	4,   // 1107: ypb.Yak.DeleteReport:output_type -> ypb.Empty
-	265, // 1108: ypb.Yak.QueryAvailableReportFrom:output_type -> ypb.Fields
-	4,   // 1109: ypb.Yak.DownloadReport:output_type -> ypb.Empty
-	267, // 1110: ypb.Yak.GetAllYsoGadgetOptions:output_type -> ypb.YsoOptionsWithVerbose
-	267, // 1111: ypb.Yak.GetAllYsoClassOptions:output_type -> ypb.YsoOptionsWithVerbose
-	270, // 1112: ypb.Yak.GetAllYsoClassGeneraterOptions:output_type -> ypb.YsoClassOptionsResponseWithVerbose
-	277, // 1113: ypb.Yak.GenerateYsoCode:output_type -> ypb.YsoCodeResponse
-	278, // 1114: ypb.Yak.GenerateYsoBytes:output_type -> ypb.YsoBytesResponse
-	276, // 1115: ypb.Yak.YsoDump:output_type -> ypb.YsoDumpResponse
-	293, // 1116: ypb.Yak.CreateWebShell:output_type -> ypb.WebShell
-	4,   // 1117: ypb.Yak.DeleteWebShell:output_type -> ypb.Empty
-	293, // 1118: ypb.Yak.UpdateWebShell:output_type -> ypb.WebShell
-	299, // 1119: ypb.Yak.QueryWebShells:output_type -> ypb.QueryWebShellsResponse
-	297, // 1120: ypb.Yak.Ping:output_type -> ypb.WebShellResponse
-	297, // 1121: ypb.Yak.GetBasicInfo:output_type -> ypb.WebShellResponse
-	297, // 1122: ypb.Yak.GenerateWebShell:output_type -> ypb.WebShellResponse
-	4,   // 1123: ypb.Yak.SetYakBridgeLogServer:output_type -> ypb.Empty
-	302, // 1124: ypb.Yak.GetCurrentYakBridgeLogServer:output_type -> ypb.YakDNSLogBridgeAddr
-	307, // 1125: ypb.Yak.RequireDNSLogDomain:output_type -> ypb.DNSLogRootDomain
-	307, // 1126: ypb.Yak.RequireDNSLogDomainByScript:output_type -> ypb.DNSLogRootDomain
-	305, // 1127: ypb.Yak.QueryDNSLogByToken:output_type -> ypb.QueryDNSLogByTokenResponse
-	305, // 1128: ypb.Yak.QueryDNSLogTokenByScript:output_type -> ypb.QueryDNSLogByTokenResponse
-	257, // 1129: ypb.Yak.RequireICMPRandomLength:output_type -> ypb.RequireICMPRandomLengthResponse
-	282, // 1130: ypb.Yak.QueryICMPTrigger:output_type -> ypb.QueryICMPTriggerResponse
-	260, // 1131: ypb.Yak.RequireRandomPortToken:output_type -> ypb.RandomPortInfo
-	258, // 1132: ypb.Yak.QueryRandomPortTrigger:output_type -> ypb.RandomPortTriggerNotification
-	283, // 1133: ypb.Yak.QuerySupportedDnsLogPlatforms:output_type -> ypb.QuerySupportedDnsLogPlatformsResponse
-	265, // 1134: ypb.Yak.GetAvailableYakScriptTags:output_type -> ypb.Fields
-	4,   // 1135: ypb.Yak.ForceUpdateAvailableYakScriptTags:output_type -> ypb.Empty
-	539, // 1136: ypb.Yak.ExecYakitPluginsByYakScriptFilter:output_type -> ypb.ExecResult
-	249, // 1137: ypb.Yak.GenerateYakCodeByPacket:output_type -> ypb.GenerateYakCodeByPacketResponse
-	248, // 1138: ypb.Yak.GenerateCSRFPocByPacket:output_type -> ypb.GenerateCSRFPocByPacketResponse
-	244, // 1139: ypb.Yak.ExportMITMReplacerRules:output_type -> ypb.ExportMITMReplacerRulesResponse
-	4,   // 1140: ypb.Yak.ImportMITMReplacerRules:output_type -> ypb.Empty
-	242, // 1141: ypb.Yak.GetCurrentRules:output_type -> ypb.MITMContentReplacers
-	4,   // 1142: ypb.Yak.SetCurrentRules:output_type -> ypb.Empty
-	554, // 1143: ypb.Yak.GenerateURL:output_type -> ypb.GenerateURLResponse
-	226, // 1144: ypb.Yak.ExtractDataToFile:output_type -> ypb.ExtractDataToFileResult
-	225, // 1145: ypb.Yak.AutoDecode:output_type -> ypb.AutoDecodeResponse
-	206, // 1146: ypb.Yak.GetSystemProxy:output_type -> ypb.GetSystemProxyResult
-	4,   // 1147: ypb.Yak.SetSystemProxy:output_type -> ypb.Empty
-	202, // 1148: ypb.Yak.GetKey:output_type -> ypb.GetKeyResult
-	4,   // 1149: ypb.Yak.SetKey:output_type -> ypb.Empty
-	4,   // 1150: ypb.Yak.DelKey:output_type -> ypb.Empty
-	204, // 1151: ypb.Yak.GetAllProcessEnvKey:output_type -> ypb.GetProcessEnvKeyResult
-	4,   // 1152: ypb.Yak.SetProcessEnvKey:output_type -> ypb.Empty
-	202, // 1153: ypb.Yak.GetProjectKey:output_type -> ypb.GetKeyResult
-	4,   // 1154: ypb.Yak.SetProjectKey:output_type -> ypb.Empty
-	199, // 1155: ypb.Yak.GetOnlineProfile:output_type -> ypb.OnlineProfile
-	4,   // 1156: ypb.Yak.SetOnlineProfile:output_type -> ypb.Empty
-	4,   // 1157: ypb.Yak.DownloadOnlinePluginById:output_type -> ypb.Empty
-	4,   // 1158: ypb.Yak.DownloadOnlinePluginByIds:output_type -> ypb.Empty
-	186, // 1159: ypb.Yak.DownloadOnlinePluginAll:output_type -> ypb.DownloadOnlinePluginProgress
-	4,   // 1160: ypb.Yak.DeletePluginByUserID:output_type -> ypb.Empty
-	4,   // 1161: ypb.Yak.DeleteAllLocalPlugins:output_type -> ypb.Empty
-	450, // 1162: ypb.Yak.GetYakScriptTagsAndType:output_type -> ypb.GetYakScriptTagsAndTypeResponse
-	4,   // 1163: ypb.Yak.DeleteLocalPluginsByWhere:output_type -> ypb.Empty
-	193, // 1164: ypb.Yak.DownloadOnlinePluginByScriptNames:output_type -> ypb.DownloadOnlinePluginByScriptNamesResponse
-	186, // 1165: ypb.Yak.DownloadOnlinePlugins:output_type -> ypb.DownloadOnlinePluginProgress
-	4,   // 1166: ypb.Yak.DownloadOnlinePluginBatch:output_type -> ypb.Empty
-	193, // 1167: ypb.Yak.DownloadOnlinePluginByPluginName:output_type -> ypb.DownloadOnlinePluginByScriptNamesResponse
-	428, // 1168: ypb.Yak.DownloadOnlinePluginByUUID:output_type -> ypb.YakScript
-	197, // 1169: ypb.Yak.QueryOnlinePlugins:output_type -> ypb.QueryOnlinePluginsResponse
-	539, // 1170: ypb.Yak.ExecPacketScan:output_type -> ypb.ExecResult
-	164, // 1171: ypb.Yak.GetEngineDefaultProxy:output_type -> ypb.DefaultProxyResult
-	4,   // 1172: ypb.Yak.SetEngineDefaultProxy:output_type -> ypb.Empty
-	157, // 1173: ypb.Yak.GetMachineID:output_type -> ypb.GetMachineIDResponse
-	540, // 1174: ypb.Yak.GetLicense:output_type -> ypb.GetLicenseResponse
-	4,   // 1175: ypb.Yak.CheckLicense:output_type -> ypb.Empty
-	143, // 1176: ypb.Yak.GetRequestBodyByHTTPFlowID:output_type -> ypb.Bytes
-	143, // 1177: ypb.Yak.GetResponseBodyByHTTPFlowID:output_type -> ypb.Bytes
-	143, // 1178: ypb.Yak.GetHTTPPacketBody:output_type -> ypb.Bytes
-	140, // 1179: ypb.Yak.RegisterFacadesHTTP:output_type -> ypb.RegisterFacadesHTTPResponse
-	4,   // 1180: ypb.Yak.ResetAndInvalidUserData:output_type -> ypb.Empty
-	137, // 1181: ypb.Yak.CreateYaklangShell:output_type -> ypb.YaklangShellResponse
-	539, // 1182: ypb.Yak.AttachCombinedOutput:output_type -> ypb.ExecResult
-	120, // 1183: ypb.Yak.IsPrivilegedForNetRaw:output_type -> ypb.IsPrivilegedForNetRawResponse
-	4,   // 1184: ypb.Yak.PromotePermissionForUserPcap:output_type -> ypb.Empty
-	4,   // 1185: ypb.Yak.SetCurrentProject:output_type -> ypb.Empty
-	126, // 1186: ypb.Yak.GetCurrentProject:output_type -> ypb.ProjectDescription
-	126, // 1187: ypb.Yak.GetCurrentProjectEx:output_type -> ypb.ProjectDescription
-	127, // 1188: ypb.Yak.GetProjects:output_type -> ypb.GetProjectsResponse
-	124, // 1189: ypb.Yak.NewProject:output_type -> ypb.NewProjectResponse
-	124, // 1190: ypb.Yak.UpdateProject:output_type -> ypb.NewProjectResponse
-	4,   // 1191: ypb.Yak.IsProjectNameValid:output_type -> ypb.Empty
-	4,   // 1192: ypb.Yak.RemoveProject:output_type -> ypb.Empty
-	4,   // 1193: ypb.Yak.DeleteProject:output_type -> ypb.Empty
-	126, // 1194: ypb.Yak.GetDefaultProject:output_type -> ypb.ProjectDescription
-	126, // 1195: ypb.Yak.GetDefaultProjectEx:output_type -> ypb.ProjectDescription
-	126, // 1196: ypb.Yak.QueryProjectDetail:output_type -> ypb.ProjectDescription
-	126, // 1197: ypb.Yak.GetTemporaryProject:output_type -> ypb.ProjectDescription
-	126, // 1198: ypb.Yak.GetTemporaryProjectEx:output_type -> ypb.ProjectDescription
-	118, // 1199: ypb.Yak.ExportProject:output_type -> ypb.ProjectIOProgress
-	118, // 1200: ypb.Yak.ImportProject:output_type -> ypb.ProjectIOProgress
-	4,   // 1201: ypb.Yak.MigrateLegacyDatabase:output_type -> ypb.Empty
-	112, // 1202: ypb.Yak.QueryMITMRuleExtractedData:output_type -> ypb.QueryMITMRuleExtractedDataResponse
-	116, // 1203: ypb.Yak.ExportMITMRuleExtractedData:output_type -> ypb.ExportMITMRuleExtractedDataResponse
-	4,   // 1204: ypb.Yak.ImportChaosMakerRules:output_type -> ypb.Empty
-	103, // 1205: ypb.Yak.QueryChaosMakerRule:output_type -> ypb.QueryChaosMakerRuleResponse
-	4,   // 1206: ypb.Yak.DeleteChaosMakerRuleByID:output_type -> ypb.Empty
-	539, // 1207: ypb.Yak.ExecuteChaosMakerRule:output_type -> ypb.ExecResult
-	100, // 1208: ypb.Yak.IsRemoteAddrAvailable:output_type -> ypb.IsRemoteAddrAvailableResponse
-	100, // 1209: ypb.Yak.ConnectVulinboxAgent:output_type -> ypb.IsRemoteAddrAvailableResponse
-	66,  // 1210: ypb.Yak.GetRegisteredVulinboxAgent:output_type -> ypb.GetRegisteredAgentResponse
-	4,   // 1211: ypb.Yak.DisconnectVulinboxAgent:output_type -> ypb.Empty
-	109, // 1212: ypb.Yak.IsCVEDatabaseReady:output_type -> ypb.IsCVEDatabaseReadyResponse
-	539, // 1213: ypb.Yak.UpdateCVEDatabase:output_type -> ypb.ExecResult
-	539, // 1214: ypb.Yak.ExportsProfileDatabase:output_type -> ypb.ExecResult
-	539, // 1215: ypb.Yak.ImportsProfileDatabase:output_type -> ypb.ExecResult
-	94,  // 1216: ypb.Yak.QueryCVE:output_type -> ypb.QueryCVEResponse
-	92,  // 1217: ypb.Yak.GetCVE:output_type -> ypb.CVEDetailEx
-	96,  // 1218: ypb.Yak.SaveTextToTemporalFile:output_type -> ypb.SaveTextToTemporalFileResponse
-	88,  // 1219: ypb.Yak.IsScrecorderReady:output_type -> ypb.IsScrecorderReadyResponse
-	539, // 1220: ypb.Yak.InstallScrecorder:output_type -> ypb.ExecResult
-	539, // 1221: ypb.Yak.StartScrecorder:output_type -> ypb.ExecResult
-	84,  // 1222: ypb.Yak.QueryScreenRecorders:output_type -> ypb.QueryScreenRecorderResponse
-	4,   // 1223: ypb.Yak.DeleteScreenRecorders:output_type -> ypb.Empty
-	4,   // 1224: ypb.Yak.UploadScreenRecorders:output_type -> ypb.Empty
-	79,  // 1225: ypb.Yak.GetOneScreenRecorders:output_type -> ypb.ScreenRecorder
-	4,   // 1226: ypb.Yak.UpdateScreenRecorders:output_type -> ypb.Empty
-	71,  // 1227: ypb.Yak.IsVulinboxReady:output_type -> ypb.IsVulinboxReadyResponse
-	539, // 1228: ypb.Yak.InstallVulinbox:output_type -> ypb.ExecResult
-	539, // 1229: ypb.Yak.StartVulinbox:output_type -> ypb.ExecResult
-	539, // 1230: ypb.Yak.GenQualityInspectionReport:output_type -> ypb.ExecResult
-	77,  // 1231: ypb.Yak.HTTPRequestBuilder:output_type -> ypb.HTTPRequestBuilderResponse
-	539, // 1232: ypb.Yak.DebugPlugin:output_type -> ypb.ExecResult
-	69,  // 1233: ypb.Yak.SmokingEvaluatePlugin:output_type -> ypb.SmokingEvaluatePluginResponse
-	552, // 1234: ypb.Yak.SmokingEvaluatePluginBatch:output_type -> ypb.SmokingEvaluatePluginBatchResponse
-	542, // 1235: ypb.Yak.GetSystemDefaultDnsServers:output_type -> ypb.DefaultDnsServerResponse
-	63,  // 1236: ypb.Yak.DiagnoseNetwork:output_type -> ypb.DiagnoseNetworkResponse
-	63,  // 1237: ypb.Yak.DiagnoseNetworkDNS:output_type -> ypb.DiagnoseNetworkResponse
-	559, // 1238: ypb.Yak.TraceRoute:output_type -> ypb.TraceRouteResponse
-	59,  // 1239: ypb.Yak.GetGlobalNetworkConfig:output_type -> ypb.GlobalNetworkConfig
-	4,   // 1240: ypb.Yak.SetGlobalNetworkConfig:output_type -> ypb.Empty
-	4,   // 1241: ypb.Yak.ResetGlobalNetworkConfig:output_type -> ypb.Empty
-	58,  // 1242: ypb.Yak.ValidP12PassWord:output_type -> ypb.ValidP12PassWordResponse
-	51,  // 1243: ypb.Yak.RequestYakURL:output_type -> ypb.RequestYakURLResponse
-	574, // 1244: ypb.Yak.ReadFile:output_type -> ypb.ReadFileResponse
-	35,  // 1245: ypb.Yak.GetPcapMetadata:output_type -> ypb.PcapMetadata
-	47,  // 1246: ypb.Yak.PcapX:output_type -> ypb.PcapXResponse
-	39,  // 1247: ypb.Yak.QueryTrafficSession:output_type -> ypb.QueryTrafficSessionResponse
-	41,  // 1248: ypb.Yak.QueryTrafficPacket:output_type -> ypb.QueryTrafficPacketResponse
-	43,  // 1249: ypb.Yak.QueryTrafficTCPReassembled:output_type -> ypb.QueryTrafficTCPReassembledResponse
-	557, // 1250: ypb.Yak.ParseTraffic:output_type -> ypb.ParseTrafficResponse
-	33,  // 1251: ypb.Yak.DuplexConnection:output_type -> ypb.DuplexConnectionResponse
-	27,  // 1252: ypb.Yak.HybridScan:output_type -> ypb.HybridScanResponse
-	24,  // 1253: ypb.Yak.QueryHybridScanTask:output_type -> ypb.QueryHybridScanTaskResponse
-	4,   // 1254: ypb.Yak.DeleteHybridScanTask:output_type -> ypb.Empty
-	20,  // 1255: ypb.Yak.GetSpaceEngineStatus:output_type -> ypb.SpaceEngineStatus
-	20,  // 1256: ypb.Yak.GetSpaceEngineAccountStatus:output_type -> ypb.SpaceEngineStatus
-	20,  // 1257: ypb.Yak.GetSpaceEngineAccountStatusV2:output_type -> ypb.SpaceEngineStatus
-	539, // 1258: ypb.Yak.FetchPortAssetFromSpaceEngine:output_type -> ypb.ExecResult
-	561, // 1259: ypb.Yak.EvaluateExpression:output_type -> ypb.EvaluateExpressionResponse
-	563, // 1260: ypb.Yak.EvaluateMultiExpression:output_type -> ypb.EvaluateMultiExpressionResponse
-	566, // 1261: ypb.Yak.GetThirdPartyAppConfigTemplate:output_type -> ypb.GetThirdPartyAppConfigTemplateResponse
-	6,   // 1262: ypb.Yak.CheckHahValidAiConfig:output_type -> ypb.GeneralResponse
-	687, // 1263: ypb.Yak.ListAiModel:output_type -> ypb.ListAiModelResponse
-	568, // 1264: ypb.Yak.GetFingerprint:output_type -> ypb.GetFingerprintResponse
-	570, // 1265: ypb.Yak.AddFingerprint:output_type -> ypb.AddFingerprintResponse
-	572, // 1266: ypb.Yak.ModifyFingerprint:output_type -> ypb.ModifyFingerprintResponse
-	584, // 1267: ypb.Yak.QueryFingerprint:output_type -> ypb.QueryFingerprintResponse
-	579, // 1268: ypb.Yak.DeleteFingerprint:output_type -> ypb.DbOperateMessage
-	579, // 1269: ypb.Yak.UpdateFingerprint:output_type -> ypb.DbOperateMessage
-	579, // 1270: ypb.Yak.CreateFingerprint:output_type -> ypb.DbOperateMessage
-	579, // 1271: ypb.Yak.RecoverBuiltinFingerprint:output_type -> ypb.DbOperateMessage
-	576, // 1272: ypb.Yak.GetReverseShellProgramList:output_type -> ypb.GetReverseShellProgramListResponse
-	578, // 1273: ypb.Yak.GenerateReverseShellCommand:output_type -> ypb.GenerateReverseShellCommandResponse
-	603, // 1274: ypb.Yak.QuerySyntaxFlowRule:output_type -> ypb.QuerySyntaxFlowRuleResponse
-	579, // 1275: ypb.Yak.CreateSyntaxFlowRule:output_type -> ypb.DbOperateMessage
-	600, // 1276: ypb.Yak.CreateSyntaxFlowRuleEx:output_type -> ypb.CreateSyntaxFlowRuleResponse
-	579, // 1277: ypb.Yak.UpdateSyntaxFlowRule:output_type -> ypb.DbOperateMessage
-	602, // 1278: ypb.Yak.UpdateSyntaxFlowRuleEx:output_type -> ypb.UpdateSyntaxFlowRuleResponse
-	579, // 1279: ypb.Yak.DeleteSyntaxFlowRule:output_type -> ypb.DbOperateMessage
-	608, // 1280: ypb.Yak.QuerySyntaxFlowRuleGroup:output_type -> ypb.QuerySyntaxFlowRuleGroupResponse
-	579, // 1281: ypb.Yak.DeleteSyntaxFlowRuleGroup:output_type -> ypb.DbOperateMessage
-	579, // 1282: ypb.Yak.CreateSyntaxFlowRuleGroup:output_type -> ypb.DbOperateMessage
-	579, // 1283: ypb.Yak.UpdateSyntaxFlowRuleGroup:output_type -> ypb.DbOperateMessage
-	579, // 1284: ypb.Yak.UpdateSyntaxFlowRuleAndGroup:output_type -> ypb.DbOperateMessage
-	613, // 1285: ypb.Yak.QuerySyntaxFlowSameGroup:output_type -> ypb.QuerySyntaxFlowSameGroupResponse
-	621, // 1286: ypb.Yak.SyntaxFlowScan:output_type -> ypb.SyntaxFlowScanResponse
-	618, // 1287: ypb.Yak.QuerySyntaxFlowScanTask:output_type -> ypb.QuerySyntaxFlowScanTaskResponse
-	579, // 1288: ypb.Yak.DeleteSyntaxFlowScanTask:output_type -> ypb.DbOperateMessage
-	624, // 1289: ypb.Yak.QuerySyntaxFlowResult:output_type -> ypb.QuerySyntaxFlowResultResponse
-	627, // 1290: ypb.Yak.DeleteSyntaxFlowResult:output_type -> ypb.DeleteSyntaxFlowResultResponse
-	598, // 1291: ypb.Yak.QuerySSAPrograms:output_type -> ypb.QuerySSAProgramResponse
-	579, // 1292: ypb.Yak.UpdateSSAProgram:output_type -> ypb.DbOperateMessage
-	579, // 1293: ypb.Yak.DeleteSSAPrograms:output_type -> ypb.DbOperateMessage
-	641, // 1294: ypb.Yak.QuerySSARisks:output_type -> ypb.QuerySSARisksResponse
-	643, // 1295: ypb.Yak.QueryNewSSARisks:output_type -> ypb.QueryNewSSARisksResponse
-	579, // 1296: ypb.Yak.DeleteSSARisks:output_type -> ypb.DbOperateMessage
-	579, // 1297: ypb.Yak.UpdateSSARiskTags:output_type -> ypb.DbOperateMessage
-	646, // 1298: ypb.Yak.GetSSARiskFieldGroup:output_type -> ypb.SSARiskFieldGroupResponse
-	648, // 1299: ypb.Yak.NewSSARiskRead:output_type -> ypb.NewSSARiskReadResponse
-	4,   // 1300: ypb.Yak.SSARiskFeedbackToOnline:output_type -> ypb.Empty
-	629, // 1301: ypb.Yak.GetAllPluginEnv:output_type -> ypb.PluginEnvData
-	629, // 1302: ypb.Yak.QueryPluginEnv:output_type -> ypb.PluginEnvData
-	4,   // 1303: ypb.Yak.CreatePluginEnv:output_type -> ypb.Empty
-	4,   // 1304: ypb.Yak.SetPluginEnv:output_type -> ypb.Empty
-	4,   // 1305: ypb.Yak.DeletePluginEnv:output_type -> ypb.Empty
-	632, // 1306: ypb.Yak.GetAllFuzztagInfo:output_type -> ypb.GetAllFuzztagInfoResponse
-	636, // 1307: ypb.Yak.GenerateFuzztag:output_type -> ypb.GenerateFuzztagResponse
-	652, // 1308: ypb.Yak.ExportSyntaxFlows:output_type -> ypb.SyntaxflowsProgress
-	652, // 1309: ypb.Yak.ImportSyntaxFlows:output_type -> ypb.SyntaxflowsProgress
-	657, // 1310: ypb.Yak.CreateHotPatchTemplate:output_type -> ypb.CreateHotPatchTemplateResponse
-	658, // 1311: ypb.Yak.DeleteHotPatchTemplate:output_type -> ypb.DeleteHotPatchTemplateResponse
-	659, // 1312: ypb.Yak.UpdateHotPatchTemplate:output_type -> ypb.UpdateHotPatchTemplateResponse
-	660, // 1313: ypb.Yak.QueryHotPatchTemplate:output_type -> ypb.QueryHotPatchTemplateResponse
-	662, // 1314: ypb.Yak.QueryHotPatchTemplateList:output_type -> ypb.QueryHotPatchTemplateListResponse
-	664, // 1315: ypb.Yak.GroupTableColumn:output_type -> ypb.GroupTableColumnResponse
-	4,   // 1316: ypb.Yak.UploadHotPatchTemplateToOnline:output_type -> ypb.Empty
-	4,   // 1317: ypb.Yak.DownloadHotPatchTemplate:output_type -> ypb.Empty
-	522, // 1318: ypb.Yak.SetMITMHijackFilter:output_type -> ypb.SetMITMFilterResponse
-	521, // 1319: ypb.Yak.GetMITMHijackFilter:output_type -> ypb.SetMITMFilterRequest
-	521, // 1320: ypb.Yak.ResetMITMHijackFilter:output_type -> ypb.SetMITMFilterRequest
-	668, // 1321: ypb.Yak.ExportHTTPFlowStream:output_type -> ypb.ExportHTTPFlowStreamResponse
-	670, // 1322: ypb.Yak.ImportHTTPFlowStream:output_type -> ypb.ImportHTTPFlowStreamResponse
-	675, // 1323: ypb.Yak.CreateNote:output_type -> ypb.CreateNoteResponse
-	579, // 1324: ypb.Yak.UpdateNote:output_type -> ypb.DbOperateMessage
-	579, // 1325: ypb.Yak.DeleteNote:output_type -> ypb.DbOperateMessage
-	679, // 1326: ypb.Yak.QueryNote:output_type -> ypb.QueryNoteResponse
-	681, // 1327: ypb.Yak.SearchNoteContent:output_type -> ypb.SearchNoteContentResponse
-	683, // 1328: ypb.Yak.ImportNote:output_type -> ypb.ImportNoteResponse
-	685, // 1329: ypb.Yak.ExportNote:output_type -> ypb.ExportNoteResponse
-	14,  // 1330: ypb.Yak.StartAITask:output_type -> ypb.AIOutputEvent
-	880, // [880:1331] is the sub-list for method output_type
-	429, // [429:880] is the sub-list for method input_type
+	605, // 829: ypb.Yak.CheckSyntaxFlowRuleUpdate:input_type -> ypb.CheckSyntaxFlowRuleUpdateRequest
+	607, // 830: ypb.Yak.ApplySyntaxFlowRuleUpdate:input_type -> ypb.ApplySyntaxFlowRuleUpdateRequest
+	611, // 831: ypb.Yak.QuerySyntaxFlowRuleGroup:input_type -> ypb.QuerySyntaxFlowRuleGroupRequest
+	618, // 832: ypb.Yak.DeleteSyntaxFlowRuleGroup:input_type -> ypb.DeleteSyntaxFlowRuleGroupRequest
+	613, // 833: ypb.Yak.CreateSyntaxFlowRuleGroup:input_type -> ypb.CreateSyntaxFlowGroupRequest
+	614, // 834: ypb.Yak.UpdateSyntaxFlowRuleGroup:input_type -> ypb.UpdateSyntaxFlowRuleGroupRequest
+	615, // 835: ypb.Yak.UpdateSyntaxFlowRuleAndGroup:input_type -> ypb.UpdateSyntaxFlowRuleAndGroupRequest
+	616, // 836: ypb.Yak.QuerySyntaxFlowSameGroup:input_type -> ypb.QuerySyntaxFlowSameGroupRequest
+	619, // 837: ypb.Yak.SyntaxFlowScan:input_type -> ypb.SyntaxFlowScanRequest
+	620, // 838: ypb.Yak.QuerySyntaxFlowScanTask:input_type -> ypb.QuerySyntaxFlowScanTaskRequest
+	624, // 839: ypb.Yak.DeleteSyntaxFlowScanTask:input_type -> ypb.DeleteSyntaxFlowScanTaskRequest
+	627, // 840: ypb.Yak.QuerySyntaxFlowResult:input_type -> ypb.QuerySyntaxFlowResultRequest
+	630, // 841: ypb.Yak.DeleteSyntaxFlowResult:input_type -> ypb.DeleteSyntaxFlowResultRequest
+	595, // 842: ypb.Yak.QuerySSAPrograms:input_type -> ypb.QuerySSAProgramRequest
+	596, // 843: ypb.Yak.UpdateSSAProgram:input_type -> ypb.UpdateSSAProgramRequest
+	597, // 844: ypb.Yak.DeleteSSAPrograms:input_type -> ypb.DeleteSSAProgramRequest
+	644, // 845: ypb.Yak.QuerySSARisks:input_type -> ypb.QuerySSARisksRequest
+	646, // 846: ypb.Yak.QueryNewSSARisks:input_type -> ypb.QueryNewSSARisksRequest
+	648, // 847: ypb.Yak.DeleteSSARisks:input_type -> ypb.DeleteSSARisksRequest
+	649, // 848: ypb.Yak.UpdateSSARiskTags:input_type -> ypb.UpdateSSARiskTagsRequest
+	4,   // 849: ypb.Yak.GetSSARiskFieldGroup:input_type -> ypb.Empty
+	651, // 850: ypb.Yak.NewSSARiskRead:input_type -> ypb.NewSSARiskReadRequest
+	653, // 851: ypb.Yak.SSARiskFeedbackToOnline:input_type -> ypb.SSARiskFeedbackToOnlineRequest
+	4,   // 852: ypb.Yak.GetAllPluginEnv:input_type -> ypb.Empty
+	632, // 853: ypb.Yak.QueryPluginEnv:input_type -> ypb.QueryPluginEnvRequest
+	633, // 854: ypb.Yak.CreatePluginEnv:input_type -> ypb.PluginEnvData
+	633, // 855: ypb.Yak.SetPluginEnv:input_type -> ypb.PluginEnvData
+	634, // 856: ypb.Yak.DeletePluginEnv:input_type -> ypb.DeletePluginEnvRequest
+	635, // 857: ypb.Yak.GetAllFuzztagInfo:input_type -> ypb.GetAllFuzztagInfoRequest
+	639, // 858: ypb.Yak.GenerateFuzztag:input_type -> ypb.GenerateFuzztagRequest
+	654, // 859: ypb.Yak.ExportSyntaxFlows:input_type -> ypb.ExportSyntaxFlowsRequest
+	655, // 860: ypb.Yak.ImportSyntaxFlows:input_type -> ypb.ImportSyntaxFlowsRequest
+	657, // 861: ypb.Yak.CreateHotPatchTemplate:input_type -> ypb.HotPatchTemplate
+	660, // 862: ypb.Yak.DeleteHotPatchTemplate:input_type -> ypb.DeleteHotPatchTemplateRequest
+	659, // 863: ypb.Yak.UpdateHotPatchTemplate:input_type -> ypb.UpdateHotPatchTemplateRequest
+	658, // 864: ypb.Yak.QueryHotPatchTemplate:input_type -> ypb.HotPatchTemplateRequest
+	665, // 865: ypb.Yak.QueryHotPatchTemplateList:input_type -> ypb.QueryHotPatchTemplateListRequest
+	667, // 866: ypb.Yak.GroupTableColumn:input_type -> ypb.GroupTableColumnRequest
+	669, // 867: ypb.Yak.UploadHotPatchTemplateToOnline:input_type -> ypb.UploadHotPatchTemplateToOnlineRequest
+	670, // 868: ypb.Yak.DownloadHotPatchTemplate:input_type -> ypb.DownloadHotPatchTemplateRequest
+	521, // 869: ypb.Yak.SetMITMHijackFilter:input_type -> ypb.SetMITMFilterRequest
+	4,   // 870: ypb.Yak.GetMITMHijackFilter:input_type -> ypb.Empty
+	4,   // 871: ypb.Yak.ResetMITMHijackFilter:input_type -> ypb.Empty
+	671, // 872: ypb.Yak.ExportHTTPFlowStream:input_type -> ypb.ExportHTTPFlowStreamRequest
+	673, // 873: ypb.Yak.ImportHTTPFlowStream:input_type -> ypb.ImportHTTPFlowStreamRequest
+	678, // 874: ypb.Yak.CreateNote:input_type -> ypb.CreateNoteRequest
+	680, // 875: ypb.Yak.UpdateNote:input_type -> ypb.UpdateNoteRequest
+	681, // 876: ypb.Yak.DeleteNote:input_type -> ypb.DeleteNoteRequest
+	682, // 877: ypb.Yak.QueryNote:input_type -> ypb.QueryNoteRequest
+	684, // 878: ypb.Yak.SearchNoteContent:input_type -> ypb.SearchNoteContentRequest
+	686, // 879: ypb.Yak.ImportNote:input_type -> ypb.ImportNoteRequest
+	688, // 880: ypb.Yak.ExportNote:input_type -> ypb.ExportNoteRequest
+	15,  // 881: ypb.Yak.StartAITask:input_type -> ypb.AIInputEvent
+	5,   // 882: ypb.Yak.Version:output_type -> ypb.VersionResponse
+	6,   // 883: ypb.Yak.YakVersionAtLeast:output_type -> ypb.GeneralResponse
+	534, // 884: ypb.Yak.Echo:output_type -> ypb.EchoResposne
+	13,  // 885: ypb.Yak.VerifySystemCertificate:output_type -> ypb.VerifySystemCertificateResponse
+	529, // 886: ypb.Yak.MITM:output_type -> ypb.MITMResponse
+	522, // 887: ypb.Yak.SetMITMFilter:output_type -> ypb.SetMITMFilterResponse
+	521, // 888: ypb.Yak.GetMITMFilter:output_type -> ypb.SetMITMFilterRequest
+	521, // 889: ypb.Yak.ResetMITMFilter:output_type -> ypb.SetMITMFilterRequest
+	263, // 890: ypb.Yak.DownloadMITMCert:output_type -> ypb.MITMCert
+	536, // 891: ypb.Yak.OpenPort:output_type -> ypb.Output
+	539, // 892: ypb.Yak.Exec:output_type -> ypb.ExecResult
+	463, // 893: ypb.Yak.QueryExecHistory:output_type -> ypb.ExecHistoryRecordResponse
+	4,   // 894: ypb.Yak.RemoveExecHistory:output_type -> ypb.Empty
+	4,   // 895: ypb.Yak.LoadNucleiTemplates:output_type -> ypb.Empty
+	539, // 896: ypb.Yak.AutoUpdateYakModule:output_type -> ypb.ExecResult
+	539, // 897: ypb.Yak.ExecYakScript:output_type -> ypb.ExecResult
+	9,   // 898: ypb.Yak.ExecBatchYakScript:output_type -> ypb.ExecBatchYakScriptResult
+	211, // 899: ypb.Yak.GetExecBatchYakScriptUnfinishedTask:output_type -> ypb.GetExecBatchYakScriptUnfinishedTaskResponse
+	8,   // 900: ypb.Yak.GetExecBatchYakScriptUnfinishedTaskByUid:output_type -> ypb.ExecBatchYakScriptRequest
+	8,   // 901: ypb.Yak.PopExecBatchYakScriptUnfinishedTaskByUid:output_type -> ypb.ExecBatchYakScriptRequest
+	9,   // 902: ypb.Yak.RecoverExecBatchYakScriptUnfinishedTask:output_type -> ypb.ExecBatchYakScriptResult
+	426, // 903: ypb.Yak.QueryYakScript:output_type -> ypb.QueryYakScriptResponse
+	428, // 904: ypb.Yak.QueryYakScriptByYakScriptName:output_type -> ypb.YakScript
+	428, // 905: ypb.Yak.SaveYakScript:output_type -> ypb.YakScript
+	4,   // 906: ypb.Yak.DeleteYakScript:output_type -> ypb.Empty
+	428, // 907: ypb.Yak.GetYakScriptById:output_type -> ypb.YakScript
+	428, // 908: ypb.Yak.GetYakScriptByName:output_type -> ypb.YakScript
+	428, // 909: ypb.Yak.GetYakScriptByOnlineID:output_type -> ypb.YakScript
+	4,   // 910: ypb.Yak.IgnoreYakScript:output_type -> ypb.Empty
+	4,   // 911: ypb.Yak.UnIgnoreYakScript:output_type -> ypb.Empty
+	364, // 912: ypb.Yak.ExportYakScript:output_type -> ypb.ExportYakScriptResponse
+	539, // 913: ypb.Yak.ExportYakScriptStream:output_type -> ypb.ExecResult
+	539, // 914: ypb.Yak.ImportYakScriptStream:output_type -> ypb.ExecResult
+	539, // 915: ypb.Yak.ExecutePacketYakScript:output_type -> ypb.ExecResult
+	9,   // 916: ypb.Yak.ExecuteBatchPacketYakScript:output_type -> ypb.ExecBatchYakScriptResult
+	227, // 917: ypb.Yak.GetYakScriptTags:output_type -> ypb.GetYakScriptTagsResponse
+	230, // 918: ypb.Yak.QueryYakScriptLocalAndUser:output_type -> ypb.QueryYakScriptLocalAndUserResponse
+	230, // 919: ypb.Yak.QueryYakScriptByOnlineGroup:output_type -> ypb.QueryYakScriptLocalAndUserResponse
+	230, // 920: ypb.Yak.QueryYakScriptLocalAll:output_type -> ypb.QueryYakScriptLocalAndUserResponse
+	234, // 921: ypb.Yak.QueryYakScriptByNames:output_type -> ypb.QueryYakScriptByNamesResponse
+	235, // 922: ypb.Yak.QueryYakScriptByIsCore:output_type -> ypb.QueryYakScriptByIsCoreResponse
+	237, // 923: ypb.Yak.QueryYakScriptRiskDetailByCWE:output_type -> ypb.QueryYakScriptRiskDetailByCWEResponse
+	238, // 924: ypb.Yak.YakScriptRiskTypeList:output_type -> ypb.YakScriptRiskTypeListResponse
+	428, // 925: ypb.Yak.SaveNewYakScript:output_type -> ypb.YakScript
+	432, // 926: ypb.Yak.SaveYakScriptToOnline:output_type -> ypb.SaveYakScriptToOnlineResponse
+	435, // 927: ypb.Yak.ExportLocalYakScript:output_type -> ypb.ExportLocalYakScriptResponse
+	436, // 928: ypb.Yak.ExportLocalYakScriptStream:output_type -> ypb.ExportYakScriptLocalResponse
+	438, // 929: ypb.Yak.ImportYakScript:output_type -> ypb.ImportYakScriptResult
+	4,   // 930: ypb.Yak.SetYakScriptSkipUpdate:output_type -> ypb.Empty
+	440, // 931: ypb.Yak.QueryYakScriptSkipUpdate:output_type -> ypb.QueryYakScriptSkipUpdateResponse
+	442, // 932: ypb.Yak.QueryYakScriptGroup:output_type -> ypb.QueryYakScriptGroupResponse
+	4,   // 933: ypb.Yak.SaveYakScriptGroup:output_type -> ypb.Empty
+	4,   // 934: ypb.Yak.RenameYakScriptGroup:output_type -> ypb.Empty
+	4,   // 935: ypb.Yak.DeleteYakScriptGroup:output_type -> ypb.Empty
+	447, // 936: ypb.Yak.GetYakScriptGroup:output_type -> ypb.GetYakScriptGroupResponse
+	4,   // 937: ypb.Yak.ResetYakScriptGroup:output_type -> ypb.Empty
+	4,   // 938: ypb.Yak.SetGroup:output_type -> ypb.Empty
+	509, // 939: ypb.Yak.GetHTTPFlowByHash:output_type -> ypb.HTTPFlow
+	509, // 940: ypb.Yak.GetHTTPFlowById:output_type -> ypb.HTTPFlow
+	511, // 941: ypb.Yak.GetHTTPFlowBodyById:output_type -> ypb.GetHTTPFlowBodyByIdResponse
+	508, // 942: ypb.Yak.GetHTTPFlowByIds:output_type -> ypb.HTTPFlows
+	512, // 943: ypb.Yak.QueryHTTPFlows:output_type -> ypb.QueryHTTPFlowResponse
+	4,   // 944: ypb.Yak.DeleteHTTPFlows:output_type -> ypb.Empty
+	4,   // 945: ypb.Yak.SetTagForHTTPFlow:output_type -> ypb.Empty
+	506, // 946: ypb.Yak.QueryHTTPFlowsIds:output_type -> ypb.QueryHTTPFlowsIdsResponse
+	514, // 947: ypb.Yak.HTTPFlowsFieldGroup:output_type -> ypb.HTTPFlowsFieldGroupResponse
+	516, // 948: ypb.Yak.HTTPFlowsShare:output_type -> ypb.HTTPFlowsShareResponse
+	4,   // 949: ypb.Yak.HTTPFlowsExtract:output_type -> ypb.Empty
+	544, // 950: ypb.Yak.GetHTTPFlowBare:output_type -> ypb.HTTPFlowBareResponse
+	512, // 951: ypb.Yak.ExportHTTPFlows:output_type -> ypb.QueryHTTPFlowResponse
+	4,   // 952: ypb.Yak.HTTPFlowsToOnline:output_type -> ypb.Empty
+	503, // 953: ypb.Yak.QueryHTTPFlowsProcessNames:output_type -> ypb.QueryHTTPFlowsProcessNamesResponse
+	499, // 954: ypb.Yak.AnalyzeHTTPFlow:output_type -> ypb.AnalyzeHTTPFlowResponse
+	487, // 955: ypb.Yak.ExtractUrl:output_type -> ypb.ExtractedUrl
+	286, // 956: ypb.Yak.GetHistoryHTTPFuzzerTask:output_type -> ypb.HistoryHTTPFuzzerTaskDetail
+	288, // 957: ypb.Yak.QueryHistoryHTTPFuzzerTask:output_type -> ypb.HistoryHTTPFuzzerTasks
+	289, // 958: ypb.Yak.QueryHistoryHTTPFuzzerTaskEx:output_type -> ypb.HistoryHTTPFuzzerTasksResponse
+	4,   // 959: ypb.Yak.DeleteHistoryHTTPFuzzerTask:output_type -> ypb.Empty
+	489, // 960: ypb.Yak.HTTPFuzzer:output_type -> ypb.FuzzerResponse
+	488, // 961: ypb.Yak.HTTPFuzzerSequence:output_type -> ypb.FuzzerSequenceResponse
+	479, // 962: ypb.Yak.PreloadHTTPFuzzerParams:output_type -> ypb.PreloadHTTPFuzzerParamsResponse
+	472, // 963: ypb.Yak.RenderVariables:output_type -> ypb.RenderVariablesResponse
+	474, // 964: ypb.Yak.MatchHTTPResponse:output_type -> ypb.MatchHTTPResponseResult
+	476, // 965: ypb.Yak.ExtractHTTPResponse:output_type -> ypb.ExtractHTTPResponseResult
+	489, // 966: ypb.Yak.RedirectRequest:output_type -> ypb.FuzzerResponse
+	339, // 967: ypb.Yak.HTTPRequestMutate:output_type -> ypb.MutateResult
+	339, // 968: ypb.Yak.HTTPResponseMutate:output_type -> ypb.MutateResult
+	221, // 969: ypb.Yak.FixUploadPacket:output_type -> ypb.FixUploadPacketResponse
+	222, // 970: ypb.Yak.IsMultipartFormDataRequest:output_type -> ypb.IsMultipartFormDataRequestResult
+	156, // 971: ypb.Yak.GenerateExtractRule:output_type -> ypb.GenerateExtractRuleResponse
+	144, // 972: ypb.Yak.ExtractData:output_type -> ypb.ExtractDataResponse
+	546, // 973: ypb.Yak.ImportHTTPFuzzerTaskFromYaml:output_type -> ypb.ImportHTTPFuzzerTaskFromYamlResponse
+	548, // 974: ypb.Yak.ExportHTTPFuzzerTaskToYaml:output_type -> ypb.ExportHTTPFuzzerTaskToYamlResponse
+	550, // 975: ypb.Yak.RenderHTTPFuzzerPacket:output_type -> ypb.RenderHTTPFuzzerPacketResponse
+	4,   // 976: ypb.Yak.SaveFuzzerLabel:output_type -> ypb.Empty
+	146, // 977: ypb.Yak.QueryFuzzerLabel:output_type -> ypb.QueryFuzzerLabelResponse
+	4,   // 978: ypb.Yak.DeleteFuzzerLabel:output_type -> ypb.Empty
+	579, // 979: ypb.Yak.SaveFuzzerConfig:output_type -> ypb.DbOperateMessage
+	151, // 980: ypb.Yak.QueryFuzzerConfig:output_type -> ypb.QueryFuzzerConfigResponse
+	579, // 981: ypb.Yak.DeleteFuzzerConfig:output_type -> ypb.DbOperateMessage
+	159, // 982: ypb.Yak.QueryHTTPFuzzerResponseByTaskId:output_type -> ypb.QueryHTTPFuzzerResponseByTaskIdResponse
+	163, // 983: ypb.Yak.CreateWebsocketFuzzer:output_type -> ypb.ClientWebsocketResponse
+	519, // 984: ypb.Yak.QueryWebsocketFlowByHTTPFlowWebsocketHash:output_type -> ypb.WebsocketFlows
+	4,   // 985: ypb.Yak.DeleteWebsocketFlowByHTTPFlowWebsocketHash:output_type -> ypb.Empty
+	4,   // 986: ypb.Yak.DeleteWebsocketFlowAll:output_type -> ypb.Empty
+	509, // 987: ypb.Yak.ConvertFuzzerResponseToHTTPFlow:output_type -> ypb.HTTPFlow
+	466, // 988: ypb.Yak.StringFuzzer:output_type -> ypb.StringFuzzerResponse
+	469, // 989: ypb.Yak.HTTPRequestAnalyzer:output_type -> ypb.HTTPRequestAnalysis
+	458, // 990: ypb.Yak.Codec:output_type -> ypb.CodecResponse
+	458, // 991: ypb.Yak.NewCodec:output_type -> ypb.CodecResponse
+	459, // 992: ypb.Yak.GetAllCodecMethods:output_type -> ypb.CodecMethods
+	4,   // 993: ypb.Yak.SaveCodecFlow:output_type -> ypb.Empty
+	4,   // 994: ypb.Yak.DeleteCodecFlow:output_type -> ypb.Empty
+	457, // 995: ypb.Yak.GetAllCodecFlow:output_type -> ypb.GetCodecFlowResponse
+	53,  // 996: ypb.Yak.PacketPrettifyHelper:output_type -> ypb.PacketPrettifyHelperResponse
+	419, // 997: ypb.Yak.QueryPayload:output_type -> ypb.QueryPayloadResponse
+	417, // 998: ypb.Yak.QueryPayloadFromFile:output_type -> ypb.QueryPayloadFromFileResponse
+	4,   // 999: ypb.Yak.DeletePayloadByFolder:output_type -> ypb.Empty
+	4,   // 1000: ypb.Yak.DeletePayloadByGroup:output_type -> ypb.Empty
+	4,   // 1001: ypb.Yak.DeletePayload:output_type -> ypb.Empty
+	4,   // 1002: ypb.Yak.SavePayload:output_type -> ypb.Empty
+	183, // 1003: ypb.Yak.SavePayloadStream:output_type -> ypb.SavePayloadProgress
+	183, // 1004: ypb.Yak.SavePayloadToFileStream:output_type -> ypb.SavePayloadProgress
+	183, // 1005: ypb.Yak.SaveLargePayloadToFileStream:output_type -> ypb.SavePayloadProgress
+	4,   // 1006: ypb.Yak.RenamePayloadFolder:output_type -> ypb.Empty
+	4,   // 1007: ypb.Yak.RenamePayloadGroup:output_type -> ypb.Empty
+	4,   // 1008: ypb.Yak.UpdatePayload:output_type -> ypb.Empty
+	4,   // 1009: ypb.Yak.UpdatePayloadToFile:output_type -> ypb.Empty
+	4,   // 1010: ypb.Yak.BackUpOrCopyPayloads:output_type -> ypb.Empty
+	408, // 1011: ypb.Yak.GetAllPayloadGroup:output_type -> ypb.GetAllPayloadGroupResponse
+	4,   // 1012: ypb.Yak.UpdateAllPayloadGroup:output_type -> ypb.Empty
+	422, // 1013: ypb.Yak.GetAllPayload:output_type -> ypb.GetAllPayloadResponse
+	423, // 1014: ypb.Yak.GetAllPayloadFromFile:output_type -> ypb.GetAllPayloadFromFileResponse
+	422, // 1015: ypb.Yak.ExportAllPayload:output_type -> ypb.GetAllPayloadResponse
+	422, // 1016: ypb.Yak.ExportAllPayloadFromFile:output_type -> ypb.GetAllPayloadResponse
+	4,   // 1017: ypb.Yak.CreatePayloadFolder:output_type -> ypb.Empty
+	183, // 1018: ypb.Yak.RemoveDuplicatePayloads:output_type -> ypb.SavePayloadProgress
+	183, // 1019: ypb.Yak.CoverPayloadGroupToDatabase:output_type -> ypb.SavePayloadProgress
+	183, // 1020: ypb.Yak.ConvertPayloadGroupToDatabase:output_type -> ypb.SavePayloadProgress
+	183, // 1021: ypb.Yak.MigratePayloads:output_type -> ypb.SavePayloadProgress
+	400, // 1022: ypb.Yak.GetYakitCompletionRaw:output_type -> ypb.YakitCompletionRawResponse
+	404, // 1023: ypb.Yak.GetYakVMBuildInMethodCompletion:output_type -> ypb.GetYakVMBuildInMethodCompletionResponse
+	182, // 1024: ypb.Yak.StaticAnalyzeError:output_type -> ypb.StaticAnalyzeErrorResponse
+	180, // 1025: ypb.Yak.YaklangCompileAndFormat:output_type -> ypb.YaklangCompileAndFormatResponse
+	171, // 1026: ypb.Yak.YaklangLanguageSuggestion:output_type -> ypb.YaklangLanguageSuggestionResponse
+	172, // 1027: ypb.Yak.YaklangLanguageFind:output_type -> ypb.YaklangLanguageFindResponse
+	171, // 1028: ypb.Yak.FuzzTagSuggestion:output_type -> ypb.YaklangLanguageSuggestionResponse
+	173, // 1029: ypb.Yak.YaklangInspectInformation:output_type -> ypb.YaklangInspectInformationResponse
+	176, // 1030: ypb.Yak.YaklangGetCliCodeFromDatabase:output_type -> ypb.YaklangGetCliCodeFromDatabaseResponse
+	536, // 1031: ypb.Yak.YaklangTerminal:output_type -> ypb.Output
+	539, // 1032: ypb.Yak.PortScan:output_type -> ypb.ExecResult
+	391, // 1033: ypb.Yak.ViewPortScanCode:output_type -> ypb.SimpleScript
+	539, // 1034: ypb.Yak.SimpleDetect:output_type -> ypb.ExecResult
+	4,   // 1035: ypb.Yak.SaveCancelSimpleDetect:output_type -> ypb.Empty
+	539, // 1036: ypb.Yak.SimpleDetectCreatReport:output_type -> ypb.ExecResult
+	217, // 1037: ypb.Yak.QuerySimpleDetectUnfinishedTask:output_type -> ypb.QueryUnfinishedTaskResponse
+	393, // 1038: ypb.Yak.GetSimpleDetectRecordRequestById:output_type -> ypb.RecordPortScanRequest
+	4,   // 1039: ypb.Yak.DeleteSimpleDetectUnfinishedTask:output_type -> ypb.Empty
+	539, // 1040: ypb.Yak.RecoverSimpleDetectTask:output_type -> ypb.ExecResult
+	212, // 1041: ypb.Yak.GetSimpleDetectUnfinishedTask:output_type -> ypb.GetSimpleDetectUnfinishedTaskResponse
+	393, // 1042: ypb.Yak.GetSimpleDetectUnfinishedTaskByUid:output_type -> ypb.RecordPortScanRequest
+	393, // 1043: ypb.Yak.PopSimpleDetectUnfinishedTaskByUid:output_type -> ypb.RecordPortScanRequest
+	539, // 1044: ypb.Yak.RecoverSimpleDetectUnfinishedTask:output_type -> ypb.ExecResult
+	398, // 1045: ypb.Yak.QueryPorts:output_type -> ypb.QueryPortsResponse
+	4,   // 1046: ypb.Yak.DeletePorts:output_type -> ypb.Empty
+	342, // 1047: ypb.Yak.QueryHosts:output_type -> ypb.QueryHostsResponse
+	4,   // 1048: ypb.Yak.DeleteHosts:output_type -> ypb.Empty
+	345, // 1049: ypb.Yak.QueryDomains:output_type -> ypb.QueryDomainsResponse
+	4,   // 1050: ypb.Yak.DeleteDomains:output_type -> ypb.Empty
+	347, // 1051: ypb.Yak.QueryPortsGroup:output_type -> ypb.QueryPortsGroupResponse
+	4,   // 1052: ypb.Yak.UpdateFromYakitResource:output_type -> ypb.Empty
+	4,   // 1053: ypb.Yak.UpdateFromGithub:output_type -> ypb.Empty
+	4,   // 1054: ypb.Yak.AddToMenu:output_type -> ypb.Empty
+	4,   // 1055: ypb.Yak.RemoveFromMenu:output_type -> ypb.Empty
+	4,   // 1056: ypb.Yak.YakScriptIsInMenu:output_type -> ypb.Empty
+	374, // 1057: ypb.Yak.GetAllMenuItem:output_type -> ypb.MenuByGroup
+	4,   // 1058: ypb.Yak.DeleteAllMenuItem:output_type -> ypb.Empty
+	4,   // 1059: ypb.Yak.ImportMenuItem:output_type -> ypb.Empty
+	381, // 1060: ypb.Yak.ExportMenuItem:output_type -> ypb.ExportMenuItemResult
+	370, // 1061: ypb.Yak.GetMenuItemById:output_type -> ypb.MenuItem
+	368, // 1062: ypb.Yak.QueryGroupsByYakScriptId:output_type -> ypb.GroupNames
+	4,   // 1063: ypb.Yak.AddMenus:output_type -> ypb.Empty
+	374, // 1064: ypb.Yak.QueryAllMenuItem:output_type -> ypb.MenuByGroup
+	4,   // 1065: ypb.Yak.DeleteAllMenu:output_type -> ypb.Empty
+	4,   // 1066: ypb.Yak.AddToNavigation:output_type -> ypb.Empty
+	386, // 1067: ypb.Yak.GetAllNavigationItem:output_type -> ypb.GetAllNavigationItemResponse
+	4,   // 1068: ypb.Yak.DeleteAllNavigation:output_type -> ypb.Empty
+	4,   // 1069: ypb.Yak.AddOneNavigation:output_type -> ypb.Empty
+	368, // 1070: ypb.Yak.QueryNavigationGroups:output_type -> ypb.GroupNames
+	4,   // 1071: ypb.Yak.SaveMarkdownDocument:output_type -> ypb.Empty
+	365, // 1072: ypb.Yak.GetMarkdownDocument:output_type -> ypb.GetMarkdownDocumentResponse
+	4,   // 1073: ypb.Yak.DeleteMarkdownDocument:output_type -> ypb.Empty
+	539, // 1074: ypb.Yak.StartBasicCrawler:output_type -> ypb.ExecResult
+	391, // 1075: ypb.Yak.ViewBasicCrawlerCode:output_type -> ypb.SimpleScript
+	356, // 1076: ypb.Yak.GenerateWebsiteTree:output_type -> ypb.GenerateWebsiteTreeResponse
+	355, // 1077: ypb.Yak.QueryYakScriptExecResult:output_type -> ypb.QueryYakScriptExecResultResponse
+	353, // 1078: ypb.Yak.QueryYakScriptNameInExecResult:output_type -> ypb.YakScriptNames
+	4,   // 1079: ypb.Yak.DeleteYakScriptExecResult:output_type -> ypb.Empty
+	4,   // 1080: ypb.Yak.DeleteYakScriptExec:output_type -> ypb.Empty
+	539, // 1081: ypb.Yak.StartBrute:output_type -> ypb.ExecResult
+	335, // 1082: ypb.Yak.GetAvailableBruteTypes:output_type -> ypb.GetAvailableBruteTypesResponse
+	329, // 1083: ypb.Yak.GetTunnelServerExternalIP:output_type -> ypb.GetTunnelServerExternalIPResponse
+	327, // 1084: ypb.Yak.VerifyTunnelServerDomain:output_type -> ypb.VerifyTunnelServerDomainResponse
+	539, // 1085: ypb.Yak.StartFacades:output_type -> ypb.ExecResult
+	539, // 1086: ypb.Yak.StartFacadesWithYsoObject:output_type -> ypb.ExecResult
+	4,   // 1087: ypb.Yak.ApplyClassToFacades:output_type -> ypb.Empty
+	280, // 1088: ypb.Yak.BytesToBase64:output_type -> ypb.BytesToBase64Response
+	4,   // 1089: ypb.Yak.ConfigGlobalReverse:output_type -> ypb.Empty
+	309, // 1090: ypb.Yak.AvailableLocalAddr:output_type -> ypb.AvailableLocalAddrResponse
+	308, // 1091: ypb.Yak.GetGlobalReverseServer:output_type -> ypb.GetGlobalReverseServerResponse
+	316, // 1092: ypb.Yak.QueryRisks:output_type -> ypb.QueryRisksResponse
+	314, // 1093: ypb.Yak.QueryRisk:output_type -> ypb.Risk
+	4,   // 1094: ypb.Yak.DeleteRisk:output_type -> ypb.Empty
+	265, // 1095: ypb.Yak.QueryAvailableRiskType:output_type -> ypb.Fields
+	265, // 1096: ypb.Yak.QueryAvailableRiskLevel:output_type -> ypb.Fields
+	262, // 1097: ypb.Yak.QueryRiskTableStats:output_type -> ypb.RiskTableStats
+	4,   // 1098: ypb.Yak.ResetRiskTableStats:output_type -> ypb.Empty
+	265, // 1099: ypb.Yak.QueryAvailableTarget:output_type -> ypb.Fields
+	318, // 1100: ypb.Yak.QueryNewRisk:output_type -> ypb.QueryNewRiskResponse
+	4,   // 1101: ypb.Yak.NewRiskRead:output_type -> ypb.Empty
+	4,   // 1102: ypb.Yak.UploadRiskToOnline:output_type -> ypb.Empty
+	4,   // 1103: ypb.Yak.SetTagForRisk:output_type -> ypb.Empty
+	319, // 1104: ypb.Yak.QueryRiskTags:output_type -> ypb.QueryRiskTagsResponse
+	320, // 1105: ypb.Yak.RiskFieldGroup:output_type -> ypb.RiskFieldGroupResponse
+	4,   // 1106: ypb.Yak.RiskFeedbackToOnline:output_type -> ypb.Empty
+	252, // 1107: ypb.Yak.QueryReports:output_type -> ypb.QueryReportsResponse
+	254, // 1108: ypb.Yak.QueryReport:output_type -> ypb.Report
+	4,   // 1109: ypb.Yak.DeleteReport:output_type -> ypb.Empty
+	265, // 1110: ypb.Yak.QueryAvailableReportFrom:output_type -> ypb.Fields
+	4,   // 1111: ypb.Yak.DownloadReport:output_type -> ypb.Empty
+	267, // 1112: ypb.Yak.GetAllYsoGadgetOptions:output_type -> ypb.YsoOptionsWithVerbose
+	267, // 1113: ypb.Yak.GetAllYsoClassOptions:output_type -> ypb.YsoOptionsWithVerbose
+	270, // 1114: ypb.Yak.GetAllYsoClassGeneraterOptions:output_type -> ypb.YsoClassOptionsResponseWithVerbose
+	277, // 1115: ypb.Yak.GenerateYsoCode:output_type -> ypb.YsoCodeResponse
+	278, // 1116: ypb.Yak.GenerateYsoBytes:output_type -> ypb.YsoBytesResponse
+	276, // 1117: ypb.Yak.YsoDump:output_type -> ypb.YsoDumpResponse
+	293, // 1118: ypb.Yak.CreateWebShell:output_type -> ypb.WebShell
+	4,   // 1119: ypb.Yak.DeleteWebShell:output_type -> ypb.Empty
+	293, // 1120: ypb.Yak.UpdateWebShell:output_type -> ypb.WebShell
+	299, // 1121: ypb.Yak.QueryWebShells:output_type -> ypb.QueryWebShellsResponse
+	297, // 1122: ypb.Yak.Ping:output_type -> ypb.WebShellResponse
+	297, // 1123: ypb.Yak.GetBasicInfo:output_type -> ypb.WebShellResponse
+	297, // 1124: ypb.Yak.GenerateWebShell:output_type -> ypb.WebShellResponse
+	4,   // 1125: ypb.Yak.SetYakBridgeLogServer:output_type -> ypb.Empty
+	302, // 1126: ypb.Yak.GetCurrentYakBridgeLogServer:output_type -> ypb.YakDNSLogBridgeAddr
+	307, // 1127: ypb.Yak.RequireDNSLogDomain:output_type -> ypb.DNSLogRootDomain
+	307, // 1128: ypb.Yak.RequireDNSLogDomainByScript:output_type -> ypb.DNSLogRootDomain
+	305, // 1129: ypb.Yak.QueryDNSLogByToken:output_type -> ypb.QueryDNSLogByTokenResponse
+	305, // 1130: ypb.Yak.QueryDNSLogTokenByScript:output_type -> ypb.QueryDNSLogByTokenResponse
+	257, // 1131: ypb.Yak.RequireICMPRandomLength:output_type -> ypb.RequireICMPRandomLengthResponse
+	282, // 1132: ypb.Yak.QueryICMPTrigger:output_type -> ypb.QueryICMPTriggerResponse
+	260, // 1133: ypb.Yak.RequireRandomPortToken:output_type -> ypb.RandomPortInfo
+	258, // 1134: ypb.Yak.QueryRandomPortTrigger:output_type -> ypb.RandomPortTriggerNotification
+	283, // 1135: ypb.Yak.QuerySupportedDnsLogPlatforms:output_type -> ypb.QuerySupportedDnsLogPlatformsResponse
+	265, // 1136: ypb.Yak.GetAvailableYakScriptTags:output_type -> ypb.Fields
+	4,   // 1137: ypb.Yak.ForceUpdateAvailableYakScriptTags:output_type -> ypb.Empty
+	539, // 1138: ypb.Yak.ExecYakitPluginsByYakScriptFilter:output_type -> ypb.ExecResult
+	249, // 1139: ypb.Yak.GenerateYakCodeByPacket:output_type -> ypb.GenerateYakCodeByPacketResponse
+	248, // 1140: ypb.Yak.GenerateCSRFPocByPacket:output_type -> ypb.GenerateCSRFPocByPacketResponse
+	244, // 1141: ypb.Yak.ExportMITMReplacerRules:output_type -> ypb.ExportMITMReplacerRulesResponse
+	4,   // 1142: ypb.Yak.ImportMITMReplacerRules:output_type -> ypb.Empty
+	242, // 1143: ypb.Yak.GetCurrentRules:output_type -> ypb.MITMContentReplacers
+	4,   // 1144: ypb.Yak.SetCurrentRules:output_type -> ypb.Empty
+	554, // 1145: ypb.Yak.GenerateURL:output_type -> ypb.GenerateURLResponse
+	226, // 1146: ypb.Yak.ExtractDataToFile:output_type -> ypb.ExtractDataToFileResult
+	225, // 1147: ypb.Yak.AutoDecode:output_type -> ypb.AutoDecodeResponse
+	206, // 1148: ypb.Yak.GetSystemProxy:output_type -> ypb.GetSystemProxyResult
+	4,   // 1149: ypb.Yak.SetSystemProxy:output_type -> ypb.Empty
+	202, // 1150: ypb.Yak.GetKey:output_type -> ypb.GetKeyResult
+	4,   // 1151: ypb.Yak.SetKey:output_type -> ypb.Empty
+	4,   // 1152: ypb.Yak.DelKey:output_type -> ypb.Empty
+	204, // 1153: ypb.Yak.GetAllProcessEnvKey:output_type -> ypb.GetProcessEnvKeyResult
+	4,   // 1154: ypb.Yak.SetProcessEnvKey:output_type -> ypb.Empty
+	202, // 1155: ypb.Yak.GetProjectKey:output_type -> ypb.GetKeyResult
+	4,   // 1156: ypb.Yak.SetProjectKey:output_type -> ypb.Empty
+	199, // 1157: ypb.Yak.GetOnlineProfile:output_type -> ypb.OnlineProfile
+	4,   // 1158: ypb.Yak.SetOnlineProfile:output_type -> ypb.Empty
+	4,   // 1159: ypb.Yak.DownloadOnlinePluginById:output_type -> ypb.Empty
+	4,   // 1160: ypb.Yak.DownloadOnlinePluginByIds:output_type -> ypb.Empty
+	186, // 1161: ypb.Yak.DownloadOnlinePluginAll:output_type -> ypb.DownloadOnlinePluginProgress
+	4,   // 1162: ypb.Yak.DeletePluginByUserID:output_type -> ypb.Empty
+	4,   // 1163: ypb.Yak.DeleteAllLocalPlugins:output_type -> ypb.Empty
+	450, // 1164: ypb.Yak.GetYakScriptTagsAndType:output_type -> ypb.GetYakScriptTagsAndTypeResponse
+	4,   // 1165: ypb.Yak.DeleteLocalPluginsByWhere:output_type -> ypb.Empty
+	193, // 1166: ypb.Yak.DownloadOnlinePluginByScriptNames:output_type -> ypb.DownloadOnlinePluginByScriptNamesResponse
+	186, // 1167: ypb.Yak.DownloadOnlinePlugins:output_type -> ypb.DownloadOnlinePluginProgress
+	4,   // 1168: ypb.Yak.DownloadOnlinePluginBatch:output_type -> ypb.Empty
+	193, // 1169: ypb.Yak.DownloadOnlinePluginByPluginName:output_type -> ypb.DownloadOnlinePluginByScriptNamesResponse
+	428, // 1170: ypb.Yak.DownloadOnlinePluginByUUID:output_type -> ypb.YakScript
+	197, // 1171: ypb.Yak.QueryOnlinePlugins:output_type -> ypb.QueryOnlinePluginsResponse
+	539, // 1172: ypb.Yak.ExecPacketScan:output_type -> ypb.ExecResult
+	164, // 1173: ypb.Yak.GetEngineDefaultProxy:output_type -> ypb.DefaultProxyResult
+	4,   // 1174: ypb.Yak.SetEngineDefaultProxy:output_type -> ypb.Empty
+	157, // 1175: ypb.Yak.GetMachineID:output_type -> ypb.GetMachineIDResponse
+	540, // 1176: ypb.Yak.GetLicense:output_type -> ypb.GetLicenseResponse
+	4,   // 1177: ypb.Yak.CheckLicense:output_type -> ypb.Empty
+	143, // 1178: ypb.Yak.GetRequestBodyByHTTPFlowID:output_type -> ypb.Bytes
+	143, // 1179: ypb.Yak.GetResponseBodyByHTTPFlowID:output_type -> ypb.Bytes
+	143, // 1180: ypb.Yak.GetHTTPPacketBody:output_type -> ypb.Bytes
+	140, // 1181: ypb.Yak.RegisterFacadesHTTP:output_type -> ypb.RegisterFacadesHTTPResponse
+	4,   // 1182: ypb.Yak.ResetAndInvalidUserData:output_type -> ypb.Empty
+	137, // 1183: ypb.Yak.CreateYaklangShell:output_type -> ypb.YaklangShellResponse
+	539, // 1184: ypb.Yak.AttachCombinedOutput:output_type -> ypb.ExecResult
+	120, // 1185: ypb.Yak.IsPrivilegedForNetRaw:output_type -> ypb.IsPrivilegedForNetRawResponse
+	4,   // 1186: ypb.Yak.PromotePermissionForUserPcap:output_type -> ypb.Empty
+	4,   // 1187: ypb.Yak.SetCurrentProject:output_type -> ypb.Empty
+	126, // 1188: ypb.Yak.GetCurrentProject:output_type -> ypb.ProjectDescription
+	126, // 1189: ypb.Yak.GetCurrentProjectEx:output_type -> ypb.ProjectDescription
+	127, // 1190: ypb.Yak.GetProjects:output_type -> ypb.GetProjectsResponse
+	124, // 1191: ypb.Yak.NewProject:output_type -> ypb.NewProjectResponse
+	124, // 1192: ypb.Yak.UpdateProject:output_type -> ypb.NewProjectResponse
+	4,   // 1193: ypb.Yak.IsProjectNameValid:output_type -> ypb.Empty
+	4,   // 1194: ypb.Yak.RemoveProject:output_type -> ypb.Empty
+	4,   // 1195: ypb.Yak.DeleteProject:output_type -> ypb.Empty
+	126, // 1196: ypb.Yak.GetDefaultProject:output_type -> ypb.ProjectDescription
+	126, // 1197: ypb.Yak.GetDefaultProjectEx:output_type -> ypb.ProjectDescription
+	126, // 1198: ypb.Yak.QueryProjectDetail:output_type -> ypb.ProjectDescription
+	126, // 1199: ypb.Yak.GetTemporaryProject:output_type -> ypb.ProjectDescription
+	126, // 1200: ypb.Yak.GetTemporaryProjectEx:output_type -> ypb.ProjectDescription
+	118, // 1201: ypb.Yak.ExportProject:output_type -> ypb.ProjectIOProgress
+	118, // 1202: ypb.Yak.ImportProject:output_type -> ypb.ProjectIOProgress
+	4,   // 1203: ypb.Yak.MigrateLegacyDatabase:output_type -> ypb.Empty
+	112, // 1204: ypb.Yak.QueryMITMRuleExtractedData:output_type -> ypb.QueryMITMRuleExtractedDataResponse
+	116, // 1205: ypb.Yak.ExportMITMRuleExtractedData:output_type -> ypb.ExportMITMRuleExtractedDataResponse
+	4,   // 1206: ypb.Yak.ImportChaosMakerRules:output_type -> ypb.Empty
+	103, // 1207: ypb.Yak.QueryChaosMakerRule:output_type -> ypb.QueryChaosMakerRuleResponse
+	4,   // 1208: ypb.Yak.DeleteChaosMakerRuleByID:output_type -> ypb.Empty
+	539, // 1209: ypb.Yak.ExecuteChaosMakerRule:output_type -> ypb.ExecResult
+	100, // 1210: ypb.Yak.IsRemoteAddrAvailable:output_type -> ypb.IsRemoteAddrAvailableResponse
+	100, // 1211: ypb.Yak.ConnectVulinboxAgent:output_type -> ypb.IsRemoteAddrAvailableResponse
+	66,  // 1212: ypb.Yak.GetRegisteredVulinboxAgent:output_type -> ypb.GetRegisteredAgentResponse
+	4,   // 1213: ypb.Yak.DisconnectVulinboxAgent:output_type -> ypb.Empty
+	109, // 1214: ypb.Yak.IsCVEDatabaseReady:output_type -> ypb.IsCVEDatabaseReadyResponse
+	539, // 1215: ypb.Yak.UpdateCVEDatabase:output_type -> ypb.ExecResult
+	539, // 1216: ypb.Yak.ExportsProfileDatabase:output_type -> ypb.ExecResult
+	539, // 1217: ypb.Yak.ImportsProfileDatabase:output_type -> ypb.ExecResult
+	94,  // 1218: ypb.Yak.QueryCVE:output_type -> ypb.QueryCVEResponse
+	92,  // 1219: ypb.Yak.GetCVE:output_type -> ypb.CVEDetailEx
+	96,  // 1220: ypb.Yak.SaveTextToTemporalFile:output_type -> ypb.SaveTextToTemporalFileResponse
+	88,  // 1221: ypb.Yak.IsScrecorderReady:output_type -> ypb.IsScrecorderReadyResponse
+	539, // 1222: ypb.Yak.InstallScrecorder:output_type -> ypb.ExecResult
+	539, // 1223: ypb.Yak.StartScrecorder:output_type -> ypb.ExecResult
+	84,  // 1224: ypb.Yak.QueryScreenRecorders:output_type -> ypb.QueryScreenRecorderResponse
+	4,   // 1225: ypb.Yak.DeleteScreenRecorders:output_type -> ypb.Empty
+	4,   // 1226: ypb.Yak.UploadScreenRecorders:output_type -> ypb.Empty
+	79,  // 1227: ypb.Yak.GetOneScreenRecorders:output_type -> ypb.ScreenRecorder
+	4,   // 1228: ypb.Yak.UpdateScreenRecorders:output_type -> ypb.Empty
+	71,  // 1229: ypb.Yak.IsVulinboxReady:output_type -> ypb.IsVulinboxReadyResponse
+	539, // 1230: ypb.Yak.InstallVulinbox:output_type -> ypb.ExecResult
+	539, // 1231: ypb.Yak.StartVulinbox:output_type -> ypb.ExecResult
+	539, // 1232: ypb.Yak.GenQualityInspectionReport:output_type -> ypb.ExecResult
+	77,  // 1233: ypb.Yak.HTTPRequestBuilder:output_type -> ypb.HTTPRequestBuilderResponse
+	539, // 1234: ypb.Yak.DebugPlugin:output_type -> ypb.ExecResult
+	69,  // 1235: ypb.Yak.SmokingEvaluatePlugin:output_type -> ypb.SmokingEvaluatePluginResponse
+	552, // 1236: ypb.Yak.SmokingEvaluatePluginBatch:output_type -> ypb.SmokingEvaluatePluginBatchResponse
+	542, // 1237: ypb.Yak.GetSystemDefaultDnsServers:output_type -> ypb.DefaultDnsServerResponse
+	63,  // 1238: ypb.Yak.DiagnoseNetwork:output_type -> ypb.DiagnoseNetworkResponse
+	63,  // 1239: ypb.Yak.DiagnoseNetworkDNS:output_type -> ypb.DiagnoseNetworkResponse
+	559, // 1240: ypb.Yak.TraceRoute:output_type -> ypb.TraceRouteResponse
+	59,  // 1241: ypb.Yak.GetGlobalNetworkConfig:output_type -> ypb.GlobalNetworkConfig
+	4,   // 1242: ypb.Yak.SetGlobalNetworkConfig:output_type -> ypb.Empty
+	4,   // 1243: ypb.Yak.ResetGlobalNetworkConfig:output_type -> ypb.Empty
+	58,  // 1244: ypb.Yak.ValidP12PassWord:output_type -> ypb.ValidP12PassWordResponse
+	51,  // 1245: ypb.Yak.RequestYakURL:output_type -> ypb.RequestYakURLResponse
+	574, // 1246: ypb.Yak.ReadFile:output_type -> ypb.ReadFileResponse
+	35,  // 1247: ypb.Yak.GetPcapMetadata:output_type -> ypb.PcapMetadata
+	47,  // 1248: ypb.Yak.PcapX:output_type -> ypb.PcapXResponse
+	39,  // 1249: ypb.Yak.QueryTrafficSession:output_type -> ypb.QueryTrafficSessionResponse
+	41,  // 1250: ypb.Yak.QueryTrafficPacket:output_type -> ypb.QueryTrafficPacketResponse
+	43,  // 1251: ypb.Yak.QueryTrafficTCPReassembled:output_type -> ypb.QueryTrafficTCPReassembledResponse
+	557, // 1252: ypb.Yak.ParseTraffic:output_type -> ypb.ParseTrafficResponse
+	33,  // 1253: ypb.Yak.DuplexConnection:output_type -> ypb.DuplexConnectionResponse
+	27,  // 1254: ypb.Yak.HybridScan:output_type -> ypb.HybridScanResponse
+	24,  // 1255: ypb.Yak.QueryHybridScanTask:output_type -> ypb.QueryHybridScanTaskResponse
+	4,   // 1256: ypb.Yak.DeleteHybridScanTask:output_type -> ypb.Empty
+	20,  // 1257: ypb.Yak.GetSpaceEngineStatus:output_type -> ypb.SpaceEngineStatus
+	20,  // 1258: ypb.Yak.GetSpaceEngineAccountStatus:output_type -> ypb.SpaceEngineStatus
+	20,  // 1259: ypb.Yak.GetSpaceEngineAccountStatusV2:output_type -> ypb.SpaceEngineStatus
+	539, // 1260: ypb.Yak.FetchPortAssetFromSpaceEngine:output_type -> ypb.ExecResult
+	561, // 1261: ypb.Yak.EvaluateExpression:output_type -> ypb.EvaluateExpressionResponse
+	563, // 1262: ypb.Yak.EvaluateMultiExpression:output_type -> ypb.EvaluateMultiExpressionResponse
+	566, // 1263: ypb.Yak.GetThirdPartyAppConfigTemplate:output_type -> ypb.GetThirdPartyAppConfigTemplateResponse
+	6,   // 1264: ypb.Yak.CheckHahValidAiConfig:output_type -> ypb.GeneralResponse
+	691, // 1265: ypb.Yak.ListAiModel:output_type -> ypb.ListAiModelResponse
+	568, // 1266: ypb.Yak.GetFingerprint:output_type -> ypb.GetFingerprintResponse
+	570, // 1267: ypb.Yak.AddFingerprint:output_type -> ypb.AddFingerprintResponse
+	572, // 1268: ypb.Yak.ModifyFingerprint:output_type -> ypb.ModifyFingerprintResponse
+	584, // 1269: ypb.Yak.QueryFingerprint:output_type -> ypb.QueryFingerprintResponse
+	579, // 1270: ypb.Yak.DeleteFingerprint:output_type -> ypb.DbOperateMessage
+	579, // 1271: ypb.Yak.UpdateFingerprint:output_type -> ypb.DbOperateMessage
+	579, // 1272: ypb.Yak.CreateFingerprint:output_type -> ypb.DbOperateMessage
+	579, // 1273: ypb.Yak.RecoverBuiltinFingerprint:output_type -> ypb.DbOperateMessage
+	576, // 1274: ypb.Yak.GetReverseShellProgramList:output_type -> ypb.GetReverseShellProgramListResponse
+	578, // 1275: ypb.Yak.GenerateReverseShellCommand:output_type -> ypb.GenerateReverseShellCommandResponse
+	603, // 1276: ypb.Yak.QuerySyntaxFlowRule:output_type -> ypb.QuerySyntaxFlowRuleResponse
+	579, // 1277: ypb.Yak.CreateSyntaxFlowRule:output_type -> ypb.DbOperateMessage
+	600, // 1278: ypb.Yak.CreateSyntaxFlowRuleEx:output_type -> ypb.CreateSyntaxFlowRuleResponse
+	579, // 1279: ypb.Yak.UpdateSyntaxFlowRule:output_type -> ypb.DbOperateMessage
+	602, // 1280: ypb.Yak.UpdateSyntaxFlowRuleEx:output_type -> ypb.UpdateSyntaxFlowRuleResponse
+	579, // 1281: ypb.Yak.DeleteSyntaxFlowRule:output_type -> ypb.DbOperateMessage
+	606, // 1282: ypb.Yak.CheckSyntaxFlowRuleUpdate:output_type -> ypb.CheckSyntaxFlowRuleUpdateResponse
+	608, // 1283: ypb.Yak.ApplySyntaxFlowRuleUpdate:output_type -> ypb.ApplySyntaxFlowRuleUpdateResponse
+	612, // 1284: ypb.Yak.QuerySyntaxFlowRuleGroup:output_type -> ypb.QuerySyntaxFlowRuleGroupResponse
+	579, // 1285: ypb.Yak.DeleteSyntaxFlowRuleGroup:output_type -> ypb.DbOperateMessage
+	579, // 1286: ypb.Yak.CreateSyntaxFlowRuleGroup:output_type -> ypb.DbOperateMessage
+	579, // 1287: ypb.Yak.UpdateSyntaxFlowRuleGroup:output_type -> ypb.DbOperateMessage
+	579, // 1288: ypb.Yak.UpdateSyntaxFlowRuleAndGroup:output_type -> ypb.DbOperateMessage
+	617, // 1289: ypb.Yak.QuerySyntaxFlowSameGroup:output_type -> ypb.QuerySyntaxFlowSameGroupResponse
+	625, // 1290: ypb.Yak.SyntaxFlowScan:output_type -> ypb.SyntaxFlowScanResponse
+	622, // 1291: ypb.Yak.QuerySyntaxFlowScanTask:output_type -> ypb.QuerySyntaxFlowScanTaskResponse
+	579, // 1292: ypb.Yak.DeleteSyntaxFlowScanTask:output_type -> ypb.DbOperateMessage
+	628, // 1293: ypb.Yak.QuerySyntaxFlowResult:output_type -> ypb.QuerySyntaxFlowResultResponse
+	631, // 1294: ypb.Yak.DeleteSyntaxFlowResult:output_type -> ypb.DeleteSyntaxFlowResultResponse
+	598, // 1295: ypb.Yak.QuerySSAPrograms:output_type -> ypb.QuerySSAProgramResponse
+	579, // 1296: ypb.Yak.UpdateSSAProgram:output_type -> ypb.DbOperateMessage
+	579, // 1297: ypb.Yak.DeleteSSAPrograms:output_type -> ypb.DbOperateMessage
+	645, // 1298: ypb.Yak.QuerySSARisks:output_type -> ypb.QuerySSARisksResponse
+	647, // 1299: ypb.Yak.QueryNewSSARisks:output_type -> ypb.QueryNewSSARisksResponse
+	579, // 1300: ypb.Yak.DeleteSSARisks:output_type -> ypb.DbOperateMessage
+	579, // 1301: ypb.Yak.UpdateSSARiskTags:output_type -> ypb.DbOperateMessage
+	650, // 1302: ypb.Yak.GetSSARiskFieldGroup:output_type -> ypb.SSARiskFieldGroupResponse
+	652, // 1303: ypb.Yak.NewSSARiskRead:output_type -> ypb.NewSSARiskReadResponse
+	4,   // 1304: ypb.Yak.SSARiskFeedbackToOnline:output_type -> ypb.Empty
+	633, // 1305: ypb.Yak.GetAllPluginEnv:output_type -> ypb.PluginEnvData
+	633, // 1306: ypb.Yak.QueryPluginEnv:output_type -> ypb.PluginEnvData
+	4,   // 1307: ypb.Yak.CreatePluginEnv:output_type -> ypb.Empty
+	4,   // 1308: ypb.Yak.SetPluginEnv:output_type -> ypb.Empty
+	4,   // 1309: ypb.Yak.DeletePluginEnv:output_type -> ypb.Empty
+	636, // 1310: ypb.Yak.GetAllFuzztagInfo:output_type -> ypb.GetAllFuzztagInfoResponse
+	640, // 1311: ypb.Yak.GenerateFuzztag:output_type -> ypb.GenerateFuzztagResponse
+	656, // 1312: ypb.Yak.ExportSyntaxFlows:output_type -> ypb.SyntaxflowsProgress
+	656, // 1313: ypb.Yak.ImportSyntaxFlows:output_type -> ypb.SyntaxflowsProgress
+	661, // 1314: ypb.Yak.CreateHotPatchTemplate:output_type -> ypb.CreateHotPatchTemplateResponse
+	662, // 1315: ypb.Yak.DeleteHotPatchTemplate:output_type -> ypb.DeleteHotPatchTemplateResponse
+	663, // 1316: ypb.Yak.UpdateHotPatchTemplate:output_type -> ypb.UpdateHotPatchTemplateResponse
+	664, // 1317: ypb.Yak.QueryHotPatchTemplate:output_type -> ypb.QueryHotPatchTemplateResponse
+	666, // 1318: ypb.Yak.QueryHotPatchTemplateList:output_type -> ypb.QueryHotPatchTemplateListResponse
+	668, // 1319: ypb.Yak.GroupTableColumn:output_type -> ypb.GroupTableColumnResponse
+	4,   // 1320: ypb.Yak.UploadHotPatchTemplateToOnline:output_type -> ypb.Empty
+	4,   // 1321: ypb.Yak.DownloadHotPatchTemplate:output_type -> ypb.Empty
+	522, // 1322: ypb.Yak.SetMITMHijackFilter:output_type -> ypb.SetMITMFilterResponse
+	521, // 1323: ypb.Yak.GetMITMHijackFilter:output_type -> ypb.SetMITMFilterRequest
+	521, // 1324: ypb.Yak.ResetMITMHijackFilter:output_type -> ypb.SetMITMFilterRequest
+	672, // 1325: ypb.Yak.ExportHTTPFlowStream:output_type -> ypb.ExportHTTPFlowStreamResponse
+	674, // 1326: ypb.Yak.ImportHTTPFlowStream:output_type -> ypb.ImportHTTPFlowStreamResponse
+	679, // 1327: ypb.Yak.CreateNote:output_type -> ypb.CreateNoteResponse
+	579, // 1328: ypb.Yak.UpdateNote:output_type -> ypb.DbOperateMessage
+	579, // 1329: ypb.Yak.DeleteNote:output_type -> ypb.DbOperateMessage
+	683, // 1330: ypb.Yak.QueryNote:output_type -> ypb.QueryNoteResponse
+	685, // 1331: ypb.Yak.SearchNoteContent:output_type -> ypb.SearchNoteContentResponse
+	687, // 1332: ypb.Yak.ImportNote:output_type -> ypb.ImportNoteResponse
+	689, // 1333: ypb.Yak.ExportNote:output_type -> ypb.ExportNoteResponse
+	14,  // 1334: ypb.Yak.StartAITask:output_type -> ypb.AIOutputEvent
+	882, // [882:1335] is the sub-list for method output_type
+	429, // [429:882] is the sub-list for method input_type
 	429, // [429:429] is the sub-list for extension type_name
 	429, // [429:429] is the sub-list for extension extendee
 	0,   // [0:429] is the sub-list for field type_name
@@ -55407,7 +55612,7 @@ func file_yakgrpc_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_yakgrpc_proto_rawDesc), len(file_yakgrpc_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   690,
+			NumMessages:   694,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
