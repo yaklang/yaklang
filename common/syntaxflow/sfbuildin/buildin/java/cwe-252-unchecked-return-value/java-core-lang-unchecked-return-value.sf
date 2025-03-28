@@ -7,7 +7,7 @@ Java的java.lang库中某些方法会返回一个值，但是调用者没有检�
 TEXT,
 )
 
-/(getRuntime|exec|waitFor|getInCheck|holdsLock|interrupted|concat|replace(All|First)?|substring|to(String|(Lower|Upper)Case)|trim|valueOf)/<getCall> as $toCheck;
+/^(getRuntime|exec|waitFor|getInCheck|holdsLock|interrupted|concat|replace(All|First)?|substring|to(String|(Lower|Upper)Case)|trim|valueOf)$/<getCall> as $toCheck;
 $toCheck?{<typeName>?{have:'java.lang'}}?{!<getUsers>} as $weak;
 
 alert $weak for {
