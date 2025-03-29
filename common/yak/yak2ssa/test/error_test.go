@@ -1573,6 +1573,7 @@ a = [1]
 target = append(a, 2, "3")`,
 				Want: []string{
 					ssa.GenericTypeError(ssa.TypeT, ssa.TypeT, ssa.GetNumberType(), ssa.GetStringType()),
+					ssa4analyze.ArgumentTypeError(3, "string", "number", "append"),
 				},
 			},
 		)

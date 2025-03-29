@@ -191,6 +191,15 @@ func (c *Call) handlerGeneric() {
 		// apply generic type
 		returnType = ApplyGenericType(returnType, instanceTypeMap)
 		// create new function type and set cache
+
+		if fType.IsVariadic {
+			lastType := paramsType[len(paramsType)-1]
+			if lastType.GetTypeKind() != SliceTypeKind {
+				lastType = NewSliceType(lastType)
+			}
+			paramsType = append(paramsType[:len(paramsType)-1], lastType)
+		}
+
 		newFuncTyp := NewFunctionType(newMethod.GetName(), paramsType, returnType, fType.IsVariadic)
 		newMethod = NewFunctionWithType(newMethod.GetName(), newFuncTyp)
 		prog.SetCacheExternInstance(name, newMethod)
