@@ -44,12 +44,11 @@ func FilterSyntaxFlowGroups(db *gorm.DB, filter *ypb.SyntaxFlowRuleGroupFilter) 
 		db = bizhelper.FuzzQueryStringArrayOrLike(db,
 			"group_name", []string{filter.GetKeyWord()})
 	}
-	if filter.GetFilterGroupKind() != "" {
-		if filter.GetFilterGroupKind() == "buildIn" {
-			db = db.Where("is_build_in = ?", true)
-		} else if filter.GetFilterGroupKind() == "unBuildIn" {
-			db = db.Where("is_build_in = ?", false)
-		}
+	switch filter.GetFilterGroupKind() {
+	case FilterBuiltinRuleTrue:
+		db = db.Where("is_build_in = ?", true)
+	case FilterBuiltinRuleFalse:
+		db = db.Where("is_build_in = ?", false)
 	}
 	return db
 }
