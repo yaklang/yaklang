@@ -12,6 +12,102 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+const (
+	FilterLibRuleTrue  string = "lib"
+	FilterLibRuleFalse string = "noLib"
+
+	FilterBuiltinRuleTrue  string = "buildIn"
+	FilterBuiltinRuleFalse string = "unBuildIn"
+)
+
+type SyntaxFlowRuleFilterOption func(*ypb.SyntaxFlowRuleFilter)
+
+func WithSyntaxFlowRuleLib(b bool) SyntaxFlowRuleFilterOption {
+	return func(sfrf *ypb.SyntaxFlowRuleFilter) {
+		if b {
+			sfrf.FilterLibRuleKind = FilterLibRuleTrue
+		} else {
+			sfrf.FilterLibRuleKind = FilterLibRuleFalse
+		}
+	}
+}
+
+func WithSyntaxFlowRuleBuiltin(b bool) SyntaxFlowRuleFilterOption {
+	return func(sfrf *ypb.SyntaxFlowRuleFilter) {
+		if b {
+			sfrf.FilterRuleKind = FilterBuiltinRuleTrue
+		} else {
+			sfrf.FilterRuleKind = FilterBuiltinRuleFalse
+		}
+	}
+}
+
+func WithSyntaxFlowRuleName(name ...string) SyntaxFlowRuleFilterOption {
+	return func(sfrf *ypb.SyntaxFlowRuleFilter) {
+		sfrf.RuleNames = append(sfrf.RuleNames, name...)
+	}
+}
+
+func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter, opt ...SyntaxFlowRuleFilterOption) *gorm.DB {
+	if params == nil {
+		if len(opt) == 0 {
+			// if no param and no option, return db
+			return db
+		} else {
+			// if no param but has option, create a new param
+			params = &ypb.SyntaxFlowRuleFilter{}
+		}
+	}
+	// apply options to it
+	for _, o := range opt {
+		o(params)
+	}
+
+	db = db.Model(&schema.SyntaxFlowRule{})
+
+	if len(params.GetGroupNames()) > 0 {
+		db = db.Joins("JOIN syntax_flow_rule_and_group ON syntax_flow_rule_and_group.syntax_flow_rule_id = syntax_flow_rules.id").
+			Joins("JOIN syntax_flow_groups ON syntax_flow_groups.id = syntax_flow_rule_and_group.syntax_flow_group_id").
+			Where("syntax_flow_groups.group_name IN (?)", params.GetGroupNames()).
+			Group("syntax_flow_rules.id")
+	}
+
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "severity", params.GetSeverity())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_name", params.GetRuleNames())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "language", params.GetLanguage())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "purpose", params.GetPurpose())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "tag", params.GetTag())
+	//if !params.GetIncludeLibraryRule() {
+	//	db = db.Where("allow_included = ?", false)
+	//}
+
+	if params.GetKeyword() != "" {
+		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
+			"rule_name", "title", "title_zh", "description", "content", "tag",
+		}, []string{params.GetKeyword()}, false)
+	}
+	if params.GetAfterId() > 0 {
+		db = db.Where("id > ?", params.GetAfterId())
+	}
+	if params.GetBeforeId() > 0 {
+		db = db.Where("id < ?", params.GetBeforeId())
+	}
+	switch params.GetFilterRuleKind() {
+	case FilterBuiltinRuleTrue:
+		db = bizhelper.QueryByBool(db, "is_build_in_rule", true)
+	case FilterBuiltinRuleFalse:
+		db = bizhelper.QueryByBool(db, "is_build_in_rule", false)
+	}
+
+	switch params.GetFilterLibRuleKind() {
+	case FilterLibRuleTrue:
+		db = bizhelper.QueryByBool(db, "allow_included", true)
+	case FilterLibRuleFalse:
+		db = bizhelper.QueryByBool(db, "allow_included", false)
+	}
+	return db
+}
+
 func QuerySyntaxFlowRule(db *gorm.DB, params *ypb.QuerySyntaxFlowRuleRequest) (*bizhelper.Paginator, []*schema.SyntaxFlowRule, error) {
 	if params == nil {
 		params = &ypb.QuerySyntaxFlowRuleRequest{}
@@ -46,57 +142,6 @@ func QuerySyntaxFlowRuleNames(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter) ([]
 	var names []string
 	db.Pluck("rule_name", &names)
 	return names, db.Error
-}
-
-func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter) *gorm.DB {
-	if params == nil {
-		return db
-	}
-
-	db = db.Model(&schema.SyntaxFlowRule{})
-
-	if len(params.GetGroupNames()) > 0 {
-		db = db.Joins("JOIN syntax_flow_rule_and_group ON syntax_flow_rule_and_group.syntax_flow_rule_id = syntax_flow_rules.id").
-			Joins("JOIN syntax_flow_groups ON syntax_flow_groups.id = syntax_flow_rule_and_group.syntax_flow_group_id").
-			Where("syntax_flow_groups.group_name IN (?)", params.GetGroupNames()).
-			Group("syntax_flow_rules.id")
-	}
-
-	db = bizhelper.ExactOrQueryStringArrayOr(db, "severity", params.GetSeverity())
-	db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_name", params.GetRuleNames())
-	db = bizhelper.ExactOrQueryStringArrayOr(db, "language", params.GetLanguage())
-	db = bizhelper.ExactOrQueryStringArrayOr(db, "purpose", params.GetPurpose())
-	db = bizhelper.ExactOrQueryStringArrayOr(db, "tag", params.GetTag())
-	//if !params.GetIncludeLibraryRule() {
-	//	db = db.Where("allow_included = ?", false)
-	//}
-
-	if params.GetKeyword() != "" {
-		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
-			"rule_name", "title", "title_zh", "description", "content", "tag",
-		}, []string{params.GetKeyword()}, false)
-	}
-	if params.GetAfterId() > 0 {
-		db = db.Where("id > ?", params.GetAfterId())
-	}
-	if params.GetBeforeId() > 0 {
-		db = db.Where("id < ?", params.GetBeforeId())
-	}
-	if kind := params.GetFilterRuleKind(); kind != "" {
-		if kind == "buildIn" {
-			db = bizhelper.QueryByBool(db, "is_build_in_rule", true)
-		} else if kind == "unBuildIn" {
-			db = bizhelper.QueryByBool(db, "is_build_in_rule", false)
-		}
-	}
-	if kind := params.GetFilterLibRuleKind(); kind != "" {
-		if kind == "lib" {
-			db = bizhelper.QueryByBool(db, "allow_included", true)
-		} else if kind == "noLib" {
-			db = bizhelper.QueryByBool(db, "allow_included", false)
-		}
-	}
-	return db
 }
 
 func DeleteSyntaxFlowRule(db *gorm.DB, params *ypb.DeleteSyntaxFlowRuleRequest) (int64, error) {

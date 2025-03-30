@@ -223,33 +223,30 @@ func (m *SyntaxFlowScanManager) initByConfig(stream ypb.Yak_SyntaxFlowScanServer
 	} else if len(config.RuleNames) != 0 {
 		// resume task, use ruleNames
 		m.ruleChan = sfdb.YieldSyntaxFlowRules(
-			yakit.FilterSyntaxFlowRule(consts.GetGormProfileDatabase(), &ypb.SyntaxFlowRuleFilter{
-				RuleNames: config.RuleNames,
-			}),
+			yakit.FilterSyntaxFlowRule(consts.GetGormProfileDatabase(),
+				nil, yakit.WithSyntaxFlowRuleName(config.RuleNames...),
+			),
 			m.ctx,
 		)
 		m.rulesCount = int64(len(config.RuleNames))
 		m.kind = schema.SFResultKindScan
 	} else if config.GetFilter() != nil {
-		m.ruleChan = sfdb.YieldSyntaxFlowRules(
-			yakit.FilterSyntaxFlowRule(consts.GetGormProfileDatabase(), config.GetFilter()),
-			m.ctx,
-		)
-		var err error
-		{
-			db := consts.GetGormProfileDatabase()
-			db = db.Model(&schema.SyntaxFlowRule{})
-			db = yakit.FilterSyntaxFlowRule(db, config.GetFilter())
-			// get all rule name
-			var ruleNames []string
-			err = db.Pluck("rule_name", &ruleNames).Error
-			config.RuleNames = ruleNames
-		}
+		db := consts.GetGormProfileDatabase()
+		db = yakit.FilterSyntaxFlowRule(db, config.GetFilter())
+		// get all rule name
+		var ruleNames []string
+		err := db.Pluck("rule_name", &ruleNames).Error
+		config.RuleNames = ruleNames
 		if err != nil {
 			return utils.Errorf("count rules failed: %s", err)
-		} else {
-			m.rulesCount = int64(len(config.RuleNames))
 		}
+		m.ruleChan = sfdb.YieldSyntaxFlowRules(
+			yakit.FilterSyntaxFlowRule(consts.GetGormProfileDatabase(),
+				nil, yakit.WithSyntaxFlowRuleName(config.RuleNames...),
+			),
+			m.ctx,
+		)
+		m.rulesCount = int64(len(config.RuleNames))
 		m.kind = schema.SFResultKindScan
 	} else {
 		return utils.Errorf("config is invalid")
