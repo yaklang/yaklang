@@ -2,7 +2,6 @@ package aispec
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"github.com/samber/lo"
 	"io"
@@ -141,34 +140,25 @@ func appendStreamHandlerPoCOptionEx(opts []poc.PocConfigOption) (io.Reader, io.R
 	return outReader, reasonReader, opts
 }
 
-func ChatWithStream(url string, model string, msg string, httpErrHandler func(err error), opt func() ([]poc.PocConfigOption, error)) (io.Reader, error) {
-	opts, err := opt()
-	if err != nil {
-		return nil, utils.Wrap(err, "failed to get options")
-	}
-
-	msgIns := NewChatMessage(model, []ChatDetail{NewUserChatDetail(msg)})
-	msgIns.Stream = true
-
-	raw, err := json.Marshal(msgIns)
-	if err != nil {
-		return nil, utils.Wrap(err, "json.Marshal failed")
-	}
-
-	opts = append(opts, poc.WithReplaceHttpPacketBody(raw, false))
-
-	pr, opts := appendStreamHandlerPoCOption(opts)
+func ChatWithStream(
+	url string, model string, msg string,
+	httpErrHandler func(err error),
+	reasonStream func(io.Reader),
+	opt func() ([]poc.PocConfigOption, error),
+) (io.Reader, error) {
+	pr, pw := utils.NewBufPipe(nil)
+	reasonPr, reasonPw := utils.NewBufPipe(nil)
 	go func() {
-		rsp, _, err := poc.DoPOST(url, opts...)
-		if err != nil {
-			if httpErrHandler == nil {
-				log.Errorf("failed to post stream request: %v", err)
+		_, _ = ChatBase(url, model, msg, nil, opt, func(reader io.Reader) {
+			defer reasonPw.Close()
+			if reasonStream != nil {
+				reasonStream(reader)
 			} else {
-				httpErrHandler(err)
+				io.Copy(reasonPw, reader)
 			}
-			return
-		}
-		_ = rsp
+		}, func(reader io.Reader) {
+			io.Copy(pw, reader)
+		}, httpErrHandler)
 	}()
-	return pr, nil
+	return mergeReasonIntoOutputStream(reasonPr, pr), nil
 }

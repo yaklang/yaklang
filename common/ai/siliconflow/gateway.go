@@ -32,11 +32,12 @@ func (g *GetawayClient) StructuredStream(s string, function ...aispec.Function) 
 		g.BuildHTTPOptions,
 		g.config.StreamHandler,
 		g.config.ReasonStreamHandler,
+		g.config.HTTPErrorHandler,
 	)
 }
 
 func (g *GetawayClient) Chat(s string, function ...aispec.Function) (string, error) {
-	return aispec.ChatBase(g.targetUrl, g.config.Model, s, function, g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler)
+	return aispec.ChatBase(g.targetUrl, g.config.Model, s, function, g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler, g.config.HTTPErrorHandler)
 }
 
 func (g *GetawayClient) ChatEx(details []aispec.ChatDetail, function ...aispec.Function) ([]aispec.ChatChoice, error) {
@@ -44,11 +45,11 @@ func (g *GetawayClient) ChatEx(details []aispec.ChatDetail, function ...aispec.F
 }
 
 func (g *GetawayClient) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
-	return aispec.ChatBasedExtractData(g.targetUrl, g.config.Model, msg, fields, g.BuildHTTPOptions, g.config.StreamHandler)
+	return aispec.ChatBasedExtractData(g.targetUrl, g.config.Model, msg, fields, g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler, g.config.HTTPErrorHandler)
 }
 
 func (g *GetawayClient) ChatStream(s string) (io.Reader, error) {
-	return aispec.ChatWithStream(g.targetUrl, g.config.Model, s, g.config.HTTPErrorHandler, g.BuildHTTPOptions)
+	return aispec.ChatWithStream(g.targetUrl, g.config.Model, s, g.config.HTTPErrorHandler, g.config.StreamHandler, g.BuildHTTPOptions)
 }
 
 func (g *GetawayClient) LoadOption(opt ...aispec.AIConfigOption) {
