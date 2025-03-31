@@ -70,7 +70,7 @@ type Gateway struct {
 }
 
 func (g *Gateway) Chat(s string, f ...aispec.Function) (string, error) {
-	return aispec.ChatBase(g.TargetUrl, g.Config.Model, s, f, g.AIClient.BuildHTTPOptions, g.Config.StreamHandler, g.Config.ReasonStreamHandler)
+	return aispec.ChatBase(g.TargetUrl, g.Config.Model, s, f, g.AIClient.BuildHTTPOptions, g.Config.StreamHandler, g.Config.ReasonStreamHandler, g.Config.HTTPErrorHandler)
 }
 
 func (g *Gateway) ChatEx(details []aispec.ChatDetail, function ...aispec.Function) ([]aispec.ChatChoice, error) {
@@ -78,11 +78,11 @@ func (g *Gateway) ChatEx(details []aispec.ChatDetail, function ...aispec.Functio
 }
 
 func (g *Gateway) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
-	return aispec.ChatBasedExtractData(g.TargetUrl, g.Config.Model, msg, fields, g.AIClient.BuildHTTPOptions, g.Config.StreamHandler)
+	return aispec.ChatBasedExtractData(g.TargetUrl, g.Config.Model, msg, fields, g.AIClient.BuildHTTPOptions, g.Config.StreamHandler, g.Config.ReasonStreamHandler, g.Config.HTTPErrorHandler)
 }
 
 func (g *Gateway) ChatStream(s string) (io.Reader, error) {
-	return aispec.ChatWithStream(g.TargetUrl, g.Config.Model, s, g.Config.HTTPErrorHandler, g.AIClient.BuildHTTPOptions)
+	return aispec.ChatWithStream(g.TargetUrl, g.Config.Model, s, g.Config.HTTPErrorHandler, g.Config.StreamHandler, g.AIClient.BuildHTTPOptions)
 }
 
 func NewGateway() *Gateway {
@@ -232,6 +232,7 @@ func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 		}
 		responseRsp, err = gateway.Chat(msg)
 		if err != nil {
+
 			log.Warnf("chat by %s failed: %s", typ, err)
 			return false
 		}

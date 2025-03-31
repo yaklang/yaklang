@@ -102,6 +102,7 @@ func StructuredStreamBase(
 	opt func() ([]poc.PocConfigOption, error),
 	streamHandler func(io.Reader),
 	reasonHandler func(io.Reader),
+	errHandler func(error),
 ) (chan *StructuredData, error) {
 	var schan = make(chan *StructuredData, 1000)
 	id := 0
@@ -153,7 +154,7 @@ func StructuredStreamBase(
 			go func() { streamHandler(r) }()
 			// read from newReader
 			io.Copy(structured, newReader)
-		})
+		}, errHandler)
 		if err != nil {
 			log.Errorf("structured stream error: %v", err)
 		}
@@ -164,6 +165,7 @@ func StructuredStreamBase(
 func ChatBase(
 	url string, model string, msg string, fs []Function, opt func() ([]poc.PocConfigOption, error),
 	streamHandler func(io.Reader), reasonStreamHandler func(reader io.Reader),
+	errHandler func(error),
 ) (string, error) {
 	opts, err := opt()
 	if err != nil {
@@ -223,6 +225,10 @@ func ChatBase(
 		rsp, _, err := poc.DoPOST(url, opts...)
 		_ = rsp
 		if err != nil {
+			if errHandler != nil {
+				errHandler(err)
+			}
+			wg.Wait()
 			return "", utils.Errorf("request post to %v：%v", url, err)
 		}
 		wg.Wait()
@@ -231,18 +237,15 @@ func ChatBase(
 
 	_, _, err = poc.DoPOST(url, opts...)
 	if err != nil {
+		if errHandler != nil {
+			errHandler(err)
+		}
 		return "", utils.Errorf("request post to %v：%v", url, err)
 	}
 
 	reader := mergeReasonIntoOutputStream(reasonPr, pr)
 	bodyRaw, err := io.ReadAll(reader)
 	return string(bodyRaw), nil
-	//var compl ChatCompletion
-	//err = json.Unmarshal(rsp.GetBody(), &compl)
-	//if err != nil || len(compl.Choices) == 0 {
-	//	return "", utils.Errorf("JSON response (%v) failed：%v", string(rsp.GetBody()), err)
-	//}
-	//return compl.Choices[0].Message.Content, nil
 }
 
 func ExtractFromResult(result string, fields map[string]any) (map[string]any, error) {
@@ -331,7 +334,12 @@ func GenerateJSONPrompt(msg string, fields map[string]any) string {
 请直接输出处理后的JSON：`
 }
 
-func ChatBasedExtractData(url string, model string, msg string, fields map[string]any, opt func() ([]poc.PocConfigOption, error), streamHandler func(io.Reader)) (map[string]any, error) {
+func ChatBasedExtractData(
+	url string, model string, msg string, fields map[string]any, opt func() ([]poc.PocConfigOption, error),
+	streamHandler func(io.Reader),
+	reasonHandler func(io.Reader),
+	httpErrorHandler func(error),
+) (map[string]any, error) {
 	if len(fields) <= 0 {
 		return nil, utils.Error("no fields config for extract")
 	}
@@ -341,7 +349,7 @@ func ChatBasedExtractData(url string, model string, msg string, fields map[strin
 		fields["raw_data"] = "相关数据"
 	}
 	msg = GenerateJSONPrompt(msg, fields)
-	result, err := ChatBase(url, model, msg, nil, opt, streamHandler, nil)
+	result, err := ChatBase(url, model, msg, nil, opt, streamHandler, reasonHandler, httpErrorHandler)
 	if err != nil {
 		log.Errorf("chatbase error: %s", err)
 		return nil, err
