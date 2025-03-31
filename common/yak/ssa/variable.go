@@ -122,6 +122,10 @@ func (v *Variable) NewError(kind ErrorKind, tag ErrorTag, msg string) {
 	}
 }
 
+func (v *Variable) IsPointer() bool {
+	return v.GetKind() == ssautil.PointerVariable
+}
+
 func ReadVariableFromScope(scope ScopeIF, name string) *Variable {
 	if ret := scope.ReadVariable(name, true); ret != nil {
 		if variable, ok := ret.(*Variable); ok {
