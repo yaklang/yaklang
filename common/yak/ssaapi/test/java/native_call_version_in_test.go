@@ -1,6 +1,7 @@
 package java
 
 import (
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -215,5 +216,51 @@ $ver in (1.0,1.0.0] || (1.5.0,2.3.0] || [0.2.4,5.2.2)    as $vulnVersion`, map[s
 			"ver":         {"\"1.2.24\""},
 			"vulnVersion": {"\"1.2.24\""},
 		}, false, ssaapi.WithLanguage(consts.JAVA))
+	})
+}
+
+func TestDependencyRange(t *testing.T) {
+	t.Run("test range with Chiness", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("pom.xml", `<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.4.1</version>
+        <relativePath/>
+    </parent>
+    <properties>
+        <java.version>1.8</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+    <dependencies>
+        <dependency>
+        	<!-- Fastjson 1.2.24存在rce漏洞 -->
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <version>1.2.41</version>
+        </dependency>
+    </dependencies>
+</project>
+`)
+		ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
+			res, err := programs.SyntaxFlowWithError(`
+__dependency__.*alibaba*fastjson.version as $ver;
+$ver in (,1.2.47] as $vuln_1_2_47;
+alert $vuln_1_2_47 for {
+    message: 'SCA: com.alibaba.fastjson <= 1.2.47 RCE Easy to exploit',
+    severity: critical,
+    cvss: "9.8"
+}
+`)
+			require.NoError(t, err)
+			vals := res.GetValues("vuln_1_2_47")
+			vals.ShowWithSource()
+			require.Contains(t, vals.StringEx(1), "fastjson")
+			return nil
+		}, ssaapi.WithLanguage(consts.JAVA))
 	})
 }
