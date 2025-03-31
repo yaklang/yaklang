@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/grpc_recovery"
 	"io"
 	"io/ioutil"
 	"net"
@@ -19,6 +18,8 @@ import (
 	"runtime/debug"
 	"runtime/pprof"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/grpc_recovery"
 
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
@@ -335,6 +336,10 @@ var startGRPCServerCommand = cli.Command{
 			Usage: "启动 GRPC 的端口",
 		},
 		cli.StringFlag{
+			Name:  "frontend",
+			Usage: "指定前端的名称，默认是空字符串，表示不限制",
+		},
+		cli.StringFlag{
 			Name:  "secret",
 			Usage: "启动 GRPC 的认证口令",
 		},
@@ -390,6 +395,7 @@ var startGRPCServerCommand = cli.Command{
 		if c.Bool("disable-output") {
 			os.Setenv("YAK_DISABLE", "output")
 		}
+		consts.SetFrontendName(c.String("frontend"))
 
 		cn := c.String("common-name")
 		if cn == "" {

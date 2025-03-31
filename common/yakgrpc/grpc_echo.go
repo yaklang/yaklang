@@ -4,13 +4,15 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/http"
-	"time"
 )
 
 func (s *Server) Echo(ctx context.Context, req *ypb.EchoRequest) (*ypb.EchoResposne, error) {
@@ -110,4 +112,22 @@ func verifySystemCertificate() (*ypb.VerifySystemCertificateResponse, error) {
 		return &ypb.VerifySystemCertificateResponse{Valid: false, Reason: err.Error()}, nil
 	}
 	return &ypb.VerifySystemCertificateResponse{Valid: true}, nil
+}
+
+func (s *Server) Handshake(ctx context.Context, req *ypb.HandshakeRequest) (*ypb.HandshakeResponse, error) {
+	if req == nil {
+		return nil, utils.Errorf("handshake failed: request is nil")
+	}
+	succ := false
+	name := consts.GetFrontendName()
+	gotName := req.GetFrontName()
+
+	if name == gotName {
+		succ = true
+	} else {
+		succ = false
+	}
+	return &ypb.HandshakeResponse{
+		Success: succ,
+	}, nil
 }
