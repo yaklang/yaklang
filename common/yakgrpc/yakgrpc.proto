@@ -6634,10 +6634,6 @@ message MITMV2Response {
   bool JustContentReplacer = 3;
   repeated MITMContentReplacer Replacers = 4;
 
-  // refresh history table
-  bool Refresh = 5;
-  HTTPFlow HistoryHTTPFlow = 6;
-
   // exec result
   bool HaveMessage = 7;
   ExecResult Message = 8;
