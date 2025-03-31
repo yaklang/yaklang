@@ -122,11 +122,23 @@ func TestMakeByte(t *testing.T) {
 	})
 }
 
-func TestBaiscTypeCheck(t *testing.T) {
+func TestBasicTypeCheck(t *testing.T) {
+	t.Run("yak append", func(t *testing.T) {
+		check(t, `
+cookie = make([]var)
+cookie = append(cookie)
+		
+		`, []string{})
+	})
+
 	t.Run("yak append map", func(t *testing.T) {
 		check(t, `
 cookie = make([]var)
 cookie = append(cookie, {
+    "cookie": codec.EncodeBase64(""),
+    "key": "",
+    "aes-mode": "",
+}, {
     "cookie": codec.EncodeBase64(""),
     "key": "",
     "aes-mode": "",
@@ -135,20 +147,21 @@ cookie = append(cookie, {
 		`, []string{})
 	})
 
-	t.Run("yak append call", func(t *testing.T) {
+	t.Run("yak append ellipsis", func(t *testing.T) {
+		check(t, `
+list = ["a","b","c"]
+newlist = []
+newlist = append(newlist, list...)
+		
+		`, []string{})
+	})
+
+	t.Run("yak slice with Append call", func(t *testing.T) {
 		check(t, `
 opt = [
     syntaxflow.withContext(context.Background()), 
 ]
 opt.Append(syntaxflow.withCache())
-		`, []string{})
-	})
-
-	t.Run("yak append ellipsis", func(t *testing.T) {
-		check(t, `
-cookie = []var
-cookie = append(cookie, cookie...)
-		
 		`, []string{})
 	})
 
@@ -167,6 +180,43 @@ if len(replacedTmp) == 0 {
     emptyResults.Append(emptyTmp)
 }
 		
+		`, []string{})
+	})
+
+	t.Run("yak slice with Push", func(t *testing.T) {
+		check(t, `
+list = []
+list.Push({"key": "", "kind": "", "value": ""})	
+		`, []string{})
+	})
+
+	t.Run("yak slice with Pop", func(t *testing.T) {
+		check(t, `
+list = ["a","b","c"]
+list.Pop(2,3)	
+		`, []string{})
+	})
+
+	t.Run("yak slice with Sort", func(t *testing.T) {
+		check(t, `
+list = ["a","b","c"]
+list.Sort(true)	
+		`, []string{})
+	})
+
+	t.Run("yak string with Fuzz", func(t *testing.T) {
+		check(t, `
+s = ""
+s.Fuzz( {
+    "key": "",
+})
+		`, []string{})
+	})
+
+	t.Run("yak string with Ljust", func(t *testing.T) {
+		check(t, `
+s = ""
+s.Ljust(1,"a","b")
 		`, []string{})
 	})
 

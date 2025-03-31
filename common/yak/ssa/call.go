@@ -134,6 +134,12 @@ func (c *Call) handlerGeneric() {
 		argTyp := arg.GetType()
 		if isVariadic && i > fType.ParameterLen-1 {
 			index = fType.ParameterLen - 1
+		} else if isVariadic && i == fType.ParameterLen-1 {
+			argType := arg.GetType()
+			if argType.GetTypeKind() != SliceTypeKind {
+				argType = NewSliceType(argType)
+			}
+			paramsType[i] = argType
 		} else {
 			// variadic should not set new paramsType
 			paramsType[i] = arg.GetType()
@@ -191,14 +197,6 @@ func (c *Call) handlerGeneric() {
 		// apply generic type
 		returnType = ApplyGenericType(returnType, instanceTypeMap)
 		// create new function type and set cache
-
-		if fType.IsVariadic {
-			lastType := paramsType[len(paramsType)-1]
-			if lastType.GetTypeKind() != SliceTypeKind {
-				lastType = NewSliceType(lastType)
-			}
-			paramsType = append(paramsType[:len(paramsType)-1], lastType)
-		}
 
 		newFuncTyp := NewFunctionType(newMethod.GetName(), paramsType, returnType, fType.IsVariadic)
 		newMethod = NewFunctionWithType(newMethod.GetName(), newFuncTyp)
