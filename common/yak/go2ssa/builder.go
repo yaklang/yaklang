@@ -29,6 +29,7 @@ func (s *SSABuilder) Create() ssa.Builder {
 		PreHandlerInit: ssa.NewPreHandlerInit(initHandler).WithLanguageConfigOpts(
 			ssa.WithLangeConfigBind(true),
 			ssa.WithLanguageConfigVirtualImport(true),
+			ssa.WithLanguageBuilder(s),
 		),
 	}
 }

@@ -41,6 +41,7 @@ func (s *SSABuild) Create() ssa.Builder {
 				//php 默认应该include所有内容
 				return true
 			}),
+			ssa.WithLanguageBuilder(s),
 		),
 	}
 }
