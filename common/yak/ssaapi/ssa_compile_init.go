@@ -99,7 +99,7 @@ func (c *config) init(filesystem filesys_interface.FileSystem) (*ssa.Program, *s
 		}
 		return LanguageBuilder.Build(src.GetSourceCode(), c.ignoreSyntaxErr, fb)
 	}
-	builder := application.GetAndCreateFunctionBuilder("main", "main")
+	builder := application.GetAndCreateFunctionBuilder(string(ssa.MainFunctionName), string(ssa.MainFunctionName))
 	// TODO: this extern info should be set in program
 	builder.WithExternLib(c.externLib)
 	builder.WithExternValue(c.externValue)

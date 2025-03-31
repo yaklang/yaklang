@@ -19,7 +19,7 @@ func TestLazyInstructionSaveAgain(t *testing.T) {
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	vf := filesys.NewVirtualFs()
 	prog := NewProgram(programName, true, Application, vf, "", ttl)
-	builder := prog.GetAndCreateFunctionBuilder("", "main")
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 
 	// create instruction
 	undefineA := builder.EmitUndefined("a")
@@ -101,7 +101,7 @@ func TestCache_with_lazyBuilder(t *testing.T) {
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	vf := filesys.NewVirtualFs()
 	prog := NewProgram(programName, true, Application, vf, "", ttl)
-	builder := prog.GetAndCreateFunctionBuilder("", "main")
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 
 	builded := false
 	var undefineId int64
