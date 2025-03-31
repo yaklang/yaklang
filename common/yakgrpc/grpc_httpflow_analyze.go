@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -16,7 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
-	"sync"
 	"sync/atomic"
 )
 
@@ -37,6 +37,7 @@ func (s *Server) AnalyzeHTTPFlow(request *ypb.AnalyzeHTTPFlowRequest, stream ypb
 	opts = append(opts, WithRules(rules...))
 	if config := request.GetConfig(); config != nil {
 		opts = append(opts, WithConcurrency(int(config.GetConcurrency())))
+		opts = append(opts, WithDedup(config.GetEnableDeduplicate()))
 	}
 
 	manger, err := NewHTTPFlowAnalyzeManger(
@@ -71,6 +72,7 @@ type HTTPFlowAnalyzeManger struct {
 	ctx          context.Context
 	pluginCaller *yak.MixPluginCaller // for hot patch code exec
 	concurrency  int                  // 并发处理数量
+	dedup        bool                 // 是否对单条数据进行去重
 
 	matchedHTTPFlowCount   int64
 	extractedHTTPFlowCount int64
@@ -95,6 +97,12 @@ func WithRules(rules ...*ypb.MITMContentReplacer) HTTPFlowAnalyzeMangerOption {
 	}
 }
 
+func WithDedup(dedup bool) HTTPFlowAnalyzeMangerOption {
+	return func(m *HTTPFlowAnalyzeManger) {
+		m.dedup = dedup
+	}
+}
+
 func NewHTTPFlowAnalyzeManger(
 	gorm *gorm.DB,
 	ctx context.Context,
@@ -107,7 +115,8 @@ func NewHTTPFlowAnalyzeManger(
 		client:       client,
 		stream:       steam,
 		ctx:          ctx,
-		concurrency:  10, // 默认并发数
+		concurrency:  10,    // 默认并发数
+		dedup:        false, // 默认不去重
 	}
 
 	for _, opt := range opts {
@@ -140,20 +149,12 @@ func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlow(db *gorm.DB, analyzeId string) (
 	}
 	flowCh := yakit.YieldHTTPFlowsEx(db, m.ctx, totalCallBack)
 
-	workerPool := make(chan struct{}, m.concurrency)
 	errChan := make(chan error, m.concurrency)
-	var wg sync.WaitGroup
-
+	swg := utils.NewSizedWaitGroup(m.concurrency, m.ctx)
 	for flow := range flowCh {
-		workerPool <- struct{}{}
-		wg.Add(1)
-
+		swg.Add(1)
 		go func(f *schema.HTTPFlow) {
-			defer func() {
-				<-workerPool
-				wg.Done()
-			}()
-
+			defer swg.Done()
 			atomic.AddInt64(&m.handledHTTPFlowCount, 1)
 			m.notifyProcess(float64(atomic.LoadInt64(&m.handledHTTPFlowCount)) / float64(atomic.LoadInt64(&m.allHTTPFlowCount)))
 			m.notifyHandleFlowNum()
@@ -166,9 +167,8 @@ func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlow(db *gorm.DB, analyzeId string) (
 		}(flow)
 	}
 
-	wg.Wait()
+	swg.Wait()
 	close(errChan)
-
 	for err := range errChan {
 		errs = utils.JoinErrors(errs, err)
 	}
@@ -220,7 +220,15 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRule(db *gorm.DB, flow *schema.HTTPF
 		}
 
 		var extractedData []schema.ExtractedData
+		filter := filter.NewFilter()
 		for _, matched := range matcheds {
+			// 如果开启了去重，检查是否已经存在相同的数据
+			if m.dedup {
+				if filter.Exist(matched.MatchResult) {
+					continue
+				}
+				filter.Insert(matched.MatchResult)
+			}
 			e := yakit.ExtractedDataFromHTTPFlow(
 				flow.HiddenIndex,
 				rule.VerboseName,

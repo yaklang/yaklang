@@ -35494,10 +35494,11 @@ func (x *AnalyzeHTTPFlowRequest) GetConfig() *AnalyzeHTTPFlowConfig {
 }
 
 type AnalyzeHTTPFlowConfig struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Concurrency   int64                  `protobuf:"varint,1,opt,name=Concurrency,proto3" json:"Concurrency,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Concurrency       int64                  `protobuf:"varint,1,opt,name=Concurrency,proto3" json:"Concurrency,omitempty"`             // 并发数量，不传默认为10
+	EnableDeduplicate bool                   `protobuf:"varint,2,opt,name=EnableDeduplicate,proto3" json:"EnableDeduplicate,omitempty"` // 是否进行单条数据去重
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *AnalyzeHTTPFlowConfig) Reset() {
@@ -35535,6 +35536,13 @@ func (x *AnalyzeHTTPFlowConfig) GetConcurrency() int64 {
 		return x.Concurrency
 	}
 	return 0
+}
+
+func (x *AnalyzeHTTPFlowConfig) GetEnableDeduplicate() bool {
+	if x != nil {
+		return x.EnableDeduplicate
+	}
+	return false
 }
 
 type AnalyzeHTTPFlowResponse struct {
@@ -51793,9 +51801,10 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x16AnalyzeHTTPFlowRequest\x12\"\n" +
 	"\fHotPatchCode\x18\x01 \x01(\tR\fHotPatchCode\x126\n" +
 	"\tReplacers\x18\x02 \x03(\v2\x18.ypb.MITMContentReplacerR\tReplacers\x122\n" +
-	"\x06Config\x18\x03 \x01(\v2\x1a.ypb.AnalyzeHTTPFlowConfigR\x06Config\"9\n" +
+	"\x06Config\x18\x03 \x01(\v2\x1a.ypb.AnalyzeHTTPFlowConfigR\x06Config\"g\n" +
 	"\x15AnalyzeHTTPFlowConfig\x12 \n" +
-	"\vConcurrency\x18\x01 \x01(\x03R\vConcurrency\"\xa9\x01\n" +
+	"\vConcurrency\x18\x01 \x01(\x03R\vConcurrency\x12,\n" +
+	"\x11EnableDeduplicate\x18\x02 \x01(\bR\x11EnableDeduplicate\"\xa9\x01\n" +
 	"\x17AnalyzeHTTPFlowResponse\x12/\n" +
 	"\n" +
 	"ExecResult\x18\x01 \x01(\v2\x0f.ypb.ExecResultR\n" +
