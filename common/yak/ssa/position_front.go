@@ -1,9 +1,8 @@
 package ssa
 
 import (
-	"strings"
-
 	"github.com/yaklang/yaklang/common/log"
+	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -125,20 +124,10 @@ func GetRangesByText(editor *memedit.MemEditor, searchText string) []memedit.Ran
 		return nil
 	}
 	var ranges []memedit.RangeIf
-	content := editor.GetSourceCode()
-	indices := strings.Index(content, searchText)
-	offset := 0
-	for indices != -1 {
-		searchTextEnd := indices + len(searchText)
-		rng := editor.GetRangeByPosition(
-			editor.GetPositionByOffset(indices+offset),
-			editor.GetPositionByOffset(searchTextEnd+offset),
-		)
-		ranges = append(ranges, rng)
-		content = content[searchTextEnd:]
-		offset += searchTextEnd
-		indices = strings.Index(content, searchText)
-	}
+	editor.FindStringRange(searchText, func(rangeIf memedit.RangeIf) error {
+		ranges = append(ranges, rangeIf)
+		return nil
+	})
 	return ranges
 }
 
