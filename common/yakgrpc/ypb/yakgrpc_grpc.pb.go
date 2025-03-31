@@ -22,6 +22,7 @@ const (
 	Yak_Version_FullMethodName                                    = "/ypb.Yak/Version"
 	Yak_YakVersionAtLeast_FullMethodName                          = "/ypb.Yak/YakVersionAtLeast"
 	Yak_Echo_FullMethodName                                       = "/ypb.Yak/Echo"
+	Yak_Handshake_FullMethodName                                  = "/ypb.Yak/Handshake"
 	Yak_VerifySystemCertificate_FullMethodName                    = "/ypb.Yak/VerifySystemCertificate"
 	Yak_MITM_FullMethodName                                       = "/ypb.Yak/MITM"
 	Yak_SetMITMFilter_FullMethodName                              = "/ypb.Yak/SetMITMFilter"
@@ -483,6 +484,7 @@ type YakClient interface {
 	YakVersionAtLeast(ctx context.Context, in *YakVersionAtLeastRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 	// echo 通常用于测试服务是否通畅
 	Echo(ctx context.Context, in *EchoRequest, opts ...grpc.CallOption) (*EchoResposne, error)
+	Handshake(ctx context.Context, in *HandshakeRequest, opts ...grpc.CallOption) (*HandshakeResponse, error)
 	VerifySystemCertificate(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*VerifySystemCertificateResponse, error)
 	// 中间人劫持
 	MITM(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[MITMRequest, MITMResponse], error)
@@ -1094,6 +1096,16 @@ func (c *yakClient) Echo(ctx context.Context, in *EchoRequest, opts ...grpc.Call
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(EchoResposne)
 	err := c.cc.Invoke(ctx, Yak_Echo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) Handshake(ctx context.Context, in *HandshakeRequest, opts ...grpc.CallOption) (*HandshakeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HandshakeResponse)
+	err := c.cc.Invoke(ctx, Yak_Handshake_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6248,6 +6260,7 @@ type YakServer interface {
 	YakVersionAtLeast(context.Context, *YakVersionAtLeastRequest) (*GeneralResponse, error)
 	// echo 通常用于测试服务是否通畅
 	Echo(context.Context, *EchoRequest) (*EchoResposne, error)
+	Handshake(context.Context, *HandshakeRequest) (*HandshakeResponse, error)
 	VerifySystemCertificate(context.Context, *Empty) (*VerifySystemCertificateResponse, error)
 	// 中间人劫持
 	MITM(grpc.BidiStreamingServer[MITMRequest, MITMResponse]) error
@@ -6843,6 +6856,9 @@ func (UnimplementedYakServer) YakVersionAtLeast(context.Context, *YakVersionAtLe
 }
 func (UnimplementedYakServer) Echo(context.Context, *EchoRequest) (*EchoResposne, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Echo not implemented")
+}
+func (UnimplementedYakServer) Handshake(context.Context, *HandshakeRequest) (*HandshakeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Handshake not implemented")
 }
 func (UnimplementedYakServer) VerifySystemCertificate(context.Context, *Empty) (*VerifySystemCertificateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method VerifySystemCertificate not implemented")
@@ -8265,6 +8281,24 @@ func _Yak_Echo_Handler(srv interface{}, ctx context.Context, dec func(interface{
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).Echo(ctx, req.(*EchoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_Handshake_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HandshakeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).Handshake(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_Handshake_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).Handshake(ctx, req.(*HandshakeRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -15786,6 +15820,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Echo",
 			Handler:    _Yak_Echo_Handler,
+		},
+		{
+			MethodName: "Handshake",
+			Handler:    _Yak_Handshake_Handler,
 		},
 		{
 			MethodName: "VerifySystemCertificate",
