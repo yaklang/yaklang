@@ -40,17 +40,18 @@ func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 	if !languageConfig.ShouldBuild(filename) {
 		return nil
 	}
-
 	//todo: modify config parse init build，fix main/@main
 	//目前代码仅仅为yak实现，因为yak不经过lazy build，并且yak的include过于特殊
 	program := mainProgram.createSubProgram(data.GetPureSourceHash(), Library)
 	builder := program.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 	//模拟编译，编译两次
 	program.SetPreHandler(true)
-	err = mainProgram.Build(filename, data, builder)
-	if err != nil {
-		return err
+	languageBuilder := languageConfig.LanguageBuilder
+	if languageBuilder == nil {
+		log.Errorf("language builder is nil")
+		return nil
 	}
+	languageBuilder.PreHandlerFile(data, builder)
 	program.SetPreHandler(false)
 	err = mainProgram.Build(filename, data, builder)
 	if err != nil {

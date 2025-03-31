@@ -1,10 +1,12 @@
 package sfdb
 
 import (
+	"encoding/json"
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"testing"
 )
@@ -247,11 +249,14 @@ func TestRule_Group_OP(t *testing.T) {
 			Severity: schema.SFR_SEVERITY_INFO,
 			Purpose:  schema.SFR_PURPOSE_AUDIT,
 		}
+		defer func() {
+			DeleteRuleByRuleName(rule.RuleName)
+		}()
 		newRule, err := CreateRuleWithDefaultGroup(rule)
 		require.NoError(t, err)
-		t.Cleanup(func() {
-			DeleteRuleByRuleName(rule.RuleName)
-		})
+		marshal, err := json.Marshal(newRule.Groups)
+		require.NoError(t, err)
+		log.Infof("new group: %v", string(marshal))
 		require.Equal(t, 3, len(newRule.Groups))
 	})
 }
