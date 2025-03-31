@@ -43,6 +43,12 @@ func WithLanguageConfigShouldBuild(f func(filename string) bool) LanguageConfigO
 		config.ShouldBuild = f
 	}
 }
+func WithLanguageBuilder(builder Builder) LanguageConfigOpt {
+	return func(config *LanguageConfig) {
+		config.LanguageBuilder = builder
+	}
+}
+
 func WithLanguageConfigIsSupportClassStaticModifier(support bool) LanguageConfigOpt {
 	return func(config *LanguageConfig) {
 		config.isSupportClassStaticModifier = support
@@ -102,9 +108,10 @@ type LanguageConfig struct {
 	//script Language need to handle call method
 	isSupportConstMethod bool
 
-	VirtualImport bool
-	VirtualGetter bool
-	ShouldBuild   func(fileName string) bool
+	VirtualImport   bool
+	VirtualGetter   bool
+	ShouldBuild     func(fileName string) bool
+	LanguageBuilder Builder
 }
 
 func NewLanguageConfig() *LanguageConfig {

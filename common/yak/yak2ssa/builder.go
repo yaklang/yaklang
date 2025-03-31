@@ -19,9 +19,12 @@ var Builder = &SSABuilder{}
 
 func (s *SSABuilder) Create() ssa.Builder {
 	return &SSABuilder{
-		PreHandlerInit: ssa.NewPreHandlerInit().WithLanguageConfigOpts(ssa.WithLanguageConfigShouldBuild(func(filename string) bool {
-			return true
-		})),
+		PreHandlerInit: ssa.NewPreHandlerInit().WithLanguageConfigOpts(
+			ssa.WithLanguageConfigShouldBuild(func(filename string) bool {
+				return true
+			}),
+			ssa.WithLanguageBuilder(s),
+		),
 	}
 }
 
