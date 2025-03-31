@@ -37,7 +37,7 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) 
 		}
 	}
 
-	// fmt.Printf("exp = %v\n", exp.GetText())
+	fmt.Printf("exp = %v\n", exp.GetText())
 
 	if ret := exp.PrimaryExpr(); ret != nil {
 		return b.buildPrimaryExpression(ret.(*gol.PrimaryExprContext), islValue)
@@ -65,7 +65,7 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) 
 				ssaop = ssa.OpChan
 			case "*":
 				if op1.GetType().GetTypeKind() == ssa.PointerKind {
-					return b.GetOriginPointer(op1).GetValue(), nil
+					return b.GetOriginValue(op1), nil
 				}
 			case "&":
 				if op1Var := getVariable(exp, 0); op1Var != nil {
@@ -229,14 +229,14 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 
 			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
 				if typ.GetTypeKind() == ssa.PointerKind {
-					rv = b.GetOriginPointer(rv).GetValue()
+					rv = b.ReadMemberCallValue(rv, b.EmitConstInst("@value"))
 					if typ, ok := ssa.ToObjectType(rv.GetType()); ok {
 						handleObjectType(rv, typ)
 					}
 					return
 				}
 
-				if key := typ.GetKeybyName(test); key != nil {
+				if key := typ.GetKeybyName(text); key != nil {
 					leftv = b.CreateMemberCallVariable(rv, key)
 				} else {
 					for n, a := range typ.AnonymousField {
@@ -296,14 +296,14 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 
 			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
 				if typ.GetTypeKind() == ssa.PointerKind {
-					rv = b.GetOriginPointer(rv).GetValue()
+					rv = b.ReadMemberCallValue(rv, b.EmitConstInst("@value"))
 					if typ, ok := ssa.ToObjectType(rv.GetType()); ok {
 						handleObjectType(rv, typ)
 					}
 					return
 				}
 
-				if key := typ.GetKeybyName(test); key != nil {
+				if key := typ.GetKeybyName(text); key != nil {
 					rightv = b.ReadMemberCallValue(rv, key)
 				} else {
 					for n, a := range typ.AnonymousField {

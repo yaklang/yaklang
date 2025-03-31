@@ -137,8 +137,10 @@ func (base *ScopedVersionedTable[T]) Merge(
 		ret := merge(name, m)
 		if base.GetParent().GetParent() == variable.GetScope() && setLocal {
 			v = base.CreateVariable(name, variable.GetLocal())
+			v.SetKind(variable.GetKind())
 		} else {
 			v = base.CreateVariable(name, false)
+			v.SetKind(variable.GetKind())
 		}
 		if canCapture {
 			// 在当前scope中尝试修改外部的某个variable

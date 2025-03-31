@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 	"golang.org/x/exp/slices"
 )
 
@@ -382,10 +383,13 @@ func (f *FunctionBuilder) EmitConstInstNil() *ConstInst {
 }
 
 func (f *FunctionBuilder) EmitConstPointer(o *Variable) Value {
-	pointer := f.InterfaceAddFieldBuild(1, func(int) Value {
-		return f.EmitConstInst("@pointer")
-	}, func(int) Value {
-		return f.EmitConstInst(o.GetName())
+	keys := []Value{f.EmitConstInst("@pointer"), f.EmitConstInst("@value")}
+	values := []Value{f.EmitConstInst(o.GetName()), o.GetValue()}
+
+	pointer := f.InterfaceAddFieldBuild(2, func(i int) Value {
+		return keys[i]
+	}, func(i int) Value {
+		return values[i]
 	})
 
 	t := NewObjectType()
@@ -398,15 +402,22 @@ func (f *FunctionBuilder) EmitConstPointer(o *Variable) Value {
 
 func (f *FunctionBuilder) GetOriginPointer(p Value) *Variable {
 	o := f.CreateMemberCallVariable(p, f.EmitConstInst("@pointer"), true)
-	if o.GetValue() != nil {
-		n := strings.TrimPrefix(o.GetValue().String(), "&")
-		if ret := ReadVariableFromScopeAndParent(o.GetScope(), n); ret != nil {
-			return ret
-		}
-
-	}
+	o.SetKind(ssautil.PointerVariable)
 
 	return o
+}
+
+func (f *FunctionBuilder) GetOriginValue(obj Value) Value {
+	v := f.ReadMemberCallValue(obj, f.EmitConstInst("@value"))
+	p := f.ReadMemberCallValue(obj, f.EmitConstInst("@pointer"))
+
+	n := strings.TrimPrefix(p.String(), "&")
+	scope := obj.GetBlock().ScopeTable
+	if ret := ReadVariableFromScopeAndParent(scope, n); ret != nil {
+		return ret.GetValue()
+	}
+
+	return v
 }
 
 func (f *FunctionBuilder) EmitConstInstWithUnary(i any, un int) *ConstInst {
