@@ -4973,6 +4973,7 @@ message AnalyzeHTTPFlowRequest{
 
 message AnalyzeHTTPFlowConfig {
   int64 Concurrency = 1; // 并发数量，不传默认为10
+  bool  EnableDeduplicate =2; // 是否进行单条数据去重
 }
 
 
