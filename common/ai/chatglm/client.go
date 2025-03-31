@@ -31,13 +31,17 @@ func (g *GLMClient) StructuredStream(s string, function ...aispec.Function) (cha
 		g.BuildHTTPOptions,
 		g.config.StreamHandler,
 		g.config.ReasonStreamHandler,
+		g.config.HTTPErrorHandler,
 	)
 }
 
 var _ aispec.AIClient = (*GLMClient)(nil)
 
 func (g *GLMClient) ChatStream(msg string) (io.Reader, error) {
-	return aispec.ChatWithStream(g.targetUrl, g.config.Model, msg, g.config.HTTPErrorHandler, g.BuildHTTPOptions)
+	return aispec.ChatWithStream(
+		g.targetUrl, g.config.Model, msg, g.config.HTTPErrorHandler,
+		g.config.ReasonStreamHandler, g.BuildHTTPOptions,
+	)
 }
 
 func (g *GLMClient) LoadOption(opt ...aispec.AIConfigOption) {
@@ -98,7 +102,10 @@ func (g *GLMClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 }
 
 func (g *GLMClient) Chat(s string, f ...aispec.Function) (string, error) {
-	return aispec.ChatBase(g.targetUrl, g.config.Model, s, f, g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler)
+	return aispec.ChatBase(
+		g.targetUrl, g.config.Model, s, f, g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler,
+		g.config.HTTPErrorHandler,
+	)
 }
 
 func (g *GLMClient) ChatEx(details []aispec.ChatDetail, function ...aispec.Function) ([]aispec.ChatChoice, error) {
@@ -106,5 +113,5 @@ func (g *GLMClient) ChatEx(details []aispec.ChatDetail, function ...aispec.Funct
 }
 
 func (g *GLMClient) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
-	return aispec.ChatBasedExtractData(g.targetUrl, g.config.Model, msg, fields, g.BuildHTTPOptions, g.config.StreamHandler)
+	return aispec.ChatBasedExtractData(g.targetUrl, g.config.Model, msg, fields, g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler, g.config.HTTPErrorHandler)
 }

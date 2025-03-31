@@ -31,7 +31,7 @@ func (g *GetawayClient) GetModelList() ([]*aispec.ModelMeta, error) {
 }
 
 func (g *GetawayClient) Chat(s string, function ...aispec.Function) (string, error) {
-	return aispec.ChatBase(g.targetUrl, g.config.Model, s, function, g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler)
+	return aispec.ChatBase(g.targetUrl, g.config.Model, s, function, g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler, g.config.HTTPErrorHandler)
 }
 
 func (g *GetawayClient) ChatEx(details []aispec.ChatDetail, function ...aispec.Function) ([]aispec.ChatChoice, error) {
@@ -39,11 +39,11 @@ func (g *GetawayClient) ChatEx(details []aispec.ChatDetail, function ...aispec.F
 }
 
 func (g *GetawayClient) ChatStream(s string) (io.Reader, error) {
-	return aispec.ChatWithStream(g.targetUrl, g.config.Model, s, g.config.HTTPErrorHandler, g.BuildHTTPOptions)
+	return aispec.ChatWithStream(g.targetUrl, g.config.Model, s, g.config.HTTPErrorHandler, g.config.StreamHandler, g.BuildHTTPOptions)
 }
 
 func (g *GetawayClient) ExtractData(data string, desc string, fields map[string]any) (map[string]any, error) {
-	return aispec.ChatBasedExtractData(g.targetUrl, g.config.Model, data, fields, g.BuildHTTPOptions, g.config.StreamHandler)
+	return aispec.ChatBasedExtractData(g.targetUrl, g.config.Model, data, fields, g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler, g.config.HTTPErrorHandler)
 }
 
 func (g *GetawayClient) LoadOption(opt ...aispec.AIConfigOption) {
@@ -53,7 +53,7 @@ func (g *GetawayClient) LoadOption(opt ...aispec.AIConfigOption) {
 	g.config = config
 
 	if g.config.Model == "" {
-		g.config.Model = "qwen-turbo"
+		g.config.Model = "qwen-plus"
 	}
 
 	if config.BaseURL != "" {
