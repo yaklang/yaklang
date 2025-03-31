@@ -656,6 +656,37 @@ var UtilsCommands = []*cli.Command{
 
 	// mcp
 	mcp.MCPCommand,
+
+	{
+		Name:    "get-random-port",
+		Aliases: []string{"random-port"},
+		Flags: []cli.Flag{
+			cli.StringFlag{Name: "type", Value: "tcp", Usage: "tcp or udp"},
+			cli.BoolFlag{Name: "json", Usage: "json output"},
+		},
+		Usage: "Get Random Available Port",
+		Action: func(c *cli.Context) error {
+			port := 0
+			switch c.String("type") {
+			case "tcp":
+				port = utils.GetRandomAvailableTCPPort()
+			case "udp":
+			default:
+				return utils.Errorf("invalid type: [%v] should be tcp/udp ", c.String("type"))
+			}
+			if port == 0 {
+				return utils.Errorf("not get port with: %v", c.String("type"))
+			}
+
+			if c.Bool("json") {
+				fmt.Printf(`{"port":%d}`, port)
+				return nil
+			} else {
+				fmt.Printf("port: %d", port)
+			}
+			return nil
+		},
+	},
 }
 
 var DistributionCommands = []*cli.Command{
