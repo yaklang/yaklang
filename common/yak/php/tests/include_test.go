@@ -39,6 +39,21 @@ echo $a;
 			"param": {"1", "2"},
 		}, false, ssaapi.WithLanguage(ssaapi.PHP))
 	})
+	t.Run("test include lazyBuild", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("/var/www/html/a.txt", `<?php
+function a($a){
+	echo($a);
+}
+`)
+		fs.AddFile("/var/www/html/b.php", `<?php
+include("a.txt");
+a(1);
+`)
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `echo(* #-> as $param)`, map[string][]string{
+			"param": {"1"},
+		}, true, ssaapi.WithLanguage(ssaapi.PHP))
+	})
 	t.Run("test include", func(t *testing.T) {
 		fs := filesys.NewVirtualFs()
 		fs.AddFile("/var/www/html/1.txt", `<?php
