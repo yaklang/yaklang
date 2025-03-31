@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
@@ -14,7 +13,19 @@ func TestParseInclude(t *testing.T) {
 	fs := filesys.NewVirtualFs()
 	fs.AddFile("a/a.yak", `include "b/b.yak"; dump(b)`)
 	fs.AddFile("b/b.yak", `b = 3`)
-	ssatest.CheckSyntaxFlowWithFS(t, fs, `dump(* as $sink)`, map[string][]string{}, false, ssaapi.WithLanguage(ssaapi.Yak))
+	ssatest.CheckSyntaxFlowWithFS(t, fs, `dump(* as $sink)`, map[string][]string{
+		"sink": {"3"},
+	}, false, ssaapi.WithLanguage(ssaapi.Yak))
+}
+func TestParseInclude2(t *testing.T) {
+	fs := filesys.NewVirtualFs()
+	fs.AddFile("a/a.yak", `include "b/b.yak"; dump(b)`)
+	fs.AddFile("b/b.yak", `b = 3`)
+	fs.AddFile("a/c.yak", `include "b/b.yak"; dump(b)`)
+	programs, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaapi.Yak))
+	require.NoError(t, err)
+	valB := programs[0].Ref("b")
+	valB.Show()
 }
 func TestParseProject(t *testing.T) {
 	vfs := filesys.NewVirtualFs()
@@ -30,11 +41,7 @@ func TestParseProject(t *testing.T) {
 			ssaapi.WithLanguage(ssaapi.Yak),
 			// ssaapi.WithDatabaseProgramName("test"),
 		)
-		for index, prog := range progs {
-			log.Infof("prog[%d]:", index)
-			prog.Show()
-		}
-
+		progs.Show()
 		require.NoError(t, err, "parse project failed")
 
 		// TODO: this parseProject will return one program
