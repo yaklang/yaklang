@@ -65,7 +65,17 @@ type VersionedIF[T versionedValue] interface {
 	GetId() int64
 	MarshalJSON() ([]byte, error)
 	UnmarshalJSON([]byte) error
+
+	GetKind() VariableKind
+	SetKind(VariableKind)
 }
+
+type VariableKind int
+
+const (
+	NormalVariable VariableKind = iota
+	PointerVariable
+)
 
 type Versioned[T versionedValue] struct {
 	// origin desc the variable's last or renamed version
@@ -81,6 +91,8 @@ type Versioned[T versionedValue] struct {
 
 	isAssigned *utils.AtomicBool
 	Value      T
+
+	kind VariableKind
 }
 
 func (v *Versioned[T]) GetId() int64 {
@@ -292,4 +304,11 @@ func (v *Versioned[T]) GetRootVersion() VersionedIF[T] {
 }
 func (v *Versioned[T]) IsRoot() bool {
 	return v.captureVariable == v
+}
+
+func (v *Versioned[T]) GetKind() VariableKind {
+	return v.kind
+}
+func (v *Versioned[T]) SetKind(k VariableKind) {
+	v.kind = k
 }
