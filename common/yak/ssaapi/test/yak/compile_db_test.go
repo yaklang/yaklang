@@ -55,7 +55,7 @@ dump(c)
 		panic(err)
 	}
 	prog.Show()
-	funcIns := prog.Program.GetFunction("main", "")
+	funcIns := prog.Program.GetFunction(string(ssa.MainFunctionName), "")
 	assert.NotNil(t, funcIns)
 	br := funcIns.Blocks[len(funcIns.Blocks)-1]
 	block, _ := ssa.ToBasicBlock(br)
@@ -146,8 +146,9 @@ c("d")
 	} else {
 		t.Logf("IRCODE Fetch: %v", count)
 	}
-	if includeFile.Len() != 2 {
-		t.Fatal("have not 2 source code hash")
+	fmt.Println(includeFile.Len())
+	if includeFile.Len() != 3 {
+		t.Fatal("have not 3 source code hash")
 	}
 }
 
@@ -183,8 +184,8 @@ c("d")
 		}
 	}
 	fmt.Println(includeFile.Len())
-	if includeFile.Len() != 2 {
-		t.Fatal("have not 2 source code hash")
+	if includeFile.Len() != 3 {
+		t.Fatal("have not 3 source code hash")
 	}
 	if !haveIncluded {
 		t.Fatal("not included")

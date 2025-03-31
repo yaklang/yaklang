@@ -210,7 +210,7 @@ func Test_ArgumentAndRest(t *testing.T) {
 		f(()=>{print(1)})
 		`, `f(*() as $i) as $fun`, map[string][]string{
 			"i":   {"Parameter-i()"},
-			"fun": {"Function-f(Function-main$1)"},
+			"fun": {"Function-f(Function-@main$1)"},
 		})
 	})
 }
