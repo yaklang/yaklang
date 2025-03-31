@@ -157,7 +157,7 @@ func (f *Function) ReturnValue() []Value {
 }
 
 func (f *Function) IsMain() bool {
-	return f.GetName() == "main"
+	return f.GetName() == string(MainFunctionName)
 }
 
 func (f *Function) GetParent() *Function {

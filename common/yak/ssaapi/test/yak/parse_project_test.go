@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -9,6 +10,12 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
+func TestParseInclude(t *testing.T) {
+	fs := filesys.NewVirtualFs()
+	fs.AddFile("a/a.yak", `include "b/b.yak"; dump(b)`)
+	fs.AddFile("b/b.yak", `b = 3`)
+	ssatest.CheckSyntaxFlowWithFS(t, fs, `dump(* as $sink)`, map[string][]string{}, false, ssaapi.WithLanguage(ssaapi.Yak))
+}
 func TestParseProject(t *testing.T) {
 	vfs := filesys.NewVirtualFs()
 	vfs.AddFile("a/b", "c")
@@ -20,6 +27,7 @@ func TestParseProject(t *testing.T) {
 		progs, err := ssaapi.ParseProjectWithFS(
 			vfs,
 			ssaapi.WithFileSystemEntry("a/a.yak"),
+			ssaapi.WithLanguage(ssaapi.Yak),
 			// ssaapi.WithDatabaseProgramName("test"),
 		)
 		for index, prog := range progs {

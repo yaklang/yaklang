@@ -35,15 +35,31 @@ func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 		b.includeStack.Push(subProg)
 		return nil
 	}
-	//include file not .php need to build
-	//program := mainProgram.createSubProgram(data.GetPureSourceHash(), Library)
-	//builder := program.GetAndCreateFunctionBuilder(string(MainFunctionName), string(MainFunctionName))
-	//fullFilename := fs.Join(dir, filename)
-	//err = mainProgram.Build(fullFilename, data, builder)
-	//mainProgram.LazyBuild()
-	//b.includeStack.Push(program)
+	//针对yak这种，不经过lazyBuild，就需要进行特殊处理，如果我们没有拿到，但是符合后缀，我们就
+	languageConfig := mainProgram.config
+	if !languageConfig.ShouldBuild(filename) {
+		return nil
+	}
+
+	//todo: modify config parse init build，fix main/@main
+	//目前代码仅仅为yak实现，因为yak不经过lazy build，并且yak的include过于特殊
+	program := mainProgram.createSubProgram(data.GetPureSourceHash(), Library)
+	builder := program.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+	//模拟编译，编译两次
+	program.SetPreHandler(true)
+	err = mainProgram.Build(filename, data, builder)
+	if err != nil {
+		return err
+	}
+	program.SetPreHandler(false)
+	err = mainProgram.Build(filename, data, builder)
+	if err != nil {
+		return err
+	}
+	mainProgram.LazyBuild()
+	builder.Finish()
+	b.includeStack.Push(program)
 	return nil
-	//return err
 }
 
 func (b *FunctionBuilder) BuildDirectoryPackage(name []string, once bool) (*Program, error) {
