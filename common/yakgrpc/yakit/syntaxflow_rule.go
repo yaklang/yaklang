@@ -144,29 +144,13 @@ func QuerySyntaxFlowRuleNames(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter) ([]
 	return names, db.Error
 }
 
-func DeleteSyntaxFlowRule(db *gorm.DB, params *ypb.DeleteSyntaxFlowRuleRequest) (int64, error) {
-	return deleteSyntaxFlowRuleEx(db, params)
-}
-
 func DeleteSyntaxFlowNonBuildInRule(db *gorm.DB, params *ypb.DeleteSyntaxFlowRuleRequest) (int64, error) {
-	return deleteSyntaxFlowRuleEx(db, params, false)
-}
-
-func deleteSyntaxFlowRuleEx(db *gorm.DB, params *ypb.DeleteSyntaxFlowRuleRequest, isBuildIn ...bool) (int64, error) {
 	if params == nil || params.Filter == nil {
 		return 0, utils.Errorf("delete syntaxFlow rule failed: syntax flow filter is nil")
 	}
 	db = db.Model(&schema.SyntaxFlowRule{})
 	query := db
-	params.Filter.FilterRuleKind = "unBuildIn"
-	if len(isBuildIn) > 0 {
-		if isBuildIn[0] {
-			params.Filter.FilterRuleKind = "buildIn"
-		} else {
-			params.Filter.FilterRuleKind = "unBuildIn"
-		}
-	}
-	query = FilterSyntaxFlowRule(query, params.Filter)
+	query = FilterSyntaxFlowRule(query, params.Filter, WithSyntaxFlowRuleBuiltin(false))
 	// 如果filter包含groupName,FilterSyntaxFlowRule会使用联表查询，导致无法直接db.delete()
 	// 所以需要先查出来再删除
 	var ids []uint64

@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -463,12 +464,8 @@ func TestGrpcMUSTPASS_UpdateSyntaxFlow(t *testing.T) {
 	}
 	_, err = client.CreateSyntaxFlowRule(context.Background(), req)
 	defer func() {
-		_, err2 := yakit.DeleteSyntaxFlowRule(consts.GetGormProfileDatabase(), &ypb.DeleteSyntaxFlowRuleRequest{
-			Filter: &ypb.SyntaxFlowRuleFilter{
-				RuleNames: []string{ruleName},
-			},
-		})
-		require.NoError(t, err2)
+		err := sfdb.DeleteRuleByRuleName(ruleName)
+		require.NoError(t, err)
 	}()
 	require.NoError(t, err)
 	updateRuleContent := `
@@ -568,7 +565,7 @@ func TestGRPCMUSTPASS_Query_Lib_Rule(t *testing.T) {
 		Pagination: nil,
 		Filter: &ypb.SyntaxFlowRuleFilter{
 			RuleNames:         []string{ruleName},
-			FilterLibRuleKind: "lib",
+			FilterLibRuleKind: yakit.FilterLibRuleTrue,
 		},
 	})
 	require.NoError(t, err)
