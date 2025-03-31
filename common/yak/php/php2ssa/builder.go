@@ -37,6 +37,10 @@ func (s *SSABuild) Create() ssa.Builder {
 			ssa.WithLanguageConfigSupportClass(true),
 			ssa.WithLanguageConfigIsSupportClassStaticModifier(true),
 			ssa.WithLanguageConfigVirtualImport(true),
+			ssa.WithLanguageConfigShouldBuild(func(filename string) bool {
+				//php 默认应该include所有内容
+				return true
+			}),
 		),
 	}
 }

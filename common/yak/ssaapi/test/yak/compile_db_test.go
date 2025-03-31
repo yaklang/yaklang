@@ -141,7 +141,7 @@ c("d")
 		}
 		includeFile.Set(result.SourceCodeHash, struct{}{})
 	}
-	if count >= 1200 {
+	if count <= 1200 {
 		t.Fatal("ircode is not right")
 	} else {
 		t.Logf("IRCODE Fetch: %v", count)
