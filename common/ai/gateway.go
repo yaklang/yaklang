@@ -69,6 +69,20 @@ type Gateway struct {
 	aispec.AIClient
 }
 
+func (g *Gateway) GetTypeName() string {
+	if g.Config == nil {
+		return ""
+	}
+	return g.Config.Type
+}
+
+func (g *Gateway) GetModelName() string {
+	if g.Config == nil {
+		return ""
+	}
+	return g.Config.Model
+}
+
 func (g *Gateway) Chat(s string, f ...aispec.Function) (string, error) {
 	return aispec.ChatBase(g.TargetUrl, g.Config.Model, s, f, g.AIClient.BuildHTTPOptions, g.Config.StreamHandler, g.Config.ReasonStreamHandler, g.Config.HTTPErrorHandler)
 }
