@@ -33,8 +33,8 @@ func TestMultipleLine(t *testing.T) {
 			f.b(* as $b)
 			`,
 			map[string][]string{
-				"a": {"1", "Parameter-i"},
-				"b": {"2", "Parameter-i"},
+				"a": {"1"},
+				"b": {"2"},
 			})
 	})
 
