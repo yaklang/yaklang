@@ -36,17 +36,22 @@ func mergeReasonIntoOutputStream(reason io.Reader, out io.Reader) io.Reader {
 }
 
 func appendStreamHandlerPoCOption(opts []poc.PocConfigOption) (io.Reader, []poc.PocConfigOption) {
-	out, reason, opts := appendStreamHandlerPoCOptionEx(opts)
+	out, reason, opts, _ := appendStreamHandlerPoCOptionEx(opts)
 	pr := mergeReasonIntoOutputStream(reason, out)
 	return pr, opts
 }
 
-func appendStreamHandlerPoCOptionEx(opts []poc.PocConfigOption) (io.Reader, io.Reader, []poc.PocConfigOption) {
+func appendStreamHandlerPoCOptionEx(opts []poc.PocConfigOption) (io.Reader, io.Reader, []poc.PocConfigOption, func()) {
 	outReader, outWriter := utils.NewBufPipe(nil)
 	reasonReader, reasonWriter := utils.NewBufPipe(nil)
+
+	cancelFunc := func() {
+		outWriter.Close()
+		reasonWriter.Close()
+	}
+
 	opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
 		defer func() {
-			outWriter.Write([]byte{'\n'})
 			outWriter.Close()
 			reasonWriter.Close()
 		}()
@@ -137,7 +142,7 @@ func appendStreamHandlerPoCOptionEx(opts []poc.PocConfigOption) (io.Reader, io.R
 			}
 		}
 	}))
-	return outReader, reasonReader, opts
+	return outReader, reasonReader, opts, cancelFunc
 }
 
 func ChatWithStream(

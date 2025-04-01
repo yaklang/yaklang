@@ -372,6 +372,22 @@ func FlushWriter(writer io.Writer) {
 	}
 }
 
+func CallGeneralClose(closer any) {
+	if IsNil(closer) {
+		return
+	}
+	switch ret := closer.(type) {
+	case interface{ Close() error }:
+		ret.Close()
+	case interface{ Close() }:
+		ret.Close()
+	case interface{ Cancel() }:
+		ret.Cancel()
+	case interface{ Cancel() error }:
+		ret.Cancel()
+	}
+}
+
 func TCPNoDelay(i net.Conn) {
 	if i == nil {
 		return
