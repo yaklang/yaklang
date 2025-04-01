@@ -2,6 +2,8 @@ package vulinbox
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/samber/lo"
@@ -150,11 +152,62 @@ func newDBM() (*dbm, error) {
 		Role:     "user",
 		Remake:   "我是用户",
 	})
+	// 生成访问者测试数据
+	generateTestVisitors(db)
 	// 生成随机用户
 	for _, u := range generateRandomUsers(20) {
 		db.Save(&u)
 	}
 	return &dbm{db}, nil
+}
+
+// generateTestVisitors 生成访问者测试数据
+func generateTestVisitors(db *gorm.DB) {
+	visitors := []VulinVisitor{
+		{
+			Username:         "john_doe",
+			Password:         "password123",
+			Age:              28,
+			LastAccessDomain: "example.com",
+			LastAccessPath:   "/visitor/reference",
+			LastAccessTime:   time.Now().Add(-2 * time.Hour),
+		},
+		{
+			Username:         "alice_smith",
+			Password:         "password456",
+			Age:              32,
+			LastAccessDomain: "example.com",
+			LastAccessPath:   "/visitor/reference",
+			LastAccessTime:   time.Now().Add(-1 * time.Hour),
+		},
+		{
+			Username:         "bob_wilson",
+			Password:         "password789",
+			Age:              35,
+			LastAccessDomain: "example.com",
+			LastAccessPath:   "/visitor/reference",
+			LastAccessTime:   time.Now().Add(-30 * time.Minute),
+		},
+		{
+			Username:         "emma_davis",
+			Password:         "passwordabc",
+			Age:              25,
+			LastAccessDomain: "example.com",
+			LastAccessPath:   "/visitor/reference",
+			LastAccessTime:   time.Now().Add(-15 * time.Minute),
+		},
+		{
+			Username:         "mike_brown",
+			Password:         "passworddef",
+			Age:              30,
+			LastAccessDomain: "example.com",
+			LastAccessPath:   "/visitor/reference",
+			LastAccessTime:   time.Now().Add(-5 * time.Minute),
+		},
+	}
+	for _, visitor := range visitors {
+		db.Save(&visitor)
+	}
 }
 
 func (s *dbm) GetUserBySession(uuid string) (*Session, error) {
@@ -239,6 +292,11 @@ func (s *dbm) GetUserByUsername(i string) ([]*VulinUser, error) {
 		return nil, db.Error
 	}
 	return v, nil
+}
+
+func (s *dbm) GetUserByPathUnsafe(path string) ([]map[string]interface{}, error) {
+	query := "SELECT * FROM vulin_visitors WHERE last_access_path = '" + path + "';"
+	return s.UnsafeSqlQuery(query)
 }
 
 func (s *dbm) GetUserByUnsafe(i, p string) ([]map[string]interface{}, error) {

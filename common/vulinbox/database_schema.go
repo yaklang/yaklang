@@ -9,6 +9,7 @@ var VulinBoxTables = []any{
 	&Session{},
 	&UserOrder{},
 	&UserCart{},
+	&VulinVisitor{},
 }
 
 func init() {

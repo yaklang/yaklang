@@ -4,12 +4,14 @@ import (
 	"bytes"
 	_ "embed"
 	"encoding/json"
-	"github.com/samber/lo"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/samber/lo"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -19,6 +21,9 @@ import (
 
 //go:embed html/vul_sqli.html
 var vulInSQLIViewer []byte
+
+//go:embed html/visitor_source.html
+var visitorSourceViewer []byte
 
 func sqliWriter(writer http.ResponseWriter, request *http.Request, data []interface{}, str ...string) {
 	sqliWriterEx(false, writer, request, data, str...)
@@ -462,6 +467,61 @@ func (s *VulinServer) registerSQLinj() {
 				return
 			},
 			RiskDetected: true,
+		},
+		{
+			DefaultQuery: "",
+			Path:         "/visitor/reference",
+			Title:        "访问来源分析系统",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				if request.Method == "GET" {
+					// GET请求直接返回页面
+					writer.Write(visitorSourceViewer)
+					return
+				}
+
+				// POST请求处理
+				referer := request.Header.Get("Referer")
+				if referer == "" {
+					writer.Header().Set("Content-Type", "application/json")
+					writer.Write([]byte(`{"error": "缺少访问来源信息"}`))
+					return
+				}
+
+				// 解析Referer URL
+				refererURL, err := url.Parse(referer)
+				if err != nil {
+					writer.Header().Set("Content-Type", "application/json")
+					writer.Write([]byte(`{"error": "无效的访问来源URL"}`))
+					return
+				}
+
+				path := refererURL.Path
+
+				// 获取访问者信息
+				users, err := s.database.GetUserByPathUnsafe(path)
+				if err != nil {
+					writer.Header().Set("Content-Type", "application/json")
+					writer.Write([]byte(fmt.Sprintf(`{"error": "获取访问者信息失败:%s"}`, err.Error())))
+					return
+				}
+
+				if len(users) == 0 {
+					writer.Header().Set("Content-Type", "application/json")
+					writer.Write([]byte(`{"error": "未找到相关访问记录"}`))
+					return
+				}
+
+				// 返回JSON数据
+				writer.Header().Set("Content-Type", "application/json")
+				jsonData, err := json.Marshal(users)
+				if err != nil {
+					writer.Write([]byte(`{"error": "数据序列化失败"}`))
+					return
+				}
+				writer.Write(jsonData)
+			},
+			RiskDetected:   true,
+			ExpectedResult: map[string]int{"疑似SQL注入：【参数：Referer头[path] 单引号闭合】": 1},
 		},
 	}
 	for _, v := range vroutes {

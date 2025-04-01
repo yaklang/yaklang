@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="/static/js/bootstrap_5.3/bootstrap.min.css">
+    <title>访问来源分析系统</title>
+    <style>
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { margin-bottom: 30px; }
+        .result-table { margin-top: 20px; }
+        .search-box {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>访问来源分析系统</h1>
+        <p class="text-muted">分析访问者的来源信息</p>
+    </div>
+
+    <div class="search-box">
+        <button class="btn btn-primary" onclick="queryUserAccess()">查看相同来源访问者</button>
+    </div>
+
+    <div class="result-table">
+        <table class="table table-striped table-hover table-bordered">
+            <thead>
+            <tr>
+                <th scope="col">ID</th>
+                <th scope="col">用户名</th>
+                <th scope="col">年龄</th>
+                <th scope="col">最后访问域名</th>
+                <th scope="col">最后访问路径</th>
+                <th scope="col">最后访问时间</th>
+            </tr>
+            </thead>
+            <tbody id="users"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    function queryUserAccess() {
+        // 使用当前页面的referrer
+        const refererUrl = document.referrer;
+        
+        // 发送请求
+        fetch(`/visitor/reference`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Referer': refererUrl
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            // 检查是否有错误
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            const usersTable = document.getElementById('users');
+            usersTable.innerHTML = '';
+            
+            if (!Array.isArray(data)) {
+                data = [data]; // 确保数据是数组
+            }
+            
+            data.forEach(visitor => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${visitor.id || '-'}</td>
+                    <td>${visitor.username || '-'}</td>
+                    <td>${visitor.age || '-'}</td>
+                    <td>${visitor.last_access_domain || '-'}</td>
+                    <td>${visitor.last_access_path || '-'}</td>
+                    <td>${visitor.last_access_time || '-'}</td>
+                `;
+                usersTable.appendChild(row);
+            });
+
+            // 如果没有数据，显示提示信息
+            if (data.length === 0) {
+                const row = document.createElement('tr');
+                row.innerHTML = '<td colspan="6" class="text-center">没有找到相同来源的访问记录</td>';
+                usersTable.appendChild(row);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            const usersTable = document.getElementById('users');
+            usersTable.innerHTML = `<tr><td colspan="6" class="text-center text-danger">查询失败：${error.message}</td></tr>`;
+        });
+    }
+</script>
+
+<script src="/static/js/bootstrap_5.3/popper.min.js"></script>
+<script src="/static/js/bootstrap_5.3/bootstrap.min.js"></script>
+</body>
+</html> 
