@@ -33251,19 +33251,21 @@ func (x *FuzzerRequests) GetConcurrent() int64 {
 }
 
 type FuzzerRequest struct {
-	state                    protoimpl.MessageState `protogen:"open.v1"`
-	Request                  string                 `protobuf:"bytes,1,opt,name=Request,proto3" json:"Request,omitempty"`
-	RequestRaw               []byte                 `protobuf:"bytes,16,opt,name=RequestRaw,proto3" json:"RequestRaw,omitempty"` // 这里是因为麻将块儿的问题，还是需要处理一下类型
-	Params                   []*FuzzerParamItem     `protobuf:"bytes,2,rep,name=Params,proto3" json:"Params,omitempty"`
-	Concurrent               int64                  `protobuf:"varint,3,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
-	IsHTTPS                  bool                   `protobuf:"varint,4,opt,name=IsHTTPS,proto3" json:"IsHTTPS,omitempty"`
-	IsGmTLS                  bool                   `protobuf:"varint,35,opt,name=IsGmTLS,proto3" json:"IsGmTLS,omitempty"`
-	ForceFuzz                bool                   `protobuf:"varint,5,opt,name=ForceFuzz,proto3" json:"ForceFuzz,omitempty"`
-	FuzzTagMode              string                 `protobuf:"bytes,50,opt,name=FuzzTagMode,proto3" json:"FuzzTagMode,omitempty"` // "close"/"standard"/"legacy"
-	FuzzTagSyncIndex         bool                   `protobuf:"varint,51,opt,name=FuzzTagSyncIndex,proto3" json:"FuzzTagSyncIndex,omitempty"`
-	Proxy                    string                 `protobuf:"bytes,6,opt,name=Proxy,proto3" json:"Proxy,omitempty"`
-	PerRequestTimeoutSeconds float64                `protobuf:"fixed64,7,opt,name=PerRequestTimeoutSeconds,proto3" json:"PerRequestTimeoutSeconds,omitempty"`
-	DialTimeoutSeconds       float64                `protobuf:"fixed64,61,opt,name=DialTimeoutSeconds,proto3" json:"DialTimeoutSeconds,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Request    string                 `protobuf:"bytes,1,opt,name=Request,proto3" json:"Request,omitempty"`
+	RequestRaw []byte                 `protobuf:"bytes,16,opt,name=RequestRaw,proto3" json:"RequestRaw,omitempty"` // 这里是因为麻将块儿的问题，还是需要处理一下类型
+	Params     []*FuzzerParamItem     `protobuf:"bytes,2,rep,name=Params,proto3" json:"Params,omitempty"`
+	Concurrent int64                  `protobuf:"varint,3,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
+	IsHTTPS    bool                   `protobuf:"varint,4,opt,name=IsHTTPS,proto3" json:"IsHTTPS,omitempty"`
+	IsGmTLS    bool                   `protobuf:"varint,35,opt,name=IsGmTLS,proto3" json:"IsGmTLS,omitempty"`
+	// random JA3 fingerprint
+	RandomJA3                bool    `protobuf:"varint,63,opt,name=RandomJA3,proto3" json:"RandomJA3,omitempty"`
+	ForceFuzz                bool    `protobuf:"varint,5,opt,name=ForceFuzz,proto3" json:"ForceFuzz,omitempty"`
+	FuzzTagMode              string  `protobuf:"bytes,50,opt,name=FuzzTagMode,proto3" json:"FuzzTagMode,omitempty"` // "close"/"standard"/"legacy"
+	FuzzTagSyncIndex         bool    `protobuf:"varint,51,opt,name=FuzzTagSyncIndex,proto3" json:"FuzzTagSyncIndex,omitempty"`
+	Proxy                    string  `protobuf:"bytes,6,opt,name=Proxy,proto3" json:"Proxy,omitempty"`
+	PerRequestTimeoutSeconds float64 `protobuf:"fixed64,7,opt,name=PerRequestTimeoutSeconds,proto3" json:"PerRequestTimeoutSeconds,omitempty"`
+	DialTimeoutSeconds       float64 `protobuf:"fixed64,61,opt,name=DialTimeoutSeconds,proto3" json:"DialTimeoutSeconds,omitempty"`
 	// 用于处理 Host 和 Header 中 Host 不一致的情况
 	ActualAddr string `protobuf:"bytes,8,opt,name=ActualAddr,proto3" json:"ActualAddr,omitempty"`
 	// redirect setting
@@ -33421,6 +33423,13 @@ func (x *FuzzerRequest) GetIsHTTPS() bool {
 func (x *FuzzerRequest) GetIsGmTLS() bool {
 	if x != nil {
 		return x.IsGmTLS
+	}
+	return false
+}
+
+func (x *FuzzerRequest) GetRandomJA3() bool {
+	if x != nil {
+		return x.RandomJA3
 	}
 	return false
 }
@@ -51489,7 +51498,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bRequests\x18\x01 \x03(\v2\x12.ypb.FuzzerRequestR\bRequests\x12\x1e\n" +
 	"\n" +
 	"Concurrent\x18\x02 \x01(\x03R\n" +
-	"Concurrent\"\xce\x13\n" +
+	"Concurrent\"\xec\x13\n" +
 	"\rFuzzerRequest\x12\x18\n" +
 	"\aRequest\x18\x01 \x01(\tR\aRequest\x12\x1e\n" +
 	"\n" +
@@ -51501,6 +51510,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"Concurrent\x12\x18\n" +
 	"\aIsHTTPS\x18\x04 \x01(\bR\aIsHTTPS\x12\x18\n" +
 	"\aIsGmTLS\x18# \x01(\bR\aIsGmTLS\x12\x1c\n" +
+	"\tRandomJA3\x18? \x01(\bR\tRandomJA3\x12\x1c\n" +
 	"\tForceFuzz\x18\x05 \x01(\bR\tForceFuzz\x12 \n" +
 	"\vFuzzTagMode\x182 \x01(\tR\vFuzzTagMode\x12*\n" +
 	"\x10FuzzTagSyncIndex\x183 \x01(\bR\x10FuzzTagSyncIndex\x12\x14\n" +
