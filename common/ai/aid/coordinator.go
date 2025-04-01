@@ -70,7 +70,7 @@ func (c *Coordinator) Run() error {
 	ep := c.config.epm.createEndpoint()
 	ep.SetDefaultSuggestionContinue()
 
-	c.config.EmitRequireReviewForPlan(ep.id, PlanReviewSuggestions...)
+	c.config.EmitRequireReviewForPlan(ep.id)
 	if !c.config.autoAgree {
 		if !ep.WaitTimeoutSeconds(60) {
 			c.config.EmitInfo("user review timeout, use default action: pass")
