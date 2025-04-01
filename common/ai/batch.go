@@ -22,7 +22,9 @@ type ChatClientDescription struct {
 
 // BatchChatter 批量聊天器，用于管理多个聊天客户端
 type BatchChatter struct {
-	mu            sync.Mutex                                                               // 互斥锁，保护并发访问
+	clientConfigRWMutex sync.RWMutex
+	invalidClientMutex  sync.Mutex
+
 	clientConfig  []*Gateway                                                               // 客户端配置列表
 	callback      func(typeName string, modelName string, isReason bool, reader io.Reader) // 回调函数，处理聊天响应
 	invalidClient map[*Gateway]struct{}
@@ -42,15 +44,15 @@ func NewBatchChatter() *BatchChatter {
 
 // Size 返回当前客户端配置的数量
 func (b *BatchChatter) Size() int {
-	b.mu.Lock()
-	defer b.mu.Unlock()
+	b.clientConfigRWMutex.RLock()
+	defer b.clientConfigRWMutex.RUnlock()
 	return len(b.clientConfig)
 }
 
 // PushChatClient 添加一个聊天客户端到批量聊天器
 func (b *BatchChatter) PushChatClient(client *Gateway) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
+	b.clientConfigRWMutex.Lock()
+	defer b.clientConfigRWMutex.Unlock()
 	b.clientConfig = append(b.clientConfig, client)
 }
 
@@ -61,8 +63,8 @@ func (b *BatchChatter) SetCallback(callback func(typeName string, modelName stri
 
 // SetDebug 设置调试模式，开启后会将所有回调输出转发到 stdout
 func (b *BatchChatter) SetDebug(debug bool) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
+	b.clientConfigRWMutex.Lock()
+	defer b.clientConfigRWMutex.Unlock()
 	b.debug = debug
 }
 
@@ -187,8 +189,8 @@ type BatchChatResult struct {
 
 // SetRetryTimes 设置重试次数，如果设置为0或负数，则默认为1
 func (b *BatchChatter) SetRetryTimes(times int) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
+	b.clientConfigRWMutex.Lock()
+	defer b.clientConfigRWMutex.Unlock()
 	if times <= 0 {
 		times = 1
 	}
@@ -197,21 +199,23 @@ func (b *BatchChatter) SetRetryTimes(times int) {
 
 // ChatWithRandomClient 使用随机一个客户端进行聊天
 func (b *BatchChatter) ChatWithRandomClient(msg string) (*BatchChatResult, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
+	b.clientConfigRWMutex.RLock()
 	// 如果没有可用的客户端，直接返回错误
 	if len(b.clientConfig) == 0 {
+		b.clientConfigRWMutex.RUnlock()
 		return nil, errors.New("no available ai clients")
 	}
 
 	// 创建一个可用客户端的列表
 	availableClients := make([]*Gateway, 0)
 	for _, client := range b.clientConfig {
+		b.invalidClientMutex.Lock()
 		if _, ok := b.invalidClient[client]; !ok {
 			availableClients = append(availableClients, client)
 		}
+		b.invalidClientMutex.Unlock()
 	}
+	b.clientConfigRWMutex.RUnlock()
 
 	// 如果没有有效的客户端，返回错误
 	if len(availableClients) == 0 {
@@ -244,7 +248,9 @@ func (b *BatchChatter) ChatWithRandomClient(msg string) (*BatchChatResult, error
 
 		// 重试失败后标记为无效
 		log.Infof("retry %d times for %v: %v, mark invalid", b.retryTimes, client.GetTypeName(), client.GetModelName())
+		b.invalidClientMutex.Lock()
 		b.invalidClient[client] = struct{}{}
+		b.invalidClientMutex.Unlock()
 	}
 
 	return nil, errors.New("all ai clients failed")
@@ -252,8 +258,15 @@ func (b *BatchChatter) ChatWithRandomClient(msg string) (*BatchChatResult, error
 
 // Chat 使用第一个成功的客户端进行聊天
 func (b *BatchChatter) Chat(msg string) (*BatchChatResult, error) {
-	for _, basicClient := range b.clientConfig {
+	b.clientConfigRWMutex.RLock()
+	clients := make([]*Gateway, len(b.clientConfig))
+	copy(clients, b.clientConfig)
+	b.clientConfigRWMutex.RUnlock()
+
+	for _, basicClient := range clients {
+		b.invalidClientMutex.Lock()
 		_, ok := b.invalidClient[basicClient]
+		b.invalidClientMutex.Unlock()
 		if ok {
 			continue
 		}
@@ -277,18 +290,25 @@ func (b *BatchChatter) Chat(msg string) (*BatchChatResult, error) {
 
 		// retry failed
 		log.Infof("retry %d times for %v: %v, mark invalid", b.retryTimes, basicClient.GetTypeName(), basicClient.GetModelName())
+		b.invalidClientMutex.Lock()
 		b.invalidClient[basicClient] = struct{}{}
+		b.invalidClientMutex.Unlock()
 	}
 	return nil, errors.New("all ai clients failed")
 }
 
 // ChatParallel 并行使用所有客户端进行聊天
 func (b *BatchChatter) ChatParallel(msg string) ([]*BatchChatResult, error) {
+	b.clientConfigRWMutex.RLock()
+	clients := make([]*Gateway, len(b.clientConfig))
+	copy(clients, b.clientConfig)
+	b.clientConfigRWMutex.RUnlock()
+
 	wg := sync.WaitGroup{}
 	mu := sync.Mutex{}
-	results := make([]*BatchChatResult, 0, len(b.clientConfig))
+	results := make([]*BatchChatResult, 0, len(clients))
 
-	for _, rawClient := range b.clientConfig {
+	for _, rawClient := range clients {
 		wg.Add(1)
 		go func(basicClient *Gateway) {
 			defer wg.Done()
@@ -319,22 +339,24 @@ func (b *BatchChatter) ChatParallel(msg string) ([]*BatchChatResult, error) {
 
 // ChatParallelDifferentModel 并行使用不同模型的客户端进行聊天，返回所有成功的结果
 func (b *BatchChatter) ChatParallelDifferentModel(msg string) ([]*BatchChatResult, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
+	b.clientConfigRWMutex.RLock()
 	// 如果没有可用的客户端，直接返回错误
 	if len(b.clientConfig) == 0 {
+		b.clientConfigRWMutex.RUnlock()
 		return nil, errors.New("no available ai clients")
 	}
 
 	// 按模型名称分组客户端
 	modelGroups := make(map[string][]*Gateway)
 	for _, client := range b.clientConfig {
+		b.invalidClientMutex.Lock()
 		if _, ok := b.invalidClient[client]; !ok {
 			modelName := client.GetModelName()
 			modelGroups[modelName] = append(modelGroups[modelName], client)
 		}
+		b.invalidClientMutex.Unlock()
 	}
+	b.clientConfigRWMutex.RUnlock()
 
 	// 如果没有有效的客户端，返回错误
 	if len(modelGroups) == 0 {
@@ -381,7 +403,9 @@ func (b *BatchChatter) ChatParallelDifferentModel(msg string) ([]*BatchChatResul
 
 				// 重试失败后标记为无效
 				log.Infof("retry %d times for %v: %v, mark invalid", b.retryTimes, client.GetTypeName(), client.GetModelName())
+				b.invalidClientMutex.Lock()
 				b.invalidClient[client] = struct{}{}
+				b.invalidClientMutex.Unlock()
 			}
 		}(modelName, clients)
 	}
