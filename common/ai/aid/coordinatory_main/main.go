@@ -43,7 +43,7 @@ func main() {
 					rsp.EmitReasonStream(c)
 				}),
 				aispec.WithType("tongyi"),
-				aispec.WithModel("qwq-plus"),
+				aispec.WithModel("qwen-plus"),
 				aispec.WithAPIKey(string(apikey)),
 				// aispec.WithDomain("api.siliconflow.cn"),
 			)
@@ -55,11 +55,12 @@ func main() {
 	}
 
 	coordinator, err := aid.NewCoordinator(
-		"找出 //Users/v1ll4n/Projects/yaklang 目录中最大的文件",
+		"找出 /Users/v1ll4n/Projects/yaklang 目录中最大的文件",
 		aid.WithAICallback(aiCallback),
 		aid.WithTools(aid.GetAllMockTools()...),
 		aid.WithSystemFileOperator(),
 		aid.WithDebugPrompt(),
+		aid.WithAutoAgree(true),
 	)
 	if err != nil {
 		panic(err)
