@@ -64,7 +64,7 @@ function unserializex($a){
     unserialize("$a");
 }
 $a = $_GET["1"];
-$a = trim($a);
+$a = undefined($a);
 unserializex($a);
 UNSAFE,
     'file://high.php':<<<CODE

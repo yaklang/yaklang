@@ -68,7 +68,7 @@ desc(
     lang: php,
     'file:///middle.php': <<<UNSAFE
 <?php
-    $llink=trim($_GET['1']);
+    $llink=undefined($_GET['1']);
     $query = "SELECT * FROM nav WHERE link='$llink'";
     $result = mysql_query($query) or die('SQL语句有误：'.mysql_error());
     $navs = mysql_fetch_array($result);

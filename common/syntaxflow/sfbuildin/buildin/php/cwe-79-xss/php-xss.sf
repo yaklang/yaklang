@@ -64,7 +64,7 @@ echo "您的输入是：" . $_POST['data'];
 CODE,
     'file://mid.php':  <<<CODE
 <?php
-   echo "您的输入是：" . trim($_POST['data']);
+   echo "您的输入是：" . undefined($_POST['data']);
 CODE,
     'file://low.php':<<<CODE
 <?php

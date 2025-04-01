@@ -59,7 +59,7 @@ desc(
     $a = $_GET[1];
     system($a); //high
 
-    $b = trim($a);
+    $b = undefined($a);
     system($b);
 
     $c = filter($a);
