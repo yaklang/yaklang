@@ -1,6 +1,7 @@
 package aid
 
 import (
+	"encoding/json"
 	"io"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -12,7 +13,7 @@ type PlanReviewSuggestion struct {
 	Suggestion        string `json:"prompt"`
 	SuggestionEnglish string `json:"prompt_english"`
 
-	PromptBuilder    func(plan *PlanRequest, rt *runtime) `json:"-"`
+	PromptBuilder    func(plan *planRequest, rt *runtime) `json:"-"`
 	ResponseCallback func(reader io.Reader)               `json:"-"`
 	ParamSchema      string                               `json:"param_schema"`
 }
@@ -41,7 +42,7 @@ var PlanReviewSuggestions = []*PlanReviewSuggestion{
 	},
 }
 
-func (p *PlanRequest) handleReviewResult(ctx *taskContext, param aitool.InvokeParams) error {
+func (p *planRequest) handleReviewPlanResponse(rsp *planResponse, param aitool.InvokeParams) error {
 	// 1. 获取审查建议
 	suggestion := param.GetString("suggestion")
 	if suggestion == "" {
@@ -53,7 +54,7 @@ func (p *PlanRequest) handleReviewResult(ctx *taskContext, param aitool.InvokePa
 	case "incomplete":
 		p.config.EmitInfo("plan is incomplete")
 		// 重新生成计划，但保留现有任务
-		newPlan, err := p.generateNewPlan(ctx)
+		newPlan, err := p.generateNewPlan(rsp)
 		if err != nil {
 			p.config.EmitError("generate new plan failed: %v", err)
 			return utils.Errorf("generate new plan failed: %v", err)
@@ -64,7 +65,7 @@ func (p *PlanRequest) handleReviewResult(ctx *taskContext, param aitool.InvokePa
 	case "unrealistic":
 		p.config.EmitInfo("plan is unrealistic")
 		// 调整现有任务的难度和范围
-		if err := p.adjustTaskDifficulty(ctx); err != nil {
+		if err := p.adjustTaskDifficulty(rsp); err != nil {
 			p.config.EmitError("adjust task difficulty failed: %v", err)
 			return utils.Errorf("adjust task difficulty failed: %v", err)
 		}
@@ -77,13 +78,13 @@ func (p *PlanRequest) handleReviewResult(ctx *taskContext, param aitool.InvokePa
 	case "replan":
 		p.config.EmitInfo("replanning entire task")
 		// 完全重新规划
-		newPlan, err := p.generateNewPlan(ctx)
+		newPlan, err := p.generateNewPlan(rsp)
 		if err != nil {
 			p.config.EmitError("generate new plan failed: %v", err)
 			return utils.Errorf("generate new plan failed: %v", err)
 		}
 		// 替换现有计划
-		p.RootTask = newPlan.RootTask
+		p.rawInput = newPlan.rawInput
 
 	default:
 		p.config.EmitError("unknown review suggestion: %s", suggestion)
@@ -93,14 +94,14 @@ func (p *PlanRequest) handleReviewResult(ctx *taskContext, param aitool.InvokePa
 }
 
 // generateNewPlan 生成新的计划
-func (p *PlanRequest) generateNewPlan(ctx *taskContext) (*PlanRequest, error) {
-	planPrompt, err := p.generateDynamicPlanPrompt(ctx, p.Goal)
+func (p *planRequest) generateNewPlan(rsp *planResponse) (*planRequest, error) {
+	planPrompt, err := p.GeneratePrompt()
 	if err != nil {
 		return nil, utils.Errorf("error generating dynamic plan prompt: %v", err)
 	}
 
 	// 调用 AI 生成新的任务计划
-	request := NewAIRequest(planPrompt, WithAIRequest_TaskContext(ctx))
+	request := NewAIRequest(planPrompt)
 	response, err := p.callAI(request)
 	if err != nil {
 		return nil, utils.Errorf("error calling AI: %v", err)
@@ -114,50 +115,46 @@ func (p *PlanRequest) generateNewPlan(ctx *taskContext) (*PlanRequest, error) {
 	}
 
 	// 解析响应并创建新计划
-	newPlan := &PlanRequest{
-		config: p.config,
-		Goal:   p.Goal,
-	}
-	if err := newPlan.parseResponse(taskResponse); err != nil {
-		return nil, utils.Errorf("error parsing response: %v", err)
+	newPlan := &planRequest{
+		config:   p.config,
+		rawInput: p.rawInput,
 	}
 
+	// 更新计划
+	newPlan.rawInput = string(taskResponse)
 	return newPlan, nil
 }
 
 // mergePlans 合并新旧计划
-func (p *PlanRequest) mergePlans(newPlan *PlanRequest) {
-	// 保留现有任务中已完成的部分
-	existingTasks := make(map[string]*aiTask)
-	for _, task := range p.RootTask.Subtasks {
-		if task.Status == "completed" {
-			existingTasks[task.Name] = task
-		}
-	}
-
-	// 合并新计划中的任务
-	for _, newTask := range newPlan.RootTask.Subtasks {
-		if existingTask, ok := existingTasks[newTask.Name]; ok {
-			// 如果任务已存在且已完成，保留原有任务
-			newTask = existingTask
-		}
-		p.RootTask.Subtasks = append(p.RootTask.Subtasks, newTask)
-	}
+func (p *planRequest) mergePlans(newPlan *planRequest) {
+	// 合并新的计划内容
+	p.rawInput = newPlan.rawInput
 }
 
 // adjustTaskDifficulty 调整任务难度
-func (p *PlanRequest) adjustTaskDifficulty(ctx *taskContext) error {
-	for _, task := range p.RootTask.Subtasks {
-		if task.Status != "completed" {
-			// 调整未完成任务的难度
-			task.Goal = p.simplifyTaskGoal(task.Goal)
-		}
+func (p *planRequest) adjustTaskDifficulty(rsp *planResponse) error {
+	// 从当前计划中提取任务
+	task, err := p.extractTaskFromRawResponse(p.rawInput)
+	if err != nil {
+		return utils.Errorf("error extracting task: %v", err)
 	}
+
+	// 调整未完成任务的难度
+	for _, subtask := range task.Subtasks {
+		subtask.Goal = p.simplifyTaskGoal(subtask.Goal)
+	}
+
+	// 更新计划内容
+	taskBytes, err := json.Marshal(task)
+	if err != nil {
+		return utils.Errorf("error marshaling task: %v", err)
+	}
+	p.rawInput = string(taskBytes)
 	return nil
 }
 
 // simplifyTaskGoal 简化任务目标
-func (p *PlanRequest) simplifyTaskGoal(goal string) string {
+func (p *planRequest) simplifyTaskGoal(goal string) string {
 	// 这里可以实现具体的任务简化逻辑
 	// 例如：移除复杂条件、减少依赖等
 	return goal

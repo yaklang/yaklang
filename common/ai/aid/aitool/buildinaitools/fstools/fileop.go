@@ -239,7 +239,7 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 		"tree",
 		aitool.WithDescription("list files in directory recursively"),
 		aitool.WithStringParam("path", aitool.WithParam_Required(true)),
-		aitool.WithIntegerParam("limit", aitool.WithParam_Required(true), aitool.WithParam_Default(100)),
+		aitool.WithIntegerParam("limit", aitool.WithParam_Required(true), aitool.WithParam_Default(20)),
 		aitool.WithIntegerParam("offset", aitool.WithParam_Default(0)),
 		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			path := params.GetString("path")
