@@ -71,6 +71,7 @@ func GetSSARiskByFuzzy(db *gorm.DB, programName, sourceUrl, search string, level
 			Select("`program_name` AS data").
 			Group("`program_name`").
 			Scan(&datas); db.Error != nil {
+			utils.Errorf("get Risk by fuzzy search failed: %s", db.Error)
 			return []string{}
 		}
 		for _, d := range datas {
@@ -83,6 +84,7 @@ func GetSSARiskByFuzzy(db *gorm.DB, programName, sourceUrl, search string, level
 			Select("`code_source_url` AS data").
 			Group("`code_source_url`").
 			Scan(&datas); db.Error != nil {
+			utils.Errorf("get Risk by fuzzy search failed: %s", db.Error)
 			return []string{}
 		}
 		for _, d := range datas {
@@ -96,6 +98,7 @@ func GetSSARiskByFuzzy(db *gorm.DB, programName, sourceUrl, search string, level
 			Select("`function_name` AS data").
 			Group("`function_name`").
 			Scan(&datas); db.Error != nil {
+			utils.Errorf("get Risk by fuzzy search failed: %s", db.Error)
 			return []string{}
 		}
 		for _, d := range datas {
