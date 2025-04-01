@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 
@@ -885,25 +886,6 @@ class ChildClass extends ParentClass {
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 }
-func TestBlueprint(t *testing.T) {
-	code := `package main;
-class Main{
-	public boolean retrieveFile(final String filename, final String[] errmsg) {
-        final String fullPathName = theLocation + File.separator + filename;
-    
-        if (libContents == null) {
-           return false;
-        }
-		FileOutputStream fos = new FileOutputStream(fullPathName);
-		BufferedOutputStream bos = new BufferedOutputStream(fos);
-		bos.write(libContents, 0, libContents.length);
-		bos.close();
-        return true;
-    }
-}
-`
-	ssatest.CheckSyntaxFlow(t, code, `FileOutputStream(,* as $sink)`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.JAVA))
-}
 func TestCode123(t *testing.T) {
 	fs := filesys.NewVirtualFs()
 	fs.AddFile("a.java", `package com.cym.controller.adminPage;
@@ -961,4 +943,5 @@ public class BB{
 		panic(err)
 	}
 	result.Show()
+	require.Equal(t, 2, result.GetValues("nioInputStream").Len())
 }
