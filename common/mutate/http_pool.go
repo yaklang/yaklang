@@ -33,6 +33,7 @@ type httpPoolConfig struct {
 	DialTimeout                  time.Duration
 	IsHttps                      bool
 	IsGmTLS                      bool
+	IsRandomJA3                  bool
 	Host                         string
 	Port                         int
 	OverrideEnableSystemProxyEnv bool
@@ -475,6 +476,12 @@ func _httpPool_IsGmTLS(f bool) HttpPoolConfigOption {
 	}
 }
 
+func _httpPool_RandomJA3(f bool) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.IsRandomJA3 = f
+	}
+}
+
 func _httpPool_proxies(proxies ...string) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.Proxies = proxies
@@ -865,6 +872,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttp.WithDNSServers(config.DNSServers),
 							lowhttp.WithETCHosts(config.EtcHosts),
 							lowhttp.WithGmTLS(config.IsGmTLS),
+							lowhttp.WithRandomJA3FingerPrint(config.IsRandomJA3),
 							lowhttp.WithConnPool(config.WithConnPool),
 							lowhttp.WithDebugCount(beforeCount, afterCount),
 							lowhttp.WithSaveHTTPFlow(config.SaveHTTPFlow),
@@ -1165,6 +1173,7 @@ var (
 	WithPoolOpt_Https                      = _httpPool_IsHttps
 	WithPoolOpt_RuntimeId                  = _httpPool_runtimeId
 	WithPoolOpt_GmTLS                      = _httpPool_IsGmTLS
+	WithPoolOpt_RandomJA3                  = _httpPool_RandomJA3
 	WithPoolOpt_NoFollowRedirect           = _httpPool_SetNoFollowRedirect
 	WithPoolOpt_FollowJSRedirect           = _httpPool_SetFollowJSRedirect
 	WithPoolOpt_Context                    = _httpPool_SetContext
