@@ -2,6 +2,7 @@ package aispec
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -183,9 +184,11 @@ func ChatBase(
 		return "", utils.Errorf("build msg[%v] to json failed: %s", string(raw), err)
 	}
 	opts = append(opts, poc.WithReplaceHttpPacketBody(raw, false))
+	opts = append(opts, poc.WithConnectTimeout(5))
 
 	var pr, reasonPr io.Reader
-	pr, reasonPr, opts = appendStreamHandlerPoCOptionEx(opts)
+	var cancel context.CancelFunc
+	pr, reasonPr, opts, cancel = appendStreamHandlerPoCOptionEx(opts)
 	wg := new(sync.WaitGroup)
 
 	noMerge := false
@@ -227,6 +230,9 @@ func ChatBase(
 		if err != nil {
 			if errHandler != nil {
 				errHandler(err)
+			}
+			if !utils.IsNil(cancel) {
+				cancel()
 			}
 			wg.Wait()
 			return "", utils.Errorf("request post to %v：%v", url, err)

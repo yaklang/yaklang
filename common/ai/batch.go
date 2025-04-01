@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"sync"
@@ -22,6 +23,13 @@ type BatchChatter struct {
 	mu           sync.Mutex                                                               // 互斥锁，保护并发访问
 	clientConfig []*Gateway                                                               // 客户端配置列表
 	callback     func(typeName string, modelName string, isReason bool, reader io.Reader) // 回调函数，处理聊天响应
+}
+
+func NewBatchChatter() *BatchChatter {
+	return &BatchChatter{
+		clientConfig: make([]*Gateway, 0),
+		callback:     nil,
+	}
 }
 
 // PushChatClient 添加一个聊天客户端到批量聊天器
@@ -55,6 +63,7 @@ func (b *BatchChatter) AddChatClient(typeName string, apikey string, modelName s
 		log.Warnf("reason stream handler or stream handler should not be set in AddChatClient")
 		return errors.New("reason stream handler or stream handler should not be set in AddChatClient")
 	}
+	_ = aic
 
 	client := createAIGateway(typeName)
 	if client == nil {
@@ -63,13 +72,27 @@ func (b *BatchChatter) AddChatClient(typeName string, apikey string, modelName s
 	}
 	opts = append(opts, aispec.WithAPIKey(apikey), aispec.WithModel(modelName))
 	opts = append(opts, aispec.WithStreamHandler(func(reader io.Reader) {
-		pr, pw := utils.NewPipe()
-		go io.Copy(pw, reader)
-		b.emitCallback(typeName, modelName, false, pr)
+		var prefetch = make([]byte, 1)
+		n, _ := io.ReadFull(reader, prefetch)
+		if n > 0 {
+			pr, pw := utils.NewPipe()
+			go func() {
+				defer pw.Close()
+				io.Copy(pw, io.MultiReader(io.MultiReader(bytes.NewReader(prefetch), reader)))
+			}()
+			b.emitCallback(typeName, modelName, false, pr)
+		}
 	}), aispec.WithReasonStreamHandler(func(reader io.Reader) {
-		pr, pw := utils.NewPipe()
-		go io.Copy(pw, reader)
-		b.emitCallback(typeName, modelName, true, pr)
+		var prefetch = make([]byte, 1)
+		n, _ := io.ReadFull(reader, prefetch)
+		if n > 0 {
+			pr, pw := utils.NewPipe()
+			go func() {
+				defer pw.Close()
+				io.Copy(pw, io.MultiReader(io.MultiReader(bytes.NewReader(prefetch), reader)))
+			}()
+			b.emitCallback(typeName, modelName, true, pr)
+		}
 	}))
 	client.LoadOption(opts...)
 	b.PushChatClient(&Gateway{
@@ -124,16 +147,16 @@ type BatchChatResult struct {
 
 // Chat 使用第一个成功的客户端进行聊天
 func (b *BatchChatter) Chat(msg string) (*BatchChatResult, error) {
-	for _, client := range b.clientConfig {
-		response, err := client.Chat(msg)
+	for _, basicClient := range b.clientConfig {
+		response, err := basicClient.AIClient.Chat(msg)
 		if err != nil {
-			log.Errorf("chat with ai client failed: %s", err)
+			log.Errorf("chat with ai client[%s] failed: %s", basicClient.GetTypeName(), err)
 			continue
 		}
 		return &BatchChatResult{
 			Result:    response,
-			TypeName:  client.GetTypeName(),
-			ModelName: client.GetModelName(),
+			TypeName:  basicClient.GetTypeName(),
+			ModelName: basicClient.GetModelName(),
 		}, nil
 	}
 	return nil, errors.New("all ai clients failed")
@@ -145,11 +168,11 @@ func (b *BatchChatter) ChatParallel(msg string) ([]*BatchChatResult, error) {
 	mu := sync.Mutex{}
 	results := make([]*BatchChatResult, 0, len(b.clientConfig))
 
-	for _, client := range b.clientConfig {
+	for _, rawClient := range b.clientConfig {
 		wg.Add(1)
-		go func(client *Gateway) {
+		go func(basicClient *Gateway) {
 			defer wg.Done()
-			response, err := client.Chat(msg)
+			response, err := basicClient.AIClient.Chat(msg)
 			if err != nil {
 				log.Errorf("chat with ai client failed: %s", err)
 				return
@@ -157,11 +180,11 @@ func (b *BatchChatter) ChatParallel(msg string) ([]*BatchChatResult, error) {
 			mu.Lock()
 			results = append(results, &BatchChatResult{
 				Result:    response,
-				TypeName:  client.GetTypeName(),
-				ModelName: client.GetModelName(),
+				TypeName:  basicClient.GetTypeName(),
+				ModelName: basicClient.GetModelName(),
 			})
 			mu.Unlock()
-		}(client)
+		}(rawClient)
 	}
 
 	wg.Wait()
