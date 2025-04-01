@@ -246,7 +246,7 @@ TOOLREQUIRED:
 	t.LongSummary = longSummary
 
 	// start to wait for user review
-	t.config.EmitRequireReview(ep.id)
+	t.config.EmitRequireReviewForTask(ep.id)
 	t.config.EmitInfo("start to wait for user review current task")
 	if !t.config.autoAgree {
 		if !ep.WaitTimeoutSeconds(60) {
