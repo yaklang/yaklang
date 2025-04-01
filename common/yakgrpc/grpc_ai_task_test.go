@@ -189,7 +189,7 @@ func TestAITaskWithBreadth(t *testing.T) {
 			continue
 		}
 		fmt.Println(event.String())
-		if event.Type == "review_require" {
+		if event.Type == "task_review_require" || event.Type == "plan_review_require" || event.Type == "tool_use_review_require" {
 			interactiveId := gjson.GetBytes(event.Content, "id").String()
 			stream.Send(&ypb.AIInputEvent{
 				IsInteractiveMessage: true,
@@ -384,7 +384,7 @@ func TestAITaskWithAdjustPlan(t *testing.T) {
 			continue
 		}
 		fmt.Println(event.String())
-		if event.Type == "review_require" {
+		if event.Type == "task_review_require" {
 			interactiveId := gjson.GetBytes(event.Content, "id").String()
 			reviewCount++
 			if reviewCount == 1 || reviewCount == 3 {
@@ -404,6 +404,20 @@ func TestAITaskWithAdjustPlan(t *testing.T) {
 					InteractiveJSONInput: `{"suggestion": "continue"}`,
 				})
 			}
+		} else if event.Type == "plan_review_require" {
+			interactiveId := gjson.GetBytes(event.Content, "id").String()
+			stream.Send(&ypb.AIInputEvent{
+				IsInteractiveMessage: true,
+				InteractiveId:        interactiveId,
+				InteractiveJSONInput: `{"suggestion": "continue"}`,
+			})
+		} else if event.Type == "tool_use_review_require" {
+			interactiveId := gjson.GetBytes(event.Content, "id").String()
+			stream.Send(&ypb.AIInputEvent{
+				IsInteractiveMessage: true,
+				InteractiveId:        interactiveId,
+				InteractiveJSONInput: `{"suggestion": "continue"}`,
+			})
 		}
 		if event.Type == "structured" && event.NodeId == "result" {
 			existMarkdownReport = true
