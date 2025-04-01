@@ -322,8 +322,8 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext) error {
 		statement := y.EmitEnterStatement()
 		y.EmitPushCallArgs(0, true)
 		handlerStatement(ret.SingleParam())
-		y.EmitLatchIterator(iteratorCtx)
 		y.EmitExitStatement(statement)
+		y.EmitLatchIterator(iteratorCtx)
 		y.EmitIterEnd(iteratorCtx)
 	case *sf.EveryParamContext:
 		iterator := y.EmitCreateIterator()
