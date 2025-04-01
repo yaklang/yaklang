@@ -35,4 +35,10 @@ func TestBatchChatter(t *testing.T) {
 		t.Fatal(err)
 	}
 	spew.Dump(result)
+
+	result, err = bc.Chat("Hello, world! 这是第二次问你了，应该回答的更快")
+	if err != nil {
+		t.Fatal(err)
+	}
+	spew.Dump(result)
 }
