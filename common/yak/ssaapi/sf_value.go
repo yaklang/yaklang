@@ -34,7 +34,7 @@ func (v *Value) GetOpcode() string {
 }
 
 func (v *Value) GetBinaryOperator() string {
-	sa := v.GetSSAValue()
+	sa := v.GetSSAInst()
 	if utils.IsNil(sa) {
 		return ""
 	}
@@ -49,7 +49,7 @@ func (v *Value) GetBinaryOperator() string {
 }
 
 func (v *Value) GetUnaryOperator() string {
-	sa := v.GetSSAValue()
+	sa := v.GetSSAInst()
 	if utils.IsNil(sa) {
 		return ""
 	}
@@ -164,11 +164,14 @@ func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.ValueOperator
 			addvalue(value)
 		}
 	}
-	call, isCall := ssa.ToCall(v.node)
+	call, isCall := ssa.ToCall(v.innerValue)
 	if !isCall {
-		return nil, nil
+		return nil, utils.Errorf("ssa.Value is not a call")
 	}
 	add(call.Args)
+	if utils.IsNil(rets) {
+		return nil, utils.Errorf("ssa.Value no actual params")
+	}
 	return rets, nil
 }
 
