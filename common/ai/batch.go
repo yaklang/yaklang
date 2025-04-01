@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"math/rand"
+	"os"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -25,7 +26,8 @@ type BatchChatter struct {
 	clientConfig  []*Gateway                                                               // 客户端配置列表
 	callback      func(typeName string, modelName string, isReason bool, reader io.Reader) // 回调函数，处理聊天响应
 	invalidClient map[*Gateway]struct{}
-	retryTimes    int // 重试次数，默认为3
+	retryTimes    int  // 重试次数，默认为3
+	debug         bool // 是否开启调试模式
 }
 
 func NewBatchChatter() *BatchChatter {
@@ -34,6 +36,7 @@ func NewBatchChatter() *BatchChatter {
 		callback:      nil,
 		invalidClient: make(map[*Gateway]struct{}),
 		retryTimes:    3, // 默认重试3次
+		debug:         false,
 	}
 }
 
@@ -49,13 +52,38 @@ func (b *BatchChatter) SetCallback(callback func(typeName string, modelName stri
 	b.callback = callback
 }
 
+// SetDebug 设置调试模式，开启后会将所有回调输出转发到 stdout
+func (b *BatchChatter) SetDebug(debug bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.debug = debug
+}
+
 // emitCallback 触发回调函数
 func (b *BatchChatter) emitCallback(typeName string, modelName string, isReason bool, reader io.Reader) {
+	// 如果开启了调试模式，将输出转发到 stdout
+	if b.debug {
+		pr, pw := utils.NewPipe()
+		go func(rawReader io.Reader) {
+			defer func() {
+				pw.Close()
+			}()
+			prefix := "AI Response"
+			if isReason {
+				prefix = "AI Reason"
+			}
+			log.Infof("[%s] %s - %s", prefix, typeName, modelName)
+			io.Copy(os.Stdout, io.TeeReader(rawReader, pw))
+			log.Infof("--- End of %s ---", prefix)
+		}(reader)
+		reader = pr
+	} else {
+		log.Infof("callback not set, skip emit callback for %v:%v (reason:%v)", typeName, modelName, isReason)
+	}
+
 	if b.callback != nil {
 		b.callback(typeName, modelName, isReason, reader)
-		return
 	}
-	log.Infof("callback not set, skip emit callback")
 }
 
 // AddChatClient 添加一个聊天客户端，指定类型、API密钥和模型名称
