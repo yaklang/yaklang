@@ -751,9 +751,6 @@ RECONNECT:
 		select {
 		case re := <-resc:
 			// get response
-			if (re.resp == nil) == (re.err == nil) {
-				return nil, utils.Errorf("BUG: internal error: exactly one of res or err should be set; nil=%v", re.resp == nil)
-			}
 			if re.err != nil && len(rawBytes) == 0 { // get some bytes but get error too
 				if pc.shouldRetryRequest(re.err) {
 					goto RECONNECT
