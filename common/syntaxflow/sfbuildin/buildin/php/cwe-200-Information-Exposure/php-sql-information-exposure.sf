@@ -10,17 +10,16 @@ desc(
 TEXT
 )
 
-/^mysql_error|mysql_[db_name|field_[name|flag|type|table]|get_[client|host|server]_info|info|status|session_id|get[_current_user|cwd]]$/ as $mysql_information;
-/^pg_[last_error|result_error(_field)?]$/ as $pg_information;
-/^pg_[dbname|field_name|field_table|host|last_notice|meta_data|options|port|tty|version]$/ as $pg_information;
+/^mysql_error|mysql_(db_name|field_(name|flag|type|table)|get_(client|host|server)_info|info|status|session_id|get(_current_user|cwd))$/ as $mysql_information;
+/^pg_(last_error|result_error(_field)?)$/ as $pg_information;
+/^pg_(dbname|field_name|field_table|host|last_notice|meta_data|options|port|tty|version)$/ as $pg_information;
 
-$pg_information + $mysql_information ?{opcode: function || opcode: call} as $param
 <include("php-xss-method")> as $method
 
 $method(* as $param)
 
 $param #{
-    include: `<self> & $information`,
+    include: `<self> & $mysql_information`,
 }-> as $mysqli_exposure;
 
 alert $mysqli_exposure for{
@@ -30,7 +29,7 @@ alert $mysqli_exposure for{
 }
 
 $param #{
-    include: `<self> & $information`,
+    include: `<self> & $pg_information`,
 }-> as $pg_exposure;
 
 alert $pg_exposure for{
