@@ -2,11 +2,12 @@ package aid
 
 import (
 	"context"
+	"sync"
+	"time"
+
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
-	"sync"
-	"time"
 )
 
 type endpointManager struct {
@@ -120,6 +121,36 @@ func (e *Endpoint) GetParams() aitool.InvokeParams {
 		params[k] = v
 	}
 	return params
+}
+
+func (e *Endpoint) SetParams(params aitool.InvokeParams) {
+	e.sig.L.Lock()
+	defer e.sig.L.Unlock()
+	if !utils.IsNil(params) {
+		e.activeParams = params
+	}
+}
+
+func (e *Endpoint) SetDefaultSuggestion(suggestion string) {
+	e.sig.L.Lock()
+	defer e.sig.L.Unlock()
+	e.activeParams["suggestion"] = suggestion
+}
+
+func (e *Endpoint) SetDefaultSuggestionContinue() {
+	e.SetDefaultSuggestion("continue")
+}
+
+func (e *Endpoint) SetDefaultSuggestionEnd() {
+	e.SetDefaultSuggestion("end")
+}
+
+func (e *Endpoint) SetDefaultSuggestionYes() {
+	e.SetDefaultSuggestion("yes")
+}
+
+func (e *Endpoint) SetDefaultSuggestionNo() {
+	e.SetDefaultSuggestion("no")
 }
 
 func (e *Endpoint) ActiveWithParams(params aitool.InvokeParams) {
