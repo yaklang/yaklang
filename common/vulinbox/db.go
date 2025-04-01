@@ -2,6 +2,7 @@ package vulinbox
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -163,6 +164,7 @@ func newDBM() (*dbm, error) {
 
 // generateTestVisitors 生成访问者测试数据
 func generateTestVisitors(db *gorm.DB) {
+	// 生成一些测试访问者数据
 	visitors := []VulinVisitor{
 		{
 			Username:         "john_doe",
@@ -171,6 +173,8 @@ func generateTestVisitors(db *gorm.DB) {
 			LastAccessDomain: "example.com",
 			LastAccessPath:   "/visitor/reference",
 			LastAccessTime:   time.Now().Add(-2 * time.Hour),
+			RealIp:           "192.168.1.100",
+			ProxyIp:          "10.0.0.1",
 		},
 		{
 			Username:         "alice_smith",
@@ -179,6 +183,8 @@ func generateTestVisitors(db *gorm.DB) {
 			LastAccessDomain: "example.com",
 			LastAccessPath:   "/visitor/reference",
 			LastAccessTime:   time.Now().Add(-1 * time.Hour),
+			RealIp:           "192.168.1.101",
+			ProxyIp:          "10.0.0.2",
 		},
 		{
 			Username:         "bob_wilson",
@@ -187,6 +193,8 @@ func generateTestVisitors(db *gorm.DB) {
 			LastAccessDomain: "example.com",
 			LastAccessPath:   "/visitor/reference",
 			LastAccessTime:   time.Now().Add(-30 * time.Minute),
+			RealIp:           "192.168.1.102",
+			ProxyIp:          "10.0.0.3",
 		},
 		{
 			Username:         "emma_davis",
@@ -195,6 +203,8 @@ func generateTestVisitors(db *gorm.DB) {
 			LastAccessDomain: "example.com",
 			LastAccessPath:   "/visitor/reference",
 			LastAccessTime:   time.Now().Add(-15 * time.Minute),
+			RealIp:           "192.168.1.103",
+			ProxyIp:          "10.0.0.4",
 		},
 		{
 			Username:         "mike_brown",
@@ -203,8 +213,11 @@ func generateTestVisitors(db *gorm.DB) {
 			LastAccessDomain: "example.com",
 			LastAccessPath:   "/visitor/reference",
 			LastAccessTime:   time.Now().Add(-5 * time.Minute),
+			RealIp:           "127.0.0.1",
+			ProxyIp:          "10.0.0.1",
 		},
 	}
+
 	for _, visitor := range visitors {
 		db.Save(&visitor)
 	}
@@ -294,11 +307,6 @@ func (s *dbm) GetUserByUsername(i string) ([]*VulinUser, error) {
 	return v, nil
 }
 
-func (s *dbm) GetUserByPathUnsafe(path string) ([]map[string]interface{}, error) {
-	query := "SELECT * FROM vulin_visitors WHERE last_access_path = '" + path + "';"
-	return s.UnsafeSqlQuery(query)
-}
-
 func (s *dbm) GetUserByUnsafe(i, p string) ([]map[string]interface{}, error) {
 	res, err := s.UnsafeSqlQuery(`select * from vulin_users where username = '` + i + `' AND password = '` + p + `';`)
 	if err != nil || len(res) == 0 {
@@ -337,4 +345,28 @@ func (s *dbm) UpdateUser(user *VulinUser) error {
 		return db.Error
 	}
 	return nil
+}
+
+func (s *dbm) GetVisitorByPathUnsafe(path string) ([]map[string]interface{}, error) {
+	query := "SELECT * FROM vulin_visitors WHERE last_access_path = '" + path + "';"
+	return s.UnsafeSqlQuery(query)
+}
+
+func (s *dbm) GetVisitorByProxyIps(ips []string) ([]map[string]interface{}, error) {
+	var builder strings.Builder
+	for i, ip := range ips {
+		ip = strings.TrimSpace(ip)
+		if ip == "" {
+			continue
+		}
+
+		if i > 0 {
+			builder.WriteString(",")
+		}
+		builder.WriteString("'")
+		builder.WriteString(ip)
+		builder.WriteString("'")
+	}
+	query := "SELECT * FROM vulin_visitors WHERE proxy_ip IN (" + builder.String() + ");"
+	return s.UnsafeSqlQuery(query)
 }

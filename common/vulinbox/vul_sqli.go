@@ -471,7 +471,7 @@ func (s *VulinServer) registerSQLinj() {
 		{
 			DefaultQuery: "",
 			Path:         "/visitor/reference",
-			Title:        "访问来源分析系统",
+			Title:        "基于 Refere 的 SQL 注入",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				if request.Method == "GET" {
 					// GET请求直接返回页面
@@ -498,14 +498,14 @@ func (s *VulinServer) registerSQLinj() {
 				path := refererURL.Path
 
 				// 获取访问者信息
-				users, err := s.database.GetUserByPathUnsafe(path)
+				visitor, err := s.database.GetVisitorByPathUnsafe(path)
 				if err != nil {
 					writer.Header().Set("Content-Type", "application/json")
 					writer.Write([]byte(fmt.Sprintf(`{"error": "获取访问者信息失败:%s"}`, err.Error())))
 					return
 				}
 
-				if len(users) == 0 {
+				if len(visitor) == 0 {
 					writer.Header().Set("Content-Type", "application/json")
 					writer.Write([]byte(`{"error": "未找到相关访问记录"}`))
 					return
@@ -513,15 +513,59 @@ func (s *VulinServer) registerSQLinj() {
 
 				// 返回JSON数据
 				writer.Header().Set("Content-Type", "application/json")
-				jsonData, err := json.Marshal(users)
+				jsonData, err := json.Marshal(visitor)
 				if err != nil {
 					writer.Write([]byte(`{"error": "数据序列化失败"}`))
 					return
 				}
 				writer.Write(jsonData)
 			},
-			RiskDetected:   true,
-			ExpectedResult: map[string]int{"疑似SQL注入：【参数：Referer头[path] 单引号闭合】": 1},
+			RiskDetected: true,
+		},
+		{
+			DefaultQuery: "",
+			Path:         "/visitor/x-forwarded-for",
+			Title:        "基于 X-Forwarded-For 的 SQL 注入",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				if request.Method == "GET" {
+					writer.Write([]byte(visitorSourceViewer))
+					return
+				}
+
+				// 获取 X-Forwarded-For 头部
+				xForwardedFor := request.Header.Get("X-Forwarded-For")
+				if xForwardedFor == "" {
+					writer.Header().Set("Content-Type", "application/json")
+					writer.Write([]byte(`{"error": "缺少 X-Forwarded-For 头部"}`))
+					return
+				}
+
+				ips := strings.Split(xForwardedFor, ",")
+				var proxyIps []string
+				if len(ips) > 1 {
+					proxyIps = ips[1:]
+				} else {
+					writer.Header().Set("Content-Type", "application/json")
+					writer.Write([]byte(`{"error": "查询失败"}`))
+				}
+
+				visitor, err := s.database.GetVisitorByProxyIps(proxyIps)
+				if err != nil {
+					writer.Header().Set("Content-Type", "application/json")
+					writer.Write([]byte(`{"error": "查询失败"}`))
+					return
+				}
+
+				// 返回JSON数据
+				writer.Header().Set("Content-Type", "application/json")
+				jsonData, err := json.Marshal(visitor)
+				if err != nil {
+					writer.Write([]byte(`{"error": "数据序列化失败"}`))
+					return
+				}
+				writer.Write(jsonData)
+			},
+			RiskDetected: true,
 		},
 	}
 	for _, v := range vroutes {

@@ -1,8 +1,9 @@
 package vulinbox
 
 import (
-	"github.com/jinzhu/gorm"
 	"time"
+
+	"github.com/jinzhu/gorm"
 )
 
 type VulinVisitor struct {
@@ -13,4 +14,6 @@ type VulinVisitor struct {
 	LastAccessDomain string
 	LastAccessPath   string
 	LastAccessTime   time.Time
+	ProxyIp          string
+	RealIp           string
 }
