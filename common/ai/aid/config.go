@@ -44,6 +44,7 @@ type Config struct {
 
 	debugPrompt bool
 	debugEvent  bool
+	autoAgree   bool
 }
 
 func (c *Config) wrapper(i AICallbackType) AICallbackType {
@@ -131,6 +132,15 @@ func WithTool(tool *aitool.Tool) Option {
 		config.m.Lock()
 		defer config.m.Unlock()
 		config.tools = append(config.tools, tool)
+		return nil
+	}
+}
+
+func WithAutoAgree(autoAgree bool) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.autoAgree = autoAgree
 		return nil
 	}
 }
