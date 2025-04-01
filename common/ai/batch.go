@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"math/rand"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -20,15 +21,19 @@ type ChatClientDescription struct {
 
 // BatchChatter 批量聊天器，用于管理多个聊天客户端
 type BatchChatter struct {
-	mu           sync.Mutex                                                               // 互斥锁，保护并发访问
-	clientConfig []*Gateway                                                               // 客户端配置列表
-	callback     func(typeName string, modelName string, isReason bool, reader io.Reader) // 回调函数，处理聊天响应
+	mu            sync.Mutex                                                               // 互斥锁，保护并发访问
+	clientConfig  []*Gateway                                                               // 客户端配置列表
+	callback      func(typeName string, modelName string, isReason bool, reader io.Reader) // 回调函数，处理聊天响应
+	invalidClient map[*Gateway]struct{}
+	retryTimes    int // 重试次数，默认为3
 }
 
 func NewBatchChatter() *BatchChatter {
 	return &BatchChatter{
-		clientConfig: make([]*Gateway, 0),
-		callback:     nil,
+		clientConfig:  make([]*Gateway, 0),
+		callback:      nil,
+		invalidClient: make(map[*Gateway]struct{}),
+		retryTimes:    3, // 默认重试3次
 	}
 }
 
@@ -145,19 +150,99 @@ type BatchChatResult struct {
 	ModelName string // 模型名称
 }
 
+// SetRetryTimes 设置重试次数，如果设置为0或负数，则默认为1
+func (b *BatchChatter) SetRetryTimes(times int) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if times <= 0 {
+		times = 1
+	}
+	b.retryTimes = times
+}
+
+// ChatWithRandomClient 使用随机一个客户端进行聊天
+func (b *BatchChatter) ChatWithRandomClient(msg string) (*BatchChatResult, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	// 如果没有可用的客户端，直接返回错误
+	if len(b.clientConfig) == 0 {
+		return nil, errors.New("no available ai clients")
+	}
+
+	// 创建一个可用客户端的列表
+	availableClients := make([]*Gateway, 0)
+	for _, client := range b.clientConfig {
+		if _, ok := b.invalidClient[client]; !ok {
+			availableClients = append(availableClients, client)
+		}
+	}
+
+	// 如果没有有效的客户端，返回错误
+	if len(availableClients) == 0 {
+		return nil, errors.New("all ai clients are invalid")
+	}
+
+	// 随机打乱客户端顺序
+	rand.Shuffle(len(availableClients), func(i, j int) {
+		availableClients[i], availableClients[j] = availableClients[j], availableClients[i]
+	})
+
+	// 尝试每个客户端
+	for _, client := range availableClients {
+		for i := 0; i < b.retryTimes; i++ {
+			response, err := client.AIClient.Chat(msg)
+			if err != nil {
+				if utils.IsErrorNetOpTimeout(err) {
+					log.Infof("met timeout error: %v, retry idx: %v", err, i+1)
+					continue
+				}
+				log.Errorf("chat with ai client[%s] failed: %s", client.GetTypeName(), err)
+				break
+			}
+			return &BatchChatResult{
+				Result:    response,
+				TypeName:  client.GetTypeName(),
+				ModelName: client.GetModelName(),
+			}, nil
+		}
+
+		// 重试失败后标记为无效
+		log.Infof("retry %d times for %v: %v, mark invalid", b.retryTimes, client.GetTypeName(), client.GetModelName())
+		b.invalidClient[client] = struct{}{}
+	}
+
+	return nil, errors.New("all ai clients failed")
+}
+
 // Chat 使用第一个成功的客户端进行聊天
 func (b *BatchChatter) Chat(msg string) (*BatchChatResult, error) {
 	for _, basicClient := range b.clientConfig {
-		response, err := basicClient.AIClient.Chat(msg)
-		if err != nil {
-			log.Errorf("chat with ai client[%s] failed: %s", basicClient.GetTypeName(), err)
+		_, ok := b.invalidClient[basicClient]
+		if ok {
 			continue
 		}
-		return &BatchChatResult{
-			Result:    response,
-			TypeName:  basicClient.GetTypeName(),
-			ModelName: basicClient.GetModelName(),
-		}, nil
+
+		for i := 0; i < b.retryTimes; i++ {
+			response, err := basicClient.AIClient.Chat(msg)
+			if err != nil {
+				if utils.IsErrorNetOpTimeout(err) {
+					log.Infof("met timeout error: %v, retry idx: %v", err, i+1)
+					continue
+				}
+				log.Errorf("chat with ai client[%s] failed: %s", basicClient.GetTypeName(), err)
+				break // next
+			}
+			return &BatchChatResult{
+				Result:    response,
+				TypeName:  basicClient.GetTypeName(),
+				ModelName: basicClient.GetModelName(),
+			}, nil
+		}
+
+		// retry failed
+		log.Infof("retry %d times for %v: %v, mark invalid", b.retryTimes, basicClient.GetTypeName(), basicClient.GetModelName())
+		b.invalidClient[basicClient] = struct{}{}
 	}
 	return nil, errors.New("all ai clients failed")
 }
