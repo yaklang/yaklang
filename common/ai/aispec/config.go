@@ -37,6 +37,9 @@ func NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
 	c := &AIConfig{
 		Timeout:                120,
 		FunctionCallRetryTimes: 5,
+		HTTPErrorHandler: func(err error) {
+			log.Errorf("ai request failed: %s", err)
+		},
 	}
 	for _, p := range opts {
 		p(c)
