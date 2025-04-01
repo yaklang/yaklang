@@ -80,6 +80,26 @@ func (t *aiTask) callTool(ctx *taskContext, targetTool *aitool.Tool) (result *ai
 	t.config.EmitStreamEvent(fmt.Sprintf("tool-%v-stdout", targetTool.Name), stdoutBuf)
 	t.config.EmitStreamEvent(fmt.Sprintf("tool-%v-stderr", targetTool.Name), stderrBuf)
 
+	t.config.EmitInfo("start to require review for tool use")
+	ep := t.config.epm.createEndpoint()
+	ep.SetDefaultSuggestionContinue()
+	t.config.EmitRequireReviewForToolUse(ep.id)
+	if !t.config.autoAgree {
+		if !ep.WaitTimeoutSeconds(60) {
+			t.config.EmitInfo("user review timeout, use default action: pass")
+		}
+	}
+	params := ep.GetParams()
+	if params == nil {
+		t.config.EmitError("user review params is nil, plan failed")
+		return nil, "", NewNonRetryableTaskStackError(utils.Errorf("user review params is nil"))
+	}
+	err = t.handleToolUseReview(ctx, params)
+	if err != nil {
+		t.config.EmitError("error handling tool use review: %v", err)
+		return nil, "", NewNonRetryableTaskStackError(err)
+	}
+
 	toolResult, err := targetTool.InvokeWithRaw(string(callParamsString), aitool.WithStdout(stdoutBuf), aitool.WithStderr(stderrBuf))
 	if err != nil {
 		err = utils.Errorf("error invoking tool: %v", err)

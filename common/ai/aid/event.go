@@ -14,13 +14,15 @@ import (
 type EventType string
 
 const (
-	EVENT_TYPE_STREAM             EventType = "stream"
-	EVENT_TYPE_STRUCTURED         EventType = "structured"
-	EVEMT_TYPE_PLAN               EventType = "plan"
-	EVENT_TYPE_SELECT             EventType = "select"
-	EVENT_TYPE_PERMISSION_REQUIRE EventType = "permission_require"
-	EVENT_TYPE_REVIEW_REQUIRE     EventType = "review_require"
-	EVENT_TYPE_INPUT              EventType = "input"
+	EVENT_TYPE_STREAM                  EventType = "stream"
+	EVENT_TYPE_STRUCTURED              EventType = "structured"
+	EVEMT_TYPE_PLAN                    EventType = "plan"
+	EVENT_TYPE_SELECT                  EventType = "select"
+	EVENT_TYPE_PERMISSION_REQUIRE      EventType = "permission_require"
+	EVENT_TYPE_TASK_REVIEW_REQUIRE     EventType = "task_review_require"
+	EVENT_TYPE_PLAN_REVIEW_REQUIRE     EventType = "plan_review_require"
+	EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE EventType = "tool_use_review_require"
+	EVENT_TYPE_INPUT                   EventType = "input"
 )
 
 type Event struct {
@@ -131,20 +133,28 @@ func (r *Config) EmitRequirePermission(title string, description ...string) {
 	r.emitJson(EVENT_TYPE_PERMISSION_REQUIRE, "permission", reqs)
 }
 
-func (r *Config) EmitRequireReviewForTask(id string, extraSelectors ...*ReviewSuggestion) {
+func (r *Config) EmitRequireReviewForTask(id string) {
 	reqs := map[string]any{
 		"id":        id,
-		"selectors": append(TaskReviewSuggestions, extraSelectors...),
+		"selectors": TaskReviewSuggestions,
 	}
-	r.emitJson(EVENT_TYPE_REVIEW_REQUIRE, "review-require", reqs)
+	r.emitJson(EVENT_TYPE_TASK_REVIEW_REQUIRE, "review-require", reqs)
 }
 
-func (r *Config) EmitRequireReviewForPlan(id string, extraSelectors ...*PlanReviewSuggestion) {
+func (r *Config) EmitRequireReviewForPlan(id string) {
 	reqs := map[string]any{
 		"id":        id,
-		"selectors": append(PlanReviewSuggestions, extraSelectors...),
+		"selectors": PlanReviewSuggestions,
 	}
-	r.emitJson(EVENT_TYPE_REVIEW_REQUIRE, "review-require", reqs)
+	r.emitJson(EVENT_TYPE_PLAN_REVIEW_REQUIRE, "review-require", reqs)
+}
+
+func (r *Config) EmitRequireReviewForToolUse(id string) {
+	reqs := map[string]any{
+		"id":        id,
+		"selectors": ToolUseReviewSuggestions,
+	}
+	r.emitJson(EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, "review-require", reqs)
 }
 
 func (r *Config) emitLogWithLevel(level, name, fmtlog string, items ...any) {
