@@ -2,9 +2,10 @@ package aid
 
 import (
 	"context"
+	"io"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"io"
 )
 
 // CoordinatorOption 定义配置 Coordinator 的选项接口
@@ -63,6 +64,28 @@ func (c *Coordinator) Run() error {
 	if err != nil {
 		c.config.EmitError("invoke planRequest failed: %v", err)
 		return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
+	}
+
+	// 审查
+	ep := c.config.epm.createEndpoint()
+	ep.SetDefaultSuggestionContinue()
+
+	c.config.EmitRequireReviewForPlan(ep.id, PlanReviewSuggestions...)
+	if !c.config.autoAgree {
+		if !ep.WaitTimeoutSeconds(60) {
+			c.config.EmitInfo("user review timeout, use default action: pass")
+		}
+	}
+	params := ep.GetParams()
+	if params == nil {
+		c.config.EmitError("user review params is nil, plan failed")
+		return utils.Errorf("coordinator: user review params is nil")
+	}
+	c.config.EmitInfo("start to handle review plan response")
+	err = planReq.handleReviewPlanResponse(rsp, params)
+	if err != nil {
+		c.config.EmitError("handle review plan response failed: %v", err)
+		return utils.Errorf("coordinator: handle review plan response failed: %v", err)
 	}
 
 	if rsp.RootTask == nil {
