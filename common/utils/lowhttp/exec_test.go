@@ -647,3 +647,21 @@ Host: %v
 	})
 
 }
+
+func TestLowhttp_conn_pool_deformity(t *testing.T) {
+	token := utils.RandStringBytes(10)
+	server, port := utils.DebugMockHTTP([]byte(fmt.Sprintf(`
+HTTP/1.1 200 OK
+Content-Length: 10
+
+%s
+`, token)))
+	rsp, err := HTTP(
+		WithPacketBytes([]byte(`GET / HTTP/1.1
+Host: `+utils.HostPort(server, port)+`
+
+`)), WithConnPool(true))
+	require.NoError(t, err)
+	require.Contains(t, string(rsp.RawPacket), token)
+
+}
