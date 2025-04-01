@@ -40,6 +40,13 @@ func NewBatchChatter() *BatchChatter {
 	}
 }
 
+// Size 返回当前客户端配置的数量
+func (b *BatchChatter) Size() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return len(b.clientConfig)
+}
+
 // PushChatClient 添加一个聊天客户端到批量聊天器
 func (b *BatchChatter) PushChatClient(client *Gateway) {
 	b.mu.Lock()
@@ -308,4 +315,83 @@ func (b *BatchChatter) ChatParallel(msg string) ([]*BatchChatResult, error) {
 		}
 	}
 	return nil, errors.New("all ai clients failed")
+}
+
+// ChatParallelDifferentModel 并行使用不同模型的客户端进行聊天，返回所有成功的结果
+func (b *BatchChatter) ChatParallelDifferentModel(msg string) ([]*BatchChatResult, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	// 如果没有可用的客户端，直接返回错误
+	if len(b.clientConfig) == 0 {
+		return nil, errors.New("no available ai clients")
+	}
+
+	// 按模型名称分组客户端
+	modelGroups := make(map[string][]*Gateway)
+	for _, client := range b.clientConfig {
+		if _, ok := b.invalidClient[client]; !ok {
+			modelName := client.GetModelName()
+			modelGroups[modelName] = append(modelGroups[modelName], client)
+		}
+	}
+
+	// 如果没有有效的客户端，返回错误
+	if len(modelGroups) == 0 {
+		return nil, errors.New("all ai clients are invalid")
+	}
+
+	// 为每个模型创建一个 goroutine
+	wg := sync.WaitGroup{}
+	mu := sync.Mutex{}
+	results := make([]*BatchChatResult, 0)
+
+	// 对每个模型组，随机选择一个客户端进行尝试
+	for modelName, clients := range modelGroups {
+		wg.Add(1)
+		go func(modelName string, modelClients []*Gateway) {
+			defer wg.Done()
+
+			// 随机打乱该模型的客户端顺序
+			rand.Shuffle(len(modelClients), func(i, j int) {
+				modelClients[i], modelClients[j] = modelClients[j], modelClients[i]
+			})
+
+			// 尝试该模型的客户端
+			for _, client := range modelClients {
+				for i := 0; i < b.retryTimes; i++ {
+					response, err := client.AIClient.Chat(msg)
+					if err != nil {
+						if utils.IsErrorNetOpTimeout(err) {
+							log.Infof("met timeout error: %v, retry idx: %v", err, i+1)
+							continue
+						}
+						log.Errorf("chat with ai client[%s] failed: %s", client.GetTypeName(), err)
+						break
+					}
+					mu.Lock()
+					results = append(results, &BatchChatResult{
+						Result:    response,
+						TypeName:  client.GetTypeName(),
+						ModelName: client.GetModelName(),
+					})
+					mu.Unlock()
+					return // 成功后就返回
+				}
+
+				// 重试失败后标记为无效
+				log.Infof("retry %d times for %v: %v, mark invalid", b.retryTimes, client.GetTypeName(), client.GetModelName())
+				b.invalidClient[client] = struct{}{}
+			}
+		}(modelName, clients)
+	}
+
+	wg.Wait()
+
+	// 如果没有成功的结果，返回错误
+	if len(results) == 0 {
+		return nil, errors.New("all ai clients failed")
+	}
+
+	return results, nil
 }
