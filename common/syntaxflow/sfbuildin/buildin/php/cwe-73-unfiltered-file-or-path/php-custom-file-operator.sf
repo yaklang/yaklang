@@ -68,7 +68,7 @@ UNSAFE,
     'file://mid.php':<<<CODE
 <?php
     $a = $_GET[1];
-    $a = trim($a);
+    $a = undefined($a);
     file_get_contents($a);
 CODE,
     'file://low.php': <<<CODE
