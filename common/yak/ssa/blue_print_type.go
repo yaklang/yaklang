@@ -9,57 +9,57 @@ var _ Type = (*Blueprint)(nil)
 
 /// ============= implement type interface
 
-func (b *Blueprint) String() string {
-	str := fmt.Sprintf("ClassBluePrint: %s", b.Name)
+func (c *Blueprint) String() string {
+	str := fmt.Sprintf("ClassBluePrint: %s", c.Name)
 	return str
 }
 
-func (b *Blueprint) PkgPathString() string {
+func (c *Blueprint) PkgPathString() string {
 	return ""
 }
 
-func (b *Blueprint) RawString() string {
+func (c *Blueprint) RawString() string {
 	return ""
 }
 
-func (b *Blueprint) GetTypeKind() TypeKind {
+func (c *Blueprint) GetTypeKind() TypeKind {
 	return ClassBluePrintTypeKind
 }
 
-func (b *Blueprint) SetMethod(m map[string]*Function) {
-	b.NormalMethod = m
+func (c *Blueprint) SetMethod(m map[string]*Function) {
+	c.NormalMethod = m
 }
 
-func (b *Blueprint) AddMethod(key string, fun *Function) {
-	b.RegisterNormalMethod(key, fun)
+func (c *Blueprint) AddMethod(key string, fun *Function) {
+	c.RegisterNormalMethod(key, fun)
 }
 
-func (b *Blueprint) GetMethod() map[string]*Function {
-	return b.NormalMethod
+func (c *Blueprint) GetMethod() map[string]*Function {
+	return c.NormalMethod
 }
 
-func (b *Blueprint) SetMethodGetter(f func() map[string]*Function) {
+func (c *Blueprint) SetMethodGetter(f func() map[string]*Function) {
 }
 
-func (b *Blueprint) AddFullTypeName(name string) {
-	if b == nil {
+func (c *Blueprint) AddFullTypeName(name string) {
+	if c == nil {
 		return
 	}
-	if !lo.Contains(b.fullTypeName, name) {
-		b.fullTypeName = append(b.fullTypeName, name)
+	if !lo.Contains(c.fullTypeName, name) {
+		c.fullTypeName = append(c.fullTypeName, name)
 	}
 }
 
-func (b *Blueprint) GetFullTypeNames() []string {
-	if b == nil {
+func (c *Blueprint) GetFullTypeNames() []string {
+	if c == nil {
 		return nil
 	}
-	return b.fullTypeName
+	return c.fullTypeName
 }
 
-func (b *Blueprint) SetFullTypeNames(names []string) {
-	if b == nil {
+func (c *Blueprint) SetFullTypeNames(names []string) {
+	if c == nil {
 		return
 	}
-	b.fullTypeName = names
+	c.fullTypeName = names
 }

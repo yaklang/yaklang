@@ -11,7 +11,9 @@ TEXT
 *Mapping.__ref__?{opcode: function} as $start;
 
 // annotation method' formal params.
+
 $start(*?{opcode: param && !have: this} as $formalParams);
+$start<getFormalParams>?{opcode: param && !have: this} as $formalParams
 
 // fetching getParameter
 .getParameter()?{<getFunc>.annotation.*Mapping} as $dynamicParams;
