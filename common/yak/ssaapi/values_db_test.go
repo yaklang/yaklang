@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -48,7 +49,6 @@ func TestValuesDB_Save_Audit_Node(t *testing.T) {
 
 	t.Run("test recursiveSaveValue ", func(t *testing.T) {
 		// TODO: save value with dataflow path
-		t.Skip()
 		progName := uuid.NewString()
 		fmt.Println(progName)
 		prog, err := ssaapi.Parse(``, ssaapi.WithProgramName(progName))
@@ -66,6 +66,21 @@ func TestValuesDB_Save_Audit_Node(t *testing.T) {
 		value2.AppendDependOn(value3_1)
 		value1.AppendDependOn(value3_2)
 		value3_2.AppendDependOn(value4)
+
+		value3_1.Predecessors = []*ssaapi.PredecessorValue{{
+			Node: value1,
+			Info: &sfvm.AnalysisContext{
+				Step:  -1,
+				Label: "dataflow_topdef",
+			},
+		}}
+		value4.Predecessors = []*ssaapi.PredecessorValue{{
+			Node: value1,
+			Info: &sfvm.AnalysisContext{
+				Step:  -1,
+				Label: "dataflow_topdef",
+			},
+		}}
 
 		values := []*ssaapi.Value{value1, value2, value3_1, value3_2, value4}
 
