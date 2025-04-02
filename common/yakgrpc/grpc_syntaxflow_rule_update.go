@@ -2,14 +2,14 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/consts"
+
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) CheckSyntaxFlowRuleUpdate(ctx context.Context, req *ypb.CheckSyntaxFlowRuleUpdateRequest) (*ypb.CheckSyntaxFlowRuleUpdateResponse, error) {
-	needUpdate := yakit.Get(consts.EmbedSfBuildInRuleKey) != consts.ExistedSyntaxFlowEmbedFSHash
+	needUpdate := sfbuildin.CheckEmbedRule()
 	if !needUpdate {
 		return &ypb.CheckSyntaxFlowRuleUpdateResponse{NeedUpdate: false}, nil
 	}
@@ -24,7 +24,6 @@ func (s *Server) CheckSyntaxFlowRuleUpdate(ctx context.Context, req *ypb.CheckSy
 }
 
 func (s *Server) ApplySyntaxFlowRuleUpdate(req *ypb.ApplySyntaxFlowRuleUpdateRequest, stream ypb.Yak_ApplySyntaxFlowRuleUpdateServer) error {
-	defer yakit.Set(consts.EmbedSfBuildInRuleKey, consts.ExistedSyntaxFlowEmbedFSHash)
 	notify := func(process float64, msg string) {
 		stream.Send(&ypb.ApplySyntaxFlowRuleUpdateResponse{
 			Percent: process,

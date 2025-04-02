@@ -3,9 +3,11 @@ package sfbuildin
 import (
 	"embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io/fs"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
@@ -18,7 +20,8 @@ import (
 var ruleFS embed.FS
 
 func SyncEmbedRule(notifies ...func(process float64, ruleName string)) (err error) {
-	// log.Infof("start sync embed rule")
+	defer DoneEmbedRule()
+	log.Infof("start sync embed rule")
 	sfdb.DeleteBuildInRule()
 
 	var notify func(process float64, ruleName string)
@@ -97,19 +100,24 @@ func SyncEmbedRule(notifies ...func(process float64, ruleName string)) (err erro
 
 func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
-		//if yakit.Get(consts.EmbedSfBuildInRuleKey) == consts.ExistedSyntaxFlowEmbedFSHash {
-		//	// log.Infof("already sync embed rule")
-		//	return nil
-		//}
-		//defer yakit.Set(consts.EmbedSfBuildInRuleKey, consts.ExistedSyntaxFlowEmbedFSHash)
-		//return SyncEmbedRule()
 		if utils.InGithubActions() {
+			// only in github actions, will sync embed rule.
 			return SyncEmbedRule()
 		}
+		// in default frontend this rule will be sync by grpc
 		return nil
 	})
 }
 
 func SyntaxFlowRuleHash() (string, error) {
 	return filesys.CreateEmbedFSHash(ruleFS)
+}
+
+func CheckEmbedRule() bool {
+	return yakit.Get(consts.EmbedSfBuildInRuleKey) != consts.ExistedSyntaxFlowEmbedFSHash
+}
+
+func DoneEmbedRule() {
+	log.Infof("done sync embed rule with hash: %s", consts.ExistedSyntaxFlowEmbedFSHash)
+	yakit.Set(consts.EmbedSfBuildInRuleKey, consts.ExistedSyntaxFlowEmbedFSHash)
 }
