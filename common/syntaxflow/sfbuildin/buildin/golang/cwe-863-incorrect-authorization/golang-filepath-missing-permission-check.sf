@@ -1,5 +1,6 @@
 desc(
     title: "golang filepath missing permission check",
+    title_zh: "golang 文件路径未适当过滤",
     type: audit,
     level: low,
     desc: <<<TEXT
