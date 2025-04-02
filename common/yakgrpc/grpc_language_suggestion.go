@@ -1242,7 +1242,7 @@ func fuzztagCompletion(fuzztagCode string, hotPatchCode string) []*ypb.Suggestio
 	if hotPatchCode != "" {
 		prog, err := static_analyzer.SSAParse(hotPatchCode, string(plugin_type.PluginTypeYak), ssaapi.WithIgnoreSyntaxError(true))
 		if err == nil {
-			mainFunc, ok := prog.Program.Funcs.Get("main")
+			mainFunc, ok := prog.Program.Funcs.Get(string(ssa.MainFunctionName))
 			if ok {
 				for _, childFunc := range mainFunc.ChildFuncs {
 					if utils.StringArrayContains(hotPatchBlacklist, childFunc.GetName()) {
