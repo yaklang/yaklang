@@ -78,6 +78,7 @@ LOOP:
 			}
 			fmt.Println("result:" + result.String())
 			if result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+				time.Sleep(100 * time.Millisecond)
 				inputChan <- &InputEvent{
 					Id: result.GetInteractiveId(),
 					Params: aitool.InvokeParams{
@@ -93,6 +94,7 @@ LOOP:
 				if a.GetObject("params").GetString("path") == "/abc-target" &&
 					a.GetString("tool") == "ls" && a.GetString("tool_description") != "" {
 					useToolReview = true
+					time.Sleep(100 * time.Millisecond)
 					inputChan <- &InputEvent{
 						Id: result.GetInteractiveId(),
 						Params: aitool.InvokeParams{

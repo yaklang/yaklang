@@ -67,6 +67,7 @@ LOOP:
 			spew.Dump(result)
 			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
+				time.Sleep(100 * time.Millisecond)
 				inputChan <- &InputEvent{
 					Id: result.GetInteractiveId(),
 					Params: aitool.InvokeParams{
@@ -155,6 +156,7 @@ func TestCoordinator_ReviewPlan_Incomplete(t *testing.T) {
 	go func() {
 		ins.Run()
 	}()
+	time.Sleep(100 * time.Millisecond)
 
 	parsedTask := false
 	regeneratePlan := false
@@ -164,8 +166,9 @@ LOOP:
 		select {
 		case result := <-outputChan:
 			fmt.Println("result:" + result.String())
-			if strings.Contains(result.String(), `目录中占用存储空间最多的文件，并展示其完整路径与大小信息`) && strings.Contains(result.String(), `"incomplete"`) {
+			if strings.Contains(result.String(), `目录中占用存储空间最多的文件，并展示其完整路径与大小信息`) && result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
+				time.Sleep(100 * time.Millisecond)
 				inputChan <- &InputEvent{
 					Id: result.GetInteractiveId(),
 					Params: aitool.InvokeParams{
