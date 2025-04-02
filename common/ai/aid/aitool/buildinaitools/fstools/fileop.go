@@ -30,10 +30,39 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 	var err error
 	factory := aitool.NewFactory()
 	err = factory.RegisterTool("ls",
-		aitool.WithDescription("list files in directory"),
+		aitool.WithDescription("list files in directory or get file info"),
 		aitool.WithStringParam("path", aitool.WithParam_Required(true)),
 		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			pathName := params.GetString("path")
+
+			// Check if path exists first
+			fileInfo, err := fsys.Stat(pathName)
+			if err != nil {
+				return nil, utils.Errorf("stat %s: %v", pathName, err)
+			}
+
+			// If it's a file, return file info directly
+			if !fileInfo.IsDir() {
+				var buf bytes.Buffer
+				raw := map[string]any{
+					"path":  pathName,
+					"isDir": false,
+					"type":  fileInfo.Mode().String(),
+				}
+				infoMap := make(map[string]any)
+				raw["info"] = infoMap
+				infoMap["name"] = fileInfo.Name()
+				infoMap["size"] = fileInfo.Size()
+				infoMap["mode"] = fileInfo.Mode()
+				infoMap["modTime"] = fileInfo.ModTime()
+
+				rawJSON, _ := json.Marshal(raw)
+				buf.WriteString(string(rawJSON))
+				buf.WriteString("\n")
+				return buf.String(), nil
+			}
+
+			// Otherwise, handle directory as before
 			entries, err := fsys.ReadDir(pathName)
 			if err != nil {
 				return nil, utils.Errorf("read dir %s: %v", pathName, err)

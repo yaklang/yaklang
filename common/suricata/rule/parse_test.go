@@ -3,10 +3,12 @@ package rule
 import (
 	_ "embed"
 	"fmt"
+	"sync"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
-	"testing"
 )
 
 //go:embed badrules.rules
@@ -16,6 +18,13 @@ var badrule string
 var badrule_mini string
 
 func TestMUSTPASS_block(t *testing.T) {
+	m := sync.Map{}
+	m.Store("a", 1)
+	m.Store("b", 1)
+	m.Range(func(k any, v any) bool {
+		fmt.Printf("%v: %v\n", k, v)
+		return true
+	})
 	rules, err := Parse(badrule)
 	if err != nil {
 		t.Fatal(err)

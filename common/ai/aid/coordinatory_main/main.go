@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 func main() {
@@ -18,13 +19,9 @@ func main() {
 		return
 	}
 
-	keyPath := filepath.Join(consts.GetDefaultYakitBaseDir(), "tongyi-apikey.txt")
-	apikey, err := os.ReadFile(keyPath)
-	if err != nil {
-		panic(err)
-	}
-	if string(apikey) == "" {
-		panic("apikey is empty")
+	apikey, proxy := tryLoadApiKeyWithProxy()
+	if apikey == "" {
+		panic("not found apikey")
 	}
 	consts.InitializeYakitDatabase("", "")
 	log.Infof("apikey for tongyi: %v", string(apikey))
@@ -42,9 +39,10 @@ func main() {
 				aispec.WithReasonStreamHandler(func(c io.Reader) {
 					rsp.EmitReasonStream(c)
 				}),
-				aispec.WithType("tongyi"),
-				aispec.WithModel("qwq-plus"),
+				aispec.WithType("openai"),
+				aispec.WithModel("gpt-4o-mini"),
 				aispec.WithAPIKey(string(apikey)),
+				aispec.WithProxy(proxy),
 				// aispec.WithDomain("api.siliconflow.cn"),
 			)
 			if err != nil {
@@ -55,10 +53,11 @@ func main() {
 	}
 
 	coordinator, err := aid.NewCoordinator(
-		"找出 //Users/v1ll4n/Projects/yaklang 目录中最大的文件",
+		"帮我找出/Users/z3/Downloads/h5-graph-lite.jar文件中的MANIFEST.MF文件的内容，并帮我总结一下这个jar包的关键信息",
 		aid.WithAICallback(aiCallback),
 		aid.WithTools(aid.GetAllMockTools()...),
 		aid.WithSystemFileOperator(),
+		aid.WithJarOperator(),
 		aid.WithDebugPrompt(),
 	)
 	if err != nil {
@@ -67,4 +66,15 @@ func main() {
 	if err := coordinator.Run(); err != nil {
 		panic(err)
 	}
+}
+
+func tryLoadApiKeyWithProxy() (string, string) {
+	keyPath := filepath.Join(consts.GetDefaultYakitBaseDir(), "tongyi-apikey.txt")
+	apikeyBytes, err := os.ReadFile(keyPath)
+	if err == nil {
+		return string(apikeyBytes), ""
+	}
+	yakit.LoadGlobalNetworkConfig()
+	cfg := aispec.NewDefaultAIConfig(aispec.WithType("openai"))
+	return cfg.APIKey, cfg.Proxy
 }
