@@ -170,10 +170,13 @@ func (r *Config) EmitRequireReviewForPlan(rsp *planResponse, id string) {
 	r.emitJson(EVENT_TYPE_PLAN_REVIEW_REQUIRE, "review-require", reqs)
 }
 
-func (r *Config) EmitRequireReviewForToolUse(id string) {
+func (r *Config) EmitRequireReviewForToolUse(tool *aitool.Tool, params aitool.InvokeParams, id string) {
 	reqs := map[string]any{
-		"id":        id,
-		"selectors": ToolUseReviewSuggestions,
+		"id":               id,
+		"selectors":        ToolUseReviewSuggestions,
+		"tool":             tool.Name,
+		"tool_description": tool.Description,
+		"params":           params,
 	}
 	r.emitJson(EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, "review-require", reqs)
 }
