@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"encoding/xml"
+	"github.com/samber/lo"
 	"regexp"
 	"strings"
 
@@ -241,7 +242,12 @@ var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 				)
 				query.AddCheckParam(variableName, rng)
 			}
-			res = append(res, query.Check()...)
+			lo.ForEach(query.Check(), func(item sfvm.ValueOperator, index int) {
+				if utils.IsNil(item) {
+					return
+				}
+				res = append(res, item)
+			})
 		})
 		xml2.Handle(content, onDirective, onStartElement, onEndElement, onCharData)
 	}

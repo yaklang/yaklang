@@ -27,9 +27,6 @@ func ValueNotMemberInCall(name, key string) string {
 		name, key,
 	)
 }
-func InvalidField(typ, key string) string {
-	return fmt.Sprintf("Invalid operation: unable to access the member or index of variable of type {%s} with name or index {%s}.", typ, key)
-}
 
 func ExternFieldError(instance, name, key, want string) string {
 	return fmt.Sprintf("Extern%s [%s] don't has [%s], maybe you meant %s ?", instance, name, key, want)
