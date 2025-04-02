@@ -3,6 +3,7 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
@@ -46,6 +47,13 @@ func (q *Action) GetBool(key string, defaults ...bool) bool {
 		return defaults[0]
 	}
 	return false
+}
+
+func (q *Action) GetInvokeParams(key string) aitool.InvokeParams {
+	if v, ok := q.params[key]; ok {
+		return utils.InterfaceToGeneralMap(v)
+	}
+	return make(aitool.InvokeParams, 0)
 }
 
 func extractAction(i string, actionName string, alias ...string) (*Action, error) {
