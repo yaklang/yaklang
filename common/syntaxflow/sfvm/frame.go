@@ -885,7 +885,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			if dup == nil {
 				return utils.Wrapf(CriticalError, "compare opcode failed: stack top is empty")
 			}
-			s.debugSubLog("Remove duplicate :%v", dup.String())
+			s.debugSubLog("Remove duplicate")
 			s.debugSubLog(">> push: %v", ValuesLen(newVal))
 			s.stack.Push(newVal)
 		}

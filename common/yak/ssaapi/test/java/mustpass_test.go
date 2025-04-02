@@ -109,7 +109,7 @@ func TestAnnontation(t *testing.T) {
 	check := func(t *testing.T, prog *ssaapi.Program) {
 		rule := `
 *Mapping.__ref__?{opcode: function} as $entryFunc;
-$entryFunc(*?{opcode: param && !have: this} as $source);
+$entryFunc<getFormalParams>?{opcode: param && !have: this} as $source;
 `
 		result, err := prog.SyntaxFlowWithError(rule)
 		if err != nil {
