@@ -1,0 +1,102 @@
+desc(
+    title: "Find Java File Delete Sinks",
+    title_zh: "查找 Java 文件删除接收点",
+    type: audit,
+    level: info,
+    lib: "java-delete-filename-sink",
+    desc: <<<TEXT
+该规则旨在识别 Java 代码中潜在的文件删除接收点（sinks），这些接收点可能会导致敏感文件被删除或未经授权的文件删除。通过检查 `File.delete`、`File.deleteOnExit` 以及 `java.nio.file.Files.delete` 等文件删除方法，可以识别出那些直接从不可信源（如用户输入或外部配置）获取文件名并用于文件删除操作的代码路径。这种不安全的做法可能会使应用程序容易受到任意文件删除漏洞的攻击，从而导致文件丢失或系统瘫痪。
+TEXT
+)
+
+// File.delete
+File?{*().delete()}(,* as $output);
+
+// File.deleteOnExit
+File?{*().deleteOnExit()}(,* as $output);
+
+// java.nio.file.Files.delete
+Files?{<typeName>?{have: 'java.nio'}}.delete(,* as $output);
+
+// java.nio.file.Files.deleteIfExists
+Files?{<typeName>?{have: 'java.nio'}}.deleteIfExists(,* as $output);
+
+alert $output;
+desc(
+    lang:java,
+    alert_num:2,
+    'file://demo1.java':<<<TEXT
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.io.IOException;
+
+public class NioDeleteFileExample {
+    public static void main(String[] args) {
+        // 定义要删除的文件路径
+        Path path1 = Paths.get("example.txt");
+
+        // 方法1: 使用 Files.delete() - 文件不存在时会抛出异常
+        try {
+            Files.delete(path1);
+            System.out.println("文件删除成功！");
+        } catch (IOException e) {
+            System.err.println("删除失败: " + e.getMessage());
+        }
+
+        // 方法2: 使用 Files.deleteIfExists() - 文件不存在时不会报错
+        Path path2 = Paths.get("example.txt");
+
+        try {
+            boolean isDeleted = Files.deleteIfExists(path2);
+            if (isDeleted) {
+                System.out.println("文件删除成功！");
+            } else {
+                System.out.println("文件不存在，无需删除");
+            }
+        } catch (IOException e) {
+            System.err.println("删除异常: " + e.getMessage());
+        }
+    }
+}
+TEXT
+)
+
+desc(
+    lang:java,
+    alert_num:2,
+    'file://demo2.java':<<<TEXT
+import java.io.File;
+
+public class IoDeleteFileExample {
+    public static void main(String[] args) {
+        // 定义要删除的文件路径（相对路径或绝对路径）
+        File file = new File("example.txt");
+
+        // 方法1: 使用 delete() - 立即删除文件
+        if (file.exists()) {
+            boolean isDeleted = file.delete();
+            if (isDeleted) {
+                System.out.println("文件删除成功！");
+            } else {
+                System.out.println("删除失败（可能权限不足或文件被占用）");
+            }
+        } else {
+            System.out.println("文件不存在");
+        }
+
+        // 方法2: 使用 deleteOnExit() - 程序退出时删除
+        File tempFile = new File("temp_file.txt");
+        try {
+            tempFile.createNewFile();
+            tempFile.deleteOnExit();
+            System.out.println("程序退出时将自动删除临时文件");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+TEXT
+)
+
+
