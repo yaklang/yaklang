@@ -4,9 +4,10 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"text/template"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // 常用元数据键名常量
@@ -46,11 +47,11 @@ func (pr *planRequest) callAI(request *AIRequest) (*AIResponse, error) {
 }
 
 type planResponse struct {
-	RootTask *aiTask
+	RootTask *aiTask `json:"root_task"`
 }
 
-// GeneratePrompt 根据PlanRequest生成prompt
-func (pr *planRequest) GeneratePrompt() (string, error) {
+// GenerateFirstPlanPrompt 根据PlanRequest生成prompt
+func (pr *planRequest) GenerateFirstPlanPrompt() (string, error) {
 	tmpl, err := template.New("generateTaskList").Parse(__prompt_GenerateTaskListPrompt)
 	if err != nil {
 		return "", err
@@ -80,7 +81,7 @@ func (pr *planRequest) GeneratePrompt() (string, error) {
 // Invoke 执行规划请求，调用AI生成任务列表并返回解析后的Task
 func (pr *planRequest) Invoke() (*planResponse, error) {
 	// 生成 Prompt
-	prompt, err := pr.GeneratePrompt()
+	prompt, err := pr.GenerateFirstPlanPrompt()
 	if err != nil {
 		return nil, fmt.Errorf("生成规划 prompt 失败: %v", err)
 	}
