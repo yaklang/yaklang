@@ -1,6 +1,7 @@
 package memedit
 
 import (
+	"github.com/stretchr/testify/require"
 	"reflect"
 	"testing"
 )
@@ -41,6 +42,19 @@ func TestFindStringRange(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFindStringRangeShort(t *testing.T) {
+	editor := NewMemEditor("a")
+	feature := "abc"
+	var results []string
+	err := editor.FindStringRange(feature, func(r RangeIf) error {
+		start, end := r.GetStart(), r.GetEnd()
+		results = append(results, editor.GetTextFromPosition(start, end))
+		return nil
+	})
+	require.NoError(t, err)
+	require.Nil(t, results)
 }
 
 func TestFindRegexpRange_Edge(t *testing.T) {
