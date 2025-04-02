@@ -15,6 +15,7 @@ type PlanReviewSuggestion struct {
 	Value             string `json:"value"`
 	Suggestion        string `json:"prompt"`
 	SuggestionEnglish string `json:"prompt_english"`
+	AllowExtraPrompt  bool   `json:"allow_extra_prompt"`
 
 	PromptBuilder    func(plan *planRequest, rt *runtime) `json:"-"`
 	ResponseCallback func(reader io.Reader)               `json:"-"`
@@ -27,11 +28,7 @@ var PlanReviewSuggestions = []*PlanReviewSuggestion{
 		Value:             "incomplete",
 		Suggestion:        "计划不够完整，需要补充更多细节",
 		SuggestionEnglish: "The plan is not complete enough, more details need to be added",
-	},
-	{
-		Value:             "unrealistic",
-		Suggestion:        "计划不够现实，需要调整任务难度和范围",
-		SuggestionEnglish: "The plan is not realistic enough, task difficulty and scope need to be adjusted",
+		AllowExtraPrompt:  true,
 	},
 	{
 		Value:             "continue",
@@ -40,8 +37,8 @@ var PlanReviewSuggestions = []*PlanReviewSuggestion{
 	},
 	{
 		Value:             "replan",
-		Suggestion:        "需要重新规划整个任务",
-		SuggestionEnglish: "Need to replan the entire task",
+		Suggestion:        "需要重新规划整个任务或者局部任务",
+		SuggestionEnglish: "Need to replan the entire task or partial task",
 	},
 }
 
@@ -74,41 +71,35 @@ func (p *planRequest) handleReviewPlanResponse(rsp *planResponse, param aitool.I
 			p.config.EmitError("generate new plan failed: %v", err)
 			return nil, utils.Errorf("generate new plan failed: %v", err)
 		}
-		// 合并新旧计划
-		p.mergePlans(newPlan)
 
-	case "unrealistic":
-		p.config.EmitInfo("plan is unrealistic")
-		// 调整现有任务的难度和范围
-		if err := p.adjustTaskDifficulty(rsp); err != nil {
-			p.config.EmitError("adjust task difficulty failed: %v", err)
-			return nil, utils.Errorf("adjust task difficulty failed: %v", err)
+		ep := p.config.epm.createEndpoint()
+		ep.SetDefaultSuggestionContinue()
+
+		p.config.EmitRequireReviewForPlan(newPlan, ep.id)
+		if !p.config.autoAgree {
+			if !ep.WaitTimeoutSeconds(60) {
+				p.config.EmitInfo("user review timeout, use default action: pass")
+			}
 		}
-
+		params := ep.GetParams()
+		if params == nil {
+			p.config.EmitError("user review params is nil, plan failed")
+			return newPlan, nil
+		}
+		return p.handleReviewPlanResponse(newPlan, params)
 	case "replan":
-		p.config.EmitInfo("replanning entire task")
-		// 完全重新规划
-		extraPrompt := param.GetString("extra_prompt", "prompt")
-		newPlan, err := p.generateNewPlan(suggestion, extraPrompt, rsp)
-		if err != nil {
-			p.config.EmitError("generate new plan failed: %v", err)
-			return nil, utils.Errorf("generate new plan failed: %v", err)
-		}
-		// 替换现有计划
-		p.rawInput = newPlan.rawInput
-
+		return nil, utils.Errorf("replan is not supported yet")
 	default:
 		p.config.EmitError("unknown review suggestion: %s", suggestion)
 		return rsp, nil
 	}
-	return rsp, nil
 }
 
 //go:embed prompts/plan-review/plan-incomplete.txt
 var planReviewPrompts string
 
 // generateNewPlan 生成新的计划
-func (p *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp *planResponse) (*planRequest, error) {
+func (p *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp *planResponse) (*planResponse, error) {
 	var buf bytes.Buffer
 	rsp.RootTask.dumpProgress(0, &buf)
 
@@ -127,8 +118,12 @@ func (p *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp
 	}
 
 	var planPrompt bytes.Buffer
-	tmpl.Execute(&planPrompt, data)
+	err = tmpl.Execute(&planPrompt, data)
+	if err != nil {
+		return nil, utils.Errorf("error executing plan review prompt: %v", err)
+	}
 
+	p.config.EmitInfo("re-plan review prompt: %s", planPrompt.String())
 	// 调用 AI 生成新的任务计划
 	request := NewAIRequest(planPrompt.String())
 	response, err := p.callAI(request)
@@ -143,14 +138,11 @@ func (p *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp
 		return nil, utils.Errorf("error reading AI response: %v", err)
 	}
 
-	// 解析响应并创建新计划
-	newPlan := &planRequest{
-		config:   p.config,
-		rawInput: p.rawInput,
+	task, err := p.extractTaskFromRawResponse(string(taskResponse))
+	if err != nil {
+		return nil, utils.Errorf("error extracting task from raw response: %v", err)
 	}
-
-	// 更新计划
-	newPlan.rawInput = string(taskResponse)
+	newPlan := &planResponse{RootTask: task}
 	return newPlan, nil
 }
 
