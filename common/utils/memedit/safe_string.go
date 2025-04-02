@@ -120,17 +120,40 @@ func (s *SafeString) IndexString(what string) int {
 }
 
 func (s *SafeString) Index(what []rune) int {
-	for i := range s.runes {
-		found := true
-		for j := range what {
-			if s.runes[i+j] != what[j] {
-				found = false
-				break
-			}
+	if len(what) == 0 {
+		return 0
+	}
+	if len(what) > len(s.runes) {
+		return -1
+	}
+
+	// 使用KMP算法匹配字符串
+	// 构建next数组
+	next := make([]int, len(what))
+	next[0] = -1
+	i, j := 0, -1
+	for i < len(what)-1 {
+		if j == -1 || what[i] == what[j] {
+			i++
+			j++
+			next[i] = j
+		} else {
+			j = next[j]
 		}
-		if found {
-			return i
+	}
+
+	// 搜索
+	i, j = 0, 0
+	for i < len(s.runes) && j < len(what) {
+		if j == -1 || s.runes[i] == what[j] {
+			i++
+			j++
+		} else {
+			j = next[j]
 		}
+	}
+	if j == len(what) {
+		return i - j
 	}
 	return -1
 }
