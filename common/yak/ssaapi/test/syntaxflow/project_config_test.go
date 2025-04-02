@@ -89,7 +89,7 @@ __projectConfig__."management.endpoints.web.exposure.include" as $include;
 			require.NoError(t, err)
 			appName := vals.GetValues("include")
 			appName.ShowWithSource()
-			require.Contains(t, appName.StringEx(1), "health.show")
+			require.Contains(t, appName.StringEx(1), "health,info,metrics")
 			return nil
 		})
 	})
