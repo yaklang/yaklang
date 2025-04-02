@@ -70,7 +70,7 @@ func (c *Coordinator) Run() error {
 	ep := c.config.epm.createEndpoint()
 	ep.SetDefaultSuggestionContinue()
 
-	c.config.EmitRequireReviewForPlan(ep.id)
+	c.config.EmitRequireReviewForPlan(rsp, ep.id)
 	if !c.config.autoAgree {
 		if !ep.WaitTimeoutSeconds(60) {
 			c.config.EmitInfo("user review timeout, use default action: pass")
@@ -82,7 +82,7 @@ func (c *Coordinator) Run() error {
 		return utils.Errorf("coordinator: user review params is nil")
 	}
 	c.config.EmitInfo("start to handle review plan response")
-	err = planReq.handleReviewPlanResponse(rsp, params)
+	rsp, err = planReq.handleReviewPlanResponse(rsp, params)
 	if err != nil {
 		c.config.EmitError("handle review plan response failed: %v", err)
 		return utils.Errorf("coordinator: handle review plan response failed: %v", err)

@@ -1,6 +1,7 @@
 package aid
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -36,6 +37,25 @@ type Event struct {
 	StreamDelta []byte
 	IsJson      bool
 	Content     []byte
+}
+
+func (e *Event) GetInteractiveId() string {
+	if e.IsJson {
+		var i map[string]any
+		if err := json.Unmarshal(e.Content, &i); err == nil {
+			// 检查事件类型是否为需要交互的类型
+			switch e.Type {
+			case EVENT_TYPE_PLAN_REVIEW_REQUIRE,
+				EVENT_TYPE_TASK_REVIEW_REQUIRE,
+				EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE,
+				EVENT_TYPE_PERMISSION_REQUIRE:
+				if id, ok := i["id"].(string); ok {
+					return id
+				}
+			}
+		}
+	}
+	return ""
 }
 
 func (e *Event) String() string {
@@ -141,10 +161,11 @@ func (r *Config) EmitRequireReviewForTask(id string) {
 	r.emitJson(EVENT_TYPE_TASK_REVIEW_REQUIRE, "review-require", reqs)
 }
 
-func (r *Config) EmitRequireReviewForPlan(id string) {
+func (r *Config) EmitRequireReviewForPlan(rsp *planResponse, id string) {
 	reqs := map[string]any{
 		"id":        id,
 		"selectors": PlanReviewSuggestions,
+		"plans":     rsp,
 	}
 	r.emitJson(EVENT_TYPE_PLAN_REVIEW_REQUIRE, "review-require", reqs)
 }

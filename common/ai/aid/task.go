@@ -27,12 +27,12 @@ type TaskProgress struct {
 type aiTask struct {
 	config *Config
 
-	Name       string
-	Goal       string
-	ParentTask *aiTask
-	Subtasks   []*aiTask
+	Name       string    `json:"name"`
+	Goal       string    `json:"goal"`
+	ParentTask *aiTask   `json:"parent_task"`
+	Subtasks   []*aiTask `json:"subtasks"`
 
-	ResponseCallback TaskResponseCallback // 响应回调函数
+	ResponseCallback TaskResponseCallback `json:"-"` // 响应回调函数
 
 	// 新增字段，存储默认工具和元数据
 	metadata map[string]interface{}
@@ -42,10 +42,10 @@ type aiTask struct {
 	rerun     bool
 
 	// runtime
-	ToolCallResults []*aitool.ToolResult
-	TaskSummary     string
-	ShortSummary    string
-	LongSummary     string
+	ToolCallResults []*aitool.ToolResult `json:"tool_call_results"`
+	TaskSummary     string               `json:"task_summary"`
+	ShortSummary    string               `json:"short_summary"`
+	LongSummary     string               `json:"long_summary"`
 }
 
 func (t *aiTask) callAI(request *AIRequest) (*AIResponse, error) {

@@ -1,8 +1,11 @@
 package aid
 
 import (
+	"bytes"
+	_ "embed"
 	"encoding/json"
 	"io"
+	"text/template"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
@@ -42,11 +45,22 @@ var PlanReviewSuggestions = []*PlanReviewSuggestion{
 	},
 }
 
-func (p *planRequest) handleReviewPlanResponse(rsp *planResponse, param aitool.InvokeParams) error {
+func (p *planRequest) handleReviewPlanResponse(rsp *planResponse, param aitool.InvokeParams) (*planResponse, error) {
+	if utils.IsNil(rsp) {
+		return nil, utils.Error("plan response is nil")
+	}
+
 	// 1. 获取审查建议
 	suggestion := param.GetString("suggestion")
 	if suggestion == "" {
-		return utils.Error("suggestion is empty")
+		p.config.EmitError("suggestion is empty, use default: continue")
+		return rsp, nil
+	}
+
+	if suggestion == "continue" {
+		p.config.EmitInfo("plan is reasonable, continue")
+		// 继续执行现有计划
+		return rsp, nil
 	}
 
 	// 2. 根据审查建议处理
@@ -54,10 +68,11 @@ func (p *planRequest) handleReviewPlanResponse(rsp *planResponse, param aitool.I
 	case "incomplete":
 		p.config.EmitInfo("plan is incomplete")
 		// 重新生成计划，但保留现有任务
-		newPlan, err := p.generateNewPlan(rsp)
+		extraPrompt := param.GetString("extra_prompt", "prompt")
+		newPlan, err := p.generateNewPlan(suggestion, extraPrompt, rsp)
 		if err != nil {
 			p.config.EmitError("generate new plan failed: %v", err)
-			return utils.Errorf("generate new plan failed: %v", err)
+			return nil, utils.Errorf("generate new plan failed: %v", err)
 		}
 		// 合并新旧计划
 		p.mergePlans(newPlan)
@@ -67,41 +82,55 @@ func (p *planRequest) handleReviewPlanResponse(rsp *planResponse, param aitool.I
 		// 调整现有任务的难度和范围
 		if err := p.adjustTaskDifficulty(rsp); err != nil {
 			p.config.EmitError("adjust task difficulty failed: %v", err)
-			return utils.Errorf("adjust task difficulty failed: %v", err)
+			return nil, utils.Errorf("adjust task difficulty failed: %v", err)
 		}
-
-	case "continue":
-		p.config.EmitInfo("plan is reasonable, continue")
-		// 继续执行现有计划
-		return nil
 
 	case "replan":
 		p.config.EmitInfo("replanning entire task")
 		// 完全重新规划
-		newPlan, err := p.generateNewPlan(rsp)
+		extraPrompt := param.GetString("extra_prompt", "prompt")
+		newPlan, err := p.generateNewPlan(suggestion, extraPrompt, rsp)
 		if err != nil {
 			p.config.EmitError("generate new plan failed: %v", err)
-			return utils.Errorf("generate new plan failed: %v", err)
+			return nil, utils.Errorf("generate new plan failed: %v", err)
 		}
 		// 替换现有计划
 		p.rawInput = newPlan.rawInput
 
 	default:
 		p.config.EmitError("unknown review suggestion: %s", suggestion)
-		return utils.Errorf("unknown review suggestion: %s", suggestion)
+		return rsp, nil
 	}
-	return nil
+	return rsp, nil
 }
 
+//go:embed prompts/plan-review/plan-incomplete.txt
+var planReviewPrompts string
+
 // generateNewPlan 生成新的计划
-func (p *planRequest) generateNewPlan(rsp *planResponse) (*planRequest, error) {
-	planPrompt, err := p.GeneratePrompt()
+func (p *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp *planResponse) (*planRequest, error) {
+	var buf bytes.Buffer
+	rsp.RootTask.dumpProgress(0, &buf)
+
+	tmpl, err := template.New("plan-review").Parse(planReviewPrompts)
 	if err != nil {
-		return nil, utils.Errorf("error generating dynamic plan prompt: %v", err)
+		return nil, utils.Errorf("error parsing plan review prompt: %v", err)
 	}
 
+	data := map[string]any{
+		"OriginPlan":     buf.String(),
+		"Query":          p.rawInput,
+		"MetaInfo":       "",
+		"TaskJsonSchema": __prompt_TaskJsonSchema,
+		"UserSuggestion": suggestion,
+		"ExtraPrompt":    extraPrompt,
+	}
+
+	var planPrompt bytes.Buffer
+	tmpl.Execute(&planPrompt, data)
+
 	// 调用 AI 生成新的任务计划
-	request := NewAIRequest(planPrompt)
+	request := NewAIRequest(planPrompt.String())
 	response, err := p.callAI(request)
 	if err != nil {
 		return nil, utils.Errorf("error calling AI: %v", err)
