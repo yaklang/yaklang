@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -28,12 +29,16 @@ type sender interface {
 }
 
 func (s *Server) tickerRiskCountFeedback(ctx context.Context, tickerTime time.Duration, runtimeId string, yakClient *yaklib.YakitClient) {
+	tickerRiskCountFeedback(ctx, tickerTime, runtimeId, yakClient, s.GetProjectDatabase())
+}
+
+func tickerRiskCountFeedback(ctx context.Context, tickerTime time.Duration, runtimeId string, yakClient *yaklib.YakitClient, projectDB *gorm.DB) {
 	ticker := time.NewTicker(tickerTime)
 	go func() {
 		defer ticker.Stop()
 		lastCount := 0
 		feedbackRiskCount := func() {
-			currentCount, err := yakit.CountRiskByRuntimeId(s.GetProjectDatabase(), runtimeId)
+			currentCount, err := yakit.CountRiskByRuntimeId(projectDB, runtimeId)
 			if err != nil {
 				log.Errorf("count risk failed: %v", err)
 			} else if lastCount != currentCount {
@@ -56,7 +61,10 @@ func (s *Server) tickerRiskCountFeedback(ctx context.Context, tickerTime time.Du
 }
 
 func (s *Server) forceRiskCountFeedback(runtimeId string, yakClient *yaklib.YakitClient) (int, error) {
-	riskCount, err := yakit.CountRiskByRuntimeId(s.GetProjectDatabase(), runtimeId)
+	return forceRiskCountFeedback(runtimeId, yakClient, s.GetProjectDatabase())
+}
+func forceRiskCountFeedback(runtimeId string, yakClient *yaklib.YakitClient, projectDB *gorm.DB) (int, error) {
+	riskCount, err := yakit.CountRiskByRuntimeId(projectDB, runtimeId)
 	if err != nil {
 		log.Errorf("count risk failed: %v", err)
 	} else {
@@ -67,7 +75,7 @@ func (s *Server) forceRiskCountFeedback(runtimeId string, yakClient *yaklib.Yaki
 	return riskCount, err
 }
 
-func (s *Server) execScriptWithExecParam(script *schema.YakScript, input string, stream sender, params []*ypb.KVPair, runtimeId string) error {
+func execScriptWithExecParam(script *schema.YakScript, input string, stream sender, params []*ypb.KVPair, runtimeId string, projectDB *gorm.DB) error {
 	var (
 		scriptName = script.ScriptName
 		scriptType = script.Type
@@ -85,8 +93,8 @@ func (s *Server) execScriptWithExecParam(script *schema.YakScript, input string,
 		result.RuntimeID = runtimeId
 		return stream.Send(result)
 	}, runtimeId) // set risk count
-	s.tickerRiskCountFeedback(streamCtx, 2*time.Second, runtimeId, feedbackClient)
-	defer s.forceRiskCountFeedback(runtimeId, feedbackClient)
+	tickerRiskCountFeedback(streamCtx, 2*time.Second, runtimeId, feedbackClient, projectDB)
+	defer forceRiskCountFeedback(runtimeId, feedbackClient, projectDB)
 
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
 	log.Infof("engine.ExecuteExWithContext(stream.Context(), debugScript ... \n")
@@ -185,6 +193,7 @@ func (s *Server) execScriptWithRequest(scriptInstance *schema.YakScript, targetI
 		scriptCode = scriptInstance.Content
 		scriptType = scriptInstance.Type
 		isTemp     = scriptInstance.Ignored && (strings.HasPrefix(scriptInstance.ScriptName, "[TMP]") || strings.HasPrefix(scriptInstance.ScriptName, "]"))
+		projectDB  = s.GetProjectDatabase()
 	)
 	streamCtx, cancel := context.WithCancel(stream.Context())
 	if scriptName == "" {
@@ -264,8 +273,8 @@ func (s *Server) execScriptWithRequest(scriptInstance *schema.YakScript, targetI
 		result.RuntimeID = runtimeId
 		return stream.Send(result)
 	}, runtimeId) // set risk count
-	s.tickerRiskCountFeedback(streamCtx, 2*time.Second, runtimeId, feedbackClient)
-	defer s.forceRiskCountFeedback(runtimeId, feedbackClient)
+	tickerRiskCountFeedback(streamCtx, 2*time.Second, runtimeId, feedbackClient, projectDB)
+	defer forceRiskCountFeedback(runtimeId, feedbackClient, projectDB)
 
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
 	log.Infof("engine.ExecuteExWithContext(stream.Context(), debugScript ... \n")
@@ -347,7 +356,7 @@ func (s *Server) execScriptEx(
 	scriptType := script.Type
 	switch scriptType {
 	case "yak", "codec":
-		return s.execScriptWithExecParam(script, input, stream, execParams, runtimeId)
+		return execScriptWithExecParam(script, input, stream, execParams, runtimeId, s.GetProjectDatabase())
 	case "mitm", "nuclei", "port-scan":
 		return s.execScriptWithRequest(script, input, stream, execParams, runtimeId, params...)
 	}
