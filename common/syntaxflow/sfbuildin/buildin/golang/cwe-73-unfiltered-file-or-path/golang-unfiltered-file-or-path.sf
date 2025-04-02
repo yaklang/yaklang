@@ -131,6 +131,7 @@ SOLUTION
 strings.HasPrefix(* #-> as $check);
 $path.Clean(* #-> as $check);
 $path.IsAbs(* #-> as $check);
+$path.Join(* #-> as $check);
 
 $sink #{include: `$check`}-> as $safe;
 $sink #{exclude: `$safe`}-> as $low;
@@ -160,9 +161,7 @@ const allowedBasePath = "/allowed/path/"
 
 func handler(w http.ResponseWriter, r *http.Request) {
     userInput := r.URL.Query().Get("file")
-
-    // 清洗路径并转换为绝对路径
-    requestedPath := filepath.Join(allowedBasePath, userInput)
+    requestedPath := userInput
 
     // 读取文件
     content, err := ioutil.ReadFile(requestedPath)

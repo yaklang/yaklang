@@ -1,0 +1,66 @@
+desc(
+    title: "golang unsafe way to write SQL statements concatenated",
+	title_zh: "golang SQL 语句拼接的不安全写法",
+    type: audit,
+    severity: mid,
+	risk: sqli,
+    desc: <<<TEXT
+SQL 注入是一种攻击技术，攻击者通过向应用程序的输入字段注入恶意的 SQL 代码，从而能够操纵后端数据库执行未经授权的查询。在 Golang 中使用 `sqlx` 或标准 `database/sql` 包时，如果直接将用户输入拼接到 SQL 查询中，而不进行适当的参数化查询或输入验证，就会导致 SQL 注入漏洞。这种漏洞允许攻击者绕过应用程序的安全控制，获取、修改或删除数据库中的数据，甚至可能完全控制数据库服务器。
+
+直接拼接用户输入到 SQL 语句中是一高危操作，可能导致 SQL 注入攻击。
+TEXT
+)
+
+<include('golang-database-sink')> as $entry;
+
+$entry.Query <getActualParams><slice(index=0)> as $result;
+$entry.Query <getActualParams><slice(index=1)> as $result;
+$result?{opcode: add} as $mid;
+
+$entry.Query <getActualParams><slice(index=0)> #-> as $result2;
+$entry.Query <getActualParams><slice(index=1)> #-> as $result2;
+$result2?{have: 'fmt.Sprintf'} as $mid;
+
+$param?{<self>-{
+   until: `* & $sink`,
+}->} as $mid;
+
+alert $mid for {
+    title: 'SQL Injection detected',
+    title_zh: '检测到SQL注入',
+    type: 'vuln',
+    level: 'mid',
+}
+
+desc(
+    lang: golang,
+    alert_mid: 1,
+    'file://main.go': <<<UNSAFE
+package test
+
+import (
+    "database/sql"
+    "fmt"
+    _ "github.com/lib/pq"
+    "strings"
+)
+
+func listTables(db *sql.DB) {
+    rows, err := db.Query("SELECT * FROM users WHERE name='" + input + "'")
+    if err != nil {
+        fmt.Println("Failed to list tables:", err)
+        return
+    }
+    defer rows.Close()
+
+    for rows.Next() {
+        var tableName string
+        if err := rows.Scan(&tableName); err != nil {
+            fmt.Println("Failed to scan table name:", err)
+            return
+        }
+        fmt.Println("Table:", tableName)
+    }
+}
+UNSAFE
+)

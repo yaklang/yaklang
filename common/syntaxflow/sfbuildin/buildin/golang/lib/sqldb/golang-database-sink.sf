@@ -34,5 +34,6 @@ REFERENCE
 <include('golang-database-reform')> as $output;
 <include('golang-database-sql')> as $output;
 <include('golang-database-sqlx')> as $output;
+<include('golang-database-from-param')> as $output;
 
 alert $output;
