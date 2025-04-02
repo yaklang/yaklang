@@ -31,10 +31,15 @@ func (t *aiTask) getToolRequired(response string) []*aitool.Tool {
 		}
 		if rawData, ok := data["tool"]; ok && fmt.Sprint(rawData) != "" {
 			toolName := fmt.Sprint(rawData)
+			count := 0
 			for _, toolIns := range t.config.tools {
 				if toolIns.Name == toolName {
+					count++
 					toolRequired = append(toolRequired, toolIns)
 				}
+			}
+			if count <= 0 {
+				t.config.EmitInfo("require-tool for %v, but not found it", toolName)
 			}
 		}
 	}
@@ -73,6 +78,15 @@ func (t *aiTask) callTool(ctx *taskContext, targetTool *aitool.Tool) (result *ai
 	}
 	callParamsString, _ := io.ReadAll(callParams.GetOutputStreamReader("call-tools", true, t.config))
 
+	// extract action
+	callToolAction, err := extractAction(string(callParamsString), "call-tool")
+	if err != nil {
+		t.config.EmitError("error extract tool params: %v", err)
+		err = utils.Errorf("error extracting action params: %v", err)
+		return nil, "", err
+	}
+	callToolParams := callToolAction.GetInvokeParams("params")
+
 	t.config.EmitInfo("start to invoke tool:%v 's callback function", targetTool.Name)
 	// 调用工具
 	stdoutBuf := bytes.NewBuffer(nil)
@@ -83,7 +97,7 @@ func (t *aiTask) callTool(ctx *taskContext, targetTool *aitool.Tool) (result *ai
 	t.config.EmitInfo("start to require review for tool use")
 	ep := t.config.epm.createEndpoint()
 	ep.SetDefaultSuggestionContinue()
-	t.config.EmitRequireReviewForToolUse(ep.id)
+	t.config.EmitRequireReviewForToolUse(targetTool, callToolParams, ep.id)
 	if !t.config.autoAgree {
 		if !ep.WaitTimeoutSeconds(60) {
 			t.config.EmitInfo("user review timeout, use default action: pass")
@@ -100,7 +114,8 @@ func (t *aiTask) callTool(ctx *taskContext, targetTool *aitool.Tool) (result *ai
 		return nil, "", NewNonRetryableTaskStackError(err)
 	}
 
-	toolResult, err := targetTool.InvokeWithRaw(string(callParamsString), aitool.WithStdout(stdoutBuf), aitool.WithStderr(stderrBuf))
+	t.config.EmitInfo("start to execute tool:%v ", targetTool.Name)
+	toolResult, err := targetTool.InvokeWithParams(callToolParams, aitool.WithStdout(stdoutBuf), aitool.WithStderr(stderrBuf))
 	if err != nil {
 		err = utils.Errorf("error invoking tool: %v", err)
 		return nil, "", NewNonRetryableTaskStackError(err)
