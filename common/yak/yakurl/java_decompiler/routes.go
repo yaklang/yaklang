@@ -95,7 +95,7 @@ func (a *Action) registerJarRoutes() {
 				},
 			}
 			entryPath := filepath.Join(dirPath, entry.Name())
-			fileInfo, err := jarParser.GetJarFS().Stat(entryPath)
+			fileInfo, err := entry.Info()
 			if err != nil {
 				return nil, err
 			}
