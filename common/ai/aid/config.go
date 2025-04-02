@@ -296,6 +296,16 @@ func WithSystemFileOperator() Option {
 	}
 }
 
+func WithJarOperator() Option {
+	return func(config *Config) error {
+		tools, err := fstools.CreateJarOperator()
+		if err != nil {
+			return utils.Errorf("create jar operator tools: %v", err)
+		}
+		return WithTools(tools...)(config)
+	}
+}
+
 func WithDebugPrompt(i ...bool) Option {
 	return func(config *Config) error {
 		config.m.Lock()

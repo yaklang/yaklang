@@ -60,6 +60,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 
 	if startParams.GetEnableSystemFileSystemOperator() {
 		opts = append(opts, aid.WithSystemFileOperator())
+		opts = append(opts, aid.WithJarOperator())
 	}
 
 	if startParams.GetUseDefaultAIConfig() {
