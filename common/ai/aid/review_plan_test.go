@@ -65,7 +65,7 @@ LOOP:
 		case result := <-outputChan:
 			fmt.Println("result:" + result.String())
 			spew.Dump(result)
-			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && strings.Contains(result.String(), `unrealistic`) {
+			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
 				inputChan <- &InputEvent{
 					Id: result.GetInteractiveId(),
