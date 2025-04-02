@@ -13,6 +13,7 @@ type ReviewSuggestion struct {
 	Value             string `json:"value"`
 	Suggestion        string `json:"prompt"`
 	SuggestionEnglish string `json:"prompt_english"`
+	AllowExtraPrompt  bool   `json:"allow_extra_prompt"`
 
 	PromptBuilder    func(task *aiTask, rt *runtime) `json:"-"`
 	ResponseCallback func(reader io.Reader)          `json:"-"`
@@ -32,11 +33,13 @@ var TaskReviewSuggestions = []*ReviewSuggestion{
 		Value:             "deeply_think",
 		Suggestion:        "思考不够深入，根据当前上下文，为当前任务拆分更多子任务",
 		SuggestionEnglish: "Not deep enough, split more sub-tasks for the current task according to the current context",
+		AllowExtraPrompt:  true,
 	},
 	{
 		Value:             "inaccurate",
 		Suggestion:        "回答不够精准，存在未使用工具导致幻觉，或者工具参数不合适",
 		SuggestionEnglish: "The answer is not accurate enough, there is an illusion caused by not using the tool, or the tool parameters are not appropriate",
+		AllowExtraPrompt:  true,
 	},
 	{
 		Value:             "continue",
@@ -44,14 +47,10 @@ var TaskReviewSuggestions = []*ReviewSuggestion{
 		SuggestionEnglish: "Continue to execute the task",
 	},
 	{
-		Value:             "end",
-		Suggestion:        "到此结束，后续不要做新任务了",
-		SuggestionEnglish: "End here, no new tasks should be done later",
-	},
-	{
 		Value:             "adjust_plan",
 		Suggestion:        "任务需要调整，用户会输入更新后任务",
 		SuggestionEnglish: "The task needs to be adjusted, and the user will enter the updated task",
+		AllowExtraPrompt:  true,
 	},
 }
 

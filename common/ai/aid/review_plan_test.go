@@ -2,6 +2,7 @@ package aid
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
 	"time"
@@ -87,8 +88,6 @@ LOOP:
 }
 
 func TestCoordinator_ReviewPlan_Incomplete(t *testing.T) {
-	t.Skip()
-
 	inputChan := make(chan *InputEvent)
 	outputChan := make(chan *Event)
 	ins, err := NewCoordinator(
@@ -104,7 +103,7 @@ func TestCoordinator_ReviewPlan_Incomplete(t *testing.T) {
 				rsp.Close()
 			}()
 
-			if strings.Contains(request.GetPrompt(), "incomplete") {
+			if !strings.Contains(request.GetPrompt(), "incomplete") {
 				rsp.EmitOutputStream(strings.NewReader(`
 {
     "@action": "plan",
@@ -133,20 +132,16 @@ func TestCoordinator_ReviewPlan_Incomplete(t *testing.T) {
 {
     "@action": "plan",
     "query": "找出 /Users/v1ll4n/Projects/yaklang 目录中最大的文件",
-    "main_task": "在指定目录中找到最大的文件",
-    "main_task_goal": "明确 /Users/v1ll4n/Projects/yaklang 目录下哪个文件占用空间最大，并输出该文件的路径和大小",
+    "main_task": "CCC",
+    "main_task_goal": "CCC",
     "tasks": [
         {
-            "subtask_name": "遍历目标目录",
-            "subtask_goal": "递归扫描 /Users/v1ll4n/Projects/yaklang 目录，获取所有文件的路径和大小"
+            "subtask_name": "ABC",
+            "subtask_goal": "ABC"
         },
         {
-            "subtask_name": "筛选最大文件",
-            "subtask_goal": "根据文件大小比较，确定目录中占用空间最大的文件"
-        },
-        {
-            "subtask_name": "输出结果",
-            "subtask_goal": "将最大文件的路径和大小以可读格式输出"
+            "subtask_name": "BCD",
+            "subtask_goal": "BCD"
         }
     ]
 }
@@ -162,13 +157,14 @@ func TestCoordinator_ReviewPlan_Incomplete(t *testing.T) {
 	}()
 
 	parsedTask := false
-
+	regeneratePlan := false
+	_ = regeneratePlan
+LOOP:
 	for {
 		select {
 		case result := <-outputChan:
 			fmt.Println("result:" + result.String())
-			spew.Dump(result)
-			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && strings.Contains(result.String(), `unrealistic`) {
+			if strings.Contains(result.String(), `目录中占用存储空间最多的文件，并展示其完整路径与大小信息`) && strings.Contains(result.String(), `"incomplete"`) {
 				parsedTask = true
 				inputChan <- &InputEvent{
 					Id: result.GetInteractiveId(),
@@ -176,12 +172,14 @@ func TestCoordinator_ReviewPlan_Incomplete(t *testing.T) {
 						"suggestion": "incomplete",
 					},
 				}
+				continue
 			}
 
-			if strings.Contains(result.String(), `任务计划已完善`) {
-				break
+			if utils.MatchAllOfSubString(result.String(), "ABC", "CCC", "BCD") &&
+				result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+				regeneratePlan = true
+				break LOOP
 			}
-
 			_ = inputChan
 		case <-time.After(time.Second * 60):
 			t.Fatal("timeout")
@@ -189,6 +187,10 @@ func TestCoordinator_ReviewPlan_Incomplete(t *testing.T) {
 	}
 
 	if !parsedTask {
+		t.Fatal("cannot parse task and not sent suggestion")
+	}
+
+	if !regeneratePlan {
 		t.Fatal("cannot parse task and not sent suggestion")
 	}
 }

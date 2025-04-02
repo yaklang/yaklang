@@ -8,9 +8,11 @@ import (
 )
 
 type ToolUseReviewSuggestion struct {
-	Value             string `json:"value"`
-	Suggestion        string `json:"prompt"`
-	SuggestionEnglish string `json:"prompt_english"`
+	Value                   string `json:"value"`
+	Suggestion              string `json:"prompt"`
+	SuggestionEnglish       string `json:"prompt_english"`
+	AllowExtraPrompt        bool   `json:"allow_extra_prompt"`
+	AllowParamsModification bool   `json:"allow_params_modification"`
 
 	PromptBuilder    func(task *aiTask, rt *runtime) `json:"-"`
 	ResponseCallback func(reader io.Reader)          `json:"-"`
@@ -23,11 +25,14 @@ var ToolUseReviewSuggestions = []*ToolUseReviewSuggestion{
 		Value:             "wrong_tool",
 		Suggestion:        "使用了错误的工具，需要更换更合适的工具",
 		SuggestionEnglish: "Wrong tool used, need to change to a more appropriate tool",
+		AllowExtraPrompt:  true,
 	},
 	{
-		Value:             "wrong_params",
-		Suggestion:        "工具参数使用不当，需要调整参数",
-		SuggestionEnglish: "Tool parameters are not used properly, need to adjust parameters",
+		Value:                   "wrong_params",
+		Suggestion:              "工具参数使用不当，需要调整参数",
+		SuggestionEnglish:       "Tool parameters are not used properly, need to adjust parameters",
+		AllowExtraPrompt:        true,
+		AllowParamsModification: true,
 	},
 	{
 		Value:             "continue",
