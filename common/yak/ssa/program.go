@@ -64,6 +64,7 @@ func NewProgram(
 		ProjectConfig:           make(map[string]*ProjectConfig),
 		Template:                make(map[string]tl.TemplateGeneratedInfo),
 		CurrentIncludingStack:   utils.NewStack[string](),
+		config:                  NewLanguageConfig(),
 	}
 	if kind == Application {
 		prog.Application = prog
