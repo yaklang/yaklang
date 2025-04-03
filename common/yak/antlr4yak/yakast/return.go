@@ -22,6 +22,8 @@ func (y *YakCompiler) VisitReturnStmt(raw yak.IReturnStmtContext) interface{} {
 	if list := i.ExpressionList(); list != nil {
 		y.writeString(" ")
 		y.VisitExpressionList(list)
+	} else {
+		y.pushNil()
 	}
 	if y.tryDepthStack.Len() > 0 {
 		y.pushOperator(yakvm.OpStopCatchError)

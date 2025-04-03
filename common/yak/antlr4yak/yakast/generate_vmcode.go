@@ -20,6 +20,13 @@ func (s *YakCompiler) _pushOpcodeWithCurrentCodeContext(codes ...*yakvm.Code) {
 	s.codes = append(s.codes, codes...)
 }
 
+func (s *YakCompiler) pushNil() {
+	s._pushOpcodeWithCurrentCodeContext(&yakvm.Code{
+		Opcode: yakvm.OpPush,
+		Op1:    yakvm.GetUndefined(),
+	})
+}
+
 func (s *YakCompiler) pushInteger(i int, origin string) {
 	s._pushOpcodeWithCurrentCodeContext(&yakvm.Code{
 		Opcode: yakvm.OpPush,
