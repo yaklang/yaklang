@@ -4,12 +4,15 @@ import (
 	"bytes"
 	_ "embed"
 	"encoding/json"
-	"github.com/samber/lo"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gorilla/mux"
+	"github.com/samber/lo"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -19,6 +22,9 @@ import (
 
 //go:embed html/vul_sqli.html
 var vulInSQLIViewer []byte
+
+//go:embed html/visitor_source.html
+var visitorSourceViewer []byte
 
 func sqliWriter(writer http.ResponseWriter, request *http.Request, data []interface{}, str ...string) {
 	sqliWriterEx(false, writer, request, data, str...)
@@ -459,6 +465,137 @@ func (s *VulinServer) registerSQLinj() {
 					return
 				}
 				sqliWriter(writer, request, []interface{}{u})
+				return
+			},
+			RiskDetected: true,
+		},
+		{
+			DefaultQuery: "",
+			Path:         "/visitor/reference",
+			Title:        "基于 Referer 的 SQL 注入",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				if request.Method == "GET" {
+					// GET请求直接返回页面
+					writer.Write(visitorSourceViewer)
+					return
+				}
+
+				// POST请求处理
+				referer := request.Header.Get("Referer")
+				if referer == "" {
+					writer.Header().Set("Content-Type", "application/json")
+					writer.Write([]byte(`{"error": "缺少访问来源信息"}`))
+					return
+				}
+
+				// 解析Referer URL
+				refererURL, err := url.Parse(referer)
+				if err != nil {
+					writer.Header().Set("Content-Type", "application/json")
+					writer.Write([]byte(`{"error": "无效的访问来源URL"}`))
+					return
+				}
+
+				path := refererURL.Path
+
+				// 获取访问者信息
+				visitor, err := s.database.GetVisitorByPathUnsafe(path)
+				if err != nil {
+					writer.Header().Set("Content-Type", "application/json")
+					writer.Write([]byte(fmt.Sprintf(`{"error": "获取访问者信息失败:%s"}`, err.Error())))
+					return
+				}
+
+				if len(visitor) == 0 {
+					writer.Header().Set("Content-Type", "application/json")
+					writer.Write([]byte(`{"error": "未找到相关访问记录"}`))
+					return
+				}
+
+				// 返回JSON数据
+				writer.Header().Set("Content-Type", "application/json")
+				jsonData, err := json.Marshal(visitor)
+				if err != nil {
+					writer.Write([]byte(`{"error": "数据序列化失败"}`))
+					return
+				}
+				writer.Write(jsonData)
+			},
+			RiskDetected: true,
+		},
+		{
+			DefaultQuery: "",
+			Path:         "/visitor/x-forwarded-for",
+			Title:        "基于 X-Forwarded-For 的 SQL 注入",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				if request.Method == "GET" {
+					writer.Write(visitorSourceViewer)
+					return
+				}
+
+				// 获取 X-Forwarded-For 头部
+				xForwardedFor := request.Header.Get("X-Forwarded-For")
+				if xForwardedFor == "" {
+					writer.Header().Set("Content-Type", "application/json")
+					writer.Write([]byte(`{"error": "缺少 X-Forwarded-For 头部"}`))
+					return
+				}
+
+				ips := strings.Split(xForwardedFor, ",")
+				var proxyIps []string
+				if len(ips) > 1 {
+					proxyIps = ips[1:]
+				} else {
+					writer.Header().Set("Content-Type", "application/json")
+					writer.Write([]byte(`{"error": "查询失败"}`))
+				}
+
+				visitor, err := s.database.GetVisitorByProxyIps(proxyIps)
+				if err != nil {
+					writer.Header().Set("Content-Type", "application/json")
+					writer.Write([]byte(`{"error": "查询失败"}`))
+					return
+				}
+
+				// 返回JSON数据
+				writer.Header().Set("Content-Type", "application/json")
+				jsonData, err := json.Marshal(visitor)
+				if err != nil {
+					writer.Write([]byte(`{"error": "数据序列化失败"}`))
+					return
+				}
+				writer.Write(jsonData)
+			},
+			RiskDetected: true,
+		},
+		{
+			Path:  "/user/path",
+			Title: "基于 Path 的SQL注入",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				http.Redirect(writer, request, "/user/path/admin", http.StatusMovedPermanently)
+				return
+			},
+		},
+		{
+			Path: "/user/path/{name}",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				vars := mux.Vars(request)
+				name := vars["name"]
+
+				visitor, err := s.database.GetUserByUsernameUnsafe(name)
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					writer.WriteHeader(500)
+					return
+				}
+
+				if len(visitor) == 0 {
+					writer.Write([]byte("未找到相关访问记录"))
+					writer.WriteHeader(404)
+					return
+				}
+
+				sqliWriter(writer, request, utils.InterfaceToSliceInterface(visitor))
 				return
 			},
 			RiskDetected: true,

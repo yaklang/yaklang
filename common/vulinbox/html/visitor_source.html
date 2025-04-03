@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="/static/js/bootstrap_5.3/bootstrap.min.css">
+    <title>访问来源分析系统</title>
+    <style>
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { margin-bottom: 30px; }
+        .result-table { margin-top: 20px; }
+        .search-box {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        #result { display: none; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1 id="pageTitle">访问来源分析系统</h1>
+        <p class="text-muted" id="pageDescription">分析访问者的来源信息</p>
+    </div>
+
+    <div class="search-box">
+        <button class="btn btn-primary" onclick="queryUserAccess()">查看相同来源访问者</button>
+    </div>
+
+    <div class="result-table">
+        <div id="result"></div>
+    </div>
+</div>
+
+<script>
+    // 根据路径设置页面标题和描述
+    function setPageInfo() {
+        const path = window.location.pathname;
+        const titleElement = document.getElementById('pageTitle');
+        const descElement = document.getElementById('pageDescription');
+        
+        if (path.includes('x-forwarded-for')) {
+            titleElement.textContent = '基于 X-Forwarded-For 的访问来源分析';
+            descElement.textContent = '分析使用相同代理IP的访问者信息';
+        } else {
+            titleElement.textContent = '基于 Referer 的访问来源分析';
+            descElement.textContent = '分析来自相同来源的访问者信息';
+        }
+    }
+
+    function queryUserAccess() {
+        // 获取当前路径
+        const path = window.location.pathname;
+        
+        // 准备请求头
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+
+        // 根据路径设置不同的请求头
+        if (path.includes('x-forwarded-for')) {
+            headers['X-Forwarded-For'] = '127.0.0.1, 10.0.0.1';
+        } else {
+            headers['Referer'] = window.location.origin + '/visitor/reference';
+        }
+
+        // 显示结果区域
+        document.getElementById('result').style.display = 'block';
+
+        // 发送请求
+        fetch(path, {
+            method: 'POST',
+            headers: headers
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                document.getElementById('result').innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                return;
+            }
+            
+            // 构建表格
+            let tableHtml = `
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>用户名</th>
+                            <th>密码</th>
+                            <th>年龄</th>
+                            <th>最后访问域名</th>
+                            <th>最后访问路径</th>
+                            <th>最后访问时间</th>
+                            <th>代理IP</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            data.forEach(visitor => {
+                tableHtml += `
+                    <tr>
+                        <td>${visitor.username}</td>
+                        <td>${visitor.password}</td>
+                        <td>${visitor.age}</td>
+                        <td>${visitor.last_access_domain}</td>
+                        <td>${visitor.last_access_path}</td>
+                        <td>${new Date(visitor.last_access_time).toLocaleString()}</td>
+                        <td>${visitor.proxy_ip || '-'}</td>
+                    </tr>
+                `;
+            });
+
+            tableHtml += `
+                    </tbody>
+                </table>
+            `;
+
+            document.getElementById('result').innerHTML = tableHtml;
+        })
+        .catch(error => {
+            document.getElementById('result').innerHTML = `<div class="alert alert-danger">请求失败: ${error.message}</div>`;
+        });
+    }
+
+    // 页面加载完成后设置页面信息
+    window.onload = setPageInfo;
+</script>
+
+<script src="/static/js/bootstrap_5.3/popper.min.js"></script>
+<script src="/static/js/bootstrap_5.3/bootstrap.min.js"></script>
+</body>
+</html> 
