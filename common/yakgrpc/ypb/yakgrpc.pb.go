@@ -21511,6 +21511,8 @@ type QueryRisksRequest struct {
 	RuntimeId       string                 `protobuf:"bytes,15,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	// ssa program
 	SSAProgramNames []string `protobuf:"bytes,16,rep,name=SSAProgramNames,proto3" json:"SSAProgramNames,omitempty"`
+	BeforeUpdatedAt int64    `protobuf:"varint,17,opt,name=BeforeUpdatedAt,proto3" json:"BeforeUpdatedAt,omitempty"`
+	AfterUpdatedAt  int64    `protobuf:"varint,18,opt,name=AfterUpdatedAt,proto3" json:"AfterUpdatedAt,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -21655,6 +21657,20 @@ func (x *QueryRisksRequest) GetSSAProgramNames() []string {
 		return x.SSAProgramNames
 	}
 	return nil
+}
+
+func (x *QueryRisksRequest) GetBeforeUpdatedAt() int64 {
+	if x != nil {
+		return x.BeforeUpdatedAt
+	}
+	return 0
+}
+
+func (x *QueryRisksRequest) GetAfterUpdatedAt() int64 {
+	if x != nil {
+		return x.AfterUpdatedAt
+	}
+	return 0
 }
 
 type QueryRisksResponse struct {
@@ -50503,7 +50519,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06IsRead\x18\x1c \x01(\bR\x06IsRead\x12\x1a\n" +
 	"\bResultID\x18\x1e \x01(\x04R\bResultID\x12.\n" +
 	"\x12SyntaxFlowVariable\x18\x1f \x01(\tR\x12SyntaxFlowVariable\x12 \n" +
-	"\vProgramName\x18  \x01(\tR\vProgramName\"\xce\x03\n" +
+	"\vProgramName\x18  \x01(\tR\vProgramName\"\xa0\x04\n" +
 	"\x11QueryRisksRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
@@ -50523,7 +50539,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x05Title\x18\r \x01(\tR\x05Title\x12\x10\n" +
 	"\x03Ids\x18\x0e \x03(\x03R\x03Ids\x12\x1c\n" +
 	"\tRuntimeId\x18\x0f \x01(\tR\tRuntimeId\x12(\n" +
-	"\x0fSSAProgramNames\x18\x10 \x03(\tR\x0fSSAProgramNames\"v\n" +
+	"\x0fSSAProgramNames\x18\x10 \x03(\tR\x0fSSAProgramNames\x12(\n" +
+	"\x0fBeforeUpdatedAt\x18\x11 \x01(\x03R\x0fBeforeUpdatedAt\x12&\n" +
+	"\x0eAfterUpdatedAt\x18\x12 \x01(\x03R\x0eAfterUpdatedAt\"v\n" +
 	"\x12QueryRisksResponse\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +

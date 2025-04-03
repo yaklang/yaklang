@@ -3251,6 +3251,8 @@ message QueryRisksRequest {
 
   // ssa program
   repeated string SSAProgramNames = 16;
+  int64 BeforeUpdatedAt = 17;
+  int64 AfterUpdatedAt = 18;
 }
 
 message QueryRisksResponse {
