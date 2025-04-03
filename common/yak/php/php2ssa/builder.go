@@ -32,7 +32,7 @@ func (s *SSABuild) Create() ssa.Builder {
 	return &SSABuild{
 		PreHandlerInit: ssa.NewPreHandlerInit(initHandler).WithLanguageConfigOpts(
 			ssa.WithLanguageConfigSupportConstMethod(true),
-			ssa.WithLangeConfigBind(true),
+			ssa.WithLanguageConfigBind(true),
 			ssa.WithLanguageConfigTryBuildValue(true),
 			ssa.WithLanguageConfigSupportClass(true),
 			ssa.WithLanguageConfigIsSupportClassStaticModifier(true),

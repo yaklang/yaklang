@@ -23,7 +23,7 @@ var _ ssa.PreHandlerAnalyzer = &SSABuilder{}
 func (s *SSABuilder) Create() ssa.Builder {
 	return &SSABuilder{
 		PreHandlerInit: ssa.NewPreHandlerInit().WithLanguageConfigOpts(
-			ssa.WithLangeConfigBind(true),
+			ssa.WithLanguageConfigBind(true),
 			ssa.WithLanguageConfigSupportClass(true),
 			ssa.WithLanguageConfigIsSupportClassStaticModifier(true),
 			ssa.WithLanguageConfigVirtualImport(true),
