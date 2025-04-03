@@ -22,9 +22,9 @@ func (s *Server) ListAiModel(ctx context.Context, req *ypb.ListAiModelRequest) (
 	if err != nil {
 		return nil, err
 	}
-	if config.APIKey == "" {
-		return nil, utils.Errorf("list ai failed, config.APIKey is empty")
-	}
+	//if config.APIKey == "" {
+	//	return nil, utils.Errorf("list ai failed, config.APIKey is empty")
+	//}
 	models, err := ai.ListModels(
 		aispec.WithAPIKey(config.APIKey),
 		aispec.WithType(config.Type),
