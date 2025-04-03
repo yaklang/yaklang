@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/samber/lo"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -471,7 +472,7 @@ func (s *VulinServer) registerSQLinj() {
 		{
 			DefaultQuery: "",
 			Path:         "/visitor/reference",
-			Title:        "基于 Refere 的 SQL 注入",
+			Title:        "基于 Referer 的 SQL 注入",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				if request.Method == "GET" {
 					// GET请求直接返回页面
@@ -528,7 +529,7 @@ func (s *VulinServer) registerSQLinj() {
 			Title:        "基于 X-Forwarded-For 的 SQL 注入",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				if request.Method == "GET" {
-					writer.Write([]byte(visitorSourceViewer))
+					writer.Write(visitorSourceViewer)
 					return
 				}
 
@@ -564,6 +565,38 @@ func (s *VulinServer) registerSQLinj() {
 					return
 				}
 				writer.Write(jsonData)
+			},
+			RiskDetected: true,
+		},
+		{
+			Path:  "/user/path",
+			Title: "基于 Path 的SQL注入",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				http.Redirect(writer, request, "/user/path/admin", http.StatusMovedPermanently)
+				return
+			},
+		},
+		{
+			Path: "/user/path/{name}",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				vars := mux.Vars(request)
+				name := vars["name"]
+
+				visitor, err := s.database.GetUserByUsernameUnsafe(name)
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					writer.WriteHeader(500)
+					return
+				}
+
+				if len(visitor) == 0 {
+					writer.Write([]byte("未找到相关访问记录"))
+					writer.WriteHeader(404)
+					return
+				}
+
+				sqliWriter(writer, request, utils.InterfaceToSliceInterface(visitor))
+				return
 			},
 			RiskDetected: true,
 		},
