@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/samber/lo"
 )
@@ -434,9 +435,21 @@ func WithRaw(name string, object map[string]any, opts ...PropertyOption) ToolOpt
 
 // ToMap converts the ToolInputSchema to a map[string]any.
 func (s *ToolInputSchema) ToMap() map[string]any {
-	return map[string]any{
-		"type":       s.Type,
-		"properties": s.Properties,
-		"required":   lo.Map(s.Required, func(item string, _ int) any { return item }),
+	copiedProps := utils.CopyMapInterface(s.Properties)
+	required := lo.Map(s.Required, func(item string, _ int) any { return item })
+	for k, v := range s.Properties {
+		m := utils.InterfaceToGeneralMap(v)
+		if _, ok := m["required"]; ok {
+			delete(m, "required")
+			copiedProps[k] = m
+		}
 	}
+	result := map[string]any{
+		"type":       s.Type,
+		"properties": copiedProps,
+	}
+	if len(required) > 0 {
+		result["required"] = required
+	}
+	return result
 }

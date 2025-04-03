@@ -237,9 +237,6 @@ TOOLREQUIRED:
 
 	chatDetails = append(chatDetails, aispec.NewAIChatDetail(response))
 
-	ep := t.config.epm.createEndpoint()
-	ep.SetDefaultSuggestionContinue()
-
 	t.config.EmitInfo("start to execute task-summary action")
 	// 处理总结回调
 	summaryPromptWellFormed, err := GenerateTaskSummaryPrompt(aispec.DetailsToString(chatDetails))
@@ -263,7 +260,6 @@ TOOLREQUIRED:
 	action, err := extractAction(string(summaryBytes), "summary")
 	if err != nil {
 		t.config.EmitError("error extracting action: %v", err)
-		return fmt.Errorf("error extracting action: %w", err)
 	}
 
 	var taskSummary = ""
@@ -281,16 +277,20 @@ TOOLREQUIRED:
 	t.LongSummary = longSummary
 
 	// start to wait for user review
-	t.config.EmitRequireReviewForTask(ep.id)
+	ep := t.config.epm.createEndpoint()
+	ep.SetDefaultSuggestionContinue()
 	t.config.EmitInfo("start to wait for user review current task")
+
+	t.config.EmitRequireReviewForTask(t, ep.id)
 	if !t.config.autoAgree {
 		if !ep.WaitTimeoutSeconds(60) {
-			t.config.EmitInfo("user review timeout, use default action: pass")
+			t.config.EmitInfo("user review timeout, use default action: continue")
 		}
 	}
 
 	// user review finished, find params
 	reviewResult := ep.GetParams()
+	t.config.EmitInfo("start to handle review task event: %v", ep.id)
 	err = t.handleReviewResult(ctx, reviewResult)
 	if err != nil {
 		log.Warnf("error handling review result: %v", err)

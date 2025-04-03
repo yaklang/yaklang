@@ -153,10 +153,13 @@ func (r *Config) EmitRequirePermission(title string, description ...string) {
 	r.emitJson(EVENT_TYPE_PERMISSION_REQUIRE, "permission", reqs)
 }
 
-func (r *Config) EmitRequireReviewForTask(id string) {
+func (r *Config) EmitRequireReviewForTask(task *aiTask, id string) {
 	reqs := map[string]any{
-		"id":        id,
-		"selectors": TaskReviewSuggestions,
+		"id":            id,
+		"selectors":     TaskReviewSuggestions,
+		"task":          task,
+		"short_summary": task.ShortSummary,
+		"long_summary":  task.LongSummary,
 	}
 	r.emitJson(EVENT_TYPE_TASK_REVIEW_REQUIRE, "review-require", reqs)
 }
