@@ -89,6 +89,7 @@ func (t *aiTask) handleReviewResult(ctx *taskContext, param aitool.InvokeParams)
 		t.rerun = true
 	case "continue":
 		t.config.EmitInfo("continue")
+		return nil
 	case "end":
 		t.config.EmitInfo("end")
 

@@ -3,6 +3,7 @@ package aitool
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"strings"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -126,11 +127,12 @@ func (t *Tool) validate(iSchema any, params map[string]any) (valid bool, errs []
 	compiler := jsonschema.NewCompiler()
 	err := compiler.AddResource("schema.json", iSchema)
 	if err != nil {
-		return false, []string{fmt.Sprintf("JSON Schema 编译失败: %v", trimErrorFirstLine(err.Error()))}
+		return false, []string{fmt.Sprintf("JSON Schema AddResource failed: %v", trimErrorFirstLine(err.Error()))}
 	}
 	schema, err := compiler.Compile("schema.json")
 	if err != nil {
-		return false, []string{fmt.Sprintf("JSON Schema 编译失败: %v", trimErrorFirstLine(err.Error()))}
+		spew.Dump(err)
+		return false, []string{fmt.Sprintf("JSON Schema Compile: %v", trimErrorFirstLine(err.Error()))}
 	}
 	applyDefault(schema, params)
 
