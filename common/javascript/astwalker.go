@@ -20,7 +20,7 @@ type ASTWalkerResult struct {
 // Example:
 // ```
 // code = `function add(a, b) { return a + b; }`
-// res = javascript.ASTWalk(code)~
+// res = js.ASTWalk(code)~
 // dump(res)
 // ```
 func BasicJavaScriptASTWalker(code string) (*ASTWalkerResult, error) {
