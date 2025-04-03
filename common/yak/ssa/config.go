@@ -13,7 +13,7 @@ func (b *FunctionBuilder) SetLanguageConfig(opts ...LanguageConfigOpt) {
 		opt(newConfig)
 	}
 }
-func WithLangeConfigBind(bind bool) LanguageConfigOpt {
+func WithLanguageConfigBind(bind bool) LanguageConfigOpt {
 	return func(config *LanguageConfig) {
 		config.isBindLanguage = bind
 	}
