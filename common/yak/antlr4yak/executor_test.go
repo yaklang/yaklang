@@ -4277,3 +4277,16 @@ assert dur("100ms") < dur("200ms")
 	_marshallerTest(code)
 	_formattest(code)
 }
+
+func TestReturnInRangeBody(t *testing.T) {
+	code := `
+func a(){
+    for i in 10 {
+        return
+    }
+}
+assert a() == nil
+`
+	_marshallerTest(code)
+	_formattest(code)
+}
