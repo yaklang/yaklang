@@ -4,7 +4,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"golang.org/x/exp/slices"
 )
 
@@ -387,9 +387,9 @@ func (f *FunctionBuilder) EmitConstInstWithUnary(i any, un int) *ConstInst {
 }
 
 func (f *FunctionBuilder) EmitConstInst(i any) *ConstInst {
-	result := codec.AnyToString(i)
-	if len(result) > 1024*5 {
-		i = result[:1024*5]
+	safeString := memedit.NewSafeString(i)
+	if safeString.Len() > 1024*5 {
+		i = safeString.SliceBeforeStart(1024 * 5)
 	}
 	ci := NewConst(i)
 	f.emit(ci)
