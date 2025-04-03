@@ -57,7 +57,10 @@ func (q *Action) GetInvokeParams(key string) aitool.InvokeParams {
 }
 
 func extractAction(i string, actionName string, alias ...string) (*Action, error) {
-	ac := &Action{}
+	ac := &Action{
+		name:   actionName,
+		params: make(map[string]any),
+	}
 	for _, pairs := range jsonextractor.ExtractObjectIndexes(i) {
 		start, end := pairs[0], pairs[1]
 		jsonRaw := i[start:end]
