@@ -57,7 +57,7 @@ func (t *aiTask) callAI(request *AIRequest) (*AIResponse, error) {
 		if cb == nil {
 			continue
 		}
-		return cb(request)
+		return cb(t.config, request)
 	}
 	return nil, utils.Error("no any ai callback is set, cannot found ai config")
 }

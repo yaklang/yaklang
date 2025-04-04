@@ -15,8 +15,15 @@ import (
 type EventType string
 
 const (
-	EVENT_TYPE_STREAM                  EventType = "stream"
-	EVENT_TYPE_STRUCTURED              EventType = "structured"
+	EVENT_TYPE_STREAM     EventType = "stream"
+	EVENT_TYPE_STRUCTURED EventType = "structured"
+
+	// token consumption
+	EVENT_TYPE_CONSUMPTION EventType = "consumption"
+
+	// ping response
+	EVENT_TYPE_PONG EventType = "pong"
+
 	EVEMT_TYPE_PLAN                    EventType = "plan"
 	EVENT_TYPE_SELECT                  EventType = "select"
 	EVENT_TYPE_PERMISSION_REQUIRE      EventType = "permission_require"
@@ -311,7 +318,22 @@ func (r *Config) WaitForStream() {
 	r.streamWaitGroup.Wait()
 }
 
+type SyncType string
+
+const (
+	SYNC_TYPE_PLAN        SyncType = "plan"
+	SYNC_TYPE_CONSUMPTION SyncType = "consumption"
+	SYNC_TYPE_PING        SyncType = "ping"
+)
+
 type InputEvent struct {
-	Id     string
-	Params aitool.InvokeParams
+	Id string
+
+	// 是否是同步信息
+	IsSyncInfo bool
+	// 同步类型 一般认为有 plan consumption
+	SyncType SyncType
+
+	IsInteractive bool
+	Params        aitool.InvokeParams
 }

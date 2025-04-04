@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -95,8 +96,9 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 				continue
 			}
 			inEvent := &aid.InputEvent{
-				Id:     event.InteractiveId,
-				Params: params,
+				IsInteractive: true,
+				Id:            event.InteractiveId,
+				Params:        params,
 			}
 			select {
 			case inputEvent <- inEvent:

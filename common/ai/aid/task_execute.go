@@ -263,11 +263,17 @@ TOOLREQUIRED:
 	}
 
 	var taskSummary = ""
-	shortSummary := action.GetString("short_summary")
+	var shortSummary = ""
+	var longSummary = ""
+	if action != nil {
+		shortSummary = action.GetString("short_summary")
+	}
 	if shortSummary != "" {
 		taskSummary = shortSummary
 	}
-	longSummary := action.GetString("long_summary")
+	if action != nil {
+		longSummary = action.GetString("long_summary")
+	}
 	if longSummary != "" && taskSummary == "" {
 		taskSummary = longSummary
 	}

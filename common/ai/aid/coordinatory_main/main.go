@@ -29,8 +29,8 @@ func main() {
 	consts.InitializeYakitDatabase("", "")
 	log.Infof("apikey for tongyi: %v", string(apikey))
 	log.Infof("primary ai engien: %v", consts.GetAIPrimaryType())
-	aiCallback := func(req *aid.AIRequest) (*aid.AIResponse, error) {
-		rsp := aid.NewAIResponse()
+	aiCallback := func(config *aid.Config, req *aid.AIRequest) (*aid.AIResponse, error) {
+		rsp := config.NewAIResponse()
 		go func() {
 			defer rsp.Close()
 			//fmt.Println(req.GetPrompt())

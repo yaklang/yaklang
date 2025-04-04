@@ -21,8 +21,8 @@ func TestCoordinator_ToolUseReview(t *testing.T) {
 		WithEventHandler(func(event *Event) {
 			outputChan <- event
 		}),
-		WithAICallback(func(request *AIRequest) (*AIResponse, error) {
-			rsp := NewAIResponse()
+		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+			rsp := config.NewAIResponse()
 			defer func() {
 				time.Sleep(100 * time.Millisecond)
 				rsp.Close()

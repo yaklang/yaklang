@@ -2,10 +2,11 @@ package aid
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 
@@ -21,8 +22,8 @@ func TestCoordinator_ReviewPlan(t *testing.T) {
 		WithEventHandler(func(event *Event) {
 			outputChan <- event
 		}),
-		WithAICallback(func(request *AIRequest) (*AIResponse, error) {
-			rsp := NewAIResponse()
+		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+			rsp := config.NewAIResponse()
 			rsp.EmitOutputStream(strings.NewReader(`
 {
     "@action": "plan",
@@ -97,8 +98,8 @@ func TestCoordinator_ReviewPlan_Incomplete(t *testing.T) {
 		WithEventHandler(func(event *Event) {
 			outputChan <- event
 		}),
-		WithAICallback(func(request *AIRequest) (*AIResponse, error) {
-			rsp := NewAIResponse()
+		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+			rsp := config.NewAIResponse()
 			defer func() {
 				time.Sleep(100 * time.Millisecond)
 				rsp.Close()
