@@ -3,6 +3,8 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 
 	"github.com/yaklang/yaklang/common/jsonextractor"
@@ -12,7 +14,7 @@ import (
 
 type Action struct {
 	name   string
-	params map[string]any
+	params aitool.InvokeParams
 }
 
 func (q *Action) Name() string {
@@ -20,40 +22,21 @@ func (q *Action) Name() string {
 }
 
 func (q *Action) GetInt(key string, defaults ...int) int {
-	if v, ok := q.params[key]; ok {
-		return utils.InterfaceToInt(v)
-	}
-	if len(defaults) > 0 {
-		return defaults[0]
-	}
-	return 0
+	return int(q.params.GetInt(key, lo.Map(defaults, func(item int, index int) int64 {
+		return int64(item)
+	})...))
 }
 
 func (q *Action) GetString(key string, defaults ...string) string {
-	if v, ok := q.params[key]; ok {
-		return utils.InterfaceToString(v)
-	}
-	if len(defaults) > 0 {
-		return defaults[0]
-	}
-	return ""
+	return q.params.GetString(key, defaults...)
 }
 
 func (q *Action) GetBool(key string, defaults ...bool) bool {
-	if v, ok := q.params[key]; ok {
-		return utils.InterfaceToBoolean(v)
-	}
-	if len(defaults) > 0 {
-		return defaults[0]
-	}
-	return false
+	return q.params.GetBool(key, defaults...)
 }
 
 func (q *Action) GetInvokeParams(key string) aitool.InvokeParams {
-	if v, ok := q.params[key]; ok {
-		return utils.InterfaceToGeneralMap(v)
-	}
-	return make(aitool.InvokeParams, 0)
+	return q.params.GetObject(key)
 }
 
 func extractAction(i string, actionName string, alias ...string) (*Action, error) {
