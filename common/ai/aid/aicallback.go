@@ -22,8 +22,9 @@ func (r *AIRequest) GetPrompt() string {
 }
 
 type AIResponse struct {
-	ch          *chanx.UnlimitedChan[*OutputStream]
-	enableDebug bool
+	ch                  *chanx.UnlimitedChan[*OutputStream]
+	enableDebug         bool
+	consumptionCallback func(current int)
 }
 
 func (a *AIResponse) Debug(i ...bool) {
@@ -93,24 +94,25 @@ func WithAIRequest_TaskContext(ctx *taskContext) AIRequestOption {
 	}
 }
 
-type AICallbackType func(req *AIRequest) (*AIResponse, error)
+type AICallbackType func(config *Config, req *AIRequest) (*AIResponse, error)
 
-func NewAIResponse() *AIResponse {
+func (c *Config) NewAIResponse() *AIResponse {
 	return &AIResponse{
-		ch: chanx.NewUnlimitedChan[*OutputStream](context.TODO(), 2),
+		ch:                  chanx.NewUnlimitedChan[*OutputStream](context.TODO(), 2),
+		consumptionCallback: c.outputConsumptionCallback,
 	}
 }
 
 func (r *AIResponse) EmitOutputStream(reader io.Reader) {
 	r.ch.SafeFeed(&OutputStream{
-		out: reader,
+		out: CreateConsumptionReader(reader, r.consumptionCallback),
 	})
 }
 
 func (r *AIResponse) EmitReasonStream(reader io.Reader) {
 	r.ch.SafeFeed(&OutputStream{
 		IsReason: true,
-		out:      reader,
+		out:      CreateConsumptionReader(reader, r.consumptionCallback),
 	})
 }
 
@@ -122,8 +124,8 @@ func (r *AIResponse) Close() {
 }
 
 func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption) (string, error)) AICallbackType {
-	return func(req *AIRequest) (*AIResponse, error) {
-		resp := NewAIResponse()
+	return func(config *Config, req *AIRequest) (*AIResponse, error) {
+		resp := config.NewAIResponse()
 		go func() {
 			defer resp.Close()
 
