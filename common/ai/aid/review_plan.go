@@ -142,8 +142,7 @@ func (p *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp
 	if err != nil {
 		return nil, utils.Errorf("error extracting task from raw response: %v", err)
 	}
-	newPlan := &planResponse{RootTask: task}
-	return newPlan, nil
+	return p.config.newPlanResponse(task), nil
 }
 
 // mergePlans 合并新旧计划

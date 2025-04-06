@@ -48,8 +48,8 @@ type Config struct {
 	autoAgree   bool
 
 	// sync
-	syncMutex *sync.Mutex
-	syncMap   map[string]func(i SyncType) any
+	syncMutex *sync.RWMutex
+	syncMap   map[string]func() any
 
 	inputConsumption  *int64
 	outputConsumption *int64
@@ -71,10 +71,10 @@ func (c *Config) GetOutputConsumption() int64 {
 	return atomic.LoadInt64(c.outputConsumption)
 }
 
-func (c *Config) Sync(i SyncType) any {
+func (c *Config) SetSyncCallback(i SyncType, callback func() any) {
 	c.syncMutex.Lock()
 	defer c.syncMutex.Unlock()
-	return c.syncMap[string(i)]
+	c.syncMap[string(i)] = callback
 }
 
 func (c *Config) wrapper(i AICallbackType) AICallbackType {
@@ -125,8 +125,8 @@ func newConfig(ctx context.Context) *Config {
 		id:                id.String(),
 		epm:               newEndpointManagerContext(ctx),
 		streamWaitGroup:   new(sync.WaitGroup),
-		syncMutex:         new(sync.Mutex),
-		syncMap:           make(map[string]func(i SyncType) any),
+		syncMutex:         new(sync.RWMutex),
+		syncMap:           make(map[string]func() any),
 		inputConsumption:  new(int64),
 		outputConsumption: new(int64),
 	}
@@ -190,6 +190,18 @@ func newConfig(ctx context.Context) *Config {
 							"now_unix":    time.Now().Unix(),
 							"now_unix_ms": time.Now().UnixMilli(),
 						})
+					case SYNC_TYPE_PLAN:
+						c.syncMutex.RLock()
+						callback, _ := c.syncMap[string(SYNC_TYPE_PLAN)]
+						c.syncMutex.RUnlock()
+						if callback != nil {
+							c.emitJson(EVENT_TYPE_PLAN, "system", map[string]any{
+								"root_task": callback(),
+							})
+						} else {
+							c.EmitWarning("sync method: %v is not supported yet", SYNC_TYPE_PLAN)
+						}
+
 					}
 				}
 			case <-ticker.C:
