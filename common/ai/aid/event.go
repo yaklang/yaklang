@@ -18,13 +18,10 @@ const (
 	EVENT_TYPE_STREAM     EventType = "stream"
 	EVENT_TYPE_STRUCTURED EventType = "structured"
 
-	// token consumption
-	EVENT_TYPE_CONSUMPTION EventType = "consumption"
+	EVENT_TYPE_CONSUMPTION EventType = "consumption" // token consumption include `{"input_"}`
+	EVENT_TYPE_PONG        EventType = "pong"        // ping response ping-pong is a check for alive item
 
-	// ping response
-	EVENT_TYPE_PONG EventType = "pong"
-
-	EVEMT_TYPE_PLAN                    EventType = "plan"
+	EVENT_TYPE_PLAN                    EventType = "plan"
 	EVENT_TYPE_SELECT                  EventType = "select"
 	EVENT_TYPE_PERMISSION_REQUIRE      EventType = "permission_require"
 	EVENT_TYPE_TASK_REVIEW_REQUIRE     EventType = "task_review_require"

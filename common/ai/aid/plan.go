@@ -78,6 +78,15 @@ func (pr *planRequest) GenerateFirstPlanPrompt() (string, error) {
 	return buf.String(), nil
 }
 
+func (pr *Config) newPlanResponse(rootTask *aiTask) *planResponse {
+	pr.SetSyncCallback(SYNC_TYPE_PLAN, func() any {
+		return rootTask
+	})
+	return &planResponse{
+		RootTask: rootTask,
+	}
+}
+
 // Invoke 执行规划请求，调用AI生成任务列表并返回解析后的Task
 func (pr *planRequest) Invoke() (*planResponse, error) {
 	// 生成 Prompt
@@ -104,10 +113,7 @@ func (pr *planRequest) Invoke() (*planResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("从 AI 响应中提取任务失败: %v", err)
 	}
-
-	return &planResponse{
-		RootTask: task,
-	}, nil
+	return pr.config.newPlanResponse(task), nil
 }
 
 func (c *Coordinator) createPlanRequest(rawUserInput string) (*planRequest, error) {
