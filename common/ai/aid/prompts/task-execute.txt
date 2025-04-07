@@ -3,11 +3,11 @@
 你是一个任务执行助手，根据既定的任务清单{{ if .Tools }}和系统提供的工具{{end}}，执行任务并提供结果。
 
 ## 任务执行进度和状态
-{{ .Context.Progress }}
-当前任务: {{ .Task.QuoteName }}
-目标：{{ .Task.QuoteGoal }}
+{{ .Memory.Progress }}
+当前任务: {{ .Memory.CurrentTask.QuoteName }}
+目标：{{ .Memory.CurrentTask.QuoteGoal }}
 
-{{ .Context.Runtime.PromptForToolCallResultsForLast20 }}
+{{ .Memory.PromptForToolCallResultsForLast20 }}
 {{ if .Tools }}## 可用工具
 
 以下工具可能对完成任务有所帮助，但使用它们是完全可选的。如果你认为不需要使用工具就能完成任务，可以直接给出答案。

@@ -54,7 +54,7 @@ var TaskReviewSuggestions = []*ReviewSuggestion{
 	},
 }
 
-func (t *aiTask) handleReviewResult(ctx *taskContext, param aitool.InvokeParams) error {
+func (t *aiTask) handleReviewResult(param aitool.InvokeParams) error {
 	// 1. 获取审查建议
 	suggestion := param.GetString("suggestion")
 	if suggestion == "" {
@@ -65,13 +65,12 @@ func (t *aiTask) handleReviewResult(ctx *taskContext, param aitool.InvokeParams)
 	switch suggestion {
 	case "deeply_think":
 		t.config.EmitInfo("deeply think")
-		r := ctx.Runtime
 		planReq, err := createPlanRequest(t.Goal)
 		if err != nil {
 			t.config.EmitError("create planRequest failed: %v", err)
 			return utils.Errorf("coordinator: create planRequest failed: %v", err)
 		}
-
+		planReq.config = t.config
 		t.config.EmitInfo("start to invoke plan request")
 		rsp, err := planReq.Invoke()
 		if err != nil {
@@ -82,6 +81,10 @@ func (t *aiTask) handleReviewResult(ctx *taskContext, param aitool.InvokeParams)
 		if rsp.RootTask == nil {
 			t.config.EmitError("root aiTask is nil, plan failed")
 			return utils.Errorf("coordinator: root aiTask is nil")
+		}
+		r := &runtime{
+			config: t.config,
+			Stack:  utils.NewStack[*aiTask](),
 		}
 		r.Invoke(rsp.RootTask)
 	case "inaccurate":
@@ -113,14 +116,14 @@ func (t *aiTask) handleReviewResult(ctx *taskContext, param aitool.InvokeParams)
 			return utils.Error("plan is empty")
 		}
 		t.config.EmitInfo("adjust plan")
-		planPrompt, err := t.generateDynamicPlanPrompt(ctx, plan)
+		planPrompt, err := t.generateDynamicPlanPrompt(plan)
 		if err != nil {
 			t.config.EmitError("error generating dynamic plan prompt: %v", err)
 			return utils.Errorf("error generating dynamic plan prompt: %v", err)
 		}
 
 		// 调用 AI 生成新的任务计划
-		request := NewAIRequest(planPrompt, WithAIRequest_TaskContext(ctx))
+		request := NewAIRequest(planPrompt)
 		response, err := t.callAI(request)
 		if err != nil {
 			t.config.EmitError("error calling AI: %v", err)

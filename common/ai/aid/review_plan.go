@@ -82,6 +82,7 @@ func (p *planRequest) handleReviewPlanResponse(rsp *planResponse, param aitool.I
 			}
 		}
 		params := ep.GetParams()
+		p.config.memory.StoreInteractiveUserInput(ep.id, params)
 		if params == nil {
 			p.config.EmitError("user review params is nil, plan failed")
 			return newPlan, nil
@@ -95,13 +96,8 @@ func (p *planRequest) handleReviewPlanResponse(rsp *planResponse, param aitool.I
 	}
 }
 
-//go:embed prompts/plan-review/plan-incomplete.txt
-var planReviewPrompts string
-
 // generateNewPlan 生成新的计划
 func (p *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp *planResponse) (*planResponse, error) {
-	var buf bytes.Buffer
-	rsp.RootTask.dumpProgress(0, &buf)
 
 	tmpl, err := template.New("plan-review").Parse(planReviewPrompts)
 	if err != nil {
@@ -109,10 +105,8 @@ func (p *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp
 	}
 
 	data := map[string]any{
-		"OriginPlan":     buf.String(),
-		"Query":          p.rawInput,
-		"MetaInfo":       "",
-		"TaskJsonSchema": __prompt_TaskJsonSchema,
+		"Memory":         p.config.memory,
+		"Schema":         p.config.schemaJson,
 		"UserSuggestion": suggestion,
 		"ExtraPrompt":    extraPrompt,
 	}

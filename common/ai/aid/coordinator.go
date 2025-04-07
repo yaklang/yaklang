@@ -53,6 +53,8 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...Opt
 
 func (c *Coordinator) Run() error {
 	c.config.EmitInfo("start to create plan request")
+	memory := c.config.memory
+	memory.Query = c.userInput
 	planReq, err := c.createPlanRequest(c.userInput)
 	if err != nil {
 		c.config.EmitError("create planRequest failed: %v", err)
@@ -77,6 +79,7 @@ func (c *Coordinator) Run() error {
 		}
 	}
 	params := ep.GetParams()
+	c.config.memory.StoreInteractiveUserInput(ep.id, params)
 	if params == nil {
 		c.config.EmitError("user review params is nil, plan failed")
 		return utils.Errorf("coordinator: user review params is nil")
@@ -114,7 +117,7 @@ func (c *Coordinator) Run() error {
 	rt.Invoke(root)
 
 	c.config.EmitInfo("start to generate report or result")
-	prompt, err := c.generateReport(rt)
+	prompt, err := c.generateReport()
 	if err != nil {
 		c.config.EmitError("generate report failed: %v", err)
 		return utils.Error("coordinator: generate report failed")

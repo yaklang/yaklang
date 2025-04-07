@@ -40,6 +40,12 @@ type Config struct {
 	tools          []*aitool.Tool
 	eventHandler   func(e *Event)
 
+	// memory
+	memory *Memory
+
+	// schema json
+	schemaJson map[string]string
+
 	// stream waitgroup
 	streamWaitGroup *sync.WaitGroup
 
@@ -125,6 +131,8 @@ func newConfig(ctx context.Context) *Config {
 		id:                id.String(),
 		epm:               newEndpointManagerContext(ctx),
 		streamWaitGroup:   new(sync.WaitGroup),
+		memory:            NewMemory(),
+		schemaJson:        GetAITaskJSONSchema(),
 		syncMutex:         new(sync.RWMutex),
 		syncMap:           make(map[string]func() any),
 		inputConsumption:  new(int64),
