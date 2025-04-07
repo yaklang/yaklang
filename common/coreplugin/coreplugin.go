@@ -281,6 +281,18 @@ func init() {
 			withPluginAuthors("Q16G"),
 			withPluginEnableGenerateParam(true),
 		)
+		registerBuildInPlugin(
+			"mitm",
+			"SQL注入-Path参数注入",
+			withPluginAuthors("intSheep"),
+			withPluginHelp("SQL注入检测，针对RESTful API风格设计的Path参数进行SQL注入检测"),
+		)
+		registerBuildInPlugin(
+			"mitm",
+			"SQL注入-高危Header注入",
+			withPluginAuthors("intSheep"),
+			withPluginHelp("SQL注入检测，针对高风险的HTTP Header(如X-Forwarded-For、Referer)进行SQL注入检测"),
+		)
 		return nil
 	})
 
