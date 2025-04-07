@@ -2,7 +2,6 @@ package schema
 
 import (
 	"github.com/jinzhu/gorm"
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -33,16 +32,9 @@ type SyntaxFlowGroup struct {
 }
 
 func (s *SyntaxFlowGroup) ToGRPCModel() *ypb.SyntaxFlowGroup {
-	var count int32
-	lo.ForEach(s.Rules, func(rule *SyntaxFlowRule, _ int) {
-		if !rule.AllowIncluded && rule.IncludedName == "" {
-			count++
-		}
-	})
-
 	return &ypb.SyntaxFlowGroup{
 		GroupName: s.GroupName,
 		IsBuildIn: s.IsBuildIn,
-		Count:     count,
+		Count:     int32(len(s.Rules)),
 	}
 }
