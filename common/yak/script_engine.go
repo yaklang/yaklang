@@ -67,6 +67,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/tevino/abool"
 
+	"github.com/yaklang/yaklang/common/omnisearch"
+
 	_ "github.com/yaklang/yaklang/common/yak/yaklang/lib/builtin" // 导入 builtin 包
 )
 
@@ -322,6 +324,9 @@ func initYaklangLib() {
 
 	// set
 	yaklang.Import("container", container.ContainerExports)
+
+	// omnisearch
+	yaklang.Import("omnisearch", omnisearch.Exports)
 
 	// 处理 yakit 库的一些函数名
 	yakdoc.RegisterHook(func(h *yakdoc.DocumentHelper) {
