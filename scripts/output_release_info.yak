@@ -10,6 +10,11 @@ log.Info("start to fetch file: %v gpt model: %v", raw, model)
 log.Info("start to check raw commit messages\n\n")
 rawCommitMsg = string(file.ReadFile(raw)~)
 rawCommitMsg = str.TrimSpace(rawCommitMsg)
+lines := str.ParseStringToLines(rawCommitMsg)
+maxLine := 30
+if lines.Len() > maxLine {
+    rawCommitMsg = str.Join(lines[len(lines) - maxLine:], "\n")
+}
 println(rawCommitMsg)
 if str.TrimSpace(rawCommitMsg) == "" {
     log.Info("empty commit msg...")
