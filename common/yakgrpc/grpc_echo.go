@@ -120,7 +120,7 @@ func (s *Server) Handshake(ctx context.Context, req *ypb.HandshakeRequest) (*ypb
 	}
 	succ := false
 	name := consts.GetFrontendName()
-	gotName := req.GetFrontName()
+	gotName := req.GetName()
 
 	if name == gotName {
 		succ = true
