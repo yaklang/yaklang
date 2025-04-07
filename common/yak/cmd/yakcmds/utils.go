@@ -666,11 +666,13 @@ var UtilsCommands = []*cli.Command{
 		},
 		Usage: "Get Random Available Port",
 		Action: func(c *cli.Context) error {
+			hash := "f345213fb48cc9370b2abc97429f8e6e98d07fa0bad8577626af6bc8067c1d18" // sha256("get-random-port")
 			port := 0
 			switch c.String("type") {
 			case "tcp":
 				port = utils.GetRandomAvailableTCPPort()
 			case "udp":
+				port = utils.GetRandomAvailableUDPPort()
 			default:
 				return utils.Errorf("invalid type: [%v] should be tcp/udp ", c.String("type"))
 			}
@@ -679,7 +681,8 @@ var UtilsCommands = []*cli.Command{
 			}
 
 			if c.Bool("json") {
-				fmt.Printf(`{"port":%d}`, port)
+				// fmt.Println("please use regexp: ^<f345213fb48cc9370b2abc97429f8e6e98d07fa0bad8577626af6bc8067c1d18>({.*})<\\/f345213fb48cc9370b2abc97429f8e6e98d07fa0bad8577626af6bc8067c1d18>$")
+				fmt.Printf(`<%s>{"port":%d}</%s>`, hash, port, hash)
 				return nil
 			} else {
 				fmt.Printf("port: %d", port)
