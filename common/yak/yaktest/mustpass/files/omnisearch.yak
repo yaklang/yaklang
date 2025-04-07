@@ -1,0 +1,16 @@
+mockSearchName = "yak searcher"
+mockSearch = (query,config)=>{
+    if config.ApiKey != "xxx"{
+        return nil,"api key is invalid"
+    }
+    return ["yaklang1","yaklang2"],nil
+}
+
+resList,err = omnisearch.Search("yaklang",omnisearch.type(mockSearchName),omnisearch.customSearcher(mockSearchName,mockSearch))
+
+assert err.Error() != nil
+
+resList = omnisearch.Search("yaklang",omnisearch.type(mockSearchName),omnisearch.customSearcher(mockSearchName,mockSearch),omnisearch.apikey("xxx"))~
+
+assert resList[0].Content == "yaklang1"
+assert resList[1].Content == "yaklang2"

@@ -17,7 +17,7 @@ func TestMustPassDebug(t *testing.T) {
 
 	yakit.RegisterLowHTTPSaveCallback()
 
-	debugName := "jwt_order.yak"
+	debugName := "omnisearch.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
