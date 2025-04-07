@@ -1109,6 +1109,8 @@ type AIInputEvent struct {
 	IsInteractiveMessage bool                   `protobuf:"varint,3,opt,name=IsInteractiveMessage,proto3" json:"IsInteractiveMessage,omitempty"`
 	InteractiveId        string                 `protobuf:"bytes,4,opt,name=InteractiveId,proto3" json:"InteractiveId,omitempty"`
 	InteractiveJSONInput string                 `protobuf:"bytes,5,opt,name=InteractiveJSONInput,proto3" json:"InteractiveJSONInput,omitempty"`
+	IsSyncMessage        bool                   `protobuf:"varint,6,opt,name=IsSyncMessage,proto3" json:"IsSyncMessage,omitempty"`
+	SyncType             string                 `protobuf:"bytes,7,opt,name=SyncType,proto3" json:"SyncType,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -1174,6 +1176,20 @@ func (x *AIInputEvent) GetInteractiveId() string {
 func (x *AIInputEvent) GetInteractiveJSONInput() string {
 	if x != nil {
 		return x.InteractiveJSONInput
+	}
+	return ""
+}
+
+func (x *AIInputEvent) GetIsSyncMessage() bool {
+	if x != nil {
+		return x.IsSyncMessage
+	}
+	return false
+}
+
+func (x *AIInputEvent) GetSyncType() string {
+	if x != nil {
+		return x.SyncType
 	}
 	return ""
 }
@@ -39025,7 +39041,7 @@ func (x *EchoResposne) GetResult() string {
 // handshake
 type HandshakeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	FrontName     string                 `protobuf:"bytes,1,opt,name=FrontName,proto3" json:"FrontName,omitempty"`
+	Name          string                 `protobuf:"bytes,1,opt,name=Name,proto3" json:"Name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -39060,9 +39076,9 @@ func (*HandshakeRequest) Descriptor() ([]byte, []int) {
 	return file_yakgrpc_proto_rawDescGZIP(), []int{531}
 }
 
-func (x *HandshakeRequest) GetFrontName() string {
+func (x *HandshakeRequest) GetName() string {
 	if x != nil {
-		return x.FrontName
+		return x.Name
 	}
 	return ""
 }
@@ -48852,13 +48868,15 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bIsReason\x18\x06 \x01(\bR\bIsReason\x12 \n" +
 	"\vStreamDelta\x18\a \x01(\fR\vStreamDelta\x12\x16\n" +
 	"\x06IsJson\x18\b \x01(\bR\x06IsJson\x12\x18\n" +
-	"\aContent\x18\t \x01(\fR\aContent\"\xe2\x01\n" +
+	"\aContent\x18\t \x01(\fR\aContent\"\xa4\x02\n" +
 	"\fAIInputEvent\x12\x18\n" +
 	"\aIsStart\x18\x01 \x01(\bR\aIsStart\x12*\n" +
 	"\x06Params\x18\x02 \x01(\v2\x12.ypb.AIStartParamsR\x06Params\x122\n" +
 	"\x14IsInteractiveMessage\x18\x03 \x01(\bR\x14IsInteractiveMessage\x12$\n" +
 	"\rInteractiveId\x18\x04 \x01(\tR\rInteractiveId\x122\n" +
-	"\x14InteractiveJSONInput\x18\x05 \x01(\tR\x14InteractiveJSONInput\"C\n" +
+	"\x14InteractiveJSONInput\x18\x05 \x01(\tR\x14InteractiveJSONInput\x12$\n" +
+	"\rIsSyncMessage\x18\x06 \x01(\bR\rIsSyncMessage\x12\x1a\n" +
+	"\bSyncType\x18\a \x01(\tR\bSyncType\"C\n" +
 	"\tMcpConfig\x12\x12\n" +
 	"\x04Type\x18\x01 \x01(\tR\x04Type\x12\x10\n" +
 	"\x03Key\x18\x02 \x01(\tR\x03Key\x12\x10\n" +
@@ -52221,9 +52239,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vEchoRequest\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\"&\n" +
 	"\fEchoResposne\x12\x16\n" +
-	"\x06result\x18\x01 \x01(\tR\x06result\"0\n" +
-	"\x10HandshakeRequest\x12\x1c\n" +
-	"\tFrontName\x18\x01 \x01(\tR\tFrontName\"-\n" +
+	"\x06result\x18\x01 \x01(\tR\x06result\"&\n" +
+	"\x10HandshakeRequest\x12\x12\n" +
+	"\x04Name\x18\x01 \x01(\tR\x04Name\"-\n" +
 	"\x11HandshakeResponse\x12\x18\n" +
 	"\aSuccess\x18\x01 \x01(\bR\aSuccess\"\x83\x01\n" +
 	"\x05Input\x12\x10\n" +
