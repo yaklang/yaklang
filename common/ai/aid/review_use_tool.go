@@ -41,7 +41,7 @@ var ToolUseReviewSuggestions = []*ToolUseReviewSuggestion{
 	},
 }
 
-func (t *aiTask) handleToolUseReview(ctx *taskContext, param aitool.InvokeParams) error {
+func (t *aiTask) handleToolUseReview(param aitool.InvokeParams) error {
 	// 1. 获取审查建议
 	suggestion := param.GetString("suggestion")
 	if suggestion == "" {

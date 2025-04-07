@@ -6,8 +6,8 @@
 
 # 任务状态
 
-当前任务：{{ .Task.QuoteName }}
-目标： {{ .Task.QuoteGoal }}
+当前任务：{{ .Memory.CurrentTask.QuoteName }}
+目标： {{ .Memory.CurrentTask.QuoteGoal }}
 
 ## 工具调用历史与上下文
 

@@ -5,11 +5,11 @@
 需要根据任务规划的内容和执行情况，以及工具数据，来提供一个图文并茂的报告提供给用户。
 
 <taskexecutecontext>
-{{ .Runtime.Progress }}
+{{ .Memory.Progress }}
 </taskexecutecontext>
 
 # 工具调用信息
 
 <toolcallcontext>
-{{ .Runtime.PromptForToolCallResultsForLast20 }}
+{{ .Memory.PromptForToolCallResultsForLast20 }}
 </toolcallcontext>

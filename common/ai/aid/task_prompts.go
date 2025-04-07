@@ -11,14 +11,11 @@ import (
 )
 
 // generateTaskPrompt 生成执行任务的prompt
-func (t *aiTask) generateTaskPrompt(tools []*aitool.Tool, systemContext *taskContext, metadata map[string]interface{}) (string, error) {
+func (t *aiTask) generateTaskPrompt() (string, error) {
 	// 创建模板数据
 	templateData := map[string]interface{}{
-		"Task":            t,
-		"Tools":           tools,
-		"Metadata":        metadata,
-		"Context":         systemContext,
-		"ToolCallHistory": t.ToolCallResults,
+		"Tools":  t.config.tools,
+		"Memory": t.config.memory,
 	}
 
 	// 解析prompt模板
@@ -38,7 +35,7 @@ func (t *aiTask) generateTaskPrompt(tools []*aitool.Tool, systemContext *taskCon
 }
 
 // generateRequireToolResponsePrompt 生成描述工具参数的 Prompt
-func (t *aiTask) generateRequireToolResponsePrompt(runtime *taskContext, targetTool *aitool.Tool, toolName string) (string, error) {
+func (t *aiTask) generateRequireToolResponsePrompt(targetTool *aitool.Tool, toolName string) (string, error) {
 	if targetTool == nil {
 		return "", fmt.Errorf("找不到名为 '%s' 的工具", toolName)
 	}
@@ -47,8 +44,7 @@ func (t *aiTask) generateRequireToolResponsePrompt(runtime *taskContext, targetT
 	toolJSONSchema := targetTool.ToJSONSchemaString()
 	// 创建模板数据
 	templateData := map[string]interface{}{
-		"Runtime":        runtime,
-		"Task":           t,
+		"Memory":         t.config.memory,
 		"Tool":           targetTool,
 		"ToolJSONSchema": toolJSONSchema,
 	}
@@ -70,12 +66,11 @@ func (t *aiTask) generateRequireToolResponsePrompt(runtime *taskContext, targetT
 }
 
 // generateToolCallResponsePrompt 生成描述工具调用结果的 Prompt
-func (t *aiTask) generateToolCallResponsePrompt(result *aitool.ToolResult, runtime *taskContext, targetTool *aitool.Tool) (string, error) {
+func (t *aiTask) generateToolCallResponsePrompt(result *aitool.ToolResult, targetTool *aitool.Tool) (string, error) {
 	templatedata := map[string]any{
-		"Runtime": runtime,
-		"Task":    t,
-		"Tool":    targetTool,
-		"Result":  result,
+		"Memory": t.config.memory,
+		"Tool":   targetTool,
+		"Result": result,
 	}
 	temp, err := template.New("tool-result").Parse(__prompt_ToolResultToDecisionPromptTemplate)
 	if err != nil {
@@ -105,11 +100,10 @@ func (t *aiTask) generateToolCallResultsPrompt() (string, error) {
 	return promptBuilder.String(), nil
 }
 
-func (t *aiTask) generateDynamicPlanPrompt(systemContext *taskContext, userInput string) (string, error) {
+func (t *aiTask) generateDynamicPlanPrompt(userInput string) (string, error) {
 	// 创建模板数据
 	templateData := map[string]interface{}{
-		"Task":      t,
-		"Context":   systemContext,
+		"Memory":    t.config.memory,
 		"UserInput": userInput,
 	}
 

@@ -14,7 +14,6 @@ import (
 
 type AIRequest struct {
 	prompt string
-	ctx    *taskContext
 }
 
 func (r *AIRequest) GetPrompt() string {
@@ -86,12 +85,6 @@ func NewAIRequest(prompt string, opt ...AIRequestOption) *AIRequest {
 		i(req)
 	}
 	return req
-}
-
-func WithAIRequest_TaskContext(ctx *taskContext) AIRequestOption {
-	return func(req *AIRequest) {
-		req.ctx = ctx
-	}
 }
 
 type AICallbackType func(config *Config, req *AIRequest) (*AIResponse, error)
