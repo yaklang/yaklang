@@ -484,6 +484,7 @@ type YakClient interface {
 	YakVersionAtLeast(ctx context.Context, in *YakVersionAtLeastRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 	// echo 通常用于测试服务是否通畅
 	Echo(ctx context.Context, in *EchoRequest, opts ...grpc.CallOption) (*EchoResposne, error)
+	// 握手 用于检查前端是否可以连接当前引擎
 	Handshake(ctx context.Context, in *HandshakeRequest, opts ...grpc.CallOption) (*HandshakeResponse, error)
 	VerifySystemCertificate(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*VerifySystemCertificateResponse, error)
 	// 中间人劫持
@@ -6260,6 +6261,7 @@ type YakServer interface {
 	YakVersionAtLeast(context.Context, *YakVersionAtLeastRequest) (*GeneralResponse, error)
 	// echo 通常用于测试服务是否通畅
 	Echo(context.Context, *EchoRequest) (*EchoResposne, error)
+	// 握手 用于检查前端是否可以连接当前引擎
 	Handshake(context.Context, *HandshakeRequest) (*HandshakeResponse, error)
 	VerifySystemCertificate(context.Context, *Empty) (*VerifySystemCertificateResponse, error)
 	// 中间人劫持

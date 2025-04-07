@@ -842,6 +842,9 @@ message AIInputEvent {
   bool IsInteractiveMessage = 3;
   string InteractiveId = 4;
   string InteractiveJSONInput = 5;
+
+  bool IsSyncMessage = 6;
+  string SyncType = 7;
 }
 
 message McpConfig {
