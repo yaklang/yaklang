@@ -33,9 +33,18 @@ var __prompt_ReportFinished string
 //go:embed prompts/dynamic-plan.txt
 var __prompt_DynamicPlan string
 
+//go:embed prompts/plan-review/plan-incomplete.txt
+var planReviewPrompts string
+
 var (
 	__prompt_SUMMARY_TEMPLATE = template.Must(template.New("summary").Parse(__prompt_TaskSummary))
 )
+
+func GetAITaskJSONSchema() map[string]string {
+	res := make(map[string]string)
+	res["TaskJsonSchema"] = __prompt_TaskJsonSchema
+	return res
+}
 
 func GenerateTaskSummaryPrompt(text string) (string, error) {
 	var buf bytes.Buffer

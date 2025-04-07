@@ -165,7 +165,7 @@ func (r *Config) EmitRequireReviewForTask(task *aiTask, id string) {
 		"short_summary": task.ShortSummary,
 		"long_summary":  task.LongSummary,
 	}
-	r.emitJson(EVENT_TYPE_TASK_REVIEW_REQUIRE, "review-require", reqs)
+	r.emitInteractiveJson(id, EVENT_TYPE_TASK_REVIEW_REQUIRE, "review-require", reqs)
 }
 
 func (r *Config) EmitRequireReviewForPlan(rsp *planResponse, id string) {
@@ -174,7 +174,7 @@ func (r *Config) EmitRequireReviewForPlan(rsp *planResponse, id string) {
 		"selectors": PlanReviewSuggestions,
 		"plans":     rsp,
 	}
-	r.emitJson(EVENT_TYPE_PLAN_REVIEW_REQUIRE, "review-require", reqs)
+	r.emitInteractiveJson(id, EVENT_TYPE_PLAN_REVIEW_REQUIRE, "review-require", reqs)
 }
 
 func (r *Config) EmitRequireReviewForToolUse(tool *aitool.Tool, params aitool.InvokeParams, id string) {
@@ -185,7 +185,19 @@ func (r *Config) EmitRequireReviewForToolUse(tool *aitool.Tool, params aitool.In
 		"tool_description": tool.Description,
 		"params":           params,
 	}
-	r.emitJson(EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, "review-require", reqs)
+	r.emitInteractiveJson(id, EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, "review-require", reqs)
+}
+
+func (r *Config) emitInteractiveJson(id string, typeName EventType, nodeId string, i any) {
+	event := &Event{
+		CoordinatorId: r.id,
+		Type:          typeName,
+		NodeId:        nodeId,
+		IsJson:        true,
+		Content:       utils.Jsonify(i),
+	}
+	r.memory.StoreInteractiveEvent(id, event)
+	r.emit(event)
 }
 
 func (r *Config) emitLogWithLevel(level, name, fmtlog string, items ...any) {

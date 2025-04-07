@@ -8,14 +8,14 @@
 *. 尽量只输出 JSON 对象，减少或不要输出和 JSON 对象不相关的东西。
 
 ```schema
-{{ .TaskJsonSchema }}
+{{ .Schema.TaskJsonSchema }}
 ```
 
 # 用户原始输入
 
-{{ .Query }}
-{{ if .MetaInfo }}
+{{ .Memory.Query }}
+{{ if .Memory.MetaInfo }}
 # 前置信息
 
-{{ .MetaInfo }}
+{{ .Memory.MetaInfo }}
 {{ end }}

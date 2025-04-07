@@ -59,9 +59,9 @@ func (pr *planRequest) GenerateFirstPlanPrompt() (string, error) {
 
 	// 准备模板数据
 	data := map[string]interface{}{
-		"TaskJsonSchema": __prompt_TaskJsonSchema,
-		"Query":          pr.rawInput,
-		"MetaInfo":       "",
+		"Schema":   pr.config.schemaJson,
+		"Memory":   pr.config.memory,
+		"MetaInfo": "",
 	}
 	// 构建综合元信息字符串
 	metaInfoBuilder := &bytes.Buffer{}

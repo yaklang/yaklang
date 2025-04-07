@@ -3,15 +3,11 @@ package aid
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"strconv"
 	"strings"
 	"sync"
-	"text/template"
-
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 type runtime struct {
@@ -19,8 +15,7 @@ type runtime struct {
 	config   *Config
 	Stack    *utils.Stack[*aiTask]
 
-	statusMutex     sync.Mutex
-	toolCallResults []*aitool.ToolResult
+	statusMutex sync.Mutex
 }
 
 func (c *Coordinator) createRuntime() *runtime {
@@ -77,6 +72,15 @@ func (t *aiTask) dumpProgress(i int, w io.Writer) {
 			subtask.dumpProgress(i+1, w)
 		}
 	}
+}
+
+func (t *aiTask) Progress() string {
+	if t == nil {
+		return ""
+	}
+	var buf bytes.Buffer
+	t.dumpProgress(0, &buf)
+	return buf.String()
 }
 
 func (r *runtime) Progress() string {
@@ -137,15 +141,12 @@ func (r *runtime) invokeSubtask(idx int, task *aiTask) error {
 				continue
 			}
 			r.config.EmitInfo("invoke subtask success: %v with %d tool call results", subtask.Name, len(subtask.ToolCallResults))
-			r.PushToolCallResults(subtask.ToolCallResults...)
+			r.config.memory.PushToolCallResults(subtask.ToolCallResults...)
 		}
 		return nil
 	}
 
-	return task.executeTask(&taskContext{
-		Runtime:     r,
-		CurrentTask: task,
-	})
+	return task.executeTask()
 }
 
 func (r *runtime) Invoke(task *aiTask) {
@@ -153,52 +154,4 @@ func (r *runtime) Invoke(task *aiTask) {
 	if err != nil {
 		r.config.EmitError("invoke subtask failed: %v", err)
 	}
-}
-
-func (r *runtime) PushToolCallResults(t ...*aitool.ToolResult) {
-	r.statusMutex.Lock()
-	defer r.statusMutex.Unlock()
-
-	r.toolCallResults = append(r.toolCallResults, t...)
-}
-
-func (r *runtime) PromptForToolCallResultsForLastN(n int) string {
-	r.statusMutex.Lock()
-	defer r.statusMutex.Unlock()
-
-	if len(r.toolCallResults) == 0 {
-		return ""
-	}
-
-	var result = r.toolCallResults
-	if len(result) > n {
-		result = result[len(result)-n:]
-	}
-	templatedata := map[string]interface{}{
-		"ToolCallResults": result,
-	}
-	temp, err := template.New("tool-result-history").Parse(__prompt_ToolResultHistoryPromptTemplate)
-	if err != nil {
-		log.Errorf("error parsing tool result history template: %v", err)
-		return ""
-	}
-	var promptBuilder strings.Builder
-	err = temp.Execute(&promptBuilder, templatedata)
-	if err != nil {
-		log.Errorf("error executing tool result history template: %v", err)
-		return ""
-	}
-	return promptBuilder.String()
-}
-
-func (r *runtime) PromptForToolCallResultsForLast5() string {
-	return r.PromptForToolCallResultsForLastN(5)
-}
-
-func (r *runtime) PromptForToolCallResultsForLast10() string {
-	return r.PromptForToolCallResultsForLastN(10)
-}
-
-func (r *runtime) PromptForToolCallResultsForLast20() string {
-	return r.PromptForToolCallResultsForLastN(20)
 }

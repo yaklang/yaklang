@@ -1,16 +1,15 @@
 package main
 
 import (
-	"io"
-	"os"
-	"path/filepath"
-
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"io"
+	"os"
+	"path/filepath"
 )
 
 func main() {
@@ -43,7 +42,7 @@ func main() {
 					rsp.EmitReasonStream(c)
 				}),
 				aispec.WithType("tongyi"),
-				aispec.WithModel("qwen-plus"),
+				aispec.WithModel("qwq-32b"),
 				aispec.WithAPIKey(string(apikey)),
 				// aispec.WithDomain("api.siliconflow.cn"),
 			)
@@ -55,7 +54,7 @@ func main() {
 	}
 
 	coordinator, err := aid.NewCoordinator(
-		"找出 /Users/v1ll4n/Projects/yaklang 目录中最大的文件",
+		"帮我规划一个一家三口北京三日游",
 		aid.WithAICallback(aiCallback),
 		aid.WithTools(aid.GetAllMockTools()...),
 		aid.WithSystemFileOperator(),
