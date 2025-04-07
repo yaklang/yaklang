@@ -323,6 +323,17 @@ const (
 	SYNC_TYPE_PING        SyncType = "ping"
 )
 
+func ParseSyncType(s string) (SyncType, bool) {
+	for _, t := range []SyncType{
+		SYNC_TYPE_PLAN, SYNC_TYPE_CONSUMPTION, SYNC_TYPE_PING,
+	} {
+		if string(t) == s {
+			return t, true
+		}
+	}
+	return "", false
+}
+
 type InputEvent struct {
 	Id string
 
