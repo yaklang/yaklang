@@ -326,3 +326,78 @@ func RenameGroup(db *gorm.DB, oldName, newName string) error {
 	}
 	return nil
 }
+
+func CreateOrUpdateGroupsForRule(db *gorm.DB, rule *schema.SyntaxFlowRule, groups ...string) error {
+	if rule == nil {
+		return nil
+	}
+	groups = lo.Filter(groups, func(item string, _ int) bool {
+		return item != ""
+	})
+	_, err := BatchAddOrUpdateGroupsForRules(db, []string{rule.RuleName}, groups)
+	// 更新组完后再查一下，用以返回更新后的rule
+	db.Where("rule_name = ?", rule.RuleName).Preload("Groups").First(&rule)
+	return err
+}
+
+// BatchAddOrUpdateGroupsForRules 为多个规则添加多个组
+// 如果要添加的组不存在，会自动创建
+func BatchAddOrUpdateGroupsForRules(db *gorm.DB, ruleNames, groupNames []string) (int64, error) {
+	ruleNames = utils.RemoveRepeatedWithStringSlice(ruleNames)
+	groupNames = utils.RemoveRepeatedWithStringSlice(groupNames)
+
+	var count int64
+	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
+		groups := GetCreateOrUpdateGroups(tx, groupNames)
+		rules, err := QueryRulesByName(tx, ruleNames)
+		if err != nil {
+			return err
+		}
+
+		if len(ruleNames) != len(rules) {
+			return utils.Errorf("batch add groups for rules failed: rules not found")
+		}
+		if len(groupNames) != len(groups) {
+			return utils.Errorf("batch add groups for rules failed: groups not found")
+		}
+		if len(groups) == 0 || len(rules) == 0 {
+			return utils.Errorf("batch add groups for rules failed: groups or rules is empty")
+		}
+		for _, rule := range rules {
+			if err = tx.Model(rule).Association("Groups").Append(groups).Error; err != nil {
+				return err
+			} else {
+				count += int64(len(groups))
+			}
+		}
+		return nil
+	})
+	return count, err
+}
+
+func GetCreateOrUpdateGroups(db *gorm.DB, groupNames []string) []*schema.SyntaxFlowGroup {
+	var groups []*schema.SyntaxFlowGroup
+	for _, groupName := range groupNames {
+		i := &schema.SyntaxFlowGroup{
+			GroupName: groupName,
+			IsBuildIn: false,
+		}
+		group, err := CreateOrUpdateGroup(db, groupName, i)
+		if err != nil {
+			log.Errorf("create group %s failed: %s", groupName, err)
+			continue
+		}
+		groups = append(groups, group)
+	}
+	return groups
+}
+
+func CreateOrUpdateGroup(db *gorm.DB, groupName string, i *schema.SyntaxFlowGroup) (*schema.SyntaxFlowGroup, error) {
+	db = db.Model(&schema.SyntaxFlowGroup{})
+	group := schema.SyntaxFlowGroup{}
+	if db := db.Where("group_name = ?", groupName).Assign(i).FirstOrCreate(&group); db.Error != nil {
+		return nil, utils.Errorf("create/update SyntaxFlowGroup failed: %s", db.Error)
+	}
+
+	return &group, nil
+}

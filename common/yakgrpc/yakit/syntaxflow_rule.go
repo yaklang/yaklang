@@ -250,3 +250,14 @@ func QueryBuildInRule(db *gorm.DB) []*schema.SyntaxFlowRule {
 	db.Find(&rules)
 	return rules
 }
+
+func AllSyntaxFlowRule(db *gorm.DB, req *ypb.SyntaxFlowRuleFilter) ([]*schema.SyntaxFlowRule, error) {
+	db = db.Model(&schema.SyntaxFlowRule{})
+	db = FilterSyntaxFlowRule(db, req)
+	var ret []*schema.SyntaxFlowRule
+	db = db.Preload("Groups")
+	if err := db.Find(&ret).Error; err != nil {
+		return nil, utils.Errorf("query failed: %s", err)
+	}
+	return ret, nil
+}

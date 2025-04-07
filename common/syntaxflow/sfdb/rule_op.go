@@ -420,3 +420,36 @@ func CreateRule(rule *schema.SyntaxFlowRule, groups ...string) (*schema.SyntaxFl
 func CreateRuleWithDefaultGroup(rule *schema.SyntaxFlowRule, groups ...string) (*schema.SyntaxFlowRule, error) {
 	return createRuleEx(rule, true, groups...)
 }
+
+func CreateOrUpdateRuleWithGroup(rule *schema.SyntaxFlowRule, groups ...string) (*schema.SyntaxFlowRule, error) {
+	if rule == nil {
+		return nil, utils.Errorf("create syntaxFlow rule failed: rule is nil")
+	}
+	if rule.RuleName == "" {
+		return nil, utils.Errorf("create syntaxFlow rule failed: rule name is empty")
+	}
+	db := consts.GetGormProfileDatabase()
+	db = db.Model(&schema.SyntaxFlowRule{})
+	// 只是创建规则而不带着组去创建，后续再添加组。
+	// 因为多对多的表直接创建会导致和该组相关的规则都被更新。
+	backUp := lo.Map(rule.Groups, func(group *schema.SyntaxFlowGroup, _ int) string {
+		return group.GroupName
+	})
+	groups = append(groups, backUp...)
+	rule.Groups = nil
+	if err := CreateOrUpdateSyntaxFlowRule(db.Debug(), rule.RuleName, &rule); err != nil {
+		return nil, utils.Errorf("create syntaxFlow rule failed: %s", err)
+	}
+	CreateOrUpdateGroupsForRule(db, rule, groups...)
+	return rule, nil
+}
+
+func CreateOrUpdateSyntaxFlowRule(db *gorm.DB, RuleName string, i interface{}) error {
+	db = db.Model(&schema.SyntaxFlowRule{})
+	db = db.Where("rule_name = ?", RuleName).Assign(i).FirstOrCreate(&schema.SyntaxFlowRule{})
+	if db.Error != nil {
+		return utils.Errorf("create/update SyntaxFlowRule failed: %s", db.Error)
+	}
+
+	return nil
+}
