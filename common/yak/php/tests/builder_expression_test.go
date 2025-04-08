@@ -35,7 +35,7 @@ $a->a();
 $a->a();
 `
 	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
-		result := prog.SyntaxFlow(".a() as $call")
+		result := prog.SyntaxFlow(".a() as $call", ssaapi.QueryWithEnableDebug())
 		assert.True(t, len(result.GetValues("call")) == 2)
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.PHP))
