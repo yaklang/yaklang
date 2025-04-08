@@ -2,6 +2,7 @@ package sfvm
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
