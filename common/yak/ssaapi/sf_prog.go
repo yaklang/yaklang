@@ -22,6 +22,14 @@ import (
 
 var _ sfvm.ValueOperator = &Program{}
 
+func (p *Program) CompareConst(comparator *sfvm.ConstComparator) []bool {
+	return []bool{false}
+}
+
+func (p *Program) NewConst(i any, rng ...memedit.RangeIf) sfvm.ValueOperator {
+	return p.NewConstValue(i, rng...)
+}
+
 func (p *Program) CompareOpcode(opcodeItems *sfvm.OpcodeComparator) (sfvm.ValueOperator, []bool) {
 	var boolRes []bool
 	ctx := opcodeItems.Context
