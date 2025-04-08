@@ -129,6 +129,15 @@ func FixRiskType(db *gorm.DB) {
 
 func FilterByQueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) *gorm.DB {
 	db = db.Model(&schema.Risk{})
+
+	if params.GetAfterCreatedAt() > 0 {
+		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "created_at", params.GetAfterCreatedAt(), time.Now().Add(10*time.Minute).Unix())
+	}
+
+	if params.GetBeforeCreatedAt() > 0 {
+		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "created_at", 0, params.GetBeforeCreatedAt())
+	}
+
 	if runtimeId := params.GetRuntimeId(); runtimeId != "" {
 		db = db.Where("runtime_id = ?", runtimeId)
 	}
