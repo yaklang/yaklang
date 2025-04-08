@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"regexp"
 
 	"golang.org/x/exp/slices"
@@ -13,7 +14,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
@@ -102,6 +102,13 @@ func (v *Value) CompareString(items *sfvm.StringComparator) (sfvm.ValueOperator,
 	names := getValueNames(v)
 	names = append(names, yakunquote.TryUnquote(v.String()))
 	return nil, []bool{items.Matches(names...)}
+}
+
+func (v *Value) CompareConst(comparator *sfvm.ConstComparator) []bool {
+	if v == nil || comparator == nil {
+		return []bool{false}
+	}
+	return []bool{comparator.Matches(v.String())}
 }
 
 func (v *Value) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOperator, []bool) {
@@ -240,4 +247,8 @@ func (v *Value) AppendPredecessor(operator sfvm.ValueOperator, opts ...sfvm.Anal
 
 func (v *Value) FileFilter(path string, match string, rule map[string]string, rule2 []string) (sfvm.ValueOperator, error) {
 	return v.ParentProgram.FileFilter(path, match, rule, rule2)
+}
+
+func (v *Value) NewConst(i any, rng ...memedit.RangeIf) sfvm.ValueOperator {
+	return v.NewConstValue(i, rng...)
 }

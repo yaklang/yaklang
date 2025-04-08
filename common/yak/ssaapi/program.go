@@ -2,10 +2,9 @@ package ssaapi
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"sort"
 	"time"
-
-	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
