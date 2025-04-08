@@ -67,9 +67,9 @@ func (s *SafeString) SliceToEnd(start int) string {
 
 func (s *SafeString) SliceBeforeStart(end int) string {
 	if s.utf8Valid {
-		return string(s.runes[:end])
+		return string(append([]rune{}, s.runes[:end]...))
 	}
-	return string(s.bytes[:end])
+	return string(append([]byte{}, s.bytes[:end]...))
 }
 
 func (s *SafeString) Slice1(idx int) rune {
