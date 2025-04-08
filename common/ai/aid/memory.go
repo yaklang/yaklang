@@ -4,21 +4,13 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	osRuntime "runtime"
 	"strings"
 	"text/template"
+	"time"
 )
 
-type Memory struct {
-	Query              string
-	CurrentTask        *aiTask
-	RootTask           *aiTask
-	PlanHistory        []*PlanRecord
-	toolCallResults    []*aitool.ToolResult
-	InteractiveHistory *omap.OrderedMap[string, *InteractiveEventRecord]
-	MetaInfo           map[string]string
-}
-
-type PlanRecord struct {
+type PlanRecord struct { // todo
 	PlanRequest  *planRequest
 	PlanResponse *planResponse
 }
@@ -28,42 +20,99 @@ type InteractiveEventRecord struct {
 	UserInput        aitool.InvokeParams
 }
 
+type Memory struct {
+	// user first input
+	Query string
+
+	// meta info
+	MetaInfo map[string]string
+
+	// task info
+	CurrentTask *aiTask
+	RootTask    *aiTask
+
+	// todo
+	PlanHistory []*PlanRecord
+
+	// tools list
+	Tools func() []*aitool.Tool
+
+	// tool call results
+	toolCallResults []*aitool.ToolResult
+
+	// interactive history
+	InteractiveHistory *omap.OrderedMap[string, *InteractiveEventRecord]
+}
+
 func NewMemory() *Memory {
 	return &Memory{
 		PlanHistory:        make([]*PlanRecord, 0),
 		MetaInfo:           make(map[string]string),
 		InteractiveHistory: omap.NewOrderedMap[string, *InteractiveEventRecord](make(map[string]*InteractiveEventRecord)),
 		toolCallResults:    make([]*aitool.ToolResult, 0),
+		Tools: func() []*aitool.Tool {
+			return make([]*aitool.Tool, 0)
+		},
 	}
 }
 
+// constants info memory api
+func (m *Memory) Now() string {
+	return time.Now().Format("2006-01-02 15:04:05")
+}
+
+func (m *Memory) OS() string {
+	return osRuntime.GOOS
+}
+
+func (m *Memory) Arch() string {
+	return osRuntime.GOARCH
+}
+
+func (m *Memory) Schema() map[string]string {
+	return taskJSONSchema()
+}
+
+// set tools list
+func (m *Memory) StoreTools(toolList func() []*aitool.Tool) {
+	m.Tools = toolList
+}
+
+// user first input
 func (m *Memory) StoreQuery(query string) {
 	m.Query = query
+}
+
+// task info memory
+func (m *Memory) StoreRootTask(t *aiTask) {
+	m.RootTask = t
 }
 
 func (m *Memory) Progress() string {
 	return m.RootTask.Progress()
 }
 
-func (m *Memory) SetCurrentTask(task *aiTask) {
+func (m *Memory) StoreCurrentTask(task *aiTask) {
 	m.CurrentTask = task
 }
 
-func (m *Memory) RootPlan() string {
-	return m.RootTask.Progress()
+// interactive history memory
+func (m *Memory) StoreInteractiveEvent(eventID string, e *Event) {
+	m.InteractiveHistory.Set(eventID, &InteractiveEventRecord{
+		InteractiveEvent: e,
+	})
 }
 
-func (m *Memory) CurrentTaskPlan() string {
-	return m.CurrentTask.Progress()
-}
-
-func (m *Memory) LastPlanResponse() string {
-	if len(m.PlanHistory) == 0 {
-		return ""
+func (m *Memory) StoreInteractiveUserInput(eventID string, invoke aitool.InvokeParams) {
+	record, ok := m.InteractiveHistory.Get(eventID)
+	if !ok {
+		log.Errorf("error getting review record for event ID %s", eventID)
+		return
 	}
-	return m.PlanHistory[len(m.PlanHistory)-1].PlanResponse.RootTask.Progress()
+	record.UserInput = invoke
 }
 
+// tool results memory
 func (m *Memory) PushToolCallResults(t ...*aitool.ToolResult) {
 	m.toolCallResults = append(m.toolCallResults, t...)
 }
@@ -77,7 +126,7 @@ func (m *Memory) PromptForToolCallResultsForLastN(n int) string {
 	if len(result) > n {
 		result = result[len(result)-n:]
 	}
-	templatedata := map[string]interface{}{
+	templateData := map[string]interface{}{
 		"ToolCallResults": result,
 	}
 	temp, err := template.New("tool-result-history").Parse(__prompt_ToolResultHistoryPromptTemplate)
@@ -86,7 +135,7 @@ func (m *Memory) PromptForToolCallResultsForLastN(n int) string {
 		return ""
 	}
 	var promptBuilder strings.Builder
-	err = temp.Execute(&promptBuilder, templatedata)
+	err = temp.Execute(&promptBuilder, templateData)
 	if err != nil {
 		log.Errorf("error executing tool result history template: %v", err)
 		return ""
@@ -106,17 +155,42 @@ func (m *Memory) PromptForToolCallResultsForLast20() string {
 	return m.PromptForToolCallResultsForLastN(20)
 }
 
-func (m *Memory) StoreInteractiveEvent(eventID string, e *Event) {
-	m.InteractiveHistory.Set(eventID, &InteractiveEventRecord{
-		InteractiveEvent: e,
-	})
+// memory tools current task info
+func (m *Memory) CurrentTaskInfo() string {
+	if m.CurrentTask == nil {
+		return ""
+	}
+	templateData := map[string]interface{}{
+		"Memory": m,
+	}
+	temp, err := template.New("current_task_info").Parse(__prompt_currentTaskInfo)
+	if err != nil {
+		log.Errorf("error parsing tool result history template: %v", err)
+		return ""
+	}
+	var promptBuilder strings.Builder
+	err = temp.Execute(&promptBuilder, templateData)
+	if err != nil {
+		log.Errorf("error executing tool result history template: %v", err)
+		return ""
+	}
+	return promptBuilder.String()
 }
 
-func (m *Memory) StoreInteractiveUserInput(eventID string, invoke aitool.InvokeParams) {
-	record, ok := m.InteractiveHistory.Get(eventID)
-	if !ok {
-		log.Errorf("error getting review record for event ID %s", eventID)
-		return
+func (m *Memory) ToolsList() string {
+	templateData := map[string]interface{}{
+		"Tools": m.Tools(),
 	}
-	record.UserInput = invoke
+	temp, err := template.New("tools_list").Parse(__prompt_ToolsList)
+	if err != nil {
+		log.Errorf("error parsing tool result history template: %v", err)
+		return ""
+	}
+	var promptBuilder strings.Builder
+	err = temp.Execute(&promptBuilder, templateData)
+	if err != nil {
+		log.Errorf("error executing tool result history template: %v", err)
+		return ""
+	}
+	return promptBuilder.String()
 }

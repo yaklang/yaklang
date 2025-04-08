@@ -10,9 +10,7 @@
 3. 新规划的任务会追加到当前任务后面，原计划未执行任务将会被替换
 
 ## 当前规划
-{{ .Memory.Progress }}
-当前任务: {{ .Memory.CurrentTask.QuoteName }}
-目标：{{ .Memory.CurrentTask.QuoteGoal }}
+{{ .Memory.CurrentTaskInfo }}
 
 {{ .Memory.PromptForToolCallResultsForLast20 }}
 
@@ -21,36 +19,5 @@
 
 根据下面Schema输出重新规划后的JSON
 ```schema
-{
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "type": "object",
-    "required": ["@action", "next_plans"],
-    "additionalProperties": false,
-    "properties": {
-        "@action": {
-            "const": "re-plan",
-            "description": "标识当前操作的具体类型"
-        },
-        "next_plans": {
-            "type": "array",
-            "description": "重新规划后的任务计划"
-            "minItems": 1,
-            "items": {
-                "type": "object",
-                "required": ["name", "goal"],
-                "additionalProperties": false,
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "description": "任务名"
-                    },
-                    "goal": {
-                        "type": "string",
-                        "description": "任务目标"
-                    }
-                }
-            }
-        }
-    }
-}
+{{ .Memory.Schema.RePlanJsonSchema }}
 ```

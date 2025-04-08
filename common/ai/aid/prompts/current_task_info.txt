@@ -1,0 +1,3 @@
+{{ .Memory.Progress }}
+当前任务: {{ .Memory.CurrentTask.QuoteName }}
+目标：{{ .Memory.CurrentTask.QuoteGoal }}
