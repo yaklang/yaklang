@@ -229,8 +229,8 @@ func getLocalInfo(localFile) {
             filesys.onFileStat(func(path, info) {
                 params.file_count++
                 ext = file.GetExt(path).Lower().TrimLeft(".")
-                countinfo = countMap[ext]
-                if countinfo != nil {
+                if ext in countMap{
+                    countinfo = countMap[ext]
                     countMap[ext] = countinfo + 1
                 }
                 if params.language == "" {
