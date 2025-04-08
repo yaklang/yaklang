@@ -25,8 +25,7 @@ func (c *CustomSearcher) GetType() ostype.SearcherType {
 	return ostype.SearcherType(c.Name)
 }
 
-func (c *CustomSearcher) Search(query string, options ...ostype.SearchOption) (*ostype.OmniSearchResultList, error) {
-	config := ostype.NewSearchConfig(options...)
+func (c *CustomSearcher) Search(query string, config *ostype.SearchConfig) (*ostype.OmniSearchResultList, error) {
 	iresults, err := c.Handle(query, config)
 	if err != nil {
 		return nil, fmt.Errorf("call custom searcher failed: %v", err)

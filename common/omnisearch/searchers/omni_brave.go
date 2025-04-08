@@ -13,9 +13,8 @@ func (c *OmniBraveSearchClient) GetType() ostype.SearcherType {
 	return ostype.SearcherTypeBrave
 }
 
-func (c *OmniBraveSearchClient) Search(query string, options ...ostype.SearchOption) (*ostype.OmniSearchResultList, error) {
+func (c *OmniBraveSearchClient) Search(query string, config *ostype.SearchConfig) (*ostype.OmniSearchResultList, error) {
 	braveConfig := NewDefaultBraveConfig()
-	config := ostype.NewSearchConfig(options...)
 	if config.ApiKey != "" {
 		braveConfig.APIKey = config.ApiKey
 	}

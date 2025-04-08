@@ -310,6 +310,16 @@ func WithJarOperator() Option {
 	}
 }
 
+func WithOmniSearchTool() Option {
+	return func(config *Config) error {
+		tools, err := fstools.CreateOmniSearchTools()
+		if err != nil {
+			return utils.Errorf("create omnisearch tools: %v", err)
+		}
+		return WithTools(tools...)(config)
+	}
+}
+
 func WithDebugPrompt(i ...bool) Option {
 	return func(config *Config) error {
 		config.m.Lock()
