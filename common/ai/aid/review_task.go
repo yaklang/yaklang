@@ -82,14 +82,15 @@ func (t *aiTask) handleReviewResult(param aitool.InvokeParams) error {
 			t.config.EmitError("root aiTask is nil, plan failed")
 			return utils.Errorf("coordinator: root aiTask is nil")
 		}
+		t.Subtasks = rsp.RootTask.Subtasks
 		r := &runtime{
 			config: t.config,
 			Stack:  utils.NewStack[*aiTask](),
 		}
-		r.Invoke(rsp.RootTask)
+		r.Invoke(t)
 	case "inaccurate":
 		t.config.EmitInfo("inaccurate")
-		t.rerun = true
+		return t.executeTask()
 	case "continue":
 		t.config.EmitInfo("continue")
 		return nil

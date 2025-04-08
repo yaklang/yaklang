@@ -1,16 +1,11 @@
 package aid
 
 import (
-	"bytes"
 	_ "embed"
-	"text/template"
 )
 
 //go:embed prompts/plan-to-task-list.txt
 var __prompt_GenerateTaskListPrompt string
-
-//go:embed jsonschema/task.json
-var __prompt_TaskJsonSchema string
 
 //go:embed prompts/task-execute.txt
 var __prompt_ExecuteTaskPromptTemplate string
@@ -33,26 +28,11 @@ var __prompt_ReportFinished string
 //go:embed prompts/dynamic-plan.txt
 var __prompt_DynamicPlan string
 
+//go:embed prompts/current_task_info.txt
+var __prompt_currentTaskInfo string
+
+//go:embed prompts/tools-list.txt
+var __prompt_ToolsList string
+
 //go:embed prompts/plan-review/plan-incomplete.txt
 var planReviewPrompts string
-
-var (
-	__prompt_SUMMARY_TEMPLATE = template.Must(template.New("summary").Parse(__prompt_TaskSummary))
-)
-
-func GetAITaskJSONSchema() map[string]string {
-	res := make(map[string]string)
-	res["TaskJsonSchema"] = __prompt_TaskJsonSchema
-	return res
-}
-
-func GenerateTaskSummaryPrompt(text string) (string, error) {
-	var buf bytes.Buffer
-	err := __prompt_SUMMARY_TEMPLATE.Execute(&buf, map[string]string{
-		"Text": text,
-	})
-	if err != nil {
-		return "", err
-	}
-	return buf.String(), nil
-}

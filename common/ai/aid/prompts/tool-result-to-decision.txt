@@ -21,23 +21,5 @@
 在你执行完任务后，需要生成符合下方Schema的JSON数据实例，禁止返回Schema结构。
 
 ```schema
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "required": ["@action"],
-  "properties": {
-    "@action": {
-      "type": "string",
-      "enum": ["require-more-tool", "finished"],
-      "x-generation-rules": [
-        "根据调用结果检查是否完成当前子任务，如果你认为未完成，需要调用更多工具，则使用require-more-tool",
-        "如果你认为任务已经完成，请使用finished"
-      ]
-    }
-  },
-  "examples": [
-    {"@action": "require-more-tool"},
-    {"@action": "finished"}
-  ]
-}
+{{ .Memory.Schema.ToolExecuteCheckSchema }}
 ```

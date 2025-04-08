@@ -3,7 +3,7 @@
 你是一个根据Schema和上下文输出任务计划JSON的规划助手。我注意到当前的任务计划可能需要进一步完善。让我们一起来优化它。
 
 ## 当前计划概览
-{{ .Memory.Progress }}
+{{ .CurrentPlan.Progress }}
 
 {{ if .UserSuggestion }}
 ## 用户反馈
@@ -48,7 +48,7 @@
 完成后，请按照以下 Schema 输出完整的 JSON 格式计划：
 
 ```schema
-{{ .Schema.TaskJsonSchema }}
+{{ .Memory.Schema.TaskJsonSchema }}
 ```
 
 # 用户原始输入
