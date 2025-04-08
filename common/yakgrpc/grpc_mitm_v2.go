@@ -48,6 +48,7 @@ var (
 	Hijack_Status_Request  = "hijacking request"
 	Hijack_Status_Response = "hijacking response"
 	Hijack_Status_Waiting  = "wait hijack"
+	Hijack_Status_WS       = "hijacking ws"
 )
 
 func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
@@ -293,6 +294,17 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			if err != nil {
 				log.Errorf("stream recv error: %v", err)
 				return
+			}
+
+			if reqInstance.GetRecoverContext() {
+				log.Infof("retry recover mitm session")
+				send(&ypb.MITMV2Response{
+					JustFilter:          true,
+					FilterData:          filterManager.Data,
+					JustContentReplacer: true,
+					Replacers:           replacer.GetRules(),
+				})
+				continue
 			}
 
 			if reqInstance.GetResetFilter() {
@@ -549,6 +561,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			RemoteAddr:  httpctx.GetRemoteAddr(req),
 			IsWebsocket: true,
 			Payload:     raw,
+			Status:      Hijack_Status_WS,
 			Method:      "WS",
 		}
 
@@ -577,7 +590,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				if controlMessage.GetForward() {
 					return originRspRaw
 				}
-				return controlMessage.GetResponse()
+				return controlMessage.GetPayload()
 			}
 		}
 	}
@@ -825,6 +838,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			RemoteAddr:      httpctx.GetRemoteAddr(req),
 			IsWebsocket:     true,
 			Payload:         raw,
+			Status:          Hijack_Status_WS,
 			WebsocketEncode: encode,
 			Method:          "WS",
 		}
@@ -852,7 +866,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				if controlMessage.GetForward() {
 					return raw
 				}
-				requestModified := controlMessage.GetRequest()
+				requestModified := controlMessage.GetPayload()
 				return requestModified
 			}
 		}
