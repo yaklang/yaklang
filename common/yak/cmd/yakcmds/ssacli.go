@@ -312,6 +312,7 @@ var SSACompilerCommands = []*cli.Command{
 			}
 
 			if inMemory {
+				//纯内存模式，cache将只会保留一个小时
 				log.Infof("compile in memory mode, program-name will be ignored")
 			} else {
 				if programName == "" {

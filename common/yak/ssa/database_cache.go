@@ -27,16 +27,17 @@ type instructionCachePair struct {
 //
 // and save the data to database when the data is expired,
 // and load the data from database when the data is not in cache.
+
 type Cache struct {
 	program          *Program // mark which program handled
 	DB               *gorm.DB
 	fetchId          func() (int64, *ssadb.IrCode) // fetch a new id
 	InstructionCache *utils.DataBaseCacheWithKey[int64, *instructionCachePair]
 
-	VariableCache   *utils.Cache[Instruction]
-	MemberCache     *utils.Cache[Instruction]
-	Class2InstIndex *utils.Cache[Instruction]
-	constCache      *utils.Cache[Instruction]
+	VariableCache   *utils.Cache[[]Instruction]
+	MemberCache     *utils.Cache[[]Instruction]
+	Class2InstIndex *utils.Cache[[]Instruction]
+	constCache      *utils.Cache[[]Instruction]
 
 	afterSaveNotify func()
 }
@@ -46,10 +47,10 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 	ttl := time.Duration(0)
 	cache := &Cache{
 		program:         prog,
-		VariableCache:   utils.NewTTLCache[Instruction](),
-		MemberCache:     utils.NewTTLCache[Instruction](),
-		Class2InstIndex: utils.NewTTLCache[Instruction](),
-		constCache:      utils.NewTTLCache[Instruction](),
+		VariableCache:   utils.NewTTLCache[[]Instruction](),
+		MemberCache:     utils.NewTTLCache[[]Instruction](),
+		Class2InstIndex: utils.NewTTLCache[[]Instruction](),
+		constCache:      utils.NewTTLCache[[]Instruction](),
 	}
 	if databaseEnable {
 		if len(ConfigTTL) > 0 {
@@ -57,10 +58,11 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 		} else {
 			ttl = time.Second * 8
 		}
-		cache.VariableCache = utils.NewTTLCache[Instruction](time.Second)
-		cache.MemberCache = utils.NewTTLCache[Instruction](time.Second)
-		cache.VariableCache = utils.NewTTLCache[Instruction](time.Second)
-		cache.Class2InstIndex = utils.NewTTLCache[Instruction](time.Second)
+		cache.VariableCache = utils.NewTTLCache[[]Instruction](ttl)
+		cache.MemberCache = utils.NewTTLCache[[]Instruction](ttl)
+		cache.VariableCache = utils.NewTTLCache[[]Instruction](ttl)
+		cache.Class2InstIndex = utils.NewTTLCache[[]Instruction](ttl)
+		cache.constCache = utils.NewTTLCache[[]Instruction](ttl)
 	}
 
 	var save func(int64, *instructionCachePair, utils.EvictionReason) bool
@@ -106,6 +108,35 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 	cache.InstructionCache = utils.NewDatabaseCacheWithKey(ttl, save, load)
 
 	return cache
+}
+func (*Cache) setOrAddInstruct(cache *utils.Cache[[]Instruction], inst Instruction, names ...string) {
+	name := ""
+	if names == nil || names[0] == "" {
+		name = inst.GetName()
+	} else {
+		name = names[0]
+	}
+	value, exists := cache.Get(name)
+	if !exists {
+		cache.Set(name, []Instruction{inst})
+		return
+	}
+	value = append(value, inst)
+	cache.Set(name, value)
+}
+func (c *Cache) deleteInstruct(cache *utils.Cache[[]Instruction], instruction Instruction, names ...string) {
+	name := ""
+	if names == nil || names[0] == "" {
+		name = instruction.GetName()
+	} else {
+		name = names[0]
+	}
+	value, exists := cache.Get(name)
+	if !exists {
+		return
+	}
+	item := utils.RemoveSliceItem(value, instruction)
+	cache.Set(name, item)
 }
 
 func (c *Cache) HaveDatabaseBackend() bool {
@@ -195,8 +226,7 @@ func (c *Cache) GetInstruction(id int64) Instruction {
 // =============================================== Variable =======================================================
 
 func (c *Cache) AddConst(inst Instruction) {
-	c.constCache.Set(inst.GetName(), inst)
-	//c.constCache = append(c.constCache, inst)
+	c.setOrAddInstruct(c.constCache, inst)
 }
 func (c *Cache) AddVariable(name string, inst Instruction) {
 	member := ""
@@ -210,11 +240,10 @@ func (c *Cache) AddVariable(name string, inst Instruction) {
 			member, _ = strings.CutSuffix(memberKey, "]")
 		}
 	}
-
 	if member != "" {
-		c.MemberCache.Set(member, inst)
+		c.setOrAddInstruct(c.MemberCache, inst, member)
 	} else {
-		c.VariableCache.Set(name, inst)
+		c.setOrAddInstruct(c.VariableCache, inst, name)
 	}
 	if c.HaveDatabaseBackend() {
 		SaveVariableIndex(inst, name, member)
@@ -235,14 +264,14 @@ func (c *Cache) RemoveVariable(name string, inst Instruction) {
 	}
 
 	if member != "" {
-		c.MemberCache.Set(member, inst)
+		c.deleteInstruct(c.MemberCache, inst, member)
 	} else {
-		c.VariableCache.Set(name, inst)
+		c.deleteInstruct(c.VariableCache, inst, name)
 	}
 }
 
 func (c *Cache) AddClassInstance(name string, inst Instruction) {
-	c.Class2InstIndex.Set(name, inst)
+	c.setOrAddInstruct(c.Class2InstIndex, inst, name)
 	if c.HaveDatabaseBackend() {
 		SaveClassIndex(inst, name)
 	}
