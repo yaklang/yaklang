@@ -33,12 +33,12 @@ func (v *Value) GetOpcode() string {
 }
 
 func (v *Value) GetBinaryOperator() string {
-	inst := v.GetSSAInst()
-	if utils.IsNil(inst) {
+	sa := v.GetSSAInst()
+	if utils.IsNil(sa) {
 		return ""
 	}
-	if inst.GetOpcode() == ssa.SSAOpcodeBinOp {
-		binop, ok := ssa.ToBinOp(inst)
+	if sa.GetOpcode() == ssa.SSAOpcodeBinOp {
+		binop, ok := ssa.ToBinOp(sa)
 		if !ok {
 			return ""
 		}
@@ -48,12 +48,12 @@ func (v *Value) GetBinaryOperator() string {
 }
 
 func (v *Value) GetUnaryOperator() string {
-	inst := v.GetSSAInst()
-	if utils.IsNil(inst) {
+	sa := v.GetSSAInst()
+	if utils.IsNil(sa) {
 		return ""
 	}
-	if inst.GetOpcode() == ssa.SSAOpcodeUnOp {
-		unOp, ok := ssa.ToUnOp(inst)
+	if sa.GetOpcode() == ssa.SSAOpcodeUnOp {
+		unOp, ok := ssa.ToUnOp(sa)
 		if !ok {
 			return ""
 		}
@@ -83,8 +83,9 @@ func (v *Value) GlobMatch(ctx context.Context, mod int, g string) (bool, sfvm.Va
 }
 
 func (v *Value) Merge(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
-	sf = append(sf, v)
-	return MergeSFValueOperator(sf...), nil
+	var vals = []sfvm.ValueOperator{v}
+	vals = append(vals, sf...)
+	return MergeSFValueOperator(vals...), nil
 }
 
 func (v *Value) RegexpMatch(ctx context.Context, mod int, re string) (bool, sfvm.ValueOperator, error) {
@@ -102,6 +103,13 @@ func (v *Value) CompareString(items *sfvm.StringComparator) (sfvm.ValueOperator,
 	names := getValueNames(v)
 	names = append(names, yakunquote.TryUnquote(v.String()))
 	return nil, []bool{items.Matches(names...)}
+}
+
+func (v *Value) CompareConst(comparator *sfvm.ConstComparator) []bool {
+	if v == nil || comparator == nil {
+		return []bool{false}
+	}
+	return []bool{comparator.Matches(v.String())}
 }
 
 func (v *Value) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOperator, []bool) {
@@ -156,17 +164,13 @@ func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.ValueOperator
 			addvalue(value)
 		}
 	}
-	v.GetCalledBy().ForEach(func(c *Value) {
-		if c, ok := ssa.ToCall(c.innerValue); ok {
-			if len(c.Args) > start {
-				add(c.Args)
-			}
-		}
-	})
-	if f, ok := ssa.ToFunction(v.innerValue); ok {
-		if len(f.Params) > start {
-			add(f.Params)
-		}
+	call, isCall := ssa.ToCall(v.innerValue)
+	if !isCall {
+		return nil, utils.Errorf("ssa.Value is not a call")
+	}
+	add(call.Args)
+	if utils.IsNil(rets) {
+		return nil, utils.Errorf("ssa.Value no actual params")
 	}
 	return rets, nil
 }
@@ -240,4 +244,8 @@ func (v *Value) AppendPredecessor(operator sfvm.ValueOperator, opts ...sfvm.Anal
 
 func (v *Value) FileFilter(path string, match string, rule map[string]string, rule2 []string) (sfvm.ValueOperator, error) {
 	return v.ParentProgram.FileFilter(path, match, rule, rule2)
+}
+
+func (v *Value) NewConst(i any, rng ...memedit.RangeIf) sfvm.ValueOperator {
+	return v.NewConstValue(i, rng...)
 }

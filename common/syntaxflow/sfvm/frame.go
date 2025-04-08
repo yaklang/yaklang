@@ -677,11 +677,11 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		callLen := ValuesLen(results)
 		s.debugSubLog("<< push len: %v", callLen)
-		// _ = results.AppendPredecessor(value, s.WithPredecessorContext("call"))
 		s.stack.Push(results)
 
 	case OpGetCallArgs:
-		s.debugSubLog("-- peek")
+		s.debugSubLog("-- getCallArgs pop call args")
+		//in iterStack
 		value := s.stack.Peek()
 		if value == nil {
 			return utils.Wrap(CriticalError, "get call args failed: stack top is empty")
@@ -759,6 +759,16 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			if vs == nil {
 				return utils.Errorf("new ref failed: empty value: %v", i.UnaryStr)
 			}
+			var operator0 ValueOperator
+			count := 0
+			vs.Recursive(func(operator ValueOperator) error {
+				if count == 0 {
+					operator0 = operator
+				}
+				count++
+				return nil
+			})
+			_ = operator0
 			s.debugSubLog(">> get value: %v ", vs)
 			s.stack.Push(vs)
 		} else {
@@ -916,7 +926,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			if dup == nil {
 				return utils.Wrapf(CriticalError, "compare string failed: stack top is empty")
 			}
-			s.debugSubLog("Remove duplicate :%v")
+			s.debugSubLog("Remove duplicate :%v", dup.String())
 			s.debugSubLog(">> push: %v", ValuesLen(newVal))
 			s.stack.Push(newVal)
 		}
@@ -959,6 +969,90 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return nil
 		})
 		s.conditionStack.Push(res)
+	case OpEq:
+		s.debugSubLog(">> pop")
+		vs1 := s.stack.Pop()
+		if vs1 == nil {
+			return utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		}
+		s.debugSubLog(">> peek")
+		vs2 := s.stack.Peek()
+		if vs2 == nil {
+			return utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		}
+		comparator := NewConstComparator(vs1.String(), BinaryConditionEqual)
+		conds := vs2.CompareConst(comparator)
+		s.conditionStack.Push(conds)
+	case OpNotEq:
+		s.debugSubLog(">> pop")
+		vs1 := s.stack.Pop()
+		if vs1 == nil {
+			return utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		}
+		s.debugSubLog(">> peek")
+		vs2 := s.stack.Peek()
+		if vs2 == nil {
+			return utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		}
+		comparator := NewConstComparator(vs1.String(), BinaryConditionNotEqual)
+		conds := vs2.CompareConst(comparator)
+		s.conditionStack.Push(conds)
+	case OpGt:
+		s.debugSubLog(">> pop")
+		vs1 := s.stack.Pop()
+		if vs1 == nil {
+			return utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		}
+		s.debugSubLog(">> peek")
+		vs2 := s.stack.Peek()
+		if vs2 == nil {
+			return utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		}
+		comparator := NewConstComparator(vs1.String(), BinaryConditionGt)
+		conds := vs2.CompareConst(comparator)
+		s.conditionStack.Push(conds)
+	case OpGtEq:
+		s.debugSubLog(">> pop")
+		vs1 := s.stack.Pop()
+		if vs1 == nil {
+			return utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		}
+		s.debugSubLog(">> peek")
+		vs2 := s.stack.Peek()
+		if vs2 == nil {
+			return utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		}
+		comparator := NewConstComparator(vs1.String(), BinaryConditionGtEq)
+		conds := vs2.CompareConst(comparator)
+		s.conditionStack.Push(conds)
+	case OpLt:
+		s.debugSubLog(">> pop")
+		vs1 := s.stack.Pop()
+		if vs1 == nil {
+			return utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		}
+		s.debugSubLog(">> peek")
+		vs2 := s.stack.Peek()
+		if vs2 == nil {
+			return utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		}
+		comparator := NewConstComparator(vs1.String(), BinaryConditionLt)
+		conds := vs2.CompareConst(comparator)
+		s.conditionStack.Push(conds)
+	case OpLtEq:
+		s.debugSubLog(">> pop")
+		vs1 := s.stack.Pop()
+		if vs1 == nil {
+			return utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		}
+		s.debugSubLog(">> peek")
+		vs2 := s.stack.Peek()
+		if vs2 == nil {
+			return utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		}
+		comparator := NewConstComparator(vs1.String(), BinaryConditionLtEq)
+		conds := vs2.CompareConst(comparator)
+		s.conditionStack.Push(conds)
 	case OpLogicBang:
 		conds := s.conditionStack.Pop()
 		for i := 0; i < len(conds); i++ {
@@ -1142,6 +1236,39 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Errorf("file filter failed: %v", err)
 		}
 		s.stack.Push(res)
+	case OpPushNumber:
+		s.debugSubLog(">> peek")
+		vs := s.stack.Peek()
+		if vs == nil {
+			return utils.Wrapf(CriticalError, "BUG: pushNumber: stack top is empty")
+		}
+		val := vs.NewConst(i.UnaryInt)
+		if !val.IsEmpty() {
+			s.debugSubLog(">> push: %v", ValuesLen(val))
+			s.stack.Push(val)
+		}
+	case OpPushBool:
+		s.debugSubLog(">> peek")
+		vs := s.stack.Peek()
+		if vs == nil {
+			return utils.Wrapf(CriticalError, "BUG: pushBool: stack top is empty")
+		}
+		val := vs.NewConst(i.UnaryBool)
+		if !val.IsEmpty() {
+			s.debugSubLog(">> push: %v", ValuesLen(val))
+			s.stack.Push(val)
+		}
+	case OpPushString:
+		s.debugSubLog(">> peek")
+		vs := s.stack.Peek()
+		if vs == nil {
+			return utils.Wrapf(CriticalError, "BUG: pushString: stack top is empty")
+		}
+		val := vs.NewConst(i.UnaryStr)
+		if !val.IsEmpty() {
+			s.debugSubLog(">> push: %v", ValuesLen(val))
+			s.stack.Push(val)
+		}
 	default:
 		msg := fmt.Sprintf("unhandled default case, undefined opcode %v", i.String())
 		return utils.Wrap(CriticalError, msg)
