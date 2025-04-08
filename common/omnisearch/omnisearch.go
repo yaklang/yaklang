@@ -100,6 +100,7 @@ func (s *OmniSearchClient) Search(query string, options ...ostype.SearchOption) 
 		return nil, fmt.Errorf("未找到搜索引擎")
 	}
 
+	config := ostype.NewSearchConfig(newOptions...)
 	// 执行搜索并返回结果
-	return searcher.Search(query, newOptions...)
+	return searcher.Search(query, config)
 }
