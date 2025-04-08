@@ -121,36 +121,36 @@ func (c *Cache) _getByVariableEx(
 ) []Instruction {
 	var ins []Instruction
 	if mod&ssadb.ConstType != 0 {
-		for _, instruction := range c.constCache {
+		c.constCache.ForEach(func(s string, instruction Instruction) {
 			value, b := ToValue(instruction)
 			if b && checkValue(value.String()) {
 				ins = append(ins, instruction)
 			}
-		}
+		})
 		return ins
 	}
 	if mod&ssadb.KeyMatch != 0 {
 		// search all instruction
-		for member, insts := range c.MemberCache {
-			if checkValue(member) {
-				ins = append(ins, insts...)
+		c.MemberCache.ForEach(func(s string, instruction Instruction) {
+			if checkValue(s) {
+				ins = append(ins, instruction)
 			}
-		}
+		})
 	}
 	if mod&ssadb.NameMatch != 0 {
 		// search in variable cache
-		for name, insts := range c.VariableCache {
-			if checkValue(name) {
-				ins = append(ins, insts...)
+		c.VariableCache.ForEach(func(s string, instruction Instruction) {
+			if checkValue(s) {
+				ins = append(ins, instruction)
 			}
-		}
+		})
 
 		// search in class instance
-		for name, insts := range c.Class2InstIndex {
-			if checkValue(name) {
-				ins = append(ins, insts...)
+		c.Class2InstIndex.ForEach(func(s string, instruction Instruction) {
+			if checkValue(s) {
+				ins = append(ins, instruction)
 			}
-		}
+		})
 	}
 	return ins
 }
