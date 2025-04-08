@@ -1101,9 +1101,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 					if len(result) > 0 {
 						current = []byte(result[0])
 					}
-					taskInfo.Request = current
 				}
-
+				taskInfo.Request = current
 				if handleRequestModified(current) {
 					setModifiedRequest("user", current)
 				}
