@@ -1,0 +1,160 @@
+// Package aiforge 提供了AI Forge的核心功能，用于构建和配置AI助手
+package aiforge
+
+import (
+	_ "embed"
+	"encoding/json"
+	"fmt"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+)
+
+//go:embed forgeprompts/forge.txt
+var forgeTemplate string
+
+// ForgeBlueprint 定义了AI Forge的蓝图结构，包含配置AI助手所需的所有元素
+type ForgeBlueprint struct {
+	// InitializePrompt 是AI助手初始化时使用的提示词，用于设置AI的基本行为和知识
+	InitializePrompt string
+
+	// PersistentPrompt 是在AI助手整个会话过程中持续存在的提示词，用于维持AI的行为一致性
+	PersistentPrompt string
+
+	// Tools 是AI助手可以使用的工具列表，这些工具可以扩展AI的能力
+	Tools []*aitool.Tool
+
+	// ParameterRuleYaklangCode 是原始的Yaklang CLI代码，用于AI理解和操作Yaklang环境
+	// 不执行这段代码，只通过代码生成表单
+	ParameterRuleYaklangCode string
+}
+
+// Option 是一个函数类型，用于实现选项模式来配置ForgeBlueprint
+type Option func(*ForgeBlueprint)
+
+// WithInitializePrompt 设置AI助手的初始化提示词
+// 这个提示词会在AI助手启动时被使用，用于定义AI的初始状态和行为
+func WithInitializePrompt(prompt string) Option {
+	return func(f *ForgeBlueprint) {
+		f.InitializePrompt = prompt
+	}
+}
+
+// WithPersistentPrompt 设置AI助手的持久提示词
+// 这个提示词会在整个会话过程中持续存在，确保AI行为的一致性
+func WithPersistentPrompt(persistentPrompt string) Option {
+	return func(f *ForgeBlueprint) {
+		f.PersistentPrompt = persistentPrompt
+	}
+}
+
+// WithTools 为AI助手添加可用的工具
+// 这些工具可以扩展AI的能力，使其能够执行特定的任务
+func WithTools(tools ...*aitool.Tool) Option {
+	return func(f *ForgeBlueprint) {
+		f.Tools = append(f.Tools, tools...)
+	}
+}
+
+// WithOriginYaklangCliCode 设置原始的Yaklang CLI代码
+// 这个结构需要 Yak 引擎根据 CLI 代码构建出正确的用户需要输入的工具
+// 这个结构是表单构建的核心依据，可以使用 Yak 原声插件基础设施直接构建表单
+func WithOriginYaklangCliCode(originYaklangCliCode string) Option {
+	return func(f *ForgeBlueprint) {
+		f.ParameterRuleYaklangCode = originYaklangCliCode
+	}
+}
+
+// GenerateParameter
+func (f *ForgeBlueprint) GenerateParameter() *ypb.YaklangInspectInformationResponse {
+	prog, err := static_analyzer.SSAParse(f.ParameterRuleYaklangCode, "yak")
+	if err != nil {
+		log.Errorf("parse yaklang code failed: %v", err)
+		return nil
+	}
+	cliInfo, uiInfo, pluginEnvKey := information.ParseCliParameter(prog)
+	ret := &ypb.YaklangInspectInformationResponse{
+		CliParameter: cliParam2grpc(cliInfo),
+		UIInfo:       uiInfo2grpc(uiInfo),
+		PluginEnvKey: pluginEnvKey,
+	}
+	return ret
+}
+
+// GenerateFirstPromptWithMemoryOption 用户根据 Origin
+func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
+	params []*ypb.ExecParamItem,
+) (string, func(any) error, error) {
+	return "", nil, nil
+}
+
+func cliParam2grpc(params []*information.CliParameter) []*ypb.YakScriptParam {
+	ret := make([]*ypb.YakScriptParam, 0, len(params))
+
+	for _, param := range params {
+		defaultValue := ""
+		if param.Default != nil {
+			defaultValue = fmt.Sprintf("%v", param.Default)
+		}
+		extra := []byte{}
+		if param.Type == "select" {
+			paramSelect := &PluginParamSelect{
+				Double: param.MultipleSelect,
+				Data:   make([]PluginParamSelectData, 0),
+			}
+			param.SelectOption.ForEach(func(k string, v any) {
+				paramSelect.Data = append(paramSelect.Data, PluginParamSelectData{
+					Key:   k,
+					Label: k,
+					Value: codec.AnyToString(v),
+				})
+			})
+			extra, _ = json.Marshal(paramSelect)
+		}
+
+		ret = append(ret, &ypb.YakScriptParam{
+			Field:                    param.Name,
+			DefaultValue:             string(defaultValue),
+			TypeVerbose:              param.Type,
+			FieldVerbose:             param.NameVerbose,
+			Help:                     param.Help,
+			Required:                 param.Required,
+			Group:                    param.Group,
+			SuggestionDataExpression: param.SuggestionValueExpression,
+			ExtraSetting:             string(extra),
+			MethodType:               param.MethodType,
+			JsonSchema:               param.JsonSchema,
+			UISchema:                 param.UISchema,
+		})
+	}
+
+	return ret
+}
+
+func uiInfo2grpc(info []*information.UIInfo) []*ypb.YakUIInfo {
+	ret := make([]*ypb.YakUIInfo, 0, len(info))
+	for _, i := range info {
+		ret = append(ret, &ypb.YakUIInfo{
+			Typ:            i.Typ,
+			Effected:       i.Effected,
+			WhenExpression: i.WhenExpression,
+		})
+	}
+	return ret
+}
+
+type PluginParamSelect struct {
+	Double bool                    `json:"double"`
+	Data   []PluginParamSelectData `json:"data"`
+}
+
+type PluginParamSelectData struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
+	Value string `json:"value"`
+}
