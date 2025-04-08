@@ -1685,9 +1685,8 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 			return obj, call
 		}
 		obj.SetType(class)
-		args := []ssa.Value{obj}
-		arguments := y.VisitClassCreatorRest(ret, className)
-		args = append(args, arguments...)
+		//args := []ssa.Value{obj}
+		args := y.VisitClassCreatorRest(ret, className)
 		return nil, y.ClassConstructor(class, args)
 		//return obj, y.EmitCall(y.NewCall(constructor, args))
 	}
