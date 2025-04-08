@@ -3,7 +3,7 @@ package ssaapi
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"regexp"
 
 	"golang.org/x/exp/slices"
