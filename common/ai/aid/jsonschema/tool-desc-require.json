@@ -1,0 +1,16 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": ["tool", "@action"],
+    "additionalProperties": false,
+    "properties": {
+        "@action": {
+            "const": "require-tool",
+            "description": "标识当前操作的具体类型"
+        },
+        "tool": {
+            "type": "string",
+            "description": "您想要了解具体参数的工具名"
+        }
+    }
+}

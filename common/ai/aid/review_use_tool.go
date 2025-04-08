@@ -41,35 +41,31 @@ var ToolUseReviewSuggestions = []*ToolUseReviewSuggestion{
 	},
 }
 
-func (t *aiTask) handleToolUseReview(param aitool.InvokeParams) error {
+func (t *aiTask) handleToolUseReview(targetTools *aitool.Tool, param aitool.InvokeParams, userInput aitool.InvokeParams) (*aitool.Tool, aitool.InvokeParams, error) {
 	// 1. 获取审查建议
-	suggestion := param.GetString("suggestion")
+	suggestion := userInput.GetString("suggestion")
 	if suggestion == "" {
-		return utils.Error("suggestion is empty")
+		return targetTools, param, utils.Error("suggestion is empty")
 	}
+	//extraPrompt := userInput.GetString("extra_prompt", "prompt")
 
 	// 2. 根据审查建议处理
 	switch suggestion {
 	case "wrong_tool":
 		t.config.EmitInfo("wrong tool used")
-		// 重新选择工具
-		t.rerun = true
-		// 可以在这里添加工具选择的逻辑
-
+		// todo
+		return targetTools, param, nil
 	case "wrong_params":
 		t.config.EmitInfo("wrong parameters used")
-		// 重新执行任务，但使用新的参数
-		t.rerun = true
-		// 可以在这里添加参数调整的逻辑
-
+		// todo
+		return targetTools, param, nil
 	case "continue":
 		t.config.EmitInfo("tool usage is correct, continue")
 		// 继续执行现有任务
-		return nil
+		return targetTools, param, nil
 
 	default:
 		t.config.EmitError("unknown review suggestion: %s", suggestion)
-		return utils.Errorf("unknown review suggestion: %s", suggestion)
+		return targetTools, param, utils.Errorf("unknown review suggestion: %s", suggestion)
 	}
-	return nil
 }

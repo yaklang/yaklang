@@ -2,6 +2,7 @@ package aid
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"io"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -48,13 +49,15 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...Opt
 		config:    config,
 		userInput: userInput,
 	}
+	config.memory.StoreQuery(c.userInput)
+	config.memory.StoreTools(func() []*aitool.Tool {
+		return config.tools
+	})
 	return c, nil
 }
 
 func (c *Coordinator) Run() error {
 	c.config.EmitInfo("start to create plan request")
-	memory := c.config.memory
-	memory.Query = c.userInput
 	planReq, err := c.createPlanRequest(c.userInput)
 	if err != nil {
 		c.config.EmitError("create planRequest failed: %v", err)
@@ -98,6 +101,7 @@ func (c *Coordinator) Run() error {
 	// init aiTask
 	// check tools
 	root := rsp.RootTask
+	c.config.memory.StoreRootTask(root)
 	if len(root.Subtasks) <= 0 {
 		c.config.EmitError("no subtasks found, this task is not a valid task")
 		return utils.Errorf("coordinator: no subtasks found")

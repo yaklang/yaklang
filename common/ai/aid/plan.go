@@ -59,7 +59,6 @@ func (pr *planRequest) GenerateFirstPlanPrompt() (string, error) {
 
 	// 准备模板数据
 	data := map[string]interface{}{
-		"Schema":   pr.config.schemaJson,
 		"Memory":   pr.config.memory,
 		"MetaInfo": "",
 	}

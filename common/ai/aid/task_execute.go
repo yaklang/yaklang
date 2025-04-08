@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"text/template"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 
@@ -60,21 +61,46 @@ func (t *aiTask) getToolResultAction(response string) string {
 	return "unknown"
 }
 
-func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, action string, err error) {
+func (t *aiTask) toolChoose() (*aitool.Tool, error) {
+	_prompt, err := t.generateTaskPrompt()
+	if err != nil {
+		log.Errorf("error generating aiTask prompt: %v", err)
+		return nil, err
+	}
+
+	req := NewAIRequest(_prompt)
+	responseReader, err := t.callAI(req)
+	if err != nil {
+		return nil, fmt.Errorf("error calling AI: %w", err)
+	}
+	responseBytes, err := io.ReadAll(responseReader.GetOutputStreamReader("execute", false, t.config))
+	if err != nil {
+		return nil, fmt.Errorf("error reading AI response: %w", err)
+	}
+	response := string(responseBytes)
+	toolRequired := t.getToolRequired(response)
+	if len(toolRequired) == 0 {
+		return nil, nil
+	}
+	targetTool := toolRequired[0]
+	return targetTool, nil
+}
+
+func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, err error) {
 	t.config.EmitInfo("start to generate tool[%v] params in task:%#v", targetTool.Name, t.Name)
 	// 生成申请工具详细描述的prompt
 	paramsPrompt, err := t.generateRequireToolResponsePrompt(targetTool, targetTool.Name)
 	if err != nil {
 		err = utils.Errorf("error generate require tool response prompt: %v", err)
 		t.config.EmitError("error generate require tool response prompt: %v", err)
-		return nil, "", NewNonRetryableTaskStackError(err)
+		return nil, NewNonRetryableTaskStackError(err)
 	}
 	// 调用AI获取工具调用参数
 	req := NewAIRequest(paramsPrompt)
 	callParams, err := t.callAI(req)
 	if err != nil || callParams == nil {
 		err = utils.Errorf("error calling AI: %v", err)
-		return nil, "", NewNonRetryableTaskStackError(err)
+		return nil, NewNonRetryableTaskStackError(err)
 	}
 	callParamsString, _ := io.ReadAll(callParams.GetOutputStreamReader("call-tools", true, t.config))
 
@@ -83,7 +109,7 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, a
 	if err != nil {
 		t.config.EmitError("error extract tool params: %v", err)
 		err = utils.Errorf("error extracting action params: %v", err)
-		return nil, "", err
+		return nil, err
 	}
 	callToolParams := callToolAction.GetInvokeParams("params")
 
@@ -107,52 +133,56 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, a
 	t.config.memory.StoreInteractiveUserInput(ep.id, params)
 	if params == nil {
 		t.config.EmitError("user review params is nil, plan failed")
-		return nil, "", NewNonRetryableTaskStackError(utils.Errorf("user review params is nil"))
+		return nil, NewNonRetryableTaskStackError(utils.Errorf("user review params is nil"))
 	}
-	err = t.handleToolUseReview(params)
+	targetTool, callToolParams, err = t.handleToolUseReview(targetTool, callToolParams, params)
 	if err != nil {
 		t.config.EmitError("error handling tool use review: %v", err)
-		return nil, "", NewNonRetryableTaskStackError(err)
+		return nil, NewNonRetryableTaskStackError(err)
 	}
 
 	t.config.EmitInfo("start to execute tool:%v ", targetTool.Name)
 	toolResult, err := targetTool.InvokeWithParams(callToolParams, aitool.WithStdout(stdoutBuf), aitool.WithStderr(stderrBuf))
 	if err != nil {
 		err = utils.Errorf("error invoking tool: %v", err)
-		return nil, "", NewNonRetryableTaskStackError(err)
+		return nil, NewNonRetryableTaskStackError(err)
 	}
 
 	t.config.EmitInfo("start to generate and feedback tool[%v] result in task:%#v", targetTool.Name, t.Name)
 	// 生成调用工具结果的prompt
-	decisionPrompt, err := t.generateToolCallResponsePrompt(toolResult, targetTool)
+
+	return toolResult, nil
+}
+
+func (t *aiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitool.Tool) (string, error) {
+	decisionPrompt, err := t.generateToolCallResponsePrompt(result, targetTool)
 	if err != nil {
 		err = utils.Errorf("error generating tool call response prompt: %v", err)
-		return nil, "", NewNonRetryableTaskStackError(err)
+		return "", NewNonRetryableTaskStackError(err)
 	}
 	// 调用AI进行下一步决策
-	req = NewAIRequest(decisionPrompt)
+	req := NewAIRequest(decisionPrompt)
 	continueResult, err := t.callAI(req)
 	if err != nil {
 		err = utils.Errorf("error calling AI: %v", err)
-		return nil, "", NewNonRetryableTaskStackError(err)
+		return "", NewNonRetryableTaskStackError(err)
 	}
 	nextResponse, err := io.ReadAll(continueResult.GetOutputStreamReader("decision", true, t.config))
 	if err != nil {
 		err = utils.Errorf("error reading AI response: %v", err)
-		return nil, "", NewNonRetryableTaskStackError(err)
+		return "", NewNonRetryableTaskStackError(err)
 	}
 
 	// 获取下一步决策
-	action = t.getToolResultAction(string(nextResponse))
+	action := t.getToolResultAction(string(nextResponse))
 	if action != "" {
 		t.config.EmitInfo("tool[%v] and next do the action: %v", targetTool.Name, action)
 	}
-	return toolResult, action, nil
+	return action, nil
 }
 
-// executeTask 实际执行任务并返回结果
-func (t *aiTask) executeTask() error {
-	t.config.memory.SetCurrentTask(t)
+func (t *aiTask) execute() error {
+	t.config.memory.StoreCurrentTask(t)
 	// 生成初始执行任务的prompt
 	prompt, err := t.generateTaskPrompt()
 	if err != nil {
@@ -191,12 +221,18 @@ TOOLREQUIRED:
 		}
 
 		targetTool := toolRequired[0]
-		result, action, err := t.callTool(targetTool)
+		result, err := t.callTool(targetTool)
 		if err != nil {
 			t.config.EmitError("error calling tool: %v", err)
 			return err
 		}
 		t.PushToolCallResult(result)
+
+		action, err := t.toolResultDecision(result, targetTool)
+		if err != nil {
+			t.config.EmitError("error calling tool: %v", err)
+			return err
+		}
 
 		switch action {
 		case "require-more-tool":
@@ -235,7 +271,7 @@ TOOLREQUIRED:
 
 	t.config.EmitInfo("start to execute task-summary action")
 	// 处理总结回调
-	summaryPromptWellFormed, err := GenerateTaskSummaryPrompt(aispec.DetailsToString(chatDetails))
+	summaryPromptWellFormed, err := t.GenerateTaskSummaryPrompt(aispec.DetailsToString(chatDetails))
 	if err != nil {
 		t.config.EmitError("error generating summary prompt: %v", err)
 		return fmt.Errorf("error generating summary prompt: %w", err)
@@ -277,7 +313,14 @@ TOOLREQUIRED:
 	t.TaskSummary = taskSummary
 	t.ShortSummary = shortSummary
 	t.LongSummary = longSummary
+	return nil
+}
 
+// executeTask 实际执行任务并返回结果
+func (t *aiTask) executeTask() error {
+	if err := t.execute(); err != nil {
+		return err
+	}
 	// start to wait for user review
 	ep := t.config.epm.createEndpoint()
 	ep.SetDefaultSuggestionContinue()
@@ -294,10 +337,23 @@ TOOLREQUIRED:
 	reviewResult := ep.GetParams()
 	t.config.memory.StoreInteractiveUserInput(ep.id, reviewResult)
 	t.config.EmitInfo("start to handle review task event: %v", ep.id)
-	err = t.handleReviewResult(reviewResult)
+	err := t.handleReviewResult(reviewResult)
 	if err != nil {
 		log.Warnf("error handling review result: %v", err)
 	}
 
 	return nil
+}
+
+func (t *aiTask) GenerateTaskSummaryPrompt(text string) (string, error) {
+	summaryTemplate := template.Must(template.New("summary").Parse(__prompt_TaskSummary))
+	var buf bytes.Buffer
+	err := summaryTemplate.Execute(&buf, map[string]any{
+		"Text":   text,
+		"Memory": t.config.memory,
+	})
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }

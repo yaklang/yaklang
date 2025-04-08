@@ -98,7 +98,6 @@ func (p *planRequest) handleReviewPlanResponse(rsp *planResponse, param aitool.I
 
 // generateNewPlan 生成新的计划
 func (p *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp *planResponse) (*planResponse, error) {
-
 	tmpl, err := template.New("plan-review").Parse(planReviewPrompts)
 	if err != nil {
 		return nil, utils.Errorf("error parsing plan review prompt: %v", err)
@@ -106,7 +105,7 @@ func (p *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp
 
 	data := map[string]any{
 		"Memory":         p.config.memory,
-		"Schema":         p.config.schemaJson,
+		"CurrentPlan":    rsp.RootTask,
 		"UserSuggestion": suggestion,
 		"ExtraPrompt":    extraPrompt,
 	}
