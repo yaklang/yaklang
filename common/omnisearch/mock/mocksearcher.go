@@ -13,9 +13,7 @@ func NewMockSearcher() *MockSearcher {
 	return &MockSearcher{}
 }
 
-func (m *MockSearcher) Search(query string, options ...ostype.SearchOption) (*ostype.OmniSearchResultList, error) {
-	config := ostype.NewSearchConfig(options...)
-
+func (m *MockSearcher) Search(query string, config *ostype.SearchConfig) (*ostype.OmniSearchResultList, error) {
 	if config.ApiKey == "" {
 		return nil, fmt.Errorf("api key is required")
 	}

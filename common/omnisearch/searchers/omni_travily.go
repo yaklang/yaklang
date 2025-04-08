@@ -13,8 +13,7 @@ func (c *OmniTavilySearchClient) GetType() ostype.SearcherType {
 	return ostype.SearcherTypeTavily
 }
 
-func (c *OmniTavilySearchClient) Search(query string, options ...ostype.SearchOption) (*ostype.OmniSearchResultList, error) {
-	config := ostype.NewSearchConfig(options...)
+func (c *OmniTavilySearchClient) Search(query string, config *ostype.SearchConfig) (*ostype.OmniSearchResultList, error) {
 	tavilyConfig := NewDefaultTavilyConfig()
 	if config.ApiKey != "" {
 		tavilyConfig.APIKey = config.ApiKey

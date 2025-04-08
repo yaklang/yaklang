@@ -26,6 +26,6 @@ type OmniSearchResultList struct {
 }
 
 type SearchClient interface {
-	Search(query string, options ...SearchOption) (*OmniSearchResultList, error)
+	Search(query string, config *SearchConfig) (*OmniSearchResultList, error)
 	GetType() SearcherType
 }
