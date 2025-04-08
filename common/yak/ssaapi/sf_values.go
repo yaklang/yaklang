@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"regexp"
 
 	"github.com/gobwas/glob"
@@ -236,4 +237,23 @@ func (vs Values) FileFilter(path string, match string, rule map[string]string, r
 		return nil, errs
 	}
 	return sfvm.NewValues(res), nil
+}
+
+func (v Values) NewConst(i any, rng ...memedit.RangeIf) sfvm.ValueOperator {
+	var result sfvm.ValueOperator
+	v.Recursive(func(operator sfvm.ValueOperator) error {
+		result = operator.NewConst(i, rng...)
+		return nil
+	})
+	return result
+}
+
+func (v Values) CompareConst(comparator *sfvm.ConstComparator) []bool {
+	var res []bool
+	v.Recursive(func(operator sfvm.ValueOperator) error {
+		result := operator.CompareConst(comparator)
+		res = append(res, result...)
+		return nil
+	})
+	return res
 }

@@ -2,6 +2,7 @@ package sfvm
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -30,6 +31,25 @@ func NewEmptyValues() ValueOperator {
 
 type ValueList struct {
 	Values []ValueOperator
+}
+
+func (v *ValueList) CompareConst(comparator *ConstComparator) []bool {
+	var res []bool
+	v.Recursive(func(operator ValueOperator) error {
+		result := operator.CompareConst(comparator)
+		res = append(res, result...)
+		return nil
+	})
+	return res
+}
+
+func (v *ValueList) NewConst(i any, rng ...memedit.RangeIf) ValueOperator {
+	var result ValueOperator
+	v.Recursive(func(operator ValueOperator) error {
+		result = operator.NewConst(i, rng...)
+		return nil
+	})
+	return result
 }
 
 func (v *ValueList) CompareOpcode(comparator *OpcodeComparator) (ValueOperator, []bool) {
