@@ -11,17 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
-const tavilyRequestTemplate = `POST /%s HTTP/1.1
-Host: api.tavily.com
-Content-Type: application/json
-Authorization: Bearer %s
-Accept: application/json
-Accept-Encoding: gzip
-User-Agent: Yaklang-TavilySearch/1.0
-Content-Length: %d
-
-%s`
-
 // SearchDepth defines the depth of search
 type SearchDepth string
 
@@ -147,7 +136,7 @@ func NewDefaultTavilyConfig() *TavilySearchConfig {
 	apiKey := os.Getenv("TAVILY_API_KEY")
 	return &TavilySearchConfig{
 		APIKey:          apiKey, // Get from environment variable or set explicitly
-		BaseURL:         "https://api.tavily.com",
+		BaseURL:         "https://api.tavily.com/search",
 		Timeout:         60,
 		MaxResults:      5,
 		DefaultTopic:    GeneralTopic,
@@ -242,19 +231,11 @@ func (t *TavilySearchClient) SearchWithCustomParams(query string, customParams *
 		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
 
-	// Create request packet
-	requestPacket := []byte(fmt.Sprintf(tavilyRequestTemplate,
-		"search",
-		t.Config.APIKey,
-		len(requestBody),
-		string(requestBody)))
-
 	// Prepare HTTP request options
 	opts := []lowhttp.LowhttpOpt{
 		lowhttp.WithHttps(isHttps),
 		lowhttp.WithHost(host),
 		lowhttp.WithTimeoutFloat(t.Config.Timeout),
-		lowhttp.WithPacketBytes(requestPacket),
 	}
 
 	// Add proxy if specified
@@ -262,117 +243,41 @@ func (t *TavilySearchClient) SearchWithCustomParams(query string, customParams *
 		opts = append(opts, lowhttp.WithProxy(t.Config.Proxy))
 	}
 
-	// Execute the HTTP request
-	resp, err := lowhttp.HTTP(opts...)
+	// Send request
+	raw, err := Request("POST", t.Config.BaseURL, map[string]string{
+		"Content-Type":    "application/json",
+		"Authorization":   "Bearer " + t.Config.APIKey,
+		"Accept":          "application/json",
+		"Accept-Encoding": "gzip",
+		"User-Agent":      "Yaklang-TavilySearch/1.0",
+	}, nil, requestBody, opts...)
+
 	if err != nil {
 		return nil, fmt.Errorf("search request failed: %v", err)
 	}
 
-	// Check response status code
-	statusCode := resp.GetStatusCode()
+	statusCode := lowhttp.GetStatusCodeFromResponse(raw)
+	body := lowhttp.GetHTTPPacketBody(raw)
 	if statusCode != 200 {
 		// Handle specific error cases
 		switch statusCode {
 		case 400:
-			return nil, fmt.Errorf("bad request: %s", string(resp.GetBody()))
+			return nil, fmt.Errorf("bad request: %s", string(body))
 		case 401:
-			return nil, fmt.Errorf("invalid API key: %s", string(resp.GetBody()))
+			return nil, fmt.Errorf("invalid API key: %s", string(body))
 		case 403, 432, 433:
-			return nil, fmt.Errorf("forbidden: %s", string(resp.GetBody()))
+			return nil, fmt.Errorf("forbidden: %s", string(body))
 		case 429:
-			return nil, fmt.Errorf("usage limit exceeded: %s", string(resp.GetBody()))
+			return nil, fmt.Errorf("usage limit exceeded: %s", string(body))
 		default:
-			return nil, fmt.Errorf("search request returned status code %d: %s", statusCode, string(resp.GetBody()))
+			return nil, fmt.Errorf("search request returned status code %d: %s", statusCode, string(body))
 		}
 	}
 
 	// Parse the response body
 	var result TavilySearchResponse
-	if err := json.Unmarshal(resp.GetBody(), &result); err != nil {
+	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse search results: %v", err)
-	}
-
-	return &result, nil
-}
-
-// Extract extracts content from the provided URLs
-func (t *TavilySearchClient) Extract(urls []string, includeImages bool, extractDepth SearchDepth) (*TavilyExtractResponse, error) {
-	if t.Config.APIKey == "" {
-		return nil, errors.New("tavily search api key is required")
-	}
-
-	// Create params
-	params := TavilyExtractParams{
-		URLs:          urls,
-		IncludeImages: includeImages,
-		ExtractDepth:  extractDepth,
-	}
-
-	// Parse the base URL
-	parsedURL, err := url.Parse(t.Config.BaseURL)
-	if err != nil {
-		return nil, fmt.Errorf("invalid base URL: %v", err)
-	}
-
-	host := parsedURL.Host
-
-	// Determine if HTTPS should be used
-	isHttps := strings.HasPrefix(t.Config.BaseURL, "https://")
-
-	// Marshal request body to JSON
-	requestBody, err := json.Marshal(params)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %v", err)
-	}
-
-	// Create request packet
-	requestPacket := []byte(fmt.Sprintf(tavilyRequestTemplate,
-		"extract",
-		t.Config.APIKey,
-		len(requestBody),
-		string(requestBody)))
-
-	// Prepare HTTP request options
-	opts := []lowhttp.LowhttpOpt{
-		lowhttp.WithHttps(isHttps),
-		lowhttp.WithHost(host),
-		lowhttp.WithTimeoutFloat(t.Config.Timeout),
-		lowhttp.WithPacketBytes(requestPacket),
-	}
-
-	// Add proxy if specified
-	if t.Config.Proxy != "" {
-		opts = append(opts, lowhttp.WithProxy(t.Config.Proxy))
-	}
-
-	// Execute the HTTP request
-	resp, err := lowhttp.HTTP(opts...)
-	if err != nil {
-		return nil, fmt.Errorf("extract request failed: %v", err)
-	}
-
-	// Check response status code
-	statusCode := resp.GetStatusCode()
-	if statusCode != 200 {
-		// Handle specific error cases
-		switch statusCode {
-		case 400:
-			return nil, fmt.Errorf("bad request: %s", string(resp.GetBody()))
-		case 401:
-			return nil, fmt.Errorf("invalid API key: %s", string(resp.GetBody()))
-		case 403, 432, 433:
-			return nil, fmt.Errorf("forbidden: %s", string(resp.GetBody()))
-		case 429:
-			return nil, fmt.Errorf("usage limit exceeded: %s", string(resp.GetBody()))
-		default:
-			return nil, fmt.Errorf("extract request returned status code %d: %s", statusCode, string(resp.GetBody()))
-		}
-	}
-
-	// Parse the response body
-	var result TavilyExtractResponse
-	if err := json.Unmarshal(resp.GetBody(), &result); err != nil {
-		return nil, fmt.Errorf("failed to parse extract results: %v", err)
 	}
 
 	return &result, nil

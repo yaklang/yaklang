@@ -11,15 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
-// Brave Search API request template with fixed formatting
-const braveRequestTemplate = `GET /res/v1/web/search?%s HTTP/1.1
-Host: api.search.brave.com
-Accept: application/json
-Accept-Encoding: gzip
-User-Agent: Yaklang-BraveSearch/1.0
-X-Subscription-Token: %s
-`
-
 // BraveSearchParams represents the query parameters for Brave Search API
 type BraveSearchParams struct {
 	Query           string   `json:"q"`                 // Required: Search query
@@ -255,58 +246,58 @@ func (b *BraveSearchClient) SearchWithCustomParams(query string, customParams *B
 	isHttps := strings.HasPrefix(b.Config.BaseURL, "https://")
 
 	// Build query string
-	values := url.Values{}
-	values.Add("q", params.Query)
+	queryMap := map[string]string{}
+	queryMap["q"] = params.Query
 
 	if params.Country != "" {
-		values.Add("country", params.Country)
+		queryMap["country"] = params.Country
 	}
 
 	if params.SearchLang != "" {
-		values.Add("search_lang", params.SearchLang)
+		queryMap["search_lang"] = params.SearchLang
 	}
 
 	if params.UILang != "" {
-		values.Add("ui_lang", params.UILang)
+		queryMap["ui_lang"] = params.UILang
 	}
 
 	if params.Count > 0 {
-		values.Add("count", strconv.Itoa(params.Count))
+		queryMap["count"] = strconv.Itoa(params.Count)
 	}
 
 	if params.Offset > 0 {
-		values.Add("offset", strconv.Itoa(params.Offset))
+		queryMap["offset"] = strconv.Itoa(params.Offset)
 	}
 
 	if params.SafeSearch != "" {
-		values.Add("safesearch", params.SafeSearch)
+		queryMap["safesearch"] = params.SafeSearch
 	}
 
 	if params.Freshness != "" {
-		values.Add("freshness", params.Freshness)
+		queryMap["freshness"] = params.Freshness
 	}
 
-	values.Add("text_decorations", strconv.FormatBool(params.TextDecorations))
-	values.Add("spellcheck", strconv.FormatBool(params.Spellcheck))
+	queryMap["text_decorations"] = strconv.FormatBool(params.TextDecorations)
+	queryMap["spellcheck"] = strconv.FormatBool(params.Spellcheck)
 
 	if params.ResultFilter != "" {
-		values.Add("result_filter", params.ResultFilter)
+		queryMap["result_filter"] = params.ResultFilter
 	}
 
 	for _, goggle := range params.Goggles {
-		values.Add("goggles", goggle)
+		queryMap["goggles"] = goggle
 	}
 
 	if params.Units != "" {
-		values.Add("units", params.Units)
+		queryMap["units"] = params.Units
 	}
 
 	if params.ExtraSnippets {
-		values.Add("extra_snippets", "true")
+		queryMap["extra_snippets"] = "true"
 	}
 
 	if params.Summary {
-		values.Add("summary", "true")
+		queryMap["summary"] = "true"
 	}
 
 	// Prepare HTTP request options
@@ -316,31 +307,34 @@ func (b *BraveSearchClient) SearchWithCustomParams(query string, customParams *B
 		lowhttp.WithTimeoutFloat(b.Config.Timeout),
 	}
 
-	// Create and add the request
-	queryString := values.Encode()
-	requestPacket := []byte(fmt.Sprintf(braveRequestTemplate, queryString, b.Config.APIKey))
-	opts = append(opts, lowhttp.WithPacketBytes(requestPacket))
-
 	// Add proxy if specified
 	if b.Config.Proxy != "" {
 		opts = append(opts, lowhttp.WithProxy(b.Config.Proxy))
 	}
 
-	// Execute the HTTP request
-	resp, err := lowhttp.HTTP(opts...)
+	// Send request
+	raw, err := Request("GET", b.Config.BaseURL, map[string]string{
+		"Accept":               "application/json",
+		"Accept-Encoding":      "gzip",
+		"User-Agent":           "Yaklang-BraveSearch/1.0",
+		"X-Subscription-Token": b.Config.APIKey,
+	}, queryMap, nil, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("search request failed: %v", err)
+		return nil, err
 	}
 
+	// Get response body
+	body := lowhttp.GetHTTPPacketBody(raw)
+
 	// Check response status code
-	statusCode := resp.GetStatusCode()
+	statusCode := lowhttp.GetStatusCodeFromResponse(raw)
 	if statusCode != 200 {
-		return nil, fmt.Errorf("search request returned status code %d: %s", statusCode, string(resp.GetBody()))
+		return nil, fmt.Errorf("search request returned status code %d: %s", statusCode, string(body))
 	}
 
 	// Parse the response body
 	var result BraveSearchResponse
-	if err := json.Unmarshal(resp.GetBody(), &result); err != nil {
+	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse search results: %v", err)
 	}
 
