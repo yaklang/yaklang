@@ -28,11 +28,11 @@ func TestCoordinator_ToolUseReview(t *testing.T) {
 				rsp.Close()
 			}()
 
-			if utils.MatchAllOfSubString(request.GetPrompt(), `当前任务: "扫描目录结构"`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-tool", "tool": "ls"}`))
-				return rsp, nil
-			} else if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: ls`, `"call-tool"`, "const") {
+			if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: ls`, `"call-tool"`, "const") {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "call-tool", "tool": "ls", "params": {"path": "/abc-target"}}`))
+				return rsp, nil
+			} else if utils.MatchAllOfSubString(request.GetPrompt(), `当前任务: "扫描目录结构"`) {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-tool", "tool": "ls"}`))
 				return rsp, nil
 			}
 
