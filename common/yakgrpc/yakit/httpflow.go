@@ -728,7 +728,9 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	} else if keywordType == "response" {
 		keywordFields = []string{"response"}
 	}
-
+	if params.GetKeyword() != "" {
+		params.Keyword = strings.Trim(strconv.Quote(params.Keyword), "\"")
+	}
 	db = bizhelper.FuzzSearchEx(db, keywordFields, params.GetKeyword(), false)
 	if len(params.GetExcludeKeywords()) > 0 {
 		for _, keyword := range params.GetExcludeKeywords() {
@@ -1177,45 +1179,4 @@ func QueryHTTPFlowsProcessNames(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (
 		s := item.String
 		return s, s != "" && item.Valid
 	}), nil
-}
-
-func QueryHTTPFlowsByRegexRequest(
-	db *gorm.DB,
-	ctx context.Context,
-	pattern string,
-	callBack func(int),
-	effectiveUrl ...string,
-) chan *schema.HTTPFlow {
-	db = db.Model(&schema.HTTPFlow{})
-	urlPattern := ""
-	if len(effectiveUrl) > 0 {
-		urlPattern = effectiveUrl[0]
-	}
-	if urlPattern == "" {
-		db = db.Where("request REGEXP ?", pattern)
-	} else {
-		db = db.Where("url REGEXP  ? AND request REGEXP ? ", urlPattern, pattern)
-	}
-
-	return YieldHTTPFlowsEx(db, ctx, callBack)
-}
-
-func QueryHTTPFlowsByRegexResponse(
-	db *gorm.DB,
-	ctx context.Context,
-	pattern string,
-	callBack func(int),
-	effectiveUrl ...string,
-) chan *schema.HTTPFlow {
-	db = db.Model(&schema.HTTPFlow{})
-	urlPattern := ""
-	if len(effectiveUrl) > 0 {
-		urlPattern = effectiveUrl[0]
-	}
-	if urlPattern == "" {
-		db = db.Where("response REGEXP ?", pattern)
-	} else {
-		db = db.Where("url REGEXP  ? AND response REGEXP ?  ", urlPattern, pattern)
-	}
-	return YieldHTTPFlowsEx(db, ctx, callBack)
 }
