@@ -22918,13 +22918,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -32056,8 +32056,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -46063,23 +46063,25 @@ func (x *SSARisk) GetDescription() string {
 }
 
 type SSARisksFilter struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ID            []int64                `protobuf:"varint,1,rep,packed,name=ID,proto3" json:"ID,omitempty"`
-	Search        string                 `protobuf:"bytes,2,opt,name=Search,proto3" json:"Search,omitempty"`
-	ProgramName   []string               `protobuf:"bytes,3,rep,name=ProgramName,proto3" json:"ProgramName,omitempty"`
-	CodeSourceUrl []string               `protobuf:"bytes,4,rep,name=CodeSourceUrl,proto3" json:"CodeSourceUrl,omitempty"`
-	RiskType      []string               `protobuf:"bytes,5,rep,name=RiskType,proto3" json:"RiskType,omitempty"`
-	Severity      []string               `protobuf:"bytes,6,rep,name=Severity,proto3" json:"Severity,omitempty"`
-	FromRule      []string               `protobuf:"bytes,7,rep,name=FromRule,proto3" json:"FromRule,omitempty"`
-	RuntimeID     []string               `protobuf:"bytes,8,rep,name=RuntimeID,proto3" json:"RuntimeID,omitempty"`
-	ResultID      []uint64               `protobuf:"varint,9,rep,packed,name=ResultID,proto3" json:"ResultID,omitempty"`
-	Tags          []string               `protobuf:"bytes,10,rep,name=Tags,proto3" json:"Tags,omitempty"`
-	IsRead        int64                  `protobuf:"varint,11,opt,name=IsRead,proto3" json:"IsRead,omitempty"` // >0 true  <0 false =0 all
-	Title         string                 `protobuf:"bytes,12,opt,name=Title,proto3" json:"Title,omitempty"`    // fuzz search
-	Hash          []string               `protobuf:"bytes,13,rep,name=Hash,proto3" json:"Hash,omitempty"`
-	FunctionName  []string               `protobuf:"bytes,14,rep,name=FunctionName,proto3" json:"FunctionName,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ID              []int64                `protobuf:"varint,1,rep,packed,name=ID,proto3" json:"ID,omitempty"`
+	Search          string                 `protobuf:"bytes,2,opt,name=Search,proto3" json:"Search,omitempty"`
+	ProgramName     []string               `protobuf:"bytes,3,rep,name=ProgramName,proto3" json:"ProgramName,omitempty"`
+	CodeSourceUrl   []string               `protobuf:"bytes,4,rep,name=CodeSourceUrl,proto3" json:"CodeSourceUrl,omitempty"`
+	RiskType        []string               `protobuf:"bytes,5,rep,name=RiskType,proto3" json:"RiskType,omitempty"`
+	Severity        []string               `protobuf:"bytes,6,rep,name=Severity,proto3" json:"Severity,omitempty"`
+	FromRule        []string               `protobuf:"bytes,7,rep,name=FromRule,proto3" json:"FromRule,omitempty"`
+	RuntimeID       []string               `protobuf:"bytes,8,rep,name=RuntimeID,proto3" json:"RuntimeID,omitempty"`
+	ResultID        []uint64               `protobuf:"varint,9,rep,packed,name=ResultID,proto3" json:"ResultID,omitempty"`
+	Tags            []string               `protobuf:"bytes,10,rep,name=Tags,proto3" json:"Tags,omitempty"`
+	IsRead          int64                  `protobuf:"varint,11,opt,name=IsRead,proto3" json:"IsRead,omitempty"` // >0 true  <0 false =0 all
+	Title           string                 `protobuf:"bytes,12,opt,name=Title,proto3" json:"Title,omitempty"`    // fuzz search
+	Hash            []string               `protobuf:"bytes,13,rep,name=Hash,proto3" json:"Hash,omitempty"`
+	FunctionName    []string               `protobuf:"bytes,14,rep,name=FunctionName,proto3" json:"FunctionName,omitempty"`
+	BeforeCreatedAt int64                  `protobuf:"varint,15,opt,name=BeforeCreatedAt,proto3" json:"BeforeCreatedAt,omitempty"`
+	AfterCreatedAt  int64                  `protobuf:"varint,16,opt,name=AfterCreatedAt,proto3" json:"AfterCreatedAt,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *SSARisksFilter) Reset() {
@@ -46208,6 +46210,20 @@ func (x *SSARisksFilter) GetFunctionName() []string {
 		return x.FunctionName
 	}
 	return nil
+}
+
+func (x *SSARisksFilter) GetBeforeCreatedAt() int64 {
+	if x != nil {
+		return x.BeforeCreatedAt
+	}
+	return 0
+}
+
+func (x *SSARisksFilter) GetAfterCreatedAt() int64 {
+	if x != nil {
+		return x.AfterCreatedAt
+	}
+	return 0
 }
 
 type QuerySSARisksRequest struct {
@@ -52794,7 +52810,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\fFunctionName\x18\x1a \x01(\tR\fFunctionName\x12\x12\n" +
 	"\x04Line\x18\x1b \x01(\x03R\x04Line\x12\x1a\n" +
 	"\bSolution\x18\x1c \x01(\tR\bSolution\x12 \n" +
-	"\vDescription\x18\x1d \x01(\tR\vDescription\"\x88\x03\n" +
+	"\vDescription\x18\x1d \x01(\tR\vDescription\"\xda\x03\n" +
 	"\x0eSSARisksFilter\x12\x0e\n" +
 	"\x02ID\x18\x01 \x03(\x03R\x02ID\x12\x16\n" +
 	"\x06Search\x18\x02 \x01(\tR\x06Search\x12 \n" +
@@ -52810,7 +52826,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06IsRead\x18\v \x01(\x03R\x06IsRead\x12\x14\n" +
 	"\x05Title\x18\f \x01(\tR\x05Title\x12\x12\n" +
 	"\x04Hash\x18\r \x03(\tR\x04Hash\x12\"\n" +
-	"\fFunctionName\x18\x0e \x03(\tR\fFunctionName\"p\n" +
+	"\fFunctionName\x18\x0e \x03(\tR\fFunctionName\x12(\n" +
+	"\x0fBeforeCreatedAt\x18\x0f \x01(\x03R\x0fBeforeCreatedAt\x12&\n" +
+	"\x0eAfterCreatedAt\x18\x10 \x01(\x03R\x0eAfterCreatedAt\"p\n" +
 	"\x14QuerySSARisksRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +

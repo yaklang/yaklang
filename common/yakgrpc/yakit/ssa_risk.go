@@ -4,6 +4,7 @@ import (
 	"context"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
@@ -198,6 +199,13 @@ func FilterSSARisk(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
 	}, filter.GetSearch(), false)
 	if filter.GetIsRead() != 0 {
 		db = bizhelper.QueryByBool(db, "is_read", filter.GetIsRead() > 0)
+	}
+	if filter.GetAfterCreatedAt() > 0 {
+		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "created_at", filter.GetAfterCreatedAt(), time.Now().Add(10*time.Minute).Unix())
+	}
+
+	if filter.GetBeforeCreatedAt() > 0 {
+		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "created_at", 0, filter.GetBeforeCreatedAt())
 	}
 	return db
 }
