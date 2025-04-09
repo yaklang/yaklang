@@ -13,7 +13,7 @@ jobs:
 
   test:
     name: Load CVE Database
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Check out code into the Go module directory
@@ -21,8 +21,6 @@ jobs:
 
       - name: Dependence
         run: |
-          sudo apt-get update
-          sudo apt-get install libpcap-dev wget
           wget -q -O './yak' https://aliyun-oss.yaklang.com/yak/1.3.7-beta3/yak_linux_amd64 && chmod +x ./yak
 
       - name: LoadCVE-Description
