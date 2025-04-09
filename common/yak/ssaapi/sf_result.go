@@ -59,7 +59,7 @@ func CreateResultWithProg(prog *Program, res *sfvm.SFFrameResult) *SyntaxFlowRes
 
 func (r *SyntaxFlowResult) setMemoryResult(res *sfvm.SFFrameResult) {
 	r.memResult = res
-	res.SymbolTable.Map(func(s string, vo sfvm.ValueOperator) (string, sfvm.ValueOperator, error) {
+	res.SymbolTable = res.SymbolTable.Map(func(s string, vo sfvm.ValueOperator) (string, sfvm.ValueOperator, error) {
 		values := SyntaxFlowVariableToValues(vo)
 		sort.Slice(values, func(i, j int) bool {
 			// sort by file
