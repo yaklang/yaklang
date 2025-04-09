@@ -121,13 +121,8 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 	case *javaparser.MemberCallExpressionContext:
 		// 处理成员调用表达式，如通过点操作符访问成员
 		objName := ret.Expression().GetText()
-		obj := ssa.Value(nil)
 		bp := y.GetBluePrint(objName)
-		if bp != nil {
-			obj = bp.Container()
-		} else {
-			obj = y.VisitExpression(ret.Expression())
-		}
+		obj := y.VisitExpression(ret.Expression())
 		if utils.IsNil(obj) {
 			return y.EmitUndefined(raw.GetText())
 		}

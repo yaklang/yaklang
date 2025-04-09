@@ -12,7 +12,7 @@ TEXT
 
 // annotation method' formal params.
 
-$start(*?{opcode: param && !have: this} as $formalParams);
+//$start(*?{opcode: param && !have: this} as $formalParams);
 $start<getFormalParams>?{opcode: param && !have: this} as $formalParams
 
 // fetching getParameter
