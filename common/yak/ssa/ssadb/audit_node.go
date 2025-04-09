@@ -16,6 +16,7 @@ type AuditNodeStatus struct {
 	ResultVariable string `json:"result_variable" gorm:"index"` // syntaxflow result variable name
 	ResultIndex    uint   `json:"result_index" gorm:"index"`
 	ResultAlertMsg string `json:"result_alert_msg"`
+	RiskHash       string `json:"risk_hash"`
 	// rule  info
 	RuleName  string `json:"rule_name" gorm:"index"`
 	RuleTitle string `json:"rule_title"`
@@ -43,7 +44,7 @@ type AuditNode struct {
 
 type ResultVariable struct {
 	Name     string `json:"result_variable"`
-	Alert    string `json:"alert"`
+	RiskHash string   `json:"risk_hash"`
 	ValueNum int    `json:"num"`
 }
 
@@ -52,8 +53,8 @@ func GetResultVariableByID(db *gorm.DB, resultID uint) ([]*ResultVariable, error
 	var items []*ResultVariable
 	db = db.Model(&AuditNode{}).
 		Where("result_id = ? and is_entry_node = ?", resultID, true).
-		Select("result_variable, result_alert_msg, count(ir_code_id) as num").
-		Group("result_variable, result_alert_msg")
+		Select("result_variable, risk_hash, count(ir_code_id) as num").
+		Group("result_variable, risk_hash")
 	row, err := db.Rows()
 	if err != nil {
 		return nil, err
@@ -63,7 +64,7 @@ func GetResultVariableByID(db *gorm.DB, resultID uint) ([]*ResultVariable, error
 	for row.Next() {
 		var item ResultVariable
 		// var tmp time.Time
-		if err := row.Scan(&item.Name, &item.Alert, &item.ValueNum); err != nil {
+		if err := row.Scan(&item.Name, &item.RiskHash, &item.ValueNum); err != nil {
 			log.Errorf("scan failed: %s", err)
 			continue
 		}

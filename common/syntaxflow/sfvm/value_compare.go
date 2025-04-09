@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/gobwas/glob"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
@@ -44,7 +43,7 @@ func (c *StringComparator) Matches(targets ...string) bool {
 	if c == nil {
 		return false
 	}
-	log.Info("StringComparator Matches", c.Conditions, targets)
+	// log.Info("StringComparator Matches", c.Conditions, targets)
 	switch c.MatchMode {
 	case MatchHaveAny:
 		for _, condition := range c.Conditions {

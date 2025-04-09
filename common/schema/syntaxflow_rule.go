@@ -3,6 +3,7 @@ package schema
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -148,6 +149,13 @@ type SyntaxFlowDescInfo struct {
 	CVE       string `json:"cve"`
 	RiskType  string
 	ExtraInfo map[string]string `json:"extra_info"`
+}
+
+func (info *SyntaxFlowDescInfo) String() string {
+	if info.OnlyMsg {
+		return info.Msg
+	}
+	return fmt.Sprintf("%s: %s", info.Title, info.Description)
 }
 
 type SyntaxFlowRule struct {
