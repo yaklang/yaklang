@@ -229,3 +229,21 @@ func (r *SyntaxFlowResult) getRisk(name string) *schema.SSARisk {
 	}
 	return nil
 }
+
+func (r *SyntaxFlowResult) YieldRisk() chan *schema.SSARisk {
+	ch := make(chan *schema.SSARisk)
+	go func() {
+		defer close(ch)
+		r.GetAlertVariables()
+		r.GetAlertValues().ForEach(func(variable string, v Values) bool {
+			for index := range v {
+				risk := r.GetRiskByValue(variable, index)
+				if risk != nil {
+					ch <- risk
+				}
+			}
+			return true
+		})
+	}()
+	return ch
+}
