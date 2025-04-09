@@ -1,6 +1,7 @@
 package yakgrpc
 
 import (
+	"context"
 	"strings"
 
 	"github.com/google/uuid"
@@ -16,6 +17,16 @@ type SyntaxFlowScanTaskConfig struct {
 }
 
 func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
+	return syntaxFlowScan(stream)
+}
+
+type SyntaxFlowScanStream interface {
+	Recv() (*ypb.SyntaxFlowScanRequest, error)
+	Send(*ypb.SyntaxFlowScanResponse) error
+	Context() context.Context
+}
+
+func syntaxFlowScan(stream SyntaxFlowScanStream) error {
 	config, err := stream.Recv()
 	if err != nil {
 		return err
@@ -83,4 +94,64 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 		m.SaveTask()
 		return utils.Error("client canceled")
 	}
+}
+
+type syntaxFlowScanStreamImpl struct {
+	ctx    context.Context
+	stream syntaxFlowScanStreamCallback
+
+	request chan *ypb.SyntaxFlowScanRequest
+}
+
+type syntaxFlowScanStreamCallback func(*ypb.SyntaxFlowScanResponse) error
+
+func NewSyntaxFlowScanStream(ctx context.Context, callback syntaxFlowScanStreamCallback) *syntaxFlowScanStreamImpl {
+	ctx = context.WithoutCancel(ctx)
+	ret := &syntaxFlowScanStreamImpl{
+		ctx:    ctx,
+		stream: callback,
+	}
+	ret.request = make(chan *ypb.SyntaxFlowScanRequest, 1)
+	return ret
+}
+
+func (s *syntaxFlowScanStreamImpl) Done() {
+	s.ctx.Done()
+}
+
+var _ SyntaxFlowScanStream = (*syntaxFlowScanStreamImpl)(nil)
+
+func (s *syntaxFlowScanStreamImpl) Recv() (*ypb.SyntaxFlowScanRequest, error) {
+	select {
+	case <-s.ctx.Done():
+		return nil, utils.Error("context canceled")
+	default:
+		if s.request != nil {
+			return <-s.request, nil
+		}
+	}
+	return nil, utils.Error("no request")
+}
+
+func (s *syntaxFlowScanStreamImpl) Context() context.Context {
+	return s.ctx
+}
+
+func (s *syntaxFlowScanStreamImpl) Send(resp *ypb.SyntaxFlowScanResponse) error {
+	select {
+	case <-s.ctx.Done():
+		return utils.Error("context canceled")
+	default:
+		if s.stream != nil {
+			return s.stream(resp)
+		}
+	}
+	return nil
+}
+
+func SyntaxFlowScan(ctx context.Context, config *ypb.SyntaxFlowScanRequest, callBack syntaxFlowScanStreamCallback) {
+	stream := NewSyntaxFlowScanStream(ctx, callBack)
+	stream.request <- config
+	syntaxFlowScan(stream)
+	stream.Done()
 }
