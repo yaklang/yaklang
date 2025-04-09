@@ -1,0 +1,71 @@
+desc(
+    title:"Find Java SpringBoot RestTemplate Network Request API Sink Params",
+    title_zh:"查找Java SpringBoot RestTemplate 请求API的Sink参数",
+    type: audit,
+    lib: "java-spring-rest-template-request-params",
+    reference:<<<TEXT
+    https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/client/RestTemplate.html
+TEXT
+    desc: <<<TEXT
+    此规则旨在查找Java代码中SpringBoot RestTemplate库中网络发包方法的Url参数。
+    该规则主要用于辅助审计SSRF(Server-Side Request Forgery)漏洞。
+    规则覆盖方法包括：
+    - delete(String url, Object... uriVariables)
+    - delete(String url, Map<String,?> uriVariables)
+    - delete(URI url)
+    - put(String url, Object request, Object... uriVariables)
+    - put(String url, Object request, Map<String,?> uriVariables)
+    - put(URI url, Object request)
+    - exchange(String url, HttpMethod method, HttpEntity<?> requestEntity, Class<T> responseType, Object... uriVariables)
+    - exchange(String url, HttpMethod method, HttpEntity<?> requestEntity, Class<T> responseType, Map<String,?> uriVariables)
+    - exchange(URI url, HttpMethod method, HttpEntity<?> requestEntity, Class<T> responseType)
+    - getForEntity(String url, Class<T> responseType, Object... uriVariables)
+    - getForObject(String url, Class<T> responseType, Object... uriVariables)
+    - headForHeaders(String url, Object... uriVariables)
+    - patchForObject(String url, Object request, Class<T> responseType, Object... uriVariables)
+    - postForEntity(String url, Object request, Class<T> responseType, Object... uriVariables)
+    - postForObject(String url, Object request, Class<T> responseType, Object... uriVariables)
+    - postForLocation(String url, Object request, Object... uriVariables)
+TEXT
+)
+
+RestTemplate()?{<typeName>?{have:'org.springframework.web.client.RestTemplate'}} as $rest
+
+// delete(String url, Object... uriVariables)
+// delete(String url, Map<String,?> uriVariables)
+// delete(URI url)
+$rest.delete(* <slice(index=1)> as $output)
+
+// put(String url, Object request, Object... uriVariables)
+// put(String url, Object request, Map<String,?> uriVariables)
+// put(URI url, Object request)
+$rest.put(* <slice(index=1)> as $output)
+
+// exchange(String url, HttpMethod method, HttpEntity<?> requestEntity, Class<T> responseType, Object... uriVariables)
+// exchange(String url, HttpMethod method, HttpEntity<?> requestEntity, Class<T> responseType, Map<String,?> uriVariables)
+// exchange(String url, HttpMethod method, HttpEntity<?> requestEntity, ParameterizedTypeReference<T> responseType, Object... uriVariables)
+// exchange(String url, HttpMethod method, HttpEntity<?> requestEntity, ParameterizedTypeReference<T> responseType, Map<String,?> uriVariables)
+// exchange(URI url, HttpMethod method, HttpEntity<?> requestEntity, Class<T> responseType)
+// exchange(URI url, HttpMethod method, HttpEntity<?> requestEntity, ParameterizedTypeReference<T> responseType)
+// execute(String uriTemplate, HttpMethod method, RequestCallback requestCallback, ResponseExtractor<T> responseExtractor, Object... uriVariables)
+// execute(String uriTemplate, HttpMethod method, RequestCallback requestCallback, ResponseExtractor<T> responseExtractor, Map<String,?> uriVariables)
+// execute(URI url, HttpMethod method, RequestCallback requestCallback, ResponseExtractor<T> responseExtractor)
+$rest.exchange(* <slice(index=1)> as $output)
+
+// getForEntity(String url, Class<T> responseType, Object... uriVariables)
+// getForEntity(String url, Class<T> responseType, Map<String,?> uriVariables)
+// getForEntity(URI url, Class<T> responseType)
+// getForObject(String url, Class<T> responseType, Object... uriVariables)
+// getForObject(String url, Class<T> responseType, Map<String,?> uriVariables)
+// getForObject(URI url, Class<T> responseType)
+// headForHeaders(String url, Object... uriVariables)
+// headForHeaders(String url, Map<String,?> uriVariables)
+// headForHeaders(URI url)
+// patchForObject(String url, Object request, Class<T> responseType, Object... uriVariables)
+// patchForObject(String url, Object request, Class<T> responseType, Map<String,?> uriVariables)
+// patchForObject(URI url, Object request, Class<T> responseType)
+// postForEntity(String url, Object request, Class<T> responseType, Object... uriVariables)
+// postForEntity(String url, Object request, Class<T> responseType, Map<String,?> uriVariables)
+// postForEntity(URI url, Object request, Class<T> responseType)
+// ...
+$rest.*For*(* <slice(index=1)> as $output)
