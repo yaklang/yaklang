@@ -224,11 +224,10 @@ func ConvertSyntaxFlowResultToSarifRun(result *SyntaxFlowResult) *sarif.Run {
 		sctx := root.CreateSubSarifContext()
 		sctx.AddSSAValue(value)
 
-		result := sarif.NewRuleResult(
-			ruleId,
-		).WithMessage(
-			sarif.NewTextMessage(risk.Description),
-		).WithLevel(ToSarifLevel(risk.Severity))
+		result := sarif.NewRuleResult(ruleId).
+			WithMessage(sarif.NewTextMessage(risk.String())).
+			WithLevel(ToSarifLevel(risk.Severity)).
+			WithKind(risk.RiskType)
 
 		// Add locations for the current value
 		if rg := value.GetRange(); rg != nil && rg.GetEditor() != nil {
