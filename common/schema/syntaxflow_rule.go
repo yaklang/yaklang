@@ -82,7 +82,7 @@ func ValidSeverityType(i any) SyntaxFlowSeverity {
 	switch strings.ToLower(yakunquote.TryUnquote(codec.AnyToString(i))) {
 	case "info", "i", "verbose", "debug", "prompt":
 		return SFR_SEVERITY_INFO
-	case "warning", "w", "middle", "mid", "warn":
+	case "warning", "w", "middle", "mid", "warn", "medium":
 		return SFR_SEVERITY_WARNING
 	case "critical", "c", "fatal", "e", "essential":
 		return SFR_SEVERITY_CRITICAL
