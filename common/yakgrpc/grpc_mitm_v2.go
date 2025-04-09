@@ -733,8 +733,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		taskInfo.TraceInfo = model.ToLowhttpTraceInfoGRPCModel(traceInfo)
 		httpctx.SetResponseViewedByUser(req)
 
-		defer hijackListFeedback(Hijack_List_Delete, taskInfo)
 		defer hijackManger.unRegister(task.taskID)
+		defer hijackListFeedback(Hijack_List_Delete, taskInfo)
 		for {
 			hijackListFeedback(Hijack_List_Update, taskInfo)
 			select {
@@ -849,8 +849,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 		hijackListFeedback(Hijack_List_Add, task.infoMessage)
 
-		defer hijackListFeedback(Hijack_List_Delete, task.infoMessage)
 		defer hijackManger.unRegister(task.taskID)
+		defer hijackListFeedback(Hijack_List_Delete, task.infoMessage)
 
 		for {
 			select {
@@ -1031,8 +1031,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		httpctx.SetResponseViewedByUser(originReqIns)
 		defer func() {
 			if !taskInfo.HijackResponse {
-				hijackManger.unRegister(task.taskID)
 				hijackListFeedback(Hijack_List_Delete, taskInfo)
+				hijackManger.unRegister(task.taskID)
 			} else {
 				taskInfo.Status = Hijack_Status_Waiting
 				hijackListFeedback(Hijack_List_Update, taskInfo)
