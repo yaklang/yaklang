@@ -40,7 +40,7 @@ type SyntaxFlowScanManager struct {
 
 	// runtime {{
 	// stream
-	stream ypb.Yak_SyntaxFlowScanServer
+	stream SyntaxFlowScanStream
 	client *yaklib.YakitClient
 
 	// rules
@@ -64,7 +64,7 @@ type SyntaxFlowScanManager struct {
 
 var syntaxFlowScanManagerMap = omap.NewEmptyOrderedMap[string, *SyntaxFlowScanManager]()
 
-func LoadSyntaxflowTaskFromDB(taskId string, ctx context.Context, stream ypb.Yak_SyntaxFlowScanServer) (*SyntaxFlowScanManager, error) {
+func LoadSyntaxflowTaskFromDB(taskId string, ctx context.Context, stream SyntaxFlowScanStream) (*SyntaxFlowScanManager, error) {
 	if manager, ok := syntaxFlowScanManagerMap.Get(taskId); ok {
 		ctx, cancel := context.WithCancel(ctx)
 		manager.ctx = ctx
@@ -109,7 +109,7 @@ func createEmptySyntaxFlowTaskByID(
 func CreateSyntaxflowTaskById(
 	taskId string, ctx context.Context,
 	req *ypb.SyntaxFlowScanRequest,
-	stream ypb.Yak_SyntaxFlowScanServer,
+	stream SyntaxFlowScanStream,
 ) (*SyntaxFlowScanManager, error) {
 	m, err := createEmptySyntaxFlowTaskByID(taskId, ctx)
 	if err != nil {
@@ -152,7 +152,7 @@ func (m *SyntaxFlowScanManager) SaveTask() error {
 	return schema.SaveSyntaxFlowScanTask(ssadb.GetDB(), m.taskRecorder)
 }
 
-func (m *SyntaxFlowScanManager) RestoreTask(stream ypb.Yak_SyntaxFlowScanServer) error {
+func (m *SyntaxFlowScanManager) RestoreTask(stream SyntaxFlowScanStream) error {
 	task, err := schema.GetSyntaxFlowScanTaskById(ssadb.GetDB(), m.TaskId())
 	if err != nil {
 		return utils.Wrapf(err, "Resume SyntaxFlow task by is failed")
@@ -180,7 +180,7 @@ func (m *SyntaxFlowScanManager) RestoreTask(stream ypb.Yak_SyntaxFlowScanServer)
 	return nil
 }
 
-func (m *SyntaxFlowScanManager) initByConfig(stream ypb.Yak_SyntaxFlowScanServer) error {
+func (m *SyntaxFlowScanManager) initByConfig(stream SyntaxFlowScanStream) error {
 	config := m.config
 	if config == nil {
 		return utils.Errorf("config is nil")
