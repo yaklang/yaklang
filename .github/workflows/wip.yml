@@ -13,7 +13,7 @@ jobs:
   WIP:
     # fork PR should not run this action
     if: github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: WAY29/wip@v1.3.0
         with:

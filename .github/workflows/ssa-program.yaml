@@ -5,7 +5,7 @@ on:
     - cron: '0 20 * * 5'
 jobs:
   setup:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     if: ${{ github.event_name == 'pull_request' || github.event_name == 'schedule' }}
     steps:
       - name: GET BRANCH HASH
@@ -40,12 +40,7 @@ jobs:
         with:
           go-version-file: "./go.mod"
         id: goz
-      - name: Dependence
-        if: steps.cache-project.outputs.cache-hit != 'true'
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: libpcap-dev
-          version: 1.9.1-3
+
       - name: Init Module
         if: steps.cache-project.outputs.cache-hit != 'true'
         run: |

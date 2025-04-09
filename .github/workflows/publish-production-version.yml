@@ -10,7 +10,7 @@ on:
 
 jobs:
   check_version_and_publish:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Check if version starts with 'v'
         run: |

@@ -11,7 +11,7 @@ on:
 
 jobs:
   check_commit_msg:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Check Commit Message
         run: |
@@ -186,7 +186,7 @@ jobs:
           path: ./${{ env.SHA256 }}
 
   check_version_and_github_release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: build_and_upload_to_oss
     steps:
       - uses: actions/checkout@v2
