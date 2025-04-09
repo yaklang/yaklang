@@ -84,7 +84,7 @@ func (y *builder) AddFullTypeNameFromMap(typName string, typ ssa.Type) ssa.Type 
 		for i := len(ft) - 1; i > 0; i-- {
 			version := y.GetPkgSCAVersion(strings.Join(ft[:i], "."))
 			if version != "" {
-				typStr = (fmt.Sprintf("%s:%s", typStr, version))
+				typStr = fmt.Sprintf("%s:%s", typStr, version)
 				break
 			}
 		}

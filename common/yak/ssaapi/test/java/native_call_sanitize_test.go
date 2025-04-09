@@ -1,9 +1,9 @@
 package java
 
 import (
+	"github.com/stretchr/testify/assert"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
@@ -30,22 +30,21 @@ public class XSSController {
 }
 `, func(prog *ssaapi.Program) error {
 		results := prog.SyntaxFlow(`
-<include('java-spring-param')>?{<typeName>?{have: String}} as $params;
+<include('java-spring-param')>?{<typeName><show>?{have: String}} as $params;
 RestController.__ref__<getMembers>?{.annotation.*Mapping} as $entryMethods;
 $entryMethods<getReturns> as $sink;
-$sink<show> #{
-    until: <<<CODE
+$sink #{
+	include: <<<CODE
 * & $params as $source
 CODE,
-}->;
-$source<show>
-$source<dataflow(<<<CODE
-*?{opcode: call && <getCallee><name><show><isSanitizeName>} as $__next__
-CODE)> as $haveCall;
-alert $haveCall;
-`)
-		assert.Equal(t, results.GetValues("haveCall").Len(), 1)
+	include: <<<CODE
+*?{opcode: call && <getCallee><name><show><isSanitizeName>} as $haveCall
+CODE
+		}-> 
+		`, ssaapi.QueryWithEnableDebug())
+		results.Show()
 		assert.Equal(t, results.GetValues("sink").Len(), 2)
+		assert.Equal(t, results.GetValues("haveCall").Len(), 1)
 		return nil
 	})
 }
