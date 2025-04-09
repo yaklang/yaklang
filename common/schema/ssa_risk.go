@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"fmt"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -132,4 +134,14 @@ func (s *SSARisk) AfterUpdate(tx *gorm.DB) (err error) {
 		"action":  "update",
 	})
 	return nil
+}
+
+func (s *SSARisk) String() string {
+	return fmt.Sprintf(`
+SSARisk: ID[%d] Hash[%s]
+Title: %s
+RiskType: %s
+Severity: %s
+Description: %s
+`, s.ID, s.Hash, s.Title, s.RiskType, s.Severity, s.Description)
 }
