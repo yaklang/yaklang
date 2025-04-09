@@ -1,6 +1,9 @@
 package ssaapi
 
 import (
+	"context"
+
+	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
@@ -51,6 +54,26 @@ func loadResult(result *ssadb.AuditResult) (*SyntaxFlowResult, error) {
 	}
 	res.program = prog
 	return res, nil
+}
+
+func YieldSyntaxFlowResult(db *gorm.DB) chan *SyntaxFlowResult {
+	ch := make(chan *SyntaxFlowResult)
+	go func() {
+		defer close(ch)
+		results := ssadb.YieldAuditResults(db, context.Background())
+		for result := range results {
+			res, err := loadResult(result)
+			if err != nil {
+				continue
+			}
+			ch <- res
+		}
+	}()
+	return ch
+}
+
+func CountSyntaxFlowResult(db *gorm.DB) (int, error) {
+	return ssadb.CountAuditResults(db)
 }
 
 func (r *SyntaxFlowResult) Save(kind schema.SyntaxflowResultKind, TaskIDs ...string) (uint, error) {
