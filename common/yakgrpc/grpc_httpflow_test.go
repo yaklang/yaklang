@@ -1173,3 +1173,45 @@ func TestHTTPFlowFieldGroup(t *testing.T) {
 		require.NotContains(t, tags, uuidTag)
 	}
 }
+
+func TestGRPCMUSTPASS_HTTPFFlow_KeyWord_Search(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	_ = client
+
+	t.Run("match escape content", func(t *testing.T) {
+		token := `/bin\/bash` + uuid.NewString()
+		flow, err := yakit.CreateHTTPFlow(
+			yakit.CreateHTTPFlowWithHTTPS(true),
+			yakit.CreateHTTPFlowWithRequestRaw([]byte(`GET / HTTP/1.1
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Accept: */*
+Accept-Language: en-US;q=0.9,en;q=0.8
+User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36
+Cache-Control: max-age=0
+`)),
+			yakit.CreateHTTPFlowWithResponseRaw([]byte(fmt.Sprintf(`HTTP/1.1 200 OK
+Date: Wed, 09 Apr 2025 05:23:28 GMT
+Content-Type: text/plain; charset=utf-8
+Content-Length: 10
+
+%s`, token))),
+		)
+		require.NoError(t, err)
+		err = yakit.InsertHTTPFlow(consts.GetGormProjectDatabase(), flow)
+		require.NoError(t, err)
+		queryFlow, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
+			KeywordType: "response",
+			Keyword:     token,
+		})
+		require.NoError(t, err)
+		require.Equal(t, 1, len(queryFlow.Data))
+		spew.Dump(queryFlow.Data[0])
+		id := queryFlow.Data[0].Id
+		_, err = client.DeleteHTTPFlows(context.Background(), &ypb.DeleteHTTPFlowRequest{
+			Id: []int64{int64(id)},
+		})
+		require.NoError(t, err)
+	})
+}
