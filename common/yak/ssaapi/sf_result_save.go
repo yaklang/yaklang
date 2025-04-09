@@ -125,7 +125,10 @@ func (r *SyntaxFlowResult) saveValue(result *ssadb.AuditResult) error {
 		}
 		// save variable that has value
 		for index, v := range values {
-			r.SaveRisk(name, index, v, result)
+			hash := r.SaveRisk(name, index, v, result)
+			if hash != "" {
+				opts = append(opts, OptionSaveValue_ResultRiskHash(hash))
+			}
 			opts = append(opts, OptionSaveValue_ResultIndex(uint(index)))
 			e := SaveValue(v, opts...)
 			err = utils.JoinErrors(err, e)

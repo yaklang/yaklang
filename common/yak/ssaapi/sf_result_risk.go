@@ -146,20 +146,22 @@ func ssaRiskName(variable string, index int) string {
 	return fmt.Sprintf("%s-%d", variable, index)
 }
 
-func (r *SyntaxFlowResult) SaveRisk(variable string, index int, value *Value, result *ssadb.AuditResult) {
+func (r *SyntaxFlowResult) SaveRisk(variable string, index int, value *Value, result *ssadb.AuditResult) string {
 	_, ok := r.GetAlertInfo(variable)
 	if !ok {
-		return
+		return ""
 	}
 	ssaRisk := buildSSARisk(r, variable, index, value, uint64(result.ID), result.TaskID)
 	if ssaRisk == nil {
-		return
+		return ""
 	}
 	err := yakit.CreateSSARisk(consts.GetGormDefaultSSADataBase(), ssaRisk)
 	if err != nil {
 		log.Errorf("save risk failed: %s", err)
+		return ""
 	}
 	r.riskMap[ssaRiskName(variable, index)] = ssaRisk
+	return ssaRisk.Hash
 }
 
 func (r *SyntaxFlowResult) GetGRPCModelRisk() []*ypb.SSARisk {

@@ -128,7 +128,7 @@ func (r *SyntaxFlowResult) Name() string {
 
 func (r *SyntaxFlowResult) GetAlertMsg(name string) (string, bool) {
 	if info, ok := r.GetAlertInfo(name); ok {
-		return info.Msg, true
+		return info.String(), true
 	}
 	return "", false
 }
