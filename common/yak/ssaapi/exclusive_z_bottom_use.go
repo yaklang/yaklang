@@ -117,126 +117,93 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		}
 		existed := map[int64]struct{}{}
 		var vals Values
-		checkVal := func(args []ssa.Value, get func(index int, arg ssa.Value) (*Value, bool), handle func(value *Value)) {
-			for index, arg := range args {
-				value, ok := get(index, arg)
-				if ok {
-					if !utils.IsNil(value) {
-						handle(value)
-					}
-				}
-			}
-		}
 		v.DependOn.ForEach(func(value *Value) {
 			existed[value.GetId()] = struct{}{}
 		})
-		fun, isFunc := ssa.ToFunction(method)
-		if !isFunc && method.GetReference() != nil {
-			fun, isFunc = ssa.ToFunction(method.GetReference())
-		}
-		if isFunc {
-			checkVal(inst.Args, func(index int, arg ssa.Value) (*Value, bool) {
-				if index >= len(fun.Params) {
-					return nil, false
-				}
-				_, ok := existed[arg.GetId()]
-				if !ok {
-					return nil, false
-				}
-				value := fun.Params[index]
-				return v.NewBottomUseValue(value), true
-			}, func(value *Value) {
-				vals = append(vals, value)
-			})
-			checkVal(inst.ArgMember, func(index int, arg ssa.Value) (*Value, bool) {
-				if index >= len(fun.ParameterMembers) {
-					return nil, false
-				}
-				_, ok := existed[arg.GetId()]
-				if !ok {
-					return nil, false
-				}
-				value := fun.ParameterMembers[index]
-				return v.NewBottomUseValue(value), true
-			}, func(value *Value) {
-				vals = append(vals, value)
-			})
-			var result Values
-			for _, val := range vals {
-				result = append(result, val.getBottomUses(actx, opt...)...)
+		checkVal := func(vs []ssa.Value, get func(index int, arg ssa.Value)) {
+			for index, value := range vs {
+				get(index, value)
 			}
-			if result.Len() == 0 {
-				result = append(result, v.visitUserFallback(actx, opt...)...)
-			}
-			return result
 		}
-		var backTrackSearch func(ssa.Instruction, int) *Value
-		backTrackSearch = func(method ssa.Instruction, callIndex int) *Value {
+		var getRealMethod func(ssa.Value, int) ssa.Value
+		getRealMethod = func(method ssa.Value, callIndex int) ssa.Value {
+			if _, isFunction := ssa.ToFunction(method); isFunction {
+				return method
+			}
 			_, isparam := ssa.ToParameter(method)
 			_, isParameterMember := ssa.ToParameterMember(method)
 			if !(isParameterMember || isparam) {
-				return v.NewValue(method)
+				return method
 			}
 			methodId := method.GetId()
 			call := actx.peekCall(callIndex)
 			if utils.IsNil(call) {
-				return v.NewValue(method)
+				return method
 			}
 			function := call.Method
 			toFunction, isFunction := ssa.ToFunction(function)
 			if !isFunction {
-				return v.NewValue(method)
+				return method
 			}
-			var val *Value
-			checkVal(toFunction.Params, func(index int, arg ssa.Value) (*Value, bool) {
+			var val ssa.Value
+			checkVal(toFunction.Params, func(index int, arg ssa.Value) {
 				if index >= len(call.Args) {
-					return nil, false
+					return
 				}
 				if arg.GetId() == methodId {
-					return v.NewValue(call.Args[index]), true
+					val = call.Args[index]
 				}
-				return nil, false
-			}, func(value *Value) {
-				val = value
 			})
-			checkVal(toFunction.ParameterMembers, func(index int, arg ssa.Value) (*Value, bool) {
+			checkVal(toFunction.ParameterMembers, func(index int, arg ssa.Value) {
 				if index >= len(call.ArgMember) {
-					return nil, false
+					return
 				}
 				if arg.GetId() == methodId {
-					return v.NewValue(call.ArgMember[index]), true
+					val = call.ArgMember[index]
 				}
-				return nil, false
-			}, func(value *Value) {
-				val = value
 			})
 			if val == nil {
-				return v.NewValue(method)
+				return method
 			}
-			return backTrackSearch(val.GetSSAInst(), callIndex+1)
+			return getRealMethod(val, callIndex+1)
 		}
-		search := backTrackSearch(method, 1)
-		if search.GetId() == method.GetId() {
+		real := getRealMethod(method, 1)
+
+		fun, isFunc := ssa.ToFunction(real)
+		if !isFunc && method.GetReference() != nil {
+			fun, isFunc = ssa.ToFunction(method.GetReference())
+		}
+
+		if isFunc {
+			checkVal(inst.Args, func(index int, arg ssa.Value) {
+				if index >= len(fun.Params) {
+					return
+				}
+				_, ok := existed[arg.GetId()]
+				if !ok {
+					return
+				}
+				val := v.NewBottomUseValue(fun.Params[index])
+				vals = append(vals, val.getBottomUses(actx, opt...)...)
+			})
+			checkVal(inst.ArgMember, func(index int, arg ssa.Value) {
+				if index >= len(fun.ParameterMembers) {
+					return
+				}
+				_, ok := existed[arg.GetId()]
+				if !ok {
+					return
+				}
+				val := v.NewBottomUseValue(fun.ParameterMembers[index])
+				vals = append(vals, val.getBottomUses(actx, opt...)...)
+			})
+		}
+		if vals.Len() > 0 {
+			return vals
+		} else {
 			return v.visitUserFallback(actx, opt...)
 		}
-		//todo： copy？
-		s := &ssa.Call{
-			Method:          search.innerValue,
-			Args:            inst.Args,
-			Binding:         inst.Binding,
-			ArgMember:       inst.ArgMember,
-			Async:           inst.Async,
-			Unpack:          inst.Unpack,
-			IsDropError:     inst.IsDropError,
-			IsEllipsis:      inst.IsEllipsis,
-			SideEffectValue: inst.SideEffectValue,
-		}
-		for _, user := range v.innerValue.GetUsers() {
-			s.AddUser(user)
-		}
-		value := v.NewBottomUseValue(s)
-		value.DependOn = append(value.DependOn, v.DependOn...)
-		return value.getBottomUses(actx, opt...)
+
 	case *ssa.Return:
 		var vals Values
 		function := inst.GetFunc()
