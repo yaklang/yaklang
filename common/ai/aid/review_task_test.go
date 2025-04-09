@@ -60,11 +60,11 @@ func TestCoordinator_TaskReview(t *testing.T) {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "finished"}`))
 				return rsp, nil
 			}
-			if utils.MatchAllOfSubString(request.GetPrompt(), `当前任务: "扫描目录结构"`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-tool", "tool": "now"}`))
-				return rsp, nil
-			} else if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: now`, `"call-tool"`, "const") {
+			if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: now`, `"call-tool"`, "const") {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "call-tool", "tool": "now", "params": {}}`))
+				return rsp, nil
+			} else if utils.MatchAllOfSubString(request.GetPrompt(), `当前任务: "扫描目录结构"`) {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-tool", "tool": "now"}`))
 				return rsp, nil
 			}
 			rsp.EmitOutputStream(strings.NewReader(`TODO`))
