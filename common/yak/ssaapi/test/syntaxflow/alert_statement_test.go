@@ -25,7 +25,7 @@ func TestAlertStatement(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			report, err := ssaapi.ConvertSyntaxFlowResultToSarif(result)
+			report, err := ssaapi.ConvertSyntaxFlowResultsToSarif(result)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -49,7 +49,7 @@ func TestAlertStatement(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			report, err := ssaapi.ConvertSyntaxFlowResultToSarif(result)
+			report, err := ssaapi.ConvertSyntaxFlowResultsToSarif(result)
 			if err != nil {
 				t.Fatal(err)
 			}

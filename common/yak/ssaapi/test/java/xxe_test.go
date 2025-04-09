@@ -69,7 +69,7 @@ alert $output;
 		if err != nil {
 			t.Fatal(err)
 		}
-		report, err := ssaapi.ConvertSyntaxFlowResultToSarif(result)
+		report, err := ssaapi.ConvertSyntaxFlowResultsToSarif(result)
 		if err != nil {
 			t.Fatal(err)
 		}

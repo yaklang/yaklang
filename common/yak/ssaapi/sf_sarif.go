@@ -4,6 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sarif"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -19,6 +20,9 @@ type SarifContext struct {
 	// context for result
 	locations []*sarif.Location
 	codeFlows []*sarif.CodeFlow
+
+	//TODO: only mark cross function path
+	stack []*sarif.Stack
 }
 
 func (s *SarifContext) CreateSubSarifContext() *SarifContext {
@@ -73,7 +77,7 @@ func (s *SarifContext) AddSSAValue(v *Value) {
 func (s *SarifContext) createCodeFlowsFromPredecessor(v *Value) {
 	// Create a new thread flow for this path
 	threadFlow := sarif.NewThreadFlow()
-	locations := []*sarif.ThreadFlowLocation{}
+	threadFlows := []*sarif.ThreadFlowLocation{}
 	visited := make(map[*Value]bool)
 
 	// Function to add a value to the thread flow
@@ -97,20 +101,20 @@ func (s *SarifContext) createCodeFlowsFromPredecessor(v *Value) {
 		if loc == nil {
 			return false
 		}
+		loc.WithMessage(sarif.NewTextMessage(rg.GetText()))
 
-		// Create thread flow location
-		tfLoc := sarif.NewThreadFlowLocation().
-			WithLocation(loc).
-			WithNestingLevel(len(locations))
+		// Create thread flow threadFlow
+		threadFlow := sarif.NewThreadFlowLocation().
+			WithLocation(loc)
 
 		// Add importance based on whether it's the target value
 		if val == v {
-			tfLoc.WithImportance("essential")
+			threadFlow.WithImportance("essential")
 		} else {
-			tfLoc.WithImportance("important")
+			threadFlow.WithImportance("important")
 		}
 
-		locations = append(locations, tfLoc)
+		threadFlows = append(threadFlows, threadFlow)
 		return true
 	}
 
@@ -123,6 +127,7 @@ func (s *SarifContext) createCodeFlowsFromPredecessor(v *Value) {
 	var processNeighbors func(val *Value)
 	processNeighbors = func(val *Value) {
 		// Process direct predecessors
+		//TODO: fix this dataflow path
 		for _, pred := range val.GetPredecessors() {
 			if pred.Node != nil && addValueToFlow(pred.Node) {
 				processNeighbors(pred.Node)
@@ -134,15 +139,16 @@ func (s *SarifContext) createCodeFlowsFromPredecessor(v *Value) {
 	processNeighbors(v)
 
 	// Only create a code flow if we have more than one location
-	if len(locations) > 1 {
+	if len(threadFlows) > 1 {
 		// Reverse the locations to show flow from source to sink
 		// for i, j := 0, len(locations)-1; i < j; i, j = i+1, j-1 {
 		// 	locations[i], locations[j] = locations[j], locations[i]
 		// }
 
-		threadFlow.WithLocations(locations)
+		threadFlow.WithLocations(threadFlows)
 		codeFlow := sarif.NewCodeFlow().WithThreadFlows([]*sarif.ThreadFlow{threadFlow})
 		s.codeFlows = append(s.codeFlows, codeFlow)
+		//TODO
 	}
 }
 
@@ -151,16 +157,18 @@ func (s *SarifContext) CreateCodeFlowsFromPredecessor(v *Value) {
 }
 
 func (s *SarifContext) CreateLocation(artifactId int, rg memedit.RangeIf) *sarif.Location {
-	return sarif.NewLocation().WithPhysicalLocation(
-		sarif.NewPhysicalLocation().WithArtifactLocation(
-			sarif.NewArtifactLocation().WithIndex(artifactId),
-		).WithRegion(
-			sarif.NewRegion().
-				WithStartLine(rg.GetStart().GetLine()).
-				WithStartColumn(rg.GetStart().GetColumn()).
-				WithEndLine(rg.GetEnd().GetLine()).
-				WithEndColumn(rg.GetEnd().GetColumn()),
-		))
+	return sarif.NewLocation().
+		WithPhysicalLocation(
+			sarif.NewPhysicalLocation().WithArtifactLocation(
+				sarif.NewArtifactLocation().WithIndex(artifactId),
+			).WithRegion(
+				sarif.NewRegion().
+					WithStartLine(rg.GetStart().GetLine()).
+					WithStartColumn(rg.GetStart().GetColumn()).
+					WithEndLine(rg.GetEnd().GetLine()).
+					WithEndColumn(rg.GetEnd().GetColumn()),
+			),
+		)
 }
 
 func (s *SarifContext) GetArtifactIdFromEditor(editor *memedit.MemEditor) int {
@@ -191,85 +199,101 @@ func (s *SarifContext) GetArtifactIdFromEditor(editor *memedit.MemEditor) int {
 	return id
 }
 
-func convertSyntaxFlowFrameToSarifRun(frameResult *SyntaxFlowResult) []*sarif.Run {
+func ConvertSyntaxFlowResultToSarifRun(result *SyntaxFlowResult) *sarif.Run {
 	var results []*sarif.Result
-	var runs []*sarif.Run
 
 	root := NewSarifContext()
 
-	if len(frameResult.GetAlertVariables()) == 0 {
-		return nil
-	}
+	// if len(result.GetAlertVariables()) == 0 {
+	// 	return nil
+	// }
 
-	SFRule := frameResult.GetRule()
+	SFRule := result.GetRule()
 	ruleId := codec.Sha256(SFRule.Content)
+	rule := sarif.NewRule(ruleId).
+		WithName(SFRule.Title).
+		WithDescription(SFRule.Description)
+	// .WithFullDescription(sarif.NewMultiformatMessageString(SFRule.Content))
 
-	for _, name := range frameResult.GetAlertVariables() {
-		values := frameResult.GetValues(name)
-		info, ok := frameResult.GetAlertInfo(name)
-		if !ok {
-			info = SFRule.GetInfo()
+	for risk := range result.YieldRisk() {
+		value, err := result.GetValue(risk.Variable, int(risk.Index))
+		if err != nil {
+			log.Errorf("get value from result failed: resultId[%d: %s: %d] %s", result.GetResultID(), risk.Variable, risk.Index, err)
+			continue
 		}
-		for _, value := range values {
-			sctx := root.CreateSubSarifContext()
-			sctx.AddSSAValue(value)
+		sctx := root.CreateSubSarifContext()
+		sctx.AddSSAValue(value)
 
-			result := sarif.NewRuleResult(
-				ruleId,
-			).WithMessage(
-				sarif.NewTextMessage(info.Description),
-			)
+		result := sarif.NewRuleResult(
+			ruleId,
+		).WithMessage(
+			sarif.NewTextMessage(risk.Description),
+		).WithLevel(ToSarifLevel(risk.Severity))
 
-			// Add locations for the current value
-			if rg := value.GetRange(); rg != nil && rg.GetEditor() != nil {
-				artid := root.GetArtifactIdFromEditor(rg.GetEditor())
-				if artid >= 0 {
-					loc := root.CreateLocation(artid, rg)
-					if loc != nil {
-						result.WithLocations([]*sarif.Location{loc})
-					}
+		// Add locations for the current value
+		if rg := value.GetRange(); rg != nil && rg.GetEditor() != nil {
+			artifactId := root.GetArtifactIdFromEditor(rg.GetEditor())
+			if artifactId >= 0 {
+				loc := root.CreateLocation(artifactId, rg)
+				if loc != nil {
+					loc.WithMessage(sarif.NewTextMessage("location message "))
+					result.WithLocations([]*sarif.Location{loc})
 				}
 			}
-
-			// Add code flows if they exist
-			if len(sctx.codeFlows) > 0 {
-				result.WithCodeFlows(sctx.codeFlows)
-			}
-
-			results = append(results, result)
-		}
-	}
-
-	if len(results) > 0 {
-		driver := sarif.NewDriver("SyntaxFlow").WithFullName("SyntaxFlow Static Analysis")
-		tool := sarif.NewTool(driver)
-		run := sarif.NewRun(*tool)
-
-		// Add artifacts if they exist
-		if len(root._artifacts) > 0 {
-			run.WithArtifacts(root._artifacts)
 		}
 
-		run.WithResults(results)
-		runs = append(runs, run)
+		// Add code flows if they exist
+		if len(sctx.codeFlows) > 0 {
+			result.WithCodeFlows(sctx.codeFlows)
+		}
+
+		results = append(results, result)
 	}
 
-	return runs
+	if len(results) == 0 {
+		return nil
+	}
+	driver := sarif.NewDriver("SyntaxFlow").
+		WithFullName("SyntaxFlow Static Analysis").
+		WithOrganization("yaklang.io").
+		WithRules([]*sarif.ReportingDescriptor{rule})
+	tool := sarif.NewTool(driver)
+	run := sarif.NewRun(*tool)
+
+	// Add artifacts if they exist
+	if len(root._artifacts) > 0 {
+		run.WithArtifacts(root._artifacts)
+	}
+
+	run.WithResults(results)
+	return run
 }
 
-func ConvertSyntaxFlowResultToSarif(r ...*SyntaxFlowResult) (*sarif.Report, error) {
+func ConvertSyntaxFlowResultsToSarif(results ...*SyntaxFlowResult) (*sarif.Report, error) {
 	report, err := sarif.New(sarif.Version210, false)
 	if err != nil {
 		return nil, utils.Wrap(err, "create sarif.New Report failed")
 	}
 
-	for _, frame := range r {
-		for _, run := range convertSyntaxFlowFrameToSarifRun(frame) {
-			if funk.IsEmpty(run) {
-				continue
-			}
-			report.AddRun(run)
+	for _, result := range results {
+		run := ConvertSyntaxFlowResultToSarifRun(result)
+		if funk.IsEmpty(run) {
+			continue
 		}
+		report.AddRun(run)
 	}
 	return report, nil
+}
+
+func ToSarifLevel(level schema.SyntaxFlowSeverity) string {
+	switch level {
+	case schema.SFR_SEVERITY_INFO:
+		return "note"
+	case schema.SFR_SEVERITY_LOW, schema.SFR_SEVERITY_WARNING:
+		return "warning"
+	case schema.SFR_SEVERITY_CRITICAL, schema.SFR_SEVERITY_HIGH:
+		return "error"
+	default:
+		return "note"
+	}
 }

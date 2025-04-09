@@ -111,6 +111,15 @@ func SaveResult(result *AuditResult) error {
 	return GetDB().Save(result).Error
 }
 
+func CountAuditResults(DB *gorm.DB) (int, error) {
+	var count int64
+	db := DB
+	if err := db.Model(&AuditResult{}).Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return int(count), nil
+}
+
 func YieldAuditResults(db *gorm.DB, ctx context.Context) chan *AuditResult {
 	return bizhelper.YieldModel[*AuditResult](ctx, db)
 }
