@@ -137,8 +137,9 @@ func execScriptWithExecParam(script *schema.YakScript, input string, stream send
 	case "codec":
 		tabName := "Codec结果"
 		subEngine, err := engine.ExecuteExWithContext(streamCtx, script.Content, map[string]any{
-			"CTX":         streamCtx,
-			"PLUGIN_NAME": scriptName,
+			"CTX":          streamCtx,
+			"PLUGIN_NAME":  scriptName,
+			"YAK_FILENAME": scriptName,
 		})
 		if err != nil {
 			return utils.Errorf("execute file %s code failed: %s", scriptName, err.Error())
@@ -173,9 +174,10 @@ func execScriptWithExecParam(script *schema.YakScript, input string, stream send
 		return nil
 	case "yak":
 		_, err := engine.ExecuteExWithContext(streamCtx, script.Content, map[string]any{
-			"RUNTIME_ID":  runtimeId,
-			"CTX":         streamCtx,
-			"PLUGIN_NAME": scriptName,
+			"RUNTIME_ID":   runtimeId,
+			"CTX":          streamCtx,
+			"PLUGIN_NAME":  scriptName,
+			"YAK_FILENAME": scriptName,
 		})
 		if err != nil {
 			log.Warnf("execute debug script failed: %v", err)
@@ -293,16 +295,17 @@ func (s *Server) execScriptWithRequest(scriptInstance *schema.YakScript, targetI
 		return nil
 	})
 	subEngine, err := engine.ExecuteExWithContext(streamCtx, debugScriptCode, map[string]any{
-		"REQUESTS":    reqs,
-		"CTX":         streamCtx,
-		"PLUGIN":      scriptInstance,
-		"PLUGIN_CODE": scriptCode,
-		"PLUGIN_NAME": scriptName,
-		"PLUGIN_TYPE": strings.ToLower(scriptType),
-		"IS_SMOKING":  isSmoking,
-		"IS_STRICT":   isStrict,
-		"RUNTIME_ID":  runtimeId,
-		"CLI_PARAMS":  KVPairToParamItem(execParams),
+		"REQUESTS":     reqs,
+		"CTX":          streamCtx,
+		"PLUGIN":       scriptInstance,
+		"PLUGIN_CODE":  scriptCode,
+		"PLUGIN_NAME":  scriptName,
+		"YAK_FILENAME": scriptName,
+		"PLUGIN_TYPE":  strings.ToLower(scriptType),
+		"IS_SMOKING":   isSmoking,
+		"IS_STRICT":    isStrict,
+		"RUNTIME_ID":   runtimeId,
+		"CLI_PARAMS":   KVPairToParamItem(execParams),
 	})
 	if err != nil {
 		log.Warnf("execute debug script failed: %v", err)

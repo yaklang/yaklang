@@ -78,7 +78,7 @@ func CreateYakLogger(yakFiles ...string) *YakLogger {
 
 func (y *YakLogger) SetEngine(engine *antlr4yak.Engine) {
 	y.Logger.SetVMRuntimeInfoGetter(func(infoType string) (res any, err error) {
-		return engine.RuntimeInfo("infoType")
+		return engine.RuntimeInfo(infoType)
 	})
 }
 
