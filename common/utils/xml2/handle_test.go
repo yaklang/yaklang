@@ -43,11 +43,11 @@ type desc struct {
 }
 
 func TestHandle(t *testing.T) {
-	stack := utils.NewStack[desc]()
+	stack := utils.NewStack[*desc]()
 
-	var m []desc
+	var m []*desc
 
-	stack.Push(desc{
+	stack.Push(&desc{
 		Name: "",
 		Attr: make(map[string]string),
 	})
@@ -58,7 +58,7 @@ func TestHandle(t *testing.T) {
 		}
 		name += element.Name.Local
 
-		d := desc{
+		d := &desc{
 			Name: name,
 			Attr: make(map[string]string),
 		}
