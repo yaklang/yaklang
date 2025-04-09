@@ -82,7 +82,7 @@ func (m *mybatisXMLQuery) SyntaxFlowFirst(name string, rng memedit.RangeIf) sfvm
 	builder.WriteString(m.mapper.ClassName)
 	builder.WriteString(".")
 	builder.WriteString(m.Id)
-	builder.WriteString("(*?{!have: this && opcode: param && have: \"" + name + "\" } as $" + token + ")")
+	builder.WriteString("<getFormalParams>?{!have: this && opcode: param && have: \"" + name + "\" } as $" + token)
 	return m.runRuleAndFixRng(token, builder.String(), rng)
 }
 
@@ -97,7 +97,7 @@ func (m *mybatisXMLQuery) SyntaxFlowFinal(rng memedit.RangeIf) sfvm.ValueOperato
 	builder.WriteString(m.mapper.ClassName)
 	builder.WriteString(".")
 	builder.WriteString(m.Id)
-	builder.WriteString("(*?{!have: this && opcode: param } as $" + token + ")")
+	builder.WriteString("<getFormalParams>?{!have: this && opcode: param } as $" + token)
 	return m.runRuleAndFixRng(token, builder.String(), rng)
 }
 
