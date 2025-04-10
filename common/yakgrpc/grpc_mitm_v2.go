@@ -745,7 +745,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 					return rsp
 				}
 
-				if len(controlMessage.GetTags()) > 0 {
+				if controlMessage.GetUpdateTags() {
 					taskInfo.Tags = controlMessage.GetTags()
 					httpctx.SetFlowTags(req, controlMessage.GetTags())
 					continue
@@ -1061,10 +1061,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 					continue
 				}
 
-				tags := controlReq.GetTags()
-				if len(tags) > 0 {
-					taskInfo.Tags = tags
-					httpctx.SetFlowTags(originReqIns, tags)
+				if controlReq.GetUpdateTags() {
+					taskInfo.Tags = controlReq.GetTags()
+					httpctx.SetFlowTags(originReqIns, controlReq.GetTags())
 					continue
 				}
 
