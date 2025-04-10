@@ -3,6 +3,9 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync/atomic"
+
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -16,8 +19,13 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"sync/atomic"
+)
+
+type AnalyzeHTTPFlowSource string
+
+const (
+	AnalyzeHTTPFlowSourceDatabase  = "database"
+	AnalyzeHTTPFlowSourceRawPacket = "rawpacket"
 )
 
 func (s *Server) AnalyzeHTTPFlow(request *ypb.AnalyzeHTTPFlowRequest, stream ypb.Yak_AnalyzeHTTPFlowServer) error {
@@ -26,11 +34,20 @@ func (s *Server) AnalyzeHTTPFlow(request *ypb.AnalyzeHTTPFlowRequest, stream ypb
 	}
 	rules := request.GetReplacers()
 	analyzedId := uuid.NewString()
+
+	// 创建一个通道来收集错误
+	errChan := make(chan error, 1)
+
 	client := yaklib.NewVirtualYakitClientWithRuntimeID(func(result *ypb.ExecResult) error {
 		result.RuntimeID = analyzedId
-		return stream.Send(&ypb.AnalyzeHTTPFlowResponse{
-			ExecResult: result,
-		})
+		select {
+		case <-stream.Context().Done():
+			return stream.Context().Err()
+		default:
+			return stream.Send(&ypb.AnalyzeHTTPFlowResponse{
+				ExecResult: result,
+			})
+		}
 	}, analyzedId)
 
 	var opts []HTTPFlowAnalyzeMangerOption
@@ -39,10 +56,14 @@ func (s *Server) AnalyzeHTTPFlow(request *ypb.AnalyzeHTTPFlowRequest, stream ypb
 		opts = append(opts, WithConcurrency(int(config.GetConcurrency())))
 		opts = append(opts, WithDedup(config.GetEnableDeduplicate()))
 	}
+	if request.GetSource() != nil {
+		opts = append(opts, WithDataSource(request.GetSource()))
+	}
 
 	manger, err := NewHTTPFlowAnalyzeManger(
 		s.GetProfileDatabase(),
 		stream.Context(),
+		analyzedId,
 		client,
 		stream,
 		opts...,
@@ -58,21 +79,33 @@ func (s *Server) AnalyzeHTTPFlow(request *ypb.AnalyzeHTTPFlowRequest, stream ypb
 		}
 	}
 
-	err = manger.AnalyzeHTTPFlow(s.GetProjectDatabase(), analyzedId)
-	if err != nil {
+	go func() {
+		err := manger.AnalyzeHTTPFlow(s.GetProjectDatabase())
+		if err != nil {
+			errChan <- err
+		} else {
+			errChan <- nil
+		}
+	}()
+
+	select {
+	case err := <-errChan:
 		return err
+	case <-stream.Context().Done():
+		return stream.Context().Err()
 	}
-	return nil
 }
 
 type HTTPFlowAnalyzeManger struct {
 	*mitmReplacer
+	analyzeId    string
 	client       *yaklib.YakitClient
 	stream       ypb.Yak_AnalyzeHTTPFlowServer
 	ctx          context.Context
-	pluginCaller *yak.MixPluginCaller // for hot patch code exec
-	concurrency  int                  // 并发处理数量
-	dedup        bool                 // 是否对单条数据进行去重
+	source       *ypb.AnalyzedDataSource // 分析流量的数据源
+	pluginCaller *yak.MixPluginCaller    // for hot patch code exec
+	concurrency  int                     // 并发处理数量
+	dedup        bool                    // 是否对单条数据进行去重
 
 	matchedHTTPFlowCount   int64
 	extractedHTTPFlowCount int64
@@ -103,15 +136,23 @@ func WithDedup(dedup bool) HTTPFlowAnalyzeMangerOption {
 	}
 }
 
+func WithDataSource(source *ypb.AnalyzedDataSource) HTTPFlowAnalyzeMangerOption {
+	return func(m *HTTPFlowAnalyzeManger) {
+		m.source = source
+	}
+}
+
 func NewHTTPFlowAnalyzeManger(
-	gorm *gorm.DB,
+	MITMReplacerConfigDb *gorm.DB,
 	ctx context.Context,
+	analyzeId string,
 	client *yaklib.YakitClient,
 	steam ypb.Yak_AnalyzeHTTPFlowServer,
 	opts ...HTTPFlowAnalyzeMangerOption,
 ) (*HTTPFlowAnalyzeManger, error) {
 	m := &HTTPFlowAnalyzeManger{
-		mitmReplacer: NewMITMReplacerFromDB(gorm),
+		analyzeId:    analyzeId,
+		mitmReplacer: NewMITMReplacerFromDB(MITMReplacerConfigDb),
 		client:       client,
 		stream:       steam,
 		ctx:          ctx,
@@ -135,7 +176,7 @@ func NewHTTPFlowAnalyzeManger(
 	return m, nil
 }
 
-func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlow(db *gorm.DB, analyzeId string) (errs error) {
+func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlow(db *gorm.DB) (errs error) {
 	defer func() {
 		m.notifyProcess(1)
 		if err := recover(); err != nil {
@@ -144,26 +185,72 @@ func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlow(db *gorm.DB, analyzeId string) (
 		}
 	}()
 
+	source := m.source
+	if source == nil {
+		return m.AnalyzeHTTPFlowFromDb(db)
+	}
+
+	if source.SourceType == AnalyzeHTTPFlowSourceDatabase {
+		return m.AnalyzeHTTPFlowFromDb(db)
+	} else if source.SourceType == AnalyzeHTTPFlowSourceRawPacket {
+		return m.AnalyzeHTTPFlowFromRawPacket(db)
+	} else {
+		return utils.Errorf("unknown analyze source type: %s", source.SourceType)
+	}
+}
+
+func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlowFromRawPacket(db *gorm.DB) error {
+	if m.source == nil {
+		return utils.Errorf("analyze source is nil")
+	}
+	flow, err := yakit.CreateHTTPFlow(
+		yakit.CreateHTTPFlowWithRequestRaw([]byte(m.source.GetRawRequest())),
+		yakit.CreateHTTPFlowWithResponseRaw([]byte(m.source.GetRawResponse())),
+		yakit.CreateHTTPFlowWithFromPlugin("流量分析"),
+	)
+	if err != nil {
+		return err
+	}
+	// 存储分析的流量
+	err = yakit.SaveHTTPFlow(db, flow)
+	if err != nil {
+		return err
+	}
+	// 处理流量
+	m.ExecHotPatch(db, flow)
+	err = m.ExecReplacerRule(db, flow)
+	if err != nil {
+		return err
+	}
+	m.notifyHandleFlowNum()
+	m.notifyProcess(1)
+	return nil
+}
+
+func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlowFromDb(db *gorm.DB) (errs error) {
 	totalCallBack := func(i int) {
 		atomic.AddInt64(&m.allHTTPFlowCount, int64(i))
 	}
+	if m.source != nil {
+		db = yakit.FilterHTTPFlow(db, m.source.GetHTTPFlowFilter())
+	}
 	flowCh := yakit.YieldHTTPFlowsEx(db, m.ctx, totalCallBack)
-
 	errChan := make(chan error, m.concurrency)
 	swg := utils.NewSizedWaitGroup(m.concurrency, m.ctx)
 	for flow := range flowCh {
 		swg.Add(1)
 		go func(f *schema.HTTPFlow) {
 			defer swg.Done()
+			// hot patch
+			m.ExecHotPatch(db, f)
+			// mitm replace rule
+			if err := m.ExecReplacerRule(db, f); err != nil {
+				errChan <- err
+			}
+			// 处理完成后更新计数和进度
 			atomic.AddInt64(&m.handledHTTPFlowCount, 1)
 			m.notifyProcess(float64(atomic.LoadInt64(&m.handledHTTPFlowCount)) / float64(atomic.LoadInt64(&m.allHTTPFlowCount)))
 			m.notifyHandleFlowNum()
-			// hot patch
-			m.ExecHotPatch(db, analyzeId, f)
-			// mitm replace rule
-			if err := m.ExecReplacerRule(db, f, analyzeId); err != nil {
-				errChan <- err
-			}
 		}(flow)
 	}
 
@@ -175,11 +262,11 @@ func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlow(db *gorm.DB, analyzeId string) (
 	return errs
 }
 
-func (m *HTTPFlowAnalyzeManger) ExecHotPatch(db *gorm.DB, analyzeId string, flow *schema.HTTPFlow) {
+func (m *HTTPFlowAnalyzeManger) ExecHotPatch(db *gorm.DB, flow *schema.HTTPFlow) {
 	extract := func(ruleName string, flow *schema.HTTPFlow) {
 		yakit.UpdateHTTPFlowTags(db, flow)
 		analyzed := &schema.AnalyzedHTTPFlow{
-			ResultId:        analyzeId,
+			ResultId:        m.analyzeId,
 			Rule:            "热加载规则",
 			RuleVerboseName: ruleName,
 			HTTPFlowId:      int64(flow.ID),
@@ -198,9 +285,9 @@ func (m *HTTPFlowAnalyzeManger) ExecHotPatch(db *gorm.DB, analyzeId string, flow
 	}
 }
 
-func (m *HTTPFlowAnalyzeManger) ExecReplacerRule(db *gorm.DB, flow *schema.HTTPFlow, analyzeId string) error {
+func (m *HTTPFlowAnalyzeManger) ExecReplacerRule(db *gorm.DB, flow *schema.HTTPFlow) error {
 	if !m.haveRules() {
-		return utils.Error("analyze rules is empty")
+		return nil
 	}
 	extractData := func(pattern string, rule *MITMReplaceRule, flow *schema.HTTPFlow, isReq bool) []schema.ExtractedData {
 		modelFull, err := model.ToHTTPFlowGRPCModelFull(flow)
@@ -251,7 +338,7 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRule(db *gorm.DB, flow *schema.HTTPF
 		atomic.AddInt64(&m.matchedHTTPFlowCount, 1)
 		m.notifyMatchedHTTPFlowNum()
 		analyzeResult := &schema.AnalyzedHTTPFlow{
-			ResultId:        analyzeId,
+			ResultId:        m.analyzeId,
 			Rule:            rule.GetRule(),
 			RuleVerboseName: rule.VerboseName,
 		}
