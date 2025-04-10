@@ -40,3 +40,21 @@ func TestEscape(t *testing.T) {
 		spew.Dump(res)
 	})
 }
+
+func TestEmptyPath(t *testing.T) {
+	local, err := yakgrpc.NewLocalClient()
+	require.NoError(t, err)
+
+	t.Run("test empty path", func(t *testing.T) {
+		res, err := local.RequestYakURL(context.Background(), &ypb.RequestYakURLParams{
+			Method: "GET",
+			Url: &ypb.YakURL{
+				Schema: "ssadb",
+				Path:   "",
+			},
+		})
+		require.Contains(t, err.Error(), "not exist")
+		spew.Dump(res)
+	})
+
+}

@@ -94,6 +94,9 @@ func (fs *irSourceFS) PathSplit(p string) (string, string) {
 }
 
 func pathSplit(p string) (string, string) {
+	if p == "" {
+		return "", ""
+	}
 	dir, name := path.Split(p)
 	if len(dir) != 1 && dir[len(dir)-1] == '/' {
 		dir = dir[:len(dir)-1]
@@ -152,6 +155,9 @@ func (fs *irSourceFS) Ext(string) string {
 }
 
 func (fs *irSourceFS) getProgram(path string) (string, bool) {
+	if path == "" {
+		return "", false
+	}
 	dir := strings.Split(path, string(fs.GetSeparators()))
 	return dir[1], len(dir) == 2
 }
