@@ -44,7 +44,6 @@ func fakeImportType(lib *Program, name string) Type {
 		builder.SetEmptyRange()
 		bluePrint := builder.CreateBlueprint(name)
 		lib.ExportType[name] = bluePrint
-		builder.ClassConstructor(bluePrint, []Value{})
 		return bluePrint
 	} else {
 		return t

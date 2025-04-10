@@ -263,7 +263,6 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 	if blueprint == nil {
 		return
 	}
-
 	store := y.StoreFunctionBuilder()
 	blueprint.AddLazyBuilder(func() {
 		switchHandler := y.SwitchFunctionBuilder(store)

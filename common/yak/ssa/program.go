@@ -116,6 +116,7 @@ func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path 
 func (prog *Program) IsVirtualImport() bool {
 	return prog.config.VirtualImport
 }
+
 func (prog *Program) GetSubProgram(name string, path ...string) *Program {
 	child, ok := prog.UpStream.Get(name)
 	if !ok {
