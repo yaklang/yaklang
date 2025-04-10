@@ -37,7 +37,7 @@ jobs:
       - name: Init Module
         run: |
           go mod tidy && go work vendor
-          cp -r $GOPATH/pkg/mod/$(go list -m github.com/yaklang/pcap | sed 's/ /@/')/libpcap ./vendor/github.com/yaklang/pcap/
+          cp -r $(go env GOPATH)/pkg/mod/$(go list -m github.com/yaklang/pcap | sed 's/ /@/')/libpcap ./vendor/github.com/yaklang/pcap/
           tree ./vendor
 
       - name: Init Project
