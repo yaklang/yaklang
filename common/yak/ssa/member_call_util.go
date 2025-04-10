@@ -206,6 +206,16 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 	case NullTypeKind:
 	default:
 	}
+	//保底操作，从val-member中获取
+	if member, exist := value.GetMember(key); exist {
+		ret.typ = member.GetType()
+		return
+	}
+	member, exist := value.GetStringMember(key.String())
+	if exist {
+		ret.typ = member.GetType()
+		return
+	}
 	ret.exist = false
 	return
 }
