@@ -348,3 +348,47 @@ namespace B\C\D\E{
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
+func TestMember(t *testing.T) {
+	code := `<?php
+class A{
+	public function aa(){
+		$this->a = 1;
+	}
+}
+$a = new A();
+$a->aa();
+println($a->a);
+`
+	ssatest.CheckSyntaxFlow(t, code,
+		`println(* #-> as $param)`, map[string][]string{
+			"param": {"1"},
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+}
+func TestCheckObjectExist(t *testing.T) {
+	code := `<?php
+
+class Generate extends Backend
+{
+    public function initialize()
+    {
+        $this->service = new GenerateService();
+    }
+	public function generate()
+    {
+		$param = request()->param();
+		return $this->service->generate($param);
+    }
+}
+class GenerateService{
+	public function generate($param){
+		println($param);
+	}
+}
+$a = new Generate();
+$a->initialize();
+$a->generate();
+`
+	ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
+		"param": {"Undefined-request", "Undefined-.param(valid)"},
+	}, ssaapi.WithLanguage(ssaapi.PHP))
+}
