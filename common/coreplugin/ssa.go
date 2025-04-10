@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc"
@@ -28,6 +29,7 @@ func ParseProjectWithAutoDetective(ctx context.Context, path string, language st
 			if msg.Type == "log" && msg.Content.Level == "code" {
 				// start compile
 				json.Unmarshal([]byte(msg.Content.Data), progInfo)
+				log.Infof("progInfo: %v", progInfo)
 			}
 			return nil
 		},
