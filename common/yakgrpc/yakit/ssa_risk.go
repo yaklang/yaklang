@@ -193,6 +193,7 @@ func FilterSSARisk(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
 	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{"tags"}, filter.GetTags(), false)
 	db = bizhelper.FuzzSearchEx(db, []string{"title", "title_verbose"}, filter.GetTitle(), false)
 	db = bizhelper.FuzzSearchEx(db, []string{
+		"id", "hash", // for exact query
 		"program_name", "code_source_url",
 		"risk_type", "severity", "from_rule", "tags",
 	}, filter.GetSearch(), false)
