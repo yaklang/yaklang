@@ -190,6 +190,9 @@ jobs:
           - name: Test gRPC(LARGE)MUSTPASS
             run: go test -timeout 2m -run TestLARGEGRPCMUSTPASS* ./common/yakgrpc/...
 
+          - name: Test gRPC MUSTPASS HTTPFlow Analyzer
+            run: go test -timeout 1m -run TestMUSTPASS_AnalyzeHTTPFlow* ./common/yakgrpc/...
+
           - name: Test AI Task
             run: go test -timeout 1m -run TestAITaskWith ./common/yakgrpc/...
 
