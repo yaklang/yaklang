@@ -1399,23 +1399,27 @@ type manualHijackManager struct {
 	hijackLock  sync.Mutex
 }
 
-func (m *manualHijackManager) setCanRegister(b bool) {
-	m.hijackLock.Lock()
-	defer m.hijackLock.Unlock()
-	if !b {
-		m.broadcastNeedLock(&ypb.SingleManualHijackControlMessage{
-			Forward: true,
-		})
-	}
-	m.canRegister = b
-}
-
 func newManualHijackManager() *manualHijackManager {
 	return &manualHijackManager{
 		hijackTask:  omap.NewOrderedMap[string, *manualHijackTask](make(map[string]*manualHijackTask)),
 		messageChan: make(map[string]chan<- *ypb.SingleManualHijackControlMessage),
 		canRegister: false,
 	}
+}
+
+func (m *manualHijackManager) setCanRegister(b bool) {
+	m.hijackLock.Lock()
+	defer m.hijackLock.Unlock()
+	if !b {
+		for _, id := range m.hijackTask.Keys() {
+			m.hijackTask.Delete(id)
+			if ch, ok := m.messageChan[id]; ok {
+				close(ch)
+				delete(m.messageChan, id)
+			}
+		}
+	}
+	m.canRegister = b
 }
 
 func (m *manualHijackManager) getHijackingTaskInfo() []*ypb.SingleManualHijackInfoMessage {
