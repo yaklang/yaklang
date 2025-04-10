@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -517,4 +518,55 @@ function a(){
 }`
 		test.NonStrictMockSSA(t, code)
 	})
+}
+
+func TestBlueprintVirtual(t *testing.T) {
+	fs := filesys.NewVirtualFs()
+	fs.AddFile("test.php", `<?php
+
+namespace app\admin\service;
+
+
+use app\admin\model\Menu;
+use app\common\service\BaseService;
+use think\Db;
+class GenerateService extends BaseService
+{
+	public function getColumnList($tableName)
+    {
+        $columnList = Db::query("SELECT COLUMN_NAME,COLUMN_DEFAULT,DATA_TYPE,COLUMN_TYPE,COLUMN_COMMENT FROM information_schema.COLUMNS where TABLE_SCHEMA = '" . env('database.database') . "' AND TABLE_NAME = '{$tableName}'");
+}
+
+}
+`)
+	fs.AddFile("test2.php", `<?php
+
+
+namespace app\admin\controller;
+
+
+use app\admin\service\GenerateService;
+use app\common\controller\Backend;
+
+class Generate extends Backend
+{
+    public function generate()
+    {
+            $param = request()->param();
+			$this->service = new GenerateService();
+            return $this->service->getColumnList($param);
+    }
+}
+`)
+	test.CheckSyntaxFlowWithFS(t, fs, `
+request().param() as $params
+Db.query(* #{
+	include: <<<CODE
+* & $params
+CODE
+}-> as $sink)
+
+`, map[string][]string{
+		"sink": {"Undefined-request"},
+	}, true, ssaapi.WithLanguage(ssaapi.PHP))
 }
