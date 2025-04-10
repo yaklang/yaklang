@@ -50,6 +50,11 @@ func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind) Value {
 			if utils.IsNil(bluePrint.Constructor) {
 				return false
 			} else {
+				//check blueprint is virtual
+				_func := bluePrint._container.GetFunc()
+				if _func.name == string(VirtualFunctionName) {
+					return false
+				}
 				_method = bluePrint.Constructor
 				return true
 			}
