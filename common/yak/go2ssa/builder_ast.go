@@ -1982,7 +1982,8 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 		if bp, ok := typ.(*ssa.Blueprint); ok {
 			if v := b.PeekValue(libName); v != nil {
 				lv := b.CreateLocalVariable(typName)
-				rv := b.ReadMemberCallValue(v, bp.Constructor)
+				method := bp.GetMagicMethod(ssa.Constructor)
+				rv := b.ReadMemberCallValue(v, method)
 				rv.SetType(HandleFullTypeNames(rv.GetType(), []string{path}))
 				b.AssignVariable(lv, rv)
 			}

@@ -290,7 +290,6 @@ func TestFakeImport_syntaxflow(t *testing.T) {
 		
 		w.Write([]byte(response))
 	}
-
 	`,
 			`
 			http?{<fullTypeName>?{have: 'net/http'}} as $entry;
