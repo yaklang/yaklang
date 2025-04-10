@@ -139,6 +139,9 @@ func TestGraph_Builder(t *testing.T) {
 				}
 				return nil
 			},
+			func(node string) map[string]*graph.Neighbor[string] {
+				return map[string]*graph.Neighbor[string]{}
+			},
 			func(fromKey, toKey int, edgeType string, extraMsg map[string]any) {
 				switch edgeType {
 				case "depends_on":
