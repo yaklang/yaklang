@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -26,12 +27,27 @@ type ForgeBlueprint struct {
 	// PersistentPrompt 是在AI助手整个会话过程中持续存在的提示词，用于维持AI的行为一致性
 	PersistentPrompt string
 
+	// ResultPrompt 是AI助手生成结果时使用的提示词，用于设置AI的输出格式和内容
+	ResultPrompt string
+
 	// Tools 是AI助手可以使用的工具列表，这些工具可以扩展AI的能力
 	Tools []*aitool.Tool
 
 	// ParameterRuleYaklangCode 是原始的Yaklang CLI代码，用于AI理解和操作Yaklang环境
 	// 不执行这段代码，只通过代码生成表单
 	ParameterRuleYaklangCode string
+}
+
+func NewForgeBlueprint(opts ...Option) *ForgeBlueprint {
+	forge := &ForgeBlueprint{
+		ParameterRuleYaklangCode: `
+cli.String("query", cli.setHelp("用户自由输入"), cli.setRequired(true))
+cli.check()`,
+	}
+	for _, opt := range opts {
+		opt(forge)
+	}
+	return forge
 }
 
 // Option 是一个函数类型，用于实现选项模式来配置ForgeBlueprint
@@ -42,6 +58,14 @@ type Option func(*ForgeBlueprint)
 func WithInitializePrompt(prompt string) Option {
 	return func(f *ForgeBlueprint) {
 		f.InitializePrompt = prompt
+	}
+}
+
+// WithResultPrompt 设置AI助手的生成结果提示词
+// 这个提示词会在AI助手生成结果时被使用，用于定义AI的输出格式和内容
+func WithResultPrompt(prompt string) Option {
+	return func(f *ForgeBlueprint) {
+		f.ResultPrompt = prompt
 	}
 }
 
@@ -90,7 +114,28 @@ func (f *ForgeBlueprint) GenerateParameter() *ypb.YaklangInspectInformationRespo
 func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
 	params []*ypb.ExecParamItem,
 ) (string, func(any) error, error) {
-	return "", nil, nil
+	initPrompt, err := f.renderInitPrompt("", params...)
+	if err != nil {
+		return "", nil, utils.Errorf("render init prompt failed: %v", err)
+	}
+	persistentPrompt, err := f.renderPersistentPrompt("")
+	if err != nil {
+		return "", nil, utils.Errorf("render persistent prompt failed: %v", err)
+	}
+	_ = persistentPrompt
+	return initPrompt, nil, nil
+}
+
+func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOptionWithQuery(
+	query string,
+) (string, func(any) error, error) {
+	params := []*ypb.ExecParamItem{
+		{
+			Key:   "query",
+			Value: query,
+		},
+	}
+	return f.GenerateFirstPromptWithMemoryOption(params)
 }
 
 func cliParam2grpc(params []*information.CliParameter) []*ypb.YakScriptParam {
