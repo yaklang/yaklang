@@ -34,14 +34,16 @@ jobs:
           go-version-file: "./go.mod"
         id: go
 
-
       - name: Init Module
         run: |
           go mod tidy && go work vendor
+          cp -r $GOPATH/pkg/mod/$(go list -m github.com/yaklang/pcap | sed 's/ /@/')/libpcap ./vendor/github.com/yaklang/pcap/
+          tree ./vendor
+
       - name: Init Project
         if: steps.cache-project.outputs.cache-hit != 'true'
         run: |
-          go build common/yak/cmd/yak.go 
+          go build -x common/yak/cmd/yak.go 
           ./yak --help
 
   test:
