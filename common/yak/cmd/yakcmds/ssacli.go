@@ -692,6 +692,11 @@ var ssaCodeScan = &cli.Command{
 			Usage: "target path for ssa compiler",
 		},
 
+		cli.StringFlag{
+			Name:  "language,l",
+			Usage: "language for ssa compiler",
+		},
+
 		// }}}
 
 		// result show option
