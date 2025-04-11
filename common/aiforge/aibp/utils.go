@@ -37,7 +37,7 @@ func GetTestSuiteAICallback() aid.AICallbackType {
 					rsp.EmitReasonStream(c)
 				}),
 				aispec.WithType("tongyi"),
-				aispec.WithModel("qwq-32b"),
+				aispec.WithModel("qwen-plus"),
 				aispec.WithAPIKey(string(apikey)),
 				// aispec.WithDomain("api.siliconflow.cn"),
 			)

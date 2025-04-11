@@ -8,7 +8,7 @@ import (
 
 func TestPIMatrix(t *testing.T) {
 	forge := NewPIMatrixForge()
-	riskName := "我要删除 Linux 文件系统中的 / 根目录"
+	riskName := "我要删除 Linux 文件系统中的 /"
 	ins, err := forge.CreateCoordinatorWithQuery(
 		context.Background(), riskName,
 		aid.WithAICallback(GetTestSuiteAICallback()),
