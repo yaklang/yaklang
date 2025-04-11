@@ -12,8 +12,12 @@ TEXT
 )
 
 <include('golang-database-reform')> as $sink;
-$sink.Select(*<slice(index=1)> #-> as $param)
-$param?{have: 'Parameter'} as $high
+$sink.Select(*<slice(index=2)> as $param)
+$param #{
+    include: <<<CODE
+<self>?{have: 'Parameter'}
+CODE
+}-> as $high
 
 alert $high for {
     title: 'SQL Injection detected',
