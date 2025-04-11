@@ -1,6 +1,7 @@
 name: Release Vulinbox(OSS Release)
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - "common/vulinbox/**"
