@@ -35,6 +35,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 )
 
 var (
@@ -372,20 +373,20 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			if reqInstance.GetSetYakScript() {
 				clearPluginHTTPFlowCache()
 				script, _ := yakit.GetYakScript(s.GetProfileDatabase(), reqInstance.GetYakScriptID())
-				if script != nil && (script.Type == "mitm" || script.Type == "port-scan") {
-					log.Infof("start to load yakScript[%v]: %v 's capabilities", script.ID, script.ScriptName)
-					err = mitmPluginCaller.LoadPluginEx(ctx, script, reqInstance.GetYakScriptParams()...)
-					if err != nil {
-						if len(script.GetParams()) > 0 {
-							_ = send(&ypb.MITMV2Response{HaveNotification: true, NotificationContent: []byte(fmt.Sprintf(
-								"加载插件【%s】，参数【%v】失败", script.ScriptName, reqInstance.GetYakScriptParams(),
-							))})
+				if script != nil {
+					if script.Type == "mitm" || script.Type == "port-scan" {
+						log.Infof("start to load yakScript[%v]: %v 's capabilities", script.ID, script.ScriptName)
+						err = mitmPluginCaller.LoadPluginEx(ctx, script, reqInstance.GetYakScriptParams()...)
+						if err != nil {
+							if len(script.GetParams()) > 0 {
+								_ = send(&ypb.MITMV2Response{HaveNotification: true, NotificationContent: []byte(fmt.Sprintf(
+									"加载插件【%s】，参数【%v】失败", script.ScriptName, reqInstance.GetYakScriptParams(),
+								))})
+							}
+							log.Error(err)
 						}
-						log.Error(err)
 					}
-					continue
-				}
-				if script == nil && reqInstance.GetYakScriptContent() != "" {
+				} else if reqInstance.GetYakScriptContent() != "" {
 					hotPatchScript := reqInstance.GetYakScriptContent()
 					log.Info("start to load yakScriptContent content")
 					err := mitmPluginCaller.LoadHotPatch(stream.Context(), reqInstance.GetYakScriptParams(), hotPatchScript)
@@ -396,7 +397,6 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 						}
 						_ = send(&ypb.MITMV2Response{HaveNotification: true, NotificationContent: []byte(fmt.Sprintf("mitm load hotpatch script error:%v", err))})
 					}
-					continue
 				}
 
 				_ = send(&ypb.MITMV2Response{
@@ -728,6 +728,11 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 		taskInfo := task.infoMessage
 
+		// todo :  maybe convert http response?
+		//if lowhttp.IsMultipartFormDataRequest(rsp) || !utf8.Valid(rsp) {
+		//	taskInfo.Response = lowhttp.ConvertHTTPRequestToFuzzTag(rsp)
+		//}
+
 		taskInfo.Status = Hijack_Status_Response
 		taskInfo.Response = rsp
 		taskInfo.TraceInfo = model.ToLowhttpTraceInfoGRPCModel(traceInfo)
@@ -1018,6 +1023,10 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			RemoteAddr: httpctx.GetRemoteAddr(originReqIns),
 			Method:     lowhttp.GetHTTPRequestMethod(req),
 			Status:     Hijack_Status_Request,
+		}
+
+		if lowhttp.IsMultipartFormDataRequest(fixReq) || !utf8.Valid(fixReq) {
+			feedbackOrigin.Request = lowhttp.ConvertHTTPRequestToFuzzTag(fixReq)
 		}
 
 		task := hijackManger.register(feedbackOrigin)
