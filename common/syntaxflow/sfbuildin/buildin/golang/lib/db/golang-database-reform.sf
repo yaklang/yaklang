@@ -9,7 +9,7 @@ TEXT
 )
 
 reform?{<fullTypeName>?{have: 'github.com/hedonist/reform'}} as $entry;
-$entry.NewDB <getCall> as $output;
+$entry.NewDB() as $output;
 
 alert $output
 

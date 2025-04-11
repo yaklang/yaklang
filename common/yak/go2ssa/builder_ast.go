@@ -26,7 +26,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			lib.SetExportType(aliasName, aliasType)
 		}
 		b.GetProgram().Funcs.ForEach(func(funcName string, funcValue *ssa.Function) bool {
-			if !funcValue.IsMethod() && funcValue.GetName() != "@init" {
+			if !funcValue.IsMethod() && funcValue.GetName() != string(ssa.MainFunctionName) {
 				lib.SetExportValue(funcName, funcValue)
 			}
 			return true
@@ -71,9 +71,9 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			lib.PushEditor(prog.GetCurrentEditor())
 			lib.GlobalScope = b.ReadMemberCallValue(global, b.EmitConstInst(pkgNameCurrent))
 
-			init := lib.GetAndCreateFunction(pkgNameCurrent, "@init")
+			init := lib.GetAndCreateFunction(pkgNameCurrent, string(ssa.MainFunctionName))
 			init.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.CreateAnyType()}, ssa.CreateAnyType(), false))
-			builder := lib.GetAndCreateFunctionBuilder(pkgNameCurrent, "@init")
+			builder := lib.GetAndCreateFunctionBuilder(pkgNameCurrent, string(ssa.MainFunctionName))
 
 			if builder != nil {
 				builder.SetBuildSupport(b.FunctionBuilder)
@@ -187,7 +187,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			defer func() {
 				lib.VisitAst(ast)
 			}()
-			builder := lib.GetAndCreateFunctionBuilder(pkgNameCurrent, "@init")
+			builder := lib.GetAndCreateFunctionBuilder(pkgNameCurrent, string(ssa.MainFunctionName))
 
 			if builder != nil {
 				builder.SetBuildSupport(b.FunctionBuilder)
