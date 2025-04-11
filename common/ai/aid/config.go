@@ -56,6 +56,9 @@ type Config struct {
 
 	inputConsumption  *int64
 	outputConsumption *int64
+
+	// RiskControl
+	riskCtrl *riskControl
 }
 
 func (c *Config) outputConsumptionCallback(current int) {
@@ -133,6 +136,7 @@ func newConfig(ctx context.Context) *Config {
 		syncMap:           make(map[string]func() any),
 		inputConsumption:  new(int64),
 		outputConsumption: new(int64),
+		riskCtrl:          new(riskControl),
 	}
 	go func() {
 		log.Infof("config %s started, start to handle receiving loop", c.id)
