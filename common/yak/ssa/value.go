@@ -1,8 +1,11 @@
 package ssa
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
 // --------------- Read
@@ -195,7 +198,24 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		return
 	}
 	scope := b.CurrentBlock.ScopeTable
-	scope.AssignVariable(variable, value)
+	if variable.IsPointer() {
+		obj := variable.object
+
+		v := b.CreateMemberCallVariable(obj, b.EmitConstInst("@value"), false)
+		p := b.CreateMemberCallVariable(obj, b.EmitConstInst("@pointer"), false)
+		p.SetKind(ssautil.PointerVariable)
+		scope.AssignVariable(v, value)
+		scope.AssignVariable(p, variable.GetValue())
+		n := strings.TrimPrefix(variable.GetValue().String(), "&")
+
+		if ret := GetFristLocalVariableFromScope(scope, n); ret == nil {
+			scope.AssignVariable(b.CreateVariable(n), b.CopyValue(value))
+		} else if ret = ReadVariableFromScopeAndParent(variable.GetScope(), n); ret != nil {
+			scope.AssignVariable(ret, b.CopyValue(value), false)
+		}
+	} else {
+		scope.AssignVariable(variable, value)
+	}
 
 	if value.GetName() == variable.GetName() {
 		if value.GetOpcode() == SSAOpcodeFreeValue || value.GetOpcode() == SSAOpcodeParameter {
@@ -248,10 +268,22 @@ func (b *FunctionBuilder) CreateVariableForce(name string, pos ...CanStartStopTo
 	return b.createVariableEx(name, false, pos...)
 }
 
+func (b *FunctionBuilder) CreateVariableCross(name string, pos ...CanStartStopToken) *Variable {
+	if variable := b.getCrossScopeVariable(name); variable != nil {
+		if value := variable.GetValue(); value != nil {
+			return variable
+		}
+	}
+	return b.createVariableEx(name, false, pos...)
+}
+
 func (b *FunctionBuilder) CreateVariable(name string, pos ...CanStartStopToken) *Variable {
 	if variable := b.getCurrentScopeVariable(name); variable != nil {
 		if value := variable.GetValue(); value != nil {
 			if _, ok := ToConst(value); ok {
+				return variable
+			}
+			if _, ok := ToMake(value); ok {
 				return variable
 			}
 			if _, ok := value.(*SideEffect); ok {
@@ -386,6 +418,14 @@ func (b *FunctionBuilder) getParentFunctionVariable(name string) (Value, bool) {
 func (b *FunctionBuilder) getCurrentScopeVariable(name string) *Variable {
 	scope := b.CurrentBlock.ScopeTable
 	if variable := ReadVariableFromScope(scope, name); variable != nil {
+		return variable
+	}
+	return nil
+}
+
+func (b *FunctionBuilder) getCrossScopeVariable(name string) *Variable {
+	scope := b.CurrentBlock.ScopeTable
+	if variable := ReadVariableFromScopeAndParent(scope, name); variable != nil {
 		return variable
 	}
 	return nil

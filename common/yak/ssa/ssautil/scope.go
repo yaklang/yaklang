@@ -39,7 +39,7 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 	CreateVariable(name string, isLocal bool) VersionedIF[T]
 
 	// assign a value to the variable
-	AssignVariable(VersionedIF[T], T)
+	AssignVariable(VersionedIF[T], T, ...bool)
 
 	GetVariableFromValue(T) VersionedIF[T]
 
@@ -416,13 +416,12 @@ func (v *ScopedVersionedTable[T]) ReadValue(name string) (t T) {
 }
 
 // ---------------- create
-
 func (v *ScopedVersionedTable[T]) CreateVariable(name string, isLocal bool) VersionedIF[T] {
 	return v.newVar(name, isLocal)
 }
 
 // ---------------- Assign
-func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], value T) {
+func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], value T, updateLinks ...bool) {
 	// assign
 	err := variable.Assign(value)
 	if err != nil {
@@ -430,12 +429,18 @@ func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], va
 		return
 	}
 
-	{
+	updata := true
+	if len(updateLinks) > 0 {
+		updata = updateLinks[0]
+	}
+
+	if updata {
 		// variable to value
 		scope.linkValues.Append(variable.GetName(), variable)
 		// value to variable
 		scope.linkVariable[value] = variable
 	}
+
 	// capture variable
 	if !variable.GetLocal() && !scope.IsRoot() {
 		for _, variable := range scope.GetCurrentVariables(variable.GetName()) {

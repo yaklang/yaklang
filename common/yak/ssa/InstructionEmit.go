@@ -1,10 +1,13 @@
 package ssa
 
 import (
+	"strings"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 	"golang.org/x/exp/slices"
 )
 
@@ -377,6 +380,44 @@ func (f *FunctionBuilder) EmitValueOnlyDeclare(name string) *Undefined {
 
 func (f *FunctionBuilder) EmitConstInstNil() *ConstInst {
 	return f.EmitConstInst(nil)
+}
+
+func (f *FunctionBuilder) EmitConstPointer(o *Variable) Value {
+	keys := []Value{f.EmitConstInst("@pointer"), f.EmitConstInst("@value")}
+	values := []Value{f.EmitConstInst(o.GetName()), o.GetValue()}
+
+	pointer := f.InterfaceAddFieldBuild(2, func(i int) Value {
+		return keys[i]
+	}, func(i int) Value {
+		return values[i]
+	})
+
+	t := NewObjectType()
+	t.SetName("Pointer")
+	t.SetTypeKind(PointerKind)
+	pointer.SetType(t)
+
+	return pointer
+}
+
+func (f *FunctionBuilder) GetOriginPointer(p Value) *Variable {
+	o := f.CreateMemberCallVariable(p, f.EmitConstInst("@pointer"), true)
+	o.SetKind(ssautil.PointerVariable)
+
+	return o
+}
+
+func (f *FunctionBuilder) GetOriginValue(obj Value) Value {
+	v := f.ReadMemberCallValue(obj, f.EmitConstInst("@value"))
+	p := f.ReadMemberCallValue(obj, f.EmitConstInst("@pointer"))
+
+	n := strings.TrimPrefix(p.String(), "&")
+	scope := obj.GetBlock().ScopeTable
+	if ret := ReadVariableFromScopeAndParent(scope, n); ret != nil {
+		return ret.GetValue()
+	}
+
+	return v
 }
 
 func (f *FunctionBuilder) EmitConstInstWithUnary(i any, un int) *ConstInst {
