@@ -2,6 +2,7 @@ package aid
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"testing"
 )
@@ -21,7 +22,7 @@ func TestRiskControl_Enabled(t *testing.T) {
 
 	// Test enabled riskControl
 	rc = &riskControl{
-		callback: func(*Config, io.Reader) *RiskControlResult {
+		callback: func(*Config, context.Context, io.Reader) *RiskControlResult {
 			return &RiskControlResult{}
 		},
 	}
@@ -34,7 +35,7 @@ func TestRiskControl_SetCallback(t *testing.T) {
 	rc := &riskControl{}
 
 	// Test setting callback
-	callback := func(*Config, io.Reader) *RiskControlResult {
+	callback := func(*Config, context.Context, io.Reader) *RiskControlResult {
 		return &RiskControlResult{}
 	}
 	rc.setCallback(callback)
@@ -77,7 +78,7 @@ func TestRiskControl_DoRiskControl(t *testing.T) {
 		{
 			name: "valid callback",
 			rc: &riskControl{
-				callback: func(*Config, io.Reader) *RiskControlResult {
+				callback: func(*Config, context.Context, io.Reader) *RiskControlResult {
 					return &RiskControlResult{
 						Skipped: false,
 						Score:   0.8,
@@ -97,7 +98,7 @@ func TestRiskControl_DoRiskControl(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.rc.doRiskControl(tt.config, tt.reader)
+			result := tt.rc.doRiskControl(tt.config, context.Background(), tt.reader)
 			if result.Skipped != tt.expectedResult.Skipped {
 				t.Errorf("expected Skipped %v, got %v", tt.expectedResult.Skipped, result.Skipped)
 			}
