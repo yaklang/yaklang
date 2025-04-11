@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -745,7 +746,11 @@ var ssaCodeScan = &cli.Command{
 		}()
 		ctx := context.Background()
 		log.Infof("============= start to scan code ==============")
+		ruleTimeStart := time.Now()
 		SyncEmbedRule()
+		ruleTime := time.Now().Sub(ruleTimeStart)
+		_ = ruleTime
+		log.Infof("sync rule from embed to database success, cost %v", ruleTime)
 
 		// Parse configuration
 		config, err := parseSFScanConfig(c)
@@ -756,13 +761,17 @@ var ssaCodeScan = &cli.Command{
 		// Ensure the file is closed after we're done
 		defer config.DeferFunc()
 
+		compileTimeStart := time.Now()
 		prog, err := getProgram(ctx, config)
 		if err != nil {
 			log.Errorf("get program failed: %s", err)
 			return err
 		}
+		compileTime := time.Now().Sub(compileTimeStart)
+		log.Infof("get or parse rule success, cost %v", compileTime)
 
 		log.Infof("================= get or parse rule ================")
+		scanTimeStart := time.Now()
 		ruleFilter := &ypb.SyntaxFlowRuleFilter{
 			Language:          []string{prog.GetLanguage()},
 			FilterLibRuleKind: yakit.FilterLibRuleFalse,
@@ -775,11 +784,22 @@ var ssaCodeScan = &cli.Command{
 			log.Infof("you can use `yak ssa-risk -p %s --task-id \"%s\" -o xxx`", prog.GetProgramName(), taskId)
 			return err
 		}
-		log.Infof("scan success, task id: %s with program: %s", taskId, prog.GetProgramName())
+		scanTime := time.Now().Sub(scanTimeStart)
+		log.Infof("scan success, task id: %s with program: %s, cost %v", taskId, prog.GetProgramName(), scanTime)
+
+		exportTimeStart := time.Now()
 		ShowResult(&ypb.SyntaxFlowResultFilter{
 			TaskIDs:  []string{taskId},
 			OnlyRisk: true,
 		}, config.OutputWriter)
+		exportTime := time.Now().Sub(exportTimeStart)
+		log.Infof("show result success, cost %v", exportTime)
+		// show echo  time
+		log.Infof("finish all time cost:")
+		log.Infof("rule sync: %v", ruleTime)
+		log.Infof("compile: %v", compileTime)
+		log.Infof("scan: %v", scanTime)
+		log.Infof("export: %v", exportTime)
 		return nil
 	},
 }
