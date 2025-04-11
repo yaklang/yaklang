@@ -1,68 +1,70 @@
-desc(
-    title: "Find Java Risky System Hash Config",
-    title_zh: "查找 Java 风险的系统哈希配置",
-    type: security,
-    level: low,
-    risk:'risky_crypt',
-    desc: <<<TEXT
-    检测代码中是否使用了已知的不安全或易受攻击的哈希算法。具体检测Java 代码中是否使用System.setProperty() 方法配置了不安全的哈希函数。
-TEXT
-)
+//todo: 该规则由于getActualParams实现bug，暂时禁用
+// desc(
+//     title: "Find Java Risky System Hash Config",
+//     title_zh: "查找 Java 风险的系统哈希配置",
+//     type: security,
+//     level: low,
+//     risk:'risky_crypt',
+//     desc: <<<TEXT
+//     检测代码中是否使用了已知的不安全或易受攻击的哈希算法。具体检测Java 代码中是否使用System.setProperty() 方法配置了不安全的哈希函数。
+// TEXT
+// )
 
-// System.setProperty("jasypt.encryptor.algorithm", "MD5");
-System.setProperty?{<typeName>?{have:'java.lang'}} as $set;
-$set?{<getActualParams><slice(index=1)>?{have:'jasypt.encryptor.algorithm'}} as $toCheck;
-$toCheck<getActualParams><slice(index=2)>?{have:'MD5'} as $algorithm;
-$algorithm#{
-    until:<<<UNTIL
-   <self>?{opcode:const}?{have:/^SHA$/ || 'SHA-0' || 'SHA-1'|| 'MD5' || 'MD4' || 'MD2' || 'RIPEMD160'}
-UNTIL,
-    exclude:<<<EXCLUDE
-    <self>?{have:'SHA256' || have:'SHA384' || have:'SHA512' }
-EXCLUDE
-}-> as $sink;
-alert $sink for{
-    message:"发现Java代码使用System.setProperty方法进行不安全的哈希算法配置",
-}
+// // System.setProperty("jasypt.encryptor.algorithm", "MD5");
+// System.setProperty?{<typeName>?{have:'java.lang'}} as $set;
+// $set?{<getActualParams><slice(index=1)>?{have:'jasypt.encryptor.algorithm'}} as $toCheck;
+// // xx(*?{opcode: const}) as $sink
+// $toCheck<getActualParams><slice(index=2)>?{have:'MD5'} as $algorithm;
+// $algorithm#{
+//     until:<<<UNTIL
+//    <self>?{opcode:const}?{have:/^SHA$/ || 'SHA-0' || 'SHA-1'|| 'MD5' || 'MD4' || 'MD2' || 'RIPEMD160'}
+// UNTIL,
+//     exclude:<<<EXCLUDE
+//     <self>?{have:'SHA256' || have:'SHA384' || have:'SHA512' }
+// EXCLUDE
+// }-> as $sink;
+// alert $sink for{
+//     message:"发现Java代码使用System.setProperty方法进行不安全的哈希算法配置",
+// }
 
-desc{
-    lang:java,
-    alert_num:1,
-    'file://unsafe.java': <<<EOF
-     import java.util.HashMap;
-     import java.util.Map;
-     import java.util.Scanner;
+// desc{
+//     lang:java,
+//     alert_num:1,
+//     'file://unsafe.java': <<<EOF
+//      import java.util.HashMap;
+//      import java.util.Map;
+//      import java.util.Scanner;
 
-     import org.jasypt.util.password.StringHasher;
+//      import org.jasypt.util.password.StringHasher;
 
-     public class InsecurePasswordStorage {
-         public static void main(String[] args) {
-             Map<String, String> userPasswords = new HashMap<>();
-             userPasswords.put("user1", "password1");
-             userPasswords.put("user2", "password2");
+//      public class InsecurePasswordStorage {
+//          public static void main(String[] args) {
+//              Map<String, String> userPasswords = new HashMap<>();
+//              userPasswords.put("user1", "password1");
+//              userPasswords.put("user2", "password2");
 
-             StringHasher stringHasher = new StringHasher();
+//              StringHasher stringHasher = new StringHasher();
 
-             Scanner scanner = new Scanner(System.in);
-             System.out.println("Enter username:");
-             String username = scanner.nextLine();
-             System.out.println("Enter password:");
-             String password = scanner.nextLine();
-             scanner.close();
+//              Scanner scanner = new Scanner(System.in);
+//              System.out.println("Enter username:");
+//              String username = scanner.nextLine();
+//              System.out.println("Enter password:");
+//              String password = scanner.nextLine();
+//              scanner.close();
 
-             // 使用 System.setProperty() 方法配置不安全的哈希函数 (MD5)
-             System.setProperty("jasypt.encryptor.algorithm", "MD5");
+//              // 使用 System.setProperty() 方法配置不安全的哈希函数 (MD5)
+//              System.setProperty("jasypt.encryptor.algorithm", "MD5");
 
-             String hashedPassword = stringHasher.hash(password);
+//              String hashedPassword = stringHasher.hash(password);
 
-             if (userPasswords.containsKey(username) && userPasswords.get(username).equals(hashedPassword)) {
-                 System.out.println("Password is correct!");
-             } else {
-                 System.out.println("Password is incorrect!");
-             }
-         }
-     }
-}
+//              if (userPasswords.containsKey(username) && userPasswords.get(username).equals(hashedPassword)) {
+//                  System.out.println("Password is correct!");
+//              } else {
+//                  System.out.println("Password is incorrect!");
+//              }
+//          }
+//      }
+// }
 
-EOF
-}
+// EOF
+// }
