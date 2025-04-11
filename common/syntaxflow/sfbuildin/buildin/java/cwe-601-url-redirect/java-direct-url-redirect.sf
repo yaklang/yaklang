@@ -14,8 +14,8 @@ $param1 + $param2 as $source;
 Controller.__ref__<getMembers>?{.annotation.*Mapping && !.annotation.ResponseBody} as $entryMethods;
 $entryMethods<getReturns>?{<typeName>?{have: String}}?{have:'redirect:'} as $sink;
 
-HttpServletResponse?{<typeName>?{have:'javax.servlet.http'}}.sendRedirect(,* as $sink);
-RedirectView?{<typeName>?{have:'org.springframework.web.servlet.view'}}(,* as $sink);
+HttpServletResponse?{<typeName>?{have:'javax.servlet.http'}}.sendRedirect(*<slice(index=1)> as $sink);
+RedirectView?{<typeName>?{have:'org.springframework.web.servlet.view'}}(*<slice(index=1)> as $sink);
 check $sink;
 
 $sink #{

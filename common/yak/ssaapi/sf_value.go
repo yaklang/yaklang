@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"regexp"
 
 	"golang.org/x/exp/slices"
@@ -13,7 +14,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
@@ -33,12 +33,12 @@ func (v *Value) GetOpcode() string {
 }
 
 func (v *Value) GetBinaryOperator() string {
-	inst := v.GetSSAInst()
-	if utils.IsNil(inst) {
+	sa := v.GetSSAInst()
+	if utils.IsNil(sa) {
 		return ""
 	}
-	if inst.GetOpcode() == ssa.SSAOpcodeBinOp {
-		binop, ok := ssa.ToBinOp(inst)
+	if sa.GetOpcode() == ssa.SSAOpcodeBinOp {
+		binop, ok := ssa.ToBinOp(sa)
 		if !ok {
 			return ""
 		}
@@ -48,12 +48,12 @@ func (v *Value) GetBinaryOperator() string {
 }
 
 func (v *Value) GetUnaryOperator() string {
-	inst := v.GetSSAInst()
-	if utils.IsNil(inst) {
+	sa := v.GetSSAInst()
+	if utils.IsNil(sa) {
 		return ""
 	}
-	if inst.GetOpcode() == ssa.SSAOpcodeUnOp {
-		unOp, ok := ssa.ToUnOp(inst)
+	if sa.GetOpcode() == ssa.SSAOpcodeUnOp {
+		unOp, ok := ssa.ToUnOp(sa)
 		if !ok {
 			return ""
 		}
@@ -156,17 +156,13 @@ func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.ValueOperator
 			addvalue(value)
 		}
 	}
-	v.GetCalledBy().ForEach(func(c *Value) {
-		if c, ok := ssa.ToCall(c.innerValue); ok {
-			if len(c.Args) > start {
-				add(c.Args)
-			}
-		}
-	})
-	if f, ok := ssa.ToFunction(v.innerValue); ok {
-		if len(f.Params) > start {
-			add(f.Params)
-		}
+	call, isCall := ssa.ToCall(v.innerValue)
+	if !isCall {
+		return nil, utils.Errorf("ssa.Value is not a call")
+	}
+	add(call.Args)
+	if utils.IsNil(rets) {
+		return nil, utils.Errorf("ssa.Value no actual params")
 	}
 	return rets, nil
 }

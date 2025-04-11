@@ -79,13 +79,19 @@ public class DemoABCEntryClass {
 		assert.Equal(t, prog.SyntaxFlowChain("*Param.__ref__?{opcode: param} as $ref", ssaapi.QueryWithEnableDebug(false)).Show().Len(), 1)
 
 		t.Log("checking *Param.__ref__?{opcode: param && .annotation} as $ref")
-		assert.Equal(t, prog.SyntaxFlowChain("*Mapping.__ref__(*?{opcode: param && .annotation} as $ref )", ssaapi.QueryWithEnableDebug(false)).Show().Len(), 1)
+		assert.Equal(t, prog.SyntaxFlowChain(`
+*Mapping.__ref__<getFormalParams>?{opcode: param && !have: this} as $ref
+`, ssaapi.QueryWithEnableDebug(false)).Show().Len(), 1)
 
 		t.Log("checking *Param.__ref__?{opcode: param && !have: this} as $ref")
-		assert.Equal(t, prog.SyntaxFlowChain("*Mapping.__ref__(*?{opcode: param && !have: this} as $ref )", ssaapi.QueryWithEnableDebug(false)).Show().Len(), 1)
+		assert.Equal(t, prog.SyntaxFlowChain(`
+*Mapping.__ref__<getFormalParams>?{opcode: param && !have: this} as $ref
+`, ssaapi.QueryWithEnableDebug(false)).Show().Len(), 1)
 
 		t.Log("checking *Param.__ref__?{have: this} as $ref")
-		assert.Equal(t, prog.SyntaxFlowChain("*Mapping.__ref__(*?{have: this} as $ref )", ssaapi.QueryWithEnableDebug(false)).Show().Len(), 1)
+		assert.Equal(t, prog.SyntaxFlowChain(`
+*Mapping.__ref__<getFormalParams>?{have: this} as $ref
+`, ssaapi.QueryWithEnableDebug(false)).Show().Len(), 1)
 		return nil
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
@@ -144,13 +150,13 @@ public interface HomeDao3 {
 		prog.Show()
 		var results ssaapi.Values
 
-		results = prog.SyntaxFlowChain(`.annotation.*?{.value<regexp('aabbccddeeff')>}.__ref__.*ab(*?{any: limit,offset} as $params)`).Show()
+		results = prog.SyntaxFlowChain(`.annotation.*?{.value<regexp('aabbccddeeff')>}.__ref__.*ab<getFormalParams>*?{any: limit,offset} as $params`).Show()
 		assert.GreaterOrEqual(t, results.Len(), 2)
 
-		results = prog.SyntaxFlowChain(`.annotation.ClassAnnotationTest.__ref__.*bar(*?{any: limit,offset} as $params)`).Show()
+		results = prog.SyntaxFlowChain(`.annotation.ClassAnnotationTest.__ref__.*bar<getFormalParams>?{any: limit,offset} as $params`).Show()
 		assert.GreaterOrEqual(t, results.Len(), 2)
 
-		results = prog.SyntaxFlowChain(`.annotation.*Anno.__ref__.*List(*?{any: limit,offset} as $params)`).Show()
+		results = prog.SyntaxFlowChain(`.annotation.*Anno.__ref__.*List<getFormalParams>?{any: limit,offset} as $params`).Show()
 		assert.GreaterOrEqual(t, results.Len(), 2)
 
 		results = prog.SyntaxFlowChain(`.annotation.*Anno2.value<regexp('bb')><show>`)

@@ -51,10 +51,10 @@ public interface UserMapper {
     void deleteUser(int id);
 }
 `)
-		ssatest.CheckWithFS(f, t, func(programs ssaapi.Programs) error {
-			prog := programs[0]
+		ssatest.CheckWithFS(f, t, func(prog ssaapi.Programs) error {
 			vals, err := prog.SyntaxFlowWithError(`<mybatisSink> as $params`)
 			require.NoError(t, err)
+			vals.Show()
 			params := vals.GetValues("params")
 			require.Contains(t, params.String(), "Parameter-user")
 			require.Equal(t, 1, params.Len())

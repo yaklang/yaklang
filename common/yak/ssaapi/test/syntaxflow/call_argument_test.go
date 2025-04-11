@@ -140,7 +140,7 @@ func Test_Function_Parameter(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code,
 			`f(* as $i, )`,
 			map[string][]string{
-				"i": {"12", "Parameter-i"},
+				"i": {"12"},
 			},
 		)
 	})

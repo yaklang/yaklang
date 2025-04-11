@@ -683,6 +683,8 @@ func init() {
 	registerNativeCall(NatiCall_ScanCurrent, nc_func(nativeCallScan(Current)))
 	registerNativeCall(NativeCall_SourceCode, nc_func(nativeCallSourceCode))
 	registerNativeCall(NativeCall_OpCodes, nc_func(nativeCallOpCodes))
+
+	//nativeCall-slice
 	registerNativeCall(NativeCall_Slice, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		start := params.GetInt(0, "start")
 		index := params.GetInt(0, "index")

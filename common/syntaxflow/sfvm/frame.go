@@ -677,11 +677,11 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		callLen := ValuesLen(results)
 		s.debugSubLog("<< push len: %v", callLen)
-		// _ = results.AppendPredecessor(value, s.WithPredecessorContext("call"))
 		s.stack.Push(results)
 
 	case OpGetCallArgs:
-		s.debugSubLog("-- peek")
+		s.debugSubLog("-- getCallArgs pop call args")
+		//in iterStack
 		value := s.stack.Peek()
 		if value == nil {
 			return utils.Wrap(CriticalError, "get call args failed: stack top is empty")
@@ -885,7 +885,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			if dup == nil {
 				return utils.Wrapf(CriticalError, "compare opcode failed: stack top is empty")
 			}
-			s.debugSubLog("Remove duplicate :%v")
+			s.debugSubLog("Remove duplicate")
 			s.debugSubLog(">> push: %v", ValuesLen(newVal))
 			s.stack.Push(newVal)
 		}

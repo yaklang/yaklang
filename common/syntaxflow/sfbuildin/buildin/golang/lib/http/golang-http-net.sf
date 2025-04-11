@@ -9,8 +9,8 @@ TEXT
 )
 
 http?{<fullTypeName>?{have: 'net/http'}} as $entry;
-$entry.HandleFunc(, * as $handle);
-$handle( * as $output);
+$entry.HandleFunc(*<slice(index=1)> as $handle);
+$handle<getFormalParams> as $output
 
 alert $output
 
