@@ -77,8 +77,7 @@ type Config struct {
 	inputConsumption  *int64
 	outputConsumption *int64
 
-	// RiskControl
-	toolRiskCtrl *riskControl
+	resultHandler func(*Config, *Memory)
 }
 
 func (c *Config) setAgreePolicy(policy AgreePolicyType) {
@@ -165,7 +164,6 @@ func newConfig(ctx context.Context) *Config {
 		syncMap:           make(map[string]func() any),
 		inputConsumption:  new(int64),
 		outputConsumption: new(int64),
-		toolRiskCtrl:      new(riskControl),
 	}
 	go func() {
 		log.Infof("config %s started, start to handle receiving loop", c.id)
@@ -460,6 +458,13 @@ func WithDebug(i ...bool) Option {
 		}
 		config.debugPrompt = true
 		config.debugEvent = true
+		return nil
+	}
+}
+
+func WithResultHandler(h func(*Config, *Memory)) Option {
+	return func(config *Config) error {
+		config.resultHandler = h
 		return nil
 	}
 }

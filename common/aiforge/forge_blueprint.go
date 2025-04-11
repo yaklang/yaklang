@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -113,7 +114,7 @@ func (f *ForgeBlueprint) GenerateParameter() *ypb.YaklangInspectInformationRespo
 // GenerateFirstPromptWithMemoryOption 用户根据 Origin
 func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
 	params []*ypb.ExecParamItem,
-) (string, func(any) error, error) {
+) (string, []aid.Option, error) {
 	initPrompt, err := f.renderInitPrompt("", params...)
 	if err != nil {
 		return "", nil, utils.Errorf("render init prompt failed: %v", err)
@@ -128,7 +129,7 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
 
 func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOptionWithQuery(
 	query string,
-) (string, func(any) error, error) {
+) (string, []aid.Option, error) {
 	params := []*ypb.ExecParamItem{
 		{
 			Key:   "query",
