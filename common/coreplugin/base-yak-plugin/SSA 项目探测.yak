@@ -42,7 +42,7 @@ cli.check()
 target = target.Trim(" ", "\n", "\t")
 origin = target
 proxy = str.TrimSpace(proxy.Lower())
-javaDir = ["webapp", "resources", "web-inf", "meta-inf", "classes"]
+ javaDir = []
 // jsDir = ["node_modules"]
 // jsFiles = ["package-lock.json","package.json","yarn.lock"]
 phpFiles = ["index.php", "composer.json", "composer.lock", "wp-config.php", "config.php"]
