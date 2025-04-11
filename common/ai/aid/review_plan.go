@@ -76,11 +76,7 @@ func (p *planRequest) handleReviewPlanResponse(rsp *planResponse, param aitool.I
 		ep.SetDefaultSuggestionContinue()
 
 		p.config.EmitRequireReviewForPlan(newPlan, ep.id)
-		if !p.config.autoAgree {
-			if !ep.WaitTimeoutSeconds(60) {
-				p.config.EmitInfo("user review timeout, use default action: pass")
-			}
-		}
+		p.config.doWaitAgree(nil, ep)
 		params := ep.GetParams()
 		p.config.memory.StoreInteractiveUserInput(ep.id, params)
 		if params == nil {

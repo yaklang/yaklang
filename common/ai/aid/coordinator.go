@@ -2,8 +2,9 @@ package aid
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"io"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -76,11 +77,7 @@ func (c *Coordinator) Run() error {
 	ep.SetDefaultSuggestionContinue()
 
 	c.config.EmitRequireReviewForPlan(rsp, ep.id)
-	if !c.config.autoAgree {
-		if !ep.WaitTimeoutSeconds(60) {
-			c.config.EmitInfo("user review timeout, use default action: pass")
-		}
-	}
+	c.config.doWaitAgree(nil, ep)
 	params := ep.GetParams()
 	c.config.memory.StoreInteractiveUserInput(ep.id, params)
 	if params == nil {
