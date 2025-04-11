@@ -824,6 +824,7 @@ RECONNECT:
 					bodyReader.Close()
 					if err := recover(); err != nil {
 						log.Errorf("BodyStreamReaderHandler panic: %v", err)
+						utils.PrintCurrentGoroutineRuntimeStack()
 					}
 				}()
 

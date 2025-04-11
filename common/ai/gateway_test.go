@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"context"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils"
@@ -10,7 +11,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 func TestDashscope_Search(t *testing.T) {
@@ -40,7 +43,7 @@ func TestAutoUpdateAiList(t *testing.T) {
 		t.Fail()
 	}
 	bak := cfg.AiApiPriority // backup the original value
-	defer func() { // restore the original value
+	defer func() {           // restore the original value
 		cfg.AiApiPriority = bak
 		yakit.ConfigureNetWork(cfg)
 	}()
@@ -129,7 +132,7 @@ func TestClientStreamExtInfo(t *testing.T) {
 		t.Fail()
 	}
 	bak := cfg.AiApiPriority // backup the original value
-	defer func() { // restore the original value
+	defer func() {           // restore the original value
 		cfg.AiApiPriority = bak
 		yakit.ConfigureNetWork(cfg)
 	}()
@@ -148,4 +151,59 @@ func TestClientStreamExtInfo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestDashscope_Search_StructuredStream(t *testing.T) {
+	if utils.InGithubActions() {
+		return
+	}
+	dir, err := os.UserHomeDir()
+	if err != nil {
+		t.Fail()
+	}
+	keyPath := filepath.Join(dir, `yakit-projects/yaklang-bailian-apikey.txt`)
+	keyContent, _ := os.ReadFile(keyPath)
+
+	// 测试用例 提前中断请求
+	t.Run("提前中断", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// 模拟提前取消（例如用户中断）
+		go func() {
+			time.Sleep(500 * time.Millisecond) // 等待部分数据到达
+			cancel()
+		}()
+
+		ch, err := StructuredStream("web fuzzer 用法", aispec.WithType("yaklang-com-search"), aispec.WithAPIKey(string(keyContent)), aispec.WithContext(ctx))
+		if err != nil {
+			t.Fatalf("提前中断流程失败: %v", err)
+		}
+
+		for range ch { // 仅消费部分数据
+			t.Log("接收到数据，即将中断...")
+			break
+		}
+		// 验证通道是否正常关闭且无 panic
+	})
+
+	// 测试用例 并发请求
+	t.Run("并发请求", func(t *testing.T) {
+		var wg sync.WaitGroup
+		for i := 0; i < 5; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				ch, err := StructuredStream("web fuzzer 用法", aispec.WithType("yaklang-com-search"), aispec.WithAPIKey(string(keyContent)))
+				if err != nil {
+					t.Errorf("并发请求失败: %v", err)
+					return
+				}
+				for range ch { // 消费所有数据
+				}
+			}()
+		}
+		wg.Wait()
+	})
+
 }
