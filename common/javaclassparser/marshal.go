@@ -217,7 +217,7 @@ func writeAttributes(writer *JavaBufferWriter, info []AttributeInfo, classObj *C
 			n := classObj.findUtf8IndexFromPool("Synthetic") + 1
 			writer.Write2Byte(n)
 			writer.Write4Byte(info[j].(*SyntheticAttribute).AttrLen)
-		default:
+		case *UnparsedAttribute:
 			n := classObj.findUtf8IndexFromPool(info[j].(*UnparsedAttribute).Name) + 1
 			writer.Write2Byte(n)
 			writer.Write4Byte(info[j].(*UnparsedAttribute).Length)
