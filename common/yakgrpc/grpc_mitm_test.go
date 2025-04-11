@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"github.com/yaklang/yaklang/common/vulinbox"
 	"io"
 	"net/http"
@@ -35,7 +36,7 @@ import (
 )
 
 func TestFilterWebsocketUpgradeRequest(t *testing.T) {
-	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	mockHost, mockPort := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		//		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
 		// Transfer-Encoding: chunked` + "\r\n\r\n" + `0` + "\r\n\r\n"))
 		rsp := []byte(`HTTP/1.1 101 Switching Protocols
@@ -144,7 +145,7 @@ token: `+token+`
 }
 
 func TestTestGRPCMUSTPASS_MITM_CHUNKED(t *testing.T) {
-	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	mockHost, mockPort := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		//		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
 		// Transfer-Encoding: chunked` + "\r\n\r\n" + `0` + "\r\n\r\n"))
 		rsp := []byte(`HTTP/1.1 200 OK
@@ -188,7 +189,7 @@ Host: www.example.com
 }
 
 func TestGRPCMUSTPASS_MITM_WITH_REPLACE_RULE_GZIP_NCHUNKED(t *testing.T) {
-	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	mockHost, mockPort := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
 Content-Type: text/html
 Content-Length: 3
@@ -286,7 +287,7 @@ func TestGRPCMUSTPASS_MITM_ALL(t *testing.T) {
 		h2Test            bool // 将MITM作为代理向mock的http2服务器发包 这个过程成功说明 MITM开启H2支持的情况下 能够正确处理H2请求和响应
 	)
 
-	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	mockHost, mockPort := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		passthroughTested = true // 测试标识位 收到了http请求
 		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
 Content-Type: text/html
@@ -331,7 +332,7 @@ Content-Length: 3
 	defer cancel()
 
 	/* H2 */
-	h2Host, h2Port := utils.DebugMockHTTP2(ctx, func(req []byte) []byte {
+	h2Host, h2Port := testutils.DebugMockHTTP2(ctx, func(req []byte) []byte {
 		return req
 	})
 	h2Addr := utils.HostPort(h2Host, h2Port)
@@ -558,7 +559,7 @@ func TestGRPCMUSTPASS_MITM_GM(t *testing.T) {
 		gmTest                 bool // 将开启了GM支持的MITM作为代理向mock的GM-HTTPS服务器发包 这个过程成功说明 MITM开启GM支持的情况下 能够正确处理GM-HTTPS请求和响应
 	)
 
-	mockGMHost, mockGMPort := utils.DebugMockGMHTTP(context.Background(), func(req []byte) []byte {
+	mockGMHost, mockGMPort := testutils.DebugMockGMHTTP(context.Background(), func(req []byte) []byte {
 		gmPassthroughTested = true // 测试标识位 收到了http请求
 		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
 Content-Type: text/html
@@ -575,7 +576,7 @@ Content-Length: 3
 		}
 		return rsp
 	})
-	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	mockHost, mockPort := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		httpPassthroughTested = true // 测试标识位 收到了http请求
 		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK\n
 Content-Type: text/html
@@ -592,7 +593,7 @@ Content-Length: 3
 		}
 		return rsp
 	})
-	mockHttpsHost, mockHttpsPort := utils.DebugMockHTTPSEx(func(req []byte) []byte {
+	mockHttpsHost, mockHttpsPort := testutils.DebugMockHTTPSEx(func(req []byte) []byte {
 		httpsPassthroughTested = true // 测试标识位 收到了http请求
 		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK\n
 Content-Type: text/html
@@ -808,7 +809,7 @@ func TestGRPCMUSTPASS_MITM_Drop(t *testing.T) {
 	}()
 
 	/* H2 */
-	h2Host, h2Port := utils.DebugMockHTTP2(ctx, func(req []byte) []byte {
+	h2Host, h2Port := testutils.DebugMockHTTP2(ctx, func(req []byte) []byte {
 		h2serverHandled++
 		return req
 	})
@@ -1235,7 +1236,7 @@ func TestGRPCMUSTPASS_MITM_CancelHijackResponse(t *testing.T) {
 	}
 
 	token := utils.RandStringBytes(20)
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(http.StatusOK)
 		fmt.Fprint(writer, token)
 	})
@@ -1332,7 +1333,7 @@ func TestGRPCMUSTPASS_MITM_LegacyProxy(t *testing.T) {
 
 	token := utils.RandSecret(100)
 	pass := false
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path == "/abc" {
 			pass = true
 			writer.Write([]byte(token))
@@ -1404,7 +1405,7 @@ func TestGRPCMUSTPASS_MITM_LegacyProxyLowhttp(t *testing.T) {
 
 	token := utils.RandSecret(100)
 	pass := false
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path == "/abc" {
 			pass = true
 			writer.Write([]byte(token))
@@ -1452,13 +1453,13 @@ Host: example.com
 func TestMiTMPlugins(t *testing.T) {
 	count, _count := 0, 0
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path == "/notify" {
 			count++
 		}
 		writer.Write([]byte(base64.StdEncoding.EncodeToString([]byte("123"))))
 	})
-	_host, _port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	_host, _port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path == "/notify" {
 			_count++
 		}
@@ -1598,7 +1599,7 @@ func TestGRPCMUSTPASS_MITM_ForceHTTPClose(t *testing.T) {
 		ForceDisableKeepAlive: true,
 	})
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("ok"))
 	})
 
@@ -1702,7 +1703,7 @@ func TestGRPCMUSTTPASS_MITM_CheckHistoryDurationField(t *testing.T) {
 		ForceDisableKeepAlive: true,
 	})
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		time.Sleep(100 * time.Millisecond)
 		writer.Write([]byte("ok"))
 	})
@@ -1751,7 +1752,7 @@ func TestGRPCMUSTTPASS_MITM_HijackTags(t *testing.T) {
 	token, token2 := utils.RandStringBytes(20), utils.RandStringBytes(20)
 	mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
 	proxy := "http://" + utils.HostPort(mitmHost, mitmPort)
-	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
+	host, port := testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
 		"Content-Length: 1\r\n\r\na"))
 
 	RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
@@ -1821,7 +1822,7 @@ func TestGRPCMUSTTPASS_MITM_ModifyHost(t *testing.T) {
 	token, token2 := utils.RandStringBytes(20), utils.RandStringBytes(20)
 	mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
 	proxy := "http://" + utils.HostPort(mitmHost, mitmPort)
-	host, port := utils.DebugMockHTTP([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n"+
+	host, port := testutils.DebugMockHTTP([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n"+
 		"Content-Length: %d\r\n\r\n%s", len(token), token)))
 	replacedHost := "www.example.com"
 
@@ -1868,13 +1869,13 @@ func TestGRPCMUSTTPASS_MITM_GM_Only(t *testing.T) {
 	mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
 	proxy := "http://" + utils.HostPort(mitmHost, mitmPort)
 
-	host, port := utils.DebugMockOnlyGMHTTP(ctx, func(req []byte) []byte {
+	host, port := testutils.DebugMockOnlyGMHTTP(ctx, func(req []byte) []byte {
 		return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n" +
 			"Content-Length:0\r\n\r\n"))
 	})
 	GMTLSTarget := fmt.Sprintf("https://%s", utils.HostPort(host, port))
 
-	host, port = utils.DebugMockHTTPS([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n" +
+	host, port = testutils.DebugMockHTTPS([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n" +
 		"Content-Length:0\r\n\r\n")))
 	//TLSTarget := fmt.Sprintf("https://%s", utils.HostPort(host, port))
 
@@ -1905,13 +1906,13 @@ func TestGRPCMUSTTPASS_MITM_GM_Prefer(t *testing.T) {
 	mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
 	proxy := "http://" + utils.HostPort(mitmHost, mitmPort)
 
-	host, port := utils.DebugMockOnlyGMHTTP(ctx, func(req []byte) []byte {
+	host, port := testutils.DebugMockOnlyGMHTTP(ctx, func(req []byte) []byte {
 		return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n" +
 			"Content-Length:0\r\n\r\n"))
 	})
 	GMTLSTarget := fmt.Sprintf("https://%s", utils.HostPort(host, port))
 
-	host, port = utils.DebugMockHTTPS([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n" +
+	host, port = testutils.DebugMockHTTPS([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n" +
 		"Content-Length:0\r\n\r\n")))
 	TLSTarget := fmt.Sprintf("https://%s", utils.HostPort(host, port))
 
@@ -1944,7 +1945,7 @@ func TestGRPCMUSTPASS_RuleExtractedData(t *testing.T) {
 
 	token := utils.RandStringBytes(10)
 
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n" +
 			"Content-Length:0\r\n\r\n"))
 	})

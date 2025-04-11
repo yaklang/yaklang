@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"io"
 	"net/http"
 	"reflect"
@@ -37,7 +38,7 @@ func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_TestFlow(t *testing.T) {
 	defer cancel()
 
 	count := 0
-	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
 		raw, _ := utils.HttpDumpWithBody(request, true)
 		spew.Dump(raw)
 		writer.Write(raw)
@@ -99,7 +100,7 @@ func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_MITM_WithRawPacketAndPaths(t *test
 	aPass := false
 	bPass := false
 	ctx, cancel := context.WithCancel(context.Background())
-	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("hello"))
 		raw, _ := utils.HttpDumpWithBody(request, true)
 		spew.Dump(raw)
@@ -250,7 +251,7 @@ func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_MITM(t *testing.T) {
 	aPass := false
 	bPass := false
 	ctx, cancel := context.WithCancel(context.Background())
-	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("hello"))
 		raw, _ := utils.HttpDumpWithBody(request, true)
 		spew.Dump(raw)
@@ -322,7 +323,7 @@ func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_MITM_WithURLTARGET(t *testing.T) {
 	bPass := false
 	cPass := false
 	ctx, cancel := context.WithCancel(context.Background())
-	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("hello"))
 		raw, _ := utils.HttpDumpWithBody(request, true)
 		spew.Dump(raw)
@@ -448,7 +449,7 @@ func TestGRPCMUSTPASS_HTTP_FuzzPacket(t *testing.T) {
 		return res
 	}
 
-	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("hello"))
 	})
 	marshalResult := func(result []any) string {
@@ -591,7 +592,7 @@ return codec.EncodeBase64(a)
 
 func TestGRPCMUSTPASS_HTTP_YakDebug(t *testing.T) {
 	client, err := NewLocalClient()
-	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+	host, port := testutils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 Content-Length: 0
 
 `))
@@ -709,7 +710,7 @@ func TestGRPCMUSTPASS_MITM_Debug_Context(t *testing.T) {
 		t.Fatal(err)
 	}
 	serverPort := utils.GetRandomAvailableTCPPort()
-	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+	host, port := testutils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 Content-Length: 0
 
 `))
@@ -785,7 +786,7 @@ func TestGRPCMUSTPASS_DebugPlugin_Nuclei(t *testing.T) {
 		t.Fatal(err)
 	}
 	ok := false
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		ok = true
 		return []byte("HTTP/1.1 200 OK\nContent-Length: 5\n\nHello")
 	})
@@ -997,7 +998,7 @@ a = risk.NewRisk("127.0.0.1")
 	})
 
 	t.Run("poc risk count", func(t *testing.T) {
-		server, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+		server, port := testutils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 
 aaa`))
 		target := utils.HostPort(server, port)
@@ -1147,7 +1148,7 @@ func TestGRPCMUSTPASS_DebugPlugin_Risk_PluginMetaInfo(t *testing.T) {
 	err = yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), nucleiScript.ScriptName, nucleiScript)
 	require.NoError(t, err)
 
-	server, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 
 aaa`))
 	target := utils.HostPort(server, port)
@@ -1250,7 +1251,7 @@ http:
 	err = yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), nucleiScript.ScriptName, nucleiScript)
 	require.NoError(t, err)
 	defer yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), nucleiScript.ScriptName)
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(token))
 	})
 	targetUrl := fmt.Sprintf("http://%s:%d/%s", host, port, randPath)
@@ -1292,7 +1293,7 @@ func TestGRPCMUSTPASS_DebugPlugin_MITM_Cli(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	host, port := testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n\r\n"))
 	targetUrl := "http://" + utils.HostPort(host, port)
 
 	token := utils.RandStringBytes(20)
@@ -1328,7 +1329,7 @@ func TestGRPCMUSTPASS_DebugPlugin_MITM_PocSaveHttpFlowHandler(t *testing.T) {
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	host, port := testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n\r\n"))
 	targetUrl := "http://" + utils.HostPort(host, port)
 
 	token := utils.RandStringBytes(20)

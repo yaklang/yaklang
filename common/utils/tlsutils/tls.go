@@ -163,19 +163,7 @@ func GenerateSelfSignedCertKeyWithCommonName(commonName, host string, alternateI
 	return GenerateSelfSignedCertKeyWithCommonNameWithPrivateKeyWithOrg(commonName, commonName, host, alternateIPs, alternateDNS, nil)
 }
 
-func init() {
-	utils.RegisterDefaultTLSConfigGenerator(func() (*tls.Config, *gmtls.Config, *gmtls.Config, *tls.Config, *gmtls.Config, []byte, []byte) {
-		ca, key, _ := GenerateSelfSignedCertKeyWithCommonName("test", "127.0.0.1", nil, nil)
-		sCa, sKey, _ := SignServerCrtNKey(ca, key)
-		cCa, cKey, _ := SignClientCrtNKey(sCa, sKey)
-		stls, _ := GetX509ServerTlsConfig(ca, sCa, sKey)
-		mstls, _ := GetX509MutualAuthServerTlsConfig(ca, sCa, sKey)
-		gmtlsConfig, _ := GetX509GMServerTlsConfigWithAuth(ca, sCa, sKey, false)
-		onlyGmtlsTestConfig, _ := GetX509GMServerTlsConfigWithOnly(ca, sCa, sKey, false)
-		mgmtlsConfig, _ := GetX509GMServerTlsConfigWithAuth(ca, sCa, sKey, true)
-		return stls, gmtlsConfig, onlyGmtlsTestConfig, mstls, mgmtlsConfig, cCa, cKey
-	})
-}
+func init() {}
 
 func GenerateSelfSignedCertKeyWithCommonNameWithPrivateKeyWithOrg(commonName, org, host string, alternateIPs []net.IP, alternateDNS []string, priv *rsa.PrivateKey) ([]byte, []byte, error) {
 	return GenerateSelfSignedCertKeyWithCommonNameEx(commonName, org, host, alternateIPs, alternateDNS, priv, false)
@@ -572,4 +560,25 @@ func GetX509MutualAuthGoClientTlsConfig(clientCrt, clientPriv []byte, caCrts ...
 	}
 
 	return &config, nil
+}
+
+func TLSConfigSetCheckServerName(tlsConfig *tls.Config, host string) *tls.Config {
+	if tlsConfig == nil {
+		return nil
+	}
+
+	cert := tlsConfig.Certificates
+	tlsConfig.Certificates = []tls.Certificate{}
+	tlsConfig.GetCertificate = func(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+		if len(cert) <= 0 {
+			return nil, errors.New("no certificate provided")
+		}
+		if clientHello.ServerName == "" {
+			return nil, errors.New("SNI not provided, failed to build certificate")
+		} else if clientHello.ServerName != host {
+			return nil, errors.New("SNI not match")
+		}
+		return &cert[0], nil
+	}
+	return tlsConfig
 }

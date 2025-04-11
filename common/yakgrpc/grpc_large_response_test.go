@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"os"
 	"strconv"
 	"strings"
@@ -110,7 +111,7 @@ func TestLARGEGRPCMUSTPASS_LARGE_RESPONSE_FOR_WEBFUZZER_POSITIVE(t *testing.T) {
 	expectedCL := 4 * 1000 * 1000
 	largeText := strings.Repeat("a", expectedCL)
 	// start Mock HTTP server
-	host, port := utils.DebugMockHTTP([]byte(fmt.Sprintf(`HTTP/1.1?token=%s 200 OK
+	host, port := testutils.DebugMockHTTP([]byte(fmt.Sprintf(`HTTP/1.1?token=%s 200 OK
 Server: test
 Content-Length: %d
 
@@ -176,7 +177,7 @@ func TestLARGEGRPCMUSTPASS_LARGE_RESPONSE_FOR_WEBFUZZER_CHUNKED_POSITIVE(t *test
 	expectedCL := 4 * 1000 * 1000
 	largeText := bytes.Repeat([]byte("z"), expectedCL)
 	// start Mock HTTP server
-	host, port := utils.DebugMockHTTP([]byte(fmt.Sprintf(`HTTP/1.1?token=%s 200 OK
+	host, port := testutils.DebugMockHTTP([]byte(fmt.Sprintf(`HTTP/1.1?token=%s 200 OK
 Server: test
 Transfer-Encoding: chunked
 

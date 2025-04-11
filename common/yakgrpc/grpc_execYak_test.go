@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"regexp"
 	"strings"
 	"testing"
@@ -40,7 +41,7 @@ func TestMitmInvokeAi(t *testing.T) {
 	rspStrTmp := `data: {"id":"1","created":1,"model":"1","choices":[{"index":0,"delta":{"role":"assistant","content":"%s"}}]}`
 	headerStr, _, _ := lowhttp.FixHTTPResponse([]byte("HTTP/1.1 200 OK\nContent-Type: application/json\nTransfer-Encoding: chunked\nConnection: Keep-Alive\n\n"))
 	port := utils.GetRandomAvailableTCPPort()
-	l, err := tls.Listen("tcp", spew.Sprintf(":%d", port), utils.GetDefaultTLSConfig(3))
+	l, err := tls.Listen("tcp", spew.Sprintf(":%d", port), testutils.GetDefaultTLSConfig(3))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +101,7 @@ func TestOUTPUT_AiChat(t *testing.T) {
 `
 	headerStr, _, _ := lowhttp.FixHTTPResponse([]byte("HTTP/1.1 200 OK\nContent-Type: application/json\nTransfer-Encoding: chunked\nConnection: Keep-Alive\n\n"))
 	port := utils.GetRandomAvailableTCPPort()
-	l, err := tls.Listen("tcp", spew.Sprintf(":%d", port), utils.GetDefaultTLSConfig(3))
+	l, err := tls.Listen("tcp", spew.Sprintf(":%d", port), testutils.GetDefaultTLSConfig(3))
 	if err != nil {
 		t.Fatal(err)
 	}

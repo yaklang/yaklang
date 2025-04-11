@@ -5,6 +5,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"testing"
 )
@@ -141,7 +142,7 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 }
 
 func TestGRPCMUSTPASS_SERVICE_SCAN(t *testing.T) {
-	host, port := utils.DebugMockGMHTTP(utils.TimeoutContextSeconds(15), func(req []byte) []byte {
+	host, port := testutils.DebugMockGMHTTP(utils.TimeoutContextSeconds(15), func(req []byte) []byte {
 		return []byte(`HTTP/1.1 200 OK
 Content-Length: 1
 

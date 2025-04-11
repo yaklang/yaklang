@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -10,7 +11,7 @@ import (
 
 func TestH2Hijack(t *testing.T) {
 	count := 0
-	h2Host, h2Port := utils.DebugMockHTTP2(context.Background(), func(req []byte) []byte {
+	h2Host, h2Port := testutils.DebugMockHTTP2(context.Background(), func(req []byte) []byte {
 		count++
 		return req
 	})

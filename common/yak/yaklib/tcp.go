@@ -3,6 +3,7 @@ package yaklib
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -173,7 +174,7 @@ func _tcpClientProxy(proxy string) dialerOpt {
 }
 
 var TcpExports = map[string]interface{}{
-	"MockServe":       utils.DebugMockHTTP,
+	"MockServe":       testutils.DebugMockHTTP,
 	"MockTCPProtocol": DebugMockTCPProtocol,
 
 	"Connect": _tcpConnect,

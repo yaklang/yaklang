@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"reflect"
 	"testing"
 
@@ -22,7 +23,7 @@ func TestGRPCMUSTTPASS_MITM_HijackFilter(t *testing.T) {
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
 	mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
 	proxy := "http://" + utils.HostPort(mitmHost, mitmPort)
-	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\na"))
+	host, port := testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\na"))
 	token, token2 := uuid.NewString(), uuid.NewString()
 
 	hijacked := false

@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"golang.org/x/net/http2"
 	"io"
 	"net"
@@ -27,7 +28,7 @@ import (
 
 func TestLowhttp_Pipeline_AutoFix(t *testing.T) {
 	count := 0
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		count++
 		writer.Write([]byte("ab"))
 	})
@@ -74,7 +75,7 @@ aa`
 
 func TestLowhttp_Pipeline_AutoFix2(t *testing.T) {
 	count := 0
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		count++
 		writer.Write([]byte("ab"))
 	})
@@ -302,7 +303,7 @@ asd`), false)
 }
 
 func TestLowhttpTraceInfo_GetServerDurationMS(t *testing.T) {
-	server, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 Content-Length: 11
 
 asdfas
@@ -424,7 +425,7 @@ func TestLowhttp_HTTP_close_readBody(t *testing.T) {
 	defer cancel()
 
 	thisTest := func() {
-		host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n" + strings.Repeat("a", 4096)))
+		host, port := testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n" + strings.Repeat("a", 4096)))
 		var packet = `GET / HTTP/1.1
 Host: ` + utils.HostPort(host, port) + `
 `
@@ -448,7 +449,7 @@ Host: ` + utils.HostPort(host, port) + `
 }
 
 func TestLowhttp_HTTP_ProxyTimeout(t *testing.T) {
-	proxyUrl := fmt.Sprintf("http://%s", utils.HostPort(utils.DebugMockHTTPKeepAliveEx(func(req []byte) []byte {
+	proxyUrl := fmt.Sprintf("http://%s", utils.HostPort(testutils.DebugMockHTTPKeepAliveEx(func(req []byte) []byte {
 		r, _ := ParseBytesToHttpRequest(req)
 		if r.Method == "CONNECT" {
 			return []byte("HTTP/1.0 200 Connection established\r\n\r\n")
@@ -469,7 +470,7 @@ func TestLowhttp_HTTP_ProxyTimeout(t *testing.T) {
 }
 
 func TestLowhttp_RESP_WithoutContentLength_WithContent(t *testing.T) {
-	target := utils.HostPort(utils.DebugMockTCPEx(func(ctx context.Context, lis net.Listener, conn net.Conn) {
+	target := utils.HostPort(testutils.DebugMockTCPEx(func(ctx context.Context, lis net.Listener, conn net.Conn) {
 		conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nX-Content-Type-Options: nosniff\r\n\r\n"))
 		time.Sleep(50 * time.Millisecond)
 		conn.Write([]byte("abcd"))
@@ -484,7 +485,7 @@ func TestLowhttp_RESP_WithoutContentLength_WithContent(t *testing.T) {
 }
 
 func TestLowhttp_RESP_StreamBody(t *testing.T) {
-	target := utils.HostPort(utils.DebugMockTCPEx(func(ctx context.Context, lis net.Listener, conn net.Conn) {
+	target := utils.HostPort(testutils.DebugMockTCPEx(func(ctx context.Context, lis net.Listener, conn net.Conn) {
 		conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 16\r\nX-Content-Type-Options: nosniff\r\n\r\n"))
 		time.Sleep(200 * time.Millisecond)
 		conn.Write([]byte("abcd"))
@@ -536,7 +537,7 @@ func TestLowhttp_RESP_StreamBody(t *testing.T) {
 }
 
 func TestLowhttp_HTTP_Cookie_Session(t *testing.T) {
-	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nSet-Cookie: a=b; path=/\r\n\r\n"))
+	host, port := testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nSet-Cookie: a=b; path=/\r\n\r\n"))
 	var packet = `GET / HTTP/1.1
 Host: ` + utils.HostPort(host, port) + `
 `
@@ -555,12 +556,12 @@ Host: ` + utils.HostPort(host, port) + `
 func TestPoCH2Preface(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	token := uuid.NewString()
-	host, port := utils.DebugMockHTTP2(ctx, func(req []byte) []byte {
+	host, port := testutils.DebugMockHTTP2(ctx, func(req []byte) []byte {
 		return []byte(token)
 	})
 
 	middlewarePort := utils.GetRandomAvailableTCPPort()
-	tlsConfig := utils.GetDefaultTLSConfig(5)
+	tlsConfig := testutils.GetDefaultTLSConfig(5)
 	copied := *tlsConfig
 	copied.NextProtos = []string{"h2"}
 	listen, err := tls.Listen("tcp", utils.HostPort(host, middlewarePort), &copied)
@@ -618,7 +619,7 @@ func TestPoCH2Preface(t *testing.T) {
 }
 
 func TestLowhttpTraceInfo(t *testing.T) {
-	httpsHost, httpsPort := utils.DebugMockHTTPS([]byte("HTTP/1.1 200 OK\r\n" +
+	httpsHost, httpsPort := testutils.DebugMockHTTPS([]byte("HTTP/1.1 200 OK\r\n" +
 		"Content-Length: 1\r\n\r\n"))
 	t.Run("https", func(t *testing.T) {
 		rsp, err := HTTPWithoutRedirect(WithPacketBytes([]byte(fmt.Sprintf(`GET / HTTP/1.1
@@ -636,7 +637,7 @@ Host: %v
 }
 
 func TestLowhttpH2Downgrade(t *testing.T) {
-	httpsHost, httpsPort := utils.DebugMockHTTPS([]byte("HTTP/1.1 200 OK\r\n" +
+	httpsHost, httpsPort := testutils.DebugMockHTTPS([]byte("HTTP/1.1 200 OK\r\n" +
 		"Content-Length: 1\r\n\r\na"))
 	t.Run("http2 Downgrade http1", func(t *testing.T) {
 		_, err := HTTPWithoutRedirect(WithPacketBytes([]byte(fmt.Sprintf(`GET / HTTP/2
@@ -650,7 +651,7 @@ Host: %v
 
 func TestLowhttp_conn_pool_deformity(t *testing.T) {
 	token := utils.RandStringBytes(10)
-	server, port := utils.DebugMockHTTP([]byte(fmt.Sprintf(`
+	server, port := testutils.DebugMockHTTP([]byte(fmt.Sprintf(`
 HTTP/1.1 200 OK
 Content-Length: 10
 

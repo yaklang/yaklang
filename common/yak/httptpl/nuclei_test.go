@@ -2,6 +2,7 @@ package httptpl
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
@@ -186,7 +186,7 @@ requests:
 }
 
 func TestCreateYakTemplateFromNucleiTemplateRaw(t *testing.T) {
-	server, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
+	server, port := testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
 		"Content-Length: 111\r\n" +
 		"Server: nginx\r\n\r\n"))
 	demo := `id: CVE-2023-24278
@@ -341,7 +341,7 @@ http:
 		spew.Dump(ret)
 	}
 
-	server, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
+	server, port := testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
 		"Content-Length: 111\r\n" +
 		"Server: nginx\r\n\r\n"))
 

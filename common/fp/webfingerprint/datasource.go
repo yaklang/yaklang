@@ -1,6 +1,7 @@
 package webfingerprint
 
 import (
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"math/rand"
 	"path"
 	"strconv"
@@ -204,7 +205,7 @@ func MockWebFingerPrintByName(name string) (string, int) {
 	if err != nil {
 		return "", 0
 	}
-	return utils.DebugMockHTTP(response)
+	return testutils.DebugMockHTTP(response)
 	//return utils.DebugMockHTTPEx(func(req []byte) []byte {
 	//	response, _, err := lowhttp.FixHTTPResponse([]byte(rsp))
 	//	if err != nil {

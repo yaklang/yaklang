@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net"
 	"strings"
@@ -26,7 +27,7 @@ func DebugMockRedis(ctx context.Context, needPasswd bool, passwd ...string) (str
 	if needPasswd && len(passwd) > 0 {
 		mockServer.passwd = passwd[0]
 	}
-	return utils.DebugMockTCPHandlerFuncContext(ctx, mockServer.redisHandler)
+	return testutils.DebugMockTCPHandlerFuncContext(ctx, mockServer.redisHandler)
 }
 
 func (s *mockRedisServer) redisHandler(ctx context.Context, lis net.Listener, conn net.Conn) {

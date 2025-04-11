@@ -2,7 +2,7 @@ package lowhttp
 
 import (
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"strings"
 	"testing"
 )
@@ -78,7 +78,7 @@ Content-Type: image/png
 }
 
 func TestCheckLowHttpAutoFixFlag(t *testing.T) {
-	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+	host, port := testutils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 Content-Type: text/html
 Content-Disposition: attachment; filename="example.pdf"
 

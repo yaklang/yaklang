@@ -3,12 +3,12 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -59,7 +59,7 @@ requests:
 `)
 	require.NoError(t, err)
 	defer clearFunc()
-	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n\r\nHello, world!"))
+	host, port := testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n\r\nHello, world!"))
 
 	stream, err := client.ExecYakScript(context.Background(), &ypb.ExecRequest{
 		ScriptId: name,
@@ -90,7 +90,7 @@ mirrorHTTPFlow = func(isHttps, url , req , rsp , body ) {
 	require.NoError(t, err)
 	defer clearFunc()
 	count := 0
-	host, port := utils.DebugMockHTTPKeepAliveEx(func(req []byte) []byte {
+	host, port := testutils.DebugMockHTTPKeepAliveEx(func(req []byte) []byte {
 		r, _ := lowhttp.ParseBytesToHttpRequest(req)
 		if r.Method == "CONNECT" {
 			return []byte("HTTP/1.0 200 Connection established\r\n\r\n")

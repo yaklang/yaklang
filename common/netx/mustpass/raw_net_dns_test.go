@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"net"
 	"net/http"
 	"strings"
@@ -101,7 +102,7 @@ func TestBASIC_SPECIFIC_TCP_FALLBACK_DNS(t *testing.T) {
 }
 
 func TestNotExisted_OnlyDoH(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(`{"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":{"name":"baidu.com.","type":1},"Answer":[{"name":"baidu.com.","TTL":403,"type":1,"data":"1.2.3.4"}]}`))
 	})
 	log.SetLevel(log.DebugLevel)

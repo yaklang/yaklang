@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
 	"strings"
@@ -32,7 +33,7 @@ func TestGRPCMUSTPASS_MITM_InvalidUTF8RequestDetail(t *testing.T) {
 	})
 
 	token := utils.RandSecret(100)
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(token))
 	})
 

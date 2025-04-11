@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"google.golang.org/grpc"
 	"net"
 	"strings"
@@ -193,10 +194,10 @@ func TestHTTPTrigger_Register(t *testing.T) {
 func TestCheckServerReachable(t *testing.T) {
 	t.SkipNow()
 
-	reachableHttpServer := utils.HostPort(utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")))
-	unreachableHttpServer := utils.HostPort(utils.DebugMockHTTP([]byte("HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n")))
+	reachableHttpServer := utils.HostPort(testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")))
+	unreachableHttpServer := utils.HostPort(testutils.DebugMockHTTP([]byte("HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n")))
 
-	reachableTcpServer := utils.HostPort(utils.DebugMockTCP([]byte(`abc`)))
+	reachableTcpServer := utils.HostPort(testutils.DebugMockTCP([]byte(`abc`)))
 	unreachableTcpServer := utils.HostPort("127.0.0.1", utils.GetRandomAvailableTCPPort())
 
 	client, server := CreateCyberTunnelLocalClient("test")

@@ -5,6 +5,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"io"
 	"testing"
 	"time"
@@ -24,7 +25,7 @@ import (
 var embedJPEG []byte
 
 func TestMITM_UploadFile(t *testing.T) {
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		return []byte("HTTP/1.1 200 OK\n\n")
 	})
 	target := utils.HostPort(host, port)
@@ -93,7 +94,7 @@ func TestMITM_UploadFile(t *testing.T) {
 }
 
 func TestMITM_InvalidUTF8Request(t *testing.T) {
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		return []byte("HTTP/1.1 200 OK\n\n")
 	})
 	target := "http://" + utils.HostPort(host, port)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
 	"testing"
@@ -15,7 +16,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_History_Detail(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	targetHost, targetPort := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("Hello"))
 	})
 

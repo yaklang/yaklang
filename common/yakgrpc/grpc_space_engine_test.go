@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -54,7 +55,7 @@ func TestGRPCMUSTPASS_SpaceEngineCustomDomain(t *testing.T) {
 	}
 	passed := false
 
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		passed = true
 		spew.Dump(req)
 		return []byte(`{}`)

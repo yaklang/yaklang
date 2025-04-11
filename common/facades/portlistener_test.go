@@ -4,6 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"net/http"
 	"testing"
 	"time"
@@ -12,7 +13,7 @@ import (
 func TestPortListener(t *testing.T) {
 	t.SkipNow()
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("abc"))
 	})
 	_ = host

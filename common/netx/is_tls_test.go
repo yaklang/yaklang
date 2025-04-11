@@ -3,11 +3,12 @@ package netx
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"testing"
 )
 
 func TestIsTLSService(t *testing.T) {
-	mockGMHost, mockGMPort := utils.DebugMockOnlyGMHTTP(context.Background(), nil)
+	mockGMHost, mockGMPort := testutils.DebugMockOnlyGMHTTP(context.Background(), nil)
 
 	addr := utils.HostPort(mockGMHost, mockGMPort)
 	type args struct {

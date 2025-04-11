@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"math/rand"
 	"net/http"
@@ -22,7 +23,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_DeleteHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	targetHost, targetPort := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("Hello"))
 	})
 

@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"net/http"
 	"strconv"
 	"testing"
@@ -27,7 +28,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence(t *testing.T) {
 		token           = utils.RandStringBytes(32)
 		verified        = false
 	)
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		switch request.RequestURI {
 		case "/verify":
 			if request.Header.Get("Authorization") == "Bearer "+token {
@@ -111,7 +112,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence_InheritKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("GREAT"))
 		return
 	})
@@ -219,7 +220,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence_InheritKeyWithType(t *testing.T)
 		t.Fatal(err)
 	}
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("GREAT"))
 		return
 	})
@@ -312,7 +313,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence_FuzzerWithTag(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(`{"path":` + strconv.Quote(request.URL.Path) + `}`))
 		return
 	})
@@ -379,7 +380,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence_FuzzerWithTag2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(`{"path":` + strconv.Quote(request.URL.Path) + `}`))
 		return
 	})
@@ -477,7 +478,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence_FuzzerWithTag3(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(`{"path":` + strconv.Quote(request.URL.Path) + `}`))
 		return
 	})
@@ -557,7 +558,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence_FuzzerTagWithConcurrent(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		time.Sleep(time.Millisecond * 500)
 		writer.Write([]byte(`{"path":` + strconv.Quote(request.URL.Path) + `}`))
 		return
@@ -638,7 +639,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence_InheritCookie(t *testing.T) {
 	)
 
 	token2 := utils.RandStringBytes(100)
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		raw, _ := utils.HttpDumpWithBody(request, true)
 
 		switch request.URL.Path {
@@ -752,7 +753,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence_Extractor_OnlyOneResult(t *testi
 	}
 	token := utils.RandStringBytes(32)
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(fmt.Sprintf(`{"a":"%s"}`, token)))
 		return
 	})

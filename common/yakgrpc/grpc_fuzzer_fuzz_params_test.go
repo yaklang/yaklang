@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
 	"testing"
@@ -93,7 +94,7 @@ func TestGRPCMUSTPASS_HTTPFuzzerFuzzParams(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
 
-			host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+			host, port := testutils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 
 aaa`))
 

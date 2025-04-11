@@ -2,12 +2,12 @@ package httptpl
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"testing"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
@@ -422,7 +422,7 @@ Hello World
 }
 
 func TestYakMatcher_Empty(t *testing.T) {
-	server, port := utils.DebugMockHTTPWithTimeout(10*time.Second, []byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTPWithTimeout(10*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
 
 ccc`))

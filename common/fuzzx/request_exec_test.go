@@ -2,6 +2,7 @@ package fuzzx
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,7 +12,7 @@ import (
 
 func TestExec(t *testing.T) {
 	key := "key"
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		return []byte(`HTTP/1.1 200 OK` + "\r\n\r\n" + lowhttp.GetHTTPRequestQueryParam(req, key))
 	})
 	iFuzztag := "{{char(a-z)}}"
@@ -35,7 +36,7 @@ Host: %s`, utils.HostPort(host, port)))
 
 func TestExecFirst(t *testing.T) {
 	key := "key"
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		return []byte(`HTTP/1.1 200 OK` + "\r\n\r\n" + lowhttp.GetHTTPRequestQueryParam(req, key))
 	})
 	iFuzztag := "{{char(a-z)}}"

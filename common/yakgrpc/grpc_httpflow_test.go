@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"io"
 	"net/http"
 	"os"
@@ -126,7 +127,7 @@ func TestGRPCMUSTPASS_HTTP_HijackedFlow_Request(t *testing.T) {
 
 	token1 := utils.RandStringBytes(20)
 	token2 := utils.RandStringBytes(20)
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Header.Get("Token") == token1 {
 			writer.Write([]byte(token2))
 		} else {
@@ -236,7 +237,7 @@ func TestGRPCMUSTPASS_HTTP_HijackedFlow_Response(t *testing.T) {
 	token1 := utils.RandStringBytes(20)
 	token2 := utils.RandStringBytes(20)
 	log.Infof("token1: %s, token2: %s", token1, token2)
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(http.StatusOK)
 		fmt.Fprint(writer, token1)
 	})
@@ -387,7 +388,7 @@ func TestExportHTTPFlows(t *testing.T) {
 func TestExportHTTPFlowsWithPayload(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
-	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+	host, port := testutils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 Content-Length: 5
 
 hello`))
@@ -433,7 +434,7 @@ func TestGRPCMUSTPASS_MITM_PreSetTags(t *testing.T) {
 	require.NoError(t, err)
 
 	token1 := utils.RandStringBytes(20)
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("hello"))
 	})
 	target := utils.HostPort(host, port)
@@ -518,7 +519,7 @@ func TestGRPCMUSTPASS_HTTP_WithPayload(t *testing.T) {
 	require.NoError(t, err)
 
 	token := utils.RandStringBytes(20)
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(http.StatusOK)
 		fmt.Fprint(writer, token)
 	})
@@ -567,7 +568,7 @@ func TestGRPCMUSTPASS_HTTP_ConvertFuzzerResponseToHTTPFlow(t *testing.T) {
 	require.NoError(t, err)
 
 	token := utils.RandStringBytes(20)
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(http.StatusOK)
 		fmt.Fprint(writer, token)
 	})

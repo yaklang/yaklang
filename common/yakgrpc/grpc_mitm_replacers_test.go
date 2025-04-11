@@ -5,6 +5,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"net/http"
 	"strings"
 	"testing"
@@ -713,7 +714,7 @@ func TestGRPCMUSTPASS_HookColorTimeout(t *testing.T) {
 		return
 	}
 	defer yakit.DelKey(consts.GetGormProfileDatabase(), MITMReplacerKeyRecords)
-	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	mockHost, mockPort := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		return []byte("HTTP/1.1 200 OK\r\nContent-length:10000\r\n\r\n" + strings.Repeat("a", 10000))
 	})
 	testReq := []byte(`POST / HTTP/1.1

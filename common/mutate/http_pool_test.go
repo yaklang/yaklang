@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	url2 "net/url"
 	"strings"
 	"testing"
@@ -13,7 +14,7 @@ import (
 )
 
 func TestFuzzNucleiVar(t *testing.T) {
-	server, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 
 aaa`))
 	for _, v := range [][2]string{
@@ -58,7 +59,7 @@ Host: www.example.com
 			}
 		}
 	}
-	server, port = utils.DebugMockHTTPS([]byte(`HTTP/1.1 200 OK
+	server, port = testutils.DebugMockHTTPS([]byte(`HTTP/1.1 200 OK
 
 aaa`))
 	for _, v := range [][2]string{
@@ -107,7 +108,7 @@ Host: www.example.com
 
 func TestSendAndRenderAsynchronously(t *testing.T) {
 	start := time.Now()
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		if time.Now().Sub(start).Seconds() > 5 {
 			t.Fatal("test TestSendAndRenderAsynchronously failed")
 		}
@@ -133,7 +134,7 @@ Host: www.example.com
 }
 
 func TestBatchTargetHost(t *testing.T) {
-	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK`))
+	host, port := testutils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK`))
 	addr := fmt.Sprintf("%s:%d", host, port)
 	testcases := []struct {
 		url    string

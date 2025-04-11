@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"math/rand"
 	"strings"
 	"sync"
@@ -131,7 +132,7 @@ Content-Type: application/json`),
 		return decodeReq
 	}
 
-	echoServer.Host, echoServer.Port = utils.DebugMockHTTPExContext(ctx, func(req []byte) []byte {
+	echoServer.Host, echoServer.Port = testutils.DebugMockHTTPExContext(ctx, func(req []byte) []byte {
 		echoServer.RequestHistoryMutex.Lock()
 		defer echoServer.RequestHistoryMutex.Unlock()
 		echoServer.RequestsHistory = append(echoServer.RequestsHistory, req...)

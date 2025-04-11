@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"net/http"
 	"slices"
 	"sort"
@@ -29,7 +30,7 @@ func TestGRPCMUSTPASS_MITM_HotPatch_Drop(t *testing.T) {
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(5))
 	defer cancel()
 
-	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+	mockHost, mockPort := testutils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("Hello"))
 	})
 
@@ -105,7 +106,7 @@ func TestGRPCMUSTPASS_MITM_HotPatch_Dangerous_FuzzTag(t *testing.T) {
 	require.NoError(t, err)
 	defer clearFunc()
 
-	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+	mockHost, mockPort := testutils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("Hello"))
 	})
 
@@ -173,7 +174,7 @@ func TestGRPCMUSTPASS_MITM_HotPatch_BeforeRequest_AfterRequest(t *testing.T) {
 	hijackRspToken := utils.RandStringBytes(16)
 	rspToken := utils.RandStringBytes(16)
 
-	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	mockHost, mockPort := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		spew.Dump(req)
 		if !bytes.Contains(req, []byte(reqToken)) {
 			panic("req token not found")
@@ -309,7 +310,7 @@ func TestGRPCMUSTPASS_MITM_HotPatch_HijackAndMirrorURL(t *testing.T) {
 	defer cancel()
 
 	hookURLCheck := false
-	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+	mockHost, mockPort := testutils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path == "/notify" {
 			hookURLCheck = true
 		}
@@ -392,7 +393,7 @@ func TestGRPCMUSTPASS_MITM_HotPatch_Output(t *testing.T) {
 
 	token1 := utils.RandStringBytes(16)
 	token2 := utils.RandStringBytes(16)
-	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+	mockHost, mockPort := testutils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("Hello"))
 	})
 
@@ -462,7 +463,7 @@ func TestGRPCMUSTPASS_MITM_HotPatch_HijackSaveHTTPFlow(t *testing.T) {
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(10))
 	defer cancel()
 
-	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+	mockHost, mockPort := testutils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("Hello"))
 	})
 
@@ -596,9 +597,9 @@ hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *y
 			return []byte("Hello")
 		}
 		if http2 {
-			host, port = utils.DebugMockHTTP2(ctx, handler)
+			host, port = testutils.DebugMockHTTP2(ctx, handler)
 		} else {
-			host, port = utils.DebugMockHTTPSEx(handler)
+			host, port = testutils.DebugMockHTTPSEx(handler)
 		}
 		mockURL := fmt.Sprintf("https://%s", utils.HostPort(host, port))
 

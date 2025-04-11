@@ -5,11 +5,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"testing"
 )
 
 func TestOOB(t *testing.T) {
-	server, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 Ok
+	server, port := testutils.DebugMockHTTP([]byte(`HTTP/1.1 200 Ok
 TestDebug: 111`))
 	spew.Dump(server, port)
 	swg := utils.NewSizedWaitGroup(20)

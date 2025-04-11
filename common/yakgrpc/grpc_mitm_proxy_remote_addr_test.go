@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -21,7 +22,7 @@ func TestGRPCMUSTPASS_MITM_RemoteAddr(t *testing.T) {
 	defer cancel()
 
 	token := utils.RandStringBytes(100)
-	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	targetHost, targetPort := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("Hello Token" + "   " + token))
 	})
 	var targetUrl = "http://" + utils.HostPort(targetHost, targetPort)

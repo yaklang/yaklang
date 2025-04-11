@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net/http"
 	"strings"
@@ -26,7 +27,7 @@ func TestGRPCMUSTPASS_HTTP_DebugPlugin_NoMatcherNExtractors_YamlPOC(t *testing.T
 		t.Fatal(err)
 	}
 	check := false
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("a"))
 		check = true
 	})
@@ -138,7 +139,7 @@ http:
 		tokenFile3 := utils.RandStringBytes(10)
 		tokenCheck3 := false
 
-		host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			if strings.Contains(request.URL.Path, tokenFile1) {
 				tokenCheck1 = true
 				writer.Write([]byte(fmt.Sprintf(`{"name":"%s"}`, tokenFile2)))
@@ -187,7 +188,7 @@ Host: ` + target + `
 		tokenFile3 := utils.RandStringBytes(10)
 		tokenCheck3 := false
 
-		host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			if strings.Contains(request.URL.Path, tokenFile1) {
 				tokenCheck1 = true
 				writer.Write([]byte(fmt.Sprintf(`{"name":"%s"}`, tokenFile2)))
@@ -234,7 +235,7 @@ func TestGRPCMUSTPASS_HTTP_DebugPlugin_SmockingWithEmptyInput(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("a"))
 	})
 	target := utils.HostPort(host, port)
@@ -560,7 +561,7 @@ Content-Length: 12
 
 aaabbbaaabbb`))
 
-	host, port := utils.DebugMockHTTP(rspRaw)
+	host, port := testutils.DebugMockHTTP(rspRaw)
 	log.Infof("start to decug mock http on: %v", utils.HostPort(host, port))
 	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
 		Code:       "yakit.AutoInitYakit(); handle = result => {dump(`executed in plugin`); dump(result); yakit.Info(`PLUGIN IS EXECUTED`);risk.NewRisk(`baidu.com`);}",
@@ -610,7 +611,7 @@ func TestGRPCMUSTPASS_HTTP_HTTPRequestBuilderWithDebug2(t *testing.T) {
 Content-Length: 12
 
 aaacccaaabbb`))
-	host, port := utils.DebugMockHTTP(rspRaw)
+	host, port := testutils.DebugMockHTTP(rspRaw)
 	log.Infof("start to debug mock http on: %v", utils.HostPort(host, port))
 	rsp, err := http.Get("http://" + utils.HostPort(host, port))
 	if err != nil {
@@ -654,7 +655,7 @@ func TestGRPCMUSTPASS_HTTP_HTTPRequestBuilderWithDebug3(t *testing.T) {
 Content-Length: 12
 
 aaacccaaabbb`))
-	host, port := utils.DebugMockHTTP(rspRaw)
+	host, port := testutils.DebugMockHTTP(rspRaw)
 	log.Infof("start to debug mock http on: %v", utils.HostPort(host, port))
 	rsp, err := http.Get("http://" + utils.HostPort(host, port))
 	if err != nil {
@@ -697,7 +698,7 @@ func TestGRPCMUSTPASS_DebugPlugin(t *testing.T) {
 Content-Length: 12
 
 aaacccaaabbb`))
-	host, port := utils.DebugMockHTTP(rspRaw)
+	host, port := testutils.DebugMockHTTP(rspRaw)
 	log.Infof("start to debug mock http on: %v", utils.HostPort(host, port))
 
 	tempName1, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", "test")
@@ -824,7 +825,7 @@ func TestGRPCMUSTPASS_DebugPlugin_ServiceScan_RuntimeId(t *testing.T) {
 Content-Length: 12
 
 aaacccaaabbb`))
-	host, port := utils.DebugMockHTTP(rspRaw)
+	host, port := testutils.DebugMockHTTP(rspRaw)
 	log.Infof("start to debug mock http on: %v", utils.HostPort(host, port))
 
 	testCode := fmt.Sprintf(`yakit.AutoInitYakit()
@@ -872,7 +873,7 @@ func TestGRPCMUSTPASS_HTTP_DebugPlugin_Global_SaveHTTPFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("a"))
 	})
 
