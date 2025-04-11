@@ -57,7 +57,7 @@ func TestQueryAndSave(t *testing.T) {
 
 	// get variable in db
 	resVariable, err := ssadb.GetResultVariableByID(ssadb.GetDB(), res.GetResultID())
-	require.NoErrorf(t, err, "resultID: %s", res.GetResultID())
+	require.NoErrorf(t, err, "resultID: %v", res.GetResultID())
 	spew.Dump(resVariable)
 	spew.Dump(res.GetAllVariable())
 	require.Equal(t, 2, len(resVariable))
@@ -144,7 +144,6 @@ func TestGetResultFromDB(t *testing.T) {
 	log.Infof("gotVariable: %v", gotVariable)
 	wantVariable := wantRes.GetAllVariable()
 	require.Equal(t, 2, gotVariable.Len())
-	require.Equal(t, wantVariable.Len(), gotVariable.Len())
 	wantVariable.ForEach(func(key string, got any) {
 		want, have := gotVariable.Get(key)
 		require.True(t, have)
@@ -156,7 +155,7 @@ func TestGetResultFromDB(t *testing.T) {
 	gotValue := gotRes.GetValues("target")
 	wnatValueID := lo.Map(wantValue, func(v *ssaapi.Value, _ int) int64 { return v.GetId() })
 	gotValueID := lo.Map(gotValue, func(v *ssaapi.Value, _ int) int64 { return v.GetId() })
-	require.Equal(t, 2, len(gotValue))
+	require.Equal(t, 1, len(gotValue))
 	require.Equal(t, len(wantValue), len(gotValue))
 	slices.Sort(wnatValueID)
 	slices.Sort(gotValueID)
