@@ -104,10 +104,13 @@ func TestGraph_Builder(t *testing.T) {
 		dotGraph.MakeDirected()
 		dotGraph.GraphAttribute("rankdir", "BT")
 
-		var NodeToKey = make(map[string]int)
+		var NodeToKey map[string]int
 		// 使用 GraphBuilder 构建图
 		builder := graph.NewBFSGraphBuilder[int, string](
 			func(node string) (int, error) {
+				if nodeId, ok := NodeToKey[node]; ok {
+					return nodeId, nil
+				}
 				nodeId := dotGraph.AddNode(node)
 				NodeToKey[node] = nodeId
 				return nodeId, nil
@@ -151,6 +154,7 @@ func TestGraph_Builder(t *testing.T) {
 		)
 
 		// from n1 to n5
+		NodeToKey = map[string]int{}
 		builder.BuildGraph("n1", "n5")
 
 		var buf bytes.Buffer
@@ -190,6 +194,7 @@ func TestGraph_Builder(t *testing.T) {
 		dotGraph.GraphAttribute("rankdir", "BT")
 
 		// from n1 to n6
+		NodeToKey = map[string]int{}
 		builder.BuildGraph("n1", "n6")
 
 		dotGraph.GenerateDOT(&buf)
