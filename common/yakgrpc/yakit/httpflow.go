@@ -710,6 +710,7 @@ func DeleteHTTPFlow(db *gorm.DB, req *ypb.DeleteHTTPFlowRequest) error {
 }
 
 func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
+	subQuery := db
 	db = db.Model(&schema.HTTPFlow{}) //.Debug()
 	if params == nil {
 		params = &ypb.QueryHTTPFlowRequest{}
@@ -875,7 +876,12 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 		db = bizhelper.ExactQueryStringArrayOr(db, "hidden_index", params.GetHiddenIndex())
 	}
 	if len(params.GetAnalyzedIds()) > 0 {
-		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", QueryHTTPIdByAnalyzedId(params.GetAnalyzedIds()))
+		db = db.Where("id IN (?)",
+			subQuery.
+				Table("analyzed_http_flows").
+				Where("id IN (?)", params.GetAnalyzedIds()).
+				Select("http_flow_id").QueryExpr(),
+		)
 	}
 	if params.AfterBodyLength > 0 {
 		db = db.Where("body_length >= ?", params.AfterBodyLength)
