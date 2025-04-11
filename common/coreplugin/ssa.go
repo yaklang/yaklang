@@ -16,7 +16,8 @@ func ParseProjectWithAutoDetective(ctx context.Context, path string, language st
 
 	progInfo := &programInfo{}
 	err := yakgrpc.ExecScriptWithParam(ctx, pluginName, map[string]string{
-		"target": path,
+		"target":   path,
+		"language": language,
 	},
 		"", func(exec *ypb.ExecResult) error {
 			if !exec.IsMessage {

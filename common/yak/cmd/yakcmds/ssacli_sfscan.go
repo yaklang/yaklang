@@ -39,6 +39,8 @@ type ssaCliConfig struct {
 	programName string
 	// targetPath is the path of the target
 	targetPath string
+
+	language string
 	// }}
 
 	// {{ should result
@@ -100,6 +102,7 @@ func parseSFScanConfig(c *cli.Context) (res *ssaCliConfig, err error) {
 		config.programName = programName
 		config.targetPath = targetPath
 	}
+	config.language = c.String("language")
 
 	// result  writer
 	// var writer io.Writer
@@ -150,7 +153,7 @@ func getProgram(ctx context.Context, config *ssaCliConfig) (*ssaapi.Program, err
 	}
 	if config.targetPath != "" {
 		log.Infof("get program from target path: %s", config.targetPath)
-		_, prog, err := coreplugin.ParseProjectWithAutoDetective(ctx, config.targetPath, "")
+		_, prog, err := coreplugin.ParseProjectWithAutoDetective(ctx, config.targetPath, config.language)
 		return prog, err
 	}
 	return nil, utils.Errorf("get program by parameter fail, please check your command")
