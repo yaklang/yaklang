@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/omnisearch/ostype"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -251,6 +252,21 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 	opts = append(opts, newSpaceEngineTmp("hunter", "Hunter", false))
 	opts = append(opts, newSpaceEngineTmp("zoomeye", "ZoomEye", false))
 
+	options, err := utils.ParseAppTagToOptions(&ostype.YakitOmniSearchKeyConfig{})
+	if err != nil {
+		log.Errorf("parse omnisearch app config tag to options failed: %v", err)
+	} else {
+		opts = append(opts, &ypb.GetThirdPartyAppConfigTemplate{
+			Name:    "brave",
+			Verbose: "Brave",
+			Items:   options,
+		})
+		opts = append(opts, &ypb.GetThirdPartyAppConfigTemplate{
+			Name:    "tavily",
+			Verbose: "Tavily",
+			Items:   options,
+		})
+	}
 	//githubOpt := &ypb.GetThirdPartyAppConfigTemplate{
 	//	Name:    "github",
 	//	Verbose: "Github",
