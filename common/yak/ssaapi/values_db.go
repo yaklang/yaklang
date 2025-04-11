@@ -174,13 +174,16 @@ func (s *saveValueCtx) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
 	}
 
 	var res []*graph.Neighbor[*Value]
-	// for _, i := range value.DependOn {
+	// for _, i := range value.GetDependOn() {
 	// 	res = append(res, graph.NewNeighbor(i, EdgeTypeDependOn))
 	// }
-	// for _, i := range value.EffectOn {
+	// for _, i := range value.GetEffectOn() {
 	// 	res = append(res, graph.NewNeighbor(i, EdgeTypeEffectOn))
 	// }
-	for _, pred := range value.Predecessors {
+	for _, pred := range value.GetPredecessors() {
+		if pred.Node == nil {
+			continue
+		}
 		if IsDataFlowLabel(pred.Info.Label) {
 			graph.BuildGraphWithBFS[*ssadb.AuditNode, *Value](
 				pred.Node, value,
@@ -206,7 +209,7 @@ func (s *saveValueCtx) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
 
 func (s *saveValueCtx) getNeighborsDependOn(value *Value) map[*Value]*graph.Neighbor[*Value] {
 	var res map[*Value]*graph.Neighbor[*Value] = make(map[*Value]*graph.Neighbor[*Value])
-	for _, i := range value.DependOn {
+	for _, i := range value.GetDependOn() {
 		res[i] = graph.NewNeighbor(i, EdgeTypeDependOn)
 	}
 	return res
@@ -214,7 +217,7 @@ func (s *saveValueCtx) getNeighborsDependOn(value *Value) map[*Value]*graph.Neig
 
 func (s *saveValueCtx) getNeighborsEffectOn(value *Value) map[*Value]*graph.Neighbor[*Value] {
 	var res map[*Value]*graph.Neighbor[*Value] = make(map[*Value]*graph.Neighbor[*Value])
-	for _, i := range value.EffectOn {
+	for _, i := range value.GetEffectOn() {
 		res[i] = graph.NewNeighbor(i, EdgeTypeEffectOn)
 	}
 	return res

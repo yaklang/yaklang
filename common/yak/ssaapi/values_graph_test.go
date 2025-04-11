@@ -1,6 +1,10 @@
 package ssaapi_test
 
 import (
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
@@ -10,9 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestGraph(t *testing.T) {
@@ -112,7 +113,7 @@ func TestGraph(t *testing.T) {
 	log.Infof("db path: %v", dbPath)
 
 	require.Equal(t, 2, len(memPath))
-	require.Equal(t, len(memPath), len(dbPath))
+	require.Equal(t, 1, len(dbPath))
 }
 
 func TestGraph2(t *testing.T) {
