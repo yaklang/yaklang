@@ -13,12 +13,12 @@ func NewMockSearcher() *MockSearcher {
 	return &MockSearcher{}
 }
 
-func (m *MockSearcher) Search(query string, config *ostype.SearchConfig) (*ostype.OmniSearchResultList, error) {
+func (m *MockSearcher) Search(query string, config *ostype.SearchConfig) ([]*ostype.OmniSearchResult, error) {
 	if config.ApiKey == "" {
 		return nil, fmt.Errorf("api key is required")
 	}
-	results := &ostype.OmniSearchResultList{}
-	results.Results = append(results.Results, &ostype.OmniSearchResult{
+	results := []*ostype.OmniSearchResult{}
+	results = append(results, &ostype.OmniSearchResult{
 		Title:   "mock",
 		URL:     "https://mock.com",
 		Content: fmt.Sprintf("apikey: %s, mock %s", config.ApiKey, query),

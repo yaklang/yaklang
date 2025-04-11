@@ -10,6 +10,16 @@ import (
 	"github.com/yaklang/yaklang/common/omnisearch/ostype"
 )
 
+var (
+	searcherList = map[ostype.SearcherType]ostype.SearchClient{} // 存储各种类型的搜索引擎实例
+)
+
+func RegisterSearchers(searcher ...ostype.SearchClient) {
+	for _, s := range searcher {
+		searcherList[s.GetType()] = s
+	}
+}
+
 // OmniSearchClient 全能搜索客户端，支持多种搜索引擎和API key自动轮换
 type OmniSearchClient struct {
 	searcherList map[ostype.SearcherType]ostype.SearchClient // 存储各种类型的搜索引擎实例
@@ -40,6 +50,9 @@ func (s *OmniSearchClient) InitDefaultSearchers() {
 
 	s.searcherList[ostype.SearcherTypeBrave] = searchers.NewOmniBraveSearchClient()
 	s.searcherList[ostype.SearcherTypeTavily] = searchers.NewOmniTavilySearchClient()
+	for _, searcher := range searcherList {
+		s.searcherList[searcher.GetType()] = searcher
+	}
 }
 
 // Search 执行搜索操作，支持API key自动轮换与负载均衡
@@ -102,5 +115,12 @@ func (s *OmniSearchClient) Search(query string, options ...ostype.SearchOption) 
 
 	config := ostype.NewSearchConfig(newOptions...)
 	// 执行搜索并返回结果
-	return searcher.Search(query, config)
+	res, err := searcher.Search(query, config)
+	if err != nil {
+		return nil, err
+	}
+	return &ostype.OmniSearchResultList{
+		Results: res,
+		Total:   len(res),
+	}, nil
 }

@@ -1,4 +1,4 @@
-package fstools
+package searchtools
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/omnisearch"
 	"github.com/yaklang/yaklang/common/omnisearch/ostype"
@@ -17,18 +18,14 @@ func CreateOmniSearchTools() ([]*aitool.Tool, error) {
 	factory := aitool.NewFactory()
 
 	err := factory.RegisterTool(
-		"omni_search",
-		aitool.WithDescription("This is an aggregated search tool that can search for various types of information."),
-		aitool.WithStringParam("search_engine",
-			aitool.WithParam_Required(true),
-			aitool.WithParam_Description("Search engine name, options include: 'brave', 'tavily'."),
-		),
+		"web_search",
+		aitool.WithDescription("This is a web search tool."),
 		aitool.WithStringParam("query",
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("search query"),
 		),
 		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
-			searchType := params.GetString("search_engine")
+			searchType := "brave"
 			query := params.GetString("query")
 
 			// 准备搜索选项
@@ -38,6 +35,14 @@ func CreateOmniSearchTools() ([]*aitool.Tool, error) {
 				ostype.WithPage(1),
 			}
 
+			cfg := &ostype.YakitOmniSearchKeyConfig{}
+			err := consts.GetThirdPartyApplicationConfig("brave", cfg)
+			if err != nil {
+				log.Errorf("get brave api key config failed: %v", err)
+			} else {
+				searchOptions = append(searchOptions, ostype.WithApiKey(cfg.APIKey))
+				searchOptions = append(searchOptions, ostype.WithProxy(cfg.Proxy))
+			}
 			// 创建搜索客户端并执行搜索
 			client := omnisearch.NewOmniSearchClient()
 			results, err := client.Search(query, searchOptions...)
@@ -66,30 +71,5 @@ func CreateOmniSearchTools() ([]*aitool.Tool, error) {
 		log.Errorf("register omni_search tool failed: %v", err)
 		return nil, err
 	}
-
-	// 添加一个辅助工具，列出支持的搜索引擎类型
-	err = factory.RegisterTool(
-		"list_search_engines",
-		aitool.WithDescription("List supported search engines"),
-		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
-			engines := map[string]string{
-				string(ostype.SearcherTypeBrave):  "Brave search engine",
-				string(ostype.SearcherTypeTavily): "Tavily search engine",
-			}
-
-			data, err := json.MarshalIndent(engines, "", "  ")
-			if err != nil {
-				return nil, utils.Errorf("serialize engine list failed: %v", err)
-			}
-
-			return string(data), nil
-		}),
-	)
-
-	if err != nil {
-		log.Errorf("register list_search_engines tool failed: %v", err)
-		return nil, err
-	}
-
 	return factory.Tools(), nil
 }

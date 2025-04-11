@@ -25,16 +25,16 @@ func (c *CustomSearcher) GetType() ostype.SearcherType {
 	return ostype.SearcherType(c.Name)
 }
 
-func (c *CustomSearcher) Search(query string, config *ostype.SearchConfig) (*ostype.OmniSearchResultList, error) {
+func (c *CustomSearcher) Search(query string, config *ostype.SearchConfig) ([]*ostype.OmniSearchResult, error) {
 	iresults, err := c.Handle(query, config)
 	if err != nil {
 		return nil, fmt.Errorf("call custom searcher failed: %v", err)
 	}
 	results := utils.InterfaceToStringSlice(iresults)
 
-	resultList := &ostype.OmniSearchResultList{}
+	resultList := []*ostype.OmniSearchResult{}
 	for _, result := range results {
-		resultList.Results = append(resultList.Results, &ostype.OmniSearchResult{
+		resultList = append(resultList, &ostype.OmniSearchResult{
 			Content: utils.InterfaceToString(result),
 			Source:  c.Name,
 		})
