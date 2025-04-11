@@ -1,8 +1,10 @@
 package aid
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
+	"context"
 	"io"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type RiskControlResult struct {
@@ -12,7 +14,7 @@ type RiskControlResult struct {
 }
 
 type riskControl struct {
-	callback func(*Config, io.Reader) *RiskControlResult
+	callback func(*Config, context.Context, io.Reader) *RiskControlResult
 }
 
 func (rc *riskControl) enabled() bool {
@@ -25,14 +27,14 @@ func (rc *riskControl) enabled() bool {
 	return true
 }
 
-func (rc *riskControl) setCallback(callback func(*Config, io.Reader) *RiskControlResult) {
+func (rc *riskControl) setCallback(callback func(*Config, context.Context, io.Reader) *RiskControlResult) {
 	if rc == nil {
 		return
 	}
 	rc.callback = callback
 }
 
-func (rc *riskControl) doRiskControl(config *Config, reader io.Reader) (final *RiskControlResult) {
+func (rc *riskControl) doRiskControl(config *Config, ctx context.Context, reader io.Reader) (final *RiskControlResult) {
 	defer func() {
 		if err := recover(); err != nil {
 			final = &RiskControlResult{
@@ -56,5 +58,5 @@ func (rc *riskControl) doRiskControl(config *Config, reader io.Reader) (final *R
 			Reason:  "callback is nil",
 		}
 	}
-	return rc.callback(config, reader)
+	return rc.callback(config, ctx, reader)
 }

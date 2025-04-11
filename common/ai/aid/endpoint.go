@@ -83,6 +83,12 @@ func (e *Endpoint) Wait() {
 	e.sig.Wait()
 }
 
+func (e Endpoint) Release() {
+	e.sig.L.Lock()
+	defer e.sig.L.Unlock()
+	e.sig.Broadcast()
+}
+
 func (e *Endpoint) WaitTimeoutSeconds(i float64) bool {
 	return e.WaitTimeout(time.Duration(i * float64(time.Second)))
 }
