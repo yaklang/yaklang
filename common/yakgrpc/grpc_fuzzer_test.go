@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"net/http"
 	"net/http/httputil"
 	"sort"
@@ -37,7 +38,7 @@ func init() {
 }
 
 func TestGRPCMUSTPASS_RawFuzztagBug(t *testing.T) {
-	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
+	host, port := testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
 		"Content-Length: 1\r\n\r\n"))
 	c, err := NewLocalClient()
 	if err != nil {
@@ -66,7 +67,7 @@ Host: %v
 }
 
 func TestGRPCMUSTPASS_CheckResponseValid(t *testing.T) {
-	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
+	host, port := testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
 		"Content-Length: 1\r\n\r\n"))
 	c, err := NewLocalClient()
 	if err != nil {
@@ -125,7 +126,7 @@ asdghasdjfgahjksdgf
 func TestGRPCMUSTPASS_FuzzerMatch(t *testing.T) {
 	data := uuid.New().String()
 	body, _ := utils.GzipCompress(data)
-	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
+	host, port := testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
 		"Content-Encoding: gzip\r\n" +
 		"Content-Length: " + fmt.Sprint(len(body)) + "\r\n" +
 		"\r\n" +
@@ -176,7 +177,7 @@ Host: ` + utils.HostPort(host, port) + `
 }
 
 func TestSaveToDB(t *testing.T) {
-	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+	host, port := testutils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 
 `))
 	client, err := NewLocalClient()
@@ -243,7 +244,7 @@ Host: www.example.com
 }
 
 func TestGRPCMUSTPASS_HTTPFuzzer_WithNoFollowRedirect(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.RequestURI != "/admin" {
 			http.Redirect(writer, request, "/admin", http.StatusMovedPermanently)
 			return
@@ -317,7 +318,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_WITHPLUGIN(t *testing.T) {
 	}
 	defer clearFunc()
 
-	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+	host, port := testutils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 Content-Length: 12
 
 {"abc": "111111", "qqq": "12"}`))
@@ -387,7 +388,7 @@ Host: %v
 func TestGRPCMUSTPASS_HTTPFuzzer_WithNoFixGZIP(t *testing.T) {
 	token := utils.RandStringBytes(200)
 	body, _ := utils.GzipCompress(token)
-	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
+	host, port := testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
 		"Content-Length: " + fmt.Sprint(len(body)) + "\r\n" +
 		"Content-Encoding: gzip\r\n\r\n" + string(body)))
 	c, err := NewLocalClient()
@@ -429,7 +430,7 @@ Host: %v
 func TestGRPCMUSTPASS_HTTPFuzzer_WithNoFixGZIP_Negative(t *testing.T) {
 	token := utils.RandStringBytes(200)
 	body, _ := utils.GzipCompress(token)
-	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
+	host, port := testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
 		"Content-Length: " + fmt.Sprint(len(body)) + "\r\n" +
 		"X: 1\r\n\r\n" + string(body)))
 	c, err := NewLocalClient()
@@ -469,7 +470,7 @@ Host: %v
 }
 
 func TestGRPCMUSTPASS_HTTPFuzzer_BIG(t *testing.T) {
-	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+	host, port := testutils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 Content-Length: 12
 
 {"abc": "111111", "qqq": "12"}`))
@@ -529,7 +530,7 @@ Host: %v
 
 func TestGRPCMUSTPASS_HTTPFuzzer_ALL(t *testing.T) {
 	var requestedCount int
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		requestedCount++
 		writer.Write([]byte("abc"))
 	})
@@ -595,7 +596,7 @@ Host: www.baidu.com
 
 func TestGRPCMUSTPASS_HTTPFuzzer_WithLegacyTag(t *testing.T) {
 	var requestedCount int
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		requestedCount++
 		writer.Write([]byte("abc"))
 	})
@@ -902,7 +903,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzztagVars(t *testing.T) {
 	}
 
 	token := utils.RandStringBytes(100)
-	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	targetHost, targetPort := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		time.Sleep(time.Second)
 		writer.Write([]byte(token))
 	})
@@ -962,7 +963,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzztagVars2(t *testing.T) {
 	}
 
 	token := utils.RandStringBytes(100)
-	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	targetHost, targetPort := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		time.Sleep(time.Second)
 		writer.Write([]byte(token))
 	})
@@ -1202,7 +1203,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzzTag(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(""))
 	})
 	target := utils.HostPort(host, port)
@@ -1308,7 +1309,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SyncFuzzTag(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(""))
 	})
 	target := utils.HostPort(host, port)
@@ -1432,7 +1433,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SyncFuzzTag(t *testing.T) {
 func TestFuzzerBigRequest(t *testing.T) {
 	uid := uuid.New().String()
 
-	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
+	host, port := testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
 		"Content-Length: 0\r\n\r\n"))
 	target := utils.HostPort(host, port)
 	origin := []byte(`GET /` + uid + ` HTTP/1.1
@@ -1504,7 +1505,7 @@ Content-Type: image/jpeg
 func TestHTTPRequest_Fuzz_FromPlugin(t *testing.T) {
 	t.Run("Request", func(t *testing.T) {
 		pluginName := utils.RandStringBytes(10)
-		server, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+		server, port := testutils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 
 aaa`))
 		runtimeId := uuid.New().String()
@@ -1527,7 +1528,7 @@ Host: %s:%d
 
 	t.Run("BatchRequest", func(t *testing.T) {
 		pluginName := utils.RandStringBytes(10)
-		server, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+		server, port := testutils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 
 aaa`))
 		runtimeId := uuid.New().String()
@@ -1556,7 +1557,7 @@ Host: %s:%d
 }
 
 func TestWebFuzzerAutoFixHeaderFlag(t *testing.T) {
-	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+	host, port := testutils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 Content-Type: text/html
 Content-Disposition: attachment; filename="example.pdf"
 X-Content-Type-Options: nosniff

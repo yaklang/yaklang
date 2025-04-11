@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"strings"
 	"sync"
 	"testing"
@@ -78,7 +79,7 @@ func RunMITMTestServerEx(
 }
 
 func Test_ForExcludeBadCase(t *testing.T) {
-	_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	_, mockPort := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		ct := lowhttp.GetHTTPRequestQueryParam(req, "ct")
 		rsp, _, _ := lowhttp.FixHTTPResponse([]byte("HTTP/1.1 200 OK\r\nD: 1\r\n\r\n" + time.Now().String()))
 		if ct != "" {
@@ -160,7 +161,7 @@ sleep(0.3)
 }
 
 func TestGRPCMUSTPASS_MITM_Filter_ForExcludeURI(t *testing.T) {
-	_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	_, mockPort := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		ct := lowhttp.GetHTTPRequestQueryParam(req, "ct")
 		rsp, _, _ := lowhttp.FixHTTPResponse([]byte("HTTP/1.1 200 OK\r\nD: 1\r\n\r\n" + time.Now().String()))
 		if ct != "" {
@@ -243,7 +244,7 @@ sleep(0.3)
 }
 
 func TestGRPCMUSTPASS_MITM_Filter_ForExcludeSuffixAndContentType(t *testing.T) {
-	_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	_, mockPort := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		ct := lowhttp.GetHTTPRequestQueryParam(req, "ct")
 		rsp, _, _ := lowhttp.FixHTTPResponse([]byte("HTTP/1.1 200 OK\r\nD: 1\r\n\r\n" + time.Now().String()))
 		if ct != "" {
@@ -431,7 +432,7 @@ func TestMITMFilterManager_Filter(t *testing.T) {
 func TestGRPCMUSTPASS_WebSocket_Filter_RSP(t *testing.T) {
 	token := utils.RandStringBytes(10)
 	sendCompleteCh := make(chan struct{})
-	host, port := utils.DebugMockWs(func(ws *websocket.Conn) {
+	host, port := testutils.DebugMockWs(func(ws *websocket.Conn) {
 		for i := 0; i < 10; i++ {
 			ws.Write([]byte(token))
 			time.Sleep(50 * time.Millisecond)
@@ -484,7 +485,7 @@ Sec-WebSocket-Key: w4v7O6xFTi36lq3RNcgctw==
 func TestGRPCMUSTPASS_WebSocket_Filter_REQ(t *testing.T) {
 	token := utils.RandStringBytes(10)
 	sendOKCh := make(chan struct{})
-	host, port := utils.DebugMockWs(func(ws *websocket.Conn) {
+	host, port := testutils.DebugMockWs(func(ws *websocket.Conn) {
 		var res []byte
 		for i := 0; i < 10; i++ {
 			ws.Read(res)
@@ -543,7 +544,7 @@ func TestGRPCMUSTPASS_MITM_Filter_Plugin(t *testing.T) {
 
 	shouldFilterToken := utils.RandStringBytes(10)
 	notFilterToken := utils.RandStringBytes(10)
-	_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	_, mockPort := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		token := lowhttp.GetHTTPRequestQueryParam(req, "token")
 		if token == shouldFilterToken {
 			shouldFilter = true

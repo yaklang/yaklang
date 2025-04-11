@@ -2,6 +2,7 @@ package lowhttp
 
 import (
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"net/http"
 	"testing"
 )
@@ -44,7 +45,7 @@ func TestHTTPAuth(t *testing.T) {
 
 	count := 0
 	username, passwd := "test", "test"
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, request *http.Request) {
 		u, p, ok := request.BasicAuth()
 		if ok && u == username && p == passwd {
 			w.WriteHeader(http.StatusOK)

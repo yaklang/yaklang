@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"io"
 	"strings"
 	"sync"
@@ -69,7 +70,7 @@ func CoreMitmPlugTest(pluginName string, vulServer VulServerInfo, vulInfo VulInf
 
 		Mock(yakit.NewDNSLogDomain).To(func() (domain string, token string, _ error) {
 			mockToken := utils.RandStringBytes(16)
-			host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+			host, port := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 				mockTokenToResultMapLock.Lock()
 				defer mockTokenToResultMapLock.Unlock()
 				mockTokenToResultMap[mockToken] = &tpb.DNSLogEvent{Domain: ""}

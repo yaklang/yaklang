@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
@@ -33,7 +34,7 @@ func TestGRPCMUSTPASS_MITM_AUTH(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
+	host, port := testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
 		"Content-Length: 1\r\n\r\na"))
 
 	p := utils.GetRandomAvailableTCPPort()
@@ -82,7 +83,7 @@ func TestGRPCMUSTPASS_MITM_AUTH_Negative(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
+	host, port := testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
 		"Content-Length: 1\r\n\r\na"))
 
 	p := utils.GetRandomAvailableTCPPort()

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"golang.org/x/exp/maps"
 	"io"
 	"net/http"
@@ -882,7 +883,7 @@ http:
 		t.Run(test.raw, func(t *testing.T) {
 			yamlRaw := test.raw
 			var extractedTitle string
-			host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 				request.ParseForm()
 				action := request.Form.Get("action")
 				if action != "" {
@@ -1089,7 +1090,7 @@ http:
 	for _, test := range tests {
 		t.Run(test.raw, func(t *testing.T) {
 			yamlRaw := test.raw
-			host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 				request.ParseForm()
 				action := request.Form.Get("action")
 				if action != "" {
@@ -1200,7 +1201,7 @@ func TestGRPCMUSTPASS_HTTPFuzzerTaskToYaml(t *testing.T) {
 		"backSlashTag": "%7b%7b%61%61%61",
 	}
 	actual := map[string]string{}
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, r *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 		body, err := io.ReadAll(r.Body)
 		if err == nil {

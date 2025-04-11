@@ -2,11 +2,11 @@ package lowhttp
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 )
 
 func DebugEchoServer() (string, int) {
-	return utils.DebugMockHTTPEx(func(req []byte) []byte {
+	return testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		return ReplaceHTTPPacketBodyFast([]byte(`HTTP/1.1 200 OK
 Content-Type: text/html
 `), req)
@@ -14,7 +14,7 @@ Content-Type: text/html
 }
 
 func DebugEchoServerContext(ctx context.Context) (string, int) {
-	return utils.DebugMockHTTPExContext(ctx, func(req []byte) []byte {
+	return testutils.DebugMockHTTPExContext(ctx, func(req []byte) []byte {
 		return ReplaceHTTPPacketBodyFast([]byte(`HTTP/1.1 200 OK
 Content-Type: text/html
 `), req)

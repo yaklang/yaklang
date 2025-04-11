@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"net/http"
 	"strings"
 	"testing"
@@ -19,12 +20,12 @@ func TestGRPCMUSTPASS_HTTPFUZZER_BatchTarget(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 	for i := 0; i < 2; i++ {
-		host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(w http.ResponseWriter, r *http.Request) {
+		host, port := testutils.DebugMockHTTPHandlerFuncContext(ctx, func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("abc"))
 		})
 		newTarget = append(newTarget, utils.HostPort(host, port))
 		if i%2 == 1 {
-			tlsHost, tlsPort := utils.DebugMockHTTPSKeepAliveEx(func(req []byte) []byte {
+			tlsHost, tlsPort := testutils.DebugMockHTTPSKeepAliveEx(func(req []byte) []byte {
 				return []byte(`HTTP/1.1 200 OK
 Content-Length: 3
 

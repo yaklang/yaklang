@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"io"
 	"net/http"
 	"os"
@@ -264,7 +265,7 @@ func TestGRPCMUSTPASS_COMMON_RPOXY_FROM_ENV(t *testing.T) {
 	}
 
 	triggerProxy := false
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		spew.Dump(req)
 		if strings.Contains(string(req), "CONNECT 8.8.8.8:80") {
 			triggerProxy = true
@@ -327,7 +328,7 @@ func TestGRPCMUSTPASS_COMMON_GLOBAL_RPOXY(t *testing.T) {
 	}
 
 	triggerProxy := false
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		spew.Dump(req)
 		if strings.Contains(string(req), "CONNECT 8.8.8.8:80") {
 			triggerProxy = true
@@ -500,7 +501,7 @@ func TestValidP12PassWord(t *testing.T) {
 
 func TestGRPCMUSTPASS_COMMON_HTTPAuth(t *testing.T) {
 	username, passwd := "test", "test"
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, request *http.Request) {
 		u, p, ok := request.BasicAuth()
 		if ok && u == username && p == passwd {
 			w.WriteHeader(http.StatusOK)
@@ -622,7 +623,7 @@ func TestPluginScanLists(t *testing.T) {
 	require.Nil(t, err, "new local client error")
 
 	_, _ = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
-	host, port := utils.DebugMockHTTP([]byte("Hello"))
+	host, port := testutils.DebugMockHTTP([]byte("Hello"))
 	recoverList := yakit.SetGlobalPluginScanLists([]string{}, []string{host})
 	defer recoverList()
 
@@ -824,7 +825,7 @@ func TestCallPluginTimeout(t *testing.T) {
 	_, err = client.SetGlobalNetworkConfig(context.Background(), config)
 	require.NoError(t, err)
 
-	host, port := utils.DebugMockHTTP([]byte("Hello"))
+	host, port := testutils.DebugMockHTTP([]byte("Hello"))
 	token := utils.RandStringBytes(20)
 	code := fmt.Sprintf(`mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
     time.sleep(65)

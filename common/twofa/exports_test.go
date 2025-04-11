@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 	"testing"
@@ -26,7 +27,7 @@ func TestNewTOTPConfig(t *testing.T) {
 
 func TestNewTOTPServer(t *testing.T) {
 	responseId := uuid.New().String()
-	target, to := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	target, to := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		return []byte(`HTTP/1.1 200 OK
 Content-Length: ` + fmt.Sprint(len(responseId)) + `
 

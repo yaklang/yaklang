@@ -2,6 +2,7 @@ package poc
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"net/http"
 	"testing"
 
@@ -11,7 +12,7 @@ import (
 
 func TestPocWithRandomJA3(t *testing.T) {
 	token := utils.RandStringBytes(128)
-	host, port := utils.DebugMockHTTP([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: %d\r\n\r\n%s", len(token), token)))
+	host, port := testutils.DebugMockHTTP([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: %d\r\n\r\n%s", len(token), token)))
 
 	for i := 0; i < 16; i++ {
 		rsp, _, err := DoGET("http://"+utils.HostPort(host, port), WithRandomJA3(true))
@@ -24,7 +25,7 @@ func TestPocRequestWithSession(t *testing.T) {
 	token, token2, token3 := utils.RandStringBytes(10), utils.RandStringBytes(10), utils.RandStringBytes(10)
 	cookieStr := fmt.Sprintf("%s=%s", token, token2)
 
-	host, port := utils.DebugMockHTTP([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nConnection: close\r\nSet-Cookie: %s\r\n\r\n", cookieStr)))
+	host, port := testutils.DebugMockHTTP([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nConnection: close\r\nSet-Cookie: %s\r\n\r\n", cookieStr)))
 
 	// get cookie from server
 	_, _, err := HTTP(fmt.Sprintf(`GET / HTTP/1.1

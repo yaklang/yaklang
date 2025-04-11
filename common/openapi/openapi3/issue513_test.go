@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"net/http"
 	"strings"
 	"testing"
@@ -12,7 +13,7 @@ import (
 )
 
 func TestExtraSiblingsInRemoteRef(t *testing.T) {
-	hostname, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	hostname, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		urlins, err := lowhttp.ExtractURLFromHTTPRequest(request, false)
 		if err != nil {
 			return

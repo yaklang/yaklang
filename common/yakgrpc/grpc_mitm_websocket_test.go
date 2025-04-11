@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"strings"
 	"testing"
 	"time"
@@ -23,7 +24,7 @@ func TestGRPCMUSTPASS_MITM_WebSocket(t *testing.T) {
 	token := utils.RandStringBytes(60)
 	token2 := utils.RandStringBytes(60)
 
-	host, port := utils.DebugMockEchoWs("enPayload")
+	host, port := testutils.DebugMockEchoWs("enPayload")
 	log.Infof("addr: %s:%d", host, port)
 	client, err := NewLocalClient()
 	if err != nil {
@@ -120,7 +121,7 @@ func TestGRPCMUSTPASS_MITM_WebSocket_EmptyRequestOrResponse(t *testing.T) {
 
 	token := utils.RandStringBytes(60)
 
-	host, port := utils.DebugMockEchoWs("test_empty")
+	host, port := testutils.DebugMockEchoWs("test_empty")
 	log.Infof("addr: %s:%d", host, port)
 
 	err := utils.WaitConnect(utils.HostPort(host, port), 5)
@@ -188,7 +189,7 @@ func TestGRPCMUSTPASS_MITM_WebSocket_Payload(t *testing.T) {
 	defer cancel()
 	token := utils.RandStringBytes(60)
 
-	host, port := utils.DebugMockEchoWs("payload")
+	host, port := testutils.DebugMockEchoWs("payload")
 
 	client, err := NewLocalClient() // 新建一个 yakit client
 	if err != nil {
@@ -308,7 +309,7 @@ func TestGRPCMUSTPASS_MITM_WebSocket_RULE(t *testing.T) {
 	token2 := utils.RandStringBytes(60)
 	tagToken := utils.RandStringBytes(10)
 
-	host, port := utils.DebugMockEchoWs("ruleCheck")
+	host, port := testutils.DebugMockEchoWs("ruleCheck")
 	log.Infof("addr: %s:%d", host, port)
 	client, err := NewLocalClient()
 	if err != nil {

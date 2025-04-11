@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -111,7 +112,7 @@ func Test_scanFingerprint1(t *testing.T) {
 }
 
 func TestMUSTPASS_Fp_GMTls(t *testing.T) {
-	mockGMHost, mockGMPort := utils.DebugMockOnlyGMHTTP(context.Background(), nil)
+	mockGMHost, mockGMPort := testutils.DebugMockOnlyGMHTTP(context.Background(), nil)
 	t.Logf("mockGMHost: %v, mockGMPort: %v", mockGMHost, mockGMPort)
 	type args struct {
 		target string

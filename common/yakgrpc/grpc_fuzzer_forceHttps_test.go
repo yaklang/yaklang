@@ -3,7 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"testing"
 )
@@ -17,8 +17,8 @@ type forceHttpsTestCases struct {
 }
 
 func TestForce(t *testing.T) {
-	server, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 10\r\nHello Http\r\n"))
-	mockHTTPS, mockHttpsPort := utils.DebugMockHTTPS([]byte("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 11\r\nHello Https\r\n"))
+	server, port := testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 10\r\nHello Http\r\n"))
+	mockHTTPS, mockHttpsPort := testutils.DebugMockHTTPS([]byte("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 11\r\nHello Https\r\n"))
 	testCase := []forceHttpsTestCases{
 		//force https returns location is https
 		{

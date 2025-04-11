@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -78,7 +79,7 @@ func TestTargetGenerator_InputTargetFile(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_HybridScan_status(t *testing.T) {
-	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Length: 12\r\n\r\nHello, World!"))
+	host, port := testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Length: 12\r\n\r\nHello, World!"))
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)
@@ -193,7 +194,7 @@ func TestGRPCMUSTPASS_HybridScan_HTTPFlow_At_Least(t *testing.T) {
 	scriptName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", "")
 	require.NoError(t, err)
 	defer clearFunc()
-	target := utils.HostPort(utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Length: 12\r\n\r\nHello, World!")))
+	target := utils.HostPort(testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Length: 12\r\n\r\nHello, World!")))
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	stream, err := client.HybridScan(context.Background())
@@ -340,7 +341,7 @@ mirrorHTTPFlow = func(isHttps , url , req , rsp , body) {
 	require.NoError(t, err)
 	defer clearFunc()
 
-	target := utils.HostPort(utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Length: 12\r\n\r\nHello, World!")))
+	target := utils.HostPort(testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Length: 12\r\n\r\nHello, World!")))
 
 	packet := fmt.Sprintf("POST /\r\nHost: %s\r\n\r\n"+
 		"%s", target, token)

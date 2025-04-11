@@ -6,12 +6,13 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"testing"
 )
 
 func TestGRPCMUSTPASS_MUTATE_MUTATE_NEG(T *testing.T) {
 	test := assert.New(T)
-	_, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+	_, port := testutils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 Content-Length: 1
 
 a`))
@@ -31,7 +32,7 @@ Host: 127.0.0.1:` + fmt.Sprint(port) + `
 
 func TestGRPCMUSTPASS_MUTATE_MUTATE_POS(T *testing.T) {
 	test := assert.New(T)
-	_, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+	_, port := testutils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 Content-Length: 1
 
 a`))

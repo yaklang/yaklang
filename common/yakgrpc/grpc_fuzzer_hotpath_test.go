@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"io"
 	"net/http"
 	"strconv"
@@ -23,7 +24,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_ErrorCode(t *testing.T) {
 		panic(err)
 	}
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("abc"))
 	})
 	target := utils.HostPort(host, port)
@@ -54,7 +55,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch(t *testing.T) {
 		panic(err)
 	}
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("abc"))
 	})
 	target := utils.HostPort(host, port)
@@ -85,7 +86,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_Yield(t *testing.T) {
 		panic(err)
 	}
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("abc"))
 	})
 	target := utils.HostPort(host, port)
@@ -116,7 +117,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_Mirror(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("abc"))
 	})
 	target := utils.HostPort(host, port)
@@ -163,7 +164,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_Mirror2(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("abc"))
 	})
 	target := utils.HostPort(host, port)
@@ -215,7 +216,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_Mirror_PANIC(t *testing.T) {
 		panic(err)
 	}
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("abc"))
 	})
 	target := utils.HostPort(host, port)
@@ -272,7 +273,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch2(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("abc"))
 	})
 	target := utils.HostPort(host, port)
@@ -313,7 +314,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch3ErrCheck(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err2 := io.ReadAll(r.Body)
 		if err2 != nil {
 			w.Write([]byte("err"))
@@ -410,7 +411,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_before_and_after_legacy(t *testing.T) 
 
 	token1 := utils.RandStringBytes(16)
 	token2 := utils.RandStringBytes(16)
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		if !bytes.Contains(req, []byte(token1)) {
 			panic("token1 not found")
 		}
@@ -453,7 +454,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_Mirror_Duplicated_ExtractorResults(t *
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("abc"))
 	})
 	target := utils.HostPort(host, port)

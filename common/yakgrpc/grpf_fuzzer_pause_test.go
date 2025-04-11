@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"net/http"
 	"sync"
 	"testing"
@@ -18,7 +19,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_Pause(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(100 * time.Millisecond)
 		w.Write([]byte(""))
 	})
@@ -91,7 +92,7 @@ func TestHTTPFuzzer_Pause_SetPauseStatus(t *testing.T) {
 	}
 
 	isPause := false
-	targetHost, targetPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	targetHost, targetPort := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		fmt.Println("send request")
 		if isPause {
 			panic("pause failed")

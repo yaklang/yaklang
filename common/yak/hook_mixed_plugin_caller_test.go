@@ -3,6 +3,7 @@ package yak
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"testing"
 	"time"
 
@@ -269,7 +270,7 @@ func TestMixCaller_Wait(t *testing.T) {
 
 func TestMixCaller_load_Plugin_Passing_Code(t *testing.T) {
 	var check bool
-	server, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	server, port := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		check = true
 		return []byte(`HTTP/1.1 200 OK
 

@@ -5,6 +5,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net"
@@ -20,7 +21,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_Retry(t *testing.T) {
 
 	token := utils.RandStringBytes(16)
 	count := uint64(0)
-	targetHost, targetPort := utils.DebugMockTCPEx(func(ctx context.Context, lis net.Listener, conn net.Conn) {
+	targetHost, targetPort := testutils.DebugMockTCPEx(func(ctx context.Context, lis net.Listener, conn net.Conn) {
 		defer conn.Close()
 		currentCount := atomic.AddUint64(&count, 1)
 		_, err := conn.Read(make([]byte, 1))

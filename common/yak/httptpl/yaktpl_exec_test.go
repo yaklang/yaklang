@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"io"
 	"net/http"
 	"net/url"
@@ -25,7 +26,7 @@ import (
 )
 
 func TestMockTest_SmokingTest(t *testing.T) {
-	server, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 TestDebug: 111`))
 	spew.Dump(server, port)
 
@@ -63,7 +64,7 @@ requests:
 }
 
 func TestMockTest_BasicWordMatcher(t *testing.T) {
-	server, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 TestDebug: 111
 
 ccc`))
@@ -114,7 +115,7 @@ requests:
 }
 
 func TestMockTest_BasicWordMatcher_ReqCondition(t *testing.T) {
-	server, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 TestDebug: 111
 
 ccc`))
@@ -166,7 +167,7 @@ requests:
 }
 
 func TestMockTest_BasicWordMatcher_ReqConditionMultiReq(t *testing.T) {
-	server, port := utils.DebugMockHTTPWithTimeout(10*time.Second, []byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTPWithTimeout(10*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
 
 ccc`))
@@ -224,7 +225,7 @@ requests:
 }
 
 func TestMockTest_BasicWordMatcher_ReqConditionMultiReq_MULTICOND(t *testing.T) {
-	server, port := utils.DebugMockHTTPWithTimeout(10*time.Second, []byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTPWithTimeout(10*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
 
 ccc`))
@@ -283,7 +284,7 @@ requests:
 }
 
 func TestMockTest_BasicWordMatcher_EXPR(t *testing.T) {
-	server, port := utils.DebugMockHTTPWithTimeout(10*time.Second, []byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTPWithTimeout(10*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
 
 ccc`))
@@ -340,7 +341,7 @@ requests:
 }
 
 func TestMockTest_BasicWordMatcher_EXPR_WithExtractor(t *testing.T) {
-	server, port := utils.DebugMockHTTPWithTimeout(10*time.Second, []byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTPWithTimeout(10*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
 
 ccc`))
@@ -416,7 +417,7 @@ requests:
 }
 
 func TestMockTest_BasicWordMatcher_EXPR2(t *testing.T) {
-	server, port := utils.DebugMockHTTPWithTimeout(10*time.Second, []byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTPWithTimeout(10*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
 
 ccc`))
@@ -473,7 +474,7 @@ requests:
 }
 
 func TestMockTest_BasicWordMatcher_EXPR2_N(t *testing.T) {
-	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
 
 ccc`))
@@ -530,7 +531,7 @@ requests:
 }
 
 func TestMockTest_BasicWordMatcher_EXPR2_N2(t *testing.T) {
-	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
 
 ccc`))
@@ -588,7 +589,7 @@ requests:
 }
 
 func TestMockTest_BasicWordMatcher_EXPR2_N2q(t *testing.T) {
-	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
 
 ccc`))
@@ -646,7 +647,7 @@ requests:
 }
 
 func TestMockTest_BasicWordMatcher_EXPR2_N2q2(t *testing.T) {
-	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
 
 ccc`))
@@ -705,7 +706,7 @@ requests:
 }
 
 func TestMockTest_BasicWordMatcher_EXPR2_N2q3(t *testing.T) {
-	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
 
 ccc`))
@@ -902,7 +903,7 @@ requests:
 }
 
 func TestMockTest_Extractor_BasicCase(t *testing.T) {
-	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
 
 cccabbbccc
@@ -1098,7 +1099,7 @@ requests:
 }
 
 func TestMockTest_Extractor_BasicCase_Extractor_XPATH(t *testing.T) {
-	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
 
 <html>
@@ -1212,7 +1213,7 @@ func TestMockTest_Extractor_BasicCase_Matcher_RandStr(t *testing.T) {
 	defer cancel()
 	hasToken1, hasToken2 := false, false
 	token := ""
-	server, port := utils.DebugMockHTTPExContext(ctx, func(req []byte) []byte {
+	server, port := testutils.DebugMockHTTPExContext(ctx, func(req []byte) []byte {
 		reqIns, err := lowhttp.ParseBytesToHttpRequest(req)
 		if err == nil {
 			token = reqIns.URL.Query().Get("token")
@@ -1273,7 +1274,7 @@ requests:
 }
 
 func TestMockTest_Extractor_BasicCase_Matcher_StatusCode(t *testing.T) {
-	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
 
 <html>
@@ -1365,7 +1366,7 @@ func TestMockTest_Extractor_BasicCase_Matcher_Raw(t *testing.T) {
 	   # Enhanced by mp on 2022/05/11
 
 	*/
-	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
 
 <html>ClassCastException
@@ -1477,7 +1478,7 @@ requests:
 }
 
 func TestRenderPackage(t *testing.T) {
-	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
 `))
 	spew.Dump(server, port)
@@ -1594,7 +1595,7 @@ func TestMockTest_OOB(t *testing.T) {
 	dnsserver := facades.MockDNSServer(context.Background(), "aaa.asdgiqwfkbas.com", 8901, func(record string, domain string) string {
 		return "1.1.1.1"
 	})
-	server, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("ok"))
 		u := request.URL.Query().Get("consumerUri")
 		urlIns, err := url.Parse(u)
@@ -1668,7 +1669,7 @@ http:
 }
 
 func TestMockTest_Body(t *testing.T) {
-	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
 
 Post Meta Setting Deleted Successfully
@@ -1749,7 +1750,7 @@ http:
 }
 
 func TestMockTest_StopAtFirstMatch(t *testing.T) {
-	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
+	server, port := testutils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
 
 Post Meta Setting Deleted Successfully
@@ -1805,7 +1806,7 @@ Post Meta Setting Deleted Successfully
 }
 
 func TestMatcherContainsTag(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(request.Header["A"][0]))
 	})
 	addr := fmt.Sprintf("http://%s:%d", host, port)
@@ -1839,7 +1840,7 @@ http:
 }
 
 func TestHTTPTpl_VariableType(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(request.Header["A"][0]))
 		writer.Write([]byte(request.Header["B"][0]))
 		body, _ := io.ReadAll(request.Body)
@@ -1888,7 +1889,7 @@ http:
 }
 
 func TestHTTPTpl_Variable_With_Fuzztag_Params(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(request.Header["A"][0]))
 	})
 	addr := fmt.Sprintf("http://%s:%d", host, port)
@@ -1943,7 +1944,7 @@ http:
 }
 
 func TestHTTPTpl_Path_Support_Variable(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(request.URL.Path))
 	})
 	addr := fmt.Sprintf("http://%s:%d", host, port)
@@ -1990,7 +1991,7 @@ func TestMockTest_interactsh(t *testing.T) {
 		return "127.0.0.1"
 	})
 
-	httpServerHost, httpServerPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	httpServerHost, httpServerPort := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		reqStr := string(req)
 		if strings.Contains(reqStr, token) {
 			interactshProtocol[token] = "http"
@@ -2000,7 +2001,7 @@ func TestMockTest_interactsh(t *testing.T) {
 	})
 
 	sendToken := utils.RandStringBytes(5)
-	server, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("ok"))
 		u := request.URL.Query().Get("consumerUri")
 		urlIns, err := url.Parse(u)
@@ -2089,7 +2090,7 @@ http:
 func TestMatcher_KeepDSLReturnType(t *testing.T) {
 	randomKey := utils.RandStringBytes(16)
 
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		a, b := request.URL.Query().Get("a"), request.URL.Query().Get("b")
 		aInt, err := strconv.Atoi(a)
 		writer.Write([]byte(fmt.Sprintf("a=%s\n", a)))
@@ -2169,7 +2170,7 @@ http:
 }
 
 func TestMatcherPathContainsPayload(t *testing.T) {
-	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(request.Header["A"][0]))
 	})
 	addr := fmt.Sprintf("http://%s:%d", host, port)
@@ -2209,7 +2210,7 @@ http:
 func TestHttpTplDisableCookie(t *testing.T) {
 	token := utils.RandStringBytes(10)
 	cookieCheck := false
-	server, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	server, port := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		if bytes.Contains(req, []byte(token)) {
 			cookieCheck = true
 		}

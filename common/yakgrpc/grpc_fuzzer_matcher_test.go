@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -24,7 +25,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcher(t *testing.T) {
 	defer cancel()
 	var mu sync.Mutex
 	first := true
-	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(w http.ResponseWriter, r *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFuncContext(ctx, func(w http.ResponseWriter, r *http.Request) {
 
 		if first {
 			mu.Lock()
@@ -173,7 +174,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcherWithParams(t *testing.T) {
 	defer cancel()
 	var mu sync.Mutex
 	first := true
-	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(w http.ResponseWriter, r *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFuncContext(ctx, func(w http.ResponseWriter, r *http.Request) {
 		if first {
 			mu.Lock()
 			if first {
@@ -275,7 +276,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcherWithParams(t *testing.T) {
 func TestFuzzerExtractorInvalidUTF8(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
-	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nTest: \xff\xff\r\n\r\nabc"))
+	host, port := testutils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nTest: \xff\xff\r\n\r\nabc"))
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -310,7 +311,7 @@ func TestFuzzerMatchMultipleColor(t *testing.T) {
 	defer cancel()
 	token1 := utils.RandStringBytes(5)
 	token2 := utils.RandStringBytes(5)
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		index := codec.Atoi(lowhttp.GetHTTPRequestQueryParam(req, "a"))
 		if index%2 == 0 {
 			return []byte("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\n" + token1)
@@ -374,7 +375,7 @@ func TestFuzzerMatchMultipleColor_HasSubMatcher(t *testing.T) {
 	token2 := utils.RandStringBytes(5)
 	token3 := utils.RandStringBytes(5)
 	token4 := utils.RandStringBytes(5)
-	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	host, port := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		index := codec.Atoi(lowhttp.GetHTTPRequestQueryParam(req, "a"))
 		if index == 0 {
 			return []byte("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n" + token1 + token3)
@@ -455,7 +456,7 @@ func TestFuzzerMatchMultipleAction(t *testing.T) {
 	t.Run("retain test", func(t *testing.T) {
 		token1 := utils.RandStringBytes(5)
 		token2 := utils.RandStringBytes(5)
-		host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		host, port := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 			index := codec.Atoi(lowhttp.GetHTTPRequestQueryParam(req, "a"))
 			if index%2 == 0 {
 				return []byte("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\n" + token1)
@@ -538,7 +539,7 @@ func TestFuzzerMatchMultipleAction(t *testing.T) {
 	t.Run("discard test", func(t *testing.T) {
 		token1 := utils.RandStringBytes(5)
 		token2 := utils.RandStringBytes(5)
-		host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		host, port := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 			index := codec.Atoi(lowhttp.GetHTTPRequestQueryParam(req, "a"))
 			if index%2 == 0 {
 				return []byte("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\n" + token1)

@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"net/http"
 	"strings"
 	"testing"
@@ -22,7 +23,7 @@ func TestGRPCMUSTPASS_MITM_PlainProxy2(t *testing.T) {
 	token3 := utils.RandStringBytes(10)
 	token4 := utils.RandStringBytes(10)
 
-	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+	mockHost, mockPort := testutils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Add("Set-Cookie", "abc="+token1)
 		writer.Header().Add("Set-Cookie", "ddd=111"+token2)
 		writer.Header().Add("Set-Cookie", "ccc=123"+token4)
@@ -155,7 +156,7 @@ func TestGRPCMUSTPASS_MITM_PlainProxy(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+	mockHost, mockPort := testutils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("hello"))
 	})
 
@@ -232,7 +233,7 @@ func TemplateTestGRPCMUSTPASS_MITM_PlainProxy(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+	mockHost, mockPort := testutils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("hello"))
 	})
 

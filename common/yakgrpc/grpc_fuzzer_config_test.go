@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"strings"
@@ -76,7 +77,7 @@ func TestGRPCMUSTPASS_MaxSize(t *testing.T) {
 		require.NoError(t, err)
 		data := bytes.Repeat([]byte("a"), 1024*1024*2)
 
-		address, port := utils.DebugMockHTTP([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length: %v\r\n\r\n%s", len(data), data)))
+		address, port := testutils.DebugMockHTTP([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length: %v\r\n\r\n%s", len(data), data)))
 		require.NoError(t, err)
 		fuzzer, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
 			RequestRaw:  []byte("GET / HTTP/1.1\r\nHost: " + utils.HostPort(address, port) + "\r\n\r\n"),
@@ -96,7 +97,7 @@ func TestGRPCMUSTPASS_MaxSize(t *testing.T) {
 		client, err := NewLocalClient(true)
 		require.NoError(t, err)
 		data := bytes.Repeat([]byte("a"), 1024*1024*2)
-		address, port := utils.DebugMockHTTP([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length: %v\r\n\r\n%s", len(data), data)))
+		address, port := testutils.DebugMockHTTP([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length: %v\r\n\r\n%s", len(data), data)))
 		require.NoError(t, err)
 		fuzzer, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
 			RequestRaw: []byte("GET / HTTP/1.1\r\nHost: " + utils.HostPort(address, port) + "\r\n\r\n"),
@@ -115,7 +116,7 @@ func TestGRPCMUSTPASS_MaxSize(t *testing.T) {
 		client, err := NewLocalClient(true)
 		require.NoError(t, err)
 		data := bytes.Repeat([]byte("a"), 1024*1024*2)
-		address, port := utils.DebugMockHTTP([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length: %v\r\n\r\n%s", len(data), data)))
+		address, port := testutils.DebugMockHTTP([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length: %v\r\n\r\n%s", len(data), data)))
 		require.NoError(t, err)
 		fuzzer, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
 			RequestRaw:  []byte("GET / HTTP/1.1\r\nHost: " + utils.HostPort(address, port) + "\r\n\r\n"),
@@ -138,7 +139,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SNI(t *testing.T) {
 
 	dataToken := utils.RandStringBytes(10)
 	addr := utils.GetRandomLocalAddr()
-	address, port := utils.DebugMockHTTPServerWithContextWithAddress(utils.TimeoutContext(30*time.Second), addr, true, false, false, false, false, true, func(bytes []byte) []byte {
+	address, port := testutils.DebugMockHTTPServerWithContextWithAddress(utils.TimeoutContext(30*time.Second), addr, true, false, false, false, false, true, func(bytes []byte) []byte {
 		return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length:10\r\n\r\n%s", dataToken))
 	})
 	target := utils.HostPort(address, port)

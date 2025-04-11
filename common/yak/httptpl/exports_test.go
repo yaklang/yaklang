@@ -3,6 +3,7 @@ package httptpl
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"strings"
 	"testing"
 
@@ -95,7 +96,7 @@ func TestScan2(t *testing.T) {
 	t.SkipNow()
 	consts.GetGormProfileDatabase()
 	consts.GetGormProjectDatabase()
-	host, port := utils.DebugMockHTTPExContext(utils.TimeoutContextSeconds(10), func(req []byte) []byte {
+	host, port := testutils.DebugMockHTTPExContext(utils.TimeoutContextSeconds(10), func(req []byte) []byte {
 		return []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")
 	})
 

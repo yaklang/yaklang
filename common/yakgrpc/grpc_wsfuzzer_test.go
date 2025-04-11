@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"testing"
 	"time"
 
@@ -22,7 +23,7 @@ func TestGRPCMUSTPASS_WsFuzzer_Fuzztag(t *testing.T) {
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(10))
 	defer cancel()
 
-	host, port := utils.DebugMockEchoWs("fuzztag")
+	host, port := testutils.DebugMockEchoWs("fuzztag")
 	log.Infof("addr: %s:%d", host, port)
 	client, err := NewLocalClient()
 	require.NoError(t, err)

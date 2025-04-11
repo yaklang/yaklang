@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"io"
 	"net"
 	"net/http"
@@ -15,7 +16,7 @@ import (
 )
 
 func TestReadConnWithContextTimeout(t *testing.T) {
-	host, port := DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(200)
 		for i := 0; i < 10; i++ {
 			time.Sleep(100 * time.Millisecond)
@@ -43,7 +44,7 @@ func TestReadConnWithContextTimeout(t *testing.T) {
 
 func TestReadConnWithTimeout(t *testing.T) {
 	var listener net.Listener
-	host, port := DebugMockTCPEx(func(ctx context.Context, lis net.Listener, conn net.Conn) {
+	host, port := testutils.DebugMockTCPEx(func(ctx context.Context, lis net.Listener, conn net.Conn) {
 		listener = lis
 		time.Sleep(500 * time.Millisecond)
 		_, err := conn.Write([]byte("hello"))

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"net/http"
 	"strings"
 	"testing"
@@ -25,7 +26,7 @@ import (
 func TemplateTestGRPCMUSTPASS_MITM_WithoutProxy_StatusCard(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	targetHost, targetPort := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("Hello Token"))
 	})
 	targetUrl := "http://" + utils.HostPort(targetHost, targetPort)
@@ -125,7 +126,7 @@ func TestGRPCMUSTPASS_MITM_Proxy(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	mockHost, mockPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	mockHost, mockPort := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Query().Get("u") == token {
 			networkIsPassed = true
 			cancel()
@@ -207,7 +208,7 @@ func TestGRPCMUSTPASS_MITM_S5Proxy(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	mockHost, mockPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	mockHost, mockPort := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Query().Get("u") == token {
 			networkIsPassed = true
 		}
@@ -267,7 +268,7 @@ func TestGRPCMUSTPASS_MITM_S5Proxy_https(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	mockHost, mockPort := utils.DebugMockHTTPSEx(func(req []byte) []byte {
+	mockHost, mockPort := testutils.DebugMockHTTPSEx(func(req []byte) []byte {
 		if lowhttp.GetHTTPRequestQueryParam(req, "u") == token {
 			networkIsPassed = true
 		}
@@ -327,7 +328,7 @@ func TestGRPCMUSTPASS_MITM_Runtime_Proxy(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	mockHost, mockPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	mockHost, mockPort := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Query().Get("u") == token {
 			networkIsPassed = true
 		}
@@ -393,7 +394,7 @@ func TestGRPCMUSTPASS_MITM_Proxy_MITMPluginInheritProxy(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	passed := false
-	_, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+	_, port := testutils.DebugMockHTTPEx(func(req []byte) []byte {
 		if bytes.Contains(req, []byte("CONNECT www3.example.com:80 HTTP")) {
 			passed = true
 			cancel()
@@ -454,7 +455,7 @@ yakit.StatusCard("mitmId", "StatusCard")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	targetHost, targetPort := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("Hello Token"))
 	})
 	targetUrl := "http://" + utils.HostPort(targetHost, targetPort)

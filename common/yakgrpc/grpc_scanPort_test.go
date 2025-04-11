@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/testutils"
 	"io"
 	"os"
 	"strconv"
@@ -14,7 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -23,7 +23,7 @@ func TestServer_PortScan(t *testing.T) {
 	client, err := NewLocalClient()
 	require.Nil(t, err)
 
-	host, port := utils.DebugMockHTTP([]byte{})
+	host, port := testutils.DebugMockHTTP([]byte{})
 
 	r, err := client.PortScan(context.Background(), &ypb.PortScanRequest{
 		Targets:     host,
@@ -51,7 +51,7 @@ func TestServer_CustomFingerprint(t *testing.T) {
 	client, err := NewLocalClient()
 	require.Nil(t, err)
 
-	host, port := utils.DebugMockHTTP([]byte("test CustomFingerprint1,test CustomFingerprint2"))
+	host, port := testutils.DebugMockHTTP([]byte("test CustomFingerprint1,test CustomFingerprint2"))
 
 	fpFiles := []string{}
 	f, err := os.CreateTemp(os.TempDir(), "yakit-test-fingerprint-*.yaml")
