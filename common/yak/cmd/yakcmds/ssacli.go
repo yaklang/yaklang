@@ -10,10 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/gobwas/glob"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
@@ -524,11 +522,8 @@ var syncRule = &cli.Command{
 	Name:  "sync-rule",
 	Usage: "sync rule from embed to database",
 	Action: func(c *cli.Context) error {
-		start := time.Now()
-		err := sfbuildin.SyncEmbedRule()
-		duration := time.Now().Sub(start)
-		log.Infof("sync rule from embed to database success, cost %v", duration)
-		return err
+		SyncEmbedRule(true)
+		return nil
 	},
 }
 
@@ -745,6 +740,7 @@ var ssaCodeScan = &cli.Command{
 		}()
 		ctx := context.Background()
 		log.Infof("============= start to scan code ==============")
+		SyncEmbedRule()
 
 		// Parse configuration
 		config, err := parseSFScanConfig(c)
