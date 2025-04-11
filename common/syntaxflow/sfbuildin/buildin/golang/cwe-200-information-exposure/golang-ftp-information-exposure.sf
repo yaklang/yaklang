@@ -1,7 +1,9 @@
 desc(
     title: "golang FTP information exposure",
+    title_zh: "golang FTP相关函数泄露服务器敏感信息",
     type: audit,
     severity: low,
+    risk: "info-exposure",
     desc: <<<TEXT
 检测可能通过FTP相关函数泄露服务器敏感信息，包括：
     1. 目录结构暴露
