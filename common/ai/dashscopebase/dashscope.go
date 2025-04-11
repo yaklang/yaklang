@@ -205,10 +205,17 @@ func (d *DashScopeGateway) StructuredStream(s string, function ...aispec.Functio
 		return nil, utils.Error("APIKey is required")
 	}
 
+	exitChan := make(chan struct{})
+	defer close(exitChan) // 函数返回时关闭通道，触发协程退出
+
 	go func() {
 		defer func() {
 			close(objChannel)
+			if err := recover(); err != nil {
+				log.Errorf("StructuredStream panic: %v", err)
+			}
 		}()
+
 		count := 0
 		feeder := &rspFeeder{}
 		opts, _ := d.BuildHTTPOptions()
@@ -230,6 +237,8 @@ func (d *DashScopeGateway) StructuredStream(s string, function ...aispec.Functio
 			},
 		))
 		opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, rawCloser io.ReadCloser) {
+			defer rawCloser.Close() // 确保资源释放
+
 			chunked := strings.ToLower(strings.TrimSpace(lowhttp.GetHTTPPacketHeader(r, "transfer-encoding"))) == "chunked"
 			var bodyReader io.Reader = rawCloser
 			if chunked {
@@ -238,33 +247,44 @@ func (d *DashScopeGateway) StructuredStream(s string, function ...aispec.Functio
 			}
 
 			for {
-				structured := &aispec.StructuredData{
-					DataSourceType: "dashscope",
-				}
-				handleLine := func(line string) {
-					if strings.HasPrefix(line, "data:") {
-						structured.DataRaw = bytes.TrimSpace([]byte(line[5:]))
-						inputs := []byte(line[5:])
-						ch := feeder.GetNewData(structured, inputs)
-						if ch != nil {
-							for data := range ch {
-								objChannel <- data
-								count++
-							}
-							return
-						} else {
-							if len(structured.DataRaw) > 0 {
-								objChannel <- structured
-								count++
-							}
-						}
-					} else if strings.HasPrefix(line, "id:") {
-						structured.Id = strings.TrimSpace(line[3:])
-					} else if strings.HasPrefix(line, "event:") {
-						structured.Event = strings.TrimSpace(line[6:])
+				select {
+				case <-exitChan: // 监听退出信号
+					return
+				default:
+					structured := &aispec.StructuredData{
+						DataSourceType: "dashscope",
 					}
-				}
-				for {
+					handleLine := func(line string) {
+						if strings.HasPrefix(line, "data:") {
+							structured.DataRaw = bytes.TrimSpace([]byte(line[5:]))
+							inputs := []byte(line[5:])
+							ch := feeder.GetNewData(structured, inputs)
+							if ch != nil {
+								for data := range ch {
+									// 检查退出信号
+									select {
+									case objChannel <- data:
+										count++
+									case <-exitChan:
+										return
+									}
+								}
+							} else {
+								if len(structured.DataRaw) > 0 {
+									select {
+									case objChannel <- structured:
+										count++
+									case <-exitChan:
+										return
+									}
+								}
+							}
+						} else if strings.HasPrefix(line, "id:") {
+							structured.Id = strings.TrimSpace(line[3:])
+						} else if strings.HasPrefix(line, "event:") {
+							structured.Event = strings.TrimSpace(line[6:])
+						}
+					}
 					resultBytes, err := utils.ReadLine(bodyReader)
 					if err != nil && len(resultBytes) <= 0 {
 						if err != io.EOF {
