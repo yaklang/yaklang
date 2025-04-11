@@ -137,3 +137,56 @@ func TestMITM_InvalidUTF8Request(t *testing.T) {
 	require.True(t, isRecvRequest, "mitm server should hijack request")
 
 }
+
+func TestGRPCMUSTPASS_MITMV2_InvalidUTF8Request(t *testing.T) {
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		return []byte("HTTP/1.1 200 OK\n\n")
+	})
+	target := "http://" + utils.HostPort(host, port)
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	isRecvRequest := false
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	RunMITMV2TestServerEx(client, ctx, func(stream ypb.Yak_MITMV2Client) {
+		stream.Send(&ypb.MITMV2Request{
+			Host: "127.0.0.1",
+			Port: uint32(mitmPort),
+		})
+
+		stream.Send(&ypb.MITMV2Request{
+			SetAutoForward:   true,
+			AutoForwardValue: false,
+		})
+	}, func(stream ypb.Yak_MITMV2Client) {
+		b, _ := codec.Utf8ToGB18030([]byte(`你好`))
+		poc.DoPOST(target, poc.WithProxy(fmt.Sprintf("http://127.0.0.1:%d", mitmPort)), poc.WithBody(b))
+	}, func(stream ypb.Yak_MITMV2Client, msg *ypb.MITMV2Response) {
+		if msg.ManualHijackListAction != Hijack_List_Add {
+			return
+		}
+		require.Len(t, msg.ManualHijackList, 1)
+		hijackTask := msg.ManualHijackList[0]
+		require.Equal(t, hijackTask.Status, Hijack_Status_Request)
+		request := hijackTask.GetRequest()
+
+		defer cancel()
+		isRecvRequest = true
+		require.Contains(t, string(request), `{{unquote("\xc4\xe3\xba\xc3")}}`, "request should be wrapped by unquote fuzztag")
+
+		stream.Send(&ypb.MITMV2Request{
+			ManualHijackMessage: &ypb.SingleManualHijackControlMessage{
+				TaskID:  hijackTask.TaskID,
+				Forward: true,
+			},
+			ManualHijackControl: true,
+		})
+	})
+
+	require.True(t, isRecvRequest, "mitm server should hijack request")
+
+}

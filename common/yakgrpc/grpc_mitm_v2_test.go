@@ -785,46 +785,6 @@ rsp, req = poc.HTTP(packet, poc.proxy(mitmProxy))~
 	}
 }
 
-func RunMITMV2TestServerEx(
-	client ypb.YakClient,
-	ctx context.Context,
-	onInit func(mitmClient ypb.Yak_MITMV2Client),
-	onLoad func(mitmClient ypb.Yak_MITMV2Client),
-	onRecv func(mitmClient ypb.Yak_MITMV2Client, msg *ypb.MITMV2Response),
-) (host, port string) {
-	stream, err := client.MITMV2(ctx)
-	if err != nil {
-		panic(err)
-	}
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	if onInit != nil {
-		onInit(stream)
-	}
-	for {
-		msg, err := stream.Recv()
-		if err != nil {
-			break
-		}
-		if msg.GetHaveMessage() {
-			msgStr := string(msg.GetMessage().GetMessage())
-			if strings.Contains(msgStr, `starting mitm serve`) {
-				if onLoad != nil {
-					go func() {
-						defer wg.Done()
-						onLoad(stream)
-					}()
-				}
-			}
-		}
-		if onRecv != nil {
-			onRecv(stream, msg)
-		}
-	}
-	wg.Wait()
-	return
-}
-
 func TestGRPCMUSTTPASS_MITMV2_HijackTags(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
