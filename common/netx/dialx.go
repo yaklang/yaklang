@@ -74,7 +74,6 @@ func dialPlainTCPConnWithRetry(target string, config *dialXConfig) (retConn net.
 	}
 
 	var lastError error
-	shouldRetryError := false
 RETRY:
 	if timeoutRetryCount > retryMax || refuseErrorRetryCount > retryMax {
 		if retryMax > 0 {
@@ -168,21 +167,25 @@ RETRY:
 		conn, err := getConnForceProxy(target, proxy, config)
 		if err != nil {
 			log.Errorf("proxy conn failed: %s", err)
-			if !shouldRetryError {
-				var opError *net.OpError
-				if errors.As(err, &opError) && (opError.Timeout() || opError.Temporary()) {
-					shouldRetryError = true
+			lastError = err
+			var opError *net.OpError
+			switch {
+			case errors.As(err, &opError):
+				if opError.Timeout() && config.EnableTimeoutRetry {
+					time.Sleep(utils.JitterBackoff(minWait, maxWait, int(timeoutRetryCount+1)))
+					addTimeoutRetry()
+					goto RETRY
+				}
+				if strings.Contains(opError.Error(), "refused") {
+					time.Sleep(utils.JitterBackoff(minWait, maxWait, int(timeoutRetryCount+1)))
+					addRefuseErrorRetry()
+					goto RETRY
 				}
 			}
 			errs = utils.JoinErrors(errs, err)
 			continue
 		}
 		return conn, nil
-	}
-	if shouldRetryError {
-		shouldRetryError = false
-		lastError = errs
-		goto RETRY
 	}
 	return nil, utils.Wrapf(errs, "connect: %v failed: no proxy available (in %v)", target, config.Proxy)
 }
