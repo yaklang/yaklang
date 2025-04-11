@@ -20,9 +20,13 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func SyncEmbedRule() {
+func SyncEmbedRule(force ...bool) {
+	sync := false
+	if len(force) > 0 {
+		sync = force[0]
+	}
 	log.Infof("================= check builtin rule sync ================")
-	if sfbuildin.CheckEmbedRule() {
+	if sync || sfbuildin.CheckEmbedRule() {
 		sfbuildin.SyncEmbedRule(func(process float64, ruleName string) {
 			log.Infof("sync embed rule: %s, process: %f", ruleName, process)
 		})
