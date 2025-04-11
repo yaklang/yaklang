@@ -1,15 +1,16 @@
 package main
 
 import (
+	"io"
+	"os"
+	"path/filepath"
+
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"io"
-	"os"
-	"path/filepath"
 )
 
 func main() {
@@ -59,7 +60,7 @@ func main() {
 		aid.WithTools(aid.GetAllMockTools()...),
 		aid.WithSystemFileOperator(),
 		aid.WithDebugPrompt(),
-		aid.WithAutoAgree(true),
+		aid.WithYOLO(true),
 	)
 	if err != nil {
 		panic(err)
