@@ -812,47 +812,75 @@ RECONNECT:
 		// BodyStreamReaderHandler is only effect non-pool connection
 		if option != nil && option.BodyStreamReaderHandler != nil {
 			reader, writer := utils.NewBufPipe(nil)
-			defer func() {
-				log.Infof("close reader and writer")
-				writer.Close()
-				reader.Close()
-			}()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			var wg sync.WaitGroup
+
+			wg.Add(1)
 			go func() {
+				defer wg.Done()
+				defer cancel() // 确保级联取消
+
 				bodyReader, bodyWriter := utils.NewBufPipe(nil)
-				defer func() {
-					bodyWriter.Close()
-					bodyReader.Close()
-					if err := recover(); err != nil {
-						log.Errorf("BodyStreamReaderHandler panic: %v", err)
-					}
-				}()
+				defer bodyWriter.Close()
 
 				packetReader := bufio.NewReader(reader)
-				responseHeader := bytes.NewBufferString("")
-				for {
-					line, err := utils.BufioReadLine(packetReader)
-					if err != nil {
-						log.Errorf("BodyStreamReaderHandler read response failed: %s", err)
-						bodyWriter.Close()
-						break
-					}
+				responseHeader := bytes.Buffer{}
 
-					responseHeader.WriteString(string(line) + "\r\n")
-					if len(line) == 0 {
-						go func() {
-							io.Copy(bodyWriter, packetReader)
-							bodyWriter.Close()
-						}()
-						break
+				// 非阻塞读取循环
+			readLoop:
+				for {
+					select {
+					case <-ctx.Done():
+						break readLoop
+					default:
+						line, err := utils.BufioReadLine(packetReader)
+						if err != nil {
+							if err != io.EOF {
+								log.Errorf("BodyStreamReaderHandler read response failed: %s", err)
+							}
+							break readLoop
+						}
+
+						responseHeader.Write(append(line, []byte("\r\n")...))
+						if len(line) == 0 {
+							// 启动受控数据拷贝
+							wg.Add(1)
+							go func() {
+								defer wg.Done()
+								buf := make([]byte, 4096)
+								for {
+									select {
+									case <-ctx.Done():
+										return
+									default:
+										n, readErr := packetReader.Read(buf)
+										if readErr != nil {
+											return
+										}
+										if _, writeErr := bodyWriter.Write(buf[:n]); writeErr != nil {
+											return
+										}
+									}
+								}
+							}()
+							break readLoop
+						}
 					}
 				}
-				if err != nil {
-					log.Warnf("BodyStreamReaderHandler read response failed: %s", err)
-				} else {
-					option.BodyStreamReaderHandler(responseHeader.Bytes(), bodyReader)
-				}
+
+				option.BodyStreamReaderHandler(responseHeader.Bytes(), bodyReader)
 			}()
+
 			mirrorWriter = io.MultiWriter(&responseRaw, writer)
+
+			// 安全关闭系统
+			defer func() {
+				// 阶段式关闭（关键顺序！）
+				cancel()
+				writer.Close()
+				wg.Wait()
+			}()
 		}
 
 		httpResponseReader := bufio.NewReaderSize(io.TeeReader(conn, mirrorWriter), option.DefaultBufferSize)

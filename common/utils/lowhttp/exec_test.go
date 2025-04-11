@@ -665,3 +665,89 @@ Host: `+utils.HostPort(server, port)+`
 	require.Contains(t, string(rsp.RawPacket), token)
 
 }
+
+func TestBodyStreamReaderHandler_GuaranteedCompletion(t *testing.T) {
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lis.Close()
+
+	var (
+		serverClosed   = make(chan struct{})
+		handlerEntered = make(chan struct{})
+		handlerExited  = make(chan struct{})
+	)
+
+	go func() {
+		conn, err := lis.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+
+		conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello"))
+
+		// 强制关闭连接
+		if tcpConn, ok := conn.(*net.TCPConn); ok {
+			tcpConn.SetLinger(0)
+		}
+		conn.Close()
+		close(serverClosed)
+	}()
+
+	target := lis.Addr().String()
+	_, err = HTTPWithoutRedirect(
+		WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: "+target+"\r\n\r\n")),
+		WithBodyStreamReaderHandler(func(headers []byte, body io.ReadCloser) {
+			close(handlerEntered)      // 标记处理开始
+			defer close(handlerExited) // 标记处理结束
+
+			buf := make([]byte, 5)
+			total := 0
+			for {
+				select {
+				case <-time.After(500 * time.Millisecond): // 读取超时保护
+					return
+				default:
+					n, err := body.Read(buf[total:])
+					total += n
+					if err != nil {
+						if err != io.EOF {
+							t.Errorf("Unexpected error: %v", err)
+						}
+						return
+					}
+					if total >= 5 {
+						return
+					}
+				}
+			}
+		}),
+		WithConnPool(false),        // 禁用连接池
+		WithTimeout(1*time.Second), // 总超时控制
+	)
+
+	select {
+	case <-handlerEntered:
+		select {
+		case <-handlerExited:
+			// 正常退出
+		case <-time.After(800 * time.Millisecond): // 短于总超时
+			t.Fatal("Handler processing timeout")
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatal("Handler not started within 1s")
+	}
+
+	select {
+	case <-serverClosed:
+		// 服务器正常关闭
+	default:
+		t.Fatal("Server connection not closed")
+	}
+
+	if err != nil {
+		t.Fatalf("Unexpected request error: %v", err)
+	}
+}
