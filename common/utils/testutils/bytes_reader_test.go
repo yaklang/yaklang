@@ -1,10 +1,10 @@
-package utils
+package testutils
 
 import (
 	"context"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/utils/testutils"
+	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"net"
 	"net/http"
@@ -16,7 +16,7 @@ import (
 )
 
 func TestReadConnWithContextTimeout(t *testing.T) {
-	host, port := testutils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	host, port := DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(200)
 		for i := 0; i < 10; i++ {
 			time.Sleep(100 * time.Millisecond)
@@ -25,13 +25,13 @@ func TestReadConnWithContextTimeout(t *testing.T) {
 		}
 		return
 	})
-	conn, err := net.Dial("tcp", HostPort(host, port))
+	conn, err := net.Dial("tcp", utils.HostPort(host, port))
 	if err != nil {
 		t.Fatal(err)
 	}
-	conn.Write([]byte("GET / HTTP/1.1\r\nHost: " + HostPort(host, port) + "\r\n\r\n"))
+	conn.Write([]byte("GET / HTTP/1.1\r\nHost: " + utils.HostPort(host, port) + "\r\n\r\n"))
 	time.Sleep(300 * time.Millisecond)
-	bytes, err := ReadConnUntil(conn, 300*time.Millisecond)
+	bytes, err := utils.ReadConnUntil(conn, 300*time.Millisecond)
 	spew.Dump(bytes)
 	if err != nil {
 		t.Fatal(err)
@@ -44,7 +44,7 @@ func TestReadConnWithContextTimeout(t *testing.T) {
 
 func TestReadConnWithTimeout(t *testing.T) {
 	var listener net.Listener
-	host, port := testutils.DebugMockTCPEx(func(ctx context.Context, lis net.Listener, conn net.Conn) {
+	host, port := DebugMockTCPEx(func(ctx context.Context, lis net.Listener, conn net.Conn) {
 		listener = lis
 		time.Sleep(500 * time.Millisecond)
 		_, err := conn.Write([]byte("hello"))
@@ -57,20 +57,20 @@ func TestReadConnWithTimeout(t *testing.T) {
 			_ = listener.Close()
 		}()
 	}
-	addr := HostPort(host, port)
+	addr := utils.HostPort(host, port)
 	c, err := net.Dial("tcp", addr)
 	if err != nil {
 		t.Logf("failed dail %v: %s", addr, err)
 		t.FailNow()
 	}
 
-	data, err := ReadConnWithTimeout(c, 200*time.Millisecond)
+	data, err := utils.ReadConnWithTimeout(c, 200*time.Millisecond)
 	if err == nil {
 		t.Logf("BUG: should not read data: %s", string(data))
 		t.FailNow()
 	}
 
-	data, err = ReadConnWithTimeout(c, 500*time.Millisecond)
+	data, err = utils.ReadConnWithTimeout(c, 500*time.Millisecond)
 	if err != nil {
 		t.Logf("BUG: should have read data: %s", err)
 		t.FailNow()
@@ -84,7 +84,7 @@ func TestReadConnWithTimeout(t *testing.T) {
 
 func TestTrigger(t *testing.T) {
 	var check = false
-	NewTriggerWriter(10, func(buffer io.ReadCloser, _ string) {
+	utils.NewTriggerWriter(10, func(buffer io.ReadCloser, _ string) {
 		check = true
 	}).Write([]byte("àf.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)"))
 	if !check {
@@ -92,7 +92,7 @@ func TestTrigger(t *testing.T) {
 	}
 
 	check = true
-	NewTriggerWriter(100000, func(buffer io.ReadCloser, _ string) {
+	utils.NewTriggerWriter(100000, func(buffer io.ReadCloser, _ string) {
 		check = false
 	}).Write([]byte("àf.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)"))
 	if !check {
