@@ -740,6 +740,39 @@ Host: www.example.com
 	require.NoError(t, err)
 }
 
+func TestGRPCMUSTPASS_MITMV2_HookColorTimeout(t *testing.T) {
+	err := yakit.SetKey(consts.GetGormProfileDatabase(), MITMReplacerKeyRecords, defaultRule)
+	if err != nil {
+		return
+	}
+	defer yakit.DelKey(consts.GetGormProfileDatabase(), MITMReplacerKeyRecords)
+	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		return []byte("HTTP/1.1 200 OK\r\nContent-length:10000\r\n\r\n" + strings.Repeat("a", 10000))
+	})
+	testReq := []byte(`POST / HTTP/1.1
+Content-Type: application/json
+Host: www.example.com
+
+{"key": "value"}`)
+
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := client.MITMV2(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	stream.Send(&ypb.MITMV2Request{
+		Host: "127.0.0.1",
+		Port: uint32(mitmPort),
+	})
+	time.Sleep(time.Second)
+	_, err = lowhttp.HTTP(lowhttp.WithPacketBytes(testReq), lowhttp.WithProxy(fmt.Sprintf("http://127.0.0.1:%d", mitmPort)), lowhttp.WithHost(mockHost), lowhttp.WithPort(mockPort), lowhttp.WithTimeout(2*time.Second))
+	require.NoError(t, err)
+}
+
 // TestGRPCMUSTPASS_ReplaceRuleAndMirrorRule fix the bug that the mirror rule not work when the replace rule is enable
 func TestGRPCMUSTPASS_ReplaceRuleAndMirrorRule(t *testing.T) {
 	replacer := NewMITMReplacer()
