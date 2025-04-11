@@ -37,10 +37,14 @@ func BuildGraphWithBFS[K comparable, T comparable](
 func (g *BFSGraphBuilder[K, T]) bfs(from, to T) error {
 	var buildNodeList, buildEdge func(T)
 	var getNeighbors func(T) map[T]*Neighbor[T]
-
-	nodeList := make(map[T][]T)
+	var visited map[T]bool
+	var nodeList map[T][]T
 
 	buildNodeList = func(node T) {
+		if visited[node] {
+			return
+		}
+		visited[node] = true
 		neighbors := getNeighbors(node)
 		for _, neighbor := range neighbors {
 			neighborNode := neighbor.Node
@@ -71,11 +75,14 @@ func (g *BFSGraphBuilder[K, T]) bfs(from, to T) error {
 		next = g.getNeighborsDependOn
 	}
 
+	nodeList = make(map[T][]T)
+	visited = make(map[T]bool)
 	getNeighbors = first
 	buildNodeList(from)
 	buildEdge(to)
 
 	nodeList = make(map[T][]T)
+	visited = make(map[T]bool)
 	getNeighbors = next
 	buildNodeList(to)
 	buildEdge(from)
