@@ -2,6 +2,7 @@ package sfvm
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -146,4 +147,6 @@ type ValueOperator interface {
 
 	CompareString(*StringComparator) (ValueOperator, []bool)
 	CompareOpcode(*OpcodeComparator) (ValueOperator, []bool)
+	CompareConst(*ConstComparator) []bool
+	NewConst(any, ...memedit.RangeIf) ValueOperator
 }

@@ -2,9 +2,13 @@ package sfvm
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -133,5 +137,101 @@ func (c *OpcodeComparator) AllSatisfy(opcodeCheck CheckOpcode, check CheckBinOrU
 			return true
 		}
 	}
+	return false
+}
+
+type BinaryCondition string
+
+const (
+	BinaryConditionEqual    BinaryCondition = "==" // OpEq
+	BinaryConditionNotEqual BinaryCondition = "!=" // OpNotEq
+	BinaryConditionGt       BinaryCondition = ">"  // OpGt
+	BinaryConditionGtEq     BinaryCondition = ">=" // OpGtEq
+	BinaryConditionLt       BinaryCondition = "<"  // OpLt
+	BinaryConditionLtEq     BinaryCondition = "<=" // OpLtEq
+)
+
+type ConstComparator struct {
+	ToCompared      string
+	BinaryCondition BinaryCondition
+}
+
+func NewConstComparator(toComparedConst string, condition BinaryCondition) *ConstComparator {
+	return &ConstComparator{
+		ToCompared:      toComparedConst,
+		BinaryCondition: condition,
+	}
+}
+
+func (c *ConstComparator) Matches(target string) bool {
+	if c == nil {
+		return false
+	}
+
+	// First try to compare as numbers
+	toComparedNum, toComparedErr := strconv.ParseFloat(c.ToCompared, 64)
+	targetNum, targetErr := strconv.ParseFloat(target, 64)
+
+	// If both can be parsed as numbers, compare them numerically
+	if toComparedErr == nil && targetErr == nil {
+		switch c.BinaryCondition {
+		case BinaryConditionEqual:
+			return targetNum == toComparedNum
+		case BinaryConditionNotEqual:
+			return targetNum != toComparedNum
+		case BinaryConditionGt:
+			return targetNum > toComparedNum
+		case BinaryConditionGtEq:
+			return targetNum >= toComparedNum
+		case BinaryConditionLt:
+			return targetNum < toComparedNum
+		case BinaryConditionLtEq:
+			return targetNum <= toComparedNum
+		}
+	}
+
+	// Try to compare as booleans
+	parseBool := func(str string) (bool, error) {
+		switch str {
+		case "true":
+			return true, nil
+		case "false":
+			return false, nil
+		}
+		return false, utils.Error("parse bool failed")
+	}
+
+	toComparedBool, toComparedErr := parseBool(c.ToCompared)
+	targetBool, targetErr := parseBool(target)
+	// If both can be parsed as booleans, compare them
+	if toComparedErr == nil && targetErr == nil {
+		switch c.BinaryCondition {
+		case BinaryConditionEqual:
+			return targetBool == toComparedBool
+		case BinaryConditionNotEqual:
+			return targetBool != toComparedBool
+		}
+	}
+
+	// Default: compare as strings
+	// String()方法会修正string类型的const，因此这里要进行修正
+	// Reference:common/yak/ssa/disasmLine.go:160
+	target = fmt.Sprintf("%#v", target)
+
+	switch c.BinaryCondition {
+	case BinaryConditionEqual:
+		return target == c.ToCompared
+	case BinaryConditionNotEqual:
+		return target != c.ToCompared
+	case BinaryConditionGt:
+		return target > c.ToCompared // String comparison
+	case BinaryConditionGtEq:
+		return target >= c.ToCompared
+	case BinaryConditionLt:
+		return target < c.ToCompared
+	case BinaryConditionLtEq:
+		return target <= c.ToCompared
+	}
+
 	return false
 }

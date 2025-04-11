@@ -123,3 +123,89 @@ UNTIL}->*)`,
 			ssaapi.WithLanguage(ssaapi.Yak))
 	})
 }
+
+func TestConstCompare(t *testing.T) {
+	t.Run("test compare const equal:simple ", func(t *testing.T) {
+		code := ` a = 1;`
+		ssatest.CheckSyntaxFlow(t, code, `a?{= 1} as $result`, map[string][]string{
+			"result": {"1"},
+		})
+	})
+
+	t.Run("test compare const equal:native call getActualParamLen", func(t *testing.T) {
+		code := ` a("param1","param2")`
+		ssatest.CheckSyntaxFlow(t, code, `a?{<getActualParamLen>?{ == 2}} as $result`, map[string][]string{
+			"result": {"Undefined-a"},
+		})
+	})
+
+	t.Run("test compare const equal:string", func(t *testing.T) {
+		code := ` a("param1","param2")`
+		ssatest.CheckSyntaxFlow(t, code, `a?{.(*?{=="param1"})} as $result`, map[string][]string{
+			"result": {"Undefined-a"},
+		})
+	})
+
+	t.Run("test compare const equal:value list", func(t *testing.T) {
+		code := ` a1("param1","param2")
+	a2("param")
+`
+		ssatest.CheckSyntaxFlow(t, code, `a*?{<getActualParamLen>?{ == 1}} as $result`, map[string][]string{
+			"result": {"Undefined-a2"},
+		})
+	})
+
+	t.Run("test compare const not equal 1 ", func(t *testing.T) {
+		code := `
+a1 = 1
+a2 = 11
+a3 = true 
+`
+		ssatest.CheckSyntaxFlow(t, code, `a*?{!=1} as $result`, map[string][]string{
+			"result": {"11", "true"},
+		})
+	})
+
+	t.Run("test compare const not equal 2 ", func(t *testing.T) {
+		code := `
+a1 = "hello"
+a2 = "world"
+a3 = true 
+`
+		ssatest.CheckSyntaxFlow(t, code, `a*?{!="hello"} as $result`, map[string][]string{
+			"result": {"world", "true"},
+		})
+	})
+
+	t.Run("test compare number const lt and gt ", func(t *testing.T) {
+		code := `
+	a1=  66 ; 
+	a2 = 999;
+`
+		ssatest.CheckSyntaxFlow(t, code, `a*?{ > 66 } as $result`, map[string][]string{
+			"result": {"999"},
+		})
+		ssatest.CheckSyntaxFlow(t, code, `a*?{ >= 66 } as $result`, map[string][]string{
+			"result": {"66", "999"},
+		})
+		ssatest.CheckSyntaxFlow(t, code, `a*?{ < 999 } as $result`, map[string][]string{
+			"result": {"66"},
+		})
+		ssatest.CheckSyntaxFlow(t, code, `a*?{ <= 999 } as $result`, map[string][]string{
+			"result": {"66", "999"},
+		})
+	})
+
+	t.Run("test compare string const lt and gt ", func(t *testing.T) {
+		code := `
+	a1 =  "hello" ; 
+	a2 =  "helloworld";
+`
+		ssatest.CheckSyntaxFlow(t, code, `a*?{ > "hello" } as $result`, map[string][]string{
+			"result": {"\"helloworld\""},
+		})
+		ssatest.CheckSyntaxFlow(t, code, `a*?{ >=  "hello" } as $result`, map[string][]string{
+			"result": {"\"hello\"", "\"helloworld\""},
+		})
+	})
+}
