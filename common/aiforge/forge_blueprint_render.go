@@ -23,10 +23,10 @@ func (f *ForgeBlueprint) tmpParams(query string, params ...*ypb.ExecParamItem) m
 
 	return map[string]any{
 		"Forge": map[string]any{
-			"UserParams": paramBuf.String(),
-			"Init":       "",
-			"Persistent": "",
-			"Result":     "",
+			"UserParams":       paramBuf.String(),
+			"Init":             f.InitializePrompt,
+			"PersistentPrompt": f.PersistentPrompt,
+			"Result":           "",
 		},
 	}
 }

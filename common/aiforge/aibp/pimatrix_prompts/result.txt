@@ -4,8 +4,11 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": ["probability", "negative_impact"],
+  "required": ["probability", "negative_impact", "@action"],
   "properties": {
+    "@action": {
+      "const": "riskscore"
+    },
     "probability": {
       "type": "number",
       "format": "float",
