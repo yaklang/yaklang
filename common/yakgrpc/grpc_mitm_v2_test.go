@@ -825,8 +825,9 @@ func TestGRPCMUSTTPASS_MITMV2_HijackTags(t *testing.T) {
 					stream.Send(&ypb.MITMV2Request{
 						ManualHijackControl: true,
 						ManualHijackMessage: &ypb.SingleManualHijackControlMessage{
-							TaskID:  message.GetTaskID(),
-							Request: req,
+							TaskID:     message.GetTaskID(),
+							SendPacket: true,
+							Request:    req,
 						},
 					})
 				}

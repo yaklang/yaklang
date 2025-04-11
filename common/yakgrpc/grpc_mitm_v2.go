@@ -590,7 +590,10 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				if controlMessage.GetForward() {
 					return originRspRaw
 				}
-				return controlMessage.GetPayload()
+				if controlMessage.GetSendPacket() {
+					task.infoMessage.Payload = controlMessage.GetPayload()
+					return task.infoMessage.Payload
+				}
 			}
 		}
 	}
@@ -753,7 +756,6 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				if controlMessage.GetUpdateTags() {
 					taskInfo.Tags = controlMessage.GetTags()
 					httpctx.SetFlowTags(req, controlMessage.GetTags())
-					continue
 				}
 
 				if controlMessage.GetDrop() {
@@ -763,23 +765,24 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 					return originRspRaw
 				}
 
-				response := controlMessage.GetResponse()
-				if handleResponseModified(response) {
-					httpctx.SetResponseModified(req, "manual")
-					httpctx.SetHijackedResponseBytes(req, response)
+				if controlMessage.GetSendPacket() {
+					response := controlMessage.GetResponse()
+					taskInfo.Response = response
+					if handleResponseModified(response) {
+						httpctx.SetResponseModified(req, "manual")
+						httpctx.SetHijackedResponseBytes(req, response)
+					}
+					rspModified, _, err := lowhttp.FixHTTPResponse(response)
+					if err != nil {
+						log.Errorf("fix http response[req:%v] failed: %s", ptr, err.Error())
+						return originRspRaw
+					}
+					if rspModified == nil {
+						log.Error("BUG: http response is empty... use origin")
+						return originRspRaw
+					}
+					return rspModified
 				}
-
-				rspModified, _, err := lowhttp.FixHTTPResponse(response)
-				if err != nil {
-					log.Errorf("fix http response[req:%v] failed: %s", ptr, err.Error())
-					return originRspRaw
-				}
-
-				if rspModified == nil {
-					log.Error("BUG: http response is empty... use origin")
-					return originRspRaw
-				}
-				return rspModified
 			}
 		}
 	}
@@ -871,8 +874,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				if controlMessage.GetForward() {
 					return raw
 				}
-				requestModified := controlMessage.GetPayload()
-				return requestModified
+				if controlMessage.GetSendPacket() {
+					return task.infoMessage.Payload
+				}
 			}
 		}
 	}
@@ -1060,20 +1064,17 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 					taskInfo.HijackResponse = true
 					httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, true)
 					log.Infof("the ptr: %p's mitm request is waiting for hijack response", originReqIns)
-					continue
 				}
 
 				if controlReq.GetCancelHijackResponse() {
 					taskInfo.HijackResponse = false
 					httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, false)
 					log.Infof("the ptr: %p's mitm request cancel hijack response", originReqIns)
-					continue
 				}
 
 				if controlReq.GetUpdateTags() {
 					taskInfo.Tags = controlReq.GetTags()
 					httpctx.SetFlowTags(originReqIns, controlReq.GetTags())
-					continue
 				}
 
 				if controlReq.GetDrop() {
@@ -1116,19 +1117,22 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 					return originReqRaw
 				}
 
-				current := controlReq.GetRequest()
-				if bytes.Contains(current, []byte{'{', '{'}) || bytes.Contains(current, []byte{'}', '}'}) {
-					// 在这可能包含 fuzztag
-					result := mutate.MutateQuick(current)
-					if len(result) > 0 {
-						current = []byte(result[0])
+				if controlReq.GetSendPacket() {
+					// 这里是用户自定义的请求
+					current := controlReq.GetRequest()
+					taskInfo.Request = current // use for front ,should not render fuzztag
+					if bytes.Contains(current, []byte{'{', '{'}) || bytes.Contains(current, []byte{'}', '}'}) {
+						// 在这可能包含 fuzztag
+						result := mutate.MutateQuick(current)
+						if len(result) > 0 {
+							current = []byte(result[0])
+						}
 					}
+					if handleRequestModified(current) {
+						setModifiedRequest("user", current)
+					}
+					return current
 				}
-				taskInfo.Request = current
-				if handleRequestModified(current) {
-					setModifiedRequest("user", current)
-				}
-				return current
 			}
 		}
 	}
