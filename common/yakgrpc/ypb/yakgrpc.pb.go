@@ -49388,19 +49388,22 @@ func (x *MITMV2Response) GetManualHijackList() []*SingleManualHijackInfoMessage 
 }
 
 type SingleManualHijackControlMessage struct {
-	state                protoimpl.MessageState `protogen:"open.v1"`
-	TaskID               string                 `protobuf:"bytes,1,opt,name=TaskID,proto3" json:"TaskID,omitempty"`
-	Request              []byte                 `protobuf:"bytes,2,opt,name=Request,proto3" json:"Request,omitempty"`
-	Response             []byte                 `protobuf:"bytes,3,opt,name=Response,proto3" json:"Response,omitempty"`
-	HijackResponse       bool                   `protobuf:"varint,4,opt,name=HijackResponse,proto3" json:"HijackResponse,omitempty"`
-	CancelHijackResponse bool                   `protobuf:"varint,5,opt,name=CancelHijackResponse,proto3" json:"CancelHijackResponse,omitempty"`
-	Drop                 bool                   `protobuf:"varint,6,opt,name=Drop,proto3" json:"Drop,omitempty"`
-	Forward              bool                   `protobuf:"varint,7,opt,name=Forward,proto3" json:"Forward,omitempty"`
-	UpdateTags           bool                   `protobuf:"varint,10,opt,name=UpdateTags,proto3" json:"UpdateTags,omitempty"`
-	Tags                 []string               `protobuf:"bytes,8,rep,name=Tags,proto3" json:"Tags,omitempty"`
-	Payload              []byte                 `protobuf:"bytes,9,opt,name=Payload,proto3" json:"Payload,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	TaskID string                 `protobuf:"bytes,1,opt,name=TaskID,proto3" json:"TaskID,omitempty"`
+	// update config action: can process multiple config info in single control message
+	HijackResponse       bool     `protobuf:"varint,2,opt,name=HijackResponse,proto3" json:"HijackResponse,omitempty"`
+	CancelHijackResponse bool     `protobuf:"varint,3,opt,name=CancelHijackResponse,proto3" json:"CancelHijackResponse,omitempty"`
+	UpdateTags           bool     `protobuf:"varint,4,opt,name=UpdateTags,proto3" json:"UpdateTags,omitempty"`
+	Tags                 []string `protobuf:"bytes,5,rep,name=Tags,proto3" json:"Tags,omitempty"` //--------------------------
+	// send packet action: every hijack just can process a send packet action, if set drop|forward|sendpacket hijack will done
+	Drop          bool   `protobuf:"varint,6,opt,name=Drop,proto3" json:"Drop,omitempty"`             // drop request|response|payload
+	Forward       bool   `protobuf:"varint,7,opt,name=Forward,proto3" json:"Forward,omitempty"`       // send origin request|response|payload
+	SendPacket    bool   `protobuf:"varint,8,opt,name=SendPacket,proto3" json:"SendPacket,omitempty"` // send request|response|payload
+	Request       []byte `protobuf:"bytes,9,opt,name=Request,proto3" json:"Request,omitempty"`
+	Response      []byte `protobuf:"bytes,10,opt,name=Response,proto3" json:"Response,omitempty"`
+	Payload       []byte `protobuf:"bytes,11,opt,name=Payload,proto3" json:"Payload,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SingleManualHijackControlMessage) Reset() {
@@ -49440,20 +49443,6 @@ func (x *SingleManualHijackControlMessage) GetTaskID() string {
 	return ""
 }
 
-func (x *SingleManualHijackControlMessage) GetRequest() []byte {
-	if x != nil {
-		return x.Request
-	}
-	return nil
-}
-
-func (x *SingleManualHijackControlMessage) GetResponse() []byte {
-	if x != nil {
-		return x.Response
-	}
-	return nil
-}
-
 func (x *SingleManualHijackControlMessage) GetHijackResponse() bool {
 	if x != nil {
 		return x.HijackResponse
@@ -49466,6 +49455,20 @@ func (x *SingleManualHijackControlMessage) GetCancelHijackResponse() bool {
 		return x.CancelHijackResponse
 	}
 	return false
+}
+
+func (x *SingleManualHijackControlMessage) GetUpdateTags() bool {
+	if x != nil {
+		return x.UpdateTags
+	}
+	return false
+}
+
+func (x *SingleManualHijackControlMessage) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
 }
 
 func (x *SingleManualHijackControlMessage) GetDrop() bool {
@@ -49482,16 +49485,23 @@ func (x *SingleManualHijackControlMessage) GetForward() bool {
 	return false
 }
 
-func (x *SingleManualHijackControlMessage) GetUpdateTags() bool {
+func (x *SingleManualHijackControlMessage) GetSendPacket() bool {
 	if x != nil {
-		return x.UpdateTags
+		return x.SendPacket
 	}
 	return false
 }
 
-func (x *SingleManualHijackControlMessage) GetTags() []string {
+func (x *SingleManualHijackControlMessage) GetRequest() []byte {
 	if x != nil {
-		return x.Tags
+		return x.Request
+	}
+	return nil
+}
+
+func (x *SingleManualHijackControlMessage) GetResponse() []byte {
+	if x != nil {
+		return x.Response
 	}
 	return nil
 }
@@ -53931,21 +53941,24 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x11HaveLoadingSetter\x18\r \x01(\bR\x11HaveLoadingSetter\x12 \n" +
 	"\vLoadingFlag\x18\x0e \x01(\bR\vLoadingFlag\x126\n" +
 	"\x16ManualHijackListAction\x18\x0f \x01(\tR\x16ManualHijackListAction\x12N\n" +
-	"\x10ManualHijackList\x18\x10 \x03(\v2\".ypb.SingleManualHijackInfoMessageR\x10ManualHijackList\"\xc8\x02\n" +
+	"\x10ManualHijackList\x18\x10 \x03(\v2\".ypb.SingleManualHijackInfoMessageR\x10ManualHijackList\"\xe8\x02\n" +
 	" SingleManualHijackControlMessage\x12\x16\n" +
-	"\x06TaskID\x18\x01 \x01(\tR\x06TaskID\x12\x18\n" +
-	"\aRequest\x18\x02 \x01(\fR\aRequest\x12\x1a\n" +
-	"\bResponse\x18\x03 \x01(\fR\bResponse\x12&\n" +
-	"\x0eHijackResponse\x18\x04 \x01(\bR\x0eHijackResponse\x122\n" +
-	"\x14CancelHijackResponse\x18\x05 \x01(\bR\x14CancelHijackResponse\x12\x12\n" +
+	"\x06TaskID\x18\x01 \x01(\tR\x06TaskID\x12&\n" +
+	"\x0eHijackResponse\x18\x02 \x01(\bR\x0eHijackResponse\x122\n" +
+	"\x14CancelHijackResponse\x18\x03 \x01(\bR\x14CancelHijackResponse\x12\x1e\n" +
+	"\n" +
+	"UpdateTags\x18\x04 \x01(\bR\n" +
+	"UpdateTags\x12\x12\n" +
+	"\x04Tags\x18\x05 \x03(\tR\x04Tags\x12\x12\n" +
 	"\x04Drop\x18\x06 \x01(\bR\x04Drop\x12\x18\n" +
 	"\aForward\x18\a \x01(\bR\aForward\x12\x1e\n" +
 	"\n" +
-	"UpdateTags\x18\n" +
-	" \x01(\bR\n" +
-	"UpdateTags\x12\x12\n" +
-	"\x04Tags\x18\b \x03(\tR\x04Tags\x12\x18\n" +
-	"\aPayload\x18\t \x01(\fR\aPayload\"\xb9\x03\n" +
+	"SendPacket\x18\b \x01(\bR\n" +
+	"SendPacket\x12\x18\n" +
+	"\aRequest\x18\t \x01(\fR\aRequest\x12\x1a\n" +
+	"\bResponse\x18\n" +
+	" \x01(\fR\bResponse\x12\x18\n" +
+	"\aPayload\x18\v \x01(\fR\aPayload\"\xb9\x03\n" +
 	"\x1dSingleManualHijackInfoMessage\x12\x16\n" +
 	"\x06TaskID\x18\x01 \x01(\tR\x06TaskID\x12\x18\n" +
 	"\aRequest\x18\x02 \x01(\fR\aRequest\x12\x1a\n" +
