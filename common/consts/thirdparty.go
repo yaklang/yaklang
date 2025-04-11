@@ -2,9 +2,10 @@ package consts
 
 import (
 	"errors"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"sync"
 
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )

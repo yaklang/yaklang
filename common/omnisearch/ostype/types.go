@@ -20,12 +20,17 @@ type OmniSearchResult struct {
 	Source     string `json:"source,omitempty"`
 }
 
+type YakitOmniSearchKeyConfig struct {
+	APIKey string `app:"name:api_key,verbose:API Key,required:true"`
+	Proxy  string `app:"name:proxy,verbose:Proxy,required:false"`
+}
+
 type OmniSearchResultList struct {
 	Results []*OmniSearchResult
 	Total   int
 }
 
 type SearchClient interface {
-	Search(query string, config *SearchConfig) (*OmniSearchResultList, error)
+	Search(query string, config *SearchConfig) ([]*OmniSearchResult, error)
 	GetType() SearcherType
 }
