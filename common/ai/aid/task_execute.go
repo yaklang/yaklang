@@ -124,11 +124,7 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 	ep := t.config.epm.createEndpoint()
 	ep.SetDefaultSuggestionContinue()
 	t.config.EmitRequireReviewForToolUse(targetTool, callToolParams, ep.id)
-	if !t.config.autoAgree {
-		if !ep.WaitTimeoutSeconds(60) {
-			t.config.EmitInfo("user review timeout, use default action: pass")
-		}
-	}
+	t.config.doWaitAgree(nil, ep)
 	params := ep.GetParams()
 	t.config.memory.StoreInteractiveUserInput(ep.id, params)
 	if params == nil {
@@ -327,12 +323,7 @@ func (t *aiTask) executeTask() error {
 	t.config.EmitInfo("start to wait for user review current task")
 
 	t.config.EmitRequireReviewForTask(t, ep.id)
-	if !t.config.autoAgree {
-		if !ep.WaitTimeoutSeconds(60) {
-			t.config.EmitInfo("user review timeout, use default action: continue")
-		}
-	}
-
+	t.config.doWaitAgree(nil, ep)
 	// user review finished, find params
 	reviewResult := ep.GetParams()
 	t.config.memory.StoreInteractiveUserInput(ep.id, reviewResult)

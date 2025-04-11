@@ -25,6 +25,20 @@ var _ AICaller = &Coordinator{}
 var _ AICaller = &planRequest{}
 var _ AICaller = &aiTask{}
 
+type AgreePolicyType string
+
+const (
+	AgreePolicyYOLO AgreePolicyType = "yolo"
+	// auto: auto agree, should with interval at least 10 seconds
+	AgreePolicyAuto AgreePolicyType = "auto"
+	// manual: block until user agree
+	AgreePolicyManual AgreePolicyType = "manual"
+	// ai: use ai to agree, is ai is not agree, will use manual
+	AgreePolicyAI AgreePolicyType = "ai"
+	// ai-auto: use ai to agree, if ai is not agree, will use auto in auto interval
+	AgreePolicyAIAuto AgreePolicyType = "ai-auto"
+)
+
 type Config struct {
 	m  *sync.Mutex
 	id string
@@ -49,7 +63,12 @@ type Config struct {
 
 	debugPrompt bool
 	debugEvent  bool
-	autoAgree   bool
+
+	// do not use it directly, use doAgree() instead
+	agreePolicy   AgreePolicyType
+	agreeInterval time.Duration
+	agreeAIScore  float64
+	agreeRiskCtrl *riskControl
 
 	// sync
 	syncMutex *sync.RWMutex
@@ -59,7 +78,11 @@ type Config struct {
 	outputConsumption *int64
 
 	// RiskControl
-	riskCtrl *riskControl
+	toolRiskCtrl *riskControl
+}
+
+func (c *Config) setAgreePolicy(policy AgreePolicyType) {
+	c.agreePolicy = policy
 }
 
 func (c *Config) outputConsumptionCallback(current int) {
@@ -128,6 +151,11 @@ func (c *Config) emit(e *Event) {
 func newConfig(ctx context.Context) *Config {
 	id := uuid.New()
 	c := &Config{
+		agreePolicy:   AgreePolicyManual,
+		agreeAIScore:  0.5,
+		agreeRiskCtrl: new(riskControl),
+		agreeInterval: 10 * time.Second,
+
 		m:                 new(sync.Mutex),
 		id:                id.String(),
 		epm:               newEndpointManagerContext(ctx),
@@ -137,7 +165,7 @@ func newConfig(ctx context.Context) *Config {
 		syncMap:           make(map[string]func() any),
 		inputConsumption:  new(int64),
 		outputConsumption: new(int64),
-		riskCtrl:          new(riskControl),
+		toolRiskCtrl:      new(riskControl),
 	}
 	go func() {
 		log.Infof("config %s started, start to handle receiving loop", c.id)
@@ -239,11 +267,66 @@ func WithTool(tool *aitool.Tool) Option {
 	}
 }
 
-func WithAutoAgree(autoAgree bool) Option {
+func WithYOLO(i ...bool) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
-		config.autoAgree = autoAgree
+		if len(i) > 0 {
+			if i[0] {
+				config.setAgreePolicy(AgreePolicyYOLO)
+			} else {
+				config.setAgreePolicy(AgreePolicyManual)
+			}
+		} else {
+			config.setAgreePolicy(AgreePolicyYOLO)
+		}
+		return nil
+	}
+}
+
+func WithAgreeAuto(auto bool, interval time.Duration) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.setAgreePolicy(AgreePolicyAuto)
+		config.agreeInterval = interval
+		return nil
+	}
+}
+
+func WithAgreePolicy(policy AgreePolicyType) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.setAgreePolicy(policy)
+		return nil
+	}
+}
+
+func WithAIAgree() Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.setAgreePolicy(AgreePolicyAI)
+		return nil
+	}
+}
+
+func WithAgreeManual() Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.setAgreePolicy(AgreePolicyManual)
+		return nil
+	}
+}
+
+func WithAIAgreeAuto(interval time.Duration) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.setAgreePolicy(AgreePolicyAIAuto)
+		config.agreeInterval = interval
 		return nil
 	}
 }
