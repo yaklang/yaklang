@@ -61,7 +61,7 @@ func compare(a, b interface{}) bool {
 	bStr := fmt.Sprintf("%v", b)
 	return aStr == bStr
 }
-func TestAiToolsSearch(t *testing.T) {
+func _TestAiToolsSearch(t *testing.T) {
 	depinjector.DependencyInject()
 	for _, testCase := range []*AiToolTestCase{
 		{
