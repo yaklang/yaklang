@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid"
+	"io"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -22,6 +23,8 @@ var forgeTemplate string
 
 // ForgeBlueprint 定义了AI Forge的蓝图结构，包含配置AI助手所需的所有元素
 type ForgeBlueprint struct {
+	Name string
+
 	// InitializePrompt 是AI助手初始化时使用的提示词，用于设置AI的基本行为和知识
 	InitializePrompt string
 
@@ -29,17 +32,21 @@ type ForgeBlueprint struct {
 	PersistentPrompt string
 
 	// ResultPrompt 是AI助手生成结果时使用的提示词，用于设置AI的输出格式和内容
-	ResultPrompt string
+	ResultPrompt  string
+	ResultHandler func(string, error)
 
 	// Tools 是AI助手可以使用的工具列表，这些工具可以扩展AI的能力
 	Tools []*aitool.Tool
+
+	// AIDOptions 是AI助手的其他配置选项
+	AIDOptions []aid.Option
 
 	// ParameterRuleYaklangCode 是原始的Yaklang CLI代码，用于AI理解和操作Yaklang环境
 	// 不执行这段代码，只通过代码生成表单
 	ParameterRuleYaklangCode string
 }
 
-func NewForgeBlueprint(opts ...Option) *ForgeBlueprint {
+func NewForgeBlueprint(name string, opts ...Option) *ForgeBlueprint {
 	forge := &ForgeBlueprint{
 		ParameterRuleYaklangCode: `
 cli.String("query", cli.setHelp("用户自由输入"), cli.setRequired(true))
@@ -54,6 +61,13 @@ cli.check()`,
 // Option 是一个函数类型，用于实现选项模式来配置ForgeBlueprint
 type Option func(*ForgeBlueprint)
 
+// WithAIDOptions 设置AI助手的配置选项
+func WithAIDOptions(options ...aid.Option) Option {
+	return func(f *ForgeBlueprint) {
+		f.AIDOptions = append(f.AIDOptions, options...)
+	}
+}
+
 // WithInitializePrompt 设置AI助手的初始化提示词
 // 这个提示词会在AI助手启动时被使用，用于定义AI的初始状态和行为
 func WithInitializePrompt(prompt string) Option {
@@ -67,6 +81,14 @@ func WithInitializePrompt(prompt string) Option {
 func WithResultPrompt(prompt string) Option {
 	return func(f *ForgeBlueprint) {
 		f.ResultPrompt = prompt
+	}
+}
+
+// WithResultHandler 设置AI助手的结果处理函数
+// 这个函数会在AI助手生成结果后被调用，用于处理AI的输出
+func WithResultHandler(handler func(string, error)) Option {
+	return func(f *ForgeBlueprint) {
+		f.ResultHandler = handler
 	}
 }
 
@@ -124,7 +146,33 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
 		return "", nil, utils.Errorf("render persistent prompt failed: %v", err)
 	}
 	_ = persistentPrompt
-	return initPrompt, nil, nil
+
+	var opts []aid.Option
+	opts = append(opts, f.AIDOptions...)
+	if f.ResultPrompt != "" && f.ResultHandler != nil {
+		opts = append(opts, aid.WithResultHandler(func(config *aid.Config) {
+			prompt, err := f.renderResultPrompt(config.GetMemory())
+			if err != nil {
+				f.ResultHandler("", utils.Errorf("render result prompt failed: %v", err))
+				return
+			}
+
+			rsp, err := config.CallAI(aid.NewAIRequest(prompt))
+			if err != nil {
+				f.ResultHandler("", utils.Errorf("render result failed: %v", err))
+				return
+			}
+			rspReader := rsp.GetOutputStreamReader("forge", true, config)
+			raw, err := io.ReadAll(rspReader)
+			if err == io.EOF {
+				f.ResultHandler(string(raw), nil)
+			} else {
+				f.ResultHandler(string(raw), err)
+			}
+		}))
+	}
+
+	return initPrompt, opts, nil
 }
 
 func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOptionWithQuery(
