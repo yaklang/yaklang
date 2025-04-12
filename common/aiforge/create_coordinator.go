@@ -10,6 +10,6 @@ func (t *ForgeBlueprint) CreateCoordinatorWithQuery(ctx context.Context, originQ
 	if err != nil {
 		return nil, err
 	}
-	opts = append(opts, extraOpts...)
-	return aid.NewCoordinatorContext(ctx, firstQuery, opts...)
+	extraOpts = append(extraOpts, opts...)
+	return aid.NewCoordinatorContext(ctx, firstQuery, extraOpts...)
 }

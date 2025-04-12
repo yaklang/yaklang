@@ -11,7 +11,11 @@ import (
 	"path/filepath"
 )
 
-func GetTestSuiteAICallback() aid.AICallbackType {
+func GetTestSuiteAICallback(modelName ...string) aid.AICallbackType {
+	var model string = "qwq-plus"
+	if len(modelName) > 0 {
+		model = modelName[0]
+	}
 	keyPath := filepath.Join(consts.GetDefaultYakitBaseDir(), "tongyi-apikey.txt")
 	apikey, err := os.ReadFile(keyPath)
 	if err != nil {
@@ -37,7 +41,7 @@ func GetTestSuiteAICallback() aid.AICallbackType {
 					rsp.EmitReasonStream(c)
 				}),
 				aispec.WithType("tongyi"),
-				aispec.WithModel("qwen-plus"),
+				aispec.WithModel(model),
 				aispec.WithAPIKey(string(apikey)),
 				// aispec.WithDomain("api.siliconflow.cn"),
 			)

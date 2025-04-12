@@ -2,6 +2,7 @@ package aiforge
 
 import (
 	"bytes"
+	"github.com/yaklang/yaklang/common/ai/aid"
 	"text/template"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -63,7 +64,7 @@ func (f *ForgeBlueprint) renderPersistentPrompt(query string) (string, error) {
 	return buf.String(), nil
 }
 
-func (f *ForgeBlueprint) renderResultPrompt(query string) (string, error) {
+func (f *ForgeBlueprint) renderResultPrompt(memory *aid.Memory) (string, error) {
 	tmpl, err := template.New("result").Parse(f.ResultPrompt)
 	if err != nil {
 		log.Errorf("parse result prompt failed: %v", err)
@@ -71,7 +72,9 @@ func (f *ForgeBlueprint) renderResultPrompt(query string) (string, error) {
 	}
 
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, f.tmpParams(query)); err != nil {
+	params := f.tmpParams("")
+	params["Memory"] = memory
+	if err := tmpl.Execute(&buf, params); err != nil {
 		log.Errorf("execute result prompt failed: %v", err)
 		return "", err
 	}

@@ -105,7 +105,7 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 	callParamsString, _ := io.ReadAll(callParams.GetOutputStreamReader("call-tools", true, t.config))
 
 	// extract action
-	callToolAction, err := extractAction(string(callParamsString), "call-tool")
+	callToolAction, err := ExtractAction(string(callParamsString), "call-tool")
 	if err != nil {
 		t.config.EmitError("error extract tool params: %v", err)
 		err = utils.Errorf("error extracting action params: %v", err)
@@ -285,7 +285,7 @@ TOOLREQUIRED:
 		return fmt.Errorf("error reading summary: %w", err)
 	}
 
-	action, err := extractAction(string(summaryBytes), "summary")
+	action, err := ExtractAction(string(summaryBytes), "summary")
 	if err != nil {
 		t.config.EmitError("error extracting action: %v", err)
 	}

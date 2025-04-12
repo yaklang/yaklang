@@ -77,7 +77,25 @@ type Config struct {
 	inputConsumption  *int64
 	outputConsumption *int64
 
-	resultHandler func(*Config, *Memory)
+	resultHandler func(*Config)
+}
+
+func (c *Config) CallAI(request *AIRequest) (*AIResponse, error) {
+	return c.callAI(request)
+}
+
+func (c *Config) callAI(request *AIRequest) (*AIResponse, error) {
+	for _, cb := range []AICallbackType{
+		c.taskAICallback,
+		c.coordinatorAICallback,
+		c.planAICallback,
+	} {
+		if cb == nil {
+			continue
+		}
+		return cb(c, request)
+	}
+	return nil, utils.Error("no any ai callback is set, cannot found ai config")
 }
 
 func (c *Config) setAgreePolicy(policy AgreePolicyType) {
@@ -94,6 +112,10 @@ func (c *Config) inputConsumptionCallback(current int) {
 
 func (c *Config) GetInputConsumption() int64 {
 	return atomic.LoadInt64(c.inputConsumption)
+}
+
+func (c *Config) GetMemory() *Memory {
+	return c.memory
 }
 
 func (c *Config) GetOutputConsumption() int64 {
@@ -462,7 +484,7 @@ func WithDebug(i ...bool) Option {
 	}
 }
 
-func WithResultHandler(h func(*Config, *Memory)) Option {
+func WithResultHandler(h func(*Config)) Option {
 	return func(config *Config) error {
 		config.resultHandler = h
 		return nil
