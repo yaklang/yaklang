@@ -1,10 +1,16 @@
-# Result
+# Background
+你需要根据材料和ResultSchema输出对应的JSON内容。
+# Material
+{{ .Memory.OS }}-{{ .Memory.Arch }}-{{ .Memory.Now }}
+{{ .Memory.Progress }}
+{{ .Memory.PromptForToolCallResultsForLast5  }}
+# ResultSchema
 根据上面的算法，只输出给出 P-I Matrix 的分析结果，要求符合 Schema:
 ```schema
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": ["probability", "negative_impact", "@action"],
+  "required": ["probability", "impact", "@action", "reason"],
   "properties": {
     "@action": {
       "const": "riskscore"
@@ -16,20 +22,21 @@
       "maximum": 1.0,
       "description": "Likelihood of risk occurrence"
     },
-    "negative_impact": {
+    "impact": {
       "type": "number",
       "format": "float",
       "minimum": 0.0,
       "maximum": 1.0,
       "description": "Magnitude of negative consequences"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Reasoning behind the risk assessment in Chinese"
+    },
+    "reason_en": {
+        "type": "string",
+        "description": "Reasoning behind the risk assessment in English"
     }
-  },
-  "additionalProperties": {
-    "type": "number",
-    "format": "float",
-    "minimum": 0.0,
-    "maximum": 1.0,
-    "description": "Optional domain-specific risk factors"
   }
 }
 ```

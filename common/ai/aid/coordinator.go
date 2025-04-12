@@ -123,7 +123,7 @@ func (c *Coordinator) Run() error {
 		用户可以在这个回调函数中处理 AI 的输出结果，或者将结果存储到数据库中。
 	*/
 	if c.config.resultHandler != nil {
-		c.config.resultHandler(c.config, c.config.memory)
+		c.config.resultHandler(c.config)
 		return nil
 	}
 

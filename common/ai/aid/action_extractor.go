@@ -27,6 +27,11 @@ func (q *Action) GetInt(key string, defaults ...int) int {
 	})...))
 }
 
+// GetFloat
+func (a *Action) GetFloat(key string, defaults ...float64) float64 {
+	return a.params.GetFloat(key, defaults...)
+}
+
 func (q *Action) GetString(key string, defaults ...string) string {
 	return q.params.GetString(key, defaults...)
 }
@@ -39,7 +44,7 @@ func (q *Action) GetInvokeParams(key string) aitool.InvokeParams {
 	return q.params.GetObject(key)
 }
 
-func extractAction(i string, actionName string, alias ...string) (*Action, error) {
+func ExtractAction(i string, actionName string, alias ...string) (*Action, error) {
 	ac := &Action{
 		name:   actionName,
 		params: make(map[string]any),
