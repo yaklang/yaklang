@@ -2,18 +2,40 @@ package aibp
 
 import (
 	"context"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"testing"
 )
 
 func TestPIMatrix(t *testing.T) {
-	forge := NewPIMatrixForge(func(result *PIMatrixResult) {
+	result, err := aiforge.ExecuteForge(
+		"pimatrix",
+		context.Background(),
+		[]*ypb.ExecParamItem{
+			{Key: "query", Value: "我要删除 Linux 文件系统中的 /"},
+		},
+		aid.WithDebugPrompt(true),
+		aid.WithAICallback(GetTestSuiteAICallback("qwen-plus")),
+	)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	spew.Dump(result.Formated)
+}
 
+func TestPIMatrix_Legacy(t *testing.T) {
+	t.Skip()
+
+	forge := newPIMatrixForge(func(result *PIMatrixResult) {
+		spew.Dump(result)
 	})
 	riskName := "我要删除 Linux 文件系统中的 /"
 	ins, err := forge.CreateCoordinatorWithQuery(
 		context.Background(), riskName,
-		aid.WithAICallback(GetTestSuiteAICallback()),
+		aid.WithAICallback(GetTestSuiteAICallback("qwen-max")),
 		aid.WithDebugPrompt(true),
 	)
 	if err != nil {
