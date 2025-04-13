@@ -6,6 +6,10 @@
 ## 任务状态与进度
 {{ .Memory.CurrentTaskInfo }}
 
+{{ if .Memory.PersistentMemory }}# 牢记
+{{ .Memory.PersistentMemory}}
+{{end}}
+
 ## 工具详情
 工具名称: {{ .Tool.Name }}
 工具描述: {{ .Tool.Description }}
