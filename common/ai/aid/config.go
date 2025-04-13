@@ -56,7 +56,8 @@ type Config struct {
 	eventHandler   func(e *Event)
 
 	// memory
-	memory *Memory
+	persistentMemory []string
+	memory           *Memory
 
 	// stream waitgroup
 	streamWaitGroup *sync.WaitGroup
@@ -487,6 +488,16 @@ func WithDebug(i ...bool) Option {
 func WithResultHandler(h func(*Config)) Option {
 	return func(config *Config) error {
 		config.resultHandler = h
+		return nil
+	}
+}
+
+func WithAppendPersistentMemory(i ...string) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.persistentMemory = append(config.persistentMemory, i...)
+		config.memory.StoreAppendPersistentInfo(i...)
 		return nil
 	}
 }

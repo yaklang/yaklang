@@ -8,7 +8,9 @@
 {{ .Memory.PromptForToolCallResultsForLast20 }}
 
 {{ .Memory.ToolsList }}
-
+{{ if .Memory.PersistentMemory }}# 牢记
+{{ .Memory.PersistentMemory}}
+{{end}}
 如果你决定使用工具，需要先申请获取工具的详细参数信息(根据Schema构建JSON对象)。请注意，每次只能申请一个工具。你的回答应该是详细和全面的，确保解决任务目标中的所有要求。Schema如下：
 
 ```schema help="申请工具详情"
