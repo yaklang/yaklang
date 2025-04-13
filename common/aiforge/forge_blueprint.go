@@ -145,9 +145,13 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
 	if err != nil {
 		return "", nil, utils.Errorf("render persistent prompt failed: %v", err)
 	}
-	_ = persistentPrompt
 
 	var opts []aid.Option
+	_ = persistentPrompt
+	if persistentPrompt != "" {
+		opts = append(opts, aid.WithAppendPersistentMemory(persistentPrompt))
+	}
+
 	opts = append(opts, f.AIDOptions...)
 	if f.ResultPrompt != "" && f.ResultHandler != nil {
 		opts = append(opts, aid.WithResultHandler(func(config *aid.Config) {

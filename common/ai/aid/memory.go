@@ -1,6 +1,7 @@
 package aid
 
 import (
+	"bytes"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -25,7 +26,7 @@ type Memory struct {
 	Query string
 
 	// meta info
-	MetaInfo map[string]string
+	PersistentData []string
 
 	// task info
 	CurrentTask *aiTask
@@ -47,7 +48,7 @@ type Memory struct {
 func NewMemory() *Memory {
 	return &Memory{
 		PlanHistory:        make([]*PlanRecord, 0),
-		MetaInfo:           make(map[string]string),
+		PersistentData:     make([]string, 0),
 		InteractiveHistory: omap.NewOrderedMap[string, *InteractiveEventRecord](make(map[string]*InteractiveEventRecord)),
 		toolCallResults:    make([]*aitool.ToolResult, 0),
 		Tools: func() []*aitool.Tool {
@@ -94,6 +95,10 @@ func (m *Memory) Progress() string {
 
 func (m *Memory) StoreCurrentTask(task *aiTask) {
 	m.CurrentTask = task
+}
+
+func (m *Memory) StoreAppendPersistentInfo(i ...string) {
+	m.PersistentData = append(m.PersistentData, i...)
 }
 
 // interactive history memory
@@ -175,6 +180,15 @@ func (m *Memory) CurrentTaskInfo() string {
 		return ""
 	}
 	return promptBuilder.String()
+}
+
+func (m *Memory) PersistentMemory() string {
+	var buf bytes.Buffer
+	for _, info := range m.PersistentData {
+		buf.WriteString(info)
+		buf.WriteString("\n")
+	}
+	return buf.String()
 }
 
 func (m *Memory) ToolsList() string {

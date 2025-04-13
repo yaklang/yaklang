@@ -59,14 +59,8 @@ func (pr *planRequest) GenerateFirstPlanPrompt() (string, error) {
 
 	// 准备模板数据
 	data := map[string]interface{}{
-		"Memory":   pr.config.memory,
-		"MetaInfo": "",
+		"Memory": pr.config.memory,
 	}
-	// 构建综合元信息字符串
-	metaInfoBuilder := &bytes.Buffer{}
-
-	// 设置合并后的元信息
-	data["MetaInfo"] = metaInfoBuilder.String()
 
 	// 渲染模板
 	var buf bytes.Buffer
