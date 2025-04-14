@@ -173,8 +173,23 @@ func (c *Config) emit(e *Event) {
 	c.eventHandler(e)
 }
 
+func initDefaultTools(c *Config) error { // set config default tools
+	if err := WithTools(buildinaitools.GetBasicBuildInTools()...)(c); err != nil {
+		return utils.Wrapf(err, "get basic build-in tools fail")
+	}
+	memoryTools, err := c.memory.CreateMemoryTools()
+	if err != nil {
+		return utils.Errorf("create memory tools: %v", err)
+	}
+	if err := WithTools(memoryTools...)(c); err != nil {
+		return err
+	}
+	return nil
+}
+
 func newConfig(ctx context.Context) *Config {
 	id := uuid.New()
+	m := NewMemory()
 	c := &Config{
 		agreePolicy:   AgreePolicyManual,
 		agreeAIScore:  0.5,
@@ -185,7 +200,7 @@ func newConfig(ctx context.Context) *Config {
 		id:                id.String(),
 		epm:               newEndpointManagerContext(ctx),
 		streamWaitGroup:   new(sync.WaitGroup),
-		memory:            NewMemory(),
+		memory:            m,
 		syncMutex:         new(sync.RWMutex),
 		syncMap:           make(map[string]func() any),
 		inputConsumption:  new(int64),
@@ -274,8 +289,8 @@ func newConfig(ctx context.Context) *Config {
 		}
 	}()
 
-	if err := WithTools(buildinaitools.GetBasicBuildInTools()...)(c); err != nil {
-		log.Errorf("get basic build in tools: %v", err)
+	if err := initDefaultTools(c); err != nil {
+		log.Errorf("init default tools: %v", err)
 	}
 	return c
 }

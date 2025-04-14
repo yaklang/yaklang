@@ -25,8 +25,11 @@ type Memory struct {
 	// user first input
 	Query string
 
-	// meta info
+	// persistent data
 	PersistentData []string
+
+	// user data, ai or user can write and read
+	userData *omap.OrderedMap[string, string]
 
 	// task info
 	CurrentTask *aiTask
@@ -55,7 +58,26 @@ func NewMemory() *Memory {
 		Tools: func() []*aitool.Tool {
 			return make([]*aitool.Tool, 0)
 		},
+		userData: omap.NewOrderedMap[string, string](make(map[string]string)),
 	}
+}
+
+// user data memory api, user or ai can set and get
+func (m *Memory) UserDataKeys() []string {
+	return m.userData.Keys()
+}
+
+func (m *Memory) UserDataGet(key string) (string, bool) {
+	return m.userData.Get(key)
+}
+
+func (m *Memory) UserDataDelete(key string) {
+	m.userData.Delete(key)
+	return
+}
+
+func (m *Memory) StoreUserData(key string, value string) {
+	m.userData.Set(key, value)
 }
 
 // constants info memory api
