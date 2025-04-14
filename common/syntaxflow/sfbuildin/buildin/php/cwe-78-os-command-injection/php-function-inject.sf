@@ -22,9 +22,14 @@ alert $evalFunction for{
 $evalFunction(* as $source)
 
 $source #{
+    include: `<self> & $params`
+}-> as $allRisk
+
+
+$source #{
     include: `<self> & $params`,
     exclude: `*?{opcode: call}`,
-}-> as $high_risk
+}-> as $high
 
 alert $high_risk for {
     title: 'Unvalidated parameter injection',
@@ -34,8 +39,8 @@ alert $high_risk for {
 
 $source #{
     include: `<self> & $params`,
-    include: `*?{opcode: call && !<self><getCallee> & $filter}`,
-}-> as $mid_risk
+    exclude: `*?{opcode: call && <self><getCallee> & $filter}`,
+}-> as $mid
 
 alert $mid_risk for {
     title: 'Insufficient parameter filtering',
@@ -43,10 +48,7 @@ alert $mid_risk for {
     level: 'mid',
 }
 
-$source #{
-    include: `<self> & $params`,
-    include: `*?{opcode: call && <self><getCallee> & $filter}`,
-}-> as $low_risk
+$allRisk - $high - $mid as $low
 
 alert $low_risk for {
     title: 'Potential code execution risk',

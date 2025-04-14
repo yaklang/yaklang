@@ -18,6 +18,10 @@ TEXT
 pg_escape_string as $filter;
 
 $pgFunction(* as $source)
+
+$source #{
+    include: `<self> & $params`
+}-> as $allRisk
 $source #{
     include: `<self> & $params`,
     exclude: `*?{opcode: call}`,
@@ -30,7 +34,7 @@ alert $high_risk for {
 }
 $source #{
     include: `<self> & $params`,
-    include: `*?{opcode: call && !<self><getCallee> & $filter}`,
+    exclude: `*?{opcode: call && <self><getCallee> & $filter}`,
 }-> as $mid_risk
 
 alert $mid_risk for {
@@ -39,10 +43,7 @@ alert $mid_risk for {
     level: 'mid',
 }
 
-$source #{
-    include: `<self> & $params`,
-    include: `*?{opcode: call && <self><getCallee> & $filter}`,
-}-> as $low_risk
+$allRisk - $high_risk - $mid_risk as $low_risk
 
 alert $low_risk for {
     title: 'Potential PostgreSQL Access Control Bypass',
