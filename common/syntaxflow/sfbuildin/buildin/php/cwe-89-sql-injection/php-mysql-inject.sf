@@ -20,6 +20,10 @@ mysql_db_query as $mysqlFunction;
 <include('php-filter-function')> as $filter;
 
 $mysqlFunction(* as $source)
+
+$source #{
+    include:`<self> & $params`
+}-> as $all
 $source #{
     include: `<self> & $params`,
     exclude: `*?{opcode: call}`,
@@ -32,7 +36,7 @@ alert $high for {
 }
 $source #{
     include: `<self> & $params`,
-    include: `*?{opcode: call && !(<self><getCallee> & $filter)}`,
+    exclude: `*?{opcode: call && (<self><getCallee> & $filter)}`,
 }-> as $mid
 
 alert $mid for {
@@ -41,11 +45,9 @@ alert $mid for {
     level: 'mid',
 }
 
-$source #{
-    include: `<self> & $params`,
-    include: `*?{opcode: call && <self><getCallee> & $filter}`,
-}-> as $low
+$all - $high - $mid as $low
 
+check $low
 alert $low for {
     title: 'Potential MySQL Access Control Bypass',
     title_zh: 'MySQL访问控制潜在绕过风险',

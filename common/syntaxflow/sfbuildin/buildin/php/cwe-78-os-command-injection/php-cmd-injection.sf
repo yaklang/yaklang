@@ -17,6 +17,10 @@ TEXT
 check $sink;
 
 $sink #{
+    include: `<self> & $params`
+}-> as $all
+
+$sink #{
     include: `<self> & $params`,
     exclude: `<self>?{opcode: call}`
 }-> as $high
@@ -30,19 +34,17 @@ alert $high for{
 
 $sink#{
     include: `<self> & $params`,
-    include: `<self>?{opcode: call && !<self><getCallee> & $filter}`
-}-> as $middle
+    exclude: `<self>?{opcode: call && <self><getCallee> & $filter}`
+}-> as $mid
 
-alert $middle for{
+alert $mid for{
     title_zh: '检测到命令执行，经过函数过滤，但未检出过滤函数',
     type: 'vuln',
     level: 'mid'
 }
 
-$sink #{
-include: `<self> & $params`,
-include: `<self>?{opcode: call && <self><getCallee> & $filter}`
-       }-> as $low
+$all - $mid - $high as $low
+
 alert $low for{
     title_zh: '检测到命令执行，但是经过函数过滤',
     type:   'info',

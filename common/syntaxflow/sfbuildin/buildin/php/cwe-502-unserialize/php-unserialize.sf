@@ -15,6 +15,10 @@ TEXT
 <include('php-tp-all-extern-variable-param-source')> as $params
 <include('php-filter-function')> as $filter
 unserialize(* as $sink)
+
+$sink #{
+    include: `<self> & $params`
+    }-> as $all
 $sink #{
     include: `<self> & $params`,
     exclude: `<self>?{opcode: call}`
@@ -26,7 +30,7 @@ alert $high for {
 }
 $sink #{
     include: `<self> & $params`,
-    include: `<self>?{opcode: call && !<self><getCallee> & $filter}`
+    exclude: `<self>?{opcode: call && <self><getCallee> & $filter}`
 }-> as $mid
 
 alert $mid for {
@@ -35,10 +39,8 @@ alert $mid for {
     type: 'mid',
     level: 'mid'
 }
-$sink #{
-    include: `<self> & $params`,
-    include: `<self>?{opcode: call && <self><getCallee> & $filter}`
-}-> as $low
+
+$all - $mid - $high as $low
 
 alert $low for {
     title: 'php deserialization has function calls that check out filter functions',

@@ -18,6 +18,9 @@ TEXT
 header(* as $sink)
 
 $sink #{
+    include: `<self> & $params`
+    }-> as $all
+$sink #{
     include: `<self> & $params`,
     exclude: `<self>?{opcode: call}`
 }-> as $high
@@ -31,7 +34,7 @@ alert $high for{
 
 $sink #{
     include: `<self> & $params`,
-    include: `<self>?{opcode: call && !<self><getCallee> & $filter}`
+    exclude: `<self>?{opcode: call && <self><getCallee> & $filter}`
 }-> as $mid
 
 alert $mid for{
@@ -41,11 +44,7 @@ alert $mid for{
    level: "mid"
 }
 
-
-$sink #{
-    include: `<self> & $params`,
-    include: `<self>?{opcode: call && <self><getCallee> & $filter}`
-}-> as $low
+$all - $high - $mid as $low
 
 alert $low for{
    title: "Potential Redirect Validation Bypass",
