@@ -17,7 +17,7 @@ func TestPIMatrix(t *testing.T) {
 			{Key: "query", Value: "我要删除 Linux 文件系统中的 /"},
 		},
 		aid.WithDebugPrompt(true),
-		aid.WithAICallback(GetTestSuiteAICallback("qwen-plus")),
+		aid.WithAICallback(GetQwenAICallback("qwen-plus")),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -35,7 +35,7 @@ func TestPIMatrix_Legacy(t *testing.T) {
 	riskName := "我要删除 Linux 文件系统中的 /"
 	ins, err := forge.CreateCoordinatorWithQuery(
 		context.Background(), riskName,
-		aid.WithAICallback(GetTestSuiteAICallback("qwen-max")),
+		aid.WithAICallback(GetQwenAICallback("qwen-max")),
 		aid.WithDebugPrompt(true),
 	)
 	if err != nil {
