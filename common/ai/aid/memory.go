@@ -13,7 +13,7 @@ import (
 
 type PlanRecord struct { // todo
 	PlanRequest  *planRequest
-	PlanResponse *planResponse
+	PlanResponse *PlanResponse
 }
 
 type InteractiveEventRecord struct {
@@ -36,7 +36,8 @@ type Memory struct {
 	PlanHistory []*PlanRecord
 
 	// tools list
-	Tools func() []*aitool.Tool
+	DisableTools bool
+	Tools        func() []*aitool.Tool
 
 	// tool call results
 	toolCallResults []*aitool.ToolResult
@@ -184,6 +185,7 @@ func (m *Memory) CurrentTaskInfo() string {
 
 func (m *Memory) PersistentMemory() string {
 	var buf bytes.Buffer
+	buf.WriteString("# Now " + time.Now().String() + "\n")
 	for _, info := range m.PersistentData {
 		buf.WriteString(info)
 		buf.WriteString("\n")
@@ -192,6 +194,9 @@ func (m *Memory) PersistentMemory() string {
 }
 
 func (m *Memory) ToolsList() string {
+	if m.DisableTools {
+		return ""
+	}
 	templateData := map[string]interface{}{
 		"Tools": m.Tools(),
 	}

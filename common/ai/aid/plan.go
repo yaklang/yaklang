@@ -10,23 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// 常用元数据键名常量
-const (
-	MetaInfoKey       = "MetaInfo"       // 基本元信息
-	CurrentTimeKey    = "CurrentTime"    // 当前时间
-	FrameworkKey      = "Framework"      // 框架信息
-	LanguageKey       = "Language"       // 编程语言
-	EnvironmentKey    = "Environment"    // 环境信息
-	TargetPlatformKey = "TargetPlatform" // 目标平台
-	APIVersionKey     = "APIVersion"     // API版本
-	DbTypeKey         = "DbType"         // 数据库类型
-	SecurityLevelKey  = "SecurityLevel"  // 安全级别要求
-	PerformanceKey    = "Performance"    // 性能要求
-	DeadlineKey       = "Deadline"       // 截止日期
-	BudgetKey         = "Budget"         // 预算
-	UserLevelKey      = "UserLevel"      // 用户技术水平
-)
-
 type planRequest struct {
 	config   *Config
 	rawInput string
@@ -46,7 +29,7 @@ func (pr *planRequest) callAI(request *AIRequest) (*AIResponse, error) {
 	return nil, utils.Error("no any ai callback is set, cannot found ai config")
 }
 
-type planResponse struct {
+type PlanResponse struct {
 	RootTask *aiTask `json:"root_task"`
 }
 
@@ -71,17 +54,24 @@ func (pr *planRequest) GenerateFirstPlanPrompt() (string, error) {
 	return buf.String(), nil
 }
 
-func (pr *Config) newPlanResponse(rootTask *aiTask) *planResponse {
+func (pr *Config) newPlanResponse(rootTask *aiTask) *PlanResponse {
 	pr.SetSyncCallback(SYNC_TYPE_PLAN, func() any {
 		return rootTask
 	})
-	return &planResponse{
+	return &PlanResponse{
 		RootTask: rootTask,
 	}
 }
 
 // Invoke 执行规划请求，调用AI生成任务列表并返回解析后的Task
-func (pr *planRequest) Invoke() (*planResponse, error) {
+func (pr *planRequest) Invoke() (*PlanResponse, error) {
+	if pr.config.planMocker != nil {
+		planRes := pr.config.planMocker(pr.config)
+		if utils.IsNil(planRes) {
+			return nil, utils.Error("planMocker returns nil, unknown error")
+		}
+		return planRes, nil
+	}
 	// 生成 Prompt
 	prompt, err := pr.GenerateFirstPlanPrompt()
 	if err != nil {
@@ -102,7 +92,7 @@ func (pr *planRequest) Invoke() (*planResponse, error) {
 	response := string(responseBytes)
 
 	// 从响应中提取任务
-	task, err := pr.extractTaskFromRawResponse(response)
+	task, err := ExtractTaskFromRawResponse(pr.config, response)
 	if err != nil {
 		return nil, fmt.Errorf("从 AI 响应中提取任务失败: %v", err)
 	}

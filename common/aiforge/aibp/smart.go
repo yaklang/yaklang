@@ -22,6 +22,9 @@ var smartInitPrompt string
 //go:embed smart_prompts/result.txt
 var smartResultPrompt string
 
+//go:embed smart_prompts/plan.txt
+var smartPlanMock string
+
 type SmartSuggestion struct {
 	Prompt      string `json:"prompt"`
 	Description string `json:"description"`
@@ -35,6 +38,14 @@ type SmartResult struct {
 func newSmartForge(callback func(result *SmartResult), opts ...aid.Option) *aiforge.ForgeBlueprint {
 	forge := aiforge.NewForgeBlueprint(
 		"smart",
+		aiforge.WithPlanMocker(func(config *aid.Config) *aid.PlanResponse {
+			plan, err := aid.ExtractPlan(config, smartPlanMock)
+			if err != nil {
+				config.EmitError("mock SMART Plan failed: %v", err)
+				return nil
+			}
+			return plan
+		}),
 		aiforge.WithInitializePrompt(smartInitPrompt),
 		aiforge.WithPersistentPrompt(smartPersistentPrompts),
 		aiforge.WithResultPrompt(smartResultPrompt),
@@ -62,6 +73,7 @@ func newSmartForge(callback func(result *SmartResult), opts ...aid.Option) *aifo
 		aiforge.WithAIDOptions(append(
 			opts,
 			aid.WithYOLO(true),
+			aid.WithDisableToolUse(true),
 		)...),
 	)
 	return forge

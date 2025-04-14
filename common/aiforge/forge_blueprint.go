@@ -25,6 +25,9 @@ var forgeTemplate string
 type ForgeBlueprint struct {
 	Name string
 
+	// Plan
+	PlanMocker func(config *aid.Config) *aid.PlanResponse
+
 	// InitializePrompt 是AI助手初始化时使用的提示词，用于设置AI的基本行为和知识
 	InitializePrompt string
 
@@ -48,6 +51,7 @@ type ForgeBlueprint struct {
 
 func NewForgeBlueprint(name string, opts ...Option) *ForgeBlueprint {
 	forge := &ForgeBlueprint{
+		Name: name,
 		ParameterRuleYaklangCode: `
 cli.String("query", cli.setHelp("用户自由输入"), cli.setRequired(true))
 cli.check()`,
@@ -65,6 +69,13 @@ type Option func(*ForgeBlueprint)
 func WithAIDOptions(options ...aid.Option) Option {
 	return func(f *ForgeBlueprint) {
 		f.AIDOptions = append(f.AIDOptions, options...)
+	}
+}
+
+// WithPlanMocker 设置AI助手的计划生成器
+func WithPlanMocker(plan func(config *aid.Config) *aid.PlanResponse) Option {
+	return func(f *ForgeBlueprint) {
+		f.PlanMocker = plan
 	}
 }
 
@@ -150,6 +161,10 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
 	_ = persistentPrompt
 	if persistentPrompt != "" {
 		opts = append(opts, aid.WithAppendPersistentMemory(persistentPrompt))
+	}
+
+	if f.PlanMocker != nil {
+		opts = append(opts, aid.WithPlanMocker(f.PlanMocker))
 	}
 
 	opts = append(opts, f.AIDOptions...)

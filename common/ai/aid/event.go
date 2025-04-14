@@ -168,7 +168,7 @@ func (r *Config) EmitRequireReviewForTask(task *aiTask, id string) {
 	r.emitInteractiveJson(id, EVENT_TYPE_TASK_REVIEW_REQUIRE, "review-require", reqs)
 }
 
-func (r *Config) EmitRequireReviewForPlan(rsp *planResponse, id string) {
+func (r *Config) EmitRequireReviewForPlan(rsp *PlanResponse, id string) {
 	reqs := map[string]any{
 		"id":        id,
 		"selectors": PlanReviewSuggestions,

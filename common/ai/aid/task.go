@@ -101,8 +101,16 @@ func (t *aiTask) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// extractTaskFromRawResponse 从原始响应中提取Task
-func (pr *planRequest) extractTaskFromRawResponse(rawResponse string) (*aiTask, error) {
+func ExtractPlan(c *Config, rawResponse string) (*PlanResponse, error) {
+	at, err := ExtractTaskFromRawResponse(c, rawResponse)
+	if err != nil {
+		return nil, err
+	}
+	return &PlanResponse{RootTask: at}, nil
+}
+
+// ExtractTaskFromRawResponse 从原始响应中提取Task
+func ExtractTaskFromRawResponse(c *Config, rawResponse string) (*aiTask, error) {
 	for _, item := range jsonextractor.ExtractObjectIndexes(rawResponse) {
 		start, end := item[0], item[1]
 		taskJSON := rawResponse[start:end]
@@ -123,7 +131,7 @@ func (pr *planRequest) extractTaskFromRawResponse(rawResponse string) (*aiTask, 
 		if err == nil && planObj.Action == "plan" && len(planObj.Tasks) > 0 {
 			// 创建主任务
 			mainTask := &aiTask{
-				config:   pr.config,
+				config:   c,
 				Name:     planObj.MainTask,
 				Goal:     planObj.MainTaskGoal,
 				Subtasks: make([]*aiTask, 0),
@@ -141,7 +149,7 @@ func (pr *planRequest) extractTaskFromRawResponse(rawResponse string) (*aiTask, 
 				if len(planObj.Tasks) > 1 {
 					for _, subtask := range planObj.Tasks[1:] {
 						mainTask.Subtasks = append(mainTask.Subtasks, &aiTask{
-							config:     pr.config,
+							config:     c,
 							Name:       subtask.SubtaskName,
 							Goal:       subtask.SubtaskGoal,
 							ParentTask: mainTask,
@@ -152,7 +160,7 @@ func (pr *planRequest) extractTaskFromRawResponse(rawResponse string) (*aiTask, 
 				// 主任务名称存在，将所有任务作为子任务
 				for _, subtask := range planObj.Tasks {
 					mainTask.Subtasks = append(mainTask.Subtasks, &aiTask{
-						config:     pr.config,
+						config:     c,
 						Name:       subtask.SubtaskName,
 						Goal:       subtask.SubtaskGoal,
 						ParentTask: mainTask,
@@ -177,7 +185,7 @@ func (pr *planRequest) extractTaskFromRawResponse(rawResponse string) (*aiTask, 
 			if name, ok := taskMap["name"].(string); ok && name != "" {
 				taskIns := &aiTask{
 					Name:   name,
-					config: pr.config,
+					config: c,
 				}
 
 				if goal, ok := taskMap["goal"].(string); ok {
