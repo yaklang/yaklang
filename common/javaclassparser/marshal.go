@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 
 	"github.com/go-viper/mapstructure/v2"
+	"github.com/yaklang/yaklang/common/javaclassparser/attribute_info"
+	"github.com/yaklang/yaklang/common/javaclassparser/constant_pool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -53,85 +55,25 @@ func _MarshalJavaClass(cp *ClassObject, charLength int) []byte {
 	writer.Write2Byte(cp.MinorVersion)
 	writer.Write2Byte(cp.MajorVersion)
 	constantPoolLen := len(cp.ConstantPool)
-	writer.Write2Byte(constantPoolLen + 1)
+	writer.Write2Byte(uint16(constantPoolLen + 1))
 
 	//写常量池
 	for i := 0; i < constantPoolLen; i++ {
-		switch cp.ConstantPool[i].(type) {
-		case *ConstantIntegerInfo:
-			writer.Write1Byte(CONSTANT_Integer)
-			writer.Write4Byte(cp.ConstantPool[i].(*ConstantIntegerInfo).Value)
-		case *ConstantFloatInfo:
-			writer.Write1Byte(CONSTANT_Float)
-			writer.Write4Byte(cp.ConstantPool[i].(*ConstantFloatInfo).Value)
-		case *ConstantLongInfo:
-			writer.Write1Byte(CONSTANT_Long)
-			writer.Write8Byte(cp.ConstantPool[i].(*ConstantLongInfo).Value)
-		case *ConstantDoubleInfo:
-			writer.Write1Byte(CONSTANT_Double)
-			writer.Write8Byte(cp.ConstantPool[i].(*ConstantDoubleInfo).Value)
-		case *ConstantUtf8Info:
-			writer.Write1Byte(CONSTANT_Utf8)
-			str := cp.ConstantPool[i].(*ConstantUtf8Info).Value
-			writer.WriteString(str)
-
-		case *ConstantStringInfo:
-			writer.Write1Byte(CONSTANT_String)
-			writer.Write2Byte(cp.ConstantPool[i].(*ConstantStringInfo).StringIndex)
-		case *ConstantClassInfo:
-			writer.Write1Byte(CONSTANT_Class)
-			writer.Write2Byte(cp.ConstantPool[i].(*ConstantClassInfo).NameIndex)
-		case *ConstantFieldrefInfo:
-			writer.Write1Byte(CONSTANT_Fieldref)
-			writer.Write2Byte(cp.ConstantPool[i].(*ConstantFieldrefInfo).ClassIndex)
-			writer.Write2Byte(cp.ConstantPool[i].(*ConstantFieldrefInfo).NameAndTypeIndex)
-		case *ConstantMethodrefInfo:
-			writer.Write1Byte(CONSTANT_Methodref)
-			writer.Write2Byte(cp.ConstantPool[i].(*ConstantMethodrefInfo).ClassIndex)
-			writer.Write2Byte(cp.ConstantPool[i].(*ConstantMethodrefInfo).NameAndTypeIndex)
-		case *ConstantInterfaceMethodrefInfo:
-			writer.Write1Byte(CONSTANT_InterfaceMethodref)
-			writer.Write2Byte(cp.ConstantPool[i].(*ConstantInterfaceMethodrefInfo).ClassIndex)
-			writer.Write2Byte(cp.ConstantPool[i].(*ConstantInterfaceMethodrefInfo).NameAndTypeIndex)
-		case *ConstantNameAndTypeInfo:
-			writer.Write1Byte(CONSTANT_NameAndType)
-			writer.Write2Byte(cp.ConstantPool[i].(*ConstantNameAndTypeInfo).NameIndex)
-			writer.Write2Byte(cp.ConstantPool[i].(*ConstantNameAndTypeInfo).DescriptorIndex)
-		case *ConstantMethodTypeInfo:
-			writer.Write1Byte(CONSTANT_MethodType)
-			writer.Write2Byte(cp.ConstantPool[i].(*ConstantMethodTypeInfo).DescriptorIndex)
-		case *ConstantMethodHandleInfo:
-			writer.Write1Byte(CONSTANT_MethodHandle)
-			writer.Write1Byte(cp.ConstantPool[i].(*ConstantMethodHandleInfo).ReferenceKind)
-			writer.Write2Byte(cp.ConstantPool[i].(*ConstantMethodHandleInfo).ReferenceIndex)
-		case *ConstantInvokeDynamicInfo:
-			writer.Write1Byte(CONSTANT_InvokeDynamic)
-			writer.Write2Byte(cp.ConstantPool[i].(*ConstantInvokeDynamicInfo).BootstrapMethodAttrIndex)
-			writer.Write2Byte(cp.ConstantPool[i].(*ConstantInvokeDynamicInfo).NameAndTypeIndex)
-		case *ConstantModuleInfo:
-			writer.Write1Byte(CONSTANT_Module)
-			writer.Write2Byte(cp.ConstantPool[i].(*ConstantModuleInfo).NameIndex)
-		case *ConstantPackageInfo:
-			writer.Write1Byte(CONSTANT_Package)
-			writer.Write2Byte(cp.ConstantPool[i].(*ConstantPackageInfo).NameIndex)
-		case nil:
-			continue
-		default:
-			panic("java.lang.ClassFormatError: constant pool tag!")
-		}
+		constantInfo := cp.ConstantPool[i]
+		constant_pool.WriteConstantInfo(writer, constantInfo)
 	}
 	writer.Write2Byte(cp.AccessFlags)
 	writer.Write2Byte(cp.ThisClass)
 	writer.Write2Byte(cp.SuperClass)
 	interfaceObjLen := len(cp.Interfaces)
-	writer.Write2Byte(interfaceObjLen)
+	writer.Write2Byte(uint16(interfaceObjLen))
 	for i := 0; i < interfaceObjLen; i++ {
 		writer.Write2Byte(cp.Interfaces[i])
 	}
 
 	//写字段
 	fieldsLen := len(cp.Fields)
-	writer.Write2Byte(fieldsLen)
+	writer.Write2Byte(uint16(fieldsLen))
 	for i := 0; i < fieldsLen; i++ {
 		writer.Write2Byte(cp.Fields[i].AccessFlags)
 		writer.Write2Byte(cp.Fields[i].NameIndex)
@@ -141,7 +83,7 @@ func _MarshalJavaClass(cp *ClassObject, charLength int) []byte {
 	}
 	//写方法
 	methodsLen := len(cp.Methods)
-	writer.Write2Byte(methodsLen)
+	writer.Write2Byte(uint16(methodsLen))
 	for i := 0; i < methodsLen; i++ {
 		writer.Write2Byte(cp.Methods[i].AccessFlags)
 		writer.Write2Byte(cp.Methods[i].NameIndex)
@@ -154,77 +96,12 @@ func _MarshalJavaClass(cp *ClassObject, charLength int) []byte {
 	return writer.Bytes()
 }
 
-func writeAttributes(writer *JavaBufferWriter, info []AttributeInfo, classObj *ClassObject) {
+func writeAttributes(writer *JavaBufferWriter, info []attribute_info.AttributeInfo, classObj *ClassObject) {
 	attributesLen := len(info)
-	writer.Write2Byte(attributesLen)
+	writer.Write2Byte(uint16(attributesLen))
 	for j := 0; j < attributesLen; j++ {
-		switch info[j].(type) {
-		case *CodeAttribute:
-			codeAttr := info[j].(*CodeAttribute)
-			n := classObj.findUtf8IndexFromPool("Code") + 1
-			writer.Write2Byte(n)
-			writer.Write4Byte(codeAttr.AttrLen)
-			writer.Write2Byte(codeAttr.MaxStack)
-			writer.Write2Byte(codeAttr.MaxLocals)
-			codel := len(codeAttr.Code)
-			writer.Write4Byte(codel)
-			writer.Write(codeAttr.Code)
-
-			exceptionTable := codeAttr.ExceptionTable
-			writer.Write2Byte(len(exceptionTable))
-			for exceptionTableIndex := 0; exceptionTableIndex < len(exceptionTable); exceptionTableIndex++ {
-				writer.Write2Byte(exceptionTable[exceptionTableIndex].StartPc)
-				writer.Write2Byte(exceptionTable[exceptionTableIndex].EndPc)
-				writer.Write2Byte(exceptionTable[exceptionTableIndex].HandlerPc)
-				writer.Write2Byte(exceptionTable[exceptionTableIndex].CatchType)
-			}
-			writeAttributes(writer, codeAttr.Attributes, classObj)
-		case *ConstantValueAttribute:
-			n := classObj.findUtf8IndexFromPool("ConstantValue") + 1
-			writer.Write2Byte(n)
-			writer.Write4Byte(info[j].(*ConstantValueAttribute).AttrLen)
-			writer.Write2Byte(info[j].(*ConstantValueAttribute).ConstantValueIndex)
-		case *DeprecatedAttribute:
-			n := classObj.findUtf8IndexFromPool("Deprecated") + 1
-			writer.Write2Byte(n)
-			writer.Write4Byte(info[j].(*DeprecatedAttribute).AttrLen)
-		case *ExceptionsAttribute:
-			n := classObj.findUtf8IndexFromPool("Exceptions") + 1
-			writer.Write2Byte(n)
-			writer.Write4Byte(info[j].(*ExceptionsAttribute).AttrLen)
-			exceptionIndexTable := info[j].(*ExceptionsAttribute).ExceptionIndexTable
-			l := len(exceptionIndexTable)
-			writer.Write2Byte(l)
-			for t := 0; t < l; t++ {
-				writer.Write2Byte(exceptionIndexTable[t])
-			}
-		case *LineNumberTableAttribute:
-			n := classObj.findUtf8IndexFromPool("LineNumberTable") + 1
-			writer.Write2Byte(n)
-			writer.Write4Byte(info[j].(*LineNumberTableAttribute).AttrLen)
-			l := len(info[j].(*LineNumberTableAttribute).LineNumberTable)
-			writer.Write2Byte(l)
-			for t := 0; t < l; t++ {
-				writer.Write2Byte(info[j].(*LineNumberTableAttribute).LineNumberTable[t].StartPc)
-				writer.Write2Byte(info[j].(*LineNumberTableAttribute).LineNumberTable[t].LineNumber)
-			}
-		case *SourceFileAttribute:
-			n := classObj.findUtf8IndexFromPool("SourceFile") + 1
-			writer.Write2Byte(n)
-			writer.Write4Byte(info[j].(*SourceFileAttribute).AttrLen)
-			writer.Write2Byte(info[j].(*SourceFileAttribute).SourceFileIndex)
-		case *SyntheticAttribute:
-			n := classObj.findUtf8IndexFromPool("Synthetic") + 1
-			writer.Write2Byte(n)
-			writer.Write4Byte(info[j].(*SyntheticAttribute).AttrLen)
-		case *UnparsedAttribute:
-			n := classObj.findUtf8IndexFromPool(info[j].(*UnparsedAttribute).Name) + 1
-			writer.Write2Byte(n)
-			writer.Write4Byte(info[j].(*UnparsedAttribute).Length)
-			writer.Write(info[j].(*UnparsedAttribute).Info)
-		}
+		attribute_info.WriteAttributeInfo(writer, info[j], classObj.ConstantPoolManager)
 	}
-
 }
 
 func _MarshalToJson(classObj *ClassObject) (string, error) {
@@ -261,7 +138,7 @@ func AddVerboseAndType(classObj *ClassObject, obj interface{}) {
 		AddVerboseAndType(classObj, classObj.Fields)
 		AddVerboseAndType(classObj, classObj.Methods)
 		AddVerboseAndType(classObj, classObj.Attributes)
-	case []ConstantInfo:
+	case []constant_pool.ConstantInfo:
 		for _, r := range ret {
 			AddVerboseAndType(classObj, r)
 		}
@@ -276,76 +153,76 @@ func AddVerboseAndType(classObj *ClassObject, obj interface{}) {
 		ret.DescriptorIndexVerbose, _ = classObj.getUtf8(ret.DescriptorIndex)
 		//ret.AccessFlagsVerbose, _ = classObj.getUtf8(ret.AccessFlags)
 		AddVerboseAndType(classObj, ret.Attributes)
-	case []AttributeInfo:
+	case []attribute_info.AttributeInfo:
 		for _, r := range ret {
 			AddVerboseAndType(classObj, r)
 		}
-	case *CodeAttribute:
-		ret.Type = CodeAttributeType
+	case *attribute_info.CodeAttribute:
+		ret.SetType(CodeAttributeType)
 		AddVerboseAndType(classObj, ret.Attributes)
-	case *ConstantValueAttribute:
-		ret.Type = ConstantValueAttributeType
+	case *attribute_info.ConstantValueAttribute:
+		ret.SetType(ConstantValueAttributeType)
 		ret.ConstantValueIndexVerbose, _ = classObj.getUtf8(ret.ConstantValueIndex)
-	case *DeprecatedAttribute:
-		ret.Type = DeprecatedAttributeType
-	case *ExceptionsAttribute:
-		ret.Type = ExceptionsAttributeType
-	case *LineNumberTableAttribute:
-		ret.Type = LineNumberTableAttributeType
-	case *SourceFileAttribute:
-		ret.Type = SourceFileAttributeType
+	case *attribute_info.DeprecatedAttribute:
+		ret.SetType(DeprecatedAttributeType)
+	case *attribute_info.ExceptionsAttribute:
+		ret.SetType(ExceptionsAttributeType)
+	case *attribute_info.LineNumberTableAttribute:
+		ret.SetType(LineNumberTableAttributeType)
+	case *attribute_info.SourceFileAttribute:
+		ret.SetType(SourceFileAttributeType)
 		ret.SourceFileIndexVerbose, _ = classObj.getUtf8(ret.SourceFileIndex)
-	case *SyntheticAttribute:
-		ret.Type = SyntheticAttributeType
-	case *UnparsedAttribute:
-		ret.Type = UnparsedAttributeType
-	case *ConstantIntegerInfo:
-		ret.Type = ConstantInteger
-	case *ConstantFloatInfo:
-		ret.Type = ConstantFloat
-	case *ConstantLongInfo:
-		ret.Type = ConstantLong
-	case *ConstantDoubleInfo:
-		ret.Type = ConstantDouble
-	case *ConstantUtf8Info:
-		ret.Type = ConstantUtf8
-	case *ConstantStringInfo:
-		ret.Type = ConstantString
+	case *attribute_info.SyntheticAttribute:
+		ret.SetType(SyntheticAttributeType)
+	case *attribute_info.UnparsedAttribute:
+		ret.SetType(UnparsedAttributeType)
+	case *constant_pool.ConstantIntegerInfo:
+		ret.SetType(ConstantInteger)
+	case *constant_pool.ConstantFloatInfo:
+		ret.SetType(ConstantFloat)
+	case *constant_pool.ConstantLongInfo:
+		ret.SetType(ConstantLong)
+	case *constant_pool.ConstantDoubleInfo:
+		ret.SetType(ConstantDouble)
+	case *constant_pool.ConstantUtf8Info:
+		ret.SetType(ConstantUtf8)
+	case *constant_pool.ConstantStringInfo:
+		ret.SetType(ConstantString)
 		ret.StringIndexVerbose, _ = classObj.getUtf8(ret.StringIndex)
-	case *ConstantClassInfo:
-		ret.Type = ConstantClass
+	case *constant_pool.ConstantClassInfo:
+		ret.SetType(ConstantClass)
 		ret.NameIndexVerbose, _ = classObj.getUtf8(ret.NameIndex)
-	case *ConstantFieldrefInfo:
-		ret.Type = ConstantFieldref
+	case *constant_pool.ConstantFieldrefInfo:
+		ret.SetType(ConstantFieldref)
 		ret.NameAndTypeIndexVerbose, _ = classObj.getUtf8(ret.NameAndTypeIndex)
 		ret.ClassIndexVerbose, _ = classObj.getUtf8(ret.ClassIndex)
-	case *ConstantMethodrefInfo:
-		ret.Type = ConstantMethodref
+	case *constant_pool.ConstantMethodrefInfo:
+		ret.SetType(ConstantMethodref)
 		ret.NameAndTypeIndexVerbose, _ = classObj.getUtf8(ret.NameAndTypeIndex)
 		ret.ClassIndexVerbose, _ = classObj.getUtf8(ret.ClassIndex)
-	case *ConstantInterfaceMethodrefInfo:
-		ret.Type = ConstantInterfaceMethodref
+	case *constant_pool.ConstantInterfaceMethodrefInfo:
+		ret.SetType(ConstantInterfaceMethodref)
 		ret.NameAndTypeIndexVerbose, _ = classObj.getUtf8(ret.NameAndTypeIndex)
 		ret.ClassIndexVerbose, _ = classObj.getUtf8(ret.ClassIndex)
-	case *ConstantNameAndTypeInfo:
-		ret.Type = ConstantNameAndType
+	case *constant_pool.ConstantNameAndTypeInfo:
+		ret.SetType(ConstantNameAndType)
 		ret.DescriptorIndexVerbose, _ = classObj.getUtf8(ret.DescriptorIndex)
 		ret.NameIndexVerbose, _ = classObj.getUtf8(ret.NameIndex)
-	case *ConstantMethodTypeInfo:
-		ret.Type = ConstantMethodref
+	case *constant_pool.ConstantMethodTypeInfo:
+		ret.SetType(ConstantMethodType)
 		ret.DescriptorIndexVerbose, _ = classObj.getUtf8(ret.DescriptorIndex)
-	case *ConstantMethodHandleInfo:
-		ret.Type = ConstantMethodHandle
+	case *constant_pool.ConstantMethodHandleInfo:
+		ret.SetType(ConstantMethodHandle)
 		ret.ReferenceIndexVerbose, _ = classObj.getUtf8(ret.ReferenceIndex)
-	case *ConstantInvokeDynamicInfo:
-		ret.Type = ConstantInvokeDynamic
+	case *constant_pool.ConstantInvokeDynamicInfo:
+		ret.SetType(ConstantInvokeDynamic)
 		ret.BootstrapMethodAttrIndexVerbose, _ = classObj.getUtf8(ret.BootstrapMethodAttrIndex)
 		ret.NameAndTypeIndexVerbose, _ = classObj.getUtf8(ret.NameAndTypeIndex)
-	case *ConstantModuleInfo:
-		ret.Type = ConstantModule
+	case *constant_pool.ConstantModuleInfo:
+		ret.SetType(ConstantModule)
 		ret.NameIndexVerbose, _ = classObj.getUtf8(ret.NameIndex)
-	case *ConstantPackageInfo:
-		ret.Type = ConstantPackage
+	case *constant_pool.ConstantPackageInfo:
+		ret.SetType(ConstantPackage)
 		ret.NameIndexVerbose, _ = classObj.getUtf8(ret.NameIndex)
 	}
 }
@@ -371,9 +248,9 @@ func mapToClassObject(objData map[string]interface{}) (_ *ClassObject, err error
 		}
 	}()
 	classObj := NewClassObject()
-	ConstantPool := []ConstantInfo{}
+	ConstantPool := []constant_pool.ConstantInfo{}
 	memberInfo := []*MemberInfo{}
-	Attributes := []AttributeInfo{}
+	Attributes := []attribute_info.AttributeInfo{}
 	var Fields, Methods []*MemberInfo
 	var parseType func(objData map[string]interface{}) error
 	parseType = func(objData map[string]interface{}) error {
@@ -416,9 +293,9 @@ func mapToClassObject(objData map[string]interface{}) (_ *ClassObject, err error
 			classObj.Methods = Methods
 			classObj.Fields = Fields
 		case CodeAttributeType:
-			d := &CodeAttribute{}
+			d := &attribute_info.CodeAttribute{}
 			Attributes_bak := Attributes
-			Attributes = []AttributeInfo{}
+			Attributes = []attribute_info.AttributeInfo{}
 			for _, AttributesData := range objData["Attributes"].([]interface{}) {
 				err = parseType(AttributesData.(map[string]interface{}))
 				if err != nil {
@@ -440,50 +317,50 @@ func mapToClassObject(objData map[string]interface{}) (_ *ClassObject, err error
 			d.Attributes = Attributes
 			Attributes = Attributes_bak
 			Attributes = append(Attributes, d)
-		case ConstantValueAttributeType:
-			d := &ConstantValueAttribute{}
-			ConstantPool = append(ConstantPool, d)
-			err := mapstructure.Decode(objData, d)
-			if err != nil {
-				return err
-			}
+		// case ConstantValueAttributeType:
+		// 	d := &attribute_info.ConstantValueAttribute{}
+		// 	ConstantPool = append(ConstantPool, d)
+		// 	err := mapstructure.Decode(objData, d)
+		// 	if err != nil {
+		// 		return err
+		// 	}
 		case DeprecatedAttributeType:
-			d := &DeprecatedAttribute{}
+			d := &attribute_info.DeprecatedAttribute{}
 			Attributes = append(Attributes, d)
 			err := mapstructure.Decode(objData, d)
 			if err != nil {
 				return err
 			}
 		case ExceptionsAttributeType:
-			d := &ExceptionsAttribute{}
+			d := &attribute_info.ExceptionsAttribute{}
 			Attributes = append(Attributes, d)
 			err := mapstructure.Decode(objData, d)
 			if err != nil {
 				return err
 			}
 		case LineNumberTableAttributeType:
-			d := &LineNumberTableAttribute{}
+			d := &attribute_info.LineNumberTableAttribute{}
 			Attributes = append(Attributes, d)
 			err := mapstructure.Decode(objData, d)
 			if err != nil {
 				return err
 			}
 		case SourceFileAttributeType:
-			d := &SourceFileAttribute{}
+			d := &attribute_info.SourceFileAttribute{}
 			Attributes = append(Attributes, d)
 			err := mapstructure.Decode(objData, d)
 			if err != nil {
 				return err
 			}
 		case SyntheticAttributeType:
-			d := &SyntheticAttribute{}
+			d := &attribute_info.SyntheticAttribute{}
 			Attributes = append(Attributes, d)
 			err := mapstructure.Decode(objData, d)
 			if err != nil {
 				return err
 			}
 		case UnparsedAttributeType:
-			d := &UnparsedAttribute{}
+			d := &attribute_info.UnparsedAttribute{}
 			Attributes = append(Attributes, d)
 			var Code []byte
 			Code, err = codec.DecodeBase64(objData["Info"].(string))
@@ -496,63 +373,63 @@ func mapToClassObject(objData map[string]interface{}) (_ *ClassObject, err error
 				return err
 			}
 		case ConstantInteger:
-			d := &ConstantIntegerInfo{}
+			d := &constant_pool.ConstantIntegerInfo{}
 			ConstantPool = append(ConstantPool, d)
 			err := mapstructure.Decode(objData, d)
 			if err != nil {
 				return err
 			}
 		case ConstantFloat:
-			d := &ConstantFloatInfo{}
+			d := &constant_pool.ConstantFloatInfo{}
 			ConstantPool = append(ConstantPool, d)
 			err := mapstructure.Decode(objData, d)
 			if err != nil {
 				return err
 			}
 		case ConstantLong:
-			d := &ConstantLongInfo{}
+			d := &constant_pool.ConstantLongInfo{}
 			ConstantPool = append(ConstantPool, d)
 			err := mapstructure.Decode(objData, d)
 			if err != nil {
 				return err
 			}
 		case ConstantDouble:
-			d := &ConstantDoubleInfo{}
+			d := &constant_pool.ConstantDoubleInfo{}
 			ConstantPool = append(ConstantPool, d)
 			err := mapstructure.Decode(objData, d)
 			if err != nil {
 				return err
 			}
 		case ConstantUtf8:
-			d := &ConstantUtf8Info{}
+			d := &constant_pool.ConstantUtf8Info{}
 			ConstantPool = append(ConstantPool, d)
 			err := mapstructure.Decode(objData, d)
 			if err != nil {
 				return err
 			}
 		case ConstantString:
-			d := &ConstantStringInfo{}
+			d := &constant_pool.ConstantStringInfo{}
 			ConstantPool = append(ConstantPool, d)
 			err := mapstructure.Decode(objData, d)
 			if err != nil {
 				return err
 			}
 		case ConstantClass:
-			d := &ConstantClassInfo{}
+			d := &constant_pool.ConstantClassInfo{}
 			ConstantPool = append(ConstantPool, d)
 			err := mapstructure.Decode(objData, d)
 			if err != nil {
 				return err
 			}
 		case ConstantFieldref:
-			d := &ConstantFieldrefInfo{ConstantMemberrefInfo: ConstantMemberrefInfo{}, Type: ConstantFieldref}
+			d := &constant_pool.ConstantFieldrefInfo{ConstantMemberrefInfo: constant_pool.ConstantMemberrefInfo{}, Type: ConstantFieldref}
 			ConstantPool = append(ConstantPool, d)
 			err := mapstructure.Decode(objData, &d.ConstantMemberrefInfo)
 			if err != nil {
 				return err
 			}
 		case ConstantMethodref:
-			d := &ConstantMethodrefInfo{ConstantMemberrefInfo: ConstantMemberrefInfo{}, Type: ConstantMethodref}
+			d := &constant_pool.ConstantMethodrefInfo{ConstantMemberrefInfo: constant_pool.ConstantMemberrefInfo{}, Type: ConstantMethodref}
 
 			ConstantPool = append(ConstantPool, d)
 			err := mapstructure.Decode(objData, &d.ConstantMemberrefInfo)
@@ -560,35 +437,35 @@ func mapToClassObject(objData map[string]interface{}) (_ *ClassObject, err error
 				return err
 			}
 		case ConstantInterfaceMethodref:
-			d := &ConstantInterfaceMethodrefInfo{ConstantMemberrefInfo: ConstantMemberrefInfo{}, Type: ConstantInterfaceMethodref}
+			d := &constant_pool.ConstantInterfaceMethodrefInfo{ConstantMemberrefInfo: constant_pool.ConstantMemberrefInfo{}, Type: ConstantInterfaceMethodref}
 			ConstantPool = append(ConstantPool, d)
 			err := mapstructure.Decode(objData, &d.ConstantMemberrefInfo)
 			if err != nil {
 				return err
 			}
 		case ConstantNameAndType:
-			d := &ConstantNameAndTypeInfo{}
+			d := &constant_pool.ConstantNameAndTypeInfo{}
 			ConstantPool = append(ConstantPool, d)
 			err := mapstructure.Decode(objData, d)
 			if err != nil {
 				return err
 			}
 		case ConstantMethodType:
-			d := &ConstantMethodTypeInfo{}
+			d := &constant_pool.ConstantMethodTypeInfo{}
 			ConstantPool = append(ConstantPool, d)
 			err := mapstructure.Decode(objData, d)
 			if err != nil {
 				return err
 			}
 		case ConstantMethodHandle:
-			d := &ConstantMethodHandleInfo{}
+			d := &constant_pool.ConstantMethodHandleInfo{}
 			ConstantPool = append(ConstantPool, d)
 			err := mapstructure.Decode(objData, d)
 			if err != nil {
 				return err
 			}
 		case ConstantInvokeDynamic:
-			d := &ConstantInvokeDynamicInfo{}
+			d := &constant_pool.ConstantInvokeDynamicInfo{}
 			ConstantPool = append(ConstantPool, d)
 			err := mapstructure.Decode(objData, d)
 			if err != nil {
@@ -598,7 +475,7 @@ func mapToClassObject(objData map[string]interface{}) (_ *ClassObject, err error
 			d := &MemberInfo{}
 			memberInfo = append(memberInfo, d)
 			Attributes_bak := Attributes
-			Attributes = []AttributeInfo{}
+			Attributes = []attribute_info.AttributeInfo{}
 			for _, AttributesData := range objData["Attributes"].([]interface{}) {
 				err := parseType(AttributesData.(map[string]interface{}))
 				if err != nil {

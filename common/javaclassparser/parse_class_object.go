@@ -4,6 +4,8 @@ import (
 	"io/ioutil"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/javaclassparser/attribute_info"
+	"github.com/yaklang/yaklang/common/javaclassparser/constant_pool"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
@@ -14,8 +16,8 @@ type ClassObject struct {
 	Magic               uint32
 	MinorVersion        uint16
 	MajorVersion        uint16
-	ConstantPool        []ConstantInfo
-	ConstantPoolManager *ConstantPool
+	ConstantPool        []constant_pool.ConstantInfo
+	ConstantPoolManager *constant_pool.ConstantPool
 	AccessFlags         uint16
 	AccessFlagsVerbose  []string
 	AccessFlagsToCode   string
@@ -27,12 +29,12 @@ type ClassObject struct {
 	InterfacesVerbose   []string
 	Fields              []*MemberInfo
 	Methods             []*MemberInfo
-	Attributes          []AttributeInfo
+	Attributes          []attribute_info.AttributeInfo
 }
 
 func NewClassObject() *ClassObject {
 	ins := &ClassObject{}
-	ins.ConstantPoolManager = NewConstantPoolWithConstant(&ins.ConstantPool)
+	ins.ConstantPoolManager = constant_pool.NewConstantPoolWithConstant(&ins.ConstantPool)
 	return ins
 }
 
@@ -111,12 +113,12 @@ func (this *ClassObject) GetInterfacesName() []string {
 }
 
 // 查找
-func (this *ClassObject) FindConstStringFromPool(v string) *ConstantUtf8Info {
+func (this *ClassObject) FindConstStringFromPool(v string) *constant_pool.ConstantUtf8Info {
 	n := this.findUtf8IndexFromPool(v)
 	if n == -1 {
 		return nil
 	}
-	return this.ConstantPool[n].(*ConstantUtf8Info)
+	return this.ConstantPool[n].(*constant_pool.ConstantUtf8Info)
 }
 func (this *ClassObject) FindFields(v string) *MemberInfo {
 	//this.Fields
@@ -133,18 +135,17 @@ func (this *ClassObject) SetClassName(name string) error {
 		return err
 	}
 
-	classInfo, ok := constantInfo.(*ConstantClassInfo)
+	classInfo, ok := constantInfo.(*constant_pool.ConstantClassInfo)
 	if !ok {
 		return utils.Errorf("index %d is not ConstantClassInfo", this.ThisClass)
 	}
-	oldName, ok := this.ConstantPool[classInfo.NameIndex-1].(*ConstantUtf8Info)
+	oldName, ok := this.ConstantPool[classInfo.NameIndex-1].(*constant_pool.ConstantUtf8Info)
 	if !ok {
 		return utils.Errorf("index %d is not ConstantUtf8Info", this.ThisClass)
 	}
 	oldName.Value = name
 	return nil
 }
-
 
 // SetSourceFileName 设置文件名
 func (this *ClassObject) SetSourceFileName(name string) error {
@@ -154,11 +155,11 @@ func (this *ClassObject) SetSourceFileName(name string) error {
 	var index uint16
 	for _, v := range this.Attributes {
 		switch v.(type) {
-		case *SourceFileAttribute:
-			index = v.(*SourceFileAttribute).SourceFileIndex
+		case *attribute_info.SourceFileAttribute:
+			index = v.(*attribute_info.SourceFileAttribute).SourceFileIndex
 		}
 	}
-	oldSourceFileName, ok := this.ConstantPool[index-1].(*ConstantUtf8Info)
+	oldSourceFileName, ok := this.ConstantPool[index-1].(*constant_pool.ConstantUtf8Info)
 	if !ok {
 		return utils.Errorf("index %d is not ConstantUtf8Info", index)
 	}
@@ -174,7 +175,7 @@ func (this *ClassObject) SetMethodName(old, name string) error {
 		if err != nil {
 			return err
 		}
-		utf8Info, ok := constantInfo.(*ConstantUtf8Info)
+		utf8Info, ok := constantInfo.(*constant_pool.ConstantUtf8Info)
 		if !ok {
 			return utils.Errorf("index %d is not ConstantUtf8Info", v.NameIndex)
 		}
@@ -182,7 +183,7 @@ func (this *ClassObject) SetMethodName(old, name string) error {
 			index = v.NameIndex
 		}
 	}
-	oldMethodName, ok := this.ConstantPool[index-1].(*ConstantUtf8Info)
+	oldMethodName, ok := this.ConstantPool[index-1].(*constant_pool.ConstantUtf8Info)
 	if !ok {
 		return utils.Errorf("index %d is not ConstantUtf8Info", index)
 	}
@@ -192,7 +193,7 @@ func (this *ClassObject) SetMethodName(old, name string) error {
 
 func (this *ClassObject) findUtf8IndexFromPool(v string) int {
 	for i := 1; i < len(this.ConstantPool); i++ {
-		s, ok := this.ConstantPool[i].(*ConstantUtf8Info)
+		s, ok := this.ConstantPool[i].(*constant_pool.ConstantUtf8Info)
 		if ok {
 			if s.Value == v {
 				return i
@@ -207,36 +208,36 @@ func (this *ClassObject) getUtf8(index uint16) (string, error) {
 		return "", err
 	}
 	switch ret := utf8Info.(type) {
-	case *ConstantIntegerInfo:
-	case *ConstantFloatInfo:
-	case *ConstantLongInfo:
-	case *ConstantDoubleInfo:
-	case *ConstantUtf8Info:
+	case *constant_pool.ConstantIntegerInfo:
+	case *constant_pool.ConstantFloatInfo:
+	case *constant_pool.ConstantLongInfo:
+	case *constant_pool.ConstantDoubleInfo:
+	case *constant_pool.ConstantUtf8Info:
 		return ret.Value, nil
-	case *ConstantStringInfo:
+	case *constant_pool.ConstantStringInfo:
 		return this.getUtf8(ret.StringIndex)
-	case *ConstantClassInfo:
+	case *constant_pool.ConstantClassInfo:
 		return this.getUtf8(ret.NameIndex)
-	case *ConstantModuleInfo:
+	case *constant_pool.ConstantModuleInfo:
 		return this.getUtf8(ret.NameIndex)
-	case *ConstantPackageInfo:
+	case *constant_pool.ConstantPackageInfo:
 		return this.getUtf8(ret.NameIndex)
-	case *ConstantFieldrefInfo:
+	case *constant_pool.ConstantFieldrefInfo:
 		return this.getUtf8(ret.ClassIndex)
-	case *ConstantMethodrefInfo:
+	case *constant_pool.ConstantMethodrefInfo:
 		return this.getUtf8(ret.ClassIndex)
-	case *ConstantInterfaceMethodrefInfo:
+	case *constant_pool.ConstantInterfaceMethodrefInfo:
 		return this.getUtf8(ret.ClassIndex)
-	case *ConstantNameAndTypeInfo:
+	case *constant_pool.ConstantNameAndTypeInfo:
 		return this.getUtf8(ret.NameIndex)
-	case *ConstantMethodTypeInfo:
+	case *constant_pool.ConstantMethodTypeInfo:
 		return this.getUtf8(ret.DescriptorIndex)
-	case *ConstantMethodHandleInfo:
-	case *ConstantInvokeDynamicInfo:
+	case *constant_pool.ConstantMethodHandleInfo:
+	case *constant_pool.ConstantInvokeDynamicInfo:
 	}
 	return "", utils.Errorf("index %d is not utf8", index)
 }
-func (this *ClassObject) getConstantInfo(index uint16) (ConstantInfo, error) {
+func (this *ClassObject) getConstantInfo(index uint16) (constant_pool.ConstantInfo, error) {
 	index -= 1
 	if len(this.ConstantPool) <= int(index) {
 		return nil, utils.Error("Invalid constant pool index!")

@@ -2,7 +2,11 @@ package javaclassparser
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/javaclassparser/attribute_info"
+	"github.com/yaklang/yaklang/common/javaclassparser/constant_pool"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
@@ -11,16 +15,15 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"github.com/yaklang/yaklang/common/log"
-	"strings"
 )
 
-func getNameAndType(pool []ConstantInfo, index uint16) (string, string) {
-	indexFromPool := func(i int) ConstantInfo {
+func getNameAndType(pool []constant_pool.ConstantInfo, index uint16) (string, string) {
+	indexFromPool := func(i int) constant_pool.ConstantInfo {
 		return pool[i-1]
 	}
-	nameAndTypeInfo := pool[index-1].(*ConstantNameAndTypeInfo)
-	name := indexFromPool(int(nameAndTypeInfo.NameIndex)).(*ConstantUtf8Info).Value
-	desc := indexFromPool(int(nameAndTypeInfo.DescriptorIndex)).(*ConstantUtf8Info).Value
+	nameAndTypeInfo := pool[index-1].(*constant_pool.ConstantNameAndTypeInfo)
+	name := indexFromPool(int(nameAndTypeInfo.NameIndex)).(*constant_pool.ConstantUtf8Info).Value
+	desc := indexFromPool(int(nameAndTypeInfo.DescriptorIndex)).(*constant_pool.ConstantUtf8Info).Value
 	return name, desc
 }
 func showOpcodes(codes []*core.OpCode) {
@@ -33,17 +36,17 @@ func showOpcodes(codes []*core.OpCode) {
 	}
 }
 
-func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
-	indexFromPool := func(i int) ConstantInfo {
+func GetValueFromCP(pool []constant_pool.ConstantInfo, index int) values.JavaValue {
+	indexFromPool := func(i int) constant_pool.ConstantInfo {
 		return pool[i-1]
 	}
 	constant := pool[index-1]
 	getClassName := func(index uint16) string {
-		classInfo := indexFromPool(int(index)).(*ConstantClassInfo)
-		nameInfo := indexFromPool(int(classInfo.NameIndex)).(*ConstantUtf8Info)
+		classInfo := indexFromPool(int(index)).(*constant_pool.ConstantClassInfo)
+		nameInfo := indexFromPool(int(classInfo.NameIndex)).(*constant_pool.ConstantUtf8Info)
 		return nameInfo.Value
 	}
-	convertMemberInfo := func(classMemberInfo *ConstantMemberrefInfo) values.JavaValue {
+	convertMemberInfo := func(classMemberInfo *constant_pool.ConstantMemberrefInfo) values.JavaValue {
 		className := getClassName(classMemberInfo.ClassIndex)
 		name, desc := getNameAndType(pool, classMemberInfo.NameAndTypeIndex)
 		typ, err := types.ParseMethodDescriptor(desc)
@@ -54,19 +57,17 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 		return val
 	}
 	switch ret := constant.(type) {
-	case *ConstantMethodHandleInfo:
+	case *constant_pool.ConstantMethodHandleInfo:
 		return GetValueFromCP(pool, int(ret.ReferenceIndex))
-	case *ConstantMemberrefInfo:
-		return convertMemberInfo(ret)
-	case *ConstantInterfaceMethodrefInfo:
+	case *constant_pool.ConstantInterfaceMethodrefInfo:
 		memberInfo := ret.ConstantMemberrefInfo
 		return convertMemberInfo(&memberInfo)
-	case *ConstantFieldrefInfo:
-		classInfo := indexFromPool(int(ret.ClassIndex)).(*ConstantClassInfo)
-		nameInfo := indexFromPool(int(classInfo.NameIndex)).(*ConstantUtf8Info)
-		nameAndType := indexFromPool(int(ret.NameAndTypeIndex)).(*ConstantNameAndTypeInfo)
-		refNameInfo := indexFromPool(int(nameAndType.NameIndex)).(*ConstantUtf8Info)
-		descInfo := indexFromPool(int(nameAndType.DescriptorIndex)).(*ConstantUtf8Info)
+	case *constant_pool.ConstantFieldrefInfo:
+		classInfo := indexFromPool(int(ret.ClassIndex)).(*constant_pool.ConstantClassInfo)
+		nameInfo := indexFromPool(int(classInfo.NameIndex)).(*constant_pool.ConstantUtf8Info)
+		nameAndType := indexFromPool(int(ret.NameAndTypeIndex)).(*constant_pool.ConstantNameAndTypeInfo)
+		refNameInfo := indexFromPool(int(nameAndType.NameIndex)).(*constant_pool.ConstantUtf8Info)
+		descInfo := indexFromPool(int(nameAndType.DescriptorIndex)).(*constant_pool.ConstantUtf8Info)
 		typeName := nameInfo.Value
 		typeName = strings.Replace(typeName, "/", ".", -1)
 		typ, err := types.ParseDescriptor(descInfo.Value)
@@ -75,13 +76,13 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 		}
 		classIns := values.NewJavaClassMember(typeName, refNameInfo.Value, descInfo.Value, typ)
 		return classIns
-	case *ConstantMethodrefInfo:
-		classInfo := indexFromPool(int(ret.ClassIndex)).(*ConstantClassInfo)
-		nameInfo := indexFromPool(int(classInfo.NameIndex)).(*ConstantUtf8Info)
+	case *constant_pool.ConstantMethodrefInfo:
+		classInfo := indexFromPool(int(ret.ClassIndex)).(*constant_pool.ConstantClassInfo)
+		nameInfo := indexFromPool(int(classInfo.NameIndex)).(*constant_pool.ConstantUtf8Info)
 
-		nameAndType := indexFromPool(int(ret.NameAndTypeIndex)).(*ConstantNameAndTypeInfo)
-		refNameInfo := indexFromPool(int(nameAndType.NameIndex)).(*ConstantUtf8Info)
-		descInfo := indexFromPool(int(nameAndType.DescriptorIndex)).(*ConstantUtf8Info)
+		nameAndType := indexFromPool(int(ret.NameAndTypeIndex)).(*constant_pool.ConstantNameAndTypeInfo)
+		refNameInfo := indexFromPool(int(nameAndType.NameIndex)).(*constant_pool.ConstantUtf8Info)
+		descInfo := indexFromPool(int(nameAndType.DescriptorIndex)).(*constant_pool.ConstantUtf8Info)
 		typeName := nameInfo.Value
 		typeName = strings.Replace(typeName, "/", ".", -1)
 		typ, err := types.ParseMethodDescriptor(descInfo.Value)
@@ -90,25 +91,25 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 		}
 		classIns := values.NewJavaClassMember(typeName, refNameInfo.Value, descInfo.Value, typ)
 		return classIns
-	case *ConstantClassInfo:
-		nameInfo := indexFromPool(int(ret.NameIndex)).(*ConstantUtf8Info)
+	case *constant_pool.ConstantClassInfo:
+		nameInfo := indexFromPool(int(ret.NameIndex)).(*constant_pool.ConstantUtf8Info)
 		typeName := nameInfo.Value
 		typeName = strings.Replace(typeName, "/", ".", -1)
 		return values.NewJavaClassValue(types.NewJavaClass(typeName))
-	case *ConstantModuleInfo:
-		nameInfo := indexFromPool(int(ret.NameIndex)).(*ConstantUtf8Info)
-		typeName := nameInfo.Value
-		typeName = strings.Replace(typeName, "/", ".", -1)
-		log.Warn("TODO: the java module should be a new java type")
-		return values.NewJavaClassValue(types.NewJavaClass(typeName))
-	case *ConstantPackageInfo:
-		nameInfo := indexFromPool(int(ret.NameIndex)).(*ConstantUtf8Info)
+	case *constant_pool.ConstantModuleInfo:
+		nameInfo := indexFromPool(int(ret.NameIndex)).(*constant_pool.ConstantUtf8Info)
 		typeName := nameInfo.Value
 		typeName = strings.Replace(typeName, "/", ".", -1)
 		log.Warn("TODO: the java module should be a new java type")
 		return values.NewJavaClassValue(types.NewJavaClass(typeName))
-	case *ConstantMethodTypeInfo:
-		descInfo := indexFromPool(int(ret.DescriptorIndex)).(*ConstantUtf8Info)
+	case *constant_pool.ConstantPackageInfo:
+		nameInfo := indexFromPool(int(ret.NameIndex)).(*constant_pool.ConstantUtf8Info)
+		typeName := nameInfo.Value
+		typeName = strings.Replace(typeName, "/", ".", -1)
+		log.Warn("TODO: the java module should be a new java type")
+		return values.NewJavaClassValue(types.NewJavaClass(typeName))
+	case *constant_pool.ConstantMethodTypeInfo:
+		descInfo := indexFromPool(int(ret.DescriptorIndex)).(*constant_pool.ConstantUtf8Info)
 		typ, err := types.ParseMethodDescriptor(descInfo.Value)
 		if err != nil {
 			log.Errorf("parse descriptor failed:%s", descInfo.Value)
@@ -123,24 +124,24 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 		panic("failed")
 	}
 }
-func GetLiteralFromCP(pool []ConstantInfo, index int) values.JavaValue {
+func GetLiteralFromCP(pool []constant_pool.ConstantInfo, index int) values.JavaValue {
 	constant := pool[index-1]
 	switch ret := constant.(type) {
-	case *ConstantStringInfo:
-		return values.NewJavaLiteral(pool[ret.StringIndex-1].(*ConstantUtf8Info).Value, types.NewJavaPrimer(types.JavaString))
-	case *ConstantLongInfo:
+	case *constant_pool.ConstantStringInfo:
+		return values.NewJavaLiteral(pool[ret.StringIndex-1].(*constant_pool.ConstantUtf8Info).Value, types.NewJavaPrimer(types.JavaString))
+	case *constant_pool.ConstantLongInfo:
 		return values.NewJavaLiteral(ret.Value, types.NewJavaPrimer(types.JavaLong))
-	case *ConstantIntegerInfo:
+	case *constant_pool.ConstantIntegerInfo:
 		return values.NewJavaLiteral(ret.Value, types.NewJavaPrimer(types.JavaInteger))
-	case *ConstantDoubleInfo:
+	case *constant_pool.ConstantDoubleInfo:
 		return values.NewJavaLiteral(ret.Value, types.NewJavaPrimer(types.JavaDouble))
-	case *ConstantFloatInfo:
+	case *constant_pool.ConstantFloatInfo:
 		return values.NewJavaLiteral(ret.Value, types.NewJavaPrimer(types.JavaFloat))
-	case *ConstantClassInfo:
+	case *constant_pool.ConstantClassInfo:
 		return GetValueFromCP(pool, index)
-	case *ConstantModuleInfo:
+	case *constant_pool.ConstantModuleInfo:
 		return GetValueFromCP(pool, index)
-	case *ConstantPackageInfo:
+	case *constant_pool.ConstantPackageInfo:
 		return GetValueFromCP(pool, index)
 	default:
 		return GetValueFromCP(pool, index)
@@ -152,7 +153,7 @@ type VarMap struct {
 	val values.JavaValue
 }
 
-func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute, id *utils.VariableId) ([]values.JavaValue, []statements.Statement, error) {
+func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *attribute_info.CodeAttribute, id *utils.VariableId) ([]values.JavaValue, []statements.Statement, error) {
 	pool := dumper.ConstantPool
 	parser := core.NewDecompiler(codeAttr.Code, func(id int) values.JavaValue {
 		return GetValueFromCP(dumper.ConstantPool, id)
@@ -180,14 +181,14 @@ func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute, id *util
 			CatchType: entry.CatchType,
 		})
 	}
-	attrInterfaces := lo.Filter(dumper.obj.Attributes, func(item AttributeInfo, index int) bool {
-		_, ok := item.(*BootstrapMethodsAttribute)
+	attrInterfaces := lo.Filter(dumper.obj.Attributes, func(item attribute_info.AttributeInfo, index int) bool {
+		_, ok := item.(*attribute_info.BootstrapMethodsAttribute)
 		return ok
 	})
-	attrs := lo.Map(attrInterfaces, func(item AttributeInfo, index int) *BootstrapMethodsAttribute {
-		return item.(*BootstrapMethodsAttribute)
+	attrs := lo.Map(attrInterfaces, func(item attribute_info.AttributeInfo, index int) *attribute_info.BootstrapMethodsAttribute {
+		return item.(*attribute_info.BootstrapMethodsAttribute)
 	})
-	var bootstrapMethod []*BootstrapMethod
+	var bootstrapMethod []*attribute_info.BootstrapMethod
 	if len(attrs) > 0 {
 		bootstrapMethod = attrs[0].BootstrapMethods
 	}
@@ -206,7 +207,7 @@ func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute, id *util
 	parser.ConstantPoolInvokeDynamicInfo = func(index int) (uint16, string, string) {
 		constant := pool[index-1]
 		switch ret := constant.(type) {
-		case *ConstantInvokeDynamicInfo:
+		case *constant_pool.ConstantInvokeDynamicInfo:
 			name, desc := getNameAndType(dumper.ConstantPool, ret.NameAndTypeIndex)
 			return ret.BootstrapMethodAttrIndex, name, desc
 		default:

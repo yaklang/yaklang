@@ -1,6 +1,10 @@
 package javaclassparser
 
-import "github.com/yaklang/yaklang/common/utils"
+import (
+	"github.com/yaklang/yaklang/common/javaclassparser/attribute_info"
+	"github.com/yaklang/yaklang/common/javaclassparser/constant_pool"
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 type ClassParser struct {
 	reader   *ClassReader
@@ -15,27 +19,6 @@ func NewClassParser(data []byte) *ClassParser {
 	}
 }
 
-/*
-*
-记录方法抛出的异常表
-
-	EXCEPTIONS_ATTRIBUTE {
-		u2 attribute_name_index;
-		u4 attribute_length;
-		u2 number_of_exceptions;
-		u2 exception_index_table[number_of_exceptions];
-	}
-*/
-type ExceptionsAttribute struct {
-	Type                string
-	AttrLen             uint32
-	ExceptionIndexTable []uint16
-}
-
-func (self *ExceptionsAttribute) readInfo(cp *ClassParser) {
-	self.ExceptionIndexTable = cp.reader.readUint16s()
-}
-
 func (this *ClassParser) Parse() (*ClassObject, error) {
 	var err error
 	err = this.parseAndCheckMagic()
@@ -44,50 +27,65 @@ func (this *ClassParser) Parse() (*ClassObject, error) {
 	}
 	err = this.readAndCheckVersion()
 	err = this.readConstantPool()
-	this.classObj.AccessFlags = this.reader.readUint16()
+	this.classObj.AccessFlags = this.reader.ReadUint16()
 	this.classObj.AccessFlagsVerbose, this.classObj.AccessFlagsToCode = getClassAccessFlagsVerbose(this.classObj.AccessFlags)
-	this.classObj.ThisClass = this.reader.readUint16()
-	this.classObj.SuperClass = this.reader.readUint16()
-	this.classObj.Interfaces = this.reader.readUint16s()
+	this.classObj.ThisClass = this.reader.ReadUint16()
+	this.classObj.SuperClass = this.reader.ReadUint16()
+	this.classObj.Interfaces = this.reader.ReadUint16s()
 	this.classObj.Fields, err = this.readMembers()
 	this.classObj.Methods, err = this.readMembers()
-	this.classObj.Attributes = this.readAttributes()
+	attributes, err := this.readAttributes()
+	if err != nil {
+		return nil, err
+	}
+	this.classObj.Attributes = attributes
 	return this.classObj, nil
 }
 func (this *ClassParser) readMembers() ([]*MemberInfo, error) {
-	memberCount := this.reader.readUint16()
+	memberCount := this.reader.ReadUint16()
 	members := make([]*MemberInfo, memberCount)
 	for i := range members {
-		members[i] = this.readMember()
+		member, err := this.readMember()
+		if err != nil {
+			return nil, err
+		}
+		members[i] = member
 	}
 	return members, nil
 }
-func (this *ClassParser) readMember() *MemberInfo {
+func (this *ClassParser) readMember() (*MemberInfo, error) {
+	accessFlags := this.reader.ReadUint16()
+	nameIndex := this.reader.ReadUint16()
+	descriptorIndex := this.reader.ReadUint16()
+	attributes, err := this.readAttributes()
+	if err != nil {
+		return nil, err
+	}
 	return &MemberInfo{
-		AccessFlags:     this.reader.readUint16(),
-		NameIndex:       this.reader.readUint16(),
-		DescriptorIndex: this.reader.readUint16(),
-		Attributes:      this.readAttributes(),
-	}
+		AccessFlags:     accessFlags,
+		NameIndex:       nameIndex,
+		DescriptorIndex: descriptorIndex,
+		Attributes:      attributes,
+	}, nil
 }
-func (this *ClassParser) readAttributes() []AttributeInfo {
-	attributesCount := this.reader.readUint16()
-	attributes := make([]AttributeInfo, attributesCount)
+func (this *ClassParser) readAttributes() ([]attribute_info.AttributeInfo, error) {
+	attributesCount := this.reader.ReadUint16()
+	attributes := make([]attribute_info.AttributeInfo, attributesCount)
 	for i := range attributes {
-		attributes[i] = this.readAttribute()
+		attrInfo, err := this.readAttribute()
+		if err != nil {
+			return nil, err
+		}
+		attributes[i] = attrInfo
 	}
-	return attributes
+	return attributes, nil
 }
-func (this *ClassParser) readAttribute() AttributeInfo {
-	attributeNameIndex := this.reader.readUint16()
-	attrName, err := this.classObj.getUtf8(attributeNameIndex)
+func (this *ClassParser) readAttribute() (attribute_info.AttributeInfo, error) {
+	attrInfo, err := attribute_info.ReadAttributeInfo(this.reader, this.classObj.ConstantPoolManager)
 	if err != nil {
 		panic(utils.Errorf("Parse Attribute error: %v", err))
 	}
-	attrLen := this.reader.readUint32()
-	attrInfo := newAttributeInfo(attrName, attrLen)
-	attrInfo.readInfo(this)
-	return attrInfo
+	return attrInfo, nil
 }
 
 func (this *ClassParser) parseAndCheckMagic() (err error) {
@@ -96,7 +94,7 @@ func (this *ClassParser) parseAndCheckMagic() (err error) {
 			err = utils.Errorf("read magic error: %v", e)
 		}
 	}()
-	magic := this.reader.readUint32()
+	magic := this.reader.ReadUint32()
 	if magic != 0xCAFEBABE {
 		return utils.Error("java.lang.ClassFormatError: Magic error")
 	}
@@ -104,8 +102,8 @@ func (this *ClassParser) parseAndCheckMagic() (err error) {
 	return nil
 }
 func (this *ClassParser) readAndCheckVersion() error {
-	this.classObj.MinorVersion = this.reader.readUint16()
-	this.classObj.MajorVersion = this.reader.readUint16()
+	this.classObj.MinorVersion = this.reader.ReadUint16()
+	this.classObj.MajorVersion = this.reader.ReadUint16()
 	switch this.classObj.MajorVersion {
 	case 45:
 		return nil
@@ -117,8 +115,8 @@ func (this *ClassParser) readAndCheckVersion() error {
 	return utils.Error("java.lang.UnsupportedClassVersionError!")
 }
 func (this *ClassParser) readConstantPool() error {
-	cpCount := int(this.reader.readUint16())
-	cp := make([]ConstantInfo, cpCount-1)
+	cpCount := int(this.reader.ReadUint16())
+	cp := make([]constant_pool.ConstantInfo, cpCount-1)
 
 	//索引从1开始，这里用了 <cpCount 说明index是从1到cpCount-1 及上文的1 ~ n-1
 	for i := 0; i < cpCount-1; i++ {
@@ -128,7 +126,7 @@ func (this *ClassParser) readConstantPool() error {
 		}
 		cp[i] = constantInfo
 		switch cp[i].(type) {
-		case *ConstantLongInfo, *ConstantDoubleInfo:
+		case *constant_pool.ConstantLongInfo, *constant_pool.ConstantDoubleInfo:
 			//占两个位置
 			i++
 		}
@@ -136,9 +134,10 @@ func (this *ClassParser) readConstantPool() error {
 	this.classObj.ConstantPool = cp
 	return nil
 }
-func (this *ClassParser) readConstantInfo() (ConstantInfo, error) {
-	tag := this.reader.readUint8()
-	c := newConstantInfo(tag)
-	c.readInfo(this)
+func (this *ClassParser) readConstantInfo() (constant_pool.ConstantInfo, error) {
+	c, err := constant_pool.ReadConstantInfo(this.reader)
+	if err != nil {
+		return nil, err
+	}
 	return c, nil
 }

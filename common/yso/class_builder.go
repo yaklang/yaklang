@@ -3,6 +3,7 @@ package yso
 import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/javaclassparser"
+	"github.com/yaklang/yaklang/common/javaclassparser/attribute_info"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 )
 
@@ -18,15 +19,15 @@ func JavaClassModifySuperClass(ins *javaclassparser.ClassObject, className strin
 		return true
 	})
 	for _, method := range constructorMethod {
-		codeAttrs := lo.Filter(method.Attributes, func(item javaclassparser.AttributeInfo, index int) bool {
-			_, ok := item.(*javaclassparser.CodeAttribute)
+		codeAttrs := lo.Filter(method.Attributes, func(item attribute_info.AttributeInfo, index int) bool {
+			_, ok := item.(*attribute_info.CodeAttribute)
 			return ok
 		})
-		var codeAttr *javaclassparser.CodeAttribute
+		var codeAttr *attribute_info.CodeAttribute
 		if len(codeAttrs) == 0 {
 			continue
 		}
-		codeAttr = codeAttrs[0].(*javaclassparser.CodeAttribute)
+		codeAttr = codeAttrs[0].(*attribute_info.CodeAttribute)
 		decompiler := core.NewDecompiler(codeAttr.Code, nil)
 		err := decompiler.ParseOpcode()
 		if err != nil {

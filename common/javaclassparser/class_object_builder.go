@@ -2,6 +2,7 @@ package javaclassparser
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/utils"
 )
 

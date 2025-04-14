@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/javaclassparser/attribute_info"
+	"github.com/yaklang/yaklang/common/javaclassparser/constant_pool"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	utils2 "github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 
@@ -27,7 +29,7 @@ type ClassObjectDumper struct {
 	ClassName         string
 	PackageName       string
 	CurrentMethod     *MemberInfo
-	ConstantPool      []ConstantInfo
+	ConstantPool      []constant_pool.ConstantInfo
 	deepStack         *utils.Stack[int]
 	MethodType        *types.JavaFuncType
 	lambdaMethods     map[string][]string
@@ -145,7 +147,7 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 		if err != nil {
 			continue
 		}
-		classInfo := info.(*ConstantClassInfo)
+		classInfo := info.(*constant_pool.ConstantClassInfo)
 		name, err := c.obj.getUtf8(classInfo.NameIndex)
 		if err != nil {
 			continue
@@ -173,11 +175,11 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	}
 
 	annoStrs := []string{}
-	for _, info := range lo.Filter(c.obj.Attributes, func(item AttributeInfo, index int) bool {
-		_, ok := item.(*RuntimeVisibleAnnotationsAttribute)
+	for _, info := range lo.Filter(c.obj.Attributes, func(item attribute_info.AttributeInfo, index int) bool {
+		_, ok := item.(*attribute_info.RuntimeVisibleAnnotationsAttribute)
 		return ok
 	}) {
-		for _, annotation := range info.(*RuntimeVisibleAnnotationsAttribute).Annotations {
+		for _, annotation := range info.(*attribute_info.RuntimeVisibleAnnotationsAttribute).Annotations {
 			res, err := c.DumpAnnotation(annotation)
 			if err != nil {
 				return "", utils.Wrap(err, "DumpAnnotation failed")
@@ -299,19 +301,19 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 		valueLiteral := ""
 		for _, attr := range field.Attributes {
 			switch ret := attr.(type) {
-			case *ConstantValueAttribute:
+			case *attribute_info.ConstantValueAttribute:
 				value, err := c.obj.getConstantInfo(ret.ConstantValueIndex)
 				if err != nil {
 					log.Errorf("getConstantInfo(%d) failed", ret.ConstantValueIndex)
 					continue
 				}
 				switch constVal := value.(type) {
-				case *ConstantStringInfo:
+				case *constant_pool.ConstantStringInfo:
 					constStr, _ := c.obj.getUtf8(constVal.StringIndex)
 					valueLiteral = strconv.Quote(constStr)
-				case *ConstantIntegerInfo:
+				case *constant_pool.ConstantIntegerInfo:
 					valueLiteral = strconv.Itoa(int(constVal.Value))
-				case *ConstantLongInfo:
+				case *constant_pool.ConstantLongInfo:
 					valueLiteral = strconv.Itoa(int(constVal.Value))
 					if !strings.HasSuffix(valueLiteral, "L") {
 						valueLiteral += "L"
@@ -319,16 +321,16 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 				default:
 					log.Errorf("when handling for fields unknown constant type: %T", constVal)
 				}
-			case *SyntheticAttribute:
+			case *attribute_info.SyntheticAttribute:
 				log.Infof("field %s is synthetic", name)
-			case *DeprecatedAttribute:
+			case *attribute_info.DeprecatedAttribute:
 			// log.Infof("field %s is deprecated", name)
-			case *SignatureAttribute:
+			case *attribute_info.SignatureAttribute:
 
-			case *UnparsedAttribute:
+			case *attribute_info.UnparsedAttribute:
 				log.Error("cannot handle attribute type: UnparsedAttribute")
 				spew.Dump(ret)
-			case *RuntimeVisibleAnnotationsAttribute:
+			case *attribute_info.RuntimeVisibleAnnotationsAttribute:
 
 			default:
 				log.Info(spew.Sdump(ret))
@@ -368,7 +370,7 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 	return fields, nil
 }
 
-func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, error) {
+func (c *ClassObjectDumper) DumpAnnotation(anno *attribute_info.AnnotationAttribute) (string, error) {
 	result := ""
 
 	annoName := anno.TypeName
@@ -381,26 +383,26 @@ func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, e
 		return "", errors.New("invalid annotation type")
 	}
 	annoName = c.FuncCtx.ShortTypeName(classIns.Name)
-	var parseElement func(element *ElementValuePairAttribute) (string, error)
-	parseElement = func(element *ElementValuePairAttribute) (string, error) {
+	var parseElement func(element *attribute_info.ElementValuePairAttribute) (string, error)
+	parseElement = func(element *attribute_info.ElementValuePairAttribute) (string, error) {
 		valStr := ""
 		switch element.Tag {
 		case 'B', 'C', 'D', 'F', 'I', 'J', 'S', 'Z':
-			constant := element.Value.(ConstantInfo)
+			constant := element.Value.(constant_pool.ConstantInfo)
 			switch ret := constant.(type) {
-			case *ConstantStringInfo:
+			case *constant_pool.ConstantStringInfo:
 				s, err := c.obj.getUtf8(ret.StringIndex)
 				if err != nil {
 					return "", err
 				}
 				valStr = values.JavaStringToLiteral(s)
-			case *ConstantLongInfo:
+			case *constant_pool.ConstantLongInfo:
 				valStr = fmt.Sprintf("%dL", ret.Value)
-			case *ConstantIntegerInfo:
+			case *constant_pool.ConstantIntegerInfo:
 				valStr = fmt.Sprintf("%d", ret.Value)
-			case *ConstantDoubleInfo:
+			case *constant_pool.ConstantDoubleInfo:
 				valStr = fmt.Sprintf("%f", ret.Value)
-			case *ConstantFloatInfo:
+			case *constant_pool.ConstantFloatInfo:
 				valStr = fmt.Sprintf("%f", ret.Value)
 			default:
 				return "", errors.New("parse annotation error, unknown constant type")
@@ -412,7 +414,7 @@ func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, e
 			valStr = element.Value.(string)
 		case '@':
 			//ele.Value = ParseAnnotation(cp)
-			annotation := element.Value.(*AnnotationAttribute)
+			annotation := element.Value.(*attribute_info.AnnotationAttribute)
 			res, err := c.DumpAnnotation(annotation)
 			if err != nil {
 				return "", err
@@ -426,7 +428,7 @@ func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, e
 			//	l = append(l, val)
 			//}
 			//ele.Value = l
-			l := element.Value.([]*ElementValuePairAttribute)
+			l := element.Value.([]*attribute_info.ElementValuePairAttribute)
 			eleList := []string{}
 			for _, e := range l {
 				res, err := parseElement(e)
@@ -439,7 +441,7 @@ func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, e
 		case 'e':
 			// fullname
 			switch ret := element.Value.(type) {
-			case *EnumConstValue:
+			case *attribute_info.EnumConstValue:
 				if len(ret.TypeName) <= 2 {
 					return "", fmt.Errorf("parse annotation error, invalid enum type name: %s", ret.TypeName)
 				}
@@ -562,7 +564,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	var paramsNewStr string
 	var exceptions string
 	for _, attribute := range method.Attributes {
-		if exceptionAttr, ok := attribute.(*ExceptionsAttribute); ok {
+		if exceptionAttr, ok := attribute.(*attribute_info.ExceptionsAttribute); ok {
 			exceptions = " throws "
 			expList := []string{}
 			for _, u := range exceptionAttr.ExceptionIndexTable {
@@ -570,7 +572,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				if err != nil {
 					continue
 				}
-				classInfo := info.(*ConstantClassInfo)
+				classInfo := info.(*constant_pool.ConstantClassInfo)
 				name, err := c.obj.getUtf8(classInfo.NameIndex)
 				if err != nil {
 					continue
@@ -584,7 +586,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 			}
 			exceptions += strings.Join(expList, ", ")
 		}
-		if anno, ok := attribute.(*RuntimeVisibleAnnotationsAttribute); ok {
+		if anno, ok := attribute.(*attribute_info.RuntimeVisibleAnnotationsAttribute); ok {
 			for _, annotation := range anno.Annotations {
 				res, err := c.DumpAnnotation(annotation)
 				if err != nil {
@@ -593,7 +595,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				annoStrs = append(annoStrs, res)
 			}
 		}
-		if codeAttr, ok := attribute.(*CodeAttribute); ok {
+		if codeAttr, ok := attribute.(*attribute_info.CodeAttribute); ok {
 			params, statementList, err := ParseBytesCode(c, codeAttr, id)
 			if err != nil {
 				return dumped, utils.Wrap(err, "ParseBytesCode failed")
@@ -903,23 +905,23 @@ func (c *ClassObjectDumper) dumpConstantPool() ([]string, error) {
 	result := []string{}
 	for _, constant := range c.obj.ConstantPool {
 		switch ret := constant.(type) {
-		case *ConstantIntegerInfo:
-		case *ConstantFloatInfo:
-		case *ConstantLongInfo:
-		case *ConstantDoubleInfo:
-		case *ConstantUtf8Info:
+		case *constant_pool.ConstantIntegerInfo:
+		case *constant_pool.ConstantFloatInfo:
+		case *constant_pool.ConstantLongInfo:
+		case *constant_pool.ConstantDoubleInfo:
+		case *constant_pool.ConstantUtf8Info:
 			result = append(result, ret.Value)
-		case *ConstantStringInfo:
-		case *ConstantClassInfo:
-		case *ConstantFieldrefInfo:
-		case *ConstantMethodrefInfo:
-		case *ConstantInterfaceMethodrefInfo:
-		case *ConstantNameAndTypeInfo:
-		case *ConstantMethodTypeInfo:
-		case *ConstantMethodHandleInfo:
-		case *ConstantInvokeDynamicInfo:
-		case *ConstantModuleInfo:
-		case *ConstantPackageInfo:
+		case *constant_pool.ConstantStringInfo:
+		case *constant_pool.ConstantClassInfo:
+		case *constant_pool.ConstantFieldrefInfo:
+		case *constant_pool.ConstantMethodrefInfo:
+		case *constant_pool.ConstantInterfaceMethodrefInfo:
+		case *constant_pool.ConstantNameAndTypeInfo:
+		case *constant_pool.ConstantMethodTypeInfo:
+		case *constant_pool.ConstantMethodHandleInfo:
+		case *constant_pool.ConstantInvokeDynamicInfo:
+		case *constant_pool.ConstantModuleInfo:
+		case *constant_pool.ConstantPackageInfo:
 		}
 	}
 	return result, nil

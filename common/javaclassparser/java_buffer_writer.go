@@ -2,6 +2,7 @@ package javaclassparser
 
 import (
 	"bytes"
+
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -32,74 +33,55 @@ func (j *JavaBufferWriter) WriteHex(v interface{}) error {
 	}
 }
 
-func (j *JavaBufferWriter) Write8Byte(v interface{}) error {
-	value, err := Interface2Uint64(v)
-	if err != nil {
-		return ValueTypeError
-	}
+func (j *JavaBufferWriter) Write8Byte(v uint64) {
 	var buf = make([]byte, 8)
-	buf[0] = byte(value >> 56)
-	buf[1] = byte(value >> 48)
-	buf[2] = byte(value >> 40)
-	buf[3] = byte(value >> 32)
-	buf[4] = byte(value >> 24)
-	buf[5] = byte(value >> 16)
-	buf[6] = byte(value >> 8)
-	buf[7] = byte(value)
+	buf[0] = byte(v >> 56)
+	buf[1] = byte(v >> 48)
+	buf[2] = byte(v >> 40)
+	buf[3] = byte(v >> 32)
+	buf[4] = byte(v >> 24)
+	buf[5] = byte(v >> 16)
+	buf[6] = byte(v >> 8)
+	buf[7] = byte(v)
 	j.data.Write(buf)
-	return nil
 }
-func (j *JavaBufferWriter) Write4Byte(v interface{}) error {
-	value, err := Interface2Uint64(v)
-	if err != nil {
-		return ValueTypeError
-	}
+func (j *JavaBufferWriter) Write4Byte(v uint32) {
 	var buf = make([]byte, 4)
-	buf[0] = byte(value >> 24)
-	buf[1] = byte(value >> 16)
-	buf[2] = byte(value >> 8)
-	buf[3] = byte(value)
+	buf[0] = byte(v >> 24)
+	buf[1] = byte(v >> 16)
+	buf[2] = byte(v >> 8)
+	buf[3] = byte(v)
 	j.data.Write(buf)
-	return nil
 }
-func (j *JavaBufferWriter) Write2Byte(v interface{}) error {
-	value, err := Interface2Uint64(v)
-	if err != nil {
-		return ValueTypeError
-	}
+func (j *JavaBufferWriter) Write2Byte(v uint16) {
 	var buf = make([]byte, 2)
-	buf[0] = byte(value >> 8)
-	buf[1] = byte(value)
+	buf[0] = byte(v >> 8)
+	buf[1] = byte(v)
 	j.data.Write(buf)
-	return nil
 }
-func (j *JavaBufferWriter) Write1Byte(v interface{}) error {
-	value, err := Interface2Uint64(v)
-	if err != nil {
-		return ValueTypeError
-	}
+func (j *JavaBufferWriter) Write1Byte(v uint8) {
 	var buf = make([]byte, 1)
-	buf[0] = byte(value)
+	buf[0] = v
 	j.data.Write(buf)
-	return nil
 }
 
-func (j *JavaBufferWriter) WriteString(v string) error {
+func (j *JavaBufferWriter) WriteBytes(v []byte) {
+	j.data.Write(v)
+}
+
+func (j *JavaBufferWriter) WriteString(v string) {
 	//bs := utils.ToJavaOverLongString([]byte(v), j.charLength)
 	bs := []byte(v)
-	j.Write2Byte(len(bs))
+	j.Write2Byte(uint16(len(bs)))
 	j.data.Write(bs)
-	return nil
 }
 
-func (j *JavaBufferWriter) WriteLString(v string) error {
-	j.Write4Byte(len(v))
+func (j *JavaBufferWriter) WriteLString(v string) {
+	j.Write4Byte(uint32(len(v)))
 	j.data.Write([]byte(v))
-	return nil
 }
-func (j *JavaBufferWriter) Write(v []byte) error {
+func (j *JavaBufferWriter) Write(v []byte) {
 	j.data.Write(v)
-	return nil
 }
 func (j *JavaBufferWriter) Bytes() []byte {
 	return j.data.Bytes()

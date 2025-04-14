@@ -1,5 +1,7 @@
 package javaclassparser
 
+import "github.com/yaklang/yaklang/common/javaclassparser/attribute_info"
+
 /*
 *
 字段/方法
@@ -14,5 +16,5 @@ type MemberInfo struct {
 	DescriptorIndex        uint16
 	DescriptorIndexVerbose string
 	//属性表
-	Attributes []AttributeInfo
+	Attributes []attribute_info.AttributeInfo
 }

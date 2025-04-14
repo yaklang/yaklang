@@ -3,7 +3,6 @@ package javaclassparser
 import (
 	"bytes"
 	"compress/gzip"
-	"fmt"
 	"io/ioutil"
 	"strings"
 
@@ -18,32 +17,7 @@ func deleteStringKeysFromMap(data map[string]interface{}, keys ...string) {
 		delete(data, key)
 	}
 }
-func Interface2Uint64(v interface{}) (uint64, error) {
-	switch v.(type) {
-	case uint:
-		return uint64(v.(uint)), nil
-	case int:
-		return uint64(v.(int)), nil
-	case uint64:
-		return v.(uint64), nil
-	case int64:
-		return uint64(v.(int64)), nil
-	case uint32:
-		return uint64(v.(uint32)), nil
-	case int32:
-		return uint64(v.(int32)), nil
-	case uint16:
-		return uint64(v.(uint16)), nil
-	case int16:
-		return uint64(v.(int16)), nil
-	case uint8:
-		return uint64(v.(uint8)), nil
-	case int8:
-		return uint64(v.(int)), nil
-	default:
-		return 0, ValueTypeError
-	}
-}
+
 func GetMap() ([]int, []int) {
 	CHAR_MAP := make([]int, 48)
 	MAP_CHAR := make([]int, 256)
@@ -175,88 +149,4 @@ func bytes2bcel(data []byte) (string, error) {
 		write(in)
 	}
 	return "$$BCEL$$" + buf.String(), nil
-}
-
-func ParseAnnotationElementValue(cp *ClassParser) *ElementValuePairAttribute {
-	getUtf8 := func(index uint16) string {
-		s, err := cp.classObj.getUtf8(index)
-		if err != nil {
-			panic(fmt.Errorf("get utf8 error: %s", err))
-		}
-		return s
-	}
-	reader := cp.reader
-	tag := reader.readUint8()
-	ele := &ElementValuePairAttribute{
-		Tag: tag,
-	}
-	switch tag {
-	case 'B', 'C', 'D', 'F', 'I', 'J', 'S', 'Z':
-		index := reader.readUint16()
-		var err error
-		ele.Value, err = cp.classObj.getConstantInfo(index)
-		if err != nil {
-			panic(fmt.Errorf("get constant info error: %s", err))
-		}
-	case 's':
-		ele.Value = getUtf8(reader.readUint16())
-	case 'e':
-		val := &EnumConstValue{
-			TypeName:  getUtf8(reader.readUint16()),
-			ConstName: getUtf8(reader.readUint16()),
-		}
-		ele.Value = val
-	case 'c':
-		ele.Value = getUtf8(reader.readUint16())
-	case '@':
-		ele.Value = ParseAnnotation(cp)
-	case '[':
-		length := reader.readUint16()
-		l := []*ElementValuePairAttribute{}
-		for k := 0; k < int(length); k++ {
-			val := ParseAnnotationElementValue(cp)
-			l = append(l, val)
-		}
-		ele.Value = l
-	default:
-		panic(fmt.Errorf("parse annotation error, unknown tag: %c", tag))
-	}
-	return ele
-}
-func ParseAnnotationElementValuePair(cp *ClassParser) *ElementValuePairAttribute {
-	getUtf8 := func(index uint16) string {
-		s, err := cp.classObj.getUtf8(index)
-		if err != nil {
-			panic(fmt.Errorf("get utf8 error: %s", err))
-		}
-		return s
-	}
-	reader := cp.reader
-	nameIndex := reader.readUint16()
-	name := getUtf8(nameIndex)
-	value := ParseAnnotationElementValue(cp)
-	value.Name = name
-	return value
-}
-func ParseAnnotation(cp *ClassParser) *AnnotationAttribute {
-	getUtf8 := func(index uint16) string {
-		s, err := cp.classObj.getUtf8(index)
-		if err != nil {
-			panic(fmt.Errorf("get utf8 error: %s", err))
-		}
-		return s
-	}
-	reader := cp.reader
-
-	typeIndex := reader.readUint16()
-	elementLen := reader.readUint16()
-	typeName := getUtf8(typeIndex)
-	anno := &AnnotationAttribute{
-		TypeName:          typeName,
-		ElementValuePairs: make([]*ElementValuePairAttribute, elementLen),
-	}
-	for j := range anno.ElementValuePairs {
-		anno.ElementValuePairs[j] = ParseAnnotationElementValuePair(cp)
-	}
-	return anno
 }

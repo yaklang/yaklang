@@ -1,4 +1,6 @@
-package javaclassparser
+package constant_pool
+
+import "github.com/yaklang/yaklang/common/javaclassparser/types"
 
 /*
 *
@@ -20,9 +22,26 @@ type ConstantNameAndTypeInfo struct {
 	DescriptorIndexVerbose string
 }
 
-func (self *ConstantNameAndTypeInfo) readInfo(cp *ClassParser) {
-	self.NameIndex = cp.reader.readUint16()
-	self.DescriptorIndex = cp.reader.readUint16()
+func (self *ConstantNameAndTypeInfo) readInfo(cp types.ClassReader) {
+	self.NameIndex = cp.ReadUint16()
+	self.DescriptorIndex = cp.ReadUint16()
+}
+
+func (self *ConstantNameAndTypeInfo) writeInfo(writer types.ClassWriter) {
+	writer.Write2Byte(uint16(self.NameIndex))
+	writer.Write2Byte(uint16(self.DescriptorIndex))
+}
+
+func (self *ConstantNameAndTypeInfo) GetTag() uint8 {
+	return CONSTANT_NameAndType
+}
+
+func (self *ConstantNameAndTypeInfo) SetType(name string) {
+	self.Type = name
+}
+
+func (self *ConstantNameAndTypeInfo) GetType() string {
+	return self.Type
 }
 
 /**

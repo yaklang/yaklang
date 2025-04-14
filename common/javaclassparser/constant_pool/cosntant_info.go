@@ -1,6 +1,9 @@
-package javaclassparser
+package constant_pool
 
-import "github.com/davecgh/go-spew/spew"
+import (
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/javaclassparser/types"
+)
 
 /*
 * See: https://docs.oracle.com/javase/specs/jvms/se9/html/jvms-4.html#jvms-4.4.11
@@ -37,18 +40,31 @@ constant info类型的接口
 */
 type ConstantInfo interface {
 	//从class data中读取常量信息
-	readInfo(reader *ClassParser)
+	readInfo(parser types.ClassReader)
+	//写入class data
+	writeInfo(writer types.ClassWriter)
+	//获取常量类型
+	GetTag() uint8
+	SetType(name string)
+	GetType() string
 }
 
-/**
+/*
+*
 从class data中读取并创建对应tag的constant Info
 */
-//func readConstantInfo(reader *ClassReader) ConstantInfo {
-//	tag := reader.readUint8()
-//	c := newConstantInfo(tag)
-//	c.readInfo(reader)
-//	return c
-//}
+func ReadConstantInfo(reader types.ClassReader) (ConstantInfo, error) {
+	tag := reader.ReadUint8()
+	c := newConstantInfo(tag)
+	c.readInfo(reader)
+	return c, nil
+}
+
+func WriteConstantInfo(writer types.ClassWriter, info ConstantInfo) error {
+	writer.Write1Byte(info.GetTag())
+	info.writeInfo(writer)
+	return nil
+}
 
 /*
 *

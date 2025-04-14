@@ -1,4 +1,4 @@
-package javaclassparser
+package constant_pool
 
 import "strings"
 
@@ -107,19 +107,19 @@ func (c *ConstantPool) AddNewMethodInfo(className, methodName, desc string) int 
 }
 func (c *ConstantPool) newMemberrefInfo(className, methodName, desc string) *ConstantMemberrefInfo {
 	className = strings.Replace(className, ".", "/", -1)
-	for _, info := range c.GetData() {
-		if memberInfo, ok := info.(*ConstantMemberrefInfo); ok {
-			if classInfo := c.GetClassName(int(memberInfo.ClassIndex)); classInfo == className {
-				if v, ok := c.IndexInfo(int(memberInfo.NameAndTypeIndex)).(*ConstantNameAndTypeInfo); ok {
-					nameStr := c.GetUtf8(int(v.NameIndex))
-					descStr := c.GetUtf8(int(v.DescriptorIndex))
-					if nameStr != nil && nameStr.Value == methodName && descStr != nil && descStr.Value == desc {
-						return memberInfo
-					}
-				}
-			}
-		}
-	}
+	// for _, info := range c.GetData() {
+	// 	if memberInfo, ok := info.(*ConstantMemberrefInfo); ok {
+	// 		if classInfo := c.GetClassName(int(memberInfo.ClassIndex)); classInfo == className {
+	// 			if v, ok := c.IndexInfo(int(memberInfo.NameAndTypeIndex)).(*ConstantNameAndTypeInfo); ok {
+	// 				nameStr := c.GetUtf8(int(v.NameIndex))
+	// 				descStr := c.GetUtf8(int(v.DescriptorIndex))
+	// 				if nameStr != nil && nameStr.Value == methodName && descStr != nil && descStr.Value == desc {
+	// 					return memberInfo
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// }
 	classIndex := c.AddNewClassInfo(className)
 	methodNameIndex := c.AddUtf8Info(methodName)
 	descIndex := c.AddUtf8Info(desc)
