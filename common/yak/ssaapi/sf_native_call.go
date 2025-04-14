@@ -915,6 +915,7 @@ func init() {
 				return nil
 			})
 			if len(vals) > 0 {
+				fmt.Println("getFormalParams: ", vals)
 				return true, sfvm.NewValues(vals), nil
 			}
 			return false, nil, utils.Error("no value(formal params) found")
