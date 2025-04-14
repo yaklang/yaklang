@@ -1,6 +1,6 @@
 # Background
 你需要根据材料和ResultSchema输出对应的JSON内容（只输出JSON就好，不用解释）。
-# Material
+# Basic Progress ToolCall and Memory
 {{ .Memory.OS }}-{{ .Memory.Arch }}-{{ .Memory.Now }}
 {{ .Memory.Progress }}
 {{ .Memory.PromptForToolCallResultsForLast5  }}
