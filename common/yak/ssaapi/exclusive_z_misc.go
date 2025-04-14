@@ -1,8 +1,8 @@
 package ssaapi
 
 import (
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
@@ -95,7 +95,7 @@ func (i *Value) AppendEffectOn(vs ...*Value) *Value {
 }
 
 func MergeValues(vs ...Values) Values {
-	tmp := make(map[int64]*Value)
+	tmp := omap.NewEmptyOrderedMap[int64, *Value]()
 	templateValue := make(Values, 0)
 	checkAndMerge := func(v *Value) {
 		if utils.IsNil(v) {
@@ -106,24 +106,24 @@ func MergeValues(vs ...Values) Values {
 			templateValue = append(templateValue, v)
 			return
 		}
-		if exist, has := tmp[v.GetId()]; has {
+		if val, exist := tmp.Get(v.GetId()); exist {
 			// merge v to existValue
 			for _, effect := range v.EffectOn {
 				effect.DependOn = utils.RemoveSliceItem(effect.DependOn, v)
-				exist.AppendEffectOn(effect)
+				val.AppendEffectOn(effect)
 			}
 
 			for _, depend := range v.DependOn {
 				depend.EffectOn = utils.RemoveSliceItem(depend.EffectOn, v)
-				exist.AppendDependOn(depend)
+				val.AppendDependOn(depend)
 			}
 
 			for _, pred := range v.Predecessors {
-				exist.Predecessors = utils.AppendSliceItemWhenNotExists(exist.Predecessors, pred)
+				val.Predecessors = utils.AppendSliceItemWhenNotExists(val.Predecessors, pred)
 			}
 		} else {
 			// set v is exist
-			tmp[v.GetId()] = v
+			tmp.Set(v.GetId(), v)
 		}
 	}
 	for _, vs := range vs {
@@ -131,5 +131,6 @@ func MergeValues(vs ...Values) Values {
 			checkAndMerge(v)
 		}
 	}
-	return append(lo.Values(tmp), templateValue...)
+	values := append(tmp.Values(), templateValue...)
+	return values
 }

@@ -759,6 +759,16 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			if vs == nil {
 				return utils.Errorf("new ref failed: empty value: %v", i.UnaryStr)
 			}
+			var operator0 ValueOperator
+			count := 0
+			vs.Recursive(func(operator ValueOperator) error {
+				if count == 0 {
+					operator0 = operator
+				}
+				count++
+				return nil
+			})
+			_ = operator0
 			s.debugSubLog(">> get value: %v ", vs)
 			s.stack.Push(vs)
 		} else {
