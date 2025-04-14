@@ -11,12 +11,17 @@ import (
 	"path/filepath"
 )
 
-func GetTestSuiteAICallback(modelName ...string) aid.AICallbackType {
-	var model string = "qwq-plus"
+func getTestSuiteAICallback(fileName string, typeName string, modelName ...string) aid.AICallbackType {
+	var model string
 	if len(modelName) > 0 {
 		model = modelName[0]
 	}
-	keyPath := filepath.Join(consts.GetDefaultYakitBaseDir(), "tongyi-apikey.txt")
+
+	if model == "" {
+		log.Errorf("getTestSuiteAICallback: model name is empty")
+	}
+
+	keyPath := filepath.Join(consts.GetDefaultYakitBaseDir(), fileName)
 	apikey, err := os.ReadFile(keyPath)
 	if err != nil {
 		panic(err)
@@ -40,10 +45,10 @@ func GetTestSuiteAICallback(modelName ...string) aid.AICallbackType {
 				aispec.WithReasonStreamHandler(func(c io.Reader) {
 					rsp.EmitReasonStream(c)
 				}),
-				aispec.WithType("tongyi"),
+				aispec.WithType(typeName),
 				aispec.WithModel(model),
 				aispec.WithAPIKey(string(apikey)),
-				// aispec.WithDomain("api.siliconflow.cn"),
+				// aispec.WithProxy("http://127.0.0.1:7890"),
 			)
 			if err != nil {
 				log.Errorf("chat error: %v", err)
@@ -52,4 +57,25 @@ func GetTestSuiteAICallback(modelName ...string) aid.AICallbackType {
 		return rsp, nil
 	}
 	return aiCallback
+}
+
+func GetOpenRouterAICallback(modelName ...string) aid.AICallbackType {
+	if len(modelName) == 0 {
+		modelName = []string{"google/gemini-2.0-flash-001"}
+	}
+	return getTestSuiteAICallback("openrouter.txt", "openrouter", modelName...)
+}
+
+func GetGLMAICallback(modelName ...string) aid.AICallbackType {
+	if len(modelName) == 0 {
+		modelName = []string{"glm-4-flash"}
+	}
+	return getTestSuiteAICallback("chatglm.txt", "chatglm", modelName...)
+}
+
+func GetQwenAICallback(modelName ...string) aid.AICallbackType {
+	if len(modelName) == 0 {
+		modelName = []string{"qwq-32b"}
+	}
+	return getTestSuiteAICallback("tongyi-apikey.txt", "tongyi", modelName...)
 }
