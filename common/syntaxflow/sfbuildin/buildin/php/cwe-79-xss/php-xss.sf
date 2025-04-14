@@ -16,6 +16,9 @@ TEXT
 
 $method(* as $param);
 
+$param #{
+    include: `<self> & $extraValue`
+}-> as $allRisk
 $param#{
     include:`<self> & $extraValue`,
     exclude: `<self>?{opcode: call}`
@@ -30,7 +33,7 @@ alert $high for{
 
 $param#{
     include: `<self> & $extraValue`,
-    include: `<self>?{opcode: call && !<self><getCallee> & $function}`
+    exclude: `<self>?{opcode: call && <self><getCallee> & $function}`
 }-> as $middle
 
 alert $middle for{
@@ -40,10 +43,7 @@ alert $middle for{
     level: 'mid'
 }
 
-$param#{
-    include: `<self> & $extraValue`,
-    include: `<self>?{opcode: call && <self><getCallee> & $function}`
-}-> as $low
+$allRisk - $high - $middle as $low
 
 alert $low for {
     title: 'xss vulnerability exists. Parameters are checked out and filtered by functions',

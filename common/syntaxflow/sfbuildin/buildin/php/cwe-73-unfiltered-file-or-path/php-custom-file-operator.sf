@@ -22,6 +22,10 @@ $read + $write + $unlink as $source
 $source(* as $param)
 
 $param#{
+    include: `<self> & $params`
+}-> as $all
+
+$param#{
     include: `<self> & $params`,
     exclude: `<self>?{opcode: call}`
 }-> as $high
@@ -34,7 +38,7 @@ alert $high for{
 
 $param #{
     include: `<self>& $params`,
-    include: `*?{opcode: call && !<self><getCallee> & $filter}`
+    exclude: `*?{opcode: call && <self><getCallee> & $filter}`
 }-> as $middle
 
 alert $middle for{
@@ -44,10 +48,7 @@ alert $middle for{
     level: 'mid'
 }
 
-$param #{
-    include: `<self> & $params`,
-    include: `*?{opcode: call && <self><getCallee> & $filter}`
-}-> as $low
+$all - $high - $middle as $low
 
 alert $low for{
     title_zh: '存在文件操作，文件操作经过函数，检出过滤',
