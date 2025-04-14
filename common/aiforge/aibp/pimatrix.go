@@ -20,6 +20,9 @@ var pimatrixInitPrompt string
 //go:embed pimatrix_prompts/result.txt
 var pimatrixResultPrompt string
 
+//go:embed pimatrix_prompts/plan.txt
+var pimatrixPlanMock string
+
 type PIMatrixResult struct {
 	action      *aid.Action
 	Probability float64 `json:"probability"`
@@ -31,6 +34,14 @@ type PIMatrixResult struct {
 func newPIMatrixForge(callback func(result *PIMatrixResult), opts ...aid.Option) *aiforge.ForgeBlueprint {
 	forge := aiforge.NewForgeBlueprint(
 		"pimatrix",
+		aiforge.WithPlanMocker(func(config *aid.Config) *aid.PlanResponse {
+			result, err := aid.ExtractPlan(config, pimatrixPlanMock)
+			if err != nil {
+				config.EmitError("pimatrix plan mock failed: %s", err)
+				return nil
+			}
+			return result
+		}),
 		aiforge.WithInitializePrompt(pimatrixInitPrompt),
 		aiforge.WithPersistentPrompt(pimatrixPersistentPrompts),
 		aiforge.WithResultPrompt(pimatrixResultPrompt),
@@ -60,6 +71,7 @@ func newPIMatrixForge(callback func(result *PIMatrixResult), opts ...aid.Option)
 		aiforge.WithAIDOptions(append(
 			opts,
 			aid.WithYOLO(true),
+			aid.WithDisableToolUse(true),
 		)...),
 	)
 	return forge

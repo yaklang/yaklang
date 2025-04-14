@@ -42,7 +42,7 @@ var PlanReviewSuggestions = []*PlanReviewSuggestion{
 	},
 }
 
-func (p *planRequest) handleReviewPlanResponse(rsp *planResponse, param aitool.InvokeParams) (*planResponse, error) {
+func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.InvokeParams) (*PlanResponse, error) {
 	if utils.IsNil(rsp) {
 		return nil, utils.Error("plan response is nil")
 	}
@@ -93,7 +93,7 @@ func (p *planRequest) handleReviewPlanResponse(rsp *planResponse, param aitool.I
 }
 
 // generateNewPlan 生成新的计划
-func (p *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp *planResponse) (*planResponse, error) {
+func (p *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp *PlanResponse) (*PlanResponse, error) {
 	tmpl, err := template.New("plan-review").Parse(planReviewPrompts)
 	if err != nil {
 		return nil, utils.Errorf("error parsing plan review prompt: %v", err)
@@ -127,7 +127,7 @@ func (p *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp
 		return nil, utils.Errorf("error reading AI response: %v", err)
 	}
 
-	task, err := p.extractTaskFromRawResponse(string(taskResponse))
+	task, err := ExtractTaskFromRawResponse(p.config, string(taskResponse))
 	if err != nil {
 		return nil, utils.Errorf("error extracting task from raw response: %v", err)
 	}
@@ -141,9 +141,9 @@ func (p *planRequest) mergePlans(newPlan *planRequest) {
 }
 
 // adjustTaskDifficulty 调整任务难度
-func (p *planRequest) adjustTaskDifficulty(rsp *planResponse) error {
+func (p *planRequest) adjustTaskDifficulty(rsp *PlanResponse) error {
 	// 从当前计划中提取任务
-	task, err := p.extractTaskFromRawResponse(p.rawInput)
+	task, err := ExtractTaskFromRawResponse(p.config, p.rawInput)
 	if err != nil {
 		return utils.Errorf("error extracting task: %v", err)
 	}

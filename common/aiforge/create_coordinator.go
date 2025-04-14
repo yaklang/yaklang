@@ -20,6 +20,7 @@ func (t *ForgeBlueprint) CreateCoordinator(ctx context.Context, params []*ypb.Ex
 	if err != nil {
 		return nil, err
 	}
+	extraOpts = append(extraOpts, aid.WithForgeParams(params))
 	extraOpts = append(extraOpts, opts...)
 	return aid.NewCoordinatorContext(ctx, firstQuery, extraOpts...)
 }
