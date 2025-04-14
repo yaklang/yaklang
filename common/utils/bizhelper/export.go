@@ -32,13 +32,14 @@ var (
 type MetaData = map[string]any
 
 type ExportConfig struct {
-	FilePath          string
-	IsEncrypted       bool
-	PreWriteHandler   func(name string, b []byte, metadata MetaData) (newName string, new []byte)
-	AfterWriteHandler func(name string, b []byte, metadata MetaData)
-	MetaData          MetaData
-	Password          string // Password for encrypted file
-	IndexField        string // for yield model
+	FilePath           string
+	IsEncrypted        bool
+	PreWriteHandler    func(name string, b []byte, metadata MetaData) (newName string, new []byte)
+	AfterWriteHandler  func(name string, b []byte, metadata MetaData)
+	MetaData           MetaData
+	Password           string // Password for encrypted file
+	IndexField         string // for yield model
+	AfterCreateHandler func(name string, b []byte, metadata MetaData) error
 }
 
 func NewExportConfig(filepath string) *ExportConfig {
@@ -79,13 +80,14 @@ func WithExportMetadata(metadata MetaData) ExportOption {
 }
 
 type ImportConfig struct {
-	FilePath         string
-	IsEncrypted      bool
-	Password         string // Password for encrypted file
-	MetaDataHandler  func(metadata MetaData) error
-	PreReadHandler   func(name string, b []byte, metadata MetaData) (new []byte, err error)
-	AfterReadHandler func(name string, b []byte, metadata MetaData)
-	ErrorHandler     func(err error) (newErr error)
+	FilePath           string
+	IsEncrypted        bool
+	Password           string // Password for encrypted file
+	MetaDataHandler    func(metadata MetaData) error
+	PreReadHandler     func(name string, b []byte, metadata MetaData) (new []byte, err error)
+	AfterReadHandler   func(name string, b []byte, metadata MetaData)
+	ErrorHandler       func(err error) (newErr error)
+	AfterCreateHandler func(b []byte, err error) error
 }
 
 func NewImportConfig(filepath string) *ImportConfig {
@@ -131,6 +133,12 @@ func WithImportAfterReadHandler(handler func(name string, b []byte, metadata Met
 func WithImportErrorHandler(handler func(err error) (newErr error)) ImportOption {
 	return func(config *ImportConfig) {
 		config.ErrorHandler = handler
+	}
+}
+
+func WithAfterCreateHandler(handler func(b []byte, err error) error) ImportOption {
+	return func(config *ImportConfig) {
+		config.AfterCreateHandler = handler
 	}
 }
 
@@ -254,6 +262,9 @@ func ImportTableZip[T any](ctx context.Context, db *gorm.DB, filepath string, op
 			}
 		}
 		if err = db.Create(d).Error; err != nil {
+			if err = config.AfterCreateHandler(b, err); err != nil {
+				return err
+			}
 			if err = config.CallErrorHandler(err); err != nil {
 				return err
 			}

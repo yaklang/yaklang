@@ -1,9 +1,8 @@
 package yakgrpc
 
 import (
+	"encoding/json"
 	"errors"
-	"fmt"
-
 	"github.com/mattn/go-sqlite3"
 	"github.com/samber/lo"
 	"github.com/tidwall/sjson"
@@ -112,19 +111,43 @@ func (s *Server) ImportSyntaxFlows(req *ypb.ImportSyntaxFlowsRequest, stream ypb
 		})
 	}))
 
-	opts = append(opts, bizhelper.WithImportErrorHandler(func(err error) (newErr error) {
+	//opts = append(opts, bizhelper.WithImportErrorHandler(func(err error) (newErr error) {
+	//	var sqlErr sqlite3.Error
+	//	if errors.As(err, &sqlErr) && sqlErr.Code == sqlite3.ErrConstraint {
+	//		// ignore duplicate error, just send message
+	//		err = nil
+	//		stream.Send(&ypb.SyntaxflowsProgress{
+	//			Verbose: fmt.Sprintf("duplicate rule, skip: %s", sqlErr.Error()),
+	//		})
+	//	}
+	//	return err
+	//}))
+
+	ruleDB := db.Model(&schema.SyntaxFlowRule{})
+	opts = append(opts, bizhelper.WithAfterCreateHandler(func(b []byte, err error) error {
+		if err == nil {
+			return nil
+		}
 		var sqlErr sqlite3.Error
-		if errors.As(err, &sqlErr) && sqlErr.Code == sqlite3.ErrConstraint {
-			// ignore duplicate error, just send message
-			err = nil
-			stream.Send(&ypb.SyntaxflowsProgress{
-				Verbose: fmt.Sprintf("duplicate rule, skip: %s", sqlErr.Error()),
+		if errors.As(err, &sqlErr) && errors.Is(sqlErr.Code, sqlite3.ErrConstraint) {
+			data := &schema.SyntaxFlowRule{}
+			json.Unmarshal(b, &data)
+			_, err = yakit.UpdateSyntaxFlowRule(db, &ypb.SyntaxFlowRuleInput{
+				RuleName:    data.RuleName,
+				Content:     data.Content,
+				Language:    data.Language,
+				Tags:        []string{data.Tag},
+				Description: data.Description,
 			})
+			if err != nil {
+				return utils.Wrap(err, "update syntax flow rule failed")
+			} else {
+				return nil
+			}
 		}
 		return err
 	}))
 
-	ruleDB := db.Model(&schema.SyntaxFlowRule{})
 	err := bizhelper.ImportTableZip[*schema.SyntaxFlowRule](stream.Context(), ruleDB, req.GetInputPath(), opts...)
 	if err != nil {
 		return err
