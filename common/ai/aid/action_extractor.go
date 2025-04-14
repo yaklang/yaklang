@@ -44,6 +44,10 @@ func (q *Action) GetInvokeParams(key string) aitool.InvokeParams {
 	return q.params.GetObject(key)
 }
 
+func (q *Action) GetInvokeParamsArray(key string) []aitool.InvokeParams {
+	return q.params.GetObjectArray(key)
+}
+
 func ExtractAction(i string, actionName string, alias ...string) (*Action, error) {
 	ac := &Action{
 		name:   actionName,
