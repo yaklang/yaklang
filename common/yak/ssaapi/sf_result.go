@@ -76,14 +76,14 @@ func (r *SyntaxFlowResult) setMemoryResult(res *sfvm.SFFrameResult) {
 			fileI := rangeI.GetEditor().GetFilename()
 			fileJ := rangeJ.GetEditor().GetFilename()
 			if fileI != fileJ {
-				return fileI > fileJ // i > j
+				return fileI < fileJ // i < j // 文件名小的在前
 			}
 			offsetI := rangeI.GetStartOffset()
 			offsetJ := rangeJ.GetStartOffset()
 			if offsetI != offsetJ {
-				return offsetI > offsetJ // i > j
+				return offsetI < offsetJ // i < j // 偏移小的在前
 			}
-			return i > j // all same just by index
+			return i < j // all same just by index
 		})
 		return s, values, nil
 	})
