@@ -186,8 +186,9 @@ func (value Values) ListIndex(i int) (sfvm.ValueOperator, error) {
 }
 
 func (vs Values) Merge(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
-	sf = append(sf, vs)
-	return MergeSFValueOperator(sf...), nil
+	var vals = []sfvm.ValueOperator{vs}
+	vals = append(vals, sf...)
+	return MergeSFValueOperator(vals...), nil
 }
 
 func (value Values) Remove(values ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
