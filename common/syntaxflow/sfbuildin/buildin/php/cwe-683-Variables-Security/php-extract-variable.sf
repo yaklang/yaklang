@@ -9,7 +9,10 @@ desc(
 TEXT
 )
 
-<include('php-param')> as $source;
+<include('php-param')> as $source1;
+/_GET|_POST|_REQUEST|_COOKIE|_SERVER|_ENV|_FILES|_GLOBALS/ as $source2;
+
+$source1 + $source2 as $source;
 <include('php-filter-function')> as $filter;
 extract(* as $output);
 
