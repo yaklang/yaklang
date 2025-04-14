@@ -46,6 +46,9 @@ type Config struct {
 	eventInputChan chan *InputEvent
 	epm            *endpointManager
 
+	// plan mocker
+	planMocker func(*Config) *PlanResponse
+
 	// need to think
 	coordinatorAICallback AICallbackType
 	planAICallback        AICallbackType
@@ -498,6 +501,39 @@ func WithAppendPersistentMemory(i ...string) Option {
 		defer config.m.Unlock()
 		config.persistentMemory = append(config.persistentMemory, i...)
 		config.memory.StoreAppendPersistentInfo(i...)
+		return nil
+	}
+}
+
+func WithPlanMocker(i func(*Config) *PlanResponse) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.planMocker = i
+		return nil
+	}
+}
+
+func WithForgeParams(i any) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		result := utils.Jsonify(i)
+		config.memory.StoreAppendPersistentInfo(fmt.Sprintf(`用户原始输入：` + string(result)))
+		return nil
+	}
+}
+
+func WithDisableToolUse(i ...bool) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+
+		if len(i) <= 0 {
+			config.memory.DisableTools = true
+		} else {
+			config.memory.DisableTools = i[0]
+		}
 		return nil
 	}
 }

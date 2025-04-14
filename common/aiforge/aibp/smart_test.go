@@ -31,7 +31,7 @@ func TestSmart(t *testing.T) {
 `},
 		},
 		aid.WithDebugPrompt(true),
-		aid.WithAICallback(GetQwenAICallback("qwen-plus")),
+		aid.WithAICallback(GetOpenRouterAICallbackWithProxy()),
 	)
 	if err != nil {
 		t.Fatal(err)
