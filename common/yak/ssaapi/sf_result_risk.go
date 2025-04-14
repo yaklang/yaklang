@@ -86,9 +86,9 @@ func buildSSARisk(
 	riskCodeRange, CodeFragment := CoverCodeRange(progName, value.GetRange())
 	rule := result.rule
 	newSSARisk := &schema.SSARisk{
-		CodeSourceUrl: riskCodeRange.URL,
+		CodeSourceUrl: utils.EscapeInvalidUTF8Byte([]byte(riskCodeRange.URL)),
 		CodeRange:     riskCodeRange.JsonString(),
-		CodeFragment:  CodeFragment,
+		CodeFragment:  utils.EscapeInvalidUTF8Byte([]byte(CodeFragment)),
 		Title:         rule.Title,
 		TitleVerbose:  rule.TitleZh,
 		Description:   rule.Description,
@@ -105,7 +105,7 @@ func buildSSARisk(
 		Variable: variable,
 		Index:    int64(index),
 
-		FunctionName: value.GetFunction().GetName(),
+		FunctionName: utils.EscapeInvalidUTF8Byte([]byte(value.GetFunction().GetName())),
 		Line:         riskCodeRange.StartLine,
 	}
 
