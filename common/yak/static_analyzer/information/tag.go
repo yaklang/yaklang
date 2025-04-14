@@ -24,9 +24,19 @@ func ParseTags(prog *ssaapi.Program) []string {
 
 	{
 		if res, err := prog.SyntaxFlowWithError(`
-		hijackHTTPRequest(, , ,*() as $forward , *() as $drop)
-		hijackHTTPResponse(, , ,*() as $forward , *() as $drop)
-		hijackHTTPResponseEx(, , ,, *() as $forward , *() as $drop)
+		hijackHTTPRequest<getFormalParams> as $hijackHTTPRequest
+		hijackHTTPResponse<getFormalParams> as $hijackHTTPResponse
+		hijackHTTPResponseEx<getFormalParams> as $hijackHTTPResponseEx
+		$hijackHTTPRequest<slice(index=3)> as $forwardFunc1
+		$hijackHTTPResponse<slice(index=3)> as $forwardFunc2
+		$hijackHTTPResponseEx<slice(index=4)> as $forwardFunc3
+		$forwardFunc1+$forwardFunc2+$forwardFunc3 as $forwardFunc
+		$hijackHTTPRequest<slice(index=4)> as $drop1
+		$hijackHTTPResponse<slice(index=4)> as $drop2
+		$hijackHTTPResponseEx<slice(index=5)> as $drop3
+		$drop1+$drop2+$drop3 as $dropFunc
+		$forwardFunc() as $forward
+		$dropFunc() as $drop
 		`); err == nil {
 			if vs := res.GetValues("forward"); vs.Len() > 0 {
 				ret = append(ret, FORWARD_HTTP_PACKET)
