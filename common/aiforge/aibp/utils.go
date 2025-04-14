@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 )
 
-func getTestSuiteAICallback(fileName string, typeName string, modelName ...string) aid.AICallbackType {
+func getTestSuiteAICallback(fileName string, opts []aispec.AIConfigOption, typeName string, modelName ...string) aid.AICallbackType {
 	var model string
 	if len(modelName) > 0 {
 		model = modelName[0]
@@ -34,22 +34,20 @@ func getTestSuiteAICallback(fileName string, typeName string, modelName ...strin
 	log.Infof("primary ai engien: %v", consts.GetAIPrimaryType())
 	aiCallback := func(config *aid.Config, req *aid.AIRequest) (*aid.AIResponse, error) {
 		rsp := config.NewAIResponse()
+
 		go func() {
 			defer rsp.Close()
 			//fmt.Println(req.GetPrompt())
-			_, err := ai.Chat(
-				req.GetPrompt(),
-				aispec.WithStreamHandler(func(c io.Reader) {
-					rsp.EmitOutputStream(c)
-				}),
+			opts = append(opts, aispec.WithStreamHandler(func(c io.Reader) {
+				rsp.EmitOutputStream(c)
+			}),
 				aispec.WithReasonStreamHandler(func(c io.Reader) {
 					rsp.EmitReasonStream(c)
 				}),
 				aispec.WithType(typeName),
 				aispec.WithModel(model),
-				aispec.WithAPIKey(string(apikey)),
-				// aispec.WithProxy("http://127.0.0.1:7890"),
-			)
+				aispec.WithAPIKey(string(apikey)))
+			_, err := ai.Chat(req.GetPrompt(), opts...)
 			if err != nil {
 				log.Errorf("chat error: %v", err)
 			}
@@ -63,19 +61,28 @@ func GetOpenRouterAICallback(modelName ...string) aid.AICallbackType {
 	if len(modelName) == 0 {
 		modelName = []string{"google/gemini-2.0-flash-001"}
 	}
-	return getTestSuiteAICallback("openrouter.txt", "openrouter", modelName...)
+	return getTestSuiteAICallback("openrouter.txt", nil, "openrouter", modelName...)
+}
+
+func GetOpenRouterAICallbackWithProxy(modelName ...string) aid.AICallbackType {
+	if len(modelName) == 0 {
+		modelName = []string{"google/gemini-2.0-flash-001"}
+	}
+	return getTestSuiteAICallback("openrouter.txt", []aispec.AIConfigOption{
+		aispec.WithProxy("http://127.0.0.1:7890"),
+	}, "openrouter", modelName...)
 }
 
 func GetGLMAICallback(modelName ...string) aid.AICallbackType {
 	if len(modelName) == 0 {
 		modelName = []string{"glm-4-flash"}
 	}
-	return getTestSuiteAICallback("chatglm.txt", "chatglm", modelName...)
+	return getTestSuiteAICallback("chatglm.txt", nil, "chatglm", modelName...)
 }
 
 func GetQwenAICallback(modelName ...string) aid.AICallbackType {
 	if len(modelName) == 0 {
 		modelName = []string{"qwq-32b"}
 	}
-	return getTestSuiteAICallback("tongyi-apikey.txt", "tongyi", modelName...)
+	return getTestSuiteAICallback("tongyi-apikey.txt", nil, "tongyi", modelName...)
 }

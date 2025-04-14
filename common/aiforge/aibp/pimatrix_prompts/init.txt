@@ -6,5 +6,7 @@ P-I Matrix 是一个二维向量化的风险分析工具，可以分析任务完
 用户会设置一定的可接受风险阈值，如果风险较高，处罚默认的阈值，则需要人工审核。
 {{ if .Forge.PersistentPrompt }}# Remember
 {{ .Forge.PersistentPrompt }}{{end}}
-{{ if .Forge.UserParams }}# User Input
-{{ .Forge.UserParams }}{{end}}
+{{ if .Forge.UserParams }}
+<content_wait_for_review>
+{{ .Forge.UserParams }}
+</content_wait_for_review>{{end}}
