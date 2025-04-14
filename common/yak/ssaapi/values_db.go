@@ -168,7 +168,7 @@ func (s *saveValueCtx) SaveNode(value *Value) (*ssadb.AuditNode, error) {
 	return an, nil
 }
 
-func (s *saveValueCtx) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
+func (s *saveValueCtx) getNeighbors(value *Value, visited *map[*Value]map[*Value]bool) []*graph.Neighbor[*Value] {
 	if value == nil {
 		return nil
 	}
@@ -191,6 +191,7 @@ func (s *saveValueCtx) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
 				s.getNeighborsDependOn,
 				s.getNeighborsEffectOn,
 				s.SaveEdge,
+				visited,
 			)
 
 			neighbor := graph.NewNeighbor(pred.Node, "")

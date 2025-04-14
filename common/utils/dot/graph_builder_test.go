@@ -25,7 +25,7 @@ func TestGraph_Builder(t *testing.T) {
 				NodeToKey[node] = nodeId
 				return nodeId, nil
 			},
-			func(node string) []*graph.Neighbor[string] {
+			func(node string, visited *map[string]map[string]bool) []*graph.Neighbor[string] {
 				switch node {
 				case "n1":
 					return []*graph.Neighbor[string]{
@@ -151,11 +151,13 @@ func TestGraph_Builder(t *testing.T) {
 					dotGraph.AddEdge(fromKey, toKey, "")
 				}
 			},
+			&map[string]map[string]bool{},
 		)
 
 		// from n1 to n5
 		NodeToKey = map[string]int{}
 		builder.BuildGraph("n1", "n5")
+		builder.ResetVisited()
 
 		var buf bytes.Buffer
 		dotGraph.GenerateDOT(&buf)
@@ -196,6 +198,7 @@ func TestGraph_Builder(t *testing.T) {
 		// from n1 to n6
 		NodeToKey = map[string]int{}
 		builder.BuildGraph("n1", "n6")
+		builder.ResetVisited()
 
 		dotGraph.GenerateDOT(&buf)
 		fmt.Println(buf.String())
