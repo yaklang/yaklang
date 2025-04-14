@@ -184,7 +184,8 @@ func ChatBase(
 		return "", utils.Errorf("build msg[%v] to json failed: %s", string(raw), err)
 	}
 	opts = append(opts, poc.WithReplaceHttpPacketBody(raw, false))
-	opts = append(opts, poc.WithConnectTimeout(5))
+	opts = append(opts, poc.WithConnectTimeout(10))
+	opts = append(opts, poc.WithRetryTimes(3))
 
 	var pr, reasonPr io.Reader
 	var cancel context.CancelFunc
@@ -379,6 +380,8 @@ func ChatExBase(url string, model string, details []ChatDetail, function []Funct
 		return nil, utils.Errorf("marshal message failed: %v", err)
 	}
 	opts = append(opts, poc.WithReplaceHttpPacketBody(raw, false))
+	opts = append(opts, poc.WithConnectTimeout(10))
+	opts = append(opts, poc.WithRetryTimes(3))
 
 	if handleStream {
 		var pr io.Reader
