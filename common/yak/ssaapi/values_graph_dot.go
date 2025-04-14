@@ -76,7 +76,7 @@ func (g *ValueGraph) createNode(value *Value) (int, error) {
 	return nodeId, nil
 }
 
-func (g *ValueGraph) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
+func (g *ValueGraph) getNeighbors(value *Value, visited *map[*Value]map[*Value]bool) []*graph.Neighbor[*Value] {
 	if value == nil {
 		return nil
 	}
