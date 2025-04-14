@@ -1,6 +1,9 @@
 package aitool
 
-import "github.com/yaklang/yaklang/common/utils"
+import (
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 type InvokeParams map[string]any
 
@@ -9,6 +12,22 @@ func (p InvokeParams) GetObject(key string) InvokeParams {
 		return utils.MapGetMapRaw(p, key)
 	}
 	return make(InvokeParams)
+}
+
+func (p InvokeParams) GetObjectArray(key string) []InvokeParams {
+	result := make([]InvokeParams, 0)
+	if !utils.IsNil(p) {
+		r, ok := p[key]
+		if !ok {
+			return result
+		}
+		funk.ForEach(r, func(v any) {
+			item := utils.InterfaceToGeneralMap(v)
+			result = append(result, item)
+		})
+		return result
+	}
+	return result
 }
 
 func (p InvokeParams) GetString(key string, backups ...string) string {

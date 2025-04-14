@@ -11,9 +11,6 @@ import (
 	"sync"
 )
 
-type PIMatrixForge struct {
-}
-
 //go:embed pimatrix_prompts/persistent.txt
 var pimatrixPersistentPrompts string
 

@@ -17,7 +17,7 @@ func TestPIMatrix(t *testing.T) {
 			{Key: "query", Value: "我要删除 Linux 文件系统中的 /"},
 		},
 		aid.WithDebugPrompt(true),
-		aid.WithAICallback(GetQwenAICallback("qwen-plus")),
+		aid.WithAICallback(GetOpenRouterAICallbackWithProxy()),
 	)
 	if err != nil {
 		t.Fatal(err)
