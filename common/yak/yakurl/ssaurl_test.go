@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -24,6 +26,21 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func CheckSSADB(local ypb.YakClient, path string) error {
+	url := &ypb.RequestYakURLParams{
+		Method: "GET",
+		Url: &ypb.YakURL{
+			Schema: "ssadb",
+			Path:   path,
+		},
+	}
+	res, err := local.RequestYakURL(context.Background(), url)
+	if err != nil {
+		return err
+	}
+	spew.Dump(res)
+	return nil
+}
 func SendURL(local ypb.YakClient, program, path string, body string) ([]*ypb.YakURLResource, error) {
 	url := &ypb.RequestYakURLParams{
 		Method: "GET",
@@ -43,7 +60,44 @@ func SendURL(local ypb.YakClient, program, path string, body string) ([]*ypb.Yak
 	return res.Resources, nil
 }
 
-func CheckSSAURL(t *testing.T, local ypb.YakClient, programName, path, sfCode string, checkHandler func([]*ypb.YakURLResource)) {
+type ssaurlTest struct {
+	programName string
+	local       ypb.YakClient
+
+	DeferFunc []func()
+}
+
+func (s *ssaurlTest) RunDefer() {
+	for _, f := range s.DeferFunc {
+		f()
+	}
+}
+
+func NewSSAURLTest(t *testing.T, vf filesys_interface.FileSystem, opt ...ssaapi.Option) *ssaurlTest {
+	local, err := yakgrpc.NewLocalClient()
+	if err != nil {
+		t.Error(err)
+	}
+	_ = local
+
+	progID := uuid.NewString()
+	opt = append(opt, ssaapi.WithProgramName(progID))
+	prog, err := ssaapi.ParseProjectWithFS(vf, opt...)
+
+	require.NoError(t, err)
+	require.NotNil(t, prog)
+
+	ret := &ssaurlTest{
+		programName: progID,
+		local:       local,
+	}
+	ret.DeferFunc = append(ret.DeferFunc, func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), progID)
+	})
+	return ret
+}
+
+func (s *ssaurlTest) CheckSSAURL(t *testing.T, path, sfCode string, checkHandler func([]*ypb.YakURLResource)) {
 	var resultID string
 	var memoryQuery, cacheQuery, databaseQuery time.Duration
 	{
@@ -52,14 +106,14 @@ func CheckSSAURL(t *testing.T, local ypb.YakClient, programName, path, sfCode st
 			Method: "GET",
 			Url: &ypb.YakURL{
 				Schema:   "syntaxflow",
-				Location: programName,
+				Location: s.programName,
 				Path:     path,
 			},
 			Body: []byte(sfCode),
 		}
 
 		start := time.Now()
-		res, err := local.RequestYakURL(context.Background(), url)
+		res, err := s.local.RequestYakURL(context.Background(), url)
 		require.NoError(t, err)
 		memoryQuery = time.Since(start)
 		t.Log("checkHandler in memory query ")
@@ -81,7 +135,7 @@ func CheckSSAURL(t *testing.T, local ypb.YakClient, programName, path, sfCode st
 			Method: "GET",
 			Url: &ypb.YakURL{
 				Schema:   "syntaxflow",
-				Location: programName,
+				Location: s.programName,
 				Path:     path,
 				Query: []*ypb.KVPair{
 					{
@@ -93,7 +147,7 @@ func CheckSSAURL(t *testing.T, local ypb.YakClient, programName, path, sfCode st
 			},
 		}
 		start := time.Now()
-		res, err := local.RequestYakURL(context.Background(), url)
+		res, err := s.local.RequestYakURL(context.Background(), url)
 		require.NoError(t, err)
 		cacheQuery = time.Since(start)
 		t.Log("checkHandler in database query ")
@@ -111,7 +165,7 @@ func CheckSSAURL(t *testing.T, local ypb.YakClient, programName, path, sfCode st
 
 	{
 		// send query from database
-		prog, err := ssaapi.FromDatabase(programName)
+		prog, err := ssaapi.FromDatabase(s.programName)
 		require.NoError(t, err)
 		result := prog.SyntaxFlow(sfCode)
 		resultID, err := result.Save(schema.SFResultKindDebug)
@@ -120,7 +174,7 @@ func CheckSSAURL(t *testing.T, local ypb.YakClient, programName, path, sfCode st
 			Method: "GET",
 			Url: &ypb.YakURL{
 				Schema:   "syntaxflow",
-				Location: programName,
+				Location: s.programName,
 				Path:     path,
 				Query: []*ypb.KVPair{
 					{
@@ -132,7 +186,7 @@ func CheckSSAURL(t *testing.T, local ypb.YakClient, programName, path, sfCode st
 			},
 		}
 		start := time.Now()
-		res, err := local.RequestYakURL(context.Background(), url)
+		res, err := s.local.RequestYakURL(context.Background(), url)
 		require.NoError(t, err)
 		databaseQuery = time.Since(start)
 		t.Log("checkHandler in database query ")
@@ -156,24 +210,79 @@ func CheckSSAURL(t *testing.T, local ypb.YakClient, programName, path, sfCode st
 	// assert.True(t, (databaseQuery-memoryQuery)/memoryQuery < 1)
 }
 
-func checkVariable(t *testing.T, res []*ypb.YakURLResource, want []string) {
-	got := lo.FilterMap(res, func(r *ypb.YakURLResource, _ int) (string, bool) {
-		return r.ResourceName, r.ResourceType == "variable"
+type variableResult struct {
+	variable string
+	number   int
+}
+
+func (s *ssaurlTest) CheckInfo(t *testing.T, sf string, want []string) {
+	s.CheckSSAURL(t, "/", sf, func(res []*ypb.YakURLResource) {
+		got := lo.FilterMap(res, func(r *ypb.YakURLResource, _ int) (string, bool) {
+			if r.ResourceType != "message" {
+				return "", false
+			}
+			return r.VerboseName, true
+		})
+		require.Equal(t, want, got)
 	})
-	require.Len(t, got, len(want))
-	require.Equal(t, want, got)
+}
+func (s *ssaurlTest) CheckVariable(t *testing.T, sf string, want []variableResult) {
+	s.CheckSSAURL(t, "/", sf, func(res []*ypb.YakURLResource) {
+		got := lo.FilterMap(res, func(r *ypb.YakURLResource, _ int) (variableResult, bool) {
+			isVariable := r.ResourceType == "variable"
+			ret := variableResult{
+				variable: r.ResourceName,
+				number:   int(r.Size),
+			}
+			return ret, isVariable
+		})
+		require.Equal(t, want, got)
+	})
+}
+
+type valueResult struct {
+	riskHash bool
+	url      string
+}
+
+func (s *ssaurlTest) CheckValue(t *testing.T, sf string, varaible string, want []valueResult) {
+	s.CheckSSAURL(t, fmt.Sprintf("/%s", varaible), sf, func(res []*ypb.YakURLResource) {
+		got := lo.FilterMap(res, func(r *ypb.YakURLResource, index int) (valueResult, bool) {
+			if r.ResourceType != "value" {
+				return valueResult{}, false
+			}
+			ret := valueResult{}
+			for _, extra := range r.Extra {
+				if extra.Key == "risk_hash" {
+					response, err := s.local.QuerySSARisks(context.Background(), &ypb.QuerySSARisksRequest{
+						Filter: &ypb.SSARisksFilter{
+							Hash: []string{extra.Value},
+						},
+					})
+					require.NoError(t, err)
+					require.Equal(t, 1, len(response.Data))
+					require.Equal(t, extra.Value, response.Data[0].Hash)
+					ret.riskHash = true
+				}
+				if extra.Key == "code_range" {
+					var codeRange ssaapi.CodeRange
+					err := json.Unmarshal([]byte(extra.Value), &codeRange)
+					require.NoError(t, err)
+					log.Infof("codeRange: %v", codeRange)
+					err = CheckSSADB(s.local, codeRange.URL)
+					require.NoError(t, err)
+					splits := strings.Split(codeRange.URL, s.programName)
+					require.Equal(t, 2, len(splits))
+					ret.url = fmt.Sprintf("%s:%d", splits[1], codeRange.StartLine)
+				}
+			}
+			return ret, true
+		})
+		require.Equal(t, want, got)
+	})
 }
 
 func TestSFURL(t *testing.T) {
-	local, err := yakgrpc.NewLocalClient()
-	if err != nil {
-		t.Error(err)
-	}
-	_ = local
-
-	ssadb.DeleteProgram(ssadb.GetDB(), "com.example.apackage")
-	ssadb.DeleteProgram(ssadb.GetDB(), "com.example.bpackage.sub")
-
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("example/src/main/java/com/example/apackage/a.java", `
 		package com.example.apackage; 
@@ -200,135 +309,115 @@ func TestSFURL(t *testing.T) {
 			}
 		}
 		`)
-	progID := uuid.NewString()
-	prog, err := ssaapi.ParseProjectWithFS(vf,
+	s := NewSSAURLTest(t, vf,
 		ssaapi.WithLanguage(consts.JAVA),
 		ssaapi.WithProgramPath("example"),
-		ssaapi.WithProgramName(progID),
 	)
-	defer func() {
-		ssadb.DeleteProgram(ssadb.GetDB(), progID)
-	}()
-	require.NoError(t, err)
-	require.NotNil(t, prog)
+	defer s.RunDefer()
 
 	t.Run("check syntaxflow variable", func(t *testing.T) {
-		CheckSSAURL(t, local, progID, "/",
-			`target2(* #-> as $a)`,
-			func(res []*ypb.YakURLResource) {
-				checkVariable(t, res, []string{"a", "_"})
-			},
-		)
+		s.CheckVariable(t, `target2(* #-> as $a)`, []variableResult{
+			{variable: "a", number: 1},
+			{variable: "_", number: 1},
+		})
 	})
 
 	t.Run("check _", func(t *testing.T) {
-		CheckSSAURL(t, local, progID, "/", `target*`, func(res []*ypb.YakURLResource) {
-			checkVariable(t, res, []string{"_"})
+		s.CheckVariable(t, `target*`, []variableResult{
+			{variable: "_", number: 2},
 		})
-		CheckSSAURL(t, local, progID, "/_", `target*`, func(res []*ypb.YakURLResource) {
-			require.Equal(t, 2, len(res))
+
+		s.CheckValue(t, `target*`, "_", []valueResult{
+			{riskHash: false, url: "/example/src/main/java/com/example/apackage/a.java:8"},
+			{riskHash: false, url: "/example/src/main/java/com/example/bpackage/sub/b.java:8"},
 		})
 	})
 
-	t.Run("check syntaxflow variable no data", func(t *testing.T) {
-		res, err := SendURL(local, progID, "/", `
-		dddd as $a
-		`)
-		require.NoError(t, err)
-		spew.Dump(res)
-		checkVariable(t, res, []string{"a"})
+	t.Run("check syntaxflow vairble no data", func(t *testing.T) {
+		s.CheckVariable(t, "dddd as $a", []variableResult{
+			{variable: "a", number: 0},
+		})
 	})
 
 	t.Run("check syntaxflow variable with alert", func(t *testing.T) {
-		CheckSSAURL(t, local, progID, "/", `
-		target2(* #-> as $a) 
-		target1() as $target1
-		alert $target1 for "alert information"
-		`, func(res []*ypb.YakURLResource) {
-			spew.Dump(res)
-			checkVariable(t, res, []string{"target1", "a", "_"})
-			target1 := res[0]
-			require.Equal(t, target1.VerboseName, "alert information")
-			require.Equal(t, target1.ResourceType, "variable")
-			require.Equal(t, target1.VerboseType, "alert")
+		s.CheckVariable(t, `
+			target2(* #-> as $a) as $target1
+			target1() as $target2
+			$target1 + $target2 as $target 
+			alert $target for "alert information"
+			`, []variableResult{
+			{variable: "target", number: 2},
+			{variable: "a", number: 1},
+			{variable: "target1", number: 1},
+			{variable: "target2", number: 1},
 		})
 	})
 
 	t.Run("check syntaxflow value with alert", func(t *testing.T) {
-		CheckSSAURL(t, local, progID, "/target1", `
-		target2(* #-> as $a) 
-		target1() as $target1
-		alert $target1 for "alert information"
-		`, func(res []*ypb.YakURLResource) {
-			spew.Dump(res)
-			target1 := res[0]
-			require.Equal(t, target1.ResourceType, "value")
-			matchRisk := false
-			for _, extra := range target1.Extra {
-				if extra.Key == "risk_hash" && extra.Value != "" {
-					matchRisk = true
-				}
-			}
-			require.True(t, matchRisk, "should have risk hash")
-		})
+		s.CheckValue(t, `
+			target2(* #-> as $a) as $target1
+			target1() as $target2
+			$target1 + $target2 as $target 
+			alert $target for "alert information"
+			`,
+			"target", []valueResult{
+				{riskHash: true, url: "/example/src/main/java/com/example/apackage/a.java:8"},
+				{riskHash: true, url: "/example/src/main/java/com/example/bpackage/sub/b.java:8"},
+			})
 	})
 
 	t.Run("check syntaxflow variable with check params", func(t *testing.T) {
-		CheckSSAURL(t, local, progID, "/", `
-		target2(* #-> as $a) 
-		$a?{!(opcode: const)} as $not_const_parameter 
-		$a?{(opcode: const)} as $const_parameter
+		rule := `
+			target2(* #-> as $a)
+			$a?{!(opcode: const)} as $not_const_parameter
+			$a?{(opcode: const)} as $const_parameter
 
-		check $const_parameter then "has const parameter" else "no const parameter"
-		check $not_const_parameter then "has not-const parameter" else "no not-const parameter"
-		`, func(res []*ypb.YakURLResource) {
-			spew.Dump(res)
-			checkVariable(t, res, []string{"a", "const_parameter", "not_const_parameter", "_"})
+			check $const_parameter then "has const parameter" else "no const parameter"
+			check $not_const_parameter then "has not-const parameter" else "no not-const parameter"
+			`
+		s.CheckVariable(t, rule, []variableResult{
+			{variable: "a", number: 1},
+			{variable: "const_parameter", number: 1},
+			{variable: "not_const_parameter", number: 0},
+			{variable: "_", number: 1},
+		})
 
-			errMsg := res[0]
-			require.Equal(t, errMsg.ResourceType, "message")
-			require.Equal(t, errMsg.VerboseType, "error")
-			require.Equal(t, errMsg.VerboseName, "no not-const parameter")
-
-			infoMsg := res[1]
-			require.Equal(t, infoMsg.ResourceType, "message")
-			require.Equal(t, infoMsg.VerboseType, "info")
-			require.Equal(t, infoMsg.VerboseName, "has const parameter")
+		s.CheckInfo(t, rule, []string{
+			"no not-const parameter",
+			"has const parameter",
 		})
 	})
 
 	t.Run("check syntaxflow value", func(t *testing.T) {
-		query := fmt.Sprintf(`
-		target* as $target 
+		rule := `target* as $target
 		$target #{
-			hook: %s
-		}->
-		`, "`*  as $a`")
+			hook:<<<HOOK
+				* as $a
+HOOK
+		}-> `
 
-		CheckSSAURL(t, local, progID, "/", query, func(yu []*ypb.YakURLResource) {
-			spew.Dump(yu)
-			checkVariable(t, yu, []string{"a", "target", "_"})
+		s.CheckVariable(t, rule, []variableResult{
+			{variable: "a", number: 2},
+			{variable: "target", number: 2},
+			{variable: "_", number: 2},
 		})
 
-		CheckSSAURL(t, local, progID, "/a", query, func(res []*ypb.YakURLResource) {
-			spew.Dump(res)
+		s.CheckValue(t, rule, "a", []valueResult{
+			{riskHash: false, url: "/example/src/main/java/com/example/apackage/a.java:8"},
+			{riskHash: false, url: "/example/src/main/java/com/example/bpackage/sub/b.java:8"},
 		})
 	})
 
 	t.Run("check syntaxflow information", func(t *testing.T) {
 		query := fmt.Sprintf(`
-		target* as $target 
-		$target (* #{
-			hook: %s
-		}-> as $para_top_def)
-		`, "`*  as $a`")
-		CheckSSAURL(t, local, progID, "/a/0", query, func(res []*ypb.YakURLResource) {
-
-			require.NoError(t, err)
-			spew.Dump(res)
+			target* as $target
+			$target (* #{
+				hook: %s
+			}-> as $para_top_def)
+			`, "`*  as $a`")
+		s.CheckSSAURL(t, "/a/0", query, func(res []*ypb.YakURLResource) {
 			check := func(path string) {
-				log.Infof("check path: %s", path)
-				_, err := ssadb.NewIrSourceFs().Stat(path)
+				err := CheckSSADB(s.local, path)
 				require.NoError(t, err)
 			}
 
@@ -417,26 +506,22 @@ func TestSFURL_golang(t *testing.T) {
 		fmt.Println("B")
 	}
 	`)
-	progID := uuid.NewString()
-	prog, err := ssaapi.ParseProjectWithFS(vf,
+
+	s := NewSSAURLTest(t, vf,
 		ssaapi.WithLanguage(consts.GO),
-		ssaapi.WithProgramPath("src"),
-		ssaapi.WithProgramName(progID),
 	)
-	defer func() {
-		ssadb.DeleteProgram(ssadb.GetDB(), progID)
-	}()
-	require.NoError(t, err)
-	require.NotNil(t, prog)
+	defer s.RunDefer()
 
 	t.Run("check syntaxflow variable", func(t *testing.T) {
-		CheckSSAURL(t, local, progID, "/",
-			`	
+		s.CheckVariable(t,
+			`
 			fmt?{<fullTypeName>?{have: 'fmt'}} as $entry;
 			$entry.Println( * as $target);
 			`,
-			func(res []*ypb.YakURLResource) {
-				checkVariable(t, res, []string{"entry", "target", "_"})
+			[]variableResult{
+				{variable: "entry", number: 2},
+				{variable: "target", number: 2},
+				{variable: "_", number: 2},
 			},
 		)
 	})
@@ -445,45 +530,10 @@ func TestSFURL_golang(t *testing.T) {
 		query := `
 				fmt.Println as $a
 			`
-
-		graphInfoMap := map[int]string{}
-		CheckSSAURL(t, local, progID, "/a", query, func(res []*ypb.YakURLResource) {
-			require.NoError(t, err)
-			spew.Dump(res)
-			check := func(path string) {
-				log.Infof("check path: %s", path)
-				_, err := ssadb.NewIrSourceFs().Stat(path)
-				require.NoError(t, err)
-			}
-
-			for _, extra := range res[0].Extra {
-				if extra.Key == "code_range" {
-					log.Infof("code_range: %v", extra.Value)
-					var codeRange ssaapi.CodeRange
-					if err := json.Unmarshal([]byte(extra.Value), &codeRange); err != nil {
-						t.Error(err)
-					}
-
-					check(codeRange.GetPath())
-					graphInfoMap[0] = codeRange.GetPath()
-				}
-			}
-
-			for _, extra := range res[1].Extra {
-				if extra.Key == "code_range" {
-					log.Infof("code_range: %v", extra.Value)
-					var codeRange ssaapi.CodeRange
-					if err := json.Unmarshal([]byte(extra.Value), &codeRange); err != nil {
-						t.Error(err)
-					}
-
-					check(codeRange.GetPath())
-					graphInfoMap[1] = codeRange.GetPath()
-				}
-			}
-
+		s.CheckValue(t, query, "a", []valueResult{
+			{riskHash: false, url: "/src/main/go/A/test1.go:7"},
+			{riskHash: false, url: "/src/main/go/A/test2.go:8"},
 		})
-		require.NotEqual(t, graphInfoMap[0], graphInfoMap[1], "The two strings should not be equal")
 	})
 }
 
@@ -497,7 +547,7 @@ func TestSSAURLPagination(t *testing.T) {
 
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("example/src/main/java/com/example/apackage/a.java", `
-		package com.example.apackage; 
+		package com.example.apackage;
 		import com.example.bpackage.sub.B;
 		class A {
 			public static void main(String[] args) {
@@ -632,7 +682,7 @@ func TestHaveRange(t *testing.T) {
 
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("example/src/main/java/com/example/apackage/a.java", `
-		package com.example.apackage; 
+		package com.example.apackage;
 		import com.example.bpackage.sub.B;
 		class A {
 			public static void main(String[] args) {
@@ -649,7 +699,7 @@ func TestHaveRange(t *testing.T) {
 		`)
 
 	vf.AddFile("example/src/main/java/com/example/bpackage/sub/b.java", `
-		package com.example.bpackage.sub; 
+		package com.example.bpackage.sub;
 		class B {
 			public  int get() {
 				return 	 1;

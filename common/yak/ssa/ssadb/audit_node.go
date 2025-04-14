@@ -44,7 +44,7 @@ type AuditNode struct {
 
 type ResultVariable struct {
 	Name     string `json:"result_variable"`
-	RiskHash string   `json:"risk_hash"`
+	HasRisk  bool   `json:"has_risk"`
 	ValueNum int    `json:"num"`
 }
 
@@ -53,8 +53,8 @@ func GetResultVariableByID(db *gorm.DB, resultID uint) ([]*ResultVariable, error
 	var items []*ResultVariable
 	db = db.Model(&AuditNode{}).
 		Where("result_id = ? and is_entry_node = ?", resultID, true).
-		Select("result_variable, risk_hash, count(ir_code_id) as num").
-		Group("result_variable, risk_hash")
+		Select("result_variable, risk_hash != '' as has_risk, count(ir_code_id) as num").
+		Group("result_variable")
 	row, err := db.Rows()
 	if err != nil {
 		return nil, err
@@ -64,7 +64,7 @@ func GetResultVariableByID(db *gorm.DB, resultID uint) ([]*ResultVariable, error
 	for row.Next() {
 		var item ResultVariable
 		// var tmp time.Time
-		if err := row.Scan(&item.Name, &item.RiskHash, &item.ValueNum); err != nil {
+		if err := row.Scan(&item.Name, &item.HasRisk, &item.ValueNum); err != nil {
 			log.Errorf("scan failed: %s", err)
 			continue
 		}

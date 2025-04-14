@@ -34,9 +34,9 @@ func queryAndSave(t *testing.T) (func(), *ssaapi.SyntaxFlowResult) {
 	// query syntaxflow
 	res, err := prog.SyntaxFlowWithError(`
 	// normal variable and un-name variable 
-	f(* as $target)
+	f(* as $target) // 1, 2 
 	// no value variable 
-	bbbbbb as $a 
+	bbbbbb as $a  // nil 
 	`)
 	require.NoError(t, err)
 	require.NotNil(t, res)
@@ -83,6 +83,50 @@ func TestQueryAndSave(t *testing.T) {
 	slices.Sort(resValueID)
 	slices.Sort(wantValueID)
 	require.Equal(t, wantValueID, resValueID)
+}
+
+func TestGetResultVariableByID(t *testing.T) {
+	code := `
+		f(1)
+		f(2)
+		f(3)
+		`
+	// parse code
+	programName := uuid.NewString()
+	prog, err := ssaapi.Parse(code, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(consts.Yak))
+	require.NoError(t, err)
+	require.NotNil(t, prog)
+
+	// query syntaxflow
+	res, err := prog.SyntaxFlowWithError(`
+	f(* as $target) // 1, 2 
+	alert $target
+	`)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+
+	// save result
+	resultID, err := res.Save(schema.SFResultKindDebug)
+	require.NoError(t, err)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	got, err := ssadb.GetResultVariableByID(ssadb.GetDB(), resultID)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(got))
+	want := []*ssadb.ResultVariable{
+		{
+			Name:     "_",
+			HasRisk:  false,
+			ValueNum: 3,
+		},
+		{
+			Name:     "target",
+			HasRisk:  true,
+			ValueNum: 3,
+		},
+	}
+	spew.Dump(got)
+	require.Equal(t, want, got)
 }
 
 func TestGetResultFromDB(t *testing.T) {
