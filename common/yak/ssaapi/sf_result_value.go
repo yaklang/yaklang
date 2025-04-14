@@ -53,7 +53,7 @@ func (r *SyntaxFlowResult) GetAllVariable() *orderedmap.OrderedMap {
 				continue
 			}
 			r.variable.Set(v.Name, int(v.ValueNum))
-			if v.RiskHash != "" {
+			if v.HasRisk {
 				r.alertVariable = append(r.alertVariable, v.Name)
 			}
 		}
