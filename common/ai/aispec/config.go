@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -129,7 +130,7 @@ func WithProxy(p string) AIConfigOption {
 
 func WithAPIKey(k string) AIConfigOption {
 	return func(c *AIConfig) {
-		c.APIKey = k
+		c.APIKey = strings.TrimSpace(k)
 	}
 }
 
