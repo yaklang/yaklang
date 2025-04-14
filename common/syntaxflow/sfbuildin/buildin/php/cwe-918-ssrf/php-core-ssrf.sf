@@ -24,11 +24,14 @@ alert $curlFunction for{
 <include('php-tp-all-extern-variable-param-source')> as $params
 
 $ssrfFunction #{
+    include: `<self> & $params`
+    }-> as $all
+$ssrfFunction #{
     include: `<self> & $params`,
     exclude: `*?{opcode: call}`,
-}-> as $high_risk
+}-> as $high
 
-alert $high_risk for {
+alert $high for {
        title: 'Unvalidated SSRF Parameter Injection',
        title_zh: 'SSRF未验证参数注入风险',
        level: 'high',
@@ -36,21 +39,17 @@ alert $high_risk for {
 
 $ssrfFunction #{
     include: `<self> & $params`,
-    include: `*?{opcode: call && !<self><getCallee> & $filter}`,
-}-> as $mid_risk
+    exclude: `*?{opcode: call && <self><getCallee> & $filter}`,
+}-> as $mid
 
-alert $mid_risk for {
+alert $mid for {
     title: 'Insufficient SSRF Parameter Filtering',
     title_zh: 'SSRF参数过滤不充分',
     level: 'mid',
 }
 
-$ssrfFunction #{
-    include: `<self> & $params`,
-    include: `*?{opcode: call && <self><getCallee> & $filter}`,
-}-> as $low_risk
-
-alert $low_risk for {
+$all - $high - $mid  as $low
+alert $low for {
     title: 'Potential SSRF Access Control Bypass',
     title_zh: 'SSRF访问控制潜在绕过风险',
     level: 'low',

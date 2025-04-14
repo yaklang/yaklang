@@ -12,7 +12,12 @@ TEXT
 <include('php-tp-all-extern-variable-param-source')> as $params
 <include('php-filter-function')> as $filter;
 
+
 include(* as $param);
+$param #{
+    include: `<self> & $params`
+}-> as $all;
+
 $param #{
     include: `<self> & $params`,
     exclude: `*?{opcode: call}`
@@ -27,7 +32,7 @@ alert $high for {
 
 $param #{
     include: `<self> & $params`,
-    include: `*?{opcode: call && !<self><getCallee> & $filter}`
+    exclude: `*?{opcode: call && <self><getCallee> & $filter}`
 }-> as $middle;
 
 alert $middle for {
@@ -37,11 +42,7 @@ alert $middle for {
     level: 'mid'
 };
 
-$param #{
-    include: `<self> & $params`,
-    include: `*?{opcode: call && <self><getCallee> & $filter}`
-}-> as $low;
-$param?{!opcode: "const"} as $low
+$all - $high - $middle as $low;
 
 alert $low for {
     title: 'File contains detected, filter function checked out',
@@ -49,6 +50,8 @@ alert $low for {
     type: 'audit',
     level: 'low'
 };
+
+//应该修改 opcode不为const的
 include() as $info
 alert $info for{
     title: "File contains were detected, but no vulnerabilities were detected. Please pay attention",

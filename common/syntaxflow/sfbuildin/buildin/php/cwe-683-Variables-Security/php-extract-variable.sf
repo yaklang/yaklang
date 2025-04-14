@@ -19,6 +19,9 @@ extract(* as $output);
 
 $output #{
     include: `* & $source`,
+    }-> as $all
+$output #{
+    include: `* & $source`,
     exclude: `*?{opcode: call}`
 }-> as $high;
 
@@ -31,7 +34,7 @@ alert $high for {
 
 $output #{
     include: `* & $source`,
-    exclude: `*?{opcode:call && !<self><getCallee> & $filter}`
+    exclude: `*?{opcode:call && <self><getCallee> & $filter}`
 }-> as $middle
 
 
@@ -42,12 +45,7 @@ alert $middle for {
     type: 'mid',
     level: 'mid'
 }
-
-
-$output#{
-    include: `* & $source`,
-    include: `<self><getCallee> & $filter`
-}-> as $low
+$all - $high - $middle  as $low;
 
 alert $low for {
     title: 'Variable coverage detected, but filter function not detected',

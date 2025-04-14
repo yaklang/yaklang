@@ -16,11 +16,14 @@ TEXT
 $function(* as $source)
 
 $source #{
+    include: `<self> & $params`
+    }-> as $all
+$source #{
     include: `<self> & $params`,
     exclude: `*?{opcode: call}`,
-}-> as $high_risk
+}-> as $high
 
-alert $high_risk for {
+alert $high for {
    title: "Direct File Operation Without Validation",
    title_zh: "未经验证的文件操作高危漏洞",
    level: "high",
@@ -28,21 +31,18 @@ alert $high_risk for {
 
 $source #{
     include: `<self> & $params`,
-    include: `*?{opcode: call && !<self><getCallee> & $filter}`,
-}-> as $mid_risk
+    exclude: `*?{opcode: call && <self><getCallee> & $filter}`,
+}-> as $mid
 
-alert $mid_risk for {
+alert $mid for {
    title: "Insufficient Parameter Filtering",
    title_zh: "参数过滤不完整风险",
    level: "mid",
 }
 
-$source #{
-    include: `<self> & $params`,
-    include: `*?{opcode: call && <self><getCallee> & $filter}`,
-}-> as $low_risk
+$all - $high - $mid  as $low
 
-alert $low_risk for {
+alert $low for {
    title: "Potential Access Control Bypass",
    title_zh: "潜在访问控制绕过风险",
    level: "low",
