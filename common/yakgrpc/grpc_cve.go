@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -17,7 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/progresswriter"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -249,54 +247,12 @@ func (s *Server) UpdateCVEDatabase(req *ypb.UpdateCVEDatabaseRequest, stream ypb
 	info(0, "开始下载 CVE 数据库: Start to download CVE Database")
 	client := utils.NewDefaultHTTPClientWithProxy(req.GetProxy())
 	client.Timeout = 30 * time.Minute
-
-	info(0, "获取下载材料大小: Fetching Download Material Basic Info")
-	rsp, err := client.Head(targetUrl)
-	if err != nil {
-		// 提示勿动
-		return utils.Errorf("client failed: %s", err)
+	err2 := utils.DownloadFile(stream.Context(), client, targetUrl, consts.GetCVEDatabaseGzipPath(), func(f float64) {
+		info(f*100, "下载 CVE 数据库中: Downloading CVE Database")
+	})
+	if err2 != nil {
+		return err2
 	}
-
-	i, err := strconv.Atoi(rsp.Header.Get("Content-Length"))
-	if err != nil {
-		return utils.Errorf("cannot fetch cl: %v", err)
-	}
-	info(0, "共需下载大小为：Download %v Total", utils.ByteSize(uint64(i)))
-
-	rsp, err = client.Get(targetUrl)
-	if err != nil {
-		return utils.Errorf("download db failed: %s", err)
-	}
-
-	fp, err := os.OpenFile(consts.GetCVEDatabaseGzipPath(), os.O_RDWR|os.O_CREATE, 0o666)
-	if err != nil {
-		return utils.Errorf("open gzip file failed: %s", err)
-	}
-
-	prog := progresswriter.New(uint64(i))
-	go func() {
-		for {
-			time.Sleep(time.Second)
-			select {
-			case <-stream.Context().Done():
-				return
-			default:
-				info(prog.GetPercent()*100, "")
-				if prog.GetPercent() >= 1 {
-					return
-				}
-			}
-		}
-	}()
-	_, err = io.Copy(fp, io.TeeReader(rsp.Body, prog))
-	if err != nil {
-		fp.Close()
-		info(0, "下载文件失败: Download Failed: %s", err)
-		return utils.Errorf("下载文件失败: Download Failed: %s", err)
-	}
-	fp.Close()
-	info(100, "下载文件成功：Download Finished")
-
 	info(100, "开始验证数据库加载：Start to verify database")
 	db := consts.GetGormCVEDatabase()
 	if db == nil {
