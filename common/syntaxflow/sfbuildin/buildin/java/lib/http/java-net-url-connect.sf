@@ -8,7 +8,7 @@ desc(
 TEXT
 )
 
-URL?{<getCall>?{.openConnection() || .openStream()}}(*<slice(index=1)> as $output);
+URL?{<getCall>?{.openConnection() || .openStream()}}(,* as $output);
 alert $output;
 
 desc(

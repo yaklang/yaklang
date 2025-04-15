@@ -11,10 +11,10 @@ desc(
 DESC
 )
 
-.createStatement().executeQuery(*<slice(index=1)> as $params);
+.createStatement().executeQuery(,* as $params);
 check $params;
 
-$params<getCallee>?{<name>?{have:toString}}<getObject>.append(*<slice(index=1)> as $appendParams)
+$params<getCallee>?{<name>?{have:toString}}<getObject>.append(,* as $appendParams)
 
 $params<getFunc><getFormalParams> as $limited
 
