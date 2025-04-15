@@ -169,7 +169,7 @@ func (s *Server) UpdateCVEDatabase(req *ypb.UpdateCVEDatabaseRequest, stream ypb
 		recent.Close()
 		os.Remove(recent.Name())
 
-		err = utils.DownloadFile(client, cvequeryops.LatestCveRecentDataFeed, recent.Name(), func(f float64) {
+		err = utils.DownloadFile(stream.Context(), client, cvequeryops.LatestCveRecentDataFeed, recent.Name(), func(f float64) {
 			info((0.1+f*0.2)*100, "下载最新数据中: Downloading Latest CVE Data")
 		})
 		if err != nil {
@@ -185,7 +185,7 @@ func (s *Server) UpdateCVEDatabase(req *ypb.UpdateCVEDatabaseRequest, stream ypb
 		}
 		modified.Close()
 		os.RemoveAll(modified.Name())
-		err = utils.DownloadFile(client, cvequeryops.LatestCveModifiedDataFeed, modified.Name(), func(f float64) {
+		err = utils.DownloadFile(stream.Context(), client, cvequeryops.LatestCveModifiedDataFeed, modified.Name(), func(f float64) {
 			info((0.3+f*0.2)*100, "下载最新数据中: Downloading Latest CVE Data")
 		})
 		if err != nil {
