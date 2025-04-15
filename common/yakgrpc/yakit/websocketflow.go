@@ -133,6 +133,20 @@ func QueryWebsocketFlowByWebsocketHash(db *gorm.DB, hash string, page int, limit
 	return paging, ret, nil
 }
 
+func QueryAllWebsocketFlowByWebsocketHash(db *gorm.DB, hash string) ([]*schema.WebsocketFlow, error) {
+	db = db.Model(&schema.WebsocketFlow{})
+	if hash == "" {
+		return nil, utils.Errorf("empty hash")
+	}
+	var ret []*schema.WebsocketFlow
+	db = bizhelper.ExactQueryString(db, "websocket_request_hash", hash)
+	db = db.Find(&ret)
+	if db.Error != nil {
+		return nil, utils.Errorf("paging failed: %s", db.Error)
+	}
+	return ret, nil
+}
+
 func DeleteWebsocketFlowByID(db *gorm.DB, id int64) error {
 	if db := db.Model(&schema.WebsocketFlow{}).Where(
 		"id = ?", id,

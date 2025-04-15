@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync/atomic"
 
@@ -126,7 +127,7 @@ func WithConcurrency(concurrency int) HTTPFlowAnalyzeMangerOption {
 
 func WithRules(rules ...*ypb.MITMContentReplacer) HTTPFlowAnalyzeMangerOption {
 	return func(m *HTTPFlowAnalyzeManger) {
-		m.SetRules(rules...)
+		m.LoadRules(rules)
 	}
 }
 
@@ -231,16 +232,21 @@ func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlowFromDb(db *gorm.DB) (errs error) 
 	totalCallBack := func(i int) {
 		atomic.AddInt64(&m.allHTTPFlowCount, int64(i))
 	}
+	query := db
 	if m.source != nil {
-		db = yakit.FilterHTTPFlow(db, m.source.GetHTTPFlowFilter())
+		query = yakit.FilterHTTPFlow(db, m.source.GetHTTPFlowFilter())
 	}
-	flowCh := yakit.YieldHTTPFlowsEx(db, m.ctx, totalCallBack)
+	flowCh := yakit.YieldHTTPFlowsEx(query, m.ctx, totalCallBack)
 	errChan := make(chan error, m.concurrency)
 	swg := utils.NewSizedWaitGroup(m.concurrency, m.ctx)
 	for flow := range flowCh {
 		swg.Add(1)
 		go func(f *schema.HTTPFlow) {
 			defer swg.Done()
+			// 处理websocket流量
+			if flow.IsWebsocket {
+				m.handleWebsocket(db, flow)
+			}
 			// hot patch
 			m.ExecHotPatch(db, f)
 			// mitm replace rule
@@ -253,13 +259,58 @@ func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlowFromDb(db *gorm.DB) (errs error) 
 			m.notifyHandleFlowNum()
 		}(flow)
 	}
-
 	swg.Wait()
 	close(errChan)
 	for err := range errChan {
 		errs = utils.JoinErrors(errs, err)
 	}
 	return errs
+}
+
+func (m *HTTPFlowAnalyzeManger) handleWebsocket(db *gorm.DB, flow *schema.HTTPFlow) error {
+	if !flow.IsWebsocket {
+		return nil
+	}
+	// 处理websocket流量
+	subQuery := db
+	wsFlows, err := yakit.QueryAllWebsocketFlowByWebsocketHash(subQuery, flow.WebsocketHash)
+	if err != nil {
+		return err
+	}
+	handleColorAndTag := func(rule *MITMReplaceRule, wsFlow *schema.WebsocketFlow) {
+		err := yakit.HandleAnalyzedHTTPFlowsColorAndTag(
+			db,
+			flow,
+			rule.GetColor(),
+			rule.GetExtraTag()...,
+		)
+		if err != nil {
+			log.Infof("handle analyzed http flows color and tag failed: %s", err)
+		}
+		yakit.HandleAnalyzedWebsocketFlowsColorAndTag(db, wsFlow, rule.GetColor(), rule.GetExtraTag()...)
+	}
+	for _, wsFlow := range wsFlows {
+		for _, rule := range m._mirrorRules {
+			if !rule.EnableForRequest && !rule.EnableForResponse {
+				continue
+			}
+			data, err := strconv.Unquote(wsFlow.QuotedData)
+			if err != nil {
+				log.Errorf("unquote websocket data failed: %v", err)
+				continue
+			}
+			match, err := rule.matchRawSimple([]byte(data))
+			if err != nil {
+				log.Errorf("match package failed: %v", err)
+				continue
+			}
+			if !match {
+				continue
+			}
+			handleColorAndTag(rule, wsFlow)
+		}
+	}
+	return nil
 }
 
 func (m *HTTPFlowAnalyzeManger) ExecHotPatch(db *gorm.DB, flow *schema.HTTPFlow) {
@@ -362,7 +413,7 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRule(db *gorm.DB, flow *schema.HTTPF
 			log.Infof("handle analyzed http flows color and tag failed: %s", err)
 		}
 	}
-	for _, rule := range m.rules {
+	for _, rule := range m._mirrorRules {
 		re, err := rule.compile()
 		if err != nil {
 			continue
