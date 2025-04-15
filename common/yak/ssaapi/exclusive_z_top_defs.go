@@ -104,6 +104,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		return vals
 	}
 	getMemberCall := func(apiValue *Value, value ssa.Value, actx *AnalyzeContext) Values {
+		if utils.IsNil(value) {
+			return nil
+		}
 		if value.HasValues() {
 			return i.visitedDefs(actx, opt...)
 		}
@@ -429,5 +432,10 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		return values
 	}
-	return getMemberCall(i, i.innerValue, actx)
+	// if if/loop/... control instruction, this innerValue is nil
+	if i.innerValue != nil {
+		return getMemberCall(i, i.innerValue, actx)
+	} else {
+		return Values{i}
+	}
 }
