@@ -1,5 +1,6 @@
 desc(
-    title: "Find Java SpringBoot SSRF Vuln Directly",
+    title_zh:"检测Java SpringBoot 直接SSRF",
+    title: "Find Java SpringBoot SSRF Vuln",
     type: vuln,
     desc: <<<TEXT
 服务器端请求伪造（SSRF）漏洞允许攻击者通过应用程序向不受信任的服务器发起请求。在Java SpringBoot应用程序中，如果开发者未对外部URL输入进行适当的验证和过滤，攻击者可以利用该漏洞访问内部资源或发起对其他系统的恶意请求。这可能导致敏感数据泄露、服务拒绝攻击或进一步的内网渗透。
@@ -11,12 +12,24 @@ TEXT
 $sink #{
     include: `<self> & $source`,
     exclude: `<self>?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`,
-}->as  $result;
+}->as  $mid;
 
-alert $result for {
-    message: "发现Java SpringBoot SSRF漏洞",
+alert $mid for {
+    message: "发现Java SpringBoot SSRF漏洞,并且没有任何数据流过滤。",
     risk: ssrf,
     level: mid,
+}
+
+$sink #{
+    include: `<self> & $source`,
+}->as  $result;
+
+$result - $mid as $low;
+
+alert $low for {
+    message: "发现Java SpringBoot SSRF漏洞,但是有数据流过滤。",
+    risk: ssrf,
+    level: low,
 }
 
 desc(
