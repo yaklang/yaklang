@@ -1,6 +1,9 @@
 package ssautil
 
 import (
+	"fmt"
+	"regexp"
+
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -102,6 +105,7 @@ func (base *ScopedVersionedTable[T]) Merge(
 		return variable
 	}
 
+	pointerCheck := make(map[string]T)
 	generatePhi := func(ver VersionedIF[T], m []T, canCapture bool) {
 		var v VersionedIF[T]
 		name := ver.GetName()
@@ -134,14 +138,22 @@ func (base *ScopedVersionedTable[T]) Merge(
 		//if len(m) > 1 {
 		//	log.Infof("merge phi %s: edges count: %v", name, len(m))
 		//}
+
+		rev := regexp.MustCompile(`#(\d+)\.@value`)
+		idvs := rev.FindStringSubmatch(name)
+
 		ret := merge(name, m)
+		if len(idvs) > 0 {
+			pointerCheck[fmt.Sprintf("#%s.@pointer", idvs[1])] = ret
+		}
+
 		if base.GetParent().GetParent() == variable.GetScope() && setLocal {
 			v = base.CreateVariable(name, variable.GetLocal())
-			v.SetKind(variable.GetKind())
 		} else {
 			v = base.CreateVariable(name, false)
-			v.SetKind(variable.GetKind())
 		}
+		v.SetPointHandle(variable.GetPointHandle())
+		v.SetKind(variable.GetKind())
 		if canCapture {
 			// 在当前scope中尝试修改外部的某个variable
 			tmpPhiCapture[v] = ret
@@ -153,8 +165,12 @@ func (base *ScopedVersionedTable[T]) Merge(
 
 	defer func() {
 		for v, ret := range tmpPhiScope {
-			base.tryRegisterCapturedVariable(v.GetName(), v)
-			base.AssignVariable(v, ret)
+			if v.GetKind() == PointerVariable {
+				v.PointHandle(pointerCheck[v.GetName()], base)
+			} else {
+				base.AssignVariable(v, ret)
+				base.tryRegisterCapturedVariable(v.GetName(), v)
+			}
 		}
 		for v, ret := range tmpPhiCapture {
 			err := v.Assign(ret)
