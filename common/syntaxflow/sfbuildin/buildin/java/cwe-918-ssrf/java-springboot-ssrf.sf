@@ -1,5 +1,5 @@
 desc(
-    title_zh:"检测Java SpringBoot 直接SSRF",
+    title_zh:"检测Java SpringBoot 服务端请求伪造(SSRF)漏洞",
     title: "Find Java SpringBoot SSRF Vuln",
     type: vuln,
     desc: <<<TEXT
