@@ -1,0 +1,245 @@
+desc(
+    title_zh:"查找Java Servlet Groovy Shell代码注入漏洞",
+    title:"Find Java Servlet Groovy Shell Code Injection Vulnerability",
+    type:"vuln",
+    desc:<<<TEXT
+Java Servlet Groovy Shell代码注入漏洞是指在Java Servlet应用程序中，使用Groovy Shell执行动态Groovy代码时，未对输入进行严格的验证和过滤，导致攻击者可以注入恶意代码并执行任意操作。这种漏洞可能导致远程命令执行、数据泄露或系统破坏等严重后果。
+TEXT
+    fix:<<<TEXT
+在使用Groovy脚本引擎时，确保对输入进行严格的验证和过滤。避免直接执行用户输入的Groovy代码，或者使用安全的沙箱环境来限制代码的执行权限。此外，可以考虑使用其他更安全的脚本语言或框架来实现动态脚本执行的需求。
+TEXT
+    ref:<<<TEXT
+https://docs.groovy-lang.org/next/html/api/groovy/lang/GroovyShell.html
+TEXT
+)
+
+<include('java-servlet-param')> as $source;
+<include('java-groovy-lang-shell-sink')> as $sink;
+
+$sink #{
+    include:`* & $source`,
+    exclude:`*?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`,
+    exclude:`*?{opcode:phi}`,
+}-> as $high;
+
+alert $high for {
+    message: "发现Java Servlet Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
+    risk: "Groovy-Shell代码执行漏洞",
+    level: high,
+}
+
+$sink #{
+    include: `<self> & $source`,
+}-> as  $result;
+$result - $high as $low;
+
+alert $low for {
+    message: "发现Java Servlet Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
+    risk: "Groovy-Shell代码执行漏洞",
+    level: low,
+}
+
+desc(
+    lang: java,
+    alert_min: 3,
+    'file://risk1.java': <<<TEXT
+package org.example.servlet.rce;
+
+import groovy.lang.GroovyShell;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+
+@WebServlet(name = "GroovyEvaluateServlet", urlPatterns = {"/groovy/evaluate"})
+public class GroovyEvaluateServlet extends HttpServlet {
+
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        response.setContentType("text/html;charset=UTF-8");
+        String payload = request.getParameter("payload");
+        
+        try (PrintWriter out = response.getWriter()) {
+            String result = "No result";
+            if (payload != null && !payload.isEmpty()) {
+                result = evaluateGroovy(payload);
+            }
+            out.println("<p>Result: " + result + "</p>");
+
+        } catch (Exception e) {
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error processing Groovy code: " + e.getMessage());
+        }
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        doGet(request, response);
+    }
+    
+    private String evaluateGroovy(String payload) {
+        try {
+            GroovyShell shell = new GroovyShell();
+            Object result = shell.evaluate(payload);
+            if (result instanceof Process) {
+                Process process = (Process) result;
+                return getProcessOutput(process);
+            } else {
+                return result != null ? result.toString() : "null";
+            }
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+    
+    private String getProcessOutput(Process process) throws Exception {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        StringBuilder output = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            output.append(line).append("\n");
+        }
+        return output.toString();
+    }
+}
+TEXT,
+    'file://risk2.java': <<<TEXT
+package org.example.servlet.rce;
+
+import groovy.lang.GroovyShell;
+import groovy.lang.Script;
+
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+
+@WebServlet(name = "GroovyParseServlet", urlPatterns = {"/groovy/parse"})
+public class GroovyParseServlet extends HttpServlet {
+
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        response.setContentType("text/html;charset=UTF-8");
+        String payload = request.getParameter("payload");
+        
+        try (PrintWriter out = response.getWriter()) {
+            String result = "No result";
+            if (payload != null && !payload.isEmpty()) {
+                result = parseGroovy(payload);
+            }
+            
+            out.println("<p>Result: " + result + "</p>");
+        } catch (Exception e) {
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error processing Groovy code: " + e.getMessage());
+        }
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        doGet(request, response);
+    }
+    
+    private String parseGroovy(String payload) {
+        try {
+            GroovyShell shell = new GroovyShell();
+            Script script = shell.parse(payload);
+            Object result = script.run();
+            if (result instanceof Process) {
+                Process process = (Process) result;
+                return getProcessOutput(process);
+            } else {
+                return result != null ? result.toString() : "null";
+            }
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+    
+    private String getProcessOutput(Process process) throws Exception {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        StringBuilder output = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            output.append(line).append("\n");
+        }
+        return output.toString();
+    }
+}
+TEXT,
+    'file://risk3.java': <<<TEXT
+package org.example.servlet.rce;
+
+import groovy.lang.GroovyShell;
+
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.util.Arrays;
+
+@WebServlet(name = "GroovyRunServlet", urlPatterns = {"/groovy/run"})
+public class GroovyRunServlet extends HttpServlet {
+
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        response.setContentType("text/html;charset=UTF-8");
+        String payload = request.getParameter("payload");
+        
+        try (PrintWriter out = response.getWriter()) {
+            String result = "No result";
+            if (payload != null && !payload.isEmpty()) {
+                result = runGroovy(payload);
+            }
+            out.println("<p>Result: " + result + "</p>");
+
+        } catch (Exception e) {
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error processing Groovy code: " + e.getMessage());
+        }
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        doGet(request, response);
+    }
+    
+    private String runGroovy(String payload) {
+        try {
+            GroovyShell shell = new GroovyShell();
+            Object result = shell.run(payload, "script.groovy", Arrays.asList());
+            if (result instanceof Process) {
+                Process process = (Process) result;
+                return getProcessOutput(process);
+            } else {
+                return result != null ? result.toString() : "null";
+            }
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+    
+    private String getProcessOutput(Process process) throws Exception {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        StringBuilder output = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            output.append(line).append("\n");
+        }
+        return output.toString();
+    }
+}
+TEXT
+)
