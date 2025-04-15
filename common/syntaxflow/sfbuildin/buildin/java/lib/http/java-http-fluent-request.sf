@@ -11,7 +11,7 @@ TEXT
 Request?{<fullTypeName>?{have: "client.fluent"}} as $root;
 $root./Get|Post|Put|Delete|Patch|Options|Head|Trace/ as $methods
 $methods?{*().execute()} as $execMethods;
-$execMethods(*<slice(index=1)> as $output);
+$execMethods(,* as $output);
 <delete(root)>
 <delete(methods)>
 <delete(execMethods)>

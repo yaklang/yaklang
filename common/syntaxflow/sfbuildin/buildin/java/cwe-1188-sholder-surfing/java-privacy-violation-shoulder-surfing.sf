@@ -10,7 +10,7 @@ TEXT
 )
 
 // new PasswordCallback("Password: ", true)
-PasswordCallback?{<typeName>?{have:'javax.security.auth.callback.PasswordCallback'}}(*<slice(index=2)> as $toCheck);
+PasswordCallback?{<typeName>?{have:'javax.security.auth.callback.PasswordCallback'}}(,,* as $toCheck);
 $toCheck ?{* #{
     include:`* ?{opcode:const && have:'true'} `
 }->} as $risk;

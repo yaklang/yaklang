@@ -17,7 +17,7 @@ check $sink then "发现JSP中存在未转义的输出"
 $source<getCallee()><getObject()>as $req;
 $sink #{
     include: `* & $req`,
-    include:`*...setAttribute(*<slice(index=1)> as $attribute)`,
+    include:`*...setAttribute(,* as $attribute)`,
     exclude:`* <getCallee> & $filter`
 }-> as $result;
 alert $result for {

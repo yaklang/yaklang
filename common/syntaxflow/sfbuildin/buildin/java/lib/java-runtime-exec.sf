@@ -8,5 +8,5 @@ desc(
 TEXT
 )
 
-Runtime.getRuntime().exec(*<slice(index=1)> as $output);
+Runtime.getRuntime().exec(,* as $output);
 alert $output;

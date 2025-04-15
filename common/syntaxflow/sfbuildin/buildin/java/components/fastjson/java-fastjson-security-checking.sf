@@ -19,7 +19,7 @@ alert $config for {
 };
 
 // 检查 FastJson 的 parseObject 方法
-JSON?{<typeName>?{have: 'alibaba'}}.parse*(*<slice(index=1)> as $dataSource) as $parseObjectCall;
+JSON?{<typeName>?{have: 'alibaba'}}.parse*(,* as $dataSource) as $parseObjectCall;
 alert $parseObjectCall for {
     message_zh: "FastJson 使用了不安全的 parseObject/parse 方法",
     message: "FastJson uses the unsafe parseObject/parse method"

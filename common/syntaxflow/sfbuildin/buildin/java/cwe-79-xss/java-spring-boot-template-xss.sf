@@ -16,7 +16,7 @@ $sink #{
     include: `<self> & $model`,
 }->as $sinkModel;
 
-$sinkModel.addAttribute(*<slice(index=2)> as $attribute);
+$sinkModel.addAttribute(,,* as $attribute);
 $attribute &  $source ->as $res;
 
 alert $res for {

@@ -9,9 +9,9 @@ desc(
 $toCheck?{<typeName>?{have:'javax.script'}} as $engine;
 check $engine;
 
-$engine.eval(*<slice(index=1)> as $params);
-$engine.put(*<slice(index=1)> as $params);
-$engine.compile(*<slice(index=1)> as $params);
+$engine.eval(,* as $params);
+$engine.put(,* as $params);
+$engine.compile(,* as $params);
 check $params;
 $params as $output;
 alert $output;

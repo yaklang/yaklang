@@ -7,9 +7,9 @@ desc(
 TEXT
 )
 
-getTemplate(*<slice(index=1)>?{!opcode:const} as $sink).process(*<slice(index=1)> as $params)
+getTemplate(,*?{!opcode: const} as $sink).process(,* as $params,);
 check $params;
-$params.put(*<slice(index=1)> as $sink);
+$params.put(,,* as $sink);
 check $sink then "Found Freemarker Process Using" else "No Freemarker Process Simple";
 alert $sink;
 
