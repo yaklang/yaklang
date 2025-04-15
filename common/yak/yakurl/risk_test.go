@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strconv"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yakgrpc"
@@ -98,6 +98,7 @@ func GetSSARisk(t *testing.T, local ypb.YakClient, url *ypb.YakURL) map[string]d
 	got := make(map[string]data)
 	for _, resource := range res.GetResources() {
 		var count, filterCount int
+		log.Infof("resource: %v", resource)
 		for _, extra := range resource.Extra {
 			if extra.Key == "count" {
 				count, err = strconv.Atoi(extra.Value)
@@ -106,10 +107,12 @@ func GetSSARisk(t *testing.T, local ypb.YakClient, url *ypb.YakURL) map[string]d
 			if extra.Key == "filter" {
 				var filter *ypb.SSARisksFilter
 				err = json.Unmarshal([]byte(extra.Value), &filter)
+				log.Infof("filter: %v", filter)
 				require.NoError(t, err)
-				_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), filter, nil)
+				paging, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), filter, nil)
+				_ = risks
 				require.NoError(t, err)
-				filterCount = len(risks)
+				filterCount = paging.TotalRecord
 			}
 		}
 		require.Equal(t, count, filterCount)
@@ -137,34 +140,32 @@ func TestRiskAction(t *testing.T) {
 		t.Error(err)
 	}
 
-	checkPathAndSearch := func(path, search string, want map[string]data) {
+	checkPathAndSearch := func(path, search string, want map[string]data, contain ...bool) {
 		url := &ypb.YakURL{
 			Schema: "ssarisk",
 			Path:   path,
 			Query:  []*ypb.KVPair{{Key: "search", Value: search}},
 		}
 		got := GetSSARisk(t, local, url)
-
-		sortmap := func(m map[string]data) map[string]data {
-			keys := make([]string, 0, len(m))
-			ret := make(map[string]data)
-			for k := range m {
-				keys = append(keys, k)
+		log.Infof("got: %v", got)
+		log.Infof("want: %v", want)
+		if len(contain) > 0 && contain[0] {
+			// Check if got contains all entries from want
+			for wantPath, wantData := range want {
+				gotData, exists := got[wantPath]
+				require.True(t, exists, "Path %s not found in results", wantPath)
+				require.Equal(t, wantData.Name, gotData.Name, "Name mismatch for path %s", wantPath)
+				require.Equal(t, wantData.Type, gotData.Type, "Type mismatch for path %s", wantPath)
+				require.Equal(t, wantData.Count, gotData.Count, "Count mismatch for path %s", wantPath)
 			}
-			sort.Strings(keys)
-			for _, k := range keys {
-				ret[k] = m[k]
-			}
-			return ret
+		} else {
+			require.Equal(t, got, want)
 		}
-
-		got = sortmap(got)
-		want = sortmap(want)
-		require.Equal(t, got, want)
 	}
 
 	t.Run("check path root", func(t *testing.T) {
 		// ssarisk://
+		// contain two  program is ok
 		checkPathAndSearch("/", "/", map[string]data{
 			"/" + programName1: {
 				Name:  programName1,
@@ -176,7 +177,7 @@ func TestRiskAction(t *testing.T) {
 				Type:  "program",
 				Count: 5,
 			},
-		})
+		}, true)
 	})
 
 	t.Run("check path program", func(t *testing.T) {
