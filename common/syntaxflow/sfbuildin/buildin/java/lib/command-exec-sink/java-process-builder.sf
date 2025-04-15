@@ -2,7 +2,6 @@ desc(
     title: "Find ProcessBuilder Sink Point",
     lib: 'java-process-builder-sink',
     type: audit,
-    level: medium,
     desc: <<<TEXT
 使用 `ProcessBuilder` 类可以启动操作系统进程，并且如果不正确地处理输入，可能会导致命令注入漏洞。攻击者可以通过操纵传递给 `ProcessBuilder` 的输入参数，执行任意命令，从而危害系统的安全性。建议对 `ProcessBuilder` 的使用进行严格的输入验证和清理，以防止潜在的命令注入攻击。
 TEXT
