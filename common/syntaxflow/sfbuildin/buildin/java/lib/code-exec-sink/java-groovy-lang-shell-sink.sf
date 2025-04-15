@@ -1,0 +1,173 @@
+desc(
+    title_zh:'查找Java GroovyShell 代码执行Sink点',
+    title:'Find Java GroovyShell Code Execution Sink Point',
+    lib: 'java-groovy-lang-shell-sink',
+    type: audit,
+    reference:<<<URL
+    https://docs.groovy-lang.org/latest/html/api/groovy/lang/GroovyShell.html
+URL
+    desc:<<<TEXT
+    该规则用于检测Java代码中使用GroovyShell类进行代码执行的潜在漏洞。GroovyShell是Groovy语言的一个类，允许动态执行Groovy脚本。由于Groovy是一种动态语言，使用GroovyShell执行的代码可能会引入安全风险，特别是在处理不受信任的输入时。
+    审计的类为:
+    - groovy.lang.GroovyShell
+    规则覆盖的方法包括：
+    - evaluate(GroovyCodeSource codeSource)
+    - evaluate(File file)
+    - evaluate(Reader in)
+    - evaluate(String scriptText)
+    - evaluate(Reader in, String fileName)
+    - evaluate(String scriptText, String fileName, String codeBase)
+    - evaluate(URI uri)
+
+    - parse(GroovyCodeSource codeSource)
+    - parse(GroovyCodeSource codeSource, Binding binding)
+    - parse(File file)
+    - parse(Reader in)
+    - parse(Reader in, Binding binding)
+    - parse(Reader reader, String fileName)
+    - parse(Reader reader, String fileName, Binding binding)
+    - parse(String scriptText)
+    - parse(String scriptText, Binding binding)
+    - parse(String scriptText, String fileName)
+    - parse(String scriptText, String fileName, Binding binding)
+    - parse(URI uri)
+    - run(File scriptFile, String[] args)
+    - run(File scriptFile, List<String> list)
+    - run(Reader in, String fileName, String[] args)
+    - run(Reader in, String fileName, List<String> list)
+    - run(String scriptText, String fileName, String[] args)
+    - run(String scriptText, String fileName, List<String> list)
+TEXT
+)
+
+GroovyShell()?{<typeName>?{have:'groovy.lang.GroovyShell'}} as $groovy;
+
+// evaluate(GroovyCodeSource codeSource)
+// evaluate(File file)
+// evaluate(Reader in)
+// evaluate(String scriptText)
+// evaluate(Reader in, String fileName)
+// evaluate(String scriptText, String fileName, String codeBase)
+// evaluate(URI uri)
+$groovy.evaluate(*<slice(index=1)> as $output);
+
+// parse 用于解析一段脚本，解析完成后还需要调用run才能执行
+// parse(GroovyCodeSource codeSource)
+// parse(GroovyCodeSource codeSource, Binding binding)
+// parse(File file)
+// parse(Reader in)
+// parse(Reader in, Binding binding)
+// parse(Reader reader, String fileName)
+// parse(Reader reader, String fileName, Binding binding)
+// parse(String scriptText)
+// parse(String scriptText, Binding binding)
+// parse(String scriptText, String fileName)
+// parse(String scriptText, String fileName, Binding binding)
+// parse(URI uri)
+$groovy.parse?{*().run}(*<slice(index=1)> as $output);
+
+// run(File scriptFile, String[] args)
+// run(File scriptFile, List<String> list)
+// run(Reader in, String fileName, String[] args)
+// run(Reader in, String fileName, List<String> list)
+// run(String scriptText, String fileName, String[] args)
+// run(String scriptText, String fileName, List<String> list)
+// run(GroovyCodeSource source, String[] args)  # 不审计
+// run(GroovyCodeSource source, List<String> args)  # 不审计
+$groovy.run(*<slice(index=1)>?{<typeName>?{any:'File','Reader','String'}} as $output);
+alert $output;
+
+desc(
+    lang:'java',
+    alert_num:3,
+    "file://groovy.java": <<<CODE
+package org.example.moudels.rce.code;
+
+import groovy.lang.GroovyShell;
+import groovy.lang.Script;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiImplicitParam;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
+import lombok.extern.slf4j.Slf4j;
+import org.example.common.util.R;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.util.Arrays;
+import java.util.List;
+
+@Slf4j
+@Api(value="CodeController",tags = "RCE-远程命令执行")
+@Controller
+@CrossOrigin(origins = "*")
+@RequestMapping("/code")
+public class CodeController {
+
+    @GetMapping("/vulGroovy-evaluate")
+    @ResponseBody
+    @ApiOperation(value = "漏洞常见：RCE-Groovy(使用evaluate方法)",notes = "Groovy代码执行")
+    @ApiImplicitParam(name = "payload", value = "Groovy代码", required = true, dataType = "String", paramType = "query")
+    public R vulGroovyEvaluate(@ApiParam(name = "payload") String payload) {
+        try {
+            GroovyShell shell = new GroovyShell();
+            Object result = shell.evaluate(payload);
+            if (result instanceof Process) {
+                Process process = (Process) result;
+                String output = getProcessOutput(process);
+                return R.ok("[+] Groovy代码执行，结果：" + output);
+            } else {
+                return R.ok("[+] Groovy代码执行，结果：" + result.toString());
+            }
+        }catch (Exception e){
+            return R.error(e.getMessage());
+        }
+    }
+
+    @GetMapping("/vulGroovy-parse")
+    @ResponseBody
+    @ApiOperation(value = "漏洞常见：RCE-Groovy(使用parse方法)",notes = "Groovy代码执行")
+    public R vulGroovyParse(@ApiParam(name = "payload") String payload) {
+        try {
+            GroovyShell shell = new GroovyShell();
+            Script script = shell.parse(payload);
+            Object result = script.run();
+            if (result instanceof Process) {
+                Process process = (Process) result;
+                String output = getProcessOutput(process);
+                return R.ok("[+] Groovy代码执行，结果：" + output);
+            } else {
+                return R.ok("[+] Groovy代码执行，结果：" + result.toString());
+            }
+        }catch (Exception e){
+            return R.error(e.getMessage());
+        }
+    }
+
+    @GetMapping("/vulGroovy-run")
+    @ResponseBody
+    @ApiOperation(value = "漏洞常见：RCE-Groovy(使用run方法)",notes = "Groovy代码执行")
+    public R vulGroovyRun(@ApiParam(name = "payload") String payload) {
+        try {
+            GroovyShell shell = new GroovyShell();
+            Object result = shell.run(payload, "script.groovy", Arrays.asList());
+            if (result instanceof Process) {
+                Process process = (Process) result;
+                String output = getProcessOutput(process);
+                return R.ok("[+] Groovy代码执行，结果：" + output);
+            } else {
+                return R.ok("[+] Groovy代码执行，结果：" + (result != null ? result.toString() : "null"));
+            }
+        }catch (Exception e){
+            return R.error(e.getMessage());
+        }
+    }
+
+}
+CODE
+)
