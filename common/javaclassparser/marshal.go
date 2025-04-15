@@ -217,14 +217,59 @@ func writeAttributes(writer *JavaBufferWriter, info []AttributeInfo, classObj *C
 			n := classObj.findUtf8IndexFromPool("Synthetic") + 1
 			writer.Write2Byte(n)
 			writer.Write4Byte(info[j].(*SyntheticAttribute).AttrLen)
-		default:
+		case *RuntimeVisibleAnnotationsAttribute:
+			n := classObj.findUtf8IndexFromPool("RuntimeVisibleAnnotations") + 1
+			writer.Write2Byte(n)
+			writer.Write4Byte(info[j].(*RuntimeVisibleAnnotationsAttribute).AttrLen)
+			writer.Write2Byte(len(info[j].(*RuntimeVisibleAnnotationsAttribute).Annotations))
+			for t := 0; t < len(info[j].(*RuntimeVisibleAnnotationsAttribute).Annotations); t++ {
+				WriteAnnotation(classObj.ConstantPoolManager, info[j].(*RuntimeVisibleAnnotationsAttribute).Annotations[t], writer)
+			}
+		case *BootstrapMethodsAttribute:
+			n := classObj.findUtf8IndexFromPool("BootstrapMethods") + 1
+			writer.Write2Byte(n)
+			writer.Write4Byte(info[j].(*BootstrapMethodsAttribute).AttributeLength)
+			writer.Write2Byte(len(info[j].(*BootstrapMethodsAttribute).BootstrapMethods))
+			for t := 0; t < len(info[j].(*BootstrapMethodsAttribute).BootstrapMethods); t++ {
+				writer.Write2Byte(info[j].(*BootstrapMethodsAttribute).BootstrapMethods[t].BootstrapMethodRef)
+				writer.Write2Byte(info[j].(*BootstrapMethodsAttribute).BootstrapMethods[t].NumBootstrapArguments)
+				for t2 := 0; t2 < len(info[j].(*BootstrapMethodsAttribute).BootstrapMethods[t].BootstrapArguments); t2++ {
+					writer.Write2Byte(info[j].(*BootstrapMethodsAttribute).BootstrapMethods[t].BootstrapArguments[t2])
+				}
+			}
+		case *InnerClassesAttribute:
+			n := classObj.findUtf8IndexFromPool("InnerClasses") + 1
+			writer.Write2Byte(n)
+			writer.Write4Byte(info[j].(*InnerClassesAttribute).AttrLen)
+			writer.Write2Byte(info[j].(*InnerClassesAttribute).NumberOfClasses)
+			for t := 0; t < len(info[j].(*InnerClassesAttribute).Classes); t++ {
+				writer.Write2Byte(info[j].(*InnerClassesAttribute).Classes[t].InnerClassInfoIndex)
+				writer.Write2Byte(info[j].(*InnerClassesAttribute).Classes[t].OuterClassInfoIndex)
+				writer.Write2Byte(info[j].(*InnerClassesAttribute).Classes[t].InnerNameIndex)
+				writer.Write2Byte(info[j].(*InnerClassesAttribute).Classes[t].InnerClassAccessFlags)
+			}
+		case *SignatureAttribute:
+			n := classObj.findUtf8IndexFromPool("Signature") + 1
+			writer.Write2Byte(n)
+			writer.Write4Byte(info[j].(*SignatureAttribute).AttrLen)
+			writer.Write2Byte(info[j].(*SignatureAttribute).SignatureIndex)
+		case *RuntimeVisibleTypeAnnotationsAttribute:
+			n := classObj.findUtf8IndexFromPool("RuntimeVisibleTypeAnnotations") + 1
+			writer.Write2Byte(n)
+			writer.Write4Byte(info[j].(*RuntimeVisibleTypeAnnotationsAttribute).AttrLen)
+			writer.Write2Byte(len(info[j].(*RuntimeVisibleAnnotationsAttribute).Annotations))
+			for t := 0; t < len(info[j].(*RuntimeVisibleAnnotationsAttribute).Annotations); t++ {
+				WriteAnnotation(classObj.ConstantPoolManager, info[j].(*RuntimeVisibleAnnotationsAttribute).Annotations[t], writer)
+			}
+		case *UnparsedAttribute:
 			n := classObj.findUtf8IndexFromPool(info[j].(*UnparsedAttribute).Name) + 1
 			writer.Write2Byte(n)
 			writer.Write4Byte(info[j].(*UnparsedAttribute).Length)
 			writer.Write(info[j].(*UnparsedAttribute).Info)
+		default:
+			panic("java.lang.ClassFormatError: attribute not found!")
 		}
 	}
-
 }
 
 func _MarshalToJson(classObj *ClassObject) (string, error) {
