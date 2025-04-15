@@ -235,32 +235,37 @@ func DownloadFile(ctx context.Context, client *http.Client, u string, localFile 
 		return Errorf("localfile: %v is existed", localFile)
 	}
 
-	request, err2 := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err2 != nil {
-		return err2
+	subCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	request, err := http.NewRequestWithContext(subCtx, http.MethodGet, u, nil) // http with context will cancel it himself
+	if err != nil {
+		return err
 	}
+
 	rsp, err := client.Do(request)
 	if err != nil {
 		return err
 	}
-	defer rsp.Body.Close()
 
 	if rsp.Body != nil {
+		defer rsp.Body.Close()
 		fp, err := os.OpenFile(localFile, os.O_CREATE|os.O_WRONLY, 0o666)
 		if err != nil {
 			return err
 		}
 		defer fp.Close()
-		cl, _ := strconv.Atoi(rsp.Header.Get("Content-Length"))
-		if cl <= 0 {
-			return Error("content length is 0")
+
+		cl := 0
+		clHeader := rsp.Header.Get("Content-Length")
+		if clHeader != "" {
+			cl, _ = strconv.Atoi(clHeader) // should can process chunk
 		}
 		pw := progresswriter.New(uint64(cl))
 		go func() {
 			for {
 				select {
-				case <-ctx.Done():
-					rsp.Body.Close() //手动关闭
+				case <-subCtx.Done():
 					return
 				default:
 					if len(every1s) > 0 {
@@ -274,7 +279,7 @@ func DownloadFile(ctx context.Context, client *http.Client, u string, localFile 
 		}()
 
 		_, err = io.Copy(fp, io.TeeReader(rsp.Body, pw))
-		if err != nil {
+		if err != nil { // maybe can delete file?
 			log.Errorf("download file failed: %v", err)
 			return err
 		}
