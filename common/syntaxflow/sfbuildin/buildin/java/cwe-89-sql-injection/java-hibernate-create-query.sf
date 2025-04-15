@@ -9,7 +9,7 @@ desc(
 TEXT
 )
 
-.create*Query(*<slice(index=1)> as $query,);
+.create*Query(,* as $query,);
 $query?{!opcode: const} as $mixQuery; <delete(query)>
 $mixQuery #{
     until: `*?{opcode: param && !<typeName>?{any: /(?i)bool/,/(?i)float/,/(?i)double/,/(?i)int/} } as $params`,

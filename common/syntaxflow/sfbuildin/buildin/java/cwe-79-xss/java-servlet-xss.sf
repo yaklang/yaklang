@@ -12,10 +12,10 @@ TEXT
 <include('java-escape-method')> as $filter
 
 response?{<typeName>?{have:'javax.servlet.http.HttpServletResponse'}}.getWriter() as $out;
-$out.print(*<slice(index=1)> as $sink);
-$out.println(*<slice(index=1)> as $sink);
-$out.write(*<slice(index=1)> as $sink);
-.append?{<typeName()>?{have:'javax.servlet.http.HttpServletResponse'}}(*<slice(index=1)> as $sink)
+$out.print(,* as $sink);
+$out.println(,* as $sink);
+$out.write(,* as $sink);
+.append?{<typeName()>?{have:'javax.servlet.http.HttpServletResponse'}}(,* as $sink)
 check $sink;
 
 $sink#{

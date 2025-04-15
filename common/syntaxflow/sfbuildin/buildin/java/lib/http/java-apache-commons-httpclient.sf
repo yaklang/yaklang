@@ -5,8 +5,8 @@ desc(
     lib: "java-apache-commons-httpclient",
 )
 
-*.executeMethod(*<slice(index=1)> as $arg);
-$arg<getCallee()>?{<fullTypeName>?{have: /commons\.httpclient\.methods\.(Get|Post|Put|Delete|Patch|Options|Head|Trace)Method/}}(*<slice(index=1)> as $output);
+*.executeMethod(,* as $arg);
+$arg<getCallee()>?{<fullTypeName>?{have: /commons\.httpclient\.methods\.(Get|Post|Put|Delete|Patch|Options|Head|Trace)Method/}}(,* as $output);
 <delete(arg)>
 alert $output;
 

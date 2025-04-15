@@ -8,7 +8,7 @@ desc(
 TEXT
 )
 
-RestTemplate?{<fullTypeName>?{have: 'springframework.web.client'}}().getForObject(*<slice(index=1)> as $output);
+RestTemplate?{<fullTypeName>?{have: 'springframework.web.client'}}().getForObject(,* as $output);
 alert $output;
 
 desc(

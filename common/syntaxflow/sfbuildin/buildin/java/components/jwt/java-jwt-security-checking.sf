@@ -24,7 +24,7 @@ alert $riskParse for {
     risk : "auth-bypass",
 }
 
-.signWith?{<typeName>?{have:'io.jsonwebtoken'}}(*<slice(index=2)>  as $key)
+.signWith?{<typeName>?{have:'io.jsonwebtoken'}}(,,*  as $key)
 $key?{opcode:const} as $simpleKey;
 $key?{opcode: call && <getCallee>?{<getObject><name>?{have:base64 || BASE64  || Base64}}(*<slice(index=1)>*?{opcode: const}<var(base64EncodedKey)>) } as $sink;
 $simpleKey + $base64EncodedKey as $hardcodedKey;
