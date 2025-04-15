@@ -226,7 +226,7 @@ func NewDefaultHTTPClientWithProxy(proxy string) *http.Client {
 	return client
 }
 
-func DownloadFile(client *http.Client, u string, localFile string, every1s ...func(float64)) error {
+func DownloadFile(ctx context.Context, client *http.Client, u string, localFile string, every1s ...func(float64)) error {
 	if client == nil {
 		return Error("client is nil")
 	}
@@ -249,7 +249,7 @@ func DownloadFile(client *http.Client, u string, localFile string, every1s ...fu
 		if cl <= 0 {
 			return Error("content length is 0")
 		}
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
 		pw := progresswriter.New(uint64(cl))
