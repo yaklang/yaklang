@@ -1,7 +1,6 @@
 desc(
     title: "Find Java SpringBoot new RestTemplate().getForObject",
     type: audit,
-    level: low,
     lib: 'java-spring-rest-template-use',
     desc: <<<TEXT
 使用 `new RestTemplate().getForObject` 方法可能会导致安全漏洞，尤其是当传入的URL参数未经充分验证时，可能会引发服务器端请求伪造（SSRF）攻击。SSRF漏洞允许攻击者通过应用服务器向内部或受限资源发起请求，从而可能暴露敏感信息或进行进一步攻击。建议对传入的URL参数进行严格的验证和清理，或使用更安全的替代方案，如使用Spring Cloud OpenFeign。

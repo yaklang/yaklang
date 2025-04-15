@@ -1,7 +1,6 @@
 desc(
     title: "Find HTTP Sink in Java (Multiple Libraries)",
     type: audit,
-    level: low,
     lib: "java-http-sink",
 )
 

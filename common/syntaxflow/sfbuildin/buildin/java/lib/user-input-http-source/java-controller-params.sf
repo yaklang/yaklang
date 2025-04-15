@@ -2,7 +2,6 @@ desc(
     title: 'checking [spring controller source parameter]',
     type: audit,
     lib: 'java-spring-param',
-    level: medium,
     desc: <<<TEXT
 此规则旨在审计Spring框架中控制器方法的参数来源安全性。确保控制器方法中的参数来源清晰且安全至关重要，因为不当的参数处理可能导致安全漏洞，如SQL注入、跨站脚本攻击(XSS)等。通过检查控制器方法的参数是否明确指定了来源（如通过@RequestParam、@PathVariable等注解），可以防止潜在的参数篡改和注入攻击。此外，这也有助于维护代码的清晰性和可维护性。
 TEXT
@@ -20,8 +19,6 @@ $start<getFormalParams>?{opcode: param && !have: this} as $formalParams
 
 // merge start and output
 $formalParams + $dynamicParams as $output;
-
-
 
 // output lib params
 alert $output;
