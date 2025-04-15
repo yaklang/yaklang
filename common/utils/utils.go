@@ -235,28 +235,32 @@ func DownloadFile(ctx context.Context, client *http.Client, u string, localFile 
 		return Errorf("localfile: %v is existed", localFile)
 	}
 
-	rsp, err := client.Get(u)
+	request, err2 := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err2 != nil {
+		return err2
+	}
+	rsp, err := client.Do(request)
 	if err != nil {
 		return err
 	}
+	defer rsp.Body.Close()
 
 	if rsp.Body != nil {
 		fp, err := os.OpenFile(localFile, os.O_CREATE|os.O_WRONLY, 0o666)
 		if err != nil {
 			return err
 		}
+		defer fp.Close()
 		cl, _ := strconv.Atoi(rsp.Header.Get("Content-Length"))
 		if cl <= 0 {
 			return Error("content length is 0")
 		}
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
-
 		pw := progresswriter.New(uint64(cl))
 		go func() {
 			for {
 				select {
 				case <-ctx.Done():
+					rsp.Body.Close() //手动关闭
 					return
 				default:
 					if len(every1s) > 0 {
@@ -268,8 +272,12 @@ func DownloadFile(ctx context.Context, client *http.Client, u string, localFile 
 				}
 			}
 		}()
-		io.Copy(fp, io.TeeReader(rsp.Body, pw))
-		fp.Close()
+
+		_, err = io.Copy(fp, io.TeeReader(rsp.Body, pw))
+		if err != nil {
+			log.Errorf("download file failed: %v", err)
+			return err
+		}
 		return nil
 	}
 	return Error("body is nil")
