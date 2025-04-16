@@ -57,6 +57,7 @@ jobs:
             run: |
               # these tests are very quick
               go test -timeout 20s ./common/jsonextractor  
+              go test -timeout 20s ./common/markdownextractor  
               go test -timeout 20s ./common/ai/aid/...  
               go test -timeout 20s ./common/yak/yaklib/codec 
               go test -timeout 20s ./common/yak/cartesian  
