@@ -7,7 +7,7 @@ Spring Framework 的 Spring Expression Language (SPEL) 解析器存在注入漏�
 TEXT
 )
 
-<include('java-spring-param')> as $params;
+<include('java-spring-mvc-param')> as $params;
 check $params;
 
 SpelExpressionParser().parseExpression(* as $sinks);

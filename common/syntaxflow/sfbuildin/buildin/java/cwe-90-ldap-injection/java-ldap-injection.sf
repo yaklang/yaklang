@@ -8,7 +8,7 @@ LDAP注入漏洞是一种安全漏洞，攻击者可以通过构造恶意的LDAP
 TEXT
 )
 
-<include('java-spring-param')> as $source;
+<include('java-spring-mvc-param')> as $source;
 <include('java-servlet-param')> as $source;
 
 InitialDirContext()?{<typeName>?{have:'javax.naming'}}.search(*?{<typeName>?{have:'String'||'string'}} as $sink);

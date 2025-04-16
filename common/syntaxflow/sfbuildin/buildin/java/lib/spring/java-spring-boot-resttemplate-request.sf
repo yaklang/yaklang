@@ -6,7 +6,7 @@ desc(
     reference:<<<TEXT
     https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/client/RestTemplate.html
 TEXT
-    desc: <<<TEXT
+    description: <<<TEXT
     此规则旨在查找Java代码中SpringBoot RestTemplate库中网络发包方法的Url参数。
     该规则主要用于辅助审计SSRF(Server-Side Request Forgery)漏洞。
     规则审计的类为:
@@ -71,3 +71,5 @@ $rest.exchange(* <slice(index=1)> as $output)
 // postForEntity(URI url, Object request, Class<T> responseType)
 // ...
 $rest.*For*(* <slice(index=1)> as $output)
+
+alert $output
