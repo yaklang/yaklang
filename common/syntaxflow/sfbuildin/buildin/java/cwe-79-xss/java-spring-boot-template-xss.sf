@@ -10,7 +10,7 @@ TEXT
 
 <javaUnescapeOutput> as $sink;
 check $sink then "发现模板语言中存在未转义的输出"
-<include('java-spring-param')>?{!<typeName>?{have:'org.springframework.ui.Model'}} as $source;
+<include('java-spring-mvc-param')>?{!<typeName>?{have:'org.springframework.ui.Model'}} as $source;
 Model?{opcode:param  && <typeName>?{have:'org.springframework.ui.Model'}} as $model;
 $sink #{
     include: `<self> & $model`,

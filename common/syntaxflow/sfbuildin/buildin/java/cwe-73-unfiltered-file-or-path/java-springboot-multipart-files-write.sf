@@ -8,7 +8,7 @@ desc(
 TEXT
 )
 
-<include('java-spring-param')>?{<typeName>?{have: MultipartFile}} as $upload;
+<include('java-spring-mvc-param')>?{<typeName>?{have: MultipartFile}} as $upload;
 check $upload;
 Files.write(*?{!opcode: param} as $sink);
 $sink #{

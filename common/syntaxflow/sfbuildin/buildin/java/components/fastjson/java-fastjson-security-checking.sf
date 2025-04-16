@@ -24,7 +24,7 @@ alert $parseObjectCall for {
     message_zh: "FastJson 使用了不安全的 parseObject/parse 方法",
     message: "FastJson uses the unsafe parseObject/parse method"
 };
-<include('java-spring-param')> as $entry;
+<include('java-spring-mvc-param')> as $entry;
 <include('java-servlet-param')> as $entry;
 $entry -{
     until: <<<CODE

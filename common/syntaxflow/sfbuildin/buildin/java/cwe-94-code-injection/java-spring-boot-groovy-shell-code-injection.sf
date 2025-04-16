@@ -13,7 +13,7 @@ https://docs.groovy-lang.org/next/html/api/groovy/lang/GroovyShell.html
 TEXT
 )
 
-<include('java-spring-param')> as $source;
+<include('java-spring-mvc-param')> as $source;
 <include('java-groovy-lang-shell-sink')> as $sink;
 
 $sink #{

@@ -18,7 +18,7 @@ alert $sink for {
 
 check $readObject;
 
-<include('java-spring-param')> as $params;
+<include('java-spring-mvc-param')> as $params;
 <include('java-servlet-param')> as $params;
 $readObject<getObject>#{
     until: `* & $params<var(source)> as $__next__`,
