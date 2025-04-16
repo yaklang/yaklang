@@ -76,10 +76,10 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 		return utils.Errorf("create coordinator failed: %v", err)
 	}
 	go func() {
+		defer cancel()
 		err := engine.Run()
 		if err != nil {
 			log.Errorf("run coordinator failed: %v", err)
-			cancel()
 		}
 	}()
 
