@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"time"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -14,6 +16,8 @@ type saveValueCtx struct {
 	ssadb.AuditNodeStatus
 
 	entryValue *Value
+
+	visitedNode map[*Value]*ssadb.AuditNode
 }
 
 type SaveValueOption func(c *saveValueCtx)
@@ -72,43 +76,15 @@ func OptionSaveValue_ProgramName(name string) SaveValueOption {
 	}
 }
 
-// type Cache struct {
-// 	mu    sync.Mutex
-// 	items map[ssa.Value]*ssadb.AuditNode
-// }
-
-// func (c *Cache) Set(key ssa.Value, value *ssadb.AuditNode) {
-// 	c.mu.Lock()
-// 	defer c.mu.Unlock()
-// 	c.items[key] = value
-// }
-
-// func (c *Cache) Get(key ssa.Value) (*ssadb.AuditNode, bool) {
-// 	c.mu.Lock()
-// 	defer c.mu.Unlock()
-// 	val, ok := c.items[key]
-// 	return val, ok
-// }
-
-// func (c *Cache) ReMove() {
-// 	c.mu.Lock()
-// 	defer c.mu.Unlock()
-// 	c.items = make(map[ssa.Value]*ssadb.AuditNode)
-// }
-
-// var cache = &Cache{
-// 	mu:    sync.Mutex{},
-// 	items: make(map[ssa.Value]*ssadb.AuditNode),
-// }
-
 func SaveValue(value *Value, opts ...SaveValueOption) error {
 	db := ssadb.GetDB()
 	if db == nil {
 		return utils.Error("db is nil")
 	}
 	ctx := &saveValueCtx{
-		db:         db,
-		entryValue: value,
+		db:          db,
+		entryValue:  value,
+		visitedNode: make(map[*Value]*ssadb.AuditNode),
 	}
 	for _, o := range opts {
 		o(ctx)
@@ -127,6 +103,9 @@ func SaveValue(value *Value, opts ...SaveValueOption) error {
 }
 
 func (s *saveValueCtx) SaveNode(value *Value) (*ssadb.AuditNode, error) {
+	if node, ok := s.visitedNode[value]; ok {
+		return node, nil
+	}
 	if value == nil {
 		return nil, utils.Error("value is nil")
 	}
@@ -152,49 +131,30 @@ func (s *saveValueCtx) SaveNode(value *Value) (*ssadb.AuditNode, error) {
 			an.TmpEndOffset = R.GetEndOffset()
 		}
 	}
-	where := &ssadb.AuditNode{
-		AuditNodeStatus: ssadb.AuditNodeStatus{
-			ResultId:       an.ResultId,
-			ResultVariable: an.ResultVariable,
-		},
-		IsEntryNode:    an.IsEntryNode,
-		IRCodeID:       an.IRCodeID,
-		TmpStartOffset: an.TmpStartOffset,
-		TmpEndOffset:   an.TmpEndOffset,
+	if ret := s.db.Save(an).Error; ret != nil {
+		return nil, utils.Wrap(ret, "save AuditNode")
 	}
-	if err := s.db.Where(where).FirstOrCreate(an).Error; err != nil {
-		return nil, utils.Wrap(err, "save AuditNode")
-	}
+	s.visitedNode[value] = an
 	return an, nil
 }
 
-func (s *saveValueCtx) getNeighbors(value *Value, visited *map[*Value]map[*Value]bool) []*graph.Neighbor[*Value] {
+func (s *saveValueCtx) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
 	if value == nil {
 		return nil
 	}
 
 	var res []*graph.Neighbor[*Value]
-	// for _, i := range value.GetDependOn() {
-	// 	res = append(res, graph.NewNeighbor(i, EdgeTypeDependOn))
-	// }
-	// for _, i := range value.GetEffectOn() {
-	// 	res = append(res, graph.NewNeighbor(i, EdgeTypeEffectOn))
-	// }
 	for _, pred := range value.GetPredecessors() {
 		if pred.Node == nil {
 			continue
 		}
 		if IsDataFlowLabel(pred.Info.Label) {
-			graph.BuildGraphWithBFS[*ssadb.AuditNode, *Value](
-				pred.Node, value,
-				s.SaveNode,
-				s.getNeighborsDependOn,
-				s.getNeighborsEffectOn,
-				s.SaveEdge,
-				visited,
-			)
-
-			neighbor := graph.NewNeighbor(pred.Node, "")
+			var neighbor *graph.Neighbor[*Value]
+			if s.saveDataFlow(pred.Node, value) {
+				neighbor = graph.NewNeighbor(pred.Node, "") // ignore this edge in dot graph
+			} else {
+				neighbor = graph.NewNeighbor(pred.Node, EdgeTypePredecessor)
+			}
 			neighbor.AddExtraMsg("label", pred.Info.Label)
 			neighbor.AddExtraMsg("step", int64(pred.Info.Step))
 			res = append(res, neighbor)
@@ -208,20 +168,51 @@ func (s *saveValueCtx) getNeighbors(value *Value, visited *map[*Value]map[*Value
 	return res
 }
 
-func (s *saveValueCtx) getNeighborsDependOn(value *Value) map[*Value]*graph.Neighbor[*Value] {
-	var res map[*Value]*graph.Neighbor[*Value] = make(map[*Value]*graph.Neighbor[*Value])
-	for _, i := range value.GetDependOn() {
-		res[i] = graph.NewNeighbor(i, EdgeTypeDependOn)
+// from is the source node, to is the target node, from -> xxx -> to
+func (s *saveValueCtx) saveDataFlow(from *Value, to *Value) bool {
+	start := time.Now()
+	paths := graph.GraphPathWithTarget(from, to,
+		func(v *Value) []*Value {
+			return v.GetDependOn()
+		},
+	)
+	elapsed := time.Since(start)
+	if elapsed > time.Second {
+		log.Warnf("saveDataFlow: collect paths cost [%v] paths: %v", elapsed, len(paths))
 	}
-	return res
-}
 
-func (s *saveValueCtx) getNeighborsEffectOn(value *Value) map[*Value]*graph.Neighbor[*Value] {
-	var res map[*Value]*graph.Neighbor[*Value] = make(map[*Value]*graph.Neighbor[*Value])
-	for _, i := range value.GetEffectOn() {
-		res[i] = graph.NewNeighbor(i, EdgeTypeEffectOn)
+	if len(paths) == 0 || len(paths) > 100 {
+		log.Warnf("saveDataFlow:  paths is empty or too many paths: %v", len(paths))
+		return false
 	}
-	return res
+
+	start = time.Now()
+	for _, path := range paths {
+		// log.Infof("saveDataFlow: %v", path)
+		// save dataflow path
+		for i := 0; i < len(path)-1; i++ {
+			fromNode, err := s.SaveNode(path[i])
+			if err != nil {
+				log.Errorf("failed to save node: %v", err)
+				continue
+			}
+
+			toNode, err := s.SaveNode(path[i+1])
+			if err != nil {
+				log.Errorf("failed to save node: %v", err)
+				continue
+			}
+
+			s.SaveEdge(fromNode, toNode, EdgeTypeDependOn, nil)
+			s.SaveEdge(toNode, fromNode, EdgeTypeEffectOn, nil)
+		}
+	}
+	elapsed = time.Since(start)
+	if elapsed > time.Second {
+		log.Warnf("saveDataFlow:  save paths cost [%v] paths: %v", elapsed, len(paths))
+	}
+
+	return true
 }
 
 func (s *saveValueCtx) SaveEdge(from *ssadb.AuditNode, to *ssadb.AuditNode, edgeType string, extraMsg map[string]interface{}) {
@@ -231,12 +222,12 @@ func (s *saveValueCtx) SaveEdge(from *ssadb.AuditNode, to *ssadb.AuditNode, edge
 	switch ValidEdgeType(edgeType) {
 	case EdgeTypeDependOn:
 		edge := from.CreateDependsOnEdge(s.ProgramName, to.ID)
-		if err := s.db.Where(edge).FirstOrCreate(edge).Error; err != nil {
+		if err := s.db.Save(edge).Error; err != nil {
 			log.Errorf("save AuditEdge failed: %v", err)
 		}
 	case EdgeTypeEffectOn:
 		edge := from.CreateEffectsOnEdge(s.ProgramName, to.ID)
-		if err := s.db.Where(edge).FirstOrCreate(edge).Error; err != nil {
+		if err := s.db.Save(edge).Error; err != nil {
 			log.Errorf("save AuditEdge failed: %v", err)
 		}
 	case EdgeTypePredecessor:
@@ -249,7 +240,7 @@ func (s *saveValueCtx) SaveEdge(from *ssadb.AuditNode, to *ssadb.AuditNode, edge
 			step = extraMsg["step"].(int64)
 		}
 		edge := from.CreatePredecessorEdge(s.ProgramName, to.ID, step, label)
-		if err := s.db.Where(edge).FirstOrCreate(edge).Error; err != nil {
+		if err := s.db.Save(edge).Error; err != nil {
 			log.Errorf("save AuditEdge failed: %v", err)
 		}
 	}

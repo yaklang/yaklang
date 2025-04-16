@@ -70,13 +70,17 @@ func (g *ValueGraph) ShowDot() {
 }
 
 func (g *ValueGraph) createNode(value *Value) (int, error) {
-	nodeId := g.AddNode(value.GetVerboseName())
+	code := value.GetRange().GetText()
+	if len(code) > 100 {
+		code = code[:100] + "..."
+	}
+	nodeId := g.AddNode(code)
 	g.Node2Value[nodeId] = value
 	g.Value2Node[value] = nodeId
 	return nodeId, nil
 }
 
-func (g *ValueGraph) getNeighbors(value *Value, visited *map[*Value]map[*Value]bool) []*graph.Neighbor[*Value] {
+func (g *ValueGraph) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
 	if value == nil {
 		return nil
 	}
@@ -92,6 +96,9 @@ func (g *ValueGraph) getNeighbors(value *Value, visited *map[*Value]map[*Value]b
 		if predecessor.Node == nil {
 			continue
 		}
+		if IsDataFlowLabel(predecessor.Info.Label) {
+			continue
+		}
 		neighbor := graph.NewNeighbor(predecessor.Node, EdgeTypePredecessor)
 		neighbor.AddExtraMsg("label", predecessor.Info.Label)
 		neighbor.AddExtraMsg("step", predecessor.Info.Step)
@@ -103,9 +110,9 @@ func (g *ValueGraph) getNeighbors(value *Value, visited *map[*Value]map[*Value]b
 func (g *ValueGraph) handleEdge(fromNode int, toNode int, edgeType string, extraMsg map[string]any) {
 	switch ValidEdgeType(edgeType) {
 	case EdgeTypeDependOn:
-		g.AddEdge(fromNode, toNode, "")
+		g.AddEdge(fromNode, toNode, "depend_on")
 	case EdgeTypeEffectOn:
-		g.AddEdge(toNode, fromNode, "")
+		g.AddEdge(toNode, fromNode, "effect_on")
 	case EdgeTypePredecessor:
 		edges := g.GetEdges(toNode, fromNode)
 		var (
