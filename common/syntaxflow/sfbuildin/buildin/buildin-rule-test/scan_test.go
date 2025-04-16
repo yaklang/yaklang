@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"strings"
 	"testing"
 
@@ -47,7 +48,9 @@ func TestVerify_DEBUG(t *testing.T) {
 		return
 	}
 	yakit.InitialDatabase()
-	ruleName := "检测Java IO库未检查返回值的API"
+	err := sfbuildin.SyncEmbedRule()
+	require.NoError(t, err)
+	ruleName := "检测Java SpringBoot 服务端请求伪造(SSRF)漏洞"
 
 	rule, err := sfdb.GetRulePure(ruleName)
 	if err != nil {
