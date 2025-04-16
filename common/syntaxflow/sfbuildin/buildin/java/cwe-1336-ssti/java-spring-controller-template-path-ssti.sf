@@ -8,7 +8,7 @@ desc(
 TEXT
 )
 
-<include('java-spring-param')>?{<typeName>?{have: String}} as $params;
+<include('java-spring-mvc-param')>?{<typeName>?{have: String}} as $params;
 
 Controller.__ref__<getMembers>?{.annotation.*Mapping && !.annotation.ResponseBody} as $entryMethods;
 $entryMethods<getReturns>?{<typeName>?{have: String}} as $sink;

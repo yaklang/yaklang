@@ -9,7 +9,7 @@ desc(
 TEXT
 )
 
-<include('java-spring-param')> as $top;
+<include('java-spring-mvc-param')> as $top;
 
 // <mybatisSink><getFunc> as $params;
 // $top -{
@@ -21,7 +21,7 @@ TEXT
 // check $target
 // alert $target;
 
-<include('java-spring-param')> as $totalSource;
+<include('java-spring-mvc-param')> as $totalSource;
 <mybatisSink><getFunc><name>?{!have: '.' && !have: '__ref__'} as $name;
 <fuzztag('.{{name}} as $call')><eval>
 $call(*<slice(start=1)> #{

@@ -8,7 +8,7 @@ TEXT,
 )
 
 <include('java-servlet-param')> as $source;
-<include('java-spring-param')> as $source;
+<include('java-spring-mvc-param')> as $source;
 <include('java-js-sink')> as $sink;
 
 $sink?{* #{

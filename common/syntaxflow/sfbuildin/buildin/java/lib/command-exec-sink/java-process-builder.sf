@@ -1,11 +1,110 @@
 desc(
-    title: "Find ProcessBuilder Sink Point",
+    title_zh:"查找Java ProcessBuilder Sink点",
+    title:"Find Java ProcessBuilder Sink Point",
     lib: 'java-process-builder-sink',
     type: audit,
-    desc: <<<TEXT
-使用 `ProcessBuilder` 类可以启动操作系统进程，并且如果不正确地处理输入，可能会导致命令注入漏洞。攻击者可以通过操纵传递给 `ProcessBuilder` 的输入参数，执行任意命令，从而危害系统的安全性。建议对 `ProcessBuilder` 的使用进行严格的输入验证和清理，以防止潜在的命令注入攻击。
+    reference:<<<URL
+    https://docs.oracle.com/javase/8/docs/api/java/lang/ProcessBuilder.html
+URL
+    desc:<<<TEXT
+    该规则用于查找Java代码中使用ProcessBuilder命令执行所使用的命令参数，查找的ProcessBuilder需要调用start方法。
+    规则覆盖的类为:
+    - java.lang.ProcessBuilder
+    规则覆盖的方法包括：
+    - ProcessBuilder(List<String> command)
+    - ProcessBuilder(String... command)
+    - ProcessBuilder.command(List<String> command)
+    - ProcessBuilder.command(String... command)
 TEXT
 )
 
-ProcessBuilder(*?{!have: ProcessBuilder} as $output);
-alert $output;
+// Constructors
+// ProcessBuilder(List<String> command)
+// ProcessBuilder(String... command)
+ProcessBuilder?{ <typeName>?{have:'java.lang.ProcessBuilder'} && *(* <slice(start=1)> as $output) }as $processBuilder;
+
+// Methods
+// ProcessBuilder.command(List<String> command)
+// ProcessBuilder.command(String... command)
+$processBuilder.command(* <slice(start=1)> as $output)
+alert $output
+
+desc(
+    lang: java,
+    alert_num: 2,
+    'file://risk1.java': <<<TEXT
+package org.example.moudels.rce.command;
+
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiImplicitParam;
+import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
+import org.example.common.util.R;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+
+@Slf4j
+@Api(value="CommandController",tags = "RCE-远程命令执行")
+@Controller
+@CrossOrigin(origins = "*")
+@RequestMapping("/command")
+public class CommandController {
+    @RequestMapping("")
+    public String spel() {
+        return "vul/rce/command";
+    }
+
+    @RequestMapping("/ProcessBuilder1")
+    @ResponseBody
+    @ApiOperation(value = "漏洞场景：命令注入-ProcessBuilder1",notes = "命令注入")
+    @ApiImplicitParam(name = "payload", value = "命令", required = true, dataType = "String", paramType = "query")
+   public R procesBuilder1(@RequestParam("payload") String payload) throws IOException {
+        String[] command ={"sh","-c",payload};
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.redirectErrorStream(true);
+
+        Process process = pb.start();
+        InputStream inputStream = process.getInputStream();
+        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+        String line;
+        StringBuilder output = new StringBuilder();
+        while ((line = reader.readLine()) != null) {
+            output.append(line).append("\n");
+        }
+        return R.ok(output.toString());
+   }
+
+    @RequestMapping("/ProcessBuilder2")
+    @ResponseBody
+    @ApiOperation(value = "漏洞场景：命令注入-ProcessBuilder2",notes = "命令注入")
+    @ApiImplicitParam(name = "payload", value = "命令", required = true, dataType = "String", paramType = "query")
+    public R procesBuilder2(@RequestParam("payload") String payload) throws IOException {
+          String[] command = {"sh", "-c", payload};
+
+          ProcessBuilder pb = new ProcessBuilder();
+          pb.redirectErrorStream(true);
+          pb.command(command);
+          Process process = pb.start();
+          InputStream inputStream = process.getInputStream();
+          BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+          String line;
+          StringBuilder output = new StringBuilder();
+          while ((line = reader.readLine()) != null) {
+                output.append(line).append("\n");
+          }
+          return R.ok(output.toString());
+    }
+}
+
+TEXT
+)
+
+
