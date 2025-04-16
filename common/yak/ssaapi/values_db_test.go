@@ -8,8 +8,10 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -146,4 +148,111 @@ func TestValuesDB_Save_Audit_Node(t *testing.T) {
 			require.Equal(t, 0, len(edge3_4))
 		}
 	})
+}
+
+func TestDataFlowPath(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+
+	vf.AddFile("org/joychou/controller/Cookies.java", `
+package org.joychou.controller;
+
+public class Cookies {
+    @GetMapping(value = "/vuln06")
+    public String vuln06(@CookieValue(value = "nick") String nick) {
+		nick = "123" + nick;
+        return "Cookie nick: " + nick;
+    }
+}
+	`)
+
+	progId := uuid.NewString()
+	prog, err := ssaapi.ParseProject(
+		ssaapi.WithProgramName(progId),
+		ssaapi.WithLanguage(consts.JAVA),
+		ssaapi.WithFileSystem(vf),
+	)
+	log.Infof("prog: %v", progId)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), progId)
+	require.NoError(t, err)
+
+	res, err := prog.SyntaxFlowWithError(`
+	GetMapping.__ref__(* as $param)
+	$param<getFunc><getReturns> as $returns;
+	$returns #{until:"* & $param"}-> as $result;
+		`)
+	require.NoError(t, err)
+	_ = res
+
+	t.Run("test memory result", func(t *testing.T) {
+
+		for _, v := range res.GetValues("result") {
+			// v.ShowDot()
+			dotGraph := v.DotGraph()
+			fmt.Println(dotGraph)
+
+			// check syntaxflow step
+			require.Contains(t, dotGraph, "getFunc")
+			require.Contains(t, dotGraph, "getReturns")
+
+			// check dataflow step
+			// // this data not exist in dataflow path,
+			// require.Contains(t, dotGraph, `"Cookie nick: "`)
+			// require.Contains(t, dotGraph, `"123"`)
+
+			// check no dataflow edge
+			require.NotContains(t, dotGraph, ssaapi.Predecessors_TopDefLabel)
+		}
+	})
+
+	t.Run("test save result", func(t *testing.T) {
+		// database
+		id, err := res.Save(schema.SFResultKindDebug)
+		require.NoError(t, err)
+
+		result, err := ssaapi.LoadResultByID(id)
+		require.NoError(t, err)
+		require.Equal(t, result.GetResultID(), id)
+
+		for _, v := range result.GetValues("result") {
+			fmt.Println(v.GetId(), v.GetName())
+			// v.ShowDot()
+			dotGraph := v.DotGraph()
+			fmt.Println(dotGraph)
+
+			// check syntaxflow step
+			require.Contains(t, dotGraph, "getFunc")
+			require.Contains(t, dotGraph, "getReturns")
+
+			/*
+				+----------------+          +----------------+
+				|  "Cookie nick: "| <--------| add("Cookie nick: ", |
+				|                |          |  add("123", Param))  |
+				+----------------+          +----------------+
+											|
+											|
+											|
+										+----------------+    +-----------------+
+										| add("123",     | --→| Parameter-nick  |
+										|  Parameter-nick)|    |                 |
+										+----------------+    +-----------------+
+											|
+											|
+										+----------------+
+										|     "123"      |
+										+----------------+
+			*/
+
+			// check dataflow step, this data not exist in dataflow path,
+			require.NotContains(t, dotGraph, `"\"Cookie nick: \""`)
+			require.NotContains(t, dotGraph, `"\"123\""`)
+
+			require.Contains(t, dotGraph, `\"Cookie nick: \" + nick`)
+			require.Contains(t, dotGraph, `\"123\" + nick`)
+			require.Contains(t, dotGraph, `@CookieValue(value = \"nick\") String nick`)
+
+			// check no dataflow edge
+			require.NotContains(t, dotGraph, ssaapi.Predecessors_TopDefLabel)
+		}
+	})
+
 }
