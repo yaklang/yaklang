@@ -505,6 +505,25 @@ func checkFunctionEx(
 }
 
 func checkResult(verifyFs *sfvm.VerifyFileSystem, rule *schema.SyntaxFlowRule, result *ssaapi.SyntaxFlowResult) (errs error) {
+	defer func() {
+		if errs != nil {
+			fs := verifyFs.GetVirtualFs()
+			builder := &strings.Builder{}
+			entrys, err := fs.ReadDir(".")
+			if err != nil {
+				return
+			}
+			for _, entry := range entrys {
+				if entry.IsDir() {
+					continue
+				}
+				fileName := entry.Name()
+				builder.WriteString(fileName)
+				builder.WriteString(" | ")
+			}
+			errs = utils.Wrapf(errs, "checkResult failed in file: %s", builder.String())
+		}
+	}()
 	result.Show()
 	if len(result.GetErrors()) > 0 {
 		for _, e := range result.GetErrors() {

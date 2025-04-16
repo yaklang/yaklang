@@ -132,11 +132,14 @@ func (s *SFFrame) ExtractVerifyFilesystemAndLanguage() (consts.Language, []*Veri
 	if err != nil {
 		log.Warnf("validate language failed: %s", err)
 	}
+
 	var result []*VerifyFileSystem
+	hasVerifyFs := false
 	for _, desc := range s.VerifyFsInfo {
 		if len(desc.verifyFilesystem) == 0 {
 			continue
 		}
+		hasVerifyFs = true
 		verify := &VerifyFileSystem{}
 		vfs := filesys.NewVirtualFs()
 		for name, content := range desc.verifyFilesystem {
@@ -152,6 +155,10 @@ func (s *SFFrame) ExtractVerifyFilesystemAndLanguage() (consts.Language, []*Veri
 		verify.checkInfo = desc.rawDesc
 		result = append(result, verify)
 	}
+	if !hasVerifyFs {
+		return val, result, nil
+	}
+	// 有verify fs就要检查是否有语言
 	if val == "" {
 		return val, result, utils.Wrap(err, "validator language not found")
 	}
