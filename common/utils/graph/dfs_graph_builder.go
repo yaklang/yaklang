@@ -6,14 +6,13 @@ type DFSGraphBuilder[K, T comparable] struct {
 	getNodeKey func(T) (K, error)
 
 	// Function to retrieve the neighboring nodes and their edge types for a given node key
-	getNeighbors func(T, *map[T]map[T]bool) []*Neighbor[T]
+	getNeighbors func(T) []*Neighbor[T]
 
 	// Function to process an edge between two nodes (e.g., store it, compute on it, etc.)
 	handleEdge func(from K, to K, edgeType string, extraMsg map[string]any)
 
 	// Map to track visited nodes during DFS traversal
-	visited     map[T]K
-	visitedEdge map[T]map[T]bool
+	visited map[T]K
 }
 
 // Neighbor Structure combining neighboring nodes with their edge types
@@ -54,7 +53,7 @@ func (g *DFSGraphBuilder[K, T]) dfs(node T) (K, error) {
 	g.visited[node] = nodeKey
 
 	// Retrieve the neighboring nodes and their edge types
-	neighbors := g.getNeighbors(node, &g.visitedEdge)
+	neighbors := g.getNeighbors(node)
 
 	// Traverse each neighboring node
 	for _, neighbor := range neighbors {
@@ -71,7 +70,7 @@ func (g *DFSGraphBuilder[K, T]) dfs(node T) (K, error) {
 
 func NewDFSGraphBuilder[K comparable, T comparable](
 	getNodeKey func(T) (K, error), // Function to generate a unique key for a node
-	getNeighbors func(T, *map[T]map[T]bool) []*Neighbor[T], // Function to retrieve neighboring nodes and edge types
+	getNeighbors func(T) []*Neighbor[T], // Function to retrieve neighboring nodes and edge types
 	handleEdge func(from K, to K, edgeType string, extraMsg map[string]any), // Function to process an edge
 ) *DFSGraphBuilder[K, T] {
 	// Initialize and return a new GraphBuilder instance
@@ -80,14 +79,13 @@ func NewDFSGraphBuilder[K comparable, T comparable](
 		getNeighbors: getNeighbors,
 		handleEdge:   handleEdge,
 		visited:      make(map[T]K),
-		visitedEdge:  make(map[T]map[T]bool),
 	}
 }
 
 func BuildGraphWithDFS[K comparable, T comparable](
 	startNode T,
 	getNodeKey func(T) (K, error),
-	getNeighbors func(T, *map[T]map[T]bool) []*Neighbor[T],
+	getNeighbors func(T) []*Neighbor[T],
 	handleEdge func(from K, to K, edgeType string, extraMsg map[string]any),
 ) error {
 	builder := NewDFSGraphBuilder[K, T](getNodeKey, getNeighbors, handleEdge)
