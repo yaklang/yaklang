@@ -272,12 +272,12 @@ func (s *dbm) UnsafeSqlQuery(rawString string) ([]map[string]interface{}, error)
 	return results, nil
 }
 
-func (s *dbm) GetUserByIdUnsafe(i string) (map[string]interface{}, error) {
+func (s *dbm) GetUserByIdUnsafe(i string) ([]map[string]interface{}, error) {
 	res, err := s.UnsafeSqlQuery(`select * from vulin_users where id = ` + i + ";")
 	if err != nil || len(res) == 0 {
 		return nil, err
 	}
-	return res[0], nil
+	return res, nil
 }
 
 func (s *dbm) GetUserById(i int) (*VulinUser, error) {
