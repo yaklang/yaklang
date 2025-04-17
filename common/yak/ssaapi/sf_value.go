@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"regexp"
 
