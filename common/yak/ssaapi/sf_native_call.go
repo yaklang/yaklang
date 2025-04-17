@@ -170,30 +170,9 @@ const (
 	NativeCall_GetInterfaceBlueprint = "getInterfaceBlueprint"
 
 	NativeCall_GetRootParentBlueprint = "getRootParentBlueprint"
-
-	NativeCall_GetRootInterfaceBlueprint = "getRootInterfaceBlueprint"
 )
 
 func init() {
-	registerNativeCall(NativeCall_GetRootInterfaceBlueprint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
-		var result []sfvm.ValueOperator
-		prog, err := fetchProgram(v)
-		if err != nil {
-			return false, nil, err
-		}
-		blueprints := getCurrentBlueprint(v)
-		for _, blueprint := range blueprints {
-			for _, parent := range blueprint.GetInterfaceBlueprint() {
-				if val, err := prog.NewValue(parent.Container()); err == nil {
-					result = append(result, val)
-				}
-			}
-		}
-		if len(result) == 0 {
-			return false, nil, utils.Errorf("no parents blueprint found")
-		}
-		return true, sfvm.NewValues(result), nil
-	}))
 
 	registerNativeCall(NativeCall_GetRootParentBlueprint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var result []sfvm.ValueOperator
@@ -300,7 +279,7 @@ func init() {
 				return false
 			}
 			for _, extend := range extends {
-				if typ.CheckExtendBy(extend) {
+				if typ.CheckExtendedBy(extend) {
 					return true
 				}
 			}

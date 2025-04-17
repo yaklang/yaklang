@@ -10,6 +10,10 @@ func getCurrentBlueprint(v sfvm.ValueOperator) []*ssa.Blueprint {
 		if v == nil {
 			return nil
 		}
+		bp, isBlueprint := ssa.ToClassBluePrintType(v.innerValue.GetType())
+		if isBlueprint {
+			return bp
+		}
 		fun := v.GetFunction()
 		if fun == nil {
 			return nil
@@ -25,16 +29,22 @@ func getCurrentBlueprint(v sfvm.ValueOperator) []*ssa.Blueprint {
 	v.Recursive(func(operator sfvm.ValueOperator) error {
 		switch ret := operator.(type) {
 		case *Value:
-			rets = append(rets, getBlueprint(ret))
+			if bp := getBlueprint(ret); bp != nil {
+				rets = append(rets, bp)
+			}
 		case Values:
 			ret.ForEach(func(value *Value) {
-				rets = append(rets, getBlueprint(value))
+				if bp := getBlueprint(value); bp != nil {
+					rets = append(rets, bp)
+				}
 			})
 		case *sfvm.ValueList:
 			values, err := SFValueListToValues(ret)
 			if err == nil {
 				values.ForEach(func(value *Value) {
-					rets = append(rets, getBlueprint(value))
+					if bp := getBlueprint(value); bp != nil {
+						rets = append(rets, bp)
+					}
 				})
 			}
 		default:
