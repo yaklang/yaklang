@@ -77,54 +77,56 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	}
 	go func() {
 		defer cancel()
-		err := engine.Run()
-		if err != nil {
-			log.Errorf("run coordinator failed: %v", err)
+		for {
+			event, err := stream.Recv()
+			if err != nil {
+				log.Errorf("receive event failed: %v", err)
+				return
+			}
+			if event.IsSyncMessage {
+				t, ok := aid.ParseSyncType(event.GetSyncType())
+				if !ok {
+					log.Errorf("parse sync type failed, got: %v", event.GetSyncType())
+					continue
+				}
+				select {
+				case inputEvent <- &aid.InputEvent{
+					IsSyncInfo: true,
+					SyncType:   t,
+				}:
+					continue
+				case <-baseCtx.Done():
+					return
+				}
+			}
+
+			if event.IsInteractiveMessage {
+				var params = make(aitool.InvokeParams)
+				err := json.Unmarshal([]byte(event.InteractiveJSONInput), &params)
+				if err != nil {
+					log.Errorf("unmarshal interactive json input failed: %v", err)
+					continue
+				}
+				inEvent := &aid.InputEvent{
+					IsInteractive: true,
+					Id:            event.InteractiveId,
+					Params:        params,
+				}
+				select {
+				case inputEvent <- inEvent:
+					continue
+				case <-baseCtx.Done():
+					return
+				}
+			}
+
 		}
 	}()
 
-	for {
-		event, err := stream.Recv()
-		if err != nil {
-			return utils.Errorf("recv event failed: %v", err)
-		}
-
-		if event.IsSyncMessage {
-			t, ok := aid.ParseSyncType(event.GetSyncType())
-			if !ok {
-				log.Errorf("parse sync type failed, got: %v", event.GetSyncType())
-				continue
-			}
-			select {
-			case inputEvent <- &aid.InputEvent{
-				IsSyncInfo: true,
-				SyncType:   t,
-			}:
-				continue
-			case <-baseCtx.Done():
-				return baseCtx.Err()
-			}
-		}
-
-		if event.IsInteractiveMessage {
-			var params = make(aitool.InvokeParams)
-			err := json.Unmarshal([]byte(event.InteractiveJSONInput), &params)
-			if err != nil {
-				log.Errorf("unmarshal interactive json input failed: %v", err)
-				continue
-			}
-			inEvent := &aid.InputEvent{
-				IsInteractive: true,
-				Id:            event.InteractiveId,
-				Params:        params,
-			}
-			select {
-			case inputEvent <- inEvent:
-				continue
-			case <-baseCtx.Done():
-				return utils.Errorf("context done: %v", baseCtx.Err())
-			}
-		}
-
+	err = engine.Run()
+	if err != nil {
+		log.Errorf("run coordinator failed: %v", err)
+		return utils.Errorf("run coordinator failed: %v", err)
 	}
+	return nil
 }
