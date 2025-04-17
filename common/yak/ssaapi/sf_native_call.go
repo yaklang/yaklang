@@ -163,11 +163,99 @@ const (
 
 	NativeCall_ExtendsBy = "extendsBy"
 
-	NativeCall_Getblurpint = "getBluePrint"
+	NativeCall_GetBlurpint = "getBluePrint"
+
+	NativeCall_GetParentBlueprint = "getParentsBlueprint"
+
+	NativeCall_GetInterfaceBlueprint = "getInterfaceBlueprint"
+
+	NativeCall_GetRootParentBlueprint = "getRootParentBlueprint"
+
+	NativeCall_GetRootInterfaceBlueprint = "getRootInterfaceBlueprint"
 )
 
 func init() {
-	registerNativeCall(NativeCall_Getblurpint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_GetRootInterfaceBlueprint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var result []sfvm.ValueOperator
+		prog, err := fetchProgram(v)
+		if err != nil {
+			return false, nil, err
+		}
+		blueprints := getCurrentBlueprint(v)
+		for _, blueprint := range blueprints {
+			for _, parent := range blueprint.GetInterfaceBlueprint() {
+				if val, err := prog.NewValue(parent.Container()); err == nil {
+					result = append(result, val)
+				}
+			}
+		}
+		if len(result) == 0 {
+			return false, nil, utils.Errorf("no parents blueprint found")
+		}
+		return true, sfvm.NewValues(result), nil
+	}))
+
+	registerNativeCall(NativeCall_GetRootParentBlueprint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var result []sfvm.ValueOperator
+		prog, err := fetchProgram(v)
+		if err != nil {
+			return false, nil, err
+		}
+		blueprints := getCurrentBlueprint(v)
+		for _, blueprint := range blueprints {
+			for _, parent := range blueprint.GetRootParentBlueprints() {
+				if val, err := prog.NewValue(parent.Container()); err == nil {
+					result = append(result, val)
+				}
+			}
+		}
+		if len(result) == 0 {
+			return false, nil, utils.Errorf("no parents blueprint found")
+		}
+		return true, sfvm.NewValues(result), nil
+	}))
+
+	registerNativeCall(NativeCall_GetInterfaceBlueprint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var result []sfvm.ValueOperator
+		prog, err := fetchProgram(v)
+		if err != nil {
+			return false, nil, err
+		}
+		blueprints := getCurrentBlueprint(v)
+		for _, blueprint := range blueprints {
+			for _, parent := range blueprint.GetAllInterfaceBlueprints() {
+				if val, err := prog.NewValue(parent.Container()); err == nil {
+					result = append(result, val)
+				}
+			}
+		}
+		if len(result) == 0 {
+			return false, nil, utils.Errorf("no parents blueprint found")
+		}
+		return true, sfvm.NewValues(result), nil
+	}))
+
+	registerNativeCall(NativeCall_GetParentBlueprint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var result []sfvm.ValueOperator
+		prog, err := fetchProgram(v)
+		if err != nil {
+			return false, nil, err
+		}
+		blueprints := getCurrentBlueprint(v)
+		for _, blueprint := range blueprints {
+			for _, parent := range blueprint.GetAllParentsBlueprint() {
+				if val, err := prog.NewValue(parent.Container()); err == nil {
+					result = append(result, val)
+				}
+			}
+		}
+		if len(result) == 0 {
+			return false, nil, utils.Errorf("no parents blueprint found")
+		}
+		return true, sfvm.NewValues(result), nil
+	}))
+
+	registerNativeCall(NativeCall_GetBlurpint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var result []sfvm.ValueOperator
 		v.Recursive(func(operator sfvm.ValueOperator) error {
 			switch ret := operator.(type) {
@@ -238,25 +326,15 @@ func init() {
 		if err != nil {
 			return false, nil, err
 		}
-		v.Recursive(func(operator sfvm.ValueOperator) error {
-			switch ret := operator.(type) {
-			case *Value:
-				function, isFunction := ssa.ToFunction(ret.innerValue)
-				if !isFunction {
-					return nil
-				}
-				blueprint := function.GetCurrentBlueprint()
-				if blueprint == nil {
-					return nil
-				}
-				if val, err := prog.NewValue(blueprint.Container()); err == nil {
-					result = append(result, val)
-				}
-			default:
-				return nil
+		blueprints := getCurrentBlueprint(v)
+		for _, blueprint := range blueprints {
+			if val, err := prog.NewValue(blueprint.Container()); err == nil {
+				result = append(result, val)
 			}
-			return nil
-		})
+		}
+		if len(result) == 0 {
+			return false, nil, utils.Errorf("no blueprint found")
+		}
 		return true, sfvm.NewValues(result), nil
 	}))
 
