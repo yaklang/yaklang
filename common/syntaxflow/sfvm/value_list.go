@@ -2,8 +2,9 @@ package sfvm
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
@@ -88,6 +89,9 @@ func (v *ValueList) Merge(values ...ValueOperator) (ValueOperator, error) {
 		return nil
 	})
 	for _, value := range values {
+		if utils.IsNil(value) {
+			continue
+		}
 		value.Recursive(func(vo ValueOperator) error {
 			res = append(res, vo)
 			return nil
