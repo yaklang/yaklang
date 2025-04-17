@@ -109,6 +109,9 @@ func _SearchValuesByOpcode(values Values, opcode string, opt ...sfvm.AnalysisCon
 func SyntaxFlowVariableToValues(vs ...sfvm.ValueOperator) Values {
 	var rets Values
 	for _, v := range vs {
+		if utils.IsNil(v) {
+			continue
+		}
 		err := v.Recursive(func(operator sfvm.ValueOperator) error {
 			switch ret := operator.(type) {
 			case *Value:

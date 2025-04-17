@@ -1283,14 +1283,17 @@ func (s *SFFrame) execStatement(i *SFI) error {
 
 func (s *SFFrame) output(resultName string, operator ValueOperator) error {
 	var values = []ValueOperator{operator}
-	if originValue, existed := s.GetSymbolTable().Get(resultName); existed {
-		values = append(values, originValue)
-	}
-	value := NewValues(values) // for merge
 	// save to result, even if value is empty or nil
 	if resultName == "_" {
-		s.result.UnNameValue = append(s.result.UnNameValue, value)
+		if unnameValue := s.result.UnNameValue; ValuesLen(unnameValue) != 0 {
+			values = append(values, s.result.UnNameValue)
+		}
+		s.result.UnNameValue = NewValues(values) // for merge
 	} else {
+		if originValue, existed := s.GetSymbolTable().Get(resultName); existed {
+			values = append(values, originValue)
+		}
+		value := NewValues(values) // for merge
 		s.GetSymbolTable().Set(resultName, value)
 	}
 	if s.config != nil {
