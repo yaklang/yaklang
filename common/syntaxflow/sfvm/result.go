@@ -26,7 +26,7 @@ type SFFrameResult struct {
 	Errors      []string
 	// value
 	SymbolTable      *omap.OrderedMap[string, ValueOperator]
-	UnNameValue      []ValueOperator
+	UnNameValue      ValueOperator
 	AlertSymbolTable map[string]ValueOperator
 }
 
@@ -149,9 +149,10 @@ func (s *SFFrameResult) String(opts ...ShowOption) string {
 			})
 		} else {
 			// use unName value
-			for _, v := range s.UnNameValue {
-				showValueMap(buf, "_", v, cfg)
-			}
+			s.UnNameValue.Recursive(func(operator ValueOperator) error {
+				showValueMap(buf, "_", operator, cfg)
+				return nil
+			})
 		}
 	}
 	return buf.String()

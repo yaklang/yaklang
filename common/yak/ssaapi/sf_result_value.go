@@ -180,7 +180,7 @@ func (r *SyntaxFlowResult) GetUnNameValues() Values {
 	}
 	if r.memResult != nil {
 		// memory
-		r.unName = SyntaxFlowVariableToValues(sfvm.NewValues(r.memResult.UnNameValue))
+		r.unName = SyntaxFlowVariableToValues(r.memResult.UnNameValue)
 	} else if r.dbResult != nil {
 		// database
 		r.unName = r.getValueFromDB("_")
