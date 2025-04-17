@@ -65,7 +65,21 @@ type VersionedIF[T versionedValue] interface {
 	GetId() int64
 	MarshalJSON() ([]byte, error)
 	UnmarshalJSON([]byte) error
+
+	GetKind() VariableKind
+	SetKind(VariableKind)
+
+	PointHandle(T, ScopedVersionedTableIF[T])
+	SetPointHandle(f func(T, ScopedVersionedTableIF[T]))
+	GetPointHandle() func(T, ScopedVersionedTableIF[T])
 }
+
+type VariableKind int
+
+const (
+	NormalVariable VariableKind = iota
+	PointerVariable
+)
 
 type Versioned[T versionedValue] struct {
 	// origin desc the variable's last or renamed version
@@ -81,6 +95,9 @@ type Versioned[T versionedValue] struct {
 
 	isAssigned *utils.AtomicBool
 	Value      T
+
+	kind        VariableKind
+	pointHandle func(T, ScopedVersionedTableIF[T])
 }
 
 func (v *Versioned[T]) GetId() int64 {
@@ -183,6 +200,27 @@ func NewVersioned[T versionedValue](globalIndex int, name string, local bool, sc
 	}
 	ret.captureVariable = ret
 	return ret
+}
+
+func (v *Versioned[T]) SetPointHandle(f func(T, ScopedVersionedTableIF[T])) {
+	v.pointHandle = f
+}
+
+func (v *Versioned[T]) GetPointHandle() func(T, ScopedVersionedTableIF[T]) {
+	return v.pointHandle
+}
+
+func (v *Versioned[T]) PointHandle(value T, scope ScopedVersionedTableIF[T]) {
+	if v.pointHandle != nil {
+		v.pointHandle(value, scope)
+	}
+}
+
+func (v *Versioned[T]) PointHandleOnce(value T, scope ScopedVersionedTableIF[T]) {
+	if v.pointHandle != nil {
+		v.pointHandle(value, scope)
+		v.pointHandle = nil
+	}
 }
 
 func (v *Versioned[T]) IsNil() bool {
@@ -292,4 +330,11 @@ func (v *Versioned[T]) GetRootVersion() VersionedIF[T] {
 }
 func (v *Versioned[T]) IsRoot() bool {
 	return v.captureVariable == v
+}
+
+func (v *Versioned[T]) GetKind() VariableKind {
+	return v.kind
+}
+func (v *Versioned[T]) SetKind(k VariableKind) {
+	v.kind = k
 }

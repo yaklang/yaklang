@@ -122,6 +122,10 @@ func (v *Variable) NewError(kind ErrorKind, tag ErrorTag, msg string) {
 	}
 }
 
+func (v *Variable) IsPointer() bool {
+	return v.GetKind() == ssautil.PointerVariable
+}
+
 func ReadVariableFromScope(scope ScopeIF, name string) *Variable {
 	if ret := scope.ReadVariable(name, true); ret != nil {
 		if variable, ok := ret.(*Variable); ok {
@@ -210,4 +214,15 @@ func GetAllVariablesFromScopeAndParent(scope ScopeIF, name string) []*Variable {
 		}
 	}
 	return rets
+}
+
+func GetVariablesWithGlobalIndex(scope ScopeIF, name string, globalIndex int) *Variable {
+	if variables := scope.GetAllVariablesByName(name, true); variables != nil {
+		for _, variable := range variables {
+			if ret, ok := variable.(*Variable); ok && variable.GetGlobalIndex() == globalIndex {
+				return ret
+			}
+		}
+	}
+	return nil
 }

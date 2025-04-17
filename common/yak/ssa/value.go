@@ -1,8 +1,11 @@
 package ssa
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
 // --------------- Read
@@ -195,7 +198,63 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		return
 	}
 	scope := b.CurrentBlock.ScopeTable
-	scope.AssignVariable(variable, value)
+	if variable.IsPointer() {
+		variable.SetPointHandle(func(value Value, scopet ssautil.ScopedVersionedTableIF[Value]) {
+			tmp := b.CurrentBlock.ScopeTable
+			defer func() {
+				b.CurrentBlock.ScopeTable = tmp
+			}()
+
+			b.CurrentBlock.ScopeTable = scopet
+			obj := variable.object
+
+			v := b.CreateMemberCallVariable(obj, b.EmitConstInst("@value"))
+			p := b.CreateMemberCallVariable(obj, b.EmitConstInst("@pointer"))
+			p.SetKind(ssautil.PointerVariable)
+			scopet.AssignVariable(v, value)
+			if p.GetValue() == nil {
+				scopet.AssignVariable(p, variable.GetValue())
+			}
+
+			n := strings.TrimPrefix(variable.GetValue().String(), "&")
+			originName, originGlobalId := SplitName(n)
+
+			newValue := b.CopyValue(value)
+			newValue.SetName(originName)
+			newValue.SetVerboseName(originName)
+
+			if ret := GetFristLocalVariableFromScope(scopet, originName); ret != nil && ret.GetGlobalIndex() != originGlobalId {
+
+			} else {
+				scopet.AssignVariable(b.CreateVariable(originName), newValue)
+			}
+
+			p.SetPointHandle(func(value Value, scopett ssautil.ScopedVersionedTableIF[Value]) {
+				tmp := b.CurrentBlock.ScopeTable
+				defer func() {
+					b.CurrentBlock.ScopeTable = tmp
+				}()
+				b.CurrentBlock.ScopeTable = scopet
+
+				v := b.ReadMemberCallValue(obj, b.EmitConstInst("@value"))
+				p := b.ReadMemberCallValue(obj, b.EmitConstInst("@pointer"))
+
+				n := strings.TrimPrefix(p.String(), "&")
+				originName, _ := SplitName(n)
+
+				b.CurrentBlock.ScopeTable = scopett
+
+				variable := b.CreateVariable(originName)
+				newValue := b.CopyValue(v)
+				newValue.SetName(originName)
+				newValue.SetVerboseName(originName)
+				b.AssignVariable(variable, newValue)
+			})
+		})
+		variable.PointHandle(value, scope)
+	} else {
+		scope.AssignVariable(variable, value)
+	}
 
 	if value.GetName() == variable.GetName() {
 		if value.GetOpcode() == SSAOpcodeFreeValue || value.GetOpcode() == SSAOpcodeParameter {
@@ -248,10 +307,22 @@ func (b *FunctionBuilder) CreateVariableForce(name string, pos ...CanStartStopTo
 	return b.createVariableEx(name, false, pos...)
 }
 
+func (b *FunctionBuilder) CreateVariableCross(name string, pos ...CanStartStopToken) *Variable {
+	if variable := b.getCrossScopeVariable(name); variable != nil {
+		if value := variable.GetValue(); value != nil {
+			return variable
+		}
+	}
+	return b.createVariableEx(name, false, pos...)
+}
+
 func (b *FunctionBuilder) CreateVariable(name string, pos ...CanStartStopToken) *Variable {
 	if variable := b.getCurrentScopeVariable(name); variable != nil {
 		if value := variable.GetValue(); value != nil {
 			if _, ok := ToConst(value); ok {
+				return variable
+			}
+			if _, ok := ToMake(value); ok {
 				return variable
 			}
 			if _, ok := value.(*SideEffect); ok {
@@ -386,6 +457,14 @@ func (b *FunctionBuilder) getParentFunctionVariable(name string) (Value, bool) {
 func (b *FunctionBuilder) getCurrentScopeVariable(name string) *Variable {
 	scope := b.CurrentBlock.ScopeTable
 	if variable := ReadVariableFromScope(scope, name); variable != nil {
+		return variable
+	}
+	return nil
+}
+
+func (b *FunctionBuilder) getCrossScopeVariable(name string) *Variable {
+	scope := b.CurrentBlock.ScopeTable
+	if variable := ReadVariableFromScopeAndParent(scope, name); variable != nil {
 		return variable
 	}
 	return nil
