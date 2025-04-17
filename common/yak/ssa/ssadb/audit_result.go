@@ -50,7 +50,7 @@ func GetResultByID(resultID uint) (*AuditResult, error) {
 	return &result, nil
 }
 
-func GetResultByHash(programName, rule string, kind schema.SyntaxflowResultKind) *AuditResult {
+func GetResultByRuleContent(programName, rule string, kind schema.SyntaxflowResultKind) *AuditResult {
 	var result AuditResult
 	if err := GetDB().Where("program_name = ? AND rule_content = ? AND kind = ?", programName, rule, kind).First(&result).Error; err != nil {
 		return nil
