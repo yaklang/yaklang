@@ -42,7 +42,13 @@ func SaveTypeToDB(typ Type, progName string) int {
 		}
 		param["parentBlueprints"] = parentBlueprintIds
 		param["interfaceBlueprints"] = interfaceBlueprintIds
-		param["container"] = t.Container().GetId()
+		container := t.Container()
+		if utils.IsNil(container) {
+			log.Infof("SaveTypeToDB: container is nil, type: %+v", t)
+			param["container"] = -1
+		} else {
+			param["container"] = container.GetId()
+		}
 	default:
 		param["fullTypeName"] = t.GetFullTypeNames()
 	}
