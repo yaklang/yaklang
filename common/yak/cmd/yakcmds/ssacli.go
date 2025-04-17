@@ -20,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"golang.org/x/exp/slices"
 
@@ -667,7 +668,7 @@ var ssaRisk = &cli.Command{
 			return err
 		}
 
-		ShowResult(&ypb.SyntaxFlowResultFilter{
+		ShowResult(config.Format, &ypb.SyntaxFlowResultFilter{
 			ProgramNames: []string{prog.GetProgramName()},
 			TaskIDs:      taskIds,
 			OnlyRisk:     true,
@@ -727,11 +728,10 @@ var ssaCodeScan = &cli.Command{
 			// Usage: "output file, use --format set output file format, default is sarif",
 			Usage: "output file, default format is sarif",
 		},
-		// TODO: json format
-		// cli.StringFlag{
-		// 	Name:  "format",
-		// 	Usage: "output file format, set with json or sarif(default)",
-		// },
+		cli.StringFlag{
+			Name:  "format",
+			Usage: "output file format, set with json or sarif(default)",
+		},
 		// }}}
 	},
 	Action: func(c *cli.Context) (e error) {
@@ -788,7 +788,7 @@ var ssaCodeScan = &cli.Command{
 		log.Infof("scan success, task id: %s with program: %s, cost %v", taskId, prog.GetProgramName(), scanTime)
 
 		exportTimeStart := time.Now()
-		ShowResult(&ypb.SyntaxFlowResultFilter{
+		ShowResult(config.Format, &ypb.SyntaxFlowResultFilter{
 			TaskIDs:  []string{taskId},
 			OnlyRisk: true,
 		}, config.OutputWriter)
@@ -907,7 +907,7 @@ var ssaQuery = &cli.Command{
 		defer func() {
 			if len(results) > 0 && sarifFile != "" {
 				log.Infof("fetch result: %v, exports sarif to %v", len(results), sarifFile)
-				report, err := ssaapi.ConvertSyntaxFlowResultsToSarif(results...)
+				sarifReport, err := sfreport.ConvertSyntaxFlowResultsToSarif(results...)
 				if err != nil {
 					log.Errorf("convert SARIF failed: %v", err)
 					return
@@ -917,7 +917,7 @@ var ssaQuery = &cli.Command{
 					os.Rename(sarifFile, backup)
 					os.RemoveAll(sarifFile)
 				}
-				err = report.WriteFile(sarifFile)
+				err = sarifReport.WriteFile(sarifFile)
 				if err != nil {
 					log.Errorf("write SARIF failed: %v", err)
 				}
