@@ -519,7 +519,7 @@ Content-Type: application/json
 			},
 		},
 		Source: &ypb.AnalyzedDataSource{
-			SourceType: "database",
+			SourceType: AnalyzeHTTPFlowSourceDatabase,
 			HTTPFlowFilter: &ypb.QueryHTTPFlowRequest{
 				SearchURL: token, // 匹配url有token
 			},
@@ -531,7 +531,6 @@ Content-Type: application/json
 		resultId string
 	)
 	{
-
 		for {
 			rsp, err := stream.Recv()
 			if err != nil {
@@ -569,11 +568,140 @@ Content-Type: application/json
 }
 
 func TestMUSTPASS_AnalyzeHTTPFlow_SourceType_RawPacket(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
 
+	token := uuid.NewString()
+	req := fmt.Sprintf(`GET /get HTTP/1.1
+Host: 127.0.0.1
+Connection: keep-alive
+Cookie: %s
+`, token)
+	rsp := fmt.Sprintf(`HTTP/1.1 200 OK
+%s`, token)
+
+	color := "green"
+	stream, err := client.AnalyzeHTTPFlow(context.Background(), &ypb.AnalyzeHTTPFlowRequest{
+		Replacers: []*ypb.MITMContentReplacer{
+			{
+				EnableForBody:     true,
+				EnableForResponse: true,
+				EnableForHeader:   true,
+				EnableForRequest:  true,
+				Rule:              token,
+				VerboseName:       token,
+				Color:             color,
+				NoReplace:         true,
+			},
+		},
+		Source: &ypb.AnalyzedDataSource{
+			SourceType:  AnalyzeHTTPFlowSourceRawPacket,
+			RawRequest:  req,
+			RawResponse: rsp,
+		},
+	})
+	require.NoError(t, err)
+
+	var analyzedIds []int64
+	{
+		for {
+			rsp, err := stream.Recv()
+			if err != nil {
+				break
+			}
+			ruleData := rsp.GetRuleData()
+			analyzedId := ruleData.GetId()
+			analyzedIds = append(analyzedIds, analyzedId)
+			if ruleData != nil {
+				fmt.Println(ruleData)
+			}
+		}
+	}
+
+	flows, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
+		AnalyzedIds: analyzedIds,
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(flows.Data))
+	require.Equal(t, flows.Data[0].Tags, schema.COLORPREFIX+strings.ToUpper(color))
+	_, err = client.DeleteHTTPFlows(context.Background(), &ypb.DeleteHTTPFlowRequest{
+		Id: []int64{int64(flows.Data[0].Id)},
+	})
+	require.NoError(t, err)
 }
 
 func TestMUSTPASS_AnalyzeHTTPFlow_Data_Dedup(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
 
+	token := uuid.NewString()
+	req := `GET /get HTTP/1.1
+Host: 127.0.0.1
+Connection: keep-alive
+`
+	rsp := fmt.Sprintf(`HTTP/1.1 200 OK
+%s 
+%s
+`, token, token)
+
+	color := "green"
+	stream, err := client.AnalyzeHTTPFlow(context.Background(), &ypb.AnalyzeHTTPFlowRequest{
+		Replacers: []*ypb.MITMContentReplacer{
+			{
+				EnableForBody:     true,
+				EnableForResponse: true,
+				EnableForHeader:   true,
+				Rule:              token,
+				VerboseName:       token,
+				Color:             color,
+				NoReplace:         true,
+			},
+		},
+		Source: &ypb.AnalyzedDataSource{
+			SourceType:  AnalyzeHTTPFlowSourceRawPacket,
+			RawRequest:  req,
+			RawResponse: rsp,
+		},
+		Config: &ypb.AnalyzeHTTPFlowConfig{
+			EnableDeduplicate: true,
+		},
+	})
+	require.NoError(t, err)
+
+	var analyzedIds []int64
+	var ruleDatas []*ypb.HTTPFlowRuleData
+	{
+		for {
+			rsp, err := stream.Recv()
+			if err != nil {
+				break
+			}
+			ruleData := rsp.GetRuleData()
+			if ruleData != nil {
+				ruleDatas = append(ruleDatas, ruleData)
+				analyzedId := ruleData.GetId()
+				analyzedIds = append(analyzedIds, analyzedId)
+				fmt.Println(ruleData)
+			}
+		}
+	}
+
+	// 测试去重
+	require.Equal(t, 1, len(ruleDatas))
+
+	flows, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
+		AnalyzedIds: analyzedIds,
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(flows.Data))
+	flow := flows.Data[0]
+	require.Equal(t, flow.Tags, schema.COLORPREFIX+strings.ToUpper(color))
+	defer func() {
+		_, err = client.DeleteHTTPFlows(context.Background(), &ypb.DeleteHTTPFlowRequest{
+			Id: []int64{int64(flow.Id)},
+		})
+		require.NoError(t, err)
+	}()
 }
 
 func TestMUSTPASS_AnalyzeWebSocketFlow(t *testing.T) {
