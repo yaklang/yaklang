@@ -1,14 +1,49 @@
-package ssaapi
+package sfreport
 
 import (
+	"io"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sarif"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
+
+type SarifReport struct {
+	report *sarif.Report
+}
+
+func NewSarifReport() (*SarifReport, error) {
+	sarifReport, err := sarif.New(sarif.Version210, false)
+	if err != nil {
+		log.Errorf("create sarif.New Report failed: %s", err)
+		return nil, err
+	}
+	return &SarifReport{
+		report: sarifReport,
+	}, nil
+}
+
+var _ IReport = (*SarifReport)(nil)
+
+func (r *SarifReport) AddSyntaxFlowResult(result *ssaapi.SyntaxFlowResult) bool {
+	run := ConvertSyntaxFlowResultToSarifRun(result)
+	if !funk.IsEmpty(run) {
+		r.report.AddRun(run)
+		return true
+	}
+	return false
+}
+
+func (r *SarifReport) PrettyWrite(writer io.Writer) error {
+	return r.report.PrettyWrite(writer)
+}
+
+// ====================== sarif context ======================
 
 type SarifContext struct {
 	root *SarifContext
@@ -58,7 +93,7 @@ func NewSarifContext() *SarifContext {
 	}
 }
 
-func (s *SarifContext) AddSSAValue(v *Value) {
+func (s *SarifContext) AddSSAValue(v *ssaapi.Value) {
 	rg := v.GetRange()
 	editor := rg.GetEditor()
 	if editor == nil {
@@ -74,14 +109,14 @@ func (s *SarifContext) AddSSAValue(v *Value) {
 	s.CreateCodeFlowsFromPredecessor(v)
 }
 
-func (s *SarifContext) createCodeFlowsFromPredecessor(v *Value) {
+func (s *SarifContext) createCodeFlowsFromPredecessor(v *ssaapi.Value) {
 	// Create a new thread flow for this path
 	threadFlow := sarif.NewThreadFlow()
 	threadFlows := []*sarif.ThreadFlowLocation{}
-	visited := make(map[*Value]bool)
+	visited := make(map[*ssaapi.Value]bool)
 
 	// Function to add a value to the thread flow
-	addValueToFlow := func(val *Value) bool {
+	addValueToFlow := func(val *ssaapi.Value) bool {
 		if visited[val] {
 			return false
 		}
@@ -124,8 +159,8 @@ func (s *SarifContext) createCodeFlowsFromPredecessor(v *Value) {
 	}
 
 	// Process predecessors
-	var processNeighbors func(val *Value)
-	processNeighbors = func(val *Value) {
+	var processNeighbors func(val *ssaapi.Value)
+	processNeighbors = func(val *ssaapi.Value) {
 		// Process direct predecessors
 		//TODO: fix this dataflow path
 		for _, pred := range val.GetPredecessors() {
@@ -152,7 +187,7 @@ func (s *SarifContext) createCodeFlowsFromPredecessor(v *Value) {
 	}
 }
 
-func (s *SarifContext) CreateCodeFlowsFromPredecessor(v *Value) {
+func (s *SarifContext) CreateCodeFlowsFromPredecessor(v *ssaapi.Value) {
 	s.createCodeFlowsFromPredecessor(v)
 }
 
@@ -199,7 +234,7 @@ func (s *SarifContext) GetArtifactIdFromEditor(editor *memedit.MemEditor) int {
 	return id
 }
 
-func ConvertSyntaxFlowResultToSarifRun(result *SyntaxFlowResult) *sarif.Run {
+func ConvertSyntaxFlowResultToSarifRun(result *ssaapi.SyntaxFlowResult) *sarif.Run {
 	var results []*sarif.Result
 
 	root := NewSarifContext()
@@ -268,7 +303,7 @@ func ConvertSyntaxFlowResultToSarifRun(result *SyntaxFlowResult) *sarif.Run {
 	return run
 }
 
-func ConvertSyntaxFlowResultsToSarif(results ...*SyntaxFlowResult) (*sarif.Report, error) {
+func ConvertSyntaxFlowResultsToSarif(results ...*ssaapi.SyntaxFlowResult) (*sarif.Report, error) {
 	report, err := sarif.New(sarif.Version210, false)
 	if err != nil {
 		return nil, utils.Wrap(err, "create sarif.New Report failed")

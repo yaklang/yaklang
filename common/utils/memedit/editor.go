@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/dlclark/regexp2"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
@@ -70,6 +71,10 @@ func (ve *MemEditor) GetIrSourceHash(programName string) string {
 
 func (ve *MemEditor) GetFilename() string {
 	return ve.fileUrl
+}
+
+func (ve *MemEditor) GetLength() int {
+	return ve.safeSourceCode.Len()
 }
 
 func (ve *MemEditor) PushSourceCodeContext(i any) {
@@ -600,8 +605,17 @@ func (ve *MemEditor) SourceCodeSha256() string {
 	return ve.sourceCodeSha256
 }
 
-func (ve *MemEditor) GetSourceCode() string {
-	return ve.safeSourceCode.String()
+func (ve *MemEditor) GetSourceCode(index ...int) string {
+	if len(index) == 0 {
+		return ve.safeSourceCode.String()
+	} else if len(index) == 1 {
+		return ve.safeSourceCode.SliceBeforeStart(index[0])
+	} else if len(index) >= 2 {
+		return ve.safeSourceCode.Slice2(index[0], index[1])
+	} else {
+		log.Warnf("GetSourceCode: invalid index: %v", index)
+		return ""
+	}
 }
 
 func (e *MemEditor) GetTextContextWithPrompt(p RangeIf, n int, msg ...string) string {

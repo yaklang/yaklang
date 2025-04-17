@@ -8,13 +8,12 @@ import (
 
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/coreplugin"
-	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/sarif"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -47,7 +46,7 @@ type ssaCliConfig struct {
 	// OutputWriter is the file to save the result
 	OutputWriter io.Writer
 	// Format is the format of the result
-	Format string // sarif or json
+	Format sfreport.ReportType // sarif or json
 	// }}
 
 	// {{ defer function
@@ -79,19 +78,7 @@ func parseSFScanConfig(c *cli.Context) (res *ssaCliConfig, err error) {
 	// 	targetPath:  targetPath,
 	// }
 
-	// format
-	// format := c.String("format")
-	// if format == "" {
-	// 	format = "sarif"
-	// }
-	// if format != "sarif" && format != "json" {
-	// 	return nil, utils.Errorf("unsupported output format: %s, must be 'sarif' or 'json'", format)
-	// } else {
-	// 	config.Format = format
-	// }
-	if config.Format == "" {
-		config.Format = "sarif"
-	}
+	config.Format = sfreport.ReportTypeFromString(c.String("format"))
 
 	// Parse program configuration
 	programName := c.String("program")
@@ -112,16 +99,19 @@ func parseSFScanConfig(c *cli.Context) (res *ssaCliConfig, err error) {
 		// writer = os.Stdout
 		config.OutputWriter = os.Stdout
 	} else {
-
-		if config.Format == "sarif" {
+		if config.Format == sfreport.SarifReportType {
 			if filepath.Ext(outputFile) != ".sarif" {
 				outputFile += ".sarif"
 			}
-			if utils.GetFirstExistedFile(outputFile) != "" {
-				backup := outputFile + ".bak"
-				os.Rename(outputFile, backup)
-				os.RemoveAll(outputFile)
+		} else {
+			if filepath.Ext(outputFile) != ".json" {
+				outputFile += ".json"
 			}
+		}
+		if utils.GetFirstExistedFile(outputFile) != "" {
+			backup := outputFile + ".bak"
+			os.Rename(outputFile, backup)
+			os.RemoveAll(outputFile)
 		}
 
 		file, err := os.OpenFile(outputFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
@@ -185,7 +175,7 @@ func scan(ctx context.Context, progName string, ruleFilter *ypb.SyntaxFlowRuleFi
 
 // ShowResult displays scan results based on the provided configuration
 // TODO: should use `showRisk` not result
-func ShowResult(filter *ypb.SyntaxFlowResultFilter, writer io.Writer) {
+func ShowResult(format sfreport.ReportType, filter *ypb.SyntaxFlowResultFilter, writer io.Writer) {
 	log.Infof("================= show result ================")
 	defer func() {
 		log.Infof("show sarif result done")
@@ -194,12 +184,10 @@ func ShowResult(filter *ypb.SyntaxFlowResultFilter, writer io.Writer) {
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-	showSarifResult(filter, writer)
-}
 
-func showSarifResult(filter *ypb.SyntaxFlowResultFilter, writer io.Writer) {
 	db := yakit.FilterSyntaxFlowResult(ssadb.GetDB(), filter)
 
+	// count total result
 	total, err := ssaapi.CountSyntaxFlowResult(db)
 	if err != nil {
 		log.Errorf("count syntax flow result failed: %s", err)
@@ -207,10 +195,11 @@ func showSarifResult(filter *ypb.SyntaxFlowResultFilter, writer io.Writer) {
 	}
 	log.Infof("total syntax flow result have risk: %d", total)
 
+	// convert result to report
 	results := ssaapi.YieldSyntaxFlowResult(db)
-	report, err := sarif.New(sarif.Version210, false)
+	reportInstance, err := sfreport.ConvertSyntaxFlowResultToReport(format)
 	if err != nil {
-		log.Errorf("create sarif.New Report failed: %s", err)
+		log.Errorf("convert syntax flow result to report failed: %s", err)
 		return
 	}
 
@@ -218,13 +207,11 @@ func showSarifResult(filter *ypb.SyntaxFlowResultFilter, writer io.Writer) {
 	for result := range results {
 		count++
 		log.Infof("cover result[%d] to sarif run %d/%d: ", result.GetResultID(), count, total)
-		run := ssaapi.ConvertSyntaxFlowResultToSarifRun(result)
-		if !funk.IsEmpty(run) {
+		if reportInstance.AddSyntaxFlowResult(result) {
 			log.Infof("cover result[%d] add run to report %d/%d done", result.GetResultID(), count, total)
-			report.AddRun(run)
 		}
 	}
 	log.Infof("write report ... ")
-	report.PrettyWrite(writer)
+	reportInstance.PrettyWrite(writer)
 	log.Infof("write report done")
 }
