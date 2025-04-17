@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -69,7 +70,7 @@ alert $output;
 		if err != nil {
 			t.Fatal(err)
 		}
-		report, err := ssaapi.ConvertSyntaxFlowResultsToSarif(result)
+		report, err := sfreport.ConvertSyntaxFlowResultsToSarif(result)
 		if err != nil {
 			t.Fatal(err)
 		}
