@@ -12,8 +12,6 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/samber/lo"
-
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -26,11 +24,11 @@ var vulInSQLIViewer []byte
 //go:embed html/visitor_source.html
 var visitorSourceViewer []byte
 
-func sqliWriter(writer http.ResponseWriter, request *http.Request, data []interface{}, str ...string) {
+func sqliWriter(writer http.ResponseWriter, request *http.Request, data any, str ...string) {
 	sqliWriterEx(false, writer, request, data, str...)
 }
 
-func sqliWriterEx(enableDebug bool, writer http.ResponseWriter, request *http.Request, data []interface{}, str ...string) {
+func sqliWriterEx(enableDebug bool, writer http.ResponseWriter, request *http.Request, data any, str ...string) {
 	raw, err := json.Marshal(data)
 	if err != nil {
 		Failed(writer, request, err.Error())
@@ -85,7 +83,7 @@ func (s *VulinServer) registerSQLinj() {
 					writer.WriteHeader(500)
 					return
 				}
-				sqliWriter(writer, request, []interface{}{u})
+				sqliWriter(writer, request, u)
 				return
 			},
 			RiskDetected:   false,
@@ -103,7 +101,7 @@ func (s *VulinServer) registerSQLinj() {
 					writer.WriteHeader(500)
 					return
 				}
-				sqliWriter(writer, request, []interface{}{u})
+				sqliWriter(writer, request, u)
 				return
 			},
 			RiskDetected:   true,
@@ -135,7 +133,7 @@ func (s *VulinServer) registerSQLinj() {
 					writer.WriteHeader(500)
 					return
 				}
-				sqliWriter(writer, request, []interface{}{u})
+				sqliWriter(writer, request, u)
 				return
 			},
 			RiskDetected:   true,
@@ -173,7 +171,7 @@ func (s *VulinServer) registerSQLinj() {
 					writer.WriteHeader(500)
 					return
 				}
-				sqliWriter(writer, request, []interface{}{u})
+				sqliWriter(writer, request, u)
 				return
 			},
 			RiskDetected:   true,
@@ -197,7 +195,7 @@ func (s *VulinServer) registerSQLinj() {
 					writer.WriteHeader(500)
 					return
 				}
-				sqliWriter(writer, request, []interface{}{u})
+				sqliWriter(writer, request, u)
 				return
 			},
 			RiskDetected:   true,
@@ -248,7 +246,8 @@ func (s *VulinServer) registerSQLinj() {
 					writer.WriteHeader(500)
 					return
 				}
-				sqliWriter(writer, request, []interface{}{u})
+				sqliWriter(writer, request, u)
+
 			},
 			RiskDetected:   true,
 			ExpectedResult: map[string]int{"疑似SQL注入：【参数：数字[ID] 双引号闭合】": 1, "存在基于UNION SQL 注入: [参数名:ID 值:[1]]": 1},
@@ -265,9 +264,8 @@ func (s *VulinServer) registerSQLinj() {
 					writer.WriteHeader(500)
 					return
 				}
-				sqliWriter(writer, request, lo.Map(u, func(i map[string]interface{}, _ int) interface{} {
-					return i
-				}))
+				sqliWriter(writer, request, u)
+
 				return
 			},
 			RiskDetected:   true,
@@ -464,7 +462,7 @@ func (s *VulinServer) registerSQLinj() {
 					writer.WriteHeader(500)
 					return
 				}
-				sqliWriter(writer, request, []interface{}{u})
+				sqliWriter(writer, request, u)
 				return
 			},
 			RiskDetected: true,
