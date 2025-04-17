@@ -32,17 +32,33 @@ const (
 	Readonly
 )
 
-type BlueprintKind int
+type BlueprintKind string
 
 const (
-	BlueprintNone BlueprintKind = iota
-	BlueprintClass
-	BlueprintInterface
+	BlueprintNone      BlueprintKind = "none"
+	BlueprintClass                   = "class"
+	BlueprintInterface               = "interface"
 
 	//BlueprintObject for object, like new Blueprint
-	BlueprintObject
+	BlueprintObject = "object"
 )
 
+func ValidBlueprintKind(str string) BlueprintKind {
+	switch str {
+	case "none":
+		return BlueprintNone
+	case "class":
+		return BlueprintClass
+	case "interface":
+		return BlueprintInterface
+	case "object":
+		return BlueprintObject
+	default:
+		return BlueprintNone
+	}
+}
+
+type BlueprintRelationKind strin
 type BlueprintRelationKind string
 
 // Blueprint is a class blueprint, it is used to create a new class
@@ -294,12 +310,12 @@ func (c *Blueprint) GetRootInterfaceBlueprint() []*Blueprint {
 	return roots
 }
 
-func (c *Blueprint) CheckExtendBy(parentBlueprint *Blueprint) bool {
+func (c *Blueprint) CheckExtendedBy(parentBlueprint *Blueprint) bool {
 	for _, blueprint := range c.ParentBlueprints {
 		if blueprint == parentBlueprint {
 			return true
 		}
-		return blueprint.CheckExtendBy(parentBlueprint)
+		return blueprint.CheckExtendedBy(parentBlueprint)
 	}
 	return false
 }

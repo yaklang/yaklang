@@ -32,6 +32,7 @@ func SaveTypeToDB(typ Type, progName string) int {
 		var parentBlueprintIds []int
 		param["name"] = t.Name
 		param["fullTypeName"] = t.GetFullTypeNames()
+		param["kind"] = t.Kind
 		for _, blueprint := range t.ParentBlueprints {
 			parentBlueprintIds = append(parentBlueprintIds, SaveTypeToDB(blueprint, progName))
 		}
@@ -112,6 +113,7 @@ func GetTypeFromDB(id int) Type {
 		typ := &Blueprint{}
 		typ.Name = getParamStr("name")
 		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
+		typ.Kind = ValidBlueprintKind(getParamStr("kind"))
 		blueprints, ok := params["parentBlueprints"].([]interface{})
 		if ok {
 			for _, typeId := range blueprints {

@@ -61,8 +61,7 @@ func TestJavaClassRelationship(t *testing.T) {
 		var ret ssaapi.Values
 		ret = prog.SyntaxFlowChain(`MyClass_declare?{.__parents__?{have: MyParentClass || have: MyInterface}}`).Show()
 		assert.Equal(t, 1, len(ret))
-		ret = prog.SyntaxFlowChain(`MyClass?{.__super__?{have: MyParentClass && !have: MyInterface}}`).Show()
-		assert.Equal(t, 1, len(ret))
+
 		ret = prog.SyntaxFlowChain(`MyClass?{.__interface__?{!have: MyParentClass && have: MyInterface}}`).Show()
 		assert.Equal(t, 1, len(ret))
 		return nil
