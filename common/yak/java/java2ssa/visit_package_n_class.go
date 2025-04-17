@@ -604,9 +604,6 @@ func (y *builder) VisitMethodDeclaration(
 		if len(annotationFunc) > 0 || len(defCallback) > 0 {
 			log.Infof("start to build annotation ref to def: %v", funcName)
 		}
-		for _, def := range defCallback {
-			def(newFunc)
-		}
 	})
 	return
 }
