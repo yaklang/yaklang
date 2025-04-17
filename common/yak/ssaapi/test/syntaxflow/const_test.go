@@ -141,7 +141,7 @@ func TestConstCompare(t *testing.T) {
 
 	t.Run("test compare const equal:string", func(t *testing.T) {
 		code := ` a("param1","param2")`
-		ssatest.CheckSyntaxFlow(t, code, `a?{.(*?{=="param1"})} as $result`, map[string][]string{
+		ssatest.CheckSyntaxFlow(t, code, `a?{*(*?{=="param1"})} as $result`, map[string][]string{
 			"result": {"Undefined-a"},
 		})
 	})
@@ -173,7 +173,7 @@ a2 = "world"
 a3 = true 
 `
 		ssatest.CheckSyntaxFlow(t, code, `a*?{!="hello"} as $result`, map[string][]string{
-			"result": {"world", "true"},
+			"result": {"\"world\"", "true"},
 		})
 	})
 
