@@ -37,7 +37,7 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 		}
 		lib.PushEditor(prog.GetApplication().GetCurrentEditor())
 
-		builder := lib.GetAndCreateFunctionBuilder(pkgName, "init")
+		builder := lib.GetAndCreateFunctionBuilder(pkgName, string(ssa.MainFunctionName))
 		if builder != nil {
 			builder.SetEditor(prog.GetApplication().GetCurrentEditor())
 			builder.SetBuildSupport(y.FunctionBuilder)
