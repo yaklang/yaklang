@@ -567,6 +567,10 @@ func (y *builder) VisitMethodDeclaration(
 		class.RegisterNormalMethod(key, newFunc)
 	}
 	store := y.StoreFunctionBuilder()
+	for _, def := range defCallback {
+		log.Infof("def: %s %s ", funcName, key)
+		def(newFunc)
+	}
 	newFunc.AddLazyBuilder(func() {
 		log.Infof("lazybuild: %s %s ", funcName, key)
 		switchHandler := y.SwitchFunctionBuilder(store)
@@ -592,9 +596,6 @@ func (y *builder) VisitMethodDeclaration(
 		y.FunctionBuilder = y.PopFunction()
 		if len(annotationFunc) > 0 || len(defCallback) > 0 {
 			log.Infof("start to build annotation ref to def: %v", funcName)
-		}
-		for _, def := range defCallback {
-			def(newFunc)
 		}
 	})
 	return
