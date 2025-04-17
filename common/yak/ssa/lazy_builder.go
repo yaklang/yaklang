@@ -94,11 +94,17 @@ func (p *Program) LazyBuild() {
 		blueprint.BuildConstructorAndDestructor()
 	}
 	function := p.GetFunction(string(MainFunctionName), "")
-	if function == nil {
-		log.Errorf("main function is not found")
+	if function != nil {
+		function.Finish()
+	}
+	virtualFunction := p.GetFunction(string(VirtualFunctionName), "")
+	if virtualFunction != nil {
+		virtualFunction.Finish()
+	}
+	if function == nil && virtualFunction == nil {
+		log.Errorf("main function is not found and virtual function is not found")
 		return
 	}
-	function.Finish()
 }
 
 func (c *Blueprint) BuildConstructorAndDestructor() {
@@ -106,7 +112,6 @@ func (c *Blueprint) BuildConstructorAndDestructor() {
 		if function, b := ToFunction(value); b {
 			function.Build()
 		}
-
 	}
 	for _, m := range c.NormalMethod {
 		m.Build()

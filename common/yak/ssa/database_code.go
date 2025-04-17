@@ -148,6 +148,7 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	}()
 	value, ok := ToValue(inst)
 	if !ok {
+		log.Errorf("not value: %s", inst.GetName())
 		return
 	}
 
