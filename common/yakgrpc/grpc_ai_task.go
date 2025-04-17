@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
@@ -49,6 +50,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 				StreamDelta:   e.StreamDelta,
 				IsJson:        e.IsJson,
 				Content:       e.Content,
+				Timestamp:     time.Now().UnixNano(),
 			}
 			err := stream.Send(event)
 			if err != nil {
