@@ -30,13 +30,18 @@ func SaveTypeToDB(typ Type, progName string) int {
 		param["fullTypeName"] = t.GetFullTypeNames()
 	case *Blueprint:
 		var parentBlueprintIds []int
+		var interfaceBlueprintIds []int
 		param["name"] = t.Name
 		param["fullTypeName"] = t.GetFullTypeNames()
 		param["kind"] = t.Kind
 		for _, blueprint := range t.ParentBlueprints {
 			parentBlueprintIds = append(parentBlueprintIds, SaveTypeToDB(blueprint, progName))
 		}
+		for _, blueprint := range t.InterfaceBlueprints {
+			interfaceBlueprintIds = append(interfaceBlueprintIds, SaveTypeToDB(blueprint, progName))
+		}
 		param["parentBlueprints"] = parentBlueprintIds
+		param["interfaceBlueprints"] = interfaceBlueprintIds
 		param["container"] = t.Container().GetId()
 	default:
 		param["fullTypeName"] = t.GetFullTypeNames()
@@ -114,12 +119,21 @@ func GetTypeFromDB(id int) Type {
 		typ.Name = getParamStr("name")
 		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
 		typ.Kind = ValidBlueprintKind(getParamStr("kind"))
-		blueprints, ok := params["parentBlueprints"].([]interface{})
+		parents, ok := params["parentBlueprints"].([]interface{})
 		if ok {
-			for _, typeId := range blueprints {
+			for _, typeId := range parents {
 				blueprint, isBlueprint := ToClassBluePrintType(GetTypeFromDB(utils.InterfaceToInt(typeId)))
 				if isBlueprint {
 					typ.ParentBlueprints = append(typ.ParentBlueprints, blueprint)
+				}
+			}
+		}
+		interfaces, ok := params["interfaceBlueprints"].([]interface{})
+		if ok {
+			for _, typeId := range interfaces {
+				blueprint, isBlueprint := ToClassBluePrintType(GetTypeFromDB(utils.InterfaceToInt(typeId)))
+				if isBlueprint {
+					typ.InterfaceBlueprints = append(typ.InterfaceBlueprints, blueprint)
 				}
 			}
 		}
