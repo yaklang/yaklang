@@ -63,7 +63,6 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 	// cname := uuid.NewString()
 
 	var (
-		parents    []string
 		interfaces []string
 		extendName string
 	)
@@ -77,7 +76,6 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 		if i.Extends() != nil {
 			if ref := y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef()); ref != nil {
 				extendName = ref.Name
-				parents = append(parents, extendName)
 				tokenMap[extendName] = i.QualifiedStaticTypeRef()
 			}
 		}
@@ -85,16 +83,8 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 			for _, impl := range i.InterfaceList().(*phpparser.InterfaceListContext).AllQualifiedStaticTypeRef() {
 				interfaces = append(interfaces, impl.GetText())
 				tokenMap[impl.GetText()] = impl
-				parents = append(parents, impl.GetText())
 			}
 		}
-	}
-	for _, parent := range parents {
-		bp := y.GetBluePrint(parent)
-		if bp == nil {
-			bp = y.CreateBlueprint(parent, tokenMap[parent])
-		}
-		blueprint.AddParentBlueprint(bp)
 	}
 	for _, impl := range interfaces {
 		bp := y.GetBluePrint(impl)
@@ -108,7 +98,7 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 		if bp == nil {
 			bp = y.CreateBlueprint(extendName, tokenMap[extendName])
 		}
-		blueprint.AddSuperBlueprint(bp)
+		blueprint.AddParentBlueprint(bp)
 	}
 	for _, statement := range i.AllClassStatement() {
 		y.VisitClassStatement(statement, blueprint)
@@ -184,7 +174,6 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 					b.SetRange(i.QualifiedStaticTypeRef())
 					extendBlueprint := y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef())
 					blueprint.AddParentBlueprint(extendBlueprint)
-					blueprint.AddSuperBlueprint(extendBlueprint)
 				})
 			}
 			if i.Implements() != nil {
@@ -213,7 +202,6 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 						iface.SetKind(ssa.BlueprintInterface)
 						//todo： 待优化，优化到blueprint中
 						blueprint.AddInterfaceBlueprint(iface)
-						blueprint.AddParentBlueprint(iface)
 					}
 				})
 			}
@@ -252,7 +240,6 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 							b.FakeGetBlueprint(library, namespaceName, ref.QualifiedNamespaceName())
 						}
 						iface.SetKind(ssa.BlueprintInterface)
-						blueprint.AddSuperBlueprint(iface)
 						blueprint.AddParentBlueprint(iface)
 						blueprint.AddInterfaceBlueprint(iface)
 					})

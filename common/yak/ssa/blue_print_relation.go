@@ -7,28 +7,22 @@ import (
 
 const (
 	BlueprintRelationParents   BlueprintRelationKind = "__parents__"
-	BlueprintRelationSuper                           = "__super__"
 	BlueprintRelationInterface                       = "__interface__"
 
-	BlueprintRelationChildren = "__children__"
-	BlueprintRelationSub      = "__sub__"
-	BlueprintRelationImpl     = "__impl__"
+	BlueprintRelationInherit = "__inherit__"
+	BlueprintRelationImpl    = "__implement__"
 )
 
 func (b BlueprintRelationKind) getRelativeRelation() BlueprintRelationKind {
 	switch b {
 	case BlueprintRelationParents:
-		return BlueprintRelationChildren
-	case BlueprintRelationSuper:
-		return BlueprintRelationSub
+		return BlueprintRelationInherit
 	case BlueprintRelationInterface:
 		return BlueprintRelationImpl
-	case BlueprintRelationChildren:
-		return BlueprintRelationParents
-	case BlueprintRelationSub:
-		return BlueprintRelationSuper
 	case BlueprintRelationImpl:
 		return BlueprintRelationInterface
+	case BlueprintRelationInherit:
+		return BlueprintRelationParents
 	}
 	return ""
 }
@@ -40,8 +34,6 @@ func (c *Blueprint) setBlueprintRelation(parent *Blueprint, relation BlueprintRe
 	switch relation {
 	case BlueprintRelationParents:
 		c.ParentBlueprints = append(c.ParentBlueprints, parent)
-	case BlueprintRelationSuper:
-		c.SuperBlueprints = append(c.SuperBlueprints, parent)
 	case BlueprintRelationInterface:
 		c.InterfaceBlueprints = append(c.InterfaceBlueprints, parent)
 	default:
