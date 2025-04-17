@@ -69,8 +69,7 @@ type Blueprint struct {
 
 	GeneralUndefined func(string) *Undefined
 
-	ParentBlueprints    []*Blueprint // ParentBlueprints All classes, including interfaces and parent classes
-	SuperBlueprints     []*Blueprint
+	ParentBlueprints    []*Blueprint
 	InterfaceBlueprints []*Blueprint
 	// full Type Name
 	fullTypeName []string
@@ -156,27 +155,6 @@ func (c *Blueprint) addParentBlueprintEx(parent *Blueprint, relation BlueprintRe
 	}
 }
 
-// GetSuperBlueprint 获取父类，用于单继承
-func (c *Blueprint) GetSuperBlueprint() *Blueprint {
-	if c == nil {
-		return nil
-	}
-	if len(c.SuperBlueprints) == 0 {
-		return nil
-	}
-	ret := c.SuperBlueprints[0]
-	ret.Build()
-	return ret
-}
-
-// GetSuperBlueprints 获取父类，用于多继承
-func (c *Blueprint) GetSuperBlueprints() []*Blueprint {
-	if c == nil {
-		return nil
-	}
-	return c.SuperBlueprints
-}
-
 func (c *Blueprint) GetInterfaceBlueprint() []*Blueprint {
 	if c == nil {
 		return nil
@@ -184,8 +162,140 @@ func (c *Blueprint) GetInterfaceBlueprint() []*Blueprint {
 	return c.InterfaceBlueprints
 }
 
+func (c *Blueprint) GetParentBlueprint() []*Blueprint {
+	if c == nil {
+		return nil
+	}
+	return c.ParentBlueprints
+}
+
+// GetSuperBlueprint only get the first parent blueprint, using for single inheritance
+func (c *Blueprint) GetSuperBlueprint() *Blueprint {
+	if c == nil {
+		return nil
+	}
+	if len(c.ParentBlueprints) > 0 {
+		return c.ParentBlueprints[0]
+	}
+	return nil
+}
+
+func (c *Blueprint) GetAllParentsBlueprint() []*Blueprint {
+	if c == nil {
+		return nil
+	}
+	// 层序遍历
+	visited := make(map[*Blueprint]bool)
+	var allParents []*Blueprint
+	queue := c.GetParentBlueprint()
+
+	for len(queue) > 0 {
+		parent := queue[0]
+		queue = queue[1:]
+		if parent == nil || visited[parent] {
+			continue
+		}
+		if visited[parent] {
+			continue
+		}
+
+		visited[parent] = true
+		allParents = append(allParents, parent)
+		queue = append(queue, parent.GetParentBlueprint()...)
+	}
+
+	return allParents
+}
+
+func (c *Blueprint) GetAllInterfaceBlueprints() []*Blueprint {
+	if c == nil {
+		return nil
+	}
+	// 层序遍历
+	visited := make(map[*Blueprint]bool)
+	var allParents []*Blueprint
+	queue := c.GetInterfaceBlueprint()
+
+	for len(queue) > 0 {
+		parent := queue[0]
+		queue = queue[1:]
+		if parent == nil || visited[parent] {
+			continue
+		}
+		if visited[parent] {
+			continue
+		}
+
+		visited[parent] = true
+		allParents = append(allParents, parent)
+		queue = append(queue, parent.GetInterfaceBlueprint()...)
+	}
+
+	return allParents
+}
+
+func (c *Blueprint) GetRootParentBlueprints() []*Blueprint {
+	if c == nil {
+		return nil
+	}
+
+	var roots []*Blueprint
+	visited := make(map[*Blueprint]bool)
+	var dfs func(*Blueprint)
+
+	dfs = func(node *Blueprint) {
+		if node == nil || visited[node] {
+			return
+		}
+		visited[node] = true
+
+		parents := node.GetParentBlueprint()
+		if len(parents) == 0 {
+			roots = append(roots, node)
+			return
+		}
+
+		for _, parent := range parents {
+			dfs(parent)
+		}
+	}
+
+	dfs(c)
+	return roots
+}
+
+func (c *Blueprint) GetRootInterfaceBlueprint() []*Blueprint {
+	if c == nil {
+		return nil
+	}
+
+	var roots []*Blueprint
+	visited := make(map[*Blueprint]bool)
+	var dfs func(*Blueprint)
+
+	dfs = func(node *Blueprint) {
+		if node == nil || visited[node] {
+			return
+		}
+		visited[node] = true
+
+		parents := node.GetInterfaceBlueprint()
+		if len(parents) == 0 {
+			roots = append(roots, node)
+			return
+		}
+
+		for _, parent := range parents {
+			dfs(parent)
+		}
+	}
+
+	dfs(c)
+	return roots
+}
+
 func (c *Blueprint) CheckExtendBy(parentBlueprint *Blueprint) bool {
-	for _, blueprint := range c.SuperBlueprints {
+	for _, blueprint := range c.ParentBlueprints {
 		if blueprint == parentBlueprint {
 			return true
 		}
