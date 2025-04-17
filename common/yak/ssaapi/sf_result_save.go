@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"context"
+	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
@@ -12,20 +13,38 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func LoadResultByHash(programName, ruleContent string, kind schema.SyntaxflowResultKind) (*SyntaxFlowResult, error) {
-	result := ssadb.GetResultByHash(programName, ruleContent, kind)
+var ResultCache *utils.CacheWithKey[uint, *SyntaxFlowResult] = utils.NewTTLCacheWithKey[uint, *SyntaxFlowResult](time.Minute * 10)
+
+func LoadResultByRuleContent(programName, ruleContent string, kind schema.SyntaxflowResultKind) (*SyntaxFlowResult, error) {
+	result := ssadb.GetResultByRuleContent(programName, ruleContent, kind)
 	if result == nil {
 		return nil, utils.Error("result not found")
 	}
 	return loadResult(result)
 }
 
-func LoadResultByID(resultID uint) (*SyntaxFlowResult, error) {
-	result, err := ssadb.GetResultByID(resultID)
+func LoadResultByID(resultID uint, force ...bool) (*SyntaxFlowResult, error) {
+	// if set force=true not use cache
+	if len(force) > 0 && force[0] {
+		// Skip cache when force is true
+	} else {
+		// check cache
+		if result, ok := ResultCache.Get(resultID); ok {
+			return result, nil
+		}
+	}
+
+	resultdb, err := ssadb.GetResultByID(resultID)
 	if err != nil {
 		return nil, err
 	}
-	return loadResult(result)
+	result, err := loadResult(resultdb)
+	if err != nil {
+		return nil, err
+	}
+	// set cache
+	ResultCache.Set(resultID, result)
+	return result, nil
 }
 
 func loadResult(result *ssadb.AuditResult) (*SyntaxFlowResult, error) {
@@ -42,9 +61,13 @@ func loadResult(result *ssadb.AuditResult) (*SyntaxFlowResult, error) {
 	} else {
 		// create rule
 		rule = &schema.SyntaxFlowRule{}
+		rule.RuleName = result.RuleName
 		rule.Title = result.RuleTitle
+		rule.TitleZh = result.RuleTitleZh
+		rule.Purpose = schema.SyntaxFlowRulePurposeType(result.RulePurpose)
 		rule.Severity = schema.SyntaxFlowSeverity(result.RuleSeverity)
 		rule.Description = result.RuleDesc
+		rule.Content = result.RuleContent
 		rule.AlertDesc = result.AlertDesc
 	}
 	res.rule = rule
