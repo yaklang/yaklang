@@ -1005,6 +1005,7 @@ type AIOutputEvent struct {
 	StreamDelta   []byte                 `protobuf:"bytes,7,opt,name=StreamDelta,proto3" json:"StreamDelta,omitempty"`
 	IsJson        bool                   `protobuf:"varint,8,opt,name=IsJson,proto3" json:"IsJson,omitempty"`
 	Content       []byte                 `protobuf:"bytes,9,opt,name=Content,proto3" json:"Content,omitempty"`
+	Timestamp     int64                  `protobuf:"varint,10,opt,name=Timestamp,proto3" json:"Timestamp,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1100,6 +1101,13 @@ func (x *AIOutputEvent) GetContent() []byte {
 		return x.Content
 	}
 	return nil
+}
+
+func (x *AIOutputEvent) GetTimestamp() int64 {
+	if x != nil {
+		return x.Timestamp
+	}
+	return 0
 }
 
 type AIInputEvent struct {
@@ -49878,7 +49886,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bOnlineID\x18\x02 \x01(\x03R\bOnlineID\"O\n" +
 	"\x1fVerifySystemCertificateResponse\x12\x14\n" +
 	"\x05valid\x18\x01 \x01(\bR\x05valid\x12\x16\n" +
-	"\x06Reason\x18\x02 \x01(\tR\x06Reason\"\x89\x02\n" +
+	"\x06Reason\x18\x02 \x01(\tR\x06Reason\"\xa7\x02\n" +
 	"\rAIOutputEvent\x12$\n" +
 	"\rCoordinatorId\x18\x01 \x01(\tR\rCoordinatorId\x12\x12\n" +
 	"\x04Type\x18\x02 \x01(\tR\x04Type\x12\x16\n" +
@@ -49888,7 +49896,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bIsReason\x18\x06 \x01(\bR\bIsReason\x12 \n" +
 	"\vStreamDelta\x18\a \x01(\fR\vStreamDelta\x12\x16\n" +
 	"\x06IsJson\x18\b \x01(\bR\x06IsJson\x12\x18\n" +
-	"\aContent\x18\t \x01(\fR\aContent\"\xa4\x02\n" +
+	"\aContent\x18\t \x01(\fR\aContent\x12\x1c\n" +
+	"\tTimestamp\x18\n" +
+	" \x01(\x03R\tTimestamp\"\xa4\x02\n" +
 	"\fAIInputEvent\x12\x18\n" +
 	"\aIsStart\x18\x01 \x01(\bR\aIsStart\x12*\n" +
 	"\x06Params\x18\x02 \x01(\v2\x12.ypb.AIStartParamsR\x06Params\x122\n" +
