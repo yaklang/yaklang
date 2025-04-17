@@ -58,7 +58,6 @@ func ValidBlueprintKind(str string) BlueprintKind {
 	}
 }
 
-type BlueprintRelationKind strin
 type BlueprintRelationKind string
 
 // Blueprint is a class blueprint, it is used to create a new class
