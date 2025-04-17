@@ -380,7 +380,7 @@ func CompareResult(t *testing.T, contain bool, results *ssaapi.SyntaxFlowResult,
 			}
 		} else {
 			require.Equal(t, len(want), len(gotVs))
-			require.Equal(t, want, got)
+			require.Equal(t, want, got, "key[%s] not match", name)
 		}
 	}
 }
