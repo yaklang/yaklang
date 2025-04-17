@@ -139,11 +139,6 @@ func init() {
 		goVersion = runtime.Version()
 	}
 
-	// migrate cli printVersion here
-	if len(os.Args) == 2 && os.Args[1] == "-v" || os.Args[1] == "-version" {
-		_, _ = fmt.Printf("%v version %v\n", filepath.Base(os.Args[0]), yakVersion)
-		os.Exit(0)
-	}
 	/* 初始化数据库: 在 grpc 模式下，数据库应该不在 init 中使用 */
 	if len(os.Args) > 1 && os.Args[1] == "grpc" {
 		log.Debug("grpc should not initialize database in func:init")
@@ -154,6 +149,8 @@ func init() {
     %v %v
 
 `, consts.GetYakVersion(), "yaklang.io")
+	} else if len(os.Args) == 2 && (os.Args[1] == "-v" || os.Args[1] == "-version") {
+
 	} else {
 		err := initializeDatabase("", "")
 		if err != nil {
