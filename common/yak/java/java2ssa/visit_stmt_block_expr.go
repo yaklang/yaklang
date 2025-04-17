@@ -1727,13 +1727,12 @@ func (y *builder) VisitClassCreatorRest(raw javaparser.IClassCreatorRestContext,
 		if parent == nil {
 			parent = y.CreateBlueprint(parentName)
 		}
-		class.AddParentBlueprint(parent)
 		if parent.IsInterface() {
 			class.SetKind(ssa.BlueprintInterface)
 			class.AddInterfaceBlueprint(parent)
 		} else if parent.IsClass() {
 			class.SetKind(ssa.BlueprintClass)
-			class.AddSuperBlueprint(parent)
+			class.AddParentBlueprint(parent)
 		}
 		y.VisitClassBody(i.ClassBody(), class)
 	}

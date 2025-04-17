@@ -101,10 +101,6 @@ func (c *Blueprint) AddParentBlueprint(parent *Blueprint) {
 	c.addParentBlueprintEx(parent, BlueprintRelationParents)
 }
 
-func (c *Blueprint) AddSuperBlueprint(parent *Blueprint) {
-	c.addParentBlueprintEx(parent, BlueprintRelationSuper)
-}
-
 func (c *Blueprint) AddInterfaceBlueprint(b *Blueprint) {
 	c.addParentBlueprintEx(b, BlueprintRelationInterface)
 }

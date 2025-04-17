@@ -154,7 +154,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 									b.NewError(ssa.Error, TAG, NotCreateBluePrint(typeName))
 									continue
 								}
-								parentBp.AddSuperBlueprint(childBp)
+								parentBp.AddParentBlueprint(childBp)
 							}
 						}
 					}

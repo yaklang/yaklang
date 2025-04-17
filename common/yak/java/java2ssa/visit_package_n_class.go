@@ -135,7 +135,6 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 				bp = y.CreateBlueprint(parent, tokenMap[parent])
 				y.AddFullTypeNameForAllImport(parent, bp)
 			}
-			blueprint.AddParentBlueprint(bp)
 		}
 
 		if extendName != "" {
@@ -145,7 +144,7 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 				y.AddFullTypeNameForAllImport(extendName, bp)
 			}
 			bp.SetKind(ssa.BlueprintClass)
-			blueprint.AddSuperBlueprint(bp)
+			blueprint.AddParentBlueprint(bp)
 		}
 
 		for _, implName := range implNames {
@@ -399,14 +398,6 @@ func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, c
 
 	if i.IMPLEMENTS() != nil {
 		mergedTemplate = append(mergedTemplate, i.TypeList().GetText())
-	}
-
-	for _, parentClass := range mergedTemplate {
-		if parent := y.GetBluePrint(parentClass); parent != nil {
-			class.AddParentBlueprint(parent)
-		} else {
-			class.AddParentBlueprint(y.CreateBlueprint(parentClass))
-		}
 	}
 
 	if i.EnumBodyDeclarations() != nil {

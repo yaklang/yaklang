@@ -42,7 +42,6 @@ func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclaration
 				y.AddFullTypeNameForAllImport(extendName, bp)
 			}
 			bp.SetKind(ssa.BlueprintInterface)
-			bluePrint.AddSuperBlueprint(bp)
 			bluePrint.AddParentBlueprint(bp)
 		}
 	})
