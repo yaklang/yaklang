@@ -149,6 +149,8 @@ func init() {
     %v %v
 
 `, consts.GetYakVersion(), "yaklang.io")
+	} else if len(os.Args) == 2 && (os.Args[1] == "-v" || os.Args[1] == "-version") {
+
 	} else {
 		err := initializeDatabase("", "")
 		if err != nil {
