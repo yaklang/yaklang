@@ -73,7 +73,7 @@ func TestJavaClassRelationship_2(t *testing.T) {
 		var ret ssaapi.Values
 		ret = prog.SyntaxFlowChain(`.__parents__?{have: ABC}<getObject>`).Show()
 		assert.Equal(t, 1, len(ret))
-		ret = prog.SyntaxFlowChain(`*declare?{.__parents__?{have: Parent}}?{.__parents__?{have:MyInterface}} `).Show()
+		ret = prog.SyntaxFlowChain(`*declare?{.__parents__?{have: Parent}}?{.__interface__?{have:MyInterface}} `).Show()
 		assert.Equal(t, 1, len(ret))
 		return nil
 	})

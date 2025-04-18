@@ -148,25 +148,23 @@ func (c *Blueprint) addParentBlueprintEx(parent *Blueprint, relation BlueprintRe
 		}
 	}
 	c.setBlueprintRelation(parent, relation)
-	if relation == BlueprintRelationParents {
-		for name, f := range parent.NormalMethod {
-			c.RegisterNormalMethod(name, f, false)
-		}
-		for name, f := range parent.StaticMethod {
-			c.RegisterStaticMethod(name, f)
-		}
-		for name, f := range parent.MagicMethod {
-			c.RegisterMagicMethod(name, f)
-		}
-		for name, value := range parent.NormalMember {
-			c.RegisterNormalMember(name, value)
-		}
-		for name, value := range parent.StaticMember {
-			c.RegisterStaticMember(name, value)
-		}
-		for name, value := range parent.ConstValue {
-			c.RegisterConstMember(name, value)
-		}
+	for name, f := range parent.NormalMethod {
+		c.RegisterNormalMethod(name, f, false)
+	}
+	for name, f := range parent.StaticMethod {
+		c.RegisterStaticMethod(name, f)
+	}
+	for name, f := range parent.MagicMethod {
+		c.RegisterMagicMethod(name, f)
+	}
+	for name, value := range parent.NormalMember {
+		c.RegisterNormalMember(name, value)
+	}
+	for name, value := range parent.StaticMember {
+		c.RegisterStaticMember(name, value)
+	}
+	for name, value := range parent.ConstValue {
+		c.RegisterConstMember(name, value)
 	}
 }
 
