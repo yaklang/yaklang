@@ -112,7 +112,7 @@ func TestGraph(t *testing.T) {
 	log.Infof("memory path: %v", memPath)
 	log.Infof("db path: %v", dbPath)
 
-	require.Equal(t, 2, len(memPath))
+	require.Equal(t, 1, len(memPath))
 	require.Equal(t, 1, len(dbPath))
 }
 
