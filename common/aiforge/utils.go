@@ -1,4 +1,4 @@
-package aibp
+package aiforge
 
 import (
 	"github.com/yaklang/yaklang/common/ai"

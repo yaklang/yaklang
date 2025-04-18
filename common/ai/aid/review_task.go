@@ -4,7 +4,6 @@ import (
 	"io"
 	"slices"
 
-	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -137,11 +136,10 @@ func (t *aiTask) handleReviewResult(param aitool.InvokeParams) error {
 			t.config.EmitError("error reading AI response: %v", err)
 			return utils.Errorf("error reading AI response: %v", err)
 		}
-		taskResponseJson := gjson.ParseBytes(taskResponse)
-		action := taskResponseJson.Get("@action").String()
-		if action != "re-plan" {
-			t.config.EmitError("invalid action: %s", action)
-			return utils.Errorf("invalid action: %s", action)
+		nextPlanTask, err := ExtractNextPlanTaskFromRawResponse(t.config, string(taskResponse))
+		if err != nil {
+			t.config.EmitError("error extracting task from raw response: %v", err)
+			return utils.Errorf("error extracting task from raw response: %v", err)
 		}
 		// 解析 AI 的响应
 		parentTask := t.ParentTask
@@ -158,28 +156,14 @@ func (t *aiTask) handleReviewResult(param aitool.InvokeParams) error {
 		}
 		// 保留之前的任务, 删除后续任务
 		parentTask.Subtasks = parentTask.Subtasks[:index+1]
-		plans := taskResponseJson.Get("next_plans").Array()
-		if len(plans) == 0 {
-			t.config.EmitError("no new dynamic plans found")
-			return utils.Error("no new dynamic plans found")
-		}
-		parentTask.Subtasks = slices.Grow(parentTask.Subtasks, len(parentTask.Subtasks)+len(plans))
+		parentTask.Subtasks = slices.Grow(parentTask.Subtasks, len(parentTask.Subtasks)+len(nextPlanTask))
 
 		// 添加新的任务
-		for _, plan := range plans {
-			name, goal := plan.Get("name").String(), plan.Get("goal").String()
-			if name == "" || goal == "" {
-				t.config.EmitError("invalid plan: %s", plan.String())
-				return utils.Errorf("invalid plan: %s", plan.String())
-			}
-			parentTask.Subtasks = append(parentTask.Subtasks, &aiTask{
-				config:     t.config,
-				Name:       name,
-				Goal:       goal,
-				ParentTask: parentTask,
-			})
-
-			t.config.EmitInfo("new dynamic plan: %s", name)
+		for _, subTask := range nextPlanTask {
+			subTask.config = t.config
+			subTask.ParentTask = parentTask
+			parentTask.Subtasks = append(parentTask.Subtasks, subTask)
+			subTask.config.EmitInfo("new dynamic plan: %s", subTask.Name)
 		}
 	default:
 		t.config.EmitError("unknown review suggestion: %s", suggestion)
