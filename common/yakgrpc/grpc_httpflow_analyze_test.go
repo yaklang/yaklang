@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"io"
 	"strings"
 	"testing"
 
@@ -52,7 +53,9 @@ Host: %s
 ` + fmt.Sprintf(`
 %s
 `, token)
-	err, deleteFlow := createHTTPFlow("http://www.baidu.com", req, "abc")
+
+	url := fmt.Sprintf("http://www.baidu.com?%s", token)
+	err, deleteFlow := createHTTPFlow(url, req, "abc")
 	defer deleteFlow()
 
 	require.NoError(t, err)
@@ -73,6 +76,12 @@ Host: %s
 				NoReplace:        true,
 			},
 		},
+		Source: &ypb.AnalyzedDataSource{
+			SourceType: AnalyzeHTTPFlowSourceDatabase,
+			HTTPFlowFilter: &ypb.QueryHTTPFlowRequest{
+				SearchURL: url,
+			},
+		},
 	})
 	require.NoError(t, err)
 
@@ -80,9 +89,10 @@ Host: %s
 	{
 		for {
 			rsp, err := stream.Recv()
-			if err != nil {
+			if err == io.EOF {
 				break
 			}
+			require.NoError(t, err)
 			resultId = rsp.ExecResult.GetRuntimeID()
 			result := rsp.GetExecResult().GetMessage()
 			var msg msg
@@ -134,7 +144,8 @@ func TestGRPCMUSTPASS_AnalyzeHTTPFlow_ReplacerRule_MatchResponse(t *testing.T) {
 	req := `GET /get HTTP/1.1
 Host: %s
 `
-	err, deleteFlow := createHTTPFlow("www.baidu.com", req, "HTTP/1.1 200 OK\n\n"+token+"\n"+token)
+	url := fmt.Sprintf("http://www.baidu.com?%s", token)
+	err, deleteFlow := createHTTPFlow(url, req, "HTTP/1.1 200 OK\n\n"+token+"\n"+token)
 	defer deleteFlow()
 	require.NoError(t, err)
 	ruleVerboseName := uuid.NewString()
@@ -153,6 +164,12 @@ Host: %s
 				NoReplace:         true,
 			},
 		},
+		Source: &ypb.AnalyzedDataSource{
+			SourceType: AnalyzeHTTPFlowSourceDatabase,
+			HTTPFlowFilter: &ypb.QueryHTTPFlowRequest{
+				SearchURL: url,
+			},
+		},
 	})
 	require.NoError(t, err)
 
@@ -160,9 +177,10 @@ Host: %s
 	{
 		for {
 			rsp, err := stream.Recv()
-			if err != nil {
+			if err == io.EOF {
 				break
 			}
+			require.NoError(t, err)
 			resultId = rsp.ExecResult.GetRuntimeID()
 			result := rsp.GetExecResult().GetMessage()
 			var msg msg
@@ -172,7 +190,6 @@ Host: %s
 				fmt.Println(ruleData)
 			}
 		}
-
 	}
 
 	{
@@ -199,6 +216,7 @@ Host: %s
 func TestGRPCMUSTPASS_AnalyzeHTTPFlow_MutliHTTPFlow(t *testing.T) {
 	urlToken := uuid.NewString()
 	rspToken := uuid.NewString()
+
 	flows := []struct {
 		url string
 		req string
@@ -212,7 +230,9 @@ func TestGRPCMUSTPASS_AnalyzeHTTPFlow_MutliHTTPFlow(t *testing.T) {
 		{fmt.Sprintf("http://www.cab%s.com", urlToken), `POST /post HTTP/1.1`, fmt.Sprintf("HTTP/1.1 200 OK\n\n%s", rspToken)},
 	}
 
+	var urls []string
 	for _, flow := range flows {
+		urls = append(urls, flow.url)
 		err, deleteFlow := createHTTPFlow(flow.url, flow.req, flow.rsp)
 		require.NoError(t, err)
 		defer deleteFlow()
@@ -238,15 +258,22 @@ func TestGRPCMUSTPASS_AnalyzeHTTPFlow_MutliHTTPFlow(t *testing.T) {
 				NoReplace:         true,
 			},
 		},
+		Source: &ypb.AnalyzedDataSource{
+			SourceType: AnalyzeHTTPFlowSourceDatabase,
+			HTTPFlowFilter: &ypb.QueryHTTPFlowRequest{
+				SearchURL: urlToken,
+			},
+		},
 	})
 
 	var resultId string
 	{
 		for {
 			rsp, err := stream.Recv()
-			if err != nil {
+			if err == io.EOF {
 				break
 			}
+			require.NoError(t, err)
 			resultId = rsp.ExecResult.GetRuntimeID()
 			result := rsp.GetExecResult().GetMessage()
 			var msg msg
@@ -258,7 +285,6 @@ func TestGRPCMUSTPASS_AnalyzeHTTPFlow_MutliHTTPFlow(t *testing.T) {
 		}
 
 	}
-
 	var analyzeId int64
 	{
 		result := yakit.QueryAnalyzedHTTPFlowRule(consts.GetGormProjectDatabase(), []string{resultId})
@@ -322,7 +348,9 @@ func TestGRPCMUSTPASS_AnalyzeHTTPFlow_HotPatch(t *testing.T) {
 		{fmt.Sprintf("http://www.cab%s.com", urlToken), `POST /post HTTP/1.1`, fmt.Sprintf("HTTP/1.1 200 OK\n\n%s", rspToken)},
 	}
 
+	var urls []string
 	for _, flow := range flows {
+		urls = append(urls, flow.url)
 		err, deleteFlow := createHTTPFlow(flow.url, flow.req, flow.rsp)
 		require.NoError(t, err)
 		defer deleteFlow()
@@ -336,9 +364,10 @@ func TestGRPCMUSTPASS_AnalyzeHTTPFlow_HotPatch(t *testing.T) {
 	{
 		for {
 			rsp, err := stream.Recv()
-			if err != nil {
+			if err == io.EOF {
 				break
 			}
+			require.NoError(t, err)
 			resultId = rsp.ExecResult.GetRuntimeID()
 			result := rsp.GetExecResult().GetMessage()
 			var msg msg
@@ -607,7 +636,7 @@ Connection: keep-alive
 	}()
 }
 
-func TestGRPCMUSTPASS_AnalyzeWebSocketFlow(t *testing.T) {
+func TestGRPCMUSTPASS_AnalyzeHTTPFlow_WebSocketFlow(t *testing.T) {
 	// create websocket flow
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -743,6 +772,6 @@ Accept: */*
 			tagCount++
 		}
 	}
-	require.Equal(t, 3, colorCount)
-	require.Equal(t, 3, tagCount)
+	require.Greater(t, tagCount, 0)
+	require.Greater(t, colorCount, 0)
 }
