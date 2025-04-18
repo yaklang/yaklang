@@ -358,10 +358,10 @@ var (
 	clientKey           []byte
 )
 
+var generator func() (*tls.Config, *gmtls.Config, *gmtls.Config, *tls.Config, *gmtls.Config, []byte, []byte)
+
 func RegisterDefaultTLSConfigGenerator(h func() (*tls.Config, *gmtls.Config, *gmtls.Config, *tls.Config, *gmtls.Config, []byte, []byte)) {
-	go tlsTestOnce.Do(func() {
-		tlsTestConfig, gmtlsTestConfig, onlyGmtlsTestConfig, mtlsTestConfig, mgmtlsTestConfig, clientCrt, clientKey = h()
-	})
+	generator = h
 }
 
 func GetDefaultTLSConfig(i float64) *tls.Config {
@@ -371,6 +371,9 @@ func GetDefaultTLSConfig(i float64) *tls.Config {
 			log.Infof("fetch default tls config finished: %p", tlsTestConfig)
 			return tlsTestConfig
 		}
+		go tlsTestOnce.Do(func() {
+			tlsTestConfig, gmtlsTestConfig, onlyGmtlsTestConfig, mtlsTestConfig, mgmtlsTestConfig, clientCrt, clientKey = generator()
+		})
 		time.Sleep(50 * time.Millisecond)
 		if !expectedEnd.After(time.Now()) {
 			break
@@ -384,15 +387,18 @@ func GetDefaultGMTLSConfig(i float64) *gmtls.Config {
 	expectedEnd := time.Now().Add(FloatSecondDuration(i))
 	for {
 		if tlsTestConfig != nil {
-			log.Infof("fetch default tls config finished: %p", tlsTestConfig)
+			log.Infof("fetch default gmtls config finished: %p", gmtlsTestConfig)
 			return gmtlsTestConfig
 		}
+		go tlsTestOnce.Do(func() {
+			tlsTestConfig, gmtlsTestConfig, onlyGmtlsTestConfig, mtlsTestConfig, mgmtlsTestConfig, clientCrt, clientKey = generator()
+		})
 		time.Sleep(50 * time.Millisecond)
 		if !expectedEnd.After(time.Now()) {
 			break
 		}
 	}
-	log.Error("fetch default tls config failed")
+	log.Error("fetch default gmtls config failed")
 	return nil
 }
 
@@ -400,15 +406,18 @@ func GetDefaultOnlyGMTLSConfig(i float64) *gmtls.Config {
 	expectedEnd := time.Now().Add(FloatSecondDuration(i))
 	for {
 		if tlsTestConfig != nil {
-			log.Infof("fetch default tls config finished: %p", tlsTestConfig)
+			log.Infof("fetch default gmtls only config finished: %p", onlyGmtlsTestConfig)
 			return onlyGmtlsTestConfig
 		}
+		go tlsTestOnce.Do(func() {
+			tlsTestConfig, gmtlsTestConfig, onlyGmtlsTestConfig, mtlsTestConfig, mgmtlsTestConfig, clientCrt, clientKey = generator()
+		})
 		time.Sleep(50 * time.Millisecond)
 		if !expectedEnd.After(time.Now()) {
 			break
 		}
 	}
-	log.Error("fetch default tls config failed")
+	log.Error("fetch default gmtls only config failed")
 	return nil
 }
 
