@@ -3,7 +3,7 @@ package yaklangmaster
 import (
 	"context"
 	_ "embed"
-	"github.com/davecgh/go-spew/spew"
+	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -21,11 +21,11 @@ func TestYaklangMaster(t *testing.T) {
 			{Key: "code", Value: testYak},
 		},
 		aid.WithDebugPrompt(true),
-		aid.WithAICallback(aiforge.GetQwenAICallback()),
+		aid.WithAICallback(aiforge.GetOpenRouterAICallback()),
 	)
 	if err != nil {
 		t.Fatal(err)
 		return
 	}
-	spew.Dump(result)
+	fmt.Println(fmt.Sprint(result.Formated))
 }
