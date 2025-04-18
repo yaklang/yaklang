@@ -142,7 +142,7 @@ func QueryAllWebsocketFlowByWebsocketHash(db *gorm.DB, hash string) ([]*schema.W
 	db = bizhelper.ExactQueryString(db, "websocket_request_hash", hash)
 	db = db.Find(&ret)
 	if db.Error != nil {
-		return nil, utils.Errorf("paging failed: %s", db.Error)
+		return nil, utils.Errorf("query websocket failed: %s", db.Error)
 	}
 	return ret, nil
 }
