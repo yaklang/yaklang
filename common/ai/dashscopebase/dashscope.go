@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 
@@ -201,102 +202,113 @@ func (d *DashScopeGateway) StructuredStream(s string, function ...aispec.Functio
 	}
 
 	go func() {
+		defer close(objChannel)
 		defer func() {
 			if err := recover(); err != nil {
 				log.Errorf("StructuredStream panic: %v", utils.ErrorStack(err))
 			}
 		}()
-
-		count := 0
 		feeder := &rspFeeder{}
-		opts, _ := d.BuildHTTPOptions()
-		opts = append(opts, poc.WithTimeout(600))
-		opts = append(opts, poc.WithReplaceHttpPacketHeader("Authorization", `Bearer `+d.dashscopeAPIKey))
-		opts = append(opts, poc.WithReplaceHttpPacketHeader("X-DashScope-SSE", "enable"))
-		opts = append(opts, poc.WithJSON(
-			map[string]any{
-				"input": map[string]any{
-					"prompt": s,
+		reader, writer := utils.NewPipe()
+		var count = new(int64)
+		addCount := func() {
+			atomic.AddInt64(count, 1)
+		}
+		getCount := func() int64 {
+			return atomic.LoadInt64(count)
+		}
+		go func() {
+			opts, _ := d.BuildHTTPOptions()
+			opts = append(opts, poc.WithTimeout(600))
+			opts = append(opts, poc.WithReplaceHttpPacketHeader("Authorization", `Bearer `+d.dashscopeAPIKey))
+			opts = append(opts, poc.WithReplaceHttpPacketHeader("X-DashScope-SSE", "enable"))
+			opts = append(opts, poc.WithJSON(
+				map[string]any{
+					"input": map[string]any{
+						"prompt": s,
+					},
+					"parameters": map[string]any{
+						"stream":             false,
+						"incremental_output": true,
+						"has_thoughts":       true,
+						// "flow_stream_mode":   "agent_format",
+					},
+					"debug": map[string]any{},
 				},
-				"parameters": map[string]any{
-					"stream":             false,
-					"incremental_output": true,
-					"has_thoughts":       true,
-					// "flow_stream_mode":   "agent_format",
-				},
-				"debug": map[string]any{},
-			},
-		))
-		opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, rawCloser io.ReadCloser) {
-			defer close(objChannel)
-			chunked := strings.ToLower(strings.TrimSpace(lowhttp.GetHTTPPacketHeader(r, "transfer-encoding"))) == "chunked"
-			var bodyReader io.Reader = rawCloser
-			if chunked {
-				log.Infof("SSE Chunked for: %v", d.endpointUrl)
-				bodyReader = httputil.NewChunkedReader(rawCloser)
-			}
-
-			for {
-				structured := &aispec.StructuredData{
-					DataSourceType: "dashscope",
+			))
+			opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, rawCloser io.ReadCloser) {
+				chunked := strings.ToLower(strings.TrimSpace(lowhttp.GetHTTPPacketHeader(r, "transfer-encoding"))) == "chunked"
+				var bodyReader io.Reader = rawCloser
+				if chunked {
+					log.Infof("SSE Chunked for: %v", d.endpointUrl)
+					bodyReader = httputil.NewChunkedReader(rawCloser)
 				}
-				handleLine := func(line string) {
-					if strings.HasPrefix(line, "data:") {
-						structured.DataRaw = bytes.TrimSpace([]byte(line[5:]))
-						inputs := []byte(line[5:])
-						ch := feeder.GetNewData(structured, inputs)
-						if ch != nil {
-							for data := range ch {
-								// 检查退出信号
-								select {
-								case objChannel <- data:
-									count++
-								}
-							}
-						} else {
-							if len(structured.DataRaw) > 0 {
-								select {
-								case objChannel <- structured:
-									count++
-								}
+				defer func() {
+					writer.Close()
+				}()
+				io.Copy(writer, bodyReader)
+			}))
+			rsp, req, err := poc.DoPOST(d.endpointUrl, opts...)
+			if getCount() <= 2 {
+				if rsp != nil && rsp.RawPacket != nil && len(rsp.RawPacket) > 0 {
+					log.Infof(" request: \n%v", string(rsp.RawRequest))
+					log.Infof("response: \n%v", string(rsp.RawPacket))
+					log.Errorf("failed to do post, body: %v", string(rsp.GetBody()))
+				}
+			}
+			if err != nil {
+				log.Warnf("failed to do post: %v", err)
+				if req != nil {
+					reqRaw, _ := utils.DumpHTTPRequest(req, true)
+					if len(reqRaw) > 0 {
+						log.Warnf("request: \n%s", string(reqRaw))
+					}
+				}
+				return
+			}
+			_ = rsp
+		}()
+		for {
+			structured := &aispec.StructuredData{
+				DataSourceType: "dashscope",
+			}
+			handleLine := func(line string) {
+				if strings.HasPrefix(line, "data:") {
+					structured.DataRaw = bytes.TrimSpace([]byte(line[5:]))
+					inputs := []byte(line[5:])
+					ch := feeder.GetNewData(structured, inputs)
+					if ch != nil {
+						for data := range ch {
+							// 检查退出信号
+							select {
+							case objChannel <- data:
+								addCount()
 							}
 						}
-					} else if strings.HasPrefix(line, "id:") {
-						structured.Id = strings.TrimSpace(line[3:])
-					} else if strings.HasPrefix(line, "event:") {
-						structured.Event = strings.TrimSpace(line[6:])
+					} else {
+						if len(structured.DataRaw) > 0 {
+							select {
+							case objChannel <- structured:
+								addCount()
+							}
+						}
 					}
+				} else if strings.HasPrefix(line, "id:") {
+					structured.Id = strings.TrimSpace(line[3:])
+				} else if strings.HasPrefix(line, "event:") {
+					structured.Event = strings.TrimSpace(line[6:])
 				}
-				resultBytes, err := utils.ReadLine(bodyReader)
-				if err != nil && len(resultBytes) <= 0 {
-					if err != io.EOF {
-						log.Warnf("failed to read line in %v: %v", d.endpointUrl, err)
-					}
-					return
+			}
+			resultBytes, err := utils.ReadLine(reader)
+			if err != nil && len(resultBytes) <= 0 {
+				if err != io.EOF {
+					log.Warnf("failed to read line in %v: %v", d.endpointUrl, err)
 				}
-				result := string(resultBytes)
-				handleLine(result)
+				return
 			}
-		}))
-		rsp, req, err := poc.DoPOST(d.endpointUrl, opts...)
-		if count <= 2 {
-			if rsp != nil && rsp.RawPacket != nil && len(rsp.RawPacket) > 0 {
-				log.Infof(" request: \n%v", string(rsp.RawRequest))
-				log.Infof("response: \n%v", string(rsp.RawPacket))
-				log.Errorf("failed to do post, body: %v", string(rsp.GetBody()))
-			}
+			result := string(resultBytes)
+			handleLine(result)
 		}
-		if err != nil {
-			log.Warnf("failed to do post: %v", err)
-			if req != nil {
-				reqRaw, _ := utils.DumpHTTPRequest(req, true)
-				if len(reqRaw) > 0 {
-					log.Warnf("request: \n%s", string(reqRaw))
-				}
-			}
-			return
-		}
-		_ = rsp
 	}()
 	return objChannel, nil
 }
