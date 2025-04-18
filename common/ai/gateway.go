@@ -61,6 +61,9 @@ func init() {
 	aispec.Register("yaklang-com-search", func() aispec.AIClient {
 		return dashscopebase.CreateDashScopeGateway("5d880c5d33484343b5b08a66c4d5ee77")
 	})
+	aispec.Register("yakit-plugin-search", func() aispec.AIClient {
+		return dashscopebase.CreateDashScopeGateway("e8be1ba351dc44568728bcb46e36aac2")
+	})
 }
 
 type Gateway struct {
