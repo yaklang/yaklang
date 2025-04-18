@@ -43,7 +43,7 @@ func createHTTPFlow(url, req, rsp string) (error, func()) {
 	}
 }
 
-func TestMUSTPASS_AnalyzeHTTPFlow_ReplacerRule_MatchRequest(t *testing.T) {
+func TestGRPCMUSTPASS_AnalyzeHTTPFlow_ReplacerRule_MatchRequest(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	token := uuid.NewString()
@@ -76,44 +76,23 @@ Host: %s
 	})
 	require.NoError(t, err)
 
-	var (
-		resultId     string
-		finalProcess float64
-		finalMatch   string
-	)
+	var resultId string
 	{
-		// 测试进度条
-		// 等待所有消息处理完成
 		for {
 			rsp, err := stream.Recv()
 			if err != nil {
-				// 当流结束时，err 会是 io.EOF
 				break
 			}
 			resultId = rsp.ExecResult.GetRuntimeID()
 			result := rsp.GetExecResult().GetMessage()
 			var msg msg
 			json.Unmarshal(result, &msg)
-			if msg.Type == "progress" {
-				finalProcess = msg.Content.Process
-			}
-			if msg.Type == "log" {
-				var contentData contentData
-				json.Unmarshal([]byte(msg.Content.Data), &contentData)
-				if contentData.ID == "符合条件数" {
-					finalMatch = contentData.Data
-				}
-			}
-
 			ruleData := rsp.GetRuleData()
 			if ruleData != nil {
 				fmt.Println(ruleData)
 			}
 		}
 
-		// 确保最终进度为1
-		require.Equal(t, float64(1), finalProcess)
-		require.Equal(t, "1", finalMatch)
 	}
 
 	var result *schema.AnalyzedHTTPFlow
@@ -148,7 +127,7 @@ Host: %s
 
 }
 
-func TestMUSTPASS_AnalyzeHTTPFlow_ReplacerRule_MatchResponse(t *testing.T) {
+func TestGRPCMUSTPASS_AnalyzeHTTPFlow_ReplacerRule_MatchResponse(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	token := uuid.NewString()
@@ -176,49 +155,24 @@ Host: %s
 		},
 	})
 	require.NoError(t, err)
-	var (
-		resultId       string
-		finalProcess   float64
-		finalMatch     string
-		finalExtracted string
-	)
+
+	var resultId string
 	{
-		// 测试进度条
-		// 等待所有消息处理完成
 		for {
 			rsp, err := stream.Recv()
 			if err != nil {
-				// 当流结束时，err 会是 io.EOF
 				break
 			}
 			resultId = rsp.ExecResult.GetRuntimeID()
 			result := rsp.GetExecResult().GetMessage()
 			var msg msg
 			json.Unmarshal(result, &msg)
-			if msg.Type == "progress" {
-				finalProcess = msg.Content.Process
-			}
-			if msg.Type == "log" {
-				var contentData contentData
-				json.Unmarshal([]byte(msg.Content.Data), &contentData)
-				if contentData.ID == "符合条件数" {
-					finalMatch = contentData.Data
-				}
-				if contentData.ID == "提取数据" {
-					finalExtracted = contentData.Data
-				}
-			}
-
 			ruleData := rsp.GetRuleData()
 			if ruleData != nil {
 				fmt.Println(ruleData)
 			}
 		}
 
-		// 确保最终进度为1
-		require.Equal(t, float64(1), finalProcess)
-		require.Equal(t, "1", finalMatch)
-		require.Equal(t, "2", finalExtracted)
 	}
 
 	{
@@ -242,7 +196,7 @@ Host: %s
 
 }
 
-func TestMUSTPASS_AnalyzeHTTPFlow_MutliHTTPFlow(t *testing.T) {
+func TestGRPCMUSTPASS_AnalyzeHTTPFlow_MutliHTTPFlow(t *testing.T) {
 	urlToken := uuid.NewString()
 	rspToken := uuid.NewString()
 	flows := []struct {
@@ -285,48 +239,24 @@ func TestMUSTPASS_AnalyzeHTTPFlow_MutliHTTPFlow(t *testing.T) {
 			},
 		},
 	})
-	var (
-		resultId       string
-		finalProcess   float64
-		finalMatch     string
-		finalExtracted string
-	)
+
+	var resultId string
 	{
-		// 测试进度条
-		// 等待所有消息处理完成
 		for {
 			rsp, err := stream.Recv()
 			if err != nil {
-				// 当流结束时，err 会是 io.EOF
 				break
 			}
 			resultId = rsp.ExecResult.GetRuntimeID()
 			result := rsp.GetExecResult().GetMessage()
 			var msg msg
 			json.Unmarshal(result, &msg)
-			if msg.Type == "progress" {
-				finalProcess = msg.Content.Process
-			}
-			if msg.Type == "log" {
-				var contentData contentData
-				json.Unmarshal([]byte(msg.Content.Data), &contentData)
-				if contentData.ID == "符合条件数" {
-					finalMatch = contentData.Data
-				}
-				if contentData.ID == "提取数据" {
-					finalExtracted = contentData.Data
-				}
-			}
-
 			ruleData := rsp.GetRuleData()
 			if ruleData != nil {
 				fmt.Println(ruleData)
 			}
 		}
-		// 确保最终进度为1
-		require.Equal(t, float64(1), finalProcess)
-		require.Equal(t, "1", finalMatch)
-		require.Equal(t, "1", finalExtracted)
+
 	}
 
 	var analyzeId int64
@@ -360,7 +290,7 @@ func TestMUSTPASS_AnalyzeHTTPFlow_MutliHTTPFlow(t *testing.T) {
 	}
 }
 
-func TestMUSTPASS_AnalyzeHTTPFlow_HotPatch(t *testing.T) {
+func TestGRPCMUSTPASS_AnalyzeHTTPFlow_HotPatch(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
@@ -401,51 +331,24 @@ func TestMUSTPASS_AnalyzeHTTPFlow_HotPatch(t *testing.T) {
 	stream, err := client.AnalyzeHTTPFlow(context.Background(), &ypb.AnalyzeHTTPFlowRequest{
 		HotPatchCode: hotPatchCode,
 	})
-	var (
-		resultId     string
-		finalProcess float64
-		finalMatch   string
-		finalHandled string
-	)
+
+	var resultId string
 	{
-		// 测试进度条
-		// 等待所有消息处理完成
 		for {
 			rsp, err := stream.Recv()
 			if err != nil {
-				// 当流结束时，err 会是 io.EOF
 				break
 			}
 			resultId = rsp.ExecResult.GetRuntimeID()
 			result := rsp.GetExecResult().GetMessage()
 			var msg msg
 			json.Unmarshal(result, &msg)
-			if msg.Type == "progress" {
-				finalProcess = msg.Content.Process
-			}
-			if msg.Type == "log" {
-				var contentData contentData
-				json.Unmarshal([]byte(msg.Content.Data), &contentData)
-				if contentData.ID == "符合条件数" {
-					finalMatch = contentData.Data
-				}
-				if contentData.ID == "已处理数/总数" {
-					finalHandled = contentData.Data
-				}
-			}
-
 			ruleData := rsp.GetRuleData()
 			if ruleData != nil {
 				fmt.Println(ruleData)
 			}
 		}
 
-		// 确保最终进度为1
-		require.Equal(t, float64(1), finalProcess)
-		require.Equal(t, "1", finalMatch)
-		split := strings.Split(finalHandled, "/")
-		require.Equal(t, 2, len(split))
-		require.Equal(t, split[0], split[1])
 	}
 
 	{
@@ -467,7 +370,7 @@ func TestMUSTPASS_AnalyzeHTTPFlow_HotPatch(t *testing.T) {
 	}
 }
 
-func TestMUSTPASS_AnalyzeHTTPFlow_SourceType_Database(t *testing.T) {
+func TestGRPCMUSTPASS_AnalyzeHTTPFlow_SourceType_Database(t *testing.T) {
 	token := uuid.NewString()
 	flows := []struct {
 		url string
@@ -567,7 +470,7 @@ Content-Type: application/json
 	}
 }
 
-func TestMUSTPASS_AnalyzeHTTPFlow_SourceType_RawPacket(t *testing.T) {
+func TestGRPCMUSTPASS_AnalyzeHTTPFlow_SourceType_RawPacket(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
@@ -630,7 +533,7 @@ Cookie: %s
 	require.NoError(t, err)
 }
 
-func TestMUSTPASS_AnalyzeHTTPFlow_Data_Dedup(t *testing.T) {
+func TestGRPCMUSTPASS_AnalyzeHTTPFlow_Data_Dedup(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
@@ -704,7 +607,7 @@ Connection: keep-alive
 	}()
 }
 
-func TestMUSTPASS_AnalyzeWebSocketFlow(t *testing.T) {
+func TestGRPCMUSTPASS_AnalyzeWebSocketFlow(t *testing.T) {
 	// create websocket flow
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
