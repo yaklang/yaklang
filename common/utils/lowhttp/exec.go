@@ -236,6 +236,17 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		connPool = DefaultLowHttpConnPool
 	}
 
+	bodyStreamReaderHandled := utils.NewAtomicBool()
+	defer func() {
+		if option != nil && option.BodyStreamReaderHandler != nil && !bodyStreamReaderHandled.IsSet() {
+			r, w := utils.NewPipe()
+			defer func() {
+				w.Close()
+			}()
+			option.BodyStreamReaderHandler([]byte{}, r)
+		}
+	}()
+
 	// ctx
 	if ctx == nil {
 		ctx = context.Background()
@@ -831,7 +842,9 @@ RECONNECT:
 				for {
 					line, err := utils.BufioReadLine(packetReader)
 					if err != nil {
-						log.Errorf("BodyStreamReaderHandler read response failed: %s", err)
+						if err != io.EOF {
+							log.Errorf("BodyStreamReaderHandler read response failed: %s", err)
+						}
 						bodyWriter.Close()
 						break
 					}
@@ -846,8 +859,9 @@ RECONNECT:
 					}
 				}
 				if err != nil {
-					log.Warnf("BodyStreamReaderHandler read response failed: %s", err)
+					log.Warnf("Normal handle BodyStreamReaderHandler read response failed: %s", err)
 				} else {
+					bodyStreamReaderHandled.Set()
 					option.BodyStreamReaderHandler(responseHeader.Bytes(), bodyReader)
 				}
 			}()
