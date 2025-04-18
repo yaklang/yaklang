@@ -32,16 +32,31 @@ const (
 	Readonly
 )
 
-type BlueprintKind int
+type BlueprintKind string
 
 const (
-	BlueprintNone BlueprintKind = iota
-	BlueprintClass
-	BlueprintInterface
+	BlueprintNone      BlueprintKind = "none"
+	BlueprintClass                   = "class"
+	BlueprintInterface               = "interface"
 
 	//BlueprintObject for object, like new Blueprint
-	BlueprintObject
+	BlueprintObject = "object"
 )
+
+func ValidBlueprintKind(str string) BlueprintKind {
+	switch str {
+	case "none":
+		return BlueprintNone
+	case "class":
+		return BlueprintClass
+	case "interface":
+		return BlueprintInterface
+	case "object":
+		return BlueprintObject
+	default:
+		return BlueprintNone
+	}
+}
 
 type BlueprintRelationKind string
 
@@ -69,8 +84,7 @@ type Blueprint struct {
 
 	GeneralUndefined func(string) *Undefined
 
-	ParentBlueprints    []*Blueprint // ParentBlueprints All classes, including interfaces and parent classes
-	SuperBlueprints     []*Blueprint
+	ParentBlueprints    []*Blueprint
 	InterfaceBlueprints []*Blueprint
 	// full Type Name
 	fullTypeName []string
@@ -99,10 +113,6 @@ func NewBlueprint(name string) *Blueprint {
 // ======================= class blueprint=======================
 func (c *Blueprint) AddParentBlueprint(parent *Blueprint) {
 	c.addParentBlueprintEx(parent, BlueprintRelationParents)
-}
-
-func (c *Blueprint) AddSuperBlueprint(parent *Blueprint) {
-	c.addParentBlueprintEx(parent, BlueprintRelationSuper)
 }
 
 func (c *Blueprint) AddInterfaceBlueprint(b *Blueprint) {
@@ -138,47 +148,24 @@ func (c *Blueprint) addParentBlueprintEx(parent *Blueprint, relation BlueprintRe
 		}
 	}
 	c.setBlueprintRelation(parent, relation)
-	if relation == BlueprintRelationParents {
-		for name, f := range parent.NormalMethod {
-			c.RegisterNormalMethod(name, f, false)
-		}
-		for name, f := range parent.StaticMethod {
-			c.RegisterStaticMethod(name, f)
-		}
-		for name, f := range parent.MagicMethod {
-			c.RegisterMagicMethod(name, f)
-		}
-		for name, value := range parent.NormalMember {
-			c.RegisterNormalMember(name, value)
-		}
-		for name, value := range parent.StaticMember {
-			c.RegisterStaticMember(name, value)
-		}
-		for name, value := range parent.ConstValue {
-			c.RegisterConstMember(name, value)
-		}
+	for name, f := range parent.NormalMethod {
+		c.RegisterNormalMethod(name, f, false)
 	}
-}
-
-// GetSuperBlueprint 获取父类，用于单继承
-func (c *Blueprint) GetSuperBlueprint() *Blueprint {
-	if c == nil {
-		return nil
+	for name, f := range parent.StaticMethod {
+		c.RegisterStaticMethod(name, f)
 	}
-	if len(c.SuperBlueprints) == 0 {
-		return nil
+	for name, f := range parent.MagicMethod {
+		c.RegisterMagicMethod(name, f)
 	}
-	ret := c.SuperBlueprints[0]
-	ret.Build()
-	return ret
-}
-
-// GetSuperBlueprints 获取父类，用于多继承
-func (c *Blueprint) GetSuperBlueprints() []*Blueprint {
-	if c == nil {
-		return nil
+	for name, value := range parent.NormalMember {
+		c.RegisterNormalMember(name, value)
 	}
-	return c.SuperBlueprints
+	for name, value := range parent.StaticMember {
+		c.RegisterStaticMember(name, value)
+	}
+	for name, value := range parent.ConstValue {
+		c.RegisterConstMember(name, value)
+	}
 }
 
 func (c *Blueprint) GetInterfaceBlueprint() []*Blueprint {
@@ -188,12 +175,144 @@ func (c *Blueprint) GetInterfaceBlueprint() []*Blueprint {
 	return c.InterfaceBlueprints
 }
 
-func (c *Blueprint) CheckExtendBy(parentBlueprint *Blueprint) bool {
-	for _, blueprint := range c.SuperBlueprints {
+func (c *Blueprint) GetParentBlueprint() []*Blueprint {
+	if c == nil {
+		return nil
+	}
+	return c.ParentBlueprints
+}
+
+// GetSuperBlueprint only get the first parent blueprint, using for single inheritance
+func (c *Blueprint) GetSuperBlueprint() *Blueprint {
+	if c == nil {
+		return nil
+	}
+	if len(c.ParentBlueprints) > 0 {
+		return c.ParentBlueprints[0]
+	}
+	return nil
+}
+
+func (c *Blueprint) GetAllParentsBlueprint() []*Blueprint {
+	if c == nil {
+		return nil
+	}
+	// 层序遍历
+	visited := make(map[*Blueprint]bool)
+	var allParents []*Blueprint
+	queue := c.GetParentBlueprint()
+
+	for len(queue) > 0 {
+		parent := queue[0]
+		queue = queue[1:]
+		if parent == nil || visited[parent] {
+			continue
+		}
+		if visited[parent] {
+			continue
+		}
+
+		visited[parent] = true
+		allParents = append(allParents, parent)
+		queue = append(queue, parent.GetParentBlueprint()...)
+	}
+
+	return allParents
+}
+
+func (c *Blueprint) GetAllInterfaceBlueprints() []*Blueprint {
+	if c == nil {
+		return nil
+	}
+	// 层序遍历
+	visited := make(map[*Blueprint]bool)
+	var allParents []*Blueprint
+	queue := c.GetInterfaceBlueprint()
+
+	for len(queue) > 0 {
+		parent := queue[0]
+		queue = queue[1:]
+		if parent == nil || visited[parent] {
+			continue
+		}
+		if visited[parent] {
+			continue
+		}
+
+		visited[parent] = true
+		allParents = append(allParents, parent)
+		queue = append(queue, parent.GetInterfaceBlueprint()...)
+	}
+
+	return allParents
+}
+
+func (c *Blueprint) GetRootParentBlueprints() []*Blueprint {
+	if c == nil {
+		return nil
+	}
+
+	var roots []*Blueprint
+	visited := make(map[*Blueprint]bool)
+	var dfs func(*Blueprint)
+
+	dfs = func(node *Blueprint) {
+		if node == nil || visited[node] {
+			return
+		}
+		visited[node] = true
+
+		parents := node.GetParentBlueprint()
+		if len(parents) == 0 {
+			roots = append(roots, node)
+			return
+		}
+
+		for _, parent := range parents {
+			dfs(parent)
+		}
+	}
+
+	dfs(c)
+	return roots
+}
+
+func (c *Blueprint) GetRootInterfaceBlueprint() []*Blueprint {
+	if c == nil {
+		return nil
+	}
+
+	var roots []*Blueprint
+	visited := make(map[*Blueprint]bool)
+	var dfs func(*Blueprint)
+
+	dfs = func(node *Blueprint) {
+		if node == nil || visited[node] {
+			return
+		}
+		visited[node] = true
+
+		parents := node.GetInterfaceBlueprint()
+		if len(parents) == 0 {
+			roots = append(roots, node)
+			return
+		}
+
+		for _, parent := range parents {
+			dfs(parent)
+		}
+	}
+
+	dfs(c)
+	return roots
+}
+
+func (c *Blueprint) CheckExtendedBy(parentBlueprint *Blueprint) bool {
+	for _, blueprint := range c.ParentBlueprints {
 		if blueprint == parentBlueprint {
 			return true
 		}
-		return blueprint.CheckExtendBy(parentBlueprint)
+		return blueprint.CheckExtendedBy(parentBlueprint)
 	}
 	return false
 }

@@ -116,11 +116,9 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		for _, val := range i.AllTypeList() {
 			implNames = append(implNames, val.GetText())
 			tokenMap[val.GetText()] = val
-			parents = append(parents, val.GetText())
 		}
 	}
 
-	parents = utils.StringArrayFilterEmpty(parents)
 	/*
 		该lazyBuilder顺序按照cls解析顺序
 	*/
@@ -129,15 +127,6 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 		switchHandler := y.SwitchFunctionBuilder(store)
 		defer switchHandler()
 
-		for _, parent := range parents {
-			bp := y.GetBluePrint(parent)
-			if bp == nil {
-				bp = y.CreateBlueprint(parent, tokenMap[parent])
-				y.AddFullTypeNameForAllImport(parent, bp)
-			}
-			blueprint.AddParentBlueprint(bp)
-		}
-
 		if extendName != "" {
 			bp := y.GetBluePrint(extendName)
 			if bp == nil {
@@ -145,7 +134,7 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 				y.AddFullTypeNameForAllImport(extendName, bp)
 			}
 			bp.SetKind(ssa.BlueprintClass)
-			blueprint.AddSuperBlueprint(bp)
+			blueprint.AddParentBlueprint(bp)
 		}
 
 		for _, implName := range implNames {
@@ -399,14 +388,6 @@ func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, c
 
 	if i.IMPLEMENTS() != nil {
 		mergedTemplate = append(mergedTemplate, i.TypeList().GetText())
-	}
-
-	for _, parentClass := range mergedTemplate {
-		if parent := y.GetBluePrint(parentClass); parent != nil {
-			class.AddParentBlueprint(parent)
-		} else {
-			class.AddParentBlueprint(y.CreateBlueprint(parentClass))
-		}
 	}
 
 	if i.EnumBodyDeclarations() != nil {

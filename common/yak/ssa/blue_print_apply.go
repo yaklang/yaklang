@@ -80,6 +80,18 @@ func (c *Blueprint) Apply(obj Value) Type {
 		c.fullTypeName = append(c.fullTypeName, i...)
 	}
 
+	for _, bp := range c.InterfaceBlueprints {
+		if bp == nil {
+			log.Warn("ClassBluePrint.ParentBlueprints is nil")
+			log.Warn("ClassBluePrint.ParentBlueprints is nil")
+			log.Warn("ClassBluePrint.ParentBlueprints is nil")
+			continue
+		}
+		bp.Apply(obj)
+		_, i := lo.Difference(c.fullTypeName, bp.fullTypeName)
+		c.fullTypeName = append(c.fullTypeName, i...)
+	}
+
 	if prog != nil || prog.Cache != nil {
 		prog.Cache.AddClassInstance(c.Name, obj)
 	}
