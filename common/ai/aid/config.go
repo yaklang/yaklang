@@ -69,10 +69,13 @@ type Config struct {
 	debugEvent  bool
 
 	// do not use it directly, use doAgree() instead
-	agreePolicy   AgreePolicyType
-	agreeInterval time.Duration
-	agreeAIScore  float64
-	agreeRiskCtrl *riskControl
+	agreePolicy    AgreePolicyType
+	agreeInterval  time.Duration
+	agreeAIScore   float64
+	agreeRiskCtrl  *riskControl
+	agreeAssistant *AIAssistant
+
+	//review suggestion
 
 	// sync
 	syncMutex *sync.RWMutex
@@ -319,6 +322,15 @@ func WithYOLO(i ...bool) Option {
 		} else {
 			config.setAgreePolicy(AgreePolicyYOLO)
 		}
+		return nil
+	}
+}
+
+func WithAgreeAIAssistant(a *AIAssistant) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.agreeAssistant = a
 		return nil
 	}
 }

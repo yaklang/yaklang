@@ -2,6 +2,7 @@ package aid
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/log"
 	"sync"
 	"time"
 )
@@ -19,6 +20,19 @@ func (c *Config) doWaitAgree(ctx any, ep *Endpoint) {
 			c.EmitInfo("auto agree timeout, use default action: pass")
 		}
 	case AgreePolicyManual:
+		manualCtx, cancel := context.WithCancel(c.epm.ctx)
+		defer cancel()
+		if c.agreeAssistant != nil {
+			go func() {
+				res, err := c.agreeAssistant.Callback(manualCtx, c)
+				if err != nil {
+					log.Errorf("agree assistant callback error: %v", err)
+				} else {
+					ep.SetParams(res.Param)
+					ep.Release()
+				}
+			}()
+		}
 		ep.Wait()
 	case AgreePolicyAI:
 		if !c.agreeRiskCtrl.enabled() {

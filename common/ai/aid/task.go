@@ -109,6 +109,25 @@ func ExtractPlan(c *Config, rawResponse string) (*PlanResponse, error) {
 	return &PlanResponse{RootTask: at}, nil
 }
 
+func ExtractNextPlanTaskFromRawResponse(c *Config, rawResponse string) ([]*aiTask, error) {
+	for _, item := range jsonextractor.ExtractObjectIndexes(rawResponse) {
+		start, end := item[0], item[1]
+		taskJSON := rawResponse[start:end]
+
+		// 尝试解析为新的 aiTask schema 结构
+		var planObj struct {
+			Action       string    `json:"@action"`
+			NextPlanTask []*aiTask `json:"next_plans"`
+		}
+
+		err := json.Unmarshal([]byte(taskJSON), &planObj)
+		if err == nil && planObj.Action == "re-plan" && len(planObj.NextPlanTask) > 0 {
+			return planObj.NextPlanTask, nil
+		}
+	}
+	return nil, errors.New("no aiTask found")
+}
+
 // ExtractTaskFromRawResponse 从原始响应中提取Task
 func ExtractTaskFromRawResponse(c *Config, rawResponse string) (*aiTask, error) {
 	for _, item := range jsonextractor.ExtractObjectIndexes(rawResponse) {

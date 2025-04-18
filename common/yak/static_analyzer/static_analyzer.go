@@ -22,6 +22,7 @@ type StaticAnalyzeKind uint8
 const (
 	Analyze StaticAnalyzeKind = iota
 	Score
+	Compile
 )
 
 func YaklangScriptChecking(code, pluginType string) []*result.StaticAnalyzeResult {

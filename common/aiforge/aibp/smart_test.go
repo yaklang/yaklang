@@ -31,7 +31,7 @@ func TestSmart(t *testing.T) {
 `},
 		},
 		aid.WithDebugPrompt(true),
-		aid.WithAICallback(GetOpenRouterAICallbackWithProxy()),
+		aid.WithAICallback(aiforge.GetOpenRouterAICallbackWithProxy()),
 	)
 	if err != nil {
 		t.Fatal(err)

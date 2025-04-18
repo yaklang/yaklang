@@ -1,0 +1,3 @@
+poc.GEt("http://www.baidu.com")
+poc.post("www.baidu.com")
+a,err = fuzz.HTTPRequest('')

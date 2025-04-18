@@ -140,6 +140,14 @@ func (m *Memory) StoreInteractiveUserInput(eventID string, invoke aitool.InvokeP
 	record.UserInput = invoke
 }
 
+func (m *Memory) GetInteractiveEventLast() (string, *InteractiveEventRecord, bool) {
+	return m.InteractiveHistory.Last()
+}
+
+func (m *Memory) GetInteractiveEvent(eventID string) (*InteractiveEventRecord, bool) {
+	return m.InteractiveHistory.Get(eventID)
+}
+
 // tool results memory
 func (m *Memory) PushToolCallResults(t ...*aitool.ToolResult) {
 	m.toolCallResults = append(m.toolCallResults, t...)
@@ -234,4 +242,8 @@ func (m *Memory) ToolsList() string {
 		return ""
 	}
 	return promptBuilder.String()
+}
+
+func (m *Memory) CurrentTaskToolCallResults() []*aitool.ToolResult {
+	return m.CurrentTask.ToolCallResults
 }

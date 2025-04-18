@@ -11,6 +11,35 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+type ForgePromptParams struct {
+	UserParams       string
+	InitPrompt       string
+	PersistentPrompt string
+	UserQuery        string // raw user query
+}
+
+// Params if set userInput will check require cli parameter
+func (f *ForgeBlueprint) Params(query string, userInput ...*ypb.ExecParamItem) (*ForgePromptParams, error) {
+	if len(userInput) == 0 {
+		return &ForgePromptParams{
+			UserQuery:        query,
+			InitPrompt:       f.InitializePrompt,
+			PersistentPrompt: f.PersistentPrompt,
+		}, nil
+	}
+
+	arguments, err := f.AnalyzeCliParameter(userInput)
+	if err != nil {
+		return nil, utils.Errorf("AnalyzeCliParameter failed: %v", err)
+	}
+	return &ForgePromptParams{
+		UserParams:       arguments.String(),
+		UserQuery:        query,
+		InitPrompt:       f.InitializePrompt,
+		PersistentPrompt: f.PersistentPrompt,
+	}, nil
+}
+
 func (f *ForgeBlueprint) tmpParams(query string, params ...*ypb.ExecParamItem) map[string]any {
 	var paramBuf bytes.Buffer
 	if !utils.IsNil(params) {
@@ -39,8 +68,15 @@ func (f *ForgeBlueprint) renderInitPrompt(query string, params ...*ypb.ExecParam
 		return "", err
 	}
 
+	forgePromptParams, err := f.Params(query, params...)
+	if err != nil {
+		log.Errorf("get init params failed: %v", err)
+		return "", err
+	}
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, f.tmpParams(query, params...)); err != nil {
+	if err := tmpl.Execute(&buf, map[string]any{
+		"Forge": forgePromptParams,
+	}); err != nil {
 		log.Errorf("execute init prompt failed: %v", err)
 		return "", err
 	}
@@ -54,9 +90,15 @@ func (f *ForgeBlueprint) renderPersistentPrompt(query string) (string, error) {
 		log.Errorf("parse persistent prompt failed: %v", err)
 		return "", err
 	}
-
+	forgePromptParams, err := f.Params(query)
+	if err != nil {
+		log.Errorf("get init params failed: %v", err)
+		return "", err
+	}
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, f.tmpParams(query)); err != nil {
+	if err := tmpl.Execute(&buf, map[string]any{
+		"Forge": forgePromptParams,
+	}); err != nil {
 		log.Errorf("execute persistent prompt failed: %v", err)
 		return "", err
 	}
@@ -71,9 +113,11 @@ func (f *ForgeBlueprint) renderResultPrompt(memory *aid.Memory) (string, error) 
 		return "", err
 	}
 
-	var buf bytes.Buffer
-	params := f.tmpParams("")
+	var params = make(map[string]any)
+	forgePromptParams, _ := f.Params(memory.Query)
+	params["Forge"] = forgePromptParams
 	params["Memory"] = memory
+	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, params); err != nil {
 		log.Errorf("execute result prompt failed: %v", err)
 		return "", err
