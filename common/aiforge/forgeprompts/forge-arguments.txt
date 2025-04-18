@@ -1,0 +1,10 @@
+{{ if .Arguments }}## 用户格式化参数输入
+{{ range .Arguments }}
+- 参数名：{{ .Name}}
+    - 参数描述：{{ .Help}}
+    - 参数值：
+```
+{{ .Value}}
+```
+{{end}}
+{{else}}{{end}}
