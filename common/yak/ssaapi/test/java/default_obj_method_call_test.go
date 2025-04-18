@@ -339,8 +339,8 @@ public class B{
 		assert.Equal(t, "Function-A.a()", result1[0].String())
 		assert.Equal(t, "Function-A.a()", result1[1].String())
 		result2 := prog.SyntaxFlow(`d* as $d;`).GetValues("d")
-		assert.Equal(t, "Undefined-A.b(A)", result2[0].String())
-		assert.Equal(t, "Undefined-A.b(A)", result2[1].String())
+		assert.Equal(t, "Undefined-A.b(Undefined-A)", result2[0].String())
+		assert.Equal(t, "Undefined-A.b(Undefined-A)", result2[1].String())
 		return nil
 	}, ssaapi.WithLanguage(consts.JAVA))
 

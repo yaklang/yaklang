@@ -17,7 +17,7 @@ TEXT
 // 声明式参数绑定(注解方式)
 *Mapping.__ref__?{opcode: function} as $start;
 $start<getFormalParams>?{opcode: param && !have: this} as $params;
-$params?{<typeName>?{!have:'javax.servlet.http.HttpServletRequest'}} as $output;
+$params?{!<typeName>?{have:'javax.servlet.http'}} as $output;
 
 // 原生请求处理(HttpServletRequest)
 // getAuthType()
