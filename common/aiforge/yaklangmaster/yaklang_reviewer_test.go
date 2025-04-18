@@ -2,6 +2,7 @@ package yaklangmaster
 
 import (
 	"context"
+	_ "embed"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
@@ -9,15 +10,15 @@ import (
 	"testing"
 )
 
+//go:embed test.yak
+var testYak string
+
 func TestYaklangMaster(t *testing.T) {
 	result, err := aiforge.ExecuteForge(
 		"yaklang-reviewer",
 		context.Background(),
 		[]*ypb.ExecParamItem{
-			{Key: "code", Value: `
-poc.GEt("http://www.baidu.com")
-poc.post("www.baidu.com")
-a,err = fuzz.HTTPRequest('')`},
+			{Key: "code", Value: testYak},
 		},
 		aid.WithDebugPrompt(true),
 		aid.WithAICallback(aiforge.GetQwenAICallback()),
