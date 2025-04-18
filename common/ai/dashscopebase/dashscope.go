@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"io"
 	"net/http/httputil"
 	"net/url"
@@ -107,30 +108,28 @@ func (d *rspFeeder) GetNewData(structued *aispec.StructuredData, input []byte) c
 			if usage, ok := usageRaw.(map[string]any); ok {
 				if models, ok := usage["models"]; ok {
 					// "usage":{"models":[{"input_tokens":809,"output_tokens":49,"model_id":"qwen-max"},{"input_tokens":1464,"output_tokens":8,"model_id":"deepseek-r1"}]}
-					modelList, ok := models.([]any)
-					if !ok {
-						return
-					}
-					for _, i := range modelList {
-						structued.HaveUsage = true
-						if model, ok := i.(map[string]any); ok {
-							if modelId, ok := model["model_id"]; ok {
-								inputTokens := 0
-								outputTokens := 0
-								if inputTokensRaw, ok := model["input_tokens"]; ok {
-									inputTokens = int(inputTokensRaw.(float64))
+					if funk.IsIteratee(models) {
+						funk.ForEach(models, func(i any) {
+							structued.HaveUsage = true
+							if model, ok := i.(map[string]any); ok {
+								if modelId, ok := model["model_id"]; ok {
+									inputTokens := 0
+									outputTokens := 0
+									if inputTokensRaw, ok := model["input_tokens"]; ok {
+										inputTokens = int(inputTokensRaw.(float64))
+									}
+									if outputTokensRaw, ok := model["output_tokens"]; ok {
+										outputTokens = int(outputTokensRaw.(float64))
+									}
+									usageInstance := aispec.UsageStatsInfo{
+										Model:       modelId.(string),
+										InputToken:  inputTokens,
+										OutputToken: outputTokens,
+									}
+									usages[fmt.Sprint(modelId)] = usageInstance
 								}
-								if outputTokensRaw, ok := model["output_tokens"]; ok {
-									outputTokens = int(outputTokensRaw.(float64))
-								}
-								usageInstance := aispec.UsageStatsInfo{
-									Model:       modelId.(string),
-									InputToken:  inputTokens,
-									OutputToken: outputTokens,
-								}
-								usages[fmt.Sprint(modelId)] = usageInstance
 							}
-						}
+						})
 					}
 				}
 			}
@@ -139,58 +138,54 @@ func (d *rspFeeder) GetNewData(structued *aispec.StructuredData, input []byte) c
 		if outputRaw, ok := data["output"]; ok {
 			if output, ok := outputRaw.(map[string]any); ok {
 				if thoughts, ok := output["thoughts"]; ok {
-					thoughtList, ok := thoughts.([]any)
-					if !ok {
+					if !funk.IsIteratee(thoughts) {
 						structued.IsParsed = false
 						return
 					}
-					if len(thoughtList) <= 0 {
-						return
-					}
-					for _, i := range thoughtList {
-						if thought, ok := i.(map[string]any); ok {
-							if responseRaw, ok := thought["response"]; ok {
-								var response = make(map[string]any)
-								responseStr := fmt.Sprint(responseRaw)
-								hash := utils.CalcSha256(responseStr)
-								if _, ok := d.visited.Load(hash); ok {
-									continue
-								}
-								d.visited.Store(hash, structued)
-								err := json.Unmarshal([]byte(responseStr), &response)
-								if err != nil {
-									return
-								}
 
-								newStructued := structued.Copy()
-
-								// "{\"nodeName\":\"开始\",\"nodeType\":\"Start\",\"nodeStatus\":\"success\",\"nodeId\":\"Start_bYxoRU\",\"nodeExecTime\":\"0ms\"}"
-								newStructued.OutputNodeId = fmt.Sprint(response["nodeId"])
-								newStructued.OutputNodeName = fmt.Sprint(response["nodeName"])
-								newStructued.OutputNodeType = fmt.Sprint(response["nodeType"])
-								newStructued.OutputNodeStatus = fmt.Sprint(response["nodeStatus"])
-								if response["nodeExecTime"] != nil {
-									newStructued.OutputNodeExecTime = fmt.Sprint(response["nodeExecTime"])
-								}
-								nodeResult, ok := response["nodeResult"]
-								if ok {
-									var result = make(map[string]any)
-									_ = json.Unmarshal([]byte(nodeResult.(string)), &result)
-									if resultText, ok := result["result"]; ok {
-										newStructued.OutputText = fmt.Sprint(resultText)
-									}
-									if resultReason, ok := result["reasoningContent"]; ok {
-										newStructued.OutputReason = fmt.Sprint(resultReason)
-									}
-								}
-								newStructued.IsParsed = true
-								for _, usage := range usages {
-									newStructued.ModelUsage = append(newStructued.ModelUsage, usage)
-								}
-								resultChan <- newStructued
+					funk.ForEach(thoughts, func(i any) {
+						thought := utils.InterfaceToGeneralMap(i)
+						if responseRaw, ok := thought["response"]; ok {
+							var response = make(map[string]any)
+							responseStr := fmt.Sprint(responseRaw)
+							hash := utils.CalcSha256(responseStr)
+							if _, ok := d.visited.Load(hash); ok {
+								return
 							}
+							d.visited.Store(hash, structued)
+							err := json.Unmarshal([]byte(responseStr), &response)
+							if err != nil {
+								return
+							}
+
+							newStructued := structued.Copy()
+
+							// "{\"nodeName\":\"开始\",\"nodeType\":\"Start\",\"nodeStatus\":\"success\",\"nodeId\":\"Start_bYxoRU\",\"nodeExecTime\":\"0ms\"}"
+							newStructued.OutputNodeId = fmt.Sprint(response["nodeId"])
+							newStructued.OutputNodeName = fmt.Sprint(response["nodeName"])
+							newStructued.OutputNodeType = fmt.Sprint(response["nodeType"])
+							newStructued.OutputNodeStatus = fmt.Sprint(response["nodeStatus"])
+							if response["nodeExecTime"] != nil {
+								newStructued.OutputNodeExecTime = fmt.Sprint(response["nodeExecTime"])
+							}
+							nodeResult, ok := response["nodeResult"]
+							if ok {
+								var result = make(map[string]any)
+								_ = json.Unmarshal([]byte(nodeResult.(string)), &result)
+								if resultText, ok := result["result"]; ok {
+									newStructued.OutputText = fmt.Sprint(resultText)
+								}
+								if resultReason, ok := result["reasoningContent"]; ok {
+									newStructued.OutputReason = fmt.Sprint(resultReason)
+								}
+							}
+							newStructued.IsParsed = true
+							for _, usage := range usages {
+								newStructued.ModelUsage = append(newStructued.ModelUsage, usage)
+							}
+							resultChan <- newStructued
 						}
-					}
+					})
 				}
 			}
 		}
@@ -205,14 +200,10 @@ func (d *DashScopeGateway) StructuredStream(s string, function ...aispec.Functio
 		return nil, utils.Error("APIKey is required")
 	}
 
-	exitChan := make(chan struct{})
-	defer close(exitChan) // 函数返回时关闭通道，触发协程退出
-
 	go func() {
 		defer func() {
-			close(objChannel)
 			if err := recover(); err != nil {
-				log.Errorf("StructuredStream panic: %v", err)
+				log.Errorf("StructuredStream panic: %v", utils.ErrorStack(err))
 			}
 		}()
 
@@ -237,8 +228,7 @@ func (d *DashScopeGateway) StructuredStream(s string, function ...aispec.Functio
 			},
 		))
 		opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, rawCloser io.ReadCloser) {
-			defer rawCloser.Close() // 确保资源释放
-
+			defer close(objChannel)
 			chunked := strings.ToLower(strings.TrimSpace(lowhttp.GetHTTPPacketHeader(r, "transfer-encoding"))) == "chunked"
 			var bodyReader io.Reader = rawCloser
 			if chunked {
@@ -247,54 +237,45 @@ func (d *DashScopeGateway) StructuredStream(s string, function ...aispec.Functio
 			}
 
 			for {
-				select {
-				case <-exitChan: // 监听退出信号
-					return
-				default:
-					structured := &aispec.StructuredData{
-						DataSourceType: "dashscope",
-					}
-					handleLine := func(line string) {
-						if strings.HasPrefix(line, "data:") {
-							structured.DataRaw = bytes.TrimSpace([]byte(line[5:]))
-							inputs := []byte(line[5:])
-							ch := feeder.GetNewData(structured, inputs)
-							if ch != nil {
-								for data := range ch {
-									// 检查退出信号
-									select {
-									case objChannel <- data:
-										count++
-									case <-exitChan:
-										return
-									}
-								}
-							} else {
-								if len(structured.DataRaw) > 0 {
-									select {
-									case objChannel <- structured:
-										count++
-									case <-exitChan:
-										return
-									}
+				structured := &aispec.StructuredData{
+					DataSourceType: "dashscope",
+				}
+				handleLine := func(line string) {
+					if strings.HasPrefix(line, "data:") {
+						structured.DataRaw = bytes.TrimSpace([]byte(line[5:]))
+						inputs := []byte(line[5:])
+						ch := feeder.GetNewData(structured, inputs)
+						if ch != nil {
+							for data := range ch {
+								// 检查退出信号
+								select {
+								case objChannel <- data:
+									count++
 								}
 							}
-						} else if strings.HasPrefix(line, "id:") {
-							structured.Id = strings.TrimSpace(line[3:])
-						} else if strings.HasPrefix(line, "event:") {
-							structured.Event = strings.TrimSpace(line[6:])
+						} else {
+							if len(structured.DataRaw) > 0 {
+								select {
+								case objChannel <- structured:
+									count++
+								}
+							}
 						}
+					} else if strings.HasPrefix(line, "id:") {
+						structured.Id = strings.TrimSpace(line[3:])
+					} else if strings.HasPrefix(line, "event:") {
+						structured.Event = strings.TrimSpace(line[6:])
 					}
-					resultBytes, err := utils.ReadLine(bodyReader)
-					if err != nil && len(resultBytes) <= 0 {
-						if err != io.EOF {
-							log.Warnf("failed to read line in %v: %v", d.endpointUrl, err)
-						}
-						return
-					}
-					result := string(resultBytes)
-					handleLine(result)
 				}
+				resultBytes, err := utils.ReadLine(bodyReader)
+				if err != nil && len(resultBytes) <= 0 {
+					if err != io.EOF {
+						log.Warnf("failed to read line in %v: %v", d.endpointUrl, err)
+					}
+					return
+				}
+				result := string(resultBytes)
+				handleLine(result)
 			}
 		}))
 		rsp, req, err := poc.DoPOST(d.endpointUrl, opts...)
