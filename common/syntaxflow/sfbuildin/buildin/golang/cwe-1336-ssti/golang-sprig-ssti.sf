@@ -1,0 +1,61 @@
+desc(
+    title: "golang SSTI(sprig)",
+    title_zh: "golang SSTI 漏洞(sprig)",
+    type: vuln,
+    severity: low,
+    risk: ssti
+    desc: <<<TEXT
+在 Go 语言中，CWE-1336（Server-Side Template Injection, SSTI）漏洞通常发生在使用模板引擎时，未对用户输入进行严格过滤，导致攻击者可以注入恶意代码。SSTI 漏洞可能导致任意代码执行、敏感信息泄露或服务中断，因此属于高风险漏洞。
+
+Sprig 函数库风险：sprig.FuncMap() 提供了大量内置函数（如文件操作、系统命令执行等），攻击者可能利用这些函数执行任意代码。
+TEXT
+)
+
+<include('golang-template')> as $sink;
+
+$sink.New as $new;
+$new().Funcs(* as $param);
+$param?{have: 'sprig'} as $low;
+
+alert $low for {
+    title: 'SSTI detected',
+    title_zh: '检测到SSTI',
+    type: 'vuln',
+    level: 'low',
+}
+
+desc(
+    lang: golang,
+    alert_low: 1,
+    'file://main.go': <<<UNSAFE
+package main
+
+import (
+	"bytes"
+	"html/template"
+	"io/ioutil"
+	"os"
+
+	"github.com/Masterminds/sprig"
+	beego "github.com/beego/beego/v2/server/web"
+)
+
+func (c *SSTIVuln1Controller) Get() {
+	os.Setenv("go-sec-code-secret-key", "b81024f158eefcf60792ae9df9524f82")
+	usertemplate := c.GetString("template", "please send your template")
+	t := template.New("ssti").Funcs(sprig.FuncMap())
+	t, _ = t.Parse(usertemplate)
+	buff := bytes.Buffer{}
+	err := t.Execute(&buff, struct{}{})
+	if err != nil {
+		panic(err)
+	}
+	data, err := ioutil.ReadAll(&buff)
+	if err != nil {
+		panic(err)
+	}
+	c.Data["usertemplate"] = string(data)
+	c.TplName = "ssti.tpl"
+}
+UNSAFE
+)
