@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/google/uuid"
@@ -21,6 +22,35 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+type HTTPFlowAnalyzeRequestStream interface {
+	Send(response *ypb.AnalyzeHTTPFlowResponse) error
+	Context() context.Context
+}
+
+type wrapperHTTPFlowAnalyzeStream struct {
+	ctx            context.Context
+	root           ypb.Yak_AnalyzeHTTPFlowServer
+	RequestHandler func(request *ypb.AnalyzeHTTPFlowRequest) bool
+	sendMutex      *sync.Mutex
+}
+
+func newWrapperHTTPFlowAnalyzeStream(ctx context.Context, stream ypb.Yak_AnalyzeHTTPFlowServer) *wrapperHTTPFlowAnalyzeStream {
+	return &wrapperHTTPFlowAnalyzeStream{
+		root: stream, ctx: ctx,
+		sendMutex: new(sync.Mutex),
+	}
+}
+
+func (w *wrapperHTTPFlowAnalyzeStream) Send(r *ypb.AnalyzeHTTPFlowResponse) error {
+	w.sendMutex.Lock()
+	defer w.sendMutex.Unlock()
+	return w.root.Send(r)
+}
+
+func (w *wrapperHTTPFlowAnalyzeStream) Context() context.Context {
+	return w.ctx
+}
 
 type AnalyzeHTTPFlowSource string
 
@@ -39,13 +69,14 @@ func (s *Server) AnalyzeHTTPFlow(request *ypb.AnalyzeHTTPFlowRequest, stream ypb
 	// 创建一个通道来收集错误
 	errChan := make(chan error, 1)
 
+	wrapperStream := newWrapperHTTPFlowAnalyzeStream(stream.Context(), stream)
 	client := yaklib.NewVirtualYakitClientWithRuntimeID(func(result *ypb.ExecResult) error {
 		result.RuntimeID = analyzedId
 		select {
-		case <-stream.Context().Done():
-			return stream.Context().Err()
+		case <-wrapperStream.Context().Done():
+			return wrapperStream.Context().Err()
 		default:
-			return stream.Send(&ypb.AnalyzeHTTPFlowResponse{
+			return wrapperStream.Send(&ypb.AnalyzeHTTPFlowResponse{
 				ExecResult: result,
 			})
 		}
@@ -66,7 +97,7 @@ func (s *Server) AnalyzeHTTPFlow(request *ypb.AnalyzeHTTPFlowRequest, stream ypb
 		stream.Context(),
 		analyzedId,
 		client,
-		stream,
+		wrapperStream,
 		opts...,
 	)
 	if err != nil {
@@ -101,7 +132,7 @@ type HTTPFlowAnalyzeManger struct {
 	*mitmReplacer
 	analyzeId    string
 	client       *yaklib.YakitClient
-	stream       ypb.Yak_AnalyzeHTTPFlowServer
+	stream       HTTPFlowAnalyzeRequestStream
 	ctx          context.Context
 	source       *ypb.AnalyzedDataSource // 分析流量的数据源
 	pluginCaller *yak.MixPluginCaller    // for hot patch code exec
@@ -148,14 +179,14 @@ func NewHTTPFlowAnalyzeManger(
 	ctx context.Context,
 	analyzeId string,
 	client *yaklib.YakitClient,
-	steam ypb.Yak_AnalyzeHTTPFlowServer,
+	stream HTTPFlowAnalyzeRequestStream,
 	opts ...HTTPFlowAnalyzeMangerOption,
 ) (*HTTPFlowAnalyzeManger, error) {
 	m := &HTTPFlowAnalyzeManger{
 		analyzeId:    analyzeId,
 		mitmReplacer: NewMITMReplacerFromDB(MITMReplacerConfigDb),
 		client:       client,
-		stream:       steam,
+		stream:       stream,
 		ctx:          ctx,
 		concurrency:  10,    // 默认并发数
 		dedup:        false, // 默认不去重
