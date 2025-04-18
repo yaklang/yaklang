@@ -1,7 +1,6 @@
 desc(
     title: "Find Java HTTP Fluent Request",
     type: audit,
-    level: low,
     lib: "java-http-fluent-request",
     desc: <<<TEXT
 使用Apache HttpClient Fluent API发送HTTP请求时，如果没有适当的安全措施，可能会导致敏感信息泄露、中间人攻击等安全风险。建议对使用Fluent API发送的请求进行严格的参数验证、错误处理以及使用HTTPS协议来增强安全性。

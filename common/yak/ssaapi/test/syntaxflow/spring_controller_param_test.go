@@ -29,7 +29,7 @@ public class FastJSONDemoController {
 }`)
 	ssatest.CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
 		prog := programs[0]
-		results := prog.SyntaxFlowChain(`<include('java-spring-param')> as $params`)
+		results := prog.SyntaxFlowChain(`<include('java-spring-mvc-param')> as $params`)
 		results.Show()
 		assert.Equal(t, 1, len(results))
 		return nil

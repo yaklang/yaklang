@@ -1,7 +1,6 @@
 desc(
     title: "Find Java Image IO Read URL",
     type: audit,
-    level: low,
     lib: "java-image-io-read-url",
     desc: <<<TEXT
 直接从不受信任的URL读取图像数据可能会使应用程序容易受到多种安全威胁，包括远程代码执行（RCE）和服务器资源耗尽攻击。如果攻击者能够控制URL的内容，他们可能会构造恶意的图像文件，该文件在解析时触发漏洞，或者通过大量请求消耗服务器资源。建议对从URL读取的图像数据进行严格的验证和清理，或者通过受信任的代理服务器下载图像。

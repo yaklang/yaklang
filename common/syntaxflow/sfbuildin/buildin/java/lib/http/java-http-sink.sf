@@ -1,7 +1,6 @@
 desc(
     title: "Find HTTP Sink in Java (Multiple Libraries)",
     type: audit,
-    level: low,
     lib: "java-http-sink",
 )
 
@@ -11,8 +10,8 @@ desc(
 <include('java-http-fluent-request')> as $output;
 <include('java-image-io-read-url')> as $output;
 <include('java-net-url-connect')> as $output;
-<include('java-spring-rest-template-use')> as $output;
 <include('java-okhttpclient-request-execute')> as $output;
+<include('java-spring-rest-template-request-params')> as $output
 alert $output;
 
 desc(

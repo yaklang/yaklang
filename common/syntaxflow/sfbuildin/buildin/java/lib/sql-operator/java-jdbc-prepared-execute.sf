@@ -2,7 +2,6 @@ desc(
     title: "JDBC getConnection.prepareStatement.executeQuery SQL",
     title_zh: "JDBC getConnection.prepareStatement.executeQuery SQL 执行语句",
     type: audit,
-    level: low,
     lib: 'java-jdbc-prepared-execute-sink'
 )
 

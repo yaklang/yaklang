@@ -1,7 +1,6 @@
 desc(
     title: "Checking Java Apache Commons HttpClient Library",
     type: audit,
-    level: low,
     lib: "java-apache-commons-httpclient",
 )
 

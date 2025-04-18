@@ -1,0 +1,195 @@
+desc(
+    title_zh:"检测Java SpringBoot 服务端请求伪造(SSRF)漏洞",
+    title: "Find Java SpringBoot SSRF Vuln",
+    type: vuln,
+    desc: <<<TEXT
+服务器端请求伪造（SSRF）漏洞允许攻击者通过应用程序向不受信任的服务器发起请求。在Java SpringBoot应用程序中，如果开发者未对外部URL输入进行适当的验证和过滤，攻击者可以利用该漏洞访问内部资源或发起对其他系统的恶意请求。这可能导致敏感数据泄露、服务拒绝攻击或进一步的内网渗透。
+TEXT
+)
+<include('java-spring-mvc-param')> as $source;
+<include("java-http-sink")> as $sink;
+
+$sink #{
+    include: `<self> & $source`,
+    exclude: `<self>?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`,
+}->as  $mid;
+
+alert $mid for {
+    message: "发现Java SpringBoot SSRF漏洞,并且没有任何数据流过滤。",
+    risk: ssrf,
+    level: mid,
+}
+
+$sink #{
+    include: `<self> & $source`,
+}->as  $result;
+
+$result - $mid as $low;
+
+alert $low for {
+    message: "发现Java SpringBoot SSRF漏洞,但是有数据流过滤。",
+    risk: ssrf,
+    level: low,
+}
+
+desc(
+lang: java,
+alert_min: 2,
+'file://risk1.java': <<<TEXT
+package src.main.a;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+
+@RestController
+public class SsrfVulnerableController {
+
+    @GetMapping("/fetch-url")
+    public String fetchUrl(@RequestParam("url") String url) {
+        try {
+            RestTemplate restTemplate = new RestTemplate();
+            String result = restTemplate.getForObject(url, String.class);
+            return result;
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+}
+TEXT,
+'file://risk2.java': <<<TEXT
+package src.main.b;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+
+@RestController
+public class SsrfVulnerableController {
+
+    @GetMapping("/fetch-url")
+    public String fetchUrl(@RequestParam("url") String url) {
+        try {
+            RestTemplate restTemplate = new RestTemplate();
+            String result = restTemplate.getForObject(url + "?queryid=1", String.class);
+            return result;
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+}
+TEXT
+)
+
+desc(
+    lang:'java',
+    alert_min:3,
+    'RestTemplateSSRFDemo.java':<<<TEXT
+package org.example.moudels.ssrf.controller;
+
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiImplicitParam;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
+import lombok.extern.slf4j.Slf4j;
+import org.example.common.util.CheckUserInput;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.*;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.URL;
+import java.net.URLConnection;
+import java.net.URI;
+
+/**
+ * @description SSRF-请求伪造漏洞
+ * @author: zpy
+ * @Date: 2025/4/6 20:40
+ */
+@Slf4j
+@Api(value = "SsrfController",tags = "SSRF-服务端请求伪造")
+@Controller
+@CrossOrigin("*")
+@RequestMapping("/ssrf")
+public class SsrfController {
+
+    @ApiOperation(value="漏洞场景：RestTemplate delete SSRF",notes="使用RestTemplate的delete方法发起请求，未做任何限制，可删除内网资源")
+    @GetMapping("/vul/delete")
+    @ResponseBody()
+    @ApiImplicitParam(name="url",value="请求参数",dataType = "String",paramType = "query",dataTypeClass = String.class)
+    public String vulDelete(@ApiParam(name="url",value="请求参数",required = true)@RequestParam String url){
+        try {
+            RestTemplate restTemplate = new RestTemplate();
+            restTemplate.delete(url);
+            return "DELETE request sent successfully to: " + url;
+        } catch (Exception e) {
+            return e.getMessage();
+        }
+    }
+
+    @ApiOperation(value="漏洞场景：RestTemplate exchange SSRF",notes="使用RestTemplate的exchange方法发起请求，支持自定义请求方法和请求头，未做任何限制")
+    @GetMapping("/vul/exchange")
+    @ResponseBody()
+    @ApiImplicitParam(name="url",value="请求参数",dataType = "String",paramType = "query",dataTypeClass = String.class)
+    public String vulExchange(
+            @ApiParam(name="url",value="请求参数",required = true)@RequestParam String url,
+            @ApiParam(name="method",value="请求方法(GET,POST,PUT,DELETE等)",required = true)@RequestParam String method){
+        try {
+            RestTemplate restTemplate = new RestTemplate();
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("User-Agent", "Mozilla/5.0");
+            headers.set("X-Forwarded-For", "127.0.0.1");
+            HttpEntity<String> entity = new HttpEntity<>("{\"test\":\"data\"}", headers);
+
+            ResponseEntity<String> response = restTemplate.exchange(
+                new URI(url),
+                HttpMethod.valueOf(method),
+                entity,
+                String.class
+            );
+
+            return "Response Status: " + response.getStatusCode() + "\n" +
+                   "Response Headers: " + response.getHeaders() + "\n" +
+                   "Response Body: " + response.getBody();
+        } catch (Exception e) {
+            return e.getMessage();
+        }
+    }
+
+    @ApiOperation(value="漏洞场景：RestTemplate getForEntity with variables SSRF",notes="使用RestTemplate的getForEntity方法发起请求，支持URI变量，未做任何限制")
+    @GetMapping("/vul/getForEntity")
+    @ResponseBody()
+    @ApiImplicitParam(name="url",value="请求参数，支持{0}、{1}等占位符",dataType = "String",paramType = "query",dataTypeClass = String.class)
+    public String vulGetForEntity(
+            @ApiParam(name="url",value="请求参数，支持{0}、{1}等占位符",required = true)@RequestParam String url,
+            @ApiParam(name="var1",value="URI变量1",required = false)@RequestParam(required = false) String var1,
+            @ApiParam(name="var2",value="URI变量2",required = false)@RequestParam(required = false) String var2){
+        try {
+            RestTemplate restTemplate = new RestTemplate();
+            ResponseEntity<String> response;
+
+            if (var1 != null && var2 != null) {
+                response = restTemplate.getForEntity(url, String.class, var1, var2);
+            } else if (var1 != null) {
+                response = restTemplate.getForEntity(url, String.class, var1);
+            } else {
+                response = restTemplate.getForEntity(url, String.class);
+            }
+
+            return "Response Status: " + response.getStatusCode() + "\n" +
+                   "Response Headers: " + response.getHeaders() + "\n" +
+                   "Response Body: " + response.getBody();
+        } catch (Exception e) {
+            return e.getMessage();
+        }
+    }
+
+    @Autowired
+    private CheckUserInput checkUserInput;
+}
+TEXT
+)

@@ -1,7 +1,6 @@
 desc(
     title: "Find javax.script.* ScriptEngineManager eval Sink",
     type: audit,
-    level: low,
     lib: "java-js-sink",
 )
 

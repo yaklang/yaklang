@@ -11,7 +11,7 @@ __dependency__./org.apache.logging.log4j/?{<self>.name?{have:'og4j-core'} }.vers
 $ver in (,2.17.0] as $vulnerable;
 check $vulnerable;
 
-<include('java-spring-param')> as $source;
+<include('java-spring-mvc-param')> as $source;
 <include('java-servlet-param')> as $source;
 
 .error as $sinkFunc;

@@ -8,7 +8,7 @@ desc(
 TEXT
 )
 
-<include('java-spring-param')> as $params;
+<include('java-spring-mvc-param')> as $params;
 check $params;
 $params?{<getFunc><getReturns><typeName>?{have: ResponseEntity}<show>} as $entry;
 ResponseEntity.ok()?{<self>...body(,* as $bodyParam)} as $sinkCaller;

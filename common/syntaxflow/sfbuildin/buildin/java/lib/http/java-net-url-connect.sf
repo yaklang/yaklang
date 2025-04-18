@@ -1,7 +1,6 @@
 desc(
     title: "Find Java URL Connection Use",
     type: audit,
-    level: low,
     lib: "java-net-url-connect",
     desc: <<<TEXT
 使用 `java.net.URL` 类来建立网络连接可能会引入安全风险，尤其是当未正确处理异常、未验证输入或未使用安全连接（如 HTTPS）时。这可能导致敏感信息泄露、中间人攻击或拒绝服务攻击。建议在使用 `URL.openConnection()` 或 `URL.openStream()` 时，实施适当的输入验证、异常处理，并尽可能使用 HTTPS 来确保通信安全。

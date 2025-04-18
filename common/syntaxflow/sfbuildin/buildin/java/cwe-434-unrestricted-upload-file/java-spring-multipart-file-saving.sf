@@ -7,7 +7,7 @@ desc(
 TEXT
 )
 
-<include('java-spring-param')>?{<typeName>?{have: "MultipartFile"}} as $entry;
+<include('java-spring-mvc-param')>?{<typeName>?{have: "MultipartFile"}} as $entry;
 $entry.getInputStream()<getCall>?{<getCallee><name>?{have: /(?i)save|copy|transfer|fileutil/}} as $result;
 alert $result for {
     message_zh: "识别到 Java Spring Framework 中处理文件上传的代码和可能的文件落地点",

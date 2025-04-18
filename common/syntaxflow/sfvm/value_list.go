@@ -2,9 +2,8 @@ package sfvm
 
 import (
 	"context"
-	"strings"
-
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"

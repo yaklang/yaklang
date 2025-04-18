@@ -13,7 +13,7 @@ desc(
 TEXT
 )
 
-<include('java-spring-param')>?{<typeName>?{have: "String"}} as $param;
+<include('java-spring-mvc-param')>?{<typeName>?{have: "String"}} as $param;
 $param<getFunc><getReturns> as $returns;
 $returns?{<typeName>?{have: "ModelAndView"}} as $result;
 $returns #{

@@ -1,6 +1,6 @@
 desc(
-    title: "Servlet & Springframework Paremeter Passed into Command Injection Sink",
-    title: 'Servlet & Springframework 基础参数命令注入',
+    title: "Springframework Paremeter Passed into Command Injection Sink",
+    title_zh: 'Servlet & Springframework 基础参数命令注入',
     type: vuln,
     risk:rce,
     desc: <<<TEXT
@@ -9,7 +9,7 @@ TEXT
 )
 
 <include('java-servlet-param')> as $source;
-<include('java-spring-param')> as $source;
+<include('java-spring-mvc-param')> as $source;
 check $source;
 <include('java-runtime-exec-sink')> as $sink;
 <include('java-command-exec-sink')> as $sink;
