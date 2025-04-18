@@ -23,11 +23,14 @@ var _initPrompt string
 //go:embed yaklang_reviewer_prompts/plan.txt
 var _codeReviewPlanMock string
 
-var _persistentPrompt = `重要：
-- 不要自行想象修改，请调用提供的代码语法检查工具获取语法检查信息
-- 不要自行回忆代码的具体的内容，调用下memory_user_data系列工具读写代码内容
-- 一定一定要在修改代码之后自行调用memory_user_data_set更新上下文中的代码
-`
+//go:embed yaklang_reviewer_prompts/persistent.txt
+var _persistentPrompt string
+
+//var _persistentPrompt = `重要：
+//- 不要自行想象修改，请调用提供的代码语法检查工具获取语法检查信息
+//- 不要自行回忆代码的具体的内容，调用下memory_user_data系列工具读写代码内容
+//- 一定一定要在修改代码之后自行调用memory_user_data_set更新上下文中的代码
+//`
 
 func newYaklangMasterForge(callback func(string)) *aiforge.ForgeBlueprint {
 	yaklangTools, err := yaklangtools.CreateYaklangTools()
