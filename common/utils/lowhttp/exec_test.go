@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -673,8 +674,18 @@ func TestWithStreamHandler(t *testing.T) {
 	}
 	called := false
 	responseChecked := false
+
+	c := new(int64)
+	add := func() {
+		atomic.AddInt64(c, 1)
+	}
+	get := func() int64 {
+		return atomic.LoadInt64(c)
+	}
+
 	HTTP(WithPacketBytes([]byte(`GET / HTTP/1.1
 Host: `+utils.HostPort(host, port)+"\r\n\r\n")), WithBodyStreamReaderHandler(func(i []byte, closer io.ReadCloser) {
+		add()
 		fmt.Println(string(i))
 		if bytes.Contains(i, []byte("Server: nginx")) {
 			responseChecked = true
@@ -683,6 +694,7 @@ Host: `+utils.HostPort(host, port)+"\r\n\r\n")), WithBodyStreamReaderHandler(fun
 	}))
 	require.True(t, called)
 	require.True(t, responseChecked)
+	require.Equal(t, get(), int64(1))
 }
 
 func TestWithStreamHandler_BAD(t *testing.T) {
@@ -692,9 +704,16 @@ func TestWithStreamHandler_BAD(t *testing.T) {
 	}
 	called := false
 	responseChecked := false
+	c := new(int64)
+	add := func() {
+		atomic.AddInt64(c, int64(1))
+	}
+	get := func() int64 {
+		return atomic.LoadInt64(c)
+	}
 	HTTP(WithPacketBytes([]byte(`GET / HTTP/1.1
 Host: `+utils.HostPort(host, port)+"\r\n\r\n")), WithBodyStreamReaderHandler(func(i []byte, closer io.ReadCloser) {
-		fmt.Println(string(i))
+		add()
 		if bytes.Contains(i, []byte("Server: nginx")) {
 			responseChecked = true
 		}
@@ -702,6 +721,7 @@ Host: `+utils.HostPort(host, port)+"\r\n\r\n")), WithBodyStreamReaderHandler(fun
 	}))
 	require.True(t, called)
 	require.False(t, responseChecked)
+	require.Equal(t, get(), int64(1))
 }
 
 func TestWithStreamHandler_BAD2(t *testing.T) {
@@ -713,14 +733,23 @@ func TestWithStreamHandler_BAD2(t *testing.T) {
 		})
 		called := false
 		responseChecked := false
+		c := new(int64)
+		add := func() {
+			atomic.AddInt64(c, 1)
+		}
+		get := func() int64 {
+			return atomic.LoadInt64(c)
+		}
 		HTTP(WithTimeoutFloat(0.2), WithPacketBytes([]byte(`GET / HTTP/1.1
 Host: `+utils.HostPort(host, port)+"\r\n\r\n")), WithBodyStreamReaderHandler(func(i []byte, closer io.ReadCloser) {
 			fmt.Println(string(i))
+			add()
 			if bytes.Contains(i, []byte("Server: nginx")) {
 				responseChecked = true
 			}
 			called = true
 		}))
+		require.Equal(t, get(), int64(1))
 		require.True(t, called)
 		require.True(t, requested)
 		require.False(t, responseChecked)
