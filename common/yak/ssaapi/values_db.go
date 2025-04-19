@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"time"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -9,11 +11,22 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
+type Dtype int
+
+const (
+	DT_None Dtype = iota
+	DT_DependOn
+	DT_EffectOn
+)
+
 type saveValueCtx struct {
 	db *gorm.DB
 	ssadb.AuditNodeStatus
 
 	entryValue *Value
+
+	visitedNode map[*Value]*ssadb.AuditNode
+	dtype       Dtype
 }
 
 type SaveValueOption func(c *saveValueCtx)
@@ -78,8 +91,10 @@ func SaveValue(value *Value, opts ...SaveValueOption) error {
 		return utils.Error("db is nil")
 	}
 	ctx := &saveValueCtx{
-		db:         db,
-		entryValue: value,
+		db:          db,
+		entryValue:  value,
+		visitedNode: make(map[*Value]*ssadb.AuditNode),
+		dtype:       DT_None,
 	}
 	for _, o := range opts {
 		o(ctx)
@@ -98,9 +113,21 @@ func SaveValue(value *Value, opts ...SaveValueOption) error {
 }
 
 func (s *saveValueCtx) SaveNode(value *Value) (*ssadb.AuditNode, error) {
+	if node, ok := s.visitedNode[value]; ok {
+		return node, nil
+	}
 	if value == nil {
 		return nil, utils.Error("value is nil")
 	}
+
+	if s.dtype == DT_None {
+		if value.GetDependOn() != nil {
+			s.dtype = DT_DependOn
+		} else if value.GetEffectOn() != nil {
+			s.dtype = DT_EffectOn
+		}
+	}
+
 	an := &ssadb.AuditNode{
 		AuditNodeStatus: s.AuditNodeStatus,
 		IsEntryNode:     value == s.entryValue,
@@ -126,6 +153,7 @@ func (s *saveValueCtx) SaveNode(value *Value) (*ssadb.AuditNode, error) {
 	if ret := s.db.Save(an).Error; ret != nil {
 		return nil, utils.Wrap(ret, "save AuditNode")
 	}
+	s.visitedNode[value] = an
 	return an, nil
 }
 
@@ -135,22 +163,17 @@ func (s *saveValueCtx) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
 	}
 
 	var res []*graph.Neighbor[*Value]
-	for _, pred := range value.Predecessors {
+	for _, pred := range value.GetPredecessors() {
+		if pred.Node == nil {
+			continue
+		}
 		if IsDataFlowLabel(pred.Info.Label) {
-			// not save dataflow path as default
-			// because it will cost too much memory and database space
-			// TODO: modify dataflow path only start and end node
-			// for _, i := range value.DependOn {
-			// 	res = append(res, graph.NewNeighbor(i, EdgeTypeDependOn))
-			// }
-			// for _, i := range value.EffectOn {
-			// 	res = append(res, graph.NewNeighbor(i, EdgeTypeEffectOn))
-			// }
-			// and testcase: common/yak/ssaapi/values_db_test.go
-
-			// TODO: delete predecessor edge after implement dataflow path
-			// now, just append predecessor edge
-			neighbor := graph.NewNeighbor(pred.Node, EdgeTypePredecessor)
+			var neighbor *graph.Neighbor[*Value]
+			if s.saveDataFlow(pred.Node, value) {
+				neighbor = graph.NewNeighbor(pred.Node, "") // ignore this edge in dot graph
+			} else {
+				neighbor = graph.NewNeighbor(pred.Node, EdgeTypePredecessor)
+			}
 			neighbor.AddExtraMsg("label", pred.Info.Label)
 			neighbor.AddExtraMsg("step", int64(pred.Info.Step))
 			res = append(res, neighbor)
@@ -159,10 +182,77 @@ func (s *saveValueCtx) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
 			neighbor.AddExtraMsg("label", pred.Info.Label)
 			neighbor.AddExtraMsg("step", int64(pred.Info.Step))
 			res = append(res, neighbor)
-
 		}
 	}
 	return res
+}
+
+// from is the source node, to is the target node, from -> xxx -> to
+func (s *saveValueCtx) saveDataFlow(from *Value, to *Value) bool {
+	start := time.Now()
+
+	f := func(v *Value) []*Value {
+		return nil
+	}
+
+	if s.dtype == DT_DependOn {
+		f = func(v *Value) []*Value {
+			return v.GetEffectOn()
+		}
+	} else if s.dtype == DT_EffectOn {
+		f = func(v *Value) []*Value {
+			return v.GetDependOn()
+		}
+	}
+
+	paths := graph.GraphPathWithTarget(from, to, f)
+
+	//MaxTime := time.Second
+	MaxTime := time.Hour
+
+	elapsed := time.Since(start)
+	if elapsed > MaxTime {
+		log.Warnf("saveDataFlow: collect paths cost [%v] paths: %v", elapsed, len(paths))
+	}
+
+	if len(paths) == 0 || len(paths) > 10 {
+		log.Warnf("saveDataFlow:  paths is empty or too many paths: %v", len(paths))
+		return false
+	}
+
+	start = time.Now()
+	for _, path := range paths {
+		// log.Infof("saveDataFlow: %v", path)
+		// save dataflow path
+		for i := 0; i < len(path)-1; i++ {
+			fromNode, err := s.SaveNode(path[i])
+			if err != nil {
+				log.Errorf("failed to save node: %v", err)
+				continue
+			}
+
+			toNode, err := s.SaveNode(path[i+1])
+			if err != nil {
+				log.Errorf("failed to save node: %v", err)
+				continue
+			}
+
+			if s.dtype == DT_DependOn {
+				s.SaveEdge(fromNode, toNode, EdgeTypeDependOn, nil)
+				s.SaveEdge(toNode, fromNode, EdgeTypeEffectOn, nil)
+			} else if s.dtype == DT_EffectOn {
+				s.SaveEdge(fromNode, toNode, EdgeTypeEffectOn, nil)
+				s.SaveEdge(toNode, fromNode, EdgeTypeDependOn, nil)
+			}
+
+		}
+	}
+	elapsed = time.Since(start)
+	if elapsed > MaxTime {
+		log.Warnf("saveDataFlow:  save paths cost [%v] paths: %v", elapsed, len(paths))
+	}
+
+	return true
 }
 
 func (s *saveValueCtx) SaveEdge(from *ssadb.AuditNode, to *ssadb.AuditNode, edgeType string, extraMsg map[string]interface{}) {
@@ -193,6 +283,5 @@ func (s *saveValueCtx) SaveEdge(from *ssadb.AuditNode, to *ssadb.AuditNode, edge
 		if err := s.db.Save(edge).Error; err != nil {
 			log.Errorf("save AuditEdge failed: %v", err)
 		}
-
 	}
 }

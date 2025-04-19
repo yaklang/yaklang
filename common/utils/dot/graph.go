@@ -77,6 +77,10 @@ func (g *Graph) AddNode(label string) int {
 	return nod.id
 }
 
+func (g *Graph) SetNode(id int, label string) {
+	g.nodes[id].label = label
+}
+
 func (g *Graph) GetOrCreateSubGraph(label string) *Graph {
 	for _, sub := range g.subGraphs {
 		if sub.GraphAttribute("label", label); sub != nil {
