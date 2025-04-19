@@ -37,6 +37,14 @@ func New(name string, options ...ToolOption) (*Tool, error) {
 	return tool, nil
 }
 
+func NewFromMCPTool(mt *mcp.Tool, opts ...ToolOption) (*Tool, error) {
+	tool := &Tool{Tool: mt}
+	for _, opt := range opts {
+		opt(tool)
+	}
+	return tool, nil
+}
+
 func newTool(name string, options ...ToolOption) *Tool {
 	tool := &Tool{
 		Tool: mcp.NewTool(name),
