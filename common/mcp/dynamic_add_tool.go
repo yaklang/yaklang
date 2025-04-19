@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/yaklang/yaklang/common/mcp/convert"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
+	"github.com/yaklang/yaklang/common/mcp/yakcliconvert"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
@@ -52,7 +52,7 @@ func handleDynamicAddTool(s *MCPServer) server.ToolHandlerFunc {
 			return nil, err
 		}
 
-		tool := convert.ConvertCliParameterToTool(toolName, prog)
+		tool := yakcliconvert.ConvertCliParameterToTool(toolName, prog)
 		// use script help first
 		if tool.Description == "" {
 			tool.Description = description
