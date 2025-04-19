@@ -178,6 +178,7 @@ func (s *VulinServer) registerBrutePlayground() {
 					)))
 					return
 				}
+				orderId = strings.TrimPrefix(orderId, time.Now().Format("20060102"))
 				writer.Write([]byte(render(
 					writer, orderId,
 					getPathWithQuery(1),
