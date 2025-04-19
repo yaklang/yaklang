@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/mcp/convert"
+	"github.com/yaklang/yaklang/common/mcp/yakcliconvert"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 )
@@ -86,7 +86,7 @@ func (cfg *MCPServerConfig) ApplyConfig(s *MCPServer) {
 				log.Errorf("failed to parse yak script: %v", err)
 			}
 
-			tool := convert.ConvertCliParameterToTool(toolName, prog)
+			tool := yakcliconvert.ConvertCliParameterToTool(toolName, prog)
 			s.server.AddTool(tool, s.execYakScriptWrapper(toolName, content))
 		}
 	}

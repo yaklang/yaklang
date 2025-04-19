@@ -1,4 +1,4 @@
-package convert
+package yakcliconvert
 
 import (
 	"fmt"

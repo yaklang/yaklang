@@ -29,7 +29,10 @@ func (c *Config) doWaitAgree(ctx any, ep *Endpoint) {
 					log.Errorf("agree assistant callback error: %v", err)
 				} else {
 					ep.SetParams(res.Param)
-					ep.Release()
+					for i := 0; i < 3; i++ {
+						ep.Release()
+						time.Sleep(time.Second)
+					}
 				}
 			}()
 		}

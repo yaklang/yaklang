@@ -241,7 +241,7 @@ jobs:
               # cli
               go test --timeout 1m ./common/utils/cli
               # mcp
-              go test --timeout 1m ./common/mcp/convert
+              go test --timeout 1m ./common/mcp/yakcliconvert
               # doc
               go test --timeout 3m  ./common/yak/yakdoc/...
               # jwt
