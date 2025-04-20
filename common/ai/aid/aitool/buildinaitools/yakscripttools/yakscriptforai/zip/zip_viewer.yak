@@ -1,0 +1,44 @@
+__DESC__ = <<<EOF
+view file list in zip, use limit and offset to view over-amount files
+EOF
+
+yakit.AutoInitYakit()
+zipfile = cli.String("filepath", cli.setRequired(true), cli.setDefault("zip filepath u want to check"))
+// zipfile = "/tmp/aaa.zip"
+limit = cli.Int("limit", cli.setRequired(true), cli.setDefault(100), cli.setHelp("limited to view chunk in zipfile"))
+offset = cli.Int("offset", cli.setRequired(true), cli.setDefault(0), cli.setHelp("if the zip if too large(have many files), change offset and chunk to view partially"))
+cli.check()
+
+if limit < 0 {
+    limit = 100
+    yakit.Info("limit cannot be zero, auto set to 100")
+}
+
+if offset < 0 {
+    yakit.Error("offset cannot below zero")
+    return
+}
+
+m = sync.NewMutex()
+
+count = 0
+err = zip.Recursive(zipfile, (isDir, name, info) => {
+    if isDir {return nil}
+
+    m.Lock()
+    defer m.Unlock()
+    defer recover()
+    count++
+    if count < offset {
+        return
+    }
+    if count > offset + limit {
+        return
+    }
+    yakit.Info("Find: %v - %v", name, info)
+})
+if err != nil {
+    yakit.Error("ZIP Recursive failed: %v", err)
+}
+
+
