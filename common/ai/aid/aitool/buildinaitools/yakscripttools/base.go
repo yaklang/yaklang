@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/yakcliconvert"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
@@ -25,7 +27,7 @@ import (
 //go:embed yakscriptforai/**
 var yakScriptFS embed.FS
 
-func GetYakScriptAiTools() []*aitool.Tool {
+func GetYakScriptAiTools(name ...string) []*aitool.Tool {
 	efs := filesys.NewEmbedFS(yakScriptFS)
 	tools := []*aitool.Tool{}
 	_ = filesys.Recursive(".", filesys.WithFileSystem(efs), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
@@ -34,12 +36,22 @@ func GetYakScriptAiTools() []*aitool.Tool {
 		if efs.Ext(filename) != ".yak" {
 			return nil
 		}
+		toolname := strings.TrimSuffix(filename, ".yak")
+
+		found := false
+		for _, i := range name {
+			if i == toolname {
+				found = true
+			}
+		}
+		if !found {
+			return nil
+		}
 
 		content, err := efs.ReadFile(s)
 		if err != nil {
 			return nil
 		}
-		toolname := strings.TrimSuffix(filename, ".yak")
 		prog, err := static_analyzer.SSAParse(string(content), "yak")
 		if err != nil {
 			log.Warnf(`static_analyzer.SSAParse(string(content), "yak") error: %v`, err)
@@ -47,11 +59,15 @@ func GetYakScriptAiTools() []*aitool.Tool {
 		}
 		var desc []string
 		prog.Ref("__DESC__").ForEach(func(value *ssaapi.Value) {
+			if !value.IsConstInst() {
+				return
+			}
 			desc = append(desc, value.String())
 		})
 		tool := yakcliconvert.ConvertCliParameterToTool(toolname, prog)
 		at, err := aitool.NewFromMCPTool(
 			tool,
+			aitool.WithDescription(strings.Join(desc, "; ")),
 			aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
@@ -59,9 +75,13 @@ func GetYakScriptAiTools() []*aitool.Tool {
 				if runtimeId == "" {
 					runtimeId = uuid.New().String()
 				}
-				engine := yak.NewYakitVirtualClientScriptEngine(yaklib.NewVirtualYakitClientWithRuntimeID(func(i *ypb.ExecResult) error {
+				yakitClient := yaklib.NewVirtualYakitClientWithRuntimeID(func(i *ypb.ExecResult) error {
+					if i.IsMessage {
+						stdout.Write([]byte(yaklib.ConvertExecResultIntoLog(i)))
+					}
 					return nil
-				}, runtimeId))
+				}, runtimeId)
+				engine := yak.NewYakitVirtualClientScriptEngine(yakitClient)
 
 				var args []string
 				for k, v := range params {
@@ -77,7 +97,11 @@ func GetYakScriptAiTools() []*aitool.Tool {
 							ctx,
 						).WithContextCancel(
 							cancel,
-						).WithCliApp(cliApp),
+						).WithCliApp(
+							cliApp,
+						).WithYakitClient(
+							yakitClient,
+						),
 					)
 					return nil
 				})
@@ -87,6 +111,11 @@ func GetYakScriptAiTools() []*aitool.Tool {
 					"CTX":          ctx,
 					"PLUGIN_NAME":  runtimeId + ".yak",
 					"YAK_FILENAME": runtimeId + ".yak",
+					"println": func(i ...any) {
+						funk.ForEach(i, func(v any) {
+							stdout.Write([]byte(utils.InterfaceToString(v)))
+						})
+					},
 				})
 				if err != nil {
 					log.Errorf("execute ex with context failed: %v", err)

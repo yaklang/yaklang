@@ -11,5 +11,5 @@ import (
 func TestSQLInject(t *testing.T) {
 	aiforge.ExecuteForge("sqlinject", context.Background(), []*ypb.ExecParamItem{
 		{Key: "target", Value: "http://www.example.com?a=1"},
-	}, aid.WithAICallback(GetOpenRouterAICallbackWithProxy()), aid.WithDebugPrompt(true))
+	}, aid.WithAICallback(aiforge.GetOpenRouterAICallbackWithProxy()), aid.WithDebugPrompt(true))
 }
