@@ -40,6 +40,30 @@ func (f *ForgeBlueprint) Params(query string, userInput ...*ypb.ExecParamItem) (
 	}, nil
 }
 
+func (f *ForgeBlueprint) ToolPrompt() string {
+	if len(f.Tools) <= 0 {
+		return ""
+	}
+	tmp, err := template.New("tool").Parse(`# 工具提示
+在设计任务中，只考虑工具名称即可，具体参数在后面的对话会按需确认:
+{{range .Tools}}
+- "{{.Name}}": "{{.Description}}"
+{{end}}`)
+	if err != nil {
+		log.Errorf("[ForgeBlueprint.ToolPrompt] %v", err)
+		return ""
+	}
+	var buf bytes.Buffer
+	err = tmp.Execute(&buf, map[string]any{
+		"Tools": f.Tools,
+	})
+	if err != nil {
+		log.Errorf("[ForgeBlueprint.ToolPrompt] %v", err)
+		return ""
+	}
+	return buf.String()
+}
+
 func (f *ForgeBlueprint) tmpParams(query string, params ...*ypb.ExecParamItem) map[string]any {
 	var paramBuf bytes.Buffer
 	if !utils.IsNil(params) {
@@ -53,6 +77,7 @@ func (f *ForgeBlueprint) tmpParams(query string, params ...*ypb.ExecParamItem) m
 
 	return map[string]any{
 		"Forge": map[string]any{
+			"Tool":             f.Tools,
 			"UserParams":       paramBuf.String(),
 			"Init":             f.InitializePrompt,
 			"PersistentPrompt": f.PersistentPrompt,
@@ -81,6 +106,10 @@ func (f *ForgeBlueprint) renderInitPrompt(query string, params ...*ypb.ExecParam
 		return "", err
 	}
 
+	if ret := f.ToolPrompt(); ret != "" {
+		buf.WriteString("\n")
+		buf.WriteString(ret)
+	}
 	return buf.String(), nil
 }
 

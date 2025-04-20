@@ -175,6 +175,29 @@ func NewYakitStatusCardExecResult(status, data string, items ...string) *ypb.Exe
 	}
 }
 
+func ConvertExecResultIntoLog(i *ypb.ExecResult) string {
+	if utils.IsNil(i) {
+		return ""
+	}
+	if !i.IsMessage {
+		return string(i.Raw)
+	}
+	var yakitMsg YakitMessage
+	err := json.Unmarshal(i.Message, &yakitMsg)
+	if err != nil {
+		return i.String()
+	}
+	if yakitMsg.Type == "log" {
+		var logInfo YakitLog
+		err := json.Unmarshal(yakitMsg.Content, &logInfo)
+		if err != nil {
+			return i.String()
+		}
+		return fmt.Sprintf("[%s] %s", logInfo.Level, logInfo.Data)
+	}
+	return i.String()
+}
+
 func NewYakitLogExecResult(level string, data string, items ...interface{}) *ypb.ExecResult {
 	logItem := &YakitLog{
 		Level:     level,
