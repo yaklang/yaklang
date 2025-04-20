@@ -17,7 +17,7 @@ func TestRecon(t *testing.T) {
 		},
 		aid.WithYOLO(),
 		aid.WithDebugPrompt(true),
-		aid.WithAICallback(GetOpenRouterAICallbackWithProxy()),
+		aid.WithAICallback(aiforge.GetOpenRouterAICallbackWithProxy()),
 	)
 	if err != nil {
 		t.Fatal(err)
