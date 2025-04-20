@@ -1,0 +1,35 @@
+__DESC__ = <<<EOF
+encode for some format, like base64/url/doubleurl/base32 and so on
+EOF
+
+tn := cli.String("type", cli.setRequired(true), cli.setHelp("encode method, available options: base64/b64, base64url, base32, hex, doubleurl, quote/ascii, html/htmlentity, htmlhex, url, unicode"))
+txt := cli.String("text", cli.setRequired(true), cli.setHelp("the origin text u want to encode"))
+cli.check()
+
+var result
+switch tn {
+case "base64", "b64":
+    result = codec.EncodeBase64(txt)
+case "base64url":
+    result = codec.EncodeBase64Url(txt)
+case "base32":
+    result = codec.EncodeBase32(txt)
+case "hex":
+    result = codec.EncodeToHex(txt)
+case "doubleurl":
+    result = codec.DoubleEncodeUrl(txt)
+case "quote", "ascii":
+    result = codec.EncodeASCII(txt)
+case "html", "htmlentity":
+    result = codec.EncodeHtml(txt)
+case "htmlhex":
+    result = codec.EncodeHtmlHex(txt)
+case "url":
+    result = codec.EncodeUrl(txt)
+case "unicode":
+    result = codec.UnicodeEncode(txt)
+default:
+    yakit.Error("unknown encode type: " + tn)
+    return
+}
+yakit.Info("encode result: " + result)

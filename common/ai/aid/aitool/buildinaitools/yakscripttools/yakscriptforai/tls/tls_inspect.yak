@@ -1,0 +1,21 @@
+__DESC__ = <<<EOF
+Inspect TLS certificates for a specified domain
+EOF
+
+// domain := "www.example.com"
+domain = cli.String("domain", cli.setHelp("the domain u want to check tls certificates"), cli.setRequired(true))
+cli.check()
+
+for inspectCall in [tls.Inspect, tls.InspectForceHttp1_1, tls.InspectForceHttp2] {
+    result, err = tls.Inspect(domain)
+    if err != nil {
+        yakit.Error("tls check failed: %v", err)
+    }
+
+    if result.Len() > 0 {
+        for i in result {
+            yakit.Info("RESULT: %#v", i.String())
+        }
+        return
+    }
+}
