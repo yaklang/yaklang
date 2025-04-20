@@ -1,0 +1,38 @@
+__DESC__ = <<<EOF
+decode for some format, like base64/url/doubleurl/base32 and so on
+EOF
+
+tn := cli.String("type", cli.setRequired(true), cli.setHelp("decode method, available options: base64/b64, base64url, base32, hex, doubleurl, quote/ascii, html/htmlentity, htmlhex, url, unicode"))
+txt := cli.String("text", cli.setRequired(true), cli.setHelp("the original text you want to decode"))
+cli.check()
+
+var result
+var err
+switch tn {
+case "base64", "b64":
+    result, err = codec.DecodeBase64(txt)
+case "base64url":
+    result, err = codec.DecodeBase64Url(txt)
+case "base32":
+    result, err = codec.DecodeBase32(txt)
+case "hex":
+    result, err = codec.DecodeHex(txt)
+case "quote", "ascii":
+    result, err = codec.DecodeASCII(txt)
+case "html", "htmlentity", "htmlhex":
+    result = codec.DecodeHtml(txt)
+    err = nil
+case "url":
+    result, err = codec.DecodeUrl(txt)
+case "unicode":
+    result = codec.UnicodeDecode(txt)
+    err = nil
+default:
+    yakit.Error("unknown encode type: %v" % tn)
+    return
+}
+if err != nil {
+    yakit.Error("decode %v error: %v, try another decode method..." % [tn, err])
+    return
+}
+yakit.Info("decode result: %#v", string(result))
