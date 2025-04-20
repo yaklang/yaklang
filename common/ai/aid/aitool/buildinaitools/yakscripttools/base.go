@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/yakcliconvert"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
@@ -78,6 +76,7 @@ func GetYakScriptAiTools(name ...string) []*aitool.Tool {
 				yakitClient := yaklib.NewVirtualYakitClientWithRuntimeID(func(i *ypb.ExecResult) error {
 					if i.IsMessage {
 						stdout.Write([]byte(yaklib.ConvertExecResultIntoLog(i)))
+						stdout.Write([]byte("\n"))
 					}
 					return nil
 				}, runtimeId)
@@ -111,14 +110,10 @@ func GetYakScriptAiTools(name ...string) []*aitool.Tool {
 					"CTX":          ctx,
 					"PLUGIN_NAME":  runtimeId + ".yak",
 					"YAK_FILENAME": runtimeId + ".yak",
-					"println": func(i ...any) {
-						funk.ForEach(i, func(v any) {
-							stdout.Write([]byte(utils.InterfaceToString(v)))
-						})
-					},
 				})
 				if err != nil {
 					log.Errorf("execute ex with context failed: %v", err)
+					stderr.Write([]byte(err.Error()))
 					return nil, err
 				}
 				return "", nil
