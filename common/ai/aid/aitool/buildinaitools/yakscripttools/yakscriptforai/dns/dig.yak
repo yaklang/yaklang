@@ -1,0 +1,48 @@
+__DESC__ = <<<EOF
+for dns lookup helper, default to check A/AAAA/NS/TXT... so on
+EOF
+
+target = cli.String("domain", cli.setRequired(true), cli.setHelp("the target domain u want to check")) //"www.example.com"
+cli.check()
+
+m = sync.NewMutex()
+output = (typeName, domain, result) => {
+    m.Lock()
+    defer m.Unlock()
+    yakit.Info("DNS[%v] for %v: %v", typeName, domain, string(result))
+}
+
+wg = sync.NewWaitGroup()
+wg.Add()
+go func{
+    defer wg.Done()
+    defer recover()
+    for i in dns.QueryNS(target /*type: string*/, dns.timeout(5)) {
+        output("NS", target, i)
+    }
+}
+wg.Add()
+go func{
+    defer wg.Done()
+    defer recover()
+    for i in dns.QueryIPAll(target /*type: string*/, dns.timeout(5)) {
+        output("A/AAAA", target, i)
+    }
+}
+wg.Add()
+go func{
+    defer wg.Done()
+    defer recover()
+    for i in dns.QuertAxfr(target /*type: string*/, dns.timeout(5)) {
+        output("AXFR", target, i)
+    }
+}
+wg.Add()
+go func{
+    defer wg.Done()
+    defer recover()
+    for i in dns.QueryTXT(target /*type: string*/, dns.timeout(5)) {
+        output("TXT", target, i)
+    }
+}
+wg.Wait()
