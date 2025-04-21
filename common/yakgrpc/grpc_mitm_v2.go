@@ -283,10 +283,12 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 
 	hijackListFeedback := func(action string, resp ...*ypb.SingleManualHijackInfoMessage) {
-		send(&ypb.MITMV2Response{
-			ManualHijackListAction: action,
-			ManualHijackList:       resp,
-		})
+		if hijackManger.isManual() {
+			send(&ypb.MITMV2Response{
+				ManualHijackListAction: action,
+				ManualHijackList:       resp,
+			})
+		}
 	}
 
 	go func() {
@@ -1405,17 +1407,17 @@ type manualHijackTask struct {
 }
 
 type manualHijackManager struct {
-	hijackTask  *omap.OrderedMap[string, *manualHijackTask]
-	messageChan map[string]chan<- *ypb.SingleManualHijackControlMessage
-	canRegister bool
-	hijackLock  sync.Mutex
+	hijackTask      *omap.OrderedMap[string, *manualHijackTask]
+	messageChan     map[string]chan<- *ypb.SingleManualHijackControlMessage
+	manualHijacking bool
+	hijackLock      sync.Mutex
 }
 
 func newManualHijackManager() *manualHijackManager {
 	return &manualHijackManager{
-		hijackTask:  omap.NewOrderedMap[string, *manualHijackTask](make(map[string]*manualHijackTask)),
-		messageChan: make(map[string]chan<- *ypb.SingleManualHijackControlMessage),
-		canRegister: false,
+		hijackTask:      omap.NewOrderedMap[string, *manualHijackTask](make(map[string]*manualHijackTask)),
+		messageChan:     make(map[string]chan<- *ypb.SingleManualHijackControlMessage),
+		manualHijacking: false,
 	}
 }
 
@@ -1431,7 +1433,7 @@ func (m *manualHijackManager) setCanRegister(b bool) {
 			}
 		}
 	}
-	m.canRegister = b
+	m.manualHijacking = b
 }
 
 func (m *manualHijackManager) getHijackingTaskInfo() []*ypb.SingleManualHijackInfoMessage {
@@ -1445,10 +1447,16 @@ func (m *manualHijackManager) getHijackingTaskInfo() []*ypb.SingleManualHijackIn
 	return tasks
 }
 
+func (m *manualHijackManager) isManual() bool {
+	m.hijackLock.Lock()
+	defer m.hijackLock.Unlock()
+	return m.manualHijacking
+}
+
 func (m *manualHijackManager) register(resp *ypb.SingleManualHijackInfoMessage) *manualHijackTask {
 	m.hijackLock.Lock()
 	defer m.hijackLock.Unlock()
-	if !m.canRegister {
+	if !m.manualHijacking {
 		return nil
 	}
 	id := ksuid.New().String()
