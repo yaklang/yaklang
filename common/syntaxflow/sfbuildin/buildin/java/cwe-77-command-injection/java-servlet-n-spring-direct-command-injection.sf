@@ -2,15 +2,25 @@ desc(
     title: "Springframework Paremeter Passed into Command Injection Sink",
     title_zh: 'Servlet & Springframework 基础参数命令注入',
     type: vuln,
-    risk:rce,
+    risk:"命令注入",
     desc: <<<TEXT
-    在Java中，如果用户输入的参数直接传递给命令执行函数，可能会导致命令注入漏洞。攻击者可以通过构造恶意输入，执行系统命令，进而控制服务器。为了防止命令注入漏洞，需要对用户输入的参数进行严格的过滤，包括验证参数的合法性、长度、字符等，并尽量避免直接将用户输入的参数传递给命令执行函数。
+    该规则用于审计Java代码中以Servlet和Springframework传入命令注入的参数为污染源(source)，以命令执行为污染汇聚点(sink)的命令执行规则。
+    规则覆盖的命令执行点包括：
+    - Runtime.getRuntime().exec()
+    - ProcessBuilder
+    - Apache Commons Exec
+    - Picocli
+    - System-Command-Executor
+    - zt-exec
+    - NuProcess
+    - org.apache.hadoop.util.Shell
 TEXT
 )
 
 <include('java-servlet-param')> as $source;
 <include('java-spring-mvc-param')> as $source;
 check $source;
+
 <include('java-runtime-exec-sink')> as $sink;
 <include('java-command-exec-sink')> as $sink;
 check $sink;
@@ -196,5 +206,113 @@ desc(
                  return modelMap;
              }
     }
+EOF
+)
+
+desc(
+    lang:'java',
+    alert_num:1,
+    'file://processExec.java':<<<EOF
+   package org.example.moudels.rce.command;
+
+   import io.swagger.annotations.Api;
+   import io.swagger.annotations.ApiOperation;
+   import lombok.extern.slf4j.Slf4j;
+   import org.springframework.stereotype.Controller;
+   import org.springframework.web.bind.annotation.CrossOrigin;
+   import org.springframework.web.bind.annotation.RequestMapping;
+   import org.springframework.web.bind.annotation.RequestParam;
+   import org.springframework.web.bind.annotation.ResponseBody;
+   import top.whgojp.common.utils.R;
+
+   import java.io.BufferedReader;
+   import java.io.IOException;
+   import java.io.InputStream;
+   import java.io.InputStreamReader;
+   import java.lang.reflect.Method;
+   import java.util.Arrays;
+   import java.util.List;
+   import java.util.Map;
+
+   @Slf4j
+   @Api(value = "CommandController", tags = "RCE - 命令注入")
+   @Controller
+   @CrossOrigin(origins = "*")
+   @RequestMapping("/command")
+   public class CommandController {
+
+       @RequestMapping("/vul1")
+       @ResponseBody
+       public R vul1(@RequestParam("payload") String payload) throws IOException {
+           String[] command = {"sh", "-c", payload};
+
+           ProcessBuilder pb = new ProcessBuilder(command);
+           pb.redirectErrorStream(true);
+
+           Process process = pb.start();
+           InputStream inputStream = process.getInputStream();
+           BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+           String line;
+           StringBuilder output = new StringBuilder();
+           while ((line = reader.readLine()) != null) {
+               output.append(line).append("\n");
+           }
+           return R.ok(output.toString());
+       }
+   }
+EOF
+)
+
+desc(
+    lang:java,
+    alert_num:1,
+    'file://processImplExec.java':<<<EOF
+     package org.example.moudels.rce.command;
+
+       import io.swagger.annotations.Api;
+       import io.swagger.annotations.ApiOperation;
+       import lombok.extern.slf4j.Slf4j;
+       import org.springframework.stereotype.Controller;
+       import org.springframework.web.bind.annotation.CrossOrigin;
+       import org.springframework.web.bind.annotation.RequestMapping;
+       import org.springframework.web.bind.annotation.RequestParam;
+       import org.springframework.web.bind.annotation.ResponseBody;
+       import top.whgojp.common.utils.R;
+
+       import java.io.BufferedReader;
+       import java.io.IOException;
+       import java.io.InputStream;
+       import java.io.InputStreamReader;
+       import java.lang.reflect.Method;
+       import java.util.Arrays;
+       import java.util.List;
+       import java.util.Map;
+    @Slf4j
+   @Api(value = "CommandController", tags = "RCE - 命令注入")
+   @Controller
+   @CrossOrigin(origins = "*")
+   @RequestMapping("/command")
+   public class CommandController {
+           @RequestMapping("/vul3")
+           @ResponseBody
+           public R vul3(String payload) throws Exception {
+               // 获取 ProcessImpl 类对象
+               Class<?> clazz = Class.forName("java.lang.ProcessImpl");
+
+               // 获取 start 方法
+               Method method = clazz.getDeclaredMethod("start", String[].class, Map.class, String.class, ProcessBuilder.Redirect[].class, boolean.class);
+               method.setAccessible(true);
+
+               Process process = (Process) method.invoke(null, new String[]{payload}, null, null, null, false);
+               try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                   StringBuilder output = new StringBuilder();
+                   String line;
+                   while ((line = reader.readLine()) != null) {
+                       output.append(line).append("\n");
+                   }
+                   return R.ok(output.toString());
+               }
+           }
+       }
 EOF
 )
