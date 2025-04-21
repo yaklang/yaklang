@@ -64,6 +64,7 @@ func (t *aiTask) callAI(request *AIRequest) (*AIResponse, error) {
 
 func (t *aiTask) PushToolCallResult(i *aitool.ToolResult) {
 	t.ToolCallResults = append(t.ToolCallResults, i)
+	t.config.memory.PushToolCallResults(i)
 }
 
 // MarshalJSON 实现自定义的JSON序列化，跳过AICallback字段

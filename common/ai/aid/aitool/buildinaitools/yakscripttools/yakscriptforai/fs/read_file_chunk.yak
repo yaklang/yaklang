@@ -24,6 +24,15 @@ if chunkSize > 1000 {
     return
 }
 
+size = 0
+try {
+    size = file.Stat(t)~.Size()
+} catch e {
+    size = 0
+}
+
+
+
 f, err := file.OpenFile(t, file.O_RDONLY, 0644)
 if err != nil {
     yakit.Error("openfile failed: %v", err)
@@ -42,5 +51,5 @@ if n <= 0 && err != nil {
     yakit.Error("MET ERR: %v", err)
 }
 if n > 0 {
-    yakit.Info("CHUNK: %#v", string(raw))
+    yakit.Info("CHUNK[Total: %v]: %#v", size, string(raw))
 }
