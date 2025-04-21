@@ -50,21 +50,18 @@ type YakFunctionCaller struct {
 	Handler func(callback func(*yakvm.Frame), args ...any) any
 }
 
-func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
+func buildHotpatchHandler(ctx context.Context, code string) func(s string, yield func(s string)) (err error) {
 	if strings.TrimSpace(code) == "" {
-		return mutate.Fuzz_WithExtraFuzzTagHandler("yak", func(s string) []string {
-			return []string{s}
-		})
+		return nil
 	}
 	engine := NewScriptEngine(1)
 	codeEnv, err := engine.ExecuteExWithContext(ctx, code, make(map[string]interface{}))
 	if err != nil {
 		log.Errorf("load hotPatch code error: %s", err)
-		return mutate.Fuzz_WithExtraFuzzTagHandler("yak", func(s string) []string {
-			return []string{s}
-		})
+		return nil
 	}
-	hotPatchHandler := func(s string, yield func(s string)) (err error) {
+
+	return func(s string, yield func(s string)) (err error) {
 		handle, params, _ := strings.Cut(s, "|")
 		logAndWrapError := func(errStr string) error {
 			errInfo := fmt.Sprintf("%s%s", fuzztag.YakHotPatchErr, errStr)
@@ -118,65 +115,41 @@ func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
 		}
 		return logAndWrapError("invalid function params")
 	}
-	return mutate.Fuzz_WithExtraFuzzTag("yak", mutate.HotPatchFuzztag(hotPatchHandler))
-	// return mutate.Fuzz_WithExtraFuzzErrorTagHandler("yak", func(s string) (result []*parser.FuzzResult, err error) {
-	// 	handle, params, _ := strings.Cut(s, "|")
+}
 
-	// 	defer func() {
-	// 		if r := recover(); r != nil {
-	// 			if e, ok := r.(*yakvm.VMPanic); ok {
-	// 				log.Errorf("call hotPatch code error: %v", e.GetData())
-	// 				err = fmt.Errorf("%v", e.GetData())
-	// 			}
-	// 		}
-	// 	}()
-	// 	yakVar, ok := codeEnv.GetVar(handle)
-	// 	if !ok {
-	// 		errorStr := spew.Sprintf("function %s not found", handle)
-	// 		log.Errorf("call hotPatch code error: %s", errorStr)
-	// 		return nil, errors.New(errorStr)
-	// 	}
-	// 	yakFunc, ok := yakVar.(*yakvm.Function)
-	// 	if !ok {
-	// 		errorStr := spew.Sprintf("function %s not found", handle)
-	// 		log.Errorf("call hotPatch code error: %s", errorStr)
-	// 		return nil, errors.New(errorStr)
-	// 	}
-	// 	iparams := []any{}
-	// 	if yakFunc.IsVariableParameter() {
-	// 		funk.ForEach(strings.Split(params, "|"), func(s any) {
-	// 			iparams = append(iparams, s)
-	// 		})
-	// 	} else {
-	// 		paramIn := yakFunc.GetNumIn()
-	// 		splits := strings.Split(params, "|")
-	// 		for len(splits) < paramIn {
-	// 			splits = append(splits, "")
-	// 		}
-	// 		i := 0
-	// 		for ; i < paramIn-1; i++ {
-	// 			iparams = append(iparams, splits[i])
-	// 		}
+func Fuzz_WithDynHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
+	if hotPatchFunc := buildHotpatchHandler(ctx, code); hotPatchFunc != nil {
+		return mutate.Fuzz_WithExtraFuzzTag("yak:dyn", mutate.HotPatchDynFuzztag(hotPatchFunc))
+	}
+	return mutate.Fuzz_WithExtraFuzzTagHandler("yak:dyn", func(s string) []string {
+		return []string{s}
+	})
+}
 
-	// 		iparams = append(iparams, strings.Join(splits[i:], "|"))
-	// 	}
-	// 	data, err := codeEnv.CallYakFunction(ctx, handle, iparams)
-	// 	if err != nil {
-	// 		errInfo := fmt.Sprintf("%s%s", fuzztag.YakHotPatchErr, err.Error())
-	// 		log.Errorf("call hotPatch code error: %s", err)
-	// 		return nil, errors.New(errInfo)
-	// 	}
-	// 	if data == nil {
-	// 		errInfo := fmt.Sprintf("%s%s", fuzztag.YakHotPatchErr, "return nil")
-	// 		log.Errorf("call hotPatch code error: %s", "return nil")
-	// 		return result, errors.New(errInfo)
-	// 	}
-	// 	res := utils.InterfaceToStringSlice(data)
-	// 	for _, item := range res {
-	// 		result = append(result, parser.NewFuzzResultWithData(item))
-	// 	}
-	// 	return result, nil
-	// })
+func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
+	if hotPatchFunc := buildHotpatchHandler(ctx, code); hotPatchFunc != nil {
+		return mutate.Fuzz_WithExtraFuzzTag("yak", mutate.HotPatchFuzztag(hotPatchFunc))
+	}
+	return mutate.Fuzz_WithExtraFuzzTagHandler("yak", func(s string) []string {
+		return []string{s}
+	})
+}
+
+func Fuzz_WithAllHotPatch(ctx context.Context, code string) []mutate.FuzzConfigOpt {
+	if hotPatchFunc := buildHotpatchHandler(ctx, code); hotPatchFunc != nil {
+		return []mutate.FuzzConfigOpt{
+			mutate.Fuzz_WithExtraFuzzTag("yak", mutate.HotPatchFuzztag(hotPatchFunc)),
+			mutate.Fuzz_WithExtraFuzzTag("yak:dyn", mutate.HotPatchDynFuzztag(hotPatchFunc)),
+		}
+	}
+	return []mutate.FuzzConfigOpt{
+		mutate.Fuzz_WithExtraFuzzTagHandler("yak", func(s string) []string {
+			return []string{s}
+		}),
+		mutate.Fuzz_WithExtraFuzzTagHandler("yak:dyn", func(s string) []string {
+			return []string{s}
+		}),
+	}
 }
 
 type callArgumentHookFunc func(name string, numIn int, args []any) []any
