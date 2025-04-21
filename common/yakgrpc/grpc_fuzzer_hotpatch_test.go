@@ -492,3 +492,33 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_Mirror_Duplicated_ExtractorResults(t *
 		t.Fatalf("expect 10, got %v", count)
 	}
 }
+
+func TestGRPCMUSTPASS_HTTPFuzzer_DynHotPatch(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("abc"))
+	})
+	target := utils.HostPort(host, port)
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
+		Request:      "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n{{int::1(1-10)}}{{yak:dyn::1(handle)}}",
+		HotPatchCode: `handle = result => randstr(10)`,
+		ForceFuzz:    true,
+	})
+	if err != nil {
+		t.Fatalf("expect error is nil, but got %v", err)
+	}
+	count := 0
+	for {
+		fuzzRequest, err := recv.Recv()
+		if err != nil {
+			break
+		}
+		require.Len(t, fuzzRequest.Payloads, 2)
+		count++
+	}
+	require.GreaterOrEqual(t, count, 10)
+}
