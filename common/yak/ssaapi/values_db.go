@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"context"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -11,6 +12,14 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
+type Dtype int
+
+const (
+	DT_None Dtype = iota
+	DT_DependOn
+	DT_EffectOn
+)
+
 type saveValueCtx struct {
 	db *gorm.DB
 	ssadb.AuditNodeStatus
@@ -18,6 +27,7 @@ type saveValueCtx struct {
 	entryValue *Value
 
 	visitedNode map[*Value]*ssadb.AuditNode
+	dtype       Dtype
 }
 
 type SaveValueOption func(c *saveValueCtx)
@@ -85,6 +95,7 @@ func SaveValue(value *Value, opts ...SaveValueOption) error {
 		db:          db,
 		entryValue:  value,
 		visitedNode: make(map[*Value]*ssadb.AuditNode),
+		dtype:       DT_None,
 	}
 	for _, o := range opts {
 		o(ctx)
@@ -109,6 +120,15 @@ func (s *saveValueCtx) SaveNode(value *Value) (*ssadb.AuditNode, error) {
 	if value == nil {
 		return nil, utils.Error("value is nil")
 	}
+
+	if s.dtype == DT_None {
+		if value.GetDependOn() != nil {
+			s.dtype = DT_DependOn
+		} else if value.GetEffectOn() != nil {
+			s.dtype = DT_EffectOn
+		}
+	}
+
 	an := &ssadb.AuditNode{
 		AuditNodeStatus: s.AuditNodeStatus,
 		IsEntryNode:     value == s.entryValue,
@@ -168,25 +188,64 @@ func (s *saveValueCtx) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
 	return res
 }
 
+var MaxTime = time.Millisecond * 500
+
 // from is the source node, to is the target node, from -> xxx -> to
 func (s *saveValueCtx) saveDataFlow(from *Value, to *Value) bool {
-	start := time.Now()
-	paths := graph.GraphPathWithTarget(from, to,
-		func(v *Value) []*Value {
-			return v.GetDependOn()
-		},
-	)
-	elapsed := time.Since(start)
-	if elapsed > time.Second {
-		log.Warnf("saveDataFlow: collect paths cost [%v] paths: %v", elapsed, len(paths))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	f := func(v *Value) []*Value {
+		return nil
 	}
 
-	if len(paths) == 0 || len(paths) > 100 {
-		log.Warnf("saveDataFlow:  paths is empty or too many paths: %v", len(paths))
+	if s.dtype == DT_DependOn {
+		f = func(v *Value) []*Value {
+			return v.GetEffectOn()
+		}
+	} else if s.dtype == DT_EffectOn {
+		f = func(v *Value) []*Value {
+			return v.GetDependOn()
+		}
+	}
+
+	var paths [][]*Value
+	resultChan := make(chan [][]*Value, 1)
+	// errChan := make(chan error, 1)
+
+	go func() {
+		paths = graph.GraphPathWithTarget(from, to, func(v *Value) []*Value {
+			select {
+			case <-ctx.Done(): // 检查是否被取消
+				return nil
+			default:
+				return f(v)
+			}
+		})
+		resultChan <- paths
+	}()
+
+	// MaxTime := time.Hour
+
+	start := time.Now()
+	select {
+	case paths = <-resultChan:
+	case <-time.After(MaxTime):
+		cancel()
+		log.Warnf("saveDataFlow:  collect paths timeout after %v", MaxTime)
 		return false
 	}
 
-	start = time.Now()
+	totalElements := 0
+	for _, innerSlice := range paths {
+		totalElements += len(innerSlice) // 累加所有内层切片长度
+	}
+
+	if totalElements == 0 || totalElements > 5 {
+		log.Warnf("saveDataFlow:  paths is empty or too many paths: %v", totalElements)
+		return false
+	}
+
 	for _, path := range paths {
 		// log.Infof("saveDataFlow: %v", path)
 		// save dataflow path
@@ -203,13 +262,19 @@ func (s *saveValueCtx) saveDataFlow(from *Value, to *Value) bool {
 				continue
 			}
 
-			s.SaveEdge(fromNode, toNode, EdgeTypeDependOn, nil)
-			s.SaveEdge(toNode, fromNode, EdgeTypeEffectOn, nil)
+			if s.dtype == DT_DependOn {
+				s.SaveEdge(fromNode, toNode, EdgeTypeDependOn, nil)
+				s.SaveEdge(toNode, fromNode, EdgeTypeEffectOn, nil)
+			} else if s.dtype == DT_EffectOn {
+				s.SaveEdge(fromNode, toNode, EdgeTypeEffectOn, nil)
+				s.SaveEdge(toNode, fromNode, EdgeTypeDependOn, nil)
+			}
+
 		}
 	}
-	elapsed = time.Since(start)
-	if elapsed > time.Second {
-		log.Warnf("saveDataFlow:  save paths cost [%v] paths: %v", elapsed, len(paths))
+	elapsed := time.Since(start)
+	if elapsed > MaxTime {
+		log.Warnf("saveDataFlow:  save paths cost [%v] paths: %v", elapsed, totalElements)
 	}
 
 	return true

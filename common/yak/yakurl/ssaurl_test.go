@@ -250,6 +250,12 @@ type valueResult struct {
 	url      string
 }
 
+type byURL []valueResult
+
+func (a byURL) Len() int           { return len(a) }
+func (a byURL) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a byURL) Less(i, j int) bool { return a[i].url < a[j].url }
+
 func (s *ssaurlTest) CheckValue(t *testing.T, sf string, varaible string, want []valueResult) {
 	s.CheckSSAURL(t, fmt.Sprintf("/%s", varaible), sf, func(res []*ypb.YakURLResource) {
 		got := lo.FilterMap(res, func(r *ypb.YakURLResource, index int) (valueResult, bool) {
@@ -283,6 +289,9 @@ func (s *ssaurlTest) CheckValue(t *testing.T, sf string, varaible string, want [
 			}
 			return ret, true
 		})
+
+		sort.Sort(byURL(want))
+		sort.Sort(byURL(got))
 		require.Equal(t, want, got)
 	})
 }
@@ -492,24 +501,46 @@ func TestSFURL_golang(t *testing.T) {
 	go 1.20
 	`)
 	vf.AddFile("src/main/go/A/test1.go", `
-	package A
+package main
 
-	import "fmt"
+import (
+        "database/sql"
+        "fmt"
+        "log"
+        "net/http"
 
-	func test1(){
-		fmt.Println("A")
-	}
+        _ "github.com/go-sql-driver/mysql"
+)
 
-	`)
-	vf.AddFile("src/main/go/A/test2.go", `
-	package A
+func login(w http.ResponseWriter, r *http.Request) {
+        username := r.FormValue("username")
+        password := r.FormValue("password")
 
-	import "fmt"
+        // 不安全的 SQL 查询
+        query := fmt.Sprintf("SELECT * FROM users WHERE username='%s' AND password='%s'", username, password)
 
-	func test2(){
-		// padding
-		fmt.Println("B")
-	}
+        db, err := sql.Open("mysql", "user:password@/dbname")
+        if err != nil {
+                log.Fatal(err)
+        }
+        defer db.Close()
+
+        var userID int
+        err = db.QueryRow(query).Scan(&userID)
+        if err != nil {
+                http.Error(w, "Invalid login", http.StatusUnauthorized)
+                return
+        }
+
+        fmt.Fprintf(w, "User ID: %d", userID)
+}
+
+func main() {
+        http.HandleFunc("/login", login)
+        log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+
 	`)
 
 	s := NewSSAURLTest(t, vf,
@@ -519,25 +550,89 @@ func TestSFURL_golang(t *testing.T) {
 
 	t.Run("check syntaxflow variable", func(t *testing.T) {
 		s.CheckVariable(t,
-			`
-			fmt?{<fullTypeName>?{have: 'fmt'}} as $entry;
-			$entry.Println( * as $target);
+			`	
+				.QueryRow(* #-> as $a)
 			`,
 			[]variableResult{
-				{variable: "entry", number: 2},
-				{variable: "target", number: 2},
-				{variable: "_", number: 2},
+				{variable: "a", number: 9},
+				{variable: "_", number: 1},
 			},
 		)
 	})
 
 	t.Run("check syntaxflow information package with different filename", func(t *testing.T) {
 		query := `
-				fmt.Println as $a
+				.QueryRow(* #-> as $a)
 			`
 		s.CheckValue(t, query, "a", []valueResult{
-			{riskHash: false, url: "/src/main/go/A/test1.go:7"},
-			{riskHash: false, url: "/src/main/go/A/test2.go:8"},
+			{riskHash: false, url: "/src/main/go/A/test1.go:5"},
+			{riskHash: false, url: "/src/main/go/A/test1.go:6"},
+			{riskHash: false, url: "/src/main/go/A/test1.go:13"},
+			{riskHash: false, url: "/src/main/go/A/test1.go:14"},
+			{riskHash: false, url: "/src/main/go/A/test1.go:14"},
+			{riskHash: false, url: "/src/main/go/A/test1.go:15"},
+			{riskHash: false, url: "/src/main/go/A/test1.go:18"},
+			{riskHash: false, url: "/src/main/go/A/test1.go:20"},
+			{riskHash: false, url: "/src/main/go/A/test1.go:20"},
+		})
+	})
+
+	t.Run("check syntaxflow information", func(t *testing.T) {
+		query := ".QueryRow(* #-> as $a) "
+		s.CheckSSAURL(t, "/a/0", query, func(res []*ypb.YakURLResource) {
+			check := func(path string) {
+				err := CheckSSADB(s.local, path)
+				require.NoError(t, err)
+			}
+
+			found := false
+			var node string
+			graphInfoMap := make(map[string]*yakurl.NodeInfo)
+			for _, extra := range res[0].Extra {
+				if extra.Key == "node_id" {
+					log.Infof("graph: %v", extra.Value)
+					node = extra.Value
+					continue
+				}
+				if extra.Key == "graph" {
+					log.Infof("graph: %v", extra.Value)
+					continue
+				}
+
+				if extra.Key == "graph_info" {
+					log.Infof("graph info: %v", extra.Value)
+					var graphInfo []*yakurl.NodeInfo
+					if err := json.Unmarshal([]byte(extra.Value), &graphInfo); err != nil {
+						t.Error(err)
+					}
+					for _, info := range graphInfo {
+						log.Infof("graph info item: \n%v", info)
+						// spew.Dump(info)
+						if info.NodeID == node {
+							found = true
+						}
+						graphInfoMap[info.NodeID] = info
+
+						check(info.CodeRange.GetPath())
+					}
+				}
+				if extra.Key == "graph_line" {
+					log.Infof("graph line: %s", extra.Value)
+					var res [][]string
+					if err := json.Unmarshal([]byte(extra.Value), &res); err != nil {
+						t.Error(err)
+					}
+					require.Greater(t, len(res), 0)
+					for _, resItem := range res {
+						for _, item := range resItem {
+							if _, ok := graphInfoMap[item]; !ok {
+								t.Errorf("not found in graph info: %s", item)
+							}
+						}
+					}
+				}
+			}
+			require.True(t, found)
 		})
 	})
 }
