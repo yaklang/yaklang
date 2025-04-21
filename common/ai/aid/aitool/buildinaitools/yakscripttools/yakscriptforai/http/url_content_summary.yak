@@ -1,0 +1,47 @@
+__DESC__ = <<<EOF
+Retrieves the content of a specified URL via a GET request.
+Logs the response headers and body size.
+If the content type indicates HTML, it extracts and logs:
+1. The page title found within the <title> tag.
+2. All text content stripped from the HTML elements, concatenated together.
+Essentially, it provides a summary (title and text) of an HTML web page.
+EOF
+// url_content_summary
+method = "GET"
+urlStr = "https://www.example.com"
+bodyLimit = ""
+
+rsp, req, err := poc.Do(method, urlStr, poc.save(true))
+if err != nil {
+    yakit.Error("err: %v", err)
+    return
+}
+header, body = poc.Split(rsp.RawPacket)
+yakit.Info("Headers: %#v", header)
+if len(body) > 0 {
+    yakit.Info("[BodySize]: %v", len(body))
+} else {
+    yakit.Info("NO HTTP Body")
+}
+ct := rsp.GetContentType().Lower()
+if str.Contains(ct, "html") {
+    title := str.ExtractTitle(ct)
+    if str.TrimSpace(title) != "" {
+        yakit.Info("[Title]: %v", title)
+    }
+    txt := make([]string)
+    xhtml.Walker(body, node => {
+        if string(node.Type) != "1" {
+            return
+        }
+
+        text := str.TrimSpace(node.Data)
+        if text != "" {
+            txt.Push(text)
+        }
+    })
+    result = str.Join(txt, " ")
+    if len(result) > 0 {
+        yakit.Info("[TEXT(Size:%v)]: %#v", len(result), result)
+    }
+}

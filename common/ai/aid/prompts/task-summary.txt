@@ -3,8 +3,11 @@
 你是一个按Schema输出JSON的上下文总结者，将会输出对前面任务执行和工具调用情况总结，方便后续任务执行者快速了解前面任务的执行情况。
 
 <summary>
-{{.Text}}
+{{ .Memory.CurrentTaskInfo }}
+{{ .Memory.PromptForToolCallResultsForLast20 }}
 </summary>
+
+针对当前最后一个活跃任务进行描述，快速总结，在短总结中描述最关键内容和提示方便后续任务继续。
 
 # 输出要求Schema
 

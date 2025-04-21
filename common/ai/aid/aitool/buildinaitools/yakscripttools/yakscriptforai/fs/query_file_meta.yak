@@ -1,0 +1,17 @@
+__DESC__ = <<<EOF
+Get basic file information including:
+1. Whether it's a directory
+2. File size
+3. File mode/permissions
+4. Last modified time
+EOF
+
+filename = cli.String("filename", cli.setRequired(true), cli.setHelp("the meta info from filename u want to check"))// "/Users/v1ll4n/Projects/yaklang/README.md"
+cli.check()
+
+info, err = file.Stat(filename)
+if err != nil {
+    yakit.Error("stat failed: %v", err)
+    return
+}
+yakit.Info("dir:%v size:%v mod:%v modify_time:%v", info.IsDir(), info.Size(), info.Mode(), info.ModTime())

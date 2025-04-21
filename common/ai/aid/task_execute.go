@@ -10,7 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 
 	"github.com/tidwall/gjson"
-	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -54,7 +53,7 @@ func (t *aiTask) getToolResultAction(response string) string {
 		gjsonResult := gjson.Parse(toolRequiredJSON)
 		action := gjsonResult.Get("@action").String()
 		switch action {
-		case "require-tool", "finished":
+		case "require-more-tool", "finished":
 			return action
 		}
 	}
@@ -185,10 +184,6 @@ func (t *aiTask) execute() error {
 		return fmt.Errorf("error generating aiTask prompt: %w", err)
 	}
 
-	chatDetails := aispec.ChatDetails{
-		aispec.NewUserChatDetail(prompt),
-	}
-
 	// 调用AI回调函数
 	t.config.EmitPrompt("task_execute", prompt)
 	req := NewAIRequest(prompt)
@@ -205,8 +200,6 @@ func (t *aiTask) execute() error {
 
 	// 处理工具调用, 直到没有工具调用为止
 	response := string(responseBytes)
-	tempChatDetails := chatDetails.Clone()
-	tempChatDetails = append(tempChatDetails, aispec.NewAIChatDetail(response))
 
 TOOLREQUIRED:
 	for {
@@ -263,11 +256,9 @@ TOOLREQUIRED:
 		}
 	}
 
-	chatDetails = append(chatDetails, aispec.NewAIChatDetail(response))
-
 	t.config.EmitInfo("start to execute task-summary action")
 	// 处理总结回调
-	summaryPromptWellFormed, err := t.GenerateTaskSummaryPrompt(aispec.DetailsToString(chatDetails))
+	summaryPromptWellFormed, err := t.GenerateTaskSummaryPrompt()
 	if err != nil {
 		t.config.EmitError("error generating summary prompt: %v", err)
 		return fmt.Errorf("error generating summary prompt: %w", err)
@@ -336,11 +327,10 @@ func (t *aiTask) executeTask() error {
 	return nil
 }
 
-func (t *aiTask) GenerateTaskSummaryPrompt(text string) (string, error) {
+func (t *aiTask) GenerateTaskSummaryPrompt() (string, error) {
 	summaryTemplate := template.Must(template.New("summary").Parse(__prompt_TaskSummary))
 	var buf bytes.Buffer
 	err := summaryTemplate.Execute(&buf, map[string]any{
-		"Text":   text,
 		"Memory": t.config.memory,
 	})
 	if err != nil {
