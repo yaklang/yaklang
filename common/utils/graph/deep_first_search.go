@@ -30,13 +30,13 @@ func (d *DeepFirstPath[K, T, U]) deepFirst(node T, target ...T) {
 	value := d.getValue(node)
 
 	if d.current.Have(key) {
-		// log.Infof("node %d already in current skip", nodeID)
+		// log.Infof("node %v already in current skip", node)
 		return
 	}
 	d.current.PushKey(key, value)
 	defer d.current.Pop()
 
-	// log.Infof("node %d add to current path: %v", nodeID, d.current.Keys())
+	// log.Infof("node %v add to current path: %v", node, d.current.Keys())
 	nextNodes := d.next(node)
 	nextNodes = lo.UniqBy(nextNodes, d.getKey)
 	// log.Infof("next node :%v", nextNodes)
