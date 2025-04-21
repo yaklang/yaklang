@@ -26,11 +26,8 @@ var _codeReviewPlanMock string
 //go:embed yaklang_reviewer_prompts/persistent.txt
 var _persistentPrompt string
 
-//var _persistentPrompt = `重要：
-//- 不要自行想象修改，请调用提供的代码语法检查工具获取语法检查信息
-//- 不要自行回忆代码的具体的内容，调用下memory_user_data系列工具读写代码内容
-//- 一定一定要在修改代码之后自行调用memory_user_data_set更新上下文中的代码
-//`
+//go:embed yaklang_reviewer_prompts/set-code.json
+var _setCodeSchema string
 
 func newYaklangMasterForge(callback func(string)) *aiforge.ForgeBlueprint {
 	yaklangTools, err := yaklangtools.CreateYaklangTools()
@@ -68,6 +65,14 @@ cli.check()
 			aid.WithResultHandler(func(config *aid.Config) {
 				code, _ := config.GetMemory().UserDataGet("code")
 				callback(code)
+			}),
+			aid.WithTaskAIRespCallback(func(rawResponse string, config *aid.Config) {
+				action, err := aid.ExtractAction(rawResponse, "set-code")
+				if err != nil {
+					return
+				}
+				codeContent := action.GetString("content")
+				config.GetMemory().StoreUserData("code", codeContent)
 			}),
 			aid.WithAgreeAIAssistant(&aid.AIAssistant{
 				Callback: func(ctx context.Context, config *aid.Config) (*aid.AIAssistantResult, error) {
@@ -164,7 +169,8 @@ func analyzeResultToSuggestion(results []*result.StaticAnalyzeResult) []*FixSugg
 			suggestion.Suggestion = "根据yaklang错误处理风格，处理未处理的错误"
 			suggestion.Reason = "有未处理的错误"
 		} else {
-			continue
+			suggestion.Suggestion = "根据提供的语法示例，处理语法错误"
+			suggestion.Reason = message
 		}
 		suggestions = append(suggestions, suggestion)
 	}
