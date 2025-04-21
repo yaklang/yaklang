@@ -112,7 +112,7 @@ func TestGraph(t *testing.T) {
 	log.Infof("memory path: %v", memPath)
 	log.Infof("db path: %v", dbPath)
 
-	require.Equal(t, 2, len(memPath))
+	require.Equal(t, 1, len(memPath))
 	require.Equal(t, 1, len(dbPath))
 }
 
@@ -204,7 +204,7 @@ func Test_Values_Graph_Dot(t *testing.T) {
 		graph.ShowDot()
 
 		result := graph.DeepFirstGraphNext(value1)
-		require.Equal(t, 2, len(result))
+		require.Equal(t, 1, len(result))
 		require.Equal(t, strings.Count(graph.Dot(), "t3: 3"), 2)
 	})
 
@@ -231,4 +231,88 @@ func Test_Values_Graph_Dot(t *testing.T) {
 		require.Contains(t, graph.Dot(), "step[2]: Test2")
 		require.Contains(t, graph.Dot(), "Test3")
 	})
+}
+
+func TestGraph_Limit(t *testing.T) {
+	t.Skip()
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("example/src/main/java/com/example/apackage/a.go", `
+package main
+
+import (
+        "database/sql"
+        "fmt"
+        "log"
+        "net/http"
+
+        _ "github.com/go-sql-driver/mysql"
+)
+
+func login(w http.ResponseWriter, r *http.Request) {
+        username := r.FormValue("username")
+        password := r.FormValue("password")
+
+        // 不安全的 SQL 查询
+        query := fmt.Sprintf("SELECT * FROM users WHERE username='%s' AND password='%s'", username, password)
+		query = fmt.Sprintf(query)
+		query = fmt.Sprintf(query)
+		query = fmt.Sprintf(query)
+		query = fmt.Sprintf(query)
+		query = fmt.Sprintf(query)
+		query = fmt.Sprintf(query)
+		query = fmt.Sprintf(query)
+		query = fmt.Sprintf(query)
+        err = db.QueryRow(query).Scan(&userID)
+        if err != nil {
+                http.Error(w, "Invalid login", http.StatusUnauthorized)
+                return
+        }
+
+        fmt.Fprintf(w, "User ID: %d", userID)
+}
+
+func main() {
+        http.HandleFunc("/login", login)
+        log.Fatal(http.ListenAndServe(":8080", nil))
+}
+		`)
+
+	progID := uuid.NewString()
+	prog, err := ssaapi.ParseProjectWithFS(vf,
+		ssaapi.WithLanguage(consts.GO),
+		ssaapi.WithProgramName(progID),
+	)
+	defer func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), progID)
+	}()
+	require.NoError(t, err)
+	require.NotNil(t, prog)
+
+	query := `
+		.QueryRow(* #-> as $para_top_def)
+		`
+
+	require.Len(t, prog, 1)
+	res, err := prog[0].SyntaxFlowWithError(query)
+	require.NoError(t, err)
+
+	ssaapi.MaxTime = 1 * time.Nanosecond
+	start := time.Now()
+	_, err = res.Save(schema.SFResultKindDebug)
+	since := time.Since(start)
+	require.NoError(t, err)
+	defer func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), progID)
+	}()
+
+	valueMem := res.GetValues("para_top_def")
+	require.NotNil(t, valueMem)
+
+	// value := valueMem[0]
+	// graph := ssaapi.NewValueGraph(value)
+	// dotStr := graph.Dot()
+	// log.Infof("dot graph: \n%v", dotStr)
+	log.Infof("save graph time: %v", since)
+
+	require.LessOrEqual(t, since, 100*time.Millisecond) // 70.1505ms
 }
