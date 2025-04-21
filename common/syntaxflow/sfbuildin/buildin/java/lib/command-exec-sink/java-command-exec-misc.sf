@@ -28,13 +28,7 @@ $systemcommandexecutorBuilder...forCommandLine(* as $systemcommandexecutorBuilde
 $systemcommandexecutorBuilder...withArgs(* as $systemcommandexecutorBuilderParam);
 // $systemcommandexecutorBuilderParam
 
-
-// check $hadoopShellParam
-// check $systemcommandexecutorBuilderParam;
-// check $apacheCommandLine;
-// check $ztExecParam;
-// check $nuprocessParam
-
+<include('java-process-builder-sink')> as $output;
 $nuprocessParam as $output;
 $hadoopShellParam as $output;
 $nuprocessParam as $output;
