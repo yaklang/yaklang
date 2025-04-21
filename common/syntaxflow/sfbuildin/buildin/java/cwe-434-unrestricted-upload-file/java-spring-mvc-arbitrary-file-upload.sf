@@ -1,0 +1,133 @@
+desc(
+    title_zh:"查找Spring MVC任意文件上传漏洞",
+    title: "Find Spring MVC Arbitrary File Upload Vulnerability",
+    risk:"任意文件上传",
+)
+
+<include('java-spring-mvc-param')>?{<typeName>?{have:'org.springframework.web.multipart.MultipartFile'}} as $source;
+<include("java-spring-multipartfile-transferTo-target")> as $sink
+
+// TODO：过滤条件可以更为精细一点，但是文件后缀名是否验证判定比较复杂
+$sink #{
+    include: `<self> & $source`,
+    exclude: `<self>?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`,
+    
+}-> & $source as  $mid;
+
+alert $mid for {
+    message: "发现Java SpringBoot任意文件上传漏洞。",
+    level: high,
+}
+
+$sink #{
+    include: `<self> & $source`,
+}->as  $result;
+
+$result - $mid as $low;
+
+alert $low for {
+    message: "发现Java SpringBoot可能存在文件上传漏洞",
+    level: low,
+}
+
+desc(
+    alert_min:1,
+    'file://controller.java': <<<TEXT
+package org.example.moudels.file.controller;
+
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
+import org.example.common.util.R;
+import org.example.common.util.UploadUtil;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.servlet.http.HttpServletRequest;
+
+
+@Slf4j
+@Api(value = "UploadController",tags = "文件上传")
+@Controller
+@CrossOrigin(origins = "*")
+@RequestMapping("/upload")
+public class UploadController {
+    @RequestMapping("")
+    public String fileUpload() {
+        return "vul/file/upload";
+    }
+
+    @Autowired
+    private UploadUtil uploadUtil;
+
+
+    @ApiOperation(value="漏洞场景：任意文件上传", notes = "原生漏洞场景，未做任何限制")
+    @RequestMapping("/vul")
+    @ResponseBody
+    @SneakyThrows
+    public R vul(@RequestParam("file") MultipartFile file, HttpServletRequest request) {
+        String res;
+        String suffix = file.getOriginalFilename().substring(file.getOriginalFilename().lastIndexOf(".") + 1);
+        String path = request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort() + "/file/";
+        res =uploadUtil.uploadFile(file, suffix, path);
+        return R.ok(res);
+    }
+}
+TEXT
+    'file://file-upload.java': <<<TEXT
+    package org.example.common.util;
+
+    import lombok.extern.slf4j.Slf4j;
+    import org.example.common.constant.SysConstant;
+    import org.springframework.beans.factory.annotation.Autowired;
+    import org.springframework.stereotype.Component;
+    import org.springframework.web.multipart.MultipartFile;
+
+    import java.io.File;
+    import java.io.IOException;
+    import java.util.Arrays;
+
+
+    @Slf4j
+    @Component
+    public class UploadUtil {
+
+        @Autowired
+        private SysConstant sysConstant;
+
+        /**
+         * @description 文件上传
+         * @param file 文件
+         * @param suffix 文件后缀
+         * @param path 上传路径
+         */
+        public String uploadFile(MultipartFile file,String suffix, String path) throws IOException {
+            // 从配置中获取上传目录
+            String uploadFolderPath = sysConstant.getUploadFolder();
+            try {
+                // 确保目录存在
+                File uploadDir = new File(uploadFolderPath);
+                if (!uploadDir.exists() && !uploadDir.mkdirs()) {
+                    throw new IOException("Failed to create upload directory: " + uploadFolderPath);
+                }
+                // 构建文件路径
+               String fileName = System.currentTimeMillis()+"."+suffix;
+                String newFilePath = uploadFolderPath + File.separator + fileName;
+                // 保存文件
+                file.transferTo(new File(newFilePath));
+                log.info("上传文件成功，文件路径：" + newFilePath);
+                return "上传文件成功，文件路径：" + path + fileName;
+            } catch (IOException e) {
+                log.error("文件上传失败：{}", e.getMessage(), e);
+                throw e; // 重新抛出异常供上层处理
+            }
+        }
+    }
+TEXT
+)
