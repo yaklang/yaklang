@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/utils/graph"
@@ -34,6 +35,7 @@ type ValueGraph struct {
 	Value2Node     map[*Value]int   // ssaapi.Value -> node-id
 	marshaledValue map[int]struct{} // node-id ->  ssaapi.value
 	Node2Value     map[int]*Value
+	dtype          Dtype
 }
 
 func NewValueGraph(v ...*Value) *ValueGraph {
@@ -69,12 +71,37 @@ func (g *ValueGraph) ShowDot() {
 	fmt.Println(buf.String())
 }
 
+func removeEscapes(s string) string {
+	s = strings.ReplaceAll(s, "\t", "")
+	s = strings.ReplaceAll(s, "\r", "")
+	return s
+}
+
 func (g *ValueGraph) createNode(value *Value) (int, error) {
-	code := value.GetRange().GetText()
-	if len(code) > 100 {
-		code = code[:100] + "..."
+	// nodeId := g.AddNode(value.GetVerboseName())
+	// s := fmt.Sprintf("%s_%d_%d", value.GetVerboseName(), value.GetId(), nodeId)
+	// g.SetNode(nodeId, s)
+
+	if g.dtype == DT_None {
+		if value.GetDependOn() != nil {
+			g.dtype = DT_DependOn
+		} else if value.GetEffectOn() != nil {
+			g.dtype = DT_EffectOn
+		}
 	}
-	nodeId := g.AddNode(code)
+
+	nodeId := 0
+	if r := value.GetRange(); r != nil {
+		code := r.GetText()
+		if len(code) > 100 {
+			code = code[:100] + "..."
+		}
+		code = removeEscapes(code)
+		nodeId = g.AddNode(code)
+	} else {
+		nodeId = g.AddNode(value.GetVerboseName())
+	}
+
 	g.Node2Value[nodeId] = value
 	g.Value2Node[value] = nodeId
 	return nodeId, nil
@@ -86,12 +113,24 @@ func (g *ValueGraph) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
 	}
 
 	var res []*graph.Neighbor[*Value]
-	for _, v := range value.GetDependOn() {
-		res = append(res, graph.NewNeighbor(v, EdgeTypeDependOn))
+	appendFunc := func() {}
+
+	if g.dtype == DT_DependOn {
+		appendFunc = func() {
+			for _, v := range value.GetDependOn() {
+				res = append(res, graph.NewNeighbor(v, EdgeTypeDependOn))
+			}
+		}
+	} else if g.dtype == DT_EffectOn {
+		appendFunc = func() {
+			for _, v := range value.GetEffectOn() {
+				res = append(res, graph.NewNeighbor(v, EdgeTypeEffectOn))
+			}
+		}
 	}
-	for _, v := range value.GetEffectOn() {
-		res = append(res, graph.NewNeighbor(v, EdgeTypeEffectOn))
-	}
+
+	appendFunc()
+
 	for _, predecessor := range value.GetPredecessors() {
 		if predecessor.Node == nil {
 			continue
@@ -110,9 +149,9 @@ func (g *ValueGraph) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
 func (g *ValueGraph) handleEdge(fromNode int, toNode int, edgeType string, extraMsg map[string]any) {
 	switch ValidEdgeType(edgeType) {
 	case EdgeTypeDependOn:
-		g.AddEdge(fromNode, toNode, "depend_on")
+		g.AddEdge(toNode, fromNode, edgeType)
 	case EdgeTypeEffectOn:
-		g.AddEdge(toNode, fromNode, "effect_on")
+		g.AddEdge(toNode, fromNode, edgeType)
 	case EdgeTypePredecessor:
 		edges := g.GetEdges(toNode, fromNode)
 		var (

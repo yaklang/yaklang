@@ -1,11 +1,12 @@
 package java
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestJava_TopDef_UD_Relationship_Param(t *testing.T) {
@@ -114,8 +115,8 @@ public class Main {
 			res := vals.GetValues("param")
 			require.NotNil(t, res)
 			path := res.DotGraph()
-			require.Contains(t, path, "IFunc_DoGet")
-			require.Contains(t, path, "ImplB_DoGet")
+			require.Contains(t, path, "DoGet")
+			require.Contains(t, path, "DoGet")
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
 	})

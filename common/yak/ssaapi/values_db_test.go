@@ -61,14 +61,15 @@ func TestValuesDB_Save_Audit_Node(t *testing.T) {
 		*/
 		value1 := CreateValue(prog, 1)
 		value2 := CreateValue(prog, 2)
-		value3 := CreateValue(prog, 3)
+		value3_1 := CreateValue(prog, 3)
+		value3_2 := CreateValue(prog, 3)
 		value4 := CreateValue(prog, 4)
 		value1.AppendDependOn(value2)
-		value2.AppendDependOn(value3)
-		value1.AppendDependOn(value3)
-		value3.AppendDependOn(value4)
+		value2.AppendDependOn(value3_1)
+		value1.AppendDependOn(value3_2)
+		value3_2.AppendDependOn(value4)
 
-		value3.Predecessors = []*ssaapi.PredecessorValue{{
+		value3_1.Predecessors = []*ssaapi.PredecessorValue{{
 			Node: value1,
 			Info: &sfvm.AnalysisContext{
 				Step:  -1,
@@ -76,7 +77,7 @@ func TestValuesDB_Save_Audit_Node(t *testing.T) {
 			},
 		}}
 
-		values := []*ssaapi.Value{value1, value2, value3, value4}
+		values := []*ssaapi.Value{value1, value2, value3_1, value3_2, value4}
 
 		for _, v := range values {
 			err := ssaapi.SaveValue(v,
