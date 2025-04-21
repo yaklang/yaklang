@@ -1,6 +1,8 @@
 package ssa
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/samber/lo"
@@ -384,7 +386,7 @@ func (f *FunctionBuilder) EmitConstInstNil() *ConstInst {
 
 func (f *FunctionBuilder) EmitConstPointer(o *Variable) Value {
 	keys := []Value{f.EmitConstInst("@pointer"), f.EmitConstInst("@value")}
-	values := []Value{f.EmitConstInst(o.GetName()), o.GetValue()}
+	values := []Value{f.EmitConstInst(fmt.Sprintf("%s#%d", o.GetName(), o.GetGlobalIndex())), o.GetValue()}
 
 	pointer := f.InterfaceAddFieldBuild(2, func(i int) Value {
 		return keys[i]
@@ -412,9 +414,13 @@ func (f *FunctionBuilder) GetOriginValue(obj Value) Value {
 	p := f.ReadMemberCallValue(obj, f.EmitConstInst("@pointer"))
 
 	n := strings.TrimPrefix(p.String(), "&")
-	scope := obj.GetBlock().ScopeTable
-	if ret := ReadVariableFromScopeAndParent(scope, n); ret != nil {
-		return ret.GetValue()
+	originName, originGlobalId := SplitName(n)
+
+	scope := f.CurrentBlock.ScopeTable
+	if variable := GetVariablesWithGlobalIndex(scope, originName, originGlobalId); variable != nil {
+		if value := variable.GetValue(); value != nil {
+			return value
+		}
 	}
 
 	return v
@@ -643,6 +649,20 @@ func (f *FunctionBuilder) CopyValue(v Value) Value {
 			func(i int) Value {
 				return members[i]
 			})
+	case *Phi:
+		phi := f.EmitPhi(v.name, v.Edge)
+		phi.CFGEntryBasicBlock = v.CFGEntryBasicBlock
+		ret = phi
 	}
+	ret.SetVerboseName(v.GetVerboseName())
 	return ret
+}
+
+func SplitName(originName string) (string, int) {
+	originGlobalId := 0
+	if i := strings.Index(originName, "#"); i > 0 {
+		originGlobalId, _ = strconv.Atoi(originName[i+1:])
+		originName = originName[:i]
+	}
+	return originName, originGlobalId
 }
