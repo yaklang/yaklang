@@ -90,23 +90,23 @@ func (s *Server) StringFuzzer(rootCtx context.Context, req *ypb.StringFuzzerRequ
 
 	var res [][]byte
 	var counter int64
+	opts := yak.Fuzz_WithAllHotPatch(rootCtx, req.GetHotPatchCode())
+	opts = append(opts, mutate.Fuzz_WithResultHandler(func(origin string, payloads []string) bool {
+		select {
+		case <-ctx.Done():
+			return false
+		default:
+			if max > 0 && counter >= max {
+				return false
+			}
+		}
+		counter++
+		res = append(res, []byte(origin))
+		return true
+	}), mutate.Fuzz_WithEnableDangerousTag())
 	mutate.FuzzTagExec(
 		req.GetTemplate(),
-		mutate.Fuzz_WithResultHandler(func(origin string, payloads []string) bool {
-			select {
-			case <-ctx.Done():
-				return false
-			default:
-				if max > 0 && counter >= max {
-					return false
-				}
-			}
-			counter++
-			res = append(res, []byte(origin))
-			return true
-		}),
-		yak.Fuzz_WithHotPatch(rootCtx, req.GetHotPatchCode()),
-		mutate.Fuzz_WithEnableDangerousTag(),
+		opts...,
 	)
 	return &ypb.StringFuzzerResponse{Results: res}, nil
 }
@@ -341,7 +341,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	// hot code
 	var extraOpt []mutate.FuzzConfigOpt
 	if strings.TrimSpace(req.GetHotPatchCode()) != "" {
-		extraOpt = append(extraOpt, yak.Fuzz_WithHotPatch(stream.Context(), req.GetHotPatchCode()))
+		extraOpt = append(extraOpt, yak.Fuzz_WithAllHotPatch(stream.Context(), req.GetHotPatchCode())...)
 		extraOpt = append(extraOpt, mutate.Fuzz_WithExtraFuzzTagHandler("request", func(s string) []string {
 			return []string{utils.UnsafeBytesToString(rawRequest)}
 		}))
