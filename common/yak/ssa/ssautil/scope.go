@@ -424,6 +424,7 @@ func (v *ScopedVersionedTable[T]) CreateVariable(name string, isLocal bool) Vers
 func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], value T, updateLinks ...bool) {
 	// assign
 	err := variable.Assign(value)
+	variable.PointHandle(value, scope)
 	if err != nil {
 		log.Warnf("BUG: variable.Assign error: %v", err)
 		return

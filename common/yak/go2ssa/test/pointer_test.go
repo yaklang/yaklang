@@ -249,33 +249,51 @@ func Test_Pointer_muti(t *testing.T) {
 
 // todo
 func Test_Pointer_cfg(t *testing.T) {
-	t.Run("pointer cfg cross block", func(t *testing.T) {
+	t.Run("pointer cfg block", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
-	
-			func main(){
-				a := 1
-				p := &a
-				{
-					a := 2
-					*p = 3
-					println(a)	// 2
-					println(*p)	// 3
-				}
+
+		func main(){
+			a := 1
+			p := &a
+			{
+				*p = 3
 				println(a)	// 3
 				println(*p)	// 3
 			}
-				
-			`, []string{"2", "3", "3", "3"}, t)
+			println(a)	// 3
+			println(*p)	// 3
+		}
+
+		`, []string{"3", "3", "3", "3"}, t)
+	})
+
+	t.Run("pointer cfg block local", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			a := 1
+			p := &a
+			{
+				a := 2
+				*p = 3
+				println(a)	// 2
+				println(*p)	// 3
+			}
+			println(a)	// 3
+			println(*p)	// 3
+		}
+
+		`, []string{"2", "3", "3", "3"}, t)
 	})
 
 	t.Run("pointer cfg if", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
-
+	
 		func main(){
 			a := 1
 			p := &a
 
-			if a > b {
+			if a > 0 {
 				*p = 2
 			} else {
 				*p = 3
@@ -285,30 +303,29 @@ func Test_Pointer_cfg(t *testing.T) {
 			println(a)	// phi(a)[2,3]
 		}
 			
-		`, []string{"phi(p.@value)[2,3]", "phi(a)[2,3]"}, t)
+		`, []string{"phi(a)[2,3]", "phi(p.@value)[2,3]"}, t)
 	})
 
 	t.Run("pointer cfg if local", func(t *testing.T) {
-		t.Skip()
 		test.CheckPrintlnValue(`package main
 
 		func main(){
 			a := 1
 			p := &a
 
-			if a > b {
+			if a > 0 {
 				a := 2
-				*p = 2
+				*p = 4
 			} else {
 				a := 3
-				*p = 3
+				*p = 5
 			}
 
-			println(*p) // phi(p.@value)[2,3]
-			println(a)	// phi(a)[2,3]
+			println(*p) // phi(p.@value)[4,5]
+			println(a)	// phi(a)[4,5]
 		}
 			
-		`, []string{"phi(p.@value)[2,3]", "phi(a)[2,3]"}, t)
+		`, []string{"phi(a)[4,5]", "phi(p.@value)[4,5]"}, t)
 	})
 
 	t.Run("pointer cfg if address", func(t *testing.T) {
@@ -316,8 +333,8 @@ func Test_Pointer_cfg(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
 		func main(){
-			var a int = 1
-			var b int = 2
+			a := 1
+			b := 2
 			var p *int
 		
 			if a > b {
@@ -336,12 +353,58 @@ func Test_Pointer_cfg(t *testing.T) {
 	})
 
 	t.Run("pointer cfg switch", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			a := 1
+			var p *int
+			p = &a
+
+			switch a {
+			case 1:
+				*p = 2
+			case 2:
+				*p = 3
+			}
+
+			println(*p) // phi(p.@value)[2,3,1]
+			println(a)	// phi(a)[2,3,1]
+		}
+			
+		`, []string{"phi(p.@value)[2,3,1]", "phi(a)[2,3,1]"}, t)
+	})
+
+	t.Run("pointer cfg switch local", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			a := 1
+			var p *int
+			p = &a
+
+			switch a {
+			case 1:
+				a := 2
+				*p = 2
+			case 2:
+				a := 3
+				*p = 3
+			}
+
+			println(*p) // phi(p.@value)[2,3,1]
+			println(a)	// phi(a)[2,3,1]
+		}
+			
+		`, []string{"phi(p.@value)[2,3,1]", "phi(a)[2,3,1]"}, t)
+	})
+
+	t.Run("pointer cfg switch address", func(t *testing.T) {
 		t.Skip()
 		test.CheckPrintlnValue(`package main
 
 		func main(){
-			var a int = 1
-			var b int = 2
+			a := 1
+			b := 2
 			var p *int
 		
 			switch a {
@@ -365,8 +428,47 @@ func Test_Pointer_cfg(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
 		func main(){
-			var a int = 1
-			var b int = 2
+			a := 1
+			var p *int
+
+			for p = &a; ; {
+				*p = 2 
+			}
+
+			println(*p) // Undefined-p.@value
+			println(a)	// phi(a)[1,2]
+		}
+			
+		`, []string{"Undefined-p.@value", "phi(a)[1,2]"}, t)
+	})
+
+	t.Run("pointer cfg for local", func(t *testing.T) {
+		t.Skip()
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			a := 1
+			var p *int
+
+			for p = &a; ; {
+				a := 2
+				*p = 2 
+			}
+
+			println(*p) // Undefined-p.@value
+			println(a)	// phi(a)[1,2]
+		}
+			
+		`, []string{"Undefined-p.@value", "phi(a)[1,2]"}, t)
+	})
+
+	t.Run("pointer cfg for address", func(t *testing.T) {
+		t.Skip()
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			a := 1
+			b := 2
 			var p *int
 
 			for p = &a; ; {
