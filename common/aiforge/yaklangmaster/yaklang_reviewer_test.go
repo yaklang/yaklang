@@ -21,7 +21,7 @@ func TestYaklangMaster(t *testing.T) {
 			{Key: "code", Value: testYak},
 		},
 		aid.WithDebugPrompt(true),
-		aid.WithAICallback(aiforge.GetOpenRouterAICallback()),
+		aid.WithAICallback(aiforge.GetHoldAICallback()),
 	)
 	if err != nil {
 		t.Fatal(err)

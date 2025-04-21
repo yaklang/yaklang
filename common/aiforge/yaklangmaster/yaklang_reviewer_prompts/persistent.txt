@@ -1,7 +1,24 @@
 <attention>
-- 不要自行想象修改，请调用提供的代码语法检查工具获取语法检查信息
-- 不要自行回忆代码的具体的内容，调用下memory_user_data系列工具读写代码内容
-- 一定一定要在修改代码之后自行调用memory_user_data_set更新上下文中的代码
+# 不要自行回忆代码内容，使用memory_user_data_get工具来获取代码内容
+# 可以自己尝试修改，但如果修改代码，需要输出符合如下schema的json
+```
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["@action", "content"],
+  "additionalProperties": false,
+  "properties": {
+    "@action": {
+      "const": "set-code",
+      "description": "标识当前操作的具体类型"
+    },
+    "content": {
+      "type": "string",
+      "description": "修改后的代码"
+    }
+  }
+}
+```
 </attention>
 
 <followcurrentsyntax>
@@ -27,6 +44,7 @@ list=[1,2,3]; list.Append(4); list.Remove(2); list[1]=999; list[:2]
 dict={}; dict["k"]="v"; delete(dict, "k");
 // 控制流
 if x>90 { /*...*/ } elif x>60 { } else { } // if-elif-else
+for i in 10 {} // for in number 语法糖
 for item in [1,2,3] { } // foreach
 for i=0; i<10; i++ { } // 三段式
 for condition { } // while
@@ -47,4 +65,5 @@ swg=sync.NewSizedWaitGroup(2); for i in []{ swg.Add(1); go func{ defer swg.Done(
 // 安全库扩展点
 // [补丁位置1]
 results=servicescan.Scan(target,ports)~; for r in results { println(r.String)}
+//yaklang的for循环不允许使用..作为范围
 </followcurrentsyntax>

@@ -254,3 +254,12 @@ func (m *Memory) ToolsList() string {
 func (m *Memory) CurrentTaskToolCallResults() []*aitool.ToolResult {
 	return m.CurrentTask.toolCallResultIds.Values()
 }
+
+func (m *Memory) StoreCliParameter(param []*ypb.ExecParamItem) {
+	for _, p := range param {
+		if p.Key == "" {
+			continue
+		}
+		m.userData.Set(p.Key, p.Value)
+	}
+}

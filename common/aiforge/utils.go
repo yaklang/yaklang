@@ -72,6 +72,13 @@ func GetOpenRouterAICallbackFree(modelName ...string) aid.AICallbackType {
 	return getTestSuiteAICallback("openrouter.txt", nil, "openrouter", modelName...)
 }
 
+func GetHoldAICallback(modelName ...string) aid.AICallbackType {
+	if len(modelName) == 0 {
+		modelName = []string{"gemini-2.0-flash"}
+	}
+	return getTestSuiteAICallback("holdai.txt", []aispec.AIConfigOption{aispec.WithDomain("api.holdai.top")}, "openai", modelName...)
+}
+
 func GetOpenRouterAICallbackWithProxy(modelName ...string) aid.AICallbackType {
 	if len(modelName) == 0 {
 		modelName = []string{"google/gemini-2.0-flash-001"}

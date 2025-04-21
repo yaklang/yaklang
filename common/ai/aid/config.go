@@ -3,6 +3,7 @@ package aid
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"math/rand/v2"
 	"strings"
@@ -597,8 +598,16 @@ func WithForgeParams(i any) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
+		// set persistent prompt
 		result := utils.Jsonify(i)
-		config.memory.StoreAppendPersistentInfo(fmt.Sprintf(`用户原始输入：` + string(result)))
+		config.memory.StoreAppendPersistentInfo(fmt.Sprint(`用户原始输入：` + string(result)))
+
+		// if cli parameter not nil , should init user data
+		if params, ok := i.([]*ypb.ExecParamItem); ok {
+			if len(params) > 0 {
+				config.memory.StoreCliParameter(params)
+			}
+		}
 		return nil
 	}
 }
