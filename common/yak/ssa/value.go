@@ -199,20 +199,59 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	}
 	scope := b.CurrentBlock.ScopeTable
 	if variable.IsPointer() {
-		obj := variable.object
+		variable.SetPointHandle(func(value Value, scopet ssautil.ScopedVersionedTableIF[Value]) {
+			tmp := b.CurrentBlock.ScopeTable
+			defer func() {
+				b.CurrentBlock.ScopeTable = tmp
+			}()
 
-		v := b.CreateMemberCallVariable(obj, b.EmitConstInst("@value"), false)
-		p := b.CreateMemberCallVariable(obj, b.EmitConstInst("@pointer"), false)
-		p.SetKind(ssautil.PointerVariable)
-		scope.AssignVariable(v, value)
-		scope.AssignVariable(p, variable.GetValue())
-		n := strings.TrimPrefix(variable.GetValue().String(), "&")
+			b.CurrentBlock.ScopeTable = scopet
+			obj := variable.object
 
-		if ret := GetFristLocalVariableFromScope(scope, n); ret == nil {
-			scope.AssignVariable(b.CreateVariable(n), b.CopyValue(value))
-		} else if ret = ReadVariableFromScopeAndParent(variable.GetScope(), n); ret != nil {
-			scope.AssignVariable(ret, b.CopyValue(value), false)
-		}
+			v := b.CreateMemberCallVariable(obj, b.EmitConstInst("@value"))
+			p := b.CreateMemberCallVariable(obj, b.EmitConstInst("@pointer"))
+			p.SetKind(ssautil.PointerVariable)
+			scopet.AssignVariable(v, value)
+			if p.GetValue() == nil {
+				scopet.AssignVariable(p, variable.GetValue())
+			}
+
+			n := strings.TrimPrefix(variable.GetValue().String(), "&")
+			originName, originGlobalId := SplitName(n)
+
+			newValue := b.CopyValue(value)
+			newValue.SetName(originName)
+			newValue.SetVerboseName(originName)
+
+			if ret := GetFristLocalVariableFromScope(scopet, originName); ret != nil && ret.GetGlobalIndex() != originGlobalId {
+
+			} else {
+				scopet.AssignVariable(b.CreateVariable(originName), newValue)
+			}
+
+			p.SetPointHandle(func(value Value, scopett ssautil.ScopedVersionedTableIF[Value]) {
+				tmp := b.CurrentBlock.ScopeTable
+				defer func() {
+					b.CurrentBlock.ScopeTable = tmp
+				}()
+				b.CurrentBlock.ScopeTable = scopet
+
+				v := b.ReadMemberCallValue(obj, b.EmitConstInst("@value"))
+				p := b.ReadMemberCallValue(obj, b.EmitConstInst("@pointer"))
+
+				n := strings.TrimPrefix(p.String(), "&")
+				originName, _ := SplitName(n)
+
+				b.CurrentBlock.ScopeTable = scopett
+
+				variable := b.CreateVariable(originName)
+				newValue := b.CopyValue(v)
+				newValue.SetName(originName)
+				newValue.SetVerboseName(originName)
+				b.AssignVariable(variable, newValue)
+			})
+		})
+		variable.PointHandle(value, scope)
 	} else {
 		scope.AssignVariable(variable, value)
 	}
