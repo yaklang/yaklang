@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"math/rand/v2"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -73,6 +75,9 @@ type Config struct {
 	enableToolSearch bool
 	// tool manager
 	aiToolManager *buildinaitools.AiToolManager
+
+	// task ai resp callback
+	taskAIRespCallback func(string, *Config)
 
 	// memory
 	persistentMemory []string
@@ -438,6 +443,24 @@ func WithToolManager(manager *buildinaitools.AiToolManager) Option {
 		config.m.Lock()
 		defer config.m.Unlock()
 		config.aiToolManager = manager
+		return nil
+	}
+}
+
+func WithTaskAIRespCallback(cb func(string, *Config)) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.taskAIRespCallback = cb
+		return nil
+	}
+}
+
+func WithMemory(m *Memory) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.memory = m
 		return nil
 	}
 }

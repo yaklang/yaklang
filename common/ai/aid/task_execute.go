@@ -39,6 +39,9 @@ func (t *aiTask) execute() error {
 	// 处理工具调用, 直到没有工具调用为止
 TOOLREQUIRED:
 	for {
+		if t.config.taskAIRespCallback != nil {
+			t.config.taskAIRespCallback(response, t.config)
+		}
 		toolRequired := t.getToolRequired(response)
 		if len(toolRequired) == 0 {
 			t.config.EmitInfo("no tool required in task: %#v", t.Name)
