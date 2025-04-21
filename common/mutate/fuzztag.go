@@ -2198,3 +2198,14 @@ func HotPatchFuzztag(hotPatchHandler func(string, func(string)) error) *FuzzTagD
 		ArgumentDescription:   "{{string_split(handle:函数名)}}{{optional(string(params:参数))}}",
 	}
 }
+
+func HotPatchDynFuzztag(hotPatchHandler func(string, func(string)) error) *FuzzTagDescription {
+	return &FuzzTagDescription{
+		TagName:               "yak:dyn",
+		HandlerAndYieldString: hotPatchHandler,
+		Description:           "执行热加载代码",
+		TagNameVerbose:        "执行热加载代码",
+		ArgumentDescription:   "{{string_split(handle:函数名)}}{{optional(string(params:参数))}}",
+		IsDyn:                 true,
+	}
+}

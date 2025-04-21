@@ -1159,7 +1159,7 @@ func getFuzztagSuggestion(tagName string, labelFormatString string, tagDesc *mut
 func _getAllFuzztagSuggestionInfo() ([]*ypb.SuggestionDescription, map[string]string) {
 	_fuzztagSuggestionsOnce.Do(func() {
 		allTag := append(mutate.GetAllFuzztags(), append(mutate.FileTag(), mutate.CodecTag()...)...)
-		allTag = append(allTag, mutate.HotPatchFuzztag(func(s string, f func(string)) error { return nil }))
+		allTag = append(allTag, mutate.HotPatchFuzztag(func(s string, f func(string)) error { return nil }), mutate.HotPatchDynFuzztag(func(s string, f func(string)) error { return nil }))
 		allTag = append(allTag, &mutate.FuzzTagDescription{TagName: "request", Description: "原始请求", TagNameVerbose: "request", Examples: []string{"{{request}}"}})
 		tagLabelFormatString := fmt.Sprintf("%%-%ds[%%s]", mutate.GetFuzztagMaxLength(allTag)+4)
 		for _, tag := range allTag {
@@ -1267,7 +1267,7 @@ func fuzztagCompletion(fuzztagCode string, hotPatchCode string) []*ypb.Suggestio
 		if strings.HasPrefix(fuzztagCode, "{{payload(") {
 			return getPayloadGroup()
 		}
-		if strings.HasPrefix(fuzztagCode, "{{yak(") {
+		if strings.HasPrefix(fuzztagCode, "{{yak(") || strings.HasPrefix(fuzztagCode, "{{yak:dyn(") {
 			return hotPatchSuggestions
 		}
 		suggestions, _ = _getAllFuzztagSuggestionInfo()
