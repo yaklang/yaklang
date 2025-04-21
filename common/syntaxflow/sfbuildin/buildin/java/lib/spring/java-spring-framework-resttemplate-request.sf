@@ -1,6 +1,6 @@
 desc(
-    title:"Find Java SpringBoot RestTemplate Network Request API Sink Params",
-    title_zh:"查找Java SpringBoot RestTemplate 请求API的Sink参数",
+    title:"Find Java Spring Framework RestTemplate Network Request API Sink Params",
+    title_zh:"查找Java Spring Framework RestTemplate 请求API的Sink参数",
     type: audit,
     lib: "java-spring-rest-template-request-params",
     reference:<<<TEXT
