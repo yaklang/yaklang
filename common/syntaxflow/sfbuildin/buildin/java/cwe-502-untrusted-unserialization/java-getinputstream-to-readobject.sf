@@ -1,34 +1,34 @@
 desc(
-    title: "Find Java Native Deserialization Vulnerability via ObjectInputStream",
-    type: vuln,
+    title_zh:"检测Java通过ObjectInputStream的原生反序列化漏洞",
+    title: "Check Java Native Deserialization Vulnerability via ObjectInputStream",
+    type: audit,
     lang: java,
-    risk: 'unserialize',
+    risk: '反序列化漏洞',
     desc: <<<TEXT
 反序列化漏洞允许攻击者通过发送恶意构造的序列化对象，远程执行任意代码。当应用程序使用`ObjectInputStream`的`readObject()`方法从不受信任的来源反序列化对象时，如果未进行适当的安全措施，攻击者可以利用此漏洞执行任意代码，造成敏感数据泄露、服务器被控等严重后果。因此，应严格限制或避免从不受信任的输入源进行反序列化操作。
 TEXT
 )
 
-.readObject?{<getObject>?{<typeName>?{have: ObjectInputStream}}<var(input)> } as $readObject;
-$readObject() as $sink;
-alert $sink for {
-    message: "Deserialization Vulnerability via ObjectInputStream",
+.readObject?{<typeName>?{have: "java.io.ObjectInputStream"} } as $readObj;
+check $readObj;
+
+alert $readObj for {
+    message: "发现使用ObjectInputStream的readObject()方法进行反序列化操作，可能存在反序列化漏洞",
+    level: info,
+};
+
+$readObj<getObject()> as $sink
+
+<include('java-spring-mvc-param')> as $source;
+<include('java-servlet-param')> as $source;
+$sink #{
+    until: `* & $source`,
+}-> as $mid;
+
+alert $mid for {
+    message: "发现从用户可控输入到ObjectInputStream的readObject的数据流，可能存在反序列化漏洞",
     level: mid,
-    type: audit,
 };
-
-check $readObject;
-
-<include('java-spring-mvc-param')> as $params;
-<include('java-servlet-param')> as $params;
-$readObject<getObject>#{
-    until: `* & $params<var(source)> as $__next__`,
-}->;
-alert $source for {
-    message: "Deserialization vulnerability: Spring parameter reaches ObjectInputStream.readObject()",
-    level: high,
-    type: audit,
-};
-
 
 
 desc(

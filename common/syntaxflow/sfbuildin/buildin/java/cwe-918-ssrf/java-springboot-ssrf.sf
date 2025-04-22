@@ -10,8 +10,8 @@ TEXT
 <include("java-http-sink")> as $sink;
 
 $sink #{
-    include: `<self> & $source`,
-    exclude: `<self>?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`,
+    until: `* & $source`,
+    exclude: `*?{opcode:call}?{!* & $source}?{!* & $sink}`,
 }->as  $mid;
 
 alert $mid for {
@@ -21,7 +21,7 @@ alert $mid for {
 }
 
 $sink #{
-    include: `<self> & $source`,
+    until: `* & $source`,
 }->as  $result;
 
 $result - $mid as $low;
