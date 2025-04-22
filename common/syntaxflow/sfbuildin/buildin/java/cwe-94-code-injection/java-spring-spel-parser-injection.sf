@@ -1,0 +1,83 @@
+desc(
+    title_zh:"检测Java Spring Framework SPEL Parser注入漏洞",
+    title: "Check SpringFramework SPEL Parser Injection",
+    type: vuln,
+    risk:"SPEL表达式注入",
+    desc: <<<TEXT
+Spring Framework 的 Spring Expression Language (SPEL) 解析器存在注入漏洞。当应用程序不安全地解析用户提供的SPEL表达式时，攻击者可以构造恶意的表达式来访问或修改应用程序中的敏感数据，执行任意代码，甚至可能导致远程代码执行。这严重威胁到应用程序的数据完整性和安全性。建议对SPEL表达式的解析进行严格的输入验证和消毒，以防止此类注入攻击。
+TEXT
+)
+
+<include('java-spring-mvc-param')> as $source;
+check $source;
+
+SpelExpressionParser()?{<typeName>?{have:'org.springframework.expression.spel'}} as $context;
+$context.parseExpression(*<slice(index=1)>  as $sink);
+$sink #{
+    until: `*  & $source`,
+    exclude: `* ?{opcode:call}?{!* & $source}?{!* & $sink}`,
+}->  as  $mid;
+
+alert $mid for {
+    message: "发现Java Framework SPEL表达式注入漏洞",
+    level: mid,
+}
+
+$sink #{
+    until: `* & $source`,
+}-> as  $result;
+
+$result - $mid as $low;
+
+alert $low for {
+    message: "发现Java 可能存在Framework SPEL表达式注入漏洞",
+    level: low,
+}
+
+desc(
+    lang: java,
+    alert_num: 1,
+    'file://spel-inject.java': <<<UNSAFE
+
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiImplicitParam;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.expression.EvaluationContext;
+import org.springframework.expression.Expression;
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.expression.spel.support.SimpleEvaluationContext;
+import org.springframework.expression.spel.support.StandardEvaluationContext;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
+
+@Slf4j
+@Api(value = "SPELController", tags = "JAVA专题-SPEL 表达式注入")
+@Controller
+@CrossOrigin(origins = "*")
+@RequestMapping("/spel")
+public class SPELController {
+    @RequestMapping("")
+    public String spel() {
+        return "vul/spel/spel";
+    }
+
+    @ApiOperation(value = "漏洞场景：原生漏洞场景", notes = "当参数未经过滤时，攻击者可以注入恶意的SPEL表达式，执行任意代码")
+    @ResponseBody
+    @ApiImplicitParam(name = "ex", value = "表达式", dataType = "String", paramType = "query", dataTypeClass = String.class)
+    @GetMapping("/vul")
+    public R vul(@ApiParam(name = "ex", value = "表达式", required = true) @RequestParam String ex) {
+        ExpressionParser parser = new SpelExpressionParser();
+
+        EvaluationContext evaluationContext = new StandardEvaluationContext();
+        Expression exp = parser.parseExpression(ex);
+        String result = exp.getValue(evaluationContext).toString();
+        log.info("[+]SPEL表达式注入："+ex);
+        return R.ok(result);
+    }
+
+}
+UNSAFE
+)
