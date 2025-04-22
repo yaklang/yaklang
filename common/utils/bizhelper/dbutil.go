@@ -480,7 +480,10 @@ func ExactQueryUInt64ArrayOr(db *gorm.DB, field string, s []uint64) *gorm.DB {
 	ranges := make([]Range, 0)
 	querys := make([]string, 0)
 	items := make([]any, 0)
-
+	//如果where数量大于100，使用in查询
+	if len(s) > 100 {
+		return db.Where(fmt.Sprintf("%v IN (?)", field), s)
+	}
 	for _, val := range s {
 		if len(ranges) == 0 || val-1 > ranges[len(ranges)-1].Max {
 			ranges = append(ranges, Range{
