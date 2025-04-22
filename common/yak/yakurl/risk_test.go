@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path"
 	"strconv"
 	"testing"
 
@@ -115,7 +116,7 @@ func GetSSARisk(t *testing.T, local ypb.YakClient, url *ypb.YakURL) map[string]d
 				filterCount = paging.TotalRecord
 			}
 		}
-		require.Equal(t, count, filterCount)
+		require.Equal(t, count, filterCount, "filter count not equal with msg count")
 		got[resource.Path] = data{
 			Name:  resource.ResourceName,
 			Type:  resource.ResourceType,
@@ -130,6 +131,22 @@ func TestRiskAction(t *testing.T) {
 	initRiskTest(t, programName1)
 	programName2 := uuid.NewString()
 	initRiskTest(t, programName2)
+
+	urlProgramPath := func(progName string) string {
+		return "/" + progName
+	}
+
+	sourcePath := func(progName, source string) string {
+		return path.Join("/", progName, source)
+	}
+
+	urlPath := func(progName, source string) string {
+		return path.Join(urlProgramPath(progName), sourcePath(progName, source))
+	}
+
+	urlFunctionPath := func(progName, source, function string) string {
+		return path.Join(urlPath(progName, source), function)
+	}
 
 	t.Cleanup(func() {
 		yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{ProgramName: []string{programName1}})
@@ -159,20 +176,20 @@ func TestRiskAction(t *testing.T) {
 				require.Equal(t, wantData.Count, gotData.Count, "Count mismatch for path %s", wantPath)
 			}
 		} else {
-			require.Equal(t, got, want)
+			require.Equal(t, want, got)
 		}
 	}
 
 	t.Run("check path root", func(t *testing.T) {
 		// ssarisk://
 		// contain two  program is ok
-		checkPathAndSearch("/", "/", map[string]data{
-			"/" + programName1: {
+		checkPathAndSearch("/", "", map[string]data{
+			urlProgramPath(programName1): {
 				Name:  programName1,
 				Type:  "program",
 				Count: 5,
 			},
-			"/" + programName2: {
+			urlProgramPath(programName2): {
 				Name:  programName2,
 				Type:  "program",
 				Count: 5,
@@ -182,24 +199,24 @@ func TestRiskAction(t *testing.T) {
 
 	t.Run("check path program", func(t *testing.T) {
 		// ssarisk://program
-		checkPathAndSearch("/"+programName1, "/", map[string]data{
-			"/" + programName1 + "/a.go": {
-				Name:  "/a.go",
+		checkPathAndSearch(urlProgramPath(programName1), "", map[string]data{
+			urlPath(programName1, "a.go"): {
+				Name:  sourcePath(programName1, "a.go"),
 				Type:  "source",
 				Count: 1,
 			},
-			"/" + programName1 + "/b/b1.go": {
-				Name:  "/b/b1.go",
+			urlPath(programName1, "b/b1.go"): {
+				Name:  sourcePath(programName1, "b/b1.go"),
 				Type:  "source",
 				Count: 1,
 			},
-			"/" + programName1 + "/b/b2.go": {
-				Name:  "/b/b2.go",
+			urlPath(programName1, "b/b2.go"): {
+				Name:  sourcePath(programName1, "b/b2.go"),
 				Type:  "source",
 				Count: 1,
 			},
-			"/" + programName1 + "/c.go": {
-				Name:  "/c.go",
+			urlPath(programName1, "c.go"): {
+				Name:  sourcePath(programName1, "c.go"),
 				Type:  "source",
 				Count: 2,
 			},
@@ -208,8 +225,8 @@ func TestRiskAction(t *testing.T) {
 
 	t.Run("check path source", func(t *testing.T) {
 		// ssarisk://program/c.go
-		checkPathAndSearch("/"+programName1+"/c.go", "/", map[string]data{
-			"/" + programName1 + "/c.go" + "/funcC": {
+		checkPathAndSearch(urlPath(programName1, "c.go"), "", map[string]data{
+			urlFunctionPath(programName1, "c.go", "funcC"): {
 				Name:  "funcC",
 				Type:  "function",
 				Count: 2,
@@ -220,77 +237,77 @@ func TestRiskAction(t *testing.T) {
 	t.Run("check search source(file)", func(t *testing.T) {
 		// ssarisk://?search=/c.go
 		checkPathAndSearch("/", "/c.go", map[string]data{
-			"/" + programName1: {
+			urlProgramPath(programName1): {
 				Name:  programName1,
 				Type:  "program",
 				Count: 2,
 			},
-			"/" + programName2: {
+			urlProgramPath(programName2): {
 				Name:  programName2,
 				Type:  "program",
 				Count: 2,
 			},
-		})
+		}, true)
 	})
 
 	t.Run("check search source(dir)", func(t *testing.T) {
 		// ssarisk://?search=/b/
 		checkPathAndSearch("/", "/b/", map[string]data{
-			"/" + programName1: {
+			urlProgramPath(programName1): {
 				Name:  programName1,
 				Type:  "program",
 				Count: 2,
 			},
-			"/" + programName2: {
+			urlProgramPath(programName2): {
 				Name:  programName2,
 				Type:  "program",
 				Count: 2,
 			},
-		})
+		}, true)
 	})
 
 	t.Run("check search function", func(t *testing.T) {
 		// ssarisk://?search=funcA
 		checkPathAndSearch("/", "funcA", map[string]data{
-			"/" + programName1: {
+			urlProgramPath(programName1): {
 				Name:  programName1,
 				Type:  "program",
 				Count: 1,
 			},
-			"/" + programName2: {
+			urlProgramPath(programName2): {
 				Name:  programName2,
 				Type:  "program",
 				Count: 1,
 			},
-		})
+		}, true)
 	})
 
 	t.Run("check search function fuzzy", func(t *testing.T) {
 		// ssarisk://?search=func
 		checkPathAndSearch("/", "func", map[string]data{
-			"/" + programName1: {
+			urlProgramPath(programName1): {
 				Name:  programName1,
 				Type:  "program",
 				Count: 5,
 			},
-			"/" + programName2: {
+			urlProgramPath(programName2): {
 				Name:  programName2,
 				Type:  "program",
 				Count: 5,
 			},
-		})
+		}, true)
 	})
 
 	t.Run("check path program and search source", func(t *testing.T) {
 		// ssarisk://program/?search=/b
-		checkPathAndSearch("/"+programName1, "/b", map[string]data{
-			"/" + programName1 + "/b/b1.go": {
-				Name:  "/b/b1.go",
+		checkPathAndSearch(urlProgramPath(programName1), "/b", map[string]data{
+			urlPath(programName1, "b/b1.go"): {
+				Name:  sourcePath(programName1, "b/b1.go"),
 				Type:  "source",
 				Count: 1,
 			},
-			"/" + programName1 + "/b/b2.go": {
-				Name:  "/b/b2.go",
+			urlPath(programName1, "b/b2.go"): {
+				Name:  sourcePath(programName1, "b/b2.go"),
 				Type:  "source",
 				Count: 1,
 			},
@@ -299,9 +316,9 @@ func TestRiskAction(t *testing.T) {
 
 	t.Run("check path program and search function", func(t *testing.T) {
 		// ssarisk://program/?search=/funcB1
-		checkPathAndSearch("/"+programName1, "funcB1", map[string]data{
-			"/" + programName1 + "/b/b1.go": {
-				Name:  "/b/b1.go",
+		checkPathAndSearch(urlProgramPath(programName1), "funcB1", map[string]data{
+			urlPath(programName1, "b/b1.go"): {
+				Name:  sourcePath(programName1, "b/b1.go"),
 				Type:  "source",
 				Count: 1,
 			},
@@ -310,8 +327,8 @@ func TestRiskAction(t *testing.T) {
 
 	t.Run("check path source and search function", func(t *testing.T) {
 		// ssarisk://program/b/?search=/funcB1
-		checkPathAndSearch("/"+programName1+"/b", "funcB1", map[string]data{
-			"/" + programName1 + "/b/b1.go" + "/funcB1": {
+		checkPathAndSearch(urlPath(programName1, "b/b1.go"), "funcB1", map[string]data{
+			urlFunctionPath(programName1, "b/b1.go", "funcB1"): {
 				Name:  "funcB1",
 				Type:  "function",
 				Count: 1,
@@ -321,7 +338,7 @@ func TestRiskAction(t *testing.T) {
 
 	t.Run("check path function and search function but not find", func(t *testing.T) {
 		// ssarisk://program/b/?search=/funcB1
-		checkPathAndSearch("/"+programName1+"/b/b1.go/funcB1", "funcB2", map[string]data{})
+		checkPathAndSearch(urlFunctionPath(programName1, "b/b1.go", "funcB1"), "funcB2", map[string]data{})
 	})
 
 }
