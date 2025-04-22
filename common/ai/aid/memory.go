@@ -2,6 +2,7 @@ package aid
 
 import (
 	"bytes"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	osRuntime "runtime"
 	"strings"
 	"text/template"

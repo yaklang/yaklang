@@ -204,9 +204,6 @@ func (t *aiTask) execute() error {
 
 TOOLREQUIRED:
 	for {
-		if t.config.taskAIRespCallback != nil {
-			t.config.taskAIRespCallback(response, t.config)
-		}
 		toolRequired := t.getToolRequired(response)
 		if len(toolRequired) == 0 {
 			t.config.EmitInfo("no tool required in task: %#v", t.Name)
