@@ -1,9 +1,6 @@
 package ssaapi
 
 import (
-	"context"
-	"time"
-
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -188,13 +185,8 @@ func (s *saveValueCtx) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
 	return res
 }
 
-var MaxTime = time.Millisecond * 500
-
 // from is the source node, to is the target node, from -> xxx -> to
 func (s *saveValueCtx) saveDataFlow(from *Value, to *Value) bool {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	f := func(v *Value) []*Value {
 		return nil
 	}
@@ -210,39 +202,22 @@ func (s *saveValueCtx) saveDataFlow(from *Value, to *Value) bool {
 	}
 
 	var paths [][]*Value
-	resultChan := make(chan [][]*Value, 1)
-	// errChan := make(chan error, 1)
-
-	go func() {
-		paths = graph.GraphPathWithTarget(from, to, func(v *Value) []*Value {
-			select {
-			case <-ctx.Done(): // 检查是否被取消
-				return nil
-			default:
-				return f(v)
-			}
-		})
-		resultChan <- paths
-	}()
-
-	// MaxTime := time.Hour
-
-	start := time.Now()
-	select {
-	case paths = <-resultChan:
-	case <-time.After(MaxTime):
-		cancel()
-		log.Warnf("saveDataFlow:  collect paths timeout after %v", MaxTime)
-		return false
-	}
+	paths = graph.GraphPathWithTarget(from, to, func(v *Value) []*Value {
+		return f(v)
+	})
 
 	totalElements := 0
 	for _, innerSlice := range paths {
 		totalElements += len(innerSlice) // 累加所有内层切片长度
 	}
 
-	if totalElements == 0 || totalElements > 5 {
-		log.Warnf("saveDataFlow:  paths is empty or too many paths: %v", totalElements)
+	var MaxPathElements = 10
+	if totalElements == 0 {
+		log.Warnf("saveDataFlow:  paths is empty, maybe timeout")
+		return false
+	}
+	if totalElements > MaxPathElements {
+		log.Warnf("saveDataFlow:  paths is too many: %v", totalElements)
 		return false
 	}
 
@@ -272,10 +247,10 @@ func (s *saveValueCtx) saveDataFlow(from *Value, to *Value) bool {
 
 		}
 	}
-	elapsed := time.Since(start)
-	if elapsed > MaxTime {
-		log.Warnf("saveDataFlow:  save paths cost [%v] paths: %v", elapsed, totalElements)
-	}
+	// elapsed := time.Since(start)
+	// if elapsed > MaxTime {
+	// 	log.Warnf("saveDataFlow:  save paths cost [%v] paths: %v", elapsed, totalElements)
+	// }
 
 	return true
 }

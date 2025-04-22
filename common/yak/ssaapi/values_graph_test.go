@@ -234,6 +234,7 @@ func Test_Values_Graph_Dot(t *testing.T) {
 }
 
 func TestGraph_Limit(t *testing.T) {
+	// 构造图的时间太短不至于触发超时
 	t.Skip()
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("example/src/main/java/com/example/apackage/a.go", `
@@ -296,7 +297,6 @@ func main() {
 	res, err := prog[0].SyntaxFlowWithError(query)
 	require.NoError(t, err)
 
-	ssaapi.MaxTime = 1 * time.Nanosecond
 	start := time.Now()
 	_, err = res.Save(schema.SFResultKindDebug)
 	since := time.Since(start)
