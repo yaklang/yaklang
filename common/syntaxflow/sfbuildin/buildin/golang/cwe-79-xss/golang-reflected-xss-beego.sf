@@ -1,0 +1,50 @@
+desc(
+    title: "golang Reflected XSS(gobee)",
+    title_zh: "golang 反射型跨站脚本攻击(gobee)",
+    type: vuln,
+    severity: mid,
+    risk: xss,
+    desc: <<<TEXT
+反射型跨站脚本攻击（Reflected XSS）是一种常见的 Web 安全漏洞，攻击者通过构造包含恶意脚本的 URL，诱使受害者点击该链接。当受害者浏览器加载该页面时，恶意脚本会被执行，从而允许攻击者窃取受害者的敏感信息或执行其他恶意操作。
+
+在 Go 语言编写的 Web 应用中，如果未对用户输入进行适当的过滤或转义，直接将用户输入嵌入到 HTML 页面中，就可能导致反射型 XSS 漏洞。此漏洞具有高风险，因为它允许攻击者绕过同源策略，执行任意 JavaScript 代码，对受害者进行攻击。
+
+反射型 XSS 漏洞通常发生在以下场景：
+1. 用户输入被直接嵌入到 HTML 页面中，例如通过字符串拼接生成 HTML 内容。
+2. 未对用户输入进行 HTML 转义，导致恶意脚本被浏览器解析执行。
+TEXT
+)
+
+.Ctx.ResponseWriter.Write(* #-> as $sink)
+$sink?{have: 'GetString'} as $mid;
+
+alert $mid for {
+    title: 'Reflected XSS detected',
+    title_zh: '检测到反射XSS',
+    type: 'vuln',
+    level: 'mid',
+}
+
+desc(
+    lang: golang,
+    alert_mid: 1,
+    'file://main.go': <<<UNSAFE
+package main
+
+import (
+	"go-sec-code/utils"
+	"html/template"
+	"io/ioutil"
+
+	beego "github.com/beego/beego/v2/server/web"
+)
+
+func (c *XSSVuln1Controller) Get() {
+	xss := c.GetString("xss", "hello")
+	c.Ctx.ResponseWriter.Header().Set("Content-Type", "text/html")
+	c.Ctx.ResponseWriter.Write([]byte(xss))
+}
+
+
+UNSAFE
+)

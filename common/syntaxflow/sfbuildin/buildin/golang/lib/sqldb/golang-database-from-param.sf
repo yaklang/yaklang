@@ -1,5 +1,5 @@
 desc(
-    title: "check file database function",
+    title: "check file database function(param)",
     type: audit,
     level: info,
     lib: 'golang-database-from-param',
@@ -8,8 +8,8 @@ desc(
 TEXT
 )
 
-*.Query<getFunc><getFormalParams>
-*.QueryRow<getFunc><getFormalParams>
+*.Query<getFunc><getFormalParams> as $entry 
+*.QueryRow<getFunc><getFormalParams> as $entry 
 $entry #-> as $output;
 
 alert $output

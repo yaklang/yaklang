@@ -135,7 +135,7 @@ $sink.Strict?{!have: 'false'} as $high
 
 alert $high for {
     title: 'xxe read any file check',
-    title_zh: '检测到文件路径未授权',
+    title_zh: '检测到XXE漏洞读取任意文件',
     type: 'vuln',
     level: 'high',
 }
