@@ -1,0 +1,104 @@
+desc(
+    title_zh:"检测Java XMLDecoder反序列化漏洞",
+    title:"Check Java XMLDecoder Unserialization",
+    type:vul,
+    reference:<<<URL
+    https://docs.oracle.com/javase/8/docs/api/java/beans/XMLDecoder.html
+URL
+    desc: <<<TEXT
+XMLDecoder反序列化漏洞允许攻击者通过发送恶意构造的XML数据，远程执行任意代码。当应用程序使用`XMLDecoder`类的`readObject()`等方法从不受信任的来源反序列化对象时，如果未进行适当的安全措施，攻击者可以利用此漏洞执行任意代码，造成敏感数据泄露、服务器被控等严重后果。
+规则审计的类:
+- java.beans.XMLDecoder
+审计的方法:
+- readObject()
+TEXT
+)
+
+// readObject()
+.readObject?{<typeName>?{have:'java.beans.XMLDecoder'}}<getObject()> as $decoder;
+$decoder<getCallee()>(*<slice(index=1)> as $sink)
+
+<include('java-spring-mvc-param')> as $source;
+<include('java-servlet-param')> as $source;
+
+$sink #{
+    until: `* & $source`,
+    exclude: `*?{opcode:call}?{!* & $source}?{!* & $sink}`,
+}->as  $high;
+
+alert $high for {
+    message: "发现Java SnakeYAML反序列化漏洞,并且没有任何数据流过滤。",
+    level: high,
+}
+
+$sink #{
+    until: `* & $source`,
+}->as  $result;
+
+$result - $high as $low;
+
+alert $low for {
+    message: "发现Java SnakeYAML反序列化漏洞,但是有数据流过滤。",
+    level: low,
+}
+
+desc(
+    lang:java,
+    alert_min:1,
+    'file://risk1.java': <<<TEXT
+
+import io.swagger.annotations.Api;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
+
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import org.xml.sax.InputSource;
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
+
+
+@Slf4j
+@Api(value = "XMLDecoderController", tags = "反序列化 - XMLDecoder")
+@Controller
+@CrossOrigin(origins = "*")
+@RequestMapping("/xmlDecoder")
+public class XMLDecoderController {
+    @RequestMapping("")
+    public String xmlDecoder() {
+        return "vul/deserialize/xmlDecoder";
+    }
+
+    @RequestMapping("/vul")
+    @ResponseBody
+    public R vul(String payload) {
+        String[] strCmd = payload.split(" ");
+        StringBuilder xml = new StringBuilder()
+                .append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
+                .append("<java version=\"1.8.0_151\" class=\"java.beans.XMLDecoder\">")
+                .append("<object class=\"java.lang.ProcessBuilder\">")
+                .append("<array class=\"java.lang.String\" length=\"").append(strCmd.length).append("\">");
+        for (int i = 0; i < strCmd.length; i++) {
+            xml.append("<void index=\"").append(i).append("\"><string>")
+                    .append(strCmd[i]).append("</string></void>");
+        }
+        xml.append("</array><void method=\"start\" /></object></java>");
+        try {
+            new java.beans.XMLDecoder(new ByteArrayInputStream(xml.toString().getBytes(StandardCharsets.UTF_8)))
+                    .readObject().toString();
+            return R.ok("[+]命令执行成功");
+        } catch (Exception e) {
+            return R.error("[-]命令执行失败: " + e.getMessage());
+        }
+    }
+}
+TEXT
+)
+
