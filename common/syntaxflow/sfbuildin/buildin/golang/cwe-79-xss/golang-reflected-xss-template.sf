@@ -95,6 +95,9 @@ $new().Parse() -> as $param
 $param.Execute(* as $target) 
 $target #{include: `*?{have: 'template.HTML'}`}-> as $high;
 
+template.HTML(* #-> as $source)
+$source?{have: '.GetSession'} as $high
+
 alert $high for {
     title: 'Reflected XSS detected',
     title_zh: '检测到反射XSS',

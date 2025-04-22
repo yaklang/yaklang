@@ -1,0 +1,67 @@
+desc(
+    title: "golang xxe-beego",
+    title_zh: "golang XXE(beego)",
+    type: vuln,
+    level: high,
+    desc: <<<TEXT
+此审计规则旨在验证 XML 解析过程中是否存在 XXE（XML External Entity）漏洞。XXE 漏洞（CWE-611）允许攻击者通过构造恶意 XML 输入读取服务器上的任意文件（如 `/etc/passwd`），甚至可能导致服务器被完全控制。当应用程序未禁用外部实体解析时，攻击者可以利用外部实体加载恶意文件或执行其他危险操作。
+
+XXE 漏洞通常发生在以下场景：
+1. 应用程序解析用户提供的 XML 数据时，未禁用外部实体解析。
+2. 攻击者通过构造包含外部实体的恶意 XML 文件
+TEXT
+)
+
+parser?{<fullTypeName>?{have: 'github.com/lestrrat-go/libxml2/parser'}} as $entry 
+
+$entry.New(* as $param)
+$param?{have: "XMLParseNoEnt"} as $high
+
+alert $high for {
+    title: 'xxe read any file check',
+    title_zh: '检测到XXE漏洞',
+    type: 'vuln',
+    level: 'high',
+}
+
+desc(
+    lang: golang,
+    alert_high: 1,
+    'file://main.go': <<<UNSAFE
+package main
+
+import (
+	"bytes"
+	"fmt"
+	"io/ioutil"
+
+	beego "github.com/beego/beego/v2/server/web"
+	"github.com/beevik/etree"
+	"github.com/lestrrat-go/libxml2/parser"
+)
+
+func (c *XXEVuln1Controller) Get() {
+	file, err := ioutil.ReadFile("static/xml/xxe.xml")
+	if err != nil {
+		panic(err)
+	}
+	c.Data["xxe"] = string(file)
+	c.TplName = "xxe.tpl"
+}
+
+func (c *XXEVuln1Controller) Post() {
+	file := c.GetString("file")
+	p := parser.New(parser.XMLParseNoEnt)
+	doc, err := p.ParseReader(bytes.NewReader([]byte(file)))
+	if err != nil {
+		panic(err)
+	}
+	defer doc.Free()
+	root, err := doc.DocumentElement()
+	xxe := root.TextContent()
+	c.Data["xxe"] = xxe
+	c.TplName = "xxe.tpl"
+}
+
+UNSAFE
+)
