@@ -52,6 +52,10 @@ const (
 	// NativeCall_GetMembers is used to get the members of a value
 	NativeCall_GetMembers = "getMembers"
 
+	// NativeCall_GetMemberByKey is used to get the members of a value by key
+	// example: <getMemberByKey(key="")>
+	NativeCall_GetMemberByKey = "getMemberByKey"
+
 	// NativeCall_GetSiblings is used to get the siblings of a value
 	NativeCall_GetSiblings = "getSiblings"
 
@@ -1208,6 +1212,34 @@ func init() {
 		}),
 		nc_desc("获取输入指令的成员指令，一般说的是如果这个指令是一个对象，可以通过这个指令获取这个对象的成员。"),
 	)
+
+	registerNativeCall(
+		NativeCall_GetMemberByKey,
+		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+			var rets []sfvm.ValueOperator
+			key := actualParams.GetString(0, "key")
+
+			v.Recursive(func(operator sfvm.ValueOperator) error {
+				val, ok := operator.(*Value)
+				if !ok {
+					return nil
+				}
+
+				if ret, ok := val.GetMembersByString(key); ok {
+					ret.AppendPredecessor(val, frame.WithPredecessorContext("getMemberByKey"))
+					rets = append(rets, ret)
+				}
+
+				return nil
+			})
+			if len(rets) > 0 {
+				return true, sfvm.NewValues(rets), nil
+			}
+			return false, nil, utils.Error("no value(members) found")
+		}),
+		nc_desc("获取输入指令的成员指令，一般说的是如果这个指令是一个对象，可以通过这个指令获取这个对象的某个特定的成员。"),
+	)
+
 	registerNativeCall(
 		NativeCall_GetObject,
 		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
