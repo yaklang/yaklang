@@ -1,6 +1,7 @@
 package aid
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"os"
@@ -57,15 +58,18 @@ func (a *AIResponse) GetUnboundStreamReader(haveReason bool) io.Reader {
 func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, config *Config) io.Reader {
 	pr, pw := utils.NewBufPipe(nil)
 	go func() {
+		cbBuffer := bytes.NewBuffer(make([]byte, 4096))
+		defer func() {
+			config.ProcessExtendedActionCallback(cbBuffer.String())
+		}()
 		defer pw.Close()
 		for i := range a.ch.Out {
 			if i == nil {
 				continue
 			}
-
-			targetStream := i.out
+			targetStream := io.TeeReader(i.out, cbBuffer)
 			if a.enableDebug {
-				targetStream = io.TeeReader(i.out, os.Stdout)
+				targetStream = io.TeeReader(targetStream, os.Stdout)
 			}
 			if i.IsReason {
 				if system {

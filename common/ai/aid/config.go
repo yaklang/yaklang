@@ -96,7 +96,8 @@ type Config struct {
 
 	aiCallTokenLimit int64
 
-	resultHandler func(*Config)
+	resultHandler          func(*Config)
+	extendedActionCallback map[string]func(config *Config, action *Action)
 }
 
 func (c *Config) CallAI(request *AIRequest) (*AIResponse, error) {
@@ -196,6 +197,15 @@ func (c *Config) emit(e *Event) {
 		return
 	}
 	c.eventHandler(e)
+}
+
+func (c *Config) ProcessExtendedActionCallback(resp string) {
+	actions := ExtractAllAction(resp)
+	for _, action := range actions {
+		if cb, ok := c.extendedActionCallback[action.Name()]; ok {
+			cb(c, action)
+		}
+	}
 }
 
 func initDefaultTools(c *Config) error { // set config default tools
@@ -349,6 +359,18 @@ func WithYOLO(i ...bool) Option {
 		} else {
 			config.setAgreePolicy(AgreePolicyYOLO)
 		}
+		return nil
+	}
+}
+
+func WithExtendedActionCallback(name string, cb func(config *Config, action *Action)) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		if config.extendedActionCallback == nil {
+			config.extendedActionCallback = make(map[string]func(config *Config, action *Action))
+		}
+		config.extendedActionCallback[name] = cb
 		return nil
 	}
 }
