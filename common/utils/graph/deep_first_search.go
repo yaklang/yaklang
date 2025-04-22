@@ -1,9 +1,12 @@
 package graph
 
 import (
+	"context"
 	"slices"
+	"time"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
@@ -23,9 +26,17 @@ type DeepFirstPath[K comparable, T, U any] struct {
 
 	// deep first search stack
 	current *omap.OrderedMap[K, U]
+	ctx     context.Context
 }
 
 func (d *DeepFirstPath[K, T, U]) deepFirst(node T, target ...T) {
+	select {
+	case <-d.ctx.Done():
+		log.Infof("deep first search timeout")
+		return
+	default:
+	}
+
 	key := d.getKey(node)
 	value := d.getValue(node)
 
@@ -76,12 +87,18 @@ func GraphPathEx[K comparable, T, U any](
 	getValue func(T) U,
 	target ...T,
 ) [][]U {
+	var MaxTime = time.Millisecond * 500
+
+	ctx, cancel := context.WithTimeout(context.Background(), MaxTime)
+	defer cancel()
+
 	df := &DeepFirstPath[K, T, U]{
 		res:      make([][]U, 0),
 		current:  omap.NewEmptyOrderedMap[K, U](),
 		next:     next,
 		getKey:   getKey,
 		getValue: getValue,
+		ctx:      ctx,
 	}
 	df.deepFirst(node, target...)
 	return df.res
