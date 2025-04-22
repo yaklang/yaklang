@@ -183,6 +183,10 @@ func (c *processAnalysisManager) getLastCauseCall(typ AnalysisType) (result *Val
 	return result
 }
 
+func (c *processAnalysisManager) getLastRecursiveNode() *Value {
+	return c.peekNNode(1)
+}
+
 func (c *processAnalysisManager) calcCrossProcessHash(v *Value) string {
 	if c == nil || c.nodeStack == nil {
 		return ""
@@ -219,6 +223,10 @@ func (c *processAnalysisManager) popCause() *Value {
 
 func (c *processAnalysisManager) peekNode() *Value {
 	return c.nodeStack.Peek()
+}
+
+func (c *processAnalysisManager) peekNNode(n int) *Value {
+	return c.nodeStack.PeekN(n)
 }
 
 func (c *processAnalysisManager) peekCause() *Value {
