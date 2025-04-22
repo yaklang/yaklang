@@ -50,7 +50,7 @@ func TestVerify_DEBUG(t *testing.T) {
 	yakit.InitialDatabase()
 	err := sfbuildin.SyncEmbedRule()
 	require.NoError(t, err)
-	ruleName := "检测Java SpringBoot 服务端请求伪造(SSRF)漏洞"
+	ruleName := "检测Java Spring Framework SPEL Parser注入漏洞"
 
 	rule, err := sfdb.GetRulePure(ruleName)
 	if err != nil {
