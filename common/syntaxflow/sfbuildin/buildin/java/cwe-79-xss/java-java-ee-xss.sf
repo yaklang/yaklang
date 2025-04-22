@@ -27,7 +27,7 @@ alert $result for {
 };
 
 desc(
-    alert_min:1,
+    alert_min:2,
     lang: "java",
     'file://xss-vulnerable.jsp': <<<EOF
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
@@ -58,7 +58,7 @@ EOF,
 
 
 desc(
-    alert_num:1,
+    alert_num:2,
     lang: "java",
     'file://web/jsp/messages/seemessages.jsp': <<<EOF
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>

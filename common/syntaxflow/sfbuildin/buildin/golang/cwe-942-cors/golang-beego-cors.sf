@@ -1,0 +1,58 @@
+desc(
+    title: "golang CORS(beego)",
+    title_zh: "golang CORS 漏洞(beego)",
+    type: vuln,
+    severity: high,
+    risk: ssti
+    desc: <<<TEXT
+当CORS策略过度宽松（如允许任意来源Access-Control-Allow-Origin: *或反射Origin）时，可能导致跨域数据泄露或CSRF攻击。
+TEXT
+)
+
+.Ctx.Request.Header.Get(* as $sink)
+
+$sink -{ 
+	include:`*?{opcode:const}?{have: "Origin"}`,
+}-> as $data;
+
+$data?{have:".Ctx.ResponseWriter.Header"} as $high
+
+alert $high for {
+    title: 'CORS detected',
+    title_zh: '检测到CORS',
+    type: 'vuln',
+    level: 'high',
+}
+
+desc(
+    lang: golang,
+    alert_high: 1,
+    'file://main.go': <<<UNSAFE
+package main
+
+import (
+	"encoding/json"
+	"go-sec-code/utils"
+
+	beego "github.com/beego/beego/v2/server/web"
+)
+
+func (c *CorsVuln1Controller) Get() {
+	origin := c.Ctx.Request.Header.Get("Origin")
+	c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Origin", origin)
+	c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE, UPDATE")
+	c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, X-Extra-Header, Content-Type, Accept, Authorization")
+	c.Ctx.ResponseWriter.Header().Set("Access-Control-Expose-Headers", "Content-Length, Access-Control-Allow-Origin, Access-Control-Allow-Headers, Cache-Control, Content-Language, Content-Type")
+	c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Credentials", "true")
+	jsonp := make(map[string]interface{})
+	jsonp["username"] = "admin"
+	jsonp["password"] = "admin@123"
+	data, err := json.Marshal(jsonp)
+	if err != nil {
+		panic(err)
+	}
+	c.Ctx.ResponseWriter.Write(data)
+}
+
+UNSAFE
+)

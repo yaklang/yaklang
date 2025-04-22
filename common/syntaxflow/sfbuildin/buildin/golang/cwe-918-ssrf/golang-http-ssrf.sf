@@ -1,8 +1,8 @@
 desc(
     title: "golang SSRF(http)",
-	title_zh: "golang 服务器端请求伪造",
+	title_zh: "golang 服务器端请求伪造(http)",
     type: vuln,
-    severity: high,
+    severity: mid,
 	risk: ssrf,
     desc: <<<TEXT
 服务器端请求伪造（Server-Side Request Forgery, SSRF）漏洞（CWE-918）允许攻击者诱导服务器对内部或外部网络地址发起请求。在 Go 语言应用中，如果应用从用户输入中读取 URL 并直接发起 HTTP 请求，而没有对 URL 进行充分的验证和过滤，就可能导致 SSRF 漏洞。攻击者可以利用此漏洞绕过防火墙、扫描内网、攻击内网其他应用或进行端口扫描等，从而获取敏感信息或进一步控制服务器。
@@ -15,18 +15,18 @@ TEXT
 
 <include('golang-http-sink')> as $output;
 $output.URL.Query().Get() #-> as $sink;
-$sink?{have: 'Parameter'} as $high
+$sink?{have: 'Parameter'} as $mid
 
-alert $high for {
+alert $mid for {
     title: 'SSRF detected',
     title_zh: '检测到SSRF',
     type: 'vuln',
-    level: 'high',
+    level: 'mid',
 }
 
 desc(
     lang: golang,
-    alert_high: 1,
+    alert_mid: 1,
     'file://main.go': <<<UNSAFE
 package main
 
