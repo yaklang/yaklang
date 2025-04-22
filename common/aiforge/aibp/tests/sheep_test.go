@@ -18,7 +18,7 @@ func init() {
 		forge := aiforge.NewForgeBlueprint(
 			"sheep-test-1",
 			aiforge.WithInitializePrompt("你需要在一个大片的文本中找到 blacksheep 这个词，并且说出他的大概位置 {{ .Forge.UserParams }} "),
-			aiforge.WithTools(yakscripttools.GetYakScriptAiTools("grep_text")...),
+			aiforge.WithTools(yakscripttools.GetYakScriptAiTools("grep")...),
 		)
 		cd, err := forge.CreateCoordinator(ctx, items, option...)
 		if err != nil {
@@ -32,7 +32,7 @@ func init() {
 			aiforge.WithInitializePrompt("你需要在一个大片的文本中找到 blacksheep 这个词，并且说出他的大概位置 {{ .Forge.UserParams }} 并且给出 blacksheep 附近的字节，展示一些上下文"),
 			aiforge.WithTools(
 				yakscripttools.GetYakScriptAiTools(
-					"grep_text",
+					"grep",
 					"read_file_chunk",
 				)...),
 		)

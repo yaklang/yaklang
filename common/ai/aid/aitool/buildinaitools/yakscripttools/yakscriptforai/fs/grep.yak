@@ -1,0 +1,163 @@
+__DESC__ = <<<EOF
+text finder tool, input filepath(file or dir) and pattern(substr or regexp), find it matched in file position, show context text(optional)
+EOF
+
+yakit.AutoInitYakit()
+
+pathName := cli.String("path", cli.setHelp("the filepath you want to check"), cli.setRequired(true))
+target := cli.String("pattern", cli.setHelp("target text you want to grep"), cli.setRequired(true))
+matchMode = cli.String("pattern-mode", cli.setHelp("one of [substr/regexp/isubstr] set match mode: 1. substr for CaseSensitive-SubString; 2. isubstr for CaseInsensitive-SubString; 3. regexp for Regexp match in Golang Style"))
+maxResult := cli.Int("limit", cli.setHelp("max times (limit) grep for results"),  cli.setDefault(10))
+offsetResultCount := cli.Int("offset", cli.setHelp("skip how many first match"), cli.setDefault(0))
+fileSizeLimit = cli.Int("file-size-max", cli.setHelp("limit for file size, if the file is too large, stop it auto"), cli.setDefault(1000 * 1000 * 1000 * 2)) // 2G
+contextBuffer := cli.Int("context-buffer", cli.setHelp("Show (or display) a certain number of bytes of context around the matching text, default 0 is for not show"), cli.setDefault(0))
+cli.check()
+
+if !file.IsExisted(pathName) {
+    yakit.Info("no such path: %v" % pathName)
+    return
+}
+if target == "" {
+    yakit.Info("grep target not right")
+    return
+}
+
+count := 0
+m := sync.NewMutex()
+
+defer func{
+    if count<= 0 { yakit.Info(f"not `${target}` find") }
+}
+
+buf = bufio.NewBuffer()
+defer func{
+    if buf.Len() <= 0 {
+        return
+    }
+    yakit.Info(buf.String())
+}
+
+end = false
+output = (targetFile, offset, offsetEnd) => {
+    m.Lock()
+    defer m.Unlock()
+    count++
+
+    if count <= offsetResultCount {
+        return
+    }
+
+    if count > (maxResult + offsetResultCount) {
+        end = true
+        return
+    }
+    msg := "find in %v index:%v-%v" % [targetFile, offset, offsetEnd]
+    println(msg)
+    buf.WriteString(msg)
+    buf.WriteByte('\n')
+    if contextBuffer > 0 {
+        println("start to show result")
+        seekStart = offset - contextBuffer
+        if seekStart <= 0 {
+            seekStart = 0
+        }
+        seekLen := offsetEnd - offset
+        if seekLen <= 0 {
+            return
+        }
+        seekLen += 2 * contextBuffer
+        fp, err := file.OpenFile(targetFile, file.O_RDONLY, 0644)
+        if err != nil { return }
+        defer fp.Close()
+
+        n, err = fp.Seek(seekStart, 0)
+        if err != nil {
+            dump(err)
+        }
+        raw, err := io.ReadAll(io.LimitReader(fp, seekLen))
+        if err != nil {
+            return
+        }
+        if len(raw) > 0 {
+            msg := "    dump: %#v" % string(raw)
+            println(msg)
+            buf.Write(msg)
+            buf.WriteByte('\n')
+        }
+    }
+}
+
+isRegexp = str.ToLower(matchMode) in ["regexp", "re", "regex"]
+var patternRe
+if isRegexp {
+    patternRe, err = re.Compile(target)
+    if err != nil {
+        yakit.Error("Compile %#v failed: %v", target, err)
+        return
+    }
+}
+handleRegexp = (targetFile, content) => {
+    loc := patternRe.FindStringIndex(string(content))
+    if len(loc) < 2 {
+        return
+    }
+    start, end = loc[0], loc[1]
+    output(targetFile, start, end)
+    for {
+        newLoc := patternRe.FindStringIndex(string(content[start+1:]))
+        if len(newLoc) < 2 {
+            return
+        }
+        base = start+1
+        start, end = newLoc[0], newLoc[1]
+        output(targetFile, start, end)
+    }
+}
+
+handle = (targetFile, content) => {
+    switch str.ToLower(matchMode){
+    case "isubstr", "isubstring":
+        content = str.ToLower(string(content))
+        target = str.ToLower(target)
+    }
+
+    offset := str.Index(content, target)
+    if offset < 0 {
+        return
+    }
+
+    output(targetFile, offset, offset+len(target))
+    for {
+        newOffset := str.Index(content[offset+1:], target)
+        if newOffset < 0 { return }
+        newOffset += 1 + offset
+        output(targetFile, newOffset, newOffset + len(target))
+        offset = newOffset
+    }
+}
+
+if file.IsDir(pathName) {
+    filesys.Recursive(pathName, filesys.onFileStat((fileToCheck, info) => {
+        defer recover()
+        if end { return }
+
+        if fileSizeLimit > 0 && info.Size() > fileSizeLimit {
+            // overlarge
+            return
+        }
+
+        if isRegexp {
+            handleRegexp(fileToCheck, string(file.ReadFile(fileToCheck)~))
+        } else {
+            handle(fileToCheck, string(file.ReadFile(fileToCheck)~))
+        }
+    }))
+} else {
+    if isRegexp {
+        handleRegexp(pathName, string(file.ReadFile(pathName)~))
+    } else {
+        handle(pathName, string(file.ReadFile(pathName)~))
+    }
+}
+println()
+println()
