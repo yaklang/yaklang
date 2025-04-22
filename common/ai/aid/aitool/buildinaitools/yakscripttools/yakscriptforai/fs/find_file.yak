@@ -1,0 +1,89 @@
+__DESC__ = <<<EOF
+Find files within a specified directory based on a pattern and various filters. This tool recursively searches a directory for files that match a given pattern.  It supports filtering by file type (file or directory), file extension, and file size.  The matching pattern can be interpreted as a substring, a regular expression, or a glob pattern.  The search is limited to a maximum number of results.
+EOF
+
+dirname = cli.String("dir", cli.setRequired(true), cli.setHelp("which dir you want to find file?"))
+// filename = `/Users/v1ll4n/Projects/yaklang/README.md`
+// dirname = `/Users/v1ll4n/Projects/yaklang/`
+pattern = cli.String("pattern", cli.setRequired(true), cli.setHelp("use pattern to match path, pattern is work in full abspath. default is substr, check 'pattern-type'"))
+// pattern = "syntaxflow"
+patternMode = cli.String("pattern-type", cli.setHelp("make pattern compile as regexp / glob or keywork, match abs file path, one of regexp/substr/glob, like 'regexp', 'text' ..."))
+
+limit = cli.Int("max", cli.setDefault(10), cli.setRequired(true), cli.setHelp("how many files you want to find, default 10"))
+findType = cli.String("type", cli.setDefault(""), cli.setHelp("set 'f' for ordinary file, 'd' for directory only, default emtpy is all"))
+findExt = cli.String("exts", cli.setHelp("use ext for filter files, like '.txt,.js,.jso' or '.txt'"))
+minSize = cli.Int("min-size", cli.setHelp("limit show file size min, unit: byte"))
+maxSize = cli.Int("max-size", cli.setHelp("limit show file size max, unit: byte"))
+cli.check()
+
+count = 0
+total = 0
+end = false
+buf = bufio.NewBuffer()
+filesys.Recursive(dirname, filesys.onStat((isDir, name, info) => {
+    total ++
+    if end {
+        return
+    }
+    switch findType.Lower() {
+    case "f", "file":
+        if isDir { return }
+    case "d", "dir":
+        if !isDir { return }
+    default:
+    }
+
+    ext := file.GetExt(name)
+    if findExt != "" && str.Contains(findExt, ext) {
+        return
+    }
+
+    if minSize > 0 && info.Size() < minSize {
+        return
+    }
+
+    if maxSize > 0 && info.Size() > maxSize {
+        return
+    }
+
+    output = () => {
+        meta = ""
+        if isDir {
+            meta = "dir"
+        } else {
+            meta = "file[size:%v]" % info.Size()
+        }
+        buf.WriteString(sprintf("idx: %v, %v: %v\n", total, meta, name))
+    }
+
+    switch str.TrimSpace(str.ToLower(patternMode)) {
+    case "re", "regex", "regexp":
+        if str.MatchAllOfRegexp(name, pattern) {
+            count++
+            output()
+            if count > limit {
+                end = true
+            }
+            return
+        }
+    case "g", "glob", "global":
+        if str.MatchAllOfGlob(name, pattern) {
+            count++
+            output()
+            if count > limit {
+                end = true
+            }
+        }
+    default:
+        if str.MatchAllOfSubString(name, pattern) {
+            count++
+            output()
+            if count > limit {
+                end = true
+            }
+        }
+    }
+}))
+println(buf.String())
+yakit.Info(buf.String())
+yakit.Info("total: %v", total)
