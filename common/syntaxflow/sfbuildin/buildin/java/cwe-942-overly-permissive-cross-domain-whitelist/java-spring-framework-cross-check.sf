@@ -1,0 +1,46 @@
+desc(
+    title_zh:"检测Java Spring Framework跨域白名单过于宽松",
+    title:"Check Spring Framework Cross",
+    type:config,
+    risk:"不安全配置",
+    desc:<<<TEXT
+    该规则用于检测Java Spring框架使用@CrossOrigin设置过于宽松的跨域白名单。这对导致以下多个风险：
+    - 敏感数据泄漏
+    - CSRF攻击
+    - 服务端资源滥用
+TEXT
+)
+
+CrossOrigin?{<typeName>?{have:"org.springframework.web.bind.annotation.CrossOrigin"}} as $co;
+$co.origins?{=="*"} as $result;
+alert $result for {
+    message: "发现Java Spring Framework跨域白名单过于宽松",
+    level: low,
+}
+
+desc(
+    lang:java,
+    alert_num:1,
+    'file://cross-origin.java':<<<USE
+package org.example.moudels.file.controller;
+
+import io.swagger.annotations.Api;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestMapping;
+
+@Slf4j
+@Api(value = "BackUpController", tags = "敏感信息泄漏-备份文件")
+@Controller
+@CrossOrigin(origins = "*")
+@RequestMapping("/infoLeak/backUp")
+public class BackUpController {
+    @RequestMapping("")
+    public String backUp() {
+    }
+}
+USE
+)
+
+
