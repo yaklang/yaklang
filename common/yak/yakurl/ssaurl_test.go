@@ -250,12 +250,6 @@ type valueResult struct {
 	url      string
 }
 
-type byURL []valueResult
-
-func (a byURL) Len() int           { return len(a) }
-func (a byURL) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a byURL) Less(i, j int) bool { return a[i].url < a[j].url }
-
 func (s *ssaurlTest) CheckValue(t *testing.T, sf string, varaible string, want []valueResult) {
 	s.CheckSSAURL(t, fmt.Sprintf("/%s", varaible), sf, func(res []*ypb.YakURLResource) {
 		got := lo.FilterMap(res, func(r *ypb.YakURLResource, index int) (valueResult, bool) {
@@ -290,8 +284,6 @@ func (s *ssaurlTest) CheckValue(t *testing.T, sf string, varaible string, want [
 			return ret, true
 		})
 
-		sort.Sort(byURL(want))
-		sort.Sort(byURL(got))
 		require.Equal(t, want, got)
 	})
 }
