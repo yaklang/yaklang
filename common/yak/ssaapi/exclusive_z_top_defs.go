@@ -31,7 +31,6 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) Values
 	if i.innerValue == nil {
 		return vals
 	}
-
 	for _, def := range i.innerValue.GetValues() {
 		if utils.IsNil(def) {
 			continue
@@ -40,13 +39,15 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) Values
 			vals = append(vals, ret...)
 		}
 	}
-
-	if len(vals) <= 0 {
+	if len(vals) == 0 {
 		vals = append(vals, i)
 	}
-	if maskable, ok := i.innerValue.(ssa.Maskable); ok {
+	// 拿到上次递归的节点作为mask的effectOn
+	// 而避免使用i作为effectOn,因为这样会使得i有dependOn，而不是最终的叶子节点
+	last := actx.getLastRecursiveNode()
+	if maskable, ok := i.innerValue.(ssa.Maskable); ok && last != nil {
 		for _, def := range maskable.GetMask() {
-			if ret := i.NewTopDefValue(def).getTopDefs(actx, opt...); len(ret) > 0 {
+			if ret := last.NewTopDefValue(def).getTopDefs(actx, opt...); len(ret) > 0 {
 				vals = append(vals, ret...)
 			}
 		}
@@ -61,12 +62,14 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			for _, ret := range result {
 				if ret.GetDependOn() == nil {
 					finalResult = append(finalResult, ret)
+				} else {
+					log.Errorf("TopDefError!!!:%s have depend on %s", ret.String(), ret.GetDependOn().String())
 				}
 			}
 		}
 		result = finalResult
 	}()
-
+	log.Infof("topdef %s", i.String())
 	if i == nil {
 		return nil
 	}
