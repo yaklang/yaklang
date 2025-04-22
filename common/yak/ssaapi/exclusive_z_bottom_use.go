@@ -21,7 +21,18 @@ func (v Values) GetBottomUses(opts ...OperationOption) Values {
 	return MergeValues(ret)
 }
 
-func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) Values {
+func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) (result Values) {
+	defer func() {
+		var finalResult Values
+		if len(result) > 0 {
+			for _, ret := range result {
+				if ret.GetDependOn() == nil {
+					finalResult = append(finalResult, ret)
+				}
+			}
+		}
+		result = finalResult
+	}()
 	var vals Values
 
 	if v.IsObject() {
