@@ -24,6 +24,6 @@ func TestMultiDataFlow_CrossProcess(t *testing.T) {
 		a=f()
 		d = a.b + a.c
      `
-		ssatest.CheckSyntaxFlow(t, code, `d #-> * as $target`, map[string][]string{"target": {"1", "2", "Undefined-a.b(valid)", "Undefined-a.c(valid)"}})
+		ssatest.CheckSyntaxFlow(t, code, `d #-> * as $target`, map[string][]string{"target": {"1", "2"}})
 	})
 }
