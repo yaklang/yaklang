@@ -332,6 +332,7 @@ func WithExtendedActionCallback(name string, cb func(config *Config, action *Act
 	}
 }
 
+
 func WithAgreeAIAssistant(a *AIAssistant) Option {
 	return func(config *Config) error {
 		config.m.Lock()
@@ -443,15 +444,6 @@ func WithToolManager(manager *buildinaitools.AiToolManager) Option {
 		config.m.Lock()
 		defer config.m.Unlock()
 		config.aiToolManager = manager
-		return nil
-	}
-}
-
-func WithTaskAIRespCallback(cb func(string, *Config)) Option {
-	return func(config *Config) error {
-		config.m.Lock()
-		defer config.m.Unlock()
-		config.taskAIRespCallback = cb
 		return nil
 	}
 }
