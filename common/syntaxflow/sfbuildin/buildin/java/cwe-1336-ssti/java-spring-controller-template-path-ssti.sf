@@ -1,7 +1,7 @@
 desc(
-    title: "Spring Controller Template Path SSTI",
+    title_zh:"检测 Spring Framework 控制器模板路径 SSTI 注入漏洞",
+    title: "Check Spring Framework Controller Template Path SSTI Injection",
     type: vuln,
-    level: high,
     risk: ssti,
     desc: <<<TEXT
 服务器端的模板引擎（如Freemarker、Thymeleaf等）在处理用户输入时，若未对用户输入进行适当的验证或转义，则可能导致服务器端的模板注入（Server-Side Template Injection, SSTI）漏洞。攻击者可以利用此漏洞执行任意模板代码，从而获取敏感信息或执行恶意操作。在Spring MVC框架中，若控制器方法直接返回用户输入作为视图名，或未对用户输入进行充分的过滤和验证，则存在SSTI漏洞的风险。
