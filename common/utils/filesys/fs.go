@@ -79,7 +79,7 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 		// count
 		totalCount++
 		if c.totalLimit > 0 && c.totalLimit < totalCount {
-			return utils.Errorf("total count limit exceeded: %d", c.totalLimit)
+			return utils.Wrapf(SkipAll, "total count limit exceeded: %d", c.totalLimit)
 		}
 
 		if c.onStat != nil {
@@ -96,7 +96,7 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 			// dir count
 			dirCount++
 			if c.dirLimit > 0 && c.dirLimit < dirCount {
-				return utils.Errorf("dir count limit exceeded: %d", c.dirLimit)
+				return utils.Wrapf(SkipAll, "dir count limit exceeded: %d", c.dirLimit)
 			}
 
 			// file stat
