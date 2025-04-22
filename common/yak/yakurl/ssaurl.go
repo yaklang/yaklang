@@ -438,39 +438,6 @@ func Value2Response(programName string, value *ssaapi.Value, msg string, url *yp
 	return res
 }
 
-type extra struct {
-	name  string
-	value any
-}
-
-func createNewRes(originParam *ypb.YakURL, size int, extra []extra) *ypb.YakURLResource {
-	yakURL := &ypb.YakURL{
-		Schema:   originParam.Schema,
-		User:     originParam.GetUser(),
-		Pass:     originParam.GetPass(),
-		Location: originParam.GetLocation(),
-		Path:     originParam.GetPath(),
-		Query:    originParam.GetQuery(),
-	}
-
-	res := &ypb.YakURLResource{
-		Size:              int64(size),
-		ModifiedTimestamp: time.Now().Unix(),
-		Path:              originParam.Path,
-		YakURLVerbose:     "",
-		Url:               yakURL,
-	}
-	if len(extra) > 0 {
-		for _, v := range extra {
-			res.Extra = append(res.Extra, &ypb.KVPair{
-				Key:   v.name,
-				Value: codec.AnyToString(v.value),
-			})
-		}
-	}
-	return res
-}
-
 func (a *SyntaxFlowAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	return nil, utils.Error("not implemented")
 }
