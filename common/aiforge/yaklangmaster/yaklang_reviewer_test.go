@@ -18,7 +18,7 @@ func TestYaklangMaster(t *testing.T) {
 		"yaklang-reviewer",
 		context.Background(),
 		[]*ypb.ExecParamItem{
-			{Key: "code", Value: testYak},
+			{Key: "yaklang-reviewer-code", Value: testYak},
 		},
 		aid.WithDebugPrompt(true),
 		aid.WithAICallback(aiforge.GetHoldAICallback()),

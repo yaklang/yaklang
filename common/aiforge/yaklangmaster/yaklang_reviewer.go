@@ -3,6 +3,7 @@ package yaklangmaster
 import (
 	"context"
 	_ "embed"
+	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
@@ -28,6 +29,8 @@ var _persistentPrompt string
 
 //go:embed yaklang_reviewer_prompts/set-code.json
 var _setCodeSchema string
+
+var magicCode = "yaklang-reviewer-code"
 
 func newYaklangMasterForge(callback func(string)) *aiforge.ForgeBlueprint {
 	yaklangTools, err := yaklangtools.CreateYaklangTools()
@@ -56,23 +59,19 @@ func newYaklangMasterForge(callback func(string)) *aiforge.ForgeBlueprint {
 		}),
 
 		aiforge.WithPersistentPrompt(_persistentPrompt),
-		aiforge.WithOriginYaklangCliCode(`
-cli.String("code", cli.setRequired(true), cli.help("代码内容"))
+		aiforge.WithOriginYaklangCliCode(fmt.Sprintf(`
+cli.String("%s", cli.setRequired(true),cli.setVerboseName("yaklang代码"), cli.help("代码内容"))
 cli.check()
-`),
+`, magicCode)),
 		aiforge.WithAIDOptions(
 			aid.WithAgreeManual(),
 			aid.WithResultHandler(func(config *aid.Config) {
 				code, _ := config.GetMemory().UserDataGet("code")
 				callback(code)
 			}),
-			aid.WithTaskAIRespCallback(func(rawResponse string, config *aid.Config) {
-				action, err := aid.ExtractAction(rawResponse, "set-code")
-				if err != nil {
-					return
-				}
+			aid.WithExtendedActionCallback("set-code", func(config *aid.Config, action *aid.Action) {
 				codeContent := action.GetString("content")
-				config.GetMemory().StoreUserData("code", codeContent)
+				config.GetMemory().StoreUserData(magicCode, codeContent)
 			}),
 			aid.WithAgreeAIAssistant(&aid.AIAssistant{
 				Callback: func(ctx context.Context, config *aid.Config) (*aid.AIAssistantResult, error) {

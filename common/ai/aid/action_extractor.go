@@ -87,3 +87,29 @@ func ExtractAction(i string, actionName string, alias ...string) (*Action, error
 	}
 	return nil, utils.Errorf("cannot extract action from: %v", utils.ShrinkString(i, 100))
 }
+
+func ExtractAllAction(i string) []*Action {
+	acs := []*Action{}
+	for _, pairs := range jsonextractor.ExtractObjectIndexes(i) {
+		ac := &Action{
+			params: make(map[string]any),
+		}
+		start, end := pairs[0], pairs[1]
+		jsonRaw := i[start:end]
+		var i = make(map[string]any)
+		err := json.Unmarshal([]byte(jsonRaw), &i)
+		if err != nil {
+			continue
+		}
+		if rawData, ok := i["@action"]; ok && fmt.Sprint(rawData) != "" {
+			action := fmt.Sprint(rawData)
+			ac.name = action
+			ac.params = i
+			if ac.params == nil {
+				ac.params = make(map[string]any)
+			}
+			acs = append(acs, ac)
+		}
+	}
+	return acs
+}

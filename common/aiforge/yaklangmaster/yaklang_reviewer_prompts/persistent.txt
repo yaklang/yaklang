@@ -1,5 +1,5 @@
 <attention>
-# 不要自行回忆代码内容，使用memory_user_data_get工具来获取代码内容
+# 不要自行回忆代码内容，使用memory_user_data_get工具以`yaklang-reviewer-code`作为key来获取代码内容
 # 可以自己尝试修改，但如果修改代码，需要输出符合如下schema的json
 ```
 {
