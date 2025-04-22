@@ -12,6 +12,7 @@ import (
 func setMemberCallRelationship(obj, key, member Value) {
 	obj.AddMember(key, member)
 	if !member.IsMember() {
+		//todo：fix one value for more object-key
 		member.SetObject(obj)
 		member.SetKey(key)
 		key.AddUser(obj.(User))

@@ -235,6 +235,8 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		// or variable assign by extern instance (extern instance but name not equal)
 		b.GetProgram().SetInstructionWithName(variable.GetName(), value)
 	}
+	//refresh
+	RefreshEx(variable.object, variable.key, value)
 }
 
 // ------------------- Create

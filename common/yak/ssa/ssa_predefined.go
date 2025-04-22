@@ -292,8 +292,6 @@ func (n *anValue) IsObject() bool {
 }
 
 func (n *anValue) AddMember(k, v Value) {
-	// n.member = append(n.member, v)
-	// n.member[k] = v
 	n.member.Set(k, v)
 }
 
@@ -502,6 +500,19 @@ func (i anValue) GetValues() Values { return nil }
 // in next pr i will remove this and user/value just save ID not point
 func (i *anValue) RefreshToCache(item any) {
 	RefreshToCache(i, item)
+}
+
+func RefreshEx(val ...Value) {
+	refresh := func(i Value) {
+		if i == nil || i.GetProgram() == nil || i.GetProgram().Cache == nil {
+			return
+		}
+		cache := i.GetProgram().Cache
+		cache.Refresh(i)
+	}
+	for _, value := range val {
+		refresh(value)
+	}
 }
 
 func RefreshToCache(i Value, item any) {
