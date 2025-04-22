@@ -54,7 +54,19 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) Values
 	return vals
 }
 
-func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values {
+func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result Values) {
+	defer func() {
+		var finalResult Values
+		if len(result) > 0 {
+			for _, ret := range result {
+				if ret.GetDependOn() == nil {
+					finalResult = append(finalResult, ret)
+				}
+			}
+		}
+		result = finalResult
+	}()
+
 	if i == nil {
 		return nil
 	}
@@ -120,7 +132,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			// obj.AppendDependOn(apiValue)
 			apiValue.AppendDependOn(obj)
 			ret := obj.getTopDefs(actx, opt...)
-			if !ValueCompare(i, actx.Self) {
+			if len(ret) == 0 && !ValueCompare(i, actx.Self) {
 				ret = append(ret, i)
 			}
 			return ret

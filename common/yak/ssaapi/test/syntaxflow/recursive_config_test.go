@@ -1,6 +1,9 @@
 package syntaxflow
 
 import (
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -311,5 +314,39 @@ end:'end',
 				"result": {"\"-t\"", "Parameter-param1"},
 				"end":    {"Function-getCmd"},
 			})
+	})
+}
+
+func TestSF_Until_Real_Demo(t *testing.T) {
+	t.Run("test until edge demo", func(t *testing.T) {
+		code := ` 
+package com.example;
+	class Main{
+    public R vul(@RequestParam("file") MultipartFile file, HttpServletRequest request) {
+         String res;
+        String suffix = file.getOriginalFilename().substring(file.getOriginalFilename().lastIndexOf(".") + 1);
+        if (!uploadUtil.checkFileSuffixWhiteList(suffix)){
+            return R.error("文件后缀不合法");
+        }
+        String path = request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort() + "/file/";
+        target=file+ suffix+ path;
+    }
+}`
+
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			vals, err := prog.SyntaxFlowWithError(`
+MultipartFile?{opcode:param} as $source
+target* #{until: <<<UNTIL
+ * & $source
+UNTIL
+}-> as $result;
+`)
+			require.NoError(t, err)
+			result := vals.GetValues("result")
+			result.Show()
+			require.Equal(t, 1, len(result))
+			require.Equal(t, "Parameter-file", result[0].String())
+			return nil
+		}, ssaapi.WithLanguage(consts.JAVA))
 	})
 }
