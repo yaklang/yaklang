@@ -13,13 +13,12 @@ TEXT
 
 <include('golang-database-sink')> as $entry;
 
-$entry.Query <getActualParams><slice(index=0)> as $result;
-$entry.Query <getActualParams><slice(index=1)> as $result;
-$result?{opcode: add} as $mid;
+$entry.Query(* as $result);
+$entry.QueryRow(* as $result);
 
-$entry.Query <getActualParams><slice(index=0)> #-> as $result2;
-$entry.Query <getActualParams><slice(index=1)> #-> as $result2;
-$result2?{have: 'fmt.Sprintf'} as $mid;
+$result?{opcode: add} as $mid;
+$result?{have: 'fmt.Sprintf'} as $mid;
+$result?{have: '.ToSql'} as $mid;
 
 $param?{<self>-{
    until: `* & $sink`,
