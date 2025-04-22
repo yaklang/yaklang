@@ -2,7 +2,6 @@ package yakit
 
 import (
 	"context"
-	"path"
 	"strings"
 	"time"
 
@@ -12,15 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
-
-//func DeleteRiskByProgram(DB *gorm.DB, programNames []string) error {
-//	db := DB.Model(&schema.Risk{})
-//	db = bizhelper.ExactOrQueryStringArrayOr(db, "program_name", programNames)
-//	if db := db.Unscoped().Delete(&schema.Risk{}); db.Error != nil {
-//		return db.Error
-//	}
-//	return nil
-//}
 
 func DeleteSSARiskBySFResult(DB *gorm.DB, resultIDs []int64) error {
 	db := DB.Model(&schema.SSARisk{})
@@ -57,130 +47,50 @@ func GetSSARiskByHash(db *gorm.DB, hash string) (*schema.SSARisk, error) {
 	return &r, nil
 }
 
-type SsaRiskDatas struct {
-	Data string
-}
+type SSARiskFilterOption func(*ypb.SSARisksFilter)
 
-func GetSSARiskByFuzzy(db *gorm.DB, programName, sourceUrl, search string, level string) []string {
-	var datas []*SsaRiskDatas
-	var ret []string
-
-	switch level {
-	case "program":
-		if db := db.Model(&schema.SSARisk{}).
-			Where("program_name LIKE ?", "%"+search+"%").
-			Select("`program_name` AS data").
-			Group("`program_name`").
-			Scan(&datas); db.Error != nil {
-			utils.Errorf("get Risk by fuzzy search failed: %s", db.Error)
-			return []string{}
-		}
-		for _, d := range datas {
-			ret = append(ret, d.Data)
-		}
-	case "source":
-		if db := db.Model(&schema.SSARisk{}).
-			Where("program_name = ?", programName).
-			Where("code_source_url LIKE ?", "%"+search+"%").
-			Select("`code_source_url` AS data").
-			Group("`code_source_url`").
-			Scan(&datas); db.Error != nil {
-			utils.Errorf("get Risk by fuzzy search failed: %s", db.Error)
-			return []string{}
-		}
-		for _, d := range datas {
-			ret = append(ret, d.Data)
-		}
-	case "function":
-		if db := db.Model(&schema.SSARisk{}).
-			Where("program_name = ?", programName).
-			Where("code_source_url LIKE ?", "%"+sourceUrl+"%").
-			Where("function_name LIKE ?", "%"+search+"%").
-			Select("`function_name` AS data").
-			Group("`function_name`").
-			Scan(&datas); db.Error != nil {
-			utils.Errorf("get Risk by fuzzy search failed: %s", db.Error)
-			return []string{}
-		}
-		for _, d := range datas {
-			ret = append(ret, d.Data)
-		}
+func WithSSARiskFilterProgramName(programName string) SSARiskFilterOption {
+	return func(sf *ypb.SSARisksFilter) {
+		sf.ProgramName = append(sf.ProgramName, programName)
 	}
-
-	return ret
 }
 
-type SsaRiskCount struct {
-	Prog   string
-	Source string
-	Func   string
-	Count  int64
-}
-
-// 请求function无获取
-func GetSSARiskByFuncName(db *gorm.DB, programName, sourceUrl, funcName string) ([]*SsaRiskCount, error) {
-	var ret []*SsaRiskCount
-
-	fullPath := path.Join("/", programName, sourceUrl)
-	if db := db.Model(&schema.SSARisk{}).
-		Where("program_name = ?", programName).
-		Where("code_source_url LIKE ?", fullPath+"%").
-		Where("function_name = ?", funcName).
-		Select("`program_name` AS prog, `code_source_url` AS source, `function_name` AS func, COUNT(*) AS count").
-		Group("`function_name`").
-		Scan(&ret); db.Error != nil {
-		return ret, utils.Errorf("get Risk failed: %s", db.Error)
+func WithSSARiskFilterRuleName(ruleName string) SSARiskFilterOption {
+	return func(sf *ypb.SSARisksFilter) {
+		sf.FromRule = append(sf.FromRule, ruleName)
 	}
-	return ret, nil
 }
 
-// 请求path获取function
-func GetSSARiskBySourceUrl(db *gorm.DB, programName, sourceUrl string) ([]*SsaRiskCount, error) {
-	var ret []*SsaRiskCount
-
-	fullPath := path.Join("/", programName, sourceUrl)
-	if db := db.Model(&schema.SSARisk{}).
-		Where("program_name = ?", programName).
-		Where("code_source_url LIKE ?", fullPath+"%").
-		Select("`program_name` AS prog, `code_source_url` AS source, `function_name` AS func, COUNT(*) AS count").
-		Group("`function_name`").
-		Scan(&ret); db.Error != nil {
-		return ret, utils.Errorf("get Risk failed: %s", db.Error)
+func WithSSARiskFilterSourceUrl(sourceUrl string) SSARiskFilterOption {
+	return func(sf *ypb.SSARisksFilter) {
+		sf.CodeSourceUrl = append(sf.CodeSourceUrl, sourceUrl)
 	}
-
-	return ret, nil
 }
 
-// 请求program获取path
-func GetSSARiskByProgram(db *gorm.DB, programName string) ([]*SsaRiskCount, error) {
-	var ret []*SsaRiskCount
-
-	if db := db.Model(&schema.SSARisk{}).
-		Where("program_name = ?", programName).
-		Select("`program_name` AS prog, `code_source_url` AS source, `function_name` AS func, COUNT(*) AS count").
-		Group("`code_source_url`").
-		Scan(&ret); db.Error != nil {
-		return ret, utils.Errorf("get Risk failed: %s", db.Error)
+func WithSSARiskFilterFunction(functionName string) SSARiskFilterOption {
+	return func(sf *ypb.SSARisksFilter) {
+		sf.FunctionName = append(sf.FunctionName, functionName)
 	}
-
-	return ret, nil
 }
 
-// 请求root获取项目
-func GetSSARiskByRoot(db *gorm.DB) ([]*SsaRiskCount, error) {
-	var ret []*SsaRiskCount
-
-	if db := db.Model(&schema.SSARisk{}).
-		Select("`program_name` AS prog, `code_source_url` AS source, `function_name` AS func, COUNT(*) AS count").
-		Group("`program_name`").
-		Scan(&ret); db.Error != nil {
-		return ret, utils.Errorf("get Risk failed: %s", db.Error)
+func WithSSARiskFilterSearch(search string) SSARiskFilterOption {
+	return func(sf *ypb.SSARisksFilter) {
+		sf.Search = search
 	}
+}
 
-	return ret, nil
+func NewSSARiskFilter(opts ...SSARiskFilterOption) *ypb.SSARisksFilter {
+	filter := &ypb.SSARisksFilter{}
+	for _, opt := range opts {
+		opt(filter)
+	}
+	return filter
 }
 
 func FilterSSARisk(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
+	if filter == nil {
+		return db
+	}
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", filter.GetID())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "program_name", filter.GetProgramName())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "function_name", filter.GetFunctionName())
@@ -195,7 +105,7 @@ func FilterSSARisk(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
 	db = bizhelper.FuzzSearchEx(db, []string{"title", "title_verbose"}, filter.GetTitle(), false)
 	db = bizhelper.FuzzSearchEx(db, []string{
 		"id", "hash", // for exact query
-		"program_name", "code_source_url",
+		"program_name", "code_source_url", "function_name",
 		"risk_type", "severity", "from_rule", "tags",
 	}, filter.GetSearch(), false)
 	if filter.GetIsRead() != 0 {
