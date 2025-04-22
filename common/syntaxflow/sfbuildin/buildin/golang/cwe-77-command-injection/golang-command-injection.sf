@@ -127,10 +127,7 @@ REFERENCE
 <include('golang-os-exec')> as $sink;
 $sink?{have: 'Parameter'} as $check;
 
-strings?{<fullTypeName>?{have: 'strings'}} as $entry;
-$entry.TrimSpace(* #-> as $safe);
-
-$check #{exclude: `$safe`}-> as $high;
+$check as $high;
 
 alert $high for {
     title: 'Reflected XSS detected',

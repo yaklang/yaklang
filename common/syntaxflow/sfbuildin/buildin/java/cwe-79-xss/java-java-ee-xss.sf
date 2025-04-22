@@ -92,9 +92,9 @@ alert $result for {
 };
 
 desc(
-	alert_min:1
-	lang: "java"
-	'file://xss-vulnerable.jsp': <<<EOF
+    alert_min:2,
+    lang: "java",
+    'file://xss-vulnerable.jsp': <<<EOF
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <html>
 <head>
@@ -124,9 +124,9 @@ EOF
 
 
 desc(
-	alert_num:1
-	lang: "java"
-	'file://web/jsp/messages/seemessages.jsp': <<<EOF
+    alert_num:2,
+    lang: "java",
+    'file://web/jsp/messages/seemessages.jsp': <<<EOF
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <%@page import="java.util.Iterator" %>
 <%@page import="java.util.ArrayList" %>

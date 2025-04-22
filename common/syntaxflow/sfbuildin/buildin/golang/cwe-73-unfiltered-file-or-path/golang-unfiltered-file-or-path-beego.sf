@@ -1,0 +1,59 @@
+desc(
+    title: "golang Unfiltered File-or-Path(beego)",
+    title_zh: "golang 未过滤的文件或路径(beego)",
+    type: audit,
+    severity: low,
+    risk: "path-traversal",
+    desc: <<<TEXT
+未过滤的文件或路径访问漏洞（Unfiltered File-or-Path）允许攻击者通过操纵输入参数来访问服务器上的任意文件。在 Go 语言应用中，如果开发者未能正确验证或过滤用户输入的文件路径，攻击者可能会利用此漏洞读取敏感文件（如配置文件、数据库凭证等），甚至执行任意代码。
+
+这种漏洞通常发生在文件读取功能中，当应用未能限制用户输入的文件路径时，攻击者可以构造恶意请求来访问服务器上的任意文件，进而获取敏感信息或破坏系统。例如，攻击者可以通过路径遍历（如 `../../etc/passwd`）访问系统文件。
+
+为了防止此类漏洞，开发者应始终对用户输入的文件路径进行严格的验证和过滤，确保路径在允许的范围内。具体措施包括：
+1. 使用 `filepath.Clean` 清洗路径，去除多余的 `..` 和 `.`。
+2. 使用 `strings.HasPrefix` 或 `filepath.IsAbs` 验证路径是否在允许的基础路径下。
+3. 避免直接使用用户输入的文件路径，而是将其与预定义的安全路径结合。
+TEXT
+)
+
+<include('golang-file-read-sink')> as $sink;
+<include('golang-file-write-sink')> as $sink;
+
+.SaveToFile(* #-> as $sink)
+
+$sink?{have: "GetString"} as $low;
+$sink?{have: "GetFile"} as $low;
+
+alert $low for {
+    title: 'Reflected XSS detected',
+    title_zh: '检测到未过滤路径',
+    type: 'vuln',
+    level: 'low',
+}
+
+desc(
+    lang: golang,
+    alert_low: 1,
+    'unsafe://main.go': <<<UNSAFE
+package main
+
+import (
+	"go-sec-code/utils"
+	"io/ioutil"
+	"path/filepath"
+	"strings"
+
+	beego "github.com/beego/beego/v2/server/web"
+)
+
+func (c *PathTraversalVuln1Controller) Get() {
+	file := c.GetString("file")
+	output, err := ioutil.ReadFile(file)
+	if err != nil {
+		panic(err)
+	}
+	c.Ctx.ResponseWriter.Write(output)
+}
+UNSAFE
+)
+

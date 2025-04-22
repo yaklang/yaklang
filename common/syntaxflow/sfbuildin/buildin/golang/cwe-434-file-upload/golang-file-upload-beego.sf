@@ -1,0 +1,61 @@
+desc(
+    title: "golang file upload check(beego)",
+	title_zh: "golang 文件路径未授权(beego)",
+    type: audit,
+    level: high,
+	risk: "file-write",
+    desc: <<<TEXT
+此审计规则旨在验证用户输入及传入的文件路径是否经过适当的过滤与授权。如果文件路径未经过验证，攻击者可能通过构造恶意路径实现文件覆盖、删除或路径穿越攻击，从而导致安全风险。路径穿越攻击允许攻击者访问或修改应用程序之外的敏感文件，甚至可能导致服务器被完全控制。
+
+文件路径未授权漏洞通常发生在以下场景：
+1. 用户提供的文件名或路径直接拼接到目标路径中，例如 `filepath.Join("/var/www/uploads", filepath.Base(handler.Filename))`。
+2. 未对文件路径进行严格的验证，导致攻击者可以通过 `../` 等特殊字符实现路径穿越。
+TEXT
+)
+
+<include('golang-file-path')> as $path;
+
+.SaveToFile(, * #-> as $sink);
+
+strings.HasPrefix(* #-> as $check);
+$path.Clean(* #-> as $check);
+$path.IsAbs(* #-> as $check);
+
+$sink #{include: `$check`}-> as $safe;
+$sink #{exclude: `$safe`}-> as $high;
+
+alert $high for {
+    title: 'file upload check',
+    title_zh: '检测到文件路径未授权',
+    type: 'vuln',
+    level: 'high',
+}
+
+desc(
+    lang: golang,
+    alert_high: 1,
+    'file://main.go': <<<UNSAFE
+package main
+
+import (
+	"fmt"
+	"go-sec-code/utils"
+	"time"
+
+	beego "github.com/beego/beego/v2/server/web"
+)
+
+func (c *FileUploadVuln1Controller) Post() {
+	userid := c.GetString("userid")
+	_, h, err := c.GetFile("file")
+	if err != nil {
+		panic(err)
+	}
+	savePath := "static/upload/" + userid + fmt.Sprint(time.Now().Unix()) + h.Filename
+	c.SaveToFile("file", savePath)
+	c.Data["savePath"] = savePath
+	c.TplName = "fileUpload.tpl"
+}
+
+UNSAFE
+)

@@ -1,0 +1,57 @@
+desc(
+    title: "golang Json information exposure",
+    title_zh: "golang Json相关函数泄露服务器敏感信息",
+    type: audit,
+    severity: low,
+    risk: "info-exposure",
+    desc: <<<TEXT
+检测可能通过Json相关函数泄露服务器敏感信息，包括：
+    1. 目录结构暴露
+    2. 当前工作路径泄露
+    3. 服务器系统类型识别
+    可能被攻击者用于信息收集阶段，辅助后续攻击
+TEXT
+)
+
+json.Marshal(*<slice(index=0)> as $sink)
+$sink<getMemberByKey(key="password")> as $obj
+$obj #{ 
+	include:`*?{opcode:const}`,
+}-> as $low;
+
+alert $low for {
+    title: 'Json Information Exposure',
+    title_zh: '检测到Json信息泄露',
+    type: 'vuln',
+    level: 'low',
+}
+
+desc(
+    lang: golang,
+    alert_low: 1,
+    'file://main.go': <<<UNSAFE
+package main
+
+import (
+	"encoding/json"
+	"go-sec-code/utils"
+
+	beego "github.com/beego/beego/v2/server/web"
+)
+
+func (c *JsonpVuln1Controller) Get() {
+	callback := c.GetString("callback")
+	c.Ctx.ResponseWriter.Header().Set("Content-Type", "application/javascript")
+	jsonp := make(map[string]interface{})
+	jsonp["username"] = "admin"
+	jsonp["password"] = "admin@123"
+	data, err := json.Marshal(jsonp)
+	output := callback + "(" + string(data) + ")"
+	if err != nil {
+		panic(err)
+	}
+	c.Ctx.ResponseWriter.Write([]byte(output))
+}
+
+UNSAFE
+)

@@ -109,18 +109,18 @@ SOLUTION
 
 <include('golang-http-sink')> as $output;
 $output.URL.Query().Get() #-> as $sink;
-$sink?{have: 'Parameter'} as $high
+$sink?{opcode: param} as $mid
 
-alert $high for {
+alert $mid for {
     title: 'SSRF detected',
     title_zh: '检测到SSRF',
     type: 'vuln',
-    level: 'high',
+    level: 'mid',
 }
 
 desc(
 	lang: golang
-	alert_high: 1
+	alert_num: 1
 	'file://main.go': <<<UNSAFE
 package main
 

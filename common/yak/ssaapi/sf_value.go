@@ -194,12 +194,15 @@ func (v *Value) GetFields() (sfvm.ValueOperator, error) {
 	return sfvm.NewEmptyValues(), nil
 }
 
-func (v *Value) GetMembersByString(key string) (sfvm.ValueOperator, error) {
+func (v *Value) GetMembersByString(key string) (sfvm.ValueOperator, bool) {
 	if v.IsMap() || v.IsList() || v.IsObject() {
-		return v.GetMember(v.NewValue(ssa.NewConst(key))), nil
+		if m := v.GetMember(v.NewValue(ssa.NewConst(key))); m != nil {
+			return m, true
+		}
+		return nil, false
 	}
 	// return v.GetUsers(), nil
-	return nil, nil
+	return nil, false
 }
 
 func (v *Value) GetSyntaxFlowUse() (sfvm.ValueOperator, error) {
