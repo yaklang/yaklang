@@ -31,7 +31,6 @@ func yieldIrIndex(DB *gorm.DB, ctx context.Context) chan *IrCode {
 				continue
 			}
 			filter[index.ValueID] = struct{}{}
-
 			// get ir code
 			code := GetIrCodeById(GetDB(), index.ValueID)
 			select {
@@ -73,7 +72,7 @@ func SearchVariable(db *gorm.DB, ctx context.Context, compareMode, matchMod int,
 }
 
 func ExactSearchVariable(DB *gorm.DB, ctx context.Context, mod int, value string) chan *IrCode {
-	db := DB.Model(&IrIndex{})
+	db := DB.Model(&IrIndex{}).Debug()
 	if mod&ConstType != 0 {
 		//指定opcode为const
 		_db := DB.Model(&IrCode{}).Where("opcode=5 and string=?", value)
