@@ -297,7 +297,7 @@ func TestFakeImport_syntaxflow(t *testing.T) {
 			
 			`,
 			map[string][]string{
-				"target": {"Undefined-Request"},
+				"target": {"Parameter-r"},
 			},
 			ssaapi.WithLanguage(ssaapi.GO),
 		)

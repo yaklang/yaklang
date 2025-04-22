@@ -165,3 +165,47 @@ func Test_Template(t *testing.T) {
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 }
+
+func Test_FakeImport(t *testing.T) {
+	t.Run("fake import", func(t *testing.T) {
+		code := `package main
+
+import (
+    "fmt"
+    "io/ioutil"
+    "net/http"
+    "path/filepath"
+    "strings"
+)
+
+const allowedBasePath = "/allowed/path/"
+
+func handler(w http.ResponseWriter, r *http.Request) {
+    userInput := r.URL.Query().Get("file")
+    requestedPath := filepath.Join(allowedBasePath, userInput)
+    cleanedPath := filepath.Clean(requestedPath)
+
+    content, err := ioutil.ReadFile(cleanedPath)
+    if err != nil {
+        http.Error(w, "File not found", http.StatusNotFound)
+        return
+    }
+
+    w.Write(content)
+}
+
+func main() {
+    http.HandleFunc("/", handler)
+    fmt.Println("Server is running on :8080")
+    http.ListenAndServe(":8080", nil)
+}
+		`
+		ssatest.CheckSyntaxFlowEx(t, code, `
+				w as $a
+				http.ResponseWriter as $b
+		`, true, map[string][]string{
+			"a": {"Parameter-w"},
+			"b": {"Parameter-w"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
+}
