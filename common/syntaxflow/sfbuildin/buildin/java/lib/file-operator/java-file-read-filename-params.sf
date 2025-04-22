@@ -3,6 +3,10 @@ desc(
     title_zh: "查找 Java 文件读取接收点",
     type: audit,
     lib: "java-read-filename-sink",
+    reference:<<<URL
+   https://docs.oracle.com/javase/8/docs/api/java/nio/file/Files.html
+   https://docs.oracle.com/javase/8/docs/api/java/io/RandomAccessFile.html
+URL
     desc: <<<TEXT
 该规则旨在识别 Java 代码中潜在的文件读取接收点（sinks），这些接收点可能会导致敏感文件泄露或未经授权的文件访问。通过检查 `FileReader`、`FileInputStream` 以及 `java.nio.file.Files` 类中的文件读取方法，可以识别出那些直接从不可信源（如用户输入或外部配置）获取文件名并用于文件读取操作的代码路径。这种不安全的做法可能会使应用程序容易受到路径遍历攻击或任意文件读取漏洞的攻击，从而暴露敏感信息或允许攻击者读取系统上的任意文件。
 TEXT
@@ -15,7 +19,7 @@ FileReader(*<slice(index=1)>  as $fileReader);
 FileInputStream(,* as $fileInputStream);
 
 // java.nio.file.Files.readAllBytes,java.nio.file.Files.readString etc...
-Files?{<typeName>?{have: 'java.nio'}}.read(,* as $nioFileRead);
+Files?{<typeName>?{have: 'java.nio'}}.read*(,* as $nioFileRead);
 
 // java.nio.file.Files.newBufferedReader
 Files?{<typeName>?{have: 'java.nio'}}.newBufferedReader(,* as $nioBufferedReader);
@@ -24,7 +28,7 @@ Files?{<typeName>?{have: 'java.nio'}}.newBufferedReader(,* as $nioBufferedReader
 Files?{<typeName>?{have: 'java.nio'}}.newInputStream(,* as $nioInputStream);
 
 // RandomAccessFile file = new RandomAccessFile("example.txt", "r");
-RandomAccessFile?{*().read()}(,* as $randomAccessFile);
+RandomAccessFile?{*().read*()}(,* as $randomAccessFile);
 
 $randomAccessFile as $output;
 $fileReader as $output;

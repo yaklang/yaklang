@@ -1,27 +1,28 @@
 desc(
-    title_zh:"查找Spring MVC任意文件上传漏洞",
-    title: "Find Spring MVC Arbitrary File Upload Vulnerability",
+    title_zh:"检测Spring MVC任意文件上传漏洞",
+    title: "Check Spring MVC Arbitrary File Upload Vulnerability",
     risk:"任意文件上传",
+    desc:<<<TEXT
+    该规则用于检测Spring MVC框架中是否存在使用MultipartFile的任意文件上传漏洞。
+TEXT
 )
 
 <include('java-spring-mvc-param')>?{<typeName>?{have:'org.springframework.web.multipart.MultipartFile'}} as $source;
 <include("java-spring-multipartfile-transferTo-target")> as $sink
 
-// TODO：过滤条件可以更为精细一点，但是文件后缀名是否验证判定比较复杂
 $sink #{
-    include: `<self> & $source`,
-    exclude: `<self>?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`,
-    
-}-> & $source as  $mid;
+    until: `* & $source`,
+    exclude: `*?{opcode:call}?{!* & $source}?{!* & $sink}`,
+}->  as  $mid;
 
 alert $mid for {
     message: "发现Java SpringBoot任意文件上传漏洞。",
-    level: high,
+    level: mid,
 }
 
 $sink #{
-    include: `<self> & $source`,
-}->as  $result;
+    until: `* & $source`,
+}-> as  $result;
 
 $result - $mid as $low;
 
@@ -31,6 +32,7 @@ alert $low for {
 }
 
 desc(
+    lang:"java",
     alert_min:1,
     'file://controller.java': <<<TEXT
 package org.example.moudels.file.controller;
