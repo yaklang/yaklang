@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -146,6 +147,7 @@ func (z *ZipFS) Stat(name string) (fs.FileInfo, error) {
 var _ fi.FileSystem = (*ZipFS)(nil)
 
 func (z *ZipFS) Clean(name string) string {
+	name = filepath.ToSlash(name)
 	return zipPathClean(name)
 }
 
