@@ -1,6 +1,6 @@
 desc(
-    title_zh: "识别到 Java Spring Framework 中 ModelAndView 构造函数可控",
-    title: "Recognize Java Spring Framework code that can control the ModelAndView constructor",
+    title_zh: "检测 Java Spring Framework 中 ModelAndView 构造函数可控",
+    title: "Check Java Spring Framework code that can control the ModelAndView constructor",
     type: vuln,
     level: high,
     risk:ssti,
