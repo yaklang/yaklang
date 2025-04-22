@@ -390,6 +390,7 @@ func init() {
 		Description:         "生成并格式化一个当前时间，默认格式为YYYY-MM-dd，如：{{date(YYYY-MM-dd)}}，还可以再加一个参数指定时区，如：{{date(YYYY-MM-dd,Asia/Shanghai)}}",
 		TagNameVerbose:      "生成日期",
 		ArgumentDescription: "{{string(YYYY-MM-dd:日期格式)}}",
+		IsDyn:               true,
 	})
 
 	datetimeFuzzFunc := datetimeFuzzFuncGenerator("YYYY-MM-dd HH:mm:ss")
@@ -403,6 +404,7 @@ func init() {
 		Description:         "生成并格式化一个当前时间，默认格式为YYYY-MM-dd HH:mm:ss，如：{{datetime(YYYY-MM-dd HH:mm:ss)}}，还可以再加一个参数指定时区，如：{{datetime(YYYY-MM-dd HH:mm:ss,Asia/Shanghai)}}",
 		TagNameVerbose:      "生成时间",
 		ArgumentDescription: "{{string(YYYY-MM-dd HH:mm:ss:日期时间格式)}}",
+		IsDyn:               true,
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
