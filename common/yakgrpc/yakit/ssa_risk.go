@@ -22,6 +22,12 @@ func DeleteSSARiskBySFResult(DB *gorm.DB, resultIDs []int64) error {
 }
 
 func CreateSSARisk(DB *gorm.DB, r *schema.SSARisk) error {
+	if r == nil {
+		return utils.Errorf("save error: ssa-risk is nil")
+	}
+	if r.TitleVerbose == "" {
+		r.TitleVerbose = r.Title
+	}
 	if db := DB.Create(r); db.Error != nil {
 		return db.Error
 	}

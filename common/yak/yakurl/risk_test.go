@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -232,6 +233,21 @@ func TestRiskAction(t *testing.T) {
 				Count: 2,
 			},
 		})
+	})
+
+	t.Run("check path function get risk", func(t *testing.T) {
+		// checkPathAndSearch(urlFunctionPath(programName1, "c.go", "funcC"), "", map[string]data{})
+		url := &ypb.YakURL{
+			Schema: "ssarisk",
+			Path:   urlFunctionPath(programName1, "c.go", "funcC"),
+		}
+		got := GetSSARisk(t, local, url)
+		log.Infof("got: %v", got)
+		require.Equal(t, len(got), 2)
+		gotTitle := lo.MapToSlice(got, func(key string, value data) string {
+			return value.Name
+		})
+		require.Equal(t, gotTitle, []string{"test4", "test5"})
 	})
 
 	t.Run("check search source(file)", func(t *testing.T) {
