@@ -1,10 +1,13 @@
 package yakgit
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"os"
 	"strings"
+
+	"github.com/go-git/go-git/v5/plumbing/object"
 
 	"github.com/go-git/go-git/v5/utils/merkletrie"
 	"github.com/yaklang/yaklang/common/log"
@@ -182,6 +185,15 @@ func FromCommitRange(repos string, start, end string) (*filesys.VirtualFS, error
 		return nil, err
 	}
 
+	start, err = RevParse(repos, start)
+	if err != nil {
+		return nil, err
+	}
+	end, err = RevParse(repos, end)
+	if err != nil {
+		return nil, err
+	}
+
 	startCommit, err := GetCommitHashEx(res, start)
 	if err != nil {
 		return nil, utils.Wrap(err, "get start commit")
@@ -261,39 +273,6 @@ func FromCommitRange(repos string, start, end string) (*filesys.VirtualFS, error
 	return fs, nil
 }
 
-func GetHeadCommitRange(repos string) (*object.Commit, *object.Commit, error) {
-	repo, err := git.PlainOpen(repos)
-	if err != nil {
-		return nil, nil, err
-	}
-	currentRef, err := repo.Head()
-	if err != nil {
-		return nil, nil, err
-	}
-	currentCommit, err := repo.CommitObject(currentRef.Hash())
-	if err != nil {
-		return nil, nil, err
-	}
-	upstreamRef, err := repo.Reference("refs/heads/main", true)
-	if err != nil {
-		return nil, nil, err
-	}
-	upstreamCommit, err := repo.CommitObject(upstreamRef.Hash())
-	if err != nil {
-		return nil, nil, err
-	}
-
-	base, err := currentCommit.MergeBase(upstreamCommit)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if len(base) <= 0 {
-		return nil, nil, utils.Error("no merge base")
-	}
-	return base[0], currentCommit, nil
-}
-
 func GetHeadHash(repos string) string {
 	res, err := git.PlainOpen(repos)
 	if err != nil {
@@ -306,6 +285,286 @@ func GetHeadHash(repos string) string {
 	}
 
 	return ref.Hash().String()
+}
+
+func GetHeadBranch(repos string) string {
+	res, err := git.PlainOpen(repos)
+	if err != nil {
+		return ""
+	}
+
+	ref, err := res.Head()
+	if err != nil {
+		return ""
+	}
+
+	refname := ref.Name()
+	if refname.IsBranch() {
+		return refname.String()
+	}
+	if refname.IsTag() {
+		return refname.String()
+	}
+	if refname.IsRemote() {
+		return refname.String()
+	}
+	return ""
+}
+
+func findChildren(res *git.Repository, commitHash plumbing.Hash) ([]*object.Commit, error) {
+	var children []*object.Commit
+	iter, err := res.CommitObjects()
+	if err != nil {
+		return nil, err
+	}
+	err = iter.ForEach(func(commit *object.Commit) error {
+		// 检查是否是目标 commit 的子 commit
+		for _, parentHash := range commit.ParentHashes {
+			if parentHash == commitHash {
+				children = append(children, commit)
+				break //  找到了一个父 commit 匹配，跳出循环
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return children, nil
+}
+
+func GetBranchRange(repos string, branchName string) (start, end string, err error) {
+	res, err := git.PlainOpen(repos)
+	if err != nil {
+		err = utils.Errorf("open repos: %v failed: %v", repos, err)
+		return
+	}
+
+	branchRef, err := res.Reference(plumbing.ReferenceName(branchName), true)
+	if err != nil {
+		err = utils.Errorf("open reference %v failed: %v", branchName, err)
+		return
+	}
+
+	commit, err := res.CommitObject(branchRef.Hash())
+	if err != nil {
+		err = utils.Errorf("get branch end commit failed: %v", err)
+		return
+	}
+	end = commit.Hash.String()
+
+	var branchStart plumbing.Hash
+	_ = commit.Parents().ForEach(func(p *object.Commit) error {
+		children, err := findChildren(res, p.Hash)
+		if err != nil {
+			return err
+		}
+		branchStart = p.Hash
+		if len(children) == 2 {
+			return utils.Error("stop it")
+		} else {
+			return nil
+		}
+	})
+	if utils.IsNil(branchStart) || branchStart.IsZero() {
+		return "", "", utils.Errorf("get branch start commit failed: %v", err)
+	}
+	start = branchStart.String()
+	return start, end, nil
+}
+
+func GetParentCommitHash(repos string, commit string) (string, error) {
+	res, err := git.PlainOpen(repos)
+	if err != nil {
+		return "", utils.Errorf("open repos: %v failed: %v", repos, err)
+	}
+	long, err := RevParse(repos, commit)
+	if err != nil {
+		return "", err
+	}
+
+	hash := plumbing.NewHash(long)
+	commitObj, err := res.CommitObject(hash)
+	if err != nil {
+		return "", utils.Errorf("get commit object failed: %v", err)
+	}
+
+	parents := commitObj.ParentHashes
+	if len(parents) == 0 {
+		return "", utils.Errorf("commit has no parent")
+	}
+
+	return parents[0].String(), nil
+}
+
+func Glance(repos string) string {
+	res, err := git.PlainOpen(repos)
+	if err != nil {
+		return ""
+	}
+
+	ref, err := res.Head()
+	if err != nil {
+		return ""
+	}
+
+	buf := bytes.NewBuffer(nil)
+	hashStr := ref.Hash().String()
+	buf.WriteString(fmt.Sprintf("hash: %v\n", hashStr))
+	buf.WriteString(fmt.Sprintf("type: %v\n", ref.Type()))
+	buf.WriteString(fmt.Sprintf("refname(branch/tag): %v\n", ref.Name()))
+	start, end, err := GetBranchRange(repos, ref.Name().String())
+	if err == nil {
+		buf.WriteString(fmt.Sprintf("branch_start: %v\n", start))
+		buf.WriteString(fmt.Sprintf("branch_end: %v\n", end))
+		endCommit, _ := res.CommitObject(plumbing.NewHash(end))
+		if !utils.IsNil(endCommit) {
+			count := 1
+			_ = endCommit.Parents().ForEach(func(p *object.Commit) error {
+				if p.Hash.String() == start {
+					count++
+					return utils.Error("stop it")
+				}
+				return nil
+			})
+			if count > 1 {
+				buf.WriteString(fmt.Sprintf("commits total in this branch: %v\n", count))
+			}
+		}
+	}
+	return buf.String()
+}
+
+func RevParse(repos string, rev string) (string, error) {
+	repo, err := git.PlainOpen(repos)
+	if err != nil {
+		return "", utils.Errorf("open: %v failed: %v", repos, err)
+	}
+	long, _ := ShortHashToFullHash(repo, rev)
+	if len(long) > 0 {
+		return long, nil
+	}
+	if rev == "HEAD" {
+		head, err := repo.Head()
+		if err != nil {
+			return "", utils.Errorf("get head failed: %v", err)
+		}
+		return head.Hash().String(), nil
+	} else if strings.HasPrefix(rev, "HEAD") {
+		if rev == "HEAD^" {
+			head, err := repo.Head()
+			if err != nil {
+				return "", utils.Errorf("get head failed: %v", err)
+			}
+			commit, err := repo.CommitObject(head.Hash())
+			if err != nil {
+				return "", err
+			}
+			parents := commit.ParentHashes
+			if len(parents) == 0 {
+				return "", utils.Errorf("HEAD commit has no parent")
+			}
+			return parents[0].String(), nil
+		} else if strings.HasPrefix(rev, "HEAD~") {
+			// 处理 HEAD~n 格式
+			n := 0
+			_, err := fmt.Sscanf(rev, "HEAD~%d", &n)
+			if err != nil || n <= 0 {
+				return "", utils.Errorf("invalid HEAD~n format: %s", rev)
+			}
+
+			// 获取 HEAD
+			head, err := repo.Head()
+			if err != nil {
+				return "", utils.Errorf("get head failed: %v", err)
+			}
+
+			// 获取当前 commit
+			commit, err := repo.CommitObject(head.Hash())
+			if err != nil {
+				return "", err
+			}
+
+			// 沿着第一个父提交向上遍历 n 次
+			for i := 0; i < n; i++ {
+				parents := commit.ParentHashes
+				if len(parents) == 0 {
+					return "", utils.Errorf("reached root commit before finding HEAD~%d", n)
+				}
+
+				commit, err = repo.CommitObject(parents[0])
+				if err != nil {
+					return "", utils.Errorf("failed to get parent commit: %v", err)
+				}
+			}
+
+			return commit.Hash.String(), nil
+		}
+	}
+
+	// 处理完整引用名
+	// 尝试将输入解析为引用名
+	referenceNames := []plumbing.ReferenceName{
+		// 尝试直接使用给定的引用名
+		plumbing.ReferenceName(rev),
+		// 尝试解析为分支
+		plumbing.NewBranchReferenceName(rev),
+		// 尝试解析为标签
+		plumbing.NewTagReferenceName(rev),
+		// 尝试解析为远程分支
+		plumbing.NewRemoteReferenceName("origin", rev),
+	}
+
+	// 遍历所有可能的引用名称并尝试解析
+	for _, refName := range referenceNames {
+		ref, err := repo.Reference(refName, true)
+		if err == nil {
+			return ref.Hash().String(), nil
+		}
+	}
+
+	// 尝试模糊匹配分支和标签名
+	refs, err := repo.References()
+	if err != nil {
+		return "", utils.Errorf("failed to get references: %v", err)
+	}
+
+	var matchedRef *plumbing.Reference
+
+	// 定义异常终止的错误
+	var errStopIteration = errors.New("reference_found")
+
+	err = refs.ForEach(func(ref *plumbing.Reference) error {
+		name := ref.Name().String()
+		shortName := ref.Name().Short()
+
+		// 如果引用名完全匹配或短名称完全匹配
+		if name == rev || shortName == rev {
+			matchedRef = ref
+			return errStopIteration
+		}
+
+		// 检查分支名（不带refs/heads/前缀）
+		if strings.HasPrefix(name, "refs/heads/") && strings.TrimPrefix(name, "refs/heads/") == rev {
+			matchedRef = ref
+			return errStopIteration
+		}
+
+		// 检查标签名（不带refs/tags/前缀）
+		if strings.HasPrefix(name, "refs/tags/") && strings.TrimPrefix(name, "refs/tags/") == rev {
+			matchedRef = ref
+			return errStopIteration
+		}
+
+		return nil
+	})
+
+	// 如果找到了匹配的引用，则返回其哈希
+	if matchedRef != nil {
+		return matchedRef.Hash().String(), nil
+	}
+
+	return "", utils.Errorf("cannot parse revision: %s", rev)
 }
 
 func ShortHashToFullHash(repo *git.Repository, hash string) (string, error) {

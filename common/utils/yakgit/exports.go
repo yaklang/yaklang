@@ -3,6 +3,12 @@ package yakgit
 var Exports = map[string]any{
 	"SetProxy": SetProxy,
 
+	"RevParse":        RevParse,
+	"HeadHash":        GetHeadHash,
+	"HeadBranch":      GetHeadBranch,
+	"HeadBranchRange": GetBranchRange,
+	"ParentHash":      GetParentCommitHash,
+
 	// githack
 	"GitHack":       GitHack,
 	"Clone":         Clone,

@@ -1,11 +1,16 @@
 package filesys
 
 var Exports = map[string]any{
-	"Recursive": Recursive,
+	"CopyToTemporary": CopyToTemporary,
+	"CopyToRefLocal":  CopyToRefLocal,
+	"Recursive":       Recursive,
 
-	"onReady":    withYaklangOnStart,
-	"onStat":     withYaklangStat,
-	"onFileStat": withYaklangFileStat,
-	"onDirStat":  withYaklangDirStat,
-	"dir":        WithDir,
+	"onFS":         withYaklangFileSystem,
+	"onReady":      withYaklangOnStart,
+	"onStat":       withYaklangStat,
+	"onStatEx":     withYaklangStatEx,
+	"onFileStat":   withYaklangFileStat,
+	"onFileStatEx": withYaklangFileStatEx,
+	"onDirStat":    withYaklangDirStat,
+	"dir":          WithDir,
 }
