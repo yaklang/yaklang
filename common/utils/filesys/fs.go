@@ -53,6 +53,10 @@ var SkipDir = errors.New("skip dir")
 var SkipAll = errors.New("skip all")
 
 func recursive(raw string, c Config, opts ...Option) (retErr error) {
+	if c.isStop() {
+		return nil
+	}
+
 	c.dirMatch = nil
 	for _, opt := range opts {
 		opt(&c)
@@ -71,6 +75,9 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 	var walkDir func(path string) error
 
 	walkSingleFile = func(path string) error {
+		if c.isStop() {
+			return nil
+		}
 		info, err := c.fileSystem.Stat(path)
 		if err != nil {
 			return utils.Errorf("stat %s failed: %v", path, err)
@@ -79,7 +86,9 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 		// count
 		totalCount++
 		if c.totalLimit > 0 && c.totalLimit < totalCount {
-			return utils.Wrapf(SkipAll, "total count limit exceeded: %d", c.totalLimit)
+			c.Stop()
+			log.Warnf("total count limit exceeded: %d", c.totalLimit)
+			return SkipAll
 		}
 
 		if c.onStat != nil {
@@ -96,7 +105,9 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 			// dir count
 			dirCount++
 			if c.dirLimit > 0 && c.dirLimit < dirCount {
-				return utils.Wrapf(SkipAll, "dir count limit exceeded: %d", c.dirLimit)
+				c.Stop()
+				log.Warnf("dir count limit exceeded: %d", c.dirLimit)
+				return SkipAll
 			}
 
 			// file stat
@@ -134,6 +145,12 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 				return utils.Errorf("dir count limit exceeded: %d", c.dirLimit)
 			}
 
+			if fileCount > c.fileLimit {
+				c.Stop()
+				log.Warnf("file count limit exceeded: %d", c.fileLimit)
+				return SkipAll
+			}
+
 			if c.onFileStat != nil {
 				err = c.onFileStat(path, info)
 				if err != nil {
@@ -145,6 +162,10 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 	}
 
 	walkDir = func(path string) error {
+		if c.isStop() {
+			return nil
+		}
+
 		dirs, err := c.fileSystem.ReadDir(path)
 		if err != nil {
 			return err

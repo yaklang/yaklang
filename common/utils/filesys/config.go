@@ -45,11 +45,13 @@ type (
 
 		dirMatch []*dirMatch
 
-		ctx context.Context
+		ctx       context.Context
+		ctxCancel context.CancelFunc
 	}
 )
 
 func NewConfig() *Config {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Config{
 		noStopWhenErr:      false,
 		RecursiveDirectory: true,
@@ -57,6 +59,8 @@ func NewConfig() *Config {
 		dirLimit:           100000,
 		totalLimit:         100000,
 		fileSystem:         NewLocalFs(),
+		ctx:                ctx,
+		ctxCancel:          cancel,
 	}
 }
 
@@ -129,6 +133,12 @@ func WithFileSystem(f fi.FileSystem) Option {
 	}
 }
 
+func WithFileLimit(limit int) Option {
+	return func(config *Config) {
+		config.fileLimit = int64(limit)
+	}
+}
+
 func WithEmbedFS(f embed.FS) Option {
 	return func(config *Config) {
 		config.fileSystem = NewEmbedFS(f)
@@ -143,7 +153,7 @@ func WithDirWalkEnd(handle func(path string) error) Option {
 
 func WithContext(ctx context.Context) Option {
 	return func(config *Config) {
-		config.ctx = ctx
+		config.ctx, config.ctxCancel = context.WithCancel(ctx)
 	}
 }
 
@@ -209,4 +219,11 @@ func (c *Config) isStop() bool {
 	default:
 		return false
 	}
+}
+
+func (c *Config) Stop() {
+	if c == nil || c.ctxCancel == nil {
+		return
+	}
+	c.ctxCancel()
 }
