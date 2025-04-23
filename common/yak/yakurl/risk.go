@@ -91,7 +91,7 @@ const (
 func (t riskTreeAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	var res []*ypb.YakURLResource
 
-	filter, err := GetSSARiskCountFilter(params)
+	filter, err := GetSSARiskCountFilter(params.GetUrl())
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,9 @@ func (t riskTreeAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURL
 	for _, rc := range rcs {
 		r, err := ConvertSSARiskCountInfoToResource(params.GetUrl(), filter, rc)
 		if err != nil {
-			return nil, err
+			log.Warnf("cover ssa-risk-info to resource: %v", err)
+			continue
+			// return nil, err
 		}
 		res = append(res, r)
 	}
@@ -124,17 +126,20 @@ type SSARiskCountFilter struct {
 	// SourceUrl    string
 	// FunctionName string
 	// RuleName     string
-	filter *ypb.SSARisksFilter
+	Filter *ypb.SSARisksFilter
 }
 
-func GetSSARiskCountFilter(params *ypb.RequestYakURLParams) (*SSARiskCountFilter, error) {
+func GetSSARiskCountFilter(u *ypb.YakURL) (*SSARiskCountFilter, error) {
 	ret := &SSARiskCountFilter{}
-
-	u := params.GetUrl()
 
 	query := make(url.Values)
 	for _, v := range u.GetQuery() {
 		query.Add(v.GetKey(), v.GetValue())
+	}
+
+	riskType := SSARiskTypeFile
+	if query.Get("type") == SSARiskTypeRule {
+		riskType = SSARiskTypeRule
 	}
 	// type="file" (default):
 	// 	path:="${program}/${source}/${function}/${risk}"
@@ -143,36 +148,68 @@ func GetSSARiskCountFilter(params *ypb.RequestYakURLParams) (*SSARiskCountFilter
 
 	rawpath := strings.TrimPrefix(u.GetPath(), "/")
 
-	var programName, sourceUrl, funcName string
+	var programName, rule, sourceUrl, funcName string
+	restPath := ""
 	if firstIndex := strings.Index(rawpath, "/"); firstIndex != -1 {
 		programName = rawpath[:firstIndex]
-		sourceUrl = rawpath[firstIndex:]
+		restPath = rawpath[firstIndex:]
 	} else {
 		programName = rawpath
 	}
-	if dotIndex := strings.LastIndex(sourceUrl, "."); dotIndex != -1 {
-		sourceUrl = strings.TrimPrefix(sourceUrl, "/")
-		if lastIndex := strings.LastIndex(sourceUrl, "/"); lastIndex > dotIndex {
-			funcName = sourceUrl[lastIndex+1:]
-			sourceUrl = sourceUrl[:lastIndex]
+	switch riskType {
+	case SSARiskTypeFile:
+		// 	path:="${program}/${source}/${function}/${risk}"
+		if dotIndex := strings.LastIndex(restPath, "."); dotIndex != -1 {
+			if lastIndex := strings.LastIndex(restPath, "/"); dotIndex < lastIndex {
+				// sourceUrl = strings.TrimPrefix(sourceUrl, "/")
+				// like : "rule_name.rule_suffix/function_name"
+				funcName = restPath[lastIndex+1:]
+				sourceUrl = restPath[:lastIndex]
+			} else {
+				sourceUrl = restPath
+			}
+		} else {
+			log.Warnf("path source not contain `.`, request path: [%s] param: [%v]", u.Path, u)
+			sourceUrl = restPath
 		}
-		sourceUrl = "/" + sourceUrl
+	case SSARiskTypeRule:
+		// 	path:="${program}/${rule}/${path}/${risk}"
+		restPath = strings.TrimPrefix(restPath, "/")
+		if lastIndex := strings.Index(restPath, "/"); lastIndex != -1 {
+			sourceUrl = restPath[lastIndex:]
+			rule = restPath[:lastIndex]
+		} else {
+			rule = restPath
+		}
 	}
 
 	var opts []yakit.SSARiskFilterOption
 	switch {
 	case programName == "":
 		ret.Level = SSARiskLevelProgram // not found program name, return all program
-	case programName != "" && sourceUrl == "":
-		// ret.filter.ProgramName = append(ret.filter.ProgramName, programName)
-		opts = append(opts, yakit.WithSSARiskFilterProgramName(programName))
+
+	// risk
+	case riskType == SSARiskTypeFile && sourceUrl == "":
 		ret.Level = SSARiskLevelSource // not found source url, return all source in program
-	case programName != "" && sourceUrl != "" && funcName == "":
+		opts = append(opts, yakit.WithSSARiskFilterProgramName(programName))
+	case riskType == SSARiskTypeFile && funcName == "":
+		ret.Level = SSARiskLevelFunction // not found function name, return all function in source & program
 		opts = append(opts, yakit.WithSSARiskFilterProgramName(programName))
 		opts = append(opts, yakit.WithSSARiskFilterSourceUrl(sourceUrl))
-		ret.Level = SSARiskLevelFunction // not found function name, return all function in source & program
+
+	// rule
+	case riskType == SSARiskTypeRule && rule == "":
+		ret.Level = SSARiskLevelRule
+		opts = append(opts, yakit.WithSSARiskFilterProgramName(programName))
+	case riskType == SSARiskTypeRule && sourceUrl == "":
+		ret.Level = SSARiskLevelSource
+		opts = append(opts, yakit.WithSSARiskFilterProgramName(programName))
+		opts = append(opts, yakit.WithSSARiskFilterRuleName(rule))
+
+	// get risk
 	default:
 		opts = append(opts, yakit.WithSSARiskFilterProgramName(programName))
+		opts = append(opts, yakit.WithSSARiskFilterRuleName(rule))
 		opts = append(opts, yakit.WithSSARiskFilterSourceUrl(sourceUrl))
 		opts = append(opts, yakit.WithSSARiskFilterFunction(funcName))
 		ret.Level = SSARiskLevelRisk // return all risk in {program, source, function}
@@ -182,8 +219,8 @@ func GetSSARiskCountFilter(params *ypb.RequestYakURLParams) (*SSARiskCountFilter
 		opts = append(opts, yakit.WithSSARiskFilterSearch(search))
 	}
 
-	ret.filter = yakit.NewSSARiskFilter(opts...)
-	log.Infof("filter : %v", ret.filter)
+	ret.Filter = yakit.NewSSARiskFilter(opts...)
+	log.Debugf("path [%s] param [%v] filter [%v]", u.Path, query, ret)
 	return ret, nil
 }
 
@@ -201,7 +238,7 @@ func GetSSARiskCountInfo(filter *SSARiskCountFilter) ([]*SSARiskCountInfo, error
 	db = db.Model(&schema.SSARisk{})
 	// db = db.Debug()
 
-	db = yakit.FilterSSARisk(db, filter.filter)
+	db = yakit.FilterSSARisk(db, filter.Filter)
 
 	switch filter.Level {
 	case SSARiskLevelProgram:
@@ -226,7 +263,7 @@ func GetSSARiskCountInfo(filter *SSARiskCountFilter) ([]*SSARiskCountInfo, error
 }
 
 func ConvertSSARiskCountInfoToResource(originParam *ypb.YakURL, countFilter *SSARiskCountFilter, rc *SSARiskCountInfo) (*ypb.YakURLResource, error) {
-	var filter ypb.SSARisksFilter = *countFilter.filter // copy assign
+	var filter ypb.SSARisksFilter = *countFilter.Filter // copy assign
 	switch countFilter.Level {
 	case SSARiskLevelProgram:
 		filter.ProgramName = append(filter.ProgramName, rc.Name)
