@@ -27,13 +27,18 @@ type riskTreeAction struct {
 			query: {
 				search: "${search}"
 				type: "${type}"
+
+				"program": "${program}" // if set this, path will ignore program
+				"rule": "${rule}" 		// if set this, path will ignore rule
 			}
 		}
 
-		type="file" "" (default):
-			path:="${program}/${source}/${function}/${risk}"
+		type="risk" "" (default):
+			path:="${program?}/${source}/${function}"
+		type="file"
+			path:="${program?}/${source}/${function}/${risk}"
 		type="rule" :
-			path:="${program}/${rule}/${source}/${risk}"
+			path:="${program?}/${rule?}/${source}/${risk}"
 
 		source must contain "."
 
@@ -45,9 +50,8 @@ type riskTreeAction struct {
 		// get risk, level=risk
 
 		resource: []Resource{
-			// frontend use this to render
 			VerboseName:  ${name}
-			VerboseType:  ${level}
+			VerboseType:  ${level} // leaf or branch
 
 			// frontend use this to require backend
 			ResourceName: ${name}
@@ -69,6 +73,9 @@ type riskTreeAction struct {
 					{
 						Key: "risk_hash"
 					}
+					{
+						Key: "code_range"
+					}
 			}
 		}
 */
@@ -83,10 +90,29 @@ const (
 	SSARiskLevelRisk     SSARiskResponseLevel = "risk"
 )
 
+type SSARiskResponseType string
+
 const (
-	SSARiskTypeFile = "file"
-	SSARiskTypeRule = "rule"
+	SSARiskTypeRisk SSARiskResponseType = "risk" // /${program}/${source}/${function}  			default
+	SSARiskTypeFile SSARiskResponseType = "file" // /${program}/${source}/${function}/${risk}
+	SSARiskTypeRule SSARiskResponseType = "rule" // /${program}/${rule}/${source}/${risk}
 )
+
+type SSARiskResponseNodeKind string
+
+const (
+	SSARiskNodeBranch SSARiskResponseNodeKind = "branch" // have child  node
+	SSARiskNodeLeaf   SSARiskResponseNodeKind = "leaf"   // no child node
+)
+
+// if argument is true , return leaf
+func GetSSARiskResponseNodeKind(b bool) SSARiskResponseNodeKind {
+	if b {
+		return SSARiskNodeLeaf
+	} else {
+		return SSARiskNodeBranch
+	}
+}
 
 func (t riskTreeAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	var res []*ypb.YakURLResource
@@ -120,48 +146,65 @@ func (t riskTreeAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURL
 }
 
 type SSARiskCountFilter struct {
-	// filter with level
-	Level SSARiskResponseLevel
-	// ProgramName  string
-	// SourceUrl    string
-	// FunctionName string
-	// RuleName     string
-	Filter *ypb.SSARisksFilter
+	Level    SSARiskResponseLevel
+	NodeKind SSARiskResponseNodeKind
+	Filter   *ypb.SSARisksFilter
 }
 
 func GetSSARiskCountFilter(u *ypb.YakURL) (*SSARiskCountFilter, error) {
 	ret := &SSARiskCountFilter{}
+	// type="file" (default):
+	// 	path:="${program}/${source}/${function}/${risk}"
+	// type="rule" :
+	// 	path:="${program}/${rule}/${source}/${risk}"
+
+	// param["program"] exist, ignore program in path
+	// param["rule"] exist, ignore rule in path
 
 	query := make(url.Values)
 	for _, v := range u.GetQuery() {
 		query.Add(v.GetKey(), v.GetValue())
 	}
 
-	riskType := SSARiskTypeFile
-	if query.Get("type") == SSARiskTypeRule {
+	riskType := SSARiskTypeRisk
+	switch query.Get("type") {
+	case "rule":
 		riskType = SSARiskTypeRule
+	case "file":
+		riskType = SSARiskTypeFile
+	default:
+		riskType = SSARiskTypeRisk
 	}
-	// type="file" (default):
-	// 	path:="${program}/${source}/${function}/${risk}"
-	// type="rule" :
-	// 	path:="${program}/${rule}/${path}/${risk}"
-
-	rawpath := strings.TrimPrefix(u.GetPath(), "/")
 
 	var programName, rule, sourceUrl, funcName string
-	restPath := ""
-	if firstIndex := strings.Index(rawpath, "/"); firstIndex != -1 {
-		programName = rawpath[:firstIndex]
-		restPath = rawpath[firstIndex:]
-	} else {
-		programName = rawpath
+
+	if prog := query.Get("program"); prog != "" {
+		programName = prog
 	}
+	if r := query.Get("rule"); r != "" {
+		rule = r
+	}
+
+	restPath := ""
+	if programName == "" {
+		rawpath := strings.TrimPrefix(u.GetPath(), "/")
+		// if no set program-name, parse from path
+		if firstIndex := strings.Index(rawpath, "/"); firstIndex != -1 {
+			programName = rawpath[:firstIndex]
+			restPath = rawpath[firstIndex:]
+		} else {
+			programName = rawpath
+		}
+	} else {
+		// if set program-name in param, ignore program in path
+		restPath = u.GetPath()
+	}
+
 	switch riskType {
-	case SSARiskTypeFile:
-		// 	path:="${program}/${source}/${function}/${risk}"
+	case SSARiskTypeFile, SSARiskTypeRisk:
+		// 	restPath:="/${source}/${function}"
 		if dotIndex := strings.LastIndex(restPath, "."); dotIndex != -1 {
 			if lastIndex := strings.LastIndex(restPath, "/"); dotIndex < lastIndex {
-				// sourceUrl = strings.TrimPrefix(sourceUrl, "/")
 				// like : "rule_name.rule_suffix/function_name"
 				funcName = restPath[lastIndex+1:]
 				sourceUrl = restPath[:lastIndex]
@@ -170,16 +213,20 @@ func GetSSARiskCountFilter(u *ypb.YakURL) (*SSARiskCountFilter, error) {
 			}
 		} else {
 			log.Warnf("path source not contain `.`, request path: [%s] param: [%v]", u.Path, u)
-			sourceUrl = restPath
 		}
 	case SSARiskTypeRule:
-		// 	path:="${program}/${rule}/${path}/${risk}"
-		restPath = strings.TrimPrefix(restPath, "/")
-		if lastIndex := strings.Index(restPath, "/"); lastIndex != -1 {
-			sourceUrl = restPath[lastIndex:]
-			rule = restPath[:lastIndex]
+		if rule == "" {
+			// 	restPath:="/${rule}/${source}"
+			restPath = strings.TrimPrefix(restPath, "/")
+			if lastIndex := strings.Index(restPath, "/"); lastIndex != -1 {
+				sourceUrl = restPath[lastIndex:]
+				rule = restPath[:lastIndex]
+			} else {
+				rule = restPath
+			}
 		} else {
-			rule = restPath
+			// restPath = "/${source}"
+			sourceUrl = restPath
 		}
 	}
 
@@ -187,17 +234,18 @@ func GetSSARiskCountFilter(u *ypb.YakURL) (*SSARiskCountFilter, error) {
 	switch {
 	case programName == "":
 		ret.Level = SSARiskLevelProgram // not found program name, return all program
+		opts = append(opts, yakit.WithSSARiskFilterRuleName(rule))
 
-	// risk
-	case riskType == SSARiskTypeFile && sourceUrl == "":
+	// risk type=(file|risk)
+	case (riskType == SSARiskTypeFile || riskType == SSARiskTypeRisk) && sourceUrl == "":
 		ret.Level = SSARiskLevelSource // not found source url, return all source in program
 		opts = append(opts, yakit.WithSSARiskFilterProgramName(programName))
-	case riskType == SSARiskTypeFile && funcName == "":
+	case (riskType == SSARiskTypeFile || riskType == SSARiskTypeRisk) && funcName == "":
 		ret.Level = SSARiskLevelFunction // not found function name, return all function in source & program
 		opts = append(opts, yakit.WithSSARiskFilterProgramName(programName))
 		opts = append(opts, yakit.WithSSARiskFilterSourceUrl(sourceUrl))
 
-	// rule
+	// rule type=rule
 	case riskType == SSARiskTypeRule && rule == "":
 		ret.Level = SSARiskLevelRule
 		opts = append(opts, yakit.WithSSARiskFilterProgramName(programName))
@@ -219,6 +267,13 @@ func GetSSARiskCountFilter(u *ypb.YakURL) (*SSARiskCountFilter, error) {
 		opts = append(opts, yakit.WithSSARiskFilterSearch(search))
 	}
 
+	switch riskType {
+	case SSARiskTypeRisk: // end in function
+		ret.NodeKind = GetSSARiskResponseNodeKind(ret.Level == SSARiskLevelFunction || ret.Level == SSARiskLevelRisk)
+	case SSARiskTypeFile, SSARiskTypeRule: // end in risk
+		ret.NodeKind = GetSSARiskResponseNodeKind(ret.Level == SSARiskLevelRisk)
+	}
+
 	ret.Filter = yakit.NewSSARiskFilter(opts...)
 	log.Debugf("path [%s] param [%v] filter [%v]", u.Path, query, ret)
 	return ret, nil
@@ -228,9 +283,10 @@ type SSARiskCountInfo struct {
 	Name  string `json:"name"`
 	Count int64  `json:"count"`
 
-	Title    string `json:"title"`
-	RiskID   int64  `json:"risk_id"`
-	RiskHash string `json:"risk_hash"`
+	Title     string `json:"title"`
+	RiskID    int64  `json:"risk_id"`
+	RiskHash  string `json:"risk_hash"`
+	CodeRange string `json:"code_range"`
 }
 
 func GetSSARiskCountInfo(filter *SSARiskCountFilter) ([]*SSARiskCountInfo, error) {
@@ -250,7 +306,7 @@ func GetSSARiskCountInfo(filter *SSARiskCountFilter) ([]*SSARiskCountInfo, error
 	case SSARiskLevelFunction:
 		db = db.Select("function_name as name, COUNT(*) as count").Group("function_name")
 	case SSARiskLevelRisk:
-		db = db.Select("title_verbose as name, 1 as count, title as title, id as risk_id, hash as risk_hash")
+		db = db.Select("title_verbose as name, 1 as count, title , id as risk_id, hash as risk_hash, code_range")
 	default:
 		return nil, utils.Errorf("unknown level: %s", filter.Level)
 	}
@@ -282,6 +338,7 @@ func ConvertSSARiskCountInfoToResource(originParam *ypb.YakURL, countFilter *SSA
 		extraData = append(extraData,
 			extra{"id", rc.RiskID},
 			extra{"hash", rc.RiskHash},
+			extra{"code_range", rc.CodeRange},
 		)
 		if rc.Name == "" {
 			rc.Name = rc.Title
@@ -307,8 +364,7 @@ func ConvertSSARiskCountInfoToResource(originParam *ypb.YakURL, countFilter *SSA
 	res.Path = path.Join(originParam.Path, rc.Name)
 	res.ResourceName = rc.Name
 	res.ResourceType = string(countFilter.Level)
-	res.VerboseType = string(countFilter.Level)
-	res.VerboseName = rc.Name
+	res.VerboseType = string(countFilter.NodeKind)
 
 	return res, nil
 }

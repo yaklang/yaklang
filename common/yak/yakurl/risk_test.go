@@ -27,6 +27,8 @@ type filter struct {
 	rule     string
 	source   string
 	function string
+	search   string
+	node     yakurl.SSARiskResponseNodeKind
 }
 
 func TestSSARiskRequestParse(t *testing.T) {
@@ -46,6 +48,7 @@ func TestSSARiskRequestParse(t *testing.T) {
 		// spew.Dump(res)
 		got := filter{
 			level: res.Level,
+			node:  res.NodeKind,
 		}
 		if len(res.Filter.ProgramName) > 0 {
 			got.program = res.Filter.ProgramName[0]
@@ -74,87 +77,231 @@ func TestSSARiskRequestParse(t *testing.T) {
 				t.Fatalf("expected only one function name, got %d: %v", len(res.Filter.FunctionName), res.Filter.FunctionName)
 			}
 		}
-
+		got.search = res.Filter.Search
 		require.Equal(t, want, got)
 	}
 
+	//{{{ // check type=""		path:="${program}/${source}/${function}(leaf)/${risk}"
 	t.Run("check get program", func(t *testing.T) {
 		check(t, "/", nil, filter{
 			level: yakurl.SSARiskLevelProgram,
+			node:  yakurl.SSARiskNodeBranch,
 		})
 	})
-
 	t.Run("check get source", func(t *testing.T) {
 		check(t, "/paaaa", nil, filter{
 			level:   yakurl.SSARiskLevelSource,
+			node:    yakurl.SSARiskNodeBranch,
 			program: "paaaa",
 		})
 	})
-
 	t.Run("check get function", func(t *testing.T) {
 		check(t, "/proaaa/bbb.go", nil, filter{
 			level:   yakurl.SSARiskLevelFunction,
+			node:    yakurl.SSARiskNodeLeaf,
 			program: "proaaa",
 			source:  "/bbb.go",
 		})
 	})
-
-	t.Run("check get risk with file", func(t *testing.T) {
+	t.Run("check get risk", func(t *testing.T) {
 		check(t, "/paaa/bb.go/ff", nil, filter{
 			level:    yakurl.SSARiskLevelRisk,
+			node:     yakurl.SSARiskNodeLeaf,
 			program:  "paaa",
 			source:   "/bb.go",
 			function: "ff",
 		})
 	})
 
-	t.Run("check get risk with param", func(t *testing.T) {
-		check(t, "/paaa", map[string]string{
-			"search": "ssssss",
+	t.Run("check get function with file type ", func(t *testing.T) {
+		check(t, "/proaaa/bbb.go", map[string]string{
+			"type": string(yakurl.SSARiskTypeFile),
+		}, filter{
+			level:   yakurl.SSARiskLevelFunction,
+			node:    yakurl.SSARiskNodeBranch,
+			program: "proaaa",
+			source:  "/bbb.go",
+		})
+	})
+	t.Run("check get risk with file type ", func(t *testing.T) {
+		check(t, "/paaa/bb.go/ff", map[string]string{
+			"type": string(yakurl.SSARiskTypeFile),
+		}, filter{
+			level:    yakurl.SSARiskLevelRisk,
+			node:     yakurl.SSARiskNodeLeaf,
+			program:  "paaa",
+			source:   "/bb.go",
+			function: "ff",
+		})
+	})
+	// }}}
+
+	// {{{ param["program"]  path:="/${source}/${function}(leaf)/${risk}(leaf)"
+	t.Run("check get source by program param", func(t *testing.T) {
+		check(t, "/", map[string]string{
+			"program": "p",
 		}, filter{
 			level:   yakurl.SSARiskLevelSource,
-			program: "paaa",
+			node:    yakurl.SSARiskNodeBranch,
+			program: "p",
 		})
 	})
 
+	t.Run("check get function by program param", func(t *testing.T) {
+		check(t, "/ssss.go", map[string]string{
+			"program": "ppp",
+		}, filter{
+			level:   yakurl.SSARiskLevelFunction,
+			node:    yakurl.SSARiskNodeLeaf,
+			program: "ppp",
+			source:  "/ssss.go",
+		})
+	})
+
+	t.Run("check get risk by program param", func(t *testing.T) {
+		check(t, "/ssss.go/fff", map[string]string{
+			"program": "pppp",
+		}, filter{
+			level:    yakurl.SSARiskLevelRisk,
+			node:     yakurl.SSARiskNodeLeaf,
+			program:  "pppp",
+			source:   "/ssss.go",
+			function: "fff",
+		})
+	})
+	// }}}
+
+	//{{{ param["type"]="rule" 			// 	path:="${program}/${rule}/${path}/${risk}"
 	t.Run("check get program with rule type", func(t *testing.T) {
 		check(t, "/", map[string]string{
-			"type": yakurl.SSARiskTypeRule,
+			"type": string(yakurl.SSARiskTypeRule),
 		}, filter{
 			level: yakurl.SSARiskLevelProgram,
+			node:  yakurl.SSARiskNodeBranch,
 		})
 	})
 
 	t.Run("check get rule with rule type", func(t *testing.T) {
 		check(t, "/aa", map[string]string{
-			"type": yakurl.SSARiskTypeRule,
+			"type": string(yakurl.SSARiskTypeRule),
 		}, filter{
 			level:   yakurl.SSARiskLevelRule,
+			node:    yakurl.SSARiskNodeBranch,
 			program: "aa",
 		})
 	})
 
 	t.Run("check get source with rule type", func(t *testing.T) {
 		check(t, "/aa/bb", map[string]string{
-			"type": yakurl.SSARiskTypeRule,
+			"type": string(yakurl.SSARiskTypeRule),
 		}, filter{
 			level:   yakurl.SSARiskLevelSource,
+			node:    yakurl.SSARiskNodeBranch,
 			program: "aa",
 			rule:    "bb",
 		})
 	})
 
 	t.Run("check get risk with rule type", func(t *testing.T) {
-		check(t, "/aa/bb/cc", map[string]string{
-			"type": yakurl.SSARiskTypeRule,
+		check(t, "/aa/bb/cc.go", map[string]string{
+			"type": string(yakurl.SSARiskTypeRule),
 		}, filter{
 			level:   yakurl.SSARiskLevelRisk,
+			node:    yakurl.SSARiskNodeLeaf,
 			program: "aa",
 			rule:    "bb",
-			source:  "/cc",
+			source:  "/cc.go",
+		})
+	})
+	// }}}
+
+	//{{{ param["program"]  		path:="/${rule}/${path}/${risk}"
+	t.Run("check rule-type get rule with program param", func(t *testing.T) {
+		check(t, "/", map[string]string{
+			"program": "pppp",
+			"type":    string(yakurl.SSARiskTypeRule),
+		}, filter{
+			level:   yakurl.SSARiskLevelRule,
+			node:    yakurl.SSARiskNodeBranch,
+			program: "pppp",
 		})
 	})
 
+	t.Run("check rule-type get source with program param", func(t *testing.T) {
+		check(t, "/bb", map[string]string{
+			"program": "pppp",
+			"type":    string(yakurl.SSARiskTypeRule),
+		}, filter{
+			level:   yakurl.SSARiskLevelSource,
+			node:    yakurl.SSARiskNodeBranch,
+			program: "pppp",
+			rule:    "bb",
+		})
+	})
+
+	t.Run("check rule-type get risk with program param", func(t *testing.T) {
+		check(t, "/bb/cc.go", map[string]string{
+			"program": "pppp",
+			"type":    string(yakurl.SSARiskTypeRule),
+		}, filter{
+			level:   yakurl.SSARiskLevelRisk,
+			node:    yakurl.SSARiskNodeLeaf,
+			program: "pppp",
+			rule:    "bb",
+			source:  "/cc.go",
+		})
+	})
+	//}}}
+
+	//{{{ param["rule"]  // 	path:="${program}/${source}/${risk}"
+	t.Run("check rule-type get program with rule param", func(t *testing.T) {
+		check(t, "/", map[string]string{
+			"rule": "rrrr",
+			"type": string(yakurl.SSARiskTypeRule),
+		}, filter{
+			level: yakurl.SSARiskLevelProgram,
+			node:  yakurl.SSARiskNodeBranch,
+			rule:  "rrrr",
+		})
+	})
+
+	t.Run("check rule-type get source with rule param", func(t *testing.T) {
+		check(t, "/pppp", map[string]string{
+			"rule": "rrrr",
+			"type": string(yakurl.SSARiskTypeRule),
+		}, filter{
+			level:   yakurl.SSARiskLevelSource,
+			node:    yakurl.SSARiskNodeBranch,
+			program: "pppp",
+			rule:    "rrrr",
+		})
+	})
+
+	t.Run("check rule-type get risk with rule param", func(t *testing.T) {
+		check(t, "/pppp/cc.go", map[string]string{
+			"rule": "rrrr",
+			"type": string(yakurl.SSARiskTypeRule),
+		}, filter{
+			level:   yakurl.SSARiskLevelRisk,
+			node:    yakurl.SSARiskNodeLeaf,
+			program: "pppp",
+			rule:    "rrrr",
+			source:  "/cc.go",
+		})
+	})
+	// }}}
+
+	// search
+	t.Run("check get risk with search param", func(t *testing.T) {
+		check(t, "/paaa", map[string]string{
+			"search": "ssssss",
+		}, filter{
+			level:   yakurl.SSARiskLevelSource,
+			node:    yakurl.SSARiskNodeBranch,
+			program: "paaa",
+			search:  "ssssss",
+		})
+	})
 }
 
 func initRiskTest(t *testing.T, programName string) {
@@ -323,11 +470,14 @@ func TestRiskAction(t *testing.T) {
 		t.Error(err)
 	}
 
-	checkPathAndSearch := func(path, search string, want map[string]data, contain ...bool) {
+	check := func(path, search, program string, want map[string]data, contain ...bool) {
 		url := &ypb.YakURL{
 			Schema: "ssarisk",
 			Path:   path,
-			Query:  []*ypb.KVPair{{Key: "search", Value: search}},
+			Query: []*ypb.KVPair{
+				{Key: "search", Value: search},
+				{Key: "program", Value: program},
+			},
 		}
 		got := GetSSARisk(t, local, url)
 		log.Infof("got: %v", got)
@@ -344,6 +494,9 @@ func TestRiskAction(t *testing.T) {
 		} else {
 			require.Equal(t, want, got)
 		}
+	}
+	checkPathAndSearch := func(path, search string, want map[string]data, contain ...bool) {
+		check(path, search, "", want, contain...)
 	}
 
 	t.Run("check path root", func(t *testing.T) {
@@ -389,10 +542,45 @@ func TestRiskAction(t *testing.T) {
 		})
 	})
 
+	t.Run("check path with program param", func(t *testing.T) {
+		check("/", "", programName1, map[string]data{
+			sourcePath(programName1, "a.go"): {
+				Name:  sourcePath(programName1, "a.go"),
+				Type:  "source",
+				Count: 1,
+			},
+			sourcePath(programName1, "b/b1.go"): {
+				Name:  sourcePath(programName1, "b/b1.go"),
+				Type:  "source",
+				Count: 1,
+			},
+			sourcePath(programName1, "b/b2.go"): {
+				Name:  sourcePath(programName1, "b/b2.go"),
+				Type:  "source",
+				Count: 1,
+			},
+			sourcePath(programName1, "c.go"): {
+				Name:  sourcePath(programName1, "c.go"),
+				Type:  "source",
+				Count: 2,
+			},
+		})
+	})
+
 	t.Run("check path source", func(t *testing.T) {
 		// ssarisk://program/c.go
 		checkPathAndSearch(urlPath(programName1, "c.go"), "", map[string]data{
 			urlFunctionPath(programName1, "c.go", "funcC"): {
+				Name:  "funcC",
+				Type:  "function",
+				Count: 2,
+			},
+		})
+	})
+	t.Run("check function with program param", func(t *testing.T) {
+		path := sourcePath(programName1, "/c.go")
+		check(path, "", programName1, map[string]data{
+			path + "/funcC": {
 				Name:  "funcC",
 				Type:  "function",
 				Count: 2,
