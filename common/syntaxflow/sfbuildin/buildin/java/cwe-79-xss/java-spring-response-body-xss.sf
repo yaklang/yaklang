@@ -1,7 +1,8 @@
 desc(
+    title_zh:"检测Java SpringBoot RestController 基础XSS漏洞",
     title: "Find SpringBoot RestController Basic XSS",
     type: vuln,
-    risk: xss,
+    risk: XSS,
     desc: <<<TEXT
 跨站脚本攻击（XSS）是一种常见的安全漏洞，攻击者通过在应用程序中注入恶意脚本，能够在其他用户的浏览器中执行这些脚本。在Spring Boot的RestController中，如果未对用户输入进行适当的过滤或转义，并将其直接输出到HTTP响应中，那么攻击者可能会利用这一点来发动XSS攻击。这可能导致敏感信息泄露、会话劫持或其他恶意行为。因此，建议对所有用户输入进行适当的验证、过滤或转义，以防止XSS攻击。
 TEXT
@@ -10,6 +11,11 @@ TEXT
 <include('java-spring-mvc-param')>?{<typeName>?{have: String}} as $params;
 
 RestController.__ref__<getMembers>?{.annotation.*Mapping} as $entryMethods;
+// ResponseBody修饰类的时候
+ResponseBody.__ref__<getMembers>?{.annotation.*Mapping} as $entryMethods;
+// ResponseBody修饰方法
+ResponseBody.__ref__?{.annotation.*Mapping} as $entryMethods;
+
 $entryMethods<getReturns> as $sink;
 $sink #{
     until: `* & $params as $source`,
@@ -110,3 +116,55 @@ public class XSSController {
 UNSAFE
 )
 
+desc(
+    lang: java,
+    alert_num:2,
+    'file://reflective.java': <<<UNSAFE
+
+import cn.hutool.core.date.DateUtil;
+import io.swagger.annotations.*;
+import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.util.HtmlUtils;
+import org.thymeleaf.util.StringUtils;
+
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+
+@Slf4j
+@Api(value = "ReflectController", tags = "跨站脚本 - 反射型XSS")
+@Controller
+@CrossOrigin(origins = "*")
+@RequestMapping("/xss/reflect")
+public class ReflectController extends XssBaseController {
+
+    @Autowired
+    private CheckUserInput checkUserInput;
+
+    @ApiOperation(value = "漏洞场景：GET型与POST型", notes = "原生漏洞场景,未加任何过滤，Controller接口返回Json类型结果")
+    @RequestMapping("/vul1")
+    @ResponseBody
+    @ApiImplicitParam(name = "payload", value = "请求参数", dataType = "String", paramType = "query", dataTypeClass = String.class)
+    public R vul1(@ApiParam(name = "payload", value = "请求参数", required = true) @RequestParam String payload) {
+        return handleXssPayload(payload, "反射型-GET/POST型", false);
+    }
+
+    @ApiOperation(value = "漏洞场景：String", notes = "原生漏洞场景,未加任何过滤，Controller接口返回String")
+    @GetMapping("/vul2")
+    @ResponseBody
+    @ApiImplicitParam(name = "payload", value = "请求参数", dataType = "String", paramType = "query", dataTypeClass = String.class)
+    public String vul2(@ApiParam(name = "payload", value = "请求参数", required = true) @RequestParam String payload) {
+        log.info("[+]XSS-反射型-String型：" + payload);
+        return payload;
+    }
+}
+UNSAFE
+)
