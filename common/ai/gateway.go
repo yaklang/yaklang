@@ -237,6 +237,29 @@ func GetPrimaryAgent() aispec.AIClient {
 	return agent
 }
 
+func ChatStream(msg string, opts ...aispec.AIConfigOption) (io.Reader, error) {
+	config := aispec.NewDefaultAIConfig(opts...)
+	var responseStream io.Reader
+	var err error
+	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIClient) bool {
+		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
+		if err := gateway.CheckValid(); err != nil {
+			log.Warnf("check valid by %s failed: %s", typ, err)
+			return false
+		}
+		responseStream, err = gateway.ChatStream(msg)
+		if err != nil {
+			log.Warnf("chat stream by %s failed: %s", typ, err)
+			return false
+		}
+		return true
+	})
+	if err != nil {
+		return nil, err
+	}
+	return responseStream, nil
+}
+
 func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	config := aispec.NewDefaultAIConfig(opts...)
 	var responseRsp string
@@ -249,7 +272,6 @@ func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 		}
 		responseRsp, err = gateway.Chat(msg)
 		if err != nil {
-
 			log.Warnf("chat by %s failed: %s", typ, err)
 			return false
 		}

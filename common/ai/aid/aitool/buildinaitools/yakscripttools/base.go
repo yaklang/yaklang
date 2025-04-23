@@ -4,20 +4,21 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"io"
+	"io/fs"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/yakcliconvert"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"io/fs"
-	"strings"
 
 	_ "github.com/yaklang/yaklang/common/yak"
 )
@@ -50,22 +51,22 @@ func GetYakScriptAiTools(name ...string) []*aitool.Tool {
 		if err != nil {
 			return nil
 		}
+		metadata, err := metadata.ParseYakScriptMetadata(filename, string(content))
+		if err != nil {
+			log.Warnf("parse yak script metadata failed: %v", err)
+			return err
+		}
 		prog, err := static_analyzer.SSAParse(string(content), "yak")
 		if err != nil {
 			log.Warnf(`static_analyzer.SSAParse(string(content), "yak") error: %v`, err)
 			return err
 		}
-		var desc []string
-		prog.Ref("__DESC__").ForEach(func(value *ssaapi.Value) {
-			if !value.IsConstInst() {
-				return
-			}
-			desc = append(desc, value.String())
-		})
+
 		tool := yakcliconvert.ConvertCliParameterToTool(toolname, prog)
 		at, err := aitool.NewFromMCPTool(
 			tool,
-			aitool.WithDescription(strings.Join(desc, "; ")),
+			aitool.WithDescription(metadata.Description),
+			aitool.WithKeywords(metadata.Keywords),
 			aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()

@@ -1,3 +1,5 @@
+__KEYWORDS__ = "tls certificates,domain inspection,ssl,security,certificate validation,encryption,network security,web security,certificate authority,domain verification"
+
 __DESC__ = <<<EOF
 Inspect TLS certificates for a specified domain
 EOF

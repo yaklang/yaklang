@@ -1,3 +1,5 @@
+__KEYWORDS__ = "dns lookup,dns helper,a record,aaaa record,ns record,txt record,domain name,network tools,dns queries,internet protocols"
+
 __DESC__ = <<<EOF
 for dns lookup helper, default to check A/AAAA/NS/TXT... so on
 EOF

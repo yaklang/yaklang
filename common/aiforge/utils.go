@@ -1,14 +1,15 @@
 package aiforge
 
 import (
+	"io"
+	"os"
+	"path/filepath"
+
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
-	"io"
-	"os"
-	"path/filepath"
 )
 
 func getTestSuiteAICallback(fileName string, opts []aispec.AIConfigOption, typeName string, modelName ...string) aid.AICallbackType {
@@ -76,7 +77,7 @@ func GetOpenRouterAICallbackWithProxy(modelName ...string) aid.AICallbackType {
 		modelName = []string{"google/gemini-2.0-flash-001"}
 	}
 	return getTestSuiteAICallback("openrouter.txt", []aispec.AIConfigOption{
-		aispec.WithProxy("http://127.0.0.1:7890"),
+		aispec.WithProxy("http://127.0.0.1:10808"),
 	}, "openrouter", modelName...)
 }
 

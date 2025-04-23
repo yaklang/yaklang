@@ -1,6 +1,8 @@
 package depinjector
 
 import (
+	"io"
+
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
@@ -17,12 +19,8 @@ var _ ostype.SearchClient = &searchtools.AiToolsSearchClient{}
 func injectAiTools() {
 	aiSearchTools := searchtools.NewAiToolsSearchClient(buildinaitools.GetAllTools, &searchtools.AiToolsSearchClientConfig{
 		SearchType: "ai",
-		CallAiFunc: func(msg string) (string, error) {
-			rsp, err := ai.Chat(msg)
-			if err != nil {
-				return "", err
-			}
-			return rsp, nil
+		ChatToAiFunc: func(msg string) (io.Reader, error) {
+			return ai.ChatStream(msg)
 		},
 	})
 	omnisearch.RegisterSearchers(aiSearchTools)

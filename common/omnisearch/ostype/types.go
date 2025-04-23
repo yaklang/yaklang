@@ -18,6 +18,7 @@ type OmniSearchResult struct {
 	FaviconURL string `json:"favicon_url,omitempty"`
 	Content    string `json:"content,omitempty"`
 	Source     string `json:"source,omitempty"`
+	Data       any    `json:"data,omitempty"`
 }
 
 type YakitOmniSearchKeyConfig struct {

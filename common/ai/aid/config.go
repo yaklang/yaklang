@@ -3,6 +3,7 @@ package aid
 import (
 	"context"
 	"fmt"
+	"io"
 	"math/rand/v2"
 	"strings"
 	"sync"
@@ -58,8 +59,12 @@ type Config struct {
 
 	// no need to think, low level
 	taskAICallback AICallbackType
+	toolAICallback SimpleAiCallbackType
 	tools          []*aitool.Tool
 	eventHandler   func(e *Event)
+
+	// tool manager
+	aiToolManager buildinaitools.ToolManager
 
 	// memory
 	persistentMemory []string
@@ -203,11 +208,10 @@ func newConfig(ctx context.Context) *Config {
 		idGenerator: func() int64 {
 			return atomic.AddInt64(idGenerator, 1)
 		},
-		agreePolicy:   AgreePolicyManual,
-		agreeAIScore:  0.5,
-		agreeRiskCtrl: new(riskControl),
-		agreeInterval: 10 * time.Second,
-
+		agreePolicy:       AgreePolicyManual,
+		agreeAIScore:      0.5,
+		agreeRiskCtrl:     new(riskControl),
+		agreeInterval:     10 * time.Second,
 		m:                 new(sync.Mutex),
 		id:                id.String(),
 		epm:               newEndpointManagerContext(ctx),
@@ -399,14 +403,68 @@ func WithTools(tool ...*aitool.Tool) Option {
 		return nil
 	}
 }
+func WithSimpleAICallback(cb SimpleAiCallbackType) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		commonAiCallback := func(config *Config, req *AIRequest) (*AIResponse, error) {
+			rsp := config.NewAIResponse()
+			reader, err := cb(req.GetPrompt())
+			if err != nil {
+				return nil, err
+			}
+			pr, pw := utils.NewBufPipe(nil)
+			go func() {
+				defer func() {
+					pw.Close()
+					pr.Close()
+					rsp.Close()
+				}()
+				io.Copy(pw, reader)
+			}()
+			rsp.EmitOutputStream(pr)
+
+			return rsp, nil
+		}
+		warpedCb := config.wrapper(commonAiCallback)
+		config.toolAICallback = func(msg string) (io.Reader, error) {
+			rsp, err := warpedCb(config, NewAIRequest(msg))
+			if err != nil {
+				return nil, err
+			}
+			return rsp.GetOutputStreamReader("tool", false, config), nil
+		}
+		config.coordinatorAICallback = warpedCb
+		config.taskAICallback = warpedCb
+		config.planAICallback = warpedCb
+		return nil
+	}
+}
 
 func WithAICallback(cb AICallbackType) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
-		config.coordinatorAICallback = config.wrapper(cb)
-		config.taskAICallback = config.wrapper(cb)
-		config.planAICallback = config.wrapper(cb)
+		warpedCb := config.wrapper(cb)
+		config.toolAICallback = func(msg string) (io.Reader, error) {
+			rsp, err := warpedCb(config, NewAIRequest(msg))
+			if err != nil {
+				return nil, err
+			}
+			return rsp.GetOutputStreamReader("tool", false, config), nil
+		}
+		config.coordinatorAICallback = warpedCb
+		config.taskAICallback = warpedCb
+		config.planAICallback = warpedCb
+		return nil
+	}
+}
+
+func WithToolManager(manager buildinaitools.ToolManager) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.aiToolManager = manager
 		return nil
 	}
 }

@@ -1,3 +1,5 @@
+__KEYWORDS__ = "file list,zip,limit,offset,pagination,file management,data retrieval,view files,archive,files"
+
 __DESC__ = <<<EOF
 view file list in zip, use limit and offset to view over-amount files
 EOF

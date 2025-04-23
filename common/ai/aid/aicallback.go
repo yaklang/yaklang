@@ -107,6 +107,7 @@ func NewAIRequest(prompt string, opt ...AIRequestOption) *AIRequest {
 }
 
 type AICallbackType func(config *Config, req *AIRequest) (*AIResponse, error)
+type SimpleAiCallbackType func(msg string) (io.Reader, error)
 
 func (c *Config) NewAIResponse() *AIResponse {
 	return &AIResponse{
