@@ -14,7 +14,7 @@ I() as $sink
 ./param|request|server|cookie|get|post|only|except|file/ as $function
 $function?{<getObject>?{opcode: call && any: "Request"}} as $sink
 $function?{<getObject>?{any: "Request","request"}} as $sink
-$sink?{<getFunc><getCurrentBlueprint><fullTypeName>?{have: "Controller"}}  as $output
+$sink?{<getFunc><getCurrentBlueprint><fullTypeName>?{any: "Controller","controller"}}  as $output
 alert $output
 
 desc(

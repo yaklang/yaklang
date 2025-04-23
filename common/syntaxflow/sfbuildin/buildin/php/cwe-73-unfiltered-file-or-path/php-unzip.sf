@@ -1,0 +1,71 @@
+desc(
+    title: 'zip operator',
+    title_zh: "文件压缩/文件解压",
+    type: vul,
+    level: low,
+    risk: "zip operator",
+    desc: <<<CODE
+    zip操作是Web应用程序中常见的功能，如果未经过充分的安全检查，可能会导致文件路径遍历（Path Traversal）漏洞。攻击者可以通过构造恶意文件路径，访问或修改服务器上的敏感文件，进而导致信息泄露、文件损坏等安全问题。在PHP应用程序中，如果开发者未能正确验证或过滤用户输入的文件路径，可能会导致文件路径遍历漏洞。建议对zip操作功能进行严格的安全检查，包括验证文件路径的合法性、长度、字符等，并确保zip操作不会导致未经授权的访问或执行。
+CODE
+)
+
+<include('php-param')> as $params
+<include('php-tp-all-extern-variable-param-source')> as $params
+<include('php-filter-function')> as $filter
+.unzip?{<getObject>?{any: "Zip","zip"}} as $function
+.extractTo?{<getObject>?{any: "Zip","zip"}} as $function
+
+$function(* #{
+    include: <<<CODE
+* & $params
+CODE
+}-> as $all)
+
+$function(* #{
+    include: <<<CODE
+* & $params
+CODE,
+    exclude: <<<CODE
+<self>?{opcode: call}
+CODE
+}-> as $high)
+
+alert $high for {
+    title: 'Unsafe File Unzip Without Validation',
+    title_zh: '未经验证的高危文件解压',
+    level: 'high'
+}
+
+$function(* #{
+    include: <<<CODE
+* & $params
+CODE,
+    exclude: <<<CODE
+<self>?{opcode: call && <self><getCallee> & $filter}
+CODE
+}-> as $mid)
+
+alert $mid for {
+    title: 'Insecure File Type Detection',
+    title_zh: '文件解压经过了某些函数，但未检查到过滤',
+    level: 'mid'
+}
+$all - $high - $mid as $low
+
+alert $low for{
+    title: 'Potential File Storage Path Misconfiguration',
+    title_zh: '潜在的文件存储路径配置问题',
+    level: 'low'
+}
+
+desc(
+    lang: "php",
+    alert_min: '1',
+    'file:///param.php': <<<PARAM
+<?php
+    $path = $_GET["path"];
+    $zip = new ZipArchive();
+    $zip->extractTo("$path");
+    $zip->close();
+PARAM
+)

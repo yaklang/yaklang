@@ -8,7 +8,7 @@ desc: <<<TEXT
     检测未经验证的用户输入直接用于文件操作系统函数,可能导致任意文件读取、写入、删除等风险,建议对用户输入进行严格过滤或验证,避免直接传递给文件操作系统函数.
 TEXT
 )
-/copy|(sym)?link|rename/ as $function
+/copy|(sym)?link|rename|fopen|fread|file_get_contents/ as $function
 
 <include('php-param')> as $params;
 <include('php-tp-all-extern-variable-param-source')> as $params
