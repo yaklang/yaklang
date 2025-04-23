@@ -195,6 +195,9 @@ func (prog *Program) AddUpStream(sub *Program) {
 }
 
 func (prog *Program) GetProgramName() string {
+	if prog == nil {
+		return ""
+	}
 	return prog.Name
 }
 
