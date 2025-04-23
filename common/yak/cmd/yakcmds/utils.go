@@ -46,6 +46,7 @@ import (
 )
 
 var UtilsCommands = []*cli.Command{
+	createYakToolMetadataCommand(),
 	{
 		Name:  "embed-fs-hash",
 		Usage: `Generate Current Embed File System(yak/syntaxflow) Hash`,

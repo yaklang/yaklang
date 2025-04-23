@@ -1,10 +1,12 @@
 package aitool
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"strings"
+
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/yaklang/yaklang/common/jsonextractor"
@@ -89,7 +91,7 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 	if _, ok := params["@action"]; ok {
 		delete(params, "@action")
 	}
-	cfg := NewToolInvokeConfig()
+	cfg := NewToolInvokeConfig(context.Background())
 	for _, opt := range opts {
 		opt(cfg)
 	}

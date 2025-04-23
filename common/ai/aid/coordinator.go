@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -45,14 +46,21 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...Opt
 			return nil, utils.Errorf("coordinator: apply option failed: %v", err)
 		}
 	}
-
+	if config.aiToolManager == nil {
+		config.aiToolManager = buildinaitools.NewDefaultToolManager(config.tools)
+	}
 	c := &Coordinator{
 		config:    config,
 		userInput: userInput,
 	}
 	config.memory.StoreQuery(c.userInput)
 	config.memory.StoreTools(func() []*aitool.Tool {
-		return config.tools
+		alltools, err := config.aiToolManager.GetAllTools()
+		if err != nil {
+			log.Errorf("coordinator: get all tools failed: %v", err)
+			return nil
+		}
+		return alltools
 	})
 	return c, nil
 }
@@ -107,10 +115,12 @@ func (c *Coordinator) Run() error {
 	for stepIdx, taskIns := range root.Subtasks {
 		log.Infof("step %d: %v", stepIdx, taskIns.Name)
 	}
-	if len(root.config.tools) <= 0 {
-		if len(c.config.tools) <= 0 {
-			log.Warnf("coordinator: no tools found")
-		}
+	alltools, err := c.config.aiToolManager.GetAllTools()
+	if err != nil {
+		log.Warnf("coordinator: get all tools failed: %v", err)
+	}
+	if len(alltools) <= 0 {
+		log.Warnf("coordinator: no tools found")
 	}
 
 	c.config.EmitInfo("start to create runtime")

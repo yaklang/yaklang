@@ -1,3 +1,5 @@
+__KEYWORDS__ = "decode,base64,url encoding,double url,base32,format conversion,data transformation,decoding tools,text processing,encoding schemes"
+
 __DESC__ = <<<EOF
 decode for some format, like base64/url/doubleurl/base32 and so on
 EOF

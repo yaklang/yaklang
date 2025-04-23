@@ -1,11 +1,14 @@
 package aitool
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
+
+	// "github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
@@ -13,10 +16,18 @@ import (
 
 // InvokeCallback 定义工具调用回调函数的签名
 type InvokeCallback func(params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error)
-
+type ChatToAiFuncType func(msg string) (io.Reader, error)
+type ToolInvokeCtx struct {
+	Ctx          context.Context
+	ChatToAiFunc ChatToAiFuncType
+}
+type InvokeCallbackWithCtx func(ctx *ToolInvokeCtx, params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error)
 type Tool struct {
 	*mcp.Tool
-	Callback InvokeCallback // 添加回调函数字段
+	// A list of keywords for tool indexing and searching.
+	Keywords        []string              `json:"keywords,omitempty"`
+	Callback        InvokeCallback        // 添加回调函数字段
+	CallbackWithCtx InvokeCallbackWithCtx // 添加回调函数字段
 }
 
 // ToolOption 定义工具选项函数的类型
@@ -65,10 +76,30 @@ func WithDescription(description string) ToolOption {
 	}
 }
 
+// WithKeywords 设置工具索引关键词
+func WithKeywords(keywords []string) ToolOption {
+	return func(t *Tool) {
+		t.Keywords = keywords
+	}
+}
+
 // WithCallback 设置工具的回调函数
 func WithCallback(callback InvokeCallback) ToolOption {
 	return func(t *Tool) {
 		t.Callback = callback
+		t.CallbackWithCtx = func(ctx *ToolInvokeCtx, params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			return callback(params, stdout, stderr)
+		}
+	}
+}
+
+// WithCallback 设置工具的回调函数
+func WithCtxCallback(callback InvokeCallbackWithCtx) ToolOption {
+	return func(t *Tool) {
+		t.CallbackWithCtx = callback
+		t.Callback = func(params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			return callback(nil, params, stdout, stderr)
+		}
 	}
 }
 

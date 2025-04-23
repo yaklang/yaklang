@@ -238,6 +238,7 @@ func ChatBase(
 			wg.Wait()
 			return "", utils.Errorf("request post to %v：%v", url, err)
 		}
+		cancel()
 		wg.Wait()
 		return body.String(), nil
 	}

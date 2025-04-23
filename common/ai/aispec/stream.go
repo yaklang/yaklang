@@ -3,11 +3,12 @@ package aispec
 import (
 	"bufio"
 	"fmt"
-	"github.com/samber/lo"
 	"io"
 	"net/http/httputil"
 	"strings"
 	"sync"
+
+	"github.com/samber/lo"
 
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/jsonpath"
@@ -155,7 +156,10 @@ func ChatWithStream(
 	reasonPr, reasonPw := utils.NewBufPipe(nil)
 	go func() {
 		_, _ = ChatBase(url, model, msg, nil, opt, func(reader io.Reader) {
-			defer reasonPw.Close()
+			defer func() {
+				reasonPw.Close()
+				pw.Close()
+			}()
 			if reasonStream != nil {
 				reasonStream(reader)
 			} else {

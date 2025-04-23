@@ -2,10 +2,11 @@ package tests
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"

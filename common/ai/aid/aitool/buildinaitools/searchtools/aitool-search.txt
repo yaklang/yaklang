@@ -5,19 +5,45 @@
 # 以下是可用工具的列表及其描述:
 {{ .ToolDescList }}
 
-# 请基于用户的查询和工具描述，推荐最合适的工具。
+# 请基于用户的查询和工具描述，推荐所有符合用户需求的工具。
 
 # 你必须以JSON格式输出结果，按照以下schema:
 
-```json
+```schema
 {
-  "tool": "工具名称",
-  "reason": "为什么推荐这个工具的理由"
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["tool", "reason"],
+    "properties": {
+      "tool": {
+        "type": "string",
+        "description": "工具的名称"
+      },
+      "reason": {
+        "type": "string",
+        "description": "推荐该工具的理由"
+      }
+    }
+  },
+  "examples": [
+    [
+      {
+        "tool": "工具名称1",
+        "reason": "推荐该工具的详细理由"
+      },
+      {
+        "tool": "工具名称2",
+        "reason": "推荐该工具的详细理由"
+      }
+    ]
+  ]
 }
 ```
 
 **注意事项**:
-1. 必须选择一个和需求最符合的工具对应"tool"字段
+1. 可以选择多个符合需求的工具
 2. 所有字段必须填写，不要添加额外字段
 3. 严格遵守JSON格式，确保输出可被直接解析
 
