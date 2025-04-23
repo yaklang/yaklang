@@ -22,19 +22,19 @@ func (v Values) GetBottomUses(opts ...OperationOption) Values {
 }
 
 func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) (result Values) {
-	defer func() {
-		var finalResult Values
-		if len(result) > 0 {
-			for _, ret := range result {
-				if ret.GetEffectOn() == nil {
-					finalResult = append(finalResult, ret)
-				} else {
-					log.Errorf("BottomUseError!!!:%s have depend on %s", ret.String(), ret.GetDependOn().String())
-				}
-			}
-		}
-		result = finalResult
-	}()
+	//defer func() {
+	//	var finalResult Values
+	//	if len(result) > 0 {
+	//		for _, ret := range result {
+	//			if ret.GetEffectOn() == nil {
+	//				finalResult = append(finalResult, ret)
+	//			} else {
+	//				log.Errorf("BottomUseError!!!:%s have depend on %s", ret.String(), ret.GetDependOn().String())
+	//			}
+	//		}
+	//	}
+	//	result = finalResult
+	//}()
 	var vals Values
 
 	if v.IsObject() {

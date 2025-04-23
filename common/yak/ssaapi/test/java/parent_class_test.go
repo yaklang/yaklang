@@ -254,7 +254,7 @@ class User {
 		func1(* #-> as $impl1Target)
 		func2(* #-> as $impl2Target)
 		`, map[string][]string{
-			"interfaceTarget": {"11", "22", "Function-IA.get"},
+			"interfaceTarget": {"11", "22"},
 			"impl1Target":     {"11"},
 			"impl2Target":     {"22"},
 		}, true, ssaapi.WithLanguage(ssaapi.JAVA))

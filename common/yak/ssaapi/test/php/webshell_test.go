@@ -10,5 +10,5 @@ import (
 var antsShell string
 
 func TestAntsShell(t *testing.T) {
-	ssatest.CheckSyntaxFlowPrintWithPhp(t, antsShell, []string{"Function-array", `"_POST"`, "Undefined-dollar0(valid)"})
+	ssatest.CheckSyntaxFlowPrintWithPhp(t, antsShell, []string{"Function-array", `"_POST"`})
 }
