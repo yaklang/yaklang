@@ -4,17 +4,22 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"strings"
 )
 
 func getValueNames(val *Value) []string {
+	name := val.GetVerboseName()
+	//过滤掉前面的ID号
+	index := strings.Index(name, ":")
+	if index != -1 {
+		name = name[index+1:]
+	}
 	var names = []string{
 		val.GetName(),
-		val.GetVerboseName(),
+		name,
 		val.ShortString(),
 		val.GetSSAInst().GetVerboseName(),
-		val.GetSSAInst().GetShortVerboseName(),
 	}
-
 	if val.IsMember() {
 		constVal, ok := ssa.ToConst(val.GetKey().GetSSAInst())
 		if ok {

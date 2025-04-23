@@ -330,13 +330,15 @@ func Test_Condition_Filter_Start_With_Program(t *testing.T) {
 			})
 	})
 	t.Run("test compareOpcode", func(t *testing.T) {
-		code := `
+		for i := 0; i < 20; i++ {
+			code := `
 a1 = 11
 a2 = 22
 `
-		ssatest.CheckSyntaxFlow(t, code, `a*?{opcode: const && have: '11'} as $target1`, map[string][]string{
-			"target1": {"11"},
-		}, ssaapi.WithLanguage(ssaapi.Yak))
+			ssatest.CheckSyntaxFlow(t, code, `a*?{opcode: const && have: '11'} as $target1`, map[string][]string{
+				"target1": {"11"},
+			}, ssaapi.WithLanguage(ssaapi.Yak))
+		}
 	})
 	t.Run("test CompareOpcode 1-2", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, `

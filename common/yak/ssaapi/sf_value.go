@@ -3,9 +3,10 @@ package ssaapi
 import (
 	"context"
 	"fmt"
+	"regexp"
+
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
-	"regexp"
 
 	"golang.org/x/exp/slices"
 
