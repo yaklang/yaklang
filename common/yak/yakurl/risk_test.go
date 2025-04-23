@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
+	"sort"
 	"strconv"
 	"testing"
 
@@ -173,6 +174,21 @@ func initRiskTest(t *testing.T, programName string) {
 				-- funcC (2)
 					-- test4
 					-- test5
+		--programName(5)
+			-- rule1 (1)
+				-- /a.go (1)
+					-- test1
+			-- rule2 (2)
+				-- /b/b1.go (1)
+					-- test2
+				-- /c.go (1)
+					-- test4
+			-- rule3 (1)
+				-- /b/b2.go (1)
+					-- test3
+			-- "" (1)
+				-- /c.go (1)
+					-- test5
 	*/
 
 	err := yakit.CreateSSARisk(db, &schema.SSARisk{
@@ -180,6 +196,7 @@ func initRiskTest(t *testing.T, programName string) {
 		CodeSourceUrl: fmt.Sprintf("/%s/a.go", programName),
 		FunctionName:  "funcA",
 		Title:         "test1",
+		FromRule:      "rule1",
 		ResultID:      1,
 	})
 	require.NoError(t, err)
@@ -189,6 +206,7 @@ func initRiskTest(t *testing.T, programName string) {
 		CodeSourceUrl: fmt.Sprintf("/%s/b/b1.go", programName),
 		FunctionName:  "funcB1",
 		Title:         "test2",
+		FromRule:      "rule2",
 		ResultID:      2,
 	})
 	require.NoError(t, err)
@@ -198,6 +216,7 @@ func initRiskTest(t *testing.T, programName string) {
 		CodeSourceUrl: fmt.Sprintf("/%s/b/b2.go", programName),
 		FunctionName:  "funcB2",
 		Title:         "test3",
+		FromRule:      "rule3",
 		ResultID:      3,
 	})
 	require.NoError(t, err)
@@ -207,6 +226,7 @@ func initRiskTest(t *testing.T, programName string) {
 		CodeSourceUrl: fmt.Sprintf("/%s/c.go", programName),
 		FunctionName:  "funcC",
 		Title:         "test4",
+		FromRule:      "rule2",
 		ResultID:      4,
 	})
 	require.NoError(t, err)
@@ -216,6 +236,7 @@ func initRiskTest(t *testing.T, programName string) {
 		CodeSourceUrl: fmt.Sprintf("/%s/c.go", programName),
 		FunctionName:  "funcC",
 		Title:         "test5",
+		FromRule:      "",
 		ResultID:      5,
 	})
 	require.NoError(t, err)
@@ -263,28 +284,35 @@ func GetSSARisk(t *testing.T, local ypb.YakClient, url *ypb.YakURL) map[string]d
 	}
 	return got
 }
+func urlProgramPath(progName string) string {
+	return "/" + progName
+}
+
+func sourcePath(progName, source string) string {
+	return path.Join("/", progName, source)
+}
+
+func urlPath(progName, source string) string {
+	return path.Join(urlProgramPath(progName), sourcePath(progName, source))
+}
+
+func urlFunctionPath(progName, source, function string) string {
+	return path.Join(urlPath(progName, source), function)
+}
+
+func urlRulePath(progName, ruleName string) string {
+	return path.Join(urlProgramPath(progName), ruleName)
+}
+
+func urlRuleSourcePath(progName, ruleName, source string) string {
+	return path.Join(urlProgramPath(progName), ruleName, sourcePath(progName, source))
+}
 
 func TestRiskAction(t *testing.T) {
 	programName1 := uuid.NewString()
 	initRiskTest(t, programName1)
 	programName2 := uuid.NewString()
 	initRiskTest(t, programName2)
-
-	urlProgramPath := func(progName string) string {
-		return "/" + progName
-	}
-
-	sourcePath := func(progName, source string) string {
-		return path.Join("/", progName, source)
-	}
-
-	urlPath := func(progName, source string) string {
-		return path.Join(urlProgramPath(progName), sourcePath(progName, source))
-	}
-
-	urlFunctionPath := func(progName, source, function string) string {
-		return path.Join(urlPath(progName, source), function)
-	}
 
 	t.Cleanup(func() {
 		yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{ProgramName: []string{programName1}})
@@ -384,6 +412,7 @@ func TestRiskAction(t *testing.T) {
 		gotTitle := lo.MapToSlice(got, func(key string, value data) string {
 			return value.Name
 		})
+		sort.Strings(gotTitle)
 		require.Equal(t, gotTitle, []string{"test4", "test5"})
 	})
 
@@ -494,4 +523,178 @@ func TestRiskAction(t *testing.T) {
 		checkPathAndSearch(urlFunctionPath(programName1, "b/b1.go", "funcB1"), "funcB2", map[string]data{})
 	})
 
+}
+
+func TestRiskActionRule(t *testing.T) {
+	programName1 := uuid.NewString()
+	initRiskTest(t, programName1)
+	programName2 := uuid.NewString()
+	initRiskTest(t, programName2)
+
+	t.Cleanup(func() {
+		yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{ProgramName: []string{programName1}})
+		yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{ProgramName: []string{programName2}})
+	})
+	local, err := yakgrpc.NewLocalClient()
+	if err != nil {
+		t.Error(err)
+	}
+
+	checkRuleAndSearch := func(path, search string, want map[string]data, contain ...bool) {
+		url := &ypb.YakURL{
+			Schema: "ssarisk",
+			Path:   path,
+			Query: []*ypb.KVPair{
+				{Key: "search", Value: search},
+				{Key: "type", Value: "rule"},
+			},
+		}
+		got := GetSSARisk(t, local, url)
+		log.Infof("got: %v", got)
+		log.Infof("want: %v", want)
+		if len(contain) > 0 && contain[0] {
+			// Check if got contains all entries from want
+			for wantPath, wantData := range want {
+				gotData, exists := got[wantPath]
+				require.True(t, exists, "Path %s not found in results", wantPath)
+				require.Equal(t, wantData.Name, gotData.Name, "Name mismatch for path %s", wantPath)
+				require.Equal(t, wantData.Type, gotData.Type, "Type mismatch for path %s", wantPath)
+				require.Equal(t, wantData.Count, gotData.Count, "Count mismatch for path %s", wantPath)
+			}
+		} else {
+			require.Equal(t, want, got)
+		}
+	}
+	t.Run("check rule root got program", func(t *testing.T) {
+		// ssarisk://?type=rule
+		// got program
+		checkRuleAndSearch("/", "", map[string]data{
+			urlProgramPath(programName1): {
+				Name:  programName1,
+				Type:  "program",
+				Count: 5,
+			},
+			urlProgramPath(programName2): {
+				Name:  programName2,
+				Type:  "program",
+				Count: 5,
+			},
+		}, true)
+	})
+
+	t.Run("check rule program get rule", func(t *testing.T) {
+		// ssarisk://program?type=rule
+		// get rule
+		checkRuleAndSearch(urlProgramPath(programName1), "", map[string]data{
+			urlRulePath(programName1, "rule1"): {
+				Name:  "rule1",
+				Type:  "rule",
+				Count: 1,
+			},
+			urlRulePath(programName1, "rule2"): {
+				Name:  "rule2",
+				Type:  "rule",
+				Count: 2,
+			},
+			urlRulePath(programName1, "rule3"): {
+				Name:  "rule3",
+				Type:  "rule",
+				Count: 1,
+			},
+		})
+	})
+
+	t.Run("check rule get source", func(t *testing.T) {
+		// ssarisk://program/ruleName?type=rule
+		// get source
+		rule2Path := urlRulePath(programName1, "rule2")            // /program1/rule2
+		b1 := urlRuleSourcePath(programName1, "rule2", "/b/b1.go") //  /program1/rule2/b/b1.go
+		c := urlRuleSourcePath(programName1, "rule2", "c.go")      //  /program1/rule2/c.go
+		checkRuleAndSearch(rule2Path, "", map[string]data{
+			b1: {
+				Name:  sourcePath(programName1, "b/b1.go"),
+				Type:  "source",
+				Count: 1,
+			},
+			c: {
+				Name:  sourcePath(programName1, "c.go"),
+				Type:  "source",
+				Count: 1,
+			},
+		})
+	})
+
+	t.Run("check source get risk", func(t *testing.T) {
+		// checkRuleAndSearch(urlRuleSourcePath(programName1, "rule2", "b/b1.go"), "", map[string]data{})
+		url := &ypb.YakURL{
+			Schema: "ssarisk",
+			Path:   urlRuleSourcePath(programName1, "rule2", "b/b1.go"),
+			Query:  []*ypb.KVPair{{Key: "type", Value: "rule"}},
+		}
+		got := GetSSARisk(t, local, url)
+		log.Infof("got: %v", got)
+		require.Equal(t, len(got), 1)
+		gotTitle := lo.MapToSlice(got, func(key string, value data) string {
+			return value.Name
+		})
+		sort.Strings(gotTitle)
+		require.Equal(t, gotTitle, []string{"test2"})
+	})
+
+	t.Run("check rule program search", func(t *testing.T) {
+		// ssarisk://program?type=rule&search=test1
+		checkRuleAndSearch(urlProgramPath(programName1), "rule1", map[string]data{
+			urlRulePath(programName1, "rule1"): {
+				Name:  "rule1",
+				Type:  "rule",
+				Count: 1,
+			},
+		})
+	})
+
+	t.Run("check rule program search source", func(t *testing.T) {
+		// ssarisk://program?type=rule&search=/c.go
+		checkRuleAndSearch(urlProgramPath(programName1), "/c.go", map[string]data{
+			urlRulePath(programName1, "rule2"): {
+				Name:  "rule2",
+				Type:  "rule",
+				Count: 1,
+			},
+		})
+	})
+
+	t.Run("check rule program search function", func(t *testing.T) {
+		// ssarisk://program?type=rule&search=funcC
+		checkRuleAndSearch(urlProgramPath(programName1), "funcC", map[string]data{
+			urlRulePath(programName1, "rule2"): {
+				Name:  "rule2",
+				Type:  "rule",
+				Count: 1,
+			},
+		})
+	})
+
+	t.Run("check rule path search source", func(t *testing.T) {
+		// ssarisk://program/test4?type=rule&search=/c.go
+		checkRuleAndSearch(urlRulePath(programName1, "rule2"), "/c.go", map[string]data{
+			urlRuleSourcePath(programName1, "rule2", "c.go"): {
+				Name:  sourcePath(programName1, "c.go"),
+				Type:  "source",
+				Count: 1,
+			},
+		})
+		checkRuleAndSearch(urlRulePath(programName1, "rule2"), "/b.go", map[string]data{})
+	})
+
+	t.Run("check rule path search function", func(t *testing.T) {
+		// ssarisk://program/test4?type=rule&search=funcC
+		checkRuleAndSearch(urlRulePath(programName1, "rule2"), "funcC", map[string]data{
+			urlRuleSourcePath(programName1, "rule2", "c.go"): {
+				Name:  sourcePath(programName1, "c.go"),
+				Type:  "source",
+				Count: 1,
+			},
+		})
+		checkRuleAndSearch(urlRulePath(programName1, "rule2"), "funcA", map[string]data{})
+	})
 }
