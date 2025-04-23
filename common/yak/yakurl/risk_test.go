@@ -28,7 +28,7 @@ type filter struct {
 	source   string
 	function string
 	search   string
-	node     yakurl.SSARiskResponseNodeKind
+	node     bool
 }
 
 func TestSSARiskRequestParse(t *testing.T) {
@@ -48,7 +48,7 @@ func TestSSARiskRequestParse(t *testing.T) {
 		// spew.Dump(res)
 		got := filter{
 			level: res.Level,
-			node:  res.NodeKind,
+			node:  res.LeafNode,
 		}
 		if len(res.Filter.ProgramName) > 0 {
 			got.program = res.Filter.ProgramName[0]
@@ -85,20 +85,20 @@ func TestSSARiskRequestParse(t *testing.T) {
 	t.Run("check get program", func(t *testing.T) {
 		check(t, "/", nil, filter{
 			level: yakurl.SSARiskLevelProgram,
-			node:  yakurl.SSARiskNodeBranch,
+			node:  false,
 		})
 	})
 	t.Run("check get source", func(t *testing.T) {
 		check(t, "/paaaa", nil, filter{
 			level:   yakurl.SSARiskLevelSource,
-			node:    yakurl.SSARiskNodeBranch,
+			node:    false,
 			program: "paaaa",
 		})
 	})
 	t.Run("check get function", func(t *testing.T) {
 		check(t, "/proaaa/bbb.go", nil, filter{
 			level:   yakurl.SSARiskLevelFunction,
-			node:    yakurl.SSARiskNodeLeaf,
+			node:    true,
 			program: "proaaa",
 			source:  "/bbb.go",
 		})
@@ -106,7 +106,7 @@ func TestSSARiskRequestParse(t *testing.T) {
 	t.Run("check get risk", func(t *testing.T) {
 		check(t, "/paaa/bb.go/ff", nil, filter{
 			level:    yakurl.SSARiskLevelRisk,
-			node:     yakurl.SSARiskNodeLeaf,
+			node:     true,
 			program:  "paaa",
 			source:   "/bb.go",
 			function: "ff",
@@ -118,7 +118,7 @@ func TestSSARiskRequestParse(t *testing.T) {
 			"type": string(yakurl.SSARiskTypeFile),
 		}, filter{
 			level:   yakurl.SSARiskLevelFunction,
-			node:    yakurl.SSARiskNodeBranch,
+			node:    false,
 			program: "proaaa",
 			source:  "/bbb.go",
 		})
@@ -128,7 +128,7 @@ func TestSSARiskRequestParse(t *testing.T) {
 			"type": string(yakurl.SSARiskTypeFile),
 		}, filter{
 			level:    yakurl.SSARiskLevelRisk,
-			node:     yakurl.SSARiskNodeLeaf,
+			node:     true,
 			program:  "paaa",
 			source:   "/bb.go",
 			function: "ff",
@@ -142,7 +142,7 @@ func TestSSARiskRequestParse(t *testing.T) {
 			"program": "p",
 		}, filter{
 			level:   yakurl.SSARiskLevelSource,
-			node:    yakurl.SSARiskNodeBranch,
+			node:    false,
 			program: "p",
 		})
 	})
@@ -152,7 +152,7 @@ func TestSSARiskRequestParse(t *testing.T) {
 			"program": "ppp",
 		}, filter{
 			level:   yakurl.SSARiskLevelFunction,
-			node:    yakurl.SSARiskNodeLeaf,
+			node:    true,
 			program: "ppp",
 			source:  "/ssss.go",
 		})
@@ -163,7 +163,7 @@ func TestSSARiskRequestParse(t *testing.T) {
 			"program": "pppp",
 		}, filter{
 			level:    yakurl.SSARiskLevelRisk,
-			node:     yakurl.SSARiskNodeLeaf,
+			node:     true,
 			program:  "pppp",
 			source:   "/ssss.go",
 			function: "fff",
@@ -177,7 +177,7 @@ func TestSSARiskRequestParse(t *testing.T) {
 			"type": string(yakurl.SSARiskTypeRule),
 		}, filter{
 			level: yakurl.SSARiskLevelProgram,
-			node:  yakurl.SSARiskNodeBranch,
+			node:  false,
 		})
 	})
 
@@ -186,7 +186,7 @@ func TestSSARiskRequestParse(t *testing.T) {
 			"type": string(yakurl.SSARiskTypeRule),
 		}, filter{
 			level:   yakurl.SSARiskLevelRule,
-			node:    yakurl.SSARiskNodeBranch,
+			node:    false,
 			program: "aa",
 		})
 	})
@@ -196,7 +196,7 @@ func TestSSARiskRequestParse(t *testing.T) {
 			"type": string(yakurl.SSARiskTypeRule),
 		}, filter{
 			level:   yakurl.SSARiskLevelSource,
-			node:    yakurl.SSARiskNodeBranch,
+			node:    false,
 			program: "aa",
 			rule:    "bb",
 		})
@@ -207,7 +207,7 @@ func TestSSARiskRequestParse(t *testing.T) {
 			"type": string(yakurl.SSARiskTypeRule),
 		}, filter{
 			level:   yakurl.SSARiskLevelRisk,
-			node:    yakurl.SSARiskNodeLeaf,
+			node:    true,
 			program: "aa",
 			rule:    "bb",
 			source:  "/cc.go",
@@ -222,7 +222,7 @@ func TestSSARiskRequestParse(t *testing.T) {
 			"type":    string(yakurl.SSARiskTypeRule),
 		}, filter{
 			level:   yakurl.SSARiskLevelRule,
-			node:    yakurl.SSARiskNodeBranch,
+			node:    false,
 			program: "pppp",
 		})
 	})
@@ -233,7 +233,7 @@ func TestSSARiskRequestParse(t *testing.T) {
 			"type":    string(yakurl.SSARiskTypeRule),
 		}, filter{
 			level:   yakurl.SSARiskLevelSource,
-			node:    yakurl.SSARiskNodeBranch,
+			node:    false,
 			program: "pppp",
 			rule:    "bb",
 		})
@@ -245,7 +245,7 @@ func TestSSARiskRequestParse(t *testing.T) {
 			"type":    string(yakurl.SSARiskTypeRule),
 		}, filter{
 			level:   yakurl.SSARiskLevelRisk,
-			node:    yakurl.SSARiskNodeLeaf,
+			node:    true,
 			program: "pppp",
 			rule:    "bb",
 			source:  "/cc.go",
@@ -260,7 +260,7 @@ func TestSSARiskRequestParse(t *testing.T) {
 			"type": string(yakurl.SSARiskTypeRule),
 		}, filter{
 			level: yakurl.SSARiskLevelProgram,
-			node:  yakurl.SSARiskNodeBranch,
+			node:  false,
 			rule:  "rrrr",
 		})
 	})
@@ -271,7 +271,7 @@ func TestSSARiskRequestParse(t *testing.T) {
 			"type": string(yakurl.SSARiskTypeRule),
 		}, filter{
 			level:   yakurl.SSARiskLevelSource,
-			node:    yakurl.SSARiskNodeBranch,
+			node:    false,
 			program: "pppp",
 			rule:    "rrrr",
 		})
@@ -283,7 +283,7 @@ func TestSSARiskRequestParse(t *testing.T) {
 			"type": string(yakurl.SSARiskTypeRule),
 		}, filter{
 			level:   yakurl.SSARiskLevelRisk,
-			node:    yakurl.SSARiskNodeLeaf,
+			node:    true,
 			program: "pppp",
 			rule:    "rrrr",
 			source:  "/cc.go",
@@ -297,7 +297,7 @@ func TestSSARiskRequestParse(t *testing.T) {
 			"search": "ssssss",
 		}, filter{
 			level:   yakurl.SSARiskLevelSource,
-			node:    yakurl.SSARiskNodeBranch,
+			node:    false,
 			program: "paaa",
 			search:  "ssssss",
 		})

@@ -98,22 +98,6 @@ const (
 	SSARiskTypeRule SSARiskResponseType = "rule" // /${program}/${rule}/${source}/${risk}
 )
 
-type SSARiskResponseNodeKind string
-
-const (
-	SSARiskNodeBranch SSARiskResponseNodeKind = "branch" // have child  node
-	SSARiskNodeLeaf   SSARiskResponseNodeKind = "leaf"   // no child node
-)
-
-// if argument is true , return leaf
-func GetSSARiskResponseNodeKind(b bool) SSARiskResponseNodeKind {
-	if b {
-		return SSARiskNodeLeaf
-	} else {
-		return SSARiskNodeBranch
-	}
-}
-
 func (t riskTreeAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	var res []*ypb.YakURLResource
 
@@ -147,7 +131,7 @@ func (t riskTreeAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURL
 
 type SSARiskCountFilter struct {
 	Level    SSARiskResponseLevel
-	NodeKind SSARiskResponseNodeKind
+	LeafNode bool
 	Filter   *ypb.SSARisksFilter
 }
 
@@ -269,9 +253,9 @@ func GetSSARiskCountFilter(u *ypb.YakURL) (*SSARiskCountFilter, error) {
 
 	switch riskType {
 	case SSARiskTypeRisk: // end in function
-		ret.NodeKind = GetSSARiskResponseNodeKind(ret.Level == SSARiskLevelFunction || ret.Level == SSARiskLevelRisk)
+		ret.LeafNode = (ret.Level == SSARiskLevelFunction || ret.Level == SSARiskLevelRisk)
 	case SSARiskTypeFile, SSARiskTypeRule: // end in risk
-		ret.NodeKind = GetSSARiskResponseNodeKind(ret.Level == SSARiskLevelRisk)
+		ret.LeafNode = (ret.Level == SSARiskLevelRisk)
 	}
 
 	ret.Filter = yakit.NewSSARiskFilter(opts...)
@@ -364,7 +348,7 @@ func ConvertSSARiskCountInfoToResource(originParam *ypb.YakURL, countFilter *SSA
 	res.Path = path.Join(originParam.Path, rc.Name)
 	res.ResourceName = rc.Name
 	res.ResourceType = string(countFilter.Level)
-	res.VerboseType = string(countFilter.NodeKind)
+	res.HaveChildrenNodes = !countFilter.LeafNode
 
 	return res, nil
 }
