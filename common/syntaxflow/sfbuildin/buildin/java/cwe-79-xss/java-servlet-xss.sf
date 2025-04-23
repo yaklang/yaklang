@@ -3,6 +3,7 @@ desc(
     title_zh: "检测Java Servlet XSS漏洞",
     type:vuln,
     level: mid,
+    risk:XSS,
     desc: <<<TEXT
     该规则检测Java Servlet中的XSS漏洞，当Servlet中使用了未转义的用户输入输出到响应中时，可能导致XSS漏洞。
 TEXT
@@ -26,7 +27,6 @@ alert $mid for {
     message: "发现Java Servlet的XSS漏洞，并且数据流没有使用任何转义方法。",
     type: vuln,
     level: mid,
-    risk:xss,
 };
 
 $sink#{
@@ -38,7 +38,6 @@ alert $low for {
     message: "发现Java Servlet的XSS漏洞,并且数据流中使用了转义方法。",
     type: vuln,
     level: low,
-    risk:xss,
 };
 
 desc(
