@@ -1,17 +1,23 @@
 desc(
-    title: "Checking XMLReaderFactory.createXMLReader() Unsafe Use",
+    title: "Check Java XMLReaderFactory.createXMLReader() Unsafe Use",
     title_zh: "检查 XMLReaderFactory.createXMLReader() 不安全使用",
-    type: vuln,
+    type: security,
+    risk: "XXE",
+    reference: <<<URL
+    https://docs.oracle.com/javase/8/docs/api/org/xml/sax/helpers/XMLReaderFactory.html
+    https://cwe.mitre.org/data/definitions/611.html
+URL
     desc: <<<TEXT
 使用 `XMLReaderFactory.createXMLReader()` 而不设置适当的安全特性或属性可能会使应用程序容易受到 XML 外部实体 (XXE) 攻击。XXE 攻击允许攻击者访问本地文件系统、执行服务器上的任意代码或进行网络攻击。为了确保安全性，应当禁用外部实体解析，并限制对系统资源的访问。
 TEXT
 )
 
-XMLReaderFactory.createXMLReader()?{!.setFeature* && !.setProp* && !.allowT* }./((parse*)|(read*))/() as $vulCall;
+XMLReaderFactory?{<typeName>?{have:'org.xml.sax.helpers.XMLReaderFactory'}} as $factory;
+$factory.createXMLReader()?{!.setFeature* && !.setProp* && !.allowT* }./((parse*)|(read*))/() as $vulCall;
 check $vulCall;
+
 alert $vulCall for {
-    message: "XMLReaderFactory.createXMLReader() Unsafe Use",
-    risk: "xxe",
+    message: "检测到不安全的 XMLReaderFactory.createXMLReader() 使用，可能导致 XXE 漏洞。",
     level: "warning",
 }
 
@@ -21,7 +27,7 @@ desc(
     "file://unsafe.java": <<<UNSAFE
 import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
-
+import org.xml.sax.helpers.XMLReaderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;

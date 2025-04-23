@@ -1,20 +1,24 @@
 desc(
     title: "Find SAXParserFactory() Unsafe Use in Context Sink",
-    title_zh: "SAXParserFactory. 未明确设置安全策略（.setFeature(...)）",
+    title_zh: "检测 SAXParserFactory() 不安全使用",
     type: vuln,
+    risk: "XXE",
+    reference: <<<URL
+https://docs.oracle.com/javase/8/docs/api/javax/xml/parsers/SAXParserFactory.html
+https://cwe.mitre.org/data/definitions/611.html
+URL
     desc: <<<TEXT
 使用 `SAXParserFactory` 时未明确设置安全策略（如禁用外部实体解析），可能会导致应用程序容易受到XXE（XML External Entity）攻击。XXE攻击允许攻击者利用应用程序解析不受信任的XML输入时，访问本地文件系统或发起网络请求，从而泄露敏感信息或执行恶意操作。建议在创建 `SAXParserFactory` 实例后，使用 `.setFeature` 方法禁用外部实体解析，以增强应用程序的安全性。
 TEXT
 )
 
-SAXParserFactory.newInstance() as $factory;
+SAXParserFactory?{<typeName>?{have:"javax.xml.parsers.SAXParserFactory"}}.newInstance() as $factory;
 check $factory;
 $factory?{!.setFeature}...newSAXParser()...parse() as $vulnCall
 
 check $vulnCall;
 alert $vulnCall for {
     message: "SAXParserFactory() Unsafe Use in Context Sink",
-    risk: "xxe",
     level: "warning",
 }
 
