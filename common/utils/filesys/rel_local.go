@@ -99,5 +99,9 @@ func (f *RelLocalFs) String() string {
 	return fmt.Sprintf("RelLocalFs{rel: %s}", f.rel)
 }
 
+func (f *RelLocalFs) Root() string {
+	return f.rel
+}
+
 func (f *RelLocalFs) ExtraInfo(string) map[string]any { return nil }
 func (f *RelLocalFs) Base(p string) string            { return filepath.Base(p) }

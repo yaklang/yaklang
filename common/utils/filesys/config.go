@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"strings"
+	"sync/atomic"
 
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/log"
@@ -170,6 +171,10 @@ func withYaklangOnStart(h func(name string, isDir bool)) Option {
 	})
 }
 
+func withYaklangFileSystem(f fi.FileSystem) Option {
+	return WithFileSystem(f)
+}
+
 // onStat will be called when the walker met one file description.
 func withYaklangStat(h func(isDir bool, pathname string, info os.FileInfo)) Option {
 	return WithStat(func(isDir bool, pathname string, info os.FileInfo) (err error) {
@@ -183,6 +188,25 @@ func withYaklangStat(h func(isDir bool, pathname string, info os.FileInfo)) Opti
 	})
 }
 
+// onStatEx will be called when the walker met one file description.
+func withYaklangStatEx(h func(isDir bool, pathname string, info os.FileInfo, stop func())) Option {
+	return WithStat(func(isDir bool, pathname string, info os.FileInfo) (err error) {
+		defer func() {
+			if e := recover(); e != nil {
+				err = utils.Errorf("onStat failed: %v", e)
+			}
+		}()
+		stop := new(int64)
+		h(isDir, pathname, info, func() {
+			atomic.AddInt64(stop, 1)
+		})
+		if atomic.LoadInt64(stop) > 0 {
+			return SkipAll
+		}
+		return nil
+	})
+}
+
 // onFileStat will be called when the walker met one file.
 func withYaklangFileStat(h func(pathname string, info os.FileInfo)) Option {
 	return WithFileStat(func(pathname string, info fs.FileInfo) (err error) {
@@ -192,6 +216,25 @@ func withYaklangFileStat(h func(pathname string, info os.FileInfo)) Option {
 			}
 		}()
 		h(pathname, info)
+		return nil
+	})
+}
+
+// onFileStatEx will be called when the walker met one file and control stop
+func withYaklangFileStatEx(h func(pathname string, info os.FileInfo, stop func())) Option {
+	return WithFileStat(func(pathname string, info fs.FileInfo) (err error) {
+		defer func() {
+			if e := recover(); e != nil {
+				err = utils.Errorf("onFileStat failed: %v", e)
+			}
+		}()
+		stop := new(int64)
+		h(pathname, info, func() {
+			atomic.AddInt64(stop, 1)
+		})
+		if atomic.LoadInt64(stop) > 0 {
+			return SkipAll
+		}
 		return nil
 	})
 }
