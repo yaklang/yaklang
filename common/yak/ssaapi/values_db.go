@@ -1,12 +1,20 @@
 package ssaapi
 
 import (
+	"context"
+	"time"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/graph"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+)
+
+const (
+	MAXTime         = time.Millisecond * 500
+	MaxPathElements = 10
 )
 
 type Dtype int
@@ -202,7 +210,9 @@ func (s *saveValueCtx) saveDataFlow(from *Value, to *Value) bool {
 	}
 
 	var paths [][]*Value
-	paths = graph.GraphPathWithTarget(from, to, func(v *Value) []*Value {
+	ctx, cancel := context.WithTimeout(context.Background(), MAXTime)
+	_ = cancel
+	paths = graph.GraphPathWithTarget(ctx, from, to, func(v *Value) []*Value {
 		return f(v)
 	})
 
@@ -211,7 +221,6 @@ func (s *saveValueCtx) saveDataFlow(from *Value, to *Value) bool {
 		totalElements += len(innerSlice) // 累加所有内层切片长度
 	}
 
-	var MaxPathElements = 10
 	if totalElements == 0 {
 		log.Warnf("saveDataFlow:  paths is empty, maybe timeout")
 		return false
