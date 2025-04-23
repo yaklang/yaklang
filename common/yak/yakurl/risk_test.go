@@ -14,10 +14,147 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/yakurl"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+type filter struct {
+	level    yakurl.SSARiskResponseLevel
+	program  string
+	rule     string
+	source   string
+	function string
+}
+
+func TestSSARiskRequestParse(t *testing.T) {
+	// yakurl.GetSSARiskCountFilter()
+	check := func(t *testing.T, path string, param map[string]string, want filter) {
+		url := &ypb.YakURL{
+			Schema: "ssarisk",
+			Path:   path,
+		}
+		for k, v := range param {
+			url.Query = append(url.Query, &ypb.KVPair{
+				Key: k, Value: v,
+			})
+		}
+		res, err := yakurl.GetSSARiskCountFilter(url)
+		require.NoError(t, err)
+		// spew.Dump(res)
+		got := filter{
+			level: res.Level,
+		}
+		if len(res.Filter.ProgramName) > 0 {
+			got.program = res.Filter.ProgramName[0]
+			if len(res.Filter.ProgramName) > 1 {
+				t.Fatalf("expected only one program name, got %d: %v", len(res.Filter.ProgramName), res.Filter.ProgramName)
+			}
+		}
+
+		if len(res.Filter.FromRule) > 0 {
+			got.rule = res.Filter.FromRule[0]
+			if len(res.Filter.FromRule) > 1 {
+				t.Fatalf("expected only one rule, got %d: %v", len(res.Filter.FromRule), res.Filter.FromRule)
+			}
+		}
+
+		if len(res.Filter.CodeSourceUrl) > 0 {
+			got.source = res.Filter.CodeSourceUrl[0]
+			if len(res.Filter.CodeSourceUrl) > 1 {
+				t.Fatalf("expected only one source URL, got %d: %v", len(res.Filter.CodeSourceUrl), res.Filter.CodeSourceUrl)
+			}
+		}
+
+		if len(res.Filter.FunctionName) > 0 {
+			got.function = res.Filter.FunctionName[0]
+			if len(res.Filter.FunctionName) > 1 {
+				t.Fatalf("expected only one function name, got %d: %v", len(res.Filter.FunctionName), res.Filter.FunctionName)
+			}
+		}
+
+		require.Equal(t, want, got)
+	}
+
+	t.Run("check get program", func(t *testing.T) {
+		check(t, "/", nil, filter{
+			level: yakurl.SSARiskLevelProgram,
+		})
+	})
+
+	t.Run("check get source", func(t *testing.T) {
+		check(t, "/paaaa", nil, filter{
+			level:   yakurl.SSARiskLevelSource,
+			program: "paaaa",
+		})
+	})
+
+	t.Run("check get function", func(t *testing.T) {
+		check(t, "/proaaa/bbb.go", nil, filter{
+			level:   yakurl.SSARiskLevelFunction,
+			program: "proaaa",
+			source:  "/bbb.go",
+		})
+	})
+
+	t.Run("check get risk with file", func(t *testing.T) {
+		check(t, "/paaa/bb.go/ff", nil, filter{
+			level:    yakurl.SSARiskLevelRisk,
+			program:  "paaa",
+			source:   "/bb.go",
+			function: "ff",
+		})
+	})
+
+	t.Run("check get risk with param", func(t *testing.T) {
+		check(t, "/paaa", map[string]string{
+			"search": "ssssss",
+		}, filter{
+			level:   yakurl.SSARiskLevelSource,
+			program: "paaa",
+		})
+	})
+
+	t.Run("check get program with rule type", func(t *testing.T) {
+		check(t, "/", map[string]string{
+			"type": yakurl.SSARiskTypeRule,
+		}, filter{
+			level: yakurl.SSARiskLevelProgram,
+		})
+	})
+
+	t.Run("check get rule with rule type", func(t *testing.T) {
+		check(t, "/aa", map[string]string{
+			"type": yakurl.SSARiskTypeRule,
+		}, filter{
+			level:   yakurl.SSARiskLevelRule,
+			program: "aa",
+		})
+	})
+
+	t.Run("check get source with rule type", func(t *testing.T) {
+		check(t, "/aa/bb", map[string]string{
+			"type": yakurl.SSARiskTypeRule,
+		}, filter{
+			level:   yakurl.SSARiskLevelSource,
+			program: "aa",
+			rule:    "bb",
+		})
+	})
+
+	t.Run("check get risk with rule type", func(t *testing.T) {
+		check(t, "/aa/bb/cc", map[string]string{
+			"type": yakurl.SSARiskTypeRule,
+		}, filter{
+			level:   yakurl.SSARiskLevelRisk,
+			program: "aa",
+			rule:    "bb",
+			source:  "/cc",
+		})
+	})
+
+}
 
 func initRiskTest(t *testing.T, programName string) {
 	db := ssadb.GetDB()
