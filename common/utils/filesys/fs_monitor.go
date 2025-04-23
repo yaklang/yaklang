@@ -2,11 +2,12 @@ package filesys
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 const (
@@ -177,40 +178,59 @@ func CompareFileTree(perv, current *FileNode) *EventSet {
 	if !(perv.IsDir() && current.IsDir()) {
 		return events
 	}
-	pervNode := utils.CopyMapShallow(perv.Children)
-	currentNode := utils.CopyMapShallow(current.Children)
-	for {
-		nextDepthPervNode := make(map[string]*FileNode, 0)
-		nextDepthCurrentNode := make(map[string]*FileNode, 0)
-		for k, c := range currentNode {
-			if p, ok := pervNode[k]; ok && c.IsDir() == p.IsDir() {
-				delete(pervNode, k)
-				delete(currentNode, k)
-				if p.IsDir() {
-					for path, node := range p.Children {
-						nextDepthPervNode[path] = node
-					}
-					for path, node := range c.Children {
-						nextDepthCurrentNode[path] = node
-					}
+
+	// 比较当前层级的文件和目录
+	for path, currentNode := range current.Children {
+		if pervNode, ok := perv.Children[path]; ok {
+			// 文件/目录存在于两个树中
+			if currentNode.IsDir() != pervNode.IsDir() {
+				// 类型改变了（文件变目录或目录变文件）
+				events.DeleteEvents = append(events.DeleteEvents, Event{
+					Path:  pervNode.Path,
+					IsDir: pervNode.IsDir(),
+					Op:    FsMonitorDelete,
+				})
+				events.CreateEvents = append(events.CreateEvents, Event{
+					Path:  currentNode.Path,
+					IsDir: currentNode.IsDir(),
+					Op:    FsMonitorCreate,
+				})
+			} else if !currentNode.IsDir() {
+				// 如果都存在且都是文件，检查文件是否有变化
+				if !IsSameFile(currentNode.Info, pervNode.Info) {
+					events.ChangeEvents = append(events.ChangeEvents, Event{
+						Path:  currentNode.Path,
+						IsDir: false,
+						Op:    FsMonitorChange,
+					})
 				}
+			} else {
+				// 都是目录，递归比较
+				subEvents := CompareFileTree(pervNode, currentNode)
+				events.CreateEvents = append(events.CreateEvents, subEvents.CreateEvents...)
+				events.DeleteEvents = append(events.DeleteEvents, subEvents.DeleteEvents...)
+				events.ChangeEvents = append(events.ChangeEvents, subEvents.ChangeEvents...)
 			}
-		}
-
-		for k, _ := range currentNode {
-			events.CreateEvents = append(events.CreateEvents, Event{Path: k, Op: FsMonitorCreate, IsDir: currentNode[k].IsDir()})
-		}
-
-		for k, _ := range pervNode {
-			events.DeleteEvents = append(events.DeleteEvents, Event{Path: k, Op: FsMonitorDelete, IsDir: pervNode[k].IsDir()})
-		}
-
-		if len(nextDepthPervNode) == 0 && len(nextDepthCurrentNode) == 0 {
-			break
 		} else {
-			pervNode = nextDepthPervNode
-			currentNode = nextDepthCurrentNode
+			// 新增的文件/目录
+			events.CreateEvents = append(events.CreateEvents, Event{
+				Path:  currentNode.Path,
+				IsDir: currentNode.IsDir(),
+				Op:    FsMonitorCreate,
+			})
 		}
 	}
+
+	// 检查删除的文件/目录
+	for path, pervNode := range perv.Children {
+		if _, ok := current.Children[path]; !ok {
+			events.DeleteEvents = append(events.DeleteEvents, Event{
+				Path:  pervNode.Path,
+				IsDir: pervNode.IsDir(),
+				Op:    FsMonitorDelete,
+			})
+		}
+	}
+
 	return events
 }

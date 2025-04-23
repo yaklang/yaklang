@@ -1,6 +1,7 @@
 package filesys
 
 import (
+	"os"
 	"strings"
 )
 
@@ -161,4 +162,12 @@ func (b *lazybuf) string() string {
 		return b.s[:b.w]
 	}
 	return string(b.buf[:b.w])
+}
+
+// IsSameFile 比较两个文件是否相同
+func IsSameFile(info1, info2 os.FileInfo) bool {
+	if info1 == nil || info2 == nil {
+		return false
+	}
+	return info1.Size() == info2.Size() && info1.ModTime().Equal(info2.ModTime())
 }

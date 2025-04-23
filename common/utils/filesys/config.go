@@ -147,6 +147,24 @@ func WithContext(ctx context.Context) Option {
 	}
 }
 
+func WithFileLimit(limit int64) Option {
+	return func(c *Config) {
+		c.fileLimit = limit
+	}
+}
+
+func WithDirLimit(limit int64) Option {
+	return func(c *Config) {
+		c.dirLimit = limit
+	}
+}
+
+func WithTotalLimit(limit int64) Option {
+	return func(c *Config) {
+		c.totalLimit = limit
+	}
+}
+
 // onReady will be called when the walker is ready to start walking.
 func withYaklangOnStart(h func(name string, isDir bool)) Option {
 	return WithOnStart(func(basename string, isDir bool) (err error) {

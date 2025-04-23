@@ -4,8 +4,6 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/log"
-
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -61,8 +59,6 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 		return utils.Errorf("file system is nil")
 	}
 
-	var lastErr error // if stop return last error
-
 	var fileCount int64
 	var dirCount int64
 	var totalCount int64
@@ -73,70 +69,83 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 	walkSingleFile = func(path string) error {
 		info, err := c.fileSystem.Stat(path)
 		if err != nil {
-			return utils.Errorf("stat %s failed: %v", path, err)
+			return nil // 忽略单个文件的错误，继续处理其他文件
 		}
 
-		// count
+		// 预先检查是否会超出限制
+		if info.IsDir() {
+			if c.dirLimit > 0 && dirCount >= c.dirLimit {
+				return SkipAll
+			}
+		} else {
+			if c.fileLimit > 0 && fileCount >= c.fileLimit {
+				return SkipAll
+			}
+		}
+		if c.totalLimit > 0 && totalCount >= c.totalLimit {
+			return SkipAll
+		}
+
+		// 增加计数
 		totalCount++
-		if c.totalLimit > 0 && c.totalLimit < totalCount {
-			return utils.Wrapf(SkipAll, "total count limit exceeded: %d", c.totalLimit)
+		if info.IsDir() {
+			dirCount++
+		} else {
+			fileCount++
 		}
 
 		if c.onStat != nil {
 			if err := c.onStat(info.IsDir(), path, info); err != nil {
-				if err == SkipDir || err == SkipAll {
+				if err == SkipDir {
 					return nil
+				}
+				if err == SkipAll {
+					return err
 				}
 				return err
 			}
 		}
 
 		if info.IsDir() {
-			// dir
-			// dir count
-			dirCount++
-			if c.dirLimit > 0 && c.dirLimit < dirCount {
-				return utils.Wrapf(SkipAll, "dir count limit exceeded: %d", c.dirLimit)
-			}
-
-			// file stat
 			if c.onDirStat != nil {
 				if err := c.onDirStat(path, info); err != nil {
-					if err == SkipDir || err == SkipAll {
+					if err == SkipDir {
 						return nil
+					}
+					if err == SkipAll {
+						return err
 					}
 					return err
 				}
 			}
 
 			for _, dirOpt := range c.dirMatch {
-				// if dirOpt.inst == nil {}
-				relPath := strings.TrimPrefix(path,
-					raw+string(c.fileSystem.GetSeparators()),
-				)
+				relPath := strings.TrimPrefix(path, raw+string(c.fileSystem.GetSeparators()))
 				if dirOpt.inst.Match(relPath) {
-					return recursive(path, c, dirOpt.opts...)
+					if err := recursive(path, c, dirOpt.opts...); err != nil {
+						if err == SkipAll {
+							return err
+						}
+						return err
+					}
+					return nil
 				}
 			}
 
 			if c.RecursiveDirectory {
-				err := walkDir(path)
-				if err != nil {
+				if err := walkDir(path); err != nil {
+					if err == SkipAll {
+						return err
+					}
 					return err
 				}
 			}
-
 		} else {
-			// file
-			// file count
-			fileCount++
-			if c.dirLimit > 0 && c.dirLimit < dirCount {
-				return utils.Errorf("dir count limit exceeded: %d", c.dirLimit)
-			}
-
 			if c.onFileStat != nil {
-				err = c.onFileStat(path, info)
-				if err != nil {
+				if err := c.onFileStat(path, info); err != nil {
+					if err == SkipAll {
+						return err
+					}
 					return err
 				}
 			}
@@ -147,28 +156,34 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 	walkDir = func(path string) error {
 		dirs, err := c.fileSystem.ReadDir(path)
 		if err != nil {
-			return err
+			return nil // 忽略单个目录的错误，继续处理其他目录
 		}
+
 		for _, d := range dirs {
+			if c.isStop() {
+				return nil
+			}
+
 			targetFile := c.fileSystem.Join(path, d.Name())
 			if err := walkSingleFile(targetFile); err != nil {
-				lastErr = err
-				log.Warnf("walk file %s failed: %v", targetFile, err)
-				//return err
-			}
-			if c.isStop() {
-				return lastErr
+				if err == SkipAll {
+					return err // 达到限制时直接返回
+				}
+				// 其他错误继续处理
 			}
 		}
+
 		if c.onDirWalkEnd != nil {
 			if err := c.onDirWalkEnd(path); err != nil {
+				if err == SkipAll {
+					return err
+				}
 				return err
 			}
 		}
 		return nil
 	}
 
-	base := raw
 	info, err := c.fileSystem.Stat(raw)
 	if err != nil {
 		return utils.Errorf("stat %s failed: %v", raw, err)
@@ -178,14 +193,28 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 	}
 
 	if c.onStart != nil {
-		if err := c.onStart(base, info.IsDir()); err != nil {
+		if err := c.onStart(raw, info.IsDir()); err != nil {
+			if err == SkipAll {
+				return nil
+			}
 			return err
 		}
 	}
 
-	if err := walkDir(raw); err != nil {
-		return err
+	if c.RecursiveDirectory {
+		if err := walkDir(raw); err != nil {
+			if err == SkipAll {
+				return nil
+			}
+			return err
+		}
+	} else {
+		if err := walkSingleFile(raw); err != nil {
+			if err == SkipAll {
+				return nil
+			}
+			return err
+		}
 	}
-
 	return nil
 }

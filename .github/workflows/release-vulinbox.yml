@@ -32,7 +32,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.22.8
+          go-version: 1.22.12
       #      - name: Download Npcap SDK (Windows)
       #        run: |
       #          Invoke-WebRequest https://nmap.org/npcap/dist/npcap-sdk-1.07.zip -OutFile C:\NpcapSDK.zip
