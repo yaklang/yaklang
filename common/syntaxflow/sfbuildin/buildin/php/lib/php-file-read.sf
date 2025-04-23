@@ -9,7 +9,7 @@ TEXT
 	rule_id: "7d0ddbae-c283-456e-94d3-2ede4b4865ac"
 )
 
-/^(file_get_contents|file|readfile|fgetss|fgets|fread|fgetc|stream_get_line|fscanf)$/ as $output
+/^(file_get_contents|file|readfile|fgetss|fgets|fread|fgetc|stream_get_line|fscanf|fopen)$/ as $output
 
 alert $output
 

@@ -8,7 +8,7 @@ desc(
 TEXT
 	rule_id: "7e2c4412-9a6f-4095-a84f-beb680e56fbf"
 )
-/copy|(sym)?link|rename/ as $function
+/copy|(sym)?link|rename|fopen|fread|file_get_contents/ as $function
 
 <include('php-param')> as $params;
 <include('php-tp-all-extern-variable-param-source')> as $params
