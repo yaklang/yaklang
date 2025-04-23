@@ -707,6 +707,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 		if block, ok := fun.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block)
 		}
+		ssa.RefreshEx(newFunc)
 		b.Finish()
 		b.FunctionBuilder = b.PopFunction()
 
@@ -841,6 +842,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		if block, ok := fun.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block)
 		}
+		ssa.RefreshEx(newFunc)
 		b.Finish()
 		b.FunctionBuilder = b.PopFunction()
 
