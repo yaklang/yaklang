@@ -57,24 +57,36 @@ type SSARiskFilterOption func(*ypb.SSARisksFilter)
 
 func WithSSARiskFilterProgramName(programName string) SSARiskFilterOption {
 	return func(sf *ypb.SSARisksFilter) {
+		if programName == "" {
+			return
+		}
 		sf.ProgramName = append(sf.ProgramName, programName)
 	}
 }
 
 func WithSSARiskFilterRuleName(ruleName string) SSARiskFilterOption {
 	return func(sf *ypb.SSARisksFilter) {
+		if ruleName == "" {
+			return
+		}
 		sf.FromRule = append(sf.FromRule, ruleName)
 	}
 }
 
 func WithSSARiskFilterSourceUrl(sourceUrl string) SSARiskFilterOption {
 	return func(sf *ypb.SSARisksFilter) {
+		if sourceUrl == "" {
+			return
+		}
 		sf.CodeSourceUrl = append(sf.CodeSourceUrl, sourceUrl)
 	}
 }
 
 func WithSSARiskFilterFunction(functionName string) SSARiskFilterOption {
 	return func(sf *ypb.SSARisksFilter) {
+		if functionName == "" {
+			return
+		}
 		sf.FunctionName = append(sf.FunctionName, functionName)
 	}
 }
@@ -113,6 +125,7 @@ func FilterSSARisk(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
 		"id", "hash", // for exact query
 		"program_name", "code_source_url", "function_name",
 		"risk_type", "severity", "from_rule", "tags",
+		"title", "title_verbose",
 	}, filter.GetSearch(), false)
 	if filter.GetIsRead() != 0 {
 		db = bizhelper.QueryByBool(db, "is_read", filter.GetIsRead() > 0)
