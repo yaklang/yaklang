@@ -1,14 +1,22 @@
 package aitool
 
-import "io"
+import (
+	"context"
+	"io"
+)
 
 type ToolInvokeConfig struct {
-	stdout io.Writer
-	stderr io.Writer
+	invokeCtx *ToolInvokeCtx
+	stdout    io.Writer
+	stderr    io.Writer
 }
 
-func NewToolInvokeConfig() *ToolInvokeConfig {
-	return &ToolInvokeConfig{}
+func NewToolInvokeConfig(ctx context.Context) *ToolInvokeConfig {
+	return &ToolInvokeConfig{
+		invokeCtx: &ToolInvokeCtx{
+			Ctx: ctx,
+		},
+	}
 }
 
 type ToolInvokeOptions func(*ToolInvokeConfig)
@@ -22,5 +30,11 @@ func WithStdout(stdout io.Writer) ToolInvokeOptions {
 func WithStderr(stderr io.Writer) ToolInvokeOptions {
 	return func(config *ToolInvokeConfig) {
 		config.stderr = stderr
+	}
+}
+
+func WithChatToAiFunc(chatToAiFunc ChatToAiFuncType) ToolInvokeOptions {
+	return func(config *ToolInvokeConfig) {
+		config.invokeCtx.ChatToAiFunc = chatToAiFunc
 	}
 }

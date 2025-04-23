@@ -2,13 +2,16 @@ package aibp
 
 import (
 	"context"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
 )
 
 func TestRecon(t *testing.T) {
+	yakit.LoadGlobalNetworkConfig()
 	result, err := aiforge.ExecuteForge(
 		"recon",
 		context.Background(),

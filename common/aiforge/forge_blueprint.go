@@ -5,8 +5,9 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"io"
+
+	"github.com/yaklang/yaklang/common/ai/aid"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -47,6 +48,8 @@ type ForgeBlueprint struct {
 	// ParameterRuleYaklangCode 是原始的Yaklang CLI代码，用于AI理解和操作Yaklang环境
 	// 不执行这段代码，只通过代码生成表单
 	ParameterRuleYaklangCode string
+
+	ToolKeywords []string
 }
 
 func NewForgeBlueprint(name string, opts ...Option) *ForgeBlueprint {
@@ -108,6 +111,13 @@ func WithResultHandler(handler func(string, error)) Option {
 func WithPersistentPrompt(persistentPrompt string) Option {
 	return func(f *ForgeBlueprint) {
 		f.PersistentPrompt = persistentPrompt
+	}
+}
+
+// WithToolKeywords
+func WithToolKeywords(keywords []string) Option {
+	return func(f *ForgeBlueprint) {
+		f.ToolKeywords = append(f.ToolKeywords, keywords...)
 	}
 }
 

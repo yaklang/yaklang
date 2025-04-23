@@ -2,13 +2,14 @@ package aid
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	osRuntime "runtime"
 	"strings"
 	"text/template"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 type PlanRecord struct { // todo
@@ -94,7 +95,11 @@ func (m *Memory) Arch() string {
 }
 
 func (m *Memory) Schema() map[string]string {
-	return taskJSONSchema()
+	var toolNames []string
+	for _, tool := range m.Tools() {
+		toolNames = append(toolNames, tool.Name)
+	}
+	return taskJSONSchema(toolNames)
 }
 
 // set tools list

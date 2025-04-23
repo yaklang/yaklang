@@ -2,8 +2,9 @@ package aiforge
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"text/template"
+
+	"github.com/yaklang/yaklang/common/ai/aid"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -39,7 +40,32 @@ func (f *ForgeBlueprint) Params(query string, userInput ...*ypb.ExecParamItem) (
 		PersistentPrompt: f.PersistentPrompt,
 	}, nil
 }
+func (f *ForgeBlueprint) KeywordPrompt() string {
+	if len(f.Tools) <= 0 {
+		return ""
+	}
+	tmp, err := template.New("tool").Parse(`# 工具提示
+现在我将给你一组关键词，这些关键词代表我拥有的工具或资源。在你思考或搜索工具时，要重点围绕这些关键词进行思考。不要脱离这些关键词去构建无关的内容。
 
+我的工具关键词如下：
+{{range .ToolKeywords}}
+- "{{.}}"
+{{ToolKeywords}}
+`)
+	if err != nil {
+		log.Errorf("[ForgeBlueprint.ToolPrompt] %v", err)
+		return ""
+	}
+	var buf bytes.Buffer
+	err = tmp.Execute(&buf, map[string]any{
+		"ToolKeywords": f.ToolKeywords,
+	})
+	if err != nil {
+		log.Errorf("[ForgeBlueprint.ToolPrompt] %v", err)
+		return ""
+	}
+	return buf.String()
+}
 func (f *ForgeBlueprint) ToolPrompt() string {
 	if len(f.Tools) <= 0 {
 		return ""
@@ -107,6 +133,10 @@ func (f *ForgeBlueprint) renderInitPrompt(query string, params ...*ypb.ExecParam
 	}
 
 	if ret := f.ToolPrompt(); ret != "" {
+		buf.WriteString("\n")
+		buf.WriteString(ret)
+	}
+	if ret := f.KeywordPrompt(); ret != "" {
 		buf.WriteString("\n")
 		buf.WriteString(ret)
 	}

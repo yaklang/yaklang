@@ -32,12 +32,13 @@ func (t *aiTask) getToolRequired(response string) []*aitool.Tool {
 		if rawData, ok := data["tool"]; ok && fmt.Sprint(rawData) != "" {
 			toolName := fmt.Sprint(rawData)
 			count := 0
-			for _, toolIns := range t.config.tools {
-				if toolIns.Name == toolName {
-					count++
-					toolRequired = append(toolRequired, toolIns)
-				}
+			toolIns, err := t.config.aiToolManager.SearchToolByName(toolName)
+			if err != nil {
+				t.config.EmitError("error searching tool: %v", err)
+				continue
 			}
+			count++
+			toolRequired = append(toolRequired, toolIns)
 			if count <= 0 {
 				t.config.EmitInfo("require-tool for %v, but not found it", toolName)
 			}
@@ -137,7 +138,7 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 	}
 
 	t.config.EmitInfo("start to execute tool:%v ", targetTool.Name)
-	toolResult, err := targetTool.InvokeWithParams(callToolParams, aitool.WithStdout(stdoutBuf), aitool.WithStderr(stderrBuf))
+	toolResult, err := targetTool.InvokeWithParams(callToolParams, aitool.WithStdout(stdoutBuf), aitool.WithStderr(stderrBuf), aitool.WithChatToAiFunc(aitool.ChatToAiFuncType(t.config.toolAICallback)))
 	if err != nil {
 		err = utils.Errorf("error invoking tool: %v", err)
 		return nil, NewNonRetryableTaskStackError(err)

@@ -1,0 +1,17 @@
+__KEYWORDS__ = "http请求,GET方法,网络通信,客户端请求,服务器响应,数据传输,请求方法,web开发,api,网络协议"
+
+__DESC__ = <<<DESC
+使用GET方法发起HTTP请求
+DESC
+__SEO__ = <<<SEO
+HTTP Get Method
+SEO
+
+url = cli.String("url", cli.setHelp("the target u want to http get"))
+cli.check()
+
+rsp, req, err := poc.Get(url)
+if err != nil {
+    println("ERROR: %v" % err)
+    return
+}

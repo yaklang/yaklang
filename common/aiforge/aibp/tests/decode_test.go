@@ -2,11 +2,11 @@ package tests
 
 import (
 	"context"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/ai/aid"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
 )
 
 func init() {
@@ -18,7 +18,8 @@ func init() {
  {{ .Forge.UserParams }}
 `),
 			aiforge.WithPersistentPrompt("处理任务的时候，注意深度，使用工具如果失败，无法达到你的目的，需要及时调整工具参数。"),
-			aiforge.WithTools(yakscripttools.GetYakScriptAiTools("encode", "decode")...),
+			// aiforge.WithTools(yakscripttools.GetYakScriptAiTools("encode", "decode")...),
+			aiforge.WithToolKeywords([]string{"encode", "decode", "encoding", "decoding", "编码", "解码"}),
 		).CreateCoordinator(ctx, items, option...)
 		if err != nil {
 			return nil, err

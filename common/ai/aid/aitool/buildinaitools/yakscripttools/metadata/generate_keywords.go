@@ -1,0 +1,59 @@
+package metadata
+
+import (
+	"bytes"
+	_ "embed"
+	"encoding/json"
+	"fmt"
+	"html/template"
+
+	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/jsonextractor"
+	"github.com/yaklang/yaklang/common/log"
+)
+
+//go:embed prompt/generate_keyword.txt
+var generate_key_word_prompt []byte
+
+func GenerateKeywordsByDescription(desc string) ([]string, error) {
+	// Create a template from the prompt
+	promptTemplate := template.Must(template.New("generate_keywords").Parse(string(generate_key_word_prompt)))
+
+	// Create a buffer to store the executed template
+	var promptBuffer bytes.Buffer
+
+	// Execute the template with the description
+	err := promptTemplate.Execute(&promptBuffer, map[string]interface{}{
+		"Description": desc,
+	})
+
+	if err != nil {
+		log.Errorf("failed to execute prompt template: %v", err)
+		return []string{}, fmt.Errorf("failed to execute prompt template: %v", err)
+	}
+
+	// Get response from AI
+	response, err := ai.Chat(promptBuffer.String(), aispec.WithDebugStream(true))
+	if err != nil {
+		log.Errorf("failed to get AI response: %v", err)
+		return []string{}, fmt.Errorf("failed to get AI response: %v", err)
+	}
+
+	// Extract JSON array from the response
+	var result struct {
+		Language string
+		Keywords []string
+	}
+	var keywords []string
+	index := jsonextractor.ExtractObjectIndexes(response)
+	for _, pair := range index {
+		err = json.Unmarshal([]byte(response[pair[0]:pair[1]]), &result)
+		if err != nil {
+			continue
+		}
+		keywords = append(keywords, result.Keywords...)
+	}
+
+	return keywords, nil
+}

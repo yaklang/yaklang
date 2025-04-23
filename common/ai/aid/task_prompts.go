@@ -13,8 +13,12 @@ import (
 // generateTaskPrompt 生成执行任务的prompt
 func (t *aiTask) generateTaskPrompt() (string, error) {
 	// 创建模板数据
+	alltools, err := t.config.aiToolManager.GetAllTools()
+	if err != nil {
+		return "", fmt.Errorf("error getting all tools: %w", err)
+	}
 	templateData := map[string]interface{}{
-		"Tools":  t.config.tools,
+		"Tools":  alltools,
 		"Memory": t.config.memory,
 	}
 

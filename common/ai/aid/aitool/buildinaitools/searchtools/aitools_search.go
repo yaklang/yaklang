@@ -18,6 +18,14 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+const searchMethod = "aikeyword"
+
+type AiToolInfo struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Reason      string `json:"reason"`
+}
+
 func CreateAiToolsSearchTools(toolsGetter func() []*aitool.Tool) ([]*aitool.Tool, error) {
 	factory := aitool.NewFactory()
 	err := factory.RegisterTool(
@@ -27,41 +35,41 @@ func CreateAiToolsSearchTools(toolsGetter func() []*aitool.Tool) ([]*aitool.Tool
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("The name of the tool to query, can describe tool requirements using natural language."),
 		),
-		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+		aitool.WithCtxCallback(func(ctx *aitool.ToolInvokeCtx, params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			query := params.GetString("query")
-
+			clientName := "buildin-aitools"
 			// 准备搜索选项
 			searchOptions := []ostype.SearchOption{
 				ostype.WithSearchType(ostype.SearcherType("aitools")),
 				ostype.WithPageSize(100),
 				ostype.WithPage(1),
-				ostype.WithSearchType("aitools"),
+				ostype.WithSearchType(ostype.SearcherType(clientName)),
 			}
 
 			// 创建搜索客户端并执行搜索
-			client := omnisearch.NewOmniSearchClient()
+			client := omnisearch.NewOmniSearchClient(omnisearch.WithExtSearcher(NewAiToolsSearchClient(toolsGetter, &AiToolsSearchClientConfig{
+				SearchType:   searchMethod,
+				ClientName:   clientName,
+				ChatToAiFunc: ctx.ChatToAiFunc,
+			})))
 			results, err := client.Search(query, searchOptions...)
 			if err != nil {
 				return nil, utils.Errorf("search failed: %v", err)
 			}
-			toolNames := []string{}
+			aitoolList := []AiToolInfo{}
 			for _, result := range results.Results {
-				toolNames = append(toolNames, result.Title)
+				toolInfo, ok := result.Data.(*AiToolInfo)
+				if !ok {
+					continue
+				}
+				aitoolList = append(aitoolList, *toolInfo)
 			}
-			// 格式化结果为JSON
-			var buf bytes.Buffer
-			resultMap := map[string]interface{}{
-				"total":   len(toolNames),
-				"results": toolNames,
-			}
-
-			data, err := json.MarshalIndent(resultMap, "", "  ")
+			data, err := json.MarshalIndent(aitoolList, "", "  ")
 			if err != nil {
 				return nil, utils.Errorf("serialize result failed: %v", err)
 			}
-			buf.Write(data)
 
-			return buf.String(), nil
+			return string(data), nil
 		}),
 	)
 
@@ -74,9 +82,10 @@ func CreateAiToolsSearchTools(toolsGetter func() []*aitool.Tool) ([]*aitool.Tool
 
 type CallAiFunc func(msg string) (string, error)
 type AiToolsSearchClientConfig struct {
+	ClientName string
 	SearchType string // "ai" or "keyword"
-	Model      string
-	CallAiFunc CallAiFunc
+
+	ChatToAiFunc aitool.ChatToAiFuncType
 }
 
 type AiToolsSearchClient struct {
@@ -125,11 +134,19 @@ type AiToolsSearchResult struct {
 	Reason string `json:"reason"`
 }
 
+func (c *AiToolsSearchClient) SearchByAIKeyWords(query string, config *ostype.SearchConfig) ([]*ostype.OmniSearchResult, error) {
+	return nil, nil
+}
 func (c *AiToolsSearchClient) SearchByAI(query string, config *ostype.SearchConfig) ([]*ostype.OmniSearchResult, error) {
+	if c.cfg.ChatToAiFunc == nil {
+		return nil, utils.Errorf("ai callback is not set")
+	}
 	tools := c.toolsGetter()
 	toolDescList := []string{}
+	toolMap := map[string]*aitool.Tool{}
 	for _, tool := range tools {
 		toolDescList = append(toolDescList, fmt.Sprintf("%s: %s", tool.Name, tool.Description))
+		toolMap[tool.Name] = tool
 	}
 	prompt, err := template.New("search_by_ai").Parse(__prompt_SearchByAIPrompt)
 	if err != nil {
@@ -144,28 +161,43 @@ func (c *AiToolsSearchClient) SearchByAI(query string, config *ostype.SearchConf
 		return nil, utils.Errorf("execute prompt failed: %v", err)
 	}
 
-	rsp, err := c.cfg.CallAiFunc(buf.String())
+	stream, err := c.cfg.ChatToAiFunc(buf.String())
 	if err != nil {
-		log.Errorf("chat error: %v", err)
+		return nil, err
 	}
-	var callResults *AiToolsSearchResult
+	rspBytes, err := io.ReadAll(stream)
+	if err != nil {
+		return nil, err
+	}
+	rsp := string(rspBytes)
+	var callResults []*AiToolsSearchResult
 	for _, item := range jsonextractor.ExtractObjectIndexes(rsp) {
 		start, end := item[0], item[1]
 		toolJSON := rsp[start:end]
-		res := AiToolsSearchResult{}
+		res := []*AiToolsSearchResult{}
 		err = json.Unmarshal([]byte(toolJSON), &res)
 		if err != nil {
 			continue
 		}
-		callResults = &res
+		callResults = append(callResults, res...)
 	}
-	if callResults == nil {
+	if len(callResults) == 0 {
 		return nil, utils.Errorf("no tool found")
 	}
 	results := []*ostype.OmniSearchResult{}
-	results = append(results, &ostype.OmniSearchResult{
-		Title: callResults.Tool,
-	})
+	for _, res := range callResults {
+		tool, ok := toolMap[res.Tool]
+		if !ok {
+			continue
+		}
+		results = append(results, &ostype.OmniSearchResult{
+			Data: &AiToolInfo{
+				Name:        tool.Name,
+				Description: tool.Description,
+				Reason:      res.Reason,
+			},
+		})
+	}
 	return results, nil
 }
 
@@ -174,10 +206,12 @@ func (c *AiToolsSearchClient) Search(query string, config *ostype.SearchConfig) 
 		return c.SearchByKeyword(query, config)
 	} else if c.cfg.SearchType == "ai" {
 		return c.SearchByAI(query, config)
+	} else if c.cfg.SearchType == "aikeyword" {
+		return c.SearchByAIKeyWords(query, config)
 	}
 	return nil, utils.Errorf("invalid search type: %s", c.cfg.SearchType)
 }
 
 func (c *AiToolsSearchClient) GetType() ostype.SearcherType {
-	return ostype.SearcherType("aitools")
+	return ostype.SearcherType(c.cfg.ClientName)
 }

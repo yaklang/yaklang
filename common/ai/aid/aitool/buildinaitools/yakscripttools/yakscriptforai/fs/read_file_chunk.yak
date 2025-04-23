@@ -1,3 +1,5 @@
+__KEYWORDS__ = "file handling,reading,chunk size,offset,large file,data processing,buffer,memory management,performance,streaming"
+
 __DESC__ = <<<EOF
 safe for read a huge file, need to set the chunk size and offset
 EOF
