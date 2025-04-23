@@ -103,6 +103,7 @@ func (v *Value) CompareString(items *sfvm.StringComparator) (sfvm.ValueOperator,
 	}
 
 	names := getValueNames(v)
+	fmt.Println("names", names)
 	names = append(names, yakunquote.TryUnquote(v.String()))
 	return nil, []bool{items.Matches(names...)}
 }
