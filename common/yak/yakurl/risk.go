@@ -263,7 +263,10 @@ func GetSSARiskCountInfo(filter *SSARiskCountFilter) ([]*SSARiskCountInfo, error
 }
 
 func ConvertSSARiskCountInfoToResource(originParam *ypb.YakURL, countFilter *SSARiskCountFilter, rc *SSARiskCountInfo) (*ypb.YakURLResource, error) {
+
+	extraData := make([]extra, 0)
 	var filter ypb.SSARisksFilter = *countFilter.Filter // copy assign
+
 	switch countFilter.Level {
 	case SSARiskLevelProgram:
 		filter.ProgramName = append(filter.ProgramName, rc.Name)
@@ -276,6 +279,17 @@ func ConvertSSARiskCountInfoToResource(originParam *ypb.YakURL, countFilter *SSA
 	case SSARiskLevelRisk:
 		filter.Hash = append(filter.Hash, rc.RiskHash)
 		filter.ID = append(filter.ID, rc.RiskID)
+		extraData = append(extraData,
+			extra{"id", rc.RiskID},
+			extra{"hash", rc.RiskHash},
+		)
+		if rc.Name == "" {
+			rc.Name = rc.Title
+		}
+	}
+
+	if rc.Name == "" {
+		return nil, utils.Error("name is empty")
 	}
 
 	filterData, err := json.Marshal(&filter)
@@ -283,22 +297,10 @@ func ConvertSSARiskCountInfoToResource(originParam *ypb.YakURL, countFilter *SSA
 		return nil, err
 	}
 
-	extraData := []extra{
-		{"count", rc.Count},
-		{"filter", filterData},
-	}
-
-	if countFilter.Level == SSARiskLevelRisk {
-		// save id and hash
-		extraData = append(extraData,
-			extra{"id", rc.RiskID},
-			extra{"hash", rc.RiskHash},
-		)
-		// if name empty, use title
-		if rc.Name == "" {
-			rc.Name = rc.Title
-		}
-	}
+	extraData = append(extraData,
+		extra{"count", rc.Count},
+		extra{"filter", filterData},
+	)
 
 	res := createNewRes(originParam, 0, extraData)
 
