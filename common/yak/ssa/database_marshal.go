@@ -550,6 +550,10 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 	case *Switch:
 		ret.Cond = unmarshalValue(params["switch_cond"])
 		if labels, ok := params["switch_label"]; ok {
+			if _, isMap := labels.([]map[string]int64); !isMap {
+				log.Errorf("BUG: switch label should be map[string]int64, %v", labels)
+				return
+			}
 			for _, label := range labels.([]map[string]int64) {
 				ret.Label = append(ret.Label, SwitchLabel{
 					Value: unmarshalValue(label["value"]),
