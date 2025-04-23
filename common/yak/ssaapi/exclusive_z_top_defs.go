@@ -40,10 +40,9 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) Values
 		}
 	}
 	if len(vals) == 0 {
-		vals = append(vals, i)
+		vals = i.AddSelfToTopDefResult(vals)
 	}
 	// 拿到上次递归的节点作为mask的effectOn
-	// 而避免使用i作为effectOn,因为这样会使得i有dependOn，而不是最终的叶子节点
 	last := actx.getLastRecursiveNode()
 	if maskable, ok := i.innerValue.(ssa.Maskable); ok && last != nil {
 		for _, def := range maskable.GetMask() {
@@ -136,7 +135,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			apiValue.AppendDependOn(obj)
 			ret := obj.getTopDefs(actx, opt...)
 			if len(ret) == 0 && !ValueCompare(i, actx.Self) {
-				ret = append(ret, i)
+				vals = i.AddSelfToTopDefResult(vals)
 			}
 			return ret
 		}
@@ -276,7 +275,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 
 		handlerReturn(i)
 		if len(vals) == 0 {
-			vals = append(vals, i)
+			vals = i.AddSelfToTopDefResult(vals)
 		}
 		// handler child-class function
 		for _, child := range inst.GetPointer() {
@@ -325,7 +324,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			}
 			ret := traced.getTopDefs(actx, opt...)
 			if !actx.needCrossProcess(i, traced) {
-				ret = append(ret, i)
+				vals = i.AddSelfToTopDefResult(vals)
 			}
 			if len(ret) > 0 {
 				return ret
@@ -421,7 +420,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			if i.IsFreeValue() && inst.GetDefault() != nil {
 				vals = append(vals, i.NewTopDefValue(inst.GetDefault()))
 			} else {
-				vals = append(vals, i)
+				// 如果要将自身作为叶子节点加入到结果，需要清除DependOn这条边
+				// 这条边是在traced := i.NewTopDefValue(actualParam)的时候产生的
+				vals = i.AddSelfToTopDefResult(vals)
 			}
 		}
 		return vals
@@ -435,7 +436,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		}
 	case *ssa.Make:
 		var values Values
-		values = append(values, i)
+		values = i.AddSelfToTopDefResult(values)
 		for key, member := range inst.GetAllMember() {
 			value := i.NewValue(member)
 			if err := actx.pushObject(i, i.NewValue(key), value); err != nil {

@@ -30,7 +30,7 @@ $a = new AA(1);
 println($a->a);
 `
 		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
-			"param": {"Undefined-AA", "Undefined-AA", "1", "Undefined-AA.AA-destructor", "AA"},
+			"param": {"Undefined-AA", "1", "Undefined-AA.AA-destructor", "AA"},
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 	t.Run("have constructor", func(t *testing.T) {

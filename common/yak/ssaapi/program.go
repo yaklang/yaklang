@@ -157,6 +157,15 @@ func (v *Value) NewTopDefValue(value ssa.Value) *Value {
 	return iv.AppendEffectOn(v)
 }
 
+func (v *Value) AddSelfToTopDefResult(result Values) Values {
+	if v == nil {
+		return result
+	}
+	v.DependOn = nil
+	result = append(result, v)
+	return result
+}
+
 func (v *Value) NewBottomUseValue(value ssa.Value) *Value {
 	iv := v.NewValue(value)
 	return iv.AppendDependOn(v)

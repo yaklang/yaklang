@@ -39,7 +39,7 @@ system($c);`
 	ssatest.CheckSyntaxFlow(t, code,
 		`system(*  #-> * as $param)`,
 		map[string][]string{
-			"param": {"Function-base64_decode", "Undefined-$a(valid)", "Undefined-_GET"},
+			"param": {"Function-base64_decode", "Undefined-_GET"},
 		},
 		ssaapi.WithLanguage(ssaapi.PHP),
 	)
@@ -63,7 +63,7 @@ eval($ob->a);
 `
 		ssatest.CheckSyntaxFlow(t, code,
 			`eval(* #-> * as $param)`,
-			map[string][]string{"param": {"Undefined-_GET", "Undefined-_GET.1(valid)"}},
+			map[string][]string{"param": {"Undefined-_GET"}},
 			ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
@@ -90,7 +90,7 @@ function test($a){
 
 test($_GET[1]);`
 	ssatest.CheckSyntaxFlow(t, code, `eval(* #-> * as $command)`, map[string][]string{
-		"command": {"Undefined-_GET", "Undefined-_GET.1(valid)"},
+		"command": {"Undefined-_GET"},
 	},
 		ssaapi.WithLanguage(ssaapi.PHP))
 }
@@ -103,7 +103,7 @@ function test($a){
 test($_GET[1]);`
 	ssatest.CheckSyntaxFlow(t, code,
 		`system(* #->  as $param)`,
-		map[string][]string{"param": {"Undefined-_GET", "Undefined-_GET.1(valid)"}},
+		map[string][]string{"param": {"Undefined-_GET"}},
 		ssaapi.WithLanguage(ssaapi.PHP))
 }
 func TestDataflow(t *testing.T) {
