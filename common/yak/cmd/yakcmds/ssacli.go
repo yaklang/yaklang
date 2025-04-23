@@ -730,7 +730,7 @@ var ssaCodeScan = &cli.Command{
 		},
 		cli.StringFlag{
 			Name:  "format",
-			Usage: "output file format, set with json or sarif(default)",
+			Usage: "output file format, set with irify,irify-full or sarif(default)",
 		},
 		// }}}
 	},
