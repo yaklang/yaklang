@@ -3,7 +3,6 @@ package graph
 import (
 	"context"
 	"slices"
-	"time"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
@@ -81,24 +80,21 @@ func (d *DeepFirstPath[K, T, U]) deepFirst(node T, target ...T) {
 }
 
 func GraphPathEx[K comparable, T, U any](
+	ctx context.Context,
 	node T,
 	next func(T) []T,
 	getKey func(T) K,
 	getValue func(T) U,
 	target ...T,
 ) [][]U {
-	var MaxTime = time.Millisecond * 500
-
-	ctx, cancel := context.WithTimeout(context.Background(), MaxTime)
-	defer cancel()
 
 	df := &DeepFirstPath[K, T, U]{
+		ctx:      ctx,
 		res:      make([][]U, 0),
 		current:  omap.NewEmptyOrderedMap[K, U](),
 		next:     next,
 		getKey:   getKey,
 		getValue: getValue,
-		ctx:      ctx,
 	}
 	df.deepFirst(node, target...)
 	return df.res
@@ -110,7 +106,7 @@ func GraphPathWithKey[K comparable, T any](
 	next func(T) []T,
 	getKey func(T) K,
 ) [][]T {
-	return GraphPathEx(node, next, getKey, func(t T) T { return t })
+	return GraphPathEx(context.Background(), node, next, getKey, func(t T) T { return t })
 }
 
 // index by T type, and return path with U type
@@ -119,7 +115,7 @@ func GraphPathWithValue[T comparable, U any](
 	next func(T) []T,
 	getValue func(T) U,
 ) [][]U {
-	return GraphPathEx(node, next, func(t T) T { return t }, getValue)
+	return GraphPathEx(context.Background(), node, next, func(t T) T { return t }, getValue)
 }
 
 // index by T type , and return path with T type
@@ -127,18 +123,19 @@ func GraphPath[T comparable](
 	node T,
 	next func(T) []T,
 ) [][]T {
-	return GraphPathEx(node, next,
+	return GraphPathEx(context.Background(), node, next,
 		func(t T) T { return t },
 		func(t T) T { return t },
 	)
 }
 
 func GraphPathWithTarget[T comparable](
+	ctx context.Context,
 	node T,
 	target T,
 	next func(T) []T,
 ) [][]T {
-	return GraphPathEx[T, T, T](node, next,
+	return GraphPathEx[T, T, T](ctx, node, next,
 		func(t T) T { return t },
 		func(t T) T { return t },
 		target,

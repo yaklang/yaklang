@@ -1,11 +1,14 @@
 package graph_test
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/graph"
 )
 
@@ -115,6 +118,7 @@ func TestGraph_Builder(t *testing.T) {
 
 		// Find all paths from n1 to n3
 		paths := graph.GraphPathWithTarget[string](
+			context.Background(),
 			"n1",
 			"n3",
 			g.getEdge,
@@ -167,6 +171,7 @@ func TestDFSPathTarget(t *testing.T) {
 		g.AddEdge("n5", "n6")
 
 		paths := graph.GraphPathWithTarget[string](
+			context.Background(),
 			"n1",
 			"n6",
 			g.getEdge,
@@ -178,6 +183,7 @@ func TestDFSPathTarget(t *testing.T) {
 		require.Contains(t, paths, []string{"n1", "n4", "n6"})
 
 		paths = graph.GraphPathWithTarget[string](
+			context.Background(),
 			"n1",
 			"n4",
 			g.getEdge,
@@ -214,6 +220,7 @@ func TestDFSPathTarget(t *testing.T) {
 
 		// Test path from n1 to n7
 		paths := graph.GraphPathWithTarget[string](
+			context.Background(),
 			"n1",
 			"n7",
 			g.getEdge,
@@ -229,6 +236,7 @@ func TestDFSPathTarget(t *testing.T) {
 
 		// Test a different target
 		paths = graph.GraphPathWithTarget[string](
+			context.Background(),
 			"n1",
 			"n3",
 			g.getEdge,
@@ -239,4 +247,23 @@ func TestDFSPathTarget(t *testing.T) {
 		require.Contains(t, paths, []string{"n1", "n2", "n3"})
 	})
 
+}
+
+func TestDFSPathContext(t *testing.T) {
+	timeInterval := 100 * time.Millisecond
+	ctx, cancel := context.WithTimeout(context.Background(), timeInterval)
+	defer cancel()
+
+	start := time.Now()
+	paths := graph.GraphPathWithTarget(ctx, "n1", "n6", func(n string) []string {
+		log.Infof("call back ")
+		time.Sleep(1 * timeInterval) // 3 times of timeInterval
+		return []string{"n2", "n3", "n4"}
+	})
+	spew.Dump(paths)
+	since := time.Since(start)
+	spew.Dump(since)
+	require.Equal(t, len(paths), 0, "Should not find any paths")
+	require.True(t, since > timeInterval, "Should match timeout")
+	require.True(t, since < 3*timeInterval, "Should match timeout")
 }
