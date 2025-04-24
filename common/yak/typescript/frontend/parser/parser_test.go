@@ -18,9 +18,6 @@ import (
 //go:embed testdata/large.js
 var largeJS string
 
-//go:embed testdata/popper.js
-var packedJS string
-
 func printAllChildren(node *ast.Node, depth int) {
 	indent := ""
 	for i := 0; i < depth; i++ {
