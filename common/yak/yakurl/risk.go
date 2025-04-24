@@ -345,7 +345,11 @@ func ConvertSSARiskCountInfoToResource(originParam *ypb.YakURL, countFilter *SSA
 
 	res := createNewRes(originParam, 0, extraData)
 
-	res.Path = path.Join(originParam.Path, rc.Name)
+	if countFilter.Level == SSARiskLevelRisk {
+		res.Path = path.Join(originParam.Path, rc.RiskHash)
+	} else {
+		res.Path = path.Join(originParam.Path, rc.Name)
+	}
 	res.ResourceName = rc.Name
 	res.ResourceType = string(countFilter.Level)
 	res.HaveChildrenNodes = !countFilter.LeafNode
