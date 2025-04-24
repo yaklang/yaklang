@@ -440,7 +440,7 @@ func newPersistConn(key connectKey, pool *LowHttpConnPool, opt ...netx.DialXOpti
 			pool.putIdleConn(pc)
 			return pc, nil
 		}
-		newH1Conn, err := netx.DialX(key.addr, opt...) // 降级
+		newH1Conn, err := netx.DialX(key.addr, append(opt, netx.DialX_WithTLSNextProto(H1))...) // 降级
 		if err != nil {
 			return nil, err
 		}

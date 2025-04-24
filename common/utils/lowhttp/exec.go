@@ -689,6 +689,7 @@ RECONNECT:
 		pc := conn.(*persistConn)
 		if pc.cacheKey.scheme != H2 { // http2 downgrade to http1.1
 			enableHttp2 = false
+			withConnPool = false // downgrade can not with conn pool
 			method, uri, _ := GetHTTPPacketFirstLine(requestPacket)
 			requestPacket = ReplaceHTTPPacketFirstLine(requestPacket, strings.Join([]string{method, uri, "HTTP/1.1"}, " "))
 		} else {
