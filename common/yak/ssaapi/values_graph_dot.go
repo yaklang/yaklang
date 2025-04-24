@@ -35,7 +35,6 @@ type ValueGraph struct {
 	Value2Node     map[*Value]int   // ssaapi.Value -> node-id
 	marshaledValue map[int]struct{} // node-id ->  ssaapi.value
 	Node2Value     map[int]*Value
-	dtype          Dtype
 }
 
 func NewValueGraph(v ...*Value) *ValueGraph {
@@ -82,14 +81,6 @@ func (g *ValueGraph) createNode(value *Value) (int, error) {
 	// s := fmt.Sprintf("%s_%d_%d", value.GetVerboseName(), value.GetId(), nodeId)
 	// g.SetNode(nodeId, s)
 
-	if g.dtype == DT_None {
-		if value.GetDependOn() != nil {
-			g.dtype = DT_DependOn
-		} else if value.GetEffectOn() != nil {
-			g.dtype = DT_EffectOn
-		}
-	}
-
 	nodeId := 0
 	if r := value.GetRange(); r != nil {
 		code := r.GetText()
@@ -113,29 +104,15 @@ func (g *ValueGraph) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
 	}
 
 	var res []*graph.Neighbor[*Value]
-	appendFunc := func() {}
-
-	if g.dtype == DT_DependOn {
-		appendFunc = func() {
-			for _, v := range value.GetDependOn() {
-				res = append(res, graph.NewNeighbor(v, EdgeTypeDependOn))
-			}
-		}
-	} else if g.dtype == DT_EffectOn {
-		appendFunc = func() {
-			for _, v := range value.GetEffectOn() {
-				res = append(res, graph.NewNeighbor(v, EdgeTypeEffectOn))
-			}
-		}
+	for _, v := range value.GetEffectOn() {
+		res = append(res, graph.NewNeighbor(v, EdgeTypeEffectOn))
 	}
-
-	appendFunc()
 
 	for _, predecessor := range value.GetPredecessors() {
 		if predecessor.Node == nil {
 			continue
 		}
-		if IsDataFlowLabel(predecessor.Info.Label) {
+		if IsDataFlowLabel(predecessor.Info.Label) && len(res) > 0 {
 			continue
 		}
 		neighbor := graph.NewNeighbor(predecessor.Node, EdgeTypePredecessor)
