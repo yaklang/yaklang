@@ -280,6 +280,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			case ssa.ParameterMemberCall:
 				if para := fun.GetParameter(inst.MemberCallObjectIndex); para != nil {
 					actx.pushObject(para, i.NewValue(inst.MemberCallKey), i.NewValue(ssa.NewConst("")))
+					if i.GetTypeKind() == ssa.FunctionTypeKind {
+						return append(para.AppendEffectOn(fun).getTopDefs(actx, opt...), i)
+					}
 					return para.AppendEffectOn(fun).getTopDefs(actx, opt...)
 				}
 			case ssa.FreeValueMemberCall:
