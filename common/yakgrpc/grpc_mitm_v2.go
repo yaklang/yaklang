@@ -1041,6 +1041,17 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 
 		taskInfo := task.infoMessage
+
+		httpctx.SetResponseContentTypeFiltered(originReqIns, func(t string) bool { // update callback set resp filter feedback
+			ret := !filterManager.IsMIMEPassed(t)
+			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered, ret)
+			if ret && httpctx.GetContextBoolInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest) {
+				hijackListFeedback(Hijack_List_Delete, taskInfo)
+				hijackManger.unRegister(task.taskID)
+			}
+			return ret
+		})
+
 		hijackListFeedback(Hijack_List_Add, taskInfo)
 		httpctx.SetRequestMITMTaskID(originReqIns, task.taskID)
 		httpctx.SetResponseViewedByUser(originReqIns)
