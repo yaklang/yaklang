@@ -215,7 +215,9 @@ func (l *LowHttpConnPool) putIdleConn(pc *persistConn) error {
 		}
 	}
 	l.idleConnMap[cacheKeyHash] = append(l.idleConnMap[cacheKeyHash], pc)
-	pc.markReused()
+	if !pc.IsH2Conn() {
+		pc.markReused()
+	}
 	return nil
 }
 
