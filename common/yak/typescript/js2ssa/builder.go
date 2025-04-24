@@ -2,31 +2,53 @@ package js2ssa
 
 import (
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/typescript/frontend/ast"
+	"github.com/yaklang/yaklang/common/yak/typescript/frontend/core"
+	"github.com/yaklang/yaklang/common/yak/typescript/frontend/parser"
+	"github.com/yaklang/yaklang/common/yak/typescript/frontend/scanner"
+	"path/filepath"
 )
 
 type SSABuilder struct {
 	*ssa.PreHandlerInit
 }
 
+type builder struct {
+	*ssa.FunctionBuilder
+	sourceFile *ast.SourceFile
+}
+
 var Builder ssa.Builder = &SSABuilder{}
 
-func (S SSABuilder) Create() ssa.Builder {
-	//TODO implement me
-	panic("implement me")
+func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
+	jsAST, err := Frontend(src, force)
+	if err != nil {
+		return err
+	}
+	b.SupportClosure = true
+	build := &builder{
+		FunctionBuilder: b,
+		sourceFile:      jsAST,
+	}
+	build.VisitSourceFile(jsAST)
+	return nil
 }
 
-func (S SSABuilder) Build(s string, b bool, builder *ssa.FunctionBuilder) error {
-	//TODO implement me
-	panic("implement me")
+func (*SSABuilder) FilterFile(path string) bool {
+	return filepath.Ext(path) == ".js"
 }
 
-func (S SSABuilder) FilterFile(s string) bool {
+func (*SSABuilder) GetLanguage() consts.Language {
 	//TODO implement me
-	panic("implement me")
+	return consts.JS
 }
 
-func (S SSABuilder) GetLanguage() consts.Language {
-	//TODO implement me
-	panic("implement me")
+func Frontend(src string, force bool) (*ast.SourceFile, error) {
+	jsast := parser.ParseSourceFile("", "", src, core.ScriptTargetES5, scanner.JSDocParsingModeParseNone)
+	if force || len(jsast.Diagnostics()) == 0 {
+		return jsast, nil
+	}
+	return nil, utils.Errorf("parse AST FrontEnd error: %v", jsast.Diagnostics()[0].Message())
 }
