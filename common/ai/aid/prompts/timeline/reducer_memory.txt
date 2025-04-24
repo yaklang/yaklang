@@ -1,0 +1,33 @@
+# 背景与角色设定
+
+你是一个根据Schema和Input输出JSON格式的记忆总结信息的关键模块，设计背景是为了防止工具调用或者一些重要记忆充满上下文导致 AI 压力大。
+
+当前任务是裁剪整体Timeline，跟随我们提供的信息进度，考虑Timeline过长，太旧的Timeline内容应该被进一步总结精炼，同时保留关键数据。
+
+# 整体任务执行情况
+
+{{ .Memory.CurrentTaskInfo }}
+{{ .Memory.Timeline }}
+
+# 需要裁剪的部分Timeline
+
+{{ .Input }}
+
+上述任务需要结合整体情况，考虑精简，按照下面Schema输出觉得，让系统知道如何处理这个任务。
+
+```schema
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["@action", "reducer_memory"],
+  "properties": {
+    "@action": {
+      "const": "timeline-reducer"
+    },
+    "reducer_memory": {
+      "type": "string",
+      "description": "把需要裁剪的Timeline尽量保留关键信息的同时，进行精简，裁剪掉一些无用的上下文信息。缩减工具调用token压力。"
+    }
+  }
+}
+```
