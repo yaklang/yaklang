@@ -51,6 +51,7 @@ type FuzzTagDescription struct {
 	HandlerAndYieldString func(s string, yield func(s string)) error
 	ErrorInfoHandler      func(string) ([]string, error)
 	IsDyn                 bool
+	IsFlowControl         bool
 	IsDynFun              func(name, params string) bool
 	Alias                 []string
 	Description           string
@@ -80,22 +81,24 @@ func AddFuzzTagDescriptionToMap(methodMap map[string]*parser.TagMethod, f *FuzzT
 	}
 	if f.HandlerAndYield != nil {
 		methodMap[name] = &parser.TagMethod{
-			Name:        name,
-			IsDyn:       f.IsDyn,
-			Expand:      expand,
-			Alias:       alias,
-			Description: f.Description,
+			Name:          name,
+			IsDyn:         f.IsDyn,
+			IsFlowControl: f.IsFlowControl,
+			Expand:        expand,
+			Alias:         alias,
+			Description:   f.Description,
 			YieldFun: func(ctx context.Context, s string, recv func(*parser.FuzzResult)) error {
 				return f.HandlerAndYield(ctx, s, recv)
 			},
 		}
 	} else {
 		methodMap[name] = &parser.TagMethod{
-			Name:        name,
-			IsDyn:       f.IsDyn,
-			Expand:      expand,
-			Alias:       alias,
-			Description: f.Description,
+			Name:          name,
+			IsDyn:         f.IsDyn,
+			IsFlowControl: f.IsFlowControl,
+			Expand:        expand,
+			Alias:         alias,
+			Description:   f.Description,
 			Fun: func(s string) (result []*parser.FuzzResult, err error) {
 				defer func() {
 					if r := recover(); r != nil {
@@ -652,7 +655,8 @@ func init() {
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
-		TagName: "repeat",
+		TagName:       "repeat",
+		IsFlowControl: true,
 		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
 			i := atoi(s)
 			if i == 0 {

@@ -3,9 +3,10 @@ package parser
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type FuzzResult struct {
@@ -60,13 +61,14 @@ func (f *FuzzResult) GetVerbose() []string {
 }
 
 type TagMethod struct {
-	Name        string
-	IsDyn       bool
-	Fun         func(string) ([]*FuzzResult, error)
-	YieldFun    func(ctx context.Context, params string, yield func(*FuzzResult)) error
-	Expand      map[string]any
-	Alias       []string
-	Description string
+	Name          string
+	IsDyn         bool
+	IsFlowControl bool
+	Fun           func(string) ([]*FuzzResult, error)
+	YieldFun      func(ctx context.Context, params string, yield func(*FuzzResult)) error
+	Expand        map[string]any
+	Alias         []string
+	Description   string
 }
 type Node interface {
 	IsNode()
@@ -80,6 +82,9 @@ func (s StringNode) IsNode() {
 func (s StringNode) String() string {
 	return string(s)
 }
+func (s StringNode) IsFlowControl() bool {
+	return false
+}
 
 type TagNode interface {
 	IsNode()
@@ -90,13 +95,19 @@ type TagNode interface {
 	String() string
 	GetData() []Node
 	GetLabels() []string
+	IsFlowControl() bool
 }
 
 type BaseTag struct {
 	Data   []Node
 	Labels []string
 	// initOnce 用来对子结构体的初始化
-	initOnce sync.Once
+	isFlowControl bool
+	initOnce      sync.Once
+}
+
+func (b *BaseTag) IsFlowControl() bool {
+	return b.isFlowControl
 }
 
 func (*BaseTag) IsNode() {

@@ -2,11 +2,13 @@ package parser
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"sync"
 	"unsafe"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/exp/maps"
 )
 
 type GenerateConfig struct {
@@ -48,6 +50,8 @@ func (m *MethodContext) UpdateLabels(tag *TagExecNode) {
 		case "dyn":
 			tag.isDyn = true
 			m.dynTag[tag] = struct{}{}
+		case "flowcontrol":
+			tag.isFlowControl = true
 		default:
 			if _, ok := m.labelTable[label]; !ok {
 				m.labelTable[label] = map[*TagExecNode]struct{}{}
@@ -95,6 +99,7 @@ type TagExecNode struct {
 	finished        bool
 	isRep           bool
 	isDyn           bool
+	isFlowControl   bool
 	params          []ExecNode
 	methodCtx       *MethodContext
 	childGenerator  *Generator //
@@ -206,7 +211,11 @@ func (f *TagExecNode) exec(s *FuzzResult) error {
 			close(ch)
 			execCtxCancel()
 		}()
-		err = f.data.Exec(execCtx, s, receiver, f.methodCtx.methodTable)
+		if f.data.IsFlowControl() {
+			err = f.data.Exec(execCtx, s, func(result *FuzzResult) {}, f.methodCtx.methodTable)
+		} else {
+			err = f.data.Exec(execCtx, s, receiver, f.methodCtx.methodTable)
+		}
 	}()
 
 	newGetter := func() (*FuzzResult, error) {
@@ -417,6 +426,23 @@ func (g *Generator) Next() bool {
 func (g *Generator) SetTagsSync(b bool) {
 	g.renderTagWithSyncIndex = b
 }
+func (g *Generator) getSameLabelTags(tag *TagExecNode) []*TagExecNode {
+	if g.renderTagWithSyncIndex {
+		return maps.Keys(g.methodCtx.tagToLabelsMap)
+	}
+	label := tag.data.GetLabels()
+	result := []*TagExecNode{}
+	for _, l := range label {
+		if ms, ok := g.methodCtx.labelTable[l]; ok {
+			for m := range ms {
+				if m != tag {
+					result = append(result, m)
+				}
+			}
+		}
+	}
+	return result
+}
 func (g *Generator) generate() (bool, error) {
 	if g.first {
 		for _, d := range g.data {
@@ -452,42 +478,21 @@ func (g *Generator) generate() (bool, error) {
 		if err != nil {
 			return genOneOk, err
 		}
-		if g.renderTagWithSyncIndex { //all tag sync render
-			if _, ok := g.data[i].(*TagExecNode); ok {
-				for _, m := range g.data {
-					uid1 := reflect.ValueOf(m).UnsafePointer()
-					if uid1 == uid {
-						continue
-					}
-					renderedNode[uid1] = struct{}{}
-					ok1, err := m.Exec()
-					if err != nil {
-						return ok1, err
-					}
-					genOneOk = genOneOk || ok1
+		if v, ok := g.data[i].(*TagExecNode); ok {
+			for _, m := range g.getSameLabelTags(v) {
+				uid1 := reflect.ValueOf(m).UnsafePointer()
+				if uid1 == uid { // not allow sync self
+					continue
 				}
-			}
-		} else { // labels sync render
-			if v, ok := g.data[i].(*TagExecNode); ok {
-				for _, label := range v.data.GetLabels() {
-					if ms, ok := v.methodCtx.labelTable[label]; ok {
-						for m := range ms {
-							uid1 := reflect.ValueOf(m).UnsafePointer()
-							if uid1 == uid { // not allow sync self
-								continue
-							}
-							if !allowSyncTag(v, m) { // check if allow sync by defined rules
-								continue
-							}
-							renderedNode[uid1] = struct{}{}
-							ok1, err := m.Exec()
-							if err != nil {
-								return ok1, err
-							}
-							genOneOk = genOneOk || ok1 // all label sync render fail then genOneOk false
-						}
-					}
+				if !allowSyncTag(v, m) { // check if allow sync by defined rules
+					continue
 				}
+				renderedNode[uid1] = struct{}{}
+				ok1, err := m.Exec()
+				if err != nil {
+					return ok1, err
+				}
+				genOneOk = genOneOk || ok1 // all label sync render fail then genOneOk false
 			}
 		}
 		if !genOneOk {
@@ -514,19 +519,15 @@ func (g *Generator) generate() (bool, error) {
 					continue
 				} else {
 					tag.FirstExecWithBackpropagation(true, false, true)
-					for _, label := range tag.data.GetLabels() {
-						if ms, ok := tag.methodCtx.labelTable[label]; ok {
-							for m := range ms {
-								uid1 := reflect.ValueOf(m).UnsafePointer()
-								if uid1 == uid { // not allow sync self
-									continue
-								}
-								if !allowSyncTag(tag, m) { // check if allow sync by defined rules
-									continue
-								}
-								m.FirstExecWithBackpropagation(true, false, true)
-							}
+					for _, m := range g.getSameLabelTags(tag) {
+						uid1 := reflect.ValueOf(m).UnsafePointer()
+						if uid1 == uid { // not allow sync self
+							continue
 						}
+						if !allowSyncTag(tag, m) { // check if allow sync by defined rules
+							continue
+						}
+						m.FirstExecWithBackpropagation(true, false, true)
 					}
 				}
 			}
@@ -543,6 +544,12 @@ func (g *Generator) generate() (bool, error) {
 }
 
 func allowSyncTag(srcTag, syncTag *TagExecNode) bool {
+	// flowcontrol tag not allow sync
+	if syncTag.isFlowControl || srcTag.isFlowControl {
+		return false
+	}
+
+	// check if sync tag is parent of src tag
 	tag1, tag2 := srcTag, syncTag
 	for {
 		if tag1.parentNode == nil {
@@ -553,6 +560,8 @@ func allowSyncTag(srcTag, syncTag *TagExecNode) bool {
 			return false
 		}
 	}
+
+	// check if src tag is parent of sync tag
 	tag1, tag2 = srcTag, syncTag
 	for {
 		if tag2.parentNode == nil {
