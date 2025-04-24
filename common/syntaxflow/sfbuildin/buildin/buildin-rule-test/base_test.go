@@ -108,7 +108,7 @@ var Cases = []BuildinRuleTestCase{
 	{
 		Name: "SAXParserFactory 基础检查",
 		// Rule: `java-saxparser-factory-unsafe`,
-		Rule: "SAXParserFactory. 未明确设置安全策略（.setFeature(...)）",
+		Rule: "检测 SAXParserFactory() 不安全使用",
 		FS: map[string]string{
 			"saxparser-factory-unsafe.java": "saxparser-factory-unsafe.java",
 		},
@@ -118,7 +118,7 @@ var Cases = []BuildinRuleTestCase{
 	{
 		Name: "SAXParserFactory 基础检查(安全)",
 		// Rule: `java-saxparser-factory-unsafe`,
-		Rule: "SAXParserFactory. 未明确设置安全策略（.setFeature(...)）",
+		Rule: "检测 SAXParserFactory() 不安全使用",
 		FS: map[string]string{
 			"saxparser-factory-safe.java": "saxparser-factory-safe.java",
 		},
