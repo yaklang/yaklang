@@ -2,14 +2,15 @@ package fuzztagx
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/fuzztagx/parser"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/fuzztagx/parser"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestReader(t *testing.T) {

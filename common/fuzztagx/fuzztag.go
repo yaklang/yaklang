@@ -109,6 +109,9 @@ func (f *FuzzTag) Exec(ctx context.Context, raw *parser.FuzzResult, yield func(r
 	if fun.IsDyn || isDynFunRes {
 		f.Labels = append(f.Labels, "dyn")
 	}
+	if fun.IsFlowControl {
+		f.Labels = append(f.Labels, "flowcontrol")
+	}
 	return runFun(fun, params)
 }
 
@@ -231,6 +234,9 @@ func (f *SimpleFuzzTag) Exec(ctx context.Context, raw *parser.FuzzResult, yield 
 		yield(parser.NewFuzzResultWithData(fmt.Sprintf("{{%s}}", escaper.Escape(rawData))))
 		return nil
 	}
+	if f.IsFlowControl() {
+		labels = append(labels, "flowcontrol")
+	}
 	set := utils.NewSet(labels)
 	f.Labels = set.List()
 	commonFuzztag.Labels = f.Labels
@@ -319,6 +325,9 @@ func getResultVerbose(f *parser.FuzzResult, visitedMap map[*parser.FuzzResult]st
 		}
 	} else if f.Verbose == "" {
 		f.Verbose = utils.InterfaceToString(f.Data)
+	}
+	if f.Verbose == "" {
+		return verboses
 	}
 	return append([]string{f.Verbose}, verboses...)
 }

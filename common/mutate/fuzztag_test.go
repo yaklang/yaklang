@@ -426,3 +426,17 @@ func TestTimestampFuzzTag(t *testing.T) {
 	now := time.Now().UnixMicro()
 	require.True(t, got >= now-1000 && got <= now+1000)
 }
+
+func TestFlowControlTag(t *testing.T) {
+	results, err := FuzzTagExec(`{{int(1-2)}}{{int(3-5)}}{{repeat(2)}}`, Fuzz_WithResultHandler(func(s string, i []string) bool {
+		return true
+	}), Fuzz_SyncTag(true))
+	require.NoError(t, err)
+	require.Len(t, results, 6)
+
+	results, err = FuzzTagExec(`{{int(1-2)}}{{int(3-5)}}{{repeat(4)}}`, Fuzz_WithResultHandler(func(s string, i []string) bool {
+		return true
+	}), Fuzz_SyncTag(true))
+	require.NoError(t, err)
+	require.Len(t, results, 12)
+}
