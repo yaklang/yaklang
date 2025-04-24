@@ -222,3 +222,67 @@ func TestDatabaseCache_Close(t *testing.T) {
 	require.True(t, ok)
 	require.Contains(t, "2", data2DB)
 }
+func TestDatabaseCache_DisableEnableSave(t *testing.T) {
+	// log.SetLevel(log.DebugLevel)
+	database := utils.NewSafeMapWithKey[int, string]()
+	ttl := time.Millisecond * 100
+
+	cache := utils.NewDatabaseCacheWithKey[int, string](
+		ttl,
+		func(i int, s string, reason utils.EvictionReason) bool {
+			log.Infof("save to database, key: %v, value: %v", i, s)
+			database.Set(i, s)
+			return true
+		},
+		func(i int) (string, error) {
+			log.Infof("load from database, key: %v", i)
+			if value, ok := database.Get(i); ok {
+				return value, nil
+			} else {
+				return "", utils.Errorf("no this id in database ")
+			}
+		},
+	)
+
+	// Disable saving to database
+	cache.DisableSave()
+	require.True(t, cache.IsSaveDisabled())
+
+	// Set data while saving is disabled
+	cache.Set(1, "1")
+	cache.Set(2, "2")
+
+	// Wait for TTL to expire
+	time.Sleep(2 * ttl)
+
+	// Check that data was not saved to database
+	_, ok := database.Get(1)
+	require.False(t, ok, "Data should not be saved to database when saving is disabled")
+	_, ok = database.Get(2)
+	require.False(t, ok, "Data should not be saved to database when saving is disabled")
+
+	// Data should still be in cache
+	data1, ok := cache.Get(1)
+	require.True(t, ok)
+	require.Equal(t, "1", data1)
+
+	// Enable saving to database
+	cache.EnableSave()
+	require.False(t, cache.IsSaveDisabled())
+
+	// Set new data
+	cache.Set(3, "3")
+
+	// Wait for TTL to expire
+	time.Sleep(2 * ttl)
+
+	// Check that new data was saved to database
+	data3DB, ok := database.Get(3)
+	require.True(t, ok)
+	require.Equal(t, "3", data3DB)
+
+	// Old data should still be in cache since it was recovered when save was disabled
+	data1, ok = cache.Get(1)
+	require.True(t, ok)
+	require.Equal(t, "1", data1)
+}

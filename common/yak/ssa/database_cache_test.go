@@ -20,6 +20,9 @@ func TestLazyInstructionSaveAgain(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	prog := NewProgram(programName, true, Application, vf, "", ttl)
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+	cache := prog.Cache
+	// enable cache save to database
+	cache.InstructionCache.EnableSave()
 
 	// create instruction
 	undefineA := builder.EmitUndefined("a")
@@ -42,8 +45,6 @@ func TestLazyInstructionSaveAgain(t *testing.T) {
 		require.Contains(t, ir.String, fmt.Sprint(undefineA.GetId()))
 		require.Contains(t, ir.String, fmt.Sprint(undefineB.GetId()))
 	}
-
-	cache := prog.Cache
 
 	// load instruction from db
 	inst2 := cache.GetInstruction(instID)
