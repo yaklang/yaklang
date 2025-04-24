@@ -61,6 +61,7 @@ func main() {
 		aid.WithSystemFileOperator(),
 		aid.WithDebugPrompt(),
 		aid.WithYOLO(true),
+		aid.WithTimeLineLimit(5),
 	)
 	if err != nil {
 		panic(err)

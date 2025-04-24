@@ -7,7 +7,7 @@
 # 整体任务执行情况
 
 {{ .Memory.CurrentTaskInfo }}
-{{ .Memory.Timeline }}
+{{ .Memory.ToolCallTimeline }}
 
 # 需要裁剪的部分Timeline
 

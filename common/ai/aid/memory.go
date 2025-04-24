@@ -44,22 +44,24 @@ type Memory struct {
 	Tools        func() []*aitool.Tool
 
 	// tool call results
-	toolCallResults []*aitool.ToolResult
+	//toolCallResults []*aitool.ToolResult
 
 	// interactive history
 	InteractiveHistory *omap.OrderedMap[string, *InteractiveEventRecord]
+
+	timeline *memoryTimeline // timeline with tool call results, will reduce the memory size
 }
 
-func NewMemory() *Memory {
+func GetDefaultMemory() *Memory {
 	return &Memory{
 		PlanHistory:        make([]*PlanRecord, 0),
 		PersistentData:     make([]string, 0),
 		InteractiveHistory: omap.NewOrderedMap[string, *InteractiveEventRecord](make(map[string]*InteractiveEventRecord)),
-		toolCallResults:    make([]*aitool.ToolResult, 0),
 		Tools: func() []*aitool.Tool {
 			return make([]*aitool.Tool, 0)
 		},
 		userData: omap.NewOrderedMap[string, string](make(map[string]string)),
+		timeline: newMemoryTimeline(10, nil),
 	}
 }
 
@@ -154,51 +156,39 @@ func (m *Memory) GetInteractiveEvent(eventID string) (*InteractiveEventRecord, b
 }
 
 // tool results memory
-func (m *Memory) PushToolCallResults(t ...*aitool.ToolResult) {
-	m.toolCallResults = append(m.toolCallResults, t...)
+func (m *Memory) PushToolCallResults(t *aitool.ToolResult) {
+	m.timeline.PushToolResult(t)
 }
 
-func (m *Memory) Timeline() string {
-	return ""
+func (m *Memory) ToolCallTimeline() string {
+	return m.timeline.Dump()
+}
+
+// timeline limit set
+func (m *Memory) SetTimelineLimit(i int) {
+	m.timeline.setTimelineLimit(i)
+}
+
+func (m *Memory) SetTimelineAICaller(caller AICaller) {
+
 }
 
 func (m *Memory) PromptForToolCallResultsForLastN(n int) string {
-	if len(m.toolCallResults) == 0 {
-		return ""
-	}
-
-	var result = m.toolCallResults
-	if len(result) > n {
-		result = result[len(result)-n:]
-	}
-	templateData := map[string]interface{}{
-		"ToolCallResults": result,
-	}
-	temp, err := template.New("tool-result-history").Parse(__prompt_ToolResultHistoryPromptTemplate)
-	if err != nil {
-		log.Errorf("error parsing tool result history template: %v", err)
-		return ""
-	}
-	var promptBuilder strings.Builder
-	err = temp.Execute(&promptBuilder, templateData)
-	if err != nil {
-		log.Errorf("error executing tool result history template: %v", err)
-		return ""
-	}
-	return promptBuilder.String()
+	return m.timeline.PromptForToolCallResultsForLastN(n)
 }
 
-func (m *Memory) PromptForToolCallResultsForLast5() string {
-	return m.PromptForToolCallResultsForLastN(5)
-}
-
-func (m *Memory) PromptForToolCallResultsForLast10() string {
-	return m.PromptForToolCallResultsForLastN(10)
-}
-
-func (m *Memory) PromptForToolCallResultsForLast20() string {
-	return m.PromptForToolCallResultsForLastN(20)
-}
+//
+//func (m *Memory) PromptForToolCallResultsForLast5() string {
+//	return m.PromptForToolCallResultsForLastN(5)
+//}
+//
+//func (m *Memory) PromptForToolCallResultsForLast10() string {
+//	return m.PromptForToolCallResultsForLastN(10)
+//}
+//
+//func (m *Memory) PromptForToolCallResultsForLast20() string {
+//	return m.PromptForToolCallResultsForLastN(20)
+//}
 
 // memory tools current task info
 func (m *Memory) CurrentTaskInfo() string {

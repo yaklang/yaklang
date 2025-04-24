@@ -8,7 +8,7 @@ import (
 )
 
 func Test_MemoryTools(t *testing.T) {
-	m := NewMemory()
+	m := GetDefaultMemory()
 	tools, err := m.CreateMemoryTools()
 	if err != nil {
 		return
