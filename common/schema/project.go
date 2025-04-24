@@ -12,9 +12,11 @@ import (
 type Project struct {
 	gorm.Model
 
-	ProjectName  string
-	Description  string
-	DatabasePath string
+	ProjectName string
+	Description string
+
+	DatabaseDialect string
+	DatabasePath    string
 
 	IsCurrentProject bool
 	FolderID         int64

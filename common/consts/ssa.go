@@ -2,6 +2,7 @@ package consts
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -47,24 +48,48 @@ func ValidateLanguage(language string) (Language, error) {
 	return "", errors.Errorf("unsupported language: %s", language)
 }
 
+const (
+	CONST_SSA_DATABASE_DIALECT = "SSA_DATABASE_DIALECT"
+	CONST_SSA_DATABASE_RAW     = "SSA_DATABASE_RAW"
+)
+
 var (
-	YAK_SSA_PROJECT_DB_PATH = "default-yakssa.db"
-	ssaDatabase             *gorm.DB
+	SSA_PROJECT_DB_RAW     = "default-yakssa.db"
+	SSA_PROJECT_DB_DIALECT = SQLiteExtend
+	ssaDatabase            *gorm.DB
 )
 
 const (
 	YAK_SSA_PROJECT_DB_DEFAULT = "default-yakssa.db"
+	YAK_SSA_PROJECT_DB_DIALECT = SQLiteExtend
 )
 
-func GetSSADataBasePathDefault(base string) string {
-	if filepath.IsAbs(YAK_SSA_PROJECT_DB_PATH) {
-		return YAK_SSA_PROJECT_DB_PATH
+func GetSSADatabaseInfoFromEnv() (string, string) {
+	raw := os.Getenv(CONST_SSA_DATABASE_RAW)
+	dialect := os.Getenv(CONST_SSA_DATABASE_DIALECT)
+	if raw == "" {
+		raw = SSA_PROJECT_DB_RAW
 	}
-	return filepath.Join(base, YAK_SSA_PROJECT_DB_PATH)
+	if dialect == "" {
+		dialect = SSA_PROJECT_DB_DIALECT
+	}
+	return raw, dialect
 }
 
-func SetGormSSAProjectDatabaseByPath(path string) error {
-	db, err := CreateSSAProjectDatabase(path)
+func GetSSADataBaseInfo() (string, string) {
+	return SSA_PROJECT_DB_RAW, SSA_PROJECT_DB_DIALECT
+}
+
+func SetSSADatabaseInfo(dialect string, raw string) {
+	if raw == "" || dialect == "" {
+		return
+	}
+	SSA_PROJECT_DB_RAW = raw
+	SSA_PROJECT_DB_DIALECT = dialect
+}
+
+func SetGormSSAProjectDatabaseByInfo(dialect string, raw string) error {
+	db, err := CreateSSAProjectDatabase(raw, dialect)
 	if err != nil {
 		return err
 	}
@@ -72,32 +97,24 @@ func SetGormSSAProjectDatabaseByPath(path string) error {
 	return nil
 }
 
-func SetGormSSAProjectDatabaseByDB(db *gorm.DB) {
-	ssaDatabase = db
-}
-
-func SetSSAProjectDatabasePath(path string) {
-	if path == "" {
-		return
-	}
-	YAK_SSA_PROJECT_DB_PATH = path
-}
-
-func CreateSSAProjectDatabase(path string) (*gorm.DB, error) {
-	db, err := createAndConfigDatabase(path, SQLiteExtend)
+func CreateSSAProjectDatabase(path string, dialect string) (*gorm.DB, error) {
+	db, err := createAndConfigDatabase(path, dialect)
 	if err != nil {
 		return nil, err
 	}
 	schema.AutoMigrate(db, schema.KEY_SCHEMA_SSA_DATABASE)
+	configureAndOptimizeDB(db)
 	return db, nil
 }
 
 func GetTempSSADataBase() (*gorm.DB, error) {
 	path := filepath.Join(GetDefaultYakitBaseTempDir(), fmt.Sprintf("temp-yakssa-%s.db", uuid.NewString()))
-	return CreateSSAProjectDatabase(path)
+	return CreateSSAProjectDatabase(path, SQLiteExtend)
 }
 
 func GetGormDefaultSSADataBase() *gorm.DB {
-	initYakitDatabase()
+	if ssaDatabase == nil {
+		initYakitDatabase()
+	}
 	return ssaDatabase
 }

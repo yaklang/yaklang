@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -42,7 +41,6 @@ type config struct {
 	ignoreSyntaxErr bool
 	reCompile       bool
 	strictMode      bool
-	databasePath    string
 
 	// input, code or project path
 	originEditor *memedit.MemEditor
@@ -364,20 +362,6 @@ func WithProgramDescription(desc string) Option {
 	}
 }
 
-func WithDatabasePath(path string) Option {
-	return func(c *config) error {
-		if utils.GetFirstExistedFile(path) == "" {
-			return nil
-		}
-		if absPath, err := filepath.Abs(path); err != nil {
-			log.Errorf("get abs path error: %v", err)
-		} else {
-			c.databasePath = absPath
-		}
-		return nil
-	}
-}
-
 // save to database, please set the program name
 func WithProgramName(name string) Option {
 	return func(c *config) error {
@@ -507,7 +491,6 @@ var Exports = map[string]any{
 	"withExternLib":          WithExternLib,
 	"withExternValue":        WithExternValue,
 	"withProgramName":        WithProgramName,
-	"withDatabasePath":       WithDatabasePath,
 	"withDescription":        WithProgramDescription,
 	"withProcess":            WithProcess,
 	"withEntryFile":          WithFileSystemEntry,

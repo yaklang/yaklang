@@ -1,10 +1,11 @@
 package ssadb
 
 import (
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strconv"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -21,7 +22,7 @@ type IrSource struct {
 	FileName   string `json:"file_name"`
 
 	// file content
-	QuotedCode string `json:"quoted_code" gorm:"type:text"`
+	QuotedCode string `json:"quoted_code" gorm:"type:longtext"`
 	IsBigFile  bool   `json:"is_big_file"` // if set this flag, the source code is too big, QuotedCode contain this file path
 
 }

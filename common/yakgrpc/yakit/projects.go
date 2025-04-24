@@ -81,7 +81,8 @@ func InitializingProjectDatabase() error {
 	defaultProjectPath := consts.GetDefaultYakitProjectDatabase(defaultYakitPath)
 	updateProject(TypeProject, defaultProjectPath)
 	// sast frontend
-	defaultSSAProjectPath := consts.GetSSADataBasePathDefault(defaultYakitPath)
+	dialect, defaultSSAProjectPath := consts.GetSSADataBaseInfo()
+	_ = dialect
 	updateProject(TypeSSAProject, defaultSSAProjectPath)
 
 	return nil
@@ -151,7 +152,7 @@ func CreateProjectFile(name, Type string) (string, error) {
 	case TypeSSAProject:
 		databaseName := fmt.Sprintf("ssa-project-%v-%v.sqlite3.db", projectNameToFileName(name), time.Now().Unix())
 		pathName := filepath.Join(consts.GetDefaultSSAProjectDir(), databaseName)
-		ssaProjectDatabase, err := consts.CreateSSAProjectDatabase(pathName)
+		ssaProjectDatabase, err := consts.CreateSSAProjectDatabase(consts.SSA_PROJECT_DB_DIALECT, pathName)
 		if err != nil {
 			return "", utils.Errorf("create ssa project database failed: %s", err)
 		}
