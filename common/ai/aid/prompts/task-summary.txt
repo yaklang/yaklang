@@ -4,7 +4,7 @@
 
 <summary>
 {{ .Memory.CurrentTaskInfo }}
-{{ .Memory.ToolCallTimeline }}
+{{ .Memory.CurrentTaskToolCallTimeline }}
 </summary>
 
 针对当前最后一个活跃任务进行描述，快速总结，在短总结中描述最关键内容和提示方便后续任务继续。

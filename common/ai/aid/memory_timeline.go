@@ -31,12 +31,44 @@ type memoryTimeline struct {
 	ai               AICaller
 	maxTimelineLimit int
 	fullMemoryCount  int
-	timestamp        []int64
+	idToTs           *omap.OrderedMap[int64, int64]
 	tsToToolResult   *omap.OrderedMap[int64, *aitool.ToolResult]
 	idToToolResult   *omap.OrderedMap[int64, *aitool.ToolResult]
+	summary          *omap.OrderedMap[int64, *linktable.LinkTable[*summary]]
+	reducers         *omap.OrderedMap[int64, *linktable.LinkTable[string]]
+}
 
-	summary  *omap.OrderedMap[int64, *linktable.LinkTable[*summary]]
-	reducers *omap.OrderedMap[int64, *linktable.LinkTable[string]]
+func (m *memoryTimeline) CreateSubTimeline(ids ...int64) *memoryTimeline {
+	tl := newMemoryTimeline(m.fullMemoryCount, m.ai)
+	if m.memory != nil {
+		tl.memory = m.memory
+	}
+	if m.config != nil {
+		tl.config = m.config
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	for _, id := range ids {
+		ts, ok := m.idToTs.Get(id)
+		if !ok {
+			continue
+		}
+		tl.idToTs.Set(id, ts)
+		if ret, ok := m.idToToolResult.Get(id); ok {
+			tl.idToToolResult.Set(id, ret)
+		}
+		if ret, ok := m.tsToToolResult.Get(ts); ok {
+			tl.tsToToolResult.Set(ts, ret)
+		}
+		if ret, ok := m.summary.Get(id); ok {
+			tl.summary.Set(id, ret)
+		}
+		if ret, ok := m.reducers.Get(id); ok {
+			tl.reducers.Set(id, ret)
+		}
+	}
+	return tl
 }
 
 func (m *memoryTimeline) BindConfig(config *Config) {
@@ -51,12 +83,11 @@ func newMemoryTimeline(clearCount int, ai AICaller) *memoryTimeline {
 		ai:               ai,
 		fullMemoryCount:  clearCount,
 		maxTimelineLimit: 3 * clearCount,
-		timestamp:        []int64{},
 		tsToToolResult:   omap.NewOrderedMap(map[int64]*aitool.ToolResult{}),
 		idToToolResult:   omap.NewOrderedMap(map[int64]*aitool.ToolResult{}),
-
-		summary:  omap.NewOrderedMap(map[int64]*linktable.LinkTable[*summary]{}),
-		reducers: omap.NewOrderedMap(map[int64]*linktable.LinkTable[string]{}),
+		idToTs:           omap.NewOrderedMap(map[int64]int64{}),
+		summary:          omap.NewOrderedMap(map[int64]*linktable.LinkTable[*summary]{}),
+		reducers:         omap.NewOrderedMap(map[int64]*linktable.LinkTable[string]{}),
 	}
 }
 
@@ -75,9 +106,9 @@ func (m *memoryTimeline) PushToolResult(toolResult *aitool.ToolResult) {
 		time.Sleep(time.Millisecond * 100)
 		ts = time.Now().UnixMilli()
 	}
+	m.idToTs.Set(toolResult.GetID(), ts)
 	m.tsToToolResult.Set(ts, toolResult)
 	m.idToToolResult.Set(toolResult.GetID(), toolResult)
-	m.timestamp = append(m.timestamp, ts)
 	total := m.idToToolResult.Len()
 	summaryCount := m.summary.Len()
 	if total-summaryCount > m.fullMemoryCount {

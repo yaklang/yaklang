@@ -164,6 +164,14 @@ func (m *Memory) ToolCallTimeline() string {
 	return m.timeline.Dump()
 }
 
+func (m *Memory) CurrentTaskToolCallTimeline() string {
+	if m.CurrentTask == nil {
+		return m.ToolCallTimeline()
+	}
+	stl := m.timeline.CreateSubTimeline(m.CurrentTask.toolCallResultIds.Keys()...)
+	return stl.Dump()
+}
+
 // timeline limit set
 func (m *Memory) SetTimelineLimit(i int) {
 	m.timeline.setTimelineLimit(i)
@@ -244,5 +252,5 @@ func (m *Memory) ToolsList() string {
 }
 
 func (m *Memory) CurrentTaskToolCallResults() []*aitool.ToolResult {
-	return m.CurrentTask.ToolCallResults
+	return m.CurrentTask.toolCallResultIds.Values()
 }
