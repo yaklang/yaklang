@@ -1,7 +1,7 @@
 package ast
 
 import (
-	"maps"
+	"golang.org/x/exp/maps"
 	"slices"
 	"strings"
 
@@ -120,7 +120,7 @@ func (c *DiagnosticsCollection) GetDiagnosticsForFile(fileName string) []*Diagno
 }
 
 func (c *DiagnosticsCollection) GetDiagnostics() []*Diagnostic {
-	fileNames := slices.Collect(maps.Keys(c.fileDiagnostics))
+	fileNames := maps.Keys(c.fileDiagnostics)
 	slices.Sort(fileNames)
 	diagnostics := slices.Clip(c.nonFileDiagnostics)
 	for _, fileName := range fileNames {

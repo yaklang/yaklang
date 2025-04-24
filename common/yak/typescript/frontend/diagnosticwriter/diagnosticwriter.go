@@ -2,9 +2,9 @@ package diagnosticwriter
 
 import (
 	"fmt"
+	"golang.org/x/exp/maps"
 	"io"
-	"maps"
-	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"unicode"
@@ -305,8 +305,9 @@ func getErrorSummary(diags []*ast.Diagnostic) *ErrorSummary {
 
 	// !!!
 	// Need an ordered map here, but sorting for consistency.
-	sortedFileList := slices.SortedFunc(maps.Keys(errorsByFiles), func(a, b *ast.SourceFile) int {
-		return strings.Compare(a.FileName(), b.FileName())
+	sortedFileList := maps.Keys(errorsByFiles)
+	sort.Slice(sortedFileList, func(i, j int) bool {
+		return strings.Compare(sortedFileList[i].FileName(), sortedFileList[j].FileName()) < 0
 	})
 
 	return &ErrorSummary{
