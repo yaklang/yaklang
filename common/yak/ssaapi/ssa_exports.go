@@ -92,6 +92,7 @@ func defaultConfig(opts ...Option) (*config, error) {
 		externValue:                make(map[string]any),
 		defineFunc:                 make(map[string]any),
 		DatabaseProgramCacheHitter: func(any) {},
+		ctx:                        context.Background(),
 		excludeFile: func(path, filename string) bool {
 			return false
 		},
