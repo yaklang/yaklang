@@ -3,8 +3,6 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
-	"time"
-
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -12,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"time"
 )
 
 type aiChatType func(string, ...aispec.AIConfigOption) (string, error)
@@ -40,6 +39,9 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 
 	var opts = []aid.Option{
 		aid.WithEventHandler(func(e *aid.Event) {
+			if e.Timestamp <= 0 {
+				e.Timestamp = time.Now().UnixNano() // fallback
+			}
 			event := &ypb.AIOutputEvent{
 				CoordinatorId: e.CoordinatorId,
 				Type:          string(e.Type),
@@ -50,7 +52,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 				StreamDelta:   e.StreamDelta,
 				IsJson:        e.IsJson,
 				Content:       e.Content,
-				Timestamp:     time.Now().UnixNano(),
+				Timestamp:     e.Timestamp,
 			}
 			err := stream.Send(event)
 			if err != nil {
