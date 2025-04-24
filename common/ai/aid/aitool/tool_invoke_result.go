@@ -1,18 +1,52 @@
 package aitool
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"strconv"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // ToolResult 表示工具调用的结果
 type ToolResult struct {
+	ID          string `json:"ksuid"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Param       any    `json:"param"`
 	Success     bool   `json:"success"`
 	Data        any    `json:"data,omitempty"`
 	Error       string `json:"error,omitempty"`
+}
+
+func (t *ToolResult) String() string {
+	buf := bytes.NewBuffer(nil)
+	if t.ID != "" {
+		buf.WriteString(fmt.Sprintf("id: %v; ", t.ID))
+	}
+	buf.WriteString(fmt.Sprintf("tool_name: %#v\n", t.Name))
+	buf.WriteString(fmt.Sprintf("param: %s\n", utils.Jsonify(t.Param)))
+	buf.WriteString(fmt.Sprintf("data: %s\n", utils.Jsonify(t.Data)))
+	if t.Error != "" {
+		buf.WriteString(fmt.Sprintf("err: %s\n", t.Error))
+	}
+	return buf.String()
+}
+
+func (t *ToolResult) StringWithoutID() string {
+	buf := bytes.NewBuffer(nil)
+	buf.WriteString(fmt.Sprintf("tool_name: %#v\n", t.Name))
+	buf.WriteString(fmt.Sprintf("param: %s\n", utils.Jsonify(t.Param)))
+	buf.WriteString(fmt.Sprintf("data: %s\n", utils.Jsonify(t.Data)))
+	if t.Error != "" {
+		buf.WriteString(fmt.Sprintf("err: %s\n", t.Error))
+	}
+	return buf.String()
+}
+
+func (t *ToolResult) GetID() string {
+	return t.ID
 }
 
 func (t *ToolResult) QuoteName() string {

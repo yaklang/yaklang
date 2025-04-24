@@ -20,6 +20,7 @@ const (
 
 	EVENT_TYPE_CONSUMPTION EventType = "consumption" // token consumption include `{"input_"}`
 	EVENT_TYPE_PONG        EventType = "pong"        // ping response ping-pong is a check for alive item
+	EVENT_TYPE_PRESSURE    EventType = "pressure"    // pressure for ai context percent
 
 	EVENT_TYPE_PLAN                    EventType = "plan"
 	EVENT_TYPE_SELECT                  EventType = "select"

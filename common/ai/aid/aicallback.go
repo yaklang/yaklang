@@ -96,6 +96,13 @@ func (c *Config) NewAIResponse() *AIResponse {
 	}
 }
 
+func newUnboundAIResponse() *AIResponse {
+	return &AIResponse{
+		ch:                  chanx.NewUnlimitedChan[*OutputStream](context.TODO(), 2),
+		consumptionCallback: func(current int) {},
+	}
+}
+
 func (r *AIResponse) EmitOutputStream(reader io.Reader) {
 	r.ch.SafeFeed(&OutputStream{
 		out: CreateConsumptionReader(reader, r.consumptionCallback),
