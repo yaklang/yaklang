@@ -10,8 +10,8 @@ import (
 // ToolExecutionResult 表示工具执行的完整结果
 type ToolExecutionResult struct {
 	Stdout string      `json:"stdout"`
-	Stderr string      `json:"stderr"`
-	Result interface{} `json:"result"`
+	Stderr string      `json:"stderr,omitempty"`
+	Result interface{} `json:"result,omitempty"`
 }
 
 // ToJSON 将执行结果转换为JSON字符串

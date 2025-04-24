@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/segmentio/ksuid"
 	"io"
 	"text/template"
 
@@ -215,6 +216,7 @@ TOOLREQUIRED:
 			t.config.EmitError("error calling tool: %v", err)
 			return err
 		}
+		result.ID = ksuid.New().String()
 		t.PushToolCallResult(result)
 
 		action, err := t.toolResultDecision(result, targetTool)
