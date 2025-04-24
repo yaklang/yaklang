@@ -404,6 +404,10 @@ func GetSSARisk(t *testing.T, local ypb.YakClient, url *ypb.YakURL) map[string]d
 	require.NoError(t, err)
 	got := make(map[string]data)
 	for _, resource := range res.GetResources() {
+		// check got exist this path
+		if _, ok := got[resource.Path]; ok {
+			require.Fail(t, "resource path same  %v", res.GetResources())
+		}
 		var count, filterCount int
 		log.Infof("resource: %v", resource)
 		for _, extra := range resource.Extra {
