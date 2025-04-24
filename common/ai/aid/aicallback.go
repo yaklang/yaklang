@@ -35,6 +35,25 @@ func (a *AIResponse) Debug(i ...bool) {
 	a.enableDebug = i[0]
 }
 
+func (a *AIResponse) GetUnboundStreamReader(haveReason bool) io.Reader {
+	pr, pw := utils.NewBufPipe(nil)
+	go func() {
+		defer pw.Close()
+		for i := range a.ch.Out {
+			if i == nil {
+				continue
+			}
+
+			if haveReason && !i.IsReason {
+				continue
+			}
+			targetStream := i.out
+			io.Copy(pw, targetStream)
+		}
+	}()
+	return pr
+}
+
 func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, config *Config) io.Reader {
 	pr, pw := utils.NewBufPipe(nil)
 	go func() {

@@ -7,6 +7,7 @@ import (
 
 const DefaultTimeFormat = "2006_01_02-15_04_05"
 const DefaultTimeFormat2 = "20060102_15_04_05"
+const DefaultTimeFormat3 = "2006/01/02 15:04:05"
 const DefaultDateFormat = "2006-01-02"
 
 func TimestampNano() int64 {

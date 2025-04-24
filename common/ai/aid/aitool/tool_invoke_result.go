@@ -11,7 +11,7 @@ import (
 
 // ToolResult 表示工具调用的结果
 type ToolResult struct {
-	ID          string `json:"ksuid"`
+	ID          int64  `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Param       any    `json:"param"`
@@ -22,7 +22,7 @@ type ToolResult struct {
 
 func (t *ToolResult) String() string {
 	buf := bytes.NewBuffer(nil)
-	if t.ID != "" {
+	if t.ID > 0 {
 		buf.WriteString(fmt.Sprintf("id: %v; ", t.ID))
 	}
 	buf.WriteString(fmt.Sprintf("tool_name: %#v\n", t.Name))
@@ -45,7 +45,7 @@ func (t *ToolResult) StringWithoutID() string {
 	return buf.String()
 }
 
-func (t *ToolResult) GetID() string {
+func (t *ToolResult) GetID() int64 {
 	return t.ID
 }
 
