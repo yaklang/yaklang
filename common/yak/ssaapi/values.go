@@ -707,8 +707,12 @@ func (v *Value) GetObject() *Value {
 	if v.IsNil() || v.innerValue == nil {
 		return nil
 	}
+	obj := v.innerValue.GetObject()
+	if obj == nil {
+		return nil
+	}
 
-	return v.NewValue(v.innerValue.GetObject())
+	return v.NewValue(obj)
 }
 
 // GetKey get key of member

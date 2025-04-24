@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"runtime"
 	"sort"
 	"time"
 
@@ -187,7 +188,9 @@ func (v *Value) NewValue(value ssa.Instruction) *Value {
 
 func (p *Program) NewValue(inst ssa.Instruction) (*Value, error) {
 	if utils.IsNil(inst) {
-		return nil, utils.Errorf("instruction is nil")
+		var raw = make([]byte, 2048)
+		runtime.Stack(raw, false)
+		return nil, utils.Errorf("instruction is nil: %s", string(raw))
 	}
 	v := &Value{
 		runtimeCtx:    omap.NewEmptyOrderedMap[ContextID, *Value](),
