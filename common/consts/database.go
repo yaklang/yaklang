@@ -3,7 +3,6 @@ package consts
 import (
 	"database/sql"
 	"fmt"
-	"github.com/google/uuid"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -11,6 +10,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/jinzhu/gorm"
 	"github.com/mattn/go-sqlite3"
@@ -22,6 +23,7 @@ import (
 
 const (
 	SQLiteExtend = "sqlite3_extended"
+	MySQL        = "mysql"
 	SQLite       = "sqlite3"
 
 	DEFAULT_DRIVER = SQLite
@@ -94,6 +96,35 @@ func createAndConfigDatabase(path string, drivers ...string) (*gorm.DB, error) {
 		driver = drivers[0]
 	}
 
+	err := checkAndTryFixDatabase(path)
+	if err != nil {
+		return nil, err
+	}
+	db, err := gorm.Open(driver, fmt.Sprintf("%s?cache=shared&mode=rwc", path))
+	if err != nil {
+		return nil, err
+	}
+	configureAndOptimizeDB(db)
+	return db, nil
+}
+
+func configureAndOptimizeDB(db *gorm.DB) {
+	// reference: https://stackoverflow.com/questions/35804884/sqlite-concurrent-writing-performance
+	db.DB().SetConnMaxLifetime(time.Hour)
+	db.DB().SetMaxIdleConns(10)
+	// set MaxOpenConns to disable connections pool, for write speed and "database is locked" error
+	db.DB().SetMaxOpenConns(1)
+
+	db.Exec("PRAGMA synchronous = OFF;")
+	// db.Exec("PRAGMA locking_mode = EXCLUSIVE;")
+	// set journal_mode for write speed
+	db.Exec("PRAGMA journal_mode = WAL;")
+	db.Exec("PRAGMA temp_store = MEMORY;")
+	db.Exec("PRAGMA cache_size = 8000;")
+	db.Exec("PRAGMA busy_timeout = 10000;")
+}
+
+func checkAndTryFixDatabase(path string) error {
 	baseDir := filepath.Dir(path)
 	if exist, err := utils.PathExists(baseDir); err != nil {
 		log.Errorf("check dir[%v] if exist failed: %s", baseDir, err)
@@ -127,30 +158,9 @@ func createAndConfigDatabase(path string, drivers ...string) (*gorm.DB, error) {
 			}
 		}
 	}
-	db, err := gorm.Open(driver, fmt.Sprintf("%s?cache=shared&mode=rwc", path))
-	if err != nil {
-		return nil, err
-	}
-	configureAndOptimizeDB(db)
-	err = os.Chmod(path, 0o666)
+	err := os.Chmod(path, 0o666)
 	if err != nil {
 		log.Errorf("chmod +rw failed: %s", err)
 	}
-	return db, nil
-}
-
-func configureAndOptimizeDB(db *gorm.DB) {
-	// reference: https://stackoverflow.com/questions/35804884/sqlite-concurrent-writing-performance
-	db.DB().SetConnMaxLifetime(time.Hour)
-	db.DB().SetMaxIdleConns(10)
-	// set MaxOpenConns to disable connections pool, for write speed and "database is locked" error
-	db.DB().SetMaxOpenConns(1)
-
-	db.Exec("PRAGMA synchronous = OFF;")
-	// db.Exec("PRAGMA locking_mode = EXCLUSIVE;")
-	// set journal_mode for write speed
-	db.Exec("PRAGMA journal_mode = WAL;")
-	db.Exec("PRAGMA temp_store = MEMORY;")
-	db.Exec("PRAGMA cache_size = 8000;")
-	db.Exec("PRAGMA busy_timeout = 10000;")
+	return nil
 }

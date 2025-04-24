@@ -93,8 +93,9 @@ func (s *Server) SetCurrentProject(ctx context.Context, req *ypb.SetCurrentProje
 		consts.SetDefaultYakitProjectDatabaseName(path)
 		consts.SetGormProjectDatabase(path)
 	case yakit.TypeSSAProject:
-		consts.SetSSAProjectDatabasePath(path)
-		consts.SetGormSSAProjectDatabaseByPath(path)
+		raw := proj.DatabasePath
+		consts.SetSSADatabaseInfo(raw)
+		consts.SetGormSSAProjectDatabaseByInfo(raw)
 	}
 	return &ypb.Empty{}, nil
 }

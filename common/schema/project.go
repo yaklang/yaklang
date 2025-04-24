@@ -12,8 +12,9 @@ import (
 type Project struct {
 	gorm.Model
 
-	ProjectName  string
-	Description  string
+	ProjectName string
+	Description string
+
 	DatabasePath string
 
 	IsCurrentProject bool
