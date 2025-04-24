@@ -5,7 +5,7 @@
 
 ## 任务状态与进度
 {{ .Memory.CurrentTaskInfo }}
-{{ .Memory.PromptForToolCallResultsForLast20 }}
+{{ .Memory.ToolCallTimeline }}
 
 {{ if .Memory.PersistentMemory }}# 牢记
 {{ .Memory.PersistentMemory}}

@@ -12,7 +12,7 @@
 ## 当前规划
 {{ .Memory.CurrentTaskInfo }}
 
-{{ .Memory.PromptForToolCallResultsForLast20 }}
+{{ .Memory.ToolCallTimeline }}
 
 ## 当前任务被用户反馈为 **无法完成** 需要重新规划{{ if .UserInput }}，用户额外反馈为：{{ .UserInput }}
 {{end}}
