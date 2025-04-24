@@ -10,6 +10,6 @@
 
 # 工具调用信息
 
-<toolcallcontext>
+<tool-call-timeline>
 {{ .Memory.ToolCallTimeline }}
-</toolcallcontext>
+</tool-call-timeline>

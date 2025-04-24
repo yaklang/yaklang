@@ -90,7 +90,7 @@ func (t *aiTask) generateToolCallResponsePrompt(result *aitool.ToolResult, targe
 
 func (t *aiTask) generateToolCallResultsPrompt() (string, error) {
 	templatedata := map[string]interface{}{
-		"ToolCallResults": t.ToolCallResults,
+		"ToolCallResults": t.toolCallResultIds.Values(),
 	}
 	temp, err := template.New("tool-result-history").Parse(__prompt_ToolResultHistoryPromptTemplate)
 	if err != nil {
