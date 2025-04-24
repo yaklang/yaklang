@@ -69,6 +69,7 @@ type Config struct {
 	// memory
 	persistentMemory []string
 	memory           *Memory
+	timeLineLimit    int
 
 	// stream waitgroup
 	streamWaitGroup *sync.WaitGroup
@@ -91,6 +92,8 @@ type Config struct {
 
 	inputConsumption  *int64
 	outputConsumption *int64
+
+	aiCallTokenLimit int64
 
 	resultHandler func(*Config)
 }
@@ -148,7 +151,17 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 		if c.debugPrompt {
 			log.Infof(strings.Repeat("=", 20)+"AIRequest"+strings.Repeat("=", 20)+"\n%v\n", request.GetPrompt())
 		}
-		c.inputConsumptionCallback(estimateTokens([]byte(request.GetPrompt())))
+		tokenSize := estimateTokens([]byte(request.GetPrompt()))
+		if int64(tokenSize) > c.aiCallTokenLimit {
+			go func() {
+				c.emitJson(EVENT_TYPE_PRESSURE, "system", map[string]any{
+					"message":          "token size is too large",
+					"tokenSize":        tokenSize,
+					"aiCallTokenLimit": c.aiCallTokenLimit,
+				})
+			}()
+		}
+		c.inputConsumptionCallback(tokenSize)
 		resp, err := i(config, request)
 		if c.debugPrompt {
 			resp.Debug(true)
@@ -200,7 +213,7 @@ func initDefaultTools(c *Config) error { // set config default tools
 
 func newConfig(ctx context.Context) *Config {
 	id := uuid.New()
-	m := NewMemory()
+	m := GetDefaultMemory()
 
 	var idGenerator = new(int64)
 	atomic.AddInt64(idGenerator, rand.Int64N(2000))
@@ -558,6 +571,15 @@ func WithAppendPersistentMemory(i ...string) Option {
 		defer config.m.Unlock()
 		config.persistentMemory = append(config.persistentMemory, i...)
 		config.memory.StoreAppendPersistentInfo(i...)
+		return nil
+	}
+}
+
+func WithTimeLineLimit(i int) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.timeLineLimit = i
 		return nil
 	}
 }

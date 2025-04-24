@@ -11,5 +11,5 @@
 # 工具调用信息
 
 <toolcallcontext>
-{{ .Memory.PromptForToolCallResultsForLast20 }}
+{{ .Memory.ToolCallTimeline }}
 </toolcallcontext>

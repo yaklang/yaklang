@@ -12,7 +12,7 @@
 # 任务状态
 {{ .Memory.CurrentTaskInfo }}
 
-{{ .Memory.PromptForToolCallResultsForLast20 }}
+{{ .Memory.ToolCallTimeline }}
 
 # 注意
 

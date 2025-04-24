@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"io"
+	"strings"
 	"sync"
 	"text/template"
 	"time"
@@ -17,6 +18,12 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
+type summary struct {
+	// summary of the tool call result
+	summaryContent string
+	meaningless    bool
+}
+
 type memoryTimeline struct {
 	memory *Memory
 	config *Config
@@ -24,17 +31,19 @@ type memoryTimeline struct {
 	ai               AICaller
 	maxTimelineLimit int
 	fullMemoryCount  int
-	Timestamp        []int64
+	timestamp        []int64
 	tsToToolResult   *omap.OrderedMap[int64, *aitool.ToolResult]
 	idToToolResult   *omap.OrderedMap[int64, *aitool.ToolResult]
 
-	summary  *omap.OrderedMap[int64, *linktable.LinkTable[string]]
+	summary  *omap.OrderedMap[int64, *linktable.LinkTable[*summary]]
 	reducers *omap.OrderedMap[int64, *linktable.LinkTable[string]]
 }
 
 func (m *memoryTimeline) BindConfig(config *Config) {
 	m.config = config
 	m.memory = config.memory
+	m.setTimelineLimit(config.timeLineLimit)
+	m.setAICaller(config)
 }
 
 func newMemoryTimeline(clearCount int, ai AICaller) *memoryTimeline {
@@ -42,13 +51,22 @@ func newMemoryTimeline(clearCount int, ai AICaller) *memoryTimeline {
 		ai:               ai,
 		fullMemoryCount:  clearCount,
 		maxTimelineLimit: 3 * clearCount,
-		Timestamp:        []int64{},
+		timestamp:        []int64{},
 		tsToToolResult:   omap.NewOrderedMap(map[int64]*aitool.ToolResult{}),
 		idToToolResult:   omap.NewOrderedMap(map[int64]*aitool.ToolResult{}),
 
-		summary:  omap.NewOrderedMap(map[int64]*linktable.LinkTable[string]{}),
+		summary:  omap.NewOrderedMap(map[int64]*linktable.LinkTable[*summary]{}),
 		reducers: omap.NewOrderedMap(map[int64]*linktable.LinkTable[string]{}),
 	}
+}
+
+func (m *memoryTimeline) setTimelineLimit(clearCount int) {
+	m.fullMemoryCount = clearCount
+	m.maxTimelineLimit = 3 * clearCount
+}
+
+func (m *memoryTimeline) setAICaller(ai AICaller) {
+	m.ai = ai
 }
 
 func (m *memoryTimeline) PushToolResult(toolResult *aitool.ToolResult) {
@@ -59,7 +77,7 @@ func (m *memoryTimeline) PushToolResult(toolResult *aitool.ToolResult) {
 	}
 	m.tsToToolResult.Set(ts, toolResult)
 	m.idToToolResult.Set(toolResult.GetID(), toolResult)
-	m.Timestamp = append(m.Timestamp, ts)
+	m.timestamp = append(m.timestamp, ts)
 	total := m.idToToolResult.Len()
 	summaryCount := m.summary.Len()
 	if total-summaryCount > m.fullMemoryCount {
@@ -148,12 +166,21 @@ func (m *memoryTimeline) shrink(result *aitool.ToolResult) {
 		return
 	}
 	pers := action.GetString("persistent")
-	if pers != "" {
-		if lt, ok := m.summary.Get(result.GetID()); ok {
-			lt.Push(pers)
-		} else {
-			m.summary.Set(result.GetID(), linktable.NewUnlimitedStringLinkTable(pers))
+	if pers == "" {
+		s, ok := m.summary.Get(result.GetID())
+		if ok {
+			pers = s.Value().summaryContent
 		}
+	}
+
+	s := &summary{
+		summaryContent: pers,
+		meaningless:    action.GetBool("should_drop"),
+	}
+	if lt, ok := m.summary.Get(result.GetID()); ok {
+		lt.Push(s)
+	} else {
+		m.summary.Set(result.GetID(), linktable.NewUnlimitedLinkTable(s))
 	}
 }
 
@@ -244,8 +271,8 @@ func (m *memoryTimeline) DumpBefore(id int64) string {
 
 		if shrinkStartId > 0 && value.GetID() <= shrinkStartId {
 			val, ok := m.summary.Get(shrinkStartId)
-			if ok {
-				buf.WriteString(fmt.Sprintf("├─[%s] id: %v memory: %v\n", timeStr, value.GetID(), val.Value()))
+			if ok && !val.Value().meaningless {
+				buf.WriteString(fmt.Sprintf("├─[%s] id: %v memory: %v\n", timeStr, value.GetID(), val.Value().summaryContent))
 			}
 			return true
 		}
@@ -263,4 +290,30 @@ func (m *memoryTimeline) DumpBefore(id int64) string {
 
 	buf.WriteString("no timeline\n")
 	return buf.String()
+}
+
+func (m *memoryTimeline) PromptForToolCallResultsForLastN(n int) string {
+	if m.idToToolResult.Len() == 0 {
+		return ""
+	}
+
+	var result = m.idToToolResult.Values()
+	if len(result) > n {
+		result = result[len(result)-n:]
+	}
+	templateData := map[string]interface{}{
+		"ToolCallResults": result,
+	}
+	temp, err := template.New("tool-result-history").Parse(__prompt_ToolResultHistoryPromptTemplate)
+	if err != nil {
+		log.Errorf("error parsing tool result history template: %v", err)
+		return ""
+	}
+	var promptBuilder strings.Builder
+	err = temp.Execute(&promptBuilder, templateData)
+	if err != nil {
+		log.Errorf("error executing tool result history template: %v", err)
+		return ""
+	}
+	return promptBuilder.String()
 }
