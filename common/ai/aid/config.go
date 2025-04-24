@@ -403,43 +403,6 @@ func WithTools(tool ...*aitool.Tool) Option {
 		return nil
 	}
 }
-func WithSimpleAICallback(cb SimpleAiCallbackType) Option {
-	return func(config *Config) error {
-		config.m.Lock()
-		defer config.m.Unlock()
-		commonAiCallback := func(config *Config, req *AIRequest) (*AIResponse, error) {
-			rsp := config.NewAIResponse()
-			reader, err := cb(req.GetPrompt())
-			if err != nil {
-				return nil, err
-			}
-			pr, pw := utils.NewBufPipe(nil)
-			go func() {
-				defer func() {
-					pw.Close()
-					pr.Close()
-					rsp.Close()
-				}()
-				io.Copy(pw, reader)
-			}()
-			rsp.EmitOutputStream(pr)
-
-			return rsp, nil
-		}
-		warpedCb := config.wrapper(commonAiCallback)
-		config.toolAICallback = func(msg string) (io.Reader, error) {
-			rsp, err := warpedCb(config, NewAIRequest(msg))
-			if err != nil {
-				return nil, err
-			}
-			return rsp.GetOutputStreamReader("tool", false, config), nil
-		}
-		config.coordinatorAICallback = warpedCb
-		config.taskAICallback = warpedCb
-		config.planAICallback = warpedCb
-		return nil
-	}
-}
 
 func WithAICallback(cb AICallbackType) Option {
 	return func(config *Config) error {

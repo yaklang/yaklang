@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -18,8 +19,8 @@ func init() {
  {{ .Forge.UserParams }}
 `),
 			aiforge.WithPersistentPrompt("处理任务的时候，注意深度，使用工具如果失败，无法达到你的目的，需要及时调整工具参数。"),
-			// aiforge.WithTools(yakscripttools.GetYakScriptAiTools("encode", "decode")...),
-			aiforge.WithToolKeywords([]string{"encode", "decode", "encoding", "decoding", "编码", "解码"}),
+			aiforge.WithTools(yakscripttools.GetYakScriptAiTools("encode", "decode")...),
+			// aiforge.WithToolKeywords([]string{"encode", "decode", "encoding", "decoding", "编码", "解码"}),
 		).CreateCoordinator(ctx, items, option...)
 		if err != nil {
 			return nil, err
@@ -36,7 +37,7 @@ func TestCodecTest1(t *testing.T) {
 			{Key: "query", Value: "帮我解答一个CTF题目，题目类型是加解密，附件内容是：RzRaVE1PQldHVTNFR05TREdaQ0RNTUpYR1EzREtOWlRHNUJETU1SVEdRWkRJTVpUR0kyREtSUlRHRVpUTU5LR0dNWlRHTVJWSVlaVE1NWlVHNUNBPT09PQ=="},
 		},
 		aid.WithYOLO(),
-		aid.WithAICallback(aiforge.GetOpenRouterAICallback()),
+		aid.WithAICallback(aiforge.GetOpenRouterAICallbackWithProxy()),
 		aid.WithDebugPrompt(true),
 	)
 }
