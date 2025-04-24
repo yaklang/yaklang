@@ -2,7 +2,6 @@ package aibp
 
 import (
 	"context"
-	"io"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai"
@@ -19,9 +18,7 @@ func TestSQLInject(t *testing.T) {
 	mockServer := tool_mocker.NewAiToolMockServer(aispec.WithDebugStream(true))
 	aiforge.ExecuteForge("sqlinject", context.Background(), []*ypb.ExecParamItem{
 		{Key: "target", Value: "http://www.example.com?a=1"},
-	}, aid.WithSimpleAICallback(func(msg string) (io.Reader, error) {
-		return ai.ChatStream(msg)
-	}), aid.WithDebugPrompt(true),
+	}, aid.WithAICallback(aid.AIChatToAICallbackType(ai.Chat)), aid.WithDebugPrompt(true),
 		aid.WithYOLO(),
 		aid.WithToolManager(mockServer.GetToolManager()))
 }
