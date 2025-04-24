@@ -604,6 +604,14 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		pluginCtx := httpctx.GetPluginContext(req)
 		urlStr := httpctx.GetRequestURL(req)
 
+		var taskInfo *ypb.SingleManualHijackInfoMessage
+		task, ok := hijackManger.getTask(httpctx.GetRequestMITMTaskID(req))
+		if task != nil || !ok {
+			taskInfo = task.infoMessage
+			defer hijackManger.unRegister(task.taskID)
+			defer hijackListFeedback(Hijack_List_Delete, taskInfo)
+		}
+
 		defer func() {
 			if err := recover(); err != nil {
 				log.Errorf("hijack response error: %s", err)
@@ -677,30 +685,26 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			rsp = httpctx.GetHijackedResponseBytes(req)
 		}
 
-		task, ok := hijackManger.getTask(httpctx.GetRequestMITMTaskID(req))
-		if !ok || task == nil {
-			httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_AutoFoward, true)
-			/*
-				自动过滤下，不是所有 response 都应该替换
-				应该替换的条件是不匹配过滤器的内容
-			*/
+		httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_AutoFoward, true)
+		/*
+			自动过滤下，不是所有 response 都应该替换
+			应该替换的条件是不匹配过滤器的内容
+		*/
 
-			// 处理响应规则
-			if replacer.haveHijackingRules() {
-				rules, rspHooked, dropped := replacer.hook(false, true, httpctx.GetRequestURL(req), rsp)
-				if dropped {
-					httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
-					log.Warn("response should be dropped(VIA replacer.hook)")
-					return nil
-				}
-				httpctx.AppendMatchedRule(req, rules...)
-				if handleResponseModified(rspHooked) {
-					httpctx.SetResponseModified(req, "yakit.rule.hook")
-					httpctx.SetHijackedResponseBytes(req, rspHooked)
-				}
-				return rspHooked
+		// 处理响应规则
+		if replacer.haveHijackingRules() {
+			rules, rspHooked, dropped := replacer.hook(false, true, httpctx.GetRequestURL(req), rsp)
+			if dropped {
+				httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
+				log.Warn("response should be dropped(VIA replacer.hook)")
+				return nil
 			}
-			return rsp
+			httpctx.AppendMatchedRule(req, rules...)
+			if handleResponseModified(rspHooked) {
+				httpctx.SetResponseModified(req, "yakit.rule.hook")
+				httpctx.SetHijackedResponseBytes(req, rspHooked)
+			}
+			return rspHooked
 		}
 
 		// 非自动转发的情况下处理替换器
@@ -726,25 +730,20 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			return originRspRaw
 		}
 
+		if taskInfo == nil || task == nil { // task not registered ,or deleted, should not hijack
+			return originRspRaw
+		}
+
 		var traceInfo *lowhttp.LowhttpTraceInfo
 		if i, ok := httpctx.GetResponseTraceInfo(req).(*lowhttp.LowhttpTraceInfo); ok {
 			traceInfo = i
 		}
-
-		taskInfo := task.infoMessage
-
-		// todo :  maybe convert http response?
-		//if lowhttp.IsMultipartFormDataRequest(rsp) || !utf8.Valid(rsp) {
-		//	taskInfo.Response = lowhttp.ConvertHTTPRequestToFuzzTag(rsp)
-		//}
 
 		taskInfo.Status = Hijack_Status_Response
 		taskInfo.Response = rsp
 		taskInfo.TraceInfo = model.ToLowhttpTraceInfoGRPCModel(traceInfo)
 		httpctx.SetResponseViewedByUser(req)
 
-		defer hijackManger.unRegister(task.taskID)
-		defer hijackListFeedback(Hijack_List_Delete, taskInfo)
 		for {
 			hijackListFeedback(Hijack_List_Update, taskInfo)
 			select {
