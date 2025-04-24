@@ -32,7 +32,6 @@ type saveValueCtx struct {
 	entryValue *Value
 
 	visitedNode map[*Value]*ssadb.AuditNode
-	dtype       Dtype
 }
 
 type SaveValueOption func(c *saveValueCtx)
@@ -100,7 +99,6 @@ func SaveValue(value *Value, opts ...SaveValueOption) error {
 		db:          db,
 		entryValue:  value,
 		visitedNode: make(map[*Value]*ssadb.AuditNode),
-		dtype:       DT_None,
 	}
 	for _, o := range opts {
 		o(ctx)
@@ -124,14 +122,6 @@ func (s *saveValueCtx) SaveNode(value *Value) (*ssadb.AuditNode, error) {
 	}
 	if value == nil {
 		return nil, utils.Error("value is nil")
-	}
-
-	if s.dtype == DT_None {
-		if value.GetDependOn() != nil {
-			s.dtype = DT_DependOn
-		} else if value.GetEffectOn() != nil {
-			s.dtype = DT_EffectOn
-		}
 	}
 
 	an := &ssadb.AuditNode{
@@ -173,9 +163,10 @@ func (s *saveValueCtx) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
 		if pred.Node == nil {
 			continue
 		}
-		if IsDataFlowLabel(pred.Info.Label) {
+		label := pred.Info.Label
+		if IsDataFlowLabel(label) {
 			var neighbor *graph.Neighbor[*Value]
-			if s.saveDataFlow(pred.Node, value) {
+			if s.saveDataFlow(pred.Node, value, label) {
 				neighbor = graph.NewNeighbor(pred.Node, "") // ignore this edge in dot graph
 			} else {
 				neighbor = graph.NewNeighbor(pred.Node, EdgeTypePredecessor)
@@ -194,26 +185,36 @@ func (s *saveValueCtx) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
 }
 
 // from is the source node, to is the target node, from -> xxx -> to
-func (s *saveValueCtx) saveDataFlow(from *Value, to *Value) bool {
-	f := func(v *Value) []*Value {
-		return nil
-	}
+func (s *saveValueCtx) saveDataFlow(from *Value, to *Value, label string) bool {
+	var getNext func(v *Value) []*Value
+	var saveNode func(from, to *ssadb.AuditNode)
 
-	if s.dtype == DT_DependOn {
-		f = func(v *Value) []*Value {
-			return v.GetEffectOn()
-		}
-	} else if s.dtype == DT_EffectOn {
-		f = func(v *Value) []*Value {
+	switch label {
+	case Predecessors_TopDefLabel:
+		getNext = func(v *Value) []*Value {
 			return v.GetDependOn()
 		}
+		saveNode = func(from, to *ssadb.AuditNode) {
+			s.SaveEdge(from, to, EdgeTypeDependOn, nil)
+			s.SaveEdge(to, from, EdgeTypeEffectOn, nil)
+		}
+	case Predecessors_BottomUseLabel:
+		getNext = func(v *Value) []*Value {
+			return v.GetEffectOn()
+		}
+		saveNode = func(from, to *ssadb.AuditNode) {
+			s.SaveEdge(from, to, EdgeTypeEffectOn, nil)
+			s.SaveEdge(to, from, EdgeTypeDependOn, nil)
+		}
+	default:
+		return false
 	}
 
 	var paths [][]*Value
 	ctx, cancel := context.WithTimeout(context.Background(), MAXTime)
 	_ = cancel
 	paths = graph.GraphPathWithTarget(ctx, from, to, func(v *Value) []*Value {
-		return f(v)
+		return getNext(v)
 	})
 
 	totalElements := 0
@@ -245,21 +246,9 @@ func (s *saveValueCtx) saveDataFlow(from *Value, to *Value) bool {
 				log.Errorf("failed to save node: %v", err)
 				continue
 			}
-
-			if s.dtype == DT_DependOn {
-				s.SaveEdge(fromNode, toNode, EdgeTypeDependOn, nil)
-				s.SaveEdge(toNode, fromNode, EdgeTypeEffectOn, nil)
-			} else if s.dtype == DT_EffectOn {
-				s.SaveEdge(fromNode, toNode, EdgeTypeEffectOn, nil)
-				s.SaveEdge(toNode, fromNode, EdgeTypeDependOn, nil)
-			}
-
+			saveNode(fromNode, toNode)
 		}
 	}
-	// elapsed := time.Since(start)
-	// if elapsed > MaxTime {
-	// 	log.Warnf("saveDataFlow:  save paths cost [%v] paths: %v", elapsed, totalElements)
-	// }
 
 	return true
 }

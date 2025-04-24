@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestGraph(t *testing.T) {
@@ -234,8 +235,6 @@ func Test_Values_Graph_Dot(t *testing.T) {
 }
 
 func TestGraph_Limit(t *testing.T) {
-	// 构造图的时间太短不至于触发超时
-	t.Skip()
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("example/src/main/java/com/example/apackage/a.go", `
 package main
@@ -254,7 +253,10 @@ func login(w http.ResponseWriter, r *http.Request) {
         password := r.FormValue("password")
 
         // 不安全的 SQL 查询
+		// depth > 10 
         query := fmt.Sprintf("SELECT * FROM users WHERE username='%s' AND password='%s'", username, password)
+		query = fmt.Sprintf(query)
+		query = fmt.Sprintf(query)
 		query = fmt.Sprintf(query)
 		query = fmt.Sprintf(query)
 		query = fmt.Sprintf(query)
@@ -278,41 +280,79 @@ func main() {
 }
 		`)
 
-	progID := uuid.NewString()
-	prog, err := ssaapi.ParseProjectWithFS(vf,
-		ssaapi.WithLanguage(consts.GO),
-		ssaapi.WithProgramName(progID),
-	)
-	defer func() {
-		ssadb.DeleteProgram(ssadb.GetDB(), progID)
-	}()
-	require.NoError(t, err)
-	require.NotNil(t, prog)
+	rule := `.QueryRow(* #->?{opcode:param} as $para_top_def)`
 
-	query := `
-		.QueryRow(* #-> as $para_top_def)
-		`
+	ssatest.CheckResult(t, vf, rule, func(sfr *ssaapi.SyntaxFlowResult) {
+		sfr.Show()
 
-	require.Len(t, prog, 1)
-	res, err := prog[0].SyntaxFlowWithError(query)
-	require.NoError(t, err)
+		value := sfr.GetValues("para_top_def")
 
-	start := time.Now()
-	_, err = res.Save(schema.SFResultKindDebug)
-	since := time.Since(start)
-	require.NoError(t, err)
-	defer func() {
-		ssadb.DeleteProgram(ssadb.GetDB(), progID)
-	}()
+		dot := value.DotGraph()
+		log.Infof("dot : \n%s", dot)
 
-	valueMem := res.GetValues("para_top_def")
-	require.NotNil(t, valueMem)
+		if sfr.IsDatabase() {
+			// database
+			log.Infof("in database")
+			require.Contains(t, dot, "db.QueryRow(query") // contain path
+			require.NotContains(t, dot, "r.FormValue")    // contain dataflow path
+		} else {
+			log.Infof("in memory ")
+			// contain all edge
+			require.Contains(t, dot, "db.QueryRow(query") // contain path
+			require.Contains(t, dot, "r.FormValue")       // contain dataflow path
+		}
+	})
+}
 
-	// value := valueMem[0]
-	// graph := ssaapi.NewValueGraph(value)
-	// dotStr := graph.Dot()
-	// log.Infof("dot graph: \n%v", dotStr)
-	log.Infof("save graph time: %v", since)
+func TestGraph_No_Limit(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("example/src/main/java/com/example/apackage/a.go", `
+package main
 
-	require.LessOrEqual(t, since, 100*time.Millisecond) // 70.1505ms
+import (
+        "database/sql"
+        "fmt"
+        "log"
+        "net/http"
+
+        _ "github.com/go-sql-driver/mysql"
+)
+
+func login(w http.ResponseWriter, r *http.Request) {
+        username := r.FormValue("username")
+        password := r.FormValue("password")
+
+        // 不安全的 SQL 查询
+		// depth > 10 
+        query := fmt.Sprintf("SELECT * FROM users WHERE username='%s' AND password='%s'", username, password)
+        err = db.QueryRow(query).Scan(&userID)
+        if err != nil {
+                http.Error(w, "Invalid login", http.StatusUnauthorized)
+                return
+        }
+
+        fmt.Fprintf(w, "User ID: %d", userID)
+}
+
+func main() {
+        http.HandleFunc("/login", login)
+        log.Fatal(http.ListenAndServe(":8080", nil))
+}
+		`)
+
+	rule := `.QueryRow(* #->?{opcode:param} as $para_top_def)`
+
+	ssatest.CheckResult(t, vf, rule, func(sfr *ssaapi.SyntaxFlowResult) {
+		sfr.Show()
+
+		value := sfr.GetValues("para_top_def")
+
+		dot := value.DotGraph()
+		log.Infof("dot : \n%s", dot)
+
+		log.Infof("in memory ")
+		// contain all edge
+		require.Contains(t, dot, "db.QueryRow(query") // contain path
+		require.Contains(t, dot, "r.FormValue")       // contain dataflow path
+	})
 }
