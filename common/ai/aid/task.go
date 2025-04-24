@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"strconv"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -42,10 +43,11 @@ type aiTask struct {
 	rerun     bool
 
 	// runtime
-	ToolCallResults []*aitool.ToolResult `json:"tool_call_results"`
-	TaskSummary     string               `json:"task_summary"`
-	ShortSummary    string               `json:"short_summary"`
-	LongSummary     string               `json:"long_summary"`
+	//ToolCallResults   []*aitool.ToolResult `json:"tool_call_results"`
+	toolCallResultIds *omap.OrderedMap[int64, *aitool.ToolResult]
+	TaskSummary       string `json:"task_summary"`
+	ShortSummary      string `json:"short_summary"`
+	LongSummary       string `json:"long_summary"`
 }
 
 func (t *aiTask) callAI(request *AIRequest) (*AIResponse, error) {
@@ -63,7 +65,7 @@ func (t *aiTask) callAI(request *AIRequest) (*AIResponse, error) {
 }
 
 func (t *aiTask) PushToolCallResult(i *aitool.ToolResult) {
-	t.ToolCallResults = append(t.ToolCallResults, i)
+	t.toolCallResultIds.Set(i.GetID(), i)
 	t.config.memory.PushToolCallResults(i)
 }
 
@@ -158,6 +160,7 @@ func ExtractTaskFromRawResponse(c *Config, rawResponse string) (*aiTask, error) 
 				metadata: map[string]interface{}{
 					"query": planObj.Query,
 				},
+				toolCallResultIds: omap.NewOrderedMap(make(map[int64]*aitool.ToolResult)),
 			}
 
 			// 如果主任务名称为空，则使用第一个子任务的名称
@@ -169,10 +172,12 @@ func ExtractTaskFromRawResponse(c *Config, rawResponse string) (*aiTask, error) 
 				if len(planObj.Tasks) > 1 {
 					for _, subtask := range planObj.Tasks[1:] {
 						mainTask.Subtasks = append(mainTask.Subtasks, &aiTask{
-							config:     c,
-							Name:       subtask.SubtaskName,
-							Goal:       subtask.SubtaskGoal,
-							ParentTask: mainTask,
+							config:            c,
+							Name:              subtask.SubtaskName,
+							Goal:              subtask.SubtaskGoal,
+							ParentTask:        mainTask,
+							metadata:          map[string]interface{}{},
+							toolCallResultIds: omap.NewOrderedMap(make(map[int64]*aitool.ToolResult)),
 						})
 					}
 				}
@@ -180,10 +185,12 @@ func ExtractTaskFromRawResponse(c *Config, rawResponse string) (*aiTask, error) 
 				// 主任务名称存在，将所有任务作为子任务
 				for _, subtask := range planObj.Tasks {
 					mainTask.Subtasks = append(mainTask.Subtasks, &aiTask{
-						config:     c,
-						Name:       subtask.SubtaskName,
-						Goal:       subtask.SubtaskGoal,
-						ParentTask: mainTask,
+						config:            c,
+						Name:              subtask.SubtaskName,
+						Goal:              subtask.SubtaskGoal,
+						ParentTask:        mainTask,
+						metadata:          map[string]interface{}{},
+						toolCallResultIds: omap.NewOrderedMap(make(map[int64]*aitool.ToolResult)),
 					})
 				}
 			}
@@ -204,8 +211,10 @@ func ExtractTaskFromRawResponse(c *Config, rawResponse string) (*aiTask, error) 
 		if err == nil {
 			if name, ok := taskMap["name"].(string); ok && name != "" {
 				taskIns := &aiTask{
-					Name:   name,
-					config: c,
+					Name:              name,
+					config:            c,
+					metadata:          map[string]interface{}{},
+					toolCallResultIds: omap.NewOrderedMap(make(map[int64]*aitool.ToolResult)),
 				}
 
 				if goal, ok := taskMap["goal"].(string); ok {
@@ -217,7 +226,9 @@ func ExtractTaskFromRawResponse(c *Config, rawResponse string) (*aiTask, error) 
 						if subtaskMap, ok := st.(map[string]interface{}); ok {
 							if stName, ok := subtaskMap["name"].(string); ok && stName != "" {
 								subtask := &aiTask{
-									Name: stName,
+									Name:              stName,
+									metadata:          map[string]interface{}{},
+									toolCallResultIds: omap.NewOrderedMap(make(map[int64]*aitool.ToolResult)),
 								}
 
 								if stGoal, ok := subtaskMap["goal"].(string); ok {

@@ -3,8 +3,8 @@ package aid
 import (
 	_ "embed"
 	"fmt"
-	"html/template"
 	"strings"
+	"text/template"
 )
 
 //go:embed jsonschema/task.json

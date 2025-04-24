@@ -134,7 +134,7 @@ func (r *runtime) invokeSubtask(idx int, task *aiTask) error {
 				// retry via user!
 				return err
 			}
-			r.config.EmitInfo("invoke subtask success: %v with %d tool call results", subtask.Name, len(subtask.ToolCallResults))
+			r.config.EmitInfo("invoke subtask success: %v with %d tool call results", subtask.Name, subtask.toolCallResultIds.Len())
 		}
 		return nil
 	}

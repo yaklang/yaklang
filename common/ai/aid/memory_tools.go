@@ -12,14 +12,14 @@ func (m *Memory) CreateMemoryTools() ([]*aitool.Tool, error) {
 	var err error
 	factory := aitool.NewFactory()
 
-	err = factory.RegisterTool("memory_query",
-		aitool.WithDescription("get ai task user first query content"),
-		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
-			return m.Query, nil
-		}))
-	if err != nil {
-		log.Errorf("register memory_query tool: %v", err)
-	}
+	//err = factory.RegisterTool("memory_query",
+	//	aitool.WithDescription("get ai task user first query content"),
+	//	aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+	//		return m.Query, nil
+	//	}))
+	//if err != nil {
+	//	log.Errorf("register memory_query tool: %v", err)
+	//}
 	err = factory.RegisterTool("memory_progress",
 		aitool.WithDescription("get ai task progress"),
 		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
