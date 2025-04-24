@@ -65,7 +65,9 @@ func NewUnlimitedChanEx[T any](ctx context.Context, in chan T, out chan T, initB
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	ch := UnlimitedChan[T]{In: in, Out: out, buffer: NewRingBuffer[T](initBufCapacity), ctx: ctx, cancel: cancel}
-	go process(ctx, in, out, &ch)
+	validator := make(chan struct{})
+	go process(validator, ctx, in, out, &ch)
+	validator <- struct{}{}
 	return &ch
 }
 
@@ -79,12 +81,13 @@ func NewUnlimitedChanSize[T any](ctx context.Context, initInCapacity, initOutCap
 	ctx, cancel := context.WithCancel(ctx)
 	ch := UnlimitedChan[T]{In: in, Out: out, buffer: NewRingBuffer[T](initBufCapacity), ctx: ctx, cancel: cancel}
 
-	go process(ctx, in, out, &ch)
-
+	validator := make(chan struct{})
+	go process(validator, ctx, in, out, &ch)
+	validator <- struct{}{}
 	return &ch
 }
 
-func process[T any](ctx context.Context, in, out chan T, ch *UnlimitedChan[T]) {
+func process[T any](validator chan struct{}, ctx context.Context, in, out chan T, ch *UnlimitedChan[T]) {
 	defer close(out)
 	drain := func() {
 		for !ch.buffer.IsEmpty() {
@@ -101,6 +104,7 @@ func process[T any](ctx context.Context, in, out chan T, ch *UnlimitedChan[T]) {
 	}
 	for {
 		select {
+		case <-validator:
 		case <-ctx.Done():
 			return
 		case val, ok := <-in:

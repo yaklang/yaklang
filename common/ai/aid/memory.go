@@ -153,6 +153,10 @@ func (m *Memory) PushToolCallResults(t ...*aitool.ToolResult) {
 	m.toolCallResults = append(m.toolCallResults, t...)
 }
 
+func (m *Memory) Timeline() string {
+	return ""
+}
+
 func (m *Memory) PromptForToolCallResultsForLastN(n int) string {
 	if len(m.toolCallResults) == 0 {
 		return ""

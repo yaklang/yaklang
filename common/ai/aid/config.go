@@ -3,6 +3,7 @@ package aid
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -40,6 +41,8 @@ const (
 )
 
 type Config struct {
+	idGenerator func() int64
+
 	m  *sync.Mutex
 	id string
 
@@ -193,7 +196,13 @@ func initDefaultTools(c *Config) error { // set config default tools
 func newConfig(ctx context.Context) *Config {
 	id := uuid.New()
 	m := NewMemory()
+
+	var idGenerator = new(int64)
+	atomic.AddInt64(idGenerator, rand.Int64N(2000))
 	c := &Config{
+		idGenerator: func() int64 {
+			return atomic.AddInt64(idGenerator, 1)
+		},
 		agreePolicy:   AgreePolicyManual,
 		agreeAIScore:  0.5,
 		agreeRiskCtrl: new(riskControl),
