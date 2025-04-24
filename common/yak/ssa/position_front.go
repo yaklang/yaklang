@@ -34,6 +34,19 @@ func (b *FunctionBuilder) SetRange(token CanStartStopToken) func() {
 	}
 }
 
+func (b *FunctionBuilder) SetRangeWithCommonTokenLoc(loc CommonTokenLoc) func() {
+	r := GetRangeWithCommonTokenLoc(b.GetEditor(), loc)
+	if r == nil {
+		return func() {}
+	}
+	backup := b.CurrentRange
+	b.CurrentRange = r
+
+	return func() {
+		b.CurrentRange = backup
+	}
+}
+
 func (b *FunctionBuilder) GetRangesByText(searchText string) []memedit.RangeIf {
 	return GetRangesByText(b.GetEditor(), searchText)
 }
@@ -92,6 +105,24 @@ type CanStartStopToken interface {
 	GetText() string
 }
 
+type CommonTokenLoc struct {
+	text      string
+	startLine int
+	startCol  int
+	endLine   int
+	endCol    int
+}
+
+func NewCommonTokenLoc(text string, startLine int, startCol int, endLine int, endCol int) CommonTokenLoc {
+	return CommonTokenLoc{
+		text:      text,
+		startLine: startLine,
+		startCol:  startCol,
+		endLine:   endLine,
+		endCol:    endCol,
+	}
+}
+
 func GetEndPosition(t antlr.Token) (int, int) {
 	var line, column int
 	str := strings.Split(t.GetText(), "\n")
@@ -116,6 +147,13 @@ func GetRange(editor *memedit.MemEditor, token CanStartStopToken) memedit.RangeI
 	return editor.GetRangeByPosition(
 		editor.GetPositionByLine(startToken.GetLine(), startToken.GetColumn()+1),
 		editor.GetPositionByLine(endLine, endColumn+1),
+	)
+}
+
+func GetRangeWithCommonTokenLoc(editor *memedit.MemEditor, loc CommonTokenLoc) memedit.RangeIf {
+	return editor.GetRangeByPosition(
+		editor.GetPositionByLine(loc.startLine+1, loc.startCol+1),
+		editor.GetPositionByLine(loc.endLine+1, loc.endCol),
 	)
 }
 
