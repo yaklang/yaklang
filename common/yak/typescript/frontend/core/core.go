@@ -3,7 +3,6 @@ package core
 import (
 	"bytes"
 	"encoding/json"
-	"iter"
 	"math"
 	"slices"
 	"sort"
@@ -220,43 +219,40 @@ func IfElse[T any](b bool, whenTrue T, whenFalse T) T {
 
 func ComputeLineStarts(text string) []TextPos {
 	result := make([]TextPos, 0, strings.Count(text, "\n")+1)
-	return slices.AppendSeq(result, ComputeLineStartsSeq(text))
+	result = append(result, ComputeLineStartsSeq(text)...)
+	return result
 }
 
-func ComputeLineStartsSeq(text string) iter.Seq[TextPos] {
-	return func(yield func(TextPos) bool) {
-		textLen := TextPos(len(text))
-		var pos TextPos
-		var lineStart TextPos
-		for pos < textLen {
-			b := text[pos]
-			if b < utf8.RuneSelf {
-				pos++
-				switch b {
-				case '\r':
-					if pos < textLen && text[pos] == '\n' {
-						pos++
-					}
-					fallthrough
-				case '\n':
-					if !yield(lineStart) {
-						return
-					}
-					lineStart = pos
+func ComputeLineStartsSeq(text string) []TextPos {
+	textLen := TextPos(len(text))
+	var pos TextPos
+	var lineStart TextPos
+	var lineStarts []TextPos
+	for pos < textLen {
+		b := text[pos]
+		if b < utf8.RuneSelf {
+			pos++
+			switch b {
+			case '\r':
+				if pos < textLen && text[pos] == '\n' {
+					pos++
 				}
-			} else {
-				ch, size := utf8.DecodeRuneInString(text[pos:])
-				pos += TextPos(size)
-				if stringutil.IsLineBreak(ch) {
-					if !yield(lineStart) {
-						return
-					}
-					lineStart = pos
-				}
+				fallthrough
+			case '\n':
+				lineStarts = append(lineStarts, lineStart)
+				lineStart = pos
+			}
+		} else {
+			ch, size := utf8.DecodeRuneInString(text[pos:])
+			pos += TextPos(size)
+			if stringutil.IsLineBreak(ch) {
+				lineStarts = append(lineStarts, lineStart)
+				lineStart = pos
 			}
 		}
-		yield(lineStart)
 	}
+	lineStarts = append(lineStarts, lineStart)
+	return lineStarts
 }
 
 func PositionToLineAndCharacter(position int, lineStarts []TextPos) (line int, character int) {

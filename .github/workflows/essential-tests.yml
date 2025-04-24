@@ -136,6 +136,7 @@ jobs:
           - name: Test SSA Frontend TypeScript
             run: |
               go test -timeout 1m ./common/yak/typescript/frontend/tests/...
+              go test -timeout 1m ./common/yak/typescript/js2ssa/tests/...
 
           - name: Test SSA Frontend Java
             run: |
