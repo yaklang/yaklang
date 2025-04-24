@@ -3,10 +3,10 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"io"
 	"strings"
-
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -42,6 +42,8 @@ type Event struct {
 	StreamDelta []byte
 	IsJson      bool
 	Content     []byte
+
+	Timestamp int64
 }
 
 func (e *Event) GetInteractiveId() string {
@@ -103,6 +105,7 @@ type eventWriteProducer struct {
 	coordinatorId string
 	nodeId        string
 	handler       func(event *Event)
+	timeStamp     int64
 }
 
 func (e *eventWriteProducer) Write(b []byte) (int, error) {
@@ -123,6 +126,7 @@ func (e *eventWriteProducer) Write(b []byte) (int, error) {
 		IsReason:      e.isReason,
 		IsStream:      true,
 		StreamDelta:   utils.CopyBytes(b),
+		Timestamp:     e.timeStamp, // the event in same stream should have the same timestamp
 	}
 	e.handler(event)
 	return len(b), nil
@@ -135,6 +139,7 @@ func (r *Config) emitJson(typeName EventType, nodeId string, i any) {
 		NodeId:        nodeId,
 		IsJson:        true,
 		Content:       utils.Jsonify(i),
+		Timestamp:     time.Now().UnixNano(),
 	}
 	r.emit(event)
 }
@@ -214,6 +219,7 @@ func (r *Config) emitInteractiveJson(id string, typeName EventType, nodeId strin
 		NodeId:        nodeId,
 		IsJson:        true,
 		Content:       utils.Jsonify(i),
+		Timestamp:     time.Now().UnixNano(),
 	}
 	r.memory.StoreInteractiveEvent(id, event)
 	r.emit(event)
@@ -337,6 +343,7 @@ func (r *Config) emitExStreamEvent(nodeId string, isSystem, isReason bool, reade
 			isSystem:      isSystem,
 			isReason:      isReason,
 			handler:       r.emit,
+			timeStamp:     time.Now().UnixNano(),
 		}, reader)
 	}()
 	return
