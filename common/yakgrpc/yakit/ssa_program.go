@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -102,7 +101,7 @@ func Prog2GRPC(prog *ssadb.IrProgram) *ypb.SSAProgram {
 		Description:   prog.Description,
 		Language:      prog.Language,
 		EngineVersion: prog.EngineVersion,
-		Dbpath:        consts.GetSSADataBasePathDefault(consts.GetDefaultYakitBaseDir()),
+		// Dbpath:        consts.GetSSADataBaseInfo(consts.GetDefaultYakitBaseDir()),
 	}
 	// recompile
 	NeedReCompile := func() bool {

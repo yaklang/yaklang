@@ -3,7 +3,6 @@ package ssaapi
 import (
 	"errors"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -41,9 +40,6 @@ func (c *config) parseProject() (Programs, error) {
 		c.Processf(0, "recompile project, delete old data...")
 		ssadb.DeleteProgramIrCode(ssadb.GetDB(), c.ProgramName)
 		c.Processf(0, "recompile project, delete old data finish")
-	}
-	if c.databasePath != "" {
-		consts.SetSSAProjectDatabasePath(c.databasePath)
 	}
 
 	c.Processf(0, "recompile project, start compile")

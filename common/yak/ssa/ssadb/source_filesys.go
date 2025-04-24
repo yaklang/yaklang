@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -126,7 +125,6 @@ func (f *irSourceFS) ExtraInfo(path string) map[string]any {
 		m["programName"] = programName
 		m["CreateAt"] = prog.CreatedAt.Unix()
 		m["Language"] = prog.Language
-		m["Path"] = consts.GetSSADataBasePathDefault(consts.GetDefaultYakitBaseDir())
 		m["Description"] = prog.Description
 	}
 	return m

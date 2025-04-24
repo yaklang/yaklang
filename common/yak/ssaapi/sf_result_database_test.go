@@ -24,6 +24,7 @@ func queryAndSave(t *testing.T) (func(), *ssaapi.SyntaxFlowResult) {
 			return a
 		}
 		target = f(1)
+		target = f(2)
 		`
 	// parse code
 	programName := uuid.NewString()
