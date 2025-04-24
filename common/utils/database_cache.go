@@ -40,6 +40,7 @@ type DataBaseCacheWithKey[K comparable, T any] struct {
 	loadFromDatabase LoadFromDatabase[K, T]
 	wait             *sync.WaitGroup
 	close            atomic.Bool
+	disableSave      atomic.Bool
 }
 
 /*
@@ -157,6 +158,13 @@ func (c *DataBaseCacheWithKey[K, T]) save(key K, reason EvictionReason) {
 		c.updateStatus(item, DatabaseCacheItemNormal)
 	}
 
+	// Check if saving to database is disabled
+	if c.IsSaveDisabled() {
+		log.Debugf("Save to database is disabled, skipping save for key: %v", key)
+		recoverData()
+		return
+	}
+
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("save failed: %v", err)
@@ -209,6 +217,7 @@ func (c *DataBaseCacheWithKey[K, T]) Count() int {
 func (c *DataBaseCacheWithKey[K, T]) IsClose() bool {
 	return c.close.Load()
 }
+
 func (c *DataBaseCacheWithKey[K, T]) Close() {
 	// todo: save all item
 	// return c.data.Close()
@@ -221,4 +230,19 @@ func (c *DataBaseCacheWithKey[K, T]) ForEach(f func(K, T) bool) {
 	c.data.ForEach(func(key K, value databaseCacheItem[K, T]) bool {
 		return f(key, value.memoryItem)
 	})
+}
+
+// EnableSave enables saving to database
+func (c *DataBaseCacheWithKey[K, T]) EnableSave() {
+	c.disableSave.Store(false)
+}
+
+// DisableSave disables saving to database
+func (c *DataBaseCacheWithKey[K, T]) DisableSave() {
+	c.disableSave.Store(true)
+}
+
+// IsSaveDisabled returns whether saving to database is disabled
+func (c *DataBaseCacheWithKey[K, T]) IsSaveDisabled() bool {
+	return c.disableSave.Load()
 }

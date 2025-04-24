@@ -106,6 +106,7 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 		}
 	}
 	cache.InstructionCache = utils.NewDatabaseCacheWithKey(ttl, save, load)
+	cache.InstructionCache.DisableSave()
 
 	return cache
 }
@@ -326,6 +327,7 @@ func (c *Cache) SaveToDatabase(cb ...func()) {
 	if len(cb) > 0 {
 		c.afterSaveNotify = cb[0]
 	}
+	c.InstructionCache.EnableSave()
 	c.InstructionCache.Close()
 }
 
