@@ -1,0 +1,15 @@
+__DESC__ = <<<EOF
+auto try many decode method for handling the text
+EOF
+
+text = cli.String("text", cli.setRequired(true), cli.setHelp("target text"))
+cli.check()
+count := 0
+for i in codec.AutoDecode(text) {
+    count ++
+    yakit.Info("[%v] decode[%v] from: %#v to %#v" % [count, i.Type, i.Origin, i.Result])
+}
+if count <= 0 {
+    yakit.Warn("auto decode failed... no some info provided")
+    return
+}
