@@ -49,6 +49,7 @@ func (m *memoryTimeline) CreateSubTimeline(ids ...int64) *memoryTimeline {
 	if len(ids) == 0 {
 		return nil
 	}
+	tl.ai = m.ai
 	for _, id := range ids {
 		ts, ok := m.idToTs.Get(id)
 		if !ok {
@@ -75,7 +76,9 @@ func (m *memoryTimeline) BindConfig(config *Config) {
 	m.config = config
 	m.memory = config.memory
 	m.setTimelineLimit(config.timeLineLimit)
-	m.setAICaller(config)
+	if utils.IsNil(m.ai) {
+		m.setAICaller(config)
+	}
 }
 
 func newMemoryTimeline(clearCount int, ai AICaller) *memoryTimeline {
@@ -140,7 +143,7 @@ func (m *memoryTimeline) reducer(beforeId int64) {
 	}
 	response, err := m.ai.callAI(NewAIRequest(pmt))
 	if err != nil {
-		log.Errorf("call ai failed: %v", err)
+		log.Errorf("reducer call ai failed: %v", err)
 		return
 	}
 	var r io.Reader
@@ -177,7 +180,7 @@ func (m *memoryTimeline) shrink(result *aitool.ToolResult) {
 
 	response, err := m.ai.callAI(NewAIRequest(m.renderSummaryPrompt(result)))
 	if err != nil {
-		log.Errorf("call ai failed: %v", err)
+		log.Errorf("shrink call ai failed: %v", err)
 		return
 	}
 	var r io.Reader
