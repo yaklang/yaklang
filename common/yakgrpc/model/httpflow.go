@@ -84,6 +84,7 @@ func FromHTTPFlowGRPCModel(f *ypb.HTTPFlow) (*schema.HTTPFlow, error) {
 		Url:                        f.Url,
 		Path:                       f.Path,
 		Method:                     f.Method,
+		RequestLength:              f.RequestLength,
 		BodyLength:                 f.BodyLength,
 		ContentType:                f.ContentType,
 		StatusCode:                 f.StatusCode,
@@ -132,6 +133,7 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 		SourceType:                 utf8safe(f.SourceType),
 		Path:                       utf8safe(f.Path),
 		Method:                     utf8safe(f.Method),
+		RequestLength:              f.RequestLength,
 		BodyLength:                 f.BodyLength,
 		ContentType:                utf8safe(f.ContentType),
 		StatusCode:                 f.StatusCode,
@@ -192,7 +194,9 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 		}
 	}
 
-	flow.RequestLength = int64(len(unquotedRequest))
+	if flow.RequestLength == 0 {
+		flow.RequestLength = int64(len(unquotedRequest))
+	}
 	flow.RequestSizeVerbose = utf8safe(utils.ByteSize(uint64(len(unquotedRequest))))
 
 	requireRequest := full || !f.IsRequestOversize

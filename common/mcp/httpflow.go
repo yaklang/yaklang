@@ -160,6 +160,7 @@ func ypbHTTPFlowToFriendlyHTTPFlow(f *ypb.HTTPFlow) *schema.HTTPFlow {
 		Url:                        f.Url,
 		Path:                       f.Path,
 		Method:                     f.Method,
+		RequestLength:              f.RequestLength,
 		BodyLength:                 f.BodyLength,
 		ContentType:                f.ContentType,
 		StatusCode:                 f.StatusCode,

@@ -35072,6 +35072,7 @@ type QueryHTTPFlowRequest struct {
 	ExcludeKeywords    []string `protobuf:"bytes,44,rep,name=ExcludeKeywords,proto3" json:"ExcludeKeywords,omitempty"`
 	KeywordType        string   `protobuf:"bytes,45,opt,name=KeywordType,proto3" json:"KeywordType,omitempty"` // <empty> = all/response/request
 	AnalyzedIds        []int64  `protobuf:"varint,46,rep,packed,name=AnalyzedIds,proto3" json:"AnalyzedIds,omitempty"`
+	PayloadKeyword     string   `protobuf:"bytes,47,opt,name=PayloadKeyword,proto3" json:"PayloadKeyword,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -35412,6 +35413,13 @@ func (x *QueryHTTPFlowRequest) GetAnalyzedIds() []int64 {
 		return x.AnalyzedIds
 	}
 	return nil
+}
+
+func (x *QueryHTTPFlowRequest) GetPayloadKeyword() string {
+	if x != nil {
+		return x.PayloadKeyword
+	}
+	return ""
 }
 
 type HTTPFlowsToOnlineRequest struct {
@@ -52808,7 +52816,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tIsRequest\x18\x02 \x01(\bR\tIsRequest\x12\x18\n" +
 	"\aBufSize\x18\x03 \x01(\x03R\aBufSize\x12\x1c\n" +
 	"\tRuntimeId\x18\x04 \x01(\tR\tRuntimeId\x12\x16\n" +
-	"\x06IsRisk\x18\x05 \x01(\bR\x06IsRisk\"\xf9\v\n" +
+	"\x06IsRisk\x18\x05 \x01(\bR\x06IsRisk\"\xa1\f\n" +
 	"\x14QueryHTTPFlowRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
@@ -52864,7 +52872,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vProcessName\x18+ \x03(\tR\vProcessName\x12(\n" +
 	"\x0fExcludeKeywords\x18, \x03(\tR\x0fExcludeKeywords\x12 \n" +
 	"\vKeywordType\x18- \x01(\tR\vKeywordType\x12 \n" +
-	"\vAnalyzedIds\x18. \x03(\x03R\vAnalyzedIds\"\x82\x01\n" +
+	"\vAnalyzedIds\x18. \x03(\x03R\vAnalyzedIds\x12&\n" +
+	"\x0ePayloadKeyword\x18/ \x01(\tR\x0ePayloadKeyword\"\x82\x01\n" +
 	"\x18HTTPFlowsToOnlineRequest\x12\x14\n" +
 	"\x05Token\x18\x01 \x01(\tR\x05Token\x12 \n" +
 	"\vProjectName\x18\x02 \x01(\tR\vProjectName\x12.\n" +
