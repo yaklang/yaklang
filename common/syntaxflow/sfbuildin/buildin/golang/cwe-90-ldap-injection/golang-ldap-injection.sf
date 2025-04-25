@@ -2,6 +2,7 @@ desc(
     title: "golang LDAP injection",
     type: audit,
     severity: high,
+    rule_id: 10090001,
     desc: <<<TEXT
 LDAP 注入攻击是一种严重的安全漏洞，它允许攻击者通过操纵 LDAP（轻量目录访问协议）查询来访问或操纵敏感数据。在 Go 语言应用程序中，如果 LDAP 查询的构造不当，特别是当查询中包含未经过滤或未转义的输入时，攻击者可能会利用这一漏洞执行恶意 LDAP 查询，获取未授权的访问权限或敏感信息。这种漏洞通常出现在用户认证、授权或数据检索功能中。
 

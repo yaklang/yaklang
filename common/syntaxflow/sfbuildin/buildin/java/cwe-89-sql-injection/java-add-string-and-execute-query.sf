@@ -2,6 +2,7 @@ desc(
     title: "Check for suspected SQL statement concatenation and execution in database queries",
     title_zh: "检查疑似 SQL 语句拼接并执行到数据库查询的代码",
     risk:sqli,
+    rule_id: 20089005,
     desc: <<<TEXT
     检查疑似 SQL 语句拼接并执行到数据库查询的代码，以确保 SQL 语句拼接的位置不会导致 SQL 注入漏洞。SQL 注入漏洞是Web应用程序中常见的安全问题，攻击者可以通过构造恶意 SQL 语句，执行数据库查询，进而获取敏感数据、修改数据等。为了防止 SQL 注入漏洞，需要对 SQL 语句拼接的位置进行严格的检查，确保 SQL 语句拼接的位置不会导致 SQL 注入漏洞。
 TEXT

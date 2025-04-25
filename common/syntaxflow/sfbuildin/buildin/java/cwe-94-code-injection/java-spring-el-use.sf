@@ -2,6 +2,7 @@ desc(
     title: "Spring EL (SpelExpressionParser) basic use",
     type: audit,
     level: middle,
+    rule_id: 20094005,
     desc: <<<TEXT
 Spring Expression Language (SpEL) 允许在运行时查询和操作对象图。如果SpelExpressionParser的使用不当，特别是在解析和执行不受信任的表达式时，可能会引发安全漏洞。攻击者可能会利用SpEL表达式注入漏洞，绕过安全限制，执行任意代码或访问敏感数据。因此，审计SpelExpressionParser的使用，确保表达式的来源是可信的，并避免在解析和执行表达式时引入潜在的安全风险，是至关重要的。
 TEXT

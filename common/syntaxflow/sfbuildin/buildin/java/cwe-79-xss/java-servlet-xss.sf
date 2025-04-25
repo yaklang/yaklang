@@ -4,6 +4,7 @@ desc(
     type:vuln,
     level: mid,
     risk:XSS,
+    rule_id: 20079002,
     desc: <<<TEXT
     该规则检测Java Servlet中的XSS漏洞，当Servlet中使用了未转义的用户输入输出到响应中时，可能导致XSS漏洞。
 TEXT

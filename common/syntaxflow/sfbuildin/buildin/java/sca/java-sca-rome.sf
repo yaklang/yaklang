@@ -2,6 +2,7 @@ desc(
     title: 'SCA: Checking Java rome Existed Vulnerabilities',
     type: vuln,
     risk: sca,
+    rule_id: 21105030,
     desc: <<<TEXT
 此规则用于检测项目中是否存在Java rome库的已知漏洞版本。rome库在1.0到1.15.0版本之间存在一个XXE（XML外部实体注入）漏洞，该漏洞允许攻击者通过发送恶意的XML数据来读取或执行服务器上的文件，从而可能导致敏感信息泄露或服务器被恶意控制。建议更新到rome库的修复版本以缓解此风险。
 TEXT

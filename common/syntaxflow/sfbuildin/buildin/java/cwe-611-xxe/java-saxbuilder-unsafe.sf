@@ -1,6 +1,7 @@
 desc(
     title: "Find SAXBuilder() Unsafe Use in Context Sink",
     title_zh: "SAXBuilder 未明确设置安全策略（.setFeature(...)）",
+    rule_id:20611002,
     type: vuln,
     desc: <<<TEXT
 SAXBuilder 类在未明确设置安全策略的情况下使用，可能会导致 XML 外部实体（XXE）漏洞。XXE 漏洞允许攻击者利用漏洞应用程序解析外部实体，从而可能导致信息泄露、服务器资源消耗、远程代码执行等风险。建议在使用 SAXBuilder 时，通过调用 `.setFeature` 方法明确禁用外部实体解析，例如 `saxBuilder.setFeature("http://xml.org/sax/features/external-general-entities", false)` 和 `saxBuilder.setFeature("http://xml.org/sax/features/external-parameter-entities", false)`，以确保解析器的安全性。

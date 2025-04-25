@@ -2,6 +2,7 @@ desc(
     title: "Recognize Java Quartz Job Class",
     title_zh: "识别 Java Quartz Job 类的位置",
     type: audit,
+    rule_id:21105007,
     severity: mid,
     desc: <<<TEXT
 Quartz 是一个开源的作业调度框架，用于在 Java 应用程序中定时执行任务。识别 Java Quartz Job 类的位置对于审计和确保任务调度的安全性至关重要。错误的配置或实现可能导致未授权的任务执行、资源耗尽或其他安全风险。

@@ -2,6 +2,7 @@ desc(
     title: 'SCA: Checking Java c3p0 Existed Vulnerabilities',
     type: vuln,
     risk: sca,
+    rule_id: 21105022,
     desc: <<<TEXT
 c3p0 是一个开源的 JDBC 连接池库，用于管理数据库连接。某些版本的 c3p0 存在不安全的类加载漏洞（CVE-2019-5427），该漏洞允许攻击者通过特定的攻击手段加载恶意类并执行任意代码，进而可能导致服务器被远程控制或数据泄露等严重后果。建议检查并升级 c3p0 到安全版本，以避免潜在的安全风险。
 TEXT

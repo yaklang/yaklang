@@ -1,6 +1,7 @@
 desc(
     title: "Find Java HTTP Request Sink Point",
     lib: "java-apache-http-request-url",
+    rule_id: 20000035,
     type: audit,
     desc: <<<TEXT
 此规则旨在审计Java代码中Apache HttpClient库的使用情况，特别是寻找HTTP请求的执行点。这些执行点可能是潜在的安全漏洞源，如敏感信息泄露、服务器请求伪造（SSRF）或开放重定向等。通过识别并监控这些HTTP请求的执行，可以帮助开发者及时修复潜在的安全问题，确保应用程序的安全性。

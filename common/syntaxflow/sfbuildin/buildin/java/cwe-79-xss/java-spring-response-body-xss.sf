@@ -3,6 +3,7 @@ desc(
     title: "Find SpringBoot RestController Basic XSS",
     type: vuln,
     risk: XSS,
+    rule_id: 20079004,
     desc: <<<TEXT
 跨站脚本攻击（XSS）是一种常见的安全漏洞，攻击者通过在应用程序中注入恶意脚本，能够在其他用户的浏览器中执行这些脚本。在Spring Boot的RestController中，如果未对用户输入进行适当的过滤或转义，并将其直接输出到HTTP响应中，那么攻击者可能会利用这一点来发动XSS攻击。这可能导致敏感信息泄露、会话劫持或其他恶意行为。因此，建议对所有用户输入进行适当的验证、过滤或转义，以防止XSS攻击。
 TEXT

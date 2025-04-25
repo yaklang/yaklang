@@ -2,6 +2,7 @@ desc(
     title: "Checking [Resource Handler Location] in Spring",
     type: audit,
     level: low,
+    rule_id: 20200001,
     desc: <<<TEXT
     检查Spring中的资源处理程序位置，以确保资源处理程序的安全性。Spring中的资源处理程序用于处理静态资源，如图片、CSS、JavaScript等。如果资源处理程序的位置设置不当，可能会导致恶意用户访问敏感资源，造成安全问题。建议开发者检查资源处理程序的位置，确保资源处理程序的位置设置正确，不会导致安全问题。
 TEXT

@@ -2,6 +2,7 @@ desc(
     title: "Find HTTP Sink in Java (Multiple Libraries)",
     type: audit,
     lib: "java-http-sink",
+    rule_id: 20000008,
 )
 
 <include('java-alibaba-druid-httpclientutil')> as $output;

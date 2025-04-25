@@ -2,6 +2,7 @@ desc(
     title: "golang open redirect",
     type: audit,
     level: high,
+    rule_id: 10601001,
     desc: <<<TEXT
 开放重定向漏洞（CWE-601）是一种严重的安全漏洞，允许攻击者构造恶意URL诱导用户访问钓鱼网站或其他恶意域名。当应用程序未对重定向目标进行严格验证时，攻击者可通过篡改URL参数（如redirect_to或url）将用户导向不受信任的外部域名。这种漏洞通常出现在使用http.Redirect函数时，未对目标URL进行验证或限制。
 

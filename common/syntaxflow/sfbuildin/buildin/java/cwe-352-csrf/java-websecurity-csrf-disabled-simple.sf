@@ -2,6 +2,7 @@ desc(
     title: "Find Simple Trail of CSRF Disabled",
     type: vuln,
     level: low,
+    rule_id: 20352001,
     desc: <<<TEXT
 禁用CSRF（跨站请求伪造）保护可能会使应用程序容易受到CSRF攻击。虽然在某些情况下（例如API服务）可以考虑禁用CSRF，但在Web应用程序中，建议保留CSRF保护
 TEXT

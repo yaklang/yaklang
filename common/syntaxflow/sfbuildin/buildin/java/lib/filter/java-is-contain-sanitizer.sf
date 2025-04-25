@@ -3,8 +3,9 @@ desc(
     title_zh:"查找Java含有contain方法的过滤器",
     type: audit,
     lib: 'is-contain-sanitizer',
+    rule_id: 20000012,
     desc: <<<TEXT
-    该规则用于查找Java代码中是否有方法包含"contain"。该规则期望输入的参数的opcode为call，如果该call名称包含“contain”则会返回call原值。
+    该规则用于查找Java代码中是否有方法包含"contain"。该规则期望输入的参数的opcode为call，如果该call名称包含"contain"则会返回call原值。
 该规则常用于确认数据流分析中是否有白名单校验、字符串检验等操作。
 TEXT
 )

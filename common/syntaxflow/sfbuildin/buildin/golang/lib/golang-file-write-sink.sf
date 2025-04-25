@@ -3,6 +3,7 @@ desc(
     type: audit,
     level: info,
     lib: 'golang-file-write-sink',
+    rule_id: 10000019,
     desc: <<<TEXT
 此规则旨在审计Go语言代码中文件写入功能的使用情况。不当的文件写入操作可能会导致敏感信息泄露、数据篡改或文件覆盖等安全风险。通过审计文件写入函数的使用，可以确保文件操作的安全性，避免潜在的安全漏洞。
 TEXT

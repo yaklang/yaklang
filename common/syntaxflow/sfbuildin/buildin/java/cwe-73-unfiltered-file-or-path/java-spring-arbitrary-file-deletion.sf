@@ -2,6 +2,7 @@ desc(
     title: "Find Java Spring Boot Arbitrary File Deletion",
     title_zh: "查找 Java Spring Boot任意文件删除",
     type: audit,
+    rule_id: 20073003,
     risk:"任意文件删除"
     desc: <<<TEXT
     该规则用于检测Java Spring Boot任意文件删除。如果应用程序中存在任意文件删除漏洞，攻击者可能会删除系统上的任意文件，导致文件丢失或系统瘫痪。因此，建议开发人员在编写Java Spring Boot应用程序时，避免直接从不可信源（如用户输入或外部配置）获取文件名并用于文件删除操作，以防止任意文件删除漏洞的攻击。

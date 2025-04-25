@@ -2,6 +2,7 @@ desc(
     title:"Check Java Process WaitFor DDOS",
     title_zh:"检测Java waitFor方法可能导致的DDOS漏洞",
     type:vuln,
+    rule_id: 20400003,
     desc:<<<TEXT
     该规则用于检测Java代码中使用Process.waitFor方法可能导致的DDOS漏洞。在Java中，Process.waitFor方法会导致当前线程阻塞，直到子进程终止。如果子进程不终止，当前线程将一直阻塞，导致资源耗尽，从而可能导致DDOS攻击。因此，建议在调用Process.waitFor方法时，设置超时时间或使用其他方式避免DDOS漏洞。
 TEXT,

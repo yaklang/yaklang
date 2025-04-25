@@ -1,6 +1,7 @@
 desc(
     title: 'SCA: Checking Java hessian Existed Vulnerabilities',
     type: vuln,
+    rule_id: 21105026,
     risk: sca,
     desc: <<<TEXT
 此规则旨在检查Java项目中使用的Hessian库是否存在已知的安全漏洞。Hessian是一个轻量级的二进制RPC协议，它允许在不同语言之间执行远程过程调用。然而，某些版本的Hessian存在不安全反序列化漏洞，攻击者可以利用这些漏洞执行远程代码或发起拒绝服务攻击。通过审计项目中Hessian库的版本，可以及时发现并修复这些漏洞，从而提高系统的安全性。

@@ -3,6 +3,7 @@ desc(
     type: audit,
     level: info,
     lib: "golang-http-net",
+    rule_id: 10000009,
     desc: <<<TEXT
 此规则旨在审计Golang应用程序中是否正确处理HTTP请求。通过检查`net/http`包的使用情况，该规则能够识别出处理HTTP请求的代码段。不当处理HTTP请求可能会导致安全漏洞，如敏感信息泄露、请求伪造等。建议开发者仔细审查HTTP请求的处理逻辑，确保对请求参数和请求体进行充分的验证和清理，以防止潜在的安全风险。
 TEXT

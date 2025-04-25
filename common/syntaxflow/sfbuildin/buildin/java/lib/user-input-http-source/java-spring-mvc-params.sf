@@ -3,6 +3,7 @@ desc(
     title: 'Find Java Spring MVC Controller User Controllable Input Parameters',
     type: audit,
     lib: 'java-spring-mvc-param',
+    rule_id: 20000017,
     reference: <<<URL
     https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html
     https://jakarta.ee/specifications/platform/8/apidocs/?javax/servlet/http/HttpServletRequest.html

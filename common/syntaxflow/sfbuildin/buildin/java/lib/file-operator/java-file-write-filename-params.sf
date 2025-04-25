@@ -3,6 +3,7 @@ desc(
     title_zh: "查找 Java 文件写入接收点",
     type: audit,
     lib: "java-write-filename-sink",
+    rule_id: 20000032,
     reference:<<<URL
        https://docs.oracle.com/javase/8/docs/api/java/nio/file/Files.html
        https://docs.oracle.com/javase/8/docs/api/java/io/RandomAccessFile.html

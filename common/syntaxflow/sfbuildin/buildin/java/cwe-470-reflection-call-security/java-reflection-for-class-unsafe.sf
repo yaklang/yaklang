@@ -2,6 +2,7 @@ desc(
     title: "Find Unsafe Reflection for 'Class.forName(...)'.",
     type: audit,
     level: low,
+    rule_id: 20470001,
     desc: <<<TEXT
 使用 `Class.forName(...)` 加载类时，如果传入的类名来源于不受信任的输入，可能会导致远程代码执行（RCE）漏洞。攻击者可以通过构造恶意的类名，使应用程序加载并执行恶意代码。为了避免这种风险，应避免使用不受信任的输入来动态加载类，或者在使用 `Class.forName(...)` 前进行严格的验证和清理。
 TEXT

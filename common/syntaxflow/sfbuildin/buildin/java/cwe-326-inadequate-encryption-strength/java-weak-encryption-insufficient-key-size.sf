@@ -2,6 +2,7 @@ desc(
     title: "Find Java Weak Encryption Insufficient Key Size",
     title_zh: "查找Java弱加密 - 密钥长度不足",
     type: security,
+    rule_id: 20236001,
     risk: 'risky_crypt'
     level: low,
     desc: <<<TEXT

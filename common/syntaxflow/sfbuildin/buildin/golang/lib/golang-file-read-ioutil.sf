@@ -3,6 +3,7 @@ desc(
     type: audit,
     level: info,
     lib: 'golang-file-read-ioutil',
+    rule_id: 10000013,
     desc: <<<TEXT
 在Go语言中，`io/ioutil` 包提供了便捷的文件读写功能。然而，`ioutil.ReadAll` 和 `ioutil.ReadFile` 函数在读取大文件时可能会导致内存占用过高，因为它们会将整个文件内容一次性加载到内存中。这可能会导致性能问题，尤其是在处理大型文件时。此外，随着Go语言的演进，`io/ioutil` 包中的部分功能已被标记为废弃，推荐使用 `os` 和 `io` 包中的相应功能来代替，如 `os.ReadFile` 和使用 `io.ReadFull` 与 `io.Reader` 接口来处理文件读取。
 TEXT

@@ -2,6 +2,7 @@ desc(
     title_zh:"检测Java SpringBoot 服务端请求伪造(SSRF)漏洞",
     title: "Find Java SpringBoot SSRF Vuln",
     type: vuln,
+    rule_id: 20918001,
     desc: <<<TEXT
 服务器端请求伪造（SSRF）漏洞允许攻击者通过应用程序向不受信任的服务器发起请求。在Java SpringBoot应用程序中，如果开发者未对外部URL输入进行适当的验证和过滤，攻击者可以利用该漏洞访问内部资源或发起对其他系统的恶意请求。这可能导致敏感数据泄露、服务拒绝攻击或进一步的内网渗透。
 TEXT

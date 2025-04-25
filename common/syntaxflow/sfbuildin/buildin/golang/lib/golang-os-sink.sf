@@ -3,6 +3,7 @@ desc(
     type: audit,
     level: info,
     lib: 'golang-os-sink',
+    rule_id: 10000024,
     desc: <<<TEXT
 此规则旨在审计Go语言代码中`os`包的使用情况。
 TEXT

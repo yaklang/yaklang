@@ -1,6 +1,7 @@
 desc(
     title: 'JWT Security Checking For Java',
     title_zh: 'Java JWT 安全检查',
+    rule_id:21105003,
     type: vuln,
     desc: <<<TEXT
 JSON Web Tokens (JWTs) 是一种用于在网络应用环境间安全地传输信息的紧凑且自包含的方式。然而，不当的 JWT 使用会导致严重的安全问题。本规则旨在检查 Java 代码中 JWT 的安全性，包括但不限于以下几个方面：

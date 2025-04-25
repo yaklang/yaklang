@@ -4,6 +4,7 @@ desc(
     level: "low",
     type: vul,
     risk: "unsafe-ftp-parameter-validation",
+   rule_id: 30863002,
     desc: <<<TEXT
     当文件操作函数（如copy/rename/symlink）未验证用户输入时，攻击者可通过构造恶意路径实现文件覆盖/删除或路径穿越攻击
 TEXT

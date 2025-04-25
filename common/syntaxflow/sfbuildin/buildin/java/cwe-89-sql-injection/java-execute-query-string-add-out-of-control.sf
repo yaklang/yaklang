@@ -4,6 +4,7 @@ desc(
     type: audit,
     severity: mid,
     risk:sqli,
+    rule_id: 20089001,
     description: <<<DESC
 在Java中，SQL语句拼接的不安全写法主要体现在使用字符串拼接来构建SQL查询时，用户输入的参数直接被插入到SQL语句中。
 

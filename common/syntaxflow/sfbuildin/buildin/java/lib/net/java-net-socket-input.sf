@@ -3,6 +3,7 @@ desc(
     title_zh : "查找TCP数据接收点",
     lib : "java-net-socket-read",
     type : audit,
+    rule_id: 20000005,
     desc: <<<TEXT
 此审计规则旨在识别Java代码中TCP数据接收的位置。TCP数据接收点通常是潜在的攻击面，因为恶意数据可能会通过这些点进入应用程序。确保这些接收点实施了适当的数据验证和清理措施，以防止诸如缓冲区溢出、注入攻击等安全漏洞。
 TEXT
