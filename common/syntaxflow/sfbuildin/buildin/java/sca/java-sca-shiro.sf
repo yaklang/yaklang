@@ -2,6 +2,7 @@ desc(
     title: 'SCA: Checking Java shiro-core Existed Vulnerabilities',
     type: vuln,
     risk: sca,
+    rule_id: 21105031,
     desc: <<<TEXT
 Apache Shiro 是一个强大的 Java 安全框架，提供了认证、授权、加密和会话管理等功能。在 shiro-core 的 1.10.0 和 1.10.1 版本中，存在一个认证绕过漏洞（CVE-2023-22602），攻击者可以利用此漏洞绕过正常的认证流程，获取未授权访问。建议更新到不受影响的版本，以确保系统的安全性。
 TEXT

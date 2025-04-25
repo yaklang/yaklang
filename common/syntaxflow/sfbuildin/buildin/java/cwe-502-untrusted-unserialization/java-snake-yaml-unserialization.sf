@@ -2,6 +2,7 @@ desc(
     title_zh:"检测Java SnakeYAML反序列化漏洞",
     title:"Check Java SnakeYAML Unserialization",
     type:vul,
+    rule_id: 20502002,
     reference:<<<URL
    https://javadoc.io/doc/org.yaml/snakeyaml/latest/org/yaml/snakeyaml/Yaml.html
 URL

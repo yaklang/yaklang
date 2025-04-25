@@ -1,7 +1,8 @@
 desc(
     title: 'Checking [Swagger2 Configuration] in Springfox Aware',
-    type: audit,
+    type: config,
     level: low,
+    rule_id: 20200002,
     desc: <<<TEXT
 Springfox 是一个用于生成 Spring Boot 应用程序的 API 文档的库，主要与 Swagger 结合使用。它通过注解和配置来自动生成 API 文档，并提供一个用户友好的界面来查看和测试 API。
 TEXT

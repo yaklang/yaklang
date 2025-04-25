@@ -110,6 +110,8 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 				y.rule.RiskType = value
 			case "solution", "fix":
 				y.rule.Solution = value
+			case "rule_id", "id":
+				y.rule.RuleId = value
 			default:
 				haveDesc = true
 				if strings.Contains(keyLower, "://") {

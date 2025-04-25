@@ -4,6 +4,7 @@ desc(
    risk: "information-exposure",
    type: vul,
    level: "low",
+   rule_id: 30200001,
    desc: <<<TEXT
 检测可能通过FTP相关函数泄露服务器敏感信息，包括：
     1. 目录结构暴露（ftp_nlist/ftp_rawlist）

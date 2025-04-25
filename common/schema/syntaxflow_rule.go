@@ -133,6 +133,7 @@ func (s *SlicesEx[K]) Value() (driver.Value, error) {
 
 // for describe the rule and create risk
 type SyntaxFlowDescInfo struct {
+	RuleId      string `json:"rule_id"`
 	Title       string `json:"title"`
 	TitleZh     string `json:"title_zh"`
 	Description string `json:"description"`
@@ -160,7 +161,7 @@ func (info *SyntaxFlowDescInfo) String() string {
 
 type SyntaxFlowRule struct {
 	gorm.Model
-
+	RuleId        string `gorm:"unique_index"`
 	IsBuildInRule bool
 
 	// Language is the language of the rule.
@@ -223,6 +224,7 @@ func (s *SyntaxFlowRule) GetAlertInfo(name string) (*SyntaxFlowDescInfo, bool) {
 func (s *SyntaxFlowRule) GetInfo() *SyntaxFlowDescInfo {
 	// load info from rule self, and create new syntaxflowdescinfo return
 	info := &SyntaxFlowDescInfo{
+		RuleId:      s.RuleId,
 		Title:       s.Title,
 		TitleZh:     s.TitleZh,
 		Description: s.Description,

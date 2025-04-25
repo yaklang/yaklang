@@ -3,6 +3,7 @@ desc(
     title_zh: "JDBC getConnection.createStatement.executeQuery SQL 执行语句",
     type: audit,
     lib: 'java-jdbc-raw-execute-sink',
+    rule_id: 20000003,
     desc: <<<TEXT
     使用 `DriverManager.getConnection().createStatement().executeQuery` 直接执行 SQL 查询可能会导致 SQL 注入漏洞。SQL 注入是一种攻击技术，攻击者可以通过在输入字段中插入恶意的 SQL 代码，从而操纵后端数据库执行未授权的查询或操作。这可能导致数据泄露、数据篡改或数据库损坏等严重后果。建议使用预处理语句（PreparedStatement）来替代直接执行 SQL 查询，以有效防止 SQL 注入攻击。
 TEXT

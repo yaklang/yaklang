@@ -2,6 +2,7 @@ desc(
     title: 'SCA: Checking Java Fastjson Existed Vulnerabilities',
     type: vuln,
     risk: sca,
+    rule_id: 21105025,
     desc: <<<TEXT
 Fastjson 是一个用于在 Java 应用程序中进行 JSON 序列化和反序列化的流行库。然而，多个版本的 Fastjson 被发现存在远程代码执行（RCE）漏洞。这些漏洞允许攻击者通过发送恶意构造的 JSON 数据来执行任意代码，从而完全控制受影响的服务器。
 

@@ -1,6 +1,7 @@
 desc(
     title: "Find 'javax.xml.transform.Transformer' unsafe use in context sink",
     title_zh: "在上下文中查找 'javax.xml.transform.Transformer' 不安全使用",
+    rule_id:20611005,
     type: vuln,
     desc: <<<TEXT
 此规则旨在检测在Java代码中使用`javax.xml.transform.Transformer`时的不安全实践。当Transformer被配置为解析不受信任的XML或XSLT输入时，如果没有适当的防护措施，攻击者可以利用外部实体引用（XXE）漏洞，从远程服务器加载恶意内容，执行服务器端请求伪造（SSRF）攻击，或暴露敏感的系统文件。XXE漏洞还可能被用来执行拒绝服务（DoS）攻击或绕过某些安全限制。因此，建议开发者在使用`Transformer`时，应确保禁用外部实体解析，或者只处理受信任的输入数据。

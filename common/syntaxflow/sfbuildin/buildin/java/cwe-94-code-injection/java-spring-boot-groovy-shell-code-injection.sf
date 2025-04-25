@@ -1,7 +1,9 @@
 desc(
     title_zh:"查找Java Spring Boot Groovy Shell代码注入漏洞",
     title:"Find Java Spring Boot Groovy Shell Code Injection Vulnerability",
-    type:"vuln",
+    type: vuln,
+    risk: "code-execution",
+    rule_id: 20094004,
     desc:<<<TEXT
 Java Spring Boot Groovy Shell代码注入漏洞是指在Java Spring Boot应用程序中，使用Groovy脚本引擎执行动态生成的Groovy代码时，未对输入进行充分验证和过滤，导致攻击者可以注入恶意代码并执行任意操作。这种漏洞通常发生在使用GroovyShell或GroovyScriptEngine等类时，攻击者可以通过构造恶意的Groovy脚本来执行任意命令、访问敏感数据或进行其他恶意操作。
 TEXT

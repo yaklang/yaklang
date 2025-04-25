@@ -2,6 +2,7 @@ desc(
     title: "golang Reflected XSS(write)",
     type: audit,
     severity: high,
+    rule_id: 10079002,
     desc: <<<TEXT
 反射型跨站脚本攻击（Reflected XSS）是一种常见的 Web 安全漏洞，攻击者通过构造包含恶意脚本的 URL，诱使受害者点击该链接。当受害者浏览器加载该页面时，恶意脚本会被执行，从而允许攻击者窃取受害者的敏感信息或执行其他恶意操作。
 

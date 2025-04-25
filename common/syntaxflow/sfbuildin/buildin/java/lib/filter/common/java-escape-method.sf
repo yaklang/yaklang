@@ -2,6 +2,7 @@ desc(
     title: "Find Java Escape Method",
     title_zh: "查找Java转义方法",
     lib: 'java-escape-method',
+    rule_id: 20000042,
     type: audit,
     desc: <<<TEXT
     此规则用于查找Java代码中可能存在的实体转义方法，该方法经常用于审计XSS漏洞。

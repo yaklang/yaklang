@@ -2,6 +2,7 @@ desc(
     title: "Find SAXReader() Unsafe Use",
     title_zh: "SAXReader 未明确设置安全策略（.setFeature(...) ...）",
     type: vuln,
+    rule_id:20611004,
     level: warning,
     risk: xxe,
     desc: <<<TEXT

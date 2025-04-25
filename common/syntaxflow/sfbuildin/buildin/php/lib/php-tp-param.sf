@@ -3,6 +3,7 @@ desc(
     type: audit,
     level: info,
     lib: 'php-tp-all-extern-variable-param-source',
+    rule_id: 30000008,
     desc: <<<TEXT
 此规则旨在审计PHP代码中外部变量参数的使用情况，以防止潜在的安全漏洞。外部变量（如GET、POST请求参数）若未经充分过滤或验证，可能会导致多种安全问题，包括但不限于SQL注入、跨站脚本攻击(XSS)、代码注入等。通过对这些参数进行严格的输入验证和过滤，可以显著提升应用程序的安全性。本规则会检查代码中是否所有外部变量都被正确处理，确保它们不会引发安全风险。
 TEXT

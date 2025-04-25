@@ -2,6 +2,7 @@ desc(
     title_zh:"查找Java Servlet Groovy Shell代码注入漏洞",
     title:"Find Java Servlet Groovy Shell Code Injection Vulnerability",
     type:"vuln",
+    rule_id: 20094003,
     desc:<<<TEXT
 Java Servlet Groovy Shell代码注入漏洞是指在Java Servlet应用程序中，使用Groovy Shell执行动态Groovy代码时，未对输入进行严格的验证和过滤，导致攻击者可以注入恶意代码并执行任意操作。这种漏洞可能导致远程命令执行、数据泄露或系统破坏等严重后果。
 TEXT

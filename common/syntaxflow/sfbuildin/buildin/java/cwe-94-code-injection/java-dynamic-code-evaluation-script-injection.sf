@@ -2,6 +2,7 @@ desc(
     title:'Check Java Script Injection Vulnerability in Java Dynamic Code Evaluation',
     title_zh:'检测Java动态代码执行中的脚本注入漏洞',
     type:vuln,
+    rule_id: 20094001,
     desc:<<<TEXT
 该规则用于检测Java中动态代码执行中的脚本注入漏洞。在Java中，动态代码执行是指在运行时动态加载、编译和执行代码的过程。如果动态代码执行的输入未经过滤，可能会导致脚本注入漏洞，攻击者可以通过构造恶意代码注入到应用程序中，从而导致应用程序受到攻击。
 TEXT,

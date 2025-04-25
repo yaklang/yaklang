@@ -3,6 +3,7 @@ desc(
     type: audit,
     level: info,
     lib: 'golang-template',
+    rule_id: 10000025,
     desc: <<<TEXT
 此规则旨在审计Go语言代码中`html/template`包的使用情况，特别是关注于命令执行时输入变量的处理。不安全的命令执行可能导致任意代码执行漏洞，如果攻击者能够控制传递给`exec.Command`的输入，那么他们可能会执行恶意命令，进而危害系统的安全性。建议开发者在使用`os/exec`包时，确保所有输入都经过严格的验证和清理，以防止命令注入攻击。
 TEXT

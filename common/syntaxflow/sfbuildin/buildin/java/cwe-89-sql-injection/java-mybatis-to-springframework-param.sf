@@ -4,6 +4,7 @@ desc(
     type: vuln,
     level: middle,
     risk: sqli,
+    rule_id: 20089003,
     desc: <<<TEXT
 在 MyBatis/iBatis 中，XML Mapper 文件中的 `${...}` 语法用于直接文本替换，这可能会导致 SQL 注入漏洞。当这些不安全的 `${...}` 参数能够从 Spring 框架的控制器或其他可达路径中被注入时，攻击者可以构造恶意的输入来操纵 SQL 查询，进而执行未授权的数据库操作。建议避免在 MyBatis/iBatis XML Mapper 中使用 `${...}` 语法，而应使用 `#{...}` 语法，因为后者会对参数进行预编译，从而防止 SQL 注入。
 TEXT

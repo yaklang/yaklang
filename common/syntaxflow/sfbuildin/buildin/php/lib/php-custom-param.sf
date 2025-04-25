@@ -2,6 +2,7 @@ desc(
     title: "check php custom extern variable",
     type: audit,
     lib: 'php-param',
+    rule_id: 30000002,
     desc: <<<TEXT
 此规则用于审计PHP代码中自定义外部变量（如$_POST, $_GET, $_REQUEST, $_COOKIE等）的使用情况。不当使用这些外部变量可能会导致安全漏洞，如跨站脚本攻击（XSS）、SQL注入攻击等。建议对外部变量进行严格的验证和过滤，以防止恶意输入带来的安全风险。
 TEXT

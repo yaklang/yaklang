@@ -3,6 +3,7 @@ desc(
     title_zh: "检测Java XPath注入漏洞",
     type: vuln,
     risk_type: "xpath-injection",
+    rule_id: 20643001,
     desc: <<<TEXT
 XPath注入漏洞是一种安全漏洞，攻击者可以通过构造恶意的XPath表达式来操控应用程序的查询逻辑，从而获取敏感数据或进行未授权的操作。在Java应用程序中，尤其是那些处理XML数据并使用XPath进行查询的应用程序中，如果未对用户输入进行适当的验证和转义，就可能会受到XPath注入攻击。这种攻击可能导致数据泄露、数据篡改或拒绝服务等严重后果。
 TEXT

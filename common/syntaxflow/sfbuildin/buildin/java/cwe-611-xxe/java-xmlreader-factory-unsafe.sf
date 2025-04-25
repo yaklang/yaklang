@@ -3,6 +3,7 @@ desc(
     title_zh: "检查 XMLReaderFactory.createXMLReader() 不安全使用",
     type: security,
     risk: "XXE",
+    rule_id:20611007,
     reference: <<<URL
     https://docs.oracle.com/javase/8/docs/api/org/xml/sax/helpers/XMLReaderFactory.html
     https://cwe.mitre.org/data/definitions/611.html

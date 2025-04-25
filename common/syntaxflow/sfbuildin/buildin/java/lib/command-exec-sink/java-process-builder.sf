@@ -3,6 +3,7 @@ desc(
     title:"Find Java ProcessBuilder Sink Point",
     lib: 'java-process-builder-sink',
     type: audit,
+    rule_id: 20000010,
     reference:<<<URL
     https://docs.oracle.com/javase/8/docs/api/java/lang/ProcessBuilder.html
 URL

@@ -3,6 +3,7 @@ desc(
     type: audit,
     level: info,
     lib: 'golang-database-sink',
+    rule_id: 10000004,
     desc: <<<TEXT
 此规则旨在审计Go语言项目中数据库操作函数的使用情况。通过检查项目中是否使用了常见的数据库库（如GORM、Pop、Reform、标准库的sql以及sqlx等），可以识别出潜在的数据处理逻辑和数据流。这有助于发现潜在的数据安全漏洞，例如SQL注入、不安全的数据库连接配置等。尽管本审计规则级别为信息级，但它为进一步的代码审查和安全加固提供了基础。
 TEXT

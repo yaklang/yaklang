@@ -1,6 +1,7 @@
 desc(
     title: "Find 'SAXTransformerFactory' unsafe use (XXE)",
     type: vuln,
+    rule_id:20611001,
     desc: <<<TEXT
 XXE（XML External Entity）漏洞允许攻击者利用应用程序解析XML输入时的配置不当，访问外部资源，如本地文件系统或网络上的文件，甚至执行服务器端的请求伪造攻击。这种漏洞通常发生在应用程序使用不受信任的XML输入进行解析时，特别是当使用了不安全的`SAXTransformerFactory`配置。通过禁用或限制对外部实体的访问，可以显著减轻这种风险。
 TEXT

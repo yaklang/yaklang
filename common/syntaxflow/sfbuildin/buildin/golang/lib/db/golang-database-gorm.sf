@@ -2,6 +2,7 @@ desc(
     title: "check file database function",
     type: audit,
     level: info,
+    rule_id: 10000001,
     lib: 'golang-database-gorm',
     desc: <<<TEXT
 此规则旨在审计使用GORM（Go Object-Relational Mapping）库进行数据库操作的文件。GORM是一个流行的Go语言ORM库，它简化了数据库操作，包括连接数据库、迁移模式、CRUD（创建、读取、更新、删除）操作等。通过审计这些操作，可以确保数据库交互代码的正确性和安全性，例如检查是否存在SQL注入风险、连接管理是否得当、错误处理是否完善等。这有助于维护数据库的完整性和应用程序的稳定性。

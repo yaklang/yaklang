@@ -2,16 +2,18 @@ desc(
     title: "Find Simple Trail of frameOptions Disabled",
     type: vuln,
     level: low,
+    rule_id: 21021001,
     desc: <<<TEXT
 禁用 X-Frame-Options 头部可能会使应用程序容易受到点击劫持攻击。建议启用该头部，以防止应用程序被嵌入到其他网站的iframe中。
 TEXT
 )
 
-.csrf().disable() as $vuln;
+.frameOptions()...disable() as $vuln;
 check $vuln;
 alert $vuln;
 
 desc(
+    alert_num:1,
     lang: java,
 'safefile:///safeconfig.java': <<<CONFIG
 package com.ruoyi.modules.monitor.config;

@@ -2,6 +2,7 @@ desc(
     title: "Find Java Reflection Call Security Vulnerability via getClass() and getMethod()",
     title_zh: "通过 getClass() 和 getMethod() 发现 Java 反射调用的潜在威胁",
     type: audit,
+    rule_id: 20470002,
     severity: mid,
     risk: rce,
     desc: <<<TEXT

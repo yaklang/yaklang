@@ -3,6 +3,7 @@ desc(
     type: audit,
     level: info,
     lib: 'golang-database-sqlx',
+    rule_id: 10000007,
     desc: <<<TEXT
 此审计规则旨在检查代码中是否正确使用了 `github.com/jmoiron/sqlx` 库进行数据库操作。`sqlx` 是一个强大的 Go 语言库，它在标准库 `database/sql` 的基础上提供了更多功能，如更便捷的查询、命名参数支持等。此审计主要关注代码中是否安全、合理地使用了数据库连接、查询、更新和删除等操作，以确保应用程序的数据安全性和稳定性。不当的数据库操作可能导致 SQL 注入、数据泄露等安全问题。
 TEXT

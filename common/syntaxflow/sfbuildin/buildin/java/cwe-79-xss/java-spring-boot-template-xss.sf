@@ -3,6 +3,7 @@ desc(
     title_zh: "检测Java Spring Boot框架模板语言XSS漏洞",
     type: vuln,
     risk: XSS,
+    rule_id: 20079003,
     desc: <<<TEXT
 跨站脚本攻击（XSS）是一种安全漏洞，允许攻击者将恶意脚本注入到其他用户查看的页面中。在Java Spring Boot应用程序中，如果模板语言（如Freemarker、Thymeleaf等）的输出未进行适当转义，攻击者可以利用此漏洞注入恶意脚本，从而窃取用户数据、劫持用户会话或执行其他恶意操作。建议对模板语言中的输出进行严格的转义处理，以防止XSS攻击。
 TEXT

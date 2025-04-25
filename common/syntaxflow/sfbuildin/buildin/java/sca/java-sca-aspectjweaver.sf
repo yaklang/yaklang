@@ -2,6 +2,7 @@ desc(
     title: 'SCA: Checking Java aspectjweaver Existed Vulnerabilities',
     type: vuln,
     risk: sca,
+    rule_id: 21105020,
     desc: <<<TEXT
 此规则用于检查Java项目中是否存在aspectjweaver库的已知漏洞版本。aspectjweaver是一个用于Java的AOP（面向切面编程）库，它允许开发者在不修改源代码的情况下向程序添加横切关注点。如果项目中使用的aspectjweaver版本低于1.9.6，则可能存在反射性文件下载漏洞（CVE-2020-5398），该漏洞可能被攻击者利用来下载并执行恶意文件，从而危害系统的安全性。
 TEXT

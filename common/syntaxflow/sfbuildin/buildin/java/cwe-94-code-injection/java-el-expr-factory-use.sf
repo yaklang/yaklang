@@ -2,6 +2,7 @@ desc(
     title: "Find EL Expression Factory basic use",
     type: audit,
     level: low,
+    rule_id: 20094002,
     desc: <<<TEXT
 使用 `ExpressionFactory` 创建和执行 EL（Expression Language）表达式可能会引发安全风险，尤其是当表达式的内容来自不受信任的输入时。EL 表达式注入攻击允许攻击者执行任意的 EL 代码，这可能导致数据泄露、数据篡改或执行未授权的操作。尽管此示例代码中的 EL 表达式是硬编码的，但审计时应警惕类似模式在更复杂或动态上下文中的滥用。
 TEXT

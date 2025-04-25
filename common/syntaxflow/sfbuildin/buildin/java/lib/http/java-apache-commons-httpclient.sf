@@ -1,5 +1,6 @@
 desc(
     title: "Checking Java Apache Commons HttpClient Library",
+    rule_id: 20000034,
     type: audit,
     lib: "java-apache-commons-httpclient",
 )

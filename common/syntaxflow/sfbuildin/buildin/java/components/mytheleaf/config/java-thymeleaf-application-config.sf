@@ -2,6 +2,7 @@ desc(
     title: "Find Thymeleaf Config in SpringBoot Application Config",
     type: audit,
     severity: low,
+    rule_id:21105005,
     desc: <<<TEXT
 此规则用于审计Spring Boot应用程序配置文件中是否存在Thymeleaf模板引擎的配置。Thymeleaf是一种用于Web和独立环境的现代服务器端Java模板引擎，能够处理HTML、XML、JavaScript、CSS甚至纯文本。审计这些配置的目的是确保Thymeleaf的使用符合安全最佳实践，例如缓存管理、模板路径和文件编码等。不当的配置可能导致性能问题、安全漏洞或模板注入攻击。尽管本规则标记为低严重度，但正确的配置对于维护应用程序的安全性和性能至关重要。
 TEXT

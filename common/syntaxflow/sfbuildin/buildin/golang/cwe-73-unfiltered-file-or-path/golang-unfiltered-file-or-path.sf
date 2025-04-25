@@ -2,6 +2,7 @@ desc(
     title: "golang Unfiltered File-or-Path",
     type: audit,
     severity: low,
+    rule_id: 10073001,
     desc: <<<TEXT
 未过滤的文件或路径访问漏洞（Unfiltered File-or-Path）允许攻击者通过操纵输入参数来访问服务器上的任意文件。在 Go 语言应用中，如果开发者未能正确验证或过滤用户输入的文件路径，攻击者可能会利用此漏洞读取敏感文件（如配置文件、数据库凭证等），甚至执行任意代码。
 

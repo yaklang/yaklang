@@ -2,6 +2,7 @@ desc(
     title: 'SCA: Checking Java resin Existed Vulnerabilities',
     type: vuln,
     risk: sca,
+    rule_id: 21105029,
     desc: <<<TEXT
 此规则用于检查Java Resin服务器是否存在已知漏洞。Resin是一个开源的、高性能的Java HTTP服务器和Servlet容器。如果Resin的版本低于4.0.64，则存在远程代码执行漏洞（CVE-2021-26291），攻击者可以利用此漏洞在服务器上执行任意代码，这可能导致数据泄露、服务器被控制等严重后果。
 TEXT

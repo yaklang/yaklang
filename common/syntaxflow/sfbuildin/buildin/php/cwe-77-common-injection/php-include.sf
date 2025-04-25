@@ -3,6 +3,7 @@ desc(
     title_zh: "文件包含",
     type: audit,
     risk: 'file-include',
+    rule_id: 30077001,
     desc: <<<TEXT
 文件包含漏洞（File Inclusion Vulnerability）是一种常见的安全漏洞，攻击者可以通过该漏洞包含并执行任意文件，进而可能导致敏感信息泄露、代码执行等严重后果。审计此漏洞旨在检测应用程序中是否存在未经授权的文件包含行为，以及是否存在有效的过滤机制来防止恶意文件的包含。
 TEXT

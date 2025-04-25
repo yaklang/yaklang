@@ -2,6 +2,7 @@ desc(
     title: "Check STAX XMLInputFactory() Unsafe Use",
     title_zh: "检测 STAX（Streaming API for XML） XMLInputFactory() 不安全使用",
     type: vuln,
+    rule_id:20611006,
     desc: <<<TEXT
 使用 STAX（Streaming API for XML）中的 `XMLInputFactory` 时，如果未明确设置安全策略，可能会导致应用程序容易受到 XML 外部实体（XXE）攻击。XXE 攻击允许攻击者访问本地文件系统、执行。
 TEXT

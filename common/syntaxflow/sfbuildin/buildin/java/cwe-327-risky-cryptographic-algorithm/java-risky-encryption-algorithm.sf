@@ -3,6 +3,7 @@ desc(
     type: security,
     level: low,
     risk : "risky_crypt",
+    rule_id: 20327002,
     desc: <<<TEXT
 使用已破解或存在风险的加密算法可能会使敏感数据面临泄露的风险。这些算法由于存在已知的漏洞或弱点，可能无法为数据提供足够的安全性。建议采用经过时间验证且广泛认可的加密算法，如AES，以确保数据的机密性和完整性。
 TEXT
@@ -32,10 +33,10 @@ desc(
     public class RC4Cipher {
 
         private static final String ALGORITHM = "DES/ECB/PKCS5Padding";
-        private static final String ALGORITHM1 = "RC4";
-        private static final String ALGORITHM2 = "RC2";
-        private static final String ALGORITHM3 = "DES";
-        private static final String ALGORITHM4 = "DESede";
+        private static final String ALGORITHM1 = "DES/ECB/PKCS5Padding";
+        private static final String ALGORITHM2 = "RC4";
+        private static final String ALGORITHM3 = "RC2";
+        private static final String ALGORITHM4 = "DES";
 
 
         public static String encrypt1(String key, String data) throws Exception {

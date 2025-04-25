@@ -2,6 +2,7 @@ desc(
     title: "Check If Java SimpleEmail Verifies The Certificate",
     title_zh: "检测Java SimpleEmail在建立SSL连接时是否验证服务器的SSL证书",
     level: info,
+    rule_id: 20297001,
     lang: java,
     risk:"auth-bypass",
     desc: <<<TEXT

@@ -4,6 +4,7 @@ desc(
     level: "low",
     risk: "open-redirect",
     type: "audit",
+   rule_id: 30601001,
     desc: <<<TEXT
 开放重定向漏洞（CWE-601）允许攻击者构造恶意URL诱导用户访问钓鱼网站。当应用程序未对header()函数中的重定向目标进行严格验证时，攻击者可通过篡改URL参数（如redirect_to）将用户导向恶意域名。
 TEXT

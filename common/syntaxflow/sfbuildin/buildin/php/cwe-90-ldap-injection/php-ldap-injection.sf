@@ -3,6 +3,7 @@ desc(
     title_zh: "LDAP注入",
     type: vuln,
     severity: mid,
+    rule_id: 30090001,
     risk: 'ldap-injection',
     desc: <<<TEXT
 LDAP注入攻击是一种通过操纵LDAP（轻量目录访问协议）查询来未授权访问或操纵目录服务器数据的攻击方式。在PHP应用中，如果开发者没有正确地对用户输入进行过滤和转义，攻击者可能会构造恶意的LDAP查询，绕过认证机制或获取敏感信息。这种漏洞的危害程度取决于LDAP服务器上存储的数据敏感度以及攻击者能够访问的数据范围。建议开发者对所有用于LDAP查询的用户输入进行严格的验证和转义，使用`ldap_escape`等函数来防止LDAP注入攻击。
