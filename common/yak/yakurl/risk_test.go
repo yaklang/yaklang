@@ -22,13 +22,16 @@ import (
 )
 
 type filter struct {
-	level    yakurl.SSARiskResponseLevel
-	program  string
-	rule     string
-	source   string
-	function string
-	search   string
-	node     bool
+	level yakurl.SSARiskResponseLevel
+	node  bool
+	// filter
+	program   string
+	rule      string
+	source    string
+	function  string
+	search    string
+	result_id uint64
+	task_id   string
 }
 
 func TestSSARiskRequestParse(t *testing.T) {
@@ -77,6 +80,21 @@ func TestSSARiskRequestParse(t *testing.T) {
 				t.Fatalf("expected only one function name, got %d: %v", len(res.Filter.FunctionName), res.Filter.FunctionName)
 			}
 		}
+
+		if len(res.Filter.ResultID) > 0 {
+			got.result_id = res.Filter.ResultID[0]
+			if len(res.Filter.ResultID) > 1 {
+				t.Fatalf("expected only one result ID, got %d: %v", len(res.Filter.ResultID), res.Filter.ResultID)
+			}
+		}
+
+		if len(res.Filter.RuntimeID) > 0 {
+			got.task_id = res.Filter.RuntimeID[0]
+			if len(res.Filter.RuntimeID) > 1 {
+				t.Fatalf("expected only one runtime ID, got %d: %v", len(res.Filter.RuntimeID), res.Filter.RuntimeID)
+			}
+		}
+
 		got.search = res.Filter.Search
 		require.Equal(t, want, got)
 	}
@@ -88,6 +106,7 @@ func TestSSARiskRequestParse(t *testing.T) {
 			node:  false,
 		})
 	})
+
 	t.Run("check get source", func(t *testing.T) {
 		check(t, "/paaaa", nil, filter{
 			level:   yakurl.SSARiskLevelSource,
@@ -113,25 +132,14 @@ func TestSSARiskRequestParse(t *testing.T) {
 		})
 	})
 
-	t.Run("check get function with file type ", func(t *testing.T) {
+	t.Run("check get risk with file type ", func(t *testing.T) {
 		check(t, "/proaaa/bbb.go", map[string]string{
 			"type": string(yakurl.SSARiskTypeFile),
 		}, filter{
-			level:   yakurl.SSARiskLevelFunction,
-			node:    false,
+			level:   yakurl.SSARiskLevelRisk,
+			node:    true,
 			program: "proaaa",
 			source:  "/bbb.go",
-		})
-	})
-	t.Run("check get risk with file type ", func(t *testing.T) {
-		check(t, "/paaa/bb.go/ff", map[string]string{
-			"type": string(yakurl.SSARiskTypeFile),
-		}, filter{
-			level:    yakurl.SSARiskLevelRisk,
-			node:     true,
-			program:  "paaa",
-			source:   "/bb.go",
-			function: "ff",
 		})
 	})
 	// }}}
@@ -300,6 +308,27 @@ func TestSSARiskRequestParse(t *testing.T) {
 			node:    false,
 			program: "paaa",
 			search:  "ssssss",
+		})
+	})
+
+	// task id
+	t.Run("check get root with task-id param", func(t *testing.T) {
+		check(t, "/", map[string]string{
+			"task_id": "ttttttt",
+		}, filter{
+			level:   yakurl.SSARiskLevelProgram,
+			node:    false,
+			task_id: "ttttttt",
+		})
+	})
+
+	t.Run("check get root with result-id param", func(t *testing.T) {
+		check(t, "/", map[string]string{
+			"result_id": "123",
+		}, filter{
+			level:     yakurl.SSARiskLevelProgram,
+			node:      false,
+			result_id: 123,
 		})
 	})
 }

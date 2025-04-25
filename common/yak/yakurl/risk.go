@@ -30,13 +30,17 @@ type riskTreeAction struct {
 
 				"program": "${program}" // if set this, path will ignore program
 				"rule": "${rule}" 		// if set this, path will ignore rule
+
+				// for filter
+				"result_id": "${result_id}"
+				"task_id": "${task_id}"
 			}
 		}
 
 		type="risk" "" (default):
 			path:="${program?}/${source}/${function}"
 		type="file"
-			path:="${program?}/${source}/${function}/${risk}"
+			path:="${program?}/${source}/${risk}"
 		type="rule" :
 			path:="${program?}/${rule?}/${source}/${risk}"
 
@@ -140,13 +144,6 @@ type SSARiskCountFilter struct {
 
 func GetSSARiskCountFilter(u *ypb.YakURL) (*SSARiskCountFilter, error) {
 	ret := &SSARiskCountFilter{}
-	// type="file" (default):
-	// 	path:="${program}/${source}/${function}/${risk}"
-	// type="rule" :
-	// 	path:="${program}/${rule}/${source}/${risk}"
-
-	// param["program"] exist, ignore program in path
-	// param["rule"] exist, ignore rule in path
 
 	query := make(url.Values)
 	for _, v := range u.GetQuery() {
@@ -188,7 +185,7 @@ func GetSSARiskCountFilter(u *ypb.YakURL) (*SSARiskCountFilter, error) {
 	}
 
 	switch riskType {
-	case SSARiskTypeFile, SSARiskTypeRisk:
+	case SSARiskTypeRisk:
 		// 	restPath:="/${source}/${function}"
 		if dotIndex := strings.LastIndex(restPath, "."); dotIndex != -1 {
 			if lastIndex := strings.LastIndex(restPath, "/"); dotIndex < lastIndex {
@@ -200,6 +197,11 @@ func GetSSARiskCountFilter(u *ypb.YakURL) (*SSARiskCountFilter, error) {
 			}
 		} else {
 			log.Warnf("path source not contain `.`, request path: [%s] param: [%v]", u.Path, u)
+		}
+	case SSARiskTypeFile:
+		// 	restPath:="/${source}/"
+		if dotIndex := strings.LastIndex(restPath, "."); dotIndex != -1 {
+			sourceUrl = restPath
 		}
 	case SSARiskTypeRule:
 		if rule == "" {
@@ -223,14 +225,19 @@ func GetSSARiskCountFilter(u *ypb.YakURL) (*SSARiskCountFilter, error) {
 		ret.Level = SSARiskLevelProgram // not found program name, return all program
 		opts = append(opts, yakit.WithSSARiskFilterRuleName(rule))
 
-	// risk type=(file|risk)
-	case (riskType == SSARiskTypeFile || riskType == SSARiskTypeRisk) && sourceUrl == "":
+	// risk type=risk  /${program}/${source}/${function}
+	case riskType == SSARiskTypeRisk && sourceUrl == "":
 		ret.Level = SSARiskLevelSource // not found source url, return all source in program
 		opts = append(opts, yakit.WithSSARiskFilterProgramName(programName))
-	case (riskType == SSARiskTypeFile || riskType == SSARiskTypeRisk) && funcName == "":
+	case riskType == SSARiskTypeRisk && funcName == "":
 		ret.Level = SSARiskLevelFunction // not found function name, return all function in source & program
 		opts = append(opts, yakit.WithSSARiskFilterProgramName(programName))
 		opts = append(opts, yakit.WithSSARiskFilterSourceUrl(sourceUrl))
+
+	// rule type=file /${program}/${source}/${risk}
+	case riskType == SSARiskTypeFile && sourceUrl == "":
+		ret.Level = SSARiskLevelSource // not found source url, return all source in program
+		opts = append(opts, yakit.WithSSARiskFilterProgramName(programName))
 
 	// rule type=rule
 	case riskType == SSARiskTypeRule && rule == "":
@@ -252,6 +259,12 @@ func GetSSARiskCountFilter(u *ypb.YakURL) (*SSARiskCountFilter, error) {
 
 	if search := query.Get("search"); search != "" {
 		opts = append(opts, yakit.WithSSARiskFilterSearch(search))
+	}
+	if taskID := query.Get("task_id"); taskID != "" {
+		opts = append(opts, yakit.WithSSARiskFilterTaskID(taskID))
+	}
+	if resultID := query.Get("result_id"); resultID != "" {
+		opts = append(opts, yakit.WithSSARiskResultID(uint64(utils.ParseStringToInts(resultID)[0])))
 	}
 
 	switch riskType {
