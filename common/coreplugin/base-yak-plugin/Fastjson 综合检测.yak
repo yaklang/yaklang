@@ -122,7 +122,6 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
         if ok {
             v.createRisk()
         }
-        yakit.Info("Fastjson 综合检测插件执行结束")
     }
     getCommonWastTime = ()=>{
         v,ok = globalInfo.Load("wastTimes")
@@ -299,7 +298,9 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
                             rsp,err = param.delayFuzz(exp)
                             wastTime = getRequestDuration(rsp)
                         }
-                        if wastTime - getCommonWastTime() < timeoutTolerance{ // 如果dnslog查询失败会进行延时检测
+                        rsp,_ = param.delayFuzz(randstr(10))
+                        originReqWastTime = getRequestDuration(rsp)
+                        if wastTime - originReqWastTime < timeoutTolerance{ // 如果dnslog查询失败会进行延时检测
                             delayCheckOk = false
                             break
                         }
@@ -457,7 +458,9 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
                             rsp,_ = param.delayFuzz(poc)
                             wastTime = getRequestDuration(rsp)
                         }
-                        if wastTime - getCommonWastTime() < timeoutTolerance{ // 如果dnslog查询失败会进行延时检测
+                        rsp,_ = param.delayFuzz(randstr(10))
+                        originReqWastTime = getRequestDuration(rsp)
+                        if wastTime - originReqWastTime < timeoutTolerance{ // 如果dnslog查询失败会进行延时检测
                             delayCheckOk = false
                             break
                         }
