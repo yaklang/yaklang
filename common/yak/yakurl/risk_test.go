@@ -425,6 +425,20 @@ func GetSSARisk(t *testing.T, local ypb.YakClient, url *ypb.YakURL) map[string]d
 				require.NoError(t, err)
 				filterCount = paging.TotalRecord
 			}
+			if resource.ResourceType == string(yakurl.SSARiskLevelRisk) {
+				if extra.Key == "hash" {
+					paging, _, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
+						Hash: []string{extra.Value},
+					}, nil)
+					require.NoError(t, err)
+					require.Equal(t, 1, paging.TotalRecord, "result_hash not exist: %s", extra.Value)
+				}
+
+				if extra.Key == "severity" {
+					// haveSeverity := true
+					require.Contains(t, schema.GetAllSFSeverityTypes(), string(schema.ValidSeverityType(extra.Value)))
+				}
+			}
 		}
 		require.Equal(t, count, filterCount, "filter count not equal with msg count")
 		got[resource.Path] = data{
