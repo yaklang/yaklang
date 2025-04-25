@@ -77,7 +77,7 @@ func getVersionMap() map[string]RuleInfo {
 	return ruleVersionMap
 }
 
-func EmbedRuleVersion(target string) error {
+func EmbedRuleVersion() error {
 	existingRules := getVersionMap()
 	db := consts.GetGormProfileDatabase()
 	ruleCh := YieldBuildInSyntaxFlowRules(db, context.Background())
@@ -116,7 +116,7 @@ func EmbedRuleVersion(target string) error {
 		return err
 	}
 
-	err = os.WriteFile(target, jsonData, 0644)
+	err = os.WriteFile("rule_versions.json", jsonData, 0644)
 	if err != nil {
 		return err
 	}

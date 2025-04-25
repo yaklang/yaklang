@@ -529,15 +529,6 @@ var syncRule = &cli.Command{
 	},
 }
 
-var embedRuleVersion = &cli.Command{
-	Name:  "embed-rule-version",
-	Usage: "Embed SyntaxFlow Rule Version",
-	Action: func(c *cli.Context) error {
-		target := "common/syntaxflow/sfdb/rule_versions.json"
-		return sfdb.EmbedRuleVersion(filepath.Join(target))
-	},
-}
-
 var syntaxFlowSave = &cli.Command{
 	Name:    "syntaxflow-save",
 	Aliases: []string{"save-syntaxflow", "ssf", "sfs"},
@@ -1067,7 +1058,6 @@ var SSACompilerCommands = []*cli.Command{
 	syntaxFlowExport, // export rule to file
 	syntaxFlowImport, // import rule from file
 	syncRule,         // sync rule from embed to database
-	embedRuleVersion, // embed sf rule version msg
 	// risk manage
 	ssaRisk, // export risk report
 

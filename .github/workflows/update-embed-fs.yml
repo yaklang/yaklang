@@ -51,7 +51,7 @@ jobs:
         if: ${{env.SKIP_CI != 'true'}}
         run: |
           go run common/yak/cmd/yak.go embed-fs-hash --override --all
-          go run common/yak/cmd/yak.go embed-rule-version
+          go test -timeout 30s -run TestEmbedRule ./common/syntaxflow/sfdb/...
           go run common/yak/cmd/yak.go
 
       - name: Commit changes
