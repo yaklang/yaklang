@@ -97,6 +97,24 @@ func WithSSARiskFilterSearch(search string) SSARiskFilterOption {
 	}
 }
 
+func WithSSARiskFilterTaskID(taskID string) SSARiskFilterOption {
+	return func(sf *ypb.SSARisksFilter) {
+		if taskID == "" {
+			return
+		}
+		sf.RuntimeID = append(sf.RuntimeID, taskID)
+	}
+}
+
+func WithSSARiskResultID(resultID uint64) SSARiskFilterOption {
+	return func(sf *ypb.SSARisksFilter) {
+		if resultID == 0 {
+			return
+		}
+		sf.ResultID = append(sf.ResultID, resultID)
+	}
+}
+
 func NewSSARiskFilter(opts ...SSARiskFilterOption) *ypb.SSARisksFilter {
 	filter := &ypb.SSARisksFilter{}
 	for _, opt := range opts {
