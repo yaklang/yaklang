@@ -24,7 +24,7 @@ func ListChatModels(url string, opt func() ([]poc.PocConfigOption, error)) ([]*M
 	if err != nil {
 		return nil, utils.Errorf("build config failed: %v", err)
 	}
-	opts = append(opts, poc.WithTimeout(600))
+	opts = append(opts, poc.WithTimeout(600), poc.WithConnectTimeout(8), poc.WithRetryTimes(3))
 
 	if strings.HasSuffix(url, "/") {
 		// remove /
@@ -184,7 +184,7 @@ func ChatBase(
 		return "", utils.Errorf("build msg[%v] to json failed: %s", string(raw), err)
 	}
 	opts = append(opts, poc.WithReplaceHttpPacketBody(raw, false))
-	opts = append(opts, poc.WithConnectTimeout(10))
+	opts = append(opts, poc.WithConnectTimeout(5))
 	opts = append(opts, poc.WithRetryTimes(3))
 
 	var pr, reasonPr io.Reader

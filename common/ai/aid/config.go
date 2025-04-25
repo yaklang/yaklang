@@ -6,7 +6,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"math/rand/v2"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -95,6 +94,7 @@ type Config struct {
 	outputConsumption *int64
 
 	aiCallTokenLimit int64
+	aiAutoRetry      int64
 
 	resultHandler          func(*Config)
 	extendedActionCallback map[string]func(config *Config, action *Action)
@@ -146,30 +146,6 @@ func (c *Config) SetSyncCallback(i SyncType, callback func() any) {
 	c.syncMutex.Lock()
 	defer c.syncMutex.Unlock()
 	c.syncMap[string(i)] = callback
-}
-
-func (c *Config) wrapper(i AICallbackType) AICallbackType {
-	return func(config *Config, request *AIRequest) (*AIResponse, error) {
-		if c.debugPrompt {
-			log.Infof(strings.Repeat("=", 20)+"AIRequest"+strings.Repeat("=", 20)+"\n%v\n", request.GetPrompt())
-		}
-		tokenSize := estimateTokens([]byte(request.GetPrompt()))
-		if int64(tokenSize) > c.aiCallTokenLimit {
-			go func() {
-				c.emitJson(EVENT_TYPE_PRESSURE, "system", map[string]any{
-					"message":          "token size is too large",
-					"tokenSize":        tokenSize,
-					"aiCallTokenLimit": c.aiCallTokenLimit,
-				})
-			}()
-		}
-		c.inputConsumptionCallback(tokenSize)
-		resp, err := i(config, request)
-		if c.debugPrompt {
-			resp.Debug(true)
-		}
-		return resp, err
-	}
 }
 
 func (c *Config) emit(e *Event) {
@@ -245,6 +221,8 @@ func newConfig(ctx context.Context) *Config {
 		syncMap:           make(map[string]func() any),
 		inputConsumption:  new(int64),
 		outputConsumption: new(int64),
+		aiCallTokenLimit:  int64(1000 * 30),
+		aiAutoRetry:       5,
 	}
 	go func() {
 		log.Infof("config %s started, start to handle receiving loop", c.id)
