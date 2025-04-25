@@ -3,10 +3,9 @@ package aid
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"text/template"
-
-	"github.com/yaklang/yaklang/common/log"
 )
 
 func (t *aiTask) execute() error {
@@ -48,6 +47,7 @@ TOOLREQUIRED:
 			t.config.EmitError("error calling tool: %v", err)
 			return err
 		}
+		result.ID = t.config.idGenerator()
 		t.PushToolCallResult(result)
 
 		action, err := t.toolResultDecision(result, targetTool)

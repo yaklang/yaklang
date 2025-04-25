@@ -139,7 +139,7 @@ func (r *Config) emitJson(typeName EventType, nodeId string, i any) {
 		NodeId:        nodeId,
 		IsJson:        true,
 		Content:       utils.Jsonify(i),
-		Timestamp:     time.Now().UnixNano(),
+		Timestamp:     time.Now().Unix(),
 	}
 	r.emit(event)
 }
@@ -219,7 +219,7 @@ func (r *Config) emitInteractiveJson(id string, typeName EventType, nodeId strin
 		NodeId:        nodeId,
 		IsJson:        true,
 		Content:       utils.Jsonify(i),
-		Timestamp:     time.Now().UnixNano(),
+		Timestamp:     time.Now().Unix(),
 	}
 	r.memory.StoreInteractiveEvent(id, event)
 	r.emit(event)
@@ -254,8 +254,44 @@ func (r *Config) EmitErrorWithName(name string, fmtlog string, items ...any) {
 	r.emitLogWithLevel("error", name, fmtlog, items...)
 }
 
-func (r *Config) EmitStreamEvent(nodeId string, reader io.Reader) {
-	r.emitExStreamEvent(nodeId, false, false, reader)
+func (r *Config) EmitStreamEvent(nodeId string, startTime time.Time, reader io.Reader) {
+	r.emitExStreamEvent(&streamEvent{
+		startTime: startTime,
+		isSystem:  false,
+		isReason:  false,
+		reader:    reader,
+		nodeId:    nodeId,
+	})
+}
+
+func (r *Config) EmitSystemStreamEvent(nodeId string, startTime time.Time, reader io.Reader) {
+	r.emitExStreamEvent(&streamEvent{
+		startTime: startTime,
+		isSystem:  true,
+		isReason:  false,
+		reader:    reader,
+		nodeId:    nodeId,
+	})
+}
+
+func (r *Config) EmitReasonStreamEvent(nodeId string, startTime time.Time, reader io.Reader) {
+	r.emitExStreamEvent(&streamEvent{
+		startTime: startTime,
+		isSystem:  false,
+		isReason:  true,
+		reader:    reader,
+		nodeId:    nodeId,
+	})
+}
+
+func (r *Config) EmitSystemReasonStreamEvent(nodeId string, startTime time.Time, reader io.Reader) {
+	r.emitExStreamEvent(&streamEvent{
+		startTime: startTime,
+		isSystem:  true,
+		isReason:  true,
+		reader:    reader,
+		nodeId:    nodeId,
+	})
 }
 
 func (r *Config) EmitInfo(fmtlog string, items ...any) {
@@ -304,18 +340,6 @@ func (r *Config) EmitError(fmtlog string, items ...any) {
 	r.emitLogWithLevel("error", "system", fmtlog, items...)
 }
 
-func (r *Config) EmitSystemStreamEvent(nodeId string, reader io.Reader) {
-	r.emitExStreamEvent(nodeId, true, false, reader)
-}
-
-func (r *Config) EmitReasonStreamEvent(nodeId string, reader io.Reader) {
-	r.emitExStreamEvent(nodeId, false, true, reader)
-}
-
-func (r *Config) EmitSystemReasonStreamEvent(nodeId string, reader io.Reader) {
-	r.emitExStreamEvent(nodeId, true, true, reader)
-}
-
 func (r *Config) EmitPrompt(step string, prompt string) {
 	r.EmitStructured("prompt", map[string]any{
 		"system": false,
@@ -332,19 +356,27 @@ func (r *Config) EmitSystemPrompt(step string, prompt string) {
 	})
 }
 
-func (r *Config) emitExStreamEvent(nodeId string, isSystem, isReason bool, reader io.Reader) {
+type streamEvent struct {
+	startTime time.Time
+	isSystem  bool
+	isReason  bool
+	reader    io.Reader
+	nodeId    string
+}
+
+func (r *Config) emitExStreamEvent(e *streamEvent) {
 	r.streamWaitGroup.Add(1)
 	go func() {
 		defer r.streamWaitGroup.Done()
 
 		io.Copy(&eventWriteProducer{
 			coordinatorId: r.id,
-			nodeId:        nodeId,
-			isSystem:      isSystem,
-			isReason:      isReason,
+			nodeId:        e.nodeId,
+			isSystem:      e.isSystem,
+			isReason:      e.isReason,
 			handler:       r.emit,
-			timeStamp:     time.Now().UnixNano(),
-		}, reader)
+			timeStamp:     e.startTime.Unix(),
+		}, e.reader)
 	}()
 	return
 }
