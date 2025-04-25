@@ -533,7 +533,8 @@ var embedRuleVersion = &cli.Command{
 	Name:  "embed-rule-version",
 	Usage: "Embed SyntaxFlow Rule Version",
 	Action: func(c *cli.Context) error {
-		return sfdb.EmbedRuleVersion()
+		target := "common/syntaxflow/sfdb/rule_versions.json"
+		return sfdb.EmbedRuleVersion(filepath.Join(target))
 	},
 }
 

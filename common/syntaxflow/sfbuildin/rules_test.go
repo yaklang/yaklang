@@ -2,7 +2,6 @@ package sfbuildin
 
 import (
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"io/fs"
@@ -54,10 +53,4 @@ func Test_BuildIn_Rule_Ast_And_Rule_Id(t *testing.T) {
 		})
 		return nil
 	}))
-}
-
-func TestAAA(t *testing.T) {
-	SyncEmbedRule(func(process float64, ruleName string) {
-		log.Infof("sync embed rule: %s, process: %f", ruleName, process)
-	})
 }
