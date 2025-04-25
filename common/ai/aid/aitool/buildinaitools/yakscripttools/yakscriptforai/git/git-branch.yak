@@ -1,0 +1,27 @@
+__DESC__ = <<<EOF
+
+EOF
+yakit.AutoInitYakit()
+
+repos = cli.String("repos", cli.setRequired(true), cli.setHelp("target git repos"))
+// repos = "/Users/v1ll4n/Projects/yaklang"
+limit = cli.Int("limit", cli.setRequired(true), cli.setDefault(20), cli.setHelp("set limit for fetch branch, use offset at same time can read chunk"))
+offset = cli.Int("offset", cli.setRequired(true), cli.setDefault(0), cli.setHelp("offset from start index, use it can read chunk"))
+cli.check()
+
+count := 0
+branches, err := git.Branch(repos /*type: string*/)
+if err != nil {
+    yakit.Error("fetch branches ERR: %v", err)
+    return
+}
+total := len(branches)
+count = 0
+start = offset
+end = offset + limit
+for i in branches {
+    count++
+    if count <= start { continue }
+    yakit.Info("[%v/%v]: %v", count, total, i)
+    if count >= end { return }
+}
