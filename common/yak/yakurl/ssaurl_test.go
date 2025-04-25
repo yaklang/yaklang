@@ -41,16 +41,21 @@ func CheckSSADB(local ypb.YakClient, path string) error {
 	spew.Dump(res)
 	return nil
 }
-func SendURL(local ypb.YakClient, program, path string, body string) ([]*ypb.YakURLResource, error) {
+func SendURL(local ypb.YakClient, path string, result string) ([]*ypb.YakURLResource, error) {
 	url := &ypb.RequestYakURLParams{
 		Method: "GET",
 		Url: &ypb.YakURL{
 			Schema:   "syntaxflow",
-			Location: program,
+			Location: "",
 			Path:     path,
-			Query:    []*ypb.KVPair{},
+			Query: []*ypb.KVPair{
+				{
+					Key: "result_id",
+					// check  this value all not empty
+					Value: result,
+				},
+			},
 		},
-		Body: []byte(body),
 	}
 	spew.Dump(url)
 	res, err := local.RequestYakURL(context.Background(), url)
