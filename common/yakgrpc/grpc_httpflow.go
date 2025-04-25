@@ -280,7 +280,7 @@ func (s *Server) SetTagForHTTPFlow(ctx context.Context, req *ypb.SetTagForHTTPFl
 	if len(req.GetCheckTags()) > 0 {
 		err := utils.GormTransaction(s.GetProjectDatabase(), func(tx *gorm.DB) error {
 			for _, i := range req.GetCheckTags() {
-				err := s.SaveSetTagForHTTPFlow(i.GetId(), i.GetHash(), i.GetTags())
+				err := yakit.SaveSetTagForHTTPFlow(tx, i.GetId(), i.GetHash(), i.GetTags())
 				if err != nil {
 					return err
 				}
@@ -291,7 +291,7 @@ func (s *Server) SetTagForHTTPFlow(ctx context.Context, req *ypb.SetTagForHTTPFl
 			return nil, err
 		}
 	} else {
-		err := s.SaveSetTagForHTTPFlow(req.GetId(), req.GetHash(), req.GetTags())
+		err := yakit.SaveSetTagForHTTPFlow(s.GetProjectDatabase(), req.GetId(), req.GetHash(), req.GetTags())
 		if err != nil {
 			return nil, err
 		}
@@ -300,26 +300,7 @@ func (s *Server) SetTagForHTTPFlow(ctx context.Context, req *ypb.SetTagForHTTPFl
 }
 
 func (s *Server) SaveSetTagForHTTPFlow(id int64, hash string, tags []string) error {
-	flow, err := yakit.GetHTTPFlowByIDOrHash(s.GetProjectDatabase(), id, hash)
-	if err != nil {
-		return err
-	}
-	// flow.AddTag(tags...)
-	extLen := len(tags)
-	tagsData := make([]string, extLen)
-	if extLen > 0 {
-		for i := 0; i < extLen; i++ {
-			tagsData[i] = tags[i]
-		}
-	}
-	flow.Tags = strings.Join(utils.RemoveRepeatStringSlice(tagsData), "|")
-	err = yakit.UpdateHTTPFlowTags(s.GetProjectDatabase(), flow)
-	m, _ := model.ToHTTPFlowGRPCModel(flow, true)
-	model.SetHTTPFlowCacheGRPCModel(flow, false, m)
-	if err != nil {
-		return err
-	}
-	return nil
+	return yakit.SaveSetTagForHTTPFlow(s.GetProjectDatabase(), id, hash, tags)
 }
 
 // 似乎已弃用？没有调用

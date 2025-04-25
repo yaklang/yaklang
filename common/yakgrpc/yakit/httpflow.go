@@ -617,6 +617,29 @@ func GetHTTPFlowByIDOrHash(db *gorm.DB, id int64, hash string) (*schema.HTTPFlow
 	return &req, nil
 }
 
+func SaveSetTagForHTTPFlow(db *gorm.DB, id int64, hash string, tags []string) error {
+	flow, err := GetHTTPFlowByIDOrHash(db, id, hash)
+	if err != nil {
+		return err
+	}
+	// flow.AddTag(tags...)
+	extLen := len(tags)
+	tagsData := make([]string, extLen)
+	if extLen > 0 {
+		for i := 0; i < extLen; i++ {
+			tagsData[i] = tags[i]
+		}
+	}
+	flow.Tags = strings.Join(utils.RemoveRepeatStringSlice(tagsData), "|")
+	err = UpdateHTTPFlowTags(db, flow)
+	m, _ := model.ToHTTPFlowGRPCModel(flow, true)
+	model.SetHTTPFlowCacheGRPCModel(flow, false, m)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func GetHttpFlowByRuntimeId(db *gorm.DB, rid string) (*schema.HTTPFlow, error) {
 	var req schema.HTTPFlow
 	if dbx := db.Model(&schema.HTTPFlow{}).Where("runtime_id=?", rid).First(&req); dbx.Error != nil {
