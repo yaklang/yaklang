@@ -32,6 +32,7 @@ type HTTPFlow struct {
 	Url                string `gorm:"index" json:"url,omitempty"`
 	Path               string `json:"path,omitempty"`
 	Method             string `json:"method,omitempty"`
+	RequestLength      int64  `json:"request_length,omitempty"`
 	BodyLength         int64  `json:"body_length,omitempty"`
 	ContentType        string `json:"content_type,omitempty"`
 	StatusCode         int64  `json:"status_code,omitempty"`

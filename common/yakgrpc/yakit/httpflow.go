@@ -316,6 +316,7 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		Path:                       requestUri,
 		Method:                     method,
 		BodyLength:                 int64(len(body)),
+		RequestLength:              int64(len(requestRaw)),
 		ContentType:                rspContentType,
 		StatusCode:                 int64(lowhttp.ExtractStatusCodeFromResponse(rspRaw)),
 		SourceType:                 source,
@@ -756,6 +757,9 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 		params.Keyword = strings.Trim(strconv.Quote(params.Keyword), "\"")
 	}
 	db = bizhelper.FuzzSearchEx(db, keywordFields, params.GetKeyword(), false)
+	if params.GetPayloadKeyword() != "" {
+		db = bizhelper.FuzzQueryStringArrayOrLike(db, "payload", []string{params.GetPayloadKeyword()})
+	}
 	if len(params.GetExcludeKeywords()) > 0 {
 		for _, keyword := range params.GetExcludeKeywords() {
 			db = bizhelper.FuzzSearchNotEx(db, []string{
@@ -912,6 +916,7 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	if params.BeforeBodyLength > 0 {
 		db = db.Where("body_length <= ?", params.BeforeBodyLength)
 	}
+
 	if len(params.ProcessName) > 0 {
 		db = bizhelper.ExactQueryStringArrayOr(db, "process_name", params.ProcessName)
 	}
