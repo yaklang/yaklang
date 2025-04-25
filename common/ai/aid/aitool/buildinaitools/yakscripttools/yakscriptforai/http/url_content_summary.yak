@@ -1,3 +1,5 @@
+__KEYWORDS__ = "web scraper,url retrieval,html parsing,page title,text extraction,get request,http,web page,content extraction,web crawling"
+
 __DESC__ = <<<EOF
 Retrieves the content of a specified URL via a GET request.
 Logs the response headers and body size.

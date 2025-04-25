@@ -1,3 +1,5 @@
+__KEYWORDS__ = "file search,directory search,pattern matching,file filtering,regular expression,glob pattern,file size,file type,recursive search,file extension"
+
 __DESC__ = <<<EOF
 Find files within a specified directory based on a pattern and various filters. This tool recursively searches a directory for files that match a given pattern.  It supports filtering by file type (file or directory), file extension, and file size.  The matching pattern can be interpreted as a substring, a regular expression, or a glob pattern.  The search is limited to a maximum number of results.
 EOF
