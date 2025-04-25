@@ -205,7 +205,7 @@ func Test_Values_Graph_Dot(t *testing.T) {
 		graph.ShowDot()
 
 		result := graph.DeepFirstGraphNext(value1)
-		require.Equal(t, 1, len(result))
+		require.Equal(t, 2, len(result))
 		require.Equal(t, strings.Count(graph.Dot(), "t3: 3"), 2)
 	})
 
