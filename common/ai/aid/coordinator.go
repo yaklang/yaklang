@@ -66,6 +66,8 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...Opt
 }
 
 func (c *Coordinator) Run() error {
+
+	c.CreateDatabaseSchema()
 	c.config.EmitInfo("start to create plan request")
 	planReq, err := c.createPlanRequest(c.userInput)
 	if err != nil {

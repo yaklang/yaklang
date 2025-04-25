@@ -100,6 +100,10 @@ var ProjectTables = []interface{}{
 
 	// Note
 	&Note{},
+
+	// AI
+	&AiCoordinatorRuntime{},
+	&AiCheckpoint{},
 }
 
 func RegisterDatabaseSchema(key uint8, schema ...any) {
