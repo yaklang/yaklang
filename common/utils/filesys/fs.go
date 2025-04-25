@@ -63,16 +63,16 @@ func glance(i filesys_interface.FileSystem) string {
 			dirCount++
 		} else {
 			fileCount++
-			if fileCount <= 0 {
+			if fileCount <= 10 {
 				first10files = append(first10files, pathname)
 			}
 		}
 		return nil
 	}), WithFileSystem(i))
 
-	buf.WriteString(fmt.Sprintf("total: %v[dir: %v file: %v]\b", fileCount+dirCount, dirCount, fileCount))
+	buf.WriteString(fmt.Sprintf("total: %v[dir: %v file: %v]\n", fileCount+dirCount, dirCount, fileCount))
 	if len(first10files) > 0 {
-		buf.WriteString("glance first files...\n")
+		buf.WriteString("glance some first files...\n")
 		for idx, line := range first10files {
 			buf.WriteString(fmt.Sprintf("  %d. %v\n", idx, line))
 		}

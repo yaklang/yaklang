@@ -3,12 +3,11 @@ __DESC__ = <<<EOF
 EOF
 yakit.AutoInitYakit()
 
-// repos = cli.String("repos", cli.setRequired(true), cli.setHelp("target git repos"))
-// refname = cli.String("ref", cli.setRequired(false), cli.setDefault("HEAD"), cli.setHelp("the ref name u want to blame from"))
+repos = cli.String("repos", cli.setRequired(true), cli.setHelp("target git repos"))
+refname = cli.String("ref", cli.setRequired(false), cli.setDefault("HEAD"), cli.setHelp("the commit hash or rev ref u want to dump filesystem from"))
 
-repos = `/Users/v1ll4n/Projects/yaklang`
-refname = "HEAD"
-
+// repos = `/Users/v1ll4n/Projects/yaklang`
+// refname = "HEAD"
 limit = cli.Int("limit", cli.setRequired(true), cli.setDefault(20), cli.setHelp("set limit for fetch branch, use offset at same time can read chunk"))
 offset = cli.Int("offset", cli.setRequired(true), cli.setDefault(0), cli.setHelp("offset from start index, use it can read chunk"))
 cli.check()
@@ -30,3 +29,4 @@ if err != nil {
     return
 }
 yakit.Info("commit %v in localfs: %v", hash, localDirname)
+yakit.Info(filesys.Glance(localDirname))
