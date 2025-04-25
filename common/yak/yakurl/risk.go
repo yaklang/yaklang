@@ -68,13 +68,16 @@ type riskTreeAction struct {
 					},
 					// ResourceType == risk
 					{
-						Key: "risk_id"
+						Key: "id"
 					}
 					{
-						Key: "risk_hash"
+						Key: "hash"
 					}
 					{
 						Key: "code_range"
+					}
+					{
+						Key: "severity"
 					}
 			}
 		}
@@ -268,9 +271,10 @@ type SSARiskCountInfo struct {
 	Count int64  `json:"count"`
 
 	Title     string `json:"title"`
-	RiskID    int64  `json:"risk_id"`
-	RiskHash  string `json:"risk_hash"`
+	Id        int64  `json:"id"`
+	Hash      string `json:"hash"`
 	CodeRange string `json:"code_range"`
+	Severity  string `json:"severity"`
 }
 
 func GetSSARiskCountInfo(filter *SSARiskCountFilter) ([]*SSARiskCountInfo, error) {
@@ -290,7 +294,7 @@ func GetSSARiskCountInfo(filter *SSARiskCountFilter) ([]*SSARiskCountInfo, error
 	case SSARiskLevelFunction:
 		db = db.Select("function_name as name, COUNT(*) as count").Group("function_name")
 	case SSARiskLevelRisk:
-		db = db.Select("title_verbose as name, 1 as count, title , id as risk_id, hash as risk_hash, code_range")
+		db = db.Select("title_verbose as name, 1 as count, title , id , hash , code_range, severity")
 	default:
 		return nil, utils.Errorf("unknown level: %s", filter.Level)
 	}
@@ -317,12 +321,13 @@ func ConvertSSARiskCountInfoToResource(originParam *ypb.YakURL, countFilter *SSA
 	case SSARiskLevelFunction:
 		filter.FunctionName = append(filter.FunctionName, rc.Name)
 	case SSARiskLevelRisk:
-		filter.Hash = append(filter.Hash, rc.RiskHash)
-		filter.ID = append(filter.ID, rc.RiskID)
+		filter.Hash = append(filter.Hash, rc.Hash)
+		filter.ID = append(filter.ID, rc.Id)
 		extraData = append(extraData,
-			extra{"id", rc.RiskID},
-			extra{"hash", rc.RiskHash},
+			extra{"id", rc.Id},
+			extra{"hash", rc.Hash},
 			extra{"code_range", rc.CodeRange},
+			extra{"severity", rc.Severity},
 		)
 		if rc.Name == "" {
 			rc.Name = rc.Title
@@ -346,7 +351,7 @@ func ConvertSSARiskCountInfoToResource(originParam *ypb.YakURL, countFilter *SSA
 	res := createNewRes(originParam, 0, extraData)
 
 	if countFilter.Level == SSARiskLevelRisk {
-		res.Path = path.Join(originParam.Path, rc.RiskHash)
+		res.Path = path.Join(originParam.Path, rc.Hash)
 	} else {
 		res.Path = path.Join(originParam.Path, rc.Name)
 	}
