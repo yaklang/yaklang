@@ -3,6 +3,7 @@ desc(
     type: audit,
     level: info,
     lib: 'golang-file-write-os',
+    rule_id: 10000018,
     desc: <<<TEXT
 此规则用于审计Go语言项目中文件写入功能的安全性。
 TEXT

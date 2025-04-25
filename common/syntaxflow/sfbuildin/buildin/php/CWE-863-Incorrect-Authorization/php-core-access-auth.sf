@@ -3,6 +3,7 @@ title: "Insecure File Operation",
 title_zh: "未经验证的文件操作风险",
 type: vul,
 risk: "file-operation",
+   rule_id: 30863001,
 desc: <<<TEXT
     检测未经验证的用户输入直接用于文件操作系统函数,可能导致任意文件读取、写入、删除等风险,建议对用户输入进行严格过滤或验证,避免直接传递给文件操作系统函数.
 TEXT

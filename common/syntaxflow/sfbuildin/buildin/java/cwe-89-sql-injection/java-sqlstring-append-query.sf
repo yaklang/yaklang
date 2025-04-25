@@ -2,6 +2,7 @@ desc(
     title: "Find sqlString.append() Query, Prompt a SQL Injection Checking",
     type: audit,
     level: low,
+    rule_id: 20089006,
     desc: <<<TEXT
 本提示并不代表真实漏洞，而是代码中不安全的用法，可能会有潜在威胁。
 

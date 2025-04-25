@@ -3,6 +3,7 @@ desc(
     title_zh: "代码执行",
     risk: "code-execution",
     type: vul,
+    rule_id: 30078002,
     desc: <<<TEXT
     检测到代码中直接使用 eval、create_function、assert 等函数，若参数来源于未经验证的外部输入，可能导致代码执行风险。修复方法包括验证输入、过滤输出、禁用危险函数等。
 TEXT

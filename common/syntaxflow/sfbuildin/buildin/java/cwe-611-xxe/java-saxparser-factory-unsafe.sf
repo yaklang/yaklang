@@ -2,6 +2,7 @@ desc(
     title: "Find SAXParserFactory() Unsafe Use in Context Sink",
     title_zh: "检测 SAXParserFactory() 不安全使用",
     type: vuln,
+    rule_id:20611003,
     risk: "XXE",
     reference: <<<URL
 https://docs.oracle.com/javase/8/docs/api/javax/xml/parsers/SAXParserFactory.html

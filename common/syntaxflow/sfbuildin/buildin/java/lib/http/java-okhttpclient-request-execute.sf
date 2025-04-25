@@ -1,5 +1,6 @@
 desc(
     title: "Find OkHttpClient Uses and Executing Request",
+    rule_id: 20000036,
     type: audit,
     lib: "java-okhttpclient-request-execute",
 )

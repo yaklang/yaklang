@@ -1,6 +1,7 @@
 desc(
     title: "golang SQL Injection(Reform)",
     type: audit,
+    rule_id: 10089006,
     severity: high,
     desc: <<<TEXT
 SQL 注入漏洞是一种严重的安全漏洞，它允许攻击者通过操控应用程序的数据库查询，执行任意 SQL 代码。在 Go 语言中使用 GORM 框架时，如果直接将用户输入拼接到 SQL 查询中，而未进行适当的过滤或参数化，攻击者可能会利用此漏洞绕过认证、访问或修改敏感数据，甚至执行数据库管理操作，如删除表或关闭数据库服务。

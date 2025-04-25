@@ -3,6 +3,7 @@ desc(
     title_zh: 'Servlet & Springframework 基础参数命令注入',
     type: vuln,
     risk:"命令注入",
+    rule_id: 20077001,
     desc: <<<TEXT
     该规则用于审计Java代码中以Servlet和Springframework传入命令注入的参数为污染源(source)，以命令执行为污染汇聚点(sink)的命令执行规则。
     规则覆盖的命令执行点包括：

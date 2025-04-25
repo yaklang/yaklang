@@ -2,6 +2,7 @@ desc(
     title: "Find javax.script.* ScriptEngineManager eval Sink",
     type: audit,
     lib: "java-js-sink",
+    rule_id: 20000009,
 )
 
 /(getEngineByName|getEngineByExtension|getEngineByMimeType)/<getCall> as $toCheck;

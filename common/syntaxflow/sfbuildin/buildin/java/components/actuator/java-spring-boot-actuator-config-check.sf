@@ -1,6 +1,7 @@
 desc(
     title:"Check Java Spring Boot Actuator Config",
     title_zh:"检查Java Spring Boot Actuator配置",
+    rule_id:21105001,
     type:config,
     desc:<<<TEXT
 Java Spring Boot Actuator是Spring Boot的一个子项目，它提供了一组监控和管理生产环境的工具。该规则检查Java Spring Boot Actuator配置是否存在安全风险。

@@ -3,6 +3,7 @@ desc(
    title_zh: "sql信息泄漏",
    type: vul,
    risk: "sql-information-exposure",
+   rule_id: 30200003,
    desc: <<<TEXT
     检测可能暴露敏感信息的PHP函数调用，包括：
         1. MySQL相关：错误信息(mysql_error)、数据库元数据(mysql_get_host_info)、会话信息等

@@ -3,6 +3,7 @@ desc(
     type: audit,
     level: info,
     lib: 'php-file-read',
+    rule_id: 30000005,
     desc: <<<TEXT
 此规则用于审计PHP代码中是否存在不安全的文件读取函数使用。文件读取函数如`file_get_contents`、`file`、`readfile`、`fgetss`、`fgets`和`fread`等，如果未对输入进行严格的验证和过滤，可能会被恶意用户利用来读取服务器上的敏感文件，导致信息泄露。因此，建议对这类函数的使用进行安全审查，确保它们不会暴露潜在的安全风险。
 TEXT

@@ -3,6 +3,7 @@ desc(
     title_zh:"查找Java Spring Framework RestTemplate 请求API的Sink参数",
     type: audit,
     lib: "java-spring-rest-template-request-params",
+    rule_id: 20000002,
     reference:<<<TEXT
     https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/client/RestTemplate.html
 TEXT

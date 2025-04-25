@@ -2,6 +2,7 @@ desc(
     title_zh: "识别到 Java Spring Framework 中处理 ModelAndView 时直接传入 String 类型参数",
     title: "Recognize Java Spring Framework code handling ModelAndView with String type parameter",
     type: audit,
+    rule_id:21336004,
     level: mid,
     risk:ssti,
     desc: <<<TEXT

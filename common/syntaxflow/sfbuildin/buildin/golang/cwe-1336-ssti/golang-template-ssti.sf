@@ -2,6 +2,7 @@ desc(
     title: "golang SSTI(template)",
     type: audit,
     severity: high,
+    rule_id: 11336001,
     desc: <<<TEXT
 在 Go 语言中，CWE-1336（Server-Side Template Injection, SSTI）漏洞通常发生在使用模板引擎时，未对用户输入进行严格过滤，导致攻击者可以注入恶意代码。SSTI 漏洞可能导致任意代码执行、敏感信息泄露或服务中断，因此属于高风险漏洞。
 

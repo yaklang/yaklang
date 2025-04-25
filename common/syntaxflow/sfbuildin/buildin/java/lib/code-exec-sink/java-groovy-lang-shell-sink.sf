@@ -3,6 +3,7 @@ desc(
     title:'Find Java GroovyShell Code Execution Sink Point',
     lib: 'java-groovy-lang-shell-sink',
     type: audit,
+    rule_id: 20000028,
     reference:<<<URL
     https://docs.groovy-lang.org/latest/html/api/groovy/lang/GroovyShell.html
 URL

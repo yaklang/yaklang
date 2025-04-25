@@ -2,6 +2,7 @@ desc(
     title:"Check Message Exposure Through PrintStackTrace",
     title_zh:"检查通过PrintStackTrace泄露信息",
     type:security,
+    rule_id:20020901,
     desc:<<<TEXT
 在Java中，PrintStackTrace是一个用于打印异常堆栈信息的方法。在生产环境中，如果异常信息中包含敏感信息，通过PrintStackTrace打印异常堆栈信息可能会导致敏感信息泄露。因此，应该避免在生产环境中使用PrintStackTrace打印异常堆栈信息。
 TEXT

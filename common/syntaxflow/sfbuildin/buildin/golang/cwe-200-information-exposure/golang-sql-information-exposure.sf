@@ -2,6 +2,7 @@ desc(
     title: "golang SQL information exposure",
     type: audit,
     severity: low,
+    rule_id: 10200002,
     desc: <<<TEXT
 检测可能通过SQL相关函数泄露服务器敏感信息，包括：
     1. 目录结构暴露

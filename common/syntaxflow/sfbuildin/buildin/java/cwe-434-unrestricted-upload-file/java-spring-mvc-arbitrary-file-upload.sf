@@ -1,6 +1,7 @@
 desc(
     title_zh:"检测Spring MVC任意文件上传漏洞",
     title: "Check Spring MVC Arbitrary File Upload Vulnerability",
+    rule_id: 20434002,
     risk:"任意文件上传",
     desc:<<<TEXT
     该规则用于检测Spring MVC框架中是否存在使用MultipartFile的任意文件上传漏洞。

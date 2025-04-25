@@ -4,6 +4,7 @@ desc(
     level: high,
     type: audit,
     risk: "xxe",
+   rule_id: 30611002,
     desc: <<<TEXT
     XXE漏洞是一种常见的安全漏洞，攻击者可以通过构造恶意XML文件，读取服务器上的敏感文件，甚至执行远程代码。在PHP应用程序中，如果开发者未能正确处理XML文件,可能会导致XXE漏洞。建议在使用simplexml_load_string函数时，设置第三个参数为LIBXML_NOENT，以防止XXE漏洞。
 TEXT

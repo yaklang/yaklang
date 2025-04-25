@@ -3,6 +3,7 @@ desc(
     type: audit,
     level: info,
     lib: 'golang-xml-sink',
+    rule_id: 10000026,
     desc: <<<TEXT
 此规则旨在审计Go语言代码中`xml`包的使用情况。
 TEXT

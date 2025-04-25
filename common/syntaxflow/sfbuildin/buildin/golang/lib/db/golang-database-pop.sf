@@ -3,6 +3,7 @@ desc(
     type: audit,
     level: info,
     lib: 'golang-database-pop',
+    rule_id: 10000002,
     desc: <<<TEXT
 此规则旨在审计使用`github.com/gobuffalo/pop`库的Go语言项目中数据库操作的安全性。`pop`库是一个流行的Go ORM（对象关系映射）库，用于在Go应用程序中方便地管理数据库操作。此审计规则会检查项目中是否正确、安全地使用了数据库连接和操作功能。不当的数据库操作可能会导致SQL注入、数据泄露等安全风险，因此建议开发者遵循最佳实践，确保数据库操作的安全性。
 TEXT

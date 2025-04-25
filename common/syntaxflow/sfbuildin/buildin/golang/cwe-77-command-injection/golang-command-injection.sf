@@ -2,6 +2,7 @@ desc(
     title: "golang Command Injection",
     type: audit,
     severity: high,
+    rule_id: 10077001,
     desc: <<<TEXT
 命令注入漏洞（Command Injection）允许攻击者通过输入恶意数据来执行任意命令。在 Golang 应用程序中，如果使用 `os/exec` 包执行外部命令时未对用户输入进行适当的清理和验证，攻击者可以通过构造特殊的输入来执行不受信任的命令，进而控制服务器或访问敏感数据。
 

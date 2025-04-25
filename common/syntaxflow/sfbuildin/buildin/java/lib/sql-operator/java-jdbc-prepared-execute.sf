@@ -2,7 +2,8 @@ desc(
     title: "JDBC getConnection.prepareStatement.executeQuery SQL",
     title_zh: "JDBC getConnection.prepareStatement.executeQuery SQL 执行语句",
     type: audit,
-    lib: 'java-jdbc-prepared-execute-sink'
+    lib: 'java-jdbc-prepared-execute-sink',
+    rule_id: 20000018
 )
 
 DriverManager.getConnection() as $conn;

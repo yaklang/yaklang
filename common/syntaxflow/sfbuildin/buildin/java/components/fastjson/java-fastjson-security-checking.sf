@@ -1,6 +1,7 @@
 desc(
     title: 'FastJson Security Checking',
     title_zh: 'FastJson 安全检查',
+    rule_id:21105002,
     type: vuln,
     level: high,
     desc: <<<TEXT

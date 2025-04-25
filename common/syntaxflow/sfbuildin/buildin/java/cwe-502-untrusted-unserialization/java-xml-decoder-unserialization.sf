@@ -2,6 +2,7 @@ desc(
     title_zh:"检测Java XMLDecoder反序列化漏洞",
     title:"Check Java XMLDecoder Unserialization",
     type:vul,
+    rule_id: 20502003,
     reference:<<<URL
     https://docs.oracle.com/javase/8/docs/api/java/beans/XMLDecoder.html
 URL

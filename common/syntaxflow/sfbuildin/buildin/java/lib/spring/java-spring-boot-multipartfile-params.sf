@@ -3,6 +3,7 @@ desc(
     title: "Find Spring Framework MultipartFile TransferTo Target",
     type: audit,
     lib: "java-spring-multipartfile-transferTo-target",
+    rule_id: 20000004,
     reference:<<<URL
     https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/multipart/MultipartFile.html
 URL

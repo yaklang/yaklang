@@ -3,6 +3,7 @@ desc(
     title_zh: "查找Java中含有主机名前缀的漏洞过滤器",
     lib: 'java-filter-hostname-prefix',
     type: audit,
+    rule_id: 20000013,
     desc: <<<TEXT
     该规则用于查找输入的字符串常量是否包含，当不可信输入与主机名前缀连接时，将会对可能存在的漏洞风险进行限制。
     该规则会匹配包含URL的锚点`#`、URL的查询参数`?`以及单个路径分隔符的`/`主机名前缀。值得注意的是，该规则不会匹配URL的协议前缀`http://`、`https://`等，
