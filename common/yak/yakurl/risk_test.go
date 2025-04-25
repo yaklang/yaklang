@@ -374,6 +374,8 @@ func initRiskTest(t *testing.T, programName string) {
 		Title:         "test1",
 		FromRule:      "rule1",
 		ResultID:      1,
+		Variable:      "a",
+		Index:         1,
 	})
 	require.NoError(t, err)
 
@@ -384,6 +386,8 @@ func initRiskTest(t *testing.T, programName string) {
 		Title:         "test2",
 		FromRule:      "rule2",
 		ResultID:      2,
+		Variable:      "b1",
+		Index:         2,
 	})
 	require.NoError(t, err)
 
@@ -394,6 +398,8 @@ func initRiskTest(t *testing.T, programName string) {
 		Title:         "test3",
 		FromRule:      "rule3",
 		ResultID:      3,
+		Variable:      "b2",
+		Index:         3,
 	})
 	require.NoError(t, err)
 
@@ -404,6 +410,8 @@ func initRiskTest(t *testing.T, programName string) {
 		Title:         "test4",
 		FromRule:      "rule2",
 		ResultID:      4,
+		Variable:      "c",
+		Index:         4,
 	})
 	require.NoError(t, err)
 
@@ -414,6 +422,8 @@ func initRiskTest(t *testing.T, programName string) {
 		Title:         "test5",
 		FromRule:      "",
 		ResultID:      5,
+		Variable:      "c",
+		Index:         5,
 	})
 	require.NoError(t, err)
 }
@@ -438,6 +448,7 @@ func GetSSARisk(t *testing.T, local ypb.YakClient, url *ypb.YakURL) map[string]d
 			require.Fail(t, "resource path same  %v", res.GetResources())
 		}
 		var count, filterCount int
+		var result_id, variable, index string
 		log.Infof("resource: %v", resource)
 		for _, extra := range resource.Extra {
 			if extra.Key == "count" {
@@ -454,20 +465,39 @@ func GetSSARisk(t *testing.T, local ypb.YakClient, url *ypb.YakURL) map[string]d
 				require.NoError(t, err)
 				filterCount = paging.TotalRecord
 			}
-			if resource.ResourceType == string(yakurl.SSARiskLevelRisk) {
-				if extra.Key == "hash" {
-					paging, _, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
-						Hash: []string{extra.Value},
-					}, nil)
-					require.NoError(t, err)
-					require.Equal(t, 1, paging.TotalRecord, "result_hash not exist: %s", extra.Value)
-				}
-
-				if extra.Key == "severity" {
-					// haveSeverity := true
-					require.Contains(t, schema.GetAllSFSeverityTypes(), string(schema.ValidSeverityType(extra.Value)))
-				}
+			if extra.Key == "hash" {
+				paging, _, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
+					Hash: []string{extra.Value},
+				}, nil)
+				require.NoError(t, err)
+				require.Equal(t, 1, paging.TotalRecord, "result_hash not exist: %s", extra.Value)
 			}
+
+			if extra.Key == "severity" {
+				// haveSeverity := true
+				require.Contains(t, schema.GetAllSFSeverityTypes(), string(schema.ValidSeverityType(extra.Value)))
+			}
+
+			if extra.Key == "result_id" {
+				result_id = extra.Value
+			}
+			if extra.Key == "variable" {
+				variable = extra.Value
+			}
+			if extra.Key == "index" {
+				index = extra.Value
+			}
+			// }
+		}
+
+		if resource.ResourceType == string(yakurl.SSARiskLevelRisk) {
+			require.NotEmpty(t, result_id)
+			require.NotEmpty(t, variable)
+			require.NotEmpty(t, index)
+			// TODO: this risk data build manual
+			// data, err := SendURL(local, fmt.Sprintf("/%s/%s", variable, index), result_id)
+			// log.Info("data--", data)
+			// require.NoError(t, err)
 		}
 		require.Equal(t, count, filterCount, "filter count not equal with msg count")
 		got[resource.Path] = data{
