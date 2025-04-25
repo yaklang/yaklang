@@ -3,6 +3,11 @@ package aid
 import (
 	"bytes"
 	"context"
+	"io"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -14,7 +19,8 @@ import (
 )
 
 type AIRequest struct {
-	prompt string
+	prompt    string
+	startTime time.Time
 }
 
 func (r *AIRequest) GetPrompt() string {
@@ -25,6 +31,9 @@ type AIResponse struct {
 	ch                  *chanx.UnlimitedChan[*OutputStream]
 	enableDebug         bool
 	consumptionCallback func(current int)
+
+	respStartTime time.Time
+	reqStartTime  time.Time
 }
 
 func (a *AIResponse) Debug(i ...bool) {
@@ -216,18 +225,18 @@ func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, config *C
 			}
 			if i.IsReason {
 				if system {
-					config.EmitSystemReasonStreamEvent(nodeId, targetStream)
+					config.EmitSystemReasonStreamEvent(nodeId, a.respStartTime, targetStream)
 				} else {
-					config.EmitReasonStreamEvent(nodeId, targetStream)
+					config.EmitReasonStreamEvent(nodeId, a.respStartTime, targetStream)
 				}
 				continue
 			}
 
 			targetStream = io.TeeReader(targetStream, pw)
 			if system {
-				config.EmitSystemStreamEvent(nodeId, targetStream)
+				config.EmitSystemStreamEvent(nodeId, a.respStartTime, targetStream)
 			} else {
-				config.EmitStreamEvent(nodeId, targetStream)
+				config.EmitStreamEvent(nodeId, a.respStartTime, targetStream)
 			}
 		}
 		config.WaitForStream()
@@ -245,7 +254,8 @@ type AIRequestOption func(req *AIRequest)
 
 func NewAIRequest(prompt string, opt ...AIRequestOption) *AIRequest {
 	req := &AIRequest{
-		prompt: prompt,
+		prompt:    prompt,
+		startTime: time.Now(),
 	}
 	for _, i := range opt {
 		i(req)
