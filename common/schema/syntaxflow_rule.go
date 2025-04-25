@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -203,17 +204,32 @@ type SyntaxFlowRule struct {
 }
 
 func (s *SyntaxFlowRule) CalcHash() string {
-	s.Hash = utils.CalcSha256(s.RuleName, s.Content, s.Tag, s.OpCodes)
+	s.Hash = utils.CalcSha256(s.RuleId, s.RuleName, s.Content, s.Tag, s.OpCodes)
 	return s.Hash
 }
 
 func (s *SyntaxFlowRule) BeforeSave() error {
+	if s.RuleId == "" {
+		s.RuleId = uuid.NewString()
+	}
 	s.CalcHash()
 	s.Purpose = ValidPurpose(s.Purpose)
 	s.Type = ValidRuleType(s.Type)
 	s.Severity = ValidSeverityType(s.Severity)
 	return nil
 }
+
+func (s *SyntaxFlowRule) BeforeCreate() error {
+	if s.RuleId == "" {
+		s.RuleId = uuid.NewString()
+	}
+	s.CalcHash()
+	s.Purpose = ValidPurpose(s.Purpose)
+	s.Type = ValidRuleType(s.Type)
+	s.Severity = ValidSeverityType(s.Severity)
+	return nil
+}
+
 func (s *SyntaxFlowRule) GetAlertInfo(name string) (*SyntaxFlowDescInfo, bool) {
 	if info, ok := s.AlertDesc[name]; ok {
 		return info, true
