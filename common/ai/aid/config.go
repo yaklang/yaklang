@@ -3,12 +3,13 @@ package aid
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"math/rand/v2"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -42,6 +43,7 @@ const (
 )
 
 type Config struct {
+	idSequence  int64
 	idGenerator func() int64
 
 	m  *sync.Mutex
@@ -98,6 +100,14 @@ type Config struct {
 
 	resultHandler          func(*Config)
 	extendedActionCallback map[string]func(config *Config, action *Action)
+}
+
+func (c *Config) AcquireId() int64 {
+	return c.idGenerator()
+}
+
+func (c *Config) GetSequenceStart() int64 {
+	return c.idSequence
 }
 
 func (c *Config) CallAI(request *AIRequest) (*AIResponse, error) {
@@ -203,8 +213,8 @@ func newConfig(ctx context.Context) *Config {
 	m := GetDefaultMemory()
 
 	var idGenerator = new(int64)
-	atomic.AddInt64(idGenerator, rand.Int64N(2000))
 	c := &Config{
+		idSequence: atomic.AddInt64(idGenerator, rand.Int64N(2000)),
 		idGenerator: func() int64 {
 			return atomic.AddInt64(idGenerator, 1)
 		},
