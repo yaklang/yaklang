@@ -1,7 +1,11 @@
 package filesys
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
+	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"os"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -47,6 +51,48 @@ func SimpleRecursive(opts ...Option) error {
 func Recursive(raw string, opts ...Option) error {
 	c := NewConfig()
 	return recursive(raw, *c, opts...)
+}
+
+func glance(i filesys_interface.FileSystem) string {
+	var buf bytes.Buffer
+	var fileCount = 0
+	var dirCount = 0
+	var first10files []string
+	err := Recursive(".", WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
+		if isDir {
+			dirCount++
+		} else {
+			fileCount++
+			if fileCount <= 0 {
+				first10files = append(first10files, pathname)
+			}
+		}
+		return nil
+	}), WithFileSystem(i))
+
+	buf.WriteString(fmt.Sprintf("total: %v[dir: %v file: %v]\b", fileCount+dirCount, dirCount, fileCount))
+	if len(first10files) > 0 {
+		buf.WriteString("glance first files...\n")
+		for idx, line := range first10files {
+			buf.WriteString(fmt.Sprintf("  %d. %v\n", idx, line))
+		}
+		if fileCount > len(first10files) {
+			buf.WriteString("...\n")
+		}
+	}
+	if err != nil {
+		buf.WriteString("\nWARN:" + err.Error())
+	}
+	return buf.String()
+}
+
+// Glance is for quickly viewing the basic info in fs
+func Glance(localfile any) string {
+	switch ret := localfile.(type) {
+	case filesys_interface.FileSystem:
+		return glance(ret)
+	}
+	return glance(NewRelLocalFs(utils.InterfaceToString(localfile)))
 }
 
 var SkipDir = errors.New("skip dir")

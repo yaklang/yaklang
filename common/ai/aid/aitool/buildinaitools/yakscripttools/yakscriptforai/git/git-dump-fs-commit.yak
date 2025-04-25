@@ -1,0 +1,32 @@
+__DESC__ = <<<EOF
+
+EOF
+yakit.AutoInitYakit()
+
+// repos = cli.String("repos", cli.setRequired(true), cli.setHelp("target git repos"))
+// refname = cli.String("ref", cli.setRequired(false), cli.setDefault("HEAD"), cli.setHelp("the ref name u want to blame from"))
+
+repos = `/Users/v1ll4n/Projects/yaklang`
+refname = "HEAD"
+
+limit = cli.Int("limit", cli.setRequired(true), cli.setDefault(20), cli.setHelp("set limit for fetch branch, use offset at same time can read chunk"))
+offset = cli.Int("offset", cli.setRequired(true), cli.setDefault(0), cli.setHelp("offset from start index, use it can read chunk"))
+cli.check()
+
+hash, err = git.RevParse(repos, refname)
+if err != nil {
+    yakit.Error(err.Error())
+    return
+}
+fs, err = git.FileSystemFromCommit(repos /*type: string*/, hash)
+if err != nil {
+    yakit.Error(err.Error())
+    return
+}
+local := filesys.CopyToTemporary(fs)
+localDirname, err = local.Getwd()
+if err != nil {
+    yakit.Error("dump to local temp file err: %v", err)
+    return
+}
+yakit.Info("commit %v in localfs: %v", hash, localDirname)

@@ -1,0 +1,28 @@
+__DESC__ = <<<EOF
+
+EOF
+yakit.AutoInitYakit()
+
+repos = cli.String("repos", cli.setRequired(true), cli.setHelp("target git repos"))
+filename = cli.String("filename", cli.setRequired(true), cli.setHelp("the file u want to blame"))
+refname = cli.String("ref", cli.setRequired(false), cli.setDefault("HEAD"), cli.setHelp("the ref name u want to blame from"))
+
+limit = cli.Int("limit", cli.setRequired(true), cli.setDefault(20), cli.setHelp("set limit for fetch branch, use offset at same time can read chunk"))
+offset = cli.Int("offset", cli.setRequired(true), cli.setDefault(0), cli.setHelp("offset from start index, use it can read chunk"))
+cli.check()
+
+lines, err = git.BlameCommit(repos, filename, refname)
+if err != nil {
+    yakit.Error("blame err: %v", err)
+    return
+}
+
+total = len(lines)
+start = offset
+end = offset + limit
+for idx, result := range lines {
+    count = idx + 1
+    if count <= start { continue }
+    if count >= end { return }
+    yakit.Info(result.String())
+}
