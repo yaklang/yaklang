@@ -137,13 +137,13 @@ func DeleteRuleByTitle(name string) error {
 	return db.Where("title = ? or title_zh = ?", name, name).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error
 }
 
-func CreateRuleByContent(ruleName string, content string, buildIn bool, tags ...string) (*schema.SyntaxFlowRule, error) {
-	languageRaw, _, _ := strings.Cut(ruleName, "-")
+func CreateRuleByContent(ruleFileName string, content string, buildIn bool, tags ...string) (*schema.SyntaxFlowRule, error) {
+	languageRaw, _, _ := strings.Cut(ruleFileName, "-")
 	language, err := CheckSyntaxFlowLanguage(languageRaw)
 	if err != nil {
 		log.Error(err)
 	}
-	ruleType, err := CheckSyntaxFlowRuleType(ruleName)
+	ruleType, err := CheckSyntaxFlowRuleType(ruleFileName)
 	if err != nil {
 		log.Error(err)
 	}
@@ -152,7 +152,7 @@ func CreateRuleByContent(ruleName string, content string, buildIn bool, tags ...
 		return nil, err
 	}
 	rule.Type = ruleType
-	rule.RuleName = ruleName
+	rule.RuleName = ruleFileName
 	rule.Language = string(language)
 	rule.Tag = strings.Join(tags, "|")
 	rule.IsBuildInRule = buildIn
@@ -162,6 +162,9 @@ func CreateRuleByContent(ruleName string, content string, buildIn bool, tags ...
 			rule.RuleName = rule.TitleZh
 		} else if rule.Title != "" {
 			rule.RuleName = rule.Title
+		} else {
+			log.Errorf("load rule %s failed:rule have not tiltle_name", ruleFileName)
+			return nil, nil
 		}
 	}
 	err = MigrateSyntaxFlow(rule.CalcHash(), rule)
