@@ -7,6 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/utils/graph"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type EdgeType string
@@ -35,6 +36,10 @@ type ValueGraph struct {
 	Value2Node     map[*Value]int   // ssaapi.Value -> node-id
 	marshaledValue map[int]struct{} // node-id ->  ssaapi.value
 	Node2Value     map[int]*Value
+
+	// hash(from-to) -> edge-type
+	// hash(to-from) -> edge-type
+	EdgeCache map[string]string
 }
 
 func NewValueGraph(v ...*Value) *ValueGraph {
@@ -46,6 +51,7 @@ func NewValueGraph(v ...*Value) *ValueGraph {
 		Value2Node:     make(map[*Value]int),
 		marshaledValue: make(map[int]struct{}),
 		Node2Value:     make(map[int]*Value),
+		EdgeCache:      make(map[string]string),
 	}
 	for _, value := range v {
 		graph.BuildGraphWithDFS[int, *Value](
@@ -104,6 +110,9 @@ func (g *ValueGraph) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
 	}
 
 	var res []*graph.Neighbor[*Value]
+	for _, v := range value.GetDependOn() {
+		res = append(res, graph.NewNeighbor(v, EdgeTypeDependOn))
+	}
 	for _, v := range value.GetEffectOn() {
 		res = append(res, graph.NewNeighbor(v, EdgeTypeEffectOn))
 	}
@@ -123,7 +132,20 @@ func (g *ValueGraph) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
 	return res
 }
 
+func IsDataFlowType(typ string) bool {
+	return typ == EdgeTypeDependOn || typ == EdgeTypeEffectOn
+}
+
 func (g *ValueGraph) handleEdge(fromNode int, toNode int, edgeType string, extraMsg map[string]any) {
+	if IsDataFlowType(edgeType) {
+		// avoid duplicate  dataflow edge
+		hash := codec.Sha256(fromNode + toNode)
+		if typ, ok := g.EdgeCache[hash]; ok && IsDataFlowType(typ) {
+			return
+		}
+		g.EdgeCache[hash] = edgeType
+	}
+
 	switch ValidEdgeType(edgeType) {
 	case EdgeTypeDependOn:
 		g.AddEdge(toNode, fromNode, edgeType)
