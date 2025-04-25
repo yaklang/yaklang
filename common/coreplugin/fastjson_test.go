@@ -132,16 +132,29 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 		},
 		StrictMode: true,
 	}
+	vulInGetUnstable := VulInfo{
+		Method: "GET",
+		Path: []string{
+			"/fastjson/get-in-query-network-unstable?auth=" + codec.EncodeUrlCode(`{"user":"admin","password":"password"}`) + "&action=login",
+		},
+		ExpectedResult: map[string]int{
+			"目标 fastjson 框架可能存在 RCE 漏洞 (Delay Check)": 0,
+		},
+		StrictMode: true,
+	}
 
 	_ = vulInForm
 	_ = vulInBodyJson
 	_ = vulInGetServeByJackson
 	_ = vulInGetIntranet
+	_ = vulInGet
+	_ = vulInGetUnstable
 	addFastjsonTestCase(vulInGet, "Fastjson 综合检测插件对于 json in query 检测结果不符合预期")
 	addFastjsonTestCase(vulInForm, "Fastjson 综合检测插件对于 json in form 检测结果不符合预期")
 	addFastjsonTestCase(vulInBodyJson, "Fastjson 综合检测插件对于 json in body 检测结果不符合预期")
 	addFastjsonTestCase(vulInGetServeByJackson, "Fastjson 综合检测插件对于 Jackson 检测结果不符合预期")
 	addFastjsonTestCase(vulInGetIntranet, "Fastjson 综合检测插件对于 get in query intranet 检测结果不符合预期")
+	addFastjsonTestCase(vulInGetUnstable, "Fastjson 综合检测插件对于 get in query unstable 检测结果不符合预期")
 	// TODO: Cookie Fuzz 需要支持自动解码
 	//vulInGet := VulInfo{
 	//	Method: "GET",
