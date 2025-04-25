@@ -288,6 +288,10 @@ type SSARiskCountInfo struct {
 	Hash      string `json:"hash"`
 	CodeRange string `json:"code_range"`
 	Severity  string `json:"severity"`
+
+	ResultId string `json:"result_id"`
+	Variable string `json:"variable"`
+	Index    int64  `json:"index"`
 }
 
 func GetSSARiskCountInfo(filter *SSARiskCountFilter) ([]*SSARiskCountInfo, error) {
@@ -307,7 +311,7 @@ func GetSSARiskCountInfo(filter *SSARiskCountFilter) ([]*SSARiskCountInfo, error
 	case SSARiskLevelFunction:
 		db = db.Select("function_name as name, COUNT(*) as count").Group("function_name")
 	case SSARiskLevelRisk:
-		db = db.Select("title_verbose as name, 1 as count, title , id , hash , code_range, severity")
+		db = db.Select(`title_verbose as name, 1 as count, title , id , hash , code_range, severity, result_id, variable, "index"`)
 	default:
 		return nil, utils.Errorf("unknown level: %s", filter.Level)
 	}
@@ -321,7 +325,6 @@ func GetSSARiskCountInfo(filter *SSARiskCountFilter) ([]*SSARiskCountInfo, error
 
 func ConvertSSARiskCountInfoToResource(originParam *ypb.YakURL, countFilter *SSARiskCountFilter, rc *SSARiskCountInfo) (*ypb.YakURLResource, error) {
 
-	extraData := make([]extra, 0)
 	var filter ypb.SSARisksFilter = *countFilter.Filter // copy assign
 
 	switch countFilter.Level {
@@ -336,12 +339,6 @@ func ConvertSSARiskCountInfoToResource(originParam *ypb.YakURL, countFilter *SSA
 	case SSARiskLevelRisk:
 		filter.Hash = append(filter.Hash, rc.Hash)
 		filter.ID = append(filter.ID, rc.Id)
-		extraData = append(extraData,
-			extra{"id", rc.Id},
-			extra{"hash", rc.Hash},
-			extra{"code_range", rc.CodeRange},
-			extra{"severity", rc.Severity},
-		)
 		if rc.Name == "" {
 			rc.Name = rc.Title
 		}
@@ -356,10 +353,23 @@ func ConvertSSARiskCountInfoToResource(originParam *ypb.YakURL, countFilter *SSA
 		return nil, err
 	}
 
-	extraData = append(extraData,
-		extra{"count", rc.Count},
-		extra{"filter", filterData},
-	)
+	extraData := make([]extra, 0)
+	if countFilter.Level == SSARiskLevelRisk {
+		extraData = append(extraData,
+			extra{"id", rc.Id},
+			extra{"hash", rc.Hash},
+			extra{"code_range", rc.CodeRange},
+			extra{"severity", rc.Severity},
+			extra{"result_id", rc.ResultId},
+			extra{"variable", rc.Variable},
+			extra{"index", rc.Index},
+		)
+	} else {
+		extraData = append(extraData,
+			extra{"count", rc.Count},
+			extra{"filter", filterData},
+		)
+	}
 
 	res := createNewRes(originParam, 0, extraData)
 
