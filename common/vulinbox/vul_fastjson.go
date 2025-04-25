@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
 	"io"
 	"net/http"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 
 	utils2 "github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -25,21 +26,35 @@ type JsonParser func(data string) (map[string]any, error)
 
 const magicIntranetHost = "qqqqqqqqqq.qqqqqqqqqq.qqqqqqqqqq.qqqqqqqqqq"
 
+var networkUnstableTimes = 0
+
+func networkUnstableTimesNext() int {
+	networkUnstableTimes = (networkUnstableTimes + 1) % 3
+	return networkUnstableTimes
+}
+
 func generateFastjsonParser(version string) JsonParser {
 	if version == "intranet" { // 内网版本，不能成功解析 payload 中的 dnslog 且解析超时
 		return func(data string) (map[string]any, error) {
-			return fastjsonParser(data, magicIntranetHost)
+			return fastjsonParser(data, "", magicIntranetHost)
+		}
+	}
+	if version == "network-unstable" { // 网络不稳定版本，不能成功解析 payload 中的 dnslog 且解析超时
+		return func(data string) (map[string]any, error) {
+			return fastjsonParser(data, "network-unstable", magicIntranetHost)
 		}
 	}
 	return func(data string) (map[string]any, error) {
-		return fastjsonParser(data)
+		return fastjsonParser(data, "")
 	}
 }
 
 var HandleDnsRequest func(domain string)
 
 // 这里模拟fastjson的解析过程
-func fastjsonParser(data string, forceDnslog ...string) (map[string]any, error) {
+func fastjsonParser(data string, flag string, forceDnslog ...string) (map[string]any, error) {
+	networkUnstableFlag := flag == "network-unstable"
+	_ = networkUnstableFlag
 	// redos
 	if strings.Contains(data, "regex") {
 		time.Sleep(2 * time.Second)
@@ -60,6 +75,12 @@ func fastjsonParser(data string, forceDnslog ...string) (map[string]any, error) 
 	if domain != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		go func() {
+			defer cancel()
+			if networkUnstableFlag {
+				if networkUnstableTimesNext() == 2 {
+					return
+				}
+			}
 			if domain != magicIntranetHost {
 				log.Infof("dnslog action to: %s", domain)
 				if HandleDnsRequest != nil {
@@ -67,11 +88,9 @@ func fastjsonParser(data string, forceDnslog ...string) (map[string]any, error) 
 				} else {
 					netx.LookupFirst(domain, netx.WithDNSContext(ctx), netx.WithDNSNoCache(false))
 				}
-
 			} else {
 				time.Sleep(2 * time.Second)
 			}
-			cancel()
 		}()
 		select {
 		case <-ctx.Done():
@@ -454,6 +473,47 @@ func (s *VulinServer) registerFastjson() {
         }`,
 					})))
 					return
+				}
+			},
+		},
+		{
+			Title: "GET 传参且网络不稳定（无漏洞）",
+			Path:  "/get-in-query-network-unstable",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				if request.Method == http.MethodGet {
+					action := request.URL.Query().Get("action")
+					if action == "" {
+						writer.Write([]byte(utils2.Format(string(fastjson_loginPage), map[string]string{
+							"script": `function load(){
+            name=$("#username").val();
+            password=$("#password").val();
+            auth = {"user":name,"password":password};
+            $.ajax({
+                type:"get",
+                url:"/fastjson/get-in-query-network-unstable",
+                data:{"auth":JSON.stringify(auth),"action":"login"},
+                success: function (data ,textStatus, jqXHR)
+                {
+                    $("#response").text(JSON.stringify(data));
+					console.log(data);
+                },
+                error:function (XMLHttpRequest, textStatus, errorThrown) {      
+                    alert("请求出错");
+                },
+            })
+        }`,
+						})))
+						return
+					}
+					auth := request.URL.Query().Get("auth")
+					if auth == "" {
+						writer.Write([]byte("auth 参数不能为空"))
+						return
+					}
+					response := mockController(generateFastjsonParser("network-unstable"), request, auth)
+					writer.Write([]byte(response))
+				} else {
+					writer.WriteHeader(http.StatusMethodNotAllowed)
 				}
 			},
 		},
