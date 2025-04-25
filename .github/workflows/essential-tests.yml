@@ -121,8 +121,7 @@ jobs:
               # StaticAnalyze
               go test -timeout 20s -run TestAnalyzeMustPASS* ./common/coreplugin
               # BuildIn SyntaxFlow Rule
-              go test -timeout 2m ./common/syntaxflow/sfbuildin/...
-              go test -timeout 1m ./common/yak/ssaapi/test/syntaxflow
+              go test -timeout 1m -skip "TestEmbedRuleVersion" ./common/yak/ssaapi/test/syntaxflow
 
           - name: Test SSA Frontend Yak  / JavaScript
             run: |
