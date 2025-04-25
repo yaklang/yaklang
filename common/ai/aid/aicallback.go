@@ -3,13 +3,15 @@ package aid
 import (
 	"bytes"
 	"context"
+	"io"
+	"os"
+	"strings"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
-	"io"
-	"os"
-	"strings"
 )
 
 type AIRequest struct {
@@ -33,6 +35,142 @@ func (a *AIResponse) Debug(i ...bool) {
 	}
 
 	a.enableDebug = i[0]
+}
+
+func (c *Config) teeAIResponse(src *AIResponse, onFirstByte func(), onClose func()) (*AIResponse, *AIResponse) {
+	// 获取原始响应的流读取器
+	reasonReader, outputReader := src.GetUnboundStreamReaderEx(onFirstByte, onClose, nil)
+
+	// 创建第一个响应对象
+	first := c.NewAIResponse()
+	first.consumptionCallback = nil
+	firstReasonReader, firstReasonWriter := utils.NewBufPipe(nil)
+	firstOutputReader, firstOutputWriter := utils.NewBufPipe(nil)
+
+	// 创建第二个响应对象
+	second := c.NewAIResponse()
+	second.consumptionCallback = nil
+	secondReasonReader, secondReasonWriter := utils.NewBufPipe(nil)
+	secondOutputReader, secondOutputWriter := utils.NewBufPipe(nil)
+
+	// 使用等待组确保所有数据复制完成
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+
+	// 复制原因流到两个目标
+	go func() {
+		defer wg.Done()
+		tee := io.MultiWriter(firstReasonWriter, secondReasonWriter)
+		io.Copy(tee, reasonReader)
+	}()
+
+	// 复制输出流到两个目标
+	go func() {
+		defer wg.Done()
+		tee := io.MultiWriter(firstOutputWriter, secondOutputWriter)
+		// io.Copy(tee, outputReader)
+		io.Copy(tee, io.TeeReader(outputReader, os.Stdout))
+	}()
+
+	// 等待所有复制完成后关闭所有写入器和响应
+	go func() {
+		wg.Wait()
+		firstReasonWriter.Close()
+		firstOutputWriter.Close()
+		secondReasonWriter.Close()
+		secondOutputWriter.Close()
+		first.Close()
+		second.Close()
+	}()
+
+	// 将流发送到第一个响应
+	go func() {
+		first.EmitReasonStreamWithoutConsumption(firstReasonReader)
+		first.EmitOutputStreamWithoutConsumption(firstOutputReader)
+	}()
+
+	// 将流发送到第二个响应
+	go func() {
+		second.EmitReasonStreamWithoutConsumption(secondReasonReader)
+		second.EmitOutputStreamWithoutConsumption(secondOutputReader)
+	}()
+
+	return first, second
+}
+
+func (a *AIResponse) GetUnboundStreamReaderEx(onFirstByte func(), onClose func(), onError func()) (io.Reader, io.Reader) {
+	reasonReader, reasonWriter := utils.NewBufPipe(nil)
+	outputReader, outputWriter := utils.NewBufPipe(nil)
+
+	callFirstByte := new(sync.Once)
+	callClose := new(sync.Once)
+	callError := new(sync.Once)
+
+	syncCh := make(chan struct{})
+	haveFirstByte := utils.NewBool(false)
+	go func() {
+		defer func() {
+			select {
+			case syncCh <- struct{}{}:
+			default:
+			}
+
+			if !haveFirstByte.IsSet() {
+				callError.Do(func() {
+					if onError != nil {
+						onError()
+					}
+				})
+			}
+
+			callClose.Do(func() {
+				if onClose != nil {
+					onClose()
+				}
+			})
+		}()
+		defer reasonWriter.Close()
+		defer outputWriter.Close()
+
+		// callEmptyOnce := new(sync.Once)
+
+		for i := range a.ch.Out {
+			if i == nil {
+				continue
+			}
+
+			if !haveFirstByte.IsSet() {
+				var buf = make([]byte, 1)
+				n, _ := io.ReadFull(i.out, buf)
+				if n > 0 {
+					haveFirstByte.SetTo(true)
+					select {
+					case syncCh <- struct{}{}:
+					default:
+					}
+					callFirstByte.Do(func() {
+						if onFirstByte != nil {
+							onFirstByte()
+						}
+					})
+					if i.IsReason {
+						io.Copy(reasonWriter, io.MultiReader(bytes.NewReader(buf[:n]), i.out))
+					} else {
+						io.Copy(outputWriter, io.MultiReader(bytes.NewReader(buf[:n]), i.out))
+					}
+				}
+				continue
+			}
+
+			if i.IsReason {
+				io.Copy(reasonWriter, i.out)
+			} else {
+				io.Copy(outputWriter, i.out)
+			}
+		}
+	}()
+	<-syncCh
+	return reasonReader, outputReader
 }
 
 func (a *AIResponse) GetUnboundStreamReader(haveReason bool) io.Reader {
@@ -132,10 +270,23 @@ func (r *AIResponse) EmitOutputStream(reader io.Reader) {
 	})
 }
 
+func (r *AIResponse) EmitOutputStreamWithoutConsumption(reader io.Reader) {
+	r.ch.SafeFeed(&OutputStream{
+		out: reader,
+	})
+}
+
 func (r *AIResponse) EmitReasonStream(reader io.Reader) {
 	r.ch.SafeFeed(&OutputStream{
 		IsReason: true,
 		out:      CreateConsumptionReader(reader, r.consumptionCallback),
+	})
+}
+
+func (r *AIResponse) EmitReasonStreamWithoutConsumption(reader io.Reader) {
+	r.ch.SafeFeed(&OutputStream{
+		IsReason: true,
+		out:      reader,
 	})
 }
 
