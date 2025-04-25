@@ -1,3 +1,5 @@
+__KEYWORDS__ = "file information,directory,file size,file permissions,modified time,file metadata"
+
 __DESC__ = <<<EOF
 Get basic file information including:
 1. Whether it's a directory

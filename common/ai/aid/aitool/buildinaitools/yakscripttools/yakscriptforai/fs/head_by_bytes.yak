@@ -1,3 +1,5 @@
+__KEYWORDS__ = "file content,head,first bytes,file,bytes,show,display"
+
 __DESC__ = <<<EOF
 show the first(head) bytes content in a file
 EOF

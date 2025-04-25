@@ -1,3 +1,5 @@
+__KEYWORDS__ = "text finder,file search,pattern matching,regexp,context text,file path,directory search,text tool"
+
 __DESC__ = <<<EOF
 text finder tool, input filepath(file or dir) and pattern(substr or regexp), find it matched in file position, show context text(optional)
 EOF

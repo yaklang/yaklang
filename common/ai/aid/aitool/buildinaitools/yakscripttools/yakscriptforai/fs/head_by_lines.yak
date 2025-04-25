@@ -1,3 +1,5 @@
+__KEYWORDS__ = "head,file,command,linux,unix,terminal,first lines,show"
+
 __DESC__ = <<<EOF
 show the first(head) lines in a file
 EOF
