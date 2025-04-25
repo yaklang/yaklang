@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -78,7 +77,7 @@ func getVersionMap() map[string]RuleInfo {
 	return ruleVersionMap
 }
 
-func EmbedRuleVersion() error {
+func EmbedRuleVersion(target string) error {
 	existingRules := getVersionMap()
 	db := consts.GetGormProfileDatabase()
 	ruleCh := YieldBuildInSyntaxFlowRules(db, context.Background())
@@ -116,8 +115,8 @@ func EmbedRuleVersion() error {
 	if err != nil {
 		return err
 	}
-	outputFile := filepath.Join("rule_versions.json")
-	err = os.WriteFile(outputFile, jsonData, 0644)
+
+	err = os.WriteFile(target, jsonData, 0644)
 	if err != nil {
 		return err
 	}
