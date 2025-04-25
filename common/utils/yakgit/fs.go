@@ -435,11 +435,7 @@ func Glance(repos string) string {
 	return buf.String()
 }
 
-func RevParse(repos string, rev string) (string, error) {
-	repo, err := git.PlainOpen(repos)
-	if err != nil {
-		return "", utils.Errorf("open: %v failed: %v", repos, err)
-	}
+func revParse(repo *git.Repository, rev string) (string, error) {
 	long, _ := ShortHashToFullHash(repo, rev)
 	if len(long) > 0 {
 		return long, nil
@@ -567,6 +563,14 @@ func RevParse(repos string, rev string) (string, error) {
 	return "", utils.Errorf("cannot parse revision: %s", rev)
 }
 
+func RevParse(repos string, rev string) (string, error) {
+	repo, err := git.PlainOpen(repos)
+	if err != nil {
+		return "", utils.Errorf("open: %v failed: %v", repos, err)
+	}
+	return revParse(repo, rev)
+}
+
 func ShortHashToFullHash(repo *git.Repository, hash string) (string, error) {
 	// 获取对象数据库
 	objDB, err := repo.Objects()
@@ -603,11 +607,9 @@ func ShortHashToFullHash(repo *git.Repository, hash string) (string, error) {
 // GetCommitHashEx 获取完整的commit hash
 // 如果hash不是完整的commit hash,则尝试查找匹配的commit hash
 func GetCommitHashEx(repo *git.Repository, hash string) (*object.Commit, error) {
-	if len(hash) < 7 {
-		return nil, fmt.Errorf("invalid commit hash: %s (too short)", hash)
-	}
-	if len(hash) > 40 {
-		return nil, fmt.Errorf("invalid commit hash: %s (too long)", hash)
+	hash, err := revParse(repo, hash)
+	if err != nil {
+		return nil, utils.Errorf("rev-parse err: %v", err)
 	}
 	commit, err := repo.CommitObject(plumbing.NewHash(hash))
 	if err != nil {

@@ -1,0 +1,15 @@
+__DESC__ = <<<EOF
+fetch head hash current repos
+EOF
+yakit.AutoInitYakit()
+
+repos = cli.String("repos", cli.setRequired(true), cli.setHelp("target git repos"))
+cli.check()
+
+count := 0
+hash = git.HeadHash(repos)
+if hash == "" {
+    yakit.Warn("fetch head hash failed, use `git-glance` tool for checking basic info")
+    return
+}
+yakit.Info("HEAD: %v", hash)

@@ -8,6 +8,10 @@ var Exports = map[string]any{
 	"HeadBranch":      GetHeadBranch,
 	"HeadBranchRange": GetBranchRange,
 	"ParentHash":      GetParentCommitHash,
+	"Glance":          Glance,
+	"Branch":          GetAllBranches,
+	"Blame":           Blame,
+	"BlameCommit":     BlameWithCommit,
 
 	// githack
 	"GitHack":       GitHack,

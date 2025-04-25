@@ -1,0 +1,18 @@
+__DESC__ = <<<EOF
+auto try many decode method for handling the text
+EOF
+yakit.AutoInitYakit()
+
+repos = cli.String("repos", cli.setRequired(true), cli.setHelp("target git repos"))
+// repos = "/Users/v1ll4n/Projects/yaklang"
+cli.check()
+
+count := 0
+branchName := git.HeadBranch(repos /*type: string*/)
+yakit.Info("current branch name: %v", branchName)
+start, end, err = git.HeadBranchRange(repos, branchName)
+if err != nil {
+    yakit.Error("fetch head branch range err: %v", err)
+    return
+}
+yakit.Info("commit range: %v ... %v", start, end)
