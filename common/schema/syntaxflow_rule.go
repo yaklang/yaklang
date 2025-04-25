@@ -200,7 +200,8 @@ type SyntaxFlowRule struct {
 
 	Groups []*SyntaxFlowGroup `gorm:"many2many:syntax_flow_rule_and_group;"`
 
-	Hash string `json:"hash" gorm:"unique_index"`
+	Version string
+	Hash    string `json:"hash" gorm:"unique_index"`
 }
 
 func (s *SyntaxFlowRule) CalcHash() string {

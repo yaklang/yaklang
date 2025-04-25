@@ -156,6 +156,10 @@ func CreateRuleByContent(ruleFileName string, content string, buildIn bool, tags
 	rule.Language = string(language)
 	rule.Tag = strings.Join(tags, "|")
 	rule.IsBuildInRule = buildIn
+	version, err := GetVersion(rule.RuleId)
+	if err == nil {
+		rule.Version = version
+	}
 	if buildIn {
 		// build in rule, use rule.title if exist
 		if rule.TitleZh != "" {
@@ -315,6 +319,11 @@ func GetRules(ruleNameGlob string) ([]*schema.SyntaxFlowRule, error) {
 		return nil, gorm.ErrRecordNotFound
 	}
 	return rules, nil
+}
+
+func YieldBuildInSyntaxFlowRules(db *gorm.DB, ctx context.Context) chan *schema.SyntaxFlowRule {
+	db = db.Model(&schema.SyntaxFlowRule{}).Where("is_build_in_rule")
+	return YieldSyntaxFlowRules(db, ctx)
 }
 
 func YieldSyntaxFlowRules(db *gorm.DB, ctx context.Context) chan *schema.SyntaxFlowRule {
