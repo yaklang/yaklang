@@ -35,7 +35,6 @@ func getTestSuiteAICallback(fileName string, opts []aispec.AIConfigOption, typeN
 	log.Infof("primary ai engien: %v", consts.GetAIPrimaryType())
 	aiCallback := func(config *aid.Config, req *aid.AIRequest) (*aid.AIResponse, error) {
 		rsp := config.NewAIResponse()
-
 		go func() {
 			defer rsp.Close()
 			//fmt.Println(req.GetPrompt())

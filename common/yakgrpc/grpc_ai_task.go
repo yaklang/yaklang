@@ -40,7 +40,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	var opts = []aid.Option{
 		aid.WithEventHandler(func(e *aid.Event) {
 			if e.Timestamp <= 0 {
-				e.Timestamp = time.Now().UnixNano() // fallback
+				e.Timestamp = time.Now().Unix() // fallback
 			}
 			event := &ypb.AIOutputEvent{
 				CoordinatorId: e.CoordinatorId,
