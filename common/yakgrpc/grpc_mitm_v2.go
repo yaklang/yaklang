@@ -606,7 +606,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 		var taskInfo *ypb.SingleManualHijackInfoMessage
 		task, ok := hijackManger.getTask(httpctx.GetRequestMITMTaskID(req))
-		if task != nil || !ok {
+		if task != nil && ok {
 			taskInfo = task.infoMessage
 			defer hijackManger.unRegister(task.taskID)
 			defer hijackListFeedback(Hijack_List_Delete, taskInfo)
