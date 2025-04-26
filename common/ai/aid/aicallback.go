@@ -87,20 +87,6 @@ func (c *Config) teeAIResponse(src *AIResponse, onFirstByte func(), onClose func
 	wg2.Add(2)
 	go func() {
 		defer wg2.Done()
-		//once := new(sync.Once)
-		//syncChan := make(chan struct{}, 1)
-		//first.EmitReasonStreamWithoutConsumption(utils.ReaderOnFirstByte(firstReasonReader, func() {
-		//	once.Do(func() {
-		//		syncChan <- struct{}{}
-		//	})
-		//}))
-		//first.EmitOutputStreamWithoutConsumption(utils.ReaderOnFirstByte(firstOutputReader, func() {
-		//	once.Do(func() {
-		//		syncChan <- struct{}{}
-		//	})
-		//}))
-		//<-syncChan
-		//close(syncChan)
 		first.EmitOutputStreamWithoutConsumption(firstReasonReader)
 		first.EmitOutputStreamWithoutConsumption(firstOutputReader)
 		first.Close()
@@ -109,20 +95,6 @@ func (c *Config) teeAIResponse(src *AIResponse, onFirstByte func(), onClose func
 	// 将流发送到第二个响应
 	go func() {
 		defer wg2.Done()
-		//once := new(sync.Once)
-		//syncChan := make(chan struct{}, 1)
-		//second.EmitReasonStreamWithoutConsumption(utils.ReaderOnFirstByte(secondReasonReader, func() {
-		//	once.Do(func() {
-		//		syncChan <- struct{}{}
-		//	})
-		//}))
-		//second.EmitOutputStreamWithoutConsumption(utils.ReaderOnFirstByte(secondOutputReader, func() {
-		//	once.Do(func() {
-		//		syncChan <- struct{}{}
-		//	})
-		//}))
-		//<-syncChan
-		//close(syncChan)
 		second.EmitOutputStreamWithoutConsumption(secondReasonReader)
 		second.EmitOutputStreamWithoutConsumption(secondOutputReader)
 		second.Close()
