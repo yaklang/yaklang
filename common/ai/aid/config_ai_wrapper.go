@@ -1,12 +1,14 @@
 package aid
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -18,9 +20,21 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 		}
 
 		seq := config.AcquireId()
+		log.Infof("start to check uuid:%v seq:%v", c.id, seq)
+		if ret, ok := aiddb.GetAIInteractiveCheckpoint(c.GetDB(), c.id, seq); ok && ret.Finished {
+			// checkpoint is finished, return the result
+			rsp := config.NewAIResponse()
+			rspParams := ret.GetResponseParams()
+			rsp.EmitReasonStream(bytes.NewBufferString(rspParams.GetString("reason")))
+			rsp.EmitOutputStream(bytes.NewBufferString(rspParams.GetString("output")))
+			rsp.Close()
+			return rsp, nil
+		}
+
+		// create or update a new checkpoint
 		cp := c.createAIInteractiveCheckpoint(seq)
 		if err := c.submitAIRequestCheckpoint(cp, request); err != nil {
-
+			log.Errorf("submit ai request checkpoint failed: %v", err)
 		}
 
 		if c.aiAutoRetry <= 0 {

@@ -211,12 +211,17 @@ func initDefaultTools(c *Config) error { // set config default tools
 }
 
 func newConfig(ctx context.Context) *Config {
-	id := uuid.New()
-	m := GetDefaultMemory()
+	offset := rand.Int64N(3000)
+	id := uuid.New().String()
+	return newConfigEx(ctx, id, offset)
+}
 
+func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
+	m := GetDefaultMemory()
 	var idGenerator = new(int64)
+	log.Infof("coordinator with %v offset: %v", id, offsetSeq)
 	c := &Config{
-		idSequence: atomic.AddInt64(idGenerator, rand.Int64N(2000)),
+		idSequence: atomic.AddInt64(idGenerator, offsetSeq),
 		idGenerator: func() int64 {
 			return atomic.AddInt64(idGenerator, 1)
 		},
@@ -225,7 +230,7 @@ func newConfig(ctx context.Context) *Config {
 		agreeRiskCtrl:     new(riskControl),
 		agreeInterval:     10 * time.Second,
 		m:                 new(sync.Mutex),
-		id:                id.String(),
+		id:                id,
 		epm:               newEndpointManagerContext(ctx),
 		streamWaitGroup:   new(sync.WaitGroup),
 		memory:            m,
