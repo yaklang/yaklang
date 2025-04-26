@@ -44,19 +44,42 @@ func TestLinkTableSizeLimit(t *testing.T) {
 
 func TestLinkTableCallback(t *testing.T) {
 	// 测试回调函数
-	var callbackValue string
-	called := false
+	var callbackValues []string
+	called := 0
+
 	table := NewLinkTable("first", 2, func(lt *LinkTable[string]) {
-		called = true
-		callbackValue = lt.Value()
+		called++
+		callbackValues = append(callbackValues, lt.Value())
+		// 验证在回调时，可以访问链表的祖先节点
+		if parent := lt.Parent(); parent != nil {
+			callbackValues = append(callbackValues, parent.Value())
+		}
 	})
 
-	table.Push("second")
-	require.False(t, called) // 回调还未被调用
+	require.Equal(t, 0, called) // 初始状态
 
-	table.Push("third")                      // 触发回调
-	require.True(t, called)                  // 回调已被调用
-	require.Equal(t, "third", callbackValue) // 回调时链表的值应该是 "third"
+	// 第一次 Push 不应该触发回调
+	table.Push("second")
+	require.Equal(t, 0, called)
+	require.Equal(t, "second", table.Value())
+
+	// 第二次 Push 应该触发回调（因为 size=1 表示只能再添加一个元素）
+	table.Push("third")
+	require.Equal(t, 1, called)
+	require.Equal(t, "third", table.Value())
+	require.Equal(t, "second", table.Parent().Value())
+	require.Len(t, callbackValues, 2)
+
+	// 检查回调中捕获的值
+	if len(callbackValues) >= 2 {
+		require.Equal(t, "third", callbackValues[0])  // 当前值
+		require.Equal(t, "second", callbackValues[1]) // 父节点值
+	}
+
+	// 第三次 Push 不应该成功，也不应该再次触发回调
+	table.Push("fourth")
+	require.Equal(t, 1, called)              // 回调次数应该不变
+	require.Equal(t, "third", table.Value()) // 值应该保持不变
 }
 
 func TestLinkTableGeneric(t *testing.T) {

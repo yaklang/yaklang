@@ -106,7 +106,7 @@ func (m *memoryTimeline) setAICaller(ai AICaller) {
 func (m *memoryTimeline) PushToolResult(toolResult *aitool.ToolResult) {
 	ts := time.Now().UnixMilli()
 	if m.tsToToolResult.Have(ts) {
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 10)
 		ts = time.Now().UnixMilli()
 	}
 	m.idToTs.Set(toolResult.GetID(), ts)
