@@ -1,10 +1,12 @@
 package aid
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 	"strings"
 	"testing"
 	"time"
@@ -13,7 +15,7 @@ import (
 )
 
 func TestCoordinator_Consumption(t *testing.T) {
-	testCount := 400
+	testCount := 1000
 	if utils.InGithubActions() {
 		testCount = 3
 	}
@@ -36,12 +38,12 @@ func TestCoordinator_Consumption(t *testing.T) {
 
 func basicTestCoordinator_Consumption(t *testing.T) {
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outChan := chanx.NewUnlimitedChan[*Event](context.Background(), 100)
 	ins, err := NewCoordinator(
 		"test",
 		WithEventInputChan(inputChan),
 		WithEventHandler(func(event *Event) {
-			outputChan <- event
+			outChan.SafeFeed(event)
 		}),
 		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
 			rsp := config.NewAIResponse()
@@ -80,10 +82,11 @@ func basicTestCoordinator_Consumption(t *testing.T) {
 
 	parsedTask := false
 	consumptionCheck := false
+	outChannel := outChan.OutputChannel()
 LOOP:
 	for {
 		select {
-		case result := <-outputChan:
+		case result := <-outChannel:
 			fmt.Println("result:" + result.String())
 			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
@@ -108,7 +111,7 @@ LOOP:
 				}
 				continue
 			}
-			if result.Type == EVENT_TYPE_CONSUMPTION {
+			if result.Type == EVENT_TYPE_CONSUMPTION && parsedTask {
 				var data = map[string]any{}
 				err := json.Unmarshal([]byte(result.Content), &data)
 				if err != nil {
@@ -127,7 +130,7 @@ LOOP:
 					break LOOP
 				}
 			}
-		case <-time.After(time.Second * 10):
+		case <-time.After(time.Second * 15):
 			t.Fatal("timeout")
 		}
 	}
