@@ -3,15 +3,14 @@ package aid
 import (
 	"bytes"
 	"context"
-	"io"
-	"os"
-	"strings"
-	"sync"
-
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
+	"io"
+	"os"
+	"strings"
+	"sync"
 )
 
 type AIRequest struct {
@@ -60,16 +59,19 @@ func (c *Config) teeAIResponse(src *AIResponse, onFirstByte func(), onClose func
 	// 复制原因流到两个目标
 	go func() {
 		defer wg.Done()
-		tee := io.MultiWriter(firstReasonWriter, secondReasonWriter)
-		io.Copy(tee, reasonReader)
+		io.Copy(
+			io.MultiWriter(firstReasonWriter, secondReasonWriter),
+			reasonReader,
+		)
 	}()
 
 	// 复制输出流到两个目标
 	go func() {
 		defer wg.Done()
-		tee := io.MultiWriter(firstOutputWriter, secondOutputWriter)
-		// io.Copy(tee, outputReader)
-		io.Copy(tee, io.TeeReader(outputReader, os.Stdout))
+		io.Copy(
+			secondOutputWriter,
+			io.TeeReader(outputReader, firstOutputWriter),
+		)
 	}()
 
 	// 等待所有复制完成后关闭所有写入器和响应
@@ -79,21 +81,53 @@ func (c *Config) teeAIResponse(src *AIResponse, onFirstByte func(), onClose func
 		firstOutputWriter.Close()
 		secondReasonWriter.Close()
 		secondOutputWriter.Close()
-		first.Close()
-		second.Close()
 	}()
 
-	// 将流发送到第一个响应
+	wg2 := new(sync.WaitGroup)
+	wg2.Add(2)
 	go func() {
-		first.EmitReasonStreamWithoutConsumption(firstReasonReader)
+		defer wg2.Done()
+		//once := new(sync.Once)
+		//syncChan := make(chan struct{}, 1)
+		//first.EmitReasonStreamWithoutConsumption(utils.ReaderOnFirstByte(firstReasonReader, func() {
+		//	once.Do(func() {
+		//		syncChan <- struct{}{}
+		//	})
+		//}))
+		//first.EmitOutputStreamWithoutConsumption(utils.ReaderOnFirstByte(firstOutputReader, func() {
+		//	once.Do(func() {
+		//		syncChan <- struct{}{}
+		//	})
+		//}))
+		//<-syncChan
+		//close(syncChan)
+		first.EmitOutputStreamWithoutConsumption(firstReasonReader)
 		first.EmitOutputStreamWithoutConsumption(firstOutputReader)
+		first.Close()
 	}()
 
 	// 将流发送到第二个响应
 	go func() {
-		second.EmitReasonStreamWithoutConsumption(secondReasonReader)
+		defer wg2.Done()
+		//once := new(sync.Once)
+		//syncChan := make(chan struct{}, 1)
+		//second.EmitReasonStreamWithoutConsumption(utils.ReaderOnFirstByte(secondReasonReader, func() {
+		//	once.Do(func() {
+		//		syncChan <- struct{}{}
+		//	})
+		//}))
+		//second.EmitOutputStreamWithoutConsumption(utils.ReaderOnFirstByte(secondOutputReader, func() {
+		//	once.Do(func() {
+		//		syncChan <- struct{}{}
+		//	})
+		//}))
+		//<-syncChan
+		//close(syncChan)
+		second.EmitOutputStreamWithoutConsumption(secondReasonReader)
 		second.EmitOutputStreamWithoutConsumption(secondOutputReader)
+		second.Close()
 	}()
+	wg2.Wait()
 
 	return first, second
 }
@@ -134,7 +168,7 @@ func (a *AIResponse) GetUnboundStreamReaderEx(onFirstByte func(), onClose func()
 
 		// callEmptyOnce := new(sync.Once)
 
-		for i := range a.ch.Out {
+		for i := range a.ch.OutputChannel() {
 			if i == nil {
 				continue
 			}
@@ -177,7 +211,7 @@ func (a *AIResponse) GetUnboundStreamReader(haveReason bool) io.Reader {
 	pr, pw := utils.NewBufPipe(nil)
 	go func() {
 		defer pw.Close()
-		for i := range a.ch.Out {
+		for i := range a.ch.OutputChannel() {
 			if i == nil {
 				continue
 			}
@@ -200,7 +234,7 @@ func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, config *C
 			config.ProcessExtendedActionCallback(cbBuffer.String())
 		}()
 		defer pw.Close()
-		for i := range a.ch.Out {
+		for i := range a.ch.OutputChannel() {
 			if i == nil {
 				continue
 			}

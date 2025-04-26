@@ -503,6 +503,16 @@ func NewTriggerWriter(trigger uint64, h func(buffer io.ReadCloser, triggerEvent 
 	}
 }
 
+func ReaderOnFirstByte(origin io.Reader, onFirstByte func()) io.Reader {
+	var buf = make([]byte, 1)
+	n, _ := io.ReadFull(origin, buf)
+	if n > 0 {
+		onFirstByte()
+		return io.MultiReader(bytes.NewReader(buf[:n]), origin)
+	}
+	return origin
+}
+
 func NewTriggerWriterEx(sizeTrigger uint64, timeTrigger time.Duration, h func(buffer io.ReadCloser, triggerEvent string)) *TriggerWriter {
 	r, w := NewBufPipe(nil)
 	return &TriggerWriter{
