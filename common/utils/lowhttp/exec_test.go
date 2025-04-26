@@ -637,16 +637,55 @@ Host: %v
 }
 
 func TestLowhttpH2Downgrade(t *testing.T) {
-	httpsHost, httpsPort := utils.DebugMockHTTPS([]byte("HTTP/1.1 200 OK\r\n" +
-		"Content-Length: 1\r\n\r\na"))
-	t.Run("http2 Downgrade http1", func(t *testing.T) {
-		_, err := HTTPWithoutRedirect(WithPacketBytes([]byte(fmt.Sprintf(`GET / HTTP/2
+	count := 40
+	if utils.InGithubActions() {
+		count = 4
+	}
+	swg := utils.NewSizedWaitGroup(1)
+	for i := 0; i < count; i++ {
+		swg.Add(1)
+		httpsHost, httpsPort := utils.DebugMockHTTPS([]byte("HTTP/1.1 200 OK\r\n" +
+			"Content-Length: 1\r\n\r\na"))
+		go func() {
+			defer swg.Done()
+
+			t.Run("http2 Downgrade http1", func(t *testing.T) {
+				rsp, err := HTTPWithoutRedirect(WithPacketBytes([]byte(fmt.Sprintf(`GET / HTTP/2
 Host: %v 
 
-`, utils.HostPort(httpsHost, httpsPort)))), WithHttps(true))
-		require.NoError(t, err)
-	})
+`, utils.HostPort(httpsHost, httpsPort)))), WithHttps(true), WithConnPool(false))
+				spew.Dump(rsp.RawPacket)
+				require.NoError(t, err)
+			})
+		}()
+	}
+	swg.Wait()
+}
 
+func TestLowhttpH2Downgrade_NG(t *testing.T) {
+	count := 10
+	if utils.InGithubActions() {
+		count = 3
+	}
+	swg := utils.NewSizedWaitGroup(100)
+	for i := 0; i < count; i++ {
+		swg.Add(1)
+		httpsHost, httpsPort := utils.DebugMockHTTPS([]byte("HTTP/1.1 200 OK\r\n" +
+			"Content-Length: 1\r\n\r\na"))
+		go func() {
+			defer swg.Done()
+
+			t.Run("ng http1.1 to http1.1 stable", func(t *testing.T) {
+				rsp, err := HTTPWithoutRedirect(WithPacketBytes([]byte(fmt.Sprintf(`GET / HTTP/1.1
+Host: %v 
+
+`, utils.HostPort(httpsHost, httpsPort)))), WithHttps(true), WithConnPool(false))
+				require.Greater(t, len(rsp.RawPacket), int(0))
+				require.NoError(t, err)
+			})
+		}()
+	}
+	swg.Wait()
 }
 
 func TestLowhttp_conn_pool_deformity(t *testing.T) {
