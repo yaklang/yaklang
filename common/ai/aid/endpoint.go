@@ -2,6 +2,7 @@ package aid
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/schema"
 	"sync"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 )
 
 type endpointManager struct {
+	config  *Config
 	ctx     context.Context
 	cancel  context.CancelFunc
 	results *sync.Map
@@ -56,6 +58,12 @@ func (e *endpointManager) createEndpoint() *Endpoint {
 		activeParams: make(aitool.InvokeParams),
 	}
 	e.results.Store(id, endpoint)
+	if e.config != nil {
+		seq := e.config.AcquireId()
+		endpoint.seq = seq
+		ck := e.config.createReviewCheckpoint(seq)
+		endpoint.checkpoint = ck
+	}
 	return endpoint
 }
 
@@ -75,6 +83,10 @@ type Endpoint struct {
 	id           string
 	sig          *sync.Cond
 	activeParams aitool.InvokeParams
+
+	// seq and checkpoint for recovering
+	seq        int64
+	checkpoint *schema.AiCheckpoint
 }
 
 func (e *Endpoint) Wait() {

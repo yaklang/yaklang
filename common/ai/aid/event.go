@@ -166,6 +166,12 @@ func (r *Config) EmitRequireReviewForTask(task *aiTask, id string) {
 		"short_summary": task.ShortSummary,
 		"long_summary":  task.LongSummary,
 	}
+	if ep, ok := r.epm.loadEndpoint(id); ok {
+		err := r.submitCheckpointRequest(ep.checkpoint, reqs)
+		if err != nil {
+			log.Errorf("submit request reivew to db for task failed: %v", err)
+		}
+	}
 	r.emitInteractiveJson(id, EVENT_TYPE_TASK_REVIEW_REQUIRE, "review-require", reqs)
 }
 
@@ -174,6 +180,12 @@ func (r *Config) EmitRequireReviewForPlan(rsp *PlanResponse, id string) {
 		"id":        id,
 		"selectors": PlanReviewSuggestions,
 		"plans":     rsp,
+	}
+	if ep, ok := r.epm.loadEndpoint(id); ok {
+		err := r.submitCheckpointRequest(ep.checkpoint, reqs)
+		if err != nil {
+			log.Errorf("submit request reivew to db for task failed: %v", err)
+		}
 	}
 	r.emitInteractiveJson(id, EVENT_TYPE_PLAN_REVIEW_REQUIRE, "review-require", reqs)
 }
@@ -185,6 +197,12 @@ func (r *Config) EmitRequireReviewForToolUse(tool *aitool.Tool, params aitool.In
 		"tool":             tool.Name,
 		"tool_description": tool.Description,
 		"params":           params,
+	}
+	if ep, ok := r.epm.loadEndpoint(id); ok {
+		err := r.submitCheckpointRequest(ep.checkpoint, reqs)
+		if err != nil {
+			log.Errorf("submit request reivew to db for task failed: %v", err)
+		}
 	}
 	r.emitInteractiveJson(id, EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, "review-require", reqs)
 }
