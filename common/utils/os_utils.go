@@ -2,9 +2,11 @@ package utils
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"math/rand"
 	"net"
 	"net/http"
@@ -448,7 +450,7 @@ func TLSConfigSetCheckServerName(tlsConfig *tls.Config, host string) *tls.Config
 }
 
 func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string, https, h2, gmtlsFlag, onlyGmtls, keepAlive bool, checkServerName bool, handle func([]byte) []byte) (string, int) {
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	host, port, _ := ParseStringToHostPort(addr)
 	go func() {
 		var (
@@ -566,9 +568,10 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 						return
 					default:
 						conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-						req, err := ReadHTTPRequestFromBufioReader(bufio.NewReader(conn))
+						var buf bytes.Buffer
+						req, err := ReadHTTPRequestFromBufioReader(bufio.NewReader(io.TeeReader(conn, &buf)))
 						if err != nil {
-							log.Errorf("read http request failed: %v", err)
+							log.Errorf("read http in %v request failed: %v", conn.RemoteAddr(), err)
 							conn.Close()
 							return
 						}
@@ -577,12 +580,17 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 							conn.Close()
 							return
 						}
+						log.Infof("write response: %#v", string(raw))
 						conn.Write(handle(raw))
 						if !keepAlive {
+							log.Infof("write response flush: %#v", string(raw))
 							time.Sleep(500 * time.Millisecond)
-							conn.Close()
+							FlushWriter(conn)
+							CloseWrite(conn)
+							log.Infof("close tcp connection: %v", conn.RemoteAddr())
 							return
 						}
+						return
 					}
 				}
 			}()

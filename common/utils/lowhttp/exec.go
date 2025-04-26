@@ -340,6 +340,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		requestURI = uri
 		if strings.HasPrefix(proto, "HTTP/2") || forceHttp2 {
 			enableHttp2 = true
+			// TODO: http should set pool force???
 			withConnPool = true
 		} else if strings.HasPrefix(proto, "HTTP/3") || forceHttp3 {
 			enableHttp3 = true
@@ -689,9 +690,11 @@ RECONNECT:
 		pc := conn.(*persistConn)
 		if pc.cacheKey.scheme != H2 { // http2 downgrade to http1.1
 			enableHttp2 = false
+			pc.removeConn()
 			withConnPool = false // downgrade can not with conn pool
 			method, uri, _ := GetHTTPPacketFirstLine(requestPacket)
 			requestPacket = ReplaceHTTPPacketFirstLine(requestPacket, strings.Join([]string{method, uri, "HTTP/1.1"}, " "))
+			goto RECONNECT
 		} else {
 			h2Conn := pc.alt
 			if h2Conn == nil {
