@@ -1,40 +1,20 @@
 package aid
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/log"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func TestCoordinator_Consumption(t *testing.T) {
-	testCount := 400
-	if utils.InGithubActions() {
-		testCount = 3
-	}
-	swg := utils.NewSizedWaitGroup(400)
-	go func() {
-		for {
-			time.Sleep(time.Second)
-			log.Infof("swg wait: %v", swg.WaitingEventCount.Load())
-		}
-	}()
-	for i := 0; i < testCount; i++ {
-		swg.Add(1)
-		go func() {
-			defer swg.Done()
-			basicTestCoordinator_Consumption(t)
-		}()
-	}
-	swg.Wait()
-}
-
-func basicTestCoordinator_Consumption(t *testing.T) {
+func TestCoordinator_SyncTaskInDatabase(t *testing.T) {
 	inputChan := make(chan *InputEvent)
 	outputChan := make(chan *Event)
 	ins, err := NewCoordinator(
@@ -67,6 +47,7 @@ func basicTestCoordinator_Consumption(t *testing.T) {
     ]
 }
 			`))
+			time.Sleep(100 * time.Millisecond)
 			rsp.Close()
 			return rsp, nil
 		}),
@@ -80,6 +61,9 @@ func basicTestCoordinator_Consumption(t *testing.T) {
 
 	parsedTask := false
 	consumptionCheck := false
+	pingPongCheck := false
+	syncTaskCheck := false
+
 LOOP:
 	for {
 		select {
@@ -87,24 +71,12 @@ LOOP:
 			fmt.Println("result:" + result.String())
 			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
-
-				end := false
-				for {
-					if end {
-						break
-					}
-					select {
-					case inputChan <- &InputEvent{
-						Id: result.GetInteractiveId(),
-						Params: aitool.InvokeParams{
-							"suggestion": "continue",
-						},
-					}:
-						end = true
-						continue
-					case <-time.After(3 * time.Second):
-						log.Warn("timeout for write to inputChan, retry it")
-					}
+				time.Sleep(100 * time.Millisecond)
+				inputChan <- &InputEvent{
+					Id: result.GetInteractiveId(),
+					Params: aitool.InvokeParams{
+						"suggestion": "continue",
+					},
 				}
 				continue
 			}
@@ -124,6 +96,36 @@ LOOP:
 				}
 				if inputConsumption > 0 && outputConsumption > 0 {
 					consumptionCheck = true
+					inputChan <- &InputEvent{
+						IsSyncInfo: true,
+						SyncType:   SYNC_TYPE_PING,
+					}
+					continue
+				}
+			}
+
+			if consumptionCheck && result.Type == EVENT_TYPE_PONG {
+				pingPongCheck = true
+				inputChan <- &InputEvent{
+					IsSyncInfo: true,
+					SyncType:   SYNC_TYPE_PLAN,
+				}
+				continue
+			}
+
+			if pingPongCheck && result.Type == EVENT_TYPE_PLAN {
+				var i = make(aitool.InvokeParams, 0)
+				if err := json.Unmarshal([]byte(result.Content), &i); err != nil {
+					t.Fatal(err)
+				}
+				tasksRaw, ok := i.GetObject("root_task")["subtasks"]
+				if !ok {
+					t.Fatal("subtasks not found")
+				}
+				tasks := tasksRaw.([]any)
+				var taskCount = len(tasks)
+				if taskCount > 0 {
+					syncTaskCheck = true
 					break LOOP
 				}
 			}
@@ -138,4 +140,23 @@ LOOP:
 	if !consumptionCheck {
 		t.Fatal("consumption check failed")
 	}
+	if !pingPongCheck {
+		t.Fatal("pingPong check failed")
+	}
+	if !syncTaskCheck {
+		t.Fatal("sync check failed")
+	}
+
+	rt, err := aiddb.GetCoordinatorRuntime(ins.config.GetDB(), ins.config.id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, rt.Uuid, ins.config.id)
+	t.Logf("rt: %+v", rt)
+	count := 0
+	for i := range aiddb.YieldCheckpoint(context.Background(), ins.config.GetDB(), ins.config.id) {
+		t.Logf("i: %+v", i)
+		count++
+	}
+	assert.Greater(t, count, 2)
 }

@@ -1,25 +1,12 @@
 package aiddb
 
 import (
+	"context"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 )
-
-func CreateOrUpdateRuntime(db *gorm.DB, runtime *schema.AiCoordinatorRuntime) error {
-	if runtime.Uuid == "" {
-		return db.Create(runtime).Error
-	}
-
-	var existingRuntime schema.AiCoordinatorRuntime
-	if err := db.Where("uuid = ?", runtime.Uuid).First(&existingRuntime).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
-			return db.Create(runtime).Error
-		}
-		return err
-	}
-
-	return db.Model(&existingRuntime).Updates(runtime).Error
-}
 
 func CreateOrUpdateCheckpoint(db *gorm.DB, checkpoint *schema.AiCheckpoint) error {
 	if checkpoint.Hash == "" {
@@ -35,4 +22,9 @@ func CreateOrUpdateCheckpoint(db *gorm.DB, checkpoint *schema.AiCheckpoint) erro
 	}
 
 	return db.Model(&existingCheckpoint).Updates(checkpoint).Error
+}
+
+func YieldCheckpoint(ctx context.Context, db *gorm.DB, uuid string) chan *schema.AiCheckpoint {
+	db = db.Model(&schema.AiCheckpoint{}).Where("coordinator_uuid = ?", uuid)
+	return bizhelper.YieldModel[*schema.AiCheckpoint](ctx, db, bizhelper.WithYieldModel_PageSize(100))
 }
