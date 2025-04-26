@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"strings"
 	"testing"
 	"time"
@@ -154,9 +155,18 @@ LOOP:
 	assert.Equal(t, rt.Uuid, ins.config.id)
 	t.Logf("rt: %+v", rt)
 	count := 0
+	aiInteractivity := 0
+	reviewCount := 0
 	for i := range aiddb.YieldCheckpoint(context.Background(), ins.config.GetDB(), ins.config.id) {
 		t.Logf("i: %+v", i)
 		count++
+		if i.Type == schema.AiCheckpointType_AIInteractive {
+			aiInteractivity++
+		} else if i.Type == schema.AiCheckpointType_Review {
+			reviewCount++
+		}
 	}
 	assert.Greater(t, count, 2)
+	assert.Greater(t, aiInteractivity, 0)
+	assert.Greater(t, reviewCount, 0)
 }

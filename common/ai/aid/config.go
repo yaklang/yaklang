@@ -241,6 +241,7 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		aiCallTokenLimit:  int64(1000 * 30),
 		aiAutoRetry:       5,
 	}
+	c.epm.config = c // review
 	if err := initDefaultTools(c); err != nil {
 		log.Errorf("init default tools: %v", err)
 	}
