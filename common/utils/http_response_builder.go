@@ -2,7 +2,9 @@ package utils
 
 import (
 	"bytes"
+	tls "crypto/tls"
 	"fmt"
+	utls2 "github.com/refraction-networking/utls"
 	"io"
 	"net"
 	"net/http"
@@ -356,6 +358,17 @@ func WriterAutoFlush(writer io.Writer) *AutoFlushWriter {
 	}
 }
 
+func CloseConnSafe(conn net.Conn) {
+	FlushWriter(conn)
+	CloseWrite(conn)
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		if err := conn.Close(); err != nil {
+			log.Errorf("failed to close connection: %v", err)
+		}
+	}()
+}
+
 func FlushWriter(writer io.Writer) {
 	if f, ok := writer.(flusher); ok {
 		err := f.Flush()
@@ -369,6 +382,19 @@ func FlushWriter(writer io.Writer) {
 		if err != nil {
 			log.Warnf("flush writer failed: %s", err)
 		}
+	}
+}
+
+func CloseWrite(i any) {
+	switch ret := i.(type) {
+	case interface{ CloseWrite() error }:
+		if err := ret.CloseWrite(); err != nil {
+			log.Errorf("close write failed: %s", err)
+		}
+		return
+	case interface{ CloseWrite() }:
+		ret.CloseWrite()
+		return
 	}
 }
 
@@ -396,5 +422,17 @@ func TCPNoDelay(i net.Conn) {
 		_ = tcpConn.SetNoDelay(true)
 		// disable write buffer
 		_ = tcpConn.SetWriteBuffer(0)
+	} else if tlsConn, ok := i.(*tls.Conn); ok {
+		netc := tlsConn.NetConn()
+		if tc, ok := netc.(*net.TCPConn); ok {
+			tc.SetNoDelay(true)
+			tc.SetWriteBuffer(0)
+		}
+	} else if utlsConn, ok := i.(*utls2.Conn); ok {
+		netc := utlsConn.NetConn()
+		if tc, ok := netc.(*net.TCPConn); ok {
+			tc.SetNoDelay(true)
+			tc.SetWriteBuffer(0)
+		}
 	}
 }
