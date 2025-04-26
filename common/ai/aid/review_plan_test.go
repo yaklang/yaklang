@@ -165,6 +165,7 @@ LOOP:
 			fmt.Println("result:" + result.String())
 			if strings.Contains(result.String(), `目录中占用存储空间最多的文件，并展示其完整路径与大小信息`) && result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
+				time.Sleep(time.Millisecond * 50)
 				inputChan <- &InputEvent{
 					Id: result.GetInteractiveId(),
 					Params: aitool.InvokeParams{
