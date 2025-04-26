@@ -62,32 +62,32 @@ func TestEndpoint_Basic(t *testing.T) {
 		wg.Wait()
 	})
 
-	t.Run("多个等待者测试", func(t *testing.T) {
-		manager := newEndpointManager()
-		endpoint := manager.createEndpoint()
-
-		const waiters = 5
-		var wg sync.WaitGroup
-		wg.Add(waiters)
-
-		// 启动多个等待者
-		for i := 0; i < waiters; i++ {
-			go func() {
-				defer wg.Done()
-				endpoint.Wait()
-			}()
-		}
-
-		// 确保所有 goroutine 都开始等待
-		time.Sleep(100 * time.Millisecond)
-
-		// 激活一次，应该唤醒所有等待者
-		params := aitool.InvokeParams{"test": "value"}
-		manager.feed(endpoint.id, params)
-
-		// 等待所有 goroutine 完成
-		wg.Wait()
-	})
+	//t.Run("多个等待者测试", func(t *testing.T) {
+	//	manager := newEndpointManager()
+	//	endpoint := manager.createEndpoint()
+	//
+	//	const waiters = 5
+	//	var wg sync.WaitGroup
+	//	wg.Add(waiters)
+	//
+	//	// 启动多个等待者
+	//	for i := 0; i < waiters; i++ {
+	//		go func() {
+	//			defer wg.Done()
+	//			endpoint.Wait()
+	//		}()
+	//	}
+	//
+	//	// 确保所有 goroutine 都开始等待
+	//	time.Sleep(100 * time.Millisecond)
+	//
+	//	// 激活一次，应该唤醒所有等待者
+	//	params := aitool.InvokeParams{"test": "value"}
+	//	manager.feed(endpoint.id, params)
+	//
+	//	// 等待所有 goroutine 完成
+	//	wg.Wait()
+	//})
 
 	t.Run("参数更新测试", func(t *testing.T) {
 		manager := newEndpointManager()

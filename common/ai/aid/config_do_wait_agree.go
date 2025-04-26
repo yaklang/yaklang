@@ -10,7 +10,7 @@ import (
 
 func (c *Config) doWaitAgree(ctx any, ep *Endpoint) {
 	if ret, ok := aiddb.GetReviewCheckpoint(c.GetDB(), c.id, ep.seq); ok {
-		if !ret.Finished {
+		if ret.Finished {
 			ep.SetParams(ret.GetResponseParams())
 			return
 		} else {
