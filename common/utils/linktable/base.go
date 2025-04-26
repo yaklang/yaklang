@@ -70,19 +70,20 @@ func NewUnlimitedFloat64LinkTable(value float64) *LinkTable[float64] {
 }
 
 func (l *LinkTable[T]) Push(value T) {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-
 	// 如果链表容量已达上限并且不是无限容量，则不允许添加
 	if l.size == 0 && l.onSizeExceeded != nil {
 		// 只有设置了回调函数的才视为有限容量
 		return
 	}
 
-	// 如果 size = 1 且设置了回调函数，则触发回调
-	if l.size == 1 && l.onSizeExceeded != nil {
-		l.onSizeExceeded(l)
-	}
+	// 先获取读锁，检查是否需要触发回调
+	l.mutex.RLock()
+	needCallback := l.size == 1 && l.onSizeExceeded != nil
+	callback := l.onSizeExceeded // 保存回调函数的引用
+	l.mutex.RUnlock()
+
+	// 再获取写锁，修改链表结构
+	l.mutex.Lock()
 
 	oldValue := l.value
 	oldParent := l.parent
@@ -99,6 +100,7 @@ func (l *LinkTable[T]) Push(value T) {
 		newParentSize = l.size - 1
 	}
 
+	// 更新当前节点的值和父节点
 	l.value = value
 	l.parent = &LinkTable[T]{
 		value:          oldValue,
@@ -111,6 +113,24 @@ func (l *LinkTable[T]) Push(value T) {
 	// 只有在有限容量链表时才减少 size
 	if l.size > 0 && l.onSizeExceeded != nil {
 		l.size--
+	}
+
+	// 在写锁内创建一个副本，用于回调
+	var callbackCopy *LinkTable[T]
+	if needCallback {
+		callbackCopy = &LinkTable[T]{
+			value:  value,
+			parent: l.parent,
+			size:   l.size,
+		}
+	}
+
+	// 释放写锁
+	l.mutex.Unlock()
+
+	// 在锁外调用回调函数，避免死锁
+	if needCallback && callback != nil {
+		callback(callbackCopy)
 	}
 }
 
