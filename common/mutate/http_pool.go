@@ -695,7 +695,8 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 		cache := chanx.NewUnlimitedChanEx[*HttpResult](config.Ctx, make(chan *HttpResult, 2048), results, 2048)
 
 		go func() {
-			defer close(cache.In)
+			//defer close(cache.In)
+			defer cache.Close()
 			defer func() {
 				if e := recover(); e != nil {
 					log.Error(e)
@@ -787,7 +788,8 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 									}
 								}
 							}
-							cache.In <- finalResult
+							//cache.In <- finalResult
+							cache.SafeFeed(finalResult)
 							requestFeedbackCounterAdd()
 						}()
 
@@ -1109,7 +1111,8 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 						finalResult := &HttpResult{
 							Error: utils.Errorf("fuzz tag exec failed: %s", err),
 						}
-						cache.In <- finalResult
+						cache.SafeFeed(finalResult)
+						//cache.In <- finalResult
 						return
 					}
 				} else {
