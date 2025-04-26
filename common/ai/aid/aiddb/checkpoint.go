@@ -54,3 +54,16 @@ func GetToolCallCheckpoint(db *gorm.DB, coordinatorUuid string, seq int64) (*sch
 
 	return &checkpoint, true
 }
+
+func GetReviewCheckpoint(db *gorm.DB, coordinatorUuid string, seq int64) (*schema.AiCheckpoint, bool) {
+	var checkpoint schema.AiCheckpoint
+	if err := db.Where("coordinator_uuid = ? AND seq = ?", coordinatorUuid, seq).First(&checkpoint).Error; err != nil {
+		return nil, false
+	}
+
+	if checkpoint.Type != schema.AiCheckpointType_Review {
+		return &checkpoint, false
+	}
+
+	return &checkpoint, true
+}
