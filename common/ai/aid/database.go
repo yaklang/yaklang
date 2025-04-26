@@ -2,20 +2,20 @@ package aid
 
 import (
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-func (c *Coordinator) CreateDatabaseSchema() *schema.AiCoordinatorRuntime {
+func (c *Coordinator) CreateDatabaseSchema(input string) *schema.AiCoordinatorRuntime {
 	rt := &schema.AiCoordinatorRuntime{
-		Uuid: c.config.id,
-		Name: "coordinator initializing...",
-		Seq:  c.config.GetSequenceStart(),
+		Uuid:            c.config.id,
+		Name:            "coordinator initializing...",
+		Seq:             c.config.GetSequenceStart(),
+		QuotedUserInput: codec.StrConvQuote(input),
 	}
 	aiddb.CreateOrUpdateRuntime(c.config.GetDB(), rt)
 	return rt
@@ -54,6 +54,7 @@ func (c *Config) submitCheckpointRequest(t *schema.AiCheckpoint, req any) error 
 
 func (c *Config) submitCheckpointResponse(t *schema.AiCheckpoint, rsp any) error {
 	t.ResponseQuotedJson = codec.StrConvQuote(string(utils.Jsonify(rsp)))
+	t.Finished = true
 	return aiddb.CreateOrUpdateCheckpoint(c.GetDB(), t)
 }
 

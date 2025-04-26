@@ -28,3 +28,29 @@ func YieldCheckpoint(ctx context.Context, db *gorm.DB, uuid string) chan *schema
 	db = db.Model(&schema.AiCheckpoint{}).Where("coordinator_uuid = ?", uuid)
 	return bizhelper.YieldModel[*schema.AiCheckpoint](ctx, db, bizhelper.WithYieldModel_PageSize(100))
 }
+
+func GetAIInteractiveCheckpoint(db *gorm.DB, coordinatorUuid string, seq int64) (*schema.AiCheckpoint, bool) {
+	var checkpoint schema.AiCheckpoint
+	if err := db.Where("coordinator_uuid = ? AND seq = ?", coordinatorUuid, seq).First(&checkpoint).Error; err != nil {
+		return nil, false
+	}
+
+	if checkpoint.Type != schema.AiCheckpointType_AIInteractive {
+		return &checkpoint, false
+	}
+
+	return &checkpoint, true
+}
+
+func GetToolCallCheckpoint(db *gorm.DB, coordinatorUuid string, seq int64) (*schema.AiCheckpoint, bool) {
+	var checkpoint schema.AiCheckpoint
+	if err := db.Where("coordinator_uuid = ? AND seq = ?", coordinatorUuid, seq).First(&checkpoint).Error; err != nil {
+		return nil, false
+	}
+
+	if checkpoint.Type != schema.AiCheckpointType_ToolCall {
+		return &checkpoint, false
+	}
+
+	return &checkpoint, true
+}
