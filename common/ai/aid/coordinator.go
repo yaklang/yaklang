@@ -46,6 +46,8 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...Opt
 			return nil, utils.Errorf("coordinator: apply option failed: %v", err)
 		}
 	}
+	config.startEventLoop(ctx)
+
 	if config.aiToolManager == nil {
 		config.aiToolManager = buildinaitools.NewDefaultToolManager(config.tools)
 	}
@@ -78,7 +80,7 @@ func (c *Coordinator) Run() error {
 	c.config.EmitInfo("start to invoke plan request")
 	rsp, err := planReq.Invoke()
 	if err != nil {
-		c.config.EmitError("invoke planRequest failed: %v", err)
+		c.config.EmitError("invoke planRequest failed(first): %v", err)
 		return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
 	}
 

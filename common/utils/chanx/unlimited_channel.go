@@ -13,8 +13,8 @@ import (
 // You can close the in channel if you want.
 type UnlimitedChan[T any] struct {
 	bufCount int64
-	In       chan<- T       // channel for write
-	Out      <-chan T       // channel for read
+	innerIn  chan<- T       // channel for write
+	innerOut <-chan T       // channel for read
 	buffer   *RingBuffer[T] // buffer
 	ctx      context.Context
 	cancel   context.CancelFunc
@@ -22,15 +22,30 @@ type UnlimitedChan[T any] struct {
 
 func (c *UnlimitedChan[T]) SafeFeed(i T) {
 	select {
-	case c.In <- i:
+	case c.innerIn <- i:
 	case <-time.After(3 * time.Second):
 		log.Error("timeout for write in *UnlimitedChan, try to solve it to prevent mem-leak")
 	}
 }
 
+func (c *UnlimitedChan[T]) OutputChannel() <-chan T {
+	if c.innerOut == nil {
+		out := make(chan T)
+		defer close(out)
+		return out
+	}
+	return c.innerOut
+}
+
 func (c *UnlimitedChan[T]) Close() {
-	if c.In != nil {
-		close(c.In)
+	if c.innerIn != nil {
+		close(c.innerIn)
+	}
+}
+
+func (c *UnlimitedChan[T]) CloseForce() {
+	if c.innerIn != nil {
+		close(c.innerIn)
 	}
 	if c.cancel != nil {
 		c.cancel()
@@ -41,7 +56,7 @@ func (c *UnlimitedChan[T]) Close() {
 // It is not accurate and only for your evaluating approximate number of elements in this chan,
 // see https://github.com/smallnest/chanx/issues/7.
 func (c *UnlimitedChan[T]) Len() int {
-	return len(c.In) + c.BufLen() + len(c.Out)
+	return len(c.innerIn) + c.BufLen() + len(c.innerOut)
 }
 
 // BufLen returns len of the buffer.
@@ -64,9 +79,10 @@ func NewUnlimitedChanEx[T any](ctx context.Context, in chan T, out chan T, initB
 		ctx = context.Background()
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	ch := UnlimitedChan[T]{In: in, Out: out, buffer: NewRingBuffer[T](initBufCapacity), ctx: ctx, cancel: cancel}
+	ch := UnlimitedChan[T]{innerIn: in, innerOut: out, buffer: NewRingBuffer[T](initBufCapacity), ctx: ctx, cancel: cancel}
 	validator := make(chan struct{})
 	go process(validator, ctx, in, out, &ch)
+	// if validator write finished, the process is working!
 	validator <- struct{}{}
 	return &ch
 }
@@ -79,7 +95,7 @@ func NewUnlimitedChanSize[T any](ctx context.Context, initInCapacity, initOutCap
 		ctx = context.Background()
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	ch := UnlimitedChan[T]{In: in, Out: out, buffer: NewRingBuffer[T](initBufCapacity), ctx: ctx, cancel: cancel}
+	ch := UnlimitedChan[T]{innerIn: in, innerOut: out, buffer: NewRingBuffer[T](initBufCapacity), ctx: ctx, cancel: cancel}
 
 	validator := make(chan struct{})
 	go process(validator, ctx, in, out, &ch)
@@ -89,6 +105,7 @@ func NewUnlimitedChanSize[T any](ctx context.Context, initInCapacity, initOutCap
 
 func process[T any](validator chan struct{}, ctx context.Context, in, out chan T, ch *UnlimitedChan[T]) {
 	defer close(out)
+
 	drain := func() {
 		for !ch.buffer.IsEmpty() {
 			select {
@@ -146,6 +163,7 @@ func process[T any](validator chan struct{}, ctx context.Context, in, out chan T
 				case out <- ch.buffer.Peek():
 					ch.buffer.Pop()
 					atomic.AddInt64(&ch.bufCount, -1)
+					log.Info("write to unlimited channel: delta -1")
 					if ch.buffer.IsEmpty() && ch.buffer.size > ch.buffer.initialSize { // after burst
 						ch.buffer.Reset()
 						atomic.StoreInt64(&ch.bufCount, 0)

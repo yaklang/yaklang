@@ -12,7 +12,7 @@ type AiCoordinatorRuntime struct {
 
 	Uuid string `json:"uuid" gorm:"unique_index"`
 	Name string `json:"name"`
-	Seq  int64  `json:"seq" gorm:"unique_index"`
+	Seq  int64  `json:"seq" gorm:"index"`
 }
 
 type AiCheckpointType string

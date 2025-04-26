@@ -77,7 +77,6 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 					onClose()
 				}
 			})
-
 			return first, err
 		}
 		return nil, utils.Errorf("")
