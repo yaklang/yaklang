@@ -127,7 +127,8 @@ jobs:
               # StaticAnalyze
               go test -timeout 20s -run TestAnalyzeMustPASS* ./common/coreplugin
               # BuildIn SyntaxFlow Rule
-              go test -timeout 1m -skip "TestEmbedRuleVersion" ./common/yak/ssaapi/test/syntaxflow
+              go test -timeout 2m ./common/syntaxflow/sfbuildin/...
+              go test -timeout 1m ./common/yak/ssaapi/test/syntaxflow
 
           - name: Test SSA Frontend Yak  / JavaScript
             run: |
@@ -218,7 +219,9 @@ jobs:
               #  integration MITM
               go test -timeout 2m -run TestGRPCMUSTPASS_MITM ./common/coreplugin
               # SyntaxFlow
-              go test -timeout 20s ./common/syntaxflow/tests
+              go test -timeout  20s  ./common/syntaxflow/tests
+              go test -timeout 20s  -skip "TestEmbedRuleVersion" ./common/syntaxflow/sfdb/...
+              go test -timeout 20s  ./common/syntaxflow/sfvm/...
 
           - name: Test Vulinbox(XSS/Shiro/SSRF/SSTI/SMUGGLE/CSRF/OPEN_REDIRECT)
             run: |

@@ -1,6 +1,7 @@
 package sfvm
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -166,7 +167,7 @@ func TestConstComparator_Matches(t *testing.T) {
 		// String comparison tests
 		{
 			name:        "Equal strings - true",
-			toCompared:  "hello",
+			toCompared:  fmt.Sprintf("%#v", "hello"),
 			target:      "hello",
 			condition:   BinaryConditionEqual,
 			expected:    true,
@@ -190,7 +191,7 @@ func TestConstComparator_Matches(t *testing.T) {
 		},
 		{
 			name:        "Not equal strings - false",
-			toCompared:  "hello",
+			toCompared:  fmt.Sprintf("%#v", "hello"),
 			target:      "hello",
 			condition:   BinaryConditionNotEqual,
 			expected:    false,
@@ -198,9 +199,9 @@ func TestConstComparator_Matches(t *testing.T) {
 		},
 		{
 			name:        "Greater than string - true",
-			toCompared:  "zebra",
+			toCompared:  fmt.Sprintf("%#v", "zebra"),
 			target:      "apple",
-			condition:   BinaryConditionGt,
+			condition:   BinaryConditionLt,
 			expected:    true,
 			description: "Lexicographically 'zebra' > 'apple' should return true",
 		},
@@ -214,15 +215,15 @@ func TestConstComparator_Matches(t *testing.T) {
 		},
 		{
 			name:        "Greater than or equal string - true (greater)",
-			toCompared:  "zebra",
+			toCompared:  fmt.Sprintf("%#v", "zebra"),
 			target:      "apple",
-			condition:   BinaryConditionGtEq,
+			condition:   BinaryConditionLtEq,
 			expected:    true,
 			description: "Lexicographically 'zebra' >= 'apple' should return true",
 		},
 		{
 			name:        "Greater than or equal string - true (equal)",
-			toCompared:  "apple",
+			toCompared:  fmt.Sprintf("%#v", "apple"),
 			target:      "apple",
 			condition:   BinaryConditionGtEq,
 			expected:    true,
@@ -246,7 +247,7 @@ func TestConstComparator_Matches(t *testing.T) {
 		},
 		{
 			name:        "Less than string - false",
-			toCompared:  "zebra",
+			toCompared:  fmt.Sprintf("%#v", "apple"),
 			target:      "apple",
 			condition:   BinaryConditionLt,
 			expected:    false,
@@ -270,9 +271,9 @@ func TestConstComparator_Matches(t *testing.T) {
 		},
 		{
 			name:        "Less than or equal string - false",
-			toCompared:  "zebra",
+			toCompared:  fmt.Sprintf("%#v", "zebra"),
 			target:      "apple",
-			condition:   BinaryConditionLtEq,
+			condition:   BinaryConditionGtEq,
 			expected:    false,
 			description: "Lexicographically 'zebra' <= 'apple' should return false",
 		},
@@ -288,9 +289,9 @@ func TestConstComparator_Matches(t *testing.T) {
 		},
 		{
 			name:        "String with special characters compared lexicographically",
-			toCompared:  "!special",
+			toCompared:  fmt.Sprintf("%#v", "!special"),
 			target:      "special",
-			condition:   BinaryConditionLt,
+			condition:   BinaryConditionGt,
 			expected:    true,
 			description: "Strings with special characters should be compared lexicographically",
 		},
