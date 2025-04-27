@@ -72,8 +72,7 @@ func (f *ForgeBlueprint) ToolPrompt() string {
 	}
 	tmp, err := template.New("tool").Parse(`# 工具提示
 在设计任务中，只考虑工具名称即可，具体参数在后面的对话会按需确认:
-{{range .Tools}}
-- "{{.Name}}": "{{.Description}}"
+{{range .Tools}}- "{{.Name}}": "{{.Description}}"
 {{end}}`)
 	if err != nil {
 		log.Errorf("[ForgeBlueprint.ToolPrompt] %v", err)

