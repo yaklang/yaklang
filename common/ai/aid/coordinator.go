@@ -90,7 +90,7 @@ func (c *Coordinator) Run() error {
 	c.config.EmitRequireReviewForPlan(rsp, ep.id)
 	c.config.doWaitAgree(nil, ep)
 	params := ep.GetParams()
-	c.config.memory.StoreInteractiveUserInput(ep.id, params)
+	c.config.ReleaseInteractiveEvent(ep.id, params)
 	if params == nil {
 		c.config.EmitError("user review params is nil, plan failed")
 		return utils.Errorf("coordinator: user review params is nil")

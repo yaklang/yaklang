@@ -111,14 +111,13 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 	callToolParams := callToolAction.GetInvokeParams("params")
 
 	t.config.EmitInfo("start to invoke tool:%v 's callback function", targetTool.Name)
-
 	t.config.EmitInfo("start to require review for tool use")
 	ep := t.config.epm.createEndpoint()
 	ep.SetDefaultSuggestionContinue()
 	t.config.EmitRequireReviewForToolUse(targetTool, callToolParams, ep.id)
 	t.config.doWaitAgree(nil, ep)
 	params := ep.GetParams()
-	t.config.memory.StoreInteractiveUserInput(ep.id, params)
+	t.config.ReleaseInteractiveEvent(ep.id, params)
 	if params == nil {
 		t.config.EmitError("user review params is nil, plan failed")
 		return nil, NewNonRetryableTaskStackError(utils.Errorf("user review params is nil"))

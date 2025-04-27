@@ -78,7 +78,7 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 		p.config.EmitRequireReviewForPlan(newPlan, ep.id)
 		p.config.doWaitAgree(nil, ep)
 		params := ep.GetParams()
-		p.config.memory.StoreInteractiveUserInput(ep.id, params)
+		p.config.ReleaseInteractiveEvent(ep.id, params)
 		if params == nil {
 			p.config.EmitError("user review params is nil, plan failed")
 			return newPlan, nil

@@ -196,6 +196,11 @@ func (c *Config) ProcessExtendedActionCallback(resp string) {
 	}
 }
 
+func (c *Config) ReleaseInteractiveEvent(eventID string, invoke aitool.InvokeParams) {
+	c.emitInteractiveRelease(eventID, invoke)
+	c.memory.StoreInteractiveUserInput(eventID, invoke)
+}
+
 func initDefaultTools(c *Config) error { // set config default tools
 	if err := WithTools(buildinaitools.GetBasicBuildInTools()...)(c); err != nil {
 		return utils.Wrapf(err, "get basic build-in tools fail")
