@@ -244,7 +244,6 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 			member := call.GetMember(v.NewValue(ssa.NewConst(getReturnIndex)))
 			if member == nil {
 				log.Errorf("BUG: (return instruction 's member is nil),check it")
-				return nil
 			} else {
 				actx.pushObject(call, member.GetKey(), member)
 				vals = append(vals, member.AppendDependOn(v).getBottomUses(actx, opt...)...)

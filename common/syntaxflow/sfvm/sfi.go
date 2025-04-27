@@ -77,15 +77,18 @@ const (
 
 	// Condition
 	// use the []bool  && []Value of stack top, push result into stack
+
 	OpCondition
 	OpCompareOpcode
 	OpCompareString
-	OpVersionIn
+	OpEmptyCompare
 
-	/*
-		Binary Operator
-		Fetch TWO in STACK, calc result, push result into stack
-	*/
+	OpVersionIn
+	//OpPopDuplicate is copy popStack to stack
+	OpPopDuplicate
+	//OpCheckEmpty check the stack top, if empty, push false
+	OpCheckEmpty
+
 	OpEq
 	OpNotEq
 	OpGt
@@ -137,6 +140,66 @@ const (
 	OpFileFilterJsonPath
 )
 
+var Opcode2String = map[SFVMOpCode]string{
+	OpPass:                  "OpPass",
+	OpEnterStatement:        "OpEnterStatement",
+	OpExitStatement:         "OpExitStatement",
+	OpDuplicate:             "OpDuplicate",
+	OpPushSearchExact:       "OpPushSearchExact",
+	OpPushSearchGlob:        "OpPushSearchGlob",
+	OpPushSearchRegexp:      "OpPushSearchRegexp",
+	OpRecursiveSearchExact:  "OpRecursiveSearchExact",
+	OpRecursiveSearchGlob:   "OpRecursiveSearchGlob",
+	OpRecursiveSearchRegexp: "OpRecursiveSearchRegexp",
+	OpGetCall:               "OpGetCall",
+	OpGetCallArgs:           "OpGetCallArgs",
+	OpGetUsers:              "OpGetUsers",
+	OpGetBottomUsers:        "OpGetBottomUsers",
+	OpGetDefs:               "OpGetDefs",
+	OpGetTopDefs:            "OpGetTopDefs",
+	OpListIndex:             "OpListIndex",
+	OpNewRef:                "OpNewRef",
+	OpUpdateRef:             "OpUpdateRef",
+	OpPushNumber:            "OpPushNumber",
+	OpPushString:            "OpPushString",
+	OpPushBool:              "OpPushBool",
+	OpPop:                   "OpPop",
+	OpCondition:             "OpCondition",
+	OpCompareOpcode:         "OpCompareOpcode",
+	OpCompareString:         "OpCompareString",
+	OpVersionIn:             "OpVersionIn",
+	OpEq:                    "OpEq",
+	OpNotEq:                 "OpNotEq",
+	OpGt:                    "OpGt",
+	OpGtEq:                  "OpGtEq",
+	OpLt:                    "OpLt",
+	OpLtEq:                  "OpLtEq",
+	OpLogicAnd:              "OpLogicAnd",
+	OpLogicOr:               "OpLogicOr",
+	OpLogicBang:             "OpLogicBang",
+	OpReMatch:               "OpReMatch",
+	OpGlobMatch:             "OpGlobMatch",
+	OpNot:                   "OpNot",
+	OpAlert:                 "OpAlert",
+	OpCheckParams:           "OpCheckParams",
+	OpAddDescription:        "OpAddDescription",
+	OpCreateIter:            "OpCreateIter",
+	OpIterNext:              "OpIterNext",
+	OpIterLatch:             "OpIterLatch",
+	OpIterEnd:               "OpIterEnd",
+	OpCheckStackTop:         "OpCheckStackTop",
+	OpMergeRef:              "OpMergeRef",
+	OpRemoveRef:             "OpRemoveRef",
+	OpIntersectionRef:       "OpIntersectionRef",
+	OpNativeCall:            "OpNativeCall",
+	OpFileFilterReg:         "OpFileFilterReg",
+	OpFileFilterXpath:       "OpFileFilterXpath",
+	OpFileFilterJsonPath:    "OpFileFilterJsonPath",
+	OpCheckEmpty:            "OpCheckEmpty",
+	OpPopDuplicate:          "OpPopDuplicate",
+	OpEmptyCompare:          "OpEmptyCompare",
+}
+
 type SFI struct {
 	OpCode               SFVMOpCode             `json:"op_code"`
 	UnaryInt             int                    `json:"unary_int"`
@@ -164,6 +227,9 @@ type IterIndex struct {
 	Next  int `json:"next"`
 	Latch int `json:"latch"`
 	End   int `json:"end"`
+
+	//记录当前的索引位置
+	currentIndex int
 }
 
 func (s *SFI) ValueByIndex(i int) string {
@@ -302,6 +368,12 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "fileFilter$jsonpath", s.UnaryStr)
 	case OpVersionIn:
 		return fmt.Sprintf(verboseLen+" ", "version$in")
+	case OpCheckEmpty:
+		return fmt.Sprintf(verboseLen+" ", "check empty")
+	case OpPopDuplicate:
+		return fmt.Sprintf(verboseLen+" ", "pop-duplicate")
+	case OpEmptyCompare:
+		return fmt.Sprintf(verboseLen+" ", "empty compare")
 	default:
 		panic("unhandled default case")
 	}

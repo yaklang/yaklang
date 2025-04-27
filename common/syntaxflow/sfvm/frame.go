@@ -45,6 +45,7 @@ type SFFrame struct {
 	stack          *utils.Stack[ValueOperator] // for filter
 	conditionStack *utils.Stack[[]bool]        // for condition
 	iterStack      *utils.Stack[*IterContext]  // for loop
+	popStack       *utils.Stack[ValueOperator] //pop stack,for sf
 
 	// when cache err skip  statement/expr
 	errorSkipStack *utils.Stack[*errorSkipContext]
@@ -204,6 +205,7 @@ func (s *SFFrame) Flush() {
 	s.errorSkipStack = utils.NewStack[*errorSkipContext]()
 	s.conditionStack = utils.NewStack[[]bool]()
 	s.iterStack = utils.NewStack[*IterContext]()
+	s.popStack = utils.NewStack[ValueOperator]()
 	s.idx = 0
 }
 
@@ -336,10 +338,12 @@ func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
 			}
 			// jump to next
 			next := i.Iter.Next
+			i.Iter.currentIndex++
 			s.debugSubLog("jump to next code: %v", next)
 			s.idx = next
 			continue
 		case OpIterEnd:
+			i.Iter.currentIndex = 0
 			// end iter, pop and collect results to conditionStack
 			if err := s.IterEnd(); err != nil {
 				return err
@@ -652,12 +656,37 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			s.debugSubLog("error: %v", err)
 			return err
 		}
+	case OpPopDuplicate:
+		val := s.popStack.Peek()
+		if val == nil {
+			log.Errorf("pop duplicate failed: stack top is empty")
+			return nil
+		}
+		s.stack.Push(val)
+	case OpCheckEmpty:
+		if i.Iter == nil {
+			return utils.Wrap(CriticalError, "check empty failed: stack top is empty")
+		}
+		index := i.Iter.currentIndex
+		conditions := s.conditionStack.Pop()
+		//如果是null
+		if len(conditions) == index+1 && !conditions[index] {
+			return nil
+		}
+		val := s.stack.Pop()
+		if len(conditions) < index+1 {
+			return utils.Errorf("check empty failed: stack top is empty")
+		}
+		conditions[index] = !val.IsEmpty()
+		s.conditionStack.Push(conditions)
+		s.popStack.Free()
 	case OpPop:
 		if s.stack.Len() == 0 {
 			s.debugSubLog(">> pop Error: empty stack")
 			return utils.Wrap(CriticalError, "E: stack is empty, cannot pop")
 		}
 		i := s.stack.Pop()
+		s.popStack.Push(i)
 		s.debugSubLog(">> pop %v", ValuesLen(i))
 		s.debugSubLog("save-to $_")
 		err := s.output("_", i)
@@ -787,7 +816,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Errorf("update ref failed: empty name")
 		}
 		s.debugSubLog(">> pop")
-		value := s.stack.Pop()
+		value := s.stack.Peek()
 		if value == nil {
 			return utils.Error("BUG: get top defs failed, empty stack")
 		}
@@ -874,6 +903,17 @@ func (s *SFFrame) execStatement(i *SFI) error {
 				s.result.Description.Set("$"+i.UnaryStr, thenStr)
 			}
 		}
+	case OpEmptyCompare:
+		vals := s.stack.Peek()
+		if vals == nil {
+			return utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
+		}
+		var flag []bool
+		vals.Recursive(func(operator ValueOperator) error {
+			flag = append(flag, true)
+			return nil
+		})
+		s.conditionStack.Push(flag)
 	case OpCompareOpcode:
 		s.debugSubLog(">> pop")
 		values := s.stack.Pop()

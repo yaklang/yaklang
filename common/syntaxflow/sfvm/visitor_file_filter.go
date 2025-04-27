@@ -36,6 +36,7 @@ func (y *SyntaxFlowVisitor) VisitFileFilterContent(raw sf.IFileFilterContentStat
 		varName := y.VisitRefVariable(ref)
 		y.EmitUpdate(varName)
 	}
+	y.EmitPop()
 	return err
 }
 
