@@ -14,10 +14,15 @@ import (
 )
 
 func (c *Config) wrapper(i AICallbackType) AICallbackType {
-	return func(config *Config, request *AIRequest) (*AIResponse, error) {
+	return func(config *Config, request *AIRequest) (rsp *AIResponse, err error) {
 		if c.debugPrompt {
 			log.Infof(strings.Repeat("=", 20)+"AIRequest"+strings.Repeat("=", 20)+"\n%v\n", request.GetPrompt())
 		}
+		defer func() {
+			// set rsp start time
+			rsp.respStartTime = time.Now()
+			rsp.reqStartTime = request.startTime
+		}()
 
 		seq := config.AcquireId()
 		log.Infof("start to check uuid:%v seq:%v", c.id, seq)
@@ -54,7 +59,7 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 		start := time.Now()
 		for _idx := 0; _idx < int(c.aiAutoRetry); _idx++ {
 			c.inputConsumptionCallback(tokenSize)
-			resp, err := i(config, request)
+			rsp, err = i(config, request)
 			if err != nil {
 				c.EmitWarning("ai request err: %v, retry auto time: [%v]", err, _idx+1)
 				time.Sleep(500 * time.Millisecond)
@@ -62,7 +67,7 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 			}
 
 			var haveFirstByte = utils.NewBool(false)
-			var first, tee *AIResponse
+			var tee *AIResponse
 			teeMux := new(sync.Mutex)
 			onClose := func() {
 				teeMux.Lock()
@@ -78,7 +83,7 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 
 			teeMux.Lock()
 			defer teeMux.Unlock()
-			first, tee = c.teeAIResponse(resp, func() {
+			rsp, tee = c.teeAIResponse(rsp, func() {
 				c.EmitInfo("ai response first byte cost: %v", time.Since(start))
 				haveFirstByte.SetTo(true)
 			}, func() {
