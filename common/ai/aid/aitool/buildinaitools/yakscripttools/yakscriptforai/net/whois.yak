@@ -1,0 +1,38 @@
+__DESC__ = <<<EOF
+query WHOIS info for domain.
+EOF
+
+domainString = cli.String("domain", cli.setRequired(true), cli.setHelp("whois target domain"))
+// domainString = "example.com"
+cli.check()
+
+domain = codec.EncodeUrl(domainString)
+
+pkt := f`GET /whois?q=${domain} HTTP/1.1
+Host: www.iana.org
+Accept-Encoding: gzip, deflate, br
+Accept: */*
+Accept-Language: en-US;q=0.9,en;q=0.8
+User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36
+Cache-Control: max-age=0
+
+`
+rsp, req, err := poc.HTTP(pkt, poc.https(true), poc.retryNotInStatusCode(200), poc.retryMaxWaitTime(5), poc.retryWaitTime(1), poc.connectTimeout(10))
+if err != nil {
+    yakit.Error("query www.iana.org/whois?q=%v failed: %v",  domain, err)
+    return
+}
+body = poc.GetHTTPPacketBody(rsp)
+bodyHtml, err := xpath.LoadHTMLDocument(body)
+if err != nil {
+    yakit.Error("cannot parse body to html: %v", err)
+    yakit.Info("%v", string(body))
+    return
+}
+for n in xpath.Find(bodyHtml, "//pre/text()") {
+    data = string(n.Data)
+    println(data)
+    if string(data) == "" { continue }
+    yakit.Info("iana whois: %v", data)
+    return
+}
