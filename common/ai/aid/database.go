@@ -64,9 +64,10 @@ func (c *Config) submitAIRequestCheckpoint(t *schema.AiCheckpoint, data *AIReque
 	})
 }
 
-func (c *Config) submitToolCallRequestCheckpoint(t *schema.AiCheckpoint, data *aitool.Tool) error {
-	return c.submitCheckpointRequest(t, map[string]string{
+func (c *Config) submitToolCallRequestCheckpoint(t *schema.AiCheckpoint, data *aitool.Tool, param map[string]any) error {
+	return c.submitCheckpointRequest(t, map[string]any{
 		"tool_name": data.Name,
+		"param":     param,
 	})
 }
 
