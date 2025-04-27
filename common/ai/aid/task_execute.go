@@ -150,7 +150,7 @@ func (t *aiTask) executeTask() error {
 	t.config.doWaitAgree(nil, ep)
 	// user review finished, find params
 	reviewResult := ep.GetParams()
-	t.config.memory.StoreInteractiveUserInput(ep.id, reviewResult)
+	t.config.ReleaseInteractiveEvent(ep.id, reviewResult)
 	t.config.EmitInfo("start to handle review task event: %v", ep.id)
 	err := t.handleReviewResult(reviewResult)
 	if err != nil {

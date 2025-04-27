@@ -1,15 +1,15 @@
 package aid
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"strings"
 	"time"
-
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 type EventType string
@@ -28,7 +28,10 @@ const (
 	EVENT_TYPE_TASK_REVIEW_REQUIRE     EventType = "task_review_require"
 	EVENT_TYPE_PLAN_REVIEW_REQUIRE     EventType = "plan_review_require"
 	EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE EventType = "tool_use_review_require"
-	EVENT_TYPE_INPUT                   EventType = "input"
+
+	EVENT_TYPE_REVIEW_RELEASE EventType = "review_release"
+
+	EVENT_TYPE_INPUT EventType = "input"
 )
 
 type Event struct {
@@ -225,6 +228,21 @@ func (r *Config) emitInteractiveJson(id string, typeName EventType, nodeId strin
 	r.emit(event)
 }
 
+func (r *Config) emitInteractiveRelease(eventId string, invokeParams aitool.InvokeParams) {
+	release := map[string]any{
+		"id":     eventId,
+		"params": invokeParams,
+	}
+	event := &Event{
+		CoordinatorId: r.id,
+		Type:          EVENT_TYPE_REVIEW_RELEASE,
+		NodeId:        "review-release",
+		IsJson:        true,
+		Content:       utils.Jsonify(release),
+	}
+	r.emit(event)
+}
+
 func (r *Config) emitLogWithLevel(level, name, fmtlog string, items ...any) {
 	message := fmtlog
 	if len(items) > 0 {
@@ -252,6 +270,12 @@ func (r *Config) EmitInfoWithName(name string, fmtlog string, items ...any) {
 
 func (r *Config) EmitErrorWithName(name string, fmtlog string, items ...any) {
 	r.emitLogWithLevel("error", name, fmtlog, items...)
+}
+
+func (r *Config) EmitToolCallStd(toolName string, stdOut, stdErr *bytes.Buffer) {
+	startTime := time.Now()
+	r.EmitStreamEvent(fmt.Sprintf("tool-%v-stdout", toolName), startTime, stdOut)
+	r.EmitStreamEvent(fmt.Sprintf("tool-%v-stderr", toolName), startTime, stdErr)
 }
 
 func (r *Config) EmitStreamEvent(nodeId string, startTime time.Time, reader io.Reader) {
