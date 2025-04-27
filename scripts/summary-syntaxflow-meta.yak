@@ -27,6 +27,67 @@ if enableCustomAI {
     opts.Push(ai.apiKey(aiAPIKEY))
 }
 
+want_data := {
+    "detail": string, 
+    "detail_en": string, 
+    "score": float,
+}
+
+check = obj => {
+    if obj == nil {
+        return false 
+    }
+    for key, typ := range want_data{
+        if typeof(obj[key]) != typ {
+            return false 
+        }
+    }
+    return true 
+}
+
+prompt = (result)=>{
+    return sprintf(<<<PPP
+<START> 
+您是一位擅长规则分析和评分的专业人士。请按照以下框架完成任务： 
+- **设定**：您的目标是将复杂的规则简化为简洁的表达，并评估其重要性。规则信息以JSON格式输入，需适合在列表中展示评分结果。 
+- **任务描述**：针对给定的JSON格式规则信息，生成一段约30字的中文描述、一段约30字的英文描述，并基于类似CVSS的标准给出0-10.0的评分。需从JSON中提取规则的核心内容进行总结。 
+- **字段解释**： - `detail`：中文描述，字符串类型，约30字，简明扼要。 - `detail_en`：英文描述，字符串类型，约30字，简明扼要。 - `score`：评分，浮点数类型，范围0-10.0，反映规则的影响力。 
+- **输出格式定义（jsonschema）**： 
+```json 
+{
+  "type": "object",
+  "properties": {
+    "detail": {
+      "type": "string",
+      "description": "中文描述，约30字"
+    },
+    "detail_en": {
+      "type": "string",
+      "description": "英文描述，约30字"
+    },
+    "score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 10,
+      "description": "评分，范围0-10.0"
+    }
+  },
+  "required": [
+    "detail",
+    "detail_en",
+    "score"
+  ]
+}
+```
+- **输入**， 规则信息如下：
+```json 
+%s
+```
+请严格按照上述jsonschema格式生成输出，确保结果符合want_data格式要求，并适应JSON格式输入。 
+<END>
+PPP, result)
+}
+
 handleResult = result => {
     m := json.loads(json.dumps(result))
     delete(m, "DeletedAt")
@@ -35,7 +96,7 @@ handleResult = result => {
     delete(m, "ID")
     delete(m, "OpCodes")
     hash = codec.Sha256(m.Content)
-    if existed.Has(hash) {
+    if existed.Has(hash) && check(existed[hash]) {
         log.Info("RULE： %v existed", result.RuleName)
         cache = existed[hash]
         cache["rule"] = m.RuleName
@@ -44,22 +105,24 @@ handleResult = result => {
         cache["is_lib"] = m.IncludedName != "" ? true : false
         return cache
     }
+
     for in 10 {
         try {
+            // ai set detail/detail-en/score 
             obj = ai.FunctionCall(
-                string(json.dumps(m)), 
-                {"detail": "(类型：字符串)把规则总结成30字左右的表达，快速表达其含义，适合放在列表中", "detail_en": "(类型：字符串；语言：英语)把规则总结成30字左右的表达，快速表达其含义，适合放在列表中", "score": "(类型：浮点数)把规则用类似CVSS的评判规则，给出一个0-10.0的评分"}, 
+                prompt(json.dumps(m)), 
+                {"detail": "(类型：字符串)把规则总结成30字左右的表达，快速表达其含义，适合放在列表中", "detail_en": "(类型：字符串；语言：英语)把规则总结成30字左右的表达，快速表达其含义，适合放在列表中", "score": "(类型：浮点数)把规则用类似CVSS的评判规则，给出一个0-10.0的评分",}, 
                 opts...
             )~
+            if !check(obj) {
+                log.warn("AI function call returned invalid object:", obj)
+                continue 
+            }
             obj["rule"] = m.RuleName
             obj["language"] = m.Language
             obj["sha256"] = hash
             obj["code"] = m.Content
             obj["is_lib"] = m.IncludedName != "" ? true : false
-            if obj["detail"] == "" || obj["detail_en"] == "" {
-                continue
-            }
-            
             println(string(json.dumps(obj)))
             return obj
         } catch e {
