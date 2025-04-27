@@ -157,6 +157,8 @@ func (v *Value) NewTopDefValue(value ssa.Value) *Value {
 	return iv.AppendEffectOn(v)
 }
 
+// AddSelfToTopDefResult adds the current value to the result set
+// and clears its DependOn edge to make use the values in result all is the top def.
 func (v *Value) AddSelfToTopDefResult(result Values) Values {
 	if v == nil {
 		return result
