@@ -1,7 +1,6 @@
 package ssaapi
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -89,10 +88,6 @@ func (i *Value) AppendEffectOn(vs ...*Value) *Value {
 		if i.GetId() == v.GetId() {
 			return i
 		}
-		if v.String() == "Parameter-a2" {
-			print("a")
-		}
-		log.Infof(">>>> append effect on %s to %s", i.String(), v.String())
 		i.EffectOn = utils.AppendSliceItemWhenNotExists(i.EffectOn, v)
 		v.DependOn = utils.AppendSliceItemWhenNotExists(v.DependOn, i)
 	}
