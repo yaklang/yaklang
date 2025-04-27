@@ -22,7 +22,10 @@ func NewValues(values []ValueOperator) ValueOperator {
 }
 
 func (v *ValueList) IsEmpty() bool {
-	return ValuesLen(v) == 0
+	if v.Values == nil || len(v.Values) == 0 {
+		return true
+	}
+	return false
 }
 
 func NewEmptyValues() ValueOperator {
