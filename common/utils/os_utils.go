@@ -590,7 +590,6 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 							log.Infof("close tcp connection: %v", conn.RemoteAddr())
 							return
 						}
-						return
 					}
 				}
 			}()
