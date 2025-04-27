@@ -26,7 +26,7 @@ func (v Values) GetTopDefs(opts ...OperationOption) Values {
 	return MergeValues(ret)
 }
 
-func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) Values {
+func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (result Values) {
 	var vals Values
 	if i.innerValue == nil {
 		return vals
@@ -42,11 +42,24 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) Values
 	if len(vals) == 0 {
 		vals = i.AddSelfToTopDefResult(vals)
 	}
-	// 拿到上次递归的节点作为mask的effectOn
-	last := actx.getLastRecursiveNode()
-	if maskable, ok := i.innerValue.(ssa.Maskable); ok && last != nil {
+
+	if maskable, ok := i.innerValue.(ssa.Maskable); ok {
+		if len(maskable.GetMask()) == 0 {
+			return vals
+		}
+		// 拿到上次递归的节点
+		last := actx.getLastRecursiveNode()
+		var shadow *Value
+		// 新建个ssa.Value和i一样的ssaapi.Value,
+		// 用以作为下个topdef的effecton的边
+		// 而不影响i作为结果result有多出来的边
+		if last != nil {
+			shadow = last.NewTopDefValue(i.innerValue)
+		} else {
+			shadow = i.NewValue(i.innerValue)
+		}
 		for _, def := range maskable.GetMask() {
-			if ret := last.NewTopDefValue(def).getTopDefs(actx, opt...); len(ret) > 0 {
+			if ret := shadow.NewTopDefValue(def).getTopDefs(actx, opt...); len(ret) > 0 {
 				vals = append(vals, ret...)
 			}
 		}
