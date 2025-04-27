@@ -1,0 +1,60 @@
+__DESC__ = <<<EOF
+信息安全风险输出工具，如果你认为有一些需要注意的安全漏洞，请使用本工具输出一些 security risk
+EOF
+
+target := cli.String("target", cli.setHelp("你认为有安全漏洞或风险的目标（URL或者IP或者IP:PORT）"), cli.setRequired(true))
+// target = "www.example.com"
+titleEn := cli.String("title-en", cli.setHelp("一句话描述这是一个什么样的漏洞或者风险作为标题（English）"), cli.setRequired(true))
+// titleEn = "英文标题"
+titleZh := cli.String("title-zh", cli.setHelp("中文总结一句话作为信息安全标题（中文）"), cli.setRequired(true))
+// titleZh = "中文标题"
+
+
+riskType := cli.String("risktype", cli.setHelp(`从后面列表中选择一个你认为对的 [[sqli,xss,rce,lfi,file-read,file-download,rfi,file-write,file-upload,xxe,ssti,unserialize,deserialization,unauth-access,auth-bypass,privilege-escalation,path-traversal,info-exposure,insecure-default,weak-pass,weak-password,weak-credential,logic,compliance-test,cve-baseline,ssrf,csrf,random-port-trigger[tcp],random-port-trigger[udp],unkdown]]`), cli.setRequired(false), cli.setDefault("baseline"))
+
+severity := cli.String("severity", cli.setHelp("风险严重级别：high/low/middle/info/debug"), cli.setDefault("low"))
+description := cli.String("desc", cli.setHelp("关于这个安全风险你有什么想解释的吗？"))
+solution := cli.String("solution", cli.setHelp("关于这个安全漏洞，你认为应该用什么方式解决或者缓解？"))
+httpRequest := cli.String("http-request", cli.setHelp("如果这个漏洞涉及某次HTTP通信，或者是通过某次HTTP通信发现的，数据包填在这里"))
+httpRequestFile := cli.String("http-request-file", cli.setHelp("如果数据包已经保存在文件里了，通过这个函数给我"))
+httpResponse := cli.String("http-response", cli.setHelp("如果一个HTTP响应可能涉及到风险判定，通过这个存储，如果响应太大，在这里输入文件系统路径"))
+httpResponseFile = cli.String("http-response-file", cli.setHelp("在这里保存响应信息（无法通过参数传递，只能放在这里了）"))
+cli.check()
+
+opts = []
+opts.Push(risk.type(riskType))
+opts.Push(risk.description(description))
+opts.Push(risk.solution(solution))
+
+if string(httpRequest) != "" {
+    opts.Push(risk.request(httpRequest))
+} else if string(httpRequestFile) != "" {
+    req, err := file.ReadFile(httpRequestFile)
+    if err != nil {
+        yakit.Error(err.Error())
+    } else {
+        opts.Push(risk.request(req))
+    }
+}
+
+if titleZh != "" {
+    opts.Push(risk.titleVerbose(titleZh))
+}
+if titleEn != "" {
+    opts.Push(risk.title(titleEn))
+}
+
+if string(httpResponse) != "" {
+    opts.Push(risk.response(httpResponse))
+} else if string(httpResponseFile) != "" {
+    rsp, err := file.ReadFile(httpResponseFile)
+    if err != nil {
+        yakit.Error(err.Error())
+    } else {
+        opts.Push(risk.response(rsp))
+    }
+}
+
+//@ssa-ignore
+risk.NewRisk(target, opts...)
+
