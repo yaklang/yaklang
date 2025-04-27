@@ -22,17 +22,17 @@ type RuleInfo struct {
 // 解析版本号，返回日期部分和序号
 func parseVersion(version string) (date string, sequence int) {
 	parts := strings.Split(version, ".")
-	if len(parts) != 4 {
+	if len(parts) != 2 {
 		return "", 0
 	}
-	date = strings.Join(parts[:3], ".")
-	seq, _ := strconv.Atoi(parts[3])
+	date = parts[0]
+	seq, _ := strconv.Atoi(parts[1])
 	return date, seq
 }
 
 // 生成新的版本号
 func generateVersion(now time.Time, existingVersion string) string {
-	currentDate := fmt.Sprintf("%d.%d.%d", now.Year(), now.Month(), now.Day())
+	currentDate := fmt.Sprintf("%d%02d%02d", now.Year(), now.Month(), now.Day())
 
 	if existingVersion == "" {
 		return currentDate + ".0001"
