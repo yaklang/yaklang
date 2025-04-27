@@ -602,7 +602,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	if option.OverrideEnableSystemProxyFromEnv {
 		dialopts = append(dialopts, netx.DialX_WithEnableSystemProxyFromEnv(option.EnableSystemProxyFromEnv))
 	}
-	cacheKey := connectKey{
+	cacheKey := &connectKey{
 		proxy:           proxy,
 		scheme:          reqSchema,
 		addr:            originAddr,
@@ -690,11 +690,9 @@ RECONNECT:
 		pc := conn.(*persistConn)
 		if pc.cacheKey.scheme != H2 { // http2 downgrade to http1.1
 			enableHttp2 = false
-			pc.removeConn()
 			withConnPool = false // downgrade can not with conn pool
 			method, uri, _ := GetHTTPPacketFirstLine(requestPacket)
 			requestPacket = ReplaceHTTPPacketFirstLine(requestPacket, strings.Join([]string{method, uri, "HTTP/1.1"}, " "))
-			goto RECONNECT
 		} else {
 			h2Conn := pc.alt
 			if h2Conn == nil {
