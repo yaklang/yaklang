@@ -2,22 +2,15 @@ package aid
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/log"
 	"sync"
 	"time"
 )
 
 func (c *Config) doWaitAgree(ctx any, ep *Endpoint) {
-	if ret, ok := aiddb.GetReviewCheckpoint(c.GetDB(), c.id, ep.seq); ok {
-		if ret.Finished {
-			ep.SetParams(ret.GetResponseParams())
-			return
-		} else {
-			log.Infof("found review checkpoint but not finished, retry it auto")
-		}
+	if ep.checkpoint != nil && ep.checkpoint.Finished { // check ep finished, is recover task or not
+		return
 	}
-
 	defer func() {
 		if ep.checkpoint != nil {
 			if err := c.submitCheckpointResponse(ep.checkpoint, ep.GetParams()); err != nil {

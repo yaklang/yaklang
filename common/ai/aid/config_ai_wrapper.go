@@ -24,7 +24,7 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 		if ret, ok := aiddb.GetAIInteractiveCheckpoint(c.GetDB(), c.id, seq); ok && ret.Finished {
 			// checkpoint is finished, return the result
 			rsp := config.NewAIResponse()
-			rspParams := ret.GetResponseParams()
+			rspParams := aiddb.AiCheckPointGetResponseParams(ret)
 			rsp.EmitReasonStream(bytes.NewBufferString(rspParams.GetString("reason")))
 			rsp.EmitOutputStream(bytes.NewBufferString(rspParams.GetString("output")))
 			rsp.Close()

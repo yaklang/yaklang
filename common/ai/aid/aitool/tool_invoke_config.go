@@ -5,10 +5,21 @@ import (
 	"io"
 )
 
+type toolInvokeHook func(t *Tool, params map[string]any, config *ToolInvokeConfig) (*ToolResult, error)
+
 type ToolInvokeConfig struct {
-	invokeCtx *ToolInvokeCtx
-	stdout    io.Writer
-	stderr    io.Writer
+	invokeCtx  *ToolInvokeCtx
+	stdout     io.Writer
+	stderr     io.Writer
+	invokeHook toolInvokeHook // hook toolCall
+}
+
+func (i ToolInvokeConfig) GetStdout() io.Writer {
+	return i.stdout
+}
+
+func (i ToolInvokeConfig) GetStderr() io.Writer {
+	return i.stderr
 }
 
 func NewToolInvokeConfig(ctx context.Context) *ToolInvokeConfig {
@@ -36,5 +47,11 @@ func WithStderr(stderr io.Writer) ToolInvokeOptions {
 func WithChatToAiFunc(chatToAiFunc ChatToAiFuncType) ToolInvokeOptions {
 	return func(config *ToolInvokeConfig) {
 		config.invokeCtx.ChatToAiFunc = chatToAiFunc
+	}
+}
+
+func WithInvokeHook(hook toolInvokeHook) ToolInvokeOptions {
+	return func(config *ToolInvokeConfig) {
+		config.invokeHook = hook
 	}
 }
