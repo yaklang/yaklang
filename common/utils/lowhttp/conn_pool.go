@@ -59,7 +59,7 @@ type LowHttpConnPool struct {
 	ctx                context.Context
 }
 
-func (l *LowHttpConnPool) HostConnFull(key connectKey) bool {
+func (l *LowHttpConnPool) HostConnFull(key *connectKey) bool {
 	l.idleConnMux.Lock()
 	defer l.idleConnMux.Unlock()
 	return len(l.idleConnMap[key.hash()]) >= l.maxIdleConnPerHost
@@ -109,7 +109,7 @@ func addGetIdleConnFinishedCounter() {
 
 // 取出一个空闲连接
 // want 检索一个可用的连接，并且把这个连接从连接池中取出来
-func (l *LowHttpConnPool) getIdleConn(key connectKey, opts ...netx.DialXOption) (*persistConn, error) {
+func (l *LowHttpConnPool) getIdleConn(key *connectKey, opts ...netx.DialXOption) (*persistConn, error) {
 	//addGetIdleConnRequiredCounter()
 	if l.contextDone() {
 		return nil, utils.Error("lowhttp: context done")
@@ -129,7 +129,7 @@ func (l *LowHttpConnPool) getIdleConn(key connectKey, opts ...netx.DialXOption) 
 	return pConn, nil
 }
 
-func (l *LowHttpConnPool) getFromConn(key connectKey) (oldPc *persistConn, getConn bool) {
+func (l *LowHttpConnPool) getFromConn(key *connectKey) (oldPc *persistConn, getConn bool) {
 	if l.contextDone() {
 		return nil, false
 	}
@@ -259,7 +259,7 @@ type persistConn struct {
 	conn     net.Conn // conn本体
 	mu       sync.Mutex
 	p        *LowHttpConnPool // 连接对应的连接池
-	cacheKey connectKey       // 连接池缓存key
+	cacheKey *connectKey      // 连接池缓存key
 	isProxy  bool             // 是否使用代理
 	alive    bool             // 存活判断
 	sawEOF   bool             // 连接是否EOF
@@ -388,32 +388,14 @@ func (es *bodyEOFSignal) condfn(err error) error {
 	return err
 }
 
-func newPersistConn(key connectKey, pool *LowHttpConnPool, opt ...netx.DialXOption) (*persistConn, error) {
+func newPersistConn(key *connectKey, pool *LowHttpConnPool, opt ...netx.DialXOption) (*persistConn, error) {
 	needProxy := len(key.proxy) > 0
 	opt = append(opt, netx.DialX_WithKeepAlive(pool.keepAliveTimeout))
 	newConn, err := netx.DialX(key.addr, opt...)
 	if err != nil {
 		return nil, err
 	}
-	if key.https && key.scheme == H2 {
-		switch conn := newConn.(type) {
-		case *tls.Conn:
-			if conn.ConnectionState().NegotiatedProtocol != H2 {
-				key.scheme = H1
-			}
-		case *utls.UConn:
-			if conn.ConnectionState().NegotiatedProtocol != H2 {
-				key.scheme = H1
-			}
-		case *gmtls.Conn:
-			if conn.ConnectionState().NegotiatedProtocol != H2 {
-				key.scheme = H1
-			}
-		}
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
-	// 初始化连接
 	pc := &persistConn{
 		ctx:             ctx,
 		cancel:          cancel,
@@ -436,20 +418,39 @@ func newPersistConn(key connectKey, pool *LowHttpConnPool, opt ...netx.DialXOpti
 	}
 
 	if key.scheme == H2 {
+		if key.https { // Negotiation fail downgrade
+			switch conn := newConn.(type) {
+			case *tls.Conn:
+				key.scheme = conn.ConnectionState().NegotiatedProtocol
+			case *utls.UConn:
+				key.scheme = conn.ConnectionState().NegotiatedProtocol
+			case *gmtls.Conn:
+				key.scheme = conn.ConnectionState().NegotiatedProtocol
+			}
+			if key.scheme != H2 { // downgrade conn should not reuse
+				key.scheme = H1
+				return pc, nil
+			}
+		}
+
 		pc.h2Conn()
 		go pc.alt.readLoop()
 		if err = pc.alt.preface(); err == nil {
-			pool.putIdleConn(pc)
+			err = pool.putIdleConn(pc)
+			if err != nil {
+				log.Errorf("h2 conn put idle conn failed: %v", err) // not care h2 conn put idle conn failed
+			}
+			return pc, nil
+		} else { // preface fail downgrade
+			key.scheme = H1
+			newH1Conn, err := netx.DialX(key.addr, append(opt, netx.DialX_WithTLSNextProto(H1))...)
+			if err != nil {
+				return nil, err
+			}
+			pc.alt = nil
+			pc.conn = newH1Conn
 			return pc, nil
 		}
-		newH1Conn, err := netx.DialX(key.addr, append(opt, netx.DialX_WithTLSNextProto(H1))...) // 降级
-		if err != nil {
-			return nil, err
-		}
-		pc.alt = nil
-		pc.conn = newH1Conn
-		pc.cacheKey.scheme = H1
-		return pc, nil // 降级之后应不使用连接池，因为是一个意外的请求做过一次兼容了，不再需要复用
 	}
 
 	pc.br = bufio.NewReader(pc)
@@ -759,7 +760,7 @@ type connectKey struct {
 	sni             string
 }
 
-func (c connectKey) hash() string {
+func (c *connectKey) hash() string {
 	return utils.CalcSha1(c.proxy, c.scheme, c.addr, c.https, c.gmTls, c.clientHelloSpec, c.sni)
 }
 

@@ -637,7 +637,7 @@ Host: %v
 }
 
 func TestLowhttpH2Downgrade(t *testing.T) {
-	count := 40
+	count := 100
 	if utils.InGithubActions() {
 		count = 4
 	}
