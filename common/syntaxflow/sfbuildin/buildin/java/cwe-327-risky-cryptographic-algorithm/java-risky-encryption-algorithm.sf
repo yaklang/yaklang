@@ -11,12 +11,8 @@ TEXT
 
 SecretKeySpec(* as $algorithm);
 $algorithm#{
-    until:<<<UNTIL
-   <self>?{opcode:const}?{have:/^DES$/ || 'DESede' || 'RC4' || 'RC2'}
-UNTIL,
-    exclude:<<<EXCLUDE
-    <self>?{have:'3DES'}
-EXCLUDE
+    until:`*?{opcode:const}?{have:DES || 'DESede' || 'RC4' || 'RC2' }`,
+    exclude:` *?{have:'3DES'}`
 }-> as $sink;
 alert $sink for {
     message:"Find the use of broken or risky encryption algorithm",
