@@ -61,10 +61,6 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 				continue
 			}
 
-			if c.debugPrompt {
-				resp.Debug(true)
-			}
-
 			var haveFirstByte = utils.NewBool(false)
 			var first, tee *AIResponse
 			teeMux := new(sync.Mutex)
@@ -91,6 +87,9 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 					onClose()
 				}
 			})
+			if c.debugPrompt {
+				first.Debug(true)
+			}
 			return first, err
 		}
 		return nil, utils.Errorf("")
