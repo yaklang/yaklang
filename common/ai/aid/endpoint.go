@@ -2,6 +2,7 @@ package aid
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"sync"
@@ -59,11 +60,14 @@ func (e *endpointManager) createEndpoint() *Endpoint {
 		activeParams: make(aitool.InvokeParams),
 	}
 	e.results.Store(id, endpoint)
-	if e.config != nil {
-		seq := e.config.AcquireId()
-		endpoint.seq = seq
-		ck := e.config.createReviewCheckpoint(seq)
-		endpoint.checkpoint = ck
+	if c := e.config; c != nil {
+		endpoint.seq = c.AcquireId()
+		if ret, ok := aiddb.GetReviewCheckpoint(c.GetDB(), c.id, endpoint.seq); ok {
+			endpoint.SetParams(aiddb.AiCheckPointGetResponseParams(ret))
+			endpoint.checkpoint = ret
+		} else {
+			endpoint.checkpoint = e.config.createReviewCheckpoint(endpoint.seq)
+		}
 	}
 	return endpoint
 }

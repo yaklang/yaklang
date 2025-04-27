@@ -111,11 +111,6 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 	callToolParams := callToolAction.GetInvokeParams("params")
 
 	t.config.EmitInfo("start to invoke tool:%v 's callback function", targetTool.Name)
-	// 调用工具
-	stdoutBuf := bytes.NewBuffer(nil)
-	stderrBuf := bytes.NewBuffer(nil)
-	t.config.EmitStreamEvent(fmt.Sprintf("tool-%v-stdout", targetTool.Name), stdoutBuf)
-	t.config.EmitStreamEvent(fmt.Sprintf("tool-%v-stderr", targetTool.Name), stderrBuf)
 
 	t.config.EmitInfo("start to require review for tool use")
 	ep := t.config.epm.createEndpoint()
@@ -139,18 +134,15 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 	/*
 		Execute tool finally
 	*/
-	resultId := t.config.AcquireId()
-	cp := t.config.createToolCallCheckpoint(resultId)
-	if err := t.config.submitToolCallRequestCheckpoint(cp, targetTool); err != nil {
-		log.Errorf("error submitting tool call checkpoint: %v", err)
-	}
-	toolResult, err := targetTool.InvokeWithParams(callToolParams, aitool.WithStdout(stdoutBuf), aitool.WithStderr(stderrBuf), aitool.WithChatToAiFunc(aitool.ChatToAiFuncType(t.config.toolAICallback)))
+	stdoutBuf := bytes.NewBuffer(nil)
+	stderrBuf := bytes.NewBuffer(nil)
+	t.config.EmitStreamEvent(fmt.Sprintf("tool-%v-stdout", targetTool.Name), stdoutBuf)
+	t.config.EmitStreamEvent(fmt.Sprintf("tool-%v-stderr", targetTool.Name), stderrBuf)
+	toolResult, err := targetTool.InvokeWithParams(callToolParams, t.config.toolCallOpts(stdoutBuf, stderrBuf)...)
 	if err != nil {
 		toolResult.Error = fmt.Sprintf("error invoking tool[%v]: %v", targetTool.Name, err)
 		toolResult.Success = false
 	}
-	t.config.submitToolCallResponse(cp, toolResult)
-
 	t.config.EmitInfo("start to generate and feedback tool[%v] result in task:%#v", targetTool.Name, t.Name)
 	// 生成调用工具结果的prompt
 

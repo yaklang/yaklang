@@ -96,7 +96,9 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 		opt(cfg)
 	}
 
-	// 执行工具并捕获stdout和stderr
+	if cfg.invokeHook != nil {
+		return cfg.invokeHook(t, params, cfg)
+	}
 	execResult, err := t.ExecuteToolWithCapture(params, cfg.stdout, cfg.stderr)
 	if err != nil {
 		return &ToolResult{
