@@ -262,11 +262,11 @@ func (m *memoryTimeline) renderSummaryPrompt(result *aitool.ToolResult) string {
 }
 
 func (m *memoryTimeline) Dump() string {
-	k, _, _ := m.idToToolResult.Last()
-	if k > 0 {
+	k, _, ok := m.idToToolResult.Last()
+	if ok {
 		return m.DumpBefore(k)
 	}
-	return "no timeline"
+	return "no timeline generated in Dump"
 }
 
 func (m *memoryTimeline) DumpBefore(id int64) string {
@@ -322,7 +322,7 @@ func (m *memoryTimeline) DumpBefore(id int64) string {
 		return buf.String()
 	}
 
-	buf.WriteString("no timeline\n")
+	buf.WriteString("no timeline generated in DumpBefore\n")
 	return buf.String()
 }
 
