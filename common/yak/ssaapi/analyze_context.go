@@ -111,7 +111,7 @@ func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 	return
 }
 
-// needCrossProcess If the SSA-ID of the function from-value and to-value is different,
+// needCrossProcess If the SSA-ID of the function from-value ·and to-value is different,
 // it is considered to cross the function boundary,
 // which means it is trying to cross process.
 func (a *AnalyzeContext) needCrossProcess(from *Value, to *Value) bool {

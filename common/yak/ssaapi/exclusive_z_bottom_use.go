@@ -21,20 +21,7 @@ func (v Values) GetBottomUses(opts ...OperationOption) Values {
 	return MergeValues(ret)
 }
 
-func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) (result Values) {
-	//defer func() {
-	//	var finalResult Values
-	//	if len(result) > 0 {
-	//		for _, ret := range result {
-	//			if ret.GetEffectOn() == nil {
-	//				finalResult = append(finalResult, ret)
-	//			} else {
-	//				log.Errorf("BottomUseError!!!:%s have depend on %s", ret.String(), ret.GetDependOn().String())
-	//			}
-	//		}
-	//	}
-	//	result = finalResult
-	//}()
+func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) Values {
 	var vals Values
 
 	if v.IsObject() {
@@ -76,13 +63,26 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 			vals = append(vals, ret...)
 		}
 	})
-	if vals.Len() <= 0 {
-		return Values{v}
+	if vals.Len() == 0 {
+		vals = v.AddSelfToBottomUseResult(vals)
 	}
 	return vals
 }
 
-func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Values {
+func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (result Values) {
+	defer func() {
+		var finalResult Values
+		for _, ret := range result {
+			if ret.GetEffectOn() == nil {
+				finalResult = append(finalResult, ret)
+			} else {
+				log.Errorf("BUG:(bottom-use's result is not a tree node,%s have depend on %s", ret.String(), ret.GetDependOn().String())
+				log.Errorf("BUG:(bottom-use's result is not a tree node,%s have depend on %s", ret.String(), ret.GetDependOn().String())
+				log.Errorf("BUG:(bottom-use's result is not a tree node,%s have depend on %s", ret.String(), ret.GetDependOn().String())
+			}
+		}
+		result = finalResult
+	}()
 	if v == nil {
 		return nil
 	}
