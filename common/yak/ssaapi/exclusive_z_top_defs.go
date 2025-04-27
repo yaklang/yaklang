@@ -70,18 +70,17 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (resul
 func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result Values) {
 	defer func() {
 		var finalResult Values
-		if len(result) > 0 {
-			for _, ret := range result {
-				if ret.GetDependOn() == nil {
-					finalResult = append(finalResult, ret)
-				} else {
-					log.Errorf("TopDefError!!!:%s have depend on %s", ret.String(), ret.GetDependOn().String())
-				}
+		for _, ret := range result {
+			if ret.GetDependOn() == nil {
+				finalResult = append(finalResult, ret)
+			} else {
+				log.Errorf("BUG:(topdef's result is not a tree node:%s have depend on %s)", ret.String(), ret.GetDependOn().String())
+				log.Errorf("BUG:(topdef's result is not a tree node:%s have depend on %s)", ret.String(), ret.GetDependOn().String())
+				log.Errorf("BUG:(topdef's result is not a tree node:%s have depend on %s)", ret.String(), ret.GetDependOn().String())
 			}
 		}
 		result = finalResult
 	}()
-	log.Infof("topdef %s", i.String())
 	if i == nil {
 		return nil
 	}
