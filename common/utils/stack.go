@@ -21,6 +21,11 @@ func NewStack[T any]() *Stack[T] {
 func (this *Stack[T]) Len() int {
 	return this.length
 }
+func (this *Stack[T]) Free() {
+	this.top = nil
+	this.last = nil
+	this.length = 0
+}
 
 func (this *Stack[T]) Size() int {
 	return this.length
