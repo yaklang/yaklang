@@ -389,6 +389,6 @@ $a->initialize();
 $a->generate();
 `
 	ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
-		"param": {"Undefined-request", "Undefined-.param(valid)"},
+		"param": {"Undefined-request"},
 	}, ssaapi.WithLanguage(ssaapi.PHP))
 }
