@@ -22,7 +22,7 @@ func init() {
 			aiforge.WithInitializePrompt(xssInitPrompt),
 			aiforge.WithPersistentPrompt(xssPersistentPrompt),
 			aiforge.WithToolKeywords([]string{"fs", "http"}),
-			aiforge.WithTools(yakscripttools.GetYakScriptAiTools("do_http", "grep", "read_file_chunk", "read_file_lines")...),
+			aiforge.WithTools(yakscripttools.GetYakScriptAiTools("do_http", "grep", "read_file_chunk", "read_file_lines", "cybersecurity-risk")...),
 		).CreateCoordinator(ctx, items, option...)
 		if err != nil {
 			return nil, err
