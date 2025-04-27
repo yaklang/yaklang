@@ -18,16 +18,11 @@ TEXT
 
 <include('golang-template')> as $sink;
 
-$sink.Must(* #-> as $param);
-$sink.New as $new;
+$sink.Must(* #{
+    hook:`.Parse(*<slice(index=1)>  as  $target)`,
+}->)
 
-$param #{ 
-	include: `$new`,
-}-> as $key;
-
-$key().Parse(* as $target);
-
-$target #{ 
+$target #{
 	exclude: `*?{opcode:const}`,
 }-> as $high;
 

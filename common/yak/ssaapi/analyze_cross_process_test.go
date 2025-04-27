@@ -205,8 +205,8 @@ EXCLUDE
 }-> as $res2;
 `
 		ssatest.CheckSyntaxFlowContain(t, code, rule, map[string][]string{
-			"res1": {"Undefined-r.FormValue(valid)"},
-			"res2": {"Undefined-r.FormValue(valid)"},
+			"res1": {"id"},
+			"res2": {"name"},
 		})
 	})
 
@@ -218,7 +218,6 @@ EXCLUDE
 	}
 	print(m)
 `
-
 		/*
 			strict digraph {
 				rankdir = "BT";
@@ -258,10 +257,8 @@ EXCLUDE
 }-> as $res2;
 `
 		ssatest.CheckSyntaxFlowContain(t, code, rule, map[string][]string{
-			"res1": {"Undefined-a.b(valid)"},
-			"res2": {"Undefined-a.b(valid)"},
+			"res1": {"bar"},
+			"res2": {"foo"},
 		})
-
 	})
-
 }
