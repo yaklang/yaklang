@@ -166,9 +166,6 @@ func CreateRuleByContent(ruleFileName string, content string, buildIn bool, tags
 			rule.RuleName = rule.TitleZh
 		} else if rule.Title != "" {
 			rule.RuleName = rule.Title
-		} else {
-			log.Errorf("load rule %s failed:rule have not tiltle_name", ruleFileName)
-			return nil, nil
 		}
 	}
 	err = MigrateSyntaxFlow(rule.CalcHash(), rule)
