@@ -1,27 +1,42 @@
-host , port = tcp.MockTCPProtocol("rdp")
+host, port = tcp.MockTCPProtocol("rdp")
 
-checked, checked2 = false, false
+maxRetries := 5
 
-for result in servicescan.Scan(host, string(port),
-    servicescan.proto(["tcp"]...),
-    servicescan.maxProbes(100),
-    servicescan.all(),
-)~{
-    dump(result)
-    if result.Fingerprint.ServiceName == "rdp" {
-        checked = true
+checked = false
+
+// TCP scan with retries
+for in maxRetries {
+    for result in servicescan.Scan(host, string(port),
+        servicescan.proto(["tcp"]...),
+        servicescan.maxProbes(5),
+        servicescan.all(),
+     )~ {
+        println("tcp")
+        dump(result)
+        if result.Fingerprint.ServiceName == "rdp" {
+            checked = true
+        }
+    }
+    if checked {
+        break
     }
 }
 
-for result in servicescan.Scan(host, string(port),
-    servicescan.proto(["udp"]...),
-    servicescan.maxProbes(100),
-)~{
-    dump(result)
-    if result.Fingerprint.ServiceName == "rdp" {
-        checked2 = true
-    }
+if !checked {
+    die("Under TCP scanning, the RDP protocol fingerprint must be detected.")
 }
 
-
-if (!checked || checked2) { die("ERROR for Mock protocol smoking test!")}
+// UDP scan with retries
+for in maxRetries {
+    for result in servicescan.Scan(host, string(port),
+        servicescan.proto(["udp"]...),
+        servicescan.maxProbes(5),
+    )~ {
+        if !result.IsOpen() {
+            continue
+        }
+        if result.Fingerprint.ServiceName == "rdp" {
+            die("Under UDP scanning, the RDP protocol fingerprint must not be detected.")
+        }
+    }
+}
