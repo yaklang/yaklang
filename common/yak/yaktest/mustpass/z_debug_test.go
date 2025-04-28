@@ -17,7 +17,7 @@ func TestMustPassDebug(t *testing.T) {
 
 	yakit.RegisterLowHTTPSaveCallback()
 
-	debugName := "omnisearch.yak"
+	debugName := "mock_tcp_probe.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
