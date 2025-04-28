@@ -310,7 +310,15 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 	// 	// only one type
 	var typ ssa.Type
 	typ = ssa.CreateAnyType()
-	className := i.TypeIdentifier().GetText()
+
+	nameBuilder := strings.Builder{}
+	for _, id := range i.AllIdentifier() {
+		nameBuilder.WriteString(id.GetText())
+		nameBuilder.WriteString(".")
+	}
+	typeId := i.TypeIdentifier().GetText()
+	nameBuilder.WriteString(typeId)
+	className := nameBuilder.String()
 	//wrapper class
 	switch className {
 	case "Boolean":
