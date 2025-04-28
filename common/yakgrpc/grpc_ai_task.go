@@ -125,8 +125,10 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	}()
 
 	forgeName := startParams.GetForgeName()
-	forgeName = "xss"
 	if forgeName != "" {
+		log.Infof("==========AI Forge Loading for %v ======", forgeName)
+		log.Infof("==========AI Forge Loading for %v ======", forgeName)
+		log.Infof("==========AI Forge Loading for %v ======", forgeName)
 		_, err := aiforge.ExecuteForge(forgeName, stream.Context(), []*ypb.ExecParamItem{
 			{Key: "query", Value: startParams.GetUserQuery()},
 		}, opts...)
