@@ -405,7 +405,7 @@ func (cs *http2ClientStream) waitResponse(timeout time.Duration) (http.Response,
 	var err error
 	select {
 	case <-time.After(timeout):
-		err = utils.Errorf("h2 stream-id %v wait response timeout : %s", cs.ID, flow)
+		err = utils.Errorf("h2 stream-id %v wait response timeout : %s, maybe you can use HTTP/1.1 retry it", cs.ID, flow)
 	case <-cs.readEndStreamSignal:
 	case <-closeFlag:
 		err = utils.Wrapf(errH2ConnClosed, "h2 stream-id %v wait response conn closed : %s", cs.ID, flow)
