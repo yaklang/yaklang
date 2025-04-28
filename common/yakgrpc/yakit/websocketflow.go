@@ -202,3 +202,31 @@ func DeleteWebsocketFlowsByHTTPFlowHash(db *gorm.DB, hash string) error {
 func BatchWebsocketFlows(db *gorm.DB, ctx context.Context) chan *schema.WebsocketFlow {
 	return bizhelper.YieldModel[*schema.WebsocketFlow](ctx, db)
 }
+
+func UpdateWebSocketFlowTags(db *gorm.DB, i *schema.WebsocketFlow) error {
+	if i == nil {
+		return nil
+	}
+	db = db.Model(&schema.WebsocketFlow{})
+	id, tags := i.ID, i.Tags
+
+	if id > 0 {
+		i.Hash = i.CalcHash()
+		if db = db.Where("id = ?", i.ID).UpdateColumns(schema.WebsocketFlow{Hash: i.Hash, Tags: tags}); db.Error != nil {
+			log.Errorf("update tags(by id) failed: %s", db.Error)
+			return db.Error
+		}
+	} else if i.WebsocketRequestHash != "" {
+		i.Hash = i.CalcHash()
+		if db = db.Where("hidden_index = ?", i.WebsocketRequestHash).UpdateColumn(schema.WebsocketFlow{Hash: i.Hash, Tags: tags}); db.Error != nil {
+			log.Errorf("update tags(by request hash) failed: %s", db.Error)
+			return db.Error
+		}
+	} else if i.Hash != "" {
+		if db = db.Where("hash = ?", i.Hash).UpdateColumn("tags", i.Tags); db.Error != nil {
+			log.Errorf("update tags(by hash) failed: %s", db.Error)
+			return db.Error
+		}
+	}
+	return nil
+}
