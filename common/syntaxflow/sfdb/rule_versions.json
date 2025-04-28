@@ -2,8 +2,8 @@
   {
     "rule_id": "11336001",
     "rule_name": "golang SSTI(template)",
-    "hash": "2ce96ba2163de066b22a9dfcfa343d14fa64b7323888a71e1f46decec5e35f1d",
-    "version": "20250428.0001"
+    "hash": "285f8dc44f2f65ef68e273ef3d53de0d53f5cbe7b0c75617e2c8edd1a6beae1f",
+    "version": "20250428.0002"
   },
   {
     "rule_id": "10200001",
@@ -474,9 +474,9 @@
     "version": "20250428.0001"
   },
   {
-    "rule_id": "927fa88b-df95-4c07-a932-ca7bc14ade7c",
+    "rule_id": "79254eb0-b656-4951-a08d-f7c54842c337",
     "rule_name": "java-risky-system-hash-config.sf",
-    "hash": "b5b9f28ffc7187f2dfca2511e842c9b51d4b7f76f647e80abc32048eceaa6f50",
+    "hash": "491f91f4b58238cba358a61dca50273e0a496eb5d3c4549221b747700bf63843",
     "version": "20250428.0001"
   },
   {
