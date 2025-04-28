@@ -90,6 +90,10 @@ func (y *builder) AddFullTypeNameFromMap(typName string, typ ssa.Type) ssa.Type 
 		}
 		typ.AddFullTypeName(typStr)
 		return typ
+	} else if strings.Contains(typName, ".") {
+		// 如果是全名，直接添加
+		typ.AddFullTypeName(typName)
+		return typ
 	} else {
 		return y.AddFullTypeNameForAllImport(typName, typ)
 	}
