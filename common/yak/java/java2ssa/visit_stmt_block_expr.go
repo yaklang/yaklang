@@ -1115,6 +1115,10 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 		return name, value
 	} else {
 		value := y.EmitValueOnlyDeclare(name)
+		if typ != nil {
+			newTyp := y.MergeFullTypeNameForType(typ.GetFullTypeNames(), value.GetType())
+			value.SetType(newTyp)
+		}
 		y.AssignVariable(variable, value)
 		return name, value
 	}

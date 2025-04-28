@@ -729,3 +729,41 @@ Request.Builder().url()<typeName> as $result2`, map[string][]string{
 		}, ssaapi.WithLanguage(consts.JAVA))
 	})
 }
+
+func TestJavaValueOnlyDeclareTypeName(t *testing.T) {
+	t.Run("only declare typename simple declare simple", func(t *testing.T) {
+		code := `
+package org.joychou.controller;
+
+public class ClassDataLoader {
+    public void classData() {
+		java.lang.reflect.Method defineClassMethod;
+    }
+}
+	`
+
+		ssatest.CheckSyntaxFlowContain(t, code, `
+defineClassMethod<fullTypeName()> as $name
+	`, map[string][]string{
+			"name": {"\"java.lang.reflect.Method\""},
+		}, ssaapi.WithLanguage(consts.JAVA))
+	})
+
+	t.Run("full typename only declare", func(t *testing.T) {
+		code := `
+package org.joychou.controller;
+
+public class ClassDataLoader {
+    public void classData() {
+		Method defineClassMethod;
+    }
+}
+	`
+
+		ssatest.CheckSyntaxFlow(t, code, `
+defineClassMethod<fullTypeName()> as $name
+	`, map[string][]string{
+			"name": {"\"java.lang.Method\"", "\"org.joychou.controller.Method\""},
+		}, ssaapi.WithLanguage(consts.JAVA))
+	})
+}
