@@ -51,7 +51,7 @@ func HandleAnalyzedWebsocketFlowsColorAndTag(db *gorm.DB, flow *schema.Websocket
 		flow.Grey()
 	}
 	flow.AddTag(extraTag...)
-	return SaveWebsocketFlowEx(db, flow)
+	return UpdateWebSocketFlowTags(db, flow)
 }
 
 func FilterAnalyzedHTTPFlowRule(db *gorm.DB, params *ypb.AnalyzedHTTPFlowFilter) *gorm.DB {
