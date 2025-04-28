@@ -154,6 +154,8 @@ const (
 
 	NativeCall_GetUsers = "getUsers"
 
+	NativeCall_GetPredecessors = "getPredecessors"
+
 	NativeCall_GetActualParams = "getActualParams"
 
 	NativeCall_GetActualParamLen = "getActualParamLen"
@@ -354,10 +356,70 @@ func init() {
 		return false, nil, nil
 	}), nc_desc("获取值的Users"))
 
-	/*
-		// NativeCall_GetFullFileName is used to get the full file name, the input is a file name. eg.
-		// <getFullFileName(filename="xxx")>
-	*/
+	// NativeCall_GetPredecessors is used to get the predecessors of a value
+	// <getPredecessors()> =  <getPredecessors(1)>
+	registerNativeCall(NativeCall_GetPredecessors, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var result []*Value
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *Value:
+				result = append(result, ret)
+			}
+			return nil
+		})
+		if len(result) == 0 {
+			return false, nil, utils.Errorf("no value found")
+		}
+		// default param is depth, depth default = 1
+		depth := params.GetInt(0, "depth")
+		if depth == -1 {
+			depth = 1
+		}
+
+		// get v.GetPredecessors() through depth
+		// this is tree
+		visited := make(map[*Value]struct{})
+		var allFoundPredecessors []sfvm.ValueOperator
+		currentLevel := make([]*Value, 0, len(result))
+
+		// Initialize visited and currentLevel with start nodes
+		for _, node := range result {
+			if _, exists := visited[node]; !exists {
+				visited[node] = struct{}{}
+				currentLevel = append(currentLevel, node)
+			}
+		}
+
+		// Traverse predecessors level by level up to the specified depth
+		for d := 0; d < depth; d++ {
+			if len(currentLevel) == 0 {
+				break // No more nodes to explore
+			}
+			nextLevel := make([]*Value, 0)
+			for _, node := range currentLevel {
+				predecessors := node.GetPredecessors() // Assuming GetPredecessors returns []*Value
+				for _, p := range predecessors {
+					pred := p.Node
+					if _, exists := visited[pred]; !exists {
+						visited[pred] = struct{}{}
+						allFoundPredecessors = append(allFoundPredecessors, pred)
+						nextLevel = append(nextLevel, pred)
+					}
+				}
+			}
+			currentLevel = nextLevel
+		}
+
+		if len(allFoundPredecessors) == 0 {
+			return false, nil, utils.Errorf("no predecessors found within depth %d", depth)
+		}
+
+		return true, sfvm.NewValues(allFoundPredecessors), nil
+
+	}), nc_desc("获取值的前驱节点"))
+
+	// NativeCall_GetFullFileName is used to get the full file name, the input is a file name. eg.
+	// <getFullFileName(filename="xxx")>
 	registerNativeCall(NativeCall_GetFullFileName, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var rs []sfvm.ValueOperator
 		fileMap := make(map[string]struct{})
