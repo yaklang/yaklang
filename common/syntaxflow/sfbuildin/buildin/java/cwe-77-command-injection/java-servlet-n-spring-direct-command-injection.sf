@@ -18,6 +18,8 @@ desc(
 TEXT
 )
 
+
+
 <include('java-servlet-param')> as $source;
 <include('java-spring-mvc-param')> as $source;
 check $source;
@@ -27,19 +29,33 @@ check $source;
 check $sink;
 
 $sink #{
-    until:`<self> & $source`,
-}->as $high;
+    until: "* & $source"
+}-> as $controlled_source_site 
 
-alert $high for{
+$controlled_source_site<dataflow(
+    exclude: "*?{(opcode: call) && !(* & $source)}"
+)> as $high_source_site 
+
+
+alert $high_source_site for{
     message: "发现Java代码中存在命令注入漏洞，并且数据流中间没有进行任何过滤。",
     level: high,
 };
 
+$controlled_source_site - $high_source_site as $normal_source_side 
 
-$sink #-> as $result 
-$result - $high as $low;
-alert $low for{
-    message: "发现Java代码中可能存在命令注入漏洞。",
+alert $normal_source_side for {
+    message: "发现Java代码存在命令注入漏洞，数据流中存在过滤", 
+    level: mid, 
+}
+
+
+$controlled_source_site<getPredecessors()>  as $controlled_sink_site 
+$sink - $controlled_sink_site as $low_risk_sink 
+
+
+alert $low_risk_sink for{
+    message: "发现Java代码中可能存在命令注入，但并没有发现参数可控。",
     level: low,
 };
 
