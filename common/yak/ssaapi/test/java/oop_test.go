@@ -51,7 +51,7 @@ public class Main {
     }
 }`
 	ssatest.CheckSyntaxFlow(t, code, `func0(* #-> * as $param)`, map[string][]string{
-		"param": {"2"},
+		"param": {"Function-IFunc.DoGet", "2"},
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
 
