@@ -157,28 +157,6 @@ func (v *Value) NewTopDefValue(value ssa.Value) *Value {
 	return iv.AppendEffectOn(v)
 }
 
-// AddSelfToTopDefResult adds the current value to the result set
-// and clears its DependOn edge to make use the values in result all is the top def.
-func (v *Value) AddSelfToTopDefResult(result Values) Values {
-	if v == nil {
-		return result
-	}
-	v.DependOn = nil
-	result = append(result, v)
-	return result
-}
-
-// AddSelfToBottomUseResult adds the current value to the result set
-// and clears its EffectOn edge to make use the values in result all is the bottom use.
-func (v *Value) AddSelfToBottomUseResult(result Values) Values {
-	if v == nil {
-		return result
-	}
-	v.EffectOn = nil
-	result = append(result, v)
-	return result
-}
-
 func (v *Value) NewBottomUseValue(value ssa.Value) *Value {
 	iv := v.NewValue(value)
 	return iv.AppendDependOn(v)

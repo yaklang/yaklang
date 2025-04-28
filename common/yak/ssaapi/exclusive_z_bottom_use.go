@@ -64,24 +64,18 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 		}
 	})
 	if vals.Len() == 0 {
-		vals = v.AddSelfToBottomUseResult(vals)
+		vals = append(vals, v)
 	}
 	return vals
 }
 
 func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (result Values) {
 	defer func() {
-		var finalResult Values
 		for _, ret := range result {
-			if ret.GetEffectOn() == nil {
-				finalResult = append(finalResult, ret)
-			} else {
-				log.Errorf("BUG:(bottom-use's result is not a tree node,%s have depend on %s", ret.String(), ret.GetDependOn().String())
-				log.Errorf("BUG:(bottom-use's result is not a tree node,%s have depend on %s", ret.String(), ret.GetDependOn().String())
+			if ret.GetEffectOn() != nil {
 				log.Errorf("BUG:(bottom-use's result is not a tree node,%s have depend on %s", ret.String(), ret.GetDependOn().String())
 			}
 		}
-		result = finalResult
 	}()
 	if v == nil {
 		return nil
