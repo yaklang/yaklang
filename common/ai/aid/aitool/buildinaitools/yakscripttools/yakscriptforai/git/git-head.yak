@@ -1,3 +1,5 @@
+__KEYWORDS__ = "git,repository,head hash,version control,commit,fetch,cli,repos,source code,development"
+
 __DESC__ = <<<EOF
 fetch head hash current repos
 EOF

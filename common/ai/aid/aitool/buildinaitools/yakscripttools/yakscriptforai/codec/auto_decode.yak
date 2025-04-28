@@ -1,3 +1,5 @@
+__KEYWORDS__ = "text decoding,character encoding,automatic detection,text processing,data conversion,unicode,utf-8,ascii,encoding,text"
+
 __DESC__ = <<<EOF
 auto try many decode method for handling the text
 EOF

@@ -8,10 +8,14 @@ If the content type indicates HTML, it extracts and logs:
 2. All text content stripped from the HTML elements, concatenated together.
 Essentially, it provides a summary (title and text) of an HTML web page.
 EOF
-// url_content_summary
-method = "GET"
-urlStr = "https://www.example.com"
-bodyLimit = ""
+
+yakit.AutoInitYakit()
+method = cli.String("method", cli.setRequired(false), cli.setDefault("GET"))
+urlStr = cli.String("url", cli.setRequired(true), cli.setHelp("the target url you want to glance"))//"https://www.example.com"
+
+cli.check()
+
+
 
 rsp, req, err := poc.Do(method, urlStr, poc.save(true))
 if err != nil {

@@ -1,7 +1,10 @@
+__KEYWORDS__ = "http请求,请求方法,url,header,网络请求,http,api,请求"
+
 __DESC__ = <<<EOF
 基础HTTP请求：可以指定方法，URL，携带的Header等
 EOF
 
+yakit.AutoInitYakit()
 url = cli.String("url", cli.setHelp("需要指定的URL"), cli.setRequired(true))
 // url = "http://127.0.0.1:8787/xss/js/in-str?name=admin"
 method = cli.String("method", cli.setHelp("需要指定的HTTP方法"), cli.setDefault("GET"), cli.setRequired(false))

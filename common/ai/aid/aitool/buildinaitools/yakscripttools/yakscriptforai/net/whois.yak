@@ -1,3 +1,5 @@
+__KEYWORDS__ = "whois query,domain info,domain lookup,domain,whois,information,query"
+
 __DESC__ = <<<EOF
 query WHOIS info for domain.
 EOF

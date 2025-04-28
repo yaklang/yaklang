@@ -69,7 +69,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 		opts = append(opts, aid.WithJarOperator())
 	}
 
-	if startParams.GetUseDefaultAIConfig() {
+	if startParams.GetUseDefaultAIConfig() && startParams.GetForgeName() != "" {
 		opts = append(opts, aid.WithAICallback(aid.AIChatToAICallbackType(ai.Chat)))
 	}
 
@@ -129,6 +129,15 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 		log.Infof("==========AI Forge Loading for %v ======", forgeName)
 		log.Infof("==========AI Forge Loading for %v ======", forgeName)
 		log.Infof("==========AI Forge Loading for %v ======", forgeName)
+
+		if forgeName == "netscan" {
+			log.Info("use deepseek-r1 for netscan plan")
+			opts = append(opts, aid.WithPlanAICallback(aiforge.GetQwenAICallback("deepseek-r1")))
+			opts = append(opts, aid.WithAICallback(aiforge.GetOpenRouterAICallback()))
+		} else {
+			opts = append(opts, aid.WithAICallback(aiforge.GetOpenRouterAICallbackGemini2_5flash()))
+		}
+
 		_, err := aiforge.ExecuteForge(forgeName, stream.Context(), []*ypb.ExecParamItem{
 			{Key: "query", Value: startParams.GetUserQuery()},
 		}, opts...)
