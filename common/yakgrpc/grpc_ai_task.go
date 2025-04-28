@@ -7,6 +7,8 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/aiforge"
+	_ "github.com/yaklang/yaklang/common/aiforge/aibp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -75,10 +77,6 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 		opts = append(opts, aid.WithAICallback(aid.AIChatToAICallbackType(mockedAIChat)))
 	}
 
-	engine, err := aid.NewCoordinatorContext(baseCtx, startParams.GetUserQuery(), opts...)
-	if err != nil {
-		return utils.Errorf("create coordinator failed: %v", err)
-	}
 	go func() {
 		defer cancel()
 		for {
@@ -123,14 +121,30 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 					return
 				}
 			}
-
 		}
 	}()
 
-	err = engine.Run()
-	if err != nil {
-		log.Errorf("run coordinator failed: %v", err)
-		return utils.Errorf("run coordinator failed: %v", err)
+	forgeName := startParams.GetForgeName()
+	forgeName = "xss"
+	if forgeName != "" {
+		_, err := aiforge.ExecuteForge(forgeName, stream.Context(), []*ypb.ExecParamItem{
+			{Key: "query", Value: startParams.GetUserQuery()},
+		}, opts...)
+		if err != nil {
+			log.Errorf("aiforge exec forge [%v] failed: %v", forgeName, err.Error())
+			cancel()
+			return nil
+		}
+	} else {
+		engine, err := aid.NewCoordinatorContext(baseCtx, startParams.GetUserQuery(), opts...)
+		if err != nil {
+			return utils.Errorf("create coordinator failed: %v", err)
+		}
+		err = engine.Run()
+		if err != nil {
+			log.Errorf("run coordinator failed: %v", err)
+			return utils.Errorf("run coordinator failed: %v", err)
+		}
 	}
 	return nil
 }

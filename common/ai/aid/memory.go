@@ -2,6 +2,8 @@ package aid
 
 import (
 	"bytes"
+	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	osRuntime "runtime"
 	"strings"
@@ -166,10 +168,19 @@ func (m *Memory) ToolCallTimeline() string {
 }
 
 func (m *Memory) CurrentTaskToolCallTimeline() string {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("error creating sub timeline: %v", r)
+			fmt.Println(utils.ErrorStack(r))
+		}
+	}()
 	if m.CurrentTask == nil {
 		return m.ToolCallTimeline()
 	}
 	stl := m.timeline.CreateSubTimeline(m.CurrentTask.toolCallResultIds.Keys()...)
+	if stl == nil {
+		return "no-toolcall, so not timeline"
+	}
 	return stl.Dump()
 }
 
