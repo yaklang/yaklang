@@ -27,8 +27,7 @@ check $source;
 check $sink;
 
 $sink #{
-    include:`<self> & $source`,
-    exclude:`<self>?{opcode:call}?{!<self> & $source}`
+    until:`<self> & $source`,
 }->as $high;
 
 alert $high for{
@@ -36,10 +35,8 @@ alert $high for{
     level: high,
 };
 
-$sink #{
-    include:`<self> & $source`,
-}->as $result;
 
+$sink #-> as $result 
 $result - $high as $low;
 alert $low for{
     message: "发现Java代码中可能存在命令注入漏洞。",
