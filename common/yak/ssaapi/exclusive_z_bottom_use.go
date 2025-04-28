@@ -64,7 +64,7 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 		}
 	})
 	if vals.Len() == 0 {
-		vals = append(vals, v)
+		return Values{v}
 	}
 	return vals
 }
