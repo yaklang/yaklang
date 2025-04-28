@@ -1,7 +1,10 @@
+__KEYWORDS__ = "信息安全,风险输出,安全漏洞,security risk,安全,漏洞,风险评估,信息安全风险,安全工具,威胁"
+
 __DESC__ = <<<EOF
 信息安全风险输出工具，如果你认为有一些需要注意的安全漏洞，请使用本工具输出一些 security risk
 EOF
 
+yakit.AutoInitYakit()
 target := cli.String("target", cli.setHelp("你认为有安全漏洞或风险的目标（URL或者IP或者IP:PORT）"), cli.setRequired(true))
 // target = "www.example.com"
 titleEn := cli.String("title-en", cli.setHelp("一句话描述这是一个什么样的漏洞或者风险作为标题（English）"), cli.setRequired(true))
