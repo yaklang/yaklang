@@ -111,6 +111,11 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 	callToolParams := callToolAction.GetInvokeParams("params")
 
 	t.config.EmitInfo("start to invoke tool:%v 's callback function", targetTool.Name)
+	// 调用工具
+	stdoutBuf := bytes.NewBuffer(nil)
+	stderrBuf := bytes.NewBuffer(nil)
+	t.config.EmitToolCallStd(targetTool.Name, stdoutBuf, stderrBuf)
+
 	t.config.EmitInfo("start to require review for tool use")
 	ep := t.config.epm.createEndpoint()
 	ep.SetDefaultSuggestionContinue()
@@ -130,13 +135,6 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 
 	t.config.EmitInfo("start to execute tool:%v ", targetTool.Name)
 
-	/*
-		Execute tool finally
-	*/
-	stdoutBuf := bytes.NewBuffer(nil)
-	stderrBuf := bytes.NewBuffer(nil)
-	t.config.EmitStreamEvent(fmt.Sprintf("tool-%v-stdout", targetTool.Name), stdoutBuf)
-	t.config.EmitStreamEvent(fmt.Sprintf("tool-%v-stderr", targetTool.Name), stderrBuf)
 	toolResult, err := targetTool.InvokeWithParams(callToolParams, t.config.toolCallOpts(stdoutBuf, stderrBuf)...)
 	if err != nil {
 		toolResult.Error = fmt.Sprintf("error invoking tool[%v]: %v", targetTool.Name, err)
