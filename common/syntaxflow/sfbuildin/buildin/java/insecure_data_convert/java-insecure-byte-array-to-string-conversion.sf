@@ -1,0 +1,92 @@
+desc(
+    title: "Insecure Byte Array to String Conversion",
+    title_zh: "不安全的字节数组到字符串转换",
+    type: Vulnerability,
+    severity: Medium,
+    risk: Medium,
+    desc: <<<TEXT
+将可能包含非字符数据的字节数组直接转换为字符串（String）是一种不安全的操作，可能导致数据丢失、安全级别降低以及其他潜在的问题。
+
+**问题描述：**
+
+在 Java 应用中，直接使用字节数组创建字符串，如果字节数组包含非预期字符集的数据，或者包含二进制数据，会导致数据丢失和信息损坏。生成的字符串可能无法正确表示原始字节数据，进而影响后续操作的可靠性，例如生成散列值（哈希值）。
+
+**示例：**
+
+```java
+FileInputStream fis = new FileInputStream(myFile);
+byte[] byteArr = new byte[BUFSIZE];
+int count = fis.read(byteArr);
+
+String fileString = new String(byteArr); // 存在风险，未指定字符集
+String fileSHA256Hex = DigestUtils.sha256Hex(fileString); // 基于损坏数据的哈希
+```
+
+**风险描述：**
+
+1.  **数据丢失：** 如果字节数组包含的字节序列在默认字符集中没有对应的字符，这些字节可能会被忽略或替换，导致信息丢失。
+2.  **散列冲突：** 如果使用损坏的字符串生成散列值，可能会增加散列冲突的风险，影响数据完整性验证。
+3.  **安全级别降低：** 在某些情况下，不正确的字符串转换可能绕过安全检查，例如文件类型验证。
+
+TEXT,
+    solution: <<<TEXT
+**安全建议：**
+
+1.  **避免转换：** 除非确定字节数组包含有效的字符数据，否则应避免将其直接转换为字符串。
+2.  **指定字符集：** 如果必须转换，请显式指定正确的字符集。如果输入数据是二进制数据，则不应以文本形式存储。对二进制类型数据进行Base64编码。
+    ```java
+    FileInputStream fis = new FileInputStream(myFile);
+    byte[] byteArr = new byte[BUFSIZE];
+    int count = fis.read(byteArr);
+
+    String fileString = new String(byteArr, "UTF-8"); // 显式指定 UTF-8 编码
+    String fileSHA256Hex = DigestUtils.sha256Hex(fileString);
+    ```
+3.  **直接处理字节数组：** 尽可能直接使用字节数组进行操作，例如计算散列值，避免不必要的字符串转换。
+    ```java
+    FileInputStream fis = new FileInputStream(myFile);
+    byte[] byteArr = new byte[BUFSIZE];
+    int count = fis.read(byteArr);
+
+    byte[] fileSHA256 = DigestUtils.sha256(byteArr); // 直接对字节数组计算哈希
+    ```
+4.   **二进制数据编码：** 对于非文本数据，使用Base64等编码方式进行存储和传输。
+TEXT,
+)
+
+
+// get call site 
+String() as $string_constructor 
+$string_constructor?{<getActualParams()>* <fullTypeName()>?{have:"byte"}} as $target 
+
+alert $target 
+
+
+
+desc (
+
+
+    "file://a.java": <<<CODE
+public class Jdbc {
+
+    /**
+     * <a href="https://github.com/JoyChou93/java-sec-code/wiki/CVE-2022-21724">CVE-2022-21724</a>
+     */
+    @RequestMapping("/postgresql")
+    public void postgresql(String jdbcUrlBase64) throws Exception{
+        byte[] b = java.util.Base64.getDecoder().decode(jdbcUrlBase64);
+        String jdbcUrl = new String(b);
+        log.info(jdbcUrl);
+        DriverManager.getConnection(jdbcUrl);
+    }
+
+    private String getImgBase64(String imgFile) throws IOException {
+        File f = new File(imgFile);
+        byte[] data = Files.readAllBytes(Paths.get(imgFile)); //FIXME: this not match 
+        return new String(Base64.encodeBase64(data));
+    }
+}
+
+CODE
+)
+
