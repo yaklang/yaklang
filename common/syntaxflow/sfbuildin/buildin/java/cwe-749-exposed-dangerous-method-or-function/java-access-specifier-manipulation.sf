@@ -1,0 +1,90 @@
+desc(
+    title: "Access Specifier Manipulation via Reflection",
+    title_zh: "通过反射操纵访问修饰符",
+    type: Vulnerability,
+    severity: High,
+    risk: High,
+    desc: <<<TEXT
+该漏洞源于滥用 Java 的反射 API（如 `setAccessible(true)`）强行修改类/方法/字段的访问修饰符（如 private/protected），
+绕过 Java 语言层面的访问控制机制。攻击者可能利用此特性访问或修改敏感内部状态，
+例如：
+- 修改 Tomcat 的 `filterConfigs` 字段注入恶意过滤器
+- 访问 Spring 框架内部缓存窃取用户会话
+- 篡改数据库连接池配置实现中间人攻击
+
+此操作违反最小权限原则，且具有以下风险：
+1. **权限提升**：攻击者通过反射链构造利用代码，可能获得系统级权限
+2. **隐蔽后门**：私有字段的修改难以被常规安全工具检测（如 SAST/IAST）
+3. **兼容性破坏**：框架内部字段名或结构变更会导致反射代码崩溃
+TEXT,
+    solution: <<<TEXT
+**根本性修复：**
+- **优先使用官方 API**：如 Spring Boot 的 `FilterRegistrationBean` 替代直接操作 Tomcat 内部类
+- **禁止非必要反射**：通过代码审查规则禁止 `setAccessible(true)` 的使用
+
+**若必须使用反射：**
+1. **严格校验调用源**：
+   - 限制反射调用仅限于受信代码库（如通过注解 `@org.springframework.stereotype.Service` 标记）
+   - 禁止从用户输入构造反射目标（如 `Class.forName(request.getParameter("className"))`）
+
+2. **最小化攻击面**：
+   ```java
+   try {
+       Field field = target.getClass().getDeclaredField("sensitiveField");
+       // 使用后立即恢复访问权限
+       field.setAccessible(true);
+       Object value = field.get(target);
+   } finally {
+       field.setAccessible(false);  // 强制恢复访问控制
+   }
+   ```
+
+3. **启用运行时保护**：
+   - 配置 Java Security Manager 限制 `ReflectPermission("suppressAccessChecks")`
+   - 在 JVM 参数中添加 `--illegal-access=deny` 阻止深度反射（JDK 16+）
+
+4. **自动化检测**：
+   - 使用 SpotBugs 规则 `SECURITY_ACCESSIBLEOBJECT_ACCESS` 标记危险代码
+   - 在 CI/CD 流程中加入静态代码分析技术检测反射滥用模式
+TEXT
+)
+
+// get call site  and check parameter 
+setAccessible(<slice(index=1)>?{==true}) as $set_accessible_true  
+// check type 
+$set_accessible_true?{<getCallee()><fullTypeName()>?{have: "java.lang.reflect"} } as $target 
+
+// alert 
+alert $target 
+    
+
+desc(
+
+
+"file://x.java": <<<CODE
+package org.joychou.config;
+
+public class TomcatFilterMemShell implements Filter {
+    static{
+        try {
+            WebappClassLoaderBase webappClassLoaderBase = (WebappClassLoaderBase) Thread.currentThread().getContextClassLoader();
+            // standardContext为tomcat标准上下文，
+            StandardContext standardContext = (StandardContext) webappClassLoaderBase.getResources().getContext();
+
+            Class<? extends StandardContext> aClass;
+            try{
+                // standardContext类名为TomcatEmbeddedContex，TomcatEmbeddedContext父类为StandardContext
+                // 适用于内嵌式springboot的tomcat
+                aClass = (Class<? extends StandardContext>) standardContext.getClass().getSuperclass();
+            }catch (Exception e){
+                aClass = standardContext.getClass();
+            }
+            Field Configs = aClass.getDeclaredField("filterConfigs");
+            Configs.setAccessible(true);
+            // 获取当前tomcat标准上下文中已经存在的filterConfigs
+            Map filterConfigs = (Map) Configs.get(standardContext);
+        }
+    }
+}
+CODE
+)
