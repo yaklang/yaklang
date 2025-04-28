@@ -141,7 +141,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			apiValue.AppendDependOn(obj)
 			ret := obj.getTopDefs(actx, opt...)
 			if len(ret) == 0 && !ValueCompare(i, actx.Self) {
-				vals = append(vals, i)
+				ret = append(ret, i)
 			}
 			return ret
 		}
@@ -330,7 +330,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			}
 			ret := traced.getTopDefs(actx, opt...)
 			if !actx.needCrossProcess(i, traced) {
-				vals = append(vals, i)
+				ret = append(ret, i)
 			}
 			if len(ret) > 0 {
 				return ret
@@ -426,8 +426,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			if i.IsFreeValue() && inst.GetDefault() != nil {
 				vals = append(vals, i.NewTopDefValue(inst.GetDefault()))
 			} else {
-				// 如果要将自身作为叶子节点加入到结果，需要清除DependOn这条边
-				// 这条边是在traced := i.NewTopDefValue(actualParam)的时候产生的
 				vals = append(vals, i)
 			}
 		}
@@ -442,7 +440,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		}
 	case *ssa.Make:
 		var values Values
-		values = append(vals, i)
+		values = append(values, i)
 		for key, member := range inst.GetAllMember() {
 			value := i.NewValue(member)
 			if err := actx.pushObject(i, i.NewValue(key), value); err != nil {
