@@ -93,9 +93,9 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 				}
 			})
 			if c.debugPrompt {
-				first.Debug(true)
+				rsp.Debug(true)
 			}
-			return first, err
+			return rsp, err
 		}
 		return nil, utils.Errorf("")
 	}
