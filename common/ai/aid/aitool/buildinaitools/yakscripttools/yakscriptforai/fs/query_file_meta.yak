@@ -8,6 +8,7 @@ Get basic file information including:
 4. Last modified time
 EOF
 
+yakit.AutoInitYakit()
 filename = cli.String("filename", cli.setRequired(true), cli.setHelp("the meta info from filename u want to check"))// "/Users/v1ll4n/Projects/yaklang/README.md"
 cli.check()
 

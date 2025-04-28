@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"io/fs"
 	"strings"
@@ -32,6 +33,8 @@ func GetYakScriptAiTools(name ...string) []*aitool.Tool {
 	_ = filesys.Recursive(".", filesys.WithFileSystem(efs), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 		filename := info.Name()
 		_, filename = efs.PathSplit(filename)
+		dirname, _ := efs.PathSplit(s)
+		log.Infof("check dirname: %v in: %v", dirname, s)
 		if efs.Ext(filename) != ".yak" {
 			return nil
 		}
@@ -40,6 +43,16 @@ func GetYakScriptAiTools(name ...string) []*aitool.Tool {
 		found := false
 		for _, i := range name {
 			if i == toolname {
+				found = true
+			}
+		}
+		if !found {
+			dirnameClean, ok := strings.CutPrefix(dirname, `yakscriptforai`)
+			if ok {
+				dirname = dirnameClean
+			}
+			dirname = strings.Trim(dirname, `/`)
+			if utils.MatchAnyOfSubString(dirname, name...) {
 				found = true
 			}
 		}

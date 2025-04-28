@@ -64,6 +64,13 @@ func GetOpenRouterAICallback(modelName ...string) aid.AICallbackType {
 	return getTestSuiteAICallback("openrouter.txt", nil, "openrouter", modelName...)
 }
 
+func GetOpenRouterAICallbackGemini2_5flash(modelName ...string) aid.AICallbackType {
+	if len(modelName) == 0 {
+		modelName = []string{"google/gemini-2.5-flash-preview"}
+	}
+	return getTestSuiteAICallback("openrouter.txt", nil, "openrouter", modelName...)
+}
+
 func GetOpenRouterAICallbackFree(modelName ...string) aid.AICallbackType {
 	if len(modelName) == 0 {
 		modelName = []string{"google/gemini-2.0-flash-exp:free"}
