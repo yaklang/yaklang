@@ -1035,3 +1035,22 @@ $a = new C();
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
+
+func TestSelf(t *testing.T) {
+	code := `<?php
+
+class StmComment extends StmBaseModel{
+
+
+	public static function get_comment($params = []){
+		echo $params;
+	}
+
+	public static function get_commnet_api(){
+		return self::get_comment($_GET);
+	}
+}`
+	ssatest.CheckSyntaxFlow(t, code, `echo(* #-> as $sink)`, map[string][]string{
+		"sink": {"Undefined-_GET"},
+	}, ssaapi.WithLanguage(ssaapi.PHP))
+}
