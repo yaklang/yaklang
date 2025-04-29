@@ -103,8 +103,12 @@ func (g *GLMClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 
 func (g *GLMClient) Chat(s string, f ...aispec.Function) (string, error) {
 	return aispec.ChatBase(
-		g.targetUrl, g.config.Model, s, f, g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler,
-		g.config.HTTPErrorHandler,
+		g.targetUrl, g.config.Model, s,
+		aispec.WithChatBase_Function(f),
+		aispec.WithChatBase_PoCOptions(g.BuildHTTPOptions),
+		aispec.WithChatBase_StreamHandler(g.config.StreamHandler),
+		aispec.WithChatBase_ReasonStreamHandler(g.config.ReasonStreamHandler),
+		aispec.WithChatBase_ErrHandler(g.config.HTTPErrorHandler),
 	)
 }
 
