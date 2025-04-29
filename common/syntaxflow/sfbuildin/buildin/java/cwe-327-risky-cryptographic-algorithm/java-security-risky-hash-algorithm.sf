@@ -1,25 +1,28 @@
 desc(
-    title: "Check The Use Of Broken Or Risky Hash Algorithm",
+    title_zh:"检测Java java.security使用不安全的哈希算法",
+    title: "Check Java java.security use of broken or risky hash algorithm",
     type: security,
     level: low,
-    risk : "risky_crypt",
+    risk : '不安全加密算法',
     rule_id: 20327003,
+    reference:<<<URL
+    https://cwe.mitre.org/data/definitions/327.html
+URL
     desc: <<<TEXT
     检测代码中是否使用了已知的不安全或易受攻击的哈希算法。在加密算法中，如果使用了已知的不安全或易受攻击的哈希算法，可能会导致信息泄露、数据篡改等安全问题。建议开发者使用安全的哈希算法，如SHA-256、SHA-3等，避免使用已知的不安全或易受攻击的哈希算法。
 TEXT
 )
 
-MessageDigest.getInstance(* as $algorithm);
+.getInstance?{<typeName>?{have:'java.security'}}(*<slice(index=1)>as $algorithm);
 $algorithm#{
-    until:<<<UNTIL
-   <self>?{opcode:const}?{have:/^SHA$/ || 'SHA-0' || 'SHA-1'|| 'MD5' || 'MD4' || 'MD2' || 'RIPEMD160'}
-UNTIL,
-    exclude:<<<EXCLUDE
-    <self>?{have:'SHA256' || have:'SHA384' || have:'SHA512' }
-EXCLUDE
+    include:`*?{opcode:const}`,
+    until:`*?{have:/MD2|MD4|MD5|SHA(-)?1|SHA(-)?0|RIPEMD160|^SHA$/}`,
+    exclude:`*?{any:'SHA256','SHA384','SHA512' }`
 }-> as $sink;
+
 alert $sink for{
     message:"Find the use of broken or risky encryption algorithm",
+    level:low,
 }
 
 desc(
