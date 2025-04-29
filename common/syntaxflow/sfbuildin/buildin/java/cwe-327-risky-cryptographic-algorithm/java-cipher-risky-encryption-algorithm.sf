@@ -1,26 +1,35 @@
 desc(
-    title: "Check The Use Of Broken Or Risky Encryption Algorithm",
+    title_zh:"检测Java javax.crypto.Cipher不安全或有风险的加密算法的使用",
+    title: "Check Java javax.crypto.Cipher The Use Of Broken Or Risky Encryption Algorithm",
     type: security,
     level: low,
-    risk : "risky_crypt",
+    risk : '不安全加密算法',
     rule_id: 20327002,
+    reference: <<<URL
+    https://cwe.mitre.org/data/definitions/327.html
+    https://docs.oracle.com/javase/8/docs/api/javax/crypto/spec/SecretKeySpec.html
+    https://docs.oracle.com/javase/8/docs/api/javax/crypto/Cipher.html
+URL
     desc: <<<TEXT
 使用已破解或存在风险的加密算法可能会使敏感数据面临泄露的风险。这些算法由于存在已知的漏洞或弱点，可能无法为数据提供足够的安全性。建议采用经过时间验证且广泛认可的加密算法，如AES，以确保数据的机密性和完整性。
 TEXT
 )
 
-SecretKeySpec(* as $algorithm);
+SecretKeySpec?{<typeName>?{have:'javax.crypto.spec.SecretKeySpec'}}(,* as $algorithm);
+
 $algorithm#{
-    until:`*?{opcode:const}?{have:DES || 'DESede' || 'RC4' || 'RC2' }`,
-    exclude:` *?{have:'3DES'}`
+    include:`*?{opcode:const}`,
+    until:`* ?{have:/3?DES((-|_)?ede)?|TRIPLE(-|_)?DES|RC[24]/}`
+    until:`* ?{have:/^(?=RSA)[A-Z0-9_]*(/(ECB|CBC)$|/(ECB|CBC)/(?!OAEPWithSHA.*Padding)|$)/`,
 }-> as $sink;
+
 alert $sink for {
-    message:"Find the use of broken or risky encryption algorithm",
+    message:"发现Java代码中使用了不安全的加密算法",
 }
 
 desc(
     lang:java,
-    alert_num:5,
+    alert_num:6,
     'file://unsafe.java':<<<EOF
     import javax.crypto.Cipher;
     import javax.crypto.spec.SecretKeySpec;
