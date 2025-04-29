@@ -1,8 +1,6 @@
-__KEYWORDS__ = "file content,head,first bytes,file,bytes,show,display"
+__DESC__ = "一个用于显示指定文件头部字节内容并将结果转化为字符串的工具。支持设置读取字节数限制，可选显示行号或进行十六进制转储。"
 
-__DESC__ = <<<EOF
-show the first(head) bytes content in a file
-EOF
+__KEYWORDS__ = "字节读取,文件读取,文件头部,命令行工具,file,bytes,文本操作,行号显示,head,first bytes,show,文件内容,十六进制转储,file content,display"
 
 filename = cli.String("filename", cli.setRequired(true), cli.setHelp("which file you want to check?"))
 // filename = `/Users/v1ll4n/Projects/yaklang/README.md`

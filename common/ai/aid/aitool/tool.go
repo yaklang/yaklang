@@ -25,9 +25,8 @@ type InvokeCallbackWithCtx func(ctx *ToolInvokeCtx, params InvokeParams, stdout 
 type Tool struct {
 	*mcp.Tool
 	// A list of keywords for tool indexing and searching.
-	Keywords        []string              `json:"keywords,omitempty"`
-	Callback        InvokeCallback        // 添加回调函数字段
-	CallbackWithCtx InvokeCallbackWithCtx // 添加回调函数字段
+	Keywords []string       `json:"keywords,omitempty"`
+	Callback InvokeCallback // 添加回调函数字段
 }
 
 // ToolOption 定义工具选项函数的类型
@@ -101,19 +100,6 @@ func WithKeywords(keywords []string) ToolOption {
 func WithCallback(callback InvokeCallback) ToolOption {
 	return func(t *Tool) {
 		t.Callback = callback
-		t.CallbackWithCtx = func(ctx *ToolInvokeCtx, params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
-			return callback(params, stdout, stderr)
-		}
-	}
-}
-
-// WithCallback 设置工具的回调函数
-func WithCtxCallback(callback InvokeCallbackWithCtx) ToolOption {
-	return func(t *Tool) {
-		t.CallbackWithCtx = callback
-		t.Callback = func(params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
-			return callback(nil, params, stdout, stderr)
-		}
 	}
 }
 

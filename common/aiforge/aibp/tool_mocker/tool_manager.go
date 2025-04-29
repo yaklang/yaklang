@@ -2,10 +2,7 @@ package tool_mocker
 
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 )
-
-var _ buildinaitools.ToolManager = &MockToolManager{}
 
 type MockToolManager struct {
 	handleGetAllTools      func() ([]*aitool.Tool, error)

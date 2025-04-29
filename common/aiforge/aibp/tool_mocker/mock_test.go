@@ -29,7 +29,7 @@ func TestGetSuggestions(t *testing.T) {
 		fmt.Println("tool name: ", suggestion.Name)
 	}
 
-	tool, err := mockServer.GetToolByName(ctx, suggestions[0].Name)
+	tool, err := mockServer.SearchTool(ctx, suggestions[0].Name)
 	if err != nil {
 		t.Fatal(err)
 		return

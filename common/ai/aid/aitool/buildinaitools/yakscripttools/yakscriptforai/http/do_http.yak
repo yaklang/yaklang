@@ -1,8 +1,6 @@
-__KEYWORDS__ = "http请求,请求方法,url,header,网络请求,http,api,请求"
+__DESC__ = "发送基础HTTP请求的工具，允许用户指定请求方法（默认为GET）和完整的URL。工具执行请求并打印原始请求和响应数据包。"
 
-__DESC__ = <<<EOF
-基础HTTP请求：可以指定方法，URL，携带的Header等
-EOF
+__KEYWORDS__ = "http请求,网络工具,web通信,请求工具,响应查看,基础请求,网络调试"
 
 yakit.AutoInitYakit()
 url = cli.String("url", cli.setHelp("需要指定的URL"), cli.setRequired(true))

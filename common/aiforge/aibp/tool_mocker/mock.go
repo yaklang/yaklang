@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/jsonextractor"
@@ -68,7 +69,7 @@ type AiToolMockServer struct {
 	aiOptions   []aispec.AIConfigOption
 	Suggestions []*ToolSuggestion
 	Tools       []*aitool.Tool
-	ToolManager buildinaitools.ToolManager
+	ToolManager *buildinaitools.AiToolManager
 }
 type SubTaskInfo struct {
 	SubTaskName string `json:"subtask_name"`
@@ -79,7 +80,7 @@ func NewAiToolMockServer(aiOptions ...aispec.AIConfigOption) *AiToolMockServer {
 	mocker := &AiToolMockServer{
 		aiOptions: aiOptions,
 	}
-	mocker.ToolManager = NewMockToolManager(func() ([]*aitool.Tool, error) {
+	mocker.ToolManager = buildinaitools.NewToolManagerByToolGetter(func() []*aitool.Tool {
 		allTools := mocker.AllTools()
 		factory := aitool.NewFactory()
 		factory.RegisterTool("tools_search",
@@ -97,12 +98,14 @@ func NewAiToolMockServer(aiOptions ...aispec.AIConfigOption) *AiToolMockServer {
 				return suggestions, nil
 			}))
 		allTools = append(allTools, factory.Tools()...)
-		return allTools, nil
-	}, func(method string, query string) ([]*aitool.Tool, error) {
-		return nil, nil
-	}, func(name string) (*aitool.Tool, error) {
-		return mocker.GetToolByName(context.Background(), name)
-	})
+		return allTools
+	}, buildinaitools.WithSearcher(func(req *searchtools.ToolSearchRequest) ([]*aitool.Tool, error) {
+		tool, err := mocker.SearchTool(context.Background(), req.Query)
+		if err != nil {
+			return nil, err
+		}
+		return []*aitool.Tool{tool}, nil
+	}), buildinaitools.WithToolEnabled("tools_search", true))
 	return mocker
 }
 
@@ -124,7 +127,7 @@ func (s *AiToolMockServer) AllTools() []*aitool.Tool {
 	return allTools
 }
 
-func (s *AiToolMockServer) GetToolManager() buildinaitools.ToolManager {
+func (s *AiToolMockServer) GetToolManager() *buildinaitools.AiToolManager {
 	return s.ToolManager
 }
 func (s *AiToolMockServer) QueryToolSuggestion(ctx context.Context, query string, opts ...aid.Option) ([]*ToolSuggestion, error) {
@@ -187,7 +190,7 @@ func (s *AiToolMockServer) CallTool(tool *aitool.Tool, params aitool.InvokeParam
 	return result.Result, nil
 }
 
-func (s *AiToolMockServer) GetToolByName(ctx context.Context, name string) (*aitool.Tool, error) {
+func (s *AiToolMockServer) SearchTool(ctx context.Context, name string) (*aitool.Tool, error) {
 	allTools, err := s.ToolManager.GetAllTools()
 	if err != nil {
 		return nil, err
