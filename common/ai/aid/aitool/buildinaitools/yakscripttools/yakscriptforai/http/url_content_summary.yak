@@ -1,5 +1,3 @@
-__KEYWORDS__ = "web scraper,url retrieval,html parsing,page title,text extraction,get request,http,web page,content extraction,web crawling"
-
 __DESC__ = <<<EOF
 Retrieves the content of a specified URL via a GET request.
 Logs the response headers and body size.
@@ -9,13 +7,13 @@ If the content type indicates HTML, it extracts and logs:
 Essentially, it provides a summary (title and text) of an HTML web page.
 EOF
 
+__KEYWORDS__ = "url retrieval,page title,http,web page,content extraction,web crawling,html parsing,text extraction,get request,内容提取,web scraper,网页抓取,url获取,页面标题,get请求,html解析,网页信息"
+
 yakit.AutoInitYakit()
 method = cli.String("method", cli.setRequired(false), cli.setDefault("GET"))
 urlStr = cli.String("url", cli.setRequired(true), cli.setHelp("the target url you want to glance"))//"https://www.example.com"
 
 cli.check()
-
-
 
 rsp, req, err := poc.Do(method, urlStr, poc.save(true))
 if err != nil {

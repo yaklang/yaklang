@@ -1,12 +1,6 @@
-__KEYWORDS__ = "file information,directory,file size,file permissions,modified time,file metadata"
+__DESC__ = "获取指定文件的基本元信息，包括判断是否为目录、文件大小、文件权限模式以及最后修改时间。"
 
-__DESC__ = <<<EOF
-Get basic file information including:
-1. Whether it's a directory
-2. File size
-3. File mode/permissions
-4. Last modified time
-EOF
+__KEYWORDS__ = "修改时间,directory,file size,file metadata,文件大小,文件权限,文件元数据,文件属性,file information,file permissions,modified time,文件信息,目录检查"
 
 yakit.AutoInitYakit()
 filename = cli.String("filename", cli.setRequired(true), cli.setHelp("the meta info from filename u want to check"))// "/Users/v1ll4n/Projects/yaklang/README.md"

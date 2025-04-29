@@ -1,8 +1,6 @@
-__KEYWORDS__ = "text finder,grep,file path,search tool,text search,position,string matching,file searching,command line,utility"
+__DESC__ = "一个文本查找工具，用于在指定文件中搜索目标文本，并输出每次匹配到的文本在文件中的起始和结束位置（索引）。支持指定文件路径或目录进行递归搜索。"
 
-__DESC__ = <<<EOF
-`grep_text` is a text finder tool, input filepath and target text, find it position
-EOF
+__KEYWORDS__ = "file path,文本处理,命令行工具,文件内容搜索,text finder,grep,file searching,文件搜索,文件路径,search tool,string matching,command line,utility,文本查找,位置查找,text search,position,字符串匹配"
 
 yakit.AutoInitYakit()
 

@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -49,12 +50,17 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...Opt
 	config.startEventLoop(ctx)
 
 	if config.aiToolManager == nil {
-		config.aiToolManager = buildinaitools.NewDefaultToolManager(config.tools)
+		config.aiToolManager = buildinaitools.NewToolManager(
+			config.tools,
+			buildinaitools.WithSearchEnabled(config.enableToolSearch),
+			buildinaitools.WithSearcher(searchtools.NewKeyWordSearcher(config.toolAICallback)),
+		)
 	}
 	c := &Coordinator{
 		config:    config,
 		userInput: userInput,
 	}
+	config.memory.CreateMemoryTools()
 	config.memory.StoreQuery(c.userInput)
 	config.memory.StoreTools(func() []*aitool.Tool {
 		alltools, err := config.aiToolManager.GetAllTools()

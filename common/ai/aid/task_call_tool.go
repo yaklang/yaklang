@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"io"
 )
 
 func (t *aiTask) getToolRequired(response string) []*aitool.Tool {
@@ -29,7 +30,7 @@ func (t *aiTask) getToolRequired(response string) []*aitool.Tool {
 		if rawData, ok := data["tool"]; ok && fmt.Sprint(rawData) != "" {
 			toolName := fmt.Sprint(rawData)
 			count := 0
-			toolIns, err := t.config.aiToolManager.SearchToolByName(toolName)
+			toolIns, err := t.config.aiToolManager.GetToolByName(toolName)
 			if err != nil {
 				t.config.EmitError("error searching tool: %v", err)
 				continue
