@@ -1,6 +1,14 @@
 package yaktest
 
-import "testing"
+import (
+	"fmt"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"testing"
+)
 
 func TestPocRunner(t *testing.T) {
 	cases := []YakTestCase{
@@ -26,4 +34,19 @@ dump(fuzz.Strings(abc[0]))
 `},
 	}
 	Run("fuzz.Unquote", t, cases...)
+}
+
+func TestPocRequestUri(t *testing.T) {
+	uri := ""
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		inst, err := lowhttp.ParseBytesToHttpRequest(req)
+		require.NoError(t, err)
+		uri = inst.RequestURI
+		log.Infof(inst.RequestURI)
+		return []byte("OK")
+	})
+	target := fmt.Sprintf("http://%s:%d/${eval(danger)}", host, port)
+	_, _, err := poc.DoGET(target)
+	require.NoError(t, err)
+	require.Equal(t, uri, "/${eval(danger)}")
 }
