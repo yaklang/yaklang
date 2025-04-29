@@ -4,7 +4,7 @@ desc(
     type: vuln,
     rule_id:20611004,
     level: warning,
-    risk: xxe,
+    risk:XXE,
     desc: <<<TEXT
 SAXReader 是 Apache Commons Digester 库中用于解析 XML 文档的类。如果 SAXReader 实例在使用时没有明确设置安全策略，例如未禁用外部实体解析（通过 `.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)`）或未设置自定义的实体解析器（通过 `.setEntityResolver(...)`），则应用程序可能会受到 XML 外部实体（XXE）攻击。XXE 攻击允许攻击者访问本地文件或通过网络发起攻击，从而导致敏感数据泄露、拒绝服务攻击等严重后果。因此，建议在使用 SAXReader 时，明确设置安全策略以防止 XXE 攻击。
 TEXT
@@ -17,7 +17,6 @@ $reader?{!.setFeature && !.setEntityResolver && !.setAllow* && !.setType*}.read(
 check $vulnCall;
 alert $vulnCall for {
     message: "SAXReader() Unsafe Use in Context Sink",
-    risk: "xxe",
     level: "warning",
 }
 
