@@ -87,7 +87,13 @@ func (g *Gateway) GetModelName() string {
 }
 
 func (g *Gateway) Chat(s string, f ...aispec.Function) (string, error) {
-	return aispec.ChatBase(g.TargetUrl, g.Config.Model, s, f, g.AIClient.BuildHTTPOptions, g.Config.StreamHandler, g.Config.ReasonStreamHandler, g.Config.HTTPErrorHandler)
+	return aispec.ChatBase(g.TargetUrl, g.Config.Model, s,
+		aispec.WithChatBase_Function(f),
+		aispec.WithChatBase_PoCOptions(g.AIClient.BuildHTTPOptions),
+		aispec.WithChatBase_StreamHandler(g.Config.StreamHandler),
+		aispec.WithChatBase_ReasonStreamHandler(g.Config.ReasonStreamHandler),
+		aispec.WithChatBase_ErrHandler(g.Config.HTTPErrorHandler),
+	)
 }
 
 func (g *Gateway) ChatEx(details []aispec.ChatDetail, function ...aispec.Function) ([]aispec.ChatChoice, error) {

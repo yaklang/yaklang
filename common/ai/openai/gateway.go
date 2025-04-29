@@ -37,7 +37,14 @@ func (g *GetawayClient) GetModelList() ([]*aispec.ModelMeta, error) {
 }
 
 func (g *GetawayClient) Chat(s string, function ...aispec.Function) (string, error) {
-	return aispec.ChatBase(g.targetUrl, g.config.Model, s, function, g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler, g.config.HTTPErrorHandler)
+	return aispec.ChatBase(g.targetUrl, g.config.Model,
+		s,
+		aispec.WithChatBase_Function(function),
+		aispec.WithChatBase_PoCOptions(g.BuildHTTPOptions),
+		aispec.WithChatBase_StreamHandler(g.config.StreamHandler),
+		aispec.WithChatBase_ReasonStreamHandler(g.config.ReasonStreamHandler),
+		aispec.WithChatBase_ErrHandler(g.config.HTTPErrorHandler),
+	)
 }
 
 func (g *GetawayClient) ChatEx(details []aispec.ChatDetail, function ...aispec.Function) ([]aispec.ChatChoice, error) {
