@@ -1,0 +1,69 @@
+desc(
+    title_zh:"检测Java javax.crypto.KEM.Encapsulator使用不安全的加密算法",
+    title:"Check Java javax.crypto.KEM.Encapsulator The Use Of Broken Or Risky Encryption Algorithm",
+    rule_id:10327005
+    risk:"不安全加密算法",
+    reference:<<<URL
+    https://cwe.mitre.org/data/definitions/327.html
+    https://docs.oracle.com/en/java/javase/17/docs/api/java.base/javax/crypto/KEM.Encapsulator.html
+URL
+    description:<<<TEXT
+    该规则用于检测Java代码中是否使用了不安全的加密算法。使用已破解或存在风险的加密算法可能会使敏感数据面临泄露的风险。这些算法由于存在已知的漏洞或弱点，可能无法为数据提供足够的安全性。
+    - 规则审计的类：
+    javax.crypto.KEM.Encapsulator
+    - 规则审计的方法：
+    encapsulate()
+TEXT
+)
+
+KEM?{<typeName>?{have:"avax.crypto.KEM"}}.getInstance(*<slice(index=1)> as $algorithm);
+
+$algorithm#{
+    include:`*?{opcode:const}`,
+    until:`* ?{have:/DES|DESede|3DES|TripleDES|ARCFOUR|RC4|RC2/}`
+}-> as $sink;
+
+alert $sink for {
+    message:"发现Java代码中使用了不安全的加密算法",
+    level:low,
+}
+
+desc{
+    lang:java,
+    alert_num:1 ,
+    "file://demo.java":<<<CODE
+    import javax.crypto.KEM;
+    import java.security.KeyPair;
+    import java.security.KeyPairGenerator;
+    import java.security.PublicKey;
+    import java.security.SecureRandom;
+
+    public class WeakKEMExample {
+        public static void main(String[] args) {
+            try {
+                // 生成密钥对
+                KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("DES");
+                keyPairGenerator.initialize(56); // DES 使用 56 位密钥
+                KeyPair keyPair = keyPairGenerator.generateKeyPair();
+                PublicKey publicKey = keyPair.getPublic();
+
+                // 创建 KEM 实例
+                KEM kem = KEM.getInstance("DES");
+
+                // 创建封装器 - 这里会触发规则检查
+                KEM.Encapsulator encapsulator = kem.newEncapsulator(publicKey);
+
+                // 执行密钥封装
+                KEM.Encapsulated encapsulated = encapsulator.encapsulate();
+
+                // 获取封装的密钥和密文
+                byte[] encapsulatedKey = encapsulated.key();
+                byte[] encapsulatedSecret = encapsulated.encapsulation();
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+CODE
+}

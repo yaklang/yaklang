@@ -3,7 +3,7 @@ desc(
     title_zh: "查找 Java 哈希算法使用硬编码的PBE盐值",
     type: security,
     level: low,
-    risk:'risky_crypt',
+    risk:'不安全加密算法',
     rule_id: 20327001,
     desc: <<<TEXT
     该审计规则旨在识别 Java 代码中使用硬编码的PBE盐值的情况。PBE（Password-Based Encryption）是一种基于密码的加密算法，用于加密和解密数据。在使用PBE算法时，盐值（Salt）是一个随机的字节序列，用于增加密码的复杂性和安全性。硬编码的PBE盐值可能会导致密码加密的不安全性，因为攻击者可以通过分析代码来获取盐值，从而破解加密密码。建议开发者使用随机生成的盐值来增强密码的安全性。
