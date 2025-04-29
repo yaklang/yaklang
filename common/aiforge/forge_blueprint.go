@@ -114,7 +114,8 @@ func WithPersistentPrompt(persistentPrompt string) Option {
 	}
 }
 
-// WithToolKeywords
+// WithToolKeywords 设置AI助手的工具关键词
+// 这些关键词可以扩展AI的能力，使其能够执行特定的任务
 func WithToolKeywords(keywords []string) Option {
 	return func(f *ForgeBlueprint) {
 		f.ToolKeywords = append(f.ToolKeywords, keywords...)

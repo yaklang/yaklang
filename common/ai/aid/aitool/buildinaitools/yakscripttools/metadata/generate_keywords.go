@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -16,44 +17,56 @@ import (
 //go:embed prompt/generate_keyword.txt
 var generate_key_word_prompt []byte
 
-func GenerateKeywordsByDescription(desc string) ([]string, error) {
+// 定义结构体来存储结果
+type GenerateResult struct {
+	Language    string   `json:"language"`
+	Description string   `json:"description"`
+	Keywords    []string `json:"keywords"`
+}
+
+func GenerateMetadataFromCode(code string) (*GenerateResult, error) {
 	// Create a template from the prompt
 	promptTemplate := template.Must(template.New("generate_keywords").Parse(string(generate_key_word_prompt)))
 
 	// Create a buffer to store the executed template
 	var promptBuffer bytes.Buffer
 
-	// Execute the template with the description
-	err := promptTemplate.Execute(&promptBuffer, map[string]interface{}{
-		"Description": desc,
-	})
+	// Execute the template with the code and existing description
+	templateData := map[string]interface{}{
+		"Code": code,
+	}
 
+	err := promptTemplate.Execute(&promptBuffer, templateData)
 	if err != nil {
 		log.Errorf("failed to execute prompt template: %v", err)
-		return []string{}, fmt.Errorf("failed to execute prompt template: %v", err)
+		return nil, fmt.Errorf("failed to execute prompt template: %v", err)
 	}
 
 	// Get response from AI
 	response, err := ai.Chat(promptBuffer.String(), aispec.WithDebugStream(true))
 	if err != nil {
 		log.Errorf("failed to get AI response: %v", err)
-		return []string{}, fmt.Errorf("failed to get AI response: %v", err)
+		return nil, fmt.Errorf("failed to get AI response: %v", err)
 	}
 
-	// Extract JSON array from the response
-	var result struct {
-		Language string
-		Keywords []string
-	}
-	var keywords []string
+	// Extract JSON object from the response
+	var result GenerateResult
 	index := jsonextractor.ExtractObjectIndexes(response)
 	for _, pair := range index {
 		err = json.Unmarshal([]byte(response[pair[0]:pair[1]]), &result)
-		if err != nil {
-			continue
+		if err == nil && len(result.Keywords) > 0 && result.Description != "" {
+			// 如果描述包含引号或反斜杠，可能需要特殊处理
+			result.Description = strings.ReplaceAll(result.Description, "\\", "\\\\")
+			result.Description = strings.ReplaceAll(result.Description, "\"", "\\\"")
+
+			// 确保所有关键词都是小写的
+			for i, keyword := range result.Keywords {
+				result.Keywords[i] = strings.ToLower(keyword)
+			}
+
+			return &result, nil
 		}
-		keywords = append(keywords, result.Keywords...)
 	}
 
-	return keywords, nil
+	return nil, fmt.Errorf("failed to extract valid metadata from AI response")
 }

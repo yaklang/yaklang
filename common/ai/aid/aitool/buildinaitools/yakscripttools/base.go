@@ -4,10 +4,12 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"io/fs"
+	"path/filepath"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -27,19 +29,14 @@ import (
 //go:embed yakscriptforai/**
 var yakScriptFS embed.FS
 
+func GetAllYakScriptAiTools() []*aitool.Tool {
+	return getYakScriptAiToolsByFilter(func(filename string, info fs.FileInfo) bool {
+		return true
+	})
+}
 func GetYakScriptAiTools(name ...string) []*aitool.Tool {
-	efs := filesys.NewEmbedFS(yakScriptFS)
-	tools := []*aitool.Tool{}
-	_ = filesys.Recursive(".", filesys.WithFileSystem(efs), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
-		filename := info.Name()
-		_, filename = efs.PathSplit(filename)
-		dirname, _ := efs.PathSplit(s)
-		log.Infof("check dirname: %v in: %v", dirname, s)
-		if efs.Ext(filename) != ".yak" {
-			return nil
-		}
-		toolname := strings.TrimSuffix(filename, ".yak")
-
+	return getYakScriptAiToolsByFilter(func(toolname string, info fs.FileInfo) bool {
+		dirname, _ := filepath.Split(info.Name())
 		found := false
 		for _, i := range name {
 			if i == toolname {
@@ -56,6 +53,22 @@ func GetYakScriptAiTools(name ...string) []*aitool.Tool {
 				found = true
 			}
 		}
+		return found
+	})
+}
+func getYakScriptAiToolsByFilter(filter func(filename string, info fs.FileInfo) bool) []*aitool.Tool {
+	efs := filesys.NewEmbedFS(yakScriptFS)
+	tools := []*aitool.Tool{}
+	_ = filesys.Recursive(".", filesys.WithFileSystem(efs), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+		filename := info.Name()
+		_, filename = efs.PathSplit(filename)
+		dirname, _ := efs.PathSplit(s)
+		log.Infof("check dirname: %v in: %v", dirname, s)
+		if efs.Ext(filename) != ".yak" {
+			return nil
+		}
+		toolname := strings.TrimSuffix(filename, ".yak")
+		found := filter(toolname, info)
 		if !found {
 			return nil
 		}

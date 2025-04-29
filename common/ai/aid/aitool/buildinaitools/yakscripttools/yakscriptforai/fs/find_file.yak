@@ -1,8 +1,6 @@
-__KEYWORDS__ = "file search,directory search,pattern matching,file filtering,regular expression,glob pattern,file size,file type,recursive search,file extension"
+__DESC__ = "一个用于在指定目录下递归搜索文件的工具，支持通过模式（子串、正则、Glob）匹配文件路径，并可根据文件类型（文件/目录）、文件扩展名和文件大小进行过滤，限制返回结果数量。"
 
-__DESC__ = <<<EOF
-Find files within a specified directory based on a pattern and various filters. This tool recursively searches a directory for files that match a given pattern.  It supports filtering by file type (file or directory), file extension, and file size.  The matching pattern can be interpreted as a substring, a regular expression, or a glob pattern.  The search is limited to a maximum number of results.
-EOF
+__KEYWORDS__ = "file size,file type,recursive search,模式匹配,正则表达式,文件大小,文件类型,file filtering,glob pattern,file search,directory search,file extension,文件搜索,文件过滤,递归搜索,regular expression,目录搜索,glob模式,文件扩展名,pattern matching"
 
 dirname = cli.String("dir", cli.setRequired(true), cli.setHelp("which dir you want to find file?"))
 // filename = `/Users/v1ll4n/Projects/yaklang/README.md`

@@ -2,6 +2,7 @@ package aid
 
 import (
 	"context"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
@@ -29,7 +30,7 @@ func NewRecoveredCoordinator(
 	config.startEventLoop(ctx)
 
 	if config.aiToolManager == nil {
-		config.aiToolManager = buildinaitools.NewDefaultToolManager(config.tools)
+		config.aiToolManager = buildinaitools.NewToolManager(config.tools)
 	}
 	c := &Coordinator{
 		config:    config,

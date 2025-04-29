@@ -70,8 +70,9 @@ type Config struct {
 	tools          []*aitool.Tool
 	eventHandler   func(e *Event)
 
+	enableToolSearch bool
 	// tool manager
-	aiToolManager buildinaitools.ToolManager
+	aiToolManager *buildinaitools.AiToolManager
 
 	// memory
 	persistentMemory []string
@@ -432,7 +433,7 @@ func WithAICallback(cb AICallbackType) Option {
 	}
 }
 
-func WithToolManager(manager buildinaitools.ToolManager) Option {
+func WithToolManager(manager *buildinaitools.AiToolManager) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -500,11 +501,8 @@ func WithOmniSearchTool() Option {
 
 func WithAiToolsSearchTool() Option {
 	return func(config *Config) error {
-		tools, err := searchtools.CreateAiToolsSearchTools(buildinaitools.GetAllTools)
-		if err != nil {
-			return utils.Errorf("create ai tools search tools: %v", err)
-		}
-		return WithTools(tools...)(config)
+		config.enableToolSearch = true
+		return nil
 	}
 }
 func WithDebugPrompt(i ...bool) Option {

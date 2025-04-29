@@ -30,7 +30,7 @@ func (t *aiTask) getToolRequired(response string) []*aitool.Tool {
 		if rawData, ok := data["tool"]; ok && fmt.Sprint(rawData) != "" {
 			toolName := fmt.Sprint(rawData)
 			count := 0
-			toolIns, err := t.config.aiToolManager.SearchToolByName(toolName)
+			toolIns, err := t.config.aiToolManager.GetToolByName(toolName)
 			if err != nil {
 				t.config.EmitError("error searching tool: %v", err)
 				continue
