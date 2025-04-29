@@ -41,9 +41,11 @@ func (g *GetawayClient) Chat(s string, function ...aispec.Function) (string, err
 		g.targetUrl,
 		g.config.Model,
 		s,
-		function,
-		g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler,
-		g.config.HTTPErrorHandler,
+		aispec.WithChatBase_Function(function),
+		aispec.WithChatBase_PoCOptions(g.BuildHTTPOptions),
+		aispec.WithChatBase_StreamHandler(g.config.StreamHandler),
+		aispec.WithChatBase_ReasonStreamHandler(g.config.ReasonStreamHandler),
+		aispec.WithChatBase_ErrHandler(g.config.HTTPErrorHandler),
 	)
 }
 

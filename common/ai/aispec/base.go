@@ -115,7 +115,7 @@ func StructuredStreamBase(
 	}
 	m := new(sync.Mutex)
 	go func() {
-		_, err := ChatBase(url, model, msg, nil, opt, func(reader io.Reader) {
+		_, err := ChatBase(url, model, msg, WithChatBase_PoCOptions(opt), WithChatBase_StreamHandler(func(reader io.Reader) {
 			structured := &streamToStructuredStream{
 				isReason: false,
 				id:       getId,
@@ -136,7 +136,7 @@ func StructuredStreamBase(
 
 			// read from newReader
 			io.Copy(structured, newReader)
-		}, func(reader io.Reader) {
+		}), WithChatBase_ReasonStreamHandler(func(reader io.Reader) {
 			structured := &streamToStructuredStream{
 				isReason: true,
 				id:       getId,
@@ -155,7 +155,7 @@ func StructuredStreamBase(
 			go func() { streamHandler(r) }()
 			// read from newReader
 			io.Copy(structured, newReader)
-		}, errHandler)
+		}), WithChatBase_ErrHandler(errHandler))
 		if err != nil {
 			log.Errorf("structured stream error: %v", err)
 		}
@@ -163,11 +163,78 @@ func StructuredStreamBase(
 	return schan, nil
 }
 
-func ChatBase(
-	url string, model string, msg string, fs []Function, opt func() ([]poc.PocConfigOption, error),
-	streamHandler func(io.Reader), reasonStreamHandler func(reader io.Reader),
-	errHandler func(error),
-) (string, error) {
+type ChatBaseContext struct {
+	FS                  []Function
+	PoCOptionGenerator  func() ([]poc.PocConfigOption, error)
+	EnableThinking      bool
+	ThinkingBudget      int64
+	StreamHandler       func(io.Reader)
+	ReasonStreamHandler func(reader io.Reader)
+	ErrHandler          func(err error)
+}
+
+type ChatBaseOption func(c *ChatBaseContext)
+
+func WithChatBase_ThinkingBudget(budget int64) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.ThinkingBudget = budget
+	}
+}
+
+func WithChatBase_EnableThinking(b bool) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.EnableThinking = b
+	}
+}
+
+func WithChatBase_Function(b []Function) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.FS = b
+	}
+}
+
+func WithChatBase_StreamHandler(b func(io.Reader)) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.StreamHandler = b
+	}
+}
+
+func WithChatBase_ReasonStreamHandler(b func(reader io.Reader)) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.ReasonStreamHandler = b
+	}
+}
+
+func WithChatBase_ErrHandler(b func(error)) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.ErrHandler = b
+	}
+}
+
+func WithChatBase_PoCOptions(b func() ([]poc.PocConfigOption, error)) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.PoCOptionGenerator = b
+	}
+}
+
+func NewChatBaseContext(opts ...ChatBaseOption) *ChatBaseContext {
+	ctx := &ChatBaseContext{
+		EnableThinking: true,
+	}
+	for _, i := range opts {
+		i(ctx)
+	}
+	return ctx
+}
+
+func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) (string, error) {
+	ctx := NewChatBaseContext(chatOpts...)
+	fs := ctx.FS
+	opt := ctx.PoCOptionGenerator
+	streamHandler := ctx.StreamHandler
+	reasonStreamHandler := ctx.ReasonStreamHandler
+	errHandler := ctx.ErrHandler
+
 	opts, err := opt()
 	if err != nil {
 		return "", utils.Errorf("build config failed: %v", err)
@@ -183,6 +250,7 @@ func ChatBase(
 	if err != nil {
 		return "", utils.Errorf("build msg[%v] to json failed: %s", string(raw), err)
 	}
+	fmt.Println(string(raw))
 	opts = append(opts, poc.WithReplaceHttpPacketBody(raw, false))
 	opts = append(opts, poc.WithConnectTimeout(5))
 	opts = append(opts, poc.WithRetryTimes(3))
@@ -356,7 +424,12 @@ func ChatBasedExtractData(
 		fields["raw_data"] = "相关数据"
 	}
 	msg = GenerateJSONPrompt(msg, fields)
-	result, err := ChatBase(url, model, msg, nil, opt, streamHandler, reasonHandler, httpErrorHandler)
+	result, err := ChatBase(
+		url, model, msg,
+		WithChatBase_PoCOptions(opt),
+		WithChatBase_StreamHandler(streamHandler),
+		WithChatBase_ReasonStreamHandler(reasonHandler),
+		WithChatBase_ErrHandler(httpErrorHandler))
 	if err != nil {
 		log.Errorf("chatbase error: %s", err)
 		return nil, err
