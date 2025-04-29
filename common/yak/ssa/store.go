@@ -13,6 +13,7 @@ func (b *FunctionBuilder) LoadFunctionBuilder(s *FunctionBuilder) {
 	// b.CurrentRange = s.CurrentRange
 	// b.parentScope = s.parentScope
 	b.parentBuilder = s.parentBuilder
+	b.MarkedThisClassBlueprint = s.MarkedThisClassBlueprint
 
 	b.Function.Type = s.Function.Type
 	// b.Function.FreeValues = s.Function.FreeValues
@@ -90,14 +91,14 @@ func (b *FunctionBuilder) StoreFunctionBuilder() *StoredFunctionBuilder {
 		// CurrentFile:  b.CurrentFile,
 		// parentScope:  b.parentScope,
 		// DefineFunc:                 b.DefineFunc,
-		// MarkedFuncName:             b.MarkedFuncName,
-		// MarkedFuncType:             b.MarkedFuncType,
-		// MarkedFunctions:            b.MarkedFunctions,
+		MarkedFuncName:  b.MarkedFuncName,
+		MarkedFuncType:  b.MarkedFuncType,
+		MarkedFunctions: b.MarkedFunctions,
 		// MarkedVariable:             b.MarkedVariable,
-		// MarkedThisObject:           b.MarkedThisObject,
-		// MarkedThisClassBlueprint:   b.MarkedThisClassBlueprint,
-		// MarkedMemberCallWantMethod: b.MarkedMemberCallWantMethod,
-		parentBuilder: b.parentBuilder,
+		MarkedThisObject:           b.MarkedThisObject,
+		MarkedThisClassBlueprint:   b.MarkedThisClassBlueprint,
+		MarkedMemberCallWantMethod: b.MarkedMemberCallWantMethod,
+		parentBuilder:              b.parentBuilder,
 	}
 	return &StoredFunctionBuilder{
 		Current: b,
