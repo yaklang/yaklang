@@ -43,7 +43,8 @@ func NewRequestPacketFromMethod(method string, targetURL string, originRequest [
 	if originReqIns != nil {
 		proto = originReqIns.Proto
 	}
-	raw = ReplaceHTTPPacketFirstLine(raw, fmt.Sprintf("%s %s %s", method, targetURLIns.RequestURI(), proto))
+	//如果能过url解析，那么将按照原URL发送，
+	raw = ReplaceHTTPPacketFirstLine(raw, fmt.Sprintf("%s %s %s", method, targetURLIns.Path, proto))
 	raw = ReplaceHTTPPacketHost(raw, targetURLIns.Host)
 
 	return raw
