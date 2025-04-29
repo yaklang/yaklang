@@ -456,28 +456,34 @@
     "version": "20250428.0001"
   },
   {
-    "rule_id": "20327001",
-    "rule_name": "查找 Java 哈希算法使用硬编码的PBE盐值",
-    "hash": "ecb904b3f59719087af979b1a4fe0b12c678c77478abfe5c793ef12ad9fba78a",
-    "version": "20250428.0001"
+    "rule_id": "10327005",
+    "rule_name": "检测Java javax.crypto.KEM.Encapsulator使用不安全的加密算法",
+    "hash": "255f6e7d22005e3367eb75e65ea91f8eddd306c304fe9fdef542fe2f8324e3a1",
+    "version": "20250429.0001"
   },
   {
-    "rule_id": "20327002",
-    "rule_name": "Check The Use Of Broken Or Risky Encryption Algorithm",
-    "hash": "b0415d56a0a0d0400f88e5730ff6ee39410896d3f84255f3ef3cfeb3badd0f18",
-    "version": "20250428.0001"
+    "rule_id": "20327001",
+    "rule_name": "查找 Java 哈希算法使用硬编码的PBE盐值",
+    "hash": "9fed852feec70819ca6cee43dcc61ff8f9380edd40a58e838e4533301f04d6f4",
+    "version": "20250429.0001"
+  },
+  {
+    "rule_id": "ab875f85-f43f-4e3e-ae21-944c887776fa",
+    "rule_name": "java-risky-system-hash-config.sf",
+    "hash": "60903096c3ba75f6b507a8a175c66afbc5f4c70d142886d0d888a3c5b5b400d8",
+    "version": "20250429.0001"
+  },
+  {
+    "rule_id": "10327006",
+    "rule_name": "检测Java java.security.AlgorithmParameters使用不安全的加密算法",
+    "hash": "ca623c3ff2c5c1dc66066dcbb1a4429990c4b9a02615f81a07ba758d365c9ed6",
+    "version": "20250429.0001"
   },
   {
     "rule_id": "20327003",
-    "rule_name": "Check The Use Of Broken Or Risky Hash Algorithm",
-    "hash": "13d221f97fc768f29c0853bc8e4f9127795f505518de3d382f7b414a7dab4641",
-    "version": "20250428.0001"
-  },
-  {
-    "rule_id": "79254eb0-b656-4951-a08d-f7c54842c337",
-    "rule_name": "java-risky-system-hash-config.sf",
-    "hash": "491f91f4b58238cba358a61dca50273e0a496eb5d3c4549221b747700bf63843",
-    "version": "20250428.0001"
+    "rule_name": "检测Java java.security使用不安全的哈希算法",
+    "hash": "9c3c919187b1332007b331ef07475d3ba374fe392b8acd50cb2067f12ebe77f8",
+    "version": "20250429.0001"
   },
   {
     "rule_id": "20352002",
@@ -560,14 +566,14 @@
   {
     "rule_id": "20611001",
     "rule_name": "Find 'SAXTransformerFactory' unsafe use (XXE)",
-    "hash": "8255f24a18bf7de0dd7bf8d4d4f4493ac5f70516badb6ec9dbe038435e3ff78d",
-    "version": "20250428.0001"
+    "hash": "38e3950ca1d1f24e69303f93c5650d4af8bcec9c3baa8aa2169511c02b27c4e9",
+    "version": "20250429.0001"
   },
   {
     "rule_id": "20611002",
     "rule_name": "SAXBuilder 未明确设置安全策略（.setFeature(...)）",
-    "hash": "a133f25e6d5a9df0b02434af184890612c492f9c1663ed9a3791561921ace92d",
-    "version": "20250428.0001"
+    "hash": "1a32139b7a997176d7f374f0f7e6d98320c826cddf69b388eda806c36ae17289",
+    "version": "20250429.0001"
   },
   {
     "rule_id": "20611003",
@@ -578,32 +584,32 @@
   {
     "rule_id": "20611004",
     "rule_name": "SAXReader 未明确设置安全策略（.setFeature(...) ...）",
-    "hash": "16321562b67c9e4c3fe3d85b1e973e21a19e1ddd9aef9a5f1548a183b1638fa0",
-    "version": "20250428.0001"
+    "hash": "a0cb8bde7b67d322379f5044fde44cf3a20e1c6a57017bd2b0eb0b606e80a90d",
+    "version": "20250429.0001"
   },
   {
     "rule_id": "20611005",
     "rule_name": "在上下文中查找 'javax.xml.transform.Transformer' 不安全使用",
-    "hash": "7987e70a4d191d263d0880a95121860d2b39941022f1ca3ebe61aa402cae05eb",
-    "version": "20250428.0001"
+    "hash": "8c17fd5c0f240e27413c893b343a1459b7fe86e6d4dac0afa511358287b52cdf",
+    "version": "20250429.0001"
   },
   {
     "rule_id": "20611006",
     "rule_name": "检测 STAX（Streaming API for XML） XMLInputFactory() 不安全使用",
-    "hash": "0f462981acf6757101e8fdbd2dc86af55806bfa987d45aac2d7d119839bbb8a3",
-    "version": "20250428.0001"
+    "hash": "1c0caa813e60ef8b3e5c19300a07eb0ae34f6d163f1e40debc2b4f432e870b0b",
+    "version": "20250429.0001"
   },
   {
     "rule_id": "20611007",
     "rule_name": "检查 XMLReaderFactory.createXMLReader() 不安全使用",
-    "hash": "af5400feb4cd88cbdd6fe37bec92b2f99fab27e46f0269eeaf914b431102e488",
-    "version": "20250428.0001"
+    "hash": "a871071959e95bab6978f8f745390f4b9198f3023f264582a42a7cee3c224480",
+    "version": "20250429.0001"
   },
   {
     "rule_id": "20611008",
     "rule_name": "XStream 未明确设置安全策略（.setMode(XStream.NO_REFERENCES)）",
-    "hash": "227f149dd9a17d4eb32e15b6e301e3c39c7ca1782075a01c0f1615f4d8efa582",
-    "version": "20250428.0001"
+    "hash": "9d58c669e28c067d35bc92b3c751a6a0e8895c9dcd921544212efdfdedde53ca",
+    "version": "20250429.0001"
   },
   {
     "rule_id": "20643001",
