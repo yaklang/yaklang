@@ -121,6 +121,14 @@ const person = { name: "Alice", age: 25,, city: "Paris" };
 	}
 }
 
+func TestArrayBinding(t *testing.T) {
+	code := `[a, b] = [1, 2]`
+	start := time.Now()
+	sf := ParseSourceFile("", "", code, core.ScriptTargetES5, scanner.JSDocParsingModeParseNone)
+	println(time.Now().Sub(start).String())
+	printAllChildren(&sf.Node, 0)
+}
+
 //func TestParseFileToDot(t *testing.T) {
 //	sf := ParseSourceFile("", "", packedJS, core.ScriptTargetES5, scanner.JSDocParsingModeParseNone)
 //
