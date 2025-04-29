@@ -250,7 +250,6 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 	if err != nil {
 		return "", utils.Errorf("build msg[%v] to json failed: %s", string(raw), err)
 	}
-	fmt.Println(string(raw))
 	opts = append(opts, poc.WithReplaceHttpPacketBody(raw, false))
 	opts = append(opts, poc.WithConnectTimeout(5))
 	opts = append(opts, poc.WithRetryTimes(3))

@@ -143,24 +143,24 @@ func TestOUTPUT_AiChat(t *testing.T) {
 		for _, c := range re.FindAllString(s, -1) {
 			stdOutputCh += c
 		}
+		// log.Infof("HandleStdoutBackgroundForTest stdout: %v", stdOutputCh)
 		if stdOutputCh == "你好我是人工智障助手" {
 			debugStreamTestResult = true
 			cancel()
 		}
 	})
+	_ = debugStreamTestResult
 	if err != nil {
 		t.Fatal(err)
 	}
 	engine := yak.NewYakitVirtualClientScriptEngine(yaklib.NewVirtualYakitClient(func(i *ypb.ExecResult) error {
 		return nil
 	}))
-	err = engine.Execute(fmt.Sprintf(`ai.Chat("你好",ai.type("chatglm"),ai.debugStream(),ai.domain("%s"))~`, addr))
+	err = engine.Execute(fmt.Sprintf(`result = ai.Chat("你好",ai.type("chatglm"),ai.debugStream(),ai.domain("%s"))~; dump(result); assert result == "你好我是人工智障助手"`, addr))
 	if err != nil {
 		t.Fatal(err)
 	}
 	wait()
-	assert.Equal(t, true, debugStreamTestResult)
-
 	subMsgN := 0
 	msg := ""
 	time.Sleep(time.Second)
