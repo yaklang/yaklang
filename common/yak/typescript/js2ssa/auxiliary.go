@@ -40,6 +40,7 @@ var bitwiseBinOpTbl = map[ast.Kind]ssa.BinaryOpcode{
 	ast.KindGreaterThanGreaterThanEqualsToken:            ssa.OpShr,
 	ast.KindGreaterThanGreaterThanGreaterThanEqualsToken: ssa.OpShr,
 }
+
 var comparisonBinOpTbl = map[ast.Kind]ssa.BinaryOpcode{
 	ast.KindLessThanToken:                ssa.OpLt,
 	ast.KindGreaterThanToken:             ssa.OpGt,
@@ -49,16 +50,6 @@ var comparisonBinOpTbl = map[ast.Kind]ssa.BinaryOpcode{
 	ast.KindEqualsEqualsEqualsToken:      ssa.OpEq,
 	ast.KindExclamationEqualsToken:       ssa.OpNotEq,
 	ast.KindExclamationEqualsEqualsToken: ssa.OpNotEq,
-}
-
-var logicalBinOpTbl = map[ast.Kind]ssa.BinaryOpcode{
-	// 普通逻辑操作
-	ast.KindAmpersandAmpersandToken: ssa.OpLogicAnd,
-	ast.KindBarBarToken:             ssa.OpLogicOr,
-
-	// 逻辑赋值操作
-	ast.KindAmpersandAmpersandEqualsToken: ssa.OpLogicAnd,
-	ast.KindBarBarEqualsToken:             ssa.OpLogicOr,
 }
 
 // VisitLeftValueExpression 只接收左值
@@ -71,8 +62,4 @@ func (b *builder) VisitLeftValueExpression(node *ast.Expression) *ssa.Variable {
 func (b *builder) VisitRightValueExpression(node *ast.Expression) ssa.Value {
 	_, rval := b.VisitExpression(node, false)
 	return rval
-}
-
-func (b *builder) IsNullishValue(value ssa.Value) bool {
-	return value == nil || value.IsUndefined() || value == ssa.NewNil()
 }

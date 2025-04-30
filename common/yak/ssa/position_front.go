@@ -153,7 +153,7 @@ func GetRange(editor *memedit.MemEditor, token CanStartStopToken) memedit.RangeI
 func GetRangeWithCommonTokenLoc(editor *memedit.MemEditor, loc CommonTokenLoc) memedit.RangeIf {
 	return editor.GetRangeByPosition(
 		editor.GetPositionByLine(loc.startLine+1, loc.startCol+1),
-		editor.GetPositionByLine(loc.endLine+1, loc.endCol),
+		editor.GetPositionByLine(loc.endLine+1, loc.endCol+1),
 	)
 }
 

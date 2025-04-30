@@ -1,13 +1,15 @@
 package js2ssa
 
 import (
+	"strconv"
+
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/ast"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/core"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/scanner"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"strconv"
 )
-import "github.com/yaklang/yaklang/common/yak/ssa"
 
 func (b *builder) GetRecoverRange(sourcefile *ast.SourceFile, node *core.TextRange, text string) func() {
 	startLine, startCol := scanner.GetLineAndCharacterOfPosition(sourcefile, node.Pos())
@@ -258,10 +260,96 @@ func (b *builder) VisitForStatement(node *ast.ForStatement) interface{} { return
 func (b *builder) VisitForInOrOfStatement(node *ast.ForInOrOfStatement) interface{} { return nil }
 
 // VisitFunctionDeclaration 访问函数声明
-func (b *builder) VisitFunctionDeclaration(node *ast.FunctionDeclaration) interface{} { return nil }
+func (b *builder) VisitFunctionDeclaration(node *ast.FunctionDeclaration) interface{} {
+	if node == nil {
+		return nil
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
+	defer recoverRange()
+
+	// 获取函数名
+	funcName := ""
+	if node.Name() != nil && node.Name().Kind == ast.KindIdentifier {
+		funcName = node.Name().AsIdentifier().Text
+	} else {
+		// 函数声明必须有名称，如果没有名称，生成一个唯一名称
+		funcName = "anonymous_func_" + uuid.NewString()
+	}
+
+	// 创建新的函数对象
+	newFunc := b.NewFunc(funcName)
+
+	// 切换到新函数的上下文
+	b.FunctionBuilder = b.PushFunction(newFunc)
+
+	// 处理函数参数
+	if node.Parameters != nil && len(node.Parameters.Nodes) > 0 {
+		for _, param := range node.Parameters.Nodes {
+			if param.Kind == ast.KindParameter {
+				paramNode := param.AsParameterDeclaration()
+				paramName := ""
+
+				if paramNode.Name() != nil && paramNode.Name().Kind == ast.KindIdentifier {
+					paramName = paramNode.Name().AsIdentifier().Text
+				}
+
+				if paramName != "" {
+					// 创建参数
+					p := b.NewParam(paramName)
+
+					// 处理默认值
+					if paramNode.Initializer != nil {
+						defaultValue := b.VisitRightValueExpression(paramNode.Initializer)
+						if defaultValue != nil {
+							p.SetDefault(defaultValue)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// 处理函数体
+	if node.Body != nil && node.Body.Kind == ast.KindBlock {
+		blockNode := node.Body.AsBlock()
+		if blockNode.Statements != nil {
+			b.VisitStatements(blockNode.Statements)
+		}
+	}
+
+	// 完成函数构建
+	b.Finish()
+
+	// 恢复原来的函数上下文
+	b.FunctionBuilder = b.PopFunction()
+
+	// 在当前作用域中创建函数变量
+	variable := b.CreateVariable(funcName)
+	b.AssignVariable(variable, newFunc)
+
+	return nil
+}
 
 // VisitReturnStatement 访问return语句
-func (b *builder) VisitReturnStatement(node *ast.ReturnStatement) interface{} { return nil }
+func (b *builder) VisitReturnStatement(node *ast.ReturnStatement) interface{} {
+	if node == nil {
+		return nil
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
+	defer recoverRange()
+
+	// 如果有返回表达式，处理它并返回
+	if node.Expression != nil {
+		returnValue := b.VisitRightValueExpression(node.Expression)
+		b.EmitReturn([]ssa.Value{returnValue})
+	} else {
+		// 如果没有返回表达式，返回undefined
+		b.EmitReturn(nil)
+	}
+	return nil
+}
 
 // VisitBreakStatement 访问break语句
 func (b *builder) VisitBreakStatement(node *ast.BreakStatement) interface{} { return nil }
@@ -539,25 +627,29 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 		if isLval {
 			return b.CreateVariable(identifierName), nil
 		}
+		// undefined 是一个 identifier
 		if identifierName == "undefined" {
 			return nil, b.EmitUndefined("")
 		}
-		if identifierName == "null" {
-			return nil, b.EmitConstInstNil()
-		}
 		return nil, b.ReadValue(identifierName)
 	case ast.KindPropertyAccessExpression:
-		b.VisitPropertyAccessExpression(node.AsPropertyAccessExpression())
-		if isLval {
+		obj, propName := b.VisitPropertyAccessExpression(node.AsPropertyAccessExpression())
+		if obj == nil || propName == "" {
 			return nil, nil
 		}
-		return nil, nil
+		if isLval {
+			return b.CreateMemberCallVariable(obj, b.EmitConstInst(propName)), nil
+		}
+		return nil, b.ReadMemberCallValueByName(obj, propName)
 	case ast.KindElementAccessExpression:
-		b.VisitElementAccessExpression(node.AsElementAccessExpression())
-		if isLval {
+		obj, arg := b.VisitElementAccessExpression(node.AsElementAccessExpression())
+		if obj == nil || arg == nil {
 			return nil, nil
 		}
-		return nil, nil
+		if isLval {
+			return b.CreateMemberCallVariable(obj, arg), nil
+		}
+		return nil, b.ReadMemberCallValue(obj, arg)
 
 	// 只会是RValue
 	case ast.KindStringLiteral:
@@ -592,7 +684,6 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 		return nil, b.VisitPostfixUnaryExpression(node.AsPostfixUnaryExpression())
 	case ast.KindCallExpression:
 		return nil, b.VisitCallExpression(node.AsCallExpression())
-
 	case ast.KindNewExpression:
 		return nil, b.VisitNewExpression(node.AsNewExpression())
 	case ast.KindParenthesizedExpression:
@@ -669,6 +760,39 @@ func (b *builder) VisitBinaryExpression(node *ast.BinaryExpression) ssa.Value {
 	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
+	handlerJumpExpression := func(
+		cond func(string) ssa.Value,
+		trueExpr, falseExpr func() ssa.Value,
+		valueName string,
+	) ssa.Value {
+		// 为了聚合产生Phi指令
+		id := valueName
+		variable := b.CreateVariable(id)
+		b.AssignVariable(variable, b.EmitValueOnlyDeclare(id))
+		// 只需要使用b.WriteValue设置value到此ID，并最后调用b.ReadValue可聚合产生Phi指令，完成语句预期行为
+		ifb := b.CreateIfBuilder()
+		ifb.AppendItem(
+			func() ssa.Value {
+				return cond(id)
+			},
+			func() {
+				v := trueExpr()
+				variable := b.CreateVariable(id)
+				b.AssignVariable(variable, v)
+			},
+		)
+		ifb.SetElse(func() {
+			v := falseExpr()
+			variable := b.CreateVariable(id)
+			b.AssignVariable(variable, v)
+		})
+		ifb.Build()
+		// generator phi instruction
+		v := b.ReadValue(id)
+		v.SetName(b.GetEditor().GetTextFromOffset(node.Loc.Pos(), node.Loc.End()))
+		return v
+	}
+
 	left := b.VisitRightValueExpression(node.Left)
 	right := b.VisitRightValueExpression(node.Right)
 
@@ -700,20 +824,50 @@ func (b *builder) VisitBinaryExpression(node *ast.BinaryExpression) ssa.Value {
 			return nil
 		}
 		return b.EmitBinOp(binOp, left, right)
-	// Logical AND && OR ||
-	case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken:
-		binOp, ok := logicalBinOpTbl[node.OperatorToken.Kind]
-		if !ok {
-			b.NewError(ssa.Error, TAG, UnexpectedLogicalOP())
-			return nil
-		}
-		return b.EmitBinOp(binOp, left, right)
+	// Logical AND &&
+	// a && b return a if a is falsy else return b
+	case ast.KindAmpersandAmpersandToken:
+		return handlerJumpExpression(
+			func(id string) ssa.Value {
+				return left
+			},
+			func() ssa.Value {
+				return right
+			},
+			func() ssa.Value {
+				return left
+			},
+			ssa.AndExpressionVariable,
+		)
+	// Logical OR ||
+	// a || b return a if a is truthy else return b
+	case ast.KindBarBarToken:
+		return handlerJumpExpression(
+			func(id string) ssa.Value {
+				return left
+			},
+			func() ssa.Value {
+				return left
+			},
+			func() ssa.Value {
+				return right
+			},
+			ssa.OrExpressionVariable,
+		)
 	// Nullish Coalescing ??
 	case ast.KindQuestionQuestionToken:
-		if b.IsNullishValue(left) {
-			return right
-		}
-		return left
+		return handlerJumpExpression(
+			func(id string) ssa.Value {
+				return b.EmitBinOp(ssa.OpLogicOr, b.EmitBinOp(ssa.OpEq, left, ssa.NewNil()), b.EmitBinOp(ssa.OpEq, left, ssa.NewUndefined("")))
+			},
+			func() ssa.Value {
+				return right
+			},
+			func() ssa.Value {
+				return left
+			},
+			ssa.AndExpressionVariable,
+		)
 	// Arithmetic Assignment += -= *= /= %= **=
 	case ast.KindPlusEqualsToken, ast.KindMinusEqualsToken, ast.KindAsteriskEqualsToken, ast.KindSlashEqualsToken, ast.KindPercentEqualsToken, ast.KindAsteriskAsteriskEqualsToken:
 		variable := b.VisitLeftValueExpression(node.Left)
@@ -738,24 +892,55 @@ func (b *builder) VisitBinaryExpression(node *ast.BinaryExpression) ssa.Value {
 		return newVal
 	// Logical Assignment &&= ||=
 	// ECMAScript 2021 introduce Logical Assignment
-	case ast.KindAmpersandAmpersandEqualsToken, ast.KindBarBarEqualsToken:
+	case ast.KindAmpersandAmpersandEqualsToken:
 		variable := b.VisitLeftValueExpression(node.Left)
-		binOp, ok := logicalBinOpTbl[node.OperatorToken.Kind]
-		if !ok {
-			b.NewError(ssa.Error, TAG, UnexpectedLogicalOP())
-			return nil
-		}
-		newVal := b.EmitBinOp(binOp, left, right)
+		newVal := handlerJumpExpression(
+			func(id string) ssa.Value {
+				return left
+			},
+			func() ssa.Value {
+				return right
+			},
+			func() ssa.Value {
+				return left
+			},
+			ssa.AndExpressionVariable,
+		)
+		b.AssignVariable(variable, newVal)
+		return newVal
+	case ast.KindBarBarEqualsToken:
+		variable := b.VisitLeftValueExpression(node.Left)
+		newVal := handlerJumpExpression(
+			func(id string) ssa.Value {
+				return left
+			},
+			func() ssa.Value {
+				return left
+			},
+			func() ssa.Value {
+				return right
+			},
+			ssa.OrExpressionVariable,
+		)
 		b.AssignVariable(variable, newVal)
 		return newVal
 	// Logical Assignment ??=
 	case ast.KindQuestionQuestionEqualsToken:
-		if b.IsNullishValue(left) {
-			variable := b.VisitLeftValueExpression(node.Left)
-			b.AssignVariable(variable, right)
-			return right
-		}
-		return left
+		variable := b.VisitLeftValueExpression(node.Left)
+		newVal := handlerJumpExpression(
+			func(id string) ssa.Value {
+				return b.EmitBinOp(ssa.OpLogicOr, b.EmitBinOp(ssa.OpEq, left, ssa.NewNil()), b.EmitBinOp(ssa.OpEq, left, ssa.NewUndefined("")))
+			},
+			func() ssa.Value {
+				return right
+			},
+			func() ssa.Value {
+				return left
+			},
+			ssa.AndExpressionVariable,
+		)
+		b.AssignVariable(variable, newVal)
+		return newVal
 	// Assignment =
 	case ast.KindEqualsToken:
 		switch node.Left.Kind {
@@ -1097,27 +1282,49 @@ func (b *builder) VisitPostfixUnaryExpression(node *ast.PostfixUnaryExpression) 
 }
 
 // VisitPropertyAccessExpression 访问属性访问表达式
-func (b *builder) VisitPropertyAccessExpression(node *ast.PropertyAccessExpression) ssa.Value {
+func (b *builder) VisitPropertyAccessExpression(node *ast.PropertyAccessExpression) (ssa.Value, string) {
 	if node == nil {
-		return nil
+		return nil, ""
 	}
 
-	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "this")
+	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
-	return nil
+	obj := b.VisitRightValueExpression(node.Expression)
+	if obj == nil {
+		b.NewErrorWithPos(ssa.Error, TAG, b.CurrentRange, UnexpectedRightValueForObjectPropertyAccess())
+		return nil, ""
+	}
+	// 获取属性名
+	propName := ""
+	if node.Name() != nil {
+		propName = b.VisitMemberName(node.Name())
+	}
+
+	return obj, propName
 }
 
 // VisitElementAccessExpression 访问元素访问表达式
-func (b *builder) VisitElementAccessExpression(node *ast.ElementAccessExpression) ssa.Value {
+func (b *builder) VisitElementAccessExpression(node *ast.ElementAccessExpression) (ssa.Value, ssa.Value) {
 	if node == nil {
-		return nil
+		return nil, nil
 	}
 
-	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "this")
+	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
-	return nil
+	obj := b.VisitRightValueExpression(node.Expression)
+	if obj == nil {
+		b.NewErrorWithPos(ssa.Error, TAG, b.CurrentRange, UnexpectedRightValueForElementAccess())
+		return nil, nil
+	}
+	// 获取下标参数
+	var argument ssa.Value
+	if node.ArgumentExpression != nil {
+		argument = b.VisitRightValueExpression(node.ArgumentExpression)
+	}
+
+	return obj, argument
 }
 
 // VisitNewExpression 访问new表达式
@@ -1151,10 +1358,71 @@ func (b *builder) VisitFunctionExpression(node *ast.FunctionExpression) ssa.Valu
 		return nil
 	}
 
-	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "this")
+	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
-	return nil
+	// 获取函数名（如果有）
+	funcName := ""
+	if node.Name() != nil {
+		funcName = node.Name().AsIdentifier().Text
+	} else {
+		funcName = "anonymous_func_" + uuid.NewString()
+	}
+
+	// 创建新的函数对象
+	newFunc := b.NewFunc(funcName)
+
+	{
+		// 切换到新函数的上下文
+		b.FunctionBuilder = b.PushFunction(newFunc)
+
+		// 处理函数参数
+		//if node.Parameters != nil && len(node.Parameters.Nodes) > 0 {
+		//	for _, param := range node.Parameters.Nodes {
+		//		if param.Kind == ast.KindParameter {
+		//			paramNode := param.AsParameter()
+		//			paramName := ""
+		//
+		//			if paramNode.Name != nil && paramNode.Name.Kind == ast.KindIdentifier {
+		//				paramName = paramNode.Name.AsIdentifier().Text
+		//			}
+		//
+		//			if paramName != "" {
+		//				// 创建参数
+		//				p := b.NewParam(paramName)
+		//
+		//				// 处理默认值
+		//				if paramNode.Initializer != nil {
+		//					defaultValue := b.VisitRightValueExpression(paramNode.Initializer)
+		//					p.SetDefault(defaultValue)
+		//				}
+		//			}
+		//		}
+		//	}
+		//}
+
+		// 处理函数体
+		if node.Body != nil && node.Body.Kind == ast.KindBlock {
+			blockNode := node.Body.AsBlock()
+			if blockNode.Statements != nil {
+				b.VisitStatements(blockNode.Statements)
+			}
+		}
+
+		// 完成函数构建
+		b.Finish()
+
+		// 恢复原来的函数上下文
+		b.FunctionBuilder = b.PopFunction()
+	}
+
+	// 如果函数有名称并且在当前作用域中可见，将其加入变量表
+	if funcName != "" {
+		variable := b.CreateVariable(funcName)
+		b.AssignVariable(variable, newFunc)
+	}
+
+	return newFunc
 }
 
 // VisitArrowFunction 访问箭头函数
@@ -1817,5 +2085,16 @@ func (b *builder) ProcessArrayBindingPattern(pattern *ast.BindingPattern, source
 				b.ProcessArrayBindingPattern(nestedPattern.AsBindingPattern(), elementValue)
 			}
 		}
+	}
+}
+
+func (b *builder) VisitMemberName(name *ast.MemberName) string {
+	switch {
+	case ast.IsIdentifier(name):
+		return name.AsIdentifier().Text
+	case ast.IsPrivateIdentifier(name):
+		return name.AsPrivateIdentifier().Text
+	default:
+		panic("unhandled member name type")
 	}
 }
