@@ -91,6 +91,23 @@ func HttpShow(i interface{}) []byte {
 	fmt.Println(string(rsp))
 	return rsp
 }
+func GetSimpleUri(u *url.URL) string {
+	result := u.Opaque
+	if result == "" {
+		result = u.Path
+		if result == "" {
+			result = "/"
+		}
+	} else {
+		if strings.HasPrefix(result, "//") {
+			result = u.Scheme + ":" + result
+		}
+	}
+	if u.ForceQuery || u.RawQuery != "" {
+		result += "?" + u.RawQuery
+	}
+	return result
+}
 
 func Url2UnEscapeString(u *url.URL) string {
 	buffer := bytes.NewBuffer(nil)
