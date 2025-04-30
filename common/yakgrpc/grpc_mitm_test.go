@@ -2069,3 +2069,30 @@ Content-length: 0
 	})
 
 }
+func TestGRPCMUSTPASS_MITM_CheckUriEncoding(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+	mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
+
+	urix := ""
+	targetHost, targetPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		inst, err2 := lowhttp.ParseBytesToHttpRequest(req)
+		require.NoError(t, err2)
+		urix = inst.RequestURI
+		return []byte("ok")
+	})
+
+	RunMITMTestServer(client, ctx, &ypb.MITMRequest{
+		Host:            mitmHost,
+		Port:            uint32(mitmPort),
+		MaxReadWaitTime: 10,
+	}, func(mitmClient ypb.Yak_MITMClient) {
+		testUri := "${token}"
+		_, _, err = poc.DoGET(fmt.Sprintf("http://%s:%d/%s", targetHost, targetPort, testUri), poc.WithProxy(fmt.Sprintf("http://%s:%v", mitmHost, mitmPort)))
+		require.NoError(t, err)
+		require.Equal(t, urix, "/"+testUri)
+		cancel()
+	})
+}
