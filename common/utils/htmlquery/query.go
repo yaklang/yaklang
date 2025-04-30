@@ -129,7 +129,7 @@ func Query(top *html.Node, expr string) (*html.Node, error) {
 func QuerySelector(top *html.Node, selector *xpath.Expr) *html.Node {
 	t := selector.Select(CreateXPathNavigator(top))
 	if t.MoveNext() {
-		return getCurrentNode(t.Current().(*NodeNavigator))
+		return GetCurrentNode(t.Current().(*NodeNavigator))
 	}
 	return nil
 }
@@ -140,7 +140,7 @@ func QuerySelectorAll(top *html.Node, selector *xpath.Expr) []*html.Node {
 	t := selector.Select(CreateXPathNavigator(top))
 	for t.MoveNext() {
 		nav := t.Current().(*NodeNavigator)
-		n := getCurrentNode(nav)
+		n := GetCurrentNode(nav)
 		elems = append(elems, n)
 	}
 	return elems
@@ -172,7 +172,7 @@ func LoadDoc(path string) (*html.Node, error) {
 	return html.Parse(bufio.NewReader(f))
 }
 
-func getCurrentNode(n *NodeNavigator) *html.Node {
+func GetCurrentNode(n *NodeNavigator) *html.Node {
 	if n.NodeType() == xpath.AttributeNode {
 		childNode := &html.Node{
 			Type: html.TextNode,
@@ -282,7 +282,7 @@ type NodeNavigator struct {
 }
 
 func (h *NodeNavigator) Current() *html.Node {
-	return getCurrentNode(h)
+	return GetCurrentNode(h)
 }
 
 func (h *NodeNavigator) NodeType() xpath.NodeType {

@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/antchfx/xmlquery"
 	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/coreplugin"
@@ -24,6 +25,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/twofa"
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
+	"github.com/yaklang/yaklang/common/utils/xmlfmt"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"github.com/go-git/go-git/v5"
@@ -691,6 +693,7 @@ var UtilsCommands = []*cli.Command{
 			return nil
 		},
 	},
+	XPathCommand,
 }
 
 var DistributionCommands = []*cli.Command{
@@ -798,6 +801,95 @@ var DistributionCommands = []*cli.Command{
 
 			return nil
 		},
+	},
+}
+
+var XPathCommand = &cli.Command{
+	Name:    "xpath",
+	Usage:   "xpath query",
+	Aliases: []string{},
+	Flags:   []cli.Flag{},
+	Action: func(c *cli.Context) error {
+		// if no --argument, just use os.Arg
+		if len(c.Args()) == 0 {
+			return utils.Errorf("empty xpath")
+		}
+
+		var Query string
+		var Targets []string
+
+		if len(c.Args()) == 1 {
+			Query = c.Args()[0]
+			Targets = []string{"."} // current path
+		}
+
+		if len(c.Args()) > 1 {
+			Query = c.Args()[0]
+			Targets = c.Args()[1:]
+		}
+
+		show := func(node ...*xmlquery.Node) {
+			for index, i := range node {
+				fmt.Printf("\n---------------------- [%d] ----------------------\n", index)
+				if i == nil {
+					continue
+				}
+				xml := i.OutputXML(true)
+				if formatted := xmlfmt.FormatXML(xml, "", "  ", true); formatted != "" {
+					fmt.Printf("%v", formatted)
+				} else {
+					fmt.Printf("%v", xml)
+				}
+				fmt.Printf("\n")
+			}
+		}
+
+		query := func(filename string) error {
+			// file
+			log.Infof("query from file: %s", filename)
+			fp, err := os.Open(filename)
+			if err != nil {
+				return err
+			}
+			defer fp.Close()
+			doc, err := xmlquery.Parse(fp)
+			if err != nil {
+				return err
+			}
+			nodes := xmlquery.Find(doc, Query)
+			show(nodes...)
+			return nil
+		}
+
+		for _, target := range Targets {
+			if utils.IsFile(target) {
+				err := query(target)
+				if err != nil {
+					log.Errorf("failed to query dir: %s, err: %v", target, err)
+					continue
+				}
+			}
+
+			if utils.IsDir(target) {
+				// is dir load each .xml file
+				err := filesys.Recursive(
+					target,
+					filesys.WithFileSystem(filesys.NewLocalFs()),
+					filesys.WithFileStat(func(name string, fi fs.FileInfo) error {
+						if !strings.HasSuffix(name, ".xml") {
+							return nil
+						}
+						return query(name)
+					}),
+				)
+				if err != nil {
+					log.Errorf("failed to query dir: %s, err: %v", target, err)
+					continue
+				}
+			}
+
+		}
+		return nil
 	},
 }
 
