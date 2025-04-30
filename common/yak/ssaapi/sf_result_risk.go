@@ -105,10 +105,11 @@ func buildSSARisk(
 		Variable: variable,
 		Index:    int64(index),
 
-		FunctionName: utils.EscapeInvalidUTF8Byte([]byte(value.GetFunction().GetName())),
-		Line:         riskCodeRange.StartLine,
+		Line: riskCodeRange.StartLine,
 	}
-
+	if fun := value.GetFunction(); fun != nil {
+		newSSARisk.FunctionName = utils.EscapeInvalidUTF8Byte([]byte(fun.GetName()))
+	}
 	// modify info by alertMsg
 	alertInfo, _ := result.GetAlertInfo(variable)
 	if alertInfo.OnlyMsg {
