@@ -53,4 +53,15 @@ ${*.properties}.regexp(/(?i).*access[_-]?[token|key].*\s*=\s*((?!\{\{)(?!(?i)^(t
 		)
 	})
 
+	t.Run("check normal file filter", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
+${.+\.(properties|prop|config|cfg|ini)$}.regexp()
+		`, map[string][]string{
+			"target": {
+				`spring.datasource.password=woshishujukumima`,
+			},
+		}, false, ssaapi.WithLanguage(consts.JAVA))
+
+	})
+
 }

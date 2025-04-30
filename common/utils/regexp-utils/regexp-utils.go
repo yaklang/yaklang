@@ -199,6 +199,16 @@ func (m *YakRegexpUtils) FindAllString(s string) ([]string, error) {
 	}
 }
 
+func (m *YakRegexpUtils) FindAllIndex(s string) ([][]int, error) {
+	if reg := m.getPriorityRegexp(); reg.CanUse() {
+		return reg.FindAllIndex(s)
+	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
+		return reg.FindAllIndex(s)
+	} else {
+		return nil, utils.Error("yak regexp find fail: no usable regexp")
+	}
+}
+
 func (m *YakRegexpUtils) ReplaceAll(src, repl []byte) ([]byte, error) {
 	if reg := m.getPriorityRegexp(); reg.CanUse() {
 		return reg.ReplaceAll(src, repl)
