@@ -4,12 +4,9 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
-	"io"
-	"sync"
-	"text/template"
-	"time"
-
 	"github.com/yaklang/yaklang/common/utils"
+	"io"
+	"text/template"
 )
 
 type planRequest struct {
@@ -80,69 +77,83 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 		return nil, fmt.Errorf("生成规划 prompt 失败: %v", err)
 	}
 
-	// 调用 AI 回调函数
-	saverMutex := new(sync.Mutex)
-	var seqId int64
-	var saver CheckpointCommitHandler
-
-	planCreator := func(overrideId int64) (*aiTask, error) {
-		responseReader, err := pr.callAI(NewAIRequest(
-			prompt,
-			WithAIRequest_OnAcquireSeq(func(i int64) {
-				saverMutex.Lock()
-				defer saverMutex.Unlock()
-				seqId = i
-			}),
-			WithAIRequest_SaveCheckpointCallback(func(f CheckpointCommitHandler) {
-				saverMutex.Lock()
-				defer saverMutex.Unlock()
-				saver = f
-			}), WithAIRequest_SeqId(seqId)),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("call ai err: %v", err)
-		}
-
-		// 读取响应内容
-		responseBytes, err := io.ReadAll(responseReader.GetOutputStreamReader("plan", false, pr.config))
-		if len(responseBytes) <= 0 {
-			return nil, utils.Error("ai resposne is empty")
-		}
-		response := string(responseBytes)
-
-		// 从响应中提取任务
-		task, err := ExtractTaskFromRawResponse(pr.config, response)
-		if err != nil {
-			return nil, fmt.Errorf("从 AI 响应中提取任务失败: %v", err)
-		}
-
-		saverMutex.Lock()
-		defer saverMutex.Unlock()
-		if !utils.IsNil(saver) && saver != nil {
-			pr.config.EmitInfo("start to save checkpoint into db: %v", seqId)
-			cp, err := saver()
-			if err != nil {
-				pr.config.EmitError("cannot save checkpoint")
-			} else {
-				pr.config.EmitInfo("checkpoint cached in database: %v:%v", utils.ShrinkString(cp.CoordinatorUuid, 12), cp.Seq)
-			}
-		}
-		return task, nil
-	}
-
 	var task *aiTask = nil
-	for utils.IsNil(task) {
-		task, err = planCreator(seqId)
-		if err != nil {
-			pr.config.EmitError("create plan err: %v", err)
-			select {
-			case <-pr.config.ctx.Done():
-			case <-time.After(200 * time.Millisecond):
-				pr.config.EmitError("retry to plan with original id: %v", seqId)
+	err = pr.config.callAiTransaction(
+		prompt, pr.callAI,
+		func(rsp *AIResponse) error {
+			// 读取响应内容
+			responseBytes, err := io.ReadAll(rsp.GetOutputStreamReader("plan", false, pr.config))
+			if len(responseBytes) <= 0 {
+				return utils.Error("ai resposne is empty")
 			}
+			response := string(responseBytes)
+
+			// 从响应中提取任务
+			task, err = ExtractTaskFromRawResponse(pr.config, response)
+			if err != nil {
+				return fmt.Errorf("从 AI 响应中提取任务失败: %v", err)
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		pr.config.EmitError(err.Error())
+		if task == nil || utils.IsNil(task) {
+			return nil, err
 		}
 	}
 	return pr.config.newPlanResponse(task), nil
+
+	//// 调用 AI 回调函数
+	//saverMutex := new(sync.Mutex)
+	//var seqId int64
+	//var saver CheckpointCommitHandler
+	//
+	//planCreator := func(overrideId int64) (*aiTask, error) {
+	//	responseReader, err := pr.callAI(NewAIRequest(
+	//		prompt,
+	//		WithAIRequest_OnAcquireSeq(func(i int64) {
+	//			saverMutex.Lock()
+	//			defer saverMutex.Unlock()
+	//			seqId = i
+	//		}),
+	//		WithAIRequest_SaveCheckpointCallback(func(f CheckpointCommitHandler) {
+	//			saverMutex.Lock()
+	//			defer saverMutex.Unlock()
+	//			saver = f
+	//		}), WithAIRequest_SeqId(seqId)),
+	//	)
+	//	if err != nil {
+	//		return nil, fmt.Errorf("call ai err: %v", err)
+	//	}
+	//
+	//	saverMutex.Lock()
+	//	defer saverMutex.Unlock()
+	//	if !utils.IsNil(saver) && saver != nil {
+	//		pr.config.EmitInfo("start to save checkpoint into db: %v", seqId)
+	//		cp, err := saver()
+	//		if err != nil {
+	//			pr.config.EmitError("cannot save checkpoint")
+	//		} else {
+	//			pr.config.EmitInfo("checkpoint cached in database: %v:%v", utils.ShrinkString(cp.CoordinatorUuid, 12), cp.Seq)
+	//		}
+	//	}
+	//	return task, nil
+	//}
+	//
+	//var task *aiTask = nil
+	//for utils.IsNil(task) {
+	//	task, err = planCreator(seqId)
+	//	if err != nil {
+	//		pr.config.EmitError("create plan err: %v", err)
+	//		select {
+	//		case <-pr.config.ctx.Done():
+	//		case <-time.After(200 * time.Millisecond):
+	//			pr.config.EmitError("retry to plan with original id: %v", seqId)
+	//		}
+	//	}
+	//}
+	//return pr.config.newPlanResponse(task), nil
 }
 
 func (c *Coordinator) createPlanRequest(rawUserInput string) (*planRequest, error) {
