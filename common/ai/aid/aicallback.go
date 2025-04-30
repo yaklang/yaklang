@@ -19,7 +19,9 @@ import (
 type AIRequest struct {
 	prompt                 string
 	startTime              time.Time
+	seqId                  int64
 	saveCheckpointCallback func(CheckpointCommitHandler)
+	onAcquireSeq           func(int64)
 }
 
 type CheckpointCommitHandler func() (*schema.AiCheckpoint, error)
@@ -31,6 +33,18 @@ func (r *AIRequest) GetPrompt() string {
 func WithAIRequest_SaveCheckpointCallback(callback func(CheckpointCommitHandler)) AIRequestOption {
 	return func(req *AIRequest) {
 		req.saveCheckpointCallback = callback
+	}
+}
+
+func WithAIRequest_OnAcquireSeq(callback func(int64)) AIRequestOption {
+	return func(req *AIRequest) {
+		req.onAcquireSeq = callback
+	}
+}
+
+func WithAIRequest_SeqId(i int64) AIRequestOption {
+	return func(req *AIRequest) {
+		req.seqId = i
 	}
 }
 
