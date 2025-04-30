@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
+	"sync"
 	"text/template"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -79,7 +80,13 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 	}
 
 	// 调用 AI 回调函数
-	responseReader, err := pr.callAI(NewAIRequest(prompt))
+	saverMutex := new(sync.Mutex)
+	var saver CheckpointCommitHandler
+	responseReader, err := pr.callAI(NewAIRequest(prompt, WithAIRequest_SaveCheckpointCallback(func(f CheckpointCommitHandler) {
+		saverMutex.Lock()
+		defer saverMutex.Unlock()
+		saver = f
+	})))
 	if err != nil {
 		return nil, fmt.Errorf("调用 AI 服务失败: %v", err)
 	}
@@ -95,6 +102,16 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 	task, err := ExtractTaskFromRawResponse(pr.config, response)
 	if err != nil {
 		return nil, fmt.Errorf("从 AI 响应中提取任务失败: %v", err)
+	}
+	saverMutex.Lock()
+	defer saverMutex.Unlock()
+	if !utils.IsNil(saver) && saver != nil {
+		cp, err := saver()
+		if err != nil {
+			pr.config.EmitError("cannot save checkpoint")
+		} else {
+			pr.config.EmitError("checkpoint cached in database: %v:%v", utils.ShrinkString(cp.CoordinatorUuid, 12), cp.Seq)
+		}
 	}
 	return pr.config.newPlanResponse(task), nil
 }
