@@ -3,6 +3,7 @@ package aid
 import (
 	"bytes"
 	"context"
+	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"os"
 	"strings"
@@ -16,12 +17,21 @@ import (
 )
 
 type AIRequest struct {
-	prompt    string
-	startTime time.Time
+	prompt                 string
+	startTime              time.Time
+	saveCheckpointCallback func(CheckpointCommitHandler)
 }
+
+type CheckpointCommitHandler func() (*schema.AiCheckpoint, error)
 
 func (r *AIRequest) GetPrompt() string {
 	return r.prompt
+}
+
+func WithAIRequest_SaveCheckpointCallback(callback func(CheckpointCommitHandler)) AIRequestOption {
+	return func(req *AIRequest) {
+		req.saveCheckpointCallback = callback
+	}
 }
 
 type AIResponse struct {
