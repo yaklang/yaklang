@@ -22,11 +22,15 @@ func UnexpectedComparisonOP() string {
 	return "unexpected binary comparison operator"
 }
 
-func UnexpectedLogicalOP() string {
-	return "unexpected binary logical operator"
+// semantic error
+
+func UnexpectedRightValueForObjectPropertyAccess() string {
+	return "unexpected right value for object property access"
 }
 
-// semantic error
+func UnexpectedRightValueForElementAccess() string {
+	return "unexpected right value for element access"
+}
 
 func UnexpectedVariableDeclarationModifierError(name string) string {
 	return fmt.Sprintf("unexpected modifier when declare variable: %s", name)
