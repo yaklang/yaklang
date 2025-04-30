@@ -3,6 +3,7 @@ package aid
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"strings"
 	"sync"
@@ -75,10 +76,23 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 				reasonReader, outputReader := tee.GetUnboundStreamReaderEx(nil, nil, nil)
 				reason, _ := io.ReadAll(reasonReader)
 				output, _ := io.ReadAll(outputReader)
-				c.submitAIResponseCheckpoint(cp, &AIResponseSimple{
-					Reason: string(reason),
-					Output: string(output),
-				})
+				if request.saveCheckpointCallback == nil {
+					err := c.submitAIResponseCheckpoint(cp, &AIResponseSimple{
+						Reason: string(reason),
+						Output: string(output),
+					})
+					if err != nil {
+						config.EmitError("ai request save response checkpoint failed err: %v", err)
+					}
+				} else {
+					request.saveCheckpointCallback(func() (*schema.AiCheckpoint, error) {
+						return cp, c.submitAIResponseCheckpoint(cp, &AIResponseSimple{
+							Reason: string(reason),
+							Output: string(output),
+						})
+					})
+				}
+
 			}
 
 			teeMux.Lock()
