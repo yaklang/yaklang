@@ -43,6 +43,9 @@ const (
 )
 
 type Config struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+
 	startInputEventOnce sync.Once
 
 	idSequence  int64
@@ -225,7 +228,15 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 	m := GetDefaultMemory()
 	var idGenerator = new(int64)
 	log.Infof("coordinator with %v offset: %v", id, offsetSeq)
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+
 	c := &Config{
+		ctx: ctx, cancel: cancel,
 		idSequence: atomic.AddInt64(idGenerator, offsetSeq),
 		idGenerator: func() int64 {
 			return atomic.AddInt64(idGenerator, 1)
@@ -562,6 +573,13 @@ func WithDisableToolUse(i ...bool) Option {
 		} else {
 			config.memory.DisableTools = i[0]
 		}
+		return nil
+	}
+}
+
+func WithAIAutoRetry(t int) Option {
+	return func(config *Config) error {
+		config.aiAutoRetry = int64(t)
 		return nil
 	}
 }

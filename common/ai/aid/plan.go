@@ -7,6 +7,7 @@ import (
 	"io"
 	"sync"
 	"text/template"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -81,36 +82,64 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 
 	// 调用 AI 回调函数
 	saverMutex := new(sync.Mutex)
+	var seqId int64
 	var saver CheckpointCommitHandler
-	responseReader, err := pr.callAI(NewAIRequest(prompt, WithAIRequest_SaveCheckpointCallback(func(f CheckpointCommitHandler) {
+
+	planCreator := func(overrideId int64) (*aiTask, error) {
+		responseReader, err := pr.callAI(NewAIRequest(
+			prompt,
+			WithAIRequest_OnAcquireSeq(func(i int64) {
+				saverMutex.Lock()
+				defer saverMutex.Unlock()
+				seqId = i
+			}),
+			WithAIRequest_SaveCheckpointCallback(func(f CheckpointCommitHandler) {
+				saverMutex.Lock()
+				defer saverMutex.Unlock()
+				saver = f
+			}), WithAIRequest_SeqId(seqId)),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("call ai err: %v", err)
+		}
+
+		// 读取响应内容
+		responseBytes, err := io.ReadAll(responseReader.GetOutputStreamReader("plan", false, pr.config))
+		if len(responseBytes) <= 0 {
+			return nil, utils.Error("ai resposne is empty")
+		}
+		response := string(responseBytes)
+
+		// 从响应中提取任务
+		task, err := ExtractTaskFromRawResponse(pr.config, response)
+		if err != nil {
+			return nil, fmt.Errorf("从 AI 响应中提取任务失败: %v", err)
+		}
+
 		saverMutex.Lock()
 		defer saverMutex.Unlock()
-		saver = f
-	})))
-	if err != nil {
-		return nil, fmt.Errorf("调用 AI 服务失败: %v", err)
+		if !utils.IsNil(saver) && saver != nil {
+			pr.config.EmitInfo("start to save checkpoint into db: %v", seqId)
+			cp, err := saver()
+			if err != nil {
+				pr.config.EmitError("cannot save checkpoint")
+			} else {
+				pr.config.EmitInfo("checkpoint cached in database: %v:%v", utils.ShrinkString(cp.CoordinatorUuid, 12), cp.Seq)
+			}
+		}
+		return task, nil
 	}
 
-	// 读取响应内容
-	responseBytes, err := io.ReadAll(responseReader.GetOutputStreamReader("plan", false, pr.config))
-	if err != nil {
-		return nil, fmt.Errorf("读取 AI 响应失败: %v", err)
-	}
-	response := string(responseBytes)
-
-	// 从响应中提取任务
-	task, err := ExtractTaskFromRawResponse(pr.config, response)
-	if err != nil {
-		return nil, fmt.Errorf("从 AI 响应中提取任务失败: %v", err)
-	}
-	saverMutex.Lock()
-	defer saverMutex.Unlock()
-	if !utils.IsNil(saver) && saver != nil {
-		cp, err := saver()
+	var task *aiTask = nil
+	for utils.IsNil(task) {
+		task, err = planCreator(seqId)
 		if err != nil {
-			pr.config.EmitError("cannot save checkpoint")
-		} else {
-			pr.config.EmitError("checkpoint cached in database: %v:%v", utils.ShrinkString(cp.CoordinatorUuid, 12), cp.Seq)
+			pr.config.EmitError("create plan err: %v", err)
+			select {
+			case <-pr.config.ctx.Done():
+			case <-time.After(200 * time.Millisecond):
+				pr.config.EmitError("retry to plan with original id: %v", seqId)
+			}
 		}
 	}
 	return pr.config.newPlanResponse(task), nil

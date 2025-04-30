@@ -21,11 +21,22 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 		}
 		defer func() {
 			// set rsp start time
-			rsp.respStartTime = time.Now()
-			rsp.reqStartTime = request.startTime
+			if rsp != nil && !utils.IsNil(rsp) {
+				rsp.respStartTime = time.Now()
+				rsp.reqStartTime = request.startTime
+			}
 		}()
 
-		seq := config.AcquireId()
+		var seq = request.seqId
+		if seq <= 0 {
+			seq = config.AcquireId()
+			if request.onAcquireSeq != nil {
+				request.onAcquireSeq(seq)
+			}
+			config.EmitInfo("prepare to call ai, create new seq is %v", seq)
+		} else {
+			config.EmitInfo("prepare to retry call ai, with an existed seq: %v", seq)
+		}
 		log.Infof("start to check uuid:%v seq:%v", c.id, seq)
 		if ret, ok := aiddb.GetAIInteractiveCheckpoint(c.GetDB(), c.id, seq); ok && ret.Finished {
 			// checkpoint is finished, return the result
