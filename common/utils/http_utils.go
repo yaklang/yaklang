@@ -1,9 +1,11 @@
 package utils
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"reflect"
 	"strings"
 
@@ -88,4 +90,53 @@ func HttpShow(i interface{}) []byte {
 	}
 	fmt.Println(string(rsp))
 	return rsp
+}
+
+func Url2UnEscapeString(u *url.URL) string {
+	buffer := bytes.NewBuffer(nil)
+	if u.Scheme != "" {
+		buffer.WriteString(u.Scheme)
+		buffer.WriteByte(':')
+	}
+	if u.Scheme != "" || u.Host != "" || u.User != nil {
+		if u.OmitHost && u.Host == "" && u.User == nil {
+			// omit empty host
+		} else {
+			if u.Host != "" || u.Path != "" || u.User != nil {
+				buffer.WriteString("//")
+			}
+			if ui := u.User; ui != nil {
+				buffer.WriteString(ui.String())
+				buffer.WriteByte('@')
+			}
+			if h := u.Host; h != "" {
+				buffer.WriteString(h)
+			}
+		}
+	}
+	path := u.Path
+	if path != "" && path[0] != '/' && u.Host != "" {
+		buffer.WriteByte('/')
+	}
+	if buffer.Len() == 0 {
+		// RFC 3986 §4.2
+		// A path segment that contains a colon character (e.g., "this:that")
+		// cannot be used as the first segment of a relative-path reference, as
+		// it would be mistaken for a scheme name. Such a segment must be
+		// preceded by a dot-segment (e.g., "./this:that") to make a relative-
+		// path reference.
+		if segment, _, _ := strings.Cut(path, "/"); strings.Contains(segment, ":") {
+			buffer.WriteString("./")
+		}
+	}
+	buffer.WriteString(path)
+	if u.ForceQuery || u.RawQuery != "" {
+		buffer.WriteByte('?')
+		buffer.WriteString(u.RawQuery)
+	}
+	if u.Fragment != "" {
+		buffer.WriteByte('#')
+		buffer.WriteString(u.Fragment)
+	}
+	return buffer.String()
 }
