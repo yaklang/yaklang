@@ -114,23 +114,31 @@ func (p *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp
 
 	p.config.EmitInfo("re-plan review prompt: %s", planPrompt.String())
 	// 调用 AI 生成新的任务计划
-	request := NewAIRequest(planPrompt.String())
-	response, err := p.callAI(request)
-	if err != nil {
-		return nil, utils.Errorf("error calling AI: %v", err)
-	}
+	prompt := planPrompt.String()
 
-	// 读取 AI 的响应
-	responseReader := response.GetOutputStreamReader("dynamic-plan", false, p.config)
-	taskResponse, err := io.ReadAll(responseReader)
-	if err != nil {
-		return nil, utils.Errorf("error reading AI response: %v", err)
-	}
+	var task *aiTask
+	err = p.config.callAiTransaction(prompt, p.callAI, func(response *AIResponse) error {
+		// 读取 AI 的响应
+		responseReader := response.GetOutputStreamReader("dynamic-plan", false, p.config)
+		taskResponse, err := io.ReadAll(responseReader)
+		if err != nil {
+			return utils.Errorf("error reading AI response: %v", err)
+		}
 
-	task, err := ExtractTaskFromRawResponse(p.config, string(taskResponse))
+		task, err = ExtractTaskFromRawResponse(p.config, string(taskResponse))
+		if err != nil {
+			return utils.Errorf("error extracting task from raw response: %v", err)
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, utils.Errorf("error extracting task from raw response: %v", err)
+		return nil, utils.Error(err.Error())
 	}
+	//request := NewAIRequest(planPrompt.String())
+	//response, err := p.callAI(request)
+	//if err != nil {
+	//	return nil, utils.Errorf("error calling AI: %v", err)
+	//}
 	return p.config.newPlanResponse(task), nil
 }
 
