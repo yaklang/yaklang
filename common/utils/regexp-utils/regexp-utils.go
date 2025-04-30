@@ -2,9 +2,10 @@ package regexp_utils
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/dlclark/regexp2"
 	"github.com/yaklang/yaklang/common/utils"
-	"time"
 )
 
 type regexpMode string
@@ -68,6 +69,16 @@ func NewYakRegexpUtils(raw string, options ...YakRegexpUtilsOption) *YakRegexpUt
 	reg.reg2 = NewRegexp2Wrapper(raw, reg.regexpOption)
 
 	return reg
+}
+
+func (m *YakRegexpUtils) CanUse() bool {
+	if reg := m.getPriorityRegexp(); reg.CanUse() {
+		return true
+	}
+	if reg := m.getSecondaryRegexp(); reg.CanUse() {
+		return true
+	}
+	return false
 }
 
 func (m *YakRegexpUtils) Hash() string {
@@ -173,6 +184,16 @@ func (m *YakRegexpUtils) FindAllString(s string) ([]string, error) {
 		return reg.FindAllString(s)
 	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
 		return reg.FindAllString(s)
+	} else {
+		return nil, utils.Error("yak regexp find fail: no usable regexp")
+	}
+}
+
+func (m *YakRegexpUtils) FindAllIndex(s string) ([][]int, error) {
+	if reg := m.getPriorityRegexp(); reg.CanUse() {
+		return reg.FindAllIndex(s)
+	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
+		return reg.FindAllIndex(s)
 	} else {
 		return nil, utils.Error("yak regexp find fail: no usable regexp")
 	}

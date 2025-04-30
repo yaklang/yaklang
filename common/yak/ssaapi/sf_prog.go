@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 
 	"github.com/antchfx/xpath"
 	"github.com/gobwas/glob"
@@ -228,103 +229,193 @@ func (p *Program) GetCalled() (sfvm.ValueOperator, error) {
 	return nil, utils.Error("ssa.Program is not supported called")
 }
 
-func (p *Program) FileFilter(path string, match string, rule map[string]string, rule2 []string) (sfvm.ValueOperator, error) {
-	if p.comeFromDatabase {
-		log.Infof("file filter support with database")
+type Index struct {
+	Start int
+	End   int
+}
+type FileFilter struct {
+	matchFile    func(string) bool
+	matchContent func(string) []Index
+}
+
+func NewFileFilter(file, matchType string, match []string) *FileFilter {
+	var matchFile []func(string) bool
+	if matchFile == nil {
+		matchFile = []func(string) bool{
+			func(s string) bool {
+				return s == file
+			},
+		}
 	}
-	var res []sfvm.ValueOperator
-	addRes := func(str, content string) {
-		// get range of match string
-		start := strings.Index(content, match)
-		editor := memedit.NewMemEditor(content)
-		editor.SetUrl(path)
-		rangeIf := editor.GetRangeOffset(start, start+len(match))
-		val := p.NewConstValue(str, rangeIf)
-		res = append(res, val)
+	if reg, err := regexp.Compile(file); err == nil {
+		matchFile = append(matchFile, func(s string) bool {
+			return reg.Match([]byte(s))
+		})
 	}
-	matchFile := false
-	handler := func(data string) {
-		matchFile = true
-		for _, rule := range rule2 {
-			switch match {
-			case "regexp":
-				reg, err := regexp.Compile(rule)
+	if glob, err := glob.Compile(file); err == nil {
+		matchFile = append(matchFile, func(s string) bool {
+			return glob.Match(s)
+		})
+	}
+	if matchFile == nil {
+		matchFile = append(matchFile, func(s string) bool {
+			return s == file
+		})
+	}
+
+	var matchContent []func(data string) []Index
+	for _, rule := range match {
+		switch matchType {
+		case "regexp":
+			reg := regexp_utils.NewYakRegexpUtils(rule)
+			// reg, err := regexp2.Compile(rule, regexp2.None)
+			// if err != nil {
+			// 	log.Errorf("regexp compile error: %s", err)
+			// 	continue
+			// }
+			matchContent = append(matchContent, func(data string) []Index {
+				indexs, err := reg.FindAllIndex(data)
 				if err != nil {
-					log.Errorf("regexp compile error: %s", err)
-					continue
+					log.Errorf("regexp match error: %s", err)
+					return nil
 				}
-				matches := reg.FindAllStringSubmatch(data, -1)
-				// skip first captured group
-				// if "url=(.*)", exclude "url="
-				// match[0] contain "url=", match[1] not contain
-				for _, match := range matches {
-					if len(match) > 1 {
-						addRes(match[1], data)
-					}
+				if len(indexs) == 0 {
+					return nil
 				}
-			case "xpath":
+				res := make([]Index, 0)
+				for _, index := range indexs {
+					res = append(res, Index{Start: index[0], End: index[1]})
+				}
+				return res
+			})
+		case "xpath":
+
+			xexp, err := xpath.Compile(rule)
+			if err != nil {
+				log.Errorf("xpath compile error: %s", err)
+				continue
+			}
+
+			matchContent = append(matchContent, func(data string) []Index {
 				top, err := htmlquery.Parse(strings.NewReader(data))
 				if err != nil {
-					continue
+					log.Errorf("htmlquery parse error: %s", err)
+					return nil
 				}
-
-				xexp, err := xpath.Compile(rule)
-				if err != nil {
-					log.Errorf("xpath compile error: %s", err)
-					continue
-				}
-
 				t := xexp.Evaluate(htmlquery.CreateXPathNavigator(top))
+				res := make([]Index, 0)
 				switch t := t.(type) {
 				case *xpath.NodeIterator:
 					for t.MoveNext() {
 						nav := t.Current().(*htmlquery.NodeNavigator)
 						node := nav.Current()
 						str := htmlquery.InnerText(node)
-						addRes(str, data)
+						_ = str
+						index := strings.Index(data, str)
+						if index == -1 {
+							log.Errorf("xpath match error: %s", err)
+							return nil
+						}
+						res = append(res, Index{Start: index, End: index + len(str)})
 					}
 				default:
 					str := codec.AnyToString(t)
-					addRes(str, data)
+					_ = str
+					index := strings.Index(data, str)
+					if index == -1 {
+						log.Errorf("xpath match error: %s", err)
+						return nil
+					}
+					res = append(res, Index{Start: index, End: index + len(str)})
 				}
-			case "json": // json path
-			}
+				return res
+			})
+
+		case "json": // json path
 		}
 	}
 
-	for filename, hash := range p.Program.ExtraFile {
-		var data string
+	return &FileFilter{
+		matchFile: func(s string) bool {
+			for _, f := range matchFile {
+				if f(s) {
+					return true
+				}
+			}
+			return false
+		},
+		matchContent: func(data string) []Index {
+			var allResults []Index
+			for _, matcher := range matchContent {
+				results := matcher(data)
+				if results != nil {
+					allResults = append(allResults, results...)
+				}
+			}
+			if len(allResults) == 0 {
+				return nil
+			}
+			return allResults
+		},
+	}
+}
+
+func (p *Program) ForEachFile(callBack func(string, *memedit.MemEditor)) {
+	for filename, data := range p.Program.ExtraFile {
+		if e, ok := p.Program.GetEditor(filename); ok {
+			editor := e
+			callBack(filename, editor)
+			continue
+		}
+
+		var err error
+		var editor *memedit.MemEditor
 		if p.Program.EnableDatabase {
 			// if have database, get source code from database
-			editor, err := ssadb.GetIrSourceFromHash(hash)
+			editor, err = ssadb.GetIrSourceFromHash(data)
 			if err != nil {
 				log.Errorf("get ir source from hash error: %s", err)
-				continue
+				// continue
 			}
-			data = editor.GetSourceCode()
 		} else {
 			// if no database, get source code from memory
-			data = hash
+			editor = memedit.NewMemEditor(data)
+			editor.SetUrl(filename)
 		}
-		if reg, err := regexp.Compile(path); err == nil {
-			if reg.Match([]byte(filename)) {
-				handler(data)
-			}
-		}
-
-		if glob, err := glob.Compile(path); err == nil {
-			if glob.Match(filename) {
-				handler(data)
-			}
-		}
-
-		if filename == path {
-			handler(data)
-		}
+		p.Program.SetEditor(filename, editor)
+		callBack(filename, editor)
 	}
+}
+
+func (p *Program) FileFilter(path string, match string, rule map[string]string, rule2 []string) (sfvm.ValueOperator, error) {
+	filter := NewFileFilter(path, match, rule2)
+
+	var res []sfvm.ValueOperator
+	addRes := func(index Index, editor *memedit.MemEditor) {
+		// get range of match string
+		rangeIf := editor.GetRangeOffset(index.Start, index.End)
+		val := p.NewConstValue(rangeIf.GetText(), rangeIf)
+		res = append(res, val)
+	}
+
+	matchFile := false
+	p.ForEachFile(func(s string, me *memedit.MemEditor) {
+		if me == nil {
+			return
+		}
+		if filter.matchFile(s) {
+			matchFile = true
+			if filter.matchContent != nil {
+				matches := filter.matchContent(me.GetSourceCode())
+				for _, match := range matches {
+					addRes(match, me)
+				}
+			}
+		}
+	})
 	if len(res) == 0 {
 		if matchFile {
-			return nil, utils.Errorf("no file contain data match rule %v %v", rule, rule2)
+			return nil, utils.Errorf("no file contains data matching rule %v %v", rule, rule2)
 		}
 		return nil, utils.Errorf("no file matched by path %s", path)
 	}

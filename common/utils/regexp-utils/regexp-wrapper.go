@@ -2,10 +2,11 @@ package regexp_utils
 
 import (
 	"errors"
-	"github.com/dlclark/regexp2"
-	"github.com/samber/lo"
 	"regexp"
 	"sync"
+
+	"github.com/dlclark/regexp2"
+	"github.com/samber/lo"
 )
 
 type RegWrapperInterface interface {
@@ -17,6 +18,7 @@ type RegWrapperInterface interface {
 
 	FindAll(b []byte) ([][]byte, error)
 	FindAllString(s string) ([]string, error)
+	FindAllIndex(s string) ([][]int, error)
 
 	FindSubmatch(b []byte) ([][]byte, error)
 	FindStringSubmatch(s string) ([]string, error)
@@ -102,6 +104,13 @@ func (r *RegexpWrapper) FindAllString(s string) ([]string, error) {
 		return nil, errors.New("regexp is nil")
 	}
 	return r.getReg().FindAllString(s, -1), nil
+}
+
+func (r *RegexpWrapper) FindAllIndex(s string) ([][]int, error) {
+	if r.getReg() == nil {
+		return nil, errors.New("regexp is nil")
+	}
+	return r.getReg().FindAllStringIndex(s, -1), nil
 }
 
 func (r *RegexpWrapper) FindSubmatch(b []byte) ([][]byte, error) {
@@ -238,6 +247,28 @@ func (r *Regexp2Wrapper) FindAllString(s string) ([]string, error) {
 		}
 	}
 	return res, nil
+}
+
+// FindAllIndex returns a slice of all successive matches of the expression in s.
+// Each match is represented by a slice of two integers: the start and end index in s.
+func (r *Regexp2Wrapper) FindAllIndex(s string) ([][]int, error) {
+	if r.getReg() == nil {
+		return nil, errors.New("regexp is nil")
+	}
+	var results [][]int
+	match, err := r.getReg().FindStringMatch(s)
+	if err != nil {
+		return nil, err
+	}
+	for match != nil {
+		results = append(results, []int{match.Index, match.Index + match.Length})
+		match, err = r.getReg().FindNextMatch(match)
+		if err != nil {
+			// Return results found so far along with the error
+			return results, err
+		}
+	}
+	return results, nil
 }
 
 func (r *Regexp2Wrapper) FindSubmatch(b []byte) ([][]byte, error) {
