@@ -3,13 +3,16 @@ package utils
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	pp "github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 )
 
@@ -102,4 +105,11 @@ aaaaaaaaaaa`)), req)
 		t.Errorf("invalid content-length: %d", clInt)
 		t.FailNow()
 	}
+}
+
+func TestHttpUtilsUrl2String(t *testing.T) {
+	u, err := url.Parse("http://127.0.0.1:7788/${eval(danger)}/#${eval(danger)}")
+	require.NoError(t, err)
+	fmt.Println(Url2UnEscapeString(u))
+	require.True(t, Url2UnEscapeString(u) == "http://127.0.0.1:7788/${eval(danger)}/#${eval(danger)}")
 }

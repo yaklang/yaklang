@@ -1175,7 +1175,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			fmt.Println(string(req))
 		}
 		if urlRaw != nil {
-			urlStr = urlRaw.String()
+			urlStr = utils.Url2UnEscapeString(urlRaw)
 			hostname = urlRaw.Host
 			if ret := path.Ext(urlRaw.EscapedPath()); ret != "" {
 				extName = ret
