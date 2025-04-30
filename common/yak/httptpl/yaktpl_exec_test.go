@@ -2009,7 +2009,10 @@ func TestMockTest_interactsh(t *testing.T) {
 			return
 		}
 		urlIns.RawQuery = fmt.Sprintf("a=%s", sendToken)
-		poc.DoGET(urlIns.String(), poc.WithDNSServers(dnsServer))
+		a := urlIns.String()
+		_ = a
+		_, _, err = poc.DoGET(urlIns.String(), poc.WithDNSServers(dnsServer))
+		require.NoError(t, err)
 	})
 	tmp := fmt.Sprintf(`id: CVE-2017-9506
 
