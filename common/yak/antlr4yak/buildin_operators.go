@@ -3,6 +3,7 @@ package antlr4yak
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	"math"
 	"reflect"
 	"strconv"
@@ -747,6 +748,15 @@ func init() {
 				if vb.IsNil() || vb.IsZero() || !vb.IsValid() {
 					result = false
 					break
+				}
+				//如果是内置的orderMap，需要进行特殊处理
+				omap, ok := vb.Interface().(*orderedmap.OrderedMap)
+				if ok {
+					_, haveKey := omap.Get(a1)
+					if haveKey {
+						result = true
+						break
+					}
 				}
 				// exclude members that are not exported
 				if !unicode.IsUpper(rune(a1[0])) {
