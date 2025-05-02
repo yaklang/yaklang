@@ -37,30 +37,33 @@ type YamlConfig struct {
 	Models []ModelConfig `yaml:"models"`
 }
 
-func (c *YamlConfig) ToConfig() *Config {
-	cfg := NewConfig()
+func (c *YamlConfig) ToServerConfig() *ServerConfig {
+	cfg := NewServerConfig()
 
-	log.Infof("开始转换配置，共有 %d 个模型和 %d 个密钥", len(c.Models), len(c.Keys))
+	log.Infof("Starting configuration conversion, total models: %d, total keys: %d", len(c.Models), len(c.Keys))
 
 	for _, model := range c.Models {
-		log.Infof("添加模型: %s, 提供者数量: %d", model.Name, len(model.Providers))
-		cfg.Models.Set(model.Name, &model)
+		log.Infof("Adding model: %s, provider count: %d", model.Name, len(model.Providers))
+		cfg.Models.models[model.Name] = model.Providers[0]
 
-		// 初始化 Entrypoints
+		// Initialize Entrypoints
 		for _, provider := range model.Providers {
-			cfg.Entrypoints.AddProvider(model.Name, provider)
+			cfg.Entrypoints.providers[model.Name] = provider
 		}
 	}
 
 	for _, key := range c.Keys {
-		log.Infof("添加密钥: %s, 允许的模型: %v", key.Key, key.AllowedModels)
-		cfg.Keys.Set(key.Key, &key)
-		allowedModels := omap.NewOrderedMap[string, bool](make(map[string]bool))
-		for _, model := range key.AllowedModels {
-			log.Infof("密钥 %s 允许访问模型: %s", key.Key, model)
-			allowedModels.Set(model, true)
+		log.Infof("Adding key: %s, allowed models: %v", key.Key, key.AllowedModels)
+		cfg.Keys.keys[key.Key] = &Key{
+			Key:           key.Key,
+			AllowedModels: make(map[string]bool),
 		}
-		cfg.KeyAllowedModels.Set(key.Key, allowedModels)
+		allowedModels := make(map[string]bool)
+		for _, model := range key.AllowedModels {
+			log.Infof("Key %s is allowed to access model: %s", key.Key, model)
+			allowedModels[model] = true
+		}
+		cfg.KeyAllowedModels.allowedModels[key.Key] = allowedModels
 	}
 
 	return cfg
