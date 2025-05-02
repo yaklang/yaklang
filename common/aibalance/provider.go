@@ -39,6 +39,8 @@ type Provider struct {
 	// works for qwen3
 	OptionalAllowReason  string `json:"optional_allow_reason,omitempty"`
 	OptionalReasonBudget int    `json:"optional_reason_budget,omitempty"`
+	// 外部展示给用户的包装名称，通常是模型的别名
+	WrapperName string `json:"wrapper_name"`
 
 	// 数据库中对应的 AiProvider 对象
 	DbProvider *schema.AiProvider `json:"-"` // json:"-" 表示此字段不会被序列化到 JSON
@@ -69,6 +71,8 @@ func (cp *ConfigProvider) toProvider(apiKey string) *Provider {
 		NoHTTPS:              cp.NoHTTPS,
 		OptionalAllowReason:  cp.OptionalAllowReason,
 		OptionalReasonBudget: cp.OptionalReasonBudget,
+		// WrapperName 初始为空，由外部设置
+		WrapperName: "",
 	}
 }
 
@@ -194,6 +198,7 @@ func (p *Provider) GetDbProvider() (*schema.AiProvider, error) {
 
 	// 创建一个临时的 AiProvider 对象用于查询
 	dbProvider := &schema.AiProvider{
+		WrapperName: p.WrapperName,
 		ModelName:   p.ModelName,
 		TypeName:    p.TypeName,
 		DomainOrURL: p.DomainOrURL,
