@@ -343,7 +343,6 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 
 	reasonWriter := writer.GetReasonWriter()
 	outputWriter := writer.GetOutputWriter()
-	_, _ = reasonWriter, outputWriter
 
 	// Handle reason stream
 	start := time.Now()
@@ -391,11 +390,24 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 	// Wait for all stream processing to complete
 	wg.Wait()
 
+	succeed := true
 	endDuration := time.Since(start)
 	total := atomic.LoadInt64(totalBytes)
 	if total == 0 {
+		succeed = false
 		writer.WriteError(fmt.Errorf("no data received from provider"))
 	}
+
+	// 更新provider状态
+	latencyMs := firstByteDuration.Milliseconds()
+	go func() {
+		if err := provider.UpdateDbProvider(succeed, latencyMs); err != nil {
+			c.logError("Failed to update provider status: %v", err)
+		} else {
+			c.logInfo("Provider status updated: success=%v, latency=%dms", succeed, latencyMs)
+		}
+	}()
+
 	bandwidth := float64(total) / endDuration.Seconds() / 1024
 	c.logInfo("Response completed, first byte duration: %v, end duration: %v, bandwidth: %.2fkbps", firstByteDuration, endDuration, bandwidth)
 	writer.Close()

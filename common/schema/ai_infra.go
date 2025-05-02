@@ -74,25 +74,17 @@ func (c *AiCheckpoint) BeforeSave() error {
 type AiProvider struct {
 	gorm.Model
 
-	WrapperName string `json:"wrapper_name"`
-	ModelName   string `json:"model_name"`
-	TypeName    string `json:"type_name"`
-	DomainOrURL string `json:"domain_or_url"`
-	APIKey      string `json:"api_key"`
+	WrapperName string `json:"wrapper_name" gorm:"index"`
+	ModelName   string `json:"model_name" gorm:"index"`
+	TypeName    string `json:"type_name" gorm:"index"`
+	DomainOrURL string `json:"domain_or_url" gorm:"index"`
+	APIKey      string `json:"api_key" gorm:"index"`
 	NoHTTPS     bool   `json:"no_https"`
 
 	// 可用性指标
 	SuccessCount  int64 `json:"success_count"`  // 成功请求总数
 	FailureCount  int64 `json:"failure_count"`  // 失败请求总数
 	TotalRequests int64 `json:"total_requests"` // 总请求数
-
-	// EMA (指数移动平均) 相关指标
-	LatencyEMA10  float64 `json:"latency_ema_10"`  // 最近10次请求的延迟EMA (毫秒)
-	LatencyEMA100 float64 `json:"latency_ema_100"` // 最近100次请求的延迟EMA (毫秒)
-
-	// 失败率指标
-	FailureRate10  float64 `json:"failure_rate_10"`  // 最近10次请求的失败率
-	FailureRate100 float64 `json:"failure_rate_100"` // 最近100次请求的失败率
 
 	// 最后一次请求信息
 	LastRequestTime   time.Time `json:"last_request_time"`   // 最后一次请求时间
