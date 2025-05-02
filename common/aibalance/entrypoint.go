@@ -2,6 +2,7 @@ package aibalance
 
 import (
 	"math/rand"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
@@ -13,6 +14,8 @@ type ModelEntry struct {
 
 type Entrypoint struct {
 	ModelEntries *omap.OrderedMap[string, *ModelEntry]
+
+	m sync.Mutex
 }
 
 func NewEntrypoint() *Entrypoint {
@@ -38,6 +41,7 @@ func (e *Entrypoint) AddProvider(modelName string, provider *Provider) {
 		})
 	}
 }
+
 func (e *Entrypoint) PeekProvider(modelName string) *Provider {
 	if entry, ok := e.ModelEntries.Get(modelName); ok {
 		if len(entry.Providers) > 0 {
