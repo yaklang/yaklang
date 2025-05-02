@@ -139,23 +139,29 @@ func (p *Provider) GetAIClient(onStream, onReasonStream func(reader io.Reader)) 
 	log.Infof("GetAIClient: type: %s, domain: %s, key: %s, model: %s, no_https: %v", p.TypeName, p.DomainOrURL, utils.ShrinkString(p.APIKey, 8), p.ModelName, p.NoHTTPS)
 	client := ai.GetAI(
 		p.TypeName,
+		aispec.WithTimeout(10),
 		aispec.WithNoHTTPS(p.NoHTTPS),
 		aispec.WithAPIKey(p.APIKey),
 		aispec.WithBaseURL(p.DomainOrURL),
 		aispec.WithModel(p.ModelName),
 		aispec.WithStreamHandler(func(reader io.Reader) {
-			if onStream != nil {
-				onStream(reader)
-			} else {
-				io.Copy(os.Stdout, reader)
-			}
+			go func() {
+				if onStream != nil {
+					onStream(reader)
+				} else {
+					io.Copy(os.Stdout, reader)
+				}
+			}()
+
 		}),
 		aispec.WithReasonStreamHandler(func(reader io.Reader) {
-			if onReasonStream != nil {
-				onReasonStream(reader)
-			} else {
-				io.Copy(os.Stdout, reader)
-			}
+			go func() {
+				if onReasonStream != nil {
+					onReasonStream(reader)
+				} else {
+					io.Copy(os.Stdout, reader)
+				}
+			}()
 		}),
 	)
 	if utils.IsNil(client) || client == nil {

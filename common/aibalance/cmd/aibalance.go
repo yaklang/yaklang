@@ -2,18 +2,15 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
 
-	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/aibalance"
 	"github.com/yaklang/yaklang/common/consts"
-	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -53,7 +50,7 @@ func main() {
 		cli.StringFlag{
 			Name:  "listen, l",
 			Usage: "Address to listen on",
-			Value: ":8080",
+			Value: "127.0.0.1:8223",
 		},
 	}
 
@@ -65,44 +62,11 @@ func main() {
 		configPath := c.String("config")
 		listenAddr := c.String("listen")
 
-		// Read configuration file
-		data, err := os.ReadFile(configPath)
+		b, err := aibalance.NewBalancer(configPath)
 		if err != nil {
-			return errors.Errorf("Failed to read configuration file: %v", err)
+			return err
 		}
-
-		fmt.Printf("Configuration file content:\n%s\n", string(data))
-
-		var yamlConfig aibalance.YamlConfig
-		if err := yaml.Unmarshal(data, &yamlConfig); err != nil {
-			return errors.Errorf("Failed to parse configuration file: %v", err)
-		}
-
-		fmt.Printf("Parsed configuration:\nKeys: %+v\nModels: %+v\n", yamlConfig.Keys, yamlConfig.Models)
-
-		// Convert to internal configuration
-		config, err := yamlConfig.ToServerConfig()
-		if err != nil {
-			return errors.Errorf("Failed to convert configuration: %v", err)
-		}
-
-		// Start server
-		listener, err := net.Listen("tcp", listenAddr)
-		if err != nil {
-			return errors.Errorf("Failed to start server: %v", err)
-		}
-		defer listener.Close()
-
-		fmt.Printf("Server started successfully, listening on: %s\n", listenAddr)
-
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				fmt.Printf("Failed to accept connection: %v\n", err)
-				continue
-			}
-			go config.Serve(conn)
-		}
+		return b.RunWithAddr(listenAddr)
 	}
 
 	err := app.Run(os.Args)

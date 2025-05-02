@@ -5,7 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 func init() {
@@ -287,5 +289,125 @@ func TestConfigProviderToProvider(t *testing.T) {
 		if !expectedKeys[key] {
 			t.Errorf("Unexpected key %s was used to create a provider", key)
 		}
+	}
+}
+
+func TestProviderModelNamePriority(t *testing.T) {
+	// 创建一个测试配置
+	yamlConfig := &YamlConfig{
+		Models: []ModelConfig{
+			{
+				Name: "user-facing-model-name",
+				Providers: []*ConfigProvider{
+					{
+						ModelName:   "actual-model-name",
+						TypeName:    "test-type",
+						DomainOrURL: "http://test.com",
+						APIKey:      "test-key",
+					},
+				},
+			},
+		},
+	}
+
+	// 转换为服务器配置
+	serverConfig, err := yamlConfig.ToServerConfig()
+	assert.NoError(t, err)
+	assert.NotNil(t, serverConfig)
+
+	// 验证 provider 的 model_name 是否正确
+	providers, ok := serverConfig.Models.Get("user-facing-model-name")
+	assert.True(t, ok)
+	assert.Len(t, providers, 1)
+	assert.Equal(t, "actual-model-name", providers[0].ModelName)
+
+	// 验证 entrypoints 中的 provider 是否正确
+	entryProviders := serverConfig.Entrypoints.GetAllProviders("user-facing-model-name")
+	assert.Len(t, entryProviders, 1)
+	assert.Equal(t, "actual-model-name", entryProviders[0].ModelName)
+}
+
+func TestProviderModelNameFallback(t *testing.T) {
+	// 创建一个测试配置,其中 provider 没有指定 model_name
+	yamlConfig := &YamlConfig{
+		Models: []ModelConfig{
+			{
+				Name: "fallback-model-name",
+				Providers: []*ConfigProvider{
+					{
+						TypeName:    "test-type",
+						DomainOrURL: "http://test.com",
+						APIKey:      "test-key",
+					},
+				},
+			},
+		},
+	}
+
+	// 转换为服务器配置
+	serverConfig, err := yamlConfig.ToServerConfig()
+	assert.NoError(t, err)
+	assert.NotNil(t, serverConfig)
+
+	// 验证 provider 的 model_name 是否正确回退到 model 的 name
+	providers, ok := serverConfig.Models.Get("fallback-model-name")
+	assert.True(t, ok)
+	assert.Len(t, providers, 1)
+	assert.Equal(t, "fallback-model-name", providers[0].ModelName)
+
+	// 验证 entrypoints 中的 provider 是否正确
+	entryProviders := serverConfig.Entrypoints.GetAllProviders("fallback-model-name")
+	assert.Len(t, entryProviders, 1)
+	assert.Equal(t, "fallback-model-name", entryProviders[0].ModelName)
+}
+
+func TestWrapperNameAndModelNameDistinction(t *testing.T) {
+	// 创建一个测试配置
+	yamlConfig := &YamlConfig{
+		Models: []ModelConfig{
+			{
+				Name: "user-facing-wrapper-name",
+				Providers: []*ConfigProvider{
+					{
+						ModelName:   "actual-model-name",
+						TypeName:    "test-type",
+						DomainOrURL: "http://test.com",
+						APIKey:      "test-key",
+					},
+				},
+			},
+		},
+	}
+
+	// 转换为服务器配置
+	serverConfig, err := yamlConfig.ToServerConfig()
+	assert.NoError(t, err)
+	assert.NotNil(t, serverConfig)
+
+	// 验证内存中的 provider 配置是否正确
+	providers, ok := serverConfig.Models.Get("user-facing-wrapper-name")
+	assert.True(t, ok)
+	assert.Len(t, providers, 1)
+	assert.Equal(t, "actual-model-name", providers[0].ModelName)
+
+	// 测试数据库保存是否正确
+	dbProviders, err := GetAllAiProviders()
+	assert.NoError(t, err)
+
+	// 查找我们要测试的 provider
+	var testProvider *schema.AiProvider
+	for _, p := range dbProviders {
+		if p.APIKey == "test-key" && p.WrapperName == "user-facing-wrapper-name" {
+			testProvider = p
+			break
+		}
+	}
+
+	// 验证是否找到了 provider
+	assert.NotNil(t, testProvider, "应该能在数据库中找到测试 provider")
+	if testProvider != nil {
+		// 验证 WrapperName 和 ModelName 是否正确保存
+		assert.Equal(t, "user-facing-wrapper-name", testProvider.WrapperName, "WrapperName 应保存外层名称")
+		assert.Equal(t, "actual-model-name", testProvider.ModelName, "ModelName 应保存实际模型名称")
 	}
 }

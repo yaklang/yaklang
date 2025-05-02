@@ -111,7 +111,8 @@ func (c *YamlConfig) ToServerConfig() (*ServerConfig, error) {
 					dbProvider.TypeName = provider.TypeName
 					dbProvider.DomainOrURL = provider.DomainOrURL
 					dbProvider.APIKey = provider.APIKey
-					dbProvider.ModelName = model.Name
+					dbProvider.WrapperName = model.Name       // 设置外层名称(展示给用户的名称)
+					dbProvider.ModelName = provider.ModelName // 保持内部实际使用的模型名称
 					dbProvider.NoHTTPS = provider.NoHTTPS
 
 					_ = UpdateAiProvider(dbProvider) // 忽略更新错误
