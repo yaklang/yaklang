@@ -95,3 +95,9 @@ type AiProvider struct {
 	IsHealthy       bool      `json:"is_healthy"`        // 提供者是否健康
 	HealthCheckTime time.Time `json:"health_check_time"` // 最后一次健康检查时间
 }
+
+type AiApiKeys struct {
+	gorm.Model
+	APIKey        string `json:"api_key" gorm:"index"`
+	AllowedModels string `json:"allowed_models"`
+}

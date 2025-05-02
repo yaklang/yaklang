@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIBalancer 管理面板</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .status-info {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .healthy {
+            color: #4caf50;
+            font-weight: bold;
+        }
+        .unhealthy {
+            color: #f44336;
+            font-weight: bold;
+        }
+        .btn {
+            display: inline-block;
+            padding: 8px 16px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .btn:hover {
+            background-color: #3367d6;
+        }
+        .btn-group {
+            margin-top: 15px;
+        }
+        .btn-group .btn {
+            margin-right: 10px;
+        }
+        .statistic {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            flex: 1;
+            min-width: 200px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin: 0 10px 10px 0;
+            text-align: center;
+        }
+        .stat-card h3 {
+            margin-top: 0;
+            color: #777;
+            font-size: 16px;
+        }
+        .stat-card .value {
+            font-size: 28px;
+            font-weight: bold;
+            margin: 10px 0;
+            color: #2c3e50;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #777;
+            font-size: 14px;
+        }
+        .copy-text {
+            font-family: monospace;
+            padding: 5px;
+            background-color: #f5f5f5;
+            border-radius: 3px;
+            font-size: 12px;
+            word-break: break-all;
+        }
+        .auto-refresh {
+            margin-left: 20px;
+            display: flex;
+            align-items: center;
+        }
+        .auto-refresh input {
+            margin-right: 5px;
+        }
+        .api-key {
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .api-key:hover {
+            overflow: visible;
+            white-space: normal;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>AIBalancer 管理面板</h1>
+        <p>当前时间: {{.CurrentTime}}</p>
+    </div>
+    
+    <div class="statistic">
+        <div class="stat-card">
+            <h3>AI提供者总数</h3>
+            <div class="value">{{.TotalProviders}}</div>
+        </div>
+        <div class="stat-card">
+            <h3>健康提供者数</h3>
+            <div class="value">{{.HealthyProviders}}</div>
+        </div>
+        <div class="stat-card">
+            <h3>总请求数</h3>
+            <div class="value">{{.TotalRequests}}</div>
+        </div>
+        <div class="stat-card">
+            <h3>成功率</h3>
+            <div class="value">{{printf "%.2f" .SuccessRate}}%</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>AI提供者列表</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>名称</th>
+                    <th>模型</th>
+                    <th>类型</th>
+                    <th>域名/URL</th>
+                    <th>请求数</th>
+                    <th>成功率</th>
+                    <th>延迟(ms)</th>
+                    <th>状态</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Providers}}
+                <tr>
+                    <td>{{.ID}}</td>
+                    <td>{{.WrapperName}}</td>
+                    <td>{{.ModelName}}</td>
+                    <td>{{.TypeName}}</td>
+                    <td title="{{.DomainOrURL}}">{{.DomainOrURL}}</td>
+                    <td>{{.TotalRequests}}</td>
+                    <td>{{printf "%.2f" .SuccessRate}}%</td>
+                    <td>{{.LastLatency}}</td>
+                    <td class="{{if .IsHealthy}}healthy{{else}}unhealthy{{end}}">
+                        {{if .IsHealthy}}健康{{else}}异常{{end}}
+                    </td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>API密钥配置</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>密钥</th>
+                    <th>允许的模型</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range $key, $models := .AllowedModels}}
+                <tr>
+                    <td class="api-key" title="{{$key}}">{{$key}}</td>
+                    <td>{{$models}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="btn-group">
+        <a href="/portal" class="btn">手动刷新</a>
+        <label class="auto-refresh">
+            <input type="checkbox" id="auto-refresh" onchange="toggleAutoRefresh()">
+            自动刷新 
+            <select id="refresh-interval" onchange="updateRefreshInterval()">
+                <option value="5">5秒</option>
+                <option value="10" selected>10秒</option>
+                <option value="30">30秒</option>
+                <option value="60">1分钟</option>
+            </select>
+        </label>
+    </div>
+
+    <div class="footer">
+        <p>AIBalancer - Yaklang 大型语言模型负载均衡系统</p>
+        <p>当前版本: v1.0.0</p>
+    </div>
+
+    <script>
+        let refreshTimer;
+        
+        function toggleAutoRefresh() {
+            const checkbox = document.getElementById('auto-refresh');
+            if (checkbox.checked) {
+                startAutoRefresh();
+            } else {
+                clearInterval(refreshTimer);
+            }
+        }
+        
+        function updateRefreshInterval() {
+            const checkbox = document.getElementById('auto-refresh');
+            if (checkbox.checked) {
+                clearInterval(refreshTimer);
+                startAutoRefresh();
+            }
+        }
+        
+        function startAutoRefresh() {
+            const interval = document.getElementById('refresh-interval').value;
+            refreshTimer = setInterval(() => {
+                window.location.reload();
+            }, interval * 1000);
+        }
+    </script>
+</body>
+</html> 

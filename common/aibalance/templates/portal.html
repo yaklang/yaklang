@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIBalancer 管理面板</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .status-info {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .healthy {
+            color: #4caf50;
+            font-weight: bold;
+        }
+        .unhealthy {
+            color: #f44336;
+            font-weight: bold;
+        }
+        .btn {
+            display: inline-block;
+            padding: 8px 16px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .btn:hover {
+            background-color: #3367d6;
+        }
+        .btn-group {
+            margin-top: 15px;
+        }
+        .btn-group .btn {
+            margin-right: 10px;
+        }
+        .statistic {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+        .stat-card {
+            flex: 1;
+            min-width: 160px;
+            background-color: white;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 8px 10px;
+            margin: 0 5px 5px 0;
+            text-align: center;
+        }
+        .stat-card h3 {
+            margin-top: 0;
+            margin-bottom: 3px;
+            color: #777;
+            font-size: 13px;
+        }
+        .stat-card .value {
+            font-size: 20px;
+            font-weight: bold;
+            margin: 3px 0;
+            color: #2c3e50;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #777;
+            font-size: 14px;
+        }
+        .copy-text {
+            font-family: monospace;
+            padding: 5px;
+            background-color: #f5f5f5;
+            border-radius: 3px;
+            font-size: 12px;
+            word-break: break-all;
+        }
+        .auto-refresh {
+            margin-left: 20px;
+            display: flex;
+            align-items: center;
+        }
+        .auto-refresh input {
+            margin-right: 5px;
+        }
+        .api-key {
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .api-key:hover {
+            overflow: visible;
+            white-space: normal;
+        }
+        /* 标签页样式 */
+        .tabs {
+            display: flex;
+            margin-bottom: 15px;
+        }
+        .tab {
+            padding: 8px 16px;
+            cursor: pointer;
+            background-color: #f2f2f2;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            margin-right: 5px;
+            border-radius: 5px 5px 0 0;
+        }
+        .tab.active {
+            background-color: white;
+            font-weight: bold;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        /* 调整表格行高，使其更紧凑 */
+        th, td {
+            padding: 6px 10px;
+        }
+        table {
+            font-size: 0.95em;
+        }
+        /* 为新添加的表单元素添加样式 */
+        .add-provider-form {
+            padding: 10px;
+        }
+        .form-row {
+            display: flex;
+            margin-bottom: 15px;
+            gap: 15px;
+        }
+        .form-row .form-group {
+            flex: 1;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-control {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .code-block {
+            font-family: monospace;
+            background-color: #f5f5f5;
+        }
+        .form-info {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+        }
+        .form-info ul {
+            margin: 5px 0;
+            padding-left: 20px;
+        }
+        .form-info code {
+            background-color: #e9ecef;
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+        /* 多选和删除相关样式 */
+        .action-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .checkbox-column {
+            width: 30px;
+            text-align: center;
+        }
+        .select-all-container {
+            display: flex;
+            align-items: center;
+            margin-right: 10px;
+        }
+        .select-all-container input {
+            margin-right: 5px;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+        .status-cell {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .provider-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 5px;
+        }
+        .delete-confirmation-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 5px;
+            width: 400px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 20px;
+            gap: 10px;
+        }
+        .close-modal {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close-modal:hover {
+            color: black;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>AIBalancer 管理面板</h1>
+        <div style="display: flex; align-items: center;">
+            <p>当前时间: {{.CurrentTime}}</p>
+            <a href="/portal/logout" class="btn" style="margin-left: 15px;">登出</a>
+        </div>
+    </div>
+    
+    <div class="statistic">
+        <div class="stat-card">
+            <h3>AI提供者总数</h3>
+            <div class="value">{{.TotalProviders}}</div>
+        </div>
+        <div class="stat-card">
+            <h3>健康提供者数</h3>
+            <div class="value">{{.HealthyProviders}}</div>
+        </div>
+        <div class="stat-card">
+            <h3>总请求数</h3>
+            <div class="value">{{.TotalRequests}}</div>
+        </div>
+        <div class="stat-card">
+            <h3>成功率</h3>
+            <div class="value">{{printf "%.2f" .SuccessRate}}%</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>AI提供者列表</h2>
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('all')">全部</div>
+            <div class="tab" onclick="switchTab('healthy')">健康</div>
+            <div class="tab" onclick="switchTab('unhealthy')">异常</div>
+            <div class="tab" onclick="switchTab('add')">添加接口</div>
+        </div>
+        
+        <div id="all" class="tab-content active">
+            <div class="action-bar">
+                <div class="select-all-container">
+                    <input type="checkbox" id="select-all" onchange="toggleSelectAll()">
+                    <label for="select-all">全选</label>
+                </div>
+                <button class="btn btn-danger" id="delete-selected" onclick="confirmDeleteSelected()" disabled>删除选中项</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th class="checkbox-column"></th>
+                        <th>ID</th>
+                        <th>名称</th>
+                        <th>模型</th>
+                        <th>类型</th>
+                        <th>域名/URL</th>
+                        <th>请求数</th>
+                        <th>成功率</th>
+                        <th>延迟(ms)</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Providers}}
+                    <tr data-id="{{.ID}}" data-healthy="{{.IsHealthy}}">
+                        <td class="checkbox-column">
+                            <input type="checkbox" class="provider-checkbox" onchange="updateDeleteButton()">
+                        </td>
+                        <td>{{.ID}}</td>
+                        <td>{{.WrapperName}}</td>
+                        <td>{{.ModelName}}</td>
+                        <td>{{.TypeName}}</td>
+                        <td title="{{.DomainOrURL}}">{{.DomainOrURL}}</td>
+                        <td>{{.TotalRequests}}</td>
+                        <td>{{printf "%.2f" .SuccessRate}}%</td>
+                        <td>{{.LastLatency}}</td>
+                        <td class="{{if .IsHealthy}}healthy{{else}}unhealthy{{end}}">
+                            {{if .IsHealthy}}健康{{else}}异常{{end}}
+                        </td>
+                        <td class="provider-actions">
+                            <button class="btn btn-sm btn-danger" onclick="confirmDeleteProvider({{.ID}}, '{{.WrapperName}}')">删除</button>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        
+        <div id="healthy" class="tab-content">
+            <div class="action-bar">
+                <div class="select-all-container">
+                    <input type="checkbox" id="select-all-healthy" onchange="toggleSelectAllHealthy()">
+                    <label for="select-all-healthy">全选</label>
+                </div>
+                <button class="btn btn-danger" id="delete-selected-healthy" onclick="confirmDeleteSelected('healthy')" disabled>删除选中项</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th class="checkbox-column"></th>
+                        <th>ID</th>
+                        <th>名称</th>
+                        <th>模型</th>
+                        <th>类型</th>
+                        <th>域名/URL</th>
+                        <th>请求数</th>
+                        <th>成功率</th>
+                        <th>延迟(ms)</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Providers}}
+                    {{if .IsHealthy}}
+                    <tr data-id="{{.ID}}" data-healthy="true">
+                        <td class="checkbox-column">
+                            <input type="checkbox" class="provider-checkbox-healthy" onchange="updateDeleteButton('healthy')">
+                        </td>
+                        <td>{{.ID}}</td>
+                        <td>{{.WrapperName}}</td>
+                        <td>{{.ModelName}}</td>
+                        <td>{{.TypeName}}</td>
+                        <td title="{{.DomainOrURL}}">{{.DomainOrURL}}</td>
+                        <td>{{.TotalRequests}}</td>
+                        <td>{{printf "%.2f" .SuccessRate}}%</td>
+                        <td>{{.LastLatency}}</td>
+                        <td class="healthy">健康</td>
+                        <td class="provider-actions">
+                            <button class="btn btn-sm btn-danger" onclick="confirmDeleteProvider({{.ID}}, '{{.WrapperName}}')">删除</button>
+                        </td>
+                    </tr>
+                    {{end}}
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        
+        <div id="unhealthy" class="tab-content">
+            <div class="action-bar">
+                <div class="select-all-container">
+                    <input type="checkbox" id="select-all-unhealthy" onchange="toggleSelectAllUnhealthy()">
+                    <label for="select-all-unhealthy">全选</label>
+                </div>
+                <button class="btn btn-danger" id="delete-selected-unhealthy" onclick="confirmDeleteSelected('unhealthy')" disabled>删除选中项</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th class="checkbox-column"></th>
+                        <th>ID</th>
+                        <th>名称</th>
+                        <th>模型</th>
+                        <th>类型</th>
+                        <th>域名/URL</th>
+                        <th>请求数</th>
+                        <th>成功率</th>
+                        <th>延迟(ms)</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Providers}}
+                    {{if not .IsHealthy}}
+                    <tr data-id="{{.ID}}" data-healthy="false">
+                        <td class="checkbox-column">
+                            <input type="checkbox" class="provider-checkbox-unhealthy" onchange="updateDeleteButton('unhealthy')">
+                        </td>
+                        <td>{{.ID}}</td>
+                        <td>{{.WrapperName}}</td>
+                        <td>{{.ModelName}}</td>
+                        <td>{{.TypeName}}</td>
+                        <td title="{{.DomainOrURL}}">{{.DomainOrURL}}</td>
+                        <td>{{.TotalRequests}}</td>
+                        <td>{{printf "%.2f" .SuccessRate}}%</td>
+                        <td>{{.LastLatency}}</td>
+                        <td class="unhealthy">异常</td>
+                        <td class="provider-actions">
+                            <button class="btn btn-sm btn-danger" onclick="confirmDeleteProvider({{.ID}}, '{{.WrapperName}}')">删除</button>
+                        </td>
+                    </tr>
+                    {{end}}
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        
+        <div id="add" class="tab-content">
+            <div class="add-provider-form">
+                <h3>添加AI提供者</h3>
+                <form action="/portal/add-providers" method="POST">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="wrapper-name">接口名称:</label>
+                            <input type="text" id="wrapper-name" name="wrapper_name" class="form-control autocomplete" list="wrapper-names-list" required>
+                            <datalist id="wrapper-names-list"></datalist>
+                        </div>
+                        <div class="form-group">
+                            <label for="model-name">模型名称:</label>
+                            <input type="text" id="model-name" name="model_name" class="form-control autocomplete" list="model-names-list" required>
+                            <datalist id="model-names-list"></datalist>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="model-type">模型类型:</label>
+                            <input type="text" id="model-type" name="model_type" class="form-control autocomplete" list="model-types-list" required>
+                            <datalist id="model-types-list"></datalist>
+                        </div>
+                        <div class="form-group">
+                            <label for="domain-url">接入点(域名或URL):</label>
+                            <input type="text" id="domain-url" name="domain_or_url" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="api-keys">API密钥 (每行一个):</label>
+                        <textarea id="api-keys" name="api_keys" rows="6" class="form-control code-block" placeholder="sk-xxxx&#10;sk-yyyy&#10;sk-zzzz" required></textarea>
+                    </div>
+                    <button type="submit" class="btn">提交</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>API密钥配置</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>密钥</th>
+                    <th>允许的模型</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range $key, $models := .AllowedModels}}
+                <tr>
+                    <td class="api-key" title="{{$key}}">{{$key}}</td>
+                    <td>{{$models}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        <div class="btn-group" style="margin-top: 10px;">
+            <a href="/portal/api-keys" class="btn">管理API密钥</a>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>系统健康管理</h2>
+        <p>运行健康检查来验证所有 AI 提供者的连接状态和响应时间。</p>
+        <div class="btn-group">
+            <a href="/portal/healthy-check" class="btn">运行健康检查</a>
+        </div>
+    </div>
+
+    <div class="btn-group">
+        <a href="/portal" class="btn">手动刷新</a>
+        <label class="auto-refresh">
+            <input type="checkbox" id="auto-refresh" onchange="toggleAutoRefresh()">
+            自动刷新 
+            <select id="refresh-interval" onchange="updateRefreshInterval()">
+                <option value="5">5秒</option>
+                <option value="10" selected>10秒</option>
+                <option value="30">30秒</option>
+                <option value="60">1分钟</option>
+            </select>
+        </label>
+    </div>
+
+    <div class="footer">
+        <p>AIBalancer - Yaklang 大型语言模型负载均衡系统</p>
+        <p>当前版本: v1.0.0</p>
+    </div>
+
+    <!-- 删除确认对话框 -->
+    <div id="delete-confirmation-modal" class="delete-confirmation-modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeDeleteModal()">&times;</span>
+            <h3>删除确认</h3>
+            <p id="delete-confirmation-message">您确定要删除选中的提供者吗？此操作无法撤销。</p>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeDeleteModal()">取消</button>
+                <button class="btn btn-danger" id="confirm-delete-btn">确认删除</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let refreshTimer;
+        let selectedProviders = []; // 存储当前选中的提供者ID
+        
+        function toggleAutoRefresh() {
+            const checkbox = document.getElementById('auto-refresh');
+            if (checkbox.checked) {
+                startAutoRefresh();
+            } else {
+                clearInterval(refreshTimer);
+            }
+        }
+        
+        function updateRefreshInterval() {
+            const checkbox = document.getElementById('auto-refresh');
+            if (checkbox.checked) {
+                clearInterval(refreshTimer);
+                startAutoRefresh();
+            }
+        }
+        
+        function startAutoRefresh() {
+            const interval = document.getElementById('refresh-interval').value;
+            refreshTimer = setInterval(() => {
+                window.location.reload();
+            }, interval * 1000);
+        }
+        
+        function switchTab(tabId) {
+            // 隐藏所有内容面板
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // 移除所有标签的活动状态
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // 激活选中的标签和内容
+            document.getElementById(tabId).classList.add('active');
+            
+            // 找到对应的标签并设置为活动状态
+            const activeTabIndex = tabId === 'all' ? 0 : (tabId === 'healthy' ? 1 : (tabId === 'unhealthy' ? 2 : 3));
+            document.querySelectorAll('.tab')[activeTabIndex].classList.add('active');
+
+            // 如果切换到"添加接口"标签，加载自动补全数据
+            if (tabId === 'add') {
+                loadAutoCompleteData();
+            }
+        }
+
+        // 加载自动补全数据
+        function loadAutoCompleteData() {
+            fetch('/portal/autocomplete')
+                .then(response => response.json())
+                .then(data => {
+                    // 填充接口名称下拉列表
+                    const wrapperNamesList = document.getElementById('wrapper-names-list');
+                    wrapperNamesList.innerHTML = '';
+                    data.wrapper_names.forEach(name => {
+                        const option = document.createElement('option');
+                        option.value = name;
+                        wrapperNamesList.appendChild(option);
+                    });
+
+                    // 填充模型名称下拉列表
+                    const modelNamesList = document.getElementById('model-names-list');
+                    modelNamesList.innerHTML = '';
+                    data.model_names.forEach(name => {
+                        const option = document.createElement('option');
+                        option.value = name;
+                        modelNamesList.appendChild(option);
+                    });
+
+                    // 填充模型类型下拉列表
+                    const modelTypesList = document.getElementById('model-types-list');
+                    modelTypesList.innerHTML = '';
+                    data.model_types.forEach(type => {
+                        const option = document.createElement('option');
+                        option.value = type;
+                        modelTypesList.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    console.error('加载自动补全数据失败:', error);
+                });
+        }
+
+        // 全选/取消全选（全部标签页）
+        function toggleSelectAll() {
+            const selectAllCheckbox = document.getElementById('select-all');
+            const checkboxes = document.querySelectorAll('#all .provider-checkbox');
+            
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+            
+            updateDeleteButton();
+        }
+
+        // 全选/取消全选（健康标签页）
+        function toggleSelectAllHealthy() {
+            const selectAllCheckbox = document.getElementById('select-all-healthy');
+            const checkboxes = document.querySelectorAll('#healthy .provider-checkbox-healthy');
+            
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+            
+            updateDeleteButton('healthy');
+        }
+
+        // 全选/取消全选（异常标签页）
+        function toggleSelectAllUnhealthy() {
+            const selectAllCheckbox = document.getElementById('select-all-unhealthy');
+            const checkboxes = document.querySelectorAll('#unhealthy .provider-checkbox-unhealthy');
+            
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+            
+            updateDeleteButton('unhealthy');
+        }
+
+        // 更新删除按钮状态
+        function updateDeleteButton(tabType = 'all') {
+            const buttonId = tabType === 'all' ? 'delete-selected' : 
+                            (tabType === 'healthy' ? 'delete-selected-healthy' : 'delete-selected-unhealthy');
+            const deleteButton = document.getElementById(buttonId);
+            
+            const checkboxSelector = tabType === 'all' ? '#all .provider-checkbox' : 
+                                    (tabType === 'healthy' ? '#healthy .provider-checkbox-healthy' : '#unhealthy .provider-checkbox-unhealthy');
+            const checkboxes = document.querySelectorAll(checkboxSelector);
+            
+            let anyChecked = false;
+            checkboxes.forEach(checkbox => {
+                if (checkbox.checked) {
+                    anyChecked = true;
+                }
+            });
+            
+            deleteButton.disabled = !anyChecked;
+        }
+
+        // 确认删除单个提供者
+        function confirmDeleteProvider(id, name) {
+            // 设置确认信息
+            document.getElementById('delete-confirmation-message').textContent = `您确定要删除提供者 "${name}" 吗？此操作无法撤销。`;
+            
+            // 配置确认按钮的操作
+            const confirmButton = document.getElementById('confirm-delete-btn');
+            confirmButton.onclick = function() {
+                deleteProviders([id]);
+            };
+            
+            // 显示模态框
+            document.getElementById('delete-confirmation-modal').style.display = 'block';
+        }
+
+        // 确认删除选中的提供者
+        function confirmDeleteSelected(tabType = 'all') {
+            // 获取选中的提供者ID
+            const checkboxSelector = tabType === 'all' ? '#all .provider-checkbox' : 
+                                    (tabType === 'healthy' ? '#healthy .provider-checkbox-healthy' : '#unhealthy .provider-checkbox-unhealthy');
+            const checkboxes = document.querySelectorAll(checkboxSelector);
+            
+            const selectedIds = [];
+            checkboxes.forEach(checkbox => {
+                if (checkbox.checked) {
+                    const row = checkbox.closest('tr');
+                    const id = parseInt(row.dataset.id);
+                    selectedIds.push(id);
+                }
+            });
+            
+            if (selectedIds.length === 0) {
+                return;
+            }
+            
+            // 设置确认信息
+            document.getElementById('delete-confirmation-message').textContent = `您确定要删除选中的 ${selectedIds.length} 个提供者吗？此操作无法撤销。`;
+            
+            // 配置确认按钮的操作
+            const confirmButton = document.getElementById('confirm-delete-btn');
+            confirmButton.onclick = function() {
+                deleteProviders(selectedIds);
+            };
+            
+            // 显示模态框
+            document.getElementById('delete-confirmation-modal').style.display = 'block';
+        }
+
+        // 关闭删除确认对话框
+        function closeDeleteModal() {
+            document.getElementById('delete-confirmation-modal').style.display = 'none';
+        }
+
+        // 执行删除提供者操作
+        function deleteProviders(ids) {
+            // 显示删除中的提示
+            document.getElementById('delete-confirmation-message').textContent = '正在删除提供者...';
+            
+            // 准备请求数据
+            const data = {
+                provider_ids: ids
+            };
+            
+            // 发送删除请求
+            fetch('/portal/delete-providers', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('删除请求失败');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // 删除成功，刷新页面
+                    window.location.reload();
+                } else {
+                    // 显示错误信息
+                    document.getElementById('delete-confirmation-message').textContent = `删除失败: ${data.message || '未知错误'}`;
+                    
+                    // 5秒后关闭对话框
+                    setTimeout(closeDeleteModal, 5000);
+                }
+            })
+            .catch(error => {
+                // 显示错误信息
+                document.getElementById('delete-confirmation-message').textContent = `删除请求错误: ${error.message}`;
+                
+                // 5秒后关闭对话框
+                setTimeout(closeDeleteModal, 5000);
+            });
+        }
+
+        // 页面加载时，检查是否在"添加接口"标签上
+        document.addEventListener('DOMContentLoaded', function() {
+            if (document.getElementById('add').classList.contains('active')) {
+                loadAutoCompleteData();
+            }
+        });
+    </script>
+</body>
+</html> 

@@ -1,6 +1,7 @@
 package aibalance
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -104,4 +105,71 @@ func RegisterAiProvider(wrapperName, modelName, typeName, domainOrUrl, apiKey st
 
 func UpdateAiProvider(provider *schema.AiProvider) error {
 	return GetDB().Save(provider).Error
+}
+
+// SaveAiApiKey 保存API密钥到数据库
+func SaveAiApiKey(apiKey string, allowedModels string) error {
+	key := &schema.AiApiKeys{
+		APIKey:        apiKey,
+		AllowedModels: allowedModels,
+	}
+	return GetDB().Create(key).Error
+}
+
+// GetAiApiKey 根据API密钥获取数据库记录
+func GetAiApiKey(apiKey string) (*schema.AiApiKeys, error) {
+	var key schema.AiApiKeys
+	if err := GetDB().Where("api_key = ?", apiKey).First(&key).Error; err != nil {
+		return nil, err
+	}
+	return &key, nil
+}
+
+// GetAllAiApiKeys 获取所有API密钥
+func GetAllAiApiKeys() ([]*schema.AiApiKeys, error) {
+	var keys []*schema.AiApiKeys
+	if err := GetDB().Find(&keys).Error; err != nil {
+		return nil, err
+	}
+	return keys, nil
+}
+
+// DeleteAiApiKey 删除API密钥
+func DeleteAiApiKey(apiKey string) error {
+	return GetDB().Where("api_key = ?", apiKey).Delete(&schema.AiApiKeys{}).Error
+}
+
+// UpdateAiApiKey 更新API密钥的允许模型
+func UpdateAiApiKey(apiKey string, allowedModels string) error {
+	return GetDB().Model(&schema.AiApiKeys{}).Where("api_key = ?", apiKey).
+		Update("allowed_models", allowedModels).Error
+}
+
+// GetAiProviderByID 根据ID获取单个AI提供者
+func GetAiProviderByID(id uint) (*schema.AiProvider, error) {
+	var provider schema.AiProvider
+	if err := GetDB().Where("id = ?", id).First(&provider).Error; err != nil {
+		return nil, err
+	}
+	return &provider, nil
+}
+
+// DeleteAiProviderByID 根据ID删除AI提供者
+func DeleteAiProviderByID(id uint) error {
+	// 先获取提供者信息，便于日志记录
+	provider, err := GetAiProviderByID(id)
+	if err != nil {
+		return fmt.Errorf("获取提供者信息失败: %v", err)
+	}
+
+	// 执行删除操作
+	if err := GetDB().Delete(&schema.AiProvider{}, id).Error; err != nil {
+		return fmt.Errorf("删除提供者失败: %v", err)
+	}
+
+	// 记录删除日志
+	log.Infof("成功删除AI提供者 (ID: %d, 名称: %s, 模型: %s)",
+		id, provider.WrapperName, provider.ModelName)
+
+	return nil
 }
