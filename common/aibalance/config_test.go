@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
@@ -389,10 +390,42 @@ func TestWrapperNameAndModelNameDistinction(t *testing.T) {
 	assert.True(t, ok)
 	assert.Len(t, providers, 1)
 	assert.Equal(t, "actual-model-name", providers[0].ModelName)
+	assert.Equal(t, "user-facing-wrapper-name", providers[0].WrapperName)
+
+	// 手动将 Provider 保存到数据库
+	t.Logf("正在将 Provider 保存到数据库：WrapperName=%s, ModelName=%s",
+		providers[0].WrapperName, providers[0].ModelName)
+
+	dbProvider := &schema.AiProvider{
+		WrapperName:       providers[0].WrapperName,
+		ModelName:         providers[0].ModelName,
+		TypeName:          providers[0].TypeName,
+		DomainOrURL:       providers[0].DomainOrURL,
+		APIKey:            providers[0].APIKey,
+		NoHTTPS:           providers[0].NoHTTPS,
+		SuccessCount:      0,
+		FailureCount:      0,
+		TotalRequests:     0,
+		LastRequestTime:   time.Now(),
+		LastRequestStatus: true,
+		LastLatency:       0,
+		IsHealthy:         true,
+		HealthCheckTime:   time.Now(),
+	}
+
+	err = SaveAiProvider(dbProvider)
+	assert.NoError(t, err, "保存 Provider 到数据库失败")
 
 	// 测试数据库保存是否正确
+	t.Log("正在查询所有 AI 提供者...")
 	dbProviders, err := GetAllAiProviders()
 	assert.NoError(t, err)
+	t.Logf("获取到 %d 个提供者", len(dbProviders))
+
+	for i, p := range dbProviders {
+		t.Logf("Provider %d: WrapperName=%s, ModelName=%s, TypeName=%s, APIKey=%s",
+			i, p.WrapperName, p.ModelName, p.TypeName, p.APIKey)
+	}
 
 	// 查找我们要测试的 provider
 	var testProvider *schema.AiProvider

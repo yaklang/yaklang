@@ -105,6 +105,10 @@ func (c *YamlConfig) ToServerConfig() (*ServerConfig, error) {
 					provider.ModelName = model.Name
 				}
 
+				// 设置 provider 的 WrapperName 为当前模型的名称（外部展示名称）
+				provider.WrapperName = model.Name
+				log.Debugf("YamlConfig.ToServerConfig: Setting wrapper name for provider %d.%d to %s", j, k, model.Name)
+
 				// Add to provider list
 				providers = append(providers, provider)
 
@@ -112,7 +116,7 @@ func (c *YamlConfig) ToServerConfig() (*ServerConfig, error) {
 				if provider.ModelName == "" || provider.TypeName == "" {
 					continue
 				}
-				log.Debugf("YamlConfig.ToServerConfig: Added provider to list: type=%s, model=%s", provider.TypeName, provider.ModelName)
+				log.Debugf("YamlConfig.ToServerConfig: Added provider to list: type=%s, model=%s, wrapper=%s", provider.TypeName, provider.ModelName, provider.WrapperName)
 			}
 		}
 
