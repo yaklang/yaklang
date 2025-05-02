@@ -34,6 +34,11 @@ func NewBalancerFromRawConfig(raw []byte, files ...string) (*Balancer, error) {
 		return nil, utils.Wrapf(err, "cannot convert yaml config file to server %s", configFile)
 	}
 
+	// 从数据库加载恢复 providers
+	if err := LoadProvidersFromDatabase(serverConfig); err != nil {
+		log.Warnf("Failed to load providers from database: %v", err)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	b := &Balancer{
 		config: serverConfig,
@@ -43,12 +48,101 @@ func NewBalancerFromRawConfig(raw []byte, files ...string) (*Balancer, error) {
 	return b, nil
 }
 
+// NewBalancer 创建一个新的平衡器实例，如果无法读取配置文件，将会创建一个默认配置并从数据库加载
 func NewBalancer(configFile string) (*Balancer, error) {
+	// 尝试读取配置文件
 	raw, err := os.ReadFile(configFile)
 	if err != nil {
-		return nil, utils.Errorf("Read config file %s error: %v", configFile, err)
+		// 如果配置文件不存在，创建一个基本的服务器配置
+		log.Warnf("Failed to read config file %s: %v, using default configuration and loading from database", configFile, err)
+
+		// 创建默认配置
+		serverConfig := NewServerConfig()
+
+		// 从数据库加载恢复 providers
+		if err := LoadProvidersFromDatabase(serverConfig); err != nil {
+			log.Warnf("Failed to load providers from database: %v", err)
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		return &Balancer{
+			config: serverConfig,
+			ctx:    ctx,
+			cancel: cancel,
+		}, nil
 	}
-	return NewBalancerFromRawConfig(raw)
+
+	// 如果配置文件存在，正常创建
+	b, err := NewBalancerFromRawConfig(raw, configFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return b, nil
+}
+
+// LoadProvidersFromDatabase 从数据库加载所有提供者并添加到 ServerConfig 中
+func LoadProvidersFromDatabase(config *ServerConfig) error {
+	log.Infof("Starting to load AI providers from database")
+
+	// 获取数据库中所有的提供者
+	dbProviders, err := GetAllAiProviders()
+	if err != nil {
+		return utils.Errorf("Failed to get AI providers from database: %v", err)
+	}
+
+	log.Infof("Retrieved %d AI providers from database", len(dbProviders))
+
+	// 按照 WrapperName 分组提供者
+	modelProviders := make(map[string][]*Provider)
+
+	for _, dbProvider := range dbProviders {
+		// 跳过无效的提供者
+		if dbProvider.TypeName == "" || dbProvider.ModelName == "" {
+			log.Warnf("Skipping invalid provider: TypeName=%s, ModelName=%s", dbProvider.TypeName, dbProvider.ModelName)
+			continue
+		}
+
+		// 创建 Provider 实例
+		provider := &Provider{
+			ModelName:   dbProvider.ModelName,
+			TypeName:    dbProvider.TypeName,
+			DomainOrURL: dbProvider.DomainOrURL,
+			APIKey:      dbProvider.APIKey,
+			NoHTTPS:     dbProvider.NoHTTPS,
+			DbProvider:  dbProvider, // 直接设置数据库对象
+		}
+
+		// 使用 WrapperName 作为模型名称来分组
+		modelName := dbProvider.WrapperName
+		if modelName == "" {
+			modelName = dbProvider.ModelName // 如果 WrapperName 为空，使用 ModelName
+		}
+
+		modelProviders[modelName] = append(modelProviders[modelName], provider)
+	}
+
+	// 将提供者添加到配置中
+	for modelName, providers := range modelProviders {
+		if len(providers) > 0 {
+			log.Infof("Adding %d providers for model %s", len(providers), modelName)
+
+			// 添加到 Models
+			config.Models.models[modelName] = providers
+
+			// 添加到 Entrypoints
+			config.Entrypoints.providers[modelName] = providers
+
+			// 打印提供者信息
+			for i, p := range providers {
+				log.Infof("  Provider %d: TypeName=%s, ModelName=%s, Domain=%s, HealthStatus=%v",
+					i, p.TypeName, p.ModelName, p.DomainOrURL, p.DbProvider.IsHealthy)
+			}
+		}
+	}
+
+	log.Infof("Database AI providers loaded, added %d models in total", len(modelProviders))
+	return nil
 }
 
 func (b *Balancer) RunWithPort(port int) error {
@@ -81,7 +175,7 @@ func (b *Balancer) run(addr string) error {
 
 	go func() {
 		<-b.ctx.Done()
-		log.Infof("balancer context is done, closing listener...")
+		log.Infof("Balancer context is done, closing listener...")
 		if b.listener != nil {
 			b.listener.Close()
 		}
@@ -99,7 +193,7 @@ func (b *Balancer) run(addr string) error {
 			defer conn.Close()
 			defer func() {
 				if err := recover(); err != nil {
-					log.Errorf("panic recover %v", utils.ErrorStack(err))
+					log.Errorf("Panic recovered: %v", utils.ErrorStack(err))
 				}
 			}()
 			b.config.Serve(conn)
