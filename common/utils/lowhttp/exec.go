@@ -240,9 +240,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	defer func() {
 		if option != nil && option.BodyStreamReaderHandler != nil && !bodyStreamReaderHandled.IsSet() {
 			r, w := utils.NewPipe()
-			defer func() {
-				w.Close()
-			}()
+			w.Close()
 			option.BodyStreamReaderHandler([]byte{}, r)
 		}
 	}()

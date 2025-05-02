@@ -140,7 +140,7 @@ func reliableLookupHost(host string, opt ...DNSOption) error {
 		}
 		swg.Wait()
 	} else {
-		log.Info("no user custom specific dns servers found")
+		log.Infof("no user custom specific dns servers found for: %v", host)
 	}
 
 	if config.FallbackDoH && config.count <= 0 && !dohExecuted {

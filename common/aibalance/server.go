@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	_ "github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -299,6 +301,9 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 	}
 	pr, pw := utils.NewBufPipe(nil)
 	rr, rw := utils.NewBufPipe(nil)
+
+	// baseCtx, cancel := context.WithCancel(context.Background())
+
 	client, err := provider.GetAIClient(func(reader io.Reader) {
 		defer func() {
 			pw.Close()
@@ -323,6 +328,7 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		return
 	}
 	go func() {
+		c.logInfo("start to call ai chat interface with prompt len: %d", prompt.Len())
 		finalMsg, err := client.Chat(prompt.String())
 		if err != nil {
 			c.logError("AI chat interface call failed: %v", err)
@@ -340,16 +346,26 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 	_, _ = reasonWriter, outputWriter
 
 	// Handle reason stream
+	start := time.Now()
+	firstByteDuration := time.Duration(0)
+	fonce := sync.Once{}
+	totalBytes := new(int64)
+
 	go func() {
 		defer func() {
 			c.logInfo("Finished forwarding AI response stream(reason)")
 			wg.Done()
 		}()
 		c.logInfo("Start to handle reason mirror stream")
-		n, err := io.Copy(reasonWriter, rr)
+		n, err := io.Copy(reasonWriter, io.TeeReader(rr, utils.FirstWriter(func(p []byte) {
+			fonce.Do(func() {
+				firstByteDuration = time.Since(start)
+			})
+		})))
 		if err != nil {
 			c.logError("Failed to copy reason stream: %v", err)
 		}
+		atomic.AddInt64(totalBytes, n)
 		c.logInfo("Reason stream copy completed, bytes: %d", n)
 	}()
 
@@ -360,7 +376,12 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			wg.Done()
 		}()
 		c.logInfo("Start to handle output mirror stream")
-		n, err := io.Copy(outputWriter, pr)
+		n, err := io.Copy(outputWriter, io.TeeReader(pr, utils.FirstWriter(func(p []byte) {
+			fonce.Do(func() {
+				firstByteDuration = time.Since(start)
+			})
+		})))
+		atomic.AddInt64(totalBytes, n)
 		if err != nil {
 			c.logError("Failed to copy output stream: %v", err)
 		}
@@ -370,7 +391,9 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 	// Wait for all stream processing to complete
 	wg.Wait()
 
-	c.logInfo("Response completed")
+	endDuration := time.Since(start)
+	bandwidth := float64(*totalBytes) / endDuration.Seconds() / 1024
+	c.logInfo("Response completed, first byte duration: %v, end duration: %v, bandwidth: %.2fkbps", firstByteDuration, endDuration, bandwidth)
 	writer.Close()
 	conn.Close()
 }
