@@ -74,6 +74,7 @@ func (c *AiCheckpoint) BeforeSave() error {
 type AiProvider struct {
 	gorm.Model
 
+	WrapperName string `json:"wrapper_name"`
 	ModelName   string `json:"model_name"`
 	TypeName    string `json:"type_name"`
 	DomainOrURL string `json:"domain_or_url"`

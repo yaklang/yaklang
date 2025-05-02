@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"io"
 	"io/ioutil"
 	"net"
@@ -13,6 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 	"unicode"
+
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
@@ -500,6 +501,29 @@ func NewTriggerWriter(trigger uint64, h func(buffer io.ReadCloser, triggerEvent 
 		once:           new(sync.Once),
 		writeFirstOnce: new(sync.Once),
 		h:              h,
+	}
+}
+
+type wrapperForFirstWrite struct {
+	once         *sync.Once
+	onFirstWrite func([]byte)
+}
+
+func (w *wrapperForFirstWrite) Write(p []byte) (n int, err error) {
+	if len(p) > 0 {
+		w.once.Do(func() {
+			if w.onFirstWrite != nil {
+				w.onFirstWrite(p)
+			}
+		})
+	}
+	return io.Discard.Write(p)
+}
+
+func FirstWriter(onFirstWrite func([]byte)) io.Writer {
+	return &wrapperForFirstWrite{
+		once:         new(sync.Once),
+		onFirstWrite: onFirstWrite,
 	}
 }
 

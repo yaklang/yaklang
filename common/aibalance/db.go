@@ -6,13 +6,13 @@ func SaveAiProvider(provider *schema.AiProvider) error {
 	return schema.GetGormProfileDatabase().Create(provider).Error
 }
 
-func GetOrCreateAiProvider(modelName string, apiKey string) (*schema.AiProvider, error) {
+func GetOrCreateAiProvider(wrapperName string, apiKey string) (*schema.AiProvider, error) {
 	var provider schema.AiProvider
-	if err := schema.GetGormProfileDatabase().Where("model_name = ? AND api_key = ?", modelName, apiKey).First(&provider).Error; err != nil {
+	if err := schema.GetGormProfileDatabase().Where("wrapper_name = ? AND api_key = ?", wrapperName, apiKey).First(&provider).Error; err != nil {
 		// 如果找不到记录，创建一个新的
 		provider = schema.AiProvider{
-			ModelName: modelName,
-			APIKey:    apiKey,
+			WrapperName: wrapperName,
+			APIKey:      apiKey,
 		}
 		if err := schema.GetGormProfileDatabase().Create(&provider).Error; err != nil {
 			return nil, err
@@ -33,6 +33,6 @@ func UpdateAiProvider(provider *schema.AiProvider) error {
 	return schema.GetGormProfileDatabase().Save(provider).Error
 }
 
-func DeleteAiProvider(modelName string) error {
-	return schema.GetGormProfileDatabase().Where("model_name = ?", modelName).Delete(&schema.AiProvider{}).Error
+func DeleteAiProvider(wrapperName string) error {
+	return schema.GetGormProfileDatabase().Where("wrapper_name = ?", wrapperName).Delete(&schema.AiProvider{}).Error
 }
