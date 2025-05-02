@@ -132,6 +132,32 @@ func (e *Entrypoints) Add(model string, providers []*Provider) {
 	e.providers[model] = append(e.providers[model], providers...)
 }
 
+// LoadAPIKeysFromDB 从数据库加载API密钥到内存配置
+func (c *ServerConfig) LoadAPIKeysFromDB() error {
+	// 从数据库获取所有API密钥
+	apiKeys, err := GetAllAiApiKeys()
+	if err != nil {
+		return fmt.Errorf("failed to load API keys from database: %v", err)
+	}
+
+	// 加载到内存配置
+	for _, key := range apiKeys {
+		// 解析允许的模型列表
+		modelNames := strings.Split(key.AllowedModels, ",")
+		modelMap := make(map[string]bool)
+		for _, model := range modelNames {
+			if model = strings.TrimSpace(model); model != "" {
+				modelMap[model] = true
+			}
+		}
+
+		// 添加到内存配置
+		c.KeyAllowedModels.allowedModels[key.APIKey] = modelMap
+	}
+
+	return nil
+}
+
 // ServerConfig represents the server configuration
 type ServerConfig struct {
 	Keys             *KeyManager
@@ -139,6 +165,8 @@ type ServerConfig struct {
 	Models           *ModelManager
 	Entrypoints      *Entrypoints
 	Logging          LogLevel
+	AdminPassword    string          // 添加管理员密码配置
+	SessionManager   *SessionManager // 会话管理器
 }
 
 // NewServerConfig creates a new server configuration
@@ -154,6 +182,8 @@ func NewServerConfig() *ServerConfig {
 			Warn:  true,
 			Error: true,
 		},
+		AdminPassword:  "admin", // 默认密码
+		SessionManager: NewSessionManager(),
 	}
 }
 
@@ -453,6 +483,10 @@ func (c *ServerConfig) Serve(conn net.Conn) {
 	case strings.HasPrefix(uriIns.Path, "/v1/chat/completions"):
 		c.logInfo("Processing chat completion request")
 		c.serveChatCompletions(conn, requestRaw)
+		return
+	case strings.HasPrefix(uriIns.Path, "/portal"):
+		// 使用 portal.go 中的处理函数
+		c.HandlePortalRequest(conn, request, uriIns)
 		return
 	case uriIns.Path == "/register/forward":
 		c.logInfo("Processing register forward request")

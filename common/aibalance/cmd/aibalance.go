@@ -146,6 +146,138 @@ func main() {
 				return nil
 			},
 		},
+		{
+			Name:  "api-key",
+			Usage: "Manage API keys for AI models",
+			Subcommands: []cli.Command{
+				{
+					Name:  "add",
+					Usage: "Add a new API key",
+					Flags: []cli.Flag{
+						cli.StringFlag{
+							Name:  "key, k",
+							Usage: "API key value",
+						},
+						cli.StringSliceFlag{
+							Name:  "models, m",
+							Usage: "Allowed models (comma separated)",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						apiKey := c.String("key")
+						models := c.StringSlice("models")
+
+						// 验证必填字段
+						if apiKey == "" {
+							return cli.NewExitError("API key is required", 1)
+						}
+
+						if len(models) == 0 {
+							return cli.NewExitError("At least one allowed model must be specified", 1)
+						}
+
+						// 保存到数据库
+						err := aibalance.SaveAiApiKey(apiKey, strings.Join(models, ","))
+						if err != nil {
+							return cli.NewExitError("Failed to save API key: "+err.Error(), 1)
+						}
+
+						log.Infof("Successfully added API key:")
+						log.Infof("  Key: %s", strings.Repeat("*", len(apiKey)))
+						log.Infof("  Allowed Models: %s", strings.Join(models, ", "))
+						return nil
+					},
+				},
+				{
+					Name:  "list",
+					Usage: "List all API keys",
+					Action: func(c *cli.Context) error {
+						keys, err := aibalance.GetAllAiApiKeys()
+						if err != nil {
+							return cli.NewExitError("Failed to get API keys: "+err.Error(), 1)
+						}
+
+						if len(keys) == 0 {
+							log.Infof("No API keys found")
+							return nil
+						}
+
+						log.Infof("Found %d API keys:", len(keys))
+						for i, k := range keys {
+							log.Infof("%d. Key: %s", i+1, strings.Repeat("*", 8)+k.APIKey[len(k.APIKey)-4:])
+							log.Infof("   Allowed Models: %s", k.AllowedModels)
+							log.Infof("") // Empty line for spacing
+						}
+						return nil
+					},
+				},
+				{
+					Name:  "delete",
+					Usage: "Delete an API key",
+					Flags: []cli.Flag{
+						cli.StringFlag{
+							Name:  "key, k",
+							Usage: "API key to delete",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						apiKey := c.String("key")
+
+						// 验证必填字段
+						if apiKey == "" {
+							return cli.NewExitError("API key is required", 1)
+						}
+
+						// 从数据库删除
+						err := aibalance.DeleteAiApiKey(apiKey)
+						if err != nil {
+							return cli.NewExitError("Failed to delete API key: "+err.Error(), 1)
+						}
+
+						log.Infof("Successfully deleted API key: %s", strings.Repeat("*", len(apiKey)))
+						return nil
+					},
+				},
+				{
+					Name:  "update",
+					Usage: "Update allowed models for an API key",
+					Flags: []cli.Flag{
+						cli.StringFlag{
+							Name:  "key, k",
+							Usage: "API key to update",
+						},
+						cli.StringSliceFlag{
+							Name:  "models, m",
+							Usage: "New allowed models (comma separated)",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						apiKey := c.String("key")
+						models := c.StringSlice("models")
+
+						// 验证必填字段
+						if apiKey == "" {
+							return cli.NewExitError("API key is required", 1)
+						}
+
+						if len(models) == 0 {
+							return cli.NewExitError("At least one allowed model must be specified", 1)
+						}
+
+						// 更新数据库
+						err := aibalance.UpdateAiApiKey(apiKey, strings.Join(models, ","))
+						if err != nil {
+							return cli.NewExitError("Failed to update API key: "+err.Error(), 1)
+						}
+
+						log.Infof("Successfully updated API key:")
+						log.Infof("  Key: %s", strings.Repeat("*", len(apiKey)))
+						log.Infof("  New Allowed Models: %s", strings.Join(models, ", "))
+						return nil
+					},
+				},
+			},
+		},
 	}
 
 	// 添加服务器运行标志
