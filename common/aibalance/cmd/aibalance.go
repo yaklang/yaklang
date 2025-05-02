@@ -28,7 +28,7 @@ func init() {
 		for {
 			select {
 			case <-c:
-				fmt.Printf("exit by signal [SIGTERM/SIGINT/SIGKILL]")
+				fmt.Printf("Exiting due to signal [SIGTERM/SIGINT/SIGKILL]")
 				os.Exit(1)
 				return
 			}
@@ -44,12 +44,12 @@ func main() {
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:  "config, c",
-			Usage: "配置文件路径",
+			Usage: "Path to configuration file",
 			Value: "config.yaml",
 		},
 		cli.StringFlag{
 			Name:  "listen, l",
-			Usage: "监听地址",
+			Usage: "Address to listen on",
 			Value: ":8080",
 		},
 	}
@@ -62,37 +62,37 @@ func main() {
 		configPath := c.String("config")
 		listenAddr := c.String("listen")
 
-		// 读取配置文件
+		// Read configuration file
 		data, err := os.ReadFile(configPath)
 		if err != nil {
-			return errors.Errorf("读取配置文件失败: %v", err)
+			return errors.Errorf("Failed to read configuration file: %v", err)
 		}
 
-		fmt.Printf("配置文件内容:\n%s\n", string(data))
+		fmt.Printf("Configuration file content:\n%s\n", string(data))
 
 		var yamlConfig aibalance.YamlConfig
 		if err := yaml.Unmarshal(data, &yamlConfig); err != nil {
-			return errors.Errorf("解析配置文件失败: %v", err)
+			return errors.Errorf("Failed to parse configuration file: %v", err)
 		}
 
-		fmt.Printf("解析后的配置:\nKeys: %+v\nModels: %+v\n", yamlConfig.Keys, yamlConfig.Models)
+		fmt.Printf("Parsed configuration:\nKeys: %+v\nModels: %+v\n", yamlConfig.Keys, yamlConfig.Models)
 
-		// 转换为内部配置
-		config := yamlConfig.ToConfig()
+		// Convert to internal configuration
+		config := yamlConfig.ToServerConfig()
 
-		// 启动服务器
+		// Start server
 		listener, err := net.Listen("tcp", listenAddr)
 		if err != nil {
-			return errors.Errorf("启动服务器失败: %v", err)
+			return errors.Errorf("Failed to start server: %v", err)
 		}
 		defer listener.Close()
 
-		fmt.Printf("服务器启动成功，监听地址: %s\n", listenAddr)
+		fmt.Printf("Server started successfully, listening on: %s\n", listenAddr)
 
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
-				fmt.Printf("接受连接失败: %v\n", err)
+				fmt.Printf("Failed to accept connection: %v\n", err)
 				continue
 			}
 			go config.Serve(conn)
@@ -101,7 +101,7 @@ func main() {
 
 	err := app.Run(os.Args)
 	if err != nil {
-		fmt.Printf("command: [%v] failed: %v\n", strings.Join(os.Args, " "), err)
+		fmt.Printf("Command execution failed: [%v] error: %v\n", strings.Join(os.Args, " "), err)
 		return
 	}
 }

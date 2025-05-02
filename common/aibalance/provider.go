@@ -2,7 +2,7 @@ package aibalance
 
 import (
 	"errors"
-	"sync"
+	"io"
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -18,29 +18,20 @@ type Provider struct {
 	// works for qwen3
 	OptionalAllowReason  string `yaml:"optional_allow_reason,omitempty" json:"optional_allow_reason,omitempty"`
 	OptionalReasonBudget int    `yaml:"optional_reason_budget,omitempty" json:"optional_reason_budget,omitempty"`
-
-	_cacheLock sync.RWMutex    `yaml:"-" json:"-"`
-	_cache     aispec.AIClient `yaml:"-" json:"-"`
 }
 
-func (p *Provider) GetAIClient() (aispec.AIClient, error) {
-	p._cacheLock.RLock()
-	defer p._cacheLock.RUnlock()
-
-	if p._cache != nil {
-		return p._cache, nil
-	}
-
+func (p *Provider) GetAIClient(onStream, onReasonStream func(reader io.Reader)) (aispec.AIClient, error) {
 	client := ai.GetAI(
-		p.ModelName,
+		p.TypeName,
 		aispec.WithNoHTTPS(p.NoHTTPS),
 		aispec.WithAPIKey(p.APIKey),
 		aispec.WithBaseURL(p.DomainOrURL),
-		aispec.WithType(p.TypeName),
+		aispec.WithModel(p.ModelName),
+		aispec.WithStreamHandler(onStream),
+		aispec.WithReasonStreamHandler(onReasonStream),
 	)
 	if utils.IsNil(client) || client == nil {
 		return nil, errors.New("failed to get ai client, no such type: " + p.TypeName)
 	}
-	p._cache = client
 	return client, nil
 }
