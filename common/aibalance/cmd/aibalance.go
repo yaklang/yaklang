@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/aibalance"
+	"github.com/yaklang/yaklang/common/consts"
 	"gopkg.in/yaml.v3"
 )
 
@@ -37,6 +38,8 @@ func init() {
 }
 
 func main() {
+	consts.InitializeYakitDatabase("", "")
+
 	app := cli.NewApp()
 
 	app.Commands = []cli.Command{}
@@ -78,7 +81,10 @@ func main() {
 		fmt.Printf("Parsed configuration:\nKeys: %+v\nModels: %+v\n", yamlConfig.Keys, yamlConfig.Models)
 
 		// Convert to internal configuration
-		config := yamlConfig.ToServerConfig()
+		config, err := yamlConfig.ToServerConfig()
+		if err != nil {
+			return errors.Errorf("Failed to convert configuration: %v", err)
+		}
 
 		// Start server
 		listener, err := net.Listen("tcp", listenAddr)

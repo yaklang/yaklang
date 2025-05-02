@@ -60,6 +60,8 @@ var ProfileTables = []interface{}{
 	&SyntaxFlowGroup{},
 	&PluginEnv{},
 	&HotPatchTemplate{},
+
+	&AiProvider{}, // for aibalance
 }
 
 var databaseSchemas = map[uint8][]any{
