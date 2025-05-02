@@ -118,7 +118,11 @@ func (c *YamlConfig) ToServerConfig() (*ServerConfig, error) {
 				}
 
 				// 直接使用 GetOrCreateAiProvider 合并创建和更新操作
-				_, _ = GetOrCreateAiProvider(dbProvider) // 忽略操作错误
+				dbAiProvider, err := GetOrCreateAiProvider(dbProvider) // 获取或创建数据库对象
+				if err == nil && dbAiProvider != nil {
+					// 将数据库对象绑定到 Provider
+					provider.DbProvider = dbAiProvider
+				}
 			}
 		}
 

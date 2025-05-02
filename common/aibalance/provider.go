@@ -5,10 +5,12 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -36,6 +38,9 @@ type Provider struct {
 	// works for qwen3
 	OptionalAllowReason  string `json:"optional_allow_reason,omitempty"`
 	OptionalReasonBudget int    `json:"optional_reason_budget,omitempty"`
+
+	// 数据库中对应的 AiProvider 对象
+	DbProvider *schema.AiProvider `json:"-"` // json:"-" 表示此字段不会被序列化到 JSON
 }
 
 // toProvider 将 ConfigProvider 转换为 Provider（私有方法）
@@ -168,4 +173,102 @@ func (p *Provider) GetAIClient(onStream, onReasonStream func(reader io.Reader)) 
 		return nil, errors.New("failed to get ai client, no such type: " + p.TypeName)
 	}
 	return client, nil
+}
+
+// GetDbProvider 获取关联的数据库 AiProvider 对象
+// 如果没有关联的数据库对象，尝试从数据库查询或创建
+func (p *Provider) GetDbProvider() (*schema.AiProvider, error) {
+	// 如果已经有关联的数据库对象，直接返回
+	if p.DbProvider != nil {
+		return p.DbProvider, nil
+	}
+
+	// 创建一个临时的 AiProvider 对象用于查询
+	dbProvider := &schema.AiProvider{
+		ModelName:   p.ModelName,
+		TypeName:    p.TypeName,
+		DomainOrURL: p.DomainOrURL,
+		APIKey:      p.APIKey,
+		NoHTTPS:     p.NoHTTPS,
+	}
+
+	// 从数据库获取或创建
+	dbAiProvider, err := GetOrCreateAiProvider(dbProvider)
+	if err != nil {
+		return nil, err
+	}
+
+	// 保存关联
+	p.DbProvider = dbAiProvider
+	return dbAiProvider, nil
+}
+
+// UpdateDbProvider 更新关联的数据库 AiProvider 对象的统计信息
+// success：请求是否成功
+// latencyMs：请求延迟（毫秒）
+func (p *Provider) UpdateDbProvider(success bool, latencyMs int64) error {
+	// 获取数据库对象
+	dbProvider, err := p.GetDbProvider()
+	if err != nil {
+		return err
+	}
+
+	// 更新统计信息
+	dbProvider.TotalRequests++
+	dbProvider.LastRequestTime = time.Now()
+	dbProvider.LastRequestStatus = success
+	dbProvider.LastLatency = latencyMs
+
+	if success {
+		dbProvider.SuccessCount++
+	} else {
+		dbProvider.FailureCount++
+	}
+
+	// 更新 EMA 延迟
+	// EMA = (当前值 * 权重) + (前一个 EMA * (1 - 权重))
+	const alpha10 = 0.2   // EMA-10 的权重
+	const alpha100 = 0.02 // EMA-100 的权重
+
+	if dbProvider.LatencyEMA10 == 0 {
+		dbProvider.LatencyEMA10 = float64(latencyMs)
+	} else {
+		dbProvider.LatencyEMA10 = (float64(latencyMs) * alpha10) + (dbProvider.LatencyEMA10 * (1 - alpha10))
+	}
+
+	if dbProvider.LatencyEMA100 == 0 {
+		dbProvider.LatencyEMA100 = float64(latencyMs)
+	} else {
+		dbProvider.LatencyEMA100 = (float64(latencyMs) * alpha100) + (dbProvider.LatencyEMA100 * (1 - alpha100))
+	}
+
+	// 更新失败率
+	// 计算最近10次和100次的失败率
+	recent10Count := int64(utils.Min(int(dbProvider.TotalRequests), 10))
+	recent100Count := int64(utils.Min(int(dbProvider.TotalRequests), 100))
+
+	if recent10Count > 0 {
+		// 更新 EMA 失败率
+		if success {
+			dbProvider.FailureRate10 = dbProvider.FailureRate10 * (1 - alpha10)
+		} else {
+			dbProvider.FailureRate10 = (1.0 * alpha10) + (dbProvider.FailureRate10 * (1 - alpha10))
+		}
+	}
+
+	if recent100Count > 0 {
+		if success {
+			dbProvider.FailureRate100 = dbProvider.FailureRate100 * (1 - alpha100)
+		} else {
+			dbProvider.FailureRate100 = (1.0 * alpha100) + (dbProvider.FailureRate100 * (1 - alpha100))
+		}
+	}
+
+	// 更新健康状态
+	// 简单规则：如果最近10次请求的失败率超过50%，则认为不健康
+	dbProvider.IsHealthy = dbProvider.FailureRate10 < 0.5
+	dbProvider.HealthCheckTime = time.Now()
+
+	// 保存到数据库
+	return UpdateAiProvider(dbProvider)
 }
