@@ -392,7 +392,11 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 	wg.Wait()
 
 	endDuration := time.Since(start)
-	bandwidth := float64(*totalBytes) / endDuration.Seconds() / 1024
+	total := atomic.LoadInt64(totalBytes)
+	if total == 0 {
+		writer.WriteError(fmt.Errorf("no data received from provider"))
+	}
+	bandwidth := float64(total) / endDuration.Seconds() / 1024
 	c.logInfo("Response completed, first byte duration: %v, end duration: %v, bandwidth: %.2fkbps", firstByteDuration, endDuration, bandwidth)
 	writer.Close()
 	conn.Close()

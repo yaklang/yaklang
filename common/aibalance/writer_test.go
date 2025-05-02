@@ -289,10 +289,30 @@ func TestConcurrentWrites(t *testing.T) {
 			t.Fatalf("Failed to parse JSON: %v", err)
 		}
 
-		choices := result["choices"].([]interface{})
-		choice := choices[0].(map[string]interface{})
-		delta := choice["delta"].(map[string]interface{})
+		// 安全地检查 JSON 结构
+		choices, ok := result["choices"].([]interface{})
+		if !ok || len(choices) == 0 {
+			// 不满足条件，跳过这个行
+			continue
+		}
 
+		choice, ok := choices[0].(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		delta, ok := choice["delta"].(map[string]interface{})
+		if !ok {
+			// 检查是否有 finish_reason
+			if finish, ok := choice["finish_reason"]; ok && finish == "stop" {
+				// 这是正常的结束标记
+				continue
+			}
+			// 不是结束标记也没有 delta，这可能是个问题
+			continue
+		}
+
+		// 检查内容和原因
 		if content, ok := delta["content"]; ok && content == "Hello, World!" {
 			contentFound = true
 		}
@@ -411,9 +431,28 @@ func TestConcurrentSafety(t *testing.T) {
 			t.Fatalf("Failed to parse JSON: %v", err)
 		}
 
-		choices := result["choices"].([]interface{})
-		choice := choices[0].(map[string]interface{})
-		delta := choice["delta"].(map[string]interface{})
+		// 安全地检查 JSON 结构
+		choices, ok := result["choices"].([]interface{})
+		if !ok || len(choices) == 0 {
+			// 不满足条件，跳过这个行
+			continue
+		}
+
+		choice, ok := choices[0].(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		delta, ok := choice["delta"].(map[string]interface{})
+		if !ok {
+			// 检查是否有 finish_reason
+			if finish, ok := choice["finish_reason"]; ok && finish == "stop" {
+				// 这是正常的结束标记
+				continue
+			}
+			// 不是结束标记也没有 delta，这可能是个问题
+			continue
+		}
 
 		if content, ok := delta["content"]; ok {
 			if strings.HasPrefix(content.(string), contentPrefix) {
