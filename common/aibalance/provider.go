@@ -15,7 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// ConfigProvider 用于配置文件的 provider 结构体
+// ConfigProvider is the provider structure for configuration files
 type ConfigProvider struct {
 	ModelName   string   `yaml:"model_name" json:"model_name"`
 	TypeName    string   `yaml:"type_name" json:"type_name"`
@@ -29,7 +29,7 @@ type ConfigProvider struct {
 	OptionalReasonBudget int    `yaml:"optional_reason_budget,omitempty" json:"optional_reason_budget,omitempty"`
 }
 
-// Provider 用于实际 API 调用的 provider 结构体
+// Provider is the provider structure for actual API calls
 type Provider struct {
 	ModelName   string `json:"model_name"`
 	TypeName    string `json:"type_name"`
@@ -39,25 +39,25 @@ type Provider struct {
 	// works for qwen3
 	OptionalAllowReason  string `json:"optional_allow_reason,omitempty"`
 	OptionalReasonBudget int    `json:"optional_reason_budget,omitempty"`
-	// 外部展示给用户的包装名称，通常是模型的别名
+	// External display name for users, usually an alias for the model
 	WrapperName string `json:"wrapper_name"`
 
-	// 数据库中对应的 AiProvider 对象
-	DbProvider *schema.AiProvider `json:"-"` // json:"-" 表示此字段不会被序列化到 JSON
+	// Corresponding AiProvider object in the database
+	DbProvider *schema.AiProvider `json:"-"` // json:"-" means this field won't be serialized to JSON
 
-	// 保护并发更新的互斥锁
+	// Mutex to protect concurrent updates
 	mutex sync.Mutex `json:"-"`
 }
 
-// toProvider 将 ConfigProvider 转换为 Provider（私有方法）
+// toProvider converts ConfigProvider to Provider (private method)
 func (cp *ConfigProvider) toProvider(apiKey string) *Provider {
-	// 确保至少有 TypeName
+	// Ensure TypeName is not empty
 	if cp.TypeName == "" {
 		log.Errorf("Provider type name cannot be empty")
 		return nil
 	}
 
-	// 确保 DomainOrURL 有效（对大多数提供者来说是必需的）
+	// Ensure DomainOrURL is valid (required for most providers)
 	if cp.DomainOrURL == "" && cp.TypeName != "ollama" {
 		// log.Errorf("Provider domain or URL cannot be empty for type: %s", cp.TypeName)
 		// return nil
@@ -71,16 +71,16 @@ func (cp *ConfigProvider) toProvider(apiKey string) *Provider {
 		NoHTTPS:              cp.NoHTTPS,
 		OptionalAllowReason:  cp.OptionalAllowReason,
 		OptionalReasonBudget: cp.OptionalReasonBudget,
-		// WrapperName 初始为空，由外部设置
+		// WrapperName is initially empty, set by external
 		WrapperName: "",
 	}
 }
 
-// ToProviders 将 ConfigProvider 转换为多个 Provider
+// ToProviders converts ConfigProvider to multiple Providers
 func (cp *ConfigProvider) ToProviders() []*Provider {
 	providers := make([]*Provider, 0)
 
-	// 验证必要字段
+	// Validate required fields
 	if cp.TypeName == "" {
 		log.Errorf("Provider type name cannot be empty")
 		return nil
@@ -88,20 +88,20 @@ func (cp *ConfigProvider) ToProviders() []*Provider {
 
 	allKeys := cp.GetAllKeys()
 
-	// 如果没有可用的 keys，只有在某些情况下才使用默认的 provider
+	// If no keys available, only use default provider in certain cases
 	if len(allKeys) == 0 {
-		// 某些类型的提供者可能不需要 API 密钥（例如本地模型或开源模型）
+		// Some provider types may not require API keys (e.g., local models or open source models)
 		if cp.TypeName == "ollama" {
-			// 对于不需要 API 密钥的提供者，使用默认的 provider
+			// For providers that don't need API keys, use default provider
 			providers = append(providers, cp.toProvider(""))
 			return providers
 		}
 
 		log.Warnf("No API keys available for provider type: %s", cp.TypeName)
-		return nil // 没有可用的密钥，返回空
+		return nil // No available keys, return empty
 	}
 
-	// 为每个 key 创建一个新的 provider
+	// Create a new provider for each key
 	for _, key := range allKeys {
 		log.Infof("ToProviders: type: %v, model: %s, key: %s", cp.TypeName, cp.ModelName, utils.ShrinkString(key, 8))
 		provider := cp.toProvider(key)
@@ -113,28 +113,28 @@ func (cp *ConfigProvider) ToProviders() []*Provider {
 	return providers
 }
 
-// GetAllKeys 获取所有可用的 keys
+// GetAllKeys gets all available keys
 func (cp *ConfigProvider) GetAllKeys() []string {
 	var allKeys []string
 
-	// 检查直接配置的 API 密钥
+	// Check directly configured API key
 	if cp.APIKey != "" {
 		allKeys = append(allKeys, cp.APIKey)
 	}
 
-	// 检查密钥列表
+	// Check key list
 	if len(cp.Keys) > 0 {
 		allKeys = append(allKeys, cp.Keys...)
 	}
 
-	// 检查 KeyFile（包含多个密钥的文件）
+	// Check KeyFile (file containing multiple keys)
 	if cp.KeyFile != "" {
-		// 尝试读取文件
+		// Try to read the file
 		data, err := os.ReadFile(cp.KeyFile)
 		if err != nil {
 			log.Errorf("Failed to read key file %s: %v", cp.KeyFile, err)
 		} else {
-			// 按行分割，每行一个密钥
+			// Split by lines, one key per line
 			lines := strings.Split(string(data), "\n")
 			for _, line := range lines {
 				line = strings.TrimSpace(line)
@@ -148,7 +148,7 @@ func (cp *ConfigProvider) GetAllKeys() []string {
 	return allKeys
 }
 
-// GetAIClient 获取 AI 客户端
+// GetAIClient gets the AI client
 func (p *Provider) GetAIClient(onStream, onReasonStream func(reader io.Reader)) (aispec.AIClient, error) {
 	log.Infof("GetAIClient: type: %s, domain: %s, key: %s, model: %s, no_https: %v", p.TypeName, p.DomainOrURL, utils.ShrinkString(p.APIKey, 8), p.ModelName, p.NoHTTPS)
 	client := ai.GetAI(
@@ -184,19 +184,19 @@ func (p *Provider) GetAIClient(onStream, onReasonStream func(reader io.Reader)) 
 	return client, nil
 }
 
-// GetDbProvider 获取关联的数据库 AiProvider 对象
-// 如果没有关联的数据库对象，尝试从数据库查询或创建
+// GetDbProvider gets the associated database AiProvider object
+// If no associated database object exists, try to query or create from database
 func (p *Provider) GetDbProvider() (*schema.AiProvider, error) {
-	// 使用互斥锁保护 DbProvider 的读取和设置
+	// Use mutex to protect reading and setting of DbProvider
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	// 如果已经有关联的数据库对象，直接返回
+	// If already has associated database object, return directly
 	if p.DbProvider != nil {
 		return p.DbProvider, nil
 	}
 
-	// 创建一个临时的 AiProvider 对象用于查询
+	// Create a temporary AiProvider object for querying
 	dbProvider := &schema.AiProvider{
 		WrapperName: p.WrapperName,
 		ModelName:   p.ModelName,
@@ -206,32 +206,32 @@ func (p *Provider) GetDbProvider() (*schema.AiProvider, error) {
 		NoHTTPS:     p.NoHTTPS,
 	}
 
-	// 从数据库获取或创建
+	// Get or create from database
 	dbAiProvider, err := GetOrCreateAiProvider(dbProvider)
 	if err != nil {
 		return nil, err
 	}
 
-	// 保存关联
+	// Save association
 	p.DbProvider = dbAiProvider
 	return dbAiProvider, nil
 }
 
-// UpdateDbProvider 更新关联的数据库 AiProvider 对象的统计信息
-// success：请求是否成功
-// latencyMs：请求延迟（毫秒）
+// UpdateDbProvider updates the statistics of the associated database AiProvider object
+// success: whether the request was successful
+// latencyMs: request latency (milliseconds)
 func (p *Provider) UpdateDbProvider(success bool, latencyMs int64) error {
-	// 获取数据库对象
+	// Get database object
 	dbProvider, err := p.GetDbProvider()
 	if err != nil {
 		return err
 	}
 
-	// 使用 Provider 自身的互斥锁保护并发更新
+	// Use Provider's mutex to protect concurrent updates
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	// 更新统计信息
+	// Update statistics
 	dbProvider.TotalRequests++
 	dbProvider.LastRequestTime = time.Now()
 	dbProvider.LastRequestStatus = success
@@ -243,11 +243,11 @@ func (p *Provider) UpdateDbProvider(success bool, latencyMs int64) error {
 		dbProvider.FailureCount++
 	}
 
-	// 更新健康状态
-	// 如果最后一次请求失败或延迟超过3000ms，则标记为不健康
+	// Update health status
+	// If the last request failed or latency exceeded 3000ms, mark as unhealthy
 	dbProvider.IsHealthy = success && latencyMs < 3000
 	dbProvider.HealthCheckTime = time.Now()
 
-	// 保存到数据库
+	// Save to database
 	return UpdateAiProvider(dbProvider)
 }
