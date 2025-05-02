@@ -34,6 +34,12 @@ type AIConfig struct {
 	HTTPErrorHandler func(error)
 }
 
+func WithNoHTTPS(b bool) AIConfigOption {
+	return func(c *AIConfig) {
+		c.NoHttps = b
+	}
+}
+
 func NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
 	c := &AIConfig{
 		Timeout:                120,
