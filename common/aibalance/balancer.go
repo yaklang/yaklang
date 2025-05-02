@@ -4,12 +4,17 @@ import (
 	"context"
 	"net"
 	"os"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"gopkg.in/yaml.v3"
 )
+
+// 用于确保健康检查调度器只启动一次
+var healthCheckSchedulerStarted sync.Once
 
 type Balancer struct {
 	config   *ServerConfig
@@ -45,6 +50,12 @@ func NewBalancerFromRawConfig(raw []byte, files ...string) (*Balancer, error) {
 		ctx:    ctx,
 		cancel: cancel,
 	}
+
+	// 启动健康检查调度器 (确保只启动一次)
+	healthCheckSchedulerStarted.Do(func() {
+		StartHealthCheckScheduler(b, 5*time.Minute) // 修改为5分钟检查一次
+	})
+
 	return b, nil
 }
 
@@ -65,11 +76,18 @@ func NewBalancer(configFile string) (*Balancer, error) {
 		}
 
 		ctx, cancel := context.WithCancel(context.Background())
-		return &Balancer{
+		b := &Balancer{
 			config: serverConfig,
 			ctx:    ctx,
 			cancel: cancel,
-		}, nil
+		}
+
+		// 启动健康检查调度器 (确保只启动一次)
+		healthCheckSchedulerStarted.Do(func() {
+			StartHealthCheckScheduler(b, 5*time.Minute) // 修改为5分钟检查一次
+		})
+
+		return b, nil
 	}
 
 	// 如果配置文件存在，正常创建
@@ -81,10 +99,11 @@ func NewBalancer(configFile string) (*Balancer, error) {
 	return b, nil
 }
 
-// LoadProvidersFromDatabase 从数据库加载所有提供者并添加到 ServerConfig 中
+// LoadProvidersFromDatabase 从数据库加载所有提供者和API密钥
 func LoadProvidersFromDatabase(config *ServerConfig) error {
-	log.Infof("Starting to load AI providers from database")
+	log.Infof("Starting to load AI providers and API keys from database")
 
+	// 1. 加载 AI 提供者
 	// 获取数据库中所有的提供者
 	dbProviders, err := GetAllAiProviders()
 	if err != nil {
@@ -142,6 +161,31 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 	}
 
 	log.Infof("Database AI providers loaded, added %d models in total", len(modelProviders))
+
+	// 2. 加载 API 密钥
+	log.Infof("Starting to load API keys from database")
+	apiKeys, err := GetAllAiApiKeys()
+	if err != nil {
+		log.Warnf("Failed to load API keys from database: %v", err)
+	} else {
+		log.Infof("Retrieved %d API keys from database", len(apiKeys))
+		for _, key := range apiKeys {
+			// 解析允许的模型列表
+			modelNames := strings.Split(key.AllowedModels, ",")
+			modelMap := make(map[string]bool)
+			for _, model := range modelNames {
+				if model = strings.TrimSpace(model); model != "" {
+					modelMap[model] = true
+				}
+			}
+
+			// 添加到内存配置
+			config.KeyAllowedModels.allowedModels[key.APIKey] = modelMap
+			log.Infof("  API Key: %s, Allowed Models: %s", utils.ShrinkString(key.APIKey, 8), key.AllowedModels)
+		}
+		log.Infof("API keys loaded successfully")
+	}
+
 	return nil
 }
 
@@ -215,4 +259,16 @@ func (b *Balancer) Close() error {
 	}
 
 	return nil
+}
+
+// GetProviders 获取所有提供者
+func (b *Balancer) GetProviders() []*Provider {
+	var providers []*Provider
+
+	// 从所有模型中获取提供者
+	for _, modelProviders := range b.config.Models.models {
+		providers = append(providers, modelProviders...)
+	}
+
+	return providers
 }

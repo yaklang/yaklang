@@ -1,6 +1,7 @@
 package aibalance
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 	"sync"
@@ -228,6 +229,30 @@ func (e *Entrypoint) PeekProvider(modelName string) *Provider {
 		if p.isHealthy {
 			return p.provider
 		}
+	}
+
+	return nil
+}
+
+// InitializeFromDB 从数据库加载Provider
+func (e *Entrypoint) InitializeFromDB() error {
+	// 从数据库加载所有提供者
+	providers, err := GetAllAiProviders()
+	if err != nil {
+		return fmt.Errorf("failed to load providers from database: %v", err)
+	}
+
+	// 添加到入口点
+	for _, dbProvider := range providers {
+		provider := &Provider{
+			TypeName:    dbProvider.TypeName,
+			ModelName:   dbProvider.ModelName,
+			DomainOrURL: dbProvider.DomainOrURL,
+			APIKey:      dbProvider.APIKey,
+			NoHTTPS:     dbProvider.NoHTTPS,
+			DbProvider:  dbProvider, // 直接关联数据库对象
+		}
+		e.AddProvider(dbProvider.WrapperName, provider)
 	}
 
 	return nil
