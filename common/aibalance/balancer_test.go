@@ -16,7 +16,7 @@ import (
 
 func TestBalancerBasic(t *testing.T) {
 	t.Skip()
-	
+
 	b, err := NewBalancerFromRawConfig([]byte(`keys:
   - key: "your-api-key"
     allowed_models:

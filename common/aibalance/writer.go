@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"sync"
 	"time"
 )
@@ -99,15 +100,56 @@ func (w *chatJSONChunkWriter) GetReasonWriter() *writerWrapper {
 	}
 }
 
+func (w *chatJSONChunkWriter) WriteError(err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	rawmsg := map[string]any{
+		"error": err,
+	}
+	msgBytes, err := json.Marshal(rawmsg)
+	if err != nil {
+		log.Printf("Failed to marshal error: %v", err)
+		return
+	}
+	msg := fmt.Sprintf("data: %s\r\n\r\n", string(msgBytes))
+	chunk := fmt.Sprintf("%x\r\n%s\r\n", len(msg), msg)
+	if _, err := w.writerClose.Write([]byte(chunk)); err != nil {
+		log.Printf("Failed to write error: %v", err)
+	}
+}
+
 // Close finalizes the streaming response
 // It sends the [DONE] marker and closes the underlying writer
 func (w *chatJSONChunkWriter) Close() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	// Send completion marker
-	msg := "data: [DONE]\r\n\r\n"
+	rawmsg := map[string]any{
+		"id":      "chat-ai-balance-" + w.uid,
+		"object":  "chat.completion.chunk",
+		"created": w.created.Unix(),
+		"model":   w.model,
+		"choices": []map[string]any{
+			{
+				"index":         0,
+				"finish_reason": "stop",
+			},
+		},
+	}
+	msgBytes, err := json.Marshal(rawmsg)
+	if err != nil {
+		return err
+	}
+	msg := fmt.Sprintf("data: %s\r\n\r\n", string(msgBytes))
 	chunk := fmt.Sprintf("%x\r\n%s\r\n", len(msg), msg)
+	if _, err := w.writerClose.Write([]byte(chunk)); err != nil {
+		return err
+	}
+
+	// write data: [DONE]
+	msg = "data: [DONE]\r\n\r\n"
+	chunk = fmt.Sprintf("%x\r\n%s\r\n", len(msg), msg)
 	if _, err := w.writerClose.Write([]byte(chunk)); err != nil {
 		return err
 	}
