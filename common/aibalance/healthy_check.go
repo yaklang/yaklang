@@ -256,12 +256,12 @@ func RunManualHealthCheck() ([]*HealthCheckResult, error) {
 			// 保存到数据库
 			err := UpdateAiProvider(result.Provider)
 			if err != nil {
-				log.Errorf("更新提供者健康状态失败: %v", err)
+				log.Errorf("Failed to update provider health status: %v", err)
 			}
 		}
 	}
 
-	log.Infof("手动健康检查完成，共检查 %d 个提供者", len(results))
+	log.Infof("Manual health check completed, checked %d providers", len(results))
 	return results, nil
 }
 
@@ -280,12 +280,12 @@ func StartHealthCheckScheduler(balancer *Balancer, interval time.Duration) {
 
 	// 首次立即执行一次健康检查
 	go func() {
-		log.Infof("执行初始健康检查...")
+		log.Infof("Running initial health check...")
 		results := CheckAllProvidersHealth(manager)
 		if results != nil {
-			log.Infof("成功完成初始健康检查，检查了 %d 个提供者", len(results))
+			log.Infof("Initial health check completed successfully, checked %d providers", len(results))
 		} else {
-			log.Warnf("初始健康检查没有找到提供者")
+			log.Warnf("No providers found for initial health check")
 		}
 	}()
 
@@ -294,22 +294,22 @@ func StartHealthCheckScheduler(balancer *Balancer, interval time.Duration) {
 		for {
 			select {
 			case <-ticker.C:
-				log.Infof("执行定期健康检查...")
+				log.Infof("Running periodic health check...")
 				results := CheckAllProvidersHealth(manager)
 				if results != nil {
-					log.Infof("成功完成健康检查，检查了 %d 个提供者", len(results))
+					log.Infof("Health check completed successfully, checked %d providers", len(results))
 				} else {
-					log.Warnf("健康检查没有找到提供者")
+					log.Warnf("No providers found for health check")
 				}
 			case <-manager.stopChan:
 				ticker.Stop()
-				log.Infof("健康检查调度器已停止")
+				log.Infof("Health check scheduler stopped")
 				return
 			}
 		}
 	}()
 
-	log.Infof("已启动健康检查调度器，检查间隔: %v", manager.checkInterval)
+	log.Infof("Health check scheduler started, check interval: %v", manager.checkInterval)
 }
 
 // CheckAllProvidersHealth 检查所有提供者的健康状态
@@ -339,7 +339,7 @@ func CheckAllProvidersHealth(manager *HealthCheckManager) []*HealthCheckResult {
 
 			result, err := CheckProviderHealth(p)
 			if err != nil {
-				log.Errorf("检查提供者[%s]健康状态时出错: %v", p.DbProvider.ModelName, err)
+				log.Errorf("Error checking health status for provider [%s]: %v", p.DbProvider.ModelName, err)
 				return
 			}
 
@@ -407,11 +407,11 @@ func RunSingleProviderHealthCheck(providerID uint) (*HealthCheckResult, error) {
 	// 获取指定 ID 的提供者
 	dbProvider, err := GetAiProviderByID(providerID)
 	if err != nil {
-		return nil, fmt.Errorf("获取提供者信息失败(ID: %d): %v", providerID, err)
+		return nil, fmt.Errorf("Failed to get provider info (ID: %d): %v", providerID, err)
 	}
 
 	if dbProvider == nil {
-		return nil, fmt.Errorf("未找到指定 ID 的提供者: %d", providerID)
+		return nil, fmt.Errorf("Provider not found with ID: %d", providerID)
 	}
 
 	// 创建 Provider 实例
@@ -425,10 +425,10 @@ func RunSingleProviderHealthCheck(providerID uint) (*HealthCheckResult, error) {
 	}
 
 	// 执行健康检查
-	log.Infof("开始对提供者 [%s](ID: %d) 进行健康检查...", dbProvider.WrapperName, dbProvider.ID)
+	log.Infof("Starting health check for provider [%s](ID: %d)...", dbProvider.WrapperName, dbProvider.ID)
 	result, err := CheckProviderHealth(provider)
 	if err != nil {
-		return nil, fmt.Errorf("健康检查失败: %v", err)
+		return nil, fmt.Errorf("Health check failed: %v", err)
 	}
 
 	// 更新数据库中的健康状态
@@ -444,9 +444,9 @@ func RunSingleProviderHealthCheck(providerID uint) (*HealthCheckResult, error) {
 
 	// 保存到数据库
 	if err := UpdateAiProvider(dbProvider); err != nil {
-		log.Errorf("更新提供者状态失败: %v", err)
+		log.Errorf("Failed to update provider status: %v", err)
 	} else {
-		log.Infof("提供者 [%s](ID: %d) 健康检查完成: 健康状态=%v, 响应时间=%dms",
+		log.Infof("Provider [%s](ID: %d) health check completed: Health=%v, ResponseTime=%dms",
 			dbProvider.WrapperName, dbProvider.ID, result.IsHealthy, result.ResponseTime)
 	}
 

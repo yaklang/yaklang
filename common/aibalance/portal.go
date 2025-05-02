@@ -23,7 +23,7 @@ import (
 //go:embed templates/portal.html templates/login.html templates/add_provider.html templates/healthy_check.html templates/api_keys.html
 var templatesFS embed.FS
 
-// ProviderData 包含用于模板渲染的提供者数据
+// ProviderData contains data for template rendering
 type ProviderData struct {
 	ID            uint
 	WrapperName   string
@@ -36,7 +36,7 @@ type ProviderData struct {
 	IsHealthy     bool
 }
 
-// PortalData 包含管理面板页面的所有数据
+// PortalData contains all data for the management panel page
 type PortalData struct {
 	CurrentTime      string
 	TotalProviders   int
@@ -47,82 +47,75 @@ type PortalData struct {
 	AllowedModels    map[string]string
 }
 
-// Session 代表一个用户会话
+// Session represents a user session
 type Session struct {
-	ID        string    // 会话ID
-	CreatedAt time.Time // 创建时间
-	ExpiresAt time.Time // 过期时间
+	ID        string    // Session ID
+	CreatedAt time.Time // Creation time
+	ExpiresAt time.Time // Expiration time
 }
 
-// SessionManager 管理用户会话
+// SessionManager manages user sessions
 type SessionManager struct {
-	sessions map[string]*Session // 会话存储
-	mutex    sync.RWMutex        // 读写锁保护会话映射
+	sessions map[string]*Session // Session storage
+	mutex    sync.RWMutex        // Read-write lock protecting session mapping
 }
 
-// NewSessionManager 创建新的会话管理器
+// NewSessionManager creates a new session manager
 func NewSessionManager() *SessionManager {
 	return &SessionManager{
 		sessions: make(map[string]*Session),
 	}
 }
 
-// CreateSession 创建新会话
-func (sm *SessionManager) CreateSession() *Session {
+// CreateSession creates a new session
+func (sm *SessionManager) CreateSession() string {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
-	// 创建新的UUID作为会话ID
-	sessionID := uuid.NewString()
+	// Create new UUID as session ID
+	sessionID := uuid.New().String()
 
-	// 创建会话，设置24小时过期
-	now := time.Now()
+	// Create session with 24-hour expiration
 	session := &Session{
 		ID:        sessionID,
-		CreatedAt: now,
-		ExpiresAt: now.Add(24 * time.Hour),
+		CreatedAt: time.Now(),
+		ExpiresAt: time.Now().Add(24 * time.Hour),
 	}
 
-	// 存储会话
+	// Store session
 	sm.sessions[sessionID] = session
 
-	return session
+	return sessionID
 }
 
-// GetSession 获取会话
-func (sm *SessionManager) GetSession(sessionID string) (*Session, bool) {
+// GetSession retrieves a session
+func (sm *SessionManager) GetSession(sessionID string) *Session {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 
 	session, exists := sm.sessions[sessionID]
 	if !exists {
-		return nil, false
+		return nil
 	}
 
-	// 检查会话是否过期
+	// Check if session has expired
 	if time.Now().After(session.ExpiresAt) {
-		// 删除过期会话
-		sm.mutex.RUnlock()
-		sm.mutex.Lock()
+		// Delete expired session
 		delete(sm.sessions, sessionID)
-		sm.mutex.Unlock()
-		sm.mutex.RLock()
-
-		return nil, false
+		return nil
 	}
 
-	return session, true
+	return session
 }
 
-// DeleteSession 删除会话
+// DeleteSession removes a session
 func (sm *SessionManager) DeleteSession(sessionID string) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
-
 	delete(sm.sessions, sessionID)
 }
 
-// CleanupExpiredSessions 清理过期会话
+// CleanupExpiredSessions removes expired sessions
 func (sm *SessionManager) CleanupExpiredSessions() {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
@@ -135,39 +128,39 @@ func (sm *SessionManager) CleanupExpiredSessions() {
 	}
 }
 
-// checkAuth 检查管理员认证，使用会话ID而非直接使用密码
+// checkAuth checks admin authentication using session ID instead of direct password
 func (c *ServerConfig) checkAuth(request *http.Request) bool {
-	// 从Cookie中获取会话ID
+	// Get session ID from cookie
 	cookies := request.Cookies()
 	for _, cookie := range cookies {
 		if cookie.Name == "admin_session" {
-			// 验证会话是否有效
-			_, valid := c.SessionManager.GetSession(cookie.Value)
-			if valid {
+			// Validate session
+			session := c.SessionManager.GetSession(cookie.Value)
+			if session != nil {
 				return true
 			}
 		}
 	}
 
-	// 从查询参数获取密码认证
+	// Get password authentication from query parameters
 	query := request.URL.Query()
 	password := query.Get("password")
 	if password == c.AdminPassword {
-		// 密码认证成功，但不生成会话，这仅用于单次访问
+		// Password authentication successful, but no session is generated, this is for one-time access only
 		return true
 	}
 
 	return false
 }
 
-// serveLoginPage 显示登录页面
+// serveLoginPage displays the login page
 func (c *ServerConfig) serveLoginPage(conn net.Conn) {
 	c.logInfo("Serving login page")
 
 	var tmpl *template.Template
 	var err error
 
-	// 尝试从文件系统读取模板
+	// Try to read template from filesystem
 	if result := utils.GetFirstExistedFile(
 		"common/aibalance/templates/login.html",
 		"templates/login.html",
@@ -176,52 +169,52 @@ func (c *ServerConfig) serveLoginPage(conn net.Conn) {
 		rawTemp, err := os.ReadFile(result)
 		if err != nil {
 			c.logError("Failed to read login template: %v", err)
-			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n模板读取失败: %v", err)
+			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to read template: %v", err)
 			conn.Write([]byte(errorResponse))
 			return
 		}
 		tmpl, err = template.New("login").Parse(string(rawTemp))
 		if err != nil {
 			c.logError("Failed to parse login template: %v", err)
-			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n模板解析失败: %v", err)
+			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to parse template: %v", err)
 			conn.Write([]byte(errorResponse))
 			return
 		}
 	} else {
-		// 使用嵌入式文件系统中的模板
+		// Use embedded file system template
 		tmpl, err = template.ParseFS(templatesFS, "templates/login.html")
 		if err != nil {
 			c.logError("Failed to parse embedded login template: %v", err)
-			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n模板解析失败: %v", err)
+			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to parse template: %v", err)
 			conn.Write([]byte(errorResponse))
 			return
 		}
 	}
 
-	// 创建一个缓冲区来保存渲染后的HTML
+	// Create a buffer to save rendered HTML
 	var htmlBuffer bytes.Buffer
 	err = tmpl.Execute(&htmlBuffer, nil)
 	if err != nil {
 		c.logError("Failed to execute login template: %v", err)
-		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n模板渲染失败: %v", err)
+		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to render template: %v", err)
 		conn.Write([]byte(errorResponse))
 		return
 	}
 
-	// 准备HTTP响应头
+	// Prepare HTTP response header
 	header := "HTTP/1.1 200 OK\r\n" +
 		"Content-Type: text/html; charset=utf-8\r\n" +
 		"Content-Length: " + fmt.Sprintf("%d", htmlBuffer.Len()) + "\r\n" +
 		"\r\n"
 
-	// 写入头部和HTML内容
+	// Write header and HTML content
 	conn.Write([]byte(header))
 	conn.Write(htmlBuffer.Bytes())
 }
 
-// processLogin 处理登录请求
+// processLogin handles login requests
 func (c *ServerConfig) processLogin(conn net.Conn, request *http.Request) {
-	// 解析表单数据
+	// Parse form data
 	err := request.ParseForm()
 	if err != nil {
 		c.logError("Failed to parse login form: %v", err)
@@ -229,12 +222,12 @@ func (c *ServerConfig) processLogin(conn net.Conn, request *http.Request) {
 		return
 	}
 
-	// 获取提交的密码
+	// Get submitted password
 	password := request.PostForm.Get("password")
 
-	// 验证密码
+	// Validate password
 	if password != c.AdminPassword {
-		// 密码错误，重定向回登录页
+		// Password error, redirect back to login page
 		header := "HTTP/1.1 303 See Other\r\n" +
 			"Location: /portal?error=invalid_password\r\n" +
 			"\r\n"
@@ -242,48 +235,48 @@ func (c *ServerConfig) processLogin(conn net.Conn, request *http.Request) {
 		return
 	}
 
-	// 创建新会话
+	// Create new session
 	session := c.SessionManager.CreateSession()
 
-	// 设置会话Cookie并重定向到管理面板
+	// Set session cookie and redirect to management panel
 	header := "HTTP/1.1 303 See Other\r\n" +
 		"Location: /portal\r\n" +
-		"Set-Cookie: admin_session=" + session.ID + "; Path=/; HttpOnly; SameSite=Strict\r\n" +
+		"Set-Cookie: admin_session=" + session + "; Path=/; HttpOnly; SameSite=Strict\r\n" +
 		"\r\n"
 	conn.Write([]byte(header))
 }
 
-// servePortal 处理管理面板页面的请求
+// servePortal handles requests for the management panel page
 func (c *ServerConfig) servePortal(conn net.Conn) {
 	c.logInfo("Serving portal page")
 
-	// 获取所有提供者
+	// Get all providers
 	providers, err := GetAllAiProviders()
 	if err != nil {
 		c.logError("Failed to get providers: %v", err)
-		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n获取提供者信息失败: %v", err)
+		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to get providers: %v", err)
 		conn.Write([]byte(errorResponse))
 		return
 	}
 
-	// 准备模板数据
+	// Prepare template data
 	data := PortalData{
 		CurrentTime:   time.Now().Format("2006-01-02 15:04:05"),
 		TotalRequests: 0,
 	}
 
-	// 处理提供者数据
+	// Process provider data
 	var totalSuccess int64
 	healthyCount := 0
 
 	for _, p := range providers {
-		// 计算成功率
+		// Calculate success rate
 		successRate := 0.0
 		if p.TotalRequests > 0 {
 			successRate = float64(p.SuccessCount) / float64(p.TotalRequests) * 100
 		}
 
-		// 添加到提供者列表
+		// Add to provider list
 		data.Providers = append(data.Providers, ProviderData{
 			ID:            p.ID,
 			WrapperName:   p.WrapperName,
@@ -296,7 +289,7 @@ func (c *ServerConfig) servePortal(conn net.Conn) {
 			IsHealthy:     p.IsHealthy,
 		})
 
-		// 累计统计数据
+		// Accumulate statistics
 		data.TotalRequests += p.TotalRequests
 		totalSuccess += p.SuccessCount
 		if p.IsHealthy {
@@ -304,16 +297,16 @@ func (c *ServerConfig) servePortal(conn net.Conn) {
 		}
 	}
 
-	// 设置总体统计数据
+	// Set overall statistics
 	data.TotalProviders = len(providers)
 	data.HealthyProviders = healthyCount
 
-	// 计算总体成功率
+	// Calculate overall success rate
 	if data.TotalRequests > 0 {
 		data.SuccessRate = float64(totalSuccess) / float64(data.TotalRequests) * 100
 	}
 
-	// 获取API密钥和允许的模型
+	// Get API keys and allowed models
 	data.AllowedModels = make(map[string]string)
 	for _, key := range c.KeyAllowedModels.Keys() {
 		models, _ := c.KeyAllowedModels.Get(key)
@@ -334,63 +327,63 @@ func (c *ServerConfig) servePortal(conn net.Conn) {
 		rawTemp, err := os.ReadFile(result)
 		if err != nil {
 			c.logError("Failed to read template: %v", err)
-			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n模板读取失败: %v", err)
+			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to read template: %v", err)
 			conn.Write([]byte(errorResponse))
 			return
 		}
 		tmpl, err = template.New("portal").Parse(string(rawTemp))
 		if err != nil {
 			c.logError("Failed to parse template: %v", err)
-			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n模板解析失败: %v", err)
+			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to read template: %v", err)
 			conn.Write([]byte(errorResponse))
 			return
 		}
 	} else {
-		// 渲染模板
+		// Render template
 		tmpl, err = template.ParseFS(templatesFS, "templates/portal.html")
 		if err != nil {
 			c.logError("Failed to parse template: %v", err)
-			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n模板解析失败: %v", err)
+			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to read template: %v", err)
 			conn.Write([]byte(errorResponse))
 			return
 		}
 	}
 
-	// 创建一个缓冲区来保存渲染后的HTML
+	// Create a buffer to save rendered HTML
 	var htmlBuffer bytes.Buffer
 	err = tmpl.Execute(&htmlBuffer, data)
 	if err != nil {
 		c.logError("Failed to execute template: %v", err)
-		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n模板渲染失败: %v", err)
+		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to render template: %v", err)
 		conn.Write([]byte(errorResponse))
 		return
 	}
 
-	// 准备HTTP响应头
+	// Prepare HTTP response header
 	header := "HTTP/1.1 200 OK\r\n" +
 		"Content-Type: text/html; charset=utf-8\r\n" +
 		"Content-Length: " + fmt.Sprintf("%d", htmlBuffer.Len()) + "\r\n" +
 		"\r\n"
 
-	// 写入头部和HTML内容
+	// Write header and HTML content
 	conn.Write([]byte(header))
 	conn.Write(htmlBuffer.Bytes())
 }
 
-// servePortalWithAuth 处理管理面板请求，使用会话ID而非密码
+// servePortalWithAuth handles management panel requests using session ID instead of password
 func (c *ServerConfig) servePortalWithAuth(conn net.Conn) {
-	// 直接调用渲染页面的方法，认证已在上层完成
+	// Directly call the method to render the page, authentication is done in the upper layer
 	c.servePortal(conn)
 }
 
-// serveAddProviderPage 处理添加AI提供者请求
+// serveAddProviderPage handles requests to add an AI provider
 func (c *ServerConfig) serveAddProviderPage(conn net.Conn, request *http.Request) {
-	// 判断是GET还是POST请求
+	// Check if it's a GET or POST request
 	if request.Method == "POST" {
-		// 处理添加提供者的表单提交
-		// TODO: 解析表单数据并添加新的AI提供者
+		// Process form submission for adding a provider
+		// TODO: Parse form data and add new AI provider
 
-		// 重定向回主页
+		// Redirect back to home page
 		header := "HTTP/1.1 303 See Other\r\n" +
 			"Location: /portal\r\n" +
 			"\r\n"
@@ -401,7 +394,7 @@ func (c *ServerConfig) serveAddProviderPage(conn net.Conn, request *http.Request
 		var tmpl *template.Template
 		var err error
 
-		// 尝试从文件系统读取模板
+		// Try to read template from filesystem
 		if result := utils.GetFirstExistedFile(
 			"common/aibalance/templates/add_provider.html",
 			"templates/add_provider.html",
@@ -410,79 +403,79 @@ func (c *ServerConfig) serveAddProviderPage(conn net.Conn, request *http.Request
 			rawTemp, err := os.ReadFile(result)
 			if err != nil {
 				c.logError("Failed to read add provider template: %v", err)
-				errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n模板读取失败: %v", err)
+				errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to read template: %v", err)
 				conn.Write([]byte(errorResponse))
 				return
 			}
 			tmpl, err = template.New("add_provider").Parse(string(rawTemp))
 			if err != nil {
 				c.logError("Failed to parse add provider template: %v", err)
-				errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n模板解析失败: %v", err)
+				errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to read template: %v", err)
 				conn.Write([]byte(errorResponse))
 				return
 			}
 		} else {
-			// 使用嵌入式文件系统中的模板
+			// Use embedded file system template
 			tmpl, err = template.ParseFS(templatesFS, "templates/add_provider.html")
 			if err != nil {
 				c.logError("Failed to parse embedded add provider template: %v", err)
-				errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n模板解析失败: %v", err)
+				errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to read template: %v", err)
 				conn.Write([]byte(errorResponse))
 				return
 			}
 		}
 
-		// 创建一个缓冲区来保存渲染后的HTML
+		// Create a buffer to save rendered HTML
 		var htmlBuffer bytes.Buffer
 		err = tmpl.Execute(&htmlBuffer, nil)
 		if err != nil {
 			c.logError("Failed to execute add provider template: %v", err)
-			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n模板渲染失败: %v", err)
+			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to render template: %v", err)
 			conn.Write([]byte(errorResponse))
 			return
 		}
 
-		// 准备HTTP响应头
+		// Prepare HTTP response header
 		header := "HTTP/1.1 200 OK\r\n" +
 			"Content-Type: text/html; charset=utf-8\r\n" +
 			"Content-Length: " + fmt.Sprintf("%d", htmlBuffer.Len()) + "\r\n" +
 			"\r\n"
 
-		// 写入头部和HTML内容
+		// Write header and HTML content
 		conn.Write([]byte(header))
 		conn.Write(htmlBuffer.Bytes())
 	}
 }
 
-// processAddProviders 处理批量添加AI提供者请求
+// processAddProviders handles batch requests to add AI providers
 func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request) {
 	c.logInfo("Processing add providers request")
 
-	// 解析表单数据
+	// Parse form data
 	err := request.ParseForm()
 	if err != nil {
 		c.logError("Failed to parse form: %v", err)
-		errorResponse := fmt.Sprintf("HTTP/1.1 400 Bad Request\r\n\r\n表单解析失败: %v", err)
+		errorResponse := fmt.Sprintf("HTTP/1.1 400 Bad Request\r\n\r\nFailed to parse form: %v", err)
 		conn.Write([]byte(errorResponse))
 		return
 	}
 
-	// 获取表单数据
+	// Get form data
 	wrapperName := request.PostForm.Get("wrapper_name")
 	modelName := request.PostForm.Get("model_name")
 	modelType := request.PostForm.Get("model_type")
 	domainOrURL := request.PostForm.Get("domain_or_url")
 	apiKeysStr := request.PostForm.Get("api_keys")
 
-	// 验证必填字段
+	// Validate required fields
 	if wrapperName == "" || modelName == "" || modelType == "" || domainOrURL == "" || apiKeysStr == "" {
 		c.logError("Missing required fields")
-		errorResponse := "HTTP/1.1 400 Bad Request\r\n\r\n所有字段都是必填的"
+		errorResponse := "HTTP/1.1 400 Bad Request\r\n\r\nAll fields are required"
 		conn.Write([]byte(errorResponse))
 		return
 	}
 
-	// 按行分割API密钥
+	// Split API keys by line
 	apiKeys := make([]string, 0)
 	for _, line := range strings.Split(apiKeysStr, "\n") {
 		line = strings.TrimSpace(line)
@@ -493,12 +486,12 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 
 	if len(apiKeys) == 0 {
 		c.logError("No valid API keys provided")
-		errorResponse := "HTTP/1.1 400 Bad Request\r\n\r\n没有提供有效的API密钥"
+		errorResponse := "HTTP/1.1 400 Bad Request\r\n\r\nNo valid API keys provided"
 		conn.Write([]byte(errorResponse))
 		return
 	}
 
-	// 创建ConfigProvider对象
+	// Create ConfigProvider object
 	configProvider := &ConfigProvider{
 		ModelName:   modelName,
 		TypeName:    modelType,
@@ -506,87 +499,87 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 		Keys:        apiKeys,
 	}
 
-	// 转换为Provider对象
+	// Convert to Provider object
 	providers := configProvider.ToProviders()
 	if len(providers) == 0 {
 		c.logError("Failed to create providers")
-		errorResponse := "HTTP/1.1 400 Bad Request\r\n\r\n创建提供者失败，请检查输入"
+		errorResponse := "HTTP/1.1 400 Bad Request\r\n\r\nFailed to create providers, please check your input"
 		conn.Write([]byte(errorResponse))
 		return
 	}
 
-	// 成功添加的计数
+	// Success count
 	successCount := 0
 
-	// 保存到数据库
+	// Save to database
 	for _, provider := range providers {
-		// 创建数据库对象
+		// Create database object
 		dbProvider := &schema.AiProvider{
 			ModelName:       modelName,
 			TypeName:        modelType,
 			DomainOrURL:     domainOrURL,
 			APIKey:          provider.APIKey,
-			WrapperName:     wrapperName, // 使用表单中提供的WrapperName
-			IsHealthy:       true,        // 默认设置为健康
-			LastRequestTime: time.Now(),  // 设置最后请求时间
-			HealthCheckTime: time.Now(),  // 设置健康检查时间
+			WrapperName:     wrapperName, // Use WrapperName from form
+			IsHealthy:       true,        // Default set to healthy
+			LastRequestTime: time.Now(),  // Set last request time
+			HealthCheckTime: time.Now(),  // Set health check time
 		}
 
-		// 保存到数据库
+		// Save to database
 		err = SaveAiProvider(dbProvider)
 		if err != nil {
 			c.logError("Failed to save provider: %v", err)
 			continue
 		}
 
-		// 关联数据库对象到Provider
+		// Associate database object with Provider
 		provider.DbProvider = dbProvider
 		successCount++
 	}
 
-	// 构建结果消息
-	resultMessage := fmt.Sprintf("成功添加 %d 个提供者(共 %d 个)", successCount, len(providers))
+	// Build result message
+	resultMessage := fmt.Sprintf("Successfully added %d providers(total %d)", successCount, len(providers))
 	c.logInfo(resultMessage)
 
-	// 重定向回主页
+	// Redirect back to home page
 	header := "HTTP/1.1 303 See Other\r\n" +
 		"Location: /portal\r\n" +
 		"\r\n"
 	conn.Write([]byte(header))
 }
 
-// serveHealthyCheckPage 处理健康检查请求
+// serveHealthyCheckPage handles health check requests
 func (c *ServerConfig) serveHealthyCheckPage(conn net.Conn, request *http.Request) {
 	c.logInfo("Serving healthy check page")
 
-	// 检查是否要执行新的健康检查
+	// Check if a new health check needs to be executed
 	query := request.URL.Query()
 	runCheck := query.Get("run") == "true"
 
 	var results []*HealthCheckResult
 	if runCheck {
-		// 如果指定了run=true参数，才执行实时健康检查
+		// If specified run=true parameter, execute real-time health check
 		c.logInfo("Running manual health check as requested")
 		var err error
 		results, err = RunManualHealthCheck()
 		if err != nil {
 			c.logError("Failed to run health check: %v", err)
-			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n健康检查失败: %v", err)
+			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nHealth check failed: %v", err)
 			conn.Write([]byte(errorResponse))
 			return
 		}
 	}
 
-	// 获取所有提供者（获取最新状态）
+	// Get all providers (get latest status)
 	providers, err := GetAllAiProviders()
 	if err != nil {
 		c.logError("Failed to get providers: %v", err)
-		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n获取提供者信息失败: %v", err)
+		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to get providers: %v", err)
 		conn.Write([]byte(errorResponse))
 		return
 	}
 
-	// 统计健康提供者数量
+	// Count healthy providers
 	healthyCount := 0
 	for _, p := range providers {
 		if p.IsHealthy {
@@ -594,22 +587,22 @@ func (c *ServerConfig) serveHealthyCheckPage(conn net.Conn, request *http.Reques
 		}
 	}
 
-	// 计算健康率
+	// Calculate health rate
 	totalProviders := len(providers)
 	healthRate := 0.0
 	if totalProviders > 0 {
 		healthRate = float64(healthyCount) * 100 / float64(totalProviders)
 	}
 
-	// 准备模板数据
+	// Prepare template data
 	data := struct {
 		Providers      []*schema.AiProvider
 		CheckTime      string
 		TotalProviders int
 		HealthyCount   int
 		HealthRate     float64
-		CheckResults   []*HealthCheckResult // 添加健康检查结果
-		JustRanCheck   bool                 // 是否刚刚执行了检查
+		CheckResults   []*HealthCheckResult // Add health check results
+		JustRanCheck   bool                 // Whether a check was just executed
 	}{
 		Providers:      providers,
 		CheckTime:      time.Now().Format("2006-01-02 15:04:05"),
@@ -622,7 +615,7 @@ func (c *ServerConfig) serveHealthyCheckPage(conn net.Conn, request *http.Reques
 
 	var tmpl *template.Template
 
-	// 尝试从文件系统读取模板
+	// Try to read template from filesystem
 	if result := utils.GetFirstExistedFile(
 		"common/aibalance/templates/healthy_check.html",
 		"templates/healthy_check.html",
@@ -631,62 +624,62 @@ func (c *ServerConfig) serveHealthyCheckPage(conn net.Conn, request *http.Reques
 		rawTemp, err := os.ReadFile(result)
 		if err != nil {
 			c.logError("Failed to read healthy check template: %v", err)
-			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n模板读取失败: %v", err)
+			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to read template: %v", err)
 			conn.Write([]byte(errorResponse))
 			return
 		}
 		tmpl, err = template.New("healthy_check").Parse(string(rawTemp))
 		if err != nil {
 			c.logError("Failed to parse healthy check template: %v", err)
-			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n模板解析失败: %v", err)
+			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to read template: %v", err)
 			conn.Write([]byte(errorResponse))
 			return
 		}
 	} else {
-		// 使用嵌入式文件系统中的模板
+		// Use embedded file system template
 		tmpl, err = template.ParseFS(templatesFS, "templates/healthy_check.html")
 		if err != nil {
 			c.logError("Failed to parse embedded healthy check template: %v", err)
-			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n模板解析失败: %v", err)
+			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to read template: %v", err)
 			conn.Write([]byte(errorResponse))
 			return
 		}
 	}
 
-	// 创建一个缓冲区来保存渲染后的HTML
+	// Create a buffer to save rendered HTML
 	var htmlBuffer bytes.Buffer
 	err = tmpl.Execute(&htmlBuffer, data)
 	if err != nil {
 		c.logError("Failed to execute healthy check template: %v", err)
-		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n模板渲染失败: %v", err)
+		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to render template: %v", err)
 		conn.Write([]byte(errorResponse))
 		return
 	}
 
-	// 准备HTTP响应头
+	// Prepare HTTP response header
 	header := "HTTP/1.1 200 OK\r\n" +
 		"Content-Type: text/html; charset=utf-8\r\n" +
 		"Content-Length: " + fmt.Sprintf("%d", htmlBuffer.Len()) + "\r\n" +
 		"\r\n"
 
-	// 写入头部和HTML内容
+	// Write header and HTML content
 	conn.Write([]byte(header))
 	conn.Write(htmlBuffer.Bytes())
 }
 
-// handleLogout 处理登出请求
+// handleLogout handles logout requests
 func (c *ServerConfig) handleLogout(conn net.Conn, request *http.Request) {
-	// 从Cookie中获取会话ID
+	// Get session ID from cookie
 	cookies := request.Cookies()
 	for _, cookie := range cookies {
 		if cookie.Name == "admin_session" {
-			// 删除会话
+			// Delete session
 			c.SessionManager.DeleteSession(cookie.Value)
 			break
 		}
 	}
 
-	// 清除Cookie并重定向到登录页
+	// Clear cookie and redirect to login page
 	header := "HTTP/1.1 303 See Other\r\n" +
 		"Location: /portal\r\n" +
 		"Set-Cookie: admin_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict\r\n" +
@@ -694,20 +687,20 @@ func (c *ServerConfig) handleLogout(conn net.Conn, request *http.Request) {
 	conn.Write([]byte(header))
 }
 
-// serveAutoCompleteData 提供自动补全数据
+// serveAutoCompleteData provides autocomplete data
 func (c *ServerConfig) serveAutoCompleteData(conn net.Conn, request *http.Request) {
 	c.logInfo("Serving autocomplete data")
 
-	// 获取所有提供者数据
+	// Get all provider data
 	providers, err := GetAllAiProviders()
 	if err != nil {
 		c.logError("Failed to get providers for autocomplete: %v", err)
-		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n获取提供者信息失败: %v", err)
+		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to get providers: %v", err)
 		conn.Write([]byte(errorResponse))
 		return
 	}
 
-	// 提取不重复的数据
+	// Extract unique data
 	wrapperNames := make(map[string]bool)
 	modelNames := make(map[string]bool)
 	modelTypes := make(map[string]bool)
@@ -724,7 +717,7 @@ func (c *ServerConfig) serveAutoCompleteData(conn net.Conn, request *http.Reques
 		}
 	}
 
-	// 转换为数组
+	// Convert to array
 	wrapperNamesList := make([]string, 0, len(wrapperNames))
 	for name := range wrapperNames {
 		wrapperNamesList = append(wrapperNamesList, name)
@@ -740,7 +733,7 @@ func (c *ServerConfig) serveAutoCompleteData(conn net.Conn, request *http.Reques
 		modelTypesList = append(modelTypesList, typeName)
 	}
 
-	// 添加一些常见的模型类型，如果数据库中没有的话
+	// Add some common model types if they don't exist in the database
 	commonTypes := []string{"ChatCompletion", "TextCompletion", "Embedding"}
 	for _, typeName := range commonTypes {
 		if _, exists := modelTypes[typeName]; !exists {
@@ -748,7 +741,7 @@ func (c *ServerConfig) serveAutoCompleteData(conn net.Conn, request *http.Reques
 		}
 	}
 
-	// 构建JSON响应
+	// Build JSON response
 	autoCompleteData := struct {
 		WrapperNames []string `json:"wrapper_names"`
 		ModelNames   []string `json:"model_names"`
@@ -759,49 +752,49 @@ func (c *ServerConfig) serveAutoCompleteData(conn net.Conn, request *http.Reques
 		ModelTypes:   modelTypesList,
 	}
 
-	// 转换为JSON
+	// Convert to JSON
 	jsonData, err := json.Marshal(autoCompleteData)
 	if err != nil {
 		c.logError("Failed to encode autocomplete data: %v", err)
-		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n数据编码失败: %v", err)
+		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to encode data: %v", err)
 		conn.Write([]byte(errorResponse))
 		return
 	}
 
-	// 准备HTTP响应头
+	// Prepare HTTP response header
 	header := "HTTP/1.1 200 OK\r\n" +
 		"Content-Type: application/json; charset=utf-8\r\n" +
 		"Content-Length: " + fmt.Sprintf("%d", len(jsonData)) + "\r\n" +
 		"\r\n"
 
-	// 写入头部和JSON内容
+	// Write header and JSON content
 	conn.Write([]byte(header))
 	conn.Write(jsonData)
 }
 
-// serveAPIKeysPage 展示API密钥信息的页面
+// serveAPIKeysPage displays the API key information page
 func (c *ServerConfig) serveAPIKeysPage(conn net.Conn) {
 	c.logInfo("Serving API keys page")
 
-	// 准备模板数据
+	// Prepare template data
 	data := struct {
 		CurrentTime  string
 		APIKeys      map[string]string
-		AllModelList []string // 所有可用的模型列表，用于创建新API密钥
+		AllModelList []string // All available model list for creating new API keys
 	}{
 		CurrentTime: time.Now().Format("2006-01-02 15:04:05"),
 		APIKeys:     make(map[string]string),
 	}
 
-	// 从数据库获取API密钥
+	// Get API keys from database
 	dbApiKeys, err := GetAllAiApiKeys()
 	if err == nil && len(dbApiKeys) > 0 {
-		// 数据库中有API密钥，使用数据库记录
+		// Database has API keys, use database records
 		for _, apiKey := range dbApiKeys {
 			data.APIKeys[apiKey.APIKey] = apiKey.AllowedModels
 		}
 	} else {
-		// 从内存配置中获取API密钥和允许的模型（用作备选方案）
+		// Get API keys and allowed models from memory configuration (use as fallback option)
 		for _, key := range c.KeyAllowedModels.Keys() {
 			models, _ := c.KeyAllowedModels.Get(key)
 			modelNames := make([]string, 0, len(models))
@@ -812,7 +805,7 @@ func (c *ServerConfig) serveAPIKeysPage(conn net.Conn) {
 		}
 	}
 
-	// 获取所有可用的模型列表
+	// Get all available model list
 	providers, err := GetAllAiProviders()
 	if err == nil {
 		modelSet := make(map[string]bool)
@@ -828,12 +821,12 @@ func (c *ServerConfig) serveAPIKeysPage(conn net.Conn) {
 		}
 	}
 
-	// 渲染模板
+	// Render template
 	var htmlBuffer bytes.Buffer
 	tmpl, err := template.ParseFS(templatesFS, "templates/api_keys.html")
 	if err != nil {
 		c.logError("Failed to parse api_keys template: %v", err)
-		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n模板解析失败: %v", err)
+		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to read template: %v", err)
 		conn.Write([]byte(errorResponse))
 		return
 	}
@@ -841,91 +834,91 @@ func (c *ServerConfig) serveAPIKeysPage(conn net.Conn) {
 	err = tmpl.Execute(&htmlBuffer, data)
 	if err != nil {
 		c.logError("Failed to execute api_keys template: %v", err)
-		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n模板渲染失败: %v", err)
+		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to render template: %v", err)
 		conn.Write([]byte(errorResponse))
 		return
 	}
 
-	// 准备HTTP响应头
+	// Prepare HTTP response header
 	header := "HTTP/1.1 200 OK\r\n" +
 		"Content-Type: text/html; charset=utf-8\r\n" +
 		"Content-Length: " + fmt.Sprintf("%d", htmlBuffer.Len()) + "\r\n" +
 		"\r\n"
 
-	// 写入头部和HTML内容
+	// Write header and HTML content
 	conn.Write([]byte(header))
 	conn.Write(htmlBuffer.Bytes())
 }
 
-// processCreateAPIKey 处理创建新API密钥的请求
+// processCreateAPIKey handles requests to create a new API key
 func (c *ServerConfig) processCreateAPIKey(conn net.Conn, request *http.Request) {
 	c.logInfo("Processing create API key request")
 
-	// 解析表单数据
+	// Parse form data
 	err := request.ParseForm()
 	if err != nil {
 		c.logError("Failed to parse form: %v", err)
-		errorResponse := fmt.Sprintf("HTTP/1.1 400 Bad Request\r\n\r\n表单解析失败: %v", err)
+		errorResponse := fmt.Sprintf("HTTP/1.1 400 Bad Request\r\n\r\nFailed to parse form: %v", err)
 		conn.Write([]byte(errorResponse))
 		return
 	}
 
-	// 获取表单数据
+	// Get form data
 	apiKey := request.PostForm.Get("api_key")
-	allowedModels := request.PostForm["allowed_models"] // 多选值
+	allowedModels := request.PostForm["allowed_models"] // Multi-select values
 
-	// 验证必填字段
+	// Validate required fields
 	if apiKey == "" || len(allowedModels) == 0 {
 		c.logError("Missing required fields for API key creation")
-		errorResponse := "HTTP/1.1 400 Bad Request\r\n\r\nAPI密钥和允许的模型都是必填的"
+		errorResponse := "HTTP/1.1 400 Bad Request\r\n\r\nAPI key and allowed models are required"
 		conn.Write([]byte(errorResponse))
 		return
 	}
 
-	// 将允许的模型添加到配置中
+	// Add allowed models to configuration
 	modelMap := make(map[string]bool)
 	for _, model := range allowedModels {
 		modelMap[model] = true
 	}
 
-	// 添加到配置（保持内存配置的兼容性）
+	// Add to configuration (maintain compatibility with memory configuration)
 	c.KeyAllowedModels.allowedModels[apiKey] = modelMap
 
-	// 将API密钥保存到数据库
+	// Save API key to database
 	allowedModelsStr := strings.Join(allowedModels, ",")
 	err = SaveAiApiKey(apiKey, allowedModelsStr)
 	if err != nil {
 		c.logError("Failed to save API key to database: %v", err)
-		// 继续执行，因为已经添加到内存配置中了
+		// Continue execution, because it's already added to memory configuration
 	}
 
-	// 构建结果消息
+	// Build result message
 	c.logInfo("Successfully created API key: %s with %d allowed models", apiKey, len(allowedModels))
 
-	// 重定向回API密钥页面
+	// Redirect back to API key page
 	header := "HTTP/1.1 303 See Other\r\n" +
 		"Location: /portal/api-keys\r\n" +
 		"\r\n"
 	conn.Write([]byte(header))
 }
 
-// HandlePortalRequest 处理管理门户请求的主入口
+// HandlePortalRequest handles the main entry point for management portal requests
 func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request, uriIns *url.URL) {
 	c.logInfo("Processing portal request: %s", uriIns.Path)
 
-	// 处理登录POST请求
+	// Process login POST request
 	if uriIns.Path == "/portal/login" && request.Method == "POST" {
 		c.processLogin(conn, request)
 		return
 	}
 
-	// 检查认证状态（除了登录页面外）
+	// Check authentication status (except for login page)
 	if !c.checkAuth(request) {
 		c.serveLoginPage(conn)
 		return
 	}
 
-	// 根据路径处理不同的请求
+	// Process different requests based on path
 	if uriIns.Path == "/portal" || uriIns.Path == "/portal/" {
 		c.servePortalWithAuth(conn)
 	} else if uriIns.Path == "/portal/add-ai-provider" {
@@ -947,45 +940,45 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 	} else if uriIns.Path == "/portal/logout" {
 		c.handleLogout(conn, request)
 	} else {
-		// 默认返回主页
+		// Default return home page
 		c.servePortalWithAuth(conn)
 	}
 }
 
-// serveSingleProviderHealthCheckPage 处理单个提供者的健康检查请求
+// serveSingleProviderHealthCheckPage handles requests for health check of a single provider
 func (c *ServerConfig) serveSingleProviderHealthCheckPage(conn net.Conn, request *http.Request) {
 	c.logInfo("Serving single provider health check page")
 
-	// 解析查询参数获取提供者ID
+	// Parse query parameters to get provider ID
 	query := request.URL.Query()
 	providerIDStr := query.Get("id")
 	if providerIDStr == "" {
 		c.logError("Missing provider ID")
-		errorResponse := "HTTP/1.1 400 Bad Request\r\n\r\n缺少提供者ID参数"
+		errorResponse := "HTTP/1.1 400 Bad Request\r\n\r\nMissing provider ID parameter"
 		conn.Write([]byte(errorResponse))
 		return
 	}
 
-	// 将ID转换为数字
+	// Convert ID to number
 	providerIDInt, err := strconv.ParseUint(providerIDStr, 10, 64)
 	if err != nil {
 		c.logError("Invalid provider ID: %s, %v", providerIDStr, err)
-		errorResponse := fmt.Sprintf("HTTP/1.1 400 Bad Request\r\n\r\n无效的提供者ID: %s", providerIDStr)
+		errorResponse := fmt.Sprintf("HTTP/1.1 400 Bad Request\r\n\r\nInvalid provider ID: %s", providerIDStr)
 		conn.Write([]byte(errorResponse))
 		return
 	}
 	providerID := uint(providerIDInt)
 
-	// 执行健康检查
+	// Execute health check
 	result, err := RunSingleProviderHealthCheck(providerID)
 	if err != nil {
 		c.logError("Failed to run health check for provider %d: %v", providerID, err)
-		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n健康检查失败: %v", err)
+		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nHealth check failed: %v", err)
 		conn.Write([]byte(errorResponse))
 		return
 	}
 
-	// 准备JSON响应
+	// Prepare JSON response
 	responseData := struct {
 		Success      bool   `json:"success"`
 		ProviderID   uint   `json:"provider_id"`
@@ -1006,39 +999,39 @@ func (c *ServerConfig) serveSingleProviderHealthCheckPage(conn net.Conn, request
 	if result.Error != nil {
 		responseData.Message = result.Error.Error()
 	} else if result.IsHealthy {
-		responseData.Message = "健康检查成功，提供者状态良好"
+		responseData.Message = "Health check successful, provider is healthy"
 	} else {
-		responseData.Message = "健康检查完成，提供者状态不佳"
+		responseData.Message = "Health check completed, provider is not healthy"
 	}
 
-	// 转换为JSON
+	// Convert to JSON
 	jsonData, err := json.Marshal(responseData)
 	if err != nil {
 		c.logError("Failed to encode response data: %v", err)
-		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n数据编码失败: %v", err)
+		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to encode data: %v", err)
 		conn.Write([]byte(errorResponse))
 		return
 	}
 
-	// 准备HTTP响应头
+	// Prepare HTTP response header
 	header := "HTTP/1.1 200 OK\r\n" +
 		"Content-Type: application/json; charset=utf-8\r\n" +
 		"Content-Length: " + fmt.Sprintf("%d", len(jsonData)) + "\r\n" +
 		"\r\n"
 
-	// 写入头部和JSON内容
+	// Write header and JSON content
 	conn.Write([]byte(header))
 	conn.Write(jsonData)
 }
 
-// processDeleteProviders 处理删除AI提供者请求
+// processDeleteProviders handles requests to delete AI providers
 func (c *ServerConfig) processDeleteProviders(conn net.Conn, request *http.Request) {
 	c.logInfo("Processing delete providers request")
 
-	// 限制请求体大小，避免潜在的DOS攻击
+	// Limit request body size to prevent potential DOS attacks
 	request.Body = http.MaxBytesReader(nil, request.Body, 1024*1024)
 
-	// 解析请求体
+	// Parse request body
 	var requestData struct {
 		ProviderIDs []uint `json:"provider_ids"`
 	}
@@ -1048,27 +1041,27 @@ func (c *ServerConfig) processDeleteProviders(conn net.Conn, request *http.Reque
 		c.logError("Failed to parse delete providers request: %v", err)
 		responseData := map[string]interface{}{
 			"success": false,
-			"message": fmt.Sprintf("解析请求失败: %v", err),
+			"message": fmt.Sprintf("Failed to parse request: %v", err),
 		}
 		c.sendJSONResponse(conn, responseData, http.StatusBadRequest)
 		return
 	}
 
-	// 验证提供者ID
+	// Validate provider IDs
 	if len(requestData.ProviderIDs) == 0 {
 		c.logError("No provider IDs specified for deletion")
 		responseData := map[string]interface{}{
 			"success": false,
-			"message": "没有指定要删除的提供者",
+			"message": "No providers specified for deletion",
 		}
 		c.sendJSONResponse(conn, responseData, http.StatusBadRequest)
 		return
 	}
 
-	// 记录删除操作
+	// Record delete operation
 	c.logInfo("Deleting %d providers: %v", len(requestData.ProviderIDs), requestData.ProviderIDs)
 
-	// 执行删除
+	// Execute delete
 	var failedIDs []uint
 	for _, id := range requestData.ProviderIDs {
 		err := DeleteAiProviderByID(id)
@@ -1078,47 +1071,47 @@ func (c *ServerConfig) processDeleteProviders(conn net.Conn, request *http.Reque
 		}
 	}
 
-	// 创建响应
+	// Create response
 	if len(failedIDs) > 0 {
 		responseData := map[string]interface{}{
 			"success":    false,
-			"message":    fmt.Sprintf("部分提供者删除失败: %v", failedIDs),
+			"message":    fmt.Sprintf("Failed to delete some providers: %v", failedIDs),
 			"failed_ids": failedIDs,
 		}
 		c.sendJSONResponse(conn, responseData, http.StatusInternalServerError)
 	} else {
 		responseData := map[string]interface{}{
 			"success": true,
-			"message": fmt.Sprintf("成功删除 %d 个提供者", len(requestData.ProviderIDs)),
+			"message": fmt.Sprintf("Successfully deleted %d providers", len(requestData.ProviderIDs)),
 		}
 		c.sendJSONResponse(conn, responseData, http.StatusOK)
 	}
 }
 
-// sendJSONResponse 发送JSON格式的响应
+// sendJSONResponse sends a JSON-formatted response
 func (c *ServerConfig) sendJSONResponse(conn net.Conn, data interface{}, statusCode int) {
-	// 将数据转换为JSON
+	// Convert data to JSON
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		c.logError("Failed to encode JSON response: %v", err)
-		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n数据编码失败: %v", err)
+		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to encode data: %v", err)
 		conn.Write([]byte(errorResponse))
 		return
 	}
 
-	// 准备HTTP状态行
+	// Prepare HTTP status line
 	statusText := http.StatusText(statusCode)
 	if statusText == "" {
 		statusText = "Unknown"
 	}
 
-	// 准备HTTP响应头
+	// Prepare HTTP response header
 	header := fmt.Sprintf("HTTP/1.1 %d %s\r\n", statusCode, statusText) +
 		"Content-Type: application/json; charset=utf-8\r\n" +
 		"Content-Length: " + fmt.Sprintf("%d", len(jsonData)) + "\r\n" +
 		"\r\n"
 
-	// 写入头部和JSON内容
+	// Write header and JSON content
 	conn.Write([]byte(header))
 	conn.Write(jsonData)
 }
