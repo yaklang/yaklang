@@ -111,30 +111,31 @@ func (cp *ConfigProvider) ToProviders() []*Provider {
 
 // GetAllKeys 获取所有可用的 keys
 func (cp *ConfigProvider) GetAllKeys() []string {
-	allKeys := make([]string, 0)
+	var allKeys []string
 
-	// 1. 添加直接配置的 keys
-	if len(cp.Keys) > 0 {
-		allKeys = append(allKeys, cp.Keys...)
-	}
-
-	// 2. 如果有配置的 api_key，也添加到可用 keys 中
+	// 检查直接配置的 API 密钥
 	if cp.APIKey != "" {
 		allKeys = append(allKeys, cp.APIKey)
 	}
 
-	// 3. 从文件读取 keys
+	// 检查密钥列表
+	if len(cp.Keys) > 0 {
+		allKeys = append(allKeys, cp.Keys...)
+	}
+
+	// 检查 KeyFile（包含多个密钥的文件）
 	if cp.KeyFile != "" {
-		content, err := os.ReadFile(cp.KeyFile)
+		// 尝试读取文件
+		data, err := os.ReadFile(cp.KeyFile)
 		if err != nil {
 			log.Errorf("Failed to read key file %s: %v", cp.KeyFile, err)
 		} else {
-			// 按行分割，每行一个 key
-			fileKeys := strings.Split(strings.TrimSpace(string(content)), "\n")
-			for _, key := range fileKeys {
-				key = strings.TrimSpace(key)
-				if key != "" {
-					allKeys = append(allKeys, key)
+			// 按行分割，每行一个密钥
+			lines := strings.Split(string(data), "\n")
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if line != "" && !strings.HasPrefix(line, "#") {
+					allKeys = append(allKeys, line)
 				}
 			}
 		}
