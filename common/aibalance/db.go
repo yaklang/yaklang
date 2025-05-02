@@ -1,24 +1,30 @@
 package aibalance
 
-import "github.com/yaklang/yaklang/common/schema"
+import (
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/schema"
+)
 
-func SaveAiProvider(provider *schema.AiProvider) error {
-	return schema.GetGormProfileDatabase().Create(provider).Error
+func GetDB() *gorm.DB {
+	return schema.GetGormProfileDatabase()
 }
 
-func GetOrCreateAiProvider(wrapperName string, apiKey string) (*schema.AiProvider, error) {
-	var provider schema.AiProvider
-	if err := schema.GetGormProfileDatabase().Where("wrapper_name = ? AND api_key = ?", wrapperName, apiKey).First(&provider).Error; err != nil {
+func SaveAiProvider(provider *schema.AiProvider) error {
+	return GetDB().Create(provider).Error
+}
+
+func GetOrCreateAiProvider(provider *schema.AiProvider) (*schema.AiProvider, error) {
+	var existingProvider schema.AiProvider
+	if err := GetDB().Where("wrapper_name = ? AND model_name = ? AND api_key = ?",
+		provider.WrapperName, provider.ModelName, provider.APIKey).First(&existingProvider).Error; err != nil {
 		// 如果找不到记录，创建一个新的
-		provider = schema.AiProvider{
-			WrapperName: wrapperName,
-			APIKey:      apiKey,
-		}
-		if err := schema.GetGormProfileDatabase().Create(&provider).Error; err != nil {
+		if err := GetDB().Create(provider).Error; err != nil {
 			return nil, err
 		}
+		return provider, nil
 	}
-	return &provider, nil
+	// 返回已存在的记录（带有ID）
+	return &existingProvider, nil
 }
 
 func GetAllAiProviders() ([]*schema.AiProvider, error) {
@@ -30,9 +36,5 @@ func GetAllAiProviders() ([]*schema.AiProvider, error) {
 }
 
 func UpdateAiProvider(provider *schema.AiProvider) error {
-	return schema.GetGormProfileDatabase().Save(provider).Error
-}
-
-func DeleteAiProvider(wrapperName string) error {
-	return schema.GetGormProfileDatabase().Where("wrapper_name = ?", wrapperName).Delete(&schema.AiProvider{}).Error
+	return GetDB().Save(provider).Error
 }

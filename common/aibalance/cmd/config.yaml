@@ -8,6 +8,6 @@ models:
     providers:
       - model_name: "gemini-2.0-flash"
         type_name: "openai"
-        domain_or_url: "http://api.a1i.yaklang.io/v1/chat/completions"
+        domain_or_url: "http://api.ai.yaklang.io/v1/chat/completions"
         no_https: true
         api_key: "sk-yak-yyds" 
