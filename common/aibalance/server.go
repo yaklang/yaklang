@@ -115,13 +115,21 @@ func (e *Entrypoints) PeekProvider(model string) *Provider {
 	if !ok || len(providers) == 0 {
 		return nil
 	}
-	// 返回第一个 provider
+	// Return the first provider
 	return providers[0]
 }
 
 // GetAllProviders returns all providers for the given model
 func (e *Entrypoints) GetAllProviders(model string) []*Provider {
 	return e.providers[model]
+}
+
+// Add adds providers to the model
+func (e *Entrypoints) Add(model string, providers []*Provider) {
+	if _, ok := e.providers[model]; !ok {
+		e.providers[model] = make([]*Provider, 0)
+	}
+	e.providers[model] = append(e.providers[model], providers...)
 }
 
 // ServerConfig represents the server configuration
@@ -398,7 +406,7 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		writer.WriteError(fmt.Errorf("no data received from provider"))
 	}
 
-	// 更新provider状态
+	// Update provider status
 	latencyMs := firstByteDuration.Milliseconds()
 	go func() {
 		if err := provider.UpdateDbProvider(succeed, latencyMs); err != nil {

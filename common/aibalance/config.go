@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"gopkg.in/yaml.v3"
@@ -38,21 +38,25 @@ func NewConfig() *Config {
 }
 
 type YamlConfig struct {
-	Keys   []KeyConfig   `yaml:"keys"`
-	Models []ModelConfig `yaml:"models"`
+	Keys   []KeyConfig   `yaml:"keys" json:"keys"`
+	Models []ModelConfig `yaml:"models" json:"models"`
 }
 
+// ToServerConfig converts YamlConfig to ServerConfig
 func (c *YamlConfig) ToServerConfig() (*ServerConfig, error) {
 	config := NewServerConfig()
 	if config == nil {
 		return nil, fmt.Errorf("failed to create server config")
 	}
 
-	fmt.Printf("YamlConfig.ToServerConfig: Processing config with %d keys and %d models\n", len(c.Keys), len(c.Models))
+	// Record mapping relationship between API keys and allowed models
+	log.Debugf("YamlConfig.ToServerConfig: Processing config with %d keys and %d models", len(c.Keys), len(c.Models))
 
-	// 处理 Keys
+	// Process API keys
 	for i, keyConfig := range c.Keys {
-		fmt.Printf("YamlConfig.ToServerConfig: Processing key %d: %s with %d allowed models\n", i, keyConfig.Key, len(keyConfig.AllowedModels))
+		log.Debugf("YamlConfig.ToServerConfig: Processing key %d: %s with %d allowed models", i, keyConfig.Key, len(keyConfig.AllowedModels))
+
+		// Set up API key
 		key := &Key{
 			Key:           keyConfig.Key,
 			AllowedModels: make(map[string]bool),
@@ -62,76 +66,69 @@ func (c *YamlConfig) ToServerConfig() (*ServerConfig, error) {
 		}
 		config.Keys.keys[keyConfig.Key] = key
 		config.KeyAllowedModels.allowedModels[keyConfig.Key] = key.AllowedModels
+
+		// Set models allowed for this key
+		// Already set up above
 	}
 
-	// 处理 Models
+	// Process model configurations
 	for i, model := range c.Models {
-		fmt.Printf("YamlConfig.ToServerConfig: Processing model %d: %s with %d providers\n", i, model.Name, len(model.Providers))
-		providers := make([]*Provider, 0)
+		log.Debugf("YamlConfig.ToServerConfig: Processing model %d: %s with %d providers", i, model.Name, len(model.Providers))
 
+		// Get all providers for this model
+		var providers []*Provider
+
+		// Process all providers for this model
 		for j, configProvider := range model.Providers {
 			if configProvider == nil {
-				fmt.Printf("YamlConfig.ToServerConfig: Provider %d is nil, skipping\n", j)
+				log.Debugf("YamlConfig.ToServerConfig: Provider %d is nil, skipping", j)
 				continue
 			}
 
-			fmt.Printf("YamlConfig.ToServerConfig: Processing provider %d: type=%s, domain=%s\n", j, configProvider.TypeName, configProvider.DomainOrURL)
+			log.Debugf("YamlConfig.ToServerConfig: Processing provider %d: type=%s, domain=%s", j, configProvider.TypeName, configProvider.DomainOrURL)
 			newProviders := configProvider.ToProviders()
 			if newProviders == nil || len(newProviders) == 0 {
-				fmt.Printf("YamlConfig.ToServerConfig: No providers returned from ToProviders for %s\n", configProvider.TypeName)
+				log.Debugf("YamlConfig.ToServerConfig: No providers returned from ToProviders for %s", configProvider.TypeName)
 				continue
 			}
 
-			fmt.Printf("YamlConfig.ToServerConfig: Provider %d returned %d new providers\n", j, len(newProviders))
+			log.Debugf("YamlConfig.ToServerConfig: Provider %d returned %d new providers", j, len(newProviders))
 			for k, provider := range newProviders {
 				if provider == nil {
-					fmt.Printf("YamlConfig.ToServerConfig: New provider %d is nil, skipping\n", k)
+					log.Debugf("YamlConfig.ToServerConfig: New provider %d is nil, skipping", k)
 					continue
 				}
 
-				// 设置模型名称（如果未设置）
+				// If provider doesn't specify model name, use current model's name
 				if provider.ModelName == "" {
-					fmt.Printf("YamlConfig.ToServerConfig: Setting model name for provider %d.%d to %s\n", j, k, model.Name)
+					log.Debugf("YamlConfig.ToServerConfig: Setting model name for provider %d.%d to %s", j, k, model.Name)
 					provider.ModelName = model.Name
 				}
 
-				// 创建简单的内存中的 Provider
-				provider = &Provider{
-					ModelName:   provider.ModelName,
-					TypeName:    provider.TypeName,
-					DomainOrURL: provider.DomainOrURL,
-					APIKey:      provider.APIKey,
-					NoHTTPS:     provider.NoHTTPS,
-				}
+				// Add to provider list
 				providers = append(providers, provider)
-				fmt.Printf("YamlConfig.ToServerConfig: Added provider to list: type=%s, model=%s\n", provider.TypeName, provider.ModelName)
 
-				// 尝试保存 Provider 到数据库，但不影响主流程
-				// 如果数据库操作失败，我们仍然可以使用内存中的配置
-				dbProvider := &schema.AiProvider{
-					WrapperName: model.Name,         // 设置外层名称(展示给用户的名称)
-					ModelName:   provider.ModelName, // 保持内部实际使用的模型名称
-					TypeName:    provider.TypeName,
-					DomainOrURL: provider.DomainOrURL,
-					APIKey:      provider.APIKey,
-					NoHTTPS:     provider.NoHTTPS,
+				// Ensure both model and type are valid
+				if provider.ModelName == "" || provider.TypeName == "" {
+					continue
 				}
-
-				// 直接使用 GetOrCreateAiProvider 合并创建和更新操作
-				dbAiProvider, err := GetOrCreateAiProvider(dbProvider) // 获取或创建数据库对象
-				if err == nil && dbAiProvider != nil {
-					// 将数据库对象绑定到 Provider
-					provider.DbProvider = dbAiProvider
-				}
+				log.Debugf("YamlConfig.ToServerConfig: Added provider to list: type=%s, model=%s", provider.TypeName, provider.ModelName)
 			}
 		}
 
+		// Ensure provider list is not empty
 		if len(providers) > 0 {
-			fmt.Printf("YamlConfig.ToServerConfig: Setting %d providers for model %s\n", len(providers), model.Name)
+			// Add providers to Models (indexed by actual model name)
 			config.Models.models[model.Name] = providers
-			config.Entrypoints.providers[model.Name] = providers
+
+			// Add providers to Entrypoints (indexed by display name)
+			for _, provider := range providers {
+				config.Entrypoints.Add(model.Name, []*Provider{provider})
+			}
+
+			log.Debugf("YamlConfig.ToServerConfig: Setting %d providers for model %s", len(providers), model.Name)
 		} else {
-			fmt.Printf("YamlConfig.ToServerConfig: No providers found for model %s\n", model.Name)
+			log.Debugf("YamlConfig.ToServerConfig: No providers found for model %s", model.Name)
 		}
 	}
 

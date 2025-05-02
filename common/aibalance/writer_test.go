@@ -197,8 +197,8 @@ func TestMultipleWrites(t *testing.T) {
 
 	// 验证输出
 	output := buf.(*testWriteCloser).String()
-	fmt.Println("Multiple writes output:")
-	fmt.Println(output)
+	t.Log("Multiple writes output:")
+	t.Log(output)
 
 	// 验证所有内容都存在
 	if !bytes.Contains([]byte(output), []byte("Hello")) {
@@ -255,8 +255,8 @@ func TestConcurrentWrites(t *testing.T) {
 
 	// 验证输出
 	output := buf.(*testWriteCloser).String()
-	fmt.Println("Concurrent writes output:")
-	fmt.Println(output)
+	t.Log("Concurrent writes output:")
+	t.Log(output)
 
 	// 验证所有内容都存在
 	if !bytes.Contains([]byte(output), []byte(content)) {
@@ -400,11 +400,11 @@ func TestConcurrentSafety(t *testing.T) {
 
 	// 验证输出
 	output := buf.(*testWriteCloser).String()
-	fmt.Println("Concurrent safety test output (first 1000 chars):")
 	if len(output) > 1000 {
-		fmt.Println(output[:1000] + "...")
+		t.Log("Concurrent safety test output (first 1000 chars):")
+		t.Log(output[:1000] + "...")
 	} else {
-		fmt.Println(output)
+		t.Log(output)
 	}
 
 	// 验证只有一个 [DONE] 标记
