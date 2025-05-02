@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"gopkg.in/yaml.v3"
@@ -107,16 +108,17 @@ func (c *YamlConfig) ToServerConfig() (*ServerConfig, error) {
 
 				// 尝试保存 Provider 到数据库，但不影响主流程
 				// 如果数据库操作失败，我们仍然可以使用内存中的配置
-				if dbProvider, err := GetOrCreateAiProvider(model.Name, provider.APIKey); err == nil {
-					dbProvider.TypeName = provider.TypeName
-					dbProvider.DomainOrURL = provider.DomainOrURL
-					dbProvider.APIKey = provider.APIKey
-					dbProvider.WrapperName = model.Name       // 设置外层名称(展示给用户的名称)
-					dbProvider.ModelName = provider.ModelName // 保持内部实际使用的模型名称
-					dbProvider.NoHTTPS = provider.NoHTTPS
-
-					_ = UpdateAiProvider(dbProvider) // 忽略更新错误
+				dbProvider := &schema.AiProvider{
+					WrapperName: model.Name,         // 设置外层名称(展示给用户的名称)
+					ModelName:   provider.ModelName, // 保持内部实际使用的模型名称
+					TypeName:    provider.TypeName,
+					DomainOrURL: provider.DomainOrURL,
+					APIKey:      provider.APIKey,
+					NoHTTPS:     provider.NoHTTPS,
 				}
+
+				// 直接使用 GetOrCreateAiProvider 合并创建和更新操作
+				_, _ = GetOrCreateAiProvider(dbProvider) // 忽略操作错误
 			}
 		}
 
