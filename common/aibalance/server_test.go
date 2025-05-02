@@ -4,7 +4,11 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 	"testing"
+	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 func TestServeChatCompletions(t *testing.T) {
@@ -133,4 +137,81 @@ func TestServeChatCompletions(t *testing.T) {
 	if !strings.Contains(response, "200 OK") {
 		t.Fatal("期望 200 OK 响应")
 	}
+}
+
+// 模拟 UpdateDbProvider 的线程安全性
+func TestServerProviderStatusUpdateConcurrency(t *testing.T) {
+	// 模拟提供者
+	provider := &Provider{
+		ModelName:   "test-model",
+		TypeName:    "test-type",
+		DomainOrURL: "http://test.com",
+		APIKey:      "test-key",
+		NoHTTPS:     false,
+	}
+
+	// 模拟数据库对象
+	dbProvider := &schema.AiProvider{
+		WrapperName:     "test-wrapper",
+		ModelName:       "test-model",
+		TypeName:        "test-type",
+		DomainOrURL:     "http://test.com",
+		APIKey:          "test-key",
+		NoHTTPS:         false,
+		SuccessCount:    0,
+		FailureCount:    0,
+		TotalRequests:   0,
+		IsHealthy:       true,
+		HealthCheckTime: time.Now(),
+	}
+
+	// 设置 provider 的 DbProvider
+	provider.DbProvider = dbProvider
+
+	// 模拟多个并发请求
+	const requestCount = 100
+
+	// 使用 WaitGroup 等待所有请求完成
+	var wg sync.WaitGroup
+	wg.Add(requestCount)
+
+	// 启动多个并发请求
+	for i := 0; i < requestCount; i++ {
+		go func(idx int) {
+			defer wg.Done()
+
+			// 模拟请求成功或失败
+			success := idx%2 == 0                // 一半成功，一半失败
+			latencyMs := int64(100 + idx%10*100) // 100ms - 1000ms
+
+			// 直接调用 UpdateDbProvider 方法
+			err := provider.UpdateDbProvider(success, latencyMs)
+			if err != nil {
+				t.Errorf("Failed to update provider: %v", err)
+			}
+		}(i)
+	}
+
+	// 等待所有请求完成
+	wg.Wait()
+
+	// 验证统计数据
+	expectedSuccessCount := int64(requestCount / 2)
+	expectedFailureCount := int64(requestCount) - expectedSuccessCount
+
+	if dbProvider.TotalRequests != int64(requestCount) {
+		t.Errorf("Total requests mismatch: expected %d, got %d", requestCount, dbProvider.TotalRequests)
+	}
+
+	if dbProvider.SuccessCount != expectedSuccessCount {
+		t.Errorf("Success count mismatch: expected %d, got %d", expectedSuccessCount, dbProvider.SuccessCount)
+	}
+
+	if dbProvider.FailureCount != expectedFailureCount {
+		t.Errorf("Failure count mismatch: expected %d, got %d", expectedFailureCount, dbProvider.FailureCount)
+	}
+
+	// 验证最后一次请求的状态
+	t.Logf("Last request status: success=%v, latency=%dms, isHealthy=%v",
+		dbProvider.LastRequestStatus, dbProvider.LastLatency, dbProvider.IsHealthy)
 }

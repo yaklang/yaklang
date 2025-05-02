@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai"
@@ -41,6 +42,9 @@ type Provider struct {
 
 	// 数据库中对应的 AiProvider 对象
 	DbProvider *schema.AiProvider `json:"-"` // json:"-" 表示此字段不会被序列化到 JSON
+
+	// 保护并发更新的互斥锁
+	mutex sync.Mutex `json:"-"`
 }
 
 // toProvider 将 ConfigProvider 转换为 Provider（私有方法）
@@ -178,6 +182,10 @@ func (p *Provider) GetAIClient(onStream, onReasonStream func(reader io.Reader)) 
 // GetDbProvider 获取关联的数据库 AiProvider 对象
 // 如果没有关联的数据库对象，尝试从数据库查询或创建
 func (p *Provider) GetDbProvider() (*schema.AiProvider, error) {
+	// 使用互斥锁保护 DbProvider 的读取和设置
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
 	// 如果已经有关联的数据库对象，直接返回
 	if p.DbProvider != nil {
 		return p.DbProvider, nil
@@ -213,6 +221,10 @@ func (p *Provider) UpdateDbProvider(success bool, latencyMs int64) error {
 		return err
 	}
 
+	// 使用 Provider 自身的互斥锁保护并发更新
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
 	// 更新统计信息
 	dbProvider.TotalRequests++
 	dbProvider.LastRequestTime = time.Now()
@@ -225,48 +237,9 @@ func (p *Provider) UpdateDbProvider(success bool, latencyMs int64) error {
 		dbProvider.FailureCount++
 	}
 
-	// 更新 EMA 延迟
-	// EMA = (当前值 * 权重) + (前一个 EMA * (1 - 权重))
-	const alpha10 = 0.2   // EMA-10 的权重
-	const alpha100 = 0.02 // EMA-100 的权重
-
-	if dbProvider.LatencyEMA10 == 0 {
-		dbProvider.LatencyEMA10 = float64(latencyMs)
-	} else {
-		dbProvider.LatencyEMA10 = (float64(latencyMs) * alpha10) + (dbProvider.LatencyEMA10 * (1 - alpha10))
-	}
-
-	if dbProvider.LatencyEMA100 == 0 {
-		dbProvider.LatencyEMA100 = float64(latencyMs)
-	} else {
-		dbProvider.LatencyEMA100 = (float64(latencyMs) * alpha100) + (dbProvider.LatencyEMA100 * (1 - alpha100))
-	}
-
-	// 更新失败率
-	// 计算最近10次和100次的失败率
-	recent10Count := int64(utils.Min(int(dbProvider.TotalRequests), 10))
-	recent100Count := int64(utils.Min(int(dbProvider.TotalRequests), 100))
-
-	if recent10Count > 0 {
-		// 更新 EMA 失败率
-		if success {
-			dbProvider.FailureRate10 = dbProvider.FailureRate10 * (1 - alpha10)
-		} else {
-			dbProvider.FailureRate10 = (1.0 * alpha10) + (dbProvider.FailureRate10 * (1 - alpha10))
-		}
-	}
-
-	if recent100Count > 0 {
-		if success {
-			dbProvider.FailureRate100 = dbProvider.FailureRate100 * (1 - alpha100)
-		} else {
-			dbProvider.FailureRate100 = (1.0 * alpha100) + (dbProvider.FailureRate100 * (1 - alpha100))
-		}
-	}
-
 	// 更新健康状态
-	// 简单规则：如果最近10次请求的失败率超过50%，则认为不健康
-	dbProvider.IsHealthy = dbProvider.FailureRate10 < 0.5
+	// 如果最后一次请求失败或延迟超过3000ms，则标记为不健康
+	dbProvider.IsHealthy = success && latencyMs < 3000
 	dbProvider.HealthCheckTime = time.Now()
 
 	// 保存到数据库
