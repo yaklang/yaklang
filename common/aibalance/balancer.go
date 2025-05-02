@@ -13,7 +13,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// 用于确保健康检查调度器只启动一次
+// Used to ensure the health check scheduler is started only once
 var healthCheckSchedulerStarted sync.Once
 
 type Balancer struct {
@@ -39,7 +39,7 @@ func NewBalancerFromRawConfig(raw []byte, files ...string) (*Balancer, error) {
 		return nil, utils.Wrapf(err, "cannot convert yaml config file to server %s", configFile)
 	}
 
-	// 从数据库加载恢复 providers
+	// Load and restore providers from database
 	if err := LoadProvidersFromDatabase(serverConfig); err != nil {
 		log.Warnf("Failed to load providers from database: %v", err)
 	}
@@ -51,26 +51,27 @@ func NewBalancerFromRawConfig(raw []byte, files ...string) (*Balancer, error) {
 		cancel: cancel,
 	}
 
-	// 启动健康检查调度器 (确保只启动一次)
+	// Start health check scheduler (ensure it only starts once)
 	healthCheckSchedulerStarted.Do(func() {
-		StartHealthCheckScheduler(b, 5*time.Minute) // 修改为5分钟检查一次
+		StartHealthCheckScheduler(b, 5*time.Minute) // Check every 5 minutes
 	})
 
 	return b, nil
 }
 
-// NewBalancer 创建一个新的平衡器实例，如果无法读取配置文件，将会创建一个默认配置并从数据库加载
+// NewBalancer creates a new balancer instance. If the config file cannot be read,
+// it will create a default configuration and load from the database
 func NewBalancer(configFile string) (*Balancer, error) {
-	// 尝试读取配置文件
+	// Try to read the config file
 	raw, err := os.ReadFile(configFile)
 	if err != nil {
-		// 如果配置文件不存在，创建一个基本的服务器配置
+		// If config file doesn't exist, create a basic server config
 		log.Warnf("Failed to read config file %s: %v, using default configuration and loading from database", configFile, err)
 
-		// 创建默认配置
+		// Create default configuration
 		serverConfig := NewServerConfig()
 
-		// 从数据库加载恢复 providers
+		// Load and restore providers from database
 		if err := LoadProvidersFromDatabase(serverConfig); err != nil {
 			log.Warnf("Failed to load providers from database: %v", err)
 		}
@@ -82,15 +83,15 @@ func NewBalancer(configFile string) (*Balancer, error) {
 			cancel: cancel,
 		}
 
-		// 启动健康检查调度器 (确保只启动一次)
+		// Start health check scheduler (ensure it only starts once)
 		healthCheckSchedulerStarted.Do(func() {
-			StartHealthCheckScheduler(b, 5*time.Minute) // 修改为5分钟检查一次
+			StartHealthCheckScheduler(b, 5*time.Minute) // Check every 5 minutes
 		})
 
 		return b, nil
 	}
 
-	// 如果配置文件存在，正常创建
+	// If config file exists, create normally
 	b, err := NewBalancerFromRawConfig(raw, configFile)
 	if err != nil {
 		return nil, err
@@ -99,12 +100,12 @@ func NewBalancer(configFile string) (*Balancer, error) {
 	return b, nil
 }
 
-// LoadProvidersFromDatabase 从数据库加载所有提供者和API密钥
+// LoadProvidersFromDatabase loads all providers and API keys from the database
 func LoadProvidersFromDatabase(config *ServerConfig) error {
 	log.Infof("Starting to load AI providers and API keys from database")
 
-	// 1. 加载 AI 提供者
-	// 获取数据库中所有的提供者
+	// 1. Load AI providers
+	// Get all providers from the database
 	dbProviders, err := GetAllAiProviders()
 	if err != nil {
 		return utils.Errorf("Failed to get AI providers from database: %v", err)
@@ -112,47 +113,47 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 
 	log.Infof("Retrieved %d AI providers from database", len(dbProviders))
 
-	// 按照 WrapperName 分组提供者
+	// Group providers by WrapperName
 	modelProviders := make(map[string][]*Provider)
 
 	for _, dbProvider := range dbProviders {
-		// 跳过无效的提供者
+		// Skip invalid providers
 		if dbProvider.TypeName == "" || dbProvider.ModelName == "" {
 			log.Warnf("Skipping invalid provider: TypeName=%s, ModelName=%s", dbProvider.TypeName, dbProvider.ModelName)
 			continue
 		}
 
-		// 创建 Provider 实例
+		// Create Provider instance
 		provider := &Provider{
 			ModelName:   dbProvider.ModelName,
 			TypeName:    dbProvider.TypeName,
 			DomainOrURL: dbProvider.DomainOrURL,
 			APIKey:      dbProvider.APIKey,
 			NoHTTPS:     dbProvider.NoHTTPS,
-			DbProvider:  dbProvider, // 直接设置数据库对象
+			DbProvider:  dbProvider, // Set database object directly
 		}
 
-		// 使用 WrapperName 作为模型名称来分组
+		// Use WrapperName as model name for grouping
 		modelName := dbProvider.WrapperName
 		if modelName == "" {
-			modelName = dbProvider.ModelName // 如果 WrapperName 为空，使用 ModelName
+			modelName = dbProvider.ModelName // If WrapperName is empty, use ModelName
 		}
 
 		modelProviders[modelName] = append(modelProviders[modelName], provider)
 	}
 
-	// 将提供者添加到配置中
+	// Add providers to config
 	for modelName, providers := range modelProviders {
 		if len(providers) > 0 {
 			log.Infof("Adding %d providers for model %s", len(providers), modelName)
 
-			// 添加到 Models
+			// Add to Models
 			config.Models.models[modelName] = providers
 
-			// 添加到 Entrypoints
+			// Add to Entrypoints
 			config.Entrypoints.providers[modelName] = providers
 
-			// 打印提供者信息
+			// Print provider information
 			for i, p := range providers {
 				log.Infof("  Provider %d: TypeName=%s, ModelName=%s, Domain=%s, HealthStatus=%v",
 					i, p.TypeName, p.ModelName, p.DomainOrURL, p.DbProvider.IsHealthy)
@@ -162,7 +163,7 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 
 	log.Infof("Database AI providers loaded, added %d models in total", len(modelProviders))
 
-	// 2. 加载 API 密钥
+	// 2. Load API keys
 	log.Infof("Starting to load API keys from database")
 	apiKeys, err := GetAllAiApiKeys()
 	if err != nil {
@@ -170,7 +171,7 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 	} else {
 		log.Infof("Retrieved %d API keys from database", len(apiKeys))
 		for _, key := range apiKeys {
-			// 解析允许的模型列表
+			// Parse allowed model list
 			modelNames := strings.Split(key.AllowedModels, ",")
 			modelMap := make(map[string]bool)
 			for _, model := range modelNames {
@@ -179,7 +180,7 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 				}
 			}
 
-			// 添加到内存配置
+			// Add to memory config
 			config.KeyAllowedModels.allowedModels[key.APIKey] = modelMap
 			log.Infof("  API Key: %s, Allowed Models: %s", utils.ShrinkString(key.APIKey, 8), key.AllowedModels)
 		}
@@ -229,7 +230,7 @@ func (b *Balancer) run(addr string) error {
 		conn, err := lis.Accept()
 		if err != nil {
 			if b.ctx.Err() != nil {
-				return nil // 正常关闭
+				return nil // Normal closure
 			}
 			return err
 		}
@@ -245,7 +246,7 @@ func (b *Balancer) run(addr string) error {
 	}
 }
 
-// Close 关闭 balancer 并释放资源
+// Close closes the balancer and releases resources
 func (b *Balancer) Close() error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -261,11 +262,11 @@ func (b *Balancer) Close() error {
 	return nil
 }
 
-// GetProviders 获取所有提供者
+// GetProviders gets all providers
 func (b *Balancer) GetProviders() []*Provider {
 	var providers []*Provider
 
-	// 从所有模型中获取提供者
+	// Get providers from all models
 	for _, modelProviders := range b.config.Models.models {
 		providers = append(providers, modelProviders...)
 	}

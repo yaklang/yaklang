@@ -12,28 +12,28 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// HealthCheckResult 存储健康检查结果
+// HealthCheckResult stores health check results
 type HealthCheckResult struct {
 	Provider     *schema.AiProvider
 	IsHealthy    bool
-	ResponseTime int64 // 毫秒
+	ResponseTime int64 // milliseconds
 	Error        error
 }
 
-// 使用简单的 ping 消息进行健康检查
+// Use a simple ping message for health check
 const healthCheckPrompt = "Ping. Please respond with 'Pong'."
 
-// HealthCheckManager 管理提供者的健康检查
+// HealthCheckManager manages provider health checks
 type HealthCheckManager struct {
-	Balancer      *Balancer                  // 负载均衡器
-	checkInterval time.Duration              // 健康检查间隔
-	checkResults  map[int]*HealthCheckResult // 存储最新的健康检查结果
-	lastCheckTime map[uint]time.Time         // 存储上次检查时间，避免频繁检查同一提供者
-	mutex         sync.RWMutex               // 保护 checkResults 和 lastCheckTime 的互斥锁
-	stopChan      chan struct{}              // 停止健康检查的信号
+	Balancer      *Balancer                  // Load balancer
+	checkInterval time.Duration              // Health check interval
+	checkResults  map[int]*HealthCheckResult // Store latest health check results
+	lastCheckTime map[uint]time.Time         // Store last check time to avoid frequent checks
+	mutex         sync.RWMutex               // Mutex to protect checkResults and lastCheckTime
+	stopChan      chan struct{}              // Signal to stop health checks
 }
 
-// NewHealthCheckManager 创建健康检查管理器
+// NewHealthCheckManager creates a new health check manager
 func NewHealthCheckManager(balancer *Balancer) *HealthCheckManager {
 	return &HealthCheckManager{
 		Balancer:      balancer,
@@ -44,14 +44,14 @@ func NewHealthCheckManager(balancer *Balancer) *HealthCheckManager {
 	}
 }
 
-// SetCheckInterval 设置健康检查的间隔时间
+// SetCheckInterval sets the health check interval
 func (m *HealthCheckManager) SetCheckInterval(interval time.Duration) {
 	if interval > 0 {
 		m.checkInterval = interval
 	}
 }
 
-// ShouldCheck 判断是否应该检查指定的提供者
+// ShouldCheck determines if a provider should be checked
 func (m *HealthCheckManager) ShouldCheck(providerID uint) bool {
 	m.mutex.RLock()
 	lastTime, exists := m.lastCheckTime[providerID]
@@ -64,14 +64,14 @@ func (m *HealthCheckManager) ShouldCheck(providerID uint) bool {
 	return time.Since(lastTime) > m.checkInterval
 }
 
-// RecordCheck 记录检查时间
+// RecordCheck records the check time
 func (m *HealthCheckManager) RecordCheck(providerID uint) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.lastCheckTime[providerID] = time.Now()
 }
 
-// CheckProviderHealth 检查单个提供者的健康状态
+// CheckProviderHealth checks the health status of a single provider
 func CheckProviderHealth(provider *Provider) (*HealthCheckResult, error) {
 	result := &HealthCheckResult{
 		Provider:  provider.DbProvider,
@@ -107,7 +107,7 @@ func CheckProviderHealth(provider *Provider) (*HealthCheckResult, error) {
 		},
 	)
 	if err != nil {
-		result.Error = fmt.Errorf("获取 AI 客户端失败: %v", err)
+		result.Error = fmt.Errorf("Failed to get AI client: %v", err)
 		return result, nil
 	}
 
@@ -131,9 +131,9 @@ func CheckProviderHealth(provider *Provider) (*HealthCheckResult, error) {
 	select {
 	case succeeded = <-succeededChan:
 		// 成功获取到结果
-	case <-time.After(15 * time.Second): // 15秒超时
+	case <-time.After(15 * time.Second): // 15 second timeout
 		succeeded = false
-		result.Error = fmt.Errorf("健康检查超时")
+		result.Error = fmt.Errorf("Health check timeout")
 	}
 
 	// 如果没有收到任何字节，firstByteDuration 可能为 0
@@ -151,18 +151,18 @@ func CheckProviderHealth(provider *Provider) (*HealthCheckResult, error) {
 
 	// 如果有错误但尚未设置错误消息
 	if !succeeded && result.Error == nil && respErr != nil {
-		result.Error = fmt.Errorf("健康检查失败: %v", respErr)
+		result.Error = fmt.Errorf("Health check failed: %v", respErr)
 	}
 
 	return result, nil
 }
 
-// CheckAllProviders 检查所有注册的提供者健康状态
+// CheckAllProviders checks health status of all registered providers
 func CheckAllProviders(checkManager *HealthCheckManager) ([]*HealthCheckResult, error) {
-	// 获取所有提供者
+	// Get all providers
 	dbProviders, err := GetAllAiProviders()
 	if err != nil {
-		return nil, fmt.Errorf("获取提供者列表失败: %v", err)
+		return nil, fmt.Errorf("Failed to get provider list: %v", err)
 	}
 
 	// 存储检查结果
@@ -194,7 +194,7 @@ func CheckAllProviders(checkManager *HealthCheckManager) ([]*HealthCheckResult, 
 			// 执行健康检查
 			result, err := CheckProviderHealth(provider)
 			if err != nil {
-				log.Errorf("检查提供者 %s (ID: %d) 健康状态时出错: %v", dbp.WrapperName, dbp.ID, err)
+				log.Errorf("Error checking health status for provider %s (ID: %d): %v", dbp.WrapperName, dbp.ID, err)
 				return
 			}
 
@@ -210,13 +210,13 @@ func CheckAllProviders(checkManager *HealthCheckManager) ([]*HealthCheckResult, 
 			} else {
 				dbp.LastRequestStatus = false
 				if result.Error != nil {
-					log.Warnf("提供者 %s (ID: %d) 健康检查失败: %v", dbp.WrapperName, dbp.ID, result.Error)
+					log.Warnf("Provider %s (ID: %d) health check failed: %v", dbp.WrapperName, dbp.ID, result.Error)
 				}
 			}
 
 			// 保存到数据库
 			if err := UpdateAiProvider(dbp); err != nil {
-				log.Errorf("更新提供者 %s (ID: %d) 状态失败: %v", dbp.WrapperName, dbp.ID, err)
+				log.Errorf("Failed to update provider %s (ID: %d) status: %v", dbp.WrapperName, dbp.ID, err)
 			}
 
 			// 添加到结果列表
@@ -229,7 +229,7 @@ func CheckAllProviders(checkManager *HealthCheckManager) ([]*HealthCheckResult, 
 	// 等待所有检查完成
 	wg.Wait()
 
-	log.Infof("完成 %d 个 AI 提供者的健康检查", len(results))
+	log.Infof("Completed health check for %d AI providers", len(results))
 	return results, nil
 }
 
@@ -238,7 +238,7 @@ func RunManualHealthCheck() ([]*HealthCheckResult, error) {
 	// 获取一个 Balancer 实例
 	balancer, err := NewBalancer("")
 	if err != nil {
-		return nil, fmt.Errorf("创建 Balancer 实例失败: %v", err)
+		return nil, fmt.Errorf("Failed to create Balancer instance: %v", err)
 	}
 	defer balancer.Close()
 
@@ -246,7 +246,7 @@ func RunManualHealthCheck() ([]*HealthCheckResult, error) {
 	manager := NewHealthCheckManager(balancer)
 
 	// 执行健康检查
-	log.Infof("开始手动健康检查...")
+	log.Infof("Starting manual health check...")
 	results := CheckAllProvidersHealth(manager)
 
 	// 更新数据库中提供者的健康状态

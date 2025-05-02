@@ -21,13 +21,13 @@ func GetOrCreateAiProvider(provider *schema.AiProvider) (*schema.AiProvider, err
 	var existingProvider schema.AiProvider
 	if err := GetDB().Where("wrapper_name = ? AND model_name = ? AND api_key = ?",
 		provider.WrapperName, provider.ModelName, provider.APIKey).First(&existingProvider).Error; err != nil {
-		// 如果找不到记录，创建一个新的
+		// If record not found, create a new one
 		if err := GetDB().Create(provider).Error; err != nil {
 			return nil, err
 		}
 		return provider, nil
 	}
-	// 返回已存在的记录（带有ID）
+	// Return existing record (with ID)
 	return &existingProvider, nil
 }
 
@@ -39,7 +39,7 @@ func GetAllAiProviders() ([]*schema.AiProvider, error) {
 	return providers, nil
 }
 
-// GetAiProvidersByModelName 从数据库获取指定模型名称(WrapperName)的所有Provider
+// GetAiProvidersByModelName gets all providers with specified model name (WrapperName) from database
 func GetAiProvidersByModelName(modelName string) ([]*schema.AiProvider, error) {
 	var providers []*schema.AiProvider
 	if err := GetDB().Where("wrapper_name = ?", modelName).Find(&providers).Error; err != nil {
@@ -48,7 +48,7 @@ func GetAiProvidersByModelName(modelName string) ([]*schema.AiProvider, error) {
 	return providers, nil
 }
 
-// GetAiProvidersByModelType 从数据库获取指定模型类型(TypeName)的所有Provider
+// GetAiProvidersByModelType gets all providers with specified model type (TypeName) from database
 func GetAiProvidersByModelType(typeName string) ([]*schema.AiProvider, error) {
 	var providers []*schema.AiProvider
 	if err := GetDB().Where("type_name = ?", typeName).Find(&providers).Error; err != nil {
@@ -57,15 +57,15 @@ func GetAiProvidersByModelType(typeName string) ([]*schema.AiProvider, error) {
 	return providers, nil
 }
 
-// RegisterAiProvider 注册一个新的 AI 提供者到数据库
-// wrapperName: 外部展示给用户的模型名称
-// modelName: 内部实际使用的模型名称
-// typeName: 提供者类型，如 openai, chatglm 等
-// domainOrUrl: API 域名或 URL
-// apiKey: API 密钥
-// noHTTPS: 是否禁用 HTTPS
+// RegisterAiProvider registers a new AI provider to the database
+// wrapperName: model name displayed to users
+// modelName: actual model name used internally
+// typeName: provider type, such as openai, chatglm, etc.
+// domainOrUrl: API domain or URL
+// apiKey: API key
+// noHTTPS: whether to disable HTTPS
 func RegisterAiProvider(wrapperName, modelName, typeName, domainOrUrl, apiKey string, noHTTPS bool) (*schema.AiProvider, error) {
-	// 创建提供者对象
+	// Create provider object
 	provider := &schema.AiProvider{
 		WrapperName:       wrapperName,
 		ModelName:         modelName,
@@ -83,17 +83,17 @@ func RegisterAiProvider(wrapperName, modelName, typeName, domainOrUrl, apiKey st
 		HealthCheckTime:   time.Now(),
 	}
 
-	// 检查是否存在相同的提供者
+	// Check if provider with same details exists
 	var existingProvider schema.AiProvider
 	if err := GetDB().Where("wrapper_name = ? AND model_name = ? AND api_key = ?",
 		wrapperName, modelName, apiKey).First(&existingProvider).Error; err == nil {
-		// 如果已存在，返回现有提供者
+		// If exists, return existing provider
 		log.Infof("Provider already exists: WrapperName=%s, ModelName=%s, TypeName=%s",
 			wrapperName, modelName, typeName)
 		return &existingProvider, nil
 	}
 
-	// 创建新提供者
+	// Create new provider
 	if err := GetDB().Create(provider).Error; err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func UpdateAiProvider(provider *schema.AiProvider) error {
 	return GetDB().Save(provider).Error
 }
 
-// SaveAiApiKey 保存API密钥到数据库
+// SaveAiApiKey saves API key to database
 func SaveAiApiKey(apiKey string, allowedModels string) error {
 	key := &schema.AiApiKeys{
 		APIKey:        apiKey,
@@ -116,7 +116,7 @@ func SaveAiApiKey(apiKey string, allowedModels string) error {
 	return GetDB().Create(key).Error
 }
 
-// GetAiApiKey 根据API密钥获取数据库记录
+// GetAiApiKey gets database record by API key
 func GetAiApiKey(apiKey string) (*schema.AiApiKeys, error) {
 	var key schema.AiApiKeys
 	if err := GetDB().Where("api_key = ?", apiKey).First(&key).Error; err != nil {
@@ -125,7 +125,7 @@ func GetAiApiKey(apiKey string) (*schema.AiApiKeys, error) {
 	return &key, nil
 }
 
-// GetAllAiApiKeys 获取所有API密钥
+// GetAllAiApiKeys gets all API keys
 func GetAllAiApiKeys() ([]*schema.AiApiKeys, error) {
 	var keys []*schema.AiApiKeys
 	if err := GetDB().Find(&keys).Error; err != nil {
@@ -134,18 +134,18 @@ func GetAllAiApiKeys() ([]*schema.AiApiKeys, error) {
 	return keys, nil
 }
 
-// DeleteAiApiKey 删除API密钥
+// DeleteAiApiKey deletes API key
 func DeleteAiApiKey(apiKey string) error {
 	return GetDB().Where("api_key = ?", apiKey).Delete(&schema.AiApiKeys{}).Error
 }
 
-// UpdateAiApiKey 更新API密钥的允许模型
+// UpdateAiApiKey updates allowed models for API key
 func UpdateAiApiKey(apiKey string, allowedModels string) error {
 	return GetDB().Model(&schema.AiApiKeys{}).Where("api_key = ?", apiKey).
 		Update("allowed_models", allowedModels).Error
 }
 
-// GetAiProviderByID 根据ID获取单个AI提供者
+// GetAiProviderByID gets single AI provider by ID
 func GetAiProviderByID(id uint) (*schema.AiProvider, error) {
 	var provider schema.AiProvider
 	if err := GetDB().Where("id = ?", id).First(&provider).Error; err != nil {
@@ -154,21 +154,21 @@ func GetAiProviderByID(id uint) (*schema.AiProvider, error) {
 	return &provider, nil
 }
 
-// DeleteAiProviderByID 根据ID删除AI提供者
+// DeleteAiProviderByID deletes AI provider by ID
 func DeleteAiProviderByID(id uint) error {
-	// 先获取提供者信息，便于日志记录
+	// Get provider info first for logging
 	provider, err := GetAiProviderByID(id)
 	if err != nil {
-		return fmt.Errorf("获取提供者信息失败: %v", err)
+		return fmt.Errorf("Failed to get provider info: %v", err)
 	}
 
-	// 执行删除操作
+	// Execute delete operation
 	if err := GetDB().Delete(&schema.AiProvider{}, id).Error; err != nil {
-		return fmt.Errorf("删除提供者失败: %v", err)
+		return fmt.Errorf("Failed to delete provider: %v", err)
 	}
 
-	// 记录删除日志
-	log.Infof("成功删除AI提供者 (ID: %d, 名称: %s, 模型: %s)",
+	// Log deletion
+	log.Infof("Successfully deleted AI provider (ID: %d, Name: %s, Model: %s)",
 		id, provider.WrapperName, provider.ModelName)
 
 	return nil
