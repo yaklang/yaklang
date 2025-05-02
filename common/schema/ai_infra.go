@@ -2,6 +2,8 @@ package schema
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/jinzhu/gorm"
@@ -67,4 +69,36 @@ func (c *AiCheckpoint) BeforeSave() error {
 	}
 
 	return nil
+}
+
+type AiProvider struct {
+	gorm.Model
+
+	ModelName   string `json:"model_name"`
+	TypeName    string `json:"type_name"`
+	DomainOrURL string `json:"domain_or_url"`
+	APIKey      string `json:"api_key"`
+	NoHTTPS     bool   `json:"no_https"`
+
+	// 可用性指标
+	SuccessCount  int64 `json:"success_count"`  // 成功请求总数
+	FailureCount  int64 `json:"failure_count"`  // 失败请求总数
+	TotalRequests int64 `json:"total_requests"` // 总请求数
+
+	// EMA (指数移动平均) 相关指标
+	LatencyEMA10  float64 `json:"latency_ema_10"`  // 最近10次请求的延迟EMA (毫秒)
+	LatencyEMA100 float64 `json:"latency_ema_100"` // 最近100次请求的延迟EMA (毫秒)
+
+	// 失败率指标
+	FailureRate10  float64 `json:"failure_rate_10"`  // 最近10次请求的失败率
+	FailureRate100 float64 `json:"failure_rate_100"` // 最近100次请求的失败率
+
+	// 最后一次请求信息
+	LastRequestTime   time.Time `json:"last_request_time"`   // 最后一次请求时间
+	LastRequestStatus bool      `json:"last_request_status"` // 最后一次请求状态 (true=成功, false=失败)
+	LastLatency       int64     `json:"last_latency"`        // 最后一次请求延迟 (毫秒)
+
+	// 健康状态
+	IsHealthy       bool      `json:"is_healthy"`        // 提供者是否健康
+	HealthCheckTime time.Time `json:"health_check_time"` // 最后一次健康检查时间
 }

@@ -1,45 +1,38 @@
 package aibalance
 
 import (
-	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
 	"testing"
-
-	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 func TestServeChatCompletions(t *testing.T) {
 	// 创建测试配置
-	cfg := NewConfig()
+	cfg := NewServerConfig()
 
 	// 添加测试密钥
-	key := &KeyConfig{
+	key := &Key{
 		Key:           "test-key",
-		AllowedModels: []string{"test-model"},
+		AllowedModels: make(map[string]bool),
 	}
-	cfg.Keys.Set("test-key", key)
+	key.AllowedModels["test-model"] = true
+	cfg.Keys.keys["test-key"] = key
 
 	// 添加允许的模型
-	allowedModels := omap.NewOrderedMap[string, bool](make(map[string]bool))
-	allowedModels.Set("test-model", true)
-	cfg.KeyAllowedModels.Set("test-key", allowedModels)
+	allowedModels := make(map[string]bool)
+	allowedModels["test-model"] = true
+	cfg.KeyAllowedModels.allowedModels["test-key"] = allowedModels
 
 	// 添加测试模型
-	model := &ModelConfig{
-		Name: "test-model",
-		Providers: []*Provider{
-			{
-				ModelName:   "test-model",
-				TypeName:    "test-provider",
-				DomainOrURL: "http://test.com",
-				APIKey:      "test-api-key",
-			},
-		},
+	model := &Provider{
+		ModelName:   "test-model",
+		TypeName:    "openai",
+		DomainOrURL: "http://test.com",
+		APIKey:      "test-api-key",
 	}
-	cfg.Models.Set("test-model", model)
+	cfg.Models.models["test-model"] = []*Provider{model}
+	cfg.Entrypoints.providers["test-model"] = []*Provider{model}
 
 	// 创建测试连接
 	client, server := net.Pipe()
@@ -77,12 +70,13 @@ func TestServeChatCompletions(t *testing.T) {
 	}()
 
 	// 发送未授权请求
+	jsonBody := `{"model":"test-model","messages":[{"role":"user","content":"test"}]}`
 	client.Write([]byte("POST /v1/chat/completions HTTP/1.1\r\n" +
 		"Host: localhost\r\n" +
 		"Content-Type: application/json\r\n" +
-		"Content-Length: 20\r\n" +
+		fmt.Sprintf("Content-Length: %d\r\n", len(jsonBody)) +
 		"\r\n" +
-		"{\"model\":\"test-model\"}"))
+		jsonBody))
 
 	n, _ = client.Read(buf)
 	response = string(buf[:n])
@@ -99,25 +93,15 @@ func TestServeChatCompletions(t *testing.T) {
 		cfg.Serve(server)
 	}()
 
-	// 发送请求到不存在的模型
-	chatMsg := aispec.ChatMessage{
-		Model: "non-existent-model",
-		Messages: []aispec.ChatDetail{
-			{
-				Role:    "user",
-				Content: "test message",
-			},
-		},
-	}
-	body, _ := json.Marshal(chatMsg)
-
+	// 发送不存在的模型请求
+	jsonBody = `{"model":"non-existent","messages":[{"role":"user","content":"test"}]}`
 	client.Write([]byte("POST /v1/chat/completions HTTP/1.1\r\n" +
 		"Host: localhost\r\n" +
 		"Authorization: Bearer test-key\r\n" +
 		"Content-Type: application/json\r\n" +
-		"Content-Length: " + fmt.Sprint(len(body)) + "\r\n" +
-		"\r\n"))
-	client.Write(body)
+		fmt.Sprintf("Content-Length: %d\r\n", len(jsonBody)) +
+		"\r\n" +
+		jsonBody))
 
 	n, _ = client.Read(buf)
 	response = string(buf[:n])
@@ -125,7 +109,7 @@ func TestServeChatCompletions(t *testing.T) {
 		t.Fatal("期望 404 Not Found 响应")
 	}
 
-	// 测试用例4: 无效的路径
+	// 测试用例4: 有效的请求
 	client, server = net.Pipe()
 	defer client.Close()
 	defer server.Close()
@@ -134,14 +118,19 @@ func TestServeChatCompletions(t *testing.T) {
 		cfg.Serve(server)
 	}()
 
-	// 发送请求到无效路径
-	client.Write([]byte("GET /invalid/path HTTP/1.1\r\n" +
+	// 发送有效请求
+	jsonBody = `{"model":"test-model","messages":[{"role":"user","content":"test"}]}`
+	client.Write([]byte("POST /v1/chat/completions HTTP/1.1\r\n" +
 		"Host: localhost\r\n" +
-		"\r\n"))
+		"Authorization: Bearer test-key\r\n" +
+		"Content-Type: application/json\r\n" +
+		fmt.Sprintf("Content-Length: %d\r\n", len(jsonBody)) +
+		"\r\n" +
+		jsonBody))
 
 	n, _ = client.Read(buf)
 	response = string(buf[:n])
-	if !strings.Contains(response, "404 Not Found") {
-		t.Fatal("期望 404 Not Found 响应")
+	if !strings.Contains(response, "200 OK") {
+		t.Fatal("期望 200 OK 响应")
 	}
 }

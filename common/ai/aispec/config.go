@@ -68,7 +68,9 @@ func WithContext(ctx context.Context) AIConfigOption {
 
 func WithBaseURL(baseURL string) AIConfigOption {
 	return func(c *AIConfig) {
-		c.BaseURL = baseURL
+		if baseURL != "" {
+			c.BaseURL = baseURL
+		}
 	}
 }
 

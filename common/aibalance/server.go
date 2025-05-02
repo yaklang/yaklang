@@ -79,36 +79,46 @@ func (k *KeyAllowedModels) Keys() []string {
 
 // ModelManager manages AI models and their providers
 type ModelManager struct {
-	models map[string]*Provider
+	models map[string][]*Provider
 }
 
 // NewModelManager creates a new model manager
 func NewModelManager() *ModelManager {
 	return &ModelManager{
-		models: make(map[string]*Provider),
+		models: make(map[string][]*Provider),
 	}
 }
 
 // Get retrieves a model from the manager
-func (m *ModelManager) Get(name string) (*Provider, bool) {
+func (m *ModelManager) Get(name string) ([]*Provider, bool) {
 	v, ok := m.models[name]
 	return v, ok
 }
 
 // Entrypoints manages model providers
 type Entrypoints struct {
-	providers map[string]*Provider
+	providers map[string][]*Provider
 }
 
 // NewEntrypoints creates a new entrypoints manager
 func NewEntrypoints() *Entrypoints {
 	return &Entrypoints{
-		providers: make(map[string]*Provider),
+		providers: make(map[string][]*Provider),
 	}
 }
 
-// PeekProvider retrieves a provider for a model
+// PeekProvider returns a random provider for the given model
 func (e *Entrypoints) PeekProvider(model string) *Provider {
+	providers, ok := e.providers[model]
+	if !ok || len(providers) == 0 {
+		return nil
+	}
+	// 返回第一个 provider
+	return providers[0]
+}
+
+// GetAllProviders returns all providers for the given model
+func (e *Entrypoints) GetAllProviders(model string) []*Provider {
 	return e.providers[model]
 }
 
@@ -129,7 +139,7 @@ func NewServerConfig() *ServerConfig {
 		Models:           NewModelManager(),
 		Entrypoints:      NewEntrypoints(),
 		Logging: LogLevel{
-			Debug: false,
+			Debug: true,
 			Info:  true,
 			Warn:  true,
 			Error: true,
