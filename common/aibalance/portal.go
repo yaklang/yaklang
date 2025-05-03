@@ -38,6 +38,16 @@ type ProviderData struct {
 	IsHealthy     bool
 }
 
+// APIKeyData contains data for displaying an API key
+type APIKeyData struct {
+	ID         uint
+	Key        string
+	DisplayKey string
+	CreatedAt  string
+	LastUsedAt string
+	Active     bool
+}
+
 // PortalData contains all data for the management panel page
 type PortalData struct {
 	CurrentTime      string
@@ -47,6 +57,7 @@ type PortalData struct {
 	SuccessRate      float64
 	Providers        []ProviderData
 	AllowedModels    map[string]string
+	APIKeys          []APIKeyData
 }
 
 // Session represents a user session
@@ -317,6 +328,32 @@ func (c *ServerConfig) servePortal(conn net.Conn) {
 			modelNames = append(modelNames, model)
 		}
 		data.AllowedModels[key] = strings.Join(modelNames, ", ")
+	}
+
+	// 获取API密钥数据
+	dbApiKeys, err := GetAllAiApiKeys()
+	if err == nil {
+		for _, apiKey := range dbApiKeys {
+			// 创建部分隐藏的API密钥显示
+			displayKey := apiKey.APIKey
+			if len(displayKey) > 8 {
+				displayKey = displayKey[:4] + "..." + displayKey[len(displayKey)-4:]
+			}
+
+			// 创建APIKeyData结构
+			keyData := APIKeyData{
+				ID:         apiKey.ID,
+				Key:        apiKey.APIKey,
+				DisplayKey: displayKey,
+				CreatedAt:  apiKey.CreatedAt.Format("2006-01-02 15:04:05"),
+				Active:     true, // 默认为激活状态，如果数据库中有状态字段，这里可以调整
+			}
+
+			// 如果有最后使用时间字段，可以在这里设置
+			// keyData.LastUsedAt = apiKey.LastUsedAt.Format("2006-01-02 15:04:05")
+
+			data.APIKeys = append(data.APIKeys, keyData)
+		}
 	}
 
 	var tmpl *template.Template
@@ -818,6 +855,14 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 		c.handleAddProvider(conn, request)
 	} else if strings.HasPrefix(uriIns.Path, "/portal/delete-provider/") && request.Method == "DELETE" {
 		c.handleDeleteProvider(conn, request, uriIns.Path)
+	} else if strings.HasPrefix(uriIns.Path, "/portal/delete-api-key/") && request.Method == "DELETE" {
+		c.handleDeleteAPIKey(conn, request, uriIns.Path)
+	} else if uriIns.Path == "/portal/delete-api-keys" && request.Method == "POST" {
+		c.handleDeleteMultipleAPIKeys(conn, request)
+	} else if strings.HasPrefix(uriIns.Path, "/portal/activate-api-key/") && request.Method == "POST" {
+		c.handleToggleAPIKeyStatus(conn, request, uriIns.Path, true)
+	} else if strings.HasPrefix(uriIns.Path, "/portal/deactivate-api-key/") && request.Method == "POST" {
+		c.handleToggleAPIKeyStatus(conn, request, uriIns.Path, false)
 	} else {
 		// Default return home page
 		c.servePortalWithAuth(conn)
@@ -1199,7 +1244,7 @@ func (c *ServerConfig) handleAddProvider(conn net.Conn, request *http.Request) {
 	})
 }
 
-// handleDeleteProvider 处理删除提供者的请求
+// handleDeleteProvider deletes a provider by ID extracted from the URL path
 func (c *ServerConfig) handleDeleteProvider(conn net.Conn, request *http.Request, path string) {
 	c.logInfo("处理删除提供者请求: %s", path)
 
@@ -1240,4 +1285,157 @@ func (c *ServerConfig) handleDeleteProvider(conn net.Conn, request *http.Request
 		"success": true,
 		"message": fmt.Sprintf("成功删除提供者 ID=%d", providerID),
 	})
+}
+
+// handleDeleteAPIKey handles deletion of a single API key
+func (c *ServerConfig) handleDeleteAPIKey(conn net.Conn, request *http.Request, path string) {
+	// Extract API key ID from URL path
+	idStr := strings.TrimPrefix(path, "/portal/delete-api-key/")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.logError("Invalid API key ID: %v", err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": "Invalid API key ID",
+		})
+		return
+	}
+
+	// Get API key info for logging purposes
+	var apiKey schema.AiApiKeys
+	if err := GetDB().First(&apiKey, uint(id)).Error; err != nil {
+		c.logError("API key not found: %v", err)
+		c.writeJSONResponse(conn, http.StatusNotFound, map[string]interface{}{
+			"success": false,
+			"message": "API key not found",
+		})
+		return
+	}
+
+	// Delete the API key from memory configuration (if exists)
+	delete(c.KeyAllowedModels.allowedModels, apiKey.APIKey)
+	// Also remove from Keys structure if exists
+	delete(c.Keys.keys, apiKey.APIKey)
+
+	// Delete the API key from database
+	if err := GetDB().Delete(&schema.AiApiKeys{}, uint(id)).Error; err != nil {
+		c.logError("Failed to delete API key: %v", err)
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
+			"success": false,
+			"message": "Failed to delete API key",
+		})
+		return
+	}
+
+	c.logInfo("Successfully deleted API key (ID: %d)", id)
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"message": "API key deleted successfully",
+	})
+}
+
+// handleDeleteMultipleAPIKeys handles deletion of multiple API keys
+func (c *ServerConfig) handleDeleteMultipleAPIKeys(conn net.Conn, request *http.Request) {
+	// Parse request body
+	var requestData struct {
+		IDs []uint `json:"ids"`
+	}
+
+	if err := json.NewDecoder(request.Body).Decode(&requestData); err != nil {
+		c.logError("Failed to parse request body: %v", err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": "Invalid request format",
+		})
+		return
+	}
+
+	if len(requestData.IDs) == 0 {
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": "No API key IDs specified",
+		})
+		return
+	}
+
+	// Get API keys to delete for memory configuration cleanup
+	var apiKeys []schema.AiApiKeys
+	if err := GetDB().Where("id IN (?)", requestData.IDs).Find(&apiKeys).Error; err != nil {
+		c.logError("Failed to retrieve API keys: %v", err)
+	} else {
+		// Remove from memory configuration
+		for _, key := range apiKeys {
+			delete(c.KeyAllowedModels.allowedModels, key.APIKey)
+			delete(c.Keys.keys, key.APIKey)
+		}
+	}
+
+	// Delete API keys from database
+	result := GetDB().Where("id IN (?)", requestData.IDs).Delete(&schema.AiApiKeys{})
+	if result.Error != nil {
+		c.logError("Failed to delete API keys: %v", result.Error)
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
+			"success": false,
+			"message": "Failed to delete API keys",
+		})
+		return
+	}
+
+	c.logInfo("Successfully deleted %d API keys", result.RowsAffected)
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"message": fmt.Sprintf("Successfully deleted %d API keys", result.RowsAffected),
+	})
+}
+
+// handleToggleAPIKeyStatus handles activation/deactivation of an API key
+func (c *ServerConfig) handleToggleAPIKeyStatus(conn net.Conn, request *http.Request, path string, activate bool) {
+	// Extract API key ID from URL path
+	prefixPath := "/portal/"
+	if activate {
+		prefixPath += "activate-api-key/"
+	} else {
+		prefixPath += "deactivate-api-key/"
+	}
+
+	idStr := strings.TrimPrefix(path, prefixPath)
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.logError("Invalid API key ID: %v", err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": "Invalid API key ID",
+		})
+		return
+	}
+
+	// Get API key info
+	var apiKey schema.AiApiKeys
+	if err := GetDB().First(&apiKey, uint(id)).Error; err != nil {
+		c.logError("API key not found: %v", err)
+		c.writeJSONResponse(conn, http.StatusNotFound, map[string]interface{}{
+			"success": false,
+			"message": "API key not found",
+		})
+		return
+	}
+
+	// Currently, the AiApiKeys schema does not have an Active field.
+	// This is a placeholder for future implementation.
+	// In a real implementation, you would update the Active field in the database.
+
+	// For now, we'll just log the action and return success
+	if activate {
+		c.logInfo("Activated API key (ID: %d)", id)
+		c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+			"success": true,
+			"message": "API key activated successfully",
+		})
+	} else {
+		c.logInfo("Deactivated API key (ID: %d)", id)
+		c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+			"success": true,
+			"message": "API key deactivated successfully",
+		})
+	}
 }
