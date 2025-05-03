@@ -1477,7 +1477,7 @@ func (c *ServerConfig) handleBatchToggleAPIKeyStatus(conn net.Conn, request *htt
 
 	// Parse request body
 	var reqBody struct {
-		IDs []uint `json:"ids"`
+		IDs []string `json:"ids"` // Changed to []string to accept string IDs from JSON
 	}
 
 	bodyBytes, err := io.ReadAll(request.Body)
@@ -1512,10 +1512,25 @@ func (c *ServerConfig) handleBatchToggleAPIKeyStatus(conn net.Conn, request *htt
 		return
 	}
 
-	// Call batch update function in the database layer
-	affectedCount, err := BatchUpdateAiApiKeyStatus(reqBody.IDs, activate)
+	// Convert string IDs to uint IDs
+	uintIDs := make([]uint, 0, len(reqBody.IDs))
+	for _, idStr := range reqBody.IDs {
+		id, err := strconv.ParseUint(idStr, 10, 32)
+		if err != nil {
+			c.logError("Invalid API key ID '%s' in batch request: %v", idStr, err)
+			c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+				"success": false,
+				"message": fmt.Sprintf("Invalid API key ID format: %s", idStr),
+			})
+			return
+		}
+		uintIDs = append(uintIDs, uint(id))
+	}
+
+	// Call batch update function in the database layer with uint IDs
+	affectedCount, err := BatchUpdateAiApiKeyStatus(uintIDs, activate)
 	if err != nil {
-		c.logError("Failed to batch %s %d API keys: %v", action, len(reqBody.IDs), err)
+		c.logError("Failed to batch %s %d API keys: %v", action, len(uintIDs), err)
 		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
 			"success": false,
 			"message": fmt.Sprintf("Failed to %s API keys", action),
@@ -1523,7 +1538,7 @@ func (c *ServerConfig) handleBatchToggleAPIKeyStatus(conn net.Conn, request *htt
 		return
 	}
 
-	c.logInfo("Successfully %sd %d API keys (%d requested)", action, affectedCount, len(reqBody.IDs))
+	c.logInfo("Successfully %sd %d API keys (%d requested)", action, affectedCount, len(uintIDs))
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"message": fmt.Sprintf("Successfully %sd %d API keys", action, affectedCount),

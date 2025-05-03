@@ -2887,7 +2887,7 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
         async function disableMultipleAPIKeys(apiIds) {
             showToast('正在禁用API密钥...', 'info');
             try {
-                const response = await fetch('/portal/disable-api-keys', { // New backend endpoint
+                const response = await fetch('/portal/batch-deactivate-api-keys', { // New backend endpoint, was /portal/disable-api-keys
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -2950,7 +2950,7 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
         async function enableMultipleAPIKeys(apiIds) {
             showToast('正在启用API密钥...', 'info');
             try {
-                const response = await fetch('/portal/enable-api-keys', {
+                const response = await fetch('/portal/batch-activate-api-keys', { // New backend endpoint, was /portal/enable-api-keys
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
