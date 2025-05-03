@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -13,17 +14,32 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	uuid "github.com/google/uuid"
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 //go:embed templates/portal.html templates/login.html templates/add_provider.html templates/api_keys.html
 var templatesFS embed.FS
+
+// formatBytes 将字节大小转换为人类可读的格式（KB、MB、GB等）
+func formatBytes(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
 
 // ProviderData contains data for template rendering
 type ProviderData struct {
@@ -40,12 +56,20 @@ type ProviderData struct {
 
 // APIKeyData contains data for displaying an API key
 type APIKeyData struct {
-	ID         uint
-	Key        string
-	DisplayKey string
-	CreatedAt  string
-	LastUsedAt string
-	Active     bool
+	ID                   uint
+	Key                  string
+	DisplayKey           string
+	AllowedModels        string
+	CreatedAt            string
+	LastUsedAt           string
+	UsageCount           int64
+	SuccessCount         int64
+	FailureCount         int64
+	InputBytes           int64
+	OutputBytes          int64
+	InputBytesFormatted  string
+	OutputBytesFormatted string
+	Active               bool
 }
 
 // PortalData contains all data for the management panel page
@@ -60,109 +84,134 @@ type PortalData struct {
 	APIKeys          []APIKeyData
 }
 
-// Session represents a user session
+// Session represents a user session (application level, not DB schema)
 type Session struct {
 	ID        string    // Session ID
 	CreatedAt time.Time // Creation time
 	ExpiresAt time.Time // Expiration time
 }
 
-// SessionManager manages user sessions
+// SessionManager manages user sessions stored in the database
 type SessionManager struct {
-	sessions map[string]*Session // Session storage
-	mutex    sync.RWMutex        // Read-write lock protecting session mapping
+	// sessions map and mutex are removed as we use the database now
 }
 
 // NewSessionManager creates a new session manager
 func NewSessionManager() *SessionManager {
-	return &SessionManager{
-		sessions: make(map[string]*Session),
-	}
+	return &SessionManager{} // No in-memory map to initialize
 }
 
-// CreateSession creates a new session
+// CreateSession creates a new session and stores it in the database
 func (sm *SessionManager) CreateSession() string {
-	sm.mutex.Lock()
-	defer sm.mutex.Unlock()
-
-	// Create new UUID as session ID
 	sessionID := uuid.New().String()
+	expiresAt := time.Now().Add(30 * time.Minute) // 30 minutes expiration
 
-	// Create session with 24-hour expiration
-	session := &Session{
-		ID:        sessionID,
-		CreatedAt: time.Now(),
-		ExpiresAt: time.Now().Add(24 * time.Hour),
+	dbSession := schema.LoginSession{
+		SessionID: sessionID,
+		ExpiresAt: expiresAt,
 	}
 
-	// Store session
-	sm.sessions[sessionID] = session
+	// Save to database
+	// Assume GetDB() returns a valid *gorm.DB instance
+	if err := GetDB().Create(&dbSession).Error; err != nil {
+		log.Errorf("Failed to create session in database: %v", err)
+		// In a real-world scenario, you might want to handle this error more gracefully
+		// For now, we'll log it and return an empty string or potentially panic
+		return "" // Indicate failure
+	}
 
+	log.Infof("Created new session %s, expires at %s", sessionID, expiresAt.Format(time.RFC3339))
 	return sessionID
 }
 
-// GetSession retrieves a session
+// GetSession retrieves a session from the database and checks its validity
 func (sm *SessionManager) GetSession(sessionID string) *Session {
-	sm.mutex.RLock()
-	defer sm.mutex.RUnlock()
-
-	session, exists := sm.sessions[sessionID]
-	if !exists {
+	var dbSession schema.LoginSession
+	// Retrieve from database
+	err := GetDB().Where("session_id = ?", sessionID).First(&dbSession).Error
+	if err != nil {
+		if err != gorm.ErrRecordNotFound {
+			log.Errorf("Error retrieving session %s from database: %v", sessionID, err)
+		}
+		// If not found or other error, return nil
 		return nil
 	}
 
 	// Check if session has expired
-	if time.Now().After(session.ExpiresAt) {
-		// Delete expired session
-		delete(sm.sessions, sessionID)
+	if time.Now().After(dbSession.ExpiresAt) {
+		log.Infof("Session %s has expired at %s, deleting.", sessionID, dbSession.ExpiresAt.Format(time.RFC3339))
+		// Delete expired session asynchronously to not block the request
+		go sm.DeleteSession(sessionID) // Run deletion in a separate goroutine
 		return nil
 	}
 
-	return session
-}
-
-// DeleteSession removes a session
-func (sm *SessionManager) DeleteSession(sessionID string) {
-	sm.mutex.Lock()
-	defer sm.mutex.Unlock()
-	delete(sm.sessions, sessionID)
-}
-
-// CleanupExpiredSessions removes expired sessions
-func (sm *SessionManager) CleanupExpiredSessions() {
-	sm.mutex.Lock()
-	defer sm.mutex.Unlock()
-
-	now := time.Now()
-	for id, session := range sm.sessions {
-		if now.After(session.ExpiresAt) {
-			delete(sm.sessions, id)
-		}
+	log.Debugf("Retrieved valid session %s", sessionID)
+	// Return the application-level Session struct
+	return &Session{
+		ID:        dbSession.SessionID,
+		CreatedAt: dbSession.CreatedAt, // Use GORM's CreatedAt
+		ExpiresAt: dbSession.ExpiresAt,
 	}
 }
 
-// checkAuth checks admin authentication using session ID instead of direct password
+// DeleteSession removes a session from the database
+func (sm *SessionManager) DeleteSession(sessionID string) {
+	log.Infof("Deleting session %s from database", sessionID)
+	// Delete from database
+	result := GetDB().Where("session_id = ?", sessionID).Delete(&schema.LoginSession{})
+	if result.Error != nil {
+		log.Errorf("Failed to delete session %s from database: %v", sessionID, result.Error)
+	} else if result.RowsAffected == 0 {
+		log.Warnf("Attempted to delete session %s, but it was not found.", sessionID)
+	} else {
+		log.Infof("Successfully deleted session %s.", sessionID)
+	}
+}
+
+// CleanupExpiredSessions removes expired sessions from the database
+func (sm *SessionManager) CleanupExpiredSessions() {
+	log.Infof("Running cleanup for expired sessions...")
+	now := time.Now()
+	// Delete expired sessions from database
+	result := GetDB().Where("expires_at < ?", now).Delete(&schema.LoginSession{})
+	if result.Error != nil {
+		log.Errorf("Error cleaning up expired sessions: %v", result.Error)
+	} else if result.RowsAffected > 0 {
+		log.Infof("Cleaned up %d expired sessions.", result.RowsAffected)
+	} else {
+		log.Debugf("No expired sessions found to clean up.")
+	}
+}
+
+// checkAuth checks admin authentication using session ID from cookie
 func (c *ServerConfig) checkAuth(request *http.Request) bool {
 	// Get session ID from cookie
-	cookies := request.Cookies()
-	for _, cookie := range cookies {
-		if cookie.Name == "admin_session" {
-			// Validate session
-			session := c.SessionManager.GetSession(cookie.Value)
-			if session != nil {
-				return true
-			}
+	cookie, err := request.Cookie("admin_session")
+	if err == nil && cookie.Value != "" {
+		// Validate session using the database-backed SessionManager
+		session := c.SessionManager.GetSession(cookie.Value)
+		if session != nil {
+			// Session is valid
+			log.Debugf("Authentication successful via session cookie: %s", cookie.Value)
+			return true
 		}
+		log.Warnf("Invalid or expired session cookie found: %s", cookie.Value)
+	} else if err != http.ErrNoCookie {
+		// Log error only if it's not ErrNoCookie
+		log.Warnf("Error reading admin_session cookie: %v", err)
 	}
 
-	// Get password authentication from query parameters
+	// Fallback: Get password authentication from query parameters (for one-time access)
+	// This part remains unchanged, allowing temporary access via password if needed.
 	query := request.URL.Query()
 	password := query.Get("password")
-	if password == c.AdminPassword {
-		// Password authentication successful, but no session is generated, this is for one-time access only
+	if c.AdminPassword != "" && password == c.AdminPassword {
+		// Password authentication successful, but no session is generated.
+		log.Infof("Authentication successful via query parameter password (one-time access).")
 		return true
 	}
 
+	log.Debugf("Authentication failed for request: %s", request.URL.Path)
 	return false
 }
 
@@ -340,17 +389,31 @@ func (c *ServerConfig) servePortal(conn net.Conn) {
 				displayKey = displayKey[:4] + "..." + displayKey[len(displayKey)-4:]
 			}
 
+			// 格式化流量数据，使其更具可读性
+			inputBytesFormatted := formatBytes(apiKey.InputBytes)
+			outputBytesFormatted := formatBytes(apiKey.OutputBytes)
+
 			// 创建APIKeyData结构
 			keyData := APIKeyData{
-				ID:         apiKey.ID,
-				Key:        apiKey.APIKey,
-				DisplayKey: displayKey,
-				CreatedAt:  apiKey.CreatedAt.Format("2006-01-02 15:04:05"),
-				Active:     true, // 默认为激活状态，如果数据库中有状态字段，这里可以调整
+				ID:                   apiKey.ID,
+				Key:                  apiKey.APIKey,
+				DisplayKey:           displayKey,
+				AllowedModels:        apiKey.AllowedModels,
+				CreatedAt:            apiKey.CreatedAt.Format("2006-01-02 15:04:05"),
+				UsageCount:           apiKey.UsageCount,
+				SuccessCount:         apiKey.SuccessCount,
+				FailureCount:         apiKey.FailureCount,
+				InputBytes:           apiKey.InputBytes,
+				OutputBytes:          apiKey.OutputBytes,
+				InputBytesFormatted:  inputBytesFormatted,
+				OutputBytesFormatted: outputBytesFormatted,
+				Active:               apiKey.Active,
 			}
 
-			// 如果有最后使用时间字段，可以在这里设置
-			// keyData.LastUsedAt = apiKey.LastUsedAt.Format("2006-01-02 15:04:05")
+			// 设置最后使用时间
+			if !apiKey.LastUsedTime.IsZero() {
+				keyData.LastUsedAt = apiKey.LastUsedTime.Format("2006-01-02 15:04:05")
+			}
 
 			data.APIKeys = append(data.APIKeys, keyData)
 		}
@@ -838,7 +901,7 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 	} else if uriIns.Path == "/portal/api-keys" {
 		c.serveAPIKeysPage(conn)
 	} else if uriIns.Path == "/portal/create-api-key" && request.Method == "POST" {
-		c.processCreateAPIKey(conn, request)
+		c.handleGenerateApiKey(conn, request)
 	} else if uriIns.Path == "/portal/api/health-check" {
 		c.serveHealthCheckAPI(conn, request)
 	} else if uriIns.Path == "/portal/api/providers" {
@@ -851,18 +914,18 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 		c.handleGenerateApiKey(conn, request)
 	} else if uriIns.Path == "/portal/logout" {
 		c.handleLogout(conn, request)
-	} else if uriIns.Path == "/portal/add-provider" && request.Method == "POST" {
-		c.handleAddProvider(conn, request)
 	} else if strings.HasPrefix(uriIns.Path, "/portal/delete-provider/") && request.Method == "DELETE" {
 		c.handleDeleteProvider(conn, request, uriIns.Path)
-	} else if strings.HasPrefix(uriIns.Path, "/portal/delete-api-key/") && request.Method == "DELETE" {
-		c.handleDeleteAPIKey(conn, request, uriIns.Path)
-	} else if uriIns.Path == "/portal/delete-api-keys" && request.Method == "POST" {
-		c.handleDeleteMultipleAPIKeys(conn, request)
+	} else if uriIns.Path == "/portal/delete-providers" && request.Method == "POST" {
+		c.handleDeleteMultipleProviders(conn, request)
 	} else if strings.HasPrefix(uriIns.Path, "/portal/activate-api-key/") && request.Method == "POST" {
 		c.handleToggleAPIKeyStatus(conn, request, uriIns.Path, true)
 	} else if strings.HasPrefix(uriIns.Path, "/portal/deactivate-api-key/") && request.Method == "POST" {
 		c.handleToggleAPIKeyStatus(conn, request, uriIns.Path, false)
+	} else if uriIns.Path == "/portal/batch-activate-api-keys" && request.Method == "POST" {
+		c.handleBatchToggleAPIKeyStatus(conn, request, true)
+	} else if uriIns.Path == "/portal/batch-deactivate-api-keys" && request.Method == "POST" {
+		c.handleBatchToggleAPIKeyStatus(conn, request, false)
 	} else {
 		// Default return home page
 		c.servePortalWithAuth(conn)
@@ -1000,11 +1063,11 @@ func (c *ServerConfig) serveHealthCheckAPI(conn net.Conn, request *http.Request)
 
 // writeJSONResponse sends a JSON-formatted response
 func (c *ServerConfig) writeJSONResponse(conn net.Conn, statusCode int, data interface{}) {
-	// Convert data to JSON
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		c.logError("Failed to marshal JSON: %v", err)
-		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to marshal JSON: %v", err)))
+		c.logError("Failed to marshal JSON response: %v", err)
+		errorHeader := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n", len(`{"error":"Internal server error"}`))
+		conn.Write([]byte(errorHeader + `{"error":"Internal server error"}`))
 		return
 	}
 
@@ -1168,93 +1231,133 @@ func (c *ServerConfig) handleCheckAllHealth(conn net.Conn, request *http.Request
 	})
 }
 
-// handleGenerateApiKey 处理生成API密钥的请求
+// handleGenerateApiKey handles requests to generate a new API key
 func (c *ServerConfig) handleGenerateApiKey(conn net.Conn, request *http.Request) {
-	c.logInfo("处理生成API密钥请求")
+	c.logInfo("Processing generate API key request")
 
-	// 生成一个新的UUID作为API密钥
-	apiKey := uuid.New().String()
+	if !c.checkAuth(request) {
+		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		return
+	}
 
-	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
-		"success": true,
-		"message": "成功生成API密钥",
-		"apiKey":  apiKey,
-	})
+	if request.Method != http.MethodPost {
+		c.writeJSONResponse(conn, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed, use POST"})
+		return
+	}
+
+	// Parse request body
+	var reqBody struct {
+		AllowedModels []string `json:"allowed_models"`
+	}
+
+	bodyBytes, err := io.ReadAll(request.Body)
+	if err != nil {
+		c.logError("Failed to read request body for API key generation: %v", err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{"error": "Failed to read request body"})
+		return
+	}
+	defer request.Body.Close()
+
+	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
+		c.logError("Failed to unmarshal request body for API key generation: %v", err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{"error": "Invalid request body format"})
+		return
+	}
+
+	// Validate whether models are selected
+	if len(reqBody.AllowedModels) == 0 {
+		c.logWarn("API key generation request missing allowed_models")
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{"error": "Missing or empty 'allowed_models' field"})
+		return
+	}
+
+	// Call new function to generate and store API key
+	apiKey, err := c.generateAndStoreAPIKey(reqBody.AllowedModels)
+	if err != nil {
+		c.logError("Failed to generate and store API key: %v", err)
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]string{"error": "Failed to generate API key"})
+		return
+	}
+
+	c.logInfo("Successfully generated new API key with allowed models: %v", reqBody.AllowedModels)
+	c.writeJSONResponse(conn, http.StatusOK, map[string]string{"apiKey": apiKey})
 }
 
-// handleAddProvider 处理添加提供者的请求
-func (c *ServerConfig) handleAddProvider(conn net.Conn, request *http.Request) {
-	c.logInfo("处理添加提供者请求")
+// generateAndStoreAPIKey generates a new API key and stores it with associated models
+func (c *ServerConfig) generateAndStoreAPIKey(allowedModels []string) (string, error) {
+	apiKey := uuid.New().String() // Or use a more secure generation method
+	allowedModelsStr := strings.Join(allowedModels, ",")
 
-	// 解析请求体
-	var provider struct {
-		WrapperName string `json:"wrapperName"`
-		ModelName   string `json:"modelName"`
-		TypeName    string `json:"typeName"`
-		DomainOrURL string `json:"domainOrURL"`
+	// Linter Error Fix: Use existing schema.AiApiKeys struct
+	newKeyData := &schema.AiApiKeys{ // Was schema.AIBalancerAPIKey
+		APIKey:        apiKey, // Field name is APIKey, not Key
+		AllowedModels: allowedModelsStr,
+		// CreatedAt and Active are part of gorm.Model
+		// Initialize stats
+		UsageCount:   0,
+		SuccessCount: 0,
+		FailureCount: 0,
+		InputBytes:   0,
+		OutputBytes:  0,
+		// LastUsedTime can be initialized or left zero
+		LastUsedTime: time.Time{}, // Explicitly zero value
 	}
 
-	// 尝试解析JSON
-	err := json.NewDecoder(request.Body).Decode(&provider)
+	// Linter Error Fix: Use existing SaveAiApiKey function with correct arguments
+	err := SaveAiApiKey(newKeyData.APIKey, newKeyData.AllowedModels) // Pass strings
 	if err != nil {
-		c.logError("解析请求体失败: %v", err)
-		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
-			"success": false,
-			"message": fmt.Sprintf("无效的请求格式: %v", err),
-		})
-		return
+		// Linter Error Fix: Use c.logError for logging within the method
+		c.logError("Failed to store new API key in database: %v", err)
+		// log.WithError(err).Error("Failed to store new API key in database") // Cannot use global log here
+		return "", fmt.Errorf("failed to store new API key: %w", err)
 	}
 
-	// 验证字段
-	if provider.WrapperName == "" || provider.ModelName == "" || provider.TypeName == "" || provider.DomainOrURL == "" {
-		c.logError("请求缺少必要字段")
-		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
-			"success": false,
-			"message": "必须提供所有必填字段",
-		})
-		return
-	}
-
-	// 创建数据库对象
-	dbProvider := &schema.AiProvider{
-		ModelName:       provider.ModelName,
-		TypeName:        provider.TypeName,
-		DomainOrURL:     provider.DomainOrURL,
-		WrapperName:     provider.WrapperName,
-		IsHealthy:       true,       // 默认设置为健康
-		LastRequestTime: time.Now(), // 设置最后请求时间
-		HealthCheckTime: time.Now(), // 设置健康检查时间
-	}
-
-	// 保存到数据库
-	err = SaveAiProvider(dbProvider)
+	// Linter Error Fix: Reload API keys from DB after adding a new one
+	// Remove the assumption of reloadAPIKeysFromDB() and explicitly reload by calling LoadAPIKeysFromDB.
+	err = c.LoadAPIKeysFromDB() // Reload keys into memory using the existing method
 	if err != nil {
-		c.logError("保存提供者失败: %v", err)
-		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
-			"success": false,
-			"message": fmt.Sprintf("保存提供者失败: %v", err),
-		})
-		return
+		c.logError("Failed to reload API keys into memory after adding a new one: %v", err)
+		// Log the error but continue, the key was saved, but the in-memory list might be stale
 	}
+	/*
+		newKeys, err := GetAllAiApiKeys() // Reload all keys from DB
+		if err != nil {
+			c.logError("Failed to reload API keys from DB after adding a new one: %v", err)
+			// Log the error but continue, the key was saved, but the in-memory list might be stale
+		} else {
+			// Update the ServerConfig's in-memory map (assuming it's named APIKeys)
+			newAPIKeysMap := make(map[string]*schema.AiApiKeys)
+			for _, k := range newKeys {
+				newAPIKeysMap[k.APIKey] = k
+			}
+			c.APIKeys = newAPIKeysMap // Update the map in ServerConfig // THIS WAS THE ERROR
+			c.logInfo("Successfully reloaded %d API keys into memory", len(newKeys))
+		}
+	*/
 
-	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
-		"success": true,
-		"message": "成功添加提供者",
-		"id":      dbProvider.ID,
-	})
+	// c.reloadAPIKeysFromDB() // Was c.AddAPIKeyToMemory(newKey)
+	// An alternative if direct manipulation is needed:
+	// c.APIKeys[apiKey] = newKeyData // Assuming c.APIKeys is a map[string]*schema.AiApiKeys
+
+	return apiKey, nil
 }
 
-// handleDeleteProvider deletes a provider by ID extracted from the URL path
+// handleDeleteProvider handles requests to delete a provider
 func (c *ServerConfig) handleDeleteProvider(conn net.Conn, request *http.Request, path string) {
-	c.logInfo("处理删除提供者请求: %s", path)
+	c.logInfo("Processing delete provider request: %s", path)
 
-	// 从路径中提取提供者ID
+	if !c.checkAuth(request) {
+		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		return
+	}
+
+	// Extract provider ID from URL path
 	parts := strings.Split(path, "/")
 	if len(parts) < 4 {
-		c.logError("无效的路径格式: %s", path)
+		c.logError("Invalid path format: %s", path)
 		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
 			"success": false,
-			"message": "无效的请求路径",
+			"message": "Invalid request path",
 		})
 		return
 	}
@@ -1262,38 +1365,59 @@ func (c *ServerConfig) handleDeleteProvider(conn net.Conn, request *http.Request
 	providerIDStr := parts[len(parts)-1]
 	providerID, err := strconv.ParseUint(providerIDStr, 10, 32)
 	if err != nil {
-		c.logError("无效的提供者ID: %s, 错误: %v", providerIDStr, err)
+		c.logError("Invalid provider ID: %s, error: %v", providerIDStr, err)
 		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
 			"success": false,
-			"message": fmt.Sprintf("无效的提供者ID: %s", providerIDStr),
+			"message": fmt.Sprintf("Invalid provider ID: %s", providerIDStr),
 		})
 		return
 	}
 
-	// 删除数据库记录
+	// Delete database record
 	err = DeleteAiProviderByID(uint(providerID))
 	if err != nil {
-		c.logError("删除提供者失败 ID=%d: %v", providerID, err)
+		c.logError("Delete provider failed ID=%d: %v", providerID, err)
 		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
 			"success": false,
-			"message": fmt.Sprintf("删除提供者失败: %v", err),
+			"message": fmt.Sprintf("Delete provider failed: %v", err),
 		})
 		return
 	}
 
-	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
-		"success": true,
-		"message": fmt.Sprintf("成功删除提供者 ID=%d", providerID),
-	})
+	c.logInfo("Successfully deleted provider with ID: %d", providerID)
+	c.writeJSONResponse(conn, http.StatusOK, map[string]string{"message": "Provider deleted successfully"})
 }
 
-// handleDeleteAPIKey handles deletion of a single API key
-func (c *ServerConfig) handleDeleteAPIKey(conn net.Conn, request *http.Request, path string) {
+// handleToggleAPIKeyStatus handles requests to activate or deactivate an API key
+func (c *ServerConfig) handleToggleAPIKeyStatus(conn net.Conn, request *http.Request, path string, activate bool) {
+	action := "deactivate"
+	prefixPath := "/portal/deactivate-api-key/"
+	if activate {
+		action = "activate"
+		prefixPath = "/portal/activate-api-key/"
+	}
+	c.logInfo("Processing %s API key request: %s", action, path)
+
+	if !c.checkAuth(request) {
+		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		return
+	}
+
+	// Ensure it's a POST request for state changes
+	if request.Method != http.MethodPost {
+		c.logError("Method not allowed for toggling API key status, expected POST")
+		c.writeJSONResponse(conn, http.StatusMethodNotAllowed, map[string]interface{}{
+			"success": false,
+			"message": "Method Not Allowed, use POST",
+		})
+		return
+	}
+
 	// Extract API key ID from URL path
-	idStr := strings.TrimPrefix(path, "/portal/delete-api-key/")
+	idStr := strings.TrimPrefix(path, prefixPath)
 	id, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil {
-		c.logError("Invalid API key ID: %v", err)
+		c.logError("Invalid API key ID '%s': %v", idStr, err)
 		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
 			"success": false,
 			"message": "Invalid API key ID",
@@ -1301,48 +1425,77 @@ func (c *ServerConfig) handleDeleteAPIKey(conn net.Conn, request *http.Request, 
 		return
 	}
 
-	// Get API key info for logging purposes
-	var apiKey schema.AiApiKeys
-	if err := GetDB().First(&apiKey, uint(id)).Error; err != nil {
-		c.logError("API key not found: %v", err)
-		c.writeJSONResponse(conn, http.StatusNotFound, map[string]interface{}{
-			"success": false,
-			"message": "API key not found",
-		})
+	// Update the API key status in the database
+	err = UpdateAiApiKeyStatus(uint(id), activate)
+	if err != nil {
+		// Check if it's a record not found error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.logError("API key not found for ID %d: %v", id, err)
+			c.writeJSONResponse(conn, http.StatusNotFound, map[string]interface{}{
+				"success": false,
+				"message": "API key not found",
+			})
+		} else {
+			c.logError("Failed to %s API key (ID: %d): %v", action, id, err)
+			c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
+				"success": false,
+				"message": fmt.Sprintf("Failed to %s API key", action),
+			})
+		}
 		return
 	}
 
-	// Delete the API key from memory configuration (if exists)
-	delete(c.KeyAllowedModels.allowedModels, apiKey.APIKey)
-	// Also remove from Keys structure if exists
-	delete(c.Keys.keys, apiKey.APIKey)
-
-	// Delete the API key from database
-	if err := GetDB().Delete(&schema.AiApiKeys{}, uint(id)).Error; err != nil {
-		c.logError("Failed to delete API key: %v", err)
-		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
-			"success": false,
-			"message": "Failed to delete API key",
-		})
-		return
-	}
-
-	c.logInfo("Successfully deleted API key (ID: %d)", id)
+	c.logInfo("Successfully %sd API key (ID: %d)", action, id)
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
-		"message": "API key deleted successfully",
+		"message": fmt.Sprintf("API key %sd successfully", action),
 	})
 }
 
-// handleDeleteMultipleAPIKeys handles deletion of multiple API keys
-func (c *ServerConfig) handleDeleteMultipleAPIKeys(conn net.Conn, request *http.Request) {
+// handleBatchToggleAPIKeyStatus handles requests to batch activate or deactivate API keys
+func (c *ServerConfig) handleBatchToggleAPIKeyStatus(conn net.Conn, request *http.Request, activate bool) {
+	action := "deactivate"
+	if activate {
+		action = "activate"
+	}
+	c.logInfo("Processing batch %s API keys request", action)
+
+	if !c.checkAuth(request) {
+		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		return
+	}
+
+	// Ensure it's a POST request
+	if request.Method != http.MethodPost {
+		c.logError("Method not allowed for batch toggling API key status, expected POST")
+		c.writeJSONResponse(conn, http.StatusMethodNotAllowed, map[string]interface{}{
+			"success": false,
+			"message": "Method Not Allowed, use POST",
+		})
+		return
+	}
+
 	// Parse request body
-	var requestData struct {
+	var reqBody struct {
 		IDs []uint `json:"ids"`
 	}
 
-	if err := json.NewDecoder(request.Body).Decode(&requestData); err != nil {
-		c.logError("Failed to parse request body: %v", err)
+	bodyBytes, err := io.ReadAll(request.Body)
+	if err != nil {
+		c.logError("Failed to read request body for batch %s API keys: %v", action, err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": "Failed to read request body",
+		})
+		return
+	}
+	defer request.Body.Close()                              // Close the original body
+	request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes)) // Restore body for potential re-reads if needed
+
+	// Decode JSON
+	decoder := json.NewDecoder(bytes.NewReader(bodyBytes))
+	if err := decoder.Decode(&reqBody); err != nil {
+		c.logError("Failed to parse request body for batch %s API keys: %v. Body: %s", action, err, string(bodyBytes))
 		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
 			"success": false,
 			"message": "Invalid request format",
@@ -1350,7 +1503,8 @@ func (c *ServerConfig) handleDeleteMultipleAPIKeys(conn net.Conn, request *http.
 		return
 	}
 
-	if len(requestData.IDs) == 0 {
+	if len(reqBody.IDs) == 0 {
+		c.logWarn("No API key IDs specified for batch %s", action)
 		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
 			"success": false,
 			"message": "No API key IDs specified",
@@ -1358,84 +1512,137 @@ func (c *ServerConfig) handleDeleteMultipleAPIKeys(conn net.Conn, request *http.
 		return
 	}
 
-	// Get API keys to delete for memory configuration cleanup
-	var apiKeys []schema.AiApiKeys
-	if err := GetDB().Where("id IN (?)", requestData.IDs).Find(&apiKeys).Error; err != nil {
-		c.logError("Failed to retrieve API keys: %v", err)
-	} else {
-		// Remove from memory configuration
-		for _, key := range apiKeys {
-			delete(c.KeyAllowedModels.allowedModels, key.APIKey)
-			delete(c.Keys.keys, key.APIKey)
-		}
-	}
-
-	// Delete API keys from database
-	result := GetDB().Where("id IN (?)", requestData.IDs).Delete(&schema.AiApiKeys{})
-	if result.Error != nil {
-		c.logError("Failed to delete API keys: %v", result.Error)
+	// Call batch update function in the database layer
+	affectedCount, err := BatchUpdateAiApiKeyStatus(reqBody.IDs, activate)
+	if err != nil {
+		c.logError("Failed to batch %s %d API keys: %v", action, len(reqBody.IDs), err)
 		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
 			"success": false,
-			"message": "Failed to delete API keys",
+			"message": fmt.Sprintf("Failed to %s API keys", action),
 		})
 		return
 	}
 
-	c.logInfo("Successfully deleted %d API keys", result.RowsAffected)
+	c.logInfo("Successfully %sd %d API keys (%d requested)", action, affectedCount, len(reqBody.IDs))
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
-		"message": fmt.Sprintf("Successfully deleted %d API keys", result.RowsAffected),
+		"message": fmt.Sprintf("Successfully %sd %d API keys", action, affectedCount),
+		"count":   affectedCount,
 	})
 }
 
-// handleToggleAPIKeyStatus handles activation/deactivation of an API key
-func (c *ServerConfig) handleToggleAPIKeyStatus(conn net.Conn, request *http.Request, path string, activate bool) {
-	// Extract API key ID from URL path
-	prefixPath := "/portal/"
-	if activate {
-		prefixPath += "activate-api-key/"
-	} else {
-		prefixPath += "deactivate-api-key/"
+// handleDeleteMultipleProviders handles requests to delete multiple providers
+func (c *ServerConfig) handleDeleteMultipleProviders(conn net.Conn, request *http.Request) {
+	c.logInfo("Processing delete multiple providers request")
+
+	if !c.checkAuth(request) {
+		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		return
 	}
 
-	idStr := strings.TrimPrefix(path, prefixPath)
-	id, err := strconv.ParseUint(idStr, 10, 32)
+	// Read the body first for logging
+	bodyBytes, err := io.ReadAll(request.Body)
 	if err != nil {
-		c.logError("Invalid API key ID: %v", err)
+		c.logError("Failed to read request body for multiple provider deletion (before decode): %v", err)
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
+			"success": false,
+			"message": "Failed to read request body",
+		})
+		return
+	}
+	request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes)) // Restore body
+	defer request.Body.Close()
+
+	c.logInfo("Raw request body for delete multiple providers: %s", string(bodyBytes))
+
+	// Parse request body struct - CHANGED IDs to []string
+	var reqBody struct {
+		IDs []string `json:"ids"` // Expect strings from JSON
+	}
+
+	// Decode JSON body (Now using the restored body)
+	// Need to use a new decoder instance as the body was replaced
+	decoder := json.NewDecoder(bytes.NewReader(bodyBytes))
+	if err := decoder.Decode(&reqBody); err != nil {
+		c.logError("Failed to parse request body for multiple provider deletion: %v. Body was: %s", err, string(bodyBytes))
 		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
 			"success": false,
-			"message": "Invalid API key ID",
+			"message": "Invalid request format",
 		})
 		return
 	}
 
-	// Get API key info
-	var apiKey schema.AiApiKeys
-	if err := GetDB().First(&apiKey, uint(id)).Error; err != nil {
-		c.logError("API key not found: %v", err)
-		c.writeJSONResponse(conn, http.StatusNotFound, map[string]interface{}{
+	if len(reqBody.IDs) == 0 {
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
 			"success": false,
-			"message": "API key not found",
+			"message": "No provider IDs specified for deletion",
 		})
 		return
 	}
 
-	// Currently, the AiApiKeys schema does not have an Active field.
-	// This is a placeholder for future implementation.
-	// In a real implementation, you would update the Active field in the database.
-
-	// For now, we'll just log the action and return success
-	if activate {
-		c.logInfo("Activated API key (ID: %d)", id)
-		c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
-			"success": true,
-			"message": "API key activated successfully",
-		})
-	} else {
-		c.logInfo("Deactivated API key (ID: %d)", id)
-		c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
-			"success": true,
-			"message": "API key deactivated successfully",
-		})
+	// Convert string IDs to uint IDs
+	providerIDsUint := make([]uint, 0, len(reqBody.IDs))
+	var conversionErrors []string
+	for _, idStr := range reqBody.IDs {
+		idUint, err := strconv.ParseUint(idStr, 10, 32) // Parse as uint (base 10, 32-bit size is appropriate for uint)
+		if err != nil {
+			c.logWarn("Failed to convert provider ID string '%s' to uint: %v", idStr, err)
+			conversionErrors = append(conversionErrors, fmt.Sprintf("ID '%s': %v", idStr, err))
+			continue // Skip invalid IDs or return error? Returning error might be safer.
+		}
+		providerIDsUint = append(providerIDsUint, uint(idUint)) // Convert uint64 result to uint
 	}
+
+	// If there were conversion errors, return a Bad Request
+	if len(conversionErrors) > 0 {
+		c.logError("Errors converting provider IDs: %v", conversionErrors)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": fmt.Sprintf("Invalid provider IDs provided: %s", strings.Join(conversionErrors, "; ")),
+		})
+		return
+	}
+
+	// Check if after conversion, we still have IDs to delete
+	if len(providerIDsUint) == 0 {
+		c.logWarn("No valid provider IDs remained after conversion.")
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": "No valid provider IDs provided after conversion.",
+		})
+		return
+	}
+
+	// Use GORM's batch delete for efficiency with the converted uint slice
+	result := GetDB().Where("id IN (?)", providerIDsUint).Delete(&schema.AiProvider{})
+	if result.Error != nil {
+		c.logError("Failed to delete multiple providers: %v", result.Error)
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
+			"success": false,
+			"message": "Failed to delete providers from database",
+		})
+		return
+	}
+
+	// Check if any rows were actually affected
+	if result.RowsAffected == 0 { // Removed the check for len(reqBody.IDs) > 0 as we use providerIDsUint now
+		c.logWarn("Attempted to delete providers, but no matching IDs found or no rows affected. Valid IDs provided: %v", providerIDsUint)
+		c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{ // Changed from Warn to OK as it's not an error
+			"success":      true,
+			"message":      "No matching providers found to delete, or they were already deleted.",
+			"deletedCount": 0,
+		})
+		return
+	}
+
+	c.logInfo("Successfully deleted %d providers", result.RowsAffected)
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success":      true,
+		"message":      fmt.Sprintf("Successfully deleted %d providers", result.RowsAffected),
+		"deletedCount": result.RowsAffected,
+	})
 }
+
+// handleAddProvider handles the form submission for adding a provider (DEPRECATED, use processAddProviders)
+// func (c *ServerConfig) handleAddProvider(conn net.Conn, request *http.Request) {
+// ... existing code ...

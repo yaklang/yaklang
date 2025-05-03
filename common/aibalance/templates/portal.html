@@ -516,6 +516,19 @@
         th:nth-child(8), td:nth-child(8) { width: 80px; } /* 总请求数 */
         th:nth-child(9), td:nth-child(9) { width: 80px; } /* 成功率 */
         th:nth-child(10), td:nth-child(10) { width: 60px; } /* 操作 */
+        
+        /* API密钥表格列宽 */
+        #api-table th:nth-child(1), #api-table td:nth-child(1) { width: 30px; } /* 复选框 */
+        #api-table th:nth-child(2), #api-table td:nth-child(2) { width: 40px; } /* ID */
+        #api-table th:nth-child(3), #api-table td:nth-child(3) { width: 100px; } /* 新：状态/操作 */
+        #api-table th:nth-child(4), #api-table td:nth-child(4) { width: 150px; } /* API密钥 */
+        #api-table th:nth-child(5), #api-table td:nth-child(5) { width: 120px; } /* 允许模型 */
+        #api-table th:nth-child(6), #api-table td:nth-child(6) { width: 70px; }  /* 使用统计 */
+        #api-table th:nth-child(7), #api-table td:nth-child(7) { width: 100px; } /* 成功/失败 */
+        #api-table th:nth-child(8), #api-table td:nth-child(8) { width: 120px; } /* 流量 */
+        #api-table th:nth-child(9), #api-table td:nth-child(9) { width: 120px; } /* 最后使用 */
+        /* #api-table th:nth-child(9), #api-table td:nth-child(9) { width: 70px; } */ /* 原状态列 - 注释掉 */
+        /* #api-table th:nth-child(10), #api-table td:nth-child(10) { width: 80px; } */ /* 原操作列 - 注释掉 */
 
         /* 表格列对齐方式 */
         /* ID、提供者和类型列居中 */
@@ -524,6 +537,16 @@
         th:nth-child(6), td:nth-child(6),
         th:nth-child(7), td:nth-child(7),
         th:nth-child(8), td:nth-child(8) {
+            text-align: center;
+        }
+        
+        /* API表格列对齐方式 */
+        #api-table th:nth-child(2), #api-table td:nth-child(2),
+        #api-table th:nth-child(5), #api-table td:nth-child(5),
+        #api-table th:nth-child(6), #api-table td:nth-child(6),
+        #api-table th:nth-child(7), #api-table td:nth-child(7),
+        #api-table th:nth-child(8), #api-table td:nth-child(8),
+        #api-table th:nth-child(9) { /* 调整对齐索引 */
             text-align: center;
         }
 
@@ -1263,9 +1286,59 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
+        
+        /* 流量数据显示样式 */
+        .traffic-data {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .traffic-data span {
+            display: block;
+            white-space: nowrap;
+        }
+
+        /* Loading Overlay Styles */
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #f9f9f9; /* Match body background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            opacity: 1;
+            transition: opacity 0.3s ease-out;
+        }
+
+        #loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none; /* Allow interaction with content below */
+        }
+
+        .loader {
+            border: 4px solid #f3f3f3; /* Light grey */
+            border-top: 4px solid #4285f4; /* Blue */
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
     </style>
 </head>
 <body>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay">
+        <div class="loader"></div>
+    </div>
+
     <div class="header">
         <h1>AIBalancer Portal Table</h1>
         <div style="display: flex; align-items: center;">
@@ -1393,16 +1466,38 @@
                 <div class="api-management">
                     <div class="form-group">
                         <label>API Key:</label>
-                        <input type="text" id="apiKey" class="form-control" readonly>
-                        <button class="btn" onclick="generateNewApiKey()">生成新的 API Key</button>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="text" id="apiKeyDisplay" class="form-control" readonly placeholder="点击右侧按钮生成新的 API Key" style="flex-grow: 1;">
+                            <button class="btn btn-sm" onclick="confirmAndGenerateApiKey()" title="生成新的 API Key" style="flex-shrink: 0;">
+                                <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 0 24 24" width="16px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" opacity=".3"/><path d="M19.78 2.2L24 6.42 19.78 10.64 18.36 9.22l2.22-2.22-2.22-2.22L19.78 2.2zM12 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-4c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-4.24 8.76L3.34 19.19 7.58 23.42l4.24-4.24-1.41-1.41-2.83 2.83-2.83-2.83-1.41 1.41zM12 16c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+                                生成
+                            </button>
+                        </div>
+                        
                     </div>
                     
-                    <div class="action-bar">
+                    <div class="form-group">
+                        <label for="allowedModelsSelect">允许的模型 (WrapperName):</label>
+                        <select id="allowedModelsSelect" class="form-control" multiple required>
+                            <!-- 模型选项将由 JavaScript 动态填充 -->
+                        </select>
+                        <small class="form-text text-muted">按住 Ctrl/Command 键选择多个模型。必须至少选择一个。</small>
+                    </div>
+                    
+                    <div class="action-bar" style="margin-top: 20px;">
                         <div>
                             <h4>API密钥列表</h4>
                         </div>
                         <div>
-                            <button class="btn btn-danger" id="delete-selected-api" onclick="confirmDeleteSelectedAPI()" disabled>删除选中项</button>
+                            <!-- <button class="btn btn-danger" id="delete-selected-api" onclick="confirmDeleteSelectedAPI()" disabled>删除选中项</button> -->
+                            <button class="btn btn-success btn-sm" id="enable-selected-api" onclick="confirmEnableSelectedAPI()" disabled title="启用选中的API密钥">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align: middle; margin-right: 4px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                                批量启用
+                            </button>
+                            <button class="btn btn-warning btn-sm" id="disable-selected-api" onclick="confirmDisableSelectedAPI()" disabled title="禁用选中的API密钥" style="background-color: #ffc107; border-color: #ffc107; color: #212529;">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align: middle; margin-right: 4px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.59-13L12 10.59 8.41 7 7 8.41 10.59 12 7 15.59 8.41 17 12 13.41 15.59 17 17 15.59 13.41 12 17 8.41z"/></svg>
+                                批量禁用
+                            </button>
                         </div>
                     </div>
                     
@@ -1414,11 +1509,15 @@
                                         <input type="checkbox" id="select-all-api" onchange="toggleSelectAllAPI()">
                                     </th>
                                     <th>ID</th>
+                                    <th class="column-name">状态/操作</th> <!-- 新合并列 -->
                                     <th class="column-name">API密钥</th>
-                                    <th class="column-name">创建时间</th>
+                                    <th class="column-name">允许模型</th>
+                                    <th class="column-name">使用统计</th>
+                                    <th class="column-name">成功/失败</th>
+                                    <th class="column-name">流量(输入/输出)</th>
                                     <th class="column-name">最后使用</th>
-                                    <th class="column-name">状态</th>
-                                    <th class="column-name">操作</th>
+                                    <!-- <th class="column-name">状态</th> --> <!-- 移除原状态列 -->
+                                    <!-- <th class="column-name">操作</th> --> <!-- 移除原操作列 -->
                                 </tr>
                             </thead>
                             <tbody>
@@ -1428,22 +1527,43 @@
                                         <input type="checkbox" class="api-checkbox">
                                     </td>
                                     <td class="text-center">{{.ID}}</td>
+                                    <td class="text-center" style="display: flex; align-items: center; justify-content: space-between; gap: 5px; padding: 4px 8px;">
+                                        {{if .Active}}
+                                            <span class="health-badge healthy" style="flex-shrink: 0;">激活</span>
+                                            <button class="btn btn-sm btn-danger" onclick="toggleAPIKeyStatus('{{.ID}}', false)" title="禁用API密钥" style="margin-left: auto;">
+                                                禁用
+                                            </button>
+                                        {{else}}
+                                            <span class="health-badge unhealthy" style="flex-shrink: 0;">禁用</span>
+                                            <button class="btn btn-sm" onclick="toggleAPIKeyStatus('{{.ID}}', true)" title="激活API密钥" style="margin-left: auto;">
+                                                激活
+                                            </button>
+                                        {{end}}
+                                    </td>
                                     <td class="copyable api-key-cell" data-full-text="{{.Key}}">{{.DisplayKey}}</td>
-                                    <td>{{.CreatedAt}}</td>
-                                    <td>{{if .LastUsedAt}}{{.LastUsedAt}}{{else}}-{{end}}</td>
+                                    <td class="copyable" data-full-text="{{.AllowedModels}}">{{.AllowedModels}}</td>
+                                    <td class="text-center">{{.UsageCount}}</td>
                                     <td class="text-center">
+                                        <span class="health-badge healthy">{{.SuccessCount}}</span>
+                                        <span class="health-badge unhealthy">{{.FailureCount}}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="traffic-data">
+                                            <span title="输入流量">↓ {{.InputBytesFormatted}}</span>
+                                            <span title="输出流量">↑ {{.OutputBytesFormatted}}</span>
+                                        </div>
+                                    </td>
+                                    <td>{{if .LastUsedAt}}{{.LastUsedAt}}{{else}}-{{end}}</td>
+                                    <!-- 原状态列 -->
+                                    <!-- <td class="text-center">
                                         {{if .Active}}
                                             <span class="health-badge healthy">激活</span>
                                         {{else}}
                                             <span class="health-badge unhealthy">禁用</span>
                                         {{end}}
-                                    </td>
-                                    <td>
-                                        <button class="delete-btn" onclick="deleteAPIKey('{{.ID}}')" title="删除API密钥">
-                                            <svg viewBox="0 0 24 24">
-                                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                                            </svg>
-                                        </button>
+                                    </td> -->
+                                    <!-- 原操作列 -->
+                                    <!-- <td>
                                         {{if .Active}}
                                             <button class="btn btn-sm btn-danger" onclick="toggleAPIKeyStatus('{{.ID}}', false)" title="禁用API密钥">
                                                 禁用
@@ -1453,7 +1573,7 @@
                                                 激活
                                             </button>
                                         {{end}}
-                                    </td>
+                                    </td> -->
                                 </tr>
                                 {{end}}
                             </tbody>
@@ -1487,6 +1607,23 @@
 
     <div id="toast-container"></div>
 
+    <!-- 新增：API Key 生成成功提示弹窗 -->
+    <div id="apiKeySuccessModal" class="delete-confirmation-modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeApiKeyModal(true)">&times;</span>
+            <h4>API Key 生成成功</h4>
+            <p>请立即复制并妥善保存此密钥，刷新页面后将无法再次查看。</p>
+            <div class="form-group">
+                <label>新生成的 API Key:</label>
+                <input type="text" id="generatedApiKeyDisplay" class="form-control" readonly style="font-family: monospace; margin-bottom: 10px;">
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="copyGeneratedApiKey()">复制密钥</button>
+                <button class="btn btn-primary" onclick="closeApiKeyModal(true)">关闭并刷新</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // 全局变量
         let resizeTimer;
@@ -1515,6 +1652,10 @@
                 content.classList.remove('active');
             });
             document.getElementById(tabId).classList.add('active');
+            
+            // Store the active tab ID in localStorage
+            localStorage.setItem('activeTabId', tabId);
+            console.log(`Switched to tab: ${tabId}, saved to localStorage.`); // Debug log
 
             // 如果是添加接口标签，显示添加表单
             if (tabId === 'add') {
@@ -1936,15 +2077,42 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             // 初始化右键菜单
             initializeContextMenu();
             
-            // 初始化标签页
+            // --- BEGIN: Tab Initialization Logic ---
+            // Restore last active tab or default to 'all'
+            const savedTabId = localStorage.getItem('activeTabId');
+            const defaultTabId = 'all';
+            const initialTabId = savedTabId || defaultTabId;
+            console.log(`Initializing tabs. Saved tab: ${savedTabId}, Initial tab: ${initialTabId}`); // Debug log
+
+            // Initialize tabs based on saved state or default
             document.querySelectorAll('.tab').forEach(tab => {
+                const currentTabId = tab.getAttribute('data-tab');
                 tab.addEventListener('click', function(e) {
                     e.preventDefault();
-                    const tabId = this.getAttribute('data-tab');
-                    switchTab(tabId);
+                    switchTab(currentTabId); // Use currentTabId from closure
                 });
+                // Set initial active state
+                if (currentTabId === initialTabId) {
+                     tab.classList.add('active');
+                } else {
+                     tab.classList.remove('active');
+                }
             });
-            
+
+            document.querySelectorAll('.tab-content').forEach(content => {
+                if (content.id === initialTabId) {
+                    content.classList.add('active');
+                } else {
+                    content.classList.remove('active');
+                }
+            });
+
+            // If the initial tab is 'add', make sure the form is shown
+            if (initialTabId === 'add') {
+                showAddProviderForm();
+            }
+            // --- END: Tab Initialization Logic ---
+
             // 添加全局事件监听器，在各种情况下隐藏tooltip
             document.addEventListener('mousedown', function(e) {
                 const tooltip = document.getElementById('global-tooltip');
@@ -2000,6 +2168,24 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             
             // 在初始化时预加载自动补全数据
             loadAutoCompleteData();
+            
+            // 动态填充模型选择器
+            populateAllowedModelsSelector();
+
+            // --- BEGIN: Hide Loading Overlay Logic ---
+            // Hide loading overlay after a short delay
+            setTimeout(() => {
+                const loadingOverlay = document.getElementById('loading-overlay');
+                if (loadingOverlay) {
+                    loadingOverlay.classList.add('hidden');
+                    // Optional: Remove the overlay from DOM after transition ends
+                    // loadingOverlay.addEventListener('transitionend', () => {
+                    //     loadingOverlay.remove();
+                    // });
+                    console.log('Hiding loading overlay.'); // Debug log
+                }
+            }, 300); // 300ms delay
+            // --- END: Hide Loading Overlay Logic ---
         });
 
         // 删除功能
@@ -2352,28 +2538,58 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             }
         }
 
-        // 添加 API Key 生成功能
+        // 新增：确认并生成 API Key 的函数
+        function confirmAndGenerateApiKey() {
+            const allowedModelsSelect = document.getElementById('allowedModelsSelect');
+            const selectedModels = Array.from(allowedModelsSelect.selectedOptions).map(option => option.value);
+
+            if (selectedModels.length === 0) {
+                showToast('请至少选择一个允许的模型', 'warning');
+                return;
+            }
+
+            if (confirm('确定要生成一个新的 API Key 吗？选定的模型将被关联。')) {
+                generateNewApiKey(); // 调用原来的生成函数
+            }
+        }
+
+        // 添加 API Key 生成功能 (现在由 confirmAndGenerateApiKey 调用)
         async function generateNewApiKey() {
+            const allowedModelsSelect = document.getElementById('allowedModelsSelect');
+            const selectedModels = Array.from(allowedModelsSelect.selectedOptions).map(option => option.value);
+            
+            // 再次检查，虽然 confirmAndGenerateApiKey 已经检查过
+            if (selectedModels.length === 0) {
+                showToast('内部错误：未选择模型', 'error'); 
+                return;
+            }
+            
             try {
                 const response = await fetch('/portal/generate-api-key', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
-                    }
+                    },
+                    // 将选中的模型包含在请求体中
+                    body: JSON.stringify({ allowed_models: selectedModels })
                 });
 
                 if (!response.ok) {
-                    throw new Error('生成 API Key 失败');
+                    const errorText = await response.text();
+                    throw new Error(`生成 API Key 失败: ${errorText || response.status}`);
                 }
 
                 const data = await response.json();
-                document.getElementById('apiKey').value = data.apiKey;
+                document.getElementById('apiKeyDisplay').value = data.apiKey; // 更新显示区域
                 showToast('API Key 生成成功', 'success');
                 
-                // 刷新页面以显示新生成的API密钥
-                setTimeout(() => window.location.reload(), 1000);
+                // 显示成功弹窗，而不是直接刷新
+                showApiKeySuccessModal(data.apiKey);
+                // // 稍微延迟刷新，让用户看到生成的 Key
+                // setTimeout(() => window.location.reload(), 1500);
             } catch (error) {
                 showToast('生成 API Key 失败: ' + error.message, 'error');
+                console.error("Error generating API key:", error); // 使用 common/log
             }
         }
         
@@ -2384,13 +2600,28 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             checkboxes.forEach(checkbox => {
                 checkbox.checked = selectAllCheckbox.checked;
             });
-            updateDeleteSelectedAPIButton();
+            updateDeleteSelectedAPIButton(); // <-- Keep this line or rename function below
         }
         
+        // Rename this function and update its logic
         function updateDeleteSelectedAPIButton() {
-            const deleteButton = document.getElementById('delete-selected-api');
+            const deleteButton = document.getElementById('delete-selected-api'); // This might be null if commented out
+            const disableButton = document.getElementById('disable-selected-api');
+            const enableButton = document.getElementById('enable-selected-api'); // Get the enable button
             const selectedCount = document.querySelectorAll('.api-checkbox:checked').length;
-            deleteButton.disabled = selectedCount === 0;
+            
+            const enable = selectedCount > 0; // Enable buttons if at least one item is selected
+
+            if (deleteButton) {
+                deleteButton.disabled = !enable;
+            }
+            if (disableButton) {
+                disableButton.disabled = !enable;
+            }
+            if (enableButton) { // Check if enable button exists
+                enableButton.disabled = !enable;
+            }
+            console.log(`API Action Buttons updated. Selected: ${selectedCount}, Buttons Enabled: ${enable}`); // Debug log
         }
         
         function confirmDeleteSelectedAPI() {
@@ -2529,6 +2760,221 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
         window.addEventListener('scroll', () => {
             hideContextMenu();
         });
+
+        // 动态填充 API Key 的模型选择器
+        function populateAllowedModelsSelector() {
+            const selectElement = document.getElementById('allowedModelsSelect');
+            if (!selectElement) return;
+        
+            // 从现有 provider 数据中提取唯一的 WrapperName
+            const providerRows = document.querySelectorAll('#all tbody tr');
+            const wrapperNames = new Set();
+            providerRows.forEach(row => {
+                const wrapperNameCell = row.cells[3]; // 第4列是提供者名称 (WrapperName)
+                if (wrapperNameCell) {
+                    const wrapperName = wrapperNameCell.getAttribute('data-full-text') || wrapperNameCell.textContent.trim();
+                    if (wrapperName) {
+                        wrapperNames.add(wrapperName);
+                    }
+                }
+            });
+        
+            selectElement.innerHTML = ''; // 清空现有选项
+            if (wrapperNames.size === 0) {
+                 // 如果没有 provider，可以添加一个提示或者禁用选择器
+                 const option = document.createElement('option');
+                 option.textContent = '没有可用的模型提供者';
+                 option.disabled = true;
+                 selectElement.appendChild(option);
+                 console.warn("No providers found to populate allowed models selector."); // 使用 common/log
+                 return;
+            }
+
+            // 添加选项
+            wrapperNames.forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                selectElement.appendChild(option);
+            });
+        }
+
+        // 新增：API Key 成功弹窗相关函数
+        function showApiKeySuccessModal(apiKey) {
+            document.getElementById('generatedApiKeyDisplay').value = apiKey;
+            document.getElementById('apiKeySuccessModal').style.display = 'block';
+        }
+
+        function closeApiKeyModal(reload = false) {
+            document.getElementById('apiKeySuccessModal').style.display = 'none';
+            if (reload) {
+                window.location.reload();
+            }
+        }
+
+        function copyGeneratedApiKey() {
+            const apiKeyInput = document.getElementById('generatedApiKeyDisplay');
+            apiKeyInput.select();
+            apiKeyInput.setSelectionRange(0, 99999); // For mobile devices
+            try {
+                navigator.clipboard.writeText(apiKeyInput.value);
+                showToast('API Key 已复制到剪贴板', 'success');
+            } catch (err) {
+                showToast('复制失败，请手动复制', 'error');
+                console.error('Failed to copy API key: ', err);
+            }
+        }
+
+        // 新增：确认删除选中的提供者
+        function confirmDeleteSelected() {
+            const selectedCheckboxes = document.querySelectorAll('.provider-checkbox:checked');
+            const selectedIds = Array.from(selectedCheckboxes)
+                .map(checkbox => checkbox.closest('tr').getAttribute('data-id'));
+                
+            if (selectedIds.length === 0) {
+                showToast('请先选择要删除的提供者', 'warning');
+                return;
+            }
+            
+            if (confirm(`确定要删除选中的 ${selectedIds.length} 个提供者吗？`)) {
+                deleteMultipleProviders(selectedIds);
+            }
+        }
+        
+        // 新增：批量删除提供者
+        async function deleteMultipleProviders(providerIds) {
+            showToast('正在删除提供者...', 'info');
+            try {
+                const response = await fetch('/portal/delete-providers', { // Assuming this endpoint
+                    method: 'POST', // Assuming POST method like API keys
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ ids: providerIds }) // Assuming JSON body with 'ids' array
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`删除提供者失败 (${response.status}): ${errorText}`);
+                }
+                
+                showToast(`成功删除 ${providerIds.length} 个提供者`, 'success');
+                // 清除全选状态
+                document.getElementById('select-all').checked = false;
+                // 禁用删除按钮
+                document.getElementById('delete-selected').disabled = true;
+                // 短暂延迟后刷新页面以显示最新列表
+                setTimeout(() => window.location.reload(), 1000); 
+            } catch (error) {
+                showToast('删除失败: ' + error.message, 'error');
+                console.error('Error deleting multiple providers:', error); // 使用 common/log
+            }
+        }
+
+        // New function: Confirm disabling selected API keys
+        function confirmDisableSelectedAPI() {
+            const selectedIds = Array.from(document.querySelectorAll('.api-checkbox:checked'))
+                .map(checkbox => checkbox.closest('tr').getAttribute('data-api-id'));
+                
+            if (selectedIds.length === 0) return;
+            
+            if (confirm(`确定要禁用选中的 ${selectedIds.length} 个API密钥吗？`)) {
+                disableMultipleAPIKeys(selectedIds);
+            }
+        }
+
+        // New function: Send request to disable multiple API keys
+        async function disableMultipleAPIKeys(apiIds) {
+            showToast('正在禁用API密钥...', 'info');
+            try {
+                const response = await fetch('/portal/disable-api-keys', { // New backend endpoint
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ ids: apiIds })
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`禁用API密钥失败 (${response.status}): ${errorText}`);
+                }
+                
+                showToast(`成功禁用 ${apiIds.length} 个API密钥`, 'success');
+                // Uncheck all checkboxes and disable buttons
+                document.getElementById('select-all-api').checked = false;
+                document.querySelectorAll('.api-checkbox:checked').forEach(cb => cb.checked = false);
+                updateDeleteSelectedAPIButton(); // Update button states
+
+                setTimeout(() => window.location.reload(), 1000); // Refresh page
+            } catch (error) {
+                showToast('禁用失败: ' + error.message, 'error');
+                console.error('Error disabling multiple API keys:', error); // Use common/log
+            }
+        }
+
+        async function deleteMultipleAPIKeys(apiIds) {
+            try {
+                const response = await fetch('/portal/delete-api-keys', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ ids: apiIds })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('删除API密钥失败');
+                }
+                
+                showToast(`成功删除 ${apiIds.length} 个API密钥`, 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } catch (error) {
+                showToast('删除失败: ' + error.message, 'error');
+            }
+        }
+
+        // New function: Confirm enabling selected API keys
+        function confirmEnableSelectedAPI() {
+            const selectedIds = Array.from(document.querySelectorAll('.api-checkbox:checked'))
+                .map(checkbox => checkbox.closest('tr').getAttribute('data-api-id'));
+                
+            if (selectedIds.length === 0) return;
+            
+            if (confirm(`确定要启用选中的 ${selectedIds.length} 个API密钥吗？`)) {
+                enableMultipleAPIKeys(selectedIds);
+            }
+        }
+
+        // New function: Send request to enable multiple API keys
+        async function enableMultipleAPIKeys(apiIds) {
+            showToast('正在启用API密钥...', 'info');
+            try {
+                const response = await fetch('/portal/enable-api-keys', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ ids: apiIds })
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`启用API密钥失败: ${errorText}`);
+                }
+                
+                showToast(`成功启用 ${apiIds.length} 个API密钥`, 'success');
+                // Uncheck all checkboxes and disable buttons
+                document.getElementById('select-all-api').checked = false;
+                document.querySelectorAll('.api-checkbox:checked').forEach(cb => cb.checked = false);
+                updateDeleteSelectedAPIButton(); // Update button states
+
+                setTimeout(() => window.location.reload(), 1000); // Refresh page
+            } catch (error) {
+                showToast('启用失败: ' + error.message, 'error');
+                console.error('Error enabling multiple API keys:', error); // Use common/log
+            }
+        } // <-- Added missing closing brace
     </script>
 </body>
 </html>

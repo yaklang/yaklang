@@ -61,8 +61,9 @@ var ProfileTables = []interface{}{
 	&PluginEnv{},
 	&HotPatchTemplate{},
 
-	&AiProvider{}, // for aibalance
-	&AiApiKeys{},  // for aibalance
+	&AiProvider{},   // for aibalance
+	&AiApiKeys{},    // for aibalance
+	&LoginSession{}, // for aibalance
 }
 
 var databaseSchemas = map[uint8][]any{
