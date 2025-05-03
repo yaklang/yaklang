@@ -2,12 +2,14 @@ package aibalance
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"gopkg.in/yaml.v3"
 )
@@ -96,7 +98,43 @@ func NewBalancer(configFile string) (*Balancer, error) {
 		return nil, err
 	}
 
+	// --- BEGIN DATA FIX ---
+	// Perform one-time update for existing healthy providers
+	// that were added before the IsFirstCheckCompleted field was introduced.
+	if err := fixHistoricalProviderHealthState(); err != nil {
+		// Log the error but don't block startup
+		log.Errorf("Failed to fix historical provider health states: %v", err)
+	}
+	// --- END DATA FIX ---
+
 	return b, nil
+}
+
+// fixHistoricalProviderHealthState updates providers that were healthy before the IsFirstCheckCompleted field was added.
+func fixHistoricalProviderHealthState() error {
+	log.Infof("Checking for historical providers needing health state fix...")
+	db := GetDB() // Assuming GetDB() returns the correct *gorm.DB instance
+	if db == nil {
+		return fmt.Errorf("database connection is nil, cannot perform fix")
+	}
+
+	// Find providers where: IsFirstCheckCompleted is false AND IsHealthy is true
+	// We don't need to check HealthCheckTime specifically, as IsHealthy=true implies a successful check happened.
+	result := db.Model(&schema.AiProvider{}).
+		Where("is_first_check_completed = ? AND is_healthy = ?", false, true).
+		Update("is_first_check_completed", true)
+
+	if result.Error != nil {
+		return fmt.Errorf("database update failed: %w", result.Error)
+	}
+
+	if result.RowsAffected > 0 {
+		log.Infof("Successfully fixed health state for %d historical providers.", result.RowsAffected)
+	} else {
+		log.Infof("No historical providers needed health state fixing.")
+	}
+
+	return nil
 }
 
 // LoadProvidersFromDatabase loads all providers and API keys from the database

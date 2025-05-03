@@ -92,8 +92,9 @@ type AiProvider struct {
 	LastLatency       int64     `json:"last_latency"`        // 最后一次请求延迟 (毫秒)
 
 	// 健康状态
-	IsHealthy       bool      `json:"is_healthy"`        // 提供者是否健康
-	HealthCheckTime time.Time `json:"health_check_time"` // 最后一次健康检查时间
+	IsHealthy             bool      `json:"is_healthy"`                                    // 提供者是否健康
+	HealthCheckTime       time.Time `json:"health_check_time"`                             // 最后一次健康检查时间
+	IsFirstCheckCompleted bool      `json:"is_first_check_completed" gorm:"default:false"` // 首次健康检查是否完成
 }
 
 type AiApiKeys struct {
