@@ -207,3 +207,38 @@ func UpdateAiApiKeyStats(apiKey string, inputBytes, outputBytes int64, success b
 	// 保存到数据库
 	return GetDB().Save(&key).Error
 }
+
+// UpdateAiApiKeyStatus 更新单个 API Key 的激活状态
+func UpdateAiApiKeyStatus(id uint, active bool) error {
+	result := GetDB().Model(&schema.AiApiKeys{}).Where("id = ?", id).Update("active", active)
+	if result.Error != nil {
+		return fmt.Errorf("failed to update status for API key ID %d: %w", id, result.Error)
+	}
+	if result.RowsAffected == 0 {
+		// 如果没有行受影响，可能是因为 ID 不存在
+		return gorm.ErrRecordNotFound // 返回 GORM 的标准错误
+	}
+	action := "deactivated"
+	if active {
+		action = "activated"
+	}
+	log.Infof("Successfully %s API key (ID: %d)", action, id)
+	return nil
+}
+
+// BatchUpdateAiApiKeyStatus 批量更新 API Key 的激活状态
+func BatchUpdateAiApiKeyStatus(ids []uint, active bool) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil // 没有 ID 需要更新
+	}
+	result := GetDB().Model(&schema.AiApiKeys{}).Where("id IN (?)", ids).Update("active", active)
+	if result.Error != nil {
+		return 0, fmt.Errorf("failed to batch update status for %d API keys: %w", len(ids), result.Error)
+	}
+	action := "deactivated"
+	if active {
+		action = "activated"
+	}
+	log.Infof("Successfully %s %d API keys (requested %d)", action, result.RowsAffected, len(ids))
+	return result.RowsAffected, nil
+}
