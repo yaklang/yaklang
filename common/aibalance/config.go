@@ -74,7 +74,6 @@ func (c *YamlConfig) ToServerConfig() (*ServerConfig, error) {
 	// Process model configurations
 	for i, model := range c.Models {
 		log.Debugf("YamlConfig.ToServerConfig: Processing model %d: %s with %d providers", i, model.Name, len(model.Providers))
-
 		// Get all providers for this model
 		var providers []*Provider
 
