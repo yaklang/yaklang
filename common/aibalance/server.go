@@ -476,6 +476,18 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		}
 	}()
 
+	// Update API Key statistics
+	go func() {
+		inputBytes := int64(prompt.Len())
+		outputBytes := atomic.LoadInt64(totalBytes)
+		if err := UpdateAiApiKeyStats(key.Key, inputBytes, outputBytes, succeed); err != nil {
+			c.logError("Failed to update API key statistics: %v", err)
+		} else {
+			c.logInfo("API key statistics updated: key=%s, input=%d bytes, output=%d bytes, success=%v",
+				utils.ShrinkString(key.Key, 8), inputBytes, outputBytes, succeed)
+		}
+	}()
+
 	bandwidth := float64(total) / endDuration.Seconds() / 1024
 	c.logInfo("Response completed, first byte duration: %v, end duration: %v, bandwidth: %.2fkbps", firstByteDuration, endDuration, bandwidth)
 	writer.Close()
