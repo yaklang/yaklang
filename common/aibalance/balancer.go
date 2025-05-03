@@ -4,7 +4,6 @@ import (
 	"context"
 	"net"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -164,27 +163,9 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 	log.Infof("Database AI providers loaded, added %d models in total", len(modelProviders))
 
 	// 2. Load API keys
-	log.Infof("Starting to load API keys from database")
-	apiKeys, err := GetAllAiApiKeys()
+	err = config.LoadAPIKeysFromDB()
 	if err != nil {
-		log.Warnf("Failed to load API keys from database: %v", err)
-	} else {
-		log.Infof("Retrieved %d API keys from database", len(apiKeys))
-		for _, key := range apiKeys {
-			// Parse allowed model list
-			modelNames := strings.Split(key.AllowedModels, ",")
-			modelMap := make(map[string]bool)
-			for _, model := range modelNames {
-				if model = strings.TrimSpace(model); model != "" {
-					modelMap[model] = true
-				}
-			}
-
-			// Add to memory config
-			config.KeyAllowedModels.allowedModels[key.APIKey] = modelMap
-			log.Infof("  API Key: %s, Allowed Models: %s", utils.ShrinkString(key.APIKey, 8), key.AllowedModels)
-		}
-		log.Infof("API keys loaded successfully")
+		return utils.Errorf("Failed to load API keys from database: %v", err)
 	}
 
 	return nil

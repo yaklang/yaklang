@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -16,11 +17,12 @@ import (
 	"time"
 
 	uuid "github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed templates/portal.html templates/login.html templates/add_provider.html templates/healthy_check.html templates/api_keys.html
+//go:embed templates/portal.html templates/login.html templates/add_provider.html templates/api_keys.html
 var templatesFS embed.FS
 
 // ProviderData contains data for template rendering
@@ -466,6 +468,7 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 	modelType := request.PostForm.Get("model_type")
 	domainOrURL := request.PostForm.Get("domain_or_url")
 	apiKeysStr := request.PostForm.Get("api_keys")
+	noHTTPS := request.PostForm.Get("no_https") == "on" // 获取 NoHTTPS 参数
 
 	// Validate required fields
 	if wrapperName == "" || modelName == "" || modelType == "" || domainOrURL == "" || apiKeysStr == "" {
@@ -497,6 +500,7 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 		TypeName:    modelType,
 		DomainOrURL: domainOrURL,
 		Keys:        apiKeys,
+		NoHTTPS:     noHTTPS, // 设置 NoHTTPS 参数
 	}
 
 	// Convert to Provider object
@@ -520,6 +524,7 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 			DomainOrURL:     domainOrURL,
 			APIKey:          provider.APIKey,
 			WrapperName:     wrapperName, // Use WrapperName from form
+			NoHTTPS:         noHTTPS,     // 设置 NoHTTPS 参数
 			IsHealthy:       true,        // Default set to healthy
 			LastRequestTime: time.Now(),  // Set last request time
 			HealthCheckTime: time.Now(),  // Set health check time
@@ -546,125 +551,6 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 		"Location: /portal\r\n" +
 		"\r\n"
 	conn.Write([]byte(header))
-}
-
-// serveHealthyCheckPage handles health check requests
-func (c *ServerConfig) serveHealthyCheckPage(conn net.Conn, request *http.Request) {
-	c.logInfo("Serving healthy check page")
-
-	// Check if a new health check needs to be executed
-	query := request.URL.Query()
-	runCheck := query.Get("run") == "true"
-
-	var results []*HealthCheckResult
-	if runCheck {
-		// If specified run=true parameter, execute real-time health check
-		c.logInfo("Running manual health check as requested")
-		var err error
-		results, err = RunManualHealthCheck()
-		if err != nil {
-			c.logError("Failed to run health check: %v", err)
-			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nHealth check failed: %v", err)
-			conn.Write([]byte(errorResponse))
-			return
-		}
-	}
-
-	// Get all providers (get latest status)
-	providers, err := GetAllAiProviders()
-	if err != nil {
-		c.logError("Failed to get providers: %v", err)
-		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to get providers: %v", err)
-		conn.Write([]byte(errorResponse))
-		return
-	}
-
-	// Count healthy providers
-	healthyCount := 0
-	for _, p := range providers {
-		if p.IsHealthy {
-			healthyCount++
-		}
-	}
-
-	// Calculate health rate
-	totalProviders := len(providers)
-	healthRate := 0.0
-	if totalProviders > 0 {
-		healthRate = float64(healthyCount) * 100 / float64(totalProviders)
-	}
-
-	// Prepare template data
-	data := struct {
-		Providers      []*schema.AiProvider
-		CheckTime      string
-		TotalProviders int
-		HealthyCount   int
-		HealthRate     float64
-		CheckResults   []*HealthCheckResult // Add health check results
-		JustRanCheck   bool                 // Whether a check was just executed
-	}{
-		Providers:      providers,
-		CheckTime:      time.Now().Format("2006-01-02 15:04:05"),
-		TotalProviders: totalProviders,
-		HealthyCount:   healthyCount,
-		HealthRate:     healthRate,
-		CheckResults:   results,
-		JustRanCheck:   runCheck,
-	}
-
-	var tmpl *template.Template
-
-	// Try to read template from filesystem
-	if result := utils.GetFirstExistedFile(
-		"common/aibalance/templates/healthy_check.html",
-		"templates/healthy_check.html",
-		"../templates/healthy_check.html",
-	); result != "" {
-		rawTemp, err := os.ReadFile(result)
-		if err != nil {
-			c.logError("Failed to read healthy check template: %v", err)
-			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to read template: %v", err)
-			conn.Write([]byte(errorResponse))
-			return
-		}
-		tmpl, err = template.New("healthy_check").Parse(string(rawTemp))
-		if err != nil {
-			c.logError("Failed to parse healthy check template: %v", err)
-			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to read template: %v", err)
-			conn.Write([]byte(errorResponse))
-			return
-		}
-	} else {
-		// Use embedded file system template
-		tmpl, err = template.ParseFS(templatesFS, "templates/healthy_check.html")
-		if err != nil {
-			c.logError("Failed to parse embedded healthy check template: %v", err)
-			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to read template: %v", err)
-			conn.Write([]byte(errorResponse))
-			return
-		}
-	}
-
-	// Create a buffer to save rendered HTML
-	var htmlBuffer bytes.Buffer
-	err = tmpl.Execute(&htmlBuffer, data)
-	if err != nil {
-		c.logError("Failed to execute healthy check template: %v", err)
-		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to render template: %v", err)
-		conn.Write([]byte(errorResponse))
-		return
-	}
-
-	// Prepare HTTP response header
-	header := "HTTP/1.1 200 OK\r\n" +
-		"Content-Type: text/html; charset=utf-8\r\n" +
-		"Content-Length: " + fmt.Sprintf("%d", htmlBuffer.Len()) + "\r\n" +
-		"\r\n"
-
-	// Write header and HTML content
-	conn.Write([]byte(header))
-	conn.Write(htmlBuffer.Bytes())
 }
 
 // handleLogout handles logout requests
@@ -703,7 +589,6 @@ func (c *ServerConfig) serveAutoCompleteData(conn net.Conn, request *http.Reques
 	// Extract unique data
 	wrapperNames := make(map[string]bool)
 	modelNames := make(map[string]bool)
-	modelTypes := make(map[string]bool)
 
 	for _, p := range providers {
 		if p.WrapperName != "" {
@@ -711,9 +596,6 @@ func (c *ServerConfig) serveAutoCompleteData(conn net.Conn, request *http.Reques
 		}
 		if p.ModelName != "" {
 			modelNames[p.ModelName] = true
-		}
-		if p.TypeName != "" {
-			modelTypes[p.TypeName] = true
 		}
 	}
 
@@ -728,18 +610,7 @@ func (c *ServerConfig) serveAutoCompleteData(conn net.Conn, request *http.Reques
 		modelNamesList = append(modelNamesList, name)
 	}
 
-	modelTypesList := make([]string, 0, len(modelTypes))
-	for typeName := range modelTypes {
-		modelTypesList = append(modelTypesList, typeName)
-	}
-
-	// Add some common model types if they don't exist in the database
-	commonTypes := []string{"ChatCompletion", "TextCompletion", "Embedding"}
-	for _, typeName := range commonTypes {
-		if _, exists := modelTypes[typeName]; !exists {
-			modelTypesList = append(modelTypesList, typeName)
-		}
-	}
+	modelTypesList := aispec.GetRegisteredAIGateways()
 
 	// Build JSON response
 	autoCompleteData := struct {
@@ -810,8 +681,8 @@ func (c *ServerConfig) serveAPIKeysPage(conn net.Conn) {
 	if err == nil {
 		modelSet := make(map[string]bool)
 		for _, p := range providers {
-			if p.ModelName != "" {
-				modelSet[p.ModelName] = true
+			if p.WrapperName != "" {
+				modelSet[p.WrapperName] = true
 			}
 		}
 
@@ -931,171 +802,164 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 		c.serveAPIKeysPage(conn)
 	} else if uriIns.Path == "/portal/create-api-key" && request.Method == "POST" {
 		c.processCreateAPIKey(conn, request)
-	} else if uriIns.Path == "/portal/healthy-check" {
-		c.serveHealthyCheckPage(conn, request)
-	} else if uriIns.Path == "/portal/single-provider-health-check" {
-		c.serveSingleProviderHealthCheckPage(conn, request)
-	} else if uriIns.Path == "/portal/delete-providers" && request.Method == "POST" {
-		c.processDeleteProviders(conn, request)
+	} else if uriIns.Path == "/portal/api/health-check" {
+		c.serveHealthCheckAPI(conn, request)
+	} else if uriIns.Path == "/portal/api/providers" {
+		c.serveProvidersAPI(conn, request)
+	} else if uriIns.Path == "/portal/check-all-health" && request.Method == "POST" {
+		c.handleCheckAllHealth(conn, request)
+	} else if strings.HasPrefix(uriIns.Path, "/portal/check-health/") && request.Method == "POST" {
+		c.handleCheckSingleHealth(conn, request, uriIns.Path)
+	} else if uriIns.Path == "/portal/generate-api-key" && request.Method == "POST" {
+		c.handleGenerateApiKey(conn, request)
 	} else if uriIns.Path == "/portal/logout" {
 		c.handleLogout(conn, request)
+	} else if uriIns.Path == "/portal/add-provider" && request.Method == "POST" {
+		c.handleAddProvider(conn, request)
+	} else if strings.HasPrefix(uriIns.Path, "/portal/delete-provider/") && request.Method == "DELETE" {
+		c.handleDeleteProvider(conn, request, uriIns.Path)
 	} else {
 		// Default return home page
 		c.servePortalWithAuth(conn)
 	}
 }
 
-// serveSingleProviderHealthCheckPage handles requests for health check of a single provider
-func (c *ServerConfig) serveSingleProviderHealthCheckPage(conn net.Conn, request *http.Request) {
-	c.logInfo("Serving single provider health check page")
+// serveHealthCheckAPI handles health check API requests
+func (c *ServerConfig) serveHealthCheckAPI(conn net.Conn, request *http.Request) {
+	c.logInfo("Handling health check API request")
 
-	// Parse query parameters to get provider ID
-	query := request.URL.Query()
-	providerIDStr := query.Get("id")
-	if providerIDStr == "" {
-		c.logError("Missing provider ID")
-		errorResponse := "HTTP/1.1 400 Bad Request\r\n\r\nMissing provider ID parameter"
-		conn.Write([]byte(errorResponse))
-		return
-	}
-
-	// Convert ID to number
-	providerIDInt, err := strconv.ParseUint(providerIDStr, 10, 64)
-	if err != nil {
-		c.logError("Invalid provider ID: %s, %v", providerIDStr, err)
-		errorResponse := fmt.Sprintf("HTTP/1.1 400 Bad Request\r\n\r\nInvalid provider ID: %s", providerIDStr)
-		conn.Write([]byte(errorResponse))
-		return
-	}
-	providerID := uint(providerIDInt)
-
-	// Execute health check
-	result, err := RunSingleProviderHealthCheck(providerID)
-	if err != nil {
-		c.logError("Failed to run health check for provider %d: %v", providerID, err)
-		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nHealth check failed: %v", err)
-		conn.Write([]byte(errorResponse))
-		return
-	}
-
-	// Prepare JSON response
-	responseData := struct {
-		Success      bool   `json:"success"`
-		ProviderID   uint   `json:"provider_id"`
-		ProviderName string `json:"provider_name"`
-		IsHealthy    bool   `json:"is_healthy"`
-		ResponseTime int64  `json:"response_time"`
-		Message      string `json:"message"`
-		CheckTime    string `json:"check_time"`
-	}{
-		Success:      true,
-		ProviderID:   providerID,
-		ProviderName: result.Provider.WrapperName,
-		IsHealthy:    result.IsHealthy,
-		ResponseTime: result.ResponseTime,
-		CheckTime:    time.Now().Format("2006-01-02 15:04:05"),
-	}
-
-	if result.Error != nil {
-		responseData.Message = result.Error.Error()
-	} else if result.IsHealthy {
-		responseData.Message = "Health check successful, provider is healthy"
-	} else {
-		responseData.Message = "Health check completed, provider is not healthy"
-	}
-
-	// Convert to JSON
-	jsonData, err := json.Marshal(responseData)
-	if err != nil {
-		c.logError("Failed to encode response data: %v", err)
-		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to encode data: %v", err)
-		conn.Write([]byte(errorResponse))
-		return
-	}
-
-	// Prepare HTTP response header
-	header := "HTTP/1.1 200 OK\r\n" +
-		"Content-Type: application/json; charset=utf-8\r\n" +
-		"Content-Length: " + fmt.Sprintf("%d", len(jsonData)) + "\r\n" +
-		"\r\n"
-
-	// Write header and JSON content
-	conn.Write([]byte(header))
-	conn.Write(jsonData)
-}
-
-// processDeleteProviders handles requests to delete AI providers
-func (c *ServerConfig) processDeleteProviders(conn net.Conn, request *http.Request) {
-	c.logInfo("Processing delete providers request")
-
-	// Limit request body size to prevent potential DOS attacks
-	request.Body = http.MaxBytesReader(nil, request.Body, 1024*1024)
-
-	// Parse request body
+	// 解析请求体，检查是否指定了特定的提供者
 	var requestData struct {
-		ProviderIDs []uint `json:"provider_ids"`
+		ProviderID uint `json:"ProviderID"`
 	}
 
-	err := json.NewDecoder(request.Body).Decode(&requestData)
-	if err != nil {
-		c.logError("Failed to parse delete providers request: %v", err)
-		responseData := map[string]interface{}{
-			"success": false,
-			"message": fmt.Sprintf("Failed to parse request: %v", err),
+	if request.Method == "POST" && request.Body != nil {
+		if err := json.NewDecoder(request.Body).Decode(&requestData); err != nil {
+			if err != io.EOF {
+				c.logError("Failed to parse request body: %v", err)
+				c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+					"success":      false,
+					"message":      "Invalid request format",
+					"totalCount":   0,
+					"healthyCount": 0,
+					"healthRate":   0.0,
+				})
+				return
+			}
 		}
-		c.sendJSONResponse(conn, responseData, http.StatusBadRequest)
-		return
 	}
 
-	// Validate provider IDs
-	if len(requestData.ProviderIDs) == 0 {
-		c.logError("No provider IDs specified for deletion")
-		responseData := map[string]interface{}{
-			"success": false,
-			"message": "No providers specified for deletion",
-		}
-		c.sendJSONResponse(conn, responseData, http.StatusBadRequest)
-		return
-	}
+	var results []*HealthCheckResult
+	var err error
 
-	// Record delete operation
-	c.logInfo("Deleting %d providers: %v", len(requestData.ProviderIDs), requestData.ProviderIDs)
-
-	// Execute delete
-	var failedIDs []uint
-	for _, id := range requestData.ProviderIDs {
-		err := DeleteAiProviderByID(id)
+	// 根据是否指定提供者 ID 执行不同的健康检查
+	if requestData.ProviderID > 0 {
+		// 单个提供者健康检查
+		result, err := RunSingleProviderHealthCheck(requestData.ProviderID)
 		if err != nil {
-			c.logError("Failed to delete provider ID %d: %v", id, err)
-			failedIDs = append(failedIDs, id)
+			c.logError("Failed to run health check for provider %d: %v", requestData.ProviderID, err)
+			c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
+				"success":      false,
+				"message":      fmt.Sprintf("Health check failed for provider %d: %v", requestData.ProviderID, err),
+				"totalCount":   0,
+				"healthyCount": 0,
+				"healthRate":   0.0,
+				"singleProvider": map[string]interface{}{
+					"id":           requestData.ProviderID,
+					"name":         "",
+					"healthy":      false,
+					"responseTime": 0,
+					"error":        err.Error(),
+				},
+			})
+			return
+		}
+		results = []*HealthCheckResult{result}
+	} else {
+		// 全量健康检查
+		results, err = RunManualHealthCheck()
+		if err != nil {
+			c.logError("Failed to run health check: %v", err)
+			c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
+				"success":      false,
+				"message":      fmt.Sprintf("Health check failed: %v", err),
+				"totalCount":   0,
+				"healthyCount": 0,
+				"healthRate":   0.0,
+			})
+			return
 		}
 	}
 
-	// Create response
-	if len(failedIDs) > 0 {
-		responseData := map[string]interface{}{
-			"success":    false,
-			"message":    fmt.Sprintf("Failed to delete some providers: %v", failedIDs),
-			"failed_ids": failedIDs,
-		}
-		c.sendJSONResponse(conn, responseData, http.StatusInternalServerError)
-	} else {
-		responseData := map[string]interface{}{
-			"success": true,
-			"message": fmt.Sprintf("Successfully deleted %d providers", len(requestData.ProviderIDs)),
-		}
-		c.sendJSONResponse(conn, responseData, http.StatusOK)
+	// 防止空结果导致除零错误
+	if results == nil {
+		results = []*HealthCheckResult{}
 	}
+
+	// 统计结果
+	totalCount := len(results)
+	healthyCount := 0
+	for _, result := range results {
+		if result != nil && result.IsHealthy {
+			healthyCount++
+		}
+	}
+
+	// 统一响应格式
+	healthRate := 0.0
+	if totalCount > 0 {
+		healthRate = float64(healthyCount) * 100 / float64(totalCount)
+	}
+
+	response := map[string]interface{}{
+		"success":      true,
+		"totalCount":   totalCount,
+		"healthyCount": healthyCount,
+		"healthRate":   healthRate,
+		"checkTime":    time.Now().Format("2006-01-02 15:04:05"),
+	}
+
+	// 如果是单个提供者检查，添加详细信息
+	if requestData.ProviderID > 0 && len(results) > 0 && results[0] != nil {
+		result := results[0]
+
+		var errorMsg string
+		if result.Error != nil {
+			errorMsg = result.Error.Error()
+		}
+
+		response["singleProvider"] = map[string]interface{}{
+			"id":           result.Provider.ID,
+			"name":         result.Provider.WrapperName,
+			"healthy":      result.IsHealthy,
+			"responseTime": result.ResponseTime,
+			"error":        errorMsg,
+		}
+		response["message"] = fmt.Sprintf("Health check completed for provider %d", requestData.ProviderID)
+	} else if requestData.ProviderID > 0 {
+		// 单个提供者但结果为空
+		response["singleProvider"] = map[string]interface{}{
+			"id":           requestData.ProviderID,
+			"name":         "",
+			"healthy":      false,
+			"responseTime": 0,
+			"error":        "Provider not found or health check failed",
+		}
+		response["message"] = fmt.Sprintf("Health check failed for provider %d", requestData.ProviderID)
+	} else {
+		response["message"] = fmt.Sprintf("Health check completed: %d/%d providers healthy", healthyCount, totalCount)
+	}
+
+	c.writeJSONResponse(conn, http.StatusOK, response)
 }
 
-// sendJSONResponse sends a JSON-formatted response
-func (c *ServerConfig) sendJSONResponse(conn net.Conn, data interface{}, statusCode int) {
+// writeJSONResponse sends a JSON-formatted response
+func (c *ServerConfig) writeJSONResponse(conn net.Conn, statusCode int, data interface{}) {
 	// Convert data to JSON
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		c.logError("Failed to encode JSON response: %v", err)
-		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to encode data: %v", err)
-		conn.Write([]byte(errorResponse))
+		c.logError("Failed to marshal JSON: %v", err)
+		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to marshal JSON: %v", err)))
 		return
 	}
 
@@ -1106,12 +970,274 @@ func (c *ServerConfig) sendJSONResponse(conn net.Conn, data interface{}, statusC
 	}
 
 	// Prepare HTTP response header
-	header := fmt.Sprintf("HTTP/1.1 %d %s\r\n", statusCode, statusText) +
-		"Content-Type: application/json; charset=utf-8\r\n" +
-		"Content-Length: " + fmt.Sprintf("%d", len(jsonData)) + "\r\n" +
-		"\r\n"
+	header := fmt.Sprintf("HTTP/1.1 %d %s\r\n"+
+		"Content-Type: application/json; charset=utf-8\r\n"+
+		"Content-Length: %d\r\n"+
+		"\r\n",
+		statusCode, statusText, len(jsonData))
 
 	// Write header and JSON content
 	conn.Write([]byte(header))
 	conn.Write(jsonData)
+}
+
+// serveProvidersAPI handles requests to get all provider information
+func (c *ServerConfig) serveProvidersAPI(conn net.Conn, request *http.Request) {
+	c.logInfo("Handling providers API request")
+
+	// 获取所有AI提供者信息
+	providers, err := GetAllAiProviders()
+	if err != nil {
+		c.logError("Failed to get providers: %v", err)
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
+			"success": false,
+			"message": fmt.Sprintf("Failed to get providers: %v", err),
+		})
+		return
+	}
+
+	// 准备返回的数据
+	providersData := make([]map[string]interface{}, 0, len(providers))
+	for _, p := range providers {
+		// 计算成功率
+		successRate := 0.0
+		if p.TotalRequests > 0 {
+			successRate = float64(p.SuccessCount) / float64(p.TotalRequests) * 100
+		}
+
+		// 添加到结果列表
+		providersData = append(providersData, map[string]interface{}{
+			"id":             p.ID,
+			"wrapper_name":   p.WrapperName,
+			"model_name":     p.ModelName,
+			"type_name":      p.TypeName,
+			"domain_or_url":  p.DomainOrURL,
+			"total_requests": p.TotalRequests,
+			"success_rate":   successRate,
+			"last_latency":   p.LastLatency,
+			"is_healthy":     p.IsHealthy,
+		})
+	}
+
+	// 返回结果
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"message": "Providers retrieved successfully",
+		"data":    providersData,
+	})
+}
+
+// handleCheckSingleHealth 处理单个提供者的健康检查请求
+func (c *ServerConfig) handleCheckSingleHealth(conn net.Conn, request *http.Request, path string) {
+	c.logInfo("处理单个提供者健康检查请求: %s", path)
+
+	// 从路径中提取提供者ID
+	parts := strings.Split(path, "/")
+	if len(parts) < 4 {
+		c.logError("无效的路径格式: %s", path)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": "无效的请求路径",
+		})
+		return
+	}
+
+	providerIDStr := parts[len(parts)-1]
+	providerID, err := strconv.ParseUint(providerIDStr, 10, 32)
+	if err != nil {
+		c.logError("无效的提供者ID: %s, 错误: %v", providerIDStr, err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": fmt.Sprintf("无效的提供者ID: %s", providerIDStr),
+		})
+		return
+	}
+
+	// 执行健康检查
+	result, err := RunSingleProviderHealthCheck(uint(providerID))
+	if err != nil {
+		c.logError("提供者健康检查失败 ID=%d: %v", providerID, err)
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
+			"success": false,
+			"message": fmt.Sprintf("健康检查失败: %v", err),
+		})
+		return
+	}
+
+	// 构造响应
+	var errorMsg string
+	if result.Error != nil {
+		errorMsg = result.Error.Error()
+	}
+
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"message": fmt.Sprintf("提供者 %d 健康检查完成", providerID),
+		"data": map[string]interface{}{
+			"id":           result.Provider.ID,
+			"name":         result.Provider.WrapperName,
+			"healthy":      result.IsHealthy,
+			"responseTime": result.ResponseTime,
+			"error":        errorMsg,
+		},
+	})
+}
+
+// handleCheckAllHealth 处理全部提供者的健康检查请求
+func (c *ServerConfig) handleCheckAllHealth(conn net.Conn, request *http.Request) {
+	c.logInfo("处理全部提供者健康检查请求")
+
+	// 执行健康检查
+	results, err := RunManualHealthCheck()
+	if err != nil {
+		c.logError("健康检查失败: %v", err)
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
+			"success": false,
+			"message": fmt.Sprintf("健康检查失败: %v", err),
+		})
+		return
+	}
+
+	// 统计结果
+	totalCount := len(results)
+	healthyCount := 0
+	for _, result := range results {
+		if result != nil && result.IsHealthy {
+			healthyCount++
+		}
+	}
+
+	// 计算健康率
+	healthRate := 0.0
+	if totalCount > 0 {
+		healthRate = float64(healthyCount) * 100 / float64(totalCount)
+	}
+
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success":      true,
+		"message":      fmt.Sprintf("健康检查完成: %d/%d 个提供者健康", healthyCount, totalCount),
+		"totalCount":   totalCount,
+		"healthyCount": healthyCount,
+		"healthRate":   healthRate,
+		"checkTime":    time.Now().Format("2006-01-02 15:04:05"),
+	})
+}
+
+// handleGenerateApiKey 处理生成API密钥的请求
+func (c *ServerConfig) handleGenerateApiKey(conn net.Conn, request *http.Request) {
+	c.logInfo("处理生成API密钥请求")
+
+	// 生成一个新的UUID作为API密钥
+	apiKey := uuid.New().String()
+
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"message": "成功生成API密钥",
+		"apiKey":  apiKey,
+	})
+}
+
+// handleAddProvider 处理添加提供者的请求
+func (c *ServerConfig) handleAddProvider(conn net.Conn, request *http.Request) {
+	c.logInfo("处理添加提供者请求")
+
+	// 解析请求体
+	var provider struct {
+		WrapperName string `json:"wrapperName"`
+		ModelName   string `json:"modelName"`
+		TypeName    string `json:"typeName"`
+		DomainOrURL string `json:"domainOrURL"`
+	}
+
+	// 尝试解析JSON
+	err := json.NewDecoder(request.Body).Decode(&provider)
+	if err != nil {
+		c.logError("解析请求体失败: %v", err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": fmt.Sprintf("无效的请求格式: %v", err),
+		})
+		return
+	}
+
+	// 验证字段
+	if provider.WrapperName == "" || provider.ModelName == "" || provider.TypeName == "" || provider.DomainOrURL == "" {
+		c.logError("请求缺少必要字段")
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": "必须提供所有必填字段",
+		})
+		return
+	}
+
+	// 创建数据库对象
+	dbProvider := &schema.AiProvider{
+		ModelName:       provider.ModelName,
+		TypeName:        provider.TypeName,
+		DomainOrURL:     provider.DomainOrURL,
+		WrapperName:     provider.WrapperName,
+		IsHealthy:       true,       // 默认设置为健康
+		LastRequestTime: time.Now(), // 设置最后请求时间
+		HealthCheckTime: time.Now(), // 设置健康检查时间
+	}
+
+	// 保存到数据库
+	err = SaveAiProvider(dbProvider)
+	if err != nil {
+		c.logError("保存提供者失败: %v", err)
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
+			"success": false,
+			"message": fmt.Sprintf("保存提供者失败: %v", err),
+		})
+		return
+	}
+
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"message": "成功添加提供者",
+		"id":      dbProvider.ID,
+	})
+}
+
+// handleDeleteProvider 处理删除提供者的请求
+func (c *ServerConfig) handleDeleteProvider(conn net.Conn, request *http.Request, path string) {
+	c.logInfo("处理删除提供者请求: %s", path)
+
+	// 从路径中提取提供者ID
+	parts := strings.Split(path, "/")
+	if len(parts) < 4 {
+		c.logError("无效的路径格式: %s", path)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": "无效的请求路径",
+		})
+		return
+	}
+
+	providerIDStr := parts[len(parts)-1]
+	providerID, err := strconv.ParseUint(providerIDStr, 10, 32)
+	if err != nil {
+		c.logError("无效的提供者ID: %s, 错误: %v", providerIDStr, err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": fmt.Sprintf("无效的提供者ID: %s", providerIDStr),
+		})
+		return
+	}
+
+	// 删除数据库记录
+	err = DeleteAiProviderByID(uint(providerID))
+	if err != nil {
+		c.logError("删除提供者失败 ID=%d: %v", providerID, err)
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
+			"success": false,
+			"message": fmt.Sprintf("删除提供者失败: %v", err),
+		})
+		return
+	}
+
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"message": fmt.Sprintf("成功删除提供者 ID=%d", providerID),
+	})
 }

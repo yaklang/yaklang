@@ -134,11 +134,31 @@ func (e *Entrypoints) Add(model string, providers []*Provider) {
 
 // LoadAPIKeysFromDB 从数据库加载API密钥到内存配置
 func (c *ServerConfig) LoadAPIKeysFromDB() error {
+	log.Info("Loading API keys from database...")
+
 	// 从数据库获取所有API密钥
 	apiKeys, err := GetAllAiApiKeys()
 	if err != nil {
 		return fmt.Errorf("failed to load API keys from database: %v", err)
 	}
+
+	// 获取所有提供者的 WrapperName
+	providers, err := GetAllAiProviders()
+	if err != nil {
+		return fmt.Errorf("failed to load providers from database: %v", err)
+	}
+
+	// 创建 WrapperName 映射
+	wrapperNames := make(map[string]bool)
+	for _, p := range providers {
+		if p.WrapperName != "" {
+			wrapperNames[p.WrapperName] = true
+		}
+	}
+
+	// 清空当前内存中的配置
+	c.KeyAllowedModels.allowedModels = make(map[string]map[string]bool)
+	c.Keys.keys = make(map[string]*Key) // 同时清空 Keys 结构
 
 	// 加载到内存配置
 	for _, key := range apiKeys {
@@ -146,15 +166,25 @@ func (c *ServerConfig) LoadAPIKeysFromDB() error {
 		modelNames := strings.Split(key.AllowedModels, ",")
 		modelMap := make(map[string]bool)
 		for _, model := range modelNames {
-			if model = strings.TrimSpace(model); model != "" {
+			model = strings.TrimSpace(model)
+			if model != "" && wrapperNames[model] {
 				modelMap[model] = true
 			}
 		}
 
-		// 添加到内存配置
+		// 添加到 KeyAllowedModels
 		c.KeyAllowedModels.allowedModels[key.APIKey] = modelMap
+
+		// 同时添加到 Keys 结构
+		c.Keys.keys[key.APIKey] = &Key{
+			Key:           key.APIKey,
+			AllowedModels: modelMap,
+		}
+
+		log.Infof("Loaded API key: %s with allowed models: %v", utils.ShrinkString(key.APIKey, 8), modelMap)
 	}
 
+	log.Infof("Successfully loaded %d API keys from database", len(apiKeys))
 	return nil
 }
 

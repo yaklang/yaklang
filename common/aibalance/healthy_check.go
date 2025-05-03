@@ -73,6 +73,9 @@ func (m *HealthCheckManager) RecordCheck(providerID uint) {
 
 // CheckProviderHealth checks the health status of a single provider
 func CheckProviderHealth(provider *Provider) (*HealthCheckResult, error) {
+	log.Infof("开始检查提供者健康状态: %s (ID: %d)",
+		provider.DbProvider.WrapperName, provider.DbProvider.ID)
+
 	result := &HealthCheckResult{
 		Provider:  provider.DbProvider,
 		IsHealthy: false,
@@ -108,8 +111,13 @@ func CheckProviderHealth(provider *Provider) (*HealthCheckResult, error) {
 	)
 	if err != nil {
 		result.Error = fmt.Errorf("Failed to get AI client: %v", err)
+		log.Errorf("健康检查失败: %s (ID: %d), 无法创建AI客户端: %v",
+			provider.DbProvider.WrapperName, provider.DbProvider.ID, err)
 		return result, nil
 	}
+
+	log.Debugf("正在进行健康检查: %s (ID: %d)",
+		provider.DbProvider.WrapperName, provider.DbProvider.ID)
 
 	// 创建一个异步的 goroutine 发送 ping 请求
 	go func() {
@@ -134,6 +142,8 @@ func CheckProviderHealth(provider *Provider) (*HealthCheckResult, error) {
 	case <-time.After(15 * time.Second): // 15 second timeout
 		succeeded = false
 		result.Error = fmt.Errorf("Health check timeout")
+		log.Warnf("健康检查超时: %s (ID: %d)",
+			provider.DbProvider.WrapperName, provider.DbProvider.ID)
 	}
 
 	// 如果没有收到任何字节，firstByteDuration 可能为 0
@@ -152,6 +162,20 @@ func CheckProviderHealth(provider *Provider) (*HealthCheckResult, error) {
 	// 如果有错误但尚未设置错误消息
 	if !succeeded && result.Error == nil && respErr != nil {
 		result.Error = fmt.Errorf("Health check failed: %v", respErr)
+	}
+
+	if result.IsHealthy {
+		log.Infof("健康检查成功: %s (ID: %d), 延迟: %dms",
+			provider.DbProvider.WrapperName, provider.DbProvider.ID,
+			result.ResponseTime)
+	} else {
+		errMsg := "未知错误"
+		if result.Error != nil {
+			errMsg = result.Error.Error()
+		}
+		log.Errorf("健康检查失败: %s (ID: %d), 错误: %s, 延迟: %dms",
+			provider.DbProvider.WrapperName, provider.DbProvider.ID,
+			errMsg, result.ResponseTime)
 	}
 
 	return result, nil
@@ -235,33 +259,101 @@ func CheckAllProviders(checkManager *HealthCheckManager) ([]*HealthCheckResult, 
 
 // RunManualHealthCheck 手动执行所有提供者的健康检查
 func RunManualHealthCheck() ([]*HealthCheckResult, error) {
-	// 获取一个 Balancer 实例
+	log.Infof("开始执行全部提供者健康检查")
+
+	// 创建一个临时的健康检查管理器
 	balancer, err := NewBalancer("")
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create Balancer instance: %v", err)
+		log.Errorf("创建临时负载均衡器失败: %v", err)
+		return nil, fmt.Errorf("Failed to create temporary balancer: %v", err)
 	}
 	defer balancer.Close()
 
-	// 创建临时健康检查管理器
-	manager := NewHealthCheckManager(balancer)
+	healthManager := NewHealthCheckManager(balancer)
+
+	// 获取所有提供者
+	dbProviders, err := GetAllAiProviders()
+	if err != nil {
+		log.Errorf("获取提供者列表失败: %v", err)
+		return nil, fmt.Errorf("Failed to get provider list: %v", err)
+	}
+
+	if len(dbProviders) == 0 {
+		log.Warnf("没有找到可用的提供者")
+		// 如果没有提供者，返回空结果而不是错误
+		return []*HealthCheckResult{}, nil
+	}
+
+	log.Infof("找到 %d 个提供者，准备健康检查", len(dbProviders))
+
+	// 将数据库提供者转换为内存对象并添加到config.Models中
+	for _, dbProvider := range dbProviders {
+		if dbProvider == nil {
+			continue
+		}
+
+		provider := &Provider{
+			ModelName:   dbProvider.ModelName,
+			TypeName:    dbProvider.TypeName,
+			DomainOrURL: dbProvider.DomainOrURL,
+			APIKey:      dbProvider.APIKey,
+			NoHTTPS:     dbProvider.NoHTTPS,
+			DbProvider:  dbProvider,
+		}
+
+		// 使用WrapperName作为模型名，添加到配置的模型列表中
+		modelName := dbProvider.WrapperName
+		if modelName == "" {
+			modelName = dbProvider.ModelName // 如果WrapperName为空，使用ModelName
+		}
+
+		// 确保models映射已初始化
+		if balancer.config.Models.models == nil {
+			balancer.config.Models.models = make(map[string][]*Provider)
+		}
+
+		// 添加到模型列表
+		balancer.config.Models.models[modelName] = append(balancer.config.Models.models[modelName], provider)
+	}
 
 	// 执行健康检查
-	log.Infof("Starting manual health check...")
-	results := CheckAllProvidersHealth(manager)
+	log.Infof("开始并行执行健康检查")
+	results := CheckAllProvidersHealth(healthManager)
+	log.Infof("健康检查完成, 共 %d 个结果", len(results))
 
-	// 更新数据库中提供者的健康状态
+	// 统计健康状态
+	healthyCount := 0
+
+	// 同步更新数据库中的健康状态
 	for _, result := range results {
-		if result.Provider != nil {
-			result.Provider.IsHealthy = result.IsHealthy
-			// 保存到数据库
-			err := UpdateAiProvider(result.Provider)
-			if err != nil {
-				log.Errorf("Failed to update provider health status: %v", err)
+		if result == nil || result.Provider == nil {
+			continue
+		}
+
+		dbProvider := result.Provider
+		dbProvider.IsHealthy = result.IsHealthy
+		dbProvider.LastLatency = result.ResponseTime
+		dbProvider.HealthCheckTime = time.Now()
+
+		if result.IsHealthy {
+			dbProvider.LastRequestStatus = true
+			healthyCount++
+		} else {
+			dbProvider.LastRequestStatus = false
+			if result.Error != nil {
+				log.Warnf("提供者 %s (ID: %d) 健康检查失败: %v",
+					dbProvider.WrapperName, dbProvider.ID, result.Error)
 			}
+		}
+
+		// 保存到数据库
+		if err := UpdateAiProvider(dbProvider); err != nil {
+			log.Errorf("更新提供者 %s (ID: %d) 状态失败: %v",
+				dbProvider.WrapperName, dbProvider.ID, err)
 		}
 	}
 
-	log.Infof("Manual health check completed, checked %d providers", len(results))
+	log.Infof("健康检查结果统计: %d/%d 个提供者健康", healthyCount, len(results))
 	return results, nil
 }
 
@@ -404,13 +496,17 @@ func (m *HealthCheckManager) StopScheduler() {
 
 // RunSingleProviderHealthCheck 执行单个提供者的健康检查
 func RunSingleProviderHealthCheck(providerID uint) (*HealthCheckResult, error) {
+	log.Infof("开始单个提供者健康检查, ID=%d", providerID)
+
 	// 获取指定 ID 的提供者
 	dbProvider, err := GetAiProviderByID(providerID)
 	if err != nil {
+		log.Errorf("获取提供者信息失败 (ID: %d): %v", providerID, err)
 		return nil, fmt.Errorf("Failed to get provider info (ID: %d): %v", providerID, err)
 	}
 
 	if dbProvider == nil {
+		log.Errorf("未找到ID为 %d 的提供者", providerID)
 		return nil, fmt.Errorf("Provider not found with ID: %d", providerID)
 	}
 
@@ -425,10 +521,22 @@ func RunSingleProviderHealthCheck(providerID uint) (*HealthCheckResult, error) {
 	}
 
 	// 执行健康检查
-	log.Infof("Starting health check for provider [%s](ID: %d)...", dbProvider.WrapperName, dbProvider.ID)
+	log.Infof("开始健康检查: [%s](ID: %d)...", dbProvider.WrapperName, dbProvider.ID)
 	result, err := CheckProviderHealth(provider)
 	if err != nil {
+		log.Errorf("健康检查执行失败: %v", err)
 		return nil, fmt.Errorf("Health check failed: %v", err)
+	}
+
+	// 检查结果是否为空
+	if result == nil {
+		log.Errorf("健康检查返回空结果")
+		return &HealthCheckResult{
+			Provider:     dbProvider,
+			IsHealthy:    false,
+			ResponseTime: 0,
+			Error:        fmt.Errorf("Health check returned empty result"),
+		}, nil
 	}
 
 	// 更新数据库中的健康状态
@@ -438,16 +546,25 @@ func RunSingleProviderHealthCheck(providerID uint) (*HealthCheckResult, error) {
 	dbProvider.LastRequestTime = time.Now()
 	if result.IsHealthy {
 		dbProvider.LastRequestStatus = true
+		log.Infof("提供者健康检查成功: [%s](ID: %d), 延迟: %dms",
+			dbProvider.WrapperName, dbProvider.ID, result.ResponseTime)
 	} else {
 		dbProvider.LastRequestStatus = false
+		errorMsg := "未知错误"
+		if result.Error != nil {
+			errorMsg = result.Error.Error()
+		}
+		log.Warnf("提供者健康检查失败: [%s](ID: %d), 错误: %s",
+			dbProvider.WrapperName, dbProvider.ID, errorMsg)
 	}
 
 	// 保存到数据库
 	if err := UpdateAiProvider(dbProvider); err != nil {
-		log.Errorf("Failed to update provider status: %v", err)
+		log.Errorf("更新提供者状态失败: [%s](ID: %d): %v",
+			dbProvider.WrapperName, dbProvider.ID, err)
 	} else {
-		log.Infof("Provider [%s](ID: %d) health check completed: Health=%v, ResponseTime=%dms",
-			dbProvider.WrapperName, dbProvider.ID, result.IsHealthy, result.ResponseTime)
+		log.Infof("提供者状态已更新: [%s](ID: %d)",
+			dbProvider.WrapperName, dbProvider.ID)
 	}
 
 	return result, nil
