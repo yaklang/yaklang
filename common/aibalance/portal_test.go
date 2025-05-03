@@ -75,7 +75,7 @@ func TestPortalPage(t *testing.T) {
 	// 验证渲染输出包含期望的内容
 	output := buf.String()
 	expectedContents := []string{
-		"AIBalancer 管理面板",
+		"AIBalancer Portal Table",
 		data.CurrentTime,
 		"Test Model 1",
 		"test-model-1",
@@ -187,7 +187,7 @@ func TestPortalEndToEnd(t *testing.T) {
 
 	// 检查响应内容是否包含期望的信息
 	expectedContents := []string{
-		"AIBalancer 管理面板",
+		"AIBalancer Portal Table",
 		"Test Model",
 		"test-model",
 		"test-key",

@@ -4,6 +4,10 @@ import "github.com/yaklang/yaklang/common/utils/omap"
 
 var list = omap.NewOrderedMap(map[string]func() AIClient{})
 
+func GetRegisteredAIGateways() []string {
+	return list.Keys()
+}
+
 func Register(name string, gateway func() AIClient) {
 	if gateway == nil {
 		return
