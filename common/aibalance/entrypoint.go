@@ -107,6 +107,11 @@ func (e *Entrypoint) PeekProvider(modelName string) *Provider {
 		totalRequests := dbProvider.TotalRequests
 		latency := dbProvider.LastLatency
 
+		// 只有延迟大于 0 的提供者才会被考虑
+		if latency <= 0 {
+			continue
+		}
+
 		// 累计健康的 Provider 总请求数
 		if isHealthy {
 			totalHealthyRequests += totalRequests
