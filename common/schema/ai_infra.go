@@ -98,6 +98,12 @@ type AiProvider struct {
 
 type AiApiKeys struct {
 	gorm.Model
-	APIKey        string `json:"api_key" gorm:"index"`
-	AllowedModels string `json:"allowed_models"`
+	APIKey        string    `json:"api_key" gorm:"index"`
+	AllowedModels string    `json:"allowed_models"`
+	InputBytes    int64     `json:"input_bytes"`    // 输入字节数统计
+	OutputBytes   int64     `json:"output_bytes"`   // 输出字节数统计
+	UsageCount    int64     `json:"usage_count"`    // 使用次数统计
+	SuccessCount  int64     `json:"success_count"`  // 成功请求数
+	FailureCount  int64     `json:"failure_count"`  // 失败请求数
+	LastUsedTime  time.Time `json:"last_used_time"` // 上次使用时间
 }

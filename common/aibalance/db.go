@@ -112,6 +112,12 @@ func SaveAiApiKey(apiKey string, allowedModels string) error {
 	key := &schema.AiApiKeys{
 		APIKey:        apiKey,
 		AllowedModels: allowedModels,
+		InputBytes:    0,
+		OutputBytes:   0,
+		UsageCount:    0,
+		SuccessCount:  0,
+		FailureCount:  0,
+		LastUsedTime:  time.Now(),
 	}
 	return GetDB().Create(key).Error
 }
@@ -172,4 +178,32 @@ func DeleteAiProviderByID(id uint) error {
 		id, provider.WrapperName, provider.ModelName)
 
 	return nil
+}
+
+// UpdateAiApiKeyStats 更新 API Key 的使用统计信息
+// apiKey：API密钥
+// inputBytes：本次请求的输入字节数
+// outputBytes：本次请求的输出字节数
+// success：请求是否成功
+func UpdateAiApiKeyStats(apiKey string, inputBytes, outputBytes int64, success bool) error {
+	// 获取数据库中的 API Key 记录
+	var key schema.AiApiKeys
+	if err := GetDB().Where("api_key = ?", apiKey).First(&key).Error; err != nil {
+		return fmt.Errorf("Failed to find API key: %v", err)
+	}
+
+	// 更新统计信息
+	key.UsageCount++
+	key.InputBytes += inputBytes
+	key.OutputBytes += outputBytes
+	key.LastUsedTime = time.Now()
+
+	if success {
+		key.SuccessCount++
+	} else {
+		key.FailureCount++
+	}
+
+	// 保存到数据库
+	return GetDB().Save(&key).Error
 }
