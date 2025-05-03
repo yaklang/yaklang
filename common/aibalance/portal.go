@@ -354,7 +354,7 @@ func (c *ServerConfig) servePortal(conn net.Conn) {
 		// Accumulate statistics
 		data.TotalRequests += p.TotalRequests
 		totalSuccess += p.SuccessCount
-		if p.IsHealthy {
+		if p.IsHealthy && p.IsFirstCheckCompleted {
 			healthyCount++
 		}
 	}
