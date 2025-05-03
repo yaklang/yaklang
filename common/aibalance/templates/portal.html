@@ -326,9 +326,8 @@
             scroll-behavior: smooth;
             /* 在移动端显示滚动条 */
             -webkit-overflow-scrolling: touch;
-            position: relative; /* 用于固定关键列 */
         }
-        /* 固定操作栏宽度 */
+        /* 操作栏样式 */
         .actions-column {
             width: 60px;
             text-align: center;
@@ -485,7 +484,6 @@
             scroll-behavior: smooth;
             /* 在移动端显示滚动条 */
             -webkit-overflow-scrolling: touch;
-            position: relative; /* 用于固定关键列 */
         }
         
         table {
@@ -510,9 +508,9 @@
         /* 设置各列的固定宽度 - 优化小屏幕 */
         th:nth-child(1), td:nth-child(1) { width: 30px; } /* 复选框 */
         th:nth-child(2), td:nth-child(2) { width: 40px; } /* ID */
-        th:nth-child(3), td:nth-child(3) { width: 180px; } /* 健康度，调整为更宽 */
-        th:nth-child(4), td:nth-child(4) { width: 90px; } /* 提供者名称 */
-        th:nth-child(5), td:nth-child(5) { width: 110px; } /* 模型名称 */
+        th:nth-child(3), td:nth-child(3) { width: 160px; } /* 健康度，调整为更窄 */
+        th:nth-child(4), td:nth-child(4) { width: 100px; } /* 提供者名称 */
+        th:nth-child(5), td:nth-child(5) { width: 120px; } /* 模型名称 */
         th:nth-child(6), td:nth-child(6) { width: 80px; } /* 类型 */
         th:nth-child(7), td:nth-child(7) { width: 170px; } /* 域名/URL */
         th:nth-child(8), td:nth-child(8) { width: 80px; } /* 总请求数 */
@@ -520,31 +518,19 @@
         th:nth-child(10), td:nth-child(10) { width: 60px; } /* 操作 */
 
         /* 表格列对齐方式 */
+        /* ID、提供者和类型列居中 */
+        th:nth-child(2), td:nth-child(2),
+        th:nth-child(4), td:nth-child(4),
+        th:nth-child(6), td:nth-child(6),
         th:nth-child(7), td:nth-child(7),
         th:nth-child(8), td:nth-child(8) {
             text-align: center;
         }
 
-        /* 关键列样式（延迟、状态和操作列固定显示） */
+        /* 表格滚动样式 */
         @media (max-width: 800px) {
             .table-container {
                 overflow-x: auto;
-            }
-            
-            /* 固定关键列在右侧 */
-            th:nth-child(9), td:nth-child(9),
-            th:nth-child(10), td:nth-child(10) {
-                position: sticky;
-                background-color: #fff;
-                z-index: 1;
-            }
-            
-            th:nth-child(9), td:nth-child(9) { right: 60px; } /* 健康度列 */
-            th:nth-child(10), td:nth-child(10) { right: 0; } /* 操作列 */
-            
-            /* 添加阴影分隔效果 */
-            th:nth-child(9), td:nth-child(9) {
-                box-shadow: -2px 0 5px rgba(0,0,0,0.1);
             }
         }
 
@@ -943,11 +929,15 @@
             transform: scale(0.95);
             transform-origin: top left;
             transition: opacity 0.1s, transform 0.1s;
+            max-height: calc(100vh - 20px);
+            overflow-y: auto;
+            visibility: hidden;
         }
 
         .context-menu.show {
             opacity: 1;
             transform: scale(1);
+            visibility: visible;
         }
 
         .context-menu-item {
@@ -1088,7 +1078,7 @@
             display: flex;
             align-items: center;
             padding: 4px 8px;
-            gap: 10px;
+            gap: 8px;
         }
 
         /* 调整刷新按钮样式 */
@@ -1106,6 +1096,7 @@
             justify-content: center;
             opacity: 0.7;
             flex-shrink: 0;
+            margin-right: 4px;
         }
 
         /* 调整健康信息区域布局 */
@@ -1113,8 +1104,9 @@
             display: flex;
             align-items: center;
             flex: 1;
-            justify-content: space-between;
+            justify-content: flex-start;
             min-width: 120px;
+            gap: 8px;
         }
         
         /* 调整健康状态标签 */
@@ -1129,6 +1121,7 @@
             font-weight: bold;
             white-space: nowrap;
             min-width: 42px;
+            text-align: center;
         }
 
         /* 调整延迟信息显示 */
@@ -1137,8 +1130,7 @@
             font-size: 12px;
             color: #666;
             white-space: nowrap;
-            text-align: right;
-            min-width: 60px;
+            min-width: 50px;
         }
 
         /* 添加检查中状态的样式 */
@@ -1205,6 +1197,71 @@
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+        }
+
+        /* 调整健康度显示布局 */
+        .health-status {
+            display: flex;
+            align-items: center;
+            padding: 4px 2px;
+            gap: 4px;
+        }
+        
+        .health-info {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex: 1;
+            justify-content: flex-start;
+        }
+        
+        .refresh-btn {
+            margin-right: 0;
+            flex-shrink: 0;
+            width: 16px;
+            height: 16px;
+        }
+        
+        /* 调整健康状态标签 */
+        .health-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 12px;
+            line-height: 1.2;
+            font-weight: bold;
+            white-space: nowrap;
+            min-width: 38px;
+            text-align: center;
+        }
+        
+        /* 调整延迟信息显示 */
+        .health-latency {
+            font-family: monospace;
+            font-size: 11px;
+            color: #666;
+            white-space: nowrap;
+            min-width: 45px;
+        }
+
+        /* 添加常用工具类 */
+        .text-center {
+            text-align: center !important;
+        }
+        
+        .text-right {
+            text-align: right !important;
+        }
+        
+        /* API密钥单元格样式 */
+        .api-key-cell {
+            font-family: monospace;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
     </style>
 </head>
@@ -1284,7 +1341,7 @@
                             <td class="checkbox-column">
                                 <input type="checkbox" class="provider-checkbox">
                             </td>
-                            <td>{{.ID}}</td>
+                            <td class="text-center">{{.ID}}</td>
                             <td class="health-status">
                                 <button class="refresh-btn" onclick="checkSingleProvider('{{.ID}}')" title="刷新健康状态">
                                     <svg viewBox="0 0 24 24">
@@ -1295,7 +1352,7 @@
                                     {{if .IsHealthy}}
                                         {{if eq .LastLatency 0}}
                                             <span class="health-badge unhealthy">未知</span>
-                                            <span class="health-latency">未知</span>
+                                            <span class="health-latency">-</span>
                                         {{else}}
                                             <span class="health-badge healthy">健康</span>
                                             <span class="health-latency">{{.LastLatency}}ms</span>
@@ -1303,7 +1360,7 @@
                                     {{else}}
                                         {{if eq .LastLatency 0}}
                                             <span class="health-badge unhealthy">未知</span>
-                                            <span class="health-latency">未知</span>
+                                            <span class="health-latency">-</span>
                                         {{else}}
                                             <span class="health-badge unhealthy">异常</span>
                                             <span class="health-latency">{{.LastLatency}}ms</span>
@@ -1311,9 +1368,9 @@
                                     {{end}}
                                 </div>
                             </td>
-                            <td class="copyable" data-full-text="{{.WrapperName}}">{{.WrapperName}}</td>
+                            <td class="copyable text-center" data-full-text="{{.WrapperName}}">{{.WrapperName}}</td>
                             <td class="copyable" data-full-text="{{.ModelName}}">{{.ModelName}}</td>
-                            <td class="copyable" data-full-text="{{.TypeName}}">{{.TypeName}}</td>
+                            <td class="copyable text-center" data-full-text="{{.TypeName}}">{{.TypeName}}</td>
                             <td class="copyable" data-full-text="{{.DomainOrURL}}">{{.DomainOrURL}}</td>
                             <td>{{.TotalRequests}}</td>
                             <td>
@@ -1338,6 +1395,79 @@
                         <label>API Key:</label>
                         <input type="text" id="apiKey" class="form-control" readonly>
                         <button class="btn" onclick="generateNewApiKey()">生成新的 API Key</button>
+                    </div>
+                    
+                    <div class="action-bar">
+                        <div>
+                            <h4>API密钥列表</h4>
+                        </div>
+                        <div>
+                            <button class="btn btn-danger" id="delete-selected-api" onclick="confirmDeleteSelectedAPI()" disabled>删除选中项</button>
+                        </div>
+                    </div>
+                    
+                    <div class="table-container">
+                        <table cellspacing="0" cellpadding="0" id="api-table">
+                            <thead>
+                                <tr>
+                                    <th class="checkbox-column">
+                                        <input type="checkbox" id="select-all-api" onchange="toggleSelectAllAPI()">
+                                    </th>
+                                    <th>ID</th>
+                                    <th class="column-name">API密钥</th>
+                                    <th class="column-name">创建时间</th>
+                                    <th class="column-name">最后使用</th>
+                                    <th class="column-name">状态</th>
+                                    <th class="column-name">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range .APIKeys}}
+                                <tr data-api-id="{{.ID}}">
+                                    <td class="checkbox-column">
+                                        <input type="checkbox" class="api-checkbox">
+                                    </td>
+                                    <td class="text-center">{{.ID}}</td>
+                                    <td class="copyable api-key-cell" data-full-text="{{.Key}}">{{.DisplayKey}}</td>
+                                    <td>{{.CreatedAt}}</td>
+                                    <td>{{if .LastUsedAt}}{{.LastUsedAt}}{{else}}-{{end}}</td>
+                                    <td class="text-center">
+                                        {{if .Active}}
+                                            <span class="health-badge healthy">激活</span>
+                                        {{else}}
+                                            <span class="health-badge unhealthy">禁用</span>
+                                        {{end}}
+                                    </td>
+                                    <td>
+                                        <button class="delete-btn" onclick="deleteAPIKey('{{.ID}}')" title="删除API密钥">
+                                            <svg viewBox="0 0 24 24">
+                                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                                            </svg>
+                                        </button>
+                                        {{if .Active}}
+                                            <button class="btn btn-sm btn-danger" onclick="toggleAPIKeyStatus('{{.ID}}', false)" title="禁用API密钥">
+                                                禁用
+                                            </button>
+                                        {{else}}
+                                            <button class="btn btn-sm" onclick="toggleAPIKeyStatus('{{.ID}}', true)" title="激活API密钥">
+                                                激活
+                                            </button>
+                                        {{end}}
+                                    </td>
+                                </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="form-info" style="margin-top: 20px;">
+                        <h4>使用说明</h4>
+                        <p>API密钥用于访问AIBalancer服务。每个密钥可以通过以下方式使用：</p>
+                        <ul>
+                            <li>添加到请求头: <code>Authorization: Bearer YOUR_API_KEY</code></li>
+                            <li>作为查询参数: <code>?api_key=YOUR_API_KEY</code></li>
+                        </ul>
+                        <p>为了安全起见，建议在生产环境中使用请求头方式。</p>
                     </div>
                 </div>
             </div>
@@ -1734,10 +1864,74 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             deleteButton.disabled = selectedCount === 0;
         }
 
+        // 初始化API表格
+        function initializeAPITable() {
+            const apiTable = document.getElementById('api-table');
+            if (!apiTable) return;
+            
+            const headers = apiTable.querySelectorAll('th');
+            headers.forEach((header, index) => {
+                if (index === 0) return;
+                header.style.cursor = 'pointer';
+                header.addEventListener('click', () => sortAPITable(index));
+            });
+            
+            // 添加事件监听器到API密钥表的复选框
+            document.querySelectorAll('.api-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', updateDeleteSelectedAPIButton);
+            });
+        }
+        
+        // API表格排序功能
+        function sortAPITable(columnIndex) {
+            const table = document.getElementById('api-table');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            const isNumeric = (value) => !isNaN(parseFloat(value)) && isFinite(value);
+            
+            rows.sort((a, b) => {
+                let aValue = a.cells[columnIndex].textContent.trim();
+                let bValue = b.cells[columnIndex].textContent.trim();
+                
+                // 处理数字列
+                if (isNumeric(aValue) && isNumeric(bValue)) {
+                    return parseFloat(aValue) - parseFloat(bValue);
+                }
+                
+                // 处理日期列
+                if (columnIndex === 3 || columnIndex === 4) {
+                    // 如果是"-"，则视为最旧
+                    if (aValue === "-") return 1;
+                    if (bValue === "-") return -1;
+                    
+                    const aDate = new Date(aValue);
+                    const bDate = new Date(bValue);
+                    return bDate - aDate; // 默认按日期倒序
+                }
+                
+                // 处理状态列
+                if (columnIndex === 5) {
+                    const aActive = a.cells[columnIndex].querySelector('.health-badge').classList.contains('healthy');
+                    const bActive = b.cells[columnIndex].querySelector('.health-badge').classList.contains('healthy');
+                    return bActive - aActive;
+                }
+                
+                // 处理文本列
+                return aValue.localeCompare(bValue, 'zh-CN');
+            });
+            
+            // 重新插入排序后的行
+            rows.forEach(row => tbody.appendChild(row));
+        }
+        
         // 页面加载完成后的初始化
         document.addEventListener('DOMContentLoaded', function() {
             // 初始化表格
             initializeTable();
+            
+            // 初始化API表格
+            initializeAPITable();
             
             // 初始化右键菜单
             initializeContextMenu();
@@ -1993,9 +2187,40 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             const menu = document.getElementById('context-menu');
             if (!menu) return;
 
-            menu.style.left = `${e.pageX}px`;
-            menu.style.top = `${e.pageY}px`;
+            // 使用clientX和clientY获取相对于视口的坐标，而不是页面
+            const x = e.clientX;
+            const y = e.clientY;
+
+            // 重置菜单位置，以便正确计算其尺寸
+            menu.style.left = '0px';
+            menu.style.top = '0px';
             menu.classList.add('show');
+            
+            // 获取菜单尺寸
+            const menuWidth = menu.offsetWidth;
+            const menuHeight = menu.offsetHeight;
+            
+            // 获取视口尺寸
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            
+            // 计算菜单位置，确保不超出视口边界
+            let menuX = x;
+            let menuY = y;
+            
+            // 检查右边界
+            if (x + menuWidth > viewportWidth) {
+                menuX = viewportWidth - menuWidth - 5;
+            }
+            
+            // 检查下边界
+            if (y + menuHeight > viewportHeight) {
+                menuY = viewportHeight - menuHeight - 5;
+            }
+            
+            // 应用计算后的位置
+            menu.style.left = `${menuX}px`;
+            menu.style.top = `${menuY}px`;
         }
 
         function hideContextMenu() {
@@ -2065,7 +2290,7 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             // 替换为检查中状态
             healthInfoDiv.innerHTML = `
                 <span class="health-badge checking">检查中</span>
-                <span class="health-latency">...</span>
+                <span class="health-latency">-</span>
             `;
             
             if (refreshBtn) {
@@ -2104,7 +2329,7 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                     } else {
                         healthInfoDiv.innerHTML = `
                             <span class="health-badge unhealthy">异常</span>
-                            <span class="health-latency">${responseTime > 0 ? responseTime + 'ms' : '未知'}</span>
+                            <span class="health-latency">${responseTime > 0 ? responseTime + 'ms' : '-'}</span>
                         `;
                     }
                     
@@ -2144,8 +2369,99 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 const data = await response.json();
                 document.getElementById('apiKey').value = data.apiKey;
                 showToast('API Key 生成成功', 'success');
+                
+                // 刷新页面以显示新生成的API密钥
+                setTimeout(() => window.location.reload(), 1000);
             } catch (error) {
                 showToast('生成 API Key 失败: ' + error.message, 'error');
+            }
+        }
+        
+        // API密钥表格功能
+        function toggleSelectAllAPI() {
+            const selectAllCheckbox = document.querySelector('#select-all-api');
+            const checkboxes = document.querySelectorAll('.api-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+            updateDeleteSelectedAPIButton();
+        }
+        
+        function updateDeleteSelectedAPIButton() {
+            const deleteButton = document.getElementById('delete-selected-api');
+            const selectedCount = document.querySelectorAll('.api-checkbox:checked').length;
+            deleteButton.disabled = selectedCount === 0;
+        }
+        
+        function confirmDeleteSelectedAPI() {
+            const selectedIds = Array.from(document.querySelectorAll('.api-checkbox:checked'))
+                .map(checkbox => checkbox.closest('tr').getAttribute('data-api-id'));
+                
+            if (selectedIds.length === 0) return;
+            
+            if (confirm(`确定要删除选中的 ${selectedIds.length} 个API密钥吗？`)) {
+                deleteMultipleAPIKeys(selectedIds);
+            }
+        }
+        
+        async function deleteMultipleAPIKeys(apiIds) {
+            try {
+                const response = await fetch('/portal/delete-api-keys', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ ids: apiIds })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('删除API密钥失败');
+                }
+                
+                showToast(`成功删除 ${apiIds.length} 个API密钥`, 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } catch (error) {
+                showToast('删除失败: ' + error.message, 'error');
+            }
+        }
+        
+        async function deleteAPIKey(apiKeyId) {
+            if (confirm('确定要删除这个API密钥吗？')) {
+                try {
+                    const response = await fetch(`/portal/delete-api-key/${apiKeyId}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('删除失败');
+                    }
+                    
+                    showToast('API密钥删除成功', 'success');
+                    setTimeout(() => window.location.reload(), 1000);
+                } catch (error) {
+                    showToast('删除失败: ' + error.message, 'error');
+                }
+            }
+        }
+        
+        async function toggleAPIKeyStatus(apiKeyId, activate) {
+            try {
+                const action = activate ? 'activate' : 'deactivate';
+                const response = await fetch(`/portal/${action}-api-key/${apiKeyId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`${activate ? '激活' : '禁用'}API密钥失败`);
+                }
+                
+                showToast(`API密钥${activate ? '激活' : '禁用'}成功`, 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } catch (error) {
+                showToast(`操作失败: ${error.message}`, 'error');
             }
         }
 
@@ -2208,6 +2524,11 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             // 重新插入排序后的行
             rows.forEach(row => tbody.appendChild(row));
         }
+
+        // 添加滚动事件监听器
+        window.addEventListener('scroll', () => {
+            hideContextMenu();
+        });
     </script>
 </body>
 </html>
