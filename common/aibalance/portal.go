@@ -43,15 +43,16 @@ func formatBytes(bytes int64) string {
 
 // ProviderData contains data for template rendering
 type ProviderData struct {
-	ID            uint
-	WrapperName   string
-	ModelName     string
-	TypeName      string
-	DomainOrURL   string
-	TotalRequests int64
-	SuccessRate   float64
-	LastLatency   int64
-	IsHealthy     bool
+	ID                uint
+	WrapperName       string
+	ModelName         string
+	TypeName          string
+	DomainOrURL       string
+	TotalRequests     int64
+	SuccessRate       float64
+	LastLatency       int64
+	IsHealthy         bool
+	HealthStatusClass string // CSS class for health status (healthy, unhealthy, unknown)
 }
 
 // APIKeyData contains data for displaying an API key
@@ -338,17 +339,29 @@ func (c *ServerConfig) servePortal(conn net.Conn) {
 			successRate = float64(p.SuccessCount) / float64(p.TotalRequests) * 100
 		}
 
+		// --- 开始修改：计算 HealthStatusClass ---
+		var healthClass string
+		if !p.IsFirstCheckCompleted {
+			healthClass = "unknown"
+		} else if p.IsHealthy {
+			healthClass = "healthy"
+		} else {
+			healthClass = "unhealthy"
+		}
+		// --- 结束修改 ---
+
 		// Add to provider list
 		data.Providers = append(data.Providers, ProviderData{
-			ID:            p.ID,
-			WrapperName:   p.WrapperName,
-			ModelName:     p.ModelName,
-			TypeName:      p.TypeName,
-			DomainOrURL:   p.DomainOrURL,
-			TotalRequests: p.TotalRequests,
-			SuccessRate:   successRate,
-			LastLatency:   p.LastLatency,
-			IsHealthy:     p.IsHealthy,
+			ID:                p.ID,
+			WrapperName:       p.WrapperName,
+			ModelName:         p.ModelName,
+			TypeName:          p.TypeName,
+			DomainOrURL:       p.DomainOrURL,
+			TotalRequests:     p.TotalRequests,
+			SuccessRate:       successRate,
+			LastLatency:       p.LastLatency,
+			IsHealthy:         p.IsHealthy,
+			HealthStatusClass: healthClass,
 		})
 
 		// Accumulate statistics
