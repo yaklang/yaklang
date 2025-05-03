@@ -225,16 +225,49 @@ func CheckAllProviders(checkManager *HealthCheckManager) ([]*HealthCheckResult, 
 			// 记录本次检查
 			checkManager.RecordCheck(dbp.ID)
 
+			// 1. 检查延迟是否大于0
+			isLatencyValid := result.ResponseTime > 0
+			if !isLatencyValid {
+				log.Warnf("Provider %s (ID: %d) health check latency is not positive (%dms), marking as unhealthy.", dbp.WrapperName, dbp.ID, result.ResponseTime)
+			}
+
+			// 2. 计算基础健康状态（原始检查结果 AND 延迟有效）
+			baseHealthy := result.IsHealthy && isLatencyValid
+
+			// 3. 获取首次检查状态
+			isFirstCheck := !dbp.IsFirstCheckCompleted
+
+			// 4. 计算最终健康状态
+			finalIsHealthy := baseHealthy
+			if isFirstCheck {
+				finalIsHealthy = false // 首次检查强制为 unhealthy
+				log.Infof("Provider %s (ID: %d) is undergoing its first health check, marking as unhealthy regardless of result.", dbp.WrapperName, dbp.ID)
+			} else if !baseHealthy {
+				// 如果非首次检查且基础不健康，记录原因
+				if !result.IsHealthy {
+					errMsg := "check failed"
+					if result.Error != nil {
+						errMsg = result.Error.Error()
+					}
+					log.Warnf("Provider %s (ID: %d) marked as unhealthy due to check failure: %s", dbp.WrapperName, dbp.ID, errMsg)
+				} else if !isLatencyValid {
+					log.Warnf("Provider %s (ID: %d) marked as unhealthy due to non-positive latency: %dms", dbp.WrapperName, dbp.ID, result.ResponseTime)
+				}
+			}
+
 			// 更新数据库中的健康状态
-			dbp.IsHealthy = result.IsHealthy
+			dbp.IsHealthy = finalIsHealthy // 使用最终计算出的健康状态
 			dbp.LastLatency = result.ResponseTime
 			dbp.HealthCheckTime = time.Now()
-			if result.IsHealthy {
+			dbp.IsFirstCheckCompleted = true // 标记首次检查已完成
+
+			// 更新最后请求状态（这个状态似乎有点冗余，但保持原逻辑）
+			if finalIsHealthy { // 使用最终状态判断
 				dbp.LastRequestStatus = true
 			} else {
 				dbp.LastRequestStatus = false
-				if result.Error != nil {
-					log.Warnf("Provider %s (ID: %d) health check failed: %v", dbp.WrapperName, dbp.ID, result.Error)
+				if result.Error != nil && !isFirstCheck { // 只在非首次检查失败时记录错误详情
+					log.Warnf("Provider %s (ID: %d) health check failed details: %v", dbp.WrapperName, dbp.ID, result.Error)
 				}
 			}
 
@@ -242,6 +275,9 @@ func CheckAllProviders(checkManager *HealthCheckManager) ([]*HealthCheckResult, 
 			if err := UpdateAiProvider(dbp); err != nil {
 				log.Errorf("Failed to update provider %s (ID: %d) status: %v", dbp.WrapperName, dbp.ID, err)
 			}
+
+			// 使用修改后的状态更新 result，以便返回给调用者
+			result.IsHealthy = finalIsHealthy
 
 			// 添加到结果列表
 			resultsMutex.Lock()
@@ -539,33 +575,70 @@ func RunSingleProviderHealthCheck(providerID uint) (*HealthCheckResult, error) {
 		}, nil
 	}
 
-	// 更新数据库中的健康状态
-	dbProvider.IsHealthy = result.IsHealthy
+	// 1. 检查延迟是否大于0
+	isLatencyValid := result.ResponseTime > 0
+	if !isLatencyValid {
+		log.Warnf("Provider %s (ID: %d) single health check latency is not positive (%dms), marking as unhealthy.", dbProvider.WrapperName, dbProvider.ID, result.ResponseTime)
+	}
+
+	// 2. 计算基础健康状态（原始检查结果 AND 延迟有效）
+	baseHealthy := result.IsHealthy && isLatencyValid
+
+	// 3. 获取首次检查状态
+	isFirstCheck := !dbProvider.IsFirstCheckCompleted
+
+	// 4. 计算最终健康状态
+	finalIsHealthy := baseHealthy
+	if isFirstCheck {
+		finalIsHealthy = false // 首次检查强制为 unhealthy
+		log.Infof("Provider %s (ID: %d) is undergoing its first single health check, marking as unhealthy regardless of result.", dbProvider.WrapperName, dbProvider.ID)
+	} else if !baseHealthy {
+		// 如果非首次检查且基础不健康，记录原因
+		if !result.IsHealthy {
+			errMsg := "check failed"
+			if result.Error != nil {
+				errMsg = result.Error.Error()
+			}
+			log.Warnf("Provider %s (ID: %d) marked as unhealthy during single check due to check failure: %s", dbProvider.WrapperName, dbProvider.ID, errMsg)
+		} else if !isLatencyValid {
+			log.Warnf("Provider %s (ID: %d) marked as unhealthy during single check due to non-positive latency: %dms", dbProvider.WrapperName, dbProvider.ID, result.ResponseTime)
+		}
+	}
+
+	// 更新数据库状态
+	dbProvider.IsHealthy = finalIsHealthy // 使用最终计算出的健康状态
 	dbProvider.LastLatency = result.ResponseTime
 	dbProvider.HealthCheckTime = time.Now()
-	dbProvider.LastRequestTime = time.Now()
-	if result.IsHealthy {
+	dbProvider.IsFirstCheckCompleted = true // 标记首次检查已完成
+	if finalIsHealthy {
 		dbProvider.LastRequestStatus = true
-		log.Infof("提供者健康检查成功: [%s](ID: %d), 延迟: %dms",
-			dbProvider.WrapperName, dbProvider.ID, result.ResponseTime)
 	} else {
 		dbProvider.LastRequestStatus = false
-		errorMsg := "未知错误"
-		if result.Error != nil {
-			errorMsg = result.Error.Error()
+	}
+
+	// --- 使用 Updates 方法显式更新字段 ---
+	updateData := map[string]interface{}{
+		"is_healthy":               finalIsHealthy,
+		"last_latency":             result.ResponseTime,
+		"health_check_time":        time.Now(),
+		"is_first_check_completed": true,           // 标记首次检查已完成
+		"last_request_status":      finalIsHealthy, // 更新最后请求状态
+	}
+
+	if err := GetDB().Model(&dbProvider).Updates(updateData).Error; err != nil {
+		// 记录错误，但仍然返回检查结果
+		log.Errorf("Failed to update provider %s (ID: %d) status after single health check: %v", dbProvider.WrapperName, dbProvider.ID, err)
+		// 将错误信息附加到结果中，但不覆盖原始的检查错误（如果存在）
+		if result.Error == nil {
+			result.Error = fmt.Errorf("failed to update provider status: %w", err)
+		} else {
+			result.Error = fmt.Errorf("health check error: %v; also failed to update provider status: %w", result.Error, err)
 		}
-		log.Warnf("提供者健康检查失败: [%s](ID: %d), 错误: %s",
-			dbProvider.WrapperName, dbProvider.ID, errorMsg)
 	}
 
-	// 保存到数据库
-	if err := UpdateAiProvider(dbProvider); err != nil {
-		log.Errorf("更新提供者状态失败: [%s](ID: %d): %v",
-			dbProvider.WrapperName, dbProvider.ID, err)
-	} else {
-		log.Infof("提供者状态已更新: [%s](ID: %d)",
-			dbProvider.WrapperName, dbProvider.ID)
-	}
+	// 使用修改后的状态更新 result，以便返回给调用者
+	result.IsHealthy = finalIsHealthy
 
+	// 返回结果
 	return result, nil
 }
