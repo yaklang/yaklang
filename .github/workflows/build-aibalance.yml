@@ -19,6 +19,11 @@ jobs:
         with:
           go-version-file: "./go.mod" # 使用 go.mod 指定的版本
 
+      - name: Install libpcap-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpcap-dev
+
       - name: Build aibalance for Linux amd64
         run: |
           go mod tidy && go work vendor
