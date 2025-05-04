@@ -22,6 +22,8 @@ jobs:
       - name: Build aibalance for Linux amd64
         run: |
           echo "Building aibalance for linux/amd64..." # 添加调试输出
+          go clean -cache # 清除 Go 构建缓存
+          git rev-parse --short HEAD
           # 使用 -s -w 优化体积
           # common/log is not a package, use fmt or log
           # fmt.Println("Building aibalance for linux/amd64...")
