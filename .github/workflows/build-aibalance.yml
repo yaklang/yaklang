@@ -23,7 +23,8 @@ jobs:
         run: |
           echo "Building aibalance for linux/amd64..." # 添加调试输出
           go clean -cache # 清除 Go 构建缓存
-          git rev-parse --short HEAD
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          echo "COMMIT_HASH=$COMMIT_HASH" >> $GITHUB_ENV # 将 HASH 存入 GITHUB_ENV 以便跨 step 使用
           # 使用 -s -w 优化体积
           # common/log is not a package, use fmt or log
           # fmt.Println("Building aibalance for linux/amd64...")
@@ -38,11 +39,14 @@ jobs:
           chmod +x ./yak
           
       - name: Upload aibalance to OSS
+        env:
+          COMMIT_HASH: ${{ env.COMMIT_HASH }} # 引用环境变量
         run: |
+          echo "Uploading aibalance with hash: $COMMIT_HASH" # 调试输出 HASH
           ./yak upload-oss \
             -b yaklang \
             --endpoint oss-accelerate.aliyuncs.com \
             -ak ${{ secrets.OSS_KEY_ID }} \
             -sk ${{ secrets.OSS_KEY_SECRET }} \
             -t 5 \
-            -f './aibalance:/aibalance/aibalance'
+            -f "./aibalance:/aibalance/$COMMIT_HASH/aibalance" # 将 HASH 加入目标路径
