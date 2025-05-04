@@ -287,6 +287,15 @@ func (c *ServerConfig) processLogin(conn net.Conn, request *http.Request) {
 
 	// Get submitted password
 	password := request.PostForm.Get("password")
+	if password == "" {
+		log.Warnf("Received empty password during login attempt.")
+		// Empty password, redirect back to login page with error
+		header := "HTTP/1.1 303 See Other\r\n" +
+			"Location: /portal?error=invalid_password\r\n" + // Use same error message for consistency
+			"\r\n"
+		conn.Write([]byte(header))
+		return
+	}
 
 	// Validate password
 	if password != c.AdminPassword {
