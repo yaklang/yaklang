@@ -669,6 +669,17 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 	resultMessage := fmt.Sprintf("Successfully added %d providers(total %d)", successCount, len(providers))
 	c.logInfo(resultMessage)
 
+	// --- 开始修改: 重新加载 Provider 配置到内存 ---
+	err = LoadProvidersFromDatabase(c) // 使用 balancer.go 中的函数刷新配置
+	if err != nil {
+		// 记录错误，但可能仍然继续，因为数据库写入已成功
+		c.logError("Failed to reload providers into memory after adding new ones: %v", err)
+		// 根据策略，这里可以选择是否向用户显示错误或阻止重定向
+	} else {
+		c.logInfo("Successfully reloaded providers into memory.")
+	}
+	// --- 结束修改 ---
+
 	// Redirect back to home page
 	header := "HTTP/1.1 303 See Other\r\n" +
 		"Location: /portal\r\n" +
@@ -893,7 +904,7 @@ func (c *ServerConfig) processCreateAPIKey(conn net.Conn, request *http.Request)
 	}
 
 	// Add to configuration (maintain compatibility with memory configuration)
-	c.KeyAllowedModels.allowedModels[apiKey] = modelMap
+	// c.KeyAllowedModels.allowedModels[apiKey] = modelMap // -- DEPRECATED: 直接修改内存可能不完整
 
 	// Save API key to database
 	allowedModelsStr := strings.Join(allowedModels, ",")
@@ -903,12 +914,22 @@ func (c *ServerConfig) processCreateAPIKey(conn net.Conn, request *http.Request)
 		// Continue execution, because it's already added to memory configuration
 	}
 
+	// --- 开始修改: 保存成功后，重新从数据库加载所有 Key 到内存 ---
+	err = c.LoadAPIKeysFromDB()
+	if err != nil {
+		c.logError("Failed to reload API keys into memory after creating key '%s': %v", apiKey, err)
+		// 记录错误，但数据库可能已成功写入
+	} else {
+		c.logInfo("Successfully reloaded API keys into memory after creating key '%s'.", apiKey)
+	}
+	// --- 结束修改 ---
+
 	// Build result message
 	c.logInfo("Successfully created API key: %s with %d allowed models", apiKey, len(allowedModels))
 
 	// Redirect back to API key page
 	header := "HTTP/1.1 303 See Other\r\n" +
-		"Location: /portal/api-keys\r\n" +
+		"Location: /portal/\r\n" +
 		"\r\n"
 	conn.Write([]byte(header))
 }
@@ -1486,6 +1507,17 @@ func (c *ServerConfig) handleToggleAPIKeyStatus(conn net.Conn, request *http.Req
 	}
 
 	c.logInfo("Successfully %sd API key (ID: %d)", action, id)
+
+	// --- 开始修改: 重新加载 API Key 配置到内存 ---
+	err = c.LoadAPIKeysFromDB()
+	if err != nil {
+		c.logError("Failed to reload API keys into memory after %s key ID %d: %v", action, id, err)
+		// Log the error, but the primary action (DB update) succeeded.
+	} else {
+		c.logInfo("Successfully reloaded API keys into memory after %s key ID %d.", action, id)
+	}
+	// --- 结束修改 ---
+
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"message": fmt.Sprintf("API key %sd successfully", action),
@@ -1579,6 +1611,17 @@ func (c *ServerConfig) handleBatchToggleAPIKeyStatus(conn net.Conn, request *htt
 	}
 
 	c.logInfo("Successfully %sd %d API keys (%d requested)", action, affectedCount, len(uintIDs))
+
+	// --- 开始修改: 重新加载 API Key 配置到内存 ---
+	err = c.LoadAPIKeysFromDB()
+	if err != nil {
+		c.logError("Failed to reload API keys into memory after batch %s for %d keys: %v", action, len(uintIDs), err)
+		// Log the error, but the primary action (DB update) succeeded.
+	} else {
+		c.logInfo("Successfully reloaded API keys into memory after batch %s.", action)
+	}
+	// --- 结束修改 ---
+
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"message": fmt.Sprintf("Successfully %sd %d API keys", action, affectedCount),
