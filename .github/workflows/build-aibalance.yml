@@ -39,4 +39,10 @@ jobs:
           
       - name: Upload aibalance to OSS
         run: |
-          ./yak oss --access-key ${{ secrets.OSS_KEY_ID }} --access-secret ${{ secrets.OSS_KEY_SECRET }} --bucket yaklang --endpoint oss-accelerate.aliyuncs.com upload ./aibalance /aibalance/aibalance
+          ./yak upload-oss \
+            -b yaklang \
+            --endpoint oss-accelerate.aliyuncs.com \
+            -ak ${{ secrets.OSS_KEY_ID }} \
+            -sk ${{ secrets.OSS_KEY_SECRET }} \
+            -t 5 \
+            -f './aibalance:/aibalance/aibalance'
