@@ -1,14 +1,17 @@
 package main
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	"os"
 	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/aibalance"
+	"github.com/yaklang/yaklang/common/aibalance/aiforwarder"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 )
@@ -44,6 +47,46 @@ func main() {
 
 	// 添加命令
 	app.Commands = []cli.Command{
+		{
+			Name:  "forward",
+			Usage: "Create a forwarder for AI models",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "url,u",
+					Usage: "URL of the aibalance server",
+				},
+			},
+			Action: func(c *cli.Context) error {
+				url := c.String("url")
+				if url == "" {
+					return cli.NewExitError("URL Server is required", 1)
+				}
+
+				forwarder := aiforwarder.NewAIForwarder(url)
+				forwarder.AddRule("example.com", true, "example.com:443")
+				forwarder.LoadFromYaml("forwarder.yaml")
+
+				serve := func() {
+					defer func() {
+						if err := recover(); err != nil {
+							log.Errorf("%v", utils.ErrorStack(err))
+						}
+					}()
+					err := forwarder.Run()
+					if err != nil {
+						log.Errorf("start forwarder failed: %v", err)
+					}
+				}
+
+				for {
+					serve()
+					log.Error("Exiting due to some signal [SIGTERM/SIGINT] or other reason, retry after 1 second")
+					time.Sleep(1 * time.Second)
+				}
+
+				return nil
+			},
+		},
 		{
 			Name:  "register",
 			Usage: "Register a new AI provider to the database",
