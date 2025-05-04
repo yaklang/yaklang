@@ -4,6 +4,7 @@ on:
   workflow_dispatch: # 允许手动触发
   push:
     paths:
+      - ".github/workflows/build-aibalance.yml"
       - 'common/aibalance/**'
 
 jobs:
