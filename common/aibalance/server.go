@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/aibalance/aiforwarder"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"io"
 	"net"
 	"net/url"
@@ -197,6 +199,7 @@ type ServerConfig struct {
 	Logging          LogLevel
 	AdminPassword    string          // 添加管理员密码配置
 	SessionManager   *SessionManager // 会话管理器
+	forwardRule      *omap.OrderedMap[string, *aiforwarder.Rule]
 }
 
 // NewServerConfig creates a new server configuration
@@ -522,6 +525,10 @@ func (c *ServerConfig) Serve(conn net.Conn) {
 	c.logInfo("Raw request content:\n%s", string(requestRaw))
 
 	switch {
+	case strings.HasPrefix(uriIns.Path, "/forwarder/"):
+		c.logInfo("Forwarder: registering with %s", uriIns.Path)
+		c.serveForwarder(conn, requestRaw)
+		return
 	case strings.HasPrefix(uriIns.Path, "/v1/chat/completions"):
 		c.logInfo("Processing chat completion request")
 		c.serveChatCompletions(conn, requestRaw)

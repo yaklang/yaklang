@@ -31,6 +31,15 @@ type TCPReverse struct {
 	target    map[string]*TCPReverseTarget
 }
 
+func NewTCPReverseWithTLSConfig(port int, c *tls.Config) *TCPReverse {
+	return &TCPReverse{
+		port:      port,
+		tlsConfig: c,
+		rwm:       sync.RWMutex{},
+		target:    make(map[string]*TCPReverseTarget),
+	}
+}
+
 func NewTCPReverse(port int) (*TCPReverse, error) {
 	log.Infof("Creating new TCP reverse proxy on port %d", port)
 
@@ -56,12 +65,7 @@ func NewTCPReverse(port int) (*TCPReverse, error) {
 		return &crts[0], nil
 	}
 
-	return &TCPReverse{
-		port:      port,
-		tlsConfig: tlsConfig,
-		rwm:       sync.RWMutex{},
-		target:    make(map[string]*TCPReverseTarget),
-	}, nil
+	return NewTCPReverseWithTLSConfig(port, tlsConfig), nil
 }
 
 func (t *TCPReverse) RegisterSNIForward(sni string, target *TCPReverseTarget) {
