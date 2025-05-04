@@ -290,6 +290,7 @@ func (c *ServerConfig) processLogin(conn net.Conn, request *http.Request) {
 
 	// Validate password
 	if password != c.AdminPassword {
+		log.Infof("Invalid password: %s, origin: %s", password, c.AdminPassword)
 		// Password error, redirect back to login page
 		header := "HTTP/1.1 303 See Other\r\n" +
 			"Location: /portal?error=invalid_password\r\n" +
