@@ -6,6 +6,8 @@ import (
 	"net"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/aibalance/aiforwarder"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -45,12 +47,39 @@ func (c *ServerConfig) serveForwarder(conn net.Conn, requestRaw []byte) {
 		caKey = string(keyRaw)
 	}
 
-	path := lowhttp.GetHTTPRequestPath(requestRaw)
-	switch {
-	case strings.HasPrefix(path, "/forwarder/register"):
+	handleRules := func() error {
 		body := lowhttp.GetHTTPPacketBody(requestRaw)
 		if body == nil {
 			conn.Write([]byte(fmt.Sprintf("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len("body is nil"), "body is nil")))
+			return fmt.Errorf("body is nil")
+		}
+
+		var rules []*aiforwarder.Rule
+		if err := json.Unmarshal(body, &rules); err != nil {
+			conn.Write([]byte(fmt.Sprintf("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(err.Error()), err.Error())))
+			return fmt.Errorf("failed to unmarshal rules: %s", err)
+		}
+
+		for _, rule := range rules {
+			log.Infof("add rule sni: %s, target: %s, enable_tls: %t", rule.SNI, rule.Target, rule.EnableTLS)
+			key := utils.CalcSha1(rule.SNI, rule.Target, rule.EnableTLS)
+			_, ok := c.forwardRule.Get(key)
+			if !ok {
+				c.forwardRule.Set(key, rule)
+			}
+		}
+		return nil
+	}
+
+	path := lowhttp.GetHTTPRequestPath(requestRaw)
+	switch {
+	case strings.HasPrefix(path, "/forwarder/add-rules"):
+		_ = handleRules()
+		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len("success"), "success")))
+		return
+	case strings.HasPrefix(path, "/forwarder/register"):
+		if err := handleRules(); err != nil {
+			log.Errorf("failed to handle rules: %s", err)
 			return
 		}
 
