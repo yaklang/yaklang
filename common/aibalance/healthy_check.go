@@ -73,8 +73,11 @@ func (m *HealthCheckManager) RecordCheck(providerID uint) {
 
 // CheckProviderHealth checks the health status of a single provider
 func CheckProviderHealth(provider *Provider) (*HealthCheckResult, error) {
-	log.Infof("开始检查提供者健康状态: %s (ID: %d)",
-		provider.DbProvider.WrapperName, provider.DbProvider.ID)
+	if provider != nil {
+		_, _ = provider.GetDbProvider()
+		log.Infof("开始检查提供者健康状态: %s (ID: %d)",
+			provider.DbProvider.WrapperName, provider.DbProvider.ID)
+	}
 
 	result := &HealthCheckResult{
 		Provider:  provider.DbProvider,

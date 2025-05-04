@@ -4,7 +4,6 @@ import (
 	"bytes"
 	tls "crypto/tls"
 	"fmt"
-	utls2 "github.com/refraction-networking/utls"
 	"io"
 	"net"
 	"net/http"
@@ -14,6 +13,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	utls2 "github.com/refraction-networking/utls"
 
 	"github.com/pkg/errors"
 	"github.com/segmentio/ksuid"
@@ -362,8 +363,11 @@ func CloseConnSafe(conn net.Conn) {
 	FlushWriter(conn)
 	CloseWrite(conn)
 	go func() {
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 		if err := conn.Close(); err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
 			log.Errorf("failed to close connection: %v", err)
 		}
 	}()
