@@ -5,8 +5,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/aibalance/aiforwarder"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"io"
 	"net"
 	"net/url"
@@ -14,6 +12,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/aibalance/aiforwarder"
+	"github.com/yaklang/yaklang/common/utils/omap"
 
 	_ "github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
