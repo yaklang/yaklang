@@ -27,7 +27,7 @@ jobs:
           # 使用 -s -w 优化体积
           # common/log is not a package, use fmt or log
           # fmt.Println("Building aibalance for linux/amd64...")
-          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o aibalance common/aibalance/main.go
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o aibalance ./common/aibalance/cmd/aibalance.go
           # fmt.Printf("Build finished. File 'aibalance' created.")
           echo "Build finished. File 'aibalance' created." # 添加调试输出
           ls -l aibalance # 确认文件已生成
