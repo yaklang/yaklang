@@ -217,6 +217,7 @@ func NewServerConfig() *ServerConfig {
 		},
 		AdminPassword:  "admin", // 默认密码
 		SessionManager: NewSessionManager(),
+		forwardRule:    omap.NewOrderedMap[string, *aiforwarder.Rule](make(map[string]*aiforwarder.Rule)),
 	}
 }
 

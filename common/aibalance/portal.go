@@ -686,6 +686,14 @@ func (c *ServerConfig) handleLogout(conn net.Conn, request *http.Request) {
 	conn.Write([]byte(header))
 }
 
+func (c *ServerConfig) ForwarderDomain() []string {
+	domains := make([]string, 0)
+	for _, rule := range c.forwardRule.Values() {
+		domains = append(domains, rule.SNI)
+	}
+	return domains
+}
+
 // serveAutoCompleteData provides autocomplete data
 func (c *ServerConfig) serveAutoCompleteData(conn net.Conn, request *http.Request) {
 	c.logInfo("Serving autocomplete data")
@@ -725,15 +733,24 @@ func (c *ServerConfig) serveAutoCompleteData(conn net.Conn, request *http.Reques
 
 	modelTypesList := aispec.GetRegisteredAIGateways()
 
+	var domainOrUrl []string
+	for _, domain := range c.ForwarderDomain() {
+		domainOrUrl = append(domainOrUrl, domain)
+		domainOrUrl = append(domainOrUrl, "https://"+domain+"/v1/chat/completions")
+	}
+	domainOrUrl = utils.RemoveRepeatStringSlice(domainOrUrl)
+
 	// Build JSON response
 	autoCompleteData := struct {
 		WrapperNames []string `json:"wrapper_names"`
 		ModelNames   []string `json:"model_names"`
 		ModelTypes   []string `json:"model_types"`
+		DomainOrURLs []string `json:"domain_or_urls"`
 	}{
 		WrapperNames: wrapperNamesList,
 		ModelNames:   modelNamesList,
 		ModelTypes:   modelTypesList,
+		DomainOrURLs: domainOrUrl,
 	}
 
 	// Convert to JSON

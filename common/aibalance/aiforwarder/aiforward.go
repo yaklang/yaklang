@@ -2,8 +2,10 @@ package aiforwarder
 
 import (
 	"encoding/json"
-	"github.com/davecgh/go-spew/spew"
 	"os"
+	"time"
+
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -47,7 +49,6 @@ func (a *AIForward) Run() error {
 	var body = rsp.GetBody()
 	err = json.Unmarshal(body, &rspBody)
 	if err != nil {
-
 		return utils.Errorf("failed to parse register response: %s, with: \n%v", err, utils.ShrinkString(spew.Sdump(body), 200))
 	}
 
@@ -64,6 +65,19 @@ func (a *AIForward) Run() error {
 			Address:  rule.Target,
 		})
 	}
+
+	go func() {
+		for {
+			time.Sleep(5 * time.Second)
+			log.Info("register forwarder (sync msg)")
+			rsp, _, err := poc.DoPOST(a.root, poc.WithJSON(a.rules), poc.WithReplaceHttpPacketPath("/forwarder/add-rules"))
+			if err != nil {
+				log.Errorf("failed to register forwarder: %s", err)
+				continue
+			}
+			_ = rsp
+		}
+	}()
 
 	return reverse.Run()
 }
