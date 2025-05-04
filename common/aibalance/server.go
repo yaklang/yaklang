@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"net/url"
 	"strings"
 	"sync"
@@ -509,6 +510,22 @@ func (c *ServerConfig) Serve(conn net.Conn) {
 		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
 		return
 	}
+
+	keys := make([]string, 0, len(request.Header))
+	for k := range request.Header {
+		keys = append(keys, k)
+	}
+	for _, k := range keys {
+		if http.CanonicalHeaderKey(k) == k {
+			continue
+		}
+		val, ok := request.Header[k]
+		if ok {
+			request.Header[http.CanonicalHeaderKey(k)] = val
+			delete(request.Header, k)
+		}
+	}
+
 	uriIns, err := url.ParseRequestURI(request.RequestURI)
 	if err != nil {
 		c.logError("Failed to parse request URI: %v", err)
@@ -536,7 +553,6 @@ func (c *ServerConfig) Serve(conn net.Conn) {
 		c.serveChatCompletions(conn, requestRaw)
 		return
 	case strings.HasPrefix(uriIns.Path, "/portal"):
-		// 使用 portal.go 中的处理函数
 		c.HandlePortalRequest(conn, request, uriIns)
 		return
 	case uriIns.Path == "/register/forward":
