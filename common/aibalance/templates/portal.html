@@ -1754,8 +1754,10 @@
                             </div>
                             <div class="form-group">
                                 <label for="domainOrURL">域名/URL *</label>
-                                <input type="text" id="domainOrURL" name="domainOrURL" class="form-control" 
-                                       required placeholder="例如：api.openai.com">
+                                <input type="text" id="domainOrURL" name="domainOrURL" class="form-control autocomplete" 
+                                       required placeholder="例如：api.openai.com"
+                                       list="domain-urls-list">  <!-- 添加 list 属性 -->
+                                <datalist id="domain-urls-list"></datalist> <!-- 添加 datalist -->
                             </div>
                         </div>
                         <div class="form-group">
@@ -1787,7 +1789,8 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
         let autoCompleteData = {
             wrapper_names: [],
             model_names: [],
-            model_types: []
+            model_types: [],
+            domain_or_urls: [] // 添加 domain_or_urls
         };
 
         // 加载自动补全数据
@@ -1797,14 +1800,17 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 if (!response.ok) {
                     throw new Error('无法获取自动补全数据');
                 }
-                
+
                 const data = await response.json();
-                
+                console.log("Received autocomplete data from backend:", data); // Debug log
+
                 // 存储数据到全局变量
                 autoCompleteData.wrapper_names = data.wrapper_names || [];
                 autoCompleteData.model_names = data.model_names || [];
                 autoCompleteData.model_types = data.model_types || [];
-                
+                autoCompleteData.domain_or_urls = data.domain_or_urls || []; // 获取 domain_or_urls
+                console.log("Processed domain_or_urls:", autoCompleteData.domain_or_urls); // Debug log
+
                 // 填充当前打开的表单（如果有）
                 if (document.querySelector('.tab.active[data-tab="add"]')) {
                     fillAutoCompleteForm();
@@ -1812,32 +1818,22 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             } catch (error) {
                 console.error('加载自动补全数据失败:', error);
             }
-        }
 
-        // 填充自动补全表单
-        function fillAutoCompleteForm() {
-            // 填充提供者名称选项
-            const wrapperNamesList = document.getElementById('wrapper-names-list');
-            if (wrapperNamesList) {
-                wrapperNamesList.innerHTML = '';
-                autoCompleteData.wrapper_names.forEach(name => {
+            // 新增：填充 Domain/URL 选项
+            const domainUrlsList = document.getElementById('domain-urls-list');
+            if (domainUrlsList) {
+                domainUrlsList.innerHTML = ''; // 清空现有选项
+                console.log("Populating domain-urls-list with:", autoCompleteData.domain_or_urls); // Debug log
+                autoCompleteData.domain_or_urls.forEach(url => {
                     const option = document.createElement('option');
-                    option.value = name;
-                    wrapperNamesList.appendChild(option);
+                    option.value = url;
+                    domainUrlsList.appendChild(option);
                 });
+                console.log("Finished populating domain-urls-list. Current innerHTML:", domainUrlsList.innerHTML); // Debug log
+            } else {
+                console.error("Could not find datalist element with ID 'domain-urls-list'"); // Debug log
             }
-            
-            // 填充模型名称选项
-            const modelNamesList = document.getElementById('model-names-list');
-            if (modelNamesList) {
-                modelNamesList.innerHTML = '';
-                autoCompleteData.model_names.forEach(name => {
-                    const option = document.createElement('option');
-                    option.value = name;
-                    modelNamesList.appendChild(option);
-                });
-            }
-            
+
             // 填充类型选择框
             const typeNameSelect = document.getElementById('typeName');
             if (typeNameSelect) {
@@ -3126,6 +3122,107 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             updateDeleteSelectedButton(); // Update delete button state based on visible items
         }
         // END: Filter Providers Function
+
+        // 填充自动补全表单
+        function fillAutoCompleteForm() {
+            // 填充提供者名称选项
+            const wrapperNamesList = document.getElementById('wrapper-names-list');
+            if (wrapperNamesList) {
+                wrapperNamesList.innerHTML = '';
+                autoCompleteData.wrapper_names.forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    wrapperNamesList.appendChild(option);
+                });
+            }
+            
+            // 填充模型名称选项
+            const modelNamesList = document.getElementById('model-names-list');
+            if (modelNamesList) {
+                modelNamesList.innerHTML = '';
+                autoCompleteData.model_names.forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    modelNamesList.appendChild(option);
+                });
+            }
+
+            // 新增：填充 Domain/URL 选项
+            const domainUrlsList = document.getElementById('domain-urls-list');
+            if (domainUrlsList) {
+                domainUrlsList.innerHTML = ''; // 清空现有选项
+                console.log("Populating domain-urls-list with:", autoCompleteData.domain_or_urls); // Debug log
+                autoCompleteData.domain_or_urls.forEach(url => {
+                    const option = document.createElement('option');
+                    option.value = url;
+                    domainUrlsList.appendChild(option);
+                });
+                console.log("Finished populating domain-urls-list. Current innerHTML:", domainUrlsList.innerHTML); // Debug log
+            } else {
+                console.error("Could not find datalist element with ID 'domain-urls-list'"); // Debug log
+            }
+
+            // 填充类型选择框
+            const typeNameSelect = document.getElementById('typeName');
+            if (typeNameSelect) {
+                // 保留第一个空选项
+                const firstOption = typeNameSelect.querySelector('option:first-child');
+                typeNameSelect.innerHTML = '';
+                if (firstOption) {
+                    typeNameSelect.appendChild(firstOption);
+                }
+                
+                // 添加从服务器获取的类型选项
+                autoCompleteData.model_types.forEach(type => {
+                    const option = document.createElement('option');
+                    option.value = type;
+                    option.textContent = type;
+                    typeNameSelect.appendChild(option);
+                });
+                
+                // 如果没有类型选项，添加默认选项
+                if (typeNameSelect.options.length <= 1) {
+                    // 后端未返回数据时，添加一些常见类型作为默认选项
+                    const defaultTypes = [
+                        'chat', 
+                        'completion', 
+                        'embedding'
+                    ];
+                    
+                    defaultTypes.forEach(type => {
+                        const option = document.createElement('option');
+                        option.value = type;
+                        option.textContent = type;
+                        typeNameSelect.appendChild(option);
+                    });
+                }
+            }
+            
+            // 添加输入事件处理器
+            const domainInput = document.getElementById('domainOrURL');
+            if (domainInput) {
+                // 根据选择的类型预填充常见域名
+                document.getElementById('typeName').addEventListener('change', function() {
+                    const selectedType = this.value;
+                    let suggestedDomain = '';
+                    
+                    // 根据类型提供默认域名建议
+                    if (['chat', 'completion', 'embedding'].includes(selectedType.toLowerCase())) {
+                        suggestedDomain = 'api.openai.com';
+                    }
+                    
+                    // 如果域名输入框为空，则填充默认值
+                    if (!domainInput.value.trim()) {
+                        domainInput.value = suggestedDomain;
+                    }
+                });
+            }
+            
+            // 添加实时表单验证
+            setupFormValidation();
+        }
+        
+        // 设置表单验证
     </script>
 </body>
 </html>
