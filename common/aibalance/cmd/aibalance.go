@@ -1,13 +1,14 @@
 package main
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"os"
 	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/aibalance"
@@ -55,6 +56,11 @@ func main() {
 					Name:  "url,u",
 					Usage: "URL of the aibalance server",
 				},
+				cli.StringFlag{
+					Name:  "config,c",
+					Usage: "Path to configuration file",
+					Value: "config.yaml",
+				},
 			},
 			Action: func(c *cli.Context) error {
 				url := c.String("url")
@@ -62,9 +68,15 @@ func main() {
 					return cli.NewExitError("URL Server is required", 1)
 				}
 
+				configPath := c.String("config")
+
 				forwarder := aiforwarder.NewAIForwarder(url)
-				forwarder.AddRule("example.com", true, "example.com:443")
-				forwarder.LoadFromYaml("forwarder.yaml")
+				log.Infof("Loading configuration from: %s", configPath)
+				err := forwarder.LoadFromYaml(configPath)
+				if err != nil {
+					log.Errorf("Failed to load configuration: %v", err)
+					return cli.NewExitError("Failed to load configuration", 1)
+				}
 
 				serve := func() {
 					defer func() {
