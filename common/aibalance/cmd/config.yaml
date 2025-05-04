@@ -1,13 +1,9 @@
-keys:
-  - key: "your-api-key"
-    allowed_models:
-      - "model1"
-      - "model2"
+admin-password: "your-admin-password"
+keys: []
 models:
-  - name: "model1"
-    providers:
-      - model_name: "gemini-2.0-flash"
-        type_name: "openai"
-        domain_or_url: "http://api.ai.yaklang.io/v1/chat/completions"
-        no_https: true
-        api_key: "sk-yak-yyds" 
+  - name: "gemini-2.0-flash"
+    providers: []
+  - name: "gemini-2.5-flash"
+    providers: [ ]
+  - name: "gemini-2.5-pro"
+    providers: [ ]

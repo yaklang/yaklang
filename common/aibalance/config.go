@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"gopkg.in/yaml.v3"
@@ -38,8 +39,9 @@ func NewConfig() *Config {
 }
 
 type YamlConfig struct {
-	Keys   []KeyConfig   `yaml:"keys" json:"keys"`
-	Models []ModelConfig `yaml:"models" json:"models"`
+	Keys          []KeyConfig   `yaml:"keys" json:"keys"`
+	Models        []ModelConfig `yaml:"models" json:"models"`
+	AdminPassword string        `yaml:"admin-password" json:"admin_password"`
 }
 
 // ToServerConfig converts YamlConfig to ServerConfig
@@ -50,7 +52,16 @@ func (c *YamlConfig) ToServerConfig() (*ServerConfig, error) {
 	}
 
 	// Record mapping relationship between API keys and allowed models
-	log.Debugf("YamlConfig.ToServerConfig: Processing config with %d keys and %d models", len(c.Keys), len(c.Models))
+	log.Debugf("YamlConfig.ToServerConfig: Processing config with %d keys, %d models, and admin password set: %v", len(c.Keys), len(c.Models), c.AdminPassword != "")
+
+	// Set admin password
+	config.AdminPassword = c.AdminPassword
+	if c.AdminPassword != "" {
+		log.Infof("YamlConfig.ToServerConfig: Admin password set. (%v)", utils.ShrinkString(c.AdminPassword, 8))
+	} else {
+		config.AdminPassword = string(utils.RandStringBytes(20))
+		log.Infof("YamlConfig.ToServerConfig: Admin password not set, using default random password: %v", config.AdminPassword)
+	}
 
 	// Process API keys
 	for i, keyConfig := range c.Keys {
