@@ -24,7 +24,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed templates/portal.html templates/login.html
+//go:embed templates/portal.html templates/login.html templates/index.html
 var templatesFS embed.FS
 
 // formatBytes 将字节大小转换为人类可读的格式（KB、MB、GB等）
