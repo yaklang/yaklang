@@ -54,4 +54,4 @@ jobs:
             -ak ${{ secrets.OSS_KEY_ID }} \
             -sk ${{ secrets.OSS_KEY_SECRET }} \
             -t 5 \
-            -f "./aibalance:/aibalance/$COMMIT_HASH/aibalance" # 将 HASH 加入目标路径
+            -f "./aibalance:/aibalance/aibalance" # 将 HASH 加入目标路径
