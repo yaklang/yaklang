@@ -1753,11 +1753,12 @@
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label for="domainOrURL">域名/URL *</label>
+                                <label for="domainOrURL">域名/URL</label> <!-- 移除 * -->
                                 <input type="text" id="domainOrURL" name="domainOrURL" class="form-control autocomplete" 
-                                       required placeholder="例如：api.openai.com"
-                                       list="domain-urls-list">  <!-- 添加 list 属性 -->
-                                <datalist id="domain-urls-list"></datalist> <!-- 添加 datalist -->
+                                       placeholder="例如：api.openai.com" 
+                                       list="domain-urls-list">
+                                <datalist id="domain-urls-list"></datalist>
+                                <small id="domainOrURL-hint" class="form-text text-muted" style="display: none; color: orange !important;">留空将使用默认直连 URL</small> <!-- 新增提示信息 -->
                             </div>
                         </div>
                         <div class="form-group">
@@ -1950,6 +1951,19 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                     this.classList.add('is-valid');
                 }
             }
+
+            // 特殊处理 domainOrURL 字段
+            if (this.id === 'domainOrURL') {
+                const hintElement = document.getElementById('domainOrURL-hint');
+                if (this.value.trim() === '') {
+                    this.classList.remove('is-valid', 'is-invalid'); // 为空时移除验证状态
+                    if (hintElement) hintElement.style.display = 'block'; // 显示提示
+                } else {
+                    this.classList.remove('is-invalid'); // 非空时移除无效状态
+                    this.classList.add('is-valid');    // 非空时标记为有效
+                    if (hintElement) hintElement.style.display = 'none';  // 隐藏提示
+                }
+            }
         }
 
         // 提交添加接口表单
@@ -1966,18 +1980,18 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             const noHTTPS = document.getElementById('noHTTPS').checked;
             
             // 日志输出表单数据（方便调试）
-            console.log('提交数据:', {
+            console.log('Submitting data:', { // Use common/log - Debug log
                 wrapper_name: wrapperName,
                 model_name: modelName,
                 model_type: typeName,
-                domain_or_url: domainOrURL,
+                domain_or_url: domainOrURL, // Now can be empty
                 api_keys: apiKeys,
                 no_https: noHTTPS ? 'on' : ''
             });
             
-            // 验证必填字段
-            if (!wrapperName || !modelName || !typeName || !domainOrURL || !apiKeys) {
-                showToast('请填写所有必填字段', 'error');
+            // 验证必填字段 (移除对 domainOrURL 的检查)
+            if (!wrapperName || !modelName || !typeName || !apiKeys) {
+                showToast('请填写所有带 * 的必填字段', 'error');
                 return;
             }
             
