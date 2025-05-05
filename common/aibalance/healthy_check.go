@@ -142,10 +142,10 @@ func CheckProviderHealth(provider *Provider) (*HealthCheckResult, error) {
 	select {
 	case succeeded = <-succeededChan:
 		// 成功获取到结果
-	case <-time.After(15 * time.Second): // 15 second timeout
+	case <-time.After(20 * time.Second): // Increase timeout to 20 seconds
 		succeeded = false
-		result.Error = fmt.Errorf("Health check timeout")
-		log.Warnf("健康检查超时: %s (ID: %d)",
+		result.Error = fmt.Errorf("Health check timeout after 20 seconds") // Update error message
+		log.Warnf("健康检查超时 (20s): %s (ID: %d)",                             // Update log message
 			provider.DbProvider.WrapperName, provider.DbProvider.ID)
 	}
 
@@ -159,8 +159,8 @@ func CheckProviderHealth(provider *Provider) (*HealthCheckResult, error) {
 	result.ResponseTime = firstByteDuration.Milliseconds()
 
 	// 根据 server.go 中的 UpdateDbProvider 逻辑判断健康状态：
-	// 如果响应成功且延迟小于 3000ms，则标记为健康
-	result.IsHealthy = succeeded && result.ResponseTime < 3000
+	// 如果响应成功且延迟小于 10000ms，则标记为健康
+	result.IsHealthy = succeeded && result.ResponseTime < 10000 // Increase latency threshold to 10 seconds
 
 	// 如果有错误但尚未设置错误消息
 	if !succeeded && result.Error == nil && respErr != nil {
