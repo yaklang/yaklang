@@ -464,40 +464,130 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 	// Wait for all stream processing to complete
 	wg.Wait()
 
-	succeed := true
 	endDuration := time.Since(start)
 	total := atomic.LoadInt64(totalBytes)
-	if total == 0 {
-		succeed = false
-		writer.WriteError(fmt.Errorf("no data received from provider"))
+	requestSucceeded := total > 0 // Determine actual request success based on data received
+	if !requestSucceeded {
+		// Log and write error only if no data was received
+		c.logWarn("No data received from provider for model %s, key: %s", modelName, utils.ShrinkString(key.Key, 8))
+		// writer.WriteError(fmt.Errorf("no data received from provider")) // Avoid writing error here if connection closed normally
 	}
 
 	// Update provider status
 	latencyMs := firstByteDuration.Milliseconds()
+	// Provider is considered healthy if the first byte arrived within 10 seconds
+	providerHealthy := firstByteDuration > 0 && firstByteDuration <= 10*time.Second
+	if !providerHealthy && !requestSucceeded {
+		c.logWarn("Provider for model %s deemed unhealthy: No data received and first byte latency > 10s (or 0)", modelName)
+	} else if !providerHealthy && requestSucceeded {
+		c.logWarn("Provider for model %s deemed unhealthy despite success: First byte latency > 10s (%v)", modelName, firstByteDuration)
+	}
+
 	go func() {
-		if err := provider.UpdateDbProvider(succeed, latencyMs); err != nil {
+		// Pass 'providerHealthy' status and latency to update function
+		if err := provider.UpdateDbProvider(providerHealthy, latencyMs); err != nil {
 			c.logError("Failed to update provider status: %v", err)
 		} else {
-			c.logInfo("Provider status updated: success=%v, latency=%dms", succeed, latencyMs)
+			// Log both actual success and the health status passed
+			c.logInfo("Provider status updated: healthy=%v (based on <=10s first byte), latency=%dms. Actual request success: %v",
+				providerHealthy, latencyMs, requestSucceeded)
 		}
 	}()
 
-	// Update API Key statistics
+	// Update API Key statistics using actual success
 	go func() {
 		inputBytes := int64(prompt.Len())
-		outputBytes := atomic.LoadInt64(totalBytes)
-		if err := UpdateAiApiKeyStats(key.Key, inputBytes, outputBytes, succeed); err != nil {
+		outputBytes := total // Use the calculated total
+		// Pass 'requestSucceeded' for API key stats
+		if err := UpdateAiApiKeyStats(key.Key, inputBytes, outputBytes, requestSucceeded); err != nil {
 			c.logError("Failed to update API key statistics: %v", err)
 		} else {
 			c.logInfo("API key statistics updated: key=%s, input=%d bytes, output=%d bytes, success=%v",
-				utils.ShrinkString(key.Key, 8), inputBytes, outputBytes, succeed)
+				utils.ShrinkString(key.Key, 8), inputBytes, outputBytes, requestSucceeded)
 		}
 	}()
 
-	bandwidth := float64(total) / endDuration.Seconds() / 1024
-	c.logInfo("Response completed, first byte duration: %v, end duration: %v, bandwidth: %.2fkbps", firstByteDuration, endDuration, bandwidth)
+	bandwidth := float64(0)
+	if endDuration.Seconds() > 0 {
+		bandwidth = float64(total) / endDuration.Seconds() / 1024
+	}
+	// Log actual success here too
+	c.logInfo("Response completed (Success: %v), first byte duration: %v, end duration: %v, bandwidth: %.2fkbps, total bytes: %d",
+		requestSucceeded, firstByteDuration, endDuration, bandwidth, total)
 	writer.Close()
 	conn.Close()
+	c.logInfo("Connection closed for %s", conn.RemoteAddr())
+}
+
+// 新增函数: 处理 /v1/models 请求，返回所有可用的 model 列表
+func (c *ServerConfig) serveModels(conn net.Conn) {
+	c.logInfo("Serving models list")
+
+	// 定义模型信息结构，与 OpenAI API 格式一致
+	type ModelMeta struct {
+		ID      string `json:"id"`       // 模型ID（实际是 WrapperName）
+		Object  string `json:"object"`   // 固定为 "model"
+		Created int64  `json:"created"`  // 创建时间戳（Unix 时间）
+		OwnedBy string `json:"owned_by"` // 模型所有者
+	}
+
+	// 构建响应数据结构
+	type ModelsResponse struct {
+		Object string       `json:"object"` // 固定为 "list"
+		Data   []*ModelMeta `json:"data"`   // 使用指针切片与 ListChatModels 兼容
+	}
+
+	// 从 Entrypoints 中获取所有可用的模型
+	modelNames := make([]string, 0, len(c.Entrypoints.providers))
+	for modelName := range c.Entrypoints.providers {
+		modelNames = append(modelNames, modelName)
+	}
+
+	// 如果没有模型，返回空列表
+	if len(modelNames) == 0 {
+		c.logWarn("No models available for listing")
+	} else {
+		c.logInfo("Found %d available models", len(modelNames))
+	}
+
+	// 构建响应对象
+	response := ModelsResponse{
+		Object: "list",
+		Data:   make([]*ModelMeta, 0, len(modelNames)), // 使用指针切片
+	}
+
+	// 创建当前时间，用于 created 字段
+	now := time.Now().Unix()
+
+	// 为每个模型创建 ModelMeta
+	for _, name := range modelNames {
+		response.Data = append(response.Data, &ModelMeta{ // 使用指针
+			ID:      name,
+			Object:  "model",
+			Created: now,
+			OwnedBy: "library", // 改为 "library" 以匹配示例中的值
+		})
+	}
+
+	// 序列化为 JSON
+	responseJSON, err := json.Marshal(response)
+	if err != nil {
+		c.logError("Failed to marshal models response: %v", err)
+		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to encode models: %v", err)
+		conn.Write([]byte(errorResponse))
+		return
+	}
+
+	// 构建 HTTP 响应
+	header := fmt.Sprintf("HTTP/1.1 200 OK\r\n"+
+		"Content-Type: application/json; charset=utf-8\r\n"+
+		"Content-Length: %d\r\n"+
+		"\r\n", len(responseJSON))
+
+	// 发送响应
+	conn.Write([]byte(header))
+	conn.Write(responseJSON)
+	c.logInfo("Models list response sent, %d bytes, models: %v", len(responseJSON), modelNames)
 }
 
 func (c *ServerConfig) Serve(conn net.Conn) {
@@ -551,6 +641,10 @@ func (c *ServerConfig) Serve(conn net.Conn) {
 	case strings.HasPrefix(uriIns.Path, "/v1/chat/completions"):
 		c.logInfo("Processing chat completion request")
 		c.serveChatCompletions(conn, requestRaw)
+		return
+	case strings.HasPrefix(uriIns.Path, "/v1/models"): // 新增：处理 /v1/models 请求
+		c.logInfo("Processing models list request")
+		c.serveModels(conn)
 		return
 	case strings.HasPrefix(uriIns.Path, "/portal"):
 		c.HandlePortalRequest(conn, request, uriIns)
