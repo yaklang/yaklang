@@ -9,9 +9,11 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"text/template"
 	"time"
 
 	"github.com/yaklang/yaklang/common/aibalance/aiforwarder"
@@ -590,6 +592,68 @@ func (c *ServerConfig) serveModels(conn net.Conn) {
 	c.logInfo("Models list response sent, %d bytes, models: %v", len(responseJSON), modelNames)
 }
 
+// serveIndexPage serves a simple HTML index page.
+func (c *ServerConfig) serveIndexPage(conn net.Conn) {
+	c.logInfo("Serving index page")
+
+	var tmpl *template.Template
+	var err error
+
+	// Try to read template from filesystem first (consistent with portal.go)
+	if result := utils.GetFirstExistedFile(
+		"common/aibalance/templates/index.html",
+		"templates/index.html",
+		"../templates/index.html", // Added ../ for potential different execution paths
+	); result != "" {
+		rawTemp, ferr := os.ReadFile(result)
+		if ferr != nil {
+			c.logError("Failed to read index template from filesystem '%s': %v", result, ferr)
+			// Fallback to embedded if reading fails
+		} else {
+			tmpl, err = template.New("index").Parse(string(rawTemp))
+			if err != nil {
+				c.logError("Failed to parse index template from filesystem: %v", err)
+				// Fallback to embedded if parsing fails
+			}
+		}
+	}
+
+	// If filesystem read/parse failed or file not found, use embedded FS
+	if tmpl == nil {
+		tmpl, err = template.ParseFS(templatesFS, "templates/index.html")
+		if err != nil {
+			c.logError("Failed to parse embedded index template: %v", err)
+			errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to parse template: %v", err)
+			conn.Write([]byte(errorResponse))
+			return
+		}
+	}
+
+	// Create a buffer to save rendered HTML
+	var htmlBuffer bytes.Buffer
+	err = tmpl.Execute(&htmlBuffer, nil) // Pass nil data as the template is static
+	if err != nil {
+		c.logError("Failed to execute index template: %v", err)
+		errorResponse := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to render template: %v", err)
+		conn.Write([]byte(errorResponse))
+		return
+	}
+
+	// Build the HTTP response
+	response := fmt.Sprintf("HTTP/1.1 200 OK\r\n"+
+		"Content-Type: text/html; charset=utf-8\r\n"+
+		"Content-Length: %d\r\n"+
+		"\r\n%s", htmlBuffer.Len(), htmlBuffer.String())
+
+	// Send the response
+	_, err = conn.Write([]byte(response))
+	if err != nil {
+		c.logError("Failed to write index page response: %v", err)
+	} else {
+		c.logInfo("Index page response sent, %d bytes", len(response))
+	}
+}
+
 func (c *ServerConfig) Serve(conn net.Conn) {
 	c.logInfo("Received new connection request, source: %s", conn.RemoteAddr())
 	defer conn.Close()
@@ -649,7 +713,15 @@ func (c *ServerConfig) Serve(conn net.Conn) {
 	case strings.HasPrefix(uriIns.Path, "/portal"):
 		c.HandlePortalRequest(conn, request, uriIns)
 		return
-	case uriIns.Path == "/register/forward":
+	case uriIns.Path == "/":
+		c.logInfo("Processing index page request for / ")
+		c.serveIndexPage(conn)
+		return
+	case uriIns.Path == "/index":
+		c.logInfo("Processing index page request for /index")
+		c.serveIndexPage(conn)
+		return
+	case strings.HasPrefix(uriIns.Path, "/register/forward"):
 		c.logInfo("Processing register forward request")
 		fallthrough
 	default:
