@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/consts"
+
 	"github.com/davecgh/go-spew/spew"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -110,6 +112,20 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 		}, err
 	}
 
+	handleLargeContent(&execResult.Stdout, "stdout", nil)
+	handleLargeContent(&execResult.Stderr, "stderr", func(filename string) {
+		log.Infof("large stderr content saved to file: %s", filename)
+	})
+
+	if jsonResultRaw := utils.Jsonify(execResult.Result); len(jsonResultRaw) > 10*1024 {
+		originJsonResult := string(jsonResultRaw)
+		jsonResult := utils.ShrinkString(originJsonResult, 200)
+		filename := handleLargeContentToFile(originJsonResult, "json")
+		execResult.Result = fmt.Sprintf("%s (total: %v, saved in file[%v]) see file use some other filesystem tool",
+			jsonResult, len(originJsonResult), filename)
+		log.Infof("large json result content saved to file: %s", filename)
+	}
+
 	return &ToolResult{
 		Name:        t.Name,
 		Description: t.Description,
@@ -117,6 +133,40 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 		Success:     true,
 		Data:        execResult,
 	}, nil
+}
+
+// handleLargeContent 处理大文本内容，将其截断并保存到临时文件
+// content: 要处理的内容指针
+// contentType: 内容类型(stdout/stderr/json)
+// logCallback: 可选的日志回调函数
+func handleLargeContent(content *string, contentType string, logCallback func(string)) {
+	if len(*content) <= 10*1024 {
+		return
+	}
+
+	origContent := *content
+	*content = utils.ShrinkString(origContent, 200)
+	filename := handleLargeContentToFile(origContent, contentType)
+
+	*content += fmt.Sprintf(" (total: %v, saved in file[%v]) see file use some other filesystem tool",
+		len(origContent), filename)
+
+	if logCallback != nil {
+		logCallback(filename)
+	}
+}
+
+// handleLargeContentToFile 将大文本内容保存到临时文件并返回文件名
+func handleLargeContentToFile(content string, contentType string) string {
+	filename := fmt.Sprintf("*-result.%s.txt", contentType)
+	fp, err := consts.TempFile(filename)
+	if err != nil {
+		return consts.TempFileFast(content)
+	}
+
+	fp.Write([]byte(content))
+	fp.Close()
+	return filename
 }
 
 // ValidateParams 验证参数
