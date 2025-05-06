@@ -1,18 +1,16 @@
 package aid
 
 import (
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"strings"
-	"time"
-
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
-// CreateRequireUserPrompt 创建一个需要用户输入的提示工具
+// CreateRequireUserInteract 创建一个需要用户输入的提示工具
 // 这个工具非常有意思，AI 如果调用这个工具，意味着，他觉得他受阻了，需要人的提示来帮助他继续完成任务
 // 调用这个工具会强制让 AI 进入等待状态，直到用户输入提示
-func (c *Config) CreateRequireUserPrompt() (*aitool.Tool, error) {
+func (c *Config) CreateRequireUserInteract() (*aitool.Tool, error) {
 	factory := aitool.NewFactory()
 	err := factory.RegisterTool(
 		"require-user-interact",
@@ -87,19 +85,19 @@ func (c *Config) RequireUserPrompt(prompt string, opts ...*RequireInteractiveReq
 		Prompt:  prompt,
 		Options: opts,
 	}
-	c.EmitRequireUserInteractive(req)
+	c.EmitRequireUserInteractive(req, ep.id)
 	c.doWaitAgree(c.ctx, ep)
 	params := ep.GetParams()
+	ep.Release()
 	return params, nil
 }
 
-func (c *Config) EmitRequireUserInteractive(i any) {
-	c.emit(&Event{
-		CoordinatorId: c.id,
-		Type:          EVENT_TYPE_REQUIRE_USER_INTERACTIVE,
-		NodeId:        "",
-		IsJson:        true,
-		Content:       utils.Jsonify(i),
-		Timestamp:     time.Now().UnixMilli(),
-	})
+func (c *Config) EmitRequireUserInteractive(i *RequireInteractiveRequest, id string) {
+	if ep, ok := c.epm.loadEndpoint(id); ok {
+		err := c.submitCheckpointRequest(ep.checkpoint, i)
+		if err != nil {
+			log.Errorf("Failed to submit checkpoint request: %v", err)
+		}
+	}
+	c.emitInteractiveJson(id, EVENT_TYPE_REQUIRE_USER_INTERACTIVE, "require-user-interact", i)
 }

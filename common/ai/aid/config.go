@@ -84,6 +84,9 @@ type Config struct {
 	debugPrompt bool
 	debugEvent  bool
 
+	// AI can ask human for help?
+	allowRequireForUserInteract bool
+
 	// do not use it directly, use doAgree() instead
 	agreePolicy    AgreePolicyType
 	agreeInterval  time.Duration
@@ -209,12 +212,28 @@ func initDefaultTools(c *Config) error { // set config default tools
 	if err := WithTools(buildinaitools.GetBasicBuildInTools()...)(c); err != nil {
 		return utils.Wrapf(err, "get basic build-in tools fail")
 	}
+
 	memoryTools, err := c.memory.CreateMemoryTools()
 	if err != nil {
 		return utils.Errorf("create memory tools: %v", err)
 	}
 	if err := WithTools(memoryTools...)(c); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (c *Config) loadToolsViaOptions() error {
+	if c.allowRequireForUserInteract {
+		userPromptTool, err := c.CreateRequireUserInteract()
+		if err != nil {
+			log.Errorf("create user prompt tool: %v", err)
+			return err
+		}
+		if err := WithTools(userPromptTool)(c); err != nil {
+			log.Errorf("load require for user prompt tools: %v", err)
+			return err
+		}
 	}
 	return nil
 }
@@ -242,22 +261,23 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		idGenerator: func() int64 {
 			return atomic.AddInt64(idGenerator, 1)
 		},
-		agreePolicy:            AgreePolicyManual,
-		agreeAIScore:           0.5,
-		agreeRiskCtrl:          new(riskControl),
-		agreeInterval:          10 * time.Second,
-		m:                      new(sync.Mutex),
-		id:                     id,
-		epm:                    newEndpointManagerContext(ctx),
-		streamWaitGroup:        new(sync.WaitGroup),
-		memory:                 m,
-		syncMutex:              new(sync.RWMutex),
-		syncMap:                make(map[string]func() any),
-		inputConsumption:       new(int64),
-		outputConsumption:      new(int64),
-		aiCallTokenLimit:       int64(1000 * 30),
-		aiAutoRetry:            5,
-		aiTransactionAutoRetry: 3,
+		agreePolicy:                 AgreePolicyManual,
+		agreeAIScore:                0.5,
+		agreeRiskCtrl:               new(riskControl),
+		agreeInterval:               10 * time.Second,
+		m:                           new(sync.Mutex),
+		id:                          id,
+		epm:                         newEndpointManagerContext(ctx),
+		streamWaitGroup:             new(sync.WaitGroup),
+		memory:                      m,
+		syncMutex:                   new(sync.RWMutex),
+		syncMap:                     make(map[string]func() any),
+		inputConsumption:            new(int64),
+		outputConsumption:           new(int64),
+		aiCallTokenLimit:            int64(1000 * 30),
+		aiAutoRetry:                 5,
+		aiTransactionAutoRetry:      3,
+		allowRequireForUserInteract: true,
 	}
 	c.epm.config = c // review
 	if err := initDefaultTools(c); err != nil {
@@ -315,6 +335,15 @@ func WithAgreeAIAssistant(a *AIAssistant) Option {
 	}
 }
 
+func WithDisallowRequireForUserPrompt() Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.allowRequireForUserInteract = false
+		return nil
+	}
+}
+
 func WithAgreeAuto(auto bool, interval time.Duration) Option {
 	return func(config *Config) error {
 		config.m.Lock()
@@ -358,6 +387,19 @@ func WithAIAgreeAuto(interval time.Duration) Option {
 		defer config.m.Unlock()
 		config.setAgreePolicy(AgreePolicyAIAuto)
 		config.agreeInterval = interval
+		return nil
+	}
+}
+
+func WithAllowRequireForUserInteract(opts ...bool) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		if len(opts) > 0 {
+			config.allowRequireForUserInteract = opts[0]
+			return nil
+		}
+		config.allowRequireForUserInteract = true
 		return nil
 	}
 }
