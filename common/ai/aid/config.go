@@ -100,8 +100,9 @@ type Config struct {
 	inputConsumption  *int64
 	outputConsumption *int64
 
-	aiCallTokenLimit int64
-	aiAutoRetry      int64
+	aiCallTokenLimit       int64
+	aiAutoRetry            int64
+	aiTransactionAutoRetry int64
 
 	resultHandler          func(*Config)
 	extendedActionCallback map[string]func(config *Config, action *Action)
@@ -241,21 +242,22 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		idGenerator: func() int64 {
 			return atomic.AddInt64(idGenerator, 1)
 		},
-		agreePolicy:       AgreePolicyManual,
-		agreeAIScore:      0.5,
-		agreeRiskCtrl:     new(riskControl),
-		agreeInterval:     10 * time.Second,
-		m:                 new(sync.Mutex),
-		id:                id,
-		epm:               newEndpointManagerContext(ctx),
-		streamWaitGroup:   new(sync.WaitGroup),
-		memory:            m,
-		syncMutex:         new(sync.RWMutex),
-		syncMap:           make(map[string]func() any),
-		inputConsumption:  new(int64),
-		outputConsumption: new(int64),
-		aiCallTokenLimit:  int64(1000 * 30),
-		aiAutoRetry:       5,
+		agreePolicy:            AgreePolicyManual,
+		agreeAIScore:           0.5,
+		agreeRiskCtrl:          new(riskControl),
+		agreeInterval:          10 * time.Second,
+		m:                      new(sync.Mutex),
+		id:                     id,
+		epm:                    newEndpointManagerContext(ctx),
+		streamWaitGroup:        new(sync.WaitGroup),
+		memory:                 m,
+		syncMutex:              new(sync.RWMutex),
+		syncMap:                make(map[string]func() any),
+		inputConsumption:       new(int64),
+		outputConsumption:      new(int64),
+		aiCallTokenLimit:       int64(1000 * 30),
+		aiAutoRetry:            5,
+		aiTransactionAutoRetry: 3,
 	}
 	c.epm.config = c // review
 	if err := initDefaultTools(c); err != nil {

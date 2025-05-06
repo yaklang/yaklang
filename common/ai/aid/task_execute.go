@@ -85,6 +85,7 @@ TOOLREQUIRED:
 			continue
 		case "finished":
 			t.config.EmitInfo("task[%v] finished", t.Name)
+			break TOOLREQUIRED
 		default:
 			t.config.EmitError("unknown action: %v, skip tool require", action)
 			break TOOLREQUIRED

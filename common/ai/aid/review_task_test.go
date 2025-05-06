@@ -91,6 +91,11 @@ LOOP:
 			if count > 100 {
 				break LOOP
 			}
+
+			if result.Type == EVENT_TYPE_CONSUMPTION {
+				continue
+			}
+
 			fmt.Println("result:" + result.String())
 			if result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				time.Sleep(100 * time.Millisecond)
