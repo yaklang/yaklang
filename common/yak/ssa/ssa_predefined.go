@@ -502,19 +502,6 @@ func (i *anValue) RefreshToCache(item any) {
 	RefreshToCache(i, item)
 }
 
-func RefreshEx(val ...Value) {
-	refresh := func(i Value) {
-		if i == nil || i.GetProgram() == nil || i.GetProgram().Cache == nil {
-			return
-		}
-		cache := i.GetProgram().Cache
-		cache.Refresh(i)
-	}
-	for _, value := range val {
-		refresh(value)
-	}
-}
-
 func RefreshToCache(i Value, item any) {
 	if i.GetProgram() == nil || i.GetProgram().Cache == nil {
 		return
