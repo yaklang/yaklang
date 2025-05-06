@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -506,4 +507,113 @@ func TestNewToolFromJSON(t *testing.T) {
 			t.Errorf("tags 参数值 = %v, want %v", tagsArray, []string{"tag1", "tag2"})
 		}
 	}
+}
+
+// TestHandleLargeContent 测试大文本内容处理功能
+func TestHandleLargeContent(t *testing.T) {
+	t.Run("处理小文本内容", func(t *testing.T) {
+		// 创建一个小于10KB的文本
+		smallContent := strings.Repeat("a", 1024*5) // 5KB
+		originalContent := smallContent
+
+		// 调用处理函数
+		handleLargeContent(&smallContent, "test", nil)
+
+		// 验证内容没有被修改
+		require.Equal(t, originalContent, smallContent, "小于10KB的内容不应被修改")
+	})
+
+	t.Run("处理大文本内容", func(t *testing.T) {
+		// 创建一个大于10KB的文本
+		largeContent := strings.Repeat("b", 1024*15) // 15KB
+		originalContent := largeContent
+
+		// 调用处理函数
+		handleLargeContent(&largeContent, "test", nil)
+
+		// 验证内容已被截断
+		require.NotEqual(t, originalContent, largeContent, "大于10KB的内容应被修改")
+		require.Contains(t, largeContent, "saved in file", "应包含文件保存信息")
+		require.True(t, len(largeContent) < len(originalContent), "内容应被截断")
+	})
+
+	t.Run("测试回调函数", func(t *testing.T) {
+		// 创建一个大于10KB的文本
+		largeContent := strings.Repeat("c", 1024*15) // 15KB
+
+		// 回调函数验证
+		callbackCalled := false
+		var savedFilename string
+
+		handleLargeContent(&largeContent, "test", func(filename string) {
+			callbackCalled = true
+			savedFilename = filename
+		})
+
+		// 验证回调被调用
+		require.True(t, callbackCalled, "回调函数应被调用")
+		require.NotEmpty(t, savedFilename, "文件名不应为空")
+	})
+
+	t.Run("测试文件保存功能", func(t *testing.T) {
+		// 创建测试内容
+		testContent := strings.Repeat("d", 100)
+
+		// 调用文件保存函数
+		filename := handleLargeContentToFile(testContent, "test")
+
+		// 验证返回的文件名
+		require.NotEmpty(t, filename, "文件名不应为空")
+		require.Contains(t, filename, ".test.txt", "文件名应包含内容类型")
+	})
+}
+
+// TestInvokeWithParamsLargeContent 测试InvokeWithParams处理大内容的功能
+func TestInvokeWithParamsLargeContent(t *testing.T) {
+	// 创建一个会生成大内容的回调函数
+	largeContentCallback := func(params InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+		// 向标准输出写入大于10KB的内容
+		largeStdout := strings.Repeat("A", 12*1024)
+		fmt.Fprint(stdout, largeStdout)
+
+		// 向标准错误写入大于10KB的内容
+		largeStderr := strings.Repeat("B", 11*1024)
+		fmt.Fprint(stderr, largeStderr)
+
+		// 返回大JSON结果
+		return map[string]interface{}{
+			"largeResult": strings.Repeat("C", 13*1024),
+		}, nil
+	}
+
+	// 创建测试工具
+	tool, err := New("largeContentTool",
+		WithDescription("生成大内容的工具"),
+		WithCallback(largeContentCallback),
+	)
+	require.NoError(t, err, "创建工具失败")
+
+	// 调用工具
+	result, err := tool.InvokeWithParams(map[string]any{})
+
+	// 验证结果
+	require.NoError(t, err, "调用工具失败")
+	require.True(t, result.Success, "工具调用不成功")
+
+	// 验证执行结果
+	execResult, ok := result.Data.(*ToolExecutionResult)
+	require.True(t, ok, "结果类型错误，期望 *ToolExecutionResult")
+
+	// 验证标准输出被截断和保存
+	require.Less(t, len(execResult.Stdout), 12*1024, "标准输出应被截断")
+	require.Contains(t, execResult.Stdout, "saved in file", "标准输出应包含文件保存信息")
+
+	// 验证标准错误被截断和保存
+	require.Less(t, len(execResult.Stderr), 11*1024, "标准错误应被截断")
+	require.Contains(t, execResult.Stderr, "saved in file", "标准错误应包含文件保存信息")
+
+	// 验证JSON结果处理
+	resultStr, ok := execResult.Result.(string)
+	require.True(t, ok, "JSON结果类型错误，应为字符串")
+	require.Contains(t, resultStr, "saved in file", "JSON结果应包含文件保存信息")
 }
