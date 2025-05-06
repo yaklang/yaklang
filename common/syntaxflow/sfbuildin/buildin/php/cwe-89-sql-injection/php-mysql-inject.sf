@@ -24,20 +24,22 @@ $mysqlFunction(* as $source)
 $source #{
     include:`<self> & $params`
 }-> as $all
-$source #{
-    include: `<self> & $params`,
-    exclude: `*?{opcode: call}`,
-}-> as $high
+
+$all<dataflow(exclude=<<<CODE
+*?{opcode: call} as $__next__
+CODE)> as $high
 
 alert $high for {
     title: 'Unvalidated MySQL Parameter Injection',
     title_zh: 'MySQL未验证参数注入风险',
     level: 'high',
 }
-$source #{
-    include: `<self> & $params`,
-    exclude: `*?{opcode: call && (<self><getCallee> & $filter)}`,
-}-> as $mid
+
+$all<dataflow(exclude=<<<CODE
+*?{opcode: call && (<self><getCallee> & $filter)} as $__next__
+CODE)> as $highAndMid
+
+$highAndMid - $high as $mid
 
 alert $mid for {
     title: 'Insufficient MySQL Parameter Filtering',

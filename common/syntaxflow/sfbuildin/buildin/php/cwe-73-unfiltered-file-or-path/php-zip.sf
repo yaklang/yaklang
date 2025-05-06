@@ -22,7 +22,7 @@ $sink #{
     include: <<<INCLUDE
     <self> & $params
 INCLUDE
-} -> as $all
+}-> as $all
 
 $all<dataflow(exclude=<<<CODE
 <self>?{opcode: call} as $__next__
@@ -36,7 +36,9 @@ alert $high for {
 
 $all<dataflow(exclude=<<<CODE
 <self>?{opcode: call && <self><getCallee> & $filter} as $__next__
-CODE)> as $mid
+CODE)> as $highAndMid
+
+$highAndMid - $high as $mid
 
 alert $mid for {
     title: 'Insecure File Type Detection',
@@ -73,5 +75,4 @@ desc(
     $zip->addFile($path);
     $zip->close();
 CODE
-)
 )

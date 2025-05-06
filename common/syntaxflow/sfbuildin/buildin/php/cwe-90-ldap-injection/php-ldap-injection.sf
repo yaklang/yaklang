@@ -24,31 +24,29 @@ ldap_compare(*<slice(index=1)> as $query);
 
 $query #{
     until: `* & $params`,
-}-> as $root;
-$root?{!<dataflow(<<<CODE
+}-> as $all;
+$all?{!<dataflow(<<<CODE
 *?{opcode: call && <getCallee><name>?{have: ldap_escape}} as $__next__;
-CODE)>} as $result;
-alert $result for {
+CODE)>} as $high;
+alert $high for {
     title: 'php ldap direct injection without filter',
     type: 'vuln',
     level: 'high'
 };
 
-$root?{<dataflow(<<<CODE
+$all<dataflow(exclude=<<<CODE
 *?{opcode: call && !(have: ldap_escape)} as $__next__;
-CODE)>} as $filter_result;
-
-alert $filter_result for {
+CODE)> as $highAndMid;
+$highAndMid - $high as $mid
+alert $mid for {
     title: 'php ldap direct injection have filter,but not match this filter function',
     type: 'mid',
     level: 'mid'
 };
 
-$root?{<dataflow(<<<CODE
-*?{opcode: call && (<self> & $filter || have: ldap_escape)} as $__next__;
-CODE)>} as $info;
+$root - $high - $mid as $low;
 
-alert $info for {
+alert $low for {
     title: 'php ldap inject have filter and match this filter function',
     type: 'info',
     level: 'info'

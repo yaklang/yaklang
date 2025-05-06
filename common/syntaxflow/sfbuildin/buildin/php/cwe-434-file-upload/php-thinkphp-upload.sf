@@ -1,0 +1,72 @@
+desc(
+    title: "Unsafe File Upload in ThinkPHP Framework",
+    title_zh: "ThinkPHP框架中的不安全文件上传",
+    type: vul,
+    desc: <<<CODE
+文件上传漏洞在ThinkPHP框架中同样是一个需要关注的安全问题。当应用未对上传的文件进行充分的验证和处理时，攻击者可能利用此漏洞上传恶意脚本，进而执行服务器端命令。
+CODE
+)
+
+<include('php-filter-function')> as $filter
+<include('php-param')> as $params
+<include('php-tp-all-extern-variable-param-source')> as $params
+<include('php-file-write')> as $source
+
+.putFile?{<getObject()><name>?{have: 'disk'}}(,* as $thinkphpPutFile)
+
+$thinkphpPutFile #{
+    include: <<<CODE
+    * & $params
+CODE
+}-> as $all
+
+$all<dataflow(exclude=<<<CODE
+*?{opcode: call} as $__next__
+CODE)> as $high
+
+alert $high for {
+    title: "Unsafe File Upload Without Validation in ThinkPHP",
+    title_zh: "ThinkPHP中未经验证的高危文件上传",
+    level: "high"
+}
+$all<dataflow(exclude=<<<CODE
+*?{opcode:call && <self><getCallee> & $filter} as $__next__
+CODE)> as $highAndMid
+
+$highAndMid - $high as $mid
+
+alert $mid for {
+    title: "Insecure File Type Detection in ThinkPHP",
+    title_zh: "ThinkPHP中不安全的文件类型检测",
+    level: "mid"
+}
+
+// 低风险：潜在的文件存储路径配置问题（这里假设ThinkPHP的putFile也可能涉及路径问题）
+$all - $high - $mid as $low
+
+alert $low for {
+    title: "Potential File Storage Path Misconfiguration in ThinkPHP",
+    title_zh: "ThinkPHP中潜在的文件存储路径配置问题",
+    level: "low"
+}
+
+desc(
+    lang: "php",
+    alert_min: 1,
+    // 示例代码，展示ThinkPHP中可能的文件上传处理
+    "file:///thinkphp-upload.php": <<<TEXT
+<?php
+    namespace app\controller;
+
+    use think\facade\Filesystem;
+
+    class UploadController {
+        public function upload() {
+            $file = request()->file('file');
+            // 假设这里未对文件类型和内容进行充分验证
+            $savename = Filesystem::disk('public')->putFile('uploads', $file);
+            return json(['savename' => $savename]);
+        }
+    }
+TEXT
+)

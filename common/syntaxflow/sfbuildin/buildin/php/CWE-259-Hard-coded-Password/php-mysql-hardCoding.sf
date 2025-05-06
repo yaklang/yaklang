@@ -1,0 +1,28 @@
+desc(
+    title: "Hard-coded MySQL Password in PHP",
+    title_zh: "PHP中硬编码的MySQL密码",
+    risk: "audit",
+    level: "low",
+    desc: <<<CODE
+此规则用于识别在PHP源代码中直接硬编码MySQL密码的情况。硬编码密码是一种安全风险，因为它会暴露敏感信息，并且使得在不修改代码的情况下难以更改密码。建议将密码存储在安全的位置，如环境变量或配置文件中，并避免在代码中直接硬编码。^[1]^
+CODE
+)
+
+/mysql_connect|mysql_pconnect/(,,*?{opcode: const},) as $sink
+
+alert $sink for {
+    title: "Hardcoded MySQL Credentials Detected",
+    title_zh: "检测到MySQL凭据硬编码"
+    level: "low"
+}
+desc(
+    lang: "php",
+    'file:///unsafe.php': <<<CODE
+    <?php
+    // 不安全示例：密码直接明文写入代码
+    $servername = "localhost";
+    $username = "username";
+    $password = "password"; // 硬编码的密码
+    $conn = mysql_connect($servername, $username, $password);
+CODE
+)

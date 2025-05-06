@@ -10,7 +10,7 @@ TEXT
 	rule_id: "bf975bf6-f601-4eb3-9961-7b2ff7b6bacd"
 )
 
-LIBXML_NOENT <getCall> <getCallee> <name> ?{have: simplexml_load_string} as $vuln;
+LIBXML_NOENT<getCall><getCallee><name>?{have: simplexml_load_string} as $vuln;
 check $vuln;
 alert $vuln;
 

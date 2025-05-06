@@ -1,0 +1,60 @@
+desc(
+    title: "ThinkPHP SQL Injection Detection",
+    title_zh: "ThinkPHP SQL注入检测",
+    risk: "audit",
+    level: "low",
+    desc: <<<CODE
+该规则旨在检测ThinkPHP框架中可能存在的SQL注入风险。规则通过静态分析，识别出直接将外部输入（如用户输入）拼接到SQL查询语句中的代码模式，这可能导致SQL注入攻击。
+CODE
+)
+
+./find|select|where|update|where/ as $sink
+<include('php-tp-all-extern-variable-param-source')> as $params
+
+$sink(,* as $params)
+
+$params #{
+    include: <<<CODE
+* & $params
+CODE
+}-> as $info
+
+alert $info for {
+    title: 'Unvalidated SQL Injection',
+    title_zh: 'SQL注入风险',
+    level: 'low',
+    risk: 'sqli-inject',
+}
+
+
+desc(
+    lang: "php",
+    'file:///unsafe.php': <<<CODE
+<?php
+// 漏洞示例代码（不安全写法）
+namespace app\controller;
+
+use think\Db;
+
+class User
+{
+    public function getUsers()
+    {
+        $id = input('get.id'); // 直接获取外部参数
+        $result = Db::table('user')
+            ->where('id = ' . $id) // 直接拼接用户输入到SQL语句
+            ->find();
+        return json($result);
+    }
+
+    // 存在风险的更新操作
+    public function updateUser()
+    {
+        $newName = input('post.name');
+        Db::table('user')
+            ->where('id', input('post.id')) // 直接使用外部参数作为条件
+            ->update(['username' => $newName]);
+    }
+}
+CODE
+)
