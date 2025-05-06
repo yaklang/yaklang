@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"text/template"
 )
@@ -18,21 +19,22 @@ func (t *aiTask) execute() error {
 
 	// 调用AI回调函数
 	t.config.EmitPrompt("task_execute", prompt)
-	req := NewAIRequest(prompt)
-	responseReader, err := t.callAI(req)
-	if err != nil {
-		return fmt.Errorf("error calling AI: %w", err)
-	}
 
-	// 读取AI的响应
-	responseBytes, err := io.ReadAll(responseReader.GetOutputStreamReader("execute", false, t.config))
+	var response string
+	err = t.config.callAiTransaction(prompt, t.callAI, func(rsp *AIResponse) error {
+		responseBytes, err := io.ReadAll(rsp.GetOutputStreamReader("execute", false, t.config))
+		if err != nil {
+			return fmt.Errorf("error reading AI response: %w", err)
+		}
+
+		response = string(responseBytes)
+		return nil
+	})
 	if err != nil {
-		return fmt.Errorf("error reading AI response: %w", err)
+		return utils.Errorf("call ai transaction failed: %v", err)
 	}
 
 	// 处理工具调用, 直到没有工具调用为止
-	response := string(responseBytes)
-
 TOOLREQUIRED:
 	for {
 		toolRequired := t.getToolRequired(response)
