@@ -90,6 +90,9 @@ func (w *h2RequestState) emitRequestHeader(req *http.Request, pairs []*ypb.KVPai
 	err := w.config.handleRequest(w, buf.Bytes(), w.bodyReader)
 	if err != nil && err != io.EOF {
 		log.Errorf("emitRequestHeader failed: %v", err)
+		if err := w.config.close(); err != nil {
+			log.Errorf("close h2 conn fail:%v", err)
+		}
 	}
 	return nil
 }
@@ -119,6 +122,7 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 	frame := http2.NewFramer(conn, r)
 	frWriteMutex := new(sync.Mutex)
 	config.frame = frame
+	config.conn = conn
 	config.frWriteMutex = frWriteMutex
 	// send settings
 	/*

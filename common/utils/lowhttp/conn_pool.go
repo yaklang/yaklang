@@ -123,6 +123,11 @@ func (l *LowHttpConnPool) getIdleConn(key *connectKey, opts ...netx.DialXOption)
 	// 没有复用连接则新建一个连接
 	pConn, err := newPersistConn(key, l, opts...)
 	if err != nil {
+		// try get idle conn
+		if oldPc, ok := l.getFromConn(key); ok {
+			//addGetIdleConnFinishedCounter()
+			return oldPc, nil
+		}
 		return nil, err
 	}
 	//addGetIdleConnFinishedCounter()
@@ -488,7 +493,7 @@ func (pc *persistConn) h2Conn() {
 	}
 
 	newH2Conn.idleTimer = time.AfterFunc(newH2Conn.idleTimeout, func() {
-		newH2Conn.closed = true
+		newH2Conn.setClose()
 	})
 	pc.alt = newH2Conn
 }
@@ -720,8 +725,17 @@ func (pc *persistConn) markReused() {
 	pc.mu.Unlock()
 }
 
+func (pc *persistConn) isReused() bool {
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+	if pc.alt != nil {
+		return pc.alt.currentStreamID > 1
+	}
+	return pc.reused
+}
+
 func (pc *persistConn) shouldRetryRequest(err error) bool {
-	if !pc.reused {
+	if !pc.isReused() {
 		// 初次连接失败，则不重试
 		return false
 	}
