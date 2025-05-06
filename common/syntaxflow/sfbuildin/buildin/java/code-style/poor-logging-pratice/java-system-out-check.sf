@@ -1,0 +1,30 @@
+desc(
+    title_zh:"检测Java 使用System.out输出流",
+    title:"Check Java Usage of System.out Output Stream",
+    rule_id:11500
+    risk:"代码风格",
+    reference:<<<URL
+    https://docs.oracle.com/javase/8/docs/api/java/io/PrintStream.html
+URL
+    description:<<<TEXT
+    该规则用于检测Java项目中是否使用了System.out输出流。System.out是Java中的标准输出流，通常用于打印调试信息或日志。然而，在生产环境中使用System.out输出流可能会导致性能问题和安全隐患。建议使用日志框架（如Log4j、SLF4J等）来替代System.out输出流，以便更好地管理日志记录和输出。
+TEXT
+    fix:<<<TEXT
+    建议使用日志框架（如Log4j、SLF4J等）来替代System.out输出流，以便更好地管理日志记录和输出。
+TEXT
+)
+
+System.out.print* as $out;
+check $out;
+alert $out for {
+    message: '检测到Java项目中使用了System.out输出流',
+    level: info,
+}
+
+desc{
+    lang:java,
+    alert_num: ,
+    "file://demo.java":<<<CODE
+    
+CODE
+}
