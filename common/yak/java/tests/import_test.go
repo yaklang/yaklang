@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -210,4 +211,34 @@ class A {
 		},
 		true,
 		ssaapi.WithLanguage(ssaapi.JAVA))
+}
+
+func TestImportSourceCodeRange(t *testing.T) {
+	code := `
+	package com.example.demo.controller.freemakerdemo;
+
+import java.io.IOException;
+import java.io.PrintWriter;
+
+@Controller
+@RequestMapping("/freemarker")
+public class FreeMakerDemo {
+    @Autowired
+    private Configuration freemarkerConfig;
+
+    @GetMapping("/template")
+    public void template(String name, Model model, HttpServletResponse response) throws Exception {
+        PrintWriter writer = response.getWriter();
+        writer.write("aaaa");
+        writer.flush();
+        writer.close();
+    }
+}
+	`
+
+	ssatest.CheckSyntaxFlowSource(t, code, `
+PrintWriter as $writer
+	`, map[string][]string{
+		"writer": {"import java.io.PrintWriter;", "getWriter()"},
+	}, ssaapi.WithLanguage(consts.JAVA))
 }
