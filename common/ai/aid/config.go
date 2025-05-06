@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"math/rand/v2"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -331,7 +329,6 @@ func WithExtendedActionCallback(name string, cb func(config *Config, action *Act
 		return nil
 	}
 }
-
 
 func WithAgreeAIAssistant(a *AIAssistant) Option {
 	return func(config *Config) error {
