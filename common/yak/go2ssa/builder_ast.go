@@ -1978,7 +1978,7 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 
 		if lib != nil && path != "" {
 			if _, ok := lib.GetExportType(libName); !ok {
-				if err := b.GetProgram().ImportTypeFromLib(lib, libName); err != nil {
+				if err := b.GetProgram().ImportTypeFromLib(lib, libName, iqul); err != nil {
 					b.NewError(ssa.Warn, TAG, "get namespace type fail: %s", err)
 				}
 			}
@@ -1987,7 +1987,7 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 			if ok {
 				return exportType
 			} else { // 找到包但没有找到类型，可能是包中引用了golang库
-				if err := b.GetProgram().ImportTypeFromLib(lib, typName); err != nil {
+				if err := b.GetProgram().ImportTypeFromLib(lib, typName, iqul); err != nil {
 					b.NewError(ssa.Warn, TAG, "get namespace type fail: %s", err)
 				}
 			}
