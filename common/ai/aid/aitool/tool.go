@@ -76,6 +76,20 @@ func WithDescription(description string) ToolOption {
 	}
 }
 
+// WithDangerousNoNeedTimelineRecorded 设置工具是否需要时间线记录
+func WithDangerousNoNeedTimelineRecorded(i bool) ToolOption {
+	return func(t *Tool) {
+		t.NoNeedTimelineRecorded = i
+	}
+}
+
+// WithDangerousNoNeedUserReview 设置工具是否不需要用户审核
+func WithDangerousNoNeedUserReview(i bool) ToolOption {
+	return func(t *Tool) {
+		t.NoNeedUserReview = i
+	}
+}
+
 // WithKeywords 设置工具索引关键词
 func WithKeywords(keywords []string) ToolOption {
 	return func(t *Tool) {
@@ -288,8 +302,11 @@ func WithSimpleArrayParam(name string, itemType string, opts ...PropertyOption) 
 	return WithRawParam(name, schema, opts...)
 }
 
-func WithStructArrayParam(name string, opts []PropertyOption, itemsOpt ...PropertyOption) ToolOption {
-	return WithArrayParam(name, "object", opts, itemsOpt...)
+func WithStructArrayParam(name string, opts []PropertyOption, structOpts []PropertyOption, structMembers ...ToolOption) ToolOption {
+	return WithArrayParamEx(
+		name, opts,
+		WithStructParam("", structOpts, structMembers...),
+	)
 }
 
 func WithArrayParam(name string, itemType string, opts []PropertyOption, itemsOpt ...PropertyOption) ToolOption {
