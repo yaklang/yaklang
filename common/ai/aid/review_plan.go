@@ -85,7 +85,35 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 		}
 		return p.handleReviewPlanResponse(newPlan, params)
 	case "replan":
-		return nil, utils.Errorf("replan is not supported yet")
+		p.config.EmitError("replan required via user suggestion")
+		extraPrompt := param.GetString("extra_prompt", "prompt")
+		if extraPrompt == "" {
+			extraPrompt = "user decide to replan, but not provide extra prompt, you can replan the task with some general priciples\n"
+			extraPrompt += " S-M-A-R-T: SMART 代表：1. Specific（具体的） 2. Measurable（可衡量的） 3. Achievable（可实现的） 4. Relevant（相关的） 5. Time-bound（有时限的）。\n" +
+				"SMART 是一个用于设定目标和评估目标达成度的标准。它帮助人们设定清晰、可行和可衡量的目标，以便更好地规划和实现个人或团队的愿景和任务。\n" +
+				"从这几个角度考虑。\n## 注意\n1. 你运行在一个由外部思维链约束的任务中，尽量保持输出简短，保留任务相关元素，避免冗长描述\n" +
+				"2. 如果重点是输出JSON，则只输出JSON\n" +
+				"3. 不需要输出算法简介和背景相关知识\n" +
+				"4. 无需额外解释"
+		}
+		newPlan, err := p.generateNewPlan(suggestion, extraPrompt, rsp)
+		if err != nil {
+			p.config.EmitError("generate new plan failed: %v", err)
+			return nil, utils.Errorf("generate new plan failed: %v", err)
+		}
+
+		ep := p.config.epm.createEndpoint()
+		ep.SetDefaultSuggestionContinue()
+
+		p.config.EmitRequireReviewForPlan(newPlan, ep.id)
+		p.config.doWaitAgree(nil, ep)
+		params := ep.GetParams()
+		p.config.ReleaseInteractiveEvent(ep.id, params)
+		if params == nil {
+			p.config.EmitError("user review params is nil, plan failed")
+			return newPlan, nil
+		}
+		return p.handleReviewPlanResponse(newPlan, params)
 	default:
 		p.config.EmitError("unknown review suggestion: %s", suggestion)
 		return rsp, nil
