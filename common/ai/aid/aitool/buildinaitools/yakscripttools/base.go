@@ -3,18 +3,22 @@ package yakscripttools
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
 	"path/filepath"
 	"strings"
+	"sync"
 
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/yakcliconvert"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak"
@@ -29,70 +33,91 @@ import (
 //go:embed yakscriptforai/**
 var yakScriptFS embed.FS
 
-func GetAllYakScriptAiTools() []*aitool.Tool {
-	return getYakScriptAiToolsByFilter(func(filename string, info fs.FileInfo) bool {
-		return true
+var overrideYakScriptAiToolsOnce sync.Once
+
+func init() {
+	overrideYakScriptAiToolsOnce.Do(func() {
+		db := consts.GetGormProjectDatabase()
+		aiTools := loadAllYakScriptFromEmbedFS()
+		for _, aiTool := range aiTools {
+			schema.SaveAIYakTool(db, aiTool)
+		}
 	})
 }
-func GetYakScriptAiTools(name ...string) []*aitool.Tool {
-	return getYakScriptAiToolsByFilter(func(toolname string, info fs.FileInfo) bool {
-		dirname, _ := filepath.Split(info.Name())
-		found := false
-		for _, i := range name {
-			if i == toolname {
-				found = true
-			}
-		}
-		if !found {
-			dirnameClean, ok := strings.CutPrefix(dirname, `yakscriptforai`)
-			if ok {
-				dirname = dirnameClean
-			}
-			dirname = strings.Trim(dirname, `/`)
-			if utils.MatchAnyOfSubString(dirname, name...) {
-				found = true
-			}
-		}
-		return found
-	})
-}
-func getYakScriptAiToolsByFilter(filter func(filename string, info fs.FileInfo) bool) []*aitool.Tool {
+
+func loadAllYakScriptFromEmbedFS() []*schema.AIYakTool {
+	aiTools := []*schema.AIYakTool{}
 	efs := filesys.NewEmbedFS(yakScriptFS)
-	tools := []*aitool.Tool{}
 	_ = filesys.Recursive(".", filesys.WithFileSystem(efs), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 		filename := info.Name()
 		_, filename = efs.PathSplit(filename)
 		dirname, _ := efs.PathSplit(s)
-		log.Infof("check dirname: %v in: %v", dirname, s)
 		if efs.Ext(filename) != ".yak" {
 			return nil
 		}
 		toolname := strings.TrimSuffix(filename, ".yak")
-		found := filter(toolname, info)
-		if !found {
-			return nil
-		}
 
 		content, err := efs.ReadFile(s)
 		if err != nil {
 			return nil
 		}
-		metadata, err := metadata.ParseYakScriptMetadata(filename, string(content))
-		if err != nil {
-			log.Warnf("parse yak script metadata failed: %v", err)
-			return err
-		}
-		prog, err := static_analyzer.SSAParse(string(content), "yak")
-		if err != nil {
-			log.Warnf(`static_analyzer.SSAParse(string(content), "yak") error: %v`, err)
-			return err
+		aiTool := loadYakScriptToAiTools(toolname, string(content))
+		if aiTool == nil {
+			return nil
 		}
 
-		tool := yakcliconvert.ConvertCliParameterToTool(toolname, prog)
+		namePath := ""
+		dirnameClean, ok := strings.CutPrefix(dirname, `yakscriptforai`)
+		if ok {
+			namePath = dirnameClean
+		}
+		namePath = strings.Trim(namePath, `/`)
+		aiTool.Path = filepath.Join(namePath, toolname)
+
+		aiTools = append(aiTools, aiTool)
+		return nil
+	}))
+	return aiTools
+}
+
+func loadYakScriptToAiTools(name string, content string) *schema.AIYakTool {
+	metadata, err := metadata.ParseYakScriptMetadata(name, string(content))
+	if err != nil {
+		log.Warnf("parse yak script metadata failed: %v", err)
+		return nil
+	}
+	prog, err := static_analyzer.SSAParse(string(content), "yak")
+	if err != nil {
+		log.Warnf(`static_analyzer.SSAParse(string(content), "yak") error: %v`, err)
+		return nil
+	}
+	tool := yakcliconvert.ConvertCliParameterToTool(name, prog)
+	params, _ := json.Marshal(tool.InputSchema.ToMap())
+	return &schema.AIYakTool{
+		Name:        name,
+		Description: metadata.Description,
+		Keywords:    strings.Join(metadata.Keywords, ","),
+		Content:     string(content),
+		Params:      string(params),
+	}
+}
+
+func ConvertYakScriptAiToolsToMCPTools(aiTools []*schema.AIYakTool) []*aitool.Tool {
+	tools := []*aitool.Tool{}
+	for _, aiTool := range aiTools {
+		tool := mcp.NewTool(aiTool.Name)
+		tool.Description = aiTool.Description
+		dataMap := map[string]any{}
+		err := json.Unmarshal([]byte(aiTool.Params), &dataMap)
+		if err != nil {
+			log.Errorf("unmarshal aiTool.Params failed: %v", err)
+			continue
+		}
+		tool.InputSchema.FromMap(dataMap)
 		at, err := aitool.NewFromMCPTool(
 			tool,
-			aitool.WithDescription(metadata.Description),
-			aitool.WithKeywords(metadata.Keywords),
+			aitool.WithDescription(aiTool.Description),
+			aitool.WithKeywords(strings.Split(aiTool.Keywords, ",")),
 			aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
@@ -132,7 +157,7 @@ func getYakScriptAiToolsByFilter(filter func(filename string, info fs.FileInfo) 
 					return nil
 				})
 
-				_, err = engine.ExecuteExWithContext(ctx, string(content), map[string]interface{}{
+				_, err = engine.ExecuteExWithContext(ctx, aiTool.Content, map[string]interface{}{
 					"RUNTIME_ID":   runtimeId,
 					"CTX":          ctx,
 					"PLUGIN_NAME":  runtimeId + ".yak",
@@ -150,7 +175,36 @@ func getYakScriptAiToolsByFilter(filter func(filename string, info fs.FileInfo) 
 			return nil
 		}
 		tools = append(tools, at)
-		return nil
-	}))
+	}
 	return tools
+}
+
+func GetAllYakScriptAiTools() []*aitool.Tool {
+	db := consts.GetGormProjectDatabase()
+	allAiTools, err := schema.SearchAIYakTool(db, "")
+	if err != nil {
+		log.Errorf("search ai yak tool failed: %v", err)
+		return nil
+	}
+	return ConvertYakScriptAiToolsToMCPTools(allAiTools)
+}
+func GetYakScriptAiTools(names ...string) []*aitool.Tool {
+	db := consts.GetGormProjectDatabase()
+	tools := []*schema.AIYakTool{}
+	toolsNameMap := map[string]struct{}{}
+	for _, name := range names {
+		dbAiTools, err := schema.SearchAIYakToolByPath(db, name)
+		if err != nil {
+			log.Errorf("search ai yak tool failed: %v", err)
+			continue
+		}
+		for _, tool := range dbAiTools {
+			if _, ok := toolsNameMap[tool.Name]; ok {
+				continue
+			}
+			toolsNameMap[tool.Name] = struct{}{}
+			tools = append(tools, tool)
+		}
+	}
+	return ConvertYakScriptAiToolsToMCPTools(tools)
 }
