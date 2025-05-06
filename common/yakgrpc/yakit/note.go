@@ -4,6 +4,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -13,8 +14,8 @@ var _note = &schema.Note{}
 
 func CreateNote(db *gorm.DB, title, content string) (uint, error) {
 	note := &schema.Note{
-		Title:   title,
-		Content: content,
+		Title:   utils.EscapeInvalidUTF8Byte([]byte(title)),
+		Content: utils.EscapeInvalidUTF8Byte([]byte(content)),
 	}
 	err := db.Create(note).Error
 	return note.ID, err
@@ -35,10 +36,10 @@ func UpdateNote(db *gorm.DB, filter *ypb.NoteFilter, updateTitle, updateContent 
 	db = FilterNote(db, filter)
 	m := make(map[string]any, 2)
 	if updateTitle {
-		m["title"] = title
+		m["title"] = utils.EscapeInvalidUTF8Byte([]byte(title))
 	}
 	if updateContent {
-		m["content"] = content
+		m["content"] = utils.EscapeInvalidUTF8Byte([]byte(content))
 	}
 	db = db.Updates(m)
 	return db.RowsAffected, db.Error
