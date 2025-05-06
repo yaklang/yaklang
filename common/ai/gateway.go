@@ -7,6 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/dashscopebase"
 	"github.com/yaklang/yaklang/common/ai/deepseek"
+	"github.com/yaklang/yaklang/common/ai/gemini"
 	"github.com/yaklang/yaklang/common/ai/openrouter"
 	"github.com/yaklang/yaklang/common/ai/siliconflow"
 
@@ -51,6 +52,9 @@ func init() {
 	})
 	aispec.Register("openrouter", func() aispec.AIClient {
 		return &openrouter.GetawayClient{}
+	})
+	aispec.Register("gemini", func() aispec.AIClient {
+		return &gemini.Client{}
 	})
 	aispec.Register("yaklang-writer", func() aispec.AIClient {
 		return dashscopebase.CreateDashScopeGateway("a51e9af5a60f40c983dac6ed50dba15b")
