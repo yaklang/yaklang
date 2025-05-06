@@ -1,0 +1,47 @@
+desc(
+    title_zh:"检测Java Spring Boot Devtools使用",
+    title:"Check Java Spring Boot Devtools Usage",
+    rule_id:11105035
+    risk:"sca",
+    reference:<<<URL
+    https://docs.spring.io/spring-boot/reference/using/devtools.html
+URL
+    description:<<<TEXT
+    该规则检测Java Spring Boot项目中是否使用了Devtools。Devtools是Spring Boot的一个开发工具包，提供了热部署、自动重启等功能，但在生产环境中不应使用。
+TEXT
+)
+
+__dependency__./org.springframework.boot:spring-boot-starter-test/  as $weak;
+
+check $weak;
+alert $weak for {
+    message: '检测到Java Spring Boot Devtools的使用',
+    level: info,
+}
+
+desc{
+    lang:java,
+    alert_num: 1,
+    "file://pom.xml":<<<CODE
+    <?xml version="1.0" encoding="UTF-8"?>
+    <project xmlns="http://maven.apache.org/POM/4.0.0"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+        <modelVersion>4.0.0</modelVersion>
+
+        <parent>
+            <groupId>org.springframework.boot</groupId>
+        </parent>
+
+        <dependencies>
+            <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-test</artifactId>
+                        <scope>test</scope>
+                    </dependency>
+        </dependencies>
+
+    </project>
+
+CODE
+}
