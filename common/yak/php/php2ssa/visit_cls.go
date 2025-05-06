@@ -296,9 +296,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 				y.FunctionBuilder = currentBuilder
 				typ := y.VisitTypeHint(ret.TypeHint())
 				value.SetType(typ)
-				ssa.RefreshEx(value)
 			})
-
 		}
 		return
 	case *phpparser.FunctionContext:
@@ -340,7 +338,6 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 					y.EmitReturn([]ssa.Value{param})
 				}
 			}
-			ssa.RefreshEx(newFunction)
 			y.Finish()
 			y.FunctionBuilder = y.PopFunction()
 		})
