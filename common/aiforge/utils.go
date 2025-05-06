@@ -1,6 +1,7 @@
 package aiforge
 
 import (
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"os"
 	"path/filepath"
@@ -106,4 +107,13 @@ func GetQwenAICallback(modelName ...string) aid.AICallbackType {
 		modelName = []string{"qwq-32b"}
 	}
 	return getTestSuiteAICallback("tongyi-apikey.txt", nil, "tongyi", modelName...)
+}
+
+func GetCliValueByKey(key string, items []*ypb.ExecParamItem) string {
+	for _, i := range items {
+		if i.Key == key {
+			return i.Value
+		}
+	}
+	return ""
 }
