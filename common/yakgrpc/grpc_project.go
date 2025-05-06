@@ -38,13 +38,19 @@ var currentProjectMutex = new(sync.Mutex)
 func (s *Server) SetCurrentProject(ctx context.Context, req *ypb.SetCurrentProjectRequest) (*ypb.Empty, error) {
 	currentProjectMutex.Lock()
 	defer currentProjectMutex.Unlock()
-	if req.GetId() <= 0 {
-		// 传入CurrentProject id为空，默认关闭当前的currentProject数据库
-		consts.GetGormProjectDatabase().Close()
-		return nil, utils.Errorf("params is empty")
-	}
 	if req.Type == "" { // empty is older front-end default,
 		req.Type = yakit.TypeProject
+	}
+
+	if req.GetId() <= 0 {
+		switch req.GetType() {
+		case yakit.TypeProject:
+			consts.GetGormProjectDatabase().Close()
+		case yakit.TypeSSAProject:
+			consts.GetGormDefaultSSADataBase().Close()
+		default:
+			return nil, utils.Errorf("invalid project type: %s", req.GetType())
+		}
 	}
 
 	db := s.GetProfileDatabase()
