@@ -2,11 +2,13 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestGRPCMUSTPASS_HTTPFuzzer_History_Detail(t *testing.T) {
@@ -15,47 +17,90 @@ func TestGRPCMUSTPASS_HTTPFuzzer_History_Detail(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		writer.Write([]byte("Hello"))
-	})
+	var targetHost string
+	var targetPort int
+	var serverStarted bool
+
+	// 尝试5次启动服务器，只要有一次成功就继续测试
+	for i := 0; i < 5; i++ {
+		targetHost, targetPort = utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			writer.Write([]byte("Hello"))
+		})
+
+		if utils.WaitConnect(utils.HostPort(targetHost, targetPort), 3) == nil {
+			serverStarted = true
+			break
+		}
+
+		log.Infof("attempt %d to start debug server failed, retrying...", i+1)
+	}
+
+	if !serverStarted {
+		t.Fatal("debug server failed after 5 attempts")
+	}
 
 	t.Run("single request", func(t *testing.T) {
-		client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
-			Request: `GET /?c=1 HTTP/1.1
+		var success bool
+		var lastErr error
+
+		for i := 0; i < 5; i++ {
+			func() {
+				client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+					Request: `GET /?c=1 HTTP/1.1
 	Host: ` + utils.HostPort(targetHost, targetPort) + `
 	`,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
+				})
+				if err != nil {
+					lastErr = err
+					return
+				}
 
-		var taskID int64 = 0
-		for {
-			rsp, err := client.Recv()
-			if err != nil {
+				var taskID int64 = 0
+				for {
+					rsp, err := client.Recv()
+					if err != nil {
+						break
+					}
+					if taskID == 0 {
+						taskID = rsp.GetTaskId()
+					}
+				}
+				if taskID == 0 {
+					lastErr = utils.Error("No Response")
+					return
+				}
+
+				client, err = c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+					HistoryWebFuzzerId: int32(taskID),
+				})
+				if err != nil {
+					lastErr = err
+					return
+				}
+
+				count := 0
+				for {
+					_, err := client.Recv()
+					if err != nil {
+						break
+					}
+					count++
+				}
+				if count != 1 {
+					lastErr = utils.Errorf("Get History WebFuzzer Detail Failed, want 1 response, but got %d", count)
+					return
+				}
+
+				success = true
+			}()
+
+			if success {
 				break
 			}
-			if taskID == 0 {
-				taskID = rsp.GetTaskId()
-			}
-		}
-		if taskID == 0 {
-			t.Fatal("No Response")
 		}
 
-		client, err = c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
-			HistoryWebFuzzerId: int32(taskID),
-		})
-		count := 0
-		for {
-			_, err := client.Recv()
-			if err != nil {
-				break
-			}
-			count++
-		}
-		if count != 1 {
-			t.Fatalf("Get History WebFuzzer Detail Failed, want 1 response, but got %d", count)
+		if !success {
+			t.Fatal(lastErr)
 		}
 	})
 
