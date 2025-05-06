@@ -3,9 +3,11 @@ package aisecretary
 import (
 	"context"
 	_ "embed"
+	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strconv"
 )
 
 //go:embed fragment_summarizer_prompts/persistent.txt
@@ -20,9 +22,13 @@ func init() {
 		items []*ypb.ExecParamItem,
 		option ...aid.Option) (*aiforge.ForgeResult, error) {
 		var summary string
+		limit, err := strconv.Atoi(aiforge.GetCliValueByKey("limit", items))
+		if err != nil || limit <= 0 {
+			limit = 50
+		}
 		bp := aiforge.NewForgeBlueprint(
 			"fragment-summarizer",
-			aiforge.WithPersistentPrompt(summarizerPersistentPrompt),
+			aiforge.WithPersistentPrompt(fmt.Sprintf(summarizerPersistentPrompt, limit)),
 			aiforge.WithPlanMocker(func(config *aid.Config) *aid.PlanResponse {
 				result, err := aid.ExtractPlan(config, summarizerPlanMock)
 				if err != nil {
@@ -33,6 +39,7 @@ func init() {
 			}),
 			aiforge.WithOriginYaklangCliCode(`
 cli.String("textSnippet", cli.setRequired(true), cli.help("文本片段内容"))
+cli.Int("limit",cli.help("字数限制"))
 `),
 
 			aiforge.WithAIDOptions(
