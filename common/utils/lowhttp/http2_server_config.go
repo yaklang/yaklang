@@ -8,6 +8,7 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
 	"io"
+	"net"
 	"strings"
 	"sync"
 )
@@ -15,6 +16,7 @@ import (
 type http2ConnectionConfig struct {
 	handler      func(header []byte, body io.ReadCloser) ([]byte, io.ReadCloser, error)
 	frame        *http2.Framer
+	conn         net.Conn
 	frWriteMutex *sync.Mutex
 
 	// writer
@@ -25,6 +27,10 @@ type http2ConnectionConfig struct {
 	wg *sync.WaitGroup
 
 	*windowSizeControl
+}
+
+func (c *http2ConnectionConfig) close() error {
+	return c.conn.Close()
 }
 
 func (c *http2ConnectionConfig) writer(wrapper *h2RequestState, header []byte, body io.ReadCloser) error {
