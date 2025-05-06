@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
@@ -16,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -419,29 +421,29 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 		}
 	})
 
+	startScanWithGroup := func(progIds []string, groupName string, isIgnoreLanguage bool) (string, ypb.Yak_SyntaxFlowScanClient) {
+		stream, err := client.SyntaxFlowScan(context.Background())
+		require.NoError(t, err)
+
+		stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode: "start",
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				GroupNames: []string{groupName},
+			},
+			IgnoreLanguage: isIgnoreLanguage,
+			ProgramName:    progIds,
+		})
+
+		resp, err := stream.Recv()
+		require.NoError(t, err)
+		log.Infof("resp: %v", resp)
+		taskID := resp.TaskID
+		return taskID, stream
+	}
+
 	t.Run("test ignore language", func(t *testing.T) {
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("/a.java", `package com.example.apackage;`)
-
-		startScanWithGroup := func(progIds []string, groupName string, isIgnoreLanguage bool) (string, ypb.Yak_SyntaxFlowScanClient) {
-			stream, err := client.SyntaxFlowScan(context.Background())
-			require.NoError(t, err)
-
-			stream.Send(&ypb.SyntaxFlowScanRequest{
-				ControlMode: "start",
-				Filter: &ypb.SyntaxFlowRuleFilter{
-					GroupNames: []string{groupName},
-				},
-				IgnoreLanguage: isIgnoreLanguage,
-				ProgramName:    progIds,
-			})
-
-			resp, err := stream.Recv()
-			require.NoError(t, err)
-			log.Infof("resp: %v", resp)
-			taskID := resp.TaskID
-			return taskID, stream
-		}
 
 		languages := []string{string(consts.JAVA), string(consts.General), string(consts.PHP), string(consts.GO)}
 		db := consts.GetGormProfileDatabase()
@@ -515,5 +517,70 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 		dataB := queryTasks([]string{taskIdB})
 		require.Equal(t, 1, len(dataB))
 		require.Equal(t, int64(0), dataB[0].SkipQuery)
+	})
+
+}
+
+func TestGRPCMUSTPASS_SyntaxFlow_Query(t *testing.T) {
+
+	createTask := func(t *testing.T, program []string) string {
+		taskID := uuid.NewString()
+		task := &schema.SyntaxFlowScanTask{
+			TaskId:    taskID,
+			Programs:  strings.Join(program, schema.SYNTAXFLOWSCAN_PROGRAM_SPLIT),
+			RiskCount: 10,
+		}
+		err := schema.SaveSyntaxFlowScanTask(ssadb.GetDB(), task)
+		require.NoError(t, err)
+		return taskID
+	}
+
+	t.Run("test normal", func(t *testing.T) {
+		taskID1 := createTask(t, nil)
+		taskID2 := createTask(t, nil)
+
+		_, resp, err := yakit.QuerySyntaxFlowScanTask(ssadb.GetDB(), &ypb.QuerySyntaxFlowScanTaskRequest{
+			Filter: &ypb.SyntaxFlowScanTaskFilter{
+				TaskIds: []string{taskID1, taskID2},
+			},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 2, len(resp))
+		require.Equal(t, taskID2, resp[0].TaskId)
+		require.Equal(t, taskID1, resp[1].TaskId)
+	})
+
+	t.Run("test multiple program", func(t *testing.T) {
+		prog1 := uuid.NewString()
+		prog2 := uuid.NewString()
+
+		task1 := createTask(t, []string{prog1, prog2})
+		task2 := createTask(t, []string{prog1})
+		task3 := createTask(t, []string{prog2})
+		_ = task3
+
+		_, resp, err := yakit.QuerySyntaxFlowScanTask(ssadb.GetDB(), &ypb.QuerySyntaxFlowScanTaskRequest{
+			Filter: &ypb.SyntaxFlowScanTaskFilter{
+				Programs: []string{prog1},
+			},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 2, len(resp))
+		require.Equal(t, task2, resp[0].TaskId)
+		require.Equal(t, task1, resp[1].TaskId)
+	})
+
+	t.Run("test filter risk count", func(t *testing.T) {
+		task1 := createTask(t, nil)
+		task2 := createTask(t, nil)
+
+		_, resp, err := yakit.QuerySyntaxFlowScanTask(ssadb.GetDB(), &ypb.QuerySyntaxFlowScanTaskRequest{
+			Filter: &ypb.SyntaxFlowScanTaskFilter{
+				TaskIds:  []string{task1, task2},
+				HaveRisk: true,
+			},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 0, len(resp))
 	})
 }

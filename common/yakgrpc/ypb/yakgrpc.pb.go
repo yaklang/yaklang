@@ -44486,8 +44486,9 @@ type SyntaxFlowScanTaskFilter struct {
 	TaskIds       []string               `protobuf:"bytes,3,rep,name=TaskIds,proto3" json:"TaskIds,omitempty"`
 	FromId        int64                  `protobuf:"varint,4,opt,name=FromId,proto3" json:"FromId,omitempty"`
 	UntilId       int64                  `protobuf:"varint,5,opt,name=UntilId,proto3" json:"UntilId,omitempty"`
-	Keyword       string                 `protobuf:"bytes,6,opt,name=Keyword,proto3" json:"Keyword,omitempty"` // fuzz search program-name
-	Kind          []string               `protobuf:"bytes,7,rep,name=Kind,proto3" json:"Kind,omitempty"`       // "debug" | "scan";
+	Keyword       string                 `protobuf:"bytes,6,opt,name=Keyword,proto3" json:"Keyword,omitempty"`     // fuzz search program-name
+	Kind          []string               `protobuf:"bytes,7,rep,name=Kind,proto3" json:"Kind,omitempty"`           // "debug" | "scan";
+	HaveRisk      bool                   `protobuf:"varint,17,opt,name=HaveRisk,proto3" json:"HaveRisk,omitempty"` // 是否有风险
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -44569,6 +44570,13 @@ func (x *SyntaxFlowScanTaskFilter) GetKind() []string {
 		return x.Kind
 	}
 	return nil
+}
+
+func (x *SyntaxFlowScanTaskFilter) GetHaveRisk() bool {
+	if x != nil {
+		return x.HaveRisk
+	}
+	return false
 }
 
 type QuerySyntaxFlowScanTaskResponse struct {
@@ -53689,7 +53697,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x125\n" +
-	"\x06Filter\x18\x02 \x01(\v2\x1d.ypb.SyntaxFlowScanTaskFilterR\x06Filter\"\xc8\x01\n" +
+	"\x06Filter\x18\x02 \x01(\v2\x1d.ypb.SyntaxFlowScanTaskFilterR\x06Filter\"\xe4\x01\n" +
 	"\x18SyntaxFlowScanTaskFilter\x12\x1a\n" +
 	"\bPrograms\x18\x01 \x03(\tR\bPrograms\x12\x16\n" +
 	"\x06Status\x18\x02 \x03(\tR\x06Status\x12\x18\n" +
@@ -53697,7 +53705,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06FromId\x18\x04 \x01(\x03R\x06FromId\x12\x18\n" +
 	"\aUntilId\x18\x05 \x01(\x03R\aUntilId\x12\x18\n" +
 	"\aKeyword\x18\x06 \x01(\tR\aKeyword\x12\x12\n" +
-	"\x04Kind\x18\a \x03(\tR\x04Kind\"\x91\x01\n" +
+	"\x04Kind\x18\a \x03(\tR\x04Kind\x12\x1a\n" +
+	"\bHaveRisk\x18\x11 \x01(\bR\bHaveRisk\"\x91\x01\n" +
 	"\x1fQuerySyntaxFlowScanTaskResponse\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +

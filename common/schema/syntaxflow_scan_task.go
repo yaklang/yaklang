@@ -54,7 +54,7 @@ func (s *SyntaxFlowScanTask) ToGRPCModel() *ypb.SyntaxFlowScanTask {
 	res := &ypb.SyntaxFlowScanTask{
 		Id:           uint64(s.ID),
 		CreatedAt:    s.CreatedAt.Unix(),
-		UpdatedAt:    s.CreatedAt.Unix(),
+		UpdatedAt:    s.UpdatedAt.Unix(),
 		TaskId:       s.TaskId,
 		Programs:     strings.Split(s.Programs, SYNTAXFLOWSCAN_PROGRAM_SPLIT),
 		RuleCount:    s.RulesCount,
