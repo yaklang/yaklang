@@ -46,6 +46,9 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...Opt
 			return nil, utils.Errorf("coordinator: apply option failed: %v", err)
 		}
 	}
+	if err := config.loadToolsViaOptions(); err != nil {
+		return nil, utils.Errorf("coordinator: load tools (post-init) failed: %v", err)
+	}
 	config.startEventLoop(ctx)
 
 	if config.aiToolManager == nil {

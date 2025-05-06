@@ -74,7 +74,7 @@ func ExtractAction(i string, actionName string, alias ...string) (*Action, error
 				}
 			}
 			if !matched {
-				log.Errorf("action[%#v] not matched", action)
+				log.Errorf("action[%#v] not matched in %v", action, keys)
 				continue
 			}
 			ac.name = action

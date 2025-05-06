@@ -142,7 +142,7 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 			return nil, NewNonRetryableTaskStackError(err)
 		}
 	}
-	t.config.EmitInfo("start to execute tool:%v ", targetTool.Name)
+	t.config.EmitInfo("start to execute tool:%v", targetTool.Name)
 	toolResult, err := targetTool.InvokeWithParams(callToolParams, t.config.toolCallOpts(stdoutBuf, stderrBuf)...)
 	if err != nil {
 		toolResult.Error = fmt.Sprintf("error invoking tool[%v]: %v", targetTool.Name, err)
