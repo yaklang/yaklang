@@ -26,8 +26,10 @@ func (t *aiTask) execute() error {
 		if err != nil {
 			return fmt.Errorf("error reading AI response: %w", err)
 		}
-
 		response = string(responseBytes)
+		if len(response) <= 0 {
+			return utils.Errorf("AI response is empty, retry it or check your AI model")
+		}
 		return nil
 	})
 	if err != nil {
@@ -66,30 +68,32 @@ TOOLREQUIRED:
 				log.Errorf("error generating aiTask prompt: %v", err)
 				break TOOLREQUIRED
 			}
-
-			req := NewAIRequest(moreToolPrompt)
-			responseReader, err := t.callAI(req)
+			err = t.config.callAiTransaction(moreToolPrompt, t.callAI, func(responseReader *AIResponse) error {
+				responseBytes, err := io.ReadAll(responseReader.GetOutputStreamReader("execute", false, t.config))
+				if err != nil {
+					return fmt.Errorf("error reading AI response: %w", err)
+				}
+				response = string(responseBytes)
+				if len(response) <= 0 {
+					return utils.Errorf("AI response is empty, retry it or check your AI model")
+				}
+				return nil
+			})
 			if err != nil {
-				return fmt.Errorf("error calling AI: %w", err)
+				return fmt.Errorf("error calling AI transaction: %w", err)
 			}
-			responseBytes, err := io.ReadAll(responseReader.GetOutputStreamReader("execute", false, t.config))
-			if err != nil {
-				return fmt.Errorf("error reading AI response: %w", err)
-			}
-			response = string(responseBytes)
+			continue
 		case "finished":
 			t.config.EmitInfo("task[%v] finished", t.Name)
-			fallthrough
 		default:
-			callHistory, err := t.generateToolCallResultsPrompt()
-			if err != nil {
-				log.Errorf("error generating tool call results prompt: %v", err)
-				return err
-			}
-			response = callHistory
+			t.config.EmitError("unknown action: %v, skip tool require", action)
 			break TOOLREQUIRED
 		}
 	}
+
+	var taskSummary = ""
+	var shortSummary = ""
+	var longSummary = ""
 
 	t.config.EmitInfo("start to execute task-summary action")
 	// 处理总结回调
@@ -98,40 +102,37 @@ TOOLREQUIRED:
 		t.config.EmitError("error generating summary prompt: %v", err)
 		return fmt.Errorf("error generating summary prompt: %w", err)
 	}
-	req = NewAIRequest(summaryPromptWellFormed)
-	summaryReader, err := t.callAI(req)
-	if err != nil {
-		t.config.EmitError("error calling summary AI: %v", err)
-		return fmt.Errorf("error calling summary AI: %w", err)
-	}
 
-	summaryBytes, err := io.ReadAll(summaryReader.GetOutputStreamReader("summary", false, t.config))
-	if err != nil {
-		t.config.EmitError("error reading summary: %v", err)
-		return fmt.Errorf("error reading summary: %w", err)
-	}
+	err = t.config.callAiTransaction(summaryPromptWellFormed, t.callAI, func(summaryReader *AIResponse) error {
+		summaryBytes, err := io.ReadAll(summaryReader.GetOutputStreamReader("summary", false, t.config))
+		if err != nil {
+			t.config.EmitError("error reading summary: %v", err)
+			return fmt.Errorf("error reading summary: %w", err)
+		}
 
-	action, err := ExtractAction(string(summaryBytes), "summary")
-	if err != nil {
-		t.config.EmitError("error extracting action: %v", err)
-	}
+		action, err := ExtractAction(string(summaryBytes), "summary")
+		if err != nil {
+			t.config.EmitError("error extracting action: %v", err)
+		}
 
-	var taskSummary = ""
-	var shortSummary = ""
-	var longSummary = ""
-	if action != nil {
-		shortSummary = action.GetString("short_summary")
-	}
-	if shortSummary != "" {
-		taskSummary = shortSummary
-	}
-	if action != nil {
-		longSummary = action.GetString("long_summary")
-	}
-	if longSummary != "" && taskSummary == "" {
-		taskSummary = longSummary
-	}
+		if action != nil {
+			shortSummary = action.GetString("short_summary")
+		}
+		if shortSummary != "" {
+			taskSummary = shortSummary
+		}
+		if action != nil {
+			longSummary = action.GetString("long_summary")
+		}
+		if longSummary != "" && taskSummary == "" {
+			taskSummary = longSummary
+		}
 
+		if shortSummary == "" {
+			return utils.Errorf("error: short summary is empty, retry it until summary finished")
+		}
+		return nil
+	})
 	t.TaskSummary = taskSummary
 	t.ShortSummary = shortSummary
 	t.LongSummary = longSummary

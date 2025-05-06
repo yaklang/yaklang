@@ -122,48 +122,58 @@ func (t *aiTask) handleReviewResult(param aitool.InvokeParams) error {
 			return utils.Errorf("error generating dynamic plan prompt: %v", err)
 		}
 
-		// 调用 AI 生成新的任务计划
-		request := NewAIRequest(planPrompt)
-		response, err := t.callAI(request)
-		if err != nil {
-			t.config.EmitError("error calling AI: %v", err)
-			return utils.Errorf("error calling AI: %v", err)
-		}
-		// 读取 AI 的响应
-		responseReader := response.GetOutputStreamReader("dynamic-plan", false, t.config)
-		taskResponse, err := io.ReadAll(responseReader)
-		if err != nil {
-			t.config.EmitError("error reading AI response: %v", err)
-			return utils.Errorf("error reading AI response: %v", err)
-		}
-		nextPlanTask, err := ExtractNextPlanTaskFromRawResponse(t.config, string(taskResponse))
-		if err != nil {
-			t.config.EmitError("error extracting task from raw response: %v", err)
-			return utils.Errorf("error extracting task from raw response: %v", err)
-		}
-		// 解析 AI 的响应
-		parentTask := t.ParentTask
-		index := -1
-		for i, subtask := range parentTask.Subtasks {
-			if subtask.Name == t.Name {
-				index = i
-				break
-			}
-		}
-		if index == -1 {
-			t.config.EmitError("current task not found in parent task")
-			return utils.Error("current task not found in parent task")
-		}
-		// 保留之前的任务, 删除后续任务
-		parentTask.Subtasks = parentTask.Subtasks[:index+1]
-		parentTask.Subtasks = slices.Grow(parentTask.Subtasks, len(parentTask.Subtasks)+len(nextPlanTask))
+		err = t.config.callAiTransaction(
+			planPrompt,
+			t.callAI,
+			func(response *AIResponse) error {
+				// 读取 AI 的响应
+				responseReader := response.GetOutputStreamReader("dynamic-plan", false, t.config)
+				taskResponse, err := io.ReadAll(responseReader)
+				if err != nil {
+					t.config.EmitError("error reading AI response: %v", err)
+					return utils.Errorf("error reading AI response: %v", err)
+				}
+				nextPlanTask, err := ExtractNextPlanTaskFromRawResponse(t.config, string(taskResponse))
+				if err != nil {
+					t.config.EmitError("error extracting task from raw response: %v", err)
+					return utils.Errorf("error extracting task from raw response: %v", err)
+				}
 
-		// 添加新的任务
-		for _, subTask := range nextPlanTask {
-			subTask.config = t.config
-			subTask.ParentTask = parentTask
-			parentTask.Subtasks = append(parentTask.Subtasks, subTask)
-			subTask.config.EmitInfo("new dynamic plan: %s", subTask.Name)
+				if len(nextPlanTask) <= 0 {
+					t.config.EmitError("any task not found in next plan")
+					return utils.Errorf("any task not found in next plan task, re-do-plan")
+				}
+
+				// 解析 AI 的响应
+				parentTask := t.ParentTask
+				index := -1
+				for i, subtask := range parentTask.Subtasks {
+					if subtask.Name == t.Name {
+						index = i
+						break
+					}
+				}
+				if index == -1 {
+					t.config.EmitError("current task not found in parent task")
+					return utils.Error("current task not found in parent task")
+				}
+				// 保留之前的任务, 删除后续任务
+				parentTask.Subtasks = parentTask.Subtasks[:index+1]
+				parentTask.Subtasks = slices.Grow(parentTask.Subtasks, len(parentTask.Subtasks)+len(nextPlanTask))
+
+				// 添加新的任务
+				for _, subTask := range nextPlanTask {
+					subTask.config = t.config
+					subTask.ParentTask = parentTask
+					parentTask.Subtasks = append(parentTask.Subtasks, subTask)
+					subTask.config.EmitInfo("new dynamic plan: %s", subTask.Name)
+				}
+				return nil
+			},
+		)
+		if err != nil {
+			t.config.EmitError("error calling AI transaction: %v", err)
+			return utils.Errorf("error calling AI transaction: %v", err)
 		}
 	default:
 		t.config.EmitError("unknown review suggestion: %s", suggestion)

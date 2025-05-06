@@ -9,11 +9,12 @@
     },
     "short_summary": {
       "type": "string",
-      "maxLength": 200,
-      "description": "200字内的简短版本的总结"
+      "maxLength": 300,
+      "description": "summary description for task, which will show always in next steps"
     },
     "long_summary": {
       "type": "string",
-      "description": "比short_summary更长的总结的版本。"
+      "description": "more details about task, which will show in some special cases, can review it anytime"
     }
+  }
 }
