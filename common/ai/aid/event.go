@@ -22,6 +22,8 @@ const (
 	EVENT_TYPE_PONG        EventType = "pong"        // ping response ping-pong is a check for alive item
 	EVENT_TYPE_PRESSURE    EventType = "pressure"    // pressure for ai context percent
 
+	EVENT_TYPE_REQUIRE_USER_INTERACTIVE = "require_user_interactive"
+
 	EVENT_TYPE_PLAN                    EventType = "plan"
 	EVENT_TYPE_SELECT                  EventType = "select"
 	EVENT_TYPE_PERMISSION_REQUIRE      EventType = "permission_require"
