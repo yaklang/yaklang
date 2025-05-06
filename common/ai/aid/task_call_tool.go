@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"io"
 )
 
 func (t *aiTask) getToolRequired(response string) []*aitool.Tool {
@@ -119,25 +120,29 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 	stdoutBuf := bytes.NewBuffer(nil)
 	stderrBuf := bytes.NewBuffer(nil)
 	t.config.EmitToolCallStd(targetTool.Name, stdoutBuf, stderrBuf)
-	t.config.EmitInfo("start to require review for tool use")
-	ep := t.config.epm.createEndpoint()
-	ep.SetDefaultSuggestionContinue()
-	t.config.EmitRequireReviewForToolUse(targetTool, callToolParams, ep.id)
-	t.config.doWaitAgree(nil, ep)
-	params := ep.GetParams()
-	t.config.ReleaseInteractiveEvent(ep.id, params)
-	if params == nil {
-		t.config.EmitError("user review params is nil, plan failed")
-		return nil, NewNonRetryableTaskStackError(utils.Errorf("user review params is nil"))
-	}
-	targetTool, callToolParams, err = t.handleToolUseReview(targetTool, callToolParams, params)
-	if err != nil {
-		t.config.EmitError("error handling tool use review: %v", err)
-		return nil, NewNonRetryableTaskStackError(err)
-	}
 
+	// DANGER: 这个值永远不应该暴露给用户，只有内部工具才有资格设置它
+	if targetTool.NoNeedUserReview {
+		t.config.EmitInfo("tool[%v] (internal helper tool) no need user review, skip review", targetTool.Name)
+	} else {
+		t.config.EmitInfo("start to require review for tool use")
+		ep := t.config.epm.createEndpoint()
+		ep.SetDefaultSuggestionContinue()
+		t.config.EmitRequireReviewForToolUse(targetTool, callToolParams, ep.id)
+		t.config.doWaitAgree(nil, ep)
+		params := ep.GetParams()
+		t.config.ReleaseInteractiveEvent(ep.id, params)
+		if params == nil {
+			t.config.EmitError("user review params is nil, plan failed")
+			return nil, NewNonRetryableTaskStackError(utils.Errorf("user review params is nil"))
+		}
+		targetTool, callToolParams, err = t.handleToolUseReview(targetTool, callToolParams, params)
+		if err != nil {
+			t.config.EmitError("error handling tool use review: %v", err)
+			return nil, NewNonRetryableTaskStackError(err)
+		}
+	}
 	t.config.EmitInfo("start to execute tool:%v ", targetTool.Name)
-
 	toolResult, err := targetTool.InvokeWithParams(callToolParams, t.config.toolCallOpts(stdoutBuf, stderrBuf)...)
 	if err != nil {
 		toolResult.Error = fmt.Sprintf("error invoking tool[%v]: %v", targetTool.Name, err)

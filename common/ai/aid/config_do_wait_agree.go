@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func (c *Config) doWaitAgree(ctx any, ep *Endpoint) {
+func (c *Config) doWaitAgreeWithPolicy(ctx any, doWaitAgreeWithPolicy AgreePolicyType, ep *Endpoint) {
 	if ep.checkpoint != nil && ep.checkpoint.Finished { // check ep finished, is recover task or not
 		return
 	}
@@ -19,7 +19,7 @@ func (c *Config) doWaitAgree(ctx any, ep *Endpoint) {
 		}
 	}()
 
-	switch c.agreePolicy {
+	switch doWaitAgreeWithPolicy {
 	case AgreePolicyYOLO:
 		c.EmitInfo("yolo policy auto agree all")
 	case AgreePolicyAuto:
@@ -125,4 +125,8 @@ func (c *Config) doWaitAgree(ctx any, ep *Endpoint) {
 		cancel()
 		wg.Wait()
 	}
+}
+
+func (c *Config) doWaitAgree(ctx any, ep *Endpoint) {
+	c.doWaitAgreeWithPolicy(ctx, c.agreePolicy, ep)
 }

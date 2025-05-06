@@ -73,6 +73,14 @@ type Tool struct {
 	Description string `json:"description,omitempty"`
 	// A JSON Schema object defining the expected parameters for the tool.
 	InputSchema ToolInputSchema `json:"inputSchema"`
+
+	// DANGER: 这个值永远不应该暴露给用户，只有内部工具才有资格设置它
+	// No Need Timeline Recorded
+	NoNeedTimelineRecorded bool `json:"-"`
+
+	// DANGER: 这个值永远不应该暴露给用户，只有内部工具才有资格设置它
+	// No Need User-Review
+	NoNeedUserReview bool `json:"-"`
 }
 
 type ToolInputSchema struct {
