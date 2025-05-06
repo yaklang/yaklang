@@ -2,6 +2,7 @@ package ai
 
 import (
 	"errors"
+	"github.com/yaklang/yaklang/common/ai/aibalance"
 	"io"
 	"time"
 
@@ -67,6 +68,9 @@ func init() {
 	})
 	aispec.Register("yakit-plugin-search", func() aispec.AIClient {
 		return dashscopebase.CreateDashScopeGateway("e8be1ba351dc44568728bcb46e36aac2")
+	})
+	aispec.Register("aibalance", func() aispec.AIClient {
+		return &aibalance.GatewayClient{}
 	})
 }
 
