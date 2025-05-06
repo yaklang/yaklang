@@ -66,10 +66,7 @@ func (a *AIResponse) Debug(i ...bool) {
 	a.enableDebug = i[0]
 }
 
-func (c *Config) teeAIResponse(src *AIResponse, onFirstByte func(), onClose func()) (*AIResponse, *AIResponse) {
-	// 获取原始响应的流读取器
-	reasonReader, outputReader := src.GetUnboundStreamReaderEx(onFirstByte, onClose, nil)
-
+func (c *Config) teeAIResponse(src *AIResponse, onFirstByte func(), onClose func(teeResponse *AIResponse)) *AIResponse {
 	// 创建第一个响应对象
 	first := c.NewAIResponse()
 	first.consumptionCallback = nil
@@ -81,6 +78,13 @@ func (c *Config) teeAIResponse(src *AIResponse, onFirstByte func(), onClose func
 	second.consumptionCallback = nil
 	secondReasonReader, secondReasonWriter := utils.NewBufPipe(nil)
 	secondOutputReader, secondOutputWriter := utils.NewBufPipe(nil)
+
+	// 获取原始响应的流读取器
+	reasonReader, outputReader := src.GetUnboundStreamReaderEx(onFirstByte, func() {
+		if onClose != nil {
+			onClose(second)
+		}
+	}, nil)
 
 	// 使用等待组确保所有数据复制完成
 	wg := new(sync.WaitGroup)
@@ -130,8 +134,7 @@ func (c *Config) teeAIResponse(src *AIResponse, onFirstByte func(), onClose func
 		second.Close()
 	}()
 	wg2.Wait()
-
-	return first, second
+	return first
 }
 
 func (a *AIResponse) GetUnboundStreamReaderEx(onFirstByte func(), onClose func(), onError func()) (io.Reader, io.Reader) {

@@ -6,7 +6,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
@@ -79,11 +78,7 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 			}
 
 			var haveFirstByte = utils.NewBool(false)
-			var tee *AIResponse
-			teeMux := new(sync.Mutex)
-			onClose := func() {
-				teeMux.Lock()
-				defer teeMux.Unlock()
+			onClose := func(tee *AIResponse) {
 				reasonReader, outputReader := tee.GetUnboundStreamReaderEx(nil, nil, nil)
 				reason, _ := io.ReadAll(reasonReader)
 				output, _ := io.ReadAll(outputReader)
@@ -106,15 +101,13 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 
 			}
 
-			teeMux.Lock()
-			defer teeMux.Unlock()
-			rsp, tee = c.teeAIResponse(rsp, func() {
+			rsp = c.teeAIResponse(rsp, func() {
 				c.EmitInfo("ai response first byte cost: %v", time.Since(start))
 				haveFirstByte.SetTo(true)
-			}, func() {
+			}, func(tee *AIResponse) {
 				c.EmitInfo("ai response close cost: %v", time.Since(start))
 				if onClose != nil {
-					onClose()
+					onClose(tee)
 				}
 			})
 			if c.debugPrompt {
