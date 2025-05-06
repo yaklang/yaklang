@@ -20,22 +20,22 @@ $sink #{
     include: `<self> & $params`
 }-> as $all
 
-$sink #{
-    include: `<self> & $params`,
-    exclude: `<self>?{opcode: call}`
-}-> as $high
 
-check $high
+$all<dataflow(exclude=<<<CODE
+<self>?{opcode: call} as $__next__
+CODE)> as $high
+
 alert $high for{
     title_zh: '检测到命令执行，且没有经过任何函数',
     type: 'vuln',
     level: 'high'
 }
 
-$sink#{
-    include: `<self> & $params`,
-    exclude: `<self>?{opcode: call && <self><getCallee> & $filter}`
-}-> as $mid
+$all<dataflow(exclude=<<<CODE
+<self>?{opcode: call && <self><getCallee> & $filter} as $__next__
+CODE)> as $highAndMid
+
+$highAndMid - $high as $mid
 
 alert $mid for{
     title_zh: '检测到命令执行，经过函数过滤，但未检出过滤函数',
