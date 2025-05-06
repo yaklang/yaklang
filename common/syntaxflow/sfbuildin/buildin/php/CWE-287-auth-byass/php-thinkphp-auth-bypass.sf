@@ -1,0 +1,45 @@
+desc(
+    title: "ThinkPHP Auth Bypass Detection",
+    title_zh: "ThinkPHP认证绕过检测",
+    risk: "audit",
+    level: "low",
+    desc: <<<CODE
+    该文件定义了用于检测PHP ThinkPHP框架中认证绕过漏洞的规则和模式。
+CODE
+)
+
+.uri?{<getObject><fullTypeName>?{have: "request","controller","Controller"}} as $source
+
+preg_match(,* #{
+    include: <<<CODE
+    * & $source
+CODE
+}-> as $vul,)
+
+alert $vul for{
+   title: "PHP ThinkPHP Auth Bypass",
+   title_zh: "PHP ThinkPHP认证绕过",
+   level: "high",
+}
+desc(
+    lang: "php",
+    'file:///unsafe.php': <<<CODE
+<?php
+namespace app\index\controller;
+use think\Controller;
+class User extends Controller
+{
+    public function auth()
+    {
+        $uri = $request->uri();
+        if preg_match('/^\/index\/user\/auth$/', $uri, $matches);{
+            $user = $request->param('user');
+            $password = $request->param('password');
+            //认证
+        }else{
+            //非认证
+        }
+    }
+}
+CODE
+)

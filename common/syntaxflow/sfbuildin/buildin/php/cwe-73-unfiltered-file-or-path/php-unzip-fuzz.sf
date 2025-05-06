@@ -1,0 +1,61 @@
+desc(
+    title: 'zip operator fuzz testing',
+    title_zh: "文件压缩/文件解压(fuzz-code)",
+    level: low,
+    risk: "zip operator",
+    desc: <<<CODE
+    针对PHP中的zip操作进行模糊测试，可以帮助识别在处理恶意或异常文件时可能存在的问题。
+CODE,
+)
+<include('php-param')> as $params
+<include('php-tp-all-extern-variable-param-source')> as $params
+<include('php-filter-function')> as $filter
+
+/(?i)unzip/(* as $path,* as $path,)
+
+
+$path #{
+    include: <<<CODE
+* & $params
+CODE
+}-> as $all
+
+$all<dataflow(exclude=<<<CODE
+*?{opcode: call} as $__next__
+CODE)> as $high
+
+alert $high for {
+    title: 'Unsafe File Unzip Without Validation',
+    title_zh: '未经验证的高危文件解压',
+    level: 'high'
+}
+
+$all<dataflow(exclude=<<<CODE
+*?{opcode: call && <self><getCallee> & $filter} as $__next__
+CODE)> as $highAndMid
+
+$highAndMid - $high as $mid
+
+alert $mid for {
+    title: 'Insecure File Type Detection',
+    title_zh: '文件解压经过了某些函数，但未检查到过滤',
+    level: 'mid'
+}
+
+$all - $high - $mid as $low
+
+alert $low for{
+    title: 'Potential File Storage Path Misconfiguration',
+    title_zh: '潜在的文件存储路径配置问题',
+    level: 'low'
+}
+
+desc(
+    lang: php,
+    alert_min: 2,
+    'file:///unsafe.php': <<<CODE
+<?php
+    unzip($_GET["path"]);
+    UnZip($_POST["path"]);
+CODE
+)

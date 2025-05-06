@@ -25,11 +25,11 @@ alert $curlFunction for{
 
 $ssrfFunction #{
     include: `<self> & $params`
-    }-> as $all
-$ssrfFunction #{
-    include: `<self> & $params`,
-    exclude: `*?{opcode: call}`,
-}-> as $high
+}-> as $all
+
+$all<dataflow(exclude=<<<CODE
+*?{opcode: call} as $__next__
+CODE)> as $high
 
 alert $high for {
        title: 'Unvalidated SSRF Parameter Injection',
@@ -37,10 +37,11 @@ alert $high for {
        level: 'high',
 }
 
-$ssrfFunction #{
-    include: `<self> & $params`,
-    exclude: `*?{opcode: call && <self><getCallee> & $filter}`,
-}-> as $mid
+$all<dataflow(exclude=<<<CODE
+*?{opcode: call && <self><getCallee> & $filter} as $__next__
+CODE)> as $highAndMid
+
+$highAndMid - $high as $mid
 
 alert $mid for {
     title: 'Insufficient SSRF Parameter Filtering',

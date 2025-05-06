@@ -36,10 +36,11 @@ alert $high for{
     level: 'high'
 }
 
-$param #{
-    include: `<self>& $params`,
-    exclude: `*?{opcode: call && <self><getCallee> & $filter}`
-}-> as $middle
+$all<dataflow(exclude=<<<CODE
+*?{opcode: call && <self><getCallee> & $filter} as $__next__
+CODE)> as $highAndMid
+
+$highAndMid - $high as $middle
 
 alert $middle for{
     title_zh: '存在文件操作，文件操作经过函数，但未检出过滤',

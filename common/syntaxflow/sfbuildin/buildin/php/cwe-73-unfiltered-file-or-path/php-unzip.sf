@@ -36,14 +36,10 @@ alert $high for {
     level: 'high'
 }
 
-$function(* #{
-    include: <<<CODE
-* & $params
-CODE,
-    exclude: <<<CODE
-<self>?{opcode: call && <self><getCallee> & $filter}
-CODE
-}-> as $mid)
+$all<dataflow(exclude=<<<CODE
+*?{opcode: call && <self><getCallee> & $filter} as $__next__
+CODE)> as $highAndMid
+$highAndMid - $high as $mid
 
 alert $mid for {
     title: 'Insecure File Type Detection',

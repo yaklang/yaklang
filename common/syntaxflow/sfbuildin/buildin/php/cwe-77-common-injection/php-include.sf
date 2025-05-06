@@ -18,10 +18,9 @@ $param #{
     include: `<self> & $params`
 }-> as $all;
 
-$param #{
-    include: `<self> & $params`,
-    exclude: `*?{opcode: call}`
-}-> as $high;
+$all<dataflow(exclude=<<<CODE
+*?{opcode: call} as $__next__
+CODE)> as $high
 
 alert $high for {
     title: 'The file contained was detected without any filtering',
@@ -30,10 +29,11 @@ alert $high for {
     level: 'high',
 }
 
-$param #{
-    include: `<self> & $params`,
-    exclude: `*?{opcode: call && <self><getCallee> & $filter}`
-}-> as $middle;
+$all<dataflow(exclude=<<<CODE
+*?{opcode: call && <self><getCallee> & $filter}
+CODE)> as $highAndMid
+
+$highAndMid - $high as $middle
 
 alert $middle for {
     title: 'File contains detected, but filter function not detected',
@@ -51,8 +51,7 @@ alert $low for {
     level: 'low'
 };
 
-//应该修改 opcode不为const的
-include() as $info
+include(*?{!opcode: const}) as $info
 alert $info for{
     title: "File contains were detected, but no vulnerabilities were detected. Please pay attention",
     title_zh: "检测到文件包含，但是未检测到漏洞，请注意关注",

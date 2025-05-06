@@ -20,10 +20,10 @@ header(* as $sink)
 $sink #{
     include: `<self> & $params`
     }-> as $all
-$sink #{
-    include: `<self> & $params`,
-    exclude: `<self>?{opcode: call}`
-}-> as $high
+
+$all<dataflow(exclude=<<<CODE
+<self>?{opcode: call} as $__next__
+CODE)> as $high
 
 alert $high for{
    title: "Unvalidated Redirect Vulnerability",
@@ -32,11 +32,11 @@ alert $high for{
    level: "high"
 }
 
-$sink #{
-    include: `<self> & $params`,
-    exclude: `<self>?{opcode: call && <self><getCallee> & $filter}`
-}-> as $mid
+$all<dataflow(exclude=<<<CODE
+<self>?{opcode: call && <self><getCallee> & $filter} as $__next__
+CODE)> as $highAndMid
 
+$highAndMid - $high as $mid
 alert $mid for{
    title: "Insufficient Redirect Validation",
    title_zh: "检测到存在过滤函数($filter)但未完全验证目标域名的合法性",
