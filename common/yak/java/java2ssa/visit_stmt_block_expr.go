@@ -1072,7 +1072,7 @@ func (y *builder) OnlyVisitVariableDeclaratorName(raw javaparser.IVariableDeclar
 	name = id.Identifier().GetText()
 	return name
 }
-func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorContext, typ ssa.Type) (name string, value ssa.Value) {
+func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorContext, typeType ssa.Type) (name string, value ssa.Value) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -1105,8 +1105,8 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 				value.SetType(newTyp)
 			} else {
 				// 没有类型转换，就使用在右值的typeName加上typeType的typeName
-				if typ != nil {
-					newTyp := y.MergeFullTypeNameForType(typ.GetFullTypeNames(), rightValTyp)
+				if typeType != nil {
+					newTyp := y.MergeFullTypeNameForType(rightValTypName, typeType)
 					value.SetType(newTyp)
 				}
 			}
@@ -1115,8 +1115,8 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 		return name, value
 	} else {
 		value := y.EmitValueOnlyDeclare(name)
-		if typ != nil {
-			newTyp := y.MergeFullTypeNameForType(typ.GetFullTypeNames(), value.GetType())
+		if typeType != nil {
+			newTyp := y.MergeFullTypeNameForType(typeType.GetFullTypeNames(), value.GetType())
 			value.SetType(newTyp)
 		}
 		y.AssignVariable(variable, value)
