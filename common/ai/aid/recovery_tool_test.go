@@ -44,7 +44,7 @@ func testRecoveryToolUseReview(t *testing.T, uid string) {
 LOOP:
 	for {
 		select {
-		case <-time.After(30 * time.Second):
+		case <-time.After(5 * time.Second):
 			break LOOP
 		case result := <-outputChan:
 			count++

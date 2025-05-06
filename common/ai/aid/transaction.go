@@ -12,7 +12,11 @@ func (c *Config) callAiTransaction(
 ) error {
 	var seq int64
 	var saver CheckpointCommitHandler
-	for {
+	trcRetry := c.aiTransactionAutoRetry
+	if trcRetry <= 0 {
+		trcRetry = 3
+	}
+	for i := int64(0); i < trcRetry; i++ {
 		rsp, err := callAi(
 			NewAIRequest(
 				prompt,
@@ -54,7 +58,7 @@ func (c *Config) callAiTransaction(
 				c.EmitInfo("checkpoint cached in database: %v:%v", utils.ShrinkString(cp.CoordinatorUuid, 12), cp.Seq)
 			}
 		}
-		break
+		return nil
 	}
-	return nil
+	return utils.Errorf("max retry count[%v] reached in transaction", trcRetry)
 }

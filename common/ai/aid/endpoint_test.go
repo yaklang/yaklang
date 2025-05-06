@@ -1,6 +1,7 @@
 package aid
 
 import (
+	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func TestEndpoint_Basic(t *testing.T) {
@@ -228,21 +230,52 @@ func TestEndpoint_Basic(t *testing.T) {
 		manager := newEndpointManager()
 		endpoint := manager.createEndpoint()
 
-		// 测试较长的超时时间
-		success := endpoint.WaitTimeout(5 * time.Second)
-		assert.False(t, success, "长时间等待应该超时返回")
+		// 测试较短的超时时间
+		success := endpoint.WaitTimeout(500 * time.Millisecond)
+		assert.False(t, success, "等待应该超时返回")
 
-		// 测试在长时间等待期间的中断
+		// 测试在等待期间的并发中断
+		const goroutines = 10
 		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			time.Sleep(2 * time.Second)
-			manager.feed(endpoint.id, aitool.InvokeParams{"test": "value"})
-		}()
+		wg.Add(goroutines)
 
-		success = endpoint.WaitTimeout(10 * time.Second)
+		// 创建通道同步所有 goroutine 的开始
+		start := make(chan struct{})
+
+		for i := 0; i < goroutines; i++ {
+			go func(id int) {
+				defer wg.Done()
+
+				// 等待开始信号
+				<-start
+
+				// 随机延迟 50-250ms
+				delay := 50 + rand.Intn(200)
+				time.Sleep(time.Duration(delay) * time.Millisecond)
+
+				manager.feed(endpoint.id, aitool.InvokeParams{
+					"test": fmt.Sprintf("value-%d", id),
+					"id":   id,
+					"time": time.Now().UnixNano(),
+				})
+
+				log.Infof("goroutine %d fed endpoint after %dms", id, delay)
+			}(i)
+		}
+
+		// 发送开始信号
+		close(start)
+
+		success = endpoint.WaitTimeout(1 * time.Second)
 		assert.True(t, success, "应该在超时前收到信号")
+
+		// 验证最后的参数
+		finalParams := endpoint.GetParams()
+		assert.NotNil(t, finalParams)
+		assert.NotNil(t, finalParams["test"])
+		assert.NotNil(t, finalParams["id"])
+		assert.NotNil(t, finalParams["time"])
+
 		wg.Wait()
 	})
 
