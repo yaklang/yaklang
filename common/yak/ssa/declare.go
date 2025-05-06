@@ -104,7 +104,7 @@ func readDeclareWithImport[T any](
 ) (T, bool) {
 	var empty T
 	//search lib
-	if pkg != "" {
+	if pkg != "" && pkg != prog.PkgName {
 		if t, ok := getImportWithPkg(pkg, name); ok {
 			return t, true
 		}
