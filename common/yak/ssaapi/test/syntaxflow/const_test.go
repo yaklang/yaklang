@@ -1,6 +1,7 @@
 package syntaxflow
 
 import (
+	"github.com/stretchr/testify/require"
 	"strconv"
 	"testing"
 
@@ -133,14 +134,27 @@ func TestConstCompare(t *testing.T) {
 	})
 
 	t.Run("test compare const equal:native call getActualParamLen", func(t *testing.T) {
-		code := ` a("param1","param2")`
-		ssatest.CheckSyntaxFlow(t, code, `a?{*()<getActualParamLen>?{ == 2}} as $result`, map[string][]string{
-			"result": {"Undefined-a"},
-		})
+		code := ` a("param1","param2")
+a("param1","param2","param3")
+`
+		ssatest.CheckSyntaxFlow(t, code, `a(*<len>?{==2}) as $result`, map[string][]string{
+			"result": {`Undefined-a("param1","param2")`},
+		}, ssaapi.WithLanguage(ssaapi.Yak))
+	})
+	t.Run("test get a have 2 param", func(t *testing.T) {
+		code := `a("param1","param2")
+a("param1","param2","param3")
+`
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			result, err := prog.SyntaxFlowWithError(`a()`)
+			require.NoError(t, err)
+			result.Show()
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.Yak))
 	})
 
 	t.Run("test compare const equal:string", func(t *testing.T) {
-		code := ` a("param1","param2")`
+		code := `a("param1","param2")`
 		ssatest.CheckSyntaxFlow(t, code, `a?{*(*?{=="param1"})} as $result`, map[string][]string{
 			"result": {"Undefined-a"},
 		})
