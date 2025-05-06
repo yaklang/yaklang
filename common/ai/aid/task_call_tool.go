@@ -92,30 +92,33 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 		t.config.EmitError("error generate require tool response prompt: %v", err)
 		return nil, NewNonRetryableTaskStackError(err)
 	}
-	// 调用AI获取工具调用参数
-	req := NewAIRequest(paramsPrompt)
-	callParams, err := t.callAI(req)
-	if err != nil || callParams == nil {
-		err = utils.Errorf("error calling AI: %v", err)
+
+	var callToolParams aitool.InvokeParams = make(aitool.InvokeParams)
+	// transaction for generate params
+	err = t.config.callAiTransaction(paramsPrompt, t.callAI, func(rsp *AIResponse) error {
+		callParamsString, _ := io.ReadAll(rsp.GetOutputStreamReader("call-tools", true, t.config))
+
+		// extract action
+		callToolAction, err := ExtractAction(string(callParamsString), "call-tool")
+		if err != nil {
+			t.config.EmitError("error extract tool params: %v", err)
+			err = utils.Errorf("error extracting action params: %v", err)
+			return err
+		}
+		callToolParams = callToolAction.GetInvokeParams("params")
+		return nil
+	})
+	if err != nil {
+		err = utils.Errorf("calling AI transaction failed: %v", err)
+		t.config.EmitError("critical err: %v", err)
 		return nil, NewNonRetryableTaskStackError(err)
 	}
-	callParamsString, _ := io.ReadAll(callParams.GetOutputStreamReader("call-tools", true, t.config))
-
-	// extract action
-	callToolAction, err := ExtractAction(string(callParamsString), "call-tool")
-	if err != nil {
-		t.config.EmitError("error extract tool params: %v", err)
-		err = utils.Errorf("error extracting action params: %v", err)
-		return nil, err
-	}
-	callToolParams := callToolAction.GetInvokeParams("params")
 
 	t.config.EmitInfo("start to invoke tool:%v 's callback function", targetTool.Name)
 	// 调用工具
 	stdoutBuf := bytes.NewBuffer(nil)
 	stderrBuf := bytes.NewBuffer(nil)
 	t.config.EmitToolCallStd(targetTool.Name, stdoutBuf, stderrBuf)
-
 	t.config.EmitInfo("start to require review for tool use")
 	ep := t.config.epm.createEndpoint()
 	ep.SetDefaultSuggestionContinue()
@@ -152,23 +155,26 @@ func (t *aiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitoo
 		err = utils.Errorf("error generating tool call response prompt: %v", err)
 		return "", NewNonRetryableTaskStackError(err)
 	}
-	// 调用AI进行下一步决策
-	req := NewAIRequest(decisionPrompt)
-	continueResult, err := t.callAI(req)
-	if err != nil {
-		err = utils.Errorf("error calling AI: %v", err)
-		return "", NewNonRetryableTaskStackError(err)
-	}
-	nextResponse, err := io.ReadAll(continueResult.GetOutputStreamReader("decision", true, t.config))
-	if err != nil {
-		err = utils.Errorf("error reading AI response: %v", err)
-		return "", NewNonRetryableTaskStackError(err)
-	}
 
-	// 获取下一步决策
-	action := t.getToolResultAction(string(nextResponse))
-	if action != "" {
-		t.config.EmitInfo("tool[%v] and next do the action: %v", targetTool.Name, action)
+	var actionFinal string
+	err = t.config.callAiTransaction(decisionPrompt, t.callAI, func(continueResult *AIResponse) error {
+		nextResponse, err := io.ReadAll(continueResult.GetOutputStreamReader("decision", true, t.config))
+		if err != nil {
+			err = utils.Errorf("error reading AI response: %v", err)
+			return utils.Errorf("error reading AI response: %v", err)
+		}
+
+		// 获取下一步决策
+		actionFinal = t.getToolResultAction(string(nextResponse))
+		if actionFinal == "" {
+			t.config.EmitWarning("no action found, using default action, finished")
+			actionFinal = "finished"
+		}
+		t.config.EmitInfo("tool[%v] and next do the action: %v", targetTool.Name, actionFinal)
+		return nil
+	})
+	if err != nil {
+		return "", NewNonRetryableTaskStackError(err)
 	}
-	return action, nil
+	return actionFinal, nil
 }
