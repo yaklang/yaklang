@@ -454,3 +454,25 @@ func (s *ToolInputSchema) ToMap() map[string]any {
 	}
 	return result
 }
+
+func (s *ToolInputSchema) FromMap(m map[string]any) error {
+	// type
+	typeStr, ok := m["type"].(string)
+	if !ok {
+		return fmt.Errorf("type is not a string")
+	}
+	s.Type = typeStr
+
+	// properties
+	properties, ok := m["properties"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("properties is not a map[string]any")
+	}
+	s.Properties = properties
+
+	// required
+	if v, ok := m["required"]; ok {
+		s.Required = utils.InterfaceToStringSlice(v)
+	}
+	return nil
+}
