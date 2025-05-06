@@ -19,19 +19,23 @@ unserialize(* as $sink)
 $sink #{
     include: `<self> & $params`
     }-> as $all
-$sink #{
-    include: `<self> & $params`,
-    exclude: `<self>?{opcode: call}`
-}-> as $high
+
+
+$all<dataflow(exclude=<<<CODE
+<self>?{opcode: call} as $__next__
+CODE)> as $high
+
 alert $high for {
     title: 'php deserialization is not filtered',
     type: 'vuln',
     level: 'high'
 }
-$sink #{
-    include: `<self> & $params`,
-    exclude: `<self>?{opcode: call && <self><getCallee> & $filter}`
-}-> as $mid
+
+$all<dataflow(exclude=<<<CODE
+<self>?{opcode: call && <self><getCallee> & $filter} as $__next__
+CODE)> as $highAndMid
+
+$highAndMid - $high as $mid
 
 alert $mid for {
     title: 'php deserialization has function calls, but no filter function is checked out',

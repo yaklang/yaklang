@@ -15,6 +15,7 @@ CODE
 _FILES.* as $params
 _FILES as $params
 
+
 move_uploaded_file(* as $source)
 ./move|putFile/?{<getFunc><getCurrentBlueprint><fullTypeName>?{any: "Controller","controller"}} as $source
 
@@ -26,20 +27,21 @@ CODE
 }-> as $all
 
 
-$source #{
-    include: `* & $params`,
-    exclude: `*?{opcode: call}`
-}-> as $high
+$all<dataflow(exclude=<<<CODE
+*?{opcode: call} as $__next__
+CODE)> as $high
 
 alert $high for {
     title: "Unsafe File Upload Without Validation",
     title_zh: "未经验证的高危文件上传",
     level: "high"
 }
-$source #{
-    include: `* & $params`,
-    exclude: `*?{opcode:call && <self><getCallee> & $filter}`
-}-> as $mid
+
+$all<dataflow(exclude=<<<CODE
+*?{opcode:call && <self><getCallee> & $filter}
+CODE)> as $highAndMid
+
+$highAndMid - $high as $mid
 alert $mid for {
     title: "Insecure File Type Detection",
     title_zh: "不安全的文件类型检测",
