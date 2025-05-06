@@ -22,8 +22,11 @@ func QuerySyntaxFlowScanTask(db *gorm.DB, params *ypb.QuerySyntaxFlowScanTaskReq
 }
 
 func FilterSyntaxFlowScanTask(DB *gorm.DB, filter *ypb.SyntaxFlowScanTaskFilter) *gorm.DB {
+	if filter == nil {
+		return DB
+	}
 	db := DB
-	db = bizhelper.ExactQueryStringArrayOr(db, "programs", filter.GetPrograms())
+	db = bizhelper.FuzzQueryStringArrayOrLike(db, "programs", filter.GetPrograms())
 	db = bizhelper.ExactQueryStringArrayOr(db, "task_id", filter.GetTaskIds())
 	db = bizhelper.ExactQueryStringArrayOr(db, "status", filter.GetStatus())
 	db = bizhelper.ExactQueryStringArrayOr(db, "kind", filter.GetKind())
@@ -37,6 +40,9 @@ func FilterSyntaxFlowScanTask(DB *gorm.DB, filter *ypb.SyntaxFlowScanTaskFilter)
 		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
 			"programs",
 		}, []string{filter.GetKeyword()}, false)
+	}
+	if filter.GetHaveRisk() {
+		db = db.Where("EXISTS (SELECT 1 FROM ssa_risks WHERE ssa_risks.runtime_id = syntax_flow_scan_tasks.task_id)")
 	}
 	return db
 }

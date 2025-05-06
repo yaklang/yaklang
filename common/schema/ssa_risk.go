@@ -49,7 +49,7 @@ type SSARisk struct {
 	FunctionName string `json:"function_name" gorm:"index"`
 	Line         int64  `json:"line" gorm:"index"`
 	// 设置运行时 ID 关联 SyntaxflowTask
-	RuntimeId string `json:"runtime_id"`
+	RuntimeId string `json:"runtime_id" gorm:"index"`
 	// for query result
 	ResultID uint64 `json:"result_id"` // result
 	Variable string `json:"variable"`  // result/variable
