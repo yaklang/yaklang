@@ -327,6 +327,27 @@ func CheckSyntaxFlowWithFS(t *testing.T, fs fi.FileSystem, sf string, wants map[
 	}, opt...)
 }
 
+func CheckSyntaxFlowSource(t *testing.T, code string, sf string, want map[string][]string, opt ...ssaapi.Option) {
+	Check(t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		results, err := prog.SyntaxFlowWithError(sf, ssaapi.QueryWithEnableDebug())
+		results.Show(sfvm.WithShowCode())
+		require.Nil(t, err)
+		require.NotNil(t, results)
+		for name, want := range want {
+			log.Infof("name:%v want: %v", name, want)
+			gotVs := results.GetValues(name)
+			require.GreaterOrEqual(t, len(gotVs), len(want), "key[%s] not found", name)
+			got := lo.Map(gotVs, func(v *ssaapi.Value, _ int) string { return v.GetRange().GetText() })
+			log.Infof("got: %v", got)
+			require.Equal(t, len(gotVs), len(want))
+			require.Equal(t, want, got, "key[%s] not match", name)
+		}
+		return nil
+	}, opt...)
+
+}
+
 func CheckSyntaxFlow(t *testing.T, code string, sf string, wants map[string][]string, opt ...ssaapi.Option) {
 	checkSyntaxFlowEx(t, code, sf, false, wants, opt, nil)
 }

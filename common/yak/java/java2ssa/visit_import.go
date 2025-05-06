@@ -17,7 +17,6 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 	defer func() {
 		deltaPackageCostFrom(start)
 	}()
-
 	for _, pkgImport := range i.AllImportDeclaration() {
 		pkgNames, static, all := y.VisitImportDeclaration(pkgImport)
 		if len(pkgNames) > 0 {
@@ -70,7 +69,7 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 		if all {
 			_ = y.GetProgram().ImportAll(prog)
 		} else {
-			_ = y.GetProgram().ImportTypeFromLib(prog, className)
+			_ = y.GetProgram().ImportTypeFromLib(prog, className, pkgImport)
 		}
 	}
 }
