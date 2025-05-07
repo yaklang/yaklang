@@ -46,7 +46,9 @@ cli.Int("limit",cli.help("字数限制"))
 				aid.WithYOLO(true),
 				aid.WithExtendedActionCallback("summarize", func(config *aid.Config, action *aid.Action) {
 					summary = action.GetString("summary")
-				})),
+				}),
+				aid.WithResultHandler(func(config *aid.Config) {}),
+			),
 		)
 		ord, err := bp.CreateCoordinator(ctx, items, option...)
 		if err != nil {
