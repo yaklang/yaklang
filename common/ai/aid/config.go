@@ -277,7 +277,7 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		outputConsumption:           new(int64),
 		aiCallTokenLimit:            int64(1000 * 30),
 		aiAutoRetry:                 5,
-		aiTransactionAutoRetry:      3,
+		aiTransactionAutoRetry:      5,
 		allowRequireForUserInteract: true,
 	}
 	c.epm.config = c // review
@@ -622,6 +622,15 @@ func WithDisableToolUse(i ...bool) Option {
 func WithAIAutoRetry(t int) Option {
 	return func(config *Config) error {
 		config.aiAutoRetry = int64(t)
+		return nil
+	}
+}
+
+func WithAITransactionRetry(t int) Option {
+	return func(config *Config) error {
+		if t > 0 {
+			config.aiTransactionAutoRetry = int64(t)
+		}
 		return nil
 	}
 }

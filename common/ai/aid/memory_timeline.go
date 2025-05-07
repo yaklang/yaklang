@@ -337,7 +337,7 @@ func (m *memoryTimeline) DumpBefore(id int64) string {
 
 		buf.WriteString(fmt.Sprintf("├─[%s]\n", timeStr))
 		raw := item.String()
-		for _, line := range utils.ParseStringToLines(raw) {
+		for _, line := range utils.ParseStringToRawLines(raw) {
 			buf.WriteString(fmt.Sprintf("│    %s\n", line))
 		}
 		count++
