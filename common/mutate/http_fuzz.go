@@ -1066,7 +1066,7 @@ func (f *FuzzHTTPRequestBatch) Exec(opts ...HttpPoolConfigOption) (chan *HttpRes
 	var originOpts []HttpPoolConfigOption
 	originOpts = append(originOpts,
 		WithPoolOpt_Https(req.isHttps), WithPoolOpt_Source(req.source),
-		WithPoolOpt_RuntimeId(req.runtimeId), WithPoolOpt_Proxy(req.proxy),
+		WithPoolOpt_RuntimeId(req.runtimeId), WithPoolOpt_Proxy(strings.Split(req.proxy, ",")...),
 		WithPoolOpt_FromPlugin(req.fromPlugin),
 	)
 	return _httpPool(f, append(originOpts, opts...)...)

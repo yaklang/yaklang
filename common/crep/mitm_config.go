@@ -241,18 +241,21 @@ func MITM_MergeOptions(b ...MITMConfig) MITMConfig {
 	}
 }
 
-func MITM_SetDownstreamProxy(s string) MITMConfig {
+func MITM_SetDownstreamProxy(proxys ...string) MITMConfig {
 	return func(server *MITMServer) error {
-		if s == "" {
-			server.proxyUrl = nil
+		server.proxyUrls = make([]*url.URL, 0)
+		if len(proxys) == 0 || proxys == nil {
+			server.proxyUrls = nil
 			return nil
 		}
-		urlRaw, err := url.Parse(s)
-		if err != nil {
-			return utils.Errorf("parse proxy url: %v failed: %s", s, err)
+		for _, proxy := range proxys {
+			urlRaw, err := url.Parse(proxy)
+			if err != nil {
+				return utils.Errorf("parse proxy url: %v failed: %s", proxy, err)
+			}
+			log.Infof("set downstream proxy as %v", urlRaw.String())
+			server.proxyUrls = append(server.proxyUrls, urlRaw)
 		}
-		log.Infof("set downstream proxy as %v", urlRaw.String())
-		server.proxyUrl = urlRaw
 		return nil
 	}
 }

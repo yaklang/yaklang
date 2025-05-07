@@ -1515,7 +1515,7 @@ func pochttp(packet []byte, config *PocConfig) (*lowhttp.LowhttpResponse, error)
 		c, err := lowhttp.NewWebsocketClient(
 			packet,
 			lowhttp.WithWebsocketTLS(https),
-			lowhttp.WithWebsocketProxy(strings.Join(config.Proxy, ",")),
+			lowhttp.WithWebsocketProxy(config.Proxy...),
 			lowhttp.WithWebsocketWithContext(wsCtx),
 			lowhttp.WithWebsocketFromServerHandler(func(bytes []byte) {
 				if config.WebsocketHandler != nil {
