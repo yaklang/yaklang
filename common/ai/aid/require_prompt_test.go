@@ -85,6 +85,14 @@ LOOP:
 				continue
 			}
 
+			if checkToken1 {
+				fmt.Println("result:" + result.String())
+				if result.Type == EVENT_TYPE_REQUIRE_USER_INTERACTIVE {
+					interactiveCheck = true
+					break LOOP
+				}
+			}
+
 			if result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				inputChan <- &InputEvent{
 					Id: result.GetInteractiveId(),
@@ -99,18 +107,11 @@ LOOP:
 				t.Fatal("no tool review required")
 			}
 
-			if strings.Contains(result.String(), token1) {
+			if !checkToken1 && strings.Contains(result.String(), token1) {
 				checkToken1 = true
 				continue
 			}
 
-			if checkToken1 {
-				fmt.Println("result:" + result.String())
-				if result.Type == EVENT_TYPE_REQUIRE_USER_INTERACTIVE {
-					interactiveCheck = true
-					break LOOP
-				}
-			}
 		}
 	}
 
