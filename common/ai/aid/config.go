@@ -214,7 +214,7 @@ func initDefaultTools(c *Config) error { // set config default tools
 		return utils.Wrapf(err, "get basic build-in tools fail")
 	}
 
-	memoryTools, err := c.memory.CreateMemoryTools()
+	memoryTools, err := c.memory.CreateBasicMemoryTools()
 	if err != nil {
 		return utils.Errorf("create memory tools: %v", err)
 	}
