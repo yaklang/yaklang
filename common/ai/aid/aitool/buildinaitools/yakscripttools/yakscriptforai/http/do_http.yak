@@ -6,6 +6,8 @@ yakit.AutoInitYakit()
 url = cli.String("url", cli.setHelp("需要指定的URL"), cli.setRequired(true))
 // url = "http://127.0.0.1:8787/xss/js/in-str?name=admin"
 method = cli.String("method", cli.setHelp("需要指定的HTTP方法"), cli.setDefault("GET"), cli.setRequired(false))
+requestRequest := cli.Bool("show-request", cli.setHelp("是否需要展示Request，如果不是必须的话，可以忽略，结果将进一步精简"))
+keyword := cli.String("keyword", cli.setHelp("是否需要重点展示某一些数据？设置了的话，如果有结果，会展示 keyword 附近200字节的内容"))
 cli.check()
 
 opts = []
@@ -17,17 +19,18 @@ if err != nil {
 }
 
 // req 是不重要的，直接保存到文件中
-tmpFileReq, err := file.TempFileName()
-if err == nil {
-    file.Save(tmpFileReq, len(rsp.RawRequest))
-    yakit.Info("req packet saved to %v", tmpFileReq)
+if requestRequest {
+    tmpFileReq, err := file.TempFileName()
+    if err == nil {
+        file.Save(tmpFileReq, len(rsp.RawRequest))
+        yakit.Info("req packet saved to %v", tmpFileReq)
+    }
 }
 
 dump(rsp.RawPacket)
-
 // 对 AI 来说，页面在 4k 内，可以认为是文本，否则保存到文件让他通过工具直接看
 if len(rsp.RawPacket) < 4096 {
-    yakit.Info("rsp packet[size:%v]: %#v", len(rsp.RawPacket), string(rsp.RawPacket))
+    yakit.Info("rsp packet[size:%v]: %v", len(rsp.RawPacket), string(rsp.RawPacket))
 } else {
     tmp, err := file.TempFileName()
     if err != nil {
@@ -36,4 +39,12 @@ if len(rsp.RawPacket) < 4096 {
     }
     file.Save(tmp, rsp.RawPacket)
     yakit.Info("rsp packet[size:%v], save to %v, use grep or some text tool to handle it", len(rsp.RawPacket), tmp )
+}
+
+rawPacket := string(rsp.RawPacket)
+if keyword != "" && rawPacket.Contains(keyword) {
+    idx := rawPacket.IndexOf(keyword)
+    if idx >= 0 {
+        yakit.Info("your fucos-keyword: %#v is existed in rawPacket", keyword)
+    }
 }
