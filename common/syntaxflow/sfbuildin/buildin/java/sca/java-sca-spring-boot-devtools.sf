@@ -1,7 +1,7 @@
 desc(
     title_zh:"检测Java Spring Boot Devtools使用",
     title:"Check Java Spring Boot Devtools Usage",
-    rule_id:11105035
+    rule_id:21105035
     risk:"sca",
     reference:<<<URL
     https://docs.spring.io/spring-boot/reference/using/devtools.html

@@ -15,8 +15,7 @@ TEXT
 
 .getInstance?{<typeName>?{have:'java.security'}}(*<slice(index=1)>as $algorithm);
 $algorithm#{
-    include:`*?{opcode:const}`,
-    until:`*?{have:/MD2|MD4|MD5|SHA(-)?1|SHA(-)?0|RIPEMD160|^SHA$/}`,
+    until:`*?{ opcode:const && have:/MD2|MD4|MD5|SHA(-)?1|SHA(-)?0|RIPEMD160|^SHA$/}`,
     exclude:`*?{any:'SHA256','SHA384','SHA512' }`
 }-> as $sink;
 

@@ -18,9 +18,7 @@ TEXT
 SecretKeySpec?{<typeName>?{have:'javax.crypto.spec.SecretKeySpec'}}(,* as $algorithm);
 
 $algorithm#{
-    include:`*?{opcode:const}`,
-    until:`* ?{have:/3?DES((-|_)?ede)?|TRIPLE(-|_)?DES|RC[24]/}`
-    until:`* ?{have:/^(?=RSA)[A-Z0-9_]*(/(ECB|CBC)$|/(ECB|CBC)/(?!OAEPWithSHA.*Padding)|$)/`,
+    until:`* ?{opcode:const && have:/(DES|3?DES((-|_)?ede)?|3DES|TRIPLE(-|_)?DES|ARCFOUR|RC[24])/}`,
 }-> as $sink;
 
 alert $sink for {
