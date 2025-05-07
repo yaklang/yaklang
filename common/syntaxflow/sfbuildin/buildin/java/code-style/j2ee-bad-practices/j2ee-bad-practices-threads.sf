@@ -1,0 +1,88 @@
+desc(
+    title_zh:"检测Java J2EE 使用threads",
+    title:"Check Java J2EE Usage of Threads",
+    rule_id:21500002
+    risk:"代码风格",
+    level: info,
+    reference:<<<URL
+    https://docs.oracle.com/javase/8/docs/api/java/lang/Thread.html
+    https://docs.oracle.com/javase/8/docs/api/java/lang/ThreadLocal.html
+URL
+    description:<<<TEXT
+    J2EE 标准明确限制在Web应用中直接管理线程，因其在容器环境中存在高风险。线程控制不仅实现复杂，更可能引发不可控的容器冲突。即便未触发容器异常，仍可能引发隐蔽性极强的并发问题，包括死锁、竞态条件及资源争用等同步缺陷。
+TEXT
+)
+
+Thread()?{<typeName>?{have:'java.lang.Thread'}} as $thread;
+alert $thread for {
+    message: '检测到Java项目中使用了Thread类',
+    level: info,
+}
+
+ThreadLocal()?{<typeName>?{have:'java.lang.ThreadLocal'}} as $threadLocal;
+alert $threadLocal for {
+    message: '检测到Java项目中使用了ThreadLocal类',
+}
+
+$thread./^(destroy|interrupt|join|resume|start|stop|suspend)$/ as $weak;
+// Thread.sleep
+Thread./^(sleep|yield)$/?{<typeName>?{have:'java.lang'}} as $weak;
+alert $weak for {
+    message:'检测到Java项目中使用了Thread类的destroy、interrupt、join、resume、sleep、start、stop、suspend或yield方法',
+}
+
+run?{opcode:function}<getInterfaceBlueprint>?{have:'Runnable'} as $run
+alert $run for {
+    message:'检测到Java项目中使用了Runnable接口并且实现了run方法',
+}
+
+desc{
+    lang:java,
+    alert_num:5 ,
+    "file://ThreadDemo.java":<<<CODE
+    public class MyServlet extends HttpServlet {
+        protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+            // 1. 启动新线程
+            Thread t = new Thread(() -> {
+                // 线程任务
+            });
+            t.start(); // 违规：直接启动线程
+
+            // 2. 让当前线程休眠
+            try {
+                Thread.sleep(1000); // 违规：直接让线程休眠
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            // 3. 终止线程
+            t.stop(); // 违规：直接停止线程（已废弃且危险）
+
+            // 4. 让线程让步
+            Thread.yield(); // 违规：直接让线程让步
+        }
+    }
+CODE
+}
+
+desc{
+    lang:java,
+    alert_num:3 ,
+    "file://ThreadDemo.java":<<<CODE
+  public class MyRunnable implements Runnable {
+      @Override
+      public void run() {
+          // 这里执行一些任务
+          System.out.println("Running in a new thread!");
+      }
+  }
+
+  // 在 J2EE 组件（如 Servlet、EJB）中这样用：
+  public class MyServlet extends HttpServlet {
+      protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+          Thread t = new Thread(new MyRunnable());
+          t.start(); // 直接启动线程，J2EE 不推荐
+      }
+  }
+CODE
+}
