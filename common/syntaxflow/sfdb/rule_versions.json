@@ -288,6 +288,24 @@
     "version": "20250428.0001"
   },
   {
+    "rule_id": "21500003",
+    "rule_name": "检测Java J2EE 使用getConnection",
+    "hash": "54369d8c36a7e4b5b4a8c1c3cb40df2e81ac0980e4196a00c5aff8c4db7fa123",
+    "version": "20250507.0001"
+  },
+  {
+    "rule_id": "21500002",
+    "rule_name": "检测Java J2EE 使用threads",
+    "hash": "67b3f42fa281d34dccf8249215f6f57d933fceafa43cd94fbeeab3f628b7b75d",
+    "version": "20250507.0001"
+  },
+  {
+    "rule_id": "21500001",
+    "rule_name": "检测Java 使用System.out输出流",
+    "hash": "78517769f978895140dd713d6f7a2a74d5671d22ca013b29808df3a1fdc753e8",
+    "version": "20250507.0001"
+  },
+  {
     "rule_id": "21105001",
     "rule_name": "检查Java Spring Boot Actuator配置",
     "hash": "f31c059c27a558648c9f6bdcff11e4c974fa8cac95e8b1b3f20498c72ee2e846",
@@ -456,10 +474,16 @@
     "version": "20250428.0001"
   },
   {
-    "rule_id": "10327005",
+    "rule_id": "20327002",
+    "rule_name": "检测Java javax.crypto.Cipher不安全或有风险的加密算法的使用",
+    "hash": "ea0b7e65ac15ac4beba0592b966f985921b3d713f7719ec48144f7c8c5635fb2",
+    "version": "20250507.0001"
+  },
+  {
+    "rule_id": "20327005",
     "rule_name": "检测Java javax.crypto.KEM.Encapsulator使用不安全的加密算法",
-    "hash": "255f6e7d22005e3367eb75e65ea91f8eddd306c304fe9fdef542fe2f8324e3a1",
-    "version": "20250429.0001"
+    "hash": "efbff2935f099d9bcd385c86b29bc1c5613914c9199fb96d9d5e16582c01ae8a",
+    "version": "20250507.0001"
   },
   {
     "rule_id": "20327001",
@@ -468,22 +492,22 @@
     "version": "20250429.0001"
   },
   {
-    "rule_id": "ab875f85-f43f-4e3e-ae21-944c887776fa",
+    "rule_id": "33a8c1db-92b1-4eb3-aed5-85f96dd4f9a9",
     "rule_name": "java-risky-system-hash-config.sf",
-    "hash": "60903096c3ba75f6b507a8a175c66afbc5f4c70d142886d0d888a3c5b5b400d8",
-    "version": "20250429.0001"
+    "hash": "6ac6de72987782db0720e2014b96e7ffec6fdb95496c925b27f784077655f783",
+    "version": "20250507.0001"
   },
   {
-    "rule_id": "10327006",
+    "rule_id": "20327006",
     "rule_name": "检测Java java.security.AlgorithmParameters使用不安全的加密算法",
-    "hash": "ca623c3ff2c5c1dc66066dcbb1a4429990c4b9a02615f81a07ba758d365c9ed6",
-    "version": "20250429.0001"
+    "hash": "d48e80078d0c8ff20d4171f3f691c4cb7db9942027980b4038e2cefebbea4ad2",
+    "version": "20250507.0001"
   },
   {
     "rule_id": "20327003",
     "rule_name": "检测Java java.security使用不安全的哈希算法",
-    "hash": "9c3c919187b1332007b331ef07475d3ba374fe392b8acd50cb2067f12ebe77f8",
-    "version": "20250429.0001"
+    "hash": "ed30914f8630facc7d9edf2d2125de36b616fb6ff52bd79c7b8ca77fbc7195b3",
+    "version": "20250507.0001"
   },
   {
     "rule_id": "20352002",
@@ -500,20 +524,26 @@
   {
     "rule_id": "20400001",
     "rule_name": "检测Java cn.hutool.captcha验证码拒绝服务漏洞",
-    "hash": "faf0a92939d0e3131e297f9ceefed0de05681ac3e5188a7bbe34273793301a48",
-    "version": "20250428.0001"
+    "hash": "089801ab7cf025b6115ed645e1cc3bc8796db81dacb394bdfac17cd805fdc56b",
+    "version": "20250507.0001"
   },
   {
     "rule_id": "20400002",
     "rule_name": "检测Java IO库拒绝服务漏洞",
-    "hash": "f95ac756712c0bcc78dfd1100e1f20655240f29bd7f3c9c4da6a95c211d42804",
-    "version": "20250428.0001"
+    "hash": "0adc92bd6e8eefe360bb941161c4b23b488657651d079ce35a76b8f4754e5b23",
+    "version": "20250507.0001"
+  },
+  {
+    "rule_id": "20400004",
+    "rule_name": "检测Java StringBuilder 拒绝服务漏洞",
+    "hash": "d8b996b732394eaffe183d4d3efe976714df49c714ea01d3514b29e340de2013",
+    "version": "20250507.0001"
   },
   {
     "rule_id": "20400003",
     "rule_name": "检测Java waitFor方法可能导致的DDOS漏洞",
-    "hash": "c423f248542549ebf2fb899833ef24d93dc7b1190a0ecfc80e097c8148425e43",
-    "version": "20250428.0001"
+    "hash": "4373216955f1ae77eb1843609cab5d1290a6ac5fbf0973b2faa76362fb445613",
+    "version": "20250507.0001"
   },
   {
     "rule_id": "20434001",
@@ -994,6 +1024,12 @@
     "rule_name": "SCA: Checking Java shiro-core Existed Vulnerabilities",
     "hash": "9c30960564e6a9efc041fb473c2fdd6db8286c4473f42409b63ea886af19e830",
     "version": "20250428.0001"
+  },
+  {
+    "rule_id": "21105035",
+    "rule_name": "检测Java Spring Boot Devtools使用",
+    "hash": "97a7d15db8cca936bdce3acd4aa8780239379b3a673b3dc97988e286de19fbff",
+    "version": "20250507.0001"
   },
   {
     "rule_id": "21105032",
