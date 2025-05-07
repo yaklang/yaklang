@@ -1,17 +1,18 @@
 package utils
 
 import (
+	"bufio"
 	"bytes"
-	"fmt"
-	"regexp"
+	"context"
+	"io"
+	"strings"
 	"unicode/utf8"
 )
 
 type TextSplitter struct {
-	ChunkSize         int
-	ChunkOverlap      int
-	Separators        []string
-	ProtectedPatterns []*regexp.Regexp
+	ChunkSize    int
+	ChunkOverlap int
+	Separators   []string
 }
 
 func NewTextSplitter() *TextSplitter {
@@ -19,58 +20,81 @@ func NewTextSplitter() *TextSplitter {
 		ChunkSize:    700,
 		ChunkOverlap: 50,
 		Separators:   []string{"\n\n", "。", "！", "？", ";", "..."},
-		ProtectedPatterns: []*regexp.Regexp{
-			regexp.MustCompile(`(\+-+){2,}`),         // ASCII 表格
-			regexp.MustCompile(`<table.*?<\/table>`), // HTML 表格
-		},
 	}
 }
 
 // 核心分割方法
-func (ts *TextSplitter) Split(text string) []string {
-	// 保护特殊内容
-	protected, placeholders := ts.protectContent(text)
-
-	// 递归分割
-	chunks := ts.recursiveSplit(protected)
-
-	// 恢复被保护内容
-	return ts.restoreContent(chunks, placeholders)
+func (ts *TextSplitter) Split(ctx context.Context, text string) []string {
+	var chunks []string
+	reader := strings.NewReader(text)
+	splitChan := ts.recursiveSplit(ctx, reader)
+	for chunk := range splitChan {
+		chunks = append(chunks, chunk)
+	}
+	return chunks
 }
 
-// 保护特殊内容不被分割
-func (ts *TextSplitter) protectContent(text string) (string, map[string]string) {
-	placeholders := make(map[string]string)
-	i := 0
+func (ts *TextSplitter) SplitReader(ctx context.Context, reader io.Reader) chan string {
+	return ts.recursiveSplit(ctx, reader)
+}
 
-	for _, pattern := range ts.ProtectedPatterns {
-		text = pattern.ReplaceAllStringFunc(text, func(m string) string {
-			key := fmt.Sprintf("__PROTECTED_%d__", i)
-			placeholders[key] = m
-			i++
-			return key
-		})
+func RuneRead(r io.Reader, maxChars int) string {
+	decoder := bufio.NewReader(r)
+	var result []rune
+	count := 0
+	for count < maxChars {
+		r, _, err := decoder.ReadRune()
+		if err != nil {
+			break
+		}
+		result = append(result, r)
+		count++
 	}
-	return text, placeholders
+	return string(result)
 }
 
 // 递归分割核心逻辑
-func (ts *TextSplitter) recursiveSplit(text string) []string {
-	if utf8.RuneCountInString(text) <= ts.ChunkSize {
-		return []string{text}
-	}
+func (ts *TextSplitter) recursiveSplit(ctx context.Context, data io.Reader) chan string {
+	result := make(chan string)
+	go func() {
+		defer close(result)
+		var splitHandle func(reader io.Reader)
+		splitHandle = func(textReader io.Reader) {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 
-	// 寻找最佳分割点
-	splitPos := ts.findBestSplitPosition(text)
-	if splitPos == -1 {
-		splitPos = ts.ChunkSize
-	}
+			text := RuneRead(textReader, ts.ChunkSize)
+			if utf8.RuneCountInString(text) < ts.ChunkSize {
+				result <- text
+				return
+			}
 
-	// 带重叠的分割
-	chunk := text[:splitPos]
-	remaining := text[splitPos:]
+			// 寻找最佳分割点
+			splitPos := ts.findBestSplitPosition(text)
+			if splitPos == -1 {
+				splitPos = ts.ChunkSize
+			}
 
-	return append([]string{chunk}, ts.recursiveSplit(remaining)...)
+			// 分割文本
+			currentChunk := text[:splitPos]
+			result <- currentChunk
+			remainingText := text[splitPos:]
+			if len(remainingText) > 0 {
+				newReader := io.MultiReader(
+					bytes.NewReader([]byte(remainingText)),
+					textReader,
+				)
+				splitHandle(newReader)
+			} else {
+				splitHandle(textReader)
+			}
+		}
+		splitHandle(data)
+	}()
+	return result
 }
 
 // 查找最佳分割位置
@@ -94,16 +118,6 @@ func (ts *TextSplitter) findBestSplitPosition(text string) int {
 	}
 
 	return -1
-}
-
-// 恢复被保护内容
-func (ts *TextSplitter) restoreContent(chunks []string, ph map[string]string) []string {
-	for i := range chunks {
-		for key, value := range ph {
-			chunks[i] = regexp.MustCompile(regexp.QuoteMeta(key)).ReplaceAllString(chunks[i], value)
-		}
-	}
-	return chunks
 }
 
 // 辅助函数

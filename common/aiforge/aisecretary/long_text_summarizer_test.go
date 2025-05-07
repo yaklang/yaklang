@@ -20,7 +20,8 @@ func TestLongText_summarizer(t *testing.T) {
 		"long-text-summarizer",
 		context.Background(),
 		[]*ypb.ExecParamItem{
-			{Key: "text", Value: monOncleJules},
+			//{Key: "text", Value: monOncleJules},
+			{Key: "file", Value: "C:\\Users\\Rookie\\home\\code\\yaklang\\common\\aiforge\\aisecretary\\long_text_summarizer_data\\我的叔叔于勒.txt"},
 		},
 		aid.WithDebugPrompt(true),
 		aid.WithAICallback(aiforge.GetHoldAICallback()),
