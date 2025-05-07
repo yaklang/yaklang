@@ -3,9 +3,10 @@ package ssa
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"reflect"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
@@ -284,8 +285,9 @@ func (b *FunctionBuilder) ClassConstructor(bluePrint *Blueprint, args []Value) V
 	method := bluePrint.GetMagicMethod(Constructor)
 	constructor := b.NewCall(method, args)
 	b.EmitCall(constructor)
-	desctructor := bluePrint.GetMagicMethod(Destructor)
-	call := b.NewCall(desctructor, []Value{constructor})
+	constructor.SetType(bluePrint)
+	destructor := bluePrint.GetMagicMethod(Destructor)
+	call := b.NewCall(destructor, []Value{constructor})
 	b.EmitDefer(call)
 	return constructor
 }

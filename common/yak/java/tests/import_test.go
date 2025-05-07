@@ -324,4 +324,52 @@ b<typeName> as $jsonType2
 			"jsonType2": {"com.alibaba.fastjson.JSON"},
 		}, ssaapi.WithLanguage(consts.JAVA))
 	})
+	t.Run("check import type with creator", func(t *testing.T) {
+		code := `
+		package org.example;
+		import okhttp3.OkHttpClient;
+		import okhttp3.Request;
+		import okhttp3.Response;
+		
+		
+		public class OkHttpClientExample {
+			public static void main(String[] args) {
+				Request request = new Request.Builder()
+						.url("https://api.github.com/users/github")
+						.build();
+			}
+		}
+		
+		`
+
+		ssatest.CheckSyntaxFlowContain(t, code, `
+		Request.Builder<getObject><typeName>  as $request_type_name 
+		Request.Builder<typeName>  as $builder_type_name
+		Request.Builder()<typeName> as $builder_constructor_type_name
+		`, map[string][]string{
+			"request_type_name":             {"okhttp3.Request"},
+			"builder_type_name":             {"okhttp3.Request.Builder"},
+			"builder_constructor_type_name": {"okhttp3.Request.Builder"},
+		}, ssaapi.WithLanguage(consts.JAVA))
+	})
+
+	t.Run("check import type with full name", func(t *testing.T) {
+		code := `
+		public class OkHttpClientExample {
+			@RequestMapping(value = "/three")
+			public String Three(@RequestParam(value = "url") String imageUrl) {
+				com.squareup.okhttp.Request request = new com.squareup.okhttp.Request.Builder().get().url(url).build();
+			}
+		}
+				`
+		ssatest.CheckSyntaxFlowContain(t, code, `
+				Request.Builder as $builder 
+				Request.Builder<getObject><typeName>  as $request_type_name
+				Builder<typeName>  as $builder_type_name 
+				`, map[string][]string{
+			"builder":           {"Undefined-Builder(valid)"},
+			"request_type_name": {"com.squareup.okhttp.Request"},
+			"builder_type_name": {"com.squareup.okhttp.Request.Builder"},
+		}, ssaapi.WithLanguage(consts.JAVA))
+	})
 }
