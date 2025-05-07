@@ -1,0 +1,68 @@
+desc(
+    title_zh:"检测Java StringBuilder 拒绝服务漏洞",
+    title:"Check Java StringBuilder Denial of Service Vulnerability",
+    rule_id:20400004
+    risk:DDOS,
+    reference:<<<URL
+    https://docs.oracle.com/javase/8/docs/api/java/lang/StringBuilder.html
+URL
+    description:<<<TEXT
+    
+TEXT
+)
+
+<include("java-servlet-param")> as $source;
+<include("java-spring-mvc-param")> as $source;
+
+StringBuilder()?{<typeName>?{have:'java.lang.StringBuilder'}} as $sb;
+$sb.append(*<slice(index=1)> as $sink);
+$sb.insert(*<slice(index=1)> as $sink);
+
+$sink#{
+    until: `* & $source`,
+    exclude : `*.length()`,
+}-> as $result;
+
+alert $result for {
+    message: "发现Java的java.lang.StringBuilder可能存在ddos漏洞",
+    level: mid,
+}
+
+desc{
+    lang:java,
+    alert_num: 1,
+    "file://demo.java":<<<CODE
+    import javax.servlet.http.*;
+    import java.io.*;
+
+    public class ExampleServlet extends HttpServlet {
+        protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+            String userInput = req.getParameter("data"); // 用户输入
+            StringBuilder sb = new StringBuilder();
+            sb.append(userInput); // 未做任何长度或内容校验，存在 DoS 风险
+            resp.getWriter().write(sb.toString());
+        }
+    }
+CODE
+}
+
+desc{
+    lang:java
+    "safefile://safe.java":<<<CODE
+    import javax.servlet.http.*;
+    import java.io.*;
+
+    public class ExampleServlet extends HttpServlet {
+        protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+            String userInput = req.getParameter("data");
+            if (userInput != null && userInput.length() < 1024) { // 做了长度校验
+                StringBuilder sb = new StringBuilder();
+                sb.append(userInput); // 安全
+                resp.getWriter().write(sb.toString());
+            } else {
+                resp.sendError(400, "Input too large");
+            }
+        }
+    }
+CODE
+}
