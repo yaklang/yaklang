@@ -185,3 +185,10 @@ func (r *SyntaxFlowResult) GetProgramName() string {
 func (r *SyntaxFlowResult) GetRule() *schema.SyntaxFlowRule {
 	return r.rule
 }
+
+func (r *SyntaxFlowResult) IsDatabase() bool {
+	if r != nil && r.dbResult != nil {
+		return true
+	}
+	return false
+}

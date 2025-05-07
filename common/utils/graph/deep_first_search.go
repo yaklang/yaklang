@@ -1,8 +1,12 @@
 package graph
 
 import (
+	"context"
+	"slices"
+
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/utils/orderedmap"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 // deep first search for nodeID and its children to [][]id, id is string,
@@ -20,54 +24,79 @@ type DeepFirstPath[K comparable, T, U any] struct {
 	res [][]U
 
 	// deep first search stack
-	current *orderedmap.OrderedMapEx[K, U] // map[string]nil
+	current *omap.OrderedMap[K, U]
+	ctx     context.Context
 }
 
-func (d *DeepFirstPath[K, T, U]) deepFirst(node T) {
+func (d *DeepFirstPath[K, T, U]) deepFirst(node T, target ...T) {
+	select {
+	case <-d.ctx.Done():
+		log.Infof("deep first search timeout")
+		return
+	default:
+	}
+
 	key := d.getKey(node)
 	value := d.getValue(node)
-	if _, ok := d.current.Get(key); ok {
-		// log.Infof("node %d already in current skip", nodeID)
+
+	if d.current.Have(key) {
+		// log.Infof("node %v already in current skip", node)
 		return
 	}
-	d.current.Set(key, value)
-	// log.Infof("node %d add to current path: %v", nodeID, d.current.Keys())
+	d.current.PushKey(key, value)
+	defer d.current.Pop()
+
+	// log.Infof("node %v add to current path: %v", node, d.current.Keys())
 	nextNodes := d.next(node)
 	nextNodes = lo.UniqBy(nextNodes, d.getKey)
 	// log.Infof("next node :%v", nextNodes)
-	if len(nextNodes) == 0 {
-		d.res = append(d.res, d.current.Values())
-		return
+	if len(target) > 0 {
+		// if have target, check if current node is target
+		if slices.ContainsFunc(target, func(t T) bool {
+			return d.getKey(t) == key
+		}) {
+			// if current node is target, add to result
+			d.res = append(d.res, d.current.Values())
+			return
+		}
+	} else {
+		// if not target, check if current node is end
+		if len(nextNodes) == 0 {
+			// the end
+			d.res = append(d.res, d.current.Values())
+			return
+		}
 	}
+
 	if len(nextNodes) == 1 {
 		prev := nextNodes[0]
-		d.deepFirst(prev)
+		d.deepFirst(prev, target...)
 		return
 	}
 
-	// origin
-	current := d.current
 	for _, next := range nextNodes {
-		// new line
-		d.current = current.Copy()
-		d.deepFirst(next)
+		d.deepFirst(next, target...)
 	}
 }
 
 func GraphPathEx[K comparable, T, U any](
+	ctx context.Context,
 	node T,
 	next func(T) []T,
 	getKey func(T) K,
 	getValue func(T) U,
+	target ...T,
 ) [][]U {
+
 	df := &DeepFirstPath[K, T, U]{
+		ctx:      ctx,
 		res:      make([][]U, 0),
-		current:  orderedmap.NewOrderMapEx[K, U](nil, nil, false),
+		current:  omap.NewEmptyOrderedMap[K, U](),
 		next:     next,
 		getKey:   getKey,
 		getValue: getValue,
 	}
-	df.deepFirst(node)
+	df.deepFirst(node, target...)
 	return df.res
 }
 
@@ -77,7 +106,7 @@ func GraphPathWithKey[K comparable, T any](
 	next func(T) []T,
 	getKey func(T) K,
 ) [][]T {
-	return GraphPathEx(node, next, getKey, func(t T) T { return t })
+	return GraphPathEx(context.Background(), node, next, getKey, func(t T) T { return t })
 }
 
 // index by T type, and return path with U type
@@ -86,7 +115,7 @@ func GraphPathWithValue[T comparable, U any](
 	next func(T) []T,
 	getValue func(T) U,
 ) [][]U {
-	return GraphPathEx(node, next, func(t T) T { return t }, getValue)
+	return GraphPathEx(context.Background(), node, next, func(t T) T { return t }, getValue)
 }
 
 // index by T type , and return path with T type
@@ -94,8 +123,21 @@ func GraphPath[T comparable](
 	node T,
 	next func(T) []T,
 ) [][]T {
-	return GraphPathEx(node, next,
+	return GraphPathEx(context.Background(), node, next,
 		func(t T) T { return t },
 		func(t T) T { return t },
+	)
+}
+
+func GraphPathWithTarget[T comparable](
+	ctx context.Context,
+	node T,
+	target T,
+	next func(T) []T,
+) [][]T {
+	return GraphPathEx[T, T, T](ctx, node, next,
+		func(t T) T { return t },
+		func(t T) T { return t },
+		target,
 	)
 }

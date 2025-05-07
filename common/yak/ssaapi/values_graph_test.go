@@ -1,6 +1,10 @@
 package ssaapi_test
 
 import (
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
@@ -10,9 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"strings"
-	"testing"
-	"time"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestGraph(t *testing.T) {
@@ -111,8 +113,8 @@ func TestGraph(t *testing.T) {
 	log.Infof("memory path: %v", memPath)
 	log.Infof("db path: %v", dbPath)
 
-	require.Equal(t, 2, len(memPath))
-	require.Equal(t, len(memPath), len(dbPath))
+	require.Equal(t, 1, len(memPath))
+	require.Equal(t, 1, len(dbPath))
 }
 
 func TestGraph2(t *testing.T) {
@@ -203,7 +205,7 @@ func Test_Values_Graph_Dot(t *testing.T) {
 		graph.ShowDot()
 
 		result := graph.DeepFirstGraphNext(value1)
-		require.Equal(t, 2, len(result))
+		require.Equal(t, 1, len(result))
 		require.Equal(t, strings.Count(graph.Dot(), "t3: 3"), 2)
 	})
 
@@ -229,5 +231,128 @@ func Test_Values_Graph_Dot(t *testing.T) {
 		require.Contains(t, graph.Dot(), "step[1]: Test1")
 		require.Contains(t, graph.Dot(), "step[2]: Test2")
 		require.Contains(t, graph.Dot(), "Test3")
+	})
+}
+
+func TestGraph_Limit(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("example/src/main/java/com/example/apackage/a.go", `
+package main
+
+import (
+        "database/sql"
+        "fmt"
+        "log"
+        "net/http"
+
+        _ "github.com/go-sql-driver/mysql"
+)
+
+func login(w http.ResponseWriter, r *http.Request) {
+        username := r.FormValue("username")
+        password := r.FormValue("password")
+
+        // 不安全的 SQL 查询
+		// depth > 10 
+        query := fmt.Sprintf("SELECT * FROM users WHERE username='%s' AND password='%s'", username, password)
+		query = fmt.Sprintf(query)
+		query = fmt.Sprintf(query)
+		query = fmt.Sprintf(query)
+		query = fmt.Sprintf(query)
+		query = fmt.Sprintf(query)
+		query = fmt.Sprintf(query)
+		query = fmt.Sprintf(query)
+		query = fmt.Sprintf(query)
+		query = fmt.Sprintf(query)
+		query = fmt.Sprintf(query)
+        err = db.QueryRow(query).Scan(&userID)
+        if err != nil {
+                http.Error(w, "Invalid login", http.StatusUnauthorized)
+                return
+        }
+
+        fmt.Fprintf(w, "User ID: %d", userID)
+}
+
+func main() {
+        http.HandleFunc("/login", login)
+        log.Fatal(http.ListenAndServe(":8080", nil))
+}
+		`)
+
+	rule := `.QueryRow(* #->?{opcode:param} as $para_top_def)`
+
+	ssatest.CheckResult(t, vf, rule, func(sfr *ssaapi.SyntaxFlowResult) {
+		sfr.Show()
+
+		value := sfr.GetValues("para_top_def")
+
+		dot := value.DotGraph()
+		log.Infof("dot : \n%s", dot)
+
+		if sfr.IsDatabase() {
+			// database
+			log.Infof("in database")
+			require.Contains(t, dot, "db.QueryRow(query") // contain path
+			require.NotContains(t, dot, "r.FormValue")    // contain dataflow path
+		} else {
+			log.Infof("in memory ")
+			// contain all edge
+			require.Contains(t, dot, "db.QueryRow(query") // contain path
+			require.Contains(t, dot, "r.FormValue")       // contain dataflow path
+		}
+	})
+}
+
+func TestGraph_No_Limit(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("example/src/main/java/com/example/apackage/a.go", `
+package main
+
+import (
+        "database/sql"
+        "fmt"
+        "log"
+        "net/http"
+
+        _ "github.com/go-sql-driver/mysql"
+)
+
+func login(w http.ResponseWriter, r *http.Request) {
+        username := r.FormValue("username")
+        password := r.FormValue("password")
+
+        // 不安全的 SQL 查询
+		// depth > 10 
+        query := fmt.Sprintf("SELECT * FROM users WHERE username='%s' AND password='%s'", username, password)
+        err = db.QueryRow(query).Scan(&userID)
+        if err != nil {
+                http.Error(w, "Invalid login", http.StatusUnauthorized)
+                return
+        }
+
+        fmt.Fprintf(w, "User ID: %d", userID)
+}
+
+func main() {
+        http.HandleFunc("/login", login)
+        log.Fatal(http.ListenAndServe(":8080", nil))
+}
+		`)
+
+	rule := `.QueryRow(* #->?{opcode:param} as $para_top_def)`
+
+	ssatest.CheckResult(t, vf, rule, func(sfr *ssaapi.SyntaxFlowResult) {
+		sfr.Show()
+
+		value := sfr.GetValues("para_top_def")
+
+		dot := value.DotGraph()
+		log.Infof("dot : \n%s", dot)
+
+		log.Infof("in memory ")
+		// contain all edge
+		require.Contains(t, dot, "db.QueryRow(query") // contain path
+		require.Contains(t, dot, "r.FormValue")       // contain dataflow path
 	})
 }

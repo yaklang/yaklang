@@ -2,15 +2,16 @@ package omap
 
 import (
 	"fmt"
-	"github.com/gobwas/glob"
-	"github.com/segmentio/ksuid"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/gobwas/glob"
+	"github.com/segmentio/ksuid"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func tryGetParent[V any](v any) *OrderedMap[string, V] {
@@ -714,6 +715,10 @@ func (s *OrderedMap[T, V]) CanAsList() bool {
 
 func (s *OrderedMap[T, V]) Push(a V) error {
 	return s.Add(a)
+}
+
+func (s *OrderedMap[T, V]) PushKey(key T, value V) {
+	s.Set(key, value)
 }
 
 func (s *OrderedMap[T, V]) Pop() V {

@@ -897,14 +897,14 @@ func (v *Value) GetPredecessors() []*PredecessorValue {
 		if auditNode := v.auditNode; auditNode != nil {
 			edges := ssadb.GetPredecessorEdgeByFromID(auditNode.ID)
 			var preds []*PredecessorValue
-			for _, edges := range edges {
-				p := v.NewValueFromAuditNode(uint(edges.ToNode))
+			for _, edge := range edges {
+				p := v.NewValueFromAuditNode(uint(edge.ToNode))
 				if p != nil {
 					preds = append(preds, &PredecessorValue{
 						Node: p,
 						Info: &sfvm.AnalysisContext{
-							Step:  int(edges.AnalysisStep),
-							Label: edges.AnalysisLabel,
+							Step:  int(edge.AnalysisStep),
+							Label: edge.AnalysisLabel,
 						},
 					})
 				}
