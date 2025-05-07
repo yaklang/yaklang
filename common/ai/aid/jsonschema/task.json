@@ -1,8 +1,6 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": ["tasks", "query", "@action"],
-  "additionalProperties": false,
+  "required": ["@action", "tasks", "main_task", "main_task_goal"],
   "properties": {
     "@action": {
       "const": "plan",
@@ -10,31 +8,27 @@
     },
     "main_task": {
       "type": "string",
-      "description": "根据用户输入改写一个优化表达的任务，作为总任务",
-      "minLength": 1
+      "description": "根据用户输入改写一个优化表达的任务，作为总任务"
     },
     "main_task_goal": {
       "type": "string",
-      "description": "总任务的目标，描述任务执行到什么程度才算结束",
-      "minLength": 1
+      "description": "总任务的目标，描述任务执行到什么程度才算结束"
     },
     "tasks": {
       "type": "array",
-      "description": "用户想要执行的任务拆分后的子任务(拆分子任务数量尽量不大于3)",
-      "minItems": 1,
+      "description": "用户想要执行的任务拆分后的子任务",
       "items": {
         "type": "object",
         "required": ["subtask_name", "subtask_goal"],
-        "additionalProperties": false,
         "properties": {
           "subtask_name": {
             "type": "string",
-            "description": "拆分后的子任务名称",
+            "description": "拆分后的子任务名称是什么？理性简明扼要的描述任务的名称，便于后续引用",
             "minLength": 1
           },
           "subtask_goal": {
             "type": "string",
-            "description": "拆分后的子任务目标，描述任务执行到什么程度才算结束",
+            "description": "拆分后的子任务目标，简要描述目的是什么",
             "minLength": 1
           }
         }

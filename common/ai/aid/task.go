@@ -1,9 +1,12 @@
 package aid
 
 import (
+	"bytes"
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"strconv"
 
@@ -128,11 +131,13 @@ func ExtractNextPlanTaskFromRawResponse(c *Config, rawResponse string) ([]*aiTas
 			return planObj.NextPlanTask, nil
 		}
 	}
-	return nil, errors.New("no aiTask found")
+	return nil, errors.New("no aiTask found in next-plans")
 }
 
 // ExtractTaskFromRawResponse 从原始响应中提取Task
 func ExtractTaskFromRawResponse(c *Config, rawResponse string) (*aiTask, error) {
+	var extraReason bytes.Buffer
+	_ = extraReason
 	for _, item := range jsonextractor.ExtractObjectIndexes(rawResponse) {
 		start, end := item[0], item[1]
 		taskJSON := rawResponse[start:end]
@@ -150,6 +155,10 @@ func ExtractTaskFromRawResponse(c *Config, rawResponse string) (*aiTask, error) 
 		}
 
 		err := json.Unmarshal([]byte(taskJSON), &planObj)
+		if err != nil {
+			fmt.Println(taskJSON)
+			log.Errorf("parse plan json failed, json unmarshal err, maybe some syntax in json?: %v", err)
+		}
 		if err == nil && planObj.Action == "plan" && len(planObj.Tasks) > 0 {
 			// 创建主任务
 			mainTask := &aiTask{
