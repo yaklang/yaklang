@@ -1975,6 +1975,16 @@ func (y *builder) VisitIdentifier(raw javaparser.IIdentifierContext, wantVariabl
 		value = importValue
 		return nil, importValue
 	}
+	if importType, ok := y.GetProgram().ReadImportType(name); ok {
+		if blueprint, ok := ssa.ToClassBluePrintType(importType); ok {
+			return nil, blueprint.Container()
+		} else {
+			// no class ? emmmm
+			value = y.EmitMakeWithoutType(nil, nil)
+			value.SetType(importType)
+			return nil, value
+		}
+	}
 	value = y.ReadValue(name)
 	return
 }
