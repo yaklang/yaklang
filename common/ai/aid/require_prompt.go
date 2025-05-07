@@ -88,7 +88,7 @@ func (c *Config) RequireUserPrompt(prompt string, opts ...*RequireInteractiveReq
 	c.EmitRequireUserInteractive(req, ep.id)
 	c.doWaitAgree(c.ctx, ep)
 	params := ep.GetParams()
-	ep.Release()
+	c.ReleaseInteractiveEvent(ep.id, params)
 	return params, nil
 }
 
