@@ -60,7 +60,8 @@ func (e *Event) GetInteractiveId() string {
 			case EVENT_TYPE_PLAN_REVIEW_REQUIRE,
 				EVENT_TYPE_TASK_REVIEW_REQUIRE,
 				EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE,
-				EVENT_TYPE_PERMISSION_REQUIRE:
+				EVENT_TYPE_PERMISSION_REQUIRE,
+				EVENT_TYPE_REQUIRE_USER_INTERACTIVE:
 				if id, ok := i["id"].(string); ok {
 					return id
 				}
