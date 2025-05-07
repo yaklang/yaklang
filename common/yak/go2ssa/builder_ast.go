@@ -943,11 +943,22 @@ func (b *astbuilder) buildParameterDecl(para *gol.ParameterDeclContext) []ssa.Ty
 
 	if idlist := para.IdentifierList(); idlist != nil {
 		pList := b.buildParamList(idlist.(*gol.IdentifierListContext))
-		if typeType != nil {
-			for _, p := range pList {
-				typeTypes = append(typeTypes, typeType)
-				p.SetType(typeType)
-				p.GetProgram().Cache.AddVariable(typeType.String(), p)
+		if typeType == nil {
+			return []ssa.Type{}
+		}
+		for _, p := range pList {
+			typeTypes = append(typeTypes, typeType)
+			p.SetType(typeType)
+
+			if bp, ok := ssa.ToClassBluePrintType(typeType); ok {
+				if len(bp.ParentBlueprints) == 0 {
+					continue
+				}
+				if exlib := b.PeekValue(bp.ParentBlueprints[0].Name); exlib != nil {
+					method := bp.GetMagicMethod(ssa.Constructor)
+					lv := b.CreateMemberCallVariable(exlib, method)
+					b.AssignVariable(lv, p)
+				}
 			}
 		}
 		return typeTypes
@@ -1966,9 +1977,15 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 		path = path + "/" + typName
 
 		if lib != nil && path != "" {
-			libtype, ok := lib.GetExportType(typName)
+			if _, ok := lib.GetExportType(libName); !ok {
+				if err := b.GetProgram().ImportTypeFromLib(lib, libName); err != nil {
+					b.NewError(ssa.Warn, TAG, "get namespace type fail: %s", err)
+				}
+			}
+
+			exportType, ok := lib.GetExportType(typName)
 			if ok {
-				return libtype
+				return exportType
 			} else { // 找到包但没有找到类型，可能是包中引用了golang库
 				if err := b.GetProgram().ImportTypeFromLib(lib, typName); err != nil {
 					b.NewError(ssa.Warn, TAG, "get namespace type fail: %s", err)
@@ -1978,20 +1995,18 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 			b.NewError(ssa.Error, TAG, ImportNotFind(typName))
 		}
 
-		typ, _ := lib.GetExportType(typName)
-		if bp, ok := typ.(*ssa.Blueprint); ok {
-			if v := b.PeekValue(libName); v != nil {
-				lv := b.CreateLocalVariable(typName)
-				method := bp.GetMagicMethod(ssa.Constructor)
-				rv := b.ReadMemberCallValue(v, method)
-				rv.SetType(HandleFullTypeNames(rv.GetType(), []string{path}))
-				b.AssignVariable(lv, rv)
+		exportType, _ := lib.GetExportType(typName)
+		libType, _ := lib.GetExportType(libName)
+
+		if exportBp, ok := ssa.ToClassBluePrintType(exportType); ok {
+			if libBp, ok := ssa.ToClassBluePrintType(libType); ok {
+				exportBp.AddParentBlueprint(libBp)
 			}
 		}
-		if typ == nil {
-			typ = ssa.CreateAnyType()
+		if exportType == nil {
+			exportType = ssa.CreateAnyType()
 		}
-		return typ
+		return exportType
 	} else {
 		name := tname.IDENTIFIER().GetText()
 		ssatyp := ssa.GetTypeByStr(name)
