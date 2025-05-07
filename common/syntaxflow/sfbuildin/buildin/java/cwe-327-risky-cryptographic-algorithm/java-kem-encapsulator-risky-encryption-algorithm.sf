@@ -1,7 +1,7 @@
 desc(
     title_zh:"检测Java javax.crypto.KEM.Encapsulator使用不安全的加密算法",
     title:"Check Java javax.crypto.KEM.Encapsulator The Use Of Broken Or Risky Encryption Algorithm",
-    rule_id:10327005
+    rule_id:20327005
     risk:"不安全加密算法",
     reference:<<<URL
     https://cwe.mitre.org/data/definitions/327.html
@@ -19,8 +19,7 @@ TEXT
 KEM?{<typeName>?{have:"avax.crypto.KEM"}}.getInstance(*<slice(index=1)> as $algorithm);
 
 $algorithm#{
-    include:`*?{opcode:const}`,
-    until:`* ?{have:/DES|DESede|3DES|TripleDES|ARCFOUR|RC4|RC2/}`
+    until:`*?{opcode:const && have:/DES|DESede|3DES|TripleDES|ARCFOUR|RC4|RC2/}`
 }-> as $sink;
 
 alert $sink for {

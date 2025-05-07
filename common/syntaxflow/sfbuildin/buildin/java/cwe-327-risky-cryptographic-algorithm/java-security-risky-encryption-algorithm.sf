@@ -1,7 +1,7 @@
 desc(
     title_zh:"检测Java java.security.AlgorithmParameters使用不安全的加密算法",
     title:"Check Java java.security.AlgorithmParameters use of broken or risky encryption algorithm",
-    rule_id:10327006
+    rule_id:20327006
     risk:"不安全加密算法",
     reference:<<<URL
     https://cwe.mitre.org/data/definitions/327.html
@@ -19,8 +19,7 @@ TEXT
 AlgorithmParameters?{<typeName>?{have:"java.security.AlgorithmParameters"}}.getInstance(*<slice(index=1)> as $algorithm);
 
 $algorithm#{
-    include:`*?{opcode:const}`,
-    until:`* ?{have:/DES|DESede|3DES|TripleDES|ARCFOUR|RC4|RC2/}`
+    until:`* ?{opcode:const && have:/DES|DESede|3DES|TripleDES|ARCFOUR|RC4|RC2/}`
 }-> as $sink;
 
 alert $sink for {
