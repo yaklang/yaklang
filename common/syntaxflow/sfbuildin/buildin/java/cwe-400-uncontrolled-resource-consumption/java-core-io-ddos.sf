@@ -3,6 +3,7 @@ desc(
     title_zh:"检测Java IO库拒绝服务漏洞",
     type:vuln,
     rule_id: 20400002,
+    risk:DDOS,
     desc:<<<TEXT
     该规则用于检测Java IO库中可能存在的拒绝服务漏洞。IO库中的一些方法如果输入的是不受信任的数据并且没有长度限制、超时限制等机制，可能导致资源被无限制使用，从而导致拒绝服务漏洞。因此，建议在使用IO库时，对输入数据进行验证和限制，以防止拒绝服务漏洞的发生。
 TEXT,
@@ -24,7 +25,6 @@ alert $vul for {
     message: "发现Java的java.io库可能存在ddos漏洞",
     level: low,
     type: vuln,
-    risk: ddos,
 }
 
 desc(

@@ -1,0 +1,53 @@
+desc(
+    title_zh:"检测Java J2EE 使用getConnection",
+    title:"Check Java J2EE Usage of getConnection",
+    rule_id:21500003
+    risk:"代码风格",
+    level: info,
+    reference:<<<URL
+    https://docs.oracle.com/javase/8/docs/api/java/sql/DriverManager.html
+URL
+    description:<<<TEXT
+    J2EE 标准强制要求通过容器资源管理框架获取数据库连接等关键资源。标准实现范式应为：
+    ```java
+    Context ctx = new InitialContext();
+    DataSource datasource = (DataSource) ctx.lookup(DB_DATASRC_REF);
+    Connection conn = datasource.getConnection();
+    ```
+    而非直接调用驱动层API：
+    ```java
+    Connection conn = DriverManager.getConnection(CONNECT_STRING);
+    ```
+    主流应用容器已将数据库连接管理（含连接池、事务整合等）深度集成至资源框架。开发者自行实现连接管理不仅需要复刻容器级功能（如异常重试、线程安全），更易引发资源泄漏和事务冲突，此行为已被J2EE规范明确禁止。
+TEXT
+)
+
+DriverManager?{<typeName>?{have:'java.sql.DriverManager'}}.getConnection() as $get;
+alert $get for {
+    message: '检测到Java项目中使用了DriverManager.getConnection()方法',
+}
+
+desc{
+    lang:java,
+    alert_num:1 ,
+    "file://demo.java":<<<CODE
+    import java.sql.Connection;
+    import java.sql.DriverManager;
+    import javax.servlet.http.HttpServlet;
+
+    public class MyServlet extends HttpServlet {
+        protected void doGet(javax.servlet.http.HttpServletRequest req, javax.servlet.http.HttpServletResponse resp) {
+            try {
+                // 直接用 DriverManager 获取连接（不推荐）
+                Connection conn = DriverManager.getConnection(
+                    "jdbc:mysql://localhost:3306/mydb", "user", "password"
+                );
+                // ... 业务逻辑 ...
+                conn.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+CODE
+}

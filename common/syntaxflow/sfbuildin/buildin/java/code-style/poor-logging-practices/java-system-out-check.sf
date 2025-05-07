@@ -1,7 +1,7 @@
 desc(
     title_zh:"检测Java 使用System.out输出流",
     title:"Check Java Usage of System.out Output Stream",
-    rule_id:11500
+    rule_id:21500001,
     risk:"代码风格",
     reference:<<<URL
     https://docs.oracle.com/javase/8/docs/api/java/io/PrintStream.html
@@ -21,10 +21,3 @@ alert $out for {
     level: info,
 }
 
-desc{
-    lang:java,
-    alert_num: ,
-    "file://demo.java":<<<CODE
-    
-CODE
-}
