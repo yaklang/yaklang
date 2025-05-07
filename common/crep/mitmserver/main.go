@@ -67,7 +67,7 @@ func main() {
 
 	app.Action = func(c *cli.Context) error {
 		server, err := crep.NewMITMServer(
-			crep.MITM_SetDownstreamProxy(c.String("proxy")),
+			crep.MITM_SetDownstreamProxy(strings.Split(c.String("proxy"), ",")...),
 			crep.MITM_SetHTTPResponseMirror(func(isHttps bool, reqUrl string, _ *http.Request, _ *http.Response, remoteAddr string) {
 
 			}),

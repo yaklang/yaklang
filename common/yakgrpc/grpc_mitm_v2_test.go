@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -861,4 +862,34 @@ func TestGRPCMUSTTPASS_MITMV2_HijackTags(t *testing.T) {
 	flow = flows.Data[0]
 	require.Contains(t, flow.Tags, "[手动劫持]")
 	require.NotContains(t, flow.Tags, "[手动修改]")
+}
+func TestGRPCMUSTPASS_MITMV2_MutProxy(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+	var (
+		downStream1 = false
+		token       = uuid.NewString()
+	)
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, r *http.Request) {})
+	target := fmt.Sprintf("http://%s:%v/%s", host, port, token)
+	host, port = utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.RequestURI(), token) {
+			downStream1 = true
+		}
+	})
+	downstream1Proxy := fmt.Sprintf("http://%s:%v", host, port)
+	mitmPort := uint32(utils.GetRandomAvailableTCPPort())
+	tcpPort := utils.GetRandomAvailableTCPPort()
+	downstream2Proxy := fmt.Sprintf("http://%s:%v", host, tcpPort)
+	RunMITMV2TestServer(client, ctx, &ypb.MITMV2Request{
+		Host:            "127.0.0.1",
+		Port:            mitmPort,
+		DownstreamProxy: strings.Join([]string{downstream2Proxy, downstream1Proxy}, ","),
+	}, func(mitmClient ypb.Yak_MITMV2Client) {
+		defer cancel()
+		poc.DoGET(target, poc.WithProxy(fmt.Sprintf("http://%s:%v", "127.0.0.1", mitmPort)))
+		require.True(t, downStream1)
+	})
 }

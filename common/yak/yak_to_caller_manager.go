@@ -855,7 +855,6 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 	if pluginContext == nil {
 		return
 	}
-
 	runtimeId = pluginContext.RuntimeId
 	pluginName = pluginContext.PluginName
 	pluginUUID = pluginContext.PluginUUID
@@ -918,7 +917,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				// poc.WithSource(pluginName),
 				poc.WithFromPlugin(pluginName),
 				poc.WithRuntimeId(runtimeId),
-				poc.WithProxy(proxy),
+				poc.WithProxy(strings.Split(proxy, ",")...),
 				poc.WithContext(streamContext),
 			}
 			index := len(args) - 1 // 获取 option 参数的 index
@@ -950,7 +949,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				// yakhttp.WithSource(pluginName),
 				yakhttp.WithFromPlugin(pluginName),
 				yakhttp.WithRuntimeID(runtimeId),
-				yakhttp.WithProxy(proxy),
+				yakhttp.WithProxy(strings.Split(proxy, ",")...),
 				yakhttp.WithContext(streamContext),
 			}
 			index := len(args) - 1 // 获取 option 参数的 index
@@ -985,7 +984,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				}
 				opts = append(opts, httptpl.WithCustomVulnFilter(pluginContext.vulFilter))
 				opts = append(opts, lowhttp.WithFromPlugin(pluginName))
-				opts = append(opts, lowhttp.WithProxy(proxy))
+				opts = append(opts, lowhttp.WithProxy(strings.Split(proxy, ",")...))
 				return originFunc(target, opts...)
 			}
 		}
@@ -1004,7 +1003,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				}
 				opts = append(opts, httptpl.WithCustomVulnFilter(pluginContext.vulFilter))
 				opts = append(opts, lowhttp.WithFromPlugin(pluginName))
-				opts = append(opts, lowhttp.WithProxy(proxy))
+				opts = append(opts, lowhttp.WithProxy(strings.Split(proxy, ",")...))
 				originFunc(target, opts...)
 			}
 		}
@@ -1116,7 +1115,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				}
 				log.Debugf("bind hook.NewMixPluginCaller to runtime: %v", runtimeId)
 				manager.SetRuntimeId(runtimeId)
-				manager.SetProxy(proxy)
+				manager.SetProxy(strings.Split(proxy, ",")...)
 				manager.SetCtx(streamContext)
 				if pluginContext.YakitClient != nil {
 					manager.SetFeedback(func(i *ypb.ExecResult) error {
@@ -1155,7 +1154,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				}
 				log.Debugf("bind hook.NewMixPluginCallerWithFilter to runtime: %v", runtimeId)
 				manager.SetRuntimeId(runtimeId)
-				manager.SetProxy(proxy)
+				manager.SetProxy(strings.Split(proxy, ",")...)
 				manager.SetCtx(streamContext)
 				if pluginContext.YakitClient != nil {
 					manager.SetFeedback(func(i *ypb.ExecResult) error {

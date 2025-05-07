@@ -239,6 +239,7 @@ type MITMServer struct {
 	allowForwarded bool
 	// httpTransport            *http.Transport
 	proxyUrl                 *url.URL
+	proxyUrls                []*url.URL
 	hijackedMaxContentLength int
 
 	// transparent hijack mode
@@ -318,10 +319,14 @@ func (m *MITMServer) initConfig() error {
 	var config []lowhttp.LowhttpOpt
 
 	config = append(config, lowhttp.WithProxyGetter(func() []string {
-		if m.proxyUrl == nil {
+		if m.proxyUrls == nil {
 			return []string{}
 		}
-		return []string{m.proxyUrl.String()}
+		var proxys []string
+		for _, proxyUrl := range m.proxyUrls {
+			proxys = append(proxys, proxyUrl.String())
+		}
+		return proxys
 	}))
 
 	if len(m.DNSServers) > 0 {

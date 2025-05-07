@@ -116,7 +116,7 @@ type MixPluginCaller struct {
 	rawQuestFilter filter.Filterable
 
 	runtimeId string
-	proxy     string
+	proxy     []string
 
 	feedbackHandler        func(*ypb.ExecResult) error
 	ordinaryFeedback       func(i interface{}, item ...interface{})
@@ -153,8 +153,8 @@ func (m *MixPluginCaller) SetRuntimeId(s string) {
 	}
 }
 
-func (m *MixPluginCaller) SetProxy(s string) {
-	if s == "" {
+func (m *MixPluginCaller) SetProxy(s ...string) {
+	if s == nil || len(s) == 0 {
 		return
 	}
 	if m == nil {
@@ -162,7 +162,7 @@ func (m *MixPluginCaller) SetProxy(s string) {
 	}
 	m.proxy = s
 	if m.callers != nil {
-		m.callers.proxy = s
+		m.callers.proxy = strings.Join(s, ",")
 	}
 }
 
@@ -866,7 +866,7 @@ func (m *MixPluginCaller) mirrorHTTPFlow(
 							log.Debugf("(port/mitm) start to match %v", addr)
 							matchResult, err = m.GetFingerprintMatcher().Match(
 								host, port, fp.WithCache(m.cache), fp.WithDatabaseCache(true),
-								fp.WithProxy(m.proxy),
+								fp.WithProxy(m.proxy...),
 							)
 							if err != nil {
 								return
