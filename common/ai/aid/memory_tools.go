@@ -7,6 +7,40 @@ import (
 	"io"
 )
 
+func (m *Memory) CreateBasicMemoryTools() ([]*aitool.Tool, error) {
+	var err error
+	factory := aitool.NewFactory()
+	err = factory.RegisterTool("delete_memory",
+		aitool.WithDescription("delete ai task memory from timeline by id"),
+		aitool.WithDangerousNoNeedTimelineRecorded(true),
+		aitool.WithIntegerParam(
+			"id",
+			aitool.WithParam_Required(true),
+		),
+		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			id := params.GetInt("id")
+			m.SoftDeleteTimeline(id)
+			return nil, nil
+		}))
+	if err != nil {
+		log.Errorf("register memory_query tool: %v", err)
+	}
+	err = factory.RegisterTool("add_persistent_memory",
+		aitool.WithDescription("add persistent memory, which will be appended to every prompt"),
+		aitool.WithDangerousNoNeedTimelineRecorded(true),
+		aitool.WithStringParam("content",
+			aitool.WithParam_Required(true)),
+		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			content := params.GetString("content")
+			m.StoreAppendPersistentInfo(content)
+			return nil, nil
+		}))
+	if err != nil {
+		log.Errorf("register memory_progress tool: %v", err)
+	}
+	return factory.Tools(), nil
+}
+
 // Memory 和 config的 绑定太强烈了，所以将tool直接放置在aid包内
 func (m *Memory) CreateMemoryTools() ([]*aitool.Tool, error) {
 	var err error

@@ -18,10 +18,10 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
-type summary struct {
-	// summary of the tool call result
-	summaryContent string
-	meaningless    bool
+type timelineItem struct {
+	*aitool.ToolResult
+	summary string
+	deleted bool
 }
 
 type memoryTimeline struct {
@@ -32,10 +32,25 @@ type memoryTimeline struct {
 	maxTimelineLimit int
 	fullMemoryCount  int
 	idToTs           *omap.OrderedMap[int64, int64]
-	tsToToolResult   *omap.OrderedMap[int64, *aitool.ToolResult]
-	idToToolResult   *omap.OrderedMap[int64, *aitool.ToolResult]
-	summary          *omap.OrderedMap[int64, *linktable.LinkTable[*summary]]
+	tsToTimelineItem *omap.OrderedMap[int64, *timelineItem]
+	idToTimelineItem *omap.OrderedMap[int64, *timelineItem]
+	summary          *omap.OrderedMap[int64, *linktable.LinkTable[*timelineItem]]
 	reducers         *omap.OrderedMap[int64, *linktable.LinkTable[string]]
+}
+
+func (m *memoryTimeline) SoftDelete(id ...int64) {
+	for _, i := range id {
+		if v, ok := m.idToTimelineItem.Get(i); ok {
+			v.deleted = true
+		}
+		if v, ok := m.summary.Get(i); ok {
+			v.Push(&timelineItem{
+				ToolResult: v.Value().ToolResult,
+				summary:    v.Value().summary,
+				deleted:    true,
+			})
+		}
+	}
 }
 
 func (m *memoryTimeline) CreateSubTimeline(ids ...int64) *memoryTimeline {
@@ -56,11 +71,11 @@ func (m *memoryTimeline) CreateSubTimeline(ids ...int64) *memoryTimeline {
 			continue
 		}
 		tl.idToTs.Set(id, ts)
-		if ret, ok := m.idToToolResult.Get(id); ok {
-			tl.idToToolResult.Set(id, ret)
+		if ret, ok := m.idToTimelineItem.Get(id); ok {
+			tl.idToTimelineItem.Set(id, ret)
 		}
-		if ret, ok := m.tsToToolResult.Get(ts); ok {
-			tl.tsToToolResult.Set(ts, ret)
+		if ret, ok := m.tsToTimelineItem.Get(ts); ok {
+			tl.tsToTimelineItem.Set(ts, ret)
 		}
 		if ret, ok := m.summary.Get(id); ok {
 			tl.summary.Set(id, ret)
@@ -86,10 +101,10 @@ func newMemoryTimeline(clearCount int, ai AICaller) *memoryTimeline {
 		ai:               ai,
 		fullMemoryCount:  clearCount,
 		maxTimelineLimit: 3 * clearCount,
-		tsToToolResult:   omap.NewOrderedMap(map[int64]*aitool.ToolResult{}),
-		idToToolResult:   omap.NewOrderedMap(map[int64]*aitool.ToolResult{}),
+		tsToTimelineItem: omap.NewOrderedMap(map[int64]*timelineItem{}),
+		idToTimelineItem: omap.NewOrderedMap(map[int64]*timelineItem{}),
 		idToTs:           omap.NewOrderedMap(map[int64]int64{}),
-		summary:          omap.NewOrderedMap(map[int64]*linktable.LinkTable[*summary]{}),
+		summary:          omap.NewOrderedMap(map[int64]*linktable.LinkTable[*timelineItem]{}),
 		reducers:         omap.NewOrderedMap(map[int64]*linktable.LinkTable[string]{}),
 	}
 }
@@ -105,18 +120,22 @@ func (m *memoryTimeline) setAICaller(ai AICaller) {
 
 func (m *memoryTimeline) PushToolResult(toolResult *aitool.ToolResult) {
 	ts := time.Now().UnixMilli()
-	if m.tsToToolResult.Have(ts) {
+	if m.tsToTimelineItem.Have(ts) {
 		time.Sleep(time.Millisecond * 10)
 		ts = time.Now().UnixMilli()
 	}
 	m.idToTs.Set(toolResult.GetID(), ts)
-	m.tsToToolResult.Set(ts, toolResult)
-	m.idToToolResult.Set(toolResult.GetID(), toolResult)
-	total := m.idToToolResult.Len()
+
+	item := &timelineItem{
+		ToolResult: toolResult,
+	}
+	m.tsToTimelineItem.Set(ts, item)
+	m.idToTimelineItem.Set(toolResult.GetID(), item)
+	total := m.idToTimelineItem.Len()
 	summaryCount := m.summary.Len()
 	if total-summaryCount > m.fullMemoryCount {
 		shrinkTargetIndex := total - m.fullMemoryCount - 1
-		id := m.idToToolResult.Index(shrinkTargetIndex)
+		id := m.idToTimelineItem.Index(shrinkTargetIndex)
 		for _, v := range id.Values() {
 			log.Infof("start to shrink memory timeline id: %v, total: %v, summary: %v, size: %v", v.GetID(), total, summaryCount, m.fullMemoryCount)
 			m.shrink(v)
@@ -125,7 +144,7 @@ func (m *memoryTimeline) PushToolResult(toolResult *aitool.ToolResult) {
 
 	if m.maxTimelineLimit > 0 && total-m.maxTimelineLimit > 0 {
 		endIdx := total - m.maxTimelineLimit - 1
-		val, ok := m.idToToolResult.GetByIndex(endIdx)
+		val, ok := m.idToTimelineItem.GetByIndex(endIdx)
 		if ok {
 			log.Infof("start to reducer from id: %v, total: %v, limit: %v, delta: %v", val.GetID(), total, m.maxTimelineLimit, total-m.maxTimelineLimit)
 			m.reducer(val.GetID())
@@ -172,13 +191,13 @@ func (m *memoryTimeline) reducer(beforeId int64) {
 	}
 }
 
-func (m *memoryTimeline) shrink(result *aitool.ToolResult) {
+func (m *memoryTimeline) shrink(currentItem *timelineItem) {
 	if m.ai == nil {
 		log.Error("ai is nil, memory cannot emit memory shrink")
 		return
 	}
 
-	response, err := m.ai.callAI(NewAIRequest(m.renderSummaryPrompt(result)))
+	response, err := m.ai.callAI(NewAIRequest(m.renderSummaryPrompt(currentItem)))
 	if err != nil {
 		log.Errorf("shrink call ai failed: %v", err)
 		return
@@ -201,20 +220,21 @@ func (m *memoryTimeline) shrink(result *aitool.ToolResult) {
 	}
 	pers := action.GetString("persistent")
 	if pers == "" {
-		s, ok := m.summary.Get(result.GetID())
+		s, ok := m.summary.Get(currentItem.GetID())
 		if ok {
-			pers = s.Value().summaryContent
+			pers = s.Value().summary
 		}
 	}
 
-	s := &summary{
-		summaryContent: pers,
-		meaningless:    action.GetBool("should_drop"),
+	s := &timelineItem{
+		ToolResult: currentItem.ToolResult,
+		summary:    pers,
+		deleted:    action.GetBool("should_drop", currentItem.deleted),
 	}
-	if lt, ok := m.summary.Get(result.GetID()); ok {
+	if lt, ok := m.summary.Get(currentItem.GetID()); ok {
 		lt.Push(s)
 	} else {
-		m.summary.Set(result.GetID(), linktable.NewUnlimitedLinkTable(s))
+		m.summary.Set(currentItem.GetID(), linktable.NewUnlimitedLinkTable(s))
 	}
 }
 
@@ -243,7 +263,7 @@ func (m *memoryTimeline) renderReducerPrompt(beforeId int64) string {
 //go:embed prompts/timeline/shrink_tool_result.txt
 var timelineSummary string
 
-func (m *memoryTimeline) renderSummaryPrompt(result *aitool.ToolResult) string {
+func (m *memoryTimeline) renderSummaryPrompt(result *timelineItem) string {
 	ins, err := template.New("timeline-tool-result").Parse(timelineSummary)
 	if err != nil {
 		log.Warnf("BUG: dump summary prompt failed: %v", err)
@@ -262,7 +282,7 @@ func (m *memoryTimeline) renderSummaryPrompt(result *aitool.ToolResult) string {
 }
 
 func (m *memoryTimeline) Dump() string {
-	k, _, ok := m.idToToolResult.Last()
+	k, _, ok := m.idToTimelineItem.Last()
 	if ok {
 		return m.DumpBefore(k)
 	}
@@ -277,11 +297,11 @@ func (m *memoryTimeline) DumpBefore(id int64) string {
 
 	shrinkStartId, _, _ := m.summary.Last()
 	reduceredStartId, _, _ := m.reducers.Last()
-	m.tsToToolResult.ForEach(func(key int64, value *aitool.ToolResult) bool {
+	m.tsToTimelineItem.ForEach(func(key int64, item *timelineItem) bool {
 		initOnce.Do(func() {
 			buf.WriteString("timeline:\n")
 		})
-		if value.GetID() > id {
+		if item.GetID() > id {
 			return true
 		}
 
@@ -289,29 +309,34 @@ func (m *memoryTimeline) DumpBefore(id int64) string {
 		timeStr := t.Format(utils.DefaultTimeFormat3)
 
 		if reduceredStartId > 0 {
-			if value.GetID() == reduceredStartId {
+			if item.GetID() == reduceredStartId {
 				val, ok := m.reducers.Get(reduceredStartId)
 				if ok {
 					reducerOnce.Do(func() {
 						buf.WriteString(fmt.Sprintf("├─...\n"))
-						buf.WriteString(fmt.Sprintf("├─[%s] id: %v reducer-memory: %v\n", timeStr, value.GetID(), val.Value()))
+						buf.WriteString(fmt.Sprintf("├─[%s] id: %v reducer-memory: %v\n", timeStr, item.GetID(), val.Value()))
 					})
 					return true
 				}
-			} else if value.GetID() < reduceredStartId {
+			} else if item.GetID() < reduceredStartId {
 				return true
 			}
 		}
 
-		if shrinkStartId > 0 && value.GetID() <= shrinkStartId {
+		if shrinkStartId > 0 && item.GetID() <= shrinkStartId {
 			val, ok := m.summary.Get(shrinkStartId)
-			if ok && !val.Value().meaningless {
-				buf.WriteString(fmt.Sprintf("├─[%s] id: %v memory: %v\n", timeStr, value.GetID(), val.Value().summaryContent))
+			if ok && !val.Value().deleted {
+				buf.WriteString(fmt.Sprintf("├─[%s] id: %v memory: %v\n", timeStr, item.GetID(), val.Value().summary))
 			}
 			return true
 		}
+
+		if item.deleted {
+			return true
+		}
+
 		buf.WriteString(fmt.Sprintf("├─[%s]\n", timeStr))
-		raw := value.String()
+		raw := item.String()
 		for _, line := range utils.ParseStringToLines(raw) {
 			buf.WriteString(fmt.Sprintf("│    %s\n", line))
 		}
@@ -327,11 +352,11 @@ func (m *memoryTimeline) DumpBefore(id int64) string {
 }
 
 func (m *memoryTimeline) PromptForToolCallResultsForLastN(n int) string {
-	if m.idToToolResult.Len() == 0 {
+	if m.idToTimelineItem.Len() == 0 {
 		return ""
 	}
 
-	var result = m.idToToolResult.Values()
+	var result = m.idToTimelineItem.Values()
 	if len(result) > n {
 		result = result[len(result)-n:]
 	}
