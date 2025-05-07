@@ -242,3 +242,86 @@ PrintWriter as $writer
 		"writer": {"import java.io.PrintWriter;", "getWriter()"},
 	}, ssaapi.WithLanguage(consts.JAVA))
 }
+
+func TestImportClassTypeName(t *testing.T) {
+	t.Run("check import type with import name", func(t *testing.T) {
+
+		code := `
+package com.example.fastjsondemo.controller;
+
+import com.alibaba.fastjson.JSON;
+import com.example.fastjsondemo.model.User;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api")
+public class UserController {
+
+    @PostMapping("/user")
+    public User createUser(@RequestBody String jsonString) {
+        // 使用 FastJSON 将 JSON 字符串解析为 User 对象
+        User user = JSON.parseObject(jsonString, User.class);
+
+		Int b = JSON;
+
+
+    }
+}
+	`
+
+		ssatest.CheckSyntaxFlowContain(t, code, `
+
+// check json.parse
+JSON.parse* as $parse 
+$parse<getObject> as $json 
+$json<typeName> as $typeName;
+
+// check assign 
+b<typeName> as $jsonType2
+
+	`, map[string][]string{
+			"typeName":  {"com.alibaba.fastjson.JSON"},
+			"jsonType2": {"com.alibaba.fastjson.JSON"},
+		}, ssaapi.WithLanguage(consts.JAVA))
+	})
+
+	t.Run("check import type with import start", func(t *testing.T) {
+		code := `
+package com.example.fastjsondemo.controller;
+
+import com.alibaba.fastjson.*;
+import com.example.fastjsondemo.model.User;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api")
+public class UserController {
+
+    @PostMapping("/user")
+    public User createUser(@RequestBody String jsonString) {
+        // 使用 FastJSON 将 JSON 字符串解析为 User 对象
+        User user = JSON.parseObject(jsonString, User.class);
+
+		Object b = JSON;
+
+
+    }
+}
+		`
+
+		ssatest.CheckSyntaxFlowContain(t, code, `
+
+// check json.parse
+JSON.parse* as $parse 
+$parse<getObject> as $json 
+$json<typeName> as $typeName;
+
+// check assign 
+b<typeName> as $jsonType2
+
+	`, map[string][]string{
+			"typeName":  {"com.alibaba.fastjson.JSON"},
+			"jsonType2": {"com.alibaba.fastjson.JSON"},
+		}, ssaapi.WithLanguage(consts.JAVA))
+	})
+}
