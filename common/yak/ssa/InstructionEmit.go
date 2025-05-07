@@ -1,10 +1,15 @@
 package ssa
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 	"golang.org/x/exp/slices"
 )
 
@@ -379,6 +384,48 @@ func (f *FunctionBuilder) EmitConstInstNil() *ConstInst {
 	return f.EmitConstInst(nil)
 }
 
+func (f *FunctionBuilder) EmitConstPointer(o *Variable) Value {
+	keys := []Value{f.EmitConstInst("@pointer"), f.EmitConstInst("@value")}
+	values := []Value{f.EmitConstInst(fmt.Sprintf("%s#%d", o.GetName(), o.GetGlobalIndex())), o.GetValue()}
+
+	pointer := f.InterfaceAddFieldBuild(2, func(i int) Value {
+		return keys[i]
+	}, func(i int) Value {
+		return values[i]
+	})
+
+	t := NewObjectType()
+	t.SetName("Pointer")
+	t.SetTypeKind(PointerKind)
+	pointer.SetType(t)
+
+	return pointer
+}
+
+func (f *FunctionBuilder) GetOriginPointer(p Value) *Variable {
+	o := f.CreateMemberCallVariable(p, f.EmitConstInst("@pointer"), true)
+	o.SetKind(ssautil.PointerVariable)
+
+	return o
+}
+
+func (f *FunctionBuilder) GetOriginValue(obj Value) Value {
+	v := f.ReadMemberCallValue(obj, f.EmitConstInst("@value"))
+	p := f.ReadMemberCallValue(obj, f.EmitConstInst("@pointer"))
+
+	n := strings.TrimPrefix(p.String(), "&")
+	originName, originGlobalId := SplitName(n)
+
+	scope := f.CurrentBlock.ScopeTable
+	if variable := GetVariablesWithGlobalIndex(scope, originName, originGlobalId); variable != nil {
+		if value := variable.GetValue(); value != nil {
+			return value
+		}
+	}
+
+	return v
+}
+
 func (f *FunctionBuilder) EmitConstInstWithUnary(i any, un int) *ConstInst {
 	ci := f.EmitConstInst(i)
 	ci.Unary = un
@@ -602,6 +649,20 @@ func (f *FunctionBuilder) CopyValue(v Value) Value {
 			func(i int) Value {
 				return members[i]
 			})
+	case *Phi:
+		phi := f.EmitPhi(v.name, v.Edge)
+		phi.CFGEntryBasicBlock = v.CFGEntryBasicBlock
+		ret = phi
 	}
+	ret.SetVerboseName(v.GetVerboseName())
 	return ret
+}
+
+func SplitName(originName string) (string, int) {
+	originGlobalId := 0
+	if i := strings.Index(originName, "#"); i > 0 {
+		originGlobalId, _ = strconv.Atoi(originName[i+1:])
+		originName = originName[:i]
+	}
+	return originName, originGlobalId
 }

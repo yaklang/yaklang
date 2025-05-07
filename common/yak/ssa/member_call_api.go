@@ -47,7 +47,20 @@ func (b *FunctionBuilder) readMemberCallValueEx(object, key Value, wantFunction 
 }
 
 // create member call variable
-func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable {
+func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value, cross ...bool) *Variable {
+	iscross := false
+	if len(cross) > 0 {
+		iscross = cross[0]
+	}
+
+	createVariable := func(name string) *Variable {
+		if iscross {
+			return b.CreateVariableCross(name)
+		} else {
+			return b.CreateVariable(name)
+		}
+	}
+
 	if utils.IsNil(object) || utils.IsNil(key) {
 		log.Errorf("CreateMemberCallVariable: object or key is nil")
 		return nil
@@ -59,7 +72,7 @@ func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable 
 	// extern lib
 	if extern, ok := ToExternLib(object); ok {
 		name := getExternLibMemberCall(object, key)
-		ret := b.CreateVariableForce(name)
+		ret := createVariable(name)
 		ret.SetMemberCall(extern, key)
 		return ret
 	}
@@ -80,7 +93,7 @@ func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable 
 		b.checkAndCreateDefaultMember(res, objectt, key)
 	}
 	// log.Infof("CreateMemberCallVariable: %v, %v", retValue.GetName(), key)
-	ret := b.CreateVariableForce(name)
+	ret := createVariable(name)
 	ret.SetMemberCall(objectt, key)
 	return ret
 }
