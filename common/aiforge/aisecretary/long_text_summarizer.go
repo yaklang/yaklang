@@ -2,12 +2,12 @@ package aisecretary
 
 import (
 	"context"
-	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/reducer"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"os"
 	"strings"
 )
 
@@ -16,10 +16,15 @@ func init() {
 		ctx context.Context,
 		items []*ypb.ExecParamItem,
 		option ...aid.Option) (*aiforge.ForgeResult, error) {
-		longText := aiforge.GetCliValueByKey("text", items)
-		textList := utils.NewTextSplitter().Split(longText)
-		if len(textList) <= 0 {
-			return nil, fmt.Errorf("no text")
+		var textChan chan string
+		if longText := aiforge.GetCliValueByKey("text", items); longText != "" {
+			textChan = utils.NewTextSplitter().SplitReader(ctx, strings.NewReader(longText))
+		} else if filePath := aiforge.GetCliValueByKey("file", items); filePath != "" {
+			fileReader, err := os.OpenFile(filePath, os.O_RDONLY, os.ModePerm)
+			if err != nil {
+				return nil, err
+			}
+			textChan = utils.NewTextSplitter().SplitReader(ctx, fileReader)
 		}
 
 		fragmentSummarize := func(polyData string) string {
@@ -44,7 +49,7 @@ func init() {
 			return fragmentSummarize(polyData)
 		})
 
-		for _, s := range textList {
+		for s := range textChan {
 			textReducer.Push(fragmentSummarize(s))
 		}
 
