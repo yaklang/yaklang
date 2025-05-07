@@ -285,8 +285,9 @@ func (b *FunctionBuilder) ClassConstructor(bluePrint *Blueprint, args []Value) V
 	method := bluePrint.GetMagicMethod(Constructor)
 	constructor := b.NewCall(method, args)
 	b.EmitCall(constructor)
-	desctructor := bluePrint.GetMagicMethod(Destructor)
-	call := b.NewCall(desctructor, []Value{constructor})
+	constructor.SetType(bluePrint)
+	destructor := bluePrint.GetMagicMethod(Destructor)
+	call := b.NewCall(destructor, []Value{constructor})
 	b.EmitDefer(call)
 	return constructor
 }

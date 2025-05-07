@@ -1636,68 +1636,25 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 	}
 
 	var (
-		p           ssa.Type
-		createdName []string
-		nameValues  []ssa.Value
+		typ ssa.Type
 	)
 	if ret := i.CreatedName(); ret != nil {
-		p, createdName, nameValues = y.VisitCreatedName(ret)
+		typ = y.VisitCreatedName(ret)
 	}
 
-	fixChainCreator := func() ssa.Value {
-		var object ssa.Value
-		if len(createdName) != len(nameValues) {
-			return nil
-		}
-		for i, v := range nameValues {
-			if i == 0 {
-				newTyp := y.AddFullTypeNameFromMap(createdName[0], v.GetType())
-				v.SetType(newTyp)
-				object = v
-			} else {
-				key := y.EmitConstInst(createdName[i])
-				object = y.ReadMemberCallValue(object, key)
-				newTyp := y.AddFullTypeNameFromMap(createdName[0], object.GetType())
-				object.SetType(newTyp)
-			}
-		}
-		return object
-	}
-
-	className := strings.Join(createdName, ".")
-	if ret := i.ClassCreatorRest(); ret != nil {
-		class := y.GetBluePrint(className)
-		obj := y.EmitUndefined(className)
-		if class == nil {
-			log.Warnf("class %v instantiation failed. maybe the origin (package) is not loaded? (dependency missed) ", className)
-			variable := y.CreateVariable(className)
-			defaultClassFullback := fixChainCreator()
-			if utils.IsNil(defaultClassFullback) {
-				log.Errorf("fixChainCreator failed.")
-				return obj, nil
-			}
-			y.AssignVariable(variable, defaultClassFullback)
-			var newCallTyp ssa.Type
-			args := []ssa.Value{obj}
-			arguments := y.VisitClassCreatorRest(ret, className)
-			args = append(args, arguments...)
-			call := y.EmitCall(y.NewCall(defaultClassFullback, args))
-
-			newCallTyp = y.AddFullTypeNameFromMap(className, call.GetType())
-			newCallTyp = y.MergeFullTypeNameForType(defaultClassFullback.GetType().GetFullTypeNames(), newCallTyp)
-			call.SetType(newCallTyp)
-			return obj, call
-		}
+	class, ok := ssa.ToClassBluePrintType(typ)
+	if ret := i.ClassCreatorRest(); ret != nil && ok {
+		// class := y.GetBluePrint(className)
+		obj := y.EmitUndefined(class.Name)
 		obj.SetType(class)
 		args := []ssa.Value{obj}
-		arguments := y.VisitClassCreatorRest(ret, className)
+		arguments := y.VisitClassCreatorRest(ret, class.Name)
 		args = append(args, arguments...)
 		return nil, y.ClassConstructor(class, args)
-		//return obj, y.EmitCall(y.NewCall(constructor, args))
 	}
 	//array init
 	if ret := i.ArrayCreatorRest(); ret != nil {
-		return y.VisitArrayCreatorRest(ret, p), nil
+		return y.VisitArrayCreatorRest(ret, typ), nil
 	}
 	log.Errorf("array  init failed.")
 	obj = y.EmitMakeWithoutType(nil, nil)
@@ -1777,33 +1734,70 @@ func (y *builder) VisitArrayCreatorRest(raw javaparser.IArrayCreatorRestContext,
 
 }
 
-func (y *builder) VisitCreatedName(raw javaparser.ICreatedNameContext) (typ ssa.Type, createdName []string, createdNameValue []ssa.Value) {
+func (y *builder) VisitCreatedName(raw javaparser.ICreatedNameContext) ssa.Type {
 	if y == nil || raw == nil || y.IsStop() {
-		return nil, nil, nil
+		return ssa.CreateAnyType()
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
 	i, _ := raw.(*javaparser.CreatedNameContext)
 	if i == nil {
-		return nil, nil, nil
+		return ssa.CreateAnyType()
 	}
 
 	if ret := i.PrimitiveType(); ret != nil {
-		typ = y.VisitPrimitiveType(ret)
-	} else {
-		typ = ssa.CreateAnyType()
+		return y.VisitPrimitiveType(ret)
 	}
+	createdName := []string{}
+	// TODO: 处理泛型
 	for _, name := range i.AllIdentifier() {
 		text := name.GetText()
-		if v := y.PeekValue(text); v != nil {
-			createdNameValue = append(createdNameValue, v)
-		} else {
-			createdNameValue = append(createdNameValue, y.ReadValue(text))
-		}
 		createdName = append(createdName, text)
 	}
-	return typ, createdName, createdNameValue
+
+	// get class from createdName
+	if len(createdName) == 0 {
+		return ssa.CreateAnyType()
+	}
+
+	className := createdName[len(createdName)-1]
+	fullClassName := strings.Join(createdName, ".")
+	class := y.GetBluePrint(className)
+	if class == nil {
+		class = y.GetBluePrint(fullClassName)
+	}
+	if class == nil {
+		class = y.CreateBlueprint(className, raw)
+		var object ssa.Value
+		// create constructor
+		for i, name := range createdName {
+			// typeName := strings.Join(createdName[:i+1], ".")
+			if i == 0 {
+				object = y.ReadValue(name)
+				typ := y.AddFullTypeNameFromMap(name, nil)
+				typ.AddFullTypeName(name)
+				log.Infof("VisitCreatedName: get first object type: %v", typ.GetFullTypeNames())
+				object.SetType(typ)
+			} else {
+				key := y.EmitConstInst(name)
+				typ := y.CreateSubType(name, object.GetType())
+				log.Infof("VisitCreatedName: get sub  type: %v", typ.GetFullTypeNames())
+				object = y.ReadMemberCallValue(object, key)
+				object.SetType(typ)
+			}
+		}
+		if !utils.IsNil(object) {
+			class.RegisterMagicMethod(ssa.Constructor, object)
+			for _, name := range object.GetType().GetFullTypeNames() {
+				log.Infof("add full type name: %s", name)
+				class.AddFullTypeName(name)
+			}
+		}
+	}
+	log.Infof("visit created name: %s", className)
+	class.AddFullTypeName(fullClassName)
+	return class
 }
 
 func (y *builder) VisitLambdaExpression(raw javaparser.ILambdaExpressionContext) ssa.Value {

@@ -395,7 +395,7 @@ func CompareResult(t *testing.T, contain bool, results *ssaapi.SyntaxFlowResult,
 					}
 				}
 				if !match {
-					t.Errorf("want[%s] not found in got[%v]", want, got)
+					t.Errorf("key: %s want[%s] not found in got[%v]", name, want, got)
 					t.FailNow()
 				}
 			}
