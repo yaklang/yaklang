@@ -113,42 +113,49 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 	feedbackToUser("接收到 MITM 启动参数 / receive mitm config request")
 
-	getDownstreamProxy := func(request *ypb.MITMV2Request) (string, error) {
+	getDownstreamProxy := func(request *ypb.MITMV2Request) ([]string, error) {
 		downstreamProxy := strings.TrimSpace(request.GetDownstreamProxy())
 		// 容错处理一下代理
 		downstreamProxy = strings.Trim(downstreamProxy, `":`)
 		if downstreamProxy == "0" {
 			downstreamProxy = ""
 		}
-		if downstreamProxy != "" {
-			feedbackToUser(fmt.Sprintf("启用下游代理为 / downstream proxy:[%v]", downstreamProxy))
-			proxyUrl, err := url.Parse(downstreamProxy)
-			if err != nil {
+		downstreamProxys := strings.Split(downstreamProxy, ",")
+		var proxys []string
+		for _, proxy := range downstreamProxys {
+			if strings.TrimSpace(proxy) == "" {
+				continue
+			}
+			proxyUrl, err2 := url.Parse(proxy)
+			if err2 != nil {
 				feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, err))
-				return "", utils.Errorf("cannot use proxy[%v]", err)
+				//做一个兼容处理
+				continue
 			}
 			_, port, err := utils.ParseStringToHostPort(proxyUrl.Host)
 			if err != nil {
-				feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, "parse host to host:port failed "+err.Error()))
-				return "", utils.Errorf("parse proxy host failed: %s", proxyUrl.Host)
+				feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", proxy, "parse host to host:port failed "+err.Error()))
+				continue
 			}
 			if port <= 0 {
-				feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, "缺乏端口（Miss Port）"))
-				return "", utils.Errorf("proxy miss port. [%v]", proxyUrl.Host)
+				feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", proxy, "缺乏端口（Miss Port）"))
+				continue
 			}
-			conn, err := netx.ProxyCheck(downstreamProxy, 5*time.Second) // 代理检查只做log记录，不在阻止MITM启动
+			conn, err := netx.ProxyCheck(proxy, 5*time.Second) // 代理检查只做log记录，不在阻止MITM启动
 			if err != nil {
 				errInfo := "代理不通（Proxy Cannot be connected）"
 				if errors.Is(err, netx.ErrorProxyAuthFailed) {
 					errInfo = "认证失败（Proxy Auth Fail）"
 				}
-				feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, errInfo))
+				log.Errorf("代理检测失败 / proxy check failed:[%v] %v", proxy, errInfo)
+				feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", proxy, errInfo))
 			}
 			if conn != nil {
 				conn.Close()
 			}
+			proxys = append(proxys, proxyUrl.String())
 		}
-		return downstreamProxy, nil
+		return proxys, nil
 	}
 	var (
 		host                        = "127.0.0.1"
@@ -256,8 +263,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	mitmPluginCaller.SetConcurrent(20)
 	mitmPluginCaller.SetLoadPluginTimeout(10)
 	mitmPluginCaller.SetCallPluginTimeout(consts.GetGlobalCallerCallPluginTimeout())
-	if downstreamProxy != "" {
-		mitmPluginCaller.SetProxy(downstreamProxy)
+	if downstreamProxy != nil {
+		mitmPluginCaller.SetProxy(downstreamProxy...)
 	}
 
 	cacheDebounce, _ := lo.NewDebounce(1*time.Second, func() {
@@ -458,12 +465,12 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			if reqInstance.GetSetDownstreamProxy() {
 				downstreamProxy, err := getDownstreamProxy(reqInstance)
 				if err == nil && mServer != nil {
-					err = mServer.Configure(crep.MITM_SetDownstreamProxy(downstreamProxy))
+					err = mServer.Configure(crep.MITM_SetDownstreamProxy(downstreamProxy...))
 					if err != nil {
 						feedbackToUser(fmt.Sprintf("设置下游代理失败 / set downstream proxy failed: %v", err))
 						log.Errorf("set downstream proxy failed: %s", err)
 					}
-					mitmPluginCaller.SetProxy(downstreamProxy)
+					mitmPluginCaller.SetProxy(downstreamProxy...)
 					feedbackToUser(fmt.Sprintf("设置下游代理成功 / set downstream proxy successful: %v", downstreamProxy))
 				}
 				continue
@@ -1363,7 +1370,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		crep.MITM_RandomJA3(randomJA3),
 		crep.MITM_ProxyAuth(proxyUsername, proxyPassword),
 		crep.MITM_SetHijackedMaxContentLength(packetLimit),
-		crep.MITM_SetDownstreamProxy(downstreamProxy),
+		crep.MITM_SetDownstreamProxy(downstreamProxy...),
 		crep.MITM_SetHTTPResponseHijackRaw(handleHijackResponse),
 		crep.MITM_SetHTTPRequestHijackRaw(handleHijackRequest),
 		crep.MITM_SetWebsocketRequestHijackRaw(handleHijackWsRequest),

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/crep"
@@ -306,7 +307,7 @@ func NewMITMServer(
 	for _, opt := range opts {
 		opt(config)
 	}
-	server, err := initMitmServer("", config)
+	server, err := initMitmServer(nil, config)
 	if err != nil {
 		return nil, utils.Errorf("create mitm server failed: %s", err)
 	}
@@ -338,7 +339,8 @@ func startBridge(
 	for _, opt := range opts {
 		opt(config)
 	}
-	server, err := initMitmServer(downstreamProxy, config)
+	downstreamProxys := strings.Split(downstreamProxy, ",")
+	server, err := initMitmServer(downstreamProxys, config)
 	if err != nil {
 		return utils.Errorf("create mitm server failed: %s", err)
 	}
@@ -350,7 +352,7 @@ func startBridge(
 	return nil
 }
 
-func initMitmServer(downstreamProxy string, config *mitmConfig) (*crep.MITMServer, error) {
+func initMitmServer(downstreamProxy []string, config *mitmConfig) (*crep.MITMServer, error) {
 
 	if config.host == "" {
 		config.host = "127.0.0.1"
@@ -363,7 +365,7 @@ func initMitmServer(downstreamProxy string, config *mitmConfig) (*crep.MITMServe
 		log.Infof("mitm proxy use the default cert and key")
 	}
 
-	if config.isTransparent && downstreamProxy != "" {
+	if config.isTransparent && downstreamProxy != nil {
 		log.Errorf("mitm.Bridge cannot be 'isTransparent'")
 	}
 
@@ -477,7 +479,7 @@ func initMitmServer(downstreamProxy string, config *mitmConfig) (*crep.MITMServe
 			fmt.Println(string(raw))
 			fmt.Println("-----------------------------")
 		}),
-		crep.MITM_SetDownstreamProxy(downstreamProxy),
+		crep.MITM_SetDownstreamProxy(downstreamProxy...),
 		crep.MITM_SetCaCertAndPrivKey(config.mitmCert, config.mitmPkey),
 		crep.MITM_SetHTTPRequestHijackRaw(func(isHttps bool, reqIns *http.Request, req []byte) []byte {
 			if config.hijackRequest == nil {

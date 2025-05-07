@@ -32,7 +32,7 @@ const (
 )
 
 type WebsocketClientConfig struct {
-	Proxy                  string
+	Proxy                  []string
 	TotalTimeout           time.Duration
 	TLS                    bool
 	FromServerHandler      func([]byte)
@@ -53,7 +53,7 @@ type WebsocketClientConfig struct {
 
 type WebsocketClientOpt func(config *WebsocketClientConfig)
 
-func WithWebsocketProxy(t string) WebsocketClientOpt {
+func WithWebsocketProxy(t ...string) WebsocketClientOpt {
 	return func(config *WebsocketClientConfig) {
 		config.Proxy = t
 	}
@@ -562,12 +562,12 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 	addr := utils.HostPort(host, port)
 	var conn net.Conn
 	if config.TLS {
-		conn, err = netx.DialTLSTimeout(30*time.Second, addr, nil, config.Proxy)
+		conn, err = netx.DialTLSTimeout(30*time.Second, addr, nil, config.Proxy...)
 		if err != nil {
 			return nil, utils.Errorf("dial tls-conn failed: %s", err)
 		}
 	} else {
-		conn, err = netx.DialTCPTimeout(30*time.Second, addr, config.Proxy)
+		conn, err = netx.DialTCPTimeout(30*time.Second, addr, config.Proxy...)
 		if err != nil {
 			return nil, utils.Errorf("dial conn failed: %s", err)
 		}

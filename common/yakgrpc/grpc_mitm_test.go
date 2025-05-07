@@ -2096,3 +2096,36 @@ func TestGRPCMUSTPASS_MITM_CheckUriEncoding(t *testing.T) {
 		cancel()
 	})
 }
+func TestGRPCMUSTPASS_MITM_MutProxy(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+	var (
+		downStream1 = false
+		token       = uuid.NewString()
+	)
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, r *http.Request) {})
+	target := fmt.Sprintf("http://%s:%v/%s", host, port, token)
+	host, port = utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.RequestURI(), token) {
+			downStream1 = true
+		}
+	})
+	downstream1Proxy := fmt.Sprintf("http://%s:%v", host, port)
+	mitmPort := uint32(utils.GetRandomAvailableTCPPort())
+	tcpPort := utils.GetRandomAvailableTCPPort()
+	downstream2Proxy := fmt.Sprintf("http://%s:%v", host, tcpPort)
+	RunMITMTestServer(client, ctx, &ypb.MITMRequest{
+		Host:            "127.0.0.1",
+		Port:            mitmPort,
+		DownstreamProxy: strings.Join([]string{downstream2Proxy, downstream1Proxy}, ","),
+	}, func(mitmClient ypb.Yak_MITMClient) {
+		defer cancel()
+		poc.DoGET(target, poc.WithProxy(fmt.Sprintf("http://%s:%v", "127.0.0.1", mitmPort)))
+		require.True(t, downStream1)
+	})
+}
+func TestGRPC_MITMPASS_HotPatchProxy(t *testing.T) {
+
+}

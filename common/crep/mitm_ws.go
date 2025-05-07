@@ -29,7 +29,7 @@ type (
 )
 
 type WebSocketModifier struct {
-	ProxyStr                       string
+	ProxyStr                       []string
 	websocketHijackMode            *utils.AtomicBool
 	forceTextFrame                 *utils.AtomicBool
 	enableCompression              *utils.AtomicBool
@@ -176,7 +176,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		lowhttp.WithWebsocketCompressionContextTakeover(true),
 		lowhttp.WithWebsocketHost(hostname),
 		lowhttp.WithWebsocketPort(port),
-		lowhttp.WithWebsocketProxy(w.ProxyStr),
+		lowhttp.WithWebsocketProxy(w.ProxyStr...),
 		lowhttp.WithWebsocketTLS(isTLS),
 		lowhttp.WithWebsocketCompress(w.enableCompression.IsSet()),
 		lowhttp.WithWebsocketDisableReassembly(!isHijack), // if transparent mode, disable reassembly
@@ -307,7 +307,7 @@ func (w *WebSocketModifier) legacyModifyRequest(req *http.Request) error {
 		logger.Infof("building websocket tls tunnel to %s", addr)
 		remoteConn, err = netx.DialX(
 			addr,
-			netx.DialX_WithProxy(w.ProxyStr),
+			netx.DialX_WithProxy(w.ProxyStr...),
 			netx.DialX_WithTimeout(30*time.Second),
 			netx.DialX_WithTLS(true),
 		)
@@ -316,7 +316,7 @@ func (w *WebSocketModifier) legacyModifyRequest(req *http.Request) error {
 		logger.Infof("building websocket tunnel to %s", addr)
 		remoteConn, err = netx.DialX(
 			addr,
-			netx.DialX_WithProxy(w.ProxyStr),
+			netx.DialX_WithProxy(w.ProxyStr...),
 			netx.DialX_WithTimeout(30*time.Second),
 			netx.DialX_WithTLS(false),
 		)

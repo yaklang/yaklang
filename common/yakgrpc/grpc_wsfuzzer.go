@@ -36,7 +36,7 @@ func (s *Server) CreateWebsocketFuzzer(stream ypb.Yak_CreateWebsocketFuzzerServe
 		lowhttp.WithWebsocketWithContext(ctx),
 		lowhttp.WithWebsocketTLS(firstReq.GetIsTLS()),
 		lowhttp.WithWebsocketTotalTimeout(float64(firstReq.GetTotalTimeoutSeconds())),
-		lowhttp.WithWebsocketProxy(firstReq.GetProxy()),
+		lowhttp.WithWebsocketProxy(strings.Split(firstReq.GetProxy(), ",")...),
 		lowhttp.WithWebsocketAllFrameHandler(func(c *lowhttp.WebsocketClient, f *lowhttp.Frame, data []byte, shutdown func()) {
 			opcode := f.Type()
 			switch opcode {
