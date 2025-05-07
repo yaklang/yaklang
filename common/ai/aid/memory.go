@@ -275,3 +275,7 @@ func (m *Memory) StoreCliParameter(param []*ypb.ExecParamItem) {
 		m.userData.Set(p.Key, p.Value)
 	}
 }
+
+func (m *Memory) SoftDeleteTimeline(id ...int64) {
+	m.timeline.SoftDelete(id...)
+}
