@@ -44,11 +44,11 @@ func Test_BuildIn_Rule_Ast_And_Rule_Id(t *testing.T) {
 			// check language
 			switch strings.Split(name, "-")[0] {
 			case "golang":
-				require.Equal(t, "1", string(ruleId[0]))
+				require.Equal(t, "1", string(ruleId[0]), "Go规则的规则ID开头应该是1")
 			case "java":
-				require.Equal(t, "2", string(ruleId[0]))
+				require.Equal(t, "2", string(ruleId[0]), "Java规则的规则ID开头应该是2")
 			case "php":
-				require.Equal(t, "3", string(ruleId[0]))
+				require.Equal(t, "3", string(ruleId[0]), "PHP规则的规则ID开头应该是3")
 			}
 		})
 		return nil
