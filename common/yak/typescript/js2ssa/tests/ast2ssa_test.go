@@ -15,6 +15,15 @@ println(a)
 `, []string{"1"}, t)
 }
 
+func TestBigInteger(t *testing.T) {
+	t.Parallel()
+	// 这里对待BigInt就是直接转成数字，不保留BigInt类型
+	ssatest.CheckPrintlnValue(`
+let a = 1234567n
+println(a)
+`, []string{"1234567"}, t)
+}
+
 func TestArithmeticBinaryExpressions(t *testing.T) {
 	t.Parallel()
 	ssatest.CheckPrintlnValue(`
@@ -653,6 +662,788 @@ println(complex.levels[0].points[2])
 		"15",
 		"40",
 	}, t)
+}
+
+func TestBasic_Variable_InBlock(t *testing.T) {
+	t.Parallel()
+	t.Run("test simple assign", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		println(a)
+		a = 2
+		println(a)
+`, []string{
+			"1",
+			"2",
+		}, t)
+	})
+
+	t.Run("simple test", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		println(a)
+		`, []string{"Undefined-a"}, t)
+	})
+
+	t.Run("test sub-scope capture parent scope in basic block", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		println(a)
+		{
+			a = 2
+			println(a)
+		}
+		println(a)
+		`, []string{
+			"1",
+			"2",
+			"2",
+		}, t)
+	})
+
+	t.Run("test sub-scope let local variable in basic block", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		println(a) // 1
+		{
+			let a = 2
+			println(a) // 2
+		}
+		println(a) // 1
+		`, []string{
+			"1",
+			"2",
+			"1",
+		}, t)
+	})
+
+	t.Run("test sub-scope var local variable in basic block", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		println(a) // 1
+		{
+			var a = 2
+			println(a) // 2
+		}
+		println(a) // 2
+		`, []string{
+			"1",
+			"2",
+			"2",
+		}, t)
+	})
+
+	t.Run("test sub-scope let local variable without assign in basic block", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		println(a) // 1
+		{
+			let a
+			println(a) // any
+		}
+		println(a) // 1
+		`, []string{
+			"1",
+			"Undefined-a",
+			"1",
+		}, t)
+	})
+
+	t.Run("test sub-scope function level variable in basic block", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		println(a) // 1
+		{
+			a = 2
+			println(a) // 2
+		}
+		println(a) // 2
+		`, []string{
+			"1",
+			"2",
+			"2",
+		}, t)
+	})
+
+	t.Run("test sub-scope and return", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		println(a) // 1
+		{
+			let a  = 2 
+			println(a) // 2
+			return 
+		}
+		println(a) // unreachable
+		`,
+			[]string{
+				"1", "2",
+			}, t)
+	})
+
+	t.Run("undefine variable in sub-scope", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		{
+			let a = 2
+			println(a) // 2
+		}
+		println(a) // undefine-a
+		`, []string{
+			"2",
+			"Undefined-a",
+		}, t)
+	})
+
+	t.Run("test ++ expression", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		{
+			a ++
+			println(a) // 2
+		}
+		`,
+			[]string{
+				"2",
+			},
+			t)
+	})
+
+	t.Run("test syntax block lose capture variable", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1 
+		{
+			a = 2  // capture [a: 2]
+			{
+				println(a) // 2
+			} 
+			// end-scope capture is []
+		}
+		println(a) // 2
+		
+		`, []string{
+			"2", "2",
+		}, t)
+	})
+}
+
+func TestBasic_Variable_InIf(t *testing.T) {
+	t.Parallel()
+	t.Run("test simple if", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		println(a)
+		if(c) {
+			a = 2
+			println(a)
+		}
+		println(a)
+		`, []string{
+			"1",
+			"2",
+			"phi(a)[2,1]",
+		}, t)
+	})
+	t.Run("test simple if with local vairable", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		println(a)
+		if(c) {
+			let a = 2
+			println(a)
+		}
+		println(a) // 1
+		`, []string{
+			"1",
+			"2",
+			"1",
+		}, t)
+	})
+
+	t.Run("test multiple phi if", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		if(c) {
+			a = 2
+		}
+		println(a)
+		println(a)
+		println(a)
+		`, []string{
+			"phi(a)[2,1]",
+			"phi(a)[2,1]",
+			"phi(a)[2,1]",
+		}, t)
+	})
+
+	t.Run("test multiple if ", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+	a = 1
+	if(1) {
+		if(2) {
+			a = 2
+		}
+	}
+	println(a)
+	`,
+			[]string{
+				"phi(a)[phi(a)[2,1],1]",
+			},
+			t)
+	})
+
+	t.Run("test simple if else", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		println(a)
+		if(c) {
+			a = 2
+			println(a)
+		} else {
+			a = 3
+			println(a)
+		}
+		println(a)
+		`, []string{
+			"1",
+			"2",
+			"3",
+			"phi(a)[2,3]",
+		}, t)
+	})
+
+	t.Run("test simple if else with origin branch", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		println(a)
+		if(c) {
+			// a = 1
+		} else {
+			a = 3
+			println(a)
+		}
+		println(a) // phi(a)[1, 3]
+		`, []string{
+			"1",
+			"3",
+			"phi(a)[1,3]",
+		}, t)
+	})
+
+	t.Run("test if-elseif", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		println(a)
+		if(c) {
+			a = 2
+			println(a)
+		}else if(c == 2){
+			a = 3
+			println(a)
+		}
+		println(a)
+		`,
+			[]string{
+				"1",
+				"2",
+				"3",
+				"phi(a)[2,3,1]",
+			}, t)
+	})
+	t.Run("test with return, no DoneBlock", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		println(a) // 1
+		if(c) {
+			return 
+		}
+		println(a) // phi(a)[Undefined-a,1]
+		`, []string{
+			"1",
+			"phi(a)[Undefined-a,1]",
+		}, t)
+	})
+	t.Run("test with return in branch, no DoneBlock", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		println(a) // 1
+		if(c) {
+			if(b) {
+				a = 2
+				println(a) // 2
+				return 
+			}else {
+				a = 3
+				println(a) // 3
+				return 
+			}
+			println(a) // unreachable // phi[2, 3]
+		}
+		println(a) // phi(a)[Undefined-a,1]
+		`, []string{
+			"1",
+			"2",
+			"3",
+			"phi(a)[Undefined-a,1]",
+		}, t)
+	})
+
+	t.Run("in if sub-scope", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		if(c) {
+			let a = 2
+		}
+		println(a)
+		`, []string{"Undefined-a"}, t)
+	})
+}
+
+func TestBasic_Variable_If_Logical(t *testing.T) {
+	t.Parallel()
+	t.Run("test simple", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		if(c || b) {
+			a = 2
+		}
+		println(a)
+		`, []string{"phi(a)[2,1]"}, t)
+	})
+
+	t.Run("test multiple logical", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		if(c || b && d) {
+			a = 2
+		}
+		println(a)
+		`, []string{"phi(a)[2,1]"}, t)
+	})
+}
+
+func TestBasic_variable_logical(t *testing.T) {
+	t.Parallel()
+	t.Run("simple", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1 || 2 
+		println(a)`,
+			[]string{
+				"phi(a)[1,2]",
+			}, t)
+	})
+
+	t.Run("test ", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = () => {
+			let t = 1 || 2
+			println(t)
+		}
+		a()
+		`, []string{
+			"phi(t)[1,2]",
+		}, t)
+	})
+}
+
+func TestBasic_For_Loop(t *testing.T) {
+	t.Run("simple loop not change", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		for(i=0; i < 10 ; i++) {
+			println(a) // 1
+		}
+		println(a) //1 
+		`,
+			[]string{
+				"1",
+				"1",
+			},
+			t)
+	})
+
+	t.Run("simple loop only condition", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		i = 1
+		for(i < 10;;) { 
+			println(i) // phi
+			i = 2 
+			println(i) // 2
+		}
+		println(i) // phi
+		`, []string{
+			"phi(i)[1,2]",
+			"2",
+			"phi(i)[1,2]",
+		}, t)
+	})
+
+	t.Run("simple loop", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		i=0
+		for(i=0; i<10; i++) {
+			println(i) // phi[0, i+1]
+		}
+		println(i)
+		`,
+			[]string{
+				"phi(i)[0,add(i, 1)]",
+				"phi(i)[0,add(i, 1)]",
+			}, t)
+	})
+
+	t.Run("loop with spin, signal phi", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		for(let i = 0; i < 10; i ++) { // i=0; i=phi[0,1]; i=0+1=1
+			println(a) // phi[0, $+1]
+			a = 0
+			println(a) // 0 
+		}
+		println(a)  // phi[0, 1]
+		`,
+			[]string{
+				"phi(a)[1,0]",
+				"0",
+				"phi(a)[1,0]",
+			},
+			t)
+	})
+
+	t.Run("loop with spin, double phi", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		for(let i = 0; i < 10; i++) {
+			a += 1
+			println(a) // add(phi, 1)
+		}
+		println(a)  // phi[1, add(phi, 1)]
+		`,
+			[]string{
+				"add(phi(a)[1,add(a, 1)], 1)",
+				"phi(a)[1,add(a, 1)]",
+			},
+			t)
+	})
+}
+
+func TestBasic_DoWhile_Loop(t *testing.T) {
+	t.Run("simple do-while not change", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		do {
+			println(a) // 1
+		} while(i < 10)
+		println(a) // 1
+		`,
+			[]string{
+				"1",
+				"1",
+			},
+			t)
+	})
+
+	t.Run("simple do-while with counter", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		i = 0
+		do {
+			println(i) // phi[0, i+1]
+			i++
+		} while(i < 3)
+		println(i) // phi[i+1]
+		`,
+			[]string{
+				"phi(i)[0,add(i, 1)]",
+				"phi(i)[0,add(i, 1)]",
+			},
+			t)
+	})
+}
+
+func TestBasic_While_Loop(t *testing.T) {
+	t.Run("simple while not change", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		while(i < 10) {
+			println(a) // 1
+		}
+		println(a) // 1
+		`,
+			[]string{
+				"1",
+				"1",
+			},
+			t)
+	})
+
+	t.Run("while with counter", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		i = 0
+		while(i < 3) {
+			println(i) // phi[0, i+1]
+			i++
+		}
+		println(i) // phi[0, i+1]
+		`,
+			[]string{
+				"phi(i)[0,add(i, 1)]",
+				"phi(i)[0,add(i, 1)]",
+			},
+			t)
+	})
+
+	t.Run("while with variable modification", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		i = 0
+		while(i < 3) {
+			a += 1
+			println(a) // add(phi, 1)
+			i++
+		}
+		println(a) // phi[1, add(phi,1)]
+		`,
+			[]string{
+				"add(phi(a)[1,add(a, 1)], 1)",
+				"phi(a)[1,add(a, 1)]",
+			},
+			t)
+	})
+}
+
+func TestForInOf_SSA(t *testing.T) {
+	t.Parallel()
+
+	t.Run("for-in with phi", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		const obj = {a: 1, b: 2, c: 3}
+		let sum = 0
+		for(const key in obj) {
+			sum += obj[key]
+		}
+		println(sum)
+		`, []string{
+			"phi(sum)[0,add(sum, Undefined-obj.key(valid))]", // for-in循环中的phi
+		}, t)
+	})
+
+	t.Run("for-of with phi", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		const arr = [10, 20, 30]
+		let sum = 0
+		for(const val of arr) {
+			sum += val
+		}
+		println(sum)
+		`, []string{
+			"phi(sum)[0,add(sum, Undefined-val(valid))]", // for-of循环中的phi
+		}, t)
+	})
+
+}
+
+func TestBasic_CFG_Break(t *testing.T) {
+	t.Run("simple break in loop", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		for(let i = 0; i < 10; i++) {
+			if(i == 5) {
+				a = 2
+				break
+			}
+		}
+		println(a) // phi[1, 2]
+		`, []string{
+			"phi(a)[2,1]",
+		}, t)
+	})
+
+	t.Run("simple continue in loop", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		for(let i = 0; i < 10; i++) {
+			if(i == 5) {
+				a = 2
+				continue
+			}
+		}
+		println(a) // phi[1, 2]
+		`, []string{
+			"phi(a)[2,1]",
+		}, t)
+	})
+
+	t.Run("simple break in switch-1", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		switch(a) {
+		case 1:
+			if(c) {
+				a = 2
+				break
+			}
+			a = 4
+			break
+		case 2:
+			a = 3
+		}
+		println(a) // phi[1, 2, 3, 4]
+		`, []string{
+			"phi(a)[2,4,phi(a)[3,1]]",
+		}, t)
+	})
+
+	t.Run("simple break in switch-2", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1;
+		switch (a) {
+		case 1:
+			if (c) {
+				 a = 2;
+				 break;
+			}
+			a = 4;
+		case 2:
+			a = 3;
+		}
+		println(a) ;
+		`, []string{
+			"phi(a)[2,phi(a)[3,1]]",
+		}, t)
+	})
+
+	t.Run("simple continue in loop", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+ 		a = 1;
+		for (let i = 0; i < 10; i++) {
+			if (i == 5) {
+				a = 2;
+				continue;
+			}
+		}
+		println(a); // phi[1, 2]
+		`, []string{
+			"phi(a)[2,1]",
+		}, t)
+	})
+
+	t.Run("simple fallthrough in switch", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		switch(a) {
+		case 1:
+			a = 2
+		case 2:
+			println(a) // 1 2
+			a = 3
+		default: 
+			a = 4
+		}
+		println(a) // 3 4
+		`, []string{
+			"phi(a)[2,1]",
+			"4",
+		}, t)
+	})
+}
+
+func TestBasic_Variable_Switch(t *testing.T) {
+	t.Run("simple switch, no default", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		switch(a) {
+		case 2: 
+			a = 22
+			println(a)
+			break
+		case 3:
+			a = 33
+			println(a)
+			break
+		}
+		println(a) // phi[1, 22, 33]
+		`, []string{
+			"22", "33", "phi(a)[22,33,1]",
+		}, t)
+	})
+
+	t.Run("simple switch, no default, without break", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		switch(a) {
+		case 2: 
+			a = 22
+			println(a)
+		case 3:
+			a = 33
+			println(a)
+		}
+		println(a) // phi[1, 22, 33]
+		`, []string{
+			"22", "33", "phi(a)[33,1]",
+		}, t)
+	})
+
+	t.Run("simple switch, has default but nothing", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		switch(a) {
+		case 2: 
+			a = 22
+			println(a)
+			break
+		case 3:
+			a = 33
+			println(a)
+			break
+		default: 
+		}
+		println(a) // phi[1, 22, 33]
+		`, []string{
+			"22", "33", "phi(a)[22,33,1]",
+		}, t)
+	})
+
+	t.Run("simple switch, has default", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		a = 1
+		switch(a) {
+		case 2: 
+			a = 22
+			println(a)
+			break
+		case 3:
+			a = 33
+			println(a)
+			break
+		default: 
+			a = 44
+			println(a)
+		}
+		println(a) // phi[22, 33, 44]
+		`, []string{
+			"22", "33", "44", "phi(a)[22,33,44]",
+		}, t)
+	})
+
+	//t.Run("simple switch, has default with break label", func(t *testing.T) {
+	//		ssatest.CheckPrintlnValue(`
+	//		a = 2
+	//		outer: {
+	// switch (a) {
+	//   case 2:
+	//     break outer; // ✅ 跳出 outer 标签块
+	//     a = 3
+	//   case 3:
+	//     break outer; // ✅ 跳出 outer 标签块
+	//     a = 4
+	//	default:
+	//     a = 1
+	//     println(a)
+	// }
+	//}
+	//println(a)
+	//		`, []string{
+	//			"1", "phi(a)[1,2]",
+	//		}, t)
+	//	})
 }
 
 //func TestDestructuring(t *testing.T) {
