@@ -1,0 +1,115 @@
+yakit.AutoInitYakit()
+
+// packet = `GET / HTTP/1.1
+// Host: www.baidu.com
+//
+// `
+
+packet = cli.String("packet", cli.setHelp("http request packet raw"), cli.setRequired(true))
+https := cli.String(
+    "https",
+    cli.setRequired(false),
+    cli.setHelp("yes or no will set https [yes/no]"),
+    cli.setDefault("no"),
+)
+// https = true
+
+matchRequest := cli.String("match-request", cli.setDefault("no"), cli.setHelp("是否需要匹配请求数据包的内容？[yes/no]"), cli.setRequired(false))
+regexpKeyword := cli.String(
+    "regexp-match",
+    cli.setRequired(false),
+    cli.setHelp("发起请求如果你想看某一些关键字/正则匹配的内容可以设置这个"),
+)
+substrs := cli.String(
+    "substring-match",
+    cli.setRequired(false),
+    cli.setHelp("发起请求如果你想看某一些关键字/正则匹配的内容可以设置这个"),
+)
+contextLine := cli.Int(
+    "context-line",
+    cli.setDefault(3),
+    cli.setHelp("如果正则或者关键字匹配到了内容，那么你可以通过 context-line 来设置想要看附近几行的数据，默认为3"),
+)
+redirectTime := cli.Int(
+    "redirect-times",
+    cli.setDefault(3),
+    cli.setHelp("设置请求是否允许重定向，设置为0则关闭重定向，默认为3"),
+)
+timeoutSecond := cli.Int("timeout-seconds", cli.setDefault(10), cli.setHelp("请求超时时间"))
+cli.check()
+
+opts = []
+
+isHttps := https in ["yes", "y", "true"]
+
+opts.Append(poc.https(isHttps))
+if redirectTime <= 0 {
+    opts.Append(poc.noRedirect(true))
+} else {
+    opts.Append(poc.noRedirect(false), poc.redirectTimes(int(redirectTime)))
+}
+
+
+url := poc.GetUrlFromHTTPRequest(isHttps ? "https": "http", packet /*type: []byte*/)
+if url != "" {
+    method := poc.GetHTTPRequestMethod(packet)
+    yakit.Info("HTTP REQ [%v] %v", method, url)
+}
+rspIns, req, err := poc.HTTPEx(packet, opts...)
+if err != nil {
+    yakit.Error("request failed: %v", err)
+    return
+}
+
+rsp = rspIns.RawPacket
+req = rspIns.RawRequest
+
+if rspIns.PortIsOpen {
+    yakit.Info("%v is open", rspIns.RemoteAddr)
+}
+yakit.Info("response body size: %v", rspIns.ResponseBodySize)
+try {
+    yakit.Info("dns cost: %v; connect time: %v; server time(firstByte arrival): %v; total: %v", rspIns.TraceInfo.DNSTime.String(), rspIns.TraceInfo.ConnTime.String(), rspIns.TraceInfo.ServerTime.String(), rspIns.TraceInfo.TotalTime.String())
+} catch {
+
+}
+
+
+try {
+    yakit.Info(rsp[:rsp.IndexOf("\r\n")])
+}catch e {
+
+}
+
+reqfile, err := file.TempFileName("req-packet-*.txt")
+if err != nil {
+    yakit.Error("save req failed: %v", err)
+} else {
+    yakit.Info("save req[size:%v] to %v", len(rsp), reqfile)
+    file.Save(reqfile, string(req))
+}
+
+rspfile, err := file.TempFileName("rsp-packet-*.txt")
+if err != nil {
+    yakit.Error("save rsp[size:%v] failed: %v", len(rsp), err)
+} else {
+    yakit.Info("save rsp[size:%v] to %v", len(rsp), rspfile)
+    file.Save(rspfile, string(rsp))
+}
+
+
+if substrs != "" && regexpKeyword != "" {
+    edt := memeditor.New(string(rsp))
+    if substrs != "" {
+        edt.FindStringRange(substrs, rg => { yakit.Info("match in rsp:\n%v", rg.String()) })
+    }
+    if regexpKeyword != "" {
+        edt.FindRegexpRange(regexpKeyword, rg => { yakit.Info("match in rsp: \n%v", string(rg.String())) })
+    }
+
+    if matchRequest in ["y", "yes", "true"] {
+        edt = memeditor.New(string(rsp))
+        substrs != "" ? edt.FindStringRange(substrs, rg => { yakit.Info("match in req:\n%v", rg.String()) }) : ""
+        regexpKeyword != "" ? edt.FindRegexpRange(regexpKeyword, rg => { yakit.Info("match in req: \n%v", string(rg.String())) }) : ""
+    }
+}

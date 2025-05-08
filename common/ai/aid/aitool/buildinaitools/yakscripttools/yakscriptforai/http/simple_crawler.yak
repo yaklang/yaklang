@@ -1,0 +1,79 @@
+__DESC__ = "不使用浏览器的基本简易爬虫，开销低，速度快，可控性好，适合初步探查使用"
+
+startUrl := cli.String("urls", cli.setHelp("开始简单爬虫的起始页面"), cli.setRequired(true))
+// startUrl = "https://www.example.com,http://127.0.0.1:8787"
+reqsLimit := cli.Int("reqs-max", cli.setHelp("最多对外发送多少请求？"))
+noParent := cli.String("forbid-for-parent-path", cli.setHelp("禁止访问夫目录，使用[yes/no]来控制"))
+ua = cli.String("user-agent", cli.setHelp("手动设置User-Agent"))
+maxUrls = cli.Int("urls-max", cli.setHelp("最多访问多少URL？"))
+maxDepth := cli.Int("max-depth", cli.setHelp("爬虫访问逻辑深度"), cli.setDefault(2))
+timeoutSecond := cli.Int("timeout", cli.setHelp("设置超时秒数(单次请求的秒数)"), cli.setDefault(10))
+cli.check()
+
+opts = []
+if reqsLimit > 0 {
+    opts.Append(crawler.maxRequest(reqsLimit))
+}
+if noParent in ["yes", "y"] {
+    opts.Append(crawler.forbiddenFromParent(true))
+}
+if ua != "" {
+    opts.Append(crawler.userAgent(ua /*type: string*/))
+}
+if maxUrls > 0 {
+    opts.Append(crawler.maxUrls(maxUrls))
+}
+
+if timeoutSecond > 0 {
+    opts.Append(crawler.connectTimeout(timeoutSecond))
+}
+
+reqCh, err := crawler.Start(startUrl, opts...)
+if err != nil {
+    yakit.Info("crawler failed: %v", err)
+    return
+}
+
+
+
+buf = bufio.NewBuffer()
+for result in reqCh {
+    urlstr := result.Url()
+    // println(urlstr)
+    req, _ := http.dump(result.Request())
+    reqfile = ""
+    try {
+        reqfile = file.TempFileName("crawler-req-*.txt")~
+        file.Save(reqfile, string(req))
+    } catch {}
+    var rspdesc = ""
+    var rspfile = ""
+    try {
+        rsp, _ := http.dump(result.Response()[0])
+        rspdesc = str.Join(poc.GetHTTPPacketFirstLine(rsp), " ")
+        rspfile = file.TempFileName("crawler-req-*.txt")~
+        file.Save(rspfile, string(rsp))
+    } catch {}
+
+    line := "[%v] [%v]: %v%v%v" % [
+        poc.GetHTTPRequestMethod(req),
+        rspdesc != "" ? (" " + rspdesc) : "",
+        urlstr,
+        reqfile != "" ? (" req in " + reqfile + " ") : "",
+        rspfile != "" ? (" rsp in " + rspfile + " ") : "",
+    ]
+    buf.WriteString(line)
+    buf.WriteString("\n")
+    println(line)
+}
+if parseInt(string(buf.String())) <= 2048 {
+    yakit.Info(string(buf.String()))
+} else {
+    yakit.Info(string(buf.String())[:2000] + "... chunked")
+}
+try {
+    name := file.TempFileName(`crawler-result-*.txt`)~
+    file.Save(name, string(buf.String()))~
+    yakit.Info("crawler result log saved: %v (size: %v)", name, len(buf.String()))
+} catch {}
+
