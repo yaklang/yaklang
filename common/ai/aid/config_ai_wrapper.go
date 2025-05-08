@@ -71,7 +71,7 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 		for _idx := 0; _idx < int(c.aiAutoRetry); _idx++ {
 			c.inputConsumptionCallback(tokenSize)
 			rsp, err = i(config, request)
-			if err != nil {
+			if err != nil || rsp == nil {
 				c.EmitWarning("ai request err: %v, retry auto time: [%v]", err, _idx+1)
 				time.Sleep(500 * time.Millisecond)
 				continue
