@@ -65,7 +65,7 @@ func (t *aiTask) dumpProgress(i int, w io.Writer) {
 		fill = "-"
 		note = " (执行中)"
 		if ret := t.SingleLineStatusSummary(); ret != "" {
-			note += fmt.Sprintf(" (info:%s)", ret)
+			note += fmt.Sprintf(" (status:%s)", ret)
 		}
 	}
 

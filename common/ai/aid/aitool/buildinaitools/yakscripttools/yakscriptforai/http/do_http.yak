@@ -12,6 +12,17 @@ cli.check()
 
 opts = []
 
+try {
+    yakit.Info("当前URL:%v", url)
+    req = fuzz.UrlToHTTPRequest(method, url)~
+    for i in req.GetGetQueryParams() {
+        yakit.Info(i.String())
+    }
+} catch e {
+
+}
+
+
 rsp, req, err = poc.Do(method, url, opts...)
 if err != nil {
     yakit.Error("request failed: %v", err)
@@ -28,24 +39,22 @@ if !(str.ToLower(requestRequest) in ["no", "n", "f", "false"]) {
     }
 }
 
-dump(rsp.RawPacket)
-// 对 AI 来说，页面在 4k 内，可以认为是文本，否则保存到文件让他通过工具直接看
-if len(rsp.RawPacket) < 4096 {
-    yakit.Info("rsp packet[size:%v]: %v", len(rsp.RawPacket), string(rsp.RawPacket))
-} else {
-    tmp, err := file.TempFileName()
-    if err != nil {
-        yakit.Error("create temp file failed: %v", err)
-        return
-    }
-    file.Save(tmp, rsp.RawPacket)
-    yakit.Info("rsp packet[size:%v], save to %v, use grep or some text tool to handle it", len(rsp.RawPacket), tmp )
+editor := memeditor.New(string(rsp.RawPacket))
+// 对 AI 来说，直接保存到文件中，他就会用一些其他的东西来检查，所以，默认重要数据保存，告诉他保存到哪儿了。
+rspFilename, err := file.TempFileName("do-http-raw-response-*.txt")
+if err != nil {
+    yakit.Error("create temp file failed: %v", err)
+    return
+}
+file.Save(rspFilename, string(rsp.RawPacket))
+yakit.Info("rsp packet[size:%v], save to %v, use grep or some text tool to handle it", len(rsp.RawPacket), rspFilename)
+
+if len(rsp.RawPacket) < 1024 {
+    yakit.Info("rsp packet[size:%v]: \n%v", len(rsp.RawPacket), string(rsp.RawPacket))
 }
 
-rawPacket := string(rsp.RawPacket)
-if keyword != "" && rawPacket.Contains(keyword) {
-    idx := rawPacket.IndexOf(keyword)
-    if idx >= 0 {
-        yakit.Info("your fucos-keyword: %#v is existed in rawPacket", keyword)
-    }
+if keyword != "" {
+    editor.FindStringRange(keyword, rangeIns => {
+        println(rangeIns.GetTextContextWithPrompt(3))
+    })
 }
