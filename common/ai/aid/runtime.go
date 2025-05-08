@@ -64,6 +64,9 @@ func (t *aiTask) dumpProgress(i int, w io.Writer) {
 	if t.executing {
 		fill = "-"
 		note = " (执行中)"
+		if ret := t.SingleLineStatusSummary(); ret != "" {
+			note += fmt.Sprintf(" (info:%s)", ret)
+		}
 	}
 
 	_, _ = fmt.Fprintf(w, "%s -[%v] %s %v\n", prefix, fill, strconv.Quote(t.Name), note)

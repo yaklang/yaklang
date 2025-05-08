@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"strconv"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
@@ -48,6 +49,7 @@ type aiTask struct {
 	// runtime
 	//ToolCallResults   []*aitool.ToolResult `json:"tool_call_results"`
 	toolCallResultIds *omap.OrderedMap[int64, *aitool.ToolResult]
+	StatusSummary     string `json:"status_summary"`
 	TaskSummary       string `json:"task_summary"`
 	ShortSummary      string `json:"short_summary"`
 	LongSummary       string `json:"long_summary"`
@@ -254,6 +256,10 @@ func ExtractTaskFromRawResponse(c *Config, rawResponse string) (*aiTask, error) 
 		}
 	}
 	return nil, errors.New("no aiTask found")
+}
+
+func (t *aiTask) SingleLineStatusSummary() string {
+	return strings.ReplaceAll(t.StatusSummary, "\n", " ")
 }
 
 func (t *aiTask) QuoteName() string {

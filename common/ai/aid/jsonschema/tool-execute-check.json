@@ -1,5 +1,4 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "required": ["@action"],
   "properties": {
@@ -10,6 +9,18 @@
         "根据调用结果检查是否完成当前子任务，如果你认为未完成，需要调用更多工具，则使用require-more-tool",
         "如果你认为任务已经完成，请使用finished"
       ]
+    },
+    "status_summary": {
+      "type": "string",
+      "description": "当前任务的进度和总结信息，为了更好的执行下一次任务，你需要总结一些基本内容，这些内容会更新在当前任务的状态中，以帮助下一次内容执行"
+    },
+    "task_long_summary": {
+      "type": "string",
+      "description": "在任务完成的情况下，给出这个任务的总结，控制在300token左右，只在特定情况下出现。"
+    },
+    "task_short_summary": {
+      "type": "string",
+      "description": "任务完成时精炼版，保留最关键信息不删减，控制在100词以内，这个短总结会出现在后面所有的进度展示中。"
     }
   },
   "examples": [

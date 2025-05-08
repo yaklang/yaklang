@@ -1,3 +1,4 @@
 {{ .Memory.Progress }}
 当前任务: {{ .Memory.CurrentTask.QuoteName }}
 目标：{{ .Memory.CurrentTask.QuoteGoal }}
+{{ if .Memory.CurrentTask.SingleLineStatusSummary }}任务状态：{{ .Memory.CurrentTask.SingleLineStatusSummary }}{{end}}
