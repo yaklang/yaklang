@@ -83,6 +83,7 @@ func (b *builder) handlerGoto(labelName string, isBreak ...bool) {
 		LabelBuilder := b.GetLabelByName(labelName)
 		if LabelBuilder == nil {
 			b.NewError(ssa.Error, TAG, fmt.Sprintf("label: %s not found", labelName))
+			return
 		}
 		gotoBuilder.SetLabel(targetBlock)
 		f := gotoBuilder.Finish()
