@@ -372,4 +372,45 @@ b<typeName> as $jsonType2
 			"builder_type_name": {"com.squareup.okhttp.Request.Builder"},
 		}, ssaapi.WithLanguage(consts.JAVA))
 	})
+
+	t.Run("check import type same name with current package ", func(t *testing.T) {
+		code := `
+		package com.ruoyi.web.controller.common;
+	
+		import com.ruoyi.common.utils.file.FileUtils;
+	
+	public class FileUtils
+	{
+		public static void writeBytes(String filePath, OutputStream os) throws IOException{}
+	}
+	
+		@Controller
+		public class CommonController
+		{
+			private static final Logger log = LoggerFactory.getLogger(CommonController.class);
+	
+			@Autowired
+			private ServerConfig serverConfig;
+	
+			/**
+			 * 通用下载请求
+			 *
+			 * @param fileName 文件名称
+			 * @param delete 是否删除
+			 */
+			@GetMapping("common/download")
+			public void fileDownload(String fileName, Boolean delete, HttpServletResponse response, HttpServletRequest request)
+			{
+				FileUtils.writeBytes(filePath, response.getOutputStream());
+			}
+		}
+		`
+
+		ssatest.CheckSyntaxFlowSource(t, code, `
+	filePath?{opcode: param}<getFunc> as $function 
+	$function() as $function_call_site
+	`, map[string][]string{
+			"function_call_site": {"writeBytes(filePath, response.getOutputStream())"},
+		}, ssaapi.WithLanguage(consts.JAVA))
+	})
 }
