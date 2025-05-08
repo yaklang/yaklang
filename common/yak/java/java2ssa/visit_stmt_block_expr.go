@@ -1969,6 +1969,9 @@ func (y *builder) VisitIdentifier(raw javaparser.IIdentifierContext, wantVariabl
 		value = importValue
 		return nil, importValue
 	}
+	if bp := y.GetBluePrint(name); bp != nil {
+		return nil, bp.Container()
+	}
 	if importType, ok := y.GetProgram().ReadImportType(name); ok {
 		if blueprint, ok := ssa.ToClassBluePrintType(importType); ok {
 			return nil, blueprint.Container()
