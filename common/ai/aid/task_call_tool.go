@@ -176,7 +176,7 @@ func (t *aiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitoo
 			return utils.Errorf("error extracting action: %v", err)
 		}
 		actionFinal = action.Name()
-		if actionFinal != "require-more-action" && actionFinal != "finished" {
+		if actionFinal != "require-more-tool" && actionFinal != "finished" {
 			return utils.Errorf("error extracting action: %v", actionFinal)
 		}
 		if ret := action.GetString("status_summary"); ret != "" {
