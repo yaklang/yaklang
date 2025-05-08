@@ -113,8 +113,9 @@ func (y *SyntaxFlowVisitor) VisitFilterStatement(raw sf.IFilterStatementContext)
 		if up := i.RefVariable(); up != nil {
 			varName := y.VisitRefVariable(up) // create symbol and pop stack
 			y.EmitUpdate(varName)
+		} else {
+			y.EmitPop()
 		}
-		y.EmitPop()
 	case *sf.RefFilterExprContext:
 		if ref := i.RefVariable(0); ref != nil {
 			variable := y.VisitRefVariable(ref)
@@ -133,8 +134,9 @@ func (y *SyntaxFlowVisitor) VisitFilterStatement(raw sf.IFilterStatementContext)
 		if up := i.RefVariable(1); up != nil {
 			varName := y.VisitRefVariable(up) // create symbol and pop stack
 			y.EmitUpdate(varName)
+		} else {
+			y.EmitPop()
 		}
-		y.EmitPop()
 	}
 
 	// for filter expression
