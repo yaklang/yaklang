@@ -1,6 +1,7 @@
 desc(
     title: "Access Specifier Manipulation via Reflection",
     title_zh: "通过反射操纵访问修饰符",
+    rule_id: 20749981, 
     type: Vulnerability,
     severity: High,
     risk: High,

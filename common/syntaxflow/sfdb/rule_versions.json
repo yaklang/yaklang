@@ -1,5 +1,11 @@
 [
   {
+    "rule_id": "05461170",
+    "rule_name": "硬编码API凭据",
+    "hash": "a2295836e334371fadffa73517b01f67ef472ddb22b99b746f2e8c8aab8ea963",
+    "version": "20250508.0001"
+  },
+  {
     "rule_id": "11336001",
     "rule_name": "golang SSTI(template)",
     "hash": "285f8dc44f2f65ef68e273ef3d53de0d53f5cbe7b0c75617e2c8edd1a6beae1f",
@@ -678,10 +684,16 @@
     "version": "20250428.0001"
   },
   {
+    "rule_id": "20749981",
+    "rule_name": "通过反射操纵访问修饰符",
+    "hash": "ea7510cd95a2ffc7b6be2679c6b8be3779492db3519b92fc76843ec834c56508",
+    "version": "20250508.0001"
+  },
+  {
     "rule_id": "20077001",
     "rule_name": "Servlet \u0026 Springframework 基础参数命令注入",
-    "hash": "9fcc92a320bbb2271837e8e2993c46791d5c331aed2e4ae9149861e08de5c0b5",
-    "version": "20250508.0002"
+    "hash": "389ed0fc3f7102426204c5e5d593f2ed4d781dd3b72d2880df8a0b403db5be2f",
+    "version": "20250508.0003"
   },
   {
     "rule_id": "20079001",
@@ -796,6 +808,12 @@
     "rule_name": "检测Java Spring Framework跨域白名单过于宽松",
     "hash": "413d662d771bec0c9af11a395dcda2eaedbae32c86e916c4145d3b3fc9dde893",
     "version": "20250428.0001"
+  },
+  {
+    "rule_id": "25435285",
+    "rule_name": "不安全的字节数组到字符串转换",
+    "hash": "8ca8b3692275546adde296d8da9ece9e8cc8eedaf1fdffc26126775921e7d9ce",
+    "version": "20250508.0001"
   },
   {
     "rule_id": "20000028",

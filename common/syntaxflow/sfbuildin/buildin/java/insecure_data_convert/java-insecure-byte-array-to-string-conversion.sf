@@ -1,6 +1,7 @@
 desc(
     title: "Insecure Byte Array to String Conversion",
     title_zh: "不安全的字节数组到字符串转换",
+    rule_id: 25435285, 
     type: Vulnerability,
     severity: Medium,
     risk: Medium,
