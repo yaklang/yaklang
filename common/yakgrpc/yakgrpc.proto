@@ -823,6 +823,26 @@ service Yak {
   rpc ExportNote(ExportNoteRequest) returns (stream ExportNoteResponse);
 
   rpc StartAITask(stream AIInputEvent) returns(stream AIOutputEvent);
+  rpc GetAIToolList(GetAIToolListRequest) returns(GetAIToolListResponse);
+}
+
+message AITool {
+  string Name = 1;
+  string Description = 2;
+  string Content = 3;
+  string ToolPath = 4;
+  repeated string Keywords = 5;
+}
+
+message GetAIToolListResponse {
+  repeated AITool Tools = 1;
+  Paging Pagination = 2;
+}
+
+message GetAIToolListRequest {
+  string Query = 1;
+  string ToolName = 2;
+  Paging Pagination = 3;
 }
 
 message AIOutputEvent {
