@@ -202,6 +202,39 @@ func BatchAddGroupsForRules(db *gorm.DB, ruleNames, groupNames []string) (int64,
 	return count, err
 }
 
+func BatchAddGroupsForRulesByRuleId(db *gorm.DB, ruleIds, groupNames []string) (int64, error) {
+	ruleIds = utils.RemoveRepeatedWithStringSlice(ruleIds)
+	groupNames = utils.RemoveRepeatedWithStringSlice(groupNames)
+
+	var count int64
+	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
+		groups := GetOrCreateGroups(tx, groupNames)
+		rules, err := QueryRulesById(tx, ruleIds)
+		if err != nil {
+			return err
+		}
+
+		if len(ruleIds) != len(rules) {
+			return utils.Errorf("batch add groups for rules failed: rules not found")
+		}
+		if len(groupNames) != len(groups) {
+			return utils.Errorf("batch add groups for rules failed: groups not found")
+		}
+		if len(groups) == 0 || len(rules) == 0 {
+			return utils.Errorf("batch add groups for rules failed: groups or rules is empty")
+		}
+		for _, rule := range rules {
+			if err = tx.Model(rule).Association("Groups").Append(groups).Error; err != nil {
+				return err
+			} else {
+				count += int64(len(groups))
+			}
+		}
+		return nil
+	})
+	return count, err
+}
+
 // BatchRemoveGroupsForRules 为多个规则移除多个组
 func BatchRemoveGroupsForRules(db *gorm.DB, ruleNames, groupNames []string) (int64, error) {
 	var count int64
@@ -222,6 +255,43 @@ func BatchRemoveGroupsForRules(db *gorm.DB, ruleNames, groupNames []string) (int
 			return utils.Errorf("batch remove groups for rules failed: rules or groups is empty")
 		}
 		if len(ruleNames) != len(rules) {
+			return utils.Errorf("batch remove groups for rules failed: rules not found")
+		}
+		if len(groupNames) != len(groups) {
+			return utils.Errorf("batch remove groups for rules failed: groups not found")
+		}
+		for _, rule := range rules {
+			if err = tx.Model(rule).Association("Groups").Delete(groups).Error; err != nil {
+				return err
+			} else {
+				count += int64(len(groups))
+			}
+		}
+		return nil
+	})
+
+	return count, err
+}
+
+func BatchRemoveGroupsForRulesById(db *gorm.DB, ruleIds, groupNames []string) (int64, error) {
+	var count int64
+	ruleIds = utils.RemoveRepeatedWithStringSlice(ruleIds)
+	groupNames = utils.RemoveRepeatedWithStringSlice(groupNames)
+
+	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
+		groups, err := QueryGroupsByName(tx, groupNames)
+		if err != nil {
+			return utils.Errorf("batch remove groups for rules failed: %s", err)
+		}
+		rules, err := QueryRulesById(tx, ruleIds)
+		if err != nil {
+			return utils.Errorf("batch remove groups for rules failed: %s", err)
+		}
+
+		if len(rules) == 0 || len(groups) == 0 {
+			return utils.Errorf("batch remove groups for rules failed: rules or groups is empty")
+		}
+		if len(ruleIds) != len(rules) {
 			return utils.Errorf("batch remove groups for rules failed: rules not found")
 		}
 		if len(groupNames) != len(groups) {
