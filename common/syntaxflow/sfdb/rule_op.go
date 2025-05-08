@@ -153,7 +153,9 @@ func CreateRuleByContent(ruleFileName string, content string, buildIn bool, tags
 	}
 	rule.Type = ruleType
 	rule.RuleName = ruleFileName
-	rule.Language = string(language)
+	if language != "" {
+		rule.Language = string(language)
+	}
 	rule.Tag = strings.Join(tags, "|")
 	rule.IsBuildInRule = buildIn
 	version, err := GetVersion(rule.RuleId)
@@ -168,12 +170,16 @@ func CreateRuleByContent(ruleFileName string, content string, buildIn bool, tags
 			rule.RuleName = rule.Title
 		}
 	}
-	err = MigrateSyntaxFlow(rule.CalcHash(), rule)
+	return rule, nil
+}
+
+func SaveRule(rule *schema.SyntaxFlowRule) error {
+	err := MigrateSyntaxFlow(rule.CalcHash(), rule)
 	if err != nil {
-		return nil, utils.Wrap(err, "migrate syntax flow rule error")
+		return utils.Wrap(err, "migrate syntax flow rule error")
 	}
 	addGroupsForRule(consts.GetGormProfileDatabase(), rule, true)
-	return rule, nil
+	return nil
 }
 
 func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags ...string) (*schema.SyntaxFlowRule, error) {
@@ -181,6 +187,7 @@ func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags 
 	if err != nil {
 		return nil, utils.Errorf("create build in rule failed: %s", err)
 	}
+	SaveRule(rule)
 	return rule, nil
 }
 

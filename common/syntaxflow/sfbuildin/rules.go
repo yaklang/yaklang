@@ -53,18 +53,21 @@ func SyncEmbedRule(notifies ...func(process float64, ruleName string)) (err erro
 		}
 
 		var tags []string
+		var cve int
 		for _, block := range utils.PrettifyListFromStringSplitEx(dirName, "/", "\\", ",", "|") {
 			block = strings.ToLower(block)
 			if block == "buildin" {
 				continue
 			}
+			// var cwe, cve string
 			if strings.HasPrefix(block, "cwe-") {
-				result, err := regexp_utils.NewYakRegexpUtils(`(cwe-\d+)(-(.*))?`).FindStringSubmatch(block)
+				result, err := regexp_utils.NewYakRegexpUtils(`(cwe-(\d+))(-(.*))?`).FindStringSubmatch(block)
 				if err != nil {
 					continue
 				}
 				tags = append(tags, strings.ToUpper(result[1]))
-				tags = append(tags, result[3])
+				cve = utils.InterfaceToInt(result[2])
+				tags = append(tags, result[4])
 				continue
 			} else if strings.HasPrefix(block, "cve-") {
 				result, err := regexp_utils.NewYakRegexpUtils(`(cve-\d+-\d+)([_-\.](.*))?`).FindStringSubmatch(block)
@@ -79,10 +82,16 @@ func SyncEmbedRule(notifies ...func(process float64, ruleName string)) (err erro
 		}
 		content := string(raw)
 		// import builtin rule
-		_, err = sfdb.ImportRuleWithoutValid(name, content, true, tags...)
+		rule, err := sfdb.CreateRuleByContent(name, content, true, tags...)
 		if err != nil {
 			log.Warnf("import rule %s error: %s", name, err)
 			return err
+		}
+		if rule.RuleId == "" {
+			rule.RuleId = sfdb.GenerateRuleID(rule.Language, cve, tags)
+		}
+		if err := sfdb.SaveRule(rule); err != nil {
+			log.Errorf("save rule %s error: %s", name, err)
 		}
 		handledCount++
 		if notify != nil {
