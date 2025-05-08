@@ -24,6 +24,8 @@ func init() {
 			aiforge.WithToolKeywords([]string{"fs", "http"}),
 			aiforge.WithTools(yakscripttools.GetYakScriptAiTools(
 				"do_http",
+				"http",
+				"packet",
 				"grep",
 				"read_file_chunk",
 				"read_file_lines",
