@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/utils"
 	"gotest.tools/v3/assert"
 )
 
@@ -31,12 +32,28 @@ func TestSearchAIYakTool(t *testing.T) {
 }
 
 func TestDecodeBase64BySearchTool(t *testing.T) {
-	stateKeyword := [][2]string{
+	taskId := string(utils.RandStringBytes(10))
+	summaryId := string(utils.RandStringBytes(10))
+	requireParamsMatcher := func(prompt string) bool {
+		keys := []string{"构造有效参数", "只生成一个有效的请求参数"}
+		for _, key := range keys {
+			if strings.Contains(prompt, key) {
+				return true
+			}
+		}
+		return false
+	}
+	stateKeyword := []struct {
+		name    string
+		matcher any
+		aiRsp   string
+	}{
 		// 规划任务
 		{
+			"规划任务",
 			"你是一个输出JSON的任务规划的工具", `{
   "@action": "plan",
-  "main_task": "解密提供的Base64字符串。",
+  "main_task": "` + taskId + `",
   "main_task_goal": "成功解密给定的Base64编码字符串，并得到明文内容。",
   "tasks": [
     {
@@ -50,11 +67,13 @@ func TestDecodeBase64BySearchTool(t *testing.T) {
 		},
 		// 申请搜索工具
 		{
-			`[-] "解密提供的Base64字符串。" `, `{"tool": "tools_search", "@action": "require-tool"}`,
+			"申请搜索工具",
+			taskId, `{"tool": "tools_search", "@action": "require-tool"}`,
 		},
 		// 调用搜索工具
 		{
-			"只生成一个有效的请求参数", `
+			"调用搜索工具",
+			requireParamsMatcher, `
 	{
   "tool": "tools_search",
   "@action": "call-tool",
@@ -65,6 +84,7 @@ func TestDecodeBase64BySearchTool(t *testing.T) {
 		},
 		// 搜索工具执行
 		{
+			"执行搜索工具",
 			"你是一个智能关键词匹配助手", `
 	[
       {
@@ -75,15 +95,18 @@ func TestDecodeBase64BySearchTool(t *testing.T) {
 		},
 		// 判断任务情况
 		{
-			"成功执行了外部工具", `{"@action": "require-more-tool"}`,
+			"判断任务情况",
+			nil, `{"@action": "require-more-tool"}`,
 		},
 		// 申请解码工具
 		{
-			"你是一个任务执行助手，根据既定的任务清单", `{"tool": "decode", "@action": "require-tool"}`,
+			"申请解码工具",
+			nil, `{"tool": "decode", "@action": "require-tool"}`,
 		},
 		// 调用解码工具
 		{
-			"请根据Schema描述构造有效JSON对象来调用此工具，系统会执行工具内容", `
+			"调用解码工具",
+			requireParamsMatcher, `
 	{
   "tool": "decode",
   "@action": "call-tool",
@@ -94,18 +117,21 @@ func TestDecodeBase64BySearchTool(t *testing.T) {
 }`,
 		},
 		{
-			"成功执行了外部工具", `{"@action": "finished"}`,
+			"判断任务完成情况",
+			nil, `{"@action": "finished"}`,
 		},
 		{
-			"你是一个按Schema输出JSON的上下文总结者", `
+			"总结任务",
+			"上下文总结者", `
 			{
 			"@action": "summary",
-			"short_summary": "成功解码了Base64字符串",
-			"long_summary": "成功解码了Base64字符串，并得到了明文内容"
+			"short_summary": "` + summaryId + `",
+			"long_summary": "` + summaryId + `"
 			}`,
 		},
 		{
-			"你是一个输出 Markdown 计划书和报告的工具", "ok",
+			"输出任务报告",
+			summaryId, "ok",
 		},
 	}
 
@@ -116,17 +142,37 @@ func TestDecodeBase64BySearchTool(t *testing.T) {
 		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
 			prompt := request.GetPrompt()
 			pair := stateKeyword[currentStateIndex]
-			pateKeyword := pair[0]
-			aiRsp := pair[1]
-			if strings.Contains(prompt, pateKeyword) {
+			matcher := pair.matcher
+			aiRsp := pair.aiRsp
+			switch ret := matcher.(type) {
+			case string:
+				if strings.Contains(prompt, ret) {
+					currentStateIndex++
+					rsp := config.NewAIResponse()
+					rsp.EmitOutputStream(strings.NewReader(aiRsp))
+					rsp.Close()
+					return rsp, nil
+				} else {
+					t.Fatalf("run step `%s` failed", pair.name)
+					return nil, nil
+				}
+			case func(string) bool:
+				if ret(prompt) {
+					currentStateIndex++
+					rsp := config.NewAIResponse()
+					rsp.EmitOutputStream(strings.NewReader(aiRsp))
+					rsp.Close()
+					return rsp, nil
+				} else {
+					t.Fatalf("run step `%s` failed", pair.name)
+					return nil, nil
+				}
+			default:
 				currentStateIndex++
 				rsp := config.NewAIResponse()
 				rsp.EmitOutputStream(strings.NewReader(aiRsp))
 				rsp.Close()
 				return rsp, nil
-			} else {
-				t.Fatalf("pateKeyword: %s, prompt: %s", pateKeyword, prompt)
-				return nil, nil
 			}
 		}),
 	)
