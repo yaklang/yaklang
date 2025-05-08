@@ -16,7 +16,7 @@ func TestXSS(t *testing.T) {
 		[]*ypb.ExecParamItem{
 			{Key: "query", Value: `http://127.0.0.1:8787/xss/js/in-str?name=admin`},
 		},
-		aid.WithAICallback(aiforge.GetQwenAICallback("qwen3-32b")),
+		aid.WithAICallback(aiforge.GetOpenRouterAICallback()),
 		//aid.WithAICallback(func(config *aid.Config, req *aid.AIRequest) (*aid.AIResponse, error) {
 		//	return aiforge.GetOpenRouterAICallback()(config, req)
 		//}),
