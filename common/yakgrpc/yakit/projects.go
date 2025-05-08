@@ -244,6 +244,9 @@ func QueryProject(db *gorm.DB, params *ypb.GetProjectsRequest) (*bizhelper.Pagin
 			db = db.Where("child_folder_id IS NULL or child_folder_id = false")
 		}
 	}
+	if params.GetAfterUpdatedAt() > 0 {
+		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "updated_at", params.GetAfterUpdatedAt(), time.Now().Add(10*time.Minute).Unix())
+	}
 	db = filterType(db, params.Type)
 	db = filterFrontendType(db, params.FrontendType)
 	db = db.Where(" NOT (project_name = ? AND folder_id = false AND child_folder_id = false AND type = 'project' )", TEMPORARY_PROJECT_NAME)
