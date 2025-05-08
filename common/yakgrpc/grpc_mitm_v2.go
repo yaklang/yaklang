@@ -290,6 +290,19 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 
 	hijackListFeedback := func(action string, resp ...*ypb.SingleManualHijackInfoMessage) {
+		for _, message := range resp { // utf8 check
+			if lowhttp.IsMultipartFormDataRequest(message.Request) || !utf8.Valid(message.Request) {
+				message.Request = lowhttp.ConvertHTTPRequestToFuzzTag(message.Request)
+			}
+
+			if !utf8.Valid(message.Response) {
+				message.Response = lowhttp.ConvertHTTPRequestToFuzzTag(message.Response)
+			}
+
+			if !utf8.Valid(message.Payload) {
+				message.Payload = lowhttp.ConvertHTTPRequestToFuzzTag(message.Payload)
+			}
+		}
 		if hijackManger.isManual() {
 			send(&ypb.MITMV2Response{
 				ManualHijackListAction: action,
@@ -1035,10 +1048,6 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			RemoteAddr: httpctx.GetRemoteAddr(originReqIns),
 			Method:     lowhttp.GetHTTPRequestMethod(req),
 			Status:     Hijack_Status_Request,
-		}
-
-		if lowhttp.IsMultipartFormDataRequest(fixReq) || !utf8.Valid(fixReq) {
-			feedbackOrigin.Request = lowhttp.ConvertHTTPRequestToFuzzTag(fixReq)
 		}
 
 		task := hijackManger.register(feedbackOrigin)
