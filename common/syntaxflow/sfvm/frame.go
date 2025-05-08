@@ -434,6 +434,24 @@ func recursiveDeepChain(element ValueOperator, handle func(operator ValueOperato
 	return recursiveDeepChain(nextValues, handle, visited)
 }
 
+func (s *SFFrame) opPop(unName bool) (ValueOperator, error) {
+	if s.stack.Len() == 0 {
+		s.debugSubLog(">> pop Error: empty stack")
+		return nil, utils.Errorf("E: stack is empty, cannot pop")
+	}
+	i := s.stack.Pop()
+	s.popStack.Push(i)
+	s.debugSubLog(">> pop %v", ValuesLen(i))
+	if unName {
+		s.debugSubLog("save-to $_")
+		err := s.output("_", i)
+		if err != nil {
+			s.debugSubLog("ERROR: %v", err)
+			return nil, utils.Errorf("output '_' error: %v", err)
+		}
+	}
+	return i, nil
+}
 func (s *SFFrame) execStatement(i *SFI) error {
 	switch i.OpCode {
 	case OpDuplicate:
@@ -681,18 +699,8 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.conditionStack.Push(conditions)
 		s.popStack.Free()
 	case OpPop:
-		if s.stack.Len() == 0 {
-			s.debugSubLog(">> pop Error: empty stack")
-			return utils.Wrap(CriticalError, "E: stack is empty, cannot pop")
-		}
-		i := s.stack.Pop()
-		s.popStack.Push(i)
-		s.debugSubLog(">> pop %v", ValuesLen(i))
-		s.debugSubLog("save-to $_")
-		err := s.output("_", i)
-		if err != nil {
-			s.debugSubLog("ERROR: %v", err)
-			return utils.Wrapf(CriticalError, "output '_' error: %v", err)
+		if _, err := s.opPop(true); err != nil {
+			return err
 		}
 	case OpGetCall:
 		s.debugSubLog(">> pop")
@@ -816,11 +824,15 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Errorf("update ref failed: empty name")
 		}
 		s.debugSubLog(">> pop")
-		value := s.stack.Peek()
+		value, err := s.opPop(false)
+		if err != nil {
+			s.debugSubLog("ERROR: %v", err)
+			return err
+		}
 		if value == nil {
 			return utils.Error("BUG: get top defs failed, empty stack")
 		}
-		err := s.output(i.UnaryStr, value)
+		err = s.output(i.UnaryStr, value)
 		if err != nil {
 			s.debugSubLog("ERROR: %v", err)
 			return err

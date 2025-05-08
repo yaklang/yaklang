@@ -22,7 +22,7 @@ $param #{
 
 $all<dataflow(exclude=<<<CODE
 *?{opcode: call} as $__next__
-CODE> as $high
+CODE)> as $high
 
 alert $high for{
     title_zh: '存在xss漏洞，参数直接从外部传入',

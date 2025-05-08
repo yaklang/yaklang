@@ -3,7 +3,7 @@ desc(
     title_zh: "ThinkPHP SQL注入检测",
     risk: "audit",
     level: "low",
-    rule_id: 30073003,
+    rule_id: 30089003,
     desc: <<<CODE
 该规则旨在检测ThinkPHP框架中可能存在的SQL注入风险。规则通过静态分析，识别出直接将外部输入（如用户输入）拼接到SQL查询语句中的代码模式，这可能导致SQL注入攻击。
 CODE
