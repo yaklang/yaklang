@@ -2,8 +2,8 @@
   {
     "rule_id": "05461170",
     "rule_name": "硬编码API凭据",
-    "hash": "a2295836e334371fadffa73517b01f67ef472ddb22b99b746f2e8c8aab8ea963",
-    "version": "20250508.0001"
+    "hash": "3035d554849e516504f263cc2f4e9cac2f067cb49dbe23106512326c1fda6fe8",
+    "version": "20250508.0002"
   },
   {
     "rule_id": "11336001",
@@ -686,8 +686,8 @@
   {
     "rule_id": "20749981",
     "rule_name": "通过反射操纵访问修饰符",
-    "hash": "ea7510cd95a2ffc7b6be2679c6b8be3779492db3519b92fc76843ec834c56508",
-    "version": "20250508.0001"
+    "hash": "2f42ab5ffb3c88f4e1bd0875d9bf5ecf1fe36857f5298f70ceaa266bb9803c69",
+    "version": "20250508.0002"
   },
   {
     "rule_id": "20077001",
@@ -812,8 +812,8 @@
   {
     "rule_id": "25435285",
     "rule_name": "不安全的字节数组到字符串转换",
-    "hash": "8ca8b3692275546adde296d8da9ece9e8cc8eedaf1fdffc26126775921e7d9ce",
-    "version": "20250508.0001"
+    "hash": "92e4be3560b1eabaabbb3a4692f8490799a371db859f5a656744d8b74d873766",
+    "version": "20250508.0002"
   },
   {
     "rule_id": "20000028",
