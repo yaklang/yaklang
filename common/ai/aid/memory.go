@@ -174,7 +174,7 @@ func (m *Memory) ToolCallTimelineWithout(n ...any) string {
 			fmt.Println(utils.ErrorStack(r))
 		}
 	}()
-	origin := m.timeline.idToToolResult.Keys()
+	origin := m.timeline.idToTimelineItem.Keys()
 	removed := make(map[int64]struct{})
 	for _, i := range n {
 		removed[int64(utils.InterfaceToInt(i))] = struct{}{}
