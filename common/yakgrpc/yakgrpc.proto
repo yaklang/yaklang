@@ -1896,6 +1896,7 @@ message GetProjectsRequest {
   // this type effect response.ProjectTotal, this type mark kind of frontend 
   // "project"(yakit) | "ssa_project"(irify)
   string FrontendType = 7;
+  int64 AfterUpdatedAt = 8;
 }
 
 message ProjectDescription {

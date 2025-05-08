@@ -9507,9 +9507,10 @@ type GetProjectsRequest struct {
 	Type string `protobuf:"bytes,6,opt,name=Type,proto3" json:"Type,omitempty"`
 	// this type effect response.ProjectTotal, this type mark kind of frontend
 	// "project"(yakit) | "ssa_project"(irify)
-	FrontendType  string `protobuf:"bytes,7,opt,name=FrontendType,proto3" json:"FrontendType,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	FrontendType   string `protobuf:"bytes,7,opt,name=FrontendType,proto3" json:"FrontendType,omitempty"`
+	AfterUpdatedAt int64  `protobuf:"varint,8,opt,name=AfterUpdatedAt,proto3" json:"AfterUpdatedAt,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetProjectsRequest) Reset() {
@@ -9589,6 +9590,13 @@ func (x *GetProjectsRequest) GetFrontendType() string {
 		return x.FrontendType
 	}
 	return ""
+}
+
+func (x *GetProjectsRequest) GetAfterUpdatedAt() int64 {
+	if x != nil {
+		return x.AfterUpdatedAt
+	}
+	return 0
 }
 
 type ProjectDescription struct {
@@ -50675,7 +50683,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x02Id\x18\x06 \x01(\x03R\x02Id\"F\n" +
 	"\x12NewProjectResponse\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x12 \n" +
-	"\vProjectName\x18\x02 \x01(\tR\vProjectName\"\xff\x01\n" +
+	"\vProjectName\x18\x02 \x01(\tR\vProjectName\"\xa7\x02\n" +
 	"\x12GetProjectsRequest\x12 \n" +
 	"\vProjectName\x18\x01 \x01(\tR\vProjectName\x12 \n" +
 	"\vDescription\x18\x02 \x01(\tR\vDescription\x12+\n" +
@@ -50685,7 +50693,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bFolderId\x18\x04 \x01(\x03R\bFolderId\x12$\n" +
 	"\rChildFolderId\x18\x05 \x01(\x03R\rChildFolderId\x12\x12\n" +
 	"\x04Type\x18\x06 \x01(\tR\x04Type\x12\"\n" +
-	"\fFrontendType\x18\a \x01(\tR\fFrontendType\"\x82\x03\n" +
+	"\fFrontendType\x18\a \x01(\tR\fFrontendType\x12&\n" +
+	"\x0eAfterUpdatedAt\x18\b \x01(\x03R\x0eAfterUpdatedAt\"\x82\x03\n" +
 	"\x12ProjectDescription\x12 \n" +
 	"\vProjectName\x18\x01 \x01(\tR\vProjectName\x12 \n" +
 	"\vDescription\x18\x02 \x01(\tR\vDescription\x12\x0e\n" +
