@@ -1,6 +1,7 @@
 package js2ssa
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/ast"
 )
@@ -62,4 +63,39 @@ func (b *builder) VisitLeftValueExpression(node *ast.Expression) *ssa.Variable {
 func (b *builder) VisitRightValueExpression(node *ast.Expression) ssa.Value {
 	_, rval := b.VisitExpression(node, false)
 	return rval
+}
+
+func (b *builder) GetLabelByName(name string) *ssa.LabelBuilder {
+	label, ok := b.labels[name]
+	if !ok || label == nil {
+		return nil
+	}
+	return label
+}
+
+func (b *builder) handlerGoto(labelName string, isBreak ...bool) {
+	gotoBuilder := b.BuildGoto(labelName)
+	if len(isBreak) > 0 {
+		gotoBuilder.SetBreak(isBreak[0])
+	}
+	if targetBlock := b.GetLabel(labelName); targetBlock != nil {
+		// target label exist, just set it
+		LabelBuilder := b.GetLabelByName(labelName)
+		if LabelBuilder == nil {
+			b.NewError(ssa.Error, TAG, fmt.Sprintf("label: %s not found", labelName))
+		}
+		gotoBuilder.SetLabel(targetBlock)
+		f := gotoBuilder.Finish()
+		LabelBuilder.SetGotoFinish(f)
+	} else {
+		// target label not exist, create it
+		LabelBuilder := b.BuildLabel(labelName)
+		// use handler function
+		LabelBuilder.SetGotoHandler(func(_goto *ssa.BasicBlock) {
+			gotoBuilder.SetLabel(_goto)
+			f := gotoBuilder.Finish()
+			LabelBuilder.SetGotoFinish(f)
+		})
+		b.labels[labelName] = LabelBuilder
+	}
 }

@@ -18,6 +18,9 @@ type SSABuilder struct {
 type builder struct {
 	*ssa.FunctionBuilder
 	sourceFile *ast.SourceFile
+
+	// 存储跳转标签
+	labels map[string]*ssa.LabelBuilder
 }
 
 var Builder ssa.Builder = &SSABuilder{}
