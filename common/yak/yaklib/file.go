@@ -222,11 +222,15 @@ func _fileIsLink(file string) bool {
 // f.WriteString("hello yak")
 // ```
 func _tempFile(dirPart ...string) (*_yakFile, error) {
+	return _tempFileEx("yak-*.tmp", dirPart...)
+}
+
+func _tempFileEx(pattern string, dirPart ...string) (*_yakFile, error) {
 	dir := consts.GetDefaultYakitBaseTempDir()
 	if len(dirPart) > 0 {
 		dir = filepath.Join(dirPart...)
 	}
-	f, err := ioutil.TempFile(dir, "yak-*.tmp")
+	f, err := ioutil.TempFile(dir, pattern)
 	if err != nil {
 		return nil, err
 	}
@@ -240,9 +244,27 @@ func _tempFile(dirPart ...string) (*_yakFile, error) {
 // die(err)
 // defer os.Remove(name)
 // file.Save(name, "hello yak")
+//
+// name, err = file.TempFileName("pattern-*.txt")
+//
+//	if die(err) {
+//		return
+//	}
+//
+// defer os.Remove(name)
+// file.Save(name, "hello yak")
 // ```
-func _tempFileName() (string, error) {
-	f, err := _tempFile()
+func _tempFileName(pattern ...string) (string, error) {
+	if len(pattern) <= 0 {
+		f, err := _tempFile()
+		if err != nil {
+			return "", err
+		}
+		f.Close()
+		return f.Name(), nil
+	}
+
+	f, err := _tempFileEx(strings.Join(pattern, "-"))
 	if err != nil {
 		return "", err
 	}

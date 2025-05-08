@@ -23,6 +23,14 @@ func parseInt(s string, bases ...int) int {
 	}
 	i, err := strconv.ParseInt(s, base, 64)
 	if err != nil {
+		// 尝试处理科学计数法表示的数字
+		if err.Error() == "strconv.ParseInt: parsing \""+s+"\": invalid syntax" {
+			f, err := strconv.ParseFloat(s, 64)
+			if err == nil {
+				return int(f)
+			}
+		}
+		// [ERRO] 2025-05-08 12:08:17 [cli:168] parse int[2e+09] failed: strconv.ParseInt: parsing "2e+09": invalid syntax
 		log.Errorf("parse int[%s] failed: %s", s, err)
 		return 0
 	}

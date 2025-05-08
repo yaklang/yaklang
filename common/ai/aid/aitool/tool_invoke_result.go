@@ -19,6 +19,9 @@ type ToolResult struct {
 	Success     bool   `json:"success"`
 	Data        any    `json:"data,omitempty"`
 	Error       string `json:"error,omitempty"`
+
+	// shrink_similar_result 表示缩略信息，是在 decision 的时候执行的，用于直接压缩信息
+	ShrinkSimilarResult string `json:"shrink_similar_result,omitempty"`
 }
 
 func (t *ToolResult) String() string {
@@ -45,58 +48,65 @@ func (t *ToolResult) String() string {
 		buf.WriteString(fmt.Sprintf("param: %s\n", utils.Jsonify(t.Param)))
 	}
 
-	// 处理工具执行结果
-	switch ret := t.Data.(type) {
-	case *ToolExecutionResult:
-		// 处理标准输出
-		if ret.Stdout != "" {
-			buf.WriteString(fmt.Sprintf("stdout: \n%v\n", string(ret.Stdout)))
-		}
+	if t.ShrinkSimilarResult == "" {
 
-		// 处理标准错误
-		if ret.Stderr != "" {
-			buf.WriteString(fmt.Sprintf("stderr: \n%v\n", string(ret.Stderr)))
-		}
-
-		// 处理结果
-		result := utils.InterfaceToString(ret.Result)
-		if result != "" {
-			buf.WriteString(fmt.Sprintf("result: \n%v\n", result))
-		}
-
-		// 如果没有任何输出，显示提示信息
-		if ret.Stdout == "" && ret.Stderr == "" && result == "" {
-			buf.WriteString("no output\n")
-		}
-	default:
-		// 处理其他类型的数据
-		rawMap := utils.InterfaceToGeneralMap(t.Data)
-		if len(rawMap) > 0 {
+		// 处理工具执行结果
+		switch ret := t.Data.(type) {
+		case *ToolExecutionResult:
 			// 处理标准输出
-			if stdout := utils.MapGetString(rawMap, "stdout"); stdout != "" {
-				buf.WriteString(fmt.Sprintf("stdout: \n%v\n", stdout))
-				delete(rawMap, "stdout")
+			if ret.Stdout != "" {
+				buf.WriteString(fmt.Sprintf("stdout: \n%v\n", string(ret.Stdout)))
 			}
 
 			// 处理标准错误
-			if stderr := utils.MapGetString(rawMap, "stderr"); stderr != "" {
-				buf.WriteString(fmt.Sprintf("stderr: \n%v\n", stderr))
-				delete(rawMap, "stderr")
+			if ret.Stderr != "" {
+				buf.WriteString(fmt.Sprintf("stderr: \n%v\n", string(ret.Stderr)))
 			}
 
 			// 处理结果
-			if result := utils.MapGetString(rawMap, "result"); result != "" {
+			result := utils.InterfaceToString(ret.Result)
+			if result != "" {
 				buf.WriteString(fmt.Sprintf("result: \n%v\n", result))
-				delete(rawMap, "result")
 			}
 
-			// 处理额外信息
-			if len(rawMap) > 0 {
-				buf.WriteString(fmt.Sprintf("extra: %s\n", utils.Jsonify(rawMap)))
+			// 如果没有任何输出，显示提示信息
+			if ret.Stdout == "" && ret.Stderr == "" && result == "" {
+				buf.WriteString("no output\n")
 			}
-		} else {
-			buf.WriteString(fmt.Sprintf("data: %s\n", utils.Jsonify(t.Data)))
+		default:
+			// 处理其他类型的数据
+			rawMap := utils.InterfaceToGeneralMap(t.Data)
+			if len(rawMap) > 0 {
+				// 处理标准输出
+				if stdout := utils.MapGetString(rawMap, "stdout"); stdout != "" {
+					buf.WriteString(fmt.Sprintf("stdout: \n%v\n", stdout))
+					delete(rawMap, "stdout")
+				}
+
+				// 处理标准错误
+				if stderr := utils.MapGetString(rawMap, "stderr"); stderr != "" {
+					buf.WriteString(fmt.Sprintf("stderr: \n%v\n", stderr))
+					delete(rawMap, "stderr")
+				}
+
+				// 处理结果
+				if result := utils.MapGetString(rawMap, "result"); result != "" {
+					buf.WriteString(fmt.Sprintf("result: \n%v\n", result))
+					delete(rawMap, "result")
+				}
+
+				// 处理额外信息
+				if len(rawMap) > 0 {
+					buf.WriteString(fmt.Sprintf("extra: %s\n", utils.Jsonify(rawMap)))
+				}
+			} else {
+				buf.WriteString(fmt.Sprintf("data: %s\n", utils.Jsonify(t.Data)))
+			}
 		}
+	}
+
+	if t.ShrinkSimilarResult != "" {
+		buf.WriteString(fmt.Sprintf("shrink_result: %#v\n", t.ShrinkSimilarResult))
 	}
 
 	// 处理错误信息

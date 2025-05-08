@@ -17,6 +17,7 @@ func TestNetScan(t *testing.T) {
 		},
 		aid.WithYOLO(),
 		aid.WithDebugPrompt(true),
+		aid.WithAiToolsSearchTool(),
 		aid.WithAICallback(aiforge.GetQwenAICallback("qwen3-30b-a3b")),
 	)
 	if err != nil {

@@ -188,6 +188,9 @@ func (t *aiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitoo
 		if ret := action.GetString("task_long_summary"); ret != "" {
 			t.LongSummary = ret
 		}
+		if ret := action.GetString("shrink_similar_tool_call_result"); ret != "" {
+			result.ShrinkSimilarResult = ret
+		}
 
 		if t.ShortSummary != "" {
 			t.TaskSummary = t.ShortSummary

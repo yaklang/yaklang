@@ -12,7 +12,7 @@
     },
     "status_summary": {
       "type": "string",
-      "description": "当前任务的进度和总结信息，为了更好的执行下一次任务，你需要总结一些基本内容，这些内容会更新在当前任务的状态中，以帮助下一次内容执行"
+      "description": "当前任务的进度和总结信息，为了更好的执行下一次任务，你需要总结一些基本内容，这些内容会更新在当前任务的状态中，以帮助下一次内容执行，任务状态会覆盖之前的任务状态，需要综合考虑之前的状态"
     },
     "task_long_summary": {
       "type": "string",
@@ -20,11 +20,11 @@
     },
     "task_short_summary": {
       "type": "string",
-      "description": "任务完成时精炼版，保留最关键信息不删减，控制在100词以内，这个短总结会出现在后面所有的进度展示中。"
+      "description": "任务完成时精炼版，保留最关键信息不删减，这个短总结会出现在后面所有的进度展示中，如果你想提供一些针对后面任务的建议或者影响，也可以设置在这里。"
+    },
+    "shrink_similar_tool_call_result": {
+      "type": "string",
+      "description": "工具调用结果压缩优化：如果当前工具执行结果和之前的工具结果类似，把不同的结果展示出来，把结果中重复的部分使用...[similar as (ID: xx)]... 代替，这会极大减轻上下文压力"
     }
-  },
-  "examples": [
-    {"@action": "require-more-tool"},
-    {"@action": "finished"}
-  ]
+  }
 }

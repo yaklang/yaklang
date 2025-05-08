@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"io"
 	"os"
 	"path/filepath"
@@ -340,6 +341,9 @@ func initYaklangLib() {
 			}
 		}
 	})
+
+	// memeditor
+	yaklang.Import("memeditor", memedit.Exports)
 }
 
 type ScriptEngine struct {
