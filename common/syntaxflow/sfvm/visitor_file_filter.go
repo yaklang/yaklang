@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"github.com/yaklang/yaklang/common/utils"
+	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 )
 
 func (y *SyntaxFlowVisitor) VisitFileFilterContent(raw sf.IFileFilterContentStatementContext) error {
@@ -20,21 +21,23 @@ func (y *SyntaxFlowVisitor) VisitFileFilterContent(raw sf.IFileFilterContentStat
 	}
 
 	y.EmitCheckStackTop()
-	var f string // fileName or compiled reg expression for fileName
+	var fileInput string // fileName or compiled reg expression for fileName
 	var err error
 	if i.FileFilterContentInput() != nil {
-		f, err = y.VisitFileFilterContentInput(i.FileFilterContentInput())
+		fileInput, err = y.VisitFileFilterContentInput(i.FileFilterContentInput())
 		if err != nil {
 			return err
 		}
 	}
 
 	if i.FileFilterContentMethod() != nil {
-		err = y.VisitFileFilterContentMethod(i.FileFilterContentMethod(), f)
+		err = y.VisitFileFilterContentMethod(i.FileFilterContentMethod(), fileInput)
 	}
 	if ref, ok := i.RefVariable().(*sf.RefVariableContext); ok {
 		varName := y.VisitRefVariable(ref)
 		y.EmitUpdate(varName)
+	} else {
+		y.EmitPop()
 	}
 	return err
 }
@@ -64,7 +67,7 @@ func (y *SyntaxFlowVisitor) VisitFileFilterContentInput(raw sf.IFileFilterConten
 	return "", utils.Error("file filter content input is not identifier or regexp literal")
 }
 
-func (y *SyntaxFlowVisitor) VisitFileFilterContentMethod(raw sf.IFileFilterContentMethodContext, f string) error {
+func (y *SyntaxFlowVisitor) VisitFileFilterContentMethod(raw sf.IFileFilterContentMethodContext, fileInput string) error {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -84,11 +87,11 @@ func (y *SyntaxFlowVisitor) VisitFileFilterContentMethod(raw sf.IFileFilterConte
 	m = strings.ToLower(m)
 	switch m {
 	case "xpath":
-		y.EmitFileFilterXpath(f, paramMap, paramList)
+		y.EmitFileFilterXpath(fileInput, paramMap, paramList)
 	case "regexp", "re":
-		y.EmitFileFilterReg(f, paramMap, paramList)
+		y.EmitFileFilterReg(fileInput, paramMap, paramList)
 	case "jsonpath", "json":
-		y.EmitFileFilterJsonPath(f, paramMap, paramList)
+		y.EmitFileFilterJsonPath(fileInput, paramMap, paramList)
 	default:
 		return utils.Errorf("file filter method not support:%s", m)
 	}
@@ -128,9 +131,9 @@ func (y *SyntaxFlowVisitor) VisitFileFilterContentMethodParam(raw sf.IFileFilter
 			if reg, ok := name.RegexpLiteral().(*sf.RegexpLiteralContext); ok {
 				reg := reg.GetText()
 				reg = reg[1 : len(reg)-1]
-				_, err := regexp.Compile(reg)
-				if err != nil {
-					log.Errorf("regexp compile failed: %v", err)
+
+				if !regexp_utils.NewYakRegexpUtils(reg).CanUse() {
+					log.Errorf("regexp compile failed: %s", reg)
 					continue
 				}
 				res = reg

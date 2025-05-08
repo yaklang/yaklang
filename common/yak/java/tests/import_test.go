@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -210,4 +211,206 @@ class A {
 		},
 		true,
 		ssaapi.WithLanguage(ssaapi.JAVA))
+}
+
+func TestImportSourceCodeRange(t *testing.T) {
+	code := `
+	package com.example.demo.controller.freemakerdemo;
+
+import java.io.IOException;
+import java.io.PrintWriter;
+
+@Controller
+@RequestMapping("/freemarker")
+public class FreeMakerDemo {
+    @Autowired
+    private Configuration freemarkerConfig;
+
+    @GetMapping("/template")
+    public void template(String name, Model model, HttpServletResponse response) throws Exception {
+        PrintWriter writer = response.getWriter();
+        writer.write("aaaa");
+        writer.flush();
+        writer.close();
+    }
+}
+	`
+
+	ssatest.CheckSyntaxFlowSource(t, code, `
+PrintWriter as $writer
+	`, map[string][]string{
+		"writer": {"import java.io.PrintWriter;", "getWriter()"},
+	}, ssaapi.WithLanguage(consts.JAVA))
+}
+
+func TestImportClassTypeName(t *testing.T) {
+	t.Run("check import type with import name", func(t *testing.T) {
+
+		code := `
+package com.example.fastjsondemo.controller;
+
+import com.alibaba.fastjson.JSON;
+import com.example.fastjsondemo.model.User;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api")
+public class UserController {
+
+    @PostMapping("/user")
+    public User createUser(@RequestBody String jsonString) {
+        // 使用 FastJSON 将 JSON 字符串解析为 User 对象
+        User user = JSON.parseObject(jsonString, User.class);
+
+		Int b = JSON;
+
+
+    }
+}
+	`
+
+		ssatest.CheckSyntaxFlowContain(t, code, `
+
+// check json.parse
+JSON.parse* as $parse 
+$parse<getObject> as $json 
+$json<typeName> as $typeName;
+
+// check assign 
+b<typeName> as $jsonType2
+
+	`, map[string][]string{
+			"typeName":  {"com.alibaba.fastjson.JSON"},
+			"jsonType2": {"com.alibaba.fastjson.JSON"},
+		}, ssaapi.WithLanguage(consts.JAVA))
+	})
+
+	t.Run("check import type with import start", func(t *testing.T) {
+		code := `
+package com.example.fastjsondemo.controller;
+
+import com.alibaba.fastjson.*;
+import com.example.fastjsondemo.model.User;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api")
+public class UserController {
+
+    @PostMapping("/user")
+    public User createUser(@RequestBody String jsonString) {
+        // 使用 FastJSON 将 JSON 字符串解析为 User 对象
+        User user = JSON.parseObject(jsonString, User.class);
+
+		Object b = JSON;
+
+
+    }
+}
+		`
+
+		ssatest.CheckSyntaxFlowContain(t, code, `
+
+// check json.parse
+JSON.parse* as $parse 
+$parse<getObject> as $json 
+$json<typeName> as $typeName;
+
+// check assign 
+b<typeName> as $jsonType2
+
+	`, map[string][]string{
+			"typeName":  {"com.alibaba.fastjson.JSON"},
+			"jsonType2": {"com.alibaba.fastjson.JSON"},
+		}, ssaapi.WithLanguage(consts.JAVA))
+	})
+	t.Run("check import type with creator", func(t *testing.T) {
+		code := `
+		package org.example;
+		import okhttp3.OkHttpClient;
+		import okhttp3.Request;
+		import okhttp3.Response;
+		
+		
+		public class OkHttpClientExample {
+			public static void main(String[] args) {
+				Request request = new Request.Builder()
+						.url("https://api.github.com/users/github")
+						.build();
+			}
+		}
+		
+		`
+
+		ssatest.CheckSyntaxFlowContain(t, code, `
+		Request.Builder<getObject><typeName>  as $request_type_name 
+		Request.Builder<typeName>  as $builder_type_name
+		Request.Builder()<typeName> as $builder_constructor_type_name
+		`, map[string][]string{
+			"request_type_name":             {"okhttp3.Request"},
+			"builder_type_name":             {"okhttp3.Request.Builder"},
+			"builder_constructor_type_name": {"okhttp3.Request.Builder"},
+		}, ssaapi.WithLanguage(consts.JAVA))
+	})
+
+	t.Run("check import type with full name", func(t *testing.T) {
+		code := `
+		public class OkHttpClientExample {
+			@RequestMapping(value = "/three")
+			public String Three(@RequestParam(value = "url") String imageUrl) {
+				com.squareup.okhttp.Request request = new com.squareup.okhttp.Request.Builder().get().url(url).build();
+			}
+		}
+				`
+		ssatest.CheckSyntaxFlowContain(t, code, `
+				Request.Builder as $builder 
+				Request.Builder<getObject><typeName>  as $request_type_name
+				Builder<typeName>  as $builder_type_name 
+				`, map[string][]string{
+			"builder":           {"Undefined-Builder(valid)"},
+			"request_type_name": {"com.squareup.okhttp.Request"},
+			"builder_type_name": {"com.squareup.okhttp.Request.Builder"},
+		}, ssaapi.WithLanguage(consts.JAVA))
+	})
+
+	t.Run("check import type same name with current package ", func(t *testing.T) {
+		code := `
+		package com.ruoyi.web.controller.common;
+	
+		import com.ruoyi.common.utils.file.FileUtils;
+	
+	public class FileUtils
+	{
+		public static void writeBytes(String filePath, OutputStream os) throws IOException{}
+	}
+	
+		@Controller
+		public class CommonController
+		{
+			private static final Logger log = LoggerFactory.getLogger(CommonController.class);
+	
+			@Autowired
+			private ServerConfig serverConfig;
+	
+			/**
+			 * 通用下载请求
+			 *
+			 * @param fileName 文件名称
+			 * @param delete 是否删除
+			 */
+			@GetMapping("common/download")
+			public void fileDownload(String fileName, Boolean delete, HttpServletResponse response, HttpServletRequest request)
+			{
+				FileUtils.writeBytes(filePath, response.getOutputStream());
+			}
+		}
+		`
+
+		ssatest.CheckSyntaxFlowSource(t, code, `
+	filePath?{opcode: param}<getFunc> as $function 
+	$function() as $function_call_site
+	`, map[string][]string{
+			"function_call_site": {"writeBytes(filePath, response.getOutputStream())"},
+		}, ssaapi.WithLanguage(consts.JAVA))
+	})
 }

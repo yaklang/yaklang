@@ -317,10 +317,14 @@ func (p *Program) GetEditor(url string) (*memedit.MemEditor, bool) {
 	return p.editorMap.Get(url)
 }
 
+func (p *Program) SetEditor(url string, me *memedit.MemEditor) {
+	p.editorMap.Set(url, me)
+}
+
 func (p *Program) PushEditor(e *memedit.MemEditor) {
 	p.editorStack.Push(e)
 	if !p.PreHandler() {
-		p.editorMap.Set(p.GetCurrentEditor().GetFilename(), p.GetCurrentEditor())
+		p.SetEditor(e.GetFilename(), e)
 	}
 }
 

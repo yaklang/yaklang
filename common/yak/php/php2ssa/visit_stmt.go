@@ -226,7 +226,7 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 					continue
 				}
 				if namespace != nil {
-					if err := prog.ImportTypeFromLib(namespace, realName); err != nil {
+					if err := prog.ImportTypeFromLib(namespace, realName, listContext); err != nil {
 						log.Errorf("get namespace type fail: %s", err)
 					}
 				}

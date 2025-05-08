@@ -3,6 +3,7 @@ package yakcmds
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -523,8 +524,27 @@ var syntaxFlowImport = &cli.Command{
 var syncRule = &cli.Command{
 	Name:  "sync-rule",
 	Usage: "sync rule from embed to database",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "output,o",
+			Usage: "output rule info file path",
+		},
+	},
 	Action: func(c *cli.Context) error {
 		SyncEmbedRule(true)
+		if output := c.String("output"); output != "" {
+			log.Infof("output rule info to %s", output)
+			log.Infof("start to parse rule info")
+			ruleInfos := sfdb.EmbedRuleVersion()
+			jsonData, err := json.MarshalIndent(ruleInfos, "", "  ")
+			if err != nil {
+				log.Infof("Error marshaling ruleInfos: %v", err)
+				return err
+			}
+			os.WriteFile(output, jsonData, 0o666)
+			log.Infof("output rule info to %s done ", output)
+		}
+
 		return nil
 	},
 }

@@ -1,7 +1,15 @@
 package ssaapi
 
 func (v *Value) GetFunction() *Value {
-	return v.NewValue(v.innerValue.GetFunc())
+	inst := v.getInstruction()
+	if inst == nil {
+		return nil
+	}
+	fun := inst.GetFunc()
+	if fun == nil {
+		return nil
+	}
+	return v.NewValue(fun)
 }
 
 func (v *Value) InMainFunction() bool {

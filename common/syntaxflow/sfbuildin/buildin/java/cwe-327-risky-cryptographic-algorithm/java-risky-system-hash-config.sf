@@ -1,15 +1,16 @@
-//todo: 该规则由于getActualParams实现bug，暂时禁用
-// desc(
-//     title: "Find Java Risky System Hash Config",
-//     title_zh: "查找 Java 风险的系统哈希配置",
-//     type: security,
-//     level: low,
-//     risk:'risky_crypt',
-//     desc: <<<TEXT
-//     检测代码中是否使用了已知的不安全或易受攻击的哈希算法。具体检测Java 代码中是否使用System.setProperty() 方法配置了不安全的哈希函数。
-// TEXT
-// )
+desc(
+    title: "Find Java Risky System Hash Config",
+    title_zh: "查找 Java 风险的系统哈希配置",
+    rule_id: 20327758,
+    type: security,
+    level: low,
+    risk:'risky_crypt',
+    desc: <<<TEXT
+    检测代码中是否使用了已知的不安全或易受攻击的哈希算法。具体检测Java 代码中是否使用System.setProperty() 方法配置了不安全的哈希函数。
+TEXT
+)
 
+//todo: 该规则由于getActualParams实现bug，暂时禁用
 // // System.setProperty("jasypt.encryptor.algorithm", "MD5");
 // System.setProperty?{<typeName>?{have:'java.lang'}} as $set;
 // $set?{<getActualParams><slice(index=1)>?{have:'jasypt.encryptor.algorithm'}} as $toCheck;

@@ -68,6 +68,50 @@ func (y *builder) AddFullTypeNameRaw(typName string, typ ssa.Type) ssa.Type {
 	return typ
 }
 
+// func (y *builder) AddFullTypeNameForSubType(typeName string,  )
+func (y *builder) CreateSubType(subName string, typ ssa.Type) ssa.Type {
+	// 1. split subName by "."
+	parts := strings.Split(subName, ".")
+
+	newType := ssa.NewBasicType(ssa.AnyTypeKind, subName)
+
+	// Get the full type names from the original type
+	fullTypeNames := typ.GetFullTypeNames()
+	newFullTypeNames := make([]string, 0, len(fullTypeNames))
+
+	// 1.1 if len(parts) == 1 just append this subName to each fullTypeName and create new type
+	if len(parts) == 1 {
+		for _, ftn := range fullTypeNames {
+			newFullTypeNames = append(newFullTypeNames, ftn+"."+subName)
+		}
+	} else {
+		// 1.2 if len(parts) > 1,
+		// check if which part matches with existing in type.FullTypeName end
+		// if match, append rest to fullTypeName
+		for _, ftn := range fullTypeNames {
+			// Split the full type name by "."
+			fullParts := strings.Split(ftn, ".")
+
+			i := 0
+			for {
+				// check is match end of fullParts and start of parts
+				if fullParts[len(fullParts)-1-i] == parts[i] {
+					parts := append(fullParts[len(fullParts)-1-i:], parts...)
+					newFullTypeNames = append(newFullTypeNames, strings.Join(parts, "."))
+					break
+				}
+				if i > len(fullParts)-1 || i > len(parts)-1 {
+					break
+				}
+				i++
+			}
+		}
+	}
+
+	newType.SetFullTypeNames(newFullTypeNames)
+	return newType
+}
+
 func (y *builder) AddFullTypeNameFromMap(typName string, typ ssa.Type) ssa.Type {
 	if b, ok := ssa.ToBasicType(typ); ok {
 		typ = ssa.NewBasicType(b.Kind, b.GetName())
@@ -75,7 +119,7 @@ func (y *builder) AddFullTypeNameFromMap(typName string, typ ssa.Type) ssa.Type 
 	}
 
 	if typ == nil {
-		return ssa.CreateAnyType()
+		typ = ssa.CreateAnyType()
 	}
 
 	typStr := typName

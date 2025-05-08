@@ -38,11 +38,10 @@ func fakeImportValue(lib *Program, name string) Value {
 		return value
 	}
 }
-func fakeImportType(lib *Program, name string) Type {
+func fakeImportType(lib *Program, name string, token CanStartStopToken) Type {
 	builder := lib.GetAndCreateFunctionBuilder(lib.PkgName, string(VirtualFunctionName))
 	if t, ok := lib.ExportType[name]; !ok && lib.IsVirtualImport() {
-		builder.SetEmptyRange()
-		bluePrint := builder.CreateBlueprint(name)
+		bluePrint := builder.CreateBlueprint(name, token)
 		lib.ExportType[name] = bluePrint
 		return bluePrint
 	} else {

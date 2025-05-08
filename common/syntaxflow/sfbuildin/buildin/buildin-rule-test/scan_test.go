@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
@@ -40,6 +41,10 @@ func TestVerifiedRule(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestA(t *testing.T) {
+	sfbuildin.SyncEmbedRule()
 }
 
 func TestVerify_DEBUG(t *testing.T) {

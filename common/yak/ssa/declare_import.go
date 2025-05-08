@@ -106,15 +106,13 @@ func (p *Program) checkImportRelationship(lib *Program) (*importDeclareItem, err
 	return pkg, nil
 }
 
-func (p *Program) ImportTypeFromLib(lib *Program, names ...string) error {
+func (p *Program) ImportTypeFromLib(lib *Program, name string, token CanStartStopToken) error {
 	pkg, err := p.checkImportRelationship(lib)
 	if err != nil {
 		return err
 	}
-	for _, name := range names {
-		importType := fakeImportType(lib, name)
-		pkg.typ[name] = importType
-	}
+	importType := fakeImportType(lib, name, token)
+	pkg.typ[name] = importType
 	return err
 }
 
