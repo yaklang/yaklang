@@ -104,6 +104,7 @@ func TestGetResultVariableByID(t *testing.T) {
 	`)
 	require.NoError(t, err)
 	require.NotNil(t, res)
+	res.Show()
 
 	// save result
 	resultID, err := res.Save(schema.SFResultKindDebug)
