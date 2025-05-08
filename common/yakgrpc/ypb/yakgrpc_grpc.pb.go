@@ -413,6 +413,10 @@ const (
 	Yak_UpdateFingerprint_FullMethodName                          = "/ypb.Yak/UpdateFingerprint"
 	Yak_CreateFingerprint_FullMethodName                          = "/ypb.Yak/CreateFingerprint"
 	Yak_RecoverBuiltinFingerprint_FullMethodName                  = "/ypb.Yak/RecoverBuiltinFingerprint"
+	Yak_CreateFingerprintGroup_FullMethodName                     = "/ypb.Yak/CreateFingerprintGroup"
+	Yak_GetAllFingerprintGroup_FullMethodName                     = "/ypb.Yak/GetAllFingerprintGroup"
+	Yak_RenameFingerprintGroup_FullMethodName                     = "/ypb.Yak/RenameFingerprintGroup"
+	Yak_DeleteFingerprintGroup_FullMethodName                     = "/ypb.Yak/DeleteFingerprintGroup"
 	Yak_GetReverseShellProgramList_FullMethodName                 = "/ypb.Yak/GetReverseShellProgramList"
 	Yak_GenerateReverseShellCommand_FullMethodName                = "/ypb.Yak/GenerateReverseShellCommand"
 	Yak_QuerySyntaxFlowRule_FullMethodName                        = "/ypb.Yak/QuerySyntaxFlowRule"
@@ -996,6 +1000,10 @@ type YakClient interface {
 	UpdateFingerprint(ctx context.Context, in *UpdateFingerprintRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	CreateFingerprint(ctx context.Context, in *CreateFingerprintRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	RecoverBuiltinFingerprint(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	CreateFingerprintGroup(ctx context.Context, in *FingerprintGroup, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	GetAllFingerprintGroup(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*FingerprintGroups, error)
+	RenameFingerprintGroup(ctx context.Context, in *RenameFingerprintGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	DeleteFingerprintGroup(ctx context.Context, in *DeleteFingerprintGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	// 反弹shell命令生成
 	GetReverseShellProgramList(ctx context.Context, in *GetReverseShellProgramListRequest, opts ...grpc.CallOption) (*GetReverseShellProgramListResponse, error)
 	GenerateReverseShellCommand(ctx context.Context, in *GenerateReverseShellCommandRequest, opts ...grpc.CallOption) (*GenerateReverseShellCommandResponse, error)
@@ -5601,6 +5609,46 @@ func (c *yakClient) RecoverBuiltinFingerprint(ctx context.Context, in *Empty, op
 	return out, nil
 }
 
+func (c *yakClient) CreateFingerprintGroup(ctx context.Context, in *FingerprintGroup, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_CreateFingerprintGroup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetAllFingerprintGroup(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*FingerprintGroups, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FingerprintGroups)
+	err := c.cc.Invoke(ctx, Yak_GetAllFingerprintGroup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) RenameFingerprintGroup(ctx context.Context, in *RenameFingerprintGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_RenameFingerprintGroup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteFingerprintGroup(ctx context.Context, in *DeleteFingerprintGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_DeleteFingerprintGroup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) GetReverseShellProgramList(ctx context.Context, in *GetReverseShellProgramListRequest, opts ...grpc.CallOption) (*GetReverseShellProgramListResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetReverseShellProgramListResponse)
@@ -6863,6 +6911,10 @@ type YakServer interface {
 	UpdateFingerprint(context.Context, *UpdateFingerprintRequest) (*DbOperateMessage, error)
 	CreateFingerprint(context.Context, *CreateFingerprintRequest) (*DbOperateMessage, error)
 	RecoverBuiltinFingerprint(context.Context, *Empty) (*DbOperateMessage, error)
+	CreateFingerprintGroup(context.Context, *FingerprintGroup) (*DbOperateMessage, error)
+	GetAllFingerprintGroup(context.Context, *Empty) (*FingerprintGroups, error)
+	RenameFingerprintGroup(context.Context, *RenameFingerprintGroupRequest) (*DbOperateMessage, error)
+	DeleteFingerprintGroup(context.Context, *DeleteFingerprintGroupRequest) (*DbOperateMessage, error)
 	// 反弹shell命令生成
 	GetReverseShellProgramList(context.Context, *GetReverseShellProgramListRequest) (*GetReverseShellProgramListResponse, error)
 	GenerateReverseShellCommand(context.Context, *GenerateReverseShellCommandRequest) (*GenerateReverseShellCommandResponse, error)
@@ -8136,6 +8188,18 @@ func (UnimplementedYakServer) CreateFingerprint(context.Context, *CreateFingerpr
 }
 func (UnimplementedYakServer) RecoverBuiltinFingerprint(context.Context, *Empty) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RecoverBuiltinFingerprint not implemented")
+}
+func (UnimplementedYakServer) CreateFingerprintGroup(context.Context, *FingerprintGroup) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateFingerprintGroup not implemented")
+}
+func (UnimplementedYakServer) GetAllFingerprintGroup(context.Context, *Empty) (*FingerprintGroups, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAllFingerprintGroup not implemented")
+}
+func (UnimplementedYakServer) RenameFingerprintGroup(context.Context, *RenameFingerprintGroupRequest) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RenameFingerprintGroup not implemented")
+}
+func (UnimplementedYakServer) DeleteFingerprintGroup(context.Context, *DeleteFingerprintGroupRequest) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteFingerprintGroup not implemented")
 }
 func (UnimplementedYakServer) GetReverseShellProgramList(context.Context, *GetReverseShellProgramListRequest) (*GetReverseShellProgramListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetReverseShellProgramList not implemented")
@@ -14910,6 +14974,78 @@ func _Yak_RecoverBuiltinFingerprint_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_CreateFingerprintGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FingerprintGroup)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CreateFingerprintGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_CreateFingerprintGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CreateFingerprintGroup(ctx, req.(*FingerprintGroup))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetAllFingerprintGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetAllFingerprintGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetAllFingerprintGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetAllFingerprintGroup(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_RenameFingerprintGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RenameFingerprintGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).RenameFingerprintGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_RenameFingerprintGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).RenameFingerprintGroup(ctx, req.(*RenameFingerprintGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteFingerprintGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteFingerprintGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteFingerprintGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteFingerprintGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteFingerprintGroup(ctx, req.(*DeleteFingerprintGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_GetReverseShellProgramList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetReverseShellProgramListRequest)
 	if err := dec(in); err != nil {
@@ -17336,6 +17472,22 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RecoverBuiltinFingerprint",
 			Handler:    _Yak_RecoverBuiltinFingerprint_Handler,
+		},
+		{
+			MethodName: "CreateFingerprintGroup",
+			Handler:    _Yak_CreateFingerprintGroup_Handler,
+		},
+		{
+			MethodName: "GetAllFingerprintGroup",
+			Handler:    _Yak_GetAllFingerprintGroup_Handler,
+		},
+		{
+			MethodName: "RenameFingerprintGroup",
+			Handler:    _Yak_RenameFingerprintGroup_Handler,
+		},
+		{
+			MethodName: "DeleteFingerprintGroup",
+			Handler:    _Yak_DeleteFingerprintGroup_Handler,
 		},
 		{
 			MethodName: "GetReverseShellProgramList",
