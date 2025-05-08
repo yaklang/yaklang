@@ -2,8 +2,10 @@ package tests
 
 import (
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+	"strings"
 	"testing"
 )
 
@@ -1423,27 +1425,66 @@ func TestBasic_Variable_Switch(t *testing.T) {
 		}, t)
 	})
 
-	//t.Run("simple switch, has default with break label", func(t *testing.T) {
-	//		ssatest.CheckPrintlnValue(`
-	//		a = 2
-	//		outer: {
-	// switch (a) {
-	//   case 2:
-	//     break outer; // ✅ 跳出 outer 标签块
-	//     a = 3
-	//   case 3:
-	//     break outer; // ✅ 跳出 outer 标签块
-	//     a = 4
-	//	default:
-	//     a = 1
-	//     println(a)
-	// }
-	//}
-	//println(a)
-	//		`, []string{
-	//			"1", "phi(a)[1,2]",
-	//		}, t)
-	//	})
+	t.Run("simple switch, has default with break label", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+a = 2
+outer: {
+    switch (a) {
+        case 2:
+            break outer; // ✅ 跳出 outer 标签块
+            a = 3
+        case 3:
+            break outer; // ✅ 跳出 outer 标签块
+            a = 4
+        default:
+            a = 1
+            println(a)
+            break outer; // ✅ 跳出 outer 标签块
+
+    }
+    a = 100
+}
+println(a)
+			`, []string{
+			"1", "phi(a)[phi(a)[phi(a)[100,2],2],100]",
+		}, t)
+	})
+}
+
+func TestFunctionCFG(t *testing.T) {
+	code := `
+				a = 1
+		println(a) // 1
+		if(c) {
+			if(b) {
+				a = 2
+				println(a) // 2
+				return 
+			}else {
+				a = 3
+				println(a) // 3
+				return 
+			}
+			println(a) // unreachable // phi[2, 3]
+		}
+		println(a) // phi(a)[Undefined-a,1]
+	`
+
+	prog, err := ssaapi.Parse(code,
+		ssaapi.WithLanguage("new-js"),
+	)
+	require.NoError(t, err)
+
+	// 生成函数的控制流图
+	dot := ssaapi.FunctionDotGraph(prog.Program.Funcs.Values()[0])
+	log.Infof("函数控制流图DOT: \n%s", dot)
+
+	// 验证控制流图包含必要的元素
+	require.True(t, strings.Contains(dot, "digraph"), "控制流图应该包含digraph定义")
+	require.True(t, strings.Contains(dot, "->"), "控制流图应该包含边")
+
+	// 验证分支信息
+	require.True(t, strings.Contains(dot, "true") || strings.Contains(dot, "false"), "控制流图应该包含条件分支标签")
 }
 
 //func TestDestructuring(t *testing.T) {
