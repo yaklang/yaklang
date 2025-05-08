@@ -171,15 +171,36 @@ func (t *aiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitoo
 		}
 
 		// 获取下一步决策
-		actionFinal = t.getToolResultAction(string(nextResponse))
-		if actionFinal == "" {
-			t.config.EmitWarning("no action found, using default action, finished")
-			actionFinal = "finished"
+		action, err := ExtractAction(string(nextResponse), "require-more-tool", "finished")
+		if err != nil {
+			return utils.Errorf("error extracting action: %v", err)
 		}
+		actionFinal = action.Name()
+		if actionFinal != "require-more-action" && actionFinal != "finished" {
+			return utils.Errorf("error extracting action: %v", actionFinal)
+		}
+		if ret := action.GetString("status_summary"); ret != "" {
+			t.StatusSummary = ret
+		}
+		if ret := action.GetString("task_short_summary"); ret != "" {
+			t.ShortSummary = ret
+		}
+		if ret := action.GetString("task_long_summary"); ret != "" {
+			t.LongSummary = ret
+		}
+
+		if t.ShortSummary != "" {
+			t.TaskSummary = t.ShortSummary
+		}
+		if t.LongSummary != "" && t.TaskSummary == "" {
+			t.TaskSummary = t.LongSummary
+		}
+
 		t.config.EmitInfo("tool[%v] and next do the action: %v", targetTool.Name, actionFinal)
 		return nil
 	})
 	if err != nil {
+		t.config.EmitWarning("no action found, using default action, finished")
 		return "", NewNonRetryableTaskStackError(err)
 	}
 	return actionFinal, nil

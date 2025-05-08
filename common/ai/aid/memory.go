@@ -167,6 +167,31 @@ func (m *Memory) ToolCallTimeline() string {
 	return m.timeline.Dump()
 }
 
+func (m *Memory) ToolCallTimelineWithout(n ...any) string {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("error creating sub timeline: %v", r)
+			fmt.Println(utils.ErrorStack(r))
+		}
+	}()
+	origin := m.timeline.idToToolResult.Keys()
+	removed := make(map[int64]struct{})
+	for _, i := range n {
+		removed[int64(utils.InterfaceToInt(i))] = struct{}{}
+	}
+	allkeys := make([]int64, 0, len(origin))
+	for _, originItem := range origin {
+		if _, ok := removed[originItem]; !ok {
+			allkeys = append(allkeys, originItem)
+		}
+	}
+	stl := m.timeline.CreateSubTimeline(allkeys...)
+	if stl == nil {
+		return "no-toolcall, so not timeline"
+	}
+	return stl.Dump()
+}
+
 func (m *Memory) CurrentTaskToolCallTimeline() string {
 	defer func() {
 		if r := recover(); r != nil {
