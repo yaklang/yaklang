@@ -111,6 +111,7 @@ func TestCoodinator_Delete_Memory(t *testing.T) {
 				rsp.Close()
 			}()
 
+			fmt.Println(request.GetPrompt())
 			if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: now`, `"call-tool"`) {
 				rsp.EmitOutputStream(strings.NewReader(
 					`{"@action": "call-tool", "tool": "now", "params": ""}`))
@@ -119,7 +120,7 @@ func TestCoodinator_Delete_Memory(t *testing.T) {
 				rsp.EmitOutputStream(strings.NewReader(
 					fmt.Sprintf(`{"@action": "call-tool", "tool": "delete_memory", "params": {"id": %d}}`, testCallKey)))
 				return rsp, nil
-			} else if utils.MatchAllOfSubString(request.GetPrompt(), `你是一个任务执行引擎，在完成用户任务的时候，并且成功执行了外部工具：`, `当前任务是根据工具结果决策是否需要再调用额外工具还是把当前任务标记为结束。`) {
+			} else if utils.MatchAllOfSubString(request.GetPrompt(), `"require-more-tool"`, `"finished"`, `"status_summary"`) {
 				if firstToolDecision {
 					firstToolDecision = false
 					keys := timeline.idToTimelineItem.Keys()
@@ -252,7 +253,7 @@ func TestCoodinator_Add_Persistent_Memory(t *testing.T) {
 				rsp.EmitOutputStream(strings.NewReader(
 					`{"@action": "call-tool", "tool": "now", "params": {"content": "` + persistentMemory + `"}}}`))
 				return rsp, nil
-			} else if utils.MatchAllOfSubString(request.GetPrompt(), `你是一个任务执行引擎，在完成用户任务的时候，并且成功执行了外部工具：`, `当前任务是根据工具结果决策是否需要再调用额外工具还是把当前任务标记为结束。`) {
+			} else if utils.MatchAllOfSubString(request.GetPrompt(), `"require-more-tool"`, `"finished"`, `"status_summary"`) {
 				if !utils.StringArrayContains(config.memory.PersistentData, persistentMemory) {
 					panic("persistent set fail")
 				}
