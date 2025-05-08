@@ -8,6 +8,7 @@ runtimeID = cli.String("runtime_id", cli.setRequired(true))
 hostTotal = cli.Int("host_total", cli.setRequired(true))
 portTotal = cli.Int("port_total", cli.setDefault(0))
 pingAliveHostTotal = cli.Int("ping_alive_host_total", cli.setDefault(0))
+scriptType = cli.String("script_type", cli.setRequired(true))
 reportName = cli.String("report_name")
 plugins = cli.Int("plugins", cli.setDefault(10))
 cli.check()
@@ -211,8 +212,11 @@ reportInstance.Markdown(`# 1、项目概述
 | <font color="#d83931">高危</font>  | 1) 高风险的信息泄露，包括但不限于可以获取一般数据的 SQL 注入漏洞、源代码泄露以及任意文件读取和下载漏洞等；<br/> 2) 越权访问，包括但不限于绕过验证直接访问管理后台、后台登录弱口令、以及其它服务的弱口令等。 |
 | <font color="#dc9b02">中危</font>  | 1) 需交互才能影响用户的漏洞。包括但不限于能够造成切实危害的存储型 XSS，重要的敏感操作 CSRF；<br/> 2) 普通信息泄露。包括但不仅限于获取用户敏感信息等；<br/> 3) 普通越权操作。包括但不仅限于越权查看非核心的信息、记录等；<br/> 4）普通逻辑设计缺陷。包括但不仅限于短信验证绕过、邮件验证绕过。 |
 | <font color="#43ab42">低危</font>  | 1) 有一定价值的轻微信息泄露。比如 phpinfo、测试数据泄露等；<br/> 2) 逻辑设计缺陷。包括但不仅限于图形验证码绕过；<br/> 3）有一定轻微影响的反射型 XSS、URL 跳转、非重要的敏感操作 CSRF 漏洞等。 |
+`)
 
-# 3、测试结果概述
+reportInstance.Raw({"type": scriptType, "data": ""})
+
+reportInstance.Markdown(`# 3、测试结果概述
 
 ## 3.1 总体安全现状
 `)
