@@ -3,6 +3,7 @@ package sfvm
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"strconv"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -15,9 +16,28 @@ func ToOpCodes(code string) OpCodes {
 	if err := json.Unmarshal([]byte(code), &opcodes); err != nil {
 		log.Errorf("to opcode fail: %s", err)
 		return OpCodes{}
-	} else {
-		return opcodes
 	}
+	existHash := make(map[string]*IterIndex)
+	for _, opcode := range opcodes {
+		switch opcode.OpCode {
+		case OpCreateIter:
+			hash := opcode.Iter.CalcHash()
+			if _, exist := existHash[hash]; exist {
+				log.Errorf("duplicate iter hash: %s", hash)
+				return OpCodes{}
+			}
+			existHash[hash] = opcode.Iter
+		case OpIterNext, OpIterEnd, OpIterLatch, OpCheckEmpty:
+			calcHash := opcode.Iter.CalcHash()
+			index, ok := existHash[calcHash]
+			if !ok {
+				log.Errorf("iter not exist: %s", calcHash)
+				return OpCodes{}
+			}
+			opcode.Iter = index
+		}
+	}
+	return opcodes
 }
 func (p OpCodes) ToString() string {
 	var result string
@@ -230,6 +250,10 @@ type IterIndex struct {
 
 	//记录当前的索引位置
 	currentIndex int
+}
+
+func (i *IterIndex) CalcHash() string {
+	return utils.CalcMd5(i.Start, i.Next, i.Latch, i.End)
 }
 
 func (s *SFI) ValueByIndex(i int) string {
