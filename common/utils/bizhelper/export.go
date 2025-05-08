@@ -12,6 +12,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"unicode"
 
 	"github.com/jinzhu/gorm"
 	"github.com/segmentio/ksuid"
@@ -82,6 +83,8 @@ type ImportConfig struct {
 	FilePath         string
 	IsEncrypted      bool
 	Password         string // Password for encrypted file
+	UniqueIndexField string
+	AllowOverwrite   bool // When true, update records if they exist
 	MetaDataHandler  func(metadata MetaData) error
 	PreReadHandler   func(name string, b []byte, metadata MetaData) (new []byte, err error)
 	AfterReadHandler func(name string, b []byte, metadata MetaData)
@@ -107,6 +110,18 @@ func WithImportPassword(password string) ImportOption {
 	return func(config *ImportConfig) {
 		config.IsEncrypted = true
 		config.Password = password
+	}
+}
+
+func WithImportUniqueIndexField(uniqueIndex string) ImportOption {
+	return func(config *ImportConfig) {
+		config.UniqueIndexField = uniqueIndex
+	}
+}
+
+func WithImportAllowOverwrite(allowOverwrite bool) ImportOption {
+	return func(config *ImportConfig) {
+		config.AllowOverwrite = allowOverwrite
 	}
 }
 
@@ -246,16 +261,72 @@ func ImportTableZip[T any](ctx context.Context, db *gorm.DB, filepath string, op
 				return err
 			}
 		}
-
 		d := new(T)
 		if err = json.Unmarshal(b, d); err != nil {
 			if err = config.CallErrorHandler(err); err != nil {
 				return err
 			}
 		}
-		if err = db.Create(d).Error; err != nil {
-			if err = config.CallErrorHandler(err); err != nil {
-				return err
+
+		createOrUpdateByUniqueIndex := func() error {
+			t := reflect.TypeOf(d)
+
+			if t.Kind() == reflect.Ptr {
+				t = t.Elem()
+			}
+			// Check if the value is a struct and has the specified index field
+			if t.Kind() != reflect.Struct {
+				return utils.Error("table must be a struct")
+			}
+
+			field, ok := t.FieldByName(config.UniqueIndexField)
+			if !ok {
+				return utils.Errorf("field %s not found in struct %s", config.UniqueIndexField, t.Name())
+			}
+			colName := field.Tag.Get("json")
+			if colName == "" {
+				colName = toSnakeCase(config.UniqueIndexField)
+			}
+
+			value := reflect.ValueOf(d).Elem().FieldByName(field.Name)
+			existing := new(T)
+			err := db.Where(fmt.Sprintf("%s = ?", colName), value.Interface()).First(existing).Error
+			if err == nil {
+				// Record exists, update it only if AllowOverwrite is true
+				if config.AllowOverwrite {
+					if err = db.Model(existing).Updates(d).Error; err != nil {
+						if err = config.CallErrorHandler(err); err != nil {
+							return err
+						}
+					}
+				}
+			} else if gorm.IsRecordNotFoundError(err) {
+				// Record doesn't exist, create a new one
+				if err = db.Create(d).Error; err != nil {
+					if err = config.CallErrorHandler(err); err != nil {
+						return err
+					}
+				}
+			} else {
+				// Other error occurred
+				if err = config.CallErrorHandler(err); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+
+		if config.UniqueIndexField != "" {
+			if err = createOrUpdateByUniqueIndex(); err != nil {
+				if err = config.CallErrorHandler(err); err != nil {
+					return err
+				}
+			}
+		} else {
+			if err = db.Create(d).Error; err != nil {
+				if err = config.CallErrorHandler(err); err != nil {
+					return err
+				}
 			}
 		}
 		if config.AfterReadHandler != nil {
@@ -401,4 +472,19 @@ func ExportTableZip[T any](ctx context.Context, db *gorm.DB, filepath string, op
 	}
 
 	return nil
+}
+
+func toSnakeCase(s string) string {
+	var buf bytes.Buffer
+	for i, c := range s {
+		if unicode.IsUpper(c) {
+			if i > 0 && (i+1 >= len(s) || unicode.IsLower(rune(s[i+1]))) {
+				buf.WriteRune('_')
+			}
+			buf.WriteRune(unicode.ToLower(c))
+		} else {
+			buf.WriteRune(c)
+		}
+	}
+	return buf.String()
 }

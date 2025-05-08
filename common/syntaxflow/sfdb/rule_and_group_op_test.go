@@ -73,7 +73,7 @@ func TestRule_OP(t *testing.T) {
 		})
 
 		rule.Language = "java"
-		err = UpdateRule(rule)
+		err = UpdateRule(db, rule)
 		require.NoError(t, err)
 
 		got, err := QueryRuleByName(db, ruleName)
