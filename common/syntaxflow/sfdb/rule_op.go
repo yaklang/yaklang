@@ -347,6 +347,15 @@ func QueryRulesByName(db *gorm.DB, ruleNames []string) ([]*schema.SyntaxFlowRule
 	}
 	return rules, nil
 }
+
+func QueryRulesById(db *gorm.DB, ruleIds []string) ([]*schema.SyntaxFlowRule, error) {
+	var rules []*schema.SyntaxFlowRule
+	if err := db.Preload("Groups").Where("rule_id IN (?)", ruleIds).Find(&rules).Error; err != nil {
+		return nil, err
+	}
+	return rules, nil
+}
+
 func QueryRuleByLanguage(db *gorm.DB, language consts.Language) ([]*schema.SyntaxFlowRule, error) {
 	var rules []*schema.SyntaxFlowRule
 	if err := db.Where("language = ?", language).Find(&rules).Error; err != nil {
@@ -355,19 +364,30 @@ func QueryRuleByLanguage(db *gorm.DB, language consts.Language) ([]*schema.Synta
 	return rules, nil
 }
 
-func UpdateRule(rule *schema.SyntaxFlowRule) error {
+func UpdateRule(db *gorm.DB, rule *schema.SyntaxFlowRule) error {
 	if rule == nil {
 		return utils.Errorf("update syntaxFlow rule failed: rule is nil")
 	}
 	if rule.RuleName == "" {
 		return utils.Errorf("update syntaxFlow rule failed: rule name is empty")
 	}
-	db := consts.GetGormProfileDatabase()
 	db = db.Model(&schema.SyntaxFlowRule{})
 	if err := db.Where("rule_name = ?", rule.RuleName).Update(rule).Error; err != nil {
 		return utils.Errorf("update syntaxFlow rule failed: %s", err)
 	}
 	return nil
+}
+
+func QueryGroupByRuleIds(db *gorm.DB, RuleIds []string) ([]*schema.SyntaxFlowGroup, error) {
+	rules, err := QueryRulesById(db, RuleIds)
+	if err != nil {
+		return nil, err
+	}
+	var groups []*schema.SyntaxFlowGroup
+	for _, rule := range rules {
+		groups = append(groups, rule.Groups...)
+	}
+	return groups, nil
 }
 
 func createRuleEx(rule *schema.SyntaxFlowRule, needDefaultGroup bool, groups ...string) (*schema.SyntaxFlowRule, error) {
