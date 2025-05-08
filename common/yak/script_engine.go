@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/amap"
 	"github.com/yaklang/yaklang/common/syntaxflow"
 	"github.com/yaklang/yaklang/common/twofa"
 
@@ -340,6 +341,8 @@ func initYaklangLib() {
 			}
 		}
 	})
+
+	yaklang.Import("amap", amap.YakExport)
 }
 
 type ScriptEngine struct {

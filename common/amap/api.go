@@ -16,13 +16,7 @@ type Client struct {
 	httpClient *http.Client
 }
 
-// NewClient creates a new Amap API client with the provided options.
-func NewClient(options ...func(*Config)) (*Client, error) {
-	config := NewConfig()
-	for _, option := range options {
-		option(config)
-	}
-
+func NewClientByConfig(config *Config) (*Client, error) {
 	if config.ApiKey == "" {
 		return nil, fmt.Errorf("amap API key is required")
 	}
@@ -33,6 +27,16 @@ func NewClient(options ...func(*Config)) (*Client, error) {
 			Timeout: config.Timeout,
 		},
 	}, nil
+}
+
+// NewClient creates a new Amap API client with the provided options.
+func NewClient(options ...func(*Config)) (*Client, error) {
+	config := NewConfig()
+	for _, option := range options {
+		option(config)
+	}
+
+	return NewClientByConfig(config)
 }
 
 // doRequest performs an HTTP request and decodes the response.

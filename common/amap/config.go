@@ -1,6 +1,10 @@
 package amap
 
-import "time"
+import (
+	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+)
 
 type AmapConfigOption func(*Config)
 
@@ -39,6 +43,14 @@ func NewConfig(opts ...AmapConfigOption) *Config {
 	}
 	for _, o := range opts {
 		o(cfg)
+	}
+	if cfg.ApiKey == "" {
+		key, err := LoadAmapKeywordFromYakit()
+		if err != nil {
+			log.Warnf("load amap apikey from yakit failed: %v", err)
+		} else {
+			cfg.ApiKey = key
+		}
 	}
 	return cfg
 }

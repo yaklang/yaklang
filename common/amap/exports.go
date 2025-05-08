@@ -68,7 +68,7 @@ func Geocode(address string, options ...AmapConfigOption) ([]*GeocodeResult, err
 	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
 	defer cancel()
 
-	client, err := NewClient(WithApiKey(config.ApiKey))
+	client, err := NewClientByConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func ReverseGeocode(longitude, latitude float64, options ...AmapConfigOption) ([
 	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
 	defer cancel()
 
-	client, err := NewClient(WithApiKey(config.ApiKey))
+	client, err := NewClientByConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -139,24 +139,21 @@ func DrivingPlan(origin, destination string, options ...AmapConfigOption) (*Dire
 	config := NewConfig(options...)
 	originGeocode := config.GeocodeFilter(originGeocodes)
 	destinationGeocode := config.GeocodeFilter(destinationGeocodes)
-	originLng, originLat, err := parseLocation(originGeocode.Location)
+	originLocation, err := LocationFromString(originGeocode.Location)
 	if err != nil {
 		return nil, err
 	}
-	destinationLng, destinationLat, err := parseLocation(destinationGeocode.Location)
+	destinationLocation, err := LocationFromString(destinationGeocode.Location)
 	if err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
 	defer cancel()
 
-	client, err := NewClient(WithApiKey(config.ApiKey))
+	client, err := NewClientByConfig(config)
 	if err != nil {
 		return nil, err
 	}
-
-	originLocation := Location{Longitude: originLng, Latitude: originLat}
-	destinationLocation := Location{Longitude: destinationLng, Latitude: destinationLat}
 
 	req := DrivingRequest{
 		DirectionRequest: DirectionRequest{
@@ -187,24 +184,21 @@ func WalkingPlan(origin, destination string, options ...AmapConfigOption) (*Dire
 	config := NewConfig(options...)
 	originGeocode := config.GeocodeFilter(originGeocodes)
 	destinationGeocode := config.GeocodeFilter(destinationGeocodes)
-	originLng, originLat, err := parseLocation(originGeocode.Location)
+	originLocation, err := LocationFromString(originGeocode.Location)
 	if err != nil {
 		return nil, err
 	}
-	destinationLng, destinationLat, err := parseLocation(destinationGeocode.Location)
+	destinationLocation, err := LocationFromString(destinationGeocode.Location)
 	if err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
 	defer cancel()
 
-	client, err := NewClient(WithApiKey(config.ApiKey))
+	client, err := NewClientByConfig(config)
 	if err != nil {
 		return nil, err
 	}
-
-	originLocation := Location{Longitude: originLng, Latitude: originLat}
-	destinationLocation := Location{Longitude: destinationLng, Latitude: destinationLat}
 
 	req := WalkingRequest{
 		DirectionRequest: DirectionRequest{
@@ -218,35 +212,6 @@ func WalkingPlan(origin, destination string, options ...AmapConfigOption) (*Dire
 	}
 
 	return client.Walking(ctx, req)
-}
-
-// Bicycling calculates a bicycling route
-func Bicycling(originLng, originLat, destLng, destLat float64, options ...AmapConfigOption) (*DirectionResponse, error) {
-	config := NewConfig(options...)
-
-	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
-	defer cancel()
-
-	client, err := NewClient(WithApiKey(config.ApiKey))
-	if err != nil {
-		return nil, err
-	}
-
-	origin := Location{Longitude: originLng, Latitude: originLat}
-	destination := Location{Longitude: destLng, Latitude: destLat}
-
-	req := BicyclingRequest{
-		DirectionRequest: DirectionRequest{
-			Origin:      origin,
-			Destination: destination,
-		},
-	}
-
-	if config.Extensions != "" {
-		req.OutputExtensions = config.Extensions
-	}
-
-	return client.Bicycling(ctx, req)
 }
 
 // BicyclingPlan calculates a bicycling route from address strings
@@ -263,24 +228,21 @@ func BicyclingPlan(origin, destination string, options ...AmapConfigOption) (*Bi
 	config := NewConfig(options...)
 	originGeocode := config.GeocodeFilter(originGeocodes)
 	destinationGeocode := config.GeocodeFilter(destinationGeocodes)
-	originLng, originLat, err := parseLocation(originGeocode.Location)
+	originLocation, err := LocationFromString(originGeocode.Location)
 	if err != nil {
 		return nil, err
 	}
-	destinationLng, destinationLat, err := parseLocation(destinationGeocode.Location)
+	destinationLocation, err := LocationFromString(destinationGeocode.Location)
 	if err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
 	defer cancel()
 
-	client, err := NewClient(WithApiKey(config.ApiKey))
+	client, err := NewClientByConfig(config)
 	if err != nil {
 		return nil, err
 	}
-
-	originLocation := Location{Longitude: originLng, Latitude: originLat}
-	destinationLocation := Location{Longitude: destinationLng, Latitude: destinationLat}
 
 	req := BicyclingRequest{
 		DirectionRequest: DirectionRequest{
@@ -329,24 +291,21 @@ func TransitPlan(origin, destination string, options ...AmapConfigOption) (*Tran
 	config := NewConfig(options...)
 	originGeocode := config.GeocodeFilter(originGeocodes)
 	destinationGeocode := config.GeocodeFilter(destinationGeocodes)
-	originLng, originLat, err := parseLocation(originGeocode.Location)
+	originLocation, err := LocationFromString(originGeocode.Location)
 	if err != nil {
 		return nil, err
 	}
-	destinationLng, destinationLat, err := parseLocation(destinationGeocode.Location)
+	destinationLocation, err := LocationFromString(destinationGeocode.Location)
 	if err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
 	defer cancel()
 
-	client, err := NewClient(WithApiKey(config.ApiKey))
+	client, err := NewClientByConfig(config)
 	if err != nil {
 		return nil, err
 	}
-
-	originLocation := Location{Longitude: originLng, Latitude: originLat}
-	destinationLocation := Location{Longitude: destinationLng, Latitude: destinationLat}
 
 	req := TransitRequest{
 		DirectionRequest: DirectionRequest{
@@ -370,7 +329,7 @@ func Distance(origin, destination string, options ...AmapConfigOption) (*Distanc
 	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
 	defer cancel()
 
-	client, err := NewClient(WithApiKey(config.ApiKey))
+	client, err := NewClientByConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -381,7 +340,7 @@ func Distance(origin, destination string, options ...AmapConfigOption) (*Distanc
 	}
 
 	originGeocode := config.GeocodeFilter(originGeocodes)
-	originLng, originLat, err := parseLocation(originGeocode.Location)
+	originLocation, err := LocationFromString(originGeocode.Location)
 	if err != nil {
 		return nil, err
 	}
@@ -390,13 +349,13 @@ func Distance(origin, destination string, options ...AmapConfigOption) (*Distanc
 		return nil, err
 	}
 	destinationGeocode := config.GeocodeFilter(destinationGeocodes)
-	destinationLng, destinationLat, err := parseLocation(destinationGeocode.Location)
+	destinationLocation, err := LocationFromString(destinationGeocode.Location)
 	if err != nil {
 		return nil, err
 	}
 	req := DistanceRequest{
-		Origins:     []Location{Location{originLng, originLat}},
-		Destination: Location{destinationLng, destinationLat},
+		Origins:     []Location{originLocation},
+		Destination: destinationLocation,
 		Type:        DirectionType(config.Type),
 	}
 	return client.Distance(ctx, req)
@@ -409,7 +368,7 @@ func IPLocation(ip string, options ...AmapConfigOption) (*IPLocationResultEx, er
 	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
 	defer cancel()
 
-	client, err := NewClient(WithApiKey(config.ApiKey))
+	client, err := NewClientByConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -437,7 +396,7 @@ func SearchPOI(keywords string, options ...AmapConfigOption) (*SearchPOIResultEx
 	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
 	defer cancel()
 
-	client, err := NewClient(WithApiKey(config.ApiKey))
+	client, err := NewClientByConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -490,7 +449,7 @@ func SearchNearbyPOI(longitude, latitude float64, keywords string, options ...Am
 	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
 	defer cancel()
 
-	client, err := NewClient(WithApiKey(config.ApiKey))
+	client, err := NewClientByConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -547,7 +506,7 @@ func GetPOIDetail(poiID string, options ...AmapConfigOption) (*POIResultEx, erro
 	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
 	defer cancel()
 
-	client, err := NewClient(WithApiKey(config.ApiKey))
+	client, err := NewClientByConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -586,7 +545,7 @@ func GetAOIBoundary(aoiID string, options ...AmapConfigOption) (*AOIBoundaryResu
 	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
 	defer cancel()
 
-	client, err := NewClient(WithApiKey(config.ApiKey))
+	client, err := NewClientByConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -666,7 +625,7 @@ func GetWeather(cityCode string, forecast bool, options ...AmapConfigOption) (*W
 	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
 	defer cancel()
 
-	client, err := NewClient(WithApiKey(config.ApiKey))
+	client, err := NewClientByConfig(config)
 	if err != nil {
 		return nil, err
 	}
