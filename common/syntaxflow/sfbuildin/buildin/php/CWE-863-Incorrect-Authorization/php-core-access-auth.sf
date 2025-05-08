@@ -1,9 +1,9 @@
 desc(
-	title: "Insecure File Operation"
-	title_zh: "未经验证的文件操作风险",
-	type: vul
-	risk: "file-operation"
-	desc: <<<TEXT
+title: "Insecure File Operation",
+title_zh: "未经验证的文件操作风险",
+type: vul,
+risk: "file-operation",
+desc: <<<TEXT
     检测未经验证的用户输入直接用于文件操作系统函数,可能导致任意文件读取、写入、删除等风险,建议对用户输入进行严格过滤或验证,避免直接传递给文件操作系统函数.
 TEXT
 	rule_id: "7e2c4412-9a6f-4095-a84f-beb680e56fbf"
@@ -49,9 +49,9 @@ alert $low for {
 }
 
 desc(
-	lang: "php"
-	alert_min: 1
-	"file:///unsafe.php": <<<TEXT
+    lang: "php",
+    alert_min: 1,
+    "file:///unsafe.php": <<<TEXT
 <?php
     $origin = $_GET["origin"];
     $destination = $_GET["destination"];

@@ -3,6 +3,7 @@ desc(
     title_zh: "ThinkPHP认证绕过检测",
     risk: "audit",
     level: "low",
+    rule_id: 30287001,
     desc: <<<CODE
     该文件定义了用于检测PHP ThinkPHP框架中认证绕过漏洞的规则和模式。
 CODE
