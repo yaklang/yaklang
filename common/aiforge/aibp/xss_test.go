@@ -16,7 +16,7 @@ func TestXSS(t *testing.T) {
 		[]*ypb.ExecParamItem{
 			{Key: "query", Value: `http://127.0.0.1:8787/xss/js/in-str?name=admin`},
 		},
-		aid.WithAICallback(aiforge.GetOpenRouterAICallback()),
+		aid.WithAICallback(aiforge.GetQwenAICallback("deepseek-v3")),
 		//aid.WithAICallback(func(config *aid.Config, req *aid.AIRequest) (*aid.AIResponse, error) {
 		//	return aiforge.GetOpenRouterAICallback()(config, req)
 		//}),
@@ -24,5 +24,6 @@ func TestXSS(t *testing.T) {
 		aid.WithAgreeAuto(true, 100*time.Millisecond),
 		aid.WithDebugPrompt(true),
 		aid.WithAITransactionRetry(5),
+		aid.WithTimeLineLimit(5),
 	)
 }

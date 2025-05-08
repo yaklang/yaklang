@@ -59,31 +59,6 @@ func (t *aiTask) getToolResultAction(response string) string {
 	return "unknown"
 }
 
-func (t *aiTask) toolChoose() (*aitool.Tool, error) {
-	_prompt, err := t.generateTaskPrompt()
-	if err != nil {
-		log.Errorf("error generating aiTask prompt: %v", err)
-		return nil, err
-	}
-
-	req := NewAIRequest(_prompt)
-	responseReader, err := t.callAI(req)
-	if err != nil {
-		return nil, fmt.Errorf("error calling AI: %w", err)
-	}
-	responseBytes, err := io.ReadAll(responseReader.GetOutputStreamReader("execute", false, t.config))
-	if err != nil {
-		return nil, fmt.Errorf("error reading AI response: %w", err)
-	}
-	response := string(responseBytes)
-	toolRequired := t.getToolRequired(response)
-	if len(toolRequired) == 0 {
-		return nil, nil
-	}
-	targetTool := toolRequired[0]
-	return targetTool, nil
-}
-
 func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, err error) {
 	t.config.EmitInfo("start to generate tool[%v] params in task:%#v", targetTool.Name, t.Name)
 	// 生成申请工具详细描述的prompt
