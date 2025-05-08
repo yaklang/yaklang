@@ -94,51 +94,53 @@ TOOLREQUIRED:
 		}
 	}
 
-	var taskSummary = ""
-	var shortSummary = ""
-	var longSummary = ""
+	if t.TaskSummary == "" {
+		var taskSummary = ""
+		var shortSummary = ""
+		var longSummary = ""
 
-	t.config.EmitInfo("start to execute task-summary action")
-	// 处理总结回调
-	summaryPromptWellFormed, err := t.GenerateTaskSummaryPrompt()
-	if err != nil {
-		t.config.EmitError("error generating summary prompt: %v", err)
-		return fmt.Errorf("error generating summary prompt: %w", err)
+		t.config.EmitInfo("start to execute task-summary action")
+		// 处理总结回调
+		summaryPromptWellFormed, err := t.GenerateTaskSummaryPrompt()
+		if err != nil {
+			t.config.EmitError("error generating summary prompt: %v", err)
+			return fmt.Errorf("error generating summary prompt: %w", err)
+		}
+
+		err = t.config.callAiTransaction(summaryPromptWellFormed, t.callAI, func(summaryReader *AIResponse) error {
+			summaryBytes, err := io.ReadAll(summaryReader.GetOutputStreamReader("summary", false, t.config))
+			if err != nil {
+				t.config.EmitError("error reading summary: %v", err)
+				return fmt.Errorf("error reading summary: %w", err)
+			}
+
+			action, err := ExtractAction(string(summaryBytes), "summary")
+			if err != nil {
+				t.config.EmitError("error extracting action: %v", err)
+			}
+
+			if action != nil {
+				shortSummary = action.GetString("short_summary")
+			}
+			if shortSummary != "" {
+				taskSummary = shortSummary
+			}
+			if action != nil {
+				longSummary = action.GetString("long_summary")
+			}
+			if longSummary != "" && taskSummary == "" {
+				taskSummary = longSummary
+			}
+
+			if shortSummary == "" {
+				return utils.Errorf("error: short summary is empty, retry it until summary finished")
+			}
+			return nil
+		})
+		t.TaskSummary = taskSummary
+		t.ShortSummary = shortSummary
+		t.LongSummary = longSummary
 	}
-
-	err = t.config.callAiTransaction(summaryPromptWellFormed, t.callAI, func(summaryReader *AIResponse) error {
-		summaryBytes, err := io.ReadAll(summaryReader.GetOutputStreamReader("summary", false, t.config))
-		if err != nil {
-			t.config.EmitError("error reading summary: %v", err)
-			return fmt.Errorf("error reading summary: %w", err)
-		}
-
-		action, err := ExtractAction(string(summaryBytes), "summary")
-		if err != nil {
-			t.config.EmitError("error extracting action: %v", err)
-		}
-
-		if action != nil {
-			shortSummary = action.GetString("short_summary")
-		}
-		if shortSummary != "" {
-			taskSummary = shortSummary
-		}
-		if action != nil {
-			longSummary = action.GetString("long_summary")
-		}
-		if longSummary != "" && taskSummary == "" {
-			taskSummary = longSummary
-		}
-
-		if shortSummary == "" {
-			return utils.Errorf("error: short summary is empty, retry it until summary finished")
-		}
-		return nil
-	})
-	t.TaskSummary = taskSummary
-	t.ShortSummary = shortSummary
-	t.LongSummary = longSummary
 	return nil
 }
 
