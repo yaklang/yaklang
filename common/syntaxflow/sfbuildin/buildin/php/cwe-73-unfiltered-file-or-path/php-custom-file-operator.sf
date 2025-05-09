@@ -22,6 +22,10 @@ $read + $write + $unlink as $source
 $source(* as $param)
 
 $param#{
+    include: `<self> & $params`
+}-> as $all
+
+$param#{
     include: `<self> & $params`,
     exclude: `<self>?{opcode: call}`
 }-> as $high
@@ -32,10 +36,11 @@ alert $high for{
     level: 'high'
 }
 
-$param #{
-    include: `<self>& $params`,
-    include: `*?{opcode: call && !<self><getCallee> & $filter}`
-}-> as $middle
+$all<dataflow(exclude=<<<CODE
+*?{opcode: call && <self><getCallee> & $filter} as $__next__
+CODE)> as $highAndMid
+
+$highAndMid - $high as $middle
 
 alert $middle for{
     title_zh: '存在文件操作，文件操作经过函数，但未检出过滤',
@@ -44,10 +49,7 @@ alert $middle for{
     level: 'mid'
 }
 
-$param #{
-    include: `<self> & $params`,
-    include: `*?{opcode: call && <self><getCallee> & $filter}`
-}-> as $low
+$all - $high - $middle as $low
 
 alert $low for{
     title_zh: '存在文件操作，文件操作经过函数，检出过滤',

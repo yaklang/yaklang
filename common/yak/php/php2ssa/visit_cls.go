@@ -297,7 +297,6 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 				typ := y.VisitTypeHint(ret.TypeHint())
 				value.SetType(typ)
 			})
-
 		}
 		return
 	case *phpparser.FunctionContext:

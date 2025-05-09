@@ -170,6 +170,8 @@ const (
 	NativeCall_GetInterfaceBlueprint = "getInterfaceBlueprint"
 
 	NativeCall_GetRootParentBlueprint = "getRootParentBlueprint"
+
+	NativeCall_Length = "len"
 )
 
 func init() {
@@ -192,6 +194,17 @@ func init() {
 			return false, nil, utils.Errorf("no parents blueprint found")
 		}
 		return true, sfvm.NewValues(result), nil
+	}))
+	registerNativeCall(NativeCall_Length, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		count := 0
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			switch operator.(type) {
+			case *Value, *Program:
+				count++
+			}
+			return nil
+		})
+		return true, v.NewConst(count), nil
 	}))
 
 	registerNativeCall(NativeCall_GetInterfaceBlueprint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
@@ -317,22 +330,6 @@ func init() {
 		return true, sfvm.NewValues(result), nil
 	}))
 
-	registerNativeCall(NativeCall_GetActualParamLen, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
-		vs, err := v.GetCallActualParams(0, true)
-		if err != nil {
-			return false, nil, err
-		}
-		prog, err := fetchProgram(v)
-		if err != nil {
-			return false, nil, err
-		}
-		var count int
-		vs.Recursive(func(operator sfvm.ValueOperator) error {
-			count++
-			return nil
-		})
-		return true, sfvm.NewValues([]sfvm.ValueOperator{prog.NewConstValue(count)}), nil
-	}), nc_desc("获取实际参数长度"))
 	registerNativeCall(NativeCall_GetActualParams, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		result, err := v.GetCallActualParams(0, true)
 		if err != nil {

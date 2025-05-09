@@ -3,6 +3,7 @@ package sfvm
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"strconv"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -15,9 +16,28 @@ func ToOpCodes(code string) OpCodes {
 	if err := json.Unmarshal([]byte(code), &opcodes); err != nil {
 		log.Errorf("to opcode fail: %s", err)
 		return OpCodes{}
-	} else {
-		return opcodes
 	}
+	existHash := make(map[string]*IterIndex)
+	for _, opcode := range opcodes {
+		switch opcode.OpCode {
+		case OpCreateIter:
+			hash := opcode.Iter.CalcHash()
+			if _, exist := existHash[hash]; exist {
+				log.Errorf("duplicate iter hash: %s", hash)
+				return OpCodes{}
+			}
+			existHash[hash] = opcode.Iter
+		case OpIterNext, OpIterEnd, OpIterLatch, OpCheckEmpty:
+			calcHash := opcode.Iter.CalcHash()
+			index, ok := existHash[calcHash]
+			if !ok {
+				log.Errorf("iter not exist: %s", calcHash)
+				return OpCodes{}
+			}
+			opcode.Iter = index
+		}
+	}
+	return opcodes
 }
 func (p OpCodes) ToString() string {
 	var result string
@@ -77,15 +97,18 @@ const (
 
 	// Condition
 	// use the []bool  && []Value of stack top, push result into stack
+
 	OpCondition
 	OpCompareOpcode
 	OpCompareString
-	OpVersionIn
+	OpEmptyCompare
 
-	/*
-		Binary Operator
-		Fetch TWO in STACK, calc result, push result into stack
-	*/
+	OpVersionIn
+	//OpPopDuplicate is copy popStack to stack
+	OpPopDuplicate
+	//OpCheckEmpty check the stack top, if empty, push false
+	OpCheckEmpty
+
 	OpEq
 	OpNotEq
 	OpGt
@@ -137,6 +160,66 @@ const (
 	OpFileFilterJsonPath
 )
 
+var Opcode2String = map[SFVMOpCode]string{
+	OpPass:                  "OpPass",
+	OpEnterStatement:        "OpEnterStatement",
+	OpExitStatement:         "OpExitStatement",
+	OpDuplicate:             "OpDuplicate",
+	OpPushSearchExact:       "OpPushSearchExact",
+	OpPushSearchGlob:        "OpPushSearchGlob",
+	OpPushSearchRegexp:      "OpPushSearchRegexp",
+	OpRecursiveSearchExact:  "OpRecursiveSearchExact",
+	OpRecursiveSearchGlob:   "OpRecursiveSearchGlob",
+	OpRecursiveSearchRegexp: "OpRecursiveSearchRegexp",
+	OpGetCall:               "OpGetCall",
+	OpGetCallArgs:           "OpGetCallArgs",
+	OpGetUsers:              "OpGetUsers",
+	OpGetBottomUsers:        "OpGetBottomUsers",
+	OpGetDefs:               "OpGetDefs",
+	OpGetTopDefs:            "OpGetTopDefs",
+	OpListIndex:             "OpListIndex",
+	OpNewRef:                "OpNewRef",
+	OpUpdateRef:             "OpUpdateRef",
+	OpPushNumber:            "OpPushNumber",
+	OpPushString:            "OpPushString",
+	OpPushBool:              "OpPushBool",
+	OpPop:                   "OpPop",
+	OpCondition:             "OpCondition",
+	OpCompareOpcode:         "OpCompareOpcode",
+	OpCompareString:         "OpCompareString",
+	OpVersionIn:             "OpVersionIn",
+	OpEq:                    "OpEq",
+	OpNotEq:                 "OpNotEq",
+	OpGt:                    "OpGt",
+	OpGtEq:                  "OpGtEq",
+	OpLt:                    "OpLt",
+	OpLtEq:                  "OpLtEq",
+	OpLogicAnd:              "OpLogicAnd",
+	OpLogicOr:               "OpLogicOr",
+	OpLogicBang:             "OpLogicBang",
+	OpReMatch:               "OpReMatch",
+	OpGlobMatch:             "OpGlobMatch",
+	OpNot:                   "OpNot",
+	OpAlert:                 "OpAlert",
+	OpCheckParams:           "OpCheckParams",
+	OpAddDescription:        "OpAddDescription",
+	OpCreateIter:            "OpCreateIter",
+	OpIterNext:              "OpIterNext",
+	OpIterLatch:             "OpIterLatch",
+	OpIterEnd:               "OpIterEnd",
+	OpCheckStackTop:         "OpCheckStackTop",
+	OpMergeRef:              "OpMergeRef",
+	OpRemoveRef:             "OpRemoveRef",
+	OpIntersectionRef:       "OpIntersectionRef",
+	OpNativeCall:            "OpNativeCall",
+	OpFileFilterReg:         "OpFileFilterReg",
+	OpFileFilterXpath:       "OpFileFilterXpath",
+	OpFileFilterJsonPath:    "OpFileFilterJsonPath",
+	OpCheckEmpty:            "OpCheckEmpty",
+	OpPopDuplicate:          "OpPopDuplicate",
+	OpEmptyCompare:          "OpEmptyCompare",
+}
+
 type SFI struct {
 	OpCode               SFVMOpCode             `json:"op_code"`
 	UnaryInt             int                    `json:"unary_int"`
@@ -164,6 +247,13 @@ type IterIndex struct {
 	Next  int `json:"next"`
 	Latch int `json:"latch"`
 	End   int `json:"end"`
+
+	//记录当前的索引位置
+	currentIndex int
+}
+
+func (i *IterIndex) CalcHash() string {
+	return utils.CalcMd5(i.Start, i.Next, i.Latch, i.End)
 }
 
 func (s *SFI) ValueByIndex(i int) string {
@@ -302,6 +392,12 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "fileFilter$jsonpath", s.UnaryStr)
 	case OpVersionIn:
 		return fmt.Sprintf(verboseLen+" ", "version$in")
+	case OpCheckEmpty:
+		return fmt.Sprintf(verboseLen+" ", "check empty")
+	case OpPopDuplicate:
+		return fmt.Sprintf(verboseLen+" ", "pop-duplicate")
+	case OpEmptyCompare:
+		return fmt.Sprintf(verboseLen+" ", "empty compare")
 	default:
 		panic("unhandled default case")
 	}

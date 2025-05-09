@@ -52,7 +52,7 @@ public class GreetingController {
 			rule := `
 print()?{<typeName>?{have:'javax.servlet.http.HttpServletResponse'}} as $sink;
 `
-			vals, err := prog.SyntaxFlowWithError(rule)
+			vals, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithEnableDebug(true))
 			require.NoError(t, err)
 			res := vals.GetValues("sink")
 			require.NotNil(t, res)

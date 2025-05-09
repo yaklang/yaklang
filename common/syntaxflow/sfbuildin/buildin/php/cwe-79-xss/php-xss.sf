@@ -16,10 +16,13 @@ TEXT
 
 $method(* as $param);
 
-$param#{
-    include:`<self> & $extraValue`,
-    exclude: `<self>?{opcode: call}`
-}-> as $high
+$param #{
+    include: `<self> & $extraValue`
+}-> as $all
+
+$all<dataflow(exclude=<<<CODE
+*?{opcode: call} as $__next__
+CODE)> as $high
 
 alert $high for{
     title_zh: '存在xss漏洞，参数直接从外部传入',
@@ -27,11 +30,11 @@ alert $high for{
     type: 'vuln',
     level: 'high'
 }
+$all<dataflow(exclude=<<<CODE
+<self>?{opcode: call && <self><getCallee> & $function}
+CODE)> as $highAndMid
 
-$param#{
-    include: `<self> & $extraValue`,
-    include: `<self>?{opcode: call && !<self><getCallee> & $function}`
-}-> as $middle
+$highAndMid - $high as $middle
 
 alert $middle for{
     title_zh: '存在xss漏洞，参数经过函数，但未检出过滤',
@@ -40,10 +43,7 @@ alert $middle for{
     level: 'mid'
 }
 
-$param#{
-    include: `<self> & $extraValue`,
-    include: `<self>?{opcode: call && <self><getCallee> & $function}`
-}-> as $low
+$allRisk - $high - $middle as $low
 
 alert $low for {
     title: 'xss vulnerability exists. Parameters are checked out and filtered by functions',

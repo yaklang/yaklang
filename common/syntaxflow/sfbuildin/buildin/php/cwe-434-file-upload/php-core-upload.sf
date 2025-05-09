@@ -15,35 +15,42 @@ CODE
 _FILES.* as $params
 _FILES as $params
 
+
 move_uploaded_file(* as $source)
-./move|putFile/?{<getFunc><getCurrentBlueprint><fullTypeName>?{have: "Controller"}} as $source
+./move|putFile/?{<getFunc><getCurrentBlueprint><fullTypeName>?{any: "Controller","controller"}} as $source
+
 
 $source #{
-    include: `* & $params`,
-    exclude: `*?{opcode: call}`
-}-> as $high_upload
+    include: <<<CODE
+    * & $params
+CODE
+}-> as $all
 
-alert $high_upload for {
+
+$all<dataflow(exclude=<<<CODE
+*?{opcode: call} as $__next__
+CODE)> as $high
+
+alert $high for {
     title: "Unsafe File Upload Without Validation",
     title_zh: "未经验证的高危文件上传",
     level: "high"
 }
-$source #{
-    include: `* & $params`,
-    include: `*?{opcode:call && !<self><getCallee> & $filter}`
-}-> as $mid_upload
-alert $mid_upload for {
+
+$all<dataflow(exclude=<<<CODE
+*?{opcode:call && <self><getCallee> & $filter}
+CODE)> as $highAndMid
+
+$highAndMid - $high as $mid
+alert $mid for {
     title: "Insecure File Type Detection",
     title_zh: "不安全的文件类型检测",
     level: "mid"
 }
 
-$source#{
-    include: `* & $params`,
-    include: `*?{opcode:call && <self><getCallee> & $filter}`
-}-> as $low_upload
+$all - $high - $mid as $low
 
-alert $low_upload for {
+alert $low for {
     title: "Potential File Storage Path Misconfiguration",
     title_zh: "潜在的文件存储路径配置问题",
     level: "low"

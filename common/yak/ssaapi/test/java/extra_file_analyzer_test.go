@@ -193,7 +193,7 @@ public interface HomeDao {
 			map[string][]string{
 				"func": {"Function-HomeDao.getFlashProductList"},
 			}, false,
-			// ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaapi.JAVA),
 		)
 	})
 }

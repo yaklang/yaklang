@@ -80,6 +80,24 @@ func (y *SyntaxFlowVisitor) EmitCheckParam(ref string, then string, elseString s
 	})
 }
 
+func (y *SyntaxFlowVisitor) EmitOpPopDuplicate() {
+	y.codes = append(y.codes, &SFI{
+		OpCode: OpPopDuplicate,
+	})
+}
+func (y *SyntaxFlowVisitor) EmitOpEmptyCompare() {
+	y.codes = append(y.codes, &SFI{
+		OpCode: OpEmptyCompare,
+	})
+}
+func (y *SyntaxFlowVisitor) EmitOpCheckEmpty(index *IterIndex) {
+	//索引
+	y.codes = append(y.codes, &SFI{
+		OpCode: OpCheckEmpty,
+		Iter:   index,
+	})
+}
+
 func (y *SyntaxFlowVisitor) EmitAddDescription(key string, value string) {
 	y.codes = append(y.codes, &SFI{
 		OpCode:   OpAddDescription,
@@ -383,7 +401,7 @@ func (v *SyntaxFlowVisitor) EmitPass() {
 
 func (v *SyntaxFlowVisitor) EmitCreateIterator() *IterIndex {
 	idx := len(v.codes)
-	it := &IterIndex{Start: idx}
+	it := &IterIndex{Start: idx, currentIndex: 0}
 	v.codes = append(v.codes, &SFI{OpCode: OpCreateIter, Iter: it})
 	return it
 }
