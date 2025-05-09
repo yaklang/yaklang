@@ -109,6 +109,13 @@ func GetQwenAICallback(modelName ...string) aid.AICallbackType {
 	return getTestSuiteAICallback("tongyi-apikey.txt", nil, "tongyi", modelName...)
 }
 
+func GetAIBalance(modelName ...string) aid.AICallbackType {
+	if len(modelName) == 0 {
+		modelName = []string{"deepseek-v3"}
+	}
+	return getTestSuiteAICallback("aibalance.txt", nil, "aibalance", modelName...)
+}
+
 func GetCliValueByKey(key string, items []*ypb.ExecParamItem) string {
 	for _, i := range items {
 		if i.Key == key {

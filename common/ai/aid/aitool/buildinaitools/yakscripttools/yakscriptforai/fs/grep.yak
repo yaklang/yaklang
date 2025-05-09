@@ -5,7 +5,7 @@ __KEYWORDS__ = "pattern matching,regexp,file path,模式匹配,查找替换,文�
 yakit.AutoInitYakit()
 
 pathName := cli.String("path", cli.setHelp("the filepath you want to check"), cli.setRequired(true))
-target := cli.String("pattern", cli.setHelp("target text you want to grep"), cli.setRequired(true))
+pattern := cli.String("pattern", cli.setHelp("target text you want to grep, use comma ',' as split"), cli.setRequired(true))
 matchMode = cli.String("pattern-mode", cli.setHelp("one of [substr/regexp/isubstr] set match mode: 1. substr for CaseSensitive-SubString; 2. isubstr for CaseInsensitive-SubString; 3. regexp for Regexp match in Golang Style"))
 maxResult := cli.Int("limit", cli.setHelp("max times (limit) grep for results"),  cli.setDefault(10))
 offsetResultCount := cli.Int("offset", cli.setHelp("skip how many first match"), cli.setDefault(0))
@@ -17,7 +17,7 @@ if !file.IsExisted(pathName) {
     yakit.Info("no such file or directory: %v" % pathName)
     return
 }
-if target == "" {
+if pattern == "" {
     yakit.Info("grep target not right")
     return
 }
@@ -26,7 +26,7 @@ count := 0
 m := sync.NewMutex()
 
 defer func{
-    if count<= 0 { yakit.Info(f"not `${target}` find") }
+    if count<= 0 { yakit.Info(f"not `${pattern}` find") }
 }
 
 buf = bufio.NewBuffer()
@@ -88,23 +88,18 @@ output = (targetFile, offset, offsetEnd) => {
 }
 
 isRegexp = str.ToLower(matchMode) in ["regexp", "re", "regex"]
-var patternRe
-if isRegexp {
-    patternRe, err = re.Compile(target)
-    if err != nil {
-        yakit.Error("Compile %#v failed: %v", target, err)
-        return
-    }
-}
-handleRegexp = (targetFile, content) => {
-    loc := patternRe.FindStringIndex(string(content))
+
+handleRegexp = (subpattern, targetFile, content) => {
+    defer recover()
+    subpatternRe := re.Compile(subpattern)~
+    loc := subpatternRe.FindStringIndex(string(content))
     if len(loc) < 2 {
         return
     }
     start, end = loc[0], loc[1]
     output(targetFile, start, end)
     for {
-        newLoc := patternRe.FindStringIndex(string(content[start+1:]))
+        newLoc := subpatternRe.FindStringIndex(string(content[start+1:]))
         if len(newLoc) < 2 {
             return
         }
@@ -114,24 +109,24 @@ handleRegexp = (targetFile, content) => {
     }
 }
 
-handle = (targetFile, content) => {
+handle = (patternSubstr, targetFile, content) => {
     switch str.ToLower(matchMode){
     case "isubstr", "isubstring":
         content = str.ToLower(string(content))
-        target = str.ToLower(target)
+        patternSubstr = str.ToLower(patternSubstr)
     }
 
-    offset := str.Index(content, target)
+    offset := str.Index(content, patternSubstr)
     if offset < 0 {
         return
     }
 
-    output(targetFile, offset, offset+len(target))
+    output(targetFile, offset, offset+len(patternSubstr))
     for {
-        newOffset := str.Index(content[offset+1:], target)
+        newOffset := str.Index(content[offset+1:], patternSubstr)
         if newOffset < 0 { return }
         newOffset += 1 + offset
-        output(targetFile, newOffset, newOffset + len(target))
+        output(targetFile, newOffset, newOffset + len(patternSubstr))
         offset = newOffset
     }
 }
@@ -146,18 +141,23 @@ if file.IsDir(pathName) {
             return
         }
 
-        if isRegexp {
-            handleRegexp(fileToCheck, string(file.ReadFile(fileToCheck)~))
-        } else {
-            handle(fileToCheck, string(file.ReadFile(fileToCheck)~))
+        allpattern := str.Split(pattern, ",")
+        for subPatternItem in allpattern {
+            if isRegexp {
+                handleRegexp(subPatternItem, fileToCheck, string(file.ReadFile(fileToCheck)~))
+            } else {
+                handle(subPatternItem, fileToCheck, string(file.ReadFile(fileToCheck)~))
+            }
         }
     }))
 } else {
-    if isRegexp {
-        handleRegexp(pathName, string(file.ReadFile(pathName)~))
-    } else {
-        handle(pathName, string(file.ReadFile(pathName)~))
+    allpattern := str.Split(pattern, ",")
+    for subPatternItem in allpattern {
+        if isRegexp {
+            handleRegexp(subPatternItem, pathName, string(file.ReadFile(pathName)~))
+        } else {
+            handle(subPatternItem, pathName, string(file.ReadFile(pathName)~))
+        }
     }
 }
-println()
 println()

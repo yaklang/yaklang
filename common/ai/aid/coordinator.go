@@ -73,6 +73,7 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...Opt
 		}
 		return alltools
 	})
+	config.memory.timeline.BindConfig(config)
 	return c, nil
 }
 

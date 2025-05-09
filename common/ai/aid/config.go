@@ -78,9 +78,11 @@ type Config struct {
 	taskAIRespCallback func(string, *Config)
 
 	// memory
-	persistentMemory []string
-	memory           *Memory
-	timeLineLimit    int
+	persistentMemory          []string
+	memory                    *Memory
+	timeLineLimit             int
+	timelineContentLimit      int
+	timelineTotalContentLimit int
 
 	// stream waitgroup
 	streamWaitGroup *sync.WaitGroup
@@ -586,6 +588,15 @@ func WithTimeLineLimit(i int) Option {
 		config.m.Lock()
 		defer config.m.Unlock()
 		config.timeLineLimit = i
+		return nil
+	}
+}
+
+func WithTimelineContentLimit(i int) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.timelineContentLimit = i
 		return nil
 	}
 }

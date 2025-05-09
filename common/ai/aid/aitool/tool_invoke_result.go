@@ -21,7 +21,7 @@ type ToolResult struct {
 	Error       string `json:"error,omitempty"`
 
 	// shrink_similar_result 表示缩略信息，是在 decision 的时候执行的，用于直接压缩信息
-	ShrinkSimilarResult string `json:"shrink_similar_result,omitempty"`
+	ShrinkResult string `json:"shrink_similar_result,omitempty"`
 }
 
 func (t *ToolResult) String() string {
@@ -48,7 +48,7 @@ func (t *ToolResult) String() string {
 		buf.WriteString(fmt.Sprintf("param: %s\n", utils.Jsonify(t.Param)))
 	}
 
-	if t.ShrinkSimilarResult == "" {
+	if t.ShrinkResult == "" {
 
 		// 处理工具执行结果
 		switch ret := t.Data.(type) {
@@ -103,10 +103,8 @@ func (t *ToolResult) String() string {
 				buf.WriteString(fmt.Sprintf("data: %s\n", utils.Jsonify(t.Data)))
 			}
 		}
-	}
-
-	if t.ShrinkSimilarResult != "" {
-		buf.WriteString(fmt.Sprintf("shrink_result: %#v\n", t.ShrinkSimilarResult))
+	} else {
+		buf.WriteString(fmt.Sprintf("shrink_result: %#v\n", t.ShrinkResult))
 	}
 
 	// 处理错误信息
