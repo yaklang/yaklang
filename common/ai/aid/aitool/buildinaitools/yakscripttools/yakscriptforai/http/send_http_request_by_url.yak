@@ -7,6 +7,9 @@ url = cli.String("url", cli.setHelp("需要指定的URL"), cli.setRequired(true)
 // url = "http://127.0.0.1:8787/xss/js/in-str?name=admin"
 method = cli.String("method", cli.setHelp("需要指定的HTTP方法"), cli.setDefault("GET"), cli.setRequired(false))
 requestRequest := cli.String("show-request", cli.setHelp("是否需要展示Request，如果不是必须的话，可以忽略，结果将进一步精简，yes/no"), cli.setDefault("no"), cli.setRequired(false))
+testParamType = cli.String("param-position", cli.setHelp("你想测试参数的位置是什么？可选为[query/post_form_encoded]，如果不设置，就不会新增参数"))
+testParamName = cli.String("param-name", cli.setHelp("在这次HTTP请求过程中，你需要改变的参数名称（注意：这会改变发包请求内容）如果你的参数在URL已经有了，忽略这个选项"), cli.setRequired(false))
+testParamValue = cli.String("param-value", cli.setHelp("配合param-name使用，你想把你设置的参数值修改为什么？"))
 keyword := cli.String("keyword", cli.setHelp("是否需要重点展示某一些数据？设置了的话，如果有结果，会展示 keyword 附近200字节的内容"))
 cli.check()
 
@@ -22,8 +25,23 @@ try {
 
 }
 
+isHttps, packet, err := poc.ParseUrlToHTTPRequestRaw(method /*type: string*/, url)
+if err != nil {
+    yakit.Error("parse url to packet failed: %v", err)
+    return
+}
+opts.Push(poc.https(isHttps))
 
-rsp, req, err = poc.Do(method, url, opts...)
+switch str.ToLower(string(testParamType)) {
+case "query", "get":
+    packet = poc.ReplaceHTTPPacketQueryParam(packet /*type: []byte*/, testParamName, testParamValue)
+    yakit.Info("apply get query param into request: \n" + string(packet))
+case "post", "post_form_encoded":
+    packet = poc.ReplaceHTTPPacketPostParam(packet /*type: []byte*/, testParamName, testParamValue)
+    yakit.Info("apply post param into request: \n" + string(packet))
+}
+
+rsp, req, err := poc.HTTPEx(packet, opts...)
 if err != nil {
     yakit.Error("request failed: %v", err)
     return
