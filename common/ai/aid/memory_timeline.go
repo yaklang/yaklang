@@ -122,7 +122,6 @@ func (m *memoryTimeline) setTimelineLimit(clearCount int) {
 
 func (m *memoryTimeline) setTimelineContentLimit(contentSize int) {
 	m.totalDumpContentLimit = contentSize
-	m.perDumpContentLimit = 900000000000
 }
 
 func (m *memoryTimeline) setAICaller(ai AICaller) {
@@ -142,9 +141,11 @@ func (m *memoryTimeline) PushToolResult(toolResult *aitool.ToolResult) {
 	}
 
 	// if item dump string > perDumpContentLimit should shrink this item
-	if len(item.String()) > m.perDumpContentLimit {
+	if m.perDumpContentLimit > 0 && len(item.String()) > m.perDumpContentLimit {
 		m.shrink(item)
 	}
+
+	m.timelineLengthCheck()
 
 	m.tsToTimelineItem.Set(ts, item)
 	m.idToTimelineItem.Set(toolResult.GetID(), item)
@@ -175,7 +176,12 @@ func (m *memoryTimeline) timelineLengthCheck() {
 }
 
 func (m *memoryTimeline) dumpSizeCheck() {
-	if len(m.Dump()) <= m.totalDumpContentLimit {
+	if m.ai == nil {
+		log.Error("ai is nil, memory cannot emit memory shrink")
+		return
+	}
+
+	if m.totalDumpContentLimit <= 0 || len(m.Dump()) <= m.totalDumpContentLimit {
 		return
 	}
 	totalLastID, _, _ := m.idToTimelineItem.Last()
