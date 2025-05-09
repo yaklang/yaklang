@@ -227,7 +227,8 @@ func TestRuleAlertMsg(t *testing.T) {
 
 	t.Run("rule db, result memory", func(t *testing.T) {
 		ruleName := uuid.NewString() + ".sf"
-		_, err := sfdb.CreateRuleByContent(ruleName, syntaxFlowCode, false)
+		rule, err := sfdb.CreateRuleByContent(ruleName, syntaxFlowCode, false)
+		sfdb.SaveRule(rule)
 		defer sfdb.DeleteRuleByRuleName(ruleName)
 		require.NoError(t, err)
 
@@ -238,7 +239,8 @@ func TestRuleAlertMsg(t *testing.T) {
 
 	t.Run("rule db, result db", func(t *testing.T) {
 		ruleName := uuid.NewString() + ".sf"
-		_, err := sfdb.CreateRuleByContent(ruleName, syntaxFlowCode, false)
+		rule, err := sfdb.CreateRuleByContent(ruleName, syntaxFlowCode, false)
+		sfdb.SaveRule(rule)
 		defer sfdb.DeleteRuleByRuleName(ruleName)
 		require.NoError(t, err)
 
@@ -287,7 +289,8 @@ func TestRuleRisk(t *testing.T) {
 	}
 	`
 	ruleName := uuid.NewString() + ".sf"
-	_, err = sfdb.CreateRuleByContent(ruleName, syntaxFlowCode, false)
+	rule, err := sfdb.CreateRuleByContent(ruleName, syntaxFlowCode, false)
+	sfdb.SaveRule(rule)
 	defer sfdb.DeleteRuleByRuleName(ruleName)
 	require.NoError(t, err)
 

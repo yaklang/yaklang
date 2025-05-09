@@ -219,8 +219,8 @@ jobs:
               #  integration MITM
               go test -timeout 2m -run TestGRPCMUSTPASS_MITM ./common/coreplugin
               # SyntaxFlow
-              go test -timeout  20s  ./common/syntaxflow/tests
-              go test -timeout 20s  -skip "TestEmbedRuleVersion" ./common/syntaxflow/sfdb/...
+              go test -timeout 20s  ./common/syntaxflow/tests
+              go test -timeout 20s  ./common/syntaxflow/sfdb/...
               go test -timeout 20s  ./common/syntaxflow/sfvm/...
 
           - name: Test Vulinbox(XSS/Shiro/SSRF/SSTI/SMUGGLE/CSRF/OPEN_REDIRECT)

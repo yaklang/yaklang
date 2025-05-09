@@ -291,19 +291,19 @@
     "rule_id": "21500003",
     "rule_name": "检测Java J2EE 使用getConnection",
     "hash": "54369d8c36a7e4b5b4a8c1c3cb40df2e81ac0980e4196a00c5aff8c4db7fa123",
-    "version": "20250507.0001"
+    "version": "20250508.0001"
   },
   {
     "rule_id": "21500002",
     "rule_name": "检测Java J2EE 使用threads",
     "hash": "67b3f42fa281d34dccf8249215f6f57d933fceafa43cd94fbeeab3f628b7b75d",
-    "version": "20250507.0001"
+    "version": "20250508.0001"
   },
   {
     "rule_id": "21500001",
     "rule_name": "检测Java 使用System.out输出流",
     "hash": "78517769f978895140dd713d6f7a2a74d5671d22ca013b29808df3a1fdc753e8",
-    "version": "20250507.0001"
+    "version": "20250508.0001"
   },
   {
     "rule_id": "21105001",
@@ -477,37 +477,37 @@
     "rule_id": "20327002",
     "rule_name": "检测Java javax.crypto.Cipher不安全或有风险的加密算法的使用",
     "hash": "ea0b7e65ac15ac4beba0592b966f985921b3d713f7719ec48144f7c8c5635fb2",
-    "version": "20250507.0001"
+    "version": "20250508.0002"
   },
   {
     "rule_id": "20327005",
     "rule_name": "检测Java javax.crypto.KEM.Encapsulator使用不安全的加密算法",
     "hash": "efbff2935f099d9bcd385c86b29bc1c5613914c9199fb96d9d5e16582c01ae8a",
-    "version": "20250507.0001"
+    "version": "20250508.0001"
   },
   {
     "rule_id": "20327001",
     "rule_name": "查找 Java 哈希算法使用硬编码的PBE盐值",
     "hash": "9fed852feec70819ca6cee43dcc61ff8f9380edd40a58e838e4533301f04d6f4",
-    "version": "20250429.0001"
+    "version": "20250508.0002"
   },
   {
-    "rule_id": "33a8c1db-92b1-4eb3-aed5-85f96dd4f9a9",
-    "rule_name": "java-risky-system-hash-config.sf",
-    "hash": "6ac6de72987782db0720e2014b96e7ffec6fdb95496c925b27f784077655f783",
-    "version": "20250507.0001"
+    "rule_id": "20327758",
+    "rule_name": "查找 Java 风险的系统哈希配置",
+    "hash": "7a1a8d6b4ab8834b9e52e93e628ff245cf5487b9b387989672cc377576482351",
+    "version": "20250508.0002"
   },
   {
     "rule_id": "20327006",
     "rule_name": "检测Java java.security.AlgorithmParameters使用不安全的加密算法",
     "hash": "d48e80078d0c8ff20d4171f3f691c4cb7db9942027980b4038e2cefebbea4ad2",
-    "version": "20250507.0001"
+    "version": "20250508.0001"
   },
   {
     "rule_id": "20327003",
     "rule_name": "检测Java java.security使用不安全的哈希算法",
     "hash": "ed30914f8630facc7d9edf2d2125de36b616fb6ff52bd79c7b8ca77fbc7195b3",
-    "version": "20250507.0001"
+    "version": "20250508.0002"
   },
   {
     "rule_id": "20352002",
@@ -525,25 +525,25 @@
     "rule_id": "20400001",
     "rule_name": "检测Java cn.hutool.captcha验证码拒绝服务漏洞",
     "hash": "089801ab7cf025b6115ed645e1cc3bc8796db81dacb394bdfac17cd805fdc56b",
-    "version": "20250507.0001"
+    "version": "20250508.0002"
   },
   {
     "rule_id": "20400002",
     "rule_name": "检测Java IO库拒绝服务漏洞",
     "hash": "0adc92bd6e8eefe360bb941161c4b23b488657651d079ce35a76b8f4754e5b23",
-    "version": "20250507.0001"
+    "version": "20250508.0002"
   },
   {
     "rule_id": "20400004",
     "rule_name": "检测Java StringBuilder 拒绝服务漏洞",
     "hash": "d8b996b732394eaffe183d4d3efe976714df49c714ea01d3514b29e340de2013",
-    "version": "20250507.0001"
+    "version": "20250508.0001"
   },
   {
     "rule_id": "20400003",
     "rule_name": "检测Java waitFor方法可能导致的DDOS漏洞",
     "hash": "4373216955f1ae77eb1843609cab5d1290a6ac5fbf0973b2faa76362fb445613",
-    "version": "20250507.0001"
+    "version": "20250508.0002"
   },
   {
     "rule_id": "20434001",
@@ -597,13 +597,13 @@
     "rule_id": "20611001",
     "rule_name": "Find 'SAXTransformerFactory' unsafe use (XXE)",
     "hash": "38e3950ca1d1f24e69303f93c5650d4af8bcec9c3baa8aa2169511c02b27c4e9",
-    "version": "20250429.0001"
+    "version": "20250508.0002"
   },
   {
     "rule_id": "20611002",
     "rule_name": "SAXBuilder 未明确设置安全策略（.setFeature(...)）",
     "hash": "1a32139b7a997176d7f374f0f7e6d98320c826cddf69b388eda806c36ae17289",
-    "version": "20250429.0001"
+    "version": "20250508.0002"
   },
   {
     "rule_id": "20611003",
@@ -615,31 +615,31 @@
     "rule_id": "20611004",
     "rule_name": "SAXReader 未明确设置安全策略（.setFeature(...) ...）",
     "hash": "a0cb8bde7b67d322379f5044fde44cf3a20e1c6a57017bd2b0eb0b606e80a90d",
-    "version": "20250429.0001"
+    "version": "20250508.0002"
   },
   {
     "rule_id": "20611005",
     "rule_name": "在上下文中查找 'javax.xml.transform.Transformer' 不安全使用",
     "hash": "8c17fd5c0f240e27413c893b343a1459b7fe86e6d4dac0afa511358287b52cdf",
-    "version": "20250429.0001"
+    "version": "20250508.0002"
   },
   {
     "rule_id": "20611006",
     "rule_name": "检测 STAX（Streaming API for XML） XMLInputFactory() 不安全使用",
     "hash": "1c0caa813e60ef8b3e5c19300a07eb0ae34f6d163f1e40debc2b4f432e870b0b",
-    "version": "20250429.0001"
+    "version": "20250508.0002"
   },
   {
     "rule_id": "20611007",
     "rule_name": "检查 XMLReaderFactory.createXMLReader() 不安全使用",
     "hash": "a871071959e95bab6978f8f745390f4b9198f3023f264582a42a7cee3c224480",
-    "version": "20250429.0001"
+    "version": "20250508.0002"
   },
   {
     "rule_id": "20611008",
     "rule_name": "XStream 未明确设置安全策略（.setMode(XStream.NO_REFERENCES)）",
     "hash": "9d58c669e28c067d35bc92b3c751a6a0e8895c9dcd921544212efdfdedde53ca",
-    "version": "20250429.0001"
+    "version": "20250508.0002"
   },
   {
     "rule_id": "20643001",
@@ -681,7 +681,7 @@
     "rule_id": "20077001",
     "rule_name": "Servlet \u0026 Springframework 基础参数命令注入",
     "hash": "9fcc92a320bbb2271837e8e2993c46791d5c331aed2e4ae9149861e08de5c0b5",
-    "version": "20250428.0001"
+    "version": "20250508.0002"
   },
   {
     "rule_id": "20079001",
@@ -1029,7 +1029,7 @@
     "rule_id": "21105035",
     "rule_name": "检测Java Spring Boot Devtools使用",
     "hash": "97a7d15db8cca936bdce3acd4aa8780239379b3a673b3dc97988e286de19fbff",
-    "version": "20250507.0001"
+    "version": "20250508.0001"
   },
   {
     "rule_id": "21105032",

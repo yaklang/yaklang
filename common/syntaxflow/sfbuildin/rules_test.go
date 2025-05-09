@@ -1,12 +1,13 @@
 package sfbuildin
 
 import (
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"io/fs"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
 func Test_BuildIn_Rule_Ast_And_Rule_Id(t *testing.T) {
@@ -43,6 +44,8 @@ func Test_BuildIn_Rule_Ast_And_Rule_Id(t *testing.T) {
 			require.Equal(t, 8, len(ruleId))
 			// check language
 			switch strings.Split(name, "-")[0] {
+			case "general":
+				require.Equal(t, "0", string(ruleId[0]), "通用规则的规则ID开头应该是0")
 			case "golang":
 				require.Equal(t, "1", string(ruleId[0]), "Go规则的规则ID开头应该是1")
 			case "java":
