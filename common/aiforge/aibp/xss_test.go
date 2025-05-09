@@ -25,5 +25,6 @@ func TestXSS(t *testing.T) {
 		aid.WithDebugPrompt(true),
 		aid.WithAITransactionRetry(5),
 		aid.WithTimeLineLimit(5),
+		aid.WithTimelineContentLimit(15000),
 	)
 }
