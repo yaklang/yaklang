@@ -102,3 +102,11 @@ func UnexpectedBreakStmt() string {
 func UnexpectedContinueStmt() string {
 	return "unexpected continue stmt"
 }
+
+// SSA error
+
+func TypeofValueIsNil() string { return "type value is nil" }
+
+func InstanceOfGotNilValue() string { return "instance of got nil value" }
+
+func BinOPWithNilSSAValue() string { return "binary op with nil SSA" }

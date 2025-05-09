@@ -110,10 +110,6 @@ func (b *builder) VisitStatement(node *ast.Node) interface{} {
 		b.VisitImportDeclaration(node.AsImportDeclaration())
 	case ast.KindExportAssignment:
 		b.VisitExportAssignment(node.AsExportAssignment())
-	case ast.KindExportDeclaration:
-		b.VisitExportDeclaration(node.AsExportDeclaration())
-	case ast.KindNotEmittedStatement:
-		b.VisitNotEmittedStatement(node)
 	default:
 		panic("Unhandled Statement")
 	}
@@ -581,79 +577,6 @@ func (b *builder) VisitForInOrOfStatement(node *ast.ForInOrOfStatement) interfac
 	return nil
 }
 
-// VisitFunctionDeclaration 访问函数声明
-func (b *builder) VisitFunctionDeclaration(node *ast.FunctionDeclaration) interface{} {
-	if node == nil {
-		return nil
-	}
-
-	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
-	defer recoverRange()
-
-	// 获取函数名
-	funcName := ""
-	if node.Name() != nil && node.Name().Kind == ast.KindIdentifier {
-		funcName = node.Name().AsIdentifier().Text
-	} else {
-		// 函数声明必须有名称，如果没有名称，生成一个唯一名称
-		funcName = "anonymous_func_" + uuid.NewString()
-	}
-
-	// 创建新的函数对象
-	newFunc := b.NewFunc(funcName)
-
-	// 切换到新函数的上下文
-	b.FunctionBuilder = b.PushFunction(newFunc)
-
-	// 处理函数参数
-	if node.Parameters != nil && len(node.Parameters.Nodes) > 0 {
-		for _, param := range node.Parameters.Nodes {
-			if param.Kind == ast.KindParameter {
-				paramNode := param.AsParameterDeclaration()
-				paramName := ""
-
-				if paramNode.Name() != nil && paramNode.Name().Kind == ast.KindIdentifier {
-					paramName = paramNode.Name().AsIdentifier().Text
-				}
-
-				if paramName != "" {
-					// 创建参数
-					p := b.NewParam(paramName)
-
-					// 处理默认值
-					if paramNode.Initializer != nil {
-						defaultValue := b.VisitRightValueExpression(paramNode.Initializer)
-						if defaultValue != nil {
-							p.SetDefault(defaultValue)
-						}
-					}
-				}
-			}
-		}
-	}
-
-	// 处理函数体
-	// 只有箭头函数的函数体可以是表达式
-	if node.Body != nil && node.Body.Kind == ast.KindBlock {
-		blockNode := node.Body.AsBlock()
-		if blockNode.Statements != nil {
-			b.VisitStatements(blockNode.Statements)
-		}
-	}
-
-	// 完成函数构建
-	b.Finish()
-
-	// 恢复原来的函数上下文
-	b.FunctionBuilder = b.PopFunction()
-
-	// 在当前作用域中创建函数变量
-	variable := b.CreateVariable(funcName)
-	b.AssignVariable(variable, newFunc)
-
-	return nil
-}
-
 // VisitReturnStatement 访问return语句
 func (b *builder) VisitReturnStatement(node *ast.ReturnStatement) interface{} {
 	if node == nil {
@@ -778,10 +701,50 @@ func (b *builder) VisitLabeledStatement(node *ast.LabeledStatement) interface{} 
 }
 
 // VisitTryStatement 访问try语句
-func (b *builder) VisitTryStatement(node *ast.TryStatement) interface{} { return nil }
+func (b *builder) VisitTryStatement(node *ast.TryStatement) interface{} {
+	if node == nil {
+		return nil
+	}
 
-// VisitCatchClause 访问catch子句
-func (b *builder) VisitCatchClause(node *ast.CatchClause) interface{} { return nil }
+	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
+	defer recoverRange()
+
+	tryBuilder := b.BuildTry()
+	tryBuilder.BuildTryBlock(func() {
+		if node.TryBlock != nil {
+			b.VisitBlock(node.TryBlock.AsBlock())
+		}
+	})
+
+	if node.CatchClause != nil {
+		catchClause := node.CatchClause.AsCatchClause()
+		tryBuilder.BuildErrorCatch(func() string {
+			if catchClause.VariableDeclaration != nil {
+				varDecl := catchClause.VariableDeclaration.AsVariableDeclaration()
+				varName := varDecl.Name()
+				if varName.Kind == ast.KindIdentifier {
+					return varName.AsIdentifier().Text
+				} else { // BindingPattern in catch clause?
+					return ""
+				}
+			}
+			return ""
+		}, func() {
+			if catchClause.Block != nil {
+				b.VisitBlock(catchClause.Block.AsBlock())
+			}
+		})
+	}
+
+	if node.FinallyBlock != nil {
+		tryBuilder.BuildFinally(func() {
+			b.VisitBlock(node.FinallyBlock.AsBlock())
+		})
+	}
+	tryBuilder.Finish()
+
+	return nil
+}
 
 // VisitSwitchStatement 访问switch语句
 func (b *builder) VisitSwitchStatement(node *ast.SwitchStatement) interface{} {
@@ -847,7 +810,18 @@ func (b *builder) VisitSwitchStatement(node *ast.SwitchStatement) interface{} {
 }
 
 // VisitThrowStatement 访问throw语句
-func (b *builder) VisitThrowStatement(node *ast.ThrowStatement) interface{} { return nil }
+func (b *builder) VisitThrowStatement(node *ast.ThrowStatement) interface{} {
+	if node == nil {
+		return nil
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
+	defer recoverRange()
+
+	value := b.VisitRightValueExpression(node.Expression)
+	b.EmitReturn([]ssa.Value{value})
+	return nil
+}
 
 // VisitEmptyStatement 访问空语句
 func (b *builder) VisitEmptyStatement(node *ast.EmptyStatement) interface{} {
@@ -872,7 +846,17 @@ func (b *builder) VisitDebuggerStatement(node *ast.DebuggerStatement) interface{
 }
 
 // VisitWithStatement 访问with语句
-func (b *builder) VisitWithStatement(node *ast.WithStatement) interface{} { return nil }
+func (b *builder) VisitWithStatement(node *ast.WithStatement) interface{} {
+	if node == nil {
+		return nil
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
+	defer recoverRange()
+
+	b.VisitStatement(node.Statement)
+	return nil
+}
 
 // VisitClassDeclaration 访问类声明
 func (b *builder) VisitClassDeclaration(node *ast.ClassDeclaration) interface{} { return nil }
@@ -1041,9 +1025,6 @@ func (b *builder) VisitNamedImports(node *ast.NamedImports) interface{} { return
 // VisitImportSpecifier 访问导入说明符
 func (b *builder) VisitImportSpecifier(node *ast.ImportSpecifier) interface{} { return nil }
 
-// VisitExportDeclaration 访问导出声明
-func (b *builder) VisitExportDeclaration(node *ast.ExportDeclaration) interface{} { return nil }
-
 // VisitNamedExports 访问命名导出
 func (b *builder) VisitNamedExports(node *ast.NamedExports) interface{} { return nil }
 
@@ -1057,9 +1038,6 @@ func (b *builder) VisitExportAssignment(node *ast.ExportAssignment) interface{} 
 func (b *builder) VisitExternalModuleReference(node *ast.ExternalModuleReference) interface{} {
 	return nil
 }
-
-// VisitNotEmittedStatement 访问不发出的语句
-func (b *builder) VisitNotEmittedStatement(node *ast.Node) interface{} { return nil }
 
 // =====Expression=====
 
@@ -1090,10 +1068,11 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 		if obj == nil || propName == "" {
 			return nil, nil
 		}
+		name := b.EmitConstInst(propName)
 		if isLval {
-			return b.CreateMemberCallVariable(obj, b.EmitConstInst(propName)), nil
+			return b.CreateMemberCallVariable(obj, name), nil
 		}
-		return nil, b.ReadMemberCallValueByName(obj, propName)
+		return nil, b.ReadMemberCallValue(obj, name)
 	case ast.KindElementAccessExpression:
 		obj, arg := b.VisitElementAccessExpression(node.AsElementAccessExpression())
 		if obj == nil || arg == nil {
@@ -1195,7 +1174,6 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 }
 
 // VisitBinaryExpression 访问二元表达式
-// in和instanceof 还没处理
 func (b *builder) VisitBinaryExpression(node *ast.BinaryExpression) ssa.Value {
 	if node == nil {
 		return nil
@@ -1240,6 +1218,10 @@ func (b *builder) VisitBinaryExpression(node *ast.BinaryExpression) ssa.Value {
 	left := b.VisitRightValueExpression(node.Left)
 	right := b.VisitRightValueExpression(node.Right)
 
+	if left == nil || right == nil {
+		b.NewError(ssa.Error, TAG, BinOPWithNilSSAValue())
+	}
+
 	// 根据操作符类型生成不同的二元操作
 	switch node.OperatorToken.Kind {
 	// Arithmetic PLUS + MINUS - MUL * DIV / MOD % POW **
@@ -1247,7 +1229,7 @@ func (b *builder) VisitBinaryExpression(node *ast.BinaryExpression) ssa.Value {
 		binOp, ok := arithmeticBinOpTbl[node.OperatorToken.Kind]
 		if !ok {
 			b.NewError(ssa.Error, TAG, UnexpectedArithmeticOP())
-			return nil
+			return b.EmitUndefined("")
 		}
 		return b.EmitBinOp(binOp, left, right)
 	// TODO: !=. !== 这两个可能需要额外处理?
@@ -1386,6 +1368,7 @@ func (b *builder) VisitBinaryExpression(node *ast.BinaryExpression) ssa.Value {
 		b.AssignVariable(variable, newVal)
 		return newVal
 	// Assignment =
+
 	case ast.KindEqualsToken:
 		switch node.Left.Kind {
 		case ast.KindArrayLiteralExpression: // arrayLiteral as binding pattern
@@ -1405,6 +1388,29 @@ func (b *builder) VisitBinaryExpression(node *ast.BinaryExpression) ssa.Value {
 			b.AssignVariable(variable, right)
 			return right
 		}
+	case ast.KindCommaToken:
+		return right
+	case ast.KindInKeyword:
+		if left != nil && right != nil && (b.IsListLike(right) || b.IsMapLike(right) || b.IsObjectLike(right)) {
+			_, ok := right.GetMember(left)
+			return b.EmitConstInst(ok)
+		}
+		return b.EmitUndefined("")
+	case ast.KindInstanceOfKeyword:
+		if left != nil && right != nil {
+			if right.GetType() == nil || left.GetType() == nil {
+				return b.EmitConstInst(true)
+			} else {
+				if ssa.TypeCompare(left.GetType(), right.GetType()) {
+					return b.EmitConstInst(true)
+				} else {
+					return b.EmitConstInst(false)
+				}
+			}
+		}
+		b.NewError(ssa.Error, TAG, InstanceOfGotNilValue())
+		return b.EmitUndefined("")
+
 	// 处理其他运算符...
 	default:
 		// 未实现的操作符处理
@@ -1439,12 +1445,12 @@ func (b *builder) VisitCallExpression(node *ast.CallExpression) ssa.Value {
 	funcValue := b.VisitRightValueExpression(node.Expression)
 	if funcValue == nil {
 		b.NewErrorWithPos(ssa.Error, TAG, b.CurrentRange, InvalidFunctionCallee())
-		return nil
+		return b.EmitUndefined("")
 	}
 
 	// 创建调用
-	call := b.NewCall(funcValue, args)
-	return b.EmitCall(call)
+	// TODO: 函数调用导致实参发生改变如何处理?
+	return b.EmitCall(b.NewCall(funcValue, args))
 }
 
 // VisitObjectLiteralExpression 访问对象字面量表达式
@@ -1456,14 +1462,14 @@ func (b *builder) VisitObjectLiteralExpression(objLiteral *ast.ObjectLiteralExpr
 	recoverRange := b.GetRecoverRange(b.sourceFile, &objLiteral.Loc, "")
 	defer recoverRange()
 
-	// 没有属性的情况下，创建一个空对象
-	if objLiteral.Properties == nil || len(objLiteral.Properties.Nodes) == 0 {
-		return b.EmitMakeWithoutType(nil, nil)
-	}
-
 	var values []ssa.Value
 	var keys []ssa.Value
 	hasNamedProperty := false
+
+	// 没有属性的情况下，创建一个空对象
+	if objLiteral.Properties == nil || len(objLiteral.Properties.Nodes) == 0 {
+		b.CreateObjectWithMap(keys, values)
+	}
 
 	// 处理所有属性
 	for i, prop := range objLiteral.Properties.Nodes {
@@ -1634,13 +1640,13 @@ func (b *builder) VisitObjectLiteralExpression(objLiteral *ast.ObjectLiteralExpr
 	}
 
 	// 创建对象
-	if len(keys) == 0 {
-		// 没有命名属性，使用数组方式创建
-		return b.CreateObjectWithSlice(values)
-	} else {
-		// 有命名属性，使用map方式创建
-		return b.CreateObjectWithMap(keys, values)
-	}
+	//if len(keys) == 0 {
+	//	// 没有命名属性，使用数组方式创建
+	//	return b.CreateObjectWithSlice(values)
+	//} else {
+	// 有命名属性，使用map方式创建
+	return b.CreateObjectWithMap(keys, values)
+	//}
 }
 
 // VisitArrayLiteralExpression 访问数组字面量表达式
@@ -1654,7 +1660,7 @@ func (b *builder) VisitArrayLiteralExpression(arrayLiteral *ast.ArrayLiteralExpr
 
 	// 没有元素的空数组
 	if arrayLiteral.Elements == nil || len(arrayLiteral.Elements.Nodes) == 0 {
-		return b.EmitMakeWithoutType(nil, nil)
+		return b.CreateObjectWithSlice([]ssa.Value{})
 	}
 
 	// 收集数组的所有元素值
@@ -1713,7 +1719,7 @@ func (b *builder) VisitPrefixUnaryExpression(node *ast.PrefixUnaryExpression) ss
 	operand := b.VisitRightValueExpression(node.Operand)
 	if operand == nil {
 		b.NewError(ssa.Error, TAG, NoOperandFoundForPrefixUnaryExp())
-		return nil
+		return b.EmitUndefined("")
 	}
 
 	// 根据操作符类型生成不同的一元操作
@@ -1772,10 +1778,11 @@ func (b *builder) VisitPrefixUnaryExpression(node *ast.PrefixUnaryExpression) ss
 	// TODO: await
 	case ast.KindAwaitKeyword:
 		// 创建await操作
-		return nil
+		return b.EmitUndefined("")
 
 	default:
 		// 未实现的操作符处理
+		panic("unhandled prefix unary expression")
 		b.NewErrorWithPos(ssa.Error, TAG, b.CurrentRange, UnexpectedUnaryOP())
 		return nil
 	}
@@ -1795,14 +1802,14 @@ func (b *builder) VisitPostfixUnaryExpression(node *ast.PostfixUnaryExpression) 
 	variable := b.VisitLeftValueExpression(node.Operand)
 	if variable == nil {
 		b.NewError(ssa.Error, TAG, NoViableOperandForPostfixUnaryExp())
-		return nil
+		return b.EmitUndefined("")
 	}
 
 	// 获取操作数的当前值
 	currentValue := b.PeekValueByVariable(variable)
 	if currentValue == nil {
 		b.NewError(ssa.Error, TAG, VariableIsNotDefined())
-		return nil
+		return b.EmitUndefined("")
 	}
 
 	// 根据操作符类型处理
@@ -1837,6 +1844,7 @@ func (b *builder) VisitPostfixUnaryExpression(node *ast.PostfixUnaryExpression) 
 
 	default:
 		// 未实现的操作符处理
+		panic("unhandled postfix unary expression")
 		b.NewErrorWithPos(ssa.Error, TAG, b.CurrentRange, fmt.Sprintf("未支持的后缀一元操作符: %v", node.Operator))
 		return nil
 	}
@@ -1897,7 +1905,24 @@ func (b *builder) VisitNewExpression(node *ast.NewExpression) ssa.Value {
 	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
-	return nil
+	callee := b.VisitRightValueExpression(node.Expression)
+	if node.Arguments == nil || len(node.Arguments.Nodes) == 0 {
+		args := make([]ssa.Value, 0)
+		return b.EmitCall(b.NewCall(callee, args))
+	}
+
+	// 处理参数列表
+	var args []ssa.Value
+	for _, argNode := range node.Arguments.Nodes {
+		argValue := b.VisitRightValueExpression(argNode)
+		if argValue != nil {
+			args = append(args, argValue)
+		} else {
+			// 如果参数无法解析，使用undefined代替
+			args = append(args, b.EmitUndefined(""))
+		}
+	}
+	return b.EmitCall(b.NewCall(callee, args))
 }
 
 // VisitParenthesizedExpression 访问带括号的表达式
@@ -1913,7 +1938,84 @@ func (b *builder) VisitParenthesizedExpression(node *ast.ParenthesizedExpression
 	return b.VisitRightValueExpression(node.Expression)
 }
 
+// 定义函数有多种方法 使用函数声明(函数语句)或者使用函数表达式
+
+// VisitFunctionDeclaration 访问函数声明
+// function name([param[, param[, ... param]]]) { statements }
+func (b *builder) VisitFunctionDeclaration(node *ast.FunctionDeclaration) interface{} {
+	if node == nil {
+		return nil
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
+	defer recoverRange()
+
+	// 获取函数名
+	funcName := ""
+	if node.Name() != nil && node.Name().Kind == ast.KindIdentifier {
+		funcName = node.Name().AsIdentifier().Text
+	} else {
+		// 函数声明必须有名称，如果没有名称，生成一个唯一名称
+		funcName = "anonymous_func_" + uuid.NewString()
+	}
+
+	// 创建新的函数对象
+	newFunc := b.NewFunc(funcName)
+
+	// 切换到新函数的上下文
+	b.FunctionBuilder = b.PushFunction(newFunc)
+
+	// 处理函数参数
+	if node.Parameters != nil && len(node.Parameters.Nodes) > 0 {
+		for _, param := range node.Parameters.Nodes {
+			if param.Kind == ast.KindParameter {
+				paramNode := param.AsParameterDeclaration()
+				paramName := ""
+
+				if paramNode.Name() != nil && paramNode.Name().Kind == ast.KindIdentifier {
+					paramName = paramNode.Name().AsIdentifier().Text
+				}
+
+				if paramName != "" {
+					// 创建参数
+					p := b.NewParam(paramName)
+
+					// 处理默认值
+					if paramNode.Initializer != nil {
+						defaultValue := b.VisitRightValueExpression(paramNode.Initializer)
+						if defaultValue != nil {
+							p.SetDefault(defaultValue)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// 处理函数体
+	// 只有箭头函数的函数体可以是表达式
+	if node.Body != nil && node.Body.Kind == ast.KindBlock {
+		blockNode := node.Body.AsBlock()
+		if blockNode.Statements != nil {
+			b.VisitStatements(blockNode.Statements)
+		}
+	}
+
+	// 完成函数构建
+	b.Finish()
+
+	// 恢复原来的函数上下文
+	b.FunctionBuilder = b.PopFunction()
+
+	// 在当前作用域中创建函数变量
+	variable := b.CreateVariable(funcName)
+	b.AssignVariable(variable, newFunc)
+
+	return nil
+}
+
 // VisitFunctionExpression 访问函数表达式
+// var myFunction = function name([param[, param[, ... param]]]) { statements }
 func (b *builder) VisitFunctionExpression(node *ast.FunctionExpression) ssa.Value {
 	if node == nil {
 		return nil
@@ -1989,6 +2091,7 @@ func (b *builder) VisitFunctionExpression(node *ast.FunctionExpression) ssa.Valu
 }
 
 // VisitArrowFunction 访问箭头函数
+// ([param] [, param]) => { statements } param => expression
 func (b *builder) VisitArrowFunction(node *ast.ArrowFunction) ssa.Value {
 	if node == nil {
 		return nil
@@ -2068,7 +2171,51 @@ func (b *builder) VisitConditionalExpression(node *ast.ConditionalExpression) ss
 	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
-	return nil
+	handlerJumpExpression := func(
+		cond func(string) ssa.Value,
+		trueExpr, falseExpr func() ssa.Value,
+		valueName string,
+	) ssa.Value {
+		// 为了聚合产生Phi指令
+		id := valueName
+		variable := b.CreateVariable(id)
+		b.AssignVariable(variable, b.EmitValueOnlyDeclare(id))
+		// 只需要使用b.WriteValue设置value到此ID，并最后调用b.ReadValue可聚合产生Phi指令，完成语句预期行为
+		ifb := b.CreateIfBuilder()
+		ifb.AppendItem(
+			func() ssa.Value {
+				return cond(id)
+			},
+			func() {
+				v := trueExpr()
+				variable := b.CreateVariable(id)
+				b.AssignVariable(variable, v)
+			},
+		)
+		ifb.SetElse(func() {
+			v := falseExpr()
+			variable := b.CreateVariable(id)
+			b.AssignVariable(variable, v)
+		})
+		ifb.Build()
+		// generator phi instruction
+		v := b.ReadValue(id)
+		v.SetName(b.GetEditor().GetTextFromOffset(node.Loc.Pos(), node.Loc.End()))
+		return v
+	}
+
+	return handlerJumpExpression(
+		func(id string) ssa.Value {
+			return b.EmitBinOp(ssa.OpEq, b.EmitConstInst(true), b.VisitRightValueExpression(node.Condition))
+		},
+		func() ssa.Value {
+			return b.VisitRightValueExpression(node.WhenTrue)
+		},
+		func() ssa.Value {
+			return b.VisitRightValueExpression(node.WhenFalse)
+		},
+		"ternary",
+	)
 }
 
 // VisitTemplateExpression 访问模板表达式
@@ -2141,6 +2288,10 @@ func (b *builder) VisitTypeOfExpression(node *ast.TypeOfExpression) ssa.Value {
 	defer recoverRange()
 
 	value := b.VisitRightValueExpression(node.Expression)
+	if value == nil {
+		b.NewError(ssa.Error, TAG, TypeofValueIsNil())
+		return nil
+	}
 	t := value.GetType()
 	if t == nil {
 		return b.EmitUndefined("")
