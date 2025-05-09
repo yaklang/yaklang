@@ -1,10 +1,10 @@
 desc(
-    title: "Access Specifier Manipulation via Reflection",
-    title_zh: "通过反射操纵访问修饰符",
-    type: Vulnerability,
-    severity: High,
-    risk: High,
-    desc: <<<TEXT
+	title: "Access Specifier Manipulation via Reflection"
+	title_zh: "通过反射操纵访问修饰符",
+	type: Vulnerability
+	severity: High
+	risk: High
+	desc: <<<TEXT
 该漏洞源于滥用 Java 的反射 API（如 `setAccessible(true)`）强行修改类/方法/字段的访问修饰符（如 private/protected），
 绕过 Java 语言层面的访问控制机制。攻击者可能利用此特性访问或修改敏感内部状态，
 例如：
@@ -16,8 +16,8 @@ desc(
 1. **权限提升**：攻击者通过反射链构造利用代码，可能获得系统级权限
 2. **隐蔽后门**：私有字段的修改难以被常规安全工具检测（如 SAST/IAST）
 3. **兼容性破坏**：框架内部字段名或结构变更会导致反射代码崩溃
-TEXT,
-    solution: <<<TEXT
+TEXT
+	solution: <<<TEXT
 **根本性修复：**
 - **优先使用官方 API**：如 Spring Boot 的 `FilterRegistrationBean` 替代直接操作 Tomcat 内部类
 - **禁止非必要反射**：通过代码审查规则禁止 `setAccessible(true)` 的使用
@@ -47,6 +47,7 @@ TEXT,
    - 使用 SpotBugs 规则 `SECURITY_ACCESSIBLEOBJECT_ACCESS` 标记危险代码
    - 在 CI/CD 流程中加入静态代码分析技术检测反射滥用模式
 TEXT
+	rule_id: "718cb86d-8629-4382-be43-03ce36c07a3b"
 )
 
 // get call site  and check parameter 
@@ -56,12 +57,10 @@ $set_accessible_true?{<getCallee()><fullTypeName()>?{have: "java.lang.reflect"} 
 
 // alert 
 alert $target 
-    
+
 
 desc(
-
-
-"file://x.java": <<<CODE
+	"file://x.java": <<<CODE
 package org.joychou.config;
 
 public class TomcatFilterMemShell implements Filter {
