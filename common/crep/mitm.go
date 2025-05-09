@@ -408,13 +408,16 @@ func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
 
 	proxy := minimartian.NewProxy()
 	server := &MITMServer{
-		proxy:                    proxy,
-		DNSServers:               make([]string, 0),
-		dnsCache:                 new(sync.Map),
-		HostMapping:              make(map[string]string),
-		hijackedMaxContentLength: 10 * 1024 * 1024,
-		http2:                    false,
-		maxContentLength:         10 * 1024 * 1024,
+		proxy:                      proxy,
+		DNSServers:                 make([]string, 0),
+		dnsCache:                   new(sync.Map),
+		HostMapping:                make(map[string]string),
+		hijackedMaxContentLength:   10 * 1024 * 1024,
+		http2:                      false,
+		maxContentLength:           10 * 1024 * 1024,
+		enableWebsocketCompression: utils.NewAtomicBool(),
+		websocketHijackMode:        utils.NewAtomicBool(),
+		forceTextFrame:             utils.NewAtomicBool(),
 	}
 	for _, op := range options {
 		err := op(server)
