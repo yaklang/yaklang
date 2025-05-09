@@ -1,6 +1,7 @@
 package yakgrpc
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
@@ -892,4 +893,181 @@ func TestGRPCMUSTPASS_MITMV2_MutProxy(t *testing.T) {
 		poc.DoGET(target, poc.WithProxy(fmt.Sprintf("http://%s:%v", "127.0.0.1", mitmPort)))
 		require.True(t, downStream1)
 	})
+}
+
+func TestGRPCMUSTPASS_MITMV2_Replacer_replace_content_ManalHijack(t *testing.T) {
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(30))
+	defer cancel()
+
+	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte("Hello"))
+	})
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	token := utils.RandStringBytes(16)
+
+	tokenCheck := false
+
+	RunMITMV2TestServerEx(client, ctx, func(stream ypb.Yak_MITMV2Client) {
+		stream.Send(&ypb.MITMV2Request{
+			Host: "127.0.0.1",
+			Port: uint32(mitmPort),
+		})
+	}, func(stream ypb.Yak_MITMV2Client) {
+
+		stream.Send(&ypb.MITMV2Request{
+			SetAutoForward:   true,
+			AutoForwardValue: false,
+		})
+		stream.Send(&ypb.MITMV2Request{
+			SetContentReplacers: true,
+			Replacers: []*ypb.MITMContentReplacer{
+				&ypb.MITMContentReplacer{
+					Result:            token,
+					Rule:              "Hello",
+					EnableForResponse: true,
+					EnableForBody:     true,
+				},
+			},
+		})
+
+	}, func(stream ypb.Yak_MITMV2Client, msg *ypb.MITMV2Response) {
+		if len(msg.GetReplacers()) > 0 {
+			// send packet
+			go func() {
+				_, err := yak.Execute(`
+			url = f"${target}"
+			rsp, req, _ = poc.Get(url, poc.proxy(mitmProxy), poc.save(false))
+			`, map[string]any{
+					"mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort),
+					"target":    `http://` + utils.HostPort(mockHost, mockPort),
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				cancel()
+			}()
+		}
+		if msg.ManualHijackListAction == Hijack_List_Add {
+			manualResp := msg.ManualHijackList[0]
+			if manualResp.GetRequest() != nil {
+				// send packet
+				stream.Send(&ypb.MITMV2Request{
+					ManualHijackControl: true,
+					ManualHijackMessage: &ypb.SingleManualHijackControlMessage{
+						TaskID:         manualResp.GetTaskID(),
+						Forward:        true,
+						HijackResponse: true,
+					},
+				})
+			}
+		}
+
+		if msg.ManualHijackListAction == Hijack_List_Update {
+			manualResp := msg.ManualHijackList[0]
+			if manualResp.Status == Hijack_Status_Response {
+				// send packet
+				if manualResp.GetResponse() != nil {
+					if bytes.Contains(manualResp.GetResponse(), []byte(token)) {
+						tokenCheck = true
+					}
+				}
+				stream.Send(&ypb.MITMV2Request{
+					ManualHijackControl: true,
+					ManualHijackMessage: &ypb.SingleManualHijackControlMessage{
+						TaskID:  manualResp.GetTaskID(),
+						Forward: true,
+					},
+				})
+			}
+		}
+	})
+	require.True(t, tokenCheck)
+}
+
+func TestGRPCMUSTPASS_MITMV2_Replacer_drop_ManalHijack(t *testing.T) {
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(30))
+	defer cancel()
+
+	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte("Hello"))
+	})
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	token := utils.RandStringBytes(16)
+
+	tokenCheck := false
+
+	RunMITMV2TestServerEx(client, ctx, func(stream ypb.Yak_MITMV2Client) {
+		stream.Send(&ypb.MITMV2Request{
+			Host: "127.0.0.1",
+			Port: uint32(mitmPort),
+		})
+	}, func(stream ypb.Yak_MITMV2Client) {
+
+		stream.Send(&ypb.MITMV2Request{
+			SetAutoForward:   true,
+			AutoForwardValue: false,
+		})
+		stream.Send(&ypb.MITMV2Request{
+			SetContentReplacers: true,
+			Replacers: []*ypb.MITMContentReplacer{
+				&ypb.MITMContentReplacer{
+					Rule:              "Hello",
+					EnableForResponse: true,
+					Drop:              true,
+					EnableForBody:     true,
+				},
+			},
+		})
+
+	}, func(stream ypb.Yak_MITMV2Client, msg *ypb.MITMV2Response) {
+		if len(msg.GetReplacers()) > 0 {
+			// send packet
+			go func() {
+				_, err := yak.Execute(`
+			url = f"${target}?token=${token}"
+			rsp, req, _ = poc.Get(url, poc.proxy(mitmProxy), poc.save(false))
+			`, map[string]any{
+					"mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort),
+					"target":    `http://` + utils.HostPort(mockHost, mockPort),
+					"token":     token,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				cancel()
+			}()
+		}
+		if msg.ManualHijackListAction == Hijack_List_Add {
+			manualResp := msg.ManualHijackList[0]
+			if manualResp.GetRequest() != nil && strings.Contains(string(manualResp.GetRequest()), token) {
+				// send packet
+				stream.Send(&ypb.MITMV2Request{
+					ManualHijackControl: true,
+					ManualHijackMessage: &ypb.SingleManualHijackControlMessage{
+						TaskID:         manualResp.GetTaskID(),
+						Forward:        true,
+						HijackResponse: true,
+					},
+				})
+			}
+		}
+
+		if msg.ManualHijackListAction == Hijack_List_Delete {
+			manualResp := msg.ManualHijackList[0]
+			if manualResp.GetRequest() != nil && strings.Contains(string(manualResp.GetRequest()), token) {
+				tokenCheck = true
+			}
+		}
+	})
+	require.True(t, tokenCheck)
 }

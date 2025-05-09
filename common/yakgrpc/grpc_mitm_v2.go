@@ -723,21 +723,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			if handleResponseModified(rspHooked) {
 				httpctx.SetResponseModified(req, "yakit.rule.hook")
 				httpctx.SetHijackedResponseBytes(req, rspHooked)
+				rsp = rspHooked
 			}
-			return rspHooked
 		}
-
-		// 非自动转发的情况下处理替换器
-		rules, rsp1, shouldBeDropped := replacer.hook(false, true, httpctx.GetRequestURL(req), rsp)
-		if shouldBeDropped {
-			log.Warn("response should be dropped(VIA replacer.hook)")
-			httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
-			return nil
-		}
-		if handleResponseModified(rsp1) {
-			rsp = rsp1
-		}
-		httpctx.AppendMatchedRule(req, rules...)
 
 		ptr := fmt.Sprintf("%p", req)
 		if !httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest) {
@@ -747,11 +735,11 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		rsp, _, err := lowhttp.FixHTTPResponse(rsp)
 		if err != nil {
 			log.Errorf("fix http response packet failed: %s", err)
-			return originRspRaw
+			return rsp
 		}
 
 		if taskInfo == nil || task == nil { // task not registered ,or deleted, should not hijack
-			return originRspRaw
+			return rsp
 		}
 
 		var traceInfo *lowhttp.LowhttpTraceInfo
