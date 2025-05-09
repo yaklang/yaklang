@@ -20,7 +20,6 @@ import (
 
 type timelineItem struct {
 	*aitool.ToolResult
-	summary string
 	deleted bool
 }
 
@@ -28,14 +27,21 @@ type memoryTimeline struct {
 	memory *Memory
 	config *Config
 
-	ai               AICaller
-	maxTimelineLimit int
-	fullMemoryCount  int
+	ai AICaller
+
 	idToTs           *omap.OrderedMap[int64, int64]
 	tsToTimelineItem *omap.OrderedMap[int64, *timelineItem]
 	idToTimelineItem *omap.OrderedMap[int64, *timelineItem]
 	summary          *omap.OrderedMap[int64, *linktable.LinkTable[*timelineItem]]
 	reducers         *omap.OrderedMap[int64, *linktable.LinkTable[string]]
+
+	// this limit is used to limit the number of timeline items.
+	maxTimelineLimit int // total timeline item count
+	fullMemoryCount  int // full memory timeline item count
+
+	// this limit is used to limit the timeline dump string size.
+	perDumpContentLimit   int
+	totalDumpContentLimit int
 }
 
 func (m *memoryTimeline) SoftDelete(id ...int64) {
@@ -46,7 +52,6 @@ func (m *memoryTimeline) SoftDelete(id ...int64) {
 		if v, ok := m.summary.Get(i); ok {
 			v.Push(&timelineItem{
 				ToolResult: v.Value().ToolResult,
-				summary:    v.Value().summary,
 				deleted:    true,
 			})
 		}
@@ -91,6 +96,7 @@ func (m *memoryTimeline) BindConfig(config *Config) {
 	m.config = config
 	m.memory = config.memory
 	m.setTimelineLimit(config.timeLineLimit)
+	m.setTimelineContentLimit(config.timelineContentLimit)
 	if utils.IsNil(m.ai) {
 		m.setAICaller(config)
 	}
@@ -114,6 +120,11 @@ func (m *memoryTimeline) setTimelineLimit(clearCount int) {
 	m.maxTimelineLimit = 3 * clearCount
 }
 
+func (m *memoryTimeline) setTimelineContentLimit(contentSize int) {
+	m.totalDumpContentLimit = contentSize
+	m.perDumpContentLimit = 900000000000
+}
+
 func (m *memoryTimeline) setAICaller(ai AICaller) {
 	m.ai = ai
 }
@@ -129,8 +140,19 @@ func (m *memoryTimeline) PushToolResult(toolResult *aitool.ToolResult) {
 	item := &timelineItem{
 		ToolResult: toolResult,
 	}
+
+	// if item dump string > perDumpContentLimit should shrink this item
+	if len(item.String()) > m.perDumpContentLimit {
+		m.shrink(item)
+	}
+
 	m.tsToTimelineItem.Set(ts, item)
 	m.idToTimelineItem.Set(toolResult.GetID(), item)
+
+	m.dumpSizeCheck()
+}
+
+func (m *memoryTimeline) timelineLengthCheck() {
 	total := m.idToTimelineItem.Len()
 	summaryCount := m.summary.Len()
 	if total-summaryCount > m.fullMemoryCount {
@@ -150,6 +172,40 @@ func (m *memoryTimeline) PushToolResult(toolResult *aitool.ToolResult) {
 			m.reducer(val.GetID())
 		}
 	}
+}
+
+func (m *memoryTimeline) dumpSizeCheck() {
+	if len(m.Dump()) <= m.totalDumpContentLimit {
+		return
+	}
+	totalLastID, _, _ := m.idToTimelineItem.Last()
+	summaryLastID, _, _ := m.summary.Last()
+
+	// check everyone timeline item was shrunk
+	if totalLastID > summaryLastID {
+		m.idToTimelineItem.ForEach(func(k int64, v *timelineItem) bool {
+			if k > summaryLastID {
+				log.Infof("start to shrink memory timeline id: %v", v.GetID())
+				m.shrink(v)
+				return false
+			}
+			return true
+		})
+	} else {
+		reducerID := int64(0)
+		if m.reducers.Len() > 0 { // has reducer, reducer index should be current reducer next
+			reducerID, _, _ = m.reducers.Last()
+		}
+		m.idToTimelineItem.ForEach(func(k int64, v *timelineItem) bool {
+			if k > reducerID {
+				log.Infof("start to shrink memory timeline id: %v", v.GetID())
+				m.reducer(k)
+				return false
+			}
+			return true
+		})
+	}
+	m.dumpSizeCheck() // recursion check
 }
 
 func (m *memoryTimeline) reducer(beforeId int64) {
@@ -222,19 +278,16 @@ func (m *memoryTimeline) shrink(currentItem *timelineItem) {
 	if pers == "" {
 		s, ok := m.summary.Get(currentItem.GetID())
 		if ok {
-			pers = s.Value().summary
+			pers = s.Value().ShrinkResult
 		}
 	}
-
-	s := &timelineItem{
-		ToolResult: currentItem.ToolResult,
-		summary:    pers,
-		deleted:    action.GetBool("should_drop", currentItem.deleted),
-	}
+	newItem := *currentItem //  copy struct
+	newItem.deleted = action.GetBool("should_drop", currentItem.deleted)
+	newItem.ShrinkResult = pers
 	if lt, ok := m.summary.Get(currentItem.GetID()); ok {
-		lt.Push(s)
+		lt.Push(&newItem)
 	} else {
-		m.summary.Set(currentItem.GetID(), linktable.NewUnlimitedLinkTable(s))
+		m.summary.Set(currentItem.GetID(), linktable.NewUnlimitedLinkTable(&newItem))
 	}
 }
 
@@ -326,7 +379,7 @@ func (m *memoryTimeline) DumpBefore(id int64) string {
 		if shrinkStartId > 0 && item.GetID() <= shrinkStartId {
 			val, ok := m.summary.Get(shrinkStartId)
 			if ok && !val.Value().deleted {
-				buf.WriteString(fmt.Sprintf("├─[%s] id: %v memory: %v\n", timeStr, item.GetID(), val.Value().summary))
+				buf.WriteString(fmt.Sprintf("├─[%s] id: %v memory: %v\n", timeStr, item.GetID(), val.Value().ShrinkResult))
 			}
 			return true
 		}
