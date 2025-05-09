@@ -1111,7 +1111,7 @@ func (y *builder) reduceAssignCalcExpressionEx(operator string, leftValues ssa.V
 	case "%=":
 		rightValue = y.EmitBinOp(ssa.OpMod, leftValues, rightValue)
 	case ".=":
-		rightValue = y.EmitConstInst(leftValues.String() + rightValue.String())
+		rightValue = y.EmitBinOp(ssa.OpAdd, leftValues, rightValue)
 		// rightValue = y.EmitBinOp(ssa.OpAdd, leftValues, rightValue)
 	case "&=":
 		rightValue = y.EmitBinOp(ssa.OpAnd, leftValues, rightValue)
