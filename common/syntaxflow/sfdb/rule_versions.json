@@ -2,1225 +2,1291 @@
   {
     "rule_id": "11336001",
     "rule_name": "golang SSTI(template)",
-    "hash": "285f8dc44f2f65ef68e273ef3d53de0d53f5cbe7b0c75617e2c8edd1a6beae1f",
-    "version": "20250428.0002"
+    "hash": "9845324c2103d0b992476111c8e7909484d67944af2861e256afd63e353a4393",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10200001",
     "rule_name": "golang FTP information exposure",
-    "hash": "af7ed3194c7d212037cb7c6bd70a84d561539adecf70ea502f6dcf3e58aaeba0",
-    "version": "20250428.0001"
+    "hash": "026f2cc6c739a5b63c7f2867bbd72e7f83cf5717b2e9f7d0e04a7dea27b04467",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10200002",
     "rule_name": "golang SQL information exposure",
-    "hash": "d293ac2605171f1a4d7c156d58c70d68a6df0edabb45edde5cb0e4bdef07f7d6",
-    "version": "20250428.0001"
+    "hash": "d37b27b21da07de0538997b0c83b3f886938ab8465c4eae6776e24d6f63b9285",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10259001",
     "rule_name": "golang FTP hardcoding",
-    "hash": "80ea296184113e721c5a81dbb52703476bff9716ffeddccf8620764f7c9d6e2c",
-    "version": "20250428.0001"
+    "hash": "5c53c4775cda78b9b0514153c19e52dc66de3264442ea15c0def65ff3b7f79f4",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10259002",
     "rule_name": "golang LDAP hardcoding",
-    "hash": "20e93e15d36b648074236e55473a8ec9181737a293242226469f7ac93be5f582",
-    "version": "20250428.0001"
+    "hash": "5c100ba3c605b26842d516da9418a62f8972bafbf6eb855b62bd9842b94b189f",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10287001",
     "rule_name": "golang null password",
-    "hash": "54fab489a827afe9be5bffdacd391001c545f45727a539674c35ca9c16bf6eb5",
-    "version": "20250428.0001"
+    "hash": "6bccb0772a8e01806dd43467da7c5f540156cb650f6ee227f008ffee5ad401fa",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10434001",
     "rule_name": "golang file upload check",
-    "hash": "b72e6abc57a73825e69d8476e4278652e13bd7f921d157c582682263431fd15c",
-    "version": "20250428.0001"
+    "hash": "46293a68a8365e0c5a4ac3426a2bded605c69cab76ce6eb53b0a57653a532817",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10601001",
     "rule_name": "golang open redirect",
-    "hash": "f1d05270bb001aa278c42b2292dd3672ecd2f23e5a13ebf50865f564abf50464",
-    "version": "20250428.0001"
+    "hash": "5e39ed0b11aa8f53594d4771ab38ffb043dd8b961f96a00ef41d085c18f74a57",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10611001",
     "rule_name": "golang xxe read any file",
-    "hash": "00d642a6ee4787fc7d6dd158f037021bdabef771abd09dfc3be49f8a77379ef1",
-    "version": "20250428.0001"
+    "hash": "f51f83f05f70820f84bc18dd4b3cf02a73be9d698ae84f8721fcc61d1f6ea8a3",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10073001",
     "rule_name": "golang Unfiltered File-or-Path",
-    "hash": "5ff0e1f3a6e211003ed0a7a6d08d03b8054dc43dcd5ee7d92d1f98af15b055ab",
-    "version": "20250428.0001"
+    "hash": "b8ffb0b4f5c6098317a53bb7b1585b69d5f3166f4452c2236ceaee0f5527ce8c",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10077001",
     "rule_name": "golang Command Injection",
-    "hash": "dc137d6ca99c60c07bc2a00bd770a3f795ded3f088669bb1e9283894fe6f5777",
-    "version": "20250428.0001"
+    "hash": "e06a717cf533bee92a303137f3c221029da05fd68f93f1b5529e61a182018c24",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10079001",
     "rule_name": "golang Reflected XSS(template)",
-    "hash": "891413541b60c6bf6a93a9d51dfc2152cf1e045bab21c7be082eecfc3ca304e1",
-    "version": "20250428.0001"
+    "hash": "a4ad812eae2ea8eceb28db19d7849901604e147c60e8a94531b54128c8dbb382",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10079002",
     "rule_name": "golang Reflected XSS(write)",
-    "hash": "5061d9383de0f87dabd6116432e3cf6652efafd7d4ec4fd41de453ff3df171c1",
-    "version": "20250428.0001"
+    "hash": "2750e4b39098af9ba907204b3f6b6f46ef9fea74f3a0a26406f3c18061bc4873",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10863001",
     "rule_name": "golang filepath missing permission check",
-    "hash": "d46e5dfcbb5e62a4f8fde4b3169d38e9debc30c69a49b77245aa14a59b746f8c",
-    "version": "20250428.0001"
+    "hash": "fc69ac0ca477148cf5943ffbc6282e17d0dfd579ae71b8e9a7cc84ba9df714bf",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10089001",
     "rule_name": "golang SQL Injection(database-gin)",
-    "hash": "fe750f88a9b73d355e01a4eb672d430380214ed18653d4b533ce27e0ddb0734a",
-    "version": "20250428.0001"
+    "hash": "344307b4f16566b64de9ed6c0801ac98017bfa26b098fae88f00e7a809ee4dab",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10089002",
     "rule_name": "golang SQL Injection(database-net)",
-    "hash": "3ccd030d97efbe742e8678edfed217c0a8cec4b7da808ec9845c1c75c9f4e475",
-    "version": "20250428.0001"
+    "hash": "8beabbc9345fd6885c67010de2a1161d8a81b1229515db746ee3f3ca7225b05d",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10089003",
     "rule_name": "golang SQL Injection(ent)",
-    "hash": "2dcaee35e920dcc4abfd74cca364342dbcac4bc6a8c6bbbbcbc42b5a89864eb2",
-    "version": "20250428.0001"
+    "hash": "9dc237fa89ba2a10f89ec6be7818c6addb903e4466b6d109d317a681bbfcc08b",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10089004",
     "rule_name": "golang SQL Injection(GORM)",
-    "hash": "391fd6d02c1c57e55aac417dc78d93d270aa125fd990952fa4c5d4f4e6bee21e",
-    "version": "20250428.0001"
+    "hash": "010742a4141aa3b6ef78a52b81365f101669d6c089041a1f9c2f9cb661be15da",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10089005",
     "rule_name": "golang SQL Injection(pop)",
-    "hash": "92fc70a4205057569ac7c77c467a0e9dba161363e5328168e73ea7fb95697a6b",
-    "version": "20250428.0001"
+    "hash": "6eed4c3f36f21fe57313b21008577e0fbe7241c89d0e5c98342eb640e3e63cad",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10089006",
     "rule_name": "golang SQL Injection(Reform)",
-    "hash": "2517849b775055d4b52140054d374cd8ddb97da0250f0f35822bce75050eefc7",
-    "version": "20250428.0001"
+    "hash": "983aa0c69567fe1240e722608200e8eb958d37674db61bd2824892cee205c25d",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10089007",
     "rule_name": "golang SQL Injection(sqlx)",
-    "hash": "8980289e7c08cd6993d8f9c54da4b3eab257506c1595e47f9d681d1921b90c07",
-    "version": "20250428.0001"
+    "hash": "81d8357ac583078e271f3eacb2a7942787148b46fe33601b72868fb0ec5d6b84",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10090001",
     "rule_name": "golang LDAP injection",
-    "hash": "377ff01c012bb05a161634db6cfededf68c77fd1c5b2b0d18b93179572c29a58",
-    "version": "20250428.0001"
+    "hash": "88bb1d70ee2cc9676e0e41d729bcee66606516a957c3ded29f4dd4d32989a5e6",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10918001",
     "rule_name": "golang SSRF(http)",
-    "hash": "0f16e28bc1d6c871a829a941d44c78f53bd1edd5ed7783262c09e0c8d84d8774",
-    "version": "20250428.0001"
+    "hash": "db91a067addb873fce75ee3091e29085d0321b215cf421b341d8418e0e275ed7",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000001",
     "rule_name": "golang-database-gorm",
-    "hash": "3b2f8426b412cbbca0de9208bedd704566b2b29ed8ef9407ec8f44a3d6484f8d",
-    "version": "20250428.0001"
+    "hash": "df5cb4a879dce769290fbe78c660798bd7197da56c38297a9d11ec11259746c4",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000002",
     "rule_name": "golang-database-pop",
-    "hash": "7c5a9b793288c9e6aa3c6de1dea9487b7db14926014e34bcdc25c87b882a0df5",
-    "version": "20250428.0001"
+    "hash": "f51201ac9e5318a499723a10223817e6755d21415990453394ad9e417925e116",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000003",
     "rule_name": "golang-database-reform",
-    "hash": "764c4786e8883186becf8db70f9d6e5c1d00d9687fa3b4e1a665eab98a939ada",
-    "version": "20250428.0001"
+    "hash": "1ec78add8d58ffa1248bcf5789746a152ef50075c993871b4dd072da58995baf",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000004",
     "rule_name": "golang-database-sink",
-    "hash": "c8ca2f06f0dafdee94b50ea40865e21d86cd0333bdd055303209bc22a1391cc4",
-    "version": "20250428.0001"
+    "hash": "c5bd7b15bfa2f7276de1375eba21ec8cf288b3b4d8c2e6d834111fa69c782881",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000005",
     "rule_name": "golang-database-sql",
-    "hash": "9e0eb6818853f67f8e97c0a3faa13828e1a1901598519d3e777d7fa511536b4e",
-    "version": "20250428.0001"
+    "hash": "d6ceee8796c1e099a0f6187742ace235764f597c30160bbf0e2c9a1111d819da",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000006",
     "rule_name": "golang-database-sqlx",
-    "hash": "7b17348d5b7352e9d0851288bcb8951845ed1d2ed93008c83b93379a28ef650f",
-    "version": "20250428.0001"
+    "hash": "13b9f5da0e045a20beac9a10d197b18c260f02776921ae76ba55585c8138d107",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000011",
     "rule_name": "golang-file-path",
-    "hash": "3a03dc331d29bd3c42c6c5ec60fb1fd59fdafd506acc63d9636fd469cde8a109",
-    "version": "20250428.0001"
+    "hash": "45f7781f34c27638158d14f3186f983c52ee1f4ad3821793905295b1e2f02e12",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000012",
     "rule_name": "golang-file-read-bufio",
-    "hash": "55a454c0c228fc54434283faa955d62c09411fb0542f546c286778a275a9b817",
-    "version": "20250428.0001"
+    "hash": "8086fa62867700f7db7e73a5812ce750c3c6ea9e6abf8fa1498944af5a5581ff",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000013",
     "rule_name": "golang-file-read-ioutil",
-    "hash": "0198bd634240fc2a08c3c6f18ebe0ed59539cb2d85c03e5994b81d2468547a2b",
-    "version": "20250428.0001"
+    "hash": "6a80adc3b3671eb45b181b01cc2d868abdf98c75d083b438c26c948a3062bc53",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000014",
     "rule_name": "golang-file-read-os",
-    "hash": "a15a32a217c9f420d599d878f0b7902d0dff66c4f4de9ea1fc5c5ad27b6733d7",
-    "version": "20250428.0001"
+    "hash": "7bcf2fb48b7e2e6845d00ad1574b8c30148d32d9fb5382a56ffc5daf3fafcfd6",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000015",
     "rule_name": "golang-file-read-sink",
-    "hash": "5792c778bf322efdc36c2a645a018a0676d40671a6d7afc4a1dda81bda49b15e",
-    "version": "20250428.0001"
+    "hash": "89e339ce1307b29d1bfee52ae397646eb10191d4635c43f6d9192555528e70e7",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000016",
     "rule_name": "golang-file-write-bufio",
-    "hash": "6fff808eb628ddf1496f1bd77aee007bf9b89a4d3bd7ff58ae0388e4cea945ec",
-    "version": "20250428.0001"
+    "hash": "7a1adaf6e4627ae7507621323737e6ecd1df49bb3ef23a083244a2caf6f60fe8",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000017",
     "rule_name": "golang-file-write-ioutil",
-    "hash": "10c822b481da9c6460adf890ebaec1b0e6ef5f4750c3c8a7ae5c16a292400e6d",
-    "version": "20250428.0001"
+    "hash": "a9317d5dadd92f9df9f8a5af166583aeb4910e9762d5cbc295e85948da7bf653",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000018",
     "rule_name": "golang-file-write-os",
-    "hash": "8bb973a03dcb285b6b293de1ce1d91b00930c5754b1b68600d02a86670393aa3",
-    "version": "20250428.0001"
+    "hash": "d37c7b50e212579ba353dd00b64668729d2582a361aebd0394820c1be1334d1b",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000019",
     "rule_name": "golang-file-write-sink",
-    "hash": "bb6ff88a61cf5a980c1da7f86daa3676af800485af63d745ae1ce11a97bc9192",
-    "version": "20250428.0001"
+    "hash": "eea1d18793bcbd03fb771eb50307b99a28a42859422ca549a7c6a81ef0eb72e2",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000020",
     "rule_name": "golang-fmt-print",
-    "hash": "5056ca235888d2599882d45df0082593a5276508dd059f433af45d1fe1eff908",
-    "version": "20250428.0001"
+    "hash": "54becac2a1cb0f359581b1fe988736d42cbe7051036fcd2b7d7ab34c445e7f9d",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000021",
     "rule_name": "golang-ftp-sink",
-    "hash": "e1aba496b73b81db6ef7cb2f158d70e5db5d6036a77bd7c8f039cdaf7b1ad20f",
-    "version": "20250428.0001"
+    "hash": "d28183e3fdf78d615ff062dea3e9f3a168aa8e5f1b9980ca7568cf9c1a689be9",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000022",
     "rule_name": "golang-ldap-sink",
-    "hash": "731671035be7cc5c19c930a92282c5b65ec6f717c0de46ff8d7d2319840efded",
-    "version": "20250428.0001"
+    "hash": "470447b73dc3e80607168be72f9d1e21c8705b80893a11676f13f439a3827d9f",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000023",
     "rule_name": "golang-os-exec",
-    "hash": "3c4098ce2b8ba9d807171c297fcc06fd44335c80dda50fb0437737807ce1e879",
-    "version": "20250428.0001"
+    "hash": "07d2dd4211aeab813516302ac5f4c58034defc39f799eeaa4e307ee7a3cffeca",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000024",
     "rule_name": "golang-os-sink",
-    "hash": "a06d7b046bed77ccfffcb624e098c4cb3267946a642dfe399ef05e6e5fcddae4",
-    "version": "20250428.0001"
+    "hash": "a77ab5860779050b8d29c32fc338e5f63f927c9fe58f4413277692f583be5b70",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000025",
     "rule_name": "golang-template",
-    "hash": "18acd17b73dd370bf1680348075f37df6d29afcfc81d8f810b602c7e45648805",
-    "version": "20250428.0001"
+    "hash": "59b24a0db3cfb90208dbc437a1afe9055282bb5b0c73af5e00c3678d8be73f9d",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000026",
     "rule_name": "golang-xml-sink",
-    "hash": "207056f089c752b0cf59482353bc6371ecdbae2a7ffcf75af26d1734d2aa40d4",
-    "version": "20250428.0001"
+    "hash": "e46c21f6c30c81696fa205ef89dd692c5811bcbc2c486cac82237630ae76db92",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000008",
     "rule_name": "golang-http-gin",
-    "hash": "c37796a459377f6f059319c07815624cf077f2e1ec8ff9ea18c04e007a9dfc34",
-    "version": "20250428.0001"
+    "hash": "475c61e52b0db4ed2191485850a0f3bb1ce6b2cd989d921a7af9fcdd884144bd",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000009",
     "rule_name": "golang-http-net",
-    "hash": "fdce1b4a84a01f33f597c9372ab932c4f5611bf1f94ff34ba7c17bc272a55286",
-    "version": "20250428.0001"
+    "hash": "0696e6b79570fe96011e6a5fedb36fbf041f13e2ba1c6c6b779f47ae072b66b8",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "10000010",
     "rule_name": "golang-http-sink",
-    "hash": "f65f249fd52cf4638ff886d0eaf81639d57a5f88ffe32092f9dacecb38339b36",
-    "version": "20250428.0001"
+    "hash": "9a1663309ff5bef5d552bcf376d6b6b6c694c137a7fb939fddd96fa05b0bd450",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21500003",
     "rule_name": "检测Java J2EE 使用getConnection",
-    "hash": "54369d8c36a7e4b5b4a8c1c3cb40df2e81ac0980e4196a00c5aff8c4db7fa123",
-    "version": "20250507.0001"
+    "hash": "8a41874eb325be18887f492a298a78b94aafa36066dfe66aab9ea8d94b11f3d7",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21500002",
     "rule_name": "检测Java J2EE 使用threads",
-    "hash": "67b3f42fa281d34dccf8249215f6f57d933fceafa43cd94fbeeab3f628b7b75d",
-    "version": "20250507.0001"
+    "hash": "4674f3ae53af7ffd4709db123b2891a9a7f5190fd287da734521872e16813f69",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21500001",
     "rule_name": "检测Java 使用System.out输出流",
-    "hash": "78517769f978895140dd713d6f7a2a74d5671d22ca013b29808df3a1fdc753e8",
-    "version": "20250507.0001"
+    "hash": "df9608c14fb0d814362f48fa30187304512cc515ccf02b24ce5e062b95d6a256",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105001",
     "rule_name": "检查Java Spring Boot Actuator配置",
-    "hash": "f31c059c27a558648c9f6bdcff11e4c974fa8cac95e8b1b3f20498c72ee2e846",
-    "version": "20250428.0001"
+    "hash": "f0665b57ff899a810dca5d2a05a6387756366153427526f56abf49251959d990",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105002",
     "rule_name": "FastJson 安全检查",
-    "hash": "f11ca19e3f121532045d69131b4f5ae13370120900b6625a6c305a728a562904",
-    "version": "20250428.0001"
+    "hash": "c2252dc76a65f7d5dcb7f2c9cb635db5403486e97053232f3244789269e16077",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105003",
     "rule_name": "Java JWT 安全检查",
-    "hash": "07adf53a4e423b890353a9b2d807d0155f1b2c3ad59acb226b5f92d24d161fe4",
-    "version": "20250428.0001"
+    "hash": "f287a7ef4af9cdb4fec92ab3a5ab7979bdd9f07325df5f323f6e98a2e098b1e9",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105004",
     "rule_name": "Log4j 安全检查",
-    "hash": "aa5d453dbab8ad149ba4e614f6034f2d9ded9a0ddc9aa7419f4088b274dda35c",
-    "version": "20250428.0001"
+    "hash": "8cdddbf1cb3e66a7f7a208305f2e10c1cdcd6deb7f1c56e281d71b675c3b75a5",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105005",
     "rule_name": "Find Thymeleaf Config in SpringBoot Application Config",
-    "hash": "1f5fb056ae3b1328e61ebed723727350674aea0b285226596b8218d8389189cb",
-    "version": "20250428.0001"
+    "hash": "b4951514d90b0acc26e8f015678c8c2dc046a31375d379c219001b52711ff525",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105006",
     "rule_name": "Find Config for Thymeleaf (Java Class Config)",
-    "hash": "208205a8a77d79b2ee4a2d10a288ab8cecf452b155e2e7043730391b1d6a08e0",
-    "version": "20250428.0001"
+    "hash": "e30d646d6fe41d16ef22c6a67e276b19ae67ee970a8d17a4cc3154d27fc637ce",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105007",
     "rule_name": "识别 Java Quartz Job 类的位置",
-    "hash": "037dd796128ac539e8a25525b653724d05e988f3845e7f36dfaf8553b2fab98b",
-    "version": "20250428.0001"
+    "hash": "1802a9d12657eb89e1addc884fc1fb0f5cfb934005903b7f3d4f8f3c61770ee6",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105008",
     "rule_name": "Shiro 设置硬编码加密密钥",
-    "hash": "70901c096a7fbdf23ae3fccc582e878ad0c7d70566e052fe80d84e827d1bd42e",
-    "version": "20250428.0001"
+    "hash": "5a6558c763e1db713a39367b39d9a33c7fc36e52d2c52f101c8124d4adc826c8",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21021001",
     "rule_name": "Find Simple Trail of frameOptions Disabled",
-    "hash": "0825ce6c9e4a5b224586f99c324eddd437ef450021c092c3dc493c889f316131",
-    "version": "20250428.0001"
+    "hash": "7f219cf868bc8bac0e90762a7de91a2538889cbbedd12226f77c8b8e1de006aa",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21188001",
     "rule_name": "检查Java隐私泄露 - 肩窥",
-    "hash": "ab06eab161951c6feca0b397ad8b6b923762a5faf468fb687cf39c50e6109253",
-    "version": "20250428.0001"
+    "hash": "97ecf454b3241b2b6f9a659f56ac7469e2db95df211393cff40762220d51e0bc",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21336002",
     "rule_name": "checking [freeMarker.Template.Process directly] audit prompt",
-    "hash": "714a19b2e58764e96c2926a7a4c4585f7d9e7c76a76b1afba1dbca56cb14a913",
-    "version": "20250428.0001"
+    "hash": "a4a52ce19d028240e0a08d7addb758fb7cda2c1ef3a5c65fff85206c4ca7610f",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21336001",
     "rule_name": "检测 Spring Framework 控制器模板路径 SSTI 注入漏洞",
-    "hash": "f9b5f966ea760289aef2f5a79a4d3ee175127a95e473f7e63e6cf6e20e73dab9",
-    "version": "20250428.0001"
+    "hash": "7106051ba076fe5a007545187444ff7a34419b46322c73d3bda4e5fabe1f03cc",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21336003",
     "rule_name": "检测 Java Spring Framework 中 ModelAndView 构造函数可控",
-    "hash": "0be461114f2de0f49667f1b731b358606d1dc467592be61d09c0cb1462d07051",
-    "version": "20250428.0001"
+    "hash": "f0336d5dfeb000f5cda391a6b236a623b23d466b99f0c8f0e9c33039e2776476",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21336004",
     "rule_name": "识别到 Java Spring Framework 中处理 ModelAndView 时直接传入 String 类型参数",
-    "hash": "93a32920eccd855c5dad3ccdf1489f5b54493a5664a4fda9ad17d365058b0079",
-    "version": "20250428.0001"
+    "hash": "f5ab0dc974697b61daf040e3b22c0100a303ed23fa513f5bcd2ae9c181519d27",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20200001",
     "rule_name": "Checking [Resource Handler Location] in Spring",
-    "hash": "a9812477955f7ad3319f34f9bcd098f5d80232eb87bc78570aa10a9b14f72982",
-    "version": "20250428.0001"
+    "hash": "089dfb61c6a6faf10019842877e6bafbaa0e62b00fccc2f3ea83ec5229d5b924",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20200002",
     "rule_name": "Checking [Swagger2 Configuration] in Springfox Aware",
-    "hash": "1d332cab651610324b3c70101c1a940da0548b7a2d5b262e8afc1680b40ee26b",
-    "version": "20250428.0001"
+    "hash": "08b61083c31652ede35d2e2a17fc9dea6e431f3778b8cf5a4c11f8383cd1059d",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20020901",
     "rule_name": "检查通过PrintStackTrace泄露信息",
-    "hash": "1ffde0d111e9ae7d42754934a7e6379aa7490fdaee253fa60e00745362c89d9a",
-    "version": "20250428.0001"
+    "hash": "21baacbf3d48d6d6e4e4b59e87bd027c67279236e38c35b0b2bcd92fd10f2808",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20022001",
     "rule_name": "检测Java直接路径穿越漏洞",
-    "hash": "184ea6ff99573c9954f37669c28f5cbb4f8f1ae00d38de19a4501d8944397da7",
-    "version": "20250428.0001"
+    "hash": "22f6b974f1ac73ed804545ea0055d11b75fcfeeaac1d46fec027def9027c5fdd",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20252001",
     "rule_name": "检测Java IO库未检查返回值的API",
-    "hash": "6a5722df17a849a3596b5ca19b16b3da81d0cced8749f10617b8e1758e503359",
-    "version": "20250428.0001"
+    "hash": "3c00bbabadd7bb1176c860541bdb79fbfb50bb7df47e0ea46cd7f1343c4e471b",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20252002",
     "rule_name": "检测Java Lang库未检查返回值的API",
-    "hash": "4140e015de22f73652e63142afa84a984a2d0df0123bb935509de2c66dc5eb8e",
-    "version": "20250428.0001"
+    "hash": "bc0065cc6208caa5ab34818d3694b96fff719b9ecaf69f16638a162ab0dfd4dc",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20252003",
     "rule_name": "检测Javax Sql Rowset未检查返回值的API",
-    "hash": "a3584e14d9e568e9993ed6c2a53de830c8e9724da9373fbf16b3e6654e39fa5c",
-    "version": "20250428.0001"
+    "hash": "1f16bdfadaaf23dc70015859264f96f4ed943e092754b41adf37065c92dab1fb",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20252004",
     "rule_name": "检测Java Util库未检查返回值的API",
-    "hash": "b68b352d55b250ee5c0c8734043810718354d4ef0a9182f3d3a4af0e5f3772a7",
-    "version": "20250428.0001"
+    "hash": "2ac39f037594471bbfb15b107281cc5d13b354ac2c5b6d583a00d8bad76e20c0",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20252005",
     "rule_name": "检测Java Zip未检查返回值的API",
-    "hash": "20c9afc5766c8111ddf9065a3d54ae352d8f7e099db2f0d74a5dfb180e5c4210",
-    "version": "20250428.0001"
+    "hash": "2ed96d6b08f596546e26628a2425645b319624f48a560561b5131c87ebb6856a",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20287001",
     "rule_name": "检测Java不当的密码配置",
-    "hash": "82591db62b1a724e3db5cce376301edb4a3d5d6b4cc569f04a3cd5e69eba4a59",
-    "version": "20250428.0001"
+    "hash": "958ef5fd84028e56d26a04a3061670a090ec87e1c4b33e1fe78ba19d539099bd",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20287002",
     "rule_name": "检测Java密码管理中使用空密码",
-    "hash": "e05c5ab031c90415405331621acc7ad4bc3c38a90f3b6897c754811870dc6d9b",
-    "version": "20250428.0001"
+    "hash": "bf0369c6f92ab3923acf9d89e099d415201b372d45a143ae2038b8eb257c744d",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20287003",
     "rule_name": "检测Java SQL不当的密码配置",
-    "hash": "8994f9920ad187b775ce470c9bdacbbf01e4874e027cd3b5fb0bdc6907edb684",
-    "version": "20250428.0001"
+    "hash": "6c2dc7c649c2dad41974a99e9713c1ded6f3fbc76a51b26c03792c00b874b954",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20297001",
     "rule_name": "检测Java SimpleEmail在建立SSL连接时是否验证服务器的SSL证书",
-    "hash": "5111e966cd8a3cbb7d7954996e4d921dc263c1c36b73c17f7524d8e47d2ee6f0",
-    "version": "20250428.0001"
+    "hash": "fee493bca207ea4665344ee249db361946940fa506f1a6b2bae1a9ea4a0007eb",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20236001",
     "rule_name": "查找Java弱加密 - 密钥长度不足",
-    "hash": "8ab3da727d878f41076052ae605c975b7fc06cf2f58ce6121411f98a27dd9d83",
-    "version": "20250428.0001"
+    "hash": "ef2545c7f23636603eba650cbeda351c18b7267c7d5aebbdf681baf82a454e97",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20327002",
     "rule_name": "检测Java javax.crypto.Cipher不安全或有风险的加密算法的使用",
-    "hash": "ea0b7e65ac15ac4beba0592b966f985921b3d713f7719ec48144f7c8c5635fb2",
-    "version": "20250507.0001"
+    "hash": "2df65f1548cfabc663e39cc11b0d89e0fce9c9327f39651bb11174474639e9ff",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20327005",
     "rule_name": "检测Java javax.crypto.KEM.Encapsulator使用不安全的加密算法",
-    "hash": "efbff2935f099d9bcd385c86b29bc1c5613914c9199fb96d9d5e16582c01ae8a",
-    "version": "20250507.0001"
+    "hash": "72abc21ed73fd63388a17f616ceb6ad9c49d89bfb77abf3f28f5b7c4e7c07db8",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20327001",
     "rule_name": "查找 Java 哈希算法使用硬编码的PBE盐值",
-    "hash": "9fed852feec70819ca6cee43dcc61ff8f9380edd40a58e838e4533301f04d6f4",
-    "version": "20250429.0001"
+    "hash": "778cce52a9b8786b8c712d786f256ccf71f865edc2173e69994cc33dd8d33961",
+    "version": "20250509.0001"
   },
   {
-    "rule_id": "33a8c1db-92b1-4eb3-aed5-85f96dd4f9a9",
+    "rule_id": "ccec99b1-96eb-4a2b-a159-2d1335938f02",
     "rule_name": "java-risky-system-hash-config.sf",
-    "hash": "6ac6de72987782db0720e2014b96e7ffec6fdb95496c925b27f784077655f783",
-    "version": "20250507.0001"
+    "hash": "ead39374ed5573b601efdbaa082dafd1272fed741dd8befc53a44760b28b8814",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20327006",
     "rule_name": "检测Java java.security.AlgorithmParameters使用不安全的加密算法",
-    "hash": "d48e80078d0c8ff20d4171f3f691c4cb7db9942027980b4038e2cefebbea4ad2",
-    "version": "20250507.0001"
+    "hash": "ab351098804bb0caab0259efa2f501d674b725172dd7ddcfed73c3dbc4623e6a",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20327003",
     "rule_name": "检测Java java.security使用不安全的哈希算法",
-    "hash": "ed30914f8630facc7d9edf2d2125de36b616fb6ff52bd79c7b8ca77fbc7195b3",
-    "version": "20250507.0001"
+    "hash": "3635257145ae86cfb5b07e08a9d8af555f8b5e8b22f1adcacf5106ccd31b33e9",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20352002",
     "rule_name": "关闭 CSRF 保护",
-    "hash": "834ceb04a977692ca226034c8eb853a11d426ed4ebaf3040f851ae8468b28528",
-    "version": "20250428.0001"
+    "hash": "05e7db939420d6535a9568f926ecbe1fd0033de22158f4feeb38895ec4f93cef",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20352001",
     "rule_name": "Find Simple Trail of CSRF Disabled",
-    "hash": "1eff33ddafa30189e33163160db94563553fdb4c006eae57f1783b3bf361ff98",
-    "version": "20250428.0001"
+    "hash": "d8138db2a3fc5cee023b512337b6032fa79c553c2a8f63a8829e54dd7732cc6e",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20400001",
     "rule_name": "检测Java cn.hutool.captcha验证码拒绝服务漏洞",
-    "hash": "089801ab7cf025b6115ed645e1cc3bc8796db81dacb394bdfac17cd805fdc56b",
-    "version": "20250507.0001"
+    "hash": "1070ebf66020d163c8c8f2aeb9965ef1126b049f234f51f78bab91ab2b04aab2",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20400002",
     "rule_name": "检测Java IO库拒绝服务漏洞",
-    "hash": "0adc92bd6e8eefe360bb941161c4b23b488657651d079ce35a76b8f4754e5b23",
-    "version": "20250507.0001"
+    "hash": "dbc52d35e70337d49c54302598578d0ecd76dbfff55165e1938d8db45e4d49a7",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20400004",
     "rule_name": "检测Java StringBuilder 拒绝服务漏洞",
-    "hash": "d8b996b732394eaffe183d4d3efe976714df49c714ea01d3514b29e340de2013",
-    "version": "20250507.0001"
+    "hash": "0be1df069cf9605232443f8a75fdbbf5eb4fa71ed40fcdb2a7e83cfe6376d5ca",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20400003",
     "rule_name": "检测Java waitFor方法可能导致的DDOS漏洞",
-    "hash": "4373216955f1ae77eb1843609cab5d1290a6ac5fbf0973b2faa76362fb445613",
-    "version": "20250507.0001"
+    "hash": "88a2159d91b64ddf65e277c4599626e5f0f8d2e434b64bfe75ed38d40a37e245",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20434001",
     "rule_name": "识别到 Spring Framework 中处理文件上传的代码",
-    "hash": "0f7c04b490a06758a43a0b6dd483076d44eeaa4518e0da9143eae8e0200be990",
-    "version": "20250428.0001"
+    "hash": "eef17a0423d0789e35d31542530aa74a3d098c0f5e1aed0e993e1a348e35dcd8",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20434002",
     "rule_name": "检测Spring MVC任意文件上传漏洞",
-    "hash": "6f38781ce18bb4c7c7e6606891e76d373dbcc21737d1b8254e10f1c407afa242",
-    "version": "20250428.0001"
+    "hash": "b6a5aad2ab943394e86b14a7527d12480ad02670c8453dfd1b824ad47f130afd",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20470002",
     "rule_name": "通过 getClass() 和 getMethod() 发现 Java 反射调用的潜在威胁",
-    "hash": "e9aa64bb2fdb2d05e21258b746e7ce1f2abaab149fe6c9cd7de6f91aa872f3c7",
-    "version": "20250428.0001"
+    "hash": "00d04a0e0800cc3b8ead20255eab7812b8060ec4f39f22fa2d3f52118a19586e",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20470001",
     "rule_name": "Find Unsafe Reflection for 'Class.forName(...)'.",
-    "hash": "b6fca6cc69f6cb5576c95d953310675d2834a66568e271fc04196ee209672191",
-    "version": "20250428.0001"
+    "hash": "f199e1c7c1a60e3b6d6145c808c4e1449b0f88fe603b57115c1b52545eeb0dac",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20502001",
     "rule_name": "检测Java通过ObjectInputStream的原生反序列化漏洞",
-    "hash": "4c3404756e19bf302a087b7081f62da5d31ebea61df5998d301b4805dfb03002",
-    "version": "20250428.0001"
+    "hash": "c001e45f62098b9cfb57ca297d8c8edb860508fa3553d2f4ff312a1329259ef6",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20502002",
     "rule_name": "检测Java SnakeYAML反序列化漏洞",
-    "hash": "e130fa3eef6f557153968934ddd5095ef0511b6c1531923c7d492a9f1af347e8",
-    "version": "20250428.0001"
+    "hash": "311449ce424f297069f74484745858ad1423fa241fdd1d1174ac83e77dbab86b",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20502003",
     "rule_name": "检测Java XMLDecoder反序列化漏洞",
-    "hash": "c94d3bd69d1091142ea60995cb0bcf4011c5b6bdd7984d26f474347cade285da",
-    "version": "20250428.0001"
+    "hash": "5cb29dab505146f422f6f140d7f7305d6bd1893be3e8e69f6bc17c8ea0d1bb52",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20601001",
     "rule_name": "检测Java URL重定向漏洞",
-    "hash": "8c94c9b07fca143cdb19d9cd85922dec224bf6dd8365983fcd3ff86d0e5c5da8",
-    "version": "20250428.0001"
+    "hash": "a7d791967604e984eaa7f2a2cf5d6454e9e5d4cefe4eb3c5dcb3f8f9051c8241",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20611001",
     "rule_name": "Find 'SAXTransformerFactory' unsafe use (XXE)",
-    "hash": "38e3950ca1d1f24e69303f93c5650d4af8bcec9c3baa8aa2169511c02b27c4e9",
-    "version": "20250429.0001"
+    "hash": "cbd119d99daf71ccffadc4f861edc559a5d57dd6e7f5dc77e58e1b8d9af5410f",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20611002",
     "rule_name": "SAXBuilder 未明确设置安全策略（.setFeature(...)）",
-    "hash": "1a32139b7a997176d7f374f0f7e6d98320c826cddf69b388eda806c36ae17289",
-    "version": "20250429.0001"
+    "hash": "b9a26421305d7d999b61c037d59506a60f788e7bf25b7f181a1f18223b4ad214",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20611003",
     "rule_name": "检测 SAXParserFactory() 不安全使用",
-    "hash": "f4b42af743a9bd00a60e7cc455ff49cdb12a0fbf9cec7b93bc0b5e4641f22a5b",
-    "version": "20250428.0001"
+    "hash": "3246bcba45aa769749fb670d5fd597fedbfef5138b089bacc88571d3eb711897",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20611004",
     "rule_name": "SAXReader 未明确设置安全策略（.setFeature(...) ...）",
-    "hash": "a0cb8bde7b67d322379f5044fde44cf3a20e1c6a57017bd2b0eb0b606e80a90d",
-    "version": "20250429.0001"
+    "hash": "a162d19198bd04a07a74d23afb1b5a8601a7cd004bf23461835354b6d06a7210",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20611005",
     "rule_name": "在上下文中查找 'javax.xml.transform.Transformer' 不安全使用",
-    "hash": "8c17fd5c0f240e27413c893b343a1459b7fe86e6d4dac0afa511358287b52cdf",
-    "version": "20250429.0001"
+    "hash": "770cb3e21a41c776a28728644b12c218eda91b80fddb74a0fea2b17b66926be3",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20611006",
     "rule_name": "检测 STAX（Streaming API for XML） XMLInputFactory() 不安全使用",
-    "hash": "1c0caa813e60ef8b3e5c19300a07eb0ae34f6d163f1e40debc2b4f432e870b0b",
-    "version": "20250429.0001"
+    "hash": "43252483fe07b1e7762d1ebd5b8a97de3a7ef0aee21912f31f478817bbb4f295",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20611007",
     "rule_name": "检查 XMLReaderFactory.createXMLReader() 不安全使用",
-    "hash": "a871071959e95bab6978f8f745390f4b9198f3023f264582a42a7cee3c224480",
-    "version": "20250429.0001"
+    "hash": "020a94acae93373b10537eeff464efb1bc124fb5d5d1895865f58fd76ad89cb0",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20611008",
     "rule_name": "XStream 未明确设置安全策略（.setMode(XStream.NO_REFERENCES)）",
-    "hash": "9d58c669e28c067d35bc92b3c751a6a0e8895c9dcd921544212efdfdedde53ca",
-    "version": "20250429.0001"
+    "hash": "a60118e87e61d71a7bf0be3571f95e0d29f13a4d2c5c5c9fdacc71e34aef2368",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20643001",
     "rule_name": "检测Java XPath注入漏洞",
-    "hash": "b8eb2e1499d83e1698efa99a9a09f0b4be282597505e157222ca4506c1caa928",
-    "version": "20250428.0001"
+    "hash": "d8bf536139696bb35f9489e4faecabc00ca194de808a37d70871b91a002ade99",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20073001",
     "rule_name": "Checking [Filename Attachment when Filedownloading]",
-    "hash": "0277ca8f5bb2d2fc9ae74ca463b897de6ead0762c311fbe741bc966560ea2e20",
-    "version": "20250428.0001"
+    "hash": "654f0891e943ea691f8f73b738d7f9ed85917fb9ec29ca579b7dae353fb343de",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20073002",
     "rule_name": "寻找文件下载位置配置点（使用 setHeader(Content-disposition...)）配置",
-    "hash": "069546127bb85104734eee9d6188909c3b7ab7b6d16660009e2d1402c62d473b",
-    "version": "20250428.0001"
+    "hash": "4e19cabc3a102c3001e88a99e1e299506bb9cd081808ed71a17a3bc51b357699",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20073003",
     "rule_name": "查找 Java Spring Boot任意文件删除",
-    "hash": "ba0fd3ad6d7be40d8db8bb2c036a0c8cec12d95a0a6a2b6af4b44d52b75bcdf4",
-    "version": "20250428.0001"
+    "hash": "f16185cc36f91a6359ec515e1a118e452a15da7836a85d015e2a1e4d57d7e4a1",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20073004",
     "rule_name": "checking [File or Content download via Springboot Params]",
-    "hash": "04ff1ab508507dc463e2a8f7ae3eeb5701b801ebb3ae294f8f1df980bf69515a",
-    "version": "20250428.0001"
+    "hash": "c08d21f67d6ee1be778c4fed029ded7ae7f1708406f8ee1ce3a08592af7f0613",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20073005",
     "rule_name": "checking [Directly relative Files.write from MultipartFile]",
-    "hash": "e6201273a70527803ebafc5b9e4bdbbf25d61e9f18dee9147faa46c045fef263",
-    "version": "20250428.0001"
+    "hash": "3b38f8543060d287fdffdae761a5402794ef5b419ddb476a8103e361e50375bd",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20077001",
     "rule_name": "Servlet \u0026 Springframework 基础参数命令注入",
-    "hash": "9fcc92a320bbb2271837e8e2993c46791d5c331aed2e4ae9149861e08de5c0b5",
-    "version": "20250428.0001"
+    "hash": "62f2f7c29a3e9418e6e130e419a064e5344b72069962dc11f39e2d100c4611c9",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20079001",
     "rule_name": "检测Java EE的XSS漏洞",
-    "hash": "97de2c84bdfe4a21c20222235cae841f9bb0043cf90ca561d4b110d6ea39a1e6",
-    "version": "20250428.0001"
+    "hash": "023c2a52a3c2d2dd7482475d36b24d2faa502010c48a1202af92bc7e414608c1",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20079002",
     "rule_name": "检测Java Servlet XSS漏洞",
-    "hash": "466f5381e8746d1b7e94d29bb0b442af4e1980c9a636067413978c7824d5f81a",
-    "version": "20250428.0001"
+    "hash": "c7879de5c0ced3fb0a219055734fe2b20fcc441343cc3f2360dfea7c2497f8e1",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20079003",
     "rule_name": "检测Java Spring Boot框架模板语言XSS漏洞",
-    "hash": "727a5345dc23a66347ec96a2d90a620ece3b189712204a8c551b235c9cda020d",
-    "version": "20250428.0001"
+    "hash": "a54e88b2b14527741f973a4bfe0d70bb97bf1e7ec26d4612a7eaa182c122926a",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20079004",
     "rule_name": "检测Java SpringBoot RestController 基础XSS漏洞",
-    "hash": "6a1c0cd706d2cfb23cc1944478f71ef82338e6ebd944031c18096ff3c0f4671c",
-    "version": "20250428.0001"
+    "hash": "e526e9ecfeadc5509485e623a9aed8a19b9527fde518a7ae2d3ff94da0384b14",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20079005",
     "rule_name": "XSS 过滤器被使用，请排查是否可绕过",
-    "hash": "080cea27618114f587a1424373e2215b4acecd488f6af4ad645fe7204ef6c7c3",
-    "version": "20250428.0001"
+    "hash": "17e9f5afbbad8e587ed9f958c97ccebea697eb5445ac57031163e9840e30fbd8",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20089005",
     "rule_name": "检查疑似 SQL 语句拼接并执行到数据库查询的代码",
-    "hash": "e0bb69109bb76be8edeb8e4b76124270be1dc7a37f2802009834f57f00128805",
-    "version": "20250428.0001"
+    "hash": "6f77b75e782afd4fd1916be3e32a62c09eb1f99b23e0df319a980f0ca36a1504",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20089001",
     "rule_name": "SQL 语句拼接的不安全写法：executeQuery 发生拼接且调用参数直接被参数控制",
-    "hash": "03968e4d24c0f86fd831e067b3821a4241a9cc0fde82471addcd84bee4201148",
-    "version": "20250428.0001"
+    "hash": "d6be4c5ababf3b3e5ad3205335bd90d7b26430a1121c7a48a5fb5fef1c2d5f52",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20089006",
     "rule_name": "Find sqlString.append() Query, Prompt a SQL Injection Checking",
-    "hash": "09df746f8956a247ed372b3bd3f02187717de1f1dc88edab33e8142758052ea9",
-    "version": "20250428.0001"
+    "hash": "06df8531f526324e8fb86c2e6b6b060b720a64123c5181b939b486ff9cb6c39d",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20089002",
     "rule_name": "Java Hibernate create*Query SQL 拼接",
-    "hash": "ade7e89e7fa38027fed106cb76eb270f49d63b8831c408b399b430fa9346f56c",
-    "version": "20250428.0001"
+    "hash": "17a03c90a0c4d3989f6811fcd28c786dd12652992b75bffb4a7392bf8638aeae",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20089003",
     "rule_name": "找到 MyBatis/iBatis XML Mapper 不安全(${...})参数到 Springframework 可达路径",
-    "hash": "f42e46be85a45d9f749758510f45ba84601c122e69e65977fbf70a6e9bfa58d6",
-    "version": "20250428.0001"
+    "hash": "477d2fa5783a6e6933d01b44d9df2220a41597ad2e88ef4ae64e8113a446b3a5",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20090001",
     "rule_name": "检测Java LDAP注入漏洞",
-    "hash": "02a09f05399d188bf7b69b7ff6eeb063dc3e0213e1ebe525f7765c6c80c7fbda",
-    "version": "20250428.0001"
+    "hash": "a99336c5c694edd6dbc45cc90f62652ec7330fc251df4f6777246a53a4cf72c9",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20918001",
     "rule_name": "检测Java SpringBoot 服务端请求伪造(SSRF)漏洞",
-    "hash": "70eebf48df2e12d74749d4d2a510bf272bd07296e43c8fb9b8ce7913caf30020",
-    "version": "20250428.0001"
+    "hash": "3968274fae02cc3d6128218e232cc71478614f0d16fdf05e5f2f5482ceffdaac",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20094001",
     "rule_name": "检测Java动态代码执行中的脚本注入漏洞",
-    "hash": "e1e42ea53385e91841a1e27df58c139f60edb376f274d5c33b1afa453713d30f",
-    "version": "20250428.0001"
+    "hash": "9703727031008626b1eb9d7a4f21a3b0a4adb24739324d62d2a13c2fb53306e0",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20094002",
     "rule_name": "Find EL Expression Factory basic use",
-    "hash": "1bfc46094af657908b258516dd8110c681fc505a669c2c68e0fe02d25968993c",
-    "version": "20250428.0001"
+    "hash": "1f0db32751f7e0edad3246855ea0bfab9d617125dcc356863c70d726ebfe1152",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20094003",
     "rule_name": "查找Java Servlet Groovy Shell代码注入漏洞",
-    "hash": "b2aef9c2f93ca5b9729b9053e57041545bd5d7030e19a6029ebc80fbbcf81b50",
-    "version": "20250428.0001"
+    "hash": "b8643303a78efc06e61545b2aaae4296b458591f0fd7c4f6cabf4db040854cc8",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20094004",
     "rule_name": "查找Java Spring Boot Groovy Shell代码注入漏洞",
-    "hash": "beac7c1b495e2aeeff7555bbcfcc2f0197ce33e6bccfddbd2ae7a1ced41eda05",
-    "version": "20250428.0001"
+    "hash": "d323207c4a4a07638ca53fb0d120266a161493279aaef488f802d2794b69c9c4",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20094005",
     "rule_name": "Spring EL (SpelExpressionParser) basic use",
-    "hash": "6678c7bda7c646c451bd2d2556acffaf87ec1ee6d53b863a89be8e98cf570c10",
-    "version": "20250428.0001"
+    "hash": "b660b2d26f12c6dcac4d84fe6b781e3e3372f365a4e1a369edf0fde83a657c55",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20094006",
     "rule_name": "检测Java Spring Framework SPEL Parser注入漏洞",
-    "hash": "c73af31b7a9431069e70eba55897d6d6a6e0e371558bf1d1295472b7a5db3318",
-    "version": "20250428.0001"
+    "hash": "7376340d661f5b93c3f6d41252860e86c9890f8bb3bf8d16fad6f0a29f8a6f03",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20942001",
     "rule_name": "检测Java Spring Framework跨域白名单过于宽松",
-    "hash": "413d662d771bec0c9af11a395dcda2eaedbae32c86e916c4145d3b3fc9dde893",
-    "version": "20250428.0001"
+    "hash": "dfb8f276e7b3086f003358095f1e0232f42cd412e881e5bca5c7af0a339b2624",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000028",
     "rule_name": "查找Java GroovyShell 代码执行Sink点",
-    "hash": "20a06c529964e2a3eb1086e38a8ce20f260b0ea3823aa6229a5b7819f3293fd8",
-    "version": "20250428.0001"
+    "hash": "b8739c8b6aaccfed65fcd122d5f81fc79aaf97321e9e43eb674f7ebdb87e7962",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000009",
     "rule_name": "java-js-sink",
-    "hash": "c890f8f50b80f68a6d6c5d7f406bc5347dbbb75f85c83911567359ab93999a9c",
-    "version": "20250428.0001"
+    "hash": "6b68efb29d00634e8791f21a886b3c718a710c5e7699a845b1c5cc32ac666caf",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000029",
     "rule_name": "java-command-exec-sink",
-    "hash": "5abf2b2e5bf0316fcd6e815c4ea09380704a4a3237793063d5b451f1d735b695",
-    "version": "20250428.0001"
+    "hash": "573f6135fb7d06a7b444c7735872aea67527b8c89f95e7c01e2186983d4f6306",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000010",
     "rule_name": "查找Java ProcessBuilder Sink点",
-    "hash": "236d17ce0c8db5654a67256ccf164e759070ecce6b672b338c27e11260242dca",
-    "version": "20250428.0001"
+    "hash": "845e56e931a56169d25dbeac8e47da8f1200333423774d93807a9ba033a0beb9",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000030",
     "rule_name": "java-runtime-exec-sink",
-    "hash": "18db4426aaaef8cf47eaf59ff7c32e00702a62d5408ced53bfc709122651743d",
-    "version": "20250428.0001"
+    "hash": "f435e6dc0cf84c41cd9f4e030fe47d224721a676bb223816b3f73cc72ef4d183",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000011",
     "rule_name": "查找 Java 文件删除接收点",
-    "hash": "50945280e84bece497c989be14244379e07996e343b34f6f8357878abbf5f4d5",
-    "version": "20250428.0001"
+    "hash": "c1514766bb0e2fe9ce9d909e686e199c6735f39fadd4a82a5ef04bd0665aee43",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000031",
     "rule_name": "查找 Java 文件读取接收点",
-    "hash": "fd40ebcc2bbc3964ccb91a964071b3ecb04430b89045fc9b69766a9b8bf3a90a",
-    "version": "20250428.0001"
+    "hash": "1756f0f06dbd2e998ede9094bdd4c87c12b6f2f20b4a885da0afb85d3e16c4f9",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000032",
     "rule_name": "查找 Java 文件写入接收点",
-    "hash": "bf48d0dd8879268fa2819449a116ae8d437c7ecb89b5502cd3ec0b09a4ca0072",
-    "version": "20250428.0001"
+    "hash": "8832dcc64223ac285e400bdc834976ee7385a1a94bd7655c3cc3d06d941b75b8",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000042",
     "rule_name": "查找Java转义方法",
-    "hash": "24f86f4fe8d1268319a1e48228c8e1db00311aa695bbd064766031be65ea6e0d",
-    "version": "20250428.0001"
+    "hash": "5ab3a53c5486e03671bd1188a2460e90a54f6ec31086ecab934f2f931d65dd44",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000012",
     "rule_name": "查找Java含有contain方法的过滤器",
-    "hash": "6ea934644e4661cc6f572a8c7731bbfede88c1014e170d7c966b57b18bcdf49a",
-    "version": "20250428.0001"
+    "hash": "b12f5bd891fabbd2812f765290a058d529e96f622bb7703b8946347310bf8923",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000013",
     "rule_name": "查找Java中含有主机名前缀的漏洞过滤器",
-    "hash": "a28242143b79950a03d2e8fb110d349bad872f903685cb93191128154fa619d7",
-    "version": "20250428.0001"
+    "hash": "6cdd6ddb86389e36ea25524859a13d9cfe4a8ab456ded3a7d43211753b4bb890",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000033",
     "rule_name": "java-alibaba-druid-httpclientutil",
-    "hash": "d23c10ec4d68a7fdb732c813f7f1b51c0a1f25be3cca40547656f0a6cfe4edb7",
-    "version": "20250428.0001"
+    "hash": "36ae2c6dde921f89898a169e33cd5ae671c2f402eef776fb09784b2a8d0edf12",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000034",
     "rule_name": "java-apache-commons-httpclient",
-    "hash": "68bc834a1f8ba0dfd845554dbe1b552e1e06c326e22edeb6c7d0d38fd11a5b31",
-    "version": "20250428.0001"
+    "hash": "957742711cea95afe5e85cbd3c5a434d030780656d1ade30fa3aee322f51ea80",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000035",
     "rule_name": "java-apache-http-request-url",
-    "hash": "b2fc1e5831abc5bd7e9d78a685a030b0fd7609a9a2c3cc651870ed3524ed0ded",
-    "version": "20250428.0001"
+    "hash": "4734ffbb96808d32af63d91417c21f9abd8898d4978e1d21cdbfae31114aa0ba",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000014",
     "rule_name": "java-http-fluent-request",
-    "hash": "f6372e226559eab9241526b84685e337fec24ac4c5ac76469b0f8e0038a798c9",
-    "version": "20250428.0001"
+    "hash": "878f7519cbd1de7c78083ca1425b87eb36a14d4270e6e12d0295a9ef4a69c18a",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000008",
     "rule_name": "java-http-sink",
-    "hash": "e7a9cd6f3a4fdf599c77c3e95b70d53676a8faadb96f3d4dd0a90120cba4e7f4",
-    "version": "20250428.0001"
+    "hash": "9aac58dad8f0a0283999ce8b3812096cf69758c8bb4261763c5ef01f16bd2944",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000015",
     "rule_name": "java-image-io-read-url",
-    "hash": "00678412c6859e84cd2ad31e9b1e07be959e7b5670bbaa8f9a0d2b437f2aeae2",
-    "version": "20250428.0001"
+    "hash": "f676affd1d035a3cb981d7406ba4eaa92de79145f51c811db159ed2294df524b",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000016",
     "rule_name": "java-net-url-connect",
-    "hash": "cc699d7f6055902fd3e95b7c95f10359092bdf75e853d9d8b939648a2cb3eb3d",
-    "version": "20250428.0001"
+    "hash": "f5cbc2c0682071fec65dc936281eeab9d7994a8409bd1e6abdaab3c3d208307f",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000036",
     "rule_name": "java-okhttpclient-request-execute",
-    "hash": "f8a5a695ecccde538ec16bfd95f29e52ef2cd5c32c698816231c0093814c6a0d",
-    "version": "20250428.0001"
+    "hash": "1a94edcd3179177729779a46309c97c40cd8a9a56ed872b5b0a5d434ce3ff286",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000005",
     "rule_name": "查找TCP数据接收点",
-    "hash": "72c0bd09a6b67c55ae9763097fa8aa26ecd2a3b95d5963e8f662a068bafef556",
-    "version": "20250428.0001"
+    "hash": "e1421c0961c81b9140ff208dbfd1cf4c09dd955fc48a5b14144314012b48fe58",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000004",
     "rule_name": "查找Spring Framework MultipartFile TransferTo 目标",
-    "hash": "4098c590a0977f86209525a2542acd1b99db91ddbb0e7be00e0a228f09b3ca90",
-    "version": "20250428.0001"
+    "hash": "9a0d1df0b108a2b67f5d279b7e812e04094b019262f662cd5459d0629b8c1bf3",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000002",
     "rule_name": "查找Java Spring Framework RestTemplate 请求API的Sink参数",
-    "hash": "3b2505db3266309c99040927d3b39119c1f79e086858d43f6ee2efff6c68c518",
-    "version": "20250428.0001"
+    "hash": "e1faf895455b570e956caebee157b36a9851c75fc185d41f8404c026fde67bea",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000018",
     "rule_name": "JDBC getConnection.prepareStatement.executeQuery SQL 执行语句",
-    "hash": "e64d85f893c4ef51a111f9508a2f84726a0359926c4d8b2fc8ccd6e8f81f2d50",
-    "version": "20250428.0001"
+    "hash": "35c83b9ffec00e8125079a12db87e0c96fdaf57874ef175d1d55e62a4ad70d26",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000003",
     "rule_name": "JDBC getConnection.createStatement.executeQuery SQL 执行语句",
-    "hash": "880974497a44a207adb6b4d5fb7cc625e14d1f7a7498b5fe9957f2fa56035ca5",
-    "version": "20250428.0001"
+    "hash": "2f907bab99e7ea3eda6b716db72ca731606eb15607b57936ad653b32652c20fc",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000001",
     "rule_name": "java-servlet-param",
-    "hash": "ef191aa53927dbcd9621301ad5d5318eab035b4714fb9b2a6cd5c747d70003e6",
-    "version": "20250428.0001"
+    "hash": "2f6aaed70749f199df48f085b2e20e97720a41d55ed89a5a7f21b7409c2766a1",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "20000017",
     "rule_name": "查找Java Spring MVC 控制层用户可控输入参数",
-    "hash": "1dbf3428ff120c1af04445f0007d30136dcbb56b429fe28f797c7e9388f1daab",
-    "version": "20250428.0001"
+    "hash": "1ba3bf9fab36bef79e204bc8fd83123e627eaac1674bc38483238911aeddb6bd",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105020",
     "rule_name": "SCA: Checking Java aspectjweaver Existed Vulnerabilities",
-    "hash": "14468a2f955d1a2856595d7f8b5da230002e262ff766e5d966a6d7552b7f263f",
-    "version": "20250428.0001"
+    "hash": "4e5580d1b2a530e5e5466ca8a5063b47da403f2ca5bbdd80282c3b7811578078",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105021",
     "rule_name": "SCA: Checking Java commons-beanutils Existed Vulnerabilities",
-    "hash": "53531b53507b957a6810832e8287ae21babf687b06082b16534cbfee77e67994",
-    "version": "20250428.0001"
+    "hash": "032fa255f693f23b4c4ebc24dbf9c755120a7910189fe149afb42566eb279ad1",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105022",
     "rule_name": "SCA: Checking Java c3p0 Existed Vulnerabilities",
-    "hash": "a915ca66f4bfea58ec5ad94668fd4aae6440bdf4f58b435ae60ca205e8284188",
-    "version": "20250428.0001"
+    "hash": "51e04487396a154b54a73e899c3345615bffb9f46aa62ad61241649477107d75",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105023",
     "rule_name": "SCA: Checking Java commons-collections Existed Vulnerabilities",
-    "hash": "728207fae03618d6886d7c61b0222e69a3ac123036ef1fb15b147734b23a1e4d",
-    "version": "20250428.0001"
+    "hash": "fd47f7ba3605f5c9f355e4df82791820965b1953a7aed785510702a8fd00aca6",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105024",
     "rule_name": "SCA: Checking Java commons-collections4 Existed Vulnerabilities",
-    "hash": "d069100aaaafd68804179459fe87eb836875df58b21a1588194a4ccbe5c71d79",
-    "version": "20250428.0001"
+    "hash": "2834d96522d884600e8513761c54f161fb36be96267789ef61bf4f523b0565cc",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105025",
     "rule_name": "SCA: Checking Java Fastjson Existed Vulnerabilities",
-    "hash": "6dd81f1bc9c1bfbb96830d0c70690bef96fdb352b4acc6c7f484df962861b177",
-    "version": "20250428.0001"
+    "hash": "4cf6a223873b739f5bc733133c872a7518da6b4c31c2b9f0b64551add808878d",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105026",
     "rule_name": "SCA: Checking Java hessian Existed Vulnerabilities",
-    "hash": "7dc02b30bb5132049ec09b544b83fbdb08c41d395eb7190f63f08ab288c23cd8",
-    "version": "20250428.0001"
+    "hash": "27dcddd9225866c56ee13f1e4fd59a4d18440a9b390c2dc9df68206ad32b6789",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105027",
     "rule_name": "SCA: Checking Java jackson-core Existed Vulnerabilities",
-    "hash": "99fa7b7d2cc23bc62ac1a8ebe98fd4a9f75e6dd9ae6554065aabcdf40556edca",
-    "version": "20250428.0001"
+    "hash": "94cc0c26fa75b81f7ef6110309564722d995cd8b9de7614960dc2c501da5e25e",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105028",
     "rule_name": "SCA: Checking Java mysql-connector-java Existed Vulnerabilities",
-    "hash": "4164015cd9092186a85c1f04671faba55231e12810251dc506a6f40914b8739a",
-    "version": "20250428.0001"
+    "hash": "96ceafdc9a0728855935086c96a12c021fee7e218a4cec3fd468304e472bb3a8",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105029",
     "rule_name": "SCA: Checking Java resin Existed Vulnerabilities",
-    "hash": "5feea100a10f03f69c5ad111937bc39d34fe19b78410f677bd448a5778e2e631",
-    "version": "20250428.0001"
+    "hash": "f2f4a1ac279d098524e19e132308ebf6bddc66f60137a987d421dee73ec694ea",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105030",
     "rule_name": "SCA: Checking Java rome Existed Vulnerabilities",
-    "hash": "3bfbd3eb768c172016d70c979b15db6d3c59438ac8545ed68b81995857a1a265",
-    "version": "20250428.0001"
+    "hash": "789098a6db5861be4395f0865f30ae8ee232d4e8500a7535ed7e30b444262e08",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105031",
     "rule_name": "SCA: Checking Java shiro-core Existed Vulnerabilities",
-    "hash": "9c30960564e6a9efc041fb473c2fdd6db8286c4473f42409b63ea886af19e830",
-    "version": "20250428.0001"
+    "hash": "b490a761f90eafc3cdc0ce92671957aabc1a8d2830e33e695bc7ef92942298bb",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105035",
     "rule_name": "检测Java Spring Boot Devtools使用",
-    "hash": "97a7d15db8cca936bdce3acd4aa8780239379b3a673b3dc97988e286de19fbff",
-    "version": "20250507.0001"
+    "hash": "ca338e308967a3f45d2c4dd9615e47d105427da762284f12e3d775e3835de1c1",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105032",
     "rule_name": "SCA: Checking Java sqlite-jdbc Existed Vulnerabilities",
-    "hash": "708c69367bbaae592dd871ef4532d0030f587a0a79b8ab495babbe17950447f0",
-    "version": "20250428.0001"
+    "hash": "f52a2befe2e6e2ef490c5f2a6eeb76a78695d238256ac6c8698c62a7c833ef68",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105033",
     "rule_name": "SCA: Checking Java vaadin-server Existed Vulnerabilities",
-    "hash": "957303bc19df21d92aa3046e117fc745ab252d4a3ee5b66a4e063ee866daa8ad",
-    "version": "20250428.0001"
+    "hash": "65b895ef140ecd31f3b9ac0af81ff1019e3ab93adf0b889744a9e7e3228062d1",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "21105034",
     "rule_name": "SCA: Checking Java xstream Existed Vulnerabilities",
-    "hash": "e6da058da606c9a9945f06726b06b4d2ba8c640f123197de557677c755500417",
-    "version": "20250428.0001"
+    "hash": "a5da648bd6544ae50cdb49f21ec1c46f3c8b31a840587dd86244a989435230d3",
+    "version": "20250509.0001"
+  },
+  {
+    "rule_id": "30259001",
+    "rule_name": "硬编码的FTP密码",
+    "hash": "1f2505131b2ac017a8df02bfda9fa6d7c812940dc8dc28f5c078b9ccf7df4606",
+    "version": "20250509.0001"
+  },
+  {
+    "rule_id": "30259002",
+    "rule_name": "LDAP硬编码漏洞",
+    "hash": "02f58d67932e574004d0d47cf53e5f355c0e29564fc3ea62f2baeaa49ae60a8c",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30259003",
-    "rule_name": "LDAP硬编码漏洞",
-    "hash": "f0e3826e3ca296e51528fdf8205793942e799950a4cdf27c9b3a676795996791",
-    "version": "20250428.0001"
+    "rule_name": "PHP中硬编码的MySQL密码",
+    "hash": "3fe74f66036e742928b178e35497cd3a763974205b8dd2eaadb57365583eef31",
+    "version": "20250509.0001"
+  },
+  {
+    "rule_id": "30287001",
+    "rule_name": "ThinkPHP认证绕过检测",
+    "hash": "4aa01e92e7d2db5fed065c0e2c1b040febcfdec842a6c0a833dd472c8767be68",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30863001",
     "rule_name": "未经验证的文件操作风险",
-    "hash": "80996e653c1d5b20bfb760d7137c1c1f095339f76e2cb8b6bfeefa437ba30e74",
-    "version": "20250428.0001"
+    "hash": "fbf56b7420b5b106f8e11305263c58e0e47a5f442cb8233bdb75d827946e0360",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30863002",
     "rule_name": "FTP参数验证风险",
-    "hash": "a8a5a5c01b4099f64a696baef6821c0f600c1fa09b59f60e331023aca65583c4",
-    "version": "20250428.0001"
+    "hash": "84e10a3ccc5e64d043a4ceb09811d0a303fc2bfb807b0931525b891d6afabd0d",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30200001",
     "rule_name": "FTP信息泄露",
-    "hash": "102ab8ea593e9f55f107ec0d08591842e7a9b5860e45169d2789dc3a421d058b",
-    "version": "20250428.0001"
+    "hash": "3c7550caa88d14a14fa27ca39387a2305ea806401273c12b55594cde15120a96",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30200002",
     "rule_name": "信息泄漏",
-    "hash": "34da00813b53d98d504c617435ff01c86e068281d08ef21db0ec6997f541e553",
-    "version": "20250428.0001"
+    "hash": "cc025792487593013c625834629b7490e7bebf09861569b3ddcd069bca9a87d5",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30200003",
     "rule_name": "sql信息泄漏",
-    "hash": "77387301c0ea0c488a9457ffaafabee0f91bb9152b33476a5a0fced14646381c",
-    "version": "20250428.0001"
+    "hash": "51bde438afebf7e70fb417947b859e2bd2512348b3f4ebddb6d179409eaee4e4",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30434001",
     "rule_name": "文件上传漏洞",
-    "hash": "1d483486a91ac29a498f2b598432d393529537370cfcb4d1743e13c85804d4d8",
-    "version": "20250428.0001"
+    "hash": "1f4faeb1e5559fefce699532dc72665104dee89070bba7bde648e3a658173fae",
+    "version": "20250509.0001"
+  },
+  {
+    "rule_id": "30434002",
+    "rule_name": "ThinkPHP框架中的不安全文件上传",
+    "hash": "dd8a1be62ab7097f1b3879ae40b0e85a0642cbf1b2d4283fd3b7071e21db8827",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30502001",
     "rule_name": "反序列化漏洞",
-    "hash": "0ffe17474be9bf9adf832daabf30da534a676f0abca76eb4824dd06f76a85360",
-    "version": "20250428.0001"
+    "hash": "00c1b8b591327eea0be57a9df1f207ba6af4d72555e68421964c63ecab8c823a",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30601001",
     "rule_name": "重定向漏洞",
-    "hash": "0a8079ac4c466060ab848053074ff6e3d0a4bd54ec71f0fb5f630be1871852e1",
-    "version": "20250428.0001"
+    "hash": "91e2b55f0772674f1aa00003e294e374b6542352b571774d45a29b79d874011e",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30611001",
     "rule_name": "xxe漏洞(DOMDocument)",
-    "hash": "e9692818602b021cdfa7751df3416a039c0a16ba5c2e17d93c1817ef7a7ff0fb",
-    "version": "20250428.0001"
+    "hash": "121ea8cf764cc7bcf5cb92228fbc19d8fb7074775dcaddba0fbdf369abe07d02",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30611002",
     "rule_name": "xxe漏洞(simplexml)",
-    "hash": "2dc08f900a0c9157123fa91fbaaed9c21e87ac0caa2bc2646ceeda1e484af558",
-    "version": "20250428.0001"
+    "hash": "9a9aae287bc229595a5e8725beceb635b508ee0e3ff90f3f6c763fcc1d2cc615",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30683001",
     "rule_name": "变量覆盖漏洞",
-    "hash": "829c70a01d9fed3b04f0c09fe41fbfe0e5e8c53c05b7a0ea5a3f83a4ad62a42c",
-    "version": "20250428.0001"
+    "hash": "f508b129422eb43a53ba8ce79fbe450e13e01dbe8062e4ccc3843351af60e3cc",
+    "version": "20250509.0001"
+  },
+  {
+    "rule_id": "30073002",
+    "rule_name": "PHP未过滤文件或路径操作检测",
+    "hash": "20b763562f54edeb6da1ae466540306f8089d6aee67e9f5ab18f657a711740f6",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30073001",
     "rule_name": "恶意文件操作",
-    "hash": "418944855420fc90a305adc84b0394d97598454b1bd0a78ce5a6a44ac69cdc9e",
-    "version": "20250428.0001"
+    "hash": "2df58c601572141f8b7e09123420fef1a49f0ffa15dace9d01bff8f66c3da1ea",
+    "version": "20250509.0001"
+  },
+  {
+    "rule_id": "30073003",
+    "rule_name": "PHP未过滤目录读取检测",
+    "hash": "1c4eb3d3e880a36fb9da1ccd77386404b05c9c60f3de93b639e31c22ae93fe76",
+    "version": "20250509.0001"
+  },
+  {
+    "rule_id": "30073005",
+    "rule_name": "文件压缩/文件解压(fuzz-code)",
+    "hash": "6f98397b154086cc6d565dc1fb5f1c2b8cb1b32da86cb3f826ee7f6237bef3f2",
+    "version": "20250509.0001"
+  },
+  {
+    "rule_id": "30073004",
+    "rule_name": "文件压缩/文件解压",
+    "hash": "e009aad6150ed732abf6b21892a3424ddd191c844202dd1e113e1a68211dea39",
+    "version": "20250509.0001"
+  },
+  {
+    "rule_id": "30073006",
+    "rule_name": "文件压缩/文件解压(原生)",
+    "hash": "98c272334aec2a88c2a383871c580861136fb5c7d2452331c66c7f07054a85d7",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30077001",
     "rule_name": "文件包含",
-    "hash": "6bd9ba649a8ed26fc1fbe5088beed8fd9806045388ded684263fb44ab4b52825",
-    "version": "20250428.0001"
+    "hash": "8876660cc04994e17c2c46d4ef826573bfdf2dd514a2ee325834065311599f03",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30078001",
     "rule_name": "命令注入",
-    "hash": "2d86f01bd17ae03958a69823a2b49ee342cdd975c3db8675c3a2ed7a5393732a",
-    "version": "20250428.0001"
+    "hash": "cf7eabdb0aee003ac2a4047ba5bb450ccdbe130535b3b4b987e6c6df84b83fd1",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30078002",
     "rule_name": "代码执行",
-    "hash": "e384989a1fd140661c4ce3c733c5a9cc3e68e4c385aaa2ee33455aa44aef675a",
-    "version": "20250428.0001"
+    "hash": "9941ce65625a59eb8afa99ed33160f0321b58e5d17efd21b55efde694fa7aa39",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30079001",
     "rule_name": "xss漏洞",
-    "hash": "ad32209e061cb1ef157f41cdc7e093f7404dfc3aca9169f9938c275906492209",
-    "version": "20250428.0001"
+    "hash": "933a762755f370a865dfb3b2e4b0ef5060286136684065ea0ca457104a7b6241",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30089001",
     "rule_name": "sql(mysql)注入漏洞",
-    "hash": "8c792137060ade6b6a3722f42890199152eb0723dbf9221ddeb1a17affa412f9",
-    "version": "20250428.0001"
+    "hash": "7657cb14ef0c2ad9f8ec544e836d709c708ea81cfc716681314c76fbb84de964",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30089002",
     "rule_name": "sql",
-    "hash": "bda31ede1f87ef8c8d6d92cbb0134d7fe34cd6e5bc69cb9756d97ce2f67f719c",
-    "version": "20250428.0001"
+    "hash": "fe9762360d4306d95224fe3dcd853f59b01379879e0ddfba9e8719a21283d3dd",
+    "version": "20250509.0001"
+  },
+  {
+    "rule_id": "30089003",
+    "rule_name": "ThinkPHP SQL注入检测",
+    "hash": "a8c6b7673d9b84f0ae7667bae98f5c1a2f6d6a4df56d5947478170b7216b99e3",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30090001",
     "rule_name": "LDAP注入",
-    "hash": "ec352a8e224e2f1d6a30b4096d5bd33da0a0891366ba14d4f3f26c3027414970",
-    "version": "20250428.0001"
+    "hash": "b8befa3469d194cc8f792003387de30d2aafc20beb664bfad7e680500eed22e8",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30918001",
     "rule_name": "SSRF漏洞，旨在获取内部服务信息或数据, 通过未经过滤的URL参数，攻击者可以探测内部服务或获取敏感数据",
-    "hash": "51252f4853c139e7e777cd633273cdad201c72f42d0904abec023272a9ad2f92",
-    "version": "20250428.0001"
+    "hash": "c7ddfddb64c9ece8b46ab3f2e9b635b9721c179ab0cc76c6faf4fef96826298a",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30000001",
     "rule_name": "php-filter-function",
-    "hash": "0d81c88c11b4ba330d52df3ebc1312cb9ee19bf6b4a793679276c123de677f72",
-    "version": "20250428.0001"
+    "hash": "c70e2d04f55dff7e3ca8e9f12c6c71503c7866c809c2ac01937fe0f93d26becd",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30000002",
     "rule_name": "php-param",
-    "hash": "7b9ddbeeb1e8a1313aeff2ea219b5c1fb8fef5a92c02f5da6fc89d64fa788f4c",
-    "version": "20250428.0001"
+    "hash": "65312eba9bea6da616f285c4ec2087eb7355e611cb806b9d534745ad2add55e9",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30000003",
     "rule_name": "php-xss-method",
-    "hash": "49d9424c427b3c63ac8d2eff0913a06b68b2693a4c5a4a9149a818abfb5266a0",
-    "version": "20250428.0001"
+    "hash": "855ecd9320378a985f95ca02d9acad1bf58b5dd14f431725b89489d6d585c97f",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30000004",
     "rule_name": "php-os-exec",
-    "hash": "3024a1bcec2bd7470588e0437a030c67f3d918b13954330b59f689721efc0a91",
-    "version": "20250428.0001"
+    "hash": "a2325d11f5f95f27059f949cbe65dcc10a0b78789cc2f16f369e61b0365fd68e",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30000005",
     "rule_name": "php-file-read",
-    "hash": "4fd93a98cd0fd944e37ecbdd67a619b8a921c87b64d2679162f945d1c542ab7d",
-    "version": "20250428.0001"
+    "hash": "203065e511f800f85323e8d7a9a4a112f8cfa26ba4a3198e9c0ad55dc471b247",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30000006",
     "rule_name": "php-file-unlink",
-    "hash": "c4fe9c28152c705a0d1c6d771016a95512bc8fcd572b9e3997054356fce644c7",
-    "version": "20250428.0001"
+    "hash": "bfa1752d064d1174a554ebb7011c081ebf413d3417d9e9a5ba1014018b7147e3",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30000007",
     "rule_name": "php-file-write",
-    "hash": "11002be96e5a3e20e5ad746ad1febe11bc99e7dd37c89f146a78b1cb40bdbebc",
-    "version": "20250428.0001"
+    "hash": "f0aa355e63788740290412503db3f70eaf767ad17e7d78ceda980fb3a8d08a39",
+    "version": "20250509.0001"
   },
   {
     "rule_id": "30000008",
     "rule_name": "php-tp-all-extern-variable-param-source",
-    "hash": "69dac704b1e0f8413ce5fa115811a82c5980a5ea2bbbbc05675cf29e18d9f908",
-    "version": "20250428.0001"
+    "hash": "488d9e816c77074b1027cf47f2c4f4d9bd6aa5c7160aecec805c5ecb5ef1a3b6",
+    "version": "20250509.0001"
+  },
+  {
+    "rule_id": "31500002",
+    "rule_name": "Cookie安全",
+    "hash": "fe3d375659b481737ef69413c40fdb5c8bc35cfa75b5fefa37537d9017c2bb9c",
+    "version": "20250509.0001"
   }
 ]
