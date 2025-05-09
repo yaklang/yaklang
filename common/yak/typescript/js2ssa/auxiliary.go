@@ -100,3 +100,25 @@ func (b *builder) handlerGoto(labelName string, isBreak ...bool) {
 		b.labels[labelName] = LabelBuilder
 	}
 }
+
+func (b *builder) IsMapLike(val ssa.Value) bool {
+	valType := val.GetType()
+	if valType != nil {
+		return valType.GetTypeKind() == ssa.MapTypeKind || valType.GetTypeKind() == ssa.ObjectTypeKind
+	}
+	return false
+
+}
+
+func (b *builder) IsListLike(val ssa.Value) bool {
+	valType := val.GetType()
+	if valType != nil {
+		return valType.GetTypeKind() == ssa.SliceTypeKind
+	}
+	return false
+
+}
+
+func (b *builder) IsObjectLike(val ssa.Value) bool {
+	return val.IsObject()
+}
