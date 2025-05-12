@@ -509,7 +509,7 @@
         /* 设置各列的固定宽度 - 优化小屏幕 */
         th:nth-child(1), td:nth-child(1) { width: 30px; } /* 复选框 */
         th:nth-child(2), td:nth-child(2) { width: 40px; } /* ID */
-        th:nth-child(3), td:nth-child(3) { width: 200px; min-width: 180px; } /* 健康度，增加宽度 */
+        th:nth-child(3), td:nth-child(3) { width: 120px; min-width: 180px; } /* 健康度，增加宽度 */
         th:nth-child(4), td:nth-child(4) { width: 100px; } /* 提供者名称 */
         th:nth-child(5), td:nth-child(5) { width: 120px; } /* 模型名称 */
         th:nth-child(6), td:nth-child(6) { width: 80px; } /* 类型 */
@@ -1690,17 +1690,13 @@
                                         <input type="checkbox" class="api-checkbox">
                                     </td>
                                     <td class="text-center">{{.ID}}</td>
-                                    <td class="text-center" style="display: flex; align-items: center; justify-content: space-between; gap: 5px; padding: 4px 8px;">
+                                    <td class="text-center" style="align-items:center;gap:2px;padding:2px 4px;">
                                         {{if .Active}}
-                                            <span class="health-badge healthy" style="flex-shrink: 0;">激活</span>
-                                            <button class="btn btn-sm btn-danger" onclick="toggleAPIKeyStatus('{{.ID}}', false)" title="禁用API密钥" style="margin-left: auto;">
-                                                禁用
-                                            </button>
+                                            <span class="health-badge healthy" style="flex-shrink:0;font-size:12px;">激活</span>
+                                            <button class="btn btn-sm btn-danger" onclick="toggleAPIKeyStatus('{{.ID}}', false)" title="禁用API密钥" style="margin-left:auto;padding:2px 4px;font-size:12px;">禁用</button>
                                         {{else}}
-                                            <span class="health-badge unhealthy" style="flex-shrink: 0;">禁用</span>
-                                            <button class="btn btn-sm" onclick="toggleAPIKeyStatus('{{.ID}}', true)" title="激活API密钥" style="margin-left: auto;">
-                                                激活
-                                            </button>
+                                            <span class="health-badge unhealthy" style="flex-shrink:0;font-size:12px;">禁用</span>
+                                            <button class="btn btn-sm" onclick="toggleAPIKeyStatus('{{.ID}}', true)" title="激活API密钥" style="margin-left:auto;padding:2px 4px;font-size:12px;">激活</button>
                                         {{end}}
                                     </td>
                                     <td class="copyable api-key-cell" data-full-text="{{.Key}}">{{.DisplayKey}}</td>
