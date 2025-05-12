@@ -1,15 +1,15 @@
 desc(
-    title:"Check Java Spring Boot Actuator Config",
-    title_zh:"检查Java Spring Boot Actuator配置",
-    rule_id:21105001,
-    type:config,
-    desc:<<<TEXT
+	title:"Check Java Spring Boot Actuator Config"
+	title_zh:"检查Java Spring Boot Actuator配置",
+	type:config
+	desc:<<<TEXT
 Java Spring Boot Actuator是Spring Boot的一个子项目，它提供了一组监控和管理生产环境的工具。该规则检查Java Spring Boot Actuator配置是否存在安全风险。
-TEXT,
-    solution:<<<TEXT
+TEXT
+	solution:<<<TEXT
 1. 禁用`management.security.enabled`和`endpoints.health.sensitive`属性，以防止敏感信息泄露。
 2. 禁止Spring Security默认放行actuator端点。
-TEXT,
+TEXT
+	rule_id: "084c0adc-69ef-42ed-aeb4-5c24603634af"
 )
 
 __projectConfig__."management.security.enabled"?{have:'false'} as $weak;
@@ -38,15 +38,15 @@ alert $sink for{
     level:'mid',
 }
 
-desc{
-    lang:java,
-    alert_num:3,
-    "file://application.properties":<<<TEXT
+desc(
+	lang:java
+	alert_num:3
+	"file://application.properties":<<<TEXT
 spring.application.name=springsecuritydemo
 management.security.enabled=false
 endpoints.health.sensitive=false
-TEXT,
-    "file://springSecurity.java":<<<TEXT
+TEXT
+	"file://springSecurity.java":<<<TEXT
 package org.example.springsecuritydemo;
 
 import org.springframework.context.annotation.Configuration;
@@ -68,13 +68,13 @@ public class InsecureSecurityConfig extends WebSecurityConfigurerAdapter {
                 .httpBasic(); // 使用 HTTP Basic 认证
     }
 }
-TEXT,
-}
+TEXT
+)
 
-desc{
-    lang:java,
-    alert_num:3,
-    "file://application.yml":<<<TEXT
+desc(
+	lang:java
+	alert_num:3
+	"file://application.yml":<<<TEXT
     spring:
       application:
         name: springsecuritydemo
@@ -84,8 +84,8 @@ desc{
     endpoints:
       health:
         sensitive: false
-TEXT,
-    "file://springSecurity.java":<<<TEXT
+TEXT
+	"file://springSecurity.java":<<<TEXT
 package org.example.springsecuritydemo;
 
 import org.springframework.context.annotation.Configuration;
@@ -111,5 +111,5 @@ public class InsecureSecurityConfig extends WebSecurityConfigurerAdapter {
             .httpBasic(); // Use HTTP Basic authentication
     }
 }
-TEXT,
-}
+TEXT
+)

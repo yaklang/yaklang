@@ -1,13 +1,13 @@
 desc(
-    title: "Check If Java SimpleEmail Verifies The Certificate",
-    title_zh: "检测Java SimpleEmail在建立SSL连接时是否验证服务器的SSL证书",
-    level: info,
-    rule_id: 20297001,
-    lang: java,
-    risk:"auth-bypass",
-    desc: <<<TEXT
+	title: "Check If Java SimpleEmail Verifies The Certificate"
+	title_zh: "检测Java SimpleEmail在建立SSL连接时是否验证服务器的SSL证书",
+	level: info
+	lang: java
+	risk:"auth-bypass"
+	desc: <<<TEXT
     Apache Commons Email是一个用于发送电子邮件的Java库。在使用SimpleEmail发送邮件时，如果未验证服务器的SSL证书，可能会导致SSL证书验证绕过漏洞。攻击者可以通过中间人攻击，窃取邮件内容，造成信息泄露等安全问题。建议开发者在使用SimpleEmail发送邮件时，确保验证服务器的SSL证书，防止SSL证书验证绕过漏洞。
 TEXT
+	rule_id: "6bb49996-bb3b-4bd5-bb33-8c9ca0e912ce"
 )
 
 SimpleEmail()?{<typeName>?{have:'org.apache.commons.mail'}} as $simpleEmail;
@@ -20,10 +20,10 @@ alert $sink for {
 };
 
 desc(
-lang: java,
-alert_min: 1,
-alert_low: 1,
-'file://SimpleEmail.java': <<<UNSAFE
+	lang: java
+	alert_min: 1
+	alert_low: 1
+	'file://SimpleEmail.java': <<<UNSAFE
 package org.example;
 
 import org.apache.commons.mail.DefaultAuthenticator;

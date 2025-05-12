@@ -1,18 +1,18 @@
 desc(
-    title_zh:"查找Java Spring Boot Groovy Shell代码注入漏洞",
-    title:"Find Java Spring Boot Groovy Shell Code Injection Vulnerability",
-    type: vuln,
-    risk: "code-execution",
-    rule_id: 20094004,
-    desc:<<<TEXT
+	title_zh:"查找Java Spring Boot Groovy Shell代码注入漏洞",
+	title:"Find Java Spring Boot Groovy Shell Code Injection Vulnerability"
+	type: vuln
+	risk: "code-execution"
+	desc:<<<TEXT
 Java Spring Boot Groovy Shell代码注入漏洞是指在Java Spring Boot应用程序中，使用Groovy脚本引擎执行动态生成的Groovy代码时，未对输入进行充分验证和过滤，导致攻击者可以注入恶意代码并执行任意操作。这种漏洞通常发生在使用GroovyShell或GroovyScriptEngine等类时，攻击者可以通过构造恶意的Groovy脚本来执行任意命令、访问敏感数据或进行其他恶意操作。
 TEXT
-    fix:<<<TEXT
+	fix:<<<TEXT
 在使用Groovy脚本引擎时，确保对输入进行严格的验证和过滤。避免直接执行用户输入的Groovy代码，或者使用安全的沙箱环境来限制代码的执行权限。此外，可以考虑使用其他更安全的脚本语言或框架来实现动态脚本执行的需求。
 TEXT
-    ref:<<<TEXT
+	ref:<<<TEXT
 https://docs.groovy-lang.org/next/html/api/groovy/lang/GroovyShell.html
 TEXT
+	rule_id: "44a473d8-3763-44c3-9819-17100cf17ad6"
 )
 
 <include('java-spring-mvc-param')> as $source;
@@ -42,9 +42,9 @@ alert $low for {
 }
 
 desc(
-    lang: java,
-    alert_num: 3,
-    'file://risk1.java': <<<TEXT
+	lang: java
+	alert_num: 3
+	'file://risk1.java': <<<TEXT
 package org.example.moudels.rce.code;
 
 import groovy.lang.GroovyShell;

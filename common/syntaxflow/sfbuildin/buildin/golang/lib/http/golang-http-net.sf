@@ -1,12 +1,12 @@
 desc(
-    title: "check executing request(net)",
-    type: audit,
-    level: info,
-    lib: "golang-http-net",
-    rule_id: 10000009,
-    desc: <<<TEXT
+	title: "check executing request(net)"
+	type: audit
+	level: info
+	lib: "golang-http-net"
+	desc: <<<TEXT
 此规则旨在审计Golang应用程序中是否正确处理HTTP请求。通过检查`net/http`包的使用情况，该规则能够识别出处理HTTP请求的代码段。不当处理HTTP请求可能会导致安全漏洞，如敏感信息泄露、请求伪造等。建议开发者仔细审查HTTP请求的处理逻辑，确保对请求参数和请求体进行充分的验证和清理，以防止潜在的安全风险。
 TEXT
+	rule_id: "5b66527b-f4e9-4784-ae3b-167983d77675"
 )
 
 http?{<fullTypeName>?{have: 'net/http'}} as $entry;
@@ -16,9 +16,9 @@ $handle<getFormalParams> as $output
 alert $output
 
 desc(
-    lang: golang,
-    alert_min: 1,
-    'file://http_net.go': <<<PARAM
+	lang: golang
+	alert_min: 1
+	'file://http_net.go': <<<PARAM
 package main
 
 import (

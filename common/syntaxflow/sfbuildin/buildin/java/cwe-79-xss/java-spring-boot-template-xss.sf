@@ -1,12 +1,12 @@
 desc(
-    title: "Check Java Spring Boot's Template Language XSS Vulnerability",
-    title_zh: "检测Java Spring Boot框架模板语言XSS漏洞",
-    type: vuln,
-    risk: XSS,
-    rule_id: 20079003,
-    desc: <<<TEXT
+	title: "Check Java Spring Boot's Template Language XSS Vulnerability"
+	title_zh: "检测Java Spring Boot框架模板语言XSS漏洞",
+	type: vuln
+	risk: XSS
+	desc: <<<TEXT
 跨站脚本攻击（XSS）是一种安全漏洞，允许攻击者将恶意脚本注入到其他用户查看的页面中。在Java Spring Boot应用程序中，如果模板语言（如Freemarker、Thymeleaf等）的输出未进行适当转义，攻击者可以利用此漏洞注入恶意脚本，从而窃取用户数据、劫持用户会话或执行其他恶意操作。建议对模板语言中的输出进行严格的转义处理，以防止XSS攻击。
 TEXT
+	rule_id: "0a730078-cd82-4dc4-8bc9-b19b8a10fee9"
 )
 
 <javaUnescapeOutput> as $sink;
@@ -27,9 +27,9 @@ alert $res for {
 };
 
 desc(
-    alert_min:1,
-    lang: "java",
-    'file://src/main/resource/greeting.ftl': <<<EOF
+	alert_min:1
+	lang: "java"
+	'file://src/main/resource/greeting.ftl': <<<EOF
     <!DOCTYPE html>
     <html>
     <head>
@@ -47,8 +47,8 @@ spring.freemarker.charset=UTF-8
 spring.freemarker.content-type=text/html
 spring.freemarker.check-template-location=true
 spring.freemarker.cache=false
-EOF,
-    'file://controller.java': <<<EOF
+EOF
+	'file://controller.java': <<<EOF
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -62,5 +62,5 @@ public class GreetingController {
            return "greeting";
        }
 }
-EOF,
-);
+EOF
+)

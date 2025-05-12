@@ -1,11 +1,11 @@
 desc(
-    title: 'SCA: Checking Java commons-collections Existed Vulnerabilities',
-    type: vuln,
-    risk: sca,
-    rule_id: 21105023,
-    desc: <<<TEXT
+	title: 'SCA: Checking Java commons-collections Existed Vulnerabilities'
+	type: vuln
+	risk: sca
+	desc: <<<TEXT
 此规则用于检查Java项目中是否使用了存在安全漏洞的Apache Commons Collections库版本。Apache Commons Collections是一个流行的Java库，提供了许多额外的集合数据类型，用于扩展Java标准库中的集合框架。版本3.2.1及更早版本中存在一个不安全的反序列化漏洞（CVE-2015-6420），攻击者可以利用此漏洞执行任意代码。为了避免潜在的安全风险，建议升级到不受此漏洞影响的最新版本。
 TEXT
+	rule_id: "22d585c5-0182-4b2e-b137-05e30b26f2b0"
 )
 
 __dependency__.*commons*collections.version as $ver;

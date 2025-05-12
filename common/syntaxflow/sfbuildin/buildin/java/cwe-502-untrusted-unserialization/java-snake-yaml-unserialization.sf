@@ -1,12 +1,11 @@
 desc(
-    title_zh:"检测Java SnakeYAML反序列化漏洞",
-    title:"Check Java SnakeYAML Unserialization",
-    type:vul,
-    rule_id: 20502002,
-    reference:<<<URL
+	title_zh:"检测Java SnakeYAML反序列化漏洞",
+	title:"Check Java SnakeYAML Unserialization"
+	type:vul
+	reference:<<<URL
    https://javadoc.io/doc/org.yaml/snakeyaml/latest/org/yaml/snakeyaml/Yaml.html
 URL
-    desc: <<<TEXT
+	desc: <<<TEXT
 反序列化漏洞允许攻击者通过发送恶意构造的序列化对象，远程执行任意代码。当应用程序使用`SnakeYAML`库的`load()`等方法从不受信任的来源反序列化对象时，如果未进行适当的安全措施，攻击者可以利用此漏洞执行任意代码，造成敏感数据泄露、服务器被控等严重后果。
 规则审计的类:
 - org.yaml.snakeyaml.Yaml
@@ -15,6 +14,7 @@ URL
 - loadAll()
 - loadAs()
 TEXT
+	rule_id: "1a99e8b1-3911-447c-8f92-d13eee1afa70"
 )
 
 // load()
@@ -47,9 +47,9 @@ alert $low for {
 }
 
 desc(
-    lang:java,
-    alert_num:1,
-    'file://risk1.java': <<<TEXT
+	lang:java
+	alert_num:1
+	'file://risk1.java': <<<TEXT
 import groovy.sql.Sql;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;

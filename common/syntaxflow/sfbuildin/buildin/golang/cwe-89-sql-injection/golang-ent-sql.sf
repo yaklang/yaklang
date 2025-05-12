@@ -1,15 +1,15 @@
 desc(
-    title: "golang SQL Injection(ent)",
-    type: audit,
-    severity: high,
-    rule_id: 10089003,
-    desc: <<<TEXT
+	title: "golang SQL Injection(ent)"
+	type: audit
+	severity: high
+	desc: <<<TEXT
 SQL 注入漏洞是一种严重的安全漏洞，它允许攻击者通过向 SQL 查询注入恶意代码来操纵后端数据库。在使用 `entgo.io/ent` 框架时，如果未正确构建查询条件，而是直接将用户输入拼接到 SQL 查询中，将会导致 SQL 注入漏洞。攻击者可以利用此漏洞绕过认证、访问或修改敏感数据，甚至执行数据库管理操作，严重危害应用程序的数据安全。
 
 SQL 注入漏洞通常发生在以下场景：
 1. 用户输入被直接拼接到 SQL 查询字符串中，例如 `client.User.Query().Where(user.Name(input))`。
 2. 未对用户输入进行参数化处理或验证，导致恶意输入被解释为 SQL 命令。
 TEXT
+	rule_id: "6702b6aa-bb87-4be9-9b11-b91359ded6b6"
 )
 
 ent?{<fullTypeName>?{have: 'entgo.io/ent'}} as $entry;
@@ -25,9 +25,9 @@ alert $high for {
 }
 
 desc(
-    lang: golang,
-    alert_high: 1,
-    'file://main.go': <<<UNSAFE
+	lang: golang
+	alert_high: 1
+	'file://main.go': <<<UNSAFE
 package test
 
 import (

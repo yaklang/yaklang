@@ -1,11 +1,11 @@
 desc(
-    title_zh:"检测Java SpringBoot 服务端请求伪造(SSRF)漏洞",
-    title: "Find Java SpringBoot SSRF Vuln",
-    type: vuln,
-    rule_id: 20918001,
-    desc: <<<TEXT
+	title_zh:"检测Java SpringBoot 服务端请求伪造(SSRF)漏洞",
+	title: "Find Java SpringBoot SSRF Vuln"
+	type: vuln
+	desc: <<<TEXT
 服务器端请求伪造（SSRF）漏洞允许攻击者通过应用程序向不受信任的服务器发起请求。在Java SpringBoot应用程序中，如果开发者未对外部URL输入进行适当的验证和过滤，攻击者可以利用该漏洞访问内部资源或发起对其他系统的恶意请求。这可能导致敏感数据泄露、服务拒绝攻击或进一步的内网渗透。
 TEXT
+	rule_id: "0539f4d4-14b9-4b9d-8a7b-8c72decdf400"
 )
 <include('java-spring-mvc-param')> as $source;
 <include("java-http-sink")> as $sink;
@@ -34,9 +34,9 @@ alert $low for {
 }
 
 desc(
-lang: java,
-alert_min: 2,
-'file://risk1.java': <<<TEXT
+	lang: java
+	alert_min: 2
+	'file://risk1.java': <<<TEXT
 package src.main.a;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -57,8 +57,8 @@ public class SsrfVulnerableController {
         }
     }
 }
-TEXT,
-'file://risk2.java': <<<TEXT
+TEXT
+	'file://risk2.java': <<<TEXT
 package src.main.b;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -83,9 +83,9 @@ TEXT
 )
 
 desc(
-    lang:'java',
-    alert_min:3,
-    'RestTemplateSSRFDemo.java':<<<TEXT
+	lang:'java'
+	alert_min:3
+	'RestTemplateSSRFDemo.java':<<<TEXT
 package org.example.moudels.ssrf.controller;
 
 import io.swagger.annotations.Api;

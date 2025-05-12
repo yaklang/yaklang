@@ -1,12 +1,12 @@
 desc(
-    title: "Check Direct Path Travel Vulnerability For Java",
-    title_zh: "检测Java直接路径穿越漏洞",
-    type: vuln,
-    rule_id:20022001,
-    risk: "path-traversal",
-    desc: <<<TEXT
+	title: "Check Direct Path Travel Vulnerability For Java"
+	title_zh: "检测Java直接路径穿越漏洞",
+	type: vuln
+	risk: "path-traversal"
+	desc: <<<TEXT
 直接路径穿越漏洞（也称为目录遍历漏洞）允许攻击者通过操纵输入参数，访问或执行服务器上的任意文件。在Java应用中，这种漏洞通常出现在未对用户输入进行适当验证或清理的情况下，导致攻击者可以读取敏感文件或执行任意代码。为了防范这种漏洞，应严格验证和清理所有用户输入，确保它们仅指向预期的文件或目录。
 TEXT
+	rule_id: "7b798768-13e1-4dcd-8ab5-99a6f9635605"
 )
 
 <include('java-spring-mvc-param')> as $source;
@@ -39,9 +39,9 @@ alert $low for {
 };
 
 desc(
-    alert_high: 1,
-    language: java,
-    'file://PathTravel.java': <<<EOF
+	alert_high: 1
+	language: java
+	'file://PathTravel.java': <<<EOF
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
@@ -80,9 +80,9 @@ EOF
 )
 
 desc(
-    language: java,
-    alert_min:1,
-    'file://unSafe.java': <<<EOF
+	language: java
+	alert_min:1
+	'file://unSafe.java': <<<EOF
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -126,8 +126,8 @@ EOF
 )
 
 desc(
-    alert_low:1,
-    "file://complex1.java": <<<EOF
+	alert_low:1
+	"file://complex1.java": <<<EOF
     package com.ruoyi.web.controller.common;
 
     import javax.servlet.http.HttpServletRequest;

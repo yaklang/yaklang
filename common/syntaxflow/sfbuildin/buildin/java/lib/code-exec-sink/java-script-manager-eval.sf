@@ -1,8 +1,8 @@
 desc(
-    title: "Find javax.script.* ScriptEngineManager eval Sink",
-    type: audit,
-    lib: "java-js-sink",
-    rule_id: 20000009,
+	title: "Find javax.script.* ScriptEngineManager eval Sink"
+	type: audit
+	lib: "java-js-sink"
+	rule_id: "f72c0172-5edc-4436-901f-c33606c18899"
 )
 
 /(getEngineByName|getEngineByExtension|getEngineByMimeType)/<getCall> as $toCheck;
@@ -18,9 +18,9 @@ alert $output;
 
 
 desc(
-    lang: java,
-    alert_num:1,
-    "file://basic.java": <<<SCRIPT
+	lang: java
+	alert_num:1
+	"file://basic.java": <<<SCRIPT
 import javax.script.*;
 
 public class JavaScriptExample {
@@ -47,9 +47,9 @@ SCRIPT
 )
 
 desc(
-    lang: java,
-    alert_num:1,
-    "file://basic.java": <<<SCRIPT
+	lang: java
+	alert_num:1
+	"file://basic.java": <<<SCRIPT
 package org.example;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptEngine;

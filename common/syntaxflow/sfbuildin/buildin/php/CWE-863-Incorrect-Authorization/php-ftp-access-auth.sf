@@ -1,13 +1,13 @@
 desc(
-    title: "FTP Parameter Validation Risk",
-    title_zh: "FTP参数验证风险",
-    level: "low",
-    type: vul,
-    risk: "unsafe-ftp-parameter-validation",
-   rule_id: 30863002,
-    desc: <<<TEXT
+	title: "FTP Parameter Validation Risk"
+	title_zh: "FTP参数验证风险",
+	level: "low"
+	type: vul
+	risk: "unsafe-ftp-parameter-validation"
+	desc: <<<TEXT
     当文件操作函数（如copy/rename/symlink）未验证用户输入时，攻击者可通过构造恶意路径实现文件覆盖/删除或路径穿越攻击
 TEXT
+	rule_id: "4e4aa781-f02e-48f2-9d71-2e17b89b218c"
 )
 
 /^ftp_(chdir|delete|fput|mkdir|nb_fput|rmdir|size|chmod|fget)$/ as $function
@@ -55,11 +55,11 @@ alert $low_risk for {
 }
 
 desc(
-    lang: "php",
-    alert_min: 3,
-    alert_high: 1,
-    alert_low: 2,
-    "file:///unsafe.php": <<<TEXT
+	lang: "php"
+	alert_min: 3
+	alert_high: 1
+	alert_low: 2
+	"file:///unsafe.php": <<<TEXT
 <?php
 // 高风险案例（直接使用未过滤参数）
 function deleteFile() {

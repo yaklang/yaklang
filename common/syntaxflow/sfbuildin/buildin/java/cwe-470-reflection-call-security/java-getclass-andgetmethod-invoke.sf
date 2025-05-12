@@ -1,13 +1,13 @@
 desc(
-    title: "Find Java Reflection Call Security Vulnerability via getClass() and getMethod()",
-    title_zh: "通过 getClass() 和 getMethod() 发现 Java 反射调用的潜在威胁",
-    type: audit,
-    rule_id: 20470002,
-    severity: mid,
-    risk: rce,
-    desc: <<<TEXT
+	title: "Find Java Reflection Call Security Vulnerability via getClass() and getMethod()"
+	title_zh: "通过 getClass() 和 getMethod() 发现 Java 反射调用的潜在威胁",
+	type: audit
+	severity: mid
+	risk: rce
+	desc: <<<TEXT
 使用 Java 的反射机制，特别是通过 `getClass()` 和 `getMethod()` 方法，可以动态地调用类的方法。这种灵活性如果被恶意利用，可能导致远程代码执行（RCE）漏洞。攻击者可以通过精心构造的输入，触发不安全的反射调用，进而执行未经授权的代码。建议对反射调用进行严格的权限控制和输入验证，以防止潜在的安全威胁。
 TEXT
+	rule_id: "2672e2d2-77c4-44a4-8685-816fdf55f72d"
 )
 
 
@@ -23,8 +23,8 @@ alert $params for {
 
 
 desc(
-lang: java,
-'file://demo.java': <<<EOF
+	lang: java
+	'file://demo.java': <<<EOF
 package com.itstyle.quartz.job;
 
 import com.itstyle.quartz.entity.*;
@@ -70,5 +70,5 @@ public class ChickenJob implements Job, Serializable {
         }
     }
 }
-EOF,
+EOF
 )

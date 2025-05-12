@@ -1,12 +1,12 @@
 desc(
-    title: "Find XStream Unsafe Use in Context Sink",
-    title_zh: "XStream 未明确设置安全策略（.setMode(XStream.NO_REFERENCES)）",
-    rule_id:20611008,
-    type: vuln,
-    risk: XXE,
-    desc: <<<TEXT
+	title: "Find XStream Unsafe Use in Context Sink"
+	title_zh: "XStream 未明确设置安全策略（.setMode(XStream.NO_REFERENCES)）",
+	type: vuln
+	risk: XXE
+	desc: <<<TEXT
 XStream 是一个流行的 Java 库，用于将 Java 对象序列化为 XML，并从 XML 反序列化为 Java 对象。如果不正确地配置 XStream，攻击者可以利用它执行远程代码执行（RCE）或执行其他恶意操作。特别是，当 XStream 未明确设置安全策略时（例如，未调用 `.setMode(XStream.NO_REFERENCES)` 禁用引用，未配置 `.allowType`、`.setupDefaultSecurity`、`.addPermission`、`.allowTypeHierarchy` 等方法），它可能会允许反序列化不受信任的数据，从而导致安全漏洞。建议开发者明确配置 XStream 的安全策略，以防止潜在的安全风险。
 TEXT
+	rule_id: "c4ad6405-a9bc-468a-87be-06742472b623"
 )
 
 fromXML as $fromXML;
@@ -19,9 +19,9 @@ alert $vuln for {
 }
 
 desc(
-    lang: "java",
-    alert_num: 1,
-    "file://unsafe.java": <<<UNSAFE
+	lang: "java"
+	alert_num: 1
+	"file://unsafe.java": <<<UNSAFE
 import com.thoughtworks.xstream.XStream;
 import com.thoughtworks.xstream.io.xml.DomDriver;
 
@@ -43,8 +43,8 @@ UNSAFE
 )
 
 desc(
-    lang: "java",
-    "safefile://safe.java": <<<SAFE
+	lang: "java"
+	"safefile://safe.java": <<<SAFE
 import com.thoughtworks.xstream.XStream;
 import com.thoughtworks.xstream.io.xml.DomDriver;
 
@@ -64,4 +64,4 @@ public class XStreamSafe {
     }
 }
 SAFE
-);
+)

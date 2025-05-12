@@ -1,11 +1,11 @@
 desc(
-    title: 'SCA: Checking Java commons-collections4 Existed Vulnerabilities',
-    type: vuln,
-    risk: sca,
-    rule_id: 21105024,
-    desc: <<<TEXT
+	title: 'SCA: Checking Java commons-collections4 Existed Vulnerabilities'
+	type: vuln
+	risk: sca
+	desc: <<<TEXT
 该规则用于检测Java项目中是否使用了存在已知安全漏洞的commons-collections4库版本。commons-collections4库版本4.x中存在一个不安全的反序列化漏洞（CVE-2015-6420），该漏洞允许攻击者通过构造恶意的输入数据，在应用程序中执行任意代码。这可能导致敏感数据泄露、远程代码执行等严重后果。因此，建议开发者及时更新commons-collections4库到安全的版本，以避免潜在的安全风险。
 TEXT
+	rule_id: "2e9c5be0-2c5b-44fc-8928-e16d740bb0bf"
 )
 
 __dependency__.*commons*collections4.version as $ver;

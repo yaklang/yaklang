@@ -1,11 +1,11 @@
 desc(
-    title: 'SCA: Checking Java jackson-core Existed Vulnerabilities',
-    type: vuln,
-    risk: sca,
-    rule_id: 21105027,
-    desc: <<<TEXT
+	title: 'SCA: Checking Java jackson-core Existed Vulnerabilities'
+	type: vuln
+	risk: sca
+	desc: <<<TEXT
 Jackson-core 是一个流行的 Java 库，用于处理 JSON 数据。在特定版本的 Jackson-core 中，存在拒绝服务（DoS）漏洞。攻击者可以利用此漏洞，通过发送恶意的 JSON 数据来消耗大量系统资源，从而导致服务不可用。建议检查并更新 Jackson-core 库到不受影响的版本，以消除此安全风险。
 TEXT
+	rule_id: "1da9ad25-714b-440a-8187-76b85d8c6341"
 )
 
 __dependency__.*jackson*core.version as $ver;

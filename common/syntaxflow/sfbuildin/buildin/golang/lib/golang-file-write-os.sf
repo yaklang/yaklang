@@ -1,12 +1,12 @@
 desc(
-    title: "check file write function(os)",
-    type: audit,
-    level: info,
-    lib: 'golang-file-write-os',
-    rule_id: 10000018,
-    desc: <<<TEXT
+	title: "check file write function(os)"
+	type: audit
+	level: info
+	lib: 'golang-file-write-os'
+	desc: <<<TEXT
 此规则用于审计Go语言项目中文件写入功能的安全性。
 TEXT
+	rule_id: "785265e2-bc75-48f6-9e9b-1d329dc75f87"
 )
 
 os?{<fullTypeName>?{have: 'os'}} as $os
@@ -16,9 +16,9 @@ $param?{!have: 'Parameter'} as $output;
 alert $output
 
 desc(
-    lang: golang,
-    alert_min: 1,
-    'file://filewrite.go': <<<PARAM
+	lang: golang
+	alert_min: 1
+	'file://filewrite.go': <<<PARAM
 package main
 
 import (

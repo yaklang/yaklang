@@ -1,13 +1,12 @@
 desc(
-    title_zh:'查找Java GroovyShell 代码执行Sink点',
-    title:'Find Java GroovyShell Code Execution Sink Point',
-    lib: 'java-groovy-lang-shell-sink',
-    type: audit,
-    rule_id: 20000028,
-    reference:<<<URL
+	title_zh:'查找Java GroovyShell 代码执行Sink点',
+	title:'Find Java GroovyShell Code Execution Sink Point'
+	lib: 'java-groovy-lang-shell-sink'
+	type: audit
+	reference:<<<URL
     https://docs.groovy-lang.org/latest/html/api/groovy/lang/GroovyShell.html
 URL
-    desc:<<<TEXT
+	desc:<<<TEXT
     该规则用于检测Java代码中使用GroovyShell类进行代码执行的潜在漏洞。GroovyShell是Groovy语言的一个类，允许动态执行Groovy脚本。由于Groovy是一种动态语言，使用GroovyShell执行的代码可能会引入安全风险，特别是在处理不受信任的输入时。
     审计的类为:
     - groovy.lang.GroovyShell
@@ -39,6 +38,7 @@ URL
     - run(String scriptText, String fileName, String[] args)
     - run(String scriptText, String fileName, List<String> list)
 TEXT
+	rule_id: "0018c56b-b5f7-49fc-80f4-d1b9a5f718e5"
 )
 
 GroovyShell()?{<typeName>?{have:'groovy.lang.GroovyShell'}} as $groovy;
@@ -79,9 +79,9 @@ $groovy.run(*<slice(index=1)>?{<typeName>?{any:'File','Reader','String'}} as $ou
 alert $output;
 
 desc(
-    lang:'java',
-    alert_num:3,
-    "file://groovy.java": <<<CODE
+	lang:'java'
+	alert_num:3
+	"file://groovy.java": <<<CODE
 package org.example.moudels.rce.code;
 
 import groovy.lang.GroovyShell;

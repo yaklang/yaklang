@@ -1,11 +1,11 @@
 desc(
-    title:'Check Java IO Unchecked Return Value',
-    title_zh:'检测Java IO库未检查返回值的API',
-    type:security,
-    rule_id: 20252001,
-    desc:<<<TEXT
+	title:'Check Java IO Unchecked Return Value'
+	title_zh:'检测Java IO库未检查返回值的API',
+	type:security
+	desc:<<<TEXT
 Java的java.io库中某些方法会返回一个值，但是调用者没有检查这个返回值。这可能导致一些潜在的安全风险，例如资源泄露、内存泄露、数据泄露等。因此，建议在调用这些方法时，检查返回值并根据需要进行处理。
-TEXT,
+TEXT
+	rule_id: "93b522c2-9ead-4ad8-b81c-bf5219793594"
 )
 
 /^(read|skip|skipBytes|implies|delete|canRead|canWrite|exists|isAbsolute|isDirectory|isFile|isHidden|mkdir|mkdirs|renameTo)$/<getCall> as $toCheck;
@@ -16,10 +16,10 @@ alert $weak for {
     level:info,
 };
 
-desc{
-    lang:'java',
-    alert_num:10,
-    'file://demo.java':<<<TEXT
+desc(
+	lang:'java'
+	alert_num:10
+	'file://demo.java':<<<TEXT
 package org.example;
 
 import java.io.*;
@@ -72,6 +72,6 @@ public class Demo {
     }
 }
 TEXT
-}
+)
 
 

@@ -1,11 +1,11 @@
 desc(
-    title: 'SCA: Checking Java mysql-connector-java Existed Vulnerabilities',
-    type: vuln,
-    risk: sca,
-    rule_id: 21105028,
-    desc: <<<TEXT
+	title: 'SCA: Checking Java mysql-connector-java Existed Vulnerabilities'
+	type: vuln
+	risk: sca
+	desc: <<<TEXT
 该规则用于检查Java项目中mysql-connector-java库的版本，以确定是否存在已知的安全漏洞。mysql-connector-java是一个用于Java应用程序与MySQL数据库进行交互的官方连接器。特定版本的mysql-connector-java（如8.0.17到8.0.27）存在信息泄露漏洞，攻击者可以利用此漏洞获取敏感信息，对系统的安全性构成威胁。因此，建议检查并更新到不受影响的版本。
 TEXT
+	rule_id: "ed3c8646-d1f0-43ca-9288-6ac03751dcfd"
 )
 
 __dependency__.*mysql*connector*java.version as $ver;

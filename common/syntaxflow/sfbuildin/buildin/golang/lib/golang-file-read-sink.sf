@@ -1,12 +1,12 @@
 desc(
-    title: "check file read function(sink)",
-    type: audit,
-    level: info,
-    lib: 'golang-file-read-sink',
-    rule_id: 10000015,
-    desc: <<<TEXT
+	title: "check file read function(sink)"
+	type: audit
+	level: info
+	lib: 'golang-file-read-sink'
+	desc: <<<TEXT
 此规则旨在审计Go语言应用程序中文件读取功能的安全性。文件读取功能如果未经过适当的权限控制和输入验证，可能会暴露敏感信息或允许未授权访问。建议对文件读取操作进行严格的权限检查，确保仅允许读取预期内的文件，并避免读取系统关键文件或包含敏感数据的文件，以减少潜在的安全风险。
 TEXT
+	rule_id: "96d04555-9e4b-4e41-882a-82ec887c0a4c"
 )
 
 <include('golang-file-read-bufio')> as $output;

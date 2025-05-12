@@ -1,9 +1,9 @@
 desc(
-    title: "JDBC getConnection.prepareStatement.executeQuery SQL",
-    title_zh: "JDBC getConnection.prepareStatement.executeQuery SQL 执行语句",
-    type: audit,
-    lib: 'java-jdbc-prepared-execute-sink',
-    rule_id: 20000018
+	title: "JDBC getConnection.prepareStatement.executeQuery SQL"
+	title_zh: "JDBC getConnection.prepareStatement.executeQuery SQL 执行语句",
+	type: audit
+	lib: 'java-jdbc-prepared-execute-sink'
+	rule_id: "0a74334a-844f-46ea-88a5-b1091d02ee89"
 )
 
 DriverManager.getConnection() as $conn;
@@ -14,8 +14,8 @@ check $output;
 alert $output;
 
 desc(
-    lang: java,
-"file://a.java": <<<CODE
+	lang: java
+	"file://a.java": <<<CODE
 import java.sql.*;
 
 public class PreparedStatementExample {

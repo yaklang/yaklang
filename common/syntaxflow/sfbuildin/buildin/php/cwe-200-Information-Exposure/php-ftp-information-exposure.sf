@@ -1,17 +1,17 @@
 desc(
-   title: "FTP Information Exposure",
-   title_zh: "FTP信息泄露",
-   risk: "information-exposure",
-   type: vul,
-   level: "low",
-   rule_id: 30200001,
-   desc: <<<TEXT
+	title: "FTP Information Exposure"
+	title_zh: "FTP信息泄露",
+	risk: "information-exposure"
+	type: vul
+	level: "low"
+	desc: <<<TEXT
 检测可能通过FTP相关函数泄露服务器敏感信息，包括：
     1. 目录结构暴露（ftp_nlist/ftp_rawlist）
     2. 当前工作路径泄露（ftp_pwd）
     3. 服务器系统类型识别（ftp_systype）
     可能被攻击者用于信息收集阶段，辅助后续攻击
 TEXT
+	rule_id: "87df2d7a-5473-4438-aa85-706657accf5f"
 )
 
 /^ftp_nlist|ftp_pwd|ftp_rawlist|ftp_systype$/ as $output
@@ -31,9 +31,9 @@ alert $ftp_exposure for{
 }
 
 desc(
-   lang: "php",
-   alert_min: "3",
-   "file:///unsafe.php": <<<TEXT
+	lang: "php"
+	alert_min: "3"
+	"file:///unsafe.php": <<<TEXT
 <?php
     // 不安全FTP操作示例
     $conn = ftp_connect('ftp.example.com');

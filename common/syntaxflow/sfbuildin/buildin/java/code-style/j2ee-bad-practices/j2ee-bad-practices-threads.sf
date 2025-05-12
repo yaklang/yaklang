@@ -1,16 +1,16 @@
 desc(
-    title_zh:"检测Java J2EE 使用threads",
-    title:"Check Java J2EE Usage of Threads",
-    rule_id:21500002
-    risk:"代码风格",
-    level: info,
-    reference:<<<URL
+	title_zh:"检测Java J2EE 使用threads",
+	title:"Check Java J2EE Usage of Threads"
+	risk:"代码风格",
+	level: info
+	reference:<<<URL
     https://docs.oracle.com/javase/8/docs/api/java/lang/Thread.html
     https://docs.oracle.com/javase/8/docs/api/java/lang/ThreadLocal.html
 URL
-    description:<<<TEXT
+	description:<<<TEXT
     J2EE 标准明确限制在Web应用中直接管理线程，因其在容器环境中存在高风险。线程控制不仅实现复杂，更可能引发不可控的容器冲突。即便未触发容器异常，仍可能引发隐蔽性极强的并发问题，包括死锁、竞态条件及资源争用等同步缺陷。
 TEXT
+	rule_id: "8e009f30-c716-4c22-b4c4-9d394e88c824"
 )
 
 Thread()?{<typeName>?{have:'java.lang.Thread'}} as $thread;
@@ -36,10 +36,10 @@ alert $run for {
     message:'检测到Java项目中使用了Runnable接口并且实现了run方法',
 }
 
-desc{
-    lang:java,
-    alert_num:5 ,
-    "file://ThreadDemo.java":<<<CODE
+desc(
+	lang:java
+	alert_num:5
+	"file://ThreadDemo.java":<<<CODE
     public class MyServlet extends HttpServlet {
         protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
             // 1. 启动新线程
@@ -63,12 +63,12 @@ desc{
         }
     }
 CODE
-}
+)
 
-desc{
-    lang:java,
-    alert_num:3 ,
-    "file://ThreadDemo.java":<<<CODE
+desc(
+	lang:java
+	alert_num:3
+	"file://ThreadDemo.java":<<<CODE
   public class MyRunnable implements Runnable {
       @Override
       public void run() {
@@ -85,4 +85,4 @@ desc{
       }
   }
 CODE
-}
+)

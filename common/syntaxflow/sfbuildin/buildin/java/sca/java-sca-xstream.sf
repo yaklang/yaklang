@@ -1,11 +1,11 @@
 desc(
-    title: 'SCA: Checking Java xstream Existed Vulnerabilities',
-    type: vuln,
-    risk: sca,
-    rule_id: 21105034,
-    desc: <<<TEXT
+	title: 'SCA: Checking Java xstream Existed Vulnerabilities'
+	type: vuln
+	risk: sca
+	desc: <<<TEXT
 XStream 是一个 Java 库，用于将 Java 对象序列化为 XML，反之亦然。XStream 在某些版本中存在反序列化漏洞，攻击者可以利用这些漏洞执行任意代码。特别是 xstream 版本在 1.4.11.1 到 1.4.17 之间，已知存在多个反序列化漏洞，这些漏洞允许攻击者通过精心构造的 XML 数据来远程执行代码。因此，建议避免在这些易受攻击的版本中使用 XStream，或者应用相关的安全补丁。
 TEXT
+	rule_id: "13ffa65e-263b-44d1-842c-52419fbea084"
 )
 
 __dependency__.*xstream.version as $ver;

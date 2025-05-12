@@ -1,17 +1,17 @@
 desc(
-    title: "Java Hibernate create*Query SQL concatenation",
-    title_zh: "Java Hibernate create*Query SQL 拼接",
-    type: audit,
-    level: high,
-    risk: sqli,
-    rule_id: 20089002,
-    desc: <<<TEXT
+	title: "Java Hibernate create*Query SQL concatenation"
+	title_zh: "Java Hibernate create*Query SQL 拼接",
+	type: audit
+	level: high
+	risk: sqli
+	desc: <<<TEXT
 在Java Hibernate框架中，如果在创建查询（如createQuery或createNativeQuery）时直接将用户输入拼接到SQL或HQL查询字符串中，可能会导致SQL注入漏洞。SQL注入攻击者可以通过构造特殊的输入来操纵后台数据库执行恶意SQL命令，进而可能泄露敏感数据、篡改数据或执行其他恶意操作。建议使用参数化查询或预编译语句来防止SQL注入攻击。
 TEXT
+	rule_id: "3c87f027-8ccb-487d-8183-b2773ceba895"
 )
 
 .create*Query(,* as $query,);
-$query?{!opcode: const} as $mixQuery; <delete(query)>
+$query?{!opcode: const} as $mixQuery;<delete(query)>
 $mixQuery #{
     until: `*?{opcode: param && !<typeName>?{any: /(?i)bool/,/(?i)float/,/(?i)double/,/(?i)int/} } as $params`,
 }->;
@@ -30,8 +30,8 @@ alert $unsafeParams for {
 }
 
 desc(
-lang: java,
-'fs://a.java': <<<CODE
+	lang: java
+	'fs://a.java': <<<CODE
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;

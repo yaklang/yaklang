@@ -1,14 +1,14 @@
 desc(
-   title: "php information exposure",
-   title_zh: "sql信息泄漏",
-   type: vul,
-   risk: "sql-information-exposure",
-   rule_id: 30200003,
-   desc: <<<TEXT
+	title: "php information exposure"
+	title_zh: "sql信息泄漏",
+	type: vul
+	risk: "sql-information-exposure"
+	desc: <<<TEXT
     检测可能暴露敏感信息的PHP函数调用，包括：
         1. MySQL相关：错误信息(mysql_error)、数据库元数据(mysql_get_host_info)、会话信息等
         2. PostgreSQL相关：错误日志(pg_last_error)、数据库配置(pg_version)等
 TEXT
+	rule_id: "082ac5f8-c196-4312-8c0f-0244f7ffa8d1"
 )
 
 /^mysql_error|mysql_(db_name|field_(name|flag|type|table)|get_(client|host|server)_info|info|status|session_id|get(_current_user|cwd))$/ as $mysql_information;
@@ -39,9 +39,9 @@ alert $pg_exposure for{
    level: "low",
 }
 desc(
-    lang: "php",
-    alert_low: 1,
-    'file:///high.php': <<<UNSAFE
+	lang: "php"
+	alert_low: 1
+	'file:///high.php': <<<UNSAFE
 <?php
     $host_info = mysql_get_host_info();
     echo "数据库主机信息：" . $host_info;

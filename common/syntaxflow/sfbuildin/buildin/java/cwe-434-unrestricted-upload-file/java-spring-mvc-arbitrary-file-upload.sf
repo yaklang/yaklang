@@ -1,11 +1,11 @@
 desc(
-    title_zh:"检测Spring MVC任意文件上传漏洞",
-    title: "Check Spring MVC Arbitrary File Upload Vulnerability",
-    rule_id: 20434002,
-    risk:"任意文件上传",
-    desc:<<<TEXT
+	title_zh:"检测Spring MVC任意文件上传漏洞",
+	title: "Check Spring MVC Arbitrary File Upload Vulnerability"
+	risk:"任意文件上传",
+	desc:<<<TEXT
     该规则用于检测Spring MVC框架中是否存在使用MultipartFile的任意文件上传漏洞。
 TEXT
+	rule_id: "2e6a2485-77c7-4b0e-a421-476b5804a941"
 )
 
 <include('java-spring-mvc-param')>?{<typeName>?{have:'org.springframework.web.multipart.MultipartFile'}} as $source;
@@ -33,9 +33,9 @@ alert $low for {
 }
 
 desc(
-    lang:"java",
-    alert_min:1,
-    'file://controller.java': <<<TEXT
+	lang:"java"
+	alert_min:1
+	'file://controller.java': <<<TEXT
 package org.example.moudels.file.controller;
 
 import io.swagger.annotations.Api;
@@ -83,7 +83,7 @@ public class UploadController {
     }
 }
 TEXT
-    'file://file-upload.java': <<<TEXT
+	'file://file-upload.java': <<<TEXT
     package org.example.common.util;
 
     import lombok.extern.slf4j.Slf4j;

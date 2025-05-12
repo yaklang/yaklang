@@ -1,13 +1,13 @@
 desc(
-    title: "CWE-611 simplexml_load_string checking for XXE (LIBXML_NOENT)",
-    title_zh: "xxe漏洞(simplexml)"
-    level: high,
-    type: audit,
-    risk: "xxe",
-   rule_id: 30611002,
-    desc: <<<TEXT
+	title: "CWE-611 simplexml_load_string checking for XXE (LIBXML_NOENT)"
+	title_zh: "xxe漏洞(simplexml)"
+	level: high
+	type: audit
+	risk: "xxe"
+	desc: <<<TEXT
     XXE漏洞是一种常见的安全漏洞，攻击者可以通过构造恶意XML文件，读取服务器上的敏感文件，甚至执行远程代码。在PHP应用程序中，如果开发者未能正确处理XML文件,可能会导致XXE漏洞。建议在使用simplexml_load_string函数时，设置第三个参数为LIBXML_NOENT，以防止XXE漏洞。
 TEXT
+	rule_id: "bf975bf6-f601-4eb3-9961-7b2ff7b6bacd"
 )
 
 LIBXML_NOENT <getCall> <getCallee> <name> ?{have: simplexml_load_string} as $vuln;
@@ -15,14 +15,14 @@ check $vuln;
 alert $vuln;
 
 desc(
-lang: php,
-alert_min: 1,
-'file://a.php': <<<CODE
+	lang: php
+	alert_min: 1
+	'file://a.php': <<<CODE
 <?php
 $xml = file_get_contents('xxe.xml');
 $doc = simplexml_load_string($xml, 'SimpleXMLElement', LIBXML_NOENT); // Noncompliant
-CODE,
-'safefile://b.php': <<<CODE
+CODE
+	'safefile://b.php': <<<CODE
 <?php
 $xml = file_get_contents('xxe.xml');
 $doc = simplexml_load_string($xml, 'SimpleXMLElement'); // Noncompliant

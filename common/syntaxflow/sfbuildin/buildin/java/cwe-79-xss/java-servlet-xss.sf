@@ -1,13 +1,13 @@
 desc(
-    title: "Check Java Servlet XSS Vulnerability",
-    title_zh: "检测Java Servlet XSS漏洞",
-    type:vuln,
-    level: mid,
-    risk:XSS,
-    rule_id: 20079002,
-    desc: <<<TEXT
+	title: "Check Java Servlet XSS Vulnerability"
+	title_zh: "检测Java Servlet XSS漏洞",
+	type:vuln
+	level: mid
+	risk:XSS
+	desc: <<<TEXT
     该规则检测Java Servlet中的XSS漏洞，当Servlet中使用了未转义的用户输入输出到响应中时，可能导致XSS漏洞。
 TEXT
+	rule_id: "91441632-5409-4bfe-8c54-cb49e21c870d"
 )
 
 <include('java-servlet-param')> as $source;
@@ -42,9 +42,9 @@ alert $low for {
 };
 
 desc(
-    lang: java,
-    alert_low:1,
-    'file://demo.jsp':<<<EOF
+	lang: java
+	alert_low:1
+	'file://demo.jsp':<<<EOF
   <%@ page language="java" contentType="text/html; charset=ISO-8859-1"
            pageEncoding="ISO-8859-1"%>
   <%@ page import="com.sectooladdict.encoders.HtmlEncoder" %>
@@ -82,9 +82,9 @@ EOF
 )
 
 desc(
-    lang: java,
-    alert_mid:1,
-    'file://demo.java':<<<EOF
+	lang: java
+	alert_mid:1
+	'file://demo.java':<<<EOF
   package com.example;
 
   import java.io.IOException;
@@ -115,8 +115,8 @@ EOF
 )
 
 desc(
-    lang: java,
-    'safefile://safe.jsp':<<<EOF
+	lang: java
+	'safefile://safe.jsp':<<<EOF
   package dao;
   import java.rmi.MarshalledObject;
   import java.sql.Connection;

@@ -1,12 +1,12 @@
 desc(
-    title: "check executing request(sink)",
-    type: audit,
-    level: info,
-    lib: "golang-http-sink",
-    rule_id: 10000010,
-    desc: <<<TEXT
+	title: "check executing request(sink)"
+	type: audit
+	level: info
+	lib: "golang-http-sink"
+	desc: <<<TEXT
 此规则旨在审计Golang应用程序中潜在的反射型XSS（跨站脚本攻击）漏洞。当应用程序直接从HTTP请求中获取用户输入，并未经适当的过滤或编码，便将其嵌入到HTML页面中时，便可能发生此类攻击。攻击者可以通过构造恶意的URL或表单输入，向受害者注入恶意脚本，从而窃取数据、劫持会话或执行其他恶意操作。
 TEXT
+	rule_id: "8031a101-c500-4444-ac4d-193be6ed6e0f"
 )
 
 <include('golang-http-gin')> as $output;
@@ -15,9 +15,9 @@ TEXT
 alert $output
 
 desc(
-    lang: golang,
-    alert_min: 2,
-    'file://http_net.go': <<<PARAM
+	lang: golang
+	alert_min: 2
+	'file://http_net.go': <<<PARAM
 package main
 
 import (

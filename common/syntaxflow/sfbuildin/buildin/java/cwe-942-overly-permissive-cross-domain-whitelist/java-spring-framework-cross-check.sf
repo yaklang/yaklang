@@ -1,15 +1,15 @@
 desc(
-    title_zh:"检测Java Spring Framework跨域白名单过于宽松",
-    title:"Check Spring Framework Cross",
-    type:config,
-    risk:"不安全配置",
-    rule_id: 20942001,
-    desc:<<<TEXT
+	title_zh:"检测Java Spring Framework跨域白名单过于宽松",
+	title:"Check Spring Framework Cross"
+	type:config
+	risk:"不安全配置",
+	desc:<<<TEXT
     该规则用于检测Java Spring框架使用@CrossOrigin设置过于宽松的跨域白名单。这对导致以下多个风险：
     - 敏感数据泄漏
     - CSRF攻击
     - 服务端资源滥用
 TEXT
+	rule_id: "bc50fb1a-9e00-46f8-985e-39f3a01a5853"
 )
 
 CrossOrigin?{<typeName>?{have:"org.springframework.web.bind.annotation.CrossOrigin"}} as $co;
@@ -20,9 +20,9 @@ alert $result for {
 }
 
 desc(
-    lang:java,
-    alert_num:1,
-    'file://cross-origin.java':<<<USE
+	lang:java
+	alert_num:1
+	'file://cross-origin.java':<<<USE
 package org.example.moudels.file.controller;
 
 import io.swagger.annotations.Api;

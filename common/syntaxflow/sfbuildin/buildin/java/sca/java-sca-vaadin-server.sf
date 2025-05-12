@@ -1,11 +1,11 @@
 desc(
-    title: 'SCA: Checking Java vaadin-server Existed Vulnerabilities',
-    type: vuln,
-    risk: sca,
-    rule_id: 21105033,
-    desc: <<<TEXT
+	title: 'SCA: Checking Java vaadin-server Existed Vulnerabilities'
+	type: vuln
+	risk: sca
+	desc: <<<TEXT
 此规则用于检测Java项目中是否存在vaadin-server库的已知漏洞版本。Vaadin-server是一个用于构建Web应用程序的Java框架。特定版本的vaadin-server（如7.7.14）存在跨站脚本攻击（XSS）漏洞，该漏洞允许攻击者通过构造特殊的请求，向易受攻击的应用程序注入恶意脚本，从而窃取敏感信息或执行其他恶意操作。因此，建议开发者及时升级vaadin-server库到安全版本，以防范此类漏洞带来的安全风险。
 TEXT
+	rule_id: "90d07a66-fa5c-43f0-a203-1b4c9dcf5c70"
 )
 
 __dependency__.*vaadin*server.version as $ver;

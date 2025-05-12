@@ -1,12 +1,12 @@
 desc(
-    title: "check include vul",
-    title_zh: "文件包含",
-    type: audit,
-    risk: 'file-include',
-    rule_id: 30077001,
-    desc: <<<TEXT
+	title: "check include vul"
+	title_zh: "文件包含",
+	type: audit
+	risk: 'file-include'
+	desc: <<<TEXT
 文件包含漏洞（File Inclusion Vulnerability）是一种常见的安全漏洞，攻击者可以通过该漏洞包含并执行任意文件，进而可能导致敏感信息泄露、代码执行等严重后果。审计此漏洞旨在检测应用程序中是否存在未经授权的文件包含行为，以及是否存在有效的过滤机制来防止恶意文件的包含。
 TEXT
+	rule_id: "6b1ca25b-cf9a-456f-b0aa-77b9cfec1b58"
 )
 <include('php-param')> as $params;
 <include('php-tp-all-extern-variable-param-source')> as $params
@@ -58,21 +58,21 @@ alert $info for{
 }
 
 desc(
-    lang: php,
-    alert_mid: 1,
-    alert_high: 1,
-    alert_low: 1,
-    'file:///high.php': <<<UNSAFE
+	lang: php
+	alert_mid: 1
+	alert_high: 1
+	alert_low: 1
+	'file:///high.php': <<<UNSAFE
 <?php
         $a = $_GET['a'];
         include $a;
-UNSAFE,
-    'file:///middle.php': <<<CODE
+UNSAFE
+	'file:///middle.php': <<<CODE
 <?php
         $a = $_GET['a'] ?: "aaaa";
         include(xxx($a));
-CODE,
-    'file:///low.php': <<<TEXT
+CODE
+	'file:///low.php': <<<TEXT
 <?php
 
 $INCLUDE_ALLOW_LIST = [

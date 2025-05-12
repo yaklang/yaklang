@@ -1,14 +1,14 @@
 desc(
-    title: "Find sqlString.append() Query, Prompt a SQL Injection Checking",
-    type: audit,
-    level: low,
-    risk:sqli,
-    rule_id: 20089004,
-    desc: <<<TEXT
+	title: "Find sqlString.append() Query, Prompt a SQL Injection Checking"
+	type: audit
+	level: low
+	risk:sqli
+	desc: <<<TEXT
 本提示并不代表真实漏洞，而是代码中不安全的用法，可能会有潜在威胁。
 
 在Java中，拼接SQL查询语句可能会导致SQL注入漏洞。建议使用预编译的SQL语句或ORM框架来避免SQL注入。
 TEXT
+	rule_id: "e53aa369-2d16-445a-a9e9-fb2155791246"
 )
 
 
@@ -22,8 +22,8 @@ alert $flag;
 
 
 desc(
-    lang: java,
-'file://risk.java': <<<TEXT
+	lang: java
+	'file://risk.java': <<<TEXT
 package com.ruoyi.common.datascope.aspect;
 
 import java.util.ArrayList;

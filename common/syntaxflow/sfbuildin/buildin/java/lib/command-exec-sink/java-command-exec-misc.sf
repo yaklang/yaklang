@@ -1,11 +1,11 @@
 desc(
-    title: "Find Thirdparty CommandLine Executing Sink",
-    lib: 'java-command-exec-sink',
-    type: audit,
-    rule_id: 20000029,
-    desc: <<<TEXT
+	title: "Find Thirdparty CommandLine Executing Sink"
+	lib: 'java-command-exec-sink'
+	type: audit
+	desc: <<<TEXT
 该规则旨在识别Java代码中存在的第三方库命令执行漏洞。通过调用特定的第三方库（如Apache Commons Exec、Picocli、System-Command-Executor、zt-exec、NuProcess、org.apache.hadoop.util.Shell等），应用程序可能会执行不受信任的外部命令。这可能导致远程代码执行（RCE）漏洞，攻击者可以利用此漏洞在服务器上执行任意命令，从而完全控制受影响的系统。为了降低风险，建议对使用这些库的代码进行严格的安全审查，并确保不会执行不受信任的输入作为命令的一部分。
 TEXT
+	rule_id: "fd447447-8e65-4813-bc14-4da80c21f0f2"
 )
 
 // Apache Commons Exec
