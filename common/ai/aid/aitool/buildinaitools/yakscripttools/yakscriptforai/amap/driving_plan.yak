@@ -1,0 +1,37 @@
+__DESC__ = "一个用于执行驾车路径规划的工具，需要指定起点和终点，可选填写城市，查询并展示可行的驾驶路线、距离、预计耗时以及详细的导航步骤。"
+
+__KEYWORDS__ = "路径规划,驾车导航,高德地图,路线查询,交通规划,导航工具,出行路线"
+
+ori = cli.String("origin",cli.setHelp("Starting point of the route planning"), cli.setRequired(true))
+dst = cli.String("destination",cli.setHelp("Ending point of the route planning"), cli.setRequired(true))
+city = cli.String("city",cli.setHelp("City where the route is located"))
+cli.check()
+
+res = amap.GetDrivingPlan(ori,dst,amap.city(city))~
+route = res.Route
+
+formatDistance = (meters) => {
+    meters = int(meters)
+	if meters >= 1000 {
+		return "%dkm" % (meters/1000)
+	}
+	return "%dm" % meters
+}
+formatDuration = (seconds) => {
+    du = time.ParseDuration(seconds+"s")~
+    return du.String()
+}
+
+log.Info("Found paths count: %d", len(route.Paths))
+
+for i, path := range route.Paths {
+    log.Info("Path %d - Distance: %s, Duration: %s, Strategy: %s", 
+        i+1, formatDistance(path.Distance), formatDuration(path.Duration), path.Strategy)
+    
+    log.Info("Path %d - Steps count: %d", i+1, len(path.Steps))
+    
+    for j, step := range path.Steps {
+        log.Info("  Step %d - Instruction: %s, Distance: %s, Duration: %s", 
+            j+1, step.Instruction, formatDistance(step.Distance), formatDuration(step.Duration))
+    }
+}

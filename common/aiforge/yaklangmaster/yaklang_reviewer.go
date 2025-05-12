@@ -4,6 +4,10 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"regexp"
+	"strings"
+	"text/template"
+
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
@@ -13,9 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"regexp"
-	"strings"
-	"text/template"
 )
 
 //go:embed yaklang_reviewer_prompts/init.txt
@@ -60,7 +61,7 @@ func newYaklangMasterForge(callback func(string)) *aiforge.ForgeBlueprint {
 
 		aiforge.WithPersistentPrompt(_persistentPrompt),
 		aiforge.WithOriginYaklangCliCode(fmt.Sprintf(`
-cli.String("%s", cli.setRequired(true),cli.setVerboseName("yaklang代码"), cli.help("代码内容"))
+cli.String("%s", cli.setRequired(true),cli.setVerboseName("yaklang代码"), cli.setHelp("代码内容"))
 cli.check()
 `, magicCode)),
 		aiforge.WithAIDOptions(

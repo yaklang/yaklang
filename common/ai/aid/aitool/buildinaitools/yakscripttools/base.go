@@ -35,9 +35,9 @@ var yakScriptFS embed.FS
 
 var overrideYakScriptAiToolsOnce sync.Once
 
-func init() {
+func OverrideYakScriptAiTools() {
 	overrideYakScriptAiToolsOnce.Do(func() {
-		db := consts.GetGormProjectDatabase()
+		db := consts.GetGormProfileDatabase()
 		aiTools := loadAllYakScriptFromEmbedFS()
 		for _, aiTool := range aiTools {
 			schema.SaveAIYakTool(db, aiTool)
@@ -180,7 +180,8 @@ func ConvertYakScriptAiToolsToMCPTools(aiTools []*schema.AIYakTool) []*aitool.To
 }
 
 func GetAllYakScriptAiTools() []*aitool.Tool {
-	db := consts.GetGormProjectDatabase()
+	OverrideYakScriptAiTools()
+	db := consts.GetGormProfileDatabase()
 	allAiTools, err := schema.SearchAIYakTool(db, "")
 	if err != nil {
 		log.Errorf("search ai yak tool failed: %v", err)
@@ -189,7 +190,8 @@ func GetAllYakScriptAiTools() []*aitool.Tool {
 	return ConvertYakScriptAiToolsToMCPTools(allAiTools)
 }
 func GetYakScriptAiTools(names ...string) []*aitool.Tool {
-	db := consts.GetGormProjectDatabase()
+	OverrideYakScriptAiTools()
+	db := consts.GetGormProfileDatabase()
 	tools := []*schema.AIYakTool{}
 	toolsNameMap := map[string]struct{}{}
 	for _, name := range names {

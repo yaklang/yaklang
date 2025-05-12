@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/amap"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/omnisearch/ostype"
@@ -265,6 +266,16 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 			Name:    "tavily",
 			Verbose: "Tavily",
 			Items:   options,
+		})
+	}
+	amapOptions, err := utils.ParseAppTagToOptions(&amap.YakitAmapConfig{})
+	if err != nil {
+		log.Errorf("parse amap app config tag to options failed: %v", err)
+	} else {
+		opts = append(opts, &ypb.GetThirdPartyAppConfigTemplate{
+			Name:    "amap",
+			Verbose: "高德地图",
+			Items:   amapOptions,
 		})
 	}
 	//githubOpt := &ypb.GetThirdPartyAppConfigTemplate{
