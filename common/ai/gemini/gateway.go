@@ -236,7 +236,12 @@ func (c *Client) internalStreamGenerateContent(ctx context.Context, req Generate
 	errChan := make(chan error, 1)
 
 	go func() {
-		defer close(rawChunkChan)
+		deferShouldCloseChunkChan := utils.NewBool(true)
+		defer func() {
+			if deferShouldCloseChunkChan.IsSet() {
+				close(rawChunkChan)
+			}
+		}()
 		defer close(errChan)
 
 		if err := c.CheckValid(); err != nil {
@@ -262,11 +267,16 @@ func (c *Client) internalStreamGenerateContent(ctx context.Context, req Generate
 			return
 		}
 
+		deferShouldCloseChunkChan.UnSet()
 		// Add body and stream handler
 		streamProcessed := utils.NewAtomicBool()
 		pocOpts = append(pocOpts,
 			poc.WithReplaceHttpPacketBody(reqBytes, false),
 			poc.WithBodyStreamReaderHandler(func(respHeader []byte, rawReader io.ReadCloser) {
+				deferShouldCloseChunkChan.SetTo(false)
+				defer func() {
+					close(rawChunkChan)
+				}()
 				streamProcessed.Set()
 				defer rawReader.Close()
 
@@ -333,6 +343,18 @@ func (c *Client) internalStreamGenerateContent(ctx context.Context, req Generate
 
 		// Execute request using poc.DoPOST
 		url := fmt.Sprintf(geminiStreamURL, c.config.Model)
+		c.config.Domain = strings.TrimSpace(c.config.Domain)
+		if !utils.IsHttpOrHttpsUrl(c.config.Domain) && c.config.Domain != "" {
+			// not an url, use domain
+			urlins, err := utils.ParseStringUrlToUrlInstance(url)
+			if err != nil {
+				log.Errorf("Failed to parse url: %v", err)
+				return
+			}
+			urlins.Host = c.config.Domain
+			url = urlins.String()
+			log.Infof("rewrite url: %s", url)
+		}
 		log.Infof("Sending request to Gemini API via poc.DoPOST: %s", url)
 
 		// poc.DoPOST handles the request execution and stream processing via the handler.
@@ -482,13 +504,20 @@ func (c *Client) ChatStream(prompt string) (io.Reader, error) {
 		}
 	}()
 
+	var finalReader io.Reader = pr
 	// Call stream handler if configured, passing the pipe reader
 	if c.config.StreamHandler != nil {
-		go c.config.StreamHandler(pr)
-		// Caller still gets the original pipe reader
+		fpr, fpw := utils.NewPipe()
+		mspr, mspw := utils.NewPipe()
+		go func() {
+			defer fpw.Close()
+			defer mspr.Close()
+			io.Copy(io.MultiWriter(fpw, mspw), finalReader)
+		}()
+		go c.config.StreamHandler(mspr)
+		return fpr, nil
 	}
-
-	return pr, nil // Return the reading end of the pipe
+	return finalReader, nil // Return the reading end of the pipe
 }
 
 // Chat sends a prompt and returns the full response as a string.
@@ -511,7 +540,7 @@ func (c *Client) Chat(prompt string, functions ...aispec.Function) (string, erro
 	}
 
 	response := buf.String()
-	log.Infof("Gemini Chat completed, response length: %d", n)
+	log.Infof("Gemini Chat completed, response length: %d, short: %v", n, utils.ShrinkString(buf.String(), 10))
 
 	return response, nil
 }
