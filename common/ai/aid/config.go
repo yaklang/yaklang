@@ -70,7 +70,8 @@ type Config struct {
 	// no need to think, low level
 	taskAICallback AICallbackType
 	toolAICallback SimpleAiCallbackType
-	tools          []*aitool.Tool
+
+	tools        []*aitool.Tool
 
 	// asyncGuardian can auto collect event handler data
 	guardian     *asyncGuardian
