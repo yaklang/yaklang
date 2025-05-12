@@ -336,8 +336,8 @@
         /* 刷新按钮样式 */
         .refresh-btn {
             padding: 0;
-            width: 18px;
-            height: 18px;
+            width: 16px;
+            height: 16px;
             background: none;
             border: none;
             color: #2196f3;
@@ -348,6 +348,7 @@
             justify-content: center;
             opacity: 0.7;
             flex-shrink: 0;
+            margin-right: 8px;
         }
         .refresh-btn:hover {
             opacity: 1;
@@ -508,7 +509,7 @@
         /* 设置各列的固定宽度 - 优化小屏幕 */
         th:nth-child(1), td:nth-child(1) { width: 30px; } /* 复选框 */
         th:nth-child(2), td:nth-child(2) { width: 40px; } /* ID */
-        th:nth-child(3), td:nth-child(3) { width: 160px; } /* 健康度，调整为更窄 */
+        th:nth-child(3), td:nth-child(3) { width: 200px; min-width: 180px; } /* 健康度，增加宽度 */
         th:nth-child(4), td:nth-child(4) { width: 100px; } /* 提供者名称 */
         th:nth-child(5), td:nth-child(5) { width: 120px; } /* 模型名称 */
         th:nth-child(6), td:nth-child(6) { width: 80px; } /* 类型 */
@@ -584,8 +585,9 @@
         .health-info {
             display: flex;
             align-items: center;
-            flex: 1;
-            width: 80px;
+            justify-content: space-between;
+            width: 100%;
+            padding: 0 4px;
         }
 
         .health-status {
@@ -1096,19 +1098,24 @@
             background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
         }
 
-        /* 健康度单元格布局优化 */
+        /* 健康度单元格样式 */
+        .health-cell {
+            padding: 4px 8px !important;
+            height: 32px;
+        }
+
+        /* 健康状态容器 */
         .health-status {
             display: flex;
             align-items: center;
-            padding: 4px 8px;
-            gap: 8px;
+            width: 100%;
         }
 
-        /* 调整刷新按钮样式 */
+        /* 刷新按钮样式 */
         .refresh-btn {
             padding: 0;
-            width: 18px;
-            height: 18px;
+            width: 16px;
+            height: 16px;
             background: none;
             border: none;
             color: #2196f3;
@@ -1119,20 +1126,25 @@
             justify-content: center;
             opacity: 0.7;
             flex-shrink: 0;
-            margin-right: 4px;
+            margin-right: 8px;
         }
 
-        /* 调整健康信息区域布局 */
+        .refresh-btn:hover {
+            opacity: 1;
+            transform: rotate(30deg);
+            color: #1976d2;
+        }
+
+        /* 健康信息显示区域 */
         .health-info {
             display: flex;
             align-items: center;
-            flex: 1;
-            justify-content: flex-start;
-            min-width: 120px;
-            gap: 8px;
+            justify-content: space-between;
+            width: 100%;
+            padding: 0 4px;
         }
-        
-        /* 调整健康状态标签 */
+
+        /* 健康状态标签 */
         .health-badge {
             display: inline-flex;
             align-items: center;
@@ -1144,16 +1156,16 @@
             font-weight: bold;
             white-space: nowrap;
             min-width: 42px;
-            text-align: center;
         }
 
-        /* 调整延迟信息显示 */
+        /* 延迟时间显示 */
         .health-latency {
             font-family: monospace;
             font-size: 12px;
             color: #666;
             white-space: nowrap;
-            min-width: 50px;
+            text-align: right;
+            margin-left: auto;
         }
 
         /* 添加检查中状态的样式 */
@@ -1228,6 +1240,8 @@
             align-items: center;
             padding: 4px 2px;
             gap: 4px;
+            width: 100%;
+            overflow: visible;
         }
         
         .health-info {
@@ -1235,7 +1249,9 @@
             align-items: center;
             gap: 6px;
             flex: 1;
-            justify-content: flex-start;
+            justify-content: space-between;
+            width: auto;
+            overflow: visible;
         }
         
         .refresh-btn {
@@ -1267,6 +1283,7 @@
             color: #666;
             white-space: nowrap;
             min-width: 45px;
+            text-align: right; /* 添加右对齐 */
         }
 
         /* 添加常用工具类 */
@@ -1401,7 +1418,6 @@
             background-color: #f5f5f5;
         }
         .health-status {
-            display: inline-block;
             width: 10px;
             height: 10px;
             border-radius: 50%;
@@ -1558,23 +1574,25 @@
                                 <input type="checkbox" class="provider-checkbox">
                             </td>
                             <td class="text-center">{{.ID}}</td>
-                            <td class="health-status">
-                                <button class="refresh-btn" onclick="checkSingleProvider('{{.ID}}')" title="刷新健康状态">
-                                    <svg viewBox="0 0 24 24">
-                                        <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
-                                    </svg>
-                                </button>
-                                <div class="health-info">
-                                    {{if eq .HealthStatusClass "healthy"}}
-                                        <span class="health-badge healthy">健康</span>
-                                        <span class="health-latency">{{.LastLatency}}ms</span>
-                                    {{else if eq .HealthStatusClass "unhealthy"}}
-                                        <span class="health-badge unhealthy">异常</span>
-                                        <span class="health-latency">{{if gt .LastLatency 0}}{{.LastLatency}}ms{{else}}-{{end}}</span>
-                                    {{else}} <!-- unknown -->
-                                        <span class="health-badge unhealthy">未知</span>
-                                        <span class="health-latency">-</span>
-                                    {{end}}
+                            <td class="health-cell">
+                                <div class="health-status">
+                                    <button class="refresh-btn" onclick="checkSingleProvider('{{.ID}}')" title="刷新健康状态">
+                                        <svg viewBox="0 0 24 24">
+                                            <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                                        </svg>
+                                    </button>
+                                    <div class="health-info">
+                                        {{if eq .HealthStatusClass "healthy"}}
+                                            <span class="health-badge healthy">健康</span>
+                                            <span class="health-latency">{{.LastLatency}}ms</span>
+                                        {{else if eq .HealthStatusClass "unhealthy"}}
+                                            <span class="health-badge unhealthy">异常</span>
+                                            <span class="health-latency">{{if gt .LastLatency 0}}{{.LastLatency}}ms{{else}}-{{end}}</span>
+                                        {{else}} <!-- unknown -->
+                                            <span class="health-badge unhealthy">未知</span>
+                                            <span class="health-latency">-</span>
+                                        {{end}}
+                                    </div>
                                 </div>
                             </td>
                             <td class="copyable text-center" data-full-text="{{.WrapperName}}">{{.WrapperName}}</td>
@@ -2542,7 +2560,7 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                     <svg viewBox="0 0 24 24" width="24" height="24">
                         <path d="${iconPath}"></path>
                     </svg>
-                </div>
+    </div>
                 <div class="toast-content">${message}</div>
                 <div class="toast-close" onclick="this.parentElement.remove()">
                     <svg viewBox="0 0 24 24" width="16" height="16">
@@ -2739,11 +2757,15 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                             <span class="health-badge healthy">健康</span>
                             <span class="health-latency">${responseTime}ms</span>
                         `;
+                        // 更新行的数据状态属性
+                        row.setAttribute('data-status', 'healthy');
                     } else {
                         healthInfoDiv.innerHTML = `
                             <span class="health-badge unhealthy">异常</span>
                             <span class="health-latency">${responseTime > 0 ? responseTime + 'ms' : '-'}</span>
                         `;
+                        // 更新行的数据状态属性
+                        row.setAttribute('data-status', 'unhealthy');
                     }
                     
                     // 显示成功提示但不刷新页面
