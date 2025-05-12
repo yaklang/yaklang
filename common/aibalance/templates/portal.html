@@ -1478,6 +1478,51 @@
             transform: translateY(1px);
             box-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
         }
+        /* API Key 相关样式 */
+        .api-key-cell {
+            max-width: 150px;
+            position: relative;
+        }
+        .api-key-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 4px;
+        }
+        .api-key-display {
+            font-family: monospace;
+            font-size: 12px;
+            flex-grow: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .btn-copy {
+            padding: 2px 4px;
+            background: none;
+            border: 1px solid #ddd;
+            color: #666;
+            opacity: 0.7;
+        }
+        .btn-copy:hover {
+            opacity: 1;
+            background-color: #f5f5f5;
+        }
+        .provider-actions {
+            display: flex;
+            gap: 4px;
+            justify-content: center;
+        }
+        .btn-quick-add {
+            padding: 2px 4px;
+            background-color: #e3f2fd;
+            border: 1px solid #90caf9;
+            color: #1565c0;
+        }
+        .btn-quick-add:hover {
+            background-color: #bbdefb;
+        }
+        /* 添加到现有样式的末尾 */
     </style>
 </head>
 <body>
@@ -1561,6 +1606,7 @@
                             <th class="column-name">模型</th>
                             <th class="column-name">类型</th>
                             <th class="column-name">域名</th>
+                            <th class="column-name">API Key</th>
                             <th class="column-name">请求</th>
                             <th class="column-name">操作</th>
                         </tr>
@@ -1599,13 +1645,30 @@
                             <td class="copyable" data-full-text="{{.ModelName}}">{{.ModelName}}</td>
                             <td class="copyable text-center" data-full-text="{{.TypeName}}">{{.TypeName}}</td>
                             <td class="copyable" data-full-text="{{.DomainOrURL}}">{{.DomainOrURL}}</td>
+                            <td class="copyable api-key-cell" data-full-text="{{.APIKey}}">
+                                <div class="api-key-container">
+                                    <span class="api-key-display">{{if .APIKey}}•••••••{{end}}</span>
+                                    <button class="btn btn-sm btn-copy" onclick="copyToClipboard('{{.APIKey}}')" title="复制 API Key">
+                                        <svg viewBox="0 0 24 24" width="14" height="14">
+                                            <path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </td>
                             <td>{{.TotalRequests}}</td>
                             <td>
-                                <button class="delete-btn" onclick="deleteProvider('{{.ID}}')" title="删除提供者">
-                                    <svg viewBox="0 0 24 24">
-                                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                                    </svg>
-                                </button>
+                                <div class="provider-actions">
+                                    <button class="btn btn-sm btn-quick-add" onclick="quickAddProvider('{{.ID}}')" title="快速添加">
+                                        <svg viewBox="0 0 24 24" width="14" height="14">
+                                            <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                                        </svg>
+                                    </button>
+                                    <button class="delete-btn" onclick="deleteProvider('{{.ID}}')" title="删除提供者">
+                                        <svg viewBox="0 0 24 24">
+                                            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                                        </svg>
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                         {{end}}
@@ -3543,9 +3606,117 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             }
         }
 
-        // 新增：快速添加供应商
-        function quickAddProvider() {
-            const row = document.querySelector(`tr[data-id="${currentContextMenuProviderId}"]`);
+        // 验证和提交表单
+        async function validateAndSubmit(event) {
+            event.preventDefault();
+            
+            // 获取表单数据
+            const wrapperName = document.getElementById('wrapper_name').value.trim();
+            const modelName = document.getElementById('model_name').value.trim();
+            const modelType = document.getElementById('model_type').value.trim();
+            const domainOrUrl = document.getElementById('domain_or_url').value.trim();
+            const apiKeys = document.getElementById('api_keys').value.trim();
+            const noHttps = document.getElementById('no_https').checked;
+
+            // 验证必填字段
+            if (!wrapperName || !modelName || !modelType || !apiKeys) {
+                showToast('请填写所有必填字段', 'error');
+                return false;
+            }
+
+            // 验证 API Keys 格式
+            const apiKeysList = apiKeys.split('\n')
+                .map(key => key.trim())
+                .filter(key => key.length > 0);
+
+            if (apiKeysList.length === 0) {
+                showToast('请至少提供一个有效的 API Key', 'error');
+                return false;
+            }
+
+            try {
+                showToast('正在添加提供者...', 'info');
+
+                const formData = new FormData();
+                formData.append('wrapper_name', wrapperName);
+                formData.append('model_name', modelName);
+                formData.append('model_type', modelType);
+                formData.append('domain_or_url', domainOrUrl);
+                formData.append('api_keys', apiKeys);
+                if (noHttps) {
+                    formData.append('no_https', 'on');
+                }
+
+                const response = await fetch('/portal/add-providers', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('添加失败');
+                }
+
+                showToast('提供者添加成功', 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } catch (error) {
+                showToast('添加失败: ' + error.message, 'error');
+                return false;
+            }
+        }
+
+        // 验证提供者配置
+        async function validateProvider() {
+            const wrapperName = document.getElementById('wrapper_name').value.trim();
+            const modelName = document.getElementById('model_name').value.trim();
+            const modelType = document.getElementById('model_type').value.trim();
+            const domainOrUrl = document.getElementById('domain_or_url').value.trim();
+            const apiKeys = document.getElementById('api_keys').value.trim();
+            const noHttps = document.getElementById('no_https').checked;
+
+            // 验证必填字段
+            if (!wrapperName || !modelName || !modelType || !apiKeys) {
+                showToast('请填写所有必填字段', 'error');
+                return;
+            }
+
+            const firstApiKey = apiKeys.split('\n')[0].trim();
+            if (!firstApiKey) {
+                showToast('请至少提供一个有效的 API Key', 'error');
+                return;
+            }
+
+            try {
+                showToast('正在验证配置...', 'info');
+
+                const formData = new FormData();
+                formData.append('wrapper_name', wrapperName);
+                formData.append('model_name', modelName);
+                formData.append('model_type', modelType);
+                formData.append('domain_or_url', domainOrUrl);
+                formData.append('api_key_to_validate', firstApiKey);
+                if (noHttps) {
+                    formData.append('no_https', 'on');
+                }
+
+                const response = await fetch('/portal/validate-provider', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    showToast(result.message, 'success');
+                } else {
+                    showToast(result.message, 'error');
+                }
+            } catch (error) {
+                showToast('验证失败: ' + error.message, 'error');
+            }
+        }
+
+        // 快速添加供应商
+        function quickAddProvider(providerId) {
+            const row = document.querySelector(`tr[data-id="${providerId}"]`);
             if (!row) return;
 
             const type = row.cells[5].textContent.trim(); // 第6列是类型
@@ -3559,30 +3730,30 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             // 等待表单加载完成
             setTimeout(() => {
                 // 填充表单
-                const typeSelect = document.getElementById('typeName');
-                if (typeSelect) {
-                    for (let i = 0; i < typeSelect.options.length; i++) {
-                        if (typeSelect.options[i].value === type) {
-                            typeSelect.selectedIndex = i;
-                            break;
-                        }
-                    }
+                const typeInput = document.getElementById('model_type');
+                if (typeInput) {
+                    typeInput.value = type;
                 }
 
-                const domainInput = document.getElementById('domainOrURL');
+                const domainInput = document.getElementById('domain_or_url');
                 if (domainInput) {
                     domainInput.value = domain;
                 }
 
-
-                const wrapperNameInput = document.getElementById('wrapperName');
+                const wrapperNameInput = document.getElementById('wrapper_name');
                 if (wrapperNameInput) {
                     wrapperNameInput.value = wrapperName;
                 }
 
-                const modelNameInput = document.getElementById('modelName');
+                const modelNameInput = document.getElementById('model_name');
                 if (modelNameInput) {
                     modelNameInput.value = modelName;
+                }
+
+                // 聚焦到 API Keys 输入框
+                const apiKeysInput = document.getElementById('api_keys');
+                if (apiKeysInput) {
+                    apiKeysInput.focus();
                 }
             }, 100);
         }
