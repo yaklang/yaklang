@@ -1,6 +1,7 @@
 package aispec
 
 import (
+	"bufio"
 	"context"
 	"io"
 	"os"
@@ -98,7 +99,7 @@ func WithDebugStream(h ...bool) AIConfigOption {
 	return func(c *AIConfig) {
 		if len(h) <= 0 || h[0] {
 			c.StreamHandler = func(r io.Reader) {
-				io.Copy(os.Stdout, r)
+				io.Copy(bufio.NewWriterSize(os.Stdout, 1), r)
 			}
 		} else {
 			c.StreamHandler = nil
