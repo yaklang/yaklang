@@ -20,8 +20,11 @@ type ToolResult struct {
 	Data        any    `json:"data,omitempty"`
 	Error       string `json:"error,omitempty"`
 
-	// shrink_similar_result 表示缩略信息，是在 decision 的时候执行的，用于直接压缩信息
-	ShrinkResult string `json:"shrink_similar_result,omitempty"`
+	// shrink_similar_result 表示相似缩略信息，是相似度过高的工具调用引发的压缩。
+	ShrinkSimilarResult string `json:"shrink_similar_result,omitempty"`
+
+	// shrink_similar_result 表示缩略信息，是由于时间线内容过多引发的压缩。
+	ShrinkResult string `json:"shrink_result,omitempty"`
 }
 
 func (t *ToolResult) String() string {
@@ -48,8 +51,11 @@ func (t *ToolResult) String() string {
 		buf.WriteString(fmt.Sprintf("param: %s\n", utils.Jsonify(t.Param)))
 	}
 
-	if t.ShrinkResult == "" {
-
+	if t.ShrinkResult != "" { // shrink result preface
+		buf.WriteString(fmt.Sprintf("shrink_result: %#v\n", t.ShrinkResult))
+	} else if t.ShrinkSimilarResult != "" { //  shrink similar result second
+		buf.WriteString(fmt.Sprintf("shrink_similar_result: %#v\n", t.ShrinkSimilarResult))
+	} else {
 		// 处理工具执行结果
 		switch ret := t.Data.(type) {
 		case *ToolExecutionResult:
@@ -103,8 +109,6 @@ func (t *ToolResult) String() string {
 				buf.WriteString(fmt.Sprintf("data: %s\n", utils.Jsonify(t.Data)))
 			}
 		}
-	} else {
-		buf.WriteString(fmt.Sprintf("shrink_result: %#v\n", t.ShrinkResult))
 	}
 
 	// 处理错误信息

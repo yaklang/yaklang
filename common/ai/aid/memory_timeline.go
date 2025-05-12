@@ -285,6 +285,9 @@ func (m *memoryTimeline) shrink(currentItem *timelineItem) {
 		s, ok := m.summary.Get(currentItem.GetID())
 		if ok {
 			pers = s.Value().ShrinkResult
+			if pers == "" {
+				pers = s.Value().ShrinkSimilarResult
+			}
 		}
 	}
 	newItem := *currentItem //  copy struct
