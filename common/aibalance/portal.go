@@ -48,6 +48,7 @@ type ProviderData struct {
 	ModelName         string
 	TypeName          string
 	DomainOrURL       string
+	APIKey            string // 添加 APIKey 字段
 	TotalRequests     int64
 	SuccessRate       float64
 	LastLatency       int64
@@ -367,6 +368,7 @@ func (c *ServerConfig) servePortal(conn net.Conn) {
 			ModelName:         p.ModelName,
 			TypeName:          p.TypeName,
 			DomainOrURL:       p.DomainOrURL,
+			APIKey:            p.APIKey, // 设置 APIKey
 			TotalRequests:     p.TotalRequests,
 			SuccessRate:       successRate,
 			LastLatency:       p.LastLatency,
