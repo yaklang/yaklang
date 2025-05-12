@@ -95,7 +95,7 @@ func (m *memoryTimeline) CreateSubTimeline(ids ...int64) *memoryTimeline {
 func (m *memoryTimeline) BindConfig(config *Config) {
 	m.config = config
 	m.memory = config.memory
-	m.setTimelineLimit(config.timeLineLimit)
+	m.setTimelineLimit(config.timelineLimit)
 	m.setTimelineContentLimit(config.timelineContentLimit)
 	if utils.IsNil(m.ai) {
 		m.setAICaller(config)
