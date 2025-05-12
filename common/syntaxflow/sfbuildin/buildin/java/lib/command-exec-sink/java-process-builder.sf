@@ -19,21 +19,10 @@ TEXT
 	rule_id: "737c2b12-e8ac-4c72-a4e6-44196847059d"
 )
 
-// Constructors
-// ProcessBuilder(List<String> command)
-// ProcessBuilder(String... command)
-ProcessBuilder?{ <typeName>?{have:'java.lang.ProcessBuilder'} && *(* <slice(start=1)> as $output) }as $processBuilder;
-
-// Methods
-// ProcessBuilder.command(List<String> command)
-// ProcessBuilder.command(String... command)
+ProcessBuilder?{<typeName>?{have:'java.lang.ProcessBuilder'}} as $processBuilder;
+$processBuilder(*<slice(start=1)> as $output)
 $processBuilder.command(* <slice(start=1)> as $output)
 
-// Reflection
-//  Class<?> clazz = Class.forName("java.lang.ProcessImpl");
-// Method method = clazz.getDeclaredMethod("start", String[].class, Map.class, String.class, ProcessBuilder.Redirect[].class, boolean.class);
-// method.setAccessible(true);
-// Process process = (Process) method.invoke(null, new String[]{payload}, null, null, null, false);
 Class?{<typeName>?{have:'java.lang'}}.forName(*<slice(index=1)>?{=='java.lang.ProcessImpl'}) as $clazz
 $clazz.getDeclaredMethod?{*(*<slice(index=1)>?{=="start"})} as $method
 $method<getCall()>?{.setAccessible(*<slice(index=1)>?{==true})}.invoke as $invoke
