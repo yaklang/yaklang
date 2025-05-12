@@ -1176,17 +1176,19 @@ func (c *ServerConfig) serveProvidersAPI(conn net.Conn, request *http.Request) {
 			successRate = float64(p.SuccessCount) / float64(p.TotalRequests) * 100
 		}
 
-		// 添加到结果列表
+		// 添加到结果列表，包含 APIKey
 		providersData = append(providersData, map[string]interface{}{
 			"id":             p.ID,
 			"wrapper_name":   p.WrapperName,
 			"model_name":     p.ModelName,
 			"type_name":      p.TypeName,
 			"domain_or_url":  p.DomainOrURL,
+			"api_key":        p.APIKey, // 添加 APIKey
 			"total_requests": p.TotalRequests,
 			"success_rate":   successRate,
 			"last_latency":   p.LastLatency,
 			"is_healthy":     p.IsHealthy,
+			"no_https":       p.NoHTTPS, // 添加 NoHTTPS 配置
 		})
 	}
 
