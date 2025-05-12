@@ -2,10 +2,11 @@ package aiforge
 
 import (
 	"context"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"sync"
 )
 
 type ForgeExecutor func(context.Context, []*ypb.ExecParamItem, ...aid.Option) (*ForgeResult, error)
