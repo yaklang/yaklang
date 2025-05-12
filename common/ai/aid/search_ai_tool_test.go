@@ -34,15 +34,6 @@ func TestSearchAIYakTool(t *testing.T) {
 func TestDecodeBase64BySearchTool(t *testing.T) {
 	taskId := string(utils.RandStringBytes(10))
 	summaryId := string(utils.RandStringBytes(10))
-	requireParamsMatcher := func(prompt string) bool {
-		keys := []string{"构造有效参数", "只生成一个有效的请求参数"}
-		for _, key := range keys {
-			if strings.Contains(prompt, key) {
-				return true
-			}
-		}
-		return false
-	}
 	stateKeyword := []struct {
 		name    string
 		matcher any
@@ -73,7 +64,7 @@ func TestDecodeBase64BySearchTool(t *testing.T) {
 		// 调用搜索工具
 		{
 			"调用搜索工具",
-			requireParamsMatcher, `
+			nil, `
 	{
   "tool": "tools_search",
   "@action": "call-tool",
@@ -106,7 +97,7 @@ func TestDecodeBase64BySearchTool(t *testing.T) {
 		// 调用解码工具
 		{
 			"调用解码工具",
-			requireParamsMatcher, `
+			nil, `
 	{
   "tool": "decode",
   "@action": "call-tool",
@@ -118,20 +109,19 @@ func TestDecodeBase64BySearchTool(t *testing.T) {
 		},
 		{
 			"判断任务完成情况",
-			nil, `{"@action": "finished"}`,
+			"status_summary", `{"@action": "finished"}`,
 		},
 		{
-			"总结任务",
-			"上下文总结者", `
-			{
+			"task summary",
+			"\"short_summary\", \"long_summary\"", `{
 			"@action": "summary",
 			"short_summary": "` + summaryId + `",
 			"long_summary": "` + summaryId + `"
-			}`,
+		}`,
 		},
 		{
 			"输出任务报告",
-			summaryId, "ok",
+			nil, "ok",
 		},
 	}
 

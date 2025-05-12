@@ -80,7 +80,7 @@ type Config struct {
 	// memory
 	persistentMemory          []string
 	memory                    *Memory
-	timeLineLimit             int
+	timelineLimit             int
 	timelineContentLimit      int
 	timelineTotalContentLimit int
 
@@ -284,6 +284,8 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		aiAutoRetry:                 5,
 		aiTransactionAutoRetry:      5,
 		allowRequireForUserInteract: true,
+		timelineLimit:               10,
+		timelineContentLimit:        30 * 1024,
 	}
 	c.epm.config = c // review
 	if err := initDefaultTools(c); err != nil {
@@ -587,7 +589,7 @@ func WithTimeLineLimit(i int) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
-		config.timeLineLimit = i
+		config.timelineLimit = i
 		return nil
 	}
 }
