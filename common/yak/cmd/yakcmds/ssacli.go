@@ -549,6 +549,58 @@ var syncRule = &cli.Command{
 	},
 }
 
+var syntaxflowFormat = &cli.Command{
+	Name:    "syntaxflow-format",
+	Aliases: []string{"sf-format", "sf-fmt"},
+	Usage:   "format SyntaxFlow rule",
+	Flags:   []cli.Flag{},
+	Action: func(c *cli.Context) error {
+		if len(c.Args()) == 0 {
+			log.Errorf("syntaxflow-format: no file provided")
+		}
+
+		format := func(fileName string) error {
+			// Check if the file has .sf extension
+			if !strings.HasSuffix(fileName, ".sf") {
+				log.Infof("syntaxflow-format: skipping file %s (not a .sf file)", fileName)
+				return nil
+			}
+			raw, err := os.ReadFile(fileName)
+			if err != nil {
+				log.Errorf("failed to read file %s: %v", fileName, err)
+				return err
+			}
+			rule, err := sfvm.FormatRule(string(raw))
+			if err != nil {
+				log.Errorf("failed to format file %s: %v", fileName, err)
+				return err
+			}
+			err = os.WriteFile(fileName, []byte(rule), 0o666)
+			if err != nil {
+				log.Errorf("failed to write file %s: %v", fileName, err)
+				return err
+			}
+			return nil
+		}
+
+		for _, path := range c.Args() {
+			if utils.IsFile(path) {
+				format(path)
+			} else if utils.IsDir(path) {
+				log.Infof("syntaxflow-format: processing directory %s", path)
+
+				filesys.Recursive(path, filesys.WithFileSystem(filesys.NewLocalFs()), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+					format(s)
+					return nil
+				}))
+			} else {
+				log.Errorf("syntaxflow-format: file %s not found", path)
+			}
+		}
+		return nil
+	},
+}
+
 var syntaxFlowSave = &cli.Command{
 	Name:    "syntaxflow-save",
 	Aliases: []string{"save-syntaxflow", "ssf", "sfs"},
@@ -1073,6 +1125,7 @@ var SSACompilerCommands = []*cli.Command{
 
 	// rule manage
 	syntaxFlowCreate, // create rule template
+	syntaxflowFormat, //  format syntaxflow rule
 	syntaxFlowSave,   // save rule to database
 	syntaxFlowTest,   // test rule
 	syntaxFlowExport, // export rule to file

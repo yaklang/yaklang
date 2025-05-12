@@ -56,7 +56,7 @@ line: BreakLine;
 lines: line+;
 
 // descriptionStatement will describe the filterExpr with stringLiteral
-descriptionStatement: Desc ('(' descriptionItems? ')') | ('{' descriptionItems? '}');
+descriptionStatement: Desc (('(' lines? descriptionItems? ')') | ('{' lines? descriptionItems? '}'));
 descriptionItems: lines? (descriptionItem descriptionSep)* descriptionItem descriptionSep? ;
 descriptionItem
     : comment
