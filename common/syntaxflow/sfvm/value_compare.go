@@ -2,7 +2,7 @@ package sfvm
 
 import (
 	"context"
-	"fmt"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"regexp"
 	"slices"
 	"strconv"
@@ -201,7 +201,7 @@ func (c *ConstComparator) Matches(target string) bool {
 		return false, utils.Error("parse bool failed")
 	}
 
-	toComparedBool, toComparedErr := parseBool(c.ToCompared)
+	toComparedBool, toComparedErr := parseBool(yakunquote.TryUnquote(c.ToCompared))
 	targetBool, targetErr := parseBool(target)
 	// If both can be parsed as booleans, compare them
 	if toComparedErr == nil && targetErr == nil {
@@ -216,7 +216,6 @@ func (c *ConstComparator) Matches(target string) bool {
 	// Default: compare as strings
 	// String()方法会修正string类型的const，因此这里要进行修正
 	// Reference:common/yak/ssa/disasmLine.go:160
-	target = fmt.Sprintf("%#v", target)
 
 	switch c.BinaryCondition {
 	case BinaryConditionEqual:

@@ -2,6 +2,7 @@ package sfvm
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"regexp"
 	"strconv"
 	"strings"
@@ -235,7 +236,7 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 			n := y.VisitNumberLiteral(i.NumberLiteral())
 			y.EmitPushLiteral(n)
 		} else if i.Identifier() != nil {
-			y.EmitPushLiteral(i.Identifier().GetText())
+			y.EmitPushLiteral(yakunquote.TryUnquote(i.Identifier().GetText()))
 		} else {
 			if i.GetText() == "true" {
 				y.EmitPushLiteral(true)
