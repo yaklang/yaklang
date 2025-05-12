@@ -67,8 +67,9 @@ type Config struct {
 	// no need to think, low level
 	taskAICallback AICallbackType
 	toolAICallback SimpleAiCallbackType
-	tools          []*aitool.Tool
-	eventHandler   func(e *Event)
+
+	tools        []*aitool.Tool
+	eventHandler func(e *Event)
 
 	enableToolSearch bool
 	// tool manager
