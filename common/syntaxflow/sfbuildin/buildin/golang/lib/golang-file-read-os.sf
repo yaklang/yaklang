@@ -1,12 +1,12 @@
 desc(
-    title: "check file read function(os)",
-    type: audit,
-    level: info,
-    lib: 'golang-file-read-os',
-    rule_id: 10000014,
-    desc: <<<TEXT
+	title: "check file read function(os)"
+	type: audit
+	level: info
+	lib: 'golang-file-read-os'
+	desc: <<<TEXT
 此规则用于审计Go语言项目中文件读取功能的安全性。
 TEXT
+	rule_id: "130d8178-f5c8-49ad-a7a3-ba47da0e50f9"
 )
 
 os?{<fullTypeName>?{have: 'os'}} as $os
@@ -16,9 +16,9 @@ $param?{!have: 'Parameter'} as $output;
 alert $output
 
 desc(
-    lang: golang,
-    alert_min: 1,
-    'file://fileread.go': <<<PARAM
+	lang: golang
+	alert_min: 1
+	'file://fileread.go': <<<PARAM
 package main
 
 import (

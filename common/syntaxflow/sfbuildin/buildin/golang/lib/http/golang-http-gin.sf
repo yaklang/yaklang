@@ -1,12 +1,12 @@
 desc(
-    title: "check executing request(gin)",
-    type: audit,
-    level: info,
-    lib: "golang-http-gin",
-    rule_id: 10000008,
-    desc: <<<TEXT
+	title: "check executing request(gin)"
+	type: audit
+	level: info
+	lib: "golang-http-gin"
+	desc: <<<TEXT
 此审计规则旨在检查使用Gin框架构建的Go语言Web应用程序中的请求处理逻辑。尽管该规则本身不直接指向特定的安全漏洞，但通过分析应用程序如何处理HTTP请求，可以发现潜在的安全风险，如不当的输入验证、未授权的资源访问、敏感信息泄露等。定期审计请求处理逻辑是确保Web应用程序安全性的重要步骤。
 TEXT
+	rule_id: "0f451c28-265e-4e72-af5b-c50c7006848f"
 )
 
 gin?{<fullTypeName>?{have: 'github.com/gin-gonic/gin'}} as $entry;
@@ -17,9 +17,9 @@ $handle<getFormalParams> as $output
 alert $output
 
 desc(
-    lang: golang,
-    alert_min: 1,
-    'file://http_gin.go': <<<PARAM
+	lang: golang
+	alert_min: 1
+	'file://http_gin.go': <<<PARAM
 package main
 
 import (

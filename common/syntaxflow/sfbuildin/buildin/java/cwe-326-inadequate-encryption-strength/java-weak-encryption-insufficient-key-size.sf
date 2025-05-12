@@ -1,13 +1,13 @@
 desc(
-    title: "Find Java Weak Encryption Insufficient Key Size",
-    title_zh: "查找Java弱加密 - 密钥长度不足",
-    type: security,
-    rule_id: 20236001,
-    risk: 'risky_crypt'
-    level: low,
-    desc: <<<TEXT
+	title: "Find Java Weak Encryption Insufficient Key Size"
+	title_zh: "查找Java弱加密 - 密钥长度不足",
+	type: security
+	risk: 'risky_crypt'
+	level: low
+	desc: <<<TEXT
    该规则是用于检测Java代码中使用RSAKeyGenParameterSpec类初始化RSA密钥时，如果密钥长度小于2048位，就会告警。这是为了防止使用不足的密钥长度导致加密强度不足，从而容易受到暴力破解攻击。开发者应该确保遵循推荐的密钥长度，以保障加密安全。
 TEXT
+	rule_id: "238e7158-0746-4178-9d00-36ff473eeafd"
 )
 
 RSAKeyGenParameterSpec?{<typeName>?{have:'java.security.spec.RSAKeyGenParameterSpec'}}(,* as $keySize);
@@ -21,9 +21,9 @@ alert $risk for{
 }
 
 desc(
-    lang:java,
-    alert_num:1,
-    'file://unsafe.java': <<<EOF
+	lang:java
+	alert_num:1
+	'file://unsafe.java': <<<EOF
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
@@ -52,8 +52,8 @@ EOF
 )
 
 desc(
-    lang:java,
-    'safefile://safe.java': <<<EOF
+	lang:java
+	'safefile://safe.java': <<<EOF
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;

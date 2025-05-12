@@ -1,12 +1,12 @@
 desc(
-    title: "Check LDAP Injection Vulnerability For Java",
-    title_zh: "检测Java LDAP注入漏洞",
-    type: vuln,
-    risk_type: "ldap-injection",
-    rule_id: 20090001,
-    desc: <<<TEXT
+	title: "Check LDAP Injection Vulnerability For Java"
+	title_zh: "检测Java LDAP注入漏洞",
+	type: vuln
+	risk_type: "ldap-injection"
+	desc: <<<TEXT
 LDAP注入漏洞是一种安全漏洞，攻击者可以通过构造恶意的LDAP查询语句，利用应用程序对用户输入的验证不足，绕过安全措施，获取敏感信息或执行未授权的操作。在Java应用中，如果LDAP查询语句直接拼接了用户输入，而未进行适当的过滤或转义，攻击者可能会插入恶意的LDAP过滤器，导致未授权访问或数据泄露。建议开发者对LDAP查询语句中的用户输入进行严格的验证和清理，使用参数化查询或预编译语句，以防止LDAP注入攻击。
 TEXT
+	rule_id: "cbf59495-e46c-45aa-9a10-e7c90559a17c"
 )
 
 <include('java-spring-mvc-param')> as $source;
@@ -37,10 +37,10 @@ alert $low for {
 };
 
 desc(
-    alert_min: 1,
-    alert_high: 1,
-    language: java,
-    'file://LDAPInjection.java': <<<EOF
+	alert_min: 1
+	alert_high: 1
+	language: java
+	'file://LDAPInjection.java': <<<EOF
 package com.example;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -87,8 +87,8 @@ EOF
 )
 
 desc(
-    language: java,
-    'safefile://LDAPInjection.java': <<<SAFE
+	language: java
+	'safefile://LDAPInjection.java': <<<SAFE
 package com.example;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;

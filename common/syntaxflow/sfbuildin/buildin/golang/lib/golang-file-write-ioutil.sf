@@ -1,12 +1,12 @@
 desc(
-    title: "check file write function(ioutil)",
-    type: audit,
-    level: info,
-    lib: 'golang-file-write-ioutil',
-    rule_id: 10000017,
-    desc: <<<TEXT
+	title: "check file write function(ioutil)"
+	type: audit
+	level: info
+	lib: 'golang-file-write-ioutil'
+	desc: <<<TEXT
 此规则用于审计Go语言项目中文件写入功能的安全性。使用`io/ioutil`包中的`WriteFile`和`WriteAll`函数进行文件写操作可能会引发安全风险，特别是在处理不受信任的数据时。这些函数会直接将数据写入文件，如果不进行适当的验证和过滤，可能会导致敏感信息泄露、文件覆盖或恶意代码注入等安全问题。尽管`ioutil`包在Go 1.16版本后逐渐被`io`和`os`包取代，但在旧代码库中仍可能广泛使用。建议开发者审慎使用这些函数，并在必要时进行输入验证和权限控制。
 TEXT
+	rule_id: "f163be89-aa0c-4f6c-a045-8ea9c8b93a0a"
 )
 
 ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
@@ -16,9 +16,9 @@ $entry.WriteFile(*<slice(index=1)> #-> as $output)
 alert $output
 
 desc(
-    lang: golang,
-    alert_min: 1,
-    'file://filewrite.go': <<<PARAM
+	lang: golang
+	alert_min: 1
+	'file://filewrite.go': <<<PARAM
 package main
 
 import (

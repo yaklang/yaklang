@@ -1,12 +1,12 @@
 desc(
-    title: "check audit xml input and parsing",
-    type: audit,
-    level: info,
-    lib: 'golang-xml-sink',
-    rule_id: 10000026,
-    desc: <<<TEXT
+	title: "check audit xml input and parsing"
+	type: audit
+	level: info
+	lib: 'golang-xml-sink'
+	desc: <<<TEXT
 此规则旨在审计Go语言代码中`xml`包的使用情况。
 TEXT
+	rule_id: "cc977fdf-90b8-44e5-a80d-468e05c15276"
 )
 
 xml?{<fullTypeName>?{have: 'encoding/xml'}} as $entry
@@ -15,9 +15,9 @@ $entry.NewDecoder() as $output
 alert $output
 
 desc(
-    lang: golang,
-    alert_min: 1,
-    'file://xml.go': <<<PARAM
+	lang: golang
+	alert_min: 1
+	'file://xml.go': <<<PARAM
 package main
 
 import (

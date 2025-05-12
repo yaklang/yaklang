@@ -1,11 +1,11 @@
 desc(
-    title: "Find Config for Thymeleaf (Java Class Config)",
-    type: audit,
-    severity: low,
-    rule_id:21105006,
-    desc: <<<TEXT
+	title: "Find Config for Thymeleaf (Java Class Config)"
+	type: audit
+	severity: low
+	desc: <<<TEXT
 审计Thymeleaf的Java类配置，主要是检查是否使用了`SpringResourceTemplateResolver`。`SpringResourceTemplateResolver`用于解析Thymeleaf模板文件，如果配置不当，可能会引发模板注入等安全风险。尽管此配置本身不一定是漏洞，但了解其使用及配置情况对于全面的安全审计是必要的。
 TEXT
+	rule_id: "70226437-3bb9-4902-b30a-da4e2820bd63"
 )
 
 SpringResourceTemplateResolver() as $templateResolver;
@@ -16,9 +16,9 @@ alert $params for {
 };
 
 desc(
-lang: java,
-alert_min: 3,
-'file://config.java': <<<EOF
+	lang: java
+	alert_min: 3
+	'file://config.java': <<<EOF
 @Configuration
 public class ThymeleafConfig {
     @Bean

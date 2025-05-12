@@ -1,21 +1,21 @@
 desc(
-    title:"Find Java Contain Sanitizer",
-    title_zh:"查找Java含有contain方法的过滤器",
-    type: audit,
-    lib: 'is-contain-sanitizer',
-    rule_id: 20000012,
-    desc: <<<TEXT
+	title:"Find Java Contain Sanitizer"
+	title_zh:"查找Java含有contain方法的过滤器",
+	type: audit
+	lib: 'is-contain-sanitizer'
+	desc: <<<TEXT
     该规则用于查找Java代码中是否有方法包含"contain"。该规则期望输入的参数的opcode为call，如果该call名称包含"contain"则会返回call原值。
 该规则常用于确认数据流分析中是否有白名单校验、字符串检验等操作。
 TEXT
+	rule_id: "43b46725-0b30-4e2f-9559-0d7a30e6b668"
 )
 $input?{opcode:call && have:"contain"} as $output;
 alert $output;
 
 desc(
-    lang:"java",
-    alert_num:1,
-    "file://demo.java":<<<EOF
+	lang:"java"
+	alert_num:1
+	"file://demo.java":<<<EOF
     public class demo {
         public static void main(String[] args) {
             String str = "hello";

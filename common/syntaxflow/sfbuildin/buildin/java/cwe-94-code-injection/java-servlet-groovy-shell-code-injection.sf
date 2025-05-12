@@ -1,17 +1,17 @@
 desc(
-    title_zh:"查找Java Servlet Groovy Shell代码注入漏洞",
-    title:"Find Java Servlet Groovy Shell Code Injection Vulnerability",
-    type:"vuln",
-    rule_id: 20094003,
-    desc:<<<TEXT
+	title_zh:"查找Java Servlet Groovy Shell代码注入漏洞",
+	title:"Find Java Servlet Groovy Shell Code Injection Vulnerability"
+	type:"vuln"
+	desc:<<<TEXT
 Java Servlet Groovy Shell代码注入漏洞是指在Java Servlet应用程序中，使用Groovy Shell执行动态Groovy代码时，未对输入进行严格的验证和过滤，导致攻击者可以注入恶意代码并执行任意操作。这种漏洞可能导致远程命令执行、数据泄露或系统破坏等严重后果。
 TEXT
-    fix:<<<TEXT
+	fix:<<<TEXT
 在使用Groovy脚本引擎时，确保对输入进行严格的验证和过滤。避免直接执行用户输入的Groovy代码，或者使用安全的沙箱环境来限制代码的执行权限。此外，可以考虑使用其他更安全的脚本语言或框架来实现动态脚本执行的需求。
 TEXT
-    ref:<<<TEXT
+	ref:<<<TEXT
 https://docs.groovy-lang.org/next/html/api/groovy/lang/GroovyShell.html
 TEXT
+	rule_id: "2446f3b6-3db3-4414-b593-4219073220c4"
 )
 
 <include('java-servlet-param')> as $source;
@@ -41,9 +41,9 @@ alert $low for {
 }
 
 desc(
-    lang: java,
-    alert_min: 3,
-    'file://risk1.java': <<<TEXT
+	lang: java
+	alert_min: 3
+	'file://risk1.java': <<<TEXT
 package org.example.servlet.rce;
 
 import groovy.lang.GroovyShell;
@@ -107,8 +107,8 @@ public class GroovyEvaluateServlet extends HttpServlet {
         return output.toString();
     }
 }
-TEXT,
-    'file://risk2.java': <<<TEXT
+TEXT
+	'file://risk2.java': <<<TEXT
 package org.example.servlet.rce;
 
 import groovy.lang.GroovyShell;
@@ -175,8 +175,8 @@ public class GroovyParseServlet extends HttpServlet {
         return output.toString();
     }
 }
-TEXT,
-    'file://risk3.java': <<<TEXT
+TEXT
+	'file://risk3.java': <<<TEXT
 package org.example.servlet.rce;
 
 import groovy.lang.GroovyShell;

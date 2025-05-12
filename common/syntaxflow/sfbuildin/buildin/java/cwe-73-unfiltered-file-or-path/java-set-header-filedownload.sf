@@ -1,12 +1,12 @@
 desc(
-    title: "Find File Download Position Config via Attachment Filename",
-    title_zh: "寻找文件下载位置配置点（使用 setHeader(Content-disposition...)）配置",
-    type: config,
-    level: low,
-    rule_id: 20073002,
-    desc: <<<TEXT
+	title: "Find File Download Position Config via Attachment Filename"
+	title_zh: "寻找文件下载位置配置点（使用 setHeader(Content-disposition...)）配置",
+	type: config
+	level: low
+	desc: <<<TEXT
 通过配置 `Content-Disposition` 头部中的文件名，应用程序可能会暴露文件下载功能的配置细节。攻击者可能会利用此配置点进行文件下载路径的猜测或枚举，进而获取敏感信息或执行进一步的攻击。建议对文件名进行适当的验证和清理，以防止潜在的安全风险。
 TEXT
+	rule_id: "df1af403-0bc8-4d7e-bcd6-6bb863559f02"
 )
 
 .setHeader(*<slice(start=1)> as $params);
@@ -18,8 +18,8 @@ check $sink;
 alert $sink for "Config Download filename Position";
 
 desc(
-    language: java,
-'file://download.java': <<<TEXT
+	language: java
+	'file://download.java': <<<TEXT
 package com.ruoyi.common.core.utils.file;
 
 import java.io.File;

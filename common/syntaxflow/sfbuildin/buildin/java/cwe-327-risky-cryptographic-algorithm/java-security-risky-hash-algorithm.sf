@@ -1,16 +1,16 @@
 desc(
-    title_zh:"检测Java java.security使用不安全的哈希算法",
-    title: "Check Java java.security use of broken or risky hash algorithm",
-    type: security,
-    level: low,
-    risk : '不安全加密算法',
-    rule_id: 20327003,
-    reference:<<<URL
+	title_zh:"检测Java java.security使用不安全的哈希算法",
+	title: "Check Java java.security use of broken or risky hash algorithm"
+	type: security
+	level: low
+	risk : '不安全加密算法',
+	reference:<<<URL
     https://cwe.mitre.org/data/definitions/327.html
 URL
-    desc: <<<TEXT
+	desc: <<<TEXT
     检测代码中是否使用了已知的不安全或易受攻击的哈希算法。在加密算法中，如果使用了已知的不安全或易受攻击的哈希算法，可能会导致信息泄露、数据篡改等安全问题。建议开发者使用安全的哈希算法，如SHA-256、SHA-3等，避免使用已知的不安全或易受攻击的哈希算法。
 TEXT
+	rule_id: "225be977-0ab7-4f04-af7f-b8ba50fb529f"
 )
 
 .getInstance?{<typeName>?{have:'java.security'}}(*<slice(index=1)>as $algorithm);
@@ -25,9 +25,9 @@ alert $sink for{
 }
 
 desc(
-    lang:java,
-    alert_num:6,
-    'file://unsafe.java': <<<EOF
+	lang:java
+	alert_num:6
+	'file://unsafe.java': <<<EOF
      import java.security.MessageDigest;
      import java.security.NoSuchAlgorithmException;
      import java.util.Formatter;

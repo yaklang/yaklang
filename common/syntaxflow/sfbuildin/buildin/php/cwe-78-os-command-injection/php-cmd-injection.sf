@@ -1,13 +1,13 @@
 desc(
-    title: "PHP Filtered Path Command Injection",
-    title_zh: "命令注入",
-    type: audit,
-    level: mid,
-    risk:'rce',
-    rule_id: 30078001,
-    desc: <<<TEXT
+	title: "PHP Filtered Path Command Injection"
+	title_zh: "命令注入",
+	type: audit
+	level: mid
+	risk:'rce'
+	desc: <<<TEXT
     在PHP代码中，如果用户输入的命令没有经过充分的过滤，可能会导致命令注入漏洞。攻击者可以通过构造恶意输入，执行系统命令，进而控制服务器。为了防止命令注入漏洞，需要对用户输入的命令进行严格的过滤，包括验证命令的合法性、长度、字符等，并尽量避免直接执行用户输入的命令。
 TEXT
+	rule_id: "0528aab2-8f17-40d9-a58a-fb83a632d377"
 )
 <include('php-os-exec')>(* as $sink);
 <include('php-param')> as $params;
@@ -50,12 +50,12 @@ alert $low for{
 }
 
 desc(
-    lang: 'php',
-    alert_min: 3,
-    alert_low: 1,
-    alert_mid: 1,
-    alert_high: 1,
-    'file://test.php': <<<CODE
+	lang: 'php'
+	alert_min: 3
+	alert_low: 1
+	alert_mid: 1
+	alert_high: 1
+	'file://test.php': <<<CODE
 <?php
     $a = $_GET[1];
     system($a); //high

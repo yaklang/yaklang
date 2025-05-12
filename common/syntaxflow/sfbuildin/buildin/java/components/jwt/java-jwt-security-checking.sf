@@ -1,9 +1,8 @@
 desc(
-    title: 'JWT Security Checking For Java',
-    title_zh: 'Java JWT 安全检查',
-    rule_id:21105003,
-    type: vuln,
-    desc: <<<TEXT
+	title: 'JWT Security Checking For Java'
+	title_zh: 'Java JWT 安全检查',
+	type: vuln
+	desc: <<<TEXT
 JSON Web Tokens (JWTs) 是一种用于在网络应用环境间安全地传输信息的紧凑且自包含的方式。然而，不当的 JWT 使用会导致严重的安全问题。本规则旨在检查 Java 代码中 JWT 的安全性，包括但不限于以下几个方面：
 1. **不安全的解析方法**：直接使用 `Jwts.parser().setSigningKey().parse()` 方法解析 JWT 而不进行任何额外的验证或检查，可能会导致恶意用户伪造或篡改 JWT。
 2. **硬编码密钥**：在代码中硬编码 JWT 签名密钥（如直接在代码中写明密钥值），会使密钥容易被泄露，从而允许攻击者伪造有效的 JWT。
@@ -11,6 +10,7 @@ JSON Web Tokens (JWTs) 是一种用于在网络应用环境间安全地传输信
 
 这些漏洞可能导致认证绕过（auth-bypass），允许攻击者未经授权地访问受保护的资源或执行特权操作。
 TEXT
+	rule_id: "98a8cf55-3355-463f-ad5d-9bbe8349e6c6"
 )
 
 Jwts?{<typeName>?{have: 'io.jsonwebtoken'}} as $jwt;
@@ -46,9 +46,9 @@ alert $sink for {
 }
 
 desc(
-    alert_min: 3,
-    lang:java,
-    "file://JWTSecurity.java": <<<EOF
+	alert_min: 3
+	lang:java
+	"file://JWTSecurity.java": <<<EOF
 package org.owasp.aaa;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwt;

@@ -1,15 +1,15 @@
 desc(
-    title: "golang FTP information exposure",
-    type: audit,
-    severity: low,
-    rule_id: 10200001,
-    desc: <<<TEXT
+	title: "golang FTP information exposure"
+	type: audit
+	severity: low
+	desc: <<<TEXT
 检测可能通过FTP相关函数泄露服务器敏感信息，包括：
     1. 目录结构暴露
     2. 当前工作路径泄露
     3. 服务器系统类型识别
     可能被攻击者用于信息收集阶段，辅助后续攻击
 TEXT
+	rule_id: "4c742090-cd2c-456b-b8e5-4cb2740abbbd"
 )
 
 <include('golang-fmt-print')> as $sink;
@@ -26,9 +26,9 @@ alert $low for {
 }
 
 desc(
-    lang: golang,
-    alert_low: 1,
-    'file://main.go': <<<UNSAFE
+	lang: golang
+	alert_low: 1
+	'file://main.go': <<<UNSAFE
 package main
 
 import (

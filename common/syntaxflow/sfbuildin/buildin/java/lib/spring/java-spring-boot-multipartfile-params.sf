@@ -1,13 +1,12 @@
 desc(
-    title_zh:"查找Spring Framework MultipartFile TransferTo 目标",
-    title: "Find Spring Framework MultipartFile TransferTo Target",
-    type: audit,
-    lib: "java-spring-multipartfile-transferTo-target",
-    rule_id: 20000004,
-    reference:<<<URL
+	title_zh:"查找Spring Framework MultipartFile TransferTo 目标",
+	title: "Find Spring Framework MultipartFile TransferTo Target"
+	type: audit
+	lib: "java-spring-multipartfile-transferTo-target"
+	reference:<<<URL
     https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/multipart/MultipartFile.html
 URL
-    desc: <<<TEXT
+	desc: <<<TEXT
 该审计规则旨在识别 Java 代码中 Spring Framework MultipartFile 库的 TransferTo 方法的目标路径。TransferTo 方法用于将上传的文件传输到指定的目标位置。审计此方法的目标路径可以帮助识别潜在的安全风险，例如任意文件上传或目录遍历攻击。通过确保目标路径是安全和受信任的，可以降低这些风险并保护系统免受恶意文件上传的影响。
 该规则审计的类为:
 - org.springframework.web.multipart.MultipartFile
@@ -15,6 +14,7 @@ URL
 - void transferTo(File dest)
 - void transferTo(Path dest)
 TEXT
+	rule_id: "8577b8ff-aeab-4830-a21c-b5a342f0cbe3"
 )
 
 MultipartFile?{<typeName>?{have:'org.springframework.web.multipart.MultipartFile'}} as $multipartFile

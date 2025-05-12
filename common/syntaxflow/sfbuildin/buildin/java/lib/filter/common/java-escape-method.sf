@@ -1,12 +1,12 @@
 desc(
-    title: "Find Java Escape Method",
-    title_zh: "查找Java转义方法",
-    lib: 'java-escape-method',
-    rule_id: 20000042,
-    type: audit,
-    desc: <<<TEXT
+	title: "Find Java Escape Method"
+	title_zh: "查找Java转义方法",
+	lib: 'java-escape-method'
+	type: audit
+	desc: <<<TEXT
     此规则用于查找Java代码中可能存在的实体转义方法，该方法经常用于审计XSS漏洞。
 TEXT
+	rule_id: "105b3dd0-6ac1-4e00-a38d-464e17e3e7fc"
 )
 
 /(?i)(sanitiz|encod(e|ing)|entit(y|ies)|escap(e|ing)|replace|regex|normaliz|canonical|anti|safe|purif|purg|pure|validate|strip|clean|clear|special|convert|remov)/ as $output;

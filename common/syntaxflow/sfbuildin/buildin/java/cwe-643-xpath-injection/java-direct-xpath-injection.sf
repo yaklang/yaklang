@@ -1,12 +1,12 @@
 desc(
-    title: "Check XPath Injection Vulnerability For Java",
-    title_zh: "检测Java XPath注入漏洞",
-    type: vuln,
-    risk_type: "xpath-injection",
-    rule_id: 20643001,
-    desc: <<<TEXT
+	title: "Check XPath Injection Vulnerability For Java"
+	title_zh: "检测Java XPath注入漏洞",
+	type: vuln
+	risk_type: "xpath-injection"
+	desc: <<<TEXT
 XPath注入漏洞是一种安全漏洞，攻击者可以通过构造恶意的XPath表达式来操控应用程序的查询逻辑，从而获取敏感数据或进行未授权的操作。在Java应用程序中，尤其是那些处理XML数据并使用XPath进行查询的应用程序中，如果未对用户输入进行适当的验证和转义，就可能会受到XPath注入攻击。这种攻击可能导致数据泄露、数据篡改或拒绝服务等严重后果。
 TEXT
+	rule_id: "9f04beb1-fc2d-40b3-b75f-9ea63e9a4338"
 )
 
 <include('java-spring-mvc-param')> as $source;
@@ -26,9 +26,9 @@ alert $high for {
 };
 
 desc(
-    alert_min: 2,
-    language: java,
-    'file://XPathInjection.java': <<<EOF
+	alert_min: 2
+	language: java
+	'file://XPathInjection.java': <<<EOF
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -69,8 +69,8 @@ public class XPathInjectionExample {
 
 
 }
-EOF,
-    'file://XPathInjection2.java': <<<EOF
+EOF
+	'file://XPathInjection2.java': <<<EOF
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;

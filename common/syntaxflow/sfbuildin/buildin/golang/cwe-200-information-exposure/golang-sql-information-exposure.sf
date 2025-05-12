@@ -1,15 +1,15 @@
 desc(
-    title: "golang SQL information exposure",
-    type: audit,
-    severity: low,
-    rule_id: 10200002,
-    desc: <<<TEXT
+	title: "golang SQL information exposure"
+	type: audit
+	severity: low
+	desc: <<<TEXT
 检测可能通过SQL相关函数泄露服务器敏感信息，包括：
     1. 目录结构暴露
     2. 当前工作路径泄露
     3. 服务器系统类型识别
     可能被攻击者用于信息收集阶段，辅助后续攻击
 TEXT
+	rule_id: "a549400b-af87-4955-b792-5dbb1fcce409"
 )
 
 <include('golang-database-sink')> as $sink;
@@ -31,9 +31,9 @@ alert $low for {
 }
 
 desc(
-    lang: golang,
-    alert_low: 1,
-    'file://main.go': <<<UNSAFE
+	lang: golang
+	alert_low: 1
+	'file://main.go': <<<UNSAFE
 package main
 
 import (

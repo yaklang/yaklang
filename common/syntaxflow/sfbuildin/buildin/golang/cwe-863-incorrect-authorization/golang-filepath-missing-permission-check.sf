@@ -1,15 +1,15 @@
 desc(
-    title: "golang filepath missing permission check",
-    type: audit,
-    level: low,
-    rule_id: 10863001,
-    desc: <<<TEXT
+	title: "golang filepath missing permission check"
+	type: audit
+	level: low
+	desc: <<<TEXT
 此审计规则旨在验证用户输入及传入的文件路径是否经过适当的过滤与授权。如果文件路径未经过验证，攻击者可能通过构造恶意路径实现文件覆盖、删除或路径穿越攻击，从而导致安全风险。路径穿越攻击允许攻击者访问或修改应用程序之外的敏感文件，甚至可能导致服务器被完全控制。
 
 文件路径未授权漏洞通常发生在以下场景：
 1. 用户提供的文件名或路径直接拼接到目标路径中，例如 `filePath := "/files/" + fileID`。
 2. 未对文件路径进行严格的验证，导致攻击者可以通过 `../` 等特殊字符实现路径穿越。
 TEXT
+	rule_id: "838bdd38-5913-46ed-88f7-8eced02db2bd"
 )
 
 <include('golang-file-path')> as $path;
@@ -30,9 +30,9 @@ alert $low for {
 }
 
 desc(
-    lang: golang,
-    alert_low: 1,
-    'file://main.go': <<<UNSAFE
+	lang: golang
+	alert_low: 1
+	'file://main.go': <<<UNSAFE
 package main
 
 import (
@@ -65,8 +65,8 @@ func main() {
     http.HandleFunc("/delete", deleteFile)
     http.ListenAndServe(":8080", nil)
 }
-UNSAFE,    
-    'safe://main.go': <<<SAFE
+UNSAFE
+	'safe://main.go': <<<SAFE
 
 
 SAFE

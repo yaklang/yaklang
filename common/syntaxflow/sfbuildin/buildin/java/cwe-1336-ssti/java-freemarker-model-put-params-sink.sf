@@ -1,11 +1,11 @@
 desc(
-  title: 'checking [freeMarker.Template.Process directly] audit prompt',
-  type: audit,
-  level: warning,
-  rule_id: 21336002,
-  desc: <<<TEXT
+	title: 'checking [freeMarker.Template.Process directly] audit prompt'
+	type: audit
+	level: warning
+	desc: <<<TEXT
    检查Freemarker模板中的process方法，以确保不会直接将用户输入作为参数传递给process方法。如果用户输入未经过充分的过滤，可能会导致Freemarker模板注入漏洞。攻击者可以通过构造恶意输入，执行Freemarker模板中的代码，进而控制服务器。为了防止Freemarker模板注入漏洞，需要对用户输入进行严格的过滤，包括验证输入的合法性、长度、字符等，并尽量避免直接将用户输入作为参数传递给Freemarker模板的process方法。
 TEXT
+	rule_id: "79bb6b64-7a3f-4bdc-9af9-9f68341d16cd"
 )
 
 getTemplate(,*?{!opcode: const} as $sink).process(,* as $params,);
@@ -15,8 +15,8 @@ check $sink then "Found Freemarker Process Using" else "No Freemarker Process Si
 alert $sink;
 
 desc(
-    lang: java,
-    'file://basic.java': <<<BASIC
+	lang: java
+	'file://basic.java': <<<BASIC
 import freemarker.template.*;
 
 import java.io.*;

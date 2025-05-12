@@ -1,13 +1,13 @@
 desc(
-    title: "Find My(i)Batis XML Weak ('${...}') Params to Spring Params",
-    title_zh: '找到 MyBatis/iBatis XML Mapper 不安全(${...})参数到 Springframework 可达路径',
-    type: vuln,
-    level: middle,
-    risk: sqli,
-    rule_id: 20089003,
-    desc: <<<TEXT
+	title: "Find My(i)Batis XML Weak ('${...}') Params to Spring Params"
+	title_zh: '找到 MyBatis/iBatis XML Mapper 不安全(${...})参数到 Springframework 可达路径',
+	type: vuln
+	level: middle
+	risk: sqli
+	desc: <<<TEXT
 在 MyBatis/iBatis 中，XML Mapper 文件中的 `${...}` 语法用于直接文本替换，这可能会导致 SQL 注入漏洞。当这些不安全的 `${...}` 参数能够从 Spring 框架的控制器或其他可达路径中被注入时，攻击者可以构造恶意的输入来操纵 SQL 查询，进而执行未授权的数据库操作。建议避免在 MyBatis/iBatis XML Mapper 中使用 `${...}` 语法，而应使用 `#{...}` 语法，因为后者会对参数进行预编译，从而防止 SQL 注入。
 TEXT
+	rule_id: "5323c275-713f-4b22-a1cc-d22db1655fb2"
 )
 
 <include('java-spring-mvc-param')> as $top;
@@ -36,8 +36,8 @@ alert $vuln;
 
 
 desc(
-language: java,
-'file://Controller.java': <<<TEXT
+	language: java
+	'file://Controller.java': <<<TEXT
 package com.mycompany.myapp;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -84,8 +84,8 @@ public class UserController {
         return ResponseEntity.ok(users);
     }
 }
-TEXT,
-'file://UserMapper.java': <<<TEXT
+TEXT
+	'file://UserMapper.java': <<<TEXT
 package com.mycompany.myapp;
 
 import org.apache.ibatis.annotations.Mapper;
@@ -106,8 +106,8 @@ public interface UserMapper {
 
     List<User> getAllUsers(); // 可选，获取所有用户
 }
-TEXT,
-'file://sqlmap.xml': <<<TEXT
+TEXT
+	'file://sqlmap.xml': <<<TEXT
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"

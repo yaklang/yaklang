@@ -1,12 +1,12 @@
 desc(
-    title: "Check Java URL Redirect Vulnerability",
-    title_zh: "检测Java URL重定向漏洞",
-    type:vuln,
-    risk_type:"url-redirect",
-    rule_id: 20601001,
-    desc:<<<TEXT
+	title: "Check Java URL Redirect Vulnerability"
+	title_zh: "检测Java URL重定向漏洞",
+	type:vuln
+	risk_type:"url-redirect"
+	desc:<<<TEXT
     URL重定向漏洞（URL Redirect）是一种常见的Web安全漏洞，攻击者通过构造恶意URL，将用户重定向到恶意网站，从而实施钓鱼攻击、恶意软件传播等攻击。在Java应用中，如果开发者未能正确验证或过滤用户输入的URL，攻击者可能会利用此漏洞将用户重定向到恶意网站，造成用户信息泄露、恶意软件传播等安全问题。这种漏洞通常发生在URL重定向功能中，当应用未能限制用户输入的URL时，攻击者可以构造恶意URL来重定向用户
 TEXT
+	rule_id: "56a91b23-787c-4c35-a4b9-dcf51521c20f"
 )
 <include('java-spring-mvc-param')> as $param1;
 <include('java-servlet-param')> as $param2;
@@ -39,9 +39,9 @@ alert $low for {
 };
 
 desc(
-    alert_min:3,
-    lang: java,
-    'file://urlDirect1.java': <<<EOF
+	alert_min:3
+	lang: java
+	'file://urlDirect1.java': <<<EOF
 package com.example.urlredirection;
 
 import org.springframework.stereotype.Controller;
@@ -62,8 +62,8 @@ public class SecureRedirectController {
        return "redirect:http://" + target;
    }
 }
-EOF,
-    'file://urlDirect2.java': <<<EOF
+EOF
+	'file://urlDirect2.java': <<<EOF
     import java.io.IOException;
     import javax.servlet.ServletException;
     import javax.servlet.annotation.WebServlet;

@@ -1,15 +1,15 @@
 desc(
-    title: "SQL query concat or Out-Of-Control in createStatement().executeQuery",
-    title: 'SQL 语句拼接的不安全写法：executeQuery 发生拼接且调用参数直接被参数控制',
-    type: audit,
-    severity: mid,
-    risk:sqli,
-    rule_id: 20089001,
-    description: <<<DESC
+	title: "SQL query concat or Out-Of-Control in createStatement().executeQuery"
+	title: 'SQL 语句拼接的不安全写法：executeQuery 发生拼接且调用参数直接被参数控制',
+	type: audit
+	severity: mid
+	risk:sqli
+	description: <<<DESC
 在Java中，SQL语句拼接的不安全写法主要体现在使用字符串拼接来构建SQL查询时，用户输入的参数直接被插入到SQL语句中。
 
 这种做法容易导致SQL注入攻击，攻击者可以通过恶意构造的输入操控SQL查询，从而获取敏感数据或执行未授权的操作。
 DESC
+	rule_id: "b8ede24d-8ff0-4d81-ab97-903495a6cb61"
 )
 
 .createStatement().executeQuery(,* as $params);
@@ -35,9 +35,9 @@ alert $vuln;
 
 
 desc(
-language: java,
-alert_min: 6,
-'file://a.java': <<<FILE
+	language: java
+	alert_min: 6
+	'file://a.java': <<<FILE
 package src.main.a;
 class Login {
   String hashPassword(char[] p) {
@@ -62,8 +62,8 @@ class Login {
     }
   }
 }
-FILE,
-'file://a1.java': <<<FILE
+FILE
+	'file://a1.java': <<<FILE
 package src.main.b;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -94,8 +94,8 @@ class Login {
     }
   }
 }
-FILE,
-'file://a3.java': <<<FILE
+FILE
+	'file://a3.java': <<<FILE
 package src.main.c;
 class Login {
   String hashPassword(char[] p) {
@@ -118,8 +118,8 @@ class Login {
     }
   }
 }
-FILE,
-'file://a4.java': <<<FILE
+FILE
+	'file://a4.java': <<<FILE
 package src.main.d;
 class Login {
   String hashPassword(char[] p) {
@@ -146,5 +146,5 @@ class Login {
     }
   }
 }
-FILE,
+FILE
 )

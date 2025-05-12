@@ -1,12 +1,12 @@
 desc(
-    title: "check audit the usage of the os package",
-    type: audit,
-    level: info,
-    lib: 'golang-os-sink',
-    rule_id: 10000024,
-    desc: <<<TEXT
+	title: "check audit the usage of the os package"
+	type: audit
+	level: info
+	lib: 'golang-os-sink'
+	desc: <<<TEXT
 此规则旨在审计Go语言代码中`os`包的使用情况。
 TEXT
+	rule_id: "4ba61a38-efec-4cf2-9d38-f77352e05185"
 )
 
 os?{<fullTypeName>?{have: 'os'}} as $entry
@@ -21,9 +21,9 @@ $entry.ReadDir(* #-> as $output)
 alert $output
 
 desc(
-    lang: golang,
-    alert_min: 1,
-    'file://os.go': <<<PARAM
+	lang: golang
+	alert_min: 1
+	'file://os.go': <<<PARAM
 package main
 
 import (

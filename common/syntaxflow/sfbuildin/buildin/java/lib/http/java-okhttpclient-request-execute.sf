@@ -1,17 +1,17 @@
 desc(
-    title: "Find OkHttpClient Uses and Executing Request",
-    rule_id: 20000036,
-    type: audit,
-    lib: "java-okhttpclient-request-execute",
+	title: "Find OkHttpClient Uses and Executing Request"
+	type: audit
+	lib: "java-okhttpclient-request-execute"
+	rule_id: "d884f15e-5dc5-4fe2-8d62-49e0b7874a13"
 )
 
 Request.Builder()?{<typeName>?{have: 'okhttp'}}...url(,* as $output);
 alert $output;
 
 desc(
-lang: java,
-alert_num:1,
-'file://a.java': <<<CODE
+	lang: java
+	alert_num:1
+	'file://a.java': <<<CODE
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -30,13 +30,13 @@ public class OkHttpClientExample {
         }
     }
 }
-CODE,
+CODE
 )
 
 desc(
-lang: java,
-alert_num:1,
-'file://a.java': <<<CODE
+	lang: java
+	alert_num:1
+	'file://a.java': <<<CODE
 public class OkHttpClientExample {
     @RequestMapping(value = "/three")
         public String Three(@RequestParam(value = "url") String imageUrl) {
@@ -53,5 +53,5 @@ public class OkHttpClientExample {
             }
         }
 }
-CODE,
+CODE
 )

@@ -1,12 +1,12 @@
 desc(
-    title: "check file path",
-    type: audit,
-    level: info,
-    lib: 'golang-file-path',
-    rule_id: 10000011,
-    desc: <<<TEXT
+	title: "check file path"
+	type: audit
+	level: info
+	lib: 'golang-file-path'
+	desc: <<<TEXT
 此规则旨在审计代码中是否使用了`path/filepath`库的相关功能，尽管`path/filepath`库本身通常不直接涉及文件写操作，但它用于处理文件路径，这在文件操作中是一个关键步骤。不当的文件路径处理可能导致安全问题，如路径遍历漏洞，攻击者可能利用此类漏洞访问或修改服务器上的敏感文件。
 TEXT
+	rule_id: "b96da337-9ec5-41a9-9c43-fcc6a7043c45"
 )
 
 filepath?{<fullTypeName>?{have: 'path/filepath'}} as $output
@@ -14,9 +14,9 @@ filepath?{<fullTypeName>?{have: 'path/filepath'}} as $output
 alert $output
 
 desc(
-    lang: golang,
-    alert_min: 1,
-    'file://filepath.go': <<<PARAM
+	lang: golang
+	alert_min: 1
+	'file://filepath.go': <<<PARAM
 package main
 
 import (

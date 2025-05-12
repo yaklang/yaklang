@@ -1,18 +1,18 @@
 desc(
-    title_zh: '查找Java Spring MVC 控制层用户可控输入参数',
-    title: 'Find Java Spring MVC Controller User Controllable Input Parameters',
-    type: audit,
-    lib: 'java-spring-mvc-param',
-    rule_id: 20000017,
-    reference: <<<URL
+	title_zh: '查找Java Spring MVC 控制层用户可控输入参数',
+	title: 'Find Java Spring MVC Controller User Controllable Input Parameters'
+	type: audit
+	lib: 'java-spring-mvc-param'
+	reference: <<<URL
     https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-requestmapping.html
     https://jakarta.ee/specifications/platform/8/apidocs/?javax/servlet/http/HttpServletRequest.html
 URL
-    desc: <<<TEXT
+	desc: <<<TEXT
     该规则用于查找Java Spring MVC控制层用户可控输入参数。查找内容包括：
     - 声明式参数绑定（注解方式）
     - 原生请求处理（HttpServletRequest）
 TEXT
+	rule_id: "1314089e-e030-4436-89d2-2aabe2758683"
 )
 
 // 声明式参数绑定(注解方式)
@@ -52,9 +52,9 @@ $request.get*() as $output;
 alert $output;
 
 desc(
-    lang: java,
-    alert_num: 10,
-    'file://parameterBinding.java': <<<TEXT
+	lang: java
+	alert_num: 10
+	'file://parameterBinding.java': <<<TEXT
 package org.example.moudels.userinput;
 
 import io.swagger.annotations.*;
@@ -158,9 +158,9 @@ TEXT
 )
 
 desc(
-    lang: java,
-    alert_num: 9,
-    'file://servletDemo.java': <<<TEXT
+	lang: java
+	alert_num: 9
+	'file://servletDemo.java': <<<TEXT
 package org.example.moudels.userinput;
 
 import io.swagger.annotations.Api;

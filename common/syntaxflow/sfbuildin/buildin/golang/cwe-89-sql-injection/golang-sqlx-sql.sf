@@ -1,15 +1,15 @@
 desc(
-    title: "golang SQL Injection(sqlx)",
-    type: audit,
-    rule_id: 10089007,
-    severity: high,
-    desc: <<<TEXT
+	title: "golang SQL Injection(sqlx)"
+	type: audit
+	severity: high
+	desc: <<<TEXT
 SQL 注入漏洞是一种严重的安全漏洞，它允许攻击者通过操纵应用程序的 SQL 查询来执行任意 SQL 代码。在 Go 语言中使用 `sqlx` 库时，如果直接将用户输入拼接到 SQL 查询字符串中，而没有进行适当的输入验证或参数化查询，就可能导致 SQL 注入漏洞。这会使攻击者能够绕过正常的认证和授权机制，访问、修改或删除数据库中的敏感数据。
 
 SQL 注入漏洞通常发生在以下场景：
 1. 用户输入被直接拼接到 SQL 查询字符串中，例如 `db.Select(&users, "SELECT * FROM users WHERE name = '" + username + "'")`。
 2. 未对用户输入进行参数化处理或验证，导致恶意输入被解释为 SQL 命令。
 TEXT
+	rule_id: "cdc66b17-36b4-4436-813e-9d121964224b"
 )
 
 <include('golang-database-sqlx')> as $sink;
@@ -24,9 +24,9 @@ alert $high for {
 }
 
 desc(
-    lang: golang,
-    alert_high: 1,
-    'file://main.go': <<<UNSAFE
+	lang: golang
+	alert_high: 1
+	'file://main.go': <<<UNSAFE
 package main
 
 import (

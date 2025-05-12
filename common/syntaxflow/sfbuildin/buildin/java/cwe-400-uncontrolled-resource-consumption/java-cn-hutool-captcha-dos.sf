@@ -1,13 +1,12 @@
 desc(
-    title_zh:"检测Java cn.hutool.captcha验证码拒绝服务漏洞",
-    title: "Check Java cn.hutool.captcha DDoS",
-    type: vuln,
-    risk:DDOS,
-    rule_id: 20400001,
-    reference:<<<URL
+	title_zh:"检测Java cn.hutool.captcha验证码拒绝服务漏洞",
+	title: "Check Java cn.hutool.captcha DDoS"
+	type: vuln
+	risk:DDOS
+	reference:<<<URL
     https://plus.hutool.cn/apidocs/cn/hutool/captcha/generator/class-use/CodeGenerator.html
 URL
-    desc: <<<TEXT
+	desc: <<<TEXT
     该规则用于检测cn.hutool.captcha生成验证码的时候，验证码大小可控造成的拒绝服务攻击漏洞。
     规则审计的类:
     - cn.hutool.captcha.CaptchaUtil
@@ -27,6 +26,7 @@ URL
     - CaptchaUtil.createGifCaptcha(int width, int height, CodeGenerator generator, int thickness)
     - CaptchaUtil.createShearCaptcha(int width, int height, CodeGenerator generator, int thickness)
 TEXT
+	rule_id: "5a737536-4f00-45e7-aa92-75ab7f4bd971"
 )
 
 // AbstractCaptcha(int width, int height, CodeGenerator generator, int interfereCount)
@@ -64,9 +64,9 @@ alert $low for {
 }
 
 desc(
-    lang:java,
-    alert_num:1,
-    'file://demo.java':<<<TEXT
+	lang:java
+	alert_num:1
+	'file://demo.java':<<<TEXT
 package org.example.Dos;
 import cn.hutool.captcha.AbstractCaptcha;
 import cn.hutool.captcha.CaptchaUtil;

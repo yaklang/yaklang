@@ -1,11 +1,11 @@
 desc(
-    title: "Find Simple Trail of CSRF Disabled",
-    type: vuln,
-    level: low,
-    rule_id: 20352001,
-    desc: <<<TEXT
+	title: "Find Simple Trail of CSRF Disabled"
+	type: vuln
+	level: low
+	desc: <<<TEXT
 禁用CSRF（跨站请求伪造）保护可能会使应用程序容易受到CSRF攻击。虽然在某些情况下（例如API服务）可以考虑禁用CSRF，但在Web应用程序中，建议保留CSRF保护
 TEXT
+	rule_id: "08636dc3-aa6e-473f-ad31-3fac651af77d"
 )
 
 .csrf().disable() as $vuln;
@@ -13,8 +13,8 @@ check $vuln;
 alert $vuln;
 
 desc(
-    lang: java,
-'safefile:///safeconfig.java': <<<CONFIG
+	lang: java
+	'safefile:///safeconfig.java': <<<CONFIG
 package com.ruoyi.modules.monitor.config;
 
 import de.codecentric.boot.admin.server.config.AdminServerProperties;
@@ -59,8 +59,8 @@ public class WebSecurityConfigurer
                 .build();
     }
 }
-CONFIG,
-'file:///config.java': <<<CONFIG
+CONFIG
+	'file:///config.java': <<<CONFIG
 package com.ruoyi.modules.monitor.config;
 
 import de.codecentric.boot.admin.server.config.AdminServerProperties;
@@ -112,5 +112,5 @@ public class WebSecurityConfigurer
                 .build();
     }
 }
-CONFIG,
+CONFIG
 )

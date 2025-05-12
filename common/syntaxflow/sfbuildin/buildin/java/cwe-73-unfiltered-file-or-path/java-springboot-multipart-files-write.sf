@@ -1,12 +1,12 @@
 desc(
-    title: 'checking [Directly relative Files.write from MultipartFile]',
-    type: audit,
-    level: warning,
-    rule_id: 20073005,
-    risk: "path-traversal",
-    desc: <<<TEXT
+	title: 'checking [Directly relative Files.write from MultipartFile]'
+	type: audit
+	level: warning
+	risk: "path-traversal"
+	desc: <<<TEXT
 该审计规则旨在检测直接从MultipartFile（上传的文件）进行文件写入的操作，且未对文件路径进行充分验证的情况。这种操作可能导致路径遍历漏洞，攻击者通过构造特定的文件名或路径，可以覆盖或篡改服务器上的任意文件，进而造成数据泄露、服务中断或远程代码执行等严重后果。因此，建议对上传的文件进行严格的路径验证和权限控制，确保文件只能被写入预期的目录，并避免使用用户可控的路径信息。
 TEXT
+	rule_id: "15815212-0f58-413f-ad8e-a514778eea85"
 )
 
 <include('java-spring-mvc-param')>?{<typeName>?{have: MultipartFile}} as $upload;
