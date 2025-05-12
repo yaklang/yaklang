@@ -1821,7 +1821,7 @@
             <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
             检查健康状态
         </div>
-        <div class="context-menu-item" onclick="quickAddProvider()">
+        <div class="context-menu-item" onclick="quickAddProvider(currentContextMenuProviderId)">
             <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
             快速新增供应商
         </div>
@@ -3714,48 +3714,95 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             }
         }
 
-        // 快速添加供应商
+        // 快速添加供应商 - 修改后
         function quickAddProvider(providerId) {
             const row = document.querySelector(`tr[data-id="${providerId}"]`);
-            if (!row) return;
+            if (!row) {
+                 console.error(`Provider row not found for ID: ${providerId}`); // Debug log
+                 hideContextMenu();
+                 return;
+            }
+            console.log(`Quick adding based on provider ID: ${providerId}`); // Debug log
 
-            const type = row.cells[5].textContent.trim(); // 第6列是类型
-            const domain = row.cells[6].textContent.trim(); // 第7列是域名
-            const wrapperName = row.cells[3].textContent.trim(); // 第4列是提供者名称
-            const modelName = row.cells[4].textContent.trim(); // 第5列是模型名称
+            // 从选中行提取数据 (优先使用 data-full-text)
+            const wrapperName = row.cells[3].getAttribute('data-full-text') || row.cells[3].textContent.trim(); // Cell 4: Provider
+            const modelName = row.cells[4].getAttribute('data-full-text') || row.cells[4].textContent.trim();   // Cell 5: Model
+            const typeName = row.cells[5].getAttribute('data-full-text') || row.cells[5].textContent.trim();     // Cell 6: Type
+            const domainOrURL = row.cells[6].getAttribute('data-full-text') || row.cells[6].textContent.trim(); // Cell 7: Domain
+            const apiKey = row.cells[7].getAttribute('data-full-text'); // Cell 8: API Key (get full key)
 
-            // 切换到添加接口标签
+            console.log(`Extracted data: Wrapper=${wrapperName}, Model=${modelName}, Type=${typeName}, Domain=${domainOrURL}, Key=...${apiKey ? apiKey.slice(-4) : ''}`); // Debug log
+
+            // 切换到 'add' 标签页
             switchTab('add');
 
-            // 等待表单加载完成
-            setTimeout(() => {
-                // 填充表单
-                const typeInput = document.getElementById('model_type');
-                if (typeInput) {
-                    typeInput.value = type;
+            // 检查表单是否准备就绪的函数
+            const checkFormReady = (callback) => {
+                const form = document.getElementById('addProviderForm');
+                const wrapperInput = document.getElementById('wrapperName');
+                const modelInput = document.getElementById('modelName');
+                const typeSelect = document.getElementById('typeName');
+                const domainInput = document.getElementById('domainOrURL');
+                const apiKeysInput = document.getElementById('apiKeys');
+
+                if (form && wrapperInput && modelInput && typeSelect && domainInput && apiKeysInput) {
+                    console.log("Add provider form is ready."); // Debug log
+                    callback(); // 表单元素存在，执行回调
+                } else {
+                    console.log("Add provider form not ready yet, waiting..."); // Debug log
+                    // 稍等后再次检查
+                    setTimeout(() => checkFormReady(callback), 50); // 每 50ms 检查一次
+                }
+            };
+
+            // 等待表单加载完成后填充数据
+            checkFormReady(() => {
+                const wrapperInput = document.getElementById('wrapperName');
+                const modelInput = document.getElementById('modelName');
+                const typeSelect = document.getElementById('typeName');
+                const domainInput = document.getElementById('domainOrURL');
+                const apiKeysInput = document.getElementById('apiKeys');
+
+                // 填充表单字段
+                wrapperInput.value = wrapperName;
+                modelInput.value = modelName;
+                domainInput.value = domainOrURL;
+                apiKeysInput.value = apiKey || ''; // 填充 API keys
+
+                // 仔细设置 Select 的值
+                let typeFound = false;
+                for (let i = 0; i < typeSelect.options.length; i++) {
+                    if (typeSelect.options[i].value === typeName) {
+                        typeSelect.value = typeName;
+                        typeFound = true;
+                        break;
+                    }
+                }
+                if (!typeFound) {
+                     console.warn(`Type "${typeName}" not found in select options. Leaving type selection unchanged.`); // Debug log
+                     typeSelect.value = ""; // 重置为默认提示选项
+                } else {
+                     console.log(`Successfully set type to "${typeName}"`); // Debug log
+                     // 触发 change 事件以处理可能的依赖逻辑（如域名建议）
+                     typeSelect.dispatchEvent(new Event('change'));
                 }
 
-                const domainInput = document.getElementById('domain_or_url');
-                if (domainInput) {
-                    domainInput.value = domain;
-                }
-
-                const wrapperNameInput = document.getElementById('wrapper_name');
-                if (wrapperNameInput) {
-                    wrapperNameInput.value = wrapperName;
-                }
-
-                const modelNameInput = document.getElementById('model_name');
-                if (modelNameInput) {
-                    modelNameInput.value = modelName;
-                }
+                // 设置值后重新验证必填字段
+                [wrapperInput, modelInput, typeSelect].forEach(input => validateInput.call(input));
+                // 处理 domainOrURL 的验证状态 (可能需要 is-valid)
+                validateInput.call(domainInput);
+                 // 处理 apiKeys 的验证状态 (现在预填充了，设为 valid)
+                 validateInput.call(apiKeysInput); // Use the standard validation function
 
                 // 聚焦到 API Keys 输入框
-                const apiKeysInput = document.getElementById('api_keys');
-                if (apiKeysInput) {
-                    apiKeysInput.focus();
-                }
-            }, 100);
+                apiKeysInput.focus();
+
+                // 在填充值后重置整体表单验证状态（按钮启用状态、消息）
+                resetValidationStatus();
+                console.log("Form populated and validation reset."); // Debug log
+            });
+
+            hideContextMenu(); // 立即关闭右键菜单
         }
     </script>
 </body>
