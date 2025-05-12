@@ -957,6 +957,8 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 		c.serveAddProviderPage(conn, request)
 	} else if uriIns.Path == "/portal/add-providers" && request.Method == "POST" {
 		c.processAddProviders(conn, request)
+	} else if uriIns.Path == "/portal/validate-provider" && request.Method == "POST" {
+		c.handleValidateProvider(conn, request)
 	} else if uriIns.Path == "/portal/autocomplete" {
 		c.serveAutoCompleteData(conn, request)
 	} else if uriIns.Path == "/portal/api-keys" {
@@ -1739,6 +1741,100 @@ func (c *ServerConfig) handleDeleteMultipleProviders(conn net.Conn, request *htt
 		"message":      fmt.Sprintf("Successfully deleted %d providers", result.RowsAffected),
 		"deletedCount": result.RowsAffected,
 	})
+}
+
+// handleValidateProvider handles requests to validate a provider configuration before adding
+func (c *ServerConfig) handleValidateProvider(conn net.Conn, request *http.Request) {
+	c.logInfo("Processing validate provider request")
+
+	if !c.checkAuth(request) {
+		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		return
+	}
+
+	if request.Method != http.MethodPost {
+		c.writeJSONResponse(conn, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed, use POST"})
+		return
+	}
+
+	// Parse form data
+	if err := request.ParseForm(); err != nil {
+		c.logError("Failed to parse form for provider validation: %v", err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": "Failed to parse form data",
+		})
+		return
+	}
+
+	wrapperName := request.PostForm.Get("wrapper_name")
+	modelName := request.PostForm.Get("model_name")
+	modelType := request.PostForm.Get("model_type")
+	domainOrURL := request.PostForm.Get("domain_or_url")
+	apiKeyToValidate := request.PostForm.Get("api_key_to_validate")
+	noHTTPS := request.PostForm.Get("no_https") == "on"
+
+	if wrapperName == "" || modelName == "" || modelType == "" || apiKeyToValidate == "" {
+		c.logWarn("Validation request missing required fields (wrapper_name, model_name, model_type, api_key_to_validate)")
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": "Missing required fields: Provider Name, Model Name, Type, and API Key are required for validation.",
+		})
+		return
+	}
+
+	// Create a temporary provider instance for validation
+	// Note: This provider is NOT saved to the database.
+	tempProvider := &Provider{
+		ModelName:   modelName,
+		TypeName:    modelType,
+		DomainOrURL: domainOrURL,
+		APIKey:      apiKeyToValidate,
+		WrapperName: wrapperName,
+		NoHTTPS:     noHTTPS,
+		// Initialize other fields as necessary for health check logic
+		// For example, if your health check needs a DbProvider, you might need to mock it
+		// or adjust the health check to work without it for this temporary validation.
+		// For simplicity, we assume PerformHealthCheck can work with these core details.
+	}
+
+	c.logInfo("Attempting to validate temporary provider: Wrapper=%s, Model=%s, Type=%s, Domain=%s, Key=%s...", wrapperName, modelName, modelType, domainOrURL, apiKeyToValidate[:min(len(apiKeyToValidate), 4)])
+
+	// Perform the health check on the temporary provider using the new ExecuteHealthCheckLogic function
+	// The Provider's GetAIClient method is responsible for handling HTTP client needs.
+	healthy, latency, checkErr := ExecuteHealthCheckLogic(tempProvider, wrapperName) // Use aibalance.ExecuteHealthCheckLogic if not in same package, assuming it is for now.
+
+	if checkErr != nil {
+		c.logWarn("Validation failed for temporary provider Wrapper=%s, Model=%s: %v", wrapperName, modelName, checkErr)
+		c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+			"success": false,
+			"message": fmt.Sprintf("Validation failed: %s", checkErr.Error()),
+		})
+		return
+	}
+
+	if !healthy {
+		c.logWarn("Validation reported unhealthy for temporary provider Wrapper=%s, Model=%s. Latency: %dms", wrapperName, modelName, latency)
+		c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+			"success": false,
+			"message": fmt.Sprintf("Validation failed: Provider reported as unhealthy. Latency: %dms", latency),
+		})
+		return
+	}
+
+	c.logInfo("Validation successful for temporary provider Wrapper=%s, Model=%s. Latency: %dms", wrapperName, modelName, latency)
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"message": fmt.Sprintf("Configuration validated successfully. Latency: %dms", latency),
+	})
+}
+
+// min is a helper function to avoid panics with string slicing
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // handleAddProvider handles the form submission for adding a provider (DEPRECATED, use processAddProviders)

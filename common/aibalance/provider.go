@@ -151,12 +151,13 @@ func (cp *ConfigProvider) GetAllKeys() []string {
 // GetAIClient gets the AI client
 func (p *Provider) GetAIClient(onStream, onReasonStream func(reader io.Reader)) (aispec.AIClient, error) {
 	log.Infof("GetAIClient: type: %s, domain: %s, key: %s, model: %s, no_https: %v", p.TypeName, p.DomainOrURL, utils.ShrinkString(p.APIKey, 8), p.ModelName, p.NoHTTPS)
-	client := ai.GetAI(
-		p.TypeName,
+
+	var opts []aispec.AIConfigOption
+	opts = append(
+		opts,
 		aispec.WithTimeout(10),
 		aispec.WithNoHTTPS(p.NoHTTPS),
 		aispec.WithAPIKey(p.APIKey),
-		aispec.WithBaseURL(p.DomainOrURL),
 		aispec.WithModel(p.ModelName),
 		aispec.WithStreamHandler(func(reader io.Reader) {
 			go func() {
@@ -178,6 +179,15 @@ func (p *Provider) GetAIClient(onStream, onReasonStream func(reader io.Reader)) 
 			}()
 		}),
 	)
+
+	if target := strings.TrimSpace(p.DomainOrURL); target != "" {
+		if utils.IsHttpOrHttpsUrl(target) {
+			opts = append(opts, aispec.WithBaseURL(target))
+		} else {
+			opts = append(opts, aispec.WithDomain(target))
+		}
+	}
+	client := ai.GetAI(p.TypeName, opts...)
 	if utils.IsNil(client) || client == nil {
 		return nil, errors.New("failed to get ai client, no such type: " + p.TypeName)
 	}
