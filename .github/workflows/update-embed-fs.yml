@@ -50,6 +50,7 @@ jobs:
       - name: Execute commands
         if: ${{env.SKIP_CI != 'true'}}
         run: |
+          go run common/yak/cmd/yak.go syntaxflow-format ./common/syntaxflow/sfbuildin/buildin
           go run common/yak/cmd/yak.go sync-rule -o common/syntaxflow/sfdb/rule_versions.json
           go run common/yak/cmd/yak.go embed-fs-hash --override --all
 
