@@ -71,33 +71,25 @@ func (m *HealthCheckManager) RecordCheck(providerID uint) {
 	m.lastCheckTime[providerID] = time.Now()
 }
 
-// CheckProviderHealth checks the health status of a single provider
-func CheckProviderHealth(provider *Provider) (*HealthCheckResult, error) {
-	if provider != nil {
-		_, _ = provider.GetDbProvider()
-		log.Infof("开始检查提供者健康状态: %s (ID: %d)",
-			provider.DbProvider.WrapperName, provider.DbProvider.ID)
-	}
+// ExecuteHealthCheckLogic performs the core health check on a given provider instance.
+// It does not interact with the database or the HealthCheckResult struct directly.
+// providerIdentifierForLog is used for logging purposes (e.g., wrapper name or model name).
+func ExecuteHealthCheckLogic(p *Provider, providerIdentifierForLog string) (isHealthy bool, latencyMs int64, checkErr error) {
+	log.Debugf("Executing health check logic for provider: %s", providerIdentifierForLog)
 
-	result := &HealthCheckResult{
-		Provider:  provider.DbProvider,
-		IsHealthy: false,
-	}
-
-	// 计时开始
 	startTime := time.Now()
 	var firstByteDuration time.Duration
 	rspOnce := new(sync.Once)
-	succeededChan := make(chan bool, 1) // 用于存储是否成功的结果
-	var respErr error                   // 用于存储响应错误
+	succeededChan := make(chan bool, 1)
+	var respErr error
 
-	// 创建 AI 客户端
-	client, err := provider.GetAIClient(
+	// Create AI client using the provider's GetAIClient method
+	// GetAIClient is assumed to handle its own HTTP client requirements.
+	client, err := p.GetAIClient(
 		func(reader io.Reader) {
 			io.Copy(utils.FirstWriter(func(b []byte) {
 				rspOnce.Do(func() {
 					firstByteDuration = time.Since(startTime)
-					// 收到第一个字节，说明请求成功
 					succeededChan <- true
 				})
 			}), reader)
@@ -106,82 +98,122 @@ func CheckProviderHealth(provider *Provider) (*HealthCheckResult, error) {
 			io.Copy(utils.FirstWriter(func(b []byte) {
 				rspOnce.Do(func() {
 					firstByteDuration = time.Since(startTime)
-					// 收到第一个字节，说明请求成功
 					succeededChan <- true
 				})
 			}), reader)
 		},
 	)
+
 	if err != nil {
-		result.Error = fmt.Errorf("Failed to get AI client: %v", err)
-		log.Errorf("健康检查失败: %s (ID: %d), 无法创建AI客户端: %v",
-			provider.DbProvider.WrapperName, provider.DbProvider.ID, err)
-		return result, nil
+		errMsg := fmt.Errorf("failed to get AI client for %s: %v", providerIdentifierForLog, err)
+		log.Warnf("Health check preparation failed for %s: %v", providerIdentifierForLog, err)
+		return false, 0, errMsg
 	}
 
-	log.Debugf("正在进行健康检查: %s (ID: %d)",
-		provider.DbProvider.WrapperName, provider.DbProvider.ID)
+	log.Debugf("Initiating health check (ping) for: %s", providerIdentifierForLog)
 
-	// 创建一个异步的 goroutine 发送 ping 请求
 	go func() {
-		// 执行 Chat ping
-		_, err := client.Chat(healthCheckPrompt)
-		if err != nil {
-			respErr = err
-			// 如果还没有接收到第一个字节时出错，则标记为失败
+		_, chatErr := client.Chat(healthCheckPrompt)
+		if chatErr != nil {
+			respErr = chatErr
 			select {
 			case succeededChan <- false:
 			default:
-				// 如果管道已经关闭或已经有值，则不做任何事
 			}
 		}
 	}()
 
-	// 设置超时等待结果
 	var succeeded bool
 	select {
 	case succeeded = <-succeededChan:
-		// 成功获取到结果
-	case <-time.After(20 * time.Second): // Increase timeout to 20 seconds
+	case <-time.After(20 * time.Second): // 20 seconds timeout
 		succeeded = false
-		result.Error = fmt.Errorf("Health check timeout after 20 seconds") // Update error message
-		log.Warnf("健康检查超时 (20s): %s (ID: %d)",                             // Update log message
-			provider.DbProvider.WrapperName, provider.DbProvider.ID)
+		checkErr = fmt.Errorf("health check timeout after 20 seconds for %s", providerIdentifierForLog)
+		log.Warnf("Health check timed out (20s) for: %s", providerIdentifierForLog)
 	}
 
-	// 如果没有收到任何字节，firstByteDuration 可能为 0
-	// 使用当前时间与起始时间的差值作为响应时间
-	if firstByteDuration == 0 {
+	if firstByteDuration == 0 && succeeded { // If succeeded but no bytes read (e.g. empty successful response)
+		firstByteDuration = time.Since(startTime)
+	} else if firstByteDuration == 0 && !succeeded { // If failed and no bytes, take full duration
 		firstByteDuration = time.Since(startTime)
 	}
 
-	// 设置响应时间
-	result.ResponseTime = firstByteDuration.Milliseconds()
+	latencyMs = firstByteDuration.Milliseconds()
+	isHealthy = succeeded && latencyMs < 10000 // 10 seconds latency threshold
 
-	// 根据 server.go 中的 UpdateDbProvider 逻辑判断健康状态：
-	// 如果响应成功且延迟小于 10000ms，则标记为健康
-	result.IsHealthy = succeeded && result.ResponseTime < 10000 // Increase latency threshold to 10 seconds
-
-	// 如果有错误但尚未设置错误消息
-	if !succeeded && result.Error == nil && respErr != nil {
-		result.Error = fmt.Errorf("Health check failed: %v", respErr)
-	}
-
-	if result.IsHealthy {
-		log.Infof("健康检查成功: %s (ID: %d), 延迟: %dms",
-			provider.DbProvider.WrapperName, provider.DbProvider.ID,
-			result.ResponseTime)
-	} else {
-		errMsg := "未知错误"
-		if result.Error != nil {
-			errMsg = result.Error.Error()
+	if !succeeded && checkErr == nil { // If failed but no explicit timeout error, use respErr
+		if respErr != nil {
+			checkErr = fmt.Errorf("health check failed for %s: %v", providerIdentifierForLog, respErr)
+		} else {
+			checkErr = fmt.Errorf("health check failed for %s due to an unknown error", providerIdentifierForLog)
 		}
-		log.Errorf("健康检查失败: %s (ID: %d), 错误: %s, 延迟: %dms",
-			provider.DbProvider.WrapperName, provider.DbProvider.ID,
-			errMsg, result.ResponseTime)
 	}
 
-	return result, nil
+	if isHealthy {
+		log.Debugf("Health check successful for %s, Latency: %dms", providerIdentifierForLog, latencyMs)
+	} else {
+		errMsgLog := "Unknown error"
+		if checkErr != nil {
+			errMsgLog = checkErr.Error()
+		}
+		log.Warnf("Health check failed for %s, Latency: %dms, Error: %s", providerIdentifierForLog, latencyMs, errMsgLog)
+	}
+
+	return isHealthy, latencyMs, checkErr
+}
+
+// CheckProviderHealth checks the health status of a single provider
+func CheckProviderHealth(provider *Provider) (*HealthCheckResult, error) {
+	// Provider identifier for logging, try DbProvider fields first.
+	var providerLogName string
+	var providerLogID uint
+	if provider != nil && provider.DbProvider != nil {
+		providerLogName = provider.DbProvider.WrapperName
+		providerLogID = provider.DbProvider.ID
+		log.Infof("开始检查提供者健康状态: %s (ID: %d)", providerLogName, providerLogID)
+	} else if provider != nil {
+		providerLogName = provider.WrapperName // Fallback to Provider's WrapperName if DbProvider is nil
+		if providerLogName == "" {
+			providerLogName = provider.ModelName // Further fallback
+		}
+		log.Infof("开始检查临时提供者健康状态: %s", providerLogName)
+	} else {
+		log.Errorf("CheckProviderHealth called with nil provider")
+		return &HealthCheckResult{IsHealthy: false, Error: fmt.Errorf("nil provider")}, fmt.Errorf("nil provider")
+	}
+
+	result := &HealthCheckResult{
+		IsHealthy: false, // Default to not healthy
+	}
+	if provider.DbProvider != nil {
+		result.Provider = provider.DbProvider
+	}
+
+	// Use the new core logic function
+	// If DbProvider is nil (e.g. temporary validation), providerLogName would have been set to WrapperName or ModelName
+	isHealthy, latencyMs, checkErr := ExecuteHealthCheckLogic(provider, providerLogName)
+
+	result.IsHealthy = isHealthy
+	result.ResponseTime = latencyMs
+	result.Error = checkErr
+
+	// Logging specific to CheckProviderHealth context (especially if DbProvider involved)
+	if provider.DbProvider != nil { // Only log with ID if DbProvider is present
+		if result.IsHealthy {
+			log.Infof("健康检查成功 (CheckProviderHealth): %s (ID: %d), 延迟: %dms",
+				providerLogName, providerLogID, result.ResponseTime)
+		} else {
+			errMsg := "未知错误"
+			if result.Error != nil {
+				errMsg = result.Error.Error()
+			}
+			log.Errorf("健康检查失败 (CheckProviderHealth): %s (ID: %d), 错误: %s, 延迟: %dms",
+				providerLogName, providerLogID, errMsg, result.ResponseTime)
+		}
+	}
+	// For temporary providers, ExecuteHealthCheckLogic already logged details.
+
+	return result, nil // error from ExecuteHealthCheckLogic is in result.Error
 }
 
 // CheckAllProviders checks health status of all registered providers

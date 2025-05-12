@@ -1360,6 +1360,108 @@
             border-color: #4285f4;
             font-weight: bold;
         }
+        /* Validation Message Styles */
+        .validation-message {
+            margin-top: 10px;
+            font-size: 0.9em;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid transparent;
+        }
+        .validation-message.success {
+            color: #2e7d32;
+            background-color: #e8f5e9;
+            border-color: #c8e6c9;
+        }
+        .validation-message.error {
+            color: #c62828;
+            background-color: #ffebee;
+            border-color: #ffcdd2;
+        }
+        .validation-message.info {
+            color: #0d47a1;
+            background-color: #e3f2fd;
+            border-color: #90caf9;
+        }
+        
+        /* 现有样式 */
+        .provider-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .provider-table th, .provider-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .provider-table th {
+            background-color: #f2f2f2;
+        }
+        .provider-table tr:hover {
+            background-color: #f5f5f5;
+        }
+        .health-status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .healthy {
+            background-color: #4CAF50;
+        }
+        .unhealthy {
+            background-color: #F44336;
+        }
+        .unknown {
+            background-color: #9E9E9E;
+        }
+        .validation-message {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        .validation-message.success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            border-left: 4px solid #4caf50;
+        }
+        .validation-message.error {
+            background-color: #ffebee;
+            color: #c62828;
+            border-left: 4px solid #f44336;
+        }
+        .validation-message.info {
+            background-color: #e3f2fd;
+            color: #1565c0;
+            border-left: 4px solid #2196f3;
+        }
+        
+        /* 按钮悬停效果 */
+        #validateConfigBtn:hover:not(:disabled) {
+            background-color: #3367d6 !important;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
+            transform: translateY(-1px);
+        }
+        
+        #submitAddProviderBtn:hover:not(:disabled) {
+            background-color: #43a047 !important;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
+            transform: translateY(-1px);
+        }
+        
+        /* 按钮激活效果 */
+        #validateConfigBtn:active:not(:disabled) {
+            transform: translateY(1px);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
+        }
+        
+        #submitAddProviderBtn:active:not(:disabled) {
+            transform: translateY(1px);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
+        }
     </style>
 </head>
 <body>
@@ -1503,7 +1605,7 @@
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <input type="text" id="apiKeyDisplay" class="form-control" readonly placeholder="点击右侧按钮生成新的 API Key" style="flex-grow: 1;">
                             <button class="btn btn-sm" onclick="confirmAndGenerateApiKey()" title="生成新的 API Key" style="flex-shrink: 0;">
-                                <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 0 24 24" width="16px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" opacity=".3"/><path d="M19.78 2.2L24 6.42 19.78 10.64 18.36 9.22l2.22-2.22-2.22-2.22L19.78 2.2zM12 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-4c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-4.24 8.76L3.34 19.19 7.58 23.42l4.24-4.24-1.41-1.41-2.83 2.83-2.83-2.83-1.41 1.41zM12 16c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 0 24 24" width="16px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" opacity=".3"/><path d="M19.78 2.2L24 6.42 19.78 10.64 18.36 9.22l2.22-2.22-2.22-2.22L19.78 2.2zM12 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-4c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-4.24 8.76L3.34 19.19 7.58 23.42l4.24-4.24-1.41-1.41-2.83 2.83-2.83-2.83-1.41 1.41zM12 16c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
                                 生成
                             </button>
                         </div>
@@ -1672,6 +1774,7 @@
         let resizeTimer;
         let currentContextMenuProviderId = null;
         let isHealthCheckInProgress = false;
+        let isProviderConfigValidated = false; // For add provider form validation
 
         // 初始化 Toast 容器
         if (!document.getElementById('toast-container')) {
@@ -1723,7 +1826,7 @@
                                 <li>模型名称：实际调用的模型名称，例如 "gpt-4-1106-preview"</li>
                                 <li>类型：提供者类型，如 chat、completion、embedding 等</li>
                                 <li>域名/URL：API服务的域名或完整URL，例如 "api.openai.com"</li>
-                                <li>API密钥：可输入多个API密钥，每行一个</li>
+                                <li>API密钥：可输入多个API密钥，每行一个。<strong>验证时将使用第一个密钥。</strong></li>
                             </ul>
                         </div>
                     </div>
@@ -1775,15 +1878,40 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                                 </label>
                             </div>
                         </div>
-                        <div class="form-group">
-                            <button type="submit" class="btn">添加提供者</button>
+                        <div class="form-group"> <!-- Removed inline flex style -->
+                            <button type="button" id="validateConfigBtn" class="btn" style="display: block; width: 100%; margin-bottom: 10px; background-color: #4285f4; color: white; min-width: 120px; height: 40px; font-size: 14px; font-weight: 500; border-radius: 4px; border: none; transition: all 0.3s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.1); padding: 0 15px;">验证配置</button>
+                            <button type="submit" id="submitAddProviderBtn" class="btn" disabled style="display: block; width: 100%; background-color: #bdbdbd; color: white; cursor: not-allowed; min-width: 120px; height: 40px; font-size: 14px; font-weight: 500; border-radius: 4px; border: none; transition: all 0.3s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 0 15px;">添加提供者</button>
                         </div>
+                        <div id="validationResult" class="validation-message"></div>
                     </form>
                 </div>
             `;
             
             // 加载自动补全数据并填充表单
             fillAutoCompleteForm();
+
+            // Add event listeners to form inputs to reset validation status
+            const formInputs = ['wrapperName', 'modelName', 'domainOrURL', 'apiKeys'];
+            formInputs.forEach(id => {
+                const inputElement = document.getElementById(id);
+                if (inputElement) {
+                    inputElement.addEventListener('input', resetValidationStatus);
+                }
+            });
+            const selectElement = document.getElementById('typeName');
+            if (selectElement) {
+                selectElement.addEventListener('change', resetValidationStatus);
+            }
+            const checkboxElement = document.getElementById('noHTTPS');
+            if (checkboxElement) {
+                checkboxElement.addEventListener('change', resetValidationStatus);
+            }
+
+            // Add event listener for the validate button
+            const validateBtn = document.getElementById('validateConfigBtn');
+            if (validateBtn) {
+                validateBtn.addEventListener('click', validateProviderConfiguration);
+            }
         }
 
         // 全局变量存储自动补全数据
@@ -1907,11 +2035,11 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 input.classList.remove('is-valid', 'is-invalid');
                 
                 // 添加事件监听器
-                input.addEventListener('input', validateInput);
-                input.addEventListener('blur', validateInput);
+                input.addEventListener('input', function() { validateInput.call(this); resetValidationStatus(); }); // Also reset validation
+                input.addEventListener('blur', function() { validateInput.call(this); }); // Don't reset on blur unless value changes (handled by input)
                 
                 if (input.tagName === 'SELECT') {
-                    input.addEventListener('change', validateInput);
+                    input.addEventListener('change', function() { validateInput.call(this); resetValidationStatus(); }); // Also reset validation
                 }
             });
             
@@ -1921,6 +2049,12 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                     validateInput.call(input);
                 }
             });
+
+            // Checkbox validation reset
+            const noHTTPSCheckbox = document.getElementById('noHTTPS');
+            if (noHTTPSCheckbox) {
+                noHTTPSCheckbox.addEventListener('change', resetValidationStatus);
+            }
         }
         
         // 验证单个输入项
@@ -3237,6 +3371,155 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
         }
         
         // 设置表单验证
+        function resetValidationStatus() {
+            const submitBtn = document.getElementById('submitAddProviderBtn');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.style.backgroundColor = '#bdbdbd';
+                submitBtn.style.cursor = 'not-allowed';
+                // 保持按钮样式一致
+                submitBtn.style.minWidth = '120px';
+                submitBtn.style.height = '40px';
+                submitBtn.style.fontSize = '14px';
+                submitBtn.style.fontWeight = '500';
+                submitBtn.style.borderRadius = '4px';
+                submitBtn.style.border = 'none';
+                submitBtn.style.transition = 'all 0.3s ease';
+                submitBtn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+                submitBtn.style.padding = '0 15px';
+            }
+            const validationResultDiv = document.getElementById('validationResult');
+            if (validationResultDiv) {
+                validationResultDiv.innerHTML = '';
+                validationResultDiv.className = 'validation-message'; // Reset to default class
+            }
+            isProviderConfigValidated = false;
+            console.log('Provider validation status reset.'); // Debug log
+        }
+
+        // Function to validate provider configuration
+        async function validateProviderConfiguration() {
+            const wrapperNameInput = document.getElementById('wrapperName');
+            const modelNameInput = document.getElementById('modelName');
+            const typeNameSelect = document.getElementById('typeName');
+            const domainOrURLInput = document.getElementById('domainOrURL');
+            const apiKeysTextarea = document.getElementById('apiKeys');
+            const noHTTPSCheckbox = document.getElementById('noHTTPS');
+            const validationResultDiv = document.getElementById('validationResult');
+            const submitBtn = document.getElementById('submitAddProviderBtn');
+            const validateBtn = document.getElementById('validateConfigBtn');
+
+            // 更新验证按钮状态
+            validateBtn.disabled = true;
+            validateBtn.innerHTML = '验证中...';
+            validateBtn.style.backgroundColor = '#bdbdbd';
+            // 保持按钮样式一致
+            validateBtn.style.minWidth = '120px';
+            validateBtn.style.height = '40px';
+            validateBtn.style.fontSize = '14px';
+            validateBtn.style.fontWeight = '500';
+            validateBtn.style.borderRadius = '4px';
+            validateBtn.style.border = 'none';
+            validateBtn.style.transition = 'all 0.3s ease';
+            validateBtn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+            validateBtn.style.padding = '0 15px';
+
+            // Clear previous results and disable submit button
+            validationResultDiv.innerHTML = '';
+            validationResultDiv.className = 'validation-message';
+            validationResultDiv.style.padding = '10px';
+            validationResultDiv.style.borderRadius = '4px';
+            
+            submitBtn.disabled = true;
+            submitBtn.style.backgroundColor = '#bdbdbd';
+            submitBtn.style.cursor = 'not-allowed';
+            // 保持按钮样式一致
+            submitBtn.style.minWidth = '120px';
+            submitBtn.style.height = '40px';
+            submitBtn.style.fontSize = '14px';
+            submitBtn.style.fontWeight = '500';
+            submitBtn.style.borderRadius = '4px';
+            submitBtn.style.border = 'none';
+            submitBtn.style.transition = 'all 0.3s ease';
+            submitBtn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+            submitBtn.style.padding = '0 15px';
+            
+            isProviderConfigValidated = false;
+
+            const wrapperName = wrapperNameInput.value.trim();
+            const modelName = modelNameInput.value.trim();
+            const typeName = typeNameSelect.value.trim();
+            const domainOrURL = domainOrURLInput.value.trim();
+            const firstApiKey = apiKeysTextarea.value.split('\n')[0].trim();
+
+            if (!wrapperName || !modelName || !typeName || !firstApiKey) {
+                validationResultDiv.textContent = '请填写提供者名称、模型名称、类型和至少一个API密钥进行验证。';
+                validationResultDiv.className = 'validation-message error';
+                
+                // 恢复验证按钮状态
+                validateBtn.disabled = false;
+                validateBtn.innerHTML = '验证配置';
+                validateBtn.style.backgroundColor = '#4285f4';
+                validateBtn.style.boxShadow = '0 2px 5px rgba(0,0,0,0.1)';
+                return;
+            }
+            
+            validationResultDiv.textContent = '正在验证配置...';
+            validationResultDiv.className = 'validation-message info';
+
+            try {
+                const params = new URLSearchParams();
+                params.append('wrapper_name', wrapperName);
+                params.append('model_name', modelName);
+                params.append('model_type', typeName);
+                params.append('domain_or_url', domainOrURL);
+                params.append('api_key_to_validate', firstApiKey);
+                if (noHTTPSCheckbox.checked) {
+                    params.append('no_https', 'on');
+                }
+
+                const response = await fetch('/portal/validate-provider', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: params
+                });
+
+                const result = await response.json(); // Expecting JSON: { "success": true/false, "message": "..." }
+
+                if (response.ok && result.success) {
+                    validationResultDiv.textContent = `验证成功: ${result.message || '配置有效。现在可以添加提供者。'}`;
+                    validationResultDiv.className = 'validation-message success';
+                    submitBtn.disabled = false;
+                    submitBtn.style.backgroundColor = '#4caf50'; // 绿色，表示成功
+                    submitBtn.style.cursor = 'pointer';
+                    submitBtn.style.boxShadow = '0 2px 5px rgba(0,0,0,0.1)';
+                    isProviderConfigValidated = true;
+                } else {
+                    validationResultDiv.textContent = `验证失败: ${result.message || '配置无效或服务器发生错误。'}`;
+                    validationResultDiv.className = 'validation-message error';
+                    submitBtn.disabled = true;
+                    submitBtn.style.backgroundColor = '#bdbdbd';
+                    submitBtn.style.cursor = 'not-allowed';
+                    submitBtn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+                    isProviderConfigValidated = false;
+                }
+            } catch (error) {
+                validationResultDiv.textContent = '验证请求失败: ' + error.message;
+                validationResultDiv.className = 'validation-message error';
+                submitBtn.disabled = true;
+                submitBtn.style.backgroundColor = '#bdbdbd';
+                submitBtn.style.cursor = 'not-allowed';
+                submitBtn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+                isProviderConfigValidated = false;
+                console.error('Validation request failed:', error); // Debug log
+            } finally {
+                // 恢复验证按钮状态
+                validateBtn.disabled = false;
+                validateBtn.innerHTML = '验证配置';
+                validateBtn.style.backgroundColor = '#4285f4';
+                validateBtn.style.boxShadow = '0 2px 5px rgba(0,0,0,0.1)';
+            }
+        }
     </script>
 </body>
 </html>
