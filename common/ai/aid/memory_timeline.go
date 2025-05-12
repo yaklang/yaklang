@@ -145,11 +145,9 @@ func (m *memoryTimeline) PushToolResult(toolResult *aitool.ToolResult) {
 		m.shrink(item)
 	}
 
-	m.timelineLengthCheck()
-
 	m.tsToTimelineItem.Set(ts, item)
 	m.idToTimelineItem.Set(toolResult.GetID(), item)
-
+	m.timelineLengthCheck()
 	m.dumpSizeCheck()
 }
 
