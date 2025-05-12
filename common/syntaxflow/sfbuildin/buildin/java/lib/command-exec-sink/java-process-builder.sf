@@ -1,13 +1,12 @@
 desc(
-    title_zh:"查找Java ProcessBuilder Sink点",
-    title:"Find Java ProcessBuilder Sink Point",
-    lib: 'java-process-builder-sink',
-    type: audit,
-    rule_id: 20000010,
-    reference:<<<URL
+	title_zh:"查找Java ProcessBuilder Sink点",
+	title:"Find Java ProcessBuilder Sink Point"
+	lib: 'java-process-builder-sink'
+	type: audit
+	reference:<<<URL
     https://docs.oracle.com/javase/8/docs/api/java/lang/ProcessBuilder.html
 URL
-    desc:<<<TEXT
+	desc:<<<TEXT
     该规则用于查找Java代码中使用ProcessBuilder命令执行所使用的命令参数，查找的ProcessBuilder需要调用start方法。
     规则覆盖的类为:
     - java.lang.ProcessBuilder
@@ -17,6 +16,7 @@ URL
     - ProcessBuilder.command(List<String> command)
     - ProcessBuilder.command(String... command)
 TEXT
+	rule_id: "737c2b12-e8ac-4c72-a4e6-44196847059d"
 )
 
 // Constructors
@@ -42,9 +42,9 @@ $invoke(,* ?{!=false && !have:"nil" }as $output)
 alert $output;
 
 desc(
-    lang: java,
-    alert_num: 2,
-    'file://risk1.java': <<<TEXT
+	lang: java
+	alert_num: 2
+	'file://risk1.java': <<<TEXT
 package org.example.moudels.rce.command;
 
 import io.swagger.annotations.Api;
@@ -119,9 +119,9 @@ TEXT
 )
 
 desc(
-    lang: java,
-    alert_num: 1,
-    'file://risk2_reflection.java': <<<TEXT
+	lang: java
+	alert_num: 1
+	'file://risk2_reflection.java': <<<TEXT
 package top.org.example;
 
 import io.swagger.annotations.Api;

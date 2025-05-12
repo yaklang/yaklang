@@ -1,11 +1,11 @@
 desc(
-    title: 'Log4j Security Checking',
-    title_zh: 'Log4j 安全检查',
-    type: vuln,
-    rule_id:21105004,
-    desc: <<<TEXT
+	title: 'Log4j Security Checking'
+	title_zh: 'Log4j 安全检查',
+	type: vuln
+	desc: <<<TEXT
 Log4j是一个广泛使用的Java日志记录库。某些版本的Log4j存在严重的安全漏洞，允许攻击者通过日志记录功能执行远程代码（RCE）。特别是，当应用程序通过Log4j记录用户输入的数据时，攻击者可以构造恶意的输入，利用JNDI（Java Naming and Directory Interface）注入攻击来触发漏洞。这可能导致服务器被完全控制，泄露敏感数据或执行其他恶意操作。因此，建议更新到不受影响的Log4j版本，并避免在日志消息中记录不受信任的用户输入。
 TEXT
+	rule_id: "815144fa-b327-4842-b75d-a7bcc9e6ea6a"
 )
 
 __dependency__./org.apache.logging.log4j/?{<self>.name?{have:'og4j-core'} }.version as $ver;
@@ -49,9 +49,9 @@ alert $low for {
 };
 
 desc(
-    alert_min: 1,
-    lang:java,
-    'file://Log4jInjection.java': <<<EOF
+	alert_min: 1
+	lang:java
+	'file://Log4jInjection.java': <<<EOF
     package org.joychou.controller;
 
     import cn.hutool.http.server.HttpServerRequest;
@@ -70,8 +70,8 @@ desc(
             return "log4j";
         }
      }
-EOF,
-    'file://pom.xml': <<<EOF
+EOF
+	'file://pom.xml': <<<EOF
    <?xml version="1.0" encoding="UTF-8"?>
    <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
             xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -124,5 +124,5 @@ EOF,
            </plugins>
        </build>
    </project>
-EOF,
+EOF
 )

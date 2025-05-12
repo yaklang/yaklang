@@ -1,11 +1,11 @@
 desc(
-    title: "Find Java HTTP Request Sink Point",
-    lib: "java-apache-http-request-url",
-    rule_id: 20000035,
-    type: audit,
-    desc: <<<TEXT
+	title: "Find Java HTTP Request Sink Point"
+	lib: "java-apache-http-request-url"
+	type: audit
+	desc: <<<TEXT
 此规则旨在审计Java代码中Apache HttpClient库的使用情况，特别是寻找HTTP请求的执行点。这些执行点可能是潜在的安全漏洞源，如敏感信息泄露、服务器请求伪造（SSRF）或开放重定向等。通过识别并监控这些HTTP请求的执行，可以帮助开发者及时修复潜在的安全问题，确保应用程序的安全性。
 TEXT
+	rule_id: "586fced3-7b78-42b4-a5e2-4b79298b7875"
 )
 
 *.execute?{<getObject><fullTypeName>?{have: /org\.apache\.http\.impl\.client\..*Client/}}(,* as $request);
@@ -16,10 +16,9 @@ alert $output;
 
 
 desc(
-language: java,
-alert_min: 3,
-
-'file://a3.java': <<<TEXT
+	language: java
+	alert_min: 3
+	'file://a3.java': <<<TEXT
 package src.main.a;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -56,9 +55,8 @@ public class HttpClientExample {
         }
     }
 }
-TEXT,
-
-'file://a2.java': <<<TEXT
+TEXT
+	'file://a2.java': <<<TEXT
 package src.main.b;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -96,9 +94,8 @@ public class HttpClientExample {
         }
     }
 }
-TEXT,
-
-'file://a.java': <<<TEXT
+TEXT
+	'file://a.java': <<<TEXT
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -135,6 +132,5 @@ public class HttpClientExample {
         }
     }
 }
-TEXT,
-
+TEXT
 )

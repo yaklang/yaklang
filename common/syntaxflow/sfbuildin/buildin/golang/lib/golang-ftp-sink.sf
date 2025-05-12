@@ -1,12 +1,12 @@
 desc(
-    title: "check FTP connect and login",
-    type: audit,
-    level: info,
-    lib: 'golang-ftp-sink',
-    rule_id: 10000021,
-    desc: <<<TEXT
+	title: "check FTP connect and login"
+	type: audit
+	level: info
+	lib: 'golang-ftp-sink'
+	desc: <<<TEXT
 此规则旨在审计Go语言代码中`github.com/jlaffaye/ft`包的使用情况。
 TEXT
+	rule_id: "f52f9e0f-536d-42e1-ba70-93c89149b97b"
 )
 
 ftp?{<fullTypeName>?{have: 'github.com/jlaffaye/ftp'}} as $ftp
@@ -15,9 +15,9 @@ $ftp.Dial().* as $output
 alert $output
 
 desc(
-    lang: golang,
-    alert_min: 1,
-    'file://ftp.go': <<<PARAM
+	lang: golang
+	alert_min: 1
+	'file://ftp.go': <<<PARAM
 package main
 
 import (

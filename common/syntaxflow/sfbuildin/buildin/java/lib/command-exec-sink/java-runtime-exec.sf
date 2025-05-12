@@ -1,11 +1,11 @@
 desc(
-    title: "Find Runtime.getRuntime().exec Point",
-    lib: 'java-runtime-exec-sink',
-    type: audit,
-    rule_id: 20000030,
-    desc: <<<TEXT
+	title: "Find Runtime.getRuntime().exec Point"
+	lib: 'java-runtime-exec-sink'
+	type: audit
+	desc: <<<TEXT
 使用 `Runtime.getRuntime().exec()` 方法执行系统命令可能会引发安全漏洞。此方法允许应用程序在运行时执行任意操作系统命令，这可能会被恶意用户利用来执行恶意代码、提升权限或执行未授权的操作。因此，建议避免使用 `Runtime.getRuntime().exec()`，或者在使用时进行严格的输入验证和权限控制，以防止潜在的安全风险。
 TEXT
+	rule_id: "c34fd04b-1d76-4756-91c3-45c63ff1c054"
 )
 
 Runtime.getRuntime().exec(,* as $output);

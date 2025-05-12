@@ -1,13 +1,13 @@
 desc(
-    title: "Find Java Risky Cryptographic Hash Hardcoded PBE Salt",
-    title_zh: "查找 Java 哈希算法使用硬编码的PBE盐值",
-    type: security,
-    level: low,
-    risk:'不安全加密算法',
-    rule_id: 20327001,
-    desc: <<<TEXT
+	title: "Find Java Risky Cryptographic Hash Hardcoded PBE Salt"
+	title_zh: "查找 Java 哈希算法使用硬编码的PBE盐值",
+	type: security
+	level: low
+	risk:'不安全加密算法',
+	desc: <<<TEXT
     该审计规则旨在识别 Java 代码中使用硬编码的PBE盐值的情况。PBE（Password-Based Encryption）是一种基于密码的加密算法，用于加密和解密数据。在使用PBE算法时，盐值（Salt）是一个随机的字节序列，用于增加密码的复杂性和安全性。硬编码的PBE盐值可能会导致密码加密的不安全性，因为攻击者可以通过分析代码来获取盐值，从而破解加密密码。建议开发者使用随机生成的盐值来增强密码的安全性。
 TEXT
+	rule_id: "195c4be8-ab65-4755-9369-67df5911d6b3"
 )
 
 // AlgorithmParameterSpec paramSpec = new PBEParameterSpec(SALT, ITERATION_COUNT);
@@ -21,10 +21,10 @@ alert $risk for{
     message:"发现Java代码中使用硬编码的PBE盐值",
 }
 
-desc{
-    lang:java,
-    alert_num:1,
-    'file://unsafe.java': <<<EOF
+desc(
+	lang:java
+	alert_num:1
+	'file://unsafe.java': <<<EOF
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
@@ -73,11 +73,11 @@ public class HardcodedSaltExample {
     }
 }
 EOF
-}
+)
 
-desc{
-    lang:java,
-    'safefile://safe.java': <<<EOF
+desc(
+	lang:java
+	'safefile://safe.java': <<<EOF
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
@@ -123,4 +123,4 @@ public class SecureEncryptionExample {
     }
 }
 EOF
-}
+)

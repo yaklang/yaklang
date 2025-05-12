@@ -1,11 +1,11 @@
 desc(
-    title: "Unsafe File Upload in Controller Component",
-    title_zh: "文件上传漏洞",
-    type: vul,
-   rule_id: 30434001,
-    desc: <<<CODE
+	title: "Unsafe File Upload in Controller Component"
+	title_zh: "文件上传漏洞",
+	type: vul
+	desc: <<<CODE
        文件上传漏洞是指用户上传了一个可执行的脚本文件，并通过此脚本文件获得了执行服务器端命令的能力。这种攻击方式是最为直接和有效的，“文件上传”本身没有问题，有问题的是文件上传后，服务器怎么处理、解释文件。如果服务器的处理逻辑做的不够安全，则会导致严重的后果.
 CODE
+	rule_id: "7138efeb-bd0b-4dd1-a728-a5d84c3bfa61"
 )
 <include('php-filter-function')> as $filter
 
@@ -49,9 +49,9 @@ alert $low_upload for {
     level: "low"
 }
 desc(
-    lang: "php",
-    alert_min: 1,
-    "file:///upload.php": <<<TEXT
+	lang: "php"
+	alert_min: 1
+	"file:///upload.php": <<<TEXT
 <?php
     class UploadController {
         public function uploadFile() {
@@ -66,8 +66,8 @@ desc(
             }
         }
     }
-TEXT,
-    "file:///upload2.php": <<<TEXT
+TEXT
+	"file:///upload2.php": <<<TEXT
 <?php
     class uploads{
         public function upload(){

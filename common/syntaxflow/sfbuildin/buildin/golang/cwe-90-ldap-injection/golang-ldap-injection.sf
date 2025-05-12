@@ -1,15 +1,15 @@
 desc(
-    title: "golang LDAP injection",
-    type: audit,
-    severity: high,
-    rule_id: 10090001,
-    desc: <<<TEXT
+	title: "golang LDAP injection"
+	type: audit
+	severity: high
+	desc: <<<TEXT
 LDAP 注入攻击是一种严重的安全漏洞，它允许攻击者通过操纵 LDAP（轻量目录访问协议）查询来访问或操纵敏感数据。在 Go 语言应用程序中，如果 LDAP 查询的构造不当，特别是当查询中包含未经过滤或未转义的输入时，攻击者可能会利用这一漏洞执行恶意 LDAP 查询，获取未授权的访问权限或敏感信息。这种漏洞通常出现在用户认证、授权或数据检索功能中。
 
 LDAP 注入漏洞通常发生在以下场景：
 1. 用户输入被直接拼接到 LDAP 查询字符串中，例如 `fmt.Sprintf("(uid=%s)", username)`。
 2. 未对用户输入进行参数化处理或验证，导致恶意输入被解释为 LDAP 命令。
 TEXT
+	rule_id: "2b4b5d82-965c-4e2c-ac36-72d950f9143e"
 )
 
 <include('golang-ldap-sink')> as $sink;
@@ -25,9 +25,9 @@ alert $high for {
 }
 
 desc(
-    lang: golang,
-    alert_high: 1,
-    'file://main.go': <<<UNSAFE
+	lang: golang
+	alert_high: 1
+	'file://main.go': <<<UNSAFE
 package main
 
 import (

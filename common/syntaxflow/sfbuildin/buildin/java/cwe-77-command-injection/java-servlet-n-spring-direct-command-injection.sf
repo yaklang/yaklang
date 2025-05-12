@@ -1,10 +1,9 @@
 desc(
-    title: "Springframework Paremeter Passed into Command Injection Sink",
-    title_zh: 'Servlet & Springframework 基础参数命令注入',
-    type: vuln,
-    risk:"命令注入",
-    rule_id: 20077001,
-    desc: <<<TEXT
+	title: "Springframework Paremeter Passed into Command Injection Sink"
+	title_zh: 'Servlet & Springframework 基础参数命令注入',
+	type: vuln
+	risk:"命令注入",
+	desc: <<<TEXT
     该规则用于审计Java代码中以Servlet和Springframework传入命令注入的参数为污染源(source)，以命令执行为污染汇聚点(sink)的命令执行规则。
     规则覆盖的命令执行点包括：
     - Runtime.getRuntime().exec()
@@ -16,6 +15,7 @@ desc(
     - NuProcess
     - org.apache.hadoop.util.Shell
 TEXT
+	rule_id: "31093d24-ee2b-448b-ba5a-111d99bbf77c"
 )
 
 <include('java-servlet-param')> as $source;
@@ -47,9 +47,9 @@ alert $low for{
 };
 
 desc(
-language: java,
-alert_min:1,
-'file://directly.java': <<<EOF
+	language: java
+	alert_min:1
+	'file://directly.java': <<<EOF
 package com.example;
 
 import jakarta.servlet.*;
@@ -75,8 +75,8 @@ EOF
 )
 
 desc(
-language: java,
-'safefile://a.java': <<<EOF
+	language: java
+	'safefile://a.java': <<<EOF
 package com.example;
 
 import jakarta.servlet.*;
@@ -103,9 +103,9 @@ EOF
 )
 
 desc(
-language: java,
-alert_high:1,
-'file://directly.java':<<<EOF
+	language: java
+	alert_high:1
+	'file://directly.java':<<<EOF
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -150,9 +150,9 @@ EOF
 )
 
 desc(
-    lang:java,
-    alert_low:1,
-    "file://complexDemo1.java":<<<EOF
+	lang:java
+	alert_low:1
+	"file://complexDemo1.java":<<<EOF
     package com.example;
 
     public class CmdObject {
@@ -211,9 +211,9 @@ EOF
 )
 
 desc(
-    lang:'java',
-    alert_num:1,
-    'file://processExec.java':<<<EOF
+	lang:'java'
+	alert_num:1
+	'file://processExec.java':<<<EOF
    package org.example.moudels.rce.command;
 
    import io.swagger.annotations.Api;
@@ -265,9 +265,9 @@ EOF
 )
 
 desc(
-    lang:java,
-    alert_num:1,
-    'file://processImplExec.java':<<<EOF
+	lang:java
+	alert_num:1
+	'file://processImplExec.java':<<<EOF
      package org.example.moudels.rce.command;
 
        import io.swagger.annotations.Api;

@@ -1,13 +1,13 @@
 desc(
-    title_zh: "识别到 Java Spring Framework 中处理 ModelAndView 时直接传入 String 类型参数",
-    title: "Recognize Java Spring Framework code handling ModelAndView with String type parameter",
-    type: audit,
-    rule_id:21336004,
-    level: mid,
-    risk:ssti,
-    desc: <<<TEXT
+	title_zh: "识别到 Java Spring Framework 中处理 ModelAndView 时直接传入 String 类型参数",
+	title: "Recognize Java Spring Framework code handling ModelAndView with String type parameter"
+	type: audit
+	level: mid
+	risk:ssti
+	desc: <<<TEXT
     在Java Spring Framework中，如果处理ModelAndView时直接传入String类型参数，可能会导致SSTI漏洞。攻击者可以通过构造恶意输入，执行模板注入，进而控制服务器。为了防止SSTI漏洞，需要对用户输入的参数进行严格的过滤，包括验证参数的合法性、长度、字符等，并尽量避免直接将用户输入的参数传递给模板执行函数。
 TEXT
+	rule_id: "0257563a-689d-4f55-9aa7-6ffcbb4df95f"
 )
 
 <include('java-spring-mvc-param')>?{<typeName>?{have: "String"}} as $param;
@@ -27,8 +27,8 @@ alert $filteredSource for {
 };
 
 desc(
-lang: java,
-'file://a.java': <<<CODE
+	lang: java
+	'file://a.java': <<<CODE
 package com.ibeetl.admin.console.web;
 
 @Controller

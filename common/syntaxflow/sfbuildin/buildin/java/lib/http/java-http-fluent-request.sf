@@ -1,11 +1,11 @@
 desc(
-    title: "Find Java HTTP Fluent Request",
-    type: audit,
-    lib: "java-http-fluent-request",
-    rule_id: 20000014,
-    desc: <<<TEXT
+	title: "Find Java HTTP Fluent Request"
+	type: audit
+	lib: "java-http-fluent-request"
+	desc: <<<TEXT
 使用Apache HttpClient Fluent API发送HTTP请求时，如果没有适当的安全措施，可能会导致敏感信息泄露、中间人攻击等安全风险。建议对使用Fluent API发送的请求进行严格的参数验证、错误处理以及使用HTTPS协议来增强安全性。
 TEXT
+	rule_id: "9323ce34-f898-40ca-b03d-4e4ffcc16dc8"
 )
 
 Request?{<fullTypeName>?{have: "client.fluent"}} as $root;
@@ -18,9 +18,9 @@ $execMethods(,* as $output);
 alert $output;
 
 desc(
-lang: java,
-alert_min: 2,
-'file://risk2.java': <<<TEXT
+	lang: java
+	alert_min: 2
+	'file://risk2.java': <<<TEXT
 package src.main.a;
 import org.apache.http.client.fluent.Request;
 import org.apache.http.client.fluent.Response;
@@ -40,8 +40,8 @@ public class FluentGetExample {
         }
     }
 }
-TEXT,
-'file://risk1.java': <<<TEXT
+TEXT
+	'file://risk1.java': <<<TEXT
 package src.main.b;
 import org.apache.http.client.fluent.Request;
 import org.apache.http.client.fluent.Response;

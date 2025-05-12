@@ -1,11 +1,11 @@
 desc(
-    title: 'SCA: Checking Java sqlite-jdbc Existed Vulnerabilities',
-    type: vuln,
-    risk: sca,
-    rule_id: 21105032,
-    desc: <<<TEXT
+	title: 'SCA: Checking Java sqlite-jdbc Existed Vulnerabilities'
+	type: vuln
+	risk: sca
+	desc: <<<TEXT
 sqlite-jdbc 是一个用于 Java 应用程序与 SQLite 数据库进行交互的库。某些版本的 sqlite-jdbc 存在 SQL 注入漏洞，可能会被恶意用户利用来执行未经授权的 SQL 命令，从而可能导致数据泄露、数据篡改或拒绝服务等严重后果。建议对 sqlite-jdbc 库进行版本审查，确保使用的版本不受已知漏洞的影响。
 TEXT
+	rule_id: "3ffebcee-b93d-4a61-a78b-42ab110c0639"
 )
 
 __dependency__.*sqlite*jdbc.version as $ver;

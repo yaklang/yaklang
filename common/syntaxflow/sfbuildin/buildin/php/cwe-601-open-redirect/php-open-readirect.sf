@@ -1,13 +1,13 @@
 desc(
-    title: " Open Redirect Vulnerability",
-    title_zh: "重定向漏洞",
-    level: "low",
-    risk: "open-redirect",
-    type: "audit",
-   rule_id: 30601001,
-    desc: <<<TEXT
+	title: " Open Redirect Vulnerability"
+	title_zh: "重定向漏洞",
+	level: "low"
+	risk: "open-redirect"
+	type: "audit"
+	desc: <<<TEXT
 开放重定向漏洞（CWE-601）允许攻击者构造恶意URL诱导用户访问钓鱼网站。当应用程序未对header()函数中的重定向目标进行严格验证时，攻击者可通过篡改URL参数（如redirect_to）将用户导向恶意域名。
 TEXT
+	rule_id: "65934f87-f276-44cc-826a-3480b5a57ff5"
 )
 
 
@@ -55,10 +55,10 @@ alert $low for{
 }
 
 desc(
-    lang: "php",
-    alert_min: 1,
-    alert_high: 1,
-    'file:///unsafe.php': <<<TEXT
+	lang: "php"
+	alert_min: 1
+	alert_high: 1
+	'file:///unsafe.php': <<<TEXT
 <?php
     $url = $_GET["url"];
     header("Location: ".$url);

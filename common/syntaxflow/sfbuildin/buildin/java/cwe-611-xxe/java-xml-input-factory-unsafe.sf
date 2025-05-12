@@ -1,12 +1,12 @@
 desc(
-    title: "Check STAX XMLInputFactory() Unsafe Use",
-    title_zh: "检测 STAX（Streaming API for XML） XMLInputFactory() 不安全使用",
-    type: vuln,
-    rule_id:20611006,
-    risk: XXE,
-    desc: <<<TEXT
+	title: "Check STAX XMLInputFactory() Unsafe Use"
+	title_zh: "检测 STAX（Streaming API for XML） XMLInputFactory() 不安全使用",
+	type: vuln
+	risk: XXE
+	desc: <<<TEXT
 使用 STAX（Streaming API for XML）中的 `XMLInputFactory` 时，如果未明确设置安全策略，可能会导致应用程序容易受到 XML 外部实体（XXE）攻击。XXE 攻击允许攻击者访问本地文件系统、执行。
 TEXT
+	rule_id: "4b416d51-56a5-4424-a7e3-79514d453483"
 )
 
 XMLInputFactory.newInstance() as $factory;
@@ -21,9 +21,9 @@ alert $vulnCall for {
 }
 
 desc(
-    lang: "java",
-    alert_num: 2,
-    "file://cve_2018_15531.java": <<<UNSAFE
+	lang: "java"
+	alert_num: 2
+	"file://cve_2018_15531.java": <<<UNSAFE
 import java.util.NoSuchElementException;
 import java.util.Scanner;
 import java.util.regex.Pattern;
@@ -83,8 +83,8 @@ UNSAFE
 )
 
 desc(
-    lang: "java",
-    "safefile://cve_2018_15531_safe.java": <<<SAFE
+	lang: "java"
+	"safefile://cve_2018_15531_safe.java": <<<SAFE
     import java.util.NoSuchElementException;
     import java.util.Scanner;
     import java.util.regex.Pattern;

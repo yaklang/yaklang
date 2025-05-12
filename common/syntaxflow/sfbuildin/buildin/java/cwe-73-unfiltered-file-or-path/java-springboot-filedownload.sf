@@ -1,12 +1,12 @@
 desc(
-    title: "checking [File or Content download via Springboot Params]",
-    type: vuln,
-    level: warning,
-    rule_id: 20073004,
-    risk:"path-traversal",
-    desc: <<<TEXT
+	title: "checking [File or Content download via Springboot Params]"
+	type: vuln
+	level: warning
+	risk:"path-traversal"
+	desc: <<<TEXT
     检查Springboot中文件下载或内容下载的代码，以确保不会直接将用户输入作为文件路径传递给文件下载函数。如果用户输入未经过充分的过滤，可能会导致文件路径遍历（Path Traversal）漏洞。攻击者可以通过构造恶意文件路径，访问或下载服务器上的敏感文件，进而导致信息泄露、文件损坏等安全问题。为了防止文件下载漏洞，需要对用户输入的文件路径进行严格的过滤，包括验证文件路径的合法性、长度、字符等，并确保文件下载不会导致未经授权的访问或下载。
 TEXT
+	rule_id: "41bfcaa6-f47e-4843-8bf0-9575eea4ee7a"
 )
 
 <include('java-spring-mvc-param')> as $params;
@@ -22,8 +22,8 @@ CODE
 alert $sink;
 
 desc(
-lang: java,
-'file://download.java': <<<CODE
+	lang: java
+	'file://download.java': <<<CODE
 package com.example.filedownload;
 import java.io.File;
 @RestController

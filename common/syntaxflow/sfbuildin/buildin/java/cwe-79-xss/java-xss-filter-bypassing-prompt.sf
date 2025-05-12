@@ -1,12 +1,12 @@
 desc(
-    title: "Find XSS Filter Call Existed, Please Checking Bypass tactics",
-    title_zh: "XSS 过滤器被使用，请排查是否可绕过",
-    type: audit,
-    level: low,
-    rule_id: 20079005,
-    desc: <<<TEXT
+	title: "Find XSS Filter Call Existed, Please Checking Bypass tactics"
+	title_zh: "XSS 过滤器被使用，请排查是否可绕过",
+	type: audit
+	level: low
+	desc: <<<TEXT
 跨站脚本攻击（XSS）是一种常见的安全漏洞，攻击者可以在受害者的浏览器中执行恶意脚本。尽管代码中使用了XSS过滤器来清理输入数据，但过滤器的实现可能存在缺陷，使得攻击者能够绕过这些安全措施。因此，建议对XSS过滤器的实现进行仔细审查，确保没有遗漏的绕过策略，并考虑使用更强大和全面的防护机制，如内容安全策略（CSP）和HTTP安全头（如X-Content-Type-Options和X-XSS-Protection）。
 TEXT
+	rule_id: "c44e3929-2379-46d2-ad00-b30fece5e2e1"
 )
 
 /(?i).*xss.*((clear)|(filter)|(escape)).*/ as $entryCall;
@@ -19,8 +19,8 @@ check $entryCall then "Find XSS Escaper" else "No XSS Escaper";
 alert $entryCall;
 
 desc(
-    lang: java,
-    "file:///unsafe.java": <<<UNSAFE
+	lang: java
+	"file:///unsafe.java": <<<UNSAFE
 @ApiIgnore
 @Controller("dynamicPageAction")
 @RequestMapping("/demo/clearXSS")

@@ -1,24 +1,24 @@
 desc(
-    title: "check file write function(bufio)",
-    type: audit,
-    level: info,
-    lib: 'golang-file-write-bufio',
-    rule_id: 10000016,
-    desc: <<<TEXT
+	title: "check file write function(bufio)"
+	type: audit
+	level: info
+	lib: 'golang-file-write-bufio'
+	desc: <<<TEXT
 此审计规则旨在检查Go语言程序中是否存在使用`bufio`库进行文件写入操作的代码。虽然`bufio`库提供了高效的文件写入功能，但不当的文件写入操作可能会引发安全问题，如写入敏感信息到不安全的文件路径，或者因文件权限设置不当而导致数据泄露。因此，建议开发者在进行文件写入操作时，确保文件路径的安全性，并合理设置文件权限。
 TEXT
+	rule_id: "72e2d1ff-51a4-4033-817a-435108c306ca"
 )
 
 bufio?{<fullTypeName>?{have: 'bufio'}} as $entry;
 $entry.NewWriter <getCall> as $writer;
-$writer.WriteString(* #-> as $output); 
+$writer.WriteString(* #-> as $output);
 
 alert $output
 
 desc(
-    lang: golang,
-    alert_min: 1,
-    'file://filewrite.go': <<<PARAM
+	lang: golang
+	alert_min: 1
+	'file://filewrite.go': <<<PARAM
 package main
 
 import (

@@ -1,11 +1,11 @@
 desc(
-    title: "Java Spring Framework Multipart File Saving",
-    title_zh: "识别到 Spring Framework 中处理文件上传的代码",
-    risk:"rce",
-    rule_id: 20434001,
-    desc: <<<TEXT
+	title: "Java Spring Framework Multipart File Saving"
+	title_zh: "识别到 Spring Framework 中处理文件上传的代码",
+	risk:"rce"
+	desc: <<<TEXT
     在Java Spring Framework中，处理文件上传的功能如果没有得到妥善的安全控制，可能会导致远程代码执行（RCE）等安全漏洞。攻击者可能会上传恶意文件，并通过服务器保存这些文件，进一步利用服务器上的漏洞执行恶意代码。因此，需要对文件上传功能进行严格的安全检查，包括验证上传文件的类型、大小、内容等，并确保文件保存在安全的目录中，防止未经授权的访问或执行。
 TEXT
+	rule_id: "5a5c7d06-ece9-4a26-879c-e6e91d73b01e"
 )
 
 <include('java-spring-mvc-param')>?{<typeName>?{have: "MultipartFile"}} as $entry;
@@ -136,9 +136,9 @@ alert $result for {
 //)
 
 desc(
-    lang: java,
-    alert_min:1,
-    'file://a.java': <<<CODE
+	lang: java
+	alert_min:1
+	'file://a.java': <<<CODE
 package com.ibeetl.admin.core.web;
 
 import java.io.IOException;

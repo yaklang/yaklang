@@ -1,12 +1,12 @@
 desc(
-    title_zh:"检测Java SpringBoot RestController 基础XSS漏洞",
-    title: "Find SpringBoot RestController Basic XSS",
-    type: vuln,
-    risk: XSS,
-    rule_id: 20079004,
-    desc: <<<TEXT
+	title_zh:"检测Java SpringBoot RestController 基础XSS漏洞",
+	title: "Find SpringBoot RestController Basic XSS"
+	type: vuln
+	risk: XSS
+	desc: <<<TEXT
 跨站脚本攻击（XSS）是一种常见的安全漏洞，攻击者通过在应用程序中注入恶意脚本，能够在其他用户的浏览器中执行这些脚本。在Spring Boot的RestController中，如果未对用户输入进行适当的过滤或转义，并将其直接输出到HTTP响应中，那么攻击者可能会利用这一点来发动XSS攻击。这可能导致敏感信息泄露、会话劫持或其他恶意行为。因此，建议对所有用户输入进行适当的验证、过滤或转义，以防止XSS攻击。
 TEXT
+	rule_id: "cad09b46-5b0f-4c43-9b43-2b786b9c625f"
 )
 
 <include('java-spring-mvc-param')>?{<typeName>?{have: String}} as $params;
@@ -78,10 +78,10 @@ alert $filteredSink for {
 // *strip*
 
 desc(
-lang: java,
-alert_min: 3,
-alert_low: 1,
-'file://b.java': <<<UNSAFE
+	lang: java
+	alert_min: 3
+	alert_low: 1
+	'file://b.java': <<<UNSAFE
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.util.HtmlUtils;
@@ -118,9 +118,9 @@ UNSAFE
 )
 
 desc(
-    lang: java,
-    alert_num:2,
-    'file://reflective.java': <<<UNSAFE
+	lang: java
+	alert_num:2
+	'file://reflective.java': <<<UNSAFE
 
 import cn.hutool.core.date.DateUtil;
 import io.swagger.annotations.*;

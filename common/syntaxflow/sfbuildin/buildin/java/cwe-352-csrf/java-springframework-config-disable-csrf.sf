@@ -1,12 +1,12 @@
 desc(
-    title: "Unsafe Config for CSRF Protection '.csrf().disable()'",
-    title_zh: "关闭 CSRF 保护",
-    type: vuln,
-    level: low,
-    rule_id: 20352002,
-    desc: <<<TEXT
+	title: "Unsafe Config for CSRF Protection '.csrf().disable()'"
+	title_zh: "关闭 CSRF 保护",
+	type: vuln
+	level: low
+	desc: <<<TEXT
 禁用跨站请求伪造（CSRF）保护可能会使应用程序容易受到CSRF攻击。CSRF攻击允许攻击者强制经过身份验证的用户执行非预期的操作。建议启用CSRF保护机制，以防御此类攻击。
 TEXT
+	rule_id: "e334c491-5e84-4f45-b13a-7b16e6d26e35"
 )
 
 configure(* as $configEntry);
@@ -17,8 +17,8 @@ check $disableCSRF;
 alert $disableCSRF;
 
 desc(
-    lang: java,
-    'safefile://config2.java': <<<SAFE
+	lang: java
+	'safefile://config2.java': <<<SAFE
 import org.springframework.context.annotation.Bean;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -41,8 +41,8 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
                 .contentSecurityPolicy("script-src 'self'; report-uri /csp-report-endpoint/");  // 添加 CSP 策略
     }
 }
-SAFE,
-    'file://config.java': <<<CONFIG
+SAFE
+	'file://config.java': <<<CONFIG
 import org.springframework.context.annotation.Bean;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;

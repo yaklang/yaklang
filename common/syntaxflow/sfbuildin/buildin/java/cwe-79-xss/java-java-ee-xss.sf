@@ -1,13 +1,13 @@
 desc(
-    title: "Check Java EE's XSS Vulnerability",
-    title_zh: "检测Java EE的XSS漏洞",
-    type: vuln,
-    risk: XSS,
-    level: high,
-    rule_id: 20079001,
-    desc: <<<TEXT
+	title: "Check Java EE's XSS Vulnerability"
+	title_zh: "检测Java EE的XSS漏洞",
+	type: vuln
+	risk: XSS
+	level: high
+	desc: <<<TEXT
 跨站脚本攻击（XSS）是一种常见的安全漏洞，攻击者通过在应用程序中注入恶意脚本，能够在其他用户的浏览器中执行这些脚本。在Java EE应用程序中，如果开发者未对用户输入进行适当的转义处理，直接将其输出到HTML页面中，就会导致XSS漏洞。攻击者可以利用这个漏洞窃取用户的敏感信息、进行会话劫持或执行其他恶意操作。因此，开发人员应该对用户输入进行严格的验证和转义，以防止XSS攻击。
 TEXT
+	rule_id: "00b097ac-f408-4a9b-b2e3-88b5c2a0fe3e"
 )
 
 <javaUnescapeOutput> as $sink;
@@ -28,9 +28,9 @@ alert $result for {
 };
 
 desc(
-    alert_min:1,
-    lang: "java",
-    'file://xss-vulnerable.jsp': <<<EOF
+	alert_min:1
+	lang: "java"
+	'file://xss-vulnerable.jsp': <<<EOF
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <html>
 <head>
@@ -41,8 +41,8 @@ desc(
     <div>${sessionScope.userInput}</div>
 </body>
 </html>
-EOF,
- 'file://servletDemo.java': <<<EOF
+EOF
+	'file://servletDemo.java': <<<EOF
 import java.io.*;
 import javax.servlet.*;
 import javax.servlet.http.*;
@@ -54,14 +54,15 @@ public class XSSVulnerableServlet extends HttpServlet {
        request.getRequestDispatcher("/xss-vulnerable.jsp").forward(request, response);
     }
 }
-EOF,
-);
+EOF
+)
+
 
 
 desc(
-    alert_num:1,
-    lang: "java",
-    'file://web/jsp/messages/seemessages.jsp': <<<EOF
+	alert_num:1
+	lang: "java"
+	'file://web/jsp/messages/seemessages.jsp': <<<EOF
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <%@page import="java.util.Iterator" %>
 <%@page import="java.util.ArrayList" %>
@@ -105,8 +106,8 @@ desc(
 </table>
 </body>
 </html>
-EOF,
- 'file://web/servlet/ShowMessagesServlet.java': <<<EOF
+EOF
+	'file://web/servlet/ShowMessagesServlet.java': <<<EOF
  package org.example;
 
 
@@ -151,5 +152,6 @@ EOF,
          doPost(request,response);
      }
  }
-EOF,
-);
+EOF
+)
+

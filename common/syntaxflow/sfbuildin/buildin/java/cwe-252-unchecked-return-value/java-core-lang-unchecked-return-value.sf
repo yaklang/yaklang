@@ -1,11 +1,11 @@
 desc(
-    title:'Check Java Lang Unchecked Return Value',
-    title_zh:'检测Java Lang库未检查返回值的API',
-    type:security,
-    rule_id: 20252002,
-    desc:<<<TEXT
+	title:'Check Java Lang Unchecked Return Value'
+	title_zh:'检测Java Lang库未检查返回值的API',
+	type:security
+	desc:<<<TEXT
 Java的java.lang库中某些方法会返回一个值，但是调用者没有检查这个返回值。这可能导致一些潜在的安全风险，例如资源泄露、内存泄露、数据泄露等。因此，建议在调用这些方法时，检查返回值并根据需要进行处理。
-TEXT,
+TEXT
+	rule_id: "11d8d5f5-900b-4d88-82f7-88f8b3c67fcd"
 )
 
 /^(getRuntime|exec|waitFor|getInCheck|holdsLock|interrupted|concat|replace(All|First)?|substring|to(String|(Lower|Upper)Case)|trim|valueOf)$/<getCall> as $toCheck;
@@ -17,10 +17,10 @@ alert $weak for {
     level:info,
 };
 
-desc{
-    lang:'java',
-    alert_num:2,
-    'file://demo.java':<<<TEXT
+desc(
+	lang:'java'
+	alert_num:2
+	'file://demo.java':<<<TEXT
 package org.example;
 
 public class Main {
@@ -31,4 +31,4 @@ public class Main {
     }
 }
 TEXT
-}
+)

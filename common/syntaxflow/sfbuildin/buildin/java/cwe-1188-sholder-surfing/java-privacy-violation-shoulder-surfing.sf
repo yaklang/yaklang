@@ -1,13 +1,13 @@
 desc(
-    title:"Check Java Privacy Violation - Shoulder Surfing",
-    title_zh:"检查Java隐私泄露 - 肩窥",
-    type:security,
-    risk:'info-exposure',
-    level:low,
-    rule_id: 21188001,
-    desc:<<<TEXT
+	title:"Check Java Privacy Violation - Shoulder Surfing"
+	title_zh:"检查Java隐私泄露 - 肩窥",
+	type:security
+	risk:'info-exposure'
+	level:low
+	desc:<<<TEXT
     该规则用于检测Java代码中是否含有"肩窥"问题，"肩窥"是一种安全威胁，指的是攻击者通过观察用户的屏幕或键盘输入来获取敏感信息，例如密码。
 TEXT
+	rule_id: "6f1eb106-9ac3-440f-817d-3701282b74f7"
 )
 
 // new PasswordCallback("Password: ", true)
@@ -20,9 +20,9 @@ alert $risk for{
 }
 
 desc(
-    lang:'java',
-    alert_num:1,
-    "file://unsafe.java":<<<TEXT
+	lang:'java'
+	alert_num:1
+	"file://unsafe.java":<<<TEXT
 package net.jradius.security.auth;
 import java.io.IOException;
 import java.util.Map;
@@ -120,8 +120,8 @@ TEXT
 )
 
 desc(
-    lang:'java',
-    "safefile://safe.java":<<<TEXT
+	lang:'java'
+	"safefile://safe.java":<<<TEXT
 package net.jradius.security.auth;
 import java.io.IOException;
 import java.util.Map;

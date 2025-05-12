@@ -1,15 +1,15 @@
 desc(
-    title: "golang xxe read any file",
-    type: audit,
-    level: high,
-    rule_id: 10611001,
-    desc: <<<TEXT
+	title: "golang xxe read any file"
+	type: audit
+	level: high
+	desc: <<<TEXT
 此审计规则旨在验证 XML 解析过程中是否存在 XXE（XML External Entity）漏洞。XXE 漏洞（CWE-611）允许攻击者通过构造恶意 XML 输入读取服务器上的任意文件（如 `/etc/passwd`），甚至可能导致服务器被完全控制。当应用程序未禁用外部实体解析时，攻击者可以利用外部实体加载恶意文件或执行其他危险操作。
 
 XXE 漏洞通常发生在以下场景：
 1. 应用程序解析用户提供的 XML 数据时，未禁用外部实体解析。
 2. 攻击者通过构造包含外部实体的恶意 XML 文件
 TEXT
+	rule_id: "2a752b37-c0ec-4098-813d-c0a685e36541"
 )
 
 <include('golang-xml-sink')> as $sink;
@@ -24,9 +24,9 @@ alert $high for {
 }
 
 desc(
-    lang: golang,
-    alert_high: 1,
-    'file://main.go': <<<UNSAFE
+	lang: golang
+	alert_high: 1
+	'file://main.go': <<<UNSAFE
 package main
 
 import (

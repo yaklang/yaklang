@@ -1,9 +1,8 @@
 desc(
-    title: "golang Command Injection",
-    type: audit,
-    severity: high,
-    rule_id: 10077001,
-    desc: <<<TEXT
+	title: "golang Command Injection"
+	type: audit
+	severity: high
+	desc: <<<TEXT
 命令注入漏洞（Command Injection）允许攻击者通过输入恶意数据来执行任意命令。在 Golang 应用程序中，如果使用 `os/exec` 包执行外部命令时未对用户输入进行适当的清理和验证，攻击者可以通过构造特殊的输入来执行不受信任的命令，进而控制服务器或访问敏感数据。
 
 这种漏洞通常发生在以下场景：
@@ -19,6 +18,7 @@ desc(
 - 使用 `os/exec` 包的 `Command` 方法，并将用户输入作为独立参数传递。
 - 对用户输入进行严格的验证，确保其符合预期格式。
 TEXT
+	rule_id: "c12cbcab-12de-4e6a-8715-4143224a36ed"
 )
 
 <include('golang-os-exec')> as $sink;
@@ -37,9 +37,9 @@ alert $high for {
 }
 
 desc(
-    lang: golang,
-    alert_high: 1,
-    'file://main.go': <<<UNSAFE
+	lang: golang
+	alert_high: 1
+	'file://main.go': <<<UNSAFE
 package main
 
 import (
@@ -64,8 +64,8 @@ func main() {
     fmt.Scanln(&userInput) // 接收用户输入
     executeCommand(userInput)
 }
-UNSAFE,
-    'safe://main.go': <<<SAFE
+UNSAFE
+	'safe://main.go': <<<SAFE
 package main
 
 import (

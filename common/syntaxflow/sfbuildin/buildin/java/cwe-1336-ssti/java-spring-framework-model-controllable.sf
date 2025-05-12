@@ -1,17 +1,17 @@
 desc(
-    title_zh: "检测 Java Spring Framework 中 ModelAndView 构造函数可控",
-    title: "Check Java Spring Framework code that can control the ModelAndView constructor",
-    type: vuln,
-    level: high,
-    risk:ssti,
-    rule_id: 21336003,
-    harm_zh: "这种漏洞可能导致服务器端模板注入(SSTI)攻击。攻击者可以通过控制ModelAndView构造函数的参数来注入恶意模板，从而执行任意代码、访问敏感数据或进行其他未授权操作。",
-    harm: "This vulnerability may lead to Server-Side Template Injection (SSTI) attacks. Attackers can inject malicious templates by controlling the parameters of the ModelAndView constructor, potentially executing arbitrary code, accessing sensitive data, or performing other unauthorized operations.",
-    fix_zh: "建议使用安全的模板引擎，并避免直接将用户输入作为模板路径或内容的一部分。",
-    fix: "Use a secure template engine and avoid directly using user input as part of the template path or content.",
-    desc: <<<TEXT
+	title_zh: "检测 Java Spring Framework 中 ModelAndView 构造函数可控",
+	title: "Check Java Spring Framework code that can control the ModelAndView constructor"
+	type: vuln
+	level: high
+	risk:ssti
+	harm_zh: "这种漏洞可能导致服务器端模板注入(SSTI)攻击。攻击者可以通过控制ModelAndView构造函数的参数来注入恶意模板，从而执行任意代码、访问敏感数据或进行其他未授权操作。",
+	harm: "This vulnerability may lead to Server-Side Template Injection (SSTI) attacks. Attackers can inject malicious templates by controlling the parameters of the ModelAndView constructor, potentially executing arbitrary code, accessing sensitive data, or performing other unauthorized operations."
+	fix_zh: "建议使用安全的模板引擎，并避免直接将用户输入作为模板路径或内容的一部分。",
+	fix: "Use a secure template engine and avoid directly using user input as part of the template path or content."
+	desc: <<<TEXT
     在Java Spring Framework中，如果ModelAndView构造函数的参数可控，可能会导致SSTI漏洞。攻击者可以通过构造恶意输入，执行模板注入，进而控制服务器。为了防止SSTI漏洞，需要对用户输入的参数进行严格的过滤，包括验证参数的合法性、长度、字符等，并尽量避免直接将用户输入的参数传递给模板执行函数。
 TEXT
+	rule_id: "0d552b29-dc8b-4f92-86f9-22badc7b5a87"
 )
 
 <include('java-spring-mvc-param')>?{<typeName>?{have: "String"}} as $param;
@@ -30,8 +30,8 @@ alert $filteredSource for {
 };
 
 desc(
-lang: java,
-'file://a.java': <<<CODE
+	lang: java
+	'file://a.java': <<<CODE
 package com.ibeetl.admin.console.web;
 
 @Controller
@@ -45,8 +45,8 @@ public class OrgConsoleController {
         return view;
     }
 }
-CODE,
-'safefile://b.java': <<<CODE
+CODE
+	'safefile://b.java': <<<CODE
 package com.ibeetl.admin.console.web;
 
 @Controller

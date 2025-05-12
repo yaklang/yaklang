@@ -1,12 +1,12 @@
 desc(
-    title: "check execution input variable",
-    type: audit,
-    level: info,
-    lib: 'golang-os-exec',
-    rule_id: 10000023,
-    desc: <<<TEXT
+	title: "check execution input variable"
+	type: audit
+	level: info
+	lib: 'golang-os-exec'
+	desc: <<<TEXT
 此规则旨在审计Go语言代码中`os/exec`包的使用情况，特别是关注于命令执行时输入变量的处理。不安全的命令执行可能导致任意代码执行漏洞，如果攻击者能够控制传递给`exec.Command`的输入，那么他们可能会执行恶意命令，进而危害系统的安全性。建议开发者在使用`os/exec`包时，确保所有输入都经过严格的验证和清理，以防止命令注入攻击。
 TEXT
+	rule_id: "c56c4a74-1d8a-4f91-a10f-11394b58506a"
 )
 
 exec?{<fullTypeName>?{have: 'os/exec'}} as $entry
@@ -15,9 +15,9 @@ $entry.Command(* as $output)
 alert $output
 
 desc(
-    lang: golang,
-    alert_min: 2,
-    'file://exec.go': <<<PARAM
+	lang: golang
+	alert_min: 2
+	'file://exec.go': <<<PARAM
 package main
 
 import (

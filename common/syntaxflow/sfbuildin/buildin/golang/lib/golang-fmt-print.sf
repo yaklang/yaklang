@@ -1,12 +1,12 @@
 desc(
-    title: "check audit the usage of the fmt package",
-    type: audit,
-    level: info,
-    lib: 'golang-fmt-print',
-    rule_id: 10000020,
-    desc: <<<TEXT
+	title: "check audit the usage of the fmt package"
+	type: audit
+	level: info
+	lib: 'golang-fmt-print'
+	desc: <<<TEXT
 此规则旨在审计Go语言代码中fmt库的使用情况。
 TEXT
+	rule_id: "25ad0819-cae4-408f-ab71-3174d8f1679c"
 )
 
 fmt?{<fullTypeName>?{have: 'fmt'}} as $entry

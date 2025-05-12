@@ -1,11 +1,11 @@
 desc(
-    title: 'SCA: Checking Java commons-beanutils Existed Vulnerabilities',
-    type: vuln,
-    risk: sca,
-    rule_id: 21105021,
-    desc: <<<TEXT
+	title: 'SCA: Checking Java commons-beanutils Existed Vulnerabilities'
+	type: vuln
+	risk: sca
+	desc: <<<TEXT
 Apache Commons BeanUtils 是一个 Java 库，用于在 JavaBean 属性之间进行复制以及操作 JavaBean。commons-beanutils 版本 1.9.2 到 1.9.4 存在一个不安全的反序列化漏洞，攻击者可以通过构造恶意的输入数据，利用该漏洞执行任意代码，从而可能导致远程代码执行（RCE）攻击。建议升级到无此漏洞的版本以确保安全。
 TEXT
+	rule_id: "fa7f6bb4-ca33-4080-af72-5a9e56eb0993"
 )
 
 __dependency__.*commons*beanutils.version as $ver;

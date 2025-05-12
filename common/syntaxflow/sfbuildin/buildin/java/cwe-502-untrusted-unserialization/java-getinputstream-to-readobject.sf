@@ -1,13 +1,13 @@
 desc(
-    title_zh:"检测Java通过ObjectInputStream的原生反序列化漏洞",
-    title: "Check Java Native Deserialization Vulnerability via ObjectInputStream",
-    type: audit,
-    lang: java,
-    risk: '反序列化漏洞',
-    rule_id: 20502001,
-    desc: <<<TEXT
+	title_zh:"检测Java通过ObjectInputStream的原生反序列化漏洞",
+	title: "Check Java Native Deserialization Vulnerability via ObjectInputStream"
+	type: audit
+	lang: java
+	risk: '反序列化漏洞',
+	desc: <<<TEXT
 反序列化漏洞允许攻击者通过发送恶意构造的序列化对象，远程执行任意代码。当应用程序使用`ObjectInputStream`的`readObject()`方法从不受信任的来源反序列化对象时，如果未进行适当的安全措施，攻击者可以利用此漏洞执行任意代码，造成敏感数据泄露、服务器被控等严重后果。因此，应严格限制或避免从不受信任的输入源进行反序列化操作。
 TEXT
+	rule_id: "faa71bd7-8156-4997-b0c3-aa53f6b71d5a"
 )
 
 .readObject?{<typeName>?{have: "java.io.ObjectInputStream"} } as $readObj;
@@ -33,10 +33,10 @@ alert $mid for {
 
 
 desc(
-lang: java,
-alert_middle: 3,
-alert_min: 5,
-'file://demo.java': <<<EOF
+	lang: java
+	alert_middle: 3
+	alert_min: 5
+	'file://demo.java': <<<EOF
 import java.io.*;
 
 public class VulnerableClass {
@@ -50,8 +50,8 @@ public class VulnerableClass {
         }
     }
 }
-EOF,
-'file://demo2.java': <<<EOF
+EOF
+	'file://demo2.java': <<<EOF
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -74,9 +74,8 @@ public class VulnerableController {
         }
     }
 }
-EOF,
-
-'file://demo3.java': <<<EOF
+EOF
+	'file://demo3.java': <<<EOF
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;

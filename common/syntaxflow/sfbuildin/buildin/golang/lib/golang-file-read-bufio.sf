@@ -1,26 +1,26 @@
 desc(
-    title: "check file read function(bufio)",
-    type: audit,
-    level: info,
-    lib: 'golang-file-read-bufio',
-    rule_id: 10000012,
-    desc: <<<TEXT
+	title: "check file read function(bufio)"
+	type: audit
+	level: info
+	lib: 'golang-file-read-bufio'
+	desc: <<<TEXT
 此审计规则旨在检查Go语言代码中是否正确使用了`bufio`包进行文件读取操作。虽然文件读取本身不是漏洞，但不当的文件读取操作（如未对读取内容进行适当的验证或处理）可能导致敏感信息泄露或数据损坏。通过审计文件读取函数，可以确保代码在处理文件数据时遵循最佳实践，从而增强应用程序的安全性和稳定性。
 TEXT
+	rule_id: "356ed721-2c96-4bfb-a8e2-6709292ae036"
 )
 
 bufio?{<fullTypeName>?{have: 'bufio'}} as $entry;
 $entry.NewReader <getCall> as $reader;
 $reader.ReadString().* as $output;
 
-$reader.ReadString(* #-> as $output); 
+$reader.ReadString(* #-> as $output);
 
 alert $output
 
 desc(
-    lang: golang,
-    alert_min: 1,
-    'file://fileread.go': <<<PARAM
+	lang: golang
+	alert_min: 1
+	'file://fileread.go': <<<PARAM
 package main
 
 import (

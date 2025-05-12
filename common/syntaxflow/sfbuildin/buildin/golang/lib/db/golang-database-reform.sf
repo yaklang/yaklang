@@ -1,12 +1,12 @@
 desc(
-    title: "check file database function",
-    type: audit,
-    level: info,
-    lib: 'golang-database-reform',
-    rule_id: 10000003,
-    desc: <<<TEXT
+	title: "check file database function"
+	type: audit
+	level: info
+	lib: 'golang-database-reform'
+	desc: <<<TEXT
 此规则旨在审计Go项目中是否使用了`github.com/hedonist/reform`库进行数据库操作。`reform`库是一个ORM（对象关系映射）工具，用于在Go应用程序中更方便地与数据库进行交互。审计的目的是确保数据库操作符合安全最佳实践，包括但不限于防止SQL注入攻击、确保数据完整性和安全性。尽管`reform`库本身旨在简化数据库操作，但开发者仍需确保在使用该库时遵循最佳实践，以避免潜在的安全风险。
 TEXT
+	rule_id: "ff1e08f0-1c18-43bb-920b-436a6bfa8dcd"
 )
 
 reform?{<fullTypeName>?{have: 'github.com/hedonist/reform'}} as $entry;
@@ -15,9 +15,9 @@ $entry.NewDB() as $output;
 alert $output
 
 desc(
-    lang: golang,
-    alert_min: 1,
-    'file://database.go': <<<PARAM
+	lang: golang
+	alert_min: 1
+	'file://database.go': <<<PARAM
 package main
 
 import (

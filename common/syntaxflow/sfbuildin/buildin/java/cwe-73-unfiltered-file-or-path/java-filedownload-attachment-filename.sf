@@ -1,12 +1,12 @@
 desc(
-    title: "Checking [Filename Attachment when Filedownloading]",
-    type: vuln,
-    level: low,
-    risk: "path-traversal",
-    rule_id: 20073001,
-    desc: <<<TEXT
+	title: "Checking [Filename Attachment when Filedownloading]"
+	type: vuln
+	level: low
+	risk: "path-traversal"
+	desc: <<<TEXT
 此规则旨在检测文件下载功能中潜在的路径遍历漏洞。当应用程序未正确验证或清理用户输入的文件名时，攻击者可能会通过构造特殊的文件名参数来访问服务器上的任意文件，包括敏感或私有文件。这可能导致敏感数据泄露或服务器配置被泄露，进而引发更严重的安全问题。建议对文件名参数进行严格的输入验证和清理，以防止路径遍历攻击。
 TEXT
+	rule_id: "b381b01b-98e3-44f4-b046-7712dcacbe72"
 )
 
 File().get*() -{

@@ -1,11 +1,11 @@
 desc(
-    title: "Find Alibaba Druid HttpClientUtils Uses and Executing Request",
-    type: audit,
-    lib: "java-alibaba-druid-httpclientutil",
-    rule_id: 20000033,
-    desc: <<<TEXT
+	title: "Find Alibaba Druid HttpClientUtils Uses and Executing Request"
+	type: audit
+	lib: "java-alibaba-druid-httpclientutil"
+	desc: <<<TEXT
 使用Alibaba Druid的HttpClientUtils类执行HTTP请求可能会引入潜在的安全风险。尽管HttpClientUtils提供了便捷的HTTP客户端功能，但如果不正确地处理请求和响应，可能会导致敏感信息泄露、请求伪造或中间人攻击等安全问题。建议对使用HttpClientUtils的代码进行审计，确保请求参数经过适当的验证和清理，响应数据被安全地处理，并且遵循最佳的安全实践。
 TEXT
+	rule_id: "169acfeb-d24a-4f93-ab9e-9c0f38ce77e4"
 )
 
 HttpClientUtils?{<fullTypeName>?{have: 'alibaba.druid'}} as $entry;
@@ -13,8 +13,8 @@ $entry./get|post/(, * as $output,);
 alert $output;
 
 desc(
-lang: java,
-'file://a.java': <<<CODE
+	lang: java
+	'file://a.java': <<<CODE
 import com.alibaba.druid.util.HttpClientUtils;
 
 public class HttpClientUtilsExample {

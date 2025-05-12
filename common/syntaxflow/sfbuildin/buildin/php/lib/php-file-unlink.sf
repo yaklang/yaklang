@@ -1,11 +1,11 @@
 desc(
-    title: "check php function--unlink",
-    type: audit,
-    lib: 'php-file-unlink',
-    rule_id: 30000006,
-    desc: <<<TEXT
+	title: "check php function--unlink"
+	type: audit
+	lib: 'php-file-unlink'
+	desc: <<<TEXT
 该规则用于审计PHP代码中`unlink`和`rmdir`函数的使用情况。`unlink`函数用于删除文件，而`rmdir`函数用于删除空目录。不当使用这些函数可能会导致意外的文件或目录删除，从而引发数据丢失或安全问题。例如，如果应用程序不正确地验证用户输入或权限，攻击者可能利用这些函数删除关键文件或目录，导致服务中断或数据泄露。
 TEXT
+	rule_id: "cdc4481e-2a74-4711-9eb6-cf4d2d1898c0"
 )
 
 
@@ -14,9 +14,9 @@ TEXT
 alert $output
 
 desc(
-    lang: php,
-    alert_min: '2',
-    'file://fileUnlink.php': <<<PARAM
+	lang: php
+	alert_min: '2'
+	'file://fileUnlink.php': <<<PARAM
 <?php
     $file_path = 'path/to/file.txt';
     if (file_exists($file_path)) {
@@ -32,8 +32,8 @@ desc(
     } else {
         echo '目录不存在';
     }
-PARAM,
-    'safefile://safe.php':<<<CODE
+PARAM
+	'safefile://safe.php':<<<CODE
 <?php
     unlinkx();
 CODE
