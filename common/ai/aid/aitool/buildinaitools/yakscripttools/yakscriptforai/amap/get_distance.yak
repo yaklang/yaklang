@@ -1,0 +1,24 @@
+__DESC__ = "根据提供的起点和终点，使用高德地图API计算并显示两点之间的行车距离和预计耗时。"
+
+__KEYWORDS__ = "路径规划,高德地图,距离计算,耗时计算,地理信息,交通工具,导航工具"
+
+ori = cli.String("origin",cli.setHelp("Starting point of the route planning"), cli.setRequired(true))
+dst = cli.String("destination",cli.setHelp("Ending point of the route planning"), cli.setRequired(true))
+cli.check()
+
+result = amap.GetDistance(ori,dst)~
+
+formatDistance = (meters) => {
+	if meters >= 1000 {
+		return "%dkm" % (meters/1000)
+	}
+	return "%dm" % meters
+}
+formatDuration = (seconds) => {
+    du = time.ParseDuration(string(seconds)+"s")~
+    return du.String()
+}
+dis = formatDistance(uint64(result.Distance))
+du = formatDuration(uint64(result.Duration))
+yakit.Info("Distance: %s", dis)
+yakit.Info("Duration: %s", du)

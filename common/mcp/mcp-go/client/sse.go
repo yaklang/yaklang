@@ -165,9 +165,15 @@ func (c *SSEMCPClient) handleSSEEvent(event, data string) {
 			fmt.Printf("Error parsing endpoint URL: %v\n", err)
 			return
 		}
-		if endpoint.Host != c.baseURL.Host {
-			fmt.Printf("Endpoint origin does not match connection origin\n")
-			return
+		if endpoint.Host == "" {
+			endpoint.Host = c.baseURL.Host
+			endpoint.Scheme = c.baseURL.Scheme
+			endpoint.User = c.baseURL.User
+		} else {
+			if endpoint.Host != c.baseURL.Host {
+				fmt.Printf("Endpoint origin does not match connection origin\n")
+				return
+			}
 		}
 		c.endpoint = endpoint
 		close(c.endpointChan)

@@ -1,0 +1,24 @@
+__DESC__ = "根据指定的地理位置名称和关键词，搜索该位置附近的地点（POI），并显示每个地点的详细信息，包括名称、地址、位置、距离、类型、电话和ID。"
+
+__KEYWORDS__ = "地理位置,周边搜索,地点信息,高德地图,poi搜索,位置服务,信息查询"
+
+location = cli.String("location", cli.setHelp("Location Name."),cli.setRequired(true))
+keyword = cli.String("keyword", cli.setHelp("Search nearby keywords, such as food, hotels, etc."),cli.setRequired(true))
+cli.check()
+
+res,err = amap.GetNearbyPOI(location,keyword)
+if err {
+    log.error("request api failed: %v",err)
+}
+yakit.Info("Total Result", res.Total)
+for poi in res.Results{
+    yakit.Info("POI Information:")
+    yakit.Info("Name: %s", poi.Name)
+    yakit.Info("Address: %s", poi.Address) 
+    yakit.Info("Location: %s", poi.Location)
+    yakit.Info("Distance: %s meters", poi.Distance)
+    yakit.Info("Type: %s", poi.Type)
+    yakit.Info("TelNumber: %s", poi.TelNumber)
+    yakit.Info("POI ID: %s", poi.POIId)
+    println()
+}

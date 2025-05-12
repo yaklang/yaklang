@@ -1,0 +1,60 @@
+__DESC__ = "一个用于公共交通导航路径规划的工具，根据起点和终点（可选指定城市）查找公共交通线路，并返回包含多个出行方案的详细信息，包括总距离、时间、步行距离、费用以及每个方案的具体步骤（步行和公交线路）。"
+
+__KEYWORDS__ = "公共交通,导航,路径规划,出行方案,公交查询,高德地图,交通工具,地图工具"
+
+ori = cli.String("origin",cli.setHelp("Starting point of the route planning"), cli.setRequired(true))
+dst = cli.String("destination",cli.setHelp("Ending point of the route planning"), cli.setRequired(true))
+city = cli.String("city",cli.setHelp("City where the route is located"))
+cli.check()
+
+res = amap.GetTransitPlan(ori,dst,amap.city(city))~
+route = res.Route
+
+formatDistance = (meters) => {
+    if meters == ""{
+        return ""
+    }
+    meters = int(meters)
+	if meters >= 1000 {
+		return "%dkm" % (meters/1000)
+	}
+	return "%dm" % meters
+}
+formatDuration = (seconds) => {
+    if seconds == ""{
+        return ""
+    }
+    du = time.ParseDuration(seconds+"s")~
+    return du.String()
+}
+
+log.Info("Found paths count: %d", len(route.Transits))
+
+for i, path := range route.Transits {
+    log.Info("Path %d - Distance: %s, Duration: %s, Walk Distance: %s, Cost: %s RMB",
+        i+1, formatDistance(path.Distance), formatDuration(path.Duration),formatDistance(path.Walking),path.Cost)
+    
+    log.Info("Path %d - Steps count: %d", i+1, len(path.Segments))
+    
+    for j, step := range path.Segments {
+        walk = step.Walking
+        Bus = step.Bus
+        Entrance = step.Entrance
+        Exit = step.Exit
+        if len(walk.Steps) > 0 {
+            for j, step := range walk.Steps {
+                yakit.Info("  Walking Step %d - Instruction: %s, Distance: %s, Duration: %s", 
+                    j+1, step.Instruction, formatDistance(step.Distance), formatDuration(step.Duration))
+            }
+        }
+        if len(Bus.BusLines) > 0 {
+            for j, step := range Bus.BusLines {
+                yakit.Info("  Bus Step %d - Name: %s, Type: %s, DepartureStop: %s, ArrivalStop: %s, Distance: %s, Duration: %s", 
+                    j+1,step.Name,step.Type, step.Departure.Name,step.Arrival.Name, formatDistance(step.Distance), formatDuration(step.Duration))
+            }
+        }
+        if Entrance.Name != "" && Exit.Name != "" {
+            yakit.Info("  Entrance: %s, Exit: %s", Entrance.Name,Exit.Name)
+        }
+    }
+}

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"io"
 	"os"
 	"path/filepath"
@@ -12,6 +11,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/utils/memedit"
+
+	"github.com/yaklang/yaklang/common/amap"
 	"github.com/yaklang/yaklang/common/syntaxflow"
 	"github.com/yaklang/yaklang/common/twofa"
 
@@ -344,6 +346,9 @@ func initYaklangLib() {
 
 	// memeditor
 	yaklang.Import("memeditor", memedit.Exports)
+
+	// amap
+	yaklang.Import("amap", amap.YakExport)
 }
 
 type ScriptEngine struct {

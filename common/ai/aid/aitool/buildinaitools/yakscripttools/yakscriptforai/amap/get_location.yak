@@ -1,0 +1,30 @@
+__DESC__ = "一个获取当前网络公网IP地址并查询其地理位置信息的工具。它通过访问指定的在线服务来获取IP，然后查询并显示该IP的省份和城市信息。"
+
+__KEYWORDS__ = "公网ip,ip地址,地理位置,网络信息,地址查询"
+
+isHttps,req,err = poc.ParseUrlToHTTPRequestRaw("GET","https://ifconfig.me/")
+if err != nil{
+    yakit.Error("get public ip error: %v", err)
+    return
+}
+rsp,req,err = poc.HTTP(`GET / HTTP/1.1
+Host: ifconfig.me
+User-Agent: curl/8.6.0`,poc.https(isHttps))
+if err != nil{
+    yakit.Error("request ifconfig.me error: %v", err)
+    return
+}
+status_code = poc.GetStatusCodeFromResponse(rsp)
+if status_code != 200 {
+    yakit.Error("request ifconfig.me response status_code is not 200")
+    return
+}
+ip = poc.GetHTTPPacketBody(rsp)
+yakit.Info("current network ip: %s", ip)
+location,err = amap.GetIpLocation(ip)
+if err {
+    yakit.Error("get %s location error: %v",ip,err)
+    return
+}
+yakit.Info("Province: %s", location.Province)
+yakit.Info("City: %s", location.City)
