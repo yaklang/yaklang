@@ -219,7 +219,7 @@ $ver in (1.0,1.0.0] || (1.5.0,2.3.0] || [0.2.4,5.2.2)    as $vulnVersion`, map[s
 	})
 }
 
-func TestDependencyRange(t *testing.T) {
+func TestDependencyRangeWithChinese(t *testing.T) {
 	t.Run("test range with Chinese", func(t *testing.T) {
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("pom.xml", `<?xml version="1.0" encoding="UTF-8"?>
@@ -262,5 +262,62 @@ alert $vuln_1_2_47 for {
 			require.Contains(t, vals.StringEx(1), "fastjson")
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
+	})
+}
+
+func TestDependencyRange(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("pom.xml",
+		`<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.7</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+    <groupId>com.example</groupId>
+    <artifactId>demo</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>demo</name>
+    <description>Demo project for Spring Boot</description>
+    <url/>
+    <properties>
+        <java.version>8</java.version>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>hello</artifactId>
+            <version>1.2.24</version>
+        </dependency>
+		<dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <version>3.22.2</version>
+        </dependency>
+		 <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>fastjson1</artifactId>
+            <version>2.12.3-release</version>
+        </dependency>
+    </dependencies>
+</project>
+`)
+	t.Run("test have mutli same group and artifactd name ", func(t *testing.T) {
+		ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
+			res, err := programs.SyntaxFlowWithError(`__dependency__.*fastjson.version as $ver;
+__dependency__.*fastjson.name as $name;
+`)
+			require.NoError(t, err)
+			ver := res.GetValues("ver")
+			name := res.GetValues("name")
+
+			require.Contains(t, ver.StringEx(1), "28:25 - 28:33")
+			require.Contains(t, name.StringEx(1), "28:25 - 28:33")
+			return nil
+		})
 	})
 }

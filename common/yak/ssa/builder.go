@@ -3,10 +3,13 @@ package ssa
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"reflect"
+	"sort"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+
+	"github.com/samber/lo"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
@@ -302,23 +305,61 @@ func (b *FunctionBuilder) GenerateDependence(pkgs []*dxtypes.Package, filename s
 		return
 	}
 
-	setDependencyRange := func(name string) {
+	getMinOffsetRng := func(rs1, rs2 []memedit.RangeIf) memedit.RangeIf {
+		if len(rs1) == 0 || len(rs2) == 0 {
+			return nil
+		}
+
+		var offsetSlice1 []int
+		offsetMap1 := lo.SliceToMap(rs1, func(item memedit.RangeIf) (int, memedit.RangeIf) {
+			offsetSlice1 = append(offsetSlice1, item.GetStartOffset())
+			return item.GetStartOffset(), item
+		})
+
+		offsetSlice2 := lo.Map(rs2, func(item memedit.RangeIf, index int) int {
+			return item.GetStartOffset()
+		})
+		sort.Ints(offsetSlice2)
+
+		minDist := -1
+		var minRng memedit.RangeIf
+		for _, offset1 := range offsetSlice1 {
+			// 在offsetSlice2中找距离offset1最近的offset2
+			for _, offset2 := range offsetSlice2 {
+				dist := offset1 - offset2
+				if dist < 0 {
+					dist = -dist
+				}
+				if minDist == -1 || dist < minDist {
+					minDist = dist
+					minRng = offsetMap1[offset1]
+				}
+			}
+		}
+		return minRng
+	}
+
+	getDependencyRangeByName := func(name string) memedit.RangeIf {
 		id := strings.Split(name, ":")
 		if len(id) != 2 {
-			return
+			return nil
 		}
 		group, artifact := id[0], id[1]
+		// 先匹配artifact，如果只匹配到一个位置
+		// 那么就是确定的位置
 		rs1 := b.GetRangesByText(artifact)
 		if len(rs1) == 1 {
-			b.SetRangeByRangeIf(rs1[0])
-			return
+			return rs1[0]
 		}
+		// 再匹配group，如果只匹配到一个位置
+		//那么就是确定的位置
 		rs2 := b.GetRangesByText(group)
 		if len(rs2) == 1 {
-			b.SetRangeByRangeIf(rs2[0])
-			return
+			return rs2[0]
 		}
-		b.SetEmptyRange()
+		// 返回每个rs1中位置和rs2最近的
+		// 返回匹配到的artifact所有位置
+		return getMinOffsetRng(rs1, rs2)
 	}
 	/*
 		__dependency__.name?{}
@@ -326,23 +367,23 @@ func (b *FunctionBuilder) GenerateDependence(pkgs []*dxtypes.Package, filename s
 	b.SetEmptyRange()
 	for _, pkg := range pkgs {
 		sub := b.EmitEmptyContainer()
-		// check item
-		// 1. name
-		// 2. version
-		// 3. filename
-		// 4. group
-		// 5. artifact
+
+		if pkg.Name == "" {
+			continue
+		}
+		rng := getDependencyRangeByName(pkg.Name)
 		for k, v := range map[string]string{
 			"name":     pkg.Name,
 			"version":  pkg.Version,
 			"filename": filename,
 		} {
-			if k == "name" {
-				setDependencyRange(v)
+			constInst := b.EmitConstInst(v)
+			if rng != nil {
+				constInst.SetRange(rng)
 			}
 			b.AssignVariable(
 				b.CreateMemberCallVariable(sub, b.EmitUndefined(k)),
-				b.EmitConstInst(v),
+				constInst,
 			)
 		}
 
