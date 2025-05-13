@@ -55,6 +55,30 @@ func TestGRPC_FingerprintCURD_Base(t *testing.T) {
 			}
 		}
 		require.True(t, ok)
+
+		test2Name := utils.RandStringBytes(10)
+		req = &ypb.CreateFingerprintRequest{
+			Rule: &ypb.FingerprintRule{
+				RuleName:  test2Name,
+				GroupName: []string{group},
+			},
+		}
+		message, err = client.CreateFingerprint(ctx, req)
+		defer func() {
+			yakit.DeleteGeneralRuleByName(consts.GetGormProfileDatabase(), test2Name)
+		}()
+		require.NoError(t, err)
+		require.NotNil(t, message)
+		require.Equal(t, "create", message.Operation)
+		require.Equal(t, int64(1), message.EffectRows)
+
+		getRule, err = yakit.GetGeneralRuleByRuleName(consts.GetGormProfileDatabase(), test2Name)
+		require.NoError(t, err)
+		require.NotNil(t, getRule)
+
+		_, res, err = yakit.QueryGeneralRule(consts.GetGormProfileDatabase(), &ypb.FingerprintFilter{GroupName: []string{group}}, &ypb.Paging{})
+		require.NoError(t, err)
+		require.Len(t, res, 2)
 	})
 
 	t.Run("Test Delete Fingerprint", func(t *testing.T) {
