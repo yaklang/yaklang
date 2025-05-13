@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/jsonpath"
@@ -68,12 +69,12 @@ func appendStreamHandlerPoCOptionEx(opts []poc.PocConfigOption) (io.Reader, io.R
 		// reader = io.TeeReader(reader, os.Stdout)
 		var ioReader io.Reader = utils.NewTrimLeftReader(reader)
 		var chunkedErrorMirror bytes.Buffer
-		//start := time.Now()
+		start := time.Now()
 		if chunked {
-			//chunkReader, origin, err := codec.ReadChunkedStream(io.TeeReader(ioReader, utils.FirstWriter(func(i []byte) {
-			//	log.Infof("chunk read first byte/token delay: %v", time.Since(start))
-			//})))
-			chunkReader, origin, err := codec.ReadChunkedStream(ioReader)
+			chunkReader, origin, err := codec.ReadChunkedStream(io.TeeReader(ioReader, utils.FirstWriter(func(i []byte) {
+				log.Infof("chunk read first byte/token delay: %v", time.Since(start))
+			})))
+			//chunkReader, origin, err := codec.ReadChunkedStream(ioReader)
 			if err != nil {
 				log.Errorf("ReadChunkedStream err: %v", err)
 				ioReader = origin

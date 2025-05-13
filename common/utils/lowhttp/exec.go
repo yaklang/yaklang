@@ -840,7 +840,7 @@ RECONNECT:
 					}
 				}()
 
-				packetReader := bufio.NewReaderSize(reader, 1)
+				packetReader := bufio.NewReader(reader)
 				responseHeader := bytes.NewBufferString("")
 				for {
 					line, err := utils.BufioReadLine(packetReader)
