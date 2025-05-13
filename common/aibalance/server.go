@@ -542,7 +542,10 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 	// Log actual success here too
 	c.logInfo("Response completed (Success: %v), first byte duration: %v, end duration: %v, bandwidth: %.2fkbps, total bytes: %d",
 		requestSucceeded, firstByteDuration, endDuration, bandwidth, total)
+
 	writer.Close()
+	utils.FlushWriter(conn)
+	writer.Wait()
 	conn.Close()
 	c.logInfo("Connection closed for %s", conn.RemoteAddr())
 }
