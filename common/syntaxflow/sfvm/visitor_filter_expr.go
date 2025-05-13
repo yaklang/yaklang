@@ -47,7 +47,7 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 		y.EmitGetCall()
 		y.EmitOpEmptyCompare()
 		if filter.ActualParam() != nil {
-			y.VisitActualParam(filter.ActualParam())
+			y.VisitActualParam(filter.ActualParam(), filter.Question() != nil)
 		}
 		//拿到符合要求的call
 		y.EmitCondition()
@@ -306,13 +306,12 @@ func (y *SyntaxFlowVisitor) VisitNameFilter(isMember bool, i sf.INameFilterConte
 	return err
 }
 
-func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext) error {
+func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext, haveQuestion bool) error {
 	handlerStatement := func(i sf.ISingleParamContext) {
 		ret, ok := (i).(*sf.SingleParamContext)
 		if !ok {
 			return
 		}
-
 		if ret.FilterStatement() != nil {
 			y.VisitFilterStatement(ret.FilterStatement())
 		}
@@ -326,8 +325,10 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext) error {
 		y.EmitPushCallArgs(0, true)
 		handlerStatement(ret.SingleParam())
 		y.EmitExitStatement(statement)
-		y.EmitOpPopDuplicate()
-		y.EmitOpCheckEmpty(iteratorCtx)
+		if haveQuestion {
+			y.EmitOpPopDuplicate()
+			y.EmitOpCheckEmpty(iteratorCtx)
+		}
 		y.EmitLatchIterator(iteratorCtx)
 		y.EmitIterEnd(iteratorCtx)
 	case *sf.EveryParamContext:
@@ -346,16 +347,20 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext) error {
 			y.EmitPushCallArgs(i, false)
 			handlerStatement(single)
 			y.EmitExitStatement(statement)
-			y.EmitOpPopDuplicate()
-			y.EmitOpCheckEmpty(iterator)
+			if haveQuestion {
+				y.EmitOpPopDuplicate()
+				y.EmitOpCheckEmpty(iterator)
+			}
 		}
 		if ret.SingleParam() != nil { // the last one get continue other value
 			statement := y.EmitEnterStatement()
 			y.EmitPushCallArgs(len(ret.AllActualParamFilter()), true)
 			handlerStatement(ret.SingleParam())
 			y.EmitExitStatement(statement)
-			y.EmitOpPopDuplicate()
-			y.EmitOpCheckEmpty(iterator)
+			if haveQuestion {
+				y.EmitOpPopDuplicate()
+				y.EmitOpCheckEmpty(iterator)
+			}
 		}
 		y.EmitLatchIterator(iterator)
 		y.EmitIterEnd(iterator)

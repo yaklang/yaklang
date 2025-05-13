@@ -137,7 +137,7 @@ func TestConstCompare(t *testing.T) {
 		code := ` a("param1","param2")
 a("param1","param2","param3")
 `
-		ssatest.CheckSyntaxFlow(t, code, `a(*<len>?{==2}) as $result`, map[string][]string{
+		ssatest.CheckSyntaxFlow(t, code, `a?(*<len>?{==2}) as $result`, map[string][]string{
 			"result": {`Undefined-a("param1","param2")`},
 		}, ssaapi.WithLanguage(ssaapi.Yak))
 	})
@@ -164,7 +164,7 @@ a("param1","param2","param3")
 		code := ` a1("param1","param2")
 	a2("param")
 `
-		ssatest.CheckSyntaxFlow(t, code, `a*?{*()<getActualParamLen>?{ == 1}} as $result`, map[string][]string{
+		ssatest.CheckSyntaxFlow(t, code, `a*?{*?(<len>?{==1})} as $result`, map[string][]string{
 			"result": {"Undefined-a2"},
 		})
 	})

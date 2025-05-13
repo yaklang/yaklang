@@ -303,7 +303,6 @@ $savename = \think\facade\Filesystem::disk('public')->putFile($path, $file);
 func Test_MethodName_in_Syntaxflow(t *testing.T) {
 	t.Run("syntaxflow method name", func(t *testing.T) {
 		code := `<?php
-
 class A{
     public function F(){
         return 1;
@@ -315,6 +314,51 @@ class A{
 		
 		`, map[string][]string{
 			"a": {"Function-A.F"},
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+}
+
+func TestNativeCall_DataFlow(t *testing.T) {
+	rule := `/^create_function|eval|assert$/ as $evalFunction;
+<include('php-param')> as $params;
+<include('php-tp-all-extern-variable-param-source')> as $params
+<include('php-filter-function')> as $filter;
+$evalFunction(*?{<self> #{include: <<<CODE
+<self> & $params
+CODE
+}->} as $all)
+$all<dataflow(include=<<<CODE
+<self> & $params as $__next__
+CODE,exclude=<<<CODE
+<self>?{opcode: call} as $__next__
+CODE)> as $high
+	`
+	t.Run("not found high", func(t *testing.T) {
+		code := `<?php
+$input = addslashes($_GET['cmd']);
+eval("echo $input;");
+`
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			result, err := prog.SyntaxFlowWithError(rule)
+			require.NoError(t, err)
+			result.Show()
+			values := result.GetValues("high")
+			require.True(t, values.Len() == 0)
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+	t.Run("check high", func(t *testing.T) {
+		code := `<?php
+$input = $_GET[1];
+eval("echo $input");
+`
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			result, err := prog.SyntaxFlowWithError(rule)
+			require.NoError(t, err)
+			result.Show()
+			values := result.GetValues("high")
+			require.True(t, values.Len() != 0)
+			return nil
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }

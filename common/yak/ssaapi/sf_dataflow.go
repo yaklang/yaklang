@@ -1,7 +1,6 @@
 package ssaapi
 
 import (
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -35,14 +34,14 @@ func DataFlowWithSFConfig(
 	analysisType AnalysisType,
 	opts ...*sf.RecursiveConfigItem,
 ) Values {
-
 	handlerResult := make([]func(v Values) Values, 0)
 	addHandler := func(key sf.RecursiveConfigKey, code string) {
 		handlerResult = append(handlerResult, func(v Values) Values {
 			return dataFlowFilter(
-				key, code, v,
+				v,
 				sfResult, config,
 				nil,
+				withFilterCondition(key, code),
 			)
 		})
 	}
@@ -109,8 +108,8 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *s
 
 	include := params.GetString(0, "code", "include")
 	exclude := params.GetString("exclude")
-	if len(exclude) != 0 && len(include) != 0 {
-		return false, nil, utils.Errorf("exclude and include can't be used at the same time")
+	if len(exclude) == 0 && len(include) == 0 {
+		return false, nil, utils.Errorf("exclude and include can't be empty")
 	}
 	var end sf.ValueOperator
 	endName := params.GetString("end", "dest", "destination")
@@ -132,21 +131,15 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *s
 		return nil
 	})
 
-	var ret Values
-	if len(exclude) != 0 {
-		ret = dataFlowFilter(
-			sf.RecursiveConfig_Exclude, exclude, vs,
-			contextResult, frame.GetVM().GetConfig(),
-			end,
-		)
-	}
+	var ret = vs
+	var condition []*filterCondition
 	if len(include) != 0 {
-		ret = dataFlowFilter(
-			sf.RecursiveConfig_Include, include, vs,
-			contextResult, frame.GetVM().GetConfig(),
-			end,
-		)
+		condition = append(condition, withFilterIncludeCondition(include))
 	}
+	if len(exclude) != 0 {
+		condition = append(condition, withFilterExcludeCondition(exclude))
+	}
+	ret = dataFlowFilter(ret, contextResult, frame.GetVM().GetConfig(), end, condition...)
 
 	if len(ret) > 0 {
 		return true, ret, nil
@@ -154,30 +147,81 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *s
 	return false, sfvm.NewEmptyValues(), nil
 }
 
+type filterCondition struct {
+	configKey sf.RecursiveConfigKey
+	code      string
+}
+
+func withFilterIncludeCondition(code string) *filterCondition {
+	return &filterCondition{
+		configKey: sf.RecursiveConfig_Include,
+		code:      code,
+	}
+}
+func withFilterExcludeCondition(code string) *filterCondition {
+	return &filterCondition{
+		configKey: sf.RecursiveConfig_Exclude,
+		code:      code,
+	}
+}
+func withFilterCondition(key sfvm.RecursiveConfigKey, code string) *filterCondition {
+	return &filterCondition{
+		configKey: key,
+		code:      code,
+	}
+}
 func dataFlowFilter(
-	configKey sf.RecursiveConfigKey, code string,
 	vs Values,
 	contextResult *sf.SFFrameResult, config *sf.Config,
 	end sf.ValueOperator,
+	condition ...*filterCondition,
 ) Values {
-	if configKey != sf.RecursiveConfig_Exclude && configKey != sf.RecursiveConfig_Include {
-		return vs
+	for _, f := range condition {
+		if f.configKey != sf.RecursiveConfig_Include && f.configKey != sf.RecursiveConfig_Exclude {
+			return vs
+		}
 	}
 	if len(vs) == 0 {
 		return vs
 	}
+	var recursiveConfigs []*RecursiveConfig
+	for _, f := range condition {
+		recursiveConfigs = append(recursiveConfigs, CreateRecursiveConfigFromItems(contextResult, config, &sf.RecursiveConfigItem{
+			Key:            string(f.configKey),
+			Value:          f.code,
+			SyntaxFlowRule: true,
+		}))
+	}
 
-	recursiveConfig := CreateRecursiveConfigFromItems(contextResult, config, &sf.RecursiveConfigItem{
-		Key:            string(configKey),
-		Value:          code,
-		SyntaxFlowRule: true,
-	})
+	//foreach every path,A-> B-> C-> D-> E
+	//if E start dataflow. include: A && exclude:D this path is not match
+	checkMatch := func(values Values) bool {
+		for _, recursiveConfig := range recursiveConfigs {
+			result := recursiveConfig.compileAndRun(values)
+			if _, ok := result[sf.RecursiveConfig_Exclude]; ok {
+				return false
+			}
+			if _, ok := result[sf.RecursiveConfig_Include]; ok {
+				continue
+			}
+			if len(recursiveConfig.configItems) == 0 {
+				return false
+			}
+			item := recursiveConfig.configItems[0]
+			switch item.Key {
+			case sfvm.RecursiveConfig_Exclude:
+				return true
+			default:
+				return false
+			}
+		}
+		return true
+	}
 	var ret []*Value
 	all := make(map[*Value]struct{})
 	for _, v := range vs {
 		all[v] = struct{}{}
 	}
-
 	if end != nil {
 		var endValues Values
 		switch i := end.(type) {
@@ -196,48 +240,35 @@ func dataFlowFilter(
 			log.Warnf("dataFlowFilter: end type is not supported: %T", end)
 		}
 		for _, v := range vs {
+			flag := false
 			paths := v.GetDataflowPath(endValues...)
-			pathNum := len(paths)
 			for _, path := range paths {
-				matchedConfigs := recursiveConfig.compileAndRun(path)
-				if _, ok := matchedConfigs[sf.RecursiveConfig_Exclude]; ok {
-					pathNum -= 1
+				if checkMatch(path) {
+					flag = true
+					break
 				}
-				if _, ok := matchedConfigs[sf.RecursiveConfig_Include]; ok {
-					ret = append(ret, v)
-				}
+				continue
 			}
-			if pathNum == 0 {
-				delete(all, v)
+			if flag {
+				ret = append(ret, v)
 			}
 		}
 	} else {
 		for _, v := range vs {
-			dataPaths := v.GetDataflowPath()
-			var excludeFlag = 0
-			for index, dataPath := range dataPaths {
-				_ = index
-				matchedConfigs := recursiveConfig.compileAndRun(dataPath)
-
-				if _, ok := matchedConfigs[sf.RecursiveConfig_Include]; ok {
-					ret = append(ret, v)
+			flag := false
+			dataflowPaths := v.GetDataflowPath()
+			for _, path := range dataflowPaths {
+				//if match one dataflowPath break
+				if checkMatch(path) {
+					flag = true
 					break
 				}
-				if _, ok := matchedConfigs[sf.RecursiveConfig_Exclude]; ok {
-					excludeFlag++
-				}
+				continue
 			}
-			if excludeFlag == len(dataPaths) {
-				delete(all, v)
+			if flag {
+				ret = append(ret, v)
 			}
 		}
 	}
-	switch configKey {
-	case sf.RecursiveConfig_Exclude:
-		return lo.Keys(all)
-	case sf.RecursiveConfig_Include:
-		return ret
-	default:
-		return vs
-	}
+	return ret
 }
