@@ -1,9 +1,9 @@
 desc(
-	title: "Check PHP XSS: Directly User OUTPUT"
-	title_zh: "xss漏洞",
-	risk:'xss'
-	type: vul
-	desc: <<<TEXT
+    title: "Check PHP XSS: Directly User OUTPUT",
+    title_zh: "xss漏洞",
+    risk:'xss',
+    type: vul,
+    desc: <<<TEXT
 跨站脚本攻击（XSS）是一种常见的安全漏洞，攻击者可以在受害者的浏览器中执行恶意脚本。如果PHP应用程序直接将用户输入的数据输出到网页上，而没有进行适当的过滤或转义，那么攻击者可能会利用此漏洞插入恶意脚本。这些脚本可以窃取用户的敏感信息（如会话令牌、密码等），或者执行其他恶意操作。建议对所有用户输入进行严格的验证和过滤，以防止XSS攻击。
 TEXT
 	rule_id: "d54faf3f-f4a3-4d19-a882-c29abf9b7901"
@@ -16,11 +16,13 @@ TEXT
 
 $method(* as $param);
 
-$param #{
-    include: `<self> & $extraValue`
-}-> as $all
+$param?{<self> #{include: <<<CODE
+* & $extraValue
+CODE}->} as $sink
 
-$all<dataflow(exclude=<<<CODE
+$sink<dataflow(include=<<<CODE
+* & $extraValue as $__next__
+CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
@@ -30,8 +32,10 @@ alert $high for{
     type: 'vuln',
     level: 'high'
 }
-$all<dataflow(exclude=<<<CODE
-<self>?{opcode: call && <self><getCallee> & $function}
+$sink<dataflow(include=<<<CODE
+* & $extraValue as $__next__
+CODE,exclude=<<<CODE
+<self>?{opcode: call && <self><getCallee> & $function} as $__next__
 CODE)> as $highAndMid
 
 $highAndMid - $high as $middle
@@ -43,7 +47,7 @@ alert $middle for{
     level: 'mid'
 }
 
-$allRisk - $high - $middle as $low
+$sink - $high - $middle as $low
 
 alert $low for {
     title: 'xss vulnerability exists. Parameters are checked out and filtered by functions',
@@ -53,21 +57,21 @@ alert $low for {
 };
 
 desc(
-	language: php
-	alert_min: 3
-	alert_low: 1
-	alert_mid: 1
-	alert_high:1
-	'file://high.php': <<<CODE
+    language: php,
+    alert_min: 3,
+    alert_low: 1,
+    alert_mid: 1,
+    alert_high:1,
+    'file://high.php': <<<CODE
 <?php
 echo "您的输入是：" . $_POST['data'];
 ?>
-CODE
-	'file://mid.php':  <<<CODE
+CODE,
+    'file://mid.php':  <<<CODE
 <?php
    echo "您的输入是：" . undefined($_POST['data']);
-CODE
-	'file://low.php':<<<CODE
+CODE,
+    'file://low.php':<<<CODE
 <?php
    echo "您的输入是：" . filter($_POST['data']);
 CODE

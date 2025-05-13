@@ -4,7 +4,6 @@ desc(
     type: vul,
     level: low,
     risk: "zip operator",
-    rule_id: 30073004,
     desc: <<<CODE
     zip操作是Web应用程序中常见的功能，如果未经过充分的安全检查，可能会导致文件路径遍历（Path Traversal）漏洞。攻击者可以通过构造恶意文件路径，访问或修改服务器上的敏感文件，进而导致信息泄露、文件损坏等安全问题。在PHP应用程序中，如果开发者未能正确验证或过滤用户输入的文件路径，可能会导致文件路径遍历漏洞。建议对zip操作功能进行严格的安全检查，包括验证文件路径的合法性、长度、字符等，并确保zip操作不会导致未经授权的访问或执行。
 CODE
@@ -16,20 +15,17 @@ CODE
 .unzip?{<getObject>?{any: "Zip","zip"}} as $function
 .extractTo?{<getObject>?{any: "Zip","zip"}} as $function
 
-$function(* #{
-    include: <<<CODE
+$function(* as $allParams)
+$allParams?{<self> #{include: <<<CODE
 * & $params
-CODE
-}-> as $all)
+CODE}->} as $sink
 
-$function(* #{
-    include: <<<CODE
-* & $params
-CODE,
-    exclude: <<<CODE
-<self>?{opcode: call}
-CODE
-}-> as $high)
+
+$sink<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
+*?{opcode: call} as $__next__
+CODE)> as $high
 
 alert $high for {
     title: 'Unsafe File Unzip Without Validation',
@@ -37,7 +33,9 @@ alert $high for {
     level: 'high'
 }
 
-$all<dataflow(exclude=<<<CODE
+$sink<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
 *?{opcode: call && <self><getCallee> & $filter} as $__next__
 CODE)> as $highAndMid
 $highAndMid - $high as $mid
@@ -47,7 +45,7 @@ alert $mid for {
     title_zh: '文件解压经过了某些函数，但未检查到过滤',
     level: 'mid'
 }
-$all - $high - $mid as $low
+$sink - $high - $mid as $low
 
 alert $low for{
     title: 'Potential File Storage Path Misconfiguration',

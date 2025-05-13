@@ -1,10 +1,10 @@
 desc(
-	title: " Open Redirect Vulnerability"
-	title_zh: "重定向漏洞",
-	level: "low"
-	risk: "open-redirect"
-	type: "audit"
-	desc: <<<TEXT
+    title: " Open Redirect Vulnerability",
+    title_zh: "重定向漏洞",
+    level: "low",
+    risk: "open-redirect",
+    type: "audit",
+    desc: <<<TEXT
 开放重定向漏洞（CWE-601）允许攻击者构造恶意URL诱导用户访问钓鱼网站。当应用程序未对header()函数中的重定向目标进行严格验证时，攻击者可通过篡改URL参数（如redirect_to）将用户导向恶意域名。
 TEXT
 	rule_id: "65934f87-f276-44cc-826a-3480b5a57ff5"
@@ -15,13 +15,16 @@ TEXT
 <include('php-tp-all-extern-variable-param-source')> as $params
 <include('php-filter-function')> as $filter
 
-header(* as $sink)
+header(* as $allParams)
 
-$sink #{
-    include: `<self> & $params`
-    }-> as $all
+$allParams?{<self> #{include: <<<CODE
+* & $params
+CODE}->} as $sink
 
-$all<dataflow(exclude=<<<CODE
+
+$sink<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
 <self>?{opcode: call} as $__next__
 CODE)> as $high
 
@@ -32,7 +35,9 @@ alert $high for{
    level: "high"
 }
 
-$all<dataflow(exclude=<<<CODE
+$all<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
 <self>?{opcode: call && <self><getCallee> & $filter} as $__next__
 CODE)> as $highAndMid
 
@@ -44,7 +49,7 @@ alert $mid for{
    level: "mid"
 }
 
-$all - $high - $mid as $low
+$sink - $high - $mid as $low
 
 alert $low for{
    title: "Potential Redirect Validation Bypass",

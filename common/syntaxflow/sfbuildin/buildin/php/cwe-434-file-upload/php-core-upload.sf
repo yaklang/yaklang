@@ -1,8 +1,8 @@
 desc(
-	title: "Unsafe File Upload in Controller Component"
-	title_zh: "文件上传漏洞",
-	type: vul
-	desc: <<<CODE
+    title: "Unsafe File Upload in Controller Component",
+    title_zh: "文件上传漏洞",
+    type: vul,
+    desc: <<<CODE
        文件上传漏洞是指用户上传了一个可执行的脚本文件，并通过此脚本文件获得了执行服务器端命令的能力。这种攻击方式是最为直接和有效的，“文件上传”本身没有问题，有问题的是文件上传后，服务器怎么处理、解释文件。如果服务器的处理逻辑做的不够安全，则会导致严重的后果.
 CODE
 	rule_id: "7138efeb-bd0b-4dd1-a728-a5d84c3bfa61"
@@ -19,15 +19,14 @@ _FILES as $params
 move_uploaded_file(* as $source)
 ./move|putFile/?{<getFunc><getCurrentBlueprint><fullTypeName>?{any: "Controller","controller"}} as $source
 
-
-$source #{
-    include: <<<CODE
-    * & $params
-CODE
-}-> as $all
+$source?{<self> #{include: <<<CODE
+* & $params
+CODE}->} as $sink
 
 
-$all<dataflow(exclude=<<<CODE
+$sink<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
@@ -37,8 +36,10 @@ alert $high for {
     level: "high"
 }
 
-$all<dataflow(exclude=<<<CODE
-*?{opcode:call && <self><getCallee> & $filter}
+$sink<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
+*?{opcode:call && <self><getCallee> & $filter} as $__next__
 CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
@@ -48,7 +49,7 @@ alert $mid for {
     level: "mid"
 }
 
-$all - $high - $mid as $low
+$sink - $high - $mid as $low
 
 alert $low for {
     title: "Potential File Storage Path Misconfiguration",
@@ -56,9 +57,9 @@ alert $low for {
     level: "low"
 }
 desc(
-	lang: "php"
-	alert_min: 1
-	"file:///upload.php": <<<TEXT
+    lang: "php",
+    alert_min: 1,
+    "file:///upload.php": <<<TEXT
 <?php
     class UploadController {
         public function uploadFile() {
@@ -73,8 +74,8 @@ desc(
             }
         }
     }
-TEXT
-	"file:///upload2.php": <<<TEXT
+TEXT,
+    "file:///upload2.php": <<<TEXT
 <?php
     class uploads{
         public function upload(){

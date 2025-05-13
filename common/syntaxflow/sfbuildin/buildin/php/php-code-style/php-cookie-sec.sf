@@ -4,16 +4,15 @@ desc(
     type: vul,
     level: low,
     risk: "cookie security",
-    rule_id: 31500002,
     desc: <<<CODE
     Cookie是Web应用程序中用于存储用户会话信息的重要机制。如果cookie的设置不当，可能会导致安全漏洞，如会话劫持、跨站脚本攻击（XSS）等。在PHP应用程序中，使用setcookie函数设置cookie时，应确保cookie的属性（如secure、httponly、samesite等）被正确设置，并且cookie的值经过充分的验证和过滤。
 CODE
 )
 
 setcookie() as $all
-setcookie(*<len>?{<6}) as $sinkCookie
-setcookie(*<len>?{==6}) as $checkCookie
-$checkCookie<getCallee>(*<slice(index=5)>?{have: "false"}) as $sinkCookie
+setcookie?(*<len>?{<6}) as $sinkCookie
+setcookie?(*<len>?{==6}) as $checkCookie
+$checkCookie<getCallee>?(*<slice(index=5)>?{have: "false"}) as $sinkCookie
 
 alert $sinkCookie for {
     title: 'Short Cookie Name Detected',
@@ -21,8 +20,8 @@ alert $sinkCookie for {
     level: 'low'
 }
 
-setcookie(*<slice(index=6)>?{have: 'false'}) as $noHttpOnlyCookie
-setcookie(*<len>?{<=6}) as $noHttpOnlyCookie
+setcookie?(*<slice(index=6)>?{have: 'false'}) as $noHttpOnlyCookie
+setcookie?(*<len>?{<=6}) as $noHttpOnlyCookie
 
 alert $noHttpOnlyCookie for {
     title: 'Cookie without HttpOnly Flag',

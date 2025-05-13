@@ -1,10 +1,10 @@
 desc(
-title: "Insecure File Operation",
-title_zh: "未经验证的文件操作风险",
-type: vul,
-risk: "file-operation",
-desc: <<<TEXT
-    检测未经验证的用户输入直接用于文件操作系统函数,可能导致任意文件读取、写入、删除等风险,建议对用户输入进行严格过滤或验证,避免直接传递给文件操作系统函数.
+    title: "Insecure File Operation",
+    title_zh: "未经验证的文件操作风险",
+    type: vul,
+    risk: "file-operation",
+    desc: <<<TEXT
+        检测未经验证的用户输入直接用于文件操作系统函数,可能导致任意文件读取、写入、删除等风险,建议对用户输入进行严格过滤或验证,避免直接传递给文件操作系统函数.
 TEXT
 	rule_id: "7e2c4412-9a6f-4095-a84f-beb680e56fbf"
 )
@@ -13,15 +13,17 @@ TEXT
 <include('php-param')> as $params;
 <include('php-tp-all-extern-variable-param-source')> as $params
 
-$function(* as $source)
+$function(* as $allParams)
 
-$source #{
-    include: `<self> & $params`
-    }-> as $all
-$source #{
-    include: `<self> & $params`,
-    exclude: `*?{opcode: call}`,
-}-> as $high
+$allParams?{<self> #{include: <<<CODE
+* & $params
+CODE}->} as $sink
+
+$sink<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
+*?{opcode: call} as $__next__
+CODE)> as $high
 
 alert $high for {
    title: "Direct File Operation Without Validation",
@@ -29,10 +31,11 @@ alert $high for {
    level: "high",
 }
 
-$source #{
-    include: `<self> & $params`,
-    exclude: `*?{opcode: call && <self><getCallee> & $filter}`,
-}-> as $mid
+$sink<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
+*?{opcode: call && <self><getCallee> & $filter} as $__next__
+CODE)> as $mid
 
 alert $mid for {
    title: "Insufficient Parameter Filtering",
@@ -40,7 +43,7 @@ alert $mid for {
    level: "mid",
 }
 
-$all - $high - $mid  as $low
+$sink - $high - $mid  as $low
 
 alert $low for {
    title: "Potential Access Control Bypass",

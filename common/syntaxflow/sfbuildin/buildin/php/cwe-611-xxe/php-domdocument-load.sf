@@ -1,10 +1,10 @@
 desc(
-	title: "Checking new DOMDocument().load with LIBXML_NOENT (XXE)"
-	title_zh: "xxe漏洞(DOMDocument)",
-	type: vuln
-	level: high
-	risk: "xxe"
-	desc: <<<TEXT
+    title: "Checking new DOMDocument().load with LIBXML_NOENT (XXE)",
+    title_zh: "xxe漏洞(DOMDocument)",
+    type: vuln,
+    level: high,
+    risk: "xxe",
+    desc: <<<TEXT
 XML External Entity (XXE) 漏洞允许攻击者利用应用程序解析 XML 输入时的漏洞，访问本地文件系统或远程服务器上的文件，甚至执行服务器端的代码。当使用 `DOMDocument` 类的 `load` 方法并启用 `LIBXML_NOENT` 选项时，如果 XML 文档包含外部实体引用，这些引用将被解析并加载。这可能导致敏感数据泄露、拒绝服务攻击或服务器被远程控制。因此，建议避免在不受信任的数据上使用 `LIBXML_NOENT` 选项，或采取适当的措施来验证和清理 XML 输入。
 TEXT
 	rule_id: "20b78d2c-a8a9-47d0-b932-610c8f67cb97"
@@ -15,8 +15,8 @@ check $vuln;
 alert $vuln;
 
 desc(
-	language: php
-	'file://a.php': <<<CODE
+language: php,
+'file://a.php': <<<CODE
 
 <?php
 

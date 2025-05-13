@@ -1,36 +1,9 @@
 desc(
-	title: "Potential code execution risk"
-	title_zh: "代码执行",
-	risk: "code-execution"
-	type: vul
-	desc: <<<TEXT
-    检测到代码中直接使用 eval、create_function、assert 等函数，若参数来源于未经验证的外部输入，可能导致代码执行风险。修复方法包括验证输入、过滤输出、禁用危险函数等。
-TEXT
-	rule_id: "43d98bb1-1f90-4582-9a43-8570852c2d5b"
-)
-/^create_function|eval|assert$/ as $evalFunction;
-
-check $evalFunction;
-alert $evalFunction for{
-    title: "Detected dangerous function, possible code execution risk",
-    title_zh: "检测到危险函数，可能存在代码执行风险",
-    level: "low",
-}
-<include('php-param')> as $params;
-<include('php-tp-all-extern-variable-param-source')> as $params
-<include('php-filter-function')> as $filter;
-$evalFunction(* as $source)
-
-$source #{
-    include: `<self> & $params`
-}-> as $all
-
-$all<dataflow>
-desc(
     title: "Potential code execution risk",
     title_zh: "代码执行",
     risk: "code-execution",
     type: vul,
+    rule_id: "43d98bb1-1f90-4582-9a43-8570852c2d5b",
     desc: <<<TEXT
     检测到代码中直接使用 eval、create_function、assert 等函数，若参数来源于未经验证的外部输入，可能导致代码执行风险。修复方法包括验证输入、过滤输出、禁用危险函数等。
 TEXT
@@ -46,13 +19,14 @@ alert $evalFunction for{
 <include('php-param')> as $params;
 <include('php-tp-all-extern-variable-param-source')> as $params
 <include('php-filter-function')> as $filter;
-$evalFunction(* as $source)
+$evalFunction(*?{<self> #{include: <<<CODE
+<self> & $params
+CODE
+}->} as $all)
 
-$source #{
-    include: `<self> & $params`
-}-> as $all
-
-$all<dataflow(exclude=<<<CODE
+$all<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
@@ -62,8 +36,10 @@ alert $high for {
     level: 'high',
 }
 
-$all<dataflow(exclude=<<<CODE
-*?{opcode: call && <self><getCallee> & $filter} as __next__
+$all<dataflow(include=<<<INCLUDE
+* & $params as $__next__
+INCLUDE,exclude=<<<CODE
+*?{opcode: call && <self><getCallee> & $filter} as $__next__
 CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
