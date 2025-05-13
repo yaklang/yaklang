@@ -1,9 +1,9 @@
 desc(
-	title: "php information exposure"
-	title_zh: "sql信息泄漏",
-	type: vul
-	risk: "sql-information-exposure"
-	desc: <<<TEXT
+   title: "php information exposure",
+   title_zh: "sql信息泄漏",
+   type: vul,
+   risk: "sql-information-exposure",
+   desc: <<<TEXT
     检测可能暴露敏感信息的PHP函数调用，包括：
         1. MySQL相关：错误信息(mysql_error)、数据库元数据(mysql_get_host_info)、会话信息等
         2. PostgreSQL相关：错误日志(pg_last_error)、数据库配置(pg_version)等
@@ -19,29 +19,29 @@ TEXT
 
 $method(* as $param)
 
-$param #{
-    include: `<self> & $mysql_information`,
-}-> as $mysqli_exposure;
+$param?{<self> #{include: <<<CODE
+* & $mysql_information
+CODE}->} as $mysql_sink
 
-alert $mysqli_exposure for{
+alert $mysql_sink for{
    title: "MySQL Information Exposure",
    title_zh: "MySQL数据库信息泄露风险"
    level: "low",
 }
 
-$param #{
-    include: `<self> & $pg_information`,
-}-> as $pg_exposure;
+$param?{<self> #{include: <<<CODE
+* & $pg_information
+CODE}->} as $pg_sink
 
-alert $pg_exposure for{
+alert $pg_sink for{
    title: "PostgreSQL Information Exposure",
    title_zh: "PostgreSQL数据库信息泄露风险"
    level: "low",
 }
 desc(
-	lang: "php"
-	alert_low: 1
-	'file:///high.php': <<<UNSAFE
+    lang: "php",
+    alert_low: 1,
+    'file:///high.php': <<<UNSAFE
 <?php
     $host_info = mysql_get_host_info();
     echo "数据库主机信息：" . $host_info;
