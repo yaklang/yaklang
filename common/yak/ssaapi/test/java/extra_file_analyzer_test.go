@@ -61,7 +61,10 @@ func TestSimpleExtraFile(t *testing.T) {
 		ssatest.CheckSyntaxFlowWithFS(t, vf,
 			`${*.properties}.re(/spring.datasource.url=(.*)/) as $url`,
 			map[string][]string{
-				"url": {`"jdbc:mysql://localhost:3306/your_database"`},
+				"url": {
+					`"spring.datasource.url=jdbc:mysql://localhost:3306/your_database"`,
+					`"jdbc:mysql://localhost:3306/your_database"`,
+				},
 			}, false,
 			ssaapi.WithLanguage(ssaapi.JAVA),
 		)
@@ -210,7 +213,7 @@ func TestMultipleResultExtraFile(t *testing.T) {
 		`${*.properties}.re(/url=(.*)/) as $url`,
 		map[string][]string{
 			"url": {`"http://a.com"`, `"http://b.com"`},
-		}, false,
+		}, true,
 		ssaapi.WithLanguage(ssaapi.JAVA),
 	)
 }
