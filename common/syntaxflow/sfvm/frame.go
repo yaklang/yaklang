@@ -1219,11 +1219,12 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		s.debugSubLog("<< push: %v", ValuesLen(ret))
 		s.stack.Push(ret)
-	case OpFileFilterJsonPath, OpFileFilterReg, OpFileFilterXpath:
+	case OpFileFilterJsonPath, OpFileFilterReg, OpFileFilterXpath, OpFileFilterYmlPath:
 		opcode2strMap := map[SFVMOpCode]string{
 			OpFileFilterJsonPath: "jsonpath",
 			OpFileFilterReg:      "regexp",
 			OpFileFilterXpath:    "xpath",
+			OpFileFilterYmlPath:  "ymlpath",
 		}
 		s.debugSubLog(">> pop")
 		value := s.stack.Pop()

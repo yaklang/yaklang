@@ -86,6 +86,7 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 	defer func() {
 		if err := recover(); err != nil {
 			ret = utils.Wrapf(utils.Error(err), "Panic for SyntaxFlow compile")
+			utils.PrintCurrentGoroutineRuntimeStack()
 			frame = nil
 		}
 	}()

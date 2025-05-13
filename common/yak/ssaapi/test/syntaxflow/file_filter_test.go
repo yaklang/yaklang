@@ -126,3 +126,47 @@ func TestFileFilterJson(t *testing.T) {
 		})
 	})
 }
+
+func TestFileFilterYaml(t *testing.T) {
+	t.Run("test simple yaml path", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("test.yaml", `# 示例配置文件（存储商店信息）
+store:
+  name: "Global Bookstore"
+  location: "New York"
+  book:
+    - title: "Python Programming"
+      author: "John Doe"
+      price: 49.99
+      tags: [编程, 技术]
+    - title: "The Art of Data"
+      author: "Jane Smith"
+      price: 35.50
+      tags: [数据科学, 机器学习]
+  inventory:
+    - category: "Science"
+      stock: 200
+    - category: "Fiction"
+      stock: 150
+`)
+		ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
+			// 所有书的标题
+			vals, err := programs.SyntaxFlowWithError(`${*.yaml}.yml("$.store.book[*].title") as $title;
+${*.yaml}.yml("$.store.book[?(@.price < 40)].title") as $book`)
+			require.NoError(t, err)
+			title := vals.GetValues("title")
+			title.ShowWithSource()
+			require.Contains(t, title.String(), "Python Programming")
+			require.Contains(t, title.String(), "The Art of Data")
+			require.Contains(t, title.StringEx(1), "6:14 - 6:34")
+			require.Contains(t, title.StringEx(1), "10:14 - 10:31")
+
+			// 价格小于40的书
+			book := vals.GetValues("book")
+			book.ShowWithSource()
+			require.NotContains(t, book.String(), "Python Programming")
+			require.Contains(t, book.String(), "The Art of Data")
+			return nil
+		})
+	})
+}

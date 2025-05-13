@@ -135,6 +135,7 @@ const (
 	OpFileFilterReg
 	OpFileFilterXpath
 	OpFileFilterJsonPath
+	OpFileFilterYmlPath
 )
 
 type SFI struct {
@@ -300,6 +301,8 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "fileFilter$xpath", s.UnaryStr)
 	case OpFileFilterJsonPath:
 		return fmt.Sprintf(verboseLen+" %v", "fileFilter$jsonpath", s.UnaryStr)
+	case OpFileFilterYmlPath:
+		return fmt.Sprintf(verboseLen+" %v", "fileFilter$ymlpath", s.UnaryStr)
 	case OpVersionIn:
 		return fmt.Sprintf(verboseLen+" ", "version$in")
 	default:

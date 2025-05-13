@@ -92,6 +92,8 @@ func (y *SyntaxFlowVisitor) VisitFileFilterContentMethod(raw sf.IFileFilterConte
 		y.EmitFileFilterReg(fileInput, paramMap, paramList)
 	case "jsonpath", "json":
 		y.EmitFileFilterJsonPath(fileInput, paramMap, paramList)
+	case "yml", "yaml", "yamlpath":
+		y.EmitFileFilterYmlPath(fileInput, paramMap, paramList)
 	default:
 		return utils.Errorf("file filter method not support:%s", m)
 	}

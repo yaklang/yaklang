@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/vmware-labs/yaml-jsonpath/pkg/yamlpath"
 	"github.com/yaklang/yaklang/common/jsonpath"
+	"gopkg.in/yaml.v3"
 	"regexp"
 	"strings"
 
@@ -240,9 +242,19 @@ func (i Index) Hash() string {
 	return utils.CalcSha256(i.Start, i.End)
 }
 
+type Position struct {
+	StartPosition memedit.PositionIf
+	EndPosition   memedit.PositionIf
+}
+
+func (p Position) Hash() string {
+	return utils.CalcSha256(p.StartPosition.String(), p.EndPosition.String())
+}
+
 type FileFilter struct {
-	matchFile    func(string) bool
-	matchContent func(string) []Index
+	matchFile            func(string) bool
+	matchContentIndex    func(string) []Index
+	matchContentPosition func(string) []Position
 }
 
 func NewFileFilter(file, matchType string, match []string) *FileFilter {
@@ -270,7 +282,8 @@ func NewFileFilter(file, matchType string, match []string) *FileFilter {
 		})
 	}
 
-	var matchContent []func(data string) []Index
+	var matchContentIndex []func(data string) []Index
+	var matchContentPosition []func(data string) []Position
 	for _, rule := range match {
 		switch matchType {
 		case "regexp":
@@ -280,7 +293,7 @@ func NewFileFilter(file, matchType string, match []string) *FileFilter {
 			// 	log.Errorf("regexp compile error: %s", err)
 			// 	continue
 			// }
-			matchContent = append(matchContent, func(data string) []Index {
+			matchContentIndex = append(matchContentIndex, func(data string) []Index {
 				indexs, err := reg.FindAllIndex(data)
 				if err != nil {
 					log.Errorf("regexp match error: %s", err)
@@ -296,14 +309,13 @@ func NewFileFilter(file, matchType string, match []string) *FileFilter {
 				return res
 			})
 		case "xpath":
-
 			xexp, err := xpath.Compile(rule)
 			if err != nil {
 				log.Errorf("xpath compile error: %s", err)
 				continue
 			}
 
-			matchContent = append(matchContent, func(data string) []Index {
+			matchContentIndex = append(matchContentIndex, func(data string) []Index {
 				top, err := htmlquery.Parse(strings.NewReader(data))
 				if err != nil {
 					log.Errorf("htmlquery parse error: %s", err)
@@ -344,7 +356,7 @@ func NewFileFilter(file, matchType string, match []string) *FileFilter {
 				continue
 			}
 
-			matchContent = append(matchContent, func(data string) []Index {
+			matchContentIndex = append(matchContentIndex, func(data string) []Index {
 				m := make(map[string]interface{})
 				err := json.Unmarshal([]byte(data), &m)
 				if err != nil {
@@ -377,16 +389,35 @@ func NewFileFilter(file, matchType string, match []string) *FileFilter {
 					}
 				}
 
-				visited := make(map[string]bool)
-				return lo.FilterMap(res, func(item Index, index int) (Index, bool) {
-					hash := item.Hash()
-					if visited[hash] {
-						return Index{}, false
-					} else {
-						visited[hash] = true
-						return item, true
+				return res
+			})
+		case "ymlpath":
+			path, err := yamlpath.NewPath(rule)
+			if err != nil {
+				log.Errorf("yaml path parse error: %s", err)
+				return nil
+			}
+
+			matchContentPosition = append(matchContentPosition, func(data string) []Position {
+				var rootNode yaml.Node
+				err := yaml.Unmarshal([]byte(data), &rootNode)
+				if err != nil {
+					log.Errorf("yaml parse error: %s", err)
+					return nil
+				}
+				res := make([]Position, 0)
+				matched, err := path.Find(&rootNode)
+				for _, result := range matched {
+					position := memedit.NewPosition(result.Line, result.Column)
+					endColumn := result.Column + len(result.Value)
+					switch result.Style {
+					case yaml.DoubleQuotedStyle, yaml.SingleQuotedStyle:
+						endColumn = endColumn + 2
 					}
-				})
+					endPosition := memedit.NewPosition(result.Line, endColumn)
+					res = append(res, Position{StartPosition: position, EndPosition: endPosition})
+				}
+				return res
 			})
 		}
 	}
@@ -400,9 +431,22 @@ func NewFileFilter(file, matchType string, match []string) *FileFilter {
 			}
 			return false
 		},
-		matchContent: func(data string) []Index {
+		matchContentIndex: func(data string) []Index {
 			var allResults []Index
-			for _, matcher := range matchContent {
+			for _, matcher := range matchContentIndex {
+				results := matcher(data)
+				if results != nil {
+					allResults = append(allResults, results...)
+				}
+			}
+			if len(allResults) == 0 {
+				return nil
+			}
+			return allResults
+		},
+		matchContentPosition: func(data string) []Position {
+			var allResults []Position
+			for _, matcher := range matchContentPosition {
 				results := matcher(data)
 				if results != nil {
 					allResults = append(allResults, results...)
@@ -447,9 +491,16 @@ func (p *Program) FileFilter(path string, match string, rule map[string]string, 
 	filter := NewFileFilter(path, match, rule2)
 
 	var res []sfvm.ValueOperator
-	addRes := func(index Index, editor *memedit.MemEditor) {
+	addIndexRes := func(index Index, editor *memedit.MemEditor) {
 		// get range of match string
 		rangeIf := editor.GetRangeOffset(index.Start, index.End)
+		val := p.NewConstValue(rangeIf.GetText(), rangeIf)
+		res = append(res, val)
+	}
+
+	addPositionRes := func(position Position, editor *memedit.MemEditor) {
+		// get range of match string
+		rangeIf := editor.GetRangeByPosition(position.StartPosition, position.EndPosition)
 		val := p.NewConstValue(rangeIf.GetText(), rangeIf)
 		res = append(res, val)
 	}
@@ -461,10 +512,29 @@ func (p *Program) FileFilter(path string, match string, rule map[string]string, 
 		}
 		if filter.matchFile(s) {
 			matchFile = true
-			if filter.matchContent != nil {
-				matches := filter.matchContent(me.GetSourceCode())
-				for _, match := range matches {
-					addRes(match, me)
+			if filter.matchContentIndex != nil {
+				indexMatches := filter.matchContentIndex(me.GetSourceCode())
+				indexVisited := make(map[string]bool)
+				for _, match := range indexMatches {
+					hash := match.Hash()
+					if indexVisited[hash] {
+						continue
+					} else {
+						addIndexRes(match, me)
+						indexVisited[hash] = true
+					}
+				}
+
+				positionVisited := make(map[string]bool)
+				positionMatchs := filter.matchContentPosition(me.GetSourceCode())
+				for _, match := range positionMatchs {
+					hash := match.Hash()
+					if positionVisited[hash] {
+						continue
+					} else {
+						addPositionRes(match, me)
+						positionVisited[hash] = true
+					}
 				}
 			}
 		}

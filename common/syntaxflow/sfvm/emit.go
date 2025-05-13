@@ -437,3 +437,12 @@ func (y *SyntaxFlowVisitor) EmitFileFilterJsonPath(i string, m map[string]string
 		Values:               s,
 	})
 }
+
+func (y *SyntaxFlowVisitor) EmitFileFilterYmlPath(i string, m map[string]string, s []string) {
+	y.codes = append(y.codes, &SFI{
+		OpCode:               OpFileFilterYmlPath,
+		UnaryStr:             i,
+		FileFilterMethodItem: m,
+		Values:               s,
+	})
+}
