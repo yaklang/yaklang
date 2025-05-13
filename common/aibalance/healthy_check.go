@@ -170,13 +170,13 @@ func CheckProviderHealth(provider *Provider) (*HealthCheckResult, error) {
 	if provider != nil && provider.DbProvider != nil {
 		providerLogName = provider.DbProvider.WrapperName
 		providerLogID = provider.DbProvider.ID
-		log.Infof("开始检查提供者健康状态: %s (ID: %d)", providerLogName, providerLogID)
+		log.Infof("Start to check ai provider healthy status: %s (ID: %d)", providerLogName, providerLogID)
 	} else if provider != nil {
 		providerLogName = provider.WrapperName // Fallback to Provider's WrapperName if DbProvider is nil
 		if providerLogName == "" {
 			providerLogName = provider.ModelName // Further fallback
 		}
-		log.Infof("开始检查临时提供者健康状态: %s", providerLogName)
+		log.Infof("start to check ai provider healthy status: %s", providerLogName)
 	} else {
 		log.Errorf("CheckProviderHealth called with nil provider")
 		return &HealthCheckResult{IsHealthy: false, Error: fmt.Errorf("nil provider")}, fmt.Errorf("nil provider")
@@ -200,14 +200,14 @@ func CheckProviderHealth(provider *Provider) (*HealthCheckResult, error) {
 	// Logging specific to CheckProviderHealth context (especially if DbProvider involved)
 	if provider.DbProvider != nil { // Only log with ID if DbProvider is present
 		if result.IsHealthy {
-			log.Infof("健康检查成功 (CheckProviderHealth): %s (ID: %d), 延迟: %dms",
+			log.Infof("Health Check Finished (CheckProviderHealth): %s (ID: %d), 延迟: %dms",
 				providerLogName, providerLogID, result.ResponseTime)
 		} else {
-			errMsg := "未知错误"
+			errMsg := "Unknown ERR"
 			if result.Error != nil {
 				errMsg = result.Error.Error()
 			}
-			log.Errorf("健康检查失败 (CheckProviderHealth): %s (ID: %d), 错误: %s, 延迟: %dms",
+			log.Errorf("Health Check Failed (CheckProviderHealth): %s (ID: %d), ERR: %s, Delay: %dms",
 				providerLogName, providerLogID, errMsg, result.ResponseTime)
 		}
 	}

@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/jsonpath"
+	"github.com/yaklang/yaklang/common/utils/bufpipe"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"net/http"
-	"net/http/httputil"
-	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -189,6 +190,13 @@ func (c *Client) LoadOption(opts ...aispec.AIConfigOption) {
 		log.Debugf("Gemini model not specified, using default: %s", defaultModel)
 	}
 
+	if c.config.StreamHandler != nil {
+		log.Infof("Gemini client configured with stream handler.")
+	}
+	if c.config.ReasonStreamHandler != nil {
+		log.Infof("Gemini client configured with reason stream handler.")
+	}
+
 	log.Infof("Gemini client configured with model: %s", c.config.Model)
 }
 
@@ -287,7 +295,11 @@ func (c *Client) internalStreamGenerateContent(ctx context.Context, req Generate
 
 				var bodyReader io.Reader
 				if isChunk {
-					bodyReader = httputil.NewChunkedReader(rawReader)
+					bodyReader, _, err = codec.ReadChunkedStream(rawReader)
+					if err != nil {
+						log.Errorf("Failed to read chunked (bodyReader, _, err = codec.ReadChunkedStream(rawReader)) body: %v", err)
+						return
+					}
 				} else {
 					bodyReader = rawReader
 				}
@@ -309,8 +321,14 @@ func (c *Client) internalStreamGenerateContent(ctx context.Context, req Generate
 					return
 				}
 
+				bodyMirrorReader, bodyMirrorWriter := bufpipe.NewPipe()
+				go func() {
+					_, err := io.Copy(bodyMirrorWriter, bodyReader)
+					bodyMirrorWriter.CloseWithError(err)
+				}()
+
 				log.Infof("Received successful streaming response header from Gemini API (Status: %d)", statusCode)
-				decoder := jstream.NewDecoder(bodyReader, 1)
+				decoder := jstream.NewDecoder(bodyMirrorReader, 1)
 				count := 0
 				for result := range decoder.Stream() {
 					jsonRaw, err := json.Marshal(result)
@@ -435,52 +453,15 @@ func (c *Client) ChatStream(prompt string) (io.Reader, error) {
 
 				// 调试日志
 				log.Debugf("接收JSON块(%d字节): %s", len(rawChunk), utils.ShrinkString(string(rawChunk), 100))
-
-				// 先尝试直接查找text字段
-				textContent := extractTextFromJSON(string(rawChunk))
-				if textContent != "" {
-					log.Debugf("通过text字段提取: %q", textContent)
-
-					if _, wErr := pw.Write([]byte(textContent)); wErr != nil {
-						log.Errorf("向管道写入数据错误: %v", wErr)
-						streamErr = wErr
-						return
-					}
-					continue
-				}
-
-				// 如果没有找到text字段，尝试通过标准JSON解析
-				var chunkResp StreamGenerateContentResponse
-				if err := json.Unmarshal(rawChunk, &chunkResp); err != nil {
-					log.Warnf("JSON解析错误，尝试直接提取: %v", err)
-					continue
-				}
-
-				// 提取文本并写入输出流
-				textExtracted := false
-				for _, candidate := range chunkResp.Candidates {
-					if candidate.FinishReason != "" && candidate.FinishReason != "STOP" {
-						log.Warnf("非正常结束原因: %s", candidate.FinishReason)
-					}
-
-					// 处理内容部分
-					for _, part := range candidate.Content.Parts {
-						if part.Text != "" {
-							textExtracted = true
-							if _, wErr := pw.Write([]byte(part.Text)); wErr != nil {
-								log.Errorf("向管道写入数据错误: %v", wErr)
-								streamErr = wErr
-								return
-							}
+				results := jsonpath.Find(string(rawChunk), "$..parts[*].text")
+				if funk.IsIteratee(results) {
+					funk.ForEach(results, func(v interface{}) {
+						if utils.IsNil(v) {
+							return
 						}
-					}
+						pw.WriteString(utils.InterfaceToString(v))
+					})
 				}
-
-				// 如果没有提取到文本,记录警告
-				if !textExtracted {
-					log.Warnf("未能从JSON块提取文本: %s", utils.ShrinkString(string(rawChunk), 100))
-				}
-
 			case err, ok := <-errChan:
 				if !ok {
 					log.Infof("Error channel closed for ChatStream.")
@@ -504,20 +485,28 @@ func (c *Client) ChatStream(prompt string) (io.Reader, error) {
 		}
 	}()
 
-	var finalReader io.Reader = pr
+	if c.config.ReasonStreamHandler != nil {
+		reasonReader, reasonWriter := utils.NewPipe()
+		go func() {
+			reasonWriter.Close()
+		}()
+		go c.config.ReasonStreamHandler(reasonReader)
+	}
+
 	// Call stream handler if configured, passing the pipe reader
 	if c.config.StreamHandler != nil {
 		fpr, fpw := utils.NewPipe()
 		mspr, mspw := utils.NewPipe()
 		go func() {
 			defer fpw.Close()
-			defer mspr.Close()
-			io.Copy(io.MultiWriter(fpw, mspw), finalReader)
+			defer mspw.Close()
+			io.Copy(io.MultiWriter(fpw, mspw), pr)
 		}()
 		go c.config.StreamHandler(mspr)
 		return fpr, nil
 	}
-	return finalReader, nil // Return the reading end of the pipe
+
+	return pr, nil // Return the reading end of the pipe
 }
 
 // Chat sends a prompt and returns the full response as a string.
@@ -1076,36 +1065,3 @@ func (c *Client) ExtractData(data string, desc string, fields map[string]any) (m
 	log.Infof("Gemini ExtractData completed successfully.")
 	return extracted, nil // Return extracted data, potentially ignoring original Chat error if extraction succeeded
 }
-
-// 简单的文本提取辅助函数
-func extractTextFromJSON(jsonStr string) string {
-	// 尝试简单地提取"text"字段的值
-	textPattern := `"text"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"`
-	re := regexp.MustCompile(textPattern)
-	matches := re.FindAllStringSubmatch(jsonStr, -1)
-
-	if len(matches) > 0 {
-		var result strings.Builder
-		for _, match := range matches {
-			if len(match) >= 2 {
-				// 处理转义字符
-				unescaped, err := strconv.Unquote(`"` + match[1] + `"`)
-				if err == nil {
-					result.WriteString(unescaped)
-				} else {
-					result.WriteString(match[1])
-				}
-			}
-		}
-		return result.String()
-	}
-
-	return ""
-}
-
-/*
-// Example Usage (commented out for now)
-func main() {
-	// ... example needs update to use LoadOption ...
-}
-*/

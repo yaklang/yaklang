@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/bufpipe"
 	"io"
 	"net"
 	"sort"
@@ -36,11 +37,11 @@ type TrafficConnection struct {
 	localAddr            net.Addr
 	remoteAddr           net.Addr
 	ctx                  context.Context
-	writer               *utils.PipeWriter
+	writer               *bufpipe.PipeWriter
 	Flow                 *TrafficFlow
 	frames               *algorithm.Queue[*TrafficFrame]
 	cancel               context.CancelFunc
-	reader               *utils.PipeReader
+	reader               *bufpipe.PipeReader
 	remoteIP             net.IP
 	localIP              net.IP
 	waitGroup            []*futureFrame
