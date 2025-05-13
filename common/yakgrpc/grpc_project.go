@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/bufpipe"
 	"io"
 	"os"
 	"path/filepath"
@@ -452,7 +453,7 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 			}
 			return nil, 0, false
 		}
-		importProjectWriter = utils.NewPerHandlerWriter(importProjectWriter, func(i []byte) ([]byte, bool) {
+		importProjectWriter = bufpipe.NewPerHandlerWriter(importProjectWriter, func(i []byte) ([]byte, bool) {
 			var n = 0
 			var data []byte
 			var ok bool

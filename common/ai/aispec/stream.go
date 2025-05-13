@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"net/http/httputil"
 	"strings"
 	"sync"
 
@@ -71,7 +70,13 @@ func appendStreamHandlerPoCOptionEx(opts []poc.PocConfigOption) (io.Reader, io.R
 		var ioReader io.Reader = utils.NewTrimLeftReader(reader)
 		var chunkedErrorMirror bytes.Buffer
 		if chunked {
-			ioReader = httputil.NewChunkedReader(io.TeeReader(ioReader, &chunkedErrorMirror))
+			chunkReader, origin, err := codec.ReadChunkedStream(io.TeeReader(ioReader, &chunkedErrorMirror))
+			if err != nil {
+				log.Errorf("ReadChunkedStream err: %v", err)
+				ioReader = origin
+			} else {
+				ioReader = chunkReader
+			}
 		}
 		lineReader := bufio.NewReader(ioReader)
 		haveReason := false

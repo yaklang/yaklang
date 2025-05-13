@@ -118,6 +118,7 @@ func (w *writerWrapper) Write(p []byte) (n int, err error) {
 	w.writer.mu.Lock()
 	defer w.writer.mu.Unlock()
 
+	// fmt.Println(string(chunk))
 	if _, err := w.writer.writerClose.Write([]byte(chunk)); err != nil {
 		return 0, err
 	}
@@ -206,6 +207,8 @@ func (w *chatJSONChunkWriter) Close() error {
 	}
 	msg := fmt.Sprintf("data: %s\r\n\r\n", string(msgBytes))
 	chunk := fmt.Sprintf("%x\r\n%s\r\n", len(msg), msg)
+
+	// fmt.Println(string(chunk))
 	if _, err := w.writerClose.Write([]byte(chunk)); err != nil {
 		return err
 	}
@@ -213,12 +216,15 @@ func (w *chatJSONChunkWriter) Close() error {
 	// write data: [DONE]
 	msg = "data: [DONE]\r\n\r\n"
 	chunk = fmt.Sprintf("%x\r\n%s\r\n", len(msg), msg)
+	// fmt.Println(string(chunk))
 	if _, err := w.writerClose.Write([]byte(chunk)); err != nil {
 		return err
 	}
 
 	// Send chunked encoding end marker
-	if _, err := w.writerClose.Write([]byte("0\r\n\r\n")); err != nil {
+	chunk = "0\r\n\r\n"
+	// fmt.Println(string(chunk))
+	if _, err := w.writerClose.Write([]byte(chunk)); err != nil {
 		return err
 	}
 
