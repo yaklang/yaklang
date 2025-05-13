@@ -42044,6 +42044,7 @@ type FingerprintFilter struct {
 	Product       []string               `protobuf:"bytes,2,rep,name=Product,proto3" json:"Product,omitempty"`
 	IncludeId     []int64                `protobuf:"varint,3,rep,packed,name=IncludeId,proto3" json:"IncludeId,omitempty"`
 	GroupName     []string               `protobuf:"bytes,4,rep,name=GroupName,proto3" json:"GroupName,omitempty"`
+	Keyword       string                 `protobuf:"bytes,5,opt,name=Keyword,proto3" json:"Keyword,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -42104,6 +42105,13 @@ func (x *FingerprintFilter) GetGroupName() []string {
 		return x.GroupName
 	}
 	return nil
+}
+
+func (x *FingerprintFilter) GetKeyword() string {
+	if x != nil {
+		return x.Keyword
+	}
+	return ""
 }
 
 type QueryFingerprintRequest struct {
@@ -53716,12 +53724,13 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\aWebPath\x18\x04 \x01(\tR\aWebPath\x12\x18\n" +
 	"\aExtInfo\x18\x05 \x01(\tR\aExtInfo\x12(\n" +
 	"\x0fMatchExpression\x18\x06 \x01(\tR\x0fMatchExpression\x12\x1c\n" +
-	"\tGroupName\x18\a \x03(\tR\tGroupName\"\x81\x01\n" +
+	"\tGroupName\x18\a \x03(\tR\tGroupName\"\x9b\x01\n" +
 	"\x11FingerprintFilter\x12\x16\n" +
 	"\x06Vendor\x18\x01 \x03(\tR\x06Vendor\x12\x18\n" +
 	"\aProduct\x18\x02 \x03(\tR\aProduct\x12\x1c\n" +
 	"\tIncludeId\x18\x03 \x03(\x03R\tIncludeId\x12\x1c\n" +
-	"\tGroupName\x18\x04 \x03(\tR\tGroupName\"v\n" +
+	"\tGroupName\x18\x04 \x03(\tR\tGroupName\x12\x18\n" +
+	"\aKeyword\x18\x05 \x01(\tR\aKeyword\"v\n" +
 	"\x17QueryFingerprintRequest\x12.\n" +
 	"\x06Filter\x18\x01 \x01(\v2\x16.ypb.FingerprintFilterR\x06Filter\x12+\n" +
 	"\n" +
