@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"strings"
@@ -301,6 +302,10 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
 		return
 	}
+
+	stream := bodyIns.Stream
+	log.Infof("user require stream flag: %v", stream)
+
 	modelName := bodyIns.Model
 	c.logInfo("Requested model: %s", modelName)
 
@@ -358,13 +363,13 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 	}
 
 	c.logInfo("Found provider for model %s: %s", modelName, provider.TypeName)
-	writer := NewChatJSONChunkWriter(conn, key.Key, modelName)
 	c.logInfo("Starting to call AI chat interface")
 
 	sendHeaderOnce := sync.Once{}
 	sendHeader := func() {
 		c.logInfo("Successfully obtained AI client, starting to send response header")
-		header := "HTTP/1.1 200 OK\r\n" +
+		var header string
+		header = "HTTP/1.1 200 OK\r\n" +
 			"Content-Type: application/json\r\n" +
 			"Transfer-Encoding: chunked\r\n" +
 			"\r\n"
@@ -380,6 +385,7 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 
 	// baseCtx, cancel := context.WithCancel(context.Background())
 
+	writer := NewChatJSONChunkWriter(conn, key.Key, modelName)
 	client, err := provider.GetAIClient(func(reader io.Reader) {
 		defer func() {
 			pw.Close()
@@ -465,6 +471,16 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 
 	// Wait for all stream processing to complete
 	wg.Wait()
+	utils.FlushWriter(writer.writerClose)
+
+	if !stream {
+		body = writer.GetNotStreamBody()
+		cwr := httputil.NewChunkedWriter(conn)
+		cwr.Write(body)
+		cwr.Close()
+		utils.FlushWriter(cwr)
+		utils.FlushWriter(conn)
+	}
 
 	endDuration := time.Since(start)
 	total := atomic.LoadInt64(totalBytes)
