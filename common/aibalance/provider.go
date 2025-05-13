@@ -167,7 +167,6 @@ func (p *Provider) GetAIClient(onStream, onReasonStream func(reader io.Reader)) 
 					io.Copy(os.Stdout, reader)
 				}
 			}()
-
 		}),
 		aispec.WithReasonStreamHandler(func(reader io.Reader) {
 			go func() {

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/bufpipe"
 	"io"
 	"strconv"
 	"unicode"
@@ -68,6 +69,143 @@ func readHTTPChunkedData(ret []byte) (data []byte, rest []byte) {
 		log.Errorf("read chunked data error: %v", err)
 	}
 	return blocks, rest
+}
+
+func ReadChunkedStream(r io.Reader) (io.Reader, io.Reader, error) {
+	reader, fixed, restReader, err := readChunkedDataFromReaderEx(r, func(err error) {
+		log.Errorf("read chunked data error in (ReadChunkedStream): %v", err)
+	})
+	_ = fixed
+	return reader, restReader, err
+}
+
+func readChunkedDataFromReaderEx(r io.Reader, onError func(error)) (io.Reader, io.Reader, io.Reader, error) {
+	var resultReader, resultWriter = bufpipe.NewPipe()
+	var fixedReader, fixedWriter = bufpipe.NewPipe()
+	var originMirror, originMirrorWriter = bufpipe.NewPipe()
+
+	go func() {
+		defer func() {
+			resultWriter.Close()
+			fixedWriter.Close()
+			originMirrorWriter.Close()
+		}()
+
+		haveRead := new(bytes.Buffer)
+		var reader *bufio.Reader
+		switch r.(type) {
+		case *bufio.Reader:
+			reader = r.(*bufio.Reader)
+		default:
+			reader = bufio.NewReader(r)
+		}
+		// read until space
+		for {
+			spaceByte, err := reader.ReadByte()
+			if err != nil {
+				err = fmt.Errorf("read chunked (strip left space) data error: %v", err)
+				if onError != nil {
+					onError(err)
+				}
+				return
+				// return nil, nil, io.MultiReader(bytes.NewReader(haveRead.Bytes()), reader), err
+			}
+			if unicode.IsSpace(rune(spaceByte)) {
+				continue
+			} else {
+				err := reader.UnreadByte()
+				if err != nil {
+					err = fmt.Errorf("read chunked (strip left space) data error: %v", err)
+					if onError != nil {
+						onError(err)
+					}
+					return
+					// return nil, nil, io.MultiReader(bytes.NewReader(haveRead.Bytes()), reader), err
+				}
+				break
+			}
+		}
+
+		handler := func() (io.Reader, io.Reader, io.Reader, error) {
+			for {
+				lineBytes, delim, err := bufioReadLine(reader)
+				haveRead.Write(lineBytes)
+				haveRead.Write(delim)
+
+				getRestReader := func() io.Reader {
+					io.Copy(originMirrorWriter, io.MultiReader(bytes.NewReader(haveRead.Bytes()), reader))
+					return originMirror
+				}
+
+				if err != nil && len(lineBytes) > 0 {
+					return nil, nil, getRestReader(), err
+				}
+
+				var comment []byte
+				var commentExisted bool
+				handledLineBytes, comment, commentExisted := bytes.Cut(lineBytes, []byte{';'})
+				handledLineBytes = bytes.TrimSpace(handledLineBytes)
+				size, err := strconv.ParseInt(string(handledLineBytes), 16, 64)
+				if err != nil && len(handledLineBytes) > 0 {
+					return nil, nil, getRestReader(), err
+				}
+
+				if size == 0 {
+					lastLine, delim, err := bufioReadLine(reader)
+					haveRead.Write(lastLine)
+					haveRead.Write(delim)
+					if len(lastLine) == 0 {
+						fixedWriter.WriteString("0\r\n\r\n")
+					} else {
+						return nil, nil, getRestReader(), fmt.Errorf("last line of chunked data is not empty: %s", lastLine)
+					}
+
+					if err != nil {
+						if err == io.EOF {
+							return resultReader, fixedReader, reader, nil
+						}
+						return nil, nil, getRestReader(), err
+					}
+					return resultReader, fixedReader, reader, nil
+				}
+
+				buf := make([]byte, size)
+				blockN, err := io.ReadFull(reader, buf)
+				resultWriter.Write(buf[:blockN])
+				haveRead.Write(buf[:blockN])
+
+				fixedWriter.Write(lineBytes)
+				if commentExisted {
+					fixedWriter.WriteString(";")
+					fixedWriter.Write(comment)
+				}
+				fixedWriter.WriteString("\r\n")
+				fixedWriter.Write(buf[:blockN])
+				fixedWriter.WriteString("\r\n")
+				if err != nil {
+					if errors.Is(err, io.ErrUnexpectedEOF) {
+						return resultReader, fixedReader, reader, err
+					} else {
+						return nil, nil, io.MultiReader(bytes.NewReader(haveRead.Bytes()), reader), fmt.Errorf("read chunked data error: %v", err)
+					}
+				}
+
+				endBlock, delim, _ := bufioReadLine(reader)
+				haveRead.Write(endBlock)
+				haveRead.Write(delim)
+				if len(endBlock) != 0 {
+					return nil, nil, io.MultiReader(bytes.NewReader(haveRead.Bytes()), reader), fmt.Errorf("read chunked data error: %v", err)
+				}
+			}
+		}
+		_, _, _, err := handler()
+		if err != nil {
+			if onError != nil {
+				onError(err)
+			}
+		}
+	}()
+	return resultReader, fixedReader, originMirror, nil
 }
 
 func readChunkedDataFromReader(r io.Reader) ([]byte, []byte, io.Reader, error) {
