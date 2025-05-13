@@ -728,7 +728,7 @@ RECONNECT:
 			return response, nil
 		}
 	}
-
+	//log.Infof("dns time + dial time cost: %v", time.Since(dnsStart))
 	var multiResponses []*http.Response
 	var isMultiResponses bool
 	var firstResponse *http.Response
@@ -827,6 +827,9 @@ RECONNECT:
 				log.Infof("close reader and writer")
 				writer.Close()
 			}()
+			//startHandlerStream := time.Now()
+			//onceForHeader := new(sync.Once)
+			//onceForBody := new(sync.Once)
 			go func() {
 				bodyReader, bodyWriter := utils.NewBufPipe(nil)
 				defer func() {
@@ -837,7 +840,7 @@ RECONNECT:
 					}
 				}()
 
-				packetReader := bufio.NewReader(reader)
+				packetReader := bufio.NewReaderSize(reader, 1)
 				responseHeader := bytes.NewBufferString("")
 				for {
 					line, err := utils.BufioReadLine(packetReader)
@@ -848,11 +851,19 @@ RECONNECT:
 						bodyWriter.Close()
 						break
 					}
+					//onceForHeader.Do(func() {
+					//	log.Infof("stream handler start to handle header: %v", time.Since(startHandlerStream))
+					//})
 
 					responseHeader.WriteString(string(line) + "\r\n")
 					if len(line) == 0 {
 						go func() {
 							io.Copy(bodyWriter, packetReader)
+							//io.Copy(bodyWriter, io.TeeReader(packetReader, utils.FirstWriter(func(i []byte) {
+							//	onceForBody.Do(func() {
+							//		log.Infof("stream handler start to handle body: %v", time.Since(startHandlerStream))
+							//	})
+							//})))
 							bodyWriter.Close()
 						}()
 						break
@@ -870,6 +881,7 @@ RECONNECT:
 
 		httpResponseReader := bufio.NewReaderSize(io.TeeReader(conn, mirrorWriter), option.DefaultBufferSize)
 
+		//log.Infof("dns time + dial time cost + write request finished: %v", time.Since(dnsStart))
 		// 服务器响应第一个字节
 	READ:
 		serverTimeStart := time.Now()
@@ -878,6 +890,8 @@ RECONNECT:
 		if err != nil {
 			return response, err
 		}
+		//log.Infof("dns time + dial time cost + write request finished + peek 1: %v", time.Since(dnsStart))
+		//log.Infof("[lowhttp] first byte in %v", time.Since(serverTimeStart))
 
 		// 检查是否是 TLS 握手错误的特定序列
 		if firstByte[0] == 0x15 {

@@ -4,11 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/samber/lo"
 	"io"
 	"strings"
 	"sync"
-
-	"github.com/samber/lo"
 
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/jsonpath"
@@ -69,8 +68,12 @@ func appendStreamHandlerPoCOptionEx(opts []poc.PocConfigOption) (io.Reader, io.R
 		// reader = io.TeeReader(reader, os.Stdout)
 		var ioReader io.Reader = utils.NewTrimLeftReader(reader)
 		var chunkedErrorMirror bytes.Buffer
+		//start := time.Now()
 		if chunked {
-			chunkReader, origin, err := codec.ReadChunkedStream(io.TeeReader(ioReader, &chunkedErrorMirror))
+			//chunkReader, origin, err := codec.ReadChunkedStream(io.TeeReader(ioReader, utils.FirstWriter(func(i []byte) {
+			//	log.Infof("chunk read first byte/token delay: %v", time.Since(start))
+			//})))
+			chunkReader, origin, err := codec.ReadChunkedStream(ioReader)
 			if err != nil {
 				log.Errorf("ReadChunkedStream err: %v", err)
 				ioReader = origin
@@ -96,6 +99,7 @@ func appendStreamHandlerPoCOptionEx(opts []poc.PocConfigOption) (io.Reader, io.R
 				continue
 			}
 			lineStr := string(line)
+			// log.Infof("chunk read line: %v", lineStr)
 			jsonIdentifiers := jsonextractor.ExtractStandardJSON(lineStr)
 			for _, j := range jsonIdentifiers {
 				var reasonDelta string

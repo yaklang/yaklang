@@ -1,6 +1,7 @@
 package bufpipe
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"io"
@@ -12,11 +13,11 @@ var ErrClosedPipe = errors.New("bufpipe: read/write on closed pipe")
 
 type pipe struct {
 	cond       *sync.Cond
-	buf        *bytes.Buffer
+	buf        *bufio.ReadWriter
 	rerr, werr error
 }
 
-func (p *pipe) BytesBuffer() *bytes.Buffer {
+func (p *pipe) BytesBuffer() *bufio.ReadWriter {
 	return p.buf
 }
 
@@ -40,11 +41,11 @@ func (p *PipeReader) Count() int {
 	return p.count
 }
 
-func (p *PipeWriter) BytesBuffer() *bytes.Buffer {
+func (p *PipeWriter) BytesBuffer() *bufio.ReadWriter {
 	return p.buf
 }
 
-func (p *PipeReader) BytesBuffer() *bytes.Buffer {
+func (p *PipeReader) BytesBuffer() *bufio.ReadWriter {
 	return p.buf
 }
 
@@ -63,8 +64,11 @@ func (p *PipeReader) BytesBuffer() *bytes.Buffer {
 // can also be used to set the initial size of the internal buffer for writing.
 // To do that, buf should have the desired capacity but a length of zero.
 func NewBufPipe(buf []byte) (*PipeReader, *PipeWriter) {
+	bufbytes := bytes.NewBuffer(buf)
+	w := bufio.NewWriterSize(bufbytes, 1)
+	r := bufio.NewReaderSize(bufbytes, 1)
 	p := &pipe{
-		buf:  bytes.NewBuffer(buf),
+		buf:  bufio.NewReadWriter(r, w),
 		cond: sync.NewCond(new(sync.Mutex)),
 	}
 	return &PipeReader{
