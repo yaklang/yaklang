@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bufpipe"
 	"io"
-	"log"
 	"sync"
 	"time"
 )
@@ -17,6 +17,7 @@ import (
 type chatJSONChunkWriter struct {
 	notStream bool
 
+	wg              *sync.WaitGroup
 	writerClose     io.WriteCloser
 	reasonBufWriter *bytes.Buffer
 	outputBufWriter *bytes.Buffer
@@ -33,13 +34,19 @@ type chatJSONChunkWriter struct {
 // model: Name of the AI model being used
 func NewChatJSONChunkWriter(writer io.WriteCloser, uid string, model string) *chatJSONChunkWriter {
 	pr, pw := bufpipe.NewPipe()
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
 	go func() {
-		defer writer.Close()
+		defer func() {
+			wg.Done()
+		}()
+		//io.Copy(writer, io.TeeReader(pr, os.Stdout))
 		io.Copy(writer, pr)
+		utils.FlushWriter(writer)
 	}()
 	return &chatJSONChunkWriter{
-		writerClose: pw,
-		//writerClose:     writer,
+		wg:              wg,
+		writerClose:     pw,
 		reasonBufWriter: bytes.NewBuffer(nil),
 		outputBufWriter: bytes.NewBuffer(nil),
 		uid:             uid,
@@ -122,7 +129,6 @@ func (w *writerWrapper) Write(p []byte) (n int, err error) {
 
 	w.writer.mu.Lock()
 	defer w.writer.mu.Unlock()
-
 	buf := bytes.Buffer{}
 	buf.WriteString("data: ")
 	buf.Write(delta)
@@ -191,6 +197,15 @@ func (w *chatJSONChunkWriter) GetNotStreamBody() []byte {
 	return msg
 }
 
+func (w *chatJSONChunkWriter) Wait() {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Warnf("wait group err: %v", err)
+		}
+	}()
+	w.wg.Wait()
+}
+
 // Close finalizes the streaming response
 // It sends the [DONE] marker and closes the underlying writer
 func (w *chatJSONChunkWriter) Close() error {
@@ -202,6 +217,7 @@ func (w *chatJSONChunkWriter) Close() error {
 	if w.notStream {
 		return nil
 	}
+	log.Info("start to close ChatJsonChunkWriter")
 
 	rawmsg := map[string]any{
 		"id":      "chat-ai-balance-" + w.uid,

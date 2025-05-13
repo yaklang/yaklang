@@ -132,6 +132,8 @@ func readChunkedDataFromReaderEx(r io.Reader, onError func(error)) (io.Reader, i
 				haveRead.Write(lineBytes)
 				haveRead.Write(delim)
 
+				//fmt.Println(string(lineBytes))
+
 				getRestReader := func() io.Reader {
 					io.Copy(originMirrorWriter, io.MultiReader(bytes.NewReader(haveRead.Bytes()), reader))
 					return originMirror
