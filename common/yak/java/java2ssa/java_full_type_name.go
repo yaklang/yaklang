@@ -230,3 +230,10 @@ func (y *builder) RemoveCastTypeFlag(typ ssa.Type) ssa.Type {
 	typ.SetFullTypeNames(newFts)
 	return typ
 }
+
+func TypeAddBracketLevel(typ ssa.Type, level int) ssa.Type {
+	for i := 0; i < level; i++ {
+		typ = ssa.NewSliceType(typ)
+	}
+	return typ
+}

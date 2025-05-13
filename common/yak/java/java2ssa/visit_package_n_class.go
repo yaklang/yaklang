@@ -291,6 +291,9 @@ func (y *builder) VisitTypeType(raw javaparser.ITypeTypeContext) ssa.Type {
 		t = y.VisitPrimitiveType(i.PrimitiveType())
 	}
 
+	bracketLevel := len(i.AllLBRACK())
+	t = TypeAddBracketLevel(t, bracketLevel)
+
 	return t
 }
 
@@ -694,7 +697,8 @@ func (y *builder) VisitFormalParameter(raw javaparser.IFormalParameterContext) (
 		insCallbacks = append(insCallbacks, insCallback)
 	}
 	typ := y.VisitTypeType(i.TypeType())
-	name, _ := y.VisitVariableDeclaratorId(i.VariableDeclaratorId())
+	name, _, bracketLevel := y.VisitVariableDeclaratorId(i.VariableDeclaratorId())
+	typ = TypeAddBracketLevel(typ, bracketLevel)
 	if name == "" {
 		return
 	}
@@ -717,9 +721,10 @@ func (y *builder) VisitFormalParameter(raw javaparser.IFormalParameterContext) (
 	return
 }
 
-func (y *builder) VisitVariableDeclaratorId(raw javaparser.IVariableDeclaratorIdContext, wantVariable ...bool) (string, *ssa.Variable) {
+func (y *builder) VisitVariableDeclaratorId(raw javaparser.IVariableDeclaratorIdContext, wantVariable ...bool) (string, *ssa.Variable, int) {
+	bracketLevel := 0
 	if y == nil || raw == nil || y.IsStop() {
-		return "", nil
+		return "", nil, bracketLevel
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
@@ -730,18 +735,21 @@ func (y *builder) VisitVariableDeclaratorId(raw javaparser.IVariableDeclaratorId
 	}
 	i, _ := raw.(*javaparser.VariableDeclaratorIdContext)
 	if i == nil {
-		return "", nil
+		return "", nil, bracketLevel
 	}
+
+	bracketLevel = len(i.AllLBRACK())
+
 	name := i.Identifier().GetText()
 	if name == "" {
-		return "", nil
+		return "", nil, bracketLevel
 	}
 
 	if want {
-		return name, y.CreateVariable(name)
+		return name, y.CreateVariable(name), bracketLevel
 	}
 
-	return name, nil
+	return name, nil, bracketLevel
 }
 
 func (y *builder) VisitLastFormalParameter(raw javaparser.ILastFormalParameterContext) {
@@ -769,8 +777,9 @@ func (y *builder) VisitLastFormalParameter(raw javaparser.ILastFormalParameterCo
 		_ = annotation
 		//y.VisitAnnotation(annotation)
 	}
-	formalParams, _ := y.VisitVariableDeclaratorId(i.VariableDeclaratorId())
 	typeType := y.VisitTypeType(i.TypeType())
+	formalParams, _, bracketLevel := y.VisitVariableDeclaratorId(i.VariableDeclaratorId())
+	typeType = TypeAddBracketLevel(typeType, bracketLevel)
 	isVariadic := i.ELLIPSIS()
 	_ = isVariadic
 	param := y.NewParam(formalParams)
