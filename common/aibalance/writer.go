@@ -1,8 +1,10 @@
 package aibalance
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"log"
 	"sync"
@@ -12,8 +14,12 @@ import (
 // chatJSONChunkWriter handles the streaming of chat completion responses
 // It implements chunked transfer encoding for streaming responses
 type chatJSONChunkWriter struct {
-	writerClose io.WriteCloser
-	mu          sync.Mutex
+	notStream bool
+
+	writerClose     io.WriteCloser
+	reasonBufWriter *bytes.Buffer
+	outputBufWriter *bytes.Buffer
+	mu              sync.Mutex
 
 	uid     string    // Unique identifier for the chat session
 	created time.Time // Timestamp when the chat session was created
@@ -26,10 +32,12 @@ type chatJSONChunkWriter struct {
 // model: Name of the AI model being used
 func NewChatJSONChunkWriter(writer io.WriteCloser, uid string, model string) *chatJSONChunkWriter {
 	return &chatJSONChunkWriter{
-		writerClose: writer,
-		uid:         uid,
-		created:     time.Now(),
-		model:       model,
+		writerClose:     writer,
+		reasonBufWriter: bytes.NewBuffer(nil),
+		outputBufWriter: bytes.NewBuffer(nil),
+		uid:             uid,
+		created:         time.Now(),
+		model:           model,
 	}
 }
 
@@ -57,8 +65,38 @@ func (w *chatJSONChunkWriter) buildDelta(reason bool, content string) ([]byte, e
 	return json.Marshal(result)
 }
 
+// buildMessage constructs a full message for streaming responses
+// reason: Whether this is a reason message (true) or content message (false)
+// content: The actual content to be sent
+func (w *chatJSONChunkWriter) buildMessage(reasonContent string, content string) ([]byte, error) {
+	r := map[string]any{
+		"role": "assistant",
+	}
+	if reasonContent != "" {
+		r["reason_content"] = reasonContent
+	}
+	r["content"] = content
+	result := map[string]any{
+		"id":      "chat-ai-balance-" + w.uid,
+		"object":  "chat.completion.chunk",
+		"created": w.created.Unix(),
+		"model":   w.model,
+		"choices": []map[string]any{
+			{
+				"message":       r,
+				"index":         0,
+				"finish_reason": "stop",
+			},
+		},
+	}
+	return json.Marshal(result)
+}
+
 // writerWrapper wraps the chatJSONChunkWriter to handle different types of messages
 type writerWrapper struct {
+	notStream bool
+	buf       *bytes.Buffer
+
 	reason bool                 // Whether this is a reason writer
 	writer *chatJSONChunkWriter // The underlying chat writer
 }
@@ -66,6 +104,10 @@ type writerWrapper struct {
 // Write implements io.Writer interface for streaming responses
 // It formats the data into chunked transfer encoding format
 func (w *writerWrapper) Write(p []byte) (n int, err error) {
+	if w.notStream {
+		return w.buf.Write(p)
+	}
+
 	delta, err := w.writer.buildDelta(w.reason, string(p))
 	if err != nil {
 		return 0, err
@@ -79,6 +121,7 @@ func (w *writerWrapper) Write(p []byte) (n int, err error) {
 	if _, err := w.writer.writerClose.Write([]byte(chunk)); err != nil {
 		return 0, err
 	}
+	utils.FlushWriter(w.writer.writerClose)
 
 	// Return the length of the original data, not the chunk
 	return len(p), nil
@@ -87,22 +130,28 @@ func (w *writerWrapper) Write(p []byte) (n int, err error) {
 // GetOutputWriter returns a writer for content messages
 func (w *chatJSONChunkWriter) GetOutputWriter() *writerWrapper {
 	return &writerWrapper{
-		reason: false,
-		writer: w,
+		notStream: w.notStream,
+		buf:       w.outputBufWriter,
+		reason:    false,
+		writer:    w,
 	}
 }
 
 // GetReasonWriter returns a writer for reason messages
 func (w *chatJSONChunkWriter) GetReasonWriter() *writerWrapper {
 	return &writerWrapper{
-		reason: true,
-		writer: w,
+		notStream: w.notStream,
+		buf:       w.reasonBufWriter,
+		reason:    true,
+		writer:    w,
 	}
 }
 
 func (w *chatJSONChunkWriter) WriteError(err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+
+	defer utils.FlushWriter(w.writerClose)
 
 	rawmsg := map[string]any{
 		"error": err,
@@ -119,11 +168,25 @@ func (w *chatJSONChunkWriter) WriteError(err error) {
 	}
 }
 
+func (w *chatJSONChunkWriter) GetNotStreamBody() []byte {
+	msg, err := w.buildMessage(w.reasonBufWriter.String(), w.outputBufWriter.String())
+	if err != nil {
+		msg = []byte(utils.Errorf("w.buildMessage failed: %v", err).Error())
+	}
+	return msg
+}
+
 // Close finalizes the streaming response
 // It sends the [DONE] marker and closes the underlying writer
 func (w *chatJSONChunkWriter) Close() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+
+	defer utils.FlushWriter(w.writerClose)
+
+	if w.notStream {
+		return nil
+	}
 
 	rawmsg := map[string]any{
 		"id":      "chat-ai-balance-" + w.uid,
