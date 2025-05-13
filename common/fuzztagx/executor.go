@@ -2,11 +2,12 @@ package fuzztagx
 
 import (
 	"errors"
+
 	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func executeWithStringHandler(code string, funcMap map[string]func(string2 string) []string, isSimple bool) ([]string, error) {
+func executeWithStringHandler(code string, funcMap map[string]func(string2 string) []string, isSimple bool, generatorHandler func(generator *parser.Generator)) ([]string, error) {
 	nodes, err := ParseFuzztag(code, isSimple)
 	if err != nil {
 		return nil, err
@@ -36,6 +37,9 @@ func executeWithStringHandler(code string, funcMap map[string]func(string2 strin
 		}
 	}
 	generator := parser.NewGenerator(nil, nodes, fMap)
+	if generatorHandler != nil {
+		generatorHandler(generator)
+	}
 	res := []string{}
 	for generator.Next() {
 		if generator.Error != nil {
@@ -45,9 +49,12 @@ func executeWithStringHandler(code string, funcMap map[string]func(string2 strin
 	}
 	return res, nil
 }
+func ExecuteWithStringHandlerEx(code string, funcMap map[string]func(string2 string) []string, generatorHandler func(generator *parser.Generator)) ([]string, error) {
+	return executeWithStringHandler(code, funcMap, false, generatorHandler)
+}
 func ExecuteWithStringHandler(code string, funcMap map[string]func(string2 string) []string) ([]string, error) {
-	return executeWithStringHandler(code, funcMap, false)
+	return executeWithStringHandler(code, funcMap, false, nil)
 }
 func ExecuteSimpleTagWithStringHandler(code string, funcMap map[string]func(string2 string) []string) ([]string, error) {
-	return executeWithStringHandler(code, funcMap, true)
+	return executeWithStringHandler(code, funcMap, true, nil)
 }

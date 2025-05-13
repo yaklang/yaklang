@@ -8,7 +8,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/exp/maps"
 )
 
 type GenerateConfig struct {
@@ -33,6 +32,7 @@ type MethodContext struct {
 	labelTable     map[string]map[*TagExecNode]struct{}
 	tagToLabelsMap map[*TagExecNode][]string
 	dynTag         map[*TagExecNode]struct{}
+	globalTagNode  []*TagExecNode
 }
 
 // UpdateLabels 更新全局labelTable，先删除当前tag的所有label映射，再增加
@@ -362,18 +362,22 @@ func NewGenerator(ctx context.Context, nodes []Node, table map[string]*TagMethod
 		labelTable:     map[string]map[*TagExecNode]struct{}{},
 		tagToLabelsMap: map[*TagExecNode][]string{},
 	}
-	var node2generator func(nodes []Node, parentNode ExecNode) []ExecNode
-	node2generator = func(nodes []Node, parentNode ExecNode) []ExecNode {
+	var globalTagNodeList []*TagExecNode
+	var node2generator func(nodes []Node, parentNode ExecNode, deep int) []ExecNode
+	node2generator = func(nodes []Node, parentNode ExecNode, deep int) []ExecNode {
 		generatorNodes := []ExecNode{}
 		for _, node := range nodes {
 			switch ret := node.(type) {
 			case TagNode:
 				gener := NewTagGenerator(ret, methodCtx)
-				gener.params = node2generator(ret.GetData(), gener)
+				gener.params = node2generator(ret.GetData(), gener, deep+1)
 				gener.parentNode = parentNode
 				methodCtx.tagToLabelsMap[gener] = ret.GetLabels()
 				generatorNodes = append(generatorNodes, gener)
 				methodCtx.UpdateLabels(gener)
+				if deep == 0 {
+					globalTagNodeList = append(globalTagNodeList, gener)
+				}
 				//for _, label := range ret.GetLabels() {
 				//	methodCtx.labelTable[label][gener] = struct{}{}
 				//}
@@ -385,8 +389,9 @@ func NewGenerator(ctx context.Context, nodes []Node, table map[string]*TagMethod
 	}
 	g := newBackpropagationGenerator(func() error {
 		return nil
-	}, node2generator(nodes, nil), cfg)
+	}, node2generator(nodes, nil, 0), cfg)
 	g.allowedLabels = true
+	g.methodCtx.globalTagNode = globalTagNodeList
 	return g
 }
 
@@ -428,7 +433,7 @@ func (g *Generator) SetTagsSync(b bool) {
 }
 func (g *Generator) getSameLabelTags(tag *TagExecNode) []*TagExecNode {
 	if g.renderTagWithSyncIndex {
-		return maps.Keys(g.methodCtx.tagToLabelsMap)
+		return g.methodCtx.globalTagNode
 	}
 	label := tag.data.GetLabels()
 	result := []*TagExecNode{}
