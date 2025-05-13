@@ -1072,7 +1072,7 @@ func (y *builder) OnlyVisitVariableDeclaratorName(raw javaparser.IVariableDeclar
 	name = id.Identifier().GetText()
 	return name
 }
-func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorContext, typeType ssa.Type) (name string, value ssa.Value) {
+func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorContext, leftType ssa.Type) (name string, value ssa.Value) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -1085,28 +1085,30 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 	}
 
 	var variable *ssa.Variable
+	var bracketLevel int
 	if ret := i.VariableDeclaratorId(); ret != nil {
-		name, variable = y.VisitVariableDeclaratorId(ret, true)
+		name, variable, bracketLevel = y.VisitVariableDeclaratorId(ret, true)
 	}
 	if variable == nil {
 		return
 	}
+	leftType = TypeAddBracketLevel(leftType, bracketLevel)
 
 	if i.VariableInitializer() != nil {
 		value := y.VisitVariableInitializer(i.VariableInitializer())
 		if utils.IsNil(value) {
 			return name, nil
 		} else {
-			rightValTyp := value.GetType()
-			rightValTypName := rightValTyp.GetFullTypeNames()
+			rightType := value.GetType()
+			rightTypeName := rightType.GetFullTypeNames()
 			// 如果有类型转换，就用转换后的typeName
-			if len(rightValTypName) != 0 && y.HaveCastType(rightValTyp) {
-				newTyp := y.RemoveCastTypeFlag(rightValTyp)
+			if len(rightTypeName) != 0 && y.HaveCastType(rightType) {
+				newTyp := y.RemoveCastTypeFlag(rightType)
 				value.SetType(newTyp)
 			} else {
 				// 没有类型转换，就使用在右值的typeName加上typeType的typeName
-				if typeType != nil {
-					newTyp := y.MergeFullTypeNameForType(rightValTypName, typeType)
+				if leftType != nil {
+					newTyp := y.MergeFullTypeNameForType(rightTypeName, leftType)
 					value.SetType(newTyp)
 				}
 			}
@@ -1115,8 +1117,8 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 		return name, value
 	} else {
 		value := y.EmitValueOnlyDeclare(name)
-		if typeType != nil {
-			newTyp := y.MergeFullTypeNameForType(typeType.GetFullTypeNames(), value.GetType())
+		if leftType != nil {
+			newTyp := y.MergeFullTypeNameForType(leftType.GetFullTypeNames(), value.GetType())
 			value.SetType(newTyp)
 		}
 		y.AssignVariable(variable, value)

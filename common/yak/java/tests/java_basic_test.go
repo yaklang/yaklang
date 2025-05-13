@@ -33,7 +33,7 @@ func TestJava_LocalType_Declaration(t *testing.T) {
 		println(c);
 		int[] numbers = {1,2,3};
 		println(numbers);
-		`, []string{"make([]any)", "make([]number)", "\"hello\"", "3", "3", "make([]number)"}, t)
+		`, []string{"make([]number)", "make([]number)", "\"hello\"", "3", "3", "make([]number)"}, t)
 	})
 	t.Run("test two dim array declaration", func(t *testing.T) {
 		CheckJavaPrintlnValue(`
