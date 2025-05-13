@@ -26,6 +26,11 @@ func FilterGeneralRule(db *gorm.DB, filter *ypb.FingerprintFilter) *gorm.DB {
 	db = bizhelper.ExactQueryStringArrayOr(db, "vendor", filter.Vendor)
 	db = bizhelper.ExactQueryStringArrayOr(db, "product", filter.Product)
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", filter.IncludeId)
+	keywordFields := []string{
+		"vendor", "product", "part", "rule_name",
+		"version", "match_expression", "language",
+	}
+	db = bizhelper.FuzzSearchEx(db, keywordFields, filter.GetKeyword(), false)
 	return db
 }
 
@@ -60,7 +65,7 @@ func GetGeneralRuleByRuleName(db *gorm.DB, ruleName string) (*schema.GeneralRule
 // CreateGeneralRule create general rule, if rule.ID is not 0, it will be ignored, will set new
 func CreateGeneralRule(db *gorm.DB, rule *schema.GeneralRule) (fErr error) {
 	fErr = utils.GormTransaction(db, func(tx *gorm.DB) error {
-		if err := tx.Omit("id").Create(rule).Error; err != nil {
+		if err := tx.Omit("id", "groups").Create(rule).Error; err != nil {
 			return utils.Errorf("create fingerprint generalRule failed: %s", err)
 		}
 		if err := CreateGeneralRuleGroupFromRule(tx, rule); err != nil {
