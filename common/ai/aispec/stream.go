@@ -2,6 +2,7 @@ package aispec
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"net/http/httputil"
@@ -68,8 +69,9 @@ func appendStreamHandlerPoCOptionEx(opts []poc.PocConfigOption) (io.Reader, io.R
 		var reader io.Reader = closer
 		// reader = io.TeeReader(reader, os.Stdout)
 		var ioReader io.Reader = utils.NewTrimLeftReader(reader)
+		var chunkedErrorMirror bytes.Buffer
 		if chunked {
-			ioReader = httputil.NewChunkedReader(ioReader)
+			ioReader = httputil.NewChunkedReader(io.TeeReader(ioReader, &chunkedErrorMirror))
 		}
 		lineReader := bufio.NewReader(ioReader)
 		haveReason := false
@@ -81,7 +83,7 @@ func appendStreamHandlerPoCOptionEx(opts []poc.PocConfigOption) (io.Reader, io.R
 			line, err := utils.BufioReadLine(lineReader)
 			if err != nil && string(line) == "" {
 				if err != io.EOF {
-					log.Warnf("failed to read line [%#v]: %v", line, err)
+					log.Warnf("failed to read chunk line: %v, mirror: %#v", err, utils.ShrinkString(chunkedErrorMirror.String(), 200))
 				}
 				return
 			}
