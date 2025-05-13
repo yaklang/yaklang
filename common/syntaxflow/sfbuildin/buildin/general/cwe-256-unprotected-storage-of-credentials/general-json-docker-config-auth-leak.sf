@@ -1,0 +1,52 @@
+desc(
+    title_zh:"检测Docker JSON 配置文件认证信息泄漏",
+    title:"Check Docker JSON Config File Authentication Information Leakage",
+    level:mid,
+    type:config,
+    description:<<<TEXT
+    该规则检测用于检测Docker 配置文件中是否存储了认证凭据（Base64 编码的用户名:密码）。
+TEXT
+    solution:<<<TEXT
+    使用 Docker 凭证助手（如 docker-credential-helpers）或其他安全机制存储认证信息，避免明文或 Base64 编码凭据出现在配置文件中。
+TEXT
+)
+
+${*.json}.json("$.auths.*.auth") as $passwd
+$passwd?{!=true || != false} as $weak
+
+alert $weak {
+    message:"检测到Docker JSON配置文件认证信息泄漏"
+}
+
+desc{
+    lang:java,
+    alert_num:2 ,
+    "file://config.json":<<<CODE
+    {
+      "auths": {
+        "https://index.docker.io/v1/": {
+          "auth": "dXNlcm5hbWU6cGFzc3dvcmQxMjM=",
+          "email": "user@example.com"
+        },
+        "https://private-registry.example.com": {
+          "auth": "YWRtaW46c2VjcmV0cGFzc3dvcmQ=",
+          "email": "admin@example.com"
+        }
+      }
+    }
+CODE
+}
+
+
+desc{
+    lang:java,
+    "safefile://config.json":<<<CODE
+   {
+     "auths": {
+       "https://index.docker.io/v1/": {},
+       "https://private-registry.example.com": {}
+     },
+     "credsStore": "osxkeychain"
+   }
+CODE
+}

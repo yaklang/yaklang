@@ -1,0 +1,74 @@
+desc(
+    title_zh:"检测 YAML 配置文件认证信息泄漏",
+    title:"Check YAML Config File Authentication Information Leakage",
+    level:mid,
+    type:config,
+    description:<<<TEXT
+    该规则用于检测Yaml配置文件中是否存储了认证凭据（明文或 Base64 编码的用户名:密码）。
+TEXT
+    solution:<<<TEXT
+    使用 Docker 凭证助手（如 docker-credential-helpers）或其他安全机制存储认证信息，避免明文或 Base64 编码凭据出现在配置文件中。
+TEXT
+)
+
+${*.y*ml}.yml("$..*[?(@.MYSQL_ROOT_PASSWORD)].MYSQL_ROOT_PASSWORD") as $passwd
+${*.y*ml}.yml("$..*[?(@.passwd)].passwd") as $passwd
+${*.y*ml}.yml("$..*[?(@.password)].password") as $passwd
+${*.y*ml}.yml("$..*[?(@.PASSWORD)].PASSWORD") as $passwd
+${*.y*ml}.yml("$..*[?(@.MYSQL_PASSWORD)].MYSQL_PASSWORD") as $passwd
+${*.y*ml}.yml("$..*[?(@.MONGO_INITDB_ROOT_PASSWORD)].MONGO_INITDB_ROOT_PASSWORD") as $passwd
+${*.y*ml}.yml("$..*[?(@.POSTGRES_PASSWORD)].POSTGRES_PASSWORD") as $passwd
+${*.y*ml}.yml("$..*[?(@.SMTP_PASSWORD)].SMTP_PASSWORD") as $passwd
+${*.y*ml}.yml("$..*[?(@.requirepass)].requirepass") as $passwd
+${*.y*ml}.yml("$..*[?(@.command=~ /--requirepass/)].command") as $passwd
+
+alert $passwd {
+    message:"检测到Docker Compose YAML配置文件认证信息泄漏"
+}
+
+desc{
+    lang:java,
+    alert_num:6 ,
+    "file://docker-compose.yml":<<<CODE
+  services:
+    mysql_db:
+      image: mysql:8.0
+      environment:
+        MYSQL_ROOT_PASSWORD: "rootpassword"  # 明文密码
+        MYSQL_DATABASE: app_db
+        MYSQL_USER: dev_user
+        MYSQL_PASSWORD: "user123"           # 明文密码
+      ports:
+        - "3306:3306"
+
+    redis_cache:
+      image: redis:6.2
+      command: redis-server --requirepass "redispass"  # 明文密码
+      ports:
+        - "6379:6379"
+
+    mongodb:
+      image: mongo:5.0
+      environment:
+        MONGO_INITDB_ROOT_USERNAME: admin
+        MONGO_INITDB_ROOT_PASSWORD: "mongo@admin"  # 含特殊字符明文密码
+      ports:
+        - "27017:27017"
+
+    postgresql:
+      image: postgres:13
+      environment:
+        POSTGRES_USER: pgadmin
+        POSTGRES_PASSWORD: "postgres#123"  # 明文密码
+      ports:
+        - "5432:5432"
+
+    smtp_server:
+      image: mailserver/demo
+      environment:
+        SMTP_USERNAME: noreply@example.com
+        SMTP_PASSWORD: "mailserver_pass"    # 明文密码
+      ports:
+        - "25:25"
+CODE
+}
