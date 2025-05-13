@@ -64,7 +64,7 @@ public class main{
 }
 `
 		ssatest.CheckSyntaxFlow(t, code, `A.a() as $call`, map[string][]string{
-			"call": {"Undefined-A.a(Undefined-A)"},
+			"call": {"Undefined-A.a(A)"},
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 
