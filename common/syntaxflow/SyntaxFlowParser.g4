@@ -101,7 +101,7 @@ constSearchPrefix: ConstSearchModePrefixRegexp | ConstSearchModePrefixGlob | Con
 filterItem
     : filterItemFirst                            # First
     | '...' lines? nameFilter                    # DeepChainFilter
-    | '(' lines? actualParam? ')'                # FunctionCallFilter
+    | Question? '(' lines? actualParam? ')'      # FunctionCallFilter
     | '[' sliceCallItem ']'                      # FieldIndexFilter
     | '?{' conditionExpression '}'               # OptionalFilter
     | '->'                                       # NextFilter
