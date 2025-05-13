@@ -274,7 +274,7 @@ func NewFileFilter(file, matchType string, match []string) *FileFilter {
 			// 	continue
 			// }
 			matchContent = append(matchContent, func(data string) []Index {
-				indexs, err := reg.FindAllIndex(data)
+				indexs, err := reg.FindStringSubmatchIndex(data)
 				if err != nil {
 					log.Errorf("regexp match error: %s", err)
 					return nil

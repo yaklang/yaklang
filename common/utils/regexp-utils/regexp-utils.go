@@ -169,6 +169,16 @@ func (m *YakRegexpUtils) FindStringSubmatch(s string) ([]string, error) {
 	}
 }
 
+func (m *YakRegexpUtils) FindStringSubmatchIndex(s string) ([][]int, error) {
+	if reg := m.getPriorityRegexp(); reg.CanUse() {
+		return reg.FindStringSubmatchIndex(s)
+	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
+		return reg.FindStringSubmatchIndex(s)
+	} else {
+		return nil, utils.Error("yak regexp find fail: no usable regexp")
+	}
+}
+
 func (m *YakRegexpUtils) FindAll(b []byte) ([][]byte, error) {
 	if reg := m.getPriorityRegexp(); reg.CanUse() {
 		return reg.FindAll(b)
@@ -184,16 +194,6 @@ func (m *YakRegexpUtils) FindAllString(s string) ([]string, error) {
 		return reg.FindAllString(s)
 	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
 		return reg.FindAllString(s)
-	} else {
-		return nil, utils.Error("yak regexp find fail: no usable regexp")
-	}
-}
-
-func (m *YakRegexpUtils) FindAllIndex(s string) ([][]int, error) {
-	if reg := m.getPriorityRegexp(); reg.CanUse() {
-		return reg.FindAllIndex(s)
-	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
-		return reg.FindAllIndex(s)
 	} else {
 		return nil, utils.Error("yak regexp find fail: no usable regexp")
 	}
