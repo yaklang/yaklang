@@ -116,37 +116,57 @@ func (y *SyntaxFlowVisitor) VisitFileFilterContentMethodParam(raw sf.IFileFilter
 		if pk := item.FileFilterContentMethodParamKey(); pk != nil {
 			key := pk.(*sf.FileFilterContentMethodParamKeyContext).Identifier().GetText()
 			if pv := item.FileFilterContentMethodParamValue(); pv != nil {
-				value := pv.(*sf.FileFilterContentMethodParamValueContext).NameFilter().GetText()
+				value := y.VisitFileFilterContentMethodParamValue(pv)
 				paramMap[key] = value
 			}
 		} else {
-			// y.VisitNameFilter()
 			value, ok := item.FileFilterContentMethodParamValue().(*sf.FileFilterContentMethodParamValueContext)
 			if !ok {
 				continue
 			}
-			name, ok := value.NameFilter().(*sf.NameFilterContext)
-			if !ok {
-				continue
-			}
-			res := ""
-			if reg, ok := name.RegexpLiteral().(*sf.RegexpLiteralContext); ok {
-				reg := reg.GetText()
-				reg = reg[1 : len(reg)-1]
-
-				if !regexp_utils.NewYakRegexpUtils(reg).CanUse() {
-					log.Errorf("regexp compile failed: %s", reg)
-					continue
-				}
-				res = reg
-			} else {
-				res = name.Identifier().GetText()
-			}
-			if s, err := strconv.Unquote(res); err == nil {
-				res = s
-			}
+			res := y.VisitFileFilterContentMethodParamValue(value)
 			paramList = append(paramList, res)
 		}
 	}
 	return paramMap, paramList
+}
+
+func (y *SyntaxFlowVisitor) VisitFileFilterContentMethodParamValue(raw sf.IFileFilterContentMethodParamValueContext) (res string) {
+	if y == nil || raw == nil {
+		return ""
+	}
+	i, _ := raw.(*sf.FileFilterContentMethodParamValueContext)
+	if i == nil {
+		return ""
+	}
+	defer func() {
+		if newRes, err := strconv.Unquote(res); err == nil {
+			res = newRes
+		}
+	}()
+
+	if nameFilter := i.NameFilter(); nameFilter != nil {
+		name, ok := nameFilter.(*sf.NameFilterContext)
+		if !ok {
+			return ""
+		}
+		//regexp literal
+		if reg, ok := name.RegexpLiteral().(*sf.RegexpLiteralContext); ok {
+			reg := reg.GetText()
+			reg = reg[1 : len(reg)-1]
+			if !regexp_utils.NewYakRegexpUtils(reg).CanUse() {
+				log.Errorf("regexp compile failed: %s", reg)
+				return ""
+			}
+			return reg
+		} else {
+			return nameFilter.GetText()
+		}
+	}
+
+	if i.HereDoc() != nil {
+		return y.VisitHereDoc(i.HereDoc())
+	}
+
+	return ""
 }
