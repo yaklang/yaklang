@@ -3,16 +3,17 @@ package fuzztagx
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
-	"strconv"
-	"strings"
-	"testing"
-	"time"
 )
 
 var testMap = map[string]func(string) []string{
@@ -449,6 +450,15 @@ func TestSyncRender3(t *testing.T) {
 			require.Equal(t, strconv.Itoa(count), splited[0])
 		}
 		require.Equal(t, strconv.Itoa(count), splited[1])
-
 	}
+}
+
+func TestSyncRender4(t *testing.T) {
+	s := "{{array(a|b|c)}}"
+	echoTag := fmt.Sprintf("{{echo(%s)}}", s)
+	res, err := ExecuteWithStringHandlerEx(echoTag+echoTag, testMap, func(generator *parser.Generator) {
+		generator.SetTagsSync(true)
+	})
+	require.NoError(t, err)
+	require.Equal(t, strings.Join(res, ""), "aabbcc")
 }
