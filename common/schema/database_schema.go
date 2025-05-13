@@ -64,6 +64,7 @@ var ProfileTables = []interface{}{
 	&AiProvider{},   // for aibalance
 	&AiApiKeys{},    // for aibalance
 	&LoginSession{}, // for aibalance
+	&AIYakTool{},
 }
 
 var databaseSchemas = map[uint8][]any{
@@ -108,8 +109,6 @@ var ProjectTables = []interface{}{
 	// AI
 	&AiCoordinatorRuntime{},
 	&AiCheckpoint{},
-
-	&AIYakTool{},
 }
 
 func RegisterDatabaseSchema(key uint8, schema ...any) {
