@@ -3,6 +3,7 @@ package aispec
 import (
 	"bufio"
 	"context"
+	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"os"
 	"strings"
@@ -99,7 +100,10 @@ func WithDebugStream(h ...bool) AIConfigOption {
 	return func(c *AIConfig) {
 		if len(h) <= 0 || h[0] {
 			c.StreamHandler = func(r io.Reader) {
-				io.Copy(bufio.NewWriterSize(os.Stdout, 1), r)
+				start := time.Now()
+				io.Copy(bufio.NewWriterSize(os.Stdout, 1), io.TeeReader(r, utils.FirstWriter(func(bytes []byte) {
+					log.Infof("first byte(token) delay: %v", time.Since(start))
+				})))
 			}
 		} else {
 			c.StreamHandler = nil

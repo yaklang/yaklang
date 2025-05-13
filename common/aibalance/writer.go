@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bufpipe"
 	"io"
 	"log"
 	"sync"
@@ -31,8 +32,14 @@ type chatJSONChunkWriter struct {
 // uid: Unique identifier for the chat session
 // model: Name of the AI model being used
 func NewChatJSONChunkWriter(writer io.WriteCloser, uid string, model string) *chatJSONChunkWriter {
+	pr, pw := bufpipe.NewPipe()
+	go func() {
+		defer writer.Close()
+		io.Copy(writer, pr)
+	}()
 	return &chatJSONChunkWriter{
-		writerClose:     writer,
+		writerClose: pw,
+		//writerClose:     writer,
 		reasonBufWriter: bytes.NewBuffer(nil),
 		outputBufWriter: bytes.NewBuffer(nil),
 		uid:             uid,
@@ -112,18 +119,25 @@ func (w *writerWrapper) Write(p []byte) (n int, err error) {
 	if err != nil {
 		return 0, err
 	}
-	msg := fmt.Sprintf("data: %s\r\n\r\n", string(delta))
-	chunk := fmt.Sprintf("%x\r\n%s\r\n", len(msg), msg)
 
 	w.writer.mu.Lock()
 	defer w.writer.mu.Unlock()
 
-	// fmt.Println(string(chunk))
-	if _, err := w.writer.writerClose.Write([]byte(chunk)); err != nil {
-		return 0, err
-	}
+	buf := bytes.Buffer{}
+	buf.WriteString("data: ")
+	buf.Write(delta)
+	buf.WriteString("\r\n\r\n")
+	w.writer.writerClose.Write([]byte(fmt.Sprintf("%x\r\n", buf.Len())))
+	w.writer.writerClose.Write(buf.Bytes())
+	w.writer.writerClose.Write([]byte("\r\n"))
+	//msg := fmt.Sprintf("data: %s\r\n\r\n", string(delta))
+	//chunk := fmt.Sprintf("%x\r\n%s\r\n", len(msg), msg)
+	//
+	//// fmt.Println(string(chunk))
+	//if _, err := w.writer.writerClose.Write([]byte(chunk)); err != nil {
+	//	return 0, err
+	//}
 	utils.FlushWriter(w.writer.writerClose)
-
 	// Return the length of the original data, not the chunk
 	return len(p), nil
 }
