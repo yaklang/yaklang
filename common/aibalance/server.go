@@ -254,6 +254,16 @@ func (c *ServerConfig) logError(format string, args ...interface{}) {
 	}
 }
 
+func (c *ServerConfig) getKeyFromRawRequest(req []byte) *Key {
+	header := lowhttp.GetHTTPPacketHeader(req, "Authorization")
+	key := strings.TrimPrefix(header, "Bearer ")
+	l, ok := c.Keys.Get(key)
+	if ok {
+		return l
+	}
+	return nil
+}
+
 func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 	c.logInfo("Starting to handle new chat completion request")
 	// handle ai request
@@ -538,7 +548,7 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 }
 
 // 新增函数: 处理 /v1/models 请求，返回所有可用的 model 列表
-func (c *ServerConfig) serveModels(conn net.Conn) {
+func (c *ServerConfig) serveModels(key *Key, conn net.Conn) {
 	c.logInfo("Serving models list")
 
 	// 定义模型信息结构，与 OpenAI API 格式一致
@@ -579,6 +589,11 @@ func (c *ServerConfig) serveModels(conn net.Conn) {
 
 	// 为每个模型创建 ModelMeta
 	for _, name := range modelNames {
+		if key != nil {
+			if _, ok := key.AllowedModels[name]; !ok {
+				continue
+			}
+		}
 		response.Data = append(response.Data, &ModelMeta{ // 使用指针
 			ID:      name,
 			Object:  "model",
@@ -724,7 +739,8 @@ func (c *ServerConfig) Serve(conn net.Conn) {
 		return
 	case strings.HasPrefix(uriIns.Path, "/v1/models"): // 新增：处理 /v1/models 请求
 		c.logInfo("Processing models list request")
-		c.serveModels(conn)
+		key := c.getKeyFromRawRequest(requestRaw)
+		c.serveModels(key, conn)
 		return
 	case strings.HasPrefix(uriIns.Path, "/portal"):
 		c.HandlePortalRequest(conn, request, uriIns)
