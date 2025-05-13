@@ -391,7 +391,9 @@ func NewGenerator(ctx context.Context, nodes []Node, table map[string]*TagMethod
 		return nil
 	}, node2generator(nodes, nil, 0), cfg)
 	g.allowedLabels = true
-	g.methodCtx.globalTagNode = globalTagNodeList
+	if g.methodCtx != nil {
+		g.methodCtx.globalTagNode = globalTagNodeList
+	}
 	return g
 }
 
