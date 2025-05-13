@@ -1,10 +1,10 @@
 desc(
-	title: 'file operator'
-	title_zh: "恶意文件操作",
-	type: vul
-	level: low
-	risk:"path-traversal"
-	desc: <<<TEXT
+    title: 'file operator',
+    title_zh: "恶意文件操作",
+    type: vul,
+    level: low,
+    risk:"path-traversal",
+    desc: <<<TEXT
     文件操作是Web应用程序中常见的功能，如果未经过充分的安全检查，可能会导致文件路径遍历（Path Traversal）漏洞。攻击者可以通过构造恶意文件路径，访问或修改服务器上的敏感文件，进而导致信息泄露、文件损坏等安全问题。在PHP应用程序中，如果开发者未能正确验证或过滤用户输入的文件路径，可能会导致文件路径遍历漏洞。建议对文件操作功能进行严格的安全检查，包括验证文件路径的合法性、长度、字符等，并确保文件操作不会导致未经授权的访问或执行。
 TEXT
 	rule_id: "205248b2-d141-4e53-882b-ca29d2a49653"
@@ -19,16 +19,17 @@ $read + $write + $unlink as $source
 <include('php-tp-all-extern-variable-param-source')> as $params
 <include('php-filter-function')> as $filter
 
-$source(* as $param)
+$source(* as $allParams)
 
-$param#{
-    include: `<self> & $params`
-}-> as $all
+$allParams?{<self>#{include: <<<CODE
+* & $params
+CODE}->} as $sink
 
-$param#{
-    include: `<self> & $params`,
-    exclude: `<self>?{opcode: call}`
-}-> as $high
+$sink<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
+*?{opcode: call} as $__next__
+CODE)> as $high
 
 alert $high for{
     title: 'Direct file manipulation,not call method',
@@ -36,7 +37,9 @@ alert $high for{
     level: 'high'
 }
 
-$all<dataflow(exclude=<<<CODE
+$sink<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
 *?{opcode: call && <self><getCallee> & $filter} as $__next__
 CODE)> as $highAndMid
 
@@ -49,7 +52,7 @@ alert $middle for{
     level: 'mid'
 }
 
-$all - $high - $middle as $low
+$sink - $high - $middle as $low
 
 alert $low for{
     title_zh: '存在文件操作，文件操作经过函数，检出过滤',
@@ -58,23 +61,23 @@ alert $low for{
     level: 'low'
 }
 desc(
-	lang: php
-	alert_min: 3
-	alert_low: 1
-	alert_mid: 1
-	alert_high: 1
-	'file://high.php': <<<UNSAFE
+    lang: php,
+    alert_min: 3,
+    alert_low: 1,
+    alert_mid: 1,
+    alert_high: 1,
+    'file://high.php': <<<UNSAFE
 <?php
     $a = $_GET[1];
     unlink($a);
-UNSAFE
-	'file://mid.php':<<<CODE
+UNSAFE,
+    'file://mid.php':<<<CODE
 <?php
     $a = $_GET[1];
     $a = undefined($a);
     file_get_contents($a);
-CODE
-	'file://low.php': <<<CODE
+CODE,
+    'file://low.php': <<<CODE
 <?php
     $a = $_GET[1];
     $a = filter($a);

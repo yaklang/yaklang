@@ -22,13 +22,15 @@ ftp_login as $function
 
 $function(* as $source)
 
-$source #{
-    include: `<self> & $params`
-    }-> as $all
-$source #{
-    include: `<self> & $params`,
-    exclude: `*?{opcode: call}`,
-}-> as $high
+$source?{<self> #{include: <<<CODE
+* & $params
+CODE}->} as $sink
+
+$sink<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
+*?{opcode: call} as $__next__
+CODE)> as $high
 
 alert $high for {
     title: 'Unvalidated FTP Parameter Injection',
@@ -36,17 +38,20 @@ alert $high for {
     level: 'high',
 }
 
-$source #{
-    include: `<self> & $params`,
-    exclude: `*?{opcode: call && <self><getCallee> & $filter}`,
-}-> as $mid
+$sink<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
+*?{opcode: call && <self><getCallee> & $filter} as $__next__
+CODE)> as $highAndMid
+
+$highAndMid - $high as $mid
 
 alert $mid for {
     title: 'Insufficient FTP Parameter Filtering',
     title_zh: 'FTP参数过滤不充分',
     level: 'mid',
 }
-$all - $high - $mid as $low
+$sink - $high - $mid as $low
 
 alert $low for {
     title: 'Potential FTP Access Control Bypass',

@@ -15,15 +15,16 @@ TEXT
 
 $source1 + $source2 as $source;
 <include('php-filter-function')> as $filter;
-extract(* as $output);
+extract(* as $allParams);
+$allParams?{<self>#{include:<<<CODE
+* & $source
+CODE}->} as $sink
 
-$output #{
-    include: `* & $source`,
-    }-> as $all
-$output #{
-    include: `* & $source`,
-    exclude: `*?{opcode: call}`
-}-> as $high;
+$sink<dataflow(include=<<<CODE
+* & $source as $__next__
+CODE,exclude=<<<CODE
+*?{opcode: call} as $__next__
+CODE)> as $high
 
 alert $high for {
     title: 'Variable overwriting is detected and there is no filtering',
@@ -31,13 +32,11 @@ alert $high for {
     type: 'vuln',
     level: 'high'
 }
-
-$output #{
-    include: `* & $source`,
-    exclude: `*?{opcode:call && <self><getCallee> & $filter}`
-}-> as $middle
-
-
+$sink<dataflow(include=<<<CODE
+* & $source as $__next__
+CODE,exclude=<<<CODE
+*?{opcode:call && <self><getCallee> & $filter} as $__next__
+CODE)> as $middle
 
 alert $middle for {
     title: 'Variable coverage detected, but filter function not detected',
@@ -45,7 +44,7 @@ alert $middle for {
     type: 'mid',
     level: 'mid'
 }
-$all - $high - $middle  as $low;
+$sink - $high - $middle  as $low;
 
 alert $low for {
     title: 'Variable coverage detected, but filter function not detected',

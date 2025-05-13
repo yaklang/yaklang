@@ -2,7 +2,6 @@ desc(
     title: "Unsafe File Upload in ThinkPHP Framework",
     title_zh: "ThinkPHP框架中的不安全文件上传",
     type: vul,
-    rule_id: 30434002,
     desc: <<<CODE
 文件上传漏洞在ThinkPHP框架中同样是一个需要关注的安全问题。当应用未对上传的文件进行充分的验证和处理时，攻击者可能利用此漏洞上传恶意脚本，进而执行服务器端命令。
 CODE
@@ -15,13 +14,13 @@ CODE
 
 .putFile?{<getObject()><name>?{have: 'disk'}}(,* as $thinkphpPutFile)
 
-$thinkphpPutFile #{
-    include: <<<CODE
-    * & $params
-CODE
-}-> as $all
+$thinkphpPutFile?{<self> #{include: <<<CODE
+* & $params
+CODE}->} as $sink
 
-$all<dataflow(exclude=<<<CODE
+$sink<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
@@ -30,7 +29,9 @@ alert $high for {
     title_zh: "ThinkPHP中未经验证的高危文件上传",
     level: "high"
 }
-$all<dataflow(exclude=<<<CODE
+$sink<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
 *?{opcode:call && <self><getCallee> & $filter} as $__next__
 CODE)> as $highAndMid
 
@@ -43,7 +44,7 @@ alert $mid for {
 }
 
 // 低风险：潜在的文件存储路径配置问题（这里假设ThinkPHP的putFile也可能涉及路径问题）
-$all - $high - $mid as $low
+$sink - $high - $mid as $low
 
 alert $low for {
     title: "Potential File Storage Path Misconfiguration in ThinkPHP",

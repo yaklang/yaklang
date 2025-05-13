@@ -1,9 +1,9 @@
 desc(
-	title: "check file read function"
-	type: audit
-	level: info
-	lib: 'php-file-read'
-	desc: <<<TEXT
+    title: "check file read function",
+    type: audit,
+    level: info,
+    lib: 'php-file-read',
+    desc: <<<TEXT
 此规则用于审计PHP代码中是否存在不安全的文件读取函数使用。文件读取函数如`file_get_contents`、`file`、`readfile`、`fgetss`、`fgets`和`fread`等，如果未对输入进行严格的验证和过滤，可能会被恶意用户利用来读取服务器上的敏感文件，导致信息泄露。因此，建议对这类函数的使用进行安全审查，确保它们不会暴露潜在的安全风险。
 TEXT
 	rule_id: "7d0ddbae-c283-456e-94d3-2ede4b4865ac"
@@ -14,9 +14,9 @@ TEXT
 alert $output
 
 desc(
-	lang: php
-	alert_min: '1'
-	'file://fileRead.php': <<<PARAM
+    lang: php,
+    alert_min: '1',
+    'file://fileRead.php': <<<PARAM
 <?php
 $tpl_name = !empty($_POST['tpl_name']) ? trim($_POST['tpl_name']) : '';
  	$tpl_content = !empty($_POST['tpl_content']) ? deep_stripslashes($_POST['tpl_content']) : '';

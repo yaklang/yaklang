@@ -3,24 +3,22 @@ desc(
     title_zh: "ThinkPHP SQL注入检测",
     risk: "audit",
     level: "low",
-    rule_id: 30089003,
     desc: <<<CODE
 该规则旨在检测ThinkPHP框架中可能存在的SQL注入风险。规则通过静态分析，识别出直接将外部输入（如用户输入）拼接到SQL查询语句中的代码模式，这可能导致SQL注入攻击。
 CODE
 )
 
-./find|select|where|update|where/ as $sink
+./find|select|where|update|where/ as $function
 <include('php-tp-all-extern-variable-param-source')> as $params
 
-$sink(,* as $params)
+$function(* as $allParams)
 
-$params #{
-    include: <<<CODE
+$allParams?{<self> #{include: <<<CODE
 * & $params
 CODE
-}-> as $info
+}->} as $sink
 
-alert $info for {
+alert $sink for {
     title: 'Unvalidated SQL Injection',
     title_zh: 'SQL注入风险',
     level: 'low',
@@ -30,6 +28,7 @@ alert $info for {
 
 desc(
     lang: "php",
+    alert_min: 3,
     'file:///unsafe.php': <<<CODE
 <?php
 // 漏洞示例代码（不安全写法）

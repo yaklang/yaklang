@@ -1,10 +1,10 @@
 desc(
-	title: "LDAP Injection PHP checking"
-	title_zh: "LDAP注入",
-	type: vuln
-	severity: mid
-	risk: 'ldap-injection'
-	desc: <<<TEXT
+    title: "LDAP Injection PHP checking",
+    title_zh: "LDAP注入",
+    type: vuln,
+    severity: mid,
+    risk: 'ldap-injection',
+    desc: <<<TEXT
 LDAP注入攻击是一种通过操纵LDAP（轻量目录访问协议）查询来未授权访问或操纵目录服务器数据的攻击方式。在PHP应用中，如果开发者没有正确地对用户输入进行过滤和转义，攻击者可能会构造恶意的LDAP查询，绕过认证机制或获取敏感信息。这种漏洞的危害程度取决于LDAP服务器上存储的数据敏感度以及攻击者能够访问的数据范围。建议开发者对所有用于LDAP查询的用户输入进行严格的验证和转义，使用`ldap_escape`等函数来防止LDAP注入攻击。
 TEXT
 	rule_id: "c773c9e1-71f1-4aed-b71f-68b8e468786f"
@@ -22,20 +22,26 @@ ldap_compare(*<slice(index=1)> as $query);
 <include('php-tp-all-extern-variable-param-source')> as $params
 <include('php-filter-function')> as $filter;
 
-$query #{
-    until: `* & $params`,
-}-> as $all;
-$all?{!<dataflow(<<<CODE
-*?{opcode: call && <getCallee><name>?{have: ldap_escape}} as $__next__;
-CODE)>} as $high;
+$query?{<self>#{include:<<<CODE
+* & $params
+CODE}->} as $sink
+
+$sink<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
+*?{opcode: call && <getCallee><name>?{have: ldap_escape}} as $__next__
+CODE)> as $high
+
 alert $high for {
     title: 'php ldap direct injection without filter',
     type: 'vuln',
     level: 'high'
 };
 
-$all<dataflow(exclude=<<<CODE
-*?{opcode: call && !(have: ldap_escape)} as $__next__;
+$sink<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
+*?{opcode: call && !(have: ldap_escape)} as $__next__
 CODE)> as $highAndMid;
 $highAndMid - $high as $mid
 alert $mid for {
@@ -44,7 +50,7 @@ alert $mid for {
     level: 'mid'
 };
 
-$root - $high - $mid as $low;
+$sink - $high - $mid as $low;
 
 alert $low for {
     title: 'php ldap inject have filter and match this filter function',
@@ -53,37 +59,35 @@ alert $low for {
 };
 
 desc(
-	language: php
-	alert_min: 1
-	alert_mid: 1
-	'file:///list3.php': <<<CODE
+    lang: php,
+    alert_min: 2,
+    alert_mid: 1,
+    alert_high: 1,
+    'file:///list3.php': <<<CODE
 <?php
-
-$ldapconn = ldap_connect("localhost");
-
-if($ldapconn){
-  $user2 = $_GET["user2"];
-
-  $filter = "(&(objectClass=user)(uid=" . $user2. "))";
-  $dn = "dc=example,dc=org";
-
-  ldap_list($ldapconn, $dn, $filter); // Noncompliant
-}
-CODE
-	'file:///list2.php': <<<CODE
+    $ldapconn = ldap_connect("localhost");
+    if($ldapconn){
+      $user2 = ldap_escape($_GET["user2"]);
+      $filter = "(&(objectClass=user)(uid=" . $user2. "))";
+      $dn = "dc=example,dc=org";
+      ldap_list($ldapconn, $dn, $filter); // Noncompliant
+    }
+CODE,
+    'file:///list2.php': <<<CODE
 <?php
+    $username = $_POST['username'];
+    $password = $_POST['password'];
+    // without_pass
+    $escaped_username = pass($username, '', LDAP_ESCAPE_FILTER);
+    $dn = "cn={$escaped_username},ou=users,dc=example,dc=com";
+    $is_valid = ldap_compare($ldap_conn, $dn, "userPassword", $password);
+CODE,
 
-$username = $_POST['username'];
-$password = $_POST['password'];
-// without_pass
-$escaped_username = pass($username, '', LDAP_ESCAPE_FILTER);
-$dn = "cn={$escaped_username},ou=users,dc=example,dc=com";
-$is_valid = ldap_compare($ldap_conn, $dn, "userPassword", $password);
-CODE
-	'safefile:///save.php':<<<CODE
+
+    'safefile:///save.php':<<<CODE
 <?php
-$escaped_username = pass($username, '', LDAP_ESCAPE_FILTER);
-$dn = "cn={$escaped_username},ou=users,dc=example,dc=com";
-$is_valid = ldap_compare($ldap_conn, $dn, "userPassword", $password);
+    $escaped_username = pass($username, '', LDAP_ESCAPE_FILTER);
+    $dn = "cn={$escaped_username},ou=users,dc=example,dc=com";
+    $is_valid = ldap_compare($ldap_conn, $dn, "userPassword", $password);
 CODE
 )

@@ -1,9 +1,9 @@
 desc(
-	title: "Server-Side Request Forgery (SSRF)"
-	title_zh: "SSRF漏洞，旨在获取内部服务信息或数据, 通过未经过滤的URL参数，攻击者可以探测内部服务或获取敏感数据",
-	type: vul
-	risk: "ssrf"
-	desc: <<<TEXT
+    title: "Server-Side Request Forgery (SSRF)",
+    title_zh: "SSRF漏洞，旨在获取内部服务信息或数据, 通过未经过滤的URL参数，攻击者可以探测内部服务或获取敏感数据",
+    type: vul,
+    risk: "ssrf",
+    desc: <<<TEXT
 检测到网络请求函数（curl_setopt/fsockopen/file_get_contents等）的参数未经过充分过滤验证。当参数包含未经验证的用户输入时，可能引发SSRF攻击导致内部服务探测或数据泄露。建议对URL参数进行协议白名单校验和域名限制。
 TEXT
 	rule_id: "61cd3ee5-20d0-4457-8e5f-f442e36296f6"
@@ -23,11 +23,14 @@ alert $curlFunction for{
 <include('php-param')> as $params;
 <include('php-tp-all-extern-variable-param-source')> as $params
 
-$ssrfFunction #{
-    include: `<self> & $params`
-}-> as $all
+$ssrfFunction(* as $allParams)
+$allParams?{<self> #{include: <<<CODE
+* & $params
+CODE}->} as $sink
 
-$all<dataflow(exclude=<<<CODE
+$sink<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
@@ -37,7 +40,9 @@ alert $high for {
        level: 'high',
 }
 
-$all<dataflow(exclude=<<<CODE
+$all<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
 *?{opcode: call && <self><getCallee> & $filter} as $__next__
 CODE)> as $highAndMid
 
@@ -49,7 +54,7 @@ alert $mid for {
     level: 'mid',
 }
 
-$all - $high - $mid  as $low
+$sink - $high - $mid  as $low
 alert $low for {
     title: 'Potential SSRF Access Control Bypass',
     title_zh: 'SSRF访问控制潜在绕过风险',
