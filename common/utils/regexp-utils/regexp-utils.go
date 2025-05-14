@@ -169,11 +169,11 @@ func (m *YakRegexpUtils) FindStringSubmatch(s string) ([]string, error) {
 	}
 }
 
-func (m *YakRegexpUtils) FindStringSubmatchIndex(s string) ([][]int, error) {
+func (m *YakRegexpUtils) FindAllSubmatchIndex(s string) ([][]int, error) {
 	if reg := m.getPriorityRegexp(); reg.CanUse() {
-		return reg.FindStringSubmatchIndex(s)
+		return reg.FindAllSubmatchIndex(s)
 	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
-		return reg.FindStringSubmatchIndex(s)
+		return reg.FindAllSubmatchIndex(s)
 	} else {
 		return nil, utils.Error("yak regexp find fail: no usable regexp")
 	}
