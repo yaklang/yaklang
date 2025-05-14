@@ -114,8 +114,8 @@ const (
 	// NativeCall_ScanNext is used to scan next
 	NativeCall_ScanNext = "scanNext"
 
-	//NatiCall_ScanCurrent is used to scan current block
-	NatiCall_ScanCurrent = "scanCurrent"
+	//NativeCall_ScanInstruction is used to scan current block's instruction
+	NativeCall_ScanInstruction = "scanInstruction"
 
 	//NativeCall_DeleteVariable is used to delete a variable
 	NativeCall_DeleteVariable = "delete"
@@ -820,7 +820,7 @@ func init() {
 	}))
 	registerNativeCall(NativeCall_ScanNext, nc_func(nativeCallScan(Next)))
 	registerNativeCall(NativeCall_ScanPrevious, nc_func(nativeCallScan(Previous)))
-	registerNativeCall(NatiCall_ScanCurrent, nc_func(nativeCallScan(Current)))
+	registerNativeCall(NativeCall_ScanInstruction, nc_func(nativeCallScan(Current)))
 	registerNativeCall(NativeCall_SourceCode, nc_func(nativeCallSourceCode))
 	registerNativeCall(NativeCall_OpCodes, nc_func(nativeCallOpCodes))
 

@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // for builder
@@ -87,6 +88,9 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 
 	// for return phi
 	GetAllVariableNames() map[string]struct{}
+
+	SetExternInfo(string, any)
+	GetExternInfo(string) any
 }
 
 func (s *ScopedVersionedTable[T]) GetScopeName() string {
@@ -162,6 +166,8 @@ type ScopedVersionedTable[T versionedValue] struct {
 	// do not use _parent direct access
 	// use GetParent
 	_parent ScopedVersionedTableIF[T]
+
+	externInfo *utils.SafeMap[any]
 }
 
 // func (s *ScopedVersionedTable[T]) ShouldSaveToDatabase() bool {
@@ -198,6 +204,7 @@ func NewScope[T versionedValue](
 		linkCaptured:    make(map[string]VersionedIF[T]),
 		linkSideEffect:  make(map[string][]VersionedIF[T]),
 		linkIncomingPhi: make(map[string]VersionedIF[T]),
+		externInfo:      utils.NewSafeMap[any](),
 	}
 	s.linkValues = newLinkNodeMap[T](func(i VersionedIF[T]) {
 		// s.callback(i)
@@ -675,4 +682,21 @@ func (s *ScopedVersionedTable[T]) GetAllVariableNames() map[string]struct{} {
 	}
 
 	return names
+}
+
+func (s *ScopedVersionedTable[T]) SetExternInfo(key string, value any) {
+	if s == nil {
+		return
+	}
+	s.externInfo.Set(key, value)
+}
+
+func (s *ScopedVersionedTable[T]) GetExternInfo(key string) any {
+	if s == nil {
+		return nil
+	}
+	if v, ok := s.externInfo.Get(key); ok {
+		return v
+	}
+	return nil
 }

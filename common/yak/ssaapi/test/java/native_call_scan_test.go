@@ -141,7 +141,7 @@ func TestScanPreviousIfStmtWithConfig(t *testing.T) {
 			}, ssaapi.WithLanguage(consts.JAVA))
 	})
 	t.Run("test current", func(t *testing.T) {
-		ssatest.CheckSyntaxFlow(t, code, `bb1<scanCurrent> as $result`, map[string][]string{
+		ssatest.CheckSyntaxFlow(t, code, `bb1<scanInstruction> as $result`, map[string][]string{
 			"result": {"Undefined-bb1", "1"},
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
