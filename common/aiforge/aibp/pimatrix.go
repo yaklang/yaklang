@@ -3,13 +3,14 @@ package aibp
 import (
 	"context"
 	_ "embed"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"sync"
 )
 
 //go:embed pimatrix_prompts/persistent.txt
