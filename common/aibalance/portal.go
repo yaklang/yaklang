@@ -991,6 +991,8 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 		c.handleBatchToggleAPIKeyStatus(conn, request, true)
 	} else if uriIns.Path == "/portal/batch-deactivate-api-keys" && request.Method == "POST" {
 		c.handleBatchToggleAPIKeyStatus(conn, request, false)
+	} else if strings.HasPrefix(uriIns.Path, "/portal/update-api-key-allowed-models/") && request.Method == "POST" {
+		c.handleUpdateAPIKeyAllowedModels(conn, request, uriIns.Path)
 	} else {
 		// Default return home page
 		c.servePortalWithAuth(conn)
@@ -1841,6 +1843,98 @@ func min(a, b int) int {
 	return b
 }
 
-// handleAddProvider handles the form submission for adding a provider (DEPRECATED, use processAddProviders)
-// func (c *ServerConfig) handleAddProvider(conn net.Conn, request *http.Request) {
-// ... existing code ...
+// handleUpdateAPIKeyAllowedModels handles requests to update allowed models for an API key
+func (c *ServerConfig) handleUpdateAPIKeyAllowedModels(conn net.Conn, request *http.Request, path string) {
+	c.logInfo("Processing update API key allowed models request: %s", path)
+
+	if !c.checkAuth(request) {
+		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		return
+	}
+
+	if request.Method != http.MethodPost {
+		c.writeJSONResponse(conn, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed, use POST"})
+		return
+	}
+
+	// Extract API key ID from URL path
+	// Example path: /portal/update-api-key-allowed-models/123
+	parts := strings.Split(path, "/")
+	if len(parts) < 4 {
+		c.logError("Invalid path format for update API key allowed models: %s", path)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": "Invalid request path",
+		})
+		return
+	}
+	idStr := parts[len(parts)-1]
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.logError("Invalid API key ID '%s' for update: %v", idStr, err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": "Invalid API key ID format",
+		})
+		return
+	}
+
+	// Parse request body
+	var reqBody struct {
+		AllowedModels string `json:"allowed_models"`
+	}
+
+	bodyBytes, err := io.ReadAll(request.Body)
+	if err != nil {
+		c.logError("Failed to read request body for updating API key allowed models: %v", err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": "Failed to read request body",
+		})
+		return
+	}
+	defer request.Body.Close()
+
+	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
+		c.logError("Failed to unmarshal request body for updating API key allowed models: %v", err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": "Invalid request body format",
+		})
+		return
+	}
+
+	// Update the API key in the database
+	err = UpdateAiApiKeyAllowedModels(uint(id), reqBody.AllowedModels) // This function needs to be created in your DB interaction code.
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.logError("API key not found for ID %d during update of allowed models: %v", id, err)
+			c.writeJSONResponse(conn, http.StatusNotFound, map[string]interface{}{
+				"success": false,
+				"message": "API key not found",
+			})
+		} else {
+			c.logError("Failed to update allowed models for API key (ID: %d): %v", id, err)
+			c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
+				"success": false,
+				"message": "Failed to update API key allowed models",
+			})
+		}
+		return
+	}
+
+	c.logInfo("Successfully updated allowed models for API key (ID: %d)", id)
+
+	// Reload API keys into memory
+	err = c.LoadAPIKeysFromDB()
+	if err != nil {
+		c.logError("Failed to reload API keys into memory after updating allowed models for key ID %d: %v", id, err)
+	} else {
+		c.logInfo("Successfully reloaded API keys into memory after updating allowed models for key ID %d.", id)
+	}
+
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"message": "API key allowed models updated successfully",
+	})
+}

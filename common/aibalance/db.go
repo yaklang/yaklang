@@ -242,3 +242,19 @@ func BatchUpdateAiApiKeyStatus(ids []uint, active bool) (int64, error) {
 	log.Infof("Successfully %s %d API keys (requested %d)", action, result.RowsAffected, len(ids))
 	return result.RowsAffected, nil
 }
+
+// UpdateAiApiKeyAllowedModels updates allowed models for API key by ID
+func UpdateAiApiKeyAllowedModels(id uint, allowedModels string) error {
+	result := GetDB().Model(&schema.AiApiKeys{}).Where("id = ?", id).
+		Update("allowed_models", allowedModels)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+
+	return nil
+}

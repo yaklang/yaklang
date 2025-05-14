@@ -1763,7 +1763,13 @@
                                         {{end}}
                                     </td>
                                     <td class="copyable api-key-cell" data-full-text="{{.Key}}">{{.DisplayKey}}</td>
-                                    <td class="copyable" data-full-text="{{.AllowedModels}}">{{.AllowedModels}}</td>
+                                    <td class="copyable editable-allowed-models"
+                                        data-api-id="{{.ID}}"
+                                        data-current-models="{{.AllowedModels}}"
+                                        data-full-text="{{.AllowedModels}}"
+                                        title="右键点击修改允许的模型">
+                                        {{.AllowedModels}}
+                                    </td>
                                     <td class="text-center">{{.UsageCount}}</td>
                                     <td class="text-center">
                                         <span class="health-badge healthy">{{.SuccessCount}}</span>
@@ -1829,6 +1835,10 @@
             <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
             删除
         </div>
+        <div class="context-menu-item" id="context-menu-item-edit-models" style="display: none;" onclick="triggerEditAllowedModelsFromContextMenu()">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+            修改允许模型
+        </div>
     </div>
 
     <div id="toast-container"></div>
@@ -1850,10 +1860,60 @@
         </div>
     </div>
 
+    <!-- 添加编辑允许模型的模态框 -->
+    <div id="editAllowedModelsModal" class="delete-confirmation-modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeEditAllowedModelsModal()">&times;</span>
+            <h4>编辑允许的模型</h4>
+            <div class="form-group">
+                <label>API Key ID: <span id="editingApiKeyIdDisplay"></span></label>
+                <input type="hidden" id="editApiKeyId">
+                <!-- 旧的textarea将被替换 -->
+                <!-- <textarea id="editAllowedModelsTextarea" class="form-control" style="height: 100px; margin: 10px 0;" placeholder="允许的模型，用逗号分隔"></textarea> -->
+                <label for="editAllowedModelsSelectModal" style="display:block; margin-top:10px;">允许的模型 (WrapperName):</label>
+                <select id="editAllowedModelsSelectModal" class="form-control" multiple style="min-height: 120px; margin: 5px 0;"></select>
+                <small class="form-text text-muted">按住 Ctrl/Command 键选择多个模型。</small>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="saveAllowedModels()">保存</button>
+                <button class="btn" onclick="closeEditAllowedModelsModal()">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加编辑模态框 - 这个是Bootstrap风格的，将被移除 -->
+    <!-- 
+    <div class="modal fade" id="editAllowedModelsModal" tabindex="-1" role="dialog" aria-labelledby="editAllowedModelsModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editAllowedModelsModalLabel">编辑允许的模型</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="editApiKeyId">
+                    <div class="form-group">
+                        <label for="editAllowedModelsInput">允许的模型（用逗号分隔）</label>
+                        <input type="text" class="form-control" id="editAllowedModelsInput">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="saveAllowedModels()">保存</button>
+                </div>
+            </div>
+        </div>
+    </div> 
+    -->
+
     <script>
         // 全局变量
         let resizeTimer;
-        let currentContextMenuProviderId = null;
+        let currentContextMenuProviderId = null; // For provider actions
+        let contextApiIdForEdit = null;          // For API key model editing
+        let contextModelsForEdit = null;         // For API key model editing
         let isHealthCheckInProgress = false;
         let isProviderConfigValidated = false; // For add provider form validation
 
@@ -2667,62 +2727,92 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
 
         // 右键菜单功能
         function initializeContextMenu() {
-            document.querySelectorAll('tr[data-id]').forEach(row => {
+            // Listener for provider rows (main table)
+            document.querySelectorAll('#provider-table-body tr[data-id]').forEach(row => {
                 row.addEventListener('contextmenu', showContextMenu);
             });
+
+            // Listener for "Allowed Models" cells in API Keys table
+            document.querySelectorAll('#api-table tbody td.editable-allowed-models').forEach(cell => {
+                cell.addEventListener('contextmenu', showContextMenu);
+            });
+
+            // Global click to hide context menu
+            document.addEventListener('click', (e) => {
+                const menu = document.getElementById('context-menu');
+                if (menu && !menu.contains(e.target) && !e.target.closest('td.editable-allowed-models') && !e.target.closest('#provider-table-body tr[data-id]')) {
+                    hideContextMenu();
+                }
+            });
+            window.addEventListener('scroll', hideContextMenu, true);
         }
 
         function showContextMenu(e) {
             e.preventDefault();
-            const providerId = e.currentTarget.getAttribute('data-id');
-            if (!providerId) return;
-
-            currentContextMenuProviderId = providerId;
             const menu = document.getElementById('context-menu');
             if (!menu) return;
 
-            // 使用clientX和clientY获取相对于视口的坐标，而不是页面
-            const x = e.clientX;
-            const y = e.clientY;
+            console.log("[Debug] showContextMenu called"); // Log: Function called
 
-            // 重置菜单位置，以便正确计算其尺寸
-            menu.style.left = '0px';
-            menu.style.top = '0px';
-            menu.classList.add('show');
-            
-            // 获取菜单尺寸
-            const menuWidth = menu.offsetWidth;
-            const menuHeight = menu.offsetHeight;
-            
-            // 获取视口尺寸
-            const viewportWidth = window.innerWidth;
-            const viewportHeight = window.innerHeight;
-            
-            // 计算菜单位置，确保不超出视口边界
-            let menuX = x;
-            let menuY = y;
-            
-            // 检查右边界
-            if (x + menuWidth > viewportWidth) {
-                menuX = viewportWidth - menuWidth - 5;
+            // Hide all items first
+            menu.querySelectorAll('.context-menu-item').forEach(item => item.style.display = 'none');
+
+            const currentTargetElement = e.currentTarget; // Element the listener was attached to
+            let showMenu = false;
+
+            if (currentTargetElement.classList.contains('editable-allowed-models')) {
+                // Context is API Key "Allowed Models" cell
+                contextApiIdForEdit = currentTargetElement.dataset.apiId;
+                contextModelsForEdit = currentTargetElement.dataset.currentModels;
+                console.log("[Debug] Context: editable-allowed-models. ID:", contextApiIdForEdit, "Models:", contextModelsForEdit); // Log: Context identified
+
+                const editModelsItem = document.getElementById('context-menu-item-edit-models');
+                if (editModelsItem) {
+                    editModelsItem.style.display = 'flex';
+                    showMenu = true;
+                    console.log("[Debug] Displaying '修改允许模型' menu item."); // Log: Menu item displayed
+                }
+            } else if (currentTargetElement.tagName === 'TR' && currentTargetElement.dataset.id && currentTargetElement.closest('#provider-table-body')) {
+                // Context is a Provider row
+                currentContextMenuProviderId = currentTargetElement.dataset.id;
+                console.log("[Debug] Context: provider-table-body TR. ID:", currentContextMenuProviderId); // Log: Provider context
+                // Show provider-specific items (items other than the new edit-models item)
+                menu.querySelectorAll('.context-menu-item:not(#context-menu-item-edit-models)').forEach(item => {
+                    item.style.display = 'flex';
+                });
+                showMenu = true;
             }
-            
-            // 检查下边界
-            if (y + menuHeight > viewportHeight) {
-                menuY = viewportHeight - menuHeight - 5;
+
+            if (showMenu) {
+                const x = e.clientX;
+                const y = e.clientY;
+                const menuWidth = menu.offsetWidth;
+                const menuHeight = menu.offsetHeight;
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+                let menuX = x;
+                let menuY = y;
+                if (x + menuWidth > viewportWidth) menuX = viewportWidth - menuWidth - 5;
+                if (y + menuHeight > viewportHeight) menuY = viewportHeight - menuHeight - 5;
+                menuX = Math.max(5, menuX);
+                menuY = Math.max(5, menuY);
+
+                menu.style.left = `${menuX}px`;
+                menu.style.top = `${menuY}px`;
+                menu.classList.add('show');
+            } else {
+                hideContextMenu();
             }
-            
-            // 应用计算后的位置
-            menu.style.left = `${menuX}px`;
-            menu.style.top = `${menuY}px`;
         }
 
         function hideContextMenu() {
             const menu = document.getElementById('context-menu');
             if (menu) {
                 menu.classList.remove('show');
-                currentContextMenuProviderId = null;
             }
+            currentContextMenuProviderId = null; // Reset provider context
+            contextApiIdForEdit = null;          // Reset API model edit context
+            contextModelsForEdit = null;         // Reset API model edit context
         }
 
         // 健康检查功能
@@ -3105,7 +3195,7 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
 
         // 添加滚动事件监听器
         window.addEventListener('scroll', () => {
-            hideContextMenu();
+            hideContextMenu(); // Ensure this is called, or use the capture phase listener
         });
 
         // 动态填充 API Key 的模型选择器
@@ -3803,6 +3893,127 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             });
 
             hideContextMenu(); // 立即关闭右键菜单
+        }
+
+        // 新增：编辑允许模型的函数 (纯 JavaScript 版本 - 使用 Select)
+        function editAllowedModels(id, currentAllowedModelsString) {
+            console.log("[Debug] editAllowedModels (Pure JS with Select) called with ID:", id, "Models:", currentAllowedModelsString);
+            
+            document.getElementById('editApiKeyId').value = id; // Hidden input to store the ID
+            document.getElementById('editingApiKeyIdDisplay').textContent = id; // Span to display the ID
+            
+            const selectElement = document.getElementById('editAllowedModelsSelectModal');
+            selectElement.innerHTML = ''; // Clear existing options
+
+            // 1. 获取所有可用的 WrapperName
+            // 优先使用 autoCompleteData.wrapper_names，如果它已被填充
+            let availableWrapperNames = new Set();
+            if (autoCompleteData && autoCompleteData.wrapper_names && autoCompleteData.wrapper_names.length > 0) {
+                autoCompleteData.wrapper_names.forEach(name => availableWrapperNames.add(name));
+            } else {
+                // Fallback: 从API Key列表的当前显示模型中提取，或者从Provider列表提取
+                // 这里我们简化，假设populateAllowedModelsSelector已经运行过，或者autoCompleteData会包含所需信息
+                // 或者，更可靠地，再次扫描provider表
+                const providerRows = document.querySelectorAll('#all #provider-table-body tr'); // Target provider table specifically
+                providerRows.forEach(row => {
+                    const wrapperNameCell = row.cells[3]; // 第4列是提供者名称 (WrapperName)
+                    if (wrapperNameCell) {
+                        const wrapperName = wrapperNameCell.getAttribute('data-full-text') || wrapperNameCell.textContent.trim();
+                        if (wrapperName) {
+                            availableWrapperNames.add(wrapperName);
+                        }
+                    }
+                });
+            }
+            
+            if (availableWrapperNames.size === 0) {
+                const option = document.createElement('option');
+                option.textContent = '没有可用的模型提供者';
+                option.disabled = true;
+                selectElement.appendChild(option);
+                console.warn("[Debug] No available wrapper names to populate select modal.");
+            } else {
+                Array.from(availableWrapperNames).sort().forEach(name => { // Sort for better UX
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    selectElement.appendChild(option);
+                });
+            }
+
+            // 2. 预选当前API Key允许的模型
+            const currentlyAllowedModelsArray = currentAllowedModelsString ? currentAllowedModelsString.split(',').map(m => m.trim()).filter(m => m) : [];
+            for (let i = 0; i < selectElement.options.length; i++) {
+                if (currentlyAllowedModelsArray.includes(selectElement.options[i].value)) {
+                    selectElement.options[i].selected = true;
+                } else {
+                    selectElement.options[i].selected = false; // Ensure others are not selected
+                }
+            }
+            
+            const modalElement = document.getElementById('editAllowedModelsModal');
+            if (modalElement) {
+                modalElement.style.display = 'block';
+                console.log("[Debug] editAllowedModelsModal shown via style.display");
+            } else {
+                console.error("[Debug] editAllowedModelsModal element not found!");
+            }
+        }
+
+        // 新增：关闭编辑模态框的函数
+        function closeEditAllowedModelsModal() {
+            const modalElement = document.getElementById('editAllowedModelsModal');
+            if (modalElement) {
+                modalElement.style.display = 'none';
+                console.log("[Debug] editAllowedModelsModal hidden via style.display");
+            }
+        }
+
+        // 新增：保存编辑的模型 (确保从新的 select 元素读取)
+        function saveAllowedModels() {
+            const id = document.getElementById('editApiKeyId').value;
+            // const allowedModels = document.getElementById('editAllowedModelsTextarea').value; // 旧代码：使用 textarea
+            const selectElement = document.getElementById('editAllowedModelsSelectModal');
+            const selectedModels = Array.from(selectElement.selectedOptions).map(option => option.value);
+            const allowedModelsString = selectedModels.join(',');
+
+
+            console.log("[Debug] saveAllowedModels called. ID:", id, "Selected Models String:", allowedModelsString);
+
+            fetch(`/portal/update-api-key-allowed-models/${id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    allowed_models: allowedModelsString
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    closeEditAllowedModelsModal(); // Close modal on success
+                    showToast('允许的模型已更新', 'success'); // Show success toast
+                    // 刷新页面以显示更新后的数据
+                    setTimeout(() => window.location.reload(), 1500); // Delay reload slightly
+                } else {
+                    showToast('错误: ' + (data.message || '更新失败'), 'error');
+                    console.error('Error updating allowed models:', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Fetch Error:', error);
+                showToast('更新允许的模型失败: ' + error.message, 'error');
+            });
+        }
+
+        // 新增：触发从上下文菜单编辑允许的模型 (确保调用纯JS版本)
+        function triggerEditAllowedModelsFromContextMenu() {
+            console.log("[Debug] triggerEditAllowedModelsFromContextMenu called. ID:", contextApiIdForEdit, "Models:", contextModelsForEdit); // Log: Function called
+            if (contextApiIdForEdit && contextModelsForEdit !== null) {
+                editAllowedModels(contextApiIdForEdit, contextModelsForEdit);
+            }
+            hideContextMenu();
         }
     </script>
 </body>
