@@ -1,11 +1,12 @@
 desc(
-    title: "PHP Unfiltered File or Path Operation Detection",
-    title_zh: "PHP未过滤文件或路径操作检测",
-    risk: "audit",
-    level: "low",
-    desc: <<<CODE
+	title: "PHP Unfiltered File or Path Operation Detection"
+	title_zh: "PHP未过滤文件或路径操作检测",
+	risk: "audit"
+	level: "low"
+	desc: <<<CODE
 该规则集旨在检测PHP代码中可能存在的未过滤文件或路径操作，这些操作可能导致安全风险，如文件包含漏洞、目录遍历等。规则通过静态分析代码中的文件操作函数（如opendir）及其参数来源，来识别潜在的安全问题。
 CODE
+	rule_id: "a6f3be4b-5f16-46d8-8e0b-9182e5078345"
 )
 <include('php-param')> as $params
 <include('php-tp-all-extern-variable-param-source')> as $params
@@ -48,9 +49,9 @@ alert $low for {
 }
 
 desc(
-    lang: "php",
-    alert_exact: 1,
-    'file:///unsafe.php': <<<CODE
+	lang: "php"
+	alert_exact: 1
+	'file:///unsafe.php': <<<CODE
 <?php
     $a = $_GET[1];
     opendir($a);

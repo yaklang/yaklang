@@ -1,11 +1,12 @@
 desc(
-    title: "ThinkPHP SQL Injection Detection",
-    title_zh: "ThinkPHP SQL注入检测",
-    risk: "audit",
-    level: "low",
-    desc: <<<CODE
+	title: "ThinkPHP SQL Injection Detection"
+	title_zh: "ThinkPHP SQL注入检测",
+	risk: "audit"
+	level: "low"
+	desc: <<<CODE
 该规则旨在检测ThinkPHP框架中可能存在的SQL注入风险。规则通过静态分析，识别出直接将外部输入（如用户输入）拼接到SQL查询语句中的代码模式，这可能导致SQL注入攻击。
 CODE
+	rule_id: "df78b6fe-a4ca-4ef0-91ee-d9f23b651e3f"
 )
 
 ./find|select|where|update|where/ as $function
@@ -27,9 +28,9 @@ alert $sink for {
 
 
 desc(
-    lang: "php",
-    alert_min: 3,
-    'file:///unsafe.php': <<<CODE
+	lang: "php"
+	alert_min: 3
+	'file:///unsafe.php': <<<CODE
 <?php
 // 漏洞示例代码（不安全写法）
 namespace app\controller;
