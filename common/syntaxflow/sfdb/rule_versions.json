@@ -2,8 +2,8 @@
   {
     "rule_id": "48c2c107-024f-4abc-a940-ed637847f22c",
     "rule_name": "硬编码API凭据",
-    "hash": "dcbdc8d8418732ba71c46d1a2add624fa02e36bf86a19de3c122d4e02c6a8b01",
-    "version": "20250512.0001"
+    "hash": "745171309deeccb179f6d2ce35177d3e51876968896e1d2626cd961cd94d1b29",
+    "version": "20250514.0001"
   },
   {
     "rule_id": "215e8ad8-2977-4cd4-9446-d0040ffec286",
@@ -308,8 +308,8 @@
   {
     "rule_id": "e1315696-3f1e-404c-9906-06c1db41a6b0",
     "rule_name": "检测Java 使用System.out输出流",
-    "hash": "4277c70a110236520d399a2555c745e30ee190bcbc53dfc03d3f8faa6bb3c84f",
-    "version": "20250512.0002"
+    "hash": "0d8774f82c77b89a8d7e68130a053bd00b4cf23244d84b9930d97bf47ca4c775",
+    "version": "20250514.0001"
   },
   {
     "rule_id": "084c0adc-69ef-42ed-aeb4-5c24603634af",
@@ -338,8 +338,8 @@
   {
     "rule_id": "d2434f8f-e41c-447d-a900-3823e56248c8",
     "rule_name": "Find Thymeleaf Config in SpringBoot Application Config",
-    "hash": "ab4b98020d22bc848ebac8e0fc3f6493c0e149e3c08585ed9c5f6170bbdfd011",
-    "version": "20250514.0001"
+    "hash": "969256614c92400c6f54388db1a9fd0fb4b98150172246cb359533ca7dff7e96",
+    "version": "20250514.0002"
   },
   {
     "rule_id": "70226437-3bb9-4902-b30a-da4e2820bd63",
@@ -680,20 +680,20 @@
   {
     "rule_id": "15815212-0f58-413f-ad8e-a514778eea85",
     "rule_name": "checking [Directly relative Files.write from MultipartFile]",
-    "hash": "500ce73094c7221a8dd668e5c14b202b318bf8874beb204662b577b0dcff6b55",
-    "version": "20250512.0001"
+    "hash": "5ac6af915e93bcab8fe098666d2fa0ae1716eef733decc3d8ad7383cb220e952",
+    "version": "20250514.0001"
   },
   {
     "rule_id": "718cb86d-8629-4382-be43-03ce36c07a3b",
     "rule_name": "通过反射操纵访问修饰符",
-    "hash": "a31a2e17d53bf56ca98120a870f6ce0cae5382bb87960f784f7fe5fc196bd5d8",
-    "version": "20250512.0001"
+    "hash": "e4ea93cfcafa379b731ea753edc137a54a667462f3c4a189492ea1f355e002f9",
+    "version": "20250514.0001"
   },
   {
     "rule_id": "31093d24-ee2b-448b-ba5a-111d99bbf77c",
     "rule_name": "Servlet \u0026 Springframework 基础参数命令注入",
-    "hash": "58e6a51d3c3b1ff7dbb1e5a5f788b41e8002ad75248ea17f3f7a5430f1cdd749",
-    "version": "20250512.0002"
+    "hash": "aa62564fcced99e27e9a93a980ee0640d59063df80b7bbda728b2ed83fe44ef7",
+    "version": "20250514.0001"
   },
   {
     "rule_id": "00b097ac-f408-4a9b-b2e3-88b5c2a0fe3e",
@@ -806,14 +806,14 @@
   {
     "rule_id": "bc50fb1a-9e00-46f8-985e-39f3a01a5853",
     "rule_name": "检测Java Spring Framework跨域白名单过于宽松",
-    "hash": "107f99cb236c81545f9e3173a3621ffe1bb3de2e2c1dba944e06451d5cb10e1f",
-    "version": "20250512.0001"
+    "hash": "177031972490420559354aa3399981eabd3ecdea2c30ce4bfcd8da08ff547622",
+    "version": "20250514.0001"
   },
   {
     "rule_id": "d8a2e488-f0d9-4e74-b2fb-3d9e41c198d5",
     "rule_name": "不安全的字节数组到字符串转换",
-    "hash": "63ab6b227bf4da218e593f0d1ef25f46f98c0c4ef3c0407dcb09daadcc939527",
-    "version": "20250512.0001"
+    "hash": "20e8870a0e795d84a1947de791044103c4c8d7f147f0a69881e2021e59500676",
+    "version": "20250514.0001"
   },
   {
     "rule_id": "0018c56b-b5f7-49fc-80f4-d1b9a5f718e5",
@@ -1065,6 +1065,12 @@
     "rule_id": "13ffa65e-263b-44d1-842c-52419fbea084",
     "rule_name": "SCA: Checking Java xstream Existed Vulnerabilities",
     "hash": "b788223356e46bcc9f565019eee54631fa7de431b6c89ade7204732ed01d492c",
+    "version": "20250514.0001"
+  },
+  {
+    "rule_id": "2161eeef-aab5-486a-a94e-e8750d37f332",
+    "rule_name": "硬编码的FTP密码",
+    "hash": "0c6d701ae599b5b5aaf0291cd9e742aa204d292940b428a9c02d43979a16cdf9",
     "version": "20250514.0001"
   },
   {
