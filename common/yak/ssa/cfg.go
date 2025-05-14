@@ -17,10 +17,11 @@ const (
 	LoopLatch     = "loop.latch"     // third // latch
 
 	// if
-	IfDone  = "if.done"
-	IfTrue  = "if.true"
-	IfFalse = "if.false"
-	IfElif  = "if.elif"
+	IfCondition = "if.condition"
+	IfDone      = "if.done"
+	IfTrue      = "if.true"
+	IfFalse     = "if.false"
+	IfElif      = "if.elif"
 
 	// try-catch
 	TryStart   = "error.try"
@@ -315,7 +316,7 @@ func (i *IfBuilder) Build() *IfBuilder {
 	// DoneBlock.ScopeTable = Scope
 
 	// create if-condition block and jump to it
-	conditionBlock := SSABuilder.NewBasicBlock("if-condition")
+	conditionBlock := SSABuilder.NewBasicBlock(IfCondition)
 	SSABuilder.EmitJump(conditionBlock)
 	SSABuilder.CurrentBlock = conditionBlock
 
@@ -398,8 +399,8 @@ func (i *IfBuilder) Build() *IfBuilder {
 }
 
 type tryCatchItem struct {
-	err       func() string
-	catchBody func()
+	errorVariable func() string
+	catchBody     func()
 }
 
 type TryBuilder struct {
@@ -428,8 +429,8 @@ func (t *TryBuilder) BuildTryBlock(f func()) {
 
 func (t *TryBuilder) BuildErrorCatch(err func() string, catch func()) {
 	t.buildCatchItem = append(t.buildCatchItem, tryCatchItem{
-		err:       err,
-		catchBody: catch,
+		errorVariable: err,
+		catchBody:     catch,
 	})
 }
 
@@ -465,7 +466,7 @@ func (t *TryBuilder) Finish() {
 		tryBuilder.AddCache(func(svti ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
 			builder.CurrentBlock.SetScope(svti)
 			// error variable
-			if id := item.err(); id != "" {
+			if id := item.errorVariable(); id != "" {
 				p := NewParam(id, false, builder)
 				p.SetType(BasicTypes[ErrorTypeKind])
 				variable := builder.CreateLocalVariable(id)
@@ -510,8 +511,8 @@ func (t *TryBuilder) Finish() {
 
 	builder.CurrentBlock = tryBlock
 	builder.EmitJump(target)
-	for _, catch := range errorHandler.catchs {
-		builder.CurrentBlock = catch
+	for _, catch := range errorHandler.Catch {
+		builder.CurrentBlock = catch.GetBlock()
 		builder.EmitJump(target)
 	}
 

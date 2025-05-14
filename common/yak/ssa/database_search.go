@@ -2,12 +2,13 @@ package ssa
 
 import (
 	"context"
+	"regexp"
+
 	"github.com/gobwas/glob"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"golang.org/x/exp/slices"
-	"regexp"
 )
 
 func MatchInstructionByExact(ctx context.Context, prog *Program, mod int, e string) []Instruction {
@@ -49,8 +50,7 @@ func matchInstructionByOpcodes(ctx context.Context, prog *Program, opcodes ...Op
 
 	for _, cache := range prog.Cache.InstructionCache.GetAll() {
 		inst := cache.inst
-		value, b := ToValue(cache.inst)
-		if b && slices.Contains(opcodes, value.GetOpcode()) {
+		if slices.Contains(opcodes, inst.GetOpcode()) {
 			insts = append(insts, inst)
 		}
 	}

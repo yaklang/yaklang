@@ -927,11 +927,13 @@ var (
 // ------------- ErrorHandler
 type ErrorHandler struct {
 	anInstruction
-	catchs           []*BasicBlock
-	try, final, done *BasicBlock
+	Catch            []Value
+	Try, Final, Done Value
 }
 
 var _ Instruction = (*ErrorHandler)(nil)
+var _ User = (*ErrorHandler)(nil)
+var _ Node = (*ErrorHandler)(nil)
 
 // -------------- PANIC
 type Panic struct {
@@ -970,6 +972,8 @@ type Jump struct {
 }
 
 var _ Instruction = (*Jump)(nil)
+var _ User = (*Jump)(nil)
+var _ Node = (*Loop)(nil)
 
 // ----------- IF
 // The If instruction transfers control to one of the two successors
