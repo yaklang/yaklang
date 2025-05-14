@@ -17,7 +17,7 @@ func TestGetYakScript(t *testing.T) {
 	tools := GetAllYakScriptAiTools()
 	hasDoHttp := false
 	for _, ait := range tools {
-		if ait.Name == "do_http" {
+		if ait.Name == "send_http_request_by_url" {
 			hasDoHttp = true
 			w1, w2 := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
 			ait.Callback(aitool.InvokeParams{
