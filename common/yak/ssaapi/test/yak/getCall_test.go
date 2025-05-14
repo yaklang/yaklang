@@ -27,3 +27,12 @@ a(2,2)
 		}, ssaapi.WithLanguage(ssaapi.Yak))
 	})
 }
+
+func TestConditionFilter(t *testing.T) {
+	code := `a("b")`
+	t.Run("check sf >=", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `a?(*?{<='c'}) as $sink`, map[string][]string{
+			"sink": {`Undefined-a("b")`},
+		}, ssaapi.WithLanguage(ssaapi.Yak))
+	})
+}
