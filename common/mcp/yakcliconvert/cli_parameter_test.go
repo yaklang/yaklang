@@ -1,13 +1,13 @@
-package yakcliconvert
+package yakcliconvert_test
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/mcp/yakcliconvert"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	_ "github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
-	_ "github.com/yaklang/yaklang/common/yak/static_analyzer/ssa_option"
 )
 
 func TestConvertCliParameterToJsonSchema(t *testing.T) {
@@ -36,7 +36,7 @@ cli.check()
 
 	prog, err := static_analyzer.SSAParse(content, "yak")
 	require.NoError(t, err)
-	tool := ConvertCliParameterToTool("test", prog)
+	tool := yakcliconvert.ConvertCliParameterToTool("test", prog)
 	require.Equal(t, "example", tool.Description)
 
 	require.ElementsMatch(t, tool.InputSchema.Required, []string{"a", "c"})
