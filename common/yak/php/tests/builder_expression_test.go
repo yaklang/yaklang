@@ -257,10 +257,10 @@ println($a);
 	})
 	t.Run("operator-'.='", func(t *testing.T) {
 		code := `<?php
-$a=1;
+$a="1";
 $a.=$a;
 println($a);`
-		ssatest.CheckPrintlnValue(code, []string{"\"11\""}, t)
+		ssatest.CheckPrintlnValue(code, []string{`"11"`}, t)
 	})
 }
 
