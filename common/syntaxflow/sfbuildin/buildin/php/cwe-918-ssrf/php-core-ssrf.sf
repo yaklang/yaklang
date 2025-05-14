@@ -1,9 +1,9 @@
 desc(
-    title: "Server-Side Request Forgery (SSRF)",
-    title_zh: "SSRF漏洞，旨在获取内部服务信息或数据, 通过未经过滤的URL参数，攻击者可以探测内部服务或获取敏感数据",
-    type: vul,
-    risk: "ssrf",
-    desc: <<<TEXT
+	title: "Server-Side Request Forgery (SSRF)"
+	title_zh: "SSRF漏洞，旨在获取内部服务信息或数据, 通过未经过滤的URL参数，攻击者可以探测内部服务或获取敏感数据",
+	type: vul
+	risk: "ssrf"
+	desc: <<<TEXT
 检测到网络请求函数（curl_setopt/fsockopen/file_get_contents等）的参数未经过充分过滤验证。当参数包含未经验证的用户输入时，可能引发SSRF攻击导致内部服务探测或数据泄露。建议对URL参数进行协议白名单校验和域名限制。
 TEXT
 	rule_id: "61cd3ee5-20d0-4457-8e5f-f442e36296f6"

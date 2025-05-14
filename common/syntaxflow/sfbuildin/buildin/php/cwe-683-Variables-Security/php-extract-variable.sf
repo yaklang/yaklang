@@ -1,10 +1,10 @@
 desc(
-    title: "check php Variable coverage",
-    title_zh: "变量覆盖漏洞",
-    type: audit,
-    level: low,
-    risk: 'variable_coverage',
-    desc: <<<TEXT
+	title: "check php Variable coverage"
+	title_zh: "变量覆盖漏洞",
+	type: audit
+	level: low
+	risk: 'variable_coverage'
+	desc: <<<TEXT
 变量覆盖漏洞是指应用程序未能正确处理用户输入，导致用户输入的数据覆盖了程序中的原有变量。这可能导致敏感数据泄露、逻辑错误或远程代码执行等安全问题。通过检查PHP代码中是否存在未经适当过滤或验证的用户输入被直接用于变量赋值，以及是否存在对全局变量的不当使用，可以识别出潜在的变量覆盖漏洞。此审计规则旨在检测变量覆盖情况，并根据是否应用了过滤函数来评估风险级别。
 TEXT
 	rule_id: "c290ad96-9b08-4adf-811e-74f059d2c75e"
@@ -55,18 +55,18 @@ alert $low for {
 
 
 desc(
-    lang: php,
-    alert_high: 1,
-    alert_low: 1,
-'file:///param.php':<<<PARAM
+	lang: php
+	alert_high: 1
+	alert_low: 1
+	'file:///param.php':<<<PARAM
 <?php
 extract($_GET);
-PARAM,
-'file:///param_filter.php':<<<CODE
+PARAM
+	'file:///param_filter.php':<<<CODE
 <?php
     extract(filter($_GET));
-CODE, 
-"safefile://safe.php":<<<CODE
+CODE
+	"safefile://safe.php":<<<CODE
 <?php
 extract();
 CODE

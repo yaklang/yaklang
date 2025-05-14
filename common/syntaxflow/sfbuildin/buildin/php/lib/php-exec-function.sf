@@ -1,9 +1,9 @@
 desc(
-    title: "Execution input variable",
-    type: audit,
-    level: info,
-    lib: 'php-os-exec',
-    desc: <<<TEXT
+	title: "Execution input variable"
+	type: audit
+	level: info
+	lib: 'php-os-exec'
+	desc: <<<TEXT
 此规则旨在审计PHP代码中是否存在潜在的危险函数使用，这些函数可以直接执行用户输入的代码或命令，从而导致远程代码执行（RCE）漏洞。这些函数包括`eval()`, `exec()`, `assert()`, `system()`, `shell_exec()`, `pcntl_exec()`, `popen()`, `ob_start()`等。如果这些函数接收了未经适当验证或转义的用户输入，攻击者可以利用此漏洞执行任意代码或命令，进而完全控制服务器或执行恶意操作。因此，建议开发者避免使用这些危险函数，或在使用时对用户输入进行严格的验证和转义。
 TEXT
 	rule_id: "4d56af61-28a4-48fd-812c-d28171f4ada7"
@@ -13,9 +13,9 @@ TEXT
 
 alert $output
 desc(
-    lang: php,
-    alert_min:8,
-    'file://unsafe.php': <<<UNSAFE
+	lang: php
+	alert_min:8
+	'file://unsafe.php': <<<UNSAFE
 <?php
     eval($_POST[1]);
     exec($_POST[1]);
@@ -26,9 +26,9 @@ desc(
     popen($_POST[1]);
     ob_start($_POST[1]);
     ob_end($_POST[1]);
-UNSAFE,
-    "safefile://save.php": <<<SAFE
+UNSAFE
+	"safefile://save.php": <<<SAFE
 <?php 
     evala($_POST[1]);
-SAFE 
+SAFE
 )

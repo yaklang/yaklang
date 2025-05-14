@@ -1,11 +1,12 @@
 desc(
-    title: "ThinkPHP Auth Bypass Detection",
-    title_zh: "ThinkPHP认证绕过检测",
-    risk: "audit",
-    level: "low",
-    desc: <<<CODE
+	title: "ThinkPHP Auth Bypass Detection"
+	title_zh: "ThinkPHP认证绕过检测",
+	risk: "audit"
+	level: "low"
+	desc: <<<CODE
     该文件定义了用于检测PHP ThinkPHP框架中认证绕过漏洞的规则和模式。
 CODE
+	rule_id: "f0c086d0-c004-4367-abd7-d16ca50de3d9"
 )
 
 .uri?{<getObject><string>?{have: "request"}} as $source
@@ -23,9 +24,9 @@ alert $sink for{
    level: "high",
 }
 desc(
-    lang: "php",
-    alert_min: 1,
-    'file:///unsafe.php': <<<CODE
+	lang: "php"
+	alert_min: 1
+	'file:///unsafe.php': <<<CODE
 <?php
 namespace app\index\controller;
 use think\Controller;

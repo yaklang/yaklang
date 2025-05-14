@@ -1,10 +1,10 @@
 desc(
-    title: "postgres sqlite check",
-    title_zh: "sql",
-    type: audit,
-    level: low,
-    risk: "sqli-inject",
-    desc: <<<TEXT
+	title: "postgres sqlite check"
+	title_zh: "sql"
+	type: audit
+	level: low
+	risk: "sqli-inject"
+	desc: <<<TEXT
 SQL注入（SQL Injection，简称SQLI）是一种代码注入技术，攻击者通过在应用程序的输入栏中恶意插入或"注入"SQL命令，干扰正常的数据库查询执行。这种攻击可导致数据泄露、数据篡改、拒绝服务等严重后果。审计此规则旨在识别和防范在PHP代码中未经过滤或不当过滤直接拼接SQL查询的情况，从而降低应用程序遭受SQL注入攻击的风险。
 TEXT
 	rule_id: "62323f1d-76c2-40da-9058-f497ae7cfc60"
@@ -57,23 +57,23 @@ alert $low for {
 }
 
 desc(
-    lang: 'php',
-    alert_min: 3,
-    alert_high: 1,
-    alert_mid: 1,
-    alert_low: 1,
-    'file:///high.php': <<<CODE
+	lang: 'php'
+	alert_min: 3
+	alert_high: 1
+	alert_mid: 1
+	alert_low: 1
+	'file:///high.php': <<<CODE
 <?php
     $username = $_COOKIE['user'];
     $conn = pg_connect("host=localhost dbname=test");
     $result = pg_query($conn, "SELECT * FROM users WHERE login = '$username'");
-CODE,
-    'file:///mid.php': <<<CODE
+CODE
+	'file:///mid.php': <<<CODE
 <?php
     $email = xxxx($_POST['email']);
     $res = pg_exec($conn, "UPDATE accounts SET email = '$email' WHERE id = 123"); // 中危漏洞[2]
-CODE,
-    'file:///low.php': <<<CODE
+CODE
+	'file:///low.php': <<<CODE
 <?php
     $filtered_id = pg_escape_string($_GET['id']);
     $query = pg_prepare($conn, "get_user", "SELECT * FROM profiles WHERE user_id = $1");

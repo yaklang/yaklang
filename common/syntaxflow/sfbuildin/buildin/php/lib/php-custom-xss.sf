@@ -1,8 +1,8 @@
 desc(
-    title: 'php Methods for xss may exist',
-    type: audit,
-    lib: 'php-xss-method',
-    desc: <<<TEXT
+	title: 'php Methods for xss may exist'
+	type: audit
+	lib: 'php-xss-method'
+	desc: <<<TEXT
 此规则旨在审计PHP代码中可能存在的XSS（跨站脚本攻击）风险点。特定的PHP输出函数，如echo、print、print_r等，如果未经适当处理就直接输出用户输入的数据，可能会导致XSS攻击。攻击者可以通过注入恶意脚本，在用户浏览器中执行任意代码，从而窃取敏感信息、劫持会话或进行其他恶意操作。因此，建议开发者在使用这些输出函数时，务必对用户输入进行严格的验证和转义，以防止XSS攻击的发生。
 TEXT
 	rule_id: "83111614-77e4-4376-996f-734c017a6e0a"

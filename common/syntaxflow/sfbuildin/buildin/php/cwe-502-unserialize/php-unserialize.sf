@@ -1,10 +1,10 @@
 desc(
-    title: 'check php function unserialize',
-    title_zh: '反序列化漏洞',
-    type: audit,
-    level: low,
-    risk: "unserialize",
-    desc: <<<TEXT
+	title: 'check php function unserialize'
+	title_zh: '反序列化漏洞',
+	type: audit
+	level: low
+	risk: "unserialize"
+	desc: <<<TEXT
 `unserialize()` 函数在 PHP 中用于将已存储的表示形式转换回 PHP 的值或对象。若未经适当过滤或验证，使用 `unserialize()` 处理不可信数据可能导致安全漏洞，如对象注入攻击。攻击者可以构造恶意序列化字符串来执行任意代码、触发漏洞利用或造成其他安全威胁。因此，建议对 `unserialize()` 的输入进行严格的过滤和验证，或考虑使用其他安全的替代方案。
 TEXT
 	risk: 'unserialize'
@@ -64,12 +64,12 @@ alert $info for{
     level: "info"
 }
 desc(
-    lang: php,
-    alert_min: 3,
-    alert_low: 1,
-    alert_mid: 1,
-    alert_high: 1,
-    'file://mid.php': <<<UNSAFE
+	lang: php
+	alert_min: 3
+	alert_low: 1
+	alert_mid: 1
+	alert_high: 1
+	'file://mid.php': <<<UNSAFE
 <?php
 function unserializex($a){
     unserialize("$a");
@@ -77,13 +77,13 @@ function unserializex($a){
 $a = $_GET["1"];
 $a = undefined($a);
 unserializex($a);
-UNSAFE,
-    'file://high.php':<<<CODE
+UNSAFE
+	'file://high.php':<<<CODE
 <?php
     $a = $_GET[1];
     unserialize($a);
-CODE,
-    'file://low.php':<<<CODE
+CODE
+	'file://low.php':<<<CODE
 <?php
     $a = $_GET[1];
     unserialize(filter($a));
