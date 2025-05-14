@@ -1522,7 +1522,10 @@ func (c *OrType) GetTypes() Types {
 	return c.types
 }
 
-func NewOrType(types ...Type) *OrType {
+func NewOrType(types ...Type) Type {
+	if len(types) == 1 {
+		return types[0]
+	}
 	return &OrType{
 		baseType: NewBaseType(),
 		types:    Types(types),

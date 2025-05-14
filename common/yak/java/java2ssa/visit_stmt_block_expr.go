@@ -904,6 +904,8 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) {
 				if block := catchClause.Block(); block != nil {
 					y.VisitBlock(block)
 				}
+			}, func() ssa.Type {
+				return y.VisitCatchType(catchClause.CatchType())
 			})
 		}
 		if finallyBlock := ret.FinallyBlock(); finallyBlock != nil {
