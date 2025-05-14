@@ -1,6 +1,7 @@
 package aiforge
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"os"
@@ -123,4 +124,25 @@ func GetCliValueByKey(key string, items []*ypb.ExecParamItem) string {
 		}
 	}
 	return ""
+}
+
+func Any2ExecParams(i any) []*ypb.ExecParamItem {
+	// covert params to ypb.ExecParamItem
+	var params []*ypb.ExecParamItem
+	if p, ok := i.([]*ypb.ExecParamItem); ok {
+		return p
+	} else if utils.IsMap(i) {
+		for k, v := range utils.InterfaceToGeneralMap(i) {
+			params = append(params, &ypb.ExecParamItem{
+				Key:   k,
+				Value: utils.InterfaceToString(v),
+			})
+		}
+	} else {
+		params = append(params, &ypb.ExecParamItem{
+			Key:   "query",
+			Value: utils.InterfaceToString(i),
+		})
+	}
+	return params
 }
