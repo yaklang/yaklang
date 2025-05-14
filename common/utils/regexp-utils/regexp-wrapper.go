@@ -7,7 +7,6 @@ import (
 
 	"github.com/dlclark/regexp2"
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/log"
 )
 
 type RegWrapperInterface interface {
@@ -22,7 +21,8 @@ type RegWrapperInterface interface {
 
 	FindSubmatch(b []byte) ([][]byte, error)
 	FindStringSubmatch(s string) ([]string, error)
-	FindStringSubmatchIndex(s string) ([][]int, error)
+
+	FindAllSubmatchIndex(s string) ([][]int, error)
 
 	ReplaceAll(src, repl []byte) ([]byte, error)
 	ReplaceAllString(src, repl string) (string, error)
@@ -118,22 +118,27 @@ func (r *RegexpWrapper) FindStringSubmatch(s string) ([]string, error) {
 	if r.getReg() == nil {
 		return nil, errors.New("regexp is nil")
 	}
-	return r.getReg().FindStringSubmatch(s), nil
+	// return r.getReg().FindStringSubmatch(s), nil
+	ret := make([]string, 0)
+	data := r.getReg().FindAllStringSubmatch(s, -1)
+	for _, data := range data {
+		ret = append(ret, data...)
+	}
+	return ret, nil
 }
 
-func (r *RegexpWrapper) FindStringSubmatchIndex(s string) ([][]int, error) {
+func (r *RegexpWrapper) FindAllSubmatchIndex(s string) ([][]int, error) {
 	if r.getReg() == nil {
 		return nil, errors.New("regexp is nil")
 	}
-	ret := r.getReg().FindStringSubmatchIndex(s)
-	log.Infof("regexp index: %v", ret)
-	index := make([][]int, 0, len(ret)/2)
-	for i := range len(ret) / 2 {
-		if 2*i < len(ret) && ret[2*i] >= 0 {
-			index = append(index, []int{ret[2*i], ret[2*i+1]})
+	ret := make([][]int, 0)
+	res := r.getReg().FindAllStringSubmatchIndex(s, -1)
+	for _, data := range res {
+		for i := 0; i+1 < len(data); i += 2 {
+			ret = append(ret, []int{data[i], data[i+1]})
 		}
 	}
-	return index, nil
+	return ret, nil
 }
 
 func (r *RegexpWrapper) ReplaceAll(src, repl []byte) ([]byte, error) {
@@ -268,7 +273,7 @@ func (r *Regexp2Wrapper) FindSubmatch(b []byte) ([][]byte, error) {
 	}), err
 }
 
-func (r *Regexp2Wrapper) FindStringSubmatchIndex(s string) ([][]int, error) {
+func (r *Regexp2Wrapper) FindAllSubmatchIndex(s string) ([][]int, error) {
 	if r.getReg() == nil {
 		return nil, errors.New("regexp is nil")
 	}
@@ -277,8 +282,14 @@ func (r *Regexp2Wrapper) FindStringSubmatchIndex(s string) ([][]int, error) {
 		return nil, err
 	}
 	var results [][]int
-	for _, g := range matchRes.Groups() {
-		results = append(results, []int{g.Index, g.Index + g.Length})
+	for matchRes != nil {
+		for _, g := range matchRes.Groups() {
+			results = append(results, []int{g.Index, g.Index + g.Length})
+		}
+		matchRes, err = r.getReg().FindNextMatch(matchRes)
+		if err != nil {
+			return results, err
+		}
 	}
 	return results, nil
 }
