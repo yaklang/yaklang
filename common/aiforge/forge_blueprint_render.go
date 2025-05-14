@@ -3,6 +3,7 @@ package aiforge
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"strings"
 	"text/template"
 
@@ -32,11 +33,15 @@ func (f *ForgeBlueprint) Params(query string, userInput ...*ypb.ExecParamItem) (
 	}
 
 	arguments, err := f.AnalyzeCliParameter(userInput)
+	s := aispec.ShrinkAndSafeToFile(arguments)
+
 	if err != nil {
 		return nil, utils.Errorf("AnalyzeCliParameter failed: %v", err)
 	}
+	nonce := utils.RandStringBytes(8)
+	userParams := fmt.Sprintf("<user_params_%v>\n%v\n</user_params_%v>", nonce, s, nonce)
 	return &ForgePromptParams{
-		UserParams:       arguments.String(),
+		UserParams:       userParams,
 		UserQuery:        query,
 		InitPrompt:       f.InitializePrompt,
 		PersistentPrompt: f.PersistentPrompt,

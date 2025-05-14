@@ -16,4 +16,7 @@ Schema如下：
 ```schema help="申请工具详情"
 {{ .Memory.Schema.ToolDescRequireSchema }}
 注意：如果你打算调用工具，一定要严格遵守Schema返回一个json数据，不要多余的解释或修饰信息。
+```{{else}}在执行这个任务的时候，系统框架并不为你提供任何工具，所以你需要直接根据任务当前状态给出你认为的信息，信息要求输出格式会通过一个Schema描述，请严格根据Schema构造JSON结果
+```Schema help="解读与文本结果"
+
 ```{{end}}

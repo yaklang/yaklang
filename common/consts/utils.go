@@ -58,8 +58,37 @@ func GetGlobalHTTPAuthInfo(host, authType string) *ypb.AuthInfo {
 	}
 	return nil
 }
+
 func TempFile(pattern string) (*os.File, error) {
 	return ioutil.TempFile(GetDefaultYakitBaseTempDir(), pattern)
+}
+
+func TempAIFile(pattern string) (*os.File, error) {
+	dirname := filepath.Clean(filepath.Join(GetDefaultYakitBaseTempDir(), "..", "aispace"))
+	if os.MkdirAll(dirname, os.ModePerm) != nil {
+		dirname = GetDefaultYakitBaseTempDir()
+	}
+	return ioutil.TempFile(dirname, pattern)
+}
+
+func TempAIFileFast(pattern string, datas ...any) string {
+	if pattern == "" {
+		pattern = "ai-*.tmp"
+	}
+	f, err := TempAIFile(pattern)
+	if err != nil {
+		log.Errorf("create temp file error: %v", err)
+		return ""
+	}
+	defer f.Close()
+	data := bytes.Join(
+		lo.Map(datas, func(item any, _ int) []byte {
+			return codec.AnyToBytes(item)
+		}),
+		[]byte("\r\n"),
+	)
+	f.Write(data)
+	return f.Name()
 }
 
 func TempFileFast(datas ...any) string {
