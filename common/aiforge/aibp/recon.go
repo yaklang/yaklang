@@ -1,12 +1,10 @@
 package aibp
 
 import (
-	"context"
 	_ "embed"
+
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 //go:embed recon_prompts/init.txt
