@@ -572,9 +572,16 @@ var syntaxflowFormat = &cli.Command{
 			}
 			rule, err := sfvm.FormatRule(string(raw))
 			if err != nil {
-				log.Errorf("failed to format file %s: %v", fileName, err)
+				log.Errorf("failed parse format file %s: %v", fileName, err)
 				return err
 			}
+
+			// check format rule
+			if _, err := sfvm.CompileRule(rule); err != nil {
+				log.Errorf("failed check format file %s: %v\nformat rule: \n%s", fileName, err, rule)
+				return err
+			}
+
 			err = os.WriteFile(fileName, []byte(rule), 0o666)
 			if err != nil {
 				log.Errorf("failed to write file %s: %v", fileName, err)
@@ -585,13 +592,12 @@ var syntaxflowFormat = &cli.Command{
 
 		for _, path := range c.Args() {
 			if utils.IsFile(path) {
-				format(path)
+				return format(path)
 			} else if utils.IsDir(path) {
 				log.Infof("syntaxflow-format: processing directory %s", path)
 
-				filesys.Recursive(path, filesys.WithFileSystem(filesys.NewLocalFs()), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
-					format(s)
-					return nil
+				return filesys.Recursive(path, filesys.WithFileSystem(filesys.NewLocalFs()), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+					return format(s)
 				}))
 			} else {
 				log.Errorf("syntaxflow-format: file %s not found", path)

@@ -79,6 +79,12 @@ func (s *SyntaxFlowVirtualMachine) Load(rule *schema.SyntaxFlowRule) (*SFFrame, 
 	return frame, nil
 }
 
+func CompileRule(rule string) (*SFFrame, error) {
+	vm := NewSyntaxFlowVirtualMachine()
+	frame, err := vm.Compile(rule)
+	return frame, err
+}
+
 func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret error) {
 	if text == "" {
 		return nil, utils.Errorf("SyntaxFlow compile error: text is nil")
