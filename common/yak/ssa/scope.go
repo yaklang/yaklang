@@ -3,6 +3,8 @@ package ssa
 import (
 	"fmt"
 
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
@@ -54,4 +56,20 @@ func (s *ScopeInstance) SetName() {
 	}
 	s.SetScopeName(fmt.Sprintf("fun(%d)-%d", s.fun.GetId(), s.fun.scopeId))
 	s.fun.scopeId++
+}
+
+func GetBlockByScope(scope ssautil.ScopedVersionedTableIF[Value]) *BasicBlock {
+	if scope == nil {
+		return nil
+	}
+	raw := scope.GetExternInfo("block")
+	if utils.IsNil(raw) {
+		log.Errorf("scope %s has no extern info with key[block]", scope.GetScopeName())
+		return nil
+	} else if block, ok := raw.(*BasicBlock); ok {
+		return block
+	} else {
+		log.Errorf("scope %s extern info with key[block] is not BasicBlock: %v", scope.GetScopeName(), raw)
+		return nil
+	}
 }

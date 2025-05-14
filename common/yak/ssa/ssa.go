@@ -394,6 +394,10 @@ type BasicBlock struct {
 	// BasicBlock graph
 	Preds, Succs []Value
 
+	// for CFG
+	Parent Value   // parent block
+	Child  []Value // child block
+
 	/*
 		if Condition == true: this block reach
 	*/
