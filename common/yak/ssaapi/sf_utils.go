@@ -25,7 +25,7 @@ func _SearchValues(values Values, mod int, handler func(string) bool, opt ...sfv
 func _SearchValue(value *Value, mod int, compare func(string) bool, opt ...sfvm.AnalysisContextOption) Values {
 	var newValue Values
 	if utils.IsNil(value.innerValue) {
-		return newValue
+		return SearchUser(value, mod, compare, opt...)
 	}
 
 	add := func(v *Value) {
