@@ -24,7 +24,7 @@ func CreateNote(db *gorm.DB, title, content string) (uint, error) {
 func FilterNote(db *gorm.DB, filter *ypb.NoteFilter) *gorm.DB {
 	db = db.Model(_note)
 	db = bizhelper.ExactQueryUInt64ArrayOr(db, "id", filter.Id)
-	db = bizhelper.ExactQueryStringArrayOr(db, "title", filter.Title)
+	db = bizhelper.FuzzQueryStringArrayOr(db, "title", filter.Title)
 	keyword := lo.Map(filter.GetKeyword(), func(item string, _ int) any {
 		return item
 	})
