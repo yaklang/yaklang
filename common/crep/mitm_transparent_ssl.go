@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/netx"
 	"io"
 	"io/ioutil"
@@ -84,7 +85,7 @@ func (m *MITMServer) handleHTTPS(ctx context.Context, conn net.Conn, origin stri
 	switch raw[0] {
 	case 0x16: // https
 		log.Infof("serving https for: %s", conn.RemoteAddr().String())
-		tconn := tls.Server(pc, m.mitmConfig.TLS())
+		tconn := gmtls.Server(pc, m.mitmConfig.TLS())
 		err := tconn.Handshake()
 		if err != nil {
 			return utils.Errorf("tls handshake failed: %s", err)

@@ -22,10 +22,10 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
-	"crypto/tls"
-	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	"github.com/yaklang/yaklang/common/gmsm/x509"
 	"github.com/yaklang/yaklang/common/minimartian/h2"
 	"github.com/yaklang/yaklang/common/utils"
 	"math/big"
@@ -52,13 +52,13 @@ type Config struct {
 	validity               time.Duration
 	org                    string
 	h2Config               *h2.Config
-	getCertificate         func(*tls.ClientHelloInfo) (*tls.Certificate, error)
+	getCertificate         func(*gmtls.ClientHelloInfo) (*gmtls.Certificate, error)
 	roots                  *x509.CertPool
 	skipVerify             bool
 	handshakeErrorCallback func(*http.Request, error)
 
 	certmu sync.RWMutex
-	certs  map[string]*tls.Certificate
+	certs  map[string]*gmtls.Certificate
 }
 
 // NewAuthority creates a new CA certificate and associated
@@ -103,7 +103,7 @@ func NewAuthority(name, organization string, validity time.Duration) (*x509.Cert
 		IsCA:                  true,
 	}
 
-	raw, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, pub, priv)
+	raw, err := x509.CreateCertificate(tmpl, tmpl, pub, priv)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -141,13 +141,13 @@ func NewConfig(ca *x509.Certificate, privateKey interface{}) (*Config, error) {
 
 	return &Config{
 		ca:       ca,
+		roots:    roots,
 		capriv:   privateKey,
 		priv:     priv,
 		keyID:    keyID,
 		validity: time.Hour,
 		org:      "Martian Proxy",
-		certs:    make(map[string]*tls.Certificate),
-		roots:    roots,
+		certs:    make(map[string]*gmtls.Certificate),
 	}, nil
 }
 
@@ -191,12 +191,12 @@ func (c *Config) HandshakeErrorCallback(r *http.Request, err error) {
 	}
 }
 
-// TLS returns a *tls.Config that will generate certificates on-the-fly using
+// TLS returns a *gmtls.Config that will generate certificates on-the-fly using
 // the SNI extension in the TLS ClientHello.
-func (c *Config) TLS() *tls.Config {
-	return &tls.Config{
+func (c *Config) TLS() *gmtls.Config {
+	return &gmtls.Config{
 		InsecureSkipVerify: c.skipVerify,
-		GetCertificate: func(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+		GetCertificate: func(clientHello *gmtls.ClientHelloInfo) (*gmtls.Certificate, error) {
 			if clientHello.ServerName == "" {
 				if clientHello.Conn != nil && clientHello.Conn.LocalAddr() != nil {
 					host := utils.ExtractHost(clientHello.Conn.LocalAddr().String())
@@ -211,16 +211,16 @@ func (c *Config) TLS() *tls.Config {
 	}
 }
 
-// TLSForHost returns a *tls.Config that will generate certificates on-the-fly
+// TLSForHost returns a *gmtls.Config that will generate certificates on-the-fly
 // using SNI from the connection, or fall back to the provided hostname.
-func (c *Config) TLSForHost(hostname string, h2Verify bool) *tls.Config {
+func (c *Config) TLSForHost(hostname string, h2Verify bool) *gmtls.Config {
 	nextProtos := []string{"http/1.1"}
 	if c.h2AllowedHost(hostname) && h2Verify {
 		nextProtos = []string{"h2", "http/1.1"}
 	}
-	return &tls.Config{
+	return &gmtls.Config{
 		InsecureSkipVerify: c.skipVerify,
-		GetCertificate: func(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+		GetCertificate: func(clientHello *gmtls.ClientHelloInfo) (*gmtls.Certificate, error) {
 			host := clientHello.ServerName
 			if host == "" {
 				host = hostname
@@ -240,11 +240,11 @@ func (c *Config) h2AllowedHost(host string) bool {
 	//	c.h2Config.AllowedHostsFilter(host)
 }
 
-func (c *Config) GetCertificateByHostname(hostname string) (*tls.Certificate, error) {
+func (c *Config) GetCertificateByHostname(hostname string) (*gmtls.Certificate, error) {
 	return c.cert(hostname)
 }
 
-func (c *Config) cert(hostname string) (*tls.Certificate, error) {
+func (c *Config) cert(hostname string) (*gmtls.Certificate, error) {
 	// Remove the port if it exists.
 	host, _, err := net.SplitHostPort(hostname)
 	if err == nil {
@@ -301,7 +301,7 @@ func (c *Config) cert(hostname string) (*tls.Certificate, error) {
 		tmpl.DNSNames = []string{hostname}
 	}
 
-	raw, err := x509.CreateCertificate(rand.Reader, tmpl, c.ca, c.priv.Public(), c.capriv)
+	raw, err := x509.CreateCertificate(tmpl, c.ca, c.priv.Public(), c.priv)
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +312,7 @@ func (c *Config) cert(hostname string) (*tls.Certificate, error) {
 		return nil, err
 	}
 
-	tlsc = &tls.Certificate{
+	tlsc = &gmtls.Certificate{
 		Certificate: [][]byte{raw, c.ca.Raw},
 		PrivateKey:  c.priv,
 		Leaf:        x509c,

@@ -3,9 +3,10 @@ package cybertunnel
 import (
 	"bufio"
 	"bytes"
-	"crypto/tls"
 	"fmt"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	"github.com/yaklang/yaklang/common/gmsm/x509"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian/mitm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -192,16 +193,12 @@ func (t *HTTPTrigger) Serve() error {
 	if err != nil {
 		return err
 	}
-	caCert, _, err := tlsutils.ParseCertAndPriKeyAndPool(caPem, caPrivateKey)
-	if err != nil {
-		return utils.Wrap(err, "parse cert and private key failed")
-	}
 
-	cert, err := tlsutils.ParsePEMCert(caPem)
+	cert, err := x509.ParseCertificate(caPem)
 	if err != nil {
-		return utils.Wrap(err, "parse cert failed")
+		return utils.Errorf("extract x509 cert failed: %s", err)
 	}
-	mitmConfig, err := mitm.NewConfig(cert, caCert.PrivateKey)
+	mitmConfig, err := mitm.NewConfig(cert, caPrivateKey)
 	if err != nil {
 		return utils.Errorf("create mitm config failed: %s", err)
 	}
@@ -261,7 +258,7 @@ func (t *HTTPTrigger) Serve() error {
 					}
 				}()
 
-				conn = tls.Server(conn, mitmConfig.TLS())
+				conn = gmtls.Server(conn, mitmConfig.TLS())
 
 				defer conn.Close()
 				cr := bufio.NewReader(conn)

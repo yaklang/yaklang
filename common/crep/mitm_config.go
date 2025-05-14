@@ -4,14 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/rsa"
-	"crypto/tls"
-	"crypto/x509"
+	tlsx509 "crypto/x509"
 	"encoding/pem"
-	"net"
-	"net/http"
-	"net/url"
-	"time"
-
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	"github.com/yaklang/yaklang/common/gmsm/x509"
 	log "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian"
 	"github.com/yaklang/yaklang/common/minimartian/h2"
@@ -19,6 +15,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
+	"net"
+	"net/http"
+	"net/url"
+	"time"
 )
 
 // request modifier
@@ -97,33 +97,33 @@ func MITM_SetCaCertAndPrivKey(ca []byte, key []byte) MITMConfig {
 			return MITM_SetCaCertAndPrivKey(defaultCA, defaultKey)(server)
 		}
 
-		c, err := tls.X509KeyPair(ca, key)
-		if err != nil {
+		c, err := gmtls.X509KeyPair(ca, key)
+		if err != nil { // use tls x509 fix
 			// if not pem blocks
 			// try to parse as der
-			caDer, err := x509.ParseCertificate(ca)
+			caDer, err := tlsx509.ParseCertificate(ca)
 			if err != nil {
 				return utils.Errorf("parse ca[pem/der] failed: %s", err)
 			}
 			ca = pem.EncodeToMemory(&pem.Block{Type: `CERTIFICATE`, Bytes: caDer.Raw})
-			keyDer, err := x509.ParsePKCS8PrivateKey(key)
+			keyDer, err := tlsx509.ParsePKCS8PrivateKey(key)
 			if err != nil {
 				log.Warnf("parse key[pem/der] pkcs8 pkey failed: %s", err)
-				keyDer, err = x509.ParsePKCS1PrivateKey(key)
+				keyDer, err = tlsx509.ParsePKCS1PrivateKey(key)
 				if err != nil {
 					return utils.Errorf("parse key[pem/der] pkcs1/pkcs8 pkey failed: %s", err)
 				}
 				// pkcs1
-				key = pem.EncodeToMemory(&pem.Block{Type: `RSA PRIVATE KEY`, Bytes: x509.MarshalPKCS1PrivateKey(keyDer.(*rsa.PrivateKey))})
+				key = pem.EncodeToMemory(&pem.Block{Type: `RSA PRIVATE KEY`, Bytes: tlsx509.MarshalPKCS1PrivateKey(keyDer.(*rsa.PrivateKey))})
 			} else {
 				// pkcs8
-				keyRawBytes, err := x509.MarshalPKCS8PrivateKey(keyDer)
+				keyRawBytes, err := tlsx509.MarshalPKCS8PrivateKey(keyDer)
 				if err != nil {
 					return utils.Errorf("marshal key[pem/der] pkcs8 pkey failed: %s", err)
 				}
 				key = pem.EncodeToMemory(&pem.Block{Type: `PRIVATE KEY`, Bytes: keyRawBytes})
 			}
-			c, err = tls.X509KeyPair(ca, key)
+			c, err = gmtls.X509KeyPair(ca, key)
 			if err != nil {
 				return utils.Errorf("parse ca and privKey (DER) failed: %s", err)
 			}
@@ -151,9 +151,10 @@ func MITM_SetCaCertAndPrivKey(ca []byte, key []byte) MITMConfig {
 
 		certPool, err := x509.SystemCertPool()
 		if err != nil {
-			log.Fatal("Failed to retrieve system certificates pool")
+			log.Errorf("Failed to retrieve system certificates pool")
+		} else {
+			certPool.AddCert(cert) // even though user may not add yak certificate yet, we add it manually
 		}
-		certPool.AddCert(cert) // even though user may not add yak certificate yet, we add it manually
 
 		defaultH2Config.RootCAs = certPool
 		defaultH2Config.AllowedHostsFilter = func(_ string) bool { return true }

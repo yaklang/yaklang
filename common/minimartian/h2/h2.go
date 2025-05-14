@@ -17,10 +17,10 @@ package h2
 
 import (
 	"bytes"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/hex"
 	"fmt"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	"github.com/yaklang/yaklang/common/gmsm/x509"
 	"github.com/yaklang/yaklang/common/log"
 	"golang.org/x/net/http2"
 	"io"
@@ -57,7 +57,7 @@ func (c *Config) Proxy(closing chan bool, cc io.ReadWriter, url *url.URL) error 
 	if c.EnableDebugLogs {
 		log.Infof("\u001b[1;35mProxying %v with HTTP/2\u001b[0m", url)
 	}
-	sc, err := tls.Dial("tcp", url.Host, &tls.Config{
+	sc, err := gmtls.Dial("tcp", url.Host, &gmtls.Config{
 		RootCAs:    c.RootCAs,
 		NextProtos: []string{"h2"},
 	})
