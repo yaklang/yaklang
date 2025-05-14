@@ -1,0 +1,49 @@
+text = cli.String("text", cli.setHelp("直接输入的长文本"))
+filePath = cli.String("filePath", cli.setHelp("长文本文件"))
+cli.check()
+
+forgeHandle = func(params) {
+        ctx = context.Background()
+        textChan = make(chan string)
+        if text != "" {
+            textChan = str.TextReaderSplit(ctx,str.NewReader(text))
+        }elif filePath != "" {
+            textChan = str.TextReaderSplit(ctx, file.Open(filePath)~)
+        }else {
+            return
+        }
+		fragmentSummarize := func(poly) {
+			result, err := aiagent.ExecuteForge(
+				"fragment_summarizer",
+                {
+                    "textSnippet": poly,
+                    "limit": 100
+                }
+			)
+			if err != nil {
+				return ""
+			}
+			return result
+		}
+
+		textReducer := x.NewReducer(10, func(data) {
+			polyData := str.Join(data, "\n")
+			return fragmentSummarize(polyData)
+		})
+
+		for s := range textChan {
+			textReducer.Push(fragmentSummarize(s))
+		}
+		reduceData := str.Join(textReducer.GetData(), "\n")
+		result, err := aiagent.ExecuteForge(
+			"fragment_summarizer",
+            {
+                "textSnippet": reduceData,
+                "limit": 300
+            }
+		)
+		if err != nil {
+			return nil
+		}
+		return result
+}
