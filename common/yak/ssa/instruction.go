@@ -135,8 +135,9 @@ func NewErrorHandler(try *BasicBlock) *ErrorHandler {
 	try.Handler = e
 	return e
 }
-func (e *ErrorHandler) AddCatch(c *BasicBlock) {
+func (e *ErrorHandler) AddCatch(c *BasicBlock, exception Value) {
 	e.Catch = append(e.Catch, c)
+	e.Exception = append(e.Exception, exception)
 }
 
 func NewExternLib(variable string, builder *FunctionBuilder, table map[string]any) *ExternLib {

@@ -399,8 +399,9 @@ func (i *IfBuilder) Build() *IfBuilder {
 }
 
 type tryCatchItem struct {
-	errorVariable func() string
-	catchBody     func()
+	exceptionParameter     func() string
+	exceptionParameterType func() Type
+	catchBody              func()
 }
 
 type TryBuilder struct {
@@ -427,10 +428,23 @@ func (t *TryBuilder) BuildTryBlock(f func()) {
 	t.buildTry = f
 }
 
-func (t *TryBuilder) BuildErrorCatch(err func() string, catch func()) {
+func defaultExceptionParameterType() Type {
+	return BasicTypes[ErrorTypeKind]
+}
+
+func (t *TryBuilder) BuildErrorCatch(
+	err func() string, catch func(),
+	errTypes ...func() Type,
+) {
+	errType := defaultExceptionParameterType
+	if len(errTypes) > 0 {
+		errType = errTypes[0]
+	}
+
 	t.buildCatchItem = append(t.buildCatchItem, tryCatchItem{
-		errorVariable: err,
-		catchBody:     catch,
+		exceptionParameter:     err,
+		exceptionParameterType: errType,
+		catchBody:              catch,
 	})
 }
 
@@ -460,18 +474,25 @@ func (t *TryBuilder) Finish() {
 
 	// build catch
 	for _, item := range t.buildCatchItem {
+		// catch block
 		catchBody := builder.NewBasicBlock(TryCatch)
-		errorHandler.AddCatch(catchBody)
 		builder.CurrentBlock = catchBody
+
+		// catch exception
+		id := item.exceptionParameter()
+		exception := builder.EmitUndefined(id)
+		exception.Kind = UndefinedValueValid
+		exception.SetType(item.exceptionParameterType())
+
+		// add instruction
+		errorHandler.AddCatch(catchBody, exception)
+
+		// add scope and callback
 		tryBuilder.AddCache(func(svti ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
 			builder.CurrentBlock.SetScope(svti)
+			variable := builder.CreateLocalVariable(id)
+			builder.AssignVariable(variable, exception)
 			// error variable
-			if id := item.errorVariable(); id != "" {
-				p := NewParam(id, false, builder)
-				p.SetType(BasicTypes[ErrorTypeKind])
-				variable := builder.CreateLocalVariable(id)
-				builder.AssignVariable(variable, p)
-			}
 			// catch body
 			if item.catchBody != nil {
 				item.catchBody()

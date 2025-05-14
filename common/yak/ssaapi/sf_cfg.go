@@ -38,6 +38,7 @@ func SearchUser(value *Value, mod int, compare func(string) bool, opt ...sfvm.An
 	switch inst := inst.(type) {
 	case *ssa.ErrorHandler:
 		addItems([]string{"catch"}, inst.Catch...)
+		addItems([]string{"exception"}, inst.Exception...)
 		addItems([]string{"finally"}, inst.Final)
 		addItems([]string{"try"}, inst.Try)
 		addItems([]string{"final"}, inst.Final)

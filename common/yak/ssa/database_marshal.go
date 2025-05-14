@@ -201,6 +201,9 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		if len(ret.Catch) != 0 {
 			params["errorhandler_catch"] = fetchIds(ret.Catch)
 		}
+		if len(ret.Exception) != 0 {
+			params["errorhandler_exception"] = fetchIds(ret.Exception)
+		}
 		if ret.Final != nil {
 			params["errorhandler_finally"] = ret.Final.GetId()
 		}
@@ -510,6 +513,7 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 	case *ErrorHandler:
 		ret.Try = unmarshalValue(params["errorhandler_try"])
 		ret.Catch = unmarshalValues(params["errorhandler_catch"])
+		ret.Exception = unmarshalValues(params["errorhandler_exception"])
 		ret.Final = unmarshalValue(params["errorhandler_finally"])
 		ret.Done = unmarshalValue(params["errorhandler_done"])
 	case *Jump:
