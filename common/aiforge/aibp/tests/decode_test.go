@@ -71,7 +71,7 @@ func TestCodecTest1(t *testing.T) {
 		[]*ypb.ExecParamItem{
 			{Key: "query", Value: "帮我解答一个CTF题目，题目类型是加解密，附件内容是：RzRaVE1PQldHVTNFR05TREdaQ0RNTUpYR1EzREtOWlRHNUJETU1SVEdRWkRJTVpUR0kyREtSUlRHRVpUTU5LR0dNWlRHTVJWSVlaVE1NWlVHNUNBPT09PQ=="},
 		},
-		aid.WithYOLO(),
+		aid.WithAgreeYOLO(),
 		aid.WithAiToolsSearchTool(),
 		aid.WithAICallback(aiforge.GetOpenRouterAICallbackWithProxy()),
 		aid.WithDebugPrompt(true),
