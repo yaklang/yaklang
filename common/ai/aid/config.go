@@ -1,8 +1,10 @@
 package aid
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"io"
 	"math/rand/v2"
 	"sync"
@@ -616,9 +618,13 @@ func WithForgeParams(i any) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
-		// set persistent prompt
-		result := utils.Jsonify(i)
-		config.memory.StoreAppendPersistentInfo(fmt.Sprint(`用户原始输入：` + string(result)))
+		var buf bytes.Buffer
+		nonce := utils.RandStringBytes(8)
+		buf.WriteString("<user_input_" + nonce + ">\n")
+		buf.WriteString(aispec.ShrinkAndSafeToFile(i))
+		buf.WriteString("\n</user_input_" + nonce + ">\n")
+		// log.Infof("user nonce params: \n%v", buf.String())
+		config.memory.StoreAppendPersistentInfo(buf.String())
 
 		// if cli parameter not nil , should init user data
 		if params, ok := i.([]*ypb.ExecParamItem); ok {

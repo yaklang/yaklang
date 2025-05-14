@@ -1,0 +1,38 @@
+{
+  "type": "object",
+  "required": ["@action"],
+  "properties": {
+    "@action": {
+      "type": "string",
+      "enum": ["require-more-tool", "finished"],
+      "x-generation-rules": [
+        "根据调用结果检查是否完成当前子任务，如果你认为未完成，需要调用更多工具，则使用require-more-tool",
+        "如果你认为任务已经完成，请使用finished"
+      ]
+    },
+    "status_summary": {
+      "type": "string",
+      "description": "当前执行工具调用后，有什么启发？需要包含当前任务的进度和总结信息和下一次任务的提示信息，这些提示信息会在后续的任务中使用到，帮助下一步进行更好决策"
+    },
+    "task_long_summary": {
+      "type": "string",
+      "description": "在任务完成的情况下，给出这个任务的总结，控制在300token左右，只在特定情况下出现。"
+    },
+    "task_short_summary": {
+      "type": "string",
+      "description": "任务完成时精炼版，保留最关键信息不删减，这个短总结会出现在后面所有的进度展示中，如果你想提供一些针对后面任务的建议或者影响，也可以设置在这里。"
+    },
+    "shrink_similar_tool_call_result": {
+      "type": "string",
+      "x-generation-rules": [
+        "如果当前时间线上没有其他工具调用，则不需要压缩，设置为空",
+        "这个规则只在你觉得工具调用结果会干扰到后续的工具调用时才需要使用，不必每次都使用"
+      ],
+      "description": "工具调用结果压缩优化：如果当前工具执行结果和之前的工具结果高度类似，则需要把不同的结果展示出来，把结果中重复的部分使用...[similar to (ID: xx)]... 代替，这会极大减轻上下文压力"
+    },
+    "summary_tool_call_result": {
+      "type": "string",
+      "description": "总结本地工具调用的关键参数和核心结果，在工具调用结果很多的情况下，为了压缩上下文，过时的工具执行结果将会使用summary_tool_call_result来代替"
+    }
+  }
+}
