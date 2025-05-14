@@ -575,6 +575,9 @@ var StringsExport = map[string]interface{}{
 	"Cut":                 strings.Cut,
 	"CutPrefix":           strings.CutPrefix,
 	"CutSuffix":           strings.CutSuffix,
+
+	"TextReaderSplit": utils.DefaultTextSplitter.SplitReader,
+	"TextSplit":       utils.DefaultTextSplitter.Split,
 }
 
 func init() {

@@ -15,7 +15,7 @@ func TestNetScan(t *testing.T) {
 		[]*ypb.ExecParamItem{
 			{Key: "query", Value: "www.example.com"},
 		},
-		aid.WithYOLO(),
+		aid.WithAgreeYOLO(),
 		aid.WithDebugPrompt(true),
 		aid.WithAiToolsSearchTool(),
 		aid.WithAICallback(aiforge.GetQwenAICallback("qwen3-30b-a3b")),

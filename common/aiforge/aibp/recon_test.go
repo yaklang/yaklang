@@ -18,7 +18,7 @@ func TestRecon(t *testing.T) {
 		[]*ypb.ExecParamItem{
 			{Key: "target", Value: "www.example.com"},
 		},
-		aid.WithYOLO(),
+		aid.WithAgreeYOLO(),
 		aid.WithDebugPrompt(true),
 		aid.WithAICallback(aiforge.GetOpenRouterAICallbackWithProxy()),
 	)

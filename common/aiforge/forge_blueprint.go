@@ -55,9 +55,6 @@ type ForgeBlueprint struct {
 func NewForgeBlueprint(name string, opts ...Option) *ForgeBlueprint {
 	forge := &ForgeBlueprint{
 		Name: name,
-		ParameterRuleYaklangCode: `
-cli.String("query", cli.setHelp("用户自由输入"), cli.setRequired(true))
-cli.check()`,
 	}
 	for _, opt := range opts {
 		opt(forge)

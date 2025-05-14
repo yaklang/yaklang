@@ -10,7 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 
-	_ "github.com/yaklang/yaklang/common/yak"
 )
 
 func GetYakScript(fs embed.FS, name string) (string, error) {

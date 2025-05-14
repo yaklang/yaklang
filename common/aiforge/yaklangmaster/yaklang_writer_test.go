@@ -18,7 +18,7 @@ func TestYaklangWriter(t *testing.T) {
 			{Key: "query", Value: "帮我写一个检查/tmp下所有文件和敏感信息的脚本"},
 		},
 		aid.WithAICallback(aiforge.GetOpenRouterAICallback()),
-		aid.WithAgreeAuto(true, 10*time.Second),
+		aid.WithAgreeAuto(10*time.Second),
 		aid.WithDebugPrompt(),
 	)
 	if err != nil {

@@ -60,6 +60,7 @@ var ProfileTables = []interface{}{
 	&SyntaxFlowGroup{},
 	&PluginEnv{},
 	&HotPatchTemplate{},
+	&AIForge{},
 
 	&AiProvider{},   // for aibalance
 	&AiApiKeys{},    // for aibalance

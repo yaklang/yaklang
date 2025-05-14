@@ -21,7 +21,7 @@ func TestXSS(t *testing.T) {
 		//	return aiforge.GetOpenRouterAICallback()(config, req)
 		//}),
 		// aid.WithPlanAICallback(aiforge.GetQwenAICallback("deepseek-r1")),
-		aid.WithAgreeAuto(true, 100*time.Millisecond),
+		aid.WithAgreeAuto( 100*time.Millisecond),
 		aid.WithDebugPrompt(true),
 		aid.WithAITransactionRetry(5),
 		aid.WithTimeLineLimit(5),

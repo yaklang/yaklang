@@ -55,7 +55,7 @@ func main() {
 		aid.WithTools(aid.GetAllMockTools()...),
 		aid.WithSystemFileOperator(),
 		aid.WithDebugPrompt(),
-		aid.WithYOLO(true),
+		aid.WithAgreeYOLO(true),
 		aid.WithTimeLineLimit(5),
 	)
 	if err != nil {

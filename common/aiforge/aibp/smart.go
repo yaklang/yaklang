@@ -72,7 +72,7 @@ func newSmartForge(callback func(result *SmartResult), opts ...aid.Option) *aifo
 		}),
 		aiforge.WithAIDOptions(append(
 			opts,
-			aid.WithYOLO(true),
+			aid.WithAgreeYOLO(true),
 			aid.WithDisableToolUse(true),
 		)...),
 	)

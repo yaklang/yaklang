@@ -128,7 +128,7 @@ func TestDecodeBase64BySearchTool(t *testing.T) {
 	currentStateIndex := 0
 	coordinator, err := NewCoordinator("帮我解码一个base64编码的字符串: eWFrbGFuZw==",
 		WithAiToolsSearchTool(),
-		WithYOLO(),
+		WithAgreeYOLO(),
 		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
 			prompt := request.GetPrompt()
 			pair := stateKeyword[currentStateIndex]
