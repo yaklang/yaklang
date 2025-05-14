@@ -58,7 +58,6 @@ func searchAlongBasicBlock(
 	direction direction,
 ) []sfvm.ValueOperator {
 	basicBlockInfo := &basicBlockInfo{
-		currentBlock:    nil,
 		prog:            prog,
 		frame:           frame,
 		recursiveConfig: nil,
@@ -100,7 +99,7 @@ func (b *basicBlockInfo) searchBlock(value ssa.Value) {
 	}
 	b.visited[blockId] = struct{}{}
 	if b.index != 0 {
-		b.searchInsts()
+		b.searchInsts(block)
 		if b.isFinish {
 			return
 		}
@@ -122,7 +121,7 @@ func (b *basicBlockInfo) searchBlock(value ssa.Value) {
 			}
 		}
 	case Current:
-		b.searchInsts()
+		b.searchInsts(block)
 		if b.isFinish {
 			break
 		}
@@ -130,11 +129,19 @@ func (b *basicBlockInfo) searchBlock(value ssa.Value) {
 	}
 }
 
-func (b *basicBlockInfo) searchInsts() {
-	for _, inst := range b.currentBlock.Insts {
+func (b *basicBlockInfo) searchInsts(block *ssa.BasicBlock) {
+	for _, inst := range block.Insts {
+		if jump, ok := ssa.ToJump(inst); ok {
+			_ = jump
+			block, ok := ssa.ToBasicBlock(jump.To)
+			if ok && b.currentBlock.HaveSubBlock(block) {
+				b.searchInsts(block)
+			}
+			continue
+		}
 		value, err := b.prog.NewValue(inst)
 		if err != nil {
-			// log.Warnf("NewValue error: %s", err)
+			log.Warnf("NewValue error: %s", err)
 			continue
 		}
 		if b.recursiveConfig.configItems == nil {

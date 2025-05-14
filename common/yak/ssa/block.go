@@ -87,6 +87,38 @@ func (b *BasicBlock) SetScope(s ScopeIF) {
 		log.Errorf("block %v already has a scope", b.GetName())
 	}
 	b.ScopeTable = s
+	{
+		if block := GetBlockByScope(s); block != nil {
+			log.Errorf("block %v set scope %v, but this scope already has block %v", b.GetName(), s.GetScopeName(), block.GetName())
+		}
+		s.SetExternInfo("block", b)
+	}
+	{
+		if block := GetBlockByScope(s.GetParent()); block != nil {
+			b.Parent = block
+			block.Child = append(block.Child, b)
+		}
+	}
+}
+
+func (b *BasicBlock) HaveSubBlock(sub Value) bool {
+	if b == nil || sub == nil {
+		return false
+	}
+
+	for {
+		subBlock, ok := ToBasicBlock(sub)
+		if !ok {
+			log.Errorf("BasicBlock.HaveSubBlock: sub %v is not a basic block", sub)
+			return false
+		}
+
+		if b.GetId() == subBlock.GetId() {
+			return true
+		}
+
+		sub = subBlock.Parent
+	}
 }
 
 /*

@@ -157,6 +157,14 @@ func ToMake(v Instruction) (*Make, bool) {
 	return p, ok
 }
 
+func ToJump(v Instruction) (*Jump, bool) {
+	if lz, isLZ := ToLazyInstruction(v); isLZ {
+		return ToJump(lz.Self())
+	}
+	j, ok := v.(*Jump)
+	return j, ok
+}
+
 // type cover
 
 func ToObjectType(t Type) (*ObjectType, bool)        { o, ok := t.(*ObjectType); return o, ok }
