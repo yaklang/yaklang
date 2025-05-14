@@ -17,7 +17,7 @@ func TestTravelMaster(t *testing.T) {
 	result, err := aiforge.ExecuteForge("travelmaster", context.Background(), []*ypb.ExecParamItem{
 		{Key: "query", Value: "帮我规划旅游计划，从成都到北京，7天，预算中等，兴趣爱好是文化、美食、科技，我需要详细的每日行程安排，包括住宿、餐饮和交通方案"}},
 		aid.WithAICallback(aiforge.GetOpenRouterAICallback()),
-		aid.WithAgreeAuto(true, 100*time.Millisecond),
+		aid.WithAgreeAuto(100*time.Millisecond),
 		aid.WithDebugPrompt(true),
 	)
 	if err != nil {

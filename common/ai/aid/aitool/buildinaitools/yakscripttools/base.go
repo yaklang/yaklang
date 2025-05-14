@@ -27,9 +27,35 @@ var overrideYakScriptAiToolsOnce sync.Once
 func OverrideYakScriptAiTools() {
 	overrideYakScriptAiToolsOnce.Do(func() {
 		db := consts.GetGormProfileDatabase()
-		aiTools := loadAllYakScriptFromEmbedFS()
-		for _, aiTool := range aiTools {
-			schema.SaveAIYakTool(db, aiTool)
+		allToolNames := []string{}
+		efs := filesys.NewEmbedFS(yakScriptFS)
+		_ = filesys.Recursive(".", filesys.WithFileSystem(efs), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+			filename := info.Name()
+			_, filename = efs.PathSplit(filename)
+			if efs.Ext(filename) != ".yak" {
+				return nil
+			}
+			toolname := strings.TrimSuffix(filename, ".yak")
+			allToolNames = append(allToolNames, toolname)
+			return nil
+		}))
+		update := false
+		for _, toolname := range allToolNames {
+			aiTool, err := schema.GetAIYakTool(db, toolname)
+			if err != nil {
+				update = true
+				break
+			}
+			if aiTool == nil {
+				update = true
+				break
+			}
+		}
+		if update {
+			aiTools := loadAllYakScriptFromEmbedFS()
+			for _, aiTool := range aiTools {
+				schema.SaveAIYakTool(db, aiTool)
+			}
 		}
 	})
 }
@@ -91,14 +117,11 @@ func loadYakScriptToAiTools(name string, content string) *schema.AIYakTool {
 	}
 }
 
-
-
 var toolCovertHandle func(aitools []*schema.AIYakTool) []*aitool.Tool
 
 func RegisterYakScriptAiToolsCovertHandle(handle func(aitools []*schema.AIYakTool) []*aitool.Tool) {
 	toolCovertHandle = handle
 }
-
 
 func covertTools(tools []*schema.AIYakTool) []*aitool.Tool {
 	if toolCovertHandle == nil {

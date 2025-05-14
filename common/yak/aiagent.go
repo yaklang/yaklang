@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -15,8 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"strings"
 )
 
 func init() {
@@ -114,12 +115,14 @@ var AIAgentExport = map[string]any{
 	// todo: need to split?
 
 	//  create ai forge blue print
-	"CreateForge":      aiforge.NewForgeBlueprint,
-	"tools":            aiforge.WithTools,
-	"initPrompt":       aiforge.WithInitializePrompt,
-	"persistentPrompt": aiforge.WithPersistentPrompt,
-	"plan":             aiforge.WithPlanMocker,
-	"aidOptions":       aiforge.WithAIDOptions,
+	"CreateForge":         aiforge.NewForgeBlueprint,
+	"NewForgeBuilder":     aiforge.NewYakForgeBlueprintConfig,
+	"CreateForgeFromJson": aiforge.NewYakForgeBlueprintConfigFromJson,
+	"tools":               aiforge.WithTools,
+	"initPrompt":          aiforge.WithInitializePrompt,
+	"persistentPrompt":    aiforge.WithPersistentPrompt,
+	"plan":                aiforge.WithPlanMocker,
+	"aidOptions":          aiforge.WithAIDOptions,
 
 	/*
 		aid api

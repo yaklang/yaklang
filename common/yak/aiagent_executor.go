@@ -2,6 +2,7 @@ package yak
 
 import (
 	"context"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
@@ -10,9 +11,15 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 var HOOK_AI_FORGE = "forgeHandle"
+var DEFAULT_INIT_PROMPT_NAME = "__INIT_PROMPT__"
+var DEFAULT_PERSISTENT_PROMPT_NAME = "__PERSISTENT_PROMPT__"
+var DEFAULT_PLAN_PROMPT_NAME = "__PLAN_PROMPT__"
+var DEFAULT_RESULT_PROMPT_NAME = "__RESULT_PROMPT__"
+var DEFAULT_FORGE_HANDLE_NAME = "__DEFAULT_FORGE_HANDLE__"
 
 type Option func(*Agent) error
 
@@ -142,6 +149,15 @@ func ExecuteForge(forgeName string, i any, opts ...Option) (any, error) {
 	params := aiforge.Any2ExecParams(i)
 	engine := NewYakitVirtualClientScriptEngine(nil)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
+		defaultForgeHandle := buildDefaultForgeHandle(engine)
+		engine.GetVM().SetVars(map[string]any{
+			DEFAULT_INIT_PROMPT_NAME:       forgeIns.InitPrompt,
+			DEFAULT_PERSISTENT_PROMPT_NAME: forgeIns.PersistentPrompt,
+			DEFAULT_PLAN_PROMPT_NAME:       forgeIns.PlanPrompt,
+			DEFAULT_RESULT_PROMPT_NAME:     forgeIns.ResultPrompt,
+			DEFAULT_FORGE_HANDLE_NAME:      defaultForgeHandle,
+			HOOK_AI_FORGE:                  defaultForgeHandle,
+		})
 		app := GetHookCliApp(makeArgs(ag.ctx, params))
 		BindYakitPluginContextToEngine(engine, CreateYakitPluginContext(
 			ag.RuntimeID,
@@ -181,4 +197,52 @@ func (ag *Agent) AIDOptions() []aid.Option {
 		aidopts = append(aidopts, aid.WithAICallback(ag.GeneralAICallback))
 	}
 	return append(aidopts, ag.ExtendAIDOptions...)
+}
+
+func buildDefaultForgeHandle(engine *antlr4yak.Engine) func(items []*ypb.ExecParamItem, opts ...aid.Option) (any, error) {
+	getStringVar := func(name string) (string, bool) {
+		initPrompt, ok := engine.GetVM().GetVar(name)
+		if !ok {
+			return "", false
+		}
+		initPromptStr, ok := initPrompt.(string)
+		if !ok {
+			return "", false
+		}
+		return initPromptStr, true
+	}
+	return func(items []*ypb.ExecParamItem, opts ...aid.Option) (any, error) {
+		initPrompt, ok := getStringVar(DEFAULT_INIT_PROMPT_NAME)
+		if !ok {
+			return nil, utils.Errorf("init prompt is nil")
+		}
+		persistentPrompt, ok := getStringVar(DEFAULT_PERSISTENT_PROMPT_NAME)
+		if !ok {
+			return nil, utils.Errorf("persistent prompt is nil")
+		}
+		planPrompt, ok := getStringVar(DEFAULT_PLAN_PROMPT_NAME)
+		if !ok {
+			return nil, utils.Errorf("plan prompt is nil")
+		}
+		resultPrompt, ok := getStringVar(DEFAULT_RESULT_PROMPT_NAME)
+		if !ok {
+			return nil, utils.Errorf("result prompt is nil")
+		}
+		cfg := aiforge.NewYakForgeBlueprintConfig("", initPrompt, persistentPrompt).
+			WithPlanPrompt(planPrompt).
+			WithResultPrompt(resultPrompt)
+		blueprint, err := cfg.Build()
+		if err != nil {
+			return nil, utils.Errorf("failed to build forge handle: %v", err)
+		}
+		ins, err := blueprint.CreateCoordinator(context.Background(), items, opts...)
+		if err != nil {
+			return nil, err
+		}
+		if err := ins.Run(); err != nil {
+			return nil, err
+		}
+
+		return cfg.ForgeResult, nil
+	}
 }

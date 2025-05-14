@@ -20,6 +20,23 @@ type ForgeResult struct {
 	Forge    *ForgeBlueprint
 }
 
+func RegisterYakAiForge(cfg *YakForgeBlueprintConfig) error {
+	blueprint, err := cfg.Build()
+	if err != nil {
+		return err
+	}
+	return RegisterForgeExecutor(cfg.Name, func(ctx context.Context, items []*ypb.ExecParamItem, opts ...aid.Option) (*ForgeResult, error) {
+		ins, err := blueprint.CreateCoordinator(ctx, items, opts...)
+		if err != nil {
+			return nil, err
+		}
+		if err := ins.Run(); err != nil {
+			return nil, err
+		}
+		return cfg.ForgeResult, nil
+	})
+}
+
 func RegisterForgeExecutor(i string, f ForgeExecutor) error {
 	forgeMutex.Lock()
 	if _, ok := forges[i]; ok {
