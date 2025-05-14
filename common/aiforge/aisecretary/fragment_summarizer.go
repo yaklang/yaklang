@@ -43,7 +43,7 @@ cli.Int("limit",cli.help("字数限制"))
 `),
 
 			aiforge.WithAIDOptions(
-				aid.WithYOLO(true),
+				aid.WithAgreeYOLO(true),
 				aid.WithExtendedActionCallback("summarize", func(config *aid.Config, action *aid.Action) {
 					summary = action.GetString("summary")
 				}),
