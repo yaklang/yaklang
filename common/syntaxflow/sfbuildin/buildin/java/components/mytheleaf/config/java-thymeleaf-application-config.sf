@@ -8,19 +8,26 @@ TEXT
 	rule_id: "d2434f8f-e41c-447d-a900-3823e56248c8"
 )
 
-${*.properties}.regexp(/spring\.(thymeleaf\.\S*)/) as $regex;
-alert $regex
-
-
-desc(
-	lang: java
-	alert_min: 3
-	'file://application.properties': <<<EOF
-spring.thymeleaf.cache=false
-spring.thymeleaf.prefix=classpath:/templates/
-spring.thymeleaf.suffix=.html
-spring.thymeleaf.mode=HTML
-spring.thymeleaf.encoding=UTF-8
-spring.thymeleaf.content-type=text/html
-EOF
-)
+// // TODO: check cache=true when product 
+// ${*.properties}.regexp(/spring\.thymeleaf\.cache=\S+/) as $cache;
+// 
+// 
+// // TODO: check must set prefix and suffix 
+// ${*.properties}.regexp(/spring\.thymeleaf\.prefix=\S+/) as $prefix;
+// ${*.properties}.regexp(/spring\.thymeleaf\.suffix=\S+/) as $suffix;
+// 
+// 
+// 
+// desc(
+// 	lang: java
+// 	alert_min: 0
+// 	'file://application.properties': <<<EOF
+// spring.thymeleaf.cache=false
+// spring.thymeleaf.prefix=classpath:/templates/
+// spring.thymeleaf.suffix=.html
+// spring.thymeleaf.mode=HTML
+// spring.thymeleaf.encoding=UTF-8
+// spring.thymeleaf.content-type=text/html
+// EOF
+// )
+// 
