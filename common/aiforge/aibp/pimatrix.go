@@ -71,7 +71,7 @@ func newPIMatrixForge(callback func(result *PIMatrixResult), opts ...aid.Option)
 		}),
 		aiforge.WithAIDOptions(append(
 			opts,
-			aid.WithYOLO(true),
+			aid.WithAgreeYOLO(true),
 			aid.WithDisableToolUse(true),
 		)...),
 	)
