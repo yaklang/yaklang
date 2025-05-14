@@ -43,13 +43,13 @@ jsc.accessKey.secret=bbbbbbbbbbbbbbbbb
 
 	t.Run("check normal file filter ", func(t *testing.T) {
 		ssatest.CheckSyntaxFlowWithFS(t, vf, `
-${*.properties}.regexp(/(?i)(.*access[_-]?((token)|(key)).*)\s*=\s*((?!\{\{)(?!(?i)^(true|false|on|off|yes|no|y|n|null)).+)/) as $accessKey
+${*.properties}.regexp(/(?i).*access[_-]?[token|key].*\s*=\s*((?!\{\{)(?!(?i)^(true|false|on|off|yes|no|y|n|null)).+)/) as $accessKey
 	`, map[string][]string{
 			"accessKey": {
 				`"jsc.accessKey.id=aaaaaaaaaaaa"`,
 				`"jsc.accessKey.secret=bbbbbbbbbbbbbbbbb"`,
 			},
-		}, false, ssaapi.WithLanguage(consts.JAVA),
+		}, true, ssaapi.WithLanguage(consts.JAVA),
 		)
 	})
 

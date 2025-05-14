@@ -1,10 +1,12 @@
 package regexp_utils
 
 import (
-	"github.com/dlclark/regexp2"
-	"github.com/stretchr/testify/require"
 	"regexp"
 	"testing"
+
+	"github.com/dlclark/regexp2"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func TestYakRegexpUtilsOption(t *testing.T) {
@@ -66,5 +68,78 @@ func TestYakRegexpUtils_Priority(t *testing.T) {
 		match, err = reUtils.MatchString("ccabc")
 		require.NoError(t, err)
 		require.True(t, match)
+	})
+}
+
+func TestSubmatchIndex(t *testing.T) {
+
+	// reg := NewYakRegexpUtils(rule)
+	// res, err := reg.FindAllSubmatchIndex(code)
+	// require.NoError(t, err)
+	// for i, v := range res {
+	// 	log.Infof("submatch %d: %v", i, v)
+	// 	if len(v) < 2 {
+	// 		continue
+	// 	}
+	// 	log.Infof("submatch %d: %s", i, code[v[0]:v[1]])
+	// }
+
+	check := func(t *testing.T, code, rule string, want []string) {
+		reg := NewYakRegexpUtils(rule)
+		res, err := reg.FindAllSubmatchIndex(code)
+		require.NoError(t, err)
+		got := make([]string, 0, len(res))
+		for _, v := range res {
+			if len(v) < 2 {
+				continue
+			}
+			got = append(got, code[v[0]:v[1]])
+		}
+		log.Infof("got: %v", got)
+		require.NotEqual(t, len(got), 0)
+		// each element of want should exist in got
+		for _, want := range want {
+			require.Contains(t, got, want)
+		}
+	}
+
+	t.Run("check regexp1", func(t *testing.T) {
+
+		code := `
+	spring.datasource.url=jdbc:mysql://localhost:3306/your_database
+	spring.datasource.username=your_username
+	spring.datasource.password=your_password
+	spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+	spring.jpa.hibernate.ddl-auto=update
+	spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQL5InnoDBDialect
+	`
+
+		rule := `spring.datasource.url=(.*)`
+
+		check(t, code, rule, []string{
+			"spring.datasource.url=jdbc:mysql://localhost:3306/your_database",
+			"jdbc:mysql://localhost:3306/your_database",
+		})
+	})
+
+	t.Run("check regexp2", func(t *testing.T) {
+		code := `
+### check referer configuration begins ###
+joychou.security.referer.enabled = false
+joychou.security.referer.host = joychou.org, joychou.com
+# Only support ant url style.
+joychou.security.referer.uri = /jsonp/**
+### check referer configuration ends ###
+# Fake aksk. Simulate actuator info leak.
+jsc.accessKey.id=aaaaaaaaaaaa
+jsc.accessKey.secret=bbbbbbbbbbbbbbbbb
+		`
+
+		rule := `(?i).*access[_-]?[token|key].*\s*=\s*((?!\{\{)(?!(?i)^(true|false|on|off|yes|no|y|n|null)).+)`
+
+		check(t, code, rule, []string{
+			"jsc.accessKey.id=aaaaaaaaaaaa",
+			"jsc.accessKey.secret=bbbbbbbbbbbbbbbbb",
+		})
 	})
 }
