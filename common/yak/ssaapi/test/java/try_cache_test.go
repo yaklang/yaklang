@@ -88,3 +88,29 @@ public class WebSocketsProxyEndpoint extends Endpoint {
 	})
 
 }
+
+func TestErrorHandler_Exception(t *testing.T) {
+
+	rule := `
+*?{opcode:try} as $try
+$try.exception as $exception 
+$exception<typeName> as $type_name
+	`
+	code := `
+package org.joychou.config;
+public class WebSocketsProxyEndpoint extends Endpoint {
+	public void onMessage2(ByteBuffer b) {
+		try {
+			process(b, session);
+		} catch (Exception eeeeee) {
+			eeeeee.printStackTrace();
+		}
+	}
+}
+	`
+
+	ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
+		"type_name": {`"Exception"`},
+	}, ssaapi.WithLanguage(ssaapi.JAVA))
+
+}

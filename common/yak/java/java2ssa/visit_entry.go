@@ -76,7 +76,7 @@ func (y *builder) VisitImportDeclaration(raw javaparser.IImportDeclarationContex
 
 	static = i.STATIC() != nil
 	importAll = i.MUL() != nil
-	res := y.VisitPackageQualifiedName(i.QualifiedName())
+	res := y.VisitQualifiedName(i.QualifiedName())
 	if importAll {
 		res = append(res, i.MUL().GetText())
 	}
@@ -122,14 +122,14 @@ func (y *builder) VisitPackageName(raw javaparser.IPackageNameContext) []string 
 	}
 	i, _ := raw.(*javaparser.PackageNameContext)
 	if name := i.QualifiedName(); name != nil {
-		return y.VisitPackageQualifiedName(name)
+		return y.VisitQualifiedName(name)
 	} else {
 		// TODO: handler `package ${package}.action` this code use with maven
 		return nil
 	}
 }
 
-func (y *builder) VisitPackageQualifiedName(raw javaparser.IQualifiedNameContext) []string {
+func (y *builder) VisitQualifiedName(raw javaparser.IQualifiedNameContext) []string {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}

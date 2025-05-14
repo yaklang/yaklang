@@ -931,8 +931,10 @@ var (
 // ------------- ErrorHandler
 type ErrorHandler struct {
 	anInstruction
-	Catch            []Value
 	Try, Final, Done Value
+	// catch and exception align
+	Catch     []Value
+	Exception []Value
 }
 
 var _ Instruction = (*ErrorHandler)(nil)

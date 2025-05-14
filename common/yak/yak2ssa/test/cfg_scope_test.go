@@ -525,7 +525,7 @@ func TestYaklangBasic_Variable_Try(t *testing.T) {
 		}
 		println(err)
 		`, []string{
-			"Parameter-err", "Undefined-err",
+			"Undefined-err", "Undefined-err",
 		}, t)
 	})
 
@@ -540,7 +540,7 @@ func TestYaklangBasic_Variable_Try(t *testing.T) {
 		}
 		println(err)
 		`, []string{
-			"Parameter-err",
+			"Undefined-err",
 			"Undefined-err",
 			"Undefined-err",
 		}, t)

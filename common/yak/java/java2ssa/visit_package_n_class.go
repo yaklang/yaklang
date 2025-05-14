@@ -297,6 +297,30 @@ func (y *builder) VisitTypeType(raw javaparser.ITypeTypeContext) ssa.Type {
 	return t
 }
 
+func (y *builder) VisitCatchType(raw javaparser.ICatchTypeContext) ssa.Type {
+	if y == nil || raw == nil || y.IsStop() {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*javaparser.CatchTypeContext)
+	if i == nil {
+		return nil
+	}
+
+	// ret := ssa.NewOrType()
+	types := make([]ssa.Type, 0, len(i.AllQualifiedName()))
+	for _, qualifiedName := range i.AllQualifiedName() {
+		names := y.VisitQualifiedName(qualifiedName)
+		typ := ssa.NewBasicType(ssa.ErrorTypeKind, names[len(names)-1])
+		typ.AddFullTypeName(strings.Join(names, "."))
+		types = append(types, typ)
+	}
+
+	return ssa.NewOrType(types...)
+}
+
 func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceTypeContext) ssa.Type {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
