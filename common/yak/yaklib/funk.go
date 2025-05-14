@@ -2,6 +2,7 @@ package yaklib
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/reducer"
 	"reflect"
 	"runtime"
 	"runtime/debug"
@@ -138,7 +139,8 @@ var FunkExports = map[string]interface{}{
 		debug.FreeOSMemory()
 		debug.SetGCPercent(8)
 	},
-	"GCPercent": debug.SetGCPercent,
+	"GCPercent":  debug.SetGCPercent,
+	"NewReducer": reducer.NewReducer,
 }
 
 func min(i interface{}) interface{} {

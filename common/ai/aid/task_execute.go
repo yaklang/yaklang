@@ -52,7 +52,7 @@ TOOLREQUIRED:
 			return err
 		}
 		if !targetTool.NoNeedTimelineRecorded {
-			result.ID = t.config.idGenerator()
+			result.ID = t.config.AcquireId()
 			t.PushToolCallResult(result)
 		}
 

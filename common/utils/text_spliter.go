@@ -15,6 +15,8 @@ type TextSplitter struct {
 	Separators   []string
 }
 
+var DefaultTextSplitter = NewTextSplitter()
+
 func NewTextSplitter() *TextSplitter {
 	return &TextSplitter{
 		ChunkSize:    700,

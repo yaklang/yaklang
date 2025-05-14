@@ -70,7 +70,7 @@ func TestSheepTest(t *testing.T) {
 		aid.WithAICallback(func(config *aid.Config, req *aid.AIRequest) (*aid.AIResponse, error) {
 			return aiforge.GetOpenRouterAICallback()(config, req)
 		}),
-		aid.WithYOLO(),
+		aid.WithAgreeYOLO(),
 		aid.WithDebugPrompt(),
 	)
 }
@@ -100,7 +100,7 @@ func TestSheepTest2(t *testing.T) {
 		aid.WithAICallback(func(config *aid.Config, req *aid.AIRequest) (*aid.AIResponse, error) {
 			return aiforge.GetOpenRouterAICallback()(config, req)
 		}),
-		aid.WithYOLO(),
+		aid.WithAgreeYOLO(),
 		aid.WithDebugPrompt(),
 	)
 }

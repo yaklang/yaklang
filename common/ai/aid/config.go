@@ -67,8 +67,9 @@ type Config struct {
 	// no need to think, low level
 	taskAICallback AICallbackType
 	toolAICallback SimpleAiCallbackType
-	tools          []*aitool.Tool
-	eventHandler   func(e *Event)
+
+	tools        []*aitool.Tool
+	eventHandler func(e *Event)
 
 	enableToolSearch bool
 	// tool manager
@@ -97,8 +98,8 @@ type Config struct {
 	agreePolicy    AgreePolicyType
 	agreeInterval  time.Duration
 	agreeAIScore   float64
-	agreeRiskCtrl  *riskControl
-	agreeAssistant *AIAssistant
+	agreeRiskCtrl        *riskControl
+	agreeManualCallback func(context.Context, *Config) (aitool.InvokeParams, error)
 
 	//review suggestion
 
@@ -115,6 +116,12 @@ type Config struct {
 
 	resultHandler          func(*Config)
 	extendedActionCallback map[string]func(config *Config, action *Action)
+}
+
+func (c *Config) MakeInvokeParams() aitool.InvokeParams {
+	p := make(aitool.InvokeParams)
+	p["runtime_id"] = c.id
+	return p
 }
 
 func (c *Config) AcquireId() int64 {
@@ -267,19 +274,19 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		idGenerator: func() int64 {
 			return atomic.AddInt64(idGenerator, 1)
 		},
-		agreePolicy:                 AgreePolicyManual,
-		agreeAIScore:                0.5,
-		agreeRiskCtrl:               new(riskControl),
-		agreeInterval:               10 * time.Second,
-		m:                           new(sync.Mutex),
-		id:                          id,
-		epm:                         newEndpointManagerContext(ctx),
-		streamWaitGroup:             new(sync.WaitGroup),
-		memory:                      m,
-		syncMutex:                   new(sync.RWMutex),
-		syncMap:                     make(map[string]func() any),
-		inputConsumption:            new(int64),
-		outputConsumption:           new(int64),
+		agreePolicy:          AgreePolicyManual,
+		agreeAIScore:         0.5,
+		agreeRiskCtrl:        new(riskControl),
+		agreeInterval:        10 * time.Second,
+		m:                    new(sync.Mutex),
+		id:                   id,
+		epm:                  newEndpointManagerContext(ctx),
+		streamWaitGroup:      new(sync.WaitGroup),
+		memory:               m,
+		syncMutex:            new(sync.RWMutex),
+		syncMap:              make(map[string]func() any),
+		inputConsumption:     new(int64),
+		outputConsumption:    new(int64),
 		aiCallTokenLimit:            int64(1000 * 30),
 		aiAutoRetry:                 5,
 		aiTransactionAutoRetry:      5,
@@ -296,28 +303,30 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 
 type Option func(config *Config) error
 
+
+func WithRuntimeID(id string) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.id = id
+		return nil
+	}
+}
+
+func WithOffsetSeq(offset int64) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.idSequence = offset
+		return nil
+	}
+}
+
 func WithTool(tool *aitool.Tool) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
 		config.tools = append(config.tools, tool)
-		return nil
-	}
-}
-
-func WithYOLO(i ...bool) Option {
-	return func(config *Config) error {
-		config.m.Lock()
-		defer config.m.Unlock()
-		if len(i) > 0 {
-			if i[0] {
-				config.setAgreePolicy(AgreePolicyYOLO)
-			} else {
-				config.setAgreePolicy(AgreePolicyManual)
-			}
-		} else {
-			config.setAgreePolicy(AgreePolicyYOLO)
-		}
 		return nil
 	}
 }
@@ -334,14 +343,6 @@ func WithExtendedActionCallback(name string, cb func(config *Config, action *Act
 	}
 }
 
-func WithAgreeAIAssistant(a *AIAssistant) Option {
-	return func(config *Config) error {
-		config.m.Lock()
-		defer config.m.Unlock()
-		config.agreeAssistant = a
-		return nil
-	}
-}
 
 func WithDisallowRequireForUserPrompt() Option {
 	return func(config *Config) error {
@@ -352,15 +353,33 @@ func WithDisallowRequireForUserPrompt() Option {
 	}
 }
 
-func WithAgreeAuto(auto bool, interval time.Duration) Option {
+func WithManualAssistantCallback(cb func(context.Context, *Config) (aitool.InvokeParams, error)) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
-		config.setAgreePolicy(AgreePolicyAuto)
-		config.agreeInterval = interval
+		config.agreeManualCallback = cb
 		return nil
 	}
 }
+
+
+func WithAgreeYOLO(i ...bool) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		if len(i) > 0 {
+			if i[0] {
+				config.setAgreePolicy(AgreePolicyYOLO)
+			} else {
+				config.setAgreePolicy(AgreePolicyManual)
+			}
+		} else {
+			config.setAgreePolicy(AgreePolicyYOLO)
+		}
+		return nil
+	}
+}
+
 
 func WithAgreePolicy(policy AgreePolicyType) Option {
 	return func(config *Config) error {
@@ -380,16 +399,20 @@ func WithAIAgree() Option {
 	}
 }
 
-func WithAgreeManual() Option {
+func WithAgreeManual(cb ...func(context.Context, *Config) (aitool.InvokeParams, error)) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
 		config.setAgreePolicy(AgreePolicyManual)
+		if len(cb) > 0 {
+			config.agreeManualCallback = cb[0]
+		}
+
 		return nil
 	}
 }
 
-func WithAIAgreeAuto(interval time.Duration) Option {
+func WithAgreeAuto(interval time.Duration) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
