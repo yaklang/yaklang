@@ -191,17 +191,17 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		//params["mark_parameter_member"] = fetchIds(ret.MarkParameterMember)
 	case *ErrorHandler:
 		// try-catch-finally-done
-		if ret.try != nil {
-			params["errorhandler_try"] = ret.try.GetId()
+		if ret.Try != nil {
+			params["errorhandler_try"] = ret.Try.GetId()
 		}
-		if len(ret.catchs) != 0 {
-			params["errorhandler_catch"] = fetchIds(ret.catchs)
+		if len(ret.Catch) != 0 {
+			params["errorhandler_catch"] = fetchIds(ret.Catch)
 		}
-		if ret.final != nil {
-			params["errorhandler_finally"] = ret.final.GetId()
+		if ret.Final != nil {
+			params["errorhandler_finally"] = ret.Final.GetId()
 		}
-		if ret.done != nil {
-			params["errorhandler_done"] = ret.done.GetId()
+		if ret.Done != nil {
+			params["errorhandler_done"] = ret.Done.GetId()
 		}
 	case *ExternLib:
 		log.Warnf("TBD: marshal ExternLib: %v", ret)
@@ -501,6 +501,11 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		ret.X = unmarshalValue(params["unop_x"])
 	case *Undefined:
 		ret.Kind = UndefinedKind(params["undefined_kind"].(float64))
+	case *ErrorHandler:
+		ret.Try = unmarshalValue(params["errorhandler_try"])
+		ret.Catch = unmarshalValues(params["errorhandler_catch"])
+		ret.Final = unmarshalValue(params["errorhandler_finally"])
+		ret.Done = unmarshalValue(params["errorhandler_done"])
 	case *Jump:
 		if to, ok := params["jump_to"]; ok {
 			ret.To = unmarshalValue(to)
