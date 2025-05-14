@@ -238,7 +238,7 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 		} else if i.Identifier() != nil {
 			y.EmitPushLiteral(yakunquote.TryUnquote(i.Identifier().GetText()))
 		} else {
-			if i.GetText() == "true" {
+			if yakunquote.TryUnquote(i.GetText()) == "true" {
 				y.EmitPushLiteral(true)
 			} else {
 				y.EmitPushLiteral(false)
