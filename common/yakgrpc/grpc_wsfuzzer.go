@@ -133,7 +133,8 @@ func (s *Server) CreateWebsocketFuzzer(stream ypb.Yak_CreateWebsocketFuzzerServe
 				if dataVerbose == "" {
 					dataVerbose = strings.Trim(strconv.Quote(message), `"`)
 				}
-
+				rawMsg := make([]byte, len(messageBytes))
+				copy(rawMsg, messageBytes)
 				err = client.WriteText(messageBytes)
 				if err != nil {
 					log.Errorf("wsfuzzer write text failed: %v", err)
@@ -144,12 +145,12 @@ func (s *Server) CreateWebsocketFuzzer(stream ypb.Yak_CreateWebsocketFuzzerServe
 					SwitchProtocolSucceeded: true,
 					IsDataFrame:             true,
 					FromServer:              false,
-					Data:                    messageBytes,
+					Data:                    rawMsg,
 					DataVerbose:             dataVerbose,
 					DataLength:              int64(len(message)),
 					DataSizeVerbose:         utils.ByteSize(uint64(len(message))),
 					IsJson:                  isJson,
-					IsProtobuf:              utils.IsProtobuf(messageBytes),
+					IsProtobuf:              utils.IsProtobuf(rawMsg),
 					DataFrameIndex:          requireDataFrameID(),
 				}
 				stream.Send(msg)
