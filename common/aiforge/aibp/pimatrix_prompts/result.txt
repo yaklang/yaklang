@@ -3,8 +3,8 @@
 # Basic Progress ToolCall and Memory
 {{ .Memory.OS }}-{{ .Memory.Arch }}-{{ .Memory.Now }}
 {{ .Memory.Progress }}
-{{ .Memory.PromptForToolCallResultsForLast5  }}
 {{ .Memory.PersistentMemory }}
+
 # ResultSchema
 根据上面的算法，只输出给出 P-I Matrix 的分析结果，要求符合 Schema:
 ```schema
