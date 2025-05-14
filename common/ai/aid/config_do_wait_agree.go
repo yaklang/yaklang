@@ -35,14 +35,17 @@ func (c *Config) doWaitAgreeWithPolicy(ctx context.Context, doWaitAgreeWithPolic
 	case AgreePolicyManual:
 		manualCtx, cancel := context.WithCancel(c.epm.ctx)
 		defer cancel()
-		if c.agreeAssistant != nil {
+		if c.agreeManualCallback != nil { // if agreeManualCallback is not nil, use it help manual agree
 			go func() {
-				res, err := c.agreeAssistant.Callback(manualCtx, c)
+				res, err := c.agreeManualCallback(manualCtx, c)
 				if err != nil {
 					log.Errorf("agree assistant callback error: %v", err)
 				} else {
 					ep.SetParams(res.Param)
-					ep.Release()
+					for i := 0; i < 3; i++ {
+						ep.Release()
+						time.Sleep(time.Second)
+					}
 				}
 			}()
 		}

@@ -37,5 +37,5 @@ func TestReadChunk(t *testing.T) {
 	log.Infof("prepare file: %v", filename)
 	aiforge.ExecuteForge("read-chunk-test-2", context.Background(), []*ypb.ExecParamItem{
 		{Key: "query", Value: filename},
-	}, aid.WithYOLO(), aid.WithDebugPrompt(), aid.WithAICallback(aiforge.GetOpenRouterAICallback()))
+	}, aid.WithAgreeYOLO(), aid.WithDebugPrompt(), aid.WithAICallback(aiforge.GetOpenRouterAICallback()))
 }

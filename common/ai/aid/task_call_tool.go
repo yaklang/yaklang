@@ -69,7 +69,7 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 		return nil, NewNonRetryableTaskStackError(err)
 	}
 
-	var callToolParams aitool.InvokeParams = make(aitool.InvokeParams)
+	var callToolParams = t.config.MakeInvokeParams()
 	// transaction for generate params
 	err = t.config.callAiTransaction(paramsPrompt, t.callAI, func(rsp *AIResponse) error {
 		callParamsString, _ := io.ReadAll(rsp.GetOutputStreamReader("call-tools", true, t.config))

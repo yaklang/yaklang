@@ -19,6 +19,6 @@ func TestSQLInject(t *testing.T) {
 	aiforge.ExecuteForge("sqlinject", context.Background(), []*ypb.ExecParamItem{
 		{Key: "target", Value: "http://www.example.com?a=1"},
 	}, aid.WithAICallback(aid.AIChatToAICallbackType(ai.Chat)), aid.WithDebugPrompt(true),
-		aid.WithYOLO(),
+		aid.WithAgreeYOLO(),
 		aid.WithToolManager(mockServer.GetToolManager()))
 }
