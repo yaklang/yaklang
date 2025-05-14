@@ -1,12 +1,13 @@
 desc(
-    title: 'zip operator',
-    title_zh: "文件压缩/文件解压(原生)",
-    type: vul,
-    level: low,
-    risk: "zip operator",
-    desc: <<<CODE
+	title: 'zip operator'
+	title_zh: "文件压缩/文件解压(原生)",
+	type: vul
+	level: low
+	risk: "zip operator"
+	desc: <<<CODE
     zip操作是Web应用程序中常见的功能，如果未经过充分的安全检查，可能会导致文件路径遍历（Path Traversal）漏洞。攻击者可以通过构造恶意文件路径，访问或修改服务器上的敏感文件，进而导致信息泄露、文件损坏等安全问题。在PHP应用程序中，如果开发者未能正确验证或过滤用户输入的文件路径，可能会导致文件路径遍历漏洞。建议对zip操作功能进行严格的安全检查，包括验证文件路径的合法性、长度、字符等，并确保zip操作不会导致未经授权的访问或执行。
 CODE
+	rule_id: "43694a01-6ffc-4839-bd32-69d612484ddc"
 )
 
 <include('php-param')> as $params
@@ -56,9 +57,9 @@ alert $low for{
 }
 
 desc(
-    lang: 'php',
-    alert_min: 1,
-    'file:///sink.php': <<<CODE
+	lang: 'php'
+	alert_min: 1
+	'file:///sink.php': <<<CODE
 <?php
     $path = $_GET["path"];
     $zip = new ZipArchive();
@@ -67,9 +68,9 @@ desc(
 CODE
 )
 desc(
-    lang: 'php',
-    alert_min: 1,
-    'file:///sink2.php': <<<CODE
+	lang: 'php'
+	alert_min: 1
+	'file:///sink2.php': <<<CODE
 <?php
     $path = $_GET["path"];
     $zip = new ZipArchive();

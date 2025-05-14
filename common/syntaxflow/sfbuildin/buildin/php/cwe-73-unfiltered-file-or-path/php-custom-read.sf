@@ -1,12 +1,13 @@
 
 desc(
-    title: "PHP Unfiltered Directory Reading Detection",
-    title_zh: "PHP未过滤目录读取检测",
-    risk: "audit",
-    level: "low",
-    desc: <<<CODE
+	title: "PHP Unfiltered Directory Reading Detection"
+	title_zh: "PHP未过滤目录读取检测",
+	risk: "audit"
+	level: "low"
+	desc: <<<CODE
 该规则旨在检测PHP代码中可能存在的未过滤目录读取操作。通过静态分析，规则识别出使用外部输入（如`$_GET`参数）作为目录路径的函数调用，这可能导致安全风险，如目录遍历攻击。示例代码展示了一个典型的漏洞场景，其中用户输入直接用于读取目录内容，未经过任何过滤或验证。
 CODE
+	rule_id: "bf141248-59ef-4fb0-b521-ff7c8339d44d"
 )
 
 <include('php-param')> as $params;
@@ -24,8 +25,8 @@ alert $sink for{
     level: "high",
 }
 desc(
-    lang: "php",
-    'file:///unsafe.php': <<<CODE
+	lang: "php"
+	'file:///unsafe.php': <<<CODE
 <?php
 function readDir($path){
     $dh = dir($path);

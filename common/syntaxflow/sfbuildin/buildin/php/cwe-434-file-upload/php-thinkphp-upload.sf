@@ -1,10 +1,11 @@
 desc(
-    title: "Unsafe File Upload in ThinkPHP Framework",
-    title_zh: "ThinkPHP框架中的不安全文件上传",
-    type: vul,
-    desc: <<<CODE
+	title: "Unsafe File Upload in ThinkPHP Framework"
+	title_zh: "ThinkPHP框架中的不安全文件上传",
+	type: vul
+	desc: <<<CODE
 文件上传漏洞在ThinkPHP框架中同样是一个需要关注的安全问题。当应用未对上传的文件进行充分的验证和处理时，攻击者可能利用此漏洞上传恶意脚本，进而执行服务器端命令。
 CODE
+	rule_id: "1265a300-b3a3-4f8f-acac-731ec80c5906"
 )
 
 <include('php-filter-function')> as $filter
@@ -53,10 +54,9 @@ alert $low for {
 }
 
 desc(
-    lang: "php",
-    alert_min: 1,
-    // 示例代码，展示ThinkPHP中可能的文件上传处理
-    "file:///thinkphp-upload.php": <<<TEXT
+	lang: "php"
+	alert_min: 1
+	"file:///thinkphp-upload.php": <<<TEXT
 <?php
     namespace app\controller;
 

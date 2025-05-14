@@ -1,12 +1,12 @@
 desc(
-    title: "Potential code execution risk",
-    title_zh: "代码执行",
-    risk: "code-execution",
-    type: vul,
-    rule_id: "43d98bb1-1f90-4582-9a43-8570852c2d5b",
-    desc: <<<TEXT
+	title: "Potential code execution risk"
+	title_zh: "代码执行",
+	risk: "code-execution"
+	type: vul
+	desc: <<<TEXT
     检测到代码中直接使用 eval、create_function、assert 等函数，若参数来源于未经验证的外部输入，可能导致代码执行风险。修复方法包括验证输入、过滤输出、禁用危险函数等。
 TEXT
+	rule_id: "43d98bb1-1f90-4582-9a43-8570852c2d5b"
 )
 /^create_function|eval|assert$/ as $evalFunction;
 
@@ -58,24 +58,24 @@ alert $low for {
     level: 'low',
 }
 desc(
-    lang: "php",
-    alert_min: 4,
-    alert_high: 3,
-    alert_low: 1,
-    "file:///eval.php": <<<TEXT
+	lang: "php"
+	alert_min: 4
+	alert_high: 3
+	alert_low: 1
+	"file:///eval.php": <<<TEXT
 <?php
 eval($_GET["code"]);
-TEXT,
-    "file:///createFunction.php": <<<TEXT
+TEXT
+	"file:///createFunction.php": <<<TEXT
 <?php
     $func = create_function('$a', $_COOKIE['func_body']);
     $func(1);
-TEXT,
-    "file:///assert.php": <<<TEXT
+TEXT
+	"file:///assert.php": <<<TEXT
 <?php
     assert($_GET['code']);
-TEXT,
-    "file:///eval_low.php": <<<TEXT
+TEXT
+	"file:///eval_low.php": <<<TEXT
 <?php
     $input = addslashes($_GET['cmd']);
     eval("echo $input;");

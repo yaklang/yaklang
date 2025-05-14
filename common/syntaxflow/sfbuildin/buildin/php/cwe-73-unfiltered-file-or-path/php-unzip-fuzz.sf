@@ -1,11 +1,12 @@
 desc(
-    title: 'zip operator fuzz testing',
-    title_zh: "文件压缩/文件解压(fuzz-code)",
-    level: low,
-    risk: "zip operator",
-    desc: <<<CODE
+	title: 'zip operator fuzz testing'
+	title_zh: "文件压缩/文件解压(fuzz-code)",
+	level: low
+	risk: "zip operator"
+	desc: <<<CODE
     针对PHP中的zip操作进行模糊测试，可以帮助识别在处理恶意或异常文件时可能存在的问题。
-CODE,
+CODE
+	rule_id: "7962164f-28ca-4570-9660-07a2a274a0c7"
 )
 <include('php-param')> as $params
 <include('php-tp-all-extern-variable-param-source')> as $params
@@ -54,9 +55,9 @@ alert $low for{
 }
 
 desc(
-    lang: php,
-    alert_min: 2,
-    'file:///unsafe.php': <<<CODE
+	lang: php
+	alert_min: 2
+	'file:///unsafe.php': <<<CODE
 <?php
     unzip($_GET["path"]);
     UnZip($_POST["path"]);

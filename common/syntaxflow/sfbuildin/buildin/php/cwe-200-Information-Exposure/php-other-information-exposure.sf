@@ -1,9 +1,9 @@
 desc(
-    title: "Unsafe Error Handling and Information Exposure",
-    title_zh: "信息泄漏",
-    type: vul,
-    risk: "information-exposure",
-    desc: <<<TEXT
+	title: "Unsafe Error Handling and Information Exposure"
+	title_zh: "信息泄漏",
+	type: vul
+	risk: "information-exposure"
+	desc: <<<TEXT
     检查查了php中常见的错误处理函数的使用，如果这些函数的返回结果直接被输出可能导致敏感信息泄露，如错误详情、调试数据等。修复方法包括验证输入、过滤输出、禁用调试函数等，可能导致敏感信息泄露，如错误详情、调试数据等。修复方法包括验证输入、过滤输出、禁用调试函数等。
 TEXT
 	rule_id: "8bf5c4b5-51c2-49b5-b30c-c7552a7be29b"

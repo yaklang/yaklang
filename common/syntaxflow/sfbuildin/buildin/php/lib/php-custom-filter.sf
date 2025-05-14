@@ -1,9 +1,9 @@
 desc(
-    title: 'php custom filter function',
-    type: audit,
-    level: info,
-    lib: 'php-filter-function',
-    desc: <<<TEXT
+	title: 'php custom filter function'
+	type: audit
+	level: info
+	lib: 'php-filter-function'
+	desc: <<<TEXT
 此规则旨在审计PHP代码中自定义过滤函数的使用情况。虽然`htmlspecialchars`, `strip_tags`, `mysql_real_escape_string`, `addslashes`, `filter`, `is_numeric`, `str_replace`, `ereg`, 和 `strpos` 等函数本身在数据过滤和验证中起到重要作用，但过度依赖或不当使用这些函数可能导致安全漏洞。例如，`mysql_real_escape_string` 已被弃用，并且在现代PHP开发中应使用PDO或MySQLi预处理语句来防止SQL注入。此外，`ereg` 函数因性能和安全问题已被废弃，建议使用`preg_match`替代。审计这些函数的使用情况有助于识别潜在的安全风险，并确保代码遵循最佳实践。
 TEXT
 	rule_id: "e34d9140-393e-4774-9793-118ea6cc54aa"

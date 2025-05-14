@@ -1,12 +1,13 @@
 desc(
-    title: 'Cookie Security',
-    title_zh: "Cookie安全",
-    type: vul,
-    level: low,
-    risk: "cookie security",
-    desc: <<<CODE
+	title: 'Cookie Security'
+	title_zh: "Cookie安全",
+	type: vul
+	level: low
+	risk: "cookie security"
+	desc: <<<CODE
     Cookie是Web应用程序中用于存储用户会话信息的重要机制。如果cookie的设置不当，可能会导致安全漏洞，如会话劫持、跨站脚本攻击（XSS）等。在PHP应用程序中，使用setcookie函数设置cookie时，应确保cookie的属性（如secure、httponly、samesite等）被正确设置，并且cookie的值经过充分的验证和过滤。
 CODE
+	rule_id: "51cb7fc1-9432-40d3-86ec-cb4c14cd52fc"
 )
 
 setcookie() as $all
@@ -30,13 +31,13 @@ alert $noHttpOnlyCookie for {
 }
 
 desc(
-    lang: "php",
-    alert_min: 2
-    'file:///unsafe.php': <<<CODE
+	lang: "php"
+	alert_min: 2
+	'file:///unsafe.php': <<<CODE
 <?php
     setcookie("user", "JohnDoe", time() + 3600); // 缺少安全属性
-CODE,
-    'safefile:///safe.php': <<<CODE
+CODE
+	'safefile:///safe.php': <<<CODE
 <?php
     setcookie("a","b",60*60,"/oo","domain",true,true);
 CODE

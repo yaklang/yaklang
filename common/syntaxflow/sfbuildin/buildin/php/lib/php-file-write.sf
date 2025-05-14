@@ -1,9 +1,9 @@
 desc(
-    title: "check file write function",
-    type: audit,
-    level: info,
-    lib: 'php-file-write',
-    desc: <<<TEXT
+	title: "check file write function"
+	type: audit
+	level: info
+	lib: 'php-file-write'
+	desc: <<<TEXT
 此规则用于审计PHP代码中文件写入功能的使用情况。文件写入功能（如fwrite和file_put_contents）若使用不当，可能会导致任意文件写入漏洞，攻击者可以通过该漏洞向服务器写入恶意代码或篡改原有文件，进而控制服务器或执行恶意操作。因此，需要对这些函数的使用进行安全审计，确保文件路径可控，且写入内容经过适当的验证和清理。
 TEXT
 	rule_id: "7fd490e1-ce5a-42f0-8bf6-cb7c2f2cddce"
@@ -14,9 +14,9 @@ TEXT
 alert $output
 
 desc(
-    lang: php,
-    alert_min: '2',
-     'file://fileUnlink.php': <<<PARAM
+	lang: php
+	alert_min: '2'
+	'file://fileUnlink.php': <<<PARAM
 <?php
 $tpl_name = !empty($_POST['tpl_name']) ? trim($_POST['tpl_name']) : '';
  	$tpl_content = !empty($_POST['tpl_content']) ? deep_stripslashes($_POST['tpl_content']) : '';
