@@ -10,6 +10,11 @@ type AIForge struct {
 	Params        string // cli params
 	DefaultParams string // for user preferences
 	Description   string // forge description
+
+	InitPrompt       string
+	PersistentPrompt string
+	PlanPrompt       string
+	ResultPrompt     string
 }
 
 var FORGE_TYPE_YAK = "yak"

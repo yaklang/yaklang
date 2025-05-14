@@ -15,10 +15,20 @@ type AIYakTool struct {
 	Content     string `json:"content" gorm:"type:text"`
 	Params      string `json:"params" gorm:"type:text"`
 	Path        string `json:"path" gorm:"type:text;index"`
+	Hash        string `json:"hash"`
 }
 
-func (AIYakTool) TableName() string {
+func (*AIYakTool) TableName() string {
 	return "ai_yak_tools"
+}
+
+func (d *AIYakTool) CalcHash() string {
+	return utils.CalcSha1(d.Name, d.Content, d.Params, d.Path, d.Description, d.Keywords)
+}
+
+func (d *AIYakTool) BeforeSave() error {
+	d.Hash = d.CalcHash()
+	return nil
 }
 
 func SaveAIYakTool(db *gorm.DB, tool *AIYakTool) error {
