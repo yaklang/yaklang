@@ -243,6 +243,7 @@ func TestCoordinator_PIMatrix_ToolUseReview(t *testing.T) {
 	useToolReview := false
 	useToolReviewPass := false
 	count := 0
+	riskControlMsg := 0
 LOOP:
 	for {
 		select {
@@ -280,7 +281,12 @@ LOOP:
 				}
 			}
 
-			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to execute tool:", "ls") {
+			if result.Type == EVENT_TYPE_RISK_CONTROL_PROMPT {
+				riskControlMsg++
+				continue
+			}
+
+			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to execute tool:", "ls") && riskControlMsg >= 2 {
 				useToolReviewPass = true
 				break LOOP
 			}
