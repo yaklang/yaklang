@@ -18,10 +18,16 @@ const (
 	EVENT_TYPE_STREAM     EventType = "stream"
 	EVENT_TYPE_STRUCTURED EventType = "structured"
 
+	// Token 开销情况
 	EVENT_TYPE_CONSUMPTION EventType = "consumption" // token consumption include `{"input_"}`
-	EVENT_TYPE_PONG        EventType = "pong"        // ping response ping-pong is a check for alive item
-	EVENT_TYPE_PRESSURE    EventType = "pressure"    // pressure for ai context percent
 
+	// 探活
+	EVENT_TYPE_PONG EventType = "pong" // ping response ping-pong is a check for alive item
+
+	// 压力值
+	EVENT_TYPE_PRESSURE EventType = "pressure" // pressure for ai context percent
+
+	// AI 请求用户交互
 	EVENT_TYPE_REQUIRE_USER_INTERACTIVE = "require_user_interactive"
 
 	// risk control prompt is the prompt for risk control
