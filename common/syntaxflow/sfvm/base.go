@@ -20,6 +20,8 @@ func validSSAOpcode(raw string) ssa.Opcode {
 		return ssa.SSAOpcodeReturn
 	case "function", "func", "def":
 		return ssa.SSAOpcodeFunction
+	case "if":
+		return ssa.SSAOpcodeIf
 	default:
 		return -1
 	}
