@@ -1,6 +1,6 @@
 desc(
-    title_zh:"检测Java ",
-    title:"Check Java ",
+    title_zh:"检测Java Socket资源未释放 ",
+    title:"Check Java Socket Unreleased Resource",
     risk:"资源泄漏",
     reference:<<<URL
     https://docs.oracle.com/javase/8/docs/api/java/net/Socket.html
