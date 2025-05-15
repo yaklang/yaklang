@@ -13,9 +13,9 @@ func TestErrorHandler_CatchBlock(t *testing.T) {
 
 	rule := `
 *?{opcode:try} as $try 
-$try.catch as $catch 
-$catch<scanInstruction> as $inst 
-$catch?{!<scanInstruction>} as $no_code_catch
+$try.catch.body as $catch_body
+$catch_body<scanInstruction> as $inst 
+$catch_body?{!<scanInstruction>} as $no_code_catch
 	`
 
 	format := `
@@ -90,12 +90,6 @@ public class WebSocketsProxyEndpoint extends Endpoint {
 }
 
 func TestErrorHandler_Exception(t *testing.T) {
-
-	rule := `
-*?{opcode:try} as $try
-$try.exception as $exception 
-$exception<typeName> as $type_name
-	`
 	code := `
 package org.joychou.config;
 public class WebSocketsProxyEndpoint extends Endpoint {
@@ -109,8 +103,69 @@ public class WebSocketsProxyEndpoint extends Endpoint {
 }
 	`
 
-	ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
-		"type_name": {`"Exception"`},
+	t.Run("test exception", func(t *testing.T) {
+		rule := `
+*?{opcode:catch} as $catch
+$catch.exception as $exception
+		`
+		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
+			"exception": {``},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+
+	t.Run("test exception with type", func(t *testing.T) {
+
+		rule := `
+*?{opcode:catch} as $catch
+$catch.exception as $exception
+$exception<typeName> as $type_name
+		`
+		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
+			"type_name": {`"Exception"`},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+
+	t.Run("test exception with type and users", func(t *testing.T) {
+		// test with type and users
+		rule := `
+*?{opcode:catch} as $catch
+$catch.exception as $exception
+$exception<getUsers>?{!opcode:catch} as $users
+		`
+		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
+			"users": {`Undefined-eeeeee.printStackTrace(Undefined-eeeeee)`},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+
+}
+
+func TestErrorHandler_SourceCode(t *testing.T) {
+	rule := `
+*?{opcode:try} as $try
+$try.catch as $catch
+$catch.body  as $catch_body
+$catch.exception as $exception
+
+`
+
+	code := `
+package org.joychou.config;
+public class WebSocketsProxyEndpoint extends Endpoint {
+	public void onMessage2(ByteBuffer b) {
+		try {
+			process(b, session);
+		} catch (Exception eeeeee) {
+			eeeeee.printStackTrace();
+		}
+	}
+}
+	`
+	ssatest.CheckSyntaxFlowSource(t, code, rule, map[string][]string{
+		"catch_body": {`catch (Exception eeeeee) {
+			eeeeee.printStackTrace();
+		}`,
+		},
+		"exception": {`eeeeee`},
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 
 }

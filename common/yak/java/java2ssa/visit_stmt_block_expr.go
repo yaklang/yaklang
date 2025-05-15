@@ -892,6 +892,10 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) {
 		}
 		tryBuilder := y.BuildTry()
 		tryBuilder.BuildTryBlock(func() {
+			recover := y.SetRange(ret.Block())
+			defer recover()
+			y.CurrentBlock.SetRange(y.CurrentRange)
+
 			if block := ret.Block(); block != nil {
 				y.VisitBlock(block)
 			}
@@ -901,15 +905,28 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) {
 			tryBuilder.BuildErrorCatch(func() string {
 				return catchClause.Identifier().GetText()
 			}, func() {
+				recover := y.SetRange(catchClause)
+				defer recover()
+				y.CurrentBlock.SetRange(y.CurrentRange)
+
 				if block := catchClause.Block(); block != nil {
 					y.VisitBlock(block)
 				}
-			}, func() ssa.Type {
-				return y.VisitCatchType(catchClause.CatchType())
+			}, func(v ssa.Value) {
+				typ := y.VisitCatchType(catchClause.CatchType())
+				v.SetType(typ)
+
+				recover := y.SetRange(catchClause.Identifier())
+				defer recover()
+				v.SetRange(y.CurrentRange)
 			})
 		}
 		if finallyBlock := ret.FinallyBlock(); finallyBlock != nil {
 			tryBuilder.BuildFinally(func() {
+				recover := y.SetRange(finallyBlock)
+				defer recover()
+				y.CurrentBlock.SetRange(y.CurrentRange)
+
 				final := finallyBlock.(*javaparser.FinallyBlockContext)
 				y.VisitBlock(final.Block())
 			})

@@ -208,6 +208,8 @@ func lineDisASM(v Instruction, liner DisasmLiner) (ret string) {
 		return "jump"
 	case *ErrorHandler:
 		return "error-handler"
+	case *ErrorCatch:
+		return fmt.Sprintf("error-catch(%s)", liner.DisasmValue(v.Exception))
 	case *If:
 		return fmt.Sprintf("if (%s)", liner.DisasmValue(v.Cond))
 	case *Loop:

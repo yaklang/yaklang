@@ -26,6 +26,8 @@ func validSSAOpcode(raw string) ssa.Opcode {
 		return ssa.SSAOpcodeIf
 	case "try": // "error_handler"
 		return ssa.SSAOpcodeErrorHandler
+	case "catch":
+		return ssa.SSAOpcodeErrorCatch
 	case "switch":
 		return ssa.SSAOpcodeSwitch
 	case "loop":

@@ -415,9 +415,16 @@ func (e *ErrorHandler) String() string {
 		// e.try.GetName(), e.catchs.GetName(), finalName, e.done.GetName(),
 		e.Try.GetName(),
 		strings.Join(lo.Map(e.Catch, func(catch Value, _ int) string {
-			return catch.GetName()
+			return catch.String()
 		}), ","),
 		finalName, e.Done.GetName(),
+	)
+}
+
+func (e *ErrorCatch) String() string {
+	return fmt.Sprintf(
+		"catch %s; body %s; exception %s",
+		e.GetName(), getStr(e.CatchBody), getStr(e.Exception),
 	)
 }
 

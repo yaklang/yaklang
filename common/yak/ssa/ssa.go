@@ -928,13 +928,22 @@ var (
 
 // ================================= Error Handler
 
+type ErrorCatch struct {
+	anValue
+	CatchBody Value
+	Exception Value
+}
+
+var _ Instruction = (*ErrorCatch)(nil)
+var _ User = (*ErrorCatch)(nil)
+var _ Value = (*ErrorCatch)(nil)
+
 // ------------- ErrorHandler
 type ErrorHandler struct {
 	anInstruction
 	Try, Final, Done Value
 	// catch and exception align
-	Catch     []Value
-	Exception []Value
+	Catch []Value // error catch
 }
 
 var _ Instruction = (*ErrorHandler)(nil)
