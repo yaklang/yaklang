@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestCoordinator_GUARDIAN_OUTPUT_SMOKING_ToolUseReview(t *testing.T) {
@@ -53,7 +54,7 @@ func TestCoordinator_GUARDIAN_OUTPUT_SMOKING_ToolUseReview(t *testing.T) {
 		WithEventHandler(func(event *Event) {
 			outputChan <- event
 		}),
-		WithRiskControlForgeName(riskControlForgeName),
+		WithRiskControlForgeName(riskControlForgeName, nil),
 		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
@@ -90,7 +91,7 @@ func TestCoordinator_GUARDIAN_OUTPUT_SMOKING_ToolUseReview(t *testing.T) {
 			return rsp, nil
 		}),
 		WithAIAgree(),
-		WithGuardianEventTrigger(EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *Event, emitter func(*Event)) {
+		WithGuardianEventTrigger(EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *Event, emitter GuardianEmitter) {
 			if event.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				guardianSmokingTestPassed = true
 			} else {
@@ -216,7 +217,7 @@ func TestCoordinator_GUARDIAN_SMOKING_ToolUseReview(t *testing.T) {
 		WithEventHandler(func(event *Event) {
 			outputChan <- event
 		}),
-		WithRiskControlForgeName(riskControlForgeName),
+		WithRiskControlForgeName(riskControlForgeName, nil),
 		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
@@ -253,7 +254,7 @@ func TestCoordinator_GUARDIAN_SMOKING_ToolUseReview(t *testing.T) {
 			return rsp, nil
 		}),
 		WithAIAgree(),
-		WithGuardianEventTrigger(EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *Event, emitter func(*Event)) {
+		WithGuardianEventTrigger(EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *Event, emitter GuardianEmitter) {
 			if event.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				guardianSmokingTestPassed = true
 			} else {

@@ -17,11 +17,20 @@ import (
 )
 
 type AIRequest struct {
+	detachCheckpoint       bool
 	prompt                 string
 	startTime              time.Time
 	seqId                  int64
 	saveCheckpointCallback func(CheckpointCommitHandler)
 	onAcquireSeq           func(int64)
+}
+
+func (ai *AIRequest) SetDetachCheckpoint(b bool) {
+	ai.detachCheckpoint = b
+}
+
+func (ai *AIRequest) IsDetachedCheckpoint() bool {
+	return ai.detachCheckpoint
 }
 
 type CheckpointCommitHandler func() (*schema.AiCheckpoint, error)

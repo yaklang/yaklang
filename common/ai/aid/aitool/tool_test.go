@@ -299,7 +299,7 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 						"required": []interface{}{"param1"},
 					},
 				},
-				"required":             []interface{}{"tool", "@action"},
+				"required":             []interface{}{"tool", "@action", "params"},
 				"additionalProperties": false,
 			},
 		},
@@ -346,7 +346,7 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 						"required": []interface{}{"stringArray"},
 					},
 				},
-				"required":             []interface{}{"tool", "@action"},
+				"required":             []interface{}{"tool", "@action", "params"},
 				"additionalProperties": false,
 			},
 		},
@@ -371,7 +371,7 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 						"const":       "noParamTool",
 					},
 				},
-				"required":             []interface{}{"tool", "@action"},
+				"required":             []interface{}{"tool", "@action", "params"},
 				"additionalProperties": false,
 			},
 		},
@@ -407,7 +407,7 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 						"required": []interface{}{"param1"},
 					},
 				},
-				"required":             []interface{}{"tool", "@action"},
+				"required":             []interface{}{"tool", "@action", "params"},
 				"additionalProperties": false,
 			},
 		},
@@ -480,7 +480,7 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 						"required": []interface{}{"stringParam", "booleanParam"},
 					},
 				},
-				"required":             []interface{}{"tool", "@action"},
+				"required":             []interface{}{"tool", "@action", "params"},
 				"additionalProperties": false,
 			},
 		},
@@ -520,7 +520,7 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 						"required": []interface{}{"special_param-名称"},
 					},
 				},
-				"required":             []interface{}{"tool", "@action"},
+				"required":             []interface{}{"tool", "@action", "params"},
 				"additionalProperties": false,
 			},
 		},
@@ -632,7 +632,7 @@ func TestComplexNestedStructures(t *testing.T) {
 		t.Errorf("required 不是期望的类型")
 		return
 	}
-	if len(required) != 2 || required[0] != "tool" || required[1] != "@action" {
+	if len(required) < 2 || required[0] != "tool" || required[1] != "@action" {
 		t.Errorf("required = %v, want ['tool', '@action']", required)
 	}
 

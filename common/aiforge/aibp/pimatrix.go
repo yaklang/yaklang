@@ -107,12 +107,9 @@ func init() {
 	})
 	if err != nil {
 		log.Errorf("register pimatrix forge failed: %s", err)
-	} else {
-		log.Infof("register pimatrix forge success")
 	}
 
-	err = aiforge.RegisterLiteForge(
-		"pimatrix-quick",
+	lfopts := []aiforge.LiteForgeOption{
 		aiforge.WithLiteForge_Prompt(`# What's S-M-A-R-T
 SMART 代表：1. Specific（具体的） 2. Measurable（可衡量的） 3. Achievable（可实现的） 4. Relevant（相关的） 5. Time-bound（有时限的）。
 SMART 是一个用于设定目标和评估目标达成度的标准。它帮助人们设定清晰、可行和可衡量的目标，以便更好地规划和实现个人或团队的愿景和任务。
@@ -122,28 +119,38 @@ SMART 是一个用于设定目标和评估目标达成度的标准。它帮助�
 		aiforge.WithLiteForge_OutputSchema(
 			aitool.WithNumberParam(
 				"probability",
-				aitool.WithParam_Min(0.0),
+				aitool.WithParam_Required(true),
+				aitool.WithParam_Min(0.001),
 				aitool.WithParam_Max(0.999),
 				aitool.WithParam_Description("Likelihood of risk occurrence"),
 			),
 			aitool.WithNumberParam(
 				"impact",
-				aitool.WithParam_Min(0.0),
+				aitool.WithParam_Required(true),
+				aitool.WithParam_Min(0.001),
 				aitool.WithParam_Max(0.999),
 				aitool.WithParam_Description("Magnitude of negative consequences"),
 			),
 			aitool.WithStringParam(
 				"reason_zh",
+				aitool.WithParam_Required(true),
 				aitool.WithParam_MaxLength(100),
 				aitool.WithParam_Description("Reason in Chinese"),
 			),
 			aitool.WithStringParam(
 				"reason_en",
+				aitool.WithParam_Required(true),
 				aitool.WithParam_MaxLength(100),
 				aitool.WithParam_Description("Reason in English"),
 			),
 		),
-	)
+	}
+
+	err = aiforge.RegisterAIDBuildInForge("pimatrix", lfopts...)
+	if err != nil {
+		log.Errorf("register pimatrix forge failed: %s", err)
+	}
+	err = aiforge.RegisterLiteForge("pimatrix-quick", lfopts...)
 	if err != nil {
 		log.Errorf("register pimatrix forge failed: %s", err)
 	}

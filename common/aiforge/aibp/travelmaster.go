@@ -41,7 +41,5 @@ func init() {
 	})
 	if err != nil {
 		log.Error("travelmaster init fail", "error", err)
-	} else {
-		log.Infof("travelmaster init success")
 	}
 }

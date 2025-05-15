@@ -37,7 +37,7 @@ func Recursive(i any, cb func(isDir bool, pathName string, info os.FileInfo) err
 		}
 		return filesys.SimpleRecursive(filesys.WithFileSystem(zfs), filesys.WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
 			if cb == nil {
-				return utils.Error("callback is nil")
+				return utils.Error("zip/callback callback is nil")
 			}
 			return cb(isDir, pathname, info)
 		}))
@@ -63,7 +63,7 @@ func RecursiveFromRaw(i any, cb func(isDir bool, pathName string, info os.FileIn
 	}
 	return filesys.SimpleRecursive(filesys.WithFileSystem(zfs), filesys.WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
 		if cb == nil {
-			return utils.Error("callback is nil")
+			return utils.Error("zip in (RecursiveFromRaw) callback is nil")
 		}
 		return cb(isDir, pathname, info)
 	}))
