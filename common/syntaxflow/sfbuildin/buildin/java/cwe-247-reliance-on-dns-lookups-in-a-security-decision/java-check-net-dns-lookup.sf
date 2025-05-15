@@ -1,0 +1,54 @@
+desc(
+    title_zh:"检测Java java.net.InetAddress 进行DNS查询",
+    title:"Check Java java.net.InetAddress DNS Lookup",
+    risk:"api-abuse",
+    reference:<<<URL
+    https://docs.oracle.com/javase/8/docs/api/java/net/InetAddress.html
+URL
+    description:<<<TEXT
+    该规则检测对 java.net.InetAddress 类方法的误用，这些方法在与认证相关的安全决策中依赖 DNS 查询，可能导致安全风险。
+    该规则审计的类:
+    - java.net.InetAddress
+TEXT
+    solution:<<<TEXT
+    在安全决策中避免使用 java.net.InetAddress 类的方法，特别是那些依赖 DNS 查询的方法。可以考虑使用其他方法或库来进行安全决策。
+TEXT
+)
+
+InetAddress?{<typeName>?{have:'java.net'}}./(get.*By.*|getLocalHost|getLoopbackAddress)/ as $weak;
+alert $weak for {
+    message: "发现Java java.net.InetAddress 进行DNS查询",
+    risk:'api-abuse',
+    level:low,
+};
+
+desc{
+    lang:java,
+    alert_num:1 ,
+    "file://demo.java":<<<CODE
+    import java.net.InetAddress;
+    import java.io.IOException;
+
+    public class UnsafeAuthExample {
+        public void authenticateClient(String clientIP) {
+            try {
+                // 根据客户端 IP 获取主机名
+                InetAddress addr = InetAddress.getByName(clientIP);
+                String hostname = addr.getHostName();
+
+                // 基于主机名进行认证（不安全）
+                if (hostname.endsWith(".trusted-domain.com")) {
+                    System.out.println("认证成功！");
+                    grantAccess();
+                } else {
+                    System.out.println("认证失败！");
+                    denyAccess();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+    }
+CODE
+}
