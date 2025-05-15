@@ -1,15 +1,16 @@
 desc(
-    title_zh:"检测Java 日志伪造攻击",
-    title:"Check Java Log Forging Attack",
-    type:security,
-    risk:"日志伪造",
-    level:low,
-    description:<<<TEXT
+	title_zh:"检测Java 日志伪造攻击",
+	title:"Check Java Log Forging Attack"
+	type:security
+	risk:"日志伪造",
+	level:low
+	description:<<<TEXT
     该规则检测Java应用程序中的日志伪造攻击。日志伪造攻击是指攻击者通过操纵日志记录的输入数据，导致生成的日志信息被篡改或伪造，从而误导系统管理员或安全分析人员。此规则审计了可能受到用户输入影响的日志记录点，特别是那些使用`log.info()`、`log.error()`等方法进行日志记录的点。
 TEXT
-    solution:<<<TEXT
+	solution:<<<TEXT
     在日志记录时，确保对用户输入进行适当的验证和清理，以防止日志伪造攻击。可以使用日志库提供的安全编码功能，或手动对输入数据进行转义和过滤。
 TEXT
+	rule_id: "235e953b-955c-43bc-9ef8-0e87715330a3"
 )
 
 <include("java-servlet-param")> as $source;
@@ -22,10 +23,10 @@ alert $sink for {
     message:"发现可能存在Java 日志伪造攻击",
 }
 
-desc{
-    lang:java,
-    alert_num: 2,
-    "file://demo.java":<<<CODE
+desc(
+	lang:java
+	alert_num: 2
+	"file://demo.java":<<<CODE
 import javax.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,4 +50,4 @@ public class ParameterProcessor {
     }
 }
 CODE
-}
+)

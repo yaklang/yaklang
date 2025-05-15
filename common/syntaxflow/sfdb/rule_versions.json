@@ -300,6 +300,12 @@
     "version": "20250514.0001"
   },
   {
+    "rule_id": "a6d1d49b-6bd2-4097-a3c9-dfaabe042d54",
+    "rule_name": "检测Java J2EE 使用socket",
+    "hash": "0b92f3409a6a660270fc3f631ce07b68f1fec5376a24a081cf699c9a9443c638",
+    "version": "20250515.0001"
+  },
+  {
     "rule_id": "8e009f30-c716-4c22-b4c4-9d394e88c824",
     "rule_name": "检测Java J2EE 使用threads",
     "hash": "0f4c024953bb96b96a7a046467357df8b65307c48fcccb3763969b0890d9302f",
@@ -366,6 +372,12 @@
     "version": "20250514.0001"
   },
   {
+    "rule_id": "235e953b-955c-43bc-9ef8-0e87715330a3",
+    "rule_name": "检测Java 日志伪造攻击",
+    "hash": "a21699866f934a7e2eb4afc134c298b9705cb6058c27339e5f39a4a2f65db88d",
+    "version": "20250515.0001"
+  },
+  {
     "rule_id": "6f1eb106-9ac3-440f-817d-3701282b74f7",
     "rule_name": "检查Java隐私泄露 - 肩窥",
     "hash": "7898aceadcd6414a5be5fb75bf03d0069323a78f71fc0203e641c41740d18e1d",
@@ -418,6 +430,12 @@
     "rule_name": "检测Java直接路径穿越漏洞",
     "hash": "6c63d71089b31b6996674eec0f3ac19998b345f98bc9fb843f44c437a328a363",
     "version": "20250514.0001"
+  },
+  {
+    "rule_id": "7501f545-a313-4bb7-b6bb-48aab80cb284",
+    "rule_name": "检测Java java.net.InetAddress 进行DNS查询",
+    "hash": "2358f215d5f73da7c5c84ab91aa91062816d4e954a23ba15053ebbd23071d81c",
+    "version": "20250515.0001"
   },
   {
     "rule_id": "93b522c2-9ead-4ad8-b81c-bf5219793594",
@@ -928,6 +946,12 @@
     "rule_name": "java-okhttpclient-request-execute",
     "hash": "42363c77929af0e99afcbe3964d826bbf9c188fa3b93a4138f0a1747cfac0bc5",
     "version": "20250514.0001"
+  },
+  {
+    "rule_id": "78903daf-72e2-454b-8275-91771836659b",
+    "rule_name": "检测Java 日志记录方法",
+    "hash": "e2dda041a3274df3d766929abef464250173ff92b82d594f87616d64861ec17b",
+    "version": "20250515.0001"
   },
   {
     "rule_id": "4db64163-7c7a-4bc3-a627-c63dd1e8abde",
