@@ -434,3 +434,17 @@ func (e *ErrorHandler) ReplaceValue(v Value, to Value) {
 }
 func (e *ErrorHandler) HasUsers() bool  { return false }
 func (e *ErrorHandler) GetUsers() Users { return nil }
+
+func (e *ErrorCatch) HasValues() bool   { return true }
+func (e *ErrorCatch) GetValues() Values { return []Value{e.CatchBody, e.Exception} }
+func (e *ErrorCatch) ReplaceValue(v Value, to Value) {
+	if e.CatchBody == v {
+		e.CatchBody = to
+	} else if e.Exception == v {
+		e.Exception = to
+	} else {
+		panic("error catch not use this value")
+	}
+}
+func (e *ErrorCatch) HasUsers() bool  { return false }
+func (e *ErrorCatch) GetUsers() Users { return nil }

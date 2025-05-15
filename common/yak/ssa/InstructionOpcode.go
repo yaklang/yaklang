@@ -16,6 +16,7 @@ const (
 	SSAOpcodeCall
 	SSAOpcodeConstInst
 	SSAOpcodeErrorHandler
+	SSAOpcodeErrorCatch
 	SSAOpcodeExternLib
 	SSAOpcodeIf
 	SSAOpcodeJump
@@ -46,6 +47,7 @@ var SSAOpcode2Name = map[Opcode]string{
 	SSAOpcodeCall:            "Call",
 	SSAOpcodeConstInst:       "ConstInst",
 	SSAOpcodeErrorHandler:    "ErrorHandler",
+	SSAOpcodeErrorCatch:      "ErrorCatch",
 	SSAOpcodeExternLib:       "ExternLib",
 	SSAOpcodeIf:              "If",
 	SSAOpcodeJump:            "Jump",
@@ -145,6 +147,7 @@ func (i *Assert) GetOpcode() Opcode       { return SSAOpcodeAssert }
 func (i *TypeCast) GetOpcode() Opcode     { return SSAOpcodeTypeCast }
 func (i *TypeValue) GetOpcode() Opcode    { return SSAOpcodeTypeValue }
 func (i *ErrorHandler) GetOpcode() Opcode { return SSAOpcodeErrorHandler }
+func (i *ErrorCatch) GetOpcode() Opcode   { return SSAOpcodeErrorCatch }
 func (i *Panic) GetOpcode() Opcode        { return SSAOpcodePanic }
 func (i *Recover) GetOpcode() Opcode      { return SSAOpcodeRecover }
 func (i *Jump) GetOpcode() Opcode         { return SSAOpcodeJump }
@@ -157,11 +160,11 @@ func IsControlInstruction(i Instruction) bool {
 }
 
 func IsValueInstruction(i Instruction) bool {
-	return slices.Index([]Opcode{SSAOpcodePanic, SSAOpcodeBasicBlock, SSAOpcodeBinOp, SSAOpcodeCall, SSAOpcodeExternLib, SSAOpcodeFunction, SSAOpcodeConstInst, SSAOpcodeMake, SSAOpcodeNext, SSAOpcodeParameter, SSAOpcodeFreeValue, SSAOpcodeParameterMember, SSAOpcodePhi, SSAOpcodeRecover, SSAOpcodeReturn, SSAOpcodeSideEffect, SSAOpcodeTypeCast, SSAOpcodeTypeValue, SSAOpcodeUnOp, SSAOpcodeUndefined}, i.GetOpcode()) != -1
+	return slices.Index([]Opcode{SSAOpcodeErrorCatch, SSAOpcodePanic, SSAOpcodeBasicBlock, SSAOpcodeBinOp, SSAOpcodeCall, SSAOpcodeExternLib, SSAOpcodeFunction, SSAOpcodeConstInst, SSAOpcodeMake, SSAOpcodeNext, SSAOpcodeParameter, SSAOpcodeFreeValue, SSAOpcodeParameterMember, SSAOpcodePhi, SSAOpcodeRecover, SSAOpcodeReturn, SSAOpcodeSideEffect, SSAOpcodeTypeCast, SSAOpcodeTypeValue, SSAOpcodeUnOp, SSAOpcodeUndefined}, i.GetOpcode()) != -1
 }
 
 func IsUserInstruction(i Instruction) bool {
-	return slices.Index([]Opcode{SSAOpcodeLoop, SSAOpcodeSwitch, SSAOpcodeIf, SSAOpcodeAssert, SSAOpcodePanic, SSAOpcodeBasicBlock, SSAOpcodeBinOp, SSAOpcodeCall, SSAOpcodeExternLib, SSAOpcodeFunction, SSAOpcodeConstInst, SSAOpcodeMake, SSAOpcodeNext, SSAOpcodeParameter, SSAOpcodeFreeValue, SSAOpcodeParameterMember, SSAOpcodePhi, SSAOpcodeRecover, SSAOpcodeReturn, SSAOpcodeSideEffect, SSAOpcodeTypeCast, SSAOpcodeTypeValue, SSAOpcodeUnOp, SSAOpcodeUndefined}, i.GetOpcode()) != -1
+	return slices.Index([]Opcode{SSAOpcodeErrorCatch, SSAOpcodeErrorHandler, SSAOpcodeLoop, SSAOpcodeSwitch, SSAOpcodeIf, SSAOpcodeAssert, SSAOpcodePanic, SSAOpcodeBasicBlock, SSAOpcodeBinOp, SSAOpcodeCall, SSAOpcodeExternLib, SSAOpcodeFunction, SSAOpcodeConstInst, SSAOpcodeMake, SSAOpcodeNext, SSAOpcodeParameter, SSAOpcodeFreeValue, SSAOpcodeParameterMember, SSAOpcodePhi, SSAOpcodeRecover, SSAOpcodeReturn, SSAOpcodeSideEffect, SSAOpcodeTypeCast, SSAOpcodeTypeValue, SSAOpcodeUnOp, SSAOpcodeUndefined}, i.GetOpcode()) != -1
 }
 
 func CreateInstruction(op Opcode) Instruction {
@@ -249,6 +252,10 @@ func CreateInstruction(op Opcode) Instruction {
 	case SSAOpcodeErrorHandler:
 		return &ErrorHandler{
 			anInstruction: NewInstruction(),
+		}
+	case SSAOpcodeErrorCatch:
+		return &ErrorCatch{
+			anValue: NewValue(),
 		}
 	case SSAOpcodePanic:
 		return &Panic{

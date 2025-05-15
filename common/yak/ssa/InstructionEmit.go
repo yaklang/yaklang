@@ -156,7 +156,11 @@ func (f *FunctionBuilder) EmitToBlock(i Instruction, block *BasicBlock) {
 	}
 }
 
-func (b *FunctionBuilder) EmitFirst(i Instruction, block *BasicBlock) {
+func (b *FunctionBuilder) EmitFirst(i Instruction, blocks ...*BasicBlock) {
+	block := b.CurrentBlock
+	if len(blocks) > 0 {
+		block = blocks[0]
+	}
 	if len(block.Insts) == 0 {
 		b.emit(i)
 	} else {
@@ -234,7 +238,7 @@ func (f *FunctionBuilder) emitEx(i Instruction, insert func(Instruction)) {
 // NOTE: the object/membercall will create vars in finished blocks
 func (f *FunctionBuilder) EmitUndefined(name string) *Undefined {
 	u := NewUndefined(name)
-	f.EmitFirst(u, f.CurrentBlock)
+	f.EmitFirst(u)
 	return u
 }
 
@@ -492,6 +496,12 @@ func (f *FunctionBuilder) EmitErrorHandler(try *BasicBlock) *ErrorHandler {
 	block := f.CurrentBlock
 	block.AddSucc(try)
 	f.emit(e)
+	return e
+}
+
+func (f *FunctionBuilder) EmitErrorCatch(try *ErrorHandler, catchBody *BasicBlock, exception Value) *ErrorCatch {
+	e := NewErrorCatch(try, catchBody, exception)
+	f.EmitFirst(e)
 	return e
 }
 

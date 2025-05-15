@@ -201,15 +201,15 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		if len(ret.Catch) != 0 {
 			params["errorhandler_catch"] = fetchIds(ret.Catch)
 		}
-		if len(ret.Exception) != 0 {
-			params["errorhandler_exception"] = fetchIds(ret.Exception)
-		}
 		if ret.Final != nil {
 			params["errorhandler_finally"] = ret.Final.GetId()
 		}
 		if ret.Done != nil {
 			params["errorhandler_done"] = ret.Done.GetId()
 		}
+	case *ErrorCatch:
+		params["errorcatch_exception"] = ret.Exception.GetId()
+		params["errorcatch_catch"] = ret.CatchBody.GetId()
 	case *ExternLib:
 		log.Warnf("TBD: marshal ExternLib: %v", ret)
 		// return nil, utils.Errorf("BUG: ConstInst should not be marshaled")
@@ -513,9 +513,11 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 	case *ErrorHandler:
 		ret.Try = unmarshalValue(params["errorhandler_try"])
 		ret.Catch = unmarshalValues(params["errorhandler_catch"])
-		ret.Exception = unmarshalValues(params["errorhandler_exception"])
 		ret.Final = unmarshalValue(params["errorhandler_finally"])
 		ret.Done = unmarshalValue(params["errorhandler_done"])
+	case *ErrorCatch:
+		ret.Exception = unmarshalValue(params["errorcatch_exception"])
+		ret.CatchBody = unmarshalValue(params["errorcatch_catch"])
 	case *Jump:
 		if to, ok := params["jump_to"]; ok {
 			ret.To = unmarshalValue(to)

@@ -399,9 +399,9 @@ func (i *IfBuilder) Build() *IfBuilder {
 }
 
 type tryCatchItem struct {
-	exceptionParameter     func() string
-	exceptionParameterType func() Type
-	catchBody              func()
+	exceptionParameter         func() string
+	exceptionParameterCallBack func(Value)
+	catchBody                  func()
 }
 
 type TryBuilder struct {
@@ -428,23 +428,23 @@ func (t *TryBuilder) BuildTryBlock(f func()) {
 	t.buildTry = f
 }
 
-func defaultExceptionParameterType() Type {
-	return BasicTypes[ErrorTypeKind]
+func defaultExceptionParameterType(v Value) {
+	v.SetType(BasicTypes[ErrorTypeKind])
 }
 
 func (t *TryBuilder) BuildErrorCatch(
 	err func() string, catch func(),
-	errTypes ...func() Type,
+	callBacks ...func(Value),
 ) {
 	errType := defaultExceptionParameterType
-	if len(errTypes) > 0 {
-		errType = errTypes[0]
+	if len(callBacks) > 0 {
+		errType = callBacks[0]
 	}
 
 	t.buildCatchItem = append(t.buildCatchItem, tryCatchItem{
-		exceptionParameter:     err,
-		exceptionParameterType: errType,
-		catchBody:              catch,
+		exceptionParameter:         err,
+		exceptionParameterCallBack: errType,
+		catchBody:                  catch,
 	})
 }
 
@@ -461,6 +461,7 @@ func (t *TryBuilder) Finish() {
 
 	builder.CurrentBlock = t.enter
 	tryBlock := builder.NewBasicBlock(TryStart)
+	enterTryBlock := tryBlock
 	errorHandler := builder.EmitErrorHandler(tryBlock)
 
 	// build try
@@ -476,17 +477,20 @@ func (t *TryBuilder) Finish() {
 	for _, item := range t.buildCatchItem {
 		// catch block
 		catchBody := builder.NewBasicBlock(TryCatch)
-		builder.CurrentBlock = catchBody
 
 		// catch exception
 		id := item.exceptionParameter()
+
+		builder.CurrentBlock = enterTryBlock
 		exception := builder.EmitUndefined(id)
 		exception.Kind = UndefinedValueValid
-		exception.SetType(item.exceptionParameterType())
+		item.exceptionParameterCallBack(exception)
 
 		// add instruction
-		errorHandler.AddCatch(catchBody, exception)
+		builder.EmitErrorCatch(errorHandler, catchBody, exception)
 
+		// switch to catch bo dy
+		builder.CurrentBlock = catchBody
 		// add scope and callback
 		tryBuilder.AddCache(func(svti ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
 			builder.CurrentBlock.SetScope(svti)

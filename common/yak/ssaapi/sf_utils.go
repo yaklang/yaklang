@@ -1,14 +1,10 @@
 package ssaapi
 
 import (
-	"fmt"
-
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func _SearchValues(values Values, mod int, handler func(string) bool, opt ...sfvm.AnalysisContextOption) Values {
@@ -23,71 +19,9 @@ func _SearchValues(values Values, mod int, handler func(string) bool, opt ...sfv
 }
 
 func _SearchValue(value *Value, mod int, compare func(string) bool, opt ...sfvm.AnalysisContextOption) Values {
-	var newValue Values
-	if utils.IsNil(value.innerValue) {
-		return SearchUser(value, mod, compare, opt...)
-	}
-
-	add := func(v *Value) {
-		v.AppendPredecessor(value, opt...)
-		newValue = append(newValue, v)
-	}
-	check := func(value *Value) bool {
-		if compare(value.GetName()) || compare(value.String()) {
-			return true
-		}
-
-		if value.IsConstInst() && compare(codec.AnyToString(value.GetConstValue())) {
-			return true
-		}
-
-		for name := range value.GetAllVariables() {
-			if compare(name) {
-				return true
-			}
-		}
-
-		if key := value.GetKey(); key != nil {
-			keyName := fmt.Sprint(key.GetConstValue())
-			if keyName != "" && compare(keyName) {
-				return true
-			}
-		}
-
-		return false
-	}
-	if mod&ssadb.ConstType != 0 {
-		if check(value) {
-			add(value)
-		}
-	}
-	if mod&ssadb.NameMatch != 0 {
-		// handler self
-		if check(value) {
-			add(value)
-		}
-	}
-	if mod&ssadb.KeyMatch != 0 {
-		if value.IsObject() {
-			allMember := value.innerValue.GetAllMember()
-			for k, v := range allMember {
-				if check(value.NewValue(k)) {
-					add(value.NewValue(v))
-				}
-			}
-
-		}
-
-		for _, ov := range value.innerValue.FlatOccultation() {
-			allMember := ov.GetAllMember()
-			for k, v := range allMember {
-				if check(value.NewValue(k)) {
-					add(value.NewValue(v))
-				}
-			}
-		}
-	}
-
+	newValue := make([]*Value, 0)
+	newValue = append(newValue, SearchWithValue(value, mod, compare, opt...)...)
+	newValue = append(newValue, SearchWithCFG(value, mod, compare, opt...)...)
 	return newValue
 }
 
