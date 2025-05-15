@@ -153,7 +153,11 @@ func (s *Server) ImportFingerprint(req *ypb.ImportFingerprintRequest, stream ypb
 		if len(iGroupNames) > 0 {
 			groupNames := lo.Map(iGroupNames, func(item any, index int) string { return utils.InterfaceToString(item) })
 
-			_, err := yakit.AppendGeneralRuleToMultipleGroup(db, ruleName, groupNames)
+			rule, err := yakit.GetGeneralRuleByRuleName(db, ruleName)
+			if err != nil {
+				return utils.Wrapf(err, "not found rule: %s", ruleName)
+			}
+			_, err = yakit.BatchAppendGeneralRuleGroupAssociations(db, []*schema.GeneralRule{rule}, groupNames)
 			if err != nil {
 				return utils.Wrap(err, "batch add groups for rules failed")
 			}
