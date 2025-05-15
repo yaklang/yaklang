@@ -386,3 +386,16 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 func NewDefaultConfig() *CaptureConfig {
 	return &CaptureConfig{wg: new(sync.WaitGroup)}
 }
+
+func WithCaptureStartedCallback(callback func()) CaptureOption {
+	return func(c *CaptureConfig) error {
+		// 保存原始的onPoolCreated回调
+		c.onPoolCreated = append(c.onPoolCreated, func(pool *TrafficPool) {
+			// 在流量池创建后立即调用回调
+			if callback != nil {
+				callback()
+			}
+		})
+		return nil
+	}
+}
