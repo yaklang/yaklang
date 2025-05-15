@@ -1,0 +1,67 @@
+desc(
+    title_zh:"检测Java J2EE 使用socket",
+    title:"Check Java J2EE Usage of 使用socket",
+    risk:"代码风格",
+    reference:<<<URL
+    http://docs.oracle.com/javase/8/docs/api/java/net/Socket.html
+URL
+    description:<<<TEXT
+    在 Web 应用程序中直接使用基于套接字的底层通信协议时，尤其是在与陈旧系统集成的场景中，极易引入安全漏洞。开发自定义通信协议需要自行解决输入/输出信号验证、协议版本兼容性、通信通道加密缺失（如未启用 TLS/SSL）、错误处理机制缺陷、防火墙穿透与网络限制规避、会话管理与重放攻击防护等复杂安全问题。即使使用标准协议，若未正确配置安全机制，攻击者仍可借助公开的协议规范和漏洞库发起定向攻击。
+    值得注意的是，主流标准协议（如 HTTP/SMTP）通常拥有成熟的漏洞修复方案，而自定义协议缺乏社区支持和持续安全更新。
+TEXT
+    solution:<<<TEXT
+优先采用行业标准协议或框架替代自定义实现，包括但不限于 HTTP/HTTPS（适用于 RESTful API 或 WebSocket）、FTP/SFTP、SMTP/SMTPS、CORBA、RMI/IIOP（Java 场景）、SOAP（企业级 Web 服务）以及 EJB（分布式事务场景）。实施时必须强制启用 TLS/SSL 加密并集成身份验证机制（如 OAuth2/JWT），同时持续监控 CVE 等安全公告以跟踪协议漏洞。建议使用 Netty 或 Apache MINA 等经过实战验证的通信框架处理底层细节，通过渗透测试和代码审计验证实现安全性。对于必须与遗留系统交互的场景，可通过部署 API 网关或协议转换中间件实现风险隔离。
+TEXT
+)
+
+*Socket*?{<typeName>?{have:'javax.net'}}  as $weak;
+alert $weak for {
+    message: "发现Java J2EE 使用socket",
+    level:info,
+};
+
+desc{
+    lang:java,
+    alert_min:5 ,
+    "file://demo.java":<<<CODE
+    import javax.net.ssl.SSLSocket;
+    import javax.net.ssl.SSLSocketFactory;
+    import javax.servlet.http.HttpServlet;
+    import javax.servlet.http.HttpServletRequest;
+    import javax.servlet.http.HttpServletResponse;
+    import java.io.IOException;
+
+    public class BadSocketServlet extends HttpServlet {
+        @Override
+        protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+            // 直接在 J2EE 组件中初始化 SSLSocket
+            SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+            try (SSLSocket socket = (SSLSocket) factory.createSocket("example.com", 443)) {
+                resp.getWriter().println("Connected to example.com via SSL socket.");
+            }
+        }
+    }
+CODE
+}
+
+desc{
+    lang:java,
+    "safefile://safe.java":<<<CODE
+    // 推荐使用容器管理的 HTTP 客户端、JMS、JCA 等资源
+    // 例如使用 JAX-RS 客户端调用外部服务
+    import javax.ws.rs.client.Client;
+    import javax.ws.rs.client.ClientBuilder;
+    import javax.ws.rs.core.Response;
+
+    public class GoodPracticeServlet extends HttpServlet {
+        @Override
+        protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+            Client client = ClientBuilder.newClient();
+            Response response = client.target("https://example.com/api").request().get();
+            resp.getWriter().println("Response: " + response.readEntity(String.class));
+            response.close();
+            client.close();
+        }
+    }
+CODE
+}
