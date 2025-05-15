@@ -740,7 +740,7 @@ service Yak {
   rpc BatchAppendFingerprintToGroup(BatchAppendFingerprintToGroupRequest) returns (DbOperateMessage); // 批量添加指纹到组
 
 
-  // 导入导出SyntaxFlow规则
+  // 导入导出指纹
   rpc ExportFingerprint(ExportFingerprintRequest) returns (stream DataTransferProgress);
   rpc ImportFingerprint(ImportFingerprintRequest) returns (stream DataTransferProgress);
 
