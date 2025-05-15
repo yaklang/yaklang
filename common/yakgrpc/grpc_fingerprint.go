@@ -59,7 +59,7 @@ func (s *Server) DeleteFingerprint(ctx context.Context, req *ypb.DeleteFingerpri
 
 func (s *Server) UpdateFingerprint(ctx context.Context, req *ypb.UpdateFingerprintRequest) (*ypb.DbOperateMessage, error) {
 	var err error
-	var effectCount int
+	var effectCount int64
 
 	rule := req.GetRule()
 	if req.GetId() > 0 {
@@ -81,7 +81,7 @@ func (s *Server) UpdateFingerprint(ctx context.Context, req *ypb.UpdateFingerpri
 	updateMessage := &ypb.DbOperateMessage{
 		TableName:  "general_rule",
 		Operation:  "update",
-		EffectRows: int64(effectCount),
+		EffectRows: effectCount,
 	}
 	return updateMessage, nil
 }
@@ -158,6 +158,19 @@ func (s *Server) RenameFingerprintGroup(ctx context.Context, req *ypb.RenameFing
 func (s *Server) DeleteFingerprintGroup(ctx context.Context, req *ypb.DeleteFingerprintGroupRequest) (*ypb.DbOperateMessage, error) {
 	db := s.GetProfileDatabase()
 	effectRow, err := yakit.DeleteGeneralRuleGroupByName(db, req.GetGroupNames())
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.DbOperateMessage{
+		TableName:  "general_rule_group",
+		Operation:  "delete",
+		EffectRows: effectRow,
+	}, nil
+}
+
+func (s *Server) BatchAppendFingerprintToGroup(ctx context.Context, req *ypb.BatchAppendFingerprintToGroupRequest) (*ypb.DbOperateMessage, error) {
+	db := s.GetProfileDatabase()
+	effectRow, err := yakit.AppendMultipleGeneralRuleToGroup(db, req.GetFilter(), req.GetGroupName())
 	if err != nil {
 		return nil, err
 	}
