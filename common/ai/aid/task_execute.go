@@ -150,7 +150,7 @@ func (t *aiTask) executeTask() error {
 		return err
 	}
 	// start to wait for user review
-	ep := t.config.epm.createEndpoint()
+	ep := t.config.epm.createEndpointWithEventType(EVENT_TYPE_TASK_REVIEW_REQUIRE)
 	ep.SetDefaultSuggestionContinue()
 	t.config.EmitInfo("start to wait for user review current task")
 

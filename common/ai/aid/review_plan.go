@@ -72,7 +72,7 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 			return nil, utils.Errorf("generate new plan failed: %v", err)
 		}
 
-		ep := p.config.epm.createEndpoint()
+		ep := p.config.epm.createEndpointWithEventType(EVENT_TYPE_PLAN_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
 
 		p.config.EmitRequireReviewForPlan(newPlan, ep.id)
@@ -102,7 +102,7 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 			return nil, utils.Errorf("generate new plan failed: %v", err)
 		}
 
-		ep := p.config.epm.createEndpoint()
+		ep := p.config.epm.createEndpointWithEventType(EVENT_TYPE_PLAN_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
 
 		p.config.EmitRequireReviewForPlan(newPlan, ep.id)

@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"sync"
 	"time"
 )
 
-func (c *Config) doWaitAgreeWithPolicy(ctx any, doWaitAgreeWithPolicy AgreePolicyType, ep *Endpoint) {
+func (c *Config) doWaitAgreeWithPolicy(ctx context.Context, doWaitAgreeWithPolicy AgreePolicyType, ep *Endpoint) {
 	if ep.checkpoint != nil && ep.checkpoint.Finished { // check ep finished, is recover task or not
 		return
 	}
@@ -41,10 +42,7 @@ func (c *Config) doWaitAgreeWithPolicy(ctx any, doWaitAgreeWithPolicy AgreePolic
 					log.Errorf("agree assistant callback error: %v", err)
 				} else {
 					ep.SetParams(res.Param)
-					for i := 0; i < 3; i++ {
-						ep.Release()
-						time.Sleep(time.Second)
-					}
+					ep.Release()
 				}
 			}()
 		}
@@ -64,7 +62,9 @@ func (c *Config) doWaitAgreeWithPolicy(ctx any, doWaitAgreeWithPolicy AgreePolic
 		go func() {
 			defer wg.Done()
 
-			result := c.agreeRiskCtrl.doRiskControl(c, riskCtrlCtx, bytes.NewBufferString("this is a fake data for review, see it, todo for changing"))
+			params := ep.GetReviewMaterials()
+
+			result := c.agreeRiskCtrl.doRiskControl(c, riskCtrlCtx, bytes.NewBufferString(string(utils.Jsonify(params))))
 			if result == nil {
 				c.EmitInfo("ai agree risk control is not enabled, use manual agree")
 				return
@@ -74,11 +74,7 @@ func (c *Config) doWaitAgreeWithPolicy(ctx any, doWaitAgreeWithPolicy AgreePolic
 				c.EmitInfo("ai agree risk control is not enabled, use manual agree")
 				return
 			}
-			//
-			for i := 0; i < 3; i++ {
-				time.Sleep(time.Second)
-				ep.Release()
-			}
+			ep.Release()
 		}()
 		ep.Wait()
 		cancel()
@@ -107,14 +103,14 @@ func (c *Config) doWaitAgreeWithPolicy(ctx any, doWaitAgreeWithPolicy AgreePolic
 				c.EmitInfo("ai agree risk control is not enabled, use manual agree")
 				return
 			}
+			if result != nil && !result.Skipped {
+				c.EmitRiskControlPrompt(ep.id, result)
+			}
 
 			if c.agreeAIScore > 0 && result.Score >= c.agreeAIScore {
 				c.EmitInfo("ai agree risk control is not enabled, use manual agree")
 				time.Sleep(c.agreeInterval)
-				for i := 0; i < 3; i++ {
-					ep.Release()
-					time.Sleep(time.Second)
-				}
+				ep.ReleaseContext(ctx)
 				return
 			}
 			//
@@ -129,6 +125,6 @@ func (c *Config) doWaitAgreeWithPolicy(ctx any, doWaitAgreeWithPolicy AgreePolic
 	}
 }
 
-func (c *Config) doWaitAgree(ctx any, ep *Endpoint) {
+func (c *Config) doWaitAgree(ctx context.Context, ep *Endpoint) {
 	c.doWaitAgreeWithPolicy(ctx, c.agreePolicy, ep)
 }

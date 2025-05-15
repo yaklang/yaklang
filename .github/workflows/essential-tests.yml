@@ -60,7 +60,6 @@ jobs:
               # these tests are very quick
               go test -timeout 20s ./common/jsonextractor  
               go test -timeout 20s ./common/markdownextractor  
-              go test -timeout 30s ./common/ai/aid/...  
               go test -timeout 20s ./common/yak/yaklib/codec 
               go test -timeout 20s ./common/yak/cartesian  
               go test -timeout 20s ./common/jsonpath  
@@ -100,14 +99,14 @@ jobs:
               go test --timeout 30s ./common/fp/...
               go test --timeout 30s ./common/yak/cmd/...
               go test --timeout 30s ./common/javaclassparser/tests/...
-
-          - name: Test NetX
-            run: |
+              
+              # suricate generate && match
+              go test -timeout 20s -run TestMUSTPASS* ./common/suricata/...
+              go test -timeout 20s -run TestMUSTPASS* ./common/chaosmaker
+              # pcapx
+              go test -timeout 20s -run TestSmoking_* ./common/pcapx
               go test -timeout 20s ./common/netx/mustpass
               go test -timeout 20s -run TestPingAutoConfig ./common/utils/pingutil
-
-          - name: Test Fuzz
-            run: |
               go test -timeout 20s ./common/mutate_tests ./common/fuzztag  
               go test -timeout 20s ./common/fuzztagx 
               go test -timeout 30s ./common/mutate
@@ -140,6 +139,10 @@ jobs:
               # Test js
               go test -timeout 60s ./common/yak/JS2ssa/...
               go test -timeout 1m ./common/yak/ssaapi/test/javascript
+
+          - name: Test AI Infra
+            run: |
+              go test -timeout 40s ./common/ai/aid/...  
 
           - name: Test SSA Frontend TypeScript
             run: |
@@ -236,14 +239,6 @@ jobs:
             run: |
               # vulinbox agent client
               go test -timeout 1m -run TestMUSTPASS* ./common/vulinboxagentclient
-
-          - name: Test Suricata Generate && Match / pcapx
-            run: |
-              # suricate generate && match
-              go test -timeout 20s -run TestMUSTPASS* ./common/suricata/...
-              go test -timeout 20s -run TestMUSTPASS* ./common/chaosmaker
-              # pcapx
-              go test -timeout 20s -run TestSmoking_* ./common/pcapx
 
           - name: Test Crawler / Crawlerx (chromium based crawler)
             run: |
