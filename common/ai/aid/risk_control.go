@@ -2,6 +2,8 @@ package aid
 
 import (
 	"context"
+	"fmt"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -14,13 +16,19 @@ type RiskControlResult struct {
 }
 
 type riskControl struct {
-	callback func(*Config, context.Context, io.Reader) *RiskControlResult
+	buildinForgeName string
+	callback         func(*Config, context.Context, io.Reader) *RiskControlResult
 }
 
 func (rc *riskControl) enabled() bool {
 	if rc == nil {
 		return false
 	}
+
+	if rc.buildinForgeName != "" {
+		return true
+	}
+
 	if rc.callback == nil {
 		return false
 	}
@@ -51,12 +59,59 @@ func (rc *riskControl) doRiskControl(config *Config, ctx context.Context, reader
 			Reason:  "not enabled",
 		}
 	}
-	if rc.callback == nil {
+
+	if rc.callback != nil {
+		return rc.callback(config, ctx, reader)
+	}
+
+	if rc.buildinForgeName == "" {
 		return &RiskControlResult{
 			Skipped: true,
 			Score:   0,
-			Reason:  "callback is nil",
+			Reason:  "not enabled (no aid forge set)",
 		}
 	}
-	return rc.callback(config, ctx, reader)
+
+	if !IsAIDBuildInForgeExisted(rc.buildinForgeName) {
+		return &RiskControlResult{
+			Skipped: true,
+			Score:   0,
+			Reason:  fmt.Sprintf("not enabled (aid forge [%v] not registered)", rc.buildinForgeName),
+		}
+	}
+
+	raw, err := io.ReadAll(reader)
+	if err != nil && len(raw) == 0 {
+		return &RiskControlResult{
+			Skipped: true,
+			Score:   0,
+			Reason:  fmt.Sprintf("read request body error: %v", err),
+		}
+	}
+	action, err := ExecuteAIForge(ctx, rc.buildinForgeName, []*ypb.ExecParamItem{
+		{Key: "query", Value: string(raw)},
+	})
+	if err != nil {
+		return &RiskControlResult{
+			Skipped: true,
+			Score:   0,
+			Reason:  fmt.Sprintf("execute aid forge error: %v", err),
+		}
+	}
+	prob := action.GetFloat("probability")
+	impact := action.GetFloat("impact")
+	reason := action.GetString("reason")
+	if prob > 0 && impact > 0 {
+		return &RiskControlResult{
+			Skipped: false,
+			Score:   (prob + impact) / 2.0,
+			Reason:  reason,
+		}
+	}
+
+	return &RiskControlResult{
+		Skipped: true,
+		Score:   0,
+		Reason:  "callback is nil",
+	}
 }

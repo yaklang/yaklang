@@ -24,7 +24,7 @@ type LiteForgeOption func(*LiteForge) error
 
 func WithLiteForge_RequireParams(params ...aitool.ToolOption) LiteForgeOption {
 	return func(l *LiteForge) error {
-		t := &aitool.Tool{}
+		t := aitool.NewWithoutCallback("", params...)
 		for _, param := range params {
 			param(t)
 		}
@@ -35,11 +35,18 @@ func WithLiteForge_RequireParams(params ...aitool.ToolOption) LiteForgeOption {
 
 func WithLiteForge_OutputSchema(params ...aitool.ToolOption) LiteForgeOption {
 	return func(l *LiteForge) error {
-		t, err := aitool.New(utils.RandStringBytes(10), params...)
-		if err != nil {
-			return err
+		t := aitool.NewWithoutCallback("", params...)
+		for _, param := range params {
+			param(t)
 		}
 		l.OutputSchema = t.ToJSONSchemaString()
+		return nil
+	}
+}
+
+func WithLiteForge_Prompt(i string) LiteForgeOption {
+	return func(forge *LiteForge) error {
+		forge.Prompt = i
 		return nil
 	}
 }
@@ -88,9 +95,9 @@ func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, op
 `
 	var promptParam = map[string]interface{}{
 		"NONCE":  nonce,
-		"PROMPT": l.Prompt,
-		"PARAMS": call,
-		"SCHEMA": l.OutputSchema,
+		"PROMPT": string(l.Prompt),
+		"PARAMS": string(call),
+		"SCHEMA": string(l.OutputSchema),
 	}
 	tmp, err := template.New("liteforge").Parse(temp)
 	if err != nil {
@@ -107,7 +114,7 @@ func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, op
 		if err != nil {
 			return err
 		}
-		action, err = aid.ExtractAction(string(raw), "final-result")
+		action, err = aid.ExtractAction(string(raw), "call-tool")
 		if err != nil {
 			return utils.Errorf("extract action failed: %v", err)
 		}

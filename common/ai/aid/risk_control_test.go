@@ -72,7 +72,7 @@ func TestRiskControl_DoRiskControl(t *testing.T) {
 			expectedResult: &RiskControlResult{
 				Skipped: true,
 				Score:   0,
-				Reason:  "callback is nil",
+				Reason:  "not enabled (no aid forge set)",
 			},
 		},
 		{

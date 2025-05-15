@@ -665,3 +665,10 @@ func WithAITransactionRetry(t int) Option {
 		return nil
 	}
 }
+
+func WithRiskControlForgeName(forgeName string) Option {
+	return func(config *Config) error {
+		config.agreeRiskCtrl.buildinForgeName = forgeName
+		return nil
+	}
+}
