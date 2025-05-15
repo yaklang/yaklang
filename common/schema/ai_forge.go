@@ -12,6 +12,7 @@ type AIForge struct {
 	Description   string // forge description
 	Tools         string // tools
 	ToolKeywords  string // tool keywords
+	Actions       string
 
 	InitPrompt       string
 	PersistentPrompt string

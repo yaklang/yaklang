@@ -2,6 +2,7 @@ package yak
 
 import (
 	"context"
+	"slices"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
@@ -77,6 +78,7 @@ func (ag *Agent) SubOption() []Option {
 }
 
 var (
+	// aid options
 	WithAgreeYOLO = aid.WithAgreeYOLO
 
 	// Additional With options
@@ -120,12 +122,25 @@ var (
 	WithDisableToolUse               = aid.WithDisableToolUse
 	WithAIAutoRetry                  = aid.WithAIAutoRetry
 	WithAITransactionRetry           = aid.WithAITransactionRetry
+
+	// aiforge options
+	WithAIDOptions           = aiforge.WithAIDOptions
+	WithForgePlanMocker      = aiforge.WithPlanMocker
+	WithInitializePrompt     = aiforge.WithInitializePrompt
+	WithResultPrompt         = aiforge.WithResultPrompt
+	WithResultHandlerForge   = aiforge.WithResultHandler
+	WithPersistentPrompt     = aiforge.WithPersistentPrompt
+	WithToolKeywords         = aiforge.WithToolKeywords
+	WithForgeTools           = aiforge.WithTools
+	WithOriginYaklangCliCode = aiforge.WithOriginYaklangCliCode
 )
 
 func NewForgeBlueprint(name string, opts ...any) *aiforge.ForgeBlueprint {
 	ag := NewAgent(opts...)
 	ag.ForgeName = name
-	return aiforge.NewForgeBlueprint(name, ag.AiForgeOptions...)
+	aiforgeOpts := slices.Clone(ag.AiForgeOptions)
+	aiforgeOpts = append(aiforgeOpts, aiforge.WithAIDOptions(ag.ExtendAIDOptions...))
+	return aiforge.NewForgeBlueprint(name, aiforgeOpts...)
 }
 func NewExecutorFromForge(forge *aiforge.ForgeBlueprint, params []*ypb.ExecParamItem, opts ...any) (*aid.Coordinator, error) {
 	ag := NewAgent(opts...)
@@ -141,8 +156,7 @@ func NewExecutorFromJson(json string, params []*ypb.ExecParamItem, opts ...any) 
 }
 func NewForgeExecutor(name string, params []*ypb.ExecParamItem, opts ...any) (*aid.Coordinator, error) {
 	ag := NewAgent(opts...)
-	ag.ForgeName = name
-	bp := aiforge.NewForgeBlueprint(name, ag.AiForgeOptions...)
+	bp := NewForgeBlueprint(name, opts...)
 	ins, err := bp.CreateCoordinator(context.Background(), params, ag.ExtendAIDOptions...)
 	if err != nil {
 		return nil, err

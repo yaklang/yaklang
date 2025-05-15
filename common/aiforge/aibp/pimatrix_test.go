@@ -7,7 +7,10 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 func TestPIMatrixQuick(t *testing.T) {
@@ -28,6 +31,9 @@ func TestPIMatrixQuick(t *testing.T) {
 }
 
 func TestPIMatrix(t *testing.T) {
+	db := consts.GetGormProfileDatabase()
+	db.Model(&schema.AIForge{}).Unscoped().Delete(&schema.AIForge{})
+	yakit.CallPostInitDatabase()
 	result, err := yak.ExecuteForge(
 		"pimatrix",
 		"我要删除 Linux 文件系统中的 /",
@@ -38,7 +44,7 @@ func TestPIMatrix(t *testing.T) {
 		t.Fatal(err)
 		return
 	}
-	spew.Dump(result.Formated)
+	spew.Dump(result)
 }
 
 func TestPIMatrix_Legacy(t *testing.T) {
