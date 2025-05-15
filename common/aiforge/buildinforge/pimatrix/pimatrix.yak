@@ -1,0 +1,21 @@
+query = cli.String("query", cli.setHelp("用户输入"),cli.required(true))
+
+forgeHandle = (params,opts...) => {
+    res,err = __DEFAULT_FORGE_HANDLE__(params,opts...)
+    if err {
+        log.error(err)
+        return nil
+    }
+    action = res.Action
+    prob = action.GetFloat("probability")
+    impact = action.GetFloat("impact")
+    reason = action.GetString("reason")
+    reason_en = action.GetString("reason_en")
+    result = {
+        "Probability": prob,
+        "Impact":      impact,
+        "Reason":      reason,
+        "ReasonEn":    reason_en,
+    }
+    return result
+}

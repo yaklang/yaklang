@@ -22,112 +22,9 @@ var DEFAULT_PLAN_PROMPT_NAME = "__PLAN_PROMPT__"
 var DEFAULT_RESULT_PROMPT_NAME = "__RESULT_PROMPT__"
 var DEFAULT_FORGE_HANDLE_NAME = "__DEFAULT_FORGE_HANDLE__"
 
-type Option func(*Agent) error
-
-type Agent struct {
-	ForgeName string
-
-	ctx    context.Context
-	cancel context.CancelFunc
-
-	RuntimeID string
-
-	PlanAICallback    aid.AICallbackType
-	TaskAICallback    aid.AICallbackType
-	GeneralAICallback aid.AICallbackType
-
-	ExtendAIDOptions []aid.Option
-}
-
-func WithForgeName(forgeName string) Option {
-	return func(ag *Agent) error {
-		ag.ForgeName = forgeName
-		return nil
-	}
-}
-
-func WithContext(ctx context.Context) Option {
-	return func(ag *Agent) error {
-		ag.ctx = ctx
-		return nil
-	}
-}
-
-func WithExtendAIDOptions(opts ...aid.Option) Option {
-	return func(ag *Agent) error {
-		ag.ExtendAIDOptions = append(ag.ExtendAIDOptions, opts...)
-		return nil
-	}
-}
-
-func WithRuntimeID(runtimeID string) Option {
-	return func(ag *Agent) error {
-		ag.RuntimeID = runtimeID
-		return nil
-	}
-}
-
-func WithPlanAICallback(callback aid.AICallbackType) Option {
-	return func(ag *Agent) error {
-		ag.PlanAICallback = callback
-		return nil
-	}
-}
-
-func WithTaskAICallback(callback aid.AICallbackType) Option {
-	return func(ag *Agent) error {
-		ag.TaskAICallback = callback
-		return nil
-	}
-}
-
-func WithAICallback(callback aid.AICallbackType) Option {
-	return func(ag *Agent) error {
-		ag.GeneralAICallback = callback
-		return nil
-	}
-}
-
-func (ag *Agent) IsAICallbackAvailable() bool {
-	if ag.PlanAICallback != nil || ag.TaskAICallback != nil || ag.GeneralAICallback != nil {
-		return true
-	}
-	return false
-}
-
-func (ag *Agent) SubOption() []Option {
-	opts := make([]Option, 0)
-	if ag.GeneralAICallback != nil {
-		opts = append(opts, WithAICallback(ag.GeneralAICallback))
-	}
-	if ag.PlanAICallback != nil {
-		opts = append(opts, WithPlanAICallback(ag.PlanAICallback))
-	}
-	if ag.TaskAICallback != nil {
-		opts = append(opts, WithTaskAICallback(ag.TaskAICallback))
-	}
-	if ag.RuntimeID != "" {
-		opts = append(opts, WithRuntimeID(ag.RuntimeID))
-	}
-	if ag.ctx != nil {
-		opts = append(opts, WithContext(ag.ctx))
-	}
-	if ag.ExtendAIDOptions != nil {
-		opts = append(opts, WithExtendAIDOptions(ag.ExtendAIDOptions...))
-	}
-	return opts
-}
-
-func ExecuteForge(forgeName string, i any, opts ...Option) (any, error) {
-	ag := &Agent{
-		ForgeName: forgeName,
-	}
-	for _, opt := range opts {
-		if err := opt(ag); err != nil {
-			return nil, err
-		}
-	}
-
+func ExecuteForge(forgeName string, i any, iopts ...any) (any, error) {
+	ag := NewAgent(iopts...)
+	ag.ForgeName = forgeName
 	if ag.RuntimeID == "" {
 		ag.RuntimeID = uuid.NewString()
 	}
@@ -146,7 +43,7 @@ func ExecuteForge(forgeName string, i any, opts ...Option) (any, error) {
 	if forgeIns.ForgeType != schema.FORGE_TYPE_YAK {
 		// todo: support json config forge
 	}
-	var defaultForgeHandle func(items []*ypb.ExecParamItem, opts ...Option) (any, error)
+	var defaultForgeHandle func(items []*ypb.ExecParamItem, opts ...any) (any, error)
 	params := aiforge.Any2ExecParams(i)
 	engine := NewYakitVirtualClientScriptEngine(nil)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
@@ -174,16 +71,23 @@ func ExecuteForge(forgeName string, i any, opts ...Option) (any, error) {
 		BindAIConfigToEngine(engine, ag)
 		return nil
 	})
-
-	subEngine, err := engine.ExecuteExWithContext(ag.ctx, forgeIns.ForgeContent, nil)
+	forgeCode := `query = cli.String("query", cli.setHelp("用户输入"),cli.setRequired(true))`
+	if forgeIns.ForgeContent != "" {
+		forgeCode = forgeIns.ForgeContent
+	}
+	subEngine, err := engine.ExecuteExWithContext(ag.ctx, forgeCode, nil)
 	if err != nil {
 		return nil, err
 	}
 	if v, ok := subEngine.GetVar(HOOK_AI_FORGE); ok {
-		if _, ok := v.(*yakvm.Function); ok {
-			return subEngine.SafeCallYakFunction(ag.ctx, HOOK_AI_FORGE, []any{params})
+		if yakFunc, ok := v.(*yakvm.Function); ok {
+			if yakFunc.IsVariableParameter() {
+				return subEngine.SafeCallYakFunction(ag.ctx, HOOK_AI_FORGE, append([]any{params}, iopts...))
+			} else {
+				return subEngine.SafeCallYakFunction(ag.ctx, HOOK_AI_FORGE, []any{params})
+			}
 		} else {
-			return defaultForgeHandle(params, opts...)
+			return defaultForgeHandle(params, iopts...)
 		}
 	} else {
 		return nil, utils.Errorf("forge handle is nil")
@@ -191,23 +95,15 @@ func ExecuteForge(forgeName string, i any, opts ...Option) (any, error) {
 }
 
 func (ag *Agent) AIDOptions() []aid.Option {
-	var aidopts []aid.Option
+	opts := make([]aid.Option, 0)
 	if ag.RuntimeID != "" {
-		aidopts = append(aidopts, aid.WithRuntimeID(ag.RuntimeID))
+		opts = append(opts, aid.WithRuntimeID(ag.RuntimeID))
 	}
-	if ag.PlanAICallback != nil {
-		aidopts = append(aidopts, aid.WithPlanAICallback(ag.PlanAICallback))
-	}
-	if ag.TaskAICallback != nil {
-		aidopts = append(aidopts, aid.WithTaskAICallback(ag.TaskAICallback))
-	}
-	if ag.GeneralAICallback != nil {
-		aidopts = append(aidopts, aid.WithAICallback(ag.GeneralAICallback))
-	}
-	return append(aidopts, ag.ExtendAIDOptions...)
+	opts = append(opts, ag.ExtendAIDOptions...)
+	return opts
 }
 
-func buildDefaultForgeHandle(forgeName string, engine *antlr4yak.Engine) func(items []*ypb.ExecParamItem, opts ...Option) (any, error) {
+func buildDefaultForgeHandle(forgeName string, engine *antlr4yak.Engine) func(items []*ypb.ExecParamItem, opts ...any) (any, error) {
 	getStringVar := func(name string) (string, bool) {
 		initPrompt, ok := engine.GetVM().GetVar(name)
 		if !ok {
@@ -219,7 +115,13 @@ func buildDefaultForgeHandle(forgeName string, engine *antlr4yak.Engine) func(it
 		}
 		return initPromptStr, true
 	}
-	return func(items []*ypb.ExecParamItem, opts ...Option) (any, error) {
+	return func(items []*ypb.ExecParamItem, anyOpts ...any) (any, error) {
+		var opts []Option
+		for _, opt := range anyOpts {
+			if o, ok := opt.(Option); ok {
+				opts = append(opts, o)
+			}
+		}
 		var aidOpts []aid.Option
 		ag := &Agent{}
 		for _, opt := range opts {
@@ -261,7 +163,6 @@ func buildDefaultForgeHandle(forgeName string, engine *antlr4yak.Engine) func(it
 		if err := ins.Run(); err != nil {
 			return nil, err
 		}
-
 		return cfg.ForgeResult, nil
 	}
 }

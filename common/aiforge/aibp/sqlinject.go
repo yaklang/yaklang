@@ -12,7 +12,7 @@ var sqlInjectInitPrompt string
 //go:embed sqlinject_prompts/persistent.txt
 var sqlInjectExecutePrompt string
 
-func init() {
+func _init_sqlinject() {
 	cfg := aiforge.NewYakForgeBlueprintConfig("sqlinject", sqlInjectInitPrompt, sqlInjectExecutePrompt)
 	cfg.WithToolKeywords("fs", "http")
 	cfg.WithTools(

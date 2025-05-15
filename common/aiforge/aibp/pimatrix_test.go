@@ -2,11 +2,12 @@ package aibp
 
 import (
 	"context"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
+	"github.com/yaklang/yaklang/common/yak"
 )
 
 func TestPIMatrixQuick(t *testing.T) {
@@ -27,14 +28,11 @@ func TestPIMatrixQuick(t *testing.T) {
 }
 
 func TestPIMatrix(t *testing.T) {
-	result, err := aiforge.ExecuteForge(
+	result, err := yak.ExecuteForge(
 		"pimatrix",
-		context.Background(),
-		[]*ypb.ExecParamItem{
-			{Key: "query", Value: "我要删除 Linux 文件系统中的 /"},
-		},
-		aid.WithDebugPrompt(true),
-		aid.WithAICallback(aiforge.GetOpenRouterAICallback()),
+		"我要删除 Linux 文件系统中的 /",
+		yak.WithDebugPrompt(true),
+		yak.WithAICallback(aiforge.GetOpenRouterAICallback()),
 	)
 	if err != nil {
 		t.Fatal(err)

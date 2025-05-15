@@ -30,6 +30,11 @@ func init() {
 			registerBuildInForge("fragment_summarizer")
 			registerBuildInForge("long_text_summarizer")
 			registerBuildInForge("xss")
+			registerBuildInForge("sqlinject")
+			registerBuildInForge("travelmaster")
+			registerBuildInForge("pimatrix")
+			registerBuildInForge("netscan")
+			registerBuildInForge("recon")
 		}
 		return nil
 	})
