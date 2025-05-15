@@ -1,0 +1,297 @@
+desc(
+    title_zh:"检测Java ",
+    title:"Check Java ",
+    risk:"资源泄漏",
+    level:high,
+    reference:<<<URL
+    https://docs.oracle.com/javase/8/docs/api/java/io/package-summary.html
+URL
+    description:<<<TEXT
+
+应用程序创建 `InputStreamReader`、`FileInputStream`、`FileOutputStream` 等 I/O 流资源后，未在使用完毕时通过调用 `close()` 方法正确关闭这些资源。这属于 CWE-772（有效生命周期后未释放资源）漏洞，会导致文件句柄泄漏和系统资源耗尽。
+
+即使 Java 垃圾回收机制最终会回收这些对象，但关联的底层系统资源（如文件描述符）可能不会被及时释放，直到垃圾回收发生，这种行为既不可预测也不可靠。
+
+## 风险影响
+
+- 文件句柄泄漏，导致"Too many open files"错误
+- 长时间运行的应用性能逐渐下降
+- 文件可能被锁定，无法被其他进程访问或修改
+- 在高并发环境下，资源消耗会迅速增加
+- 可能导致系统稳定性问题和应用程序崩溃
+TEXT
+    solution:<<<TEXT
+    ## 修复建议
+
+    ### 1. 使用 try-with-resources 自动关闭资源 (Java 7+，强烈推荐)
+
+    ```java
+    try (FileInputStream fis = new FileInputStream("input.txt");
+         InputStreamReader reader = new InputStreamReader(fis, StandardCharsets.UTF_8);
+         BufferedReader br = new BufferedReader(reader)) {
+
+        String line;
+        while ((line = br.readLine()) != null) {
+            // 处理每一行...
+        }
+    } // 所有资源自动关闭，按照声明顺序的逆序
+    ```
+
+    ### 2. 使用 try-finally 手动关闭资源
+
+    ```java
+    FileInputStream fis = null;
+    InputStreamReader reader = null;
+    BufferedReader br = null;
+
+    try {
+        fis = new FileInputStream("input.txt");
+        reader = new InputStreamReader(fis, StandardCharsets.UTF_8);
+        br = new BufferedReader(reader);
+
+        String line;
+        while ((line = br.readLine()) != null) {
+            // 处理每一行...
+        }
+    } finally {
+        // 按照获取顺序的逆序关闭资源
+        if (br != null) {
+            try { br.close(); } catch (IOException e) { /* 记录日志 */ }
+        }
+        if (reader != null) {
+            try { reader.close(); } catch (IOException e) { /* 记录日志 */ }
+        }
+        if (fis != null) {
+            try { fis.close(); } catch (IOException e) { /* 记录日志 */ }
+        }
+    }
+    ```
+
+    ### 3. 使用 Java NIO 的 Files 工具类 (Java 7+)
+
+    ```java
+    // 读取文件所有行
+    List<String> lines = Files.readAllLines(Paths.get("input.txt"), StandardCharsets.UTF_8);
+
+    // 或读取为字符串
+    String content = Files.readString(Paths.get("input.txt"), StandardCharsets.UTF_8); // Java 11+
+
+    // 或使用 BufferedReader
+    try (BufferedReader reader = Files.newBufferedReader(Paths.get("input.txt"), StandardCharsets.UTF_8)) {
+        // 使用 reader...
+    }
+    ```
+
+    ### 4. 使用工具类封装资源管理
+
+    ```java
+    // Apache Commons IO 示例
+    String content = FileUtils.readFileToString(new File("input.txt"), StandardCharsets.UTF_8);
+
+    // 使用自定义工具类
+    public static String readFile(String path) throws IOException {
+        try (FileInputStream fis = new FileInputStream(path);
+             InputStreamReader reader = new InputStreamReader(fis, StandardCharsets.UTF_8);
+             BufferedReader br = new BufferedReader(reader)) {
+
+            StringBuilder content = new StringBuilder();
+            String line;
+            while ((line = br.readLine()) != null) {
+                content.append(line).append("\n");
+            }
+            return content.toString();
+        }
+    }
+    ```
+TEXT
+)
+
+
+*InputStream() as $toCheck;
+*OutputStream() as $toCheck;
+*StreamReader() as $toCheck;
+*StreamWriter() as $toCheck;
+// TODO:try with resource的expression会自动调用.close
+// 但是如果exression是一个new creator，会默认生成constructor，而这个constructor不会调用close
+// 目前通过<name>限制constructor
+$toCheck?{<typeName>?{have:"java.io"} && <name> ?{!have:"-constructor"}} as $stream;
+$stream -{
+    include:`*.close`,
+}-> as $safe
+
+$safe<getPredecessors()> as $safeStream;
+$stream - $safeStream as $weak;
+alert $weak for{
+    message:"检测到java.io未释放的资源",
+}
+
+desc{
+    lang:java,
+    alert_num:2 ,
+    "file://demo.java":<<<CODE
+    /**
+     * InputStreamReader 资源管理示例
+     * 展示资源泄漏问题和正确的资源管理方式
+     */
+    import java.io.*;
+    import java.nio.charset.StandardCharsets;
+
+    public class InputStreamReaderExample {
+
+        /**
+         * 错误示例：InputStreamReader 未关闭
+         * 这会导致文件句柄泄漏
+         */
+        public static void unsafeReadFile(String filePath) {
+            try {
+                // 创建底层的 FileInputStream
+                FileInputStream fileStream = new FileInputStream(filePath);
+
+                // 创建 InputStreamReader，指定字符编码
+                InputStreamReader reader = new InputStreamReader(fileStream, StandardCharsets.UTF_8);
+
+                // 读取文件内容
+                char[] buffer = new char[1024];
+                int charsRead;
+                StringBuilder content = new StringBuilder();
+
+                while ((charsRead = reader.read(buffer)) != -1) {
+                    content.append(buffer, 0, charsRead);
+                }
+
+                System.out.println("文件内容: " + content.toString());
+
+                // 错误：未关闭 reader 和 fileStream
+                // 即使程序继续运行，文件句柄也会保持打开状态
+                // 长时间运行会导致文件句柄泄漏
+            } catch (IOException e) {
+                System.err.println("读取文件时出错: " + e.getMessage());
+            }
+        }
+
+        /**
+         * 正确示例1：使用 try-with-resources 自动关闭资源
+         */
+        public static void safeReadFileWithTryWithResources(String filePath) {
+            try (
+                // 资源声明 - 这些资源会自动关闭
+                FileInputStream fileStream = new FileInputStream(filePath);
+                InputStreamReader reader = new InputStreamReader(fileStream, StandardCharsets.UTF_8)
+            ) {
+                // 读取文件内容
+                char[] buffer = new char[1024];
+                int charsRead;
+                StringBuilder content = new StringBuilder();
+
+                while ((charsRead = reader.read(buffer)) != -1) {
+                    content.append(buffer, 0, charsRead);
+                }
+
+                System.out.println("安全读取的文件内容: " + content.toString());
+
+            } catch (IOException e) {
+                System.err.println("读取文件时出错: " + e.getMessage());
+            }
+            // reader 和 fileStream 在这里自动关闭，即使出现异常
+        }
+
+        /**
+         * 正确示例2：使用 try-finally 手动关闭资源
+         */
+        public static void safeReadFileWithTryFinally(String filePath) {
+            FileInputStream fileStream = null;
+            InputStreamReader reader = null;
+
+            try {
+                // 创建资源
+                fileStream = new FileInputStream(filePath);
+                reader = new InputStreamReader(fileStream, StandardCharsets.UTF_8);
+
+                // 读取文件内容
+                char[] buffer = new char[1024];
+                int charsRead;
+                StringBuilder content = new StringBuilder();
+
+                while ((charsRead = reader.read(buffer)) != -1) {
+                    content.append(buffer, 0, charsRead);
+                }
+
+                System.out.println("使用try-finally安全读取的内容: " + content.toString());
+
+            } catch (IOException e) {
+                System.err.println("读取文件时出错: " + e.getMessage());
+            } finally {
+                // 按照资源创建的逆序关闭资源
+                if (reader != null) {
+                    try {
+                        reader.close(); // 这会间接关闭底层的 FileInputStream
+                    } catch (IOException e) {
+                        System.err.println("关闭reader时出错: " + e.getMessage());
+                    }
+                }
+
+                // 通常不需要这样做，因为关闭reader会关闭底层流
+                // 但为了保险起见，尤其是处理自定义InputStreamReader的情况
+                if (fileStream != null) {
+                    try {
+                        fileStream.close();
+                    } catch (IOException e) {
+                        System.err.println("关闭fileStream时出错: " + e.getMessage());
+                    }
+                }
+            }
+        }
+
+        /**
+         * 正确示例3：使用 BufferedReader 提高效率
+         */
+        public static void safeReadFileWithBufferedReader(String filePath) {
+            try (
+                FileInputStream fileStream = new FileInputStream(filePath);
+                InputStreamReader reader = new InputStreamReader(fileStream, StandardCharsets.UTF_8);
+                BufferedReader bufferedReader = new BufferedReader(reader)
+            ) {
+                // 按行读取更高效
+                String line;
+                StringBuilder content = new StringBuilder();
+
+                while ((line = bufferedReader.readLine()) != null) {
+                    content.append(line).append("\n");
+                }
+
+                System.out.println("使用BufferedReader读取的内容: " + content.toString());
+
+            } catch (IOException e) {
+                System.err.println("读取文件时出错: " + e.getMessage());
+            }
+            // 所有资源自动关闭
+        }
+
+        /**
+         * 主方法 - 演示各种读取方式
+         */
+        public static void main(String[] args) {
+            String filePath = "example.txt";
+
+            // 创建示例文件进行测试
+            try (FileWriter writer = new FileWriter(filePath)) {
+                writer.write("这是一个测试文件。\n包含多行内容。\n用于演示InputStreamReader资源管理。");
+            } catch (IOException e) {
+                System.err.println("创建测试文件失败: " + e.getMessage());
+                return;
+            }
+
+            // 不要在生产环境使用不安全的方法
+            // unsafeReadFile(filePath);
+
+            // 使用安全的方法
+            safeReadFileWithTryWithResources(filePath);
+            safeReadFileWithTryFinally(filePath);
+            safeReadFileWithBufferedReader(filePath);
+
+            // 删除测试文件
+            new File(filePath).delete();
+        }
+    }
+CODE
+}
