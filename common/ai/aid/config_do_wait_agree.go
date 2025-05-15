@@ -49,7 +49,7 @@ func (c *Config) doWaitAgreeWithPolicy(ctx context.Context, doWaitAgreeWithPolic
 		ep.Wait()
 	case AgreePolicyAI:
 		if !c.agreeRiskCtrl.enabled() {
-			c.EmitInfo("ai agree risk control is not enabled, use manual agree")
+			c.EmitInfo("policy[ai]: ai agree risk control is not enabled, use manual agree (risk control is disabled)")
 			ep.Wait()
 			return
 		}
@@ -66,14 +66,18 @@ func (c *Config) doWaitAgreeWithPolicy(ctx context.Context, doWaitAgreeWithPolic
 
 			result := c.agreeRiskCtrl.doRiskControl(c, riskCtrlCtx, bytes.NewBufferString(string(utils.Jsonify(params))))
 			if result == nil {
-				c.EmitInfo("ai agree risk control is not enabled, use manual agree")
+				c.EmitInfo("ai agree risk control is not configured or impl bug, wait manual agree")
 				return
 			}
 
+			if result != nil && !result.Skipped {
+				c.EmitRiskControlPrompt(ep.id, result)
+			}
 			if c.agreeAIScore > 0 && result.Score >= c.agreeAIScore {
-				c.EmitInfo("ai agree risk control is not enabled, use manual agree")
+				c.EmitInfo("ai got risk score: %v >= %v, use manual agree", result.Score, c.agreeAIScore)
 				return
 			}
+			c.EmitInfo("ai agree risk control ")
 			ep.Release()
 		}()
 		ep.Wait()
