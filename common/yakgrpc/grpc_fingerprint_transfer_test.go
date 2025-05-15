@@ -59,17 +59,14 @@ func deleteFingerprintByNames(client ypb.YakClient, names []string) error {
 }
 
 func addFingerprintGroups(client ypb.YakClient, ruleNames []string, groupNames []string) error {
-	for _, groupName := range groupNames {
-		req := &ypb.BatchAppendFingerprintToGroupRequest{
-			Filter: &ypb.FingerprintFilter{
-				RuleName: ruleNames,
-			},
-			GroupName: groupName,
-		}
-		_, err := client.BatchAppendFingerprintToGroup(context.Background(), req)
-		if err != nil {
-			return err
-		}
+	_, err := client.BatchUpdateFingerprintToGroup(context.Background(), &ypb.BatchUpdateFingerprintToGroupRequest{
+		Filter: &ypb.FingerprintFilter{
+			RuleName: ruleNames,
+		},
+		AppendGroupName: groupNames,
+	})
+	if err != nil {
+		return err
 	}
 	return nil
 }
