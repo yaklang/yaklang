@@ -76,7 +76,6 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 			}
 		}
 	}()
-	log.Infof("层数:%d,v:%s", actx.getRecursiveCounter(), v.String())
 
 	if v == nil {
 		return nil
