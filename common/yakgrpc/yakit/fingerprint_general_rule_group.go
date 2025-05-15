@@ -4,6 +4,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 )
 
 // CreateGeneralRuleGroup create general rule group , omit rules and id
@@ -49,14 +50,15 @@ func GetGeneralRuleGroupByName(db *gorm.DB, name string) (*schema.GeneralRuleGro
 }
 
 // DeleteGeneralRuleGroupByName delete general rule group by group name
-func DeleteGeneralRuleGroupByName(db *gorm.DB, name []string) (effectRows int64, fErr error) {
-	fErr = utils.GormTransaction(db, func(tx *gorm.DB) error {
-		db := tx.Model(&schema.SyntaxFlowGroup{})
+func DeleteGeneralRuleGroupByName(outDb *gorm.DB, name []string) (effectRows int64, fErr error) {
+	fErr = utils.GormTransaction(outDb, func(tx *gorm.DB) error {
+		db := tx.Model(&schema.GeneralRuleGroup{})
 		var ids []uint
-		if err := db.Where("group_name IN (?)", name).Pluck("id", &ids).Error; err != nil {
+		db = bizhelper.ExactQueryStringArrayOr(db, "group_name", name)
+		if err := db.Pluck("id", &ids).Error; err != nil {
 			return err
 		}
-		if db = db.Unscoped().Where("group_name = ?", name).Delete(&schema.GeneralRuleGroup{}); db.Error != nil {
+		if db = db.Unscoped().Delete(&schema.GeneralRuleGroup{}); db.Error != nil {
 			return db.Error
 		}
 		effectRows = db.RowsAffected
@@ -91,6 +93,25 @@ func UpdateGeneralRuleAndGroupAssociations(db *gorm.DB, rule []*schema.GeneralRu
 	return nil
 }
 
+func AppendGeneralRuleGroupAssociations(db *gorm.DB, rule []*schema.GeneralRule, group []*schema.GeneralRuleGroup) error {
+	for _, r := range rule {
+		if err := db.Model(r).Association("Groups").Replace(append(r.Groups, group...)).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func DeleteGeneralRuleGroupAssociationsByID(db *gorm.DB, ruleID []uint, groupID []uint) error {
 	return db.Table("general_rule_and_group").Where("general_rule_id IN (?) OR general_rule_group_id IN (?)", ruleID, groupID).Unscoped().Delete(nil).Error
+}
+
+func CreateGeneralMultipleRuleGroup(db *gorm.DB, groups []*schema.GeneralRuleGroup) error {
+	for _, group := range groups {
+		err := FirstOrCreateGeneralRuleGroup(db, group)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
