@@ -3,6 +3,10 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"io"
+	"sync"
 	"testing"
 	"time"
 
@@ -179,4 +183,64 @@ func TestIsProtobuf(t *testing.T) {
 	if utils.IsProtobuf(raw) {
 		panic(1)
 	}
+}
+func TestWsData(t *testing.T) {
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(10))
+	defer cancel()
+
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	stream, err := client.CreateWebsocketFuzzer(ctx)
+	require.NoError(t, err)
+	host, port := utils.DebugMockEchoWs("")
+
+	target := fmt.Sprintf("%s:%d", host, port)
+	rawBytes := poc.BuildRequest(fmt.Sprintf(`GET / HTTP/1.1
+Host: %s
+Accept-Encoding: gzip, deflate
+Sec-WebSocket-Extensions: permessage-deflate
+Sec-WebSocket-Key: 3o0bLKJzcaNwhJQs4wBw2g==
+Accept-Language: zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2
+Cache-Control: no-cache
+Pragma: no-cache
+Upgrade: websocket
+Sec-WebSocket-Version: 13
+Connection: keep-alive, Upgrade
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0
+Accept: */*
+`, target))
+	stream.Send(&ypb.ClientWebsocketRequest{
+		IsTLS:               false,
+		UpgradeRequest:      rawBytes,
+		TotalTimeoutSeconds: 20,
+	})
+	token := uuid.NewString()
+	stream.Send(&ypb.ClientWebsocketRequest{
+		ToServer: []byte(token),
+	})
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	flag := false
+	go func() {
+		defer wg.Done()
+		count := 0
+		for {
+			count++
+			recv, err2 := stream.Recv()
+			if err2 != nil && err2 != io.EOF {
+				break
+			}
+			if string(recv.Data) == token {
+				flag = true
+				break
+			}
+			if count > 5 {
+				break
+			}
+			count++
+			continue
+		}
+	}()
+	wg.Wait()
+	require.True(t, flag)
 }
