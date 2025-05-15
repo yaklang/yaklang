@@ -79,7 +79,7 @@ func newPIMatrixForge(callback func(result *PIMatrixResult), opts ...aid.Option)
 	return forge
 }
 
-func init() {
+func _init_pimatrix() {
 	err := aiforge.RegisterForgeExecutor("pimatrix", func(ctx context.Context, items []*ypb.ExecParamItem, option ...aid.Option) (*aiforge.ForgeResult, error) {
 		m := new(sync.Mutex)
 		var finalResult *PIMatrixResult
