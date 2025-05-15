@@ -132,27 +132,32 @@ func (c *YakForgeBlueprintConfig) Build() (*ForgeBlueprint, error) {
 	if err := c.Validate(); err != nil {
 		return nil, err
 	}
+	config := c
 
 	var aidOpts []aid.Option
 	if c.YakForgeBlueprintAIDOptionsConfig != nil {
 		aidOpts = c.YakForgeBlueprintAIDOptionsConfig.ToOptions()
 	}
 
-	config := c
-	name := config.Name
-	blueprint := NewForgeBlueprint(name,
-		WithOriginYaklangCliCode(config.CLIParameterRuleYaklangCode),
-		WithToolKeywords(config.ToolKeywords),
-		WithInitializePrompt(config.InitPrompt),
-		WithPersistentPrompt(config.PersistentPrompt),
-		WithPlanMocker(func(cfg *aid.Config) *aid.PlanResponse {
+	var planMocker func(cfg *aid.Config) *aid.PlanResponse
+	if c.PlanPrompt != "" {
+		planMocker = func(cfg *aid.Config) *aid.PlanResponse {
 			plan, err := aid.ExtractPlan(cfg, config.PlanPrompt)
 			if err != nil {
 				cfg.EmitError("mock SMART Plan failed: %v", err)
 				return nil
 			}
 			return plan
-		}),
+		}
+	}
+
+	name := config.Name
+	blueprint := NewForgeBlueprint(name,
+		WithOriginYaklangCliCode(config.CLIParameterRuleYaklangCode),
+		WithToolKeywords(config.ToolKeywords),
+		WithInitializePrompt(config.InitPrompt),
+		WithPersistentPrompt(config.PersistentPrompt),
+		WithPlanMocker(planMocker),
 		WithResultPrompt(config.ResultPrompt),
 		WithAIDOptions(aidOpts...),
 		WithResultHandler(func(s string, err error) {
