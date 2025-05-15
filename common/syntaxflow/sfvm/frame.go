@@ -51,7 +51,7 @@ type SFFrame struct {
 	errorSkipStack *utils.Stack[*errorSkipContext]
 
 	Text   string
-	Codes  []*SFI
+	Codes  []*SFI // code list
 	toLeft bool
 
 	predCounter int

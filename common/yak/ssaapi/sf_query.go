@@ -56,9 +56,13 @@ func (config *queryConfig) GetFrame() (*sfvm.SFFrame, error) {
 
 	// use rule compiled
 	if config.rule != nil {
-		frame, err := vm.Load(config.rule)
+		frame, resave, err := vm.Load(config.rule)
 		if err != nil {
 			return nil, utils.Errorf("SyntaxflowQuery: load rule %s error: %v", config.rule.RuleName, err)
+		}
+		if resave {
+			// save rule to db
+			sfdb.MigrateSyntaxFlow("", config.rule)
 		}
 		return frame, nil
 	}
@@ -79,7 +83,11 @@ func (config *queryConfig) GetFrame() (*sfvm.SFFrame, error) {
 		if err != nil {
 			return nil, utils.Errorf("SyntaxflowQuery: load rule %s from db error: %v", config.ruleName, err)
 		}
-		frame, err := vm.Load(rule)
+		frame, resave, err := vm.Load(rule)
+		if resave {
+			// save rule to db
+			sfdb.MigrateSyntaxFlow("", config.rule)
+		}
 		if err != nil {
 			return nil, utils.Errorf("SyntaxflowQuery: load rule %s to sfvm error: %v", config.ruleName, err)
 		}
