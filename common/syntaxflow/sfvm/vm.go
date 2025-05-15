@@ -71,12 +71,23 @@ func (s *SyntaxFlowVirtualMachine) ForEachFrame(h func(frame *SFFrame)) {
 	}
 }
 
-func (s *SyntaxFlowVirtualMachine) Load(rule *schema.SyntaxFlowRule) (*SFFrame, error) {
-	frame := newSfFrameEx(s.vars, rule.Content, ToOpCodes(rule.OpCodes), rule, s.config)
-	frame.config = s.config
-	frame.vm = s
-	s.frames = append(s.frames, frame)
-	return frame, nil
+func (s *SyntaxFlowVirtualMachine) Load(rule *schema.SyntaxFlowRule) (*SFFrame, bool, error) {
+	var frame *SFFrame
+	opcode, ok := ToOpCodes(rule.OpCodes)
+	if ok {
+		frame = newSfFrameEx(s.vars, rule.Content, opcode.Opcode, rule, s.config)
+		frame.config = s.config
+		frame.vm = s
+		s.frames = append(s.frames, frame)
+		return frame, false, nil
+	} else {
+		var err error
+		frame, err = s.Compile(rule.Content)
+		if err != nil {
+			return nil, false, utils.Errorf("SyntaxFlow compile error: %v", err)
+		}
+		return frame, true, nil
+	}
 }
 
 func CompileRule(rule string) (*SFFrame, error) {
@@ -118,7 +129,7 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 	}
 	result.rule.Content = text
 	result.VisitFlow(flow)
-	result.rule.OpCodes = result.codes.ToString()
+	result.rule.OpCodes = result.ToString()
 	frame = result.CreateFrame(s.vars)
 	frame.config = s.config
 	if len(result.verifyFsInfo) > 0 {
