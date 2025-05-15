@@ -1598,6 +1598,9 @@ func HTTP(i interface{}, opts ...PocConfigOption) (rsp []byte, req []byte, err e
 		return nil, nil, err
 	}
 	response, err := pochttp(packet, config)
+	if err != nil {
+		return nil, nil, err
+	}
 	noFixContentLength := config.NoFixContentLength != nil && *config.NoFixContentLength
 	return response.RawPacket, lowhttp.FixHTTPPacketCRLF(response.RawRequest, noFixContentLength), err
 }
