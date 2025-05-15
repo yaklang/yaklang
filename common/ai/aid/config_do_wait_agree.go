@@ -1,6 +1,7 @@
 package aid
 
 import (
+	"bytes"
 	"context"
 	"github.com/yaklang/yaklang/common/log"
 	"sync"
@@ -62,7 +63,8 @@ func (c *Config) doWaitAgreeWithPolicy(ctx any, doWaitAgreeWithPolicy AgreePolic
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			result := c.agreeRiskCtrl.doRiskControl(c, riskCtrlCtx, nil)
+
+			result := c.agreeRiskCtrl.doRiskControl(c, riskCtrlCtx, bytes.NewBufferString("this is a fake data for review, see it, todo for changing"))
 			if result == nil {
 				c.EmitInfo("ai agree risk control is not enabled, use manual agree")
 				return
