@@ -3,9 +3,11 @@ package aiforge
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -44,25 +46,26 @@ func (c *YakForgeBlueprintAIDOptionsConfig) ToOptions() []aid.Option {
 
 type YakForgeBlueprintConfig struct {
 	// prompt
-	Name             string
-	InitPrompt       string
-	PersistentPrompt string
-	PlanPrompt       string
-	ResultPrompt     string
+	Name             string `json:"name"`
+	InitPrompt       string `json:"init_prompt"`
+	PersistentPrompt string `json:"persistent_prompt"`
+	PlanPrompt       string `json:"plan_prompt"`
+	ResultPrompt     string `json:"result_prompt"`
 
 	// cli code
-	CLIParameterRuleYaklangCode string
+	CLIParameterRuleYaklangCode string `json:"cli_parameter_rule_yaklang_code"`
 
 	// tools
-	ToolKeywords []string
-	Tools        []string
+	ToolKeywords string `json:"tool_keywords"`
+	Tools        string `json:"tools"`
+	Description  string `json:"description"`
 
 	// aid options
-	YakForgeBlueprintAIDOptionsConfig *YakForgeBlueprintAIDOptionsConfig
+	YakForgeBlueprintAIDOptionsConfig *YakForgeBlueprintAIDOptionsConfig `json:"aid_options_config"`
 
 	// result handle
-	ForgeResult *ForgeResult
-	ActionName  string
+	ForgeResult *ForgeResult `json:"forge_result"`
+	Actions     string       `json:"actions"`
 }
 
 // NewYakForgeBlueprintConfigFromJson 从Json数据创建Forge
@@ -81,13 +84,27 @@ func NewYakForgeBlueprintConfig(name string, initPrompt string, persistentPrompt
 		Name:             name,
 		InitPrompt:       initPrompt,
 		PersistentPrompt: persistentPrompt,
-		ToolKeywords:     []string{},
-		Tools:            []string{},
 	}
 }
-
+func NewYakForgeBlueprintConfigFromSchemaForge(forge *schema.AIForge) *YakForgeBlueprintConfig {
+	return NewYakForgeBlueprintConfig(forge.ForgeName, forge.InitPrompt, forge.PersistentPrompt).
+		WithSchemaForge(forge)
+}
+func (c *YakForgeBlueprintConfig) WithSchemaForge(forge *schema.AIForge) *YakForgeBlueprintConfig {
+	c.Name = forge.ForgeName
+	c.InitPrompt = forge.InitPrompt
+	c.PersistentPrompt = forge.PersistentPrompt
+	c.PlanPrompt = forge.PlanPrompt
+	c.ResultPrompt = forge.ResultPrompt
+	c.CLIParameterRuleYaklangCode = forge.ForgeContent
+	c.ToolKeywords = forge.ToolKeywords
+	c.Tools = forge.Tools
+	c.Description = forge.Description
+	c.Actions = forge.Actions
+	return c
+}
 func (c *YakForgeBlueprintConfig) WithActionName(name string) *YakForgeBlueprintConfig {
-	c.ActionName = name
+	c.Actions = name
 	return c
 }
 
@@ -97,6 +114,16 @@ func (c *YakForgeBlueprintConfig) WithAIDOptions(opts *YakForgeBlueprintAIDOptio
 }
 func (c *YakForgeBlueprintConfig) WithPlanPrompt(planPrompt string) *YakForgeBlueprintConfig {
 	c.PlanPrompt = planPrompt
+	return c
+}
+
+func (c *YakForgeBlueprintConfig) WithInitPrompt(initPrompt string) *YakForgeBlueprintConfig {
+	c.InitPrompt = initPrompt
+	return c
+}
+
+func (c *YakForgeBlueprintConfig) WithPersistentPrompt(persistentPrompt string) *YakForgeBlueprintConfig {
+	c.PersistentPrompt = persistentPrompt
 	return c
 }
 
@@ -111,12 +138,12 @@ func (c *YakForgeBlueprintConfig) WithCLIParameterRuleYaklangCode(cliParameterRu
 }
 
 func (c *YakForgeBlueprintConfig) WithToolKeywords(toolKeywords ...string) *YakForgeBlueprintConfig {
-	c.ToolKeywords = toolKeywords
+	c.ToolKeywords = strings.Join(toolKeywords, ",")
 	return c
 }
 
 func (c *YakForgeBlueprintConfig) WithTools(tools ...string) *YakForgeBlueprintConfig {
-	c.Tools = tools
+	c.Tools = strings.Join(tools, ",")
 	return c
 }
 
@@ -154,14 +181,21 @@ func (c *YakForgeBlueprintConfig) Build() (*ForgeBlueprint, error) {
 	name := config.Name
 	blueprint := NewForgeBlueprint(name,
 		WithOriginYaklangCliCode(config.CLIParameterRuleYaklangCode),
-		WithToolKeywords(config.ToolKeywords),
+		WithToolKeywords(strings.Split(config.ToolKeywords, ",")),
 		WithInitializePrompt(config.InitPrompt),
 		WithPersistentPrompt(config.PersistentPrompt),
 		WithPlanMocker(planMocker),
 		WithResultPrompt(config.ResultPrompt),
 		WithAIDOptions(aidOpts...),
 		WithResultHandler(func(s string, err error) {
-			action, err := aid.ExtractAction(s, config.ActionName)
+			actions := strings.Split(config.Actions, ",")
+			var actionName string
+			var alias []string
+			if len(actions) > 0 {
+				actionName = actions[0]
+				alias = actions[1:]
+			}
+			action, err := aid.ExtractAction(s, actionName, alias...)
 			if err != nil {
 				log.Errorf("Failed to extract action from smart: %s", err)
 				return

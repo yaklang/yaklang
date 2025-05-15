@@ -61,18 +61,6 @@ func getForgeCode(name string) (string, bool) {
 	return string(codeBytes), true
 }
 
-// ForgeCfg 用于解析forge_cfg.json文件
-type ForgeCfg struct {
-	Name             string `json:"name"`
-	ToolKeywords     string `json:"tool_keywords"`
-	Tools            string `json:"tools"`
-	InitPrompt       string `json:"init_prompt"`
-	PersistentPrompt string `json:"persistent_prompt"`
-	PlanPrompt       string `json:"plan_prompt"`
-	ResultPrompt     string `json:"result_prompt"`
-	Description      string `json:"description"`
-}
-
 func getForgeConfig(name string) (string, *schema.AIForge, bool) {
 	forge := &schema.AIForge{}
 	p := fmt.Sprintf("buildinforge/%v", name)
@@ -100,7 +88,7 @@ func getForgeConfig(name string) (string, *schema.AIForge, bool) {
 		forge.ForgeContent = string(codeContent)
 	} else {
 		// 使用结构体解析forge_cfg.json
-		var cfg ForgeCfg
+		var cfg YakForgeBlueprintConfig
 		err = json.Unmarshal(configBytes, &cfg)
 		if err != nil {
 			log.Errorf("parse forge config failed: %v", err)
@@ -127,6 +115,7 @@ func getForgeConfig(name string) (string, *schema.AIForge, bool) {
 		forge.PersistentPrompt = cfg.PersistentPrompt
 		forge.PlanPrompt = cfg.PlanPrompt
 		forge.ResultPrompt = cfg.ResultPrompt
+		forge.Actions = cfg.Actions
 		forge.ForgeContent = string(codeContent)
 	}
 	return string(configBytes), forge, true
