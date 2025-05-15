@@ -122,7 +122,7 @@ func (sm *SessionManager) CreateSession() string {
 		return "" // Indicate failure
 	}
 
-	log.Infof("Created new session %s, expires at %s", sessionID, expiresAt.Format(time.RFC3339))
+	log.Infof("Created new sessio1n %s, expires at %s", sessionID, expiresAt.Format(time.RFC3339))
 	return sessionID
 }
 
