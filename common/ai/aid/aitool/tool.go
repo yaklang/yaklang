@@ -475,12 +475,17 @@ func (t *Tool) ToJSONSchema() map[string]any {
 		}
 	}
 
+	finalRequires := []string{"tool", "@action"}
+	if _, ok := properties["params"]; ok {
+		finalRequires = append(finalRequires, "params")
+	}
+
 	// 构建最终的JSON Schema
 	schema := map[string]any{
 		"$schema":              "http://json-schema.org/draft-07/schema#",
 		"type":                 "object",
 		"properties":           properties,
-		"required":             []string{"tool", "@action"},
+		"required":             []string{"tool", "@action", "params"},
 		"additionalProperties": false,
 	}
 

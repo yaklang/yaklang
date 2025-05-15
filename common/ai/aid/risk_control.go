@@ -17,8 +17,9 @@ type RiskControlResult struct {
 }
 
 type riskControl struct {
-	buildinForgeName string
-	callback         func(*Config, context.Context, io.Reader) *RiskControlResult
+	buildinForgeName  string
+	buildinAICallback AICallbackType
+	callback          func(*Config, context.Context, io.Reader) *RiskControlResult
 }
 
 func (rc *riskControl) enabled() bool {
@@ -114,7 +115,7 @@ func (rc *riskControl) doRiskControl(config *Config, ctx context.Context, reader
 		})
 	}
 
-	action, err := ExecuteAIForge(ctx, rc.buildinForgeName, params)
+	action, err := ExecuteAIForge(ctx, rc.buildinForgeName, params, WithAICallback(rc.buildinAICallback))
 	if err != nil {
 		return &RiskControlResult{
 			Skipped: true,
@@ -122,20 +123,23 @@ func (rc *riskControl) doRiskControl(config *Config, ctx context.Context, reader
 			Reason:  fmt.Sprintf("execute aid forge error: %v", err),
 		}
 	}
-	prob := action.GetFloat("probability")
-	impact := action.GetFloat("impact")
-	reason := action.GetString("reason")
+	obj := action.GetInvokeParams("params")
+	prob := obj.GetFloat("probability")
+	impact := obj.GetFloat("impact")
+	reasonZh := obj.GetString("reason_zh")
+	reasonEn := obj.GetString("reason_en")
+	_ = reasonEn
 	if prob > 0 && impact > 0 {
 		return &RiskControlResult{
 			Skipped: false,
 			Score:   (prob + impact) / 2.0,
-			Reason:  reason,
+			Reason:  reasonZh,
 		}
 	}
 
 	return &RiskControlResult{
 		Skipped: true,
 		Score:   0,
-		Reason:  "callback is nil",
+		Reason:  "aiforge execute failed, probability n impact all zero",
 	}
 }

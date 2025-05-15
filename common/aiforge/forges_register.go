@@ -28,6 +28,20 @@ func RegisterLiteForge(i string, params ...LiteForgeOption) error {
 	return RegisterForgeExecutor(i, lf.Execute)
 }
 
+func RegisterAIDBuildInForge(i string, params ...LiteForgeOption) error {
+	lf, err := NewLiteForge(i, params...)
+	if err != nil {
+		return utils.Errorf("build lite forge failed: %v", err)
+	}
+	return aid.RegisterAIDBuildinForge(i, func(c context.Context, params []*ypb.ExecParamItem, opts ...aid.Option) (*aid.Action, error) {
+		result, err := lf.Execute(c, params, opts...)
+		if err != nil {
+			return nil, err
+		}
+		return result.Action, nil
+	})
+}
+
 func RegisterForgeExecutor(i string, f ForgeExecutor) error {
 	forgeMutex.Lock()
 	if _, ok := forges[i]; ok {

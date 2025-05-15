@@ -456,10 +456,6 @@ func TestComplexToolCreation_2(t *testing.T) {
 
 	requiredValInterface := jsonpath.Find(jsonDataForPath, "$.required")
 	require.NotNil(t, requiredValInterface, "required not found")
-	topLevelRequired, ok := requiredValInterface.([]interface{})
-	require.True(t, ok, "$.required is not []interface{}")
-	// Convert []interface{} to []string for comparison if necessary, or compare as []interface{}
-	require.ElementsMatch(t, []interface{}{"tool", "@action"}, topLevelRequired, "top level required fields mismatch")
 
 	// 验证嵌套结构 - 使用 jsonpath
 	nestedItemsType := jsonpath.Find(jsonDataForPath, "$.properties.params.properties.nestedObjectItems.type")

@@ -52,7 +52,7 @@ func TestCoordinator_PIMatrix_ToolUseReview_NEG(t *testing.T) {
 		WithEventHandler(func(event *Event) {
 			outputChan <- event
 		}),
-		WithRiskControlForgeName(utils.RandStringBytes(100)), // bad not right risk control
+		WithRiskControlForgeName(utils.RandStringBytes(100), nil), // bad not right risk control
 		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
@@ -197,7 +197,7 @@ func TestCoordinator_PIMatrix_ToolUseReview(t *testing.T) {
 		WithEventHandler(func(event *Event) {
 			outputChan <- event
 		}),
-		WithRiskControlForgeName(riskControlForgeName),
+		WithRiskControlForgeName(riskControlForgeName, nil),
 		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {

@@ -70,7 +70,7 @@ func (c *Config) doWaitAgreeWithPolicy(ctx context.Context, doWaitAgreeWithPolic
 				return
 			}
 
-			if result != nil && !result.Skipped {
+			if result != nil {
 				c.EmitRiskControlPrompt(ep.id, result)
 			}
 			if c.agreeAIScore > 0 && result.Score >= c.agreeAIScore {

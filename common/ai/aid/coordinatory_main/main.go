@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
+	_ "github.com/yaklang/yaklang/common/aiforge/aibp"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -53,10 +54,11 @@ func main() {
 			return aiforge.GetOpenRouterAICallback()(config, req)
 		}),
 		aid.WithTools(aid.GetAllMockTools()...),
-		aid.WithSystemFileOperator(),
 		aid.WithDebugPrompt(),
-		aid.WithYOLO(true),
 		aid.WithTimeLineLimit(5),
+		aid.WithRiskControlForgeName("pimatrix", aiforge.GetOpenRouterAICallback()),
+		aid.WithAllowRequireForUserInteract(false),
+		aid.WithAIAgree(),
 	)
 	if err != nil {
 		panic(err)
