@@ -23,7 +23,7 @@ func FilterGeneralRule(db *gorm.DB, filter *ypb.FingerprintFilter) *gorm.DB {
 			Where("general_rule_groups.group_name IN (?)", filter.GetGroupName()).
 			Group("general_rules.id")
 	}
-
+	db = bizhelper.ExactQueryStringArrayOr(db, "rule_name", filter.RuleName)
 	db = bizhelper.ExactQueryStringArrayOr(db, "vendor", filter.Vendor)
 	db = bizhelper.ExactQueryStringArrayOr(db, "product", filter.Product)
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", filter.IncludeId)
@@ -45,6 +45,16 @@ func QueryGeneralRule(db *gorm.DB, filter *ypb.FingerprintFilter, paging *ypb.Pa
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
 	}
 	return pag, ret, nil
+}
+
+func QueryGeneralRuleFast(db *gorm.DB, filter *ypb.FingerprintFilter) ([]*schema.GeneralRule, error) {
+	db = db.Model(&schema.GeneralRule{}).Preload("Groups")
+	db = FilterGeneralRule(db, filter)
+	var ret []*schema.GeneralRule
+	if err := db.Find(&ret).Error; err != nil {
+		return nil, err
+	}
+	return ret, nil
 }
 
 func GetGeneralRuleByID(db *gorm.DB, id int64) (*schema.GeneralRule, error) {
@@ -116,40 +126,28 @@ func UpdateGeneralRule(outDb *gorm.DB, rule *schema.GeneralRule) (effectRows int
 	return effectRows, err
 }
 
-// AppendGeneralRuleToMultipleGroup append general rule to multiple group
-func AppendGeneralRuleToMultipleGroup(outDb *gorm.DB, ruleName string, groupName []string) (effectRows int64, fErr error) {
+// BatchDeleteGeneralRuleGroupAssociations batch delete general rule group associations,
+func BatchDeleteGeneralRuleGroupAssociations(outDb *gorm.DB, rules []*schema.GeneralRule, groupName []string) (effectRows int64, fErr error) {
 	err := utils.GormTransaction(outDb, func(tx *gorm.DB) error {
-		rule, err := GetGeneralRuleByRuleName(tx, ruleName)
+		groups, err := GetGeneralRuleGroupByNames(tx, groupName)
 		if err != nil {
 			return err
 		}
+		return DeleteGeneralRuleGroupAssociations(tx, rules, groups)
+	})
+	return effectRows, err
+}
+
+// BatchAppendGeneralRuleGroupAssociations  batch append general rule group associations,  rule should exist in database; group if not exist, will create it
+func BatchAppendGeneralRuleGroupAssociations(outDb *gorm.DB, rules []*schema.GeneralRule, groupName []string) (effectRows int64, fErr error) {
+	err := utils.GormTransaction(outDb, func(tx *gorm.DB) error {
 		groups := lo.Map(groupName, func(item string, _ int) *schema.GeneralRuleGroup {
 			return &schema.GeneralRuleGroup{GroupName: item}
 		})
 		if err := CreateGeneralMultipleRuleGroup(tx, groups); err != nil {
 			return err
 		}
-		effectRows = tx.RowsAffected
-		return AppendGeneralRuleGroupAssociations(tx, []*schema.GeneralRule{rule}, groups)
-	})
-	return effectRows, err
-}
-
-// AppendMultipleGeneralRuleToGroup append multiple general rule to group
-func AppendMultipleGeneralRuleToGroup(outDb *gorm.DB, filter *ypb.FingerprintFilter, groupName string) (effectRows int64, fErr error) {
-	err := utils.GormTransaction(outDb, func(tx *gorm.DB) error {
-		rules := []*schema.GeneralRule{}
-		ruleTx := FilterGeneralRule(tx.Model(&schema.GeneralRule{}).Preload("Groups"), filter)
-		ruleTx.Find(&rules)
-		if err := ruleTx.Find(&rules).Error; err != nil {
-			return err
-		}
-		effectRows = ruleTx.RowsAffected
-		group := &schema.GeneralRuleGroup{GroupName: groupName}
-		if err := FirstOrCreateGeneralRuleGroup(tx, group); err != nil {
-			return err
-		}
-		return AppendGeneralRuleGroupAssociations(tx, rules, []*schema.GeneralRuleGroup{group})
+		return AppendGeneralRuleGroupAssociations(tx, rules, groups)
 	})
 	return effectRows, err
 }
@@ -165,7 +163,7 @@ func DeleteGeneralRuleByName(db *gorm.DB, ruleName string) (fErr error) {
 			return utils.Errorf("delete GeneralRule failed: %s", db.Error)
 		}
 
-		return DeleteGeneralRuleGroupAssociationsByID(tx, []uint{id}, nil)
+		return DeleteGeneralRuleGroupAssociationsByIDOR(tx, []uint{id}, nil)
 	})
 }
 
@@ -174,7 +172,7 @@ func DeleteGeneralRuleByID(db *gorm.DB, id int64) (fErr error) {
 		if err := tx.Where("id = ?", id).Unscoped().Delete(&schema.GeneralRule{}).Error; err != nil {
 			return err
 		}
-		return DeleteGeneralRuleGroupAssociationsByID(tx, []uint{uint(id)}, nil)
+		return DeleteGeneralRuleGroupAssociationsByIDOR(tx, []uint{uint(id)}, nil)
 	})
 }
 
@@ -189,7 +187,7 @@ func DeleteGeneralRuleByFilter(outDb *gorm.DB, filter *ypb.FingerprintFilter) (r
 			return utils.Errorf("delete GeneralRule failed: %s", db.Error)
 		}
 		rowCount = db.RowsAffected
-		return DeleteGeneralRuleGroupAssociationsByID(tx, ids, nil)
+		return DeleteGeneralRuleGroupAssociationsByIDOR(tx, ids, nil)
 	})
 	return
 }

@@ -417,7 +417,8 @@ const (
 	Yak_GetAllFingerprintGroup_FullMethodName                     = "/ypb.Yak/GetAllFingerprintGroup"
 	Yak_RenameFingerprintGroup_FullMethodName                     = "/ypb.Yak/RenameFingerprintGroup"
 	Yak_DeleteFingerprintGroup_FullMethodName                     = "/ypb.Yak/DeleteFingerprintGroup"
-	Yak_BatchAppendFingerprintToGroup_FullMethodName              = "/ypb.Yak/BatchAppendFingerprintToGroup"
+	Yak_BatchUpdateFingerprintToGroup_FullMethodName              = "/ypb.Yak/BatchUpdateFingerprintToGroup"
+	Yak_GetFingerprintGroupSetByFilter_FullMethodName             = "/ypb.Yak/GetFingerprintGroupSetByFilter"
 	Yak_ExportFingerprint_FullMethodName                          = "/ypb.Yak/ExportFingerprint"
 	Yak_ImportFingerprint_FullMethodName                          = "/ypb.Yak/ImportFingerprint"
 	Yak_GetReverseShellProgramList_FullMethodName                 = "/ypb.Yak/GetReverseShellProgramList"
@@ -1007,7 +1008,9 @@ type YakClient interface {
 	GetAllFingerprintGroup(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*FingerprintGroups, error)
 	RenameFingerprintGroup(ctx context.Context, in *RenameFingerprintGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	DeleteFingerprintGroup(ctx context.Context, in *DeleteFingerprintGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
-	BatchAppendFingerprintToGroup(ctx context.Context, in *BatchAppendFingerprintToGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	// 指纹 与 组 工具接口
+	BatchUpdateFingerprintToGroup(ctx context.Context, in *BatchUpdateFingerprintToGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	GetFingerprintGroupSetByFilter(ctx context.Context, in *GetFingerprintGroupSetRequest, opts ...grpc.CallOption) (*FingerprintGroups, error)
 	// 导入导出指纹
 	ExportFingerprint(ctx context.Context, in *ExportFingerprintRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DataTransferProgress], error)
 	ImportFingerprint(ctx context.Context, in *ImportFingerprintRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DataTransferProgress], error)
@@ -5656,10 +5659,20 @@ func (c *yakClient) DeleteFingerprintGroup(ctx context.Context, in *DeleteFinger
 	return out, nil
 }
 
-func (c *yakClient) BatchAppendFingerprintToGroup(ctx context.Context, in *BatchAppendFingerprintToGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+func (c *yakClient) BatchUpdateFingerprintToGroup(ctx context.Context, in *BatchUpdateFingerprintToGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DbOperateMessage)
-	err := c.cc.Invoke(ctx, Yak_BatchAppendFingerprintToGroup_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, Yak_BatchUpdateFingerprintToGroup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetFingerprintGroupSetByFilter(ctx context.Context, in *GetFingerprintGroupSetRequest, opts ...grpc.CallOption) (*FingerprintGroups, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FingerprintGroups)
+	err := c.cc.Invoke(ctx, Yak_GetFingerprintGroupSetByFilter_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6970,7 +6983,9 @@ type YakServer interface {
 	GetAllFingerprintGroup(context.Context, *Empty) (*FingerprintGroups, error)
 	RenameFingerprintGroup(context.Context, *RenameFingerprintGroupRequest) (*DbOperateMessage, error)
 	DeleteFingerprintGroup(context.Context, *DeleteFingerprintGroupRequest) (*DbOperateMessage, error)
-	BatchAppendFingerprintToGroup(context.Context, *BatchAppendFingerprintToGroupRequest) (*DbOperateMessage, error)
+	// 指纹 与 组 工具接口
+	BatchUpdateFingerprintToGroup(context.Context, *BatchUpdateFingerprintToGroupRequest) (*DbOperateMessage, error)
+	GetFingerprintGroupSetByFilter(context.Context, *GetFingerprintGroupSetRequest) (*FingerprintGroups, error)
 	// 导入导出指纹
 	ExportFingerprint(*ExportFingerprintRequest, grpc.ServerStreamingServer[DataTransferProgress]) error
 	ImportFingerprint(*ImportFingerprintRequest, grpc.ServerStreamingServer[DataTransferProgress]) error
@@ -8260,8 +8275,11 @@ func (UnimplementedYakServer) RenameFingerprintGroup(context.Context, *RenameFin
 func (UnimplementedYakServer) DeleteFingerprintGroup(context.Context, *DeleteFingerprintGroupRequest) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteFingerprintGroup not implemented")
 }
-func (UnimplementedYakServer) BatchAppendFingerprintToGroup(context.Context, *BatchAppendFingerprintToGroupRequest) (*DbOperateMessage, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method BatchAppendFingerprintToGroup not implemented")
+func (UnimplementedYakServer) BatchUpdateFingerprintToGroup(context.Context, *BatchUpdateFingerprintToGroupRequest) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BatchUpdateFingerprintToGroup not implemented")
+}
+func (UnimplementedYakServer) GetFingerprintGroupSetByFilter(context.Context, *GetFingerprintGroupSetRequest) (*FingerprintGroups, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetFingerprintGroupSetByFilter not implemented")
 }
 func (UnimplementedYakServer) ExportFingerprint(*ExportFingerprintRequest, grpc.ServerStreamingServer[DataTransferProgress]) error {
 	return status.Errorf(codes.Unimplemented, "method ExportFingerprint not implemented")
@@ -15114,20 +15132,38 @@ func _Yak_DeleteFingerprintGroup_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Yak_BatchAppendFingerprintToGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(BatchAppendFingerprintToGroupRequest)
+func _Yak_BatchUpdateFingerprintToGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BatchUpdateFingerprintToGroupRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(YakServer).BatchAppendFingerprintToGroup(ctx, in)
+		return srv.(YakServer).BatchUpdateFingerprintToGroup(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Yak_BatchAppendFingerprintToGroup_FullMethodName,
+		FullMethod: Yak_BatchUpdateFingerprintToGroup_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YakServer).BatchAppendFingerprintToGroup(ctx, req.(*BatchAppendFingerprintToGroupRequest))
+		return srv.(YakServer).BatchUpdateFingerprintToGroup(ctx, req.(*BatchUpdateFingerprintToGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetFingerprintGroupSetByFilter_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFingerprintGroupSetRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetFingerprintGroupSetByFilter(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetFingerprintGroupSetByFilter_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetFingerprintGroupSetByFilter(ctx, req.(*GetFingerprintGroupSetRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -17598,8 +17634,12 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_DeleteFingerprintGroup_Handler,
 		},
 		{
-			MethodName: "BatchAppendFingerprintToGroup",
-			Handler:    _Yak_BatchAppendFingerprintToGroup_Handler,
+			MethodName: "BatchUpdateFingerprintToGroup",
+			Handler:    _Yak_BatchUpdateFingerprintToGroup_Handler,
+		},
+		{
+			MethodName: "GetFingerprintGroupSetByFilter",
+			Handler:    _Yak_GetFingerprintGroupSetByFilter_Handler,
 		},
 		{
 			MethodName: "GetReverseShellProgramList",
