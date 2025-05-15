@@ -33,9 +33,11 @@ func TestCoordinator_GUARDIAN_OUTPUT_SMOKING_ToolUseReview(t *testing.T) {
 
 		spew.Dump(params)
 		p := make(aitool.InvokeParams)
-		p["probability"] = 0.5
-		p["impact"] = 0.5
-		p["reason"] = "test reason"
+		rawParams := make(aitool.InvokeParams)
+		rawParams["probability"] = 0.5
+		rawParams["impact"] = 0.5
+		rawParams["reason"] = "test reason"
+		p["params"] = rawParams
 		return &Action{
 			name:   "",
 			params: p,
@@ -44,6 +46,8 @@ func TestCoordinator_GUARDIAN_OUTPUT_SMOKING_ToolUseReview(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	token2 := "status-..." + utils.RandStringBytes(20)
 
 	inputChan := make(chan *InputEvent)
 	outputChan := make(chan *Event)
@@ -97,6 +101,7 @@ func TestCoordinator_GUARDIAN_OUTPUT_SMOKING_ToolUseReview(t *testing.T) {
 			} else {
 				guardianSmokingTestPassed = false
 			}
+			emitter.EmitStatus(token2, token2)
 		}),
 	)
 	if err != nil {
@@ -108,6 +113,7 @@ func TestCoordinator_GUARDIAN_OUTPUT_SMOKING_ToolUseReview(t *testing.T) {
 	useToolReviewPass := false
 	count := 0
 	riskControlMsg := 0
+	guardianOutputPass := false
 LOOP:
 	for {
 		select {
@@ -150,7 +156,12 @@ LOOP:
 				continue
 			}
 
-			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to execute tool:", "ls") && riskControlMsg >= 2 {
+			if strings.Contains(result.String(), token2) {
+				guardianOutputPass = true
+				continue
+			}
+
+			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to execute tool:", "ls") && riskControlMsg >= 2 && guardianOutputPass {
 				useToolReviewPass = true
 				break LOOP
 			}
@@ -175,6 +186,10 @@ LOOP:
 
 	if !guardianSmokingTestPassed {
 		t.Fatal("guardian smoking test failed")
+	}
+
+	if !guardianOutputPass {
+		t.Fatal("guardian output test failed")
 	}
 }
 
