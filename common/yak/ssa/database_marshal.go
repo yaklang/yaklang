@@ -130,6 +130,7 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		if p := ret.GetParent(); p != nil {
 			params["parent"] = p.GetId()
 		}
+		params["throws"] = fetchIds(ret.Throws)
 		params["child_funcs"] = fetchIds(ret.ChildFuncs)
 		params["return"] = fetchIds(ret.Return)
 		params["blocks"] = fetchIds(ret.Blocks)
@@ -634,6 +635,7 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		if parent, ok := params["parent"]; ok {
 			ret.parent = unmarshalValue(parent)
 		}
+		ret.Throws = unmarshalValues(params["throws"])
 		ret.ChildFuncs = unmarshalValues(params["child_funcs"])
 		ret.Return = unmarshalValues(params["return"])
 		ret.Blocks = unmarshalInstructions(params["blocks"])

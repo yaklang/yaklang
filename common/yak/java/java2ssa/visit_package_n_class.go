@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/google/uuid"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -595,6 +596,9 @@ func (y *builder) VisitMethodDeclaration(
 	methodName := key
 	newFunc := y.NewFunc(funcName)
 	newFunc.SetMethodName(methodName)
+	vs := y.VisitThrowsClause(i)
+	newFunc.Throws = vs
+
 	annotationFunc, defCallback, isStatic := y.VisitModifiers(modify)
 	if isStatic {
 		class.RegisterStaticMethod(key, newFunc)
@@ -832,17 +836,26 @@ func (y *builder) VisitVariableModifier(raw javaparser.IVariableModifierContext)
 	return y.VisitAnnotation(i.Annotation())
 }
 
-func (y *builder) VisitQualifiedNameList(raw javaparser.IQualifiedNameListContext) {
+func (y *builder) VisitQualifiedNameList(raw javaparser.IQualifiedNameListContext) [][]string {
 	if y == nil || raw == nil || y.IsStop() {
-		return
+		return nil
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 	i, _ := raw.(*javaparser.QualifiedNameListContext)
 	if i == nil {
-		return
+		return nil
 	}
 
+	qualifiedNames := make([][]string, 0, len(i.AllQualifiedName()))
+	for _, qualifiedName := range i.AllQualifiedName() {
+		names := y.VisitQualifiedName(qualifiedName)
+		if len(names) == 0 {
+			continue
+		}
+		qualifiedNames = append(qualifiedNames, names)
+	}
+	return qualifiedNames
 }
 
 func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclarationContext, class *ssa.Blueprint) {
@@ -861,6 +874,7 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 	funcName := fmt.Sprintf("%s_%s_%s_%s", pkgName.Name, class.Name, key, uuid.NewString()[:4])
 	newFunc := y.NewFunc(funcName)
 	class.Constructor = newFunc
+	newFunc.Throws = y.VisitThrowsClause(i)
 	class.RegisterMagicMethod(ssa.Constructor, newFunc)
 	store := y.StoreFunctionBuilder()
 	newFunc.AddLazyBuilder(func() {
@@ -878,9 +892,34 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 			y.EmitReturn([]ssa.Value{container})
 			y.Finish()
 		}
-		if i.THROWS() != nil {
-			y.VisitQualifiedNameList(i.QualifiedNameList())
-		}
 		y.FunctionBuilder = y.PopFunction()
 	})
+}
+
+type Ithrows interface {
+	THROWS() antlr.TerminalNode
+	QualifiedNameList() javaparser.IQualifiedNameListContext
+}
+
+func (y *builder) VisitThrowsClause(i Ithrows) []ssa.Value {
+	if i.THROWS() == nil {
+		return nil
+	}
+	vs := make([]ssa.Value, 0)
+	iNameList := i.QualifiedNameList()
+	nameList, _ := iNameList.(*javaparser.QualifiedNameListContext)
+	for _, qual := range nameList.AllQualifiedName() {
+		recover := y.SetRange(qual)
+
+		names := y.VisitQualifiedName(qual)
+		name := strings.Join(names, ".")
+		typ := ssa.NewBasicType(ssa.ErrorTypeKind, names[len(names)-1])
+		typ.AddFullTypeName(name)
+		value := y.EmitConstInst(name)
+		value.SetType(typ)
+		vs = append(vs, value)
+
+		recover()
+	}
+	return vs
 }

@@ -150,6 +150,7 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *s
 
 			fakeFunc := y.NewFunc(member.Identifier().GetText())
 			fakeFunc.SetMethodName(member.Identifier().GetText())
+			fakeFunc.Throws = y.VisitThrowsClause(member)
 			y.FunctionBuilder = y.PushFunction(fakeFunc)
 			thisPara := y.NewParam("this", raw)
 			thisPara.SetType(this)

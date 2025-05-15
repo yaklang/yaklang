@@ -40,6 +40,8 @@ func SearchWithCFG(value *Value, mod int, compare func(string) bool, opt ...sfvm
 	}
 
 	switch inst := inst.(type) {
+	case *ssa.Function:
+		addItems([]string{"throws"}, inst.Throws...)
 	case *ssa.ErrorHandler:
 		addItems([]string{"catch"}, inst.Catch...)
 		addItems([]string{"finally"}, inst.Final)
