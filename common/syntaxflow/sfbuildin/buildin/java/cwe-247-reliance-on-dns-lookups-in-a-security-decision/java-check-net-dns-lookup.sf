@@ -1,18 +1,19 @@
 desc(
-    title_zh:"检测Java java.net.InetAddress 进行DNS查询",
-    title:"Check Java java.net.InetAddress DNS Lookup",
-    risk:"api-abuse",
-    reference:<<<URL
+	title_zh:"检测Java java.net.InetAddress 进行DNS查询",
+	title:"Check Java java.net.InetAddress DNS Lookup"
+	risk:"api-abuse"
+	reference:<<<URL
     https://docs.oracle.com/javase/8/docs/api/java/net/InetAddress.html
 URL
-    description:<<<TEXT
+	description:<<<TEXT
     该规则检测对 java.net.InetAddress 类方法的误用，这些方法在与认证相关的安全决策中依赖 DNS 查询，可能导致安全风险。
     该规则审计的类:
     - java.net.InetAddress
 TEXT
-    solution:<<<TEXT
+	solution:<<<TEXT
     在安全决策中避免使用 java.net.InetAddress 类的方法，特别是那些依赖 DNS 查询的方法。可以考虑使用其他方法或库来进行安全决策。
 TEXT
+	rule_id: "7501f545-a313-4bb7-b6bb-48aab80cb284"
 )
 
 InetAddress?{<typeName>?{have:'java.net'}}./(get.*By.*|getLocalHost|getLoopbackAddress)/ as $weak;
@@ -22,10 +23,10 @@ alert $weak for {
     level:low,
 };
 
-desc{
-    lang:java,
-    alert_num:1 ,
-    "file://demo.java":<<<CODE
+desc(
+	lang:java
+	alert_num:1
+	"file://demo.java":<<<CODE
     import java.net.InetAddress;
     import java.io.IOException;
 
@@ -51,4 +52,4 @@ desc{
 
     }
 CODE
-}
+)
