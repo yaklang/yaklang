@@ -1,24 +1,25 @@
 desc(
-    title_zh:"检测Java 日志记录方法",
-    title:"Check Java Log Recording Method",
-    type:audit,
-    lib:'java-log-record',
-    reference:<<<URL
+	title_zh:"检测Java 日志记录方法",
+	title:"Check Java Log Recording Method"
+	type:audit
+	lib:'java-log-record'
+	reference:<<<URL
     https://docs.oracle.com/javase/8/docs/api/java/util/logging/Logger.html
     https://logging.apache.org/log4j/2.x/javadoc/log4j-api/org/apache/logging/log4j/Logger.html
 URL
-    description:<<<TEXT
+	description:<<<TEXT
     该规则用于检测Java应用程序中的日志记录方法。日志记录是应用程序中重要的调试和监控工具，但不当的日志记录可能导致信息泄露或其他安全问题。此规则审计了可能受到用户输入影响的日志记录点，特别是那些使用`log.info()`、`log.error()`等方法进行日志记录的点。
 TEXT
+	rule_id: "78903daf-72e2-454b-8275-91771836659b"
 )
 
 /(?i)log/./(?:errorf?|infof?|warn(ing)?|log(?:rb|p)?|debug|fatal|trace|^e$)/()  as $output;
 alert $output;
 
-desc{
-    lang:java,
-    alert_num:2 ,
-    "file://demo.java":<<<CODE
+desc(
+	lang:java
+	alert_num:2
+	"file://demo.java":<<<CODE
    public class LogExample {
         private static final Logger logger = Logger.getLogger(LogExample.class.getName());
 
@@ -33,16 +34,16 @@ desc{
         }
     }
 CODE
-}
+)
 
-desc{
-    lang:java,
-    alert_num:1,
-    "file://demo2.java":<<<CODE
+desc(
+	lang:java
+	alert_num:1
+	"file://demo2.java":<<<CODE
    public class LogExample {
         public void logMessage(String message) {
             log.warn(message);
         }
     }
 CODE
-}
+)
