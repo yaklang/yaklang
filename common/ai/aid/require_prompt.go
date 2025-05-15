@@ -77,7 +77,7 @@ type RequireInteractiveRequest struct {
 }
 
 func (c *Config) RequireUserPrompt(prompt string, opts ...*RequireInteractiveRequestOption) (aitool.InvokeParams, error) {
-	ep := c.epm.createEndpoint()
+	ep := c.epm.createEndpointWithEventType(EVENT_TYPE_REQUIRE_USER_INTERACTIVE)
 	ep.SetDefaultSuggestionContinue()
 
 	req := &RequireInteractiveRequest{
@@ -94,6 +94,11 @@ func (c *Config) RequireUserPrompt(prompt string, opts ...*RequireInteractiveReq
 
 func (c *Config) EmitRequireUserInteractive(i *RequireInteractiveRequest, id string) {
 	if ep, ok := c.epm.loadEndpoint(id); ok {
+		ep.SetReviewMaterials(map[string]any{
+			"id":      i.Id,
+			"prompt":  i.Prompt,
+			"options": i.Options,
+		})
 		err := c.submitCheckpointRequest(ep.checkpoint, i)
 		if err != nil {
 			log.Errorf("Failed to submit checkpoint request: %v", err)

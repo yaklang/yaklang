@@ -24,6 +24,10 @@ const (
 
 	EVENT_TYPE_REQUIRE_USER_INTERACTIVE = "require_user_interactive"
 
+	// risk control prompt is the prompt for risk control
+	// contains score, reason, and other information to help uesr interactivation
+	EVENT_TYPE_RISK_CONTROL_PROMPT = "risk_control_prompt"
+
 	EVENT_TYPE_PLAN                    EventType = "plan"
 	EVENT_TYPE_SELECT                  EventType = "select"
 	EVENT_TYPE_PERMISSION_REQUIRE      EventType = "permission_require"
@@ -178,6 +182,7 @@ func (r *Config) EmitRequireReviewForTask(task *aiTask, id string) {
 		"long_summary":  task.LongSummary,
 	}
 	if ep, ok := r.epm.loadEndpoint(id); ok {
+		ep.SetReviewMaterials(reqs)
 		err := r.submitCheckpointRequest(ep.checkpoint, reqs)
 		if err != nil {
 			log.Errorf("submit request reivew to db for task failed: %v", err)
@@ -193,6 +198,7 @@ func (r *Config) EmitRequireReviewForPlan(rsp *PlanResponse, id string) {
 		"plans":     rsp,
 	}
 	if ep, ok := r.epm.loadEndpoint(id); ok {
+		ep.SetReviewMaterials(reqs)
 		err := r.submitCheckpointRequest(ep.checkpoint, reqs)
 		if err != nil {
 			log.Errorf("submit request reivew to db for task failed: %v", err)
@@ -210,6 +216,7 @@ func (r *Config) EmitRequireReviewForToolUse(tool *aitool.Tool, params aitool.In
 		"params":           params,
 	}
 	if ep, ok := r.epm.loadEndpoint(id); ok {
+		ep.SetReviewMaterials(reqs)
 		err := r.submitCheckpointRequest(ep.checkpoint, reqs)
 		if err != nil {
 			log.Errorf("submit request reivew to db for task failed: %v", err)
@@ -342,6 +349,14 @@ func (r *Config) EmitPopTask(task *aiTask) {
 			"name": task.Name,
 			"goal": task.Goal,
 		},
+	})
+}
+
+func (r *Config) EmitRiskControlPrompt(id string, result *RiskControlResult) {
+	r.emitJson(EVENT_TYPE_RISK_CONTROL_PROMPT, `risk-control`, map[string]any{
+		"id":     id,
+		"score":  result.Score,
+		"reason": result.Reason,
 	})
 }
 

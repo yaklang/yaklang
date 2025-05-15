@@ -52,12 +52,13 @@ func (e *endpointManager) feed(id string, params aitool.InvokeParams) {
 	}
 }
 
-func (e *endpointManager) createEndpoint() *Endpoint {
+func (e *endpointManager) createEndpointWithEventType(typeName EventType) *Endpoint {
 	id := ksuid.New().String()
 	endpoint := &Endpoint{
-		id:           id,
-		sig:          newSignal(), // sync.NewCond(&sync.Mutex{}), // 正确初始化 Cond
-		activeParams: make(aitool.InvokeParams),
+		id:              id,
+		sig:             newSignal(), // sync.NewCond(&sync.Mutex{}), // 正确初始化 Cond
+		activeParams:    make(aitool.InvokeParams),
+		reviewMaterials: make(aitool.InvokeParams),
 	}
 	e.results.Store(id, endpoint)
 	if c := e.config; c != nil {
@@ -70,6 +71,10 @@ func (e *endpointManager) createEndpoint() *Endpoint {
 		}
 	}
 	return endpoint
+}
+
+func (e *endpointManager) createEndpoint() *Endpoint {
+	return e.createEndpointWithEventType("")
 }
 
 func (e *endpointManager) loadEndpoint(id string) (*Endpoint, bool) {
@@ -85,13 +90,30 @@ func (e *endpointManager) loadEndpoint(id string) (*Endpoint, bool) {
 }
 
 type Endpoint struct {
-	id           string
-	sig          *signal
-	activeParams aitool.InvokeParams
+	id              string
+	sig             *signal
+	reviewType      EventType
+	activeParams    aitool.InvokeParams
+	reviewMaterials aitool.InvokeParams
 
 	// seq and checkpoint for recovering
 	seq        int64
 	checkpoint *schema.AiCheckpoint
+}
+
+func (e *Endpoint) SetReviewMaterials(
+	params aitool.InvokeParams) {
+	if !utils.IsNil(params) {
+		e.reviewMaterials = params
+	}
+}
+
+func (e *Endpoint) GetReviewMaterials() aitool.InvokeParams {
+	params := make(aitool.InvokeParams)
+	for k, v := range e.reviewMaterials {
+		params[k] = v
+	}
+	return params
 }
 
 func (e *Endpoint) WaitContext(ctx context.Context) {

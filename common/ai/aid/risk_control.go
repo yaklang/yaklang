@@ -2,6 +2,7 @@ package aid
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
@@ -88,9 +89,32 @@ func (rc *riskControl) doRiskControl(config *Config, ctx context.Context, reader
 			Reason:  fmt.Sprintf("read request body error: %v", err),
 		}
 	}
-	action, err := ExecuteAIForge(ctx, rc.buildinForgeName, []*ypb.ExecParamItem{
-		{Key: "query", Value: string(raw)},
-	})
+
+	var params []*ypb.ExecParamItem
+	if _, ok := utils.IsJSON(string(raw)); ok {
+		var i = make(map[string]any)
+		err := json.Unmarshal(raw, &i)
+		if err != nil {
+			params = append(params, &ypb.ExecParamItem{
+				Key:   "query",
+				Value: string(raw),
+			})
+		} else {
+			for k, v := range i {
+				params = append(params, &ypb.ExecParamItem{
+					Key:   k,
+					Value: utils.InterfaceToString(v),
+				})
+			}
+		}
+	} else {
+		params = append(params, &ypb.ExecParamItem{
+			Key:   "query",
+			Value: string(raw),
+		})
+	}
+
+	action, err := ExecuteAIForge(ctx, rc.buildinForgeName, params)
 	if err != nil {
 		return &RiskControlResult{
 			Skipped: true,

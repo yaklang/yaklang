@@ -101,7 +101,7 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 		t.config.EmitInfo("tool[%v] (internal helper tool) no need user review, skip review", targetTool.Name)
 	} else {
 		t.config.EmitInfo("start to require review for tool use")
-		ep := t.config.epm.createEndpoint()
+		ep := t.config.epm.createEndpointWithEventType(EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
 		t.config.EmitRequireReviewForToolUse(targetTool, callToolParams, ep.id)
 		t.config.doWaitAgree(nil, ep)

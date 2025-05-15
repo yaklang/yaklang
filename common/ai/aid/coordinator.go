@@ -107,7 +107,7 @@ func (c *Coordinator) Run() error {
 	}
 
 	// 审查
-	ep := c.config.epm.createEndpoint()
+	ep := c.config.epm.createEndpointWithEventType(EVENT_TYPE_PLAN_REVIEW_REQUIRE)
 	ep.SetDefaultSuggestionContinue()
 
 	c.config.EmitRequireReviewForPlan(rsp, ep.id)
