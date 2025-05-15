@@ -317,6 +317,9 @@ type Function struct {
 	SideEffects       []*FunctionSideEffect
 	SideEffectsReturn []map[*Variable]*FunctionSideEffect
 
+	// throws clause
+	Throws []Value
+
 	// closure function double link. parentFunc <-> childFuncs
 	parent     Value   // parent function;  can be nil if there is no parent function
 	ChildFuncs []Value // child function within this function

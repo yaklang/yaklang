@@ -169,3 +169,62 @@ public class WebSocketsProxyEndpoint extends Endpoint {
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 
 }
+
+func TestErrorHandler_Function_Exception(t *testing.T) {
+	rule := `
+*?{opcode:function} as $function 
+$function.throws as $throws
+`
+
+	t.Run("test method exception", func(t *testing.T) {
+		code := `
+package org.aa.com;
+public class AA{
+	public void onMessage2(ByteBuffer b) throws Exception {
+	}
+}
+		`
+		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
+			"throws": {`"Exception"`},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+
+	t.Run("test method exception source code", func(t *testing.T) {
+		code := `
+package org.aa.com;
+public class AA{
+	public void onMessage2(ByteBuffer b) throws Exception {
+	}
+}
+		`
+		ssatest.CheckSyntaxFlowSource(t, code, rule, map[string][]string{
+			"throws": {`Exception`},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+
+	t.Run("test constructor exception", func(t *testing.T) {
+		code := `
+package org.aa.com;
+public class AA{
+	AA() throws Exception {
+	}
+}
+		`
+		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
+			"throws": {`"Exception"`},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+
+	t.Run("test interface function exception", func(t *testing.T) {
+		code := `
+package org.aa.com;
+public interface AA{
+	int A() throws Exception;
+}
+		`
+
+		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
+			"throws": {`"Exception"`},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+}
