@@ -1008,7 +1008,7 @@ type YakClient interface {
 	RenameFingerprintGroup(ctx context.Context, in *RenameFingerprintGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	DeleteFingerprintGroup(ctx context.Context, in *DeleteFingerprintGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	BatchAppendFingerprintToGroup(ctx context.Context, in *BatchAppendFingerprintToGroupRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
-	// 导入导出SyntaxFlow规则
+	// 导入导出指纹
 	ExportFingerprint(ctx context.Context, in *ExportFingerprintRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DataTransferProgress], error)
 	ImportFingerprint(ctx context.Context, in *ImportFingerprintRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DataTransferProgress], error)
 	// 反弹shell命令生成
@@ -6971,7 +6971,7 @@ type YakServer interface {
 	RenameFingerprintGroup(context.Context, *RenameFingerprintGroupRequest) (*DbOperateMessage, error)
 	DeleteFingerprintGroup(context.Context, *DeleteFingerprintGroupRequest) (*DbOperateMessage, error)
 	BatchAppendFingerprintToGroup(context.Context, *BatchAppendFingerprintToGroupRequest) (*DbOperateMessage, error)
-	// 导入导出SyntaxFlow规则
+	// 导入导出指纹
 	ExportFingerprint(*ExportFingerprintRequest, grpc.ServerStreamingServer[DataTransferProgress]) error
 	ImportFingerprint(*ImportFingerprintRequest, grpc.ServerStreamingServer[DataTransferProgress]) error
 	// 反弹shell命令生成
