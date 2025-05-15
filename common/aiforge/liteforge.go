@@ -35,7 +35,8 @@ func WithLiteForge_RequireParams(params ...aitool.ToolOption) LiteForgeOption {
 
 func WithLiteForge_OutputSchema(params ...aitool.ToolOption) LiteForgeOption {
 	return func(l *LiteForge) error {
-		t := aitool.NewWithoutCallback("", params...)
+		t := aitool.NewWithoutCallback(
+			"output", params...)
 		for _, param := range params {
 			param(t)
 		}
@@ -89,6 +90,8 @@ func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, op
 
 # Output Formatter
 
+请你根据下面 SCHEMA 构建数据
+
 <schema_{{ .NONCE }}>
 {{ .SCHEMA }}
 </schema_{{ .NONCE }}>
@@ -124,7 +127,7 @@ func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, op
 		return nil
 	})
 	if transactionErr != nil {
-		return nil, utils.Errorf("liteforge execute failed: %v", err)
+		return nil, utils.Errorf("liteforge execute failed: %v", transactionErr)
 	}
 	result := &ForgeResult{Action: action}
 	return result, nil

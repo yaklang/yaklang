@@ -26,6 +26,23 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 			}
 		}()
 
+		// 不需要 checkpoint 的请求直接执行就好
+		if request.IsDetachedCheckpoint() {
+			if c.aiAutoRetry <= 0 {
+				c.aiAutoRetry = 1
+			}
+			for _idx := 0; _idx < int(c.aiAutoRetry); _idx++ {
+				rsp, err = i(config, request)
+				if err != nil || rsp == nil {
+					c.EmitWarning("ai request err: %v, retry auto time: [%v]", err, _idx+1)
+					time.Sleep(500 * time.Millisecond)
+					continue
+				}
+				return rsp, err
+			}
+			return nil, utils.Errorf("ai request err with max retry: %v", err)
+		}
+
 		var seq = request.seqId
 		if seq <= 0 {
 			seq = config.AcquireId()

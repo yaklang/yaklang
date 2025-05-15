@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aispec"
 	"io"
 	"math/rand/v2"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aispec"
 
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
@@ -286,7 +287,7 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		epm:                         newEndpointManagerContext(ctx),
 		streamWaitGroup:             new(sync.WaitGroup),
 		memory:                      m,
-		guardian:                    newAysncGuardian(ctx),
+		guardian:                    newAysncGuardian(ctx, id),
 		syncMutex:                   new(sync.RWMutex),
 		syncMap:                     make(map[string]func() any),
 		inputConsumption:            new(int64),
@@ -681,12 +682,13 @@ func WithAITransactionRetry(t int) Option {
 	}
 }
 
-func WithRiskControlForgeName(forgeName string) Option {
+func WithRiskControlForgeName(forgeName string, callbackType AICallbackType) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
 
 		config.agreeRiskCtrl.buildinForgeName = forgeName
+		config.agreeRiskCtrl.buildinAICallback = callbackType
 		return nil
 	}
 }

@@ -44,7 +44,5 @@ func init() {
 	})
 	if err != nil {
 		log.Error("recon init fail", "error", err)
-	} else {
-		log.Infof("recon init success")
 	}
 }
