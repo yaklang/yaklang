@@ -384,3 +384,35 @@ alert $output;`, map[string][]string{
 			})
 	})
 }
+
+func TestCondition_CheckType(t *testing.T) {
+	code := `
+package org.joychou.config;
+class A{
+	public void test() {
+		Exception e = 11; 
+		InvalidClassException e2 = 22; 
+		IOException e3 = 33;
+		XXX e4 = 44;
+	}
+}
+	`
+
+	t.Run("check normal have is string contain", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+e* as $target 
+$target?{<typeName>?{have:Exception}} as $output
+	`, map[string][]string{
+			"output": {"11", "22", "33"},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+
+	t.Run("check normal have regexp", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+e* as $target
+$target?{<typeName>?{have:/^Exception$/}} as $output
+`, map[string][]string{
+			"output": {"11"},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+}

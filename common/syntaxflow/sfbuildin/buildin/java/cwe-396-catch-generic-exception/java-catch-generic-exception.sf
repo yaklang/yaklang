@@ -1,0 +1,78 @@
+desc(
+  title: "Avoid Overly Broad Exception Catching",
+  title_zh: "避免捕获范围过大的异常",
+  type: "Code Vulnerability",
+  severity: "low",
+  risk: "error-handling",
+  cwe: "CWE-396",
+  desc: <<<TEXT
+在软件开发中，异常处理是一个关键的安全和可靠性机制。然而，捕获范围过大的异常类（如 `Exception`、`Throwable`、`Error` 或 `RuntimeException`）会导致严重问题（对应 CWE-396: Declaration of Catch for Generic Exception）。使用单一的 `catch` 块捕获高级别异常类可能会混淆需要特殊处理的特定异常，或者捕获那些不应该在当前代码位置处理的异常。这种做法违背了 Java 中分类定义异常的目的，随着程序规模的增加和新异常类型的引入，这种做法会变得非常危险。新抛出的异常类型可能不会被注意到，编译器也无法提示开发者存在未处理的新异常。此外，范围过大的 `catch` 块可能意外捕获 `RuntimeException` 的子类（如 `ClassCastException` 或 `NullPointerException`），而这些异常通常是程序员未预料到的，可能会掩盖代码中的逻辑错误。
+
+示例代码（不推荐的做法）：
+```java
+try {
+    doExchange();
+} catch (Exception e) {
+    logger.error("doExchange failed", e);
+}
+```
+在上述代码中，使用 `catch (Exception e)` 捕获了所有类型的异常，包括那些需要特殊处理的异常以及未预料的运行时异常。如果 `doExchange()` 方法抛出新的异常类型，开发者可能无法及时察觉，导致问题被掩盖。
+
+推荐的做法是针对具体异常类型分别编写 `catch` 块：
+```java
+try {
+    doExchange();
+} catch (IOException e) {
+    logger.error("doExchange failed due to IO error", e);
+} catch (InvocationTargetException e) {
+    logger.error("doExchange failed due to invocation error", e);
+} catch (SQLException e) {
+    logger.error("doExchange failed due to database error", e);
+}
+```
+通过这种方式，可以确保每种异常类型得到适当的处理，并避免意外捕获不相关的异常。
+TEXT,
+  solution: <<<TEXT
+1. **避免捕获范围过大的异常类**：不要捕获 `Exception`、`Throwable`、`Error` 或 `RuntimeException` 等高级别异常类，除非是在非常高层次的程序或线程入口点（如主线程或应用程序的顶层错误处理逻辑），并且有明确的需求和文档说明。
+2. **针对具体异常类型编写 catch 块**：根据业务逻辑和方法可能抛出的异常类型，分别编写对应的 `catch` 块，确保每种异常得到适当处理。
+3. **记录异常信息**：在每个 `catch` 块中记录异常的详细信息，包括异常类型、消息和堆栈跟踪，以便后续调试和安全分析。
+4. **使用静态代码分析工具**：配置静态代码分析工具以检测捕获范围过大的异常，并强制执行异常处理的最佳实践。
+5. **定期审查代码**：在代码审查过程中，重点检查异常处理逻辑，确保没有使用范围过大的 `catch` 块，并验证所有异常类型都被合理处理。
+TEXT,
+)
+
+*?{opcode:catch}.exception as $exception
+$exception?{<typeName()>?{have:/^Exception$/}} as $generic_exception
+
+desc (
+    lang:java 
+    alert_num: 1
+    "file://a.java": <<<CODE
+package org.joychou.config;
+public class WebSocketsProxyEndpoint extends Endpoint {
+	public void onMessage2(ByteBuffer b) {
+		try {
+			process(b, session);
+		} catch (Exception eeeeee) {
+			eeeeee.printStackTrace();
+		}
+	}
+}
+CODE
+)
+
+desc (
+    lang:java 
+    "safefile://safe.java": <<<CODE
+package org.joychou.config;
+public class WebSocketsProxyEndpoint extends Endpoint {
+	public void onMessage2(ByteBuffer b) {
+		try {
+			process(b, session);
+		} catch (InvalidClassException eeeeee) {
+			eeeeee.printStackTrace();
+		}
+	}
+}
+CODE
+)

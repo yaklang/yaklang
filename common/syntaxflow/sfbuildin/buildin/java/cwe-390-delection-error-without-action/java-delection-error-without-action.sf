@@ -1,0 +1,84 @@
+desc(
+  title: "Detection of Error Condition Without Action",
+  title_zh: "异常捕获后没有合理的异常处理",
+  type: "Code Vulnerability",
+  severity: "low",
+  risk: "error-handling",
+  desc: <<<TEXT
+在软件开发中，错误处理不当是一个严重的安全隐患，尤其是使用空 `catch` 块的情况。空 `catch` 块是指在捕获异常后不执行任何操作（例如：`catch (RareException e) { }`），这种做法会悄无声息地忽略异常，导致应用程序无法检测到潜在的问题，甚至掩盖了可能被恶意攻击者利用的深层漏洞。开发者常常基于错误假设（如“这永远不会发生”）而忽略异常处理，这种做法非常危险。
+
+空 `catch` 块会导致关键的诊断信息丢失，包括异常类型、错误消息、堆栈跟踪等重要数据。这不仅使得调试和问题定位变得异常困难，还可能导致应用程序在异常发生后继续以不一致或损坏的状态运行。这种状态可能引发数据损坏、系统崩溃或不可预知的行为，为攻击者提供了可乘之机。例如，攻击者可能利用未处理的异常来触发拒绝服务（DoS）攻击、访问未经授权的数据，或者通过注入恶意输入来利用系统逻辑中的漏洞。
+
+此外，由于缺乏异常日志，安全团队无法及时发现异常模式或攻击迹象，这进一步增加了系统被攻破的风险。在现代网络安全威胁日益增加的背景下，任何被忽略的异常都可能成为攻击者的突破口，因此解决空 `catch` 块问题对保护应用程序和数据的安全至关重要。
+TEXT,
+  solution: <<<TEXT
+为了解决空 `catch` 块导致的错误处理不当问题，并提升应用程序的整体安全性，建议采取以下综合措施：
+
+1. **彻底消除空Catch块：** 这是最基本且必须遵守的原则。每一个 `catch` 块都应执行有意义的处理操作。至少应记录异常的详细信息，包括异常类型、错误消息、堆栈跟踪以及相关的上下文数据。可以使用成熟的日志框架（如 Log4j、SLF4J）来确保日志的完整性和可追溯性。如果当前代码层无法处理异常，则应将异常重新抛出或包装成更具描述性的异常，传递到更高层次进行处理。切勿悄无声息地忽略异常。
+
+2. **制定并执行严格的编码规范：** 企业应制定明确的编码标准，明确禁止使用空 `catch` 块，并通过静态代码分析工具自动检测代码中的违规行为。在代码审查（Code Review）过程中，需特别关注异常处理逻辑，确保所有异常都被妥善处理或记录。
+
+3. **建立集中化的日志管理和监控系统：** 将应用程序所有组件的日志汇总到集中化的日志管理系统（如 Splunk、ELK Stack）中，以便安全团队能够实时分析异常事件和潜在威胁。设置基于异常日志的实时告警规则，例如当某种特定异常在短时间内频繁发生时触发告警，这有助于快速发现拒绝服务攻击或其他异常行为。
+
+通过以上措施的综合实施，可以显著提升应用程序的安全性，降低因错误处理不当而导致的安全风险。需要强调的是，网络安全是一个持续的过程，企业应定期更新策略、修补漏洞，并根据最新的威胁情报调整防护措施。
+TEXT,
+)
+
+*?{opcode: try}.catch  as $catch 
+$catch.body?{!<scanInstruction()>} as $no_instruction_catch_body
+
+alert $no_instruction_catch for {
+    title: "空的Catch块导致错误处理不当",
+}
+
+$catch?{!.body & $no_instruction_catch_body} as $normal_catch 
+$normal_catch.exception as $exception 
+$exception?{!(<getUsers()>?{!opcode:catch})} as $unuse_exception 
+alert $unuse_exception for {
+    title: "在非空Catch块中没有对异常进行任何处理",
+}
+
+desc (
+    lang:java
+    alert_num: 1 
+    "file://a.java": <<<CODE
+package org.joychou.security.ssrf;
+
+
+class SocketHookUtils {
+    static Method findMethod(Class<?> clazz, String findName, Class<?>[] args) {
+
+        while (clazz != null) {
+            try {
+                Method method = clazz.getDeclaredMethod(findName, args);
+                method.setAccessible(true);
+                return method;
+            } catch (NoSuchMethodException e) {
+                clazz = clazz.getSuperclass();
+            }
+        }
+        return null;
+    }
+}
+CODE
+)
+
+desc (
+    lang:java
+    alert_num: 1 
+    "file://a.java": <<<CODE
+package org.joychou.security.ssrf;
+
+public class SocketHook {
+
+    public static void startHook() throws IOException {
+        SocketHookFactory.initSocket();
+        SocketHookFactory.setHook(true);
+        try{
+            Socket.setSocketImplFactory(new SocketHookFactory());
+        }catch (SocketException ignored){
+        }
+    }
+}
+CODE
+)
