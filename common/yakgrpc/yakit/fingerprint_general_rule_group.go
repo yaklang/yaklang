@@ -62,9 +62,21 @@ func DeleteGeneralRuleGroupByName(outDb *gorm.DB, name []string) (effectRows int
 			return db.Error
 		}
 		effectRows = db.RowsAffected
-		return DeleteGeneralRuleGroupAssociationsByID(tx, nil, ids)
+		return DeleteGeneralRuleGroupAssociationsByIDOR(tx, nil, ids)
 	})
 	return
+}
+
+func GetGeneralRuleGroupByNames(db *gorm.DB, name []string) ([]*schema.GeneralRuleGroup, error) {
+	if len(name) <= 0 {
+		return nil, nil
+	}
+	var groups []*schema.GeneralRuleGroup
+	db = bizhelper.ExactQueryStringArrayOr(db, "group_name", name)
+	if err := db.Find(&groups).Error; err != nil {
+		return nil, err
+	}
+	return groups, nil
 }
 
 func FirstOrCreateGeneralRuleGroup(db *gorm.DB, group *schema.GeneralRuleGroup) error {
@@ -102,7 +114,16 @@ func AppendGeneralRuleGroupAssociations(db *gorm.DB, rule []*schema.GeneralRule,
 	return nil
 }
 
-func DeleteGeneralRuleGroupAssociationsByID(db *gorm.DB, ruleID []uint, groupID []uint) error {
+func DeleteGeneralRuleGroupAssociations(db *gorm.DB, rule []*schema.GeneralRule, group []*schema.GeneralRuleGroup) error {
+	for _, r := range rule {
+		if err := db.Model(r).Association("Groups").Delete(group).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func DeleteGeneralRuleGroupAssociationsByIDOR(db *gorm.DB, ruleID []uint, groupID []uint) error {
 	return db.Table("general_rule_and_group").Where("general_rule_id IN (?) OR general_rule_group_id IN (?)", ruleID, groupID).Unscoped().Delete(nil).Error
 }
 
