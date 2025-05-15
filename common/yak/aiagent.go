@@ -115,14 +115,16 @@ var AIAgentExport = map[string]any{
 	// todo: need to split?
 
 	//  create ai forge blue print
-	"CreateForge":         aiforge.NewForgeBlueprint,
-	"NewForgeBuilder":     aiforge.NewYakForgeBlueprintConfig,
-	"CreateForgeFromJson": aiforge.NewYakForgeBlueprintConfigFromJson,
-	"tools":               aiforge.WithTools,
-	"initPrompt":          aiforge.WithInitializePrompt,
-	"persistentPrompt":    aiforge.WithPersistentPrompt,
-	"plan":                aiforge.WithPlanMocker,
-	"aidOptions":          aiforge.WithAIDOptions,
+	"CreateForge":          NewForgeBlueprint,
+	"NewExecutor":          NewForgeExecutor,
+	"NewExecutorFromForge": NewExecutorFromForge,
+	"NewExecutorFromJson":  NewExecutorFromJson,
+	"tools":                aiforge.WithTools,
+	"initPrompt":           aiforge.WithInitializePrompt,
+	"persistentPrompt":     aiforge.WithPersistentPrompt,
+	"resultPrompt":         aiforge.WithResultPrompt,
+	"plan":                 aiforge.WithPlanMocker,
+	"aidOptions":           aiforge.WithAIDOptions,
 
 	/*
 		aid api

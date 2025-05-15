@@ -17,7 +17,7 @@ var travelMasterInitPrompt string
 //go:embed travelmaster_prompts/persistent.txt
 var travelMasterExecutePrompt string
 
-func init() {
+func _init_travelmaster() {
 	err := aiforge.RegisterForgeExecutor("travelmaster", func(ctx context.Context, items []*ypb.ExecParamItem, option ...aid.Option) (*aiforge.ForgeResult, error) {
 		forge := aiforge.NewForgeBlueprint(
 			"travelmaster",

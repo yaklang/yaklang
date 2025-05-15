@@ -2,10 +2,11 @@ package aibp
 
 import (
 	"context"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
 )
 
 func TestNetScan(t *testing.T) {

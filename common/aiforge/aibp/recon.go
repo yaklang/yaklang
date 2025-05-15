@@ -25,7 +25,7 @@ func newRecon(extraOpt ...aid.Option) *aiforge.ForgeBlueprint {
 	return forge
 }
 
-func init() {
+func _init_recon() {
 	cfg := aiforge.NewYakForgeBlueprintConfig("recon", reconInitPrompt, reconPersistentPrompts)
 	aiforge.RegisterYakAiForge(cfg)
 }

@@ -1,0 +1,151 @@
+package yak
+
+import (
+	"context"
+
+	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+)
+
+type Option func(*Agent) error
+
+type Agent struct {
+	ForgeName string
+
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	RuntimeID string
+
+	ExtendAIDOptions []aid.Option
+	AiForgeOptions   []aiforge.Option
+}
+
+func NewAgent(iopts ...any) *Agent {
+	ag := &Agent{}
+	for _, opt := range iopts {
+		switch o := opt.(type) {
+		case Option:
+			if err := o(ag); err != nil {
+				log.Errorf("failed to apply agent option: %v", err)
+				return nil
+			}
+		case aid.Option:
+			ag.ExtendAIDOptions = append(ag.ExtendAIDOptions, o)
+		case aiforge.Option:
+			ag.AiForgeOptions = append(ag.AiForgeOptions, o)
+		}
+	}
+	return ag
+}
+
+func WithForgeName(forgeName string) Option {
+	return func(ag *Agent) error {
+		ag.ForgeName = forgeName
+		return nil
+	}
+}
+
+func WithContext(ctx context.Context) Option {
+	return func(ag *Agent) error {
+		ag.ctx = ctx
+		return nil
+	}
+}
+
+func WithExtendAIDOptions(opts ...aid.Option) Option {
+	return func(ag *Agent) error {
+		ag.ExtendAIDOptions = append(ag.ExtendAIDOptions, opts...)
+		return nil
+	}
+}
+
+func (ag *Agent) SubOption() []Option {
+	opts := make([]Option, 0)
+	if ag.ctx != nil {
+		opts = append(opts, WithContext(ag.ctx))
+	}
+	if ag.RuntimeID != "" {
+		opts = append(opts, WithRuntimeID(ag.RuntimeID))
+	}
+	if ag.ExtendAIDOptions != nil {
+		opts = append(opts, WithExtendAIDOptions(ag.ExtendAIDOptions...))
+	}
+	return opts
+}
+
+var (
+	WithAgreeYOLO = aid.WithAgreeYOLO
+
+	// Additional With options
+	WithRuntimeID = func(id string) Option {
+		return func(ag *Agent) error {
+			ag.RuntimeID = id
+			return nil
+		}
+	}
+	WithOffsetSeq                    = aid.WithOffsetSeq
+	WithTool                         = aid.WithTool
+	WithExtendedActionCallback       = aid.WithExtendedActionCallback
+	WithDisallowRequireForUserPrompt = aid.WithDisallowRequireForUserPrompt
+	WithManualAssistantCallback      = aid.WithManualAssistantCallback
+	WithAgreePolicy                  = aid.WithAgreePolicy
+	WithAIAgree                      = aid.WithAIAgree
+	WithAgreeManual                  = aid.WithAgreeManual
+	WithAgreeAuto                    = aid.WithAgreeAuto
+	WithAllowRequireForUserInteract  = aid.WithAllowRequireForUserInteract
+	WithTools                        = aid.WithTools
+	WithAICallback                   = aid.WithAICallback
+	WithToolManager                  = aid.WithToolManager
+	WithMemory                       = aid.WithMemory
+	WithTaskAICallback               = aid.WithTaskAICallback
+	WithCoordinatorAICallback        = aid.WithCoordinatorAICallback
+	WithPlanAICallback               = aid.WithPlanAICallback
+	WithSystemFileOperator           = aid.WithSystemFileOperator
+	WithJarOperator                  = aid.WithJarOperator
+	WithOmniSearchTool               = aid.WithOmniSearchTool
+	WithAiToolsSearchTool            = aid.WithAiToolsSearchTool
+	WithDebugPrompt                  = aid.WithDebugPrompt
+	WithEventHandler                 = aid.WithEventHandler
+	WithEventInputChan               = aid.WithEventInputChan
+	WithDebug                        = aid.WithDebug
+	WithResultHandler                = aid.WithResultHandler
+	WithAppendPersistentMemory       = aid.WithAppendPersistentMemory
+	WithTimeLineLimit                = aid.WithTimeLineLimit
+	WithTimelineContentLimit         = aid.WithTimelineContentLimit
+	WithPlanMocker                   = aid.WithPlanMocker
+	WithForgeParams                  = aid.WithForgeParams
+	WithDisableToolUse               = aid.WithDisableToolUse
+	WithAIAutoRetry                  = aid.WithAIAutoRetry
+	WithAITransactionRetry           = aid.WithAITransactionRetry
+)
+
+func NewForgeBlueprint(name string, opts ...any) *aiforge.ForgeBlueprint {
+	ag := NewAgent(opts...)
+	ag.ForgeName = name
+	return aiforge.NewForgeBlueprint(name, ag.AiForgeOptions...)
+}
+func NewExecutorFromForge(forge *aiforge.ForgeBlueprint, params []*ypb.ExecParamItem, opts ...any) (*aid.Coordinator, error) {
+	ag := NewAgent(opts...)
+	ag.ForgeName = forge.Name
+	return forge.CreateCoordinator(context.Background(), params, ag.ExtendAIDOptions...)
+}
+func NewExecutorFromJson(json string, params []*ypb.ExecParamItem, opts ...any) (*aid.Coordinator, error) {
+	bp, err := aiforge.NewYakForgeBlueprintConfigFromJson(json)
+	if err != nil {
+		return nil, err
+	}
+	return NewExecutorFromForge(bp, params, opts...)
+}
+func NewForgeExecutor(name string, params []*ypb.ExecParamItem, opts ...any) (*aid.Coordinator, error) {
+	ag := NewAgent(opts...)
+	ag.ForgeName = name
+	bp := aiforge.NewForgeBlueprint(name, ag.AiForgeOptions...)
+	ins, err := bp.CreateCoordinator(context.Background(), params, ag.ExtendAIDOptions...)
+	if err != nil {
+		return nil, err
+	}
+	return ins, nil
+}

@@ -95,10 +95,10 @@ type Config struct {
 	allowRequireForUserInteract bool
 
 	// do not use it directly, use doAgree() instead
-	agreePolicy    AgreePolicyType
-	agreeInterval  time.Duration
-	agreeAIScore   float64
-	agreeRiskCtrl        *riskControl
+	agreePolicy         AgreePolicyType
+	agreeInterval       time.Duration
+	agreeAIScore        float64
+	agreeRiskCtrl       *riskControl
 	agreeManualCallback func(context.Context, *Config) (aitool.InvokeParams, error)
 
 	//review suggestion
@@ -274,19 +274,19 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		idGenerator: func() int64 {
 			return atomic.AddInt64(idGenerator, 1)
 		},
-		agreePolicy:          AgreePolicyManual,
-		agreeAIScore:         0.5,
-		agreeRiskCtrl:        new(riskControl),
-		agreeInterval:        10 * time.Second,
-		m:                    new(sync.Mutex),
-		id:                   id,
-		epm:                  newEndpointManagerContext(ctx),
-		streamWaitGroup:      new(sync.WaitGroup),
-		memory:               m,
-		syncMutex:            new(sync.RWMutex),
-		syncMap:              make(map[string]func() any),
-		inputConsumption:     new(int64),
-		outputConsumption:    new(int64),
+		agreePolicy:                 AgreePolicyManual,
+		agreeAIScore:                0.5,
+		agreeRiskCtrl:               new(riskControl),
+		agreeInterval:               10 * time.Second,
+		m:                           new(sync.Mutex),
+		id:                          id,
+		epm:                         newEndpointManagerContext(ctx),
+		streamWaitGroup:             new(sync.WaitGroup),
+		memory:                      m,
+		syncMutex:                   new(sync.RWMutex),
+		syncMap:                     make(map[string]func() any),
+		inputConsumption:            new(int64),
+		outputConsumption:           new(int64),
 		aiCallTokenLimit:            int64(1000 * 30),
 		aiAutoRetry:                 5,
 		aiTransactionAutoRetry:      5,
@@ -302,7 +302,6 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 }
 
 type Option func(config *Config) error
-
 
 func WithRuntimeID(id string) Option {
 	return func(config *Config) error {
@@ -343,7 +342,6 @@ func WithExtendedActionCallback(name string, cb func(config *Config, action *Act
 	}
 }
 
-
 func WithDisallowRequireForUserPrompt() Option {
 	return func(config *Config) error {
 		config.m.Lock()
@@ -362,7 +360,6 @@ func WithManualAssistantCallback(cb func(context.Context, *Config) (aitool.Invok
 	}
 }
 
-
 func WithAgreeYOLO(i ...bool) Option {
 	return func(config *Config) error {
 		config.m.Lock()
@@ -379,7 +376,6 @@ func WithAgreeYOLO(i ...bool) Option {
 		return nil
 	}
 }
-
 
 func WithAgreePolicy(policy AgreePolicyType) Option {
 	return func(config *Config) error {

@@ -29,7 +29,7 @@ type SmartResult struct {
 	Suggestions []*SmartSuggestion
 }
 
-func init() {
+func _init_smart() {
 	cfg := aiforge.NewYakForgeBlueprintConfig("smart", smartInitPrompt, smartPersistentPrompts)
 	cfg.WithPlanPrompt(smartPlanMock)
 	cfg.WithResultPrompt(smartResultPrompt)

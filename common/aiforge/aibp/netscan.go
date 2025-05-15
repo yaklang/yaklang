@@ -12,7 +12,7 @@ var netscanInitPrompt string
 //go:embed netscan/persistent.txt
 var netscanPersistentPrompt string
 
-func init() {
+func _init_netscan() {
 	cfg := aiforge.NewYakForgeBlueprintConfig("netscan", netscanInitPrompt, netscanPersistentPrompt)
 	cfg.WithTools("http", "pentest", "net", "fs", "dns", "codec", "risk", "tls")
 	aiforge.RegisterYakAiForge(cfg)
