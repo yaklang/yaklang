@@ -1,6 +1,6 @@
 desc(
-    title_zh:"检测Java ",
-    title:"Check Java ",
+    title_zh:"检测Java Zip GetInputStream资源未释放",
+    title:"Check Java Zip GetInputStream Unreleased Resource",
     risk:"资源泄漏",
     level:high,
     reference:<<<URL
