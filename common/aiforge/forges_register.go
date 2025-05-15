@@ -20,6 +20,14 @@ type ForgeResult struct {
 	Forge    *ForgeBlueprint
 }
 
+func RegisterLiteForge(i string, params ...LiteForgeOption) error {
+	lf, err := NewLiteForge(i, params...)
+	if err != nil {
+		return utils.Errorf("build lite forge failed: %v", err)
+	}
+	return RegisterForgeExecutor(i, lf.Execute)
+}
+
 func RegisterForgeExecutor(i string, f ForgeExecutor) error {
 	forgeMutex.Lock()
 	if _, ok := forges[i]; ok {

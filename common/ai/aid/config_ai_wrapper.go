@@ -39,7 +39,12 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 		//log.Infof("start to check uuid:%v seq:%v", c.id, seq)
 		if ret, ok := aiddb.GetAIInteractiveCheckpoint(c.GetDB(), c.id, seq); ok && ret.Finished {
 			// checkpoint is finished, return the result
-			rsp := config.NewAIResponse()
+			var rsp *AIResponse
+			if config != nil {
+				rsp = config.NewAIResponse()
+			} else {
+				rsp = NewUnboundAIResponse()
+			}
 			rspParams := aiddb.AiCheckPointGetResponseParams(ret)
 			rsp.EmitReasonStream(bytes.NewBufferString(rspParams.GetString("reason")))
 			rsp.EmitOutputStream(bytes.NewBufferString(rspParams.GetString("output")))
