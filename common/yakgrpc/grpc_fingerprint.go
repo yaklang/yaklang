@@ -168,15 +168,75 @@ func (s *Server) DeleteFingerprintGroup(ctx context.Context, req *ypb.DeleteFing
 	}, nil
 }
 
-func (s *Server) BatchAppendFingerprintToGroup(ctx context.Context, req *ypb.BatchAppendFingerprintToGroupRequest) (*ypb.DbOperateMessage, error) {
+func (s *Server) BatchUpdateFingerprintToGroup(ctx context.Context, req *ypb.BatchUpdateFingerprintToGroupRequest) (*ypb.DbOperateMessage, error) {
 	db := s.GetProfileDatabase()
-	effectRow, err := yakit.AppendMultipleGeneralRuleToGroup(db, req.GetFilter(), req.GetGroupName())
+	rules, err := yakit.QueryGeneralRuleFast(db, req.GetFilter())
 	if err != nil {
 		return nil, err
 	}
+
+	effectRow, err := yakit.BatchAppendGeneralRuleGroupAssociations(db, rules, req.GetAppendGroupName())
+	if err != nil {
+		return nil, err
+	}
+
+	effectRow, err = yakit.BatchDeleteGeneralRuleGroupAssociations(db, rules, req.GetDeleteGroupName())
+	if err != nil {
+		return nil, err
+	}
+
 	return &ypb.DbOperateMessage{
 		TableName:  "general_rule_group",
 		Operation:  "delete",
 		EffectRows: effectRow,
+	}, nil
+}
+
+func (s *Server) GetFingerprintGroupSetByFilter(ctx context.Context, req *ypb.GetFingerprintGroupSetRequest) (*ypb.FingerprintGroups, error) {
+	db := s.GetProfileDatabase()
+	rules, err := yakit.QueryGeneralRuleFast(db, req.GetFilter())
+	if err != nil {
+		return nil, err
+	}
+	if req.GetUnion() {
+		groupMap := make(map[string]*schema.GeneralRuleGroup)
+		lo.ForEach(rules, func(item *schema.GeneralRule, _ int) {
+			for _, group := range item.Groups {
+				if _, ok := groupMap[group.GroupName]; !ok {
+					groupMap[group.GroupName] = group
+				}
+			}
+		})
+		var groupSet []*ypb.FingerprintGroup
+
+		for _, group := range groupMap {
+			groupSet = append(groupSet, group.ToGRPCModel())
+		}
+		return &ypb.FingerprintGroups{
+			Data: groupSet,
+		}, nil
+	}
+
+	var groupSet []*ypb.FingerprintGroup
+	groupMap := make(map[string]int)
+	lo.ForEach(rules, func(item *schema.GeneralRule, _ int) {
+		for _, group := range item.Groups {
+			if count, ok := groupMap[group.GroupName]; ok {
+				if count < 0 { // if count < 0, means this group already in groupSet
+					continue
+				} else if count == len(rules)-1 { // if count == len(rules) - 1, means this group is the last count, can set to groupset
+					groupSet = append(groupSet, group.ToGRPCModel())
+					groupMap[group.GroupName] = -1
+				} else { // if count < len(rules) - 1, means this group is not the last count
+					groupMap[group.GroupName] = count + 1
+				}
+			} else { // map not ok ,init
+				groupMap[group.GroupName] = 1
+			}
+		}
+	})
+
+	return &ypb.FingerprintGroups{
+		Data: groupSet,
 	}, nil
 }
