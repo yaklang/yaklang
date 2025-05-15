@@ -77,6 +77,19 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...Opt
 	return c, nil
 }
 
+func (c *Coordinator) CallAITransaction(prompt string, postHandler func(response *AIResponse) error) error {
+	return c.config.callAiTransaction(prompt, c.callAI, func(rsp *AIResponse) error {
+		if postHandler == nil {
+			return nil
+		}
+		return postHandler(rsp)
+	})
+}
+
+func (c *Coordinator) GetConfig() *Config {
+	return c.config
+}
+
 func (c *Coordinator) Run() error {
 	c.CreateDatabaseSchema(c.userInput)
 	c.config.EmitInfo("start to create plan request")
