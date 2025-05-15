@@ -145,7 +145,7 @@ func FuzzQueryArrayOr(db *gorm.DB, field string, s []interface{}) *gorm.DB {
 	)
 
 	for _, sub := range s {
-		querys = append(querys, fmt.Sprintf("( %v ILIKE ? )", field))
+		querys = append(querys, fmt.Sprintf("( %v LIKE ? )", field))
 		items = append(items, fmt.Sprintf("%%%v%%", sub))
 	}
 
@@ -323,7 +323,7 @@ func FuzzQueryStringByFieldsOr(db *gorm.DB, fields []string, keyword string) *go
 	)
 
 	for _, field := range fields {
-		querys = append(querys, fmt.Sprintf("( %v ILIKE ? )", field))
+		querys = append(querys, fmt.Sprintf("( %v LIKE ? )", field))
 		items = append(items, fmt.Sprintf("%%%v%%", keyword))
 	}
 
@@ -543,7 +543,7 @@ func FuzzQuery(db *gorm.DB, field string, value string) *gorm.DB {
 	if value == "" {
 		return db
 	}
-	return db.Where(fmt.Sprintf("%s ILIKE ?", field), "%"+value+"%")
+	return db.Where(fmt.Sprintf("%s LIKE ?", field), "%"+value+"%")
 }
 
 func FuzzQueryLike(db *gorm.DB, field string, value string) *gorm.DB {
@@ -610,7 +610,7 @@ func StartswithString(db *gorm.DB, field string, value string) *gorm.DB {
 	if value == "" {
 		return db
 	}
-	return db.Where(fmt.Sprintf("%s ILIKE ?", field), value+"%")
+	return db.Where(fmt.Sprintf("%s LIKE ?", field), value+"%")
 }
 
 func StartswithStringLike(db *gorm.DB, field string, value string) *gorm.DB {
@@ -631,7 +631,7 @@ func StartswithStringArrayOr(db *gorm.DB, field string, value []string) *gorm.DB
 	)
 
 	for _, v := range value {
-		cond = append(cond, fmt.Sprintf("( %v ILIKE ? )", field))
+		cond = append(cond, fmt.Sprintf("( %v LIKE ? )", field))
 		items = append(items, v+"%")
 	}
 	return db.Where(strings.Join(cond, " OR "), items...)
@@ -724,7 +724,7 @@ func QueryOrder(db *gorm.DB, byField, order string) *gorm.DB {
 func FuzzQueryJsonText(db *gorm.DB, jsonField string, search string) *gorm.DB {
 	search = fmt.Sprintf("%%%v%%", search)
 	db = db.Where(
-		fmt.Sprintf("(%v::text ILIKE ?)", jsonField),
+		fmt.Sprintf("(%v::text LIKE ?)", jsonField),
 		search,
 	)
 	return db
@@ -893,7 +893,7 @@ func FuzzQueryPostgresStringArray(
 		if h == "" {
 			continue
 		}
-		conds = append(conds, "(fuzzquery ILIKE ?)")
+		conds = append(conds, "(fuzzquery LIKE ?)")
 		items = append(items, "%"+h+"%")
 	}
 
@@ -1031,6 +1031,7 @@ func FuzzSearch(db *gorm.DB, fields []string, target string) *gorm.DB {
 	return FuzzSearchEx(db, fields, target, true)
 }
 
+// ilike sqliter not support
 func FuzzSearchEx(db *gorm.DB, fields []string, target string, ilike bool) *gorm.DB {
 	if target == "" || len(fields) <= 0 {
 		return db
@@ -1057,6 +1058,7 @@ func FuzzSearchWithStringArrayOr(db *gorm.DB, fields []string, targets []string)
 	return FuzzSearchWithStringArrayOrEx(db, fields, targets, true)
 }
 
+// ilike sqliter not support
 func FuzzSearchWithStringArrayOrEx(db *gorm.DB, fields []string, targets []string, ilike bool) *gorm.DB {
 	if len(targets) <= 0 {
 		return db
@@ -1091,6 +1093,7 @@ func FuzzSearchWithStringArrayOrEx(db *gorm.DB, fields []string, targets []strin
 	return db.Where(strings.Join(conds, " OR "), items...)
 }
 
+// ilike sqliter not support
 func FuzzSearchNotEx(db *gorm.DB, fields []string, target string, ilike bool) *gorm.DB {
 	if target == "" || len(fields) <= 0 {
 		return db
@@ -1164,6 +1167,7 @@ func OrFuzzQueryArrayOrLike(db *gorm.DB, field string, s []interface{}) *gorm.DB
 	return db.Where(strings.Join(querys, " or "), items...)
 }
 
+// ilike sqliter not support
 func FuzzSearchWithStringArrayOrAf(db *gorm.DB, fields []string, targets []string, ilike bool) *gorm.DB {
 	if len(targets) <= 0 {
 		return db
