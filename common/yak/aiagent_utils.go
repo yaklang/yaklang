@@ -3,6 +3,9 @@ package yak
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -10,8 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"os"
-	"strings"
 )
 
 func makeArgs(ctx context.Context, execParams []*ypb.ExecParamItem) []string {
@@ -60,12 +61,13 @@ func makeArgs(ctx context.Context, execParams []*ypb.ExecParamItem) []string {
 	return args
 }
 
-func BindAIConfigToEngine(nIns *antlr4yak.Engine, ag *Agent) {
+func BindAIConfigToEngine(nIns *antlr4yak.Engine, agentOptions ...any) {
 	nIns.GetVM().RegisterMapMemberCallHandler("aiagent", "ExecuteForge", func(i interface{}) interface{} {
-		ofunc, ok := i.(func(forgeName string, i any, opts ...Option) (any, error))
+		ofunc, ok := i.(func(forgeName string, i any, opts ...any) (any, error))
 		if ok {
-			return func(forgeName string, i any, opts ...Option) (any, error) {
-				opts = append(opts, ag.SubOption()...)
+			return func(forgeName string, i any, opts ...any) (any, error) {
+				// new option is more priority
+				opts = append(agentOptions, opts...)
 				return ofunc(forgeName, i, opts...)
 			}
 		}
@@ -73,10 +75,11 @@ func BindAIConfigToEngine(nIns *antlr4yak.Engine, ag *Agent) {
 	})
 
 	nIns.GetVM().RegisterMapMemberCallHandler("aiagent", "CreateForge", func(i interface{}) interface{} {
-		originFunc, ok := i.(func(name string, opts ...aiforge.Option) *aiforge.ForgeBlueprint)
+		originFunc, ok := i.(func(name string, opts ...any) *aiforge.ForgeBlueprint)
 		if ok {
-			return func(name string, opts ...aiforge.Option) *aiforge.ForgeBlueprint {
-				opts = append(opts, aiforge.WithAIDOptions(ag.AIDOptions()...))
+			return func(name string, opts ...any) *aiforge.ForgeBlueprint {
+				agent := NewAgent(agentOptions...)
+				opts = append(opts, aiforge.WithAIDOptions(agent.AIDOptions()...))
 				return originFunc(name, opts...)
 			}
 		}

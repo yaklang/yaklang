@@ -1,4 +1,4 @@
-query = cli.String("query", cli.setHelp("用户输入"),cli.required(true))
+query = cli.String("query", cli.setHelp("用户输入"),cli.setRequired(true))
 
 forgeHandle = (params,opts...) => {
     res,err = __DEFAULT_FORGE_HANDLE__(params,opts...)

@@ -1,6 +1,8 @@
 package aibp
 
 import (
+	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -114,12 +116,10 @@ forgeHandle = func(params) {
     bp = aiagent.CreateForge("add",
         aiagent.persistentPrompt(persis),
 		aiagent.initPrompt(init),
-        aiagent.aidOptions(
-            aiagent.agreeYOLO(true),
-			aiagent.resultHandler((config) => {
-				result = config.GetMemory().CurrentTask.TaskSummary
-			}),
-        )
+		aiagent.agreeYOLO(true),
+		aiagent.resultHandler((config) => {
+			result = config.GetMemory().CurrentTask.TaskSummary
+		}),
     )
     ordr,err = bp.CreateCoordinator(context.Background(),params)
     if err != nil {
@@ -156,12 +156,10 @@ forgeHandle = func(params) {
     bp = aiagent.CreateForge("add",
         aiagent.persistentPrompt(__PERSISTENT_PROMPT__),
 		aiagent.initPrompt(__INIT_PROMPT__),
-        aiagent.aidOptions(
-            aiagent.agreeYOLO(true),
-			aiagent.resultHandler((config) => {
-				result = config.GetMemory().CurrentTask.TaskSummary
-			}),
-        )
+		aiagent.agreeYOLO(true),
+		aiagent.resultHandler((config) => {
+			result = config.GetMemory().CurrentTask.TaskSummary
+		}),
     )
     ordr,err = bp.CreateCoordinator(context.Background(),params)
     if err != nil {
@@ -283,4 +281,92 @@ func TestBuildForgeFromYakNoQuery(t *testing.T) {
 	}
 	_, ok := result.(*aiforge.ForgeResult)
 	assert.Assert(t, ok)
+}
+
+func TestNewForgeExecutor(t *testing.T) {
+	var initFlag = uuid.New().String()
+	var persistentFlag = uuid.New().String()
+	forgeName := utils.RandString(10)
+	forge := &schema.AIForge{
+		ForgeName:        forgeName,
+		PersistentPrompt: "一定要算准一点" + persistentFlag,
+		InitPrompt:       "帮我计算表达式的值" + initFlag,
+		ForgeContent: `query = cli.String("query", cli.setRequired(true), cli.setHelp("query"))
+cli.check()
+forgeHandle = func(params,opts...) {
+	res = ""
+	opts = append(opts,
+		aiagent.persistentPrompt(__PERSISTENT_PROMPT__),
+		aiagent.initPrompt(__INIT_PROMPT__),
+		aiagent.agreeYOLO(true),
+		aiagent.resultHandler((config) => {
+			res = config.GetMemory().CurrentTask.TaskSummary
+		}),
+	)
+	excutor,err := aiagent.NewExecutor("test",params,opts...)
+	if err != nil {
+		return nil
+	}
+	err = excutor.Run()
+	if err != nil {
+		return nil
+	}
+	return res
+}`,
+	}
+	result, err := RunTestForge(t, forge, initFlag, persistentFlag)
+	if err != nil {
+		t.Errorf("run forge %v failed: %v", forge.ForgeName, err)
+		return
+	}
+	assert.Equal(t, result, "result is 2")
+}
+
+func TestNewForgeExecutorFromJson(t *testing.T) {
+	var initFlag = uuid.New().String()
+	var persistentFlag = uuid.New().String()
+	forgeName := utils.RandString(10)
+	forgeData := map[string]any{
+		"name":             forgeName,
+		"persistentPrompt": "一定要算准一点" + persistentFlag,
+		"initPrompt":       "帮我计算表达式的值" + initFlag,
+		"forgeContent":     "query = cli.String(\"query\", cli.setRequired(true), cli.setHelp(\"query\"))",
+	}
+	jsonData, err := json.Marshal(forgeData)
+	if err != nil {
+		t.Errorf("marshal forge data failed: %v", err)
+		return
+	}
+	jsonForge := strconv.Quote(string(jsonData))
+	forge := &schema.AIForge{
+		ForgeName: forgeName,
+		ForgeContent: `query = cli.String("query", cli.setRequired(true), cli.setHelp("query"))
+cli.check()
+forgeHandle = func(params,opts...) {
+	res = ""
+	opts = append(opts,
+		aiagent.persistentPrompt(__PERSISTENT_PROMPT__),
+		aiagent.initPrompt(__INIT_PROMPT__),
+		aiagent.agreeYOLO(true),
+		aiagent.resultHandler((config) => {
+			res = config.GetMemory().CurrentTask.TaskSummary
+		}),
+	)
+	excutor,err := aiagent.NewExecutorFromJson(` + jsonForge + `,params,opts...)
+	if err != nil {
+		return nil
+	}
+	err = excutor.Run()
+	if err != nil {
+		return nil
+	}
+	return res
+}`,
+	}
+	result, err := RunTestForge(t, forge, initFlag, persistentFlag)
+	if err != nil {
+		t.Errorf("run forge %v failed: %v", forge.ForgeName, err)
+		return
+	}
+	assert.Equal(t, result, "result is 2")
 }
