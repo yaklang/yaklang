@@ -3,6 +3,7 @@ package yakit
 import (
 	"encoding/json"
 	"github.com/jinzhu/gorm"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -56,7 +57,7 @@ func GetGeneralRuleByID(db *gorm.DB, id int64) (*schema.GeneralRule, error) {
 
 func GetGeneralRuleByRuleName(db *gorm.DB, ruleName string) (*schema.GeneralRule, error) {
 	rule := &schema.GeneralRule{}
-	if db := db.Where("rule_name = ?", ruleName).First(rule); db.Error != nil {
+	if db := db.Model(rule).Preload("Groups").Where("rule_name = ?", ruleName).First(rule); db.Error != nil {
 		return nil, db.Error
 	}
 	return rule, nil
@@ -78,7 +79,7 @@ func CreateGeneralRule(db *gorm.DB, rule *schema.GeneralRule) (fErr error) {
 }
 
 // UpdateGeneralRuleByRuleName update general rule by rule name(unique index)
-func UpdateGeneralRuleByRuleName(outDb *gorm.DB, ruleName string, rule *schema.GeneralRule) (effectRows int, fErr error) {
+func UpdateGeneralRuleByRuleName(outDb *gorm.DB, ruleName string, rule *schema.GeneralRule) (effectRows int64, fErr error) {
 	err := utils.GormTransaction(outDb, func(tx *gorm.DB) error {
 		db := tx.Model(rule).Omit("id", "Groups") // not update groups
 		if db = db.Where("rule_name = ?", ruleName).Updates(rule); db.Error != nil {
@@ -89,7 +90,7 @@ func UpdateGeneralRuleByRuleName(outDb *gorm.DB, ruleName string, rule *schema.G
 		if err := tx.Where("rule_name = ?", ruleName).First(&newRule).Error; err != nil {
 			return err
 		}
-		effectRows = int(db.RowsAffected)
+		effectRows = db.RowsAffected
 		if err := CreateGeneralRuleGroupFromRule(tx, rule); err != nil {
 			return err
 		}
@@ -99,18 +100,56 @@ func UpdateGeneralRuleByRuleName(outDb *gorm.DB, ruleName string, rule *schema.G
 }
 
 // UpdateGeneralRule update general rule by id(primary key)
-func UpdateGeneralRule(outDb *gorm.DB, rule *schema.GeneralRule) (effectRows int, fErr error) {
+func UpdateGeneralRule(outDb *gorm.DB, rule *schema.GeneralRule) (effectRows int64, fErr error) {
 	err := utils.GormTransaction(outDb, func(tx *gorm.DB) error {
 		db := tx.Model(rule).Omit("Groups") // not update groups
 		if db = db.Where("id = ?", rule.ID).Updates(rule); db.Error != nil {
 			log.Errorf("update generalRule(by rule_name) failed: %s", db.Error)
 			return db.Error
 		}
-		effectRows = int(db.RowsAffected)
+		effectRows = db.RowsAffected
 		if err := CreateGeneralRuleGroupFromRule(tx, rule); err != nil {
 			return err
 		}
 		return UpdateGeneralRuleAndGroupAssociations(tx, []*schema.GeneralRule{rule}, rule.Groups)
+	})
+	return effectRows, err
+}
+
+// AppendGeneralRuleToMultipleGroup append general rule to multiple group
+func AppendGeneralRuleToMultipleGroup(outDb *gorm.DB, ruleName string, groupName []string) (effectRows int64, fErr error) {
+	err := utils.GormTransaction(outDb, func(tx *gorm.DB) error {
+		rule, err := GetGeneralRuleByRuleName(tx, ruleName)
+		if err != nil {
+			return err
+		}
+		groups := lo.Map(groupName, func(item string, _ int) *schema.GeneralRuleGroup {
+			return &schema.GeneralRuleGroup{GroupName: item}
+		})
+		if err := CreateGeneralMultipleRuleGroup(tx, groups); err != nil {
+			return err
+		}
+		effectRows = tx.RowsAffected
+		return AppendGeneralRuleGroupAssociations(tx, []*schema.GeneralRule{rule}, groups)
+	})
+	return effectRows, err
+}
+
+// AppendMultipleGeneralRuleToGroup append multiple general rule to group
+func AppendMultipleGeneralRuleToGroup(outDb *gorm.DB, filter *ypb.FingerprintFilter, groupName string) (effectRows int64, fErr error) {
+	err := utils.GormTransaction(outDb, func(tx *gorm.DB) error {
+		rules := []*schema.GeneralRule{}
+		ruleTx := FilterGeneralRule(tx.Model(&schema.GeneralRule{}).Preload("Groups"), filter)
+		ruleTx.Find(&rules)
+		if err := ruleTx.Find(&rules).Error; err != nil {
+			return err
+		}
+		effectRows = ruleTx.RowsAffected
+		group := &schema.GeneralRuleGroup{GroupName: groupName}
+		if err := FirstOrCreateGeneralRuleGroup(tx, group); err != nil {
+			return err
+		}
+		return AppendGeneralRuleGroupAssociations(tx, rules, []*schema.GeneralRuleGroup{group})
 	})
 	return effectRows, err
 }
@@ -193,11 +232,5 @@ func InsertBuiltinGeneralRules(db *gorm.DB) error {
 }
 
 func CreateGeneralRuleGroupFromRule(db *gorm.DB, rule *schema.GeneralRule) error {
-	for _, group := range rule.Groups {
-		err := FirstOrCreateGeneralRuleGroup(db, group)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return CreateGeneralMultipleRuleGroup(db, rule.Groups)
 }
