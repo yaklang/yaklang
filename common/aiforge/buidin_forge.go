@@ -2,6 +2,7 @@ package aiforge
 
 import (
 	"embed"
+	"encoding/json"
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -28,7 +29,7 @@ func init() {
 			//}()
 			registerBuildInForge("fragment_summarizer")
 			registerBuildInForge("long_text_summarizer")
-			// registerBuildInForge("xss")
+			registerBuildInForge("xss")
 		}
 		return nil
 	})
@@ -47,27 +48,105 @@ func getBuildInForge(name string) []byte {
 	return codeBytes
 }
 
-func registerBuildInForge(name string) {
+func getForgeCode(name string) (string, bool) {
 	codeBytes, err := basePlugin.ReadFile(fmt.Sprintf("buildinforge/%v.yak", name))
 	if err != nil {
-		log.Errorf("%v不是build-in forge", name)
-		return
+		return "", false
 	}
-	code := string(codeBytes)
+	return string(codeBytes), true
+}
 
-	initPrompt, _ := basePlugin.ReadFile(fmt.Sprintf("buildinforge/%v_prompts/init.txt", name))
-	persistentPrompt, _ := basePlugin.ReadFile(fmt.Sprintf("buildinforge/%v_prompts/persistent.txt", name))
-	planPrompt, _ := basePlugin.ReadFile(fmt.Sprintf("buildinforge/%v_prompts/plan.txt", name))
-	resultPrompt, _ := basePlugin.ReadFile(fmt.Sprintf("buildinforge/%v_prompts/result.txt", name))
+// ForgeCfg 用于解析forge_cfg.json文件
+type ForgeCfg struct {
+	Name             string `json:"name"`
+	ToolKeywords     string `json:"tool_keywords"`
+	Tools            string `json:"tools"`
+	InitPrompt       string `json:"init_prompt"`
+	PersistentPrompt string `json:"persistent_prompt"`
+	PlanPrompt       string `json:"plan_prompt"`
+	ResultPrompt     string `json:"result_prompt"`
+	Description      string `json:"description"`
+}
 
-	err = yakit.CreateOrUpdateAIForge(consts.GetGormProfileDatabase(), name, &schema.AIForge{
-		ForgeName:        name,
-		ForgeContent:     code,
-		InitPrompt:       string(initPrompt),
-		PersistentPrompt: string(persistentPrompt),
-		PlanPrompt:       string(planPrompt),
-		ResultPrompt:     string(resultPrompt),
-	})
+func getForgeConfig(name string) (string, *schema.AIForge, bool) {
+	forge := &schema.AIForge{}
+	p := fmt.Sprintf("buildinforge/%v", name)
+	loadDefaultPrompt := func(promptName string) string {
+		promptBytes, _ := basePlugin.ReadFile(fmt.Sprintf("%v/%v.txt", p, promptName))
+		return string(promptBytes)
+	}
+	codeContent, _ := basePlugin.ReadFile(fmt.Sprintf("%v/%v.yak", p, name))
+	configBytes, err := basePlugin.ReadFile(fmt.Sprintf("%v/forge_cfg.json", p))
+	if err != nil {
+		// If config file doesn't exist, try to read prompt files directly
+		initPrompt := loadDefaultPrompt("init")
+		persistentPrompt := loadDefaultPrompt("persistent")
+		planPrompt := loadDefaultPrompt("plan")
+		resultPrompt := loadDefaultPrompt("result")
+
+		if len(initPrompt) == 0 && len(persistentPrompt) == 0 && len(planPrompt) == 0 && len(resultPrompt) == 0 {
+			return "", nil, false
+		}
+		forge.ForgeName = name
+		forge.InitPrompt = string(initPrompt)
+		forge.PersistentPrompt = string(persistentPrompt)
+		forge.PlanPrompt = string(planPrompt)
+		forge.ResultPrompt = string(resultPrompt)
+		forge.ForgeContent = string(codeContent)
+	} else {
+		// 使用结构体解析forge_cfg.json
+		var cfg ForgeCfg
+		err = json.Unmarshal(configBytes, &cfg)
+		if err != nil {
+			log.Errorf("parse forge config failed: %v", err)
+			return "", nil, false
+		}
+
+		if cfg.InitPrompt == "" {
+			cfg.InitPrompt = loadDefaultPrompt("init")
+		}
+		if cfg.PersistentPrompt == "" {
+			cfg.PersistentPrompt = loadDefaultPrompt("persistent")
+		}
+		if cfg.PlanPrompt == "" {
+			cfg.PlanPrompt = loadDefaultPrompt("plan")
+		}
+		if cfg.ResultPrompt == "" {
+			cfg.ResultPrompt = loadDefaultPrompt("result")
+		}
+		forge.ForgeName = cfg.Name
+		forge.ToolKeywords = cfg.ToolKeywords
+		forge.Tools = cfg.Tools
+		forge.Description = cfg.Description
+		forge.InitPrompt = cfg.InitPrompt
+		forge.PersistentPrompt = cfg.PersistentPrompt
+		forge.PlanPrompt = cfg.PlanPrompt
+		forge.ResultPrompt = cfg.ResultPrompt
+		forge.ForgeContent = string(codeContent)
+	}
+	return string(configBytes), forge, true
+}
+
+func registerBuildInForge(name string) {
+	var forge *schema.AIForge
+	// First try to get forge code
+	code, ok := getForgeCode(name)
+	if ok {
+		forge = &schema.AIForge{
+			ForgeName:    name,
+			ForgeContent: code,
+		}
+	} else {
+		// Try to get forge config
+		_, forge, ok = getForgeConfig(name)
+		if !ok {
+			log.Errorf("%v不是build-in forge", name)
+			return
+		}
+		forge.ForgeName = name
+	}
+
+	err := yakit.CreateOrUpdateAIForge(consts.GetGormProfileDatabase(), forge.ForgeName, forge)
 	if err != nil {
 		log.Errorf("create or update forge %v failed: %v", name, err)
 		return

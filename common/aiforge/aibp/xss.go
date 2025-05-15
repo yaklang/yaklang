@@ -12,7 +12,7 @@ var xssInitPrompt string
 //go:embed xss_prompts/persistent.txt
 var xssPersistentPrompt string
 
-func init() {
+func _init() {
 	cfg := aiforge.NewYakForgeBlueprintConfig("xss", xssInitPrompt, xssPersistentPrompt)
 	cfg.WithToolKeywords("fs", "http")
 	cfg.WithTools(

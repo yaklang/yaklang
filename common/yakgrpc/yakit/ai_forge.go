@@ -3,25 +3,13 @@ package yakit
 import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func CreateOrUpdateAIForge(db *gorm.DB, name string, forge *schema.AIForge) error {
 	db = db.Model(&schema.AIForge{})
-	if findDb := db.Where("forge_name = ?", name).Find(&schema.AIForge{}); findDb.Error != nil {
-		if !findDb.RecordNotFound() {
-			return findDb.Error
-		}
-		if db := db.Create(forge); db.Error != nil {
-			return db.Error
-		}
-	} else {
-		if db := db.Where("forge_name = ?", name).UpdateColumns(&schema.AIForge{
-			ForgeContent:  forge.ForgeContent,
-			Params:        forge.Params,
-			DefaultParams: forge.DefaultParams,
-		}); db.Error != nil {
-			return db.Error
-		}
+	if db := db.Where("forge_name = ?", name).Assign(forge).FirstOrCreate(&schema.AIForge{}); db.Error != nil {
+		return utils.Errorf("create/update AI Forge failed: %s", db.Error)
 	}
 	return nil
 }

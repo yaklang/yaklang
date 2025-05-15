@@ -10,6 +10,8 @@ type AIForge struct {
 	Params        string // cli params
 	DefaultParams string // for user preferences
 	Description   string // forge description
+	Tools         string // tools
+	ToolKeywords  string // tool keywords
 
 	InitPrompt       string
 	PersistentPrompt string

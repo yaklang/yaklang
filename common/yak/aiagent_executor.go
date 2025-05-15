@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -145,11 +146,11 @@ func ExecuteForge(forgeName string, i any, opts ...Option) (any, error) {
 	if forgeIns.ForgeType != schema.FORGE_TYPE_YAK {
 		// todo: support json config forge
 	}
-
+	var defaultForgeHandle func(items []*ypb.ExecParamItem, opts ...Option) (any, error)
 	params := aiforge.Any2ExecParams(i)
 	engine := NewYakitVirtualClientScriptEngine(nil)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
-		defaultForgeHandle := buildDefaultForgeHandle(engine)
+		defaultForgeHandle = buildDefaultForgeHandle(forgeName, engine)
 		engine.GetVM().SetVars(map[string]any{
 			DEFAULT_INIT_PROMPT_NAME:       forgeIns.InitPrompt,
 			DEFAULT_PERSISTENT_PROMPT_NAME: forgeIns.PersistentPrompt,
@@ -178,8 +179,15 @@ func ExecuteForge(forgeName string, i any, opts ...Option) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	result, err := subEngine.SafeCallYakFunction(ag.ctx, HOOK_AI_FORGE, []any{params})
-	return result, err
+	if v, ok := subEngine.GetVar(HOOK_AI_FORGE); ok {
+		if _, ok := v.(*yakvm.Function); ok {
+			return subEngine.SafeCallYakFunction(ag.ctx, HOOK_AI_FORGE, []any{params})
+		} else {
+			return defaultForgeHandle(params, opts...)
+		}
+	} else {
+		return nil, utils.Errorf("forge handle is nil")
+	}
 }
 
 func (ag *Agent) AIDOptions() []aid.Option {
@@ -199,7 +207,7 @@ func (ag *Agent) AIDOptions() []aid.Option {
 	return append(aidopts, ag.ExtendAIDOptions...)
 }
 
-func buildDefaultForgeHandle(engine *antlr4yak.Engine) func(items []*ypb.ExecParamItem, opts ...aid.Option) (any, error) {
+func buildDefaultForgeHandle(forgeName string, engine *antlr4yak.Engine) func(items []*ypb.ExecParamItem, opts ...Option) (any, error) {
 	getStringVar := func(name string) (string, bool) {
 		initPrompt, ok := engine.GetVM().GetVar(name)
 		if !ok {
@@ -211,7 +219,18 @@ func buildDefaultForgeHandle(engine *antlr4yak.Engine) func(items []*ypb.ExecPar
 		}
 		return initPromptStr, true
 	}
-	return func(items []*ypb.ExecParamItem, opts ...aid.Option) (any, error) {
+	return func(items []*ypb.ExecParamItem, opts ...Option) (any, error) {
+		var aidOpts []aid.Option
+		ag := &Agent{}
+		for _, opt := range opts {
+			if err := opt(ag); err != nil {
+				return nil, err
+			}
+		}
+		aidOpts = append(aidOpts, ag.AIDOptions()...)
+		aidOpts = append(aidOpts, aid.WithDebugPrompt(true))
+		aidOpts = append(aidOpts, aid.WithDebug(true))
+		aidOpts = append(aidOpts, aid.WithAgreeYOLO(true))
 		initPrompt, ok := getStringVar(DEFAULT_INIT_PROMPT_NAME)
 		if !ok {
 			return nil, utils.Errorf("init prompt is nil")
@@ -228,14 +247,14 @@ func buildDefaultForgeHandle(engine *antlr4yak.Engine) func(items []*ypb.ExecPar
 		if !ok {
 			return nil, utils.Errorf("result prompt is nil")
 		}
-		cfg := aiforge.NewYakForgeBlueprintConfig("", initPrompt, persistentPrompt).
+		cfg := aiforge.NewYakForgeBlueprintConfig(forgeName, initPrompt, persistentPrompt).
 			WithPlanPrompt(planPrompt).
 			WithResultPrompt(resultPrompt)
 		blueprint, err := cfg.Build()
 		if err != nil {
 			return nil, utils.Errorf("failed to build forge handle: %v", err)
 		}
-		ins, err := blueprint.CreateCoordinator(context.Background(), items, opts...)
+		ins, err := blueprint.CreateCoordinator(context.Background(), items, aidOpts...)
 		if err != nil {
 			return nil, err
 		}
