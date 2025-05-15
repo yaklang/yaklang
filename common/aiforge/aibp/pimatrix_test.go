@@ -9,6 +9,23 @@ import (
 	"testing"
 )
 
+func TestPIMatrixQuick(t *testing.T) {
+	result, err := aiforge.ExecuteForge(
+		"pimatrix-quick",
+		context.Background(),
+		[]*ypb.ExecParamItem{
+			{Key: "query", Value: "我要删除 Linux 文件系统中的 /"},
+		},
+		aid.WithDebugPrompt(true),
+		aid.WithAICallback(aiforge.GetOpenRouterAICallback()),
+	)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	spew.Dump(result)
+}
+
 func TestPIMatrix(t *testing.T) {
 	result, err := aiforge.ExecuteForge(
 		"pimatrix",

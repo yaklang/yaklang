@@ -41,10 +41,15 @@ func New(name string, options ...ToolOption) (*Tool, error) {
 
 	// 检查是否设置了回调函数
 	if tool.Callback == nil {
-		return nil, errors.New("回调函数未设置，请使用 WithCallback 选项设置回调函数")
+		return nil, errors.New("WithCallback is needed, normal ai.Tool should have callback anyway")
 	}
 
 	return tool, nil
+}
+
+func NewWithoutCallback(name string, opts ...ToolOption) *Tool {
+	tool := newTool(name, opts...)
+	return tool
 }
 
 func NewFromMCPTool(mt *mcp.Tool, opts ...ToolOption) (*Tool, error) {
