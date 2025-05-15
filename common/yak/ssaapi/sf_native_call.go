@@ -340,6 +340,7 @@ func init() {
 		return true, result, nil
 	}), nc_desc("获取实际参数"))
 	registerNativeCall(NativeCall_GetUsers, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		depth := params.GetInt(0, "depth")
 		var result []sfvm.ValueOperator
 		v.Recursive(func(operator sfvm.ValueOperator) error {
 			switch ret := operator.(type) {
@@ -350,6 +351,29 @@ func init() {
 			}
 			return nil
 		})
+		if depth > 0 {
+			depth--
+		}
+
+		for ; depth > 0; depth-- {
+			var temp []sfvm.ValueOperator
+			for _, v := range result {
+				switch ret := v.(type) {
+				case *Value:
+					temp = append(temp, ret.GetUsers())
+				case Values:
+					temp = append(temp, ret.GetUsers())
+				case *sfvm.ValueList:
+					values, err := SFValueListToValues(ret)
+					if err == nil {
+						values.ForEach(func(value *Value) {
+							temp = append(temp, value.GetUsers())
+						})
+					}
+				}
+			}
+			result = temp
+		}
 		if len(result) > 0 {
 			return true, sfvm.NewValues(result), nil
 		}

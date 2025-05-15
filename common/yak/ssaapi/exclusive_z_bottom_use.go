@@ -23,7 +23,6 @@ func (v Values) GetBottomUses(opts ...OperationOption) Values {
 
 func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) Values {
 	var vals Values
-
 	if v.IsObject() {
 		exist := false
 		actx.foreachObjectStack(func(obj *Value, key *Value, val *Value) bool {
@@ -77,6 +76,8 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 			}
 		}
 	}()
+	log.Infof("层数:%d,v:%s", actx.getRecursiveCounter(), v.String())
+
 	if v == nil {
 		return nil
 	}
