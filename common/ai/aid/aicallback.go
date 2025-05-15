@@ -297,6 +297,10 @@ func (c *Config) NewAIResponse() *AIResponse {
 	}
 }
 
+func NewUnboundAIResponse() *AIResponse {
+	return newUnboundAIResponse()
+}
+
 func newUnboundAIResponse() *AIResponse {
 	return &AIResponse{
 		ch:                  chanx.NewUnlimitedChan[*OutputStream](context.TODO(), 2),
