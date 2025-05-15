@@ -1,0 +1,231 @@
+desc(
+    title_zh:"检测Java java.sql 数据库Connection资源未释放",
+    title:"Check Java java.sql Connection Unreleased Resource",
+    risk:"资源泄漏",
+    level:high,
+    reference:<<<URL
+    https://docs.oracle.com/javase/8/docs/api/java/sql/package-summary.html
+URL
+    description:<<<TEXT
+    ## 漏洞描述
+
+    应用程序在使用 JDBC API 进行数据库操作时，未能正确关闭数据库资源（Connection、Statement、ResultSet）。这些资源在超出生命周期后未被释放，导致资源泄漏。
+
+    ## 风险影响
+
+    - 数据库连接池耗尽，无法创建新的连接
+    - 系统资源（内存、文件句柄等）过度消耗
+    - 应用程序性能随时间逐渐下降
+    - 长时间运行后可能导致应用崩溃或拒绝服务
+    - 可能引发数据库服务器连接数超限
+    - 事务可能无法正确提交或回滚
+TEXT
+    solution:<<<TEXT
+    ```java
+    Connection conn = null;
+    Statement stmt = null;
+    ResultSet rs = null;
+    try {
+        conn = dataSource.getConnection();
+        stmt = conn.createStatement();
+        rs = stmt.executeQuery(sql);
+
+        while (rs.next()) {
+            // 处理结果
+        }
+    } finally {
+        // 按获取顺序的逆序关闭
+        if (rs != null) try { rs.close(); } catch (SQLException e) { /* 记录日志 */ }
+        if (stmt != null) try { stmt.close(); } catch (SQLException e) { /* 记录日志 */ }
+        if (conn != null) try { conn.close(); } catch (SQLException e) { /* 记录日志 */ }
+    }
+    ```
+
+    ### 3. 使用数据库操作工具/框架
+
+    ```java
+    // 使用 Spring JdbcTemplate
+    JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+    List<User> users = jdbcTemplate.query(
+        "SELECT * FROM users WHERE status = ?",
+        new Object[] { "active" },
+        (rs, rowNum) -> new User(rs.getLong("id"), rs.getString("name"))
+    );
+    ```
+
+    ### 4. 实现工具类统一关闭资源
+
+    ```java
+    public static void closeResources(Connection conn, Statement stmt, ResultSet rs) {
+        if (rs != null) try { rs.close(); } catch (SQLException e) { logger.error("关闭ResultSet失败", e); }
+        if (stmt != null) try { stmt.close(); } catch (SQLException e) { logger.error("关闭Statement失败", e); }
+        if (conn != null) try { conn.close(); } catch (SQLException e) { logger.error("关闭Connection失败", e); }
+    }
+    ```
+TEXT
+)
+
+// 获取connection的单例方法
+*?{opcode:function}?{<getReturns()><typeName()>?{have:"java.sql.Connection"}} as $fun;
+// 方法调用点
+$fun() as $getConnection;
+// 直接调用
+.getConnection()?{<typeName()>?{have:"java.sql"}} as $getConnection;
+$getConnection -{
+    include:`*.close`
+}-> as $safe
+
+$safe<getPredecessors()> as $safeGetConnection;
+$getConnection - $safeGetConnection as $weak;
+alert $weak for{
+    message:"检测到java.sql.Connection未释放资源",
+}
+
+desc{
+    lang:java,
+    alert_num:2 ,
+    "file://demo.java":<<<CODE
+    /**
+     * JDBC 数据库连接资源管理示例
+     * 演示正确和错误的数据库资源管理方式
+     */
+    import java.sql.*;
+    import javax.sql.DataSource;
+
+    public class DatabaseResourceExample {
+
+        private DataSource dataSource; // 假设通过某种方式注入
+
+        /**
+         * 错误示例 1: 使用 DriverManager 但未释放资源
+         */
+        public void unsafeDriverManagerExample() throws Exception {
+            // 获取连接但从不关闭
+            Connection conn = DriverManager.getConnection(
+                    "jdbc:mysql://localhost:3306/mydb", "user", "password");
+
+            // 使用连接
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery("SELECT * FROM users");
+
+            while (rs.next()) {
+                System.out.println(rs.getString("name"));
+            }
+
+            // 错误: 没有关闭 ResultSet、Statement 和 Connection
+            // 导致数据库连接泄漏!
+        }
+
+        /**
+         * 错误示例 2: 使用 DataSource 但未释放资源
+         */
+        public void unsafeDataSourceExample() throws Exception {
+            // 从数据源获取连接但从不关闭
+            Connection conn = dataSource.getConnection();
+
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT * FROM users WHERE role = ?");
+            stmt.setString(1, "admin");
+
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                System.out.println(rs.getString("name"));
+            }
+
+            // 错误: 没有关闭任何资源
+        }
+
+        /**
+         * 正确示例 1: 使用 try-finally 手动关闭资源
+         */
+        public void safeManualCloseExample() throws Exception {
+            Connection conn = null;
+            Statement stmt = null;
+            ResultSet rs = null;
+
+            try {
+                // 获取连接
+                conn = DriverManager.getConnection(
+                        "jdbc:mysql://localhost:3306/mydb", "user", "password");
+
+                // 创建语句和结果集
+                stmt = conn.createStatement();
+                rs = stmt.executeQuery("SELECT * FROM users");
+
+                // 处理结果
+                while (rs.next()) {
+                    System.out.println(rs.getString("name"));
+                }
+            } finally {
+                // 按照获取顺序的逆序关闭资源
+                try { if (rs != null) rs.close(); } catch (SQLException e) { /* 记录日志 */ }
+                try { if (stmt != null) stmt.close(); } catch (SQLException e) { /* 记录日志 */ }
+                try { if (conn != null) conn.close(); } catch (SQLException e) { /* 记录日志 */ }
+            }
+        }
+
+        /**
+         * 正确示例 2: 使用 try-with-resources (Java 7+)
+         * 自动管理资源关闭
+         */
+        public void safeTryWithResourcesExample() throws Exception {
+            String query = "SELECT * FROM users WHERE role = ?";
+
+            try (
+                    // 资源会按照声明顺序的逆序自动关闭
+                    Connection conn = dataSource.getConnection();
+                    PreparedStatement stmt = conn.prepareStatement(query);
+            ) {
+                stmt.setString(1, "admin");
+
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        System.out.println(rs.getString("name"));
+                    }
+                } // ResultSet 自动关闭
+            } // PreparedStatement 和 Connection 自动关闭
+        }
+
+        /**
+         * 正确示例 3: 嵌套 try-finally 更细粒度地控制资源
+         */
+        public void safeNestedExample() throws Exception {
+            Connection conn = null;
+
+            try {
+                conn = DriverManager.getConnection(
+                        "jdbc:mysql://localhost:3306/mydb", "user", "password");
+
+                // 使用连接进行第一个查询
+                executeQuery(conn, "SELECT * FROM users");
+
+                // 使用同一连接进行第二个查询
+                executeQuery(conn, "SELECT * FROM products");
+
+            } finally {
+                if (conn != null) {
+                    try { conn.close(); } catch (SQLException e) { /* 记录日志 */ }
+                }
+            }
+        }
+
+        private void executeQuery(Connection conn, String sql) throws SQLException {
+            Statement stmt = null;
+            ResultSet rs = null;
+
+            try {
+                stmt = conn.createStatement();
+                rs = stmt.executeQuery(sql);
+
+                while (rs.next()) {
+                    // 处理结果
+                }
+            } finally {
+                if (rs != null) try { rs.close(); } catch (SQLException e) {}
+                if (stmt != null) try { stmt.close(); } catch (SQLException e) {}
+                // 注意：不要在这里关闭 Connection，它会在外层方法中关闭
+            }
+        }
+    }
+CODE
+}
