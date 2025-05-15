@@ -51,6 +51,7 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...Opt
 		return nil, utils.Errorf("coordinator: load tools (post-init) failed: %v", err)
 	}
 	config.startEventLoop(ctx)
+	config.guardian.setOutputEmitter(config.eventHandler)
 
 	if config.aiToolManager == nil {
 		config.aiToolManager = buildinaitools.NewToolManager(
