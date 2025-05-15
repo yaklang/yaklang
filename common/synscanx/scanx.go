@@ -3,6 +3,11 @@ package synscanx
 import (
 	"context"
 	"fmt"
+	"net"
+	"os"
+	"sync"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/filter"
@@ -14,10 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
 	"github.com/yaklang/yaklang/common/utils/netutil"
 	"golang.org/x/time/rate"
-	"net"
-	"os"
-	"sync"
-	"time"
 )
 
 type Scannerx struct {
@@ -413,7 +414,6 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 			close(s.PacketChan)
 			close(s.LoopPacket)
 		}()
-		time.Sleep(250 * time.Millisecond)
 
 		if !s.FromPing {
 			s.arpScan()

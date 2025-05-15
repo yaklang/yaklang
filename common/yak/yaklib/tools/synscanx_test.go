@@ -21,6 +21,7 @@ import (
 )
 
 func Test__scanx(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
 	synPacketCounter := 0
 	addSynPacketCounter := func() {
 		synPacketCounter++
@@ -40,13 +41,15 @@ func Test__scanx(t *testing.T) {
 		//"192.168.124.50/24",
 		//"124.222.42.210/24",
 		//"192.168.3.3,192.168.3.5",
-		"192.168.3.1/24",
+		"172.22.166.244",
+		//"172.22.160.1",
 		//"baidu.com",
 		//"U:137",
-		"21,22,443,445,80",
+		"12345",
 		//synscanx.WithInitFilterPorts("443"),
 		//synscanx.WithWaiting(5),
 		synscanx.WithShuffle(false),
+		synscanx.WithIface("vEthernet (WSL (Hyper-V firewall))"),
 		//synscanx.WithConcurrent(2000),
 		synscanx.WithSubmitTaskCallback(func(i string) {
 			addSynPacketCounter()

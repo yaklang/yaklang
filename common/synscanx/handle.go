@@ -4,6 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"runtime"
+	"unicode/utf8"
+
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/pcap"
@@ -12,10 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"io"
-	"net"
-	"runtime"
-	"unicode/utf8"
 )
 
 // windows 的pcap 错误信息是gb18030编码的，需要转换成utf8
@@ -75,6 +76,8 @@ func (s *Scannerx) initHandle() error {
 
 func (s *Scannerx) initHandlerStart(ctx context.Context) error {
 	var err error
+	// 通知
+	captureReady := make(chan struct{})
 
 	go func() {
 		defer func() {
@@ -112,6 +115,10 @@ func (s *Scannerx) initHandlerStart(ctx context.Context) error {
 			pcaputil.WithContext(ctx),
 			pcaputil.WithEnableCache(true),
 			pcaputil.WithDisableAssembly(true),
+			pcaputil.WithCaptureStartedCallback(func() {
+				// 通知主协程，捕获器已经准备就绪
+				close(captureReady)
+			}),
 			pcaputil.WithNetInterfaceCreated(func(handle *pcaputil.PcapHandleWrapper) {
 				go func() {
 					defer func() {
@@ -173,6 +180,15 @@ func (s *Scannerx) initHandlerStart(ctx context.Context) error {
 			log.Errorf("pcaputil start failed: %v", err)
 		}
 	}()
+
+	// 等待捕获器准备就绪
+	select {
+	case <-captureReady:
+		log.Infof("pcap handle %s is ready", s.config.Iface.Name)
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
 	return err
 }
 

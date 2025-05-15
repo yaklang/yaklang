@@ -8,8 +8,8 @@ import (
 )
 
 func (s *Scannerx) getGatewayMac() (net.HardwareAddr, error) {
-	gateway := s.config.GatewayIP.String()
-	if gateway != "" && gateway != "<nil>" {
+	if s.config.GatewayIP != nil {
+		gateway := s.config.GatewayIP.String()
 		var retry int
 		for {
 			// 通过 ARP 协议获取网关的 MAC 地址
