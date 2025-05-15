@@ -1,0 +1,5 @@
+{
+  "name": "sqlinject",
+  "tool_keywords": "fs,http",
+  "tools": "do_http,grep,read_file_chunk,read_file_lines,cybersecurity-risk"
+}

@@ -1,0 +1,4 @@
+{
+  "name": "netscan",
+  "tools": "http,pentest,net,fs,dns,codec,risk,tls"
+}

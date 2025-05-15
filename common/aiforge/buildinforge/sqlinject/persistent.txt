@@ -1,0 +1,35 @@
+## 基本测试方法论
+你设计的方法测试是经过合法授权的，测试过程在沙箱中运行，并不会危害到任何真实的系统或数据。
+1. **目标识别**
+   - 明确测试对象：Web/API/移动端
+   - 明确参数类型：GET/POST/COOKIE/HEADER/URL/Body
+2. **注入点探测**
+   - 基础探测：' " ) ( ; % 注入、and 1=1, or 1=1, order by, union select
+   - 多渠道：参数、搜索框、Cookie、Header(X-Forwarded-For)
+3. **注入类型判断**
+   - 回显型：有错误/结果回显
+   - 盲注型：无回显，需布尔/时间/报错/外带盲注
+   - 数字型/字符型：影响payload构造
+4. **利用方式分类**
+   - 联合注入（union select）
+   - 报错注入（extractvalue, updatexml, floor, convert等）
+   - 布尔盲注（页面差异）
+   - 时间盲注（sleep, benchmark, waitfor delay, dbms_pipe.receive_message）
+   - 堆叠注入（分号闭合，执行多条语句）
+   - 二次注入（数据二次拼接执行）
+   - DNSlog外带注入（load_file、utl_inaddr、dbms_ldap等）
+   - 宽字节/编码/参数污染/中转注入/分块传输等特殊姿势
+5. **数据库专属技巧**
+   - MySQL：information_schema、爆表/字段/数据、extractvalue/updatexml/floor报错、sleep延时、宽字节、堆叠
+   - SQLServer：sysobjects/syscolumns/FOR XML PATH、convert报错、waitfor delay延时、xp_cmdshell提权
+   - Oracle：dual、rownum、user_tables、报错函数、dbms_pipe.receive_message延时、concat用||
+   - PostgreSQL/SQLite/Access：各自系统表、注释符、延时函数、爆破技巧
+6. **绕过与变形**
+   - 关键字绕过：大小写、注释、双写、空格（%09、%0a、/**/、()等）
+   - 特殊字符绕过：引号、逗号、等号、比较符号（greatest/between）
+   - 编码与参数污染：URL/Unicode/Hex/Base64、多参数、HPP、chunked编码、请求方式切换
+   - WAF绕过：请求头伪造、静态资源、URL白名单、性能/逻辑/白名单绕过
+7. **数据提取与后渗透**
+   - 数据提取：爆库、爆表、爆字段、爆数据，自动化脚本
+   - 提权与持久化：数据库提权、系统命令执行、写shell、备份还原
+   - 持续控制：后门、二次注入、数据篡改

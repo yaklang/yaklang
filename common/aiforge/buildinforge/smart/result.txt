@@ -1,0 +1,42 @@
+# Background
+你需要根据材料和ResultSchema输出对应的JSON内容（只输出JSON就好，不用解释）。
+# Basic Progress ToolCall and Memory
+{{ .Memory.OS }}-{{ .Memory.Arch }}-{{ .Memory.Now }}
+{{ .Memory.Progress }}
+{{ .Memory.PromptForToolCallResultsForLast5  }}
+{{ .Memory.PersistentMemory }}
+# ResultSchema
+根据上面的算法和具体任务内容，按照下面Schema给出具体案例建议，一定要结合当前任务信息。
+```schema
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["@action", "suggestions"],
+  "properties": {
+    "@action": {
+      "const": "smart"
+    },
+    "suggestions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "item": {
+        "type": object,
+        "required": ["prompt", "description"],
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "用户可以选择这条建议拼接进后续的Prompt以扩展或重新规划任务（结合具体任务，不要太宽泛）"
+          },
+          "description": {
+            "type": "string",
+            "description": "详细解释Why和How，为什么要这样做，如何去做"
+          }
+        }
+      }
+    }
+  }
+}
+```
