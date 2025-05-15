@@ -11,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
-	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/schema"
@@ -115,26 +114,61 @@ var AIAgentExport = map[string]any{
 	// todo: need to split?
 
 	//  create ai forge blue print
-	"CreateForge":          NewForgeBlueprint,
-	"NewExecutor":          NewForgeExecutor,
-	"NewExecutorFromForge": NewExecutorFromForge,
-	"NewExecutorFromJson":  NewExecutorFromJson,
-	"tools":                aiforge.WithTools,
-	"initPrompt":           aiforge.WithInitializePrompt,
-	"persistentPrompt":     aiforge.WithPersistentPrompt,
-	"resultPrompt":         aiforge.WithResultPrompt,
-	"plan":                 aiforge.WithPlanMocker,
-	"aidOptions":           aiforge.WithAIDOptions,
+	"CreateForge":           NewForgeBlueprint,
+	"NewExecutor":           NewForgeExecutor,
+	"NewExecutorFromJson":   NewExecutorFromJson,
+	"tools":                 WithTools,
+	"initPrompt":            WithInitializePrompt,
+	"persistentPrompt":      WithPersistentPrompt,
+	"resultPrompt":          WithResultPrompt,
+	"plan":                  WithPlanMocker,
+	"forgePlanMocker":       WithForgePlanMocker,
+	"initializePrompt":      WithInitializePrompt, // similar to initPrompt above
+	"resultPromptForge":     WithResultPrompt,     // similar to resultPrompt above
+	"resultHandlerForge":    WithResultHandlerForge,
+	"persistentPromptForge": WithPersistentPrompt, // similar to persistentPrompt above
+	"toolKeywords":          WithToolKeywords,
+	"forgeTools":            WithForgeTools,
+	"originYaklangCliCode":  WithOriginYaklangCliCode,
 
 	/*
 		aid api
 	*/
-	"agreeAuto":              aid.WithAgreeAuto,
-	"agreeYOLO":              aid.WithAgreeYOLO,
-	"agreePolicyAI":          aid.WithAIAgree,
-	"agreeManual":            aid.WithAgreeManual,
-	"extendedActionCallback": aid.WithExtendedActionCallback,
-	"resultHandler":          aid.WithResultHandler,
+	"agreeAuto":                    WithAgreeAuto,
+	"agreeYOLO":                    WithAgreeYOLO,
+	"agreePolicyAI":                WithAIAgree,
+	"agreeManual":                  WithAgreeManual,
+	"extendedActionCallback":       WithExtendedActionCallback,
+	"resultHandler":                WithResultHandler,
+	"forgeName":                    WithForgeName,
+	"context":                      WithContext,
+	"extendAIDOptions":             WithExtendAIDOptions,
+	"runtimeID":                    WithRuntimeID,
+	"offsetSeq":                    WithOffsetSeq,
+	"tool":                         WithTool,
+	"disallowRequireForUserPrompt": WithDisallowRequireForUserPrompt,
+	"manualAssistantCallback":      WithManualAssistantCallback,
+	"agreePolicy":                  WithAgreePolicy,
+	"aiAgree":                      WithAIAgree,
+	"allowRequireForUserInteract":  WithAllowRequireForUserInteract,
+	"toolManager":                  WithToolManager,
+	"memory":                       WithMemory,
+	"coordinatorAICallback":        WithCoordinatorAICallback,
+	"systemFileOperator":           WithSystemFileOperator,
+	"jarOperator":                  WithJarOperator,
+	"omniSearchTool":               WithOmniSearchTool,
+	"aiToolsSearchTool":            WithAiToolsSearchTool,
+	"debugPrompt":                  WithDebugPrompt,
+	"eventHandler":                 WithEventHandler,
+	"eventInputChan":               WithEventInputChan,
+	"debug":                        WithDebug,
+	"appendPersistentMemory":       WithAppendPersistentMemory,
+	"timeLineLimit":                WithTimeLineLimit,
+	"timelineContentLimit":         WithTimelineContentLimit,
+	"forgeParams":                  WithForgeParams,
+	"disableToolUse":               WithDisableToolUse,
+	"aiAutoRetry":                  WithAIAutoRetry,
+	"aiTransactionRetry":           WithAITransactionRetry,
 
 	/*
 		ai utils api

@@ -47,7 +47,7 @@ func ExecuteForge(forgeName string, i any, iopts ...any) (any, error) {
 	params := aiforge.Any2ExecParams(i)
 	engine := NewYakitVirtualClientScriptEngine(nil)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
-		defaultForgeHandle = buildDefaultForgeHandle(forgeName, engine)
+		defaultForgeHandle = buildDefaultForgeHandle(forgeIns, engine)
 		engine.GetVM().SetVars(map[string]any{
 			DEFAULT_INIT_PROMPT_NAME:       forgeIns.InitPrompt,
 			DEFAULT_PERSISTENT_PROMPT_NAME: forgeIns.PersistentPrompt,
@@ -68,7 +68,7 @@ func ExecuteForge(forgeName string, i any, iopts ...any) (any, error) {
 		).WithContextCancel(
 			ag.cancel,
 		))
-		BindAIConfigToEngine(engine, ag)
+		BindAIConfigToEngine(engine, iopts...)
 		return nil
 	})
 	forgeCode := `query = cli.String("query", cli.setHelp("用户输入"),cli.setRequired(true))`
@@ -103,7 +103,7 @@ func (ag *Agent) AIDOptions() []aid.Option {
 	return opts
 }
 
-func buildDefaultForgeHandle(forgeName string, engine *antlr4yak.Engine) func(items []*ypb.ExecParamItem, opts ...any) (any, error) {
+func buildDefaultForgeHandle(forgeIns *schema.AIForge, engine *antlr4yak.Engine) func(items []*ypb.ExecParamItem, opts ...any) (any, error) {
 	getStringVar := func(name string) (string, bool) {
 		initPrompt, ok := engine.GetVM().GetVar(name)
 		if !ok {
@@ -133,6 +133,7 @@ func buildDefaultForgeHandle(forgeName string, engine *antlr4yak.Engine) func(it
 		aidOpts = append(aidOpts, aid.WithDebugPrompt(true))
 		aidOpts = append(aidOpts, aid.WithDebug(true))
 		aidOpts = append(aidOpts, aid.WithAgreeYOLO(true))
+
 		initPrompt, ok := getStringVar(DEFAULT_INIT_PROMPT_NAME)
 		if !ok {
 			return nil, utils.Errorf("init prompt is nil")
@@ -149,7 +150,9 @@ func buildDefaultForgeHandle(forgeName string, engine *antlr4yak.Engine) func(it
 		if !ok {
 			return nil, utils.Errorf("result prompt is nil")
 		}
-		cfg := aiforge.NewYakForgeBlueprintConfig(forgeName, initPrompt, persistentPrompt).
+		cfg := aiforge.NewYakForgeBlueprintConfigFromSchemaForge(forgeIns).
+			WithInitPrompt(initPrompt).
+			WithPersistentPrompt(persistentPrompt).
 			WithPlanPrompt(planPrompt).
 			WithResultPrompt(resultPrompt)
 		blueprint, err := cfg.Build()

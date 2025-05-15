@@ -57,13 +57,11 @@ forgeHandle = func(params) {
             return res
         }),
         aiagent.persistentPrompt(sprintf(persis, limit)),
-        aiagent.aidOptions(
-            aiagent.agreeYOLO(true),
-            aiagent.extendedActionCallback("summarize", func(config , action) {
-                summary = action.GetString("summary")
-            }),
-            aiagent.resultHandler(func(config){})
-        )
+        aiagent.agreeYOLO(true),
+        aiagent.extendedActionCallback("summarize", func(config , action) {
+            summary = action.GetString("summary")
+        }),
+        aiagent.resultHandler(func(config){})
     )
     ordr,err = bp.CreateCoordinator(context.Background(),params)
     if err != nil {
