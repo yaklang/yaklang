@@ -1,0 +1,252 @@
+desc(
+    title_zh:"检测Java 未检测返回值是否为null导致空指针",
+    title:"Check Java Uncheked Return Value to Null Pointer Dereference",
+    risk:"空指针",
+    level:low,
+    reference:<<<URL
+    https://docs.oracle.com/javase/8/docs/api/java/lang/System.html
+    https://docs.oracle.com/javaee/7/api/javax/servlet/http/HttpServletRequest.html
+URL
+    description:<<<TEXT
+    某些方法（如 System.getProperty(), request.getParameter(), Class.getResource()）可能返回null。直接使用这些返回值而不检查是否为null可能导致空指针异常（NullPointerException），造成程序崩溃或意外行为。这属于CWE-476（空指针解引用）安全问题。
+TEXT
+    solution:<<<TEXT
+    ## 修复建议
+
+    1. 对可能返回`null`的方法结果务必进行检查：
+       ```java
+       String value = request.getParameter("name");
+       if (value != null) {
+           // 安全使用value
+       }
+       ```
+
+    2. 使用防御式编程，为可能的`null`值提供默认替代：
+       ```java
+       String value = System.getProperty("config.path");
+       value = (value != null) ? value : "default/path";
+       ```
+
+    3. 考虑使用辅助库（如Apache Commons Lang的`StringUtils`）：
+       ```java
+       if (StringUtils.isNotEmpty(value)) {
+           // 安全使用value
+       }
+       ```
+
+    4. 对于Java 8+项目，可使用`Optional`：
+       ```java
+       Optional.ofNullable(resource).ifPresent(r -> {
+           // 处理资源
+       });
+       ```
+TEXT
+)
+
+// 只检测有一个参数的System.getProperty，有两个参数说明有默认值
+System.getProperty()?{<getActualParamLen()>?{==2}} as $getProperty;
+Integer.getInteger()?{<getActualParamLen()>?{==2}} as $getInteger;
+Long.getLong()?{<getActualParamLen()>?{==2}} as $getLong;
+// 	setProperty(String key, String value) 用于设置系统属性，返回属性的先前值（如果存在）
+System.setProperty()?{<getActualParamLen()>?{==3}} as $setProperty;
+System.getSecurityManager() as $getSecurityManager;
+
+ServletRequest?{<typeName>?{any:"javax.servlet.http.ServletRequest","jakarta.servlet.ServletRequest"}}.get* as $allServletRequestGet;
+$allServletRequestGet?{<typeName>?{!any:getContentLength*,get*Port}} as $servletRequestGet;
+
+ServletContext?{<typeName>?{any:"javax.servlet.ServletContext","jakarta.servlet.ServletContext"}} as $allServletContext;
+$allServletGet?{<typeName>?{!any:get*Version}} as $servletContextGet;
+
+/^(ActionForm|ValidatorForm)$/?{<typeName>?{any:"org.apache.struts.action.ActionForm","org.apache.struts.action.ValidatorForm"}} as $allActionGet;
+$allActionGet?{<typeName>?{!any:getServlet*,"getPage","getResultValueMap","getValidationKey","getValidatorResults"}} as $actionGet;
+
+Class./^(getClassLoader|getComponentType|getSigners|getResource|getResourceAsStream)$/ as $get1
+
+./^(getImplementationTitle|getImplementationVendor|getImplementationVersion|getSpecificationTitle|getSpecificationVendor|getSpecificationVersion)$/ as $get2
+
+./^(getPackage)$/ as $get3
+
+SaslClient()?{<typeName>?{have:'com.netscape.sasl'}}./createInitialResponse|evaluateChallenge/ as $get4
+
+/SaslClientFactory|Sasl/?{<typeName>?{have:'com.netscape.sasl'}}.createSaslClient as $get5
+
+/LDAPMessageQueue|LDAPSearchListener|LDAPResponseListener/?{<typeName>?{have:'netscape.ldap'}}.getResponse as $get6
+
+/HibernateAccessor|HibernateTransactionManager/?{<typeName>?{have:'org.springframework.orm.hibernate|org.springframework.orm.hibernate3'}}.getEntityInterceptor as $get7
+
+/HibernateOperations|HibernateTemplate/?{<typeName>?{have:'org.springframework.orm.hibernate|org.springframework.orm.hibernate3'}}./execute(Find)?|get/ as $get8
+
+HibernateCallback?{<typeName>?{have:'org.springframework.orm.hibernate|org.springframework.orm.hibernate3'}}.doInHibernate as $get9
+
+FactoryBean?{<typeName>?{have:'org.springframework.beans.factory'}}./getObject|getObjectType/ as $get10
+
+TransactionManagerLookup?{<typeName>?{have:'org.hibernate.transaction'}}.getUserTransactionName as $get11
+
+Interceptor?{<typeName>?{have:'org.hibernate'}}./findDirty|instantiate/ as $get12
+
+EntityManager?{<typeName>?{have:'(javax|jakarta).persistence'}}.find as $get13
+
+/ExternalContext|ExternalContextWrapper/?{<typeName>?{have:'javax.faces.context'}}./getRemoteUser|getRequestPathInfo|getRequestServletPath|getResource|getResourceAsStream/ as $get14
+
+/MethodBinding|ValueBinding/?{<typeName>?{have:'javax.faces.el'}}.getExpressionString as $get15
+
+VariableResolver?{<typeName>?{have:'javax.faces.el'}}.resolveVariable as $get16
+
+UISelectMany?{<typeName>?{have:'javax.faces.component'}}.getSelectedValues as $get17
+
+JDOHelper?{<typeName>?{have:'javax.jdo'}}./getNamedPMFProperties|getPropertiesFromJdoconfig|loadPropertiesFromResource/ as $get18
+
+JDOImplHelper?{<typeName>?{have:'javax.jdo.spi'}}./newInstance|newObjectIdInstance|nonBinaryCompatibleGet/ as $get19
+
+ZipFile?{<typeName>?{have:'java.util.zip|org.apache.commons.compress.archivers.zip'}}.getEntry as $get20
+
+JarFile?{<typeName>?{have:'java.util.jar'}}./getJarEntry|getManifest/ as $get21
+
+JarURLConnection?{<typeName>?{have:'java.net'}}./getAttributes|getCertificates|getManifest/ as $get22
+
+URLConnection?{<typeName>?{have:'java.net'}}./getContent|getContentEncoding|getContentType|getHeaderField|getHeaderFieldKey|getPermission|getRequestProperty|guessContentTypeFromStream/ as $get23
+
+HttpURLConnection?{<typeName>?{have:'java.net'}}./getResponseMessage|getErrorStream/ as $get24
+
+XmlHelper?{<typeName>?{have:'org.hibernate.ejb.packaging'}}./getOptionalChild|getOptionalChildContent|getUniqueChildContent/ as $get25
+
+System?{<typeName>?{have:'java.lang'}}.getenv as $get26
+
+/TreeLogger$HelpInfo/?{<typeName>?{have:'com.google.gwt.core.ext'}}.getURL as $get27
+
+RequestBuilder?{<typeName>?{have:'com.google.gwt.http.client'}}./getCallback|getHeader|getPassword|getRequestData|getUser/ as $get28
+
+$get1 + $get2 + $get3 + $get4 + $get5 + $get6 + $get7 + $get8 + $get9 + $get10 + $get11 + $get12 + $get13 + $get14 + $get15 + $get16 + $get17 + $get18 + $get19 + $get20 + $get21 + $get22 + $get23 + $get24 + $get25 + $get26 + $get27 + $get28 as $allGet;
+$allGet<getCall> as $allGetMethod;
+
+$allGetMethod+$getProperty + $getInteger + $getLong + $setProperty + $getSecurityManager + $servletRequestGet + $servletContextGet + $actionGet  as $toCheck
+
+check $toCheck
+
+$toCheck?{.*()<var(memberCall)>} as $haveMemberCall
+$haveMemberCall?{!<getUsers(depth=2)>?{opcode:if} && !<getUsers(depth=3)>?{opcode:if}} as $weak
+alert $weak for {
+    message:"检测到未检查返回值可能导致空指针异常",
+    level:low,
+}
+
+desc{
+    lang:java,
+    alert_num:1 ,
+    "file://demo.java":<<<CODE
+    import org.apache.commons.lang3.StringUtils;
+    import java.util.Properties;
+
+    public class SystemPropertyExample {
+
+
+        public void riskyMethod() {
+            // 获取可能为 null 的系统属性
+            String homeDir = System.getProperty("user.home.custom");
+
+            // 直接使用，没有检查 null
+            // 如果属性不存在，将导致 NullPointerException
+            int length = homeDir.length();  // allocated -> used 转换，触发错误
+            System.out.println("Home directory length: " + length);
+        }
+
+        /**
+         * 安全方法 1：使用 if 进行 null 检查
+         */
+        public void safeMethod1() {
+            String homeDir = System.getProperty("user.home.custom");
+
+            Object object = new Object();
+            // 使用 if 检查 null (allocated -> checked 转换)
+            if (homeDir != null) {
+                int length = homeDir.length();
+                System.out.println("Home directory length: " + length);
+            } else {
+                System.out.println("Home directory not set");
+            }
+        }
+
+        /**
+         * 安全方法 2：重新赋值
+         */
+        public void safeMethod2() {
+            String homeDir = System.getProperty("user.home.custom");
+
+            // 重新赋值 (allocated -> set 转换)
+            homeDir = (homeDir != null) ? homeDir : "";
+
+            // 现在可以安全使用
+            int length = homeDir.length();
+            System.out.println("Home directory length: " + length);
+        }
+
+        /**
+         * 安全方法 3：使用 Apache Commons StringUtils
+         */
+        public void safeMethod3() {
+            String homeDir = System.getProperty("user.home.custom");
+
+            // 使用 StringUtils.isEmpty 检查 (allocated -> checked 转换)
+            if (!StringUtils.isEmpty(homeDir)) {
+                int length = homeDir.length();
+                System.out.println("Home directory length: " + length);
+            } else {
+                System.out.println("Home directory not set or empty");
+            }
+        }
+
+        /**
+         * 安全方法 4：使用带默认值的 getProperty 方法
+         */
+        public void safeMethod4() {
+            // 直接使用带默认值的方法，确保不会返回 null
+            String homeDir = System.getProperty("user.home.custom", "/default/home");
+
+            // 现在可以安全使用
+            int length = homeDir.length();
+            System.out.println("Home directory length: " + length);
+        }
+
+    }
+CODE
+}
+
+desc{
+    lang:java,
+    alert_num:1 ,
+    "file://demo1.java":<<<CODE
+   package com.example.controller;
+
+   @Slf4j
+   @Controller
+   @RequestMapping("/ueditor")
+   public class UEditorController {
+       @RequestMapping("")
+       public String ueditor() {
+           return "vul/xss/ueditor";
+       }
+
+       @RequestMapping("/config")
+       @ResponseBody
+       public void getConfigInfo(HttpServletRequest request, HttpServletResponse response) {
+           response.setContentType("application/json");
+
+           String rootPath = "";
+           if (isWindowsSystem()) {
+               rootPath = ClassUtils.getDefaultClassLoader().getResource("").getPath() + "static/ueditor/jsp";
+           } else {
+           }
+       }
+
+       /**
+        * 判断当前系统是否是Windows系统
+        *
+        * @return true：Windows系统，false：Linux系统
+        */
+       private boolean isWindowsSystem() {
+           String property = System.getProperty("os.name").toLowerCase();
+           return property.contains("windows");
+       }
+   }
+CODE
+}
