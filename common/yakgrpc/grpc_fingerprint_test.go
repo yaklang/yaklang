@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"github.com/google/uuid"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
@@ -245,4 +246,171 @@ func TestGRPC_FingerprintCURD_Group(t *testing.T) {
 		require.Equal(t, newName, newGroup.GroupName)
 	})
 
+}
+
+func createTestFingerprints(client ypb.YakClient, count int) ([]string, error) {
+	testFingerprintName := make([]string, 0)
+	for i := 0; i < count; i++ {
+		name := uuid.NewString()
+		testFingerprintName = append(testFingerprintName, name)
+		err := createFingerprint(client, name, uuid.NewString())
+		if err != nil {
+			return nil, err
+		}
+	}
+	return testFingerprintName, nil
+}
+
+func createTestFingerprintGroups(client ypb.YakClient, count int) ([]string, error) {
+	testFingerprintGroupName := make([]string, 0)
+	for i := 0; i < count; i++ {
+		testFingerprintGroupName = append(testFingerprintGroupName, uuid.NewString())
+	}
+	if err := createFingerprintGroups(client, testFingerprintGroupName); err != nil {
+		return nil, err
+	}
+	return testFingerprintGroupName, nil
+}
+
+func TestGRPC_FingerprintCURD_Associations(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	testName, err := createTestFingerprints(client, 10)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		deleteFingerprintByNames(client, testName)
+	})
+	testGroupName, err := createTestFingerprintGroups(client, 10)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		deleteFingerprintGroup(client, testGroupName)
+	})
+
+	// test Batch append FingerprintToGroup Associations
+	_, err = client.BatchUpdateFingerprintToGroup(ctx, &ypb.BatchUpdateFingerprintToGroupRequest{
+		Filter: &ypb.FingerprintFilter{
+			RuleName: testName,
+		},
+		AppendGroupName: testGroupName,
+	})
+
+	require.NoError(t, err)
+	fingerprints, err := queryFingerprintByName(client, testName)
+	require.NoError(t, err)
+	require.Len(t, fingerprints, 10)
+	for _, f := range fingerprints {
+		require.Len(t, f.GroupName, 10)
+	}
+
+	// test Batch delete FingerprintToGroup Associations
+	_, err = client.BatchUpdateFingerprintToGroup(ctx, &ypb.BatchUpdateFingerprintToGroupRequest{
+		Filter: &ypb.FingerprintFilter{
+			RuleName: testName,
+		},
+		DeleteGroupName: testGroupName,
+	})
+
+	require.NoError(t, err)
+	fingerprints, err = queryFingerprintByName(client, testName)
+	require.NoError(t, err)
+	require.Len(t, fingerprints, 10)
+	for _, f := range fingerprints {
+		require.Len(t, f.GroupName, 0)
+	}
+}
+
+func TestGRPC_FingerprintGroupSet(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// init test data
+	testName, err := createTestFingerprints(client, 2)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		deleteFingerprintByNames(client, testName)
+	})
+
+	testName1, testName2 := testName[0], testName[1]
+
+	testGroupName, err := createTestFingerprintGroups(client, 3)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		deleteFingerprintGroup(client, testGroupName)
+	})
+
+	// all fingerprint in testGroupAll , t1->g1 t2->g2
+	testGroupAll, testGroup1, testGroup2 := testGroupName[0], testGroupName[1], testGroupName[2]
+
+	_, err = client.BatchUpdateFingerprintToGroup(ctx, &ypb.BatchUpdateFingerprintToGroupRequest{
+		Filter: &ypb.FingerprintFilter{
+			RuleName: testName,
+		},
+		AppendGroupName: []string{testGroupAll},
+	})
+	require.NoError(t, err)
+
+	_, err = client.BatchUpdateFingerprintToGroup(ctx, &ypb.BatchUpdateFingerprintToGroupRequest{
+		Filter: &ypb.FingerprintFilter{
+			RuleName: []string{testName1},
+		},
+		AppendGroupName: []string{testGroup1},
+	})
+	require.NoError(t, err)
+
+	_, err = client.BatchUpdateFingerprintToGroup(ctx, &ypb.BatchUpdateFingerprintToGroupRequest{
+		Filter: &ypb.FingerprintFilter{
+			RuleName: []string{testName2},
+		},
+		AppendGroupName: []string{testGroup2},
+	})
+	require.NoError(t, err)
+
+	rules, err := queryFingerprintByName(client, testName)
+	if err != nil {
+		return
+	}
+
+	for _, rule := range rules {
+		require.Contains(t, rule.GroupName, testGroupAll)
+		require.Len(t, rule.GroupName, 2)
+		if rule.RuleName == testName1 {
+			require.Contains(t, rule.GroupName, testGroup1)
+		} else if rule.RuleName == testName2 {
+			require.Contains(t, rule.GroupName, testGroup2)
+		} else {
+			require.Fail(t, "unexpected rule name")
+		}
+	}
+
+	// test intersection
+	groupSet, err := client.GetFingerprintGroupSetByFilter(ctx, &ypb.GetFingerprintGroupSetRequest{
+		Filter: &ypb.FingerprintFilter{
+			RuleName: testName,
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, groupSet.Data, 1)
+	require.Equal(t, testGroupAll, groupSet.Data[0].GroupName)
+
+	// test union
+	groupSet, err = client.GetFingerprintGroupSetByFilter(ctx, &ypb.GetFingerprintGroupSetRequest{
+		Filter: &ypb.FingerprintFilter{
+			RuleName: testName,
+		},
+		Union: true,
+	})
+	require.NoError(t, err)
+	require.Len(t, groupSet.Data, 3)
+
+	groupNameSet := lo.Map(groupSet.Data, func(item *ypb.FingerprintGroup, _ int) string {
+		return item.GroupName
+	})
+	require.Contains(t, groupNameSet, testGroupAll)
+	require.Contains(t, groupNameSet, testGroup1)
+	require.Contains(t, groupNameSet, testGroup2)
 }
