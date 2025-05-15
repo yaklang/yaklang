@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type EventType string
@@ -161,10 +162,10 @@ func (r *Config) emitJson(typeName EventType, nodeId string, i any) {
 }
 
 func (r *Config) EmitStatus(key string, value any) {
-	r.EmitStructured("status", utils.Jsonify(map[string]any{
+	r.EmitStructured("status", map[string]any{
 		"key":   key,
 		"value": value,
-	}))
+	})
 }
 
 func (r *Config) EmitStructured(nodeId string, i any) {

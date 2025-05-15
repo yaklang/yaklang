@@ -9,38 +9,28 @@ import (
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
-type GuardianEmitter interface {
-
-}
-
-type guardianEmitter struct {
-
-}
-
-var _ GuardianEmitter = (*guardianEmitter)(nil)
-
-type GuardianEventTrigger func(event *Event, emitter func(*Event))
-type GuardianMirrorStreamTrigger func(unlimitedChan *chanx.UnlimitedChan[*Event], emitter func(*Event))
+type GuardianEventTrigger func(event *Event, emitter GuardianEmitter)
+type GuardianMirrorStreamTrigger func(unlimitedChan *chanx.UnlimitedChan[*Event], emitter GuardianEmitter)
 
 type asyncGuardian struct {
 	ctx                  context.Context
 	unlimitedInput       *chanx.UnlimitedChan[*Event]
 	callbackMutex        *sync.RWMutex
-	outputEmitter        func(*Event)
+	outputEmitter        GuardianEmitter
 	mirrorCallback       map[string]*mirrorEventStream
 	eventTriggerCallback map[EventType][]GuardianEventTrigger
 }
 
 type mirrorEventStream struct {
 	unlimitedChan *chanx.UnlimitedChan[*Event]
-	emitter       func(*Event)
+	emitter       GuardianEmitter
 	trigger       GuardianMirrorStreamTrigger
 }
 
-func newAysncGuardian(ctx context.Context) *asyncGuardian {
+func newAysncGuardian(ctx context.Context, coordinatorId string) *asyncGuardian {
 	g := &asyncGuardian{
 		ctx:                  ctx,
-		outputEmitter:        func(event *Event) {},
+		outputEmitter:        newGuardianEmitter(coordinatorId, func(event *Event) {}),
 		unlimitedInput:       chanx.NewUnlimitedChan[*Event](ctx, 1000),
 		callbackMutex:        new(sync.RWMutex),
 		eventTriggerCallback: make(map[EventType][]GuardianEventTrigger),
@@ -57,10 +47,10 @@ func newAysncGuardian(ctx context.Context) *asyncGuardian {
 	return g
 }
 
-func (a *asyncGuardian) setOutputEmitter(emitter func(*Event)) {
+func (a *asyncGuardian) setOutputEmitter(coordinatorId string, emitter func(*Event)) {
 	a.callbackMutex.Lock()
 	defer a.callbackMutex.Unlock()
-	a.outputEmitter = emitter
+	a.outputEmitter = newGuardianEmitter(coordinatorId, emitter)
 }
 
 func (a *asyncGuardian) feed(event *Event) {
