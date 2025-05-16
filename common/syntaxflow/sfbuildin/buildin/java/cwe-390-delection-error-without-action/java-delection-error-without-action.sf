@@ -27,15 +27,15 @@ TEXT,
 *?{opcode: try}.catch  as $catch 
 $catch.body?{!<scanInstruction()>} as $no_instruction_catch_body
 
-alert $no_instruction_catch for {
-    title: "空的Catch块导致错误处理不当",
+alert $no_instruction_catch_body for {
+    title_zh: "不应该编写空的Catch块",
 }
 
 $catch?{!.body & $no_instruction_catch_body} as $normal_catch 
 $normal_catch.exception as $exception 
 $exception?{!(<getUsers()>?{!opcode:catch})} as $unuse_exception 
 alert $unuse_exception for {
-    title: "在非空Catch块中没有对异常进行任何处理",
+    title_zh: "在非空Catch块中没有对异常进行任何处理",
 }
 
 desc (

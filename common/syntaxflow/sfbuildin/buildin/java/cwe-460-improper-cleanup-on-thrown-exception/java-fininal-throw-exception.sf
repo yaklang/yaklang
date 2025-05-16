@@ -80,6 +80,8 @@ TEXT,
 $try.finally as $finally 
 $finally<scanInstruction>?{opcode:throw} as $throw  
 
+alert $throw 
+
 desc (
     lang:java 
     alert_num:1 
@@ -99,10 +101,9 @@ CODE
 )
 
 desc(
-    lang:java 
-    alert_num:0 
-    "safefile://s.java":<<<CODE
-package com.a.c 
+	lang:java
+	alert_num:0
+	"safefile://s.java":<<<CODE
 package org.aa.com;
 public class AA{
 	public void onMessage2(ByteBuffer b) throws Exception {

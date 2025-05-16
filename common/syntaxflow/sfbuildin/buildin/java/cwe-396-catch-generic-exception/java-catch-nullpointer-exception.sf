@@ -36,6 +36,7 @@ TEXT,
 *?{opcode:catch}.exception as $exception 
 $exception?{<typeName()>?{have:/^NullPointerException$/}} as $null_pointer_exception
 
+alert $null_pointer_exception
 
 
 desc (

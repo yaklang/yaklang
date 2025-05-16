@@ -55,7 +55,7 @@ func TestVerify_DEBUG(t *testing.T) {
 	yakit.InitialDatabase()
 	err := sfbuildin.SyncEmbedRule()
 	require.NoError(t, err)
-	ruleName := "检测Java Hibernate 数据库Session资源未释放"
+	ruleName := "不当的错误处理：避免在 Finally 块中抛出异常"
 
 	rule, err := sfdb.GetRulePure(ruleName)
 	if err != nil {
