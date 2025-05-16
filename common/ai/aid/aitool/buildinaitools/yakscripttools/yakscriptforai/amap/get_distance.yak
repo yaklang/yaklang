@@ -6,16 +6,30 @@ ori = cli.String("origin",cli.setHelp("Starting point of the route planning"), c
 dst = cli.String("destination",cli.setHelp("Ending point of the route planning"), cli.setRequired(true))
 cli.check()
 
-result = amap.GetDistance(ori,dst)~
+result,err = amap.GetDistance(ori,dst)
+if err {
+    log.error("invoke GetDistance failed: %v" % err)
+    return
+}
 
 formatDistance = (meters) => {
+    if meters == ""{
+        return ""
+    }
+    meters = int(meters)
 	if meters >= 1000 {
 		return "%dkm" % (meters/1000)
 	}
 	return "%dm" % meters
 }
 formatDuration = (seconds) => {
-    du = time.ParseDuration(string(seconds)+"s")~
+    if seconds == ""{
+        return ""
+    }
+    du,err = time.ParseDuration(seconds+"s")
+    if err {
+        return ""
+    }
     return du.String()
 }
 dis = formatDistance(uint64(result.Distance))

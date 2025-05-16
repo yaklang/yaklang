@@ -4,7 +4,11 @@ __KEYWORDS__ = "天气查询,实时天气,天气信息,天气工具,地点天气
 
 location = cli.String("location", cli.setHelp("Location Name"),cli.setRequired(true))
 cli.check()
-res = amap.GetWeather(location)~
+res,err = amap.GetWeather(location)
+if err {
+    log.error("invoke GetWeather failed: %v" % err)
+    return
+}
 yakit.Info("Live weather info:")
 for item in res.Lives{
     yakit.Info(json.dumps(item))
