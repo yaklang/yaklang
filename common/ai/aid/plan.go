@@ -32,6 +32,45 @@ type PlanResponse struct {
 	RootTask *aiTask `json:"root_task"`
 }
 
+func (p *PlanResponse) recursiveMergeSubtask(subtask *aiTask, callback func(i *aiTask) error, stopped *utils.AtomicBool) {
+	if subtask == nil || (stopped != nil && stopped.IsSet()) {
+		return
+	}
+
+	err := callback(subtask)
+	if err != nil {
+		stopped.Set()
+		return
+	}
+	if subtask.Subtasks == nil || len(subtask.Subtasks) <= 0 {
+		return
+	}
+	for _, st := range subtask.Subtasks {
+		p.recursiveMergeSubtask(st, callback, stopped)
+	}
+}
+
+func (p *PlanResponse) MergeSubtask(parentIndex string, name string, goal string) {
+	if p.RootTask == nil {
+		return
+	}
+	p.RootTask.GenerateIndex()
+
+	p.recursiveMergeSubtask(p.RootTask, func(i *aiTask) error {
+		if i.Index != parentIndex {
+			return nil
+		}
+
+		i.Subtasks = append(i.Subtasks, &aiTask{
+			config:     p.RootTask.config,
+			Name:       name,
+			Goal:       goal,
+			ParentTask: i,
+		})
+		return utils.Error("normal exit")
+	}, utils.NewBool(false))
+}
+
 // GenerateFirstPlanPrompt 根据PlanRequest生成prompt
 func (pr *planRequest) GenerateFirstPlanPrompt() (string, error) {
 	tmpl, err := template.New("generateTaskList").Parse(__prompt_GenerateTaskListPrompt)

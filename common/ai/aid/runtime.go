@@ -25,7 +25,7 @@ func (c *Coordinator) createRuntime() *runtime {
 	}
 }
 
-func (t *aiTask) dumpProgress(i int, w io.Writer) {
+func (t *aiTask) dumpProgressEx(i int, w io.Writer, details bool) {
 	prefix := strings.Repeat(" ", i)
 
 	executing := false
@@ -69,12 +69,23 @@ func (t *aiTask) dumpProgress(i int, w io.Writer) {
 		}
 	}
 
-	_, _ = fmt.Fprintf(w, "%s -[%v] %s %v\n", prefix, fill, strconv.Quote(t.Name), note)
-	if len(t.Subtasks) > 0 {
-		for _, subtask := range t.Subtasks {
-			subtask.dumpProgress(i+1, w)
+	taskNameShow := strconv.Quote(t.Name)
+	if details {
+		taskNameShow = taskNameShow + "(" + strconv.Quote(t.Goal) + ")"
+		if t.Index != "" {
+			taskNameShow = t.Index + ". " + taskNameShow
 		}
 	}
+	_, _ = fmt.Fprintf(w, "%s -[%v] %s %v\n", prefix, fill, taskNameShow, note)
+	if len(t.Subtasks) > 0 {
+		for _, subtask := range t.Subtasks {
+			subtask.dumpProgressEx(i+1, w, details)
+		}
+	}
+}
+
+func (t *aiTask) dumpProgress(i int, w io.Writer) {
+	t.dumpProgressEx(i, w, false)
 }
 
 func (t *aiTask) Progress() string {
@@ -83,6 +94,15 @@ func (t *aiTask) Progress() string {
 	}
 	var buf bytes.Buffer
 	t.dumpProgress(0, &buf)
+	return buf.String()
+}
+
+func (t *aiTask) ProgressWithDetail() string {
+	if t == nil {
+		return ""
+	}
+	var buf bytes.Buffer
+	t.dumpProgressEx(0, &buf, true)
 	return buf.String()
 }
 

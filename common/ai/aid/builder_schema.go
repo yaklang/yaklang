@@ -22,6 +22,9 @@ var toolDescRequireSchema string
 //go:embed jsonschema/tool-execute-check.json
 var toolExecuteCheckSchema string
 
+//go:embed jsonschema/plan-review/create-subtask.json
+var planReviewCreateSubtasksSchema string
+
 func taskJSONSchema(toolNames []string) map[string]string {
 	var toolNamesStrs []string
 	for _, toolName := range toolNames {
@@ -38,5 +41,6 @@ func taskJSONSchema(toolNames []string) map[string]string {
 	res["TaskSummarySchema"] = taskSummarySchema
 	res["ToolDescRequireSchema"] = toolDescRequireSchemaBuilder.String()
 	res["ToolExecuteCheckSchema"] = toolExecuteCheckSchema
+	res["PlanCreateSubtaskSchema"] = planReviewCreateSubtasksSchema
 	return res
 }
