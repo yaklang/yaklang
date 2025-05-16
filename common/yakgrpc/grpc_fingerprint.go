@@ -221,17 +221,14 @@ func (s *Server) GetFingerprintGroupSetByFilter(ctx context.Context, req *ypb.Ge
 	groupMap := make(map[string]int)
 	lo.ForEach(rules, func(item *schema.GeneralRule, _ int) {
 		for _, group := range item.Groups {
-			if count, ok := groupMap[group.GroupName]; ok {
-				if count < 0 { // if count < 0, means this group already in groupSet
-					continue
-				} else if count == len(rules)-1 { // if count == len(rules) - 1, means this group is the last count, can set to groupset
-					groupSet = append(groupSet, group.ToGRPCModel())
-					groupMap[group.GroupName] = -1
-				} else { // if count < len(rules) - 1, means this group is not the last count
-					groupMap[group.GroupName] = count + 1
-				}
-			} else { // map not ok ,init
-				groupMap[group.GroupName] = 1
+			count := groupMap[group.GroupName]
+			if count < 0 { // if count < 0, means this group already in groupSet
+				continue
+			} else if count == len(rules)-1 { // if count == len(rules) - 1, means this group is the last count, can set to groupset
+				groupSet = append(groupSet, group.ToGRPCModel())
+				groupMap[group.GroupName] = -1
+			} else { // if count < len(rules) - 1, means this group is not the last count
+				groupMap[group.GroupName] = count + 1
 			}
 		}
 	})
