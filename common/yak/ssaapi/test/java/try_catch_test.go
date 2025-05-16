@@ -170,7 +170,7 @@ public class WebSocketsProxyEndpoint extends Endpoint {
 
 }
 
-func TestErrorHandler_Function_Exception(t *testing.T) {
+func TestErrorHandler_Function_Throw(t *testing.T) {
 	rule := `
 *?{opcode:function} as $function 
 $function.throws as $throws
@@ -225,6 +225,68 @@ public interface AA{
 
 		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
 			"throws": {`"Exception"`},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+}
+
+func TestErrorHandler_Throw(t *testing.T) {
+	t.Run("test throw", func(t *testing.T) {
+		code := `
+package org.aa.com;
+public class AA{
+	public void onMessage2(ByteBuffer b) throws Exception {
+		throw new Exception("test");
+	}
+}
+	`
+		rule := `
+*?{opcode:throw} as $throw
+`
+		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
+			"throw": {"panic(Exception(Undefined-Exception,\"test\"))"},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+
+	t.Run("test throw with source code", func(t *testing.T) {
+		code := `
+package org.aa.com;
+public class AA{
+	public void onMessage2(ByteBuffer b) throws Exception {
+		throw new Exception("test");
+	}
+}
+	`
+		rule := `
+*?{opcode:throw} as $throw
+`
+		ssatest.CheckSyntaxFlowSource(t, code, rule, map[string][]string{
+			"throw": {`throw new Exception("test");`},
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+
+	t.Run("test throw Block", func(t *testing.T) {
+		code := `
+package org.aa.com;
+public class AA{
+	public void onMessage2(ByteBuffer b) throws Exception {
+		throw new Exception("block");
+		try {
+			throw new Exception("try");
+		} catch (Exception e) {
+			throw new Exception("catch");
+		} finally {
+			throw new Exception("finally");
+		}
+	}
+}
+	`
+		rule := `
+*?{opcode:try} as $try
+$try.finally as $finally 
+$finally<scanInstruction>?{opcode:throw} as $throw 
+`
+		ssatest.CheckSyntaxFlowSource(t, code, rule, map[string][]string{
+			"throw": {`throw new Exception("finally");`},
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 }

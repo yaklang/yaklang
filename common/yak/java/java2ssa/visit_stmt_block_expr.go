@@ -1000,7 +1000,7 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) {
 		}
 	case *javaparser.ThrowStatementContext:
 		value := y.VisitExpression(ret.Expression())
-		y.EmitReturn([]ssa.Value{value})
+		y.EmitPanic(value)
 		// 处理 throw 语句
 	case *javaparser.BreakStatementContext:
 		// 处理 break 语句
