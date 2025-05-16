@@ -109,7 +109,7 @@ public class WebSocketsProxyEndpoint extends Endpoint {
 $catch.exception as $exception
 		`
 		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
-			"exception": {``},
+			"exception": {`Undefined-eeeeee`},
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 
