@@ -308,8 +308,8 @@
   {
     "rule_id": "8e009f30-c716-4c22-b4c4-9d394e88c824",
     "rule_name": "检测Java J2EE 使用threads",
-    "hash": "0f4c024953bb96b96a7a046467357df8b65307c48fcccb3763969b0890d9302f",
-    "version": "20250514.0001"
+    "hash": "03b58855bb1a749d82eede418678e3ce94d083f8d565be8026170d2becdc6cc8",
+    "version": "20250516.0001"
   },
   {
     "rule_id": "e1315696-3f1e-404c-9906-06c1db41a6b0",
@@ -752,14 +752,14 @@
   {
     "rule_id": "4dc8d2a1-6cca-4025-a219-7c52ac3a5fd7",
     "rule_name": "检测Java java.sql Statement查询结果集ResultSet资源未释放",
-    "hash": "ebb43efe1a967f3a048283564da5e35b4edfc700d3491c32a5cc85be0f940e0c",
-    "version": "20250516.0001"
+    "hash": "9c47b282f5d7921f395850e4435a509016ba3e22d1f82d26f4fb4d19a8a8c6eb",
+    "version": "20250516.0002"
   },
   {
     "rule_id": "195768f2-de1d-4e9f-9a72-7244efbc0abf",
     "rule_name": "检测Java java.sql 数据库Statement资源未释放",
-    "hash": "bb191184e79a6b6d411185e188414c2f9b38ab68c115e77dbe51b649f58f1881",
-    "version": "20250516.0001"
+    "hash": "52399d20d0ed4136e5dab9d5f4ac74194e0499c62f9076327bbb71e8a877da70",
+    "version": "20250516.0002"
   },
   {
     "rule_id": "8a2c763a-d909-4dd4-a44c-cad0f46b7041",
