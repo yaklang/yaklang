@@ -1681,10 +1681,19 @@ func (b *builder) VisitObjectLiteralExpression(objLiteral *ast.ObjectLiteralExpr
 		} else if ast.IsGetAccessorDeclaration(prop) || ast.IsSetAccessorDeclaration(prop) {
 			// 处理getter和setter
 			var accessorName string
-			accessorDecl := prop.AsGetAccessorDeclaration()
+			var propertyName *ast.PropertyName
 
-			if accessorDecl.Name() != nil {
-				propertyName := accessorDecl.Name()
+			// 根据实际类型选择正确的转换
+			if ast.IsGetAccessorDeclaration(prop) {
+				accessorDecl := prop.AsGetAccessorDeclaration()
+				propertyName = accessorDecl.Name()
+			} else { // 必定是SetAccessorDeclaration
+				accessorDecl := prop.AsSetAccessorDeclaration()
+				propertyName = accessorDecl.Name()
+			}
+
+			// 处理属性名
+			if propertyName != nil {
 				if idNode := propertyName.AsIdentifier(); idNode != nil {
 					accessorName = idNode.Text
 				} else {
