@@ -44,11 +44,11 @@ TEXT
 )
 
 // 只检测有一个参数的System.getProperty，有两个参数说明有默认值
-System.getProperty()?{<getActualParamLen()>?{==2}} as $getProperty;
-Integer.getInteger()?{<getActualParamLen()>?{==2}} as $getInteger;
-Long.getLong()?{<getActualParamLen()>?{==2}} as $getLong;
+System.getProperty?(*<len()>?{==2}) as $getProperty;
+Integer.getInteger?(*<len()>?{==2}) as $getInteger;
+Long.getLong?(*<len()>?{==2}) as $getLong;
 // 	setProperty(String key, String value) 用于设置系统属性，返回属性的先前值（如果存在）
-System.setProperty()?{<getActualParamLen()>?{==3}} as $setProperty;
+System.setProperty?(*<len()>?{==3}) as $setProperty;
 System.getSecurityManager() as $getSecurityManager;
 
 ServletRequest?{<typeName>?{any:"javax.servlet.http.ServletRequest","jakarta.servlet.ServletRequest"}}.get* as $allServletRequestGet;
