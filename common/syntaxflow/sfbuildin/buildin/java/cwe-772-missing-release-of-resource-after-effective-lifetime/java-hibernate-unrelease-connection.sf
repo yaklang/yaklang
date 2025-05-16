@@ -1,11 +1,11 @@
 desc(
-    title_zh:"检测Java Hibernate 数据库Connection资源未释放",
-    title:"Check Java Hibernate Connection Unreleased Resource",
-    risk:"资源泄漏",
-    reference:<<<URL
+	title_zh:"检测Java Hibernate 数据库Connection资源未释放",
+	title:"Check Java Hibernate Connection Unreleased Resource"
+	risk:"资源泄漏",
+	reference:<<<URL
     https://docs.atlassian.com/hibernate2/2.1.8/api/net/sf/hibernate/connection/ConnectionProvider.html
 URL
-    description:<<<TEXT
+	description:<<<TEXT
     ## 漏洞描述
 
     应用程序通过 Hibernate 的 `ConnectionProvider.getConnection()` 方法直接获取数据库连接后，未正确关闭这些连接资源。尽管 Hibernate 通常会管理自己的连接，但当直接使用 ConnectionProvider 接口获取连接时，应用程序需要负责关闭这些连接。
@@ -21,7 +21,7 @@ URL
     - 在高负载情况下，可能引发数据库服务拒绝服务
 
 TEXT
-    solution:<<<TEXT
+	solution:<<<TEXT
     ### 1. 使用 try-with-resources 自动关闭连接
 
     ```java
@@ -94,6 +94,7 @@ TEXT
     }
     ```
 TEXT
+	rule_id: "40fc9df0-6e95-4b7a-b9f6-202b0356fef4"
 )
 
 *?{opcode:function}?{<getReturns()><typeName()>?{have:"net.sf.hibernate.Connection"}} as $fun;
@@ -112,10 +113,10 @@ alert $weak for {
 }
 
 
-desc{
-    lang:java,
-    alert_num: 1,
-    "file://demo.java":<<<CODE
+desc(
+	lang:java
+	alert_num: 1
+	"file://demo.java":<<<CODE
     /**
      * Hibernate ConnectionProvider 资源管理示例
      * 演示直接使用ConnectionProvider获取数据库连接的正确和错误方式
@@ -306,4 +307,4 @@ desc{
         }
     }
 CODE
-}
+)

@@ -1,13 +1,13 @@
 desc(
-    title_zh:"检测Java Zip GetInputStream资源未释放",
-    title:"Check Java Zip GetInputStream Unreleased Resource",
-    risk:"资源泄漏",
-    level:high,
-    reference:<<<URL
+	title_zh:"检测Java Zip GetInputStream资源未释放",
+	title:"Check Java Zip GetInputStream Unreleased Resource"
+	risk:"资源泄漏",
+	level:high
+	reference:<<<URL
     https://docs.oracle.com/javase/8/docs/api/index.html?java/util/zip/package-summary.html
     https://commons.apache.org/proper/commons-compress/apidocs/org/apache/commons/compress/archivers/zip/ZipFile.html
 URL
-    description:<<<TEXT
+	description:<<<TEXT
     ## 漏洞描述
 
     应用程序通过 `ZipFile.getInputStream()` 方法获取 ZIP 文件条目的输入流后，未正确关闭这些 `InputStream` 资源。每次调用 `getInputStream()` 都会创建一个新的输入流，必须单独关闭，即使关闭了父级 `ZipFile` 对象也不足以完全释放相关资源。
@@ -22,7 +22,7 @@ URL
     - 在长时间运行的应用中更为严重，可能导致应用程序崩溃
     - 处理大量 ZIP 条目时可能迅速耗尽系统资源
 TEXT
-    solution:<<<TEXT
+	solution:<<<TEXT
 ## 修复建议
 
 ### 1. 使用 try-with-resources 自动关闭资源 (Java 7+，推荐)
@@ -101,6 +101,7 @@ try (ZipFile zipFile = new ZipFile(zipFilePath)) {
 }
 ```
 TEXT
+	rule_id: "8a2c763a-d909-4dd4-a44c-cad0f46b7041"
 )
 
 ZipFile?{<typeName()>?{any:"java.util.zip.ZipFile","org.apache.commons.compress.archivers.zip"}}.getInputStream() as $getInputStream
@@ -114,10 +115,10 @@ alert $weak for{
     message:"检测到ZipFile.getInputStream()未释放资源",
 }
 
-desc{
-    lang:java,
-    alert_num: 1,
-    "file://demo.java":<<<CODE
+desc(
+	lang:java
+	alert_num: 1
+	"file://demo.java":<<<CODE
     /**
      * ZipFile.getInputStream() 资源泄漏示例
      * 演示从ZIP文件中读取内容时的资源管理
@@ -310,4 +311,4 @@ desc{
         }
     }
 CODE
-}
+)
