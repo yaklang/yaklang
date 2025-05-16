@@ -1,11 +1,11 @@
 desc(
-  title: "Poor Error Handling: Avoid Throwing Exceptions Inside Finally Block",
-  title_zh: "不当的错误处理：避免在 Finally 块中抛出异常",
-  type: "Code Vulnerability",
-  severity: "Medium",
-  risk: "Moderate",
-  cwe: "CWE-460",
-  desc: <<<TEXT
+	title: "Poor Error Handling: Avoid Throwing Exceptions Inside Finally Block"
+	title_zh: "不当的错误处理：避免在 Finally 块中抛出异常",
+	type: "Code Vulnerability"
+	severity: "Medium"
+	risk: "Moderate"
+	cwe: "CWE-460"
+	desc: <<<TEXT
 在 Java 编程中，`finally` 块通常用于确保资源的释放（如文件句柄、数据库连接等），并在 `try-catch` 块之后执行。然而，在 `finally` 块中抛出异常会破坏程序的正常执行逻辑，可能导致关键的资源清理代码被绕过，从而引发资源泄漏或其他未预期的行为（对应 CWE-460: Improper Cleanup on Thrown Exception）。这种做法会干扰 `try-catch-finally` 结构的逻辑进度，降低代码的可靠性和可维护性。
 
 示例代码（不推荐的做法）：
@@ -36,8 +36,8 @@ public void processTransaction(Connection conn) throws FileNotFoundException {
 }
 ```
 在上述代码中，如果 `fis` 为 `null`，则在 `finally` 块中抛出 `FileNotFoundException`，这会导致对 `stmt.close()` 的调用被绕过，可能导致资源泄漏。
-TEXT,
-  solution: <<<TEXT
+TEXT
+	solution: <<<TEXT
 1. **避免在 Finally 块中抛出异常**：`finally` 块的主要目的是确保资源清理或执行必要的收尾工作，因此不应在其中抛出异常。抛出异常会导致程序执行流程中断，可能绕过关键的清理代码，引发资源泄漏或其他问题。
 2. **在 Catch 块中重新抛出异常**：如果需要抛出或重新抛出异常，应在 `catch` 块中完成，而不是在 `finally` 块中。这样可以确保 `finally` 块的清理逻辑正常执行。示例代码（推荐的做法）：
    ```java
@@ -73,7 +73,8 @@ TEXT,
    ```
 3. **使用静态代码分析工具**：配置静态代码分析工具以检测在 `finally` 块中抛出异常的情况，并强制执行异常处理的最佳实践。
 4. **代码审查**：在代码审查过程中，重点检查 `finally` 块的逻辑，确保其中不包含抛出异常的代码，并验证所有资源清理操作都能正常执行。
-TEXT,
+TEXT
+	rule_id: "eb8a8bf3-96d4-4d35-b953-3efa848c4aaa"
 )
 
 *?{opcode:try} as $try
@@ -82,10 +83,10 @@ $finally<scanInstruction>?{opcode:throw} as $throw
 
 alert $throw 
 
-desc (
-    lang:java 
-    alert_num:1 
-    "file://a.java":<<<CODE
+desc(
+	lang:java
+	alert_num:1
+	"file://a.java":<<<CODE
 package org.aa.com;
 public class AA{
 	public void onMessage2(ByteBuffer b) throws Exception {
