@@ -6,10 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
@@ -32,6 +33,7 @@ type TaskProgress struct {
 type aiTask struct {
 	config *Config
 
+	Index      string    `json:"index"`
 	Name       string    `json:"name"`
 	Goal       string    `json:"goal"`
 	ParentTask *aiTask   `json:"parent_task"`
@@ -136,8 +138,75 @@ func ExtractNextPlanTaskFromRawResponse(c *Config, rawResponse string) ([]*aiTas
 	return nil, errors.New("no aiTask found in next-plans")
 }
 
+// _genIdx 递归地为任务及其子任务生成索引。
+// currentStartIndex 是当前任务建议的起始索引。
+// parentAssignedIndex 是其父任务被分配的索引值。
+// 返回值是处理完此任务及其所有子任务后，下一个可用的起始索引。
+func _genIdx(currentStartIndex int, parentAssignedIndex int, i *aiTask) int {
+	if i == nil {
+		return currentStartIndex
+	}
+	idx := fmt.Sprintf("%d-%d", currentStartIndex, parentAssignedIndex)
+	i.Index = idx
+
+	// 当前任务的 assignedIndex 就是 currentStartIndex
+	assignedIndexForThisTask := currentStartIndex
+	// 下一个子任务应该从 currentStartIndex + 1 开始
+	nextSubTaskStartIndex := currentStartIndex + 1
+
+	for _, subNode := range i.Subtasks {
+		// 递归调用 _genIdx，它会返回其处理完后的下一个可用 startIndex
+		nextSubTaskStartIndex = _genIdx(nextSubTaskStartIndex, assignedIndexForThisTask, subNode)
+	}
+	// 返回处理完当前节点及其所有子节点后，下一个兄弟节点可用的 startIndex
+	return nextSubTaskStartIndex
+}
+
+func (a *aiTask) GenerateIndex() {
+	if a == nil {
+		return
+	}
+	if a.ParentTask != nil {
+		var root *aiTask = a.ParentTask
+		for i := 0; i < 1000; i++ {
+			if root.ParentTask == nil {
+				_genIdx(1, 0, root)
+				return
+			}
+			root = root.ParentTask
+		}
+		if root != nil && root.ParentTask != nil {
+			_genIdx(1, 0, root)
+		}
+	} else {
+		_genIdx(1, 0, a)
+	}
+}
+
 // ExtractTaskFromRawResponse 从原始响应中提取Task
-func ExtractTaskFromRawResponse(c *Config, rawResponse string) (*aiTask, error) {
+func ExtractTaskFromRawResponse(c *Config, rawResponse string) (retTask *aiTask, err error) {
+	defer func() {
+		if retTask == nil {
+			return
+		}
+		// Ensure config is propagated to the new task and its subtasks
+		var propagateConfig func(task *aiTask)
+		propagateConfig = func(task *aiTask) {
+			if task == nil {
+				return
+			}
+			task.config = c
+			if task.toolCallResultIds == nil {
+				task.toolCallResultIds = omap.NewOrderedMap(make(map[int64]*aitool.ToolResult))
+			}
+			for _, sub := range task.Subtasks {
+				sub.ParentTask = task // Ensure parent is set
+				propagateConfig(sub)
+			}
+		}
+		propagateConfig(retTask)
+		retTask.GenerateIndex()
+	}()
 	var extraReason bytes.Buffer
 	_ = extraReason
 	for _, item := range jsonextractor.ExtractObjectIndexes(rawResponse) {
@@ -156,10 +225,9 @@ func ExtractTaskFromRawResponse(c *Config, rawResponse string) (*aiTask, error) 
 			} `json:"tasks"`
 		}
 
-		err := json.Unmarshal([]byte(taskJSON), &planObj)
+		err = json.Unmarshal([]byte(taskJSON), &planObj)
 		if err != nil {
-			fmt.Println(taskJSON)
-			log.Errorf("parse plan json failed, json unmarshal err, maybe some syntax in json?: %v", err)
+			log.Debugf("Failed to parse taskJSON as planObj structure: %v. JSON: %s", err, taskJSON)
 		}
 		if err == nil && planObj.Action == "plan" && len(planObj.Tasks) > 0 {
 			// 创建主任务
@@ -206,19 +274,29 @@ func ExtractTaskFromRawResponse(c *Config, rawResponse string) (*aiTask, error) 
 				}
 			}
 
-			return mainTask, nil
+			retTask = mainTask
+			err = nil
+			return
 		}
 
 		// 尝试直接解析为单个 aiTask 对象
 		var simpleTask aiTask
 		err = json.Unmarshal([]byte(taskJSON), &simpleTask)
+		if err != nil {
+			log.Debugf("Failed to parse taskJSON as simpleTask: %v. JSON: %s", err, taskJSON)
+		}
 		if err == nil && simpleTask.Name != "" {
-			return &simpleTask, nil
+			retTask = &simpleTask
+			err = nil
+			return
 		}
 
 		// 尝试解析为一个简单的 map 并创建 aiTask
 		var taskMap map[string]interface{}
 		err = json.Unmarshal([]byte(taskJSON), &taskMap)
+		if err != nil {
+			log.Debugf("Failed to parse taskJSON as taskMap: %v. JSON: %s", err, taskJSON)
+		}
 		if err == nil {
 			if name, ok := taskMap["name"].(string); ok && name != "" {
 				taskIns := &aiTask{
@@ -251,11 +329,15 @@ func ExtractTaskFromRawResponse(c *Config, rawResponse string) (*aiTask, error) 
 						}
 					}
 				}
-				return taskIns, nil
+				retTask = taskIns
+				err = nil
+				return
 			}
 		}
 	}
-	return nil, errors.New("no aiTask found")
+	err = errors.New("no aiTask found in raw response")
+	retTask = nil
+	return
 }
 
 func (t *aiTask) SingleLineStatusSummary() string {
