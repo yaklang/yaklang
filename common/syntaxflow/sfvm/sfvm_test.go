@@ -29,7 +29,7 @@ func compileSyntaxFlow(text string) *SyntaxFlowVisitor {
 	return visitor
 }
 func TestName(t *testing.T) {
-	syntaxFlow := compileSyntaxFlow(`println(* #-> * as $param)`)
+	syntaxFlow := compileSyntaxFlow(`.setFeature?(,*?{==false}) as $excludeCall;`)
 	for _, code := range syntaxFlow.codes {
 		fmt.Println(Opcode2String[code.OpCode])
 	}
