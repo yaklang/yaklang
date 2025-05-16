@@ -232,14 +232,15 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 
 	t.Run("test query syntax rule by key word", func(t *testing.T) {
 		ruleName := uuid.NewString()
+		token := uuid.NewString()
 		createReq := &ypb.CreateSyntaxFlowRuleRequest{
 			SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
 				RuleName: ruleName,
-				Content: `desc(
-  title: '这是一个测试文件',
+				Content: fmt.Sprintf(`desc(
+  title: '%s',
   type: audit,
   level: warning,
-)`,
+)`, token),
 				Language: "java",
 			},
 		}
@@ -248,7 +249,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 
 		queryReq := &ypb.QuerySyntaxFlowRuleRequest{
 			Filter: &ypb.SyntaxFlowRuleFilter{
-				Keyword: "这是一个测试文件",
+				Keyword: token,
 			},
 		}
 
