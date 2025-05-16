@@ -294,6 +294,14 @@ func (b *FunctionBuilder) ClassConstructor(bluePrint *Blueprint, args []Value) V
 	b.EmitDefer(call)
 	return constructor
 }
+
+func (b *FunctionBuilder) ClassConstructorWithoutDeferDestructor(bluePrint *Blueprint, args []Value) Value {
+	method := bluePrint.GetMagicMethod(Constructor)
+	constructor := b.NewCall(method, args)
+	b.EmitCall(constructor)
+	return constructor
+}
+
 func (b *FunctionBuilder) GetStaticMember(classname *Blueprint, field string) *Variable {
 	return b.CreateVariable(fmt.Sprintf("%s_%s", classname.Name, strings.TrimPrefix(field, "$")))
 }
