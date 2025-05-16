@@ -92,6 +92,7 @@ func buildSSARisk(
 		Title:         rule.Title,
 		TitleVerbose:  rule.TitleZh,
 		Description:   rule.Description,
+		Solution:      rule.Solution,
 		RiskType:      rule.RiskType,
 		Severity:      rule.Severity,
 		CVE:           rule.CVE,
