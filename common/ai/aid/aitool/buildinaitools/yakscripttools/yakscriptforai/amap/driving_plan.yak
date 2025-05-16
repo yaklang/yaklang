@@ -7,10 +7,17 @@ dst = cli.String("destination",cli.setHelp("Ending point of the route planning")
 city = cli.String("city",cli.setHelp("City where the route is located"))
 cli.check()
 
-res = amap.GetDrivingPlan(ori,dst,amap.city(city))~
+res,err = amap.GetDrivingPlan(ori,dst,amap.city(city))
+if err {
+    log.error("invoke GetDrivingPlan failed: %v" % err)
+    return
+}
 route = res.Route
 
 formatDistance = (meters) => {
+    if meters == ""{
+        return ""
+    }
     meters = int(meters)
 	if meters >= 1000 {
 		return "%dkm" % (meters/1000)
@@ -18,10 +25,15 @@ formatDistance = (meters) => {
 	return "%dm" % meters
 }
 formatDuration = (seconds) => {
-    du = time.ParseDuration(seconds+"s")~
+    if seconds == ""{
+        return ""
+    }
+    du,err = time.ParseDuration(seconds+"s")
+    if err {
+        return ""
+    }
     return du.String()
 }
-
 log.Info("Found paths count: %d", len(route.Paths))
 
 for i, path := range route.Paths {
