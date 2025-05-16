@@ -672,6 +672,12 @@
     "version": "20250514.0001"
   },
   {
+    "rule_id": "44c752d4-9249-49af-8d0a-e6ad3d767e07",
+    "rule_name": "检测Java 未检测返回值是否为null导致空指针",
+    "hash": "c9f149baabfb0f28d4d96de0cce24429f6835a435309e2002616b356512df3c5",
+    "version": "20250516.0001"
+  },
+  {
     "rule_id": "b381b01b-98e3-44f4-b046-7712dcacbe72",
     "rule_name": "Checking [Filename Attachment when Filedownloading]",
     "hash": "d115446810af2907f5458725aa11b9e91d4f180e93a48951a89460cdd4379ec5",
@@ -712,6 +718,54 @@
     "rule_name": "Servlet \u0026 Springframework 基础参数命令注入",
     "hash": "aa62564fcced99e27e9a93a980ee0640d59063df80b7bbda728b2ed83fe44ef7",
     "version": "20250514.0001"
+  },
+  {
+    "rule_id": "40fc9df0-6e95-4b7a-b9f6-202b0356fef4",
+    "rule_name": "检测Java Hibernate 数据库Connection资源未释放",
+    "hash": "7843d9047a08354fc1b6a1cfc667a7494756c034943debfd7038457a7ffe81ea",
+    "version": "20250516.0001"
+  },
+  {
+    "rule_id": "b70c9711-31ed-4147-a982-35a6b5605078",
+    "rule_name": "检测Java Hibernate 数据库Session资源未释放",
+    "hash": "e90d95d484286167be9af8f83bf2c4290c5e37822c02fdcd516d565ba13cf743",
+    "version": "20250516.0001"
+  },
+  {
+    "rule_id": "1c9a0032-1723-49f1-a0c2-047069ec7a21",
+    "rule_name": "检测Java java.io 流资源未释放 ",
+    "hash": "939936417b5fce25b0a7789431915301b0dc120c06427d7507f188332373954b",
+    "version": "20250516.0001"
+  },
+  {
+    "rule_id": "4dd5053f-36a9-4f35-83a9-aeb40fc43094",
+    "rule_name": "检测Java Socket资源未释放 ",
+    "hash": "545c0bb1defe95cb5d229ba6f3758785af7503d3cb1ff8f46050bcb73596fd00",
+    "version": "20250516.0001"
+  },
+  {
+    "rule_id": "7691bedd-84dd-44bd-a403-d8c72e9d5378",
+    "rule_name": "检测Java java.sql 数据库Connection资源未释放",
+    "hash": "ac0f128dc8e63a72116ff63717e481aa63c918e27e19a8b2298427d8f1e5f082",
+    "version": "20250516.0001"
+  },
+  {
+    "rule_id": "4dc8d2a1-6cca-4025-a219-7c52ac3a5fd7",
+    "rule_name": "检测Java java.sql Statement查询结果集ResultSet资源未释放",
+    "hash": "ebb43efe1a967f3a048283564da5e35b4edfc700d3491c32a5cc85be0f940e0c",
+    "version": "20250516.0001"
+  },
+  {
+    "rule_id": "195768f2-de1d-4e9f-9a72-7244efbc0abf",
+    "rule_name": "检测Java java.sql 数据库Statement资源未释放",
+    "hash": "bb191184e79a6b6d411185e188414c2f9b38ab68c115e77dbe51b649f58f1881",
+    "version": "20250516.0001"
+  },
+  {
+    "rule_id": "8a2c763a-d909-4dd4-a44c-cad0f46b7041",
+    "rule_name": "检测Java Zip GetInputStream资源未释放",
+    "hash": "2fb0c1d611520ebdd838f7079235bc8ec3595c55a9cc3d35de9a69e99026e3b1",
+    "version": "20250516.0001"
   },
   {
     "rule_id": "00b097ac-f408-4a9b-b2e3-88b5c2a0fe3e",

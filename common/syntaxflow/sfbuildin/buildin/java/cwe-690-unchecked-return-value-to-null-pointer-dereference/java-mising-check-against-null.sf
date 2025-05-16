@@ -1,16 +1,16 @@
 desc(
-    title_zh:"检测Java 未检测返回值是否为null导致空指针",
-    title:"Check Java Uncheked Return Value to Null Pointer Dereference",
-    risk:"空指针",
-    level:low,
-    reference:<<<URL
+	title_zh:"检测Java 未检测返回值是否为null导致空指针",
+	title:"Check Java Uncheked Return Value to Null Pointer Dereference"
+	risk:"空指针",
+	level:low
+	reference:<<<URL
     https://docs.oracle.com/javase/8/docs/api/java/lang/System.html
     https://docs.oracle.com/javaee/7/api/javax/servlet/http/HttpServletRequest.html
 URL
-    description:<<<TEXT
+	description:<<<TEXT
     某些方法（如 System.getProperty(), request.getParameter(), Class.getResource()）可能返回null。直接使用这些返回值而不检查是否为null可能导致空指针异常（NullPointerException），造成程序崩溃或意外行为。这属于CWE-476（空指针解引用）安全问题。
 TEXT
-    solution:<<<TEXT
+	solution:<<<TEXT
     ## 修复建议
 
     1. 对可能返回`null`的方法结果务必进行检查：
@@ -41,6 +41,7 @@ TEXT
        });
        ```
 TEXT
+	rule_id: "44c752d4-9249-49af-8d0a-e6ad3d767e07"
 )
 
 // 只检测有一个参数的System.getProperty，有两个参数说明有默认值
@@ -130,10 +131,10 @@ alert $weak for {
     level:low,
 }
 
-desc{
-    lang:java,
-    alert_num:1 ,
-    "file://demo.java":<<<CODE
+desc(
+	lang:java
+	alert_num:1
+	"file://demo.java":<<<CODE
     import org.apache.commons.lang3.StringUtils;
     import java.util.Properties;
 
@@ -209,12 +210,12 @@ desc{
 
     }
 CODE
-}
+)
 
-desc{
-    lang:java,
-    alert_num:1 ,
-    "file://demo1.java":<<<CODE
+desc(
+	lang:java
+	alert_num:1
+	"file://demo1.java":<<<CODE
    package com.example.controller;
 
    @Slf4j
@@ -249,4 +250,4 @@ desc{
        }
    }
 CODE
-}
+)

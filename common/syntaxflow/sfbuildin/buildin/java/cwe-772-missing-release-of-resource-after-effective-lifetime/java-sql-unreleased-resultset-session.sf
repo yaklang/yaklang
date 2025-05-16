@@ -1,11 +1,11 @@
 desc(
-    title_zh:"检测Java java.sql Statement查询结果集ResultSet资源未释放",
-    title:"Check Java java.sql Statement ResultSet Unreleased Resource",
-    risk:"资源泄漏",
-    reference:<<<URL
+	title_zh:"检测Java java.sql Statement查询结果集ResultSet资源未释放",
+	title:"Check Java java.sql Statement ResultSet Unreleased Resource"
+	risk:"资源泄漏",
+	reference:<<<URL
     https://docs.oracle.com/javase/8/docs/api/java/sql/Statement.html
 URL
-    description:<<<TEXT
+	description:<<<TEXT
     ## 漏洞描述
 
     应用程序通过 `Statement.executeQuery()` 方法执行 SQL 查询，获取 ResultSet 对象后未正确关闭这些资源。ResultSet 对象持有数据库资源，如游标和结果集数据。即使关闭了父级 Statement 对象，最佳实践仍然要求显式关闭每个 ResultSet 对象，以确保及时释放资源。
@@ -18,7 +18,7 @@ URL
     - 在高并发环境中，游标泄漏可能迅速耗尽数据库资源
     - 可能导致应用程序性能下降和稳定性问题
 TEXT
-    solution:<<<TEXT
+	solution:<<<TEXT
     ### 1. 使用 try-with-resources 自动关闭 ResultSet (Java 7+)
 
     ```java
@@ -88,6 +88,7 @@ TEXT
     );
     ```
 TEXT
+	rule_id: "4dc8d2a1-6cca-4025-a219-7c52ac3a5fd7"
 )
 
 ./(executeQuery|getGeneratedKeys|getResultSet)/()?{<typeName()>?{have:"java.sql"}} as $stmt;
@@ -103,10 +104,10 @@ alert $weak for{
     message:"检测到java.sql.ResultSet未释放资源",
 }
 
-desc{
-    lang:java,
-    alert_num:1 ,
-    "file://demo.java":<<<CODE
+desc(
+	lang:java
+	alert_num:1
+	"file://demo.java":<<<CODE
     /**
      * JDBC ResultSet 资源管理示例
      * 演示 Statement.executeQuery() 返回的 ResultSet 正确和错误的资源管理方式
@@ -253,4 +254,4 @@ desc{
         }
     }
 CODE
-}
+)
