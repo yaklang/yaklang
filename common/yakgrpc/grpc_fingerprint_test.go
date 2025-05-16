@@ -386,9 +386,22 @@ func TestGRPC_FingerprintGroupSet(t *testing.T) {
 			require.Fail(t, "unexpected rule name")
 		}
 	}
+	// test one
+	groupSet, err := client.GetFingerprintGroupSetByFilter(ctx, &ypb.GetFingerprintGroupSetRequest{
+		Filter: &ypb.FingerprintFilter{
+			RuleName: []string{testName1},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, groupSet.Data, 2)
+	groupNameSet := lo.Map(groupSet.Data, func(item *ypb.FingerprintGroup, _ int) string {
+		return item.GroupName
+	})
+	require.Contains(t, groupNameSet, testGroupAll)
+	require.Contains(t, groupNameSet, testGroup1)
 
 	// test intersection
-	groupSet, err := client.GetFingerprintGroupSetByFilter(ctx, &ypb.GetFingerprintGroupSetRequest{
+	groupSet, err = client.GetFingerprintGroupSetByFilter(ctx, &ypb.GetFingerprintGroupSetRequest{
 		Filter: &ypb.FingerprintFilter{
 			RuleName: testName,
 		},
@@ -407,7 +420,7 @@ func TestGRPC_FingerprintGroupSet(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, groupSet.Data, 3)
 
-	groupNameSet := lo.Map(groupSet.Data, func(item *ypb.FingerprintGroup, _ int) string {
+	groupNameSet = lo.Map(groupSet.Data, func(item *ypb.FingerprintGroup, _ int) string {
 		return item.GroupName
 	})
 	require.Contains(t, groupNameSet, testGroupAll)
