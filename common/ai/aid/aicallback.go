@@ -88,8 +88,11 @@ func (c *Config) teeAIResponse(src *AIResponse, onFirstByte func(), onClose func
 	secondReasonReader, secondReasonWriter := utils.NewBufPipe(nil)
 	secondOutputReader, secondOutputWriter := utils.NewBufPipe(nil)
 
+	copyWg := new(sync.WaitGroup)
+	copyWg.Add(3)
 	// 获取原始响应的流读取器
 	reasonReader, outputReader := src.GetUnboundStreamReaderEx(onFirstByte, func() {
+		defer copyWg.Done()
 		if onClose != nil {
 			onClose(second)
 		}
@@ -126,10 +129,8 @@ func (c *Config) teeAIResponse(src *AIResponse, onFirstByte func(), onClose func
 		secondOutputWriter.Close()
 	}()
 
-	wg2 := new(sync.WaitGroup)
-	wg2.Add(2)
 	go func() {
-		defer wg2.Done()
+		defer copyWg.Done()
 		first.EmitOutputStreamWithoutConsumption(firstReasonReader)
 		first.EmitOutputStreamWithoutConsumption(firstOutputReader)
 		first.Close()
@@ -137,12 +138,12 @@ func (c *Config) teeAIResponse(src *AIResponse, onFirstByte func(), onClose func
 
 	// 将流发送到第二个响应
 	go func() {
-		defer wg2.Done()
+		defer copyWg.Done()
 		second.EmitOutputStreamWithoutConsumption(secondReasonReader)
 		second.EmitOutputStreamWithoutConsumption(secondOutputReader)
 		second.Close()
 	}()
-	wg2.Wait()
+	copyWg.Wait()
 	return first
 }
 
