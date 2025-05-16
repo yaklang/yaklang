@@ -989,6 +989,12 @@ func TestGRPCMUSTPASS_MITMV2_Replacer_replace_content_ManalHijack(t *testing.T) 
 	require.True(t, tokenCheck)
 }
 
+func TestAccccc(t *testing.T) {
+	for i := 0; i < 20; i++ {
+		TestGRPCMUSTPASS_MITMV2_Replacer_drop_ManalHijack(t)
+	}
+}
+
 func TestGRPCMUSTPASS_MITMV2_Replacer_drop_ManalHijack(t *testing.T) {
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(30))
 	defer cancel()
@@ -1044,6 +1050,7 @@ func TestGRPCMUSTPASS_MITMV2_Replacer_drop_ManalHijack(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
+				time.Sleep(1 * time.Second) //avoid conditional competition
 				cancel()
 			}()
 		}
