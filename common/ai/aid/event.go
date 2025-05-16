@@ -201,7 +201,7 @@ func (r *Config) EmitRequireReviewForTask(task *aiTask, id string) {
 func (r *Config) EmitRequireReviewForPlan(rsp *PlanResponse, id string) {
 	reqs := map[string]any{
 		"id":        id,
-		"selectors": PlanReviewSuggestions,
+		"selectors": r.getPlanReviewSuggestion(),
 		"plans":     rsp,
 	}
 	if ep, ok := r.epm.loadEndpoint(id); ok {

@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["@action", "subtask"],
+  "properties": {
+    "@action": {
+      "const": "plan-create-subtask"
+    },
+    "subtask": {
+      "type": "array",
+      "description": "把用户需要拆分的任务拆分后的结果",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["parent_index", "name", "goal"],
+        "properties": {
+          "parent_index": {
+            "type": "string",
+            "description": "当前正在拆分的任务的索引，使用x-y格式的任务层级索引，其中x表示主任务序号，y表示子任务序号（如1-1表示第一个主任务的第一个子任务）"
+          },
+          "name": {
+            "type": "string",
+            "description": "拆分后的子任务名"
+          },
+          "goal": {
+            "type": "string",
+            "description": "拆分后的子任务目标，描述目的是什么和大致规划"
+          }
+        }
+      }
+    }
+  }
+}
