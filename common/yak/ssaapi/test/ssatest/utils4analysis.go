@@ -724,9 +724,11 @@ func EvaluateVerifyFilesystem(i string, t require.TestingT) error {
 		CheckWithFS(f.GetVirtualFs(), t, func(programs ssaapi.Programs) error {
 			result, err := programs.SyntaxFlowWithError(i, ssaapi.QueryWithEnableDebug(false), ssaapi.QueryWithInitInputVar(programs[0]))
 			if err != nil {
+				log.Errorf("syntax flow content failed: %v", err)
 				errs = utils.JoinErrors(errs, err)
 				return err
 			}
+			result.Show()
 			if err := checkResult(f, frame.GetRule(), result); err != nil {
 				errs = utils.JoinErrors(errs, err)
 			}
@@ -744,10 +746,12 @@ func EvaluateVerifyFilesystem(i string, t require.TestingT) error {
 				result, err := programs.SyntaxFlowWithError(i, ssaapi.QueryWithEnableDebug(false), ssaapi.QueryWithInitInputVar(programs[0]))
 				if err != nil {
 					if errors.Is(err, sfvm.CriticalError) {
+						log.Errorf("syntax flow content failed: %v", err)
 						errs = utils.JoinErrors(errs, err)
 						return err
 					}
 				}
+				result.Show()
 				if result != nil {
 					if len(result.GetErrors()) > 0 {
 						return nil
