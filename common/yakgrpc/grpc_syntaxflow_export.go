@@ -1,10 +1,6 @@
 package yakgrpc
 
 import (
-	"errors"
-	"fmt"
-
-	"github.com/mattn/go-sqlite3"
 	"github.com/samber/lo"
 	"github.com/tidwall/sjson"
 	"github.com/yaklang/yaklang/common/consts"
@@ -19,7 +15,7 @@ import (
 func (s *Server) ExportSyntaxFlows(req *ypb.ExportSyntaxFlowsRequest, stream ypb.Yak_ExportSyntaxFlowsServer) error {
 	db := consts.GetGormProfileDatabase()
 	ruleDB := yakit.FilterSyntaxFlowRule(db, req.GetFilter())
-	ruleGroupDB := ruleDB.Select(`"syntax_flow_rules".id, "syntax_flow_rules".rule_name`).Preload("Groups")
+	ruleGroupDB := ruleDB.Select(`"syntax_flow_rules".id, "syntax_flow_rules".rule_id`).Preload("Groups")
 	var rules []*schema.SyntaxFlowRule
 	if ruleDB := ruleGroupDB.Find(&rules); ruleDB.Error != nil {
 		return utils.Wrap(ruleDB.Error, "get syntax flow group failed")
@@ -32,7 +28,7 @@ func (s *Server) ExportSyntaxFlows(req *ypb.ExportSyntaxFlowsRequest, stream ypb
 		})
 		totalGroupNames = append(totalGroupNames, groupNames...)
 		return map[string]any{
-			"rule_name":   item.RuleName,
+			"rule_id":     item.RuleId,
 			"group_names": groupNames,
 		}
 	})
@@ -111,21 +107,11 @@ func (s *Server) ImportSyntaxFlows(req *ypb.ImportSyntaxFlowsRequest, stream ypb
 			Progress: progress,
 		})
 	}))
-
-	opts = append(opts, bizhelper.WithImportErrorHandler(func(err error) (newErr error) {
-		var sqlErr sqlite3.Error
-		if errors.As(err, &sqlErr) && sqlErr.Code == sqlite3.ErrConstraint {
-			// ignore duplicate error, just send message
-			err = nil
-			stream.Send(&ypb.SyntaxflowsProgress{
-				Verbose: fmt.Sprintf("duplicate rule, skip: %s", sqlErr.Error()),
-			})
-		}
-		return err
-	}))
+	opts = append(opts, bizhelper.WithImportUniqueIndexField(`RuleId`))
+	opts = append(opts, bizhelper.WithImportAllowOverwrite(true))
 
 	ruleDB := db.Model(&schema.SyntaxFlowRule{})
-	err := bizhelper.ImportTableZip[*schema.SyntaxFlowRule](stream.Context(), ruleDB, req.GetInputPath(), opts...)
+	err := bizhelper.ImportTableZip[schema.SyntaxFlowRule](stream.Context(), ruleDB, req.GetInputPath(), opts...)
 	if err != nil {
 		return err
 	}
@@ -144,9 +130,9 @@ func (s *Server) ImportSyntaxFlows(req *ypb.ImportSyntaxFlowsRequest, stream ypb
 		if !ok {
 			return utils.Error("metadata: invalid metadata item")
 		}
-		ruleName, ok := item["rule_name"].(string)
+		ruleId, ok := item["rule_id"].(string)
 		if !ok {
-			return utils.Error("metadata: rule_name invalid")
+			return utils.Error("metadata: rule_id invalid")
 		}
 		iGroupNames, ok := item["group_names"].([]any)
 		if !ok {
@@ -155,7 +141,7 @@ func (s *Server) ImportSyntaxFlows(req *ypb.ImportSyntaxFlowsRequest, stream ypb
 		if len(iGroupNames) > 0 {
 			groupNames := lo.Map(iGroupNames, func(item any, index int) string { return utils.InterfaceToString(item) })
 
-			_, err := sfdb.BatchAddGroupsForRules(db, []string{ruleName}, groupNames)
+			_, err := sfdb.BatchAddGroupsForRulesByRuleId(db, []string{ruleId}, groupNames)
 			if err != nil {
 				return utils.Wrap(err, "batch add groups for rules failed")
 			}
