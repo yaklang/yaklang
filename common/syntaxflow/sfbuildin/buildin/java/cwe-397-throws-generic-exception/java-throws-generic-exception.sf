@@ -1,11 +1,11 @@
 desc(
-  title: "Poor Error Handling: Avoid Overly Broad Throws Declaration",
-  title_zh: "不当的错误处理：避免声明过于笼统的异常抛出",
-  type: "Code Vulnerability",
-  severity: "low",
-  risk:  "error-handling",
-  cwe: "CWE-397",
-  desc: <<<TEXT
+	title: "Poor Error Handling: Avoid Overly Broad Throws Declaration"
+	title_zh: "不当的错误处理：避免声明过于笼统的异常抛出",
+	type: "Code Vulnerability"
+	severity: "low"
+	risk:  "error-handling"
+	cwe: "CWE-397"
+	desc: <<<TEXT
 在软件开发中，异常处理是确保代码可靠性和安全性的重要机制。Java 的异常机制设计目的是让调用者能够方便地预见可能发生的错误，并为每种异常情况编写针对性的处理代码。然而，声明一个方法抛出过于笼统的异常（如 `Exception` 或 `Throwable`）会使调用者难以理解、处理和修复发生的错误（对应 CWE-397: Declaration of Throws for Generic Exception）。这种做法违背了 Java 异常分类系统的设计初衷，降低了代码的可维护性和可靠性。
 
 示例代码（不推荐的做法）：
@@ -23,8 +23,8 @@ public void doExchange() throws IOException, InvocationTargetException, SQLExcep
 }
 ```
 通过声明具体的异常类型，调用者可以更清晰地了解可能发生的错误，并编写相应的处理逻辑。
-TEXT,
-  solution: <<<TEXT
+TEXT
+	solution: <<<TEXT
 1. **避免声明过于笼统的异常**：不要在方法签名中声明抛出 `Exception` 或 `Throwable` 等过于笼统的异常类型。应明确声明方法可能抛出的具体异常类型（如 `IOException`、`SQLException` 等），以便调用者能够针对性地处理异常。
 2. **使用未检查异常（Unchecked Exception）**：如果方法抛出的异常无法恢复，或者通常不期望被调用者捕获，可以考虑抛出未检查的异常（如继承自 `RuntimeException` 或 `Error` 的自定义异常类），而不是已检查的异常（Checked Exception）。
 3. **转换异常类型**：如果方法内部调用了可能抛出已检查异常的代码，但不希望将这些异常直接抛给调用者，可以在方法中使用 `try/catch` 块将已检查异常转换为未检查异常。例如：
@@ -39,7 +39,8 @@ TEXT,
    ```
 4. **使用静态代码分析工具**：配置静态代码分析工具以检测方法签名中声明的过于笼统的异常，并强制执行异常声明的最佳实践。
 5. **代码审查**：在代码审查过程中，重点检查方法签名中的异常声明，确保没有声明过于笼统的异常类型，并验证所有抛出的异常类型都具有明确的业务含义和处理逻辑。
-TEXT,
+TEXT
+	rule_id: "8b5be577-f8ad-45a4-ab1f-5f50188fa33b"
 )
 
 *?{opcode:function}.throws as $throws 
@@ -47,10 +48,10 @@ $throws?{have:/^(Exception|Throwable)$/} as $generic_throws
 
 alert $generic_throws 
 
-desc (
-    lang:java 
-    alert_num:1 
-    "file://a.java":<<<CODE
+desc(
+	lang:java
+	alert_num:1
+	"file://a.java":<<<CODE
 package org.joychou;
 public class Application {
     public static void Apppp(String[] args) throws Exception {
@@ -60,9 +61,9 @@ CODE
 )
 
 desc(
-    lang:java 
-    alert_num:0 
-    "safefile://s.java":<<<CODE
+	lang:java
+	alert_num:0
+	"safefile://s.java":<<<CODE
 package com.a.c 
 class A {
     @Override
