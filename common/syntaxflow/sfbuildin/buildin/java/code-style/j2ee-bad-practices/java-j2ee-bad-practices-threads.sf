@@ -14,6 +14,7 @@ TEXT
 )
 
 Thread()?{<typeName>?{have:'java.lang.Thread'}} as $thread;
+Thread?{<typeName>?{have:'java.lang.Thread'}}.currentThread() as $thread;
 alert $thread for {
     message: '检测到Java项目中使用了Thread类',
     level: info,
