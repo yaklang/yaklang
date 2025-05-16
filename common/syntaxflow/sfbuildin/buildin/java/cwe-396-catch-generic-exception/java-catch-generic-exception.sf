@@ -42,7 +42,9 @@ TEXT,
 )
 
 *?{opcode:catch}.exception as $exception
-$exception?{<typeName()>?{have:/^Exception$/}} as $generic_exception
+$exception?{<typeName()>?{have:/^(Exception|Throwable|Error|RuntimeException)$/}} as $generic_exception
+
+alert $generic_exception
 
 desc (
     lang:java 

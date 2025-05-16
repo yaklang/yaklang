@@ -45,7 +45,7 @@ TEXT,
 *?{opcode:function}.throws as $throws 
 $throws?{have:/^(Exception|Throwable)$/} as $generic_throws 
 
-alert $generic_exception 
+alert $generic_throws 
 
 desc (
     lang:java 

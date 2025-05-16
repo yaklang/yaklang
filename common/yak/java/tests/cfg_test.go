@@ -547,7 +547,7 @@ func TestJavaBasic_Variable_Try(t *testing.T) {
 		}
 		println(e);
 		`, []string{
-			"Parameter-e", "Undefined-e",
+			"Undefined-e", "Undefined-e",
 		}, t)
 	})
 
@@ -562,7 +562,7 @@ func TestJavaBasic_Variable_Try(t *testing.T) {
 		}
 		println(e);
 		`, []string{
-			"Parameter-e",
+			"Undefined-e",
 			"Undefined-e",
 			"Undefined-e",
 		}, t)
