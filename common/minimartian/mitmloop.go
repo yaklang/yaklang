@@ -225,13 +225,13 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 	}
 }
 
-var cachedTLSConfig *tls.Config
+var cachedTLSConfig *gmtls.Config
 
-func (p *Proxy) defaultTLSConfig() *tls.Config {
+func (p *Proxy) defaultTLSConfig() *gmtls.Config {
 	if cachedTLSConfig != nil {
-		cachedTLSConfig = &tls.Config{
+		cachedTLSConfig = &gmtls.Config{
 			InsecureSkipVerify: true,
-			GetCertificate: func(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			GetCertificate: func(info *gmtls.ClientHelloInfo) (*gmtls.Certificate, error) {
 				var hostname string
 				if info.ServerName != "" {
 					hostname = info.ServerName
@@ -320,7 +320,7 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, ctx *Context) {
 				p.h2Cache.Store(cacheKey, serverUseH2)
 			}
 		}
-		conn = tls.Server(conn, p.mitm.TLSForHost("127.0.0.1", p.http2 && serverUseH2))
+		conn = gmtls.Server(conn, p.mitm.TLSForHost("127.0.0.1", p.http2 && serverUseH2))
 		if tlsConn, ok := conn.(*tls.Conn); ok && tlsConn != nil {
 			err := tlsConn.HandshakeContext(utils.TimeoutContextSeconds(5))
 			if err != nil {
@@ -495,7 +495,7 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 		// fallback: 最普通的情况，没有任何 http2 支持
 		// do as ordinary https server and use *tls.Conn
 		tlsConfig := p.mitm.TLSForHost(req.Host, p.http2 && serverUseH2)
-		tlsconn := tls.Server(&peekedConn{
+		tlsconn := gmtls.Server(&peekedConn{
 			Conn: conn,
 			r:    io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn),
 		}, tlsConfig)
