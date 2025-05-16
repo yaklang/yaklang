@@ -3,43 +3,65 @@ package sfvm
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"strconv"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/log"
 )
 
-type OpCodes []*SFI
+type OpCodes struct {
+	Version string `json:"version"`
+	Opcode  []*SFI `json:"opcode"`
+}
 
-func ToOpCodes(code string) OpCodes {
-	var opcodes OpCodes
+func ToOpCodes(code string) (*OpCodes, bool) {
+	var opcodes *OpCodes
 	if err := json.Unmarshal([]byte(code), &opcodes); err != nil {
 		log.Errorf("to opcode fail: %s", err)
-		return OpCodes{}
+		return nil, false
 	}
+	// check version
+	if opcodes.Version != "dev" && opcodes.Version != consts.GetYakVersion() {
+		return nil, false
+	}
+
 	existHash := make(map[string]*IterIndex)
-	for _, opcode := range opcodes {
+	for _, opcode := range opcodes.Opcode {
 		switch opcode.OpCode {
 		case OpCreateIter:
-			hash := opcode.Iter.CalcHash()
+			iter := opcode.Iter
+			if iter == nil {
+				return nil, false
+			}
+			hash := iter.CalcHash()
 			if _, exist := existHash[hash]; exist {
 				log.Errorf("duplicate iter hash: %s", hash)
-				return OpCodes{}
+				return nil, false
 			}
-			existHash[hash] = opcode.Iter
+			existHash[hash] = iter
 		case OpIterNext, OpIterEnd, OpIterLatch, OpCheckEmpty:
+			if opcode.Iter == nil {
+				return nil, false
+			}
 			calcHash := opcode.Iter.CalcHash()
 			index, ok := existHash[calcHash]
 			if !ok {
 				log.Errorf("iter not exist: %s", calcHash)
-				return OpCodes{}
+				return nil, false
 			}
 			opcode.Iter = index
 		}
 	}
-	return opcodes
+	return opcodes, true
 }
-func (p OpCodes) ToString() string {
+func (y *SyntaxFlowVisitor) ToString() string {
+	p := &OpCodes{
+		Version: consts.GetYakVersion(),
+		Opcode:  y.codes,
+	}
+
 	var result string
 	if jsonBytes, err := json.Marshal(p); err == nil {
 		result = string(jsonBytes)

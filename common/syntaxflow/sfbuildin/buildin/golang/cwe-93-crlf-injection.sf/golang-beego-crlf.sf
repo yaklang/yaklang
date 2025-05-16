@@ -1,0 +1,47 @@
+desc(
+    title: "golang CRLF(beego)",
+	title_zh: "golang CRLF注入漏洞(beego)",
+    type: vuln,
+    severity: high,
+	risk: crlf,
+    desc: <<<TEXT
+CRLF注入漏洞（Carriage Return Line Feed Injection）是一种利用特殊控制字符（\r\n）篡改HTTP协议数据流的攻击方式。攻击者通过注入这些字符，可以破坏协议结构，导致HTTP响应拆分、头部伪造等严重后果
+TEXT
+)
+
+.GetString(* as $sink)
+$sink -{ 
+	include:`*?{opcode:const}?{have: "header"}`,
+}-> as $data;
+
+$data?{have:".Ctx.ResponseWriter.Header"} as $high
+
+alert $high for {
+    title: 'CRLF Injection detected',
+    title_zh: '检测到CRLF注入',
+    type: 'vuln',
+    level: 'high',
+}
+
+desc(
+    lang: golang,
+    alert_high: 1,
+    'file://main.go': <<<UNSAFE
+package main
+
+import (
+	beego "github.com/beego/beego/v2/server/web"
+)
+
+type CRLFSafe1Controller struct {
+	beego.Controller
+}
+
+func (c *CRLFSafe1Controller) Get() {
+	header := c.GetString("header")
+	c.Ctx.ResponseWriter.Header().Set("header", header)
+	c.Ctx.ResponseWriter.Write([]byte(""))
+}
+	
+UNSAFE
+)

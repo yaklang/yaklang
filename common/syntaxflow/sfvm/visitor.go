@@ -2,10 +2,11 @@ package sfvm
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -15,7 +16,7 @@ import (
 type SyntaxFlowVisitor struct {
 	rule         *schema.SyntaxFlowRule
 	verifyFsInfo []*VerifyFsInfo
-	codes        OpCodes
+	codes        []*SFI
 }
 
 type VerifyFsInfo struct {

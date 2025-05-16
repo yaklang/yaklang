@@ -5,6 +5,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
@@ -26,4 +29,19 @@ func TestError(t *testing.T) {
 			_ = res
 		})
 	}
+}
+
+func TestLoadSyntaxflowRule(t *testing.T) {
+	rule := &schema.SyntaxFlowRule{
+		Title:   "a",
+		Content: `a() as $call_a`,
+		OpCodes: `aaaaaaaaa`, // error opcode
+	}
+
+	vm := sfvm.NewSyntaxFlowVirtualMachine()
+	frame, resave, err := vm.Load(rule)
+	log.Infof("resave: %v", resave)
+	require.NoError(t, err)
+	require.NotNil(t, frame)
+	require.True(t, resave)
 }

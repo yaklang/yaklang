@@ -2,11 +2,12 @@ package sfvm
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
-	"testing"
 )
 
 func compileSyntaxFlow(text string) *SyntaxFlowVisitor {
