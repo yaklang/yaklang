@@ -1,6 +1,7 @@
 desc(
 	title_zh:"检测Java java.sql 数据库Statement资源未释放",
-	title:"Check Java java.sql Statement Unreleased Resource"
+	title:"Check Java java.sql Statement Unreleased Resource",
+	level:high,
 	risk:"资源泄漏",
 	reference:<<<URL
     https://docs.oracle.com/javase/8/docs/api/java/sql/Connection.html

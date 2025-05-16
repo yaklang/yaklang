@@ -1,6 +1,6 @@
 desc(
 	title_zh:"检测Java J2EE 使用getConnection",
-	title:"Check Java J2EE Usage of getConnection"
+	title:"Check Java J2EE Usage of getConnection",
 	risk:"代码风格",
 	level: info
 	reference:<<<URL
