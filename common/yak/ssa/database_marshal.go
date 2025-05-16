@@ -482,6 +482,8 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 	case *Next:
 		ret.InNext = toBool(params["next_in_next"])
 		ret.Iter = unmarshalValue(params["next_iter"])
+	case *Panic:
+		ret.Info = unmarshalValue(params["panic_value"])
 	case *Parameter:
 		ret.IsFreeValue = params["formalParam_is_freevalue"].(bool)
 		if defaultValue, ok := params["formalParam_default"]; ok {

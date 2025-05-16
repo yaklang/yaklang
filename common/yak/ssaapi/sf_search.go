@@ -24,6 +24,9 @@ func SearchWithCFG(value *Value, mod int, compare func(string) bool, opt ...sfvm
 
 	add := func(vvs ...ssa.Value) {
 		for _, vv := range vvs {
+			if utils.IsNil(vv) {
+				continue
+			}
 			v := value.NewValue(vv)
 			v.AppendPredecessor(value, opt...)
 			newValue = append(newValue, v)
