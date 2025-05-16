@@ -885,3 +885,34 @@ class ChildClass extends ParentClass {
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 }
+
+func TestXXECompareConst(t *testing.T) {
+	code := `import org.xml.sax.SAXException;
+import org.xml.sax.XMLReader;
+import org.xml.sax.helpers.XMLReaderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+import org.xml.sax.helpers.DefaultHandler;
+
+
+public class XMLReaderFactorySafe {
+    public void parseXml(String xml) {
+        try {
+            XMLReader reader = XMLReaderFactory.createXMLReader();
+            reader.setFeature("http://apache.org/xml/features/demo-xxx", true);
+            reader.setContentHandler(new DefaultHandler());
+            reader.parse(xml);
+        } catch (SAXException | ParserConfigurationException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}`
+	ssatest.CheckSyntaxFlow(t, code, `
+XMLReaderFactory?{<typeName>?{have:'org.xml.sax.helpers.XMLReaderFactory'}} as $factory;
+$factory.createXMLReader() as $reader;
+$reader.setFeature?(,*?{=="http://xml.org/sax/features/external-general-entities"},*?{==false}) as $excludeCall;
+`, map[string][]string{}, ssaapi.WithLanguage(consts.JAVA))
+}

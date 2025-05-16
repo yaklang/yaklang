@@ -686,12 +686,13 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Wrap(CriticalError, "check empty failed: stack top is empty")
 		}
 		index := i.Iter.currentIndex
-		conditions := s.conditionStack.Pop()
+		conditions := s.conditionStack.Peek()
 		//如果是null
+		val := s.stack.Pop()
 		if len(conditions) == index+1 && !conditions[index] {
 			return nil
 		}
-		val := s.stack.Pop()
+		conditions = s.conditionStack.Pop()
 		if len(conditions) < index+1 {
 			return utils.Errorf("check empty failed: stack top is empty")
 		}
