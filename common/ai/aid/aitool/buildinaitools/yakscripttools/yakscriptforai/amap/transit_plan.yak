@@ -7,7 +7,11 @@ dst = cli.String("destination",cli.setHelp("Ending point of the route planning")
 city = cli.String("city",cli.setHelp("City where the route is located"))
 cli.check()
 
-res = amap.GetTransitPlan(ori,dst,amap.city(city))~
+res = amap.GetTransitPlan(ori,dst,amap.city(city))
+if err {
+    log.error("invoke GetTransitPlan failed: %v" % err)
+    return
+}
 route = res.Route
 
 formatDistance = (meters) => {
@@ -24,10 +28,12 @@ formatDuration = (seconds) => {
     if seconds == ""{
         return ""
     }
-    du = time.ParseDuration(seconds+"s")~
+    du,err = time.ParseDuration(seconds+"s")
+    if err {
+        return ""
+    }
     return du.String()
 }
-
 log.Info("Found paths count: %d", len(route.Transits))
 
 for i, path := range route.Transits {

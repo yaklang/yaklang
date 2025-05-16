@@ -7,7 +7,11 @@ dst = cli.String("destination",cli.setHelp("Ending point of the route planning")
 city = cli.String("city",cli.setHelp("City where the route is located"))
 cli.check()
 
-route = amap.GetBicyclingPlan(ori,dst,amap.city(city))~
+route,err = amap.GetBicyclingPlan(ori,dst,amap.city(city))
+if err {
+    log.error("invoke GetBicyclingPlan failed: %v" % err)
+    return
+}
 formatDistance = (meters) => {
     if meters == ""{
         return ""
@@ -22,7 +26,10 @@ formatDuration = (seconds) => {
     if seconds == ""{
         return ""
     }
-    du = time.ParseDuration(seconds+"s")~
+    du,err = time.ParseDuration(seconds+"s")
+    if err {
+        return ""
+    }
     return du.String()
 }
 yakit.Info("Found paths count: %d", len(route.Paths))

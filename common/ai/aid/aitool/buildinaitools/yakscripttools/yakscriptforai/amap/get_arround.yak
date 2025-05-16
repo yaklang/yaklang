@@ -9,6 +9,7 @@ cli.check()
 res,err = amap.GetNearbyPOI(location,keyword)
 if err {
     log.error("request api failed: %v",err)
+    return
 }
 yakit.Info("Total Result", res.Total)
 for poi in res.Results{
