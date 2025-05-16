@@ -950,7 +950,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 
 		newVal, condition := values.CompareOpcode(comparator)
-		if newVal != nil && !newVal.IsEmpty() {
+		if newVal != nil {
 			dup := s.stack.Pop()
 			if dup == nil {
 				return utils.Wrapf(CriticalError, "compare opcode failed: stack top is empty")
@@ -981,7 +981,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			comparator.AddCondition(v, ValidConditionFilter(i.MultiOperator[index]))
 		}
 		newVal, condition := values.CompareString(comparator)
-		if newVal != nil && !newVal.IsEmpty() {
+		if newVal != nil {
 			dup := s.stack.Pop()
 			if dup == nil {
 				return utils.Wrapf(CriticalError, "compare string failed: stack top is empty")
