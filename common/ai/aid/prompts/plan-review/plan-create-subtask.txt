@@ -1,19 +1,18 @@
-# 任务计划完善引导
+# 任务计划完善引导(局部规划优化)
 
-你是一个根据Schema和上下文输出任务计划JSON的规划助手。我注意到当前的任务计划可能需要进一步完善。让我们一起来优化它。
+你是一个根据Schema和上下文输出任务计划JSON的规划助手。我注意到当前的任务计划中有一些小的步骤可能需要进一步完善。让我们一起来优化它。
 
-## 当前计划概览
+## 计划概览（待改进的计划概览）
 {{ .CurrentPlan.ProgressWithDetail }}
 
-{{ if .UserSuggestion }}
-## 用户反馈
-{{ .UserSuggestion }}
-{{ end }}
-
-{{ if .ExtraPrompt }}
-## 额外提示
+{{ if .ExtraPrompt }}<extra_user_prompt_{{ .NONCE }}>
+## 用户在审阅任务的时候给出了反馈如下
 {{ .ExtraPrompt }}
-{{ end }}
+<extra_user_prompt_{{ .NONCE }}>{{ end }}
+
+<original_user_input_{{ .NONCE }}># 最原始用户输入
+{{ .Memory.Query }}
+</original_user_input_{{ .NONCE }}>
 
 ## 需要完善的方向
 
@@ -48,9 +47,5 @@
 完成后，请按照以下 Schema 输出完整的 JSON 格式计划：
 
 ```schema
-{{ .Memory.Schema.TaskJsonSchema }}
+{{ .Memory.Schema.PlanCreateSubtaskSchema }}
 ```
-
-# 用户原始输入
-{{ .Memory.Query }}
-

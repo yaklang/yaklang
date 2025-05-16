@@ -18,7 +18,7 @@ func TestAiTask_GenerateIndex(t *testing.T) {
 	t.Run("SingleRootTask", func(t *testing.T) {
 		task := &aiTask{Name: "Root"}
 		task.GenerateIndex()
-		assert.Equal(t, "1-0", task.Index)
+		assert.Equal(t, "1", task.Index)
 	})
 
 	// Test case 3: Task with subtasks
@@ -35,9 +35,9 @@ func TestAiTask_GenerateIndex(t *testing.T) {
 			sub.ParentTask = root
 		}
 		root.GenerateIndex()
-		assert.Equal(t, "1-0", root.Index, "Root index should be 1-0")
-		assert.Equal(t, "2-1", root.Subtasks[0].Index, "Sub1 index should be 2-1")
-		assert.Equal(t, "3-1", root.Subtasks[1].Index, "Sub2 index should be 3-1")
+		assert.Equal(t, "1", root.Index, "Root index should be 1")
+		assert.Equal(t, "1-1", root.Subtasks[0].Index, "Sub1 index should be 1-1")
+		assert.Equal(t, "1-2", root.Subtasks[1].Index, "Sub2 index should be 1-2")
 	})
 
 	// Test case 4: Calling GenerateIndex on a subtask (should rebuild from root)
@@ -49,9 +49,9 @@ func TestAiTask_GenerateIndex(t *testing.T) {
 
 		sub1.GenerateIndex() // Call on subtask
 
-		assert.Equal(t, "1-0", root.Index, "Root index should be 1-0")
-		assert.Equal(t, "2-1", sub1.Index, "Sub1 index should be 2-1")
-		assert.Equal(t, "3-1", sub2.Index, "Sub2 index should be 3-1")
+		assert.Equal(t, "1", root.Index, "Root index should be 1")
+		assert.Equal(t, "1-1", sub1.Index, "Sub1 index should be 1-1")
+		assert.Equal(t, "1-2", sub2.Index, "Sub2 index should be 1-2")
 	})
 
 	// Test case 5: Nested subtasks
@@ -67,11 +67,11 @@ func TestAiTask_GenerateIndex(t *testing.T) {
 
 		root.GenerateIndex()
 
-		assert.Equal(t, "1-0", root.Index)
-		assert.Equal(t, "2-1", s1.Index)
-		assert.Equal(t, "3-2", s1_1.Index)
-		assert.Equal(t, "4-2", s1_2.Index)
-		assert.Equal(t, "5-1", s2.Index)
+		assert.Equal(t, "1", root.Index)
+		assert.Equal(t, "1-1", s1.Index)
+		assert.Equal(t, "1-1-1", s1_1.Index)
+		assert.Equal(t, "1-1-2", s1_2.Index)
+		assert.Equal(t, "1-2", s2.Index)
 	})
 
 	// Test case 6: Calling GenerateIndex on a deeply nested subtask
@@ -89,12 +89,12 @@ func TestAiTask_GenerateIndex(t *testing.T) {
 
 		s1_1_1.GenerateIndex() // Call on the most nested subtask
 
-		assert.Equal(t, "1-0", root.Index, "Root index")
-		assert.Equal(t, "2-1", s1.Index, "S1 index")
-		assert.Equal(t, "3-2", s1_1.Index, "S1.1 index")
-		assert.Equal(t, "4-3", s1_1_1.Index, "S1.1.1 index")
-		assert.Equal(t, "5-2", s1_2.Index, "S1.2 index")
-		assert.Equal(t, "6-1", s2.Index, "S2 index")
+		assert.Equal(t, "1", root.Index, "Root index")
+		assert.Equal(t, "1-1", s1.Index, "S1 index")
+		assert.Equal(t, "1-1-1", s1_1.Index, "S1.1 index")
+		assert.Equal(t, "1-1-1-1", s1_1_1.Index, "S1.1.1 index")
+		assert.Equal(t, "1-1-2", s1_2.Index, "S1.2 index")
+		assert.Equal(t, "1-2", s2.Index, "S2 index")
 	})
 
 	// Test Case 7: Task with parent but no siblings, calling GenerateIndex on child
@@ -105,8 +105,8 @@ func TestAiTask_GenerateIndex(t *testing.T) {
 
 		child.GenerateIndex()
 
-		assert.Equal(t, "1-0", parent.Index, "Parent index")
-		assert.Equal(t, "2-1", child.Index, "Child index")
+		assert.Equal(t, "1", parent.Index, "Parent index")
+		assert.Equal(t, "1-1", child.Index, "Child index")
 	})
 
 	// Test Case 8: Complex structure with GenerateIndex called on an intermediate node
@@ -124,11 +124,11 @@ func TestAiTask_GenerateIndex(t *testing.T) {
 
 		sA2.GenerateIndex() // Call GenerateIndex on sA2
 
-		assert.Equal(t, "1-0", root.Index, "R")
-		assert.Equal(t, "2-1", sA.Index, "SA")
-		assert.Equal(t, "3-2", sA1.Index, "SA1")
-		assert.Equal(t, "4-2", sA2.Index, "SA2")
-		assert.Equal(t, "5-1", sB.Index, "SB")
-		assert.Equal(t, "6-5", sB1.Index, "SB1")
+		assert.Equal(t, "1", root.Index, "R")
+		assert.Equal(t, "1-1", sA.Index, "SA")
+		assert.Equal(t, "1-1-1", sA1.Index, "SA1")
+		assert.Equal(t, "1-1-2", sA2.Index, "SA2")
+		assert.Equal(t, "1-2", sB.Index, "SB")
+		assert.Equal(t, "1-2-1", sB1.Index, "SB1")
 	})
 }

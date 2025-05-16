@@ -138,49 +138,43 @@ func ExtractNextPlanTaskFromRawResponse(c *Config, rawResponse string) ([]*aiTas
 	return nil, errors.New("no aiTask found in next-plans")
 }
 
-// _genIdx 递归地为任务及其子任务生成索引。
-// currentStartIndex 是当前任务建议的起始索引。
-// parentAssignedIndex 是其父任务被分配的索引值。
-// 返回值是处理完此任务及其所有子任务后，下一个可用的起始索引。
-func _genIdx(currentStartIndex int, parentAssignedIndex int, i *aiTask) int {
-	if i == nil {
-		return currentStartIndex
+// _assignHierarchicalIndicesRecursive 递归地为任务及其子任务分配层级索引。
+// currentTask 是当前要处理的任务。
+// currentIndex 是为 currentTask 计算好的索引字符串 (例如 "1", "1-2", "1-2-3")。
+func _assignHierarchicalIndicesRecursive(currentTask *aiTask, currentIndex string) {
+	if currentTask == nil {
+		return
 	}
-	idx := fmt.Sprintf("%d-%d", currentStartIndex, parentAssignedIndex)
-	i.Index = idx
+	currentTask.Index = currentIndex
 
-	// 当前任务的 assignedIndex 就是 currentStartIndex
-	assignedIndexForThisTask := currentStartIndex
-	// 下一个子任务应该从 currentStartIndex + 1 开始
-	nextSubTaskStartIndex := currentStartIndex + 1
-
-	for _, subNode := range i.Subtasks {
-		// 递归调用 _genIdx，它会返回其处理完后的下一个可用 startIndex
-		nextSubTaskStartIndex = _genIdx(nextSubTaskStartIndex, assignedIndexForThisTask, subNode)
+	for i, subTask := range currentTask.Subtasks {
+		// 子任务的索引是父任务索引加上自己的序号 (1-based)
+		// 例如，如果父任务索引是 "1-2", 第一个子任务是 "1-2-1", 第二个是 "1-2-2"
+		subTaskIndex := fmt.Sprintf("%s-%d", currentIndex, i+1)
+		_assignHierarchicalIndicesRecursive(subTask, subTaskIndex)
 	}
-	// 返回处理完当前节点及其所有子节点后，下一个兄弟节点可用的 startIndex
-	return nextSubTaskStartIndex
 }
 
+// GenerateIndex 为任务树生成层级索引。
+// 调用此方法的任务 (a) 所在树的根节点索引将被设为 "1"。
+// 其子任务将相应地获得如 "1-1", "1-2" 等索引，孙任务如 "1-1-1" 等。
 func (a *aiTask) GenerateIndex() {
 	if a == nil {
 		return
 	}
-	if a.ParentTask != nil {
-		var root *aiTask = a.ParentTask
-		for i := 0; i < 1000; i++ {
-			if root.ParentTask == nil {
-				_genIdx(1, 0, root)
-				return
-			}
-			root = root.ParentTask
-		}
-		if root != nil && root.ParentTask != nil {
-			_genIdx(1, 0, root)
-		}
-	} else {
-		_genIdx(1, 0, a)
+
+	root := a
+	// 向上遍历以找到树的实际根节点。
+	// 包含一个针对极深树或潜在循环依赖的安全中断。
+	for i := 0; i < 1000 && root.ParentTask != nil; i++ {
+		root = root.ParentTask
 	}
+
+	// 循环结束后，'root' 要么是真正的根节点 (ParentTask == nil)，
+	// 要么是经过1000次迭代后到达的节点。
+	// 从这个 'root' 开始进行索引。
+	// 根任务的索引被指定为 "1"。
+	_assignHierarchicalIndicesRecursive(root, "1")
 }
 
 // ExtractTaskFromRawResponse 从原始响应中提取Task

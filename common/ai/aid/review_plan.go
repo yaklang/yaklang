@@ -4,6 +4,8 @@ import (
 	"bytes"
 	_ "embed"
 	"encoding/json"
+	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"text/template"
 
@@ -12,6 +14,7 @@ import (
 )
 
 type PlanReviewSuggestion struct {
+	Id                string `json:"id"`
 	Value             string `json:"value"`
 	Suggestion        string `json:"prompt"`
 	SuggestionEnglish string `json:"prompt_english"`
@@ -22,24 +25,29 @@ type PlanReviewSuggestion struct {
 	ParamSchema      string                               `json:"param_schema"`
 }
 
-// PlanReviewSuggestions 是计划审查时的建议(内置一些常见选项)
-var PlanReviewSuggestions = []*PlanReviewSuggestion{
-	{
-		Value:             "incomplete",
-		Suggestion:        "计划不够完整，需要补充更多细节",
-		SuggestionEnglish: "The plan is not complete enough, more details need to be added",
-		AllowExtraPrompt:  true,
-	},
-	{
-		Value:             "continue",
-		Suggestion:        "计划合理，继续执行",
-		SuggestionEnglish: "The plan is reasonable, continue execution",
-	},
-	{
-		Value:             "replan",
-		Suggestion:        "需要重新规划整个任务或者局部任务",
-		SuggestionEnglish: "Need to replan the entire task or partial task",
-	},
+func (c *Config) getPlanReviewSuggestion() []*PlanReviewSuggestion {
+	opt := []*PlanReviewSuggestion{
+		{
+			Value:             "incomplete",
+			Suggestion:        "计划不够完整，需要补充更多细节",
+			SuggestionEnglish: "The plan is not complete enough, more details need to be added",
+			AllowExtraPrompt:  true,
+		},
+		{
+			Value:             "create-subtask",
+			Suggestion:        "当前层级任务不变，为某些任务创建子任务，如果用户没有指定，自动评估应该如何修改任务",
+			SuggestionEnglish: "Create Subtask for current level task, if user not specified, auto evaluate how to modify the task",
+		},
+		{
+			Value:             "continue",
+			Suggestion:        "计划合理，继续执行",
+			SuggestionEnglish: "The plan is reasonable, continue execution",
+		},
+	}
+	for idx, o := range opt {
+		o.Id = fmt.Sprintf("plan-review-suggestion-%v-%d", c.id, idx)
+	}
+	return opt
 }
 
 func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.InvokeParams) (*PlanResponse, error) {
@@ -65,7 +73,10 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 	case "incomplete":
 		p.config.EmitInfo("plan is incomplete")
 		// 重新生成计划，但保留现有任务
-		extraPrompt := param.GetString("extra_prompt", "prompt")
+		extraPrompt := param.GetString("extra_prompt")
+		if extraPrompt == "" {
+			extraPrompt = param.GetString("prompt")
+		}
 		newPlan, err := p.generateNewPlan(suggestion, extraPrompt, rsp)
 		if err != nil {
 			p.config.EmitError("generate new plan failed: %v", err)
@@ -84,11 +95,11 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 			return newPlan, nil
 		}
 		return p.handleReviewPlanResponse(newPlan, params)
-	case "replan":
-		p.config.EmitError("replan required via user suggestion")
-		extraPrompt := param.GetString("extra_prompt", "prompt")
+	case "create-subtask":
+		p.config.EmitError("create-subtask required via user suggestion")
+		extraPrompt := param.GetString("extra_prompt")
 		if extraPrompt == "" {
-			extraPrompt = "user decide to replan, but not provide extra prompt, you can replan the task with some general priciples\n"
+			extraPrompt = "用户认为某些任务太宽泛了，需要被分割成更小的子任务以确保执行顺利，切分制定任务需要注意一下原则\n"
 			extraPrompt += " S-M-A-R-T: SMART 代表：1. Specific（具体的） 2. Measurable（可衡量的） 3. Achievable（可实现的） 4. Relevant（相关的） 5. Time-bound（有时限的）。\n" +
 				"SMART 是一个用于设定目标和评估目标达成度的标准。它帮助人们设定清晰、可行和可衡量的目标，以便更好地规划和实现个人或团队的愿景和任务。\n" +
 				"从这几个角度考虑。\n## 注意\n1. 你运行在一个由外部思维链约束的任务中，尽量保持输出简短，保留任务相关元素，避免冗长描述\n" +
@@ -96,7 +107,13 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 				"3. 不需要输出算法简介和背景相关知识\n" +
 				"4. 无需额外解释"
 		}
-		newPlan, err := p.generateNewPlan(suggestion, extraPrompt, rsp)
+		targetPlans := param.GetStringSlice("target_plans")
+		if len(targetPlans) > 0 {
+			extraPrompt += "\n用户认为你应该重点关注的子任务：" + fmt.Sprint(targetPlans)
+		} else {
+			extraPrompt += "\n用户没有规定你需要具体拆分哪些子任务，你需要自己决定在当前任务树的叶节点拆分"
+		}
+		newPlan, err := p.generateCreateSubtaskPlan(extraPrompt, rsp)
 		if err != nil {
 			p.config.EmitError("generate new plan failed: %v", err)
 			return nil, utils.Errorf("generate new plan failed: %v", err)
@@ -118,6 +135,56 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 		p.config.EmitError("unknown review suggestion: %s", suggestion)
 		return rsp, nil
 	}
+}
+
+func (p *planRequest) generateCreateSubtaskPlan(extraPrompt string, rsp *PlanResponse) (*PlanResponse, error) {
+	tmpl, err := template.New("partial-replan").Parse(planReviewCreateSubtaskPrompts)
+	if err != nil {
+		return nil, utils.Errorf("error parsing plan review prompt: %v", err)
+	}
+	nonce := utils.RandStringBytes(6)
+	params := map[string]any{
+		"Memory":      p.config.memory,
+		"CurrentPlan": rsp.RootTask,
+		"ExtraPrompt": extraPrompt,
+		"NONCE":       nonce,
+	}
+	var buf bytes.Buffer
+	err = tmpl.Execute(&buf, params)
+	if err != nil {
+		return nil, err
+	}
+	err = p.config.callAiTransaction(buf.String(), p.callAI, func(response *AIResponse) error {
+		reader := response.GetOutputStreamReader("create-subtasks", false, p.config)
+		if reader == nil {
+			return utils.Error("get output stream failed")
+		}
+		raw, err := io.ReadAll(reader)
+		if err != nil && len(raw) <= 0 {
+			return utils.Errorf("read create-subtask stream failed: %v", err)
+		}
+		action, err := ExtractAction(string(raw), "plan-create-subtask")
+		if err != nil {
+			return utils.Errorf("extract create-subtask action failed: %v", err)
+		}
+		count := 0
+		for _, subtask := range action.GetInvokeParamsArray("subtasks") {
+			count++
+			parentIdx := subtask.GetString("parent_index")
+			name, goal := subtask.GetString("name"), subtask.GetString("goal")
+			log.Infof("create subtask for: %v, title: %v goal: %v", parentIdx, name, goal)
+			rsp.MergeSubtask(parentIdx, name, goal)
+		}
+		if count <= 1 {
+			return utils.Errorf("create subtask failed, no subtask found (<=1)")
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	rsp.RootTask.GenerateIndex()
+	return rsp, nil
 }
 
 // generateNewPlan 生成新的计划
