@@ -895,6 +895,54 @@ func TestGRPCMUSTPASS_MITMV2_MutProxy(t *testing.T) {
 	})
 }
 
+func TestGRPCMUSTPASS_MITMV2_HotPatch(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+	flag := false
+	token := uuid.NewString()
+	beforeRequestToken := uuid.NewString()
+	mitmPort := uint32(utils.GetRandomAvailableTCPPort())
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		if strings.Contains(string(req), beforeRequestToken) {
+			flag = true
+		}
+		return nil
+	})
+	RunMITMV2TestServer(client, ctx, &ypb.MITMV2Request{
+		Host:           "127.0.0.1",
+		Port:           mitmPort,
+		SetAutoForward: true,
+	},
+		func(mitmClient ypb.Yak_MITMV2Client) {
+			defer cancel()
+			mitmClient.Send(&ypb.MITMV2Request{
+				SetYakScript: true,
+				YakScriptContent: fmt.Sprintf(`
+hijackHTTPRequest = func(isHttps, url, req, forward /*func(modifiedRequest []byte)*/, drop /*func()*/) {
+	rawReq = poc.ReplaceHTTPPacketCookies(req, {"aa":"%s"})
+	forward(rawReq)
+}
+beforeRequest = func(ishttps /*bool*/, oreq /*[]byte*/, req/*[]byte*/){
+    rawReq = poc.ReplaceHTTPPacketCookies(req, {"bb":"%s"})
+	return rawReq
+}`, token, beforeRequestToken)})
+			for {
+				recv, err2 := mitmClient.Recv()
+				if err2 != nil {
+					break
+				}
+				if recv.GetGetCurrentHook() && len(recv.GetHooks()) > 0 {
+					poc.DoGET(fmt.Sprintf("http://%s:%d", host, port), poc.WithProxy(fmt.Sprintf("http://%s:%v", "127.0.0.1", mitmPort)))
+					break
+				}
+				continue
+			}
+			require.True(t, flag)
+		})
+}
+
 func TestGRPCMUSTPASS_MITMV2_Replacer_replace_content_ManalHijack(t *testing.T) {
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(30))
 	defer cancel()

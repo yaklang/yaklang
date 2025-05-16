@@ -1040,7 +1040,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 		task := hijackManger.register(feedbackOrigin)
 		if task == nil {
-			return originReqRaw
+			return req
 		}
 
 		taskInfo := task.infoMessage
@@ -1071,10 +1071,10 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			hijackListFeedback(Hijack_List_Update, taskInfo)
 			select {
 			case <-ctx.Done():
-				return originReqRaw
+				return req
 			case controlReq, ok := <-task.messageChan:
 				if !ok {
-					return originReqRaw
+					return req
 				}
 				if controlReq.GetHijackResponse() {
 					taskInfo.HijackResponse = true
