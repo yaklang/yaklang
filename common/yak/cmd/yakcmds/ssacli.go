@@ -559,6 +559,7 @@ var syntaxflowFormat = &cli.Command{
 			log.Errorf("syntaxflow-format: no file provided")
 		}
 
+		var errors error
 		format := func(fileName string) error {
 			// Check if the file has .sf extension
 			if !strings.HasSuffix(fileName, ".sf") {
@@ -572,13 +573,17 @@ var syntaxflowFormat = &cli.Command{
 			}
 			rule, err := sfvm.FormatRule(string(raw))
 			if err != nil {
-				log.Errorf("failed parse format file %s: %v", fileName, err)
+				err = utils.Errorf("failed parse format file %s: %v", fileName, err)
+				log.Errorf("%v", err)
+				errors = utils.JoinErrors(errors, err)
 				return err
 			}
 
 			// check format rule
 			if _, err := sfvm.CompileRule(rule); err != nil {
-				log.Errorf("failed check format file %s: %v\nformat rule: \n%s", fileName, err, rule)
+				err = utils.Errorf("failed check format file %s: %v\nformat rule: \n%s", fileName, err, rule)
+				log.Errorf("%v", err)
+				errors = utils.JoinErrors(errors, err)
 				return err
 			}
 
@@ -592,18 +597,19 @@ var syntaxflowFormat = &cli.Command{
 
 		for _, path := range c.Args() {
 			if utils.IsFile(path) {
-				return format(path)
+				log.Infof("syntaxflow-format: processing file %s", path)
+				format(path)
 			} else if utils.IsDir(path) {
 				log.Infof("syntaxflow-format: processing directory %s", path)
-
-				return filesys.Recursive(path, filesys.WithFileSystem(filesys.NewLocalFs()), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+				filesys.Recursive(path, filesys.WithFileSystem(filesys.NewLocalFs()), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+					log.Infof("syntaxflow-format: processing file %s", s)
 					return format(s)
 				}))
 			} else {
 				log.Errorf("syntaxflow-format: file %s not found", path)
 			}
 		}
-		return nil
+		return errors
 	},
 }
 
