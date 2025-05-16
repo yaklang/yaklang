@@ -297,6 +297,11 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 		resources = append(resources, res)
 	}
 	// res.CheckParams
+	// for _, msg := range resources {
+	// 	if len(msg.Extra) > 3 {
+	// 		fmt.Println(msg.Extra[1].Value)
+	// 	}
+	// }
 	return &ypb.RequestYakURLResponse{
 		Page:      params.Page,
 		PageSize:  params.PageSize,

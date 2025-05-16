@@ -3,9 +3,11 @@ package ssaapi
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/utils/graph"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type EdgeType string
@@ -34,6 +36,10 @@ type ValueGraph struct {
 	Value2Node     map[*Value]int   // ssaapi.Value -> node-id
 	marshaledValue map[int]struct{} // node-id ->  ssaapi.value
 	Node2Value     map[int]*Value
+
+	// hash(from-to) -> edge-type
+	// hash(to-from) -> edge-type
+	EdgeCache map[string]string
 }
 
 func NewValueGraph(v ...*Value) *ValueGraph {
@@ -45,6 +51,7 @@ func NewValueGraph(v ...*Value) *ValueGraph {
 		Value2Node:     make(map[*Value]int),
 		marshaledValue: make(map[int]struct{}),
 		Node2Value:     make(map[int]*Value),
+		EdgeCache:      make(map[string]string),
 	}
 	for _, value := range v {
 		graph.BuildGraphWithDFS[int, *Value](
@@ -69,8 +76,29 @@ func (g *ValueGraph) ShowDot() {
 	fmt.Println(buf.String())
 }
 
+func removeEscapes(s string) string {
+	s = strings.ReplaceAll(s, "\t", "")
+	s = strings.ReplaceAll(s, "\r", "")
+	return s
+}
+
 func (g *ValueGraph) createNode(value *Value) (int, error) {
-	nodeId := g.AddNode(value.GetVerboseName())
+	// nodeId := g.AddNode(value.GetVerboseName())
+	// s := fmt.Sprintf("%s_%d_%d", value.GetVerboseName(), value.GetId(), nodeId)
+	// g.SetNode(nodeId, s)
+
+	nodeId := 0
+	if r := value.GetRange(); r != nil {
+		code := r.GetText()
+		if len(code) > 100 {
+			code = code[:100] + "..."
+		}
+		code = removeEscapes(code)
+		nodeId = g.AddNode(code)
+	} else {
+		nodeId = g.AddNode(value.GetVerboseName())
+	}
+
 	g.Node2Value[nodeId] = value
 	g.Value2Node[value] = nodeId
 	return nodeId, nil
@@ -88,8 +116,12 @@ func (g *ValueGraph) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
 	for _, v := range value.GetEffectOn() {
 		res = append(res, graph.NewNeighbor(v, EdgeTypeEffectOn))
 	}
+
 	for _, predecessor := range value.GetPredecessors() {
 		if predecessor.Node == nil {
+			continue
+		}
+		if IsDataFlowLabel(predecessor.Info.Label) && len(res) > 0 {
 			continue
 		}
 		neighbor := graph.NewNeighbor(predecessor.Node, EdgeTypePredecessor)
@@ -100,12 +132,25 @@ func (g *ValueGraph) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
 	return res
 }
 
+func IsDataFlowType(typ string) bool {
+	return typ == EdgeTypeDependOn || typ == EdgeTypeEffectOn
+}
+
 func (g *ValueGraph) handleEdge(fromNode int, toNode int, edgeType string, extraMsg map[string]any) {
+	if IsDataFlowType(edgeType) {
+		// avoid duplicate  dataflow edge
+		hash := codec.Sha256(fromNode + toNode)
+		if typ, ok := g.EdgeCache[hash]; ok && IsDataFlowType(typ) {
+			return
+		}
+		g.EdgeCache[hash] = edgeType
+	}
+
 	switch ValidEdgeType(edgeType) {
 	case EdgeTypeDependOn:
-		g.AddEdge(fromNode, toNode, "")
+		g.AddEdge(toNode, fromNode, edgeType)
 	case EdgeTypeEffectOn:
-		g.AddEdge(toNode, fromNode, "")
+		g.AddEdge(toNode, fromNode, edgeType)
 	case EdgeTypePredecessor:
 		edges := g.GetEdges(toNode, fromNode)
 		var (

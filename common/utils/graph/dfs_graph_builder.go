@@ -33,14 +33,19 @@ func (n *Neighbor[T]) AddExtraMsg(k string, v any) {
 
 // BuildGraph Depth-First Search driven graph construction method
 func (g *DFSGraphBuilder[K, T]) BuildGraph(startNode T) error {
-	_, err := g.dfs(startNode)
+	_, err := g.dfs(startNode, true)
 	return err
 }
 
 // Internal implementation of Depth-First Search (DFS)
-func (g *DFSGraphBuilder[K, T]) dfs(node T) (K, error) {
+func (g *DFSGraphBuilder[K, T]) dfs(node T, isroots ...bool) (K, error) {
+	isroot := false
+	// if len(isroots) > 0 {
+	// 	isroot = isroots[0]
+	// }
+
 	// Check if the node has already been visited
-	if key, ok := g.visited[node]; ok {
+	if key, ok := g.GetVisited(node); ok {
 		return key, nil
 	}
 
@@ -63,9 +68,20 @@ func (g *DFSGraphBuilder[K, T]) dfs(node T) (K, error) {
 			return neighborKey, err
 		}
 		// Process the edge between the current node and its neighbor
+		if isroot {
+			continue
+		}
 		g.handleEdge(nodeKey, neighborKey, neighbor.EdgeType, neighbor.ExtraMsg)
 	}
 	return nodeKey, nil
+}
+
+func (g *DFSGraphBuilder[K, T]) GetVisited(node T) (key K, ok bool) {
+	if key, ok = g.visited[node]; ok {
+		return key, true
+	}
+
+	return key, false
 }
 
 func NewDFSGraphBuilder[K comparable, T comparable](
