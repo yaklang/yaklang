@@ -2,6 +2,8 @@ package js2ssa
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"strconv"
 	"strings"
 
@@ -104,14 +106,12 @@ func (b *builder) VisitStatement(node *ast.Node) interface{} {
 		b.VisitWithStatement(node.AsWithStatement())
 	case ast.KindClassDeclaration:
 		b.VisitClassDeclaration(node.AsClassDeclaration())
-	case ast.KindEnumDeclaration:
-		b.VisitEnumDeclaration(node.AsEnumDeclaration())
 	case ast.KindImportDeclaration:
 		b.VisitImportDeclaration(node.AsImportDeclaration())
 	case ast.KindExportAssignment:
 		b.VisitExportAssignment(node.AsExportAssignment())
 	default:
-		panic("Unhandled Statement")
+		b.NewError(ssa.Error, TAG, UnhandledStatement())
 	}
 	return nil
 }
@@ -859,13 +859,68 @@ func (b *builder) VisitWithStatement(node *ast.WithStatement) interface{} {
 }
 
 // VisitClassDeclaration 访问类声明
-func (b *builder) VisitClassDeclaration(node *ast.ClassDeclaration) interface{} { return nil }
+func (b *builder) VisitClassDeclaration(node *ast.ClassDeclaration) ssa.Value {
+	if node == nil {
+		return nil
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
+	defer recoverRange()
+
+	var (
+		blueprint  *ssa.Blueprint
+		extendName string
+	)
+
+	className := node.Name().AsIdentifier().Text
+	blueprint = b.CreateBlueprint(className)
+	blueprint.SetKind(ssa.BlueprintClass)
+
+	if node.HeritageClauses != nil && len(node.HeritageClauses.Nodes) != 0 {
+		parent := node.HeritageClauses.Nodes[0].AsHeritageClause()
+		if parent.Types != nil && len(parent.Types.Nodes) != 0 {
+			typedExp := parent.Types.Nodes[0].AsExpressionWithTypeArguments()
+			if ast.IsIdentifier(typedExp.Expression) {
+				extendName = typedExp.AsIdentifier().Text
+			}
+		}
+	}
+
+	/*
+		该lazyBuilder顺序按照cls解析顺序
+	*/
+	store := b.StoreFunctionBuilder()
+	blueprint.AddLazyBuilder(func() {
+		switchHandler := b.SwitchFunctionBuilder(store)
+		defer switchHandler()
+
+		if extendName != "" {
+			bp := b.GetBluePrint(extendName)
+			if bp == nil {
+				bp = b.CreateBlueprint(extendName)
+			}
+			bp.SetKind(ssa.BlueprintClass)
+			blueprint.AddParentBlueprint(bp)
+		}
+
+	})
+
+	container := blueprint.Container()
+	b.MarkedThisClassBlueprint = blueprint
+	defer func() {
+		b.MarkedThisClassBlueprint = nil
+	}()
+
+	if node.Members != nil && len(node.Members.Nodes) > 0 {
+		for _, memberNode := range node.Members.Nodes {
+			b.ProcessClassMember(memberNode, blueprint)
+		}
+	}
+	return container
+}
 
 // VisitHeritageClause 访问继承子句
 func (b *builder) VisitHeritageClause(node *ast.HeritageClause) interface{} { return nil }
-
-// VisitClassElement 访问类成员
-func (b *builder) VisitClassElement(node *ast.Node) interface{} { return nil }
 
 // ===== Declaration =====
 
@@ -895,7 +950,7 @@ func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declTy
 	defer recoverRange()
 	// === Fast Fail Start ===
 	if decl.Name() == nil {
-		b.NewError(ssa.Error, TAG, NoDeclaraionName())
+		b.NewError(ssa.Error, TAG, NoDeclarationName())
 		return nil
 	}
 
@@ -969,43 +1024,11 @@ func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declTy
 		}
 
 	default:
-		panic("unexpected variable declaration type")
+		b.NewError(ssa.Error, TAG, UnhandledVariableDeclarationType())
 	}
 
 	return nil
 }
-
-// VisitPropertyDeclaration 访问属性声明
-func (b *builder) VisitPropertyDeclaration(node *ast.PropertyDeclaration) interface{} { return nil }
-
-// VisitMethodDeclaration 访问方法声明
-func (b *builder) VisitMethodDeclaration(node *ast.MethodDeclaration) interface{} { return nil }
-
-// VisitConstructorDeclaration 访问构造函数声明
-func (b *builder) VisitConstructorDeclaration(node *ast.ConstructorDeclaration) interface{} {
-	return nil
-}
-
-// VisitGetAccessorDeclaration 访问getter声明
-func (b *builder) VisitGetAccessorDeclaration(node *ast.GetAccessorDeclaration) interface{} {
-	return nil
-}
-
-// VisitSetAccessorDeclaration 访问setter声明
-func (b *builder) VisitSetAccessorDeclaration(node *ast.SetAccessorDeclaration) interface{} {
-	return nil
-}
-
-// VisitClassStaticBlockDeclaration 访问静态代码块声明
-func (b *builder) VisitClassStaticBlockDeclaration(node *ast.ClassStaticBlockDeclaration) interface{} {
-	return nil
-}
-
-// VisitEnumDeclaration 访问枚举声明
-func (b *builder) VisitEnumDeclaration(node *ast.EnumDeclaration) interface{} { return nil }
-
-// VisitEnumMember 访问枚举成员
-func (b *builder) VisitEnumMember(node *ast.EnumMember) interface{} { return nil }
 
 // VisitModuleBlock 访问模块块
 func (b *builder) VisitModuleBlock(node *ast.ModuleBlock) interface{} { return nil }
@@ -1054,25 +1077,71 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 	switch node.Kind {
 	// 需要区分L/R Value的类型
 	case ast.KindIdentifier:
+		class := b.MarkedThisClassBlueprint
 		identifierName := b.VisitIdentifier(node.AsIdentifier())
 		if isLval {
+			if class == nil {
+				return b.CreateVariable(identifierName), nil
+			}
+			if class.GetNormalMember(identifierName) != nil {
+				obj := b.PeekValue("this")
+				if obj != nil {
+					return b.CreateMemberCallVariable(obj, b.EmitConstInst(identifierName)), nil
+				}
+			}
 			return b.CreateVariable(identifierName), nil
 		}
 		// undefined 是一个 identifier
 		if identifierName == "undefined" {
 			return nil, b.EmitUndefined("")
 		}
-		return nil, b.ReadValue(identifierName)
+
+		if value := b.ReadValue(identifierName); value != nil {
+			return nil, value
+		}
+
+		if class != nil {
+			if method := class.GetStaticMethod(identifierName); !utils.IsNil(method) {
+				return nil, method
+			}
+			if class.GetNormalMember(identifierName) != nil {
+				obj := b.PeekValue("this")
+				if obj != nil {
+					if value := b.ReadMemberCallValue(obj, b.EmitConstInst(identifierName)); value != nil {
+						return nil, value
+					}
+				}
+			}
+			value := b.ReadSelfMember(identifierName)
+			if value != nil {
+				return nil, value
+			}
+		}
+		return nil, nil
 	case ast.KindPropertyAccessExpression:
-		obj, propName := b.VisitPropertyAccessExpression(node.AsPropertyAccessExpression())
-		if obj == nil || propName == "" {
+		propertyAccessExp := node.AsPropertyAccessExpression()
+		obj, propName := b.VisitPropertyAccessExpression(propertyAccessExp)
+		var objName string
+		if ast.IsIdentifier(propertyAccessExp.Expression) {
+			objName = propertyAccessExp.Expression.AsIdentifier().Text
+		}
+
+		bp := b.GetBluePrint(objName) // 处理静态方法调用
+		if (obj == nil && bp == nil) || propName == "" {
 			return nil, nil
 		}
 		name := b.EmitConstInst(propName)
 		if isLval {
 			return b.CreateMemberCallVariable(obj, name), nil
 		}
-		return nil, b.ReadMemberCallValue(obj, name)
+		if obj == nil {
+			val := bp.GetStaticMember(propName)
+			if !utils.IsNil(val) {
+				return nil, val
+			}
+			return nil, nil
+		}
+		return nil, b.ReadMemberCallMethodOrValue(obj, name)
 	case ast.KindElementAccessExpression:
 		obj, arg := b.VisitElementAccessExpression(node.AsElementAccessExpression())
 		if obj == nil || arg == nil {
@@ -1251,7 +1320,7 @@ func (b *builder) VisitBinaryExpression(node *ast.BinaryExpression) ssa.Value {
 		}
 		return b.EmitBinOp(binOp, left, right)
 	// Logical AND &&
-	// a && b return a if a is falsy else return b
+	// `a && b` return a if a is falsy else return b
 	case ast.KindAmpersandAmpersandToken:
 		return handlerJumpExpression(
 			func(id string) ssa.Value {
@@ -1266,7 +1335,7 @@ func (b *builder) VisitBinaryExpression(node *ast.BinaryExpression) ssa.Value {
 			ssa.AndExpressionVariable,
 		)
 	// Logical OR ||
-	// a || b return a if a is truthy else return b
+	// `a || b` return a if a is truthy else return b
 	case ast.KindBarBarToken:
 		return handlerJumpExpression(
 			func(id string) ssa.Value {
@@ -1414,8 +1483,9 @@ func (b *builder) VisitBinaryExpression(node *ast.BinaryExpression) ssa.Value {
 	// 处理其他运算符...
 	default:
 		// 未实现的操作符处理
-		panic("unhandled bin op")
+		b.NewError(ssa.Error, TAG, UnhandledBinOP())
 	}
+	return nil
 }
 
 // VisitCallExpression 处理函数调用表达式
@@ -1782,7 +1852,7 @@ func (b *builder) VisitPrefixUnaryExpression(node *ast.PrefixUnaryExpression) ss
 
 	default:
 		// 未实现的操作符处理
-		panic("unhandled prefix unary expression")
+		//panic("unhandled prefix unary expression")
 		b.NewErrorWithPos(ssa.Error, TAG, b.CurrentRange, UnexpectedUnaryOP())
 		return nil
 	}
@@ -1844,7 +1914,7 @@ func (b *builder) VisitPostfixUnaryExpression(node *ast.PostfixUnaryExpression) 
 
 	default:
 		// 未实现的操作符处理
-		panic("unhandled postfix unary expression")
+		//panic("unhandled postfix unary expression")
 		b.NewErrorWithPos(ssa.Error, TAG, b.CurrentRange, fmt.Sprintf("未支持的后缀一元操作符: %v", node.Operator))
 		return nil
 	}
@@ -1867,7 +1937,7 @@ func (b *builder) VisitPropertyAccessExpression(node *ast.PropertyAccessExpressi
 	// 获取属性名
 	propName := ""
 	if node.Name() != nil {
-		propName = b.VisitMemberName(node.Name())
+		propName = b.ProcessMemberName(node.Name())
 	}
 
 	return obj, propName
@@ -1905,24 +1975,31 @@ func (b *builder) VisitNewExpression(node *ast.NewExpression) ssa.Value {
 	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
-	callee := b.VisitRightValueExpression(node.Expression)
-	if node.Arguments == nil || len(node.Arguments.Nodes) == 0 {
-		args := make([]ssa.Value, 0)
-		return b.EmitCall(b.NewCall(callee, args))
+	// TODO: js builtin support? Symbol Bigint
+	className := ""
+	switch node.Expression.Kind {
+	case ast.KindIdentifier:
+		className = node.Expression.AsIdentifier().Text
+	default:
+		b.NewError(ssa.Warn, TAG, NewExpressionOnlySupportIdentifierClassName())
+		return nil
 	}
 
-	// 处理参数列表
-	var args []ssa.Value
-	for _, argNode := range node.Arguments.Nodes {
-		argValue := b.VisitRightValueExpression(argNode)
-		if argValue != nil {
-			args = append(args, argValue)
-		} else {
-			// 如果参数无法解析，使用undefined代替
-			args = append(args, b.EmitUndefined(""))
+	class := b.GetBluePrint(className)
+	obj := b.EmitUndefined(className)
+	if class == nil {
+		log.Warnf("class %v instantiation failed.", className)
+		return obj
+	}
+	obj.SetType(class)
+	args := []ssa.Value{obj}
+	if node.Arguments != nil {
+		for _, arg := range node.Arguments.Nodes {
+			args = append(args, b.VisitRightValueExpression(arg))
+
 		}
 	}
-	return b.EmitCall(b.NewCall(callee, args))
+	return b.ClassConstructorWithoutDeferDestructor(class, args)
 }
 
 // VisitParenthesizedExpression 访问带括号的表达式
@@ -1967,29 +2044,7 @@ func (b *builder) VisitFunctionDeclaration(node *ast.FunctionDeclaration) interf
 
 	// 处理函数参数
 	if node.Parameters != nil && len(node.Parameters.Nodes) > 0 {
-		for _, param := range node.Parameters.Nodes {
-			if param.Kind == ast.KindParameter {
-				paramNode := param.AsParameterDeclaration()
-				paramName := ""
-
-				if paramNode.Name() != nil && paramNode.Name().Kind == ast.KindIdentifier {
-					paramName = paramNode.Name().AsIdentifier().Text
-				}
-
-				if paramName != "" {
-					// 创建参数
-					p := b.NewParam(paramName)
-
-					// 处理默认值
-					if paramNode.Initializer != nil {
-						defaultValue := b.VisitRightValueExpression(paramNode.Initializer)
-						if defaultValue != nil {
-							p.SetDefault(defaultValue)
-						}
-					}
-				}
-			}
-		}
+		b.ProcessFunctionParams(node.Parameters)
 	}
 
 	// 处理函数体
@@ -2041,29 +2096,7 @@ func (b *builder) VisitFunctionExpression(node *ast.FunctionExpression) ssa.Valu
 
 		// 处理函数参数
 		if node.Parameters != nil && len(node.Parameters.Nodes) > 0 {
-			for _, param := range node.Parameters.Nodes {
-				if param.Kind == ast.KindParameter {
-					paramNode := param.AsParameterDeclaration()
-					paramName := ""
-
-					if paramNode.Name() != nil && paramNode.Name().Kind == ast.KindIdentifier {
-						paramName = paramNode.Name().AsIdentifier().Text
-					}
-
-					if paramName != "" {
-						// 创建参数
-						p := b.NewParam(paramName)
-
-						// 处理默认值
-						if paramNode.Initializer != nil {
-							defaultValue := b.VisitRightValueExpression(paramNode.Initializer)
-							if defaultValue != nil {
-								p.SetDefault(defaultValue)
-							}
-						}
-					}
-				}
-			}
+			b.ProcessFunctionParams(node.Parameters)
 		}
 
 		// 处理函数体
@@ -2117,29 +2150,7 @@ func (b *builder) VisitArrowFunction(node *ast.ArrowFunction) ssa.Value {
 
 		// 处理函数参数
 		if node.Parameters != nil && len(node.Parameters.Nodes) > 0 {
-			for _, param := range node.Parameters.Nodes {
-				if param.Kind == ast.KindParameter {
-					paramNode := param.AsParameterDeclaration()
-					paramName := ""
-
-					if paramNode.Name() != nil && paramNode.Name().Kind == ast.KindIdentifier {
-						paramName = paramNode.Name().AsIdentifier().Text
-					}
-
-					if paramName != "" {
-						// 创建参数
-						p := b.NewParam(paramName)
-
-						// 处理默认值
-						if paramNode.Initializer != nil {
-							defaultValue := b.VisitRightValueExpression(paramNode.Initializer)
-							if defaultValue != nil {
-								p.SetDefault(defaultValue)
-							}
-						}
-					}
-				}
-			}
+			b.ProcessFunctionParams(node.Parameters)
 		}
 
 		// 处理函数体
@@ -2227,7 +2238,62 @@ func (b *builder) VisitTemplateExpression(node *ast.TemplateExpression) ssa.Valu
 	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
-	return b.EmitConstInst("")
+	unescapeTemplate := func(s string) string {
+		s = strings.ReplaceAll(s, "\\`", "`")
+		s = strings.ReplaceAll(s, "\\$", "$")
+		s = strings.ReplaceAll(s, "\\n", "\n")
+		s = strings.ReplaceAll(s, "\\r", "\r")
+		return s
+	}
+
+	getRawTemplateText := func(node *ast.Node) string {
+		if node == nil {
+			return ""
+		}
+		switch node.Kind {
+		case ast.KindTemplateHead:
+			return node.AsTemplateHead().Text
+		case ast.KindTemplateMiddle:
+			return node.AsTemplateMiddle().Text
+		case ast.KindTemplateTail:
+			return node.AsTemplateTail().Text
+		default:
+			b.NewError(ssa.Error, TAG, "Unknown template literal node type")
+			return ""
+		}
+	}
+	var result ssa.Value
+	result = b.EmitConstInst("")
+
+	// 处理 head 部分（`head ${...}`）
+	if node.Head != nil {
+		headText := getRawTemplateText(node.Head)
+		unescaped := unescapeTemplate(headText)
+		result = b.EmitBinOp(ssa.OpAdd, result, b.EmitConstInst(unescaped))
+	}
+
+	// 处理每个 TemplateSpan：${expr} + literal
+	if node.TemplateSpans != nil {
+		for _, spanNode := range node.TemplateSpans.Nodes {
+			// 1. 表达式部分
+			exprVal := b.VisitRightValueExpression(spanNode.AsTemplateSpan().Expression)
+			exprStr := b.EmitTypeCast(exprVal, ssa.BasicTypes[ssa.StringTypeKind])
+			result = b.EmitBinOp(ssa.OpAdd, result, exprStr)
+
+			// 2. 字符串字面量部分（tail 或 middle）
+			if spanNode.AsTemplateSpan().Literal != nil {
+				text := getRawTemplateText(spanNode.AsTemplateSpan().Literal)
+				unescaped := unescapeTemplate(text)
+				// TS前端解析出的TemplateSpan包含一个空的TemplateTail其中的Text和RawText都为空
+				if spanNode.AsTemplateSpan().Literal.Kind == ast.KindTemplateTail && unescaped == "" {
+					continue
+				}
+				result = b.EmitBinOp(ssa.OpAdd, result, b.EmitConstInst(unescaped))
+			}
+		}
+	}
+
+	return result
 }
 
 // VisitNoSubstitutionTemplateLiteral 访问无替换模板字面量
@@ -2464,7 +2530,7 @@ func (b *builder) VisitThisExpression(node *ast.Node) ssa.Value {
 
 	b.NewErrorWithPos(ssa.Error, TAG, b.CurrentRange, ThisKeywordNotAvailableInCurrentContext())
 
-	// 可能还需要设置thisParam的类型
+	// 可能还需要设置this的类型
 	// 如果在类方法中，设置为当前类的类型
 	// 如果在全局上下文中，设置为全局对象的类型
 
@@ -2481,16 +2547,14 @@ func (b *builder) VisitSuperExpression(node *ast.Node) ssa.Value {
 	defer recoverRange()
 
 	// 尝试从当前作用域获取已存在的super
-	if superValue := b.PeekValue("super"); superValue != nil {
-		return superValue
+	parent := b.PeekValue("super")
+	if parent == nil {
+		b.NewErrorWithPos(ssa.Error, TAG, b.CurrentRange, SuperKeywordNotAvailableInCurrentContext())
+		return b.EmitUndefined("")
 	}
-
-	b.NewErrorWithPos(ssa.Error, TAG, b.CurrentRange, SuperKeywordNotAvailableInCurrentContext())
-
-	// 可能还需要设置superParam的类型
-	// 如果在类方法中，设置为当前类的父类的类型
-
-	return b.EmitUndefined("")
+	cls := b.MarkedThisClassBlueprint.GetSuperBlueprint()
+	parent.SetType(cls)
+	return parent
 }
 
 // VisitClassExpression 访问类表达式
@@ -2650,9 +2714,6 @@ func (b *builder) VisitJsxSpreadAttribute(node *ast.JsxSpreadAttribute) ssa.Valu
 
 // ===== MISC =====
 
-// VisitTypeElement 访问类型元素
-func (b *builder) VisitTypeElement(node *ast.Node) interface{} { return nil }
-
 func (b *builder) VisitPropertyName(propertyName *ast.PropertyName) ssa.Value {
 	switch propertyName.Kind {
 	case ast.KindIdentifier:
@@ -2673,8 +2734,10 @@ func (b *builder) VisitPropertyName(propertyName *ast.PropertyName) ssa.Value {
 	case ast.KindBigIntLiteral:
 		return nil
 	default:
-		panic("unknown property name kind")
+		// panic("unknown property name kind")
+		b.NewError(ssa.Error, TAG, UnhandledPropertyNameType())
 	}
+	return nil
 }
 
 // ProcessObjectBindingPattern 处理对象解构模式
@@ -2736,7 +2799,7 @@ func (b *builder) ProcessObjectBindingPattern(pattern *ast.BindingPattern, sourc
 		}
 
 		// 如果没有绑定名称，跳过
-		if bindingElement.Name() == nil {
+		if bindingElement.Name() == nil || propertyKey == nil {
 			continue
 		}
 
@@ -2802,7 +2865,7 @@ func (b *builder) ProcessArrayBindingPattern(pattern *ast.BindingPattern, source
 			continue
 		}
 
-		// 检查是否是剩余元素: let [a, ...rest] = arr
+		// 检查是否是剩余元素: `let [a, ...rest] = arr`
 		isRest := bindingElement.DotDotDotToken != nil
 
 		var elementValue ssa.Value
@@ -2861,13 +2924,248 @@ func (b *builder) ProcessArrayBindingPattern(pattern *ast.BindingPattern, source
 	}
 }
 
-func (b *builder) VisitMemberName(name *ast.MemberName) string {
+func (b *builder) ProcessFunctionParams(params *ast.NodeList) {
+	for index, param := range params.Nodes {
+		paramNode := param.AsParameterDeclaration()
+		paramName := ""
+
+		paramNodeName := paramNode.Name()
+		if paramNodeName != nil {
+			switch paramNodeName.Kind {
+			case ast.KindIdentifier:
+				paramName = paramNodeName.AsIdentifier().Text
+			// TODO: 这里的函数参数中的绑定需要额外处理
+			case ast.KindArrayBindingPattern:
+			case ast.KindObjectBindingPattern:
+			default:
+			}
+		}
+
+		if paramName != "" {
+			// 创建参数
+			p := b.NewParam(paramName)
+
+			// 处理默认值
+			if paramNode.Initializer != nil {
+				defaultValue := b.VisitRightValueExpression(paramNode.Initializer)
+				if defaultValue != nil {
+					p.SetDefault(defaultValue)
+				}
+			}
+		} else {
+			b.NewError(ssa.Error, TAG, FunctionParamNameEmpty())
+		}
+
+		if index == len(params.Nodes)-1 && paramNode.DotDotDotToken != nil {
+			b.HandlerEllipsis()
+		}
+	}
+}
+
+func (b *builder) ProcessClassMember(member *ast.ClassElement, class *ssa.Blueprint) {
+	b.PushBlueprint(class)
+	defer b.PopBlueprint()
+
+	switch member.Kind {
+	case ast.KindConstructor:
+		b.ProcessClassCtor(member, class)
+	case ast.KindGetAccessor, ast.KindSetAccessor, ast.KindMethodDeclaration:
+		b.ProcessClassMethod(member, class)
+		return
+	case ast.KindPropertyDeclaration:
+		propDecl := member.AsPropertyDeclaration()
+
+		setMember := class.RegisterNormalMember
+		if ast.HasStaticModifier(member) {
+			setMember = class.RegisterStaticMember
+		}
+
+		nameVal := b.ProcessPropertyName(propDecl.Name())
+		undefined := b.EmitUndefined(nameVal)
+		setMember(nameVal, undefined, false)
+		store := b.StoreFunctionBuilder()
+		class.AddLazyBuilder(func() {
+			switchHandler := b.SwitchFunctionBuilder(store)
+			defer switchHandler()
+			if propDecl.Initializer != nil {
+				value := b.VisitRightValueExpression(propDecl.Initializer)
+				if !utils.IsNil(value) {
+					setMember(nameVal, value)
+				}
+			}
+		})
+		return
+	case ast.KindSemicolonClassElement:
+		return
+	case ast.KindClassStaticBlockDeclaration:
+		store := b.StoreFunctionBuilder()
+		class.AddLazyBuilder(func() {
+			switchHandler := b.SwitchFunctionBuilder(store)
+			defer switchHandler()
+			b.VisitBlock(member.AsClassStaticBlockDeclaration().Body.AsBlock())
+		})
+		return
+	default:
+		return
+	}
+}
+
+func (b *builder) ProcessPropertyName(propertyName *ast.PropertyName) string {
+	switch propertyName.Kind {
+	case ast.KindIdentifier:
+		return propertyName.AsIdentifier().Text
+	case ast.KindPrivateIdentifier:
+		return propertyName.AsPrivateIdentifier().Text
+	case ast.KindStringLiteral:
+		return propertyName.AsStringLiteral().Text
+	case ast.KindNoSubstitutionTemplateLiteral:
+		return propertyName.AsNoSubstitutionTemplateLiteral().Text
+	// 在ECMAScript 规范 (ECMA-262) 里 PropertyKey = String | Symbol 所以数字会被当成string处理
+	// const obj = { 42: "the answer", "42": "not the answer" }; "42"会覆盖前面的
+	case ast.KindNumericLiteral:
+		return propertyName.AsNumericLiteral().Text
+	case ast.KindComputedPropertyName:
+		return b.VisitComputedPropertyName(propertyName.AsComputedPropertyName()).String()
+	// A 'bigint' literal cannot be used as a property name.
+	case ast.KindBigIntLiteral:
+		return propertyName.AsBigIntLiteral().Text[:len(propertyName.AsBigIntLiteral().Text)-1]
+	default:
+		b.NewError(ssa.Error, TAG, UnexpectedPropertyNameType())
+		return uuid.NewString()
+	}
+}
+
+func (b *builder) ProcessClassMethod(member *ast.ClassElement, class *ssa.Blueprint) {
+	var methodName string
+	var params *ast.NodeList
+	// 只有箭头函数的函数体可以是表达式 箭头函数一般不出现在类内部作为方法
+	var bodyNode *ast.Block
+
+	// 根据不同类型获取相应信息
+	switch member.Kind {
+	case ast.KindGetAccessor:
+		getAccessor := member.AsGetAccessorDeclaration()
+		methodName = b.ProcessPropertyName(getAccessor.Name())
+		params = getAccessor.Parameters
+		if !ast.IsBlock(getAccessor.Body) {
+			return
+		}
+		bodyNode = getAccessor.Body.AsBlock()
+	case ast.KindSetAccessor:
+		setAccessor := member.AsSetAccessorDeclaration()
+		methodName = b.ProcessPropertyName(setAccessor.Name())
+		params = setAccessor.Parameters
+		if !ast.IsBlock(setAccessor.Body) {
+			return
+		}
+		bodyNode = setAccessor.Body.AsBlock()
+	case ast.KindMethodDeclaration:
+		methodDecl := member.AsMethodDeclaration()
+		methodName = b.ProcessPropertyName(methodDecl.Name())
+		params = methodDecl.Parameters
+		if !ast.IsBlock(methodDecl.Body) {
+			return
+		}
+		bodyNode = methodDecl.Body.AsBlock()
+	default:
+		b.NewError(ssa.Error, TAG, UnexpectedClassMethodType())
+		return
+	}
+
+	// 共同的处理逻辑
+	funcName := fmt.Sprintf("%s_%s_%s", class.Name, methodName, uuid.NewString()[:4])
+	newFunc := b.NewFunc(funcName)
+	newFunc.SetMethodName(methodName)
+
+	isStatic := ast.HasStaticModifier(member)
+	if isStatic {
+		class.RegisterStaticMethod(methodName, newFunc)
+	} else {
+		class.RegisterNormalMethod(methodName, newFunc)
+	}
+
+	store := b.StoreFunctionBuilder()
+
+	newFunc.AddLazyBuilder(func() {
+		log.Infof("lazybuild: %s %s ", funcName, methodName)
+		switchHandler := b.SwitchFunctionBuilder(store)
+		defer switchHandler()
+		b.FunctionBuilder = b.PushFunction(newFunc)
+
+		if !isStatic {
+			this := b.NewParam("this")
+			this.SetType(class)
+		}
+		b.MarkedThisClassBlueprint = class
+
+		// 处理函数参数
+		if params != nil && len(params.Nodes) > 0 {
+			b.ProcessFunctionParams(params)
+		}
+
+		// 处理函数体
+		if bodyNode != nil && bodyNode.Kind == ast.KindBlock {
+			blockNode := bodyNode.AsBlock()
+			if blockNode.Statements != nil {
+				b.VisitStatements(blockNode.Statements)
+			}
+		}
+
+		b.Finish()
+		b.FunctionBuilder = b.PopFunction()
+	})
+}
+
+func (b *builder) ProcessClassCtor(member *ast.ClassElement, class *ssa.Blueprint) {
+	ctor := member.AsConstructorDeclaration()
+	ctorName := fmt.Sprintf("%s_%s_%s", class.Name, "Custom-Constructor", uuid.NewString()[:4])
+	params := ctor.Parameters
+
+	newFunc := b.NewFunc(ctorName)
+	newFunc.SetMethodName(ctorName)
+	class.Constructor = newFunc
+	class.RegisterMagicMethod(ssa.Constructor, newFunc)
+	store := b.StoreFunctionBuilder()
+	newFunc.AddLazyBuilder(func() {
+		log.Infof("lazybuild: %s ", ctorName)
+		switchHandler := b.SwitchFunctionBuilder(store)
+		defer switchHandler()
+		b.FunctionBuilder = b.PushFunction(newFunc)
+		{
+			b.NewParam("$this")
+			container := b.EmitEmptyContainer()
+			variable := b.CreateVariable("this")
+			b.AssignVariable(variable, container)
+			container.SetType(class)
+
+			// 处理函数参数
+			if params != nil && len(params.Nodes) > 0 {
+				b.ProcessFunctionParams(params)
+			}
+
+			// 处理函数体
+			if ctor.Body != nil && ctor.Body.Kind == ast.KindBlock {
+				blockNode := ctor.Body.AsBlock()
+				b.VisitBlock(blockNode)
+			}
+
+			b.EmitReturn([]ssa.Value{container})
+			b.Finish()
+		}
+
+		b.FunctionBuilder = b.PopFunction()
+	})
+}
+
+func (b *builder) ProcessMemberName(name *ast.MemberName) string {
 	switch {
 	case ast.IsIdentifier(name):
 		return name.AsIdentifier().Text
 	case ast.IsPrivateIdentifier(name):
 		return name.AsPrivateIdentifier().Text
 	default:
-		panic("unhandled member name type")
+		// panic("unhandled member name type")
+		b.NewError(ssa.Error, TAG, UnhandledMemberNameType())
 	}
+	return fmt.Sprintf("UnexoectedMemberNameKind_%s", uuid.NewString()[:8])
 }

@@ -122,3 +122,16 @@ func (b *builder) IsListLike(val ssa.Value) bool {
 func (b *builder) IsObjectLike(val ssa.Value) bool {
 	return val.IsObject()
 }
+
+func (b *builder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() {
+	t := b.StoreFunctionBuilder()
+	b.LoadBuilder(s)
+	return func() {
+		b.LoadBuilder(t)
+	}
+}
+
+func (b *builder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
+	b.FunctionBuilder = s.Current
+	b.LoadFunctionBuilder(s.Store)
+}

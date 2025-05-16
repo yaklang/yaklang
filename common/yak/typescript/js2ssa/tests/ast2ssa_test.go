@@ -11,6 +11,7 @@ import (
 
 func TestSimplePrint(t *testing.T) {
 	t.Parallel()
+
 	ssatest.CheckPrintlnValue(`
 let a = 1
 println(a)
@@ -19,6 +20,7 @@ println(a)
 
 func TestBigInteger(t *testing.T) {
 	t.Parallel()
+
 	// 这里对待BigInt就是直接转成数字，不保留BigInt类型
 	ssatest.CheckPrintlnValue(`
 let a = 1234567n
@@ -28,6 +30,7 @@ println(a)
 
 func TestArithmeticBinaryExpressions(t *testing.T) {
 	t.Parallel()
+
 	ssatest.CheckPrintlnValue(`
 let a = 5 + 3
 let b = a - 2
@@ -53,6 +56,7 @@ println(f)
 
 func TestComparisonBinaryExpressions(t *testing.T) {
 	t.Parallel()
+
 	ssatest.CheckPrintlnValue(`
 let a = 5
 let b = 3
@@ -87,6 +91,7 @@ println(k)
 
 func TestBitwiseBinaryExpressions(t *testing.T) {
 	t.Parallel()
+
 	ssatest.CheckPrintlnValue(`
 let a = 5 & 3
 let b = 5 | 3
@@ -112,6 +117,7 @@ println(f)
 
 func TestLogicalBinaryExpressions(t *testing.T) {
 	t.Parallel()
+
 	code := `
 let a = true && false
 let b = true || false
@@ -129,6 +135,7 @@ println(e)
 
 func TestLogicalBinaryExpressionWithVariables(t *testing.T) {
 	t.Parallel()
+
 	code := `
 let a = 19
 let b = 200
@@ -148,6 +155,7 @@ println(f)
 
 func TestNullishCoalescingBinaryExpressions(t *testing.T) {
 	t.Parallel()
+
 	code := `
 let e = (null ?? 5) ?? 10
 `
@@ -158,6 +166,7 @@ let e = (null ?? 5) ?? 10
 
 func TestLogicalAssignmentBinaryExpressions(t *testing.T) {
 	t.Parallel()
+
 	code := `
 let a = false
 a ||= true
@@ -176,6 +185,7 @@ println(c)
 
 func TestArithmeticAssignmentBinaryExpressions(t *testing.T) {
 	t.Parallel()
+
 	ssatest.CheckPrintlnValue(`
 let a = 5
 a += 3
@@ -207,6 +217,7 @@ println(f)
 
 func TestBitwiseAssignmentBinaryExpressions(t *testing.T) {
 	t.Parallel()
+
 	ssatest.CheckPrintlnValue(`
 let a = 5
 a &= 3
@@ -238,6 +249,7 @@ println(f)
 
 func TestAssignmentBinaryExpressions(t *testing.T) {
 	t.Parallel()
+
 	ssatest.CheckPrintlnValue(`
 let a = 5
 let b = (a = 10)
@@ -251,6 +263,7 @@ println(b)
 
 func TestComplexBinaryExpressions(t *testing.T) {
 	t.Parallel()
+
 	ssatest.CheckPrintlnValue(`
 let a = 5 + 3 * 2
 let b = (5 + 3) * 2
@@ -270,6 +283,7 @@ println(d)
 
 func TestPropertyAccessExpression(t *testing.T) {
 	t.Parallel()
+
 	ssatest.CheckPrintlnValue(`
 // 基本对象属性访问 - 右值
 const obj = { name: "Alice", age: 30 }
@@ -316,6 +330,7 @@ println(multi.a.b)
 
 func TestElementAccessExpression(t *testing.T) {
 	t.Parallel()
+
 	ssatest.CheckPrintlnValue(`
 // 基本数组元素访问 - 右值
 const arr = [10, 20, 30]
@@ -382,6 +397,7 @@ println(mixed.items[0])
 
 func TestNestedAccessPatterns(t *testing.T) {
 	t.Parallel()
+
 	ssatest.CheckPrintlnValue(`
 // 测试嵌套的属性和元素访问组合
 const data = {
@@ -460,6 +476,7 @@ println(collection[index+1][key])
 
 func TestAssignmentVariations(t *testing.T) {
 	t.Parallel()
+
 	ssatest.CheckPrintlnValue(`
 // 测试各种赋值变体与属性/元素访问
 
@@ -574,6 +591,7 @@ println(swap.second)
 
 func TestPropertyAndElementCombinations(t *testing.T) {
 	t.Parallel()
+
 	ssatest.CheckPrintlnValue(`
 // 测试属性访问和元素访问的各种组合
 
@@ -668,6 +686,7 @@ println(complex.levels[0].points[2])
 
 func TestBasic_Variable_InBlock(t *testing.T) {
 	t.Parallel()
+
 	t.Run("test simple assign", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 		a = 1
@@ -829,6 +848,7 @@ func TestBasic_Variable_InBlock(t *testing.T) {
 
 func TestBasic_Variable_InIf(t *testing.T) {
 	t.Parallel()
+
 	t.Run("test simple if", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 		a = 1
@@ -844,7 +864,7 @@ func TestBasic_Variable_InIf(t *testing.T) {
 			"phi(a)[2,1]",
 		}, t)
 	})
-	t.Run("test simple if with local vairable", func(t *testing.T) {
+	t.Run("test simple if with local variable", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 		a = 1
 		println(a)
@@ -1000,6 +1020,7 @@ func TestBasic_Variable_InIf(t *testing.T) {
 
 func TestBasic_Variable_If_Logical(t *testing.T) {
 	t.Parallel()
+
 	t.Run("test simple", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 		a = 1
@@ -1023,6 +1044,7 @@ func TestBasic_Variable_If_Logical(t *testing.T) {
 
 func TestBasic_variable_logical(t *testing.T) {
 	t.Parallel()
+
 	t.Run("simple", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 		a = 1 || 2 
@@ -1046,6 +1068,8 @@ func TestBasic_variable_logical(t *testing.T) {
 }
 
 func TestBasic_For_Loop(t *testing.T) {
+	t.Parallel()
+
 	t.Run("simple loop not change", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 		a = 1
@@ -1127,6 +1151,8 @@ func TestBasic_For_Loop(t *testing.T) {
 }
 
 func TestBasic_DoWhile_Loop(t *testing.T) {
+	t.Parallel()
+
 	t.Run("simple do-while not change", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 		a = 1
@@ -1160,6 +1186,8 @@ func TestBasic_DoWhile_Loop(t *testing.T) {
 }
 
 func TestBasic_While_Loop(t *testing.T) {
+	t.Parallel()
+
 	t.Run("simple while not change", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 		a = 1
@@ -1242,6 +1270,8 @@ func TestForInOf_SSA(t *testing.T) {
 }
 
 func TestBasic_CFG_Break(t *testing.T) {
+	t.Parallel()
+
 	t.Run("simple break in loop", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 		a = 1
@@ -1347,6 +1377,8 @@ func TestBasic_CFG_Break(t *testing.T) {
 }
 
 func TestBasic_Variable_Switch(t *testing.T) {
+	t.Parallel()
+
 	t.Run("simple switch, no default", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 		a = 1
@@ -1452,6 +1484,8 @@ println(a)
 }
 
 func TestFunctionCFG(t *testing.T) {
+	t.Parallel()
+
 	code := `
 				a = 1
 		println(a) // 1
@@ -1485,6 +1519,132 @@ func TestFunctionCFG(t *testing.T) {
 
 	// 验证分支信息
 	require.True(t, strings.Contains(dot, "true") || strings.Contains(dot, "false"), "控制流图应该包含条件分支标签")
+}
+
+func TestTemplateString(t *testing.T) {
+	t.Parallel()
+
+	t.Run("NoSubstitutionTemplateLiteral test", func(t *testing.T) {
+		ssatest.CheckPrintlnValue("var a = `hello world`; println(a)", []string{`"hello world"`}, t)
+	})
+
+	t.Run("TemplateExpression with variable", func(t *testing.T) {
+		ssatest.CheckPrintlnValue("var b = 123; var a = `b = ${b}`; println(a)", []string{`add("b = ", castType(string, 123))`}, t)
+	})
+
+	t.Run("TemplateExpression with expr", func(t *testing.T) {
+		ssatest.CheckPrintlnValue("var a = `hello ${5 + 10} world`; println(a)", []string{`add(add("hello ", castType(string, 15)), " world")`}, t)
+	})
+}
+
+func TestClass(t *testing.T) {
+	t.Parallel()
+
+	t.Run("simple class with constructor and field access", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		class A {
+			a = 0;
+		}
+		let a = new A();
+		println(a.a);
+		`, []string{"0"}, t)
+	})
+
+	t.Run("method with side effect (setA)", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		class A {
+			a = 0 
+			setA(par) {
+				this.a = par;
+			}
+		}
+		let a = new A();
+		println(a.a);
+		a.setA(1);
+		println(a.a);
+		`, []string{
+			"0",
+			"side-effect(Parameter-par, this.a)",
+		}, t)
+	})
+
+	t.Run("method returning member value", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		class A {
+			a = 0
+			getA() {
+				return this.a;
+			}
+		}
+		let a = new A();
+		println(a.getA());
+		a.a = 1;
+		println(a.getA());
+		`, []string{
+			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
+			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[1]",
+		}, t)
+	})
+
+	t.Run("just use method set/get", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		class A {
+			a = 0;
+			getA() {
+				return this.a;
+			}
+			setA(par) {
+				this.a = par;
+			}
+		}
+		let a = new A();
+		println(a.getA());
+		a.setA(1);
+		println(a.getA());
+		`, []string{
+			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[0]",
+			"Undefined-a.getA(valid)(Undefined-A(Undefined-A)) member[side-effect(Parameter-par, this.a)]",
+		}, t)
+	})
+
+	t.Run("static member access and mutation", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		class A {
+			static a = 0;
+			static getA() {
+				return A.a;
+			}
+			static setA(par) {
+				A.a = par;
+			}
+		}
+		println(A.getA());
+		A.setA(1);
+		println(A.getA());
+		`, []string{
+			"Function-A.getA() binding[A] member[0]",
+			"Function-A.getA() binding[A] member[side-effect(Parameter-par, A.a)]",
+		}, t)
+	})
+
+	t.Run("simple class with constructor and method", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		class Person {
+			constructor(name) {
+				this.name = name;
+			}
+			greet() {
+				println("Hello, " + this.name);
+			}
+		}
+		let p = new Person("Alice");
+		p.greet();
+		`,
+			[]string{
+				`add("Hello, ", ParameterMember-parameter[0].name)`,
+			},
+			t)
+	})
 }
 
 //func TestDestructuring(t *testing.T) {

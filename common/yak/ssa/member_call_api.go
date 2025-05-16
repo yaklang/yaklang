@@ -2,10 +2,18 @@ package ssa
 
 import (
 	"fmt"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+// ReadMemberCallMethodOrValue read member call method or value depends on type
+func (b *FunctionBuilder) ReadMemberCallMethodOrValue(object, key Value) Value {
+	res := checkCanMemberCallExist(object, key, false)
+	if res.exist && res.typ.GetTypeKind() == FunctionTypeKind {
+		return b.readMemberCallValueEx(object, key, true)
+	}
+	return b.readMemberCallValueEx(object, key, false)
+}
 
 // read member call variable, want method
 func (b *FunctionBuilder) ReadMemberCallMethod(object, key Value) Value {
