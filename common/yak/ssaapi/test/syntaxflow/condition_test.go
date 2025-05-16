@@ -416,3 +416,8 @@ $target?{<typeName>?{have:/^Exception$/}} as $output
 		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 }
+
+func TestSearch(t *testing.T) {
+	code := `function a(){}`
+	ssatest.CheckSyntaxFlow(t, code, `*?{opcode: const}`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.Yak))
+}
