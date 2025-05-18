@@ -1,8 +1,6 @@
 package jsonextractor
 
 import (
-	"fmt"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 )
@@ -14,7 +12,7 @@ type bufStackKv struct {
 
 type bufStack struct {
 	isRoot       bool
-	key          string
+	key          any
 	parent       *bufStack
 	kv           func(key any, val any)
 	currentStack *vmstack.Stack
@@ -57,10 +55,13 @@ func (m *bufStackManager) PushValue(v string) {
 }
 
 func (m *bufStackManager) PushContainer() {
-	key := fmt.Sprint(m.base.currentStack.Peek())
+	var keyRaw any
+	if ret := m.base.currentStack.Peek(); ret != nil {
+		keyRaw = ret
+	}
 	sub := &bufStack{
 		isRoot:       false,
-		key:          key,
+		key:          keyRaw,
 		parent:       m.base,
 		kv:           m.base.kv,
 		currentStack: vmstack.New(),
