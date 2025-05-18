@@ -70,6 +70,7 @@ const (
 	// ex state
 	state_objectKey   = "object-key"
 	state_objectValue = "object-value"
+	state_jsonArray   = "json-array"
 )
 
 func ExtractObjectIndexes(c string) [][2]int {

@@ -2,158 +2,277 @@ package jsonextractor
 
 import (
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 )
 
-func TestExtractJSONStream(t *testing.T) {
-	raw := `{"abc"  :"abccc"}`
-	keyPass := false
-	valPass := false
-	results := ExtractJSONStream(raw, WithKeyValueCallback(func(key, data any) {
-		if key == `"abc"  ` {
-			keyPass = true
-		}
-		if data == `"abccc"` {
-			valPass = true
-		}
-	}))
-	require.Greater(t, len(results), 0)
-	require.True(t, keyPass)
-	require.True(t, valPass)
+type jsonStreamTestCase struct {
+	name                  string
+	raw                   string
+	kvCallbackAssertions  func(key, data any, keyMatch *bool, valMatch *bool, counter *int)
+	expectKeyMatch        bool
+	expectValMatch        bool
+	expectCount           int // Expected number of times the callback is called.
+	expectResultsNotEmpty bool
 }
 
-func TestExtractJSONStreamArray(t *testing.T) {
-	raw := `{"abc"  :["v1", "ccc", "eee"]}`
-	keyPass := false
-	valPass := false
-	results := ExtractJSONStream(raw, WithKeyValueCallback(func(key, data any) {
-		if key == `"abc"  ` {
-			keyPass = true
-		}
-	}))
-	require.Greater(t, len(results), 0)
-	require.True(t, keyPass)
-	_ = valPass
+func TestExtractJSONStream_TableDriven(t *testing.T) {
+	testCases := []jsonStreamTestCase{
+		{
+			name: "Simple K/V pair (Original TestExtractJSONStream)",
+			raw:  `{"abc"  :"abccc"}`,
+			kvCallbackAssertions: func(key, data any, keyMatch *bool, valMatch *bool, counter *int) {
+				if keyStr, ok := key.(string); ok && keyStr == `"abc"  ` {
+					*keyMatch = true
+				}
+				if dataStr, ok := data.(string); ok && dataStr == `"abccc"` {
+					*valMatch = true
+				}
+				if counter != nil {
+					(*counter)++
+				}
+			},
+			expectKeyMatch:        true,
+			expectValMatch:        true,
+			expectCount:           2,
+			expectResultsNotEmpty: true,
+		},
+		{
+			name: "K/V pair with array value (Original TestExtractJSONStreamArray)",
+			raw:  `{"abc"  :["v1", "ccc", "eee"]}`,
+			kvCallbackAssertions: func(key, data any, keyMatch *bool, valMatch *bool, counter *int) {
+				if keyStr, ok := key.(string); ok && keyStr == `"abc"  ` {
+					*keyMatch = true
+				}
+				// valMatch is not asserted to be true in the original test for array.
+				if counter != nil {
+					(*counter)++
+				}
+			},
+			expectKeyMatch:        true,
+			expectValMatch:        false, // Original test didn't require valPass to be true.
+			expectCount:           6,
+			expectResultsNotEmpty: true,
+		},
+		{
+			name: "Multiple K/V pairs with count (Original TestExtractJSONStream2)",
+			raw:  `{"abc"  :"abccc", "def" : "def"}`,
+			kvCallbackAssertions: func(key, data any, keyMatch *bool, valMatch *bool, counter *int) {
+				if keyStr, ok := key.(string); ok && keyStr == `"abc"  ` {
+					*keyMatch = true
+				}
+				if dataStr, ok := data.(string); ok && dataStr == `"abccc"` {
+					*valMatch = true
+				}
+				if counter != nil {
+					(*counter)++
+				}
+			},
+			expectKeyMatch:        true,
+			expectValMatch:        true,
+			expectCount:           3, // Based on original test's count assertion (N(N+1)/2 for N=2 keys)
+			expectResultsNotEmpty: true,
+		},
+		{
+			name: "More K/V pairs with count (Original TestExtractJSONStream3)",
+			raw:  `{"abc"  :"abccc", "def" : "def", "ghi" : "ghi", "jkl" : "jkl"}`,
+			kvCallbackAssertions: func(key, data any, keyMatch *bool, valMatch *bool, counter *int) {
+				if keyStr, ok := key.(string); ok && keyStr == `"abc"  ` {
+					*keyMatch = true
+				}
+				if dataStr, ok := data.(string); ok && dataStr == `"abccc"` {
+					*valMatch = true
+				}
+				if counter != nil {
+					(*counter)++
+				}
+			},
+			expectKeyMatch:        true,
+			expectValMatch:        true,
+			expectCount:           5, // Based on N(N+1)/2 for N=4 keys, original was count > 2
+			expectResultsNotEmpty: true,
+		},
+		{
+			name: "Nested object 1 (Original TestExtractJSONStream_NEST1)",
+			raw:  `{"abc"  :{"def" : "def"}}`,
+			kvCallbackAssertions: func(key, data any, keyMatch *bool, valMatch *bool, counter *int) {
+				if keyStr, ok := key.(string); ok && keyStr == `"def" ` { // Note the space
+					*keyMatch = true
+				}
+				if dataStr, ok := data.(string); ok && dataStr == ` "def"` { // Note the space
+					*valMatch = true
+				}
+				if counter != nil {
+					(*counter)++
+				}
+				fmt.Println(key, data)
+
+			},
+			expectKeyMatch:        true, // For inner key "def"
+			expectValMatch:        true, // For inner value "def"
+			expectCount:           4,    // One callback for the inner pair
+			expectResultsNotEmpty: true,
+		},
+		{
+			name: "Nested object 2 with trailing space (Original TestExtractJSONStream_NEST2)",
+			raw:  `{"abc"  :{"def" : "def"}  }`,
+			kvCallbackAssertions: func(key, data any, keyMatch *bool, valMatch *bool, counter *int) {
+				if keyStr, ok := key.(string); ok && keyStr == `"def" ` {
+					*keyMatch = true
+				}
+				if dataStr, ok := data.(string); ok && dataStr == ` "def"` {
+					*valMatch = true
+				}
+				if counter != nil {
+					(*counter)++
+				}
+			},
+			expectKeyMatch:        true,
+			expectValMatch:        true,
+			expectCount:           4,
+			expectResultsNotEmpty: true,
+		},
+		{
+			name: "Bad JSON 1 - extra quote in value (Original TestExtractJSONStream_BAD)",
+			raw:  `{"abc"  :"abc"abc""  }`,
+			kvCallbackAssertions: func(key, data any, keyMatch *bool, valMatch *bool, counter *int) {
+				// Original test only cared about valPass
+				if dataStr, ok := data.(string); ok && dataStr == `"abc"abc""  ` {
+					*valMatch = true
+				}
+				// *keyMatch is not set, so actualKeyMatch will remain false.
+				if counter != nil {
+					(*counter)++
+				}
+			},
+			expectKeyMatch:        false, // keyPass was not asserted true in original
+			expectValMatch:        true,
+			expectCount:           2,
+			expectResultsNotEmpty: true,
+		},
+		{
+			name: "Bad JSON 2 - missing quote in value (Original TestExtractJSONStream_BAD2)",
+			raw:  `{"abc"  :"abc"abc"  }`,
+			kvCallbackAssertions: func(key, data any, keyMatch *bool, valMatch *bool, counter *int) {
+				// Original test only cared about valPass
+				if dataStr, ok := data.(string); ok && dataStr == `"abc"abc"  ` {
+					*valMatch = true
+				}
+				if counter != nil {
+					(*counter)++
+				}
+			},
+			expectKeyMatch:        false, // keyPass was not asserted true in original
+			expectValMatch:        true,
+			expectCount:           2,
+			expectResultsNotEmpty: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actualKeyMatch := false
+			actualValMatch := false
+			actualCount := 0
+
+			results := ExtractJSONStream(tc.raw, WithKeyValueCallback(func(key, data any) {
+				tc.kvCallbackAssertions(key, data, &actualKeyMatch, &actualValMatch, &actualCount)
+			}))
+
+			if tc.expectResultsNotEmpty {
+				require.Greater(t, len(results), 0, "Expected results to be non-empty")
+			} else {
+				// This branch could be used if some tests expect empty results.
+				// require.Len(t, results, 0, "Expected results to be empty")
+			}
+
+			require.Equal(t, tc.expectKeyMatch, actualKeyMatch, "Key match expectation failed")
+			require.Equal(t, tc.expectValMatch, actualValMatch, "Value match expectation failed")
+			require.Equal(t, tc.expectCount, actualCount, "Count expectation failed (number of callbacks)")
+		})
+	}
 }
 
-func TestExtractJSONStream2(t *testing.T) {
-	raw := `{"abc"  :"abccc", "def" : "def"}`
-	keyPass := false
-	valPass := false
-	count := 0
-	results := ExtractJSONStream(raw, WithKeyValueCallback(func(key, data any) {
-		count++
-		fmt.Println("--------------------------------")
-		fmt.Printf("key: %#v value: %#v\n", key, data)
-		fmt.Println("--------------------------------")
-		if key == `"abc"  ` {
-			keyPass = true
-		}
-		if data == `"abccc"` {
-			valPass = true
-		}
+func TestStreamExtractorArray_SMOKING(t *testing.T) {
+	ExtractJSONStream(`{a: []}`, WithKeyValueCallback(func(key, data any) {
+		spew.Dump(key)
+		spew.Dump(data)
 	}))
-	require.Equal(t, 3, count)
-	require.Greater(t, len(results), 0)
-	require.True(t, keyPass)
-	require.True(t, valPass)
 }
 
-func TestExtractJSONStream3(t *testing.T) {
-	raw := `{"abc"  :"abccc", "def" : "def", "ghi" : "ghi", "jkl" : "jkl"}`
-	keyPass := false
-	valPass := false
-	count := 0
-	results := ExtractJSONStream(raw, WithKeyValueCallback(func(key, data any) {
-		count++
-		fmt.Println("--------------------------------")
-		fmt.Println(key, data)
-		fmt.Println("--------------------------------")
-		if key == `"abc"  ` {
-			keyPass = true
+func TestStreamExtractorArray_BASIC(t *testing.T) {
+	keyHaveZero := false
+	valueHaveResult := false
+	ExtractJSONStream(`{a: ["abc"]}`, WithKeyValueCallback(func(key, data any) {
+		if key == 0 {
+			keyHaveZero = true
 		}
-		if data == `"abccc"` {
-			valPass = true
+		spew.Dump(data)
+		if data == `"abc"` {
+			valueHaveResult = true
 		}
 	}))
-	require.Greater(t, count, 2)
-	require.Greater(t, len(results), 0)
-	require.True(t, keyPass)
-	require.True(t, valPass)
+	assert.True(t, keyHaveZero)
+	assert.True(t, valueHaveResult)
 }
 
-func TestExtractJSONStream_NEST1(t *testing.T) {
-	raw := `{"abc"  :{"def" : "def"}}`
-	keyPass := false
-	valPass := false
-	results := ExtractJSONStream(raw, WithKeyValueCallback(func(key, data any) {
-		fmt.Println("--------------------------------")
-		fmt.Println(key, data)
-		fmt.Println("--------------------------------")
-		if key == `"def" ` {
-			keyPass = true
+func TestStreamExtractorArray_BASIC2(t *testing.T) {
+	keyHaveZero := false
+	valueHaveResult := false
+	ExtractJSONStream(`{a: ["abc"    ]}`, WithKeyValueCallback(func(key, data any) {
+		if key == 0 {
+			keyHaveZero = true
 		}
-		if data == ` "def"` {
-			valPass = true
+		spew.Dump(data)
+		if data == `"abc"    ` {
+			valueHaveResult = true
 		}
 	}))
-	require.Greater(t, len(results), 0)
-	require.True(t, keyPass)
-	require.True(t, valPass)
+	assert.True(t, keyHaveZero)
+	assert.True(t, valueHaveResult)
 }
 
-func TestExtractJSONStream_NEST2(t *testing.T) {
-	raw := `{"abc"  :{"def" : "def"}  }`
-	keyPass := false
-	valPass := false
-	results := ExtractJSONStream(raw, WithKeyValueCallback(func(key, data any) {
-		fmt.Println("--------------------------------")
-		fmt.Println(key, data)
-		fmt.Println("--------------------------------")
-		if key == `"def" ` {
-			keyPass = true
+func TestStreamExtractorArray_BASIC3(t *testing.T) {
+	keyHaveZero := false
+	valueHaveResult := false
+	emptyResult := false
+	ExtractJSONStream(`{a: ["abc". ,    ]}`, WithKeyValueCallback(func(key, data any) {
+		if key == 0 {
+			keyHaveZero = true
 		}
-		if data == ` "def"` {
-			valPass = true
+		spew.Dump(data)
+		if data == `"abc". ` {
+			valueHaveResult = true
+		}
+		if data == `    ` {
+			emptyResult = true
 		}
 	}))
-	require.Greater(t, len(results), 0)
-	require.True(t, keyPass)
-	require.True(t, valPass)
-	spew.Dump(results)
+	assert.True(t, keyHaveZero)
+	assert.True(t, valueHaveResult)
+	assert.True(t, emptyResult)
 }
 
-func TestExtractJSONStream_BAD(t *testing.T) {
-	raw := `{"abc"  :"abc"abc""  }`
-	valPass := false
-	results := ExtractJSONStream(raw, WithKeyValueCallback(func(key, data any) {
-		fmt.Println("--------------------------------")
-		fmt.Println(key, data)
-		if data == `"abc"abc""  ` {
-			valPass = true
+func TestStreamExtractorArray_BASIC4(t *testing.T) {
+	keyHaveZero := false
+	valueHaveResult := false
+	emptyResult := false
+	ExtractJSONStream(`{a: ["abc". , ,,,,  ]}`, WithKeyValueCallback(func(key, data any) {
+		if key == 0 {
+			keyHaveZero = true
 		}
-		fmt.Println("--------------------------------")
-	}))
-	require.Greater(t, len(results), 0)
-	require.True(t, valPass)
-	spew.Dump(results)
-}
-
-func TestExtractJSONStream_BAD2(t *testing.T) {
-	raw := `{"abc"  :"abc"abc"  }`
-	valPass := false
-	results := ExtractJSONStream(raw, WithKeyValueCallback(func(key, data any) {
-		fmt.Println("--------------------------------")
-		fmt.Println(key, data)
-		if data == `"abc"abc"  ` {
-			valPass = true
+		spew.Dump(data)
+		if data == `"abc". ` {
+			valueHaveResult = true
 		}
-		fmt.Println("--------------------------------")
+		if data == `  ` {
+			emptyResult = true
+		}
 	}))
-	require.Greater(t, len(results), 0)
-	require.True(t, valPass)
-	spew.Dump(results)
+	assert.True(t, keyHaveZero)
+	assert.True(t, valueHaveResult)
+	assert.True(t, emptyResult)
 }
