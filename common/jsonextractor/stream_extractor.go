@@ -4,75 +4,38 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"regexp"
 	"sort"
-	"strconv"
-	"strings"
 
-	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 )
 
-var (
-	reQuoted = regexp.MustCompile(`(?P<quoted>(\\x[0-9a-fA-F]{2}))`)
-)
-
-func FixJson(b []byte) []byte {
-	// invalid character 'x' in string escape code
-	b = reQuoted.ReplaceAllFunc(b, func(i []byte) []byte {
-		raw, err := strconv.Unquote(`"` + string(i) + `"`)
-		if err != nil || len(raw) <= 0 {
-			return i
-		}
-		return []byte(fmt.Sprintf(`\u%04x`, raw[0]))
-	})
-	return b
+type callbackManager struct {
+	kvCallback func(key, data any)
 }
 
-func JsonValidObject(b []byte) ([]byte, bool) {
-	if gjson.ValidBytes(b) {
-		return b, true
+func (c *callbackManager) kv(key, data any) {
+	if c.kvCallback != nil {
+		c.kvCallback(key, data)
+	} else {
+		log.Infof("kv callback is not set, key: %v, data: %v", key, data)
 	}
-
-	r := gjson.ParseBytes(b)
-	var buf []string
-	if r.IsObject() {
-		for k, v := range r.Map() {
-			kJsonBytes, _ := json.Marshal(k)
-			var kJson = string(kJsonBytes)
-			if strings.HasPrefix(kJson, `"`) && strings.HasSuffix(kJson, `"`) {
-				buf = append(buf, fmt.Sprintf(`%v: %s`, kJson, v.String()))
-			} else {
-				buf = append(buf, fmt.Sprintf(`"%v": %s`, kJson, v.String()))
-			}
-		}
-	}
-
-	if len(buf) > 0 {
-		return []byte("{" + strings.Join(buf, ", ") + "}"), true
-	}
-
-	return nil, false
 }
 
-const (
-	state_SingleQuoteString = "s-quote"
-	state_DoubleQuoteString = "d-quote"
-	state_BacktickString    = "b-quote"
-	state_jsonObj           = "json-object"
-	state_data              = "data"
-	//state_esExpr            = "es-expr"
-	state_reset = "reset"
-	state_quote = "quote"
+type CallbackOption func(*callbackManager)
 
-	// ex state
-	state_objectKey   = "object-key"
-	state_objectValue = "object-value"
-)
+func WithKeyValueCallback(callback func(key, data any)) CallbackOption {
+	return func(c *callbackManager) {
+		c.kvCallback = callback
+	}
+}
 
-func ExtractObjectIndexes(c string) [][2]int {
+func ExtractJSONStream(c string, options ...CallbackOption) [][2]int {
+	callbackManager := &callbackManager{}
+	for _, option := range options {
+		option(callbackManager)
+	}
+
 	scanner := bufio.NewScanner(bytes.NewBufferString(c))
 	scanner.Split(bufio.ScanBytes)
 
@@ -82,43 +45,86 @@ func ExtractObjectIndexes(c string) [][2]int {
 
 	var results [][2]int
 	stack := vmstack.New()
-	pushState := func(i string) {
+
+	type state struct {
+		value string
+		start int
+		end   int
+
+		objectValueHandledString bool
+	}
+
+	bufManager := newBufStackManager(func(key any, val any) {
+		callbackManager.kv(key, val)
+	})
+
+	pushStateWithIdx := func(i string, idx int) {
+		log.Infof("push state: %v, with index: %v", i, index)
 		if i == state_jsonObj {
+			bufManager.PushContainer()
 			objectDepth++
 			if _, existed := objectDepthIndexTable[objectDepth]; !existed {
 				objectDepthIndexTable[objectDepth] = index
 			}
 		}
-		stack.Push(i)
-	}
-	popState := func() {
-		r := stack.Pop()
-		if r != nil {
-			raw, ok := r.(string)
-			if ok && raw == state_jsonObj {
-				// 记录结果
-				ret, ok := objectDepthIndexTable[objectDepth]
-				if ok && ret >= 0 {
-					results = append(results, [2]int{objectDepthIndexTable[objectDepth], index + 1})
-				}
-				delete(objectDepthIndexTable, objectDepth)
-				if objectDepth == 0 {
-					objectDepthIndexTable = make(map[int]int)
-				}
-				objectDepth--
-			}
-		}
+		stack.Push(&state{
+			value: i,
+			start: idx,
+			end:   idx,
+		})
 	}
 	currentState := func() string {
 		basicState := stack.Peek()
 		if basicState == nil {
 			return state_reset
 		}
-		return basicState.(string)
+		return basicState.(*state).value
 	}
+	currentStateIns := func() *state {
+		basicState := stack.Peek()
+		return basicState.(*state)
+	}
+	_ = currentStateIns
+	popStateWithIdx := func(idx int) {
+		r := stack.Pop()
+		if r != nil {
+			raw, ok := r.(*state)
+			if ok {
+				raw.end = idx
+				log.Infof("pop  state: %v, with data: %v (start:%v end:%v), current-state: %v", raw.value, c[raw.start:raw.end], raw.start, raw.end, currentState())
+				switch raw.value {
+				case state_objectKey:
+					bufManager.PushKey(c[raw.start:raw.end])
+				case state_objectValue:
+					bufManager.PushValue(c[raw.start:raw.end])
+				case state_jsonObj:
+					bufManager.PopContainer()
+					// 记录结果
+					ret, ok := objectDepthIndexTable[objectDepth]
+					if ok && ret >= 0 {
+						results = append(results, [2]int{objectDepthIndexTable[objectDepth], index + 1})
+					}
+					delete(objectDepthIndexTable, objectDepth)
+					if objectDepth == 0 {
+						objectDepthIndexTable = make(map[int]int)
+					}
+					objectDepth--
+				}
+
+			}
+		}
+	}
+	lastState := func() string {
+		basicState := stack.Peek()
+		if basicState == nil {
+			return state_reset
+		}
+		return basicState.(*state).value
+	}
+	_ = lastState
 
 	// 启动栈状态机
-	pushState(state_data)
+	pushStateWithIdx(state_data, 0)
 	var ch byte
 	for {
 		if !scanner.Scan() {
@@ -131,11 +137,72 @@ func ExtractObjectIndexes(c string) [][2]int {
 		}
 		ch = results[0]
 
+		pushState := func(i string) {
+			pushStateWithIdx(i, index)
+		}
+		popState := func() {
+			popStateWithIdx(index)
+		}
 		switch currentState() {
+		case state_objectValue:
+			switch ch {
+			case '{':
+				pushState(state_jsonObj)
+				pushStateWithIdx(state_objectKey, index+1)
+				continue
+			case '"':
+				if ret := currentStateIns(); ret != nil {
+					if ret.objectValueHandledString {
+						// 处理过了
+						continue
+					} else {
+						ret.objectValueHandledString = true
+					}
+				}
+				pushState(state_DoubleQuoteString)
+				continue
+			case '\'':
+				pushState(state_SingleQuoteString)
+				continue
+			case '}':
+				popState()
+				currentStateName := currentState()
+				switch currentStateName {
+				case state_jsonObj:
+					popStateWithIdx(index + 1)
+					continue
+				}
+				continue
+			case '\n':
+				popState()
+				pushStateWithIdx(state_objectKey, index+1)
+			case ',':
+				popState()
+				pushStateWithIdx(state_objectKey, index+1)
+				continue
+			}
+		case state_objectKey:
+			switch ch {
+			case '"':
+				pushState(state_DoubleQuoteString)
+				continue
+			case ':':
+				popStateWithIdx(index)
+				pushStateWithIdx(state_objectValue, index+1)
+				continue
+			case '}':
+				popStateWithIdx(index - 1)
+				if currentState() == state_jsonObj {
+					popStateWithIdx(index)
+					continue
+				}
+				continue
+			}
 		case state_data:
 			switch ch {
 			case '{':
 				pushState(state_jsonObj)
+				pushStateWithIdx(state_objectKey, index+1)
 				continue
 			case '"':
 				pushState(state_DoubleQuoteString)
@@ -177,7 +244,7 @@ func ExtractObjectIndexes(c string) [][2]int {
 				pushState(state_quote)
 				continue
 			case '"':
-				popState()
+				popStateWithIdx(index + 1)
 				continue
 			}
 		case state_SingleQuoteString:
@@ -259,37 +326,4 @@ func ExtractObjectIndexes(c string) [][2]int {
 		return blocks
 	}
 	return append(blocks, [2]int{currentBlock[0], currentBlock[1]})
-}
-
-func ExtractJSONWithRaw(raw string) (results []string, rawStr []string) {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Errorf("extract json failed: %s", err)
-		}
-	}()
-	var extraValid []string
-	for _, obj := range ExtractObjectIndexes(raw) {
-		jsonStr := raw[obj[0]:obj[1]]
-		if ret, ok := JsonValidObject([]byte(jsonStr)); ok {
-			if !json.Valid([]byte(jsonStr)) {
-				rawStr = append(rawStr, jsonStr)
-				// 修复后的 JSON
-				extraValid = append(extraValid, string(ret))
-			} else {
-				// 完美的 JSON
-				results = append(results, jsonStr)
-			}
-		} else {
-			rawStr = append(rawStr, jsonStr)
-		}
-	}
-	if len(extraValid) > 0 {
-		results = append(results, extraValid...)
-	}
-	return
-}
-
-func ExtractStandardJSON(raw string) []string {
-	jsonStr, _ := ExtractJSONWithRaw(raw)
-	return jsonStr
 }
