@@ -52,6 +52,8 @@ func ExtractJSONStream(c string, options ...CallbackOption) [][2]int {
 		end   int
 
 		objectValueHandledString bool
+		objectValueInArray       bool
+		arrayCurrentKeyIndex     int
 	}
 
 	bufManager := newBufStackManager(func(key any, val any) {
@@ -66,6 +68,8 @@ func ExtractJSONStream(c string, options ...CallbackOption) [][2]int {
 			if _, existed := objectDepthIndexTable[objectDepth]; !existed {
 				objectDepthIndexTable[objectDepth] = index
 			}
+		} else if i == state_jsonArray {
+			bufManager.PushContainer()
 		}
 		stack.Push(&state{
 			value: i,
@@ -97,6 +101,8 @@ func ExtractJSONStream(c string, options ...CallbackOption) [][2]int {
 					bufManager.PushKey(c[raw.start:raw.end])
 				case state_objectValue:
 					bufManager.PushValue(c[raw.start:raw.end])
+				case state_jsonArray:
+					bufManager.PopContainer()
 				case state_jsonObj:
 					bufManager.PopContainer()
 					// 记录结果
@@ -143,9 +149,24 @@ func ExtractJSONStream(c string, options ...CallbackOption) [][2]int {
 		popState := func() {
 			popStateWithIdx(index)
 		}
+	RETRY:
 		switch currentState() {
+		case state_jsonArray:
+			switch ch {
+			case ']':
+				popState()
+			default:
+				s := currentStateIns()
+				bufManager.PushKey(s.arrayCurrentKeyIndex)
+				s.arrayCurrentKeyIndex++
+				pushState(state_objectValue)
+				currentStateIns().objectValueInArray = true
+				goto RETRY
+			}
 		case state_objectValue:
 			switch ch {
+			case '[':
+				pushState(state_jsonArray)
 			case '{':
 				pushState(state_jsonObj)
 				pushStateWithIdx(state_objectKey, index+1)
@@ -178,8 +199,28 @@ func ExtractJSONStream(c string, options ...CallbackOption) [][2]int {
 				pushStateWithIdx(state_objectKey, index+1)
 			case ',':
 				popState()
+				if currentState() == state_jsonArray {
+					// 数组中，继续处理
+					s := currentStateIns()
+					bufManager.PushKey(s.arrayCurrentKeyIndex)
+					s.arrayCurrentKeyIndex++
+					pushStateWithIdx(state_objectValue, index+1)
+					currentStateIns().objectValueInArray = true
+					continue
+				}
 				pushStateWithIdx(state_objectKey, index+1)
 				continue
+			case ']':
+				if currentStateIns().objectValueInArray {
+					popStateWithIdx(index)
+					currentStateName := currentState()
+					switch currentStateName {
+					case state_jsonArray:
+						popStateWithIdx(index)
+						continue
+					}
+					goto RETRY
+				}
 			}
 		case state_objectKey:
 			switch ch {
