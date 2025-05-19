@@ -218,7 +218,7 @@ jobs:
           
           # 如果行数超过3行，输出111
           if [ "$line_count" -gt 3 ]; then
-            ./yak_linux_amd64 ./scripts/output_release_info.yak --ai-type chatglm --apikey ${{ secrets.CHATGLM_APIKEY }} --filename ./raw_commit_message.txt --ai-model glm-4
+            ./yak_linux_amd64 ./scripts/output_release_info.yak --ai-type chatglm --apikey ${{ secrets.CHATGLM_APIKEY }} --filename ./raw_commit_message.txt --ai-model glm-4-long
             ls | grep release
           fi
           
