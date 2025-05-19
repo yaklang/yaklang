@@ -116,23 +116,8 @@ func buildDefaultForgeHandle(forgeIns *schema.AIForge, engine *antlr4yak.Engine)
 		return initPromptStr, true
 	}
 	return func(items []*ypb.ExecParamItem, anyOpts ...any) (any, error) {
-		var opts []Option
-		for _, opt := range anyOpts {
-			if o, ok := opt.(Option); ok {
-				opts = append(opts, o)
-			}
-		}
-		var aidOpts []aid.Option
-		ag := &Agent{}
-		for _, opt := range opts {
-			if err := opt(ag); err != nil {
-				return nil, err
-			}
-		}
-		aidOpts = append(aidOpts, ag.AIDOptions()...)
-		aidOpts = append(aidOpts, aid.WithDebugPrompt(true))
-		aidOpts = append(aidOpts, aid.WithDebug(true))
-		aidOpts = append(aidOpts, aid.WithAgreeYOLO(true))
+		ag := NewAgent(anyOpts...)
+		aidOpts := ag.AIDOptions()
 
 		initPrompt, ok := getStringVar(DEFAULT_INIT_PROMPT_NAME)
 		if !ok {

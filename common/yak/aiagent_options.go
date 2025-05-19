@@ -7,7 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type Option func(*Agent) error
@@ -142,19 +141,22 @@ func NewForgeBlueprint(name string, opts ...any) *aiforge.ForgeBlueprint {
 	aiforgeOpts = append(aiforgeOpts, aiforge.WithAIDOptions(ag.ExtendAIDOptions...))
 	return aiforge.NewForgeBlueprint(name, aiforgeOpts...)
 }
-func NewExecutorFromForge(forge *aiforge.ForgeBlueprint, params []*ypb.ExecParamItem, opts ...any) (*aid.Coordinator, error) {
+func NewExecutorFromForge(forge *aiforge.ForgeBlueprint, i any, opts ...any) (*aid.Coordinator, error) {
 	ag := NewAgent(opts...)
 	ag.ForgeName = forge.Name
+	params := aiforge.Any2ExecParams(i)
 	return forge.CreateCoordinator(context.Background(), params, ag.ExtendAIDOptions...)
 }
-func NewExecutorFromJson(json string, params []*ypb.ExecParamItem, opts ...any) (*aid.Coordinator, error) {
+func NewExecutorFromJson(json string, i any, opts ...any) (*aid.Coordinator, error) {
 	bp, err := aiforge.NewYakForgeBlueprintConfigFromJson(json)
 	if err != nil {
 		return nil, err
 	}
+	params := aiforge.Any2ExecParams(i)
 	return NewExecutorFromForge(bp, params, opts...)
 }
-func NewForgeExecutor(name string, params []*ypb.ExecParamItem, opts ...any) (*aid.Coordinator, error) {
+func NewForgeExecutor(name string, i any, opts ...any) (*aid.Coordinator, error) {
+	params := aiforge.Any2ExecParams(i)
 	ag := NewAgent(opts...)
 	bp := NewForgeBlueprint(name, opts...)
 	ins, err := bp.CreateCoordinator(context.Background(), params, ag.ExtendAIDOptions...)

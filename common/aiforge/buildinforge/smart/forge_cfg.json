@@ -1,8 +1,4 @@
 {
   "name": "smart",
-  "aid_options": {
-    "disable_tool_use": true,
-    "yolo": true
-  },
-  "action_name": "smart"
+  "actions": "smart"
 }
