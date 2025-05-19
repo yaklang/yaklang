@@ -2,7 +2,6 @@ package aid
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"strings"
@@ -79,15 +78,19 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 			c.aiAutoRetry = 1
 		}
 		tokenSize := estimateTokens([]byte(request.GetPrompt()))
-		if int64(tokenSize) > c.aiCallTokenLimit {
-			go func() {
-				c.emitJson(EVENT_TYPE_PRESSURE, "system", map[string]any{
-					"message":          fmt.Sprintf("token size is too large, now[%v > limit: %v]", tokenSize, c.aiCallTokenLimit),
-					"tokenSize":        tokenSize,
-					"aiCallTokenLimit": c.aiCallTokenLimit,
-				})
-			}()
-		}
+		c.emitJson(EVENT_TYPE_PRESSURE, "system", map[string]any{
+			"current_cost_token_size": tokenSize,
+			"pressure_token_size":     c.aiCallTokenLimit,
+		})
+		//if int64(tokenSize) > c.aiCallTokenLimit {
+		//	go func() {
+		//		c.emitJson(EVENT_TYPE_PRESSURE, "system", map[string]any{
+		//			"message":          fmt.Sprintf("token size is too large, now[%v > limit: %v]", tokenSize, c.aiCallTokenLimit),
+		//			"tokenSize":        tokenSize,
+		//			"aiCallTokenLimit": c.aiCallTokenLimit,
+		//		})
+		//	}()
+		//}
 
 		start := time.Now()
 		for _idx := 0; _idx < int(c.aiAutoRetry); _idx++ {
@@ -124,13 +127,24 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 			}
 
 			rsp = c.teeAIResponse(rsp, func() {
-				c.EmitInfo("ai response first byte cost: %v", time.Since(start))
+				du := time.Since(start)
+				c.EmitInfo("ai response first byte cost: %v", du.String())
 				haveFirstByte.SetTo(true)
+				c.emitJson(EVENT_TYPE_AI_FIRST_BYTE_COST_MS, "system", map[string]any{
+					"ms":     du.Milliseconds(),
+					"second": du.Seconds(),
+				})
 			}, func(tee *AIResponse) {
-				c.EmitInfo("ai response close cost: %v", time.Since(start))
+				du := time.Since(start)
+				c.EmitInfo("ai response close cost: %v", du)
+				c.emitJson(EVENT_TYPE_AI_TOTAL_COST_MS, "system", map[string]any{
+					"ms":     du.Milliseconds(),
+					"second": du.Seconds(),
+				})
 				if onClose != nil {
 					onClose(tee)
 				}
+
 			})
 			if c.debugPrompt {
 				rsp.Debug(true)
