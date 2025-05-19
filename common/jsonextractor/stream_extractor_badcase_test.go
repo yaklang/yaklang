@@ -37,7 +37,7 @@ func TestJSONinONE(t *testing.T) {
 `
 
 	unicodeString := ""
-	ExtractJSONStream(
+	ExtractStructuredJSON(
 		data,
 		WithObjectCallback(func(data map[string]any) {
 			fmt.Println("-------------------------------")
@@ -52,7 +52,7 @@ func TestJSONinONE(t *testing.T) {
 }
 
 func TestStreamExtractor_NestObj(t *testing.T) {
-	ExtractJSONStream(`{"abc": {"a": 1}}`, WithObjectCallback(func(data map[string]any) {
+	ExtractStructuredJSON(`{"abc": {"a": 1}}`, WithObjectCallback(func(data map[string]any) {
 		spew.Dump(data)
 	}))
 }
@@ -63,7 +63,7 @@ func TestStreamExtractor_BadCase(t *testing.T) {
 	haveNull := false
 	haveFullMap := false
 
-	ExtractJSONStream(`{"name": "John Deo", 
+	ExtractStructuredJSON(`{"name": "John Deo", 
 "age": 30,
 
 "isActive": true,
