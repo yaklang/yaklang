@@ -2,12 +2,54 @@ package jsonextractor
 
 import (
 	"fmt"
+	"reflect"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
-	"reflect"
-	"testing"
 )
+
+func TestJSONinONE(t *testing.T) {
+	data := `{
+  "name": "测试数据",
+  "version": 1.0,
+  "description": "用于测试JSON解析器的示例数据。",
+  "isActive": true,
+  "score": null,
+  "configuration": {
+    "isEnabled": false,
+    "retryAttempts": 3,
+    "settings": {
+      "timeout": 5000,
+      "mode": "strict",
+      "advanced": {
+        "featureA": true,
+        "featureB": "off",
+        "featureC": [1, 2, 3, "mixed"]
+      }
+    }
+  },
+  "emptyObject": {},
+  "emptyArray": [],
+  "unicodeString": "你好，世界！🌍"
+}
+`
+
+	unicodeString := ""
+	ExtractJSONStream(
+		data,
+		WithObjectCallback(func(data map[string]any) {
+			fmt.Println("-------------------------------")
+			if result, ok := data[`unicodeString`]; ok {
+				unicodeString = fmt.Sprint(result)
+			}
+			fmt.Println("-------------------------------")
+		}),
+	)
+	fmt.Println(unicodeString)
+	assert.Equal(t, unicodeString, "你好，世界！🌍")
+}
 
 func TestStreamExtractor_BadCase(t *testing.T) {
 	haveInt64 := false
