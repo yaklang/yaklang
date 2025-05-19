@@ -90,7 +90,7 @@ jobs:
             --custom-ai \
             --ai-type chatglm \
             --apikey ${{ secrets.CHATGLM_APIKEY }} \
-            --ai-model glm-4 \
+            --ai-model glm-4-long \
             --concurrent 5 
           
           echo "Checking generated files..."
