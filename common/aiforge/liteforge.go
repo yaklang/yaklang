@@ -77,7 +77,7 @@ func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, op
 	call := utils.Jsonify(params)
 
 	temp := `# Preset
-你现在在一个任务引擎中，是一个输出JSON的数据提取和总结小助手，我会为你提供一些基本信息和输入材料，你需要按照我的Schema生成一个JSON数据直接返回。
+你现在在一个任务引擎中，是一个输出JSON的数据处理和总结提示小助手，我会为你提供一些基本信息和输入材料，你需要按照我的Schema生成一个JSON数据直接返回。
 
 作为系统的一部分你应该直接返回JSON，避免多余的解释。
 

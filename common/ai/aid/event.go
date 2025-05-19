@@ -28,6 +28,9 @@ const (
 	// 压力值
 	EVENT_TYPE_PRESSURE EventType = "pressure" // pressure for ai context percent
 
+	EVENT_TYPE_AI_FIRST_BYTE_COST_MS EventType = "ai_first_byte_cost_ms" // first byte cost
+	EVENT_TYPE_AI_TOTAL_COST_MS      EventType = "ai_total_cost_ms"      // first byte cost
+
 	// AI 请求用户交互
 	EVENT_TYPE_REQUIRE_USER_INTERACTIVE = "require_user_interactive"
 
