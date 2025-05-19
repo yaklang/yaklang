@@ -388,6 +388,9 @@ func (p *Program) ForEachFile(callBack func(string, *memedit.MemEditor)) {
 
 func (p *Program) FileFilter(path string, match string, rule map[string]string, rule2 []string) (sfvm.ValueOperator, error) {
 	filter := NewFileFilter(path, match, rule2)
+	if filter == nil {
+		return nil, nil
+	}
 
 	var res []sfvm.ValueOperator
 	addRes := func(index Index, editor *memedit.MemEditor) {
@@ -402,6 +405,7 @@ func (p *Program) FileFilter(path string, match string, rule map[string]string, 
 		if me == nil {
 			return
 		}
+
 		if filter.matchFile(s) {
 			matchFile = true
 			if filter.matchContent != nil {
