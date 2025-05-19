@@ -51,6 +51,12 @@ func TestJSONinONE(t *testing.T) {
 	assert.Equal(t, unicodeString, "你好，世界！🌍")
 }
 
+func TestStreamExtractor_NestObj(t *testing.T) {
+	ExtractJSONStream(`{"abc": {"a": 1}}`, WithObjectCallback(func(data map[string]any) {
+		spew.Dump(data)
+	}))
+}
+
 func TestStreamExtractor_BadCase(t *testing.T) {
 	haveInt64 := false
 	haveBool := false

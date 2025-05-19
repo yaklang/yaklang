@@ -71,6 +71,8 @@ func ExtractJSONStream(c string, options ...CallbackOption) [][2]int {
 		start int
 		end   int
 
+		isObject                 bool
+		isArray                  bool
 		objectValueHandledString bool
 		objectValueInArray       bool
 		arrayCurrentKeyIndex     int
@@ -137,7 +139,9 @@ func ExtractJSONStream(c string, options ...CallbackOption) [][2]int {
 				case state_objectKey:
 					bufManager.PushKey(sliceValue)
 				case state_objectValue:
-					bufManager.PushValue(sliceValue)
+					if !raw.isObject && !raw.isArray {
+						bufManager.PushValue(sliceValue)
+					}
 				case state_jsonArray:
 					bufManager.PopContainer()
 				case state_jsonObj:
@@ -203,8 +207,10 @@ func ExtractJSONStream(c string, options ...CallbackOption) [][2]int {
 		case state_objectValue:
 			switch ch {
 			case '[':
+				currentStateIns().isArray = true
 				pushState(state_jsonArray)
 			case '{':
+				currentStateIns().isObject = true
 				pushState(state_jsonObj)
 				pushStateWithIdx(state_objectKey, index+1)
 				continue
