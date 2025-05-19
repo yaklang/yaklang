@@ -178,7 +178,7 @@ func TestExtractJSONStream_TableDriven(t *testing.T) {
 			actualValMatch := false
 			actualCount := 0
 
-			results := ExtractJSONStream(tc.raw, WithKeyValueCallback(func(key, data any) {
+			results := ExtractJSONStream(tc.raw, WithRawKeyValueCallback(func(key, data any) {
 				tc.kvCallbackAssertions(key, data, &actualKeyMatch, &actualValMatch, &actualCount)
 			}))
 
@@ -197,7 +197,7 @@ func TestExtractJSONStream_TableDriven(t *testing.T) {
 }
 
 func TestStreamExtractorArray_SMOKING(t *testing.T) {
-	ExtractJSONStream(`{a: []}`, WithKeyValueCallback(func(key, data any) {
+	ExtractJSONStream(`{a: []}`, WithRawKeyValueCallback(func(key, data any) {
 		spew.Dump(key)
 		spew.Dump(data)
 	}))
@@ -206,7 +206,7 @@ func TestStreamExtractorArray_SMOKING(t *testing.T) {
 func TestStreamExtractorArray_BASIC(t *testing.T) {
 	keyHaveZero := false
 	valueHaveResult := false
-	ExtractJSONStream(`{a: ["abc"]}`, WithKeyValueCallback(func(key, data any) {
+	ExtractJSONStream(`{a: ["abc"]}`, WithRawKeyValueCallback(func(key, data any) {
 		if key == 0 {
 			keyHaveZero = true
 		}
@@ -222,7 +222,7 @@ func TestStreamExtractorArray_BASIC(t *testing.T) {
 func TestStreamExtractorArray_BASIC2(t *testing.T) {
 	keyHaveZero := false
 	valueHaveResult := false
-	ExtractJSONStream(`{a: ["abc"    ]}`, WithKeyValueCallback(func(key, data any) {
+	ExtractJSONStream(`{a: ["abc"    ]}`, WithRawKeyValueCallback(func(key, data any) {
 		if key == 0 {
 			keyHaveZero = true
 		}
@@ -239,7 +239,7 @@ func TestStreamExtractorArray_BASIC3(t *testing.T) {
 	keyHaveZero := false
 	valueHaveResult := false
 	emptyResult := false
-	ExtractJSONStream(`{a: ["abc". ,    ]}`, WithKeyValueCallback(func(key, data any) {
+	ExtractJSONStream(`{a: ["abc". ,    ]}`, WithRawKeyValueCallback(func(key, data any) {
 		if key == 0 {
 			keyHaveZero = true
 		}
@@ -260,7 +260,7 @@ func TestStreamExtractorArray_BASIC4(t *testing.T) {
 	keyHaveZero := false
 	valueHaveResult := false
 	emptyResult := false
-	ExtractJSONStream(`{a: ["abc". , ,,,,  ]}`, WithKeyValueCallback(func(key, data any) {
+	ExtractJSONStream(`{a: ["abc". , ,,,,  ]}`, WithRawKeyValueCallback(func(key, data any) {
 		if key == 0 {
 			keyHaveZero = true
 		}
