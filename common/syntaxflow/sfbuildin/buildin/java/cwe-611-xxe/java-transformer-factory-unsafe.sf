@@ -27,8 +27,8 @@ alert $vuln for {
 
 // ---------------------------------------CODE----------------------------------------------
 desc(
-	lang: java,
-	alert_num:1,
+	lang: java
+	alert_num:1
 	"file:///unsafe.java": <<<UNSAFE
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerException;
@@ -55,9 +55,9 @@ public class XXEVulnerableExample {
 UNSAFE
 )
 
-desc (
-    lang:java,
-    "safefile:///safe.java": <<<SAFE
+desc(
+	lang:java
+	"safefile:///safe.java": <<<SAFE
 import javax.xml.XMLConstants;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerConfigurationException;

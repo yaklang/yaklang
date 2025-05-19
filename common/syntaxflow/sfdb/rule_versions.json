@@ -662,8 +662,8 @@
   {
     "rule_id": "91546005-80bf-4320-9273-1df7155f61a7",
     "rule_name": "检测 SAXParserFactory() 不安全使用",
-    "hash": "03a18127e73cc08e11a1d2f6b9a78e52a8a34a2485bbcafdc7146c51960c6abd",
-    "version": "20250516.0001"
+    "hash": "1915d5d6d2be5698095ff839b71050349a5d21e773ccdf50788cc7e336b8ca01",
+    "version": "20250519.0001"
   },
   {
     "rule_id": "bac3b5b7-9ff9-4534-ae1d-4ff2128c6e57",
@@ -674,20 +674,20 @@
   {
     "rule_id": "b139c1f5-00ba-415d-ad4f-0f6c4df9b344",
     "rule_name": "在上下文中查找 'javax.xml.transform.Transformer' 不安全使用",
-    "hash": "6fcaec66886601c5027247519c4c9bb728442ee1b6cf436028b592860ad75df5",
-    "version": "20250516.0001"
+    "hash": "90105e3bb58d811fc1b2a878de37b11fa767f8d454fd144c305eeb19d194fd27",
+    "version": "20250519.0001"
   },
   {
     "rule_id": "4b416d51-56a5-4424-a7e3-79514d453483",
     "rule_name": "检测 STAX（Streaming API for XML） XMLInputFactory() 不安全使用",
-    "hash": "e09a3aae5d61b52c777b0228c212b788fafda9575e26b0f1467ec027bd206ee0",
-    "version": "20250516.0001"
+    "hash": "aaa077ce9ecf2c5750f4872813f2b250b7e47c3b2b69dc17e9023f534f0e3b81",
+    "version": "20250519.0001"
   },
   {
     "rule_id": "310b2358-73f4-4be5-863c-0acbcf06c66b",
     "rule_name": "检查 XMLReaderFactory.createXMLReader() 不安全使用",
-    "hash": "280818769fe6eae1d3b2557936c15c7b1f03e172c0e956577ca391dd7e44c657",
-    "version": "20250516.0001"
+    "hash": "3bdef3cfaa66823a3ce6934a452fc7d7cd594a9fd72c3f97bd3841c97ad8965a",
+    "version": "20250519.0001"
   },
   {
     "rule_id": "c4ad6405-a9bc-468a-87be-06742472b623",
