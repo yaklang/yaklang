@@ -1,6 +1,9 @@
 package yakvm
 
 import (
+	"reflect"
+	"unsafe"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor/nasl_type"
 )
@@ -60,4 +63,88 @@ func GetNaslValueBySymbolId(symbol int, frame *Frame) *Value {
 	}
 	val.SymbolId = id
 	return val
+}
+
+func IsDefinedType(t reflect.Type) bool {
+	return t.Name() != ""
+}
+
+func TypeUnderlying(t reflect.Type) (ret reflect.Type) {
+	// 如果类型没有名称，则它是一个未命名类型，底层类型就是它自己
+	if t.Name() == "" {
+		return t
+	}
+
+	// 获取kind并使用适当的方法创建底层类型
+	kind := t.Kind()
+
+	// 处理基本类型
+	switch kind {
+	case reflect.Bool:
+		return reflect.TypeOf(false)
+	case reflect.Int:
+		return reflect.TypeOf(int(0))
+	case reflect.Int8:
+		return reflect.TypeOf(int8(0))
+	case reflect.Int16:
+		return reflect.TypeOf(int16(0))
+	case reflect.Int32:
+		return reflect.TypeOf(int32(0))
+	case reflect.Int64:
+		return reflect.TypeOf(int64(0))
+	case reflect.Uint:
+		return reflect.TypeOf(uint(0))
+	case reflect.Uint8:
+		return reflect.TypeOf(uint8(0))
+	case reflect.Uint16:
+		return reflect.TypeOf(uint16(0))
+	case reflect.Uint32:
+		return reflect.TypeOf(uint32(0))
+	case reflect.Uint64:
+		return reflect.TypeOf(uint64(0))
+	case reflect.Uintptr:
+		return reflect.TypeOf(uintptr(0))
+	case reflect.Float32:
+		return reflect.TypeOf(float32(0))
+	case reflect.Float64:
+		return reflect.TypeOf(float64(0))
+	case reflect.Complex64:
+		return reflect.TypeOf(complex64(0))
+	case reflect.Complex128:
+		return reflect.TypeOf(complex128(0))
+	case reflect.String:
+		return reflect.TypeOf("")
+	case reflect.UnsafePointer:
+		return reflect.TypeOf(unsafe.Pointer(nil))
+
+	// 复合类型
+	case reflect.Array:
+		return reflect.ArrayOf(t.Len(), t.Elem())
+	case reflect.Chan:
+		return reflect.ChanOf(t.ChanDir(), t.Elem())
+	case reflect.Map:
+		return reflect.MapOf(t.Key(), t.Elem())
+	case reflect.Ptr:
+		return reflect.PointerTo(t.Elem())
+	case reflect.Slice:
+		return reflect.SliceOf(t.Elem())
+	case reflect.Func:
+		// 获取参数和返回值类型
+		numIn := t.NumIn()
+		numOut := t.NumOut()
+		in := make([]reflect.Type, numIn)
+		out := make([]reflect.Type, numOut)
+
+		for i := 0; i < numIn; i++ {
+			in[i] = t.In(i)
+		}
+		for i := 0; i < numOut; i++ {
+			out[i] = t.Out(i)
+		}
+
+		return reflect.FuncOf(in, out, t.IsVariadic())
+	}
+
+	// 默认返回原始类型
+	return t
 }

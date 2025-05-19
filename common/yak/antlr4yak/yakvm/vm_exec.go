@@ -792,6 +792,14 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			return
 		}
 
+		originValType := reflect.TypeOf(val.Value)
+		if IsDefinedType(originValType) {
+			underlyingType := TypeUnderlying(originValType)
+			reflectVal := reflect.ValueOf(val.Value)
+			reflectVal = reflectVal.Convert(underlyingType)
+			val = NewAutoValue(reflectVal.Interface())
+		}
+
 		// 基本类型互转
 		switch typ.Type() {
 		case literalReflectType_Int:

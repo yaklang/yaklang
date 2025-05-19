@@ -929,8 +929,11 @@ func (v *Value) Int() int {
 		return int(ret)
 	default:
 		refV := reflect.ValueOf(v.Value)
-		if refV.Kind() >= reflect.Int && refV.Kind() <= reflect.Uint64 {
+		if refV.Kind() >= reflect.Int && refV.Kind() <= reflect.Int64 {
 			return int(refV.Int())
+		}
+		if refV.Kind() >= reflect.Uint && refV.Kind() <= reflect.Uint64 {
+			return int(refV.Uint())
 		}
 	}
 
@@ -964,8 +967,11 @@ func (v *Value) Int64() int64 {
 		return int64(ret)
 	default:
 		refV := reflect.ValueOf(v.Value)
-		if refV.Kind() >= reflect.Int && refV.Kind() <= reflect.Uint64 {
+		if refV.Kind() >= reflect.Int && refV.Kind() <= reflect.Int64 {
 			return refV.Int()
+		}
+		if refV.Kind() >= reflect.Uint && refV.Kind() <= reflect.Uint64 {
+			return int64(refV.Uint())
 		}
 	}
 	return 0

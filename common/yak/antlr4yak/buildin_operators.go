@@ -3,12 +3,13 @@ package antlr4yak
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	"math"
 	"reflect"
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/yaklang/yaklang/common/utils/orderedmap"
 
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )

@@ -28,6 +28,11 @@ import (
 type testStructed struct {
 	A []int
 }
+type Number uint16
+
+func (n Number) String() string {
+	return fmt.Sprintf("number: %d", n)
+}
 
 func init() {
 	Import("libx", map[string]interface{}{
@@ -124,6 +129,9 @@ func init() {
 	Import("dur", func(i string) time.Duration {
 		dur, _ := time.ParseDuration(i)
 		return dur
+	})
+	Import("getNumber", func(i int) Number {
+		return Number(i)
 	})
 }
 
@@ -4286,6 +4294,24 @@ func a(){
     }
 }
 assert a() == nil
+`
+	_marshallerTest(code)
+	_formattest(code)
+}
+
+func TestTypeCast(t *testing.T) {
+	code := `
+number = getNumber(1)
+assert "Number" in typeof(number).String()
+assert typeof(int(number)).String() == "int"
+assert string(int(number)) == "1"
+assert int(number)+1 == 2
+
+number2 = dur("1s")
+assert typeof(number2).String() == "time.Duration"
+assert typeof(int(number2)).String() == "int"
+assert string(int(number2)/1000/1000/1000) == "1"
+assert (int(number2)+1)/1000/1000/1000 == 1
 `
 	_marshallerTest(code)
 	_formattest(code)
