@@ -4,19 +4,19 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
 type jsonStreamTestCase struct {
-	name                  string
-	raw                   string
-	kvCallbackAssertions  func(key, data any, keyMatch *bool, valMatch *bool, counter *int)
-	expectKeyMatch        bool
-	expectValMatch        bool
-	expectCount           int // Expected number of times the callback is called.
-	expectResultsNotEmpty bool
+	name                 string
+	raw                  string
+	kvCallbackAssertions func(key, data any, keyMatch *bool, valMatch *bool, counter *int)
+	expectKeyMatch       bool
+	expectValMatch       bool
+	expectCount          int // Expected number of times the callback is called.
 }
 
 func TestExtractJSONStream_TableDriven(t *testing.T) {
@@ -35,10 +35,9 @@ func TestExtractJSONStream_TableDriven(t *testing.T) {
 					(*counter)++
 				}
 			},
-			expectKeyMatch:        true,
-			expectValMatch:        true,
-			expectCount:           2,
-			expectResultsNotEmpty: true,
+			expectKeyMatch: true,
+			expectValMatch: true,
+			expectCount:    2,
 		},
 		{
 			name: "K/V pair with array value (Original TestExtractJSONStreamArray)",
@@ -52,10 +51,9 @@ func TestExtractJSONStream_TableDriven(t *testing.T) {
 					(*counter)++
 				}
 			},
-			expectKeyMatch:        true,
-			expectValMatch:        false, // Original test didn't require valPass to be true.
-			expectCount:           5,
-			expectResultsNotEmpty: true,
+			expectKeyMatch: true,
+			expectValMatch: false, // Original test didn't require valPass to be true.
+			expectCount:    5,
 		},
 		{
 			name: "Multiple K/V pairs with count (Original TestExtractJSONStream2)",
@@ -71,10 +69,9 @@ func TestExtractJSONStream_TableDriven(t *testing.T) {
 					(*counter)++
 				}
 			},
-			expectKeyMatch:        true,
-			expectValMatch:        true,
-			expectCount:           3, // Based on original test's count assertion (N(N+1)/2 for N=2 keys)
-			expectResultsNotEmpty: true,
+			expectKeyMatch: true,
+			expectValMatch: true,
+			expectCount:    3, // Based on original test's count assertion (N(N+1)/2 for N=2 keys)
 		},
 		{
 			name: "More K/V pairs with count (Original TestExtractJSONStream3)",
@@ -90,10 +87,9 @@ func TestExtractJSONStream_TableDriven(t *testing.T) {
 					(*counter)++
 				}
 			},
-			expectKeyMatch:        true,
-			expectValMatch:        true,
-			expectCount:           5, // Based on N(N+1)/2 for N=4 keys, original was count > 2
-			expectResultsNotEmpty: true,
+			expectKeyMatch: true,
+			expectValMatch: true,
+			expectCount:    5, // Based on N(N+1)/2 for N=4 keys, original was count > 2
 		},
 		{
 			name: "Nested object 1 (Original TestExtractJSONStream_NEST1)",
@@ -111,10 +107,9 @@ func TestExtractJSONStream_TableDriven(t *testing.T) {
 				fmt.Println(key, data)
 
 			},
-			expectKeyMatch:        true, // For inner key "def"
-			expectValMatch:        true, // For inner value "def"
-			expectCount:           3,    // One callback for the inner pair
-			expectResultsNotEmpty: true,
+			expectKeyMatch: true, // For inner key "def"
+			expectValMatch: true, // For inner value "def"
+			expectCount:    3,    // One callback for the inner pair
 		},
 		{
 			name: "Nested object 2 with trailing space (Original TestExtractJSONStream_NEST2)",
@@ -130,10 +125,9 @@ func TestExtractJSONStream_TableDriven(t *testing.T) {
 					(*counter)++
 				}
 			},
-			expectKeyMatch:        true,
-			expectValMatch:        true,
-			expectCount:           3,
-			expectResultsNotEmpty: true,
+			expectKeyMatch: true,
+			expectValMatch: true,
+			expectCount:    3,
 		},
 		{
 			name: "Bad JSON 1 - extra quote in value (Original TestExtractJSONStream_BAD)",
@@ -148,10 +142,9 @@ func TestExtractJSONStream_TableDriven(t *testing.T) {
 					(*counter)++
 				}
 			},
-			expectKeyMatch:        false, // keyPass was not asserted true in original
-			expectValMatch:        true,
-			expectCount:           2,
-			expectResultsNotEmpty: true,
+			expectKeyMatch: false, // keyPass was not asserted true in original
+			expectValMatch: true,
+			expectCount:    2,
 		},
 		{
 			name: "Bad JSON 2 - missing quote in value (Original TestExtractJSONStream_BAD2)",
@@ -165,10 +158,9 @@ func TestExtractJSONStream_TableDriven(t *testing.T) {
 					(*counter)++
 				}
 			},
-			expectKeyMatch:        false, // keyPass was not asserted true in original
-			expectValMatch:        true,
-			expectCount:           2,
-			expectResultsNotEmpty: true,
+			expectKeyMatch: false, // keyPass was not asserted true in original
+			expectValMatch: true,
+			expectCount:    2,
 		},
 	}
 
@@ -178,15 +170,13 @@ func TestExtractJSONStream_TableDriven(t *testing.T) {
 			actualValMatch := false
 			actualCount := 0
 
-			results := ExtractJSONStream(tc.raw, WithRawKeyValueCallback(func(key, data any) {
+			parseError := ExtractStructuredJSON(tc.raw, WithRawKeyValueCallback(func(key, data any) {
 				tc.kvCallbackAssertions(key, data, &actualKeyMatch, &actualValMatch, &actualCount)
 			}))
-
-			if tc.expectResultsNotEmpty {
-				require.Greater(t, len(results), 0, "Expected results to be non-empty")
-			} else {
-				// This branch could be used if some tests expect empty results.
-				// require.Len(t, results, 0, "Expected results to be empty")
+			if parseError != nil {
+				if parseError != io.EOF {
+					t.Fatal("SMOKING ERR: ", parseError)
+				}
 			}
 
 			require.Equal(t, tc.expectKeyMatch, actualKeyMatch, "Key match expectation failed")
@@ -197,7 +187,7 @@ func TestExtractJSONStream_TableDriven(t *testing.T) {
 }
 
 func TestStreamExtractorArray_SMOKING(t *testing.T) {
-	ExtractJSONStream(`{a: []}`, WithRawKeyValueCallback(func(key, data any) {
+	ExtractStructuredJSON(`{a: []}`, WithRawKeyValueCallback(func(key, data any) {
 		spew.Dump(key)
 		spew.Dump(data)
 	}))
@@ -206,7 +196,7 @@ func TestStreamExtractorArray_SMOKING(t *testing.T) {
 func TestStreamExtractorArray_BASIC(t *testing.T) {
 	keyHaveZero := false
 	valueHaveResult := false
-	ExtractJSONStream(`{a: ["abc"]}`, WithRawKeyValueCallback(func(key, data any) {
+	ExtractStructuredJSON(`{a: ["abc"]}`, WithRawKeyValueCallback(func(key, data any) {
 		if key == 0 {
 			keyHaveZero = true
 		}
@@ -222,7 +212,7 @@ func TestStreamExtractorArray_BASIC(t *testing.T) {
 func TestStreamExtractorArray_BASIC2(t *testing.T) {
 	keyHaveZero := false
 	valueHaveResult := false
-	ExtractJSONStream(`{a: ["abc"    ]}`, WithRawKeyValueCallback(func(key, data any) {
+	ExtractStructuredJSON(`{a: ["abc"    ]}`, WithRawKeyValueCallback(func(key, data any) {
 		if key == 0 {
 			keyHaveZero = true
 		}
@@ -239,7 +229,7 @@ func TestStreamExtractorArray_BASIC3(t *testing.T) {
 	keyHaveZero := false
 	valueHaveResult := false
 	emptyResult := false
-	ExtractJSONStream(`{a: ["abc". ,    ]}`, WithRawKeyValueCallback(func(key, data any) {
+	ExtractStructuredJSON(`{a: ["abc". ,    ]}`, WithRawKeyValueCallback(func(key, data any) {
 		if key == 0 {
 			keyHaveZero = true
 		}
@@ -260,7 +250,7 @@ func TestStreamExtractorArray_BASIC4(t *testing.T) {
 	keyHaveZero := false
 	valueHaveResult := false
 	emptyResult := false
-	ExtractJSONStream(`{a: ["abc". , ,,,,  ]}`, WithRawKeyValueCallback(func(key, data any) {
+	ExtractStructuredJSON(`{a: ["abc". , ,,,,  ]}`, WithRawKeyValueCallback(func(key, data any) {
 		if key == 0 {
 			keyHaveZero = true
 		}

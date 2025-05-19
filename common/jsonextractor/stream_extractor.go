@@ -1,11 +1,10 @@
 package jsonextractor
 
 import (
-	"bufio"
 	"bytes"
-	"encoding/json"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
-	"sort"
+	"io"
 )
 
 type callbackManager struct {
@@ -50,14 +49,22 @@ func WithRootMapCallback(callback func(data map[string]any)) CallbackOption {
 	}
 }
 
-func ExtractJSONStream(c string, options ...CallbackOption) [][2]int {
+func ExtractStructuredJSON(c string, options ...CallbackOption) error {
+	return ExtractStructuredJSONFromStream(bytes.NewBufferString(c), options...)
+}
+
+func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOption) error {
 	callbackManager := &callbackManager{}
 	for _, option := range options {
 		option(callbackManager)
 	}
 
-	scanner := bufio.NewScanner(bytes.NewBufferString(c))
-	scanner.Split(bufio.ScanBytes)
+	var mirror = new(bytes.Buffer)
+	reader := newAutoPeekReader(io.TeeReader(jsonReader, mirror))
+
+	getMirrorBytes := func() string {
+		return mirror.String()
+	}
 
 	var index = -1
 	var objectDepth = 0
@@ -118,6 +125,7 @@ func ExtractJSONStream(c string, options ...CallbackOption) [][2]int {
 		if s.start == s.end {
 			return ""
 		}
+		c := getMirrorBytes()
 		if s.end >= len(c) {
 			s.end = len(c) - 1
 		}
@@ -130,6 +138,7 @@ func ExtractJSONStream(c string, options ...CallbackOption) [][2]int {
 			raw, ok := r.(*state)
 			if ok {
 				raw.end = idx
+				c := getMirrorBytes()
 				if raw.end >= len(c) {
 					raw.end = len(c) - 1
 				}
@@ -174,11 +183,18 @@ func ExtractJSONStream(c string, options ...CallbackOption) [][2]int {
 	pushStateWithIdx(state_data, 0)
 	var ch byte
 	for {
-		if !scanner.Scan() {
-			break
+		var results = make([]byte, 1)
+		n, err := io.ReadFull(reader, results)
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			log.Errorf("parse json stream failed: %v", err)
+			return err
 		}
+		results = results[:n]
+
 		index++
-		results := scanner.Bytes()
 		if len(results) <= 0 {
 			break
 		}
@@ -370,44 +386,5 @@ func ExtractJSONStream(c string, options ...CallbackOption) [][2]int {
 			pushState(state_data)
 		}
 	}
-
-	// 收缩结果
-	var blocks [][2]int
-	var currentBlock = [2]int{-1, -1}
-	sort.SliceStable(results, func(i, j int) bool {
-		return results[i][0] < results[j][0]
-	})
-	currentBlockIsJson := func() bool {
-		if currentBlock[0] < 0 {
-			return false
-		}
-		return json.Valid([]byte(c[currentBlock[0]:currentBlock[1]]))
-	}
-	for _, result := range results {
-		retRaw := c[result[0]:result[1]]
-		_, isJson := JsonValidObject([]byte(retRaw))
-		// fmt.Printf("%v: idx: %v json: %v\n", retRaw, result, isJson)
-		if currentBlock[0] < 0 {
-			currentBlock[0], currentBlock[1] = result[0], result[1]
-			continue
-		}
-
-		if result[0] >= currentBlock[0] && result[1] <= currentBlock[1] && currentBlockIsJson() {
-			// 被包含的内容
-			continue
-		} else {
-			blocks = append(blocks, [2]int{currentBlock[0], currentBlock[1]})
-			if isJson {
-				currentBlock[0], currentBlock[1] = result[0], result[1]
-			} else {
-				blocks = append(blocks, [2]int{result[0], result[1]})
-				currentBlock[0] = -1
-				currentBlock[1] = -1
-			}
-		}
-	}
-	if currentBlock[0] < 0 {
-		return blocks
-	}
-	return append(blocks, [2]int{currentBlock[0], currentBlock[1]})
+	return nil
 }
