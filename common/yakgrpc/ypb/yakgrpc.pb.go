@@ -42827,13 +42827,14 @@ type SSAProgram struct {
 	Language      string `protobuf:"bytes,6,opt,name=Language,proto3" json:"Language,omitempty"`
 	EngineVersion string `protobuf:"bytes,7,opt,name=EngineVersion,proto3" json:"EngineVersion,omitempty"`
 	// need re-compile
-	Recompile bool `protobuf:"varint,8,opt,name=Recompile,proto3" json:"Recompile,omitempty"`
+	Recompile bool   `protobuf:"varint,8,opt,name=Recompile,proto3" json:"Recompile,omitempty"`
+	Id        uint32 `protobuf:"varint,13,opt,name=Id,proto3" json:"Id,omitempty"`
 	// risk number
-	HighRiskNumber     int64  `protobuf:"varint,9,opt,name=HighRiskNumber,proto3" json:"HighRiskNumber,omitempty"`
-	CriticalRiskNumber int64  `protobuf:"varint,10,opt,name=CriticalRiskNumber,proto3" json:"CriticalRiskNumber,omitempty"`
-	WarnRiskNumber     int64  `protobuf:"varint,11,opt,name=WarnRiskNumber,proto3" json:"WarnRiskNumber,omitempty"`
-	LowRiskNumber      int64  `protobuf:"varint,12,opt,name=LowRiskNumber,proto3" json:"LowRiskNumber,omitempty"`
-	Id                 uint32 `protobuf:"varint,13,opt,name=Id,proto3" json:"Id,omitempty"`
+	CriticalRiskNumber int64 `protobuf:"varint,10,opt,name=CriticalRiskNumber,proto3" json:"CriticalRiskNumber,omitempty"`
+	HighRiskNumber     int64 `protobuf:"varint,9,opt,name=HighRiskNumber,proto3" json:"HighRiskNumber,omitempty"`
+	WarnRiskNumber     int64 `protobuf:"varint,11,opt,name=WarnRiskNumber,proto3" json:"WarnRiskNumber,omitempty"`
+	LowRiskNumber      int64 `protobuf:"varint,12,opt,name=LowRiskNumber,proto3" json:"LowRiskNumber,omitempty"`
+	InfoRiskNumber     int64 `protobuf:"varint,14,opt,name=InfoRiskNumber,proto3" json:"InfoRiskNumber,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -42924,9 +42925,9 @@ func (x *SSAProgram) GetRecompile() bool {
 	return false
 }
 
-func (x *SSAProgram) GetHighRiskNumber() int64 {
+func (x *SSAProgram) GetId() uint32 {
 	if x != nil {
-		return x.HighRiskNumber
+		return x.Id
 	}
 	return 0
 }
@@ -42934,6 +42935,13 @@ func (x *SSAProgram) GetHighRiskNumber() int64 {
 func (x *SSAProgram) GetCriticalRiskNumber() int64 {
 	if x != nil {
 		return x.CriticalRiskNumber
+	}
+	return 0
+}
+
+func (x *SSAProgram) GetHighRiskNumber() int64 {
+	if x != nil {
+		return x.HighRiskNumber
 	}
 	return 0
 }
@@ -42952,9 +42960,9 @@ func (x *SSAProgram) GetLowRiskNumber() int64 {
 	return 0
 }
 
-func (x *SSAProgram) GetId() uint32 {
+func (x *SSAProgram) GetInfoRiskNumber() int64 {
 	if x != nil {
-		return x.Id
+		return x.InfoRiskNumber
 	}
 	return 0
 }
@@ -53582,7 +53590,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\aAfterId\x18\v \x01(\x03R\aAfterId\x12\x1a\n" +
 	"\bBeforeId\x18\f \x01(\x03R\bBeforeId\x12&\n" +
 	"\x0eFilterRuleKind\x18\r \x01(\tR\x0eFilterRuleKind\x12,\n" +
-	"\x11FilterLibRuleKind\x18\x0e \x01(\tR\x11FilterLibRuleKind\"\xa8\x03\n" +
+	"\x11FilterLibRuleKind\x18\x0e \x01(\tR\x11FilterLibRuleKind\"\xd0\x03\n" +
 	"\n" +
 	"SSAProgram\x12\x1a\n" +
 	"\bCreateAt\x18\x01 \x01(\x03R\bCreateAt\x12\x1a\n" +
@@ -53592,13 +53600,14 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06Dbpath\x18\x05 \x01(\tR\x06Dbpath\x12\x1a\n" +
 	"\bLanguage\x18\x06 \x01(\tR\bLanguage\x12$\n" +
 	"\rEngineVersion\x18\a \x01(\tR\rEngineVersion\x12\x1c\n" +
-	"\tRecompile\x18\b \x01(\bR\tRecompile\x12&\n" +
-	"\x0eHighRiskNumber\x18\t \x01(\x03R\x0eHighRiskNumber\x12.\n" +
+	"\tRecompile\x18\b \x01(\bR\tRecompile\x12\x0e\n" +
+	"\x02Id\x18\r \x01(\rR\x02Id\x12.\n" +
 	"\x12CriticalRiskNumber\x18\n" +
 	" \x01(\x03R\x12CriticalRiskNumber\x12&\n" +
+	"\x0eHighRiskNumber\x18\t \x01(\x03R\x0eHighRiskNumber\x12&\n" +
 	"\x0eWarnRiskNumber\x18\v \x01(\x03R\x0eWarnRiskNumber\x12$\n" +
-	"\rLowRiskNumber\x18\f \x01(\x03R\rLowRiskNumber\x12\x0e\n" +
-	"\x02Id\x18\r \x01(\rR\x02Id\"G\n" +
+	"\rLowRiskNumber\x18\f \x01(\x03R\rLowRiskNumber\x12&\n" +
+	"\x0eInfoRiskNumber\x18\x0e \x01(\x03R\x0eInfoRiskNumber\"G\n" +
 	"\x0fSSAProgramInput\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12 \n" +
 	"\vDescription\x18\x02 \x01(\tR\vDescription\"\x88\x02\n" +

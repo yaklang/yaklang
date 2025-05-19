@@ -116,21 +116,25 @@ func Prog2GRPC(prog *ssadb.IrProgram) *ypb.SSAProgram {
 			High     int64
 			Low      int64
 			Critical int64
-			Warning  int64
+			Middle   int64
+			Info     int64
 		}
 		projectDB := ssadb.GetDB()
+		// SFR_SEVERITY "critical" "high" "middle" "low" "info"
 		if err := projectDB.Model(&schema.SSARisk{}).Where("program_name=?", prog.ProgramName).Select(`
 		sum(case when severity='critical' then 1 else 0 end) as critical,
 		sum(case when severity='high' then 1 else 0 end) as high,
-		sum(case when severity='warning' then 1 else 0 end) as warning,
-		sum(case when severity='low' then 1 else 0 end) as low
+		sum(case when severity='middle' then 1 else 0 end) as middle,
+		sum(case when severity='low' then 1 else 0 end) as low,
+		sum(case when severity='info' then 1 else 0 end) as info	
 		`).Scan(&result).Error; err != nil {
 			log.Errorf("query risk fail: %s", err) // ignore
 		}
 		ret.CriticalRiskNumber = result.Critical
 		ret.HighRiskNumber = result.High
-		ret.WarnRiskNumber = result.Warning
+		ret.WarnRiskNumber = result.Middle
 		ret.LowRiskNumber = result.Low
+		ret.InfoRiskNumber = result.Info
 	}
 
 	return ret
