@@ -1,4 +1,4 @@
-package yakscripttools
+package test
 
 import (
 	"bytes"
@@ -7,14 +7,16 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/utils"
+	_ "github.com/yaklang/yaklang/common/yak"
 	"gotest.tools/v3/assert"
 )
 
 func TestGetYakScript(t *testing.T) {
 	flag := utils.RandStringBytes(20)
 	host, port := utils.DebugMockHTTP([]byte(flag))
-	tools := GetAllYakScriptAiTools()
+	tools := yakscripttools.GetAllYakScriptAiTools()
 	hasDoHttp := false
 	for _, ait := range tools {
 		if ait.Name == "send_http_request_by_url" {
@@ -30,6 +32,6 @@ func TestGetYakScript(t *testing.T) {
 }
 
 func TestSearchYakScript(t *testing.T) {
-	tools := GetYakScriptAiTools("http")
+	tools := yakscripttools.GetYakScriptAiTools("http")
 	assert.Assert(t, len(tools) > 0)
 }

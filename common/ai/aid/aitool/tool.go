@@ -1,7 +1,6 @@
 package aitool
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,12 +15,7 @@ import (
 
 // InvokeCallback 定义工具调用回调函数的签名
 type InvokeCallback func(params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error)
-type ChatToAiFuncType func(msg string) (io.Reader, error)
-type ToolInvokeCtx struct {
-	Ctx          context.Context
-	ChatToAiFunc ChatToAiFuncType
-}
-type InvokeCallbackWithCtx func(ctx *ToolInvokeCtx, params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error)
+
 type Tool struct {
 	*mcp.Tool
 	// A list of keywords for tool indexing and searching.

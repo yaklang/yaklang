@@ -57,7 +57,13 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...Opt
 		config.aiToolManager = buildinaitools.NewToolManager(
 			config.tools,
 			buildinaitools.WithSearchEnabled(config.enableToolSearch),
-			buildinaitools.WithSearcher(searchtools.NewKeyWordSearcher(config.toolAICallback)),
+			buildinaitools.WithSearcher(searchtools.NewKeyWordSearcher(func(prompt string) (io.Reader, error) {
+				rsp, err := config.callAI(NewAIRequest(prompt))
+				if err != nil {
+					return nil, err
+				}
+				return rsp.GetOutputStreamReader("tool", false, config), nil
+			})),
 		)
 	}
 	c := &Coordinator{

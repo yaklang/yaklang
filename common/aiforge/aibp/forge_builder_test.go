@@ -87,10 +87,9 @@ func RunTestForge(t *testing.T, forge *schema.AIForge, initFlag, persistentFlag 
 		"query": "1+1",
 	},
 		yak.WithAICallback(MockAICallback(t, initFlag, persistentFlag, "")),
-		yak.WithExtendAIDOptions(
-			aid.WithDebugPrompt(true),
-			aid.WithDebug(true),
-		),
+		yak.WithAgreeYOLO(true),
+		yak.WithDebugPrompt(true),
+		yak.WithDebug(true),
 	)
 	if err != nil {
 		return nil, err
@@ -327,10 +326,10 @@ func TestNewForgeExecutorFromJson(t *testing.T) {
 	var persistentFlag = uuid.New().String()
 	forgeName := utils.RandString(10)
 	forgeData := map[string]any{
-		"name":             forgeName,
-		"persistentPrompt": "一定要算准一点" + persistentFlag,
-		"initPrompt":       "帮我计算表达式的值" + initFlag,
-		"forgeContent":     "query = cli.String(\"query\", cli.setRequired(true), cli.setHelp(\"query\"))",
+		"name":              forgeName,
+		"persistent_prompt": "一定要算准一点" + persistentFlag,
+		"init_prompt":       "帮我计算表达式的值" + initFlag,
+		"forge_content":     "query = cli.String(\"query\", cli.setRequired(true), cli.setHelp(\"query\"))",
 	}
 	jsonData, err := json.Marshal(forgeData)
 	if err != nil {

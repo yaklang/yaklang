@@ -3,6 +3,7 @@ package aid
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
@@ -11,7 +12,6 @@ func (c *Config) toolCallOpts(stdoutBuf, stderrBuf *bytes.Buffer) []aitool.ToolI
 	return []aitool.ToolInvokeOptions{
 		aitool.WithStdout(stdoutBuf),
 		aitool.WithStderr(stderrBuf),
-		aitool.WithChatToAiFunc(aitool.ChatToAiFuncType(c.toolAICallback)),
 		aitool.WithInvokeHook(func(t *aitool.Tool, params map[string]any, config *aitool.ToolInvokeConfig) (*aitool.ToolResult, error) {
 			seq := c.AcquireId()
 			if ret, ok := aiddb.GetToolCallCheckpoint(c.GetDB(), c.id, seq); ok { // todo rerun
