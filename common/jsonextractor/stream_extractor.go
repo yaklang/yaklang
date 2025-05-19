@@ -4,82 +4,18 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"regexp"
-	"sort"
-	"strconv"
-	"strings"
-
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
+	"sort"
 )
 
 type callbackManager struct {
 	objectKeyValueCallback func(string string, data any)
 	arrayValueCallback     func(idx int, data any)
+	onRootMapCallback      func(i map[string]any)
+	onArrayCallback        func(data []any)
+	onObjectCallback       func(data map[string]any)
 
 	rawKVCallback func(key, data any)
-}
-
-func (c *callbackManager) kv(key, data any) {
-	// raw key value callback
-	originKey := key
-	originValue := data
-	if c.rawKVCallback != nil {
-		c.rawKVCallback(originKey, originValue)
-	}
-
-	// handle key value
-	var trimmedValue string
-	if data == nil {
-		trimmedValue = ""
-	} else {
-		trimmedValue = strings.TrimSpace(fmt.Sprint(data))
-	}
-	lowerTrimmedValue := strings.ToLower(trimmedValue)
-	if lowerTrimmedValue == "true" {
-		data = true
-	} else if lowerTrimmedValue == "false" {
-		data = false
-	} else if lowerTrimmedValue == "null" {
-		data = nil
-	} else if lowerTrimmedValue == "undefined" {
-		data = nil
-	} else if matched, _ := regexp.Match(`^\d+$`, []byte(lowerTrimmedValue)); matched {
-		data, _ = strconv.ParseInt(lowerTrimmedValue, 10, 64)
-		data = int(data.(int64))
-	} else if matched, _ := regexp.Match(`^\d+\.\d+`, []byte(lowerTrimmedValue)); matched {
-		data, _ = strconv.ParseFloat(lowerTrimmedValue, 64)
-	}
-
-	switch key.(type) {
-	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
-		keyInt, _ := strconv.ParseInt(fmt.Sprintf("%d", key), 10, 64)
-		newKey := keyInt
-		if c.arrayValueCallback != nil {
-			c.arrayValueCallback(int(newKey), data)
-		}
-	default:
-		var keyStr string
-		if key == nil {
-			keyStr = ""
-		} else {
-			keyStr = fmt.Sprint(key)
-		}
-		trimmed := strings.TrimSpace(keyStr)
-		if strings.HasPrefix(trimmed, `"`) && strings.HasSuffix(trimmed, `"`) {
-			unquoted, err := strconv.Unquote(trimmed)
-			if err != nil {
-				trimmed = trimmed[1 : len(trimmed)-1]
-			} else {
-				trimmed = unquoted
-			}
-		}
-		if c.objectKeyValueCallback != nil {
-			c.objectKeyValueCallback(trimmed, data)
-		}
-	}
-
 }
 
 type CallbackOption func(*callbackManager)
@@ -93,6 +29,24 @@ func WithObjectKeyValue(callback func(string string, data any)) CallbackOption {
 func WithRawKeyValueCallback(callback func(key, data any)) CallbackOption {
 	return func(c *callbackManager) {
 		c.rawKVCallback = callback
+	}
+}
+
+func WithArrayCallback(callback func(data []any)) CallbackOption {
+	return func(c *callbackManager) {
+		c.onArrayCallback = callback
+	}
+}
+
+func WithObjectCallback(callback func(data map[string]any)) CallbackOption {
+	return func(c *callbackManager) {
+		c.onObjectCallback = callback
+	}
+}
+
+func WithRootMapCallback(callback func(data map[string]any)) CallbackOption {
+	return func(c *callbackManager) {
+		c.onRootMapCallback = callback
 	}
 }
 
@@ -127,7 +81,7 @@ func ExtractJSONStream(c string, options ...CallbackOption) [][2]int {
 	})
 
 	pushStateWithIdx := func(i string, idx int) {
-		log.Infof("push state: %v, with index: %v", i, index)
+		//log.Infof("push state: %v, with index: %v", i, index)
 		if i == state_jsonObj {
 			bufManager.PushContainer()
 			objectDepth++
@@ -178,7 +132,7 @@ func ExtractJSONStream(c string, options ...CallbackOption) [][2]int {
 					raw.end = len(c) - 1
 				}
 				sliceValue := getStrSlice(raw)
-				log.Infof("pop  state: %v, with data: %v (start:%v end:%v), current-state: %v", raw.value, sliceValue, raw.start, raw.end, currentState())
+				//log.Infof("pop  state: %v, with data: %#v (start:%v end:%v), current-state: %v", raw.value, sliceValue, raw.start, raw.end, currentState())
 				switch raw.value {
 				case state_objectKey:
 					bufManager.PushKey(sliceValue)
