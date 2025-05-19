@@ -65,7 +65,7 @@ func NewLiteForge(i string, opts ...LiteForgeOption) (*LiteForge, error) {
 
 func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, opts ...aid.Option) (*ForgeResult, error) {
 	if l.OutputSchema == "" {
-		return nil, fmt.Errorf("schema is required")
+		return nil, fmt.Errorf("liteforge output schema is required")
 	}
 
 	cod, err := aid.NewCoordinator(l.Prompt, opts...)
