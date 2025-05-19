@@ -13,6 +13,14 @@ XMLInputFactory.newInstance() as $factory;
 check $factory;
 
 $factory?{!.setProperty}...createXMLStreamReader() as $vulnCall;
+$factory...createXMLStreamReader() as $allCall;
+
+$allCall - $vulnCall as $toCheckCall;
+$factory?{.setProperty?(,*?{=="javax.xml.stream.supportDTD"},*?{==false})} as $excludeFactory;
+$factory?{.setProperty?(,*?{=="javax.xml.stream.isSupportingExternalEntities"},*?{==false})} as $excludeFactory;
+$factory?{.setProperty?(,*?{=="javax.xml.stream.isSupportingExternalEntities"},*?{==false})}  as $excludeFactory;
+$excludeFactory...createXMLStreamReader() as $excludeCall;
+$toCheckCall - $excludeCall as $vulnCall;
 check $vulnCall;
 
 alert $vulnCall for {

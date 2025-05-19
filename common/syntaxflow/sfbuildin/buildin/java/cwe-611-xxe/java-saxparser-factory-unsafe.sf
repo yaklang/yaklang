@@ -15,7 +15,17 @@ TEXT
 
 SAXParserFactory?{<typeName>?{have:"javax.xml.parsers.SAXParserFactory"}}.newInstance() as $factory;
 check $factory;
+
+
+$factory...newSAXParser()...parse() as $allCall
 $factory?{!.setFeature}...newSAXParser()...parse() as $vulnCall
+
+$allCall - $vulnCall as $toCheckCall
+$factory?{.setFeature?(,*?{=="http://xml.org/sax/features/external-general-entities"},*?{==false})}as $excludeFactory;
+$factory?{.setFeature?(,*?{=="http://xml.org/sax/features/external-parameter-entities"},*?{==false})} as $excludeFactory;
+$factory?{.setFeature?(,*?{=="http://apache.org/xml/features/disallow-doctype-decl"},*?{==true})}  as $excludeFactory;
+$excludeFactory...newSAXParser()...parse() as $excludeCall
+$toCheckCall - $excludeCall as $vulnCall;
 
 check $vulnCall;
 alert $vulnCall for {
@@ -50,6 +60,37 @@ public class SAXParserFactoryUnsafe {
 }
 UNSAFE
 )
+
+
+desc(
+	lang: "java"
+	alert_num: 1
+	"file://unsafe2.java": <<<UNSAFE
+package com.example.sax;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
+import org.xml.sax.InputSource;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+import java.io.IOException;
+import java.io.StringReader;
+
+class SAXParserFactorySafe {
+    public void parseXml(String xml) {
+        SAXParserFactory factory = SAXParserFactory.newInstance();
+        try {
+            factory.setFeature("http://xml.org/sax/features/external-general-entities-xxx", false);
+            SAXParser parser = factory.newSAXParser();
+            parser.parse(new InputSource(new StringReader(xml)), new DefaultHandler());
+        } catch (ParserConfigurationException | SAXException | IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+UNSAFE
+)
+
 
 desc(
 	lang: "java"

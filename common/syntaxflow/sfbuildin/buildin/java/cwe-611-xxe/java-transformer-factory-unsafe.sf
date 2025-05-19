@@ -11,6 +11,14 @@ TEXT
 
 TransformerFactory.newInstance() as $newInstance;
 $newInstance?{!.setAttribute}.new*().transform() as $vuln;
+$newInstance.new*().transform() as $allTransform;
+
+$allTransform - $vuln as $toCheckTransform;
+$toCheckTransform - $excludeNewInstance
+$newInstance?{.setAttribute?(,*?{=="javax.xml.XMLConstants.ACCESS_EXTERNAL_DTD"},*?{==""})} as $excludeNewInstance;
+$excludeNewInstance.new*().transform() as $excludeTransform;
+$toCheckTransform - $excludeTransform as $vuln;
+
 check $vuln;
 alert $vuln for {
     message: "Transformer Unsafe Use in Context Sink",
@@ -19,7 +27,8 @@ alert $vuln for {
 
 // ---------------------------------------CODE----------------------------------------------
 desc(
-	lang: java
+	lang: java,
+	alert_num:1,
 	"file:///unsafe.java": <<<UNSAFE
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerException;
@@ -44,7 +53,11 @@ public class XXEVulnerableExample {
     }
 }
 UNSAFE
-	"safefile:///safe.java": <<<SAFE
+)
+
+desc (
+    lang:java,
+    "safefile:///safe.java": <<<SAFE
 import javax.xml.XMLConstants;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerConfigurationException;
@@ -75,4 +88,3 @@ public class XXESecureExample {
 }
 SAFE
 )
-
