@@ -2,7 +2,9 @@ package ssaapi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/jsonpath"
 	"regexp"
 	"strings"
 
@@ -330,7 +332,47 @@ func NewFileFilter(file, matchType string, match []string) *FileFilter {
 				return res
 			})
 
-		case "json": // json path
+		case "jsonpath": // json path
+			jsonFilter, err := jsonpath.Prepare(rule)
+			if err != nil {
+				log.Errorf("json path parse error: %s", err)
+				continue
+			}
+			matchContent = append(matchContent, func(data string) []Index {
+				m := make(map[string]interface{})
+				err := json.Unmarshal([]byte(data), &m)
+				if err != nil {
+					log.Errorf("json parse error: %s", err)
+					return nil
+				}
+
+				matched, err := jsonFilter(m)
+				if err != nil {
+					log.Errorf("json path match content error: %s", err)
+					return nil
+				}
+
+				searchResults, ok := matched.([]interface{})
+				if !ok {
+					return nil
+				}
+
+				res := make([]Index, 0)
+				for _, searchResult := range searchResults {
+					strResult := utils.InterfaceToString(searchResult)
+					reg := regexp_utils.NewYakRegexpUtils(strResult)
+					indexs, err := reg.FindAllSubmatchIndex(data)
+					if err != nil {
+						log.Errorf("regexp match error: %s", err)
+						continue
+					}
+					for _, index := range indexs {
+						res = append(res, Index{Start: index[0], End: index[1]})
+					}
+				}
+
+				return res
+			})
 		}
 	}
 
