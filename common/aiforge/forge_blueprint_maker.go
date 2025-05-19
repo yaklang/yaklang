@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -59,7 +61,7 @@ type YakForgeBlueprintConfig struct {
 	ToolKeywords string `json:"tool_keywords"`
 	Tools        string `json:"tools"`
 	Description  string `json:"description"`
-
+	ForgeContent string `json:"forge_content"`
 	// aid options
 	YakForgeBlueprintAIDOptionsConfig *YakForgeBlueprintAIDOptionsConfig `json:"aid_options_config"`
 
@@ -96,15 +98,20 @@ func (c *YakForgeBlueprintConfig) WithSchemaForge(forge *schema.AIForge) *YakFor
 	c.PersistentPrompt = forge.PersistentPrompt
 	c.PlanPrompt = forge.PlanPrompt
 	c.ResultPrompt = forge.ResultPrompt
-	c.CLIParameterRuleYaklangCode = forge.ForgeContent
 	c.ToolKeywords = forge.ToolKeywords
 	c.Tools = forge.Tools
 	c.Description = forge.Description
 	c.Actions = forge.Actions
+	c.ForgeContent = forge.ForgeContent
 	return c
 }
 func (c *YakForgeBlueprintConfig) WithActionName(name string) *YakForgeBlueprintConfig {
 	c.Actions = name
+	return c
+}
+
+func (c *YakForgeBlueprintConfig) WithForgeContent(forgeContent string) *YakForgeBlueprintConfig {
+	c.ForgeContent = forgeContent
 	return c
 }
 
@@ -177,17 +184,25 @@ func (c *YakForgeBlueprintConfig) Build() (*ForgeBlueprint, error) {
 			return plan
 		}
 	}
-
+	var tools []*aitool.Tool
+	if config.Tools != "" {
+		tools = yakscripttools.GetYakScriptAiTools(strings.Split(config.Tools, ",")...)
+	}
 	name := config.Name
 	blueprint := NewForgeBlueprint(name,
 		WithOriginYaklangCliCode(config.CLIParameterRuleYaklangCode),
 		WithToolKeywords(strings.Split(config.ToolKeywords, ",")),
+		WithTools(tools...),
 		WithInitializePrompt(config.InitPrompt),
 		WithPersistentPrompt(config.PersistentPrompt),
 		WithPlanMocker(planMocker),
 		WithResultPrompt(config.ResultPrompt),
 		WithAIDOptions(aidOpts...),
 		WithResultHandler(func(s string, err error) {
+			if err != nil {
+				log.Errorf("Failed to get result: %v", err)
+				return
+			}
 			actions := strings.Split(config.Actions, ",")
 			var actionName string
 			var alias []string

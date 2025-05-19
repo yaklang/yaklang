@@ -1,10 +1,13 @@
 package aibp
 
 import (
+	"context"
 	_ "embed"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 //go:embed recon_prompts/init.txt
@@ -25,7 +28,7 @@ func newRecon(extraOpt ...aid.Option) *aiforge.ForgeBlueprint {
 	return forge
 }
 
-func init() {
+func _init_recon() {
 	err := aiforge.RegisterForgeExecutor("recon", func(ctx context.Context, items []*ypb.ExecParamItem, option ...aid.Option) (*aiforge.ForgeResult, error) {
 		forge := newRecon(option...)
 		co, err := forge.CreateCoordinator(ctx, items, option...)

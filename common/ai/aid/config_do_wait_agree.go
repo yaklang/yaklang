@@ -41,7 +41,7 @@ func (c *Config) doWaitAgreeWithPolicy(ctx context.Context, doWaitAgreeWithPolic
 				if err != nil {
 					log.Errorf("agree assistant callback error: %v", err)
 				} else {
-					ep.SetParams(res.Param)
+					ep.SetParams(res)
 					for i := 0; i < 3; i++ {
 						ep.Release()
 						time.Sleep(time.Second)

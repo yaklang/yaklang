@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -78,9 +79,28 @@ func BindAIConfigToEngine(nIns *antlr4yak.Engine, agentOptions ...any) {
 		originFunc, ok := i.(func(name string, opts ...any) *aiforge.ForgeBlueprint)
 		if ok {
 			return func(name string, opts ...any) *aiforge.ForgeBlueprint {
-				agent := NewAgent(agentOptions...)
-				opts = append(opts, aiforge.WithAIDOptions(agent.AIDOptions()...))
+				opts = append(agentOptions, opts...)
 				return originFunc(name, opts...)
+			}
+		}
+		return i
+	})
+	nIns.GetVM().RegisterMapMemberCallHandler("aiagent", "NewExecutor", func(i interface{}) interface{} {
+		ofunc, ok := i.(func(forgeName string, i any, opts ...any) (*aid.Coordinator, error))
+		if ok {
+			return func(forgeName string, i any, opts ...any) (*aid.Coordinator, error) {
+				opts = append(agentOptions, opts...)
+				return ofunc(forgeName, i, opts...)
+			}
+		}
+		return i
+	})
+	nIns.GetVM().RegisterMapMemberCallHandler("aiagent", "NewExecutorFromJson", func(i interface{}) interface{} {
+		ofunc, ok := i.(func(forgeName string, i any, opts ...any) (*aid.Coordinator, error))
+		if ok {
+			return func(forgeName string, i any, opts ...any) (*aid.Coordinator, error) {
+				opts = append(agentOptions, opts...)
+				return ofunc(forgeName, i, opts...)
 			}
 		}
 		return i

@@ -3,17 +3,19 @@ package aid
 import (
 	"bytes"
 	"context"
-	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/yaklang/yaklang/common/schema"
+
+	"sync"
+
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
-	"sync"
 )
 
 type AIRequest struct {
@@ -298,7 +300,6 @@ func NewAIRequest(prompt string, opt ...AIRequestOption) *AIRequest {
 }
 
 type AICallbackType func(config *Config, req *AIRequest) (*AIResponse, error)
-type SimpleAiCallbackType func(msg string) (io.Reader, error)
 
 func (c *Config) NewAIResponse() *AIResponse {
 	return &AIResponse{

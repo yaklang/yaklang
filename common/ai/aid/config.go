@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"math/rand/v2"
 	"sync"
 	"sync/atomic"
@@ -69,9 +68,7 @@ type Config struct {
 
 	// no need to think, low level
 	taskAICallback AICallbackType
-	toolAICallback SimpleAiCallbackType
-
-	tools        []*aitool.Tool
+	tools          []*aitool.Tool
 
 	// asyncGuardian can auto collect event handler data
 	guardian     *asyncGuardian
@@ -457,13 +454,6 @@ func WithAICallback(cb AICallbackType) Option {
 		config.m.Lock()
 		defer config.m.Unlock()
 		warpedCb := config.wrapper(cb)
-		config.toolAICallback = func(msg string) (io.Reader, error) {
-			rsp, err := warpedCb(config, NewAIRequest(msg))
-			if err != nil {
-				return nil, err
-			}
-			return rsp.GetOutputStreamReader("tool", false, config), nil
-		}
 		config.coordinatorAICallback = warpedCb
 		config.taskAICallback = warpedCb
 		config.planAICallback = warpedCb

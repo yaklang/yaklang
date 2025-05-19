@@ -107,6 +107,9 @@ func getForgeConfig(name string) (string, *schema.AIForge, bool) {
 		if cfg.ResultPrompt == "" {
 			cfg.ResultPrompt = loadDefaultPrompt("result")
 		}
+		if cfg.ForgeContent == "" {
+			cfg.ForgeContent = string(codeContent)
+		}
 		forge.ForgeName = cfg.Name
 		forge.ToolKeywords = cfg.ToolKeywords
 		forge.Tools = cfg.Tools
@@ -116,7 +119,7 @@ func getForgeConfig(name string) (string, *schema.AIForge, bool) {
 		forge.PlanPrompt = cfg.PlanPrompt
 		forge.ResultPrompt = cfg.ResultPrompt
 		forge.Actions = cfg.Actions
-		forge.ForgeContent = string(codeContent)
+		forge.ForgeContent = cfg.ForgeContent
 	}
 	return string(configBytes), forge, true
 }

@@ -99,7 +99,7 @@ jobs:
               go test --timeout 30s ./common/fp/...
               go test --timeout 30s ./common/yak/cmd/...
               go test --timeout 30s ./common/javaclassparser/tests/...
-              
+
               # suricate generate && match
               go test -timeout 20s -run TestMUSTPASS* ./common/suricata/...
               go test -timeout 20s -run TestMUSTPASS* ./common/chaosmaker
@@ -142,7 +142,8 @@ jobs:
 
           - name: Test AI Infra
             run: |
-              go test -timeout 40s ./common/ai/aid/...  
+              go test -timeout 40s ./common/ai/aid/...
+              go test -timeout 30s ./common/aiforge/aibp/forge_builder_test.go
 
           - name: Test SSA Frontend TypeScript
             run: |
@@ -190,7 +191,7 @@ jobs:
               # Test gRPC MUSTPASS MITM
               go test -timeout 5m -run TestGRPCMUSTPASS_MITM_* ./common/yakgrpc/...
               # Test gRPC MUSTPASS MITM V2
-              go test -timeout 5m -run TestGRPCMUSTPASS_MITMV2_* ./common/yakgrpc/... 
+              go test -timeout 5m -run TestGRPCMUSTPASS_MITMV2_* ./common/yakgrpc/...
 
           - name: Test gRPC MUSTPASS Fuzzer
             run: go test -timeout 5m -run TestGRPCMUSTPASS_HTTPFuzzer* ./common/yakgrpc/...
@@ -273,7 +274,6 @@ jobs:
         with:
           go-version-file: "./go.mod"
         id: go
-
 
       - name: GRPC
         run: |
