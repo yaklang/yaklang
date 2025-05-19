@@ -82,3 +82,21 @@ CODE
 		},
 		ssaapi.WithLanguage(ssaapi.PHP))
 }
+
+func TestTypeCast(t *testing.T) {
+	code := `<?php
+$a = (int)$_GET[1];
+echo($a);
+`
+	ssatest.CheckSyntaxFlow(t, code, `
+_GET as $source
+echo?(* #{
+include: <<<INCLUDE
+* & $source
+INCLUDE,
+exclude: <<<EXCLUDE
+*?{opcode: typecast}
+EXCLUDE
+}->) as $sink
+`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.PHP))
+}
