@@ -68,15 +68,14 @@ type Config struct {
 
 	// no need to think, low level
 	taskAICallback AICallbackType
-	tools          []*aitool.Tool
 
 	// asyncGuardian can auto collect event handler data
 	guardian     *asyncGuardian
 	eventHandler func(e *Event)
 
-	enableToolSearch bool
 	// tool manager
-	aiToolManager *buildinaitools.AiToolManager
+	aiToolManager       *buildinaitools.AiToolManager
+	aiToolManagerOption []buildinaitools.ToolManagerOption
 
 	// task ai resp callback
 	taskAIRespCallback func(string, *Config)
@@ -87,6 +86,7 @@ type Config struct {
 	timelineLimit             int
 	timelineContentLimit      int
 	timelineTotalContentLimit int
+	keywords                  []string // task keywords, maybe tools name ,help ai to plan
 
 	// stream waitgroup
 	streamWaitGroup *sync.WaitGroup
@@ -232,10 +232,6 @@ func (c *Config) ReleaseInteractiveEvent(eventID string, invoke aitool.InvokePar
 }
 
 func initDefaultTools(c *Config) error { // set config default tools
-	if err := WithTools(buildinaitools.GetBasicBuildInTools()...)(c); err != nil {
-		return utils.Wrapf(err, "get basic build-in tools fail")
-	}
-
 	memoryTools, err := c.memory.CreateBasicMemoryTools()
 	if err != nil {
 		return utils.Errorf("create memory tools: %v", err)
@@ -304,6 +300,7 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		allowRequireForUserInteract: true,
 		timelineLimit:               10,
 		timelineContentLimit:        30 * 1024,
+		aiToolManagerOption:         make([]buildinaitools.ToolManagerOption, 0),
 	}
 	c.epm.config = c // review
 	if err := initDefaultTools(c); err != nil {
@@ -314,7 +311,7 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 
 type Option func(config *Config) error
 
-func WithRuntimeID(id string) Option {
+func WithTaskID(id string) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -328,15 +325,6 @@ func WithOffsetSeq(offset int64) Option {
 		config.m.Lock()
 		defer config.m.Unlock()
 		config.idSequence = offset
-		return nil
-	}
-}
-
-func WithTool(tool *aitool.Tool) Option {
-	return func(config *Config) error {
-		config.m.Lock()
-		defer config.m.Unlock()
-		config.tools = append(config.tools, tool)
 		return nil
 	}
 }
@@ -442,15 +430,6 @@ func WithAllowRequireForUserInteract(opts ...bool) Option {
 	}
 }
 
-func WithTools(tool ...*aitool.Tool) Option {
-	return func(config *Config) error {
-		config.m.Lock()
-		defer config.m.Unlock()
-		config.tools = append(config.tools, tool...)
-		return nil
-	}
-}
-
 func WithAICallback(cb AICallbackType) Option {
 	return func(config *Config) error {
 		config.m.Lock()
@@ -540,10 +519,65 @@ func WithOmniSearchTool() Option {
 
 func WithAiToolsSearchTool() Option {
 	return func(config *Config) error {
-		config.enableToolSearch = true
+		config.m.Lock()
+		defer config.m.Unlock()
+		if config.aiToolManagerOption == nil {
+			config.aiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
+		}
+		config.aiToolManagerOption = append(config.aiToolManagerOption,
+			buildinaitools.WithSearchEnabled(true))
 		return nil
 	}
 }
+
+func WithEnableToolsName(toolsName ...string) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		if config.aiToolManagerOption == nil {
+			config.aiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
+		}
+		config.aiToolManagerOption = append(config.aiToolManagerOption, buildinaitools.WithEnabledTools(toolsName))
+		return nil
+	}
+}
+
+func WithDisableToolsName(toolsName ...string) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		if config.aiToolManagerOption == nil {
+			config.aiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
+		}
+		config.aiToolManagerOption = append(config.aiToolManagerOption, buildinaitools.WithDisableTools(toolsName))
+		return nil
+	}
+}
+
+func WithTool(tool *aitool.Tool) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		if config.aiToolManagerOption == nil {
+			config.aiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
+		}
+		config.aiToolManagerOption = append(config.aiToolManagerOption, buildinaitools.WithExtendTools([]*aitool.Tool{tool}, true))
+		return nil
+	}
+}
+
+func WithTools(tool ...*aitool.Tool) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		if config.aiToolManagerOption == nil {
+			config.aiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
+		}
+		config.aiToolManagerOption = append(config.aiToolManagerOption, buildinaitools.WithExtendTools(tool, true))
+		return nil
+	}
+}
+
 func WithDebugPrompt(i ...bool) Option {
 	return func(config *Config) error {
 		config.m.Lock()
@@ -604,6 +638,15 @@ func WithAppendPersistentMemory(i ...string) Option {
 		defer config.m.Unlock()
 		config.persistentMemory = append(config.persistentMemory, i...)
 		config.memory.StoreAppendPersistentInfo(i...)
+		return nil
+	}
+}
+
+func WithToolKeywords(i ...string) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.keywords = append(config.keywords, i...)
 		return nil
 	}
 }

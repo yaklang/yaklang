@@ -13,7 +13,7 @@ import (
 func init() {
 	// forgeToolKeywords, err := searchtools.ToolKeywordSummary(
 	// 	"你正在帮助用户处理一些文本任务，任务来源可能是，CTF这类黑客竞赛，一般会涉及到一些编码解码工作",
-	// 	buildinaitools.GetAllTools(),
+	// 	buildinaitools.GetSuggestedTools(),
 	// 	20,
 	// 	func(msg string) (io.Reader, error) {
 	// 		reader, writer := io.Pipe()

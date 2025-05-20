@@ -5,6 +5,10 @@
 ## 当前计划概览
 {{ .CurrentPlan.ProgressWithDetail }}
 
+<plan_help_># 规划任务帮助信息
+{{ .Memory.PlanHelp }}
+</plan_help>
+
 {{ if .UserSuggestion }}<USER_INTERACTION_{{ .NONCE }}>
 {{ .UserSuggestion }}
 </USER_INTERACTION_{{ .NONCE }}>{{ end }}

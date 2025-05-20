@@ -5,7 +5,7 @@ func DependencyInject() {
 }
 
 func injectAiTools() {
-	// aiSearchTools := searchtools.NewAiToolsSearchClient(buildinaitools.GetAllTools, &searchtools.AiToolsSearchClientConfig{
+	// aiSearchTools := searchtools.NewAiToolsSearchClient(buildinaitools.GetSuggestedTools, &searchtools.AiToolsSearchClientConfig{
 	// 	SearchType: "ai",
 	// 	ChatToAiFunc: func(msg string) (io.Reader, error) {
 	// 		return ai.ChatStream(msg)

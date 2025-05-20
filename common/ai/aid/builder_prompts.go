@@ -39,3 +39,6 @@ var planReviewPrompts string
 
 //go:embed prompts/plan-review/plan-create-subtask.txt
 var planReviewCreateSubtaskPrompts string
+
+//go:embed prompts/plan-help.txt
+var __prompt_PlanHelp string

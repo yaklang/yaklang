@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
-type Option func(*Agent) error
+type AIAgentOption func(*Agent) error
 
 type Agent struct {
 	ForgeName string
@@ -27,7 +27,7 @@ func NewAgent(iopts ...any) *Agent {
 	ag := &Agent{}
 	for _, opt := range iopts {
 		switch o := opt.(type) {
-		case Option:
+		case AIAgentOption:
 			if err := o(ag); err != nil {
 				log.Errorf("failed to apply agent option: %v", err)
 				return nil
@@ -41,29 +41,29 @@ func NewAgent(iopts ...any) *Agent {
 	return ag
 }
 
-func WithForgeName(forgeName string) Option {
+func WithForgeName(forgeName string) AIAgentOption {
 	return func(ag *Agent) error {
 		ag.ForgeName = forgeName
 		return nil
 	}
 }
 
-func WithContext(ctx context.Context) Option {
+func WithContext(ctx context.Context) AIAgentOption {
 	return func(ag *Agent) error {
 		ag.ctx = ctx
 		return nil
 	}
 }
 
-func WithExtendAIDOptions(opts ...aid.Option) Option {
+func WithExtendAIDOptions(opts ...aid.Option) AIAgentOption {
 	return func(ag *Agent) error {
 		ag.ExtendAIDOptions = append(ag.ExtendAIDOptions, opts...)
 		return nil
 	}
 }
 
-func (ag *Agent) SubOption() []Option {
-	opts := make([]Option, 0)
+func (ag *Agent) SubOption() []AIAgentOption {
+	opts := make([]AIAgentOption, 0)
 	if ag.ctx != nil {
 		opts = append(opts, WithContext(ag.ctx))
 	}
@@ -81,7 +81,7 @@ var (
 	WithAgreeYOLO = aid.WithAgreeYOLO
 
 	// Additional With options
-	WithRuntimeID = func(id string) Option {
+	WithRuntimeID = func(id string) AIAgentOption {
 		return func(ag *Agent) error {
 			ag.RuntimeID = id
 			return nil
