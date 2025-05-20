@@ -191,7 +191,7 @@ func (s *AiToolMockServer) CallTool(tool *aitool.Tool, params aitool.InvokeParam
 }
 
 func (s *AiToolMockServer) SearchTool(ctx context.Context, name string) (*aitool.Tool, error) {
-	allTools, err := s.ToolManager.GetAllTools()
+	allTools, err := s.ToolManager.GetEnableTools()
 	if err != nil {
 		return nil, err
 	}

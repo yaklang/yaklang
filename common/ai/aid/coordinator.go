@@ -2,11 +2,10 @@ package aid
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
 	"io"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -54,33 +53,21 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...Opt
 	config.guardian.setOutputEmitter(config.id, config.eventHandler)
 
 	if config.aiToolManager == nil {
-		config.aiToolManager = buildinaitools.NewToolManager(
-			config.tools,
-			buildinaitools.WithSearchEnabled(config.enableToolSearch),
-			buildinaitools.WithSearcher(searchtools.NewKeyWordSearcher(func(prompt string) (io.Reader, error) {
+		config.aiToolManager = buildinaitools.NewToolManager(append(config.aiToolManagerOption, buildinaitools.WithSearcher(searchtools.NewKeyWordSearcher(
+			func(prompt string) (io.Reader, error) {
 				rsp, err := config.callAI(NewAIRequest(prompt))
 				if err != nil {
 					return nil, err
 				}
 				return rsp.GetOutputStreamReader("tool", false, config), nil
-			})),
-		)
+			})))...)
+
 	}
 	c := &Coordinator{
 		config:    config,
 		userInput: userInput,
 	}
-	config.memory.CreateMemoryTools()
-	config.memory.StoreQuery(c.userInput)
-	config.memory.StoreTools(func() []*aitool.Tool {
-		alltools, err := config.aiToolManager.GetAllTools()
-		if err != nil {
-			log.Errorf("coordinator: get all tools failed: %v", err)
-			return nil
-		}
-		return alltools
-	})
-	config.memory.timeline.BindConfig(config)
+	config.memory.BindCoordinator(c)
 	return c, nil
 }
 
@@ -148,12 +135,12 @@ func (c *Coordinator) Run() error {
 	for stepIdx, taskIns := range root.Subtasks {
 		log.Infof("step %d: %v", stepIdx, taskIns.Name)
 	}
-	alltools, err := c.config.aiToolManager.GetAllTools()
+	alltools, err := c.config.aiToolManager.GetEnableTools()
 	if err != nil {
 		log.Warnf("coordinator: get all tools failed: %v", err)
 	}
 	if len(alltools) <= 0 {
-		log.Warnf("coordinator: no tools found")
+		log.Warnf("coordinator: no tools enable")
 	}
 
 	c.config.EmitInfo("start to create runtime")

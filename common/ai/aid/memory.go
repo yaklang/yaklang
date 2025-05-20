@@ -43,8 +43,9 @@ type Memory struct {
 	PlanHistory []*PlanRecord
 
 	// tools list
-	DisableTools bool
-	Tools        func() []*aitool.Tool
+	DisableTools  bool
+	Tools         func() []*aitool.Tool
+	ToolsKeywords func() []string
 
 	// tool call results
 	//toolCallResults []*aitool.ToolResult
@@ -66,6 +67,23 @@ func GetDefaultMemory() *Memory {
 		userData: omap.NewOrderedMap[string, string](make(map[string]string)),
 		timeline: newMemoryTimeline(10, nil),
 	}
+}
+
+func (m *Memory) BindCoordinator(c *Coordinator) {
+	config := c.config
+	m.StoreQuery(c.userInput)
+	m.StoreTools(func() []*aitool.Tool {
+		alltools, err := config.aiToolManager.GetEnableTools()
+		if err != nil {
+			log.Errorf("coordinator: get all tools failed: %v", err)
+			return nil
+		}
+		return alltools
+	})
+	m.StoreToolsKeywords(func() []string {
+		return config.keywords
+	})
+	m.timeline.BindConfig(config)
 }
 
 // user data memory api, user or ai can set and get
@@ -110,6 +128,11 @@ func (m *Memory) Schema() map[string]string {
 // set tools list
 func (m *Memory) StoreTools(toolList func() []*aitool.Tool) {
 	m.Tools = toolList
+}
+
+// set tools list
+func (m *Memory) StoreToolsKeywords(keywords func() []string) {
+	m.ToolsKeywords = keywords
 }
 
 // user first input
@@ -265,6 +288,24 @@ func (m *Memory) PersistentMemory() string {
 		buf.WriteString("\n")
 	}
 	return buf.String()
+}
+
+func (m *Memory) PlanHelp() string {
+	templateData := map[string]interface{}{
+		"Memory": m,
+	}
+	temp, err := template.New("plan_help").Parse(__prompt_PlanHelp)
+	if err != nil {
+		log.Errorf("error parsing plan help template: %v", err)
+		return ""
+	}
+	var promptBuilder strings.Builder
+	err = temp.Execute(&promptBuilder, templateData)
+	if err != nil {
+		log.Errorf("error executing plan help history template: %v", err)
+		return ""
+	}
+	return promptBuilder.String()
 }
 
 func (m *Memory) ToolsList() string {

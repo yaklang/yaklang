@@ -2,6 +2,7 @@ package buildinaitools
 
 import (
 	"fmt"
+	"github.com/samber/lo"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
@@ -14,6 +15,7 @@ type AiToolManager struct {
 	toolEnabled  map[string]bool // 记录工具是否开启
 	enableSearch bool            // 是否开启工具搜索
 	searcher     searchtools.AiToolSearcher
+	disableTools map[string]struct{} // 禁用的工具列表 优先级最高
 }
 
 // ToolManagerOption 定义工具管理器的配置选项
@@ -23,6 +25,47 @@ type ToolManagerOption func(*AiToolManager)
 func WithSearcher(searcher searchtools.AiToolSearcher) ToolManagerOption {
 	return func(m *AiToolManager) {
 		m.searcher = searcher
+	}
+}
+
+func WithDisableTools(toolsName []string) ToolManagerOption {
+	return func(m *AiToolManager) {
+		if m.disableTools == nil {
+			m.disableTools = make(map[string]struct{})
+		}
+		for _, name := range toolsName {
+			m.disableTools[name] = struct{}{}
+		}
+	}
+}
+
+func WithExtendTools(tools []*aitool.Tool, suggested ...bool) ToolManagerOption {
+	return func(m *AiToolManager) {
+		var enable = len(suggested) > 0 && suggested[0]
+		var allTools []*aitool.Tool
+		if m.toolsGetter != nil {
+			allTools = m.toolsGetter()
+		}
+
+		toolsMap := map[string]*aitool.Tool{}
+		for _, tool := range allTools {
+			toolsMap[tool.Name] = tool
+		}
+
+		var extTools []*aitool.Tool
+		lo.ForEach(tools, func(tool *aitool.Tool, _ int) {
+			if enable {
+				m.EnableTool(tool.Name)
+			}
+			if _, ok := toolsMap[tool.Name]; !ok {
+				extTools = append(extTools, tool)
+			}
+		})
+
+		originGetter := m.toolsGetter
+		m.toolsGetter = func() []*aitool.Tool {
+			return append(originGetter(), extTools...)
+		}
 	}
 }
 
@@ -67,31 +110,29 @@ func NewToolManagerByToolGetter(getter func() []*aitool.Tool, options ...ToolMan
 }
 
 // NewToolManager 创建一个新的默认工具管理器实例
-func NewToolManager(tools []*aitool.Tool, options ...ToolManagerOption) *AiToolManager {
-	allTools := GetAllTools()
-	toolsMap := map[string]*aitool.Tool{}
-	for _, tool := range allTools {
-		toolsMap[tool.Name] = tool
-	}
-	var extTools []*aitool.Tool
-	for _, tool := range tools {
-		if _, ok := toolsMap[tool.Name]; !ok {
-			extTools = append(extTools, tool)
-		}
-	}
-	manager := NewToolManagerByToolGetter(func() []*aitool.Tool {
-		return append(GetAllTools(), extTools...)
-	}, options...)
-	for _, tool := range tools {
-		manager.EnableTool(tool.Name)
-	}
+func NewToolManager(options ...ToolManagerOption) *AiToolManager {
+	manager := NewToolManagerByToolGetter(GetAllTools, options...)
 	return manager
 }
 
-// GetAllTools 获取所有可用的工具
-func (m *AiToolManager) GetAllTools() ([]*aitool.Tool, error) {
+func (m *AiToolManager) safeToolsGetter() []*aitool.Tool {
+	if m.toolsGetter == nil {
+		return []*aitool.Tool{}
+	}
+	allTools := m.toolsGetter()
+	if len(m.disableTools) > 0 {
+		allTools = lo.Filter(allTools, func(tool *aitool.Tool, _ int) bool {
+			_, ok := m.disableTools[tool.Name]
+			return !ok
+		})
+	}
+	return allTools
+}
+
+// GetEnableTools 获取所有可用的工具
+func (m *AiToolManager) GetEnableTools() ([]*aitool.Tool, error) {
 	var enabledTools []*aitool.Tool
-	for _, tool := range m.toolsGetter() {
+	for _, tool := range m.safeToolsGetter() {
 		if m.toolEnabled[tool.Name] {
 			enabledTools = append(enabledTools, tool)
 		}
@@ -102,7 +143,7 @@ func (m *AiToolManager) GetAllTools() ([]*aitool.Tool, error) {
 			return enabledTools, nil
 		}
 		tool, err := searchtools.CreateAiToolsSearchTools(m.toolsGetter, func(req *searchtools.ToolSearchRequest) ([]*aitool.Tool, error) {
-			req.Tools = m.toolsGetter()
+			req.Tools = m.safeToolsGetter()
 			res, err := m.searcher(req)
 			for _, tool := range res {
 				m.EnableTool(tool.Name)
@@ -122,7 +163,7 @@ func (m *AiToolManager) GetAllTools() ([]*aitool.Tool, error) {
 
 // GetToolByName 通过工具名获取特定工具
 func (m *AiToolManager) GetToolByName(name string) (*aitool.Tool, error) {
-	tools, err := m.GetAllTools()
+	tools, err := m.GetEnableTools()
 	if err != nil {
 		return nil, err
 	}
@@ -145,10 +186,10 @@ func (m *AiToolManager) SearchTools(method string, query string) ([]*aitool.Tool
 	})
 }
 
-// IsToolEnabled 检查工具是否开启
-func (m *AiToolManager) IsToolEnabled(name string) bool {
-	return m.toolEnabled[name]
-}
+//// IsToolEnabled 检查工具是否开启
+//func (m *AiToolManager) IsToolEnabled(name string) bool {
+//	return m.toolSuggested[name]
+//}
 
 // EnableTool 开启单个工具
 func (m *AiToolManager) EnableTool(name string) {

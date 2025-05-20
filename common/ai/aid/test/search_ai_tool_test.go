@@ -14,7 +14,7 @@ import (
 // 	coordinator, err := aid.NewCoordinator("test", aid.WithAiToolsSearchTool())
 // 	assert.NilError(t, err)
 
-// 	tools, err := coordinator.config.aiToolManager.GetAllTools()
+// 	tools, err := coordinator.config.aiToolManager.GetSuggestedTools()
 // 	assert.NilError(t, err)
 
 // 	hasSearchTool := false
