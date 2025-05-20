@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	gmx509 "github.com/yaklang/yaklang/common/gmsm/x509"
 	"net"
 	"net/http"
 	"net/url"
@@ -134,7 +135,16 @@ func MITM_SetCaCertAndPrivKey(ca []byte, key []byte) MITMConfig {
 			return utils.Errorf("extract x509 cert failed: %s", err)
 		}
 
-		mc, err := mitm.NewConfig(cert, c.PrivateKey)
+		// compatible obsolete tls version
+		var opts []mitm.ConfigOption
+		gmCert, err := gmx509.ParseCertificate(c.Certificate[0])
+		if err != nil {
+			log.Errorf("parse gmx509 cert failed: %s", err)
+		} else {
+			opts = append(opts, mitm.WithObsoleteTLS(gmCert, c.PrivateKey))
+		}
+
+		mc, err := mitm.NewConfig(cert, c.PrivateKey, opts...)
 		if err != nil {
 			return utils.Errorf("build private key failed: %s", err)
 		}
