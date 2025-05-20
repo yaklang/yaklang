@@ -97,6 +97,8 @@ type LowhttpExecConfig struct {
 	AfterCount  *int64
 
 	Dialer func(duration time.Duration, addr string) (net.Conn, error)
+
+	ExtendDialOption []netx.DialXOption // for test
 }
 
 type LowhttpResponse struct {
@@ -705,5 +707,11 @@ func WithClientHelloSpec(spec *utls.ClientHelloSpec) LowhttpOpt {
 func WithDialer(dialer func(duration time.Duration, addr string) (net.Conn, error)) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.Dialer = dialer
+	}
+}
+
+func WithExtendDialXOption(options ...netx.DialXOption) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.ExtendDialOption = options
 	}
 }

@@ -26,6 +26,8 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	gmx509 "github.com/yaklang/yaklang/common/gmsm/x509"
 	"github.com/yaklang/yaklang/common/minimartian/h2"
 	"github.com/yaklang/yaklang/common/utils"
 	"math/big"
@@ -59,6 +61,8 @@ type Config struct {
 
 	certmu sync.RWMutex
 	certs  map[string]*tls.Certificate
+
+	obsoleteConfig *ObsoleteTLSConfig
 }
 
 // NewAuthority creates a new CA certificate and associated
@@ -117,9 +121,22 @@ func NewAuthority(name, organization string, validity time.Duration) (*x509.Cert
 	return x509c, priv, nil
 }
 
+type ConfigOption func(*Config) error
+
+func WithObsoleteTLS(ca *gmx509.Certificate, privateKey interface{}) ConfigOption {
+	return func(c *Config) error {
+		config, err := NewObsoleteTLSConfig(ca, privateKey)
+		if err != nil {
+			return err
+		}
+		c.obsoleteConfig = config
+		return nil
+	}
+}
+
 // NewConfig creates a MITM config using the CA certificate and
 // private key to generate on-the-fly certificates.
-func NewConfig(ca *x509.Certificate, privateKey interface{}) (*Config, error) {
+func NewConfig(ca *x509.Certificate, privateKey interface{}, opts ...ConfigOption) (*Config, error) {
 	roots := x509.NewCertPool()
 	roots.AddCert(ca)
 
@@ -139,7 +156,7 @@ func NewConfig(ca *x509.Certificate, privateKey interface{}) (*Config, error) {
 	h.Write(pkixpub)
 	keyID := h.Sum(nil)
 
-	return &Config{
+	config := &Config{
 		ca:       ca,
 		capriv:   privateKey,
 		priv:     priv,
@@ -148,7 +165,15 @@ func NewConfig(ca *x509.Certificate, privateKey interface{}) (*Config, error) {
 		org:      "Martian Proxy",
 		certs:    make(map[string]*tls.Certificate),
 		roots:    roots,
-	}, nil
+	}
+
+	for _, opt := range opts {
+		err := opt(config)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return config, nil
 }
 
 // SetValidity sets the validity window around the current time that the
@@ -227,6 +252,28 @@ func (c *Config) TLSForHost(hostname string, h2Verify bool) *tls.Config {
 			}
 
 			return c.cert(host)
+		},
+		NextProtos: nextProtos,
+	}
+}
+
+func (c *Config) ObsoleteTLS(hostname string, h2Verify bool) *gmtls.Config {
+	if c.obsoleteConfig == nil {
+		return nil
+	}
+	nextProtos := []string{"http/1.1"}
+	if c.h2AllowedHost(hostname) && h2Verify {
+		nextProtos = []string{"h2", "http/1.1"}
+	}
+	return &gmtls.Config{
+		InsecureSkipVerify: c.skipVerify,
+		GetCertificate: func(clientHello *gmtls.ClientHelloInfo) (*gmtls.Certificate, error) {
+			host := clientHello.ServerName
+			if host == "" {
+				host = hostname
+			}
+
+			return c.obsoleteConfig.cert(host)
 		},
 		NextProtos: nextProtos,
 	}
