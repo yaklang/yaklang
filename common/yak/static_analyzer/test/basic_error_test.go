@@ -245,3 +245,20 @@ for i in infos {
 		`, []string{})
 	})
 }
+func TestHandlerError(t *testing.T) {
+	code := `func c(){
+	a = randn(1, 2)
+	_,err = poc.ParseBytesToHTTPRequest("")
+	if(a!=2){
+		println(err);
+		return true;
+	}
+		println(err);
+	if(a!=3){
+		return true;
+	}
+	println(a);
+}
+`
+	check(t, code, []string{})
+}

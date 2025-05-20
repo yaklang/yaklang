@@ -880,8 +880,10 @@ func (b *FunctionBuilder) HandlerReturnPhi(s ssautil.ScopedVersionedTableIF[Valu
 		if _, ok := ToFunction(value); ok { // 忽略function
 			continue
 		}
-
 		if _, ok := ToExternLib(value); ok { // 忽略import value
+			continue
+		}
+		if value.GetType().GetTypeKind() == ErrorTypeKind {
 			continue
 		}
 

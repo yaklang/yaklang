@@ -71,7 +71,7 @@ func (c *config) parseFile() (ret *Program, err error) {
 }
 
 func (c *config) feed(prog *ssa.Program, code *memedit.MemEditor) error {
-	builder := prog.GetAndCreateFunctionBuilder("main", "main")
+	builder := prog.GetAndCreateFunctionBuilder(string(ssa.MainFunctionName), string(ssa.MainFunctionName))
 	if err := prog.Build("", code, builder); err != nil {
 		return err
 	}

@@ -98,5 +98,5 @@ exclude: <<<EXCLUDE
 *?{opcode: typecast}
 EXCLUDE
 }->) as $sink
-`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.PHP))
+`, map[string][]string{"sink": {}}, ssaapi.WithLanguage(ssaapi.PHP))
 }
