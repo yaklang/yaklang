@@ -169,6 +169,11 @@ func (c *callbackManager) kv(key, data any) {
 	// raw key value callback
 	originKey := key
 	originValue := data
+
+	if strings.TrimSpace(fmt.Sprint(originValue)) == "" {
+		return
+	}
+
 	if c.rawKVCallback != nil {
 		c.rawKVCallback(originKey, originValue)
 	}
@@ -185,6 +190,7 @@ func (c *callbackManager) kv(key, data any) {
 	default:
 		autoData = anyData
 	}
+
 	switch key.(type) {
 	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
 		keyInt, _ := strconv.ParseInt(fmt.Sprintf("%d", key), 10, 64)

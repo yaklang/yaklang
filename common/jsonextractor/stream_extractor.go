@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 	"io"
+	"unicode"
 )
 
 type callbackManager struct {
@@ -90,7 +91,7 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 	})
 
 	pushStateWithIdx := func(i string, idx int) {
-		log.Infof("push state: %v, with index: %v", i, index)
+		//log.Infof("push state: %v, with index: %v", i, index)
 		if i == state_jsonObj {
 			bufManager.PushContainer()
 			objectDepth++
@@ -143,7 +144,7 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 					raw.end = len(c) - 1
 				}
 				sliceValue := getStrSlice(raw)
-				log.Infof("pop  state: %v, with data: %#v (start:%v end:%v), current-state: %v", raw.value, sliceValue, raw.start, raw.end, currentState())
+				//log.Infof("pop  state: %v, with data: %#v (start:%v end:%v), current-state: %v", raw.value, sliceValue, raw.start, raw.end, currentState())
 				switch raw.value {
 				case state_objectKey:
 					bufManager.PushKey(sliceValue)
@@ -193,7 +194,6 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 			return err
 		}
 		results = results[:n]
-
 		index++
 		if len(results) <= 0 {
 			break
@@ -208,6 +208,21 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 		}
 	RETRY:
 		switch currentState() {
+		case state_arrayItem:
+			// [
+			if unicode.IsSpace(rune(ch)) {
+				continue
+			}
+
+			if ch == ']' {
+				popState()
+				goto RETRY
+			}
+
+			popState()
+			pushState(state_objectValue)
+			currentStateIns().objectValueInArray = true
+			goto RETRY
 		case state_jsonArray:
 			switch ch {
 			case ']':
@@ -216,8 +231,7 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 				s := currentStateIns()
 				bufManager.PushKey(s.arrayCurrentKeyIndex)
 				s.arrayCurrentKeyIndex++
-				pushState(state_objectValue)
-				currentStateIns().objectValueInArray = true
+				pushState(state_arrayItem)
 				goto RETRY
 			}
 		case state_objectValue:
@@ -245,17 +259,23 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 				pushState(state_SingleQuoteString)
 				continue
 			case '}':
-				popState()
-				currentStateName := currentState()
-				switch currentStateName {
-				case state_jsonObj:
-					popStateWithIdx(index + 1)
+				if !currentStateIns().objectValueInArray {
+					popState()
+					currentStateName := currentState()
+					switch currentStateName {
+					case state_jsonObj:
+						popStateWithIdx(index + 1)
+						continue
+					}
 					continue
 				}
-				continue
 			case '\n':
 				popState()
-				pushStateWithIdx(state_objectKey, index+1)
+				if currentState() == state_jsonArray {
+
+				} else {
+					pushStateWithIdx(state_objectKey, index+1)
+				}
 			case ',':
 				popState()
 				if currentState() == state_jsonArray {
