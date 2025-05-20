@@ -15,9 +15,6 @@ import (
 
 func (c *Config) wrapper(i AICallbackType) AICallbackType {
 	return func(config *Config, request *AIRequest) (rsp *AIResponse, err error) {
-		if c.debugPrompt {
-			log.Infof(strings.Repeat("=", 20)+"AIRequest"+strings.Repeat("=", 20)+"\n%v\n", request.GetPrompt())
-		}
 		defer func() {
 			// set rsp start time
 			if rsp != nil && !utils.IsNil(rsp) {
@@ -25,6 +22,12 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 				rsp.reqStartTime = request.startTime
 			}
 		}()
+		if c.promptHook != nil {
+			request.prompt = c.promptHook(request.GetPrompt())
+		}
+		if c.debugPrompt {
+			log.Infof(strings.Repeat("=", 20)+"AIRequest"+strings.Repeat("=", 20)+"\n%v\n", request.GetPrompt())
+		}
 
 		// 不需要 checkpoint 的请求直接执行就好
 		if request.IsDetachedCheckpoint() {

@@ -119,6 +119,8 @@ type Config struct {
 
 	resultHandler          func(*Config)
 	extendedActionCallback map[string]func(config *Config, action *Action)
+
+	promptHook func(string) string
 }
 
 func (c *Config) MakeInvokeParams() aitool.InvokeParams {
@@ -724,4 +726,20 @@ func WithGuardianMirrorStreamMirror(streamName string, callback GuardianMirrorSt
 		}
 		return config.guardian.registerMirrorEventTrigger(streamName, callback)
 	}
+}
+
+func WithPromptHook(c func(string) string) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+
+		config.promptHook = c
+		return nil
+	}
+}
+
+func WithQwenNoThink() Option {
+	return WithPromptHook(func(origin string) string {
+		return origin + "/nothink"
+	})
 }
