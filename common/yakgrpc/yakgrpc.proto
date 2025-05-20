@@ -1892,7 +1892,7 @@ message GetProjectsRequest {
   int64 FolderId = 4;
   int64 ChildFolderId = 5;
   // this type is filter ""(all) | "project"(yakit) | file(only-folder) | "ssa_project"(irify)
-  string Type = 6; 
+  string Type = 6;
   // this type effect response.ProjectTotal, this type mark kind of frontend 
   // "project"(yakit) | "ssa_project"(irify)
   string FrontendType = 7;
@@ -4609,7 +4609,7 @@ message FuzzerRequests {
   int64 Concurrent = 2;
 }
 
-message FuzzerRequest { // last index 63
+message FuzzerRequest {// last index 63
   string Request = 1;
   bytes RequestRaw = 16;  // 这里是因为麻将块儿的问题，还是需要处理一下类型
   repeated FuzzerParamItem Params = 2;
@@ -4974,7 +4974,7 @@ message HTTPFlowsToOnlineRequest {
 message AnalyzeHTTPFlowRequest{
   string HotPatchCode = 1;
   repeated MITMContentReplacer Replacers = 2;
-  AnalyzeHTTPFlowConfig Config =3 ;
+  AnalyzeHTTPFlowConfig Config = 3 ;
   // 分析数据源
   AnalyzedDataSource Source = 4;
 }
@@ -4990,7 +4990,7 @@ message AnalyzedDataSource {
 
 message AnalyzeHTTPFlowConfig {
   int64 Concurrency = 1; // 并发数量，不传默认为10
-  bool  EnableDeduplicate =2; // 是否进行单条数据去重
+  bool  EnableDeduplicate = 2; // 是否进行单条数据去重
 }
 
 
@@ -5011,9 +5011,9 @@ message AnalyzedHTTPFlowFilter{
 // 规则数据
 message HTTPFlowRuleData{
   int64 Id = 1;
-  int64 HTTPFlowId =2;
+  int64 HTTPFlowId = 2;
   string RuleVerboseName = 3;
-  string Rule =4;
+  string Rule = 4;
 }
 
 message ExportHTTPFlowsRequest {
@@ -5517,11 +5517,11 @@ message EchoResposne {
 
 // handshake 
 message HandshakeRequest {
-  string Name = 1; 
+  string Name = 1;
 }
 
 message HandshakeResponse {
-  bool Success = 1; 
+  bool Success = 1;
 }
 
 // 开启一个端口，对接 GRPC 服务器
@@ -5864,6 +5864,7 @@ message  SyntaxFlowRuleInput{
   repeated string Tags = 4;
   repeated string GroupNames = 5;
   string Description = 6;
+  string AlertMsg = 7;
 }
 
 message SyntaxFlowRuleFilter {
@@ -6504,7 +6505,7 @@ message UpdateNoteRequest {
 }
 
 message DeleteNoteRequest {
-    NoteFilter Filter = 1;
+  NoteFilter Filter = 1;
 }
 
 message QueryNoteRequest {
@@ -6556,7 +6557,7 @@ message ListAiModelRequest{
 }
 
 message ListAiModelResponse{
-  repeated string ModelName =1;
+  repeated string ModelName = 1;
 }
 
 
