@@ -1167,8 +1167,9 @@ Host: %s
 				lowhttp.WithProxy(fmt.Sprintf("http://%s", utils.HostPort("127.0.0.1", mitmPort))),
 				lowhttp.WithHttps(true),
 				lowhttp.WithExtendDialXOption(netx.DialX_WithTLSConfig(&gmtls.Config{
-					MaxVersion: tls.VersionTLS10,
-					MinVersion: tls.VersionTLS10,
+					MaxVersion:         tls.VersionTLS10,
+					MinVersion:         tls.VersionTLS10,
+					InsecureSkipVerify: true,
 				})),
 			)
 
