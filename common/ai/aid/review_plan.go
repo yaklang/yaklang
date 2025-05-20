@@ -41,7 +41,7 @@ func (c *Config) getPlanReviewSuggestion() []*PlanReviewSuggestion {
 		},
 		{
 			Value:             "create-subtask",
-			Suggestion:        "任务模糊，拆分子任务",
+			Suggestion:        "需要拆分子任务",
 			SuggestionEnglish: "Create Subtask for current level task, if user not specified, auto evaluate how to modify the task",
 			AllowExtraPrompt:  true,
 		},
