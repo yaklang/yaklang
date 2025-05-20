@@ -5,17 +5,17 @@
 ## 当前计划概览
 {{ .CurrentPlan.ProgressWithDetail }}
 
-{{ if .UserSuggestion }}
-## 用户反馈
+{{ if .UserSuggestion }}<USER_INTERACTION_{{ .NONCE }}>
 {{ .UserSuggestion }}
-{{ end }}
+</USER_INTERACTION_{{ .NONCE }}>{{ end }}
 
-{{ if .ExtraPrompt }}
-## 额外提示
+{{ if .ExtraPrompt }}<EXTRA_PROMPT_{{ .NONCE }}>
 {{ .ExtraPrompt }}
-{{ end }}
+</EXTRA_PROMPT_{{ .NONCE }}>{{ end }}
 
-## 需要完善的方向
+## 基本原则
+
+虽然在 EXTRA_PROMPT 中已经给出提示，但是为了保证绝对理性和高质量回答，你仍然需要遵守如下原则
 
 1. 任务分解
    - 是否所有必要的子任务都已列出？
@@ -31,26 +31,16 @@
    - 每个任务是否都有明确的执行方法？
    - 是否考虑了可能的错误情况和异常处理？
    - 是否有合理的资源需求评估？
+   - 添加必要的错误处理和边界情况考虑
 
-## 建议完善步骤
+# 用户原始输入
+{{ .Memory.Query }}
 
-1. 仔细检查当前计划中的每个任务
-2. 补充缺失的关键信息
-3. 确保所有任务目标都是具体和可执行的
-4. 添加必要的错误处理和边界情况考虑
+# 输出要求
 
-请根据以上方向，完善当前的任务计划。你可以：
-- 添加新的子任务
-- 修改现有任务的目标
-- 补充必要的约束条件
-- 添加错误处理机制
-
-完成后，请按照以下 Schema 输出完整的 JSON 格式计划：
+请按照以下 Schema 输出完整的 JSON 格式计划：
 
 ```schema
 {{ .Memory.Schema.TaskJsonSchema }}
 ```
-
-# 用户原始输入
-{{ .Memory.Query }}
 

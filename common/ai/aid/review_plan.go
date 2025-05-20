@@ -28,15 +28,22 @@ type PlanReviewSuggestion struct {
 func (c *Config) getPlanReviewSuggestion() []*PlanReviewSuggestion {
 	opt := []*PlanReviewSuggestion{
 		{
+			Value:             "unclear",
+			Suggestion:        "目标不明确",
+			SuggestionEnglish: `The plan is too vague and fuzzy, needs more specific objectives and clearer definition`,
+			AllowExtraPrompt:  true,
+		},
+		{
 			Value:             "incomplete",
-			Suggestion:        "计划不够完整，需要补充更多细节",
+			Suggestion:        "有遗漏",
 			SuggestionEnglish: "The plan is not complete enough, more details need to be added",
 			AllowExtraPrompt:  true,
 		},
 		{
 			Value:             "create-subtask",
-			Suggestion:        "当前层级任务不变，为某些任务创建子任务，如果用户没有指定，自动评估应该如何修改任务",
+			Suggestion:        "任务模糊，拆分子任务",
 			SuggestionEnglish: "Create Subtask for current level task, if user not specified, auto evaluate how to modify the task",
+			AllowExtraPrompt:  true,
 		},
 		{
 			Value:             "continue",
@@ -70,6 +77,33 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 
 	// 2. 根据审查建议处理
 	switch suggestion {
+	case "unclear":
+		p.config.EmitInfo("user suggestion: the plan is unclear, regenerate plan")
+		extraPrompt := param.GetString("extra_prompt")
+		if extraPrompt == "" {
+			extraPrompt = param.GetString("prompt")
+		}
+		if extraPrompt == "" {
+			extraPrompt = "用户认为当前计划不够明确，需要细化每个子任务具体的目标和清晰的定义，包含其中可能会用到的工具"
+		}
+		newPlan, err := p.generateNewPlan(suggestion, extraPrompt, rsp)
+		if err != nil {
+			p.config.EmitError("generate new plan failed: %v", err)
+			return nil, utils.Errorf("generate new plan failed: %v", err)
+		}
+
+		ep := p.config.epm.createEndpointWithEventType(EVENT_TYPE_PLAN_REVIEW_REQUIRE)
+		ep.SetDefaultSuggestionContinue()
+
+		p.config.EmitRequireReviewForPlan(newPlan, ep.id)
+		p.config.doWaitAgree(nil, ep)
+		params := ep.GetParams()
+		p.config.ReleaseInteractiveEvent(ep.id, params)
+		if params == nil {
+			p.config.EmitError("user review params is nil, plan failed")
+			return newPlan, nil
+		}
+		return p.handleReviewPlanResponse(newPlan, params)
 	case "incomplete":
 		p.config.EmitInfo("plan is incomplete")
 		// 重新生成计划，但保留现有任务
@@ -194,11 +228,13 @@ func (p *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp
 		return nil, utils.Errorf("error parsing plan review prompt: %v", err)
 	}
 
+	nonce := utils.RandStringBytes(6)
 	data := map[string]any{
 		"Memory":         p.config.memory,
 		"CurrentPlan":    rsp.RootTask,
 		"UserSuggestion": suggestion,
 		"ExtraPrompt":    extraPrompt,
+		"NONCE":          nonce,
 	}
 
 	var planPrompt bytes.Buffer
