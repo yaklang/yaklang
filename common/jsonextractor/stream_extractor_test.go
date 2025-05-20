@@ -233,12 +233,15 @@ func TestStreamExtractorArray_BASIC3(t *testing.T) {
 		if key == 0 {
 			keyHaveZero = true
 		}
-		spew.Dump(data)
 		if data == `"abc". ` {
 			valueHaveResult = true
 		}
-		if data == `    ` {
-			emptyResult = true
+	}), WithArrayCallback(func(data []any) {
+		spew.Dump(data)
+		for _, i := range data {
+			if fmt.Sprint(i) == "" {
+				emptyResult = true
+			}
 		}
 	}))
 	assert.True(t, keyHaveZero)
@@ -260,6 +263,12 @@ func TestStreamExtractorArray_BASIC4(t *testing.T) {
 		}
 		if data == `  ` {
 			emptyResult = true
+		}
+	}), WithArrayCallback(func(data []any) {
+		for _, i := range data {
+			if fmt.Sprint(i) == "" {
+				emptyResult = true
+			}
 		}
 	}))
 	assert.True(t, keyHaveZero)
