@@ -47,20 +47,20 @@ func GetAllSFSupportLanguage() []string {
 }
 
 const (
-	SFR_SEVERITY_INFO     = "info"
-	SFR_SEVERITY_LOW      = "low"
-	SFR_SEVERITY_WARNING  = "middle"
-	SFR_SEVERITY_CRITICAL = "critical"
-	SFR_SEVERITY_HIGH     = "high"
+	SFR_SEVERITY_INFO     SyntaxFlowSeverity = "info"
+	SFR_SEVERITY_LOW      SyntaxFlowSeverity = "low"
+	SFR_SEVERITY_WARNING  SyntaxFlowSeverity = "middle"
+	SFR_SEVERITY_CRITICAL SyntaxFlowSeverity = "critical"
+	SFR_SEVERITY_HIGH     SyntaxFlowSeverity = "high"
 )
 
 func GetAllSFSeverityTypes() []string {
 	return []string{
-		SFR_SEVERITY_INFO,
-		SFR_SEVERITY_LOW,
-		SFR_SEVERITY_WARNING,
-		SFR_SEVERITY_CRITICAL,
-		SFR_SEVERITY_HIGH,
+		string(SFR_SEVERITY_INFO),
+		string(SFR_SEVERITY_LOW),
+		string(SFR_SEVERITY_WARNING),
+		string(SFR_SEVERITY_CRITICAL),
+		string(SFR_SEVERITY_HIGH),
 	}
 }
 

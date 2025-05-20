@@ -6139,6 +6139,7 @@ message  SyntaxFlowRuleInput{
   repeated string Tags = 4;
   repeated string GroupNames = 5;
   string Description = 6;
+  string AlertMsg = 7;
 }
 
 message SyntaxFlowRuleFilter {
