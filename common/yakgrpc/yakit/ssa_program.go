@@ -122,7 +122,7 @@ func Prog2GRPC(prog *ssadb.IrProgram) *ypb.SSAProgram {
 		if err := projectDB.Model(&schema.SSARisk{}).Where("program_name=?", prog.ProgramName).Select(`
 		sum(case when severity='critical' then 1 else 0 end) as critical,
 		sum(case when severity='high' then 1 else 0 end) as high,
-		sum(case when severity='warning' then 1 else 0 end) as warning,
+		sum(case when severity='middle' then 1 else 0 end) as warning,
 		sum(case when severity='low' then 1 else 0 end) as low
 		`).Scan(&result).Error; err != nil {
 			log.Errorf("query risk fail: %s", err) // ignore
