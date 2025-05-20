@@ -90,7 +90,7 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 	})
 
 	pushStateWithIdx := func(i string, idx int) {
-		//log.Infof("push state: %v, with index: %v", i, index)
+		log.Infof("push state: %v, with index: %v", i, index)
 		if i == state_jsonObj {
 			bufManager.PushContainer()
 			objectDepth++
@@ -143,7 +143,7 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 					raw.end = len(c) - 1
 				}
 				sliceValue := getStrSlice(raw)
-				//log.Infof("pop  state: %v, with data: %#v (start:%v end:%v), current-state: %v", raw.value, sliceValue, raw.start, raw.end, currentState())
+				log.Infof("pop  state: %v, with data: %#v (start:%v end:%v), current-state: %v", raw.value, sliceValue, raw.start, raw.end, currentState())
 				switch raw.value {
 				case state_objectKey:
 					bufManager.PushKey(sliceValue)
@@ -185,7 +185,7 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 	for {
 		var results = make([]byte, 1)
 		n, err := io.ReadFull(reader, results)
-		if err != nil {
+		if n <= 0 && err != nil {
 			if err == io.EOF {
 				return nil
 			}

@@ -51,6 +51,26 @@ func TestJSONinONE(t *testing.T) {
 	assert.Equal(t, unicodeString, "你好，世界！🌍")
 }
 
+func TestStreamExtractor_Action(t *testing.T) {
+	haveAction := false
+	ExtractStructuredJSON(`
+{
+    "@action": "plan-create-subtask",
+    "subtasks": [
+        {
+            "goal": "1-2-2details"
+        }
+    ]
+}
+			`, WithObjectCallback(func(data map[string]any) {
+		fmt.Println("-------------------------------")
+		spew.Dump(data)
+		_, haveAction = data["@action"]
+
+	}))
+	assert.True(t, haveAction)
+}
+
 func TestStreamExtractor_NestObj(t *testing.T) {
 	ExtractStructuredJSON(`{"abc": {"a": 1}}`, WithObjectCallback(func(data map[string]any) {
 		spew.Dump(data)
