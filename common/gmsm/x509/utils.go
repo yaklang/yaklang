@@ -169,7 +169,7 @@ func ReadCertificateFromPem(certPem []byte) (*Certificate, error) {
 //
 // All keys types that are implemented via crypto.Signer are supported (This
 // includes *rsa.PublicKey and *ecdsa.PublicKey.)
-func CreateCertificate(template, parent *Certificate, publicKey *sm2.PublicKey, signer crypto.Signer) ([]byte, error) {
+func CreateCertificate(template, parent *Certificate, publicKey interface{}, signer crypto.Signer) ([]byte, error) {
 	if template.SerialNumber == nil {
 		return nil, errors.New("x509: no SerialNumber given")
 	}

@@ -2,7 +2,6 @@ package minimartian
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/base64"
@@ -320,24 +319,21 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, ctx *Context) {
 				p.h2Cache.Store(cacheKey, serverUseH2)
 			}
 		}
-		conn = tls.Server(conn, p.mitm.TLSForHost("127.0.0.1", p.http2 && serverUseH2))
-		if tlsConn, ok := conn.(*tls.Conn); ok && tlsConn != nil {
-			err := tlsConn.HandshakeContext(utils.TimeoutContextSeconds(5))
-			if err != nil {
-				log.Errorf("mitm recv tls conn from client, but handshake error: %v", err)
-				return
-			}
-			if tlsConn.ConnectionState().NegotiatedProtocol == "h2" {
-				err := p.proxyH2(p.closing, tlsConn, nil, ctx)
-				if err != nil {
-					log.Errorf("mitm proxy h2 failed: %v", err)
-				}
-				return
-			}
-			brw.Writer.Reset(tlsConn)
-			brw.Reader.Reset(tlsConn)
-			conn = tlsConn
+		tlsConn, useH2, err := p.TLSHandshake(utils.TimeoutContextSeconds(5), conn, serverUseH2)
+		if err != nil {
+			log.Errorf("tls handshake faile:%v", err)
+			return
 		}
+		if useH2 {
+			err := p.proxyH2(p.closing, tlsConn, nil, ctx)
+			if err != nil {
+				log.Errorf("mitm proxy h2 failed: %v", err)
+			}
+			return
+		}
+		brw.Writer.Reset(tlsConn)
+		brw.Reader.Reset(tlsConn)
+		conn = tlsConn
 	}
 
 	/* handle cleaning proxy! */
@@ -420,24 +416,15 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 
 	log.Debugf("mitm: completed MITM for connection: %s", req.Host)
 
-	// peek the first byte to determine if this is an HTTPS connection.
-	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
-	b := make([]byte, 1)
-	if _, err := io.ReadFull(brw, b); err != nil {
-		log.Errorf("mitm: error peeking message through CONNECT tunnel to determine type: %v", err)
+	var isTLS bool
+	conn, isTLS, err = IsTlsHandleShake(conn)
+	if err != nil {
 		return err
 	}
-	conn.SetReadDeadline(time.Time{})
-
-	// Drain all of the rest of the buffered data.
-	buf := make([]byte, brw.Reader.Buffered())
-	brw.Read(buf)
-
 	// 22 is the TLS handshake.
-	isHttps := b[0] == 0x16
-	session.Set(httpctx.REQUEST_CONTEXT_KEY_IsHttps, isHttps)
+	session.Set(httpctx.REQUEST_CONTEXT_KEY_IsHttps, isTLS)
 	if parsedConnectedToPort == 0 {
-		if isHttps {
+		if isTLS {
 			parsedConnectedToPort = 443
 		} else {
 			parsedConnectedToPort = 80
@@ -446,7 +433,7 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 	}
 
 	// https://tools.ietf.org/html/rfc5246#section-6.2.1
-	if isHttps {
+	if isTLS {
 		session.MarkSecure()
 
 		var serverUseH2 bool
@@ -494,29 +481,21 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 
 		// fallback: 最普通的情况，没有任何 http2 支持
 		// do as ordinary https server and use *tls.Conn
-		tlsConfig := p.mitm.TLSForHost(req.Host, p.http2 && serverUseH2)
-		tlsconn := tls.Server(&peekedConn{
-			Conn: conn,
-			r:    io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn),
-		}, tlsConfig)
-		if err := tlsconn.Handshake(); err != nil {
+		tlsConn, useH2, err := p.TLSHandshake(utils.TimeoutContextSeconds(5), conn, serverUseH2)
+		if err != nil {
 			p.mitm.HandshakeErrorCallback(req, err)
-			return err
+			return utils.Errorf("tls handshake faile:%v", err)
 		}
-		nextProto := tlsconn.ConnectionState().NegotiatedProtocol
-		log.Debugf("connect from browser: %v use: %v", tlsconn.RemoteAddr().String(), nextProto)
-		if nextProto == "h2" {
-			return p.proxyH2(p.closing, tlsconn, req.URL, ctx)
+		if useH2 {
+			return p.proxyH2(p.closing, tlsConn, nil, ctx)
 		}
-
-		brw.Writer.Reset(tlsconn)
-		brw.Reader.Reset(tlsconn)
-		// -> Client Connection <- is none HTTP2 HTTPS connection
-		return p.handle(ctx, timer, tlsconn, brw)
+		brw.Writer.Reset(tlsConn)
+		brw.Reader.Reset(tlsConn)
+		return p.handle(ctx, timer, tlsConn, brw)
 	}
 	// -> Client Connection <- is plain HTTP connection
 	// Prepend the previously read data to be read again.
-	brw.Reader.Reset(io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn))
+	brw.Reader.Reset(conn)
 	return p.handle(ctx, timer, conn, brw) // should read next request from client
 }
 
@@ -799,4 +778,35 @@ func (p *Proxy) handleRequest(conn net.Conn, req *http.Request, ctx *Context) er
 	}
 
 	return closing
+}
+
+func (p *Proxy) TLSHandshake(ctx context.Context, conn net.Conn, serverUseH2 bool) (net.Conn, bool, error) {
+	peekConn, version, err := peekTLSVersion(conn) // !!!!!! should use peekdConn for handshake!!!
+	if err != nil {
+		return nil, false, utils.Errorf("peek tls conn from client falied: %v", err)
+	}
+	var newConn net.Conn
+	var useH2 bool
+	if version < tls.VersionTLS12 {
+		tlsConn := gmtls.Server(peekConn, p.mitm.ObsoleteTLS("127.0.0.1", p.http2 && serverUseH2))
+		if tlsConn != nil {
+			err := tlsConn.HandshakeContext(ctx)
+			if err != nil {
+				return nil, false, utils.Errorf("mitm recv tls conn from client, but handshake error: %v", err)
+			}
+			useH2 = tlsConn.ConnectionState().NegotiatedProtocol == "h2"
+			newConn = tlsConn
+		}
+	} else {
+		tlsConn := tls.Server(peekConn, p.mitm.TLSForHost("127.0.0.1", p.http2 && serverUseH2))
+		if tlsConn != nil {
+			err = tlsConn.HandshakeContext(ctx)
+			if err != nil {
+				return nil, false, utils.Errorf("mitm recv tls conn from client, but handshake error: %v", err)
+			}
+			useH2 = tlsConn.ConnectionState().NegotiatedProtocol == "h2"
+			newConn = tlsConn
+		}
+	}
+	return newConn, useH2, nil
 }

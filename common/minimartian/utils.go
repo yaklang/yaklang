@@ -2,8 +2,10 @@ package minimartian
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
@@ -11,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
+	"golang.org/x/crypto/cryptobyte"
 	"io"
 	"net"
 	"net/http"
@@ -80,6 +83,58 @@ func IsTlsHandleShake(conn net.Conn) (fConn net.Conn, _ bool, _ error) {
 		return nil, false, utils.Errorf("check s5 failed: %v", raw)
 	}
 	return peekable, raw[0] == 0x16, nil
+}
+
+func peekTLSVersion(conn net.Conn) (fConn net.Conn, version int, _ error) {
+	peekable, ok := conn.(*utils.BufferedPeekableConn)
+	if !ok {
+		peekable = utils.NewPeekableNetConn(conn)
+	}
+	defer func() {
+		if err := recover(); err != nil {
+			log.Infof("peekable failed: %s", err)
+			fConn = peekable
+		}
+	}()
+
+	headerByte, err := peekable.Peek(5)
+	if err != nil {
+		return nil, 0, err
+	}
+	header := cryptobyte.String(headerByte)
+
+	var clientHelloLength uint16
+	if !header.Skip(3) || !header.ReadUint16(&clientHelloLength) {
+		return nil, 0, utils.Errorf("failed to parse TLS header")
+	}
+
+	clientHelloByte, err := peekable.Peek(5 + int(clientHelloLength))
+	if err != nil {
+		return nil, 0, err
+	}
+	clientHelloByte = clientHelloByte[5:]
+
+	if len(clientHelloByte) < int(clientHelloLength) || clientHelloByte[0] != 0x01 {
+		return nil, 0, utils.Errorf("failed to parse client hello msg")
+	}
+	info, err := gmtls.UnmarshalClientHello(clientHelloByte)
+	if err != nil {
+		return nil, 0, err
+	}
+	var chosenVersion uint16
+	if len(info.SupportedVersions) > 0 {
+		chosenVersion = lo.Max(lo.Filter(info.SupportedVersions, func(i uint16, _ int) bool {
+			if i > gmtls.VersionTLS13 { // filter reserved version
+				return false
+			}
+			return true
+		}))
+	}
+
+	return &peekedConn{
+		Conn: conn,
+		r:    io.MultiReader(bytes.NewReader(peekable.GetBuf()), peekable.GetReader()),
+	}, int(chosenVersion), nil
 }
 
 func (p *Proxy) setHTTPCtxConnectTo(req *http.Request) (string, error) {
