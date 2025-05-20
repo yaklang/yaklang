@@ -5,13 +5,26 @@
   "additionalProperties": false,
   "properties": {
     "@action": {
-      "const": "require-tool",
-      "description": "标识当前操作的具体类型"
+      "type": "string",
+      "enum": ["require-tool", "direct-answer"],
+      "description": "标识当前操作的具体类型",
+      "x-enum-rules": [
+        "如果当前操作是需要请求工具，则使用require-tool",
+        "如果当前操作是没有工具可用，则使用direct-answer"
+      ]
     },
     "tool": {
       "type": "string",
-      "description": "您需要请求使用的工具名称",
+      "description": "您需要请求使用的工具名称，如果你的@action不是require-tool,设置tool为空字符串",
       "enum": [{{ .ToolsList }}]
+    },
+    "direct_answer": {
+      "type": "string",
+      "description": "无需工具时直接给出针对当前任务的终结性答案，需简洁、完整且一次性满足用户需求（如：\"Python反转字符串：'hello'[::-1]\"）"
+    },
+    "direct_answer_long": {
+      "type": "string",
+      "description": "direct_answer的长文本版本，包含更多的细节和解释，适用于需要更详细信息的场景"
     }
   }
 }
