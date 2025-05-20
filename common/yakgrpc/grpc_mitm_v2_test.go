@@ -3,12 +3,15 @@ package yakgrpc
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
@@ -1123,6 +1126,58 @@ func TestGRPCMUSTPASS_MITMV2_Replacer_drop_ManalHijack(t *testing.T) {
 				tokenCheck = true
 			}
 		}
+	})
+	require.True(t, tokenCheck)
+}
+
+func TestGRPCMUSTPASS_MITM_ObsoleteTLS(t *testing.T) {
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(30))
+	defer cancel()
+
+	token := utils.RandStringBytes(16)
+
+	mockHost, mockPort := utils.DebugMockHTTPSEx(func(req []byte) []byte {
+		return []byte("HTTP/1.1 200 OK\r\nContent-length: 16\r\n\r\n" + token)
+	})
+	target := utils.HostPort(mockHost, mockPort)
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tokenCheck := false
+
+	var doOnece sync.Once
+
+	RunMITMV2TestServerEx(client, ctx, func(stream ypb.Yak_MITMV2Client) {
+		stream.Send(&ypb.MITMV2Request{
+			Host: "127.0.0.1",
+			Port: uint32(mitmPort),
+		})
+	}, func(stream ypb.Yak_MITMV2Client) {
+	}, func(stream ypb.Yak_MITMV2Client, msg *ypb.MITMV2Response) {
+		doOnece.Do(func() {
+			rsp, err := lowhttp.HTTP(
+				lowhttp.WithPacketBytes([]byte(fmt.Sprintf(`GET / HTTP/1.1
+Host: %s
+
+`, target))),
+				lowhttp.WithProxy(fmt.Sprintf("http://%s", utils.HostPort("127.0.0.1", mitmPort))),
+				lowhttp.WithHttps(true),
+				lowhttp.WithExtendDialXOption(netx.DialX_WithTLSConfig(&gmtls.Config{
+					MaxVersion: tls.VersionTLS10,
+					MinVersion: tls.VersionTLS10,
+				})),
+			)
+
+			require.NoError(t, err)
+			spew.Dump(rsp)
+			require.Contains(t, string(rsp.RawPacket), token)
+			tokenCheck = true
+			cancel()
+		})
 	})
 	require.True(t, tokenCheck)
 }
