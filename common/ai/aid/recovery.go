@@ -4,10 +4,7 @@ import (
 	"context"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -20,32 +17,7 @@ func NewRecoveredCoordinator(
 	if pt.Uuid == "" {
 		return nil, utils.Error("cannot recover coordinator at this time, no coordinator uuid")
 	}
-	config := newConfigEx(ctx, pt.Uuid, pt.Seq)
-	for _, opt := range options {
-		err := opt(config)
-		if err != nil {
-			return nil, utils.Errorf("coordinator: apply option failed: %v", err)
-		}
-	}
-	config.startEventLoop(ctx)
-
-	if config.aiToolManager == nil {
-		config.aiToolManager = buildinaitools.NewToolManager(config.tools)
-	}
-	c := &Coordinator{
-		config:    config,
-		userInput: pt.GetUserInput(),
-	}
-	config.memory.StoreQuery(c.userInput)
-	config.memory.StoreTools(func() []*aitool.Tool {
-		alltools, err := config.aiToolManager.GetAllTools()
-		if err != nil {
-			log.Errorf("coordinator: get all tools failed: %v", err)
-			return nil
-		}
-		return alltools
-	})
-	return c, nil
+	return NewCoordinatorContext(ctx, pt.GetUserInput(), append(options, WithTaskID(pt.Uuid), WithOffsetSeq(pt.Seq))...)
 }
 
 func NewFastRecoverCoordinatorContext(ctx context.Context, uuid string, opt ...Option) (*Coordinator, error) {

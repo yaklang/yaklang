@@ -97,7 +97,7 @@ func ExecuteForge(forgeName string, i any, iopts ...any) (any, error) {
 func (ag *Agent) AIDOptions() []aid.Option {
 	opts := make([]aid.Option, 0)
 	if ag.RuntimeID != "" {
-		opts = append(opts, aid.WithRuntimeID(ag.RuntimeID))
+		opts = append(opts, aid.WithTaskID(ag.RuntimeID))
 	}
 	opts = append(opts, ag.ExtendAIDOptions...)
 	return opts

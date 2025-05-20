@@ -3,14 +3,15 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/aiforge"
 	_ "github.com/yaklang/yaklang/common/aiforge/aibp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"time"
 )
@@ -39,7 +40,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 
 	inputEvent := make(chan *aid.InputEvent, 1000)
 
-	var opts = []aid.Option{
+	var aidOption = []aid.Option{
 		aid.WithEventHandler(func(e *aid.Event) {
 			if e.Timestamp <= 0 {
 				e.Timestamp = time.Now().Unix() // fallback
@@ -64,19 +65,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 		}),
 		aid.WithEventInputChan(inputEvent),
 	}
-
-	if startParams.GetEnableSystemFileSystemOperator() {
-		opts = append(opts, aid.WithSystemFileOperator())
-		opts = append(opts, aid.WithJarOperator())
-	}
-
-	if startParams.GetUseDefaultAIConfig() { // && startParams.GetForgeName() != "" {
-		opts = append(opts, aid.WithAICallback(aid.AIChatToAICallbackType(ai.Chat)))
-	}
-
-	if mockedAIChat != nil {
-		opts = append(opts, aid.WithAICallback(aid.AIChatToAICallbackType(mockedAIChat)))
-	}
+	aidOption = append(aidOption, buildAIDOption(startParams)...)
 
 	go func() {
 		defer cancel()
@@ -125,30 +114,25 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 		}
 	}()
 
+	var params any
+	if startParams.GetForgeParams() != nil {
+		params = startParams.GetForgeParams()
+	} else {
+		params = startParams.GetUserQuery()
+	}
+
 	forgeName := startParams.GetForgeName()
 	if forgeName != "" {
-		log.Infof("==========AI Forge Loading for %v ======", forgeName)
-		log.Infof("==========AI Forge Loading for %v ======", forgeName)
-		log.Infof("==========AI Forge Loading for %v ======", forgeName)
-
-		//if forgeName == "netscan" {
-		//	log.Info("use deepseek-r1 for netscan plan")
-		//	opts = append(opts, aid.WithPlanAICallback(aiforge.GetQwenAICallback("deepseek-r1")))
-		//	opts = append(opts, aid.WithAICallback(aiforge.GetOpenRouterAICallback()))
-		//} else {
-		//	opts = append(opts, aid.WithAICallback(aiforge.GetOpenRouterAICallbackGemini2_5flash()))
-		//}
-
-		_, err := aiforge.ExecuteForge(forgeName, stream.Context(), []*ypb.ExecParamItem{
-			{Key: "query", Value: startParams.GetUserQuery()},
-		}, opts...)
+		res, err := yak.ExecuteForge(forgeName, params, buildAIAgentOption(baseCtx, startParams.GetTaskID(), aidOption...)...)
 		if err != nil {
-			log.Errorf("aiforge exec forge [%v] failed: %v", forgeName, err.Error())
-			cancel()
-			return nil
+			log.Errorf("run ai forge[%s] failed: %v", forgeName, err)
+			return err
 		}
+		spew.Dump(res)
+		// todo send result
+		_ = res
 	} else {
-		engine, err := aid.NewCoordinatorContext(baseCtx, startParams.GetUserQuery(), opts...)
+		engine, err := aid.NewCoordinatorContext(baseCtx, startParams.GetUserQuery(), aidOption...)
 		if err != nil {
 			return utils.Errorf("create coordinator failed: %v", err)
 		}
@@ -159,4 +143,77 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 		}
 	}
 	return nil
+}
+
+func buildAIAgentOption(ctx context.Context, taskID string, extendOption ...aid.Option) []any {
+	agentOption := []any{
+		yak.WithContext(ctx),
+	}
+	if taskID != "" {
+		agentOption = append(agentOption, yak.WithRuntimeID(taskID))
+	}
+
+	if len(extendOption) > 0 {
+		agentOption = append(agentOption, yak.WithExtendAIDOptions(extendOption...))
+	}
+
+	return agentOption
+}
+
+func buildAIDOption(startParams *ypb.AIStartParams) []aid.Option {
+	aidOption := make([]aid.Option, 0)
+	if startParams.GetEnableSystemFileSystemOperator() {
+		aidOption = append(aidOption, aid.WithSystemFileOperator())
+		aidOption = append(aidOption, aid.WithJarOperator())
+	}
+
+	if startParams.GetUseDefaultAIConfig() {
+		aidOption = append(aidOption, aid.WithAICallback(aid.AIChatToAICallbackType(ai.Chat)))
+	}
+
+	if mockedAIChat != nil {
+		aidOption = append(aidOption, aid.WithAICallback(aid.AIChatToAICallbackType(mockedAIChat)))
+	}
+
+	if startParams.GetDisallowRequireForUserPrompt() {
+		aidOption = append(aidOption, aid.WithDisallowRequireForUserPrompt())
+	}
+
+	if startParams.GetDisableToolUse() {
+		aidOption = append(aidOption, aid.WithDisableToolUse())
+	}
+
+	if startParams.GetAICallAutoRetry() > 0 {
+		aidOption = append(aidOption, aid.WithAIAutoRetry(int(startParams.GetAICallAutoRetry())))
+	}
+
+	if startParams.GetAITransactionRetry() > 0 {
+		aidOption = append(aidOption, aid.WithAITransactionRetry(int(startParams.GetAITransactionRetry())))
+	}
+
+	if startParams.GetEnableAISearchTool() {
+		aidOption = append(aidOption, aid.WithAiToolsSearchTool())
+	}
+
+	if startParams.GetEnableAISearchInternet() {
+		aidOption = append(aidOption, aid.WithOmniSearchTool())
+	}
+
+	if len(startParams.GetIncludeSuggestedToolKeywords()) > 0 {
+		aidOption = append(aidOption, aid.WithToolKeywords(startParams.GetIncludeSuggestedToolKeywords()...))
+	}
+
+	if len(startParams.GetIncludeSuggestedToolNames()) > 0 {
+		aidOption = append(aidOption, aid.WithEnableToolsName(startParams.GetIncludeSuggestedToolNames()...))
+	}
+
+	if len(startParams.GetExcludeToolNames()) > 0 {
+		aidOption = append(aidOption, aid.WithDisableToolsName(startParams.GetExcludeToolNames()...))
+	}
+
+	if startParams.GetTaskID() != "" {
+		aidOption = append(aidOption, aid.WithTaskID(startParams.GetTaskID()))
+	}
+
+	return aidOption
 }
