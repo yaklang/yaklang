@@ -71,6 +71,7 @@ const (
 	state_objectKey   = "object-key"
 	state_objectValue = "object-value"
 	state_jsonArray   = "json-array"
+	state_arrayItem   = `json-array-item`
 )
 
 func ExtractObjectIndexes(c string) [][2]int {
