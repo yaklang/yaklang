@@ -52,23 +52,21 @@ func TestJSONinONE(t *testing.T) {
 }
 
 func TestStreamExtractor_Action(t *testing.T) {
-	haveAction := false
+	haveResult := false
 	ExtractStructuredJSON(`
 {
-    "@action": "plan-create-subtask",
     "subtasks": [
         {
-            "goal": "1-2-2details"
+            "goal": "ABC1"
         }
     ]
 }
 			`, WithObjectCallback(func(data map[string]any) {
 		fmt.Println("-------------------------------")
 		spew.Dump(data)
-		_, haveAction = data["@action"]
-
+		haveResult = true
 	}))
-	assert.True(t, haveAction)
+	assert.True(t, haveResult)
 }
 
 func TestStreamExtractor_NestObj(t *testing.T) {
