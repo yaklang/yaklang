@@ -392,3 +392,17 @@ public class OuterClass extends A {
 			}, ssaapi.WithLanguage(consts.JAVA))
 	})
 }
+
+func TestInterfaceDeclarationBlueprint(t *testing.T) {
+	code := `
+public interface SqliService extends IService<Sqli> {
+    int nativeInsert(Sqli user);
+    int nativeDelete(Integer id);
+    int nativeUpdate(Sqli user);
+    Sqli nativeSelect(Integer id);
+}
+`
+	ssatest.CheckSyntaxFlow(t, code, `nativeInsert?{opcode:function}<getCurrentBlueprint> as $result`, map[string][]string{
+		"result": {"SqliService"},
+	}, ssaapi.WithLanguage(consts.JAVA))
+}
