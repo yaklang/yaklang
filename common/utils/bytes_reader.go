@@ -467,8 +467,8 @@ func ReadLineEx(reader io.Reader) (string, int64, error) {
 	buf := make([]byte, 1)
 	var res bytes.Buffer
 	for {
-		n, err := reader.Read(buf)
-		if err != nil {
+		n, err := io.ReadFull(reader, buf)
+		if err != nil && n <= 0 {
 			return strings.TrimRightFunc(res.String(), unicode.IsSpace), count, err
 		}
 		count += int64(n)

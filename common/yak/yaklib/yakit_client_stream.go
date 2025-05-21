@@ -81,6 +81,7 @@ func (c *YakitClient) Stream(streamType string, streamId string, stream io.Reade
 			}
 			wg.Done()
 		}()
+		warningOnce := new(sync.Once)
 		for {
 			select {
 			case msg, ok := <-bufChannel:
@@ -99,7 +100,9 @@ func (c *YakitClient) Stream(streamType string, streamId string, stream io.Reade
 						"extra":      params,
 					})))
 					if err != nil {
-						log.Warnf("stream send failed: %s", err)
+						warningOnce.Do(func() {
+							log.Warnf("stream send failed: %s", err)
+						})
 						//return
 					}
 					buf.Reset()
