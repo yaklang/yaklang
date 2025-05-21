@@ -22,7 +22,7 @@ func (b *builder) GetRecoverRange(sourcefile *ast.SourceFile, node *core.TextRan
 }
 
 func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
-	if sourcefile == nil {
+	if sourcefile == nil || b.IsStop() {
 		return nil
 	}
 
@@ -34,7 +34,7 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 }
 
 func (b *builder) VisitStatements(stmtList *ast.NodeList) interface{} {
-	if stmtList == nil || len(stmtList.Nodes) == 0 {
+	if stmtList == nil || len(stmtList.Nodes) == 0 || b.IsStop() {
 		return nil
 	}
 
@@ -54,7 +54,7 @@ func (b *builder) VisitStatements(stmtList *ast.NodeList) interface{} {
 
 // VisitStatement 处理Statement相关
 func (b *builder) VisitStatement(node *ast.Node) interface{} {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 	if b.IsBlockFinish() {
@@ -117,7 +117,7 @@ func (b *builder) VisitStatement(node *ast.Node) interface{} {
 }
 
 func (b *builder) VisitVariableStatement(node *ast.VariableStatement) interface{} {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -132,7 +132,7 @@ func (b *builder) VisitVariableStatement(node *ast.VariableStatement) interface{
 
 // VisitExpressionStatement 访问表达式语句
 func (b *builder) VisitExpressionStatement(node *ast.ExpressionStatement) interface{} {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -148,7 +148,7 @@ func (b *builder) VisitExpressionStatement(node *ast.ExpressionStatement) interf
 
 // VisitIdentifier 访问标识符
 func (b *builder) VisitIdentifier(node *ast.Identifier) string {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return ""
 	}
 
@@ -161,7 +161,7 @@ func (b *builder) VisitIdentifier(node *ast.Identifier) string {
 
 // VisitStringLiteral 访问字符串字面量
 func (b *builder) VisitStringLiteral(node *ast.StringLiteral) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -174,7 +174,7 @@ func (b *builder) VisitStringLiteral(node *ast.StringLiteral) ssa.Value {
 
 // VisitNumericLiteral 访问数字字面量
 func (b *builder) VisitNumericLiteral(node *ast.NumericLiteral) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -188,7 +188,7 @@ func (b *builder) VisitNumericLiteral(node *ast.NumericLiteral) ssa.Value {
 
 // VisitBooleanLiteral 访问布尔字面量
 func (b *builder) VisitBooleanLiteral(node *ast.Node) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -208,7 +208,7 @@ func (b *builder) VisitBooleanLiteral(node *ast.Node) ssa.Value {
 
 // VisitNullLiteral 访问null字面量
 func (b *builder) VisitNullLiteral(node *ast.Node) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -221,7 +221,7 @@ func (b *builder) VisitNullLiteral(node *ast.Node) ssa.Value {
 
 // VisitUndefinedLiteral 访问undefined字面量
 func (b *builder) VisitUndefinedLiteral(node *ast.Node) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -234,7 +234,7 @@ func (b *builder) VisitUndefinedLiteral(node *ast.Node) ssa.Value {
 
 // VisitIfStatement 访问if语句
 func (b *builder) VisitIfStatement(node *ast.IfStatement) interface{} {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -309,7 +309,7 @@ func (b *builder) VisitIfStatement(node *ast.IfStatement) interface{} {
 
 // VisitBlock 访问代码块
 func (b *builder) VisitBlock(node *ast.Block) interface{} {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -337,7 +337,7 @@ func (b *builder) VisitBlock(node *ast.Block) interface{} {
 
 // VisitDoStatement 访问do-while语句 - 至少执行一次的循环
 func (b *builder) VisitDoStatement(node *ast.DoStatement) interface{} {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -389,7 +389,7 @@ func (b *builder) VisitDoStatement(node *ast.DoStatement) interface{} {
 
 // VisitWhileStatement 访问while语句 - 简单条件循环
 func (b *builder) VisitWhileStatement(node *ast.WhileStatement) interface{} {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -426,7 +426,7 @@ func (b *builder) VisitWhileStatement(node *ast.WhileStatement) interface{} {
 
 // VisitForStatement 访问for语句 - 经典三语句循环
 func (b *builder) VisitForStatement(node *ast.ForStatement) interface{} {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -497,7 +497,7 @@ func (b *builder) VisitForStatement(node *ast.ForStatement) interface{} {
 
 // VisitForInOrOfStatement 访问for-in和for-of语句
 func (b *builder) VisitForInOrOfStatement(node *ast.ForInOrOfStatement) interface{} {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -579,7 +579,7 @@ func (b *builder) VisitForInOrOfStatement(node *ast.ForInOrOfStatement) interfac
 
 // VisitReturnStatement 访问return语句
 func (b *builder) VisitReturnStatement(node *ast.ReturnStatement) interface{} {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -599,7 +599,7 @@ func (b *builder) VisitReturnStatement(node *ast.ReturnStatement) interface{} {
 
 // VisitBreakStatement 访问break语句
 func (b *builder) VisitBreakStatement(node *ast.BreakStatement) interface{} {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -641,7 +641,7 @@ func (b *builder) VisitContinueStatement(node *ast.ContinueStatement) interface{
 
 // VisitLabeledStatement 访问带标签的语句
 func (b *builder) VisitLabeledStatement(node *ast.LabeledStatement) interface{} {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -702,7 +702,7 @@ func (b *builder) VisitLabeledStatement(node *ast.LabeledStatement) interface{} 
 
 // VisitTryStatement 访问try语句
 func (b *builder) VisitTryStatement(node *ast.TryStatement) interface{} {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -748,7 +748,7 @@ func (b *builder) VisitTryStatement(node *ast.TryStatement) interface{} {
 
 // VisitSwitchStatement 访问switch语句
 func (b *builder) VisitSwitchStatement(node *ast.SwitchStatement) interface{} {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -811,7 +811,7 @@ func (b *builder) VisitSwitchStatement(node *ast.SwitchStatement) interface{} {
 
 // VisitThrowStatement 访问throw语句
 func (b *builder) VisitThrowStatement(node *ast.ThrowStatement) interface{} {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -825,7 +825,7 @@ func (b *builder) VisitThrowStatement(node *ast.ThrowStatement) interface{} {
 
 // VisitEmptyStatement 访问空语句
 func (b *builder) VisitEmptyStatement(node *ast.EmptyStatement) interface{} {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -836,7 +836,7 @@ func (b *builder) VisitEmptyStatement(node *ast.EmptyStatement) interface{} {
 
 // VisitDebuggerStatement 访问debugger语句
 func (b *builder) VisitDebuggerStatement(node *ast.DebuggerStatement) interface{} {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -847,7 +847,7 @@ func (b *builder) VisitDebuggerStatement(node *ast.DebuggerStatement) interface{
 
 // VisitWithStatement 访问with语句
 func (b *builder) VisitWithStatement(node *ast.WithStatement) interface{} {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -860,7 +860,7 @@ func (b *builder) VisitWithStatement(node *ast.WithStatement) interface{} {
 
 // VisitClassDeclaration 访问类声明
 func (b *builder) VisitClassDeclaration(node *ast.ClassDeclaration) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -881,7 +881,7 @@ func (b *builder) VisitClassDeclaration(node *ast.ClassDeclaration) ssa.Value {
 		if parent.Types != nil && len(parent.Types.Nodes) != 0 {
 			typedExp := parent.Types.Nodes[0].AsExpressionWithTypeArguments()
 			if ast.IsIdentifier(typedExp.Expression) {
-				extendName = typedExp.AsIdentifier().Text
+				extendName = typedExp.Expression.AsIdentifier().Text
 			}
 		}
 	}
@@ -926,7 +926,7 @@ func (b *builder) VisitHeritageClause(node *ast.HeritageClause) interface{} { re
 
 // VisitVariableDeclarationList 访问变量声明列表
 func (b *builder) VisitVariableDeclarationList(node *ast.VariableDeclarationListNode) interface{} {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -942,7 +942,7 @@ func (b *builder) VisitVariableDeclarationList(node *ast.VariableDeclarationList
 
 // VisitVariableDeclaration 访问变量声明
 func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declType ast.NodeFlags) interface{} {
-	if decl == nil {
+	if decl == nil || b.IsStop() {
 		return nil
 	}
 
@@ -1067,7 +1067,7 @@ func (b *builder) VisitExternalModuleReference(node *ast.ExternalModuleReference
 // VisitExpression 访问表达式相关的访问函数
 // VisitExpression 返回L-Val和R-Val分别对应返回类型*ssa.Variable和ssa.Value
 func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Variable, ssa.Value) {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil, nil
 	}
 
@@ -1244,7 +1244,7 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 
 // VisitBinaryExpression 访问二元表达式
 func (b *builder) VisitBinaryExpression(node *ast.BinaryExpression) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -1280,7 +1280,7 @@ func (b *builder) VisitBinaryExpression(node *ast.BinaryExpression) ssa.Value {
 		ifb.Build()
 		// generator phi instruction
 		v := b.ReadValue(id)
-		v.SetName(b.GetEditor().GetTextFromOffset(node.Loc.Pos(), node.Loc.End()))
+		v.SetName(scanner.GetSourceTextOfNodeFromSourceFile(b.sourceFile, node.AsNode(), true))
 		return v
 	}
 
@@ -1490,7 +1490,7 @@ func (b *builder) VisitBinaryExpression(node *ast.BinaryExpression) ssa.Value {
 
 // VisitCallExpression 处理函数调用表达式
 func (b *builder) VisitCallExpression(node *ast.CallExpression) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -1525,7 +1525,7 @@ func (b *builder) VisitCallExpression(node *ast.CallExpression) ssa.Value {
 
 // VisitObjectLiteralExpression 访问对象字面量表达式
 func (b *builder) VisitObjectLiteralExpression(objLiteral *ast.ObjectLiteralExpression) ssa.Value {
-	if objLiteral == nil {
+	if objLiteral == nil || b.IsStop() {
 		return nil
 	}
 
@@ -1730,7 +1730,7 @@ func (b *builder) VisitObjectLiteralExpression(objLiteral *ast.ObjectLiteralExpr
 
 // VisitArrayLiteralExpression 访问数组字面量表达式
 func (b *builder) VisitArrayLiteralExpression(arrayLiteral *ast.ArrayLiteralExpression) ssa.Value {
-	if arrayLiteral == nil {
+	if arrayLiteral == nil || b.IsStop() {
 		return nil
 	}
 
@@ -1787,7 +1787,7 @@ func (b *builder) VisitArrayLiteralExpression(arrayLiteral *ast.ArrayLiteralExpr
 
 // VisitPrefixUnaryExpression 访问前缀一元表达式
 func (b *builder) VisitPrefixUnaryExpression(node *ast.PrefixUnaryExpression) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -1869,7 +1869,7 @@ func (b *builder) VisitPrefixUnaryExpression(node *ast.PrefixUnaryExpression) ss
 
 // VisitPostfixUnaryExpression 访问后缀一元表达式
 func (b *builder) VisitPostfixUnaryExpression(node *ast.PostfixUnaryExpression) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -1931,7 +1931,7 @@ func (b *builder) VisitPostfixUnaryExpression(node *ast.PostfixUnaryExpression) 
 
 // VisitPropertyAccessExpression 访问属性访问表达式
 func (b *builder) VisitPropertyAccessExpression(node *ast.PropertyAccessExpression) (ssa.Value, string) {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil, ""
 	}
 
@@ -1977,7 +1977,7 @@ func (b *builder) VisitElementAccessExpression(node *ast.ElementAccessExpression
 
 // VisitNewExpression 访问new表达式
 func (b *builder) VisitNewExpression(node *ast.NewExpression) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -1997,8 +1997,11 @@ func (b *builder) VisitNewExpression(node *ast.NewExpression) ssa.Value {
 	class := b.GetBluePrint(className)
 	obj := b.EmitUndefined(className)
 	if class == nil {
-		log.Warnf("class %v instantiation failed.", className)
-		return obj
+		class = b.CreateBlueprint(className)
+		object := b.ReadValue(className)
+		if !utils.IsNil(object) {
+			class.RegisterMagicMethod(ssa.Constructor, object)
+		}
 	}
 	obj.SetType(class)
 	args := []ssa.Value{obj}
@@ -2016,7 +2019,7 @@ func (b *builder) VisitParenthesizedExpression(node *ast.ParenthesizedExpression
 	// 括号表达式直接访问其内部表达式
 	// 括号在AST中只是一个标记，不影响执行结果
 	// 但在某些情况下可能影响优先级或类型推断
-	if node.Expression == nil {
+	if node.Expression == nil || b.IsStop() {
 		return b.EmitUndefined("")
 	}
 
@@ -2029,7 +2032,7 @@ func (b *builder) VisitParenthesizedExpression(node *ast.ParenthesizedExpression
 // VisitFunctionDeclaration 访问函数声明
 // function name([param[, param[, ... param]]]) { statements }
 func (b *builder) VisitFunctionDeclaration(node *ast.FunctionDeclaration) interface{} {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2081,7 +2084,7 @@ func (b *builder) VisitFunctionDeclaration(node *ast.FunctionDeclaration) interf
 // VisitFunctionExpression 访问函数表达式
 // var myFunction = function name([param[, param[, ... param]]]) { statements }
 func (b *builder) VisitFunctionExpression(node *ast.FunctionExpression) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2135,7 +2138,7 @@ func (b *builder) VisitFunctionExpression(node *ast.FunctionExpression) ssa.Valu
 // VisitArrowFunction 访问箭头函数
 // ([param] [, param]) => { statements } param => expression
 func (b *builder) VisitArrowFunction(node *ast.ArrowFunction) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2184,7 +2187,7 @@ func (b *builder) VisitArrowFunction(node *ast.ArrowFunction) ssa.Value {
 
 // VisitConditionalExpression 访问条件表达式
 func (b *builder) VisitConditionalExpression(node *ast.ConditionalExpression) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2220,7 +2223,7 @@ func (b *builder) VisitConditionalExpression(node *ast.ConditionalExpression) ss
 		ifb.Build()
 		// generator phi instruction
 		v := b.ReadValue(id)
-		v.SetName(b.GetEditor().GetTextFromOffset(node.Loc.Pos(), node.Loc.End()))
+		v.SetName(scanner.GetSourceTextOfNodeFromSourceFile(b.sourceFile, node.AsNode(), true))
 		return v
 	}
 
@@ -2240,7 +2243,7 @@ func (b *builder) VisitConditionalExpression(node *ast.ConditionalExpression) ss
 
 // VisitTemplateExpression 访问模板表达式
 func (b *builder) VisitTemplateExpression(node *ast.TemplateExpression) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2307,7 +2310,7 @@ func (b *builder) VisitTemplateExpression(node *ast.TemplateExpression) ssa.Valu
 
 // VisitNoSubstitutionTemplateLiteral 访问无替换模板字面量
 func (b *builder) VisitNoSubstitutionTemplateLiteral(node *ast.NoSubstitutionTemplateLiteral) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2319,7 +2322,7 @@ func (b *builder) VisitNoSubstitutionTemplateLiteral(node *ast.NoSubstitutionTem
 
 // VisitTaggedTemplateExpression 访问标记模板表达式
 func (b *builder) VisitTaggedTemplateExpression(node *ast.TaggedTemplateExpression) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2331,7 +2334,7 @@ func (b *builder) VisitTaggedTemplateExpression(node *ast.TaggedTemplateExpressi
 
 // VisitSpreadElement 访问展开元素
 func (b *builder) VisitSpreadElement(node *ast.SpreadElement) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2343,7 +2346,7 @@ func (b *builder) VisitSpreadElement(node *ast.SpreadElement) ssa.Value {
 
 // VisitDeleteExpression 访问delete表达式
 func (b *builder) VisitDeleteExpression(node *ast.DeleteExpression) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2355,7 +2358,7 @@ func (b *builder) VisitDeleteExpression(node *ast.DeleteExpression) ssa.Value {
 
 // VisitTypeOfExpression 访问typeof表达式
 func (b *builder) VisitTypeOfExpression(node *ast.TypeOfExpression) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2396,7 +2399,7 @@ func (b *builder) VisitTypeOfExpression(node *ast.TypeOfExpression) ssa.Value {
 
 // VisitVoidExpression 访问void表达式
 func (b *builder) VisitVoidExpression(node *ast.VoidExpression) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2414,7 +2417,7 @@ func (b *builder) VisitVoidExpression(node *ast.VoidExpression) ssa.Value {
 
 // VisitAwaitExpression 访问await表达式
 func (b *builder) VisitAwaitExpression(node *ast.AwaitExpression) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2426,7 +2429,7 @@ func (b *builder) VisitAwaitExpression(node *ast.AwaitExpression) ssa.Value {
 
 // VisitYieldExpression 访问yield表达式
 func (b *builder) VisitYieldExpression(node *ast.YieldExpression) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2441,7 +2444,7 @@ func (b *builder) VisitMetaProperty(node *ast.MetaProperty) ssa.Value { return b
 
 // VisitPropertyAssignment 访问属性赋值
 func (b *builder) VisitPropertyAssignment(node *ast.PropertyAssignment) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2453,7 +2456,7 @@ func (b *builder) VisitPropertyAssignment(node *ast.PropertyAssignment) ssa.Valu
 
 // VisitShorthandPropertyAssignment 访问简写属性赋值
 func (b *builder) VisitShorthandPropertyAssignment(node *ast.ShorthandPropertyAssignment) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2465,7 +2468,7 @@ func (b *builder) VisitShorthandPropertyAssignment(node *ast.ShorthandPropertyAs
 
 // VisitSpreadAssignment 访问展开赋值
 func (b *builder) VisitSpreadAssignment(node *ast.SpreadAssignment) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2477,7 +2480,7 @@ func (b *builder) VisitSpreadAssignment(node *ast.SpreadAssignment) ssa.Value {
 
 // VisitJsxElement 访问JSX元素
 func (b *builder) VisitJsxElement(node *ast.JsxElement) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2489,7 +2492,7 @@ func (b *builder) VisitJsxElement(node *ast.JsxElement) ssa.Value {
 
 // VisitTemplateSpan 访问模板跨度
 func (b *builder) VisitTemplateSpan(node *ast.TemplateSpan) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2501,7 +2504,7 @@ func (b *builder) VisitTemplateSpan(node *ast.TemplateSpan) ssa.Value {
 
 // VisitBigIntLiteral 访问BigInt字面量
 func (b *builder) VisitBigIntLiteral(node *ast.BigIntLiteral) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2513,7 +2516,7 @@ func (b *builder) VisitBigIntLiteral(node *ast.BigIntLiteral) ssa.Value {
 
 // VisitRegularExpressionLiteral 访问正则表达式字面量
 func (b *builder) VisitRegularExpressionLiteral(node *ast.RegularExpressionLiteral) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2525,7 +2528,7 @@ func (b *builder) VisitRegularExpressionLiteral(node *ast.RegularExpressionLiter
 
 // VisitThisExpression 访问this表达式
 func (b *builder) VisitThisExpression(node *ast.Node) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2548,7 +2551,7 @@ func (b *builder) VisitThisExpression(node *ast.Node) ssa.Value {
 
 // VisitSuperExpression 访问super表达式
 func (b *builder) VisitSuperExpression(node *ast.Node) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2568,7 +2571,7 @@ func (b *builder) VisitSuperExpression(node *ast.Node) ssa.Value {
 
 // VisitClassExpression 访问类表达式
 func (b *builder) VisitClassExpression(node *ast.ClassExpression) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2580,7 +2583,7 @@ func (b *builder) VisitClassExpression(node *ast.ClassExpression) ssa.Value {
 
 // VisitOmittedExpression 访问省略表达式
 func (b *builder) VisitOmittedExpression(node *ast.Node) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2592,7 +2595,7 @@ func (b *builder) VisitOmittedExpression(node *ast.Node) ssa.Value {
 
 // VisitSyntheticExpression 访问合成表达式
 func (b *builder) VisitSyntheticExpression(node *ast.Node) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2604,7 +2607,7 @@ func (b *builder) VisitSyntheticExpression(node *ast.Node) ssa.Value {
 
 // VisitPartiallyEmittedExpression 访问部分发出的表达式
 func (b *builder) VisitPartiallyEmittedExpression(node *ast.PartiallyEmittedExpression) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2621,7 +2624,7 @@ func (b *builder) VisitPartiallyEmittedExpression(node *ast.PartiallyEmittedExpr
 
 // VisitCommaListExpression 访问逗号列表表达式
 func (b *builder) VisitCommaListExpression(node *ast.Node) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2633,7 +2636,7 @@ func (b *builder) VisitCommaListExpression(node *ast.Node) ssa.Value {
 
 // VisitJsxSelfClosingElement 访问JSX自闭合元素
 func (b *builder) VisitJsxSelfClosingElement(node *ast.JsxSelfClosingElement) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2645,7 +2648,7 @@ func (b *builder) VisitJsxSelfClosingElement(node *ast.JsxSelfClosingElement) ss
 
 // VisitJsxFragment 访问JSX片段
 func (b *builder) VisitJsxFragment(node *ast.JsxFragment) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2657,7 +2660,7 @@ func (b *builder) VisitJsxFragment(node *ast.JsxFragment) ssa.Value {
 
 // VisitJsxAttributes 访问JSX属性
 func (b *builder) VisitJsxAttributes(node *ast.JsxAttributes) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2669,7 +2672,7 @@ func (b *builder) VisitJsxAttributes(node *ast.JsxAttributes) ssa.Value {
 
 // VisitJsxAttributeValue 访问JSX属性值
 func (b *builder) VisitJsxAttributeValue(node *ast.Node) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2681,7 +2684,7 @@ func (b *builder) VisitJsxAttributeValue(node *ast.Node) ssa.Value {
 
 // VisitJsxChild 访问JSX子元素
 func (b *builder) VisitJsxChild(node *ast.Node) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2694,7 +2697,7 @@ func (b *builder) VisitJsxChild(node *ast.Node) ssa.Value {
 // VisitComputedPropertyName 访问计算属性名
 // 处理对象字面量或类中使用计算属性名的情况，如 { [expr]: value }
 func (b *builder) VisitComputedPropertyName(node *ast.ComputedPropertyName) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2711,7 +2714,7 @@ func (b *builder) VisitComputedPropertyName(node *ast.ComputedPropertyName) ssa.
 
 // VisitJsxSpreadAttribute 访问JSX展开属性
 func (b *builder) VisitJsxSpreadAttribute(node *ast.JsxSpreadAttribute) ssa.Value {
-	if node == nil {
+	if node == nil || b.IsStop() {
 		return nil
 	}
 
@@ -2724,6 +2727,10 @@ func (b *builder) VisitJsxSpreadAttribute(node *ast.JsxSpreadAttribute) ssa.Valu
 // ===== MISC =====
 
 func (b *builder) VisitPropertyName(propertyName *ast.PropertyName) ssa.Value {
+	if propertyName == nil || b.IsStop() {
+		return nil
+	}
+
 	switch propertyName.Kind {
 	case ast.KindIdentifier:
 		return b.EmitConstInst(propertyName.AsIdentifier().Text)
@@ -2751,7 +2758,7 @@ func (b *builder) VisitPropertyName(propertyName *ast.PropertyName) ssa.Value {
 
 // ProcessObjectBindingPattern 处理对象解构模式
 func (b *builder) ProcessObjectBindingPattern(pattern *ast.BindingPattern, sourceObj ssa.Value, isLocal bool) {
-	if pattern == nil || sourceObj == nil {
+	if pattern == nil || sourceObj == nil || b.IsStop() {
 		return
 	}
 
@@ -2852,7 +2859,7 @@ func (b *builder) ProcessObjectBindingPattern(pattern *ast.BindingPattern, sourc
 
 // ProcessArrayBindingPattern 处理数组解构模式
 func (b *builder) ProcessArrayBindingPattern(pattern *ast.BindingPattern, sourceArr ssa.Value, isLocal bool) {
-	if pattern == nil || sourceArr == nil {
+	if pattern == nil || sourceArr == nil || b.IsStop() {
 		return
 	}
 
@@ -2934,6 +2941,9 @@ func (b *builder) ProcessArrayBindingPattern(pattern *ast.BindingPattern, source
 }
 
 func (b *builder) ProcessFunctionParams(params *ast.NodeList) {
+	if params == nil || len(params.Nodes) == 0 || b.IsStop() {
+		return
+	}
 	for index, param := range params.Nodes {
 		paramNode := param.AsParameterDeclaration()
 		paramName := ""

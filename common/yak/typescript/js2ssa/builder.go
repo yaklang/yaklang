@@ -3,7 +3,6 @@ package js2ssa
 import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/ast"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/core"
@@ -27,6 +26,9 @@ type builder struct {
 var Builder ssa.Builder = &SSABuilder{}
 
 func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
+	if b.PreHandler() {
+		return nil
+	}
 	jsAST, err := Frontend(src, force)
 	if err != nil {
 		return err
@@ -36,7 +38,6 @@ func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		FunctionBuilder: b,
 		sourceFile:      jsAST,
 	}
-	b.SetEditor(memedit.NewMemEditor(src))
 	build.VisitSourceFile(jsAST)
 	return nil
 }
