@@ -1,6 +1,7 @@
 package aispec
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"github.com/h2non/filetype"
@@ -105,12 +106,13 @@ func WithDebugStream(h ...bool) AIConfigOption {
 		if len(h) <= 0 || h[0] {
 			c.StreamHandler = func(r io.Reader) {
 				start := time.Now()
-				var buf = make([]byte, 1)
-				n, _ := io.ReadFull(r, buf)
-				if n > 0 {
+				reader := bufio.NewReader(r)
+				_, err := reader.ReadByte()
+				if err == nil {
 					log.Infof("first byte(token) delay: %v", time.Since(start))
 				}
-				io.Copy(os.Stdout, io.MultiReader(bytes.NewReader(buf), r))
+				reader.UnreadByte()
+				io.Copy(os.Stdout, reader)
 			}
 		} else {
 			c.StreamHandler = nil
