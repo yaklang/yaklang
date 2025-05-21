@@ -1,6 +1,7 @@
 package java
 
 import (
+	"github.com/yaklang/yaklang/common/consts"
 	"strconv"
 	"strings"
 	"testing"
@@ -599,3 +600,82 @@ func TestNativeCall_GetFileFullName(t *testing.T) {
 //			"len": {"4"},
 //		}, ssaapi.WithLanguage(consts.JAVA))
 //}
+
+func TestNativeCallGetPointerAndReference(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("SqliServer.java", `
+package top.whgojp.modules.sqli.service;
+
+import io.swagger.models.auth.In;
+import top.whgojp.modules.sqli.entity.Sqli;
+import com.baomidou.mybatisplus.extension.service.IService;
+
+import java.util.List;
+
+public interface SqliService extends IService<Sqli> {
+    int nativeInsert(Sqli user);
+    int nativeDelete(Integer id);
+    int nativeUpdate(Sqli user);
+    Sqli nativeSelect(Integer id);
+}
+`)
+	vf.AddFile("SqliServiceImpl.java", `
+package top.whgojp.modules.sqli.service.impl;
+
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import io.swagger.models.auth.In;
+import org.apache.ibatis.annotations.Options;
+import org.springframework.beans.factory.annotation.Autowired;
+import top.whgojp.modules.sqli.entity.Sqli;
+import top.whgojp.modules.sqli.mapper.SqliMapper;
+import top.whgojp.modules.sqli.service.SqliService;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class SqliServiceImpl extends ServiceImpl<SqliMapper, Sqli>
+    implements SqliService {
+    @Autowired
+    private SqliMapper sqliMapper;
+
+    @Override
+    public int nativeInsert(Sqli user) {
+        return sqliMapper.insert(user);
+    }
+
+    @Override
+    public int nativeDelete(Integer id) {
+        return sqliMapper.deleteById(id);
+    }
+
+    @Override
+    @Options(useCache = false)
+    public int nativeUpdate(Sqli user) {
+        return sqliMapper.updateById(user);
+    }
+
+    @Override
+    public Sqli nativeSelect(Integer id) {
+        return sqliMapper.selectById(id);
+    }
+
+}
+`)
+
+	rule := `
+nativeInsert?{opcode:"function"}<getPointer> as $pointer
+nativeInsert?{opcode:"function"}<getReference> as $reference
+`
+	ssatest.CheckSyntaxFlowWithFS(
+		t,
+		vf,
+		rule,
+		map[string][]string{
+			"pointer":   {"Function-SqliServiceImpl.nativeInsert"},
+			"reference": {"Function-SqliService.nativeInsert"},
+		},
+		false,
+		ssaapi.WithLanguage(consts.JAVA),
+	)
+}
