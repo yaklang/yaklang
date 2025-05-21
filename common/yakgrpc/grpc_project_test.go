@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -274,6 +275,54 @@ func TestServer_Project_ExportAndImportProject(t *testing.T) {
 
 		_, err = gorm.Open(consts.SQLite, newProject.DatabasePath) // check db whether it is damaged
 		require.NoError(t, err)
+	})
+
+}
+
+func TestServer_Project_DefaultProject(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx := utils.TimeoutContext(20 * time.Second) // set timeout
+	token := utils.RandStringBytes(10)
+	newProjectResp, err := client.NewProject(ctx, &ypb.NewProjectRequest{
+		ProjectName: token,
+		Description: "hello",
+		Type:        yakit.TypeProject,
+	})
+	require.NoError(t, err)
+	defer func() {
+		yakit.DeleteProjectByProjectName(consts.GetGormProfileDatabase(), token)
+	}()
+
+	getDefaultPath := func() string {
+		projects, err := client.GetProjects(context.Background(), &ypb.GetProjectsRequest{
+			Type: yakit.TypeProject,
+		})
+		require.NoError(t, err)
+		log.Info("projects: ", projects)
+		for _, project := range projects.Projects {
+			if project.GetProjectName() == "[default]" {
+				return project.GetDatabasePath()
+			}
+		}
+		return ""
+	}
+
+	defaultID := getDefaultPath()
+	require.NotEqual(t, defaultID, "")
+
+	t.Run("set default project", func(t *testing.T) {
+		_, err = client.SetCurrentProject(context.Background(), &ypb.SetCurrentProjectRequest{
+			Id:   newProjectResp.Id,
+			Type: yakit.TypeProject,
+		})
+		require.NoError(t, err)
+		_, err := client.SetCurrentProject(context.Background(), &ypb.SetCurrentProjectRequest{
+			Id:   0,
+			Type: yakit.TypeProject,
+		})
+		require.NoError(t, err)
+		require.Equal(t, getDefaultPath(), defaultID)
 	})
 
 }
