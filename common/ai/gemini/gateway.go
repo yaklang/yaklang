@@ -510,7 +510,7 @@ func (c *Client) ChatStream(prompt string) (io.Reader, error) {
 }
 
 // Chat sends a prompt and returns the full response as a string.
-func (c *Client) Chat(prompt string, functions ...aispec.Function) (string, error) {
+func (c *Client) Chat(prompt string, functions ...any) (string, error) {
 	log.Infof("Initiating Gemini Chat with prompt: %s", utils.ShrinkString(prompt, 50))
 	if len(functions) > 0 {
 		// TODO: Implement function calling support for Chat if needed.
@@ -535,7 +535,7 @@ func (c *Client) Chat(prompt string, functions ...aispec.Function) (string, erro
 }
 
 // ChatEx sends a multi-turn conversation history and returns the choices.
-func (c *Client) ChatEx(details []aispec.ChatDetail, functions ...aispec.Function) ([]aispec.ChatChoice, error) {
+func (c *Client) ChatEx(details []aispec.ChatDetail, functions ...any) ([]aispec.ChatChoice, error) {
 	log.Infof("Initiating Gemini ChatEx with %d messages.", len(details))
 	if len(details) == 0 {
 		return nil, errors.New("ChatEx requires at least one message detail")
@@ -562,7 +562,7 @@ func (c *Client) ChatEx(details []aispec.ChatDetail, functions ...aispec.Functio
 			continue // Skip system message in main contents for now
 		}
 		contents = append(contents, Content{
-			Parts: []Part{{Text: detail.Content}},
+			Parts: []Part{{Text: utils.InterfaceToString(detail.Content)}},
 			Role:  role,
 		})
 	}
@@ -571,7 +571,7 @@ func (c *Client) ChatEx(details []aispec.ChatDetail, functions ...aispec.Functio
 	var systemInstruction *Content
 	if len(details) > 0 && strings.ToLower(details[0].Role) == "system" {
 		log.Infof("Using first message as system instruction.")
-		systemInstruction = &Content{Parts: []Part{{Text: details[0].Content}}}
+		systemInstruction = &Content{Parts: []Part{{Text: utils.InterfaceToString(details[0].Content)}}}
 		if len(contents) > 0 && contents[0].Role == "user" { // Ensure user starts if system instruction is separate
 			// Contents should be ok as is, or Gemini might require user first after system instruction.
 		} else if len(contents) > 0 {
@@ -747,7 +747,7 @@ func (c *Client) SupportedStructuredStream() bool {
 }
 
 // StructuredStream sends a prompt and returns a channel of structured data chunks.
-func (c *Client) StructuredStream(prompt string, functions ...aispec.Function) (chan *aispec.StructuredData, error) {
+func (c *Client) StructuredStream(prompt string, functions ...any) (chan *aispec.StructuredData, error) {
 	log.Infof("Initiating Gemini StructuredStream with prompt: %s", utils.ShrinkString(prompt, 50))
 	if len(functions) > 0 {
 		// TODO: Implement function calling support for StructuredStream if needed.

@@ -2,8 +2,11 @@ package aispec
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"github.com/h2non/filetype"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"os"
 	"strings"
@@ -34,6 +37,8 @@ type AIConfig struct {
 	FunctionCallRetryTimes int
 
 	HTTPErrorHandler func(error)
+
+	Images []*ImageDescription
 }
 
 func WithNoHTTPS(b bool) AIConfigOption {
@@ -144,6 +149,37 @@ func WithProxy(p string) AIConfigOption {
 func WithAPIKey(k string) AIConfigOption {
 	return func(c *AIConfig) {
 		c.APIKey = strings.TrimSpace(k)
+	}
+}
+
+func WithImageFile(i string) AIConfigOption {
+	return func(config *AIConfig) {
+		if utils.GetFirstExistedFile(i) == "" {
+			log.Warnf("file: %v is not existed", i)
+			return
+		}
+
+		data, err := os.ReadFile(i)
+		if err != nil {
+			log.Warnf("file: %v read error: %v", i, err)
+			return
+		}
+
+		name, err := filetype.Image(data)
+		if err != nil {
+			log.Warnf("file: %v is not image: %v", i, err)
+			return
+		}
+
+		var buf bytes.Buffer
+		buf.WriteString("data:")
+		buf.WriteString(name.MIME.Value)
+		buf.WriteString(";")
+		buf.WriteString("base64,")
+		buf.WriteString(codec.EncodeBase64(data))
+		config.Images = append(config.Images, &ImageDescription{
+			Url: buf.String(),
+		})
 	}
 }
 

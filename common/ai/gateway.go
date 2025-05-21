@@ -94,17 +94,18 @@ func (g *Gateway) GetModelName() string {
 	return g.Config.Model
 }
 
-func (g *Gateway) Chat(s string, f ...aispec.Function) (string, error) {
+func (g *Gateway) Chat(s string, f ...any) (string, error) {
 	return aispec.ChatBase(g.TargetUrl, g.Config.Model, s,
 		aispec.WithChatBase_Function(f),
 		aispec.WithChatBase_PoCOptions(g.AIClient.BuildHTTPOptions),
 		aispec.WithChatBase_StreamHandler(g.Config.StreamHandler),
 		aispec.WithChatBase_ReasonStreamHandler(g.Config.ReasonStreamHandler),
 		aispec.WithChatBase_ErrHandler(g.Config.HTTPErrorHandler),
+		aispec.WithChatBase_ImageRawInstance(g.Config.Images...),
 	)
 }
 
-func (g *Gateway) ChatEx(details []aispec.ChatDetail, function ...aispec.Function) ([]aispec.ChatChoice, error) {
+func (g *Gateway) ChatEx(details []aispec.ChatDetail, function ...any) ([]aispec.ChatChoice, error) {
 	return aispec.ChatExBase(g.TargetUrl, g.Config.Model, details, function, g.AIClient.BuildHTTPOptions, g.Config.StreamHandler)
 }
 

@@ -163,14 +163,18 @@ func StructuredStreamBase(
 	return schan, nil
 }
 
+type ImageDescription struct {
+	Url string `json:"url"`
+}
+
 type ChatBaseContext struct {
-	FS                  []Function
 	PoCOptionGenerator  func() ([]poc.PocConfigOption, error)
 	EnableThinking      bool
 	ThinkingBudget      int64
 	StreamHandler       func(io.Reader)
 	ReasonStreamHandler func(reader io.Reader)
 	ErrHandler          func(err error)
+	ImageUrls           []*ImageDescription
 }
 
 type ChatBaseOption func(c *ChatBaseContext)
@@ -187,9 +191,9 @@ func WithChatBase_EnableThinking(b bool) ChatBaseOption {
 	}
 }
 
-func WithChatBase_Function(b []Function) ChatBaseOption {
+func WithChatBase_Function(b []any) ChatBaseOption {
 	return func(c *ChatBaseContext) {
-		c.FS = b
+		//c.FS = b
 	}
 }
 
@@ -217,6 +221,12 @@ func WithChatBase_PoCOptions(b func() ([]poc.PocConfigOption, error)) ChatBaseOp
 	}
 }
 
+func WithChatBase_ImageRawInstance(images ...*ImageDescription) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.ImageUrls = append(c.ImageUrls, images...)
+	}
+}
+
 func NewChatBaseContext(opts ...ChatBaseOption) *ChatBaseContext {
 	ctx := &ChatBaseContext{
 		EnableThinking: true,
@@ -229,7 +239,6 @@ func NewChatBaseContext(opts ...ChatBaseOption) *ChatBaseContext {
 
 func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) (string, error) {
 	ctx := NewChatBaseContext(chatOpts...)
-	fs := ctx.FS
 	opt := ctx.PoCOptionGenerator
 	streamHandler := ctx.StreamHandler
 	reasonStreamHandler := ctx.ReasonStreamHandler
@@ -239,7 +248,21 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 	if err != nil {
 		return "", utils.Errorf("build config failed: %v", err)
 	}
-	msgIns := NewChatMessage(model, []ChatDetail{NewUserChatDetail(msg)}, fs...)
+	var msgs []ChatDetail
+	if len(ctx.ImageUrls) <= 0 {
+		msgs = append(msgs, NewUserChatDetail(msg))
+	} else {
+		var contents []*ChatContent
+		if msg == "" {
+			msg = "请描述图片内容"
+			contents = append(contents, NewUserChatContentText(msg))
+		}
+		for _, image := range ctx.ImageUrls {
+			contents = append(contents, NewUserChatContentImageUrl(image.Url))
+		}
+		msgs = append(msgs, NewUserChatDetailEx(contents))
+	}
+	msgIns := NewChatMessage(model, msgs)
 
 	handleStream := streamHandler != nil
 	if handleStream {
@@ -437,7 +460,7 @@ func ChatBasedExtractData(
 	return ExtractFromResult(result, fields)
 }
 
-func ChatExBase(url string, model string, details []ChatDetail, function []Function, opt func() ([]poc.PocConfigOption, error), streamHandler func(closer io.Reader)) ([]ChatChoice, error) {
+func ChatExBase(url string, model string, details []ChatDetail, function []any, opt func() ([]poc.PocConfigOption, error), streamHandler func(closer io.Reader)) ([]ChatChoice, error) {
 	handleStream := streamHandler != nil
 	opts, err := opt()
 	if err != nil {
