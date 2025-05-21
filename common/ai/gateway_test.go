@@ -4,12 +4,6 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
 	"os"
 	"path/filepath"
@@ -17,8 +11,34 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/omnisearch/ostype"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
+func TestWebSearch(t *testing.T) {
+	yakit.LoadGlobalNetworkConfig()
+	cfg := &ostype.YakitOmniSearchKeyConfig{}
+	err := consts.GetThirdPartyApplicationConfig("tavily", cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := Chat("yaklang 是什么",
+		aispec.WithType("web-search"),
+		aispec.WithModel("tavily"),
+		aispec.WithAPIKey(cfg.APIKey),
+		aispec.WithProxy(cfg.Proxy),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	println(res)
+}
 func TestDashscope_Search(t *testing.T) {
 	if utils.InGithubActions() {
 		return

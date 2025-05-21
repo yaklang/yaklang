@@ -2,15 +2,17 @@ package ai
 
 import (
 	"errors"
-	"github.com/yaklang/yaklang/common/ai/aibalance"
 	"io"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aibalance"
 
 	"github.com/yaklang/yaklang/common/ai/dashscopebase"
 	"github.com/yaklang/yaklang/common/ai/deepseek"
 	"github.com/yaklang/yaklang/common/ai/gemini"
 	"github.com/yaklang/yaklang/common/ai/openrouter"
 	"github.com/yaklang/yaklang/common/ai/siliconflow"
+	"github.com/yaklang/yaklang/common/omnisearch"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -71,6 +73,9 @@ func init() {
 	})
 	aispec.Register("aibalance", func() aispec.AIClient {
 		return &aibalance.GatewayClient{}
+	})
+	aispec.Register("web-search", func() aispec.AIClient {
+		return &omnisearch.AIWebSearchClient{}
 	})
 }
 

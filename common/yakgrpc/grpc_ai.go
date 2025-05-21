@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils"
@@ -16,15 +17,22 @@ func (s *Server) ListAiModel(ctx context.Context, req *ypb.ListAiModelRequest) (
 	if req.Config == "" {
 		return nil, utils.Errorf("list ai failed, config is empty")
 	}
-
 	config := &aispec.AIConfig{}
 	err := json.Unmarshal([]byte(req.Config), config)
 	if err != nil {
 		return nil, err
 	}
-	//if config.APIKey == "" {
-	//	return nil, utils.Errorf("list ai failed, config.APIKey is empty")
-	//}
+
+	// check type is valid ai type
+	if config.Type == "" {
+		return nil, nil
+	}
+	_, ok := aispec.Lookup(config.Type)
+	if !ok {
+		return nil, nil
+	}
+
+	// list models
 	models, err := ai.ListModels(
 		aispec.WithAPIKey(config.APIKey),
 		aispec.WithType(config.Type),
