@@ -61,7 +61,7 @@ func (c *ServerConfig) serveForwarder(conn net.Conn, requestRaw []byte) {
 		}
 
 		for _, rule := range rules {
-			log.Infof("add rule sni: %s, target: %s, enable_tls: %t", rule.SNI, rule.Target, rule.EnableTLS)
+			//log.Infof("add rule sni: %s, target: %s, enable_tls: %t", rule.SNI, rule.Target, rule.EnableTLS)
 			key := utils.CalcSha1(rule.SNI, rule.Target, rule.EnableTLS)
 			_, ok := c.forwardRule.Get(key)
 			if !ok {

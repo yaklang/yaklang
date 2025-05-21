@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/samber/lo"
 	"io"
+	"net/http/httputil"
 	"strings"
 	"sync"
 	"time"
@@ -56,6 +57,7 @@ func appendStreamHandlerPoCOptionEx(opts []poc.PocConfigOption) (io.Reader, io.R
 			outWriter.Close()
 			reasonWriter.Close()
 		}()
+
 		var chunked bool
 		if te := lowhttp.GetHTTPPacketHeader(r, "transfer-encoding"); utils.IContains(te, "chunked") {
 			chunked = true
@@ -66,21 +68,30 @@ func appendStreamHandlerPoCOptionEx(opts []poc.PocConfigOption) (io.Reader, io.R
 		}
 
 		var reader io.Reader = closer
-		// reader = io.TeeReader(reader, os.Stdout)
-		var ioReader io.Reader = utils.NewTrimLeftReader(reader)
-		var chunkedErrorMirror bytes.Buffer
+		ioReader := reader
+
 		start := time.Now()
+		var firstbuf = make([]byte, 1)
+		n, err := io.ReadFull(ioReader, firstbuf)
+		if n <= 0 && err != nil {
+			log.Errorf("no body read")
+			return
+		}
+		log.Infof("read first byte [%#v] delay: %v", string(firstbuf), time.Since(start))
+
+		var chunkedErrorMirror bytes.Buffer
 		if chunked {
-			chunkReader, origin, err := codec.ReadChunkedStream(io.TeeReader(ioReader, utils.FirstWriter(func(i []byte) {
-				log.Infof("chunk read first byte/token delay: %v", time.Since(start))
-			})))
-			//chunkReader, origin, err := codec.ReadChunkedStream(ioReader)
-			if err != nil {
-				log.Errorf("ReadChunkedStream err: %v", err)
-				ioReader = origin
-			} else {
-				ioReader = chunkReader
-			}
+			ioReader = httputil.NewChunkedReader(io.MultiReader(bytes.NewBufferString(string(firstbuf)), ioReader))
+			//chunkReader, origin, err := codec.ReadChunkedStream(io.TeeReader(ioReader, utils.FirstWriter(func(i []byte) {
+			//	log.Infof("chunk read first byte/token delay: %v", time.Since(start))
+			//})))
+			////chunkReader, origin, err := codec.ReadChunkedStream(ioReader)
+			//if err != nil {
+			//	log.Errorf("ReadChunkedStream err: %v", err)
+			//	ioReader = origin
+			//} else {
+			//	ioReader = chunkReader
+			//}
 		}
 		lineReader := bufio.NewReader(ioReader)
 		haveReason := false
@@ -93,6 +104,7 @@ func appendStreamHandlerPoCOptionEx(opts []poc.PocConfigOption) (io.Reader, io.R
 			if err != nil && string(line) == "" {
 				if err != io.EOF {
 					log.Warnf("failed to read chunk line: %v, mirror: %#v", err, utils.ShrinkString(chunkedErrorMirror.String(), 200))
+					fmt.Println(chunkedErrorMirror.String())
 				}
 				return
 			}
@@ -100,7 +112,7 @@ func appendStreamHandlerPoCOptionEx(opts []poc.PocConfigOption) (io.Reader, io.R
 				continue
 			}
 			lineStr := string(line)
-			// log.Infof("chunk read line: %v", lineStr)
+			//log.Infof("chunk read line: %v", lineStr)
 			jsonIdentifiers := jsonextractor.ExtractStandardJSON(lineStr)
 			for _, j := range jsonIdentifiers {
 				var reasonDelta string
@@ -141,6 +153,7 @@ func appendStreamHandlerPoCOptionEx(opts []poc.PocConfigOption) (io.Reader, io.R
 							reasonWriter.Close()
 						})
 					}
+					//log.Infof("out writer: %v", string(data))
 					outWriter.Write(data)
 				}
 				if !handled {
