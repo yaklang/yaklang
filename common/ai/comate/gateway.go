@@ -29,7 +29,7 @@ func (c *Client) SupportedStructuredStream() bool {
 	return false
 }
 
-func (c *Client) StructuredStream(s string, function ...aispec.Function) (chan *aispec.StructuredData, error) {
+func (c *Client) StructuredStream(s string, function ...any) (chan *aispec.StructuredData, error) {
 	return nil, utils.Error("unsupported method")
 }
 
@@ -140,7 +140,7 @@ func (c *Client) question(i string) (io.Reader, error) {
 	return r, nil
 }
 
-func (c *Client) Chat(s string, function ...aispec.Function) (string, error) {
+func (c *Client) Chat(s string, function ...any) (string, error) {
 	reader, err := c.question(s)
 	if err != nil {
 		return "", err
@@ -159,7 +159,7 @@ func (c *Client) Chat(s string, function ...aispec.Function) (string, error) {
 	return buf.String(), nil
 }
 
-func (c *Client) ChatEx(details []aispec.ChatDetail, function ...aispec.Function) ([]aispec.ChatChoice, error) {
+func (c *Client) ChatEx(details []aispec.ChatDetail, function ...any) ([]aispec.ChatChoice, error) {
 	return nil, utils.Error("not implemented: comate is not supported openai style chat ex")
 }
 

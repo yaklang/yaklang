@@ -83,42 +83,6 @@ func WithYakDomain() ConfigOption {
 	}
 }
 
-// newFunction 设置新的函数调用
-// 详情请参考 https://platform.openai.com/docs/guides/function-calling
-// @param {string} name 函数名称
-// @param {string} description 函数描述
-// @param {ConfigOption} ...opts 配置选项，接收openai.functionParamType,openai.functionProperty,openai.functionRequired
-// @return {ConfigOption} 配置选项
-// Example:
-// ```
-// f = openai.newFunction(
-// "get_current_weather",
-// "Get the current weather in a given location",
-// openai.functionProperty("location", "string", "The city and state, e.g. San Francisco, CA"),
-// openai.functionRequired("location"),
-// )
-// d = openai.ChatEx(
-// [
-// openai.userMessage("What is the weather like in Boston?")
-// ],
-// f,
-// openai.proxy("http://127.0.0.1:7890"),
-// )~
-// println(d.FunctionCallResult())
-// ```
-func WithFunction(name, description string, opts ...ConfigOption) ConfigOption {
-	c := NewRawOpenAIClient(opts...)
-	f := aispec.Function{
-		Name:        name,
-		Description: description,
-		Parameters:  c.Parameters,
-	}
-
-	return func(client *Client) {
-		client.Functions = append(client.Functions, f)
-	}
-}
-
 // functionParamType 设置函数调用时的参数类型，默认为 "object"
 // Example:
 // ```

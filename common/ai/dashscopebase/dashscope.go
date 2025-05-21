@@ -38,7 +38,7 @@ func (d *DashScopeGateway) SupportedStructuredStream() bool {
 	return true
 }
 
-func (d *DashScopeGateway) Chat(s string, function ...aispec.Function) (string, error) {
+func (d *DashScopeGateway) Chat(s string, function ...any) (string, error) {
 	reader, err := d.ChatStream(s)
 	if err != nil {
 		return "", err
@@ -57,7 +57,7 @@ func (d *DashScopeGateway) Chat(s string, function ...aispec.Function) (string, 
 	return buf.String(), nil
 }
 
-func (d *DashScopeGateway) ChatEx(details []aispec.ChatDetail, function ...aispec.Function) ([]aispec.ChatChoice, error) {
+func (d *DashScopeGateway) ChatEx(details []aispec.ChatDetail, function ...any) ([]aispec.ChatChoice, error) {
 	return nil, utils.Error("not implemented: dashscope is not supported openai style chat ex")
 }
 
@@ -194,7 +194,7 @@ func (d *rspFeeder) GetNewData(structued *aispec.StructuredData, input []byte) c
 	return resultChan
 }
 
-func (d *DashScopeGateway) StructuredStream(s string, function ...aispec.Function) (chan *aispec.StructuredData, error) {
+func (d *DashScopeGateway) StructuredStream(s string, function ...any) (chan *aispec.StructuredData, error) {
 	var objChannel = make(chan *aispec.StructuredData, 1000)
 
 	if d.dashscopeAPIKey == "" {
