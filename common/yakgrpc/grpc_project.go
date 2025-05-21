@@ -7,12 +7,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/bufpipe"
 	"io"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/bufpipe"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/gmsm/sm4"
@@ -52,6 +53,7 @@ func (s *Server) SetCurrentProject(ctx context.Context, req *ypb.SetCurrentProje
 		default:
 			return nil, utils.Errorf("invalid project type: %s", req.GetType())
 		}
+		return &ypb.Empty{}, nil
 	}
 
 	db := s.GetProfileDatabase()
