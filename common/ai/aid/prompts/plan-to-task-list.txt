@@ -11,9 +11,11 @@
     3. 任务制定需要考虑可实现性（Achievable），结合现有工具或搜索新的工具，理性制定任务，避免过于复杂任务导致无法实现。
     4. 任务需要相关性（Relevant），任务需要有主次关系，避免无关任务的干扰
 
-<<<<PLAN_HELP START>>>
+{{if .Memory.PlanHelp }}
+<<<PLAN_HELP START>>>
 {{ .Memory.PlanHelp }}
 <<<PLAN_HELP END>>>
+{{end}}
 
 <<<USER_INPUT_MATERIAL START>>>
 {{ .Memory.Query }}

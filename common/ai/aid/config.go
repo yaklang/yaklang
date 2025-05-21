@@ -232,6 +232,9 @@ func (c *Config) ReleaseInteractiveEvent(eventID string, invoke aitool.InvokePar
 }
 
 func initDefaultTools(c *Config) error { // set config default tools
+	if err := WithTools(buildinaitools.GetBasicBuildInTools()...)(c); err != nil {
+		return utils.Wrapf(err, "get basic build-in tools fail")
+	}
 	memoryTools, err := c.memory.CreateBasicMemoryTools()
 	if err != nil {
 		return utils.Errorf("create memory tools: %v", err)
@@ -320,11 +323,15 @@ func WithTaskID(id string) Option {
 	}
 }
 
-func WithOffsetSeq(offset int64) Option {
+func WithSequence(seq int64) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
-		config.idSequence = offset
+		var idGenerator = new(int64)
+		config.idSequence = atomic.AddInt64(idGenerator, seq)
+		config.idGenerator = func() int64 {
+			return atomic.AddInt64(idGenerator, 1)
+		}
 		return nil
 	}
 }
