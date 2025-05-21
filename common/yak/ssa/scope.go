@@ -64,7 +64,6 @@ func GetBlockByScope(scope ssautil.ScopedVersionedTableIF[Value]) *BasicBlock {
 	}
 	raw := scope.GetExternInfo("block")
 	if utils.IsNil(raw) {
-		log.Errorf("scope %s has no extern info with key[block]", scope.GetScopeName())
 		return nil
 	} else if block, ok := raw.(*BasicBlock); ok {
 		return block
