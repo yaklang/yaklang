@@ -4,6 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/bytedance/mockey"
+	"github.com/jinzhu/gorm"
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"google.golang.org/grpc"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -579,4 +584,71 @@ func TestGRPCMUSTPASS_Query_Lib_Rule(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
+}
+
+func TestSyntaxFlowRuleToOnline(t *testing.T) {
+	mockSendProgress(t)
+
+	testRules := []*schema.SyntaxFlowRule{
+		{RuleName: "test-rule-1", IsBuildInRule: false},
+		{RuleName: "test-rule-2", IsBuildInRule: false},
+	}
+
+	mockey.Mock(yakit.AllSyntaxFlowRule).To(func(*gorm.DB, *ypb.SyntaxFlowRuleFilter) ([]*schema.SyntaxFlowRule, error) {
+		return testRules, nil
+	}).Build()
+
+	mockey.Mock(uploadRule).To(func(context.Context, *yaklib.OnlineClient, string, *schema.SyntaxFlowRule) error {
+		return nil
+	}).Build()
+
+	server := &Server{}
+	req := &ypb.SyntaxFlowRuleToOnlineRequest{Token: "valid-token"}
+	stream := &TestProgressStream{ctx: context.Background()}
+
+	err := server.SyntaxFlowRuleToOnline(req, stream)
+	assert.NoError(t, err)
+}
+
+func TestDownloadSyntaxFlowRule(t *testing.T) {
+	mockSendProgress(t)
+
+	mockey.Mock((*yaklib.OnlineClient).DownloadOnlineSyntaxFlowRule).To(func(
+		*yaklib.OnlineClient, context.Context, string, *ypb.DownloadSyntaxFlowRuleRequest,
+	) *yaklib.OnlineDownloadFlowRuleStream {
+		ch := make(chan *yaklib.OnlineSyntaxFlowRuleItem, 2)
+		ch <- &yaklib.OnlineSyntaxFlowRuleItem{Rule: &yaklib.OnlineSyntaxFlowRule{RuleName: "rule1"}}
+		ch <- &yaklib.OnlineSyntaxFlowRuleItem{Rule: &yaklib.OnlineSyntaxFlowRule{RuleName: "rule2"}}
+		close(ch)
+		return &yaklib.OnlineDownloadFlowRuleStream{Chan: ch, Total: 2}
+	}).Build()
+
+	mockey.Mock((*yaklib.OnlineClient).SaveSyntaxFlowRule).To(func(*yaklib.OnlineClient, *gorm.DB, ...*yaklib.OnlineSyntaxFlowRule) error {
+		return nil
+	}).Build()
+
+	server := &Server{}
+	stream := &TestProgressStream{ctx: context.Background()}
+
+	err := server.DownloadSyntaxFlowRule(&ypb.DownloadSyntaxFlowRuleRequest{}, stream)
+	assert.NoError(t, err)
+}
+
+type TestProgressStream struct {
+	grpc.ServerStream
+	ctx context.Context
+}
+
+func (s *TestProgressStream) Context() context.Context {
+	return s.ctx
+}
+
+func (s *TestProgressStream) Send(*ypb.SyntaxFlowRuleOnlineProgress) error {
+	return nil
+}
+
+func mockSendProgress(t *testing.T) {
+	mockey.Mock(sendProgress).To(func(stream ProgressStream, progress float64, msg, msgType string) {
+		assert.True(t, progress >= 0 && progress <= 1)
+	}).Build()
 }
