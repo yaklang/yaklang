@@ -17,7 +17,7 @@ func NewRecoveredCoordinator(
 	if pt.Uuid == "" {
 		return nil, utils.Error("cannot recover coordinator at this time, no coordinator uuid")
 	}
-	return NewCoordinatorContext(ctx, pt.GetUserInput(), append(options, WithTaskID(pt.Uuid), WithOffsetSeq(pt.Seq))...)
+	return NewCoordinatorContext(ctx, pt.GetUserInput(), append(options, WithTaskID(pt.Uuid), WithSequence(pt.Seq))...)
 }
 
 func NewFastRecoverCoordinatorContext(ctx context.Context, uuid string, opt ...Option) (*Coordinator, error) {
