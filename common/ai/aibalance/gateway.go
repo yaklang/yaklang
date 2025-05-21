@@ -21,7 +21,7 @@ func (g *GatewayClient) GetModelList() ([]*aispec.ModelMeta, error) {
 	return aispec.ListChatModels(g.targetUrl, g.BuildHTTPOptions)
 }
 
-func (g *GatewayClient) StructuredStream(s string, function ...aispec.Function) (chan *aispec.StructuredData, error) {
+func (g *GatewayClient) StructuredStream(s string, function ...any) (chan *aispec.StructuredData, error) {
 	return aispec.StructuredStreamBase(
 		g.targetUrl,
 		g.config.Model,
@@ -35,7 +35,7 @@ func (g *GatewayClient) StructuredStream(s string, function ...aispec.Function) 
 
 var _ aispec.AIClient = (*GatewayClient)(nil)
 
-func (g *GatewayClient) Chat(s string, function ...aispec.Function) (string, error) {
+func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 	return aispec.ChatBase(
 		g.targetUrl,
 		g.config.Model,
@@ -45,10 +45,11 @@ func (g *GatewayClient) Chat(s string, function ...aispec.Function) (string, err
 		aispec.WithChatBase_StreamHandler(g.config.StreamHandler),
 		aispec.WithChatBase_ReasonStreamHandler(g.config.ReasonStreamHandler),
 		aispec.WithChatBase_ErrHandler(g.config.HTTPErrorHandler),
+		aispec.WithChatBase_ImageRawInstance(g.config.Images...),
 	)
 }
 
-func (g *GatewayClient) ChatEx(details []aispec.ChatDetail, function ...aispec.Function) ([]aispec.ChatChoice, error) {
+func (g *GatewayClient) ChatEx(details []aispec.ChatDetail, function ...any) ([]aispec.ChatChoice, error) {
 	return aispec.ChatExBase(g.targetUrl, g.config.Model, details, function, g.BuildHTTPOptions, g.config.StreamHandler)
 }
 

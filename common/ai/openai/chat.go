@@ -29,7 +29,7 @@ type Client struct {
 	Domain string
 
 	// function call
-	Functions  []aispec.Function
+	Functions  []any
 	Parameters aispec.Parameters
 }
 
@@ -74,7 +74,7 @@ func (s *Session) Chat(message aispec.ChatDetail, opts ...ConfigOption) (aispec.
 
 func NewRawOpenAIClient(opts ...ConfigOption) *Client {
 	c := &Client{
-		Functions: make([]aispec.Function, 0),
+		Functions: make([]any, 0),
 		Parameters: aispec.Parameters{
 			Type:       "object",
 			Properties: make(map[string]aispec.Property),
@@ -88,7 +88,7 @@ func NewRawOpenAIClient(opts ...ConfigOption) *Client {
 
 func NewOpenAIClient(opts ...ConfigOption) *Client {
 	c := &Client{
-		Functions: make([]aispec.Function, 0),
+		Functions: make([]any, 0),
 		Parameters: aispec.Parameters{
 			Type:       "object",
 			Properties: make(map[string]aispec.Property),
@@ -146,7 +146,7 @@ func (c *Client) TranslateToChinese(data string) (string, error) {
 	return strings.Trim(results, "\r\n \v\f\""), nil
 }
 
-func (c *Client) ChatEx(messages []aispec.ChatDetail, funcs ...aispec.Function) ([]aispec.ChatChoice, error) {
+func (c *Client) ChatEx(messages []aispec.ChatDetail, funcs ...any) ([]aispec.ChatChoice, error) {
 	chatModel := c.ChatModel
 	if chatModel == "" {
 		chatModel = "gpt-3.5-turbo"
@@ -198,7 +198,7 @@ func (c *Client) ChatEx(messages []aispec.ChatDetail, funcs ...aispec.Function) 
 	return comp.Choices, nil
 }
 
-func (c *Client) Chat(data string, funcs ...aispec.Function) (string, error) {
+func (c *Client) Chat(data string, funcs ...any) (string, error) {
 	choices, err := c.ChatEx([]aispec.ChatDetail{
 		{
 			Role:    "user",

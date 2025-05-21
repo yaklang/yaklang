@@ -1,6 +1,7 @@
 package aispec
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 
@@ -13,7 +14,6 @@ import (
 type ChatMessage struct {
 	Model          string       `json:"model"`
 	Messages       []ChatDetail `json:"messages"`
-	Tools          []Tool       `json:"tools,omitempty"`
 	Stream         bool         `json:"stream"`
 	EnableThinking bool         `json:"enable_thinking"`
 }
@@ -21,10 +21,16 @@ type ChatMessage struct {
 type ChatDetail struct {
 	Role         string        `json:"role"`
 	Name         string        `json:"name,omitempty"`
-	Content      string        `json:"content"`
+	Content      any           `json:"content"`
 	ToolCalls    []*ToolCall   `json:"tool_calls,omitempty"`
 	ToolCallID   string        `json:"tool_call_id,omitempty"`
 	FunctionCall *FunctionCall `json:"function_call,omitempty"`
+}
+
+type ChatContent struct {
+	Type     string `json:"type"` // text / image_url
+	Text     string `json:"text,omitempty"`
+	ImageUrl any    `json:"image_url,omitempty"`
 }
 
 type ChatDetails []ChatDetail
@@ -38,16 +44,6 @@ type Parameters struct {
 	Type       string              `json:"type"`
 	Properties map[string]Property `json:"properties"`
 	Required   []string            `json:"required"`
-}
-
-type Tool struct {
-	Type     string   `json:"type"`
-	Function Function `json:"function"`
-}
-type Function struct {
-	Name        string     `json:"name"`
-	Description string     `json:"description"`
-	Parameters  Parameters `json:"parameters"`
 }
 
 type ChatCompletion struct {
@@ -95,16 +91,10 @@ type ChatError struct {
 	Code    string `json:"code"`
 }
 
-func NewChatMessage(model string, messages []ChatDetail, funcs ...Function) *ChatMessage {
+func NewChatMessage(model string, messages []ChatDetail, more ...any) *ChatMessage {
 	return &ChatMessage{
 		Model:    model,
 		Messages: messages,
-		Tools: lo.Map(funcs, func(item Function, index int) Tool {
-			return Tool{
-				Type:     "function",
-				Function: item,
-			}
-		}),
 	}
 }
 
@@ -119,6 +109,29 @@ func NewChatMessage(model string, messages []ChatDetail, funcs ...Function) *Cha
 // )~
 // ```
 func NewUserChatDetail(content string) ChatDetail {
+	return ChatDetail{
+		Role:    "user",
+		Content: content,
+	}
+}
+
+func NewUserChatContentText(i string) *ChatContent {
+	return &ChatContent{
+		Type: "text",
+		Text: i,
+	}
+}
+
+func NewUserChatContentImageUrl(u string) *ChatContent {
+	return &ChatContent{
+		Type: "image_url",
+		ImageUrl: map[string]any{
+			"url": u,
+		},
+	}
+}
+
+func NewUserChatDetailEx(content any) ChatDetail {
 	return ChatDetail{
 		Role:    "user",
 		Content: content,
@@ -347,7 +360,18 @@ func DetailsToString(details []ChatDetail) string {
 		})
 	} else {
 		list = lo.Map(details, func(d ChatDetail, _ int) string {
-			return strings.TrimSpace(d.Content)
+			switch ret := d.Content.(type) {
+			case []*ChatContent:
+				var txt bytes.Buffer
+				for _, i := range ret {
+					n, _ := txt.WriteString(i.Text)
+					if n > 0 {
+						txt.WriteString("\n")
+					}
+				}
+				return strings.TrimSpace(txt.String())
+			}
+			return strings.TrimSpace(utils.InterfaceToString(d.Content))
 		})
 	}
 

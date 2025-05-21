@@ -23,7 +23,7 @@ func (g *GLMClient) SupportedStructuredStream() bool {
 	return true
 }
 
-func (g *GLMClient) StructuredStream(s string, function ...aispec.Function) (chan *aispec.StructuredData, error) {
+func (g *GLMClient) StructuredStream(s string, function ...any) (chan *aispec.StructuredData, error) {
 	return aispec.StructuredStreamBase(
 		g.targetUrl,
 		g.config.Model,
@@ -101,7 +101,7 @@ func (g *GLMClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 	return opts, nil
 }
 
-func (g *GLMClient) Chat(s string, f ...aispec.Function) (string, error) {
+func (g *GLMClient) Chat(s string, f ...any) (string, error) {
 	return aispec.ChatBase(
 		g.targetUrl, g.config.Model, s,
 		aispec.WithChatBase_Function(f),
@@ -109,10 +109,11 @@ func (g *GLMClient) Chat(s string, f ...aispec.Function) (string, error) {
 		aispec.WithChatBase_StreamHandler(g.config.StreamHandler),
 		aispec.WithChatBase_ReasonStreamHandler(g.config.ReasonStreamHandler),
 		aispec.WithChatBase_ErrHandler(g.config.HTTPErrorHandler),
+		aispec.WithChatBase_ImageRawInstance(g.config.Images...),
 	)
 }
 
-func (g *GLMClient) ChatEx(details []aispec.ChatDetail, function ...aispec.Function) ([]aispec.ChatChoice, error) {
+func (g *GLMClient) ChatEx(details []aispec.ChatDetail, function ...any) ([]aispec.ChatChoice, error) {
 	return aispec.ChatExBase(g.targetUrl, g.config.Model, details, function, g.BuildHTTPOptions, g.config.StreamHandler)
 }
 

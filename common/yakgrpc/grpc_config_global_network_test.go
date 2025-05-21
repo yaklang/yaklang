@@ -48,7 +48,7 @@ func (g *GetawayClient) GetModelList() ([]*aispec.ModelMeta, error) {
 	return nil, nil
 }
 
-func (g *GetawayClient) StructuredStream(s string, function ...aispec.Function) (chan *aispec.StructuredData, error) {
+func (g *GetawayClient) StructuredStream(s string, function ...any) (chan *aispec.StructuredData, error) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -60,14 +60,14 @@ func (g *GetawayClient) CheckValid() error {
 	return errors.New("invalid")
 }
 
-func (g *GetawayClient) Chat(s string, function ...aispec.Function) (string, error) {
+func (g *GetawayClient) Chat(s string, function ...any) (string, error) {
 	if g.valid {
 		return "ok", nil
 	}
 	return "", errors.New("invalid")
 }
 
-func (g *GetawayClient) ChatEx(details []aispec.ChatDetail, function ...aispec.Function) ([]aispec.ChatChoice, error) {
+func (g *GetawayClient) ChatEx(details []aispec.ChatDetail, function ...any) ([]aispec.ChatChoice, error) {
 	return nil, nil
 }
 

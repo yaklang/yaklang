@@ -7,8 +7,8 @@ import (
 )
 
 type Chatter interface {
-	Chat(string, ...Function) (string, error)
-	ChatEx([]ChatDetail, ...Function) ([]ChatChoice, error)
+	Chat(string, ...any) (string, error)
+	ChatEx([]ChatDetail, ...any) ([]ChatChoice, error)
 	ChatStream(string) (io.Reader, error)
 }
 
@@ -62,7 +62,7 @@ type UsageStatsInfo struct {
 
 type StructuredStreamer interface {
 	SupportedStructuredStream() bool
-	StructuredStream(string, ...Function) (chan *StructuredData, error)
+	StructuredStream(string, ...any) (chan *StructuredData, error)
 }
 
 type ModelMeta struct {
