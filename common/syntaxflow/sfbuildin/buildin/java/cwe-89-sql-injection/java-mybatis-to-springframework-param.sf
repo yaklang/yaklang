@@ -10,33 +10,20 @@ TEXT
 	rule_id: "5323c275-713f-4b22-a1cc-d22db1655fb2"
 )
 
-<include('java-spring-mvc-param')> as $top;
-
-// <mybatisSink><getFunc> as $params;
-// $top -{
-//     hook: `*?{opcode: call}<getCallee> as $name`
-// }->
-// $name<getObject><typeName>?{!have: '.'} as $cls;
-// $name<name>?{!have: '.'} as $methodName;
-// <fuzztag('{{cls}}.{{methodName}} & $params as $target')><show><eval>
-// check $target
-// alert $target;
 
 <include('java-spring-mvc-param')> as $totalSource;
-<mybatisSink><getFunc><name>?{!have: '.' && !have: '__ref__'} as $name;
-<fuzztag('.{{name}} as $call')><eval>
-$call(*<slice(start=1)> #{
+<mybatisSink><getFunc>?{<name>?{!have: '.' && !have: '__ref__'}} as $interface;
+$interface<getPointer()> as $implMethod;
+$implMethod(*<slice(start=1)> #{
     hook: `* & $totalSource as $source`,
 }->)
-// $call(*<slice(start=1)> #{
-//     hook: `*?{opcode: param && <getFunc>.annotation.*Mapping && <typeName>?{!have: Long} } as $source`,
-// }->)
 $source?{<typeName>?{!have: Long && !have: Integer && !have: Boolean && !have: Double}} as $vuln
 alert $vuln;
 
 
 desc(
-	language: java
+	language: java,
+	alert_num:1,
 	'file://Controller.java': <<<TEXT
 package com.mycompany.myapp;
 
