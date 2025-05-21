@@ -174,9 +174,66 @@ const (
 	NativeCall_GetRootParentBlueprint = "getRootParentBlueprint"
 
 	NativeCall_Length = "len"
+
+	NativeCall_GetPointer   = "getPointer"
+	NativeCall_GetReference = "getReference"
 )
 
 func init() {
+	registerNativeCall(NativeCall_GetReference, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var result []sfvm.ValueOperator
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *Value:
+				result = append(result, ret.GetReference())
+			case Values:
+				for _, value := range ret {
+					result = append(result, value.GetReference())
+				}
+			case *sfvm.ValueList:
+				values, err := SFValueListToValues(ret)
+				if err == nil {
+					values.ForEach(func(value *Value) {
+						result = append(result, value.GetReference())
+					})
+				}
+			}
+			return nil
+		})
+		if len(result) == 0 {
+			return false, nil, utils.Errorf("no reference found")
+		}
+		for _, res := range result {
+			res.AppendPredecessor(v, sfvm.WithAnalysisContext_Label("getReference"))
+		}
+		return true, sfvm.NewValues(result), nil
+	}), nc_desc("与getPointer逻辑相反，获取引用。"))
+
+	registerNativeCall(NativeCall_GetPointer, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var result []sfvm.ValueOperator
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *Value:
+				result = append(result, ret.GetPointer())
+			case Values:
+				for _, value := range ret {
+					result = append(result, value.GetPointer())
+				}
+			case *sfvm.ValueList:
+				values, err := SFValueListToValues(ret)
+				if err == nil {
+					values.ForEach(func(value *Value) {
+						result = append(result, value.GetPointer())
+					})
+				}
+			}
+			return nil
+		})
+		for _, res := range result {
+			res.AppendPredecessor(v, sfvm.WithAnalysisContext_Label("getPointer"))
+		}
+		return true, sfvm.NewValues(result), nil
+	}), nc_desc("获取指针。对于有类语言，接口方法的Pointer则是指向具体实现的方法"))
 
 	registerNativeCall(NativeCall_GetRootParentBlueprint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var result []sfvm.ValueOperator

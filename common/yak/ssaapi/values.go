@@ -370,6 +370,18 @@ func (v *Value) GetPointer() Values {
 	})
 }
 
+func (v *Value) GetReference() *Value {
+	if v.IsNil() {
+		return nil
+	}
+
+	pointerIF, ok := v.getInstruction().(ssa.PointerIF)
+	if !ok {
+		return nil
+	}
+	return v.NewValue(pointerIF.GetReference())
+}
+
 func (v *Value) GetMask() Values {
 	if v.IsNil() {
 		return nil
