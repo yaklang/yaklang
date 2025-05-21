@@ -1,6 +1,7 @@
 package javascript
 
 import (
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -9,22 +10,21 @@ import (
 
 func Test_JS_XMLHttpRequest(t *testing.T) {
 	t.Run("simple get request", func(t *testing.T) {
-
-		code := `
-		let xhr1 =new XMLHttpRequest()
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("simple.js", `let xhr1 =new XMLHttpRequest()
 		xhr1.open('GET', 'http://example.com')
 		xhr1.send()
 		xhr1.send("123")
 		xhr1.addEventListener('load', function () {
 		console.log(this.response)
-		})
-	`
-		ssatest.CheckSyntaxFlow(t, code,
+		})`)
+
+		ssatest.CheckSyntaxFlowWithFS(t, fs,
 			`XMLHttpRequest().open(* as $method, * as $url)`,
 			map[string][]string{
 				"url":    {"\"http://example.com\""},
 				"method": {"\"GET\""},
-			},
+			}, false,
 			ssaapi.WithLanguage(ssaapi.JS),
 		)
 	})
@@ -95,7 +95,7 @@ func TestJs_JQuery(t *testing.T) {
 	});`
 
 		ssatest.CheckSyntaxFlow(t, code,
-			`.ajax(* as $obj)
+			`/\$/.ajax(* as $obj)
 			$obj.type as $method 
 			$obj.url as $url
 			$obj.data as $data
@@ -136,7 +136,7 @@ func TestJs_JQuery(t *testing.T) {
 	});
 	`
 		ssatest.CheckSyntaxFlow(t, code,
-			`.post(* as $obj)
+			`/\$/.post(* as $obj)
 			$obj.url as $url
 			$obj.contentType as $contentType
 			$obj.data as $data

@@ -102,6 +102,7 @@ func handleJS(code string, callback func(*requestNewTarget)) {
 			}
 			return false
 		})
+		log.Infof("Found param from XMLHttpRequest with API EndPoint: %v", target.Path)
 		callback(target)
 	})
 
@@ -143,6 +144,7 @@ func handleJS(code string, callback func(*requestNewTarget)) {
 					}
 				}
 			}
+			log.Infof("Found param from fetch with API EndPoint: %v", target.Path)
 			callback(target)
 		}
 	})
