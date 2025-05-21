@@ -87,7 +87,7 @@ var (
 			return nil
 		}
 	}
-	WithOffsetSeq                    = aid.WithOffsetSeq
+	WithOffsetSeq                    = aid.WithSequence
 	WithTool                         = aid.WithTool
 	WithExtendedActionCallback       = aid.WithExtendedActionCallback
 	WithDisallowRequireForUserPrompt = aid.WithDisallowRequireForUserPrompt
