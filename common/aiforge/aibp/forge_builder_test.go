@@ -29,19 +29,17 @@ var planJson = `{
   ]
 }`
 var finishJson = `{
-  "@action": "finished",
+  "@action": "direct-answer",
   "status_summary": "已完成计算1+1的值任务，成功计算了1+1的值。",
   "task_long_summary": "本次任务完成了对1+1的值的计算。通过计算，我们得到了1+1的值为2。",
   "task_short_summary": "完成计算1+1的值任务，成功计算了1+1的值。",
+  "direct_answer": "result is 2",
+  "direct_answer_long": "本次任务完成了对1+1的值的计算。通过计算，我们得到了1+1的值为2。",
   "shrink_similar_tool_call_result": "",
   "summary_tool_call_result": ""
 }`
 
-var summaryJson = `{
-  "@action": "summary",
-  "short_summary": "result is 2",
-  "long_summary": ""
-}`
+var summaryJson = `result is 2`
 
 func MockAICallback(t *testing.T, initFlag, persistentFlag, planFlag string) aid.AICallbackType {
 	step := 0
@@ -116,8 +114,14 @@ forgeHandle = func(params) {
         aiagent.persistentPrompt(persis),
 		aiagent.initPrompt(init),
 		aiagent.agreeYOLO(true),
-		aiagent.resultHandler((config) => {
-			result = config.GetMemory().CurrentTask.TaskSummary
+		aiagent.eventHandler((e) => {
+			if e.NodeId == "result" {
+				try {
+					result = json.loads(e.Content)['data']
+				} catch err {
+					result = e.Content
+				}
+			}
 		}),
     )
     ordr,err = bp.CreateCoordinator(context.Background(),params)
@@ -128,6 +132,7 @@ forgeHandle = func(params) {
     if err != nil {
 		return nil
 	}
+		println(result)
     return result
 }`,
 	}
