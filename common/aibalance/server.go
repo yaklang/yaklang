@@ -321,7 +321,7 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 
 	var prompt bytes.Buffer
 	for _, message := range bodyIns.Messages {
-		prompt.WriteString(message.Content + "\n")
+		prompt.WriteString(fmt.Sprint(message.Content) + "\n")
 	}
 
 	if prompt.Len() == 0 {
@@ -689,7 +689,7 @@ func (c *ServerConfig) serveIndexPage(conn net.Conn) {
 }
 
 func (c *ServerConfig) Serve(conn net.Conn) {
-	c.logInfo("Received new connection request, source: %s", conn.RemoteAddr())
+	//c.logInfo("Received new connection request, source: %s", conn.RemoteAddr())
 	defer conn.Close()
 	reader := bufio.NewReader(conn)
 	request, err := utils.ReadHTTPRequestFromBufioReader(reader)
@@ -721,7 +721,7 @@ func (c *ServerConfig) Serve(conn net.Conn) {
 		return
 	}
 
-	c.logInfo("Request path: %s", uriIns.Path)
+	//c.logInfo("Request path: %s", uriIns.Path)
 	requestRaw, err := utils.DumpHTTPRequest(request, true)
 	if err != nil {
 		c.logError("Failed to serialize HTTP request: %v", err)
@@ -729,15 +729,14 @@ func (c *ServerConfig) Serve(conn net.Conn) {
 		return
 	}
 
-	c.logInfo("Raw request content:\n%s", string(requestRaw))
+	//c.logInfo("Raw request content:\n%s", string(requestRaw))
 
 	switch {
 	case strings.HasPrefix(uriIns.Path, "/forwarder/"):
-		c.logInfo("Forwarder: registering with %s", uriIns.Path)
+		//c.logInfo("Forwarder: registering with %s", uriIns.Path)
 		c.serveForwarder(conn, requestRaw)
 		return
 	case strings.HasPrefix(uriIns.Path, "/v1/chat/completions"):
-		c.logInfo("Processing chat completion request")
 		c.serveChatCompletions(conn, requestRaw)
 		return
 	case strings.HasPrefix(uriIns.Path, "/v1/models"): // 新增：处理 /v1/models 请求
