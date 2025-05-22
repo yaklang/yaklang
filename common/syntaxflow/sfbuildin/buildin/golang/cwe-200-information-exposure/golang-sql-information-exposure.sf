@@ -1,10 +1,10 @@
 desc(
-    title: "golang SQL information exposure",
-    title_zh: "golang SQL相关函数泄露服务器敏感信息",
-    type: audit,
-    severity: low,
-    risk: "info-exposure",
-    desc: <<<TEXT
+	title: "golang SQL information exposure"
+	title_zh: "golang SQL相关函数泄露服务器敏感信息",
+	type: audit
+	severity: low
+	risk: "info-exposure"
+	desc: <<<TEXT
 检测可能通过SQL相关函数泄露服务器敏感信息，包括：
     1. 目录结构暴露
     2. 当前工作路径泄露

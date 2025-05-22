@@ -1,10 +1,10 @@
 desc(
-    title: "golang SQL Injection(sqlx)",
+	title: "golang SQL Injection(sqlx)"
 	title_zh: "golang SQL注入(sqlx)",
-    type: vuln,
-    severity: high,
-	risk: sqli,
-    desc: <<<TEXT
+	type: vuln
+	severity: high
+	risk: sqli
+	desc: <<<TEXT
 SQL 注入漏洞是一种严重的安全漏洞，它允许攻击者通过操纵应用程序的 SQL 查询来执行任意 SQL 代码。在 Go 语言中使用 `sqlx` 库时，如果直接将用户输入拼接到 SQL 查询字符串中，而没有进行适当的输入验证或参数化查询，就可能导致 SQL 注入漏洞。这会使攻击者能够绕过正常的认证和授权机制，访问、修改或删除数据库中的敏感数据。
 
 SQL 注入漏洞通常发生在以下场景：
