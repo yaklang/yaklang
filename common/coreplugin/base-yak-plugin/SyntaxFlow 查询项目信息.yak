@@ -1,0 +1,87 @@
+yakit.AutoInitYakit()
+
+# Input your code!
+ProgramName := cli.String("progName",
+    cli.setVerboseName("项目名"),
+    cli.setRequired(true)
+)
+
+cli.check()
+yakit.SetProgress(0)
+prog, err := ssa.NewProgramFromDB(ProgramName)
+if err !=nil{
+    yakit.Error("load program %s from db err: %s",ProgramName, err)
+    return
+}
+
+language = prog.GetLanguage()
+searchFilterMethodRule = {
+    "go":[],
+    "java":[],
+    "php":[],
+    "yak":[],
+}
+
+func registerGoRule(ruleName,content){
+    rule = {ruleName:content}
+    searchFilterMethodRule["go"]= append(searchFilterMethodRule["go"], rule)
+}
+
+func registerJavaRule(ruleName,content){
+    rule = {ruleName:content}
+    searchFilterMethodRule["java"]=append(searchFilterMethodRule["java"], rule)
+}
+
+func registerPHP(ruleName,content){
+    rule = {ruleName:content}
+    searchFilterMethodRule["php"] = append(searchFilterMethodRule["php"], rule)
+}
+
+# filter method rule
+registerGoRule("Go 通用过滤函数检测", `
+/(?i).*(sanitize|filter|escape|clean|validate|check|secure|scrub|strip|encode|decode|prevent|safe|block|remove|replace|purge|whitelist|blacklist|neutralize|defense|harden|mitigate).*/ as $filter;
+$filter?{opcode:function} as $output;
+`)
+
+registerJavaRule("Java 通用过滤函数检测", `
+/(?i).*(sanitize|filter|escape|clean|validate|check|secure|scrub|strip|encode|decode|prevent|safe|block|remove|replace|purge|whitelist|blacklist|neutralize|defense|harden|mitigate).*/ as  $filter;
+$filter?{opcode:function } as $output;
+`)
+
+registerJavaRule("Java XSS 过滤函数检测", `
+/(?i).*xss.*((clear)|(filter)|(escape)).*/ as $filter;
+/(?i)((clear)|(filter)|(escape)).*xss.*/ as $filter;
+$filter?{opcode:function} as $output;
+`)
+
+registerPHP("PHP通用过滤函数检测", `
+/^(htmlspecialchars|strip_tags|mysql_real_escape_string|addslashes|filter|is_numeric|str_replace|ereg|strpos|preg_replace|trim)$/?{opcode:call,function} as $output;
+`)
+
+
+opt = [
+    syntaxflow.withContext(context.Background()),
+    syntaxflow.withProcess((f, s)=>{
+        yakit.SetProgress(f)
+        yakit.Info("%s",s)
+    }),
+    syntaxflow.withSearch(),
+    syntaxflow.withCache()
+]
+
+rules = searchFilterMethodRule[language]
+for _,rule := range rules{
+    for name,content := range rule{
+         yakit.Info("exec search filter method rule:%s ", name)
+        res, err := prog.SyntaxFlowWithError(content, opt...)
+        if err != nil {
+            yakit.Error("exec syntaxflow rule %s error:%s",name, err)
+            continue
+        }
+        resultId = res.GetResultID()
+        result = {"规则名称":name,"规则结果ID":resultId}
+        yakit.Output(result)
+        res.Show()
+    }
+}
+yakit.SetProgress(1)
