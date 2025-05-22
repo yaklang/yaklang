@@ -13,7 +13,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -29,15 +28,13 @@ func TestDashscope_Search(t *testing.T) {
 	}
 	keyPath := filepath.Join(dir, `yakit-projects/yaklang-bailian-apikey.txt`)
 	keyContent, _ := os.ReadFile(keyPath)
-	ch, err := StructuredStream("web fuzzer 用法", aispec.WithType("yaklang-com-search"), aispec.WithAPIKey(string(keyContent)))
-	if err != nil {
-		t.Fail()
-	}
-	for data := range ch {
-		if strings.HasPrefix(data.OutputNodeId, "End_") {
-			println(data.OutputText)
-		}
-	}
+	client := GetAI("tongyi",
+		aispec.WithType("tongyi"),
+		aispec.WithAPIKey(string(keyContent)),
+		aispec.WithModel("qwen-max"),
+		aispec.WithDebugStream(true),
+	)
+	client.Chat("你是谁？输出一个400字故事")
 }
 
 func TestAIBalanceLatest(t *testing.T) {
@@ -97,7 +94,7 @@ func TestAutoUpdateAiList(t *testing.T) {
 		t.Fail()
 	}
 	bak := cfg.AiApiPriority // backup the original value
-	defer func() { // restore the original value
+	defer func() {           // restore the original value
 		cfg.AiApiPriority = bak
 		yakit.ConfigureNetWork(cfg)
 	}()
@@ -186,7 +183,7 @@ func TestClientStreamExtInfo(t *testing.T) {
 		t.Fail()
 	}
 	bak := cfg.AiApiPriority // backup the original value
-	defer func() { // restore the original value
+	defer func() {           // restore the original value
 		cfg.AiApiPriority = bak
 		yakit.ConfigureNetWork(cfg)
 	}()
