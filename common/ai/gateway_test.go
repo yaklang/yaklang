@@ -40,6 +40,26 @@ func TestDashscope_Search(t *testing.T) {
 	}
 }
 
+func TestAIBalanceLatest(t *testing.T) {
+	if utils.InGithubActions() {
+		return
+	}
+
+	dir, err := os.UserHomeDir()
+	if err != nil {
+		t.Fail()
+	}
+	keyPath := filepath.Join(dir, `yakit-projects/aibalance.txt`)
+	keyContent, _ := os.ReadFile(keyPath)
+	client := GetAI("aibalance",
+		aispec.WithType("aibalance"),
+		aispec.WithAPIKey(string(keyContent)),
+		aispec.WithModel("gemini-2.0-flash"),
+		aispec.WithDebugStream(true),
+	)
+	client.Chat("你是谁？输出一个400字故事")
+}
+
 //go:embed demo2.jpg
 var imgzip string
 
@@ -77,7 +97,7 @@ func TestAutoUpdateAiList(t *testing.T) {
 		t.Fail()
 	}
 	bak := cfg.AiApiPriority // backup the original value
-	defer func() {           // restore the original value
+	defer func() { // restore the original value
 		cfg.AiApiPriority = bak
 		yakit.ConfigureNetWork(cfg)
 	}()
@@ -166,7 +186,7 @@ func TestClientStreamExtInfo(t *testing.T) {
 		t.Fail()
 	}
 	bak := cfg.AiApiPriority // backup the original value
-	defer func() {           // restore the original value
+	defer func() { // restore the original value
 		cfg.AiApiPriority = bak
 		yakit.ConfigureNetWork(cfg)
 	}()
