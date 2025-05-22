@@ -105,7 +105,7 @@ func (v *Value) CompareString(items *sfvm.StringComparator) (sfvm.ValueOperator,
 	names := getValueNames(v)
 	fmt.Println("names", names)
 	names = append(names, yakunquote.TryUnquote(v.String()))
-	return nil, []bool{items.Matches(names...)}
+	return v, []bool{items.Matches(names...)}
 }
 
 func (v *Value) CompareConst(comparator *sfvm.ConstComparator) []bool {
@@ -126,7 +126,7 @@ func (v *Value) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOper
 		ops := []string{v.GetBinaryOperator(), v.GetUnaryOperator()}
 		return slices.Contains(ops, binOp)
 	}
-	return nil, []bool{comparator.AllSatisfy(checkOp, checkBinOrUnaryOp)}
+	return v, []bool{comparator.AllSatisfy(checkOp, checkBinOrUnaryOp)}
 }
 
 func (v *Value) Remove(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {

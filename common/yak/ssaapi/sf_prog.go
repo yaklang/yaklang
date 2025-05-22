@@ -39,7 +39,7 @@ func (p *Program) CompareOpcode(opcodeItems *sfvm.OpcodeComparator) (sfvm.ValueO
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, err := p.NewValue(i); err != nil {
 				log.Errorf("CompareOpcode: new value failed: %v", err)
-				return nil, false
+				return v, false
 			} else {
 				boolRes = append(boolRes, true)
 				return v, true
@@ -65,7 +65,6 @@ func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOp
 			_, v, _ = p.RegexpMatch(ctx, ssadb.NameMatch, fmt.Sprintf(".*%s.*", condition.Pattern))
 		}
 		return v
-		return nil
 	}
 
 	switch comparator.MatchMode {

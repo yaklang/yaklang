@@ -217,7 +217,6 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 		y.EmitLatchIterator(ctx)
 		y.EmitIterEnd(ctx)
 	case *sf.OpcodeTypeConditionContext:
-		y.EmitDuplicate()
 		opcodes := i.AllOpcodesCondition()
 		ops := make([]string, 0, len(opcodes))
 		for _, opcode := range opcodes {
@@ -225,11 +224,9 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 		}
 		y.EmitCompareOpcode(ops)
 	case *sf.StringContainAnyConditionContext:
-		y.EmitDuplicate()
 		res := y.VisitStringLiteralWithoutStarGroup(i.StringLiteralWithoutStarGroup())
 		y.EmitCompareString(res, MatchHaveAny)
 	case *sf.StringContainHaveConditionContext:
-		y.EmitDuplicate()
 		res := y.VisitStringLiteralWithoutStarGroup(i.StringLiteralWithoutStarGroup())
 		y.EmitCompareString(res, MatchHave)
 	case *sf.FilterExpressionCompareContext:
