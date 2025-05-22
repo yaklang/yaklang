@@ -280,11 +280,10 @@ func TestServer_Project_ExportAndImportProject(t *testing.T) {
 }
 
 func TestServer_Project_DefaultProject(t *testing.T) {
-	client, err := NewLocalClient()
+	client, err := NewLocalClient(true)
 	require.NoError(t, err)
-	ctx := utils.TimeoutContext(20 * time.Second) // set timeout
 	token := utils.RandStringBytes(10)
-	newProjectResp, err := client.NewProject(ctx, &ypb.NewProjectRequest{
+	newProjectResp, err := client.NewProject(context.Background(), &ypb.NewProjectRequest{
 		ProjectName: token,
 		Description: "hello",
 		Type:        yakit.TypeProject,
@@ -294,7 +293,7 @@ func TestServer_Project_DefaultProject(t *testing.T) {
 		yakit.DeleteProjectByProjectName(consts.GetGormProfileDatabase(), token)
 	}()
 
-	getDefaultPath := func() string {
+	getDefaultPath := func() *ypb.ProjectDescription {
 		projects, err := client.GetProjects(context.Background(), &ypb.GetProjectsRequest{
 			Type: yakit.TypeProject,
 		})
@@ -302,14 +301,14 @@ func TestServer_Project_DefaultProject(t *testing.T) {
 		log.Info("projects: ", projects)
 		for _, project := range projects.Projects {
 			if project.GetProjectName() == "[default]" {
-				return project.GetDatabasePath()
+				return project
 			}
 		}
-		return ""
+		return nil
 	}
 
-	defaultID := getDefaultPath()
-	require.NotEqual(t, defaultID, "")
+	defaultProgram := getDefaultPath()
+	require.NotEqual(t, defaultProgram, nil)
 
 	t.Run("set default project", func(t *testing.T) {
 		_, err = client.SetCurrentProject(context.Background(), &ypb.SetCurrentProjectRequest{
@@ -321,8 +320,17 @@ func TestServer_Project_DefaultProject(t *testing.T) {
 			Id:   0,
 			Type: yakit.TypeProject,
 		})
+		gotDefault := getDefaultPath()
+		gotDefaultPath := gotDefault.DatabasePath
 		require.NoError(t, err)
-		require.Equal(t, getDefaultPath(), defaultID)
+
+		// set default project for other test
+		_, err = client.SetCurrentProject(context.Background(), &ypb.SetCurrentProjectRequest{
+			Id:   defaultProgram.Id,
+			Type: yakit.TypeProject,
+		})
+		require.NoError(t, err)
+		require.Equal(t, gotDefaultPath, defaultProgram.DatabasePath)
 	})
 
 }
