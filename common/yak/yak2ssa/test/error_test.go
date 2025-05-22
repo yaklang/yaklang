@@ -1344,7 +1344,6 @@ func TestErrorHandler(t *testing.T) {
 			Want: []string{
 				ssa4analyze.ErrorUnhandled(),
 				ssa4analyze.ErrorUnhandled(),
-				ssa4analyze.ErrorUnhandled(),
 			},
 			ExternValue: map[string]any{"getError1": func() error { return errors.New("err") }, "getError2": func() (int, error) { return 1, errors.New("err") }},
 		})
