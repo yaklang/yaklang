@@ -46,7 +46,7 @@ a["e"] = a.c.location
 a.e.href = "1010"
 
 
-var b = ()=>{return window.location.hostname + "/app/"}()
+var b = (()=>{return window.location.hostname + "/app/"})()
 window.location.href = b + "/login.html?ts=";
 window.location.href = "www"
 	`,
