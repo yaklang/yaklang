@@ -1,7 +1,6 @@
 package yakit
 
 import (
-	"encoding/json"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -198,6 +197,7 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.S
 	updateRule.TitleZh = dbRule.TitleZh
 	updateRule.OpCodes = dbRule.OpCodes
 	updateRule.Hash = dbRule.CalcHash()
+
 	groups := sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), rule.GetGroupNames())
 	if err := db.Model(&schema.SyntaxFlowRule{}).Update(&updateRule).Error; err != nil {
 		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
@@ -237,14 +237,9 @@ func ParseSyntaxFlowInput(ruleInput *ypb.SyntaxFlowRuleInput) (*schema.SyntaxFlo
 	rule.Title = ruleInput.RuleName
 	//rule.Groups = sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), ruleInput.GroupNames)
 	rule.Description = ruleInput.Description
-	if ruleInput.AlertMsg != "" {
-		mapx := make(schema.MapEx[string, *schema.SyntaxFlowDescInfo])
-		if err = json.Unmarshal([]byte(ruleInput.AlertMsg), &mapx); err != nil {
-			return nil, err
-		}
-		rule.AlertDesc = mapx
+	for s, message := range ruleInput.AlertMsg {
+		rule.AlertDesc[s] = schema.ToSyntaxFlowAlertDesc(message)
 	}
-
 	return rule, nil
 }
 

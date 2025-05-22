@@ -2,7 +2,6 @@ package yakgrpc
 
 import (
 	"context"
-	"encoding/json"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -70,7 +69,7 @@ alert $high for{
 	title: "存在xxx漏洞2"
 }
 `
-	_, err = client.CreateSyntaxFlowRuleEx(context.Background(), &ypb.CreateSyntaxFlowRuleRequest{
+	res, err := client.CreateSyntaxFlowRuleEx(context.Background(), &ypb.CreateSyntaxFlowRuleRequest{
 		SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
 			RuleName: ruleName,
 			Content:  content,
@@ -78,6 +77,9 @@ alert $high for{
 		},
 	})
 	require.NoError(t, err)
+	hg, exist := res.Rule.AlertMsg["high"]
+	require.True(t, exist)
+	hg.Severity = string(schema.SFR_SEVERITY_HIGH)
 	_, rules, err := yakit.QuerySyntaxFlowRule(consts.GetGormProfileDatabase(), &ypb.QuerySyntaxFlowRuleRequest{
 		Filter: &ypb.SyntaxFlowRuleFilter{
 			RuleNames: []string{ruleName},
@@ -89,14 +91,16 @@ alert $high for{
 	high, isHigh := rule.AlertDesc["high"]
 	require.True(t, isHigh)
 	require.True(t, high.Severity == schema.SFR_SEVERITY_HIGH)
-	high.Severity = schema.SFR_SEVERITY_CRITICAL
-	rawBytes, err := json.Marshal(rule.AlertDesc)
 	require.NoError(t, err)
 	_, err = client.UpdateSyntaxFlowRule(context.Background(), &ypb.UpdateSyntaxFlowRuleRequest{
 		SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
 			RuleName: ruleName,
 			Content:  content,
-			AlertMsg: string(rawBytes),
+			AlertMsg: map[string]*ypb.AlertMessage{
+				"high": {
+					Severity: string(schema.SFR_SEVERITY_CRITICAL),
+				},
+			},
 			Language: "php",
 		},
 	})
