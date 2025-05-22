@@ -185,16 +185,22 @@ func init() {
 		v.Recursive(func(operator sfvm.ValueOperator) error {
 			switch ret := operator.(type) {
 			case *Value:
-				result = append(result, ret.GetReference())
+				if ref := ret.GetReference(); ref != nil {
+					result = append(result, ref)
+				}
 			case Values:
 				for _, value := range ret {
-					result = append(result, value.GetReference())
+					if ref := value.GetReference(); ref != nil {
+						result = append(result, ref)
+					}
 				}
 			case *sfvm.ValueList:
 				values, err := SFValueListToValues(ret)
 				if err == nil {
 					values.ForEach(func(value *Value) {
-						result = append(result, value.GetReference())
+						if ref := value.GetReference(); ref != nil {
+							result = append(result, ref)
+						}
 					})
 				}
 			}
@@ -214,16 +220,22 @@ func init() {
 		v.Recursive(func(operator sfvm.ValueOperator) error {
 			switch ret := operator.(type) {
 			case *Value:
-				result = append(result, ret.GetPointer())
+				if pointer := ret.GetPointer(); pointer != nil {
+					result = append(result, pointer)
+				}
 			case Values:
 				for _, value := range ret {
-					result = append(result, value.GetPointer())
+					if pointer := value.GetPointer(); pointer != nil {
+						result = append(result, pointer)
+					}
 				}
 			case *sfvm.ValueList:
 				values, err := SFValueListToValues(ret)
 				if err == nil {
 					values.ForEach(func(value *Value) {
-						result = append(result, value.GetPointer())
+						if pointer := value.GetPointer(); pointer != nil {
+							result = append(result, pointer)
+						}
 					})
 				}
 			}
