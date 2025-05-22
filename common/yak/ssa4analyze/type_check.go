@@ -44,29 +44,70 @@ func (t *TypeCheck) Run(prog *ssa.Program) {
 }
 
 func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
+	var checkError func(value ssa.Value, top ...ssa.Value)
+	errorIds := make(map[int64]struct{})
+	addError := func(value ssa.Value) {
+		_, ok := errorIds[value.GetId()]
+		if !ok {
+			value.NewError(ssa.Error, TypeCheckTAG, ErrorUnhandled())
+			errorIds[value.GetId()] = struct{}{}
+		}
+	}
+	checkError = func(v ssa.Value, top ...ssa.Value) {
+		userCount := 0
+		for _, user := range v.GetUsers() {
+			if len(top) == 0 {
+				userCount++
+				continue
+			}
+			for _, value := range top {
+				if user.GetId() != value.GetId() {
+					userCount++
+				}
+			}
+		}
+		phi, isPhi := ssa.ToPhi(v)
+		if isPhi {
+			//说明phi被处理，不应该去检查上层
+			if userCount != 0 {
+				return
+			}
+			//phi没有被处理，检查phi edge里面的每一层
+			for _, edge := range phi.Edge {
+				//有一个不处理就报错
+				checkError(edge, append(top, phi)...)
+			}
+			return
+		}
+		if userCount != 0 {
+			return
+		}
+		vs := v.GetAllVariables()
+		if len(vs) == 0 && v.GetOpcode() != ssa.SSAOpcodeCall {
+			// if `a()//return err` just ignore,
+			// but `a()[1] //return int,err` add handler
+			if v.GetRange().GetText() != "_" {
+				addError(v)
+			}
+		}
+		if slices.Contains(lo.Keys(vs), "_") {
+			return
+		}
+		for _, variable := range vs {
+			// if is `_` variable
+			if variable.GetName() == "_" {
+				break
+			}
+			ret := variable.GetValue()
+			addError(ret)
+			//variable.NewError(ssa.Error, TypeCheckTAG, ErrorUnhandled())
+		}
+		return
+	}
 	if v, ok := inst.(ssa.Value); ok {
 		switch v.GetType().GetTypeKind() {
 		case ssa.ErrorTypeKind:
-			if len(v.GetUsers()) == 0 {
-				vs := v.GetAllVariables()
-				if len(vs) == 0 && v.GetOpcode() != ssa.SSAOpcodeCall {
-					// if `a()//return err` just ignore,
-					// but `a()[1] //return int,err` add handler
-					if v.GetRange().GetText() != "_" {
-						v.NewError(ssa.Error, TypeCheckTAG, ErrorUnhandled())
-					}
-				}
-				if slices.Contains(lo.Keys(vs), "_") {
-					break
-				}
-				for _, variable := range vs {
-					// if is `_` variable
-					if variable.GetName() == "_" {
-						break
-					}
-					variable.NewError(ssa.Error, TypeCheckTAG, ErrorUnhandled())
-				}
-			}
+			checkError(v)
 		case ssa.NullTypeKind:
 			if len(v.GetAllVariables()) != 0 {
 				inst.NewError(ssa.Warn, TypeCheckTAG, ssa.ValueIsNull())

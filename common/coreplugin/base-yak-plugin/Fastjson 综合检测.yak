@@ -268,6 +268,9 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
                     }
                     exp = exp[0]
                     rsp,err = param.delayFuzz(exp)
+                    if err!=nil{
+                        continue
+                    }
                     wastTime = getRequestDuration(rsp)
                     if checkDns{
                         res,err = risk.CheckDNSLogByToken(token,dnslogTimeout)
