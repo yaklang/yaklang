@@ -950,18 +950,11 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 
 		newVal, condition := values.CompareOpcode(comparator)
-		if newVal != nil {
-			dup := s.stack.Pop()
-			if dup == nil {
-				return utils.Wrapf(CriticalError, "compare opcode failed: stack top is empty")
-			}
-			s.debugSubLog("Remove duplicate :%v", dup.String())
-			s.debugSubLog(">> push: %v", ValuesLen(newVal))
-			s.stack.Push(newVal)
-		}
+		s.stack.Push(newVal)
 		s.conditionStack.Push(condition)
 	case OpCompareString:
 		s.debugSubLog(">> pop")
+		//pop到原值
 		values := s.stack.Pop()
 		if values == nil {
 			return utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
@@ -981,15 +974,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			comparator.AddCondition(v, ValidConditionFilter(i.MultiOperator[index]))
 		}
 		newVal, condition := values.CompareString(comparator)
-		if newVal != nil {
-			dup := s.stack.Pop()
-			if dup == nil {
-				return utils.Wrapf(CriticalError, "compare string failed: stack top is empty")
-			}
-			s.debugSubLog("Remove duplicate :%v", dup.String())
-			s.debugSubLog(">> push: %v", ValuesLen(newVal))
-			s.stack.Push(newVal)
-		}
+		s.stack.Push(newVal)
 		s.conditionStack.Push(condition)
 	case OpVersionIn:
 		value := s.stack.Peek()

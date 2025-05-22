@@ -62,7 +62,7 @@ func (v *ValueList) CompareOpcode(comparator *OpcodeComparator) (ValueOperator, 
 		res = append(res, result...)
 		return nil
 	})
-	return nil, res
+	return v, res
 }
 
 func (v *ValueList) CompareString(comparator *StringComparator) (ValueOperator, []bool) {
@@ -72,7 +72,7 @@ func (v *ValueList) CompareString(comparator *StringComparator) (ValueOperator, 
 		res = append(res, result...)
 		return nil
 	})
-	return nil, res
+	return v, res
 }
 
 func (v *ValueList) AppendPredecessor(value ValueOperator, opts ...AnalysisContextOption) error {
