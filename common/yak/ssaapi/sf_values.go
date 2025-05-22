@@ -22,7 +22,7 @@ func (v Values) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOper
 		res = append(res, result...)
 		return nil
 	})
-	return nil, res
+	return v, res
 }
 
 func (v Values) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOperator, []bool) {
@@ -32,7 +32,7 @@ func (v Values) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOper
 		res = append(res, result...)
 		return nil
 	})
-	return nil, res
+	return v, res
 }
 
 func (p Values) GetOpcode() string {

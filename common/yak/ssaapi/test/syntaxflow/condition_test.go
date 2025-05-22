@@ -11,6 +11,18 @@ import (
 )
 
 func TestSimple(t *testing.T) {
+	t.Run("test get function", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, `
+func a(){}
+func b(){}
+`, `
+*?{opcode: func} as $sink
+`, map[string][]string{"sink": {
+			"Function-@main",
+			"Function-a",
+			"Function-b",
+		}}, ssaapi.WithLanguage(ssaapi.Yak))
+	})
 	t.Run("Test opcode", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, `
 		aa = 1 // constant
