@@ -17,7 +17,7 @@ type Agent struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	RuntimeID string
+	CoordinatorId string
 
 	ExtendAIDOptions []aid.Option
 	AiForgeOptions   []aiforge.Option
@@ -67,8 +67,8 @@ func (ag *Agent) SubOption() []AIAgentOption {
 	if ag.ctx != nil {
 		opts = append(opts, WithContext(ag.ctx))
 	}
-	if ag.RuntimeID != "" {
-		opts = append(opts, WithRuntimeID(ag.RuntimeID))
+	if ag.CoordinatorId != "" {
+		opts = append(opts, WithCoordinatorId(ag.CoordinatorId))
 	}
 	if ag.ExtendAIDOptions != nil {
 		opts = append(opts, WithExtendAIDOptions(ag.ExtendAIDOptions...))
@@ -81,9 +81,9 @@ var (
 	WithAgreeYOLO = aid.WithAgreeYOLO
 
 	// Additional With options
-	WithRuntimeID = func(id string) AIAgentOption {
+	WithCoordinatorId = func(id string) AIAgentOption {
 		return func(ag *Agent) error {
-			ag.RuntimeID = id
+			ag.CoordinatorId = id
 			return nil
 		}
 	}

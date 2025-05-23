@@ -859,7 +859,7 @@ message McpConfig {
 
 message AIStartParams {
   // if set will try recovery
-  string TaskID = 17;
+  string CoordinatorId = 17;
   int64  Sequence = 18;
 
   repeated McpConfig McpServers = 1;
