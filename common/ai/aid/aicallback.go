@@ -19,12 +19,21 @@ import (
 )
 
 type AIRequest struct {
+	taskIndex              string
 	detachCheckpoint       bool
 	prompt                 string
 	startTime              time.Time
 	seqId                  int64
 	saveCheckpointCallback func(CheckpointCommitHandler)
 	onAcquireSeq           func(int64)
+}
+
+func (a *AIRequest) GetTaskIndex() string {
+	return a.taskIndex
+}
+
+func (a *AIRequest) SetTaskIndex(taskIndex string) {
+	a.taskIndex = taskIndex
 }
 
 func (ai *AIRequest) SetDetachCheckpoint(b bool) {
@@ -60,12 +69,24 @@ func WithAIRequest_SeqId(i int64) AIRequestOption {
 }
 
 type AIResponse struct {
+	taskIndex           string
 	ch                  *chanx.UnlimitedChan[*OutputStream]
 	enableDebug         bool
 	consumptionCallback func(current int)
 
 	respStartTime time.Time
 	reqStartTime  time.Time
+}
+
+func (a *AIResponse) GetTaskIndex() string {
+	return a.taskIndex
+}
+
+func (a *AIResponse) SetTaskIndex(taskIndex string) {
+	if a == nil {
+		return
+	}
+	a.taskIndex = taskIndex
 }
 
 func (a *AIResponse) Debug(i ...bool) {
@@ -80,12 +101,14 @@ func (a *AIResponse) Debug(i ...bool) {
 func (c *Config) teeAIResponse(src *AIResponse, onFirstByte func(), onClose func(teeResponse *AIResponse)) *AIResponse {
 	// 创建第一个响应对象
 	first := c.NewAIResponse()
+	first.SetTaskIndex(src.GetTaskIndex())
 	first.consumptionCallback = nil
 	firstReasonReader, firstReasonWriter := utils.NewBufPipe(nil)
 	firstOutputReader, firstOutputWriter := utils.NewBufPipe(nil)
 
 	// 创建第二个响应对象
 	second := c.NewAIResponse()
+	first.SetTaskIndex(src.GetTaskIndex())
 	second.consumptionCallback = nil
 	secondReasonReader, secondReasonWriter := utils.NewBufPipe(nil)
 	secondOutputReader, secondOutputWriter := utils.NewBufPipe(nil)
@@ -261,18 +284,18 @@ func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, config *C
 			}
 			if i.IsReason {
 				if system {
-					config.EmitSystemReasonStreamEvent(nodeId, a.respStartTime, targetStream)
+					config.EmitSystemReasonStreamEvent(nodeId, a.respStartTime, targetStream, a.GetTaskIndex())
 				} else {
-					config.EmitReasonStreamEvent(nodeId, a.respStartTime, targetStream)
+					config.EmitReasonStreamEvent(nodeId, a.respStartTime, targetStream, a.GetTaskIndex())
 				}
 				continue
 			}
 
 			targetStream = io.TeeReader(targetStream, pw)
 			if system {
-				config.EmitSystemStreamEvent(nodeId, a.respStartTime, targetStream)
+				config.EmitSystemStreamEvent(nodeId, a.respStartTime, targetStream, a.GetTaskIndex())
 			} else {
-				config.EmitStreamEvent(nodeId, a.respStartTime, targetStream)
+				config.EmitStreamEvent(nodeId, a.respStartTime, targetStream, a.GetTaskIndex())
 			}
 		}
 		config.WaitForStream()
