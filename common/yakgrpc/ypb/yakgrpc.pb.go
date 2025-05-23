@@ -1273,10 +1273,10 @@ func (x *McpConfig) GetUrl() string {
 type AIStartParams struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// if set will try recovery
-	TaskID     string       `protobuf:"bytes,17,opt,name=TaskID,proto3" json:"TaskID,omitempty"`
-	Sequence   int64        `protobuf:"varint,18,opt,name=Sequence,proto3" json:"Sequence,omitempty"`
-	McpServers []*McpConfig `protobuf:"bytes,1,rep,name=McpServers,proto3" json:"McpServers,omitempty"`
-	UserQuery  string       `protobuf:"bytes,2,opt,name=UserQuery,proto3" json:"UserQuery,omitempty"`
+	CoordinatorId string       `protobuf:"bytes,17,opt,name=CoordinatorId,proto3" json:"CoordinatorId,omitempty"`
+	Sequence      int64        `protobuf:"varint,18,opt,name=Sequence,proto3" json:"Sequence,omitempty"`
+	McpServers    []*McpConfig `protobuf:"bytes,1,rep,name=McpServers,proto3" json:"McpServers,omitempty"`
+	UserQuery     string       `protobuf:"bytes,2,opt,name=UserQuery,proto3" json:"UserQuery,omitempty"`
 	// allow ai to use the fs
 	EnableSystemFileSystemOperator bool `protobuf:"varint,3,opt,name=EnableSystemFileSystemOperator,proto3" json:"EnableSystemFileSystemOperator,omitempty"`
 	UseDefaultAIConfig             bool `protobuf:"varint,4,opt,name=UseDefaultAIConfig,proto3" json:"UseDefaultAIConfig,omitempty"`
@@ -1344,9 +1344,9 @@ func (*AIStartParams) Descriptor() ([]byte, []int) {
 	return file_yakgrpc_proto_rawDescGZIP(), []int{13}
 }
 
-func (x *AIStartParams) GetTaskID() string {
+func (x *AIStartParams) GetCoordinatorId() string {
 	if x != nil {
-		return x.TaskID
+		return x.CoordinatorId
 	}
 	return ""
 }
@@ -50081,9 +50081,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tMcpConfig\x12\x12\n" +
 	"\x04Type\x18\x01 \x01(\tR\x04Type\x12\x10\n" +
 	"\x03Key\x18\x02 \x01(\tR\x03Key\x12\x10\n" +
-	"\x03Url\x18\x03 \x01(\tR\x03Url\"\x99\a\n" +
-	"\rAIStartParams\x12\x16\n" +
-	"\x06TaskID\x18\x11 \x01(\tR\x06TaskID\x12\x1a\n" +
+	"\x03Url\x18\x03 \x01(\tR\x03Url\"\xa7\a\n" +
+	"\rAIStartParams\x12$\n" +
+	"\rCoordinatorId\x18\x11 \x01(\tR\rCoordinatorId\x12\x1a\n" +
 	"\bSequence\x18\x12 \x01(\x03R\bSequence\x12.\n" +
 	"\n" +
 	"McpServers\x18\x01 \x03(\v2\x0e.ypb.McpConfigR\n" +

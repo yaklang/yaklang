@@ -314,7 +314,7 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 
 type Option func(config *Config) error
 
-func WithTaskID(id string) Option {
+func WithCoordinatorId(id string) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
