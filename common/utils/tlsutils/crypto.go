@@ -126,11 +126,6 @@ func GeneratePrivateAndPublicKeyPEMWithPrivateFormatterWithSize(t string, size i
 	return priBuffer.Bytes(), pubBuffer.Bytes(), nil
 }
 
-// EncryptWithPkcs1v15 将PEM格式的公钥与数据进行PKCS1v15加密，返回密文与错误
-// Example:
-// ```
-// enc, err := tls.EncryptWithPkcs1v15(pemBytes, "hello")
-// ```
 func PemPkcs1v15Encrypt(pemBytes []byte, data interface{}) ([]byte, error) {
 	dataBytes := utils.InterfaceToBytes(data)
 	block, _ := pem.Decode(pemBytes)
@@ -151,10 +146,28 @@ func PemPkcs1v15Encrypt(pemBytes []byte, data interface{}) ([]byte, error) {
 	return results, err
 }
 
-// EncryptWithPkcs1v15 将公钥与数据进行PKCS1v15加密，返回密文与错误
+// EncryptWithPkcs1v15/RSAEncryptWithPKCS1v15 使用 RSA 公钥和 PKCS#1 v1.5 填充方式对给定数据进行加密。
+//
+// 参数 raw 表示 RSA 公钥，支持以下格式：
+//   - DER 编码的公钥（raw ASN.1 DER 字节流）
+//   - Base64 编码的 DER 格式（自动解码）
+//   - PEM 编码（例如 "-----BEGIN PUBLIC KEY-----" 或 "-----BEGIN RSA PUBLIC KEY-----" 块）
+//   - Base64 编码的 PEM 格式（自动解码）
+//
+// 参数 data 是要加密的明文数据，可以是 []byte、string 或其他可转换为字节数组的类型。
+// 返回值是加密后的密文（字节切片），如果加密失败则返回错误。
+//
 // Example:
 // ```
-// enc, err := tls.EncryptWithPkcs1v15(raw, "hello")
+//
+//		raw := `
+//		-----BEGIN PUBLIC KEY-----
+//		MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAn...（略）
+//		-----END PUBLIC KEY-----
+//		`
+//		ciphertext, err := EncryptWithPkcs1v15(raw, "hello world")
+//	 ciphertext, err := RSAEncryptWithPKCS1v15(raw, "hello world")
+//
 // ```
 func Pkcs1v15Encrypt(raw []byte, data interface{}) ([]byte, error) {
 	dataBytes := utils.InterfaceToBytes(data)
@@ -211,6 +224,7 @@ func ParseRsaPublicKeyFromDerBytes(derBytes []byte) (*rsa.PublicKey, error) {
 func GetRSAPubKey(raw []byte) (*rsa.PublicKey, error) {
 	var err error
 	var decodedBytes []byte
+	var pub *rsa.PublicKey
 
 	block, _ := pem.Decode(raw) // check for raw pem
 
@@ -225,7 +239,11 @@ func GetRSAPubKey(raw []byte) (*rsa.PublicKey, error) {
 		rawString := strings.ReplaceAll(strings.TrimSpace(string(raw)), "\n", "")
 		decodedBytes, err = codec.DecodeBase64(rawString)
 		if err != nil {
-			return nil, errors.New("all strategies failed to parse public key")
+			pub, err = ParseRsaPublicKeyFromDerBytes(raw)
+			if err != nil {
+				return nil, errors.New("all strategies failed to parse public key")
+			}
+			return pub, nil
 		}
 		return ParseRsaPublicKeyFromDerBytes(decodedBytes)
 	}
@@ -272,6 +290,7 @@ func ParseRsaPrivateKeyFromDerBytes(derBytes []byte) (*rsa.PrivateKey, error) {
 func GetRSAPrivateKey(raw []byte) (*rsa.PrivateKey, error) {
 	var err error
 	var decodedBytes []byte
+	var pri *rsa.PrivateKey
 
 	block, _ := pem.Decode(raw) // check for raw pem
 
@@ -286,7 +305,11 @@ func GetRSAPrivateKey(raw []byte) (*rsa.PrivateKey, error) {
 		rawString := strings.ReplaceAll(strings.TrimSpace(string(raw)), "\n", "")
 		decodedBytes, err = codec.DecodeBase64(rawString)
 		if err != nil {
-			return nil, errors.New("all strategies failed to parse private key")
+			pri, err = ParseRsaPrivateKeyFromDerBytes(raw)
+			if err != nil {
+				return nil, errors.New("all strategies failed to parse private key")
+			}
+			return pri, nil
 		}
 		return ParseRsaPrivateKeyFromDerBytes(decodedBytes)
 	}
@@ -297,6 +320,28 @@ func PemPkcsOAEPEncrypt(raw []byte, data interface{}) ([]byte, error) {
 	return PkcsOAEPEncryptWithHash(raw, data, sha256.New())
 }
 
+// RSAEncryptWithOAEP 使用 RSA 公钥和 OAEP 填充方式对给定数据进行加密。
+//
+// 参数 raw 表示 RSA 公钥，支持以下格式：
+//   - DER 编码的公钥（raw ASN.1 DER 字节流）
+//   - Base64 编码的 DER 格式（自动解码）
+//   - PEM 编码（例如 "-----BEGIN PUBLIC KEY-----" 或 "-----BEGIN RSA PUBLIC KEY-----" 块）
+//   - Base64 编码的 PEM 格式（自动解码）
+//
+// 参数 data 是要加密的明文数据，可以是 []byte、string 或其他可转换为字节数组的类型。
+// 返回值是加密后的密文（字节切片），如果加密失败则返回错误。
+//
+// Example:
+// ```
+//
+//	raw := `
+//	-----BEGIN PUBLIC KEY-----
+//	MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAn...（略）
+//	-----END PUBLIC KEY-----
+//	`
+//	ciphertext, err := RSAEncryptWithOAEP(raw, "hello world")
+//
+// ```
 func PkcsOAEPEncrypt(raw []byte, data interface{}) ([]byte, error) {
 	return PkcsOAEPEncryptWithHash(raw, data, sha256.New())
 }
@@ -320,8 +365,26 @@ func PemPkcsOAEPDecrypt(pemPriBytes []byte, data interface{}) ([]byte, error) {
 	return PkcsOAEPDecryptWithHash(pemPriBytes, data, sha256.New())
 }
 
-func PkcsOAEPDecrypt(pemPriBytes []byte, data interface{}) ([]byte, error) {
-	return PkcsOAEPDecryptWithHash(pemPriBytes, data, sha256.New())
+// RSADecryptWithOAEP 使用 RSA私钥 和 RSA-OAEP 填充方式解密给定的密文。
+// 参数 raw 表示 RSA 私钥，支持以下格式：
+//   - DER 编码的私钥（raw ASN.1 DER 字节流）
+//   - Base64 编码的 DER 格式（自动解码）
+//   - PEM 编码（包括带有 "-----BEGIN PRIVATE KEY-----" 或 "-----BEGIN RSA PRIVATE KEY-----" 的块）
+//   - Base64 编码的 PEM 格式（自动解码）
+//
+// 参数 data 是加密后的数据（密文），可以是 []byte 或 base64 字符串等支持类型。
+// 返回值是解密得到的原始明文，如果失败则返回错误。
+//
+// 示例：
+//
+//	raw := `
+//	-----BEGIN PRIVATE KEY-----
+//	MIIEvQIBADANBgkqhkiG9w0BAQEFAASC...（略）
+//	-----END PRIVATE KEY-----
+//	`
+//	plaintext, err := Pkcs1v15Decrypt([]byte(raw), encryptedData)
+func PkcsOAEPDecrypt(raw []byte, data interface{}) ([]byte, error) {
+	return PkcsOAEPDecryptWithHash(raw, data, sha256.New())
 }
 
 func PkcsOAEPDecryptWithHash(raw []byte, data interface{}, hashFunc hash.Hash) ([]byte, error) {
@@ -338,11 +401,6 @@ func PkcsOAEPDecryptWithHash(raw []byte, data interface{}, hashFunc hash.Hash) (
 	return results, err
 }
 
-// DecryptWithPkcs1v15 将PEM格式的私钥与密文进行PKCS1v15解密，返回明文与错误
-// Example:
-// ```
-// dec, err := tls.DecryptWithPkcs1v15(pemBytes, enc)
-// ```
 func PemPkcs1v15Decrypt(pemPriBytes []byte, data interface{}) ([]byte, error) {
 	dataBytes := utils.InterfaceToBytes(data)
 	b, _ := pem.Decode(pemPriBytes)
@@ -367,10 +425,27 @@ func PemPkcs1v15Decrypt(pemPriBytes []byte, data interface{}) ([]byte, error) {
 	return results, err
 }
 
-// DecryptWithPkcs1v15 将私钥与密文进行PKCS1v15解密，返回明文与错误
+// DecryptWithPkcs1v15/RSADecryptWithPKCS1v15 使用 RSA私钥 和 PKCS#1 v1.5填充方式 解密给定的密文。
+// 参数 raw 表示 RSA 私钥，支持以下格式：
+//   - DER 编码的私钥（raw ASN.1 DER 字节流）
+//   - Base64 编码的 DER 格式（自动解码）
+//   - PEM 编码（包括带有 "-----BEGIN PRIVATE KEY-----" 或 "-----BEGIN RSA PRIVATE KEY-----" 的块）
+//   - Base64 编码的 PEM 格式（自动解码）
+//
+// 参数 data 是被加密后的数据（密文）
+// 返回值是解密得到的原始明文，如果失败则返回错误。
+//
 // Example:
 // ```
-// dec, err := tls.DecryptWithPkcs1v15(raw, enc)
+//
+//		raw := `
+//		-----BEGIN PRIVATE KEY-----
+//		MIIEvQIBADANBgkqhkiG9w0BAQEFAASC...（略）
+//		-----END PRIVATE KEY-----
+//		`
+//		plaintext, err := DecryptWithPkcs1v15(raw, encryptedData)
+//	 	plaintext, err := RSADecryptWithPKCS1v15(raw, encryptedData)
+//
 // ```
 func Pkcs1v15Decrypt(raw []byte, data interface{}) ([]byte, error) {
 	dataBytes := utils.InterfaceToBytes(data)
