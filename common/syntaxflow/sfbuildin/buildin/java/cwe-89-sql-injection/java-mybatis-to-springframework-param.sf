@@ -18,8 +18,8 @@ $source?{<typeName>?{!any: Long,Integer, Boolean,Double}} as $vuln
 alert $vuln;
 
 desc(
-	language: java,
-	alert_num:1,
+	language: java
+	alert_num:1
 	'file://Controller.java': <<<TEXT
 package com.mycompany.myapp;
 
