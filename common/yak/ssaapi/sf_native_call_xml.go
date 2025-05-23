@@ -2,21 +2,19 @@ package ssaapi
 
 import (
 	"encoding/xml"
+	regexp "github.com/dlclark/regexp2"
 	"github.com/samber/lo"
-	"regexp"
-	"strings"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/xml2"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"sort"
+	"strings"
 )
 
-var (
-	mybatisVarExtractor = regexp.MustCompile(`\$\{\s*([^}]+)\s*}`)
-)
+var mybatisVarExtractor = regexp.MustCompile(`\$\{\s*([^}]+)\s*}`, regexp.None)
 
 type mybatisXMLMapper struct {
 	FullClassName string
@@ -162,6 +160,7 @@ var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 		mapper := newMybatisXMLMapper(prog, frame)
 		mapperStack.Push(mapper)
 
+		runeOffsetMap := memedit.NewRuneOffsetMap(content)
 		onDirective := xml2.WithDirectiveHandler(func(directive xml.Directive) bool {
 			offset += len(directive)
 			if utils.MatchAnyOfSubString(string(directive), "dtd/mybatis-", "mybatis.org") {
@@ -233,14 +232,30 @@ var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 			if query == nil {
 				return
 			}
-			for _, match := range mybatisVarExtractor.FindAllStringSubmatchIndex(string(data), -1) {
-				start, end := match[2], match[3]
-				variableName := string(data[start:end])
-				rng := editor.GetRangeByPosition(
-					editor.GetPositionByOffset(start+int(offset)),
-					editor.GetPositionByOffset(end+int(offset)),
-				)
-				query.AddCheckParam(variableName, rng)
+			safeStr := memedit.NewSafeString(string(data))
+			match, err := mybatisVarExtractor.FindRunesMatch(safeStr.Runes())
+			if err != nil {
+				return
+			}
+			runeIndex, ok := runeOffsetMap.ByteOffsetToRuneIndex(int(offset))
+			if !ok {
+				log.Warnf("mybatis-${...}: byteOffsetToRuneIndex error: %v", err)
+				return
+			}
+
+			for match != nil {
+				matchStart := match.Index + runeIndex
+				matchEnd := matchStart + match.Length
+				param := match.String()
+				startPos := editor.GetPositionByOffset(matchStart)
+				endPos := editor.GetPositionByOffset(matchEnd)
+				rng := editor.GetRangeByPosition(startPos, endPos)
+				query.AddCheckParam(param, rng)
+				match, err = mybatisVarExtractor.FindNextMatch(match)
+				if err != nil {
+					log.Warnf("mybatis-${...}: regex error: %v", err)
+					break
+				}
 			}
 			lo.ForEach(query.Check(), func(item sfvm.ValueOperator, index int) {
 				if utils.IsNil(item) {
@@ -255,4 +270,14 @@ var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 		return true, sfvm.NewValues(res), nil
 	}
 	return false, nil, nil
+}
+
+func byteOffsetToRuneIndex(byteOffset int, offsets []int) (int, bool) {
+	index := sort.Search(len(offsets), func(i int) bool {
+		return offsets[i] > byteOffset
+	})
+	if index == 0 {
+		return 0, false
+	}
+	return index - 1, true
 }

@@ -1,6 +1,7 @@
 package java
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -164,21 +165,89 @@ public interface UserMapper {
 			params := res.GetValues("params")
 
 			check := false
+			checkRng := false
 			params.Recursive(func(vo sfvm.ValueOperator) error {
 				if v, ok := vo.(*ssaapi.Value); ok {
 					for _, p := range v.Predecessors {
-						// p.Node.ShowWithRange()
+						p.Node.ShowWithRange()
 						rng := p.Node.GetRange()
 						// str := p.Node.StringWithSourceCode()
 						// log.Infof("str: %s", str)
 						if editor := rng.GetEditor(); editor != nil && editor.GetFilename() == "sqlmap.xml" {
 							check = true
 						}
+						if strings.Contains(p.Node.StringWithRange(), "22:63") {
+							checkRng = true
+						}
 					}
 				}
 				return nil
 			})
 			require.True(t, check)
+			require.True(t, checkRng, "mybatis 位置信息错误")
+			return nil
+		}, ssaapi.WithLanguage(consts.JAVA))
+	})
+
+	t.Run("test mybatis weak param range with chinese", func(t *testing.T) {
+		f := filesys.NewVirtualFs()
+		f.AddFile(`sqlmap.xml`, `<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.mycompany.myapp.UserMapper">
+    <resultMap id="UserResult" type="com.mycompany.myapp.User">
+        <id property="id" column="id" />
+        <result property="name" column="name" />
+        <result property="email" column="email" />
+    </resultMap>
+	<!--    这是一个带有中文的注释 -->
+    <select id="getUser" resultMap="UserResult">
+        SELECT * FROM User WHERE id = #{id}
+    </select>
+
+    <insert id="insertUser" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO User (name, email) VALUES (#{name}, #{email})
+    </insert>
+
+    <update id="updateUser">
+        UPDATE User SET name=#{name}, email=#{email} WHERE id=${id}
+    </update>
+
+    <delete id="deleteUser">
+        DELETE FROM User WHERE id=#{id}
+    </delete>
+</mapper>
+`)
+		f.AddFile("UserMapper.java", `package com.mycompany.myapp;
+public interface UserMapper {
+    User getUser(int id);
+    int insertUser(User user);
+    void updateUser(User user);
+    void deleteUser(int id);
+}
+`)
+		ssatest.CheckWithFS(f, t, func(programs ssaapi.Programs) error {
+			prog := programs[0]
+			res, err := prog.SyntaxFlowWithError(`<mybatisSink> as $params`)
+			require.NoError(t, err)
+			res.Show()
+			params := res.GetValues("params")
+
+			checkRng := true
+			params.Recursive(func(vo sfvm.ValueOperator) error {
+				if v, ok := vo.(*ssaapi.Value); ok {
+					for _, p := range v.Predecessors {
+						p.Node.ShowWithRange()
+						if strings.Contains(p.Node.StringWithRange(), "22:63") {
+							checkRng = true
+						}
+					}
+				}
+				return nil
+			})
+			require.True(t, checkRng, "mybatis 位置信息错误")
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
 	})

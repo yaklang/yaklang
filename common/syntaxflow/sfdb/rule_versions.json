@@ -854,8 +854,8 @@
   {
     "rule_id": "5323c275-713f-4b22-a1cc-d22db1655fb2",
     "rule_name": "找到 MyBatis/iBatis XML Mapper 不安全(${...})参数到 Springframework 可达路径",
-    "hash": "7d963a61da45767abba0e79debaf7c966b93e8310b87c0ab2d84d16d42116a5f",
-    "version": "20250516.0001"
+    "hash": "03b979a7f812e7226de98cd8b811b9be493738c21d03949ae472ecb21143bffa",
+    "version": "20250523.0001"
   },
   {
     "rule_id": "cbf59495-e46c-45aa-9a10-e7c90559a17c",
