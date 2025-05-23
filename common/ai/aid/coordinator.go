@@ -167,27 +167,29 @@ func (c *Coordinator) Run() error {
 	*/
 	if c.config.resultHandler != nil {
 		c.config.resultHandler(c.config)
-		return nil
+	} else if c.config.generateReport {
+		c.config.EmitInfo("start to generate report or result")
+		prompt, err := c.generateReport()
+		if err != nil {
+			c.config.EmitError("generate report failed: %v", err)
+			return utils.Error("coordinator: generate report failed")
+		}
+		aiRsp, err := c.callAI(NewAIRequest(prompt))
+		if err != nil {
+			c.config.EmitError("AICallback failed: %v", err)
+			return utils.Errorf("coordinator: AICallback failed: %v", err)
+		}
+		output, err := io.ReadAll(aiRsp.GetOutputStreamReader("result", false, c.config))
+		if err != nil {
+			c.config.EmitError("read AICallback response failed: %v", err)
+			return utils.Errorf("coordinator: read AICallback response failed: %v", err)
+		}
+		c.config.EmitStructured("result", map[string]any{
+			"data": string(output),
+		})
 	}
-
-	c.config.EmitInfo("start to generate report or result")
-	prompt, err := c.generateReport()
-	if err != nil {
-		c.config.EmitError("generate report failed: %v", err)
-		return utils.Error("coordinator: generate report failed")
-	}
-	aiRsp, err := c.callAI(NewAIRequest(prompt))
-	if err != nil {
-		c.config.EmitError("AICallback failed: %v", err)
-		return utils.Errorf("coordinator: AICallback failed: %v", err)
-	}
-	output, err := io.ReadAll(aiRsp.GetOutputStreamReader("result", false, c.config))
-	if err != nil {
-		c.config.EmitError("read AICallback response failed: %v", err)
-		return utils.Errorf("coordinator: read AICallback response failed: %v", err)
-	}
-	c.config.EmitStructured("result", map[string]any{
-		"data": string(output),
-	})
+	// maybe need special type to tell user run finished,just wait db insert?
+	c.config.EmitInfo("coordinator run finished")
+	c.config.Wait()
 	return nil
 }
