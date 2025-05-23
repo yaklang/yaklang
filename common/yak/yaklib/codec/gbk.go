@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"reflect"
 	"unicode"
 	"unicode/utf8"
 
@@ -178,6 +179,81 @@ func UTF8SafeEscape(i any) string {
 		res.WriteRune(runeWord)
 	}
 	return res.String()
+}
+
+func StringUtf8SafeEscape(str string) string {
+	if str == "" || utf8.ValidString(str) {
+		return str
+	}
+	return UTF8SafeEscape(str)
+}
+
+func StringArrayUtf8SafeEscape(strArray []string) []string {
+	for i := 0; i < len(strArray); i++ {
+		strArray[i] = StringUtf8SafeEscape(strArray[i])
+	}
+	return strArray
+}
+
+// SanitizeUTF8 escapes invalid UTF-8 characters in a struct or slice.
+func SanitizeUTF8(v interface{}) error {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Ptr || rv.IsNil() {
+		return fmt.Errorf("v is nil")
+	}
+	return sanitizeRecursive(rv.Elem())
+}
+
+func sanitizeRecursive(val reflect.Value) error {
+	switch val.Kind() {
+	case reflect.Ptr:
+		if !val.IsNil() {
+			return sanitizeRecursive(val.Elem())
+		}
+	case reflect.Interface:
+		if !val.IsNil() {
+			return sanitizeRecursive(val.Elem())
+		}
+	case reflect.Struct:
+		for i := 0; i < val.NumField(); i++ {
+			if err := sanitizeRecursive(val.Field(i)); err != nil {
+				return err
+			}
+		}
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < val.Len(); i++ {
+			if err := sanitizeRecursive(val.Index(i)); err != nil {
+				return err
+			}
+		}
+	case reflect.Map:
+		for _, key := range val.MapKeys() {
+			originalKey := reflect.New(key.Type()).Elem()
+			originalKey.Set(key)
+			if err := sanitizeRecursive(originalKey); err != nil {
+				return err
+			}
+			value := val.MapIndex(key)
+			originalValue := reflect.New(value.Type()).Elem()
+			originalValue.Set(value)
+			if err := sanitizeRecursive(originalValue); err != nil {
+				return err
+			}
+			val.SetMapIndex(key, reflect.Value{})
+			val.SetMapIndex(originalKey, originalValue)
+		}
+	case reflect.String:
+		if val.CanSet() {
+			str := val.String()
+			if !utf8.ValidString(str) {
+				cleaned := UTF8SafeEscape(str)
+				val.SetString(cleaned)
+			}
+		}
+	default:
+
+	}
+	return nil
 }
 
 func IsUtf8(data []byte) bool {
