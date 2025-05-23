@@ -107,13 +107,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	}()
 
 	var mServer *crep.MITMServer
-
-	feedbacker := yak.YakitCallerIf(func(result *ypb.ExecResult) error {
-		return stream.Send(&ypb.MITMResponse{Message: result, HaveMessage: true})
-	})
-
-	feedbackToUser := feedbackFactory(s.GetProjectDatabase(), feedbacker, false, "")
-	send := func(rsp *ypb.MITMResponse) (sendError error) {
+	streamCtx, cancel := context.WithCancel(stream.Context())
+	defer cancel()
+	mitmSendResp := func(rsp *ypb.MITMResponse) (sendError error) {
 		defer func() {
 			if err := recover(); err != nil {
 				rspRaw, _ := json.Marshal(rsp)
@@ -122,9 +118,21 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 		}()
 
-		sendError = stream.Send(rsp)
+		sendError = stream.Send(safeUTF8MITMResp(rsp))
 		return
 	}
+	mitmSendRespLogged := func(rsp *ypb.MITMResponse) {
+		err := mitmSendResp(rsp)
+		if err != nil {
+			log.Errorf("send error: %s", err)
+		}
+	}
+
+	execFeedback := yak.YakitCallerIf(func(result *ypb.ExecResult) error {
+		return mitmSendResp(&ypb.MITMResponse{Message: result, HaveMessage: true})
+	})
+	feedbackToUser := feedbackFactory(s.GetProjectDatabase(), execFeedback, false, "")
+
 	getPlainRequestBytes := func(req *http.Request) []byte {
 		var plainRequest []byte
 		if httpctx.GetRequestIsModified(req) {
@@ -242,10 +250,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 	addr := utils.HostPort(host, port)
 	log.Infof("start to listening mitm for %v", addr)
-
-	ctx, cancel := context.WithCancel(stream.Context())
-	defer cancel()
-
 	log.Infof("start to create mitm server instance for %v", addr)
 
 	// 创建一个劫持流用来控制流程
@@ -295,7 +299,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	})
 
 	recoverFilterAndReplacerSend := func() {
-		send(&ypb.MITMResponse{
+		mitmSendRespLogged(&ypb.MITMResponse{
 			JustFilter:          true,
 			FilterData:          filterManager.Data,
 			JustContentReplacer: true,
@@ -313,7 +317,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	if err != nil {
 		return utils.Errorf("create mitm plugin manager failed: %s", err)
 	}
-	mitmPluginCaller.SetFeedback(feedbacker)
+	mitmPluginCaller.SetFeedback(execFeedback)
 	mitmPluginCaller.SetDividedContext(true)
 	mitmPluginCaller.SetConcurrent(20)
 	mitmPluginCaller.SetLoadPluginTimeout(10)
@@ -323,10 +327,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	}
 
 	cacheDebounce, _ := lo.NewDebounce(1*time.Second, func() {
-		stream.Send(&ypb.MITMResponse{
+		err := mitmSendResp(&ypb.MITMResponse{
 			HaveNotification:    true,
 			NotificationContent: []byte("MITM 插件去重缓存已重置"),
 		})
+		log.Errorf("send reset filter cache failed: %s", err)
 	})
 
 	clearPluginHTTPFlowCache := func() {
@@ -381,7 +386,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		defer close(autoForwardCh)
 		for {
 			select {
-			case <-ctx.Done():
+			case <-streamCtx.Done():
 				return
 			case <-autoForwardCh:
 			}
@@ -403,7 +408,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 			if reqInstance.GetSetResetFilter() {
 				filterManager.Recover()
-				send(&ypb.MITMResponse{
+				mitmSendRespLogged(&ypb.MITMResponse{
 					JustFilter: true,
 					FilterData: filterManager.Data,
 				})
@@ -431,7 +436,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					var plugins []string
 					if len(reqInstance.GetInitPluginNames()) > 200 && false {
 						plugins = reqInstance.GetInitPluginNames()[:200]
-						stream.Send(&ypb.MITMResponse{HaveNotification: true, NotificationContent: []byte(
+						mitmSendRespLogged(&ypb.MITMResponse{HaveNotification: true, NotificationContent: []byte(
 							"批量加载插件受限，最多一次性加载200个插件",
 						)})
 					} else {
@@ -439,7 +444,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					}
 					var failedPlugins []string // 失败插件
 					var loadedPlugins []string
-					stream.Send(&ypb.MITMResponse{HaveLoadingSetter: true, LoadingFlag: true})
+					mitmSendRespLogged(&ypb.MITMResponse{HaveLoadingSetter: true, LoadingFlag: true})
 					swg := utils.NewSizedWaitGroup(50)
 					wg := &sync.WaitGroup{}
 					successScriptNameChan := make(chan string)
@@ -464,7 +469,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 						go func() {
 							defer swg.Done()
 							err := mitmPluginCaller.LoadPluginEx(
-								ctx,
+								streamCtx,
 								script, reqInstance.GetYakScriptParams()...,
 							)
 							if err != nil {
@@ -480,8 +485,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					close(failedScriptNameChan)
 					wg.Wait()
 					duration := time.Now().Sub(startTime).Seconds()
-					stream.Send(&ypb.MITMResponse{HaveLoadingSetter: true, LoadingFlag: false})
-					stream.Send(&ypb.MITMResponse{HaveNotification: true, NotificationContent: []byte(fmt.Sprintf(
+					mitmSendRespLogged(&ypb.MITMResponse{HaveLoadingSetter: true, LoadingFlag: false})
+					mitmSendRespLogged(&ypb.MITMResponse{HaveNotification: true, NotificationContent: []byte(fmt.Sprintf(
 						"初始化加载插件完成，加载成功【%v】个，失败【%v】个, 共耗时 %f 秒。", len(loadedPlugins), len(failedPlugins), duration,
 					))})
 				}
@@ -499,7 +504,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			if reqInstance.RemoveHook {
 				clearPluginHTTPFlowCache()
 				mitmPluginCaller.GetNativeCaller().Remove(reqInstance.GetRemoveHookParams())
-				_ = stream.Send(&ypb.MITMResponse{
+				mitmSendRespLogged(&ypb.MITMResponse{
 					GetCurrentHook: true,
 					Hooks:          mitmPluginCaller.GetNativeCaller().GetCurrentHooksGRPCModel(),
 				})
@@ -527,8 +532,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				if script != nil && (script.Type == "mitm" || script.Type == "port-scan") {
 					log.Infof("start to load yakScript[%v]: %v 's capabilities", script.ID, script.ScriptName)
 					// appendCallers(script.Content, script.ScriptName, reqInstance.YakScriptParams)
-					ctx := stream.Context()
-					err = mitmPluginCaller.LoadPluginEx(ctx, script, reqInstance.GetYakScriptParams()...)
+					err = mitmPluginCaller.LoadPluginEx(streamCtx, script, reqInstance.GetYakScriptParams()...)
 					if err != nil {
 						//_ = stream.Send(&ypb.MITMResponse{
 						//	HaveNotification:    true,
@@ -540,7 +544,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 						}
 						log.Error(err)
 					}
-					_ = stream.Send(&ypb.MITMResponse{
+					mitmSendRespLogged(&ypb.MITMResponse{
 						GetCurrentHook: true,
 						Hooks:          mitmPluginCaller.GetNativeCaller().GetCurrentHooksGRPCModel(),
 					})
@@ -550,8 +554,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				if script == nil && reqInstance.GetYakScriptContent() != "" {
 					hotPatchScript := reqInstance.GetYakScriptContent()
 					log.Info("start to load yakScriptContent content")
-					err := mitmPluginCaller.LoadHotPatch(stream.Context(), reqInstance.GetYakScriptParams(), hotPatchScript)
-					_ = stream.Send(&ypb.MITMResponse{
+					err := mitmPluginCaller.LoadHotPatch(streamCtx, reqInstance.GetYakScriptParams(), hotPatchScript)
+					mitmSendRespLogged(&ypb.MITMResponse{
 						GetCurrentHook: true,
 						Hooks:          mitmPluginCaller.GetNativeCaller().GetCurrentHooksGRPCModel(),
 					})
@@ -571,7 +575,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 			// 获取当前已经启用的插件
 			if reqInstance.GetCurrentHook {
-				_ = stream.Send(&ypb.MITMResponse{
+				mitmSendRespLogged(&ypb.MITMResponse{
 					GetCurrentHook: true,
 					Hooks:          mitmPluginCaller.GetNativeCaller().GetCurrentHooksGRPCModel(),
 				})
@@ -720,7 +724,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			IsWebsocket: true,
 		}
 
-		err = send(feedbackRspIns)
+		err = mitmSendResp(feedbackRspIns)
 		if err != nil {
 			log.Errorf("send response failed: %s", err)
 			return raw
@@ -735,8 +739,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			// 如果出现了问题，丢失上下文，可以通过 recover 来恢复
 			if reqInstance.GetRecover() {
 				log.Infof("retry recover mitm session")
-				send(feedbackRspIns)
-				send(&ypb.MITMResponse{
+				mitmSendRespLogged(feedbackRspIns)
+				mitmSendRespLogged(&ypb.MITMResponse{
 					JustFilter:          true,
 					FilterData:          filterManager.Data,
 					JustContentReplacer: true,
@@ -912,7 +916,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			RemoteAddr:  remoteAddr,
 			TraceInfo:   model.ToLowhttpTraceInfoGRPCModel(traceInfo),
 		}
-		err = send(feedbackRspIns)
+		err = mitmSendResp(feedbackRspIns)
 		if err != nil {
 			log.Errorf("send response failed: %s", err)
 			return rsp
@@ -931,7 +935,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			// 如果出现了问题，丢失上下文，可以通过 recover 来恢复
 			if reqInstance.GetRecover() {
 				log.Infof("retry recover mitm session")
-				send(feedbackRspIns)
+				mitmSendRespLogged(feedbackRspIns)
 				recoverFilterAndReplacerSend()
 				continue
 			}
@@ -1044,12 +1048,12 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		counter := time.Now().UnixNano()
 		select {
 		case hijackingStream <- counter:
-		case <-ctx.Done():
+		case <-streamCtx.Done():
 			return raw
 		}
 
 		select {
-		case <-stream.Context().Done():
+		case <-streamCtx.Done():
 			return raw
 		case id, ok := <-hijackingStream:
 			if !ok {
@@ -1069,7 +1073,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					IsWebsocket:         true,
 					RemoteAddr:          httpctx.GetRemoteAddr(req),
 				}
-				err = send(feedbackOrigin)
+				err = mitmSendResp(feedbackOrigin)
 				if err != nil {
 					log.Errorf("send ws to mitm client failed: %s", err)
 					return raw
@@ -1083,7 +1087,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				}
 
 				if reqInstance.GetRecover() {
-					send(feedbackOrigin)
+					mitmSendRespLogged(feedbackOrigin)
 				}
 
 				// 如果 ID 对不上，返回来的是旧的，已经不需要处理的 ID，则重新接受等待新的
@@ -1285,12 +1289,12 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		counter := time.Now().UnixNano()
 		select {
 		case hijackingStream <- counter:
-		case <-ctx.Done():
+		case <-streamCtx.Done():
 			return req
 		}
 
 		select {
-		case <-stream.Context().Done():
+		case <-streamCtx.Done():
 			return req
 		case id, ok := <-hijackingStream:
 			// channel 可以保证线程安全
@@ -1315,7 +1319,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					feedbackOrigin.Request = lowhttp.ConvertHTTPRequestToFuzzTag(fixReq)
 				}
 
-				err = send(feedbackOrigin)
+				err = mitmSendResp(feedbackOrigin)
 				if err != nil {
 					log.Errorf("send to mitm client failed: %s", err)
 					return req
@@ -1331,7 +1335,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				// 如果出现了问题，丢失上下文，可以通过 recover 来恢复
 				if reqInstance.GetRecover() {
 					log.Infof("retry recover mitm session")
-					send(feedbackOrigin)
+					mitmSendRespLogged(feedbackOrigin)
 					continue
 				}
 
@@ -1583,7 +1587,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		var needUpdate bool
-		timeoutCtx, timeCancel := context.WithTimeout(ctx, 300*time.Millisecond)
+		timeoutCtx, timeCancel := context.WithTimeout(streamCtx, 300*time.Millisecond)
 		defer timeCancel()
 		select {
 		case <-colorCh:
@@ -1672,7 +1676,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 	log.Infof("start serve mitm server for %s", addr)
 	// err = mServer.Run(ctx)
-	err = mServer.ServeWithListenedCallback(ctx, utils.HostPort(host, port), func() {
+	err = mServer.ServeWithListenedCallback(streamCtx, utils.HostPort(host, port), func() {
 		feedbackToUser("MITM 服务器已启动 / starting mitm server")
 	})
 	if err != nil {
