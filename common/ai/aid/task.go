@@ -82,10 +82,12 @@ func (t aiTask) MarshalJSON() ([]byte, error) {
 
 	// 创建一个不包含AICallback的结构体
 	return json.Marshal(struct {
+		Index    string    `json:"index"`
 		Name     string    `json:"name"`
 		Goal     string    `json:"goal"`
 		Subtasks []*aiTask `json:"subtasks,omitempty"`
 	}{
+		Index:    t.Index,
 		Name:     t.Name,
 		Goal:     t.Goal,
 		Subtasks: t.Subtasks,
@@ -96,6 +98,7 @@ func (t aiTask) MarshalJSON() ([]byte, error) {
 func (t *aiTask) UnmarshalJSON(data []byte) error {
 	// 创建一个临时结构体，不包含AICallback
 	aux := struct {
+		Index    string    `json:"index"`
 		Name     string    `json:"name"`
 		Goal     string    `json:"goal"`
 		Subtasks []*aiTask `json:"subtasks,omitempty"`
@@ -105,6 +108,7 @@ func (t *aiTask) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	t.Index = aux.Index
 	t.Name = aux.Name
 	t.Goal = aux.Goal
 	t.Subtasks = aux.Subtasks

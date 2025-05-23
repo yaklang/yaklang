@@ -346,8 +346,9 @@ func (r *Config) EmitPushTask(task *aiTask) {
 	r.EmitStructured("system", map[string]any{
 		"type": "push_task",
 		"task": map[string]any{
-			"name": task.Name,
-			"goal": task.Goal,
+			"index": task.Index,
+			"name":  task.Name,
+			"goal":  task.Goal,
 		},
 	})
 }
@@ -356,8 +357,9 @@ func (r *Config) EmitPopTask(task *aiTask) {
 	r.EmitStructured("system", map[string]any{
 		"type": "pop_task",
 		"task": map[string]any{
-			"name": task.Name,
-			"goal": task.Goal,
+			"index": task.Index,
+			"name":  task.Name,
+			"goal":  task.Goal,
 		},
 	})
 }
@@ -374,6 +376,7 @@ func (r *Config) EmitUpdateTaskStatus(task *aiTask) {
 	r.EmitStructured("system", map[string]any{
 		"type": "update_task_status",
 		"task": map[string]any{
+			"index":        task.Index,
 			"name":         task.Name,
 			"goal":         task.Goal,
 			"summary":      task.ShortSummary,
