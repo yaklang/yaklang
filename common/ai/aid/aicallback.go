@@ -98,7 +98,7 @@ func (a *AIResponse) Debug(i ...bool) {
 	a.enableDebug = i[0]
 }
 
-func (c *Config) teeAIResponse(src *AIResponse, onFirstByte func(), onClose func(teeResponse *AIResponse)) *AIResponse {
+func (c *Config) teeAIResponse(src *AIResponse, onFirstByte func(teeResp *AIResponse), onClose func()) *AIResponse {
 	// 创建第一个响应对象
 	first := c.NewAIResponse()
 	first.SetTaskIndex(src.GetTaskIndex())
@@ -113,15 +113,12 @@ func (c *Config) teeAIResponse(src *AIResponse, onFirstByte func(), onClose func
 	secondReasonReader, secondReasonWriter := utils.NewBufPipe(nil)
 	secondOutputReader, secondOutputWriter := utils.NewBufPipe(nil)
 
-	copyWg := new(sync.WaitGroup)
-	copyWg.Add(3)
 	// 获取原始响应的流读取器
-	reasonReader, outputReader := src.GetUnboundStreamReaderEx(onFirstByte, func() {
-		defer copyWg.Done()
-		if onClose != nil {
-			onClose(second)
+	reasonReader, outputReader := src.GetUnboundStreamReaderEx(func() {
+		if onFirstByte != nil {
+			onFirstByte(second)
 		}
-	}, nil)
+	}, onClose, nil)
 
 	// 使用等待组确保所有数据复制完成
 	wg := new(sync.WaitGroup)
@@ -154,6 +151,8 @@ func (c *Config) teeAIResponse(src *AIResponse, onFirstByte func(), onClose func
 		secondOutputWriter.Close()
 	}()
 
+	copyWg := new(sync.WaitGroup)
+	copyWg.Add(1)
 	go func() {
 		defer copyWg.Done()
 		first.EmitOutputStreamWithoutConsumption(firstReasonReader)
@@ -161,13 +160,10 @@ func (c *Config) teeAIResponse(src *AIResponse, onFirstByte func(), onClose func
 		first.Close()
 	}()
 
-	// 将流发送到第二个响应
-	go func() {
-		defer copyWg.Done()
-		second.EmitOutputStreamWithoutConsumption(secondReasonReader)
-		second.EmitOutputStreamWithoutConsumption(secondOutputReader)
-		second.Close()
-	}()
+	second.EmitOutputStreamWithoutConsumption(secondReasonReader)
+	second.EmitOutputStreamWithoutConsumption(secondOutputReader)
+	second.Close()
+	// 等待所有复制完成
 	copyWg.Wait()
 	return first
 }
