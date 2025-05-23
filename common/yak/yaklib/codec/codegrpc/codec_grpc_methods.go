@@ -604,7 +604,7 @@ func (flow *CodecExecFlow) TripleDESDecrypt(key string, keyType string, IV strin
 // CodecName = "RSA加密"
 // Desc = """RSA加密算法是一种非对称加密算法，在公开密钥加密和电子商业中被广泛使用。RSA是被研究得最广泛的公钥算法，从提出后经历了各种攻击的考验，逐渐为人们接受，普遍认为是目前最优秀的公钥方案之一。"""
 // Params = [
-// { Name = "pubKey", Type = "text", Required = true,Label = "pem公钥"},
+// { Name = "pubKey", Type = "text", Required = true,Label = "公钥"},
 // { Name = "encryptSchema", Type = "select",DefaultValue = "RSA-OAEP", Options = ["RSA-OAEP", "PKCS1v15"], Required = true, Label = "填充方式"},
 // { Name = "algorithm", Type = "select",DefaultValue = "SHA-256", Options = ["SHA-1", "SHA-256","SHA-384","SHA-512","MD5"], Required = true ,Label = "hash算法"}
 // ]
@@ -646,7 +646,7 @@ func (flow *CodecExecFlow) RSAEncrypt(pubKey string, encryptSchema string, algor
 // CodecName = "RSA解密"
 // Desc = """RSA加密算法是一种非对称加密算法，在公开密钥加密和电子商业中被广泛使用。RSA是被研究得最广泛的公钥算法，从提出后经历了各种攻击的考验，逐渐为人们接受，普遍认为是目前最优秀的公钥方案之一。"""
 // Params = [
-// { Name = "priKey", Type = "text", Required = true,Label = "pem私钥"},
+// { Name = "priKey", Type = "text", Required = true,Label = "私钥"},
 // { Name = "decryptSchema", Type = "select",DefaultValue = "RSA-OAEP", Options = ["RSA-OAEP", "PKCS1v15"], Required = true, Label = "填充方式"},
 // { Name = "algorithm", Type = "select",DefaultValue = "SHA-256", Options = ["SHA-1", "SHA-256","SHA-384","SHA-512","MD5"], Required = true ,Label = "hash算法"}
 // ]
