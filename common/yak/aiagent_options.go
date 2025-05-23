@@ -112,6 +112,7 @@ var (
 	WithEventHandler                 = aid.WithEventHandler
 	WithEventInputChan               = aid.WithEventInputChan
 	WithDebug                        = aid.WithDebug
+	WithGenerateReport               = aid.WithGenerateReport
 	WithResultHandler                = aid.WithResultHandler
 	WithAppendPersistentMemory       = aid.WithAppendPersistentMemory
 	WithTimeLineLimit                = aid.WithTimeLineLimit

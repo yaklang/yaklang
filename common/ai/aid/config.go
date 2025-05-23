@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai"
 	"math/rand/v2"
 	"sync"
 	"sync/atomic"
@@ -263,6 +264,17 @@ func initDefaultTools(c *Config) error { // set config default tools
 	return nil
 }
 
+func initDefaultAICallback(c *Config) error { // set config default tools
+	defaultAICallback := AIChatToAICallbackType(ai.Chat)
+	if defaultAICallback == nil {
+		return nil
+	}
+	if err := WithAICallback(defaultAICallback)(c); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (c *Config) loadToolsViaOptions() error {
 	if c.allowRequireForUserInteract {
 		userPromptTool, err := c.CreateRequireUserInteract()
@@ -326,6 +338,11 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 	if err := initDefaultTools(c); err != nil {
 		log.Errorf("init default tools: %v", err)
 	}
+
+	if err := initDefaultAICallback(c); err != nil {
+		log.Errorf("init default ai callback: %v", err)
+	}
+
 	return c
 }
 
@@ -751,6 +768,16 @@ func WithPromptHook(c func(string) string) Option {
 		defer config.m.Unlock()
 
 		config.promptHook = c
+		return nil
+	}
+}
+
+func WithGenerateReport(b bool) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+
+		config.generateReport = b
 		return nil
 	}
 }
