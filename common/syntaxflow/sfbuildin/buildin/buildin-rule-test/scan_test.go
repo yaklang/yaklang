@@ -55,7 +55,8 @@ func TestVerify_DEBUG(t *testing.T) {
 	yakit.InitialDatabase()
 	err := sfbuildin.SyncEmbedRule()
 	require.NoError(t, err)
-	ruleName := "不当的错误处理：避免在 Finally 块中抛出异常"
+	ruleName := "golang 反射型跨站脚本攻击(gobee)"
+	// ruleName := "golang 服务器端请求伪造(beego)"
 
 	rule, err := sfdb.GetRulePure(ruleName)
 	if err != nil {

@@ -1,7 +1,9 @@
 desc(
 	title: "golang Reflected XSS(template)"
-	type: audit
+	title_zh: "golang 反射型跨站脚本攻击(template)",
+	type: vuln
 	severity: high
+	risk: xss
 	desc: <<<TEXT
 反射型跨站脚本攻击（Reflected XSS）是一种常见的 Web 安全漏洞，攻击者通过构造包含恶意脚本的 URL，诱使受害者点击该链接。当受害者浏览器加载该页面时，恶意脚本会被执行，从而允许攻击者窃取受害者的敏感信息或执行其他恶意操作。
 
@@ -19,6 +21,9 @@ $template.New as $new;
 $new().Parse() -> as $param
 $param.Execute(* as $target) 
 $target #{include: `*?{have: 'template.HTML'}`}-> as $high;
+
+template.HTML(* #-> as $source)
+$source?{have: '.GetSession'} as $high
 
 alert $high for {
     title: 'Reflected XSS detected',

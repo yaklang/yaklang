@@ -2,7 +2,7 @@ desc(
 	title: "check audit the usage of the os package"
 	type: audit
 	level: info
-	lib: 'golang-os-sink'
+	lib: 'golang-os-file'
 	desc: <<<TEXT
 此规则旨在审计Go语言代码中`os`包的使用情况。
 TEXT
