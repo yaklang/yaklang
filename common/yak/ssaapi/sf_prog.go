@@ -5,22 +5,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/jsonpath"
-	"regexp"
-	"strings"
-
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"regexp"
 
-	"github.com/antchfx/xpath"
 	"github.com/gobwas/glob"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/htmlquery"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 var _ sfvm.ValueOperator = &Program{}
@@ -290,48 +286,28 @@ func NewFileFilter(file, matchType string, match []string) *FileFilter {
 				return res
 			})
 		case "xpath":
-
-			xexp, err := xpath.Compile(rule)
+			matcher, err := NewFileXPathMatcher(rule)
 			if err != nil {
-				log.Errorf("xpath compile error: %s", err)
+				log.Errorf("xpath match error: %s", err)
 				continue
 			}
-
 			matchContent = append(matchContent, func(data string) []Index {
-				top, err := htmlquery.Parse(strings.NewReader(data))
+				results, err := matcher.Match(data)
 				if err != nil {
-					log.Errorf("htmlquery parse error: %s", err)
+					log.Errorf("xpath match error: %s", err)
 					return nil
 				}
-				t := xexp.Evaluate(htmlquery.CreateXPathNavigator(top))
 				res := make([]Index, 0)
-				switch t := t.(type) {
-				case *xpath.NodeIterator:
-					for t.MoveNext() {
-						nav := t.Current().(*htmlquery.NodeNavigator)
-						node := nav.Current()
-						str := htmlquery.InnerText(node)
-						_ = str
-						index := strings.Index(data, str)
-						if index == -1 {
-							log.Errorf("xpath match error: %s", err)
-							return nil
-						}
-						res = append(res, Index{Start: index, End: index + len(str)})
+				for _, result := range results {
+					// TODO:使用string.Index会导致遇到重复内容位置会不正确;
+					// 此外，如果遇到中文，位置也会不正确。
+					substrings := utils.IndexAllSubstrings(data, result)
+					for _, subString := range substrings {
+						res = append(res, Index{Start: subString[1], End: subString[1] + len(result)})
 					}
-				default:
-					str := codec.AnyToString(t)
-					_ = str
-					index := strings.Index(data, str)
-					if index == -1 {
-						log.Errorf("xpath match error: %s", err)
-						return nil
-					}
-					res = append(res, Index{Start: index, End: index + len(str)})
 				}
 				return res
 			})
-
 		case "jsonpath": // json path
 			jsonFilter, err := jsonpath.Prepare(rule)
 			if err != nil {
@@ -359,15 +335,10 @@ func NewFileFilter(file, matchType string, match []string) *FileFilter {
 
 				res := make([]Index, 0)
 				for _, searchResult := range searchResults {
-					strResult := utils.InterfaceToString(searchResult)
-					reg := regexp_utils.NewYakRegexpUtils(strResult)
-					indexs, err := reg.FindAllSubmatchIndex(data)
-					if err != nil {
-						log.Errorf("regexp match error: %s", err)
-						continue
-					}
-					for _, index := range indexs {
-						res = append(res, Index{Start: index[0], End: index[1]})
+					str := codec.AnyToString(searchResult)
+					substrings := utils.IndexAllSubstrings(data, str)
+					for _, subString := range substrings {
+						res = append(res, Index{Start: subString[1], End: subString[1] + len(str)})
 					}
 				}
 
