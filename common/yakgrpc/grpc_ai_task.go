@@ -123,7 +123,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 
 	forgeName := startParams.GetForgeName()
 	if forgeName != "" {
-		res, err := yak.ExecuteForge(forgeName, params, buildAIAgentOption(baseCtx, startParams.GetTaskID(), aidOption...)...)
+		res, err := yak.ExecuteForge(forgeName, params, buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), aidOption...)...)
 		if err != nil {
 			log.Errorf("run ai forge[%s] failed: %v", forgeName, err)
 			return err
@@ -145,12 +145,12 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	return nil
 }
 
-func buildAIAgentOption(ctx context.Context, taskID string, extendOption ...aid.Option) []any {
+func buildAIAgentOption(ctx context.Context, CoordinatorId string, extendOption ...aid.Option) []any {
 	agentOption := []any{
 		yak.WithContext(ctx),
 	}
-	if taskID != "" {
-		agentOption = append(agentOption, yak.WithRuntimeID(taskID))
+	if CoordinatorId != "" {
+		agentOption = append(agentOption, yak.WithCoordinatorId(CoordinatorId))
 	}
 
 	if len(extendOption) > 0 {
@@ -211,8 +211,8 @@ func buildAIDOption(startParams *ypb.AIStartParams) []aid.Option {
 		aidOption = append(aidOption, aid.WithDisableToolsName(startParams.GetExcludeToolNames()...))
 	}
 
-	if startParams.GetTaskID() != "" {
-		aidOption = append(aidOption, aid.WithTaskID(startParams.GetTaskID()))
+	if startParams.GetCoordinatorId() != "" {
+		aidOption = append(aidOption, aid.WithCoordinatorId(startParams.GetCoordinatorId()))
 	}
 
 	return aidOption

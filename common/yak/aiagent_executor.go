@@ -25,8 +25,8 @@ var DEFAULT_FORGE_HANDLE_NAME = "__DEFAULT_FORGE_HANDLE__"
 func ExecuteForge(forgeName string, i any, iopts ...any) (any, error) {
 	ag := NewAgent(iopts...)
 	ag.ForgeName = forgeName
-	if ag.RuntimeID == "" {
-		ag.RuntimeID = uuid.NewString()
+	if ag.CoordinatorId == "" {
+		ag.CoordinatorId = uuid.NewString()
 	}
 
 	if ag.ctx == nil {
@@ -58,7 +58,7 @@ func ExecuteForge(forgeName string, i any, iopts ...any) (any, error) {
 		})
 		app := GetHookCliApp(makeArgs(ag.ctx, params))
 		BindYakitPluginContextToEngine(engine, CreateYakitPluginContext(
-			ag.RuntimeID,
+			ag.CoordinatorId,
 		).WithPluginName(
 			forgeName,
 		).WithContext(
@@ -96,8 +96,8 @@ func ExecuteForge(forgeName string, i any, iopts ...any) (any, error) {
 
 func (ag *Agent) AIDOptions() []aid.Option {
 	opts := make([]aid.Option, 0)
-	if ag.RuntimeID != "" {
-		opts = append(opts, aid.WithTaskID(ag.RuntimeID))
+	if ag.CoordinatorId != "" {
+		opts = append(opts, aid.WithCoordinatorId(ag.CoordinatorId))
 	}
 	opts = append(opts, ag.ExtendAIDOptions...)
 	return opts
