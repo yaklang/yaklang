@@ -10,16 +10,12 @@ TEXT
 	rule_id: "5323c275-713f-4b22-a1cc-d22db1655fb2"
 )
 
-
 <include('java-spring-mvc-param')> as $totalSource;
-<mybatisSink><getFunc>?{<name>?{!have: '.' && !have: '__ref__'}} as $interface;
-$interface<getPointer()> as $implMethod;
-$implMethod(*<slice(start=1)> #{
-    hook: `* & $totalSource as $source`,
-}->)
-$source?{<typeName>?{!have: Long && !have: Integer && !have: Boolean && !have: Double}} as $vuln
+<mybatisSink>#{
+    until: `* & $totalSource as $source`,
+}->
+$source?{<typeName>?{!any: Long,Integer, Boolean,Double}} as $vuln
 alert $vuln;
-
 
 desc(
 	language: java,
