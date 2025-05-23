@@ -4,6 +4,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"strings"
 	"testing"
 )
 
@@ -294,20 +295,40 @@ lk7fnekIQODBiR6R8z9GTjZtAHptQ/4ffYXNpxlJAoGAe7aJgtwy0rcALZ39XOnC
 UaK7Wv7BJwlQyO08aKcgR9IrVXxpgmeFYXY5jg7qOE50ekUnHqsAneq1Rz+z6Bmk
 YGavRBwSFX1E+SjurtbCrFPT9KyGmJs6SQst8LRenetipAblazcEZ0LEstTKmWjI
 btVhZFTAOegonuyb8ybhGQg=`
-	mockInputPubKey := []string{pemPubKey, b64PemPubKey, b64DerPubKey}
-	mockInputPrivKey := []string{pemPriKey, b64PemPriKey, b64DerPrivKey}
 
+	rawDerPubKey, err := codec.DecodeBase64(strings.ReplaceAll(strings.TrimSpace(b64DerPubKey), "\n", ""))
+	require.NoError(t, err)
+	rawDerPrivKey, err := codec.DecodeBase64(strings.ReplaceAll(strings.TrimSpace(b64DerPrivKey), "\n", ""))
+	require.NoError(t, err)
+
+	mockInputPubKey := []any{pemPubKey, b64PemPubKey, b64DerPubKey, rawDerPubKey}
+	mockInputPrivKey := []any{pemPriKey, b64PemPriKey, b64DerPrivKey, rawDerPrivKey}
+
+	var pubBytes []byte
+	var privBytes []byte
 	for _, pub := range mockInputPubKey {
 		for _, priv := range mockInputPrivKey {
-			rsaCiphertext, err := PkcsOAEPEncrypt([]byte(pub), []byte("go0p"))
+			if val, ok := pub.(string); ok {
+				pubBytes = []byte(val)
+			}
+			if val, ok := pub.([]byte); ok {
+				pubBytes = val
+			}
+			if val, ok := priv.(string); ok {
+				privBytes = []byte(val)
+			}
+			if val, ok := priv.([]byte); ok {
+				privBytes = val
+			}
+			rsaCiphertext, err := PkcsOAEPEncrypt(pubBytes, []byte("go0p"))
 			require.NoError(t, err)
-			rsaPlaintext, err := PkcsOAEPDecrypt([]byte(priv), rsaCiphertext)
+			rsaPlaintext, err := PkcsOAEPDecrypt(privBytes, rsaCiphertext)
 			require.NoError(t, err)
 			require.Equal(t, []byte("go0p"), rsaPlaintext)
 
-			rsaCiphertext, err = Pkcs1v15Encrypt([]byte(pub), []byte("go0p"))
+			rsaCiphertext, err = Pkcs1v15Encrypt(pubBytes, []byte("go0p"))
 			require.NoError(t, err)
-			rsaPlaintext, err = Pkcs1v15Decrypt([]byte(priv), rsaCiphertext)
+			rsaPlaintext, err = Pkcs1v15Decrypt(privBytes, rsaCiphertext)
 			require.NoError(t, err)
 			require.Equal(t, []byte("go0p"), rsaPlaintext)
 		}
