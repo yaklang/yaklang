@@ -49,6 +49,7 @@ type Config struct {
 	cancel context.CancelFunc
 
 	startInputEventOnce sync.Once
+	wg                  sync.WaitGroup // sub task wait group
 
 	idSequence  int64
 	idGenerator func() int64
@@ -120,13 +121,29 @@ type Config struct {
 	resultHandler          func(*Config)
 	extendedActionCallback map[string]func(config *Config, action *Action)
 
-	promptHook func(string) string
+	promptHook     func(string) string
+	generateReport bool
 }
 
 func (c *Config) MakeInvokeParams() aitool.InvokeParams {
 	p := make(aitool.InvokeParams)
 	p["runtime_id"] = c.id
 	return p
+}
+
+func (c *Config) Add(delta int) {
+	c.wg.Add(delta)
+	return
+}
+
+func (c *Config) Done() {
+	c.wg.Done()
+	return
+}
+
+func (c *Config) Wait() {
+	c.wg.Wait()
+	return
 }
 
 func (c *Config) AcquireId() int64 {
