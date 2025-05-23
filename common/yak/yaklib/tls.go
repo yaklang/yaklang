@@ -55,6 +55,6 @@ var TlsExports = map[string]interface{}{
 	"Inspect":                  netx.TLSInspect,
 	"InspectForceHttp2":        netx.TLSInspectForceHttp2,
 	"InspectForceHttp1_1":      netx.TLSInspectForceHttp1_1,
-	"EncryptWithPkcs1v15":      tlsutils.PemPkcs1v15Encrypt,
-	"DecryptWithPkcs1v15":      tlsutils.PemPkcs1v15Decrypt,
+	"EncryptWithPkcs1v15":      tlsutils.Pkcs1v15Encrypt,
+	"DecryptWithPkcs1v15":      tlsutils.Pkcs1v15Decrypt,
 }

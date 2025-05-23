@@ -213,7 +213,7 @@ func (s *VulinServer) registerCryptoJS() {
 				_ = keyPlain
 				originSign := utils.MapGetString(params, "signature")
 				siginatureHmacHex := originSign
-				//siginatureHmacHex, err := tlsutils.PemPkcs1v15Decrypt(pri, []byte(originSignDecoded))
+				//siginatureHmacHex, err := tlsutils.Pkcs1v15Decrypt(pri, []byte(originSignDecoded))
 				//if err != nil {
 				//	Failed(writer, request, "signature decrypt failed: %v", err)
 				//	return
@@ -293,7 +293,7 @@ setTimeout(function(){
 					Failed(writer, request, "originSign decode hex failed: %v", err)
 					return
 				}
-				siginatureHmacHex, err := tlsutils.PemPkcs1v15Decrypt(pri, []byte(originSignDecoded))
+				siginatureHmacHex, err := tlsutils.Pkcs1v15Decrypt(pri, []byte(originSignDecoded))
 				if err != nil {
 					Failed(writer, request, "signature decrypt failed: %v", err)
 					return

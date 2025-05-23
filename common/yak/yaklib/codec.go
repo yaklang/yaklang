@@ -137,8 +137,8 @@ var CodecExports = map[string]interface{}{
 	"UnicodeEncode": codec.JsonUnicodeEncode,
 	"UnicodeDecode": codec.JsonUnicodeDecode,
 
-	"RSAEncryptWithPKCS1v15": tlsutils.PemPkcs1v15Encrypt,
-	"RSADecryptWithPKCS1v15": tlsutils.PemPkcs1v15Decrypt,
+	"RSAEncryptWithPKCS1v15": tlsutils.Pkcs1v15Encrypt,
+	"RSADecryptWithPKCS1v15": tlsutils.Pkcs1v15Decrypt,
 	"RSAEncryptWithOAEP":     tlsutils.PemPkcsOAEPEncrypt,
 	"RSADecryptWithOAEP":     tlsutils.PemPkcsOAEPDecrypt,
 
