@@ -47,20 +47,20 @@ func GetAllSFSupportLanguage() []string {
 }
 
 const (
-	SFR_SEVERITY_INFO     = "info"
-	SFR_SEVERITY_LOW      = "low"
-	SFR_SEVERITY_WARNING  = "middle"
-	SFR_SEVERITY_CRITICAL = "critical"
-	SFR_SEVERITY_HIGH     = "high"
+	SFR_SEVERITY_INFO     SyntaxFlowSeverity = "info"
+	SFR_SEVERITY_LOW      SyntaxFlowSeverity = "low"
+	SFR_SEVERITY_WARNING  SyntaxFlowSeverity = "middle"
+	SFR_SEVERITY_CRITICAL SyntaxFlowSeverity = "critical"
+	SFR_SEVERITY_HIGH     SyntaxFlowSeverity = "high"
 )
 
 func GetAllSFSeverityTypes() []string {
 	return []string{
-		SFR_SEVERITY_INFO,
-		SFR_SEVERITY_LOW,
-		SFR_SEVERITY_WARNING,
-		SFR_SEVERITY_CRITICAL,
-		SFR_SEVERITY_HIGH,
+		string(SFR_SEVERITY_INFO),
+		string(SFR_SEVERITY_LOW),
+		string(SFR_SEVERITY_WARNING),
+		string(SFR_SEVERITY_CRITICAL),
+		string(SFR_SEVERITY_HIGH),
 	}
 }
 
@@ -151,6 +151,38 @@ type SyntaxFlowDescInfo struct {
 	CVE       string `json:"cve"`
 	RiskType  string
 	ExtraInfo map[string]string `json:"extra_info"`
+}
+
+func ToSyntaxFlowAlertDesc(message *ypb.AlertMessage) *SyntaxFlowDescInfo {
+	return &SyntaxFlowDescInfo{
+		Title:       message.Title,
+		TitleZh:     message.TitleZh,
+		Description: message.Description,
+		Solution:    message.Solution,
+		Tag:         message.Tag,
+		Severity:    SyntaxFlowSeverity(message.Severity),
+		Purpose:     SyntaxFlowRulePurposeType(message.Purpose),
+		OnlyMsg:     false,
+		Msg:         message.Msg,
+		CVE:         message.Cve,
+		RiskType:    message.RiskType,
+		ExtraInfo:   message.Extra,
+	}
+}
+func (s *SyntaxFlowDescInfo) ToYpbSyntaxFlowRuleDesc() *ypb.AlertMessage {
+	return &ypb.AlertMessage{
+		Title:       s.Title,
+		TitleZh:     s.TitleZh,
+		Description: s.Description,
+		Solution:    s.Solution,
+		Severity:    string(s.Severity),
+		Purpose:     string(s.Purpose),
+		Msg:         s.Msg,
+		Cve:         s.CVE,
+		RiskType:    s.RiskType,
+		Tag:         s.Tag,
+		Extra:       s.ExtraInfo,
+	}
 }
 
 func (info *SyntaxFlowDescInfo) String() string {
@@ -262,6 +294,10 @@ func (s *SyntaxFlowRule) ToGRPCModel() *ypb.SyntaxFlowRule {
 	for _, group := range s.Groups {
 		groupNames = append(groupNames, group.GroupName)
 	}
+	alertmsg := make(map[string]*ypb.AlertMessage)
+	for name, info := range s.AlertDesc {
+		alertmsg[name] = info.ToYpbSyntaxFlowRuleDesc()
+	}
 	sfRule := &ypb.SyntaxFlowRule{
 		Id:            int64(s.ID),
 		IsBuildInRule: s.IsBuildInRule,
@@ -280,6 +316,7 @@ func (s *SyntaxFlowRule) ToGRPCModel() *ypb.SyntaxFlowRule {
 		Hash:          s.Hash,
 		Tag:           s.Tag,
 		GroupName:     groupNames,
+		AlertMsg:      alertmsg,
 	}
 	return sfRule
 }
