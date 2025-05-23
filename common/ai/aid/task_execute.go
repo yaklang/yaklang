@@ -25,7 +25,10 @@ func (t *aiTask) execute() error {
 	var action *Action
 	var directlyAnswer string
 	var directlyAnswerLong string
-	err = t.config.callAiTransaction(prompt, t.callAI, func(rsp *AIResponse) error {
+	err = t.config.callAiTransaction(prompt, func(request *AIRequest) (*AIResponse, error) {
+		request.SetTaskIndex(t.Index)
+		return t.callAI(request)
+	}, func(rsp *AIResponse) error {
 		responseBytes, err := io.ReadAll(rsp.GetOutputStreamReader("execute", false, t.config))
 		if err != nil {
 			return fmt.Errorf("error reading AI response: %w", err)
