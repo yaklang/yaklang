@@ -38,7 +38,7 @@ fileFilterContentMethod: Identifier '(' fileFilterContentMethodParam? ')'; // do
 fileFilterContentMethodParam:  fileFilterContentMethodParamItem lines? (',' lines? fileFilterContentMethodParamItem lines? )* ','? lines? ;
 fileFilterContentMethodParamItem: fileFilterContentMethodParamKey? fileFilterContentMethodParamValue;
 fileFilterContentMethodParamKey: Identifier ':';
-fileFilterContentMethodParamValue: nameFilter;
+fileFilterContentMethodParamValue: nameFilter | hereDoc;
 fileName:nameFilter (. nameFilter)*;
 
 filterStatement

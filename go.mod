@@ -15,7 +15,7 @@ require (
 	github.com/aliyun/aliyun-oss-go-sdk v2.2.7+incompatible
 	github.com/andybalholm/brotli v1.0.6
 	github.com/antchfx/xmlquery v1.3.1
-	github.com/antchfx/xpath v1.2.1
+	github.com/antchfx/xpath v1.3.2
 	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20220911224424-aa1f1f12a846
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
 	github.com/aymanbagabas/go-pty v0.2.2
