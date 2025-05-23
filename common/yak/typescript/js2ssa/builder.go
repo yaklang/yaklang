@@ -26,6 +26,9 @@ type builder struct {
 var Builder ssa.Builder = &SSABuilder{}
 
 func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
+	if b.PreHandler() {
+		return nil
+	}
 	jsAST, err := Frontend(src, force)
 	if err != nil {
 		return err

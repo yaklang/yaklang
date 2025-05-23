@@ -55,12 +55,19 @@ var comparisonBinOpTbl = map[ast.Kind]ssa.BinaryOpcode{
 
 // VisitLeftValueExpression 只接收左值
 func (b *builder) VisitLeftValueExpression(node *ast.Expression) *ssa.Variable {
+	if node == nil || b.IsStop() {
+		return nil
+	}
+
 	lval, _ := b.VisitExpression(node, true)
 	return lval
 }
 
 // VisitRightValueExpression 只接收右值
 func (b *builder) VisitRightValueExpression(node *ast.Expression) ssa.Value {
+	if node == nil || b.IsStop() {
+		return nil
+	}
 	_, rval := b.VisitExpression(node, false)
 	return rval
 }
