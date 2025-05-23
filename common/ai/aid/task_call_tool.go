@@ -71,7 +71,10 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 
 	var callToolParams = t.config.MakeInvokeParams()
 	// transaction for generate params
-	err = t.config.callAiTransaction(paramsPrompt, t.callAI, func(rsp *AIResponse) error {
+	err = t.config.callAiTransaction(paramsPrompt, func(request *AIRequest) (*AIResponse, error) {
+		request.SetTaskIndex(t.Index)
+		return t.callAI(request)
+	}, func(rsp *AIResponse) error {
 		callParamsString, _ := io.ReadAll(rsp.GetOutputStreamReader("call-tools", true, t.config))
 
 		// extract action
@@ -94,7 +97,7 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 	// 调用工具
 	stdoutBuf := bytes.NewBuffer(nil)
 	stderrBuf := bytes.NewBuffer(nil)
-	t.config.EmitToolCallStd(targetTool.Name, stdoutBuf, stderrBuf)
+	t.config.EmitToolCallStd(targetTool.Name, stdoutBuf, stderrBuf, t.Index)
 
 	// DANGER: 这个值永远不应该暴露给用户，只有内部工具才有资格设置它
 	if targetTool.NoNeedUserReview {
@@ -138,7 +141,10 @@ func (t *aiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitoo
 	}
 
 	var actionFinal string
-	err = t.config.callAiTransaction(decisionPrompt, t.callAI, func(continueResult *AIResponse) error {
+	err = t.config.callAiTransaction(decisionPrompt, func(request *AIRequest) (*AIResponse, error) {
+		request.SetTaskIndex(t.Index)
+		return t.callAI(request)
+	}, func(continueResult *AIResponse) error {
 		nextResponse, err := io.ReadAll(continueResult.GetOutputStreamReader("decision", true, t.config))
 		if err != nil {
 			err = utils.Errorf("error reading AI response: %v", err)

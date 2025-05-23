@@ -63,7 +63,6 @@ func (t *aiTask) handleToolUseReview(targetTools *aitool.Tool, param aitool.Invo
 		t.config.EmitInfo("tool usage is correct, continue")
 		// 继续执行现有任务
 		return targetTools, param, nil
-
 	default:
 		t.config.EmitError("unknown review suggestion: %s", suggestion)
 		return targetTools, param, utils.Errorf("unknown review suggestion: %s", suggestion)

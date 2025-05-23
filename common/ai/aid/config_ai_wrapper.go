@@ -40,6 +40,7 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 					time.Sleep(500 * time.Millisecond)
 					continue
 				}
+				rsp.SetTaskIndex(request.GetTaskIndex())
 				return rsp, err
 			}
 			return nil, utils.Errorf("ai request err with max retry: %v", err)
@@ -64,6 +65,7 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 			} else {
 				rsp = NewUnboundAIResponse()
 			}
+			rsp.SetTaskIndex(request.GetTaskIndex())
 			rspParams := aiddb.AiCheckPointGetResponseParams(ret)
 			rsp.EmitReasonStream(bytes.NewBufferString(rspParams.GetString("reason")))
 			rsp.EmitOutputStream(bytes.NewBufferString(rspParams.GetString("output")))
@@ -104,6 +106,7 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 				time.Sleep(500 * time.Millisecond)
 				continue
 			}
+			rsp.SetTaskIndex(request.GetTaskIndex())
 
 			var haveFirstByte = utils.NewBool(false)
 			onClose := func(tee *AIResponse) {

@@ -63,6 +63,9 @@ type Event struct {
 	Content     []byte
 
 	Timestamp int64
+
+	// task index
+	TaskIndex string
 }
 
 func (e *Event) GetInteractiveId() string {
@@ -124,6 +127,7 @@ type eventWriteProducer struct {
 	isSystem      bool
 	coordinatorId string
 	nodeId        string
+	taskIndex     string
 	handler       func(event *Event)
 	timeStamp     int64
 }
@@ -147,6 +151,7 @@ func (e *eventWriteProducer) Write(b []byte) (int, error) {
 		IsStream:      true,
 		StreamDelta:   utils.CopyBytes(b),
 		Timestamp:     e.timeStamp, // the event in same stream should have the same timestamp
+		TaskIndex:     e.taskIndex,
 	}
 	e.handler(event)
 	return len(b), nil
@@ -292,49 +297,53 @@ func (r *Config) EmitErrorWithName(name string, fmtlog string, items ...any) {
 	r.emitLogWithLevel("error", name, fmtlog, items...)
 }
 
-func (r *Config) EmitToolCallStd(toolName string, stdOut, stdErr *bytes.Buffer) {
+func (r *Config) EmitToolCallStd(toolName string, stdOut, stdErr *bytes.Buffer, taskIndex string) {
 	startTime := time.Now()
-	r.EmitStreamEvent(fmt.Sprintf("tool-%v-stdout", toolName), startTime, stdOut)
-	r.EmitStreamEvent(fmt.Sprintf("tool-%v-stderr", toolName), startTime, stdErr)
+	r.EmitStreamEvent(fmt.Sprintf("tool-%v-stdout", toolName), startTime, stdOut, taskIndex)
+	r.EmitStreamEvent(fmt.Sprintf("tool-%v-stderr", toolName), startTime, stdErr, taskIndex)
 }
 
-func (r *Config) EmitStreamEvent(nodeId string, startTime time.Time, reader io.Reader) {
+func (r *Config) EmitStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string) {
 	r.emitExStreamEvent(&streamEvent{
 		startTime: startTime,
 		isSystem:  false,
 		isReason:  false,
 		reader:    reader,
 		nodeId:    nodeId,
+		taskIndex: taskIndex,
 	})
 }
 
-func (r *Config) EmitSystemStreamEvent(nodeId string, startTime time.Time, reader io.Reader) {
+func (r *Config) EmitSystemStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string) {
 	r.emitExStreamEvent(&streamEvent{
 		startTime: startTime,
 		isSystem:  true,
 		isReason:  false,
 		reader:    reader,
 		nodeId:    nodeId,
+		taskIndex: taskIndex,
 	})
 }
 
-func (r *Config) EmitReasonStreamEvent(nodeId string, startTime time.Time, reader io.Reader) {
+func (r *Config) EmitReasonStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string) {
 	r.emitExStreamEvent(&streamEvent{
 		startTime: startTime,
 		isSystem:  false,
 		isReason:  true,
 		reader:    reader,
 		nodeId:    nodeId,
+		taskIndex: taskIndex,
 	})
 }
 
-func (r *Config) EmitSystemReasonStreamEvent(nodeId string, startTime time.Time, reader io.Reader) {
+func (r *Config) EmitSystemReasonStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string) {
 	r.emitExStreamEvent(&streamEvent{
 		startTime: startTime,
 		isSystem:  true,
 		isReason:  true,
 		reader:    reader,
 		nodeId:    nodeId,
+		taskIndex: taskIndex,
 	})
 }
 
@@ -417,6 +426,7 @@ type streamEvent struct {
 	isReason  bool
 	reader    io.Reader
 	nodeId    string
+	taskIndex string
 }
 
 func (r *Config) emitExStreamEvent(e *streamEvent) {
@@ -431,6 +441,7 @@ func (r *Config) emitExStreamEvent(e *streamEvent) {
 			isReason:      e.isReason,
 			handler:       r.emit,
 			timeStamp:     e.startTime.Unix(),
+			taskIndex:     e.taskIndex,
 		}, e.reader)
 	}()
 	return

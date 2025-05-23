@@ -59,6 +59,7 @@ func (e *guardianEmitter) emitExStreamEvent(s *streamEvent) {
 			isReason:      s.isReason,
 			handler:       e.emitter,
 			timeStamp:     s.startTime.Unix(),
+			taskIndex:     s.taskIndex,
 		}, s.reader)
 	}()
 }

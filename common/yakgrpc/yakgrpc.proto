@@ -836,6 +836,7 @@ message AIOutputEvent {
   bool IsJson = 8;
   bytes Content = 9;
   int64 Timestamp = 10;
+  string TaskIndex = 11;
 }
 
 message AIInputEvent {

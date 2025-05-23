@@ -55,6 +55,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 				IsJson:        e.IsJson,
 				Content:       e.Content,
 				Timestamp:     e.Timestamp,
+				TaskIndex:     e.TaskIndex,
 			}
 			err := stream.Send(event)
 			if err != nil {
