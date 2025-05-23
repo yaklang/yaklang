@@ -106,7 +106,7 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 			}
 
 			var haveFirstByte = utils.NewBool(false)
-			onClose := func(tee *AIResponse) {
+			saveHandler := func(tee *AIResponse) {
 				reasonReader, outputReader := tee.GetUnboundStreamReaderEx(nil, nil, nil)
 				reason, _ := io.ReadAll(reasonReader)
 				output, _ := io.ReadAll(outputReader)
@@ -129,25 +129,29 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 
 			}
 
-			rsp = c.teeAIResponse(rsp, func() {
+			rsp = c.teeAIResponse(rsp, func(teeResp *AIResponse) {
 				du := time.Since(start)
 				c.EmitInfo("ai response first byte cost: %v", du.String())
+
+				// save response to checkpoint
+				config.Add(1)
+				go func() {
+					defer config.Done()
+					saveHandler(teeResp)
+				}()
+
 				haveFirstByte.SetTo(true)
 				c.emitJson(EVENT_TYPE_AI_FIRST_BYTE_COST_MS, "system", map[string]any{
 					"ms":     du.Milliseconds(),
 					"second": du.Seconds(),
 				})
-			}, func(tee *AIResponse) {
+			}, func() {
 				du := time.Since(start)
 				c.EmitInfo("ai response close cost: %v", du)
 				c.emitJson(EVENT_TYPE_AI_TOTAL_COST_MS, "system", map[string]any{
 					"ms":     du.Milliseconds(),
 					"second": du.Seconds(),
 				})
-				if onClose != nil {
-					onClose(tee)
-				}
-
 			})
 			if c.debugPrompt {
 				rsp.Debug(true)
