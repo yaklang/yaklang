@@ -60,10 +60,6 @@ func MockAICallback(t *testing.T, initFlag, persistentFlag, planFlag string) aid
 				t.Fatalf("persistent flag not found in prompt: %s", req.GetPrompt())
 			}
 			rsp.EmitReasonStream(strings.NewReader(finishJson))
-		case 2:
-			rsp.EmitReasonStream(strings.NewReader(summaryJson))
-		case 3:
-			rsp.EmitReasonStream(strings.NewReader("1+1=2"))
 		default:
 		}
 		step++
@@ -77,6 +73,7 @@ func RunTestForge(t *testing.T, forge *schema.AIForge, initFlag, persistentFlag 
 	if err != nil {
 		return nil, err
 	}
+
 	defer func() {
 		yakit.DeleteAIForge(db, forge.ForgeName)
 	}()
@@ -114,14 +111,8 @@ forgeHandle = func(params) {
         aiagent.persistentPrompt(persis),
 		aiagent.initPrompt(init),
 		aiagent.agreeYOLO(true),
-		aiagent.eventHandler((e) => {
-			if e.NodeId == "result" {
-				try {
-					result = json.loads(e.Content)['data']
-				} catch err {
-					result = e.Content
-				}
-			}
+		aiagent.resultHandler((config) => {
+			result = config.GetMemory().CurrentTask.TaskSummary
 		}),
     )
     ordr,err = bp.CreateCoordinator(context.Background(),params)
