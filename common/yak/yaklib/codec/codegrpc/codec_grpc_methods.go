@@ -630,9 +630,9 @@ func (flow *CodecExecFlow) RSAEncrypt(pubKey string, encryptSchema string, algor
 
 	switch encryptSchema {
 	case "RSA-OAEP":
-		data, err = tlsutils.PemPkcsOAEPEncryptWithHash([]byte(pubKey), flow.Text, hashFunc)
+		data, err = tlsutils.PkcsOAEPEncryptWithHash([]byte(pubKey), flow.Text, hashFunc)
 	case "PKCS1v15":
-		data, err = tlsutils.PemPkcs1v15Encrypt([]byte(pubKey), flow.Text)
+		data, err = tlsutils.Pkcs1v15Encrypt([]byte(pubKey), flow.Text)
 	default:
 		return utils.Error("RSA encrypt error: 未知的填充方式")
 	}
@@ -672,9 +672,9 @@ func (flow *CodecExecFlow) RSADecrypt(priKey string, decryptSchema string, algor
 
 	switch decryptSchema {
 	case "RSA-OAEP":
-		data, err = tlsutils.PemPkcsOAEPDecryptWithHash([]byte(priKey), flow.Text, hashFunc)
+		data, err = tlsutils.PkcsOAEPDecryptWithHash([]byte(priKey), flow.Text, hashFunc)
 	case "PKCS1v15":
-		data, err = tlsutils.PemPkcs1v15Decrypt([]byte(priKey), flow.Text)
+		data, err = tlsutils.Pkcs1v15Decrypt([]byte(priKey), flow.Text)
 	default:
 		return utils.Error("RSA decrypt error: 未知的填充方式")
 	}

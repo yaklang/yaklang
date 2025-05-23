@@ -21,7 +21,7 @@ import (
 
 func Encrypt(raw []byte, pemBytes []byte) (string, error) {
 	b, _ := pem.Decode(pemBytes)
-	pub, err := ParseRsaPublicKey(b)
+	pub, err := ParseRsaPublicKeyFromPemBlock(b)
 	if err != nil {
 		return "", utils.Errorf("parse public key failed: %s", err)
 	}
@@ -138,7 +138,7 @@ func PemPkcs1v15Encrypt(pemBytes []byte, data interface{}) ([]byte, error) {
 		return nil, errors.Wrap(errors.New("empty pem block"), "pem decode public key failed")
 	}
 
-	pub, err := ParseRsaPublicKey(block)
+	pub, err := ParseRsaPublicKeyFromPemBlock(block)
 	if err != nil {
 		return nil, errors.Wrap(err, `x509.ParsePKIXPublicKey(block.Bytes) failed`)
 	}
@@ -151,7 +151,27 @@ func PemPkcs1v15Encrypt(pemBytes []byte, data interface{}) ([]byte, error) {
 	return results, err
 }
 
-func ParseRsaPublicKey(block *pem.Block) (*rsa.PublicKey, error) {
+// EncryptWithPkcs1v15 将公钥与数据进行PKCS1v15加密，返回密文与错误
+// Example:
+// ```
+// enc, err := tls.EncryptWithPkcs1v15(raw, "hello")
+// ```
+func Pkcs1v15Encrypt(raw []byte, data interface{}) ([]byte, error) {
+	dataBytes := utils.InterfaceToBytes(data)
+	pub, err := GetRSAPubKey(raw)
+	if err != nil {
+		return nil, errors.Wrap(err, `GetRSAPubKey failed`)
+	}
+	_, _ = dataBytes, pub
+
+	results, err := rsa.EncryptPKCS1v15(cryptorand.Reader, pub, dataBytes)
+	if err != nil {
+		return nil, errors.Wrap(err, `rsa.EncryptPKCS1v15(cryptorand.Reader, pubKey, dataBytes) error`)
+	}
+	return results, err
+}
+
+func ParseRsaPublicKeyFromPemBlock(block *pem.Block) (*rsa.PublicKey, error) {
 	derBytes := block.Bytes
 	var pub *rsa.PublicKey
 	var key any
@@ -160,7 +180,7 @@ func ParseRsaPublicKey(block *pem.Block) (*rsa.PublicKey, error) {
 	if err != nil {
 		key, err = x509.ParsePKCS1PublicKey(derBytes)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("derBytes from pem block is neither PKIXPublicKey nor PKCS1PublicKey")
 		}
 	}
 	pub, ok := key.(*rsa.PublicKey)
@@ -170,20 +190,122 @@ func ParseRsaPublicKey(block *pem.Block) (*rsa.PublicKey, error) {
 	return pub, nil
 }
 
-func PemPkcsOAEPEncrypt(pemBytes []byte, data interface{}) ([]byte, error) {
-	return PemPkcsOAEPEncryptWithHash(pemBytes, data, sha256.New())
+func ParseRsaPublicKeyFromDerBytes(derBytes []byte) (*rsa.PublicKey, error) {
+	var pub *rsa.PublicKey
+	var key any
+	var err error
+	key, err = x509.ParsePKIXPublicKey(derBytes)
+	if err != nil {
+		key, err = x509.ParsePKCS1PublicKey(derBytes)
+		if err != nil {
+			return nil, errors.New("derBytes is neither PKIXPublicKey nor PKCS1PublicKey")
+		}
+	}
+	pub, ok := key.(*rsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("need *rsa.PublicKey, got %t", key)
+	}
+	return pub, nil
 }
 
-func PemPkcsOAEPEncryptWithHash(pemBytes []byte, data interface{}, hashFunc hash.Hash) ([]byte, error) {
-	dataBytes := utils.InterfaceToBytes(data)
-	block, _ := pem.Decode(pemBytes)
-	if block == nil {
-		return nil, errors.Wrap(errors.New("empty pem block"), "pem decode public key failed")
+func GetRSAPubKey(raw []byte) (*rsa.PublicKey, error) {
+	var err error
+	var decodedBytes []byte
+
+	block, _ := pem.Decode(raw) // check for raw pem
+
+	if block == nil { // check for base64 encoded pem
+		decodedBytes, err = codec.DecodeBase64(string(raw))
+		if err == nil {
+			block, _ = pem.Decode(decodedBytes)
+		}
 	}
 
-	pub, err := ParseRsaPublicKey(block)
+	if block == nil { // raw is not pem format
+		rawString := strings.ReplaceAll(strings.TrimSpace(string(raw)), "\n", "")
+		decodedBytes, err = codec.DecodeBase64(rawString)
+		if err != nil {
+			return nil, errors.New("all strategies failed to parse public key")
+		}
+		return ParseRsaPublicKeyFromDerBytes(decodedBytes)
+	}
+	return ParseRsaPublicKeyFromPemBlock(block)
+}
+
+func ParseRsaPrivateKeyFromPemBlock(block *pem.Block) (*rsa.PrivateKey, error) {
+	derBytes := block.Bytes
+	var pri *rsa.PrivateKey
+	var err error
+	pri, err = x509.ParsePKCS1PrivateKey(derBytes)
 	if err != nil {
-		return nil, errors.Wrap(err, `x509.ParsePKIXPublicKey(block.Bytes) failed`)
+		parsedPri, err := x509.ParsePKCS8PrivateKey(derBytes)
+		if err != nil {
+			return nil, utils.Errorf("parse private key failed: %s", err)
+		}
+		var ok bool
+		pri, ok = parsedPri.(*rsa.PrivateKey)
+		if !ok {
+			return nil, utils.Errorf("need *rsa.PrivateKey, got %t", parsedPri)
+		}
+	}
+	return pri, nil
+}
+
+func ParseRsaPrivateKeyFromDerBytes(derBytes []byte) (*rsa.PrivateKey, error) {
+	var pri *rsa.PrivateKey
+	var err error
+	pri, err = x509.ParsePKCS1PrivateKey(derBytes)
+	if err != nil {
+		parsedPri, err := x509.ParsePKCS8PrivateKey(derBytes)
+		if err != nil {
+			return nil, utils.Errorf("parse private key failed: %s", err)
+		}
+		var ok bool
+		pri, ok = parsedPri.(*rsa.PrivateKey)
+		if !ok {
+			return nil, utils.Errorf("need *rsa.PrivateKey, got %t", parsedPri)
+		}
+	}
+	return pri, nil
+}
+
+func GetRSAPrivateKey(raw []byte) (*rsa.PrivateKey, error) {
+	var err error
+	var decodedBytes []byte
+
+	block, _ := pem.Decode(raw) // check for raw pem
+
+	if block == nil { // check for base64 encoded pem
+		decodedBytes, err = codec.DecodeBase64(string(raw))
+		if err == nil {
+			block, _ = pem.Decode(decodedBytes)
+		}
+	}
+
+	if block == nil {
+		rawString := strings.ReplaceAll(strings.TrimSpace(string(raw)), "\n", "")
+		decodedBytes, err = codec.DecodeBase64(rawString)
+		if err != nil {
+			return nil, errors.New("all strategies failed to parse private key")
+		}
+		return ParseRsaPrivateKeyFromDerBytes(decodedBytes)
+	}
+	return ParseRsaPrivateKeyFromPemBlock(block)
+}
+
+func PemPkcsOAEPEncrypt(raw []byte, data interface{}) ([]byte, error) {
+	return PkcsOAEPEncryptWithHash(raw, data, sha256.New())
+}
+
+func PkcsOAEPEncrypt(raw []byte, data interface{}) ([]byte, error) {
+	return PkcsOAEPEncryptWithHash(raw, data, sha256.New())
+}
+
+func PkcsOAEPEncryptWithHash(raw []byte, data interface{}, hashFunc hash.Hash) ([]byte, error) {
+	dataBytes := utils.InterfaceToBytes(data)
+	pub, err := GetRSAPubKey(raw)
+	if err != nil {
+		return nil, errors.Wrap(err, `GetRSAPubKey failed`)
 	}
 	_, _ = dataBytes, pub
 
@@ -195,28 +317,18 @@ func PemPkcsOAEPEncryptWithHash(pemBytes []byte, data interface{}, hashFunc hash
 }
 
 func PemPkcsOAEPDecrypt(pemPriBytes []byte, data interface{}) ([]byte, error) {
-	return PemPkcsOAEPDecryptWithHash(pemPriBytes, data, sha256.New())
+	return PkcsOAEPDecryptWithHash(pemPriBytes, data, sha256.New())
 }
 
-func PemPkcsOAEPDecryptWithHash(pemPriBytes []byte, data interface{}, hashFunc hash.Hash) ([]byte, error) {
+func PkcsOAEPDecrypt(pemPriBytes []byte, data interface{}) ([]byte, error) {
+	return PkcsOAEPDecryptWithHash(pemPriBytes, data, sha256.New())
+}
+
+func PkcsOAEPDecryptWithHash(raw []byte, data interface{}, hashFunc hash.Hash) ([]byte, error) {
 	dataBytes := utils.InterfaceToBytes(data)
-	b, _ := pem.Decode(pemPriBytes)
-	pri, err := x509.ParsePKCS1PrivateKey(b.Bytes)
+	pri, err := GetRSAPrivateKey(raw)
 	if err != nil {
-		parsedPri, err := x509.ParsePKCS8PrivateKey(b.Bytes)
-		if err != nil {
-			return nil, utils.Errorf("parse private key failed: %s", err)
-		}
-
-		var ok bool
-		pri, ok = parsedPri.(*rsa.PrivateKey)
-		if !ok {
-			return nil, utils.Errorf("need *rsa.PrivateKey, cannot found! ")
-		}
-
-		if pri == nil {
-			return nil, utils.Errorf("need *rsa.PrivateKey, cannot found! ")
-		}
+		return nil, errors.Wrap(err, `GetRSAPrivateKey failed`)
 	}
 
 	results, err := rsa.DecryptOAEP(hashFunc, cryptorand.Reader, pri, dataBytes, nil)
@@ -246,6 +358,25 @@ func PemPkcs1v15Decrypt(pemPriBytes []byte, data interface{}) ([]byte, error) {
 		if !ok {
 			return nil, utils.Errorf("need *rsa.PrivateKey, cannot found! ")
 		}
+	}
+
+	results, err := rsa.DecryptPKCS1v15(cryptorand.Reader, pri, dataBytes)
+	if err != nil {
+		return nil, errors.Wrap(err, `rsa.DecryptPKCS1v15(cryptorand.Reader, pri, dataBytes) error`)
+	}
+	return results, err
+}
+
+// DecryptWithPkcs1v15 将私钥与密文进行PKCS1v15解密，返回明文与错误
+// Example:
+// ```
+// dec, err := tls.DecryptWithPkcs1v15(raw, enc)
+// ```
+func Pkcs1v15Decrypt(raw []byte, data interface{}) ([]byte, error) {
+	dataBytes := utils.InterfaceToBytes(data)
+	pri, err := GetRSAPrivateKey(raw)
+	if err != nil {
+		return nil, errors.Wrap(err, `GetRSAPrivateKey failed`)
 	}
 
 	results, err := rsa.DecryptPKCS1v15(cryptorand.Reader, pri, dataBytes)
@@ -301,7 +432,7 @@ func PemVerifySignSha256WithRSA(pemBytes []byte, originData any, sign []byte) er
 	dataBytes := utils.InterfaceToBytes(originData)
 	block, _ := pem.Decode(pemBytes)
 
-	pub, err := ParseRsaPublicKey(block)
+	pub, err := ParseRsaPublicKeyFromPemBlock(block)
 	if err != nil {
 		return utils.Errorf("parse public key failed: %s", err)
 	}
