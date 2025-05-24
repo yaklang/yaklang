@@ -3,17 +3,20 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
-func TestCoordinator_TaskReview(t *testing.T) {
-	inputChan := make(chan *InputEvent, 3)
+func TestCoordinator_ToolUseReview_WrongTool_SuggestionTools(t *testing.T) {
+	inputChan := make(chan *InputEvent)
 	outputChan := make(chan *Event)
+
+	lsReviewed := false
+	nowReviewed := false
+
 	coordinator, err := NewCoordinator(
 		"test",
 		WithEventInputChan(inputChan),
@@ -24,18 +27,26 @@ func TestCoordinator_TaskReview(t *testing.T) {
 		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
-				time.Sleep(100 * time.Millisecond)
 				rsp.Close()
 			}()
-			fmt.Println("===========" + "request:" + "===========\n" + request.GetPrompt())
 
-			if utils.MatchAllOfSubString(request.GetPrompt(), `["short_summary", "long_summary"]`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "short_summary": "short", "long_summary": "long"}`))
+			if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: ls`, `"call-tool"`, "const") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "call-tool", "tool": "ls", "params": {"path": "/abc-target"}}`))
+				return rsp, nil
+			} else if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: now`, `"call-tool"`, "const") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "call-tool", "tool": "now", "params": {}}`))
+				return rsp, nil
+			} else if utils.MatchAllOfSubString(request.GetPrompt(), `当前任务: "扫描目录结构"`, `"require-tool"`) {
+				if utils.MatchAllOfSubString(request.GetPrompt(), `"direct-answer"`) {
+					rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-tool", "tool": "ls"}`))
+				} else {
+					rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-tool", "tool": "now"}`))
+				}
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(request.GetPrompt(), `"@action"`, `"plan"`) {
-				rsp.EmitOutputStream(strings.NewReader(`
+			fmt.Println("===========" + "request:" + "===========\n" + request.GetPrompt())
+			rsp.EmitOutputStream(strings.NewReader(`
 {
     "@action": "plan",
     "query": "找出 /Users/v1ll4n/Projects/yaklang 目录中最大的文件",
@@ -53,21 +64,6 @@ func TestCoordinator_TaskReview(t *testing.T) {
     ]
 }
 			`))
-				return rsp, nil
-			}
-
-			if utils.MatchAllOfSubString(request.GetPrompt(), `["require-more-tool", "finished"]`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "finished"}`))
-				return rsp, nil
-			}
-			if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: now`, `"call-tool"`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "call-tool", "tool": "now", "params": {}}`))
-				return rsp, nil
-			} else if utils.MatchAllOfSubString(request.GetPrompt(), `当前任务: "扫描目录结构"`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-tool", "tool": "now"}`))
-				return rsp, nil
-			}
-			rsp.EmitOutputStream(strings.NewReader(`TODO`))
 			return rsp, nil
 		}),
 	)
@@ -78,8 +74,6 @@ func TestCoordinator_TaskReview(t *testing.T) {
 
 	useToolReview := false
 	useToolReviewPass := false
-	taskReview := false
-	taskReviewPass := false
 	count := 0
 LOOP:
 	for {
@@ -91,14 +85,8 @@ LOOP:
 			if count > 100 {
 				break LOOP
 			}
-
-			if result.Type == EVENT_TYPE_CONSUMPTION {
-				continue
-			}
-
 			fmt.Println("result:" + result.String())
 			if result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
-				time.Sleep(100 * time.Millisecond)
 				inputChan <- &InputEvent{
 					Id: result.GetInteractiveId(),
 					Params: aitool.InvokeParams{
@@ -111,13 +99,26 @@ LOOP:
 			if result.Type == EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
 				var a = make(aitool.InvokeParams)
 				json.Unmarshal(result.Content, &a)
-				if a.GetString("tool") == "now" && a.GetString("tool_description") != "" {
-					useToolReview = true
-					time.Sleep(100 * time.Millisecond)
+				toolname := a.GetString("tool")
+				if toolname == "ls" {
+					lsReviewed = true
+				} else if toolname == "now" {
+					nowReviewed = true
 					inputChan <- &InputEvent{
 						Id: result.GetInteractiveId(),
 						Params: aitool.InvokeParams{
 							"suggestion": "continue",
+						},
+					}
+				}
+				if a.GetObject("params").GetString("path") == "/abc-target" &&
+					a.GetString("tool") == "ls" && a.GetString("tool_description") != "" {
+					useToolReview = true
+					inputChan <- &InputEvent{
+						Id: result.GetInteractiveId(),
+						Params: aitool.InvokeParams{
+							"suggestion":      "wrong_tool",
+							"suggestion_tool": "tree,now",
 						},
 					}
 					continue
@@ -126,30 +127,9 @@ LOOP:
 
 			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to execute tool:", "now") {
 				useToolReviewPass = true
+				break LOOP
 			}
-
-			if useToolReviewPass {
-				if result.Type == EVENT_TYPE_TASK_REVIEW_REQUIRE {
-					fmt.Println("task result:" + result.String())
-					time.Sleep(200 * time.Millisecond)
-					inputChan <- &InputEvent{
-						Id: result.GetInteractiveId(),
-						Params: aitool.InvokeParams{
-							"suggestion": "continue",
-						},
-					}
-					taskReview = true
-					continue
-				}
-			}
-
-			if taskReview {
-				fmt.Println("task result:" + result.String())
-				if utils.MatchAllOfSubString(string(result.Content), "start to handle review task event:") {
-					taskReviewPass = true
-					break LOOP
-				}
-			}
+			fmt.Println("review task result:" + result.String())
 		}
 	}
 
@@ -161,11 +141,11 @@ LOOP:
 		t.Fatal("tool review not finished")
 	}
 
-	if !taskReview {
-		t.Fatal("task review fail")
+	if !lsReviewed {
+		t.Fatal("ls tool review not finished")
 	}
 
-	if !taskReviewPass {
-		t.Fatal("task review not finished")
+	if !nowReviewed {
+		t.Fatal("now tool review not finished")
 	}
 }

@@ -216,7 +216,7 @@ func TestAITaskWithAdjustPlan(t *testing.T) {
 	if t.Skipped() {
 		return
 	}
-	
+
 	client, err := NewLocalClientForceNew()
 	require.NoError(t, err)
 

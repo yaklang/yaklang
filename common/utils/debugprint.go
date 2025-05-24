@@ -30,7 +30,7 @@ func TryCloseChannel(i any) {
 	}
 	defer func() {
 		if err := recover(); err != nil {
-			log.Errorf("close channel failed: %v", err)
+			log.Infof("close channel failed (maybe already closed): %v", err)
 		}
 	}()
 

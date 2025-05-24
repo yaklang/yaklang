@@ -47,6 +47,6 @@
 请按照以下 Schema 输出完整的 JSON 格式计划：
 
 ```schema
-{{ .Memory.Schema.TaskJsonSchema }}
+{{ .Memory.Schema.PlanJsonSchema }}
 ```
 

@@ -1,12 +1,10 @@
 package aid
 
 import (
-	"bytes"
 	_ "embed"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"io"
-	"text/template"
 )
 
 type planRequest struct {
@@ -73,23 +71,15 @@ func (p *PlanResponse) MergeSubtask(parentIndex string, name string, goal string
 
 // GenerateFirstPlanPrompt 根据PlanRequest生成prompt
 func (pr *planRequest) GenerateFirstPlanPrompt() (string, error) {
-	tmpl, err := template.New("generateTaskList").Parse(__prompt_GenerateTaskListPrompt)
-	if err != nil {
-		return "", err
+	if pr.config.allowPlanUserInteract {
+		return pr.config.quickBuildPrompt(__prompt_GenerateTaskListPromptWithUserInteract, map[string]any{
+			"Memory": pr.config.memory,
+		})
+	} else {
+		return pr.config.quickBuildPrompt(__prompt_GenerateTaskListPrompt, map[string]any{
+			"Memory": pr.config.memory,
+		})
 	}
-
-	// 准备模板数据
-	data := map[string]interface{}{
-		"Memory": pr.config.memory,
-	}
-
-	// 渲染模板
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", err
-	}
-
-	return buf.String(), nil
 }
 
 func (pr *Config) newPlanResponse(rootTask *aiTask) *PlanResponse {
