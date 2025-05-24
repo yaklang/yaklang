@@ -55,11 +55,14 @@ func (c *Config) startEventLoop(ctx context.Context) {
 					continue
 				case event, ok := <-c.eventInputChan:
 					if !ok {
+						log.Errorf("event input channel closed, (%v) start", c.id)
 						return
 					}
 					if event == nil {
 						continue
 					}
+
+					log.Infof("event received, (%v) start: %v", c.id, event)
 
 					if event.IsInteractive || event.Id != "" {
 						c.epm.feed(event.Id, event.Params)

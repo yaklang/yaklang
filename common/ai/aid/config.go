@@ -62,7 +62,8 @@ type Config struct {
 	epm            *endpointManager
 
 	// plan mocker
-	planMocker func(*Config) *PlanResponse
+	planMocker            func(*Config) *PlanResponse
+	allowPlanUserInteract bool // allow user to interact before planning.
 
 	// need to think
 	coordinatorAICallback AICallbackType
@@ -836,4 +837,18 @@ func WithQwenNoThink() Option {
 	return WithPromptHook(func(origin string) string {
 		return origin + "/nothink"
 	})
+}
+
+func WithAllowPlanUserInteract(i ...bool) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+
+		if len(i) > 0 {
+			config.allowPlanUserInteract = i[0]
+			return nil
+		}
+		config.allowPlanUserInteract = true
+		return nil
+	}
 }
