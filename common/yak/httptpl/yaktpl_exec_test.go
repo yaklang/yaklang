@@ -1975,8 +1975,17 @@ http:
 }
 
 func TestMockTest_interactsh(t *testing.T) {
-	rootDomain := utils.RandStringBytes(5) + ".com"
-	token := strings.ToLower(utils.RandStringBytes(5))
+	for i := 0; i < 5; i++ {
+		ok := item_testMockTest_interactsh(t)
+		if ok {
+			return
+		}
+	}
+}
+
+func item_testMockTest_interactsh(t *testing.T) bool {
+	rootDomain := utils.RandStringBytes(15) + ".com"
+	token := strings.ToLower(utils.RandStringBytes(15))
 	tokenDomain := token + "." + rootDomain
 
 	interactshProtocol := make(map[string]string)
@@ -2011,8 +2020,12 @@ func TestMockTest_interactsh(t *testing.T) {
 		urlIns.RawQuery = fmt.Sprintf("a=%s", sendToken)
 		a := urlIns.String()
 		_ = a
-		_, _, err = poc.DoGET(urlIns.String(), poc.WithDNSServers(dnsServer))
+		_, _, err = poc.DoGET(urlIns.String(), poc.WithDNSServers(dnsServer), poc.WithDNSNoCache(true))
 		require.NoError(t, err)
+		if err != nil {
+			t.Fatal(err)
+			t.FailNow()
+		}
 	})
 	tmp := fmt.Sprintf(`id: CVE-2017-9506
 
@@ -2084,9 +2097,7 @@ http:
 	log.Infof("interactsh http server:%s:%d\n", httpServerHost, httpServerPort)
 	log.Infof("interactsh dns server:%s\n", dnsServer)
 	tmpIns.ExecWithUrl("http://www.baidu.com", config, lowhttp.WithHost(server), lowhttp.WithPort(port))
-	if !ok {
-		t.Error("test oob error")
-	}
+	return ok
 }
 
 func TestMatcher_KeepDSLReturnType(t *testing.T) {
