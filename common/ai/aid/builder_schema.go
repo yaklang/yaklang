@@ -7,8 +7,8 @@ import (
 	"text/template"
 )
 
-//go:embed jsonschema/task.json
-var taskJsonSchema string
+//go:embed jsonschema/plan.json
+var planJsonSchema string
 
 //go:embed jsonschema/re-plan.json
 var rePlanSchema string
@@ -25,7 +25,7 @@ var toolExecuteCheckSchema string
 //go:embed jsonschema/plan-review/create-subtask.json
 var planReviewCreateSubtasksSchema string
 
-func taskJSONSchema(toolNames []string) map[string]string {
+func planJSONSchema(toolNames []string) map[string]string {
 	var toolNamesStrs []string
 	for _, toolName := range toolNames {
 		toolNamesStrs = append(toolNamesStrs, fmt.Sprintf("\"%s\"", toolName))
@@ -36,7 +36,7 @@ func taskJSONSchema(toolNames []string) map[string]string {
 		"ToolsList": strings.Join(toolNamesStrs, ", "),
 	})
 	res := make(map[string]string)
-	res["TaskJsonSchema"] = taskJsonSchema
+	res["PlanJsonSchema"] = planJsonSchema
 	res["RePlanJsonSchema"] = rePlanSchema
 	res["TaskSummarySchema"] = taskSummarySchema
 	res["ToolDescRequireSchema"] = toolDescRequireSchemaBuilder.String()
