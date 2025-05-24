@@ -1,7 +1,10 @@
 package aid
 
 import (
+	"bytes"
 	_ "embed"
+	"github.com/yaklang/yaklang/common/utils"
+	"text/template"
 )
 
 //go:embed prompts/plan-to-task-list.txt
@@ -42,3 +45,29 @@ var planReviewCreateSubtaskPrompts string
 
 //go:embed prompts/plan-help.txt
 var __prompt_PlanHelp string
+
+//go:embed prompts/tool/tool-re-select.txt
+var __prompt_toolReSelect string
+
+func (c *Config) quickBuildPrompt(tmp string, i map[string]any) (string, error) {
+	tmpl, err := template.New("prompt").Parse(tmp)
+	if err != nil {
+		return "", err
+	}
+
+	if utils.IsNil(i) {
+		i = make(map[string]any)
+		i["Memory"] = c.memory
+	}
+
+	if _, ok := i["Memory"]; !ok {
+		i["Memory"] = c.memory
+	}
+
+	var buf bytes.Buffer
+	err = tmpl.Execute(&buf, i)
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
