@@ -12,7 +12,7 @@ import (
 )
 
 func TestCoordinator_TaskReview(t *testing.T) {
-	inputChan := make(chan *InputEvent)
+	inputChan := make(chan *InputEvent, 3)
 	outputChan := make(chan *Event)
 	coordinator, err := NewCoordinator(
 		"test",
@@ -34,7 +34,7 @@ func TestCoordinator_TaskReview(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(request.GetPrompt(), `"@action"`, `"plan"`, `"require-user-interact"`) {
+			if utils.MatchAllOfSubString(request.GetPrompt(), `"@action"`, `"plan"`) {
 				rsp.EmitOutputStream(strings.NewReader(`
 {
     "@action": "plan",
@@ -60,7 +60,7 @@ func TestCoordinator_TaskReview(t *testing.T) {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "finished"}`))
 				return rsp, nil
 			}
-			if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: now`, `"call-tool"`, "const") {
+			if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: now`, `"call-tool"`) {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "call-tool", "tool": "now", "params": {}}`))
 				return rsp, nil
 			} else if utils.MatchAllOfSubString(request.GetPrompt(), `当前任务: "扫描目录结构"`) {
