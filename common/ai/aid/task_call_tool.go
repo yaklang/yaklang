@@ -114,10 +114,17 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 			t.config.EmitError("user review params is nil, plan failed")
 			return nil, NewNonRetryableTaskStackError(utils.Errorf("user review params is nil"))
 		}
-		targetTool, callToolParams, err = t.handleToolUseReview(targetTool, callToolParams, params)
+		var overrideResult *aitool.ToolResult
+		var next HandleToolUseNext
+		targetTool, callToolParams, overrideResult, next, err = t.handleToolUseReview(targetTool, callToolParams, params)
 		if err != nil {
 			t.config.EmitError("error handling tool use review: %v", err)
 			return nil, NewNonRetryableTaskStackError(err)
+		}
+		switch next {
+		case HandleToolUseNext_Override:
+			return overrideResult, nil
+		default:
 		}
 	}
 	t.config.EmitInfo("start to execute tool:%v", targetTool.Name)

@@ -43,9 +43,9 @@ type Memory struct {
 	PlanHistory []*PlanRecord
 
 	// tools list
-	DisableTools  bool
-	Tools         func() []*aitool.Tool
-	ToolsKeywords func() []string
+	DisableTools          bool
+	Tools                 func() []*aitool.Tool
+	toolsKeywordsCallback func() []string
 
 	// tool call results
 	//toolCallResults []*aitool.ToolResult
@@ -122,7 +122,7 @@ func (m *Memory) Schema() map[string]string {
 	for _, tool := range m.Tools() {
 		toolNames = append(toolNames, tool.Name)
 	}
-	return taskJSONSchema(toolNames)
+	return planJSONSchema(toolNames)
 }
 
 // set tools list
@@ -132,7 +132,11 @@ func (m *Memory) StoreTools(toolList func() []*aitool.Tool) {
 
 // set tools list
 func (m *Memory) StoreToolsKeywords(keywords func() []string) {
-	m.ToolsKeywords = keywords
+	m.toolsKeywordsCallback = keywords
+}
+
+func (m *Memory) ToolsKeywords() string {
+	return strings.Join(m.toolsKeywordsCallback(), ", ")
 }
 
 // user first input

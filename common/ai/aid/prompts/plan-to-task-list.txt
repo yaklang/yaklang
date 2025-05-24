@@ -28,5 +28,5 @@
 *. 在任务输出时，任务目标或者详情中只允许出现工具名和简要说明，不允许出现特殊符号，尤其是"避免破坏JSON结构
 
 ```schema
-{{ .Memory.Schema.TaskJsonSchema }}
+{{ .Memory.Schema.PlanJsonSchema }}
 ```
