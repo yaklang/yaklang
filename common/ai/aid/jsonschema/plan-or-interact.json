@@ -5,31 +5,51 @@
     "@action": {
       "type": "string",
       "enum": ["plan", "require-user-interact"],
-      "description": "标识当前操作的具体类型"
+      "x-generation-rules": [
+        "信息不足时：选择require-user-interact，询问关键缺失信息",
+        "信息充足时：选择plan，直接制定任务分解计划"
+      ],
+      "description": "选择当前操作类型。如果信息不足无法制定完整计划，选择'require-user-interact'询问用户；如果信息充足可以直接制定任务计划，选择'plan'。"
+    },
+    "question": {
+      "type": "string",
+      "description": "【仅当@action为require-user-interact时生效】向用户提出的具体问题，用于获取制定计划所需的关键信息。问题应该明确、具体，避免模糊表达。"
+    },
+    "options": {
+        "type": "array",
+        "description": "【仅当@action为require-user-interact时使用】为用户提供的选择选项，帮助用户快速回答问题。每个选项应该清晰、互斥且涵盖主要可能性。",
+        "items": {
+            "type": "string",
+            "description": "单个选项的完整描述，格式：'选项名称：详细说明'"
+        },
+        "example": [
+          "网页应用：创建可在浏览器中运行的交互式网页",
+          "桌面应用：开发本地运行的桌面软件程序"
+        ]
     },
     "main_task": {
       "type": "string",
-      "description": "根据用户输入改写一个优化表达的任务，作为总任务"
+      "description": "【仅当@action为plan时必填】将用户原始需求重新表述为清晰、具体、可执行的主任务描述。使用动词开头，明确说明要做什么。"
     },
     "main_task_goal": {
       "type": "string",
-      "description": "总任务的目标，描述任务执行到什么程度才算结束"
+      "description": "【仅当@action为plan时必填】定义主任务的完成标准和预期结果。明确描述什么状态下可以认为任务已完成，包括具体的交付物或达成效果。"
     },
     "tasks": {
       "type": "array",
-      "description": "用户想要执行的任务拆分后的子任务",
+      "description": "【仅当@action为plan时必填】将主任务分解为有序的子任务列表。子任务应该逻辑清晰、相互独立、可并行或顺序执行。",
       "items": {
         "type": "object",
         "required": ["subtask_name", "subtask_goal"],
         "properties": {
           "subtask_name": {
             "type": "string",
-            "description": "拆分后的子任务名称是什么？理性简明扼要的描述任务的名称，便于后续引用",
+            "description": "子任务的简洁名称，使用动词+名词的格式（如'设计界面'、'编写代码'），长度控制在20个字内，便于引用和跟踪。",
             "minLength": 1
           },
           "subtask_goal": {
             "type": "string",
-            "description": "拆分后的子任务目标，简要描述目的是什么",
+            "description": "子任务的具体目标和预期产出，明确说明完成这个子任务后应该得到什么结果或达到什么状态。",
             "minLength": 1
           }
         }

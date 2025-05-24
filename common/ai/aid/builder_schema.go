@@ -7,7 +7,7 @@ import (
 	"text/template"
 )
 
-//go:embed jsonschema/plan.json
+//go:embed jsonschema/plan-or-interact.json
 var planJsonSchema string
 
 //go:embed jsonschema/re-plan.json

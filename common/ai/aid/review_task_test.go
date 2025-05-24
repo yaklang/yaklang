@@ -34,7 +34,7 @@ func TestCoordinator_TaskReview(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(request.GetPrompt(), `"@action"`, `"const":`, `"plan"`) {
+			if utils.MatchAllOfSubString(request.GetPrompt(), `"@action"`, `"plan"`, `"require-user-interact"`) {
 				rsp.EmitOutputStream(strings.NewReader(`
 {
     "@action": "plan",
