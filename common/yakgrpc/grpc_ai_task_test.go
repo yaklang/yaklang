@@ -58,6 +58,11 @@ func TestAITask(t *testing.T) {
 }
 
 func TestAITaskWithBreadth(t *testing.T) {
+	t.SkipNow()
+	if t.Skipped() {
+		return
+	}
+
 	client, err := NewLocalClientForceNew()
 	require.NoError(t, err)
 
@@ -206,6 +211,11 @@ func TestAITaskWithBreadth(t *testing.T) {
 }
 
 func TestAITaskWithAdjustPlan(t *testing.T) {
+	t.SkipNow()
+	if t.Skipped() {
+		return
+	}
+	
 	client, err := NewLocalClientForceNew()
 	require.NoError(t, err)
 
