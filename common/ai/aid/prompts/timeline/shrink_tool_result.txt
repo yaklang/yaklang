@@ -5,7 +5,7 @@
 目的是总结某一个精确工具调用的结果，提取重要记忆。你需要根据用户进度，既往任务信息。
 
 {{ .Memory.CurrentTaskInfo }}
-{{ .Memory.ToolCallTimeline }}
+{{ .Memory.Timeline }}
 
 # 输入
 

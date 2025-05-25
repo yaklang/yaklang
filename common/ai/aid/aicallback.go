@@ -368,6 +368,13 @@ func (r *AIResponse) Close() {
 	if r.ch == nil {
 		return
 	}
+
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("recover from panic when closing AIResponse: %v", err)
+		}
+	}()
+
 	r.ch.Close()
 }
 

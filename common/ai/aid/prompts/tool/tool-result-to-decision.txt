@@ -11,7 +11,7 @@
 
 在此之前，你使用过如下工具：
 
-{{ .Memory.ToolCallTimelineWithout .Result.ID }}
+{{ .Memory.TimelineWithout .Result.ID }}
 
 ## 当前需要做什么
 

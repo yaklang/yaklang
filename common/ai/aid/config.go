@@ -62,8 +62,9 @@ type Config struct {
 	epm            *endpointManager
 
 	// plan mocker
-	planMocker            func(*Config) *PlanResponse
-	allowPlanUserInteract bool // allow user to interact before planning.
+	planMocker               func(*Config) *PlanResponse
+	allowPlanUserInteract    bool  // allow user to interact before planning.
+	planUserInteractMaxCount int64 // max user interact count before planning, default is 3
 
 	// need to think
 	coordinatorAICallback AICallbackType
@@ -334,6 +335,7 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		timelineLimit:               10,
 		timelineContentLimit:        30 * 1024,
 		aiToolManagerOption:         make([]buildinaitools.ToolManagerOption, 0),
+		planUserInteractMaxCount:    3,
 	}
 	c.epm.config = c // review
 	if err := initDefaultTools(c); err != nil {
@@ -849,6 +851,19 @@ func WithAllowPlanUserInteract(i ...bool) Option {
 			return nil
 		}
 		config.allowPlanUserInteract = true
+		return nil
+	}
+}
+
+func WithPlanUserInteractMaxCount(i int64) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+
+		if i <= 0 {
+			i = 3
+		}
+		config.planUserInteractMaxCount = i
 		return nil
 	}
 }

@@ -1,6 +1,6 @@
 ## 任务状态与进度
 {{ .Memory.CurrentTaskInfo }}
-{{ .Memory.ToolCallTimeline }}
+{{ .Memory.Timeline }}
 
 {{ if .Memory.PersistentMemory }}# 牢记
 {{ .Memory.PersistentMemory}}
