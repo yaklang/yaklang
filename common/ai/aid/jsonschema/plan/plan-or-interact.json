@@ -16,16 +16,22 @@
       "description": "【仅当@action为require-user-interact时生效】向用户提出的具体问题，用于获取制定计划所需的关键信息。问题应该明确、具体，避免模糊表达。"
     },
     "options": {
-        "type": "array",
+        "type": "object",
         "description": "【仅当@action为require-user-interact时使用】为用户提供的选择选项，帮助用户快速回答问题。每个选项应该清晰、互斥且涵盖主要可能性。",
         "items": {
-            "type": "string",
-            "description": "单个选项的完整描述，格式：'选项名称：详细说明'"
-        },
-        "example": [
-          "网页应用：创建可在浏览器中运行的交互式网页",
-          "桌面应用：开发本地运行的桌面软件程序"
-        ]
+            "type": "object",
+            "required": ["option_name", "option_description"],
+            "properties": {
+                "option_name": {
+                    "type": "string",
+                    "description": "选项名称，简洁明了地描述选项内容，长度控制在10个字以内。单个选项的完整描述，格式：'选项名称：详细说明'"
+                },
+                "option_description": {
+                    "type": "string",
+                    "description": "选项的详细说明，提供足够的信息帮助用户理解选项的含义和用途。"
+                }
+            }
+        }
     },
     "main_task": {
       "type": "string",

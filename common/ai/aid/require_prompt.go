@@ -66,8 +66,9 @@ func (c *Config) CreateRequireUserInteract() (*aitool.Tool, error) {
 }
 
 type RequireInteractiveRequestOption struct {
-	Index  int    `json:"index"`
-	Prompt string `json:"prompt"`
+	Index       int    `json:"index"`
+	PromptTitle string `json:"prompt_title"`
+	Prompt      string `json:"prompt"`
 }
 
 type RequireInteractiveRequest struct {

@@ -1,0 +1,34 @@
+package aid
+
+import "github.com/yaklang/yaklang/common/utils"
+
+func (pr *planRequest) handlePlanWithUserInteract(interactAction *Action) (*PlanResponse, error) {
+	q := interactAction.GetString("question")
+	opt := interactAction.GetInvokeParamsArray("options")
+	var opts []*RequireInteractiveRequestOption
+	idx := -1
+	for _, o := range opt {
+		idx++
+		opts = append(opts, &RequireInteractiveRequestOption{
+			Index:       idx,
+			PromptTitle: o.GetString("option_name"),
+			Prompt:      o.GetString("option_value"),
+		})
+	}
+	haveOpt := len(opt) > 0
+	_ = haveOpt
+	params, err := pr.config.RequireUserPrompt(q, opts...)
+	if err != nil {
+		return nil, utils.Errorf("plan: require user interact failed: %v", err)
+	}
+	_ = params
+
+	id := pr.config.AcquireId()
+	pr.config.memory.timeline.PushSimpleTimelineEvent(id, string(utils.Jsonify(params)))
+
+	pr.deltaInteractCount(1)
+	if pr.GetInteractCount() >= pr.config.planUserInteractMaxCount {
+		pr.disableInteract = true
+	}
+	return pr.Invoke()
+}

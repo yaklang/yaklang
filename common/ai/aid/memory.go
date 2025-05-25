@@ -190,11 +190,11 @@ func (m *Memory) PushToolCallResults(t *aitool.ToolResult) {
 	m.timeline.PushToolResult(t)
 }
 
-func (m *Memory) ToolCallTimeline() string {
+func (m *Memory) Timeline() string {
 	return m.timeline.Dump()
 }
 
-func (m *Memory) ToolCallTimelineWithout(n ...any) string {
+func (m *Memory) TimelineWithout(n ...any) string {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Errorf("error creating sub timeline: %v", r)
@@ -219,7 +219,7 @@ func (m *Memory) ToolCallTimelineWithout(n ...any) string {
 	return stl.Dump()
 }
 
-func (m *Memory) CurrentTaskToolCallTimeline() string {
+func (m *Memory) CurrentTaskTimeline() string {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Errorf("error creating sub timeline: %v", r)
@@ -227,7 +227,7 @@ func (m *Memory) CurrentTaskToolCallTimeline() string {
 		}
 	}()
 	if m.CurrentTask == nil {
-		return m.ToolCallTimeline()
+		return m.Timeline()
 	}
 	stl := m.timeline.CreateSubTimeline(m.CurrentTask.toolCallResultIds.Keys()...)
 	if stl == nil {

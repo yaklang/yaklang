@@ -3,13 +3,33 @@ package aid
 import (
 	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
-	"io"
+	"github.com/yaklang/yaklang/common/utils/omap"
+	"sync/atomic"
 )
 
 type planRequest struct {
 	config   *Config
 	rawInput string
+
+	// interactCount
+	disableInteract bool // 是否禁用用户交互
+	interactCount   *int64
+}
+
+func (pr *planRequest) deltaInteractCount(i int64) {
+	if pr.interactCount == nil {
+		pr.interactCount = new(int64)
+	}
+	atomic.AddInt64(pr.interactCount, i)
+}
+
+func (pr *planRequest) GetInteractCount() int64 {
+	if pr.interactCount == nil {
+		return 0
+	}
+	return atomic.LoadInt64(pr.interactCount)
 }
 
 func (pr *planRequest) callAI(request *AIRequest) (*AIResponse, error) {
@@ -71,7 +91,7 @@ func (p *PlanResponse) MergeSubtask(parentIndex string, name string, goal string
 
 // GenerateFirstPlanPrompt 根据PlanRequest生成prompt
 func (pr *planRequest) GenerateFirstPlanPrompt() (string, error) {
-	if pr.config.allowPlanUserInteract {
+	if pr.config.allowPlanUserInteract && !pr.disableInteract {
 		return pr.config.quickBuildPrompt(__prompt_GenerateTaskListPromptWithUserInteract, map[string]any{
 			"Memory": pr.config.memory,
 		})
@@ -106,32 +126,76 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 		return nil, fmt.Errorf("生成规划 prompt 失败: %v", err)
 	}
 
-	var task *aiTask = nil
+	var rootTask = &aiTask{}
+	defer func() {
+		// Ensure config is propagated to the new task and its subtasks
+		var propagateConfig func(task *aiTask)
+		propagateConfig = func(task *aiTask) {
+			if task == nil {
+				return
+			}
+			task.config = pr.config
+			if task.toolCallResultIds == nil {
+				task.toolCallResultIds = omap.NewOrderedMap(make(map[int64]*aitool.ToolResult))
+			}
+			for _, sub := range task.Subtasks {
+				sub.ParentTask = task // Ensure parent is set
+				propagateConfig(sub)
+			}
+		}
+		propagateConfig(rootTask)
+		rootTask.GenerateIndex()
+	}()
+
+	var interactAction *Action
+
+	needInteract := func() bool {
+		return interactAction != nil && interactAction.ActionType() == "require-user-interact"
+	}
+
 	err = pr.config.callAiTransaction(
 		prompt, pr.callAI,
 		func(rsp *AIResponse) error {
-			// 读取响应内容
-			responseBytes, err := io.ReadAll(rsp.GetOutputStreamReader("plan", false, pr.config))
-			if len(responseBytes) <= 0 {
-				return utils.Error("ai resposne is empty")
-			}
-			response := string(responseBytes)
-
-			// 从响应中提取任务
-			task, err = ExtractTaskFromRawResponse(pr.config, response)
+			action, err := ExtractActionFromStream(rsp.GetOutputStreamReader("plan", false, pr.config), "plan", "require-user-interact")
 			if err != nil {
-				return fmt.Errorf("从 AI 响应中提取任务失败: %v", err)
+				return utils.Error("parse action from AI response failed: " + err.Error())
 			}
-			return nil
+			switch action.ActionType() {
+			case "plan":
+				rootTask.Name = action.GetString("main_task")
+				rootTask.Goal = action.GetString("main_task_goal")
+				for _, subtask := range action.GetInvokeParamsArray("tasks") {
+					rootTask.Subtasks = append(rootTask.Subtasks, &aiTask{
+						config: pr.config,
+						Name:   subtask.GetString("subtask_name"),
+						Goal:   subtask.GetString("subtask_goal"),
+					})
+				}
+				if rootTask.Name == "" {
+					return fmt.Errorf("AI response does not contain any tasks, please check your AI model or prompt")
+				}
+				return nil
+			case "require-user-interact":
+				interactAction = action
+				return nil
+			}
+			return utils.Error("no any ai callback is set, cannot found ai config")
 		},
 	)
 	if err != nil {
 		pr.config.EmitError(err.Error())
-		if task == nil || utils.IsNil(task) {
-			return nil, err
-		}
+		return nil, err
 	}
-	return pr.config.newPlanResponse(task), nil
+
+	if needInteract() {
+		return pr.handlePlanWithUserInteract(interactAction)
+	}
+
+	if rootTask.Name == "" {
+		return nil, utils.Error("cannot found any task in AI response, please check your AI model or prompt")
+	}
+
+	return pr.config.newPlanResponse(rootTask), nil
 }
 
 func (c *Coordinator) createPlanRequest(rawUserInput string) (*planRequest, error) {

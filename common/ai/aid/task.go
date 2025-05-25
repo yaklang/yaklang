@@ -46,7 +46,6 @@ type aiTask struct {
 
 	executing bool
 	executed  bool
-	rerun     bool
 
 	// runtime
 	//ToolCallResults   []*aitool.ToolResult `json:"tool_call_results"`
