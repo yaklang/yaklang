@@ -4,7 +4,7 @@
 
 ## 任务执行进度和状态
 {{ .Memory.CurrentTaskInfo }}
-{{ .Memory.ToolCallTimeline }}
+{{ .Memory.Timeline }}
 
 {{ if .Memory.PersistentMemory }}# 牢记
 {{ .Memory.PersistentMemory}}{{end}}

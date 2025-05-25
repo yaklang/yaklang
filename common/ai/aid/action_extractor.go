@@ -37,6 +37,10 @@ func (q *Action) GetString(key string, defaults ...string) string {
 	return q.params.GetString(key, defaults...)
 }
 
+func (q *Action) GetStringSlice(key string, defaults ...[]string) []string {
+	return q.params.GetStringSlice(key, defaults...)
+}
+
 func (q *Action) ActionType() string {
 	return q.params.GetString("@action")
 }

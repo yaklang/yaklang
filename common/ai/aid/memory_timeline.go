@@ -19,6 +19,7 @@ import (
 )
 
 type timelineItem struct {
+	OverrideMessage string
 	*aitool.ToolResult
 	deleted bool
 }
@@ -147,6 +148,25 @@ func (m *memoryTimeline) PushToolResult(toolResult *aitool.ToolResult) {
 
 	m.tsToTimelineItem.Set(ts, item)
 	m.idToTimelineItem.Set(toolResult.GetID(), item)
+	m.timelineLengthCheck()
+	m.dumpSizeCheck()
+}
+
+func (m *memoryTimeline) PushSimpleTimelineEvent(id int64, i string) {
+	ts := time.Now().UnixMilli()
+	if m.tsToTimelineItem.Have(ts) {
+		time.Sleep(time.Millisecond * 10)
+		ts = time.Now().UnixMilli()
+	}
+	m.idToTs.Set(id, ts)
+	item := &timelineItem{
+		OverrideMessage: i,
+	}
+	if m.perDumpContentLimit > 0 && len(item.String()) > m.perDumpContentLimit {
+		m.shrink(item)
+	}
+	m.tsToTimelineItem.Set(ts, item)
+	m.idToTimelineItem.Set(id, item)
 	m.timelineLengthCheck()
 	m.dumpSizeCheck()
 }
@@ -346,7 +366,7 @@ func (m *memoryTimeline) Dump() string {
 	if ok {
 		return m.DumpBefore(k)
 	}
-	return "no timeline generated in Dump"
+	return ""
 }
 
 func (m *memoryTimeline) DumpBefore(id int64) string {
@@ -361,6 +381,12 @@ func (m *memoryTimeline) DumpBefore(id int64) string {
 		initOnce.Do(func() {
 			buf.WriteString("timeline:\n")
 		})
+
+		if item.OverrideMessage != "" {
+			buf.WriteString(fmt.Sprintf(`├─id:[%v] %v`, key, item.OverrideMessage))
+			return true
+		}
+
 		if item.GetID() > id {
 			return true
 		}

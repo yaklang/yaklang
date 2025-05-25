@@ -11,5 +11,5 @@
 # 工具调用信息
 
 <tool-call-timeline>
-{{ .Memory.ToolCallTimeline }}
+{{ .Memory.Timeline }}
 </tool-call-timeline>

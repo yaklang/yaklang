@@ -21,6 +21,8 @@
 {{ .Memory.Query }}
 <<<USER_INPUT_MATERIAL END>>>
 
+{{ .Memory.Timeline }}
+
 # 任务设计输出要求：
 *. 根据后续任务计划的schema构造JSON
 *. 任务规划只能输出JSON，禁止输出非JSON的内容，注意JSON的格式，避免出现语法错误
