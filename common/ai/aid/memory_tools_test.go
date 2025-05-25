@@ -128,7 +128,8 @@ func TestCoodinator_Delete_Memory(t *testing.T) {
 						panic("timeline.summary.GetByIndex fail")
 					}
 					callResult, _ := timeline.idToTimelineItem.Get(keys[0])
-					if callResult.Name != "now" {
+					result := callResult.value.(*aitool.ToolResult)
+					if result.Name != "now" {
 						panic("timeline.idToToolResult.Get now fail")
 					}
 					testCallKey = keys[0]
