@@ -19,10 +19,35 @@ import (
 )
 
 type timelineItem struct {
-	OverrideMessage string
-	*aitool.ToolResult
 	deleted bool
+
+	value TimelineItemValue // *aitool.ToolResult
 }
+
+func (item *timelineItem) GetShrinkResult() string {
+	return item.value.GetShrinkResult()
+}
+
+func (item *timelineItem) GetShrinkSimilarResult() string {
+	return item.value.GetShrinkSimilarResult()
+}
+
+func (item *timelineItem) String() string {
+	return item.value.String()
+}
+
+func (item *timelineItem) SetShrinkResult(pers string) {
+	item.value.SetShrinkResult(pers)
+}
+
+func (item *timelineItem) GetID() int64 {
+	if item.value == nil {
+		return 0
+	}
+	return item.value.GetID()
+}
+
+var _ TimelineItemValue = (*timelineItem)(nil)
 
 type memoryTimeline struct {
 	memory *Memory
@@ -52,8 +77,8 @@ func (m *memoryTimeline) SoftDelete(id ...int64) {
 		}
 		if v, ok := m.summary.Get(i); ok {
 			v.Push(&timelineItem{
-				ToolResult: v.Value().ToolResult,
-				deleted:    true,
+				value:   v.Value().value,
+				deleted: true,
 			})
 		}
 	}
@@ -138,7 +163,7 @@ func (m *memoryTimeline) PushToolResult(toolResult *aitool.ToolResult) {
 	m.idToTs.Set(toolResult.GetID(), ts)
 
 	item := &timelineItem{
-		ToolResult: toolResult,
+		value: toolResult,
 	}
 
 	// if item dump string > perDumpContentLimit should shrink this item
@@ -152,19 +177,27 @@ func (m *memoryTimeline) PushToolResult(toolResult *aitool.ToolResult) {
 	m.dumpSizeCheck()
 }
 
-func (m *memoryTimeline) PushSimpleTimelineEvent(id int64, i string) {
+func (m *memoryTimeline) PushUserInteraction(stage UserInteractionStage, id int64, systemPrompt string, userExtraPrompt string) {
 	ts := time.Now().UnixMilli()
 	if m.tsToTimelineItem.Have(ts) {
 		time.Sleep(time.Millisecond * 10)
 		ts = time.Now().UnixMilli()
 	}
 	m.idToTs.Set(id, ts)
+
 	item := &timelineItem{
-		OverrideMessage: i,
+		value: &UserInteraction{
+			ID:              id,
+			SystemPrompt:    systemPrompt,
+			UserExtraPrompt: userExtraPrompt,
+			Stage:           stage,
+		},
 	}
+
 	if m.perDumpContentLimit > 0 && len(item.String()) > m.perDumpContentLimit {
 		m.shrink(item)
 	}
+
 	m.tsToTimelineItem.Set(ts, item)
 	m.idToTimelineItem.Set(id, item)
 	m.timelineLengthCheck()
@@ -178,15 +211,16 @@ func (m *memoryTimeline) timelineLengthCheck() {
 		shrinkTargetIndex := total - m.fullMemoryCount - 1
 		id := m.idToTimelineItem.Index(shrinkTargetIndex)
 		for _, v := range id.Values() {
-			log.Infof("start to shrink memory timeline id: %v, total: %v, summary: %v, size: %v", v.GetID(), total, summaryCount, m.fullMemoryCount)
+			log.Infof("start to shrink memory timeline id: %v, total: %v, summary: %v, size: %v", v.value.GetID(), total, summaryCount, m.fullMemoryCount)
 			m.shrink(v)
 		}
 	}
 
 	if m.maxTimelineLimit > 0 && total-m.maxTimelineLimit > 0 {
 		endIdx := total - m.maxTimelineLimit - 1
-		val, ok := m.idToTimelineItem.GetByIndex(endIdx)
+		rawValue, ok := m.idToTimelineItem.GetByIndex(endIdx)
 		if ok {
+			val := rawValue.value
 			log.Infof("start to reducer from id: %v, total: %v, limit: %v, delta: %v", val.GetID(), total, m.maxTimelineLimit, total-m.maxTimelineLimit)
 			m.reducer(val.GetID())
 		}
@@ -209,7 +243,7 @@ func (m *memoryTimeline) dumpSizeCheck() {
 	if totalLastID > summaryLastID {
 		m.idToTimelineItem.ForEach(func(k int64, v *timelineItem) bool {
 			if k > summaryLastID {
-				log.Infof("start to shrink memory timeline id: %v", v.GetID())
+				log.Infof("start to shrink memory timeline id: %v", v.value.GetID())
 				m.shrink(v)
 				return false
 			}
@@ -222,7 +256,7 @@ func (m *memoryTimeline) dumpSizeCheck() {
 		}
 		m.idToTimelineItem.ForEach(func(k int64, v *timelineItem) bool {
 			if k > reducerID {
-				log.Infof("start to shrink memory timeline id: %v", v.GetID())
+				log.Infof("start to shrink memory timeline id: %v", v.value.GetID())
 				m.reducer(k)
 				return false
 			}
@@ -302,15 +336,16 @@ func (m *memoryTimeline) shrink(currentItem *timelineItem) {
 	if pers == "" {
 		s, ok := m.summary.Get(currentItem.GetID())
 		if ok {
-			pers = s.Value().ShrinkResult
+			pers = s.Value().GetShrinkResult()
 			if pers == "" {
-				pers = s.Value().ShrinkSimilarResult
+				pers = s.Value().GetShrinkSimilarResult()
 			}
 		}
 	}
 	newItem := *currentItem //  copy struct
 	newItem.deleted = action.GetBool("should_drop", currentItem.deleted)
-	newItem.ShrinkResult = pers
+	//newItem.ShrinkResult = pers
+	newItem.SetShrinkResult(pers)
 	if lt, ok := m.summary.Get(currentItem.GetID()); ok {
 		lt.Push(&newItem)
 	} else {
@@ -382,11 +417,6 @@ func (m *memoryTimeline) DumpBefore(id int64) string {
 			buf.WriteString("timeline:\n")
 		})
 
-		if item.OverrideMessage != "" {
-			buf.WriteString(fmt.Sprintf(`├─id:[%v] %v`, key, item.OverrideMessage))
-			return true
-		}
-
 		if item.GetID() > id {
 			return true
 		}
@@ -412,7 +442,7 @@ func (m *memoryTimeline) DumpBefore(id int64) string {
 		if shrinkStartId > 0 && item.GetID() <= shrinkStartId {
 			val, ok := m.summary.Get(shrinkStartId)
 			if ok && !val.Value().deleted {
-				buf.WriteString(fmt.Sprintf("├─[%s] id: %v memory: %v\n", timeStr, item.GetID(), val.Value().ShrinkResult))
+				buf.WriteString(fmt.Sprintf("├─[%s] id: %v memory: %v\n", timeStr, item.GetID(), val.Value().GetShrinkResult()))
 			}
 			return true
 		}

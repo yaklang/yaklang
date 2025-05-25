@@ -17,14 +17,18 @@ func (pr *planRequest) handlePlanWithUserInteract(interactAction *Action) (*Plan
 	}
 	haveOpt := len(opt) > 0
 	_ = haveOpt
-	params, err := pr.config.RequireUserPrompt(q, opts...)
+	params, ep, err := pr.config.RequireUserPromptWithEndpointResult(q, opts...)
 	if err != nil {
 		return nil, utils.Errorf("plan: require user interact failed: %v", err)
 	}
 	_ = params
 
-	id := pr.config.AcquireId()
-	pr.config.memory.timeline.PushSimpleTimelineEvent(id, string(utils.Jsonify(params)))
+	pr.config.memory.timeline.PushUserInteraction(
+		UserInteractionStage_BeforePlan,
+		ep.seq,
+		q,
+		string(utils.Jsonify(params)),
+	)
 
 	pr.deltaInteractCount(1)
 	if pr.GetInteractCount() >= pr.config.planUserInteractMaxCount {

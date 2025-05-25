@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"gopkg.in/yaml.v3"
+	"io"
 	"strconv"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -25,6 +26,28 @@ type ToolResult struct {
 
 	// shrink_similar_result 表示缩略信息，是由于时间线内容过多引发的压缩。
 	ShrinkResult string `json:"shrink_result,omitempty"`
+}
+
+func (t *ToolResult) DumpTimelineItem(buf io.Writer) {
+
+}
+
+func (t *ToolResult) GetShrinkResult() string {
+	if t.ShrinkResult != "" {
+		return t.ShrinkResult
+	}
+	return t.ShrinkSimilarResult
+}
+
+func (t *ToolResult) SetShrinkResult(i string) {
+	t.ShrinkResult = i
+}
+
+func (t *ToolResult) GetShrinkSimilarResult() string {
+	if t.ShrinkSimilarResult != "" {
+		return t.ShrinkSimilarResult
+	}
+	return t.ShrinkResult
 }
 
 func (t *ToolResult) String() string {
