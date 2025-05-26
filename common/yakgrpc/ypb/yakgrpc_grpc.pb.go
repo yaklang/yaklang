@@ -474,6 +474,10 @@ const (
 	Yak_ImportNote_FullMethodName                                 = "/ypb.Yak/ImportNote"
 	Yak_ExportNote_FullMethodName                                 = "/ypb.Yak/ExportNote"
 	Yak_StartAITask_FullMethodName                                = "/ypb.Yak/StartAITask"
+	Yak_CreateAIForge_FullMethodName                              = "/ypb.Yak/CreateAIForge"
+	Yak_UpdateAIForge_FullMethodName                              = "/ypb.Yak/UpdateAIForge"
+	Yak_DeleteAIForge_FullMethodName                              = "/ypb.Yak/DeleteAIForge"
+	Yak_QueryAIForge_FullMethodName                               = "/ypb.Yak/QueryAIForge"
 )
 
 // YakClient is the client API for Yak service.
@@ -1065,6 +1069,11 @@ type YakClient interface {
 	ImportNote(ctx context.Context, in *ImportNoteRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ImportNoteResponse], error)
 	ExportNote(ctx context.Context, in *ExportNoteRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExportNoteResponse], error)
 	StartAITask(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent], error)
+	// AI forge curd
+	CreateAIForge(ctx context.Context, in *AIForge, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	UpdateAIForge(ctx context.Context, in *AIForge, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	DeleteAIForge(ctx context.Context, in *AIForgeFilter, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	QueryAIForge(ctx context.Context, in *QueryAIForgeRequest, opts ...grpc.CallOption) (*QueryAIForgeResponse, error)
 }
 
 type yakClient struct {
@@ -6267,6 +6276,46 @@ func (c *yakClient) StartAITask(ctx context.Context, opts ...grpc.CallOption) (g
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_StartAITaskClient = grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent]
 
+func (c *yakClient) CreateAIForge(ctx context.Context, in *AIForge, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_CreateAIForge_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateAIForge(ctx context.Context, in *AIForge, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_UpdateAIForge_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteAIForge(ctx context.Context, in *AIForgeFilter, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_DeleteAIForge_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QueryAIForge(ctx context.Context, in *QueryAIForgeRequest, opts ...grpc.CallOption) (*QueryAIForgeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryAIForgeResponse)
+	err := c.cc.Invoke(ctx, Yak_QueryAIForge_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility.
@@ -6856,6 +6905,11 @@ type YakServer interface {
 	ImportNote(*ImportNoteRequest, grpc.ServerStreamingServer[ImportNoteResponse]) error
 	ExportNote(*ExportNoteRequest, grpc.ServerStreamingServer[ExportNoteResponse]) error
 	StartAITask(grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]) error
+	// AI forge curd
+	CreateAIForge(context.Context, *AIForge) (*DbOperateMessage, error)
+	UpdateAIForge(context.Context, *AIForge) (*DbOperateMessage, error)
+	DeleteAIForge(context.Context, *AIForgeFilter) (*DbOperateMessage, error)
+	QueryAIForge(context.Context, *QueryAIForgeRequest) (*QueryAIForgeResponse, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -8230,6 +8284,18 @@ func (UnimplementedYakServer) ExportNote(*ExportNoteRequest, grpc.ServerStreamin
 }
 func (UnimplementedYakServer) StartAITask(grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]) error {
 	return status.Errorf(codes.Unimplemented, "method StartAITask not implemented")
+}
+func (UnimplementedYakServer) CreateAIForge(context.Context, *AIForge) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateAIForge not implemented")
+}
+func (UnimplementedYakServer) UpdateAIForge(context.Context, *AIForge) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateAIForge not implemented")
+}
+func (UnimplementedYakServer) DeleteAIForge(context.Context, *AIForgeFilter) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteAIForge not implemented")
+}
+func (UnimplementedYakServer) QueryAIForge(context.Context, *QueryAIForgeRequest) (*QueryAIForgeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryAIForge not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 func (UnimplementedYakServer) testEmbeddedByValue()             {}
@@ -15830,6 +15896,78 @@ func _Yak_StartAITask_Handler(srv interface{}, stream grpc.ServerStream) error {
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_StartAITaskServer = grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]
 
+func _Yak_CreateAIForge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AIForge)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CreateAIForge(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_CreateAIForge_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CreateAIForge(ctx, req.(*AIForge))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateAIForge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AIForge)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateAIForge(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateAIForge_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateAIForge(ctx, req.(*AIForge))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteAIForge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AIForgeFilter)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteAIForge(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteAIForge_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteAIForge(ctx, req.(*AIForgeFilter))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QueryAIForge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryAIForgeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryAIForge(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QueryAIForge_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryAIForge(ctx, req.(*QueryAIForgeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -17336,6 +17474,22 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SearchNoteContent",
 			Handler:    _Yak_SearchNoteContent_Handler,
+		},
+		{
+			MethodName: "CreateAIForge",
+			Handler:    _Yak_CreateAIForge_Handler,
+		},
+		{
+			MethodName: "UpdateAIForge",
+			Handler:    _Yak_UpdateAIForge_Handler,
+		},
+		{
+			MethodName: "DeleteAIForge",
+			Handler:    _Yak_DeleteAIForge_Handler,
+		},
+		{
+			MethodName: "QueryAIForge",
+			Handler:    _Yak_QueryAIForge_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
