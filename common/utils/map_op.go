@@ -366,6 +366,10 @@ func MapGetInt64(m map[string]interface{}, key string) int64 {
 }
 
 func InterfaceToGeneralMap(params interface{}) (finalResult map[string]interface{}) {
+	if IsNil(params) {
+		return map[string]any{}
+	}
+
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("handle ptr/struct to map failed: %s", err)

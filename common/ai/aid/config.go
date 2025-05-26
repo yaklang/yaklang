@@ -87,8 +87,8 @@ type Config struct {
 	// memory
 	persistentMemory          []string
 	memory                    *Memory
-	timelineLimit             int
-	timelineContentLimit      int
+	timelineRecordLimit       int
+	timelineContentSizeLimit  int
 	timelineTotalContentLimit int
 	keywords                  []string // task keywords, maybe tools name ,help ai to plan
 
@@ -332,8 +332,8 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		aiAutoRetry:                 5,
 		aiTransactionAutoRetry:      5,
 		allowRequireForUserInteract: true,
-		timelineLimit:               10,
-		timelineContentLimit:        30 * 1024,
+		timelineRecordLimit:         10,
+		timelineContentSizeLimit:    30 * 1024,
 		aiToolManagerOption:         make([]buildinaitools.ToolManagerOption, 0),
 		planUserInteractMaxCount:    3,
 	}
@@ -345,6 +345,8 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 	if err := initDefaultAICallback(c); err != nil {
 		log.Errorf("init default ai callback: %v", err)
 	}
+
+	m.timeline.setAICaller(c)
 
 	return c
 }
@@ -699,7 +701,7 @@ func WithTimeLineLimit(i int) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
-		config.timelineLimit = i
+		config.timelineRecordLimit = i
 		return nil
 	}
 }
@@ -708,7 +710,7 @@ func WithTimelineContentLimit(i int) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
-		config.timelineContentLimit = i
+		config.timelineContentSizeLimit = i
 		return nil
 	}
 }
