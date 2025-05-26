@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户信息</title>
+    <!-- 引入 Bootstrap CSS -->
+    <link href="/static/js/bootstrap_5.3/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container">
+    <div class="row justify-content-center mt-5">
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="text-center mb-0">用户信息</h2>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-success">
+                        登录成功！
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0">用户信息</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="d-grid gap-2">
+                                        <button type="button" class="btn btn-primary" onclick="getUserInfo()">
+                                            获取用户信息
+                                        </button>
+                                        <button type="button" class="btn btn-secondary" onclick="logout()">
+                                            退出登录
+                                        </button>
+                                    </div>
+                                    <div id="userInfo" class="mt-3"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0">命令执行</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="commandInput" class="form-label">命令</label>
+                                        <input type="text" class="form-control" id="commandInput" value="ls" readonly>
+                                        <div class="form-text">当前只支持ls命令</div>
+                                    </div>
+                                    <div class="d-grid">
+                                        <button type="button" class="btn btn-warning" onclick="executeCommand()">
+                                            执行命令
+                                        </button>
+                                    </div>
+                                    <div id="commandResult" class="mt-3"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentUserRole = null;
+let currentUsername = null;
+const isVulnVersion = '{{params(vulnVersion)}}' === 'true';
+
+function getUserInfo() {
+    const apiPath = '{{params(apiPath)}}';
+    let requestUrl = apiPath;
+    
+    // 漏洞版本需要传递username参数
+    if (isVulnVersion) {
+        // 漏洞版本：默认获取user1的信息（因为这是默认登录用户）
+        // 实际上这个API可以获取任意用户的信息
+        if (!currentUsername) {
+            currentUsername = 'user1'; // 默认用户
+        }
+        requestUrl = apiPath + '?username=' + currentUsername;
+    }
+    
+    fetch(requestUrl, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        credentials: 'include' // 包含cookie
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+        }
+        return response.json();
+    })
+    .then(data => {
+        currentUserRole = data.role; // 保存用户角色
+        currentUsername = data.username; // 保存用户名
+        displayUserInfo(data);
+    })
+    .catch(error => {
+        document.getElementById('userInfo').innerHTML = 
+            '<div class="alert alert-danger"><strong>获取用户信息失败:</strong> ' + error.message + '</div>';
+    });
+}
+
+function executeCommand() {
+    // 漏洞版本：前端判断用户角色
+    if (isVulnVersion && currentUserRole !== 'admin') {
+        document.getElementById('commandResult').innerHTML = 
+            '<div class="alert alert-danger"><strong>权限不足:</strong> 只有管理员才能执行命令</div>';
+        return;
+    }
+    
+    const cmdPath = '{{params(cmdPath)}}';
+    const command = document.getElementById('commandInput').value;
+    
+    fetch(cmdPath, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+            command: command
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+        }
+        return response.json();
+    })
+    .then(data => {
+        displayCommandResult(data);
+    })
+    .catch(error => {
+        document.getElementById('commandResult').innerHTML = 
+            '<div class="alert alert-danger"><strong>命令执行失败:</strong> ' + error.message + '</div>';
+    });
+}
+
+function displayUserInfo(data) {
+    const userInfoDiv = document.getElementById('userInfo');
+    
+    let html = `
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">用户详细信息</h6>
+            </div>
+            <div class="card-body">
+                <p><strong>用户名：</strong>${data.username}</p>
+                <p><strong>ID：</strong>${data.id}</p>
+                <p><strong>角色：</strong>${data.role}</p>
+                <p><strong>年龄：</strong>${data.age}</p>
+            </div>
+        </div>
+    `;
+    
+    userInfoDiv.innerHTML = html;
+}
+
+function displayCommandResult(data) {
+    const resultDiv = document.getElementById('commandResult');
+    
+    let html = `
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">执行结果</h6>
+            </div>
+            <div class="card-body">
+                <pre class="mb-0">${data.result}</pre>
+            </div>
+        </div>
+    `;
+    
+    resultDiv.innerHTML = html;
+}
+
+function logout() {
+    // 清除cookie
+    document.cookie = 'session_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    
+    // 重定向到登录页面
+    window.location.href = window.location.pathname.replace('/dashboard', '');
+}
+
+// 页面加载时自动获取用户信息
+window.onload = function() {
+    getUserInfo();
+};
+</script>
+
+<!-- 引入 Bootstrap JavaScript -->
+<script src="/static/js/bootstrap_5.3/bootstrap.min.js"></script>
+</body>
+</html> 
