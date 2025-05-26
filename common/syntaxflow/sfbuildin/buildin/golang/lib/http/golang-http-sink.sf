@@ -9,8 +9,8 @@ TEXT
 	rule_id: "8031a101-c500-4444-ac4d-193be6ed6e0f"
 )
 
-<include('golang-http-gin')> as $output;
-<include('golang-http-net')> as $output;
+<include('golang-http-handlefunc-gin')> as $output;
+<include('golang-http-handlefunc-net')> as $output;
 
 alert $output
 

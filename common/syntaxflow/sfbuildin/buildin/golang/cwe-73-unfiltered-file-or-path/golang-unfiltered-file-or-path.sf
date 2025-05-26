@@ -1,7 +1,9 @@
 desc(
 	title: "golang Unfiltered File-or-Path"
+	title_zh: "golang 未过滤的文件或路径",
 	type: audit
 	severity: low
+	risk: "path-traversal"
 	desc: <<<TEXT
 未过滤的文件或路径访问漏洞（Unfiltered File-or-Path）允许攻击者通过操纵输入参数来访问服务器上的任意文件。在 Go 语言应用中，如果开发者未能正确验证或过滤用户输入的文件路径，攻击者可能会利用此漏洞读取敏感文件（如配置文件、数据库凭证等），甚至执行任意代码。
 
@@ -22,6 +24,7 @@ TEXT
 strings.HasPrefix(* #-> as $check);
 $path.Clean(* #-> as $check);
 $path.IsAbs(* #-> as $check);
+$path.Join(* #-> as $check);
 
 $sink #{include: `$check`}-> as $safe;
 $sink #{exclude: `$safe`}-> as $low;
@@ -51,9 +54,7 @@ const allowedBasePath = "/allowed/path/"
 
 func handler(w http.ResponseWriter, r *http.Request) {
     userInput := r.URL.Query().Get("file")
-
-    // 清洗路径并转换为绝对路径
-    requestedPath := filepath.Join(allowedBasePath, userInput)
+    requestedPath := userInput
 
     // 读取文件
     content, err := ioutil.ReadFile(requestedPath)

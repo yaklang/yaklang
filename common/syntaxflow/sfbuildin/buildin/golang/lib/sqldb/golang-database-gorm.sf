@@ -1,5 +1,5 @@
 desc(
-	title: "check file database function"
+	title: "check file database function(gorm)"
 	type: audit
 	level: info
 	lib: 'golang-database-gorm'

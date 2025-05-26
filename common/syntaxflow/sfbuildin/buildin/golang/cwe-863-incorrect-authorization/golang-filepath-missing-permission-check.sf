@@ -1,5 +1,6 @@
 desc(
 	title: "golang filepath missing permission check"
+	title_zh: "golang 文件路径未适当过滤",
 	type: audit
 	level: low
 	desc: <<<TEXT
@@ -13,7 +14,7 @@ TEXT
 )
 
 <include('golang-file-path')> as $path;
-<include('golang-os-sink')> as $sink;
+<include('golang-os-file')> as $sink;
 
 strings.HasPrefix(* #-> as $check);
 $path.Clean(* #-> as $check);
