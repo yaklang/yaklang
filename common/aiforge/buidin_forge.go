@@ -143,7 +143,7 @@ func registerBuildInForge(name string) {
 		forge.ForgeName = name
 	}
 
-	err := yakit.CreateOrUpdateAIForge(consts.GetGormProfileDatabase(), forge.ForgeName, forge)
+	err := yakit.CreateOrUpdateAIForgeByName(consts.GetGormProfileDatabase(), forge.ForgeName, forge)
 	if err != nil {
 		log.Errorf("create or update forge %v failed: %v", name, err)
 		return

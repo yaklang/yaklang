@@ -69,13 +69,13 @@ func MockAICallback(t *testing.T, initFlag, persistentFlag, planFlag string) aid
 
 func RunTestForge(t *testing.T, forge *schema.AIForge, initFlag, persistentFlag string) (any, error) {
 	db := consts.GetGormProfileDatabase()
-	err := yakit.CreateOrUpdateAIForge(db, forge.ForgeName, forge)
+	err := yakit.CreateOrUpdateAIForgeByName(db, forge.ForgeName, forge)
 	if err != nil {
 		return nil, err
 	}
 
 	defer func() {
-		yakit.DeleteAIForge(db, forge.ForgeName)
+		yakit.DeleteAIForgeByName(db, forge.ForgeName)
 	}()
 
 	result, err := yak.ExecuteForge(forge.ForgeName, map[string]any{
