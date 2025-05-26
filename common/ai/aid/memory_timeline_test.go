@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -73,7 +74,7 @@ func (m *mockedAI2) callAI(req *AIRequest) (*AIResponse, error) {
 	rsp := newUnboundAIResponse()
 	defer rsp.Close()
 
-	if strings.Contains(req.GetPrompt(), "# 需要裁剪的部分Timeline") {
+	if utils.MatchAllOfRegexp(req.GetPrompt(), `const"\s*:\s*"timeline-reducer"`) {
 		rsp.EmitOutputStream(strings.NewReader(`
 {"@action": "timeline-reducer", "reducer_memory": "高度压缩的内容` + fmt.Sprint(atomic.AddInt64(m.hCompressTime, 1)) + `"}
 `))
