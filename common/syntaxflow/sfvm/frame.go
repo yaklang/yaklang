@@ -817,7 +817,11 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			s.debugSubLog(">> get value: %v ", vs)
 			s.stack.Push(vs)
 		} else {
-			return utils.Errorf("new ref failed: not found: %v", i.UnaryStr)
+			values := NewEmptyValues()
+			s.result.SymbolTable.Set(i.UnaryStr, values)
+			s.stack.Push(values)
+			return nil
+			//return utils.Errorf("new ref failed: not found: %v", i.UnaryStr)
 		}
 	case OpUpdateRef:
 		if i.UnaryStr == "" {
