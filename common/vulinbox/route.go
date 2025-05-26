@@ -156,6 +156,7 @@ func (s *VulinServer) init() {
 	s.registerMiscRoute()
 	s.registerPipelineNSmuggle()
 
+	s.registerAuthorizationBypass()
 	// 靶场是否是安全的？
 	if !s.safeMode {
 		s.registerPingCMDI()
