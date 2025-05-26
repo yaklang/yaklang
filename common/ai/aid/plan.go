@@ -165,6 +165,9 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 				rootTask.Name = action.GetString("main_task")
 				rootTask.Goal = action.GetString("main_task_goal")
 				for _, subtask := range action.GetInvokeParamsArray("tasks") {
+					if subtask.GetString("subtask_name") == "" {
+						continue
+					}
 					rootTask.Subtasks = append(rootTask.Subtasks, &aiTask{
 						config: pr.config,
 						Name:   subtask.GetString("subtask_name"),
