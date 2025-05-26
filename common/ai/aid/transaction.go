@@ -5,14 +5,26 @@ import (
 	"time"
 )
 
-func (c *Config) callAiTransaction(
+func CallAITransactionWithoutConfig(
+	prompt string,
+	callAi func(*AIRequest) (*AIResponse, error),
+	postHandler func(rsp *AIResponse) error,
+) error {
+	return CallAITransaction(nil, prompt, callAi, postHandler)
+}
+
+func CallAITransaction(
+	c *Config,
 	prompt string,
 	callAi func(*AIRequest) (*AIResponse, error),
 	postHandler func(rsp *AIResponse) error,
 ) error {
 	var seq int64
 	var saver CheckpointCommitHandler
-	trcRetry := c.aiTransactionAutoRetry
+	var trcRetry int64 = 3
+	if c != nil {
+		trcRetry = c.aiTransactionAutoRetry
+	}
 	if trcRetry <= 0 {
 		trcRetry = 3
 	}
@@ -61,4 +73,12 @@ func (c *Config) callAiTransaction(
 		return nil
 	}
 	return utils.Errorf("max retry count[%v] reached in transaction", trcRetry)
+}
+
+func (c *Config) callAiTransaction(
+	prompt string,
+	callAi func(*AIRequest) (*AIResponse, error),
+	postHandler func(rsp *AIResponse) error,
+) error {
+	return CallAITransaction(c, prompt, callAi, postHandler)
 }

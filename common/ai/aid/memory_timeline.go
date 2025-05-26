@@ -121,8 +121,8 @@ func (m *memoryTimeline) CreateSubTimeline(ids ...int64) *memoryTimeline {
 func (m *memoryTimeline) BindConfig(config *Config) {
 	m.config = config
 	m.memory = config.memory
-	m.setTimelineLimit(config.timelineLimit)
-	m.setTimelineContentLimit(config.timelineContentLimit)
+	m.setTimelineLimit(config.timelineRecordLimit)
+	m.setTimelineContentLimit(config.timelineContentSizeLimit)
 	if utils.IsNil(m.ai) {
 		m.setAICaller(config)
 	}
@@ -274,35 +274,45 @@ func (m *memoryTimeline) reducer(beforeId int64) {
 	if utils.IsNil(m.ai) {
 		return
 	}
-	response, err := m.ai.callAI(NewAIRequest(pmt))
-	if err != nil {
-		log.Errorf("reducer call ai failed: %v", err)
-		return
-	}
-	var r io.Reader
+
 	if m.config == nil {
-		r = response.GetUnboundStreamReader(false)
+		CallAITransactionWithoutConfig(pmt, m.ai.callAI, func(response *AIResponse) error {
+			action, err := ExtractActionFromStream(response.GetUnboundStreamReader(false), "timeline-reducer")
+			if err != nil {
+				log.Errorf("extract timeline action failed: %v", err)
+				return utils.Errorf("extract timeline-reducer failed: %v", err)
+			}
+			pers := action.GetString("reducer_memory")
+			if pers != "" {
+				if lt, ok := m.reducers.Get(beforeId); ok {
+					lt.Push(pers)
+				} else {
+					m.reducers.Set(beforeId, linktable.NewUnlimitedStringLinkTable(pers))
+				}
+			}
+			return nil
+		})
 	} else {
-		r = response.GetOutputStreamReader("memory-reducer", true, m.config)
+		m.config.callAiTransaction(pmt, m.ai.callAI, func(response *AIResponse) error {
+			action, err := ExtractActionFromStream(
+				response.GetOutputStreamReader("memory-reducer", true, m.config),
+				"timeline-reducer",
+			)
+			if err != nil {
+				return utils.Errorf("extract timeline action failed: %v", err)
+			}
+			pers := action.GetString("reducer_memory")
+			if pers != "" {
+				if lt, ok := m.reducers.Get(beforeId); ok {
+					lt.Push(pers)
+				} else {
+					m.reducers.Set(beforeId, linktable.NewUnlimitedStringLinkTable(pers))
+				}
+			}
+			return nil
+		})
 	}
-	output, err := io.ReadAll(r)
-	if err != nil {
-		log.Errorf("read ai output failed: %v", err)
-		return
-	}
-	action, err := ExtractAction(string(output), "timeline-reducer")
-	if err != nil {
-		log.Errorf("extract timeline action failed: %v", err)
-		return
-	}
-	pers := action.GetString("reducer_memory")
-	if pers != "" {
-		if lt, ok := m.reducers.Get(beforeId); ok {
-			lt.Push(pers)
-		} else {
-			m.reducers.Set(beforeId, linktable.NewUnlimitedStringLinkTable(pers))
-		}
-	}
+
 }
 
 func (m *memoryTimeline) shrink(currentItem *timelineItem) {
@@ -364,9 +374,11 @@ func (m *memoryTimeline) renderReducerPrompt(beforeId int64) string {
 		return ""
 	}
 	var buf bytes.Buffer
+	var nonce = utils.RandStringBytes(6)
 	err = ins.Execute(&buf, map[string]any{
 		"Memory": m.memory,
 		"Input":  input,
+		`NONCE`:  nonce,
 	})
 	if err != nil {
 		log.Errorf("BUG: dump summary prompt failed: %v", err)
@@ -385,9 +397,11 @@ func (m *memoryTimeline) renderSummaryPrompt(result *timelineItem) string {
 		return ""
 	}
 	var buf bytes.Buffer
+	var nonce = strings.ToLower(utils.RandStringBytes(6))
 	err = ins.Execute(&buf, map[string]any{
 		"Memory": m.memory,
 		"Input":  result.String(),
+		"NONCE":  nonce,
 	})
 	if err != nil {
 		log.Errorf("BUG: dump summary prompt failed: %v", err)

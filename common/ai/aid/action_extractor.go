@@ -114,7 +114,7 @@ func ExtractActionFromStream(reader io.Reader, actionName string, alias ...strin
 	if err != nil {
 		return nil, err
 	}
-	return nil, utils.Errorf("cannot extract action from: %v", utils.ShrinkString(buf.String(), 100))
+	return nil, utils.Errorf("cannot extract action[%v] from: %v", actions, utils.ShrinkString(buf.String(), 100))
 }
 
 func ExtractAction(i string, actionName string, alias ...string) (*Action, error) {
