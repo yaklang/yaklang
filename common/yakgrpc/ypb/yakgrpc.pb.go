@@ -1310,8 +1310,16 @@ type AIStartParams struct {
 	IncludeSuggestedToolNames    []string `protobuf:"bytes,14,rep,name=IncludeSuggestedToolNames,proto3" json:"IncludeSuggestedToolNames,omitempty"`
 	IncludeSuggestedToolKeywords []string `protobuf:"bytes,16,rep,name=IncludeSuggestedToolKeywords,proto3" json:"IncludeSuggestedToolKeywords,omitempty"`
 	ExcludeToolNames             []string `protobuf:"bytes,15,rep,name=ExcludeToolNames,proto3" json:"ExcludeToolNames,omitempty"`
-	unknownFields                protoimpl.UnknownFields
-	sizeCache                    protoimpl.SizeCache
+	// ollama 本地模型部署可以使用 /nothink 关闭，使用这个选项可以移除 qwen3 的思考模式
+	EnableQwenNoThinkMode bool `protobuf:"varint,19,opt,name=EnableQwenNoThinkMode,proto3" json:"EnableQwenNoThinkMode,omitempty"`
+	// 在任务规划的时候，AI 是否被允许主动问用户问题
+	AllowPlanUserInteract bool `protobuf:"varint,20,opt,name=AllowPlanUserInteract,proto3" json:"AllowPlanUserInteract,omitempty"`
+	// 在任务规划的时候，如果AI允许问用户问题，那么最多问几次？
+	PlanUserInteractMaxCount int64 `protobuf:"varint,23,opt,name=PlanUserInteractMaxCount,proto3" json:"PlanUserInteractMaxCount,omitempty"`
+	// 是否允许生成报告，默认不允许
+	AllowGenerateReport bool `protobuf:"varint,24,opt,name=AllowGenerateReport,proto3" json:"AllowGenerateReport,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *AIStartParams) Reset() {
@@ -1475,6 +1483,34 @@ func (x *AIStartParams) GetExcludeToolNames() []string {
 		return x.ExcludeToolNames
 	}
 	return nil
+}
+
+func (x *AIStartParams) GetEnableQwenNoThinkMode() bool {
+	if x != nil {
+		return x.EnableQwenNoThinkMode
+	}
+	return false
+}
+
+func (x *AIStartParams) GetAllowPlanUserInteract() bool {
+	if x != nil {
+		return x.AllowPlanUserInteract
+	}
+	return false
+}
+
+func (x *AIStartParams) GetPlanUserInteractMaxCount() int64 {
+	if x != nil {
+		return x.PlanUserInteractMaxCount
+	}
+	return 0
+}
+
+func (x *AIStartParams) GetAllowGenerateReport() bool {
+	if x != nil {
+		return x.AllowGenerateReport
+	}
+	return false
 }
 
 type GetSpaceEngineAccountStatusRequest struct {
@@ -50081,7 +50117,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tMcpConfig\x12\x12\n" +
 	"\x04Type\x18\x01 \x01(\tR\x04Type\x12\x10\n" +
 	"\x03Key\x18\x02 \x01(\tR\x03Key\x12\x10\n" +
-	"\x03Url\x18\x03 \x01(\tR\x03Url\"\xa7\a\n" +
+	"\x03Url\x18\x03 \x01(\tR\x03Url\"\x81\t\n" +
 	"\rAIStartParams\x12$\n" +
 	"\rCoordinatorId\x18\x11 \x01(\tR\rCoordinatorId\x12\x1a\n" +
 	"\bSequence\x18\x12 \x01(\x03R\bSequence\x12.\n" +
@@ -50104,7 +50140,11 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x16EnableAISearchInternet\x18\r \x01(\bR\x16EnableAISearchInternet\x12<\n" +
 	"\x19IncludeSuggestedToolNames\x18\x0e \x03(\tR\x19IncludeSuggestedToolNames\x12B\n" +
 	"\x1cIncludeSuggestedToolKeywords\x18\x10 \x03(\tR\x1cIncludeSuggestedToolKeywords\x12*\n" +
-	"\x10ExcludeToolNames\x18\x0f \x03(\tR\x10ExcludeToolNames\"|\n" +
+	"\x10ExcludeToolNames\x18\x0f \x03(\tR\x10ExcludeToolNames\x124\n" +
+	"\x15EnableQwenNoThinkMode\x18\x13 \x01(\bR\x15EnableQwenNoThinkMode\x124\n" +
+	"\x15AllowPlanUserInteract\x18\x14 \x01(\bR\x15AllowPlanUserInteract\x12:\n" +
+	"\x18PlanUserInteractMaxCount\x18\x17 \x01(\x03R\x18PlanUserInteractMaxCount\x120\n" +
+	"\x13AllowGenerateReport\x18\x18 \x01(\bR\x13AllowGenerateReport\"|\n" +
 	"\"GetSpaceEngineAccountStatusRequest\x12\x12\n" +
 	"\x04Type\x18\x01 \x01(\tR\x04Type\x12\x10\n" +
 	"\x03Key\x18\x02 \x01(\tR\x03Key\x12\x18\n" +

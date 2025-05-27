@@ -167,6 +167,31 @@ func buildAIDOption(startParams *ypb.AIStartParams) []aid.Option {
 		aidOption = append(aidOption, aid.WithJarOperator())
 	}
 
+	switch startParams.GetReviewPolicy() {
+	case "yolo":
+		aidOption = append(aidOption, aid.WithAgreeYOLO(true))
+	case "ai":
+		aidOption = append(aidOption, aid.WithAIAgree())
+	case "manual":
+		aidOption = append(aidOption, aid.WithAgreeManual())
+	}
+
+	if startParams.GetEnableQwenNoThinkMode() {
+		aidOption = append(aidOption, aid.WithQwenNoThink())
+	}
+
+	if startParams.GetAllowPlanUserInteract() {
+		aidOption = append(aidOption, aid.WithAllowPlanUserInteract())
+	}
+
+	if startParams.GetPlanUserInteractMaxCount() > 0 {
+		aidOption = append(aidOption, aid.WithPlanUserInteractMaxCount(startParams.GetPlanUserInteractMaxCount()))
+	}
+
+	if startParams.GetAllowGenerateReport() {
+		aidOption = append(aidOption, aid.WithGenerateReport(startParams.GetAllowGenerateReport()))
+	}
+
 	if startParams.GetUseDefaultAIConfig() {
 		aidOption = append(aidOption, aid.WithAICallback(aid.AIChatToAICallbackType(ai.Chat)))
 	}
