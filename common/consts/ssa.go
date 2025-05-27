@@ -73,7 +73,10 @@ func GetSSADatabaseInfoFromEnv() string {
 }
 
 func GetSSADataBaseInfo() (string, string) {
-	return SSA_PROJECT_DB_RAW, SSA_PROJECT_DB_DIALECT
+	if !filepath.IsAbs(SSA_PROJECT_DB_RAW) {
+		SSA_PROJECT_DB_RAW = filepath.Join(GetDefaultYakitBaseDir(), SSA_PROJECT_DB_RAW)
+	}
+	return SSA_PROJECT_DB_DIALECT, SSA_PROJECT_DB_RAW
 }
 
 func parseDatabaseURL(raw string) (string, string) {
@@ -113,8 +116,8 @@ func SetSSADatabaseInfo(raw string) {
 }
 
 func SetGormSSAProjectDatabaseByInfo(raw string) error {
-	raw, dialect := parseDatabaseURL(raw)
-	db, err := CreateSSAProjectDatabase(raw, dialect)
+	dialect, path := parseDatabaseURL(raw)
+	db, err := CreateSSAProjectDatabase(dialect, path)
 	if err != nil {
 		return err
 	}
@@ -122,13 +125,13 @@ func SetGormSSAProjectDatabaseByInfo(raw string) error {
 	return nil
 }
 
-func CreateSSAProjectDatabase(path string, dialect string) (*gorm.DB, error) {
+func CreateSSAProjectDatabase(dialect, path string) (*gorm.DB, error) {
 	db, err := createAndConfigDatabase(path, dialect)
 	if err != nil {
 		return nil, err
 	}
 	schema.AutoMigrate(db, schema.KEY_SCHEMA_SSA_DATABASE)
-	configureAndOptimizeDB(db)
+	configureAndOptimizeDB(dialect, db)
 	return db, nil
 }
 

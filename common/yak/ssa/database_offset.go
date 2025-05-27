@@ -46,7 +46,6 @@ func SaveVariableOffset(v *Variable, variableName string) {
 		// variable name
 		irOffset.VariableName = variableName
 		irOffset.ValueID = v.GetValue().GetId()
-		ssadb.SaveIrOffset(irOffset)
 	}
 
 	add(v.DefRange)

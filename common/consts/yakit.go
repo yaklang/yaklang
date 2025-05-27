@@ -120,8 +120,8 @@ func initYakitDatabase() {
 		schema.SetGormProjectDatabase(projectDataBase)
 
 		/* 创建SSA数据库 */
-		ssaDatabaseRaw, ssaDatabaseDialect := GetSSADataBaseInfo()
-		ssaprojectDatabase, err := CreateSSAProjectDatabase(ssaDatabaseRaw, ssaDatabaseDialect)
+		ssaDatabaseDialect, ssaDatabaseRaw := GetSSADataBaseInfo()
+		ssaprojectDatabase, err := CreateSSAProjectDatabase(ssaDatabaseDialect, ssaDatabaseRaw)
 		if err != nil {
 			log.Errorf("init ssa-db[%s %s] failed: %s", ssaDatabaseRaw, ssaDatabaseDialect, err)
 		}
