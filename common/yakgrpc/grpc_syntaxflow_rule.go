@@ -110,7 +110,6 @@ func (s *Server) SyntaxFlowRuleToOnline(req *ypb.SyntaxFlowRuleToOnlineRequest, 
 	if req.Filter == nil {
 		req.Filter = &ypb.SyntaxFlowRuleFilter{}
 	}
-	req.Filter.FilterRuleKind = yakit.FilterBuiltinRuleFalse
 
 	ctx := stream.Context()
 	ret, err := yakit.AllSyntaxFlowRule(s.GetProfileDatabase(), req.GetFilter())
