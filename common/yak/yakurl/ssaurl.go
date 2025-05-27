@@ -200,7 +200,7 @@ Get SyntaxFlowAction
 		page:
 			start from
 	Response:
-		1. "syntaxflow://program_id/" :
+		1. "syntaxflow://program_id/" :`
 			* ResourceType: (message / variable) +  result_id
 			all variable names
 		2. "syntaxflow://program_id/variable_name" :
