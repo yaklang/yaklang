@@ -102,8 +102,8 @@ type QuerySyntaxFlow struct {
 	index    int64
 
 	// option
-	haveRange bool
-
+	haveRange      bool
+	useVerboseName bool
 	// extra info
 	programName string
 	ResultID    uint
@@ -121,6 +121,10 @@ func (a *SyntaxFlowAction) GetResult(params *ypb.RequestYakURLParams) (*QuerySyn
 		query[v.GetKey()] = v.GetValue()
 	}
 
+	useVerboseName := false
+	if ret, ok := query["use_verbose_name"]; ok {
+		useVerboseName = ret == "true"
+	}
 	haveRange := false
 	if have_range, ok := query["have_range"]; ok {
 		haveRange = have_range == "true"
@@ -171,7 +175,8 @@ func (a *SyntaxFlowAction) GetResult(params *ypb.RequestYakURLParams) (*QuerySyn
 		variable: variable,
 		index:    index,
 
-		haveRange: haveRange,
+		haveRange:      haveRange,
+		useVerboseName: useVerboseName,
 
 		ResultID:    resultID,
 		programName: programName,
@@ -191,10 +196,11 @@ Get SyntaxFlowAction
 		query:
 			result_id	string  // if set this, will get result from database
 			have_range  bool    // if set this, will just return value contain code range
+			use_verbose_name bool // if set this, will use verbose name in response
 		page:
 			start from
 	Response:
-		1. "syntaxflow://program_id/" :
+		1. "syntaxflow://program_id/" :`
 			* ResourceType: (message / variable) +  result_id
 			all variable names
 		2. "syntaxflow://program_id/variable_name" :
@@ -267,7 +273,11 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 
 			res := createNewRes(url, 0, extraData)
 			res.ResourceType = "value"
-			res.ResourceName = v.String()
+			if query.useVerboseName {
+				res.ResourceName = v.GetVerboseName()
+			} else {
+				res.ResourceName = v.String()
+			}
 			resources = append(resources, res)
 		}
 
