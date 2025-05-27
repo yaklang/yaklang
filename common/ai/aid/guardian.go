@@ -22,6 +22,8 @@ type asyncGuardian struct {
 }
 
 type mirrorEventStream struct {
+	triggerCallbackOnce *sync.Once
+
 	unlimitedChan *chanx.UnlimitedChan[*Event]
 	emitter       GuardianEmitter
 	trigger       GuardianMirrorStreamTrigger
@@ -77,9 +79,10 @@ func (a *asyncGuardian) registerMirrorEventTrigger(mirrorName string, trigger Gu
 		return utils.Errorf("GuardianMirrorStreamTrigger for mirror name %s already registered", mirrorName)
 	}
 	a.mirrorCallback[mirrorName] = &mirrorEventStream{
-		unlimitedChan: chanx.NewUnlimitedChan[*Event](a.ctx, 1000),
-		emitter:       a.outputEmitter,
-		trigger:       trigger,
+		triggerCallbackOnce: new(sync.Once),
+		unlimitedChan:       chanx.NewUnlimitedChan[*Event](a.ctx, 1000),
+		emitter:             a.outputEmitter,
+		trigger:             trigger,
 	}
 	return nil
 }
@@ -116,6 +119,16 @@ func (a *asyncGuardian) emitEvent(event *Event) {
 	}
 
 	for _, mirror := range a.mirrorCallback {
-		mirror.trigger(mirror.unlimitedChan, a.outputEmitter)
+		mirror.triggerCallbackOnce.Do(func() {
+			go func() {
+				defer func() {
+					if err := recover(); err != nil {
+						log.Errorf("GuardianEmitter panic: %v", utils.ErrorStack(err))
+					}
+				}()
+				mirror.trigger(mirror.unlimitedChan, a.outputEmitter)
+			}()
+		})
+		mirror.unlimitedChan.SafeFeed(event)
 	}
 }
