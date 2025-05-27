@@ -330,7 +330,10 @@ func TestAsyncGuardian_EventAndMirrorTriggers(t *testing.T) {
 	})
 	g.registerMirrorEventTrigger("interaction_mirror", func(uc *chanx.UnlimitedChan[*Event], emitter GuardianEmitter) {
 		mirrorTriggerCalled = true
-		emitter.EmitStructured("mirror_trigger_node", &Event{Type: "from_mirror_trigger"})
+		for event := range uc.OutputChannel() {
+			_ = event
+			emitter.EmitStructured("mirror_trigger_node", &Event{Type: "from_mirror_trigger"})
+		}
 	})
 
 	// Feed event that matches specific trigger
@@ -355,7 +358,7 @@ func TestAsyncGuardian_EventAndMirrorTriggers(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	assert.False(t, eventTriggerCalled, "Event trigger should NOT be called for other event")
-	assert.True(t, mirrorTriggerCalled, "Mirror trigger should be called for other event (run2)")
+	assert.False(t, mirrorTriggerCalled, "Mirror trigger should be called once in run1, not called in run2")
 
 	emitterMutex.Lock()
 	assert.False(t, emittedEventTypes["from_event_trigger_via_structured"], "Output emitter should NOT receive event from event trigger (run2)")
