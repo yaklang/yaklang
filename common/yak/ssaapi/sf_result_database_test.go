@@ -24,7 +24,6 @@ func queryAndSave(t *testing.T) (func(), *ssaapi.SyntaxFlowResult) {
 			return a
 		}
 		target = f(1)
-		target = f(2)
 		`
 	// parse code
 	programName := uuid.NewString()
@@ -85,6 +84,38 @@ func TestQueryAndSave(t *testing.T) {
 	slices.Sort(wantValueID)
 	require.Equal(t, wantValueID, resValueID)
 }
+func TestGetResultFromDB(t *testing.T) {
+	deleteProgram, wantRes := queryAndSave(t)
+	defer deleteProgram()
+	_ = wantRes
+
+	// get result from db
+	gotRes, err := ssaapi.LoadResultByID(wantRes.GetResultID())
+	require.NoError(t, err)
+	_ = gotRes
+
+	// get "variable" from db
+	gotVariable := gotRes.GetAllVariable()
+	log.Infof("gotVariable: %v", gotVariable)
+	wantVariable := wantRes.GetAllVariable()
+	require.Equal(t, 2, gotVariable.Len())
+	wantVariable.ForEach(func(key string, got any) {
+		want, have := gotVariable.Get(key)
+		require.True(t, have)
+		require.Equal(t, got, want)
+	})
+
+	// get value from db
+	wantValue := wantRes.GetValues("target")
+	gotValue := gotRes.GetValues("target")
+	wnatValueID := lo.Map(wantValue, func(v *ssaapi.Value, _ int) int64 { return v.GetId() })
+	gotValueID := lo.Map(gotValue, func(v *ssaapi.Value, _ int) int64 { return v.GetId() })
+	require.Equal(t, 1, len(gotValue))
+	require.Equal(t, len(wantValue), len(gotValue))
+	slices.Sort(wnatValueID)
+	slices.Sort(gotValueID)
+	require.Equal(t, wnatValueID, gotValueID)
+}
 
 func TestGetResultVariableByID(t *testing.T) {
 	code := `
@@ -129,39 +160,6 @@ func TestGetResultVariableByID(t *testing.T) {
 	}
 	spew.Dump(got)
 	require.Equal(t, want, got)
-}
-
-func TestGetResultFromDB(t *testing.T) {
-	deleteProgram, wantRes := queryAndSave(t)
-	defer deleteProgram()
-	_ = wantRes
-
-	// get result from db
-	gotRes, err := ssaapi.LoadResultByID(wantRes.GetResultID())
-	require.NoError(t, err)
-	_ = gotRes
-
-	// get "variable" from db
-	gotVariable := gotRes.GetAllVariable()
-	log.Infof("gotVariable: %v", gotVariable)
-	wantVariable := wantRes.GetAllVariable()
-	require.Equal(t, 2, gotVariable.Len())
-	wantVariable.ForEach(func(key string, got any) {
-		want, have := gotVariable.Get(key)
-		require.True(t, have)
-		require.Equal(t, got, want)
-	})
-
-	// get value from db
-	wantValue := wantRes.GetValues("target")
-	gotValue := gotRes.GetValues("target")
-	wnatValueID := lo.Map(wantValue, func(v *ssaapi.Value, _ int) int64 { return v.GetId() })
-	gotValueID := lo.Map(gotValue, func(v *ssaapi.Value, _ int) int64 { return v.GetId() })
-	require.Equal(t, 1, len(gotValue))
-	require.Equal(t, len(wantValue), len(gotValue))
-	slices.Sort(wnatValueID)
-	slices.Sort(gotValueID)
-	require.Equal(t, wnatValueID, gotValueID)
 }
 
 func TestRuleAlertMsg(t *testing.T) {

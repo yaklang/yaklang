@@ -220,7 +220,6 @@ func (c *DataBaseCacheWithKey[K, T]) IsClose() bool {
 
 func (c *DataBaseCacheWithKey[K, T]) Close() {
 	// todo: save all item
-	// return c.data.Close()
 	c.close.Store(true)
 	c.notifyCache.Close()
 	c.close.Store(false)

@@ -3,5 +3,5 @@
 package consts
 
 func GetRegistryYakitHome() {
-	
+
 }
