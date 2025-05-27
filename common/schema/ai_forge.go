@@ -44,8 +44,6 @@ func (a *AIForge) AfterDelete(tx *gorm.DB) (err error) {
 	return nil
 }
 
-//todo  schema2grpc model
-
 func (a *AIForge) ToGRPC() *ypb.AIForge {
 	return &ypb.AIForge{
 		ForgeName:          a.ForgeName,
