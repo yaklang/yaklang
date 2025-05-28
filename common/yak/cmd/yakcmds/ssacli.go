@@ -615,29 +615,37 @@ var syntaxflowFormat = &cli.Command{
 	},
 }
 
-var syntaxflowComplete = &cli.Command{
-	Name:    "syntaxflowCompletions",
+var syntaxflowCompletion = &cli.Command{
+	Name:    "syntaxflowCompletion",
 	Aliases: []string{"sf-complete", "sf-completions"},
-	Usage:   "format SyntaxFlow rule",
+	Usage:   "SyntaxFlow Rule Description Completion By AI",
 	Flags: []cli.Flag{
 		cli.StringFlag{
-			Name: "type",
+			Name:  "ai-type,type",
+			Usage: "type of AI type",
 		},
 		cli.StringFlag{
-			Name: "target,t",
+			Name:  "target,t",
+			Usage: "the file or directory to process, if it is a directory, all .sf files will be processed",
 		},
 		cli.StringFlag{
-			Name: "key",
+			Name:  "api-key,key,k",
+			Usage: "api key of AI",
 		},
 		cli.StringFlag{
-			Name: "model",
+			Name:  "ai-model,model,m",
+			Usage: "model of AI",
+		},
+		cli.StringFlag{
+			Name:  "proxy,p",
+			Usage: "proxy of AI",
 		},
 	},
 	Action: func(c *cli.Context) error {
 		target := c.String("target")
-		typ := c.String("type")
-		key := c.String("key")
-		model := c.String("model")
+		typ := c.String("ai-type")
+		key := c.String("api-key")
+		model := c.String("ai-model")
 
 		var aiOpts []aispec.AIConfigOption
 		if model != "" {
@@ -654,7 +662,7 @@ var syntaxflowComplete = &cli.Command{
 		complete := func(fileName string) error {
 			// Check if the file has .sf extension
 			if !strings.HasSuffix(fileName, ".sf") {
-				log.Infof("syntaxflow-format: skipping file %s (not a .sf file)", fileName)
+				log.Infof("syntaxflow-completion: skipping file %s (not a .sf file)", fileName)
 				return nil
 			}
 			raw, err := os.ReadFile(fileName)
@@ -662,9 +670,9 @@ var syntaxflowComplete = &cli.Command{
 				log.Errorf("failed to read file %s: %v", fileName, err)
 				return err
 			}
-			rule, err := sfcompletion.CompleteInfoDesc(fileName, string(raw), aiOpts...)
+			rule, err := sfcompletion.CompleteRuleDesc(fileName, string(raw), aiOpts...)
 			if err != nil {
-				err = utils.Errorf("failed parse format file %s: %v", fileName, err)
+				err = utils.Errorf("failed parse complete file %s: %v", fileName, err)
 				log.Errorf("%v", err)
 				errors = utils.JoinErrors(errors, err)
 				return err
@@ -672,7 +680,7 @@ var syntaxflowComplete = &cli.Command{
 
 			// check format rule
 			if _, err := sfvm.CompileRule(rule); err != nil {
-				err = utils.Errorf("failed check format file %s: %v\nformat rule: \n%s", fileName, err, rule)
+				err = utils.Errorf("failed completion sf rule %s: %v\nsf rule: \n%s", fileName, err, rule)
 				log.Errorf("%v", err)
 				errors = utils.JoinErrors(errors, err)
 				return err
@@ -687,16 +695,16 @@ var syntaxflowComplete = &cli.Command{
 		}
 
 		if utils.IsFile(target) {
-			log.Infof("syntaxflow-format: processing file %s", target)
+			log.Infof("syntaxflow-completion: processing file %s", target)
 			complete(target)
 		} else if utils.IsDir(target) {
-			log.Infof("syntaxflow-format: processing directory %s", target)
+			log.Infof("syntaxflow-completion: processing directory %s", target)
 			filesys.Recursive(target, filesys.WithFileSystem(filesys.NewLocalFs()), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
-				log.Infof("syntaxflow-format: processing file %s", s)
+				log.Infof("syntaxflow-completion: processing file %s", s)
 				return complete(s)
 			}))
 		} else {
-			log.Errorf("syntaxflow-format: file %s not found", target)
+			log.Errorf("syntaxflow-completion: file %s not found", target)
 		}
 		return errors
 	},
@@ -1225,14 +1233,14 @@ var SSACompilerCommands = []*cli.Command{
 	ssaCompile, // compile program
 
 	// rule manage
-	syntaxFlowCreate,   // create rule template
-	syntaxflowFormat,   //  format syntaxflow rule
-	syntaxflowComplete, // complete syntaxflow rule with AI
-	syntaxFlowSave,     // save rule to database
-	syntaxFlowTest,     // test rule
-	syntaxFlowExport,   // export rule to file
-	syntaxFlowImport,   // import rule from file
-	syncRule,           // sync rule from embed to database
+	syntaxFlowCreate,     // create rule template
+	syntaxflowFormat,     //  format syntaxflow rule
+	syntaxflowCompletion, // complete syntaxflow rule with AI
+	syntaxFlowSave,       // save rule to database
+	syntaxFlowTest,       // test rule
+	syntaxFlowExport,     // export rule to file
+	syntaxFlowImport,     // import rule from file
+	syncRule,             // sync rule from embed to database
 	// risk manage
 	ssaRisk, // export risk report
 
