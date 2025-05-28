@@ -1,4 +1,59 @@
 package chunkmaker
 
+import (
+	"context"
+	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
+)
+
 type Config struct {
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	ChunkSize           int64
+	enableTimeTrigger   bool
+	timeTriggerInterval time.Duration
+}
+
+type Option func(c *Config)
+
+func WithTimeTrigger(interval time.Duration) Option {
+	return func(c *Config) {
+		c.enableTimeTrigger = true
+		c.timeTriggerInterval = interval
+	}
+}
+
+func WithTimeTriggerSeconds(interval float64) Option {
+	return func(c *Config) {
+		c.enableTimeTrigger = true
+		c.timeTriggerInterval = utils.FloatSecondDuration(interval)
+	}
+}
+
+func NewConfig(opts ...Option) *Config {
+	c := &Config{
+		ChunkSize: 100,
+	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	if c.ctx == nil {
+		c.ctx, c.cancel = context.WithCancel(context.Background())
+	}
+
+	if c.cancel == nil && c.ctx != nil {
+		// wrapper with cancel
+		c.ctx, c.cancel = context.WithCancel(c.ctx)
+	}
+
+	return c
+}
+
+func WithChunkSize(size int64) Option {
+	return func(c *Config) {
+		c.ChunkSize = size
+	}
 }
