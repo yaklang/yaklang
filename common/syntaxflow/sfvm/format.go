@@ -16,10 +16,12 @@ import (
 )
 
 type RuleFormat struct {
-	ruleID string
-	write  io.Writer
-	editor *memedit.MemEditor
-	once   sync.Once
+	ruleID                 string
+	write                  io.Writer
+	editor                 *memedit.MemEditor
+	once                   sync.Once
+	requireInfoDescKeyType map[SFDescKeyType]bool         // 第一个desc语句中需要的desc item key类型，没有会补全
+	infoDescHandler        func(key, value string) string // 第一个desc语句内容的处理函数，可以结合AI补全
 }
 
 type RuleFormatOption func(*RuleFormat)
@@ -53,6 +55,23 @@ type CanStartStopToken interface {
 func RuleFormatWithRuleID(ruleID string) RuleFormatOption {
 	return func(f *RuleFormat) {
 		f.ruleID = ruleID
+	}
+}
+
+func RuleFormatWithRequireInfoDescKeyType(typ ...SFDescKeyType) RuleFormatOption {
+	return func(f *RuleFormat) {
+		if f.requireInfoDescKeyType == nil {
+			f.requireInfoDescKeyType = make(map[SFDescKeyType]bool)
+		}
+		for _, t := range typ {
+			f.requireInfoDescKeyType[t] = false
+		}
+	}
+}
+
+func RuleFormatWithInfoDescHandler(handler func(key, value string) string) RuleFormatOption {
+	return func(f *RuleFormat) {
+		f.infoDescHandler = handler
 	}
 }
 
@@ -106,62 +125,118 @@ func (f *RuleFormat) Visit(flow sf.IFlowContext, editor *memedit.MemEditor) {
 	if statements == nil {
 		return
 	}
+	// 第一次遍历确定需要补全的desc item
 	for _, stmt := range statements.AllStatement() {
 		switch stmt := stmt.(type) {
 		case *sf.DescriptionContext:
-			f.VisitDescription(stmt.DescriptionStatement())
+			f.VisitDescriptionFistly(stmt.DescriptionStatement())
 		default:
-			log.Debugf("statement: %s", stmt.GetText())
+			continue
+		}
+	}
+
+	// 第二次遍历用于补全
+	for i, stmt := range statements.AllStatement() {
+		switch stmt := stmt.(type) {
+		case *sf.DescriptionContext:
+			if i == 0 {
+				f.VisitInfoDescription(stmt.DescriptionStatement())
+			} else {
+				f.Write(f.GetTextFromToken(stmt))
+			}
+		default:
 			f.Write(f.GetTextFromToken(stmt))
 		}
 	}
 }
 
-func (f *RuleFormat) VisitDescription(desc sf.IDescriptionStatementContext) {
-	log.Debugf("description: %s", desc.GetText())
+func (f *RuleFormat) VisitDescriptionFistly(desc sf.IDescriptionStatementContext) {
+	i, ok := desc.(*sf.DescriptionStatementContext)
+	if i == nil || !ok {
+		return
+	}
+	items, ok := i.DescriptionItems().(*sf.DescriptionItemsContext)
+	if !ok || items == nil {
+		return
+	}
+
+	for _, item := range items.AllDescriptionItem() {
+		ret, ok := item.(*sf.DescriptionItemContext)
+		if !ok || ret.Comment() != nil {
+			continue
+		}
+
+		key := mustUnquoteSyntaxFlowString(ret.StringLiteral().GetText())
+		switch keyType := ValidDescItemKeyType(strings.ToLower(key)); keyType {
+		case SFDescKeyType_Unknown:
+			continue
+		default:
+			if f.requireInfoDescKeyType == nil {
+				continue
+			}
+			_, ok := f.requireInfoDescKeyType[keyType]
+			if ok {
+				f.requireInfoDescKeyType[keyType] = true
+			}
+		}
+	}
+}
+
+func (f *RuleFormat) VisitInfoDescription(desc sf.IDescriptionStatementContext) {
 	i, _ := desc.(*sf.DescriptionStatementContext)
 	if i == nil {
 		return
 	}
 
 	f.Write("desc(\n")
-	resultId := ""
-	if items, ok := i.DescriptionItems().(*sf.DescriptionItemsContext); ok && items != nil {
-		for _, item := range items.AllDescriptionItem() {
-			ret, ok := item.(*sf.DescriptionItemContext)
-			if !ok || ret.Comment() != nil { // skip comment
-				continue
+
+	items, ok := i.DescriptionItems().(*sf.DescriptionItemsContext)
+	if !ok || items == nil {
+		return
+	}
+
+	for _, item := range items.AllDescriptionItem() {
+		ret, ok := item.(*sf.DescriptionItemContext)
+		if !ok || ret.Comment() != nil { // skip comment
+			continue
+		}
+		key := mustUnquoteSyntaxFlowString(ret.StringLiteral().GetText())
+		var value string
+		if valueItem, ok := ret.DescriptionItemValue().(*sf.DescriptionItemValueContext); ok && valueItem != nil {
+			if valueItem.StringLiteral() != nil {
+				value = valueItem.GetText()
 			}
-			key := mustUnquoteSyntaxFlowString(ret.StringLiteral().GetText())
-			switch keyLower := strings.ToLower(key); keyLower {
-			case "rule_id", "id":
-				var value string
-				if valueItem, ok := ret.DescriptionItemValue().(*sf.DescriptionItemValueContext); ok && valueItem != nil {
-					if valueItem.StringLiteral() != nil {
-						value = mustUnquoteSyntaxFlowString(valueItem.StringLiteral().GetText())
-					} else {
-						value = valueItem.GetText()
-					}
-				}
-				resultId = value
-				if value == "" {
-					log.Errorf("set result-id but is empty: %s", desc.GetText())
-				}
-			default:
-				// f.WriteToken(item)
-				f.Write("\t%s\n", f.GetTextFromToken(item))
+		}
+		if f.infoDescHandler != nil {
+			value = f.infoDescHandler(key, value)
+		}
+		f.Write("\t%s: %s\n", key, value)
+	}
+
+	if toAdd := f.getToAddInfoDescKeyType(); toAdd != nil {
+		for _, keyType := range toAdd {
+			if f.infoDescHandler != nil {
+				value := f.infoDescHandler(string(keyType), "")
+				f.Write("\t%s: %s\n", string(keyType), value)
+			} else {
+				f.Write("\t%s\n", string(keyType))
 			}
 		}
 	}
-
-	if resultId == "" {
-		resultId = f.ruleID
-	}
-
-	f.once.Do(func() {
-		f.Write("\trule_id: \"%v\"\n", resultId)
-	})
 	f.Write(")\n")
+}
+
+func (f *RuleFormat) getToAddInfoDescKeyType() []SFDescKeyType {
+	if f.requireInfoDescKeyType == nil {
+		return []SFDescKeyType{}
+	}
+	var ret []SFDescKeyType
+	for keyType, ok := range f.requireInfoDescKeyType {
+		if !ok {
+			ret = append(ret, keyType)
+		}
+	}
+	return ret
 }
 
 func GetText(editor *memedit.MemEditor, token CanStartStopToken) string {
