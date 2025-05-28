@@ -13,6 +13,9 @@ type Chunk interface {
 	Data() []byte
 	BytesSize() int64
 	RunesSize() int64
+	HaveLastChunk() bool
+	LastChunk() Chunk
+	PrevNBytes(n int) []byte
 }
 
 type BufferChunk struct {
@@ -22,6 +25,7 @@ type BufferChunk struct {
 	buffer   *bytes.Buffer
 	bytesize int64
 	runesize int64
+	prev     Chunk // 指向前一个 Chunk
 }
 
 var _ Chunk = (*BufferChunk)(nil)
@@ -32,6 +36,7 @@ func NewBufferChunk(buffer []byte) *BufferChunk {
 		isUTF8:   utf8.Valid(buffer),
 		buffer:   bytes.NewBuffer(buffer),
 		bytesize: int64(len(buffer)),
+		prev:     nil, // 新创建的 chunk 默认没有前一个 chunk
 	}
 	if bc.isUTF8 {
 		bc.runesize = int64(len([]rune(string(buffer))))
@@ -201,4 +206,57 @@ func (c *BufferChunk) RunesSize() int64 {
 	defer c.mu.RUnlock()
 
 	return c.runesize
+}
+
+func (c *BufferChunk) HaveLastChunk() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.prev != nil
+}
+
+func (c *BufferChunk) LastChunk() Chunk {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.prev
+}
+
+// PrevNBytes collects N bytes by traversing the prev chain, excluding the current chunk's data.
+func (c *BufferChunk) PrevNBytes(n int) []byte {
+	if n <= 0 {
+		return []byte{}
+	}
+
+	var result [][]byte
+	var totalBytesCollected int
+	// Start collecting from the previous chunk
+	currentChunk := c.LastChunk() // This is c.prev
+
+	for currentChunk != nil && totalBytesCollected < n {
+		data := currentChunk.Data()
+		bytesToTake := len(data)
+		if totalBytesCollected+bytesToTake > n {
+			bytesToTake = n - totalBytesCollected
+		}
+
+		if bytesToTake > 0 {
+			// Prepend to maintain order (last bytes come from earlier chunks in the list)
+			// If taking a partial chunk, take from its end.
+			start := len(data) - bytesToTake
+			result = append([][]byte{data[start:]}, result...) // Prepend slice of bytes
+			totalBytesCollected += bytesToTake
+		}
+
+		if totalBytesCollected >= n {
+			break
+		}
+		currentChunk = currentChunk.LastChunk() // Move to the next previous chunk
+	}
+
+	// Concatenate all collected byte slices
+	finalBuffer := bytes.NewBuffer(make([]byte, 0, totalBytesCollected))
+	for _, b := range result {
+		finalBuffer.Write(b)
+	}
+
+	return finalBuffer.Bytes()
 }

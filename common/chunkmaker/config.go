@@ -33,7 +33,7 @@ func WithTimeTriggerSeconds(interval float64) Option {
 
 func NewConfig(opts ...Option) *Config {
 	c := &Config{
-		chunkSize: 100,
+		chunkSize: 1024,
 	}
 
 	for _, opt := range opts {
