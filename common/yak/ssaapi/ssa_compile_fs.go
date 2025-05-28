@@ -205,8 +205,8 @@ func (c *config) parseProjectWithFS(
 	prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, total) // %90
 	index := 0
 	prevProcess := 0.9
-	prog.Cache.SaveToDatabase(func() {
-		index++
+	prog.Cache.SaveToDatabase(func(size int) {
+		index += size
 		process = 0.9 + (float64(index)/float64(total))*0.1
 		if (process - prevProcess) > 0.01 { // is 91.0%/92.0%/....
 			prog.ProcessInfof("Saving instructions: %d complete(total %d)", index, total)

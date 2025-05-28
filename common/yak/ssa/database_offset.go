@@ -19,8 +19,8 @@ func SaveValueOffset(inst Instruction) {
 
 	rng := inst.GetRange()
 	if utils.IsNil(rng) || utils.IsNil(rng.GetEditor()) {
-		inst.GetRange()
-		log.Errorf("%v: CreateOffset: rng or editor is nil", inst.GetVerboseName())
+		// inst.GetRange()
+		// log.Errorf("%v: CreateOffset: rng or editor is nil", inst.GetVerboseName())
 		return
 	}
 	irOffset := ssadb.CreateOffset(rng, inst.GetProgram().GetApplication().GetProgramName())
