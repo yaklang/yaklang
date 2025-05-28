@@ -274,7 +274,7 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 			res := createNewRes(url, 0, extraData)
 			res.ResourceType = "value"
 			if query.useVerboseName {
-				res.ResourceName = v.GetVerboseName()
+				res.ResourceName = v.GetInnerValueVerboseName()
 			} else {
 				res.ResourceName = v.String()
 			}
