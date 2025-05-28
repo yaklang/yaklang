@@ -243,6 +243,17 @@ func (v *Value) GetVerboseName() string {
 	return fmt.Sprintf(`t%d: %v`, v.GetId(), v.ShortString())
 }
 
+func (v *Value) GetInnerValueVerboseName() string {
+	if v.IsNil() {
+		return ""
+	}
+	inner := v.innerValue
+	if utils.IsNil(inner) {
+		return ""
+	}
+	return inner.GetVerboseName()
+}
+
 func (i *Value) Show() *Value               { fmt.Println(i); return i }
 func (i *Value) ShowWithRange() *Value      { fmt.Println(i.StringWithRange()); return i }
 func (i *Value) ShowWithSourceCode() *Value { fmt.Println(i.StringWithSourceCode()); return i }
