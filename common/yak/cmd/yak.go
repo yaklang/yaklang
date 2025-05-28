@@ -409,6 +409,7 @@ var startGRPCServerCommand = cli.Command{
 
 		enableProfile := c.Bool("pprof")
 		if enableProfile {
+			runtime.SetBlockProfileRate(1)
 			println("----------------------------------------------------------------------")
 			println("----------------------------------------------------------------------")
 			println("---------------------------YAK GRPC PPROF-----------------------------")

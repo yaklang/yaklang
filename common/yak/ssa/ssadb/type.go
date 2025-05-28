@@ -20,12 +20,13 @@ type IrType struct {
 }
 
 func (t *IrType) CalcHash() string {
-	return utils.CalcSha1(t.Kind, t.String, t.ExtraInformation)
+	return utils.CalcSha1(t.ProgramName, t.Kind, t.String, t.ExtraInformation)
 }
 
 var saveTypeMutex sync.Mutex
 
 func SaveType(kind int, str, extra, progName string) int {
+	// return -1
 	start := time.Now()
 	defer func() {
 		atomic.AddUint64(&_SSASaveTypeCost, uint64(time.Since(start).Nanoseconds()))
@@ -38,9 +39,16 @@ func SaveType(kind int, str, extra, progName string) int {
 		ExtraInformation: extra,
 	}
 	irType.Hash = irType.CalcHash()
-	saveType(&irType)
+	if ret, ok := TypeMap.Get(irType.Hash); ok {
+		return ret
+	} else {
+		saveType(&irType)
+		TypeMap.Set(irType.Hash, int(irType.ID))
+	}
 	return int(irType.ID)
 }
+
+var TypeMap *utils.SafeMap[int] = utils.NewSafeMap[int]()
 
 func saveType(irType *IrType) error {
 	saveTypeMutex.Lock()

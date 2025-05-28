@@ -3,6 +3,7 @@ package ssa
 import (
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -38,16 +39,23 @@ type Cache struct {
 	ClassIndex    InstructionsIndex
 	ConstCache    InstructionsIndex
 
-	afterSaveNotify func()
+	afterSaveNotify func(int)
+
+	IrCodeChan      chan *ssadb.IrCode
+	IrCodeWaitGroup sync.WaitGroup
 }
+
+var ChanSize = 1000
 
 // NewDBCache : create a new ssa db cache. if ttl is 0, the cache will never expire, and never save to database.
 func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) *Cache {
 	ttl := time.Duration(0)
 	cache := &Cache{
 		program: prog,
+		// set ttl
+		IrCodeChan:      make(chan *ssadb.IrCode, ChanSize),
+		IrCodeWaitGroup: sync.WaitGroup{},
 	}
-	// set ttl
 	if databaseEnable {
 		if len(ConfigTTL) > 0 {
 			ttl = ConfigTTL[0]
@@ -72,7 +80,11 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 					return false
 				}
 			}
-			return cache.saveInstruction(s)
+			if cache.marshalInstruction(s) {
+				cache.IrCodeChan <- s.irCode
+				return true
+			}
+			return false
 		}
 		load = func(id int64) (*instructionCachePair, error) {
 			irCode := ssadb.GetIrCodeById(cache.DB, id)
@@ -85,6 +97,42 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 				irCode: irCode,
 			}, nil
 		}
+
+		cache.IrCodeWaitGroup.Add(1)
+		go func() {
+			defer cache.IrCodeWaitGroup.Done()
+
+			irCodes := make([]*ssadb.IrCode, 0, 100)
+			save := func() {
+				if len(irCodes) == 0 {
+					return
+				}
+				start := time.Now()
+				utils.GormTransaction(cache.DB, func(tx *gorm.DB) error {
+					for _, irCode := range irCodes {
+						if err := irCode.Save(tx); err != nil {
+							log.Errorf("save irCode to database error: %v", err)
+						}
+					}
+					return nil
+				})
+				syncAtomic.AddUint64(&_SSASaveIrCodeDBCost, uint64(time.Since(start)))
+				if cache.afterSaveNotify != nil {
+					cache.afterSaveNotify(len(irCodes))
+				}
+				irCodes = make([]*ssadb.IrCode, 0, 100)
+			}
+			for irCode := range cache.IrCodeChan {
+
+				if len(irCodes) == 100 {
+					save()
+				} else {
+					irCodes = append(irCodes, irCode)
+				}
+			}
+			save()
+		}()
+
 	} else {
 		id := atomic.NewInt64(0)
 		cache.fetchId = func() (int64, *ssadb.IrCode) {
@@ -94,6 +142,7 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 			return nil, utils.Errorf("load from database is disabled")
 		}
 		save = func(i int64, icp *instructionCachePair, reason utils.EvictionReason) bool {
+			cache.marshalInstruction(icp)
 			return false // disable save to database
 		}
 	}
@@ -275,7 +324,7 @@ func (c *Cache) AddClassInstance(name string, inst Instruction) {
 
 // =============================================== Database =======================================================
 // only LazyInstruction and false marshal will not be saved to database
-func (c *Cache) saveInstruction(instIr *instructionCachePair) bool {
+func (c *Cache) marshalInstruction(instIr *instructionCachePair) bool {
 	if instIr.inst.GetId() == -1 {
 		log.Errorf("[BUG]: instruction id is -1: %s", codec.AnyToString(instIr.inst))
 		return false
@@ -304,27 +353,21 @@ func (c *Cache) saveInstruction(instIr *instructionCachePair) bool {
 	if instIr.irCode.Opcode == 0 {
 		log.Errorf("BUG: saveInstruction called with empty opcode: %v", instIr.inst.GetName())
 	}
-	if err := instIr.irCode.Save(c.DB); err != nil {
-		log.Errorf("Save irCode error: %v", err)
-	}
-	syncAtomic.AddUint64(&_SSASaveIrCodeCost, uint64(time.Since(start)))
-	if c.afterSaveNotify != nil {
-		c.afterSaveNotify()
-	}
-
+	syncAtomic.AddUint64(&_SSASaveIrCodeCPUCost, uint64(time.Since(start)))
 	return true
 }
 
-func (c *Cache) SaveToDatabase(cb ...func()) {
-	if !c.HaveDatabaseBackend() {
-		return
-	}
+func (c *Cache) SaveToDatabase(cb ...func(int)) {
+	// if !c.HaveDatabaseBackend() {
+	// 	return
+	// }
 	if len(cb) > 0 {
 		c.afterSaveNotify = cb[0]
 	}
 	c.InstructionCache.EnableSave()
 	c.InstructionCache.Close()
-	c.InstructionCache.DisableSave()
+	close(c.IrCodeChan)
+	c.IrCodeWaitGroup.Wait()
 }
 
 func (c *Cache) CountInstruction() int {
