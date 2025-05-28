@@ -3,9 +3,6 @@ package chunkmaker
 import (
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/log"
-
 	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -58,23 +55,17 @@ func TestChunkerWithChunkSize_Basic(t *testing.T) {
 				pw.Close()
 			}()
 
-			log.Info("start to create new chunk maker for test case: ", tc.name)
-
 			// 创建 ChunkMaker
 			cm, err := NewChunkMaker(pr, WithChunkSize(tc.chunkSize))
 			if err != nil {
 				t.Fatalf("Failed to create ChunkMaker: %v", err)
 			}
 
-			log.Info("start to collect output for test case: ", tc.name)
 			// 收集输出
 			var chunks []string
 			for chunk := range cm.OutputChannel() {
-				spew.Dump(chunk.Data())
 				chunks = append(chunks, string(chunk.Data()))
 			}
-
-			log.Info("end to collect output for test case: ", tc.name)
 			// 验证结果
 			if len(chunks) != len(tc.expectedChunks) {
 				t.Errorf("Expected %d chunks, got %d", len(tc.expectedChunks), len(chunks))
@@ -194,8 +185,6 @@ func TestChunkerWithChunkSize_Advanced(t *testing.T) {
 				pw.Close()
 			}()
 
-			log.Info("start to create new chunk maker for test case: ", tc.name)
-
 			// 创建 ChunkMaker
 			cm, err := NewChunkMaker(pr, WithChunkSize(tc.chunkSize))
 
@@ -211,16 +200,12 @@ func TestChunkerWithChunkSize_Advanced(t *testing.T) {
 				t.Fatalf("Failed to create ChunkMaker for chunkSize %d: %v", tc.chunkSize, err)
 			}
 
-			log.Info("start to collect output for test case: ", tc.name)
 			// 收集输出
 			var chunks []string
 			outputChan := cm.OutputChannel()
 			for chunk := range outputChan {
-				spew.Dump(chunk.Data())
 				chunks = append(chunks, string(chunk.Data()))
 			}
-			log.Info("end to collect output for test case: ", tc.name)
-
 			// 验证结果
 			if len(chunks) != len(tc.expectedChunks) {
 				t.Errorf("Expected %d chunks, got %d. Chunks: %v", len(tc.expectedChunks), len(chunks), chunks)

@@ -42,8 +42,11 @@ func NewChunkMakerEx(
 
 func NewChunkMaker(dst io.Reader, opts ...Option) (*ChunkMaker, error) {
 	c := NewConfig(opts...)
-	if c.ChunkSize <= 0 {
-		return nil, fmt.Errorf("NewChunkMaker: ChunkSize must be positive, got %d", c.ChunkSize)
+	if c.chunkSize <= 0 {
+		return nil, fmt.Errorf("NewChunkMaker: ChunkSize must be positive, got %d", c.chunkSize)
+	}
+	if c.enableTimeTrigger && c.timeTriggerInterval <= 0 {
+		return nil, fmt.Errorf("NewChunkMaker: timeTriggerInterval must be positive when time trigger is enabled, got %v", c.timeTriggerInterval)
 	}
 	inputSrc := NewChunkChannelFromReader(c.ctx, dst)
 	return NewChunkMakerEx(inputSrc, c)

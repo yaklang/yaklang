@@ -4,9 +4,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/log"
 )
 
 func (cm *ChunkMaker) loop(i chan struct{}) {
@@ -30,15 +27,15 @@ func (cm *ChunkMaker) loop(i chan struct{}) {
 	_ = currentBuffer
 	_ = bufferChunk
 
-	var timer *time.Ticker
+	var timerChan <-chan time.Time // Use a nil channel if timer is not enabled
 	if cm.config.enableTimeTrigger {
-		timer = time.NewTicker(cm.config.timeTriggerInterval)
-	} else {
-		timer = time.NewTicker(time.Second)
+		ticker := time.NewTicker(cm.config.timeTriggerInterval)
+		defer ticker.Stop() // Ensure ticker is stopped
+		timerChan = ticker.C
 	}
 
 	flushAll := func() {
-		bufferChunk.FlushAllChunkSizeTo(cm.dst, cm.config.ChunkSize)
+		bufferChunk.FlushAllChunkSizeTo(cm.dst, cm.config.chunkSize)
 	}
 
 	for {
@@ -46,21 +43,19 @@ func (cm *ChunkMaker) loop(i chan struct{}) {
 			close(i)
 		})
 		select {
-		case <-timer.C:
-			log.Infof("time trigger, current buffer size: %d", bufferChunk.BytesSize())
-			if !cm.config.enableTimeTrigger {
-				continue
-			}
+		case <-timerChan: // This will block indefinitely if timerChan is nil
+			// log.Infof("time trigger, current buffer size: %d", bufferChunk.BytesSize())
+			// No need to check cm.config.enableTimeTrigger here, as timerChan would be nil if not enabled
 			flushAll()
 		case result, ok := <-inputChan:
 			if !ok {
-				log.Infof("start to flush all chunks, current buffer size: %d", bufferChunk.BytesSize())
+				// log.Infof("start to flush all chunks, current buffer size: %d", bufferChunk.BytesSize())
 				flushAll()
 				return
 			}
 			bufferChunk.Write(result.Data())
-			log.Infof("start to write %v", spew.Sdump(string(result.Data())))
-			bufferChunk.FlushFullChunkSizeTo(cm.dst, cm.config.ChunkSize)
+			// log.Infof("start to write %v", spew.Sdump(string(result.Data())))
+			bufferChunk.FlushFullChunkSizeTo(cm.dst, cm.config.chunkSize)
 		}
 	}
 }

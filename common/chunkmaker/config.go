@@ -10,7 +10,7 @@ import (
 type Config struct {
 	ctx                 context.Context
 	cancel              context.CancelFunc
-	ChunkSize           int64
+	chunkSize           int64
 	enableTimeTrigger   bool
 	timeTriggerInterval time.Duration
 }
@@ -33,7 +33,7 @@ func WithTimeTriggerSeconds(interval float64) Option {
 
 func NewConfig(opts ...Option) *Config {
 	c := &Config{
-		ChunkSize: 100,
+		chunkSize: 100,
 	}
 
 	for _, opt := range opts {
@@ -54,6 +54,6 @@ func NewConfig(opts ...Option) *Config {
 
 func WithChunkSize(size int64) Option {
 	return func(c *Config) {
-		c.ChunkSize = size
+		c.chunkSize = size
 	}
 }
