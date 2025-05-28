@@ -58,6 +58,7 @@ jobs:
           - name: "Test in 2min"
             run: |
               # these tests are very quick
+              go test -timeout 20s ./common/chunkmaker/...
               go test -timeout 20s ./common/jsonextractor  
               go test -timeout 20s ./common/markdownextractor  
               go test -timeout 20s ./common/yak/yaklib/codec 
