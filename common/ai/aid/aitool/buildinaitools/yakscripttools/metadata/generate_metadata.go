@@ -15,7 +15,10 @@ import (
 )
 
 //go:embed prompt/generate_keyword.txt
-var generate_key_word_prompt []byte
+var aitool_generate_key_word_prompt string
+
+//go:embed prompt/generate_keyword_forge.txt
+var aiforge_generate_key_word_prompt string
 
 // 定义结构体来存储结果
 type GenerateResult struct {
@@ -24,9 +27,16 @@ type GenerateResult struct {
 	Keywords    []string `json:"keywords"`
 }
 
-func GenerateMetadataFromCode(code string) (*GenerateResult, error) {
-	// Create a template from the prompt
-	promptTemplate := template.Must(template.New("generate_keywords").Parse(string(generate_key_word_prompt)))
+func GenerateYakScriptAIToolMetadata(code string) (*GenerateResult, error) {
+	return generateMetadata(code, aitool_generate_key_word_prompt)
+}
+
+func GenerateForgeMetadata(forgeContent string) (*GenerateResult, error) {
+	return generateMetadata(forgeContent, aiforge_generate_key_word_prompt)
+}
+
+func generateMetadata(code string, promptFormat string) (*GenerateResult, error) {
+	promptTemplate := template.Must(template.New("generate_keywords").Parse(promptFormat))
 
 	// Create a buffer to store the executed template
 	var promptBuffer bytes.Buffer
@@ -67,6 +77,5 @@ func GenerateMetadataFromCode(code string) (*GenerateResult, error) {
 			return &result, nil
 		}
 	}
-
 	return nil, fmt.Errorf("failed to extract valid metadata from AI response")
 }
