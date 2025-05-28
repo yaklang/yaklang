@@ -31,8 +31,9 @@ type RuleFormatOption func(*RuleFormat)
 
 func NewRuleFormat(w io.Writer) *RuleFormat {
 	return &RuleFormat{
-		ruleID: uuid.NewString(),
-		write:  w,
+		ruleID:             uuid.NewString(),
+		write:              w,
+		requireDescKeyType: map[SFDescKeyType]bool{SFDescKeyType_Rule_Id: false},
 	}
 }
 
@@ -129,14 +130,16 @@ func (f *RuleFormat) Visit(flow sf.IFlowContext, editor *memedit.MemEditor) {
 		return
 	}
 
-	for i, stmt := range statements.AllStatement() {
+	descCount := 0
+	for _, stmt := range statements.AllStatement() {
 		switch stmt := stmt.(type) {
 		case *sf.DescriptionContext:
-			if i == 0 {
+			if descCount == 0 {
 				f.VisitInfoDescription(stmt.DescriptionStatement())
 			} else {
 				f.Write(f.GetTextFromToken(stmt))
 			}
+			descCount++
 		default:
 			f.Write(f.GetTextFromToken(stmt))
 		}
@@ -153,76 +156,78 @@ func (f *RuleFormat) VisitInfoDescription(desc sf.IDescriptionStatementContext) 
 	f.Write("desc(\n")
 
 	items, ok := i.DescriptionItems().(*sf.DescriptionItemsContext)
-	if !ok || items == nil {
-		return
-	}
-
-	for _, item := range items.AllDescriptionItem() {
-		ret, ok := item.(*sf.DescriptionItemContext)
-		if !ok || ret.Comment() != nil { // skip comment
-			continue
-		}
-		key := mustUnquoteSyntaxFlowString(ret.StringLiteral().GetText())
-		valueItem, ok := ret.DescriptionItemValue().(*sf.DescriptionItemValueContext)
-		if !ok || valueItem == nil {
-			continue
-		}
-
-		descType := ValidDescItemKeyType(key)
-		// 记录访问过的desc item key类型，以便后续确认还缺少哪些key
-		f.visitRequireInfoDescKeyType(descType)
-		// 不进行字段补全
-		if f.descHandler == nil || !f.needCompletion(descType) {
-			f.Write("\t%s\n", f.GetTextFromToken(item))
-			continue
-		}
-
-		// 区分StringLiteral、HereDoc和NumberLiteral
-		if valueItem.StringLiteral() != nil && !IsComplexInfoDescType(descType) {
-			value := f.VisitStringLiteral(valueItem.StringLiteral())
-			value = f.descHandler(key, value)
-			f.Write("\t%s: \"%s\"\n", key, value)
-		} else if valueItem.StringLiteral() != nil && IsComplexInfoDescType(descType) {
-			// 虽然原规则使用StringLiteral写，但是descType是复杂类型，AI补全的可能是复杂文本
-			// 所以这里使用heredoc
-			value := f.VisitStringLiteral(valueItem.StringLiteral())
-			value = f.descHandler(key, value)
-			upperKey := strings.ToUpper(key)
-			f.Write("\t%s: <<<%s\n", key, upperKey)
-			f.Write("%s\n", value)
-			f.Write("%s\n", upperKey)
-		} else if valueItem.HereDoc() != nil {
-			value := f.VisitHereDoc(valueItem.HereDoc())
-			newValue := f.descHandler(key, value)
-			upperKey := strings.ToUpper(key)
-			f.Write("\t%s: <<<%s\n", key, upperKey)
-			f.Write("%s\n", newValue)
-			f.Write("%s\n", upperKey)
-		} else if valueItem.NumberLiteral() != nil {
-			value := valueItem.NumberLiteral().GetText()
-			newValue := f.descHandler(key, value)
-			_, err := strconv.ParseInt(newValue, 10, 64)
-			if err == nil {
-				f.Write("\t%s: %s\n", key, newValue)
+	if ok && items != nil {
+		for _, item := range items.AllDescriptionItem() {
+			ret, ok := item.(*sf.DescriptionItemContext)
+			if !ok || ret.Comment() != nil { // skip comment
 				continue
 			}
-			_, err = strconv.ParseInt(newValue, 8, 64)
-			if err == nil {
-				f.Write("\t%s: %s\n", key, newValue)
+			key := mustUnquoteSyntaxFlowString(ret.StringLiteral().GetText())
+			valueItem, ok := ret.DescriptionItemValue().(*sf.DescriptionItemValueContext)
+			if !ok || valueItem == nil {
 				continue
 			}
-			_, err = strconv.ParseInt(newValue, 16, 64)
-			if err == nil {
-				f.Write("\t%s: %s\n", key, newValue)
+
+			descType := ValidDescItemKeyType(key)
+			// 记录访问过的desc item key类型，以便后续确认还缺少哪些key
+			f.visitRequireInfoDescKeyType(descType)
+			// 不进行字段补全
+			if f.descHandler == nil || !f.needCompletion(descType) {
+				f.Write("\t%s\n", f.GetTextFromToken(item))
 				continue
 			}
-			f.Write("\t%s: \"%s\"\n", key, value)
+
+			// 区分StringLiteral、HereDoc和NumberLiteral
+			if valueItem.StringLiteral() != nil && !IsComplexInfoDescType(descType) {
+				value := f.VisitStringLiteral(valueItem.StringLiteral())
+				value = f.descHandler(key, value)
+				f.Write("\t%s: \"%s\"\n", key, value)
+			} else if valueItem.StringLiteral() != nil && IsComplexInfoDescType(descType) {
+				// 虽然原规则使用StringLiteral写，但是descType是复杂类型，AI补全的可能是复杂文本
+				// 所以这里使用heredoc
+				value := f.VisitStringLiteral(valueItem.StringLiteral())
+				value = f.descHandler(key, value)
+				upperKey := strings.ToUpper(key)
+				f.Write("\t%s: <<<%s\n", key, upperKey)
+				f.Write("%s\n", value)
+				f.Write("%s\n", upperKey)
+			} else if valueItem.HereDoc() != nil {
+				value := f.VisitHereDoc(valueItem.HereDoc())
+				newValue := f.descHandler(key, value)
+				upperKey := strings.ToUpper(key)
+				f.Write("\t%s: <<<%s\n", key, upperKey)
+				f.Write("%s\n", newValue)
+				f.Write("%s\n", upperKey)
+			} else if valueItem.NumberLiteral() != nil {
+				value := valueItem.NumberLiteral().GetText()
+				newValue := f.descHandler(key, value)
+				_, err := strconv.ParseInt(newValue, 10, 64)
+				if err == nil {
+					f.Write("\t%s: %s\n", key, newValue)
+					continue
+				}
+				_, err = strconv.ParseInt(newValue, 8, 64)
+				if err == nil {
+					f.Write("\t%s: %s\n", key, newValue)
+					continue
+				}
+				_, err = strconv.ParseInt(newValue, 16, 64)
+				if err == nil {
+					f.Write("\t%s: %s\n", key, newValue)
+					continue
+				}
+				f.Write("\t%s: \"%s\"\n", key, value)
+			}
 		}
 	}
 
 	// 补充没有的字段
 	if toAdd := f.getDescKeyTypesToAdd(); toAdd != nil {
 		for _, keyType := range toAdd {
+			if keyType == SFDescKeyType_Rule_Id {
+				f.Write("\t%s: \"%s\"\n", string(keyType), f.ruleID)
+				continue
+			}
 			if f.descHandler != nil {
 				value := f.descHandler(string(keyType), "")
 				// 复杂文本使用heredoc
@@ -233,7 +238,7 @@ func (f *RuleFormat) VisitInfoDescription(desc sf.IDescriptionStatementContext) 
 					f.Write("%s\n", upperKey)
 					continue
 				} else {
-					f.Write("\t%s: %s\n", string(keyType), value)
+					f.Write("\t%s: \"%s\"\n", string(keyType), value)
 				}
 			} else {
 				f.Write("\t%s\n", string(keyType))
