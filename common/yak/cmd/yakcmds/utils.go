@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"github.com/yaklang/yaklang/common/aiforge"
 	"io"
 	"io/fs"
 	"io/ioutil"
@@ -49,6 +50,7 @@ import (
 
 var UtilsCommands = []*cli.Command{
 	createYakToolMetadataCommand(),
+	createBuildInForgeMetadataCommand(),
 	{
 		Name:  "embed-fs-hash",
 		Usage: `Generate Current Embed File System(yak/syntaxflow) Hash`,
@@ -75,7 +77,7 @@ var UtilsCommands = []*cli.Command{
 
 			rets := []string{strings.ToLower(c.String("type"))}
 			if c.Bool("all") {
-				rets = []string{"yak", "syntaxflow"}
+				rets = []string{"yak", "syntaxflow", "forge"}
 			}
 			for _, ret := range rets {
 				switch ret {
@@ -132,6 +134,39 @@ var UtilsCommands = []*cli.Command{
 						}
 
 						re := regexp.MustCompile(`(const ExistedSyntaxFlowEmbedFSHash string = ")([a-zA-Z0-9]+)(")`)
+						newContent := re.ReplaceAllString(string(templ), "${1}"+result+"${3}")
+						err = os.RemoveAll(template + ".bak")
+						if err != nil {
+							return err
+						}
+						err = os.Rename(template, template+".bak")
+						if err != nil {
+							return err
+						}
+						err = os.WriteFile(template, []byte(newContent), 0o644)
+						if err != nil {
+							return err
+						}
+					}
+				case "forge":
+					result, err := aiforge.BuildInForgeHash()
+					if err != nil {
+						return err
+					}
+					fmt.Println(result)
+					if c.Bool("override") {
+						if consts.ExistedSyntaxFlowEmbedFSHash == result {
+							continue
+						}
+						if matched, _ := regexp_utils.NewYakRegexpUtils("[0-9a-fA-F]+").MatchString(result); !matched {
+							return utils.Errorf("invalid hash: %v", result)
+						}
+						templ, err := os.ReadFile(template)
+						if err != nil {
+							return err
+						}
+
+						re := regexp.MustCompile(`(const ExistedBuildInForgeEmbedFSHash string = ")([a-zA-Z0-9]*)(")`)
 						newContent := re.ReplaceAllString(string(templ), "${1}"+result+"${3}")
 						err = os.RemoveAll(template + ".bak")
 						if err != nil {

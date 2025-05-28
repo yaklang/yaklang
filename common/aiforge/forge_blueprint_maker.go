@@ -68,6 +68,9 @@ type YakForgeBlueprintConfig struct {
 	// result handle
 	ForgeResult *ForgeResult `json:"forge_result"`
 	Actions     string       `json:"actions"`
+
+	// tag
+	Tags string `json:"tags"`
 }
 
 // NewYakForgeBlueprintConfigFromJson 从Json数据创建Forge
