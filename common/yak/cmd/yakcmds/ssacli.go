@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfcompletion"
 	"io"
 	"io/fs"
 	"os"
@@ -613,6 +615,93 @@ var syntaxflowFormat = &cli.Command{
 	},
 }
 
+var syntaxflowComplete = &cli.Command{
+	Name:    "syntaxflowCompletions",
+	Aliases: []string{"sf-complete", "sf-completions"},
+	Usage:   "format SyntaxFlow rule",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name: "type",
+		},
+		cli.StringFlag{
+			Name: "target,t",
+		},
+		cli.StringFlag{
+			Name: "key",
+		},
+		cli.StringFlag{
+			Name: "model",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		target := c.String("target")
+		typ := c.String("type")
+		key := c.String("key")
+		model := c.String("model")
+
+		var aiOpts []aispec.AIConfigOption
+		if model != "" {
+			aiOpts = append(aiOpts, aispec.WithModel(model))
+		}
+		if typ == "" {
+			aiOpts = append(aiOpts, aispec.WithType(typ))
+		}
+		if key != "" {
+			aiOpts = append(aiOpts, aispec.WithAPIKey(key))
+		}
+
+		var errors error
+		complete := func(fileName string) error {
+			// Check if the file has .sf extension
+			if !strings.HasSuffix(fileName, ".sf") {
+				log.Infof("syntaxflow-format: skipping file %s (not a .sf file)", fileName)
+				return nil
+			}
+			raw, err := os.ReadFile(fileName)
+			if err != nil {
+				log.Errorf("failed to read file %s: %v", fileName, err)
+				return err
+			}
+			rule, err := sfcompletion.CompleteInfoDesc(fileName, string(raw), aiOpts...)
+			if err != nil {
+				err = utils.Errorf("failed parse format file %s: %v", fileName, err)
+				log.Errorf("%v", err)
+				errors = utils.JoinErrors(errors, err)
+				return err
+			}
+
+			// check format rule
+			if _, err := sfvm.CompileRule(rule); err != nil {
+				err = utils.Errorf("failed check format file %s: %v\nformat rule: \n%s", fileName, err, rule)
+				log.Errorf("%v", err)
+				errors = utils.JoinErrors(errors, err)
+				return err
+			}
+
+			err = os.WriteFile(fileName, []byte(rule), 0o666)
+			if err != nil {
+				log.Errorf("failed to write file %s: %v", fileName, err)
+				return err
+			}
+			return nil
+		}
+
+		if utils.IsFile(target) {
+			log.Infof("syntaxflow-format: processing file %s", target)
+			complete(target)
+		} else if utils.IsDir(target) {
+			log.Infof("syntaxflow-format: processing directory %s", target)
+			filesys.Recursive(target, filesys.WithFileSystem(filesys.NewLocalFs()), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+				log.Infof("syntaxflow-format: processing file %s", s)
+				return complete(s)
+			}))
+		} else {
+			log.Errorf("syntaxflow-format: file %s not found", target)
+		}
+		return errors
+	},
+}
+
 var syntaxFlowSave = &cli.Command{
 	Name:    "syntaxflow-save",
 	Aliases: []string{"save-syntaxflow", "ssf", "sfs"},
@@ -1136,13 +1225,14 @@ var SSACompilerCommands = []*cli.Command{
 	ssaCompile, // compile program
 
 	// rule manage
-	syntaxFlowCreate, // create rule template
-	syntaxflowFormat, //  format syntaxflow rule
-	syntaxFlowSave,   // save rule to database
-	syntaxFlowTest,   // test rule
-	syntaxFlowExport, // export rule to file
-	syntaxFlowImport, // import rule from file
-	syncRule,         // sync rule from embed to database
+	syntaxFlowCreate,   // create rule template
+	syntaxflowFormat,   //  format syntaxflow rule
+	syntaxflowComplete, // complete syntaxflow rule with AI
+	syntaxFlowSave,     // save rule to database
+	syntaxFlowTest,     // test rule
+	syntaxFlowExport,   // export rule to file
+	syntaxFlowImport,   // import rule from file
+	syncRule,           // sync rule from embed to database
 	// risk manage
 	ssaRisk, // export risk report
 
