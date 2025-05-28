@@ -3,6 +3,7 @@ package sfvm
 import (
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -16,12 +17,14 @@ import (
 )
 
 type RuleFormat struct {
-	ruleID                 string
-	write                  io.Writer
-	editor                 *memedit.MemEditor
-	once                   sync.Once
-	requireInfoDescKeyType map[SFDescKeyType]bool         // 第一个desc语句中需要的desc item key类型，没有会补全
-	infoDescHandler        func(key, value string) string // 第一个desc语句内容的处理函数，可以结合AI补全
+	ruleID string
+	write  io.Writer
+	editor *memedit.MemEditor
+	once   sync.Once
+
+	requireDescKeyType map[SFDescKeyType]bool // 第一个desc语句中需要的desc item key类型，没有会补全
+	// desc handler
+	descHandler func(key, value string) string
 }
 
 type RuleFormatOption func(*RuleFormat)
@@ -58,20 +61,20 @@ func RuleFormatWithRuleID(ruleID string) RuleFormatOption {
 	}
 }
 
-func RuleFormatWithRequireInfoDescKeyType(typ ...SFDescKeyType) RuleFormatOption {
+func RuleFormatWithRequireDescKeyType(typ ...SFDescKeyType) RuleFormatOption {
 	return func(f *RuleFormat) {
-		if f.requireInfoDescKeyType == nil {
-			f.requireInfoDescKeyType = make(map[SFDescKeyType]bool)
+		if f.requireDescKeyType == nil {
+			f.requireDescKeyType = make(map[SFDescKeyType]bool)
 		}
 		for _, t := range typ {
-			f.requireInfoDescKeyType[t] = false
+			f.requireDescKeyType[t] = false
 		}
 	}
 }
 
-func RuleFormatWithInfoDescHandler(handler func(key, value string) string) RuleFormatOption {
+func RuleFormatWithDescHandler(handler func(key, value string) string) RuleFormatOption {
 	return func(f *RuleFormat) {
-		f.infoDescHandler = handler
+		f.descHandler = handler
 	}
 }
 
@@ -125,17 +128,7 @@ func (f *RuleFormat) Visit(flow sf.IFlowContext, editor *memedit.MemEditor) {
 	if statements == nil {
 		return
 	}
-	// 第一次遍历确定需要补全的desc item
-	for _, stmt := range statements.AllStatement() {
-		switch stmt := stmt.(type) {
-		case *sf.DescriptionContext:
-			f.VisitDescriptionFistly(stmt.DescriptionStatement())
-		default:
-			continue
-		}
-	}
 
-	// 第二次遍历用于补全
 	for i, stmt := range statements.AllStatement() {
 		switch stmt := stmt.(type) {
 		case *sf.DescriptionContext:
@@ -150,38 +143,7 @@ func (f *RuleFormat) Visit(flow sf.IFlowContext, editor *memedit.MemEditor) {
 	}
 }
 
-func (f *RuleFormat) VisitDescriptionFistly(desc sf.IDescriptionStatementContext) {
-	i, ok := desc.(*sf.DescriptionStatementContext)
-	if i == nil || !ok {
-		return
-	}
-	items, ok := i.DescriptionItems().(*sf.DescriptionItemsContext)
-	if !ok || items == nil {
-		return
-	}
-
-	for _, item := range items.AllDescriptionItem() {
-		ret, ok := item.(*sf.DescriptionItemContext)
-		if !ok || ret.Comment() != nil {
-			continue
-		}
-
-		key := mustUnquoteSyntaxFlowString(ret.StringLiteral().GetText())
-		switch keyType := ValidDescItemKeyType(strings.ToLower(key)); keyType {
-		case SFDescKeyType_Unknown:
-			continue
-		default:
-			if f.requireInfoDescKeyType == nil {
-				continue
-			}
-			_, ok := f.requireInfoDescKeyType[keyType]
-			if ok {
-				f.requireInfoDescKeyType[keyType] = true
-			}
-		}
-	}
-}
-
+// VisitInfoDescription针对第一个desc语句进行处理，主要补全一些规则描述性信息
 func (f *RuleFormat) VisitInfoDescription(desc sf.IDescriptionStatementContext) {
 	i, _ := desc.(*sf.DescriptionStatementContext)
 	if i == nil {
@@ -201,37 +163,151 @@ func (f *RuleFormat) VisitInfoDescription(desc sf.IDescriptionStatementContext) 
 			continue
 		}
 		key := mustUnquoteSyntaxFlowString(ret.StringLiteral().GetText())
-		var value string
-		if valueItem, ok := ret.DescriptionItemValue().(*sf.DescriptionItemValueContext); ok && valueItem != nil {
-			if valueItem.StringLiteral() != nil {
-				value = valueItem.GetText()
+		valueItem, ok := ret.DescriptionItemValue().(*sf.DescriptionItemValueContext)
+		if !ok || valueItem == nil {
+			continue
+		}
+
+		descType := ValidDescItemKeyType(key)
+		// 记录访问过的desc item key类型，以便后续确认还缺少哪些key
+		f.visitRequireInfoDescKeyType(descType)
+		// 不进行字段补全
+		if f.descHandler == nil || !f.needCompletion(descType) {
+			f.Write("\t%s\n", f.GetTextFromToken(item))
+			continue
+		}
+
+		// 区分StringLiteral、HereDoc和NumberLiteral
+		if valueItem.StringLiteral() != nil && !IsComplexInfoDescType(descType) {
+			value := f.VisitStringLiteral(valueItem.StringLiteral())
+			value = f.descHandler(key, value)
+			f.Write("\t%s: \"%s\"\n", key, value)
+		} else if valueItem.StringLiteral() != nil && IsComplexInfoDescType(descType) {
+			// 虽然原规则使用StringLiteral写，但是descType是复杂类型，AI补全的可能是复杂文本
+			// 所以这里使用heredoc
+			value := f.VisitStringLiteral(valueItem.StringLiteral())
+			value = f.descHandler(key, value)
+			upperKey := strings.ToUpper(key)
+			f.Write("\t%s: <<<%s\n", key, upperKey)
+			f.Write("%s\n", value)
+			f.Write("%s\n", upperKey)
+		} else if valueItem.HereDoc() != nil {
+			value := f.VisitHereDoc(valueItem.HereDoc())
+			newValue := f.descHandler(key, value)
+			upperKey := strings.ToUpper(key)
+			f.Write("\t%s: <<<%s\n", key, upperKey)
+			f.Write("%s\n", newValue)
+			f.Write("%s\n", upperKey)
+		} else if valueItem.NumberLiteral() != nil {
+			value := valueItem.NumberLiteral().GetText()
+			newValue := f.descHandler(key, value)
+			_, err := strconv.ParseInt(newValue, 10, 64)
+			if err == nil {
+				f.Write("\t%s: %s\n", key, newValue)
+				continue
 			}
+			_, err = strconv.ParseInt(newValue, 8, 64)
+			if err == nil {
+				f.Write("\t%s: %s\n", key, newValue)
+				continue
+			}
+			_, err = strconv.ParseInt(newValue, 16, 64)
+			if err == nil {
+				f.Write("\t%s: %s\n", key, newValue)
+				continue
+			}
+			f.Write("\t%s: \"%s\"\n", key, value)
 		}
-		if f.infoDescHandler != nil {
-			value = f.infoDescHandler(key, value)
-		}
-		f.Write("\t%s: %s\n", key, value)
 	}
 
-	if toAdd := f.getToAddInfoDescKeyType(); toAdd != nil {
+	// 补充没有的字段
+	if toAdd := f.getDescKeyTypesToAdd(); toAdd != nil {
 		for _, keyType := range toAdd {
-			if f.infoDescHandler != nil {
-				value := f.infoDescHandler(string(keyType), "")
-				f.Write("\t%s: %s\n", string(keyType), value)
+			if f.descHandler != nil {
+				value := f.descHandler(string(keyType), "")
+				// 复杂文本使用heredoc
+				if IsComplexInfoDescType(keyType) {
+					upperKey := strings.ToUpper(string(keyType))
+					f.Write("\t%s: <<<%s\n", string(keyType), upperKey)
+					f.Write("%s\n", value)
+					f.Write("%s\n", upperKey)
+					continue
+				} else {
+					f.Write("\t%s: %s\n", string(keyType), value)
+				}
 			} else {
 				f.Write("\t%s\n", string(keyType))
 			}
 		}
 	}
+
 	f.Write(")\n")
 }
 
-func (f *RuleFormat) getToAddInfoDescKeyType() []SFDescKeyType {
-	if f.requireInfoDescKeyType == nil {
+func (f *RuleFormat) VisitStringLiteral(raw sf.IStringLiteralContext) string {
+	if raw == nil {
+		return ""
+	}
+
+	i, ok := raw.(*sf.StringLiteralContext)
+	if !ok || i == nil {
+		return ""
+	}
+	return mustUnquoteSyntaxFlowString(i.GetText())
+}
+
+func (f *RuleFormat) VisitHereDoc(raw sf.IHereDocContext) string {
+	if raw == nil {
+		return ""
+	}
+
+	i, ok := raw.(*sf.HereDocContext)
+	if !ok || i == nil {
+		return ""
+	}
+	return f.VisitCrlfHereDoc(i.CrlfHereDoc())
+}
+
+func (f *RuleFormat) VisitCrlfHereDoc(raw sf.ICrlfHereDocContext) string {
+	if raw == nil {
+		return ""
+	}
+	i, ok := raw.(*sf.CrlfHereDocContext)
+	if !ok || i == nil {
+		return ""
+	}
+	if i.CrlfText() != nil {
+		return i.CrlfText().GetText()
+	} else {
+		return ""
+	}
+}
+
+func (f *RuleFormat) needCompletion(descType SFDescKeyType) bool {
+	if f == nil || f.requireDescKeyType == nil {
+		return false
+	}
+	_, ok := f.requireDescKeyType[descType]
+	return ok
+}
+
+func (f *RuleFormat) visitRequireInfoDescKeyType(descType SFDescKeyType) {
+	if f == nil || f.requireDescKeyType == nil {
+		return
+	}
+
+	_, ok := f.requireDescKeyType[descType]
+	if ok {
+		f.requireDescKeyType[descType] = true
+	}
+}
+
+func (f *RuleFormat) getDescKeyTypesToAdd() []SFDescKeyType {
+	if f.requireDescKeyType == nil {
 		return []SFDescKeyType{}
 	}
 	var ret []SFDescKeyType
-	for keyType, ok := range f.requireInfoDescKeyType {
+	for keyType, ok := range f.requireDescKeyType {
 		if !ok {
 			ret = append(ret, keyType)
 		}

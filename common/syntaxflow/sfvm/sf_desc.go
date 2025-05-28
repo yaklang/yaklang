@@ -1,6 +1,7 @@
 package sfvm
 
 import (
+	"github.com/samber/lo"
 	"strings"
 )
 
@@ -63,6 +64,28 @@ func GetSupplyInfoDescKeyType() []SFDescKeyType {
 		SFDescKeyType_Solution,
 		SFDescKeyType_Reference,
 	}
+}
+
+func GetBasisSupplyInfoDescKeyType() []SFDescKeyType {
+	keys := GetSupplyInfoDescKeyType()
+	return lo.Filter(keys, func(item SFDescKeyType, index int) bool {
+		if IsComplexInfoDescType(item) {
+			return false
+		} else {
+			return true
+		}
+	})
+}
+
+func GetComplexSupplyInfoDescKeyType() []SFDescKeyType {
+	keys := GetSupplyInfoDescKeyType()
+	return lo.Filter(keys, func(item SFDescKeyType, index int) bool {
+		if IsComplexInfoDescType(item) {
+			return true
+		} else {
+			return false
+		}
+	})
 }
 
 func IsComplexInfoDescType(typ SFDescKeyType) bool {
