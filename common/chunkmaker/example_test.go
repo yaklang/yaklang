@@ -199,10 +199,11 @@ func ExampleNewChunkMaker_withPrevNBytes() {
 
 	// Write data in a separate goroutine
 	go func() {
-		defer pw.Close()                               // Close the writer when done
-		_, err := pw.Write([]byte(inputData))          // Write all data at once
-		if err != nil && err !=روفutils.ErrPipeWriteToClosedPipe {
-			log.Printf("Error writing to pipe: %v", err)
+		defer pw.Close()                           // Close the writer when done
+		_, errWrite := pw.Write([]byte(inputData)) // Write all data at once.
+		// Temporarily simplifying the error check to isolate the linter issue
+		if errWrite != nil {
+			// log.Printf("Error writing to pipe: %v", errWrite) // Temporarily commented out to see if this is the source of the error
 		}
 	}()
 
@@ -215,11 +216,11 @@ func ExampleNewChunkMaker_withPrevNBytes() {
 
 	// Iterate through collected chunks to show linking and PrevNBytes
 	for i, currentChunk := range collectedChunks {
-		fmt.Printf("Chunk %d: ["%s"]\n", i, string(currentChunk.Data()))
+		fmt.Printf("Chunk %d: [\"%s\"]\n", i, string(currentChunk.Data()))
 
 		if currentChunk.HaveLastChunk() {
 			lastChunk := currentChunk.LastChunk()
-			fmt.Printf("  - Has Prev Chunk: true (Data: ["%s"])\n", string(lastChunk.Data()))
+			fmt.Printf("  - Has Prev Chunk: true (Data: [\"%s\"])\n", string(lastChunk.Data()))
 		} else {
 			fmt.Printf("  - Has Prev Chunk: false\n")
 		}
@@ -228,7 +229,7 @@ func ExampleNewChunkMaker_withPrevNBytes() {
 		// Get previous 3 bytes (if available)
 		prev3Bytes := currentChunk.PrevNBytes(3)
 		if len(prev3Bytes) > 0 {
-			fmt.Printf("  - PrevNBytes(3): ["%s"]\n", string(prev3Bytes))
+			fmt.Printf("  - PrevNBytes(3): [\"%s\"]\n", string(prev3Bytes))
 		} else {
 			fmt.Printf("  - PrevNBytes(3): [] (no previous data or not enough)\n")
 		}
@@ -236,7 +237,7 @@ func ExampleNewChunkMaker_withPrevNBytes() {
 		// Get previous 7 bytes (if available)
 		prev7Bytes := currentChunk.PrevNBytes(7)
 		if len(prev7Bytes) > 0 {
-			fmt.Printf("  - PrevNBytes(7): ["%s"]\n", string(prev7Bytes))
+			fmt.Printf("  - PrevNBytes(7): [\"%s\"]\n", string(prev7Bytes))
 		} else {
 			fmt.Printf("  - PrevNBytes(7): [] (no previous data or not enough)\n")
 		}
