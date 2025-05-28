@@ -4,13 +4,17 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/chanx" // Import chanx
 )
 
 func (cm *ChunkMaker) loop(i chan struct{}) {
 	closeOnce := sync.Once{}
 	src := cm.src
 	inputChan := src.OutputChannel()
-	bufferChunk := NewBufferChunk(nil)
+	bufferChunk := NewBufferChunk(nil) // This buffer accumulates data from inputChan
+
+	var lastSentChunk Chunk // Variable to keep track of the last chunk sent to cm.dst
 
 	defer func() {
 		cm.dst.Close()
@@ -25,17 +29,46 @@ func (cm *ChunkMaker) loop(i chan struct{}) {
 	}
 	_ = delta
 	_ = currentBuffer
-	_ = bufferChunk
+	// _ = bufferChunk // bufferChunk is used
 
-	var timerChan <-chan time.Time // Use a nil channel if timer is not enabled
+	var timerChan <-chan time.Time
 	if cm.config.enableTimeTrigger {
 		ticker := time.NewTicker(cm.config.timeTriggerInterval)
-		defer ticker.Stop() // Ensure ticker is stopped
+		defer ticker.Stop()
 		timerChan = ticker.C
 	}
 
-	flushAll := func() {
-		bufferChunk.FlushAllChunkSizeTo(cm.dst, cm.config.chunkSize)
+	// Helper function to process and link chunks from a temporary channel
+	processAndLinkChunks := func(tempOutputChan *chanx.UnlimitedChan[Chunk]) {
+		for chunkToLink := range tempOutputChan.OutputChannel() {
+			if bc, ok := chunkToLink.(*BufferChunk); ok {
+				bc.prev = lastSentChunk
+				cm.dst.SafeFeed(bc)
+				lastSentChunk = bc
+			} else {
+				// Handle case where chunkToLink is not *BufferChunk, though unlikely
+				// based on current NewBufferChunk usage. For safety, send as is or log.
+				cm.dst.SafeFeed(chunkToLink)
+				lastSentChunk = chunkToLink
+			}
+		}
+	}
+
+	flushBufferToTempChannel := func(flushAllData bool) {
+		// Create a temporary channel for Flush...To methods
+		// The context for this temp channel should ideally be derived from cm.config.ctx
+		// or a new one if appropriate for its lifecycle.
+		tempDst := chanx.NewUnlimitedChan[Chunk](cm.config.ctx, 100) // Buffer size can be adjusted
+
+		go func() { // Run flushing in a new goroutine to avoid deadlocks
+			defer tempDst.Close() // Close tempDst when flushing is done
+			if flushAllData {
+				bufferChunk.FlushAllChunkSizeTo(tempDst, cm.config.chunkSize)
+			} else {
+				bufferChunk.FlushFullChunkSizeTo(tempDst, cm.config.chunkSize)
+			}
+		}()
+		processAndLinkChunks(tempDst)
 	}
 
 	for {
@@ -43,19 +76,22 @@ func (cm *ChunkMaker) loop(i chan struct{}) {
 			close(i)
 		})
 		select {
-		case <-timerChan: // This will block indefinitely if timerChan is nil
-			// log.Infof("time trigger, current buffer size: %d", bufferChunk.BytesSize())
-			// No need to check cm.config.enableTimeTrigger here, as timerChan would be nil if not enabled
-			flushAll()
+		case <-timerChan:
+			if bufferChunk.BytesSize() > 0 { // Only flush if there's data
+				flushBufferToTempChannel(true) // Time trigger should flush all remaining data
+			}
 		case result, ok := <-inputChan:
 			if !ok {
-				// log.Infof("start to flush all chunks, current buffer size: %d", bufferChunk.BytesSize())
-				flushAll()
+				if bufferChunk.BytesSize() > 0 { // Flush any remaining data on close
+					flushBufferToTempChannel(true)
+				}
 				return
 			}
+			// It's assumed result itself doesn't need linking here,
+			// as it's raw data to be added to bufferChunk.
+			// If result itself is a Chunk that needs linking, the logic would differ.
 			bufferChunk.Write(result.Data())
-			// log.Infof("start to write %v", spew.Sdump(string(result.Data())))
-			bufferChunk.FlushFullChunkSizeTo(cm.dst, cm.config.chunkSize)
+			flushBufferToTempChannel(false) // Flush only full chunks after new data
 		}
 	}
 }

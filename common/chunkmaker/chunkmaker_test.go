@@ -5,6 +5,10 @@ import (
 
 	"unicode/utf8"
 
+	"bytes"
+
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -228,6 +232,208 @@ func TestChunkerWithChunkSize_Advanced(t *testing.T) {
 			// 检查预期的 chunks 是否都已收到
 			if len(tc.expectedChunks) > len(chunks) {
 				t.Errorf("Missing expected chunks. Expected: %v, Got: %v", tc.expectedChunks, chunks)
+			}
+		})
+	}
+}
+
+func TestChunkMaker_ChunkLinkingAndPrevNBytes(t *testing.T) {
+	testCases := []struct {
+		name               string
+		chunkSize          int64
+		inputData          string
+		expectedChunkDatas []string // Data content of each chunk
+		prevNChecks        []struct {
+			chunkIndex int // Index of the chunk in expectedChunkDatas to call PrevNBytes on
+			n          int
+			expected   []byte
+		}
+	}{
+		{
+			name:               "Simple linking and PrevNBytes",
+			chunkSize:          5,
+			inputData:          "HelloWorldThisIsFun", // Chunks: Hello, World, ThisI, sFun
+			expectedChunkDatas: []string{"Hello", "World", "ThisI", "sFun"},
+			prevNChecks: []struct {
+				chunkIndex int
+				n          int
+				expected   []byte
+			}{
+				// On chunk "Hello" (index 0), prev is nil
+				{chunkIndex: 0, n: 3, expected: []byte("")},
+				// On chunk "World" (index 1), prev is "Hello"
+				{chunkIndex: 1, n: 3, expected: []byte("llo")},   // Last 3 of "Hello"
+				{chunkIndex: 1, n: 5, expected: []byte("Hello")}, // All of "Hello"
+				{chunkIndex: 1, n: 7, expected: []byte("Hello")}, // All of "Hello" (n > prev length)
+				// On chunk "ThisI" (index 2), prev is "World"
+				{chunkIndex: 2, n: 3, expected: []byte("rld")},      // Last 3 of "World"
+				{chunkIndex: 2, n: 8, expected: []byte("lloWorld")}, // "llo" (from Hello) + "World"
+				// On chunk "sFun" (index 3), prev is "ThisI"
+				{chunkIndex: 3, n: 2, expected: []byte("sI")},               // Last 2 of "ThisI"
+				{chunkIndex: 3, n: 10, expected: []byte("WorldThisI")},      // "World" + "ThisI"
+				{chunkIndex: 3, n: 15, expected: []byte("HelloWorldThisI")}, // "Hello" + "World" + "ThisI"
+				{chunkIndex: 3, n: 20, expected: []byte("HelloWorldThisI")}, // All prev data
+			},
+		},
+		{
+			name:               "Input smaller than chunk size, single chunk",
+			chunkSize:          10,
+			inputData:          "Tiny",
+			expectedChunkDatas: []string{"Tiny"},
+			prevNChecks: []struct {
+				chunkIndex int
+				n          int
+				expected   []byte
+			}{
+				// On chunk "Tiny" (index 0), prev is nil
+				{chunkIndex: 0, n: 2, expected: []byte("")},
+				{chunkIndex: 0, n: 4, expected: []byte("")},
+			},
+		},
+		{
+			name:               "Empty input",
+			chunkSize:          5,
+			inputData:          "",
+			expectedChunkDatas: []string{},
+			prevNChecks: []struct {
+				chunkIndex int
+				n          int
+				expected   []byte
+			}{}, // No checks
+		},
+		{
+			name:               "Multiple small writes, exact multiples of chunksize",
+			chunkSize:          3,
+			inputData:          "abcdefghi", // 3 chunks: abc, def, ghi
+			expectedChunkDatas: []string{"abc", "def", "ghi"},
+			prevNChecks: []struct {
+				chunkIndex int
+				n          int
+				expected   []byte
+			}{
+				{chunkIndex: 0, n: 2, expected: []byte("")},
+				{chunkIndex: 1, n: 2, expected: []byte("bc")},      // prev: "abc"
+				{chunkIndex: 2, n: 2, expected: []byte("ef")},      // prev: "def"
+				{chunkIndex: 2, n: 5, expected: []byte("bcdef")},   // prevs: "abc" + "def"
+				{chunkIndex: 2, n: 6, expected: []byte("abcdef")},  // all prevs
+				{chunkIndex: 2, n: 10, expected: []byte("abcdef")}, // n > all prevs
+			},
+		},
+		{
+			name:               "Write data, then close, flush partial last chunk",
+			chunkSize:          5,
+			inputData:          "HelloWorldPartial",                       // Hello, World, Parti, al
+			expectedChunkDatas: []string{"Hello", "World", "Parti", "al"}, // Corrected
+			prevNChecks: []struct {
+				chunkIndex int
+				n          int
+				expected   []byte
+			}{
+				// Chunk 0: "Hello", prev: nil
+				// Chunk 1: "World", prev: "Hello"
+				// Chunk 2: "Parti", prev: "World"
+				// Chunk 3: "al",    prev: "Parti"
+				{chunkIndex: 2, n: 3, expected: []byte("rld")},           // On "Parti", prev "World", last 3 of "World"
+				{chunkIndex: 2, n: 8, expected: []byte("lloWorld")},      // On "Parti", prevs "Hello"+"World"
+				{chunkIndex: 3, n: 1, expected: []byte("i")},             // On "al", prev "Parti", last 1 of "Parti"
+				{chunkIndex: 3, n: 7, expected: []byte("ldParti")},       // On "al", prevs "Parti"+"World" -> "ld" from World, "Parti"
+				{chunkIndex: 3, n: 12, expected: []byte("loWorldParti")}, // Corrected: On "al", prevs "Parti"+"World"+"Hello" (tail of Hello)
+			},
+		},
+		{
+			name:               "Write data exactly chunksize, then close",
+			chunkSize:          5,
+			inputData:          "Exact", // Single chunk
+			expectedChunkDatas: []string{"Exact"},
+			prevNChecks: []struct {
+				chunkIndex int
+				n          int
+				expected   []byte
+			}{
+				{chunkIndex: 0, n: 3, expected: []byte("")}, // No prev
+			},
+		},
+		{
+			name:               "Write data less than chunksize, then close",
+			chunkSize:          10,
+			inputData:          "Less", // Single chunk
+			expectedChunkDatas: []string{"Less"},
+			prevNChecks: []struct {
+				chunkIndex int
+				n          int
+				expected   []byte
+			}{
+				{chunkIndex: 0, n: 3, expected: []byte("")},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pr, pw := utils.NewPipe()
+
+			go func() {
+				pw.Write([]byte(tc.inputData))
+				pw.Close()
+			}()
+
+			cm, err := NewChunkMaker(pr, WithChunkSize(tc.chunkSize))
+			if err != nil {
+				t.Fatalf("Failed to create ChunkMaker: %v", err)
+			}
+
+			var outputChunks []Chunk
+			for chunk := range cm.OutputChannel() {
+				outputChunks = append(outputChunks, chunk)
+			}
+
+			if len(outputChunks) != len(tc.expectedChunkDatas) {
+				t.Fatalf("Expected %d chunks, got %d", len(tc.expectedChunkDatas), len(outputChunks))
+			}
+
+			for i, outChunk := range outputChunks {
+				expectedData := []byte(tc.expectedChunkDatas[i])
+				if !bytes.Equal(outChunk.Data(), expectedData) {
+					t.Errorf("Chunk %d data: expected %q, got %q", i, string(expectedData), string(outChunk.Data()))
+				}
+
+				if i > 0 {
+					if outChunk.LastChunk() != outputChunks[i-1] {
+						t.Errorf("Chunk %d LastChunk() should be chunk %d (expected_ptr: %p), but got %p",
+							i, i-1, outputChunks[i-1], outChunk.LastChunk())
+					}
+				} else {
+					if outChunk.LastChunk() != nil {
+						t.Errorf("Chunk 0 LastChunk() should be nil, but got %p", outChunk.LastChunk())
+					}
+				}
+			}
+
+			// Perform PrevNBytes checks
+			for _, check := range tc.prevNChecks {
+				if check.chunkIndex >= len(outputChunks) {
+					t.Errorf("PrevNBytes check: chunkIndex %d out of bounds (%d chunks)", check.chunkIndex, len(outputChunks))
+					continue
+				}
+				chunkToTest := outputChunks[check.chunkIndex]
+				actualNBytes := chunkToTest.PrevNBytes(check.n)
+				if !bytes.Equal(actualNBytes, check.expected) {
+					// Construct a more informative message for PrevNBytes failure
+					var prevChainStr string
+					curr := chunkToTest.LastChunk()
+					var history []string
+					for curr != nil {
+						history = append([]string{string(curr.Data())}, history...)
+						curr = curr.LastChunk()
+					}
+					if len(history) > 0 {
+						prevChainStr = strings.Join(history, " <- ")
+					} else {
+						prevChainStr = "<nil>"
+					}
+					t.Errorf("Chunk %d (data: %s, prev chain: [%s]).PrevNBytes(%d): expected %q, got %q",
+						check.chunkIndex, string(chunkToTest.Data()), prevChainStr, check.n, string(check.expected), string(actualNBytes))
+				}
 			}
 		})
 	}
