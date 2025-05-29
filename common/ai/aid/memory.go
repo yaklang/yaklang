@@ -56,6 +56,24 @@ type Memory struct {
 	timeline *memoryTimeline // timeline with tool call results, will reduce the memory size
 }
 
+func (m *Memory) CopyReducibleMemory() *Memory {
+	mem := &Memory{
+		PersistentData:        utils.CopySlice(m.PersistentData),
+		userData:              m.userData.Copy(),
+		DisableTools:          m.DisableTools,
+		Tools:                 m.Tools,
+		toolsKeywordsCallback: m.toolsKeywordsCallback,
+		InteractiveHistory:    m.InteractiveHistory.Copy(),
+
+		// task && plan is not reducible, remove it
+		CurrentTask: nil,
+		RootTask:    nil,
+		PlanHistory: nil,
+	}
+	mem.timeline = m.timeline.CopyReducibleTimelineWithMemory(mem)
+	return m
+}
+
 func GetDefaultMemory() *Memory {
 	return &Memory{
 		PlanHistory:        make([]*PlanRecord, 0),
