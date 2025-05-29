@@ -646,16 +646,20 @@ var syntaxflowCompletion = &cli.Command{
 		typ := c.String("ai-type")
 		key := c.String("api-key")
 		model := c.String("ai-model")
+		proxy := c.String("proxy")
 
 		var aiOpts []aispec.AIConfigOption
 		if model != "" {
 			aiOpts = append(aiOpts, aispec.WithModel(model))
 		}
-		if typ == "" {
+		if typ != "" {
 			aiOpts = append(aiOpts, aispec.WithType(typ))
 		}
 		if key != "" {
 			aiOpts = append(aiOpts, aispec.WithAPIKey(key))
+		}
+		if proxy != "" {
+			aiOpts = append(aiOpts, aispec.WithProxy(proxy))
 		}
 
 		var errors error
