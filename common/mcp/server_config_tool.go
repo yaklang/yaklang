@@ -3,6 +3,7 @@ package mcp
 import (
 	"maps"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 )
@@ -43,4 +44,8 @@ func AddGlobalToolSet(setName string, opts ...ToolSetOption) {
 
 	globalToolSets[setName] = b
 	maps.Copy(globalTools, b.Tools)
+}
+
+func GlobalToolSetList() []string {
+	return lo.Keys(globalToolSets)
 }
