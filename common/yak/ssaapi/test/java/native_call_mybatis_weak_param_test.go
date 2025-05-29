@@ -176,7 +176,7 @@ public interface UserMapper {
 						if editor := rng.GetEditor(); editor != nil && editor.GetFilename() == "sqlmap.xml" {
 							check = true
 						}
-						if strings.Contains(p.Node.StringWithRange(), "22:63") {
+						if strings.Contains(p.Node.StringWithRange(), "\"${id}\"\t22:63 - 22:68: ${id}") {
 							checkRng = true
 						}
 					}
@@ -240,7 +240,7 @@ public interface UserMapper {
 				if v, ok := vo.(*ssaapi.Value); ok {
 					for _, p := range v.Predecessors {
 						p.Node.ShowWithRange()
-						if strings.Contains(p.Node.StringWithRange(), "22:63") {
+						if strings.Contains(p.Node.StringWithRange(), "\"${id}\"\t22:63 - 22:68: ${id}") {
 							checkRng = true
 						}
 					}
