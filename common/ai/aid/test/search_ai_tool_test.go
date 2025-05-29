@@ -1,6 +1,7 @@
 package test
 
 import (
+	"github.com/yaklang/yaklang/common/yak/depinjector"
 	"strings"
 	"testing"
 
@@ -34,6 +35,8 @@ import (
 // }
 
 func TestDecodeBase64BySearchTool(t *testing.T) {
+	depinjector.DependencyInject()
+
 	taskId := string(utils.RandStringBytes(10))
 	summaryId := string(utils.RandStringBytes(10))
 	stateKeyword := []struct {
