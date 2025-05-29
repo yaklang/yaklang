@@ -436,6 +436,18 @@ func WithRawParam(name string, object map[string]any, opts ...PropertyOption) To
 	}
 }
 
+func (t *Tool) GetName() string {
+	return t.Name
+}
+
+func (t *Tool) GetDescription() string {
+	return t.Description
+}
+
+func (t *Tool) GetKeywords() []string {
+	return t.Keywords
+}
+
 func (t *Tool) Params() map[string]any {
 	return t.Tool.InputSchema.Properties
 }

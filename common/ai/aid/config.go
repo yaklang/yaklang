@@ -5,6 +5,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"io"
 	"math/rand/v2"
 	"sync"
 	"sync/atomic"
@@ -574,6 +578,33 @@ func WithAiToolsSearchTool() Option {
 		config.aiToolManagerOption = append(config.aiToolManagerOption,
 			buildinaitools.WithSearchEnabled(true))
 		return nil
+	}
+}
+
+func WithAiForgeSearchTool() Option {
+	return func(config *Config) error {
+		forgeSearchTools, err := searchtools.CreateAISearchTools[*schema.AIForge](
+			searchtools.NewKeyWordSearcher[*schema.AIForge](
+				func(prompt string) (io.Reader, error) {
+					rsp, err := config.callAI(NewAIRequest(prompt))
+					if err != nil {
+						return nil, err
+					}
+					return rsp.GetOutputStreamReader("tool", false, config), nil
+				}),
+			func() []*schema.AIForge {
+				forgeList, err := yakit.GetAllAIForge(consts.GetGormProfileDatabase())
+				if err != nil {
+					log.Errorf("yakit.GetAllAIForge: %v", err)
+					return nil
+				}
+				return forgeList
+			}, searchtools.SearchForgeName,
+		)
+		if err != nil {
+			return utils.Errorf("create ai forge search tools fail: %v", err)
+		}
+		return WithTools(forgeSearchTools...)(config)
 	}
 }
 

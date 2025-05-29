@@ -26,12 +26,7 @@ type YakScriptMetadata struct {
 	Keywords    []string
 }
 
-func ParseYakScriptMetadata(name string, code string) (*YakScriptMetadata, error) {
-	prog, err := static_analyzer.SSAParse(code, "yak")
-	if err != nil {
-		return nil, fmt.Errorf("static_analyzer.SSAParse(string(content), \"yak\") error: %v", err)
-	}
-
+func ParseYakScriptMetadataProg(name string, prog *ssaapi.Program) (*YakScriptMetadata, error) {
 	var desc []string
 	prog.Ref("__DESC__").ForEach(func(value *ssaapi.Value) {
 		if !value.IsConstInst() {
@@ -60,6 +55,14 @@ func ParseYakScriptMetadata(name string, code string) (*YakScriptMetadata, error
 		Description: strings.Join(desc, "; "),
 		Keywords:    keywords,
 	}, nil
+}
+
+func ParseYakScriptMetadata(name string, code string) (*YakScriptMetadata, error) {
+	prog, err := static_analyzer.SSAParse(code, "yak")
+	if err != nil {
+		return nil, fmt.Errorf("static_analyzer.SSAParse(string(content), \"yak\") error: %v", err)
+	}
+	return ParseYakScriptMetadataProg(name, prog)
 }
 
 // 生成元数据（关键词和描述）从代码
