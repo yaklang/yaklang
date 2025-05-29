@@ -29,7 +29,21 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 	recoverRange := b.GetRecoverRange(sourcefile, &sourcefile.Loc, sourcefile.Text())
 	defer recoverRange()
 
-	b.VisitStatements(sourcefile.Statements)
+	// js暂时不需要处理prehandle阶段
+	if b.PreHandler() {
+		return nil
+	}
+
+	if sourcefile.Statements != nil {
+		for _, statement := range sourcefile.Statements.Nodes {
+			if ast.IsPrologueDirective(statement) && statement.AsExpressionStatement().Expression.Text() == "use strict" {
+				b.useStrict = true
+				break
+			}
+		}
+		b.VisitStatements(sourcefile.Statements)
+	}
+
 	return nil
 }
 
@@ -361,17 +375,15 @@ func (b *builder) VisitDoStatement(node *ast.DoStatement) interface{} {
 
 		// 检查do-while的条件，如果条件为false则break
 		if node.Expression != nil {
-			condition := b.VisitRightValueExpression(node.Expression)
-			if condition == nil {
-				// 如果无法获取条件，可以选择继续循环或退出
-				// 这里我们选择退出循环
-				b.Break()
-				return
-			}
-
 			// 创建条件分支，当条件为false时退出循环
 			ifBuilder := b.CreateIfBuilder()
 			ifBuilder.SetCondition(func() ssa.Value {
+				condition := b.VisitRightValueExpression(node.Expression)
+				if condition == nil {
+					// 如果无法获取条件，可以选择继续循环或退出
+					// 这里我们选择退出循环
+					b.Break()
+				}
 				// 对条件取反，当原条件为false时进入if分支
 				return b.EmitUnOp(ssa.OpNeg, condition)
 			}, func() {
@@ -433,8 +445,13 @@ func (b *builder) VisitForStatement(node *ast.ForStatement) interface{} {
 	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
+	var loop *ssa.LoopBuilder
 	// 创建循环构建器
-	loop := b.CreateLoopBuilder()
+	if len(b.contextLabelStack) > 0 {
+		loop = b.CreateLoopBuilderWithLabelName(b.contextLabelStack[len(b.contextLabelStack)-1])
+	} else {
+		loop = b.CreateLoopBuilder()
+	}
 
 	// 设置初始化语句(first)
 	if node.Initializer != nil {
@@ -608,7 +625,7 @@ func (b *builder) VisitBreakStatement(node *ast.BreakStatement) interface{} {
 
 	// if exist label, goto label
 	if label := node.Label; label != nil {
-		b.handlerGoto(label.Text(), true)
+		b.BreakWithLabelName(label.Text())
 		return nil
 	}
 
@@ -629,11 +646,11 @@ func (b *builder) VisitContinueStatement(node *ast.ContinueStatement) interface{
 
 	// if exist label, goto label
 	if label := node.Label; label != nil {
-		b.handlerGoto(label.Text())
+		b.ContinueWithLabelName(label.Text())
 		return nil
 	}
 
-	if !b.Break() {
+	if !b.Continue() {
 		b.NewError(ssa.Error, TAG, UnexpectedContinueStmt())
 	}
 	return nil
@@ -648,55 +665,34 @@ func (b *builder) VisitLabeledStatement(node *ast.LabeledStatement) interface{} 
 	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
+	// 对于JS Label语句结构分为Label名和语句两部分
+	// outer: console.log("not a jump target") 这种标签语句合法但不会成为break和continue目标
+	// 因为Label语句的语句部分不是Block或者是循环
+	// 这里为了兼容label循环的情况统一套一个block
+
 	// 获取标签名称
 	labelName := ""
 	if node.Label != nil {
 		labelName = node.Label.Text()
 	} else {
 		b.NewError(ssa.Error, TAG, LabelNameEmptyNotAllowed())
-	}
-
-	// 获取或创建标签构建器
-	labelBuilder := b.GetLabelByName(labelName)
-	if labelBuilder != nil {
-		b.NewError(ssa.Error, TAG, LabelNameDupNotAllowed())
 		return nil
 	}
 
-	labelBuilder = b.BuildLabel(labelName)
-	if b.labels == nil {
-		b.labels = make(map[string]*ssa.LabelBuilder)
-	}
-	b.labels[labelName] = labelBuilder
+	b.contextLabelStack = append(b.contextLabelStack, labelName)
+	defer func() {
+		b.contextLabelStack = b.contextLabelStack[:len(b.contextLabelStack)-1]
+	}()
 
-	// 获取标签对应的代码块
-	block := labelBuilder.GetBlock()
+	label := b.CreateLabelBlockBuilder(labelName)
 
-	// 构建标签
-	labelBuilder.Build()
+	label.SetLabelBlock(func() {
+		if node.Statement != nil {
+			b.VisitStatement(node.Statement)
+		}
+	})
 
-	// 添加标签到当前作用域
-	b.AddLabel(labelName, block)
-
-	// 处理所有引用这个标签的goto语句
-	for _, handler := range labelBuilder.GetGotoHandlers() {
-		handler(block)
-	}
-
-	// 跳转到标签块
-	b.EmitJump(block)
-
-	// 更新当前块
-	b.CurrentBlock = block
-
-	// 访问标签下的语句
-	if node.Statement != nil {
-		b.VisitStatement(node.Statement)
-	}
-
-	// 完成标签构建
-	labelBuilder.Finish()
-
+	label.Finish()
 	return nil
 }
 
@@ -997,7 +993,7 @@ func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declTy
 		if isLocal {
 			variable = b.CreateLocalVariable(identifier)
 		} else {
-			variable = b.CreateVariable(identifier)
+			variable = b.CreateJSVariable(identifier)
 		}
 
 		if decl.Initializer != nil { // 定义变量
@@ -1081,7 +1077,7 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 		identifierName := b.VisitIdentifier(node.AsIdentifier())
 		if isLval {
 			if class == nil {
-				return b.CreateVariable(identifierName), nil
+				return b.CreateJSVariable(identifierName), nil
 			}
 			if class.GetNormalMember(identifierName) != nil {
 				obj := b.PeekValue("this")
@@ -1089,15 +1085,11 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 					return b.CreateMemberCallVariable(obj, b.EmitConstInst(identifierName)), nil
 				}
 			}
-			return b.CreateVariable(identifierName), nil
+			return b.CreateJSVariable(identifierName), nil
 		}
 		// undefined 是一个 identifier
 		if identifierName == "undefined" {
 			return nil, b.EmitUndefined("")
-		}
-
-		if value := b.ReadValue(identifierName); value != nil {
-			return nil, value
 		}
 
 		if class != nil {
@@ -1117,7 +1109,8 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 				return nil, value
 			}
 		}
-		return nil, nil
+
+		return nil, b.ReadValue(identifierName)
 	case ast.KindPropertyAccessExpression:
 		propertyAccessExp := node.AsPropertyAccessExpression()
 		obj, propName := b.VisitPropertyAccessExpression(propertyAccessExp)
@@ -1257,8 +1250,8 @@ func (b *builder) VisitBinaryExpression(node *ast.BinaryExpression) ssa.Value {
 		valueName string,
 	) ssa.Value {
 		// 为了聚合产生Phi指令
-		id := valueName
-		variable := b.CreateVariable(id)
+		id := valueName + "_" + uuid.NewString()
+		variable := b.CreateLocalVariable(id)
 		b.AssignVariable(variable, b.EmitValueOnlyDeclare(id))
 		// 只需要使用b.WriteValue设置value到此ID，并最后调用b.ReadValue可聚合产生Phi指令，完成语句预期行为
 		ifb := b.CreateIfBuilder()
@@ -1895,9 +1888,6 @@ func (b *builder) VisitPostfixUnaryExpression(node *ast.PostfixUnaryExpression) 
 	switch node.Operator {
 	// 后缀自增(x++)：将操作数加1，但返回原始值
 	case ast.KindPlusPlusToken:
-		// 保存原始值（用于返回）
-		originalValue := b.EmitCall(b.NewCall(b.ReadValue("clone"), []ssa.Value{currentValue}))
-
 		// 计算新值：当前值加1
 		newValue := b.EmitBinOp(ssa.OpAdd, currentValue, b.EmitConstInst(1))
 
@@ -1905,13 +1895,10 @@ func (b *builder) VisitPostfixUnaryExpression(node *ast.PostfixUnaryExpression) 
 		b.AssignVariable(variable, newValue)
 
 		// 返回操作前的原始值
-		return originalValue
+		return currentValue
 
 	// 后缀自减(x--)：将操作数减1，但返回原始值
 	case ast.KindMinusMinusToken:
-		// 保存原始值（用于返回）
-		originalValue := b.EmitCall(b.NewCall(b.ReadValue("clone"), []ssa.Value{currentValue}))
-
 		// 计算新值：当前值减1
 		newValue := b.EmitBinOp(ssa.OpSub, currentValue, b.EmitConstInst(1))
 
@@ -1919,7 +1906,7 @@ func (b *builder) VisitPostfixUnaryExpression(node *ast.PostfixUnaryExpression) 
 		b.AssignVariable(variable, newValue)
 
 		// 返回操作前的原始值
-		return originalValue
+		return currentValue
 
 	default:
 		// 未实现的操作符处理
@@ -2075,7 +2062,7 @@ func (b *builder) VisitFunctionDeclaration(node *ast.FunctionDeclaration) interf
 	b.FunctionBuilder = b.PopFunction()
 
 	// 在当前作用域中创建函数变量
-	variable := b.CreateVariable(funcName)
+	variable := b.CreateJSVariable(funcName)
 	b.AssignVariable(variable, newFunc)
 
 	return nil
@@ -2128,7 +2115,7 @@ func (b *builder) VisitFunctionExpression(node *ast.FunctionExpression) ssa.Valu
 
 	// 如果函数有名称并且在当前作用域中可见，将其加入变量表
 	if funcName != "" {
-		variable := b.CreateVariable(funcName)
+		variable := b.CreateJSVariable(funcName)
 		b.AssignVariable(variable, newFunc)
 	}
 
@@ -2200,8 +2187,8 @@ func (b *builder) VisitConditionalExpression(node *ast.ConditionalExpression) ss
 		valueName string,
 	) ssa.Value {
 		// 为了聚合产生Phi指令
-		id := valueName
-		variable := b.CreateVariable(id)
+		id := valueName + "_" + uuid.NewString()
+		variable := b.CreateLocalVariable(id)
 		b.AssignVariable(variable, b.EmitValueOnlyDeclare(id))
 		// 只需要使用b.WriteValue设置value到此ID，并最后调用b.ReadValue可聚合产生Phi指令，完成语句预期行为
 		ifb := b.CreateIfBuilder()
@@ -2787,7 +2774,7 @@ func (b *builder) ProcessObjectBindingPattern(pattern *ast.BindingPattern, sourc
 				if isLocal {
 					restVar = b.CreateLocalVariable(restName)
 				} else {
-					restVar = b.CreateVariable(restName)
+					restVar = b.CreateJSVariable(restName)
 				}
 				// 直接赋值整个对象
 				b.AssignVariable(restVar, sourceObj)
@@ -2839,7 +2826,7 @@ func (b *builder) ProcessObjectBindingPattern(pattern *ast.BindingPattern, sourc
 			if isLocal {
 				variable = b.CreateLocalVariable(varName)
 			} else {
-				variable = b.CreateVariable(varName)
+				variable = b.CreateJSVariable(varName)
 			}
 			b.AssignVariable(variable, propValue)
 
@@ -2894,7 +2881,7 @@ func (b *builder) ProcessArrayBindingPattern(pattern *ast.BindingPattern, source
 				if isLocal {
 					restVar = b.CreateLocalVariable(restName)
 				} else {
-					restVar = b.CreateVariable(restName)
+					restVar = b.CreateJSVariable(restName)
 				}
 				b.AssignVariable(restVar, sourceArr)
 			}
@@ -2922,7 +2909,7 @@ func (b *builder) ProcessArrayBindingPattern(pattern *ast.BindingPattern, source
 			if isLocal {
 				variable = b.CreateLocalVariable(varName)
 			} else {
-				variable = b.CreateVariable(varName)
+				variable = b.CreateJSVariable(varName)
 			}
 			b.AssignVariable(variable, elementValue)
 
@@ -2944,6 +2931,10 @@ func (b *builder) ProcessFunctionParams(params *ast.NodeList) {
 	if params == nil || len(params.Nodes) == 0 || b.IsStop() {
 		return
 	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &params.Loc, "")
+	defer recoverRange()
+
 	for index, param := range params.Nodes {
 		paramNode := param.AsParameterDeclaration()
 		paramName := ""
