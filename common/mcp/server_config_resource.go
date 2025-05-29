@@ -3,6 +3,7 @@ package mcp
 import (
 	"maps"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 )
@@ -53,4 +54,8 @@ func AddGlobalResourceSet(setName string, opts ...ResourceSetOption) {
 
 	globalResourceSets[setName] = b
 	maps.Copy(globalResources, b.Resources)
+}
+
+func GlobalResourceSetList() []string {
+	return lo.Keys(globalResourceSets)
 }

@@ -22,6 +22,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/grpc_recovery"
 
 	"github.com/yaklang/yaklang/common/crep"
+	"github.com/yaklang/yaklang/common/yak/depinjector"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 
 	"github.com/yaklang/yaklang/common/netx"
@@ -40,7 +41,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"github.com/yaklang/yaklang/common/utils/umask"
 	"github.com/yaklang/yaklang/common/yak"
-	"github.com/yaklang/yaklang/common/yak/antlr4nasl"
 	debugger "github.com/yaklang/yaklang/common/yak/interactive_debugger"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -158,7 +158,7 @@ func init() {
 		}
 	}
 	yaklib.SetEngineInterface(yak.NewScriptEngine(1000))
-	yak.SetNaslExports(antlr4nasl.Exports)
+	depinjector.DependencyInject()
 	yak.InitYaklangLib()
 }
 

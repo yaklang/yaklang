@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/httptpl"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/httptpl"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) ExtractData(server ypb.Yak_ExtractDataServer) error {
