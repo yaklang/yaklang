@@ -451,6 +451,54 @@ func (s *GotoStmt[T]) FallThough(from ScopedVersionedTableIF[T]) {
 	// do nothing
 }
 
+type LabelBlockStmt[T versionedValue] struct {
+	enter        ScopedVersionedTableIF[T]
+	name         string
+	labeledBlock ScopedVersionedTableIF[T]
+
+	MergeToEnd []ScopedVersionedTableIF[T]
+}
+
+func NewLabelBlockStmt[T versionedValue](enter ScopedVersionedTableIF[T], name string) *LabelBlockStmt[T] {
+	l := &LabelBlockStmt[T]{
+		enter: enter,
+		name:  name,
+	}
+	l.labeledBlock = l.enter.CreateSubScope()
+	return l
+}
+
+// SetLabelBlock sets the block content for the LabelBlockStmt.
+func (l *LabelBlockStmt[T]) SetLabelBlock(f func(ScopedVersionedTableIF[T]) ScopedVersionedTableIF[T]) {
+	l.labeledBlock = f(l.labeledBlock)
+}
+
+func (l *LabelBlockStmt[T]) Build(mergeEnd MergeHandle[T]) ScopedVersionedTableIF[T] {
+	end := l.enter.CreateShadowScope()
+
+	if len(l.MergeToEnd) > 0 {
+		end.Merge(
+			false, true,
+			mergeEnd,
+			l.MergeToEnd...,
+		)
+	} else {
+		end.CoverBy(l.labeledBlock)
+	}
+
+	return end
+}
+
+func (l *LabelBlockStmt[T]) Break(from ScopedVersionedTableIF[T]) {
+	l.MergeToEnd = append(l.MergeToEnd, from)
+}
+
+func (l *LabelBlockStmt[T]) Continue(from ScopedVersionedTableIF[T]) {
+}
+
+func (l *LabelBlockStmt[T]) FallThough(from ScopedVersionedTableIF[T]) {
+}
+
 type LabelStmt[T versionedValue] struct {
 	enter ScopedVersionedTableIF[T]
 	name  string
