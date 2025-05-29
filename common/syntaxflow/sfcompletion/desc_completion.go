@@ -15,7 +15,7 @@ import (
 )
 
 // CompleteRuleDesc 用于给sf rule文件的desc中信息项内容补全，包括title、title_zh、desc、solution等
-func CompleteRuleDesc(
+func CompletegRuleDesc(
 	fileName, ruleContent string,
 	aiConfig ...aispec.AIConfigOption,
 ) (string, error) {
