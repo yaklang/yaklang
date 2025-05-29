@@ -22,5 +22,7 @@ func (t *ForgeBlueprint) CreateCoordinator(ctx context.Context, i any, opts ...a
 	}
 	extraOpts = append(extraOpts, aid.WithForgeParams(params))
 	extraOpts = append(extraOpts, opts...)
-	return aid.NewCoordinatorContext(ctx, firstQuery, extraOpts...)
+	finalOpts := []aid.Option{aid.WithMemory(aid.GetDefaultMemory())}
+	finalOpts = append(finalOpts, extraOpts...)
+	return aid.NewCoordinatorContext(ctx, firstQuery, finalOpts...)
 }

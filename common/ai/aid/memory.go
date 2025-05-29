@@ -176,6 +176,10 @@ func (m *Memory) StoreCurrentTask(task *aiTask) {
 }
 
 func (m *Memory) StoreAppendPersistentInfo(i ...string) {
+	if utils.IsNil(m) {
+		log.Warn("no memory instance found while calling `StoreAppendPersistentInfo`")
+		return
+	}
 	m.PersistentData = append(m.PersistentData, i...)
 }
 
@@ -356,6 +360,10 @@ func (m *Memory) CurrentTaskToolCallResults() []*aitool.ToolResult {
 }
 
 func (m *Memory) StoreCliParameter(param []*ypb.ExecParamItem) {
+	if utils.IsNil(m) {
+		log.Warnf("memory nil while calling StoreCliParameter")
+		return
+	}
 	for _, p := range param {
 		if p.Key == "" {
 			continue
