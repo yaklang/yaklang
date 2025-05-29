@@ -23,7 +23,7 @@ func TestJS_ASTLargeText(t *testing.T) {
 
 	start = time.Now()
 	prog, err := ssaapi.Parse(largeJS,
-		ssaapi.WithLanguage("new-js"),
+		ssaapi.WithLanguage("js"),
 	)
 	require.NoError(t, err)
 

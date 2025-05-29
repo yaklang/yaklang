@@ -1,6 +1,9 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/yak/ssa/ssautil"
+import (
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
+	"strings"
+)
 
 // use in for/switch
 type target struct {
@@ -43,6 +46,17 @@ func (b *FunctionBuilder) Break() bool {
 	return false
 }
 
+func (b *FunctionBuilder) BreakWithLabelName(labelName string) bool {
+	for target := b.target; target != nil; target = target.tail {
+		if target._break != nil && strings.Contains(target._break.name, labelName) {
+			target.LabelTarget.Break(b.CurrentBlock.ScopeTable)
+			b.EmitJump(target._break)
+			return true
+		}
+	}
+	return false
+}
+
 func (b *FunctionBuilder) Continue() bool {
 	for target := b.target; target != nil; target = target.tail {
 		if target._continue != nil {
@@ -53,6 +67,18 @@ func (b *FunctionBuilder) Continue() bool {
 	}
 	return false
 }
+
+func (b *FunctionBuilder) ContinueWithLabelName(labelName string) bool {
+	for target := b.target; target != nil; target = target.tail {
+		if target._continue != nil && strings.Contains(target._continue.name, labelName) {
+			target.LabelTarget.Continue(b.CurrentBlock.ScopeTable)
+			b.EmitJump(target._continue)
+			return true
+		}
+	}
+	return false
+}
+
 func (b *FunctionBuilder) Fallthrough() bool {
 	for target := b.target; target != nil; target = target.tail {
 		if target._fallthrough != nil {
