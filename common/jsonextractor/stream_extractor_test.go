@@ -275,3 +275,40 @@ func TestStreamExtractorArray_BASIC4(t *testing.T) {
 	assert.True(t, valueHaveResult)
 	assert.True(t, emptyResult)
 }
+
+func TestStreamExtractorArray_BASIC5(t *testing.T) {
+	resultLengthCheck := false
+	allEmptyCheck := false
+	ExtractStructuredJSON(`{a: [ ,    ]}`, WithArrayCallback(func(data []any) {
+		spew.Dump(data)
+		resultLengthCheck = len(data) == 2
+		for _, d := range data {
+			if fmt.Sprint(d) == "" {
+				allEmptyCheck = true
+			} else {
+				allEmptyCheck = false
+			}
+		}
+	}))
+	assert.True(t, resultLengthCheck)
+	assert.True(t, allEmptyCheck)
+}
+
+func TestStreamExtractorArray_BASIC6(t *testing.T) {
+	resultLengthCheck := false
+	ExtractStructuredJSON(`
+[
+{
+"a":"b"
+},
+{
+"b":"c"
+},
+{
+"c":"a"
+}]`, WithArrayCallback(func(data []any) {
+		spew.Dump(data)
+		resultLengthCheck = len(data) == 3
+	}))
+	assert.True(t, resultLengthCheck)
+}
