@@ -2,6 +2,7 @@ package aid
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
 	"io"
 
@@ -60,7 +61,7 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...Opt
 	config.guardian.setOutputEmitter(config.id, config.eventHandler)
 
 	if config.aiToolManager == nil {
-		config.aiToolManager = buildinaitools.NewToolManager(append(config.aiToolManagerOption, buildinaitools.WithSearcher(searchtools.NewKeyWordSearcher(
+		config.aiToolManager = buildinaitools.NewToolManager(append(config.aiToolManagerOption, buildinaitools.WithSearcher(searchtools.NewKeyWordSearcher[*aitool.Tool](
 			func(prompt string) (io.Reader, error) {
 				rsp, err := config.callAI(NewAIRequest(prompt))
 				if err != nil {

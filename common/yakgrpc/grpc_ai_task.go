@@ -3,15 +3,16 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/reducer"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strings"
 	"time"
 )
 
@@ -22,6 +23,18 @@ var mockedAIChat aiChatType = nil
 func RegisterMockAIChat(c aiChatType) {
 	mockedAIChat = c
 }
+
+var triageCache = reducer.NewReducer(10, func(data []string) string {
+	result, err := yak.ExecuteForge("fragment_summarizer", map[string]any{
+		"textSnippet": strings.Join(data, "\n"),
+	}, aid.WithAgreeYOLO(true))
+	if err != nil {
+		return ""
+	}
+	return utils.InterfaceToString(result)
+})
+
+var ForgeResultType = "FORGE_RESULT"
 
 func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	firstMsg, err := stream.Recv()
@@ -40,6 +53,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	inputEvent := make(chan *aid.InputEvent, 1000)
 
 	var aidOption = []aid.Option{
+		aid.WithDebug(true),
 		aid.WithEventHandler(func(e *aid.Event) {
 			if e.Timestamp <= 0 {
 				e.Timestamp = time.Now().Unix() // fallback
@@ -64,6 +78,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 		}),
 		aid.WithEventInputChan(inputEvent),
 	}
+	startParams.EnableAISearchTool = false
 	aidOption = append(aidOption, buildAIDOption(startParams)...)
 
 	go func() {
@@ -121,25 +136,38 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	}
 
 	forgeName := startParams.GetForgeName()
+
+	var res any
 	if forgeName != "" {
-		res, err := yak.ExecuteForge(forgeName, params, buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), aidOption...)...)
+		res, err = yak.ExecuteForge(forgeName, params, buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), aidOption...)...)
 		if err != nil {
 			log.Errorf("run ai forge[%s] failed: %v", forgeName, err)
 			return err
 		}
-		spew.Dump(res)
-		// todo send result
-		_ = res
 	} else {
-		engine, err := aid.NewCoordinatorContext(baseCtx, startParams.GetUserQuery(), aidOption...)
+		aidOption = append(aidOption, aid.WithResultHandler(func(config *aid.Config) {
+			go func() {
+				triageCache.Push(config.GetMemory().Timeline())
+			}()
+		}))
+		res, err = yak.ExecuteForge("forge_triage", map[string]any{
+			"query":   params,
+			"context": triageCache.Dump(),
+		}, buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), aidOption...)...)
 		if err != nil {
-			return utils.Errorf("create coordinator failed: %v", err)
+			log.Errorf("run ai forge[%s] failed: %v", forgeName, err)
+			return err
 		}
-		err = engine.Run()
-		if err != nil {
-			log.Errorf("run coordinator failed: %v", err)
-			return utils.Errorf("run coordinator failed: %v", err)
-		}
+	}
+	err = stream.Send(&ypb.AIOutputEvent{
+		CoordinatorId: startParams.GetCoordinatorId(),
+		Type:          ForgeResultType,
+		Content:       utils.InterfaceToBytes(res),
+		Timestamp:     time.Now().Unix(),
+	})
+	if err != nil {
+		log.Errorf("send result failed: %v", err)
+		return err
 	}
 	return nil
 }

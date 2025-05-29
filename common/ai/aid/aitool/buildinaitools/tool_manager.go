@@ -14,15 +14,16 @@ type AiToolManager struct {
 	toolsGetter  func() []*aitool.Tool
 	toolEnabled  map[string]bool // 记录工具是否开启
 	enableSearch bool            // 是否开启工具搜索
-	searcher     searchtools.AiToolSearcher
+	searcher     searchtools.AISearcher[*aitool.Tool]
 	disableTools map[string]struct{} // 禁用的工具列表 优先级最高
+	searchTool   []*aitool.Tool
 }
 
 // ToolManagerOption 定义工具管理器的配置选项
 type ToolManagerOption func(*AiToolManager)
 
 // WithSearcher 设置搜索器
-func WithSearcher(searcher searchtools.AiToolSearcher) ToolManagerOption {
+func WithSearcher(searcher searchtools.AISearcher[*aitool.Tool]) ToolManagerOption {
 	return func(m *AiToolManager) {
 		m.searcher = searcher
 	}
@@ -96,9 +97,8 @@ func WithSearchEnabled(enabled bool) ToolManagerOption {
 }
 func NewToolManagerByToolGetter(getter func() []*aitool.Tool, options ...ToolManagerOption) *AiToolManager {
 	manager := &AiToolManager{
-		toolsGetter:  getter,
-		toolEnabled:  make(map[string]bool),
-		enableSearch: true, // 默认开启搜索
+		toolsGetter: getter,
+		toolEnabled: make(map[string]bool),
 	}
 
 	// 应用选项
@@ -142,9 +142,20 @@ func (m *AiToolManager) GetEnableTools() ([]*aitool.Tool, error) {
 			log.Errorf("searcher is not set")
 			return enabledTools, nil
 		}
-		tool, err := searchtools.CreateAiToolsSearchTools(m.toolsGetter, func(req *searchtools.ToolSearchRequest) ([]*aitool.Tool, error) {
-			req.Tools = m.safeToolsGetter()
-			res, err := m.searcher(req)
+		tool, err := m.GetSearchTools()
+		if err != nil {
+			return nil, err
+		}
+		enabledTools = append(enabledTools, tool...)
+	}
+	return enabledTools, nil
+}
+
+func (m *AiToolManager) GetSearchTools() ([]*aitool.Tool, error) {
+	if m.searchTool == nil {
+		var err error
+		m.searchTool, err = searchtools.CreateAISearchTools(func(query string, searchList []*aitool.Tool) ([]*aitool.Tool, error) {
+			res, err := m.searcher(query, searchList)
 			for _, tool := range res {
 				m.EnableTool(tool.Name)
 			}
@@ -152,13 +163,12 @@ func (m *AiToolManager) GetEnableTools() ([]*aitool.Tool, error) {
 				return nil, err
 			}
 			return res, nil
-		})
+		}, m.safeToolsGetter, searchtools.SearchToolName)
 		if err != nil {
-			return nil, err
+			log.Error(err)
 		}
-		enabledTools = append(enabledTools, tool...)
 	}
-	return enabledTools, nil
+	return m.searchTool, nil
 }
 
 // GetToolByName 通过工具名获取特定工具
@@ -181,9 +191,7 @@ func (m *AiToolManager) SearchTools(method string, query string) ([]*aitool.Tool
 		return nil, fmt.Errorf("工具搜索功能已被禁用")
 	}
 
-	return m.searcher(&searchtools.ToolSearchRequest{
-		Query: query,
-	})
+	return m.searcher(query, m.safeToolsGetter())
 }
 
 //// IsToolEnabled 检查工具是否开启

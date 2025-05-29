@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"strings"
 	"text/template"
@@ -16,12 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type ToolSearchRequest struct {
-	Query string
-	Tools []*aitool.Tool
-}
-type AiToolSearcher func(req *ToolSearchRequest) ([]*aitool.Tool, error)
-
 //go:embed aitool-search.txt
 var __prompt_SearchByAIPrompt string
 
@@ -30,6 +23,18 @@ var __prompt_KeywordSearch string
 
 //go:embed aitool-keyword-summary.txt
 var __prompt_KeywordSummary string
+
+type AISearchable interface {
+	GetName() string
+	GetDescription() string
+	GetKeywords() []string
+}
+
+type SearchRequest struct {
+	Query      string
+	SearchList []AISearchable
+}
+type AISearcher[T AISearchable] func(query string, searchList []T) ([]T, error)
 
 type AiToolsSearchResult struct {
 	Tool   string `json:"tool"`
@@ -41,15 +46,17 @@ type KeywordSearchResult struct {
 	MatchedKeywords []string `json:"matched_keywords"`
 }
 
-func NewKeyWordSearcher(chatToAiFunc func(string) (io.Reader, error)) AiToolSearcher {
-	return func(req *ToolSearchRequest) ([]*aitool.Tool, error) {
-		log.Info("start to search with query: %v", req.Query)
-		query := req.Query
+func (req *SearchRequest) SetSearchList(items ...AISearchable) {
+	req.SearchList = items
+}
+
+func NewKeyWordSearcher[T AISearchable](chatToAiFunc func(string) (io.Reader, error)) AISearcher[T] {
+	return func(query string, searchList []T) ([]T, error) {
 		if chatToAiFunc == nil {
 			return nil, utils.Errorf("ai callback is not set")
 		}
 
-		tools := req.Tools
+		tools := searchList
 
 		type ToolWithKeywords struct {
 			Name     string `json:"Name"`
@@ -57,17 +64,17 @@ func NewKeyWordSearcher(chatToAiFunc func(string) (io.Reader, error)) AiToolSear
 		}
 
 		toolsLists := []ToolWithKeywords{}
-		toolMap := map[string]*aitool.Tool{}
+		toolMap := map[string]T{}
 
 		for _, tool := range tools {
-			if len(tool.Keywords) == 0 {
+			if len(tool.GetKeywords()) == 0 {
 				continue
 			}
 			toolsLists = append(toolsLists, ToolWithKeywords{
-				Name:     tool.Name,
-				Keywords: strings.Join(tool.Keywords, ", "),
+				Name:     tool.GetName(),
+				Keywords: strings.Join(tool.GetKeywords(), ", "),
 			})
-			toolMap[tool.Name] = tool
+			toolMap[tool.GetName()] = tool
 		}
 
 		prompt, err := template.New("search_by_keyword").Parse(__prompt_KeywordSearch)
@@ -97,39 +104,22 @@ func NewKeyWordSearcher(chatToAiFunc func(string) (io.Reader, error)) AiToolSear
 		rsp := string(rspBytes)
 
 		var callResults []*KeywordSearchResult
-		err = jsonextractor.ExtractStructuredJSON(rsp, jsonextractor.WithObjectCallback(func(data map[string]any) {
-			toolname, ok := data["tool"]
-			if !ok {
-				return
+		for _, item := range jsonextractor.ExtractObjectIndexes(rsp) {
+			start, end := item[0], item[1]
+			resultJSON := rsp[start:end]
+			res := KeywordSearchResult{}
+			err = json.Unmarshal([]byte(resultJSON), &res)
+			if err != nil {
+				continue
 			}
-			reason, ok := data["reason"]
-			if !ok {
-				return
-			}
-			_ = reason
-			callResults = append(callResults, &KeywordSearchResult{
-				Tool: fmt.Sprint(toolname),
-			})
-		}))
-		if err != nil {
-			return nil, utils.Errorf("extract result failed: %v", err)
+			callResults = append(callResults, &res)
 		}
-		//for _, item := range  {
-		//	start, end := item[0], item[1]
-		//	resultJSON := rsp[start:end]
-		//	res := KeywordSearchResult{}
-		//	err = json.Unmarshal([]byte(resultJSON), &res)
-		//	if err != nil {
-		//		continue
-		//	}
-		//	callResults = append(callResults, &res)
-		//}
 
 		if len(callResults) == 0 {
 			return nil, utils.Errorf("no tool found")
 		}
 
-		results := []*aitool.Tool{}
+		results := []T{}
 		for _, res := range callResults {
 			tool, ok := toolMap[res.Tool]
 			if !ok {
@@ -142,19 +132,18 @@ func NewKeyWordSearcher(chatToAiFunc func(string) (io.Reader, error)) AiToolSear
 	}
 }
 
-func NewDescSearch(toolsGetter func() []*aitool.Tool, chatToAiFunc func(string) (io.Reader, error)) AiToolSearcher {
-	return func(req *ToolSearchRequest) ([]*aitool.Tool, error) {
-		query := req.Query
+func NewDescSearch[T AISearchable](toolsGetter func() []T, chatToAiFunc func(string) (io.Reader, error)) AISearcher[T] {
+	return func(query string, searchList []T) ([]T, error) {
 		if chatToAiFunc == nil {
 			return nil, utils.Errorf("ai callback is not set")
 		}
 
 		tools := toolsGetter()
 		toolDescList := []string{}
-		toolMap := map[string]*aitool.Tool{}
+		toolMap := map[string]T{}
 		for _, tool := range tools {
-			toolDescList = append(toolDescList, fmt.Sprintf("%s: %s", tool.Name, tool.Description))
-			toolMap[tool.Name] = tool
+			toolDescList = append(toolDescList, fmt.Sprintf("%s: %s", tool.GetName(), tool.GetDescription()))
+			toolMap[tool.GetName()] = tool
 		}
 		prompt, err := template.New("search_by_ai").Parse(__prompt_SearchByAIPrompt)
 		if err != nil {
@@ -192,7 +181,7 @@ func NewDescSearch(toolsGetter func() []*aitool.Tool, chatToAiFunc func(string) 
 		if len(callResults) == 0 {
 			return nil, utils.Errorf("no tool found")
 		}
-		results := []*aitool.Tool{}
+		results := []T{}
 		for _, res := range callResults {
 			tool, ok := toolMap[res.Tool]
 			if !ok {

@@ -1,3 +1,7 @@
+__DESC__ = "根据用户输入的文本片段生成简洁的总结文本，可以限制总结的字数。"
+
+__KEYWORDS__ = "文本总结,内容提炼,信息提取,字数限制,文本处理,片段总结"
+
 textSnippent = cli.String("textSnippet", cli.setRequired(true), cli.setHelp("文本片段内容"))
 limit = cli.Int("limit",cli.setDefault("50"),cli.setHelp("字数限制"))
 cli.check()

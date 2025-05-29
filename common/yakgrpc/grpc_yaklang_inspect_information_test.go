@@ -69,7 +69,7 @@ func CompareScriptParams(got, want []*ypb.YakScriptParam) error {
 			continue
 		}
 
-		var extraWant, extraGot *PluginParamSelect
+		var extraWant, extraGot *information.PluginParamSelect
 		err1 := json.Unmarshal([]byte(want[i].ExtraSetting), &extraWant)
 		err2 := json.Unmarshal([]byte(got[i].ExtraSetting), &extraGot)
 		if err1 != nil {
@@ -1031,7 +1031,7 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Risk(t *testing.T) {
 			Solution:          "solution",
 			Severity:          "high",
 		})
-		got := riskInfo2grpc([]*information.RiskInfo{
+		got := information.RiskInfo2grpc([]*information.RiskInfo{
 			{
 				CVE: cve,
 			},
