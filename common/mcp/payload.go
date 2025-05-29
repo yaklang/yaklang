@@ -7,13 +7,30 @@ import (
 	"io"
 
 	"github.com/go-viper/mapstructure/v2"
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+var NewLocalClient func(locals ...bool) (YakClientInterface, error)
+
+func init() {
+	NewLocalClient = func(locals ...bool) (YakClientInterface, error) {
+		return nil, utils.Error("not register NewLocalClient")
+	}
+}
+
+func RegisterNewLocalClient(f func(locals ...bool) (YakClientInterface, error)) {
+	NewLocalClient = f
+}
+
+type YakClientInterface interface {
+	ypb.YakClient
+	GetProfileDatabase() *gorm.DB
+}
 
 var savePayloadToolOptions = []mcp.ToolOption{
 	mcp.WithString("group",
@@ -188,11 +205,7 @@ func handleQueryPayload(s *MCPServer) server.ToolHandlerFunc {
 		if err != nil {
 			return nil, utils.Wrap(err, "invalid argument")
 		}
-		client, ok := s.grpcClient.(*yakgrpc.Client)
-		if !ok {
-			return nil, utils.Wrap(err, "BUG: local server is nil")
-		}
-		payload, err := yakit.GetPayloadFirst(client.GetProfileDatabase(), req.Group)
+		payload, err := yakit.GetPayloadFirst(s.grpcClient.GetProfileDatabase(), req.Group)
 		if err != nil {
 			return nil, utils.Wrap(err, "failed to query payload first")
 		}
@@ -394,11 +407,7 @@ func handleUpdateOnePayload(s *MCPServer) server.ToolHandlerFunc {
 		if req.Data == nil {
 			return nil, utils.Error("argument:data is empty")
 		}
-		client, ok := s.grpcClient.(*yakgrpc.Client)
-		if !ok {
-			return nil, utils.Wrap(err, "BUG: local server is nil")
-		}
-		payload, err := yakit.GetPayloadFirst(client.GetProfileDatabase(), req.Group)
+		payload, err := yakit.GetPayloadFirst(s.grpcClient.GetProfileDatabase(), req.Group)
 		if err != nil {
 			return nil, utils.Wrap(err, "failed to query payload first")
 		}
@@ -424,11 +433,7 @@ func handleUpdatePayloadFileContent(s *MCPServer) server.ToolHandlerFunc {
 		if err != nil {
 			return nil, utils.Wrap(err, "invalid argument")
 		}
-		client, ok := s.grpcClient.(*yakgrpc.Client)
-		if !ok {
-			return nil, utils.Wrap(err, "BUG: local server is nil")
-		}
-		payload, err := yakit.GetPayloadFirst(client.GetProfileDatabase(), req.GroupName)
+		payload, err := yakit.GetPayloadFirst(s.grpcClient.GetProfileDatabase(), req.GroupName)
 		if err != nil {
 			return nil, utils.Wrap(err, "failed to query payload first")
 		}
