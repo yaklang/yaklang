@@ -16,7 +16,7 @@ func TestSFDescCompletion(t *testing.T) {
 	if utils.InGithubActions() {
 		return
 	}
-	fileName := `D:\GoProject\yaklang\common\syntaxflow\sfbuildin\buildin\java\cwe-22-path-travel\java-path-travel.sf`
+	fileName := `D:\GoProject\yaklang\common\syntaxflow\sfbuildin\buildin\php\cwe-89-sql-injection\php-mysql-inject.sf`
 	content, err := os.ReadFile(fileName)
 	require.NoError(t, err)
 	results, err := aiforge.ExecuteForge(
