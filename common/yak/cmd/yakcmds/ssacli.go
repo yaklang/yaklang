@@ -640,6 +640,10 @@ var syntaxflowCompletion = &cli.Command{
 			Name:  "proxy,p",
 			Usage: "proxy of AI",
 		},
+		cli.IntFlag{
+			Name:  "concurrency,c",
+			Usage: "concurrency of AI completion, default is 5",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		target := c.String("target")
@@ -647,6 +651,10 @@ var syntaxflowCompletion = &cli.Command{
 		key := c.String("api-key")
 		model := c.String("ai-model")
 		proxy := c.String("proxy")
+		concurrency := c.Int("concurrency")
+		if concurrency == 0 {
+			concurrency = 5 // default concurrency
+		}
 
 		var aiOpts []aispec.AIConfigOption
 		if model != "" {
@@ -662,40 +670,47 @@ var syntaxflowCompletion = &cli.Command{
 			aiOpts = append(aiOpts, aispec.WithProxy(proxy))
 		}
 
-		var errors error
-		complete := func(fileName string) error {
-			// Check if the file has .sf extension
-			if !strings.HasSuffix(fileName, ".sf") {
-				log.Infof("syntaxflow-completion: skipping file %s (not a .sf file)", fileName)
-				return nil
-			}
-			raw, err := os.ReadFile(fileName)
-			if err != nil {
-				log.Errorf("failed to read file %s: %v", fileName, err)
-				return err
-			}
-			rule, err := sfcompletion.CompleteRuleDesc(fileName, string(raw), aiOpts...)
-			if err != nil {
-				err = utils.Errorf("failed parse complete file %s: %v", fileName, err)
-				log.Errorf("%v", err)
-				errors = utils.JoinErrors(errors, err)
-				return err
-			}
+		swg := utils.NewSizedWaitGroup(concurrency, context.Background())
+		var errChan = make(chan error, concurrency)
+		complete := func(fileName string) {
+			swg.Add(1)
+			go func() {
+				defer swg.Done()
+				// Check if the file has .sf extension
+				if !strings.HasSuffix(fileName, ".sf") {
+					log.Infof("syntaxflow-completion: skipping file %s (not a .sf file)", fileName)
+					return
+				}
+				raw, err := os.ReadFile(fileName)
+				if err != nil {
+					log.Errorf("failed to read file %s: %v", fileName, err)
+					return
+				}
+				rule, err := sfcompletion.CompletegRuleDesc(fileName, string(raw), aiOpts...)
+				if err != nil {
+					err = utils.Errorf("failed parse complete file %s: %v", fileName, err)
+					errChan <- utils.JoinErrors(err, err)
+					log.Errorf("%v", err)
+					return
+				}
 
-			// check format rule
-			if _, err := sfvm.CompileRule(rule); err != nil {
-				err = utils.Errorf("failed completion sf rule %s: %v\nsf rule: \n%s", fileName, err, rule)
-				log.Errorf("%v", err)
-				errors = utils.JoinErrors(errors, err)
-				return err
-			}
+				// check format rule
+				if _, err := sfvm.CompileRule(rule); err != nil {
+					err = utils.Errorf("failed completion sf rule %s: %v\nsf rule: \n%s", fileName, err, rule)
+					errChan <- utils.JoinErrors(err, err)
+					log.Errorf("%v", err)
+					return
+				}
 
-			err = os.WriteFile(fileName, []byte(rule), 0o666)
-			if err != nil {
-				log.Errorf("failed to write file %s: %v", fileName, err)
-				return err
-			}
-			return nil
+				err = os.WriteFile(fileName, []byte(rule), 0o666)
+				if err != nil {
+					log.Errorf("failed to write file %s: %v", fileName, err)
+					errChan <- utils.Errorf("failed to write file %s: %v", fileName, err)
+					return
+				}
+				return
+			}()
+			return
 		}
 
 		if utils.IsFile(target) {
@@ -705,10 +720,18 @@ var syntaxflowCompletion = &cli.Command{
 			log.Infof("syntaxflow-completion: processing directory %s", target)
 			filesys.Recursive(target, filesys.WithFileSystem(filesys.NewLocalFs()), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 				log.Infof("syntaxflow-completion: processing file %s", s)
-				return complete(s)
+				complete(s)
+				return nil
 			}))
 		} else {
 			log.Errorf("syntaxflow-completion: file %s not found", target)
+		}
+
+		swg.Wait()
+		var errors error
+		close(errChan)
+		for err := range errChan {
+			errors = utils.JoinErrors(errors, err)
 		}
 		return errors
 	},
