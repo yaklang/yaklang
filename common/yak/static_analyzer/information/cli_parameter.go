@@ -3,7 +3,13 @@ package information
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/cve/cveresources"
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"math"
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -628,3 +634,129 @@ var (
 		"line_dict":    "cli.LineDict",
 	}
 )
+
+func CliParam2grpc(params []*CliParameter) []*ypb.YakScriptParam {
+	ret := make([]*ypb.YakScriptParam, 0, len(params))
+
+	for _, param := range params {
+		defaultValue := ""
+		if param.Default != nil {
+			defaultValue = fmt.Sprintf("%v", param.Default)
+		}
+		extra := []byte{}
+		if param.Type == "select" {
+			paramSelect := &PluginParamSelect{
+				Double: param.MultipleSelect,
+				Data:   make([]PluginParamSelectData, 0),
+			}
+			param.SelectOption.ForEach(func(k string, v any) {
+				paramSelect.Data = append(paramSelect.Data, PluginParamSelectData{
+					Key:   k,
+					Label: k,
+					Value: codec.AnyToString(v),
+				})
+			})
+			extra, _ = json.Marshal(paramSelect)
+		}
+
+		ret = append(ret, &ypb.YakScriptParam{
+			Field:                    param.Name,
+			DefaultValue:             string(defaultValue),
+			TypeVerbose:              param.Type,
+			FieldVerbose:             param.NameVerbose,
+			Help:                     param.Help,
+			Required:                 param.Required,
+			Group:                    param.Group,
+			SuggestionDataExpression: param.SuggestionValueExpression,
+			ExtraSetting:             string(extra),
+			MethodType:               param.MethodType,
+			JsonSchema:               param.JsonSchema,
+			UISchema:                 param.UISchema,
+		})
+	}
+
+	return ret
+}
+
+func GenerateParameterFromProgram(prog *ssaapi.Program) (string, string, error) {
+	parameters, _, pluginEnvKey := ParseCliParameter(prog) //
+	cli := CliParam2grpc(parameters)
+
+	getMarshalData := func(data interface{}) (string, error) {
+		if funk.IsEmpty(data) {
+			return "", nil
+		}
+		dataRaw, err := json.Marshal(data)
+		if err != nil {
+			return "", err
+		}
+		return strconv.Quote(string(dataRaw)), err
+	}
+
+	parameterRaw, err := getMarshalData(cli)
+	if err != nil {
+		return "", "", err
+	}
+	pluginEnvKeyRaw, err := getMarshalData(pluginEnvKey)
+	if err != nil {
+		return "", "", err
+	}
+	return parameterRaw, pluginEnvKeyRaw, nil
+}
+
+type PluginParamSelect struct {
+	Double bool                    `json:"double"`
+	Data   []PluginParamSelectData `json:"data"`
+}
+
+type PluginParamSelectData struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
+	Value string `json:"value"`
+}
+
+func UiInfo2grpc(info []*UIInfo) []*ypb.YakUIInfo {
+	ret := make([]*ypb.YakUIInfo, 0, len(info))
+	for _, i := range info {
+		ret = append(ret, &ypb.YakUIInfo{
+			Typ:            i.Typ,
+			Effected:       i.Effected,
+			WhenExpression: i.WhenExpression,
+		})
+	}
+	return ret
+}
+
+func RiskInfo2grpc(info []*RiskInfo, db *gorm.DB) []*ypb.YakRiskInfo {
+	ret := make([]*ypb.YakRiskInfo, 0, len(info))
+	for _, i := range info {
+		description := i.Description
+		solution := i.Solution
+
+		if (description == "" || solution == "") && i.CVE != "" {
+			if db != nil {
+				cve, err := cveresources.GetCVE(db, i.CVE)
+				if err == nil {
+					if description == "" {
+						description = cve.DescriptionMainZh
+					}
+					if solution == "" {
+						solution = cve.Solution
+					}
+					if i.Level == "" {
+						i.Level = cve.Severity
+					}
+				}
+			}
+		}
+
+		ret = append(ret, &ypb.YakRiskInfo{
+			Level:       i.Level,
+			TypeVerbose: i.TypeVerbose,
+			CVE:         i.CVE,
+			Description: description,
+			Solution:    solution,
+		})
+	}
+	return ret
+}

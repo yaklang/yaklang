@@ -48,29 +48,29 @@ func (c *YakForgeBlueprintAIDOptionsConfig) ToOptions() []aid.Option {
 
 type YakForgeBlueprintConfig struct {
 	// prompt
-	Name             string `json:"name"`
-	InitPrompt       string `json:"init_prompt"`
-	PersistentPrompt string `json:"persistent_prompt"`
-	PlanPrompt       string `json:"plan_prompt"`
-	ResultPrompt     string `json:"result_prompt"`
+	Name             string `json:"name,omitempty"`
+	InitPrompt       string `json:"init_prompt,omitempty"`
+	PersistentPrompt string `json:"persistent_prompt,omitempty"`
+	PlanPrompt       string `json:"plan_prompt,omitempty"`
+	ResultPrompt     string `json:"result_prompt,omitempty"`
 
 	// cli code
-	CLIParameterRuleYaklangCode string `json:"cli_parameter_rule_yaklang_code"`
+	CLIParameterRuleYaklangCode string `json:"cli_parameter_rule_yaklang_code,omitempty"`
 
 	// tools
-	ToolKeywords string `json:"tool_keywords"`
-	Tools        string `json:"tools"`
-	Description  string `json:"description"`
-	ForgeContent string `json:"forge_content"`
+	ToolKeywords string `json:"tool_keywords,omitempty"`
+	Tools        string `json:"tools,omitempty"`
+	Description  string `json:"description,omitempty"`
+	ForgeContent string `json:"forge_content,omitempty"`
 	// aid options
-	YakForgeBlueprintAIDOptionsConfig *YakForgeBlueprintAIDOptionsConfig `json:"aid_options_config"`
+	YakForgeBlueprintAIDOptionsConfig *YakForgeBlueprintAIDOptionsConfig `json:"aid_options_config,omitempty"`
 
 	// result handle
-	ForgeResult *ForgeResult `json:"forge_result"`
-	Actions     string       `json:"actions"`
+	ForgeResult *ForgeResult `json:"forge_result,omitempty"`
+	Actions     string       `json:"actions,omitempty"`
 
 	// tag
-	Tags string `json:"tags"`
+	Tags string `json:"tags,omitempty"`
 }
 
 // NewYakForgeBlueprintConfigFromJson 从Json数据创建Forge

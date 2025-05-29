@@ -26,6 +26,12 @@ func NewReducer(reduceLimit int, handle ReduceFunction) *Reducer {
 	}
 }
 
+func (r *Reducer) SetReduceFunction(handle ReduceFunction) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	r.reduceHandler = handle
+}
+
 func (r *Reducer) Push(data string) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -48,7 +54,6 @@ func (r *Reducer) _getBeforeData(index int) (beforeData []string) {
 }
 
 func (r *Reducer) Dump() string {
-
 	return spew.Sdump(r.GetData())
 }
 
@@ -73,7 +78,7 @@ func (r *Reducer) reduce(beforeId int) {
 		return
 	}
 	beforeData := r._getBeforeData(beforeId)
-	if len(beforeData) == 0 {
+	if len(beforeData) == 0 || r.reduceHandler == nil {
 		return
 	}
 	newReduceData := r.reduceHandler(beforeData)

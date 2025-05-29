@@ -8,123 +8,17 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/go-funk"
-
 	"github.com/yaklang/yaklang/common/schema"
 
-	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
-
-type PluginParamSelect struct {
-	Double bool                    `json:"double"`
-	Data   []PluginParamSelectData `json:"data"`
-}
-
-type PluginParamSelectData struct {
-	Key   string `json:"key"`
-	Label string `json:"label"`
-	Value string `json:"value"`
-}
-
-func uiInfo2grpc(info []*information.UIInfo) []*ypb.YakUIInfo {
-	ret := make([]*ypb.YakUIInfo, 0, len(info))
-	for _, i := range info {
-		ret = append(ret, &ypb.YakUIInfo{
-			Typ:            i.Typ,
-			Effected:       i.Effected,
-			WhenExpression: i.WhenExpression,
-		})
-	}
-	return ret
-}
-
-func cliParam2grpc(params []*information.CliParameter) []*ypb.YakScriptParam {
-	ret := make([]*ypb.YakScriptParam, 0, len(params))
-
-	for _, param := range params {
-		defaultValue := ""
-		if param.Default != nil {
-			defaultValue = fmt.Sprintf("%v", param.Default)
-		}
-		extra := []byte{}
-		if param.Type == "select" {
-			paramSelect := &PluginParamSelect{
-				Double: param.MultipleSelect,
-				Data:   make([]PluginParamSelectData, 0),
-			}
-			param.SelectOption.ForEach(func(k string, v any) {
-				paramSelect.Data = append(paramSelect.Data, PluginParamSelectData{
-					Key:   k,
-					Label: k,
-					Value: codec.AnyToString(v),
-				})
-			})
-			extra, _ = json.Marshal(paramSelect)
-		}
-
-		ret = append(ret, &ypb.YakScriptParam{
-			Field:                    param.Name,
-			DefaultValue:             string(defaultValue),
-			TypeVerbose:              param.Type,
-			FieldVerbose:             param.NameVerbose,
-			Help:                     param.Help,
-			Required:                 param.Required,
-			Group:                    param.Group,
-			SuggestionDataExpression: param.SuggestionValueExpression,
-			ExtraSetting:             string(extra),
-			MethodType:               param.MethodType,
-			JsonSchema:               param.JsonSchema,
-			UISchema:                 param.UISchema,
-		})
-	}
-
-	return ret
-}
-
-func riskInfo2grpc(info []*information.RiskInfo, db *gorm.DB) []*ypb.YakRiskInfo {
-	ret := make([]*ypb.YakRiskInfo, 0, len(info))
-	for _, i := range info {
-		description := i.Description
-		solution := i.Solution
-
-		if (description == "" || solution == "") && i.CVE != "" {
-			if db != nil {
-				cve, err := cveresources.GetCVE(db, i.CVE)
-				if err == nil {
-					if description == "" {
-						description = cve.DescriptionMainZh
-					}
-					if solution == "" {
-						solution = cve.Solution
-					}
-					if i.Level == "" {
-						i.Level = cve.Severity
-					}
-				}
-			}
-		}
-
-		ret = append(ret, &ypb.YakRiskInfo{
-			Level:       i.Level,
-			TypeVerbose: i.TypeVerbose,
-			CVE:         i.CVE,
-			Description: description,
-			Solution:    solution,
-		})
-	}
-	return ret
-}
 
 func (s *Server) YaklangInspectInformation(ctx context.Context, req *ypb.YaklangInspectInformationRequest) (*ypb.YaklangInspectInformationResponse, error) {
 	ret := &ypb.YaklangInspectInformationResponse{}
@@ -133,9 +27,9 @@ func (s *Server) YaklangInspectInformation(ctx context.Context, req *ypb.Yaklang
 		return nil, errors.New("ssa parse error")
 	}
 	parameters, uiInfos, pluginEnvKey := information.ParseCliParameter(prog)
-	ret.CliParameter = cliParam2grpc(parameters)
-	ret.UIInfo = uiInfo2grpc(uiInfos)
-	ret.RiskInfo = riskInfo2grpc(information.ParseRiskInfo(prog), consts.GetGormCVEDatabase())
+	ret.CliParameter = information.CliParam2grpc(parameters)
+	ret.UIInfo = information.UiInfo2grpc(uiInfos)
+	ret.RiskInfo = information.RiskInfo2grpc(information.ParseRiskInfo(prog), consts.GetGormCVEDatabase())
 	ret.Tags = information.ParseTags(prog)
 	ret.PluginEnvKey = pluginEnvKey
 	return ret, nil
@@ -221,7 +115,7 @@ func getCliCodeFromParam(params []*ypb.YakScriptParam) string {
 		case "select":
 			cliFunction = "StringSlice"
 			if para.ExtraSetting != "" {
-				var dataSelect *PluginParamSelect
+				var dataSelect *information.PluginParamSelect
 				if err := json.Unmarshal([]byte(para.ExtraSetting), &dataSelect); err != nil {
 					log.Error(err)
 					continue
@@ -336,7 +230,7 @@ func getNeedReturn(script *schema.YakScript) ([]*ypb.YakScriptParam, error) {
 	}
 	parameters, _, _ := information.ParseCliParameter(prog)
 	codeParameter := lo.SliceToMap(
-		cliParam2grpc(parameters),
+		information.CliParam2grpc(parameters),
 		func(ysp *ypb.YakScriptParam) (string, *ypb.YakScriptParam) {
 			return ysp.Field, ysp
 		},
@@ -389,30 +283,4 @@ func (s *Server) YaklangGetCliCodeFromDatabase(ctx context.Context, req *ypb.Yak
 		Code:       code,
 		NeedHandle: len(code) != 0,
 	}, nil
-}
-
-func GenerateParameterFromProgram(prog *ssaapi.Program) (string, string, error) {
-	parameters, _, pluginEnvKey := information.ParseCliParameter(prog) //
-	cli := cliParam2grpc(parameters)
-
-	getMarshalData := func(data interface{}) (string, error) {
-		if funk.IsEmpty(data) {
-			return "", nil
-		}
-		dataRaw, err := json.Marshal(data)
-		if err != nil {
-			return "", err
-		}
-		return strconv.Quote(string(dataRaw)), err
-	}
-
-	parameterRaw, err := getMarshalData(cli)
-	if err != nil {
-		return "", "", err
-	}
-	pluginEnvKeyRaw, err := getMarshalData(pluginEnvKey)
-	if err != nil {
-		return "", "", err
-	}
-	return parameterRaw, pluginEnvKeyRaw, nil
 }

@@ -10,6 +10,8 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"os"
 	"strings"
@@ -20,27 +22,26 @@ var basePlugin embed.FS
 
 func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
-		if consts.IsDevMode() {
-			if !consts.IsDevMode() {
-				const key = "6ef3c850244a2b26ed0b163d1fda9600"
-				if yakit.Get(key) == consts.ExistedBuildInForgeEmbedFSHash {
-					return nil
-				}
-				log.Debug("start to load core plugin")
-				defer func() {
-					hash, _ := BuildInForgeHash()
-					yakit.Set(key, hash)
-				}()
+		if !consts.IsDevMode() {
+			const key = "6ef3c850244a2b26ed0b163d1fda9600"
+			if yakit.Get(key) == consts.ExistedBuildInForgeEmbedFSHash {
+				return nil
 			}
-			registerBuildInForge("fragment_summarizer")
-			registerBuildInForge("long_text_summarizer")
-			registerBuildInForge("xss")
-			registerBuildInForge("sqlinject")
-			registerBuildInForge("travelmaster")
-			registerBuildInForge("pimatrix")
-			registerBuildInForge("netscan")
-			registerBuildInForge("recon")
+			log.Debug("start to load core plugin")
+			defer func() {
+				hash, _ := BuildInForgeHash()
+				yakit.Set(key, hash)
+			}()
 		}
+		registerBuildInForge("fragment_summarizer")
+		registerBuildInForge("long_text_summarizer")
+		registerBuildInForge("xss")
+		registerBuildInForge("sqlinject")
+		registerBuildInForge("travelmaster")
+		registerBuildInForge("pimatrix")
+		registerBuildInForge("netscan")
+		registerBuildInForge("recon")
+		registerBuildInForge("forge_triage")
 		return nil
 	})
 }
@@ -50,23 +51,38 @@ func BuildInForgeHash() (string, error) {
 }
 
 func getForgeYakScript(name string) (*schema.AIForge, bool) {
+	var fullName string
 	if !strings.HasSuffix(name, ".yak") {
-		name = name + ".yak"
+		fullName = name + ".yak"
 	}
-	codeBytes, err := basePlugin.ReadFile(fmt.Sprintf("buildinforge/%v", name))
+	codeBytes, err := basePlugin.ReadFile(fmt.Sprintf("buildinforge/%v", fullName))
 	if err != nil {
 		return nil, false
 	}
 
-	scriptMetadata, err := metadata.ParseYakScriptMetadata(name, string(codeBytes))
+	prog, err := static_analyzer.SSAParse(string(codeBytes), "yak")
 	if err != nil {
 		return nil, false
 	}
+
+	scriptMetadata, err := metadata.ParseYakScriptMetadataProg(name, prog)
+	if err != nil {
+		log.Errorf("parse yak script metadata failed: %v", err)
+		return nil, false
+	}
+
+	uiParamsConfig, _, err := information.GenerateParameterFromProgram(prog)
+	if err != nil {
+		log.Error("generate yak script parameters failed: %v", err)
+		return nil, false
+	}
+
 	return &schema.AIForge{
-		ForgeName:    scriptMetadata.Name,
-		Description:  scriptMetadata.Description,
-		Tags:         strings.Join(scriptMetadata.Keywords, ","),
-		ForgeContent: string(codeBytes),
+		ForgeName:      scriptMetadata.Name,
+		Description:    scriptMetadata.Description,
+		Tags:           strings.Join(scriptMetadata.Keywords, ","),
+		ForgeContent:   string(codeBytes),
+		ParamsUIConfig: uiParamsConfig,
 	}, true
 }
 
@@ -129,6 +145,7 @@ func getForgeConfig(name string) (string, *schema.AIForge, bool) {
 		forge.ResultPrompt = cfg.ResultPrompt
 		forge.Actions = cfg.Actions
 		forge.ForgeContent = cfg.ForgeContent
+		forge.Tags = cfg.Tags
 	}
 	return string(configBytes), forge, true
 }
@@ -217,7 +234,7 @@ func UpdateForgesMetaData(inputDir, outputDir string, concurrency int, forceUpda
 
 func updateForgeMetaData(fileinfo *utils.FileInfo, forceUpdate bool) error {
 	if fileinfo.IsDir {
-		simpleCfg, forge, ok := getForgeConfig(fileinfo.Path)
+		simpleCfg, forge, ok := getForgeConfig(fileinfo.Name)
 		if !ok {
 			return fmt.Errorf(`failed to find forge config for "%v"`, fileinfo.Path)
 		}
@@ -237,7 +254,7 @@ func updateForgeMetaData(fileinfo *utils.FileInfo, forceUpdate bool) error {
 			cfg.Tags = strings.Join(metaData.Keywords, ",")
 			cfg.Description = metaData.Description
 
-			newCfg, err := json.Marshal(cfg)
+			newCfg, err := json.MarshalIndent(cfg, "", "\t")
 			if err != nil {
 				return fmt.Errorf("failed to marshal updated forge config: %v", err)
 			}

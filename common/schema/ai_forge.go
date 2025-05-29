@@ -26,6 +26,18 @@ type AIForge struct {
 	ResultPrompt     string
 }
 
+func (a *AIForge) GetName() string {
+	return a.ForgeName
+}
+
+func (a *AIForge) GetDescription() string {
+	return a.Description
+}
+
+func (a *AIForge) GetKeywords() []string {
+	return strings.Split(a.Tags, ",")
+}
+
 var FORGE_TYPE_YAK = "yak"
 var FORGE_TYPE_Config = "config"
 

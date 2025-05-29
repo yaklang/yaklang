@@ -85,6 +85,14 @@ func GetAIForgeByName(db *gorm.DB, name string) (*schema.AIForge, error) {
 	return &forge, nil
 }
 
+func GetAllAIForge(db *gorm.DB) ([]*schema.AIForge, error) {
+	var forges []*schema.AIForge
+	if db := db.Find(&forges); db.Error != nil {
+		return nil, db.Error
+	}
+	return forges, nil
+}
+
 func FilterAIForge(db *gorm.DB, filter *ypb.AIForgeFilter) *gorm.DB {
 	db = db.Model(&schema.AIForge{})
 	db = bizhelper.FuzzQueryLike(db, "forge_name", filter.GetForgeName())

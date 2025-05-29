@@ -11,11 +11,8 @@ import (
 func createBuildInForgeMetadataCommand() *cli.Command {
 	command := &cli.Command{}
 	command.Name = "update-forge-metadata"
-	command.Description = "forge-metadata 是一个用于生成和更新 yaklang buildin forge 的 metadata 的命令行工具"
-	command.UsageText = `format: yak forge-metadata --input <yak_tool_dir> --output <output_dir>
-
-yak update-forge-metadata -p <forge_dir> -o <output_dir> -f
-`
+	command.Description = "forge-metadata 是一个用于生成和更新 yaklang forge 的 metadata 的命令行工具"
+	command.UsageText = `format: yak update-forge-metadata -p <forge_dir> -o <output_dir> -f`
 	command.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:  "path,p",
@@ -32,7 +29,7 @@ yak update-forge-metadata -p <forge_dir> -o <output_dir> -f
 		cli.IntFlag{
 			Name:  "concurrency,c",
 			Usage: "并发处理的数量",
-			Value: 20,
+			Value: 1,
 		},
 	}
 

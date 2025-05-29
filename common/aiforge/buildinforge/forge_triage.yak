@@ -1,0 +1,82 @@
+cli.String("query",cli.setHelp("用户输入"),cli.setVerboseName("用户输入") )
+cli.String("context", cli.setHelp("上下文信息"))
+cli.check()
+
+plan = <<<plandata
+```json
+{
+  "@action": "plan",
+  "query": "-",
+  "main_task": "根据用户的输入以及上下文信息，识别用户的意图，总结成一句话调用 forge_search 搜索工具，向用户推荐对应的ai forge。",
+  "main_task_goal": "根据用户输入和任务上下文信息，识别意图，推荐合适的ai forge。",
+  "tasks": [
+    {
+      "subtask_name": "总结提炼用户需求",
+      "subtask_goal": "分析用户输入的输入以及系统收集的上下文信息，总结出用户的需要。"
+    },
+    {
+      "subtask_name": "搜索forge",
+      "subtask_goal": "根据上一步总结的需要，调用搜索工具，查询推荐的forge"
+    },
+    {
+      "subtask_name": "询问用户",
+      "subtask_goal": "根据上一步的输出，调用工具向用户询问是否有符合要求的forge"
+    }
+  ]
+}
+```
+plandata
+
+persis = <<<persistent
+你是一个用户意图识别器，你需要做的事情是，根据历史上下文信息，以及用户的输入，识别用户的意图，向用户推荐合适的ai forge。
+注意事项：如果用户选择了一个forge请输出符合下列jsonschema要求的json。
+{
+"$schema": "http://json-schema.org/draft-07/schema#",
+"type": "object",
+"required": ["@action", "forgename"],
+"additionalProperties": false,
+"properties": {
+    "@action": {
+    "const": "select-forge",
+    "description": "标识当前操作的具体类型"
+    },
+    "forgename": {
+    "type": "string",
+    "description": "选择的forge的名字"
+    }
+}
+}
+persistent
+
+
+
+forgeHandle = func(params) {
+    forgename = ""
+    bp = aiagent.CreateForge("forge-triage",
+        aiagent.plan(func(config){
+            res,err = aiagent.ExtractPlan(config, plan)
+            if err != nil {
+                config.EmitError("forge triage plan mock failed: %s", err)
+                return nil
+            }
+            return res
+        }),
+        aiagent.persistentPrompt(persis),
+        aiagent.agreeYOLO(true),
+        aiagent.aiForgeSearchTool(),
+        aiagent.allowRequireForUserInteract(true),
+        aiagent.extendedActionCallback("select-forge", func(config , action) {
+            forgename = action.GetString("forgename")
+        }),
+        aiagent.resultHandler(func(config){})
+    )
+    ordr,err = bp.CreateCoordinator(context.Background(),params)
+    if err != nil {
+		return nil
+	}
+    err = ordr.Run()
+    if err != nil {
+		return nil
+	}
+    return forgename
+}
