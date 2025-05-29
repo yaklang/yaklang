@@ -19,8 +19,7 @@ type builder struct {
 	*ssa.FunctionBuilder
 	sourceFile *ast.SourceFile
 
-	// 存储跳转标签
-	labels map[string]*ssa.LabelBuilder
+	contextLabelStack []string
 }
 
 var Builder ssa.Builder = &SSABuilder{}
@@ -35,8 +34,9 @@ func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	}
 	b.SupportClosure = true
 	build := &builder{
-		FunctionBuilder: b,
-		sourceFile:      jsAST,
+		FunctionBuilder:   b,
+		sourceFile:        jsAST,
+		contextLabelStack: make([]string, 0),
 	}
 	build.VisitSourceFile(jsAST)
 	return nil

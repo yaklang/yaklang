@@ -433,8 +433,13 @@ func (b *builder) VisitForStatement(node *ast.ForStatement) interface{} {
 	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
+	var loop *ssa.LoopBuilder
 	// 创建循环构建器
-	loop := b.CreateLoopBuilder()
+	if len(b.contextLabelStack) > 0 {
+		loop = b.CreateLoopBuilderWithLabelName(b.contextLabelStack[len(b.contextLabelStack)-1])
+	} else {
+		loop = b.CreateLoopBuilder()
+	}
 
 	// 设置初始化语句(first)
 	if node.Initializer != nil {
@@ -608,7 +613,7 @@ func (b *builder) VisitBreakStatement(node *ast.BreakStatement) interface{} {
 
 	// if exist label, goto label
 	if label := node.Label; label != nil {
-		b.handlerGoto(label.Text(), true)
+		b.BreakWithLabelName(label.Text())
 		return nil
 	}
 
@@ -629,11 +634,11 @@ func (b *builder) VisitContinueStatement(node *ast.ContinueStatement) interface{
 
 	// if exist label, goto label
 	if label := node.Label; label != nil {
-		b.handlerGoto(label.Text())
+		b.ContinueWithLabelName(label.Text())
 		return nil
 	}
 
-	if !b.Break() {
+	if !b.Continue() {
 		b.NewError(ssa.Error, TAG, UnexpectedContinueStmt())
 	}
 	return nil
@@ -648,55 +653,33 @@ func (b *builder) VisitLabeledStatement(node *ast.LabeledStatement) interface{} 
 	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
+	// 对于JS Label语句结构分为Label名和语句两部分
+	// outer: console.log("not a jump target") 这种标签语句合法但不会成为break和continue目标
+	// 因为Label语句的语句部分不是Block或者是循环
+	// 这里为了兼容label循环的情况统一套一个block
+
 	// 获取标签名称
 	labelName := ""
 	if node.Label != nil {
 		labelName = node.Label.Text()
 	} else {
 		b.NewError(ssa.Error, TAG, LabelNameEmptyNotAllowed())
-	}
-
-	// 获取或创建标签构建器
-	labelBuilder := b.GetLabelByName(labelName)
-	if labelBuilder != nil {
-		b.NewError(ssa.Error, TAG, LabelNameDupNotAllowed())
 		return nil
 	}
 
-	labelBuilder = b.BuildLabel(labelName)
-	if b.labels == nil {
-		b.labels = make(map[string]*ssa.LabelBuilder)
-	}
-	b.labels[labelName] = labelBuilder
+	b.contextLabelStack = append(b.contextLabelStack, labelName)
+	defer func() {
+		b.contextLabelStack = b.contextLabelStack[:len(b.contextLabelStack)-1]
+	}()
+	label := b.CreateLabelBlockBuilder(labelName)
 
-	// 获取标签对应的代码块
-	block := labelBuilder.GetBlock()
+	label.SetLabelBlock(func() {
+		if node.Statement != nil {
+			b.VisitStatement(node.Statement)
+		}
+	})
 
-	// 构建标签
-	labelBuilder.Build()
-
-	// 添加标签到当前作用域
-	b.AddLabel(labelName, block)
-
-	// 处理所有引用这个标签的goto语句
-	for _, handler := range labelBuilder.GetGotoHandlers() {
-		handler(block)
-	}
-
-	// 跳转到标签块
-	b.EmitJump(block)
-
-	// 更新当前块
-	b.CurrentBlock = block
-
-	// 访问标签下的语句
-	if node.Statement != nil {
-		b.VisitStatement(node.Statement)
-	}
-
-	// 完成标签构建
-	labelBuilder.Finish()
-
+	label.Finish()
 	return nil
 }
 
@@ -2944,6 +2927,10 @@ func (b *builder) ProcessFunctionParams(params *ast.NodeList) {
 	if params == nil || len(params.Nodes) == 0 || b.IsStop() {
 		return
 	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &params.Loc, "")
+	defer recoverRange()
+
 	for index, param := range params.Nodes {
 		paramNode := param.AsParameterDeclaration()
 		paramName := ""
