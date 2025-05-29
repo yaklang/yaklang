@@ -84,6 +84,7 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 		objectValueHandledString bool
 		objectValueInArray       bool
 		arrayCurrentKeyIndex     int
+		legalArrayItem           bool
 	}
 
 	bufManager := newBufStackManager(func(key any, val any) {
@@ -166,6 +167,10 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 						objectDepthIndexTable = make(map[int]int)
 					}
 					objectDepth--
+				case state_arrayItem:
+					if !raw.legalArrayItem {
+						bufManager.PushValue(sliceValue)
+					}
 				}
 
 			}
@@ -213,12 +218,15 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 			if unicode.IsSpace(rune(ch)) {
 				continue
 			}
-
-			if ch == ']' {
+			if ch == ',' {
+				popState()
+				continue
+			} else if ch == ']' {
 				popState()
 				goto RETRY
 			}
 
+			currentStateIns().legalArrayItem = true
 			popState()
 			pushState(state_objectValue)
 			currentStateIns().objectValueInArray = true
@@ -279,12 +287,6 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 			case ',':
 				popState()
 				if currentState() == state_jsonArray {
-					// 数组中，继续处理
-					s := currentStateIns()
-					bufManager.PushKey(s.arrayCurrentKeyIndex)
-					s.arrayCurrentKeyIndex++
-					pushStateWithIdx(state_objectValue, index+1)
-					currentStateIns().objectValueInArray = true
 					continue
 				}
 				pushStateWithIdx(state_objectKey, index+1)
@@ -330,9 +332,9 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 			case '\'':
 				pushState(state_SingleQuoteString)
 				continue
-				//case '`':
-				//	pushState(state_esExpr)
-				//	continue
+			case '[':
+				currentStateIns().isArray = true
+				pushState(state_jsonArray)
 			}
 		case state_jsonObj:
 			switch ch {
