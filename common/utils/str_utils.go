@@ -852,6 +852,15 @@ func CopyMapShallow[K comparable, V any](originalMap map[K]V) map[K]V {
 	return copiedMap
 }
 
+func CopySlice[T any](i []T) []T {
+	if i == nil {
+		return make([]T, 0)
+	}
+	result := make([]T, len(i))
+	copy(result, i)
+	return result
+}
+
 func ByteCountDecimal(b int64) string {
 	const unit = 1000
 	if b < unit {
