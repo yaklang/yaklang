@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"strings"
 	"text/template"
@@ -42,6 +43,7 @@ type KeywordSearchResult struct {
 
 func NewKeyWordSearcher(chatToAiFunc func(string) (io.Reader, error)) AiToolSearcher {
 	return func(req *ToolSearchRequest) ([]*aitool.Tool, error) {
+		log.Info("start to search with query: %v", req.Query)
 		query := req.Query
 		if chatToAiFunc == nil {
 			return nil, utils.Errorf("ai callback is not set")
@@ -95,16 +97,33 @@ func NewKeyWordSearcher(chatToAiFunc func(string) (io.Reader, error)) AiToolSear
 		rsp := string(rspBytes)
 
 		var callResults []*KeywordSearchResult
-		for _, item := range jsonextractor.ExtractObjectIndexes(rsp) {
-			start, end := item[0], item[1]
-			resultJSON := rsp[start:end]
-			res := KeywordSearchResult{}
-			err = json.Unmarshal([]byte(resultJSON), &res)
-			if err != nil {
-				continue
+		err = jsonextractor.ExtractStructuredJSON(rsp, jsonextractor.WithObjectCallback(func(data map[string]any) {
+			toolname, ok := data["tool"]
+			if !ok {
+				return
 			}
-			callResults = append(callResults, &res)
+			reason, ok := data["reason"]
+			if !ok {
+				return
+			}
+			_ = reason
+			callResults = append(callResults, &KeywordSearchResult{
+				Tool: fmt.Sprint(toolname),
+			})
+		}))
+		if err != nil {
+			return nil, utils.Errorf("extract result failed: %v", err)
 		}
+		//for _, item := range  {
+		//	start, end := item[0], item[1]
+		//	resultJSON := rsp[start:end]
+		//	res := KeywordSearchResult{}
+		//	err = json.Unmarshal([]byte(resultJSON), &res)
+		//	if err != nil {
+		//		continue
+		//	}
+		//	callResults = append(callResults, &res)
+		//}
 
 		if len(callResults) == 0 {
 			return nil, utils.Errorf("no tool found")
