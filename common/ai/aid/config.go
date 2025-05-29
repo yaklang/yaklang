@@ -255,13 +255,7 @@ func initDefaultTools(c *Config) error { // set config default tools
 	if err := WithTools(buildinaitools.GetBasicBuildInTools()...)(c); err != nil {
 		return utils.Wrapf(err, "get basic build-in tools fail")
 	}
-	memoryTools, err := c.memory.CreateBasicMemoryTools()
-	if err != nil {
-		return utils.Errorf("create memory tools: %v", err)
-	}
-	if err := WithTools(memoryTools...)(c); err != nil {
-		return err
-	}
+
 	return nil
 }
 
@@ -277,6 +271,16 @@ func initDefaultAICallback(c *Config) error { // set config default tools
 }
 
 func (c *Config) loadToolsViaOptions() error {
+	if c.memory != nil {
+		memoryTools, err := c.memory.CreateBasicMemoryTools()
+		if err != nil {
+			return utils.Errorf("create memory tools: %v", err)
+		}
+		if err := WithTools(memoryTools...)(c); err != nil {
+			log.Errorf("load memory tools: %v", err)
+			return err
+		}
+	}
 	if c.allowRequireForUserInteract {
 		userPromptTool, err := c.CreateRequireUserInteract()
 		if err != nil {
@@ -298,7 +302,6 @@ func newConfig(ctx context.Context) *Config {
 }
 
 func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
-	m := GetDefaultMemory()
 	var idGenerator = new(int64)
 	log.Infof("coordinator with %v offset: %v", id, offsetSeq)
 
@@ -322,7 +325,7 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		id:                          id,
 		epm:                         newEndpointManagerContext(ctx),
 		streamWaitGroup:             new(sync.WaitGroup),
-		memory:                      m,
+		memory:                      nil, // default mem cannot create in config
 		guardian:                    newAysncGuardian(ctx, id),
 		syncMutex:                   new(sync.RWMutex),
 		syncMap:                     make(map[string]func() any),
@@ -345,9 +348,6 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 	if err := initDefaultAICallback(c); err != nil {
 		log.Errorf("init default ai callback: %v", err)
 	}
-
-	m.timeline.setAICaller(c)
-
 	return c
 }
 

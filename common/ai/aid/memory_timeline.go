@@ -70,6 +70,23 @@ type memoryTimeline struct {
 	totalDumpContentLimit int
 }
 
+func (m *memoryTimeline) CopyReducibleTimelineWithMemory(mem *Memory) *memoryTimeline {
+	tl := &memoryTimeline{
+		memory:                mem,
+		config:                m.config,
+		idToTs:                m.idToTs.Copy(),
+		tsToTimelineItem:      m.tsToTimelineItem.Copy(),
+		idToTimelineItem:      m.idToTimelineItem.Copy(),
+		summary:               m.summary.Copy(),
+		reducers:              m.reducers.Copy(),
+		maxTimelineLimit:      m.maxTimelineLimit,
+		fullMemoryCount:       m.fullMemoryCount,
+		perDumpContentLimit:   m.perDumpContentLimit,
+		totalDumpContentLimit: m.totalDumpContentLimit,
+	}
+	return tl
+}
+
 func (m *memoryTimeline) SoftDelete(id ...int64) {
 	for _, i := range id {
 		if v, ok := m.idToTimelineItem.Get(i); ok {
@@ -121,6 +138,9 @@ func (m *memoryTimeline) CreateSubTimeline(ids ...int64) *memoryTimeline {
 func (m *memoryTimeline) BindConfig(config *Config) {
 	m.config = config
 	m.memory = config.memory
+	if m.memory == nil {
+		m.memory = GetDefaultMemory()
+	}
 	m.setTimelineLimit(config.timelineRecordLimit)
 	m.setTimelineContentLimit(config.timelineContentSizeLimit)
 	if utils.IsNil(m.ai) {
@@ -312,7 +332,6 @@ func (m *memoryTimeline) reducer(beforeId int64) {
 			return nil
 		})
 	}
-
 }
 
 func (m *memoryTimeline) shrink(currentItem *timelineItem) {
@@ -370,7 +389,7 @@ func (m *memoryTimeline) renderReducerPrompt(beforeId int64) string {
 	input := m.DumpBefore(beforeId)
 	ins, err := template.New("timeline-reducer").Parse(timelineReducer)
 	if err != nil {
-		log.Warnf("BUG: dump summary prompt failed: %v", err)
+		log.Errorf("BUG: dump summary prompt failed: %v", err)
 		return ""
 	}
 	var buf bytes.Buffer
