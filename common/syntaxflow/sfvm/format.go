@@ -137,7 +137,7 @@ func (f *RuleFormat) Visit(flow sf.IFlowContext, editor *memedit.MemEditor) {
 			if descCount == 0 {
 				f.VisitInfoDescription(stmt.DescriptionStatement())
 			} else {
-				f.Write(f.GetTextFromToken(stmt))
+				f.VisitDescription(stmt.DescriptionStatement())
 			}
 			descCount++
 		default:
@@ -245,7 +245,25 @@ func (f *RuleFormat) VisitInfoDescription(desc sf.IDescriptionStatementContext) 
 			}
 		}
 	}
+	f.Write(")\n")
+}
 
+func (f *RuleFormat) VisitDescription(desc sf.IDescriptionStatementContext) {
+	i, _ := desc.(*sf.DescriptionStatementContext)
+	if i == nil {
+		return
+	}
+
+	f.Write("desc(\n")
+	if items, ok := i.DescriptionItems().(*sf.DescriptionItemsContext); ok && items != nil {
+		for _, item := range items.AllDescriptionItem() {
+			ret, ok := item.(*sf.DescriptionItemContext)
+			if !ok || ret.Comment() != nil { // skip comment
+				continue
+			}
+			f.Write("\t%s\n", f.GetTextFromToken(item))
+		}
+	}
 	f.Write(")\n")
 }
 
