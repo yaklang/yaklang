@@ -125,8 +125,8 @@
     2. 如果规则原有字段符合要求，则无需进行修改。
     3. 如果没有参考链接，那么返回none。
     示例:
-    [路径穿越漏洞]https://owasp.org/www-community/vulnerabilities/Path_Traversal
-    [CWE]https://cwe.mitre.org/data/definitions/23.html
+    [路径穿越漏洞](https://owasp.org/www-community/vulnerabilities/Path_Traversal)
+    [CWE-23](https://cwe.mitre.org/data/definitions/23.html)
 
 ## 语言类型定义
 - Golang
