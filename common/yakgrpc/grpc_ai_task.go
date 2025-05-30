@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -34,7 +35,7 @@ var triageCache = reducer.NewReducer(10, func(data []string) string {
 	return utils.InterfaceToString(result)
 })
 
-var ForgeResultType = "FORGE_RESULT"
+var RedirectForge = "redirect_forge"
 
 func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	firstMsg, err := stream.Recv()
@@ -52,12 +53,16 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 
 	inputEvent := make(chan *aid.InputEvent, 1000)
 
+	var currentCoordinatorId = startParams.CoordinatorId
+	var coordinatorIdOnce sync.Once
 	var aidOption = []aid.Option{
-		aid.WithDebug(true),
 		aid.WithEventHandler(func(e *aid.Event) {
 			if e.Timestamp <= 0 {
 				e.Timestamp = time.Now().Unix() // fallback
 			}
+			coordinatorIdOnce.Do(func() {
+				currentCoordinatorId = e.CoordinatorId
+			})
 			event := &ypb.AIOutputEvent{
 				CoordinatorId: e.CoordinatorId,
 				Type:          string(e.Type),
@@ -78,7 +83,6 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 		}),
 		aid.WithEventInputChan(inputEvent),
 	}
-	startParams.EnableAISearchTool = false
 	aidOption = append(aidOption, buildAIDOption(startParams)...)
 
 	go func() {
@@ -145,11 +149,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 			return err
 		}
 	} else {
-		aidOption = append(aidOption, aid.WithResultHandler(func(config *aid.Config) {
-			go func() {
-				triageCache.Push(config.GetMemory().Timeline())
-			}()
-		}))
+		triageCache.Push(utils.InterfaceToString(params))
 		res, err = yak.ExecuteForge("forge_triage", map[string]any{
 			"query":   params,
 			"context": triageCache.Dump(),
@@ -158,16 +158,22 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 			log.Errorf("run ai forge[%s] failed: %v", forgeName, err)
 			return err
 		}
-	}
-	err = stream.Send(&ypb.AIOutputEvent{
-		CoordinatorId: startParams.GetCoordinatorId(),
-		Type:          ForgeResultType,
-		Content:       utils.InterfaceToBytes(res),
-		Timestamp:     time.Now().Unix(),
-	})
-	if err != nil {
-		log.Errorf("send result failed: %v", err)
-		return err
+		if res != nil {
+			var redirectParam = &ypb.AIStartParams{
+				ForgeName: strings.ToLower(utils.InterfaceToString(res)),
+			}
+			redirectParamJson, err := json.Marshal(redirectParam)
+			if err != nil {
+				return err
+			}
+			err = stream.Send(&ypb.AIOutputEvent{
+				CoordinatorId: currentCoordinatorId,
+				Type:          RedirectForge,
+				Content:       redirectParamJson,
+				Timestamp:     time.Now().Unix(),
+				IsJson:        true,
+			})
+		}
 	}
 	return nil
 }

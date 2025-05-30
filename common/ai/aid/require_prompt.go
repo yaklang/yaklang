@@ -87,7 +87,7 @@ func (c *Config) RequireUserPromptWithEndpointResult(prompt string, opts ...*Req
 		Options: opts,
 	}
 	c.EmitRequireUserInteractive(req, ep.id)
-	c.doWaitAgree(c.ctx, ep)
+	c.doWaitAgreeWithPolicy(c.ctx, AgreePolicyManual, ep)
 	params := ep.GetParams()
 	c.ReleaseInteractiveEvent(ep.id, params)
 	return params, ep, nil
