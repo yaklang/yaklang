@@ -148,6 +148,11 @@ func (m *Memory) StoreTools(toolList func() []*aitool.Tool) {
 	m.Tools = toolList
 }
 
+func (m *Memory) ClearRuntimeConfig() {
+	m.timeline.ai = nil
+	m.timeline.config = nil
+}
+
 // set tools list
 func (m *Memory) StoreToolsKeywords(keywords func() []string) {
 	m.toolsKeywordsCallback = keywords
