@@ -181,11 +181,12 @@ func registerBuildInForge(name string) {
 func UpdateForgesMetaData(inputDir, outputDir string, concurrency int, forceUpdate bool) error {
 	currentDir := inputDir
 	if outputDir != "" {
-		err := os.CopyFS(outputDir, os.DirFS(inputDir))
-		if err != nil {
-			return err
-		}
-		currentDir = outputDir
+		//todo
+		//err := os.CopyFS(outputDir, os.DirFS(inputDir))
+		//if err != nil {
+		//	return err
+		//}
+		//currentDir = outputDir
 	}
 
 	fileInfos, err := utils.ReadDir(currentDir)
