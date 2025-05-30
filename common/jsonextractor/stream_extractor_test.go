@@ -312,3 +312,17 @@ func TestStreamExtractorArray_BASIC6(t *testing.T) {
 	}))
 	assert.True(t, resultLengthCheck)
 }
+
+func TestStreamExtractorArray_BASIC7(t *testing.T) {
+	resultLengthCheck := false
+	ExtractStructuredJSON(` [
+      {
+        "value": "recon"
+      }
+    ]
+`, WithArrayCallback(func(data []any) {
+		spew.Dump(data)
+		resultLengthCheck = len(data) == 1
+	}))
+	assert.True(t, resultLengthCheck)
+}
