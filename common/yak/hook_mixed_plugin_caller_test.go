@@ -3,6 +3,9 @@ package yak
 import (
 	"context"
 	"fmt"
+	"net"
+	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -382,4 +385,64 @@ hijackHTTPRequest = func(isHttps, url, req, forward, drop) {
 	require.NoError(t, err)
 	checkCallerLoads(HOOK_HijackHTTPRequest, 0)
 	checkCallerLoads(HOOK_MirrorHTTPFlow, 1, utils.CalcSha1(reloadPluginCode, HOOK_MirrorHTTPFlow, pluginName))
+}
+
+func TestPortscanPlugin(t *testing.T) {
+	l1, _ := net.Listen("tcp", "127.0.0.1:0")
+	defer l1.Close()
+	l2, _ := net.Listen("tcp", "127.0.0.1:0")
+	defer l2.Close()
+	port1 := l1.Addr().(*net.TCPAddr).Port
+	port2 := l2.Addr().(*net.TCPAddr).Port
+	go func() {
+		for {
+			conn, _ := l1.Accept()
+			if conn != nil {
+				conn.Close()
+			}
+		}
+	}()
+	go func() {
+		for {
+			conn, _ := l2.Accept()
+			if conn != nil {
+				conn.Close()
+			}
+		}
+	}()
+
+	tmpFile, err := os.CreateTemp("", "log*.log")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpFile.Name())
+	code := `
+logFile = "` + tmpFile.Name() + `"
+	` +
+		`
+lock = sync.NewLock()
+n = 0
+handle = (result) => {
+	lock.Lock()
+	n += 1
+	file.Save(logFile, string(n))
+	lock.Unlock()
+}
+	`
+	tempName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("port-scan", code)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clearFunc()
+	caller, err := NewMixPluginCaller()
+	require.NoError(t, err)
+	caller.SetLoadPluginTimeout(10)
+	err = caller.LoadPlugin(tempName)
+	require.NoError(t, err)
+	caller.MirrorHTTPFlowExSync(true, true, "http://127.0.0.1:"+strconv.Itoa(port1), []byte{}, []byte{}, []byte{})
+	caller.MirrorHTTPFlowExSync(true, true, "http://127.0.0.1:"+strconv.Itoa(port2), []byte{}, []byte{}, []byte{})
+	caller.Wait()
+	content, err := os.ReadFile(tmpFile.Name())
+	require.NoError(t, err)
+	require.Equal(t, "2", string(content))
 }
