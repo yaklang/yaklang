@@ -1,0 +1,9 @@
+desc(
+	title: "Find Java Common Filter"
+	title_zh: "查找Java过滤方法",
+	lib: "java-common-filter",
+	type: audit
+)
+
+/(?i).*(sanitize|filter|escape|clean|validate|check|secure|scrub|strip|encode|decode|prevent|safe|block|remove|replace|purge|whitelist|blacklist|neutralize|defense|harden|mitigate).*/ as  $output;
+alert $output
