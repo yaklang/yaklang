@@ -10,13 +10,28 @@ TEXT
 	rule_id: "5323c275-713f-4b22-a1cc-d22db1655fb2"
 )
 
-<include('java-spring-mvc-param')> as $totalSource;
+<include('java-spring-mvc-param')> as $source;
+<include("java-common-filter")>() as $filter
 <mybatisSink>#{
-    until: `* & $totalSource as $source`,
-}->
-$source?{<typeName>?{!any: Long,Integer, Boolean,Double}} as $vuln
-alert $vuln;
+    until: `* &  $source`,
+}-> as $result
+$result?{<typeName>?{!any: Long,Integer, Boolean,Double}} as $all
 
+$all<dataflow(
+    include=`* & $filter`
+)> as $mid
+
+alert $mid for{
+    message:"发现Mybatis SQL注入，但是数据流中有过滤函数。",
+    level:mid,
+}
+
+$all - $mid as $high
+
+alert $high for {
+    message:"发现Mybatis SQL注入，并且数据流中没有过滤函数。",
+    level:high,
+}
 desc(
 	language: java,
 	alert_num:1,
@@ -119,5 +134,129 @@ TEXT
         DELETE FROM User WHERE id=#{id}
     </delete>
 </mapper>
+TEXT
+)
+
+desc(
+    lang:java,
+    alert_mid:1,
+    alert_high:2,
+    "file://SQLI.java": <<<TEXT
+    package org.joychou.controller;
+
+    import org.joychou.mapper.UserMapper;
+    import org.joychou.dao.User;
+    import org.joychou.security.SecurityUtil;
+    import org.slf4j.Logger;
+    import org.slf4j.LoggerFactory;
+    import org.springframework.beans.factory.annotation.Value;
+    import org.springframework.web.bind.annotation.*;
+
+    import javax.annotation.Resource;
+    import java.sql.*;
+    import java.util.List;
+
+
+    @SuppressWarnings("Duplicates")
+    @RestController
+    @RequestMapping("/sqli")
+    public class SQLI {
+        private static final Logger logger = LoggerFactory.getLogger(SQLI.class);
+
+        // com.mysql.jdbc.Driver is deprecated. Change to com.mysql.cj.jdbc.Driver.
+        private static final String driver = "com.mysql.cj.jdbc.Driver";
+
+        @Value("${spring.datasource.url}")
+        private String url;
+
+        @Value("${spring.datasource.username}")
+        private String user;
+
+        @Value("${spring.datasource.password}")
+        private String password;
+
+        @Resource
+        private UserMapper userMapper;
+
+        @GetMapping("/mybatis/vuln02")
+        public List<User> mybatisVuln02(@RequestParam("username") String username) {
+            return userMapper.findByUserNameVuln02(username);
+        }
+
+        @GetMapping("/mybatis/orderby/vuln03")
+        public List<User> mybatisVuln03(@RequestParam("sort") String sort) {
+            return userMapper.findByUserNameVuln03(sort);
+        }
+
+        @GetMapping("/mybatis/orderby/sec04")
+        public List<User> mybatisOrderBySec04(@RequestParam("sort") String sort) {
+            return userMapper.findByUserNameVuln03(SecurityUtil.sqlFilter(sort));
+        }
+    }
+TEXT
+    "file://UserMapper.java":<<<TEXT
+    package org.joychou.mapper;
+
+    import org.apache.ibatis.annotations.Mapper;
+    import org.apache.ibatis.annotations.Param;
+    import org.apache.ibatis.annotations.Select;
+    import org.joychou.dao.User;
+
+    import java.util.List;
+
+    @Mapper
+    public interface UserMapper {
+
+        @Select("select * from users where username = #{username}")
+        User findByUserName(@Param("username") String username);
+
+        @Select("select * from users where username = '${username}'")
+        List<User> findByUserNameVuln01(@Param("username") String username);
+
+        List<User> findByUserNameVuln02(String username);
+        List<User> findByUserNameVuln03(@Param("order") String order);
+
+        User findById(Integer id);
+
+        User OrderByUsername();
+
+    }
+TEXT
+    "file://UseMapper.xml":<<<TEXT
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+    <mapper namespace="org.joychou.mapper.UserMapper">
+
+        <resultMap type="org.joychou.dao.User" id="User">
+            <id column="id" property="id" javaType="java.lang.Integer" jdbcType="NUMERIC"/>
+            <id column="username" property="username" javaType="java.lang.String" jdbcType="VARCHAR"/>
+            <id column="password" property="password" javaType="java.lang.String" jdbcType="VARCHAR"/>
+        </resultMap>
+
+        <!--<select id="findByUserName" resultMap="User">-->
+    	    <!--select * from users where username = #{username}-->
+        <!--</select>-->
+
+        <select id="findByUserNameVuln02" parameterType="String" resultMap="User">
+            select * from users where username like '%${_parameter}%'
+        </select>
+
+        <select id="findByUserNameVuln03" parameterType="String" resultMap="User">
+            select * from users
+            <if test="order != null">
+                order by ${order} asc
+            </if>
+        </select>
+
+        <select id="findById" resultMap="User">
+            select * from users where id = #{id}
+        </select>
+
+
+        <select id="OrderByUsername" resultMap="User">
+            select * from users order by id asc limit 1
+        </select>
+    </mapper>
 TEXT
 )
