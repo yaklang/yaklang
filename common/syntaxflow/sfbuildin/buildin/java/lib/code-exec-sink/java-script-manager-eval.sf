@@ -1,8 +1,54 @@
 desc(
-	title: "Find javax.script.* ScriptEngineManager eval Sink"
+	title: "Find Java javax.script.* ScriptEngineManager eval Sink"
 	type: audit
 	lib: "java-js-sink"
 	rule_id: "f72c0172-5edc-4436-901f-c33606c18899"
+	solution: <<<SOLUTION
+none
+SOLUTION
+	reference: <<<REFERENCE
+none
+REFERENCE
+	title_zh: "查找Java javax.script.* ScriptEngineManager eval Sink"
+	desc: <<<DESC
+### 1.规则目的
+该规则用于查找Java代码中使用了`javax.script.*`包下的`ScriptEngineManager`类及其相关方法的代码片段。特别是关注`getEngineByName`, `getEngineByExtension`, `getEngineByMimeType`方法获取`ScriptEngine`对象后，对该对象的`eval`、`put`、`compile`等方法的使用。
+
+### 2.规则详细
+1. **作为基础检测库**
+   属于`java-js-sink`库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测可能存在的代码执行漏洞，提供核心函数识别能力。
+
+2. **覆盖关键方法**
+   检测以下关键方法的调用：
+   - `ScriptEngineManager.getEngineByName`
+   - `ScriptEngineManager.getEngineByExtension`
+   - `ScriptEngineManager.getEngineByMimeType`
+   - `ScriptEngine.eval`
+   - `ScriptEngine.put`
+   - `ScriptEngine.compile`
+
+3. **潜在风险**
+   如果`eval`等方法的输入源（即代码中的`$params`变量）直接或间接来源于用户可控的外部输入且未经过严格的输入验证和沙箱隔离，攻击者可能注入恶意代码并使其在服务器端执行，导致远程代码执行（RCE）漏洞。
+
+4. **示例**
+   该规则能够识别类似如下代码结构，并标记存在输入流向`eval`方法的情况：
+   ```java
+   import javax.script.ScriptEngineManager;
+   import javax.script.ScriptEngine;
+   import javax.script.ScriptException;
+   import javax.servlet.http.HttpServletRequest;
+
+   public class CalculatorServlet {
+       public Object executeOperation(HttpServletRequest request) throws ScriptException {
+           ScriptEngineManager scriptEngineManager = new ScriptEngineManager();
+           ScriptEngine scriptEngine = scriptEngineManager.getEngineByExtension("js");
+           String userOps = request.getParameter("operation"); // 用户输入
+           return scriptEngine.eval(userOps); // 用户输入直接传入eval方法，存在风险
+       }
+   }
+   ```
+   本规则主要用于识别这种危险的代码模式，后续需要配合数据流分析规则来确认输入是否来自不受信任的源。
+DESC
 )
 
 /(getEngineByName|getEngineByExtension|getEngineByMimeType)/<getCall> as $toCheck;

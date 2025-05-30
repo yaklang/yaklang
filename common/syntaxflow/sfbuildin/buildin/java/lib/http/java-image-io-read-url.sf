@@ -1,11 +1,49 @@
 desc(
-	title: "Find Java Image IO Read URL"
+	title: "Audit Java ImageIo Read URL"
 	type: audit
 	lib: "java-image-io-read-url"
-	desc: <<<TEXT
-直接从不受信任的URL读取图像数据可能会使应用程序容易受到多种安全威胁，包括远程代码执行（RCE）和服务器资源耗尽攻击。如果攻击者能够控制URL的内容，他们可能会构造恶意的图像文件，该文件在解析时触发漏洞，或者通过大量请求消耗服务器资源。建议对从URL读取的图像数据进行严格的验证和清理，或者通过受信任的代理服务器下载图像。
-TEXT
+	desc: <<<DESC
+### 1.规则目的
+该规则用于审计 Java 代码中通过 `ImageIO.read()` 方法从 URL 直接读取图像数据的用法。这种方式可能隐藏安全风险，特别是当 URL 来源不受信任时。
+
+### 2.规则详细
+1. **作为基础检测库**
+   属于 `java-image-io-read-url` 库规则 (`lib` 类型)，通常用于与其他规则（如用户输入跟踪规则）配合，以识别是否存在从外部可控 URL 读取图像数据的潜在漏洞。
+
+2. **审计目标**
+   规则的核心是查找所有调用 `javax.imageio.ImageIO.read()` 方法时，参数是 `java.net.URL` 类型的情况。这表明程序正在尝试直接从网络位置加载图像。
+
+**触发场景示例:**
+```java
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.net.URL;
+
+public class ImageLoader {
+    public static void main(String[] args) {
+        try {
+            // 直接从 URL 读取图像数据 (潜在风险点)
+            BufferedImage image = ImageIO.read(new URL("http://example.com/image.jpg")); 
+            System.out.println("Image loaded successfully.");
+        } catch (IOException e) {
+            System.err.println("Error loading image: " + e.getMessage());
+        }
+    }
+}
+```
+审计这样的代码可以帮助开发者识别需要进一步审查和加固的点。
+
+
+DESC
 	rule_id: "ce4c5050-30c9-472b-b42e-96794478d3df"
+	title_zh: "审计Java ImageIo 读取 URL 的方法"
+	solution: <<<SOLUTION
+none
+SOLUTION
+	reference: <<<REFERENCE
+none
+REFERENCE
 )
 
 ImageIO.read(*?{<typeName>?{have: URL}} as $params);

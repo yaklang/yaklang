@@ -1,44 +1,90 @@
 desc(
-	title_zh:'查找Java GroovyShell 代码执行Sink点',
-	title:'Find Java GroovyShell Code Execution Sink Point'
+	title_zh: "审计Java GroovyShell 代码执行Sink点"
+	title: "Audit Java GroovyShell Code Execution Sink"
 	lib: 'java-groovy-lang-shell-sink'
 	type: audit
-	reference:<<<URL
+	reference: <<<REFERENCE
     https://docs.groovy-lang.org/latest/html/api/groovy/lang/GroovyShell.html
-URL
-	desc:<<<TEXT
-    该规则用于检测Java代码中使用GroovyShell类进行代码执行的潜在漏洞。GroovyShell是Groovy语言的一个类，允许动态执行Groovy脚本。由于Groovy是一种动态语言，使用GroovyShell执行的代码可能会引入安全风险，特别是在处理不受信任的输入时。
-    审计的类为:
-    - groovy.lang.GroovyShell
-    规则覆盖的方法包括：
-    - evaluate(GroovyCodeSource codeSource)
-    - evaluate(File file)
-    - evaluate(Reader in)
-    - evaluate(String scriptText)
-    - evaluate(Reader in, String fileName)
-    - evaluate(String scriptText, String fileName, String codeBase)
-    - evaluate(URI uri)
+REFERENCE
+	desc: <<<DESC
+### 规则目的
+该规则用于审计Java代码中使用`groovy.lang.GroovyShell`类可能导致的远程命令执行（RCE）漏洞。`GroovyShell`允许应用程序动态执行Groovy脚本，如果输入的脚本内容来自不可信的外部来源且未经充分校验和过滤，攻击者可以注入恶意代码，导致服务器执行任意命令。
 
-    - parse(GroovyCodeSource codeSource)
-    - parse(GroovyCodeSource codeSource, Binding binding)
-    - parse(File file)
-    - parse(Reader in)
-    - parse(Reader in, Binding binding)
-    - parse(Reader reader, String fileName)
-    - parse(Reader reader, String fileName, Binding binding)
-    - parse(String scriptText)
-    - parse(String scriptText, Binding binding)
-    - parse(String scriptText, String fileName)
-    - parse(String scriptText, String fileName, Binding binding)
-    - parse(URI uri)
-    - run(File scriptFile, String[] args)
-    - run(File scriptFile, List<String> list)
-    - run(Reader in, String fileName, String[] args)
-    - run(Reader in, String fileName, List<String> list)
-    - run(String scriptText, String fileName, String[] args)
-    - run(String scriptText, String fileName, List<String> list)
-TEXT
+### 规则详细
+该规则属于审计库规则（lib类型），主要用于标识GroovyShell中可用于执行代码的危险方法，作为数据汇聚点（sink）探测远程代码执行漏洞。它需要与其他规则（如污点跟踪规则）配合使用，以判断输入的Groovy脚本是否可控并被恶意利用。
+
+审计的类为：
+- `groovy.lang.GroovyShell`
+
+规则覆盖的危险方法包括（其中以 `*` 标记的方法由于参数或使用方式的灵活性，尤其需要注意）：
+
+**evaluate 方法：** 直接执行Groovy脚本或代码资源。
+- `evaluate(GroovyCodeSource codeSource)`
+- `evaluate(File file)`
+- `evaluate(Reader in)`
+- `evaluate(String scriptText)` *
+- `evaluate(Reader in, String fileName)`
+- `evaluate(String scriptText, String fileName, String codeBase)` *
+- `evaluate(URI uri)`
+
+**parse 方法：** 解析Groovy脚本，返回可执行的Script对象，通常配合 `run()` 方法使用。
+- `parse(GroovyCodeSource codeSource)`
+- `parse(GroovyCodeSource codeSource, Binding binding)`
+- `parse(File file)`
+- `parse(Reader in)`
+- `parse(Reader in, Binding binding)`
+- `parse(Reader reader, String fileName)`
+- `parse(Reader reader, String fileName, Binding binding)`
+- `parse(String scriptText)` *
+- `parse(String scriptText, Binding binding)` *
+- `parse(String scriptText, String fileName)` *
+- `parse(String scriptText, String fileName, Binding binding)` *
+- `parse(URI uri)`
+
+**run 方法：** 执行从文件、Reader 或字符串中加载的Groovy脚本。
+- `run(File scriptFile, String[] args)`
+- `run(File scriptFile, List<String> list)`
+- `run(Reader in, String fileName, String[] args)`
+- `run(Reader in, String fileName, List<String> list)`
+- `run(String scriptText, String fileName, String[] args)` *
+- `run(String scriptText, String fileName, List<String> list)` *
+
+这些方法特别是接受 `String` 类型参数或从 `Reader`/`File` 读取内容的方法，如果输入内容直接或间接来源于用户可控数据，且未进行适当的安全处理，则构成严重的安全风险。
+DESC
 	rule_id: "0018c56b-b5f7-49fc-80f4-d1b9a5f718e5"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 避免使用 GroovyShell 执行不受信任的代码
+如果可能，应彻底避免使用`GroovyShell`来执行来自终端用户的、未经严格验证和沙箱化的代码。考虑使用更安全的、专为执行表达式设计的库（如`AviatorScript`, `JEXL`）或采用更严格的代码沙箱机制。
+
+#### 2. 对用户输入进行严格的过滤和校验
+如果必须使用`GroovyShell`执行用户提供的代码，务必对输入内容进行极致的过滤和校验。仅允许执行白名单中的、已知安全的Groovy代码片段或结构，拒绝任何包含可执行系统命令、文件操作、网络访问等敏感操作的代码。
+
+#### 3. 使用安全沙箱
+配置`GroovyShell`的安全策略或使用Java的安全管理器 (`SecurityManager`) 对Groovy脚本的执行环境进行限制，例如限制文件访问、网络访问、系统属性读取等。请注意，构建一个足够安全的沙箱环境非常复杂且容易出错，需要深入理解Groovy的执行机制和潜在的逃逸技术。
+
+#### 4. 最小权限原则
+运行应用程序的系统用户应遵循最小权限原则，限制其对操作系统资源的访问权限，即使命令执行成功，也能最小化攻击的影响范围。
+
+#### 示例代码 (仅为示意，沙箱机制实现复杂，需谨慎使用)：
+
+```java
+import java.security.Policy;
+import java.security.Permission;
+import java.security.Permissions;
+import java.security.AllPermission;
+import groovy.lang.GroovyShell;
+import org.apache.groovy.groovyshell.DefaultGroovyMethods;
+
+// 创建一个简单的安全策略，严格限制权限
+class RestrictedPolicy extends Policy {
+    @Override
+    public Permissions getPermissions(java.security.CodeSource codesource) {
+        Permissions perms = new Permissions();
+        // 仅允许读写位于特定路径的文件，具体路径需要根据应用实际情况调整
+        // perms.add(new java.io.FilePermission("<<APPPATH>>/-
+SOLUTION
 )
 
 GroovyShell()?{<typeName>?{have:'groovy.lang.GroovyShell'}} as $groovy;

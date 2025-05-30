@@ -1,12 +1,31 @@
 desc(
-	title: "check file database function"
+	title: "Audit Golang Database/SQL Usage"
 	type: audit
 	level: info
 	lib: 'golang-database-sql'
-	desc: <<<TEXT
-此审计规则旨在检查Go语言项目中是否正确使用了`database/sql`包来操作数据库。`database/sql`包提供了对SQL数据库的通用接口，包括打开和关闭数据库连接、执行SQL语句以及查询数据。不正确的数据库操作可能会导致SQL注入攻击、数据泄露或损坏等安全风险。通过此审计，可以确保数据库操作代码符合安全最佳实践，减少潜在的安全漏洞。
-TEXT
+	desc: <<<DESC
+### 规则目的
+此审计规则旨在检查Go语言项目中是否正确使用了`database/sql`包来操作数据库。`database/sql`包提供了对SQL数据库的通用接口，包括打开和关闭数据库连接、执行SQL语句以及查询数据。
+
+### 规则详细
+此规则属于`golang-database-sql`库规则（`lib`类型），主要用于标记所有对`database/sql`包中`Open`函数的调用点及其返回的数据库连接对象。这些标记点可以作为后续规则（例如，检测SQL注入或其他不安全数据库操作的规则）的起点或基础数据，从而更精确地追踪潜在的安全问题。
+
+**检测目标:**
+
+1.  识别并标记所有`database/sql`包的引用。
+2.  识别并标记所有对`database/sql.Open`函数的调用。
+3.  识别并标记`database/sql.Open`函数调用返回的`*sql.DB`数据库连接对象及其成员函数（如`Exec`, `Query`, `Prepare`等）。
+
+通过标记这些关键的数据库操作点，可以为更高级别的安全审计规则提供必要的信息流和数据依赖关系。
+DESC
 	rule_id: "db7e72fa-79c2-42a8-bcd3-8418ad3136af"
+	title_zh: "审计Golang Database/SQL使用"
+	solution: <<<SOLUTION
+none
+SOLUTION
+	reference: <<<REFERENCE
+[Golang database/sql documentation](https://pkg.go.dev/database/sql)
+REFERENCE
 )
 
 sql?{<fullTypeName>?{have: 'database/sql'}} as $entry;
