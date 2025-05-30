@@ -1,53 +1,98 @@
 desc(
-	title: "Access Specifier Manipulation via Reflection"
-	title_zh: "通过反射操纵访问修饰符",
+	title: "Detect Java Reflection setAccessible Vulnerability"
+	title_zh: "检测Java反射setAccessible函数滥用漏洞"
 	type: Vulnerability
 	severity: High
 	risk: High
-	desc: <<<TEXT
-该漏洞源于滥用 Java 的反射 API（如 `setAccessible(true)`）强行修改类/方法/字段的访问修饰符（如 private/protected），
-绕过 Java 语言层面的访问控制机制。攻击者可能利用此特性访问或修改敏感内部状态，
-例如：
-- 修改 Tomcat 的 `filterConfigs` 字段注入恶意过滤器
-- 访问 Spring 框架内部缓存窃取用户会话
-- 篡改数据库连接池配置实现中间人攻击
+	desc: <<<DESC
+### 漏洞描述
 
-此操作违反最小权限原则，且具有以下风险：
-1. **权限提升**：攻击者通过反射链构造利用代码，可能获得系统级权限
-2. **隐蔽后门**：私有字段的修改难以被常规安全工具检测（如 SAST/IAST）
-3. **兼容性破坏**：框架内部字段名或结构变更会导致反射代码崩溃
-TEXT
-	solution: <<<TEXT
-**根本性修复：**
-- **优先使用官方 API**：如 Spring Boot 的 `FilterRegistrationBean` 替代直接操作 Tomcat 内部类
-- **禁止非必要反射**：通过代码审查规则禁止 `setAccessible(true)` 的使用
+1. **漏洞原理**
+该漏洞源于滥用 Java 的反射 API（如 `setAccessible(true)`）强行修改类/方法/字段的访问修饰符（如 private/protected），绕过 Java 语言层面的访问控制机制。攻击者可能利用此特性访问或修改敏感内部状态，导致非预期的行为和潜在的安全风险。
 
-**若必须使用反射：**
-1. **严格校验调用源**：
-   - 限制反射调用仅限于受信代码库（如通过注解 `@org.springframework.stereotype.Service` 标记）
-   - 禁止从用户输入构造反射目标（如 `Class.forName(request.getParameter("className"))`）
+2. **触发场景**
+攻击者可能通过构造 악意的反射链，利用 `setAccessible(true)` 访问或修改应用程序的内部状态。例如，攻击者可能通过反射修改 Tomcat 的 `filterConfigs` 字段注入恶意过滤器，访问 Spring 框架内部缓存窃取用户会话，或者篡改数据库连接池配置实现中间人攻击。这些行为违反最小权限原则，且具有以下风险：权限提升、隐蔽后门和兼容性破坏。
 
-2. **最小化攻击面**：
    ```java
-   try {
-       Field field = target.getClass().getDeclaredField("sensitiveField");
-       // 使用后立即恢复访问权限
-       field.setAccessible(true);
-       Object value = field.get(target);
-   } finally {
-       field.setAccessible(false);  // 强制恢复访问控制
+   // 存在漏洞的代码示例
+   public class SensitiveClass {
+       private String sensitiveField = "confidential";
+
+       public void printSensitiveField() {
+           System.out.println(sensitiveField);
+       }
+   }
+
+   public class Attacker {
+       public static void main(String[] args) throws Exception {
+           SensitiveClass instance = new SensitiveClass();
+           // Attempt to access private field directly (will fail without reflection)
+           // String value = instance.sensitiveField;
+
+           // Access private field using reflection and setAccessible(true)
+           Field field = SensitiveClass.class.getDeclaredField("sensitiveField");
+           field.setAccessible(true); // Bypass access control
+           String value = (String) field.get(instance);
+           System.out.println("Accessed sensitive field: " + value);
+
+           // Modify private field using reflection
+           field.set(instance, "modified confidential");
+           instance.printSensitiveField();
+       }
    }
    ```
 
-3. **启用运行时保护**：
-   - 配置 Java Security Manager 限制 `ReflectPermission("suppressAccessChecks")`
-   - 在 JVM 参数中添加 `--illegal-access=deny` 阻止深度反射（JDK 16+）
+3. **潜在影响**
+- **权限提升**：攻击者通过反射链构造利用代码，可能获得系统级权限，对系统造成更严重的破坏。
+- **隐蔽后门**：私有字段的修改难以被常规安全工具检测（如 SAST/IAST），攻击痕迹不易被发现。
+- **兼容性破坏**：框架内部字段名或结构变更会导致反射代码崩溃，影响程序的稳定性和可用性。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
 
-4. **自动化检测**：
-   - 使用 SpotBugs 规则 `SECURITY_ACCESSIBLEOBJECT_ACCESS` 标记危险代码
-   - 在 CI/CD 流程中加入静态代码分析技术检测反射滥用模式
-TEXT
+#### 1. 优先使用官方 API
+避免直接使用反射操作框架或库的内部类和字段。优先使用官方提供的 API 或扩展点，它们通常更稳定且受官方维护。
+
+例如，在使用 Spring Boot 时，应使用 `FilterRegistrationBean` 替代直接操作 Tomcat 内部类来注册过滤器。
+
+#### 2. 禁止非必要反射
+通过代码审查规则、静态代码分析工具或自定义 lint 规则，禁止或标记 `setAccessible(true)` 的使用。只允许在极少数确实需要反射的场景下使用，并确保其使用是安全的。
+
+#### 3. 严格校验调用源
+如果必须使用反射，应限制反射的调用范围，确保只有受信任的代码库才能进行反射操作。可以通过注解（如 `@org.springframework.stereotype.Service` ）标记允许使用反射的类或方法，并通过代码逻辑或静态分析强制执行此限制。
+
+另外， **严禁将用户输入直接用于构造反射的目标**，例如使用 `Class.forName(request.getParameter("className"))`，这会允许攻击者实例化任意类，导致严重的安全问题。
+
+#### 4. 最小化攻击面
+在使用 `setAccessible(true)` 后，应尽快将其恢复为 `false`，以最小化访问窗口。在 `try-finally` 块中执行此操作可以确保在发生异常时也能恢复访问控制。
+
+```java
+// 修复代码示例
+try {
+    Field field = target.getClass().getDeclaredField("sensitiveField");
+    field.setAccessible(true);
+    // Perform operations with the field
+    Object value = field.get(target);
+    // ... other operations
+} finally {
+    if (field != null) {
+        field.setAccessible(false); // 强制恢复访问控制
+    }
+}
+```
+
+#### 5. 启用运行时保护
+配置 Java Security Manager，限制 `ReflectPermission("suppressAccessChecks")` 权限，从而阻止或限制对 `setAccessible(true)` 的调用。虽然 Security Manager 在现代应用中较少使用，但在某些场景下仍可提供一层额外的保护。
+
+对于 JDK 16 及以上版本，可以在 JVM 参数中添加 `--illegal-access=deny` 或 `--illegal-access=permit` 来控制深度反射的行为。`deny` 会阻止非法访问，而 `permit` 只会发出警告。
+
+#### 6. 自动化检测
+在 CI/CD 流程中集成静态代码分析工具（如 SpotBugs、SonarQube），并配置相应的规则（如 SpotBugs 的 `SECURITY_ACCESSIBLEOBJECT_ACCESS` ）来自动检测代码中的反射滥用模式。持续的自动化检测有助于及时发现和修复潜在的漏洞。
+SOLUTION
 	rule_id: "718cb86d-8629-4382-be43-03ce36c07a3b"
+	reference: <<<REFERENCE
+https://cwe.mitre.org/data/definitions/749.html
+REFERENCE
 )
 
 // get call site  and check parameter 

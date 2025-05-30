@@ -3,6 +3,31 @@ desc(
 	type: audit
 	lib: "java-http-sink"
 	rule_id: "d6dc4b9c-84a7-4cce-9e8e-b423a92d5a3c"
+	title_zh: "查找Java中的HTTP Sink (多库)"
+	desc: <<<DESC
+### 规则目的
+该规则用于识别Java应用程序中调用了多种HTTP客户端库或URL相关操作的下沉点（Sink）。这些下沉点代表了可能向外部发送HTTP请求的代码位置。通过识别这些点，安全审计人员可以追踪用户输入或其他外部数据的流动，判断是否存在SSRF（服务器端请求伪造）等漏洞的风险。
+
+### 规则详细
+该规则属于库规则（`lib` 유형），旨在提供一个集中的列表，列举多种常见Java库和API中用于发起HTTP请求或处理URL的关键方法调用。这些方法通常是SSRF漏洞链的末端。该规则通过包含以下子规则来实现此目的：
+
+1.  `java-alibaba-druid-httpclientutil`: 识别Alibaba Druid库中的HttpClientUtil相关方法。
+2.  `java-apache-commons-httpclient`: 识别Apache Commons HttpClient库的相关方法。
+3.  `java-apache-http-request-url`: 识别Apache HttpComponents库中处理请求URL的方法。
+4.  `java-http-fluent-request`: 识别Apache HttpClients Fluent API的相关方法。
+5.  `java-image-io-read-url`: 识别javax.imageio.ImageIO.read()方法，该方法可以直接从URL读取图像，是潜在的SSRF触发点。
+6.  `java-net-url-connect`: 识别java.net.URL.openConnection()和java.net.URL.openStream()等方法，这些是Java标准库中发起HTTP连接的基本方式。
+7.  `java-okhttpclient-request-execute`: 识别OkHttpClient库中发起请求的方法。
+8.  `java-spring-rest-template-request-params`: 识别Spring RestTemplate中处理请求参数的方法。
+
+将这些常见的HTTP请求下沉点集中在一个规则中，可以方便地与其他污点跟踪规则（比如追踪来自用户输入的污点）结合使用，构建完整的SSRF漏洞检测链。当来自不受信任来源的数据流入这些下沉点时，就可能存在SSRF漏洞。
+DESC
+	solution: <<<SOLUTION
+none
+SOLUTION
+	reference: <<<REFERENCE
+none
+REFERENCE
 )
 
 <include('java-alibaba-druid-httpclientutil')> as $output;

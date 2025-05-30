@@ -1,16 +1,53 @@
 desc(
-	title_zh:"检测Java 日志伪造攻击",
-	title:"Check Java Log Forging Attack"
+	title_zh: "检测Java 日志伪造攻击"
+	title: "Check Java Log Forging Attack"
 	type:security
 	risk:"日志伪造",
 	level:low
-	description:<<<TEXT
+	description: <<<DESCRIPTION
     该规则检测Java应用程序中的日志伪造攻击。日志伪造攻击是指攻击者通过操纵日志记录的输入数据，导致生成的日志信息被篡改或伪造，从而误导系统管理员或安全分析人员。此规则审计了可能受到用户输入影响的日志记录点，特别是那些使用`log.info()`、`log.error()`等方法进行日志记录的点。
-TEXT
-	solution:<<<TEXT
-    在日志记录时，确保对用户输入进行适当的验证和清理，以防止日志伪造攻击。可以使用日志库提供的安全编码功能，或手动对输入数据进行转义和过滤。
-TEXT
+DESCRIPTION
+	solution: <<<SOLUTION
+### 修复建议
+
+1. **对日志输入进行清理和转义**
+在将任何用户提供的数据或不受信数据写入日志之前，应对其进行清理和转义。特别是需要删除或转义换行符和回车符（`\n`和`\r`），以及其他可能导致日志格式被破坏的特殊字符。许多日志框架提供了内置的安全编码器或格式化器。
+
+**示例代码（sl4j 结合 Logback/Log4j2 的参数化日志）**
+使用日志框架提供的参数化日志记录方法是防止日志伪造的有效方式，框架会负责处理参数中的特殊字符。
+```java
+import javax.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class ParameterProcessor {
+
+    private static final Logger log = LoggerFactory.getLogger(ParameterProcessor.class);
+
+    public void processRequest(HttpServletRequest request) {
+        String val = request.getParameter("val");
+        try {
+            int value = Integer.parseInt(val);
+            // 使用参数化日志，框架会自动处理 val 中的特殊字符
+            log.debug("Successfully parsed value: {}", value);
+        } catch (NumberFormatException e) {
+            // 使用参数化日志，框架会自动处理 val 中的特殊字符
+            log.error("Failed to parse val = '{}'", val, e);
+        }
+    }
+}
+```
+
+2. **白名单校验**
+如果可能，对用户输入的数据进行白名单校验，只接受已知安全的字符集或数据格式。
+
+3. **避免在日志消息中直接包含敏感信息**
+尽量避免在日志中记录敏感的用户输入，如密码、信用卡号等，以降低日志泄露的风险。
+SOLUTION
 	rule_id: "235e953b-955c-43bc-9ef8-0e87715330a3"
+	reference: <<<REFERENCE
+[CWE-117: Improper Output Neutralization for Logs](https://cwe.mitre.org/data/definitions/117.html)
+REFERENCE
 )
 
 <include("java-servlet-param")> as $source;

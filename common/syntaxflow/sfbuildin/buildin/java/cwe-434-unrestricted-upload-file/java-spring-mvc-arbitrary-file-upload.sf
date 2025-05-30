@@ -1,11 +1,143 @@
 desc(
-	title_zh:"检测Spring MVC任意文件上传漏洞",
+	title_zh: "检测Spring MVC任意文件上传漏洞"
 	title: "Check Spring MVC Arbitrary File Upload Vulnerability"
 	risk:"任意文件上传",
-	desc:<<<TEXT
-    该规则用于检测Spring MVC框架中是否存在使用MultipartFile的任意文件上传漏洞。
-TEXT
+	desc: <<<DESC
+### 漏洞原理
+
+任意文件上传漏洞是指攻击者能够将恶意文件（如WebShell或可执行文件）上传到服务器，并可能通过访问这些文件来执行任意代码或进行其他恶意操作。在基于Spring MVC的应用程序中，如果开发人员在使用`MultipartFile`处理文件上传时，没有对上传的文件名、文件类型、文件内容等进行严格的校验和过滤，就可能导致该漏洞。
+
+具体来说，如果应用程序直接使用用户提供的文件名（例如通过`MultipartFile.getOriginalFilename()`获取）来保存文件，并且文件名中包含路径遍历字符（如`../`）或者允许上传具有可执行扩展名（如`.jsp`, `.php`, `.asp`, `.sh`等）的文件，攻击者就可以上传恶意文件到服务器的任意位置，甚至覆盖现有文件。
+
+### 触发场景
+
+当应用程序接收用户上传的文件时，如果以下条件中的一个或多个未得到满足，则可能存在任意文件上传漏洞：
+
+1.  **未校验文件类型和扩展名:** 应用程序允许上传任何文件扩展名的文件，包括可执行文件。
+2.  **未校验文件内容:** 应用程序未对文件内容进行安全检查，无法识别恶意代码或恶意文件头部。
+3.  **使用用户提供的文件名直接保存:** 直接使用`MultipartFile.getOriginalFilename()`获取的文件名，未对文件名进行清洗过滤。
+4.  **目标保存路径可控:** 如果文件的保存路径部分或完全由用户控制，攻击者可以将文件上传到非预期目录，例如Web目录之外的敏感目录或可执行目录。
+
+以下是一个**存在漏洞**的简单示例代码：
+```java
+import org.springframework.web.multipart.MultipartFile;
+import java.io.File;
+
+public class UploadController {
+    public String uploadFile(MultipartFile file, String uploadDir) {
+        if (!file.isEmpty()) {
+            try {
+                // 直接使用原始文件名和用户提供的上传目录进行保存
+                String originalFilename = file.getOriginalFilename();
+                File targetFile = new File(uploadDir + File.separator + originalFilename);
+                file.transferTo(targetFile);
+                return "文件上传成功！";
+            } catch (Exception e) {
+                e.printStackTrace();
+                return "文件上传失败！";
+            }
+        } else {
+            return "请选择文件上传！";
+        }
+    }
+}
+```
+
+攻击者可以构造一个文件名如 `../webapps/ROOT/shell.jsp` 并将其上传，如果不对文件名进行过滤，该文件可能会被保存到 Web 根目录，从而导致WebShell。
+
+### 潜在影响
+
+*   **远程代码执行 (RCE):** 如果成功上传可执行文件（如WebShell），攻击者可以在服务器上执行任意代码，完全控制服务器。
+*   **服务器被控:** 攻击者可以利用上传的恶意文件进一步渗透内网，控制更多服务器资源。
+*   **数据泄露或篡改:** 攻击者可能通过执行代码访问、窃取或篡改数据库及其他敏感文件。
+*   **拒绝服务 (DoS):** 攻击者可能上传超大文件，消耗服务器磁盘空间或带宽，导致服务不可用。
+*   **网站内容被篡改:** 上传恶意文件覆盖网站原有文件，修改网站内容。
+DESC
 	rule_id: "2e6a2485-77c7-4b0e-a421-476b5804a941"
+	solution: <<<SOLUTION
+### 修复建议
+
+为防止任意文件上传漏洞，应采取以下安全措施：
+
+1.  **严格校验文件类型和扩展名:**
+    *   **白名单机制:** 优先使用白名单限制允许上传的文件类型和扩展名，例如只允许上传`.jpg`, `.png`, `.pdf`等非可执行文件。
+    *   **MIME类型校验:** 除了校验扩展名，还应该校验文件的MIME类型，防止攻击者通过修改扩展名绕过校验。
+    *   **文件内容校验 (魔术字节):** 对文件头部进行检查，识别文件的真实类型，防止通过伪造文件头绕过MIME类型或扩展名校验。
+
+2.  **不使用用户提供的文件名:**
+    *   **生成随机文件名:** 在保存文件时，生成一个随机的唯一文件名或使用时间戳等方式，而不是使用用户上传的原始文件名。
+    *   **文件路径过滤:** 如果需要使用用户提供的文件路径信息，必须对路径进行严格的过滤和校验，禁用路径遍历字符（如`../`，`./`等）。
+
+3.  **安全保存路径:**
+    *   将上传的文件保存到应用程序 Web 根目录之外的非可执行目录，避免直接通过URL访问上传的可执行文件。
+    *   确保上传目录的权限设置正确，限制文件的执行权限。
+
+4.  **限制上传文件大小:** 设置文件上传的最大大小限制，防止拒绝服务攻击。
+
+以下是**修复后**的示例代码：
+
+```java
+import org.springframework.web.multipart.MultipartFile;
+import java.io.File;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
+
+public class SecuredUploadController {
+
+    private static final List<String> ALLOWED_EXTENSIONS = Arrays.asList("jpg", "jpeg", "png", "gif", "pdf"); // 白名单
+    private static final String UPLOAD_BASE_DIR = "/app/uploads"; // 非Web根目录的安全路径
+
+    public String uploadFile(MultipartFile file) {
+        if (file.isEmpty()) {
+            return "请选择文件上传！";
+        }
+
+        String originalFilename = file.getOriginalFilename();
+        String fileExtension = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
+
+        // 1. 校验文件扩展名（白名单）
+        if (!ALLOWED_EXTENSIONS.contains(fileExtension)) {
+            return "不允许上传该类型的文件！";
+        }
+
+        // 2. 校验MIME类型 (示例：这里只简单演示，实际应用需更详细校验)
+        // String contentType = file.getContentType();
+        // if (!contentType.equals("image/jpeg") && !contentType.equals("image/png")) {
+        //     return "不允许上传该MIME类型的文件！";
+        // }
+
+        try {
+            // 3. 生成随机文件名
+            String newFileName = UUID.randomUUID().toString() + "." + fileExtension;
+            File uploadDir = new File(UPLOAD_BASE_DIR);
+            if (!uploadDir.exists() && !uploadDir.mkdirs()) {
+                 throw new IOException("Failed to create upload directory: " + UPLOAD_BASE_DIR);
+            }
+            File targetFile = new File(uploadDir, newFileName);
+
+            // 检查父目录是否是期望的上传目录，防止路径遍历
+            if (!targetFile.getParentFile().equals(uploadDir)) {
+                 throw new SecurityException("非法文件路径！");
+            }
+
+            // 4. 保存文件到安全路径
+            file.transferTo(targetFile);
+            return "文件上传成功，新文件名为: " + newFileName;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "文件上传失败！";
+        }
+    }
+}
+```
+
+5.  **定期安全扫描:** 对上传目录进行定期或实时的安全扫描，检测是否存在恶意文件。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-434: Unrestricted Upload of File with Dangerous Type](https://cwe.mitre.org/data/definitions/434.html)
+REFERENCE
 )
 
 <include('java-spring-mvc-param')>?{<typeName>?{have:'org.springframework.web.multipart.MultipartFile'}} as $source;

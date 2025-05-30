@@ -1,12 +1,67 @@
 desc(
-	title: "check FTP connect and login"
+	title: "Audit Golang FTP Library Usage"
 	type: audit
 	level: info
 	lib: 'golang-ftp-sink'
-	desc: <<<TEXT
-此规则旨在审计Go语言代码中`github.com/jlaffaye/ft`包的使用情况。
-TEXT
+	desc: <<<DESC
+### 1.规则目的
+该规则主要用于审计Go语言代码中对`github.com/jlaffaye/ftp`包的使用情况。该库提供了Go语言连接和操作FTP服务器的功能。
+
+### 2.规则详细
+1. **作为基础检测库**
+   属于`golang-ftp-sink`库规则（`lib`类型），主要用于识别代码中是否引入和使用了`github.com/jlaffaye/ftp`包及其相关函数，例如FTP连接的`Dial`、用户登录的`Login`等操作。
+
+2. **识别潜在的敏感操作点**
+   该规则通过识别对`Dial`函数的调用及其后续结果 (`$output`)，可以帮助分析人员快速定位到程序中进行FTP连接操作的代码段。这对于安全审计过程中识别潜在的硬编码凭据、明文传输敏感数据等风险点非常有用。
+
+   虽然此规则本身不直接检测漏洞，但它是更高级别规则（例如检测FTP明文密码、不安全连接等的规则）的基础组件，能够提供目标审计的起点。
+
+3. **示例代码分析**
+   规则附带的示例代码展示了如何连接到一个FTP服务器 (`ftp.Dial`) 并进行用户登录 (`conn.Login`)。这种模式在实际应用中可能包含敏感信息，例如服务器地址、用户名和密码，是审计过程中需要重点关注的部分。
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/jlaffaye/ftp"
+    "time"
+)
+
+func main() {
+    // 连接到 FTP 服务器
+    conn, err := ftp.Dial("ftp.example.com:21", ftp.DialWithTimeout(5*time.Second))
+    if err != nil {
+        fmt.Println("Failed to connect:", err)
+        return
+    }
+    defer conn.Quit()
+
+    // 登录
+    err = conn.Login("username", "password") // 潜在的敏感信息点
+    if err != nil {
+        fmt.Println("Failed to login:", err)
+        return
+    }
+    defer conn.Logout()
+
+    fmt.Println("Connected and logged in successfully")
+}
+```
+
+该规则的审计结果可以用于进一步分析是否存在以下风险：
+* 硬编码敏感信息：如FTP服务器地址、用户名、密码直接写在代码中。
+* 使用不安全的连接：例如，未通过TLS/SSL等方式加密FTP连接，导致传输过程中的数据可能被窃听。
+* 错误的错误处理：例如，在连接或登录失败时未进行适当的处理，可能导致信息泄露。
+DESC
 	rule_id: "f52f9e0f-536d-42e1-ba70-93c89149b97b"
+	title_zh: "审计Golang FTP库使用情况"
+	solution: <<<SOLUTION
+none
+SOLUTION
+	reference: <<<REFERENCE
+none
+REFERENCE
 )
 
 ftp?{<fullTypeName>?{have: 'github.com/jlaffaye/ftp'}} as $ftp
