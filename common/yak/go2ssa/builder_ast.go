@@ -1645,25 +1645,24 @@ func (b *astbuilder) buildForStmt(stmt *gol.ForStmtContext) {
 			})
 		}
 
-		loop.SetCondition(func() ssa.Value {
-			var condition ssa.Value
-			if cond == nil {
-				condition = b.EmitConstInst(true)
-			} else {
-				// recoverRange := b.SetRange(cond.BaseParserRuleContext)
-				// defer recoverRange()
-				condition, _ = b.buildExpression(cond, false)
-				if condition == nil {
-					condition = b.EmitConstInst(true)
-					// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
-				}
-			}
-			return condition
-		})
 	} else if rangec, ok := stmt.RangeClause().(*gol.RangeClauseContext); ok {
 		b.buildForRangeStmt(rangec, loop)
 	}
-
+	loop.SetCondition(func() ssa.Value {
+		var condition ssa.Value
+		if cond == nil {
+			condition = b.EmitConstInst(true)
+		} else {
+			// recoverRange := b.SetRange(cond.BaseParserRuleContext)
+			// defer recoverRange()
+			condition, _ = b.buildExpression(cond, false)
+			if condition == nil {
+				condition = b.EmitConstInst(true)
+				// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
+			}
+		}
+		return condition
+	})
 	//  build body
 	loop.SetBody(func() {
 		if block, ok := stmt.Block().(*gol.BlockContext); ok {
