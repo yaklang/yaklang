@@ -1617,34 +1617,9 @@ func (b *astbuilder) buildForStmt(stmt *gol.ForStmtContext) {
 	loop := b.CreateLoopBuilder()
 
 	// var cond ssa.Value
-	var cond *gol.ExpressionContext
 	if e, ok := stmt.Expression().(*gol.ExpressionContext); ok {
 		// if only expression; just build expression in header;
-		cond = e
-	} else if condition, ok := stmt.ForClause().(*gol.ForClauseContext); ok {
-		if first, ok := condition.GetInitStmt().(*gol.SimpleStmtContext); ok {
-			// first expression is initialization, in enter block
-			loop.SetFirst(func() []ssa.Value {
-				recoverRange := b.SetRange(first.BaseParserRuleContext)
-				defer recoverRange()
-				return b.buildSimpleStmt(first)
-			})
-		}
-		if expr, ok := condition.Expression().(*gol.ExpressionContext); ok {
-			// build expression in header
-			cond = expr
-		}
-
-		if third, ok := condition.GetPostStmt().(*gol.SimpleStmtContext); ok {
-			// build latch
-			loop.SetThird(func() []ssa.Value {
-				// build third expression in loop.latch
-				recoverRange := b.SetRange(third.BaseParserRuleContext)
-				defer recoverRange()
-				return b.buildSimpleStmt(third)
-			})
-		}
-
+		cond := e
 		loop.SetCondition(func() ssa.Value {
 			var condition ssa.Value
 			if cond == nil {
@@ -1660,10 +1635,54 @@ func (b *astbuilder) buildForStmt(stmt *gol.ForStmtContext) {
 			}
 			return condition
 		})
+	} else if condition, ok := stmt.ForClause().(*gol.ForClauseContext); ok {
+		if first, ok := condition.GetInitStmt().(*gol.SimpleStmtContext); ok {
+			// first expression is initialization, in enter block
+			loop.SetFirst(func() []ssa.Value {
+				recoverRange := b.SetRange(first.BaseParserRuleContext)
+				defer recoverRange()
+				return b.buildSimpleStmt(first)
+			})
+		}
+		if expr, ok := condition.Expression().(*gol.ExpressionContext); ok {
+			// build expression in header
+			cond := expr
+			loop.SetCondition(func() ssa.Value {
+				var condition ssa.Value
+				if cond == nil {
+					condition = b.EmitConstInst(true)
+				} else {
+					// recoverRange := b.SetRange(cond.BaseParserRuleContext)
+					// defer recoverRange()
+					condition, _ = b.buildExpression(cond, false)
+					if condition == nil {
+						condition = b.EmitConstInst(true)
+						// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
+					}
+				}
+				return condition
+			})
+		}
+
+		if third, ok := condition.GetPostStmt().(*gol.SimpleStmtContext); ok {
+			// build latch
+			loop.SetThird(func() []ssa.Value {
+				// build third expression in loop.latch
+				recoverRange := b.SetRange(third.BaseParserRuleContext)
+				defer recoverRange()
+				return b.buildSimpleStmt(third)
+			})
+		}
+
 	} else if rangec, ok := stmt.RangeClause().(*gol.RangeClauseContext); ok {
 		b.buildForRangeStmt(rangec, loop)
+	} else {
+		// for range
+		loop.SetCondition(func() ssa.Value {
+			condition := b.EmitConstInst(true)
+			return condition
+		})
 	}
-
 	//  build body
 	loop.SetBody(func() {
 		if block, ok := stmt.Block().(*gol.BlockContext); ok {
