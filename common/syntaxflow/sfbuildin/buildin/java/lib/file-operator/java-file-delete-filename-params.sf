@@ -1,12 +1,30 @@
 desc(
 	title: "Find Java File Delete Sinks"
-	title_zh: "查找 Java 文件删除接收点",
+	title_zh: "查找 Java 文件删除接收点"
 	type: audit
 	lib: "java-delete-filename-sink"
-	desc: <<<TEXT
-该规则旨在识别 Java 代码中潜在的文件删除接收点（sinks），这些接收点可能会导致敏感文件被删除或未经授权的文件删除。通过检查 `File.delete`、`File.deleteOnExit` 以及 `java.nio.file.Files.delete` 等文件删除方法，可以识别出那些直接从不可信源（如用户输入或外部配置）获取文件名并用于文件删除操作的代码路径。这种不安全的做法可能会使应用程序容易受到任意文件删除漏洞的攻击，从而导致文件丢失或系统瘫痪。
-TEXT
+	desc: <<<DESC
+### 规则目的
+该规则用于查找 Java 代码中可能被攻击者利用的文件删除操作的关键方法调用，识别潜在的文件删除接收点（sinks）。这些接收点是程序中执行文件删除操作的地方，如果其输入的文件名来源于不可信源（如用户输入、外部配置等），就可能导致任意文件删除漏洞。
+
+### 规则详细
+1. **作为基础检测库**
+   属于 `java-delete-filename-sink` 库规则（`lib` 类型），主要用于标识执行文件删除的核心函数，需配合污点分析等其他规则（如用户输入跟踪规则）共同检测任意文件删除漏洞，其本身不直接报告漏洞，而是提供关键的污点传播终点。
+
+2. **覆盖常见文件删除方法**
+   规则检测以下 Java 中常用的文件删除相关方法调用：
+   - `java.io.File.delete()`：删除由此抽象路径名表示的文件或目录。
+   - `java.io.File.deleteOnExit()`：请求在虚拟机终止时删除由此抽象路径名表示的文件或目录。
+   - `java.nio.file.Files.delete(Path path)`：删除指定的文件。
+   - `java.nio.file.Files.deleteIfExists(Path path)`：删除指定的文件（如果存在）。
+DESC
 	rule_id: "63713c0b-d9c9-4720-a270-e4832cfd8dc5"
+	solution: <<<SOLUTION
+none
+SOLUTION
+	reference: <<<REFERENCE
+none
+REFERENCE
 )
 
 // File.delete

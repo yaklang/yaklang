@@ -1,15 +1,69 @@
 desc(
-	title: "SQL query concat or Out-Of-Control in createStatement().executeQuery"
-	title: 'SQL 语句拼接的不安全写法：executeQuery 发生拼接且调用参数直接被参数控制',
+	title: "Detect Java SQL Injection Vulnerability"
+	title: "Detect Java SQL Injection Vulnerability"
 	type: audit
 	severity: mid
 	risk:sqli
-	description: <<<DESC
+	description: <<<DESCRIPTION
 在Java中，SQL语句拼接的不安全写法主要体现在使用字符串拼接来构建SQL查询时，用户输入的参数直接被插入到SQL语句中。
 
 这种做法容易导致SQL注入攻击，攻击者可以通过恶意构造的输入操控SQL查询，从而获取敏感数据或执行未授权的操作。
-DESC
+DESCRIPTION
 	rule_id: "b8ede24d-8ff0-4d81-ab97-903495a6cb61"
+	reference: <<<REFERENCE
+[OWASP - SQL Injection](https://owasp.org/www-community/attacks/SQL_Injection)
+[CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')](https://cwe.mitre.org/data/definitions/89.html)
+[Java SE API - PreparedStatement](https://docs.oracle.com/javase/8/docs/api/java/sql/PreparedStatement.html)
+REFERENCE
+	title_zh: "检测Java SQL注入漏洞"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用参数化查询（PreparedStatement）
+通过预编译SQL语句并绑定用户输入，隔离代码与数据，避免恶意输入篡改逻辑。这是防止SQL注入最有效的方法。
+```java
+// 修复代码示例
+String userInput = request.getParameter("id");
+String sql = "SELECT * FROM users WHERE id = ?";  // 使用占位符
+try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+    // 根据实际情况选择合适的set方法，并进行类型转换/校验
+    pstmt.setInt(1, Integer.parseInt(userInput)); 
+    ResultSet rs = pstmt.executeQuery();
+    // 处理结果集
+}
+```
+
+#### 2. 使用ORM框架
+利用Hibernate、MyBatis等ORM框架提供的安全特性，这些框架通常内置了参数化查询的功能，能够自动处理用户输入，降低SQL注入风险。
+```java
+// MyBatis示例 (XML映射文件)
+<select id="getUserById" resultType="User">
+    SELECT * FROM users WHERE id = #{userId}  <!-- 安全参数占位符 -->
+</select>
+```
+```java
+// 调用代码 (避免直接拼接)
+String userInput = request.getParameter("id");
+User user = sqlSession.selectOne("getUserById", Integer.parseInt(userInput));
+```
+
+#### 3. 输入合法性校验和过滤
+在将用户输入用于构建SQL语句之前，进行严格的输入验证和过滤。例如，对数字类型输入强制转换为int或long，对字符串类型输入进行转义或过滤潜在的恶意字符。
+```java
+// 示例：校验输入为数字且范围合法
+String userInput = request.getParameter("id");
+if (!userInput.matches("^[0-9]+$")) {
+    // 处理非法输入，例如抛出异常或返回错误
+    throw new IllegalArgumentException("ID输入格式不正确");
+}
+int id = Integer.parseInt(userInput);
+// 如果需要，进一步校验数值范围
+if (id < 1 || id > 1000) {
+    throw new IllegalArgumentException("ID超出有效范围");
+}
+// 此时可以将id用于安全的SQL操作（最好是参数化询）
+```
+SOLUTION
 )
 
 .createStatement().executeQuery(,* as $params);

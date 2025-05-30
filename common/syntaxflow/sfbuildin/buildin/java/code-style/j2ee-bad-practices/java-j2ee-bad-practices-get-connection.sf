@@ -1,12 +1,12 @@
 desc(
-	title_zh:"检测Java J2EE 使用getConnection",
-	title:"Check Java J2EE Usage of getConnection"
+	title_zh: "检测Java J2EE 使用DriverManager getConnection"
+	title: "Check Java J2EE Usage of DriverManager getConnection"
 	risk:"代码风格",
 	level: info
-	reference:<<<URL
-    https://docs.oracle.com/javase/8/docs/api/java/sql/DriverManager.html
-URL
-	description:<<<TEXT
+	reference: <<<REFERENCE
+https://docs.oracle.com/javase/8/docs/api/java/sql/DriverManager.html
+REFERENCE
+	description: <<<DESCRIPTION
     J2EE 标准强制要求通过容器资源管理框架获取数据库连接等关键资源。标准实现范式应为：
     ```java
     Context ctx = new InitialContext();
@@ -18,8 +18,113 @@ URL
     Connection conn = DriverManager.getConnection(CONNECT_STRING);
     ```
     主流应用容器已将数据库连接管理（含连接池、事务整合等）深度集成至资源框架。开发者自行实现连接管理不仅需要复刻容器级功能（如异常重试、线程安全），更易引发资源泄漏和事务冲突，此行为已被J2EE规范明确禁止。
-TEXT
+DESCRIPTION
 	rule_id: "219b8265-213b-474f-8a71-a86bfb3d3929"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用JNDI获取数据源
+
+将数据库配置交由应用服务器或容器管理，通过JNDI（Java Naming and Directory Interface）查找并使用容器配置好的 `DataSource`。这是J2EE/Jakarta EE 推荐的标准方式。
+
+```java
+// 修复代码示例：使用 JNDI 获取 DataSource
+import javax.naming.InitialContext;
+import javax.sql.DataSource;
+import java.sql.Connection;
+
+public class SomeDao {
+    private static final String DATA_SOURCE_JNDI_NAME = "jdbc/mydb"; // 容器中配置的JNDI名称
+
+    public void accessDatabase() {
+        Connection conn = null;
+        try {
+            // 1. 获取 InitialContext
+            InitialContext ctx = new InitialContext();
+            // 2. 通过 JNDI 名称查找 DataSource
+            DataSource dataSource = (DataSource) ctx.lookup(DATA_SOURCE_JNDI_NAME);
+            // 3. 从 DataSource 获取连接（连接池管理）
+            conn = dataSource.getConnection();
+
+            // ... 数据库操作 ...
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            // 确保连接被关闭（归还到连接池）
+            if (conn != null) {
+                try {
+                    conn.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+}
+```
+
+#### 2. 使用Spring等框架管理数据源
+
+如果使用Spring框架，应通过Spring的依赖注入（DI）机制配置 `DataSource` Bean，并在DAO层注入使用。
+
+```java
+// Spring配置示例 (applicationContext.xml 或 Java Config)
+/*
+<bean id="dataSource" class="org.apache.commons.dbcp2.BasicDataSource">
+    <property name="driverClassName" value="com.mysql.cj.jdbc.Driver"/>
+    <property name="url" value="jdbc:mysql://localhost:3306/mydb"/>
+    <property name="username" value="user"/>
+    <property name="password" value="password"/>
+    <property name="initialSize" value="5"/>
+    <property name="maxTotal" value="10"/>
+</bean>
+
+<bean id="someDao" class="com.example.SomeDao">
+    <property name="dataSource" ref="dataSource"/>
+</bean>
+*/
+
+// 修复代码示例：在DAO中注入使用 Spring 管理的 DataSource
+import javax.sql.DataSource;
+import java.sql.Connection;
+
+public class SomeDao {
+    private DataSource dataSource;
+
+    // Spring 通过 Setter 注入 DataSource
+    public void setDataSource(DataSource dataSource) {
+        this.dataSource = dataSource;
+    }
+
+    public void accessDatabase() {
+        Connection conn = null;
+        try {
+            // 通过注入的 DataSource 获取连接 (由 Spring 和连接池管理)
+            conn = dataSource.getConnection();
+
+            // ... 数据库操作 ...
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            // 确保连接被关闭（归还到连接池）
+            if (conn != null) {
+                try {
+                    conn.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+}
+```
+
+#### 3. 避免硬编码数据库连接信息
+
+无论使用JNDI还是Spring管理，均应将数据库连接 URL、用户名、密码等敏感信息从代码中移除，配置在应用服务器、properties文件或环境变量中，通过配置方式获取，提高安全性和可维护性。
+SOLUTION
 )
 
 DriverManager?{<typeName>?{have:'java.sql.DriverManager'}}.getConnection() as $get;

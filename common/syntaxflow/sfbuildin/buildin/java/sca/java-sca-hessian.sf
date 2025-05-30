@@ -1,11 +1,61 @@
 desc(
-	title: 'SCA: Checking Java hessian Existed Vulnerabilities'
+	title: "SCA: Check Java Hessian Vulnerability"
 	type: vuln
 	risk: sca
-	desc: <<<TEXT
-此规则旨在检查Java项目中使用的Hessian库是否存在已知的安全漏洞。Hessian是一个轻量级的二进制RPC协议，它允许在不同语言之间执行远程过程调用。然而，某些版本的Hessian存在不安全反序列化漏洞，攻击者可以利用这些漏洞执行远程代码或发起拒绝服务攻击。通过审计项目中Hessian库的版本，可以及时发现并修复这些漏洞，从而提高系统的安全性。
-TEXT
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   Hessian是一个轻量级的二进制RPC协议，用于实现跨语言的远程过程调用。然而，在其部分版本中存在不安全的反序列化漏洞。当应用程序接收并反序列化由攻击者精心构造的二进制数据时，可能触发危险的对象方法调用，从而导致远程代码执行（RCE）或拒绝服务（DoS）等安全问题。
+
+2. **触发场景**
+   该漏洞通常发生在应用程序使用存在漏洞的 Hessian 库版本，并通过网络接收并反序列化不可信的外部数据时。攻击者可以通过发送恶意的序列化数据包来触发漏洞。
+
+   例如，如果项目中使用了受影响版本的 `com.alibaba:hessian-lite` 并对外提供了基于 Hessian 的RPC服务接口，攻击者可以构造恶意请求触发反序列化漏洞。
+
+3. **潜在影响**
+   - **远程代码执行 (RCE)**: 攻击者可能在目标服务器上执行任意代码，完全控制服务器。
+   - **拒绝服务 (DoS)**: 攻击者可能通过构造大量畸形数据导致服务器资源耗尽，服务不可用。
+   - **敏感信息泄露**: 在某些情况下，攻击者可能利用反序列化链读取服务器上的敏感文件内容。
+
+此规则致力于检测Java项目中对 Hessian 库 (包括 `hessian`, `hessian-lite`, `sofa-hessian`, `camel-hessian`, `solon.serialization.hessian`) 的依赖，并识别已知存在不安全反序列化漏洞的版本，以便及时响应和修复。
+DESC
 	rule_id: "0786672a-de59-4a19-8896-206bbded3cf0"
+	title_zh: "SCA: 检测Java Hessian依赖漏洞"
+	solution: <<<SOLUTION
+### 修复建议
+
+1. **升级 Hessian 库版本**
+   将项目中使用的 Hessian 及其相关库升级到不受已知漏洞影响的最新版本。请查阅官方文档或安全公告，确认修复了相关漏洞的版本号。例如：
+   - 对于 `hessian`，升级到高于 4.0.63 的版本。
+   - 对于 `com.alibaba:hessian-lite`，升级到 3.2.13 或更高版本。
+   - 对于 `com.alipay.sofa:hessian`，升级到 3.5.5 或 4.0.3 及更高版本。
+   - 对于 `com.caucho:hessian`，避开 2.5.0 - 2.6.9 和 2.7.0 - 2.7.8 版本区间，升级到修复版本。
+   - 对于 `org.apache.camel:camel-hessian`，升级到 2.19.4 或 2.20.1 及更高版本。
+   - 对于 `org.noear:solon.serialization.hessian`，升级到 2.3.3 或更高版本。
+
+   **Maven 示例如下：**
+   修改 `pom.xml` 文件中的依赖版本。
+   ```xml
+   <dependency>
+       <groupId>com.alibaba</groupId>
+       <artifactId>hessian-lite</artifactId>
+       <version>3.2.13</version>  <!-- 升级到安全版本 -->
+   </dependency>
+   ```
+
+2. **限制反序列化能力**
+   如果业务场景允许，考虑限制可被反序列化的类，采用白名单机制，只允许反序列化已知的、安全的类。这可以通过自定义 `ObjectInputStream` 或利用相关库提供的机制来实现。
+
+3. **避免对不可信来源的数据进行反序列化**
+   设计系统架构时，尽量避免直接对来自不受信任的外部网络或用户输入的数据进行反序列化操作。
+SOLUTION
+	reference: <<<REFERENCE
+[CVE-2021-43297](https://nvd.nist.gov/vuln/detail/CVE-2021-43297)
+[CVE-2022-38371](https://nvd.nist.gov/vuln/detail/CVE-2022-38371)
+[CVE-2022-26136](https://nvd.nist.gov/vuln/detail/CVE-2022-26136)
+[SOFAHessian 反序列化漏洞分析 (CVE-2022-38371, CVE-2022-40728)](https://zhuanlan.zhihu.com/p/574662960)
+REFERENCE
 )
 
 __dependency__.*hessian.version as $ver;

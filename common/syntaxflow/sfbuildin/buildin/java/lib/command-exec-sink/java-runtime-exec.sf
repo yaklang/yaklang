@@ -1,11 +1,26 @@
 desc(
-	title: "Find Runtime.getRuntime().exec Point"
+	title: "Find Java Command Execution Sink"
 	lib: 'java-runtime-exec-sink'
 	type: audit
-	desc: <<<TEXT
-使用 `Runtime.getRuntime().exec()` 方法执行系统命令可能会引发安全漏洞。此方法允许应用程序在运行时执行任意操作系统命令，这可能会被恶意用户利用来执行恶意代码、提升权限或执行未授权的操作。因此，建议避免使用 `Runtime.getRuntime().exec()`，或者在使用时进行严格的输入验证和权限控制，以防止潜在的安全风险。
-TEXT
+	desc: <<<DESC
+### 1.规则目的
+该规则用于审计 Java 代码中可能导致命令执行漏洞的安全风险。它主要关注 `Runtime.getRuntime().exec()` 方法的使用。
+
+### 2.规则详细
+1. **作为基础检测库**
+   属于 `java-runtime-exec-sink` 库规则（`lib` 类型），需配合其他规则（如用户输入跟踪规则）共同检测命令执行漏洞，提供核心方法识别能力。
+
+2. **覆盖高危函数**
+   主要检测 Java 中用于执行系统命令的 `Runtime.getRuntime().exec()` 方法。
+DESC
 	rule_id: "c34fd04b-1d76-4756-91c3-45c63ff1c054"
+	title_zh: "查找 Java 命令执行汇聚点"
+	solution: <<<SOLUTION
+none
+SOLUTION
+	reference: <<<REFERENCE
+none
+REFERENCE
 )
 
 Runtime.getRuntime().exec(,* as $output);

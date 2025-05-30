@@ -1,17 +1,56 @@
 desc(
-	title_zh:"检测Java J2EE 使用socket",
-	title:"Check Java J2EE Usage of 使用socket",
+	title_zh: "审计Java J2EE 使用socket"
+	title: "Audit Java J2EE Usage of Socket"
 	risk:"代码风格",
-	reference:<<<URL
-    http://docs.oracle.com/javase/8/docs/api/java/net/Socket.html
-URL
-	description:<<<TEXT
+	reference: <<<REFERENCE
+http://docs.oracle.com/javase/8/docs/api/java/net/Socket.html
+REFERENCE
+	description: <<<DESCRIPTION
     在 Web 应用程序中直接使用基于套接字的底层通信协议时，尤其是在与陈旧系统集成的场景中，极易引入安全漏洞。开发自定义通信协议需要自行解决输入/输出信号验证、协议版本兼容性、通信通道加密缺失（如未启用 TLS/SSL）、错误处理机制缺陷、防火墙穿透与网络限制规避、会话管理与重放攻击防护等复杂安全问题。即使使用标准协议，若未正确配置安全机制，攻击者仍可借助公开的协议规范和漏洞库发起定向攻击。
     值得注意的是，主流标准协议（如 HTTP/SMTP）通常拥有成熟的漏洞修复方案，而自定义协议缺乏社区支持和持续安全更新。
-TEXT
-	solution:<<<TEXT
-优先采用行业标准协议或框架替代自定义实现，包括但不限于 HTTP/HTTPS（适用于 RESTful API 或 WebSocket）、FTP/SFTP、SMTP/SMTPS、CORBA、RMI/IIOP（Java 场景）、SOAP（企业级 Web 服务）以及 EJB（分布式事务场景）。实施时必须强制启用 TLS/SSL 加密并集成身份验证机制（如 OAuth2/JWT），同时持续监控 CVE 等安全公告以跟踪协议漏洞。建议使用 Netty 或 Apache MINA 等经过实战验证的通信框架处理底层细节，通过渗透测试和代码审计验证实现安全性。对于必须与遗留系统交互的场景，可通过部署 API 网关或协议转换中间件实现风险隔离。
-TEXT
+DESCRIPTION
+	solution: <<<SOLUTION
+### 修复建议
+
+1. **优先使用容器管理的标准通信机制**
+   - 对于Web服务调用，优先使用JAX-RS（RESTful Web Services）或JAX-WS（SOAP-based Web Services）客户端，它们通常利用容器提供的连接池和安全管理能力。
+   - 对于消息传递，使用JMS（Java Message Service）。
+   - 对于数据库访问，使用JTA（Java Transaction API）和JDBC数据源，通过容器管理连接池和事务。
+   - 对于资源适配，使用JCA（Java EE Connector Architecture）。
+
+2. **利用成熟的通信框架**
+   如果必须进行底层网络通信，考虑使用经过广泛验证的通信框架，如 Netty 或 Apache MINA。这些框架提供了事件驱动、异步I/O模型，并内置了对TLS/SSL、连接管理等特性的支持，能显著降低自行实现底层通信的风险。
+   ```java
+   // 示例：使用 Apache HttpClient 代替 Socket 手动构建 HTTP 请求
+   import org.apache.http.client.methods.CloseableHttpResponse;
+   import org.apache.http.client.methods.HttpGet;
+   import org.apache.http.impl.client.CloseableHttpClient;
+   import org.apache.http.impl.client.HttpClients;
+   import javax.servlet.http.HttpServlet;
+   import javax.servlet.http.HttpServletRequest;
+   import javax.servlet.http.HttpServletResponse;
+   import java.io.IOException;
+
+   public class SafeHttpGetServlet extends HttpServlet {
+       @Override
+       protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+           try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+               HttpGet request = new HttpGet("https://example.com");
+               try (CloseableHttpResponse response = httpClient.execute(request)) {
+                   // 处理响应
+                   resp.getWriter().println("Status Code: " + response.getStatusLine().getStatusCode());
+               }
+           }
+       }
+   }
+   ```
+
+3. **强制启用加密和认证**
+   无论使用何种机制，务必强制启用 TLS/SSL 加密通信，并集成适当的身份验证和授权机制，如 OAuth2、JWT 或客户端证书。
+
+4. **通过API网关隔离遗留系统风险**
+   对于必须与采用非标准协议或存在安全风险的遗留系统交互的场景，考虑在应用外部署API网关或协议转换中间件。应用通过标准的、安全的协议与网关通信，由网关负责与遗留系统进行风险交互。
+SOLUTION
 	rule_id: "a6d1d49b-6bd2-4097-a3c9-dfaabe042d54"
 )
 

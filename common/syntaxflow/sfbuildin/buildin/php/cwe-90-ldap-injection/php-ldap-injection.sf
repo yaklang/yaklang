@@ -1,13 +1,73 @@
 desc(
-	title: "LDAP Injection PHP checking"
-	title_zh: "LDAP注入",
+	title: "Check PHP LDAP Injection Vulnerability"
+	title_zh: "检测PHP LDAP注入漏洞"
 	type: vuln
 	severity: mid
 	risk: 'ldap-injection'
-	desc: <<<TEXT
-LDAP注入攻击是一种通过操纵LDAP（轻量目录访问协议）查询来未授权访问或操纵目录服务器数据的攻击方式。在PHP应用中，如果开发者没有正确地对用户输入进行过滤和转义，攻击者可能会构造恶意的LDAP查询，绕过认证机制或获取敏感信息。这种漏洞的危害程度取决于LDAP服务器上存储的数据敏感度以及攻击者能够访问的数据范围。建议开发者对所有用于LDAP查询的用户输入进行严格的验证和转义，使用`ldap_escape`等函数来防止LDAP注入攻击。
-TEXT
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+LDAP注入攻击是一种通过操纵LDAP（轻量目录访问协议）查询来未授权访问或操纵目录服务器数据的攻击方式。在PHP应用中，如果开发者没有正确地对用户输入进行过滤和转义，攻击者可能会构造恶意的LDAP查询，绕过认证机制或获取敏感信息。
+
+2. **触发场景**
+当应用程序从用户接收输入，并在构建LDAP查询时直接将其拼接到查询字符串中，而未对输入进行适当的过滤或转义时，就可能发生LDAP注入。
+
+例如，用户输入的用户名 `*)(cn=*` 会导致 `(&(objectClass=user)(uid=*)(cn=*))` 的查询，这可能导致列出所有用户。
+
+```php
+<?php
+$ldapconn = ldap_connect("localhost");
+if($ldapconn){
+    $user = $_GET["user"];
+    $filter = "(&(objectClass=user)(uid=" . $user . "))"; // 未过滤用户输入直接拼接
+    $dn = "dc=example,dc=org";
+    $result = ldap_search($ldapconn, $dn, $filter);
+    // ...
+}
+?>
+```
+在上述示例中，如果用户输入 `$user` 为 `*)(cn=*`，最终的 `$filter` 将变为 `(&(objectClass=user)(uid=*)(cn=*))`，这会改变查询的逻辑。
+
+3. **潜在影响**
+- 未授权访问LDAP目录中的敏感信息（如用户名、组、证书等）。
+- 修改或删除LDAP目录数据。
+- 绕过认证机制。
+- 在某些情况下，可能导致拒绝服务。
+DESC
 	rule_id: "c773c9e1-71f1-4aed-b71f-68b8e468786f"
+	solution: <<<SOLUTION
+### 修复建议
+
+1. **使用 `ldap_escape` 函数对用户输入进行转义**
+在将用户输入用于构建LDAP查询之前，使用PHP内置的 `ldap_escape` 函数对潜在的特殊字符进行转义，以防止它们被解释为LDAP查询语法。
+
+```php
+<?php
+$ldapconn = ldap_connect("localhost");
+if($ldapconn){
+    $user = $_GET["user"];
+    $escaped_user = ldap_escape($user, "", LDAP_ESCAPE_FILTER); // 使用ldap_escape进行过滤
+    $filter = "(&(objectClass=user)(uid=" . $escaped_user . "))";
+    $dn = "dc=example,dc=org";
+    $result = ldap_search($ldapconn, $dn, $filter);
+    // ...
+}
+?>
+```
+
+2. **实施严格的用户输入验证和过滤**
+除了使用 `ldap_escape` 外，还应该根据预期的输入类型和格式对用户输入进行严格的验证和过滤，例如限制允许的字符、长度等。
+
+3. **使用参数化查询或ORM**
+如果可能，考虑使用支持参数化查询或提供的ORM（对象关系映射）库来与LDAP进行交互。这些工具或方法通常会自带防注入的机制，可以更有效地隔离用户输入和查询逻辑。
+
+4. **最小化LDAP服务权限**
+限制应用程序用于连接LDAP服务的账户权限，遵循最小权限原则，只赋予应用程序完成必要操作的权限，以限制即使发生注入攻击的影响范围。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-90: Improper Neutralization of Special Elements used in an LDAP Query ('LDAP Injection')](https://cwe.mitre.org/data/definitions/90.html)
+REFERENCE
 )
 
 ldap_search(*<slice(start=1)> as $query);
