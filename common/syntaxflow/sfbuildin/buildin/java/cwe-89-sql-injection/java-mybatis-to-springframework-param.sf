@@ -33,8 +33,8 @@ alert $high for {
     level:high,
 }
 desc(
-	language: java,
-	alert_num:1,
+	language: java
+	alert_num:1
 	'file://Controller.java': <<<TEXT
 package com.mycompany.myapp;
 
@@ -138,10 +138,10 @@ TEXT
 )
 
 desc(
-    lang:java,
-    alert_mid:1,
-    alert_high:2,
-    "file://SQLI.java": <<<TEXT
+	lang:java
+	alert_mid:1
+	alert_high:2
+	"file://SQLI.java": <<<TEXT
     package org.joychou.controller;
 
     import org.joychou.mapper.UserMapper;
@@ -194,7 +194,7 @@ desc(
         }
     }
 TEXT
-    "file://UserMapper.java":<<<TEXT
+	"file://UserMapper.java":<<<TEXT
     package org.joychou.mapper;
 
     import org.apache.ibatis.annotations.Mapper;
@@ -222,7 +222,7 @@ TEXT
 
     }
 TEXT
-    "file://UseMapper.xml":<<<TEXT
+	"file://UseMapper.xml":<<<TEXT
     <?xml version="1.0" encoding="UTF-8"?>
     <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 

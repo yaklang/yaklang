@@ -1,8 +1,9 @@
 desc(
 	title: "Find Java Common Filter"
 	title_zh: "查找Java过滤方法",
-	lib: "java-common-filter",
+	lib: "java-common-filter"
 	type: audit
+	rule_id: "ec23bb9d-7756-4c8a-86ff-ce140f205209"
 )
 
 /(?i).*(sanitize|filter|escape|clean|validate|check|secure|scrub|strip|encode|decode|prevent|safe|block|remove|replace|purge|whitelist|blacklist|neutralize|defense|harden|mitigate).*/ as  $output;
