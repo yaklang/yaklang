@@ -4,15 +4,17 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"io"
 	"math/rand/v2"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
 
@@ -130,6 +132,85 @@ type Config struct {
 
 	promptHook     func(string) string
 	generateReport bool
+}
+
+func (c *Config) HandleSearch(query string, items *omap.OrderedMap[string, []string]) ([]*searchtools.KeywordSearchResult, error) {
+	type ToolWithKeywords struct {
+		Name     string `json:"Name"`
+		Keywords string `json:"Keywords"`
+	}
+
+	toolsLists := []ToolWithKeywords{}
+	toolMap := map[string]*aitool.Tool{}
+	items.ForEach(func(key string, value []string) bool {
+		toolsLists = append(toolsLists, ToolWithKeywords{
+			Name:     key,
+			Keywords: strings.Join(value, ", "),
+		})
+		return true
+	})
+	var nonce = strings.ToLower(utils.RandStringBytes(6))
+	prompt, err := c.quickBuildPrompt(__prompt_KeywordSearchPrompt, map[string]any{
+		"NONCE":           nonce,
+		"Memory":          c.memory,
+		"UserRequirement": query,
+		"Tools":           toolsLists,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var callResults []*searchtools.KeywordSearchResult
+
+	err = c.callAiTransaction(prompt, c.callAI, func(response *AIResponse) error {
+		action, err := ExtractActionFromStream(response.GetUnboundStreamReader(false), "keyword_search")
+		if err != nil {
+			log.Errorf("extract aitool-keyword-search action failed: %v", err)
+			return utils.Errorf("extract aitool-keyword-search failed: %v", err)
+		}
+		tools := action.GetInvokeParamsArray("matches")
+		if len(tools) > 0 {
+			for _, toolInfo := range tools {
+				lt, ok := toolMap[toolInfo.GetString("tool")]
+				if !ok {
+					continue
+				}
+				callResults = append(callResults, &searchtools.KeywordSearchResult{
+					Tool:            lt.GetName(),
+					MatchedKeywords: toolInfo.GetStringSlice("matched_keywords"),
+				})
+			}
+			return nil
+		}
+		return utils.Errorf("no tool found")
+	})
+	if err != nil {
+		return nil, err
+	}
+	return callResults, nil
+
+}
+
+func (c *Config) InitToolManager() error {
+	if c.aiToolManager == nil {
+		c.aiToolManager = buildinaitools.NewToolManager(append(c.aiToolManagerOption, buildinaitools.WithSearcher(func(query string, searchList []*aitool.Tool) ([]*aitool.Tool, error) {
+			keywords := omap.NewOrderedMap[string, []string](nil)
+			toolMap := map[string]*aitool.Tool{}
+			for _, tool := range searchList {
+				keywords.Set(tool.GetName(), tool.GetKeywords())
+				toolMap[tool.GetName()] = tool
+			}
+			searchResults, err := c.HandleSearch(query, keywords)
+			if err != nil {
+				return nil, err
+			}
+			tools := []*aitool.Tool{}
+			for _, result := range searchResults {
+				tools = append(tools, toolMap[result.Tool])
+			}
+			return tools, nil
+		}))...)
+	}
+	return nil
 }
 
 func (c *Config) MakeInvokeParams() aitool.InvokeParams {
@@ -583,15 +664,24 @@ func WithAiToolsSearchTool() Option {
 
 func WithAiForgeSearchTool() Option {
 	return func(config *Config) error {
-		forgeSearchTools, err := searchtools.CreateAISearchTools[*schema.AIForge](
-			searchtools.NewKeyWordSearcher[*schema.AIForge](
-				func(prompt string) (io.Reader, error) {
-					rsp, err := config.callAI(NewAIRequest(prompt))
-					if err != nil {
-						return nil, err
-					}
-					return rsp.GetOutputStreamReader("tool", false, config), nil
-				}),
+		forgeSearchTools, err := searchtools.CreateAISearchTools(
+			func(query string, searchList []*schema.AIForge) ([]*schema.AIForge, error) {
+				keywords := omap.NewOrderedMap[string, []string](nil)
+				forgeMap := map[string]*schema.AIForge{}
+				for _, forge := range searchList {
+					keywords.Set(forge.GetName(), forge.GetKeywords())
+					forgeMap[forge.GetName()] = forge
+				}
+				searchResults, err := config.HandleSearch(query, keywords)
+				if err != nil {
+					return nil, err
+				}
+				forges := []*schema.AIForge{}
+				for _, result := range searchResults {
+					forges = append(forges, forgeMap[result.Tool])
+				}
+				return forges, nil
+			},
 			func() []*schema.AIForge {
 				forgeList, err := yakit.GetAllAIForge(consts.GetGormProfileDatabase())
 				if err != nil {
