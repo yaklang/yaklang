@@ -41,6 +41,17 @@ func (b *builder) VisitStatements(stmtList *ast.NodeList) interface{} {
 	recoverRange := b.GetRecoverRange(b.sourceFile, &stmtList.Loc, "")
 	defer recoverRange()
 
+	if b.PreHandler() {
+		for _, statement := range stmtList.Nodes {
+			if ast.IsPrologueDirective(statement) && statement.AsExpressionStatement().Expression.Text() == "use strict" {
+				b.useStrict = true
+			} else {
+				break
+			}
+		}
+		return nil
+	}
+
 	for _, stmt := range stmtList.Nodes {
 		if b.IsStop() {
 			return nil
@@ -316,6 +327,14 @@ func (b *builder) VisitBlock(node *ast.Block) interface{} {
 	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
+	b.SetForceCapture(true)
+	b.syntaxBlockStackDepth++
+	defer func() {
+		b.syntaxBlockStackDepth--
+		if b.syntaxBlockStackDepth == 0 {
+			b.SetForceCapture(false)
+		}
+	}()
 	// 处理代码块中的语句列表
 	if node.Statements != nil && len(node.Statements.Nodes) > 0 {
 		// 使用语法块包装执行
@@ -671,6 +690,20 @@ func (b *builder) VisitLabeledStatement(node *ast.LabeledStatement) interface{} 
 	defer func() {
 		b.contextLabelStack = b.contextLabelStack[:len(b.contextLabelStack)-1]
 	}()
+
+	if node.Statement != nil {
+		if ast.IsBlock(node.Statement) {
+			b.SetForceCapture(true)
+			b.syntaxBlockStackDepth++
+			defer func() {
+				b.syntaxBlockStackDepth--
+				if b.syntaxBlockStackDepth == 0 {
+					b.SetForceCapture(false)
+				}
+			}()
+		}
+	}
+
 	label := b.CreateLabelBlockBuilder(labelName)
 
 	label.SetLabelBlock(func() {
@@ -980,7 +1013,7 @@ func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declTy
 		if isLocal {
 			variable = b.CreateLocalVariable(identifier)
 		} else {
-			variable = b.CreateVariable(identifier)
+			variable = b.CreateJSVariable(identifier)
 		}
 
 		if decl.Initializer != nil { // 定义变量
@@ -1064,7 +1097,7 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 		identifierName := b.VisitIdentifier(node.AsIdentifier())
 		if isLval {
 			if class == nil {
-				return b.CreateVariable(identifierName), nil
+				return b.CreateJSVariable(identifierName), nil
 			}
 			if class.GetNormalMember(identifierName) != nil {
 				obj := b.PeekValue("this")
@@ -1072,15 +1105,11 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 					return b.CreateMemberCallVariable(obj, b.EmitConstInst(identifierName)), nil
 				}
 			}
-			return b.CreateVariable(identifierName), nil
+			return b.CreateJSVariable(identifierName), nil
 		}
 		// undefined 是一个 identifier
 		if identifierName == "undefined" {
 			return nil, b.EmitUndefined("")
-		}
-
-		if value := b.ReadValue(identifierName); value != nil {
-			return nil, value
 		}
 
 		if class != nil {
@@ -1100,7 +1129,11 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 				return nil, value
 			}
 		}
-		return nil, nil
+
+		if value := b.ReadValue(identifierName); value != nil {
+			return nil, value
+		}
+		return nil, ssa.NewUndefined(identifierName)
 	case ast.KindPropertyAccessExpression:
 		propertyAccessExp := node.AsPropertyAccessExpression()
 		obj, propName := b.VisitPropertyAccessExpression(propertyAccessExp)
@@ -1878,9 +1911,6 @@ func (b *builder) VisitPostfixUnaryExpression(node *ast.PostfixUnaryExpression) 
 	switch node.Operator {
 	// 后缀自增(x++)：将操作数加1，但返回原始值
 	case ast.KindPlusPlusToken:
-		// 保存原始值（用于返回）
-		originalValue := b.EmitCall(b.NewCall(b.ReadValue("clone"), []ssa.Value{currentValue}))
-
 		// 计算新值：当前值加1
 		newValue := b.EmitBinOp(ssa.OpAdd, currentValue, b.EmitConstInst(1))
 
@@ -1888,13 +1918,10 @@ func (b *builder) VisitPostfixUnaryExpression(node *ast.PostfixUnaryExpression) 
 		b.AssignVariable(variable, newValue)
 
 		// 返回操作前的原始值
-		return originalValue
+		return currentValue
 
 	// 后缀自减(x--)：将操作数减1，但返回原始值
 	case ast.KindMinusMinusToken:
-		// 保存原始值（用于返回）
-		originalValue := b.EmitCall(b.NewCall(b.ReadValue("clone"), []ssa.Value{currentValue}))
-
 		// 计算新值：当前值减1
 		newValue := b.EmitBinOp(ssa.OpSub, currentValue, b.EmitConstInst(1))
 
@@ -1902,7 +1929,7 @@ func (b *builder) VisitPostfixUnaryExpression(node *ast.PostfixUnaryExpression) 
 		b.AssignVariable(variable, newValue)
 
 		// 返回操作前的原始值
-		return originalValue
+		return currentValue
 
 	default:
 		// 未实现的操作符处理
@@ -2058,7 +2085,7 @@ func (b *builder) VisitFunctionDeclaration(node *ast.FunctionDeclaration) interf
 	b.FunctionBuilder = b.PopFunction()
 
 	// 在当前作用域中创建函数变量
-	variable := b.CreateVariable(funcName)
+	variable := b.CreateJSVariable(funcName)
 	b.AssignVariable(variable, newFunc)
 
 	return nil
@@ -2111,7 +2138,7 @@ func (b *builder) VisitFunctionExpression(node *ast.FunctionExpression) ssa.Valu
 
 	// 如果函数有名称并且在当前作用域中可见，将其加入变量表
 	if funcName != "" {
-		variable := b.CreateVariable(funcName)
+		variable := b.CreateJSVariable(funcName)
 		b.AssignVariable(variable, newFunc)
 	}
 
@@ -2770,7 +2797,7 @@ func (b *builder) ProcessObjectBindingPattern(pattern *ast.BindingPattern, sourc
 				if isLocal {
 					restVar = b.CreateLocalVariable(restName)
 				} else {
-					restVar = b.CreateVariable(restName)
+					restVar = b.CreateJSVariable(restName)
 				}
 				// 直接赋值整个对象
 				b.AssignVariable(restVar, sourceObj)
@@ -2822,7 +2849,7 @@ func (b *builder) ProcessObjectBindingPattern(pattern *ast.BindingPattern, sourc
 			if isLocal {
 				variable = b.CreateLocalVariable(varName)
 			} else {
-				variable = b.CreateVariable(varName)
+				variable = b.CreateJSVariable(varName)
 			}
 			b.AssignVariable(variable, propValue)
 
@@ -2877,7 +2904,7 @@ func (b *builder) ProcessArrayBindingPattern(pattern *ast.BindingPattern, source
 				if isLocal {
 					restVar = b.CreateLocalVariable(restName)
 				} else {
-					restVar = b.CreateVariable(restName)
+					restVar = b.CreateJSVariable(restName)
 				}
 				b.AssignVariable(restVar, sourceArr)
 			}
@@ -2905,7 +2932,7 @@ func (b *builder) ProcessArrayBindingPattern(pattern *ast.BindingPattern, source
 			if isLocal {
 				variable = b.CreateLocalVariable(varName)
 			} else {
-				variable = b.CreateVariable(varName)
+				variable = b.CreateJSVariable(varName)
 			}
 			b.AssignVariable(variable, elementValue)
 

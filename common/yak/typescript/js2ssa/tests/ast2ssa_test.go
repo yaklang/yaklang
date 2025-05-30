@@ -18,6 +18,64 @@ println(a)
 `, []string{"1"}, t)
 }
 
+func TestBasicBlock(t *testing.T) {
+	t.Parallel()
+
+	ssatest.CheckPrintlnValue(`
+{
+	{
+		a = 1
+		println(a)
+	}
+	println(a)
+}
+println(a)
+{
+	println(a)
+}
+`, []string{"1", "1", "1", "1"}, t)
+}
+
+func TestBasicIfBlock(t *testing.T) {
+	t.Parallel()
+
+	ssatest.CheckPrintlnValue(`
+if(cond){
+a=1
+}
+println(a)
+`, []string{"1"}, t)
+}
+
+func TestLabeledBlock(t *testing.T) {
+	t.Parallel()
+
+	code := `
+gg:{
+let b = 999
+	{
+		a = 1
+		println(a)
+	}
+	println(a)
+}
+println(a)
+println(b)
+{
+	println(a)
+}
+`
+	prog, err := ssaapi.Parse(code,
+		ssaapi.WithLanguage("js"),
+	)
+	require.NoError(t, err)
+	// 生成函数的控制流图
+	dot := ssaapi.FunctionDotGraph(prog.Program.Funcs.Values()[0])
+	log.Infof("函数控制流图DOT: \n%s", dot)
+
+	ssatest.CheckPrintlnValue(code, []string{"1", "1", "1", "Undefined-b", "1"}, t)
+}
+
 func TestBigInteger(t *testing.T) {
 	t.Parallel()
 
@@ -1519,7 +1577,7 @@ println(a)
 		dot := ssaapi.FunctionDotGraph(prog.Program.Funcs.Values()[0])
 		log.Infof("函数控制流图DOT: \n%s", dot)
 		ssatest.CheckPrintlnValue(code, []string{
-			"1", "2",
+			"1", "phi(a)[2,2,1]", // not 100
 		}, t)
 	})
 }
@@ -1693,51 +1751,76 @@ func TestLabel(t *testing.T) {
 
 	t.Run("simple label jump outer loop", func(t *testing.T) {
 		codeWithLabel := `
-		outer: for (let i = 0; i < 3; i++) {
-  for (let j = 0; j < 3; j++) {
-	if(foo=2){
-    break outer; // 跳出外层循环
-}
-	a = 0
-  }
-}
-println(a);
-		`
-		codeWithoutLabel := `
-		 for (let i = 0; i < 3; i++) {
-  for (let j = 0; j < 3; j++) {
-	if(foo=2){
-    break;
-}
-	var a = 0
-  }
+outer: for (let i = 0; i < 3; i++) {
+	for (let j = 0; j < 3; j++) {
+		if (foo == 2) {
+			break outer; // 跳出外层循环
+		}
+		a = 0
+	}
 }
 println(a);
 `
-		testSet := []string{codeWithLabel, codeWithoutLabel}
-		for _, code := range testSet {
-			prog, err := ssaapi.Parse(code,
-				ssaapi.WithLanguage("js"),
-			)
-			require.NoError(t, err)
-			log.Info(ssaapi.FunctionDotGraph(prog.Program.Funcs.Values()[0]))
-			ssatest.CheckPrintlnValue(code, []string{"Undefined-a"}, t)
+
+		codeWithLabelNoBreakLabel := `
+outer: for (let i = 0; i < 3; i++) {
+	for (let j = 0; j < 3; j++) {
+		if (foo = 2) {
+			break;
 		}
+		a = 0
+	}
+}
+println(a);
+`
+
+		codeWithoutLabel := `
+for (let i = 0; i < 3; i++) {
+	for (let j = 0; j < 3; j++) {
+		if (foo == 2) {
+			break;
+		}
+		a = 0
+	}
+}
+println(a);
+`
+
+		prog, err := ssaapi.Parse(codeWithoutLabel,
+			ssaapi.WithLanguage("js"),
+		)
+		require.NoError(t, err)
+		log.Info(ssaapi.FunctionDotGraph(prog.Program.Funcs.Values()[0]))
+		ssatest.CheckPrintlnValue(codeWithoutLabel, []string{"phi(a)[0,Undefined-a]"}, t)
+
+		prog, err = ssaapi.Parse(codeWithLabelNoBreakLabel,
+			ssaapi.WithLanguage("js"),
+		)
+		require.NoError(t, err)
+		log.Info(ssaapi.FunctionDotGraph(prog.Program.Funcs.Values()[0]))
+		ssatest.CheckPrintlnValue(codeWithLabelNoBreakLabel, []string{"phi(a)[0,Undefined-a]"}, t)
+
+		prog, err = ssaapi.Parse(codeWithLabel,
+			ssaapi.WithLanguage("js"),
+		)
+		require.NoError(t, err)
+		log.Info(ssaapi.FunctionDotGraph(prog.Program.Funcs.Values()[0]))
+		ssatest.CheckPrintlnValue(codeWithLabel, []string{"Undefined-a"}, t)
 
 	})
 
 	t.Run("simple label jump outer block", func(t *testing.T) {
 		code := `
 		process: {
-  
-    break process; // 跳出 block，阻止继续执行后续语句
-  	a = 0
-println(a);
-println(a);
-println(a);
-println(a);
-
-}
+			break process; // 跳出 block，阻止继续执行后续语句
+			a = 0
+			println(a);
+			println(a);
+			a = 2
+			println(a);
+			println(a);
+			a = 3
+		}
 println(a);
 		`
 		prog, err := ssaapi.Parse(code,
@@ -1758,7 +1841,8 @@ var k = 1
     outer3: for (let k = 0; k < 3; k++) {
       console.log("outer3:", k);
       if (k == 1) {
-        break outer2; // 直接跳出 outer2，outer3 也随之结束
+        break outer1; // 直接跳出outer1, outer2，outer3 也随之结束
+		k = 2
       }
     }
   }
@@ -1770,7 +1854,7 @@ println(k)
 		)
 		require.NoError(t, err)
 		log.Info(ssaapi.FunctionDotGraph(prog.Program.Funcs.Values()[0]))
-		ssatest.CheckPrintlnValue(code, []string{"Undefined-a"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
 	})
 
 }

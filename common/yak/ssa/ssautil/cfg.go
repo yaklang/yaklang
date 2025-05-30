@@ -464,7 +464,7 @@ func NewLabelBlockStmt[T versionedValue](enter ScopedVersionedTableIF[T], name s
 		enter: enter,
 		name:  name,
 	}
-	l.labeledBlock = l.enter.CreateShadowScope()
+	l.labeledBlock = l.enter.CreateSubScope()
 	return l
 }
 
@@ -474,15 +474,15 @@ func (l *LabelBlockStmt[T]) SetLabelBlock(f func(ScopedVersionedTableIF[T]) Scop
 }
 
 func (l *LabelBlockStmt[T]) Build(mergeEnd MergeHandle[T]) ScopedVersionedTableIF[T] {
-	//end := l.labeledBlock.CreateShadowScope()
-	//end.Merge(
-	//	true, true,
-	//	mergeEnd,
-	//	l.MergeToEnd...,
-	//)
+	end := l.enter.CreateShadowScope()
 
-	l.enter.CoverBy(l.labeledBlock)
-	return l.enter
+	end.CoverBy(l.labeledBlock)
+	end.Merge(
+		false, true,
+		mergeEnd,
+		l.MergeToEnd...,
+	)
+	return end
 }
 
 func (l *LabelBlockStmt[T]) Break(from ScopedVersionedTableIF[T]) {

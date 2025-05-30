@@ -105,3 +105,10 @@ func (b *builder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
 	b.FunctionBuilder = s.Current
 	b.LoadFunctionBuilder(s.Store)
 }
+
+func (b *builder) CreateJSVariable(identifierName string) *ssa.Variable {
+	if b.useStrict {
+		return b.CreateLocalVariable(identifierName)
+	}
+	return b.CreateVariable(identifierName)
+}

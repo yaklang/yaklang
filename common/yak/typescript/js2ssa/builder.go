@@ -19,15 +19,14 @@ type builder struct {
 	*ssa.FunctionBuilder
 	sourceFile *ast.SourceFile
 
-	contextLabelStack []string
+	useStrict             bool
+	syntaxBlockStackDepth int
+	contextLabelStack     []string
 }
 
 var Builder ssa.Builder = &SSABuilder{}
 
 func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
-	if b.PreHandler() {
-		return nil
-	}
 	jsAST, err := Frontend(src, force)
 	if err != nil {
 		return err
