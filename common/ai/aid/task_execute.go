@@ -49,9 +49,10 @@ func (t *aiTask) execute() error {
 			if directlyAnswer == "" {
 				return utils.Errorf("error: direct answer is empty, retry it until direct answer finished")
 			}
+			t.config.ProcessExtendedActionCallback(directlyAnswer)
 			directlyAnswerLong = action.GetString("direct_answer_long")
 			if directlyAnswerLong == "" {
-				return utils.Errorf("error: direct answer long is empty, retry it until direct answer finished")
+				log.Errorf("error: direct answer long is empty, retry it until direct answer finished")
 			}
 			t.config.EmitInfo("task[%v] finished, directly answer: %v", t.Name, directlyAnswer)
 		} else if action.GetString("@action") == "require-tool" {

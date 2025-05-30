@@ -1,11 +1,12 @@
 package yakgrpc
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/jsonextractor"
 	"math/rand"
 	"os"
 	"strings"
@@ -514,7 +515,17 @@ func TestAITaskForgeTriage(t *testing.T) {
 			break
 		}
 		if event.Type == aid.EVENT_TYPE_REQUIRE_USER_INTERACTIVE {
-			spew.Dump(event)
+			eventId := ""
+			jsonextractor.ExtractStructuredJSONFromStream(bytes.NewReader(event.Content), jsonextractor.WithObjectCallback(func(data map[string]any) {
+				if id, ok := data["id"]; ok {
+					eventId = id.(string)
+				}
+			}))
+			stream.Send(&ypb.AIInputEvent{
+				IsInteractiveMessage: true,
+				InteractiveId:        eventId,
+				InteractiveJSONInput: `{"suggestion": "xss"}`,
+			})
 		}
 	}
 }

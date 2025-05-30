@@ -11,16 +11,16 @@ plan = <<<plandata
   "main_task_goal": "根据用户输入和任务上下文信息，识别意图，推荐合适的ai forge。",
   "tasks": [
     {
-      "subtask_name": "总结提炼用户需求",
-      "subtask_goal": "分析用户输入的输入以及系统收集的上下文信息，总结出用户的需要。"
-    },
-    {
       "subtask_name": "搜索forge",
-      "subtask_goal": "根据上一步总结的需要，调用搜索工具，查询推荐的forge"
+      "subtask_goal": "分析用户输入的输入以及系统收集的上下文信息，总结出用户的需要。根据总结的需要，调用搜索工具，查询推荐的forge，注意只查询一次即可"
     },
     {
       "subtask_name": "询问用户",
-      "subtask_goal": "根据上一步的输出，调用工具向用户询问是否有符合要求的forge"
+      "subtask_goal": "根据上一步的输出，调用require-user-interact工具向用户询问是否有符合要求的forge"
+    },
+    {
+       "subtask_name": "输出结果",
+       "subtask_goal": "若上一步用户选择了forge，则输出使用提示词中定义的jsonschema额外输出一份结果json要求有准确的forage名"
     }
   ]
 }
@@ -28,8 +28,9 @@ plan = <<<plandata
 plandata
 
 persis = <<<persistent
-你是一个用户意图识别器，你需要做的事情是，根据历史上下文信息，以及用户的输入，识别用户的意图，向用户推荐合适的ai forge。
-注意事项：如果用户选择了一个forge请输出符合下列jsonschema要求的json。
+你是一个用户意图识别器，你需要做的事情是，根据上下文信息和用户的初始输入，识别用户的意图，向用户推荐合适的ai forge。
+1.**快速处理**：在执行每一步的时候不要多次调用工具，根据任务的目标描述调用工具即可结束子任务
+2.**结果输出**：如果在调用 require-user-interact 用户选择了一个forge请额外输出符合下列jsonschema要求的json。
 {
 "$schema": "http://json-schema.org/draft-07/schema#",
 "type": "object",
