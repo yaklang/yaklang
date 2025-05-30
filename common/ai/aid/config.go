@@ -501,6 +501,7 @@ func WithMemory(m *Memory) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
+		m.ClearRuntimeConfig()
 		config.memory = m
 		return nil
 	}
