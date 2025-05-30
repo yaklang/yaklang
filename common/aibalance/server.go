@@ -116,14 +116,113 @@ func NewEntrypoints() *Entrypoints {
 	}
 }
 
-// PeekProvider returns a random provider for the given model
+// PeekProvider returns a provider for the given model based on latency-weighted random selection
 func (e *Entrypoints) PeekProvider(model string) *Provider {
 	providers, ok := e.providers[model]
 	if !ok || len(providers) == 0 {
 		return nil
 	}
-	// Return the first provider
-	return providers[0]
+
+	// 过滤出健康的提供者（延迟小于10秒）
+	var healthyProviders []*Provider
+	var totalWeight float64
+	weights := make([]float64, 0, len(providers))
+
+	for _, p := range providers {
+		if p.DbProvider == nil {
+			continue
+		}
+
+		// 检查提供者是否健康（延迟小于10秒）
+		if p.DbProvider.IsHealthy && p.DbProvider.LastLatency > 0 && p.DbProvider.LastLatency < 10000 {
+			healthyProviders = append(healthyProviders, p)
+			// 使用延迟的倒数作为权重，延迟越低权重越高
+			weight := 1.0 / float64(p.DbProvider.LastLatency)
+			weights = append(weights, weight)
+			totalWeight += weight
+		}
+	}
+
+	// 如果没有健康的提供者，返回 nil
+	if len(healthyProviders) == 0 {
+		return nil
+	}
+
+	// 如果只有一个健康的提供者，直接返回
+	if len(healthyProviders) == 1 {
+		return healthyProviders[0]
+	}
+
+	// 生成随机数
+	r := utils.RandFloat64() * totalWeight
+
+	// 根据权重选择提供者
+	var cumulativeWeight float64
+	for i, weight := range weights {
+		cumulativeWeight += weight
+		if r <= cumulativeWeight {
+			return healthyProviders[i]
+		}
+	}
+
+	// 如果由于浮点数精度问题没有选中任何提供者，返回最后一个
+	return healthyProviders[len(healthyProviders)-1]
+}
+
+// PeekOrderedProviders returns providers for the given model in random order
+// Only returns providers with latency < 10s, randomly shuffled
+func (e *Entrypoints) PeekOrderedProviders(model string) []*Provider {
+	providers, ok := e.providers[model]
+	if !ok || len(providers) == 0 {
+		log.Debugf("No providers found for model: %s", model)
+		return nil
+	}
+
+	log.Debugf("PeekOrderedProviders for model %s: found %d providers", model, len(providers))
+
+	// 过滤出延迟小于10秒的提供者
+	var validProviders []*Provider
+	for _, p := range providers {
+		if p.DbProvider == nil {
+			log.Debugf("Provider %s skipped (no DbProvider)", p.TypeName)
+			continue
+		}
+
+		// 只保留延迟小于10秒的提供者
+		if p.DbProvider.LastLatency > 0 && p.DbProvider.LastLatency < 10000 {
+			validProviders = append(validProviders, p)
+			log.Debugf("Provider %s accepted (latency: %dms, healthy: %v)",
+				p.TypeName, p.DbProvider.LastLatency, p.DbProvider.IsHealthy)
+		} else {
+			log.Debugf("Provider %s filtered out (latency: %dms >= 10s or no latency data)",
+				p.TypeName, p.DbProvider.LastLatency)
+		}
+	}
+
+	if len(validProviders) == 0 {
+		log.Debugf("No valid providers found for model %s (all have latency >= 10s)", model)
+		return nil
+	}
+
+	log.Debugf("Found %d valid providers (latency < 10s) for model %s", len(validProviders), model)
+
+	// 使用 Fisher-Yates 洗牌算法完全随机打乱
+	shuffledProviders := make([]*Provider, len(validProviders))
+	copy(shuffledProviders, validProviders)
+
+	for i := len(shuffledProviders) - 1; i > 0; i-- {
+		j := int(utils.RandFloat64() * float64(i+1))
+		shuffledProviders[i], shuffledProviders[j] = shuffledProviders[j], shuffledProviders[i]
+	}
+
+	// 输出随机排序结果
+	log.Debugf("Randomly shuffled providers for model %s:", model)
+	for i, p := range shuffledProviders {
+		log.Debugf("  %d. %s (latency: %dms, healthy: %v)",
+			i+1, p.TypeName, p.DbProvider.LastLatency, p.DbProvider.IsHealthy)
+	}
+
+	return shuffledProviders
 }
 
 // GetAllProviders returns all providers for the given model
@@ -365,187 +464,226 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 
 	c.logInfo("Key[%v] requesting model %s, starting to forward request", key.Key, modelName)
 	_ = model
-	provider := c.Entrypoints.PeekProvider(modelName)
-	if provider == nil {
-		c.logError("No provider found for model %s", modelName)
-		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 404 Not Found\r\nX-Reason: no provider found, contact admin to add provider for %v\r\n\r\n", modelName)))
+
+	// 使用 PeekOrderedProviders 获取按优先级排序的提供者列表
+	providers := c.Entrypoints.PeekOrderedProviders(modelName)
+	if len(providers) == 0 {
+		c.logError("No valid providers found for model %s (all providers have latency >= 10s)", modelName)
+		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 404 Not Found\r\nX-Reason: no valid provider found for %v, all providers have high latency\r\n\r\n", modelName)))
 		return
 	}
 
-	c.logInfo("Found provider for model %s: %s", modelName, provider.TypeName)
-	c.logInfo("Starting to call AI chat interface")
+	c.logInfo("Found %d valid providers for model %s, trying in order", len(providers), modelName)
 
-	sendHeaderOnce := sync.Once{}
-	sendHeader := func() {
-		c.logInfo("Successfully obtained AI client, starting to send response header")
-		var header string
-		header = "HTTP/1.1 200 OK\r\n" +
-			"Content-Type: application/json\r\n" +
-			"Transfer-Encoding: chunked\r\n" +
-			"\r\n"
-		_, err := conn.Write([]byte(header))
-		if err != nil {
-			c.logError("Failed to send response header: %v", err)
+	// 尝试每个提供者，直到有一个成功
+	var successfulProvider *Provider
+	var lastError error
+	for i, provider := range providers {
+		c.logInfo("Trying provider %d/%d for model %s: %s", i+1, len(providers), modelName, provider.TypeName)
+
+		sendHeaderOnce := sync.Once{}
+		sendHeader := func() {
+			c.logInfo("Successfully obtained AI client, starting to send response header")
+			var header string
+			header = "HTTP/1.1 200 OK\r\n" +
+				"Content-Type: application/json\r\n" +
+				"Transfer-Encoding: chunked\r\n" +
+				"\r\n"
+			_, err := conn.Write([]byte(header))
+			if err != nil {
+				c.logError("Failed to send response header: %v", err)
+			}
+			c.logInfo("Response header sent, bytes: %d", len(header))
+			utils.FlushWriter(conn)
 		}
-		c.logInfo("Response header sent, bytes: %d", len(header))
-		utils.FlushWriter(conn)
-	}
-	pr, pw := utils.NewBufPipe(nil)
-	rr, rw := utils.NewBufPipe(nil)
+		pr, pw := utils.NewBufPipe(nil)
+		rr, rw := utils.NewBufPipe(nil)
 
-	// baseCtx, cancel := context.WithCancel(context.Background())
+		writer := NewChatJSONChunkWriter(conn, key.Key, modelName)
+		client, err := provider.GetAIClient(func(reader io.Reader) {
+			defer func() {
+				pw.Close()
+				c.logInfo("Finished handling AI response stream(output)")
+			}()
+			c.logInfo("Start to handle AI response stream")
+			sendHeaderOnce.Do(sendHeader)
+			io.Copy(pw, reader)
+		}, func(reader io.Reader) {
+			defer func() {
+				rw.Close()
+				c.logInfo("Finished handling AI response stream(reason)")
+			}()
+			c.logInfo("Start to handle AI response stream(reason)")
+			sendHeaderOnce.Do(sendHeader)
+			io.Copy(rw, reader)
+			utils.FlushWriter(writer.writerClose)
+		})
+		if err != nil {
+			c.logError("Failed to get AI client from provider %s: %v", provider.TypeName, err)
+			lastError = err
+			continue // 尝试下一个提供者
+		}
 
-	writer := NewChatJSONChunkWriter(conn, key.Key, modelName)
-	client, err := provider.GetAIClient(func(reader io.Reader) {
-		defer func() {
-			pw.Close()
-			c.logInfo("Finished handling AI response stream(output)")
+		// 启动 AI 聊天请求
+		chatCompleted := make(chan error, 1)
+		go func() {
+			c.logInfo("start to call ai chat interface with prompt len: %d", prompt.Len())
+			finalMsg, err := client.Chat(prompt.String())
+			if err != nil {
+				c.logError("AI chat interface call failed: %v", err)
+				chatCompleted <- err
+				return
+			}
+			c.logInfo("AI chat interface call completed, final: %v", utils.ShrinkString(finalMsg, 100))
+			chatCompleted <- nil
 		}()
-		c.logInfo("Start to handle AI response stream")
-		sendHeaderOnce.Do(sendHeader)
-		io.Copy(pw, reader)
-	}, func(reader io.Reader) {
-		defer func() {
-			rw.Close()
-			c.logInfo("Finished handling AI response stream(reason)")
+
+		wg := new(sync.WaitGroup)
+		wg.Add(2)
+
+		reasonWriter := writer.GetReasonWriter()
+		outputWriter := writer.GetOutputWriter()
+
+		// Handle reason stream
+		start := time.Now()
+		firstByteDuration := time.Duration(0)
+		fonce := sync.Once{}
+		totalBytes := new(int64)
+
+		go func() {
+			defer func() {
+				c.logInfo("Finished forwarding AI response stream(reason)")
+				wg.Done()
+			}()
+			c.logInfo("Start to handle reason mirror stream")
+			n, err := io.Copy(reasonWriter, io.TeeReader(rr, utils.FirstWriter(func(p []byte) {
+				fonce.Do(func() {
+					firstByteDuration = time.Since(start)
+				})
+			})))
+			if err != nil {
+				c.logError("Failed to copy reason stream: %v", err)
+			}
+			atomic.AddInt64(totalBytes, n)
+			c.logInfo("Reason stream copy completed, bytes: %d", n)
 		}()
-		c.logInfo("Start to handle AI response stream(reason)")
-		sendHeaderOnce.Do(sendHeader)
-		io.Copy(rw, reader)
+
+		// Handle output stream
+		go func() {
+			defer func() {
+				c.logInfo("Finished forwarding AI response stream(output)")
+				wg.Done()
+			}()
+			c.logInfo("Start to handle output mirror stream")
+			n, err := io.Copy(outputWriter, io.TeeReader(pr, utils.FirstWriter(func(p []byte) {
+				fonce.Do(func() {
+					firstByteDuration = time.Since(start)
+				})
+			})))
+			atomic.AddInt64(totalBytes, n)
+			if err != nil {
+				c.logError("Failed to copy output stream: %v", err)
+			}
+			c.logInfo("Output stream copy completed, bytes: %d", n)
+		}()
+
+		// Wait for all stream processing to complete
+		wg.Wait()
 		utils.FlushWriter(writer.writerClose)
-	})
-	if err != nil {
-		c.logError("Failed to get AI client: %v", err)
-		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\nX-Reason: %v\r\n\r\n", err)))
+
+		if !stream {
+			body = writer.GetNotStreamBody()
+			cwr := httputil.NewChunkedWriter(conn)
+			cwr.Write(body)
+			cwr.Close()
+			utils.FlushWriter(cwr)
+			utils.FlushWriter(conn)
+		}
+
+		endDuration := time.Since(start)
+		total := atomic.LoadInt64(totalBytes)
+		requestSucceeded := total > 0 // Determine actual request success based on data received
+
+		// 检查聊天请求是否成功完成
+		select {
+		case chatErr := <-chatCompleted:
+			if chatErr != nil {
+				c.logError("Provider %s chat failed: %v", provider.TypeName, chatErr)
+				lastError = chatErr
+				// 更新失败的提供者状态
+				latencyMs := firstByteDuration.Milliseconds()
+				go func() {
+					if err := provider.UpdateDbProvider(false, latencyMs); err != nil {
+						c.logError("Failed to update failed provider status: %v", err)
+					}
+				}()
+				continue // 尝试下一个提供者
+			}
+		default:
+			// 如果聊天还在进行中，检查是否有数据传输
+			if !requestSucceeded {
+				c.logWarn("No data received from provider %s for model %s", provider.TypeName, modelName)
+				lastError = fmt.Errorf("no data received from provider")
+				// 更新失败的提供者状态
+				latencyMs := firstByteDuration.Milliseconds()
+				go func() {
+					if err := provider.UpdateDbProvider(false, latencyMs); err != nil {
+						c.logError("Failed to update failed provider status: %v", err)
+					}
+				}()
+				continue // 尝试下一个提供者
+			}
+		}
+
+		// 如果到达这里，说明当前提供者成功了
+		successfulProvider = provider
+		c.logInfo("Provider %s successfully handled the request for model %s", provider.TypeName, modelName)
+
+		// Update successful provider status
+		latencyMs := firstByteDuration.Milliseconds()
+		providerHealthy := firstByteDuration > 0 && firstByteDuration <= 10*time.Second
+		go func() {
+			if err := provider.UpdateDbProvider(providerHealthy, latencyMs); err != nil {
+				c.logError("Failed to update provider status: %v", err)
+			} else {
+				c.logInfo("Provider status updated: healthy=%v (based on <=10s first byte), latency=%dms. Actual request success: %v",
+					providerHealthy, latencyMs, requestSucceeded)
+			}
+		}()
+
+		// Update API Key statistics using actual success
+		go func() {
+			inputBytes := int64(prompt.Len())
+			outputBytes := total
+			if err := UpdateAiApiKeyStats(key.Key, inputBytes, outputBytes, requestSucceeded); err != nil {
+				c.logError("Failed to update API key statistics: %v", err)
+			} else {
+				c.logInfo("API key statistics updated: key=%s, input=%d bytes, output=%d bytes, success=%v",
+					utils.ShrinkString(key.Key, 8), inputBytes, outputBytes, requestSucceeded)
+			}
+		}()
+
+		bandwidth := float64(0)
+		if endDuration.Seconds() > 0 {
+			bandwidth = float64(total) / endDuration.Seconds() / 1024
+		}
+		c.logInfo("Response completed (Success: %v), first byte duration: %v, end duration: %v, bandwidth: %.2fkbps, total bytes: %d",
+			requestSucceeded, firstByteDuration, endDuration, bandwidth, total)
+
+		writer.Close()
+		utils.FlushWriter(conn)
+		writer.Wait()
+		break // 成功处理，退出循环
+	}
+
+	// 如果所有提供者都失败了
+	if successfulProvider == nil {
+		c.logError("All providers failed for model %s, last error: %v", modelName, lastError)
+		errorMsg := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\nX-Reason: all providers failed for %v, last error: %v\r\n\r\n", modelName, lastError)
+		conn.Write([]byte(errorMsg))
 		return
 	}
-	go func() {
-		c.logInfo("start to call ai chat interface with prompt len: %d", prompt.Len())
-		finalMsg, err := client.Chat(prompt.String())
-		if err != nil {
-			c.logError("AI chat interface call failed: %v", err)
-			return
-		}
-		c.logInfo("AI chat interface call completed, final: %v", utils.ShrinkString(finalMsg, 100))
-		_ = finalMsg
-	}()
 
-	wg := new(sync.WaitGroup)
-	wg.Add(2)
-
-	reasonWriter := writer.GetReasonWriter()
-	outputWriter := writer.GetOutputWriter()
-
-	// Handle reason stream
-	start := time.Now()
-	firstByteDuration := time.Duration(0)
-	fonce := sync.Once{}
-	totalBytes := new(int64)
-
-	go func() {
-		defer func() {
-			c.logInfo("Finished forwarding AI response stream(reason)")
-			wg.Done()
-		}()
-		c.logInfo("Start to handle reason mirror stream")
-		n, err := io.Copy(reasonWriter, io.TeeReader(rr, utils.FirstWriter(func(p []byte) {
-			fonce.Do(func() {
-				firstByteDuration = time.Since(start)
-			})
-		})))
-		if err != nil {
-			c.logError("Failed to copy reason stream: %v", err)
-		}
-		atomic.AddInt64(totalBytes, n)
-		c.logInfo("Reason stream copy completed, bytes: %d", n)
-	}()
-
-	// Handle output stream
-	go func() {
-		defer func() {
-			c.logInfo("Finished forwarding AI response stream(output)")
-			wg.Done()
-		}()
-		c.logInfo("Start to handle output mirror stream")
-		n, err := io.Copy(outputWriter, io.TeeReader(pr, utils.FirstWriter(func(p []byte) {
-			fonce.Do(func() {
-				firstByteDuration = time.Since(start)
-			})
-		})))
-		atomic.AddInt64(totalBytes, n)
-		if err != nil {
-			c.logError("Failed to copy output stream: %v", err)
-		}
-		c.logInfo("Output stream copy completed, bytes: %d", n)
-	}()
-
-	// Wait for all stream processing to complete
-	wg.Wait()
-	utils.FlushWriter(writer.writerClose)
-
-	if !stream {
-		body = writer.GetNotStreamBody()
-		cwr := httputil.NewChunkedWriter(conn)
-		cwr.Write(body)
-		cwr.Close()
-		utils.FlushWriter(cwr)
-		utils.FlushWriter(conn)
-	}
-
-	endDuration := time.Since(start)
-	total := atomic.LoadInt64(totalBytes)
-	requestSucceeded := total > 0 // Determine actual request success based on data received
-	if !requestSucceeded {
-		// Log and write error only if no data was received
-		c.logWarn("No data received from provider for model %s, key: %s", modelName, utils.ShrinkString(key.Key, 8))
-		// writer.WriteError(fmt.Errorf("no data received from provider")) // Avoid writing error here if connection closed normally
-	}
-
-	// Update provider status
-	latencyMs := firstByteDuration.Milliseconds()
-	// Provider is considered healthy if the first byte arrived within 10 seconds
-	providerHealthy := firstByteDuration > 0 && firstByteDuration <= 10*time.Second
-	if !providerHealthy && !requestSucceeded {
-		c.logWarn("Provider for model %s deemed unhealthy: No data received and first byte latency > 10s (or 0)", modelName)
-	} else if !providerHealthy && requestSucceeded {
-		c.logWarn("Provider for model %s deemed unhealthy despite success: First byte latency > 10s (%v)", modelName, firstByteDuration)
-	}
-
-	go func() {
-		// Pass 'providerHealthy' status and latency to update function
-		if err := provider.UpdateDbProvider(providerHealthy, latencyMs); err != nil {
-			c.logError("Failed to update provider status: %v", err)
-		} else {
-			// Log both actual success and the health status passed
-			c.logInfo("Provider status updated: healthy=%v (based on <=10s first byte), latency=%dms. Actual request success: %v",
-				providerHealthy, latencyMs, requestSucceeded)
-		}
-	}()
-
-	// Update API Key statistics using actual success
-	go func() {
-		inputBytes := int64(prompt.Len())
-		outputBytes := total // Use the calculated total
-		// Pass 'requestSucceeded' for API key stats
-		if err := UpdateAiApiKeyStats(key.Key, inputBytes, outputBytes, requestSucceeded); err != nil {
-			c.logError("Failed to update API key statistics: %v", err)
-		} else {
-			c.logInfo("API key statistics updated: key=%s, input=%d bytes, output=%d bytes, success=%v",
-				utils.ShrinkString(key.Key, 8), inputBytes, outputBytes, requestSucceeded)
-		}
-	}()
-
-	bandwidth := float64(0)
-	if endDuration.Seconds() > 0 {
-		bandwidth = float64(total) / endDuration.Seconds() / 1024
-	}
-	// Log actual success here too
-	c.logInfo("Response completed (Success: %v), first byte duration: %v, end duration: %v, bandwidth: %.2fkbps, total bytes: %d",
-		requestSucceeded, firstByteDuration, endDuration, bandwidth, total)
-
-	writer.Close()
-	utils.FlushWriter(conn)
-	writer.Wait()
 	conn.Close()
 	c.logInfo("Connection closed for %s", conn.RemoteAddr())
 }
