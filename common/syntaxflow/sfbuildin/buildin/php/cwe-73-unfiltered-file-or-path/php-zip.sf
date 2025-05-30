@@ -1,13 +1,129 @@
 desc(
-	title: 'zip operator'
-	title_zh: "文件压缩/文件解压(原生)",
+	title: "Detect PHP Zip Path Traversal Vulnerability"
+	title_zh: "检测PHP Zip文件路径遍历漏洞"
 	type: vul
 	level: low
 	risk: "zip operator"
-	desc: <<<CODE
-    zip操作是Web应用程序中常见的功能，如果未经过充分的安全检查，可能会导致文件路径遍历（Path Traversal）漏洞。攻击者可以通过构造恶意文件路径，访问或修改服务器上的敏感文件，进而导致信息泄露、文件损坏等安全问题。在PHP应用程序中，如果开发者未能正确验证或过滤用户输入的文件路径，可能会导致文件路径遍历漏洞。建议对zip操作功能进行严格的安全检查，包括验证文件路径的合法性、长度、字符等，并确保zip操作不会导致未经授权的访问或执行。
-CODE
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+文件路径遍历（Path Traversal），又称目录穿越（Directory Traversal），是一种安全漏洞，攻击者利用应用程序对用户输入过滤不足的缺陷，通过构造包含特殊字符（如 `../` 或 `..\`）的恶意路径，访问或操纵本不应该被他们访问的文件或目录。在处理ZIP文件时，如果应用程序直接使用用户提供的或者ZIP文件中包含的文件名解压文件，而未对其中的路径进行充分检查和过滤，则攻击者可以将文件解压到任意目录，覆盖现有文件或创建新的文件，从而导致信息泄露、远程代码执行、拒绝服务等严重后果。
+
+2. **触发场景**
+当PHP应用程序使用 `ZipArchive::open()`、`ZipArchive::addFile()` 或 `ZipArchive::addGlob()` 等函数处理用户上传或用户可控的ZIP文件时，如果未对文件内部包含的文件名进行路径合法性检查，例如：
+
+```php
+<?php
+    $path = $_GET["path"];
+    $zip = new ZipArchive();
+    // 直接使用用户输入的路径打开ZIP文件，如果path可控，攻击者可以指定任意文件
+    $zip->open($path);
+    // ... 处理ZIP文件内容（如解压）
+    if ($zip->extractTo('/tmp/extracted/')) { // 如果extractTo的内部处理没有对文件名进行过滤
+        echo "文件解压成功";
+    } else {
+        echo "文件解压失败";
+    }
+    $zip->close();
+?>
+```
+或者在添加文件时，如果文件名可控：
+```php
+<?php
+    $filename = $_GET["filename"]; // 攻击者可以提交 '../sensitive/config.php'
+    $zip = new ZipArchive();
+    if ($zip->open('archive.zip', ZipArchive::CREATE) === TRUE) {
+        // 未对$filename进行过滤
+        $zip->addFile('/path/to/source/file.txt', $filename);
+        $zip->close();
+        echo "文件添加成功";
+    } else {
+        echo "无法打开ZIP文件";
+    }
+?>
+```
+攻击者可以构造一个ZIP包，其中包含一个名为 `../../../../var/www/html/webshell.php` 或类似路径的文件。当应用程序解压该ZIP包时，如果不进行路径检查，该webshell.php文件可能会被解压到Web服务器的根目录，导致远程代码执行。
+
+3. **潜在影响**
+- **任意文件写入/覆盖:** 攻击者可以覆盖重要的配置文件、系统文件或Web服务器文件，导致服务不可用或篡改业务逻辑。
+- **远程代码执行:** 如果能够将可执行文件（如webshell）写入到Web可访问目录，攻击者可以直接控制服务器。
+- **信息泄露:** 攻击者可以将敏感文件（如配置文件、日志文件）添加到ZIP包中，并在后续操作中下载该ZIP包，导致信息泄露。
+- **拒绝服务:** 攻击者可以创建大量文件或解压到非预期的目录，耗尽磁盘空间或系统资源。
+DESC
 	rule_id: "43694a01-6ffc-4839-bd32-69d612484ddc"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 对ZIP文件内部的文件名进行严格校验和过滤
+在处理ZIP文件中的文件时，必须验证每个文件名的合法性。最常见且有效的方法是确保文件名不包含路径穿越符 `../` 或 `..\`，并确保解压后的目标路径在预期的安全目录内。
+
+```php
+<?php
+// 修复代码示例 - 解压时过滤文件名
+function isValidFilename($filename) {
+    // 检查文件名是否包含路径穿越符
+    if (strpos($filename, '../') !== false || strpos($filename, '..\\') !== false) {
+        return false;
+    }
+     // 检查文件名是否包含绝对路径或非法字符（根据具体需求调整字符集）
+     if (strpos($filename, '/') === 0 || strpos($filename, '\\') === 0 || preg_match('/[^a-zA-Z0-9_\-.\/\\]/', $filename)) {
+         // 允许部分路径分隔符但要进一步检查
+         //更安全的做法是只允许字母、数字和少数安全字符，并处理单层目录
+     }
+     // 确保相对路径不会跳出指定目录 (更复杂的逻辑可能需要解析路径)
+     // 一个简单的检查：确保最终路径是指定安全目录的子路径
+     $safe_dir = '/tmp/extracted/';
+     $target_path = realpath($safe_dir . '/' . $filename);
+     if ($target_path === false || strpos($target_path, realpath($safe_dir)) !== 0) {
+         return false;
+     }
+    return true;
+}
+
+$path = $_GET["path"];
+$zip = new ZipArchive();
+if ($zip->open($path) === TRUE) {
+    $safe_extract_dir = '/tmp/extracted/';
+    // 确保解压目录存在且可写
+    if (!is_dir($safe_extract_dir)) {
+        mkdir($safe_extract_dir, 0755, true);
+    }
+
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $filename = $zip->getNameIndex($i);
+        if (isValidFilename($filename)) {
+            // 解压单个文件到安全目录
+            if (!$zip->extractTo($safe_extract_dir, array($filename))) {
+                 // 处理解压失败（例如，文件已存在且权限问题）
+                 error_log("无法解压文件: " . $filename);
+            }
+        } else {
+            // 发现非法文件名，记录日志或抛出异常，并跳过此文件
+            error_log("发现非法ZIP文件路径: " . $filename);
+        }
+    }
+    $zip->close();
+    echo "ZIP文件处理完成";
+} else {
+    echo "无法打开ZIP文件";
+}
+?>
+```
+
+#### 2. 限制ZIP文件中文件的数量和大小
+为了防止通过ZIP炸弹（Zip Bomb）进行拒绝服务攻击，应该限制ZIP文件包含的文件数量以及解压后文件的总大小，避免耗尽系统资源。
+
+#### 3. 对用户上传的ZIP文件进行病毒扫描
+即使文件路径安全，ZIP文件中也可能包含恶意软件。在处理用户上传的文件前，应对其进行病毒扫描。
+
+#### 4. 遵循最小权限原则
+运行处理ZIP文件的服务时，确保其使用的用户/进程拥有最小化的文件系统权限，限制其写入和执行的能力，即使发生漏洞也能降低损害范围。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')](https://cwe.mitre.org/data/definitions/22.html)
+[PHP ZipArchive Documentation](https://www.php.net/manual/en/class.ziparchive.php)
+REFERENCE
 )
 
 <include('php-param')> as $params

@@ -1,17 +1,89 @@
 desc(
-	title: "FTP Information Exposure"
-	title_zh: "FTP信息泄露",
+	title: "Find PHP FTP Information Exposure"
+	title_zh: "发现PHP FTP信息泄露"
 	risk: "information-exposure"
 	type: vul
 	level: "low"
-	desc: <<<TEXT
-检测可能通过FTP相关函数泄露服务器敏感信息，包括：
-    1. 目录结构暴露（ftp_nlist/ftp_rawlist）
-    2. 当前工作路径泄露（ftp_pwd）
-    3. 服务器系统类型识别（ftp_systype）
-    可能被攻击者用于信息收集阶段，辅助后续攻击
-TEXT
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   在PHP应用程序中，如果开发者使用FTP相关函数（`ftp_nlist`、`ftp_pwd`、`ftp_rawlist`、`ftp_systype`等）来获取FTP服务器的信息，并将这些信息直接或间接输出到前端页面，可能导致敏感信息泄露。这些信息可能包括服务器的文件目录结构、当前工作目录路径、服务器操作系统类型等。攻击者可以利用这些信息了解服务器的文件系统布局、软件环境等，为后续的攻击（如目录遍历、远程代码执行、社工攻击等）提供便利。
+
+2. **触发场景**
+   当PHP代码连接FTP服务器并调用上述函数获取信息，然后将获取到的信息（如目录列表、当前目录）直接通过`echo`、`print_r`等输出函数返回给用户时，就会触发信息泄露。
+
+   ```php
+   <?php
+       // 不安全FTP操作示例
+       $conn = ftp_connect('ftp.example.com');
+       ftp_login($conn, 'user', 'pass');
+
+       // 风险点1：获取并输出当前工作目录
+       echo "Current dir: " . ftp_pwd($conn);
+
+       // 风险点2：列出服务器文件列表
+       $files = ftp_nlist($conn, ".");
+       print_r($files);
+
+       // 风险点3：获取服务器类型
+       echo "System type: " . ftp_systype($conn);
+   ?>
+   ```
+
+3. **潜在影响**
+   - 攻击者获取FTP服务器的详细信息，有助于进行更精准的攻击。
+   - 服务器文件结构和敏感文件路径暴露，增加目录遍历或文件包含漏洞的风险。
+   - 泄露的服务器类型信息有助于攻击者寻找特定版本的服务漏洞。
+DESC
 	rule_id: "87df2d7a-5473-4438-aa85-706657accf5f"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 避免直接输出敏感信息
+不要将从FTP服务器获取的敏感信息（如目录列表、路径、系统类型）直接通过Web页面回显给用户。
+
+```php
+<?php
+    // 修复代码示例：避免直接输出敏感信息
+    $conn = ftp_connect('ftp.example.com');
+    if ($conn && ftp_login($conn, 'user', 'pass')) {
+
+        // 风险点1：获取当前工作目录，但不在前端展示
+        $current_dir = ftp_pwd($conn);
+        // echo "Current dir: " . $current_dir; // 避免这行代码
+
+        // 风险点2：列出服务器文件列表，但在后端处理，不直接展示
+        $files = ftp_nlist($conn, ".");
+        // print_r($files); // 避免这行代码
+
+        // 风险点3：获取服务器类型，但在后端处理，不直接展示
+        $system_type = ftp_systype($conn);
+        // echo "System type: " . $system_type; // 避免这行代码
+
+        // 在后端处理获取的信息，只输出业务逻辑需要展示的非敏感信息
+        echo "FTP connection successful.";
+
+        ftp_close($conn);
+    } else {
+        echo "FTP connection failed.";
+    }
+?>
+```
+
+#### 2. 最小化FTP权限
+限制FTP用户的权限，只允许访问必要的目录和文件，并禁用不必要的命令（如`systype`），即使信息泄露，攻击者获取的信息也非常有限。
+
+#### 3. 使用更安全的协议
+如果可能，优先使用SFTP或FTPS等加密且更安全的协议来传输文件，这些协议提供了更好的认证和数据传输安全性，减少信息泄露的风险。
+
+#### 4. 过滤和验证输出内容
+如果确实需要将FTP信息展示给特定用户（例如管理员后台），应对输出内容进行严格的过滤和验证，确保不包含潜在的恶意内容或过多的敏感细节。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-200: Information Exposure](https://cwe.mitre.org/data/definitions/200.html)
+[PHP FTP Functions](https://www.php.net/manual/en/book.ftp.php)
+REFERENCE
 )
 
 /^ftp_nlist|ftp_pwd|ftp_rawlist|ftp_systype$/ as $output

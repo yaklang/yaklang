@@ -1,13 +1,83 @@
 desc(
-	title: "mysql inject"
-	title_zh: "sql(mysql)注入漏洞",
+	title: "Check PHP MySQL Injection Vulnerability"
+	title_zh: "检测PHP MySQL注入漏洞"
 	type: audit
 	level: low
 	risk: "sqli-inject"
-	desc: <<<TEXT
-SQL注入（SQL Injection，简称SQLI）是一种代码注入技术，攻击者通过在应用程序的输入栏中恶意插入或"注入"SQL命令，干扰正常的数据库查询执行。这种攻击可导致数据泄露、数据篡改、拒绝服务等严重后果。审计此规则旨在识别和防范在PHP代码中未经过滤或不当过滤直接拼接SQL查询的情况，从而降低应用程序遭受SQL注入攻击的风险。
-TEXT
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   SQL注入（SQL Injection，简称SQLI）是一种代码注入技术，攻击者通过在应用程序的输入栏中恶意插入或"注入"SQL命令，干扰正常的数据库查询执行。当PHP应用程序未对用户输入进行充分过滤或转义，直接将其拼接到MySQL查询语句中时，攻击者可以构造恶意输入，改变原本的SQL逻辑，导致非预期的数据库操作。
+
+2. **触发场景**
+   当程序使用 `mysql_query` 或 `mysqli_query` 等函数执行SQL语句，且语句中包含了来自用户输入的变量，并且该变量没有进行适当的过滤或参数化处理时，就可能存在SQL注入漏洞。以下是常见的漏洞触发场景示例：
+   ```php
+   <?php
+       $id = $_GET['id']; // 未过滤的用户输入
+       $query = "SELECT * FROM users WHERE id = " . $id; // 直接拼接
+       $result = mysql_query($query);
+   ?>
+   ```
+   攻击者可以输入 `id=1 OR 1=1` 来绕过登录或获取所有用户数据。
+
+3. **潜在影响**
+   - **数据泄露**: 攻击者可以读取、复制数据库中的敏感信息，如用户名、密码、信用卡号等。
+   - **数据篡改或删除**: 攻击者可以修改、插入或删除数据库中的数据，破坏数据的完整性。
+   - **绕过认证和授权**: 攻击者可能绕过登录验证，获取管理员权限。
+   - **拒绝服务**: 攻击者可以通过执行大量耗时或恶意的SQL查询，导致数据库服务器负载过高，影响正常服务。
+   - **操作系统命令执行**: 在某些配置不当的情况下，攻击者甚至可能通过SQL注入执行操作系统命令。
+DESC
 	rule_id: "746fdb55-f824-4633-a6f4-4d71fb471ea3"
+	solution: <<<SOLUTION
+### 修复建议
+
+1. **使用参数化查询 (Prepared Statements)**
+   这是防御SQL注入最有效的方法。参数化查询将SQL语句的结构与数据分离，数据库在执行前会先解析SQL结构，然后再绑定数据，从而防止恶意数据被当作SQL代码执行。
+   ```php
+   <?php
+       $id = $_GET['id'];
+       $mysqli = new mysqli("localhost", "user", "password", "database");
+       $stmt = $mysqli->prepare("SELECT * FROM users WHERE id = ?"); // 使用占位符
+       $stmt->bind_param("i", $id); // 绑定参数，指定类型为整数
+       $stmt->execute();
+       $result = $stmt->get_result();
+       // 处理结果集
+   ?>
+   ```
+
+2. **使用ORM框架**
+   使用成熟的ORM（对象关系映射）框架（如 Laravel Eloquent, Doctrine等）可以帮助开发者更安全地构建数据库查询，因为这些框架通常内置了参数化查询的机制。
+
+3. **对特殊字符进行转义**
+   如果必须手动拼接SQL语句（不推荐），则需要使用数据库提供的转义函数来处理用户输入。例如，对于MySQL，可以使用 `mysql_real_escape_string` (已废弃，仅用于旧版) 或 `mysqli_real_escape_string` 或 PDO 的 `quote` 方法。
+   ```php
+   <?php
+       $id = $_GET['id'];
+       $link = mysqli_connect("localhost", "user", "password", "database");
+       $escaped_id = mysqli_real_escape_string($link, $id); // 转义特殊字符
+       $query = "SELECT * FROM users WHERE id = '" . $escaped_id . "'"; // 拼接时使用单引号包裹
+       $result = mysqli_query($link, $query);
+   ?>
+   ```
+   需要注意的是，仅仅转义并不能完全杜绝所有SQL注入风险，特别是对于数字类型的输入，使用参数化查询更为安全。
+
+4. **输入验证和过滤**
+   虽然不能替代参数化查询，但对用户输入进行严格的类型、长度和格式检查可以增加安全性。例如，如果一个id必须是数字，就强制将其转换为整数。
+   ```php
+   <?php
+       $id = (int)$_GET['id']; // 强制类型转换
+       $query = "SELECT * FROM users WHERE id = " . $id; // 拼接整数
+       // ......
+   ?>
+   ```
+SOLUTION
+	reference: <<<REFERENCE
+[SQL Injection](https://owasp.org/www-community/attacks/SQL_Injection)
+[CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')](https://cwe.mitre.org/data/definitions/89.html)
+[PHP: MySQLi Manual](https://www.php.net/manual/en/book.mysqli.php)
+[PHP: PDO Manual](https://www.php.net/manual/en/book.pdo.php)
+REFERENCE
 )
 /mysql_(p)?connect/ as $mysqlFunction;
 /mysql_(query|(drop|create)_db)/ as $mysqlFunction;

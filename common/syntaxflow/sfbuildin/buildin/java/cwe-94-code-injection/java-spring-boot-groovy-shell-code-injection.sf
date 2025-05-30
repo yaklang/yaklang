@@ -1,17 +1,51 @@
 desc(
-	title_zh:"查找Java Spring Boot Groovy Shell代码注入漏洞",
-	title:"Find Java Spring Boot Groovy Shell Code Injection Vulnerability"
+	title_zh: "检测Java Spring Boot Groovy Shell代码注入漏洞"
+	title: "Detect Java Spring Boot Groovy Shell Code Injection Vulnerability"
 	type: vuln
 	risk: "code-execution"
-	desc:<<<TEXT
-Java Spring Boot Groovy Shell代码注入漏洞是指在Java Spring Boot应用程序中，使用Groovy脚本引擎执行动态生成的Groovy代码时，未对输入进行充分验证和过滤，导致攻击者可以注入恶意代码并执行任意操作。这种漏洞通常发生在使用GroovyShell或GroovyScriptEngine等类时，攻击者可以通过构造恶意的Groovy脚本来执行任意命令、访问敏感数据或进行其他恶意操作。
-TEXT
-	fix:<<<TEXT
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   Java Spring Boot Groovy Shell代码注入漏洞是指在Java Spring Boot应用程序中，当应用程序使用Groovy脚本引擎（如 `groovy.lang.GroovyShell` 或 `groovy.script.GroovyScriptEngine`）执行动态生成的Groovy代码时，如果未对来自外部（如用户输入）的数据进行充分的验证和过滤，攻击者可以通过构造恶意的Groovy脚本 payload，将其注入到待执行的代码中。Groovy引擎会解析并执行这些恶意脚本，从而导致在服务器端执行任意代码。
+
+2. **触发场景**
+   当应用程序直接或间接将用户可控的输入作为参数传递给 `GroovyShell.evaluate()`、`GroovyShell.parse()` 后调用 `Script.run()` 或 `GroovyShell.run()` 等方法时，会触发此漏洞。常见的触发场景包括：
+   * 动态执行用户提供的 Groovy 代码片段。
+   * 基于用户输入构建动态脚本内容。
+   * 在特定功能模块（如规则引擎、表达式计算）中使用了 Groovy 且未对输入进行安全处理。
+
+   以下是示例代码，展示了直接将用户输入 `$payload` 传递给 `GroovyShell.evaluate()` 方法的场景：
+   ```java
+   import groovy.lang.GroovyShell;
+   import org.springframework.web.bind.annotation.GetMapping;
+   import org.springframework.web.bind.annotation.RequestParam;
+   import org.springframework.web.bind.annotation.RestController;
+
+   @RestController
+   public class GroovyController {
+       @GetMapping("/execute")
+       public String executeGroovy(@RequestParam String payload) {
+           GroovyShell shell = new GroovyShell();
+           Object result = shell.evaluate(payload); // 漏洞点：直接执行用户输入的payload
+           return "Result: " + result.toString();
+       }
+   }
+   ```
+   攻击者可以提交类似 `payload=println('Hello from injected code!')` 或 `payload=''.execute('ls -l').text` 的输入，导致服务器执行相应的 Groovy 或系统命令。
+
+3. **潜在影响**
+   * **远程代码执行 (RCE):** 攻击者可以在服务器上执行任意操作系统命令，获得对服务器的完全控制。
+   * **数据泄露:** 攻击者可以读取、修改或删除服务器上的敏感文件和数据。
+   * **拒绝服务 (DoS):** 攻击者可以执行资源消耗型操作，导致服务不可用。
+   * **进一步渗透:** 攻击者可以利用受控服务器作为跳板，对内网其他系统进行攻击。
+DESC
+	fix: <<<FIX
 在使用Groovy脚本引擎时，确保对输入进行严格的验证和过滤。避免直接执行用户输入的Groovy代码，或者使用安全的沙箱环境来限制代码的执行权限。此外，可以考虑使用其他更安全的脚本语言或框架来实现动态脚本执行的需求。
-TEXT
-	ref:<<<TEXT
+FIX
+	ref: <<<REF
 https://docs.groovy-lang.org/next/html/api/groovy/lang/GroovyShell.html
-TEXT
+REF
 	rule_id: "44a473d8-3763-44c3-9819-17100cf17ad6"
 )
 

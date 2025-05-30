@@ -1,12 +1,12 @@
 desc(
-	title:"Find Java Spring Framework RestTemplate Network Request API Sink Params"
-	title_zh:"查找Java Spring Framework RestTemplate 请求API的Sink参数",
+	title: "Find Java Spring Framework RestTemplate Request API Sink Params"
+	title_zh: "查找Java Spring Framework RestTemplate 请求API的Sink参数"
 	type: audit
 	lib: "java-spring-rest-template-request-params"
-	reference:<<<TEXT
-    https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/client/RestTemplate.html
-TEXT
-	description: <<<TEXT
+	reference: <<<REFERENCE
+https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/client/RestTemplate.html
+REFERENCE
+	description: <<<DESCRIPTION
     此规则旨在查找Java代码中SpringBoot RestTemplate库中网络发包方法的Url参数。
     该规则主要用于辅助审计SSRF(Server-Side Request Forgery)漏洞。
     规则审计的类为:
@@ -28,8 +28,11 @@ TEXT
     - postForEntity(String url, Object request, Class<T> responseType, Object... uriVariables)
     - postForObject(String url, Object request, Class<T> responseType, Object... uriVariables)
     - postForLocation(String url, Object request, Object... uriVariables)
-TEXT
+DESCRIPTION
 	rule_id: "a8705f0b-2e87-4a81-99da-2f2d0c7c25ea"
+	solution: <<<SOLUTION
+none
+SOLUTION
 )
 
 RestTemplate()?{<typeName>?{have:'org.springframework.web.client.RestTemplate'}} as $rest

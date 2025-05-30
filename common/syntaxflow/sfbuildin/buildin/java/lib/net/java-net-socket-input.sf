@@ -1,12 +1,34 @@
 desc(
-	title : "Find TCP Data Reception Point"
-	title_zh : "查找TCP数据接收点",
+	title: "Find Java TCP Data Reception Point"
+	title_zh: "查找Java TCP数据接收点"
 	lib : "java-net-socket-read"
 	type : audit
-	desc: <<<TEXT
-此审计规则旨在识别Java代码中TCP数据接收的位置。TCP数据接收点通常是潜在的攻击面，因为恶意数据可能会通过这些点进入应用程序。确保这些接收点实施了适当的数据验证和清理措施，以防止诸如缓冲区溢出、注入攻击等安全漏洞。
-TEXT
+	desc: <<<DESC
+### 规则目的
+
+此审计规则旨在识别Java代码中TCP数据接收的位置。TCP数据接收点通常是潜在的攻击面，因为恶意数据可能会通过这些点进入应用程序。
+
+### 规则详细
+
+1. **作为基础审计库**
+   属于`java-net-socket-read`库规则（`lib`类型），用于识别Java网络编程中数据流入的关键点，通常需要与其他规则（如数据流跟踪规则）配合使用，来检测更具体的漏洞（如反序列化、缓冲区溢出等）。
+
+2. **检测的类库和函数**
+   该规则主要识别使用了标准Java网络库（`java.net` 和 `java.nio`）中读取TCP数据的相关函数。
+
+   - **`java.net.Socket` 的 `getInputStream()` 方法:** 通过Socket获取输入流，攻击者可以通过该流发送恶意数据。
+   - **`java.net.ServerSocket` 的 `getInputStream()` 方法:** ServerSocket本身不直接读取数据，但此规则在此处可能是为了与 Socket 的 getInputStream() 区分或标记与 Socket 相关的数据流入点。实际数据读取通常发生在 accept() 接受连接后获得的 Socket 对象上。
+   - **`java.nio.channels.SocketChannel` 的 `read()` 方法:** NIO中的 SocketChannel 用于非阻塞 I/O，`read()` 方法用于从通道读取数据到缓冲区，这也是一个重要的数据接收点。
+
+确保这些接收点实施了适当的数据验证和清理措施，以防止诸如缓冲区溢出、注入攻击、不安全的反序列化等安全漏洞。
+DESC
 	rule_id: "4db64163-7c7a-4bc3-a627-c63dd1e8abde"
+	solution: <<<SOLUTION
+none
+SOLUTION
+	reference: <<<REFERENCE
+none
+REFERENCE
 )
 
 // java.net.Socket

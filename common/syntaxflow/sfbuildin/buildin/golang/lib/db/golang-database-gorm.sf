@@ -1,12 +1,29 @@
 desc(
-	title: "check file database function"
+	title: "Audit Golang GORM Usage"
 	type: audit
 	level: info
 	lib: 'golang-database-gorm'
-	desc: <<<TEXT
-此规则旨在审计使用GORM（Go Object-Relational Mapping）库进行数据库操作的文件。GORM是一个流行的Go语言ORM库，它简化了数据库操作，包括连接数据库、迁移模式、CRUD（创建、读取、更新、删除）操作等。通过审计这些操作，可以确保数据库交互代码的正确性和安全性，例如检查是否存在SQL注入风险、连接管理是否得当、错误处理是否完善等。这有助于维护数据库的完整性和应用程序的稳定性。
-TEXT
+	desc: <<<DESC
+### 1. 规则目的
+该规则旨在审计使用GORM（Go Object-Relational Mapping）库进行数据库操作的Golang代码。GORM是一个功能丰富的Go语言ORM库，它简化了数据库连接管理、数据模型定义、数据库迁移以及CRUD（创建、读取、更新、删除）等核心数据库操作。通过此规则，可以识别出代码中与GORM相关的关键函数调用和对象，例如数据库连接的建立、模型的定义、各种查询和修改操作的调用等。这有助于安全审计人员或开发人员快速定位数据库交互逻辑，进一步检查是否存在潜在的安全风险（如SQL注入、不当连接配置等）或 代码实现问题。
+
+### 2. 规则详细
+1. **作为基础检测库**
+   属于`golang-database-gorm`库规则（`lib`类型），主要用于识别和标记代码中对GORM库的引用和使用，捕获通过`gorm.Opent`函数建立的数据库连接对象及其后续成员操作。这为后续针对GORM特定漏洞或风险的规则（如不安全查询、连接泄漏等）提供了基础数据支持，需要与其他跟踪用户输入流向或特定函数调用的规则结合使用。
+2. **核心识别能力**
+   规则核心在于识别`gorm.io/gorm`包的导入，并进一步识别通过`gorm.Open`方法创建的数据库连接实例。通过`getMembers`等语法操作，规则能够追踪该连接实例上调用的各种方法，从而覆盖GORM库的大部分数据库操作。
+3. **应用场景**
+   此规则适用于对任何使用GORM库进行数据库操作的Go项目进行代码审计，无论项目规模大小或数据库类型（支持GORM支持的所有数据库）。它可以帮助识别所有数据库入口点和关键操作，为后续的安全分析奠定基础。
+
+DESC
 	rule_id: "5a878cb7-49c0-45e7-9689-ed17055f8544"
+	title_zh: "审计Golang GORM库使用"
+	solution: <<<SOLUTION
+none
+SOLUTION
+	reference: <<<REFERENCE
+none
+REFERENCE
 )
 
 gorm?{<fullTypeName>?{have: 'gorm.io/gorm'}} as $entry;

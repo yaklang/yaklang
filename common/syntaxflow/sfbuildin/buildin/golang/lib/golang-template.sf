@@ -1,12 +1,27 @@
 desc(
-	title: "check template"
+	title: "Audit Golang html/template Usage"
 	type: audit
 	level: info
 	lib: 'golang-template'
-	desc: <<<TEXT
-此规则旨在审计Go语言代码中`html/template`包的使用情况，特别是关注于命令执行时输入变量的处理。不安全的命令执行可能导致任意代码执行漏洞，如果攻击者能够控制传递给`exec.Command`的输入，那么他们可能会执行恶意命令，进而危害系统的安全性。建议开发者在使用`os/exec`包时，确保所有输入都经过严格的验证和清理，以防止命令注入攻击。
-TEXT
+	desc: <<<DESC
+### 1.规则目的
+该规则用于审计Go语言代码中`html/template`包的使用情况，特别是关注于模板渲染时输入变量的处理。虽然`html/template`包本身设计用于防止跨站脚本（XSS）等常见注入攻击，但开发者在使用时如果不当处理动态内容，仍可能引入安全风险。因此，此规则旨在识别潜在的不安全模板使用模式。
+
+### 2.规则详细
+1. **作为基础检测库**
+   属于`golang-template`库规则（`lib`类型），可配合其他规则（如用户输入跟踪规则）共同检测模板注入或不安全的模板使用。
+
+2. **识别`html/template`导入**
+   检测代码中是否导入了`html/template`包。
+DESC
 	rule_id: "d47f5ca9-7bab-441d-bc3b-8c642bac9e97"
+	reference: <<<REFERENCE
+[Go html/template documentation](https://pkg.go.dev/html/template)
+REFERENCE
+	title_zh: "审计Golang html/template使用"
+	solution: <<<SOLUTION
+none
+SOLUTION
 )
 
 template?{<fullTypeName>?{have: 'html/template'}} as $output

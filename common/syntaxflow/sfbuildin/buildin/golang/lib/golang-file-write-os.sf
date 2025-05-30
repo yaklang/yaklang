@@ -1,12 +1,27 @@
 desc(
-	title: "check file write function(os)"
+	title: "Audit Golang File Write Function (os)"
 	type: audit
 	level: info
 	lib: 'golang-file-write-os'
-	desc: <<<TEXT
-此规则用于审计Go语言项目中文件写入功能的安全性。
-TEXT
+	desc: <<<DESC
+### 1.规则目的
+该规则专注于审计Go语言代码中使用`os`包进行文件写入的代码，主要用于识别潜在的文件操作风险，并非直接检测特定漏洞，而是作为审计文件写入操作的基础规则。
+
+### 2.规则详细
+* **作为基础审计库**
+  属于`golang-file-write-os`审计库规则（`lib`类型），主要用于识别代码中所有调用了`os`包提供的文件写入功能的实例。它可以帮助安全审计人员快速定位所有文件写入操作点，以便进一步分析是否存在路径遍历、任意文件写入或其他文件操作相关的安全问题。
+
+* **覆盖函数**
+  该规则主要识别对`os.WriteFile`函数的调用。
+DESC
 	rule_id: "785265e2-bc75-48f6-9e9b-1d329dc75f87"
+	title_zh: "审计Golang文件写入函数(os)"
+	solution: <<<SOLUTION
+none
+SOLUTION
+	reference: <<<REFERENCE
+none
+REFERENCE
 )
 
 os?{<fullTypeName>?{have: 'os'}} as $os

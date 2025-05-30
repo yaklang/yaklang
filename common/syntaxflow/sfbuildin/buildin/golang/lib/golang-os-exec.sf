@@ -1,12 +1,27 @@
 desc(
-	title: "check execution input variable"
+	title: "Audit Golang OS Exec Command Usage"
 	type: audit
 	level: info
 	lib: 'golang-os-exec'
-	desc: <<<TEXT
-此规则旨在审计Go语言代码中`os/exec`包的使用情况，特别是关注于命令执行时输入变量的处理。不安全的命令执行可能导致任意代码执行漏洞，如果攻击者能够控制传递给`exec.Command`的输入，那么他们可能会执行恶意命令，进而危害系统的安全性。建议开发者在使用`os/exec`包时，确保所有输入都经过严格的验证和清理，以防止命令注入攻击。
-TEXT
+	desc: <<<DESC
+### 1.规则目的
+该规则旨在审计Go语言代码中`os/exec`包的使用情况，特别是关注于命令执行时输入变量的处理。不安全的命令执行可能导致任意代码执行漏洞，如果攻击者能够控制传递给`exec.Command`的输入，那么他们可能会执行恶意命令，进而危害系统的安全性。此规则属于`golang-os-exec`库规则（`lib`类型），用于标识代码中调用`os/exec.Command`方法的点，为后续跟踪用户输入和检测命令注入漏洞提供基础。
+
+### 2.规则详细
+1. **作为基础审计库**
+   属于`golang-os-exec`库规则（lib类型），需配合其他规则（如用户输入跟踪规则）共同检测命令注入漏洞，提供核心方法识别能力。
+
+2. **识别 `exec.Command` 调用**
+   规则检测所有对`os/exec`包下`Command`方法的调用，无论传入的参数是什么，都会被标记出来。
+DESC
 	rule_id: "c56c4a74-1d8a-4f91-a10f-11394b58506a"
+	reference: <<<REFERENCE
+none
+REFERENCE
+	title_zh: "审计Golang OS Exec命令使用"
+	solution: <<<SOLUTION
+none
+SOLUTION
 )
 
 exec?{<fullTypeName>?{have: 'os/exec'}} as $entry

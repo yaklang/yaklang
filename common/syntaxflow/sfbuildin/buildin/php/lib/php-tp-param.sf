@@ -1,12 +1,40 @@
 desc(
-	title: "tp param"
+	title: "Audit PHP ThinkPHP Param Usage"
 	type: audit
 	level: info
 	lib: 'php-tp-all-extern-variable-param-source'
-	desc: <<<TEXT
-此规则旨在审计PHP代码中外部变量参数的使用情况，以防止潜在的安全漏洞。外部变量（如GET、POST请求参数）若未经充分过滤或验证，可能会导致多种安全问题，包括但不限于SQL注入、跨站脚本攻击(XSS)、代码注入等。通过对这些参数进行严格的输入验证和过滤，可以显著提升应用程序的安全性。本规则会检查代码中是否所有外部变量都被正确处理，确保它们不会引发安全风险。
-TEXT
+	desc: <<<DESC
+### 1. 规则目的
+该规则用于审计 ThinkPHP 框架中 `param` 方法的使用情况，特别是用于获取外部用户输入（如 `GET`、`POST`、`COOKIE`、`REQUEST` 等）的场景。目的是识别潜在的未经过滤或验证的用户输入，这些输入如果不加处理地直接用于数据库操作或页面输出，可能导致 SQL 注入、XSS 跨站脚本攻击等安全漏洞。
+
+### 2. 规则详细
+1. **作为基础检测库**
+    属于 ThinkPHP 外部变量参数源 (`php-tp-all-extern-variable-param-source`) 库规则 (`lib` 类型)。它与用户输入跟踪规则配合使用，用于标识 ThinkPHP 中通过 `param` 或 `request` 对象相关方法获取用户输入的代码位置，作为污点分析的起点。
+
+2. **覆盖的关键方法**
+    规则主要检测以下 ThinkPHP 中用于获取请求参数的方法：
+    - `input()` （无参数或带请求类型参数）
+    - `I()` （ThinkPHP 3.x 兼容方法）
+    - `param()`
+    - `request()`
+    - `server()`
+    - `cookie()`
+    - `get()`
+    - `post()`
+    - `only()`
+    - `except()`
+    - `file()`
+    - `
+Request::instance()->param()` 等通过 `Request` 对象调用的相关方法。
+DESC
 	rule_id: "ce83fe54-a8de-4794-abf7-f3476892bdec"
+	title_zh: "审计PHP ThinkPHP Param 参数使用"
+	solution: <<<SOLUTION
+none
+SOLUTION
+	reference: <<<REFERENCE
+none
+REFERENCE
 )
 
 input() as $sink

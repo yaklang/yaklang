@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfcompletion"
 	"io"
 	"io/fs"
 	"os"
@@ -613,6 +615,128 @@ var syntaxflowFormat = &cli.Command{
 	},
 }
 
+var syntaxflowCompletion = &cli.Command{
+	Name:    "syntaxflowCompletion",
+	Aliases: []string{"sf-complete", "sf-completions"},
+	Usage:   "SyntaxFlow Rule Description Completion By AI",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "ai-type,type",
+			Usage: "type of AI type",
+		},
+		cli.StringFlag{
+			Name:  "target,t",
+			Usage: "the file or directory to process, if it is a directory, all .sf files will be processed",
+		},
+		cli.StringFlag{
+			Name:  "api-key,key,k",
+			Usage: "api key of AI",
+		},
+		cli.StringFlag{
+			Name:  "ai-model,model,m",
+			Usage: "model of AI",
+		},
+		cli.StringFlag{
+			Name:  "proxy,p",
+			Usage: "proxy of AI",
+		},
+		cli.IntFlag{
+			Name:  "concurrency,c",
+			Usage: "concurrency of AI completion, default is 5",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		target := c.String("target")
+		typ := c.String("ai-type")
+		key := c.String("api-key")
+		model := c.String("ai-model")
+		proxy := c.String("proxy")
+		concurrency := c.Int("concurrency")
+		if concurrency == 0 {
+			concurrency = 5 // default concurrency
+		}
+
+		var aiOpts []aispec.AIConfigOption
+		if model != "" {
+			aiOpts = append(aiOpts, aispec.WithModel(model))
+		}
+		if typ != "" {
+			aiOpts = append(aiOpts, aispec.WithType(typ))
+		}
+		if key != "" {
+			aiOpts = append(aiOpts, aispec.WithAPIKey(key))
+		}
+		if proxy != "" {
+			aiOpts = append(aiOpts, aispec.WithProxy(proxy))
+		}
+
+		swg := utils.NewSizedWaitGroup(concurrency, context.Background())
+		var errChan = make(chan error, concurrency)
+		complete := func(fileName string) {
+			swg.Add(1)
+			go func() {
+				defer swg.Done()
+				// Check if the file has .sf extension
+				if !strings.HasSuffix(fileName, ".sf") {
+					log.Infof("syntaxflow-completion: skipping file %s (not a .sf file)", fileName)
+					return
+				}
+				raw, err := os.ReadFile(fileName)
+				if err != nil {
+					log.Errorf("failed to read file %s: %v", fileName, err)
+					return
+				}
+				rule, err := sfcompletion.CompletegRuleDesc(fileName, string(raw), aiOpts...)
+				if err != nil {
+					err = utils.Errorf("failed parse complete file %s: %v", fileName, err)
+					errChan <- utils.JoinErrors(err, err)
+					log.Errorf("%v", err)
+					return
+				}
+
+				// check format rule
+				if _, err := sfvm.CompileRule(rule); err != nil {
+					err = utils.Errorf("failed completion sf rule %s: %v\nsf rule: \n%s", fileName, err, rule)
+					errChan <- utils.JoinErrors(err, err)
+					log.Errorf("%v", err)
+					return
+				}
+
+				err = os.WriteFile(fileName, []byte(rule), 0o666)
+				if err != nil {
+					log.Errorf("failed to write file %s: %v", fileName, err)
+					errChan <- utils.Errorf("failed to write file %s: %v", fileName, err)
+					return
+				}
+				return
+			}()
+			return
+		}
+
+		if utils.IsFile(target) {
+			log.Infof("syntaxflow-completion: processing file %s", target)
+			complete(target)
+		} else if utils.IsDir(target) {
+			log.Infof("syntaxflow-completion: processing directory %s", target)
+			filesys.Recursive(target, filesys.WithFileSystem(filesys.NewLocalFs()), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+				log.Infof("syntaxflow-completion: processing file %s", s)
+				complete(s)
+				return nil
+			}))
+		} else {
+			log.Errorf("syntaxflow-completion: file %s not found", target)
+		}
+
+		swg.Wait()
+		var errors error
+		close(errChan)
+		for err := range errChan {
+			errors = utils.JoinErrors(errors, err)
+		}
+		return errors
+	},
+}
+
 var syntaxFlowSave = &cli.Command{
 	Name:    "syntaxflow-save",
 	Aliases: []string{"save-syntaxflow", "ssf", "sfs"},
@@ -1136,13 +1260,14 @@ var SSACompilerCommands = []*cli.Command{
 	ssaCompile, // compile program
 
 	// rule manage
-	syntaxFlowCreate, // create rule template
-	syntaxflowFormat, //  format syntaxflow rule
-	syntaxFlowSave,   // save rule to database
-	syntaxFlowTest,   // test rule
-	syntaxFlowExport, // export rule to file
-	syntaxFlowImport, // import rule from file
-	syncRule,         // sync rule from embed to database
+	syntaxFlowCreate,     // create rule template
+	syntaxflowFormat,     //  format syntaxflow rule
+	syntaxflowCompletion, // complete syntaxflow rule with AI
+	syntaxFlowSave,       // save rule to database
+	syntaxFlowTest,       // test rule
+	syntaxFlowExport,     // export rule to file
+	syntaxFlowImport,     // import rule from file
+	syncRule,             // sync rule from embed to database
 	// risk manage
 	ssaRisk, // export risk report
 

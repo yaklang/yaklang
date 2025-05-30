@@ -1,16 +1,39 @@
 desc(
-	title: "Find Java File Write Sinks"
-	title_zh: "查找 Java 文件写入接收点",
+	title: "Find Java File Write Operation Sinks"
+	title_zh: "查找 Java 文件写入操作接收点"
 	type: audit
 	lib: "java-write-filename-sink"
-	reference:<<<URL
+	reference: <<<REFERENCE
+URL
        https://docs.oracle.com/javase/8/docs/api/java/nio/file/Files.html
        https://docs.oracle.com/javase/8/docs/api/java/io/RandomAccessFile.html
 URL
-	desc: <<<TEXT
-该审计规则旨在识别 Java 代码中潜在的文件写入操作，特别是那些直接将用户输入或不受信任的数据用作文件名或文件路径的情况。这种实践可能导致安全风险，例如目录遍历攻击或任意文件写入漏洞，攻击者可能会利用这些漏洞覆盖重要文件、执行恶意代码或泄露敏感数据。通过审计这些文件写入接收点，可以确保应用程序在处理文件时采取了适当的安全措施，例如验证和清理输入数据，以及限制文件写入的目录范围。
-TEXT
+REFERENCE
+	desc: <<<DESC
+### 1. 规则目的
+
+该审计规则旨在识别 Java 代码中与文件写入相关的潜在操作接收点（sinks）。这些接收点指的是应用程序中直接将数据写入文件系统的特定方法或构造函数调用。识别这些接收点至关重要，因为它们可能成为各种文件相关漏洞（如目录遍历、任意文件写入、文件内容篡改等）的利用点。通过定位这些接收点，安全审计人员可以进一步分析数据源是否可控（特别关注是否来源于用户输入或不可信外部源），以及是否在写入操作前进行了充分的安全验证和过滤，从而评估潜在的安全风险。
+
+### 2. 规则详细
+
+1. **作为基础检测库**
+   属于 `java-write-filename-sink` 库规则 (`lib` 类型)，主要用于识别 Java 标准库中负责文件写入的核心 API 调用。这些 API 调用是构建更复杂的污点跟踪或安全规则的基础组件。
+
+2. **覆盖的关键 API**
+   该规则识别以下可能涉及到文件写入操作的 Java API 调用：
+   - `java.io.File` 的各种构造函数和方法，尤其关注那些接受文件路径作为参数的方法。
+   - `java.io.PrintWriter` 的构造函数和方法，用于将格式化数据写入文件。
+   - `java.io.FileOutputStream` 的构造函数和方法，用于向文件写入字节流。
+   - `java.io.FileWriter` 的构造函数和方法，用于向文件写入字符流。
+   - `java.nio.file.Files` 类中的各种 `write*` 方法，例如 `Files.write()`、`Files.writeString()` 等，这些是 Java NIO.2 提供的文件写入方式。
+   - `java.io.RandomAccessFile` 的构造函数和 `write*` 方法，用于随机读写文件。
+
+   规则通过匹配这些特定类及其相关方法的调用，将这些文件写入操作标记为潜在的接收点，为后续的安全分析提供定位信息。
+DESC
 	rule_id: "6e39de24-d79a-4475-98b8-f1842417bca1"
+	solution: <<<SOLUTION
+none
+SOLUTION
 )
 
 File?{<typeName>?{have: 'java.io.File'}}(,* as $javaIOFileParam)

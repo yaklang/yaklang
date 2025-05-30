@@ -1,11 +1,12 @@
 desc(
-	title_zh:"检测Java Socket资源未释放 ",
-	title:"Check Java Socket Unreleased Resource"
+	title_zh: "检测Java Socket资源未释放"
+	title: "Check Java Socket Unreleased Resource"
 	risk:"资源泄漏",
-	reference:<<<URL
-    https://docs.oracle.com/javase/8/docs/api/java/net/Socket.html
-URL
-	description:<<<TEXT
+	reference: <<<REFERENCE
+https://docs.oracle.com/javase/8/docs/api/java/net/Socket.html
+https://cwe.mitre.org/data/definitions/772.html
+REFERENCE
+	description: <<<DESCRIPTION
 ## 漏洞描述
 
 应用程序创建了 `java.net.Socket`、`java.net.ServerSocket` 或 `java.net.SocketImpl` 类的实例后，未在使用完毕时通过调用 `close()` 方法正确关闭这些网络资源。这属于 CWE-772（有效生命周期后未释放资源）漏洞，会导致网络端口和系统资源泄漏。
@@ -20,100 +21,67 @@ URL
 - 服务器性能随时间下降，尤其在高并发环境中
 - 长时间运行的服务可能需要定期重启以释放资源
 - 可能影响其他应用程序的网络连接能力
-TEXT
-	solution:<<<TEXT
-    ## 修复建议
+DESCRIPTION
+	solution: <<<SOLUTION
+### 修复建议
 
-    ### 1. 使用 try-with-resources 自动关闭资源 (Java 7+，推荐)
+#### 1. 使用 try-with-resources 自动关闭资源 (Java 7+，推荐)
+**优点:** 最简洁、最安全的方式，确保资源在try块结束时无论是否发生异常都能被正确关闭。
 
-    ```java
-    try (Socket socket = new Socket("hostname", 8080)) {
-        // 使用套接字进行通信
-        OutputStream out = socket.getOutputStream();
-        out.write("Hello Server".getBytes());
+```java
+// 客户端 Socket
+try (Socket socket = new Socket("hostname", 8080)) {
+    // 使用套接字进行通信
+    // ...
+} // socket 会在此自动关闭
 
-        InputStream in = socket.getInputStream();
-        // 读取响应...
-    } // socket 自动关闭
-    ```
+// 服务器 Socket
+try (ServerSocket serverSocket = new ServerSocket(8080)) {
+    // ...接受连接循环...
+} // serverSocket 会在此自动关闭
+```
 
-    ### 2. 使用 try-finally 手动关闭资源
+#### 2. 使用 try-finally 手动关闭资源
+**优点:** 适用于Java 7之前的版本，或者需要更精细控制关闭流程的场景。需要手动检查资源是否非空且未关闭。
 
-    ```java
-    Socket socket = null;
-    try {
-        socket = new Socket("hostname", 8080);
-
-        // 使用套接字进行通信
-        OutputStream out = socket.getOutputStream();
-        out.write("Hello Server".getBytes());
-
-        InputStream in = socket.getInputStream();
-        // 读取响应...
-    } finally {
-        // 确保关闭资源
-        if (socket != null && !socket.isClosed()) {
-            try {
-                socket.close();
-            } catch (IOException e) {
-                logger.error("关闭套接字时出错", e);
-            }
+```java
+Socket socket = null;
+try {
+    socket = new Socket("hostname", 8080);
+    // 使用套接字进行通信
+    // ...
+} catch (IOException e) {
+    // ... 错误处理 ...
+} finally {
+    // 确保关闭资源，避免空指针异常
+    if (socket != null && !socket.isClosed()) {
+        try {
+            socket.close();
+        } catch (IOException e) {
+            // 记录关闭时的错误
+            System.err.println("关闭套接字时出错: " + e.getMessage());
         }
     }
-    ```
+}
+```
 
-    ### 3. 对于 ServerSocket 的正确管理
+#### 3. 对于并发服务器中的 Socket 管理
+在使用线程池处理多个客户端连接时，确保在每个处理线程内部正确关闭对应的客户端 Socket。
 
-    ```java
-    try (ServerSocket serverSocket = new ServerSocket(8080)) {
-        serverSocket.setSoTimeout(10000); // 设置超时，避免永久阻塞
-
-        while (!Thread.currentThread().isInterrupted()) {
-            try (Socket clientSocket = serverSocket.accept()) {
-                // 处理客户端连接
-                handleClient(clientSocket);
-            } catch (SocketTimeoutException e) {
-                // 接受连接超时，继续循环
-                continue;
-            }
-        }
-    } // serverSocket 自动关闭
-    ```
-
-    ### 4. 在线程池中处理客户端连接时的资源管理
-
-    ```java
-    public void startServer() throws IOException {
-        ExecutorService executor = Executors.newFixedThreadPool(10);
-
-        try (ServerSocket serverSocket = new ServerSocket(8080)) {
-            while (!Thread.currentThread().isInterrupted()) {
-                try {
-                    final Socket clientSocket = serverSocket.accept();
-                    executor.submit(() -> {
-                        try (Socket socket = clientSocket) { // 确保在线程中关闭
-                            // 处理客户端连接
-                        } catch (IOException e) {
-                            logger.error("处理客户端连接时出错", e);
-                        }
-                    });
-                } catch (IOException e) {
-                    logger.error("接受连接时出错", e);
-                }
-            }
-        } finally {
-            executor.shutdown();
-            try {
-                if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
-                    executor.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                executor.shutdownNow();
-            }
-        }
+```java
+// 在线程池任务中处理客户端连接
+executor.submit(() -> {
+    // 使用 try-with-resources 确保在线程中关闭客户端 Socket
+    try (Socket clientSocket = serverSocket.accept()) {
+        // 处理客户端请求
+        // ...
+    } catch (IOException e) {
+        System.err.println("处理客户端连接时出错: " + e.getMessage());
     }
-    ```
-TEXT
+});
+```
+并且，确保在应用程序关闭时或不再需要监听时，正确关闭 `ServerSocket` 以及关联的线程池。
+SOLUTION
 	rule_id: "4dd5053f-36a9-4f35-83a9-aeb40fc43094"
 )
 
