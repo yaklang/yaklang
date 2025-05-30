@@ -141,7 +141,6 @@ func (c *Config) HandleSearch(query string, items *omap.OrderedMap[string, []str
 	}
 
 	toolsLists := []ToolWithKeywords{}
-	toolMap := map[string]*aitool.Tool{}
 	items.ForEach(func(key string, value []string) bool {
 		toolsLists = append(toolsLists, ToolWithKeywords{
 			Name:     key,
@@ -154,7 +153,7 @@ func (c *Config) HandleSearch(query string, items *omap.OrderedMap[string, []str
 		"NONCE":           nonce,
 		"Memory":          c.memory,
 		"UserRequirement": query,
-		"Tools":           toolsLists,
+		"ToolsLists":      toolsLists,
 	})
 	if err != nil {
 		return nil, err
@@ -170,12 +169,8 @@ func (c *Config) HandleSearch(query string, items *omap.OrderedMap[string, []str
 		tools := action.GetInvokeParamsArray("matches")
 		if len(tools) > 0 {
 			for _, toolInfo := range tools {
-				lt, ok := toolMap[toolInfo.GetString("tool")]
-				if !ok {
-					continue
-				}
 				callResults = append(callResults, &searchtools.KeywordSearchResult{
-					Tool:            lt.GetName(),
+					Tool:            toolInfo.GetString("tool"),
 					MatchedKeywords: toolInfo.GetStringSlice("matched_keywords"),
 				})
 			}

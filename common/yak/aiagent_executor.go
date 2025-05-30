@@ -47,7 +47,7 @@ func ExecuteForge(forgeName string, i any, iopts ...any) (any, error) {
 	params := aiforge.Any2ExecParams(i)
 	engine := NewYakitVirtualClientScriptEngine(nil)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
-		defaultForgeHandle = buildDefaultForgeHandle(forgeIns, engine)
+		defaultForgeHandle = buildDefaultForgeHandle(ag.ctx, forgeIns, engine)
 		engine.GetVM().SetVars(map[string]any{
 			DEFAULT_INIT_PROMPT_NAME:       forgeIns.InitPrompt,
 			DEFAULT_PERSISTENT_PROMPT_NAME: forgeIns.PersistentPrompt,
@@ -103,7 +103,7 @@ func (ag *Agent) AIDOptions() []aid.Option {
 	return opts
 }
 
-func buildDefaultForgeHandle(forgeIns *schema.AIForge, engine *antlr4yak.Engine) func(items []*ypb.ExecParamItem, opts ...any) (any, error) {
+func buildDefaultForgeHandle(ctx context.Context, forgeIns *schema.AIForge, engine *antlr4yak.Engine) func(items []*ypb.ExecParamItem, opts ...any) (any, error) {
 	getStringVar := func(name string) (string, bool) {
 		initPrompt, ok := engine.GetVM().GetVar(name)
 		if !ok {
@@ -144,7 +144,7 @@ func buildDefaultForgeHandle(forgeIns *schema.AIForge, engine *antlr4yak.Engine)
 		if err != nil {
 			return nil, utils.Errorf("failed to build forge handle: %v", err)
 		}
-		ins, err := blueprint.CreateCoordinator(context.Background(), items, aidOpts...)
+		ins, err := blueprint.CreateCoordinator(ctx, items, aidOpts...)
 		if err != nil {
 			return nil, err
 		}

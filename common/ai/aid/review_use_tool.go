@@ -78,20 +78,17 @@ func (t *aiTask) handleToolUseReview(targetTool *aitool.Tool, param aitool.Invok
 		targetTool, err := t.toolReviewPolicy_wrongTool(targetTool, userInput.GetString("suggestion_tool"), userInput.GetString("suggestion_tool_keyword"))
 		if err != nil {
 			t.config.EmitError("error handling tool review: %v", err)
-			return targetTool, param, nil, "", err
+			return targetTool, param, nil, "", nil
 		}
 		result, err := t.callTool(targetTool)
 		if err != nil {
-			return targetTool, param, nil, "", err
+			t.config.EmitError("error handling tool review: %v", err)
+			return targetTool, param, nil, "", nil
 		}
 		return targetTool, param, result, HandleToolUseNext_Override, nil
 	case "wrong_params":
-		t.config.EmitInfo("wrong parameters used")
-		// todo
 		return targetTool, param, nil, "", nil
-	case "continue":
-		t.config.EmitInfo("tool usage is correct, continue")
-		// 继续执行现有任务
+	case "direct_answer":
 		return targetTool, param, nil, "", nil
 	default:
 		t.config.EmitError("unknown review suggestion: %s", suggestion)
@@ -100,6 +97,76 @@ func (t *aiTask) handleToolUseReview(targetTool *aitool.Tool, param aitool.Invok
 }
 
 func (t *aiTask) toolReviewPolicy_wrongTool(oldTool *aitool.Tool, suggestionToolName string, suggestionKeyword string) (*aitool.Tool, error) {
+	var tools []*aitool.Tool
+	if suggestionToolName != "" {
+		for _, item := range utils.PrettifyListFromStringSplited(suggestionToolName, ",") {
+			toolins, err := t.config.aiToolManager.GetToolByName(item)
+			if err != nil || utils.IsNil(toolins) {
+				if err != nil {
+					t.config.EmitError("error searching tool: %v", err)
+				} else {
+					t.config.EmitInfo("suggestion tool: %v but not found it.", suggestionToolName)
+				}
+			}
+			tools = append(tools, toolins)
+		}
+	}
+
+	var err error
+	if suggestionKeyword != "" {
+		searched, err := t.config.aiToolManager.SearchTools("", suggestionKeyword)
+		if err != nil {
+			t.config.EmitError("error searching tool: %v", err)
+		}
+		tools = append(tools, searched...)
+	}
+
+	if len(tools) <= 0 {
+		return oldTool, utils.Error("tool not found via user prompt")
+	}
+
+	prompt, err := t.config.quickBuildPrompt(__prompt_toolReSelect, map[string]any{
+		"OldTool":  oldTool,
+		"ToolList": tools,
+	})
+	if err != nil {
+		return oldTool, err
+	}
+
+	var selecteddTool *aitool.Tool
+	transErr := t.config.callAiTransaction(prompt, func(request *AIRequest) (*AIResponse, error) {
+		request.SetTaskIndex(t.Index)
+		return t.callAI(request)
+	}, func(rsp *AIResponse) error {
+		action, err := ExtractActionFromStream(
+			rsp.GetOutputStreamReader("call-tools", true, t.config),
+			"require-tool", "abandon")
+		if err != nil {
+			return err
+		}
+		switch action.ActionType() {
+		case "require-tool":
+			toolName := action.GetString("tool")
+			selecteddTool, err = t.config.aiToolManager.GetToolByName(toolName)
+			if err != nil {
+				return utils.Errorf("error searching tool: %v", err)
+			}
+		case "abandon":
+		default:
+			return utils.Errorf("unknown action type: %s", action.ActionType())
+		}
+		return nil
+	})
+	if transErr != nil {
+		return oldTool, transErr
+	}
+	if selecteddTool == nil {
+		return oldTool, nil
+	}
+	return selecteddTool, nil
+}
+
+func (t *aiTask) toolReviewPolicy_wrongParam(oldTool *aitool.Tool, suggestionToolName string, suggestionKeyword string) (*aitool.Tool, error) {
 	var tools []*aitool.Tool
 	if suggestionToolName != "" {
 		for _, item := range utils.PrettifyListFromStringSplited(suggestionToolName, ",") {
