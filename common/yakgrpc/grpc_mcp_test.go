@@ -6,9 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp"
+	mcpclient "github.com/yaklang/yaklang/common/mcp/mcp-go/client"
+	rawmcp "github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -95,6 +98,47 @@ func TestGRPC_StartMcpServer_BasicFlow(t *testing.T) {
 
 	// 验证 URL 格式
 	require.Contains(t, serverUrl, "http://127.0.0.1:", "ServerUrl should contain correct host")
+
+	// 创建 SSE MCP 客户端
+	mcpClient, err := mcpclient.NewSSEMCPClient(serverUrl)
+	if err != nil {
+		t.Fatalf("创建 MCP 客户端失败: %v", err)
+	}
+	defer mcpClient.Close()
+
+	// 设置上下文和超时
+	ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// 启动客户端连接
+	err = mcpClient.Start(ctx)
+	if err != nil {
+		t.Fatalf("启动 MCP 客户端连接失败: %v", err)
+	}
+
+	// 初始化客户端
+	t.Log("初始化 MCP 客户端...")
+	initRequest := rawmcp.InitializeRequest{}
+	initRequest.Params.ProtocolVersion = rawmcp.LATEST_PROTOCOL_VERSION
+	initRequest.Params.ClientInfo = rawmcp.Implementation{
+		Name:    "dump-mcp-tools-client",
+		Version: "1.0.0",
+	}
+
+	initResult, err := mcpClient.Initialize(ctx, initRequest)
+	if err != nil {
+		t.Fatalf("初始化失败: %v", err)
+	}
+	t.Logf("初始化成功，服务器名称: %s, 版本: %s",
+		initResult.ServerInfo.Name,
+		initResult.ServerInfo.Version)
+
+	toolsRequest := rawmcp.ListToolsRequest{}
+	toolsResult, err := mcpClient.ListTools(ctx, toolsRequest)
+	assert.NoError(t, err)
+	assert.NotNil(t, toolsResult)
+	assert.True(t, len(toolsResult.Tools) > 0)
+	log.Infof("获取到 %d 个工具", len(toolsResult.Tools))
 }
 
 func TestGRPC_StartMcpServer_DefaultPort(t *testing.T) {

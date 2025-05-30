@@ -141,13 +141,13 @@ func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send f
 	}
 
 	hostPort := utils.HostPort(host, int(port))
-	urlStr := fmt.Sprintf("http://%s/sse", hostPort)
+	urlStr := fmt.Sprintf("http://%s", hostPort)
 
 	// 发送启动状态
 	err = send(&ypb.StartMcpServerResponse{
 		Status:    "running",
 		Message:   fmt.Sprintf("MCP server started with SSE transport on %s", urlStr),
-		ServerUrl: urlStr,
+		ServerUrl: urlStr + "/sse",
 	})
 	if err != nil {
 		return err
