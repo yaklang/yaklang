@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"strings"
 	"text/template"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	_ "embed"
 
@@ -43,7 +44,7 @@ type KeywordSearchResult struct {
 
 func NewKeyWordSearcher(chatToAiFunc func(string) (io.Reader, error)) AiToolSearcher {
 	return func(req *ToolSearchRequest) ([]*aitool.Tool, error) {
-		log.Info("start to search with query: %v", req.Query)
+		log.Infof("start to search with query: %v", req.Query)
 		query := req.Query
 		if chatToAiFunc == nil {
 			return nil, utils.Errorf("ai callback is not set")
