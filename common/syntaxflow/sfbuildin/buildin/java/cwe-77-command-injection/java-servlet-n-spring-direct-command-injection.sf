@@ -1,21 +1,94 @@
 desc(
-	title: "Springframework Paremeter Passed into Command Injection Sink"
-	title_zh: 'Servlet & Springframework 基础参数命令注入',
+	title: "Check Java Command Injection from Servlet and SpringMVC"
+	title_zh: "检测Java Servlet和SpringMVC中的命令注入漏洞"
 	type: vuln
 	risk:"命令注入",
-	desc: <<<TEXT
-    该规则用于审计Java代码中以Servlet和Springframework传入命令注入的参数为污染源(source)，以命令执行为污染汇聚点(sink)的命令执行规则。
-    规则覆盖的命令执行点包括：
-    - Runtime.getRuntime().exec()
-    - ProcessBuilder
-    - Apache Commons Exec
-    - Picocli
-    - System-Command-Executor
-    - zt-exec
-    - NuProcess
-    - org.apache.hadoop.util.Shell
-TEXT
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   命令注入（Command Injection）漏洞发生在应用程序将用户可控的数据拼接到系统命令中执行时，攻击者可以构造恶意输入，改变原始命令的逻辑或执行任意系统命令。当Java应用程序通过`Runtime.getRuntime().exec()`、`ProcessBuilder`等方法执行外部命令，并且命令字符串中直接或间接包含了来自用户请求（如Servlet或SpringMVC的参数）且未经充分过滤验证的数据时，就可能存在命令注入漏洞。
+
+2. **触发场景**
+   以下示例展示了在Servlet和SpringMVC中通过直接使用用户输入构建并执行命令的场景：
+   
+   **Servlet示例：**
+   ```java
+   protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+       String userInput = request.getParameter("command");
+       // 直接使用用户输入拼接到命令中
+       Process process = Runtime.getRuntime().exec(userInput);
+       // ... 处理命令执行结果 ...
+   }
+   ```
+   攻击者可以通过`command`参数注入恶意命令，例如输入`ls -l /; rm -rf /`。
+   
+   **SpringMVC示例：**
+   ```java
+   @GetMapping("/execute/{command}")
+   public String executeCommand(@PathVariable String command) {
+       try {
+           // 直接使用路径变量作为命令
+           Process process = Runtime.getRuntime().exec(command);
+           // ... 处理命令执行结果 ...
+       } catch (IOException e) {
+           // ... 错误处理 ...
+       }
+       return "Output";
+   }
+   ```
+   攻击者可以通过`{command}`路径变量注入恶意命令。
+   
+   此外，规则还覆盖了其他常见的命令执行汇聚点，如Apache Commons Exec, Picocli, System-Command-Executor, zt-exec, NuProcess, org.apache.hadoop.util.Shell等，以及通过ProcessBuilder构建并执行命令的场景。
+
+3. **潜在影响**
+   - 执行任意系统命令，可能导致服务器被完全控制。
+   - 读取、修改或删除系统文件。
+   - 安装恶意软件或后门。
+   - 窃取敏感数据。
+   - 利用受感染服务器作为跳板攻击其他系统。
+   - 拒绝服务攻击。
+DESC
 	rule_id: "31093d24-ee2b-448b-ba5a-111d99bbf77c"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 避免直接拼接外部输入到命令中
+尽量避免将用户可控的、复杂的字符串直接作为命令的参数传递给命令执行函数。如果必须执行外部命令，应采用更安全的方式。
+
+#### 2. 使用ProcessBuilder的参数列表形式
+`ProcessBuilder`提供了一种更安全的执行命令的方式，即将命令和每个参数作为单独的字符串项传递给构造函数或`command()`方法，而不要将整个命令字符串传递给一个参数。这样系统会负责处理参数分隔，避免了命令注入。
+```java
+// 修复代码示例
+String userInput = request.getParameter("arg");
+// ProcessBuilder安全用法：命令和参数分开
+ProcessBuilder pb = new ProcessBuilder("ls", "-l", userInput); // 假设只想列出特定文件
+pb.redirectErrorStream(true);
+Process process = pb.start();
+```
+
+#### 3. 对外部输入进行严格的白名单或强校验
+如果需要基于用户输入动态构建命令，只允许执行白名单中的命令或参数，并对所有输入进行严格的格式、类型和内容校验，拒绝一切不符合预期的输入。例如，如果只允许执行ping命令，并且参数只能是IP地址或域名，则应对输入进行相应的格式校验。
+```java
+// 修复代码示例：白名单校验参数
+String userInput = request.getParameter("target");
+// 假设只允许ping一个合法的IP地址或域名
+if (!isValidHostnameOrIp(userInput)) { // 实现isValidHostnameOrIp方法进行校验
+    throw new IllegalArgumentException("Invalid ping target");
+}
+ProcessBuilder pb = new ProcessBuilder("ping", "-c 4", userInput);
+Process process = pb.start();
+```
+
+#### 4. 最小化命令执行权限
+运行应用程序的用户应具有执行外部命令的最低限度权限，以限制即使发生命令注入时攻击者能够造成的损害范围。
+
+#### 5. 考虑替代方案
+许多系统命令的功能可以通过Java标准库或第三方库来实现，例如使用Java的文件操作API代替`ls`或`rm`命令。尽量利用安全的API代替直接调用外部命令。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-77: Improper Neutralization of Special Elements used in a Command ('Command Injection')](https://cwe.mitre.org/data/definitions/77.html)
+REFERENCE
 )
 
 

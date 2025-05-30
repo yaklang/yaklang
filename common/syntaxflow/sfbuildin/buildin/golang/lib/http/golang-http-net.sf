@@ -1,12 +1,38 @@
 desc(
-	title: "check executing request(net)"
+	title: "Audit Golang net/http Handlers"
 	type: audit
 	level: info
 	lib: "golang-http-net"
-	desc: <<<TEXT
-此规则旨在审计Golang应用程序中是否正确处理HTTP请求。通过检查`net/http`包的使用情况，该规则能够识别出处理HTTP请求的代码段。不当处理HTTP请求可能会导致安全漏洞，如敏感信息泄露、请求伪造等。建议开发者仔细审查HTTP请求的处理逻辑，确保对请求参数和请求体进行充分的验证和清理，以防止潜在的安全风险。
-TEXT
+	desc: <<<DESC
+### 规则目的
+
+该规则用于审计Golang应用程序中基于`net/http`标准库构建的HTTP服务，识别和标注处理传入HTTP请求的函数（Handlers）。通过分析`http.HandleFunc`或类似方式注册的回调函数，该规则能够帮助开发者快速定位HTTP请求处理的核心逻辑。
+
+### 规则详细
+
+1. **基础审计库**
+   属于`golang-http-net`基础库规则，旨在提供HTTP请求处理入口点的识别能力。它通过识别使用`net/http`包定义或注册的HTTP处理函数，为后续更深入的代码分析（如参数输入验证、数据流跟踪等）提供基础。
+
+2. **识别关键函数**
+   规则主要关注`net/http`包中的函数，尤其是用于注册/处理请求的入口点函数（例如通过捕捉 `http.HandleFunc` 注册的回调函数）。
+
+3. **风险提示**
+   识别出HTTP处理函数本身不构成漏洞，但这些函数是处理用户输入和执行业务逻辑的关键位置。不当处理请求数据（如未经验证的参数、未过滤的请求体）可能导致多种安全漏洞，例如命令注入、SQL注入、XSS、敏感信息泄露、HTTP头注入等。
+
+4. **使用方式**
+   该规则通常作为静态代码审计流程的第一步，用于发现所有潜在的HTTP请求处理点。为了进行有效的安全审计，建议将此规则与其他规则结合使用，例如：
+   - 输入验证规则：检查是否对用户输入进行了充分的验证和过滤。
+   - 数据流跟踪规则：跟踪用户输入数据在代码中的传播路径，识别潜在的高危操作。
+   - 特定的漏洞检测规则：例如命令注入检测、SQL注入检测等，针对性地分析处理函数中的逻辑。
+DESC
 	rule_id: "5b66527b-f4e9-4784-ae3b-167983d77675"
+	title_zh: "审计 Golang net/http 请求处理函数"
+	solution: <<<SOLUTION
+none
+SOLUTION
+	reference: <<<REFERENCE
+[Golang net/http documentation](https://pkg.go.dev/net/http)
+REFERENCE
 )
 
 http?{<fullTypeName>?{have: 'net/http'}} as $entry;

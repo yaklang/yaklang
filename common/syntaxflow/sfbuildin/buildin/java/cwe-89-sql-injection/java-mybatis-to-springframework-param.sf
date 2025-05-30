@@ -1,13 +1,97 @@
 desc(
-	title: "Find My(i)Batis XML Weak ('${...}') Params to Spring Params"
-	title_zh: '找到 MyBatis/iBatis XML Mapper 不安全(${...})参数到 Springframework 可达路径',
+	title: "Find Java MyBatis/iBatis XML Weak ('${...}') Params to Spring Params"
+	title_zh: "查找 Java MyBatis/iBatis XML Mapper 不安全(${...})参数"
 	type: vuln
 	level: middle
 	risk: sqli
-	desc: <<<TEXT
-在 MyBatis/iBatis 中，XML Mapper 文件中的 `${...}` 语法用于直接文本替换，这可能会导致 SQL 注入漏洞。当这些不安全的 `${...}` 参数能够从 Spring 框架的控制器或其他可达路径中被注入时，攻击者可以构造恶意的输入来操纵 SQL 查询，进而执行未授权的数据库操作。建议避免在 MyBatis/iBatis XML Mapper 中使用 `${...}` 语法，而应使用 `#{...}` 语法，因为后者会对参数进行预编译，从而防止 SQL 注入。
-TEXT
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   在MyBatis/iBatis的XML Mapper文件中，`$`符号用于进行文本替换，直接将用户输入的值拼接进SQL语句。如果应用程序没有对用户输入进行严格的过滤或参数化处理，攻击者可以构造恶意的输入来篡改原始SQL语句的逻辑，从而导致 SQL 注入漏洞。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
+
+2. **触发场景**
+   当MyBatis/iBatis XML Mapper中使用了`${...}`语法，并且这个参数的值来源于Spring框架的控制器或其他用户可控的输入点时，就会触发这个漏洞。攻击者可以通过控制输入参数来注入恶意的SQL代码。
+
+   在提供的示例代码中，`UserMapper.xml` 文件中的 `updateUser` mapper使用了 `${id}` 语法：
+   ```xml
+   <update id="updateUser">
+       UPDATE User SET name=#{name}, email=#{email} WHERE id=${id}
+   </update>
+   ```
+   以及 `UseMapper.xml` 中的 `findByUserNameVuln02` 和 `findByUserNameVuln03` methods:
+   ```xml
+   <select id="findByUserNameVuln02" parameterType="String" resultMap="User">
+       select * from users where username like '%${_parameter}%'
+   </select>
+
+   <select id="findByUserNameVuln03" parameterType="String" resultMap="User">
+       select * from users
+       <if test="order != null">
+           order by ${order} asc
+       </if>
+   </select>
+   ```
+   如果对应的Spring Controller方法直接接收用户输入的`id`、`username`或`sort`参数，并将其传递给这些Mapper方法，则存在SQL注入风险。
+
+3. **潜在影响**
+    - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+    - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+    - 通过数据库提权进一步渗透至服务器或其他系统组件。
+DESC
 	rule_id: "5323c275-713f-4b22-a1cc-d22db1655fb2"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用参数化查询（使用`#{...}`语法）
+避免在MyBatis/iBatis XML Mapper或注解中使用`${...}`语法，而是使用`#{...}`语法。`#{...}`语法会使用PreparedStatement进行参数绑定，从而有效地防止SQL注入。
+
+**修复代码示例：**
+
+将MyBatis/iBatis XML Mapper中的`${id}`、`${_parameter}`或`${order}`替换为`#{id}`、`#{username}`或`#{order}`。例如：
+
+原代码 (UserMapper.xml):
+```xml
+<update id="updateUser">
+    UPDATE User SET name=#{name}, email=#{email} WHERE id=${id}
+</update>
+
+<select id="findByUserNameVuln02" parameterType="String" resultMap="User">
+    select * from users where username like '%${_parameter}%'
+</select>
+
+<select id="findByUserNameVuln03" parameterType="String" resultMap="User">
+    select * from users
+    <if test="order != null">
+        order by ${order} asc
+    </if>
+</select>
+```
+
+修复后的代码 (UserMapper.xml):
+```xml
+<update id="updateUser">
+    UPDATE User SET name=#{name}, email=#{email} WHERE id=#{id}
+</update>
+
+<select id="findByUserNameVuln02" parameterType="String" resultMap="User">
+    select * from users where username like CONCAT('%', #{username}, '%')
+</select>
+
+<select id="findByUserNameVuln03" parameterType="String" resultMap="User">
+    select * from users
+    <if test="order != null">
+        order by #{order} asc  <!-- 注意：Order By 字段通常无法直接参数化，需要额外的安全校验 -->
+    </if>
+</select>
+```
+
+对于`ORDER BY`等需要根据用户输入动态确定字段的场景，直接使用`#{...}`可能无法满足需求。此时需要对用户输入的字段名进行严格的白名单过滤，只允许预定义的合法字段名。不要直接将用户输入的字段名拼接进SQL语句。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')](https://cwe.mitre.org/data/definitions/89.html)
+[MyBatis 3 Documentation](https://mybatis.net/mybatis-3/sqlmap-xml.html)
+REFERENCE
 )
 
 <include('java-spring-mvc-param')> as $source;

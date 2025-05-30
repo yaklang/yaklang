@@ -1,12 +1,24 @@
 desc(
 	title: "Find Java Escape Method"
-	title_zh: "查找Java转义方法",
+	title_zh: "查找Java转义方法"
 	lib: 'java-escape-method'
 	type: audit
-	desc: <<<TEXT
-    此规则用于查找Java代码中可能存在的实体转义方法，该方法经常用于审计XSS漏洞。
-TEXT
+	desc: <<<DESC
+### 1.规则目的
+此规则用于查找Java代码中可能存在的实体转义方法，该方法经常用于审计XSS漏洞。
+### 2.规则详细
+1. **作为基础检测库**
+属于`java-escape-method`库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测XSS漏洞，提供核心函数识别能力。
+2. **覆盖高频转义词汇**
+规则通过正则表达式匹配函数名称中包含以下词汇的潜在转义方法：`sanitiz`, `encod(e|ing)`, `entit(y|ies)`, `escap(e|ing)`, `replace`, `regex`, `normaliz`, `canonical`, `anti`, `safe`, `purif`, `purg`, `pure`, `validate`, `strip`, `clean`, `clear`, `special`, `convert`, `remov`。
+DESC
 	rule_id: "105b3dd0-6ac1-4e00-a38d-464e17e3e7fc"
+	solution: <<<SOLUTION
+none
+SOLUTION
+	reference: <<<REFERENCE
+none
+REFERENCE
 )
 
 /(?i)(sanitiz|encod(e|ing)|entit(y|ies)|escap(e|ing)|replace|regex|normaliz|canonical|anti|safe|purif|purg|pure|validate|strip|clean|clear|special|convert|remov)/ as $output;

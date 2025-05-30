@@ -1,12 +1,15 @@
 desc(
-	title_zh:"检测Java java.sql 数据库Statement资源未释放",
-	title:"Check Java java.sql Statement Unreleased Resource"
+	title_zh: "检测Java java.sql 数据库Statement资源未释放"
+	title: "Check Java java.sql Statement Unreleased Resource"
 	level:high
 	risk:"资源泄漏",
-	reference:<<<URL
+	reference: <<<REFERENCE
+[CWE-772: Missing Release of Resource after Effective Lifetime](https://cwe.mitre.org/data/definitions/772.html)
+URL
     https://docs.oracle.com/javase/8/docs/api/java/sql/Connection.html
 URL
-	description:<<<TEXT
+REFERENCE
+	description: <<<DESCRIPTION
     应用程序通过 `Connection.createStatement()`、`Connection.prepareStatement()` 或 `Connection.prepareCall()` 创建了 JDBC Statement 对象后，未正确关闭这些资源。这些 Statement 对象在不再使用时必须显式关闭，否则会导致资源泄漏。
 
     即使关闭了父级 Connection 对象，最佳实践仍然要求显式关闭每个 Statement 对象，以确保及时释放资源，特别是在连接池环境中。
@@ -19,73 +22,110 @@ URL
     - 大量未关闭的 Statement 会增加内存占用，可能导致内存溢出
     - 长时间运行的应用程序性能会因资源泄漏而逐渐下降
 
-TEXT
-	solution:<<<TEXT
-    ### 1. 使用 try-with-resources 自动关闭 Statement (Java 7+)
+DESCRIPTION
+	solution: <<<SOLUTION
+### 修复建议
 
-    ```java
-    try (
-        Connection conn = dataSource.getConnection();
-        Statement stmt = conn.createStatement()
-    ) {
-        // 使用 Statement 进行操作
-        ResultSet rs = stmt.executeQuery("SELECT * FROM users");
-        // 处理结果集...
-    } // Statement 和 Connection 会自动关闭
-    ```
+应用程序应确保在使用完 `java.sql.Statement`、`PreparedStatement` 和 `CallableStatement` 对象后，及时调用其 `close()` 方法释放资源。优先推荐使用 Java 7 引入的 try-with-resources 语法，它可以确保资源在代码块执行完毕后自动关闭，包括正常执行、抛出异常或 break/continue/return。
 
-    ### 2. 使用 try-finally 手动关闭 Statement
+1. **使用 try-with-resources (Java 7+)**
+   这是最推荐的方式，简洁且安全，能够自动处理资源的关闭，即使发生异常。确保所有实现了 `AutoCloseable` 或 `Closeable` 接口的资源都在 try 括号中声明和初始化。
+   ```java
+   import java.sql.*;
+   import javax.sql.DataSource;
 
-    ```java
-    Connection conn = null;
-    Statement stmt = null;
-    try {
-        conn = dataSource.getConnection();
-        stmt = conn.createStatement();
+   public class SafeJdbcExample {
 
-        // 使用 Statement 进行操作
-        // ...
-    } finally {
-        // 按照资源获取的逆序关闭
-        if (stmt != null) try { stmt.close(); } catch (SQLException e) { /* 记录日志 */ }
-        if (conn != null) try { conn.close(); } catch (SQLException e) { /* 记录日志 */ }
-    }
-    ```
+       private DataSource dataSource; // 假设通过依赖注入获取
 
-    ### 3. 为 PreparedStatement 和 CallableStatement 应用相同原则
+       public void safeStatementUsage() throws SQLException {
+           String sql = "SELECT * FROM employees";
+           try (
+               Connection conn = dataSource.getConnection();
+               Statement stmt = conn.createStatement();
+               ResultSet rs = stmt.executeQuery(sql)
+           ) {
+               while (rs.next()) {
+                   System.out.println(rs.getString("name"));
+               }
+           } // Connection, Statement, ResultSet 会自动关闭
+       }
 
-    ```java
-    // PreparedStatement 示例
-    try (
-        Connection conn = dataSource.getConnection();
-        PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM users WHERE id = ?")
-    ) {
-        pstmt.setInt(1, userId);
-        // 使用 PreparedStatement...
-    }
+       public void safePreparedStatementUsage(int userId) throws SQLException{
+           String sql = "SELECT * FROM products WHERE id = ?";
+           try (
+               Connection conn = dataSource.getConnection();
+               PreparedStatement pstmt = conn.prepareStatement(sql)
+           ) {
+               pstmt.setInt(1, userId);
+               try (ResultSet rs = pstmt.executeQuery()){
+                  while (rs.next()) {
+                     // 处理结果...
+                   }
+               }
+           }
+       }
+   }
+   ```
 
-    // CallableStatement 示例
-    try (
-        Connection conn = dataSource.getConnection();
-        CallableStatement cstmt = conn.prepareCall("{call get_user(?)}")
-    ) {
-        cstmt.setInt(1, userId);
-        // 使用 CallableStatement...
-    }
-    ```
+2. **使用 try-finally 手动关闭资源 (适用于旧版本 Java 或特定场景)**
+   在旧版本的 Java 中或 try-with-resources 不适用的情况下，必须在 `finally` 块中手动调用资源的 `close()` 方法。关闭资源的顺序应与获取资源的顺序相反。
+   ```java
+   import java.sql.*;
+   import javax.sql.DataSource;
 
-    ### 4. 使用数据访问框架自动管理资源
+   public class SafeJdbcOlderVersion {
 
-    ```java
-    // 使用 Spring JdbcTemplate
-    JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
-    User user = jdbcTemplate.queryForObject(
-        "SELECT * FROM users WHERE id = ?",
-        new Object[]{userId},
-        (rs, rowNum) -> new User(rs.getLong("id"), rs.getString("name"))
-    );
-    ```
-TEXT
+       private DataSource dataSource;
+
+       public void safeStatementUsage() throws SQLException {
+           Connection conn = null;
+           Statement stmt = null;
+           ResultSet rs = null;
+           try {
+               conn = dataSource.getConnection();
+               stmt = conn.createStatement();
+               rs = stmt.executeQuery("SELECT * FROM employees");
+               while (rs.next()) {
+                   System.out.println(rs.getString("name"));
+               }
+           } finally {
+               // 按照获取的逆序关闭
+               if (rs != null) { try { rs.close(); } catch (SQLException e) { /* 记录日志 */ } }
+               if (stmt != null) { try { stmt.close(); } catch (SQLException e) { /* 记录日志 */ } }
+               if (conn != null) { try { conn.close(); } catch (SQLException e) { /* 记录日志 */ } }
+           }
+       }
+   }
+   ```
+
+3. **使用数据访问框架/ORM**
+   使用 Spring JDBC Template, MyBatis, Hibernate 等现代数据访问框架或 ORM 工具，它们通常内置了资源管理机制，能够自动处理 Statement 和 Connection 的关闭。
+   ```java
+   // 使用 Spring JdbcTemplate，通常不需要手动关闭 Statement
+   import org.springframework.jdbc.core.JdbcTemplate;
+   import javax.sql.DataSource;
+
+   public class SafeJdbcWithSpring {
+       private JdbcTemplate jdbcTemplate;
+
+       public void setDataSource(DataSource dataSource) {
+           this.jdbcTemplate = new JdbcTemplate(dataSource);
+       }
+
+       public String getEmployeeNameById(int id) {
+           // JdbcTemplateHelper会自动管理Statement和Connection的关闭
+           return jdbcTemplate.queryForObject(
+               "SELECT name FROM employees WHERE id = ?",
+               String.class,
+               id
+           );
+       }
+   }
+   ```
+
+**重要提示:** 即使关闭了父级 Connection，最好还是显式关闭每个 Statement。在连接池环境中，只关闭 Statement 可以将连接对象保留给后续操作复用，提高效率。
+SOLUTION
 	rule_id: "195768f2-de1d-4e9f-9a72-7244efbc0abf"
 )
 

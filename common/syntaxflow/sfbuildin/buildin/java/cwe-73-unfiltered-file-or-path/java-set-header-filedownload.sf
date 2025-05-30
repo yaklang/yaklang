@@ -1,12 +1,59 @@
 desc(
-	title: "Find File Download Position Config via Attachment Filename"
-	title_zh: "寻找文件下载位置配置点（使用 setHeader(Content-disposition...)）配置",
+	title: "Audit Java SetHeader for File Download Position Config"
+	title_zh: "审计Java SetHeader中文件下载位置配置点"
 	type: config
 	level: low
-	desc: <<<TEXT
-通过配置 `Content-Disposition` 头部中的文件名，应用程序可能会暴露文件下载功能的配置细节。攻击者可能会利用此配置点进行文件下载路径的猜测或枚举，进而获取敏感信息或执行进一步的攻击。建议对文件名进行适当的验证和清理，以防止潜在的安全风险。
-TEXT
+	desc: <<<DESC
+### 风险描述
+
+1. **风险原理**
+该规则用于审计Java代码中通过设置`Content-Disposition` HTTP头部来配置文件下载功能的位置点。攻击者如果能够控制或影响该头部中的文件名参数，可能结合其他漏洞（如路径穿越）进行敏感文件下载或枚举服务器文件结构。即使文件名本身经过编码，如果处理不当或存在其他漏洞，暴露配置点本身也增加了攻击面。
+
+2. **触发场景**
+当Java应用程序使用`HttpServletResponse.setHeader("Content-disposition", ...)`方法，并且该头部的值（特别是`filename`或`filename*`参数）是基于用户输入或与用户输入有关的数据构造时，可能触发该规则。
+
+例如，以下代码片段虽然对文件名进行了URL编码，但如果`realFileName`来源于外部不可信源且未进行严格校验，则仍构成一个配置点，需要关注其后续的安全性。
+```java
+StringBuilder contentDispositionValue = new StringBuilder();
+contentDispositionValue.append("attachment; filename=")
+        .append(percentEncodedFileName)
+        .append(";")
+        .append("filename*=")
+        .append("utf-8''")
+        .append(percentEncodedFileName);
+response.setHeader("Content-disposition", contentDispositionValue.toString());
+```
+
+3. **潜在影响**
+- 攻击者可能通过路径穿越攻击下载任意文件（如果文件名参数未经验证或编码不当）。
+- 即使不存在路径穿越，暴露文件下载的实现方式和文件名构造逻辑也有助于攻击者理解应用结构。
+- 结合其他漏洞，可能导致更严重的攻击。
+DESC
 	rule_id: "df1af403-0bc8-4d7e-bcd6-6bb863559f02"
+	solution: <<<SOLUTION
+### 修复建议
+
+1. **严格限制和校验文件名**
+   - 对下载文件名进行白名单限制：仅允许下载特定目录下的文件，并验证文件是否确实存在于该目录中。
+   - 移除或过滤文件名中的特殊字符，特别是路径分隔符（`/`, `\`）和表示上级目录的序列（`..`）。
+   - 避免直接使用用户输入作为文件名或文件名的一部分。如果必须包含用户提供的信息，应对其进行严格的清洗和编码。
+
+2. **使用安全的API或框架**
+   - 考虑使用成熟的文件下载库或框架，它们通常提供了更健壮的安全处理机制。
+
+3. **文件名编码处理**
+   - 确保使用正确的、安全的编码方式（如RFC 5987中推荐的`filename*`）处理包含非ASCII字符的文件名。
+   - 示例（基于原始代码片段）：确保`percentEncode`方法能够彻底移除或编码所有潜在恶意字符，并结合文件路径的严格限制。
+
+4. **权限检查**
+   - 在提供文件下载服务时，务必对用户进行身份验证和授权检查，确保用户有权下载指定文件。
+
+5. **日志记录**
+   - 记录文件下载请求，特别是文件名参数，以便进行安全审计和事件追踪。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-73: External Control of File Name or Path](https://cwe.mitre.org/data/definitions/73.html)
+REFERENCE
 )
 
 .setHeader(*<slice(start=1)> as $params);
