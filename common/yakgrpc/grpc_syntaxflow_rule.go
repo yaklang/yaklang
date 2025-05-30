@@ -92,7 +92,7 @@ func (s *Server) DeleteSyntaxFlowRule(ctx context.Context, req *ypb.DeleteSyntax
 		EffectRows:   0,
 		ExtraMessage: "",
 	}
-	count, err := yakit.DeleteSyntaxFlowNonBuildInRule(s.GetProfileDatabase(), req)
+	count, err := yakit.DeleteSyntaxFlowRule(s.GetProfileDatabase(), req)
 	msg.EffectRows = count
 	return msg, err
 }
