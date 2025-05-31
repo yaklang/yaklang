@@ -157,6 +157,7 @@ var AIAgentExport = map[string]any{
 	"jarOperator":                  WithJarOperator,
 	"omniSearchTool":               WithOmniSearchTool,
 	"aiToolsSearchTool":            WithAiToolsSearchTool,
+	"aiForgeSearchTool":            WithAiForgeSearchTool,
 	"debugPrompt":                  WithDebugPrompt,
 	"eventHandler":                 WithEventHandler,
 	"eventInputChan":               WithEventInputChan,

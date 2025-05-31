@@ -148,6 +148,9 @@ func ExtractObjectIndexes(c string) [][2]int {
 				//case '`':
 				//	pushState(state_esExpr)
 				//	continue
+			case '[':
+				pushState(state_jsonArray)
+				continue
 			}
 		case state_jsonObj:
 			switch ch {

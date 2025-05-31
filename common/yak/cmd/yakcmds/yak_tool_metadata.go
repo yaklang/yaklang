@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 
@@ -12,8 +11,6 @@ import (
 	yaktool "github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 )
 
 func createYakToolMetadataCommand() *cli.Command {
@@ -66,7 +63,7 @@ yak yak-tool-metadata --input ./tools --output ./tools_with_metadata
 		}
 
 		if concurrency <= 0 {
-			concurrency = 20 // 使用默认值
+			concurrency = 1 // 使用默认值
 		}
 
 		// 检查输入目录是否存在
@@ -217,7 +214,7 @@ func processYakScript(info utils.FileInfo, inputDir, outputDir string, forceUpda
 		}
 
 		// 生成带有新Description和Keywords的脚本内容
-		newContent := generateScriptWithMetadata(string(content), metadata.Description, metadata.Keywords)
+		newContent := yaktool.GenerateScriptWithMetadata(string(content), metadata.Description, metadata.Keywords)
 		content = []byte(newContent)
 	}
 
@@ -237,84 +234,4 @@ func processYakScript(info utils.FileInfo, inputDir, outputDir string, forceUpda
 
 	log.Infof("Processed %s -> %s", filePath, outputFilePath)
 	return nil
-}
-
-// generateScriptWithMetadata 生成带有描述和关键词的脚本内容
-func generateScriptWithMetadata(content string, description string, keywords []string) string {
-	prog, err := static_analyzer.SSAParse(content, "yak")
-	if err != nil {
-		log.Errorf("Failed to parse metadata: %v", err)
-		return content
-	}
-
-	contentLines := strings.Split(content, "\n")
-	descRanges := make([]struct{ typ, start, end int }, 0)
-	keywordsRanges := make([]struct{ typ, start, end int }, 0)
-
-	// Find __DESC__ variables and their ranges
-	prog.Ref("__DESC__").ForEach(func(value *ssaapi.Value) {
-		if !value.IsConstInst() {
-			return
-		}
-		descRange := value.GetRange()
-		if descRange != nil {
-			start := descRange.GetStart().GetLine()
-			end := descRange.GetEnd().GetLine()
-			descRanges = append(descRanges, struct{ typ, start, end int }{typ: 0, start: start, end: end})
-		}
-	})
-
-	// Find __KEYWORDS__ variables and their ranges
-	prog.Ref("__KEYWORDS__").ForEach(func(value *ssaapi.Value) {
-		if !value.IsConstInst() {
-			return
-		}
-		keywordsRange := value.GetRange()
-		if keywordsRange != nil {
-			start := keywordsRange.GetStart().GetLine()
-			end := keywordsRange.GetEnd().GetLine()
-			keywordsRanges = append(keywordsRanges, struct{ typ, start, end int }{typ: 1, start: start, end: end})
-		}
-	})
-
-	allRange := append(descRanges, keywordsRanges...)
-	// Sort ranges in reverse order to avoid index shifts when modifying the content
-	sort.Slice(allRange, func(i, j int) bool {
-		return allRange[i].start > allRange[j].start
-	})
-
-	// Replace or remove all __DESC__ variables
-	for _, r := range allRange {
-		// 确保索引在有效范围内
-		if r.start <= 0 || r.end >= len(contentLines) {
-			log.Warnf("Invalid range: start=%d, end=%d, content length=%d", r.start, r.end, len(contentLines))
-			continue
-		}
-
-		switch r.typ {
-		case 0:
-			if r.start-1 >= 0 && r.end+1 <= len(contentLines) {
-				contentLines = append(contentLines[:r.start-1], contentLines[r.end:]...)
-			}
-		case 1:
-			if r.start-1 >= 0 && r.end+1 <= len(contentLines) {
-				contentLines = append(contentLines[:r.start-1], contentLines[r.end:]...)
-			}
-		}
-	}
-
-	// Generate new declarations
-	newDesc := ""
-	if strings.Contains(description, "\n") {
-		// Use heredoc format for multiline descriptions
-		newDesc = fmt.Sprintf("__DESC__ = <<<EOF\n%s\nEOF\n\n", description)
-	} else {
-		newDesc = fmt.Sprintf("__DESC__ = %q\n\n", description)
-	}
-	newKeywords := fmt.Sprintf("__KEYWORDS__ = %q\n\n", strings.Join(keywords, ","))
-
-	newContent := strings.TrimSpace(strings.Join(contentLines, "\n"))
-	// Add new declarations at the beginning of the file
-	newContent = newDesc + newKeywords + newContent
-	return newContent
 }

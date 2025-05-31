@@ -1,9 +1,12 @@
 package yakgrpc
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/jsonextractor"
 	"math/rand"
 	"os"
 	"strings"
@@ -479,5 +482,50 @@ func TestAITaskForge(t *testing.T) {
 			continue
 		}
 		fmt.Println(event.String())
+	}
+}
+
+func TestAITaskForgeTriage(t *testing.T) {
+	if utils.InGithubActions() {
+		return
+	}
+
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	stream, err := client.StartAITask(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stream.Send(&ypb.AIInputEvent{
+		IsStart: true,
+		Params: &ypb.AIStartParams{
+			ForgeName:          "",
+			UserQuery:          "我想做渗透测试",
+			UseDefaultAIConfig: true,
+		},
+	})
+
+	for {
+		event, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if event.Type == aid.EVENT_TYPE_REQUIRE_USER_INTERACTIVE {
+			eventId := ""
+			jsonextractor.ExtractStructuredJSONFromStream(bytes.NewReader(event.Content), jsonextractor.WithObjectCallback(func(data map[string]any) {
+				if id, ok := data["id"]; ok {
+					eventId = id.(string)
+				}
+			}))
+			stream.Send(&ypb.AIInputEvent{
+				IsInteractiveMessage: true,
+				InteractiveId:        eventId,
+				InteractiveJSONInput: `{"suggestion": "xss"}`,
+			})
+		}
 	}
 }

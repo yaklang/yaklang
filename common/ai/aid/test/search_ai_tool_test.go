@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/yak/depinjector"
+
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/utils"
 	_ "github.com/yaklang/yaklang/common/yak"
@@ -34,6 +36,8 @@ import (
 // }
 
 func TestDecodeBase64BySearchTool(t *testing.T) {
+	depinjector.DependencyInject()
+
 	taskId := string(utils.RandStringBytes(10))
 	summaryId := string(utils.RandStringBytes(10))
 	stateKeyword := []struct {
@@ -79,12 +83,15 @@ func TestDecodeBase64BySearchTool(t *testing.T) {
 		{
 			"执行搜索工具",
 			"你是一个智能关键词匹配助手", `
-	[
-      {
-        "tool": "decode",
-        "reason": "可以用于base64解码"
-      }
-    ]`,
+	{
+		"@action": "keyword_search",
+		"matches": [
+			{
+				"tool": "decode",
+				"matched_keywords": ["base64解码"]
+			}
+		]
+	}`,
 		},
 		// 判断任务情况
 		{

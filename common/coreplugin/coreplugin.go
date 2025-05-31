@@ -3,15 +3,13 @@ package coreplugin
 import (
 	"strings"
 
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
-	"github.com/yaklang/yaklang/common/yakgrpc"
-
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
@@ -316,7 +314,7 @@ func OverWriteYakPlugin(name string, scriptData *schema.YakScript, enableGenerat
 			if err != nil {
 				return "", "", err
 			}
-			params, envKey, err := yakgrpc.GenerateParameterFromProgram(prog)
+			params, envKey, err := information.GenerateParameterFromProgram(prog)
 			if err != nil {
 				return "", "", utils.Wrapf(err, "generate param for %s failed", name)
 			}

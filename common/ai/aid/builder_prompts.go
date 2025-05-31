@@ -3,8 +3,9 @@ package aid
 import (
 	"bytes"
 	_ "embed"
-	"github.com/yaklang/yaklang/common/utils"
 	"text/template"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 //go:embed prompts/plan/plan-to-task-list.txt
@@ -51,6 +52,9 @@ var __prompt_PlanHelp string
 
 //go:embed prompts/tool/tool-re-select.txt
 var __prompt_toolReSelect string
+
+//go:embed prompts/search/aitool-keyword-search.txt
+var __prompt_KeywordSearchPrompt string
 
 func (c *Config) quickBuildPrompt(tmp string, i map[string]any) (string, error) {
 	tmpl, err := template.New("prompt").Parse(tmp)

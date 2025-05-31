@@ -108,6 +108,7 @@ var (
 	WithJarOperator                  = aid.WithJarOperator
 	WithOmniSearchTool               = aid.WithOmniSearchTool
 	WithAiToolsSearchTool            = aid.WithAiToolsSearchTool
+	WithAiForgeSearchTool            = aid.WithAiForgeSearchTool
 	WithDebugPrompt                  = aid.WithDebugPrompt
 	WithEventHandler                 = aid.WithEventHandler
 	WithEventInputChan               = aid.WithEventInputChan

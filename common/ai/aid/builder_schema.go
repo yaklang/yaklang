@@ -28,6 +28,9 @@ var toolExecuteCheckSchema string
 //go:embed jsonschema/plan-review/create-subtask.json
 var planReviewCreateSubtasksSchema string
 
+//go:embed jsonschema/search/keyword_search.json
+var keywordSearchSchema string
+
 func planJSONSchema(toolNames []string) map[string]string {
 	var toolNamesStrs []string
 	for _, toolName := range toolNames {
@@ -46,5 +49,6 @@ func planJSONSchema(toolNames []string) map[string]string {
 	res["ToolDescRequireSchema"] = toolDescRequireSchemaBuilder.String()
 	res["ToolExecuteCheckSchema"] = toolExecuteCheckSchema
 	res["PlanCreateSubtaskSchema"] = planReviewCreateSubtasksSchema
+	res["KeywordSearchSchema"] = keywordSearchSchema
 	return res
 }

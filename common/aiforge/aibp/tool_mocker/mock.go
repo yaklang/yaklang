@@ -76,6 +76,16 @@ type SubTaskInfo struct {
 	SubTaskGoal string `json:"subtask_goal"`
 }
 
+func NewMockerSearcher[T searchtools.AISearchable](getter func(ctx context.Context, query string) (T, error)) searchtools.AISearcher[T] {
+	return func(query string, searchList []T) ([]T, error) {
+		tool, err := getter(context.Background(), query)
+		if err != nil {
+			return nil, err
+		}
+		return []T{tool}, nil
+	}
+}
+
 func NewAiToolMockServer(aiOptions ...aispec.AIConfigOption) *AiToolMockServer {
 	mocker := &AiToolMockServer{
 		aiOptions: aiOptions,
@@ -99,13 +109,7 @@ func NewAiToolMockServer(aiOptions ...aispec.AIConfigOption) *AiToolMockServer {
 			}))
 		allTools = append(allTools, factory.Tools()...)
 		return allTools
-	}, buildinaitools.WithSearcher(func(req *searchtools.ToolSearchRequest) ([]*aitool.Tool, error) {
-		tool, err := mocker.SearchTool(context.Background(), req.Query)
-		if err != nil {
-			return nil, err
-		}
-		return []*aitool.Tool{tool}, nil
-	}), buildinaitools.WithToolEnabled("tools_search", true))
+	}, buildinaitools.WithSearcher(NewMockerSearcher(mocker.SearchTool)), buildinaitools.WithToolEnabled("tools_search", true))
 	return mocker
 }
 

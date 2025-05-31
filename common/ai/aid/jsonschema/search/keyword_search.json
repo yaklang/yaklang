@@ -1,0 +1,31 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": ["@action", "matches"],
+    "properties": {
+      "@action": {
+        "type": "string",
+        "const": "keyword_search"
+      },
+      "matches": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["tool", "matched_keywords"],
+          "properties": {
+            "tool": {
+              "type": "string",
+              "description": "工具的名称"
+            },
+            "matched_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "与用户需求匹配的关键词列表"
+            }
+          }
+        }
+      }
+    }
+  }

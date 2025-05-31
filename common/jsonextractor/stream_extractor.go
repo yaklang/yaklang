@@ -84,6 +84,7 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 		objectValueHandledString bool
 		objectValueInArray       bool
 		arrayCurrentKeyIndex     int
+		legalArrayItem           bool
 	}
 
 	bufManager := newBufStackManager(func(key any, val any) {
@@ -166,6 +167,10 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 						objectDepthIndexTable = make(map[int]int)
 					}
 					objectDepth--
+				case state_arrayItem:
+					if !raw.legalArrayItem {
+						bufManager.PushValue(sliceValue)
+					}
 				}
 
 			}
@@ -209,26 +214,36 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 	RETRY:
 		switch currentState() {
 		case state_arrayItem:
-			// [
 			if unicode.IsSpace(rune(ch)) {
 				continue
 			}
-
-			if ch == ']' {
+			if ch == ',' || ch == ']' {
 				popState()
-				goto RETRY
+				goto RETRY // array item not consume ',' and ']'
 			}
-
+			currentStateIns().legalArrayItem = true
 			popState()
 			pushState(state_objectValue)
 			currentStateIns().objectValueInArray = true
 			goto RETRY
 		case state_jsonArray:
+			s := currentStateIns()
 			switch ch {
 			case ']':
 				popState()
+			case ',': // if get ',' means has new array item, should push state
+				if s.arrayCurrentKeyIndex == 0 { // if get ',' and index == 0 ,should consume it. push 0:""
+					bufManager.PushKey(s.arrayCurrentKeyIndex)
+					s.arrayCurrentKeyIndex++
+					bufManager.PushValue("")
+				}
+				bufManager.PushKey(s.arrayCurrentKeyIndex)
+				s.arrayCurrentKeyIndex++
+				pushStateWithIdx(state_arrayItem, index+1) // item should not contains this comma
 			default:
-				s := currentStateIns()
+				if unicode.IsSpace(rune(ch)) {
+					continue
+				}
 				bufManager.PushKey(s.arrayCurrentKeyIndex)
 				s.arrayCurrentKeyIndex++
 				pushState(state_arrayItem)
@@ -279,13 +294,7 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 			case ',':
 				popState()
 				if currentState() == state_jsonArray {
-					// 数组中，继续处理
-					s := currentStateIns()
-					bufManager.PushKey(s.arrayCurrentKeyIndex)
-					s.arrayCurrentKeyIndex++
-					pushStateWithIdx(state_objectValue, index+1)
-					currentStateIns().objectValueInArray = true
-					continue
+					goto RETRY // in json array every ',' and ']' should process in state_jsonArray
 				}
 				pushStateWithIdx(state_objectKey, index+1)
 				continue
@@ -330,9 +339,9 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 			case '\'':
 				pushState(state_SingleQuoteString)
 				continue
-				//case '`':
-				//	pushState(state_esExpr)
-				//	continue
+			case '[':
+				currentStateIns().isArray = true
+				pushState(state_jsonArray)
 			}
 		case state_jsonObj:
 			switch ch {
