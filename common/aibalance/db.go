@@ -57,8 +57,8 @@ func GetAiProvidersByModelType(typeName string) ([]*schema.AiProvider, error) {
 	return providers, nil
 }
 
-// RegisterAiProvider registers a new AI provider to the database
-// wrapperName: model name displayed to users
+// RegisterAiProvider registers a new AI provider in the database
+// wrapperName: wrapper name used for external reference
 // modelName: actual model name used internally
 // typeName: provider type, such as openai, chatglm, etc.
 // domainOrUrl: API domain or URL
@@ -67,20 +67,21 @@ func GetAiProvidersByModelType(typeName string) ([]*schema.AiProvider, error) {
 func RegisterAiProvider(wrapperName, modelName, typeName, domainOrUrl, apiKey string, noHTTPS bool) (*schema.AiProvider, error) {
 	// Create provider object
 	provider := &schema.AiProvider{
-		WrapperName:       wrapperName,
-		ModelName:         modelName,
-		TypeName:          typeName,
-		DomainOrURL:       domainOrUrl,
-		APIKey:            apiKey,
-		NoHTTPS:           noHTTPS,
-		SuccessCount:      0,
-		FailureCount:      0,
-		TotalRequests:     0,
-		LastRequestTime:   time.Now(),
-		LastRequestStatus: true,
-		LastLatency:       0,
-		IsHealthy:         true,
-		HealthCheckTime:   time.Now(),
+		WrapperName:           wrapperName,
+		ModelName:             modelName,
+		TypeName:              typeName,
+		DomainOrURL:           domainOrUrl,
+		APIKey:                apiKey,
+		NoHTTPS:               noHTTPS,
+		SuccessCount:          0,
+		FailureCount:          0,
+		TotalRequests:         0,
+		LastRequestTime:       time.Time{}, // 修改：不设置时间，让健康检查来更新
+		LastRequestStatus:     false,       // 修改：默认为false，需要通过健康检查
+		LastLatency:           0,
+		IsHealthy:             false,       // 修改：新provider默认为不健康，需要通过健康检查
+		IsFirstCheckCompleted: false,       // 修改：明确设置首次检查未完成
+		HealthCheckTime:       time.Time{}, // 修改：不设置时间，让健康检查来更新
 	}
 
 	// Check if provider with same details exists
