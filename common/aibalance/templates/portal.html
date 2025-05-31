@@ -1831,6 +1831,10 @@
             <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
             快速新增供应商
         </div>
+        <div class="context-menu-item" onclick="copySimilarProviderKeys(currentContextMenuProviderId)">
+            <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+            复制同类供应商Keys
+        </div>
         <div class="context-menu-item delete" onclick="deleteSelectedProvider()">
             <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
             删除
@@ -1881,32 +1885,29 @@
         </div>
     </div>
 
-    <!-- 添加编辑模态框 - 这个是Bootstrap风格的，将被移除 -->
-    <!-- 
-    <div class="modal fade" id="editAllowedModelsModal" tabindex="-1" role="dialog" aria-labelledby="editAllowedModelsModalLabel" aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="editAllowedModelsModalLabel">编辑允许的模型</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" id="editApiKeyId">
-                    <div class="form-group">
-                        <label for="editAllowedModelsInput">允许的模型（用逗号分隔）</label>
-                        <input type="text" class="form-control" id="editAllowedModelsInput">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
-                    <button type="button" class="btn btn-primary" onclick="saveAllowedModels()">保存</button>
-                </div>
+    <!-- 新增：复制同类供应商Keys弹窗 -->
+    <div id="copySimilarKeysModal" class="delete-confirmation-modal" style="display: none;">
+        <div class="modal-content" style="max-width: 600px;">
+            <span class="close-modal" onclick="closeCopySimilarKeysModal()">&times;</span>
+            <h4 id="similarKeysModalTitle">同类供应商 API Keys</h4>
+            <div class="form-group">
+                <label id="similarKeysModalDesc">找到以下相同配置的供应商：</label>
+                <div id="similarProvidersInfo" style="background-color: #f5f5f5; padding: 10px; border-radius: 4px; margin-bottom: 10px; font-size: 12px;"></div>
+                <label for="similarKeysTextarea">API Keys (每行一个):</label>
+                <textarea id="similarKeysTextarea" class="form-control" rows="8" readonly style="font-family: monospace; font-size: 12px; resize: vertical;"></textarea>
+                <small class="form-text text-muted">共找到 <span id="similarKeysCount">0</span> 个相同的供应商API Key</small>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="copySimilarKeysToClipboard()">
+                    <svg viewBox="0 0 24 24" width="14" height="14" style="margin-right: 4px; vertical-align: middle;">
+                        <path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                    </svg>
+                    复制到剪贴板
+                </button>
+                <button class="btn" onclick="closeCopySimilarKeysModal()">关闭</button>
             </div>
         </div>
-    </div> 
-    -->
+    </div>
 
     <script>
         // 全局变量
@@ -4014,6 +4015,157 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 editAllowedModels(contextApiIdForEdit, contextModelsForEdit);
             }
             hideContextMenu();
+        }
+
+        // New function: Copy similar provider keys
+        function copySimilarProviderKeys(providerId) {
+            console.log(`Copy similar provider keys for provider ID: ${providerId}`);
+            
+            if (!providerId) {
+                showToast('未找到供应商ID', 'error');
+                return;
+            }
+
+            // 获取当前供应商的信息
+            const currentRow = document.querySelector(`tr[data-id="${providerId}"]`);
+            if (!currentRow) {
+                showToast('未找到当前供应商信息', 'error');
+                return;
+            }
+
+            // 提取当前供应商的模型名、类型名和域名
+            const cells = currentRow.cells;
+            const currentWrapperName = cells[3].getAttribute('data-full-text') || cells[3].textContent.trim(); // 提供者
+            const currentModelName = cells[4].getAttribute('data-full-text') || cells[4].textContent.trim();   // 模型
+            const currentTypeName = cells[5].getAttribute('data-full-text') || cells[5].textContent.trim();    // 类型
+            const currentDomainOrURL = cells[6].getAttribute('data-full-text') || cells[6].textContent.trim(); // 域名
+
+            console.log(`Current provider: ${currentWrapperName}, Model: ${currentModelName}, Type: ${currentTypeName}, Domain: ${currentDomainOrURL}`);
+
+            // 查找相同的供应商（模型+类型+域名相同）
+            const allRows = document.querySelectorAll('#provider-table-body tr[data-id]');
+            const similarProviders = [];
+
+            allRows.forEach(row => {
+                const rowCells = row.cells;
+                const rowModelName = rowCells[4].getAttribute('data-full-text') || rowCells[4].textContent.trim();
+                const rowTypeName = rowCells[5].getAttribute('data-full-text') || rowCells[5].textContent.trim();
+                const rowDomainOrURL = rowCells[6].getAttribute('data-full-text') || rowCells[6].textContent.trim();
+                
+                // 判断是否为相同的供应商（模型+类型+域名都相同）
+                if (rowModelName === currentModelName && 
+                    rowTypeName === currentTypeName && 
+                    rowDomainOrURL === currentDomainOrURL) {
+                    
+                    const providerId = row.getAttribute('data-id');
+                    const wrapperName = rowCells[3].getAttribute('data-full-text') || rowCells[3].textContent.trim();
+                    const apiKey = rowCells[7].getAttribute('data-full-text') || ''; // API Key
+                    
+                    similarProviders.push({
+                        id: providerId,
+                        wrapperName: wrapperName,
+                        modelName: rowModelName,
+                        typeName: rowTypeName,
+                        domainOrURL: rowDomainOrURL,
+                        apiKey: apiKey
+                    });
+                }
+            });
+
+            if (similarProviders.length === 0) {
+                showToast('未找到相同配置的供应商', 'warning');
+                return;
+            }
+
+            // 显示结果弹窗
+            showSimilarKeysModal(similarProviders, currentModelName, currentTypeName, currentDomainOrURL);
+            hideContextMenu();
+        }
+
+        // 显示相同供应商Keys的弹窗
+        function showSimilarKeysModal(providers, modelName, typeName, domainOrURL) {
+            const modal = document.getElementById('copySimilarKeysModal');
+            const titleElement = document.getElementById('similarKeysModalTitle');
+            const descElement = document.getElementById('similarKeysModalDesc');
+            const infoElement = document.getElementById('similarProvidersInfo');
+            const textareaElement = document.getElementById('similarKeysTextarea');
+            const countElement = document.getElementById('similarKeysCount');
+
+            // 设置标题和描述
+            titleElement.textContent = `${modelName} 的同类供应商 API Keys`;
+            descElement.textContent = '找到以下相同配置的供应商：';
+
+            // 设置配置信息
+            infoElement.innerHTML = `
+                <strong>匹配条件：</strong><br>
+                模型名称：${modelName}<br>
+                类型：${typeName}<br>
+                域名/URL：${domainOrURL || '(默认)'}
+            `;
+
+            // 收集API Keys
+            const apiKeys = providers
+                .map(p => p.apiKey)
+                .filter(key => key && key.trim() !== '')
+                .filter((key, index, arr) => arr.indexOf(key) === index); // 去重
+
+            // 显示在textarea中
+            textareaElement.value = apiKeys.join('\n');
+            countElement.textContent = apiKeys.length;
+
+            // 显示弹窗
+            modal.style.display = 'block';
+
+            console.log(`Found ${providers.length} similar providers with ${apiKeys.length} unique API keys`);
+        }
+
+        // 关闭相同供应商Keys弹窗
+        function closeCopySimilarKeysModal() {
+            const modal = document.getElementById('copySimilarKeysModal');
+            modal.style.display = 'none';
+        }
+
+        // 复制相同供应商Keys到剪贴板
+        function copySimilarKeysToClipboard() {
+            const textareaElement = document.getElementById('similarKeysTextarea');
+            const content = textareaElement.value;
+
+            if (!content.trim()) {
+                showToast('没有可复制的内容', 'warning');
+                return;
+            }
+
+            // 尝试使用现代剪贴板API
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(content).then(() => {
+                    showToast(`已复制 ${content.split('\n').filter(line => line.trim()).length} 个API Key到剪贴板`, 'success');
+                }).catch(err => {
+                    console.error('复制失败:', err);
+                    fallbackCopyToClipboard(content);
+                });
+            } else {
+                // 降级处理：使用传统方法
+                fallbackCopyToClipboard(content);
+            }
+        }
+
+        // 降级复制方法
+        function fallbackCopyToClipboard(text) {
+            const textareaElement = document.getElementById('similarKeysTextarea');
+            textareaElement.select();
+            textareaElement.setSelectionRange(0, 99999); // 适用于移动设备
+
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    showToast(`已复制 ${text.split('\n').filter(line => line.trim()).length} 个API Key到剪贴板`, 'success');
+                } else {
+                    showToast('复制失败，请手动选择并复制', 'error');
+                }
+            } catch (err) {
+                console.error('复制失败:', err);
+                showToast('复制失败，请手动选择并复制', 'error');
+            }
         }
     </script>
 </body>

@@ -54,7 +54,7 @@ func NewBalancerFromRawConfig(raw []byte, files ...string) (*Balancer, error) {
 
 	// Start health check scheduler (ensure it only starts once)
 	healthCheckSchedulerStarted.Do(func() {
-		StartHealthCheckScheduler(b, 5*time.Minute) // Check every 5 minutes
+		StartHealthCheckScheduler(b, 10*time.Minute) // Check every 10 minutes
 	})
 
 	return b, nil
@@ -86,7 +86,7 @@ func NewBalancer(configFile string) (*Balancer, error) {
 
 		// Start health check scheduler (ensure it only starts once)
 		healthCheckSchedulerStarted.Do(func() {
-			StartHealthCheckScheduler(b, 5*time.Minute) // Check every 5 minutes
+			StartHealthCheckScheduler(b, 10*time.Minute) // Check every 10 minutes
 		})
 
 		return b, nil
