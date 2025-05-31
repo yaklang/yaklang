@@ -143,16 +143,6 @@ func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send f
 	hostPort := utils.HostPort(host, int(port))
 	urlStr := fmt.Sprintf("http://%s", hostPort)
 
-	// 发送启动状态
-	err = send(&ypb.StartMcpServerResponse{
-		Status:    "running",
-		Message:   fmt.Sprintf("MCP server started with SSE transport on %s", urlStr),
-		ServerUrl: urlStr + "/sse",
-	})
-	if err != nil {
-		return err
-	}
-
 	// 启动心跳机制
 	heartbeatCtx, cancelHeartbeat := context.WithCancel(ctx)
 	defer cancelHeartbeat()
@@ -193,6 +183,22 @@ func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send f
 
 	// 阻塞运行服务器
 	log.Infof("Starting MCP SSE server on: %s", urlStr)
+	go func() {
+		err := utils.WaitConnect(hostPort, 3)
+		if err != nil {
+			log.Errorf("Failed to wait for MCP server to start: %v", err)
+			return
+		}
+		// 发送启动状态
+		err = send(&ypb.StartMcpServerResponse{
+			Status:    "running",
+			Message:   fmt.Sprintf("MCP server started with SSE transport on %s", urlStr),
+			ServerUrl: urlStr + "/sse",
+		})
+		if err != nil {
+			log.Errorf("Failed to send running status: %v", err)
+		}
+	}()
 	if err := mcpServer.ServeSSE(hostPort, urlStr); err != nil {
 		log.Errorf("MCP SSE server error: %v", err)
 		send(&ypb.StartMcpServerResponse{
