@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"io"
 	"net"
 	"net/http"
@@ -178,7 +180,7 @@ func (e *Entrypoints) PeekOrderedProviders(model string) []*Provider {
 		return nil
 	}
 
-	log.Debugf("PeekOrderedProviders for model %s: found %d providers", model, len(providers))
+	log.Infof("PeekOrderedProviders for model %s: found %d providers", model, len(providers))
 
 	// 过滤出延迟小于10秒的提供者
 	var validProviders []*Provider
@@ -419,17 +421,54 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 	c.logInfo("Requested model: %s", modelName)
 
 	var prompt bytes.Buffer
+	var imageContent []*aispec.ChatContent
 	for _, message := range bodyIns.Messages {
-		prompt.WriteString(fmt.Sprint(message.Content) + "\n")
+		switch ret := message.Content.(type) {
+		case string:
+			log.Infof("Received text content: %s", utils.ShrinkString(ret, 200))
+			prompt.Write([]byte(ret))
+			//contents = append(contents, aispec.NewUserChatContentText(ret))
+		default:
+			handleItem := func(element any) {
+				if utils.IsMap(element) {
+					// handle images
+					generalMap := utils.InterfaceToGeneralMap(element)
+					typeName := utils.MapGetString(generalMap, `type`)
+					switch typeName {
+					case "image_url":
+						txt := utils.MapGetString(utils.MapGetMapRaw(generalMap, `image_url`), "url")
+						log.Infof("meet image_url.url with: %#v", utils.ShrinkString(txt, 200))
+						imageContent = append(imageContent, aispec.NewUserChatContentImageUrl(txt))
+					case "text":
+						txt := utils.MapGetString(generalMap, "text") + "\n"
+						log.Infof("meet text with: %#v", utils.ShrinkString(txt, 200))
+						prompt.Write([]byte(txt))
+					default:
+						log.Infof("unknown type: %s with %v", typeName, spew.Sdump(ret))
+					}
+				} else {
+					log.Infof("Received unknown content: %s", utils.ShrinkString(element, 300))
+					prompt.Write(utils.InterfaceToBytes(element))
+				}
+			}
+			if funk.IsIteratee(ret) {
+				funk.ForEach(ret, func(i any) {
+					handleItem(i)
+				})
+			} else {
+				log.Infof("Received unknown content: %s", utils.ShrinkString(ret, 300))
+				prompt.Write(utils.InterfaceToBytes(ret))
+			}
+		}
 	}
 
-	if prompt.Len() == 0 {
+	if len(imageContent) == 0 && prompt.Len() <= 0 {
 		c.logError("Prompt is empty")
 		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\nX-Reason: empty prompt\r\n\r\n"))
 		return
 	}
 
-	c.logInfo("Built prompt length: %d", prompt.Len())
+	c.logInfo("Built prompt length: %d with image content: %d", prompt.Len(), len(imageContent))
 
 	allowedModels, ok := c.KeyAllowedModels.Get(key.Key)
 	if !ok {
@@ -500,24 +539,27 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		rr, rw := utils.NewBufPipe(nil)
 
 		writer := NewChatJSONChunkWriter(conn, key.Key, modelName)
-		client, err := provider.GetAIClient(func(reader io.Reader) {
-			defer func() {
-				pw.Close()
-				c.logInfo("Finished handling AI response stream(output)")
-			}()
-			c.logInfo("Start to handle AI response stream")
-			sendHeaderOnce.Do(sendHeader)
-			io.Copy(pw, reader)
-		}, func(reader io.Reader) {
-			defer func() {
-				rw.Close()
-				c.logInfo("Finished handling AI response stream(reason)")
-			}()
-			c.logInfo("Start to handle AI response stream(reason)")
-			sendHeaderOnce.Do(sendHeader)
-			io.Copy(rw, reader)
-			utils.FlushWriter(writer.writerClose)
-		})
+		client, err := provider.GetAIClientWithImages(
+			imageContent,
+			func(reader io.Reader) {
+				defer func() {
+					pw.Close()
+					c.logInfo("Finished handling AI response stream(output)")
+				}()
+				c.logInfo("Start to handle AI response stream")
+				sendHeaderOnce.Do(sendHeader)
+				io.Copy(pw, reader)
+			}, func(reader io.Reader) {
+				defer func() {
+					rw.Close()
+					c.logInfo("Finished handling AI response stream(reason)")
+				}()
+				c.logInfo("Start to handle AI response stream(reason)")
+				sendHeaderOnce.Do(sendHeader)
+				io.Copy(rw, reader)
+				utils.FlushWriter(writer.writerClose)
+			},
+		)
 		if err != nil {
 			c.logError("Failed to get AI client from provider %s: %v", provider.TypeName, err)
 			lastError = err

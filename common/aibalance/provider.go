@@ -148,13 +148,19 @@ func (cp *ConfigProvider) GetAllKeys() []string {
 	return allKeys
 }
 
-// GetAIClient gets the AI client
-func (p *Provider) GetAIClient(onStream, onReasonStream func(reader io.Reader)) (aispec.AIClient, error) {
+func (p *Provider) GetAIClientWithImages(imageContents []*aispec.ChatContent, onStream, onReasonStream func(reader io.Reader)) (aispec.AIClient, error) {
 	log.Infof("GetAIClient: type: %s, domain: %s, key: %s, model: %s, no_https: %v", p.TypeName, p.DomainOrURL, utils.ShrinkString(p.APIKey, 8), p.ModelName, p.NoHTTPS)
 
+	var images []any
+	for _, content := range imageContents {
+		if content.Type == "image_url" {
+			images = append(images, content)
+		}
+	}
 	var opts []aispec.AIConfigOption
 	opts = append(
 		opts,
+		aispec.WithChatImageContent(images...),
 		aispec.WithTimeout(10),
 		aispec.WithNoHTTPS(p.NoHTTPS),
 		aispec.WithAPIKey(p.APIKey),
@@ -191,6 +197,11 @@ func (p *Provider) GetAIClient(onStream, onReasonStream func(reader io.Reader)) 
 		return nil, errors.New("failed to get ai client, no such type: " + p.TypeName)
 	}
 	return client, nil
+}
+
+// GetAIClient gets the AI client
+func (p *Provider) GetAIClient(onStream, onReasonStream func(reader io.Reader)) (aispec.AIClient, error) {
+	return p.GetAIClientWithImages(nil, onStream, onReasonStream)
 }
 
 // GetDbProvider gets the associated database AiProvider object

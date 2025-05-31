@@ -132,6 +132,59 @@ func WithModel(model string) AIConfigOption {
 	}
 }
 
+func WithChatImageContent(image ...any) AIConfigOption {
+	return func(c *AIConfig) {
+		for _, i := range image {
+			switch v := i.(type) {
+			case string:
+				if utils.GetFirstExistedFile(v) != "" {
+					log.Infof("add image_url.url with: %v", utils.ShrinkString(v, 200))
+					WithImageFile(v)(c)
+				} else if strings.HasPrefix(v, "http://") || strings.HasPrefix(v, "https://") {
+					log.Infof("add image_url.url with: %v", utils.ShrinkString(v, 200))
+					c.Images = append(c.Images, &ImageDescription{
+						Url: v,
+					})
+				} else if utils.MatchAllOfGlob(v, `data:image/*;base64*`) {
+					log.Infof("add image_url.url with: %v", utils.ShrinkString(v, 200))
+					c.Images = append(c.Images, &ImageDescription{
+						Url: v,
+					})
+				} else {
+					log.Warnf("invalid image: %s", v)
+				}
+			case *ImageDescription:
+				if v.Url != "" {
+					log.Infof("add image_url.url with: %v", utils.ShrinkString(v.Url, 200))
+					c.Images = append(c.Images, v)
+				} else {
+					log.Warnf("invalid image description: %v", v)
+				}
+			case *ChatContent:
+				if v.Type == "image_url" {
+					log.Infof("add image_url.url with: %v", utils.ShrinkString(v.ImageUrl, 200))
+					c.Images = append(c.Images, &ImageDescription{
+						Url: utils.MapGetString(utils.InterfaceToGeneralMap(v.ImageUrl), "url"),
+					})
+				} else {
+					log.Warnf("invalid chat content image: %v", v)
+				}
+			case ChatContent:
+				if v.Type == "image_url" {
+					c.Images = append(c.Images, &ImageDescription{
+						Url: utils.MapGetString(utils.InterfaceToGeneralMap(v.ImageUrl), "url"),
+					})
+				} else {
+					log.Warnf("invalid chat content image: %v", v)
+				}
+			default:
+				log.Warnf("unsupported image type: %T, value: %v", i, i)
+			}
+		}
+
+	}
+}
+
 func WithType(t string) AIConfigOption {
 	return func(config *AIConfig) {
 		config.Type = t
