@@ -417,4 +417,5 @@ var Exports = map[string]any{
 	"onReasonStream":     aispec.WithReasonStreamHandler,
 	"debugStream":        aispec.WithDebugStream,
 	"type":               aispec.WithType,
+	"imageFile":          aispec.WithImageFile,
 }

@@ -644,15 +644,16 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 	for _, provider := range providers {
 		// Create database object
 		dbProvider := &schema.AiProvider{
-			ModelName:       modelName,
-			TypeName:        modelType,
-			DomainOrURL:     domainOrURL,
-			APIKey:          provider.APIKey,
-			WrapperName:     wrapperName, // Use WrapperName from form
-			NoHTTPS:         noHTTPS,     // 设置 NoHTTPS 参数
-			IsHealthy:       true,        // Default set to healthy
-			LastRequestTime: time.Now(),  // Set last request time
-			HealthCheckTime: time.Now(),  // Set health check time
+			ModelName:             modelName,
+			TypeName:              modelType,
+			DomainOrURL:           domainOrURL,
+			APIKey:                provider.APIKey,
+			WrapperName:           wrapperName, // Use WrapperName from form
+			NoHTTPS:               noHTTPS,     // 设置 NoHTTPS 参数
+			IsHealthy:             false,       // 修改：新provider默认为不健康，需要通过健康检查
+			IsFirstCheckCompleted: false,       // 修改：明确设置首次检查未完成
+			LastRequestTime:       time.Time{}, // 修改：不设置时间，让健康检查来更新
+			HealthCheckTime:       time.Time{}, // 修改：不设置时间，让健康检查来更新
 		}
 
 		// Save to database
@@ -680,6 +681,22 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 	} else {
 		c.logInfo("Successfully reloaded providers into memory.")
 	}
+
+	// --- 新增：立即对新添加的provider执行健康检查 ---
+	go func() {
+		// 异步执行健康检查，避免阻塞用户请求
+		for _, provider := range providers {
+			if provider.DbProvider != nil {
+				c.logInfo("Triggering immediate health check for newly added provider: %s (ID: %d)", provider.DbProvider.WrapperName, provider.DbProvider.ID)
+				_, err := RunSingleProviderHealthCheck(provider.DbProvider.ID)
+				if err != nil {
+					c.logError("Failed to run immediate health check for provider %d: %v", provider.DbProvider.ID, err)
+				} else {
+					c.logInfo("Immediate health check completed for provider %d", provider.DbProvider.ID)
+				}
+			}
+		}
+	}()
 	// --- 结束修改 ---
 
 	// Redirect back to home page

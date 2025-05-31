@@ -255,8 +255,8 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 		var contents []*ChatContent
 		if msg == "" {
 			msg = "请描述图片内容"
-			contents = append(contents, NewUserChatContentText(msg))
 		}
+		contents = append(contents, NewUserChatContentText(msg))
 		for _, image := range ctx.ImageUrls {
 			contents = append(contents, NewUserChatContentImageUrl(image.Url))
 		}

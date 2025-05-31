@@ -60,3 +60,8 @@ func ShuffleInt(slice []int) {
 		slice = slice[:n-1]
 	}
 }
+
+// RandFloat64 returns a random float64 in [0.0, 1.0)
+func RandFloat64() float64 {
+	return rand.Float64()
+}

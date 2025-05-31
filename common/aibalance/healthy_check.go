@@ -57,10 +57,20 @@ func (m *HealthCheckManager) ShouldCheck(providerID uint) bool {
 	lastTime, exists := m.lastCheckTime[providerID]
 	m.mutex.RUnlock()
 
+	// 如果是新的provider（没有检查记录），立即检查
 	if !exists {
 		return true
 	}
 
+	// 检查数据库中provider的首次检查完成状态
+	// 如果首次检查未完成，应该立即检查而不考虑时间间隔
+	dbProvider, err := GetAiProviderByID(providerID)
+	if err == nil && dbProvider != nil && !dbProvider.IsFirstCheckCompleted {
+		log.Debugf("Provider %d has not completed first health check, should check immediately", providerID)
+		return true
+	}
+
+	// 对于已完成首次检查的provider，按间隔检查
 	return time.Since(lastTime) > m.checkInterval
 }
 
@@ -274,11 +284,13 @@ func CheckAllProviders(checkManager *HealthCheckManager) ([]*HealthCheckResult, 
 
 			// 4. 计算最终健康状态
 			finalIsHealthy := baseHealthy
+
 			if isFirstCheck {
-				finalIsHealthy = false // 首次检查强制为 unhealthy
-				log.Infof("Provider %s (ID: %d) is undergoing its first health check, marking as unhealthy regardless of result.", dbp.WrapperName, dbp.ID)
-			} else if !baseHealthy {
-				// 如果非首次检查且基础不健康，记录原因
+				log.Infof("Provider %s (ID: %d) completing first health check with result: healthy=%v, latency=%dms", dbp.WrapperName, dbp.ID, baseHealthy, result.ResponseTime)
+			}
+
+			if !baseHealthy {
+				// 记录不健康的原因
 				if !result.IsHealthy {
 					errMsg := "check failed"
 					if result.Error != nil {
@@ -624,19 +636,21 @@ func RunSingleProviderHealthCheck(providerID uint) (*HealthCheckResult, error) {
 
 	// 4. 计算最终健康状态
 	finalIsHealthy := baseHealthy
+
 	if isFirstCheck {
-		finalIsHealthy = false // 首次检查强制为 unhealthy
-		log.Infof("Provider %s (ID: %d) is undergoing its first single health check, marking as unhealthy regardless of result.", dbProvider.WrapperName, dbProvider.ID)
-	} else if !baseHealthy {
-		// 如果非首次检查且基础不健康，记录原因
+		log.Infof("Provider %s (ID: %d) completing first health check with result: healthy=%v, latency=%dms", dbProvider.WrapperName, dbProvider.ID, baseHealthy, result.ResponseTime)
+	}
+
+	if !baseHealthy {
+		// 记录不健康的原因
 		if !result.IsHealthy {
 			errMsg := "check failed"
 			if result.Error != nil {
 				errMsg = result.Error.Error()
 			}
-			log.Warnf("Provider %s (ID: %d) marked as unhealthy during single check due to check failure: %s", dbProvider.WrapperName, dbProvider.ID, errMsg)
+			log.Warnf("Provider %s (ID: %d) marked as unhealthy due to check failure: %s", dbProvider.WrapperName, dbProvider.ID, errMsg)
 		} else if !isLatencyValid {
-			log.Warnf("Provider %s (ID: %d) marked as unhealthy during single check due to non-positive latency: %dms", dbProvider.WrapperName, dbProvider.ID, result.ResponseTime)
+			log.Warnf("Provider %s (ID: %d) marked as unhealthy due to non-positive latency: %dms", dbProvider.WrapperName, dbProvider.ID, result.ResponseTime)
 		}
 	}
 
