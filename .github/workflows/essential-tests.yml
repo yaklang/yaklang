@@ -144,6 +144,7 @@ jobs:
           - name: Test AI Infra
             run: |
               go test -timeout 40s ./common/ai/aid/...
+              go test -timeout 40s ./common/aireducer/...
               go test -timeout 30s ./common/aiforge/aibp/forge_builder_test.go
 
           - name: Test SSA Frontend TypeScript
