@@ -57,9 +57,6 @@ func NewConfig(opts ...Option) *Config {
 
 func WithChunkSize(size int64) Option {
 	return func(c *Config) {
-		if size <= 0 {
-			return
-		}
 		c.chunkSize = size
 	}
 }
