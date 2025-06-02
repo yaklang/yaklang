@@ -3,6 +3,7 @@ package chunkmaker
 import (
 	"context"
 	"io"
+	"os"
 
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
@@ -38,4 +39,12 @@ func NewChunkChannelFromReader(ctx context.Context, r io.Reader) *chanx.Unlimite
 		io.Copy(writer, r)
 	}()
 	return dst
+}
+
+func NewChunkChannelFromFilename(ctx context.Context, filename string) *chanx.UnlimitedChan[Chunk] {
+	fp, err := os.Open(filename)
+	if err != nil {
+		return nil
+	}
+	return NewChunkChannelFromReader(ctx, fp)
 }

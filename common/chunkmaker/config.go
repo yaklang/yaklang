@@ -19,6 +19,9 @@ type Option func(c *Config)
 
 func WithTimeTrigger(interval time.Duration) Option {
 	return func(c *Config) {
+		if interval <= 0 {
+			return
+		}
 		c.enableTimeTrigger = true
 		c.timeTriggerInterval = interval
 	}
@@ -54,6 +57,9 @@ func NewConfig(opts ...Option) *Config {
 
 func WithChunkSize(size int64) Option {
 	return func(c *Config) {
+		if size <= 0 {
+			return
+		}
 		c.chunkSize = size
 	}
 }
