@@ -837,13 +837,17 @@ service Yak {
   rpc ImportNote(ImportNoteRequest) returns (stream ImportNoteResponse);
   rpc ExportNote(ExportNoteRequest) returns (stream ExportNoteResponse);
 
+  // AI Task
   rpc StartAITask(stream AIInputEvent) returns(stream AIOutputEvent);
+  rpc QueryAITask(AITaskQueryRequest) returns (AITaskQueryResponse);
 
   // AI forge curd
   rpc CreateAIForge(AIForge) returns (DbOperateMessage);
   rpc UpdateAIForge(AIForge) returns (DbOperateMessage);
   rpc DeleteAIForge(AIForgeFilter) returns (DbOperateMessage);
   rpc QueryAIForge(QueryAIForgeRequest) returns (QueryAIForgeResponse);
+
+  // mcp server
   rpc StartMcpServer(StartMcpServerRequest) returns(stream StartMcpServerResponse);
   rpc GetToolSetList(Empty) returns(GetToolSetListResponse);
 }
@@ -956,6 +960,29 @@ message AIStartParams {
 
   // 是否允许生成报告，默认不允许
   bool AllowGenerateReport = 24;
+}
+
+message AITaskFilter {
+
+}
+
+message AITaskQueryRequest {
+  Paging Pagination = 1;
+  AITaskFilter Filter = 2;
+}
+
+message AITaskQueryResponse {
+  Paging Pagination = 1;
+  repeated AITask Data = 2;
+  int64 Total = 3;
+}
+
+message AITask {
+  string CoordinatorId = 1;
+  string Name = 2;
+  int64 Seq = 3;
+  string UserInput = 4;
+  string ForgeName = 5;
 }
 
 message AIForgeFilter {

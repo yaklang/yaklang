@@ -3,6 +3,7 @@ package aid
 import (
 	"bytes"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
 	"strings"
 	"time"
@@ -57,7 +58,7 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 			config.EmitInfo("prepare to retry call ai, with an existed seq: %v", seq)
 		}
 		//log.Infof("start to check uuid:%v seq:%v", c.id, seq)
-		if ret, ok := aiddb.GetAIInteractiveCheckpoint(c.GetDB(), c.id, seq); ok && ret.Finished {
+		if ret, ok := yakit.GetAIInteractiveCheckpoint(c.GetDB(), c.id, seq); ok && ret.Finished {
 			// checkpoint is finished, return the result
 			var rsp *AIResponse
 			if config != nil {

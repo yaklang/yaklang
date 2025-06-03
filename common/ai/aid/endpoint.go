@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"sync"
 	"time"
 
@@ -63,7 +64,7 @@ func (e *endpointManager) createEndpointWithEventType(typeName EventType) *Endpo
 	e.results.Store(id, endpoint)
 	if c := e.config; c != nil {
 		endpoint.seq = c.AcquireId()
-		if ret, ok := aiddb.GetReviewCheckpoint(c.GetDB(), c.id, endpoint.seq); ok {
+		if ret, ok := yakit.GetReviewCheckpoint(c.GetDB(), c.id, endpoint.seq); ok {
 			endpoint.SetParams(aiddb.AiCheckPointGetResponseParams(ret))
 			endpoint.checkpoint = ret
 		} else {
