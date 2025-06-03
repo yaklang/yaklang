@@ -196,7 +196,7 @@ func (e *Entrypoints) PeekOrderedProviders(model string) []*Provider {
 			log.Debugf("Provider %s accepted (latency: %dms, healthy: %v)",
 				p.TypeName, p.DbProvider.LastLatency, p.DbProvider.IsHealthy)
 		} else {
-			log.Debugf("Provider %s filtered out (latency: %dms >= 10s or no latency data)",
+			log.Infof("Provider %s filtered out (latency: %dms >= 10s or no latency data)",
 				p.TypeName, p.DbProvider.LastLatency)
 		}
 	}
