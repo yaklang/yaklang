@@ -44,7 +44,6 @@ desc(
 
 3. **潜在影响**
 - **权限提升**：攻击者通过反射链构造利用代码，可能获得系统级权限，对系统造成更严重的破坏。
-- **隐蔽后门**：私有字段的修改难以被常规安全工具检测（如 SAST/IAST），攻击痕迹不易被发现。
 - **兼容性破坏**：框架内部字段名或结构变更会导致反射代码崩溃，影响程序的稳定性和可用性。
 DESC
 	solution: <<<SOLUTION
@@ -87,7 +86,7 @@ try {
 对于 JDK 16 及以上版本，可以在 JVM 参数中添加 `--illegal-access=deny` 或 `--illegal-access=permit` 来控制深度反射的行为。`deny` 会阻止非法访问，而 `permit` 只会发出警告。
 
 #### 6. 自动化检测
-在 CI/CD 流程中集成静态代码分析工具（如 SpotBugs、SonarQube），并配置相应的规则（如 SpotBugs 的 `SECURITY_ACCESSIBLEOBJECT_ACCESS` ）来自动检测代码中的反射滥用模式。持续的自动化检测有助于及时发现和修复潜在的漏洞。
+    使用IRify来自动检测代码中的反射滥用模式。持续的自动化检测有助于及时发现和修复潜在的漏洞。
 SOLUTION
 	rule_id: "718cb86d-8629-4382-be43-03ce36c07a3b"
 	reference: <<<REFERENCE
