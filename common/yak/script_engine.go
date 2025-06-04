@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/aireducer"
 	"io"
 	"os"
 	"path/filepath"
@@ -312,6 +313,8 @@ func initYaklangLib() {
 	yaklang.Import("ai", ai.Exports)
 
 	yaklang.Import("aiagent", AIAgentExport)
+
+	yaklang.Import("aireducer", aireducer.Exports)
 
 	// pprof utils
 	yaklang.Import("pprof", pprofutils.Exports)

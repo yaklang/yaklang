@@ -67,12 +67,12 @@ cli.check()
 		aiforge.WithAIDOptions(
 			aid.WithAgreeManual(),
 			aid.WithResultHandler(func(config *aid.Config) {
-				code, _ := config.GetMemory().UserDataGet("code")
+				code, _ := config.GetMemory().GetPersistentData("code")
 				callback(code)
 			}),
 			aid.WithExtendedActionCallback("set-code", func(config *aid.Config, action *aid.Action) {
 				codeContent := action.GetString("content")
-				config.GetMemory().StoreUserData(magicCode, codeContent)
+				config.GetMemory().SetPersistentData(magicCode, codeContent)
 			}),
 			aid.WithManualAssistantCallback(func(ctx context.Context, config *aid.Config) (aitool.InvokeParams, error) {
 				m := config.GetMemory()

@@ -18,8 +18,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
 
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
@@ -800,7 +798,6 @@ func WithAppendPersistentMemory(i ...string) Option {
 		config.m.Lock()
 		defer config.m.Unlock()
 		config.persistentMemory = append(config.persistentMemory, i...)
-		config.memory.StoreAppendPersistentInfo(i...)
 		return nil
 	}
 }
@@ -851,14 +848,7 @@ func WithForgeParams(i any) Option {
 		buf.WriteString(aispec.ShrinkAndSafeToFile(i))
 		buf.WriteString("\n</user_input_" + nonce + ">\n")
 		// log.Infof("user nonce params: \n%v", buf.String())
-		config.memory.StoreAppendPersistentInfo(buf.String())
-
-		// if cli parameter not nil , should init user data
-		if params, ok := i.([]*ypb.ExecParamItem); ok {
-			if len(params) > 0 {
-				config.memory.StoreCliParameter(params)
-			}
-		}
+		config.memory.PushPersistentData(buf.String())
 		return nil
 	}
 }

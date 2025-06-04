@@ -6,29 +6,15 @@ textSnippent = cli.String("textSnippet", cli.setRequired(true), cli.setHelp("文
 limit = cli.Int("limit",cli.setDefault("50"),cli.setHelp("字数限制"))
 cli.check()
 
-plan = <<<plandata
- ```json
-    {
-        "@action": "plan",
-        "query": "-",
-        "main_task": "文本片段生成简洁总结",
-        "main_task_goal": "对用户的输入的内容进行分析和总结，提取出关键信息，并生成简洁的总结文本。",
-        "tasks": [
-        {
-            "subtask_name": "文本总结",
-            "subtask_goal": "分析用户输入的文本内容，提取出关键信息，并生成简洁的总结文本。"
-        }
-        ]
-    }
-```
-plandata
 
-persis = <<<persistent
+prompt = <<<prompt
 你是一个简单文本片段总结器，你正在总结一个文本片段。请遵循以下规则：
-1. **关键信息优先**：保留核心事实、结论或行动项，忽略次要细节。
+1. **信息完整**：用户输入必须全部总结，包括前情提要等信息，在不超过字数限制的情况下尽可能详细的总结信息。
 2. **保持中立**：不添加原文未明确提及的推断。
 3. **字数限制**：不超过 [%d] 字
-4. **输出格式**：按照下列json schema 输出：
+prompt
+
+schema = <<<schema
 {
 "$schema": "http://json-schema.org/draft-07/schema#",
 "type": "object",
@@ -45,35 +31,22 @@ persis = <<<persistent
     }
 }
 }
-persistent
-
+schema
 
 
 forgeHandle = func(params) {
-    summary = ""
-    bp = aiagent.CreateForge("fragment-summarizer",
-        aiagent.plan(func(config){
-            res,err = aiagent.ExtractPlan(config, plan)
-            if err != nil {
-                config.EmitError("yak review plan mock failed: %s", err)
-                return nil
-            }
-            return res
-        }),
-        aiagent.persistentPrompt(sprintf(persis, limit)),
-        aiagent.agreeYOLO(true),
-        aiagent.extendedActionCallback("summarize", func(config , action) {
-            summary = action.GetString("summary")
-        }),
-        aiagent.resultHandler(func(config){})
+    bp,err = aiagent.CreateLiteForge("fragment-summarizer",
+        aiagent.liteForgePrompt(sprintf(prompt, limit)),
+        aiagent.liteForgeOutputSchemaRaw("summarize",schema)
     )
-    ordr,err = bp.CreateCoordinator(context.Background(),params)
+    if err != nil {
+        return err
+    }
+    res,err = bp.Execute(context.Background(),params)
     if err != nil {
 		return nil
 	}
-    err = ordr.Run()
-    if err != nil {
-		return nil
-	}
-    return summary
+	a = res.GetString("summary")
+	println(a)
+    return a
 }
