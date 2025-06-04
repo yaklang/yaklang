@@ -850,6 +850,10 @@ service Yak {
   // mcp server
   rpc StartMcpServer(StartMcpServerRequest) returns(stream StartMcpServerResponse);
   rpc GetToolSetList(Empty) returns(GetToolSetListResponse);
+  rpc GetAIToolList(GetAIToolListRequest) returns(GetAIToolListResponse);
+  rpc DeleteAITool(DeleteAIToolRequest) returns(DbOperateMessage);
+  rpc SaveAITool(SaveAIToolRequest) returns(DbOperateMessage);
+  rpc AIToolGenerateMetadata(AIToolGenerateMetadataRequest) returns(AIToolGenerateMetadataResponse);
 }
 
 message GetToolSetListResponse {
@@ -865,6 +869,48 @@ message ResourceSetInfo {
   string Name = 1;
 }
 
+
+message AIToolGenerateMetadataRequest {
+  string ToolName = 1;
+  string Content = 2;
+}
+
+message AIToolGenerateMetadataResponse {
+  string Name = 1;
+  string Description = 2;
+  repeated string Keywords = 3;
+}
+
+message SaveAIToolRequest {
+  string Name = 1;
+  string Description = 2;
+  string Content = 3;
+  string ToolPath = 4;
+  repeated string Keywords = 5;
+}
+
+message DeleteAIToolRequest {
+  repeated string ToolNames = 1;
+}
+
+message AITool {
+  string Name = 1;
+  string Description = 2;
+  string Content = 3;
+  string ToolPath = 4;
+  repeated string Keywords = 5;
+}
+
+message GetAIToolListResponse {
+  repeated AITool Tools = 1;
+  Paging Pagination = 2;
+}
+
+message GetAIToolListRequest {
+  string Query = 1;
+  string ToolName = 2;
+  Paging Pagination = 3;
+}
 message AIOutputEvent {
   string CoordinatorId = 1;
   string Type = 2;
