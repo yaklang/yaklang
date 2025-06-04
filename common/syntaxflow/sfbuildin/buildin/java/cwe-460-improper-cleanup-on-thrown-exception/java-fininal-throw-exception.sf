@@ -129,7 +129,7 @@ DESC
    ```
 
 4. **代码审查和静态分析**: 
-   定期进行代码审查，特别关注 `finally` 块中的异常处理逻辑。使用静态代码分析工具（如 SonarQube, FindBugs/SpotBugs, Checkstyle 等）来自动检测在 `finally` 块中抛出异常的模式，并在开发流程中强制执行这些最佳实践。
+   定期进行代码审查，特别关注 `finally` 块中的异常处理逻辑。使用IRify自动检测在 `finally` 块中抛出异常的模式，并在开发流程中强制执行这些最佳实践。
 SOLUTION
 	rule_id: "eb8a8bf3-96d4-4d35-b953-3efa848c4aaa"
 	reference: <<<REFERENCE
