@@ -2,6 +2,7 @@ package netstackvm
 
 import (
 	"errors"
+
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
@@ -131,7 +132,10 @@ func (driver *PCAPEndpoint) generateRSTFromPacket(pkt gopacket.Packet) (bool, er
 	if linkLayer == nil {
 		return false, errors.New("ethernet layer not found")
 	}
-	eth := linkLayer.(*layers.Ethernet)
+	eth, ok := linkLayer.(*layers.Ethernet)
+	if !ok {
+		return false, errors.New("invalid ethernet layer")
+	}
 
 	newEth := &layers.Ethernet{
 		SrcMAC:       eth.DstMAC,
