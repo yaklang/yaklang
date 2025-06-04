@@ -105,4 +105,15 @@ func BindAIConfigToEngine(nIns *antlr4yak.Engine, agentOptions ...any) {
 		}
 		return i
 	})
+
+	nIns.GetVM().RegisterMapMemberCallHandler("aiagent", "CreateLiteForge", func(i interface{}) interface{} {
+		originFunc, ok := i.(func(name string, opts ...any) (*aiforge.LiteForge, error))
+		if ok {
+			return func(name string, opts ...any) (*aiforge.LiteForge, error) {
+				opts = append(agentOptions, opts...)
+				return originFunc(name, opts...)
+			}
+		}
+		return i
+	})
 }
