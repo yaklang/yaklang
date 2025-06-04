@@ -134,7 +134,28 @@ var (
 	WithToolKeywords         = aiforge.WithToolKeywords
 	WithForgeTools           = aiforge.WithTools
 	WithOriginYaklangCliCode = aiforge.WithOriginYaklangCliCode
+
+	// lite aiforge options
+	WithLiteForgePrompt          = aiforge.WithLiteForge_Prompt
+	WithLiteForgeOutputSchema    = aiforge.WithLiteForge_OutputSchema
+	WithLiteForgeRequireParams   = aiforge.WithLiteForge_RequireParams
+	WithLiteForgeOutputMemoryOP  = aiforge.WithLiteForge_OutputMemoryOP
+	WithLiteForgeOutputSchemaRaw = aiforge.WithLiteForge_OutputSchemaRaw
 )
+
+func NewLiteForge(name string, opts ...any) (*aiforge.LiteForge, error) {
+	var extendAIDOptions []aid.Option
+	var liteForgeOpts []aiforge.LiteForgeOption
+	for _, opt := range opts {
+		switch o := opt.(type) {
+		case aiforge.LiteForgeOption:
+			liteForgeOpts = append(liteForgeOpts, o)
+		case aid.Option:
+			extendAIDOptions = append(extendAIDOptions, o)
+		}
+	}
+	return aiforge.NewLiteForge(name, append(liteForgeOpts, aiforge.WithExtendLiteForge_AIDOption(extendAIDOptions...))...)
+}
 
 func NewForgeBlueprint(name string, opts ...any) *aiforge.ForgeBlueprint {
 	ag := NewAgent(opts...)

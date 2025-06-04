@@ -111,6 +111,13 @@ var AIAgentExport = map[string]any{
 	"taskAICallback": WithTaskAICallback,
 	"aiCallback":     WithAICallback,
 
+	"CreateLiteForge":          NewLiteForge,
+	"liteForgePrompt":          WithLiteForgePrompt,
+	"liteForgeOutputSchema":    WithLiteForgeOutputSchema,
+	"liteForgeOutputMemoryOP":  WithLiteForgeOutputMemoryOP,
+	"liteForgedRequireParams":  WithLiteForgeRequireParams,
+	"liteForgeOutputSchemaRaw": WithLiteForgeOutputSchemaRaw,
+
 	// todo: need to split?
 
 	//  create ai forge blue print
@@ -172,6 +179,7 @@ var AIAgentExport = map[string]any{
 	/*
 		ai utils api
 	*/
-	"ExtractPlan":   aid.ExtractPlan,
-	"ExtractAction": aid.ExtractAction,
+	"ExtractPlan":      aid.ExtractPlan,
+	"ExtractAction":    aid.ExtractAction,
+	"GetDefaultMemory": aid.GetDefaultMemory,
 }
