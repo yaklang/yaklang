@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	osRuntime "runtime"
 	"strings"
@@ -25,15 +26,17 @@ type InteractiveEventRecord struct {
 	UserInput        aitool.InvokeParams
 }
 
+type PersistentDataRecord struct {
+	Variable bool
+	Value    string
+}
+
 type Memory struct {
 	// user first input
 	Query string
 
 	// persistent data
-	PersistentData []string
-
-	// user data, ai or user can write and read
-	userData *omap.OrderedMap[string, string]
+	PersistentData *omap.OrderedMap[string, *PersistentDataRecord]
 
 	// task info
 	CurrentTask *aiTask
@@ -58,8 +61,7 @@ type Memory struct {
 
 func (m *Memory) CopyReducibleMemory() *Memory {
 	mem := &Memory{
-		PersistentData:        utils.CopySlice(m.PersistentData),
-		userData:              m.userData.Copy(),
+		PersistentData:        m.PersistentData.Copy(),
 		DisableTools:          m.DisableTools,
 		Tools:                 m.Tools,
 		toolsKeywordsCallback: m.toolsKeywordsCallback,
@@ -77,12 +79,11 @@ func (m *Memory) CopyReducibleMemory() *Memory {
 func GetDefaultMemory() *Memory {
 	return &Memory{
 		PlanHistory:        make([]*PlanRecord, 0),
-		PersistentData:     make([]string, 0),
+		PersistentData:     omap.NewOrderedMap[string, *PersistentDataRecord](make(map[string]*PersistentDataRecord)),
 		InteractiveHistory: omap.NewOrderedMap[string, *InteractiveEventRecord](make(map[string]*InteractiveEventRecord)),
 		Tools: func() []*aitool.Tool {
 			return make([]*aitool.Tool, 0)
 		},
-		userData: omap.NewOrderedMap[string, string](make(map[string]string)),
 		timeline: newMemoryTimeline(10, nil),
 	}
 }
@@ -101,25 +102,38 @@ func (m *Memory) BindCoordinator(c *Coordinator) {
 	m.StoreToolsKeywords(func() []string {
 		return config.keywords
 	})
+	m.PushPersistentData(config.persistentMemory...)
 	m.timeline.BindConfig(config)
 }
 
 // user data memory api, user or ai can set and get
-func (m *Memory) UserDataKeys() []string {
-	return m.userData.Keys()
+
+func (m *Memory) PushPersistentData(values ...string) {
+	for _, value := range values {
+		m.PersistentData.Set(codec.Sha1(value), &PersistentDataRecord{
+			Variable: false,
+			Value:    value,
+		})
+	}
 }
 
-func (m *Memory) UserDataGet(key string) (string, bool) {
-	return m.userData.Get(key)
+func (m *Memory) SetPersistentData(key string, value string) {
+	m.PersistentData.Set(key, &PersistentDataRecord{
+		Variable: true,
+		Value:    value,
+	})
 }
 
-func (m *Memory) UserDataDelete(key string) {
-	m.userData.Delete(key)
-	return
+func (m *Memory) GetPersistentData(key string) (string, bool) {
+	res, ok := m.PersistentData.Get(key)
+	if ok {
+		return res.Value, ok
+	}
+	return "", ok
 }
 
-func (m *Memory) StoreUserData(key string, value string) {
-	m.userData.Set(key, value)
+func (m *Memory) DeletePersistentData(key string) {
+	m.PersistentData.Delete(key)
 }
 
 // constants info memory api
@@ -178,14 +192,6 @@ func (m *Memory) Progress() string {
 
 func (m *Memory) StoreCurrentTask(task *aiTask) {
 	m.CurrentTask = task
-}
-
-func (m *Memory) StoreAppendPersistentInfo(i ...string) {
-	if utils.IsNil(m) {
-		log.Warn("no memory instance found while calling `StoreAppendPersistentInfo`")
-		return
-	}
-	m.PersistentData = append(m.PersistentData, i...)
 }
 
 // interactive history memory
@@ -314,10 +320,16 @@ func (m *Memory) CurrentTaskInfo() string {
 func (m *Memory) PersistentMemory() string {
 	var buf bytes.Buffer
 	buf.WriteString("# Now " + time.Now().String() + "\n")
-	for _, info := range m.PersistentData {
-		buf.WriteString(info)
-		buf.WriteString("\n")
-	}
+	buf.WriteString("<persistent_memory>\n")
+	m.PersistentData.ForEach(func(i string, v *PersistentDataRecord) bool {
+		if v.Variable {
+			buf.WriteString(fmt.Sprintf("%s: %s\n", i, v.Value))
+		} else {
+			buf.WriteString(fmt.Sprintf("%s\n", v.Value))
+		}
+		return true
+	})
+	buf.WriteString("</persistent_memory>\n")
 	return buf.String()
 }
 
@@ -373,10 +385,24 @@ func (m *Memory) StoreCliParameter(param []*ypb.ExecParamItem) {
 		if p.Key == "" {
 			continue
 		}
-		m.userData.Set(p.Key, p.Value)
+		m.SetPersistentData(p.Key, p.Value)
 	}
 }
 
 func (m *Memory) SoftDeleteTimeline(id ...int64) {
 	m.timeline.SoftDelete(id...)
+}
+
+func (m *Memory) ModifyMemoryFromOpList(opList ...aitool.InvokeParams) {
+	for _, op := range opList {
+		optype := op.GetString("op")
+		opKey := op.GetString("key")
+		opValue := op.GetString("value")
+		switch optype {
+		case "set":
+			m.SetPersistentData(opKey, opValue)
+		case "delete":
+			m.DeletePersistentData(opKey)
+		}
+	}
 }
