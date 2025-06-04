@@ -3,10 +3,11 @@ package netstackvm
 import (
 	"bytes"
 	"context"
-	"github.com/yaklang/yaklang/common/netx"
-	"golang.org/x/net/ipv6"
 	"net"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/netx"
+	"golang.org/x/net/ipv6"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gopacket/gopacket"
@@ -290,7 +291,10 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 		data := packet.Data()
 		offset := 0
 		if p.loopback {
-			offset = len(packet.Layer(layers.LayerTypeLoopback).LayerContents())
+			loopbackLayer := packet.Layer(layers.LayerTypeLoopback)
+			if loopbackLayer != nil {
+				offset = len(loopbackLayer.LayerContents())
+			}
 		} else {
 			linkLayer := packet.LinkLayer()
 			if linkLayer != nil {
@@ -303,6 +307,12 @@ func (p *PCAPEndpoint) inboundLoop(ctx context.Context) {
 					_ = dstMac
 				}
 			}
+		}
+
+		// 检查数据是否有效
+		if len(data) < offset {
+			log.Errorf("invalid packet data: offset %d exceeds data length %d", offset, len(data))
+			continue
 		}
 		networkPayloads := data[offset:]
 

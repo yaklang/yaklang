@@ -837,7 +837,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		finalResult = originReqRaw
 
 		defer func() {
-			wsFlow := yakit.BuildWebsocketFlow(true, wshash, requireWsFrameIndexByWSHash(wshash), finalResult[:])
+			wsFlow := yakit.BuildWebsocketFlow(false, wshash, requireWsFrameIndexByWSHash(wshash), finalResult[:])
 			replacer.hookColorWs(finalResult, wsFlow)
 			yakit.SaveWebsocketFlowEx(s.GetProjectDatabase(), wsFlow, func(err error) {
 				if err != nil {
