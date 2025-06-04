@@ -587,7 +587,10 @@ func TestGRPCMUSTPASS_Query_Lib_Rule(t *testing.T) {
 }
 
 func TestSyntaxFlowRuleToOnline(t *testing.T) {
-	mockSendProgress(t)
+	guard := mockey.Mock(sendProgress).To(func(stream ProgressStream, progress float64, msg, msgType string) {
+		assert.True(t, progress >= 0 && progress <= 1)
+	}).Build()
+	defer guard.UnPatch()
 
 	testRules := []*schema.SyntaxFlowRule{
 		{RuleName: "test-rule-1", IsBuildInRule: false},
@@ -611,7 +614,10 @@ func TestSyntaxFlowRuleToOnline(t *testing.T) {
 }
 
 func TestDownloadSyntaxFlowRule(t *testing.T) {
-	mockSendProgress(t)
+	guard := mockey.Mock(sendProgress).To(func(stream ProgressStream, progress float64, msg, msgType string) {
+		assert.True(t, progress >= 0 && progress <= 1)
+	}).Build()
+	defer guard.UnPatch()
 
 	mockey.Mock((*yaklib.OnlineClient).DownloadOnlineSyntaxFlowRule).To(func(
 		*yaklib.OnlineClient, context.Context, string, *ypb.DownloadSyntaxFlowRuleRequest,
@@ -645,10 +651,4 @@ func (s *TestProgressStream) Context() context.Context {
 
 func (s *TestProgressStream) Send(*ypb.SyntaxFlowRuleOnlineProgress) error {
 	return nil
-}
-
-func mockSendProgress(t *testing.T) {
-	mockey.Mock(sendProgress).To(func(stream ProgressStream, progress float64, msg, msgType string) {
-		assert.True(t, progress >= 0 && progress <= 1)
-	}).Build()
 }
