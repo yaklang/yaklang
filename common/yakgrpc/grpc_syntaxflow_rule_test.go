@@ -507,6 +507,7 @@ alert $output
 }
 
 func TestGRPCMUSTPASS_Delete_BuildIn_Rule(t *testing.T) {
+	t.Skip("build in rule allow to be delted")
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
