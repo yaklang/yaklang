@@ -20,14 +20,15 @@ type Reducer struct {
 }
 
 func (r *Reducer) Run() error {
-	memory := aid.GetDefaultMemory()
-	_ = memory
+	if r.config.Memory == nil {
+		r.config.Memory = aid.GetDefaultMemory()
+	}
 	ch := r.input.OutputChannel()
 	for {
 		select {
 		case chunk, ok := <-ch:
 			if !ok {
-				return utils.Error("done")
+				return nil
 			}
 			if r.config.callback != nil {
 				err := r.config.callback(r.config, r.config.Memory, chunk)

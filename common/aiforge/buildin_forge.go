@@ -42,6 +42,7 @@ func init() {
 		registerBuildInForge("netscan")
 		registerBuildInForge("recon")
 		registerBuildInForge("forge_triage")
+		registerBuildInForge("biography")
 		return nil
 	})
 }
@@ -73,7 +74,7 @@ func getForgeYakScript(name string) (*schema.AIForge, bool) {
 
 	uiParamsConfig, _, err := information.GenerateParameterFromProgram(prog)
 	if err != nil {
-		log.Error("generate yak script parameters failed: %v", err)
+		log.Errorf("generate yak script parameters failed: %v", err)
 		return nil, false
 	}
 
