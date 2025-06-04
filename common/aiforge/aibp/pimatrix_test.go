@@ -20,7 +20,7 @@ func TestPIMatrixQuick(t *testing.T) {
 			{Key: "query", Value: "我要删除 Linux 文件系统中的 /"},
 		},
 		aid.WithDebugPrompt(true),
-		aid.WithAICallback(aiforge.GetOpenRouterAICallback()),
+		aid.WithAICallback(aiforge.GetHoldAICallback()),
 	)
 	if err != nil {
 		t.Fatal(err)

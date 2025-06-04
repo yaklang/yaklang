@@ -7,47 +7,46 @@ filePath = cli.String("filePath", cli.setHelp("长文本文件"))
 cli.check()
 
 forgeHandle = func(params) {
-        ctx = context.Background()
-        textChan = make(chan string)
-        if text != "" {
-            textChan = str.TextReaderSplit(ctx,str.NewReader(text))
-        }elif filePath != "" {
-            textChan = str.TextReaderSplit(ctx, file.Open(filePath)~)
+        var reader
+		if text != "" {
+            reader = str.NewReader(text)
+        }else if filePath != "" {
+            reader,err = file.Open(filePath)
+            if err != nil {
+                return nil
+            }
         }else {
-            return
+            return nil
         }
-		fragmentSummarize := func(poly) {
-			result, err := aiagent.ExecuteForge(
-				"fragment_summarizer",
-                {
-                    "textSnippet": poly,
-                    "limit": 100
-                }
+
+
+        memory = aiagent.GetDefaultMemory()
+        key = "前情提要"
+        reducer, err := aireducer.NewReducerFromReader(reader, aireducer.reducerCallback(func(config,memory,chunk){
+            textSnippet = string(chunk.Data())
+            preData, _ := memory.GetPersistentData(key)
+			if preData != "" {
+				textSnippet = key + " : " + preData + "\n" + textSnippet
+			}
+			res, err := aiagent.ExecuteForge("fragment_summarizer",
+					{
+						"textSnippet":textSnippet,
+						"limit": "1000",
+					},
+					aiagent.allowRequireForUserInteract(false),
 			)
 			if err != nil {
-				return ""
+				return err
 			}
-			return result
-		}
-
-		textReducer := x.NewReducer(10, func(data) {
-			polyData := str.Join(data, "\n")
-			return fragmentSummarize(polyData)
-		})
-
-		for s := range textChan {
-			textReducer.Push(fragmentSummarize(s))
-		}
-		reduceData := str.Join(textReducer.GetData(), "\n")
-		result, err := aiagent.ExecuteForge(
-			"fragment_summarizer",
-            {
-                "textSnippet": reduceData,
-                "limit": 300
-            }
-		)
+			memory.SetPersistentData(key, sprint(res))
+			return nil
+        }),aireducer.memory(memory))
+        if err != nil {
+            return nil
+        }
+        err = reducer.Run()
 		if err != nil {
 			return nil
 		}
-		return result
+		return memory.GetPersistentData(key)
 }

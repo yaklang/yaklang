@@ -1,0 +1,34 @@
+cli.String("text", cli.setHelp("文本片段内容"))
+cli.check()
+
+
+prompt := <<<prompt
+你是一位文学评论家，擅长从小说/散文等文学作品中分析人物，并提炼出人物的关键特质和经历。 现在，你将分析一个文学作品的片段，并将它转化为按照人物划分的人物志风格的简介。
+
+要求：
+
+1. 人物识别： 识别片段中出现的所有主要人物（主角、重要配角等）。
+2. 分人物总结: 如需要存入 persistent memory ，应认真分析是否已有对应的记忆，注意别名，人称等信息尽可能将片段中的人物和persistent memory中的信息对应起来，若实在无法对应再新增。
+3. 角色分析： 针对每个识别出的人物，提取以下信息：
+    别名： 人物的别名或昵称，若没有则不输出。
+    当前人称代词：在当前文本片段结束时的人称代词,若没有则不输出
+    核心特质 (1-2 个)： 基于人物在片段中最突出的行为、语言、或他人评价，总结该人物在该片段呈现的核心性格或能力。
+    支撑细节 (最多3点)： 列出片段中直接支持核心特质的细节，用简洁的短语描述该人物的行为、语言、心理活动等。
+    一句话总结： 用一句话概括该人物在该片段中呈现的形象。
+prompt
+
+forgeHandle = func(params) {
+
+    bp,err = aiagent.CreateLiteForge("biography",
+        aiagent.liteForgeOutputMemoryOP(),
+        aiagent.liteForgePrompt(prompt)
+    )
+     if err != nil {
+		return nil
+	}
+    res,err = bp.Execute(context.Background(),params)
+    if err != nil {
+		return nil
+	}
+    return res
+}

@@ -93,6 +93,12 @@ func WithReducerCallback(callback ReducerCallbackType) Option {
 	}
 }
 
+func WithMemory(memory *aid.Memory) Option {
+	return func(c *Config) {
+		c.Memory = memory
+	}
+}
+
 func NewConfig(opts ...Option) *Config {
 	c := &Config{
 		Memory:              aid.GetDefaultMemory(),

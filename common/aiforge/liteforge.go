@@ -15,9 +15,11 @@ import (
 
 // LiteForge 被设计只允许提取数据，生成结构化（单步），如果需要多步拆解，不能使用 LiteForge
 type LiteForge struct {
-	Prompt        string
-	RequireSchema string
-	OutputSchema  string
+	Prompt           string
+	RequireSchema    string
+	OutputSchema     string
+	OutputActionName string
+	ExtendAIDOptions []aid.Option
 }
 
 type LiteForgeOption func(*LiteForge) error
@@ -41,6 +43,43 @@ func WithLiteForge_OutputSchema(params ...aitool.ToolOption) LiteForgeOption {
 			param(t)
 		}
 		l.OutputSchema = t.ToJSONSchemaString()
+		l.OutputActionName = "call-tool"
+		return nil
+	}
+}
+
+func WithLiteForge_OutputSchemaRaw(actionName string, outputSchema string) LiteForgeOption {
+	return func(l *LiteForge) error {
+		l.OutputActionName = actionName
+		l.OutputSchema = outputSchema
+		return nil
+	}
+}
+
+func WithLiteForge_OutputMemoryOP() LiteForgeOption {
+	return func(l *LiteForge) error {
+		return WithLiteForge_OutputSchema(
+			aitool.WithStructArrayParam("memory_op",
+				[]aitool.PropertyOption{
+					aitool.WithParam_Description("persistent memory operation, you can use this to store some data in the memory, and it will be used in the next call"),
+					aitool.WithParam_Required(true),
+					aitool.WithParam_MinLength(0),
+				},
+				nil,
+				aitool.WithStringParam("op", aitool.WithParam_Description("the operation type, can be 'set', 'delete'"), aitool.WithParam_EnumString("set", "delete"), aitool.WithParam_Required(true)),
+				aitool.WithStringParam("key", aitool.WithParam_Description("the key of the persistent memory, if you set op to 'set', this is required"), aitool.WithParam_Required(true)),
+				aitool.WithStringParam("value", aitool.WithParam_Description("the value of the persistent memory, if you set op to 'set', this is required"), aitool.WithParam_Required(false)),
+			),
+		)(l)
+	}
+}
+
+func WithExtendLiteForge_AIDOption(opts ...aid.Option) LiteForgeOption {
+	return func(l *LiteForge) error {
+		if l.ExtendAIDOptions == nil {
+			l.ExtendAIDOptions = make([]aid.Option, 0)
+		}
+		l.ExtendAIDOptions = append(l.ExtendAIDOptions, opts...)
 		return nil
 	}
 }
@@ -68,7 +107,7 @@ func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, op
 		return nil, fmt.Errorf("liteforge output schema is required")
 	}
 
-	cod, err := aid.NewCoordinator(l.Prompt, opts...)
+	cod, err := aid.NewCoordinatorContext(ctx, l.Prompt, append(l.ExtendAIDOptions, opts...)...)
 	if err != nil {
 		return nil, utils.Errorf("cannot create coordinator: %v", err)
 	}
@@ -88,6 +127,8 @@ func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, op
 {{ .PARAMS }}
 </params_{{ .NONCE }}>{{end}}
 
+{{ if .MEMORY.PersistentMemory }}# 牢记
+{{ .MEMORY.PersistentMemory}}{{end}}
 # Output Formatter
 
 请你根据下面 SCHEMA 构建数据
@@ -101,6 +142,7 @@ func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, op
 		"PROMPT": string(l.Prompt),
 		"PARAMS": string(call),
 		"SCHEMA": string(l.OutputSchema),
+		"MEMORY": cod.GetConfig().GetMemory(),
 	}
 	tmp, err := template.New("liteforge").Parse(temp)
 	if err != nil {
@@ -117,7 +159,7 @@ func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, op
 		if err != nil {
 			return err
 		}
-		action, err = aid.ExtractAction(string(raw), "call-tool")
+		action, err = aid.ExtractAction(string(raw), l.OutputActionName)
 		if err != nil {
 			return utils.Errorf("extract action failed: %v", err)
 		}
