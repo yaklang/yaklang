@@ -348,7 +348,7 @@ func BatchAddOrUpdateGroupsForRules(db *gorm.DB, ruleNames, groupNames []string)
 
 	var count int64
 	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
-		groups := GetCreateOrUpdateGroups(tx, groupNames)
+		groups := CreateOrUpdateGroups(tx, groupNames)
 		rules, err := QueryRulesByName(tx, ruleNames)
 		if err != nil {
 			return err
@@ -375,7 +375,7 @@ func BatchAddOrUpdateGroupsForRules(db *gorm.DB, ruleNames, groupNames []string)
 	return count, err
 }
 
-func GetCreateOrUpdateGroups(db *gorm.DB, groupNames []string) []*schema.SyntaxFlowGroup {
+func CreateOrUpdateGroups(db *gorm.DB, groupNames []string) []*schema.SyntaxFlowGroup {
 	var groups []*schema.SyntaxFlowGroup
 	for _, groupName := range groupNames {
 		i := &schema.SyntaxFlowGroup{

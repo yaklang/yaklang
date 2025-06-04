@@ -437,7 +437,7 @@ func CreateOrUpdateRuleWithGroup(rule *schema.SyntaxFlowRule, groups ...string) 
 	})
 	groups = append(groups, backUp...)
 	rule.Groups = nil
-	if err := CreateOrUpdateSyntaxFlowRule(db.Debug(), rule.RuleName, &rule); err != nil {
+	if err := CreateOrUpdateSyntaxFlowRule(db, rule.RuleName, &rule); err != nil {
 		return nil, utils.Errorf("create syntaxFlow rule failed: %s", err)
 	}
 	CreateOrUpdateGroupsForRule(db, rule, groups...)

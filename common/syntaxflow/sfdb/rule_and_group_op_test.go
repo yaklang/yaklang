@@ -260,3 +260,27 @@ func TestRule_Group_OP(t *testing.T) {
 		require.Equal(t, 3, len(newRule.Groups))
 	})
 }
+
+func TestRule_Group_CreateOrUpdate(t *testing.T) {
+	db := consts.GetGormProfileDatabase()
+	t.Run("test create or update rule with group", func(t *testing.T) {
+		rule := &schema.SyntaxFlowRule{
+			RuleName: uuid.NewString(),
+			Language: "java",
+			Severity: schema.SFR_SEVERITY_INFO,
+			Purpose:  schema.SFR_PURPOSE_AUDIT,
+		}
+		groupName1 := uuid.NewString()
+		defer func() {
+			DeleteRuleByRuleName(rule.RuleName)
+			DeleteGroup(db, groupName1)
+		}()
+		newRule, err := CreateOrUpdateRuleWithGroup(rule, groupName1, groupName1)
+		require.NoError(t, err)
+		marshal, err := json.Marshal(newRule.Groups)
+		require.NoError(t, err)
+		log.Infof("new group: %v", string(marshal))
+		require.Equal(t, 1, len(newRule.Groups))
+	})
+
+}
