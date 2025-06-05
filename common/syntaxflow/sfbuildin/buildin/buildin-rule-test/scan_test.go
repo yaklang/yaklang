@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 
 	"github.com/stretchr/testify/require"
@@ -20,6 +21,72 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
+
+func TestSyntaxFlowVerifyFileSystem(t *testing.T) {
+	yakCode := uuid.NewString()
+	javaCode := uuid.NewString()
+	phpCode := uuid.NewString()
+
+	rule := fmt.Sprintf(`
+
+desc(
+	title: "test rule verify file system", 
+)
+
+desc (
+	language: yaklang, 
+	alert_min: 1, 
+	'file://a.yak': "%s"
+)
+
+desc(
+	language: java, 
+	'file://a.java': "%s"
+)
+
+desc( 
+	language: php,
+	'safefile://a.php': '%s'
+)
+
+	`, yakCode, javaCode, phpCode)
+
+	f, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(rule)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = f
+
+	verifyFS, err := f.ExtractVerifyFilesystemAndLanguage()
+	require.NoError(t, err)
+	require.Len(t, verifyFS, 2)
+
+	yakVerify := verifyFS[0]
+	require.Equal(t, (consts.Yak), yakVerify.GetLanguage())
+	data, err := yakVerify.GetVirtualFs().ReadFile("a.yak")
+	require.NoError(t, err)
+	require.Equal(t, yakCode, string(data))
+	require.Equal(t, 1, yakVerify.GetExtraInfoInt("alert_min"))
+	_ = yakVerify
+
+	javaVerify := verifyFS[1]
+	require.Equal(t, (consts.JAVA), javaVerify.GetLanguage())
+	data, err = javaVerify.GetVirtualFs().ReadFile("a.java")
+	require.NoError(t, err)
+	require.Equal(t, javaCode, string(data))
+	_ = javaVerify
+
+	verifyFS, err = f.ExtractNegativeFilesystemAndLanguage()
+	require.NoError(t, err)
+	require.Len(t, verifyFS, 1)
+
+	phpNegative := verifyFS[0]
+	require.Equal(t, (consts.PHP), phpNegative.GetLanguage())
+	data, err = phpNegative.GetVirtualFs().ReadFile("a.php")
+	require.NoError(t, err)
+	require.Equal(t, phpCode, string(data))
+	_ = phpNegative
+}
 
 func TestVerifiedRule(t *testing.T) {
 	yakit.InitialDatabase()
@@ -51,8 +118,8 @@ func TestVerify_DEBUG(t *testing.T) {
 	yakit.InitialDatabase()
 	err := sfbuildin.SyncEmbedRule()
 	require.NoError(t, err)
-	// ruleName := "golang 反射型跨站脚本攻击(gobee)"
-	ruleName := "golang 服务器端请求伪造(beego)"
+	ruleName := "审计Golang FTP 硬编码密码"
+	// ruleName := "审计Golang HTTP输出点"
 
 	rule, err := sfdb.GetRulePure(ruleName)
 	if err != nil {
