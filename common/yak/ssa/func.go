@@ -171,7 +171,7 @@ func (f *Function) IsMain() bool {
 }
 
 func (f *Function) GetParent() *Function {
-	if f.parent > 0 {
+	if f.parent <= 0 {
 		return nil
 	}
 
