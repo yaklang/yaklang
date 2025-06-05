@@ -1,14 +1,15 @@
 desc(
-    title: "golang unsafe way to write SQL statements concatenated",
+	title: "golang unsafe way to write SQL statements concatenated"
 	title_zh: "golang SQL 语句拼接的不安全写法",
-    type: audit,
-    severity: mid,
-	risk: sqli,
-    desc: <<<TEXT
+	type: audit
+	severity: mid
+	risk: sqli
+	desc: <<<TEXT
 SQL 注入是一种攻击技术，攻击者通过向应用程序的输入字段注入恶意的 SQL 代码，从而能够操纵后端数据库执行未经授权的查询。在 Golang 中使用 `sqlx` 或标准 `database/sql` 包时，如果直接将用户输入拼接到 SQL 查询中，而不进行适当的参数化查询或输入验证，就会导致 SQL 注入漏洞。这种漏洞允许攻击者绕过应用程序的安全控制，获取、修改或删除数据库中的数据，甚至可能完全控制数据库服务器。
 
 直接拼接用户输入到 SQL 语句中是一高危操作，可能导致 SQL 注入攻击。
 TEXT
+	rule_id: "ac672ab7-a78c-4866-8a92-76074034def7"
 )
 
 <include('golang-database-sink')> as $entry;
@@ -32,9 +33,9 @@ alert $mid for {
 }
 
 desc(
-    lang: golang,
-    alert_mid: 1,
-    'file://main.go': <<<UNSAFE
+	lang: golang
+	alert_mid: 1
+	'file://main.go': <<<UNSAFE
 package test
 
 import (
