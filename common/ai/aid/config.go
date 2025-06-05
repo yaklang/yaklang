@@ -87,9 +87,6 @@ type Config struct {
 	aiToolManager       *buildinaitools.AiToolManager
 	aiToolManagerOption []buildinaitools.ToolManagerOption
 
-	// task ai resp callback
-	taskAIRespCallback func(string, *Config)
-
 	// memory
 	persistentMemory          []string
 	memory                    *Memory
@@ -132,6 +129,8 @@ type Config struct {
 
 	promptHook     func(string) string
 	generateReport bool
+
+	forgeName string // if coordinator is create from a forge, this is the forge name
 }
 
 func (c *Config) HandleSearch(query string, items *omap.OrderedMap[string, []string]) ([]*searchtools.KeywordSearchResult, error) {
@@ -950,6 +949,16 @@ func WithGenerateReport(b bool) Option {
 		defer config.m.Unlock()
 
 		config.generateReport = b
+		return nil
+	}
+}
+
+func WithForgeName(forgeName string) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+
+		config.forgeName = forgeName
 		return nil
 	}
 }

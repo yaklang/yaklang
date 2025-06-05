@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -148,7 +148,7 @@ LOOP:
 		t.Fatal("sync check failed")
 	}
 
-	rt, err := aiddb.GetCoordinatorRuntime(ins.config.GetDB(), ins.config.id)
+	rt, err := yakit.GetCoordinatorRuntime(ins.config.GetDB(), ins.config.id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +157,7 @@ LOOP:
 	count := 0
 	aiInteractivity := 0
 	reviewCount := 0
-	for i := range aiddb.YieldCheckpoint(context.Background(), ins.config.GetDB(), ins.config.id) {
+	for i := range yakit.YieldCheckpoint(context.Background(), ins.config.GetDB(), ins.config.id) {
 		t.Logf("i: %+v", i)
 		count++
 		if i.Type == schema.AiCheckpointType_AIInteractive {

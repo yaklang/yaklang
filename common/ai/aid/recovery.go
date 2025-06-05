@@ -2,8 +2,8 @@ package aid
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -21,7 +21,7 @@ func NewRecoveredCoordinator(
 }
 
 func NewFastRecoverCoordinatorContext(ctx context.Context, uuid string, opt ...Option) (*Coordinator, error) {
-	rt, err := aiddb.GetCoordinatorRuntime(consts.GetGormProjectDatabase(), uuid)
+	rt, err := yakit.GetCoordinatorRuntime(consts.GetGormProjectDatabase(), uuid)
 	if err != nil {
 		return nil, utils.Errorf("coordinator: get runtime failed: %v", err)
 	}

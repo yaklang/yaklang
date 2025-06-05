@@ -2,12 +2,12 @@ package aid
 
 import (
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 func (c *Coordinator) CreateDatabaseSchema(input string) *schema.AiCoordinatorRuntime {
@@ -16,8 +16,9 @@ func (c *Coordinator) CreateDatabaseSchema(input string) *schema.AiCoordinatorRu
 		Name:            "coordinator initializing...",
 		Seq:             c.config.GetSequenceStart(),
 		QuotedUserInput: codec.StrConvQuote(input),
+		ForgeName:       c.GetConfig().forgeName,
 	}
-	aiddb.CreateOrUpdateRuntime(c.config.GetDB(), rt)
+	yakit.CreateOrUpdateRuntime(c.config.GetDB(), rt)
 	return rt
 }
 
@@ -31,7 +32,7 @@ func (c *Config) createCheckpoint(typeName schema.AiCheckpointType, id int64) *s
 		Seq:             id,
 		Type:            typeName,
 	}
-	aiddb.CreateOrUpdateCheckpoint(c.GetDB(), mod)
+	yakit.CreateOrUpdateCheckpoint(c.GetDB(), mod)
 	return mod
 }
 
@@ -49,13 +50,13 @@ func (c *Config) createReviewCheckpoint(id int64) *schema.AiCheckpoint {
 
 func (c *Config) submitCheckpointRequest(t *schema.AiCheckpoint, req any) error {
 	t.RequestQuotedJson = codec.StrConvQuote(string(utils.Jsonify(req)))
-	return aiddb.CreateOrUpdateCheckpoint(c.GetDB(), t)
+	return yakit.CreateOrUpdateCheckpoint(c.GetDB(), t)
 }
 
 func (c *Config) submitCheckpointResponse(t *schema.AiCheckpoint, rsp any) error {
 	t.ResponseQuotedJson = codec.StrConvQuote(string(utils.Jsonify(rsp)))
 	t.Finished = true
-	return aiddb.CreateOrUpdateCheckpoint(c.GetDB(), t)
+	return yakit.CreateOrUpdateCheckpoint(c.GetDB(), t)
 }
 
 func (c *Config) submitAIRequestCheckpoint(t *schema.AiCheckpoint, data *AIRequest) error {
