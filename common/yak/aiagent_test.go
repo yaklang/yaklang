@@ -114,8 +114,7 @@ func TestReducerAI2(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			action := res.(*aiforge.ForgeResult).Action
-			memory.ModifyMemoryFromOpList(action.GetInvokeParams("params").GetObjectArray("memory_op")...)
+			memory.ApplyOp(res.(*aiforge.ForgeResult).Action)
 			return nil
 		}),
 		aireducer.WithMemory(memory),
