@@ -114,25 +114,3 @@ func GetAllAIForge(db *gorm.DB) ([]*schema.AIForge, error) {
 	}
 	return forges, nil
 }
-
-func FilterAIForge(db *gorm.DB, filter *ypb.AIForgeFilter) *gorm.DB {
-	db = db.Model(&schema.AIForge{})
-	db = bizhelper.FuzzQueryLike(db, "forge_name", filter.GetForgeName())
-	db = bizhelper.ExactQueryString(db, "forge_type", filter.GetForgeType())
-	db = bizhelper.FuzzSearchEx(db, []string{
-		"forge_name", "forge_content", "init_prompt", "persistent_prompt", "plan_prompt", "result_prompt",
-	}, filter.GetKeyword(), false)
-	db = bizhelper.ExactQueryStringArrayOr(db, "tags", filter.GetTag())
-	return db
-}
-
-func QueryAIForge(db *gorm.DB, filter *ypb.AIForgeFilter, paging *ypb.Paging) (*bizhelper.Paginator, []schema.AIForge, error) {
-	db = FilterAIForge(db, filter)
-	db = bizhelper.OrderByPaging(db, paging)
-	var forges []schema.AIForge
-	pag, db := bizhelper.Paging(db, int(paging.Page), int(paging.Limit), &forges)
-	if db.Error != nil {
-		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
-	}
-	return pag, forges, nil
-}

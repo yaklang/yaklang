@@ -482,6 +482,7 @@ const (
 	Yak_ImportNote_FullMethodName                                 = "/ypb.Yak/ImportNote"
 	Yak_ExportNote_FullMethodName                                 = "/ypb.Yak/ExportNote"
 	Yak_StartAITask_FullMethodName                                = "/ypb.Yak/StartAITask"
+	Yak_QueryAITask_FullMethodName                                = "/ypb.Yak/QueryAITask"
 	Yak_CreateAIForge_FullMethodName                              = "/ypb.Yak/CreateAIForge"
 	Yak_UpdateAIForge_FullMethodName                              = "/ypb.Yak/UpdateAIForge"
 	Yak_DeleteAIForge_FullMethodName                              = "/ypb.Yak/DeleteAIForge"
@@ -1088,12 +1089,15 @@ type YakClient interface {
 	SearchNoteContent(ctx context.Context, in *SearchNoteContentRequest, opts ...grpc.CallOption) (*SearchNoteContentResponse, error)
 	ImportNote(ctx context.Context, in *ImportNoteRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ImportNoteResponse], error)
 	ExportNote(ctx context.Context, in *ExportNoteRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExportNoteResponse], error)
+	// AI Task
 	StartAITask(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent], error)
+	QueryAITask(ctx context.Context, in *AITaskQueryRequest, opts ...grpc.CallOption) (*AITaskQueryResponse, error)
 	// AI forge curd
 	CreateAIForge(ctx context.Context, in *AIForge, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	UpdateAIForge(ctx context.Context, in *AIForge, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	DeleteAIForge(ctx context.Context, in *AIForgeFilter, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	QueryAIForge(ctx context.Context, in *QueryAIForgeRequest, opts ...grpc.CallOption) (*QueryAIForgeResponse, error)
+	// mcp server
 	StartMcpServer(ctx context.Context, in *StartMcpServerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StartMcpServerResponse], error)
 	GetToolSetList(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetToolSetListResponse, error)
 }
@@ -6396,6 +6400,16 @@ func (c *yakClient) StartAITask(ctx context.Context, opts ...grpc.CallOption) (g
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_StartAITaskClient = grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent]
 
+func (c *yakClient) QueryAITask(ctx context.Context, in *AITaskQueryRequest, opts ...grpc.CallOption) (*AITaskQueryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AITaskQueryResponse)
+	err := c.cc.Invoke(ctx, Yak_QueryAITask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) CreateAIForge(ctx context.Context, in *AIForge, opts ...grpc.CallOption) (*DbOperateMessage, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DbOperateMessage)
@@ -7063,12 +7077,15 @@ type YakServer interface {
 	SearchNoteContent(context.Context, *SearchNoteContentRequest) (*SearchNoteContentResponse, error)
 	ImportNote(*ImportNoteRequest, grpc.ServerStreamingServer[ImportNoteResponse]) error
 	ExportNote(*ExportNoteRequest, grpc.ServerStreamingServer[ExportNoteResponse]) error
+	// AI Task
 	StartAITask(grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]) error
+	QueryAITask(context.Context, *AITaskQueryRequest) (*AITaskQueryResponse, error)
 	// AI forge curd
 	CreateAIForge(context.Context, *AIForge) (*DbOperateMessage, error)
 	UpdateAIForge(context.Context, *AIForge) (*DbOperateMessage, error)
 	DeleteAIForge(context.Context, *AIForgeFilter) (*DbOperateMessage, error)
 	QueryAIForge(context.Context, *QueryAIForgeRequest) (*QueryAIForgeResponse, error)
+	// mcp server
 	StartMcpServer(*StartMcpServerRequest, grpc.ServerStreamingServer[StartMcpServerResponse]) error
 	GetToolSetList(context.Context, *Empty) (*GetToolSetListResponse, error)
 	mustEmbedUnimplementedYakServer()
@@ -8469,6 +8486,9 @@ func (UnimplementedYakServer) ExportNote(*ExportNoteRequest, grpc.ServerStreamin
 }
 func (UnimplementedYakServer) StartAITask(grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]) error {
 	return status.Errorf(codes.Unimplemented, "method StartAITask not implemented")
+}
+func (UnimplementedYakServer) QueryAITask(context.Context, *AITaskQueryRequest) (*AITaskQueryResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryAITask not implemented")
 }
 func (UnimplementedYakServer) CreateAIForge(context.Context, *AIForge) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateAIForge not implemented")
@@ -16217,6 +16237,24 @@ func _Yak_StartAITask_Handler(srv interface{}, stream grpc.ServerStream) error {
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_StartAITaskServer = grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]
 
+func _Yak_QueryAITask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AITaskQueryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryAITask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QueryAITask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryAITask(ctx, req.(*AITaskQueryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_CreateAIForge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AIForge)
 	if err := dec(in); err != nil {
@@ -17848,6 +17886,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SearchNoteContent",
 			Handler:    _Yak_SearchNoteContent_Handler,
+		},
+		{
+			MethodName: "QueryAITask",
+			Handler:    _Yak_QueryAITask_Handler,
 		},
 		{
 			MethodName: "CreateAIForge",
