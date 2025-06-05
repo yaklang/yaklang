@@ -163,6 +163,14 @@ func WithParam_Enum(values ...any) PropertyOption {
 	}
 }
 
+// WithParam_Enum specifies a list of allowed values for a string property.
+// The property value must be one of the specified enum values.
+func WithParam_Const(values ...any) PropertyOption {
+	return func(schema map[string]any) {
+		schema["const"] = values
+	}
+}
+
 func WithParam_EnumString(values ...string) PropertyOption {
 	return func(schema map[string]any) {
 		schema["enum"] = lo.Map(values, func(item string, _ int) any { return item })
@@ -450,6 +458,17 @@ func (t *Tool) GetKeywords() []string {
 
 func (t *Tool) Params() map[string]any {
 	return t.Tool.InputSchema.Properties
+}
+
+func (t *Tool) ParamsJsonSchemaString() string {
+	schema := t.Params()
+
+	jsonBytes, err := json.MarshalIndent(schema, "", "  ")
+	if err != nil {
+		return fmt.Sprintf("Error: %v", err)
+	}
+
+	return string(jsonBytes)
 }
 
 // ToJSONSchema 将整个Tool转换为符合JSON Schema Draft-07规范的格式

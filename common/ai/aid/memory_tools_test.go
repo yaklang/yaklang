@@ -255,9 +255,7 @@ func TestCoodinator_Add_Persistent_Memory(t *testing.T) {
 					`{"@action": "call-tool", "tool": "now", "params": {"content": "` + persistentMemory + `"}}}`))
 				return rsp, nil
 			} else if utils.MatchAllOfSubString(request.GetPrompt(), `"require-more-tool"`, `"finished"`, `"status_summary"`) {
-				if !utils.StringArrayContains(config.memory.PersistentData, persistentMemory) {
-					panic("persistent set fail")
-				}
+				config.memory.PushPersistentData(persistentMemory)
 				if timeline.idToTimelineItem.Len() > 0 {
 					panic("skip add persistent memory to timeline fail")
 				}

@@ -39,9 +39,6 @@ func WithLiteForge_OutputSchema(params ...aitool.ToolOption) LiteForgeOption {
 	return func(l *LiteForge) error {
 		t := aitool.NewWithoutCallback(
 			"output", params...)
-		for _, param := range params {
-			param(t)
-		}
 		l.OutputSchema = t.ToJSONSchemaString()
 		l.OutputActionName = "call-tool"
 		return nil
@@ -58,19 +55,9 @@ func WithLiteForge_OutputSchemaRaw(actionName string, outputSchema string) LiteF
 
 func WithLiteForge_OutputMemoryOP() LiteForgeOption {
 	return func(l *LiteForge) error {
-		return WithLiteForge_OutputSchema(
-			aitool.WithStructArrayParam("memory_op",
-				[]aitool.PropertyOption{
-					aitool.WithParam_Description("persistent memory operation, you can use this to store some data in the memory, and it will be used in the next call"),
-					aitool.WithParam_Required(true),
-					aitool.WithParam_MinLength(0),
-				},
-				nil,
-				aitool.WithStringParam("op", aitool.WithParam_Description("the operation type, can be 'set', 'delete'"), aitool.WithParam_EnumString("set", "delete"), aitool.WithParam_Required(true)),
-				aitool.WithStringParam("key", aitool.WithParam_Description("the key of the persistent memory, if you set op to 'set', this is required"), aitool.WithParam_Required(true)),
-				aitool.WithStringParam("value", aitool.WithParam_Description("the value of the persistent memory, if you set op to 'set', this is required"), aitool.WithParam_Required(false)),
-			),
-		)(l)
+		t := aitool.NewWithoutCallback(
+			"output", aid.MemoryOpSchemaOption...)
+		return WithLiteForge_OutputSchemaRaw(aid.MemoryOpAction, t.ParamsJsonSchemaString())(l)
 	}
 }
 
