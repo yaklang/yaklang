@@ -393,7 +393,28 @@ func (m *Memory) SoftDeleteTimeline(id ...int64) {
 	m.timeline.SoftDelete(id...)
 }
 
-func (m *Memory) ModifyMemoryFromOpList(opList ...aitool.InvokeParams) {
+var MemoryOpAction = "operate_memory"
+
+var MemoryOpSchemaOption = []aitool.ToolOption{
+	aitool.WithStringParam("@action", aitool.WithParam_Const(MemoryOpAction)), aitool.WithStructArrayParam("memory_op",
+		[]aitool.PropertyOption{
+			aitool.WithParam_Description("persistent memory operation, you can use this to store some data in the memory, and it will be used in the next call"),
+			aitool.WithParam_Required(true),
+			aitool.WithParam_MinLength(0),
+		},
+		nil,
+		aitool.WithStringParam("op", aitool.WithParam_Description("the operation type, can be 'set', 'delete'"), aitool.WithParam_EnumString("set", "delete"), aitool.WithParam_Required(true)),
+		aitool.WithStringParam("key", aitool.WithParam_Description("the key of the persistent memory, if you set op to 'set', this is required"), aitool.WithParam_Required(true)),
+		aitool.WithStringParam("value", aitool.WithParam_Description("the value of the persistent memory, if you set op to 'set', this is required"), aitool.WithParam_Required(false)),
+	),
+}
+
+// ApplyOp applies a list of operations to the memory.
+func (m *Memory) ApplyOp(memoryOpAction *Action) {
+	if memoryOpAction.ActionType() != MemoryOpAction {
+		return
+	}
+	opList := memoryOpAction.GetInvokeParamsArray("memory_op")
 	for _, op := range opList {
 		optype := op.GetString("op")
 		opKey := op.GetString("key")
