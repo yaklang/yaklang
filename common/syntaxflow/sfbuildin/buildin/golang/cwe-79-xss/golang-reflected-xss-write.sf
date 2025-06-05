@@ -117,9 +117,13 @@ SOLUTION
 REFERENCE
 )
 
+
+http.Request as $source 
 <include('golang-http-sink')> as $output;
-$output.Write(* #-> as $sink)
-$sink?{have: 'Parameter'} as $high
+$output.Write(* as $sink)
+$sink #{
+	until: "* & $source",
+}-> as $high 
 
 alert $high for {
     title: 'Reflected XSS detected',

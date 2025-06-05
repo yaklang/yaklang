@@ -12,8 +12,20 @@ SSRF 漏洞通常发生在以下场景：
 2. 未对目标 URL 进行验证，导致攻击者可以构造恶意 URL，使服务器请求内部网络或敏感服务。
 TEXT
 )
-http.Get(* #-> as $sink);
-$sink?{have: 'GetString'} as $mid;
+
+<include('golang-http-source')> as $source 
+.GetString() as $source  
+
+// todo: implement embed struct type 
+// $getStr<getObject> as $object 
+// $object<typeName> as $typeName 
+// $getStr?{<getObject><typeName>?{have: "beego.Controller"}} as $source 
+
+http.Get(* as $param);
+
+$param #{
+	until: "* & $source" 
+}-> as $mid 
 
 alert $mid for {
     title: 'SSRF detected',

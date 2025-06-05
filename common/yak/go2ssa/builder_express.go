@@ -3,7 +3,6 @@ package go2ssa
 import (
 	"fmt"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 
 	gol "github.com/yaklang/yaklang/common/yak/antlr4go/parser"
@@ -334,8 +333,8 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 				rightv = readMemberCall(rv, b.EmitConstInst(text))
 				rightv.SetType(HandleFullTypeNames(rightv.GetType(), rv.GetType().GetFullTypeNames()))
 			}
-			log.Infof("rightv = %v", rightv)
-			log.Infof("rightv type = %v", rightv.GetType())
+			// log.Infof("rightv = %v", rightv)
+			// log.Infof("rightv type = %v", rightv.GetType())
 		}
 
 		if ret := exp.TypeAssertion(); ret != nil {
