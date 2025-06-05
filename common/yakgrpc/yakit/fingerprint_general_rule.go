@@ -57,6 +57,19 @@ func QueryGeneralRuleFast(db *gorm.DB, filter *ypb.FingerprintFilter) ([]*schema
 	return ret, nil
 }
 
+func QueryGeneralRuleByGroup(db *gorm.DB, groups ...string) ([]*schema.GeneralRule, error) {
+	db = db.Model(&schema.GeneralRule{}).Preload("Groups")
+	filter := &ypb.FingerprintFilter{
+		GroupName: groups,
+	}
+	db = FilterGeneralRule(db, filter)
+	var ret []*schema.GeneralRule
+	if err := db.Find(&ret).Error; err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
 func GetGeneralRuleByID(db *gorm.DB, id int64) (*schema.GeneralRule, error) {
 	rule := &schema.GeneralRule{}
 	if db := db.Where("id = ?", id).First(rule); db.Error != nil {

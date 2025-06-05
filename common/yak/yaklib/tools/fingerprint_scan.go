@@ -488,5 +488,9 @@ var FingerprintScanExports = map[string]interface{}{
 	// 全部服务扫描
 	"all": _allOption,
 
+	// 选择指纹规则组
+	"withRuleGroupAll": fp.WithFingerprintRuleGroupAll,
+	"withRuleGroup":    fp.WithFingerprintRuleGroup,
+
 	"disableDefaultRule": _disableDefaultFingerprint,
 }
