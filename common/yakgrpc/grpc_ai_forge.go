@@ -6,7 +6,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"time"
 )
 
 func (s *Server) QueryAIForge(ctx context.Context, req *ypb.QueryAIForgeRequest) (*ypb.QueryAIForgeResponse, error) {
@@ -15,19 +14,14 @@ func (s *Server) QueryAIForge(ctx context.Context, req *ypb.QueryAIForgeRequest)
 		return nil, err
 	}
 
-	start := time.Now()
 	var res []*ypb.AIForge
 	for _, r := range data {
 		m := r.ToGRPC()
 		if m == nil {
-			log.Errorf("failed to convert schema.GeneralRule to ypb.FingerprintRule: %v", r)
+			log.Errorf("failed to convert schema to ypb grpc: %v", r)
 		} else {
 			res = append(res, m)
 		}
-	}
-	cost := time.Now().Sub(start)
-	if cost.Milliseconds() > 200 {
-		log.Infof("finished converting httpflow(%v) cost: %s", len(res), cost)
 	}
 
 	return &ypb.QueryAIForgeResponse{

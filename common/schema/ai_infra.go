@@ -2,6 +2,7 @@ package schema
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"time"
 
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -17,10 +18,21 @@ type AiCoordinatorRuntime struct {
 	Name            string `json:"name"`
 	Seq             int64  `json:"seq" gorm:"index"`
 	QuotedUserInput string `json:"quoted_user_input"`
+	ForgeName       string `json:"forge_name"`
 }
 
 func (a *AiCoordinatorRuntime) GetUserInput() string {
 	return string(codec.StrConvUnquoteForce(a.QuotedUserInput))
+}
+
+func (a *AiCoordinatorRuntime) ToGRPC() *ypb.AITask {
+	return &ypb.AITask{
+		CoordinatorId: a.Uuid,
+		Name:          a.Name,
+		Seq:           a.Seq,
+		UserInput:     a.GetUserInput(),
+		ForgeName:     a.ForgeName,
+	}
 }
 
 type AiCheckpointType string
