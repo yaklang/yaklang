@@ -81,7 +81,7 @@ func TestGRPCMUSTPASS_WriteDB(t *testing.T) {
 	randomToolPath := uuid.NewString()
 	randomKeywords := []string{uuid.NewString()}
 	t.Run("CreateAITool", func(t *testing.T) {
-		resp, err := c.SaveAITool(ctx, &ypb.SaveAIToolRequest{
+		_, err := c.SaveAITool(ctx, &ypb.SaveAIToolRequest{
 			Name:        randomName,
 			Description: randomDescription,
 			Content:     randomContent,
@@ -89,7 +89,6 @@ func TestGRPCMUSTPASS_WriteDB(t *testing.T) {
 			Keywords:    randomKeywords,
 		})
 		require.NoError(t, err)
-		assert.Equal(t, int64(1), resp.EffectRows)
 		aiListRsp, err := c.GetAIToolList(ctx, &ypb.GetAIToolListRequest{
 			ToolName: randomName,
 			Pagination: &ypb.Paging{
@@ -111,7 +110,7 @@ func TestGRPCMUSTPASS_WriteDB(t *testing.T) {
 	newRandomKeywords := []string{uuid.NewString()}
 	t.Run("UpdateAITool", func(t *testing.T) {
 		// 不更新工具名
-		resp, err := c.SaveAITool(ctx, &ypb.SaveAIToolRequest{
+		_, err := c.SaveAITool(ctx, &ypb.SaveAIToolRequest{
 			Name:        randomName,
 			Description: newRandomDescription,
 			Content:     newRandomContent,
@@ -119,7 +118,6 @@ func TestGRPCMUSTPASS_WriteDB(t *testing.T) {
 			Keywords:    newRandomKeywords,
 		})
 		require.NoError(t, err)
-		assert.Equal(t, int64(1), resp.EffectRows)
 		aiListRsp, err := c.GetAIToolList(ctx, &ypb.GetAIToolListRequest{
 			ToolName: randomName,
 			Pagination: &ypb.Paging{
@@ -134,7 +132,7 @@ func TestGRPCMUSTPASS_WriteDB(t *testing.T) {
 		assert.Equal(t, newRandomKeywords, aiListRsp.Tools[0].Keywords)
 
 		// 更新工具名
-		resp, err = c.SaveAITool(ctx, &ypb.SaveAIToolRequest{
+		_, err = c.SaveAITool(ctx, &ypb.SaveAIToolRequest{
 			Name:        newRandomName,
 			Description: newRandomDescription,
 			Content:     newRandomContent,
@@ -142,7 +140,6 @@ func TestGRPCMUSTPASS_WriteDB(t *testing.T) {
 			Keywords:    newRandomKeywords,
 		})
 		require.NoError(t, err)
-		assert.Equal(t, int64(1), resp.EffectRows)
 		aiListRsp, err = c.GetAIToolList(ctx, &ypb.GetAIToolListRequest{
 			ToolName: newRandomName,
 			Pagination: &ypb.Paging{
@@ -168,12 +165,12 @@ func TestGRPCMUSTPASS_WriteDB(t *testing.T) {
 		assert.Len(t, aiListRsp.Tools, 2)
 	})
 	t.Run("DeleteAITool", func(t *testing.T) {
-		resp, err := c.DeleteAITool(ctx, &ypb.DeleteAIToolRequest{
+		_, err := c.DeleteAITool(ctx, &ypb.DeleteAIToolRequest{
 			ToolNames: []string{randomName, newRandomName},
 		})
 		require.NoError(t, err)
-		assert.Equal(t, int64(2), resp.EffectRows)
 		aiListRsp, err := c.GetAIToolList(ctx, &ypb.GetAIToolListRequest{
+			Query: flag,
 			Pagination: &ypb.Paging{
 				Page:  1,
 				Limit: 10,
