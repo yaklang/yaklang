@@ -33,7 +33,7 @@ func CreateOrUpdateAIForge(db *gorm.DB, forge *schema.AIForge) error {
 
 func UpdateAIForgeByName(db *gorm.DB, name string, forge *schema.AIForge) error {
 	db = db.Model(&schema.AIForge{})
-	if db := db.Where("forge_name = ?", name).Updates(&schema.AIForge{}); db.Error != nil {
+	if db := db.Where("forge_name = ?", name).Updates(forge); db.Error != nil {
 		return utils.Errorf("update AI Forge failed: %s", db.Error)
 	}
 	return nil
@@ -86,7 +86,7 @@ func GetAIForgeByName(db *gorm.DB, name string) (*schema.AIForge, error) {
 }
 
 func FilterAIForge(db *gorm.DB, filter *ypb.AIForgeFilter) *gorm.DB {
-	db.Model(&schema.AIForge{})
+	db = db.Model(&schema.AIForge{})
 	db = bizhelper.FuzzQueryLike(db, "forge_name", filter.GetForgeName())
 	db = bizhelper.ExactQueryString(db, "forge_type", filter.GetForgeType())
 	db = bizhelper.FuzzSearchEx(db, []string{
