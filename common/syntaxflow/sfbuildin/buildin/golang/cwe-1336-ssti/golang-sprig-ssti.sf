@@ -1,14 +1,15 @@
 desc(
-    title: "golang SSTI(sprig)",
-    title_zh: "golang SSTI 漏洞(sprig)",
-    type: vuln,
-    severity: low,
-    risk: ssti
-    desc: <<<TEXT
+	title: "golang SSTI(sprig)"
+	title_zh: "golang SSTI 漏洞(sprig)",
+	type: vuln
+	severity: low
+	risk: ssti
+	desc: <<<TEXT
 在 Go 语言中，CWE-1336（Server-Side Template Injection, SSTI）漏洞通常发生在使用模板引擎时，未对用户输入进行严格过滤，导致攻击者可以注入恶意代码。SSTI 漏洞可能导致任意代码执行、敏感信息泄露或服务中断，因此属于高风险漏洞。
 
 Sprig 函数库风险：sprig.FuncMap() 提供了大量内置函数（如文件操作、系统命令执行等），攻击者可能利用这些函数执行任意代码。
 TEXT
+	rule_id: "017cae33-9b73-4470-9e98-adbdd10dbc3a"
 )
 
 <include('golang-template')> as $sink;
@@ -25,9 +26,9 @@ alert $low for {
 }
 
 desc(
-    lang: golang,
-    alert_low: 1,
-    'file://main.go': <<<UNSAFE
+	lang: golang
+	alert_low: 1
+	'file://main.go': <<<UNSAFE
 package main
 
 import (

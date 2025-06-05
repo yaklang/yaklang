@@ -1,12 +1,13 @@
 desc(
-    title: "golang CRLF(beego)",
+	title: "golang CRLF(beego)"
 	title_zh: "golang CRLF注入漏洞(beego)",
-    type: vuln,
-    severity: high,
-	risk: crlf,
-    desc: <<<TEXT
+	type: vuln
+	severity: high
+	risk: crlf
+	desc: <<<TEXT
 CRLF注入漏洞（Carriage Return Line Feed Injection）是一种利用特殊控制字符（\r\n）篡改HTTP协议数据流的攻击方式。攻击者通过注入这些字符，可以破坏协议结构，导致HTTP响应拆分、头部伪造等严重后果
 TEXT
+	rule_id: "dc8b9d04-3d71-4ca3-9820-95d21c57b945"
 )
 
 .GetString(* as $sink)
@@ -24,9 +25,9 @@ alert $high for {
 }
 
 desc(
-    lang: golang,
-    alert_high: 1,
-    'file://main.go': <<<UNSAFE
+	lang: golang
+	alert_high: 1
+	'file://main.go': <<<UNSAFE
 package main
 
 import (
