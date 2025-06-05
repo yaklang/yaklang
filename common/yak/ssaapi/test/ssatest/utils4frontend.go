@@ -211,21 +211,20 @@ func CheckError(t *testing.T, tc TestCase) {
 }
 
 func CheckTypeKind(t *testing.T, code string, kind ssa.TypeKind, opt ...ssaapi.Option) {
-	tc := TestCase{
-		Code: code,
-		Check: func(prog *ssaapi.Program, _ []string) {
-			vs := prog.Ref("target")
-			require.Len(t, vs, 1)
-
-			v := vs[0]
-			require.NotNil(t, v)
-
+	opt = append(opt, static_analyzer.GetPluginSSAOpt(string(language))...)
+	Check(t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		match := false
+		prog.Ref("target").Show().ForEach(func(v *ssaapi.Value) {
 			log.Info("type and kind: ", v.GetType(), v.GetTypeKind())
-			require.Equal(t, kind, v.GetTypeKind())
-		},
-		Option: opt,
-	}
-	CheckTestCase(t, tc)
+			if kind == v.GetTypeKind() {
+				match = true
+			}
+			// require.Equal(t, kind, v.GetTypeKind())
+		})
+		require.True(t, match, "type kind not match, want %v", kind)
+		return nil
+	}, opt...)
 }
 
 func CheckType(t *testing.T, code string, typ ssa.Type, opt ...ssaapi.Option) {

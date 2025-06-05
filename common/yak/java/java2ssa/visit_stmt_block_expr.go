@@ -691,7 +691,8 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.
 		if ret := i.Identifier(); ret != nil {
 			recover = y.SetRange(ret)
 			text := ret.GetText()
-			log.Infof("visitMethodCall: %s: range: %s", text, y.CurrentRange.String())
+			_ = text
+			// log.Infof("visitMethodCall: %s: range: %s", text, y.CurrentRange.String())
 			memberKey = y.EmitConstInstPlaceholder(ret.GetText())
 		} else if ret := i.THIS(); ret != nil {
 			// get clazz
