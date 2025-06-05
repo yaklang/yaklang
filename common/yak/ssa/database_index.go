@@ -4,6 +4,14 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
+func SaveVariableIndexByName(name string, inst Instruction) {
+	SaveVariableIndex(inst, name, "")
+}
+
+func SaveVariableIndexByMember(member string, inst Instruction) {
+	SaveVariableIndex(inst, "", member)
+}
+
 func SaveVariableIndex(inst Instruction, name, member string) {
 	if inst.GetId() == -1 {
 		return
@@ -41,7 +49,7 @@ func SaveVariableIndex(inst Instruction, name, member string) {
 	}
 }
 
-func SaveClassIndex(inst Instruction, name string) {
+func SaveClassIndex(name string, inst Instruction) {
 	if inst.GetId() == -1 {
 		return
 	}

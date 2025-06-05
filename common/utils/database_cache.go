@@ -221,10 +221,8 @@ func (c *DataBaseCacheWithKey[K, T]) IsClose() bool {
 }
 
 func (c *DataBaseCacheWithKey[K, T]) Close() {
-	// todo: save all item
-	c.close.Store(true)
 	c.notifyCache.Close()
-	c.close.Store(false)
+	c.data.Clear()
 }
 
 func (c *DataBaseCacheWithKey[K, T]) ForEach(f func(K, T) bool) {
