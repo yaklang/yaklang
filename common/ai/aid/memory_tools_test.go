@@ -20,20 +20,20 @@ func Test_MemoryTools(t *testing.T) {
 		return
 	}
 
-	var userDataSet, userDataGet, userDataDelete, userDataList *aitool.Tool
+	var persistentDataSet, persistentDataGet, persistentDataDelete, persistentDataList *aitool.Tool
 	var userQuery *aitool.Tool
 
 	for _, tool := range tools {
 		name := tool.Name
 		switch name {
-		case "memory_user_data_set":
-			userDataSet = tool
-		case "memory_user_data_get":
-			userDataGet = tool
-		case "memory_user_data_delete":
-			userDataDelete = tool
-		case "memory_user_data_list":
-			userDataList = tool
+		case "memory_persistent_data_set":
+			persistentDataSet = tool
+		case "memory_persistent_data_get":
+			persistentDataGet = tool
+		case "memory_persistent_data_delete":
+			persistentDataDelete = tool
+		case "memory_persistent_data_list":
+			persistentDataList = tool
 		case "memory_query":
 			userQuery = tool
 		default:
@@ -43,33 +43,33 @@ func Test_MemoryTools(t *testing.T) {
 	// test user data
 	tokenKey := uuid.New().String()
 	tokenValue := uuid.New().String()
-	_, err = userDataSet.InvokeWithParams(map[string]any{
+	_, err = persistentDataSet.InvokeWithParams(map[string]any{
 		"key":   tokenKey,
 		"value": tokenValue,
 	})
 	require.NoError(t, err)
 
-	callRes, err := userDataList.InvokeWithParams(map[string]any{})
+	callRes, err := persistentDataList.InvokeWithParams(map[string]any{})
 	require.NoError(t, err)
 	require.Len(t, callRes.Data.(*aitool.ToolExecutionResult).Result, 1)
 	require.Contains(t, callRes.Data.(*aitool.ToolExecutionResult).Result, tokenKey)
 
-	callRes, err = userDataGet.InvokeWithParams(map[string]any{
+	callRes, err = persistentDataGet.InvokeWithParams(map[string]any{
 		"key": tokenKey,
 	})
 	require.NoError(t, err)
 	require.Equal(t, callRes.Data.(*aitool.ToolExecutionResult).Result, tokenValue)
 
-	_, err = userDataDelete.InvokeWithParams(map[string]any{
+	_, err = persistentDataDelete.InvokeWithParams(map[string]any{
 		"key": tokenKey,
 	})
 	require.NoError(t, err)
 
-	callRes, err = userDataList.InvokeWithParams(map[string]any{})
+	callRes, err = persistentDataList.InvokeWithParams(map[string]any{})
 	require.NoError(t, err)
 	require.Len(t, callRes.Data.(*aitool.ToolExecutionResult).Result, 0)
 
-	_, err = userDataGet.InvokeWithParams(map[string]any{
+	_, err = persistentDataGet.InvokeWithParams(map[string]any{
 		"key": tokenKey,
 	})
 	require.Error(t, err)
