@@ -453,3 +453,8 @@ func CreateOrUpdateSyntaxFlowRule(db *gorm.DB, RuleName string, i interface{}) e
 
 	return nil
 }
+
+func DeleteSyntaxFlowRuleByRuleNameOrRuleId(name, ruleId string) error {
+	db := consts.GetGormProfileDatabase()
+	return db.Where("rule_name = ? or rule_id = ?", name, ruleId).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error
+}
