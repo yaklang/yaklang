@@ -112,8 +112,8 @@ type MixPluginCaller struct {
 	websiteFilter       filter.Filterable
 	websitePathFilter   filter.Filterable
 	websiteParamsFilter filter.Filterable
-
-	rawQuestFilter filter.Filterable
+	targetFilter        filter.Filterable
+	rawQuestFilter      filter.Filterable
 
 	runtimeId string
 	proxy     []string
@@ -252,6 +252,7 @@ func NewMixPluginCaller() (*MixPluginCaller, error) {
 		websitePathFilter:   webFilter,
 		websiteParamsFilter: webFilter,
 		rawQuestFilter:      webFilter,
+		targetFilter:        webFilter,
 		pluginScanFilter:    yakit.GlobalPluginScanFilter,
 		callers:             NewYakToCallerManager().WithVulFilter(callerFilter),
 		feedbackHandler: func(result *ypb.ExecResult) error {
@@ -274,6 +275,7 @@ func NewMixPluginCallerWithFilter(webFilter filter.Filterable) (*MixPluginCaller
 		websiteFilter:       webFilter,
 		websitePathFilter:   webFilter,
 		websiteParamsFilter: webFilter,
+		targetFilter:        webFilter,
 		pluginScanFilter:    yakit.GlobalPluginScanFilter,
 		callers:             NewYakToCallerManager().WithVulFilter(callerFilter),
 		feedbackHandler: func(result *ypb.ExecResult) error {
@@ -329,6 +331,7 @@ func (c *MixPluginCaller) ResetFilter() {
 	webFilter := filter.NewCuckooFilter()
 	c.websiteParamsFilter = webFilter
 	c.websitePathFilter = webFilter
+	c.targetFilter = webFilter
 	c.websiteFilter = webFilter
 }
 
@@ -709,6 +712,10 @@ func calcNewWebsiteHash(urlIns *url.URL, host, port interface{}, req []byte) str
 	return utils.CalcSha1(urlIns.Scheme, host, port, freq.GetMethod(), "new-website")
 }
 
+func calcTargetHash(host, port interface{}) string {
+	return utils.CalcSha1(host, port)
+}
+
 func (m *MixPluginCaller) GetFingerprintMatcher() *fp.Matcher {
 	m.fingerprintMatcherOnce.Do(func() {
 		m.fingerprintMatcher, _ = fp.NewDefaultFingerprintMatcher(fp.NewConfig(fp.WithDatabaseCache(true), fp.WithCache(true)))
@@ -841,16 +848,9 @@ func (m *MixPluginCaller) mirrorHTTPFlow(
 		websiteHash := calcNewWebsiteHash(urlObj, host, port, req)
 		websitePathHash := calcWebsitePathHash(urlObj, host, port, req)
 		websitePathParamsHash := calcWebsitePathParamsHash(urlObj, host, port, req)
-		if !m.websiteFilter.Exist(websiteHash) {
-			m.websiteFilter.Insert(websiteHash)
-			if callers.ShouldCallByName(HOOK_MirrorNewWebsite) {
-				callers.Call(HOOK_MirrorNewWebsite,
-					WithCallConfigRuntimeCtx(runtimeCtx),
-					WithCallConfigForceSync(forceSync),
-					WithCallConfigItems(isHttps, u, req, rsp, body),
-				)
-			}
-
+		targetHash := calcTargetHash(host, port)
+		if !m.targetFilter.Exist(targetHash) {
+			m.targetFilter.Insert(targetHash)
 			if callers.ShouldCallByName(HOOK_PortScanHandle) {
 				var (
 					matchResult *fp.MatchResult = &fp.MatchResult{State: fp.OPEN}
@@ -880,6 +880,16 @@ func (m *MixPluginCaller) mirrorHTTPFlow(
 						)
 					}()
 				}
+			}
+		}
+		if !m.websiteFilter.Exist(websiteHash) {
+			m.websiteFilter.Insert(websiteHash)
+			if callers.ShouldCallByName(HOOK_MirrorNewWebsite) {
+				callers.Call(HOOK_MirrorNewWebsite,
+					WithCallConfigRuntimeCtx(runtimeCtx),
+					WithCallConfigForceSync(forceSync),
+					WithCallConfigItems(isHttps, u, req, rsp, body),
+				)
 			}
 
 			// 异步+并发限制执行 Nuclei
