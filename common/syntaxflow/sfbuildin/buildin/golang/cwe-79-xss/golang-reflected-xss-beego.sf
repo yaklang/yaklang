@@ -16,7 +16,9 @@ TEXT
 )
 
 .Ctx.ResponseWriter.Write(* #-> as $sink)
-$sink?{have: 'GetString'} as $mid;
+$sink<dataflow(
+	include:" * ?{have: 'GetString'}",
+)> as $mid;
 
 alert $mid for {
     title: 'Reflected XSS detected',

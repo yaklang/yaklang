@@ -129,7 +129,7 @@ REFERENCE
 )
 
 <include('golang-file-path')> as $path;
-<include('golang-os-file')> as $sink;
+<include('golang-os-sink')> as $sink;
 
 strings.HasPrefix(* #-> as $check);
 $path.Clean(* #-> as $check);

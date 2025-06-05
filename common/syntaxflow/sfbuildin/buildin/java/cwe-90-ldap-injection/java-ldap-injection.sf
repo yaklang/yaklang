@@ -63,19 +63,18 @@ InitialDirContext()?{<typeName>?{have:'javax.naming'}}.search(*?{<typeName>?{hav
 check $sink;
 
 $sink #{
-    include:`* & $source`,
+    until: `* & $source`
+}-> as $result 
+
+$result<dataflow(
     exclude:`*?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`,
     exclude:`*?{opcode:phi}`,
-}->as $high;
+)> as $high 
 
 alert $high for {
     message: "发现Java代码中存在LDAP注入漏洞，并且数据流中间没有进行任何过滤。",
     level: high,
 };
-
-$sink #{
-    include:`<self> & $source`,
-}->as $result;
 
 $result - $high  as $low;
 alert $low for {
