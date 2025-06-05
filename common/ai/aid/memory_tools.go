@@ -115,6 +115,14 @@ func (m *Memory) CreateMemoryTools() ([]*aitool.Tool, error) {
 	if err != nil {
 		log.Errorf("register memory_persistent_data_delete tool: %v", err)
 	}
+	err = factory.RegisterTool("memory_persistent_data_list",
+		aitool.WithDescription("memory tools: list user data key in memory; user data  as the AI's external long-term memory, allowing the AI to read from and write to this data storage to maintain continuity across different contexts"),
+		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			return m.PersistentData.Keys(), nil
+		}))
+	if err != nil {
+		log.Errorf("register memory_user_data_list tool: %v", err)
+	}
 
 	tools := factory.Tools()
 	if len(tools) == 0 {
