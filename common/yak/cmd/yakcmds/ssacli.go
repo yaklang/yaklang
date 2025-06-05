@@ -16,10 +16,10 @@ import (
 	"time"
 
 	"github.com/gobwas/glob"
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -271,17 +271,17 @@ var ssaCompile = &cli.Command{
 			if err != nil {
 				return utils.Errorf("open database failed: %v", err)
 			}
-			consts.SetGormSSAProjectDatabaseByDB(db)
+			consts.SetGormSSAProjectDatabase(db)
 		}
 		// if not set dialect, use existed db
 		if databaseDialect == "" && databaseFileRaw != "" {
 			// set database path
-			if target == "" &&
-				utils.GetFirstExistedFile(databaseFileRaw) == "" {
-				// no compile ,database not existed
-				return utils.Errorf("database file not found: %v", databaseFileRaw)
-			}
-			consts.SetGormSSAProjectDatabaseByPath(databaseFileRaw)
+			// if target == "" &&
+			// 	utils.GetFirstExistedFile(databaseFileRaw) == "" {
+			// 	// no compile ,database not existed
+			// 	return utils.Errorf("database file not found: %v", databaseFileRaw)
+			// }
+			consts.SetSSADatabaseInfo(databaseFileRaw)
 		}
 
 		if slices.Contains(ssadb.AllProgramNames(ssadb.GetDB()), programName) {
@@ -1079,14 +1079,14 @@ var ssaQuery = &cli.Command{
 			if err != nil {
 				return utils.Errorf("open database failed: %v", err)
 			}
-			consts.SetGormSSAProjectDatabaseByDB(db)
+			consts.SetGormSSAProjectDatabase(db)
 		} else if databaseFileRaw != "" {
 			// set database path
 			if utils.GetFirstExistedFile(databaseFileRaw) == "" {
 				// no compile ,database not existed
 				return utils.Errorf("database file not found: %v use default database", databaseFileRaw)
 			}
-			consts.SetSSAProjectDatabasePath(databaseFileRaw)
+			consts.SetGormSSAProjectDatabaseByInfo(databaseFileRaw)
 		}
 
 		sarifFile := c.String("sarif")

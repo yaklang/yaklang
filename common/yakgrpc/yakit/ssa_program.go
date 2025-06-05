@@ -102,7 +102,7 @@ func Prog2GRPC(prog *ssadb.IrProgram) *ypb.SSAProgram {
 		Description:   prog.Description,
 		Language:      prog.Language,
 		EngineVersion: prog.EngineVersion,
-		Dbpath:        consts.GetSSADataBasePathDefault(consts.GetDefaultYakitBaseDir()),
+		Dbpath:        consts.SSA_PROJECT_DB_RAW,
 	}
 	// recompile
 	NeedReCompile := func() bool {

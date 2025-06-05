@@ -10422,6 +10422,7 @@ type NewProjectRequest struct {
 	ChildFolderId int64                  `protobuf:"varint,4,opt,name=ChildFolderId,proto3" json:"ChildFolderId,omitempty"`
 	Type          string                 `protobuf:"bytes,5,opt,name=Type,proto3" json:"Type,omitempty"`
 	Id            int64                  `protobuf:"varint,6,opt,name=Id,proto3" json:"Id,omitempty"`
+	Database      string                 `protobuf:"bytes,7,opt,name=Database,proto3" json:"Database,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -10496,6 +10497,13 @@ func (x *NewProjectRequest) GetId() int64 {
 		return x.Id
 	}
 	return 0
+}
+
+func (x *NewProjectRequest) GetDatabase() string {
+	if x != nil {
+		return x.Database
+	}
+	return ""
 }
 
 type NewProjectResponse struct {
@@ -52331,14 +52339,15 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vProjectName\x18\x01 \x01(\tR\vProjectName\x12\x1a\n" +
 	"\bFolderId\x18\x02 \x01(\x03R\bFolderId\x12$\n" +
 	"\rChildFolderId\x18\x03 \x01(\x03R\rChildFolderId\x12\x12\n" +
-	"\x04Type\x18\x04 \x01(\tR\x04Type\"\xbd\x01\n" +
+	"\x04Type\x18\x04 \x01(\tR\x04Type\"\xd9\x01\n" +
 	"\x11NewProjectRequest\x12 \n" +
 	"\vProjectName\x18\x01 \x01(\tR\vProjectName\x12 \n" +
 	"\vDescription\x18\x02 \x01(\tR\vDescription\x12\x1a\n" +
 	"\bFolderId\x18\x03 \x01(\x03R\bFolderId\x12$\n" +
 	"\rChildFolderId\x18\x04 \x01(\x03R\rChildFolderId\x12\x12\n" +
 	"\x04Type\x18\x05 \x01(\tR\x04Type\x12\x0e\n" +
-	"\x02Id\x18\x06 \x01(\x03R\x02Id\"F\n" +
+	"\x02Id\x18\x06 \x01(\x03R\x02Id\x12\x1a\n" +
+	"\bDatabase\x18\a \x01(\tR\bDatabase\"F\n" +
 	"\x12NewProjectResponse\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x12 \n" +
 	"\vProjectName\x18\x02 \x01(\tR\vProjectName\"\xa7\x02\n" +
