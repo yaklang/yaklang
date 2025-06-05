@@ -24,7 +24,7 @@ type AuditResult struct {
 	RulePurpose  string `json:"purpose"`
 	RuleSeverity string `json:"rule_severity"`
 	RuleDesc     string `json:"rule_desc"`
-	RuleContent  string `json:"rule_content" gorm:"type:text;index"`
+	RuleContent  string `json:"rule_content" gorm:"type:text;"`
 
 	AlertDesc schema.MapEx[string, *schema.SyntaxFlowDescInfo] `gorm:"type:text"`
 

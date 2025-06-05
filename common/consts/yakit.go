@@ -74,17 +74,24 @@ func GetGormProjectDatabase() *gorm.DB {
 }
 
 func InitializeYakitDatabase(projectDB string, profileDB string) {
-	projectName := GetProjectDatabaseNameFromEnv()
-	if projectDB != "" {
-		projectName = projectDB
-	}
+	// profile
 	profileDBName := GetProfileDatabaseNameFromEnv()
 	if profileDB != "" {
 		profileDBName = profileDB
 	}
-
-	SetDefaultYakitProjectDatabaseName(projectName)
 	SetDefaultYakitProfileDatabaseName(profileDBName)
+
+	// project
+	projectName := GetProjectDatabaseNameFromEnv()
+	if projectDB != "" {
+		projectName = projectDB
+	}
+	SetDefaultYakitProjectDatabaseName(projectName)
+
+	// ssa check env
+	ssaProjectDatabaseRaw := GetSSADatabaseInfoFromEnv()
+	SetSSADatabaseInfo(ssaProjectDatabaseRaw)
+
 	initYakitDatabase()
 }
 
@@ -103,20 +110,22 @@ func initYakitDatabase() {
 		if err != nil {
 			log.Errorf("init plugin-db[%v] failed: %s", profileDatabaseName, err)
 		}
+		schema.SetGormProfileDatabase(profileDatabase)
+
 		/* 再创建项目数据库 */
 		projectDataBase, err = CreateProjectDatabase(projectDatabaseName)
 		if err != nil {
 			log.Errorf("init project-db[%v] failed: %s", projectDatabaseName, err)
 		}
 		schema.SetGormProjectDatabase(projectDataBase)
-		schema.SetGormProfileDatabase(profileDatabase)
 
 		/* 创建SSA数据库 */
-		ssaProjectDatabaseName := GetSSADataBasePathDefault(baseDir)
-		ssaDatabase, err = CreateSSAProjectDatabase(ssaProjectDatabaseName)
+		ssaDatabaseDialect, ssaDatabaseRaw := GetSSADataBaseInfo()
+		ssaprojectDatabase, err := CreateSSAProjectDatabase(ssaDatabaseDialect, ssaDatabaseRaw)
 		if err != nil {
-			log.Errorf("init ssa-db[%v] failed: %s", ssaProjectDatabaseName, err)
+			log.Errorf("init ssa-db[%s %s] failed: %s", ssaDatabaseRaw, ssaDatabaseDialect, err)
 		}
+		SetGormSSAProjectDatabase(ssaprojectDatabase)
 	})
 }
 

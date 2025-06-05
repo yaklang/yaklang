@@ -54,9 +54,6 @@ func (c *config) isStop() bool {
 }
 
 func (c *config) parseFile() (ret *Program, err error) {
-	if c.databasePath != "" {
-		consts.SetSSAProjectDatabasePath(c.databasePath)
-	}
 	prog, err := c.parseSimple(c.originEditor)
 	if err != nil {
 		return nil, err
