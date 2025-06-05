@@ -1,12 +1,13 @@
 desc(
-    title: "golang CORS(beego)",
-    title_zh: "golang CORS 漏洞(beego)",
-    type: vuln,
-    severity: high,
-    risk: ssti
-    desc: <<<TEXT
+	title: "golang CORS(beego)"
+	title_zh: "golang CORS 漏洞(beego)",
+	type: vuln
+	severity: high
+	risk: ssti
+	desc: <<<TEXT
 当CORS策略过度宽松（如允许任意来源Access-Control-Allow-Origin: *或反射Origin）时，可能导致跨域数据泄露或CSRF攻击。
 TEXT
+	rule_id: "a9f2254c-7a3d-4ea9-9830-6ca98bde8cd8"
 )
 
 .Ctx.Request.Header.Get(* as $sink)
@@ -25,9 +26,9 @@ alert $high for {
 }
 
 desc(
-    lang: golang,
-    alert_high: 1,
-    'file://main.go': <<<UNSAFE
+	lang: golang
+	alert_high: 1
+	'file://main.go': <<<UNSAFE
 package main
 
 import (

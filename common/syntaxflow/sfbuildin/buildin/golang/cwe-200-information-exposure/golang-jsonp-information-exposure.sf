@@ -1,16 +1,17 @@
 desc(
-    title: "golang Json information exposure",
-    title_zh: "golang Json相关函数泄露服务器敏感信息",
-    type: audit,
-    severity: low,
-    risk: "info-exposure",
-    desc: <<<TEXT
+	title: "golang Json information exposure"
+	title_zh: "golang Json相关函数泄露服务器敏感信息",
+	type: audit
+	severity: low
+	risk: "info-exposure"
+	desc: <<<TEXT
 检测可能通过Json相关函数泄露服务器敏感信息，包括：
     1. 目录结构暴露
     2. 当前工作路径泄露
     3. 服务器系统类型识别
     可能被攻击者用于信息收集阶段，辅助后续攻击
 TEXT
+	rule_id: "80849d1b-19fd-44ca-91be-9fdbd4af1fe3"
 )
 
 json.Marshal(*<slice(index=0)> as $sink)
@@ -27,9 +28,9 @@ alert $low for {
 }
 
 desc(
-    lang: golang,
-    alert_low: 1,
-    'file://main.go': <<<UNSAFE
+	lang: golang
+	alert_low: 1
+	'file://main.go': <<<UNSAFE
 package main
 
 import (
