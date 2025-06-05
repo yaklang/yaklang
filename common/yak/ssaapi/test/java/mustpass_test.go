@@ -65,9 +65,9 @@ func TestMustPass_Debug(t *testing.T) {
 
 	keyword := "local-file-write.sf"
 	// prog, err := ssaapi.FromDatabase(MUSTPASS_JAVA_CACHE_KEY)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
 
 	code := filesys.NewEmbedFS(mustpassFS)
 

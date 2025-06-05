@@ -348,7 +348,13 @@ func (n *anValue) SetStringMember(key string, v Value) {
 
 func (n *anValue) GetAllMember() map[Value]Value {
 	return lo.MapEntries(n.member.GetMap(), func(key int64, value int64) (Value, Value) {
-		return n.GetValueById(key), n.GetValueById(value)
+		k := n.GetValueById(key)
+		if k.String() == "__ref__" {
+			log.Info("bb")
+		}
+		v := n.GetValueById(value)
+		return k, v
+		// return n.GetValueById(key), n.GetValueById(value)
 	})
 }
 
