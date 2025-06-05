@@ -95,12 +95,14 @@ REFERENCE
 )
 
 <include('golang-template')> as $sink;
+<include('golang-http-source')> as $source 
 
 $sink.Must(* #{
     hook:`.Parse(*<slice(index=1)>  as  $target)`,
 }->)
 
 $target #{
+    until: "* & $source",
 	exclude: `*?{opcode:const}`,
 }-> as $high;
 
