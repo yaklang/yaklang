@@ -116,6 +116,12 @@ func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, op
 
 {{ if .MEMORY.PersistentMemory }}# 牢记
 {{ .MEMORY.PersistentMemory}}{{end}}
+
+# timeline
+<timeline_{{ .NONCE }}>
+{{ .MEMORY.Timeline }}
+</timeline_{{ .NONCE }}>
+
 # Output Formatter
 
 请你根据下面 SCHEMA 构建数据
