@@ -283,8 +283,8 @@ func (b *astbuilder) handleImportPackage() {
 
 		if importp, _ := b.GetImportPackageUser(id); importp != nil {
 			for n, g := range importp.ExportValue {
-				ex.Member = append(ex.Member, g)
-				ex.MemberMap[n] = g
+				ex.Member = append(ex.Member, g.GetId())
+				ex.MemberMap[n] = g.GetId()
 			}
 		}
 
@@ -662,6 +662,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 		}
 
 		for i, p := range fun.Params {
+			p := fun.GetValueById(p)
 			p.SetType(MarkedFunctionType.Parameter[i])
 		}
 		hitDefinedFunction = true
@@ -785,6 +786,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		}
 
 		for i, p := range fun.Params {
+			p := fun.GetValueById(p)
 			p.SetType(MarkedFunctionType.Parameter[i])
 		}
 		hitDefinedFunction = true
@@ -1645,25 +1647,24 @@ func (b *astbuilder) buildForStmt(stmt *gol.ForStmtContext) {
 			})
 		}
 
-		loop.SetCondition(func() ssa.Value {
-			var condition ssa.Value
-			if cond == nil {
-				condition = b.EmitConstInst(true)
-			} else {
-				// recoverRange := b.SetRange(cond.BaseParserRuleContext)
-				// defer recoverRange()
-				condition, _ = b.buildExpression(cond, false)
-				if condition == nil {
-					condition = b.EmitConstInst(true)
-					// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
-				}
-			}
-			return condition
-		})
 	} else if rangec, ok := stmt.RangeClause().(*gol.RangeClauseContext); ok {
 		b.buildForRangeStmt(rangec, loop)
 	}
-
+	loop.SetCondition(func() ssa.Value {
+		var condition ssa.Value
+		if cond == nil {
+			condition = b.EmitConstInst(true)
+		} else {
+			// recoverRange := b.SetRange(cond.BaseParserRuleContext)
+			// defer recoverRange()
+			condition, _ = b.buildExpression(cond, false)
+			if condition == nil {
+				condition = b.EmitConstInst(true)
+				// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
+			}
+		}
+		return condition
+	})
 	//  build body
 	loop.SetBody(func() {
 		if block, ok := stmt.Block().(*gol.BlockContext); ok {
@@ -2064,6 +2065,7 @@ func (b *astbuilder) buildMethodSpec(stmt *gol.MethodSpecContext, interfacetyp *
 		}
 
 		for i, p := range fun.Params {
+			p := fun.GetValueById(p)
 			p.SetType(MarkedFunctionType.Parameter[i])
 		}
 		hitDefinedFunction = true

@@ -43,6 +43,8 @@ type DataBaseCacheWithKey[K comparable, T any] struct {
 	disableSave      atomic.Bool
 }
 
+var SAVE_BreakPoint = false
+
 /*
 param:
 cache : ttl/lru cache
@@ -64,6 +66,16 @@ func NewDatabaseCacheWithKey[K comparable, T any](
 		close:            atomic.Bool{},
 	}
 	cache.SetExpirationCallback(func(_ string, key K, reason EvictionReason) {
+		// Check if saving to database is disabled
+		if ret.IsSaveDisabled() {
+			log.Debugf("Save to database is disabled, skipping save for key: %v", key)
+			ret.notifyCache.Set(InterfaceToString(key), key)
+			return
+		}
+
+		if SAVE_BreakPoint {
+			log.Infof("bbb")
+		}
 		log.Debugf("expire key: %v", key)
 		ret.save(key, reason)
 	})
@@ -84,6 +96,7 @@ func GetDatabaseCacheStatus[K comparable, T any](c *DataBaseCacheWithKey[K, T], 
 }
 
 func (c *DataBaseCacheWithKey[K, T]) Set(key K, memValue T) {
+	// log.Errorf("Set key: %v", key)
 	if c.close.Load() {
 		log.Errorf("BUG:: cache is closed,  con't set value with key: %v", key)
 		return
@@ -117,6 +130,7 @@ func (c *DataBaseCacheWithKey[K, T]) GetPure(key K) (T, bool) {
 }
 
 func (c *DataBaseCacheWithKey[K, T]) Get(key K) (T, bool) {
+	// log.Errorf("Get key: %v", key)
 	if item, ok := c.GetPure(key); ok {
 		return item, true
 	}
@@ -156,13 +170,6 @@ func (c *DataBaseCacheWithKey[K, T]) save(key K, reason EvictionReason) {
 		// recover c.notifyCache
 		c.notifyCache.Set(InterfaceToString(key), key)
 		c.updateStatus(item, DatabaseCacheItemNormal)
-	}
-
-	// Check if saving to database is disabled
-	if c.IsSaveDisabled() {
-		log.Debugf("Save to database is disabled, skipping save for key: %v", key)
-		recoverData()
-		return
 	}
 
 	defer func() {
@@ -219,10 +226,9 @@ func (c *DataBaseCacheWithKey[K, T]) IsClose() bool {
 }
 
 func (c *DataBaseCacheWithKey[K, T]) Close() {
-	// todo: save all item
-	c.close.Store(true)
 	c.notifyCache.Close()
-	c.close.Store(false)
+	c.data.Clear()
+	c.DisableSave()
 }
 
 func (c *DataBaseCacheWithKey[K, T]) ForEach(f func(K, T) bool) {

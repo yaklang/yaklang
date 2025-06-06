@@ -1,5 +1,7 @@
 package ssaapi
 
+import "github.com/yaklang/yaklang/common/yak/ssa"
+
 func (v *Value) GetFunction() *Value {
 	inst := v.getInstruction()
 	if inst == nil {
@@ -20,15 +22,11 @@ func (v *Value) GetBlock() *Value {
 	return v.NewValue(v.innerValue.GetBlock())
 }
 
-/*
-if condition is true  :  1 reach
-if condition is false : -1 unreachable
-if condition need calc: 0  unknown
-*/
-func (v *Value) IsReachable() int {
+func (v *Value) IsReachable() ssa.BasicBlockReachableKind {
 	return v.innerValue.GetBlock().Reachable()
 }
 
 func (v *Value) GetReachable() *Value {
-	return v.NewValue(v.innerValue.GetBlock().Condition)
+	node := v.innerValue
+	return v.NewValue(node.GetValueById(node.GetBlock().Condition))
 }

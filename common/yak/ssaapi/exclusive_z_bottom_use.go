@@ -111,9 +111,9 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 	case *ssa.Phi:
 		return v.visitUserFallback(actx, opt...)
 	case *ssa.Call:
-		method := inst.Method
+		method := inst.GetValueById(inst.Method)
 		if method == nil {
-			log.Infof("fallback: (call instruction 's method/func is not *Function) unknown caller, got: %v", inst.Method.String())
+			log.Infof("fallback: (call instruction 's method/func is not *Function) unknown caller, got: %v", method.String())
 			return v.visitUserFallback(actx, opt...)
 		}
 		actx.pushCall(inst)
@@ -127,7 +127,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 		v.DependOn.ForEach(func(value *Value) {
 			existed[value.GetId()] = struct{}{}
 		})
-		checkVal := func(vs []ssa.Value, get func(index int, arg ssa.Value)) {
+		checkVal := func(vs []int64, get func(index int, arg int64)) {
 			for index, value := range vs {
 				get(index, value)
 			}
@@ -147,32 +147,32 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 			if utils.IsNil(call) {
 				return method
 			}
-			function := call.Method
+			function := call.GetValueById(call.Method)
 			toFunction, isFunction := ssa.ToFunction(function)
 			if !isFunction {
 				return method
 			}
-			var val ssa.Value
-			checkVal(toFunction.Params, func(index int, arg ssa.Value) {
+			var val int64
+			checkVal(toFunction.Params, func(index int, arg int64) {
 				if index >= len(call.Args) {
 					return
 				}
-				if arg.GetId() == methodId {
+				if arg == methodId {
 					val = call.Args[index]
 				}
 			})
-			checkVal(toFunction.ParameterMembers, func(index int, arg ssa.Value) {
+			checkVal(toFunction.ParameterMembers, func(index int, arg int64) {
 				if index >= len(call.ArgMember) {
 					return
 				}
-				if arg.GetId() == methodId {
+				if arg == methodId {
 					val = call.ArgMember[index]
 				}
 			})
-			if val == nil {
+			if val <= 0 {
 				return method
 			}
-			return getRealMethod(val, callIndex+1)
+			return getRealMethod(call.GetValueById(val), callIndex+1)
 		}
 		real := getRealMethod(method, 1)
 
@@ -182,26 +182,26 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 		}
 
 		if isFunc {
-			checkVal(inst.Args, func(index int, arg ssa.Value) {
+			checkVal(inst.Args, func(index int, arg int64) {
 				if index >= len(fun.Params) {
 					return
 				}
-				_, ok := existed[arg.GetId()]
+				_, ok := existed[arg]
 				if !ok {
 					return
 				}
-				val := v.NewBottomUseValue(fun.Params[index])
+				val := v.NewBottomUseValue(fun.GetValueById(fun.Params[index]))
 				vals = append(vals, val.getBottomUses(actx, opt...)...)
 			})
-			checkVal(inst.ArgMember, func(index int, arg ssa.Value) {
+			checkVal(inst.ArgMember, func(index int, arg int64) {
 				if index >= len(fun.ParameterMembers) {
 					return
 				}
-				_, ok := existed[arg.GetId()]
+				_, ok := existed[arg]
 				if !ok {
 					return
 				}
-				val := v.NewBottomUseValue(fun.ParameterMembers[index])
+				val := v.NewBottomUseValue(fun.GetValueById(fun.ParameterMembers[index]))
 				vals = append(vals, val.getBottomUses(actx, opt...)...)
 			})
 		}
@@ -236,7 +236,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 
 		getReturnIndex := -1
 		for index, result := range inst.Results {
-			if _, ok := exists[result.GetId()]; ok {
+			if _, ok := exists[result]; ok {
 				getReturnIndex = index
 			}
 		}

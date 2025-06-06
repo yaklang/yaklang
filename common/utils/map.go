@@ -71,3 +71,9 @@ func (sm *SafeMapWithKey[K, V]) Count() int {
 	defer sm.mu.RUnlock()
 	return len(sm.m)
 }
+
+func (sm *SafeMapWithKey[K, V]) Clear() {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.m = make(map[K]V)
+}

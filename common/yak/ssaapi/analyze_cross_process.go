@@ -174,10 +174,11 @@ func (c *processAnalysisManager) getLastCauseCall(typ AnalysisType) (result *Val
 	case *ssa.Call:
 		result = value
 	case *ssa.SideEffect:
+		callSide := ret.GetValueById(ret.CallSite)
 		if typ == TopDefAnalysis {
-			result = value.NewTopDefValue(ret.CallSite)
+			result = value.NewTopDefValue(callSide)
 		} else if typ == BottomUseAnalysis {
-			result = value.NewBottomUseValue(ret.CallSite)
+			result = value.NewBottomUseValue(callSide)
 		}
 	}
 	return result

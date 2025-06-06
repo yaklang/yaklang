@@ -4,6 +4,14 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
+func SaveVariableIndexByName(name string, inst Instruction) {
+	SaveVariableIndex(inst, name, "")
+}
+
+func SaveVariableIndexByMember(member string, inst Instruction) {
+	SaveVariableIndex(inst, "", member)
+}
+
 func SaveVariableIndex(inst Instruction, name, member string) {
 	if inst.GetId() == -1 {
 		return
@@ -25,23 +33,22 @@ func SaveVariableIndex(inst Instruction, name, member string) {
 			return
 		}
 		variable := value.GetVariable(name)
-		if variable == nil {
-			return
+		if variable != nil {
+			index.VersionID = variable.GetVersion()
+			// TODO : scope ID
+			scope := variable.GetScope()
+			index.ScopeName = scope.GetScopeName()
 		}
-		index.VersionID = variable.GetVersion()
 
 		// field
 		if member != "" {
 			index.FieldName = member
 		}
 
-		// TODO : scope ID
-		scope := variable.GetScope()
-		index.ScopeName = scope.GetScopeName()
 	}
 }
 
-func SaveClassIndex(inst Instruction, name string) {
+func SaveClassIndex(name string, inst Instruction) {
 	if inst.GetId() == -1 {
 		return
 	}

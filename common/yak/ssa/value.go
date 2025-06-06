@@ -77,11 +77,11 @@ func (b *FunctionBuilder) readValueFromIncludeStack(name string) Value {
 	var value Value
 	b.includeStack.ForeachStack(func(program *Program) bool {
 		mainFunc := program.GetFunctionEx(string(MainFunctionName), "")
-		if mainFunc == nil || mainFunc.ExitBlock == nil {
+		if mainFunc == nil || mainFunc.ExitBlock == 0 {
 			return true
 		}
-		block, isBlock := ToBasicBlock(mainFunc.ExitBlock)
-		if !isBlock {
+		block := b.GetBasicBlockByID(mainFunc.ExitBlock)
+		if block == nil {
 			return true
 		}
 		if ret := ReadVariableFromScope(block.ScopeTable, name); ret != nil && ret.Value != nil {
@@ -319,7 +319,7 @@ func (b *FunctionBuilder) CreateVariableCross(name string, pos ...CanStartStopTo
 func (b *FunctionBuilder) CreateVariable(name string, pos ...CanStartStopToken) *Variable {
 	if variable := b.getCurrentScopeVariable(name); variable != nil {
 		if value := variable.GetValue(); value != nil {
-			if _, ok := ToConst(value); ok {
+			if _, ok := ToConstInst(value); ok {
 				return variable
 			}
 			if _, ok := ToMake(value); ok {
@@ -404,7 +404,7 @@ func (b *FunctionBuilder) BuildFreeValue(name string) *Parameter {
 			return freeValue
 		} else {
 			freeValue := NewParam(name, true, b)
-			b.FreeValues[variable.(*Variable)] = freeValue
+			b.FreeValues[variable.(*Variable)] = freeValue.GetId()
 			return freeValue
 		}
 	}
@@ -412,7 +412,7 @@ func (b *FunctionBuilder) BuildFreeValue(name string) *Parameter {
 	freeValue := NewParam(name, true, b)
 	v := b.CreateVariableHead(name)
 	headScope.AssignVariable(v, freeValue)
-	b.FreeValues[v] = freeValue
+	b.FreeValues[v] = freeValue.GetId()
 
 	// b.WriteVariable(variable, freeValue)
 	return freeValue
