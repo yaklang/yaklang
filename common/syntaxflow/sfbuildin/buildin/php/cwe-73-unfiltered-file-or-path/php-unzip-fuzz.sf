@@ -117,107 +117,15 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high for {
+	level: "high",
 	title: "Detect PHP Unsafe File Unzip Without Validation",
 	title_zh: "检测PHP未经验证的高危文件解压",
 	solution: <<<CODE
-### 修复建议
 
-1. **路径验证**
-   实施严格的路径验证机制，确保解压后的文件位于预期的安全目录内。避免使用相对路径或绝对路径直接拼接，防止目录穿越漏洞。
-
-   ```php
-   <?php
-   $zip = new ZipArchive;
-   if ($zip->open($_FILES['zip_file']['tmp_name']) === TRUE) {
-       $target_dir = '/safe/extraction/path/'; // 安全的目标目录
-       for ($i = 0; $i < $zip->numFiles; $i++) {
-           $filename = $zip->getNameIndex($i);
-           // 使用 basename 获取文件名，防止路径穿越
-           $safe_filename = basename($filename);
-           $extraction_path = $target_dir . $safe_filename;
-           // 确保目录存在
-           if (!is_dir($target_dir)) {
-               mkdir($target_dir, 0777, true);
-           }
-           if ($zip->extractTo($target_dir, [$filename])){
-                echo 'success';
-           }else{
-                exit();
-           }
-       }
-       $zip->close();
-   } else {
-       echo 'failed';
-   }
-   ?>
-   ```
-
-2. **文件名过滤**
-   在解压前，对压缩包内的文件名进行严格过滤，移除所有非预期字符，例如 `../`、`\`、`/` 等，只允许包含安全字符集的文件名。
-
-   ```php
-   <?php
-   $zip = new ZipArchive;
-   if ($zip->open($_FILES['zip_file']['tmp_name']) === TRUE) {
-       $target_dir = '/safe/extraction/path/'; // 安全的目标目录
-       for ($i = 0; $i < $zip->numFiles; $i++) {
-           $filename = $zip->getNameIndex($i);
-           // 过滤文件名，移除不安全字符
-           $safe_filename = preg_replace('/[^a-zA-Z0-9._-]/', '', $filename);
-           $extraction_path = $target_dir . $safe_filename;
-           if ($zip->extractTo($target_dir, [$filename])){
-                echo 'success';
-           }else{
-                exit();
-           }
-       }
-       $zip->close();
-   } else {
-       echo 'failed';
-   }
-   ?>
-   ```
-
-3. **文件类型验证**
-   根据业务需求，限制允许解压的文件类型。在解压前后，对文件扩展名和内容进行校验，仅允许白名单类型的文件解压。
-
-4. **最小权限原则**
-   确保运行解压操作的用户具有尽可能低的权限，降低潜在的损害。
 CODE
 	desc: <<<CODE
-### 漏洞描述
 
-1.  **漏洞原理**
-    当应用程序直接使用用户提供的压缩文件进行解压，并且没有对压缩文件中的文件路径进行充分验证时，攻击者可以构造包含恶意路径（例如 `../`）的压缩文件，使得解压后的文件被写入到预期的目标目录之外，甚至覆盖系统关键文件。
-
-2. **触发场景**
-
-   ```php
-   <?php
-   $zip = new ZipArchive;
-   if ($zip->open($_FILES['zip_file']['tmp_name']) === TRUE) {
-       $target_dir = '/safe/extraction/path/'; // 目标目录
-       for ($i = 0; $i < $zip->numFiles; $i++) {
-           $filename = $zip->getNameIndex($i);
-           $extraction_path = $target_dir . $filename; // 未经验证的文件名
-           $zip->extractTo($target_dir, [$filename]);
-       }
-       $zip->close();
-   } else {
-       echo 'failed';
-   }
-   ?>
-   ```
-
-   攻击者可以创建一个包含名为 `../../../../etc/passwd` 的文件的压缩包，上传后，该文件会被解压到 `/etc/passwd`，覆盖系统文件。
-
-3. **潜在影响**
-   - 任意文件读取或写入，包括敏感配置文件。
-   - WebShell植入，导致服务器被控制。
-   - 提权攻击，获取系统更高权限。
-   - 拒绝服务，通过大量小文件或超大文件消耗系统资源。
 CODE
-	level: "high",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -228,196 +136,28 @@ CODE)> as $highAndMid
 $highAndMid - $high as $mid
 
 alert $mid for {
-	title_zh: "检测PHP文件解压类型检测不安全",
-	solution: <<<CODE
-### 修复建议
-
-1. **执行安全的文件类型检查**
-   在解压文件之前，务必检查文件的类型，确保允许解压的文件类型是安全的。使用白名单方法，只允许特定的安全文件类型解压。
-
-   ```php
-   <?php
-   $zip = new ZipArchive;
-   if ($zip->open($_FILES['zip_file']['tmp_name']) === TRUE) {
-       $target_dir = '/safe/extraction/path/'; // 安全的目标目录
-       for ($i = 0; $i < $zip->numFiles; $i++) {
-           $filename = $zip->getNameIndex($i);
-           // 获取文件扩展名
-           $file_extension = pathinfo($filename, PATHINFO_EXTENSION);
-           
-           // 白名单检查
-           $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
-           if (!in_array(strtolower($file_extension), $allowed_extensions)) {
-               echo 'Illegal file type.';
-               continue; // 跳过不安全的文件类型
-           }
-   
-           $extraction_path = $target_dir . $filename;
-           if ($zip->extractTo($target_dir, [$filename])){
-                echo 'success';
-           }else{
-                exit();
-           }
-       }
-       $zip->close();
-   } else {
-       echo 'failed';
-   }
-   ?>
-   ```
-
-2. **使用`mime_content_type()`进行更可靠的文件类型检测**
-   不仅依赖文件扩展名，还应使用`mime_content_type()`函数检测文件的MIME类型，以防止通过更改扩展名伪装文件类型的情况。
-
-   ```php
-   <?php
-   $zip = new ZipArchive;
-       if ($zip->open($_FILES['zip_file']['tmp_name']) === TRUE) {
-           $target_dir = '/safe/extraction/path/'; // 安全的目标目录
-           for ($i = 0; $i < $zip->numFiles; $i++) {
-               $filename = $zip->getNameIndex($i);
-                // 获取临时文件路径
-               $tmp_file_path = tempnam(sys_get_temp_dir(), 'check');
-               
-               //提取文件到临时目录
-                if ($zip->extractTo(dirname($tmp_file_path), [$filename])){     
-                    copy(dirname($tmp_file_path).'/'.$filename,$tmp_file_path);
-                }else{
-                    continue;
-                }
-               // 获取文件的 MIME 类型
-               $mime_type = mime_content_type($tmp_file_path);
-               
-               // 白名单检查MIME类型
-               $allowed_mime_types = ['image/jpeg', 'image/png', 'image/gif'];
-                   
-               if (!in_array($mime_type, $allowed_mime_types)) {
-                   echo 'Illegal MIME type.';
-                   unlink($tmp_file_path);//删除临时文件
-                   continue; // 跳过不安全的文件类型
-               }           
-                                 $extraction_path = $target_dir . $filename;
-                   if ($zip->extractTo($target_dir, [$filename])){
-                       echo 'success';
-                   }else{
-                       exit();
-                   }
-                 unlink($tmp_file_path);//删除临时文件
-           }
-           $zip->close();
-       } else {
-           echo 'failed';
-       }
-   ?>
-   ```
-CODE
-	desc: <<<CODE
-### 风险描述
-
-1.  **风险原理**
-    当应用程序在解压文件之前或之后尝试检测文件类型，但使用的检测方法存在缺陷或易于绕过时，攻击者可以通过伪造文件类型来绕过检查，从而上传恶意文件。
-
-2. **触发场景**
-
-   ```php
-   <?php
-   $zip = new ZipArchive;
-   if ($zip->open($_FILES['zip_file']['tmp_name']) === TRUE) {
-       $target_dir = '/safe/extraction/path/'; // 目标目录
-       
-       $filename = $zip->getNameIndex(0);
-       $file_extension = pathinfo($filename, PATHINFO_EXTENSION);
-       
-       // 检查扩展名
-       $allowed_extensions = ['jpg', 'png', 'gif'];
-       if (!in_array(strtolower($file_extension), $allowed_extensions)) {
-           echo 'Illegal file type.';
-           exit();
-       }
-   
-       $zip->extractTo($target_dir);
-       $zip->close();
-   } else {
-       echo 'failed';
-   }
-   ?>
-   ```
-    
-   攻击者可以创建一个名为 `evil.php.jpg` 的文件，虽然扩展名是 `jpg`，但实际上是 PHP 代码。上述代码仅检查扩展名，而未检查文件内容，因此攻击者可以成功上传并执行恶意代码。
-
-3. **潜在影响**
-   - 恶意代码执行，例如 WebShell 植入。
-   - 跨站脚本攻击（XSS）。
-   - 文件覆盖或篡改。
-CODE
 	level: "mid",
 	title: "Detect PHP Insecure File Type Detection",
+	title_zh: "检测PHP文件解压类型检测不安全",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
 }
 $sink - $high - $mid as $low
 
 alert $low for {
-	title: "Audit PHP Potential File Storage Path Misconfiguration",
-	title_zh: "审计PHP潜在的文件存储路径配置问题",
 	solution: <<<CODE
-### 修复建议
 
-1. **配置正确的文件存储路径**
-   确保文件存储路径配置正确，并且只有授权用户才能访问。
-
-   ```php
-   <?php
-   // 正确配置
-   $target_dir = '/safe/extraction/path/';
-   
-   // 错误配置
-   $target_dir = $_GET['path']; // 从用户输入获取路径，存在安全问题
-   
-   $zip = new ZipArchive;
-   if ($zip->open($_FILES['zip_file']['tmp_name']) === TRUE) {
-       $zip->extractTo($target_dir);
-       $zip->close();
-   } else {
-       echo 'failed';
-   }
-   ?>
-   ```
-
-2. **限制目录访问权限**
-   使用操作系统提供的机制限制对文件存储目录的访问权限，确保只有授权用户才能读取或写入文件。
-
-3. **定期审查配置**
-   定期审查并更新文件存储路径配置，确保其仍然安全可靠。
 CODE
 	desc: <<<CODE
-### 风险描述
 
-1.  **风险原理**
-    当应用程序的文件存储路径配置不当，例如使用了不安全的默认路径或允许用户自定义路径，则存在信息泄露、文件覆盖甚至任意文件写入的风险。
-
-2. **触发场景**
-
-   ```php
-   <?php
-   $target_dir = $_GET['path']; // 从用户输入获取路径
-   
-   $zip = new ZipArchive;
-   if ($zip->open($_FILES['zip_file']['tmp_name']) === TRUE) {
-       $zip->extractTo($target_dir);
-       $zip->close();
-   } else {
-       echo 'failed';
-   }
-   ?>
-   ```
-
-   攻击者可以通过修改 `path` 参数来指定任意文件存储路径，例如覆盖系统关键文件。
-
-3. **潜在影响**
-   - 敏感信息泄露。
-   - 文件覆盖或篡改。
-   - 远程代码执行（如果攻击者可以写入 Web 目录）。
 CODE
 	level: "low",
+	title: "Audit PHP Potential File Storage Path Misconfiguration",
+	title_zh: "审计PHP潜在的文件存储路径配置问题",
 }
 desc(
 	lang: php

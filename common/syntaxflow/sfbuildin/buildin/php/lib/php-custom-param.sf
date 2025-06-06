@@ -46,39 +46,15 @@ _COOKIE.* as $param4
 
 $param1 + $param2 + $param3 + $param4 + $extra as $output
 alert $output for {
-	title: "Audit PHP Custom Extern Variable",
-	title_zh: "审计PHP自定义外部变量使用",
 	solution: <<<CODE
-none
+
 CODE
 	desc: <<<CODE
-### 1.规则目的
-该规则属于 `php-param` 库规则（`lib`类型），旨在审计PHP代码中对自定义外部变量（如 `$_POST`、`$_GET`、`$_REQUEST`、`$_COOKIE`）的使用情况。通过识别直接或间接使用这些用户可控外部变量的代码位置，为后续的数据流入跟踪和安全分析提供基础。
 
-### 2.规则详细
-1. **作为基础审计库**
-该规则不直接报告漏洞，而是作为其他规则（如污点分析规则）的基础组件。它标记出代码中所有对 `$_POST`, `$_GET`, `$_REQUEST`, `$_COOKIE` 等全局变量的访问点。
-
-2. **覆盖常见外部输入**
-规则识别并跟踪以下常见的PHP自定义外部变量：
-   - `$_POST`：通过 HTTP POST 方法传递的变量。
-   - `$_GET`：通过 URL 参数（HTTP GET 方法）传递的变量。
-   - `$_REQUEST`：默认包含 `$_GET`, `$_POST`, `$_COOKIE` 中的变量。
-   - `$_COOKIE`：通过 HTTP Cookie 传递的变量。
-
-3. **潜在安全风险**
-尽管本规则本身不报告漏洞，但对外部变量的不当处理是许多PHP安全漏洞（如SQL注入、XSS、文件包含、命令执行等）的根本原因。后续的污点分析规则将利用本规则识别的源，追踪数据流程，判断是否存在安全风险。
-
-4. **审计示例**
-例如，以下代码片段中对 `$_POST["a"]` 的使用将被本规则标记：
-```php
-$a = $_POST["a"]; // 此处 $_POST["a"] 被标记为外部输入
-$b = $_GET["b"];  // 此处 $_GET["b"] 被标记为外部输入
-$c = $_REQUEST["c"]; // 此处 $_REQUEST["c"] 被标记为外部输入
-$e = $_COOKIE["E"]; // 此处 $_COOKIE["E"] 被标记为外部输入
-```
 CODE
 	level: "low",
+	title: "Audit PHP Custom Extern Variable",
+	title_zh: "审计PHP自定义外部变量使用",
 }
 
 desc(

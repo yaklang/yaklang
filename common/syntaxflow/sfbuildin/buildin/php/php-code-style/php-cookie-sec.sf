@@ -75,96 +75,30 @@ setcookie?(*<len>?{==6}) as $checkCookie
 $checkCookie<getCallee>?(*<slice(index=5)>?{have: "false"}) as $sinkCookie
 
 alert $sinkCookie for {
-	title_zh: "检测PHP Cookie缺少Secure标志",
-	solution: <<<CODE
-### 修复建议
-
-#### 1. 设置Secure属性
-设置 `Secure` 属性为 `true`，确保Cookie只在HTTPS连接下发送。
-```php
-<?php
-    // 设置 Secure 属性为 true
-    setcookie("user", "JohnDoe", time() + 3600, "/", "", true, true);
-?>
-```
-
-#### 2. 始终使用HTTPS
-确保Web应用程序的所有通信都通过HTTPS进行，以防止Cookie在传输过程中被窃取。
-
-#### 3. 验证Cookie值
-对Cookie中存储的数据进行严格的验证和过滤，即使Cookie本身被窃取，也能限制攻击者可利用的范围。
-CODE
 	desc: <<<CODE
-### 漏洞描述
 
-1. **漏洞原理**
-`Secure`属性是HTTP Cookie的一个重要安全标志，用于指示浏览器只在通过加密的HTTPS连接发送Cookie。如果此属性未设置或设置为`false`，Cookie可能会在不安全的HTTP连接中被发送，从而使其容易受到中间人攻击（MITM）的监听和窃取。
-
-2. **触发场景**
-当使用`setcookie()`函数设置Cookie时，其第六个参数（secure）未显式设置为`true`，或者该参数缺失（默认为`false`）。例如：
-```php
-<?php
-    setcookie("user_session", "abcdef123", time() + 3600); // 缺少 secure 属性，默认为 false
-    setcookie("auth_token", "xyz789", time() + 3600, "/", "", false, true); // secure 显式设置为 false
-?>
-```
-即使应用程序部署在HTTPS上，如果Cookie的`Secure`属性没有设置为`true`，当用户通过HTTP访问页面时，浏览器仍可能发送此Cookie，或在HTTP到HTTPS的重定向过程中泄露。
-
-3. **潜在影响**
-- **会话劫持（Session Hijacking）**：攻击者在HTTP连接中截获会话Cookie，从而冒充合法用户进行操作。
-- **敏感信息泄露**：Cookie中可能包含用户凭证、会话ID或其他敏感数据，在不安全的传输中被窃取。
-- **凭证重放攻击**：如果Cookie被窃取，攻击者可以使用这些凭证进行重放攻击，即使密码已更改。
 CODE
 	level: "low",
 	title: "Detect PHP Cookie Missing Secure Flag",
+	title_zh: "检测PHP Cookie缺少Secure标志",
+	solution: <<<CODE
+
+CODE
 }
 
 setcookie?(*<slice(index=6)>?{have: 'false'}) as $noHttpOnlyCookie
 setcookie?(*<len>?{<=6}) as $noHttpOnlyCookie
 
 alert $noHttpOnlyCookie for {
+	title_zh: "检测PHP Cookie缺少HttpOnly标志",
+	solution: <<<CODE
+
+CODE
 	desc: <<<CODE
-### 漏洞描述
 
-1. **漏洞原理**
-`HttpOnly`属性是HTTP Cookie的一个安全标志，旨在防止客户端脚本（如JavaScript）通过`document.cookie`等方式访问Cookie。如果Cookie未设置此属性或设置为`false`，则当应用程序存在跨站脚本（XSS）漏洞时，攻击者可以利用XSS注入恶意脚本，从而轻松窃取用户的会话Cookie。一旦Cookie被窃取，攻击者可以利用它劫持用户会话，冒充受害者进行操作。
-
-2. **触发场景**
-当使用`setcookie()`函数设置Cookie时，其第七个参数（httponly）未显式设置为`true`，或者该参数缺失（默认为`false`）。例如：
-```php
-<?php
-    setcookie("user_session", "abcdef123", time() + 3600); // 缺少 httponly 属性，默认为 false
-    setcookie("auth_token", "xyz789", time() + 3600, "/", "", true, false); // httponly 显式设置为 false
-?>
-```
-如果应用程序存在XSS漏洞，攻击者可以注入如 `<script>alert(document.cookie)</script>` 的脚本，直接获取到未设置`HttpOnly`的Cookie。
-
-3. **潜在影响**
-- **会话劫持（Session Hijacking）**：攻击者通过窃取的Cookie冒充合法用户，执行未经授权的操作。
-- **敏感信息泄露**：如果Cookie中包含敏感数据，攻击者可以直接获取这些信息。
-- **绕过身份验证和授权**：攻击者可以完全控制用户会话，执行包括修改密码、查看私密数据等操作。
 CODE
 	level: "low",
 	title: "Detect PHP Cookie Missing HttpOnly Flag",
-	title_zh: "检测PHP Cookie缺少HttpOnly标志",
-	solution: <<<CODE
-### 修复建议
-
-#### 1. 设置HttpOnly属性
-设置`HttpOnly`属性为`true`，防止通过JavaScript等客户端脚本访问Cookie。
-```php
-<?php
-    // 设置 HttpOnly 属性为 true
-    setcookie("user", "JohnDoe", time() + 3600, "/", "", true, true);
-?>
-```
-
-#### 2. 防御XSS攻击
-除了设置`HttpOnly`，还需要对用户输入进行严格的验证和输出编码，以从根本上防止XSS漏洞。
-
-#### 3. 使用安全会话管理
-结合其他安全的会话管理实践，如定期更换会话ID，限制会话有效期，以及服务器端验证会话有效性。
-CODE
 }
 
 desc(

@@ -62,7 +62,18 @@ $params?{opcode: const && <string>?{any: disposition,Disposition} } as $flag;
 check $flag;
 $flag<getCall><getCallee> as $sink;
 check $sink;
-alert $sink for "Config Download filename Position";
+alert $sink for {
+	title: "",
+	title_zh: "",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "",
+}
+
 
 desc(
 	language: java

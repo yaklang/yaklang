@@ -119,78 +119,17 @@ $sqlConst?{<self>#>?{opcode: add}<var(op)> || <self>->?{opcode: add}<var(op)>};
 check $op;
 
 alert $op for {
+	desc: <<<CODE
+
+CODE
+	level: "mid",
 	severity: "medium",
+	type: "audit",
 	title: "SQL Statement Concatenation Detected",
 	title_zh: "SQL 字符串拼接位置：疑似 SQL 语句拼接并执行到数据库查询的代码",
 	solution: <<<CODE
-### 修复建议
 
-#### 1. 使用参数化查询（PreparedStatement）
-通过预编译SQL语句并绑定用户输入，隔离代码与数据，避免恶意输入篡改逻辑。这是防止SQL注入最有效的方法。
-
-```java
-// 修复代码示例
-String userInput = request.getParameter("id");
-String sql = "SELECT * FROM users WHERE id = ?";  // 使用占位符
-try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-    // 对用户输入进行类型检查和转换，避免恶意输入导致异常
-    try {
-        pstmt.setInt(1, Integer.parseInt(userInput));  // 强制类型转换并绑定参数
-    } catch (NumberFormatException e) {
-        // 处理非数字输入，如抛出异常或返回错误信息
-        throw new IllegalArgumentException("非法输入：ID 必须为数字", e);
-    }
-    ResultSet rs = pstmt.executeQuery();
-    // 处理结果集
-}
-```
-
-#### 2. 输入合法性校验
-对用户输入实施严格的类型、格式、长度或范围限制，拒绝非法输入。这是一种补充性的安全措施，不能完全替代参数化查询。
-
-```java
-// 示例：校验输入为数字且范围合法
-String userInput = request.getParameter("id");
-if (!userInput.matches("^[0-9]+$")) {
-    throw new IllegalArgumentException("输入必须为数字");
-}
-int id = Integer.parseInt(userInput);
-if (id < 1 || id > 1000) {
-    throw new IllegalArgumentException("ID超出有效范围");
-}
-// 继续使用安全的数据库访问方式（如PreparedStatement）处理合法输入
-String sql = "SELECT * FROM users WHERE id = ?";
-// ... 使用 PreparedStatement ...
-```
-
-#### 3. 使用ORM框架
-利用ORM（如Hibernate、MyBatis）内置的安全机制，通常会默认使用参数化查询，从而抽象化数据库操作细节，降低SQL注入风险。
-
-```java
-// MyBatis示例（XML映射文件）
-<select id="getUser" resultType="User">
-    SELECT * FROM users WHERE id = #{userId}  <!-- 安全参数占位符 -->
-</select>
-```
-
-```java
-// 调用代码（避免直接拼接）
-String userInput = request.getParameter("id");
-// 对用户输入进行必要的校验和转换
-try {
-    User user = sqlSession.selectOne("getUser", Long.parseLong(userInput));
-    // 处理查询结果
-} catch (NumberFormatException e) {
-    // 处理非数字输入
-    throw new IllegalArgumentException("非法输入：ID 必须为数字", e);
-}
-```
 CODE
-	desc: <<<CODE
-疑似 SQL 语句拼接并执行到数据库查询的代码
-CODE
-	level: "mid",
-	type: "audit",
 }
 
 

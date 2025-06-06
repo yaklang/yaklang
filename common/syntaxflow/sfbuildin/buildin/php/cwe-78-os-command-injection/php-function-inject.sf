@@ -99,10 +99,16 @@ REFERENCE
 /^create_function|eval|assert$/ as $evalFunction;
 
 check $evalFunction;
-alert $evalFunction for{
-    title: "Detected dangerous function, possible code execution risk",
-    title_zh: "检测到危险函数，可能存在代码执行风险",
-    level: "low",
+alert $evalFunction for {
+	title: "Detected dangerous function, possible code execution risk",
+	title_zh: "检测到危险函数，可能存在代码执行风险",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
 }
 <include('php-param')> as $params;
 <include('php-tp-all-extern-variable-param-source')> as $params
@@ -119,9 +125,15 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high for {
-    title: 'Unvalidated parameter injection',
-    title_zh: '未验证参数注入风险',
-    level: 'high',
+	title: "Unvalidated parameter injection",
+	title_zh: "未验证参数注入风险",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
 }
 
 $all<dataflow(include=<<<INCLUDE
@@ -133,17 +145,29 @@ CODE)> as $highAndMid
 $highAndMid - $high as $mid
 
 alert $mid for {
-    title: 'Insufficient parameter filtering',
-    title_zh: '参数过滤不充分，可能存在代码执行风险',
-    level: 'mid',
+	title: "Insufficient parameter filtering",
+	title_zh: "参数过滤不充分，可能存在代码执行风险",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
 }
 
 $all - $high - $mid as $low
 
 alert $low for {
-    title: 'Potential code execution risk',
-    title_zh: '潜在代码执行风险',
-    level: 'low',
+	title: "Potential code execution risk",
+	title_zh: "潜在代码执行风险",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
 }
 desc(
 	lang: "php"
@@ -175,9 +199,15 @@ $source #{
 }-> as $high
 
 alert $high_risk for {
-    title: 'Unvalidated parameter injection',
-    title_zh: '未验证参数注入风险',
-    level: 'high',
+	title: "Unvalidated parameter injection",
+	title_zh: "未验证参数注入风险",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
 }
 
 $source #{
@@ -186,17 +216,29 @@ $source #{
 }-> as $mid
 
 alert $mid_risk for {
-    title: 'Insufficient parameter filtering',
-    title_zh: '参数过滤不充分，可能存在代码执行风险',
-    level: 'mid',
+	title: "Insufficient parameter filtering",
+	title_zh: "参数过滤不充分，可能存在代码执行风险",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
 }
 
 $allRisk - $high - $mid as $low
 
 alert $low_risk for {
-    title: 'Potential code execution risk',
-    title_zh: '潜在代码执行风险',
-    level: 'low',
+	title: "Potential code execution risk",
+	title_zh: "潜在代码执行风险",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
 }
 desc(
 	lang: "php"

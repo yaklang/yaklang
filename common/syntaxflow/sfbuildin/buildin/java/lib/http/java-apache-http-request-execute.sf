@@ -71,53 +71,15 @@ $request<getCallee>?{<fullTypeName>?{have: /Http(Get|Post|Put|Delete|Patch|Optio
 $request<getCallee>?{<fullTypeName>?{have: /BasicHttpRequest/}}(,,* as $output);
 <delete(request)>
 alert $output for {
+	title: "Unvalidated Apache HttpClient Execution",
 	title_zh: "未验证的Apache HttpClient执行风险",
 	solution: <<<CODE
-### 修复建议
-#### 1. 输入合法性校验
-在构建和执行HTTP请求时，对用户提供的URL或其他参数进行严格的输入验证和过滤。根据预期的协议（e.g., `http`, `https`）、域名、端口和路径格式，拒绝任何不符合规范的输入，防止攻击者注入恶意URL或路径。
-
-#### 2. 限制访问范围
-如果应用程序只需要访问特定的几个内部或外部服务，可以维护一个允许访问的域名或IP地址白名单。在执行HTTP请求前，校验目标地址是否在白名单内，拒绝访问其他未经授权的地址。
-
-#### 3. 禁止重定向
-禁用HttpClient的自动重定向功能，或对重定向的目标地址进行严格检查，确保不会重定向到内部系统或敏感地址。这有助于防止开放重定向漏洞。
-
-#### 4. 使用安全的HTTP客户端配置
-配置HttpClient时，确保使用安全的默认设置，例如合适的连接超时、读取超时和最大连接数限制，以防止拒绝服务攻击（DoS）。
-
-#### 5. 遵循最小权限原则
-应用程序执行HTTP请求所使用的用户或进程应该拥有执行该操作所需的最低权限，限制潜在攻击的影响范围。
-
-#### 6. 日志记录与监控
-记录所有执行的HTTP请求的详细信息，包括目标URL、参数等。建立监控机制，对异常的请求模式（例如请求大量内部地址、高频次的请求）进行告警，及时发现和响应潜在的安全威胁。
-
-#### 7. 避免敏感信息泄露
-在构建HTTP请求时，避免在URL、请求头或请求体中包含敏感信息，特别是用户凭证、会话令牌或其他个人身份信息。如果必须传递敏感信息，使用加密或其他安全机制保护数据传输。
 
 CODE
 	desc: <<<CODE
-### 漏洞描述
-1. **漏洞原理**
-   由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始HTTP请求的逻辑。这可能导致非预期的HTTP请求操作，例如访问内网资源或执行其他恶意操作。
-
-2. **触发场景**
-   // 存在漏洞的代码示例
-   ```java
-   CloseableHttpClient httpClient = HttpClients.createDefault();
-   HttpGet httpGet = new HttpGet("http://attacker.com");
-   CloseableHttpResponse response = httpClient.execute(httpGet);
-   ```
-   攻击者通过构造恶意URL，诱导应用程序访问内网资源。
-
-3. **潜在影响**
-   - 泄露内网敏感信息。
-   - 执行未经授权的操作。
-   - 作为其他攻击的跳板。
 
 CODE
 	level: "mid",
-	title: "Unvalidated Apache HttpClient Execution",
 }
 
 

@@ -119,113 +119,16 @@ $sink.RawQuery(* #-> as $param);
 $param?{have: 'Parameter'} as $high;
 
 alert $high for {
-	title: "SQL Injection detected",
-	title_zh: "检测到SQL注入",
 	solution: <<<CODE
-### 修复建议
 
-#### 1. 使用 Pop 库的参数化查询方式
-优先使用 Pop 库提供的安全的查询方法，例如 `Where`、`Find` 或 `Select`，并使用参数化占位符来绑定用户输入。Pop 会自动处理参数的引用和转义，从而防止 SQL 注入。
-
-```golang
-// 修复代码示例 (使用 Pop 的 Where 方法进行参数化查询)
-func secureLogin(w http.ResponseWriter, r *http.Request) {
-	username := r.FormValue("username")
-	// ...连接数据库代码...
-	var users []User
-	// 使用 Pop 的 Where 方法和参数化查询
-	q := db.Where("name = ?", username)
-	if err := q.All(&users); err != nil {
-		log.Fatal(err)
-	}
-	// ...处理结果...
-}
-
-// 或者如果必须使用 RawQuery，使用参数化占位符
-func secureRawQueryLogin(w http.ResponseWriter, r *http.Request) {
-	username := r.FormValue("username")
-	// ...连接数据库代码...
-	var user User
-	// 使用 ? 作为占位符，并将用户输入作为参数传递给 RawQuery
-	if err := db.RawQuery("SELECT * FROM users WHERE name = ?", username).First(&user); err != nil {
-		log.Fatal(err)
-	}
-	// ...处理结果...
-}
-```
-
-#### 2. 对用户输入进行严格的输入验证和过滤
-虽然参数化查询是首选的防御方式，但在某些情况下，对用户输入进行额外的验证和过滤也是重要的。确保用户输入符合预期的类型、格式和长度。
-
-```golang
-// 示例：简单校验用户名是否包含特殊字符 (不全面的示例，参数化查询优先)
-import (
-	"regexp"
-)
-
-func validateUsername(username string) bool {
-	// 简单示例，实际场景应更全面
-	validUsername := regexp.MustCompile("^[a-zA-Z0-9_]+$")
-	return validUsername.MatchString(username)
-}
-
-func secureLoginWithValidation(w http.ResponseWriter, r *http.Request) {
-	username := r.FormValue("username")
-
-	if !validateUsername(username) {
-		http.Error(w, "Invalid username", http.StatusBadRequest)
-		return
-	}
-	// ...继续使用参数化查询...
-	// ...连接数据库代码...
-	var users []User
-	q := db.Where("name = ?", username)
-	if err := q.All(&users); err != nil {
-		log.Fatal(err)
-	}
-	// ...处理结果...
-}
-```
-
-#### 3. 避免使用 `fmt.Sprintf` 或字符串拼接构造 SQL 查询
-绝不应该直接将用户输入通过字符串拼接（例如 `fmt.Sprintf` 或 `+`）的方式构建 SQL 查询字符串，这几乎总是导致 SQL 注入。
-
-#### 4. 最小化数据库权限
-为应用程序使用的数据库用户分配最小必要的权限，限制其只能执行应用程序所需的特定操作。即使发生 SQL 注入，也能降低攻击者造成的损害。
 CODE
 	desc: <<<CODE
-### 漏洞描述
 
-1. **漏洞原理**
-   SQL注入是一种严重的安全漏洞，它允许攻击者通过操控应用程序的数据库查询，执行任意 SQL 代码。在 Go 语言中使用 Pop 库进行数据库操作时，如果直接将用户输入拼接到 SQL 查询中（例如使用 `db.RawQuery` 或 `fmt.Sprintf` 构建查询字符串），而未进行适当的过滤或参数化，攻击者可能会利用此漏洞绕过认证、访问或修改敏感数据，甚至执行数据库管理操作，如删除表或关闭数据库服务。
-
-2. **触发场景**
-   当应用程序接收用户输入（如表单数据、URL参数）并将其直接拼接到构建 Pop 库的查询字符串中使用时，例如 `db.RawQuery(fmt.Sprintf("SELECT * FROM users WHERE name = '%!!(MISSING)!(MISSING)s(MISSING)'", username))`，如果 `username` 变量包含恶意 SQL 代码（如 `' OR '1'='1` 或 `' ; DROP TABLE users; --`），则可能导致SQL注入。
-   
-   ```golang
-   // 存在漏洞的 Go 代码示例 (使用 Pop 库)
-   func login(w http.ResponseWriter, r *http.Request) {
-   	username := r.FormValue("username")
-   	// ...连接数据库代码...
-   	var users []User
-   	// 直接拼接用户输入到 RawQuery 中，存在 SQL 注入风险
-   	query := fmt.Sprintf("SELECT * FROM users WHERE name = '%!!(MISSING)!(MISSING)s(MISSING)'", username)
-   	if err := db.RawQuery(query).Scan(&users); err != nil {
-   		log.Fatal(err)
-   	}
-   	// ...处理结果...
-   }
-   ```
-
-3. **潜在影响**
-   - 数据库敏感信息（如用户凭证、个人隐私数据）被窃取或泄露。
-   - 执行任意SQL语句，导致数据被篡改、删除或新增。
-   - 绕过应用程序的认证和授权机制，获取未授权访问权限。
-   - 通过数据库的特性（如外部存储过程、UDF）进一步攻击操作系统或内部网络。
-   - 导致应用程序崩溃或拒绝服务。
 CODE
 	level: "high",
 	type: "vuln",
+	title: "SQL Injection detected",
+	title_zh: "检测到SQL注入",
 }
 
 desc(

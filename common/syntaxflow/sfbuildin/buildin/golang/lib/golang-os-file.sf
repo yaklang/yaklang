@@ -75,51 +75,10 @@ $entry.ReadDir(* #-> as $output)
 
 alert $output for {
 	solution: <<<CODE
-### 修复建议
 
-#### 1. 使用安全库
-建议使用更安全的库来替代直接使用`os`包，例如使用`afero`库来处理文件操作，它提供了更安全的文件操作接口。
-
-#### 2. 输入验证
-对用户输入进行严格的验证，确保输入符合预期的格式和范围，避免路径穿越等安全问题。
-
-#### 3. 权限控制
-确保文件操作时的权限控制得当，避免权限过高导致的安全风险。
-
-#### 4. 日志记录
-对关键文件操作进行日志记录，便于事后审计和问题追踪。
-
-```go
-// 示例：使用afero库进行文件操作
-import (
-    "github.com/spf13/afero"
-)
-
-func safeCreateFile(path string) error {
-    fs := afero.NewOsFs()
-    file, err := fs.Create(path)
-    if err != nil {
-        return err
-    }
-    defer file.Close()
-    // 其他文件操作
-    return nil
-}
-```
 CODE
 	desc: <<<CODE
-### 漏洞描述
 
-#### 1. 漏洞原理
-未验证的文件操作可能导致路径穿越、文件权限问题等安全风险。
-
-#### 2. 触发场景
-在文件操作时，未对用户输入进行严格验证，可能导致路径穿越等安全问题。
-
-#### 3. 潜在影响
-- 文件权限被篡改
-- 敏感文件被泄露
-- 系统文件被删除或修改
 CODE
 	level: "info",
 	title: "Unvalidated File Operation",

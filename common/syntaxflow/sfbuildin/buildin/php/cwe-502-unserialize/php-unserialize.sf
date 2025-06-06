@@ -120,76 +120,16 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high for {
+	solution: <<<CODE
+
+CODE
 	desc: <<<CODE
-### 漏洞描述
-
-1. **高风险场景**
-直接反序列化未经验证的用户输入，没有任何过滤或验证机制，攻击者可以构造任意恶意序列化字符串。
-
-```php
-<?php
-// 高风险示例
-$data = $_GET['data'];
-unserialize($data);
-?>
-```
-
-2. **攻击方式**
-- 构造包含 `__destruct` 或 `__wakeup` 方法的恶意类
-- 通过序列化对象执行任意文件操作
-- 结合其他漏洞实现RCE
-
-3. **影响范围**
-- 整个应用程序及其依赖的组件
-- 服务器文件系统和网络资源
-- 可能影响数据库和其他服务
 
 CODE
 	level: "high",
 	type: "vuln",
 	title: "PHP Unserialization Vulnerability - High Risk",
 	title_zh: "PHP反序列化漏洞 - 高风险",
-	solution: <<<CODE
-### 修复建议
-
-#### 1. 使用数据源白名单
-确保所有反序列化的数据来自可信任的内部源，并实现严格的数据来源验证机制。
-
-```php
-<?php
-// 检查数据来源
-if (!is_trusted_source($_GET['data'])) {
-    die("Untrusted data source");
-}
-
-// 使用反序列化白名单
-$options = ['allowed_classes' => []]; // 禁止所有类反序列化
-$object = unserialize($_GET['data'], $options);
-?>
-```
-
-#### 2. 实现数字签名
-对序列化数据进行签名，反序列化前验证签名有效性。
-
-```php
-<?php
-function verify_serialized_data($data, $signature) {
-    $secretKey = "your-secret-key";
-    return hash_hmac('sha256', $data, $secretKey) === $signature;
-}
-
-$data = $_GET['data'];
-$signature = $_GET['sig'];
-
-if (!verify_serialized_data($data, $signature)) {
-    die("Invalid data signature");
-}
-
-$object = unserialize($data);
-?>
-```
-
-CODE
 }
 
 $sink<dataflow(include=<<<CODE
@@ -201,179 +141,44 @@ CODE)> as $highAndMid
 $highAndMid - $high as $mid
 
 alert $mid for {
-	level: "mid",
-	type: "mid",
 	title: "PHP Unserialization Vulnerability - Medium Risk",
 	title_zh: "PHP反序列化漏洞 - 中风险",
 	solution: <<<CODE
-### 修复建议
-
-#### 1. 实现严格的输入验证
-对反序列化前的数据进行多层次的验证。
-
-```php
-<?php
-function is_valid_serialized($data) {
-    // 检查基本序列化格式
-    if (!is_string($data) || strlen($data) < 4) {
-        return false;
-    }
-    
-    // 检查数据前缀类型
-    $prefix = substr($data, 0, 2);
-    if (!in_array($prefix, ['a:', 'O:', 's:', 'i:', 'd:'])) {
-        return false;
-    }
-    
-    return true;
-}
-
-$data = $_GET['data'];
-if (!is_valid_serialized($data)) {
-    die("Invalid serialized data format");
-}
-
-$object = unserialize($data);
-?>
-```
-
-#### 2. 使用类白名单
-限制可以反序列化的类。
-
-```php
-<?php
-$allowedClasses = ['SafeClass1', 'SafeClass2'];
-$options = ['allowed_classes' => $allowedClasses];
-$object = unserialize($data, $options);
-?>
-```
 
 CODE
 	desc: <<<CODE
-### 漏洞描述
-
-1. **中风险场景**
-反序列化操作前有部分过滤或验证但不完整，可能存在绕过可能。
-
-```php
-<?php
-// 中风险示例
-$data = sanitize_input($_GET['data']);
-$object = unserialize($data);
-?>
-```
-
-2. **潜在问题**
-- 过滤函数可能不完善
-- 类白名单管理不当
-- 数据格式验证不严格
-
-3. **影响范围**
-- 应用程序部分功能
-- 依赖的错误配置组件
 
 CODE
+	level: "mid",
+	type: "mid",
 }
 
 $sink - $mid - $high as $low
 
 alert $low for {
-	title: "PHP Unserialization Vulnerability - Low Risk",
 	title_zh: "PHP反序列化漏洞 - 低风险",
 	solution: <<<CODE
-### 修复建议
-
-#### 1. 定期安全审计
-即使已部署防护措施，仍需定期检查：
-- 反序列化类白名单
-- 输入验证逻辑
-- 签名验证机制
-
-#### 2. 代码审查
-审查所有使用 `unserialize()` 的地方，确保：
-- 不是处理用户直接输入
-- 有适当的验证层
-- 使用最小权限原则
-
-#### 3. 监控和日志
-记录所有反序列化操作：
-```php
-<?php
-function safe_unserialize($data) {
-    $options = ['allowed_classes' => ['SafeClass']];
-    log_serialization_attempt($data);
-    return unserialize($data, $options);
-}
-?>
-```
 
 CODE
 	desc: <<<CODE
-### 漏洞描述
-
-1. **低风险场景**
-反序列化操作已实施安全措施，如：
-- 数据来源验证
-- 类白名单限制
-- 输入格式校验
-
-```php
-<?php
-// 低风险示例
-$data = verify_and_filter($_GET['data']);
-$options = ['allowed_classes' => ['SafeClass']];
-$object = unserialize($data, $options);
-?>
-```
-
-2. **注意事项**
-- 仍需警惕白名单类中的安全问题
-- 确保过滤函数没有逻辑缺陷
-- 保持PHP版本更新
 
 CODE
 	level: "low",
 	type: "low",
+	title: "PHP Unserialization Vulnerability - Low Risk",
 }
 unserialize?(*?{!opcode: const}) as $info
 alert $info for {
+	desc: <<<CODE
+
+CODE
+	level: "info",
 	type: "info",
 	title: "PHP Unserialization Function Detected",
 	title_zh: "检测到PHP反序列化函数",
 	solution: <<<CODE
-### 安全建议
 
-1. **代码审查建议**
-检查所有检测到的 `unserialize()` 调用：
-- 确定数据来源
-- 检查是否有过滤/验证
-- 评估是否可替换为更安全的方式
-
-2. **测试建议**
-对相关功能进行安全测试：
-- 尝试输入恶意序列化数据
-- 监控异常行为
-- 检查错误日志
-
-3. **文档记录**
-记录所有使用场景，便于后续维护和安全审计。
 CODE
-	desc: <<<CODE
-### 检测到的情况
-
-1. **检测结果**
-规则检测到 `unserialize()` 函数使用，但未确认具体漏洞存在。
-
-2. **建议操作**
-手动检查以下方面：
-- 输入源是否可信
-- 是否有安全防护措施
-- 是否必须使用反序列化
-
-3. **注意事项**
-即使当前未发现问题，也应考虑替换为更安全的方案。
-CODE
-	level: "info",
 }
 desc(
 	lang: php
