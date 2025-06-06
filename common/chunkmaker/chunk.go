@@ -2,6 +2,7 @@ package chunkmaker
 
 import (
 	"bytes"
+	"github.com/yaklang/yaklang/common/utils"
 	"sync"
 	"unicode/utf8"
 
@@ -45,85 +46,94 @@ func NewBufferChunk(buffer []byte) *BufferChunk {
 	}
 	return bc
 }
-func (c *BufferChunk) FlushFullChunkSizeTo(dst *chanx.UnlimitedChan[Chunk], chunkSize int64) {
+
+func BytesHandler(data []byte, chunkSize int64, sep []byte, emitFunc func([]byte)) []byte {
+	sepLength := len(sep)
+	for len(data) > 0 {
+		step := int(chunkSize)
+		if sepIndex := bytes.Index(data, sep); sepIndex > 0 && int64(sepIndex+sepLength) < chunkSize {
+			step = sepIndex + sepLength
+		}
+		if step > len(data) {
+			break
+		}
+		if emitFunc != nil {
+			emitFunc(data[:step])
+		}
+		data = data[step:]
+	}
+	return data
+}
+
+func RuneHandler(data []rune, chunkSize int64, sep []rune, emitFunc func([]rune)) []rune {
+	sepLength := len(sep)
+	for len(data) > 0 {
+		step := int(chunkSize)
+		if sepIndex := utils.RuneIndex(data, sep); sepIndex > 0 && int64(sepIndex+sepLength) < chunkSize {
+			step = sepIndex + sepLength
+		}
+		if step > len(data) {
+			break
+		}
+		if emitFunc != nil {
+			emitFunc(data[:step])
+		}
+		data = data[step:]
+	}
+	return data
+}
+
+func (c *BufferChunk) FlushFullChunkSizeTo(dst *chanx.UnlimitedChan[Chunk], chunkSize int64, sep string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if c.isUTF8 {
-		// use runes size
-		runes := []rune(c.buffer.String())
-		processed := 0
-
-		// 修复：使用 <= 确保处理所有完整的chunk
-		for i := 0; i+int(chunkSize) <= len(runes); i += int(chunkSize) {
-			end := i + int(chunkSize)
-			chunk := NewBufferChunk([]byte(string(runes[i:end])))
+		remainingData := RuneHandler([]rune(c.buffer.String()), chunkSize, []rune(sep), func(runes []rune) {
+			chunk := NewBufferChunk([]byte(string(runes)))
 			dst.SafeFeed(chunk)
-			processed = end
-		}
-
-		// 保留剩余数据而不是清空
-		if processed < len(runes) {
-			remaining := string(runes[processed:])
-			c.buffer.Reset()
-			c.buffer.WriteString(remaining)
-			c.runesize = int64(len([]rune(remaining)))
-			c.bytesize = int64(len(remaining))
+		})
+		c.buffer.Reset()
+		if len(remainingData) > 0 {
+			c.buffer.WriteString(string(remainingData))
+			c.runesize = int64(len(remainingData))
+			c.bytesize = int64(len([]byte(string(remainingData))))
 		} else {
-			// 只有当所有数据都被处理时才完全重置
-			c.buffer.Reset()
 			c.runesize = 0
 			c.bytesize = 0
 		}
 		c.isUTF8 = true
 	} else {
-		// use bytes size
-		bytes := c.buffer.Bytes()
-		processed := 0
-
-		// 修复：使用 <= 确保处理所有完整的chunk
-		for i := 0; i+int(chunkSize) <= len(bytes); i += int(chunkSize) {
-			end := i + int(chunkSize)
-			chunk := NewBufferChunk(bytes[i:end])
+		remainingData := BytesHandler([]byte(c.buffer.String()), chunkSize, []byte(sep), func(dataBytes []byte) {
+			chunk := NewBufferChunk(dataBytes)
 			dst.SafeFeed(chunk)
-			processed = end
-		}
-
-		// 保留剩余数据而不是清空
-		if processed < len(bytes) {
-			remaining := bytes[processed:]
-			c.buffer.Reset()
-			c.buffer.Write(remaining)
-			c.bytesize = int64(len(remaining))
-			c.runesize = 0 // 非UTF8数据不计算rune size
+		})
+		c.buffer.Reset()
+		if len(remainingData) > 0 {
+			c.buffer.Write(remainingData)
+			c.runesize = int64(len([]rune(string(remainingData))))
+			c.bytesize = int64(len(remainingData))
 		} else {
-			// 只有当所有数据都被处理时才完全重置
-			c.buffer.Reset()
-			c.bytesize = 0
 			c.runesize = 0
+			c.bytesize = 0
 		}
 		c.isUTF8 = false
 	}
 }
 
-func (c *BufferChunk) FlushAllChunkSizeTo(dst *chanx.UnlimitedChan[Chunk], chunkSize int64) {
+func (c *BufferChunk) FlushAllChunkSizeTo(dst *chanx.UnlimitedChan[Chunk], chunkSize int64, sep string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if c.isUTF8 {
 		// use runes size
-		runes := []rune(c.buffer.String())
-
-		// 处理所有数据，包括最后不完整的chunk
-		for i := 0; i < len(runes); i += int(chunkSize) {
-			end := i + int(chunkSize)
-			if end > len(runes) {
-				end = len(runes)
-			}
-			chunk := NewBufferChunk([]byte(string(runes[i:end])))
+		remainingData := RuneHandler([]rune(c.buffer.String()), chunkSize, []rune(sep), func(runes []rune) {
+			chunk := NewBufferChunk([]byte(string(runes)))
+			dst.SafeFeed(chunk)
+		})
+		if len(remainingData) > 0 {
+			chunk := NewBufferChunk([]byte(string(remainingData)))
 			dst.SafeFeed(chunk)
 		}
-
 		// 完全重置buffer
 		c.buffer.Reset()
 		c.isUTF8 = true
@@ -131,15 +141,12 @@ func (c *BufferChunk) FlushAllChunkSizeTo(dst *chanx.UnlimitedChan[Chunk], chunk
 		c.runesize = 0
 	} else {
 		// use bytes size
-		bytes := c.buffer.Bytes()
-
-		// 处理所有数据，包括最后不完整的chunk
-		for i := 0; i < len(bytes); i += int(chunkSize) {
-			end := i + int(chunkSize)
-			if end > len(bytes) {
-				end = len(bytes)
-			}
-			chunk := NewBufferChunk(bytes[i:end])
+		remainingData := BytesHandler(c.buffer.Bytes(), chunkSize, []byte(sep), func(dataBytes []byte) {
+			chunk := NewBufferChunk(dataBytes)
+			dst.SafeFeed(chunk)
+		})
+		if len(remainingData) > 0 {
+			chunk := NewBufferChunk(remainingData)
 			dst.SafeFeed(chunk)
 		}
 
