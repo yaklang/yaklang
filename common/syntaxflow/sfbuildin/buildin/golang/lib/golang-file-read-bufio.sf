@@ -33,7 +33,28 @@ $reader.ReadString().* as $output;
 
 $reader.ReadString(* #-> as $output);
 
-alert $output
+alert $output for {
+	title: "Audit Golang File Read bufio",
+	title_zh: "审计Golang文件读取bufio包使用",
+	solution: <<<CODE
+none
+CODE
+	desc: <<<CODE
+### 1. 规则目的
+该规则旨在审计Go语言代码中对`bufio`包进行文件读取操作的使用情况。`bufio`包提供了带缓冲的I/O操作，可以提高文件读写的效率。审计该规则的目的在于识别代码中如何使用`bufio.NewReader`和其相关的读取方法（如`ReadString`），以确保文件内容的读取方式符合预期，并为后续可能存在的安全检查（例如，检查读取的内容是否被直接用于敏感操作，如命令执行、文件路径拼接等）提供基础信息。此规则本身不检测漏洞，而是作为基础库规则，用于辅助构建更复杂的安全规则。
+
+### 2. 规则详细
+1. **作为基础检测库**
+   属于`golang-file-read-bufio`库规则 (`lib` 类型)，本身不直接报告漏洞，需配合其他规则（如污点跟踪规则）共同使用。它识别使用 `bufio.NewReader` 创建读取器，并跟踪 `ReadString` 方法读取的文件内容输出点。
+
+2. **识别关键函数**
+   规则主要识别并跟踪 `bufio.NewReader` 的创建以及通过其创建的读取器调用 `ReadString` 方法读取的内容。
+
+3. **应用场景**
+   该规则常用于审计程序对配置文件的读取、日志文件的处理、用户上传文件的读取等场景，帮助理解数据来源和流向，为检测文件内容导致的注入、跨站脚本等漏洞奠定基础。
+CODE
+	level: "info",
+}
 
 desc(
 	lang: golang

@@ -58,10 +58,61 @@ REFERENCE
 )
 
 .tryLock()?{<typeName>?{have:'java.util.concurrent.locks'}}?{!<getUsers>} as $weak;
-alert $weak for{
-    message:"发现Java java.util.concurrent.locks库的Lock.tryLock未检查返回值的API",
-    risk:'api-abuse',
-    level:info,
+alert $weak for {
+	solution: <<<CODE
+### 修复建议
+
+1.  **始终检查返回值**: 对于返回状态或结果的方法，务必检查其返回值，并根据返回值进行相应的处理。特别是在处理锁、资源句柄、数据流等敏感操作时。
+
+    ```java
+    // 修复代码示例 (针对 Lock.tryLock())
+    Lock lock = new ReentrantLock();
+    boolean acquired = lock.tryLock(); // 检查返回值
+    if (acquired) {
+        try {
+            // 执行需要锁保护的代码
+        } finally {
+            lock.unlock(); // 确保在 finally 块中释放锁
+        }
+    } else {
+        // 未能获取锁，执行相应处理，如重试、等待或报错
+        System.out.println("未能立即获取到锁");
+    }
+    ```
+
+2.  **使用`lock()`代替`tryLock()`**: 如果需要阻塞直到获取到锁，可以使用`lock()`方法，它会阻塞直到获取到锁，无需检查返回值（除非考虑中断）。
+
+    ```java
+    // 示例：使用 lock()
+    Lock lock = new ReentrantLock();
+    lock.lock(); // 阻塞直到获取锁
+    try {
+        // 执行需要锁保护的代码
+    } finally {
+        lock.unlock();
+    }
+    ```
+
+3.  **规范的异常处理**: 对于可能抛出异常的方法，使用 `try-catch` 或 `try-with-resources` 结构确保错误得到妥善处理。
+CODE
+	desc: <<<CODE
+### 描述
+
+Java的`java.util`库中，尤其是与资源管理、并发控制相关的API，其某些方法会返回一个表示操作结果的值（如布尔值、状态码等），但如果调用方未对这些返回值进行检查和相应的错误处理，可能导致潜在的问题。
+
+### 影响
+
+1.  **资源泄露**: 例如，在调用`tryLock()`未检查返回值的情况下，如果未能成功获取锁，后续的代码仍可能尝试访问受保护的资源，导致线程安全问题或资源死锁。
+2.  **错误处理不当**: 未检查错误或状态返回值，可能导致程序继续执行在异常状态下，产生未预期的行为或数据错误。
+3.  **安全风险**: 在某些特定场景下（如文件操作、网络通信等），未检查返回值可能错过重要的错误指示，如权限不足、文件未找到等，从而暴露潜在的攻击面。
+
+本规则主要关注`java.util.concurrent.locks.Lock.tryLock()`方法，该方法是非阻塞地尝试获取锁，并返回一个布尔值表示是否成功获取。若未检查其返回值，程序无法得知是否成功获得了锁，可能导致并发错误。
+CODE
+	level: "info",
+	message: "发现Java java.util.concurrent.locks库的Lock.tryLock未检查返回值的API",
+	risk: "api-abuse",
+	title: "Check Java Util Unchecked Return Value",
+	title_zh: "检测Java Util库未检查返回值的API",
 }
 
 desc(

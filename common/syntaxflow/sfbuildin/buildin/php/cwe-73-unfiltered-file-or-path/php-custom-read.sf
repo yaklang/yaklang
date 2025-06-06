@@ -81,10 +81,95 @@ $allParams?{<self> #{include: <<<CODE
 CODE
 }->} as $sink
 
-alert $sink for{
-    title: "PHP Unfiltered Directory Reading",
-    title_zh: "PHP未过滤目录读取",
-    level: "high",
+alert $sink for {
+	title: "PHP Unfiltered Directory Reading Vulnerability",
+	title_zh: "PHP未过滤目录读取漏洞",
+	solution: <<<CODE
+### 修复建议
+
+#### 1. 输入验证与过滤
+对所有用户提供的输入路径进行严格的验证和过滤。确保不允许使用相对路径（例如“..”）或绝对路径，并验证路径是否在允许访问的目录白名单中。
+```php
+<?php
+function safeReadDir($path, $baseDir) {
+    // 1. 检查是否包含非法字符
+    if (preg_match('/\.\./', $path)) {
+        return 'Invalid path: contains relative paths.';
+    }
+
+    // 2. 构建完整路径并进行realpath规范化
+    $fullPath = realpath($baseDir . '/' . $path);
+
+    // 3. 确保路径在允许的baseDir下
+    if (strpos($fullPath, realpath($baseDir)) !== 0) {
+        return 'Invalid path: outside base directory.';
+    }
+
+    // 4. 使用安全的scandir替代dir
+    $files = scandir($fullPath);
+
+    if ($files === false) {
+        return 'Could not read directory.';
+    }
+
+    // 5. 返回过滤后的文件列表
+    return array_diff($files, ['.', '..']);  // 移除 . 和 ..
+}
+
+// 示例用法：
+$baseDirectory = '/var/www/safe_uploads'; // 设置基础目录
+$userInputPath = $_GET['path'] ?? '';   // 获取用户输入
+
+$files = safeReadDir($userInputPath, $baseDirectory);
+
+if (is_array($files)) {
+    echo 'Files: ' . implode(', ', $files);
+} else {
+    echo $files;  // 输出错误消息
+}
+?>
+```
+#### 2. 路径规范化
+使用`realpath()`函数将用户提供的路径转换为绝对路径，然后确保该路径位于允许的目录范围内。这可以防止路径遍历攻击。
+
+#### 3. 最小权限原则
+确保运行PHP进程的用户具有执行目录操作所需的最小权限。避免使用具有过高权限的用户身份运行Web服务器。
+
+#### 4. 使用内置函数进行安全操作
+使用如`scandir()`等更安全的内置函数，替代已弃用的或存在安全风险的函数。
+
+#### 5. 日志记录
+记录所有目录读取尝试，尤其是在发生错误或检测到潜在攻击时，以便进行后续分析和审计。
+CODE
+	desc: <<<CODE
+### 漏洞描述
+1. **漏洞原理**
+PHP未过滤目录读取漏洞（也称为路径遍历漏洞）发生在应用程序允许用户控制用于访问文件或目录的路径时。如果应用程序没有充分验证或清理用户提供的输入，攻击者可以操纵路径以访问受限的文件和目录，从而可能导致敏感信息泄露或执行恶意代码。
+
+2. **触发场景**
+以下是一个PHP代码示例，显示了如何触发此漏洞：
+```php
+<?php
+$path = $_GET['path'];  // 从URL参数获取用户提供的路径
+
+// 直接使用用户提供的路径来读取目录
+$files = scandir($path);
+
+if ($files) {
+    foreach ($files as $file) {
+        echo $file . "\n";
+    }
+}
+?>
+```
+攻击者可以修改`path`参数，例如设置为`../../etc/passwd`，来尝试读取服务器上的敏感文件。
+
+3. **潜在影响**
+- **信息泄露**：攻击者可以访问和下载敏感文件和目录，例如配置文件、数据库连接信息、源代码等。
+- **系统入侵**：通过访问包含敏感信息的配置文件，攻击者可能能够进一步入侵系统。
+- **代码执行**：在某些情况下，攻击者可能能够上传恶意文件到服务器上，并通过路径遍历漏洞来执行这些文件。
+CODE
+	level: "high",
 }
 desc(
 	lang: "php"

@@ -1,22 +1,55 @@
 desc(
-	title: "Find Java Command Execution Sink"
+	title: "Detect Java Command Execution Vulnerability"
 	lib: 'java-runtime-exec-sink'
 	type: audit
 	desc: <<<DESC
-### 1.规则目的
-该规则用于审计 Java 代码中可能导致命令执行漏洞的安全风险。它主要关注 `Runtime.getRuntime().exec()` 方法的使用。
-
-### 2.规则详细
-1. **作为基础检测库**
-   属于 `java-runtime-exec-sink` 库规则（`lib` 类型），需配合其他规则（如用户输入跟踪规则）共同检测命令执行漏洞，提供核心方法识别能力。
-
-2. **覆盖高危函数**
-   主要检测 Java 中用于执行系统命令的 `Runtime.getRuntime().exec()` 方法。
+### 漏洞描述
+1. **漏洞原理**
+命令执行漏洞是指攻击者可以通过操纵应用程序来执行任意系统命令。在Java中，`Runtime.getRuntime().exec()`方法允许执行外部命令，如果用户输入未经过适当验证或过滤，攻击者可以利用这一点执行恶意命令。
+2. **触发场景**
+// 存在漏洞的代码示例
+```java
+String userInput = request.getParameter("cmd");
+Runtime.getRuntime().exec(userInput); // 直接执行用户输入
+```
+攻击者可以通过构造特定的输入执行任意命令，如获取系统信息、修改文件或执行恶意软件。
+3. **潜在影响**
+- 执行任意系统命令，可能导致系统被完全控制。
+- 数据泄露，攻击者可能获取敏感信息。
+- 系统不稳定，恶意命令可能导致服务中断。
 DESC
 	rule_id: "c34fd04b-1d76-4756-91c3-45c63ff1c054"
-	title_zh: "查找 Java 命令执行汇聚点"
+	title_zh: "检测Java命令执行漏洞"
 	solution: <<<SOLUTION
-none
+### 修复建议
+#### 1. 输入验证
+对用户输入进行严格的验证和过滤，确保输入仅包含预期的字符和格式。
+```java
+String userInput = request.getParameter("cmd");
+if (userInput.matches("^[a-zA-Z0-9]+$")) {
+    Runtime.getRuntime().exec(userInput);
+} else {
+    throw new IllegalArgumentException("非法输入");
+}
+```
+#### 2. 使用白名单
+限制用户输入只能从一组预定义的命令中选择。
+```java
+List<String> allowedCommands = Arrays.asList("ls", "pwd", "whoami");
+String userInput = request.getParameter("cmd");
+if (allowedCommands.contains(userInput)) {
+    Runtime.getRuntime().exec(userInput);
+} else {
+    throw new IllegalArgumentException("不允许的命令");
+}
+```
+#### 3. 参数化命令
+如果必须使用动态命令，考虑使用参数化命令来减少风险。
+```java
+String command = "ls";
+String[] args = {"-l", "-a"};
+Process process = Runtime.getRuntime().exec(new String[]{command, args});
+```
 SOLUTION
 	reference: <<<REFERENCE
 none
@@ -24,4 +57,56 @@ REFERENCE
 )
 
 Runtime.getRuntime().exec(,* as $output);
-alert $output;
+alert $output for {
+	title_zh: "检测Java命令执行漏洞",
+	solution: <<<CODE
+### 修复建议
+#### 1. 输入验证
+对用户输入进行严格的验证和过滤，确保输入仅包含预期的字符和格式。
+```java
+String userInput = request.getParameter("cmd");
+if (userInput.matches("^[a-zA-Z0-9]+$")) {
+    Runtime.getRuntime().exec(userInput);
+} else {
+    throw new IllegalArgumentException("非法输入");
+}
+```
+#### 2. 使用白名单
+限制用户输入只能从一组预定义的命令中选择。
+```java
+List<String> allowedCommands = Arrays.asList("ls", "pwd", "whoami");
+String userInput = request.getParameter("cmd");
+if (allowedCommands.contains(userInput)) {
+    Runtime.getRuntime().exec(userInput);
+} else {
+    throw new IllegalArgumentException("不允许的命令");
+}
+```
+#### 3. 参数化命令
+如果必须使用动态命令，考虑使用参数化命令来减少风险。
+```java
+String command = "ls";
+String[] args = {"-l", "-a"};
+Process process = Runtime.getRuntime().exec(new String[]{command, args});
+```
+CODE
+	desc: <<<CODE
+### 漏洞描述
+1. **漏洞原理**
+命令执行漏洞是指攻击者可以通过操纵应用程序来执行任意系统命令。在Java中，`Runtime.getRuntime().exec()`方法允许执行外部命令，如果用户输入未经过适当验证或过滤，攻击者可以利用这一点执行恶意命令。
+2. **触发场景**
+// 存在漏洞的代码示例
+```java
+String userInput = request.getParameter("cmd");
+Runtime.getRuntime().exec(userInput); // 直接执行用户输入
+```
+攻击者可以通过构造特定的输入执行任意命令，如获取系统信息、修改文件或执行恶意软件。
+3. **潜在影响**
+- 执行任意系统命令，可能导致系统被完全控制。
+- 数据泄露，攻击者可能获取敏感信息。
+- 系统不稳定，恶意命令可能导致服务中断。
+CODE
+	level: "high",
+	title: "Detect Java Command Execution Vulnerability",
+}
+
