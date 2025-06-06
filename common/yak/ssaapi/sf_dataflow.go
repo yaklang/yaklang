@@ -85,6 +85,8 @@ func DataFlowWithSFConfig(
 			return nil
 		}))
 	}
+
+	options = append(options, WithExclusiveContext(config.GetContext()))
 	var dataflowRecursiveFunc func(options ...OperationOption) Values
 	if analysisType == TopDefAnalysis {
 		dataflowRecursiveFunc = value.GetTopDefs
