@@ -15,6 +15,8 @@ import (
 )
 
 func TestCoordinator_Consumption(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	testCount := 1000
 	if utils.InGithubActions() {
 		testCount = 3
@@ -22,8 +24,13 @@ func TestCoordinator_Consumption(t *testing.T) {
 	swg := utils.NewSizedWaitGroup(400)
 	go func() {
 		for {
-			time.Sleep(time.Second)
-			log.Infof("swg wait: %v", swg.WaitingEventCount.Load())
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Second):
+				time.Sleep(time.Second)
+				log.Infof("swg wait: %v", swg.WaitingEventCount.Load())
+			}
 		}
 	}()
 	for i := 0; i < testCount; i++ {
