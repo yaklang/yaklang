@@ -33,7 +33,7 @@ func recoverPlan(t *testing.T, uuid string) {
 		}),
 		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
 			rsp := config.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBuffer([]byte("Hello, world!")))
+			rsp.EmitOutputStream(bytes.NewBuffer([]byte("What can i say")))
 			rsp.Close()
 			return rsp, nil
 		}),
