@@ -99,6 +99,9 @@ func (config *queryConfig) GetFrame() (*sfvm.SFFrame, error) {
 }
 
 func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
+
+	utils.SAVE_BreakPoint = true
+
 	config := &queryConfig{}
 	for _, o := range opt {
 		o(config)

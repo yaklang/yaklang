@@ -120,9 +120,9 @@ func GetIrCodeById(db *gorm.DB, id int64) *IrCode {
 		return nil
 	}
 	// check cache
-	if ret, ok := irCodeCache.Get(id); ok && ret != nil {
-		return ret
-	}
+	// if ret, ok := irCodeCache.Get(id); ok && ret != nil {
+	// 	return ret
+	// }
 	ir := db.Model(&IrCode{}).Where("id = ?", id).First(&IrCode{}).Value.(*IrCode)
 	// save to cache
 	if ir != nil {

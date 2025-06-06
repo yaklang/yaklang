@@ -218,6 +218,15 @@ func (c *Cache) GetInstruction(id int64) Instruction {
 		return nil
 	}
 	if ret, ok := c.InstructionCache.Get(id); ok {
+		if lz, ok := ToLazyInstruction(ret.inst); ok {
+			if lz.ir.Opcode == 0 {
+				log.Errorf("BUG: GetInstruction called with empty opcode: %v", ret.inst.GetName())
+				if ir := ssadb.GetIrCodeById(c.DB, id); ir != nil && ir.Opcode != 0 {
+					log.Errorf("bbb")
+				}
+			}
+
+		}
 		return ret.inst
 	}
 	return nil
@@ -242,9 +251,9 @@ func (c *Cache) AddVariable(name string, inst Instruction) {
 		}
 	}
 	if member != "" {
+		log.Infof("add member %s : %v", name, inst)
 		c.MemberIndex.Add(member, inst)
 	} else {
-		// log.Infof("add variable %s : %v", name, inst)
 		c.VariableIndex.Add(name, inst)
 	}
 }
@@ -263,9 +272,9 @@ func (c *Cache) RemoveVariable(name string, inst Instruction) {
 	}
 
 	if member != "" {
+		log.Infof("remove member %s : %v", name, inst)
 		c.MemberIndex.Delete(member, inst)
 	} else {
-		// log.Infof("remove variable %s : %v", name, inst)
 		c.VariableIndex.Delete(name, inst)
 	}
 }

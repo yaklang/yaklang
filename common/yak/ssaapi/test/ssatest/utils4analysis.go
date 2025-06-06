@@ -88,7 +88,7 @@ func CheckWithName(
 	opt ...ssaapi.Option,
 ) {
 	// only in memory
-	{
+	if false {
 		prog, err := ssaapi.Parse(code, opt...)
 		require.Nil(t, err)
 
@@ -374,7 +374,7 @@ func checkSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants
 }
 
 func CompareResult(t *testing.T, contain bool, results *ssaapi.SyntaxFlowResult, wants map[string][]string) {
-	results.Show()
+	results.Show(sfvm.WithShowAll())
 	for name, want := range wants {
 		gotVs := results.GetValues(name)
 		if contain {

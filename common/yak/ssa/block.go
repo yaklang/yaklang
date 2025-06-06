@@ -83,6 +83,9 @@ func (b *BasicBlock) SetScope(s ScopeIF) {
 	if b.ScopeTable != nil {
 		log.Errorf("block %v already has a scope", b.GetName())
 	}
+	if s == nil {
+		log.Infof("scope is nil ")
+	}
 	b.ScopeTable = s
 	{
 		if block := GetBlockByScope(s); block != nil {

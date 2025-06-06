@@ -43,6 +43,8 @@ type DataBaseCacheWithKey[K comparable, T any] struct {
 	disableSave      atomic.Bool
 }
 
+var SAVE_BreakPoint = false
+
 /*
 param:
 cache : ttl/lru cache
@@ -69,6 +71,10 @@ func NewDatabaseCacheWithKey[K comparable, T any](
 			log.Debugf("Save to database is disabled, skipping save for key: %v", key)
 			ret.notifyCache.Set(InterfaceToString(key), key)
 			return
+		}
+
+		if SAVE_BreakPoint {
+			log.Infof("bbb")
 		}
 		log.Debugf("expire key: %v", key)
 		ret.save(key, reason)
@@ -222,6 +228,7 @@ func (c *DataBaseCacheWithKey[K, T]) IsClose() bool {
 func (c *DataBaseCacheWithKey[K, T]) Close() {
 	c.notifyCache.Close()
 	c.data.Clear()
+	c.DisableSave()
 }
 
 func (c *DataBaseCacheWithKey[K, T]) ForEach(f func(K, T) bool) {

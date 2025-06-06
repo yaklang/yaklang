@@ -101,6 +101,14 @@ func NewLazyInstructionFromIrCode(ir *ssadb.IrCode, prog *Program, ignoreCache .
 	if ir == nil || ir.ID == 0 {
 		log.Infof("ircode is nil or id is 0")
 	}
+
+	if ir.Opcode == 0 {
+		IRDB := ssadb.GetIrCodeById(ssadb.GetDB(), ir.GetIdInt64())
+		if IRDB != nil && IRDB.Opcode != 0 {
+			log.Infof("ircode opcode is 0, but ircode in db is not 0: %d: %s", IRDB.GetIdInt64(), IRDB.OpcodeName)
+		}
+	}
+
 	lz := &LazyInstruction{
 		id:          ir.GetIdInt64(),
 		ir:          ir,
@@ -152,6 +160,11 @@ func (lz *LazyInstruction) check() {
 	if utils.IsNil(lz.Instruction) {
 		inst := CreateInstruction(Opcode(lz.GetOpcode()))
 		if inst == nil {
+			ir := ssadb.GetIrCodeById(ssadb.GetDB(), lz.id)
+			if ir != nil && ir.Opcode != 0 {
+				log.Infof("bb")
+			}
+
 			log.Infof("unknown opcode: %d: %s", lz.GetOpcode(), lz.ir.OpcodeName)
 			return
 		}
@@ -228,11 +241,11 @@ func (lz *LazyInstruction) GetOpcode() Opcode {
 }
 
 func (lz *LazyInstruction) String() string {
-	if utils.IsNil(lz.ir) {
+	lz.check()
+	if utils.IsNil(lz.Instruction) {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
 		return ""
 	}
-	lz.check()
 	return lz.Instruction.String()
 	// return "lz:" + lz.ir.String
 }
