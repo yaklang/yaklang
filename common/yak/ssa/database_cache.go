@@ -325,6 +325,7 @@ func (c *Cache) SaveToDatabase(cb ...func()) {
 	}
 	c.InstructionCache.EnableSave()
 	c.InstructionCache.Close()
+	c.InstructionCache.DisableSave()
 }
 
 func (c *Cache) CountInstruction() int {
