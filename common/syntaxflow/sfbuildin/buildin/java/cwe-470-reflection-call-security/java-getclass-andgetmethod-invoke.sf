@@ -79,75 +79,17 @@ $entry #{
     until: `*?{opcode: param}<var(params)> as $__next__`,
 }->;
 alert $params for {
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
 	message: "Java Reflection Call Security Vulnerability via getClass() and getMethod()",
 	type: "audit",
 	title: "Java Reflection Call Security Vulnerability via getClass() and getMethod()",
 	title_zh: "Java 反射调用安全漏洞（getClass() 和 getMethod()）",
-	solution: <<<CODE
-### 修复建议
-
-#### 1. 避免使用用户输入作为反射调用的方法名或参数
-尽量避免根据用户提供的字符串来动态确定反射调用哪个方法或传递哪些参数。如果必须这样做，应采用白名单机制，只允许调用预定义的安全方法，并对参数进行严格的验证和过滤。
-
-#### 2. 严格验证和过滤用户输入
-对用于反射调用的所有用户输入进行严格验证，确保其符合预期的格式、类型和范围。使用正则表达式、类型转换、枚举值校验等方法。
-```java
-// 修复代码示例：使用白名单和严格验证
-String methodName = request.getParameter("methodName");
-// 白名单定义允许调用的方法
-Set<String> allowedMethods = new HashSet<>(Arrays.asList("safeMethod1", "safeMethod2"));
-
-if (methodName != null && allowedMethods.contains(methodName)) {
-    try {
-        Class<?> clazz = Class.forName("com.example.SomeService");
-        Method method = clazz.getMethod(methodName);
-        method.invoke(clazz.newInstance());
-    } catch (Exception e) {
-        // 安全地处理反射异常
-        System.err.println("反射调用失败: " + e.getMessage());
-    }
-} else {
-    // 拒绝非法的方法名
-    throw new IllegalArgumentException("不允许的方法名");
-}
-```
-
-#### 3. 使用安全沙箱或权限控制
-如果应用程序运行环境支持，可以考虑使用Java安全管理器（SecurityManager）或类似的沙箱机制，限制反射操作的权限，例如不允许调用执行系统命令的方法。
-
-#### 4. 最小化反射的使用
-评估是否确实需要使用反射。许多情况下，可以通过接口、抽象类或工厂模式等更安全的设计模式替代反射，从而降低风险。
-CODE
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   Java反射机制，特别是通过`getClass()`和`getMethod()`方法，允许程序在运行时探索和调用任意类的方法。如果方法名或参数等信息来源于不受信任的用户输入，攻击者可能通过构造恶意输入，控制调用的方法或参数，从而执行未经授权的操作。
-   这种漏洞通常发生在程序根据用户提供的字符串动态加载类或调用方法时，缺乏充分的输入验证和权限控制。
-
-2. **触发场景**
-   当应用程序根据用户输入（例如，通过请求参数获取的方法名）使用反射调用方法时，可能触发此漏洞。
-   // 存在漏洞的代码示例
-   ```java
-   String methodName = request.getParameter("methodName");
-   try {
-       Class<?> clazz = Class.forName("com.example.SomeService");
-       Method method = clazz.getMethod(methodName); // methodName来自用户输入
-       method.invoke(clazz.newInstance());
-   } catch (Exception e) {
-       // 异常处理
-   }
-   ```
-   在上面的示例中，如果攻击者将`methodName`设置为`"getRuntime"`或`"exec"`等危险方法，并控制后续的参数，则可能导致远程代码执行。
-
-3. **潜在影响**
-    - 攻击者可以调用任意可访问的方法，绕过应用程序的业务逻辑和安全限制。
-    - 可能通过调用系统命令执行相关的方法（如`java.lang.Runtime.exec()`），导致远程代码执行（RCE）。
-    - 泄露敏感信息（如果反射调用了读取系统配置或私有数据的方法）。
-    - 拒绝服务（如果攻击者通过反射调用导致资源耗尽或崩溃）。
-
-CODE
-	level: "mid",
 }
 
 

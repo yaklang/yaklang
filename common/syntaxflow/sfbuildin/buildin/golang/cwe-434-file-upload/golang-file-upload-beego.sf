@@ -26,10 +26,16 @@ $sink #{include: `$check`}-> as $safe;
 $sink #{exclude: `$safe`}-> as $high;
 
 alert $high for {
-    title: 'file upload check',
-    title_zh: '检测到文件路径未授权',
-    type: 'vuln',
-    level: 'high',
+	level: "high",
+	type: "vuln",
+	title: "file upload check",
+	title_zh: "检测到文件路径未授权",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
 }
 
 desc(

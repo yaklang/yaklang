@@ -103,98 +103,16 @@ $client.User.Query().Where(* #-> as $param);
 $param?{have: 'Parameter'} as $high;
 
 alert $high for {
-	title: "SQL Injection detected",
-	title_zh: "检测到SQL注入",
-	solution: <<<CODE
-### 修复建议
-
-1. **使用参数化查询（Parameterized Queries）**
-   使用 `entgo.io/ent` 提供的安全查询方法，通过参数化处理将用户输入作为参数绑定到查询中，而不是直接拼接到 SQL 语句中。这样数据库会区分代码和数据，从而有效防止 SQL 注入。
-   
-   修复代码示例：
-   ```go
-   func login(w http.ResponseWriter, r *http.Request) {
-   	username := r.FormValue("username")
-   	client, err := ent.Open("mysql", "user:password@tcp(localhost:3306)/dbname")
-   	if err != nil {
-   		log.Fatal(err)
-   	}
-   	defer client.Close()
-   	ctx := context.Background()
-   	// 使用 ent 的参数化查询方法
-   	users, err := client.User.Query().Where(user.Name(username)).All(ctx) // username 作为参数传递
-   	if err != nil {
-   		log.Fatal(err)
-   	}
-   }
-   ```
-
-2. **输入验证和过滤**
-   虽然参数化查询是首选方法，但对用户输入进行严格的验证和过滤也是重要的安全措施。根据预期的输入类型、格式和范围对用户输入进行检查，拒绝任何无效或可疑的输入。
-   
-   示例：验证用户名是否只包含字母和数字：
-   ```go
-   import (
-   	"regexp"
-   )
-   
-   var validUsername = regexp.MustCompile(`^[a-zA-Z0-9]+$`)
-   
-   func login(w http.ResponseWriter, r *http.Request) {
-   	username := r.FormValue("username")
-   	if !validUsername.MatchString(username) {
-   		http.Error(w, "Invalid username format", http.StatusBadRequest)
-   		return
-   	}
-   	// ... 后续安全查询处理 ...
-   }
-   ```
-
-3. **最小权限原则**
-   数据库用户应仅拥有执行其所需操作的最小权限。避免使用具有 `DROP TABLE`, `ALTER TABLE` 等高危权限的数据库用户连接应用程序。
-
-4. **日志记录和监控**
-   记录所有数据库操作，特别是失败的查询和异常行为，并进行实时监控，以便及时发现和应对潜在的攻击。
-CODE
 	desc: <<<CODE
-### 漏洞描述
 
-1. **漏洞原理**
-   SQL 注入漏洞是一种严重的安全漏洞，它允许攻击者通过向 SQL 查询注入恶意代码来操纵后端数据库。在使用 `entgo.io/ent` 框架时，如果未正确构建查询条件，而是直接将用户输入拼接到 SQL 查询中，将会导致 SQL 注入漏洞。攻击者可以利用此漏洞绕过认证、访问或修改敏感数据，甚至执行数据库管理操作，严重危害应用程序的数据安全。
-
-2. **触发场景**
-   SQL 注入漏洞通常发生在以下场景：
-   - 用户输入被直接拼接到 SQL 查询字符串中，例如 `client.User.Query().Where(user.Name(input)).All(ctx)` 其中的 `input` 直接来源于用户可控的数据。
-   - 未对用户输入进行参数化处理或验证，导致恶意输入被解释为 SQL 命令。
-
-   存在漏洞的代码示例:
-   ```go
-   func login(w http.ResponseWriter, r *http.Request) {
-   	username := r.FormValue("username")
-   	client, err := ent.Open("mysql", "user:password@tcp(localhost:3306)/dbname")
-   	if err != nil {
-   		log.Fatal(err)
-   	}
-   	defer client.Close()
-   	input := fmt.Sprintf("SELECT * FROM users WHERE name = '%!!(MISSING)!(MISSING)s(MISSING)'", username)
-   	ctx := context.Background()
-   	users, err := client.User.Query().Where(user.Name(input)).All(ctx) // 这里存在SQL注入风险
-   	if err != nil {
-   		log.Fatal(err)
-   	}
-   }
-   ```
-
-3. **潜在影响**
-   攻击者可以利用 SQL 注入漏洞造成以下影响：
-   - 数据泄露：获取数据库中的敏感信息，如用户账号、密码、个人身份信息等。
-   - 数据篡改：修改或删除数据库中的数据。
-   - 绕过认证：绕过应用程序的登录验证，以管理员身份访问系统。
-   - 执行任意命令：在某些情况下，攻击者可能通过 SQL 注入执行操作系统命令。
-   - 拒绝服务：通过构造恶意查询导致数据库服务器过载或崩溃。
 CODE
 	level: "high",
 	type: "vuln",
+	title: "SQL Injection detected",
+	title_zh: "检测到SQL注入",
+	solution: <<<CODE
+
+CODE
 }
 
 desc(

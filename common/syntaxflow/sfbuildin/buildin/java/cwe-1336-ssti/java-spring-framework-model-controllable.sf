@@ -71,107 +71,16 @@ $source<dataflow(exclude=<<<CODE
 CODE)> as $filteredSource
 <delete(param)>
 alert $filteredSource for {
+	desc: <<<CODE
+
+CODE
 	level: "high",
 	message_zh: "识别到 Java Spring Framework 中 ModelAndView 构造函数可控",
 	message: "Recognize Java Spring Framework code that can control the ModelAndView constructor",
 	title: "Unvalidated Java Spring Framework ModelAndView SSTI",
 	title_zh: "未验证的 Java Spring Framework ModelAndView SSTI",
 	solution: <<<CODE
-### 修复建议
 
-#### 1. 使用安全的模板引擎
-   选择并使用安全的模板引擎，如Thymeleaf（启用表达式转义）或Freemarker（启用自动转义），以防止恶意输入被当作模板代码执行。
-
-   ```java
-   // 使用Thymeleaf安全配置示例
-   @Configuration
-   public class ThymeleafConfig {
-       @Bean
-       public TemplateEngine templateEngine() {
-           SpringTemplateEngine engine = new SpringTemplateEngine();
-           engine.setEnableSpringELCompiler(true);
-           engine.addDialect(new LayoutDialect());
-           return engine;
-       }
-   }
-   ```
-
-#### 2. 避免直接使用用户输入
-   不要直接将用户输入用于构建视图名或模板路径，应对用户输入进行严格的验证和过滤。
-
-   ```java
-   // 示例：对用户输入进行验证和过滤
-   @GetMapping("/")
-   public ModelAndView handleRequest(@RequestParam String viewName) {
-       if (!isValidViewName(viewName)) {
-           throw new IllegalArgumentException("Invalid view name");
-       }
-       return new ModelAndView(viewName);
-   }
-
-   private boolean isValidViewName(String viewName) {
-       // 实现具体的验证逻辑
-       return true;
-   }
-   ```
-
-#### 3. 使用安全的视图解析策略
-   采用安全的视图解析策略，如使用视图解析器的前缀和后缀限制，避免直接拼接用户输入。
-
-   ```java
-   // 配置视图解析器示例
-   @Bean
-   public ViewResolver viewResolver() {
-       InternalResourceViewResolver resolver = new InternalResourceViewResolver();
-       resolver.setPrefix("/WEB-INF/views/");
-       resolver.setSuffix(".jsp");
-       return resolver;
-   }
-   ```
-CODE
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   在Java Spring Framework应用中，如果`ModelAndView`构造函数的参数（通常用于指定视图名或模板路径）可由用户输入直接或间接控制，攻击者可以通过构造恶意输入，注入模板引擎能够解析和执行的特定指令或代码片段。
-
-   当Spring使用某些模板引擎（如Velocity、FreeMarker、Thymeleaf with unescaped expressions）时，这些指令会被解析执行，从而实现服务器端模板注入（SSTI）攻击。攻击者可以利用此漏洞执行任意Java代码，访问服务器文件，获取数据库信息，甚至完全控制服务器。
-
-2. **触发场景**
-   当应用程序根据用户提供的输入 dynamically 构建 `ModelAndView` 的视图名或模板路径时，就可能触发此漏洞。例如，将用户输入的id直接拼接到视图路径中：
-
-   ```java
-   @GetMapping("/")
-   public ModelAndView handleRequest(@RequestParam String viewName) {
-       // 直接使用用户输入作为视图名，若这里使用了易受SSTI攻击的模板引擎
-       return new ModelAndView(viewName);
-   }
-   ```
-
-   另一个示例是规则中提供的：
-
-   ```java
-   @Controller
-   public class OrgConsoleController {
-       @GetMapping(MODEL + "/edit.do")
-       @Function("org.edit")
-       public ModelAndView edit(String id) {
-       	ModelAndView view = new ModelAndView("/admin/org" + id + "/edit.html"); // 用户输入id被拼接到模板路径
-           CoreOrg org = orgConsoleService.queryById(id);
-           view.addObject("org", org);
-           return view;
-       }
-   }
-   ```
-
-   如果攻击者能控制 `id` 参数，并将其设置为 `../../../../etc/passwd` (对于某些模板引擎，这可能读取文件内容)，或者具有模板引擎执行能力的payload，则可能导致代码执行。
-
-3. **潜在影响**
-    - 远程代码执行 (RCE)，攻击者可以在服务器上执行任意系统命令。
-    - 敏感信息泄露，如数据库连接信息、配置文件、源代码或用户数据。
-    - 文件读取和写入。
-    - 进一步渗透到内部网络或提升权限。
-    - 服务拒绝 (DoS)。
 CODE
 }
 

@@ -19,10 +19,16 @@ $new().Funcs(* as $param);
 $param?{have: 'sprig'} as $low;
 
 alert $low for {
-    title: 'SSTI detected',
-    title_zh: '检测到SSTI',
-    type: 'vuln',
-    level: 'low',
+	type: "vuln",
+	title: "SSTI detected",
+	title_zh: "检测到SSTI",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
 }
 
 desc(

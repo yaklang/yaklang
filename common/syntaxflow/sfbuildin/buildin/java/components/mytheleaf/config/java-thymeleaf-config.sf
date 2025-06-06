@@ -62,110 +62,26 @@ alert $templateResolver for {
 	title: "Audit Java Thymeleaf Configuration",
 	title_zh: "审计Java Thymeleaf配置",
 	solution: <<<CODE
-### 修复建议
 
-#### 1. 严格配置模板路径
-确保`setPrefix`和`setSuffix`的配置严格限制模板文件的路径和扩展名，避免使用可能导致目录遍历的配置。
-
-```java
-// 示例：严格配置模板路径
-SpringResourceTemplateResolver templateResolver = new SpringResourceTemplateResolver();
-templateResolver.setPrefix("classpath:/secure/templates/");
-templateResolver.setSuffix(".html");
-```
-
-#### 2. 避免使用动态路径
-避免在模板路径中使用动态参数，确保路径的静态性和可预测性。
-
-```java
-// 避免示例：动态路径配置
-// templateResolver.setPrefix("classpath:/templates/" + userInput);
-```
-
-#### 3. 使用安全的模板模式
-确保`setTemplateMode`配置为安全的模式，如`TemplateMode.HTML`，避免使用可能导致执行恶意代码的模式。
-
-```java
-// 示例：使用安全的模板模式
-templateResolver.setTemplateMode(TemplateMode.HTML);
-```
-
-#### 4. 定期审计模板配置
-定期审计模板配置文件，确保没有不当的配置项，及时发现潜在的安全风险。
 CODE
 	desc: <<<CODE
-### 规则描述
 
-#### 1. 规则目的
-该规则用于审计Java应用中Thymeleaf模板引擎的配置，特别是检查`SpringResourceTemplateResolver`的使用情况。了解Thymeleaf模板解析器的配置对于评估潜在的安全风险至关重要，尤其是与模板注入相关的风险。通过审计配置，可以帮助开发者和安全人员识别可能导致攻击者控制模板内容或文件路径的配置项。
-
-#### 2. 规则详细
-1. **关注TemplateResolver**
-   规则主要关注Thymeleaf使用的`TemplateResolver`实现类，`SpringResourceTemplateResolver`是Spring集成Thymeleaf时常用的解析器，负责加载模板文件。
-
-2. **识别关键配置属性**
-   规则进一步检查`SpringResourceTemplateResolver`的各种配置方法（以`set`开头的方法，如`setPrefix`、`setSuffix`、`setTemplateMode`等）及其常量参数的使用。这些配置直接影响模板文件的定位和解析方式。例如，`setPrefix`定义模板文件所在的目录，`setSuffix`定义模板文件的扩展名。不当的配置（如允许任意前缀或后缀）可能被攻击者利用进行目录遍历或注入恶意模板。
-
-3. **辅助安全审计**
-   虽然此规则本身不直接检测漏洞，但它提供了重要的上下文信息。结合其他规则（如检测用户输入是否直接或间接影响模板名称或参数的规则），可以更有效地发现Thymeleaf模板注入（Server-Side Template Injection, SSTI）等漏洞。审计配置也是了解应用如何处理模板、评估其安全健壮性的必要步骤。
 CODE
 	level: "info",
 }
 
 $templateResolver.set*(*?{opcode: const} as $params);
 alert $params for {
-	solution: <<<CODE
-### 修复建议
-
-#### 1. 严格配置模板路径
-确保`setPrefix`和`setSuffix`的配置严格限制模板文件的路径和扩展名，避免使用可能导致目录遍历的配置。
-
-```java
-// 示例：严格配置模板路径
-SpringResourceTemplateResolver templateResolver = new SpringResourceTemplateResolver();
-templateResolver.setPrefix("classpath:/secure/templates/");
-templateResolver.setSuffix(".html");
-```
-
-#### 2. 避免使用动态路径
-避免在模板路径中使用动态参数，确保路径的静态性和可预测性。
-
-```java
-// 避免示例：动态路径配置
-// templateResolver.setPrefix("classpath:/templates/" + userInput);
-```
-
-#### 3. 使用安全的模板模式
-确保`setTemplateMode`配置为安全的模式，如`TemplateMode.HTML`，避免使用可能导致执行恶意代码的模式。
-
-```java
-// 示例：使用安全的模板模式
-templateResolver.setTemplateMode(TemplateMode.HTML);
-```
-
-#### 4. 定期审计模板配置
-定期审计模板配置文件，确保没有不当的配置项，及时发现潜在的安全风险。
-CODE
 	desc: <<<CODE
-### 规则描述
 
-#### 1. 规则目的
-该规则用于审计Java应用中Thymeleaf模板引擎的配置参数，特别是检查`SpringResourceTemplateResolver`的配置方法及其参数。了解这些配置参数对于评估潜在的安全风险至关重要，尤其是与模板注入相关的风险。通过审计配置参数，可以帮助开发者和安全人员识别可能导致攻击者控制模板内容或文件路径的配置项。
-
-#### 2. 规则详细
-1. **关注配置方法**
-   规则主要关注`SpringResourceTemplateResolver`的各种配置方法（如`setPrefix`、`setSuffix`、`setTemplateMode`等）及其参数的使用。
-
-2. **识别关键参数**
-   规则进一步检查这些配置方法的参数，特别是常量参数的使用。这些参数直接影响模板文件的定位和解析方式。例如，`setPrefix`的参数定义模板文件所在的目录，`setSuffix`的参数定义模板文件的扩展名。不当的参数（如允许任意前缀或后缀）可能被攻击者利用进行目录遍历或注入恶意模板。
-
-3. **辅助安全审计**
-   虽然此规则本身不直接检测漏洞，但它提供了重要的上下文信息。结合其他规则（如检测用户输入是否直接或间接影响模板名称或参数的规则），可以更有效地发现Thymeleaf模板注入（Server-Side Template Injection, SSTI）等漏洞。审计配置参数也是了解应用如何处理模板、评估其安全健壮性的必要步骤。
 CODE
 	level: "info",
 	message: "SpringResourceTemplateResolver is used with some params",
 	title: "Audit Java Thymeleaf Configuration Parameters",
 	title_zh: "审计Java Thymeleaf配置参数",
+	solution: <<<CODE
+
+CODE
 }
 
 

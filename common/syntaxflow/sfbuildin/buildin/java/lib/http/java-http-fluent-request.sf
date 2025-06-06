@@ -31,23 +31,15 @@ $execMethods(,* as $output);
 <delete(methods)>
 <delete(execMethods)>
 alert $output for {
-	title: "Audit Java HTTP Fluent Request",
-	title_zh: "审计Java HTTP Fluent Request",
 	solution: <<<CODE
-none
+
 CODE
 	desc: <<<CODE
-### 1.规则目的
-该规则用于审计使用Apache HttpClient Fluent API发送HTTP请求的代码。Fluent API提供了一种简化发送HTTP请求的方式，但如果没有适当的安全措施，可能会引入安全风险。
 
-### 2.规则详细
-1. **作为基础审计库**
-   属于`java-http-fluent-request`库规则(`lib`类型)，用于识别代码中使用了Apache HttpClient Fluent API发送请求的位置。
-
-2. **识别HTTP请求方法**
-   识别以下HTTP请求方法：`Get`, `Post`, `Put`, `Delete`, `Patch`, `Options`, `Head`, `Trace`。
 CODE
 	level: "mid",
+	title: "Audit Java HTTP Fluent Request",
+	title_zh: "审计Java HTTP Fluent Request",
 }
 
 

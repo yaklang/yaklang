@@ -29,10 +29,16 @@ $param #{
 }-> as $mid 
 
 alert $mid for {
-    title: 'SSRF detected',
-    title_zh: '检测到SSRF',
-    type: 'vuln',
-    level: 'mid',
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+	type: "vuln",
+	title: "SSRF detected",
+	title_zh: "检测到SSRF",
+	solution: <<<CODE
+
+CODE
 }
 
 desc(

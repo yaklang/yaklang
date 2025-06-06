@@ -138,7 +138,16 @@ $getConnection -{
 $safe<getPredecessors()> as $safeGetConnection;
 $getConnection - $safeGetConnection as $weak;
 alert $weak for {
-    message:"检测到Hibernate Session 未释放资源",
+	level: "",
+	message: "检测到Hibernate Session 未释放资源",
+	title: "",
+	title_zh: "",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
 }
 
 

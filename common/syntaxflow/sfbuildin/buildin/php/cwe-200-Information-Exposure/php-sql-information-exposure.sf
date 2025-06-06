@@ -75,84 +75,30 @@ $param?{<self> #{include: <<<CODE
 CODE}->} as $mysql_sink
 
 alert $mysql_sink for {
-	title: "Detect PHP MySQL Information Exposure Risk",
-	title_zh: "检测PHP MySQL数据库信息泄露风险",
 	solution: <<<CODE
-### 修复建议
 
-#### 1. 避免在生产环境中使用敏感信息输出函数
-确保在生产环境中不调用或删除可能泄露敏感信息的函数，如 `mysql_get_host_info()`、`mysql_error()`等。
-
-#### 2. 严格控制错误报告级别
-在生产环境中，关闭 `display_errors`，并将错误日志记录到安全的位置，避免错误信息直接暴露给用户。
-
-#### 3. 使用通用的错误信息
-对于数据库连接或查询失败等情况，捕获异常并向用户显示通用的错误信息，避免泄露数据库的详细错误信息。
 CODE
 	desc: <<<CODE
-### 风险描述
 
-1. **风险原理**
-当PHP应用程序直接使用可能暴露MySQL数据库敏感信息的函数，如`mysql_get_host_info()`、`mysql_error()`等，并且未对这些函数的输出进行适当处理，可能会导致敏感信息泄露。
-
-2. **触发场景**
-应用程序在生产环境中调用了`mysql_get_host_info()`等函数，并将返回值直接输出到Web页面或日志文件中。
-
-```php
-<?php
-$host_info = mysql_get_host_info();
-echo "MySQL主机信息: " . $host_info;
-?>
-```
-
-3. **潜在影响**
-- 攻击者获取MySQL服务器的版本信息、主机信息等。
-- 攻击者获取数据库连接用户名、密码等。
-- 被攻击者利用数据库信息，辅助进行其他攻击。
 CODE
 	level: "low",
+	title: "Detect PHP MySQL Information Exposure Risk",
+	title_zh: "检测PHP MySQL数据库信息泄露风险",
 }
 $param?{<self> #{include: <<<CODE
 * & $pg_information
 CODE}->} as $pg_sink
 
 alert $pg_sink for {
+	title: "Detect PHP PostgreSQL Information Exposure Risk",
 	title_zh: "检测PHP PostgreSQL数据库信息泄露风险",
 	solution: <<<CODE
-### 修复建议
 
-#### 1. 避免在生产环境中使用敏感信息输出函数
-确保在生产环境中不调用或删除可能泄露敏感信息的函数，如 `pg_version()`、`pg_last_error()`等。
-
-#### 2. 严格控制错误报告级别
-在生产环境中，关闭 `display_errors`，并将错误日志记录到安全的位置，避免错误信息直接暴露给用户。
-
-#### 3. 使用通用的错误信息
-对于数据库连接或查询失败等情况，捕获异常并向用户显示通用的错误信息，避免泄露数据库的详细错误信息。
 CODE
 	desc: <<<CODE
-### 风险描述
 
-1. **风险原理**
-当PHP应用程序直接使用可能暴露PostgreSQL数据库敏感信息的函数，如`pg_version()`、`pg_last_error()`等，并且未对这些函数的输出进行适当处理，可能会导致敏感信息泄露。
-
-2. **触发场景**
-应用程序在生产环境中调用了`pg_version()`等函数，并将返回值直接输出到Web页面或日志文件中。
-
-```php
-<?php
-$version = pg_version();
-echo "PostgreSQL版本信息: " . $version['server'];
-?>
-```
-
-3. **潜在影响**
-- 攻击者获取PostgreSQL服务器的版本信息、主机信息等。
-- 攻击者获取数据库连接用户名、密码等。
-- 被攻击者利用数据库信息，辅助进行其他攻击。
 CODE
 	level: "low",
-	title: "Detect PHP PostgreSQL Information Exposure Risk",
 }
 desc(
 	lang: "php"

@@ -96,68 +96,10 @@ alert $high for {
 	title: "Check PHP Unsafe File Unzip Vulnerability",
 	title_zh: "检测PHP未验证文件解压漏洞",
 	solution: <<<CODE
-### 修复建议
 
-1. **对解压目标路径进行严格校验**
-   - **限制解压目录：** 始终将文件解压到固定的、与Web根目录无关的非公共目录。
-   - **路径规范化：** 在使用解压路径之前，利用PHP的 `realpath()` 或其他方法将路径规范化，去除 `..` 等相对路径元素。
-   - **路径合法性检查：** 校验规范化后的路径是否仍然在预期的解压根目录下，拒绝超出指定目录的路径。
-   ```php
-   // 修复代码示例：限制解压目录并校验路径合法性
-   $baseExtractPath = '/path/to/safe_extract_directory/'; // 安全解压根目录
-   $userInputPath = $_GET['path'];
-   $extractPath = realpath($baseExtractPath . '/' . $userInputPath); // 结合基准路径并规范化
-
-   // 校验解压路径是否在基准目录内
-   if (strpos($extractPath, $baseExtractPath) !== 0) {
-       die('Invalid extract path');
-   }
-
-   $zip = new ZipArchive();
-   if ($zip->open('uploaded.zip') === TRUE) {
-       // 在解压前，进一步校验压缩包内文件名是否包含父目录穿越字符（更安全的方法）
-       for ($i = 0; $i < $zip->numFiles; $i++) {
-           $filename = $zip->getNameIndex($i);
-           if (strpos($filename, '../') !== false || strpos($filename, '..\') !== false) {
-               die('Malicious path detected in zip file');
-           }
-       }
-
-       $zip->extractTo($extractPath); // 使用校验后的安全路径
-       $zip->close();
-   }
-   ```
-
-2. **对压缩包内的文件名进行校验**
-   - 在解压每个文件之前，检查压缩包内的文件名是否包含 `../` 或其他非法的路径元素。这是最根本也是最安全的防护措施。
-
-3. **使用安全的解压函数或库**
-   - 检查使用的解压函数或库是否内置了防止路径穿越的机制。优先使用支持文件名 sanitization 的库。
 CODE
 	desc: <<<CODE
-### 漏洞描述
 
-1. **漏洞原理**
-   文件解压功能在Web应用程序中如果未经过充分的安全检查，可能会导致**目录穿越（Path Traversal）**漏洞。攻击者可以通过构造恶意压缩包，在解压时指定包含 `../` 或 `..\` 等特殊字符的文件路径，使得解压后的文件存储到非预期的目录，例如服务器的敏感目录或网站根目录之外。
-
-2. **触发场景**
-   当应用程序允许用户上传压缩包，并在服务器端直接解压时，如果解压库或应用程序未对压缩包内的文件名进行路径规范化和合法性检查，攻击者可以在压缩包中包含一个名为 `../../../../tmp/evil.php` 的文件。当解压到默认目录 `/path/to/extract` 时，`evil.php` 文件可能会被解压到 `/tmp/evil.php`。
-   ```php
-   // 存在漏洞的代码示例
-   $path = $_GET["path"]; // 用户可控的解压路径
-   $zip = new ZipArchive();
-   if ($zip->open('uploaded.zip') === TRUE) {
-       $zip->extractTo($path); // 直接使用用户输入的路径进行解压
-       $zip->close();
-   }
-   ```
-   在上述示例中，如果用户通过GET请求提供 `path=../../../../tmp/`，且`uploaded.zip`包含一个文件名为`evil.php`的文件，解压后`evil.php`将会被放置在`/tmp/`目录下。
-
-3. **潜在影响**
-   - **任意文件写入：** 攻击者可以将恶意文件（如webshell）写入服务器可执行目录，获取服务器控制权。
-   - **文件覆盖：** 攻击者可能覆盖重要的配置文件、程序文件或日志文件，导致服务中断或篡改系统行为。
-   - **敏感信息泄露：** 攻击者可能将文件解压到Web可访问目录，泄露原本不应公开的文件内容。
-   - **拒绝服务：** 攻击者可能解压大量小文件或超大文件，消耗服务器资源导致服务不可用。
 CODE
 	level: "high",
 }
@@ -169,144 +111,28 @@ CODE)> as $highAndMid
 $highAndMid - $high as $mid
 
 alert $mid for {
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   文件解压功能在Web应用程序中如果未经过充分的安全检查，可能会导致**目录穿越（Path Traversal）**漏洞。攻击者可以通过构造恶意压缩包，在解压时指定包含 `../` 或 `..\` 等特殊字符的文件路径，使得解压后的文件存储到非预期的目录，例如服务器的敏感目录或网站根目录之外。
-
-2. **触发场景**
-   当应用程序允许用户上传压缩包，并在服务器端直接解压时，如果解压库或应用程序未对压缩包内的文件名进行路径规范化和合法性检查，攻击者可以在压缩包中包含一个名为 `../../../../tmp/evil.php` 的文件。当解压到默认目录 `/path/to/extract` 时，`evil.php` 文件可能会被解压到 `/tmp/evil.php`。
-   ```php
-   // 存在漏洞的代码示例
-   $path = $_GET["path"]; // 用户可控的解压路径
-   $zip = new ZipArchive();
-   if ($zip->open('uploaded.zip') === TRUE) {
-       $zip->extractTo($path); // 直接使用用户输入的路径进行解压
-       $zip->close();
-   }
-   ```
-   在上述示例中，如果用户通过GET请求提供 `path=../../../../tmp/`，且`uploaded.zip`包含一个文件名为`evil.php`的文件，解压后`evil.php`将会被放置在`/tmp/`目录下。
-
-3. **潜在影响**
-   - **任意文件写入：** 攻击者可以将恶意文件（如webshell）写入服务器可执行目录，获取服务器控制权。
-   - **文件覆盖：** 攻击者可能覆盖重要的配置文件、程序文件或日志文件，导致服务中断或篡改系统行为。
-   - **敏感信息泄露：** 攻击者可能将文件解压到Web可访问目录，泄露原本不应公开的文件内容。
-   - **拒绝服务：** 攻击者可能解压大量小文件或超大文件，消耗服务器资源导致服务不可用。
-CODE
-	level: "mid",
 	title: "Audit PHP Partially Validated Unzip Path Vulnerability",
 	title_zh: "审计PHP部分验证文件解压路径漏洞",
 	solution: <<<CODE
-### 修复建议
 
-1. **对解压目标路径进行严格校验**
-   - **限制解压目录：** 始终将文件解压到固定的、与Web根目录无关的非公共目录。
-   - **路径规范化：** 在使用解压路径之前，利用PHP的 `realpath()` 或其他方法将路径规范化，去除 `..` 等相对路径元素。
-   - **路径合法性检查：** 校验规范化后的路径是否仍然在预期的解压根目录下，拒绝超出指定目录的路径。
-   ```php
-   // 修复代码示例：限制解压目录并校验路径合法性
-   $baseExtractPath = '/path/to/safe_extract_directory/'; // 安全解压根目录
-   $userInputPath = $_GET['path'];
-   $extractPath = realpath($baseExtractPath . '/' . $userInputPath); // 结合基准路径并规范化
-
-   // 校验解压路径是否在基准目录内
-   if (strpos($extractPath, $baseExtractPath) !== 0) {
-       die('Invalid extract path');
-   }
-
-   $zip = new ZipArchive();
-   if ($zip->open('uploaded.zip') === TRUE) {
-       // 在解压前，进一步校验压缩包内文件名是否包含父目录穿越字符（更安全的方法）
-       for ($i = 0; $i < $zip->numFiles; $i++) {
-           $filename = $zip->getNameIndex($i);
-           if (strpos($filename, '../') !== false || strpos($filename, '..\') !== false) {
-               die('Malicious path detected in zip file');
-           }
-       }
-
-       $zip->extractTo($extractPath); // 使用校验后的安全路径
-       $zip->close();
-   }
-   ```
-
-2. **对压缩包内的文件名进行校验**
-   - 在解压每个文件之前，检查压缩包内的文件名是否包含 `../` 或其他非法的路径元素。这是最根本也是最安全的防护措施。
-
-3. **使用安全的解压函数或库**
-   - 检查使用的解压函数或库是否内置了防止路径穿越的机制。优先使用支持文件名 sanitization 的库。
 CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
 }
 $sink - $high - $mid as $low
 
 alert $low for {
+	desc: <<<CODE
+
+CODE
+	level: "low",
 	title: "Audit PHP Low Risk File Unzip Operation",
 	title_zh: "审计PHP低风险文件解压操作",
 	solution: <<<CODE
-### 修复建议
 
-1. **对解压目标路径进行严格校验**
-   - **限制解压目录：** 始终将文件解压到固定的、与Web根目录无关的非公共目录。
-   - **路径规范化：** 在使用解压路径之前，利用PHP的 `realpath()` 或其他方法将路径规范化，去除 `..` 等相对路径元素。
-   - **路径合法性检查：** 校验规范化后的路径是否仍然在预期的解压根目录下，拒绝超出指定目录的路径。
-   ```php
-   // 修复代码示例：限制解压目录并校验路径合法性
-   $baseExtractPath = '/path/to/safe_extract_directory/'; // 安全解压根目录
-   $userInputPath = $_GET['path'];
-   $extractPath = realpath($baseExtractPath . '/' . $userInputPath); // 结合基准路径并规范化
-
-   // 校验解压路径是否在基准目录内
-   if (strpos($extractPath, $baseExtractPath) !== 0) {
-       die('Invalid extract path');
-   }
-
-   $zip = new ZipArchive();
-   if ($zip->open('uploaded.zip') === TRUE) {
-       // 在解压前，进一步校验压缩包内文件名是否包含父目录穿越字符（更安全的方法）
-       for ($i = 0; $i < $zip->numFiles; $i++) {
-           $filename = $zip->getNameIndex($i);
-           if (strpos($filename, '../') !== false || strpos($filename, '..\') !== false) {
-               die('Malicious path detected in zip file');
-           }
-       }
-
-       $zip->extractTo($extractPath); // 使用校验后的安全路径
-       $zip->close();
-   }
-   ```
-
-2. **对压缩包内的文件名进行校验**
-   - 在解压每个文件之前，检查压缩包内的文件名是否包含 `../` 或其他非法的路径元素。这是最根本也是最安全的防护措施。
-
-3. **使用安全的解压函数或库**
-   - 检查使用的解压函数或库是否内置了防止路径穿越的机制。优先使用支持文件名 sanitization 的库。
 CODE
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   文件解压功能在Web应用程序中如果未经过充分的安全检查，可能会导致**目录穿越（Path Traversal）**漏洞。攻击者可以通过构造恶意压缩包，在解压时指定包含 `../` 或 `..\` 等特殊字符的文件路径，使得解压后的文件存储到非预期的目录，例如服务器的敏感目录或网站根目录之外。
-
-2. **触发场景**
-   当应用程序允许用户上传压缩包，并在服务器端直接解压时，如果解压库或应用程序未对压缩包内的文件名进行路径规范化和合法性检查，攻击者可以在压缩包中包含一个名为 `../../../../tmp/evil.php` 的文件。当解压到默认目录 `/path/to/extract` 时，`evil.php` 文件可能会被解压到 `/tmp/evil.php`。
-   ```php
-   // 存在漏洞的代码示例
-   $path = $_GET["path"]; // 用户可控的解压路径
-   $zip = new ZipArchive();
-   if ($zip->open('uploaded.zip') === TRUE) {
-       $zip->extractTo($path); // 直接使用用户输入的路径进行解压
-       $zip->close();
-   }
-   ```
-   在上述示例中，如果用户通过GET请求提供 `path=../../../../tmp/`，且`uploaded.zip`包含一个文件名为`evil.php`的文件，解压后`evil.php`将会被放置在`/tmp/`目录下。
-
-3. **潜在影响**
-   - **任意文件写入：** 攻击者可以将恶意文件（如webshell）写入服务器可执行目录，获取服务器控制权。
-   - **文件覆盖：** 攻击者可能覆盖重要的配置文件、程序文件或日志文件，导致服务中断或篡改系统行为。
-   - **敏感信息泄露：** 攻击者可能将文件解压到Web可访问目录，泄露原本不应公开的文件内容。
-   - **拒绝服务：** 攻击者可能解压大量小文件或超大文件，消耗服务器资源导致服务不可用。
-CODE
-	level: "low",
 }
 desc(
 	lang: "php"

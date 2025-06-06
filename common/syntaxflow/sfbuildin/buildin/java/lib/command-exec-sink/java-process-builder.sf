@@ -84,66 +84,10 @@ alert $output for {
 	title: "Unvalidated Command Execution",
 	title_zh: "未验证的命令执行",
 	solution: <<<CODE
-### 修复建议
-#### 1. 使用参数化查询（PreparedStatement）
-通过预编译SQL语句并绑定用户输入，隔离代码与数据，避免恶意输入篡改逻辑。
 
-```java
-// 修复代码示例
-String userInput = request.getParameter("id");
-String sql = "SELECT * FROM users WHERE id = ?";  // 使用占位符
-try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-    pstmt.setInt(1, Integer.parseInt(userInput));  // 强制类型转换并绑定参数
-    ResultSet rs = pstmt.executeQuery();
-    // 处理结果集
-}
-```
-
-#### 2. 输入合法性校验
-对用户输入实施类型、格式或范围限制，拒绝非法输入。
-
-```java
-// 示例：校验输入为数字且范围合法
-if (!userInput.matches("^[0-9]+$")) {
-    throw new IllegalArgumentException("输入必须为数字");
-}
-int id = Integer.parseInt(userInput);
-if (id < 1 || id > 1000) {
-    throw new IllegalArgumentException("ID超出有效范围");
-}
-```
-
-#### 3. 使用ORM框架
-通过ORM（如Hibernate、MyBatis）内置的安全机制自动处理参数化，避免手动拼接SQL。
-
-```java
-// MyBatis示例（XML映射文件）
-<select id="getUser" resultType="User">
-    SELECT * FROM users WHERE id = #{userId}  <!-- 安全参数占位符 -->
-</select>
-
-// 调用代码（避免直接拼接）
-User user = sqlSession.selectOne("getUser", Long.parseLong(userInput));
-```
 CODE
 	desc: <<<CODE
-### 漏洞描述
-1. **漏洞原理**
-   由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始命令的逻辑。这可能导致非预期的命令执行，例如数据泄露、数据篡改或权限绕过。
 
-2. **触发场景**
-   // 存在漏洞的代码示例
-   ```java
-   String userInput = request.getParameter("command");
-   ProcessBuilder pb = new ProcessBuilder(userInput);
-   pb.start();
-   ```
-   攻击者输入 `rm -rf /` 可导致系统文件被删除。
-
-3. **潜在影响**
-   - 系统敏感信息（如用户凭证、隐私数据）被窃取。
-   - 执行任意命令（如删除文件、修改系统配置）。
-   - 通过命令执行提权进一步渗透至服务器或其他系统组件。
 CODE
 	level: "high",
 }

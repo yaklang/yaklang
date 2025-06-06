@@ -29,22 +29,15 @@ $entry.Open <getCall> as $db;
 $db <getMembers> as $output;
 
 alert $output for {
+	title: "Audit Golang Sqlx Library Usage",
 	title_zh: "审计Golang Sqlx库使用情况",
 	solution: <<<CODE
-### 修复建议
-1. 确保所有的数据库操作都使用参数化查询或命名参数，避免直接拼接SQL字符串。
-2. 对所有输入数据进行严格的验证和清理，防止SQL注入。
-3. 使用`MustExec`或`Exec`时，务必检查返回的错误，确保操作成功。
+
 CODE
 	desc: <<<CODE
-### 1.规则目的
-此审计规则旨在检查代码中是否正确使用了 `github.com/jmoiron/sqlx` 库进行数据库操作。`sqlx` 是一个强大的 Go 语言库，它在标准库 `database/sql` 的基础上提供了更多功能，如更便捷的查询、命名参数支持等。
 
-### 2.规则详细
-此审计主要关注代码中是否安全、合理地使用了数据库连接、查询、更新和删除等操作，以确保应用程序的数据安全性和稳定性。不当的数据库操作可能导致 SQL 注入、数据泄露等安全问题。
 CODE
 	level: "info",
-	title: "Audit Golang Sqlx Library Usage",
 }
 
 desc(

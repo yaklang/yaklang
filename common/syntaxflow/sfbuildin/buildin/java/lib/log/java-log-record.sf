@@ -50,53 +50,13 @@ SOLUTION
 /(?i)log/./(?:errorf?|infof?|warn(ing)?|log(?:rb|p)?|debug|fatal|trace|^e$)/()  as $output;
 alert $output for {
 	desc: <<<CODE
-### 规则目的
-该规则用于检测Java应用程序中的日志记录方法。日志记录是应用程序中重要的调试和监控工具，但不当的日志记录可能导致信息泄露或其他安全问题。此规则审计了可能受到用户输入影响的日志记录点，特别是那些使用`log.info()`、`log.error()`等方法进行日志记录的点。
 
-### 规则详细
-1. **作为基础检测库**
-   属于`java-log-record`库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测日志记录风险，提供核心函数识别能力。
-
-2. **覆盖高危日志函数**
-   检测以下常见的Java日志记录函数：
-   `log.info`, `log.error`, `log.warn`, `log.debug`, `log.trace`, `log.fatal`等。
 CODE
 	level: "info",
 	title: "Find Java Logging Method",
 	title_zh: "查找Java日志记录方法",
 	solution: <<<CODE
-### 修复建议
-#### 1. 避免记录敏感信息
-确保日志中不包含敏感信息，如用户密码、个人信息等。
 
-```java
-// 示例：避免记录敏感信息
-if (message.contains("password")) {
-    return; // 不记录包含密码的日志
-}
-logger.info(message);
-```
-
-#### 2. 使用日志级别控制
-合理使用日志级别，避免在生产环境中输出过多调试信息。
-
-```java
-// 示例：使用日志级别控制
-if (logger.isDebugEnabled()) {
-    logger.debug("Debug information");
-}
-```
-
-#### 3. 参数化日志记录
-使用参数化日志记录，避免直接拼接用户输入。
-
-```java
-// 示例：参数化日志记录
-logger.info("User login attempt: {}", username);
-```
-
-#### 4. 审计日志配置
-定期审计日志配置文件，确保日志记录策略符合安全要求。
 CODE
 }
 

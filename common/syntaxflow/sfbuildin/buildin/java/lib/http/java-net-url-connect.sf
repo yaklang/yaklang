@@ -134,101 +134,15 @@ REFERENCE
 
 URL?{<getCall>?{.openConnection() || .openStream()}}(,* as $output);
 alert $output for {
+	desc: <<<CODE
+
+CODE
+	level: "info",
 	title: "Audit Java URL Connection Use",
 	title_zh: "审计Java URL连接使用",
 	solution: <<<CODE
-### 审计建议
 
-#### 1. 优先使用HTTPS
-建立连接时，优先使用`https://`协议，确保数据传输加密和安全。
-
-#### 2. 验证用户提供的URL
-如果URL是基于用户输入构建的，需要对输入进行严格校验和过滤，防止SSRF等攻击。
-
-#### 3. 设置连接超时和读取超时
-设置适当的超时时间，避免因为网络问题导致长时间等待，影响应用程序可用性。
-
-```java
-// 修复代码示例：设置超时时间
-import java.net.HttpURLConnection;
-import java.net.URL;
-
-// ...
-URL url = new URL("https://secure-example.com"); // 使用HTTPS
-HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-connection.setConnectTimeout(5000); // 设置连接超时5秒
-connection.setReadTimeout(5000);    // 设置读取超时5秒
-// ...
-```
-
-#### 4. 完善异常处理
-捕获并处理可能发生的各种IOException，或使用try-with-resources语句确保资源正确关闭。
-
-```java
-// 修复代码示例：使用try-with-resources关闭资源
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-
-// ...
-try {
-    URL url = new URL("https://secure-example.com");
-    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-    connection.setConnectTimeout(5000); // 设置连接超时5秒
-    connection.setReadTimeout(5000);    // 设置读取超时5秒
-    connection.setRequestMethod("GET");
-    connection.setRequestProperty("Accept", "application/json");
-
-    try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
-        String line;
-        StringBuilder response = new StringBuilder();
-        while ((line = reader.readLine()) != null) {
-            response.append(line);
-            response.append('\r');
-        }
-        System.out.println("Response: " + response.toString());
-    } finally {
-        if (connection != null) {
-            connection.disconnect();
-        }
-    }
-} catch (IOException e) {
-    // 更精细的异常处理或记录日志
-    e.printStackTrace();
-}
-// ...
-```
-
-#### 5. 使用更高级的HTTP客户端库
-考虑使用功能更丰富且通常提供更多安全特性的第三方库，如Apache HttpClient、OkHttp等。
-
-#### 6. 结合其他安全规则进行审计
-结合检测SSRF、路径遍历等相关安全规则，对URL的构造来源和使用方式进行全面审计。
 CODE
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
-
-2. **触发场景**
-   // 存在漏洞的代码示例
-   ```java
-   String userInput = request.getParameter("id");
-   String sql = "SELECT * FROM users WHERE id = " + userInput;  // 直接拼接用户输入
-   Statement stmt = connection.createStatement();
-   ResultSet rs = stmt.executeQuery(sql);
-   ```
-   攻击者输入 `1 OR 1=1` 可绕过业务逻辑，泄露所有用户数据；输入 `1; DROP TABLE users` 可能导致数据表被删除。
-
-3. **潜在影响**
-   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
-   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
-   - 通过数据库提权进一步渗透至服务器或其他系统组件。
-CODE
-	level: "info",
 }
 
 

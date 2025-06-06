@@ -128,78 +128,10 @@ alert $high for {
 	title: "Unvalidated FTP Parameter Injection",
 	title_zh: "FTP未验证参数注入风险",
 	solution: <<<CODE
-### 修复建议
 
-#### 1. 对用户输入进行严格验证和过滤
-在将用户输入传递给FTP函数之前，进行严格的输入验证和过滤，只允许合法的字符和路径结构。使用白名单方法优于黑名单方法。
-
-```php
-<?php
-// 修复代码示例：严格路径验证
-function safeDeleteFile() {
-    $file = $_GET['file'];
-    if (isValidFtpPath($file)) { // 使用自定义函数验证路径合法性
-        ftp_delete($ftp_conn, $file);
-    } else {
-        // 处理非法输入，如记录日志或返回错误
-        error_log("Invalid FTP file path attempted: " . $file);
-        echo "Error: Invalid file path.";
-    }
-}
-
-function isValidFtpPath($path) {
-    // 示例验证逻辑：
-    // 1. 检查路径是否包含 '..' 进行路径穿越
-    if (strpos($path, '..') !== false) {
-        return false;
-    }
-    // 2. 根据实际需求添加更多验证，如只允许在特定目录下操作，或验证文件名/目录名符合预期格式
-    // if (!preg_match('/^[a-zA-Z0-9_\/\-]+\.txt$/', $path)) { // 示例：只允许特定格式和扩展名的文件
-    //     return false;
-    // }
-    return true;
-}
-?>
-```
-
-#### 2. 使用绝对路径或已严格控制的相対路径
-尽量避免使用用户可控的相对路径。如果必须使用相对路径，确保其受限于一个已知的、受限的根目录，并且用户无法通过操纵输入逃离该目录。
-
-#### 3. 对文件名和路径进行编码和解码
-根据FTP协议和服务器的实际情况，对文件名和路径进行适当的URL编码或FTP特定的编码解码，以确保特殊字符被正确处理而不是被解释为路径分隔符或命令。
-
-#### 4. 限制FTP用户权限
-为进行文件操作的FTP用户配置最小必需的权限，限制其只能访问和操作特定目录下的文件，即使存在参数注入漏洞，也能限制潜在的危害范围。
-
-#### 5. 定期更新和审计代码
-定期对处理用户输入的代码进行安全审计，并及时应用框架和库的安全更新。
 CODE
 	desc: <<<CODE
-### 漏洞描述
 
-1. **漏洞原理**
-当应用程序在调用FTP相关函数（如 `ftp_chdir`, `ftp_delete`, `ftp_put`, `ftp_get`, `ftp_rename` 等）时，未对用户提供的文件名、路径或参数进行充分的验证和过滤，攻击者可以构造恶意输入。
-这可能导致以下问题：
-- **路径穿越 (Path Traversal/Directory Traversal)**: 攻击者利用 `../` 等序列访问FTP服务器上预期目录之外的文件和目录。
-- **文件覆盖/删除**: 攻击者通过操纵文件名或路径来覆盖或删除任意文件。
-- **权限绕过/文件泄露**: 在某些情况下，恶意参数可能导致绕过FTP权限限制，访问敏感文件或执行未授权操作。
-
-2. **触发场景**
-该规则主要检测用户可控的输入（如来自 `$_GET`, `$_POST`, `$_REQUEST` 等超全局变量）直接或间接作为FTP函数参数的情况，并且缺乏有效的安全过滤措施。例如，直接将用户输入的路径字符串传递给 `ftp_delete` 函数，而未检查其中是否包含恶意构造的路径穿越字符。
-
-```php
-<?php
-// 高风险案例（直接使用未过滤参数）
-function deleteFile() {
-    $file = $_GET['file']; // 直接接收用户输入
-    ftp_delete($ftp_conn, $file); // 触发高风险告警
-}
-```
-
-3. **潜在影响**
-- 攻击者可能在FTP服务器上读写、修改或删除任意文件，导致数据损坏、丢失或敏感信息泄露。
-- 攻击者可能利用路径穿越漏洞访问受限目录，获取配置文件、日志或源代码等敏感信息。
-- 在某些FTP配置和场景下，可能导致进一步的服务器访问权限绕过或远程代码执行。
 CODE
 	level: "high",
 }
@@ -215,76 +147,10 @@ alert $mid for {
 	title: "Insufficient FTP Parameter Filtering",
 	title_zh: "FTP参数过滤不充分",
 	solution: <<<CODE
-### 修复建议
 
-#### 1.  强化输入验证和过滤：
-   - 使用更严格的白名单机制，只允许预期的字符和路径格式。
-   - 对特殊字符进行编码，以防止它们被解释为路径分隔符或命令。
-   - 实施多层过滤，组合使用多种过滤函数。
-
-#### 2.  使用绝对路径或受限相对路径：
-   -  尽量避免使用用户可控的相对路径。如果必须使用相对路径，确保其受限于一个已知的、受限的根目录，并且用户无法通过操纵输入逃离该目录。
-
-#### 3.  FTP服务器配置安全：
-   -  限制FTP用户的权限，确保他们只能访问和操作特定目录下的文件。
-   -  禁用不必要的FTP命令和功能。
-   -  定期审查和更新FTP服务器的配置。
-
-#### 4.  代码审计与安全测试：
-   -  定期对处理用户输入的代码进行安全审计。
-   -  进行渗透测试，验证过滤机制是否能够有效地阻止恶意攻击。
-```php
-<?php
-// 修复代码示例：强化过滤
-function safeUploadFile() {
-    $path = $_POST['path'];
-    // 1. 使用白名单验证字符，只允许字母、数字、下划线和斜杠
-    $filtered = preg_replace('/[^a-zA-Z0-9_\/]/', '', $path);
-    // 2. 防止路径遍历
-    $filtered = str_replace('..', '', $filtered);
-
-    // 3. URL解码以处理编码的路径遍历尝试
-    $filtered = urldecode($filtered);
-
-    // 4. 校验目标路径必须在允许的目录中
-    $baseDir = '/var/www/ftp_uploads/';
-    $fullPath = $baseDir . $filtered;
-
-    if (strpos($fullPath, $baseDir) === 0) {
-        ftp_fput($ftp_conn, $filtered, $fp);
-    } else {
-        // 处理非法路径
-        error_log("Invalid FTP upload path attempted: " . $path);
-        echo "Error: Invalid upload path.";
-    }
-}
-?>
-```
 CODE
 	desc: <<<CODE
-### 漏洞描述
 
-1.  **漏洞原理**
-    当应用程序使用PHP的FTP函数（如`ftp_put`, `ftp_get`, `ftp_delete`等）处理用户上传的文件或目录路径时，如果仅进行简单的过滤（例如，仅移除`../`），而未充分考虑到各种绕过技术（如URL编码、双重编码等），攻击者可以构造恶意路径，从而访问或操作FTP服务器上的敏感文件或目录，造成未授权访问。
-
-2.  **触发场景**
-    - 应用程序接收用户通过POST或GET请求传递的文件路径或文件名参数。
-    - 使用`str_replace()`或类似函数移除`../`字符串，但未递归处理或未考虑到URL编码。
-    - 将经过“过滤”的路径传递给FTP函数，如`ftp_put`或`ftp_delete`。
-
-    ```php
-    <?php
-    // 中风险案例：使用str_replace过滤，但未处理URL编码
-    $path = $_POST['path'];
-    $filtered = str_replace('../', '', $path); // 移除../
-    ftp_fput($ftp_conn, $filtered, $fp); // 可能会被绕过
-    ?>
-    ```
-
-3.  **潜在影响**
-    - 攻击者可以上传恶意文件到服务器上的敏感目录，例如`/var/www/shell.php`。
-    - 攻击者可以删除服务器上的关键文件，导致服务中断或数据丢失。
-    - 攻击者可以访问服务器上的配置文件或日志文件，获取敏感信息。
 CODE
 	level: "mid",
 }
@@ -294,71 +160,10 @@ alert $low for {
 	title: "Potential FTP Access Control Bypass",
 	title_zh: "FTP访问控制潜在绕过风险",
 	solution: <<<CODE
-### 修复建议
 
-#### 1. 审查和强化过滤逻辑：
-- 深入分析现有的过滤函数的实现，确保其能够覆盖所有可能的绕过情况。例如，递归地移除`../`，并处理URL编码的情况。
-
-#### 2. 实施更严格的路径验证：
-- 严格验证用户提供的路径是否在允许的范围内。使用绝对路径或将相对路径限制在受控的根目录下。
-
-#### 3. 最小权限原则：
-- 使用FTP账号连接服务器时，应遵循最小权限原则，限制其只能访问和操作特定目录下的文件，防止因权限过大而导致的安全风险。
-```php
-<?php
-// 修复代码示例：强化路径验证
-function safeCreateDir() {
-    $dir = $_GET['dir'];
-    $sanitizedDir = sanitizeInput($dir); // 使用sanitizeInput函数
-    // 确保目标目录在允许的根目录下
-    $baseDir = '/var/www/ftp_base/';
-    $fullPath = $baseDir . $sanitizedDir;
-
-    if (strpos($fullPath, $baseDir) === 0) {
-        ftp_mkdir($ftp_conn, $fullPath); // 创建目录
-    } else {
-        // 处理非法路径，如记录日志或返回错误
-        error_log("Invalid FTP directory path attempted: " . $dir);
-        echo "Error: Invalid directory path.";
-    }
-}
-
-function sanitizeInput($input) {
-    // 递归移除'../'，并处理URL编码
-    $input = str_replace('..', '', $input);
-    $input = str_replace('%!e(MISSING)%!e(MISSING)%!f(MISSING)', '', $input, $count); // 移除url编码的'../'
-    $input = str_replace('%!E(MISSING)%!E(MISSING)%!F(MISSING)', '', $input, $count);
-
-    // 如果有替换发生，则再次调用该函数以确保移除所有绕过
-    if ($count > 0) {
-        $input = sanitizeInput($input);
-    }
-    return $input;
-}
-?>
-```
 CODE
 	desc: <<<CODE
-### 风险描述
 
-1.  **风险原理**
-    即使存在一定的过滤机制，但如果过滤规则不够严格或存在漏洞，攻击者仍有可能绕过这些限制，访问到不应访问的文件或目录，从而导致未授权访问。
-
-2.  **触发场景**
-    - 应用程序使用`preg_replace`或`str_replace`过滤用户输入的目录路径，但未能充分考虑到各种绕过技术，如双重编码、UTF-8编码等。
-
-    ```php
-    <?php
-    // 低风险示例：只移除'../'，但未处理双重编码
-    $dir = $_GET['dir'];
-    $sanitizedDir = preg_replace('/\.\.\//', '', $dir); // 移除../
-    ftp_mkdir($ftp_conn, $sanitizedDir); // 仍然可能存在风险
-    ?>
-    ```
-
-3.  **潜在影响**
-    - 攻击者可以通过构造特殊的目录路径，访问服务器上的敏感文件或目录，例如配置文件、日志文件等。
-    - 在某些情况下，攻击者甚至可以执行任意代码，从而控制整个服务器。
 CODE
 	level: "low",
 }

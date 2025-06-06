@@ -52,62 +52,16 @@ $algorithm#{
 }-> as $sink;
 
 alert $sink for {
-	solution: <<<CODE
-### 修复建议
-
-#### 1. 弃用弱加密算法
-停止使用被认为不安全或已被破解的加密算法。避免在 `AlgorithmParameters.getInstance()` 方法中指定此类算法。
-
-#### 2. 采用现代强加密算法
-改用当前业界推荐的强加密算法，例如高级加密标准（AES）。在选择算法时，应考虑算法的强度、密钥长度、工作模式以及Padding方案。
-
-```java
-// 修复代码示例：使用更安全的 AES 算法
-import java.security.AlgorithmParameters;
-
-public class SecureAlgorithmParametersExample {
-    public static void main(String[] args) {
-        try {
-            // 使用更安全的 AES 算法，并指定合适的模式和Padding（例如 AES/CBC/PKCS5Padding）
-            AlgorithmParameters params = AlgorithmParameters.getInstance("AES"); 
-            System.out.println("Using Algorithm: " + params.getAlgorithm());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-}
-```
-
-#### 3. 保持依赖更新
-及时更新Java运行时环境(JRE)以及相关的安全提供者库，以确保使用了最新的、已知无弱点的密码学实现。
-
-#### 4. 安全配置审计
-定期审计应用程序中使用的加密算法和配置，确保符合最新的安全标准和最佳实践。
-
-CODE
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   该规则用于检测Java代码中是否使用了不安全的加密算法。使用已破解或存在风险的加密算法可能会使敏感数据面临泄露的风险。这些算法由于存在已知的漏洞或弱点，可能无法为数据提供足够的安全性。
-
-2. **触发场景**
-   // 存在漏洞的代码示例
-   ```java
-   AlgorithmParameters params = AlgorithmParameters.getInstance("DES"); // 使用不安全的 DES 算法
-   ```
-   在此场景中，`getInstance()` 方法被用于获取一个已知的弱加密算法实例，如DES。
-
-3. **潜在影响**
-   - 数据泄露：敏感信息可能被未授权的攻击者解密。
-   - 合规风险：使用不安全的加密算法可能违反行业或法律标准。
-   - 信誉损失：安全漏洞的披露可能损害组织的声誉。
-
-CODE
 	level: "low",
 	message: "发现Java代码中使用了不安全的加密算法",
 	title: "Detect Java java.security.AlgorithmParameters use of broken or risky encryption algorithm",
 	title_zh: "检测Java java.security.AlgorithmParameters使用不安全的加密算法",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
 }
 
 desc(

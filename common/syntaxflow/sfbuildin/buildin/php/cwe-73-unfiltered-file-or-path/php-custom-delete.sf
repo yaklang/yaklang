@@ -104,76 +104,15 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high for {
-	title: "Unsafe File Operation Without Validation",
 	title_zh: "未经验证的文件操作",
 	solution: <<<CODE
-### 修复建议
-
-#### 1. 输入验证和清理
-
-*   在文件操作之前，验证并清理用户输入，确保只允许预期的字符和格式。
-*   使用白名单方法，只允许已知的安全字符和路径。
-
-#### 2. 路径规范化
-
-*   使用 `realpath()` 函数来解析和规范化路径，消除其中的 `..`，防止目录遍历攻击。
-*   检查规范化后的路径是否处于预期的安全目录范围内。
-
-#### 3. 权限控制
-
-*   确保PHP运行的用户拥有执行所需操作的最小权限。
-*   避免使用具有过高权限的用户账户运行PHP。
-
-#### 4. 安全的文件操作函数
-
-*   使用安全的文件操作函数，如 `move_uploaded_file()` 处理文件上传。
-*   避免直接拼接用户输入到文件路径中。
-
-**修复示例：**
-
-```php
-<?php
-$filename = $_GET['filename'];
-$base_dir = '/var/www/html/uploads/'; // 限制文件操作在指定目录下
-
-// 规范化用户提供的路径
-$real_path = realpath($base_dir . $filename);
-
-// 检查规范化后的路径是否仍然在预期的安全目录下
-if ($real_path !== false && strpos($real_path, $base_dir) === 0) {
-    // 文件路径安全，可以进行文件操作
-    // 例如： stat($real_path);
-    echo 'allowed';
-} else {
-    // 非法路径或路径超出范围
-    die('非法文件或目录');
-}
-
-
-?>
-```
 
 CODE
 	desc: <<<CODE
-### 漏洞描述
 
-#### 1. 漏洞原理
-
-当应用程序允许用户控制文件或路径名，而未对输入进行充分的验证和清理时，攻击者可以操纵这些输入来访问或修改不应被访问的文件或目录。
-
-#### 2. 触发场景
-
-*   使用未经清理的GET或POST参数作为文件名或路径。
-*   使用 `opendir()`，`include()`，`require()` 等函数时，未对参数进行验证。
-
-#### 3. 潜在影响
-
-*   读取或写入任意文件。
-*   执行任意代码（如果允许上传恶意文件）。
-*   信息泄露。
-*   拒绝服务。
 CODE
 	level: "high",
+	title: "Unsafe File Operation Without Validation",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -186,140 +125,24 @@ alert $mid for {
 	title: "Insecure File Type Detection",
 	title_zh: "不安全的文件类型检测",
 	solution: <<<CODE
-### 修复建议
-
-#### 1. 多重文件类型验证
-
-*   同时使用MIME类型检查、文件扩展名检查和文件内容签名检查来判断文件的真实类型。
-*   不要仅仅依赖客户端提供的MIME类型。
-
-#### 2. 文件名处理
-
-*   上传文件时不要直接使用客户端提供的文件名和扩展名。
-*   生成一个唯一且不可预测的新文件名，并存储原始文件名在数据库中。
-
-#### 3. 内容扫描
-
-*   使用病毒扫描软件或自定义脚本扫描上传的文件，查找恶意代码。
-
-**修复示例：**
-
-```php
-<?php
-$filename = $_FILES['file']['name'];
-$tmp_name = $_FILES['file']['tmp_name'];
-
-// 获取文件扩展名
-$file_ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-
-// 检查MIME类型
-$finfo = finfo_open(FILEINFO_MIME_TYPE);
-$mime_type = finfo_file($finfo, $tmp_name);
-finfo_close($finfo);
-
-// 允许的文件类型
-$allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
-
-// 检查文件类型和扩展名
-if (in_array($mime_type, $allowed_types) && in_array($file_ext, ['jpg', 'png', 'gif'])) {
-    // 生成新的文件名
-    $new_filename = uniqid('', true) . '.' . $file_ext;
-    $destination = '/var/www/html/uploads/' . $new_filename;
-    move_uploaded_file($tmp_name, $destination);
-    echo '上传成功';
-} else {
-    die('非法文件类型');
-}
-?>
-```
 
 CODE
 	desc: <<<CODE
-### 漏洞描述
 
-#### 1. 漏洞原理
-
-当应用程序仅仅依赖文件扩展名或客户端提供的MIME类型来判断文件类型时，攻击者可以通过伪造文件类型绕过验证。
-
-#### 2. 触发场景
-
-*   上传文件时，仅仅检查文件扩展名是否在允许的列表中。
-*   使用客户端提供的MIME类型进行文件类型验证。
-
-#### 3. 潜在影响
-
-*   上传恶意的文件，如PHP脚本。
-*   执行任意代码。
-*   跨站脚本攻击（XSS）。
 CODE
 	level: "mid",
 }
 $all - $high - $mid as $low
 alert $low for {
+	solution: <<<CODE
+
+CODE
 	desc: <<<CODE
-### 风险描述
 
-#### 1. 风险原理
-
-当应用程序的文件存储路径配置不当，可能导致敏感文件被存储在不安全的位置，或者未授权的用户可以访问这些文件。
-
-#### 2. 触发场景
-
-*   使用默认的文件存储路径配置。
-*   使用相对路径作为文件存储路径。
-*   文件存储路径没有进行适当的访问权限控制。
-
-#### 3. 潜在影响
-
-*   敏感信息泄露。
-*   未经授权的文件访问。
-*   拒绝服务（如果恶意文件覆盖了重要文件）。
 CODE
 	level: "low",
 	title: "Potential File Storage Path Misconfiguration",
 	title_zh: "潜在的文件存储路径配置问题",
-	solution: <<<CODE
-### 修复建议
-
-#### 1. 明确指定文件存储路径
-
-在配置文件中明确指定文件存储路径，不要依赖默认设置。
-
-#### 2. 避免使用相对路径
-
-使用绝对路径作为文件存储路径，避免使用相对路径。
-
-#### 3. 限制访问权限
-
-确保只有授权的用户可以访问文件存储路径。
-
-#### 4. 定期审计
-
-定期审计文件存储路径配置，确保其安全性。
-
-**修复示例：**
-
-```php
-<?php
-// 在配置文件中定义文件存储路径
-define('UPLOAD_DIR', '/var/www/html/uploads/');
-
-$filename = $_FILES['file']['name'];
-$tmp_name = $_FILES['file']['tmp_name'];
-
-// 确保文件存储路径存在
-if (!is_dir(UPLOAD_DIR)) {
-    mkdir(UPLOAD_DIR, 0777, true);
-}
-
-$destination = UPLOAD_DIR . '/' . $filename;
-move_uploaded_file($tmp_name, $destination);
-
-echo '上传成功';
-?>
-```
-
-CODE
 }
 desc(
 	lang: "php"

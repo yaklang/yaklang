@@ -18,10 +18,16 @@ $sink -{
 $data?{have:".Ctx.ResponseWriter.Header"} as $high
 
 alert $high for {
-    title: 'CRLF Injection detected',
-    title_zh: '检测到CRLF注入',
-    type: 'vuln',
-    level: 'high',
+	title_zh: "检测到CRLF注入",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	type: "vuln",
+	title: "CRLF Injection detected",
 }
 
 desc(

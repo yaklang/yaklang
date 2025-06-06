@@ -162,71 +162,19 @@ check $jwt;
 $jwt.parser().setSigningKey().parse() as $riskParse;
 
 alert $riskParse for {
-	title: "Check Java JWT Unsafe Parse Method",
-	title_zh: "检查 Java JWT 不安全的解析方法",
-	solution: <<<CODE
-### 修复建议
-
-#### 1. 强制验证签名算法
-
-在解析 JWT 时，务必验证其签名算法是否为预期的安全强度算法（如 HS256, RS256 等），拒绝使用 `none` 或其他弱算法签名的 JWT。
-
-```java
-// 修复代码示例：明确指定允许的签名算法
-import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.security.Keys;
-
-import java.security.Key;
-
-public class JwtValidator {
-    private final Key signingKey;
-
-    public JwtValidator(String base64Secret) {
-        this.signingKey = Keys.hmacShaKeyFor(base64Secret.getBytes());
-    }
-
-    public Claims validateToken(String token) throws JwtException {
-        return Jwts.parserBuilder()
-                   .setSigningKey(signingKey)
-                   .requireSignatureAlgorithm(SignatureAlgorithm.HS256) // 强制指定签名算法
-                   .build()
-                   .parseClaimsJws(token)
-                   .getBody;
-    }
-}
-```
-CODE
-	type: "vuln",
 	risk: "auth-bypass",
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-
-JWT（JSON Web Tokens）是一种用于在各方之间安全传输信息的开放标准。尽管 JWT 本身是格式化的，但其安全性依赖于正确的使用和配置。本规则检测 Java 应用中在使用 JWT 时可能导致的安全漏洞，主要包括：
-
-- **不安全的解析方法（Unsafe Parsing）**：一些 JWT 库允许使用不安全的解析方法，例如直接调用 `Jwts.parser().setSigningKey().parse()` 方法，而没有对签名算法进行严格验证。这使得攻击者可能通过修改 JWT 的 header，将签名算法改为 `none` 或其他弱算法，从而伪造合法的 JWT，绕过身份验证和授权。
-
-2. **触发场景**
-
-这些漏洞通常在使用 `io.jsonwebtoken` 等 JWT 库处理 JWT 的解析、签名和验证过程中产生。例如：
-
-- 直接使用 `Jwts.parser().setSigningKey(SigningKey).parse(token)` 而未对 JWT 的 header 进行额外的验证。
-
-3. **潜在影响**
-
-这些 JWT 安全问题可能导致严重的后果，包括：
-
-- **身份验证绕过（Authentication Bypass）**：攻击者可以伪造有效的 JWT，无需提供正确的凭证即可访问受保护的资源或API。
-- **授权绕过（Authorization Bypass）**：攻击者可以修改 JWT 中的权限信息，获得超出其应有权限的访问能力。
-
-总而言之，不当的 JWT 使用可能严重破坏应用程序的安全性，允许攻击者获取未授权访问和控制。
-CODE
-	level: "mid",
 	message: "JWT uses the unsafe parse method",
 	message_zh: "JWT 使用了不安全的 parse 方法",
+	title: "Check Java JWT Unsafe Parse Method",
+	title_zh: "检查 Java JWT 不安全的解析方法",
+	level: "mid",
+	type: "vuln",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
 }
 
 .signWith?{<typeName>?{have:'io.jsonwebtoken'}}(,,*  as $key)
@@ -234,112 +182,34 @@ $key?{opcode:const} as $simpleKey;
 $key?{opcode: call && <getCallee>?{<getObject><name>?{have:base64 || BASE64  || Base64}}(*<slice(index=1)>*?{opcode: const}<var(base64EncodedKey)>) } as $sink;
 $simpleKey + $base64EncodedKey as $hardcodedKey;
 alert $hardcodedKey for {
-	solution: <<<CODE
-### 修复建议
-
-#### 1. 安全管理密钥
-
-避免在代码中硬编码密钥。密钥应存储在安全的位置，例如：
-
-- **环境变量**：在应用程序外部配置密钥，避免将其直接包含在源代码中。
-- **秘钥管理服务（KMS）**：使用专业的云服务或内部系统来安全地存储、管理和轮换密钥。
-- **安全配置文件**：将密钥存储在受适当权限保护的配置文件中，并确保文件不被意外泄露。
-
-```java
-// 修复代码示例：从环境变量读取密钥
-public class JwtService {
-    private static final String JWT_SECRET = System.getenv("JWT_SECRET_KEY"); // 从环境变量获取密钥
-
-    // ... 其他代码使用 JWT_SECRET
-}
-```
-CODE
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-
-JWT（JSON Web Tokens）是一种用于在各方之间安全传输信息的开放标准。尽管 JWT 本身是格式化的，但其安全性依赖于正确的使用和配置。本规则检测 Java 应用中在使用 JWT 时可能导致的安全漏洞，主要包括：
-
-- **硬编码密钥（Hardcoded Keys）**：将用于签名和验证 JWT 的密钥直接硬编码在代码中，极易被泄露。一旦密钥泄露，攻击者就可以轻松地伪造有效的 JWT，从而窃取敏感信息、获取未授权访问权限或执行其他恶意操作。
-
-2. **触发场景**
-
-这些漏洞通常在使用 `io.jsonwebtoken` 等 JWT 库处理 JWT 的解析、签名和验证过程中产生。例如：
-
-- 将密钥定义为代码中的常量字符串，如 `private static final String JWT_PASSWORD = "your_secret_key";`。
-
-3. **潜在影响**
-
-这些 JWT 安全问题可能导致严重的后果，包括：
-
-- **身份验证绕过（Authentication Bypass）**：攻击者可以伪造有效的 JWT，无需提供正确的凭证即可访问受保护的资源或API。
-- **授权绕过（Authorization Bypass）**：攻击者可以修改 JWT 中的权限信息，获得超出其应有权限的访问能力。
-- **数据泄露或篡改**：攻击者可以通过伪造 JWT 获取或修改敏感数据。
-
-总而言之，不当的 JWT 使用可能严重破坏应用程序的安全性，允许攻击者获取未授权访问和控制。
-CODE
+	level: "high",
 	type: "vuln",
 	message: "JWT uses the hardcoded key",
+	title: "Check Java JWT Hardcoded Key",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	title_zh: "检查 Java JWT 硬编码的密钥",
 	message_zh: "JWT 使用了硬编码的密钥",
 	risk: "auth-bypass",
-	title: "Check Java JWT Hardcoded Key",
-	title_zh: "检查 Java JWT 硬编码的密钥",
-	level: "high",
 }
 
 alert $sink for {
 	title: "Check Java JWT Insecure Key Usage",
 	solution: <<<CODE
-### 修复建议
 
-#### 1. 安全管理密钥
-
-避免在代码中硬编码密钥。密钥应存储在安全的位置，例如：
-
-- **环境变量**：在应用程序外部配置密钥，避免将其直接包含在源代码中。
-- **秘钥管理服务（KMS）**：使用专业的云服务或内部系统来安全地存储、管理和轮换密钥。
-- **安全配置文件**：将密钥存储在受适当权限保护的配置文件中，并确保文件不被意外泄露。
-
-```java
-// 修复代码示例：从环境变量读取密钥
-public class JwtService {
-    private static final String JWT_SECRET = System.getenv("JWT_SECRET_KEY"); // 从环境变量获取密钥
-
-    // ... 其他代码使用 JWT_SECRET
-}
-```
-CODE
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-
-JWT（JSON Web Tokens）是一种用于在各方之间安全传输信息的开放标准。尽管 JWT 本身是格式化的，但其安全性依赖于正确的使用和配置。本规则检测 Java 应用中在使用 JWT 时可能导致的安全漏洞，主要包括：
-
-- **不安全的密钥管理（Insecure Key Management）**：从不安全或易于访问的位置（如未加密的配置文件、环境变量以外的非安全存储）获取 JWT 密钥。这增加了密钥被未经授权访问的风险，与硬编码密钥类似，可能导致密钥泄露和相关的安全漏洞。
-
-2. **触发场景**
-
-这些漏洞通常在使用 `io.jsonwebtoken` 等 JWT 库处理 JWT 的解析、签名和验证过程中产生。例如：
-
-- 从不安全的配置文件或环境变量中读取密钥。
-
-3. **潜在影响**
-
-这些 JWT 安全问题可能导致严重的后果，包括：
-
-- **身份验证绕过（Authentication Bypass）**：攻击者可以伪造有效的 JWT，无需提供正确的凭证即可访问受保护的资源或API。
-- **授权绕过（Authorization Bypass）**：攻击者可以修改 JWT 中的权限信息，获得超出其应有权限的访问能力。
-- **数据泄露或篡改**：攻击者可以通过伪造 JWT 获取或修改敏感数据。
-
-总而言之，不当的 JWT 使用可能严重破坏应用程序的安全性，允许攻击者获取未授权访问和控制。
 CODE
 	message: "JWT uses the unsafe key",
-	risk: "auth-bypass",
-	title_zh: "检查 Java JWT 不安全的密钥使用",
-	level: "mid",
 	message_zh: "JWT 使用了不安全的密钥",
+	title_zh: "检查 Java JWT 不安全的密钥使用",
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+	risk: "auth-bypass",
 	type: "vuln",
 }
 

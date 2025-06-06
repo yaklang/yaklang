@@ -106,68 +106,10 @@ alert $high for {
 	title: "Unfiltered PHP File Manipulation Vulnerability",
 	title_zh: "PHP未过滤文件操作漏洞",
 	solution: <<<CODE
-### 修复建议
 
-#### 1. 严格校验和过滤用户输入的文件路径
-对所有来自用户输入的、用于文件操作的路径进行严格的校验，确保文件操作只在预期的目录下进行。
-```php
-<?php
-    // 修复代码示例：限制文件访问在特定目录内
-    $base_dir = '/var/www/html/uploads/';
-    $filename = basename($_GET['file']); // 使用 basename() 过滤路径信息，只保留文件名
-    $filepath = $base_dir . $filename;
-
-    // 校验文件路径是否在预期目录内，虽然 basename() 过滤了目录，但保险起见可以再次检查
-    if (strpos(realpath($filepath), realpath($base_dir)) === 0) {
-        readfile($filepath); // 处理过滤和校验后的文件路径
-    } else {
-        echo "非法文件访问";
-    }
-?>
-```
-
-#### 2. 使用白名单机制限制可访问的文件
-如果应用程序只需要访问特定的一组文件，可以使用白名单机制，只允许访问预定义的文件列表。
-```php
-<?php
-    // 修复代码示例：使用白名单
-    $allowed_files = ['report.txt', 'config.ini', 'data.csv'];
-    $filename = $_GET['file'];
-
-    if (in_array($filename, $allowed_files)) {
-        readfile('/var/www/html/data/' . $filename);
-    } else {
-        echo "文件不存在或不允许访问";
-    }
-?>
-```
-
-#### 3. 避免直接拼接用户输入的路径
-尽量避免将用户输入直接拼接到文件路径中，而是采用更安全的函数或方法。
-
-#### 4. 配置目录权限
-为存放用户可访问文件的目录设置严格的权限，限制Web服务器进程的读写执行权限，即使发生路径遍历，也能降低危害。
 CODE
 	desc: <<<CODE
-### 漏洞描述
 
-1. **漏洞原理**
-攻击者可以利用应用程序中存在的漏洞，未经过滤或验证地直接使用用户提供的输入来执行文件操作。这可能允许攻击者读取、写入或删除服务器上的任意文件，从而危害服务器安全。
-
-2. **触发场景**
-```php
-<?php
-    // 存在漏洞的代码示例
-    $filename = $_GET['file']; // 直接获取用户输入的文件名
-    unlink($filename); // 删除文件
-?>
-```
-攻击者可以输入 `/etc/passwd` 作为 `file` 参数的值，从而删除 `/etc/passwd` 文件。
-
-3. **潜在影响**
-- 泄露或篡改服务器上的敏感信息。
-- 删除关键系统文件，导致服务不可用或系统崩溃。
-- 执行恶意代码，控制服务器。
 CODE
 	level: "high",
 	type: "vuln",
@@ -186,140 +128,27 @@ alert $middle for {
 	title: "PHP File Operation with Insufficient Filtering",
 	title_zh: "PHP文件操作，过滤不足",
 	solution: <<<CODE
-### 修复建议
 
-#### 1. 严格校验和过滤用户输入的文件路径
-对所有来自用户输入的、用于文件操作的路径进行严格的校验，确保文件操作只在预期的目录下进行。
-```php
-<?php
-    // 修复代码示例：限制文件访问在特定目录内
-    $base_dir = '/var/www/html/uploads/';
-    $filename = basename($_GET['file']); // 使用 basename() 过滤路径信息，只保留文件名
-    $filepath = $base_dir . $filename;
-
-    // 校验文件路径是否在预期目录内，虽然 basename() 过滤了目录，但保险起见可以再次检查
-    if (strpos(realpath($filepath), realpath($base_dir)) === 0) {
-        readfile($filepath); // 处理过滤和校验后的文件路径
-    } else {
-        echo "非法文件访问";
-    }
-?>
-```
-
-#### 2. 使用白名单机制限制可访问的文件
-如果应用程序只需要访问特定的一组文件，可以使用白名单机制，只允许访问预定义的文件列表。
-```php
-<?php
-    // 修复代码示例：使用白名单
-    $allowed_files = ['report.txt', 'config.ini', 'data.csv'];
-    $filename = $_GET['file'];
-
-    if (in_array($filename, $allowed_files)) {
-        readfile('/var/www/html/data/' . $filename);
-    } else {
-        echo "文件不存在或不允许访问";
-    }
-?>
-```
-
-#### 3. 避免直接拼接用户输入的路径
-尽量避免将用户输入直接拼接到文件路径中，而是采用更安全的函数或方法。
-
-#### 4. 配置目录权限
-为存放用户可访问文件的目录设置严格的权限，限制Web服务器进程的读写执行权限，即使发生路径遍历，也能降低危害。
 CODE
 	desc: <<<CODE
-### 风险描述
 
-1. **风险原理**
-尽管应用程序尝试使用函数来处理从用户接收的文件名，但这些函数可能不足以提供足够的保护。例如，一个函数可能只删除基本路径，但没有防止目录遍历攻击。
-
-2. **触发场景**
-```php
-<?php
-    // 存在风险的代码示例
-    $filename = $_GET['file'];
-    $filename = undefined($filename); // 不充分的过滤函数
-    file_get_contents($filename);
-?>
-```
-
-3. **潜在影响**
-- 可能允许攻击者访问未经授权的文件。
-- 敏感数据可能暴露。
 CODE
 }
 $sink - $high - $middle as $low
 
 alert $low for {
+	title: "PHP File Operation with Filtering Mechanism",
+	title_zh: "PHP文件操作，存在过滤机制",
 	solution: <<<CODE
-### 修复建议
 
-#### 1. 严格校验和过滤用户输入的文件路径
-对所有来自用户输入的、用于文件操作的路径进行严格的校验，确保文件操作只在预期的目录下进行。
-```php
-<?php
-    // 修复代码示例：限制文件访问在特定目录内
-    $base_dir = '/var/www/html/uploads/';
-    $filename = basename($_GET['file']); // 使用 basename() 过滤路径信息，只保留文件名
-    $filepath = $base_dir . $filename;
-
-    // 校验文件路径是否在预期目录内，虽然 basename() 过滤了目录，但保险起见可以再次检查
-    if (strpos(realpath($filepath), realpath($base_dir)) === 0) {
-        readfile($filepath); // 处理过滤和校验后的文件路径
-    } else {
-        echo "非法文件访问";
-    }
-?>
-```
-
-#### 2. 使用白名单机制限制可访问的文件
-如果应用程序只需要访问特定的一组文件，可以使用白名单机制，只允许访问预定义的文件列表。
-```php
-<?php
-    // 修复代码示例：使用白名单
-    $allowed_files = ['report.txt', 'config.ini', 'data.csv'];
-    $filename = $_GET['file'];
-
-    if (in_array($filename, $allowed_files)) {
-        readfile('/var/www/html/data/' . $filename);
-    } else {
-        echo "文件不存在或不允许访问";
-    }
-?>
-```
-
-#### 3. 避免直接拼接用户输入的路径
-尽量避免将用户输入直接拼接到文件路径中，而是采用更安全的函数或方法。
-
-#### 4. 配置目录权限
-为存放用户可访问文件的目录设置严格的权限，限制Web服务器进程的读写执行权限，即使发生路径遍历，也能降低危害。
 CODE
 	desc: <<<CODE
-### 风险描述
 
-1. **风险原理**
-应用程序使用已知的过滤函数来清理用户提供的文件名。然而，仍有必要审查这些过滤器的有效性和充分性。
-
-2. **触发场景**
-```php
-<?php
-    // 存在风险的代码示例
-    $filename = $_GET['file'];
-    $filename = filter($filename); // 执行过滤
-    file_put_contents("1.php",$filename);
-?>
-```
-
-3. **潜在影响**
-- 过滤函数可能存在缺陷，允许攻击者绕过限制。
-- 可能会引入其他未预料到的行为。
 CODE
 	level: "low",
 	type: "low",
-	title: "PHP File Operation with Filtering Mechanism",
-	title_zh: "PHP文件操作，存在过滤机制",
-}desc(
+}
+desc(
 	lang: php
 	alert_min: 3
 	alert_low: 1

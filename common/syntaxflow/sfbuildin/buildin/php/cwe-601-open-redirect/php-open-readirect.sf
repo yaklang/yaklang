@@ -91,62 +91,16 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high for {
-	level: "high",
-	type: "vuln",
 	title: "Check PHP Unvalidated Redirect Vulnerability",
 	title_zh: "检测PHP未验证重定向漏洞",
 	solution: <<<CODE
-### 修复建议
 
-#### 1. 使用白名单验证URL
-创建一个允许重定向到的安全URL列表，并检查用户提供的URL是否在此列表中。
-```php
-<?php
-$safe_urls = [
-    'http://example.com',
-    'https://example.com',
-];
-
-$url = $_GET['url'];
-
-if (in_array($url, $safe_urls)) {
-    header('Location: ' . $url);
-    exit;
-} else {
-    // 处理不安全URL，例如显示错误信息
-    echo '不安全的URL';
-}
-?>
-```
-
-#### 2. 使用相对URL
-如果可能，使用相对URL进行重定向，避免完全依赖用户输入。
-
-#### 3. 对URL进行清理和验证
-- 移除任何不必要的字符。
-- 确保URL使用安全的协议（https）。
-- 验证主机名是否是授权的。
 CODE
 	desc: <<<CODE
-### 漏洞描述
-此漏洞发生在当应用未验证用户提供的数据就将其用于重定向时。攻击者可以利用此漏洞将用户重定向到恶意站点。
 
-1. **漏洞原理**
-如果应用接受一个未验证的URL作为重定向目标，攻击者可以修改此URL以指向一个恶意站点。
-
-2. **触发场景**
-```php
-<?php
-$url = $_GET['url'];
-header('Location: ' . $url);
-exit;
-?>
-```
-
-3. **潜在影响**
-- 用户可能会被重定向到钓鱼网站，从而泄露凭据和其他敏感信息。
-- 用户可能会在不知情的情况下下载恶意软件。
 CODE
+	level: "high",
+	type: "vuln",
 }
 $all<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -156,87 +110,30 @@ CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
 alert $mid for {
-	title_zh: "检测PHP重定向验证不充分",
 	solution: <<<CODE
-### 修复建议
 
-#### 1. 强化白名单验证
-扩展白名单以覆盖所有可接受的域名，并定期审查以移除任何不再使用的条目。
-
-#### 2. 多重验证
-除了白名单，还应实施其他验证措施，如URL格式验证和协议验证。
-
-#### 3. 严格过滤输入
-- 移除任何不必要的字符。
-- 使用安全协议（https）。
-- 验证主机名。
 CODE
 	desc: <<<CODE
-### 漏洞描述
-即使存在过滤函数，如果这些函数未能充分验证目标域名的合法性，仍然可能存在风险。
 
-1. **漏洞原理**
-不完整的验证可能允许攻击者绕过保护措施，并重定向到恶意站点。
-
-2. **触发场景**
-```php
-<?php
-$url = filter_var($_GET['url'], FILTER_SANITIZE_URL);
-header('Location: ' . $url);
-exit;
-?>
-```
-
-3. **潜在影响**
-- 用户可能会被重定向到钓鱼网站。
-- 用户可能会下载恶意软件。
 CODE
 	level: "mid",
 	type: "mid",
 	title: "Check PHP Insufficient Redirect Validation",
+	title_zh: "检测PHP重定向验证不充分",
 }
 $sink - $high - $mid as $low
 
 alert $low for {
-	title: "Check PHP Potential Redirect Validation Bypass",
-	title_zh: "检测PHP重定向验证潜在绕过风险",
-	solution: <<<CODE
-### 修复建议
-
-#### 1. 审查过滤逻辑
-定期审查所有过滤函数，以确保它们仍然有效并能防止绕过。
-
-#### 2. 使用最新的安全实践
-保持对最新的安全漏洞和攻击技术的了解，并相应地更新验证和过滤策略。
-
-#### 3. 实施运行时监控
-监控重定向行为，以检测和响应任何可疑活动。
-CODE
 	desc: <<<CODE
-### 风险描述
-即使使用了过滤函数，仍然可能存在验证逻辑缺陷，导致潜在的绕过风险。
 
-1. **风险原理**
-验证逻辑中的缺陷可能允许攻击者构造特殊的URL，绕过过滤并重定向到恶意站点。
-
-2. **触发场景**
-```php
-<?php
-$url = $_GET['url'];
-// 假设的验证逻辑有缺陷
-if (!preg_match('/example\\.com/', $url)) {
-    header('Location: ' . $url);
-    exit;
-}
-?>
-```
-
-3. **潜在影响**
-- 用户可能会被重定向到恶意网站。
-- 可能会损害网站的信誉。
 CODE
 	level: "low",
 	type: "low",
+	title: "Check PHP Potential Redirect Validation Bypass",
+	title_zh: "检测PHP重定向验证潜在绕过风险",
+	solution: <<<CODE
+
+CODE
 }
 desc(
 	lang: "php"
