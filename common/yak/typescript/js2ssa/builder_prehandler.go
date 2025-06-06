@@ -14,7 +14,9 @@ func (s *SSABuilder) Create() ssa.Builder {
 			ssa.WithLanguageConfigBind(true), // 设置处理语言闭包的副作用的策略
 			ssa.WithLanguageConfigSupportClass(true),
 			ssa.WithLanguageConfigIsSupportClassStaticModifier(true),
-			ssa.WithLanguageBuilder(s)),
+			ssa.WithLanguageBuilder(s),
+			ssa.WithLanguageConfigTryBuildValue(true),
+		),
 	}
 }
 

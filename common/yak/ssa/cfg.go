@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -34,6 +35,10 @@ const (
 	SwitchDefault = "switch.default"
 	SwitchHandler = "switch.handler"
 	SwitchBlock   = "switch.block"
+
+	// Label jmp
+	LabelBlock = "label.block"
+	LabelDone  = "label.done"
 
 	// for &&  || ?: expression
 	AndExpressionVariable     = "and_expression"
@@ -135,13 +140,23 @@ type LoopBuilder struct {
 	condition            func() Value
 	body                 func()
 	firstExpr, thirdExpr func() []Value
+	labelName            string
 }
 
 // CreateLoopBuilder Create LoopBuilder
 func (b *FunctionBuilder) CreateLoopBuilder() *LoopBuilder {
 	return &LoopBuilder{
-		enter:   b.CurrentBlock,
-		builder: b,
+		enter:     b.CurrentBlock,
+		builder:   b,
+		labelName: "",
+	}
+}
+
+func (b *FunctionBuilder) CreateLoopBuilderWithLabelName(labelName string) *LoopBuilder {
+	return &LoopBuilder{
+		enter:     b.CurrentBlock,
+		builder:   b,
+		labelName: labelName,
 	}
 }
 
@@ -174,7 +189,13 @@ func (lb *LoopBuilder) Finish() {
 	condition := SSABuild.NewBasicBlockUnSealed(LoopCondition)
 	body := SSABuild.NewBasicBlockNotAddBlocks(LoopBody)
 	exit := SSABuild.NewBasicBlockNotAddBlocks(LoopExit)
-	latch := SSABuild.NewBasicBlockNotAddBlocks(LoopLatch)
+	latchName := ""
+	if lb.labelName != "" {
+		latchName = fmt.Sprintf("%s-%s", LoopLatch, lb.labelName)
+	} else {
+		latchName = LoopLatch
+	}
+	latch := SSABuild.NewBasicBlockNotAddBlocks(latchName)
 
 	LoopBuilder := ssautil.NewLoopStmt(ssautil.ScopedVersionedTableIF[Value](scope), func(name string) Value {
 		phi := NewPhi(condition, name)
@@ -600,7 +621,8 @@ func (t *SwitchBuilder) Finish() {
 	condb := builder.NewBasicBlockNotAddBlocks("switch-condition")
 	done := builder.NewBasicBlockNotAddBlocks(SwitchDone)
 	defaultb := builder.NewBasicBlockNotAddBlocks(SwitchDefault)
-	t.enter.AddSucc(condb)
+	builder.EmitJump(condb)
+	//t.enter.AddSucc(condb)
 	condb.AddSucc(defaultb)
 
 	sLabels := make([]SwitchLabel, 0, t.caseSize)
@@ -707,8 +729,14 @@ func (t *SwitchBuilder) Finish() {
 
 	builder.CurrentBlock = condb
 	builder.EmitSwitch(cond, defaultb, sLabels)
-	addToBlocks(done)
+
+	if len(done.Preds) == 0 {
+		done.finish = true
+	} else {
+		addToBlocks(done)
+	}
 	builder.CurrentBlock = done
+
 	end := switchBuilder.Build(generatePhi(builder, done, t.enter))
 	done.SetScope(end)
 }
@@ -789,6 +817,62 @@ func (t *GotoBuilder) Finish() func() {
 	}
 }
 
+type LabelBlockBuilder struct {
+	builder   *FunctionBuilder
+	enter     *BasicBlock
+	labelName string
+
+	labelBlock func()
+}
+
+func (b *FunctionBuilder) CreateLabelBlockBuilder(labelName string) *LabelBlockBuilder {
+	return &LabelBlockBuilder{
+		builder:   b,
+		enter:     b.CurrentBlock,
+		labelName: labelName,
+	}
+}
+
+// SetLabelBlock : Label block (LabelBlockBuilder should always have a label block)
+func (t *LabelBlockBuilder) SetLabelBlock(f func()) {
+	t.labelBlock = f
+}
+
+func (t *LabelBlockBuilder) Finish() {
+	builder := t.builder
+	enterBlock := t.enter
+	scope := enterBlock.ScopeTable
+	labeledBlock := builder.NewBasicBlockNotAddBlocks(fmt.Sprintf("%s-%s", LabelBlock, t.labelName))
+	done := builder.NewBasicBlockNotAddBlocks(fmt.Sprintf("%s-%s", LabelDone, t.labelName))
+
+	labelBlockBuilder := ssautil.NewLabelBlockStmt(ssautil.ScopedVersionedTableIF[Value](scope), t.labelName)
+
+	labelBlockBuilder.SetLabelBlock(func(svt ssautil.ScopedVersionedTableIF[Value]) ssautil.ScopedVersionedTableIF[Value] {
+		builder.EmitJump(labeledBlock)
+		builder.CurrentBlock = labeledBlock
+		builder.CurrentBlock.SetScope(svt)
+
+		addToBlocks(labeledBlock)
+		builder.AddLabel(t.labelName, done)
+		if t.labelBlock != nil {
+			builder.PushTarget(labelBlockBuilder, done, nil, nil)
+			t.labelBlock()
+			builder.PopTarget()
+		}
+		return builder.CurrentBlock.ScopeTable
+	})
+
+	doneScope := labelBlockBuilder.Build(generatePhi(builder, labeledBlock, enterBlock))
+
+	done.SetScope(doneScope)
+	builder.EmitJump(done)
+	builder.CurrentBlock = done
+
+	addToBlocks(done)
+
+}
+
+// LabelBuilder is a builder for label statement
 type LabelBuilder struct {
 	b *FunctionBuilder
 

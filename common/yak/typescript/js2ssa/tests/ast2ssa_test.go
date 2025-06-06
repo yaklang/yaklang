@@ -18,6 +18,96 @@ println(a)
 `, []string{"1"}, t)
 }
 
+func TestBasicBlock(t *testing.T) {
+	t.Parallel()
+	// without "use strict" prologue directive
+	ssatest.CheckPrintlnValue(`
+{
+	{
+		a = 1
+		println(a)
+	}
+	println(a)
+}
+println(a)
+{
+	println(a)
+}
+`, []string{"1", "1", "1", "1"}, t)
+
+	// with "use strict" prologue directive
+	ssatest.CheckPrintlnValue(`
+"use strict";
+{
+	{
+		a = 1
+		println(a)
+	}
+	println(a)
+}
+println(a)
+{
+	println(a)
+}
+`, []string{"1", "Undefined-a", "Undefined-a", "Undefined-a"}, t)
+
+	// with "use strict" prologue directive in labeled block
+	ssatest.CheckPrintlnValue(`
+"use strict";
+test:{
+		{
+			a = 1
+			println(a)
+		}
+		println(a)
+}
+println(a)
+test1:{
+	println(a)
+}
+`, []string{"1", "Undefined-a", "Undefined-a", "Undefined-a"}, t)
+}
+
+func TestBasicIfBlock(t *testing.T) {
+	t.Parallel()
+
+	ssatest.CheckPrintlnValue(`
+if(cond){
+a=1
+}
+println(a)
+`, []string{"phi(a)[1,Undefined-a]"}, t)
+}
+
+func TestLabeledBlock(t *testing.T) {
+	t.Parallel()
+
+	code := `
+gg:{
+let b = 999
+	{
+		a = 1
+		println(a)
+	}
+	println(a)
+}
+println(a)
+println(b)
+{
+	println(a)
+}
+`
+	prog, err := ssaapi.Parse(code,
+		ssaapi.WithLanguage("js"),
+	)
+	require.NoError(t, err)
+	// 生成函数的控制流图
+	dot := ssaapi.FunctionDotGraph(prog.Program.Funcs.Values()[0])
+	log.Infof("函数控制流图DOT: \n%s", dot)
+
+	ssatest.CheckPrintlnValue(code, []string{"1", "1", "1", "Undefined-b", "1"}, t)
+}
+
 func TestBigInteger(t *testing.T) {
 	t.Parallel()
 
@@ -128,7 +218,7 @@ println(b)
 println(d)
 println(e)
 `
-	parse, err := ssaapi.Parse(code, ssaapi.WithLanguage("new-js"))
+	parse, err := ssaapi.Parse(code, ssaapi.WithLanguage("js"))
 	require.NoError(t, err)
 	parse.Show()
 }
@@ -148,7 +238,7 @@ println(d)
 println(e)
 println(f)
 `
-	parse, err := ssaapi.Parse(code, ssaapi.WithLanguage("new-js"))
+	parse, err := ssaapi.Parse(code, ssaapi.WithLanguage("js"))
 	require.NoError(t, err)
 	parse.Show()
 }
@@ -159,7 +249,7 @@ func TestNullishCoalescingBinaryExpressions(t *testing.T) {
 	code := `
 let e = (null ?? 5) ?? 10
 `
-	parse, err := ssaapi.Parse(code, ssaapi.WithLanguage("new-js"))
+	parse, err := ssaapi.Parse(code, ssaapi.WithLanguage("js"))
 	require.NoError(t, err)
 	parse.Show()
 }
@@ -178,7 +268,7 @@ println(a)
 println(b)
 println(c)
 `
-	parse, err := ssaapi.Parse(code, ssaapi.WithLanguage("new-js"))
+	parse, err := ssaapi.Parse(code, ssaapi.WithLanguage("js"))
 	require.NoError(t, err)
 	parse.Show()
 }
@@ -1054,15 +1144,117 @@ func TestBasic_variable_logical(t *testing.T) {
 			}, t)
 	})
 
-	t.Run("test ", func(t *testing.T) {
+	t.Run("test syntax block", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		{
+			t = 1 || 2
+			println(t)
+		}
+		println(t)
+		`, []string{
+			"phi(t)[1,2]", "Undefined-t",
+		}, t)
+	})
+
+	t.Run("test syntax block local", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		{
+			let t = 1 || 2
+			println(t)
+		}
+		println(t)
+		`, []string{
+			"phi(t)[1,2]", "Undefined-t",
+		}, t)
+	})
+
+	t.Run("test closure not leak", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 		a = () => {
 			let t = 1 || 2
 			println(t)
 		}
+		println(t)
 		a()
+		println(t)
 		`, []string{
-			"phi(t)[1,2]",
+			"Undefined-t", "phi(t)[1,2]", "Undefined-t",
+		}, t)
+	})
+
+	// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Strict_mode
+	t.Run("test closure side-effect which will create global variable implicitly", func(t *testing.T) {
+		t.Skip("目前还不能处理这种函数内部隐式创建全局变量，当前开启TryBuildValue选项后也只能创建函数级全局变量")
+		ssatest.CheckPrintlnValue(`
+		a = () => {
+			t = 1
+			println(t)
+		}
+		println(t)
+		a()
+		println(t)
+		`, []string{
+			"Undefined-t", "1", "side-effect(phi(t)[1,2], t)",
+		}, t)
+	})
+
+	t.Run("test function side-effect which will create global variable implicitly", func(t *testing.T) {
+		t.Skip("目前还不能处理这种函数内部隐式创建全局变量，当前开启TryBuildValue选项后也只能创建函数级全局变量")
+		ssatest.CheckPrintlnValue(`
+		function a(){
+			t = 1
+			println(t)
+		}
+		println(t)
+		a()
+		println(t)
+		`, []string{
+			"Undefined-t", "1", "side-effect(phi(t)[1,2], t)",
+		}, t)
+	})
+
+	t.Run("test closure side-effect case 1", func(t *testing.T) {
+		t.Skip("目前还不能处理这种函数内部隐式创建全局变量，当前开启TryBuildValue选项后也只能创建函数级全局变量")
+		ssatest.CheckPrintlnValue(`
+		a = () => {
+			t = 1 || 2
+			println(t)
+		}
+		println(t)
+		a()
+		println(t)
+		`, []string{
+			"Undefined-t", "phi(t)[1,2]", "side-effect(phi(t)[1,2], t)",
+		}, t)
+	})
+
+	t.Run("test closure side-effect case 2", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		var t;
+		a = () => {
+			t = 1 || 2
+			println(t)
+		}
+		println(t)
+		a()
+		println(t)
+		`, []string{
+			"Undefined-t", "phi(t)[1,2]", "side-effect(phi(t)[1,2], t)",
+		}, t)
+	})
+
+	t.Run("test closure side-effect case 3", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		let t;
+		a = () => {
+			t = 1 || 2
+			println(t)
+		}
+		println(t)
+		a()
+		println(t)
+		`, []string{
+			"Undefined-t", "phi(t)[1,2]", "side-effect(phi(t)[1,2], t)",
 		}, t)
 	})
 }
@@ -1457,8 +1649,40 @@ func TestBasic_Variable_Switch(t *testing.T) {
 		}, t)
 	})
 
-	t.Run("simple switch, has default with break label", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`
+	t.Run("simple switch, has default branch and label block without break label", func(t *testing.T) {
+		code := `
+a = 2
+outer: {
+    switch (a) {
+        case 2:
+            break ;
+            a = 3
+        case 3:
+            break ;
+            a = 4
+        default:
+            a = 1
+            println(a)
+            break ;
+    }
+    a = 100
+}
+println(a)
+			`
+		prog, err := ssaapi.Parse(code,
+			ssaapi.WithLanguage("js"),
+		)
+		require.NoError(t, err)
+		// 生成函数的控制流图
+		dot := ssaapi.FunctionDotGraph(prog.Program.Funcs.Values()[0])
+		log.Infof("函数控制流图DOT: \n%s", dot)
+		ssatest.CheckPrintlnValue(code, []string{
+			"1", "100",
+		}, t)
+	})
+
+	t.Run("simple switch, has default branch and label block without break label", func(t *testing.T) {
+		code := `
 a = 2
 outer: {
     switch (a) {
@@ -1477,8 +1701,16 @@ outer: {
     a = 100
 }
 println(a)
-			`, []string{
-			"1", "phi(a)[phi(a)[phi(a)[100,2],2],100]",
+			`
+		prog, err := ssaapi.Parse(code,
+			ssaapi.WithLanguage("js"),
+		)
+		require.NoError(t, err)
+		// 生成函数的控制流图
+		dot := ssaapi.FunctionDotGraph(prog.Program.Funcs.Values()[0])
+		log.Infof("函数控制流图DOT: \n%s", dot)
+		ssatest.CheckPrintlnValue(code, []string{
+			"1", "phi(a)[2,2,1]", // not 100
 		}, t)
 	})
 }
@@ -1505,7 +1737,7 @@ func TestFunctionCFG(t *testing.T) {
 	`
 
 	prog, err := ssaapi.Parse(code,
-		ssaapi.WithLanguage("new-js"),
+		ssaapi.WithLanguage("js"),
 	)
 	require.NoError(t, err)
 
@@ -1645,6 +1877,172 @@ func TestClass(t *testing.T) {
 			},
 			t)
 	})
+}
+
+func TestLabel(t *testing.T) {
+	t.Parallel()
+
+	t.Run("simple label jump outer loop", func(t *testing.T) {
+		codeWithLabel := `
+outer: for (let i = 0; i < 3; i++) {
+	for (let j = 0; j < 3; j++) {
+		if (foo == 2) {
+			break outer; // 跳出外层循环
+		}
+		a = 0
+	}
+}
+println(a);
+`
+
+		codeWithLabelNoBreakLabel := `
+outer: for (let i = 0; i < 3; i++) {
+	for (let j = 0; j < 3; j++) {
+		if (foo = 2) {
+			break;
+		}
+		a = 0
+	}
+}
+println(a);
+`
+
+		codeWithoutLabel := `
+for (let i = 0; i < 3; i++) {
+	for (let j = 0; j < 3; j++) {
+		if (foo == 2) {
+			break;
+		}
+		a = 0
+	}
+}
+println(a);
+`
+
+		prog, err := ssaapi.Parse(codeWithoutLabel,
+			ssaapi.WithLanguage("js"),
+		)
+		require.NoError(t, err)
+		log.Info(ssaapi.FunctionDotGraph(prog.Program.Funcs.Values()[0]))
+		ssatest.CheckPrintlnValue(codeWithoutLabel, []string{"phi(a)[Undefined-a,0]"}, t)
+
+		prog, err = ssaapi.Parse(codeWithLabelNoBreakLabel,
+			ssaapi.WithLanguage("js"),
+		)
+		require.NoError(t, err)
+		log.Info(ssaapi.FunctionDotGraph(prog.Program.Funcs.Values()[0]))
+		ssatest.CheckPrintlnValue(codeWithLabelNoBreakLabel, []string{"phi(a)[Undefined-a,0]"}, t)
+
+		prog, err = ssaapi.Parse(codeWithLabel,
+			ssaapi.WithLanguage("js"),
+		)
+		require.NoError(t, err)
+		log.Info(ssaapi.FunctionDotGraph(prog.Program.Funcs.Values()[0]))
+		ssatest.CheckPrintlnValue(codeWithLabel, []string{"Undefined-a"}, t)
+
+	})
+
+	t.Run("simple label jump outer block", func(t *testing.T) {
+		code := `
+		process: {
+			break process; // 跳出 block，阻止继续执行后续语句
+			a = 0
+			println(a);
+			println(a);
+			a = 2
+			println(a);
+			println(a);
+			a = 3
+		}
+println(a);
+		`
+		prog, err := ssaapi.Parse(code,
+			ssaapi.WithLanguage("js"),
+		)
+		require.NoError(t, err)
+		log.Info(ssaapi.FunctionDotGraph(prog.Program.Funcs.Values()[0]))
+		ssatest.CheckPrintlnValue(code, []string{"Undefined-a"}, t)
+	})
+
+	t.Run("simple label jump outer block", func(t *testing.T) {
+		code := `
+var k = 1
+		outer1: for (let i = 0; i < 3; i++) {
+  console.log("outer1:", i);
+  outer2: for (let j = 0; j < 3; j++) {
+    console.log("  outer2:", j);
+    outer3: for (let k = 0; k < 3; k++) {
+      console.log("outer3:", k);
+      if (k == 1) {
+        break outer1; // 直接跳出outer1, outer2，outer3 也随之结束
+		k = 2
+      }
+    }
+  }
+}
+println(k)
+		`
+		prog, err := ssaapi.Parse(code,
+			ssaapi.WithLanguage("js"),
+		)
+		require.NoError(t, err)
+		log.Info(ssaapi.FunctionDotGraph(prog.Program.Funcs.Values()[0]))
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+	})
+
+	t.Run("do-while", func(t *testing.T) {
+		code := `
+a = 1;
+
+function b(){
+	a += 1;
+	return true;
+}
+
+
+do {
+  break;
+  a = 3;
+} while (b());
+println(a);`
+		prog, err := ssaapi.Parse(code,
+			ssaapi.WithLanguage("js"),
+		)
+		require.NoError(t, err)
+		log.Info(ssaapi.FunctionDotGraph(prog.Program.Funcs.Values()[0]))
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+	})
+
+	t.Run("simple label jump outer block with do-while", func(t *testing.T) {
+		code := `outer:
+a = 1;
+
+function b(){
+	a += 1;
+	return true;
+}
+
+outer:
+do {
+  console.log('开始执行任务');
+  break outer;
+  a = 3;
+  
+
+  console.log('执行核心任务...');
+  // ...a
+} while (b());
+
+console.log('任务流程结束');
+println(a);`
+		prog, err := ssaapi.Parse(code,
+			ssaapi.WithLanguage("js"),
+		)
+		require.NoError(t, err)
+		log.Info(ssaapi.FunctionDotGraph(prog.Program.Funcs.Values()[0]))
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+	})
+
 }
 
 //func TestDestructuring(t *testing.T) {

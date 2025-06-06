@@ -262,7 +262,7 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		}
 	}
 
-	if b.isTryBuildValue() {
+	if b.isTryBuildValue() && !variable.GetLocal() {
 		b.TryBuildValueWithoutParent(variable.GetName(), value)
 	}
 
