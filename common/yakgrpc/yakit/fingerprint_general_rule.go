@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"encoding/json"
+
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
@@ -244,4 +245,49 @@ func InsertBuiltinGeneralRules(db *gorm.DB) error {
 
 func CreateGeneralRuleGroupFromRule(db *gorm.DB, rule *schema.GeneralRule) error {
 	return CreateGeneralMultipleRuleGroup(db, rule.Groups)
+}
+
+// CreateOrUpdateGeneralRule create or update general rule by rule name
+// If rule exists (by rule_name), update it; otherwise create new one
+func CreateOrUpdateGeneralRule(db *gorm.DB, rule *schema.GeneralRule) error {
+	if rule.RuleName == "" {
+		return utils.Errorf("rule name cannot be empty")
+	}
+
+	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+		var existingRule schema.GeneralRule
+		err := tx.Where("rule_name = ?", rule.RuleName).First(&existingRule).Error
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return err
+		}
+		isCreate := false
+		if err == gorm.ErrRecordNotFound {
+			isCreate = true
+			if err := tx.Omit("Groups").Create(rule).Error; err != nil {
+				return utils.Errorf("create rule failed: %s", err)
+			}
+		} else {
+			rule.ID = existingRule.ID
+			if err := tx.Model(&existingRule).Omit("Groups", "rule_name").Updates(rule).Error; err != nil {
+				return utils.Errorf("update rule failed: %s", err)
+			}
+		}
+
+		if err := CreateGeneralRuleGroupFromRule(tx, rule); err != nil {
+			return err
+		}
+
+		if rule.Groups != nil {
+			if isCreate {
+				if err := CreateGeneralRuleAndGroupAssociations(tx, []*schema.GeneralRule{rule}, rule.Groups); err != nil {
+					return err
+				}
+			} else {
+				if err := UpdateGeneralRuleAndGroupAssociations(tx, []*schema.GeneralRule{rule}, rule.Groups); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
 }
