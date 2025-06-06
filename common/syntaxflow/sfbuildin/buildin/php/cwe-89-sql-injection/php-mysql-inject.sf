@@ -102,11 +102,16 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high for {
-    title: 'Unvalidated MySQL Parameter Injection',
-    title_zh: 'MySQL未验证参数注入风险',
-    level: 'high',
-}
+	title: "Unvalidated MySQL Parameter Injection",
+	title_zh: "MySQL未验证参数注入风险",
+	solution: <<<CODE
 
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+}
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
 CODE,exclude=<<<CODE
@@ -116,20 +121,30 @@ CODE)> as $highAndMid
 $highAndMid - $high as $mid
 
 alert $mid for {
-    title: 'Insufficient MySQL Parameter Filtering',
-    title_zh: 'MySQL参数过滤不充分',
-    level: 'mid',
-}
+	level: "mid",
+	title: "Insufficient MySQL Parameter Filtering",
+	title_zh: "MySQL参数过滤不充分",
+	solution: <<<CODE
 
+CODE
+	desc: <<<CODE
+
+CODE
+}
 $sink - $high - $mid as $low
 
 check $low
 alert $low for {
-    title: 'Potential MySQL Access Control Bypass',
-    title_zh: 'MySQL访问控制潜在绕过风险',
-    level: 'low',
-}
+	title_zh: "MySQL访问控制潜在绕过风险",
+	solution: <<<CODE
 
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	title: "Potential MySQL Access Control Bypass",
+}
 desc(
 	lang: php
 	alert_low: 1

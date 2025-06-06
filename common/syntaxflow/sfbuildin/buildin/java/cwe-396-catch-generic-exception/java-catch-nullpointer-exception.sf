@@ -49,7 +49,7 @@ if (data != null) {
 #### 2. 修复底层业务逻辑问题
 如果 `NullPointerException` 是由复杂的业务逻辑或不正确的对象状态引起，需要回溯代码，查找并修复导致 `null` 引用产生的根本原因。
 
-#### 3. 使用 `Optional` 类 (Java 8+) 
+#### 3. 使用 `Optional` 类 (Java 8+)
 利用 `java.util.Optional` 类来更优雅地处理可能为 `null` 的值，鼓励链式调用和明确的 `null` 处理逻辑。
 ```java
 // 使用 Optional 示例
@@ -73,7 +73,17 @@ REFERENCE
 *?{opcode:catch}.exception as $exception 
 $exception?{<typeName()>?{have:/^NullPointerException$/}} as $null_pointer_exception
 
-alert $null_pointer_exception
+alert $null_pointer_exception for {
+	title: "Audit Java Catch NullPointerException",
+	title_zh: "审计Java捕获NullPointerException",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+}
 
 
 desc(

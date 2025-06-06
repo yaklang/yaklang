@@ -115,10 +115,19 @@ $sink #{
 }->as $high;
 
 alert $high for {
-    message: "发现Java代码中存在Log4j远程代码执行漏洞，并且数据流中间没有进行任何过滤。",
-    level: high,
-    risk: "rce",
-};
+	level: "high",
+	message: "发现Java代码中存在Log4j远程代码执行漏洞，并且数据流中间没有进行任何过滤。",
+	risk: "rce",
+	title: "Detect Java Log4j Remote Code Execution Vulnerability",
+	title_zh: "检测Java Log4j远程代码执行漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+}
+
 
 $sink #{
     include:`<self> & $source`,
@@ -126,10 +135,19 @@ $sink #{
 
 $result - $high  as $low;
 alert $low for {
-    message: "发现Java代码中可能存在Log4j远程代码执行漏洞。",
-    level: low,
-    risk: "rce",
-};
+	level: "low",
+	message: "发现Java代码中可能存在Log4j远程代码执行漏洞。",
+	risk: "rce",
+	title: "Detect Java Log4j Remote Code Execution Vulnerability",
+	title_zh: "检测Java Log4j远程代码执行漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+}
+
 
 desc(
 	alert_min: 1

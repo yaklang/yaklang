@@ -3,7 +3,7 @@ desc(
 	type: vuln
 	risk: sca
 	desc: <<<DESC
-## 漏洞描述
+### 漏洞描述
 
 1. **漏洞原理**
    此规则用于检查Java Resin服务器是否存在已知的高危漏洞。具体来说，针对 Resin 版本低于 4.0.64 的情况，存在一个远程代码执行漏洞（CVE-2021-26291）。该漏洞是由于 Resin 在处理特定请求时，未能对用户输入进行充分的校验和转义，导致攻击者可以通过构造恶意的输入，在服务器端执行任意的操作系统命令。
@@ -45,7 +45,15 @@ SOLUTION
 __dependency__.*resin.version as $ver;
 $ver in (,4.0.63] as $vuln_resin;
 alert $vuln_resin for {
-    message: 'SCA: resin version 4.0.63 has a remote code execution vulnerability',
-    cve: 'CVE-2021-26291',
-    level: 'high',
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	message: "SCA: resin version 4.0.63 has a remote code execution vulnerability",
+	cve: "CVE-2021-26291",
+	title: "SCA: Check Java Resin Vulnerability",
+	title_zh: "SCA: 检测Java Resin 依赖漏洞",
+	solution: <<<CODE
+
+CODE
 }

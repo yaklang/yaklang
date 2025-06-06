@@ -63,7 +63,7 @@ if (in_array($page, $allowed_pages)) {
 ```
 
 2. **对用户输入进行严格过滤和校验**
-移除或过滤用户输入中的恶意字符，特别是路径遍历字符（`../`、`..\`）、空字节（`%00`）等。同时，限制输入的文件名格式，例如只允许字母数字、下划线等。
+移除或过滤用户输入中的恶意字符，特别是路径遍历字符（`../`、`..\\`）、空字节（`%00`）等。同时，限制输入的文件名格式，例如只允许字母数字、下划线等。
 
 ```php
 <?php
@@ -127,12 +127,17 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high for {
-    title: 'The file contained was detected without any filtering',
-    title_zh: '检测到文件包含无任何过滤',
-    type: 'vuln',
-    level: 'high',
-}
+	level: "high",
+	type: "vuln",
+	title: "Unfiltered PHP File Inclusion Vulnerability",
+	title_zh: "未过滤的PHP文件包含漏洞",
+	solution: <<<CODE
 
+CODE
+	desc: <<<CODE
+
+CODE
+}
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
 CODE,exclude=<<<CODE
@@ -142,29 +147,46 @@ CODE)> as $highAndMid
 $highAndMid - $high as $middle
 
 alert $middle for {
-    title: 'File contains detected, but filter function not detected',
-    title_zh: '检测到文件包含，但未检出过滤函数',
-    type: 'mid',
-    level: 'mid'
-};
+	title: "PHP File Inclusion with Insufficient Filtering",
+	title_zh: "PHP文件包含漏洞，但过滤不充分",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+	type: "mid",
+}
 
 $sink - $high - $middle as $low;
 
 alert $low for {
-    title: 'File contains detected, filter function checked out',
-    title_zh: '检测到文件包含，检出过滤函数',
-    type: 'audit',
-    level: 'low'
-};
+	desc: <<<CODE
 
-include(*?{!opcode: const}) as $info
-alert $info for{
-    title: "File contains were detected, but no vulnerabilities were detected. Please pay attention",
-    title_zh: "检测到文件包含，但是未检测到漏洞，请注意关注",
-    type: 'audit',
-    level: 'info'
+CODE
+	level: "low",
+	type: "audit",
+	title: "PHP File Inclusion with Filtering Functions",
+	title_zh: "PHP文件包含漏洞，检出过滤函数",
+	solution: <<<CODE
+
+CODE
 }
 
+include(*?{!opcode: const}) as $info
+alert $info for {
+	title: "PHP File Inclusion Detected - Further Review Recommended",
+	title_zh: "检测到PHP文件包含，建议进一步审查",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	type: "audit",
+}
 desc(
 	lang: php
 	alert_mid: 1

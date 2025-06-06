@@ -7,16 +7,14 @@ desc(
 [Oracle JavaDocs: java.net.InetAddress](https://docs.oracle.com/javase/8/docs/api/java/net/InetAddress.html)
 REFERENCE
 	description: <<<DESCRIPTION
-    该规则检测对 java.net.InetAddress 类方法的误用，这些方法在与认证相关的安全决策中依赖 DNS 查询，可能导致安全风险。
-    该规则审计的类:
-    - java.net.InetAddress
+
 DESCRIPTION
 	solution: <<<SOLUTION
 ### 修复建议
 
 1. **避免在安全决策中依赖DNS查找结果**
    不要使用`java.net.InetAddress`的`getHostName()`、`getCanonicalHostName()`等方法的结果来作为认证或授权的依据。IP地址本身也可能因网络配置或转发而存在不确定性。
-   
+
 2. **使用更安全的身份验证和授权机制**
    - 考虑使用基于证书的身份验证（如SSL/TLS客户端证书）。
    - Implement robust user authentication mechanisms (e.g., username/password, OAuth, SAML).
@@ -36,10 +34,7 @@ DESCRIPTION
    public class SaferAuthExample {
        public void authenticateClient(String clientIP) {
            try {
-               // 直接使用IP地址进行判断（比依赖DNS查找主机名更可靠，但仍需谨慎）
                InetAddress addr = InetAddress.getByName(clientIP);
-
-               // 示例：检查IP是否在内部网段 (这只是一个示例，实际应用需考虑更多因素)
                if (isInInternalNetwork(addr)) {
                    System.out.println("认证成功！来源IP在内部网段。");
                    grantAccess();
@@ -56,12 +51,8 @@ DESCRIPTION
            }
        }
 
-       // 示例方法：判断IP是否在内部网段 (需要根据实际网络情况实现)
        private boolean isInInternalNetwork(InetAddress addr) {
-           // 例如，检查是否是内网保留IP地址范围
            return addr.isSiteLocalAddress();
-           // 或者检查是否属于特定的子网
-           // ... 实现更复杂的IP范围检查逻辑
        }
 
        private void grantAccess() {// ...}
@@ -69,16 +60,26 @@ DESCRIPTION
    }
    ```
    **请注意**：仅仅基于IP地址进行认证也不总是完全安全的，因为IP地址可以被欺骗或通过代理转发。最安全的做法是结合多种认证和授权机制。
+
 SOLUTION
 	rule_id: "7501f545-a313-4bb7-b6bb-48aab80cb284"
 )
 
 InetAddress?{<typeName>?{have:'java.net'}}./(get.*By.*|getLocalHost|getLoopbackAddress)/ as $weak;
 alert $weak for {
-    message: "发现Java java.net.InetAddress 进行DNS查询",
-    risk:'api-abuse',
-    level:low,
-};
+	title_zh: "检测Java java.net.InetAddress 进行DNS查询",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	message: "发现Java java.net.InetAddress 进行DNS查询",
+	risk: "api-abuse",
+	title: "Check Java java.net.InetAddress DNS Lookup",
+}
+
 
 desc(
 	lang:java

@@ -26,7 +26,17 @@ SOLUTION
 
 template?{<fullTypeName>?{have: 'html/template'}} as $output
 
-alert $output
+alert $output for {
+	title: "Audit Golang html/template Usage",
+	title_zh: "审计Golang html/template使用",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "info",
+}
 
 desc(
 	lang: golang

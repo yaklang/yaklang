@@ -65,7 +65,7 @@ User user = userMapper.getUserById(Integer.parseInt(userInput));
 ```java
 // 示例：简单检查输入是否为数字
 String userInput = request.getParameter("id");
-if (!userInput.matches("\\d+")) {
+if (!userInput.matches("\d+")) {
     // 输入不是数字，拒绝请求或抛出异常
     throw new IllegalArgumentException("Invalid input: ID must be a number.");
 }
@@ -88,7 +88,18 @@ check $params;
 $params?{!opcode: const}#{
     hook: `*?{opcode: const && have: 'WHERE'}<show> as $flag`,
 }->
-alert $flag;
+alert $flag for {
+	title: "Check Java SQL String Append Query",
+	title_zh: "检测Java SQL字符串拼接查询",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+}
+
 
 
 desc(

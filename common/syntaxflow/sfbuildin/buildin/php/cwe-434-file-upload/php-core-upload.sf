@@ -141,11 +141,16 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high for {
-    title: "Unsafe File Upload Without Validation",
-    title_zh: "未经验证的高危文件上传",
-    level: "high"
-}
+	level: "high",
+	title: "Unsafe File Upload Without Validation",
+	title_zh: "未经验证的高危文件上传",
+	solution: <<<CODE
 
+CODE
+	desc: <<<CODE
+
+CODE
+}
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
 CODE,exclude=<<<CODE
@@ -154,17 +159,28 @@ CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
 alert $mid for {
-    title: "Insecure File Type Detection",
-    title_zh: "不安全的文件类型检测",
-    level: "mid"
-}
+	solution: <<<CODE
 
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+	title: "Insecure File Type Detection",
+	title_zh: "不安全的文件类型检测",
+}
 $sink - $high - $mid as $low
 
 alert $low for {
-    title: "Potential File Storage Path Misconfiguration",
-    title_zh: "潜在的文件存储路径配置问题",
-    level: "low"
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	title: "Potential File Storage Path Misconfiguration",
+	title_zh: "潜在的文件存储路径配置问题",
+	solution: <<<CODE
+
+CODE
 }
 desc(
 	lang: "php"

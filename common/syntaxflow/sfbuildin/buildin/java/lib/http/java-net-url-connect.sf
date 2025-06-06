@@ -53,34 +53,6 @@ public class HttpGetExample {
     }
 }
 ```
-```java
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.URL;
-
-public class SimpleWebReader {
-    public static void main(String[] args) {
-        try {
-            URL url = new URL("http://example.com"); // 潜在风险：使用了HTTP而非HTTPS
-            // 直接使用 URL.openStream() 获取输入流，审计点
-            InputStream inputStream = url.openStream(); // 未设置连接和读取超时
-            BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-            String line;
-            StringBuilder response = new StringBuilder();
-            while ((line = reader.readLine()) != null) {
-                response.append(line);
-                response.append('\n');  // 使用换行符来分隔每一行
-            }
-            reader.close(); // 未在finally块中关闭资源
-            System.out.println("Web page content:\n" + response.toString());
-        } catch (IOException e) { // 未针对不同类型的异常进行精细处理
-            e.printStackTrace();
-        }
-    }
-}
-```
 DESC
 	rule_id: "ac4cd901-cba2-4e21-86fa-7eb6d68c834c"
 	title_zh: "审计Java URL连接使用"
@@ -161,7 +133,18 @@ REFERENCE
 )
 
 URL?{<getCall>?{.openConnection() || .openStream()}}(,* as $output);
-alert $output;
+alert $output for {
+	desc: <<<CODE
+
+CODE
+	level: "info",
+	title: "Audit Java URL Connection Use",
+	title_zh: "审计Java URL连接使用",
+	solution: <<<CODE
+
+CODE
+}
+
 
 desc(
 	lang: java

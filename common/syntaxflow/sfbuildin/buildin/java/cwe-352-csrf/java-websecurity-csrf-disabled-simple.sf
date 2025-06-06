@@ -74,7 +74,18 @@ SOLUTION
 
 .csrf().disable() as $vuln;
 check $vuln;
-alert $vuln;
+alert $vuln for {
+	title: "Check Java Simple Trail of CSRF Disabled",
+	title_zh: "检测Java简单CSRF禁用痕迹",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+}
+
 
 desc(
 	lang: java

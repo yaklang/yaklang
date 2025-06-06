@@ -9,7 +9,7 @@ desc(
 该规则用于识别Java应用程序中调用了多种HTTP客户端库或URL相关操作的下沉点（Sink）。这些下沉点代表了可能向外部发送HTTP请求的代码位置。通过识别这些点，安全审计人员可以追踪用户输入或其他外部数据的流动，判断是否存在SSRF（服务器端请求伪造）等漏洞的风险。
 
 ### 规则详细
-该规则属于库规则（`lib` 유형），旨在提供一个集中的列表，列举多种常见Java库和API中用于发起HTTP请求或处理URL的关键方法调用。这些方法通常是SSRF漏洞链的末端。该规则通过包含以下子规则来实现此目的：
+该规则属于库规则（`lib`类型），旨在提供一个集中的列表，列举多种常见Java库和API中用于发起HTTP请求或处理URL的关键方法调用。这些方法通常是SSRF漏洞链的末端。该规则通过包含以下子规则来实现此目的：
 
 1.  `java-alibaba-druid-httpclientutil`: 识别Alibaba Druid库中的HttpClientUtil相关方法。
 2.  `java-apache-commons-httpclient`: 识别Apache Commons HttpClient库的相关方法。
@@ -38,7 +38,18 @@ REFERENCE
 <include('java-net-url-connect')> as $output;
 <include('java-okhttpclient-request-execute')> as $output;
 <include('java-spring-rest-template-request-params')> as $output
-alert $output;
+alert $output for {
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+	title: "Find HTTP Sink in Java (Multiple Libraries)",
+	title_zh: "查找Java中的HTTP Sink (多库)",
+}
+
 
 desc(
 	lang: java

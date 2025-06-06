@@ -170,8 +170,16 @@ check $toCheck
 $toCheck?{.*()<var(memberCall)>} as $haveMemberCall
 $haveMemberCall?{!<getUsers(depth=2)>?{opcode:if} && !<getUsers(depth=3)>?{opcode:if}} as $weak
 alert $weak for {
-    message:"检测到未检查返回值可能导致空指针异常",
-    level:low,
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	message: "检测到未检查返回值可能导致空指针异常",
+	title: "",
+	title_zh: "",
 }
 
 desc(

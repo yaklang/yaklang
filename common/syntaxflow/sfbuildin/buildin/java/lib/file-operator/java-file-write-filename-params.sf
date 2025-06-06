@@ -1,13 +1,11 @@
 desc(
-	title: "Find Java File Write Operation Sinks"
-	title_zh: "查找 Java 文件写入操作接收点"
+	title: "Audit Java File Write Operation Sinks"
+	title_zh: "审计 Java 文件写入操作接收点"
 	type: audit
 	lib: "java-write-filename-sink"
 	reference: <<<REFERENCE
-URL
-       https://docs.oracle.com/javase/8/docs/api/java/nio/file/Files.html
-       https://docs.oracle.com/javase/8/docs/api/java/io/RandomAccessFile.html
-URL
+https://docs.oracle.com/javase/8/docs/api/java/nio/file/Files.html
+https://docs.oracle.com/javase/8/docs/api/java/io/RandomAccessFile.html
 REFERENCE
 	desc: <<<DESC
 ### 1. 规则目的
@@ -54,4 +52,15 @@ $printWriterFilenames as $output;
 $javaIOFileStreamName as $output;
 $javaIOFileName as $output;
 $nioParam as $output;
-alert $output;
+alert $output for {
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+	title: "Audit Java File Write Operation Sinks",
+	title_zh: "审计 Java 文件写入操作接收点",
+}
+

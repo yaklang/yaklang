@@ -1,5 +1,5 @@
 desc(
-	title: "Audit Golang gin HTTP Handler"
+	title: "Audit Golang Gin HTTP Handler"
 	type: audit
 	level: info
 	lib: "golang-http-gin"
@@ -61,7 +61,17 @@ $entry.Default() as $default;
 $default.*(*<slice(index=2)> as $handle);
 $handle<getFormalParams> as $output
 
-alert $output
+alert $output for {
+	title: "Audit Golang Gin HTTP Handler",
+	title_zh: "审计Golang gin HTTP Handler",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "info",
+}
 
 desc(
 	lang: golang

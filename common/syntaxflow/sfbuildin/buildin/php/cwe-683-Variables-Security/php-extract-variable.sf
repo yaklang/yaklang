@@ -82,10 +82,16 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high for {
-    title: 'Variable overwriting is detected and there is no filtering',
-    title_zh: '检测到变量覆盖，并且没有任何过滤',
-    type: 'vuln',
-    level: 'high'
+	title: "Unfiltered PHP Variable Overwrite Detected",
+	title_zh: "未过滤PHP变量覆盖",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	type: "vuln",
 }
 $sink<dataflow(include=<<<CODE
 * & $source as $__next__
@@ -94,19 +100,31 @@ CODE,exclude=<<<CODE
 CODE)> as $middle
 
 alert $middle for {
-    title: 'Variable coverage detected, but filter function not detected',
-    title_zh: '检测到变量覆盖，但是未检出过滤函数',
-    type: 'mid',
-    level: 'mid'
+	title: "PHP Variable Overwrite with Missing Filter Function",
+	title_zh: "PHP变量覆盖，缺少过滤函数",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+	type: "mid",
 }
 $sink - $high - $middle  as $low;
 
 alert $low for {
-    title: 'Variable coverage detected, but filter function not detected',
-    title_zh: '检测到变量覆盖，检出过滤函数',
-    type: 'low',
-    level: 'low'
-};
+	title_zh: "PHP变量覆盖，检测到过滤函数",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	type: "low",
+	title: "PHP Variable Overwrite with Filter Function",
+}
 
 
 desc(

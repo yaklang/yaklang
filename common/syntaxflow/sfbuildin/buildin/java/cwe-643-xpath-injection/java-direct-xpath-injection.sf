@@ -80,9 +80,18 @@ $sink #{
 }->as $high;
 
 alert $high for {
-    message: "Find LDAP direct injection vulnerability",
-    level: high,
-};
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	message: "Find LDAP direct injection vulnerability",
+	title: "Check Java XPath Injection Vulnerability",
+	title_zh: "检测Java XPath注入漏洞",
+}
+
 
 desc(
 	alert_min: 2

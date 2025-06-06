@@ -5,7 +5,6 @@ desc(
 	level: low
 	risk: "unserialize"
 	desc: <<<DESC
-
 ### 漏洞描述
 
 1. **漏洞原理**
@@ -37,12 +36,10 @@ unserialize($data); // 直接反序列化用户输入
 - **权限绕过**：修改对象状态，绕过应用程序的访问控制。
 - **拒绝服务 (DoS)**：构造特殊序列化字符串，导致服务器崩溃或资源耗尽。
 - **其他漏洞触发**：通过反序列化触发其他类型的漏洞，如XXE、SSRF等。
-
 DESC
 	risk: 'unserialize'
 	rule_id: "43175d39-14f0-42bc-a054-3e29998a802a"
 	solution: <<<SOLUTION
-
 ### 修复建议
 
 #### 1. 避免使用 `unserialize()` 处理不可信数据
@@ -98,7 +95,6 @@ $object = unserialize($data);
 
 #### 5. 使用其他序列化方式
 考虑使用更安全的数据表示方式，例如 JSON、XML 或 Protocol Buffers，并使用相应的安全解析函数进行处理。这些格式通常不会自动实例化对象或触发魔术方法，降低了对象注入的风险。
-
 SOLUTION
 	reference: <<<REFERENCE
 [PHP: unserialize - Manual](https://www.php.net/manual/en/function.unserialize.php)
@@ -124,9 +120,16 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high for {
-    title: 'php deserialization is not filtered',
-    type: 'vuln',
-    level: 'high'
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	type: "vuln",
+	title: "PHP Unserialization Vulnerability - High Risk",
+	title_zh: "PHP反序列化漏洞 - 高风险",
 }
 
 $sink<dataflow(include=<<<CODE
@@ -138,26 +141,44 @@ CODE)> as $highAndMid
 $highAndMid - $high as $mid
 
 alert $mid for {
-    title: 'php deserialization has function calls, but no filter function is checked out',
-    title_zh: 'php反序列化中有函数调用，但未检出过滤函数',
-    type: 'mid',
-    level: 'mid'
+	title: "PHP Unserialization Vulnerability - Medium Risk",
+	title_zh: "PHP反序列化漏洞 - 中风险",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+	type: "mid",
 }
 
 $sink - $mid - $high as $low
 
 alert $low for {
-    title: 'php deserialization has function calls that check out filter functions',
-    title_zh: 'php反序列化中有函数调用，检出过滤函数',
-    type: 'low',
-    level: 'low'
+	title_zh: "PHP反序列化漏洞 - 低风险",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	type: "low",
+	title: "PHP Unserialization Vulnerability - Low Risk",
 }
 unserialize?(*?{!opcode: const}) as $info
-alert $info for{
-    title: "php deserialization function detected, but no vulnerability detected, please check manually",
-    title_zh: "检测到php反序列化函数，但是未检测到漏洞，请手动检查",
-    type: "info",
-    level: "info"
+alert $info for {
+	desc: <<<CODE
+
+CODE
+	level: "info",
+	type: "info",
+	title: "PHP Unserialization Function Detected",
+	title_zh: "检测到PHP反序列化函数",
+	solution: <<<CODE
+
+CODE
 }
 desc(
 	lang: php

@@ -30,4 +30,14 @@ MultipartFile?{<typeName>?{have:'org.springframework.web.multipart.MultipartFile
 // void transferTo(File dest)
 // void transferTo(Path dest)
 $multipartFile.transferTo(* <slice(index=1)> as $output)
-alert $output;
+alert $output for {
+	level: "mid",
+	title: "Audit Spring MultipartFile TransferTo Target",
+	title_zh: "审计 Spring MultipartFile TransferTo 目标",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+}

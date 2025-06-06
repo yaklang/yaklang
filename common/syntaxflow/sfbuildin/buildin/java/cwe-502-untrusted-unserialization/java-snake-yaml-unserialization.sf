@@ -69,7 +69,7 @@ y.load(userSuppliedYaml);
 对来自不可信源的YAML数据进行严格的格式和内容验证。虽然这不能完全替代安全的构造器，但可以作为附加的安全层级。避免直接读取和反序列化任意结构的YAML数据。
 
 #### 4. 升级SnakeYAML库
-确保使用的SnakeYAML库版本是最新的，以 포함已知的反序列化漏洞修复。
+确保使用的SnakeYAML库版本是最新的，以包含已知的反序列化漏洞修复。
 SOLUTION
 )
 
@@ -88,8 +88,16 @@ $sink #{
 }->as  $high;
 
 alert $high for {
-    message: "发现Java SnakeYAML反序列化漏洞,并且没有任何数据流过滤。",
-    level: high,
+	title: "Check Java SnakeYAML Unserialization Vulnerability",
+	title_zh: "检测Java SnakeYAML反序列化漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	message: "发现Java SnakeYAML反序列化漏洞,并且没有任何数据流过滤。",
 }
 
 $sink #{
@@ -98,8 +106,16 @@ $sink #{
 
 $result - $high as $low;
 alert $low for {
-    message: "发现Java SnakeYAML反序列化漏洞,但是有数据流过滤。",
-    level: low,
+	message: "发现Java SnakeYAML反序列化漏洞,但是有数据流过滤。",
+	title: "Check Java SnakeYAML Unserialization Vulnerability",
+	title_zh: "检测Java SnakeYAML反序列化漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
 }
 
 desc(

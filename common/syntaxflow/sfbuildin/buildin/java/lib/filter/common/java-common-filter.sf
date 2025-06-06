@@ -7,7 +7,7 @@ desc(
 	desc: <<<DESC
 ### 1.规则目的
 
-该规则旨在识别 Java 代码中 সম্ভাব্য 的安全过滤、验证或净化方法。通过匹配常见的方法命名模式（如 sanitize、filter、escape 等），该规则可以帮助安全审计人员或自动化工具快速定位可能处理用户输入或敏感数据的代码点。
+该规则旨在识别 Java 代码中可能的安全过滤、验证或净化方法。通过匹配常见的方法命名模式（如 sanitize、filter、escape 等），该规则可以帮助安全审计人员或自动化工具快速定位可能处理用户输入或敏感数据的代码点。
 
 ### 2.规则详细
 
@@ -36,4 +36,14 @@ REFERENCE
 )
 
 /(?i).*(sanitize|filter|escape|clean|validate|check|secure|scrub|strip|encode|decode|prevent|safe|block|remove|replace|purge|whitelist|blacklist|neutralize|defense|harden|mitigate).*/ as  $output;
-alert $output
+alert $output for {
+	title: "Find Java Common Filter Methods",
+	title_zh: "查找Java过滤方法",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+}

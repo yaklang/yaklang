@@ -33,7 +33,7 @@ DESC
 ### 修复建议
 
 #### 1. 升级c3p0到安全版本
- 最直接和有效的修复方法是将c3p0升级到已经修复了该漏洞的版本。根据官方信息，0.9.5.7之后的版本修复了此漏洞。建议升级到最新稳定的安全版本。
+最直接和有效的修复方法是将c3p0升级到已经修复了该漏洞的版本。根据官方信息，0.9.5.7之后的版本修复了此漏洞。建议升级到最新稳定的安全版本。
 
 #### 2. 避免反序列化不可信来源的数据
 如果可能，审查代码中涉及反序列化操作的部分，特别是处理外部、用户输入或不可信来源的数据时。避免反序列化未知或不可信的数据结构。
@@ -55,7 +55,15 @@ REFERENCE
 __dependency__.*c3p0.version as $ver;
 $ver in [0.9.5.2,0.9.5.7] as $vuln_c3p0;
 alert $vuln_c3p0 for {
-    message: 'SCA: c3p0 versions between 0.9.5.2 and 0.9.5.7 have an unsafe class loading vulnerability',
-    cve: 'CVE-2019-5427',
-    level: 'high',
+	message: "SCA: c3p0 versions between 0.9.5.2 and 0.9.5.7 have an unsafe class loading vulnerability",
+	title: "SCA: Check Java c3p0 Vulnerability",
+	title_zh: "SCA: 检测Java c3p0 依赖漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	cve: "CVE-2019-5427",
 }

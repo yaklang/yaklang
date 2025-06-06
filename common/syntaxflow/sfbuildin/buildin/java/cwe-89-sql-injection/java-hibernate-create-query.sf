@@ -76,7 +76,7 @@ List<String> allowedSortFields = Arrays.asList("id", "username", "email");
 if (!allowedSortFields.contains(sortField)) {
     throw new IllegalArgumentException("Invalid sort field");
 }
-String 现在的规则不会去检测这种场景，所以这个应该放在描述中的预防措施中sortOrder = request.getParameter("order");
+String sortOrder = request.getParameter("order");
 List<String> allowedSortOrders = Arrays.asList("ASC", "DESC");
 if (!allowedSortOrders.contains(sortOrder)) {
      throw new IllegalArgumentException("Invalid sort order");
@@ -111,9 +111,17 @@ $opParam?{opcode: const} as $__next__;
 CODE)> as $unsafeParams;
 
 alert $unsafeParams for {
-    message: "SQL concatenation is used in the query creation, which may lead to SQL injection vulnerabilities.",
-    type: audit,
-    level: high,
+	type: "audit",
+	title: "Check Java Hibernate SQL Injection Vulnerability",
+	title_zh: "检测Java Hibernate SQL注入漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	message: "SQL concatenation is used in the query creation, which may lead to SQL injection vulnerabilities.",
 }
 
 desc(

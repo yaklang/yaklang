@@ -39,7 +39,17 @@ http?{<fullTypeName>?{have: 'net/http'}} as $entry;
 $entry.HandleFunc(*<slice(index=1)> as $handle);
 $handle<getFormalParams> as $output
 
-alert $output
+alert $output for {
+	title: "Audit Golang net/http Handlers",
+	title_zh: "审计 Golang net/http 请求处理函数",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "info",
+}
 
 desc(
 	lang: golang

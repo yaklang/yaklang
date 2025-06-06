@@ -8,7 +8,7 @@ desc(
 	harm: "This vulnerability may lead to Server-Side Template Injection (SSTI) attacks. Attackers can inject malicious templates by controlling the parameters of the ModelAndView constructor, potentially executing arbitrary code, accessing sensitive data, or performing other unauthorized operations."
 	fix_zh: "建议使用安全的模板引擎，并避免直接将用户输入作为模板路径或内容的一部分。",
 	fix: <<<FIX
-Use a secure template engine and avoid directly using user input as part of the template path or content.
+
 FIX
 	desc: <<<DESC
 ### 漏洞描述
@@ -71,9 +71,19 @@ $source<dataflow(exclude=<<<CODE
 CODE)> as $filteredSource
 <delete(param)>
 alert $filteredSource for {
-    message_zh: "识别到 Java Spring Framework 中 ModelAndView 构造函数可控",
-    message: "Recognize Java Spring Framework code that can control the ModelAndView constructor",
-};
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	message_zh: "识别到 Java Spring Framework 中 ModelAndView 构造函数可控",
+	message: "Recognize Java Spring Framework code that can control the ModelAndView constructor",
+	title: "Unvalidated Java Spring Framework ModelAndView SSTI",
+	title_zh: "未验证的 Java Spring Framework ModelAndView SSTI",
+	solution: <<<CODE
+
+CODE
+}
+
 
 desc(
 	lang: java

@@ -69,7 +69,7 @@ DESC
    	name := r.URL.Query().Get("name")
 
    	// 使用模板引擎和占位符进行安全输出
-   	tmpl, _ := template.New("hello").Parse("<h1>Hello, {{.}}!</h1>") // 使用 {{.}} 占位符
+   	tmpl, _ := template.New("hello").Parse(`<h1>Hello, {{.}}!</h1>`) // 使用 {{.}} 占位符
    	tmpl.Execute(w, name) // 将name参数传递给模板进行渲染和转义
    }
 
@@ -126,10 +126,16 @@ $sink #{
 }-> as $high 
 
 alert $high for {
-    title: 'Reflected XSS detected',
-    title_zh: '检测到反射XSS',
-    type: 'vuln',
-    level: 'high',
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	type: "vuln",
+	title: "Reflected XSS detected",
+	title_zh: "检测到反射XSS",
 }
 
 desc(

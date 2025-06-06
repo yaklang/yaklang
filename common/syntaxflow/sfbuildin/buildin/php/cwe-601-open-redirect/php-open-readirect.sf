@@ -90,13 +90,18 @@ CODE,exclude=<<<CODE
 <self>?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high for{
-   title: "Unvalidated Redirect Vulnerability",
-   title_zh: "检测到用户输入($source)直接传递给header()函数且未经过任何过滤函数调用",
-   type: "vuln",
-   level: "high"
-}
+alert $high for {
+	title: "Check PHP Unvalidated Redirect Vulnerability",
+	title_zh: "检测PHP未验证重定向漏洞",
+	solution: <<<CODE
 
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	type: "vuln",
+}
 $all<dataflow(include=<<<CODE
 * & $params as $__next__
 CODE,exclude=<<<CODE
@@ -104,22 +109,32 @@ CODE,exclude=<<<CODE
 CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
-alert $mid for{
-   title: "Insufficient Redirect Validation",
-   title_zh: "检测到存在过滤函数($filter)但未完全验证目标域名的合法性",
-   type: "mid",
-   level: "mid"
-}
+alert $mid for {
+	solution: <<<CODE
 
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+	type: "mid",
+	title: "Check PHP Insufficient Redirect Validation",
+	title_zh: "检测PHP重定向验证不充分",
+}
 $sink - $high - $mid as $low
 
-alert $low for{
-   title: "Potential Redirect Validation Bypass",
-   title_zh: "检测到已使用过滤函数但存在验证逻辑缺陷的潜在绕过风险",
-   type: "low",
-   level: "low"
-}
+alert $low for {
+	desc: <<<CODE
 
+CODE
+	level: "low",
+	type: "low",
+	title: "Check PHP Potential Redirect Validation Bypass",
+	title_zh: "检测PHP重定向验证潜在绕过风险",
+	solution: <<<CODE
+
+CODE
+}
 desc(
 	lang: "php"
 	alert_min: 1

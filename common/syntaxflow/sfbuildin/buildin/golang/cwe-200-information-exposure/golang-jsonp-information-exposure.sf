@@ -21,10 +21,16 @@ $obj #{
 }-> as $low;
 
 alert $low for {
-    title: 'Json Information Exposure',
-    title_zh: '检测到Json信息泄露',
-    type: 'vuln',
-    level: 'low',
+	title: "Json Information Exposure",
+	title_zh: "检测到Json信息泄露",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	type: "vuln",
 }
 
 desc(

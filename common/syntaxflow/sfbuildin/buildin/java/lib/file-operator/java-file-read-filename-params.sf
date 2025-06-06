@@ -1,13 +1,11 @@
 desc(
-	title: "Find Java File Read Sinks"
-	title_zh: "查找 Java 文件读取接收点"
+	title: "Detect Java File Read Sinks"
+	title_zh: "检测 Java 文件读取接收点"
 	type: audit
 	lib: "java-read-filename-sink"
 	reference: <<<REFERENCE
-URL
-   https://docs.oracle.com/javase/8/docs/api/java/nio/file/Files.html
-   https://docs.oracle.com/javase/8/docs/api/java/io/RandomAccessFile.html
-URL
+[Java NIO Files API](https://docs.oracle.com/javase/8/docs/api/java/nio/file/Files.html)
+[Java IO RandomAccessFile API](https://docs.oracle.com/javase/8/docs/api/java/io/RandomAccessFile.html)
 REFERENCE
 	desc: <<<DESC
 ### 1.规则目的
@@ -25,7 +23,15 @@ REFERENCE
 DESC
 	rule_id: "b6bad1ee-f94a-4a92-a060-90c10b5de529"
 	solution: <<<SOLUTION
-none
+### 修复建议
+#### 1. 验证文件路径
+在使用文件路径之前，应先验证其合法性，确保路径不是来自不受信任的来源，并且不会指向敏感文件。
+
+#### 2. 使用安全的文件读取方法
+尽量使用具有安全特性的方法或库，例如使用安全的文件路径解析器来确保路径的安全性。
+
+#### 3. 限制文件访问权限
+确保文件访问权限设置适当，避免不必要的读取权限。
 SOLUTION
 )
 
@@ -53,4 +59,15 @@ $fileInputStream as $output;
 $nioFileRead as $output;
 $nioBufferedReader as $output;
 $nioInputStream as $output;
-alert $output;
+alert $output for {
+	title: "Detect Java File Read Sinks",
+	title_zh: "检测 Java 文件读取接收点",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+}
+

@@ -114,9 +114,17 @@ $sink #{
 }->as  $mid;
 
 alert $mid for {
-    message: "发现Java SpringBoot SSRF漏洞,并且没有任何数据流过滤。",
-    risk: ssrf,
-    level: mid,
+	risk: "ssrf",
+	title: "Detect Java SpringBoot SSRF Vulnerability",
+	title_zh: "检测Java SpringBoot 服务端请求伪造(SSRF)漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+	message: "发现Java SpringBoot SSRF漏洞,并且没有任何数据流过滤。",
 }
 
 $sink #{
@@ -126,9 +134,17 @@ $sink #{
 $result - $mid as $low;
 
 alert $low for {
-    message: "发现Java SpringBoot SSRF漏洞,但是有数据流过滤。",
-    risk: ssrf,
-    level: low,
+	risk: "ssrf",
+	title: "Detect Java SpringBoot SSRF Vulnerability",
+	title_zh: "检测Java SpringBoot 服务端请求伪造(SSRF)漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	message: "发现Java SpringBoot SSRF漏洞,但是有数据流过滤。",
 }
 
 desc(

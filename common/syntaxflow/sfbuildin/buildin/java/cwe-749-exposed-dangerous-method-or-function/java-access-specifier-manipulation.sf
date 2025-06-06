@@ -86,7 +86,7 @@ try {
 对于 JDK 16 及以上版本，可以在 JVM 参数中添加 `--illegal-access=deny` 或 `--illegal-access=permit` 来控制深度反射的行为。`deny` 会阻止非法访问，而 `permit` 只会发出警告。
 
 #### 6. 自动化检测
-    使用IRify来自动检测代码中的反射滥用模式。持续的自动化检测有助于及时发现和修复潜在的漏洞。
+使用IRify来自动检测代码中的反射滥用模式。持续的自动化检测有助于及时发现和修复潜在的漏洞。
 SOLUTION
 	rule_id: "718cb86d-8629-4382-be43-03ce36c07a3b"
 	reference: <<<REFERENCE
@@ -100,7 +100,17 @@ setAccessible(<slice(index=1)>?{==true}) as $set_accessible_true
 $set_accessible_true?{<getCallee()><fullTypeName()>?{have: "java.lang.reflect"} } as $target 
 
 // alert 
-alert $target 
+alert $target for {
+	title: "Detect Java Reflection setAccessible Vulnerability",
+	title_zh: "检测Java反射setAccessible函数滥用漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+}
 
 
 desc(

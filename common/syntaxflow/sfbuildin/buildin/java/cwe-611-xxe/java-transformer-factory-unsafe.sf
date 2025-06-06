@@ -109,8 +109,16 @@ $toCheckTransform - $excludeTransform as $vuln;
 
 check $vuln;
 alert $vuln for {
-    message: "Transformer Unsafe Use in Context Sink",
-    level: "warning",
+	title: "",
+	title_zh: "",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "warning",
+	message: "Transformer Unsafe Use in Context Sink",
 }
 
 // ---------------------------------------CODE----------------------------------------------

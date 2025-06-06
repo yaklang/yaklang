@@ -8,7 +8,7 @@ desc(
 ### 漏洞描述
 
 1. **漏洞原理**
-   跨站脚本攻击（XSS）是一种常见的安全漏洞，攻击者通过在应用程序中注入恶意脚本，能够在其他用户的浏览器中执行这些脚本。在Java EE应用程序中，如果开发者未对用户输入进行适当的转义处理，直接将其输出到HTML页面中（例如在JSP中使用`${}`或`<%=%>`直接输出用户可控数据），就会导致XSS漏洞。
+   跨站脚本攻击（XSS）是一种常见的安全漏洞，攻击者通过在应用程序中注入恶意脚本，能够在其他用户的浏览器中执行这些脚本。在Java EE应用程序中，如果开发者未对用户输入进行适当的转义处理，直接将其输出到HTML页面中（例如在JSP中使用`${}`或`<%= %>`直接输出用户可控数据），就会导致XSS漏洞。
 
 2. **触发场景**
    当用户提交的包含恶意脚本的数据未经充分过滤或转义，被直接嵌入到动态生成的HTML页面中并返回给浏览器时，漏洞就会被触发。常见的场景包括：
@@ -39,7 +39,7 @@ DESC
 ### 修复建议
 
 #### 1. 对用户输入进行严格的输出转义
-在将用户控制的数据输出到HTML页面时，务必对其进行转义，将"<", ">", "&", "'", """等可能改变HTML结构的特殊字符转换为HTML实体。Java EE提供了多种方法进行转义：
+在将用户控制的数据输出到HTML页面时，务必对其进行转义，将`<`, `>`, `&`, `'`, `"`等可能改变HTML结构的特殊字符转换为HTML实体。Java EE提供了多种方法进行转义：
 
 - **使用JSTL的`<c:out>`标签**：这是推荐的方式，它默认会对输出进行HTML转义。
   ```jsp
@@ -86,10 +86,19 @@ $sink #{
     exclude:`* <getCallee> & $filter`
 }-> as $result;
 alert $result for {
-    message: "Find Java EE's XSS Vulnerability",
-    type: vuln,
-    level: high,
-};
+	message: "Find Java EE's XSS Vulnerability",
+	type: "vuln",
+	title: "Check Java EE XSS Vulnerability",
+	title_zh: "检测Java EE的XSS漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+}
+
 
 desc(
 	alert_min:1

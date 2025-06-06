@@ -18,7 +18,9 @@ desc(
    例如，一个应用程序接收用户提交的XML报文并使用默认配置的`SAXReader`进行解析：
    ```xml
    <?xml version="1.0" encoding="UTF-8"?>
-   <!DOCTYPE root [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+   <!DOCTYPE root [
+   <!ENTITY xxe SYSTEM "file:///etc/passwd">
+   ]>
    <root>&xxe;</root>
    ```
    在没有禁用外部实体解析的情况下，`SAXReader`会尝试读取 `/etc/passwd` 文件，并将其内容包含在解析结果中，从而导致文件内容泄露。
@@ -97,8 +99,16 @@ check $reader;
 $reader?{!.setFeature && !.setEntityResolver && !.setAllow* && !.setType*}.read() as $vulnCall;
 check $vulnCall;
 alert $vulnCall for {
-    message: "SAXReader() Unsafe Use in Context Sink",
-    level: "warning",
+	desc: <<<CODE
+
+CODE
+	level: "warning",
+	message: "SAXReader() Unsafe Use in Context Sink",
+	title: "Check Java SAXReader Unsafe Use",
+	title_zh: "检测 Java SAXReader 未安全使用",
+	solution: <<<CODE
+
+CODE
 }
 
 desc(

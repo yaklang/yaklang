@@ -43,7 +43,6 @@ desc(
    - **植入恶意软件:** 攻击者可能诱导用户下载并安装恶意软件。
    - **客户端重定向:** 将用户重定向到恶意网站。
    - **进一步攻击:** XSS可能是攻击链中的一环，用于绕过CSRF防护、配合其他漏洞发起更复杂的攻击。
-
 DESC
 	rule_id: "91441632-5409-4bfe-8c54-cb49e21c870d"
 	solution: <<<SOLUTION
@@ -118,10 +117,19 @@ $sink#{
     exclude:` *<getCallee> & $filter`
 }-> as $mid;
 alert $mid for {
-    message: "发现Java Servlet的XSS漏洞，并且数据流没有使用任何转义方法。",
-    type: vuln,
-    level: mid,
-};
+	type: "vuln",
+	title: "Check Java Servlet XSS Vulnerability",
+	title_zh: "检测Java Servlet XSS漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+	message: "发现Java Servlet的XSS漏洞，并且数据流没有使用任何转义方法。",
+}
+
 
 $sink#{
     include:`* & $source`,
@@ -129,10 +137,19 @@ $sink#{
 $all - $mid as $low;
 
 alert $low for {
-    message: "发现Java Servlet的XSS漏洞,并且数据流中使用了转义方法。",
-    type: vuln,
-    level: low,
-};
+	title: "Check Java Servlet XSS Vulnerability",
+	title_zh: "检测Java Servlet XSS漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	message: "发现Java Servlet的XSS漏洞,并且数据流中使用了转义方法。",
+	type: "vuln",
+}
+
 
 desc(
 	lang: java

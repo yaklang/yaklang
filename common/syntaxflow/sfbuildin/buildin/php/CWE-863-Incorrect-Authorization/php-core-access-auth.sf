@@ -107,11 +107,16 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high for {
-   title: "Direct File Operation Without Validation",
-   title_zh: "未经验证的文件操作高危漏洞",
-   level: "high",
-}
+	title: "Direct File Operation Without Validation",
+	title_zh: "未经验证的文件操作高危漏洞",
+	solution: <<<CODE
 
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+}
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
 CODE,exclude=<<<CODE
@@ -119,19 +124,29 @@ CODE,exclude=<<<CODE
 CODE)> as $mid
 
 alert $mid for {
-   title: "Insufficient Parameter Filtering",
-   title_zh: "参数过滤不完整风险",
-   level: "mid",
-}
+	title: "Insufficient Parameter Filtering",
+	title_zh: "参数过滤不完整风险",
+	solution: <<<CODE
 
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+}
 $sink - $high - $mid  as $low
 
 alert $low for {
-   title: "Potential Access Control Bypass",
-   title_zh: "潜在访问控制绕过风险",
-   level: "low",
-}
+	title: "Potential Access Control Bypass",
+	title_zh: "潜在访问控制绕过风险",
+	solution: <<<CODE
 
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+}
 desc(
 	lang: "php"
 	alert_min: 1

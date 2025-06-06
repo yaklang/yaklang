@@ -91,10 +91,16 @@ $sink.Select(*<slice(index=2)> #-> as $param);
 $param?{have: 'Parameter'} as $high;
 
 alert $high for {
-    title: 'SQL Injection detected',
-    title_zh: '检测到SQL注入',
-    type: 'vuln',
-    level: 'high',
+	type: "vuln",
+	title: "SQL Injection detected",
+	title_zh: "检测到SQL注入",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
 }
 
 desc(

@@ -1,5 +1,5 @@
 desc(
-	title: "Find Java Thirdparty CommandLine Executing Sink"
+	title: "Detect Java Thirdparty CommandLine Executing Sink"
 	lib: 'java-command-exec-sink'
 	type: audit
 	desc: <<<DESC
@@ -113,7 +113,18 @@ $systemcommandexecutorBuilderParam as $output;
 $apacheCommandLine as $output;
 $ztExecParam as $output;
 
-alert $output;
+alert $output for {
+	title: "Detect Java Thirdparty CommandLine Executing Sink",
+	title_zh: "查找Java第三方库命令执行Sink",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+}
+
 
 
 

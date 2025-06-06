@@ -8,7 +8,6 @@ desc(
 [CWE-327: Use of a Broken or Risky Cryptographic Algorithm](https://cwe.mitre.org/data/definitions/327.html)
 [Oracle Java SE 8 Dokumentation: SecretKeySpec](https://docs.oracle.com/javase/8/docs/api/javax/crypto/spec/SecretKeySpec.html)
 [Oracle Java SE 8 Dokumentation: Cipher](https://docs.oracle.com/javase/8/docs/api/javax/crypto/Cipher.html)
-
 REFERENCE
 	desc: <<<DESC
 ### 漏洞描述
@@ -54,7 +53,6 @@ REFERENCE
 - 数据完整性被破坏，攻击者可以在不被察觉的情况下修改加密数据。
 - 系统或应用因为加密算法的弱点而更容易受到其他类型的密码学攻击。
 - 不符合行业标准和合规性要求，导致法律和商业风险。
-
 DESC
 	rule_id: "f6e60690-fd58-4130-bef5-ff86b1fd3ec4"
 	solution: <<<SOLUTION
@@ -96,7 +94,6 @@ DESC
 
 #### 4. 及时更新加密库和依赖
 使用最新版本的加密库和相关的依赖，以获取最新的安全修复和性能改进。
-
 SOLUTION
 )
 
@@ -107,7 +104,16 @@ $algorithm#{
 }-> as $sink;
 
 alert $sink for {
-    message:"发现Java代码中使用了不安全的加密算法",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	message: "发现Java代码中使用了不安全的加密算法",
+	title: "Check Java Cipher Weak Encryption Algorithm",
+	title_zh: "检测Java Cipher使用不安全或有风险的加密算法",
 }
 
 desc(

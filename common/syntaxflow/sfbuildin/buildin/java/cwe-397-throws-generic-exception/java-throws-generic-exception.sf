@@ -6,8 +6,6 @@ desc(
 	risk:  "error-handling"
 	cwe: "CWE-397"
 	desc: <<<DESC
-在软件开发中，异常处理是确保代码可靠性和安全性的重要机制。Java 的异常机制设计目的是让调用者能够方便地预见可能发生的错误，并为每种异常情况编写针对性的处理代码。然而，声明一个方法抛出过于笼统的异常（如 `Exception` 或 `Throwable`）会使调用者难以理解、处理和修复发生的错误（对应 CWE-397: Declaration of Throws for Generic Exception）。这种做法违背了 Java 异常分类系统的设计初衷，降低了代码的可维护性和可靠性。
-
 ### 漏洞描述
 
 1. **问题原理**
@@ -69,7 +67,17 @@ REFERENCE
 *?{opcode:function}.throws as $throws 
 $throws?{have:/^(Exception|Throwable)$/} as $generic_throws 
 
-alert $generic_throws 
+alert $generic_throws for {
+	title_zh: "审计Java方法声明中抛出过于宽泛的异常",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	title: "Audit Java Generic Exception Throws Declaration",
+}
 
 desc(
 	lang:java

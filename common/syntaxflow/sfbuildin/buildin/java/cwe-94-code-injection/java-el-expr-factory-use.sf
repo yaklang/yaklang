@@ -3,10 +3,12 @@ desc(
 	type: audit
 	level: low
 	desc: <<<DESC
-### 1. 规则目的
+### 规则描述
+
+#### 1. 规则目的
 该规则用于审计 Java 代码中 `javax.el.ExpressionFactory` 的使用情况。特别是关注通过 `ExpressionFactory.newInstance().createValueExpression()` 方法创建表达式的代码，以识别潜在的 EL 表达式注入风险。
 
-### 2. 规则详细
+#### 2. 规则详细
 该规则属于审计（audit）类型，旨在查找代码中实例化 `ExpressionFactory` 并调用 `createValueExpression` 方法创建 EL 表达式的模式。尽管规则文件中的描述提到了硬编码的表达式，但在实际代码审计中，更重要的关注点是 `createValueExpression` 方法的第二个参数（表示 EL 表达式字符串）是否来自用户可控的不可信输入。如果 EL 表达式字符串可被外部控制，则可能导致EL表达式注入漏洞，允许攻击者执行任意 EL 代码，进而危及应用程序安全。因此，本规则作为基础审计，用于定位可能存在EL表达式注入风险的代码位置，后续需要人工或更复杂的流分析规则进一步判断是否存在风险。
 DESC
 	rule_id: "0ec1f11c-7559-4d8f-b711-40e9e7b4338a"
@@ -58,7 +60,17 @@ REFERENCE
 
 ExpressionFactory.newInstance().createValueExpression(*?{!<typeName>?{any: ExpressionFactory,StandardELContext }} as $params) as $vuln;
 check $params;
-alert $params
+alert $params for {
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	title: "Unvalidated EL Expression Injection",
+	title_zh: "未验证的EL表达式注入风险",
+	solution: <<<CODE
+
+CODE
+}
 
 desc(
 	lang: java

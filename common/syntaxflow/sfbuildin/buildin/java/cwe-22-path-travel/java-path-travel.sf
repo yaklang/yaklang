@@ -118,10 +118,19 @@ $sink #{
 }->as $high;
 
 alert $high for {
-    message: "Java代码中发现路径穿越漏洞，并且数据流中间没有进行任何过滤。",
-    type: vuln,
-    level: high,
-};
+	title_zh: "检测Java路径穿越漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	message: "Java代码中发现路径穿越漏洞，并且数据流中间没有进行任何过滤。",
+	type: "vuln",
+	title: "Check Java Path Traversal Vulnerability",
+}
+
 
 $sink #{
     include:`<self> & $source`,
@@ -129,10 +138,19 @@ $sink #{
 
 $result - $high as $low;
 alert $low for {
-    message: "Java代码中可能存在路径穿越漏洞。",
-    type: vuln,
-    level: low,
-};
+	title: "Check Java Path Traversal Vulnerability",
+	title_zh: "检测Java路径穿越漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	message: "Java代码中可能存在路径穿越漏洞。",
+	type: "vuln",
+}
+
 
 desc(
 	alert_high: 1

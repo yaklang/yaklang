@@ -1,5 +1,5 @@
 desc(
-	title: "Check PHP File Deletion Functions"
+	title: "Detect PHP File Deletion Functions"
 	type: audit
 	lib: 'php-file-unlink'
 	desc: <<<DESC
@@ -89,7 +89,17 @@ REFERENCE
 
 /^(unlink|rmdir)$/ as $output
 
-alert $output
+alert $output for {
+	title_zh: "检测PHP文件删除函数",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+	title: "Detect PHP File Deletion Functions",
+}
 
 desc(
 	lang: php

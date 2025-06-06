@@ -74,7 +74,18 @@ SOLUTION
 
 LIBXML_NOENT<getCall><getCallee>?{<getObject><name>?{have: DOMDocument} && <name>?{have: load} } as $vuln;
 check $vuln;
-alert $vuln;
+alert $vuln for {
+	level: "high",
+	title: "Detect PHP DOMDocument Load XXE Vulnerability",
+	title_zh: "检测PHP DOMDocument load XXE漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+}
+
 
 desc(
 	language: php

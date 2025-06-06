@@ -4,10 +4,8 @@ desc(
 	type: vuln
 	risk: "XXE"
 	reference: <<<REFERENCE
-URL
 https://docs.oracle.com/javase/8/docs/api/javax/xml/parsers/SAXParserFactory.html
 https://cwe.mitre.org/data/definitions/611.html
-URL
 REFERENCE
 	desc: <<<DESC
 ### 漏洞描述
@@ -36,7 +34,7 @@ REFERENCE
                parser.parse(new InputSource(new StringReader(xml)), new DefaultHandler()); // 解析用户控制的XML
            } catch (ParserConfigurationException | SAXException | IOException e) {
                e.printStackTrace();
-           }。
+           }
        }
    }
    ```
@@ -111,8 +109,16 @@ $toCheckCall - $excludeCall as $vulnCall;
 
 check $vulnCall;
 alert $vulnCall for {
-    message: "SAXParserFactory() Unsafe Use in Context Sink",
-    level: "warning",
+	title: "Detect Java SAXParserFactory Unsafe Use",
+	title_zh: "检测 Java SAXParserFactory 不安全使用",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+	message: "SAXParserFactory() Unsafe Use in Context Sink",
 }
 
 desc(

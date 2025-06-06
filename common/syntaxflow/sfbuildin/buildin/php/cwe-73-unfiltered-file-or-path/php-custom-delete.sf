@@ -28,6 +28,7 @@ desc(
     opendir($a);
 ?>
 ```
+
 DESC
 	rule_id: "a6f3be4b-5f16-46d8-8e0b-9182e5078345"
 	reference: <<<REFERENCE
@@ -103,9 +104,15 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high for {
-    title: "Unsafe File Operation Without Validation",
-    title_zh: "未经验证的文件操作",
-    level: "high"
+	title_zh: "未经验证的文件操作",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	title: "Unsafe File Operation Without Validation",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -115,17 +122,28 @@ CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
 alert $mid for {
-    title: "Insecure File Type Detection",
-    title_zh: "不安全的文件类型检测",
-    level: "mid"
+	title: "Insecure File Type Detection",
+	title_zh: "不安全的文件类型检测",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
 }
 $all - $high - $mid as $low
 alert $low for {
-    title: "Potential File Storage Path Misconfiguration",
-    title_zh: "潜在的文件存储路径配置问题",
-    level: "low"
-}
+	solution: <<<CODE
 
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	title: "Potential File Storage Path Misconfiguration",
+	title_zh: "潜在的文件存储路径配置问题",
+}
 desc(
 	lang: "php"
 	alert_exact: 1

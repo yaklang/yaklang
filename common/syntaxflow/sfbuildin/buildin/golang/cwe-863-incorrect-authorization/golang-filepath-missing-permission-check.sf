@@ -1,5 +1,5 @@
 desc(
-	title: "CWE-863: Incorrect Authorization"
+	title: "Detect Golang Path Traversal Vulnerability"
 	type: audit
 	level: low
 	desc: <<<DESC
@@ -27,7 +27,7 @@ desc(
        // 潜在危险的文件操作，如果 filePath 包含 "../"，可能删除应用程序目录之外的文件
        err := os.Remove(filePath)
        if err != nil {
-           fmt.Fprintf(w, "Failed to delete file: %v", err)
+           fmt.Fprintf(w, "Failed to delete file: %!!(MISSING)v(MISSING)", err)
            return
        }
 
@@ -47,7 +47,7 @@ desc(
    - **拒绝服务**: 通过删除关键系统文件，可能导致应用程序或整个系统瘫痪。
 DESC
 	rule_id: "838bdd38-5913-46ed-88f7-8eced02db2bd"
-	title_zh: "CWE-863: 验证或授权不当"
+	title_zh: "检测Golang路径穿越漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -144,10 +144,16 @@ $sink #{include: `$check`}-> as $safe;
 $sink #{exclude: `$safe`}-> as $low;
 
 alert $low for {
-    title: 'filedelele missing permission check',
-    title_zh: '检测到文件路径未授权',
-    type: 'vuln',
-    level: 'low',
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	type: "vuln",
+	title: "filedelele missing permission check",
+	title_zh: "检测到文件路径未授权",
 }
 
 desc(

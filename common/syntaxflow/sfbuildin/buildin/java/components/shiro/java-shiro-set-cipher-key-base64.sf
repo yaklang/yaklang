@@ -99,8 +99,30 @@ REFERENCE
 
 setCipherKey(*<slice(index=1)> as $key);
 $key?{opcode: call && <getCallee>?{<getObject><name>?{have: Base64} && <name>?{have: 'Base64.decode'}}(, *?{opcode: const}<var(base64EncodedKey)>) } as $sink;
-alert $base64EncodedKey for { level: high };
-alert $sink for { level: mid };
+alert $base64EncodedKey for {
+	title: "Detect Java Shiro Hardcoded Encryption Key",
+	title_zh: "检测Java Shiro硬编码加密密钥",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+}
+
+alert $sink for {
+	title: "Detect Java Shiro Hardcoded Encryption Key",
+	title_zh: "检测Java Shiro硬编码加密密钥",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+}
+
 
 desc(
 	lang: java

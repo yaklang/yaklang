@@ -79,7 +79,18 @@ $checkedStmt.executeQuery(*<slice(start=1)> as $sink);
 check $sink;
 
 $sink as $output;
-alert $output;
+alert $output for {
+	title: "Check Java JDBC Statement ExecuteQuery Call",
+	title_zh: "检测 Java JDBC Statement.executeQuery 调用",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+}
+
 
 desc(
 	lang: java

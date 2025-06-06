@@ -20,16 +20,12 @@ desc(
            return value;
        }
 
-       // 这是可能被绕过的一个简单过滤实现
        value = value.replaceAll("<", "&lt;").replaceAll(">", "&gt;");
        value = value.replaceAll("\\(", "&#40;").replace("\\)", "&#41;");
        value = value.replaceAll("'", "&#39;");
-       // 更容易被绕过的正则，如eval可能被Unicode编码绕过
        value = value.replaceAll("eval\\((.*)\\)", "");
-       // 这里的过滤规则可能不覆盖所有情况
        value = value.replaceAll("[\\\"\\\'][\\s]*javascript:(.*)[\\\"\\\']",
-               "\"");
-       // 仅移除'script'字符串可能被`<scr script ipt>`等方式绕过
+               "\"\"");
        value = value.replace("script", "");
 
        return value;
@@ -42,7 +38,6 @@ desc(
    - 修改网页内容，进行网络钓鱼。
    - 通过浏览器漏洞进一步攻击用户系统。
    - 网站声誉受损。
-
 DESC
 	rule_id: "c44e3929-2379-46d2-ad00-b30fece5e2e1"
 	solution: <<<SOLUTION
@@ -109,7 +104,18 @@ $entryCall(* as $paramEntry);
 $paramEntry.../(?i)replace(all)?/() as $replacers;
 
 check $entryCall then "Find XSS Escaper" else "No XSS Escaper";
-alert $entryCall;
+alert $entryCall for {
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	title: "Audit Java XSS Filter Bypass",
+	title_zh: "审计 Java XSS 白名单绕过",
+}
+
 
 desc(
 	lang: java

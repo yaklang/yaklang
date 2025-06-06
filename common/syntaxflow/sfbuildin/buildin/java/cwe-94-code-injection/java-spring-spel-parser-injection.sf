@@ -91,8 +91,16 @@ $sink #{
 }->  as  $mid;
 
 alert $mid for {
-    message: "发现Java Framework SPEL表达式注入漏洞",
-    level: mid,
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+	message: "发现Java Framework SPEL表达式注入漏洞",
+	title: "Check Java Spring SPEL Parser Injection",
+	title_zh: "检测Java Spring SPEL Parser表达式注入漏洞",
+	solution: <<<CODE
+
+CODE
 }
 
 $sink #{
@@ -102,8 +110,16 @@ $sink #{
 $result - $mid as $low;
 
 alert $low for {
-    message: "发现Java 可能存在Framework SPEL表达式注入漏洞",
-    level: low,
+	title_zh: "检测Java Spring SPEL Parser表达式注入漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	message: "发现Java 可能存在Framework SPEL表达式注入漏洞",
+	title: "Check Java Spring SPEL Parser Injection",
 }
 
 desc(

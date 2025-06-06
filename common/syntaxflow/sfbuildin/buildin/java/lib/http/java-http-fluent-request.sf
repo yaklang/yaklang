@@ -30,7 +30,18 @@ $execMethods(,* as $output);
 <delete(root)>
 <delete(methods)>
 <delete(execMethods)>
-alert $output;
+alert $output for {
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+	title: "Audit Java HTTP Fluent Request",
+	title_zh: "审计Java HTTP Fluent Request",
+}
+
 
 desc(
 	lang: java

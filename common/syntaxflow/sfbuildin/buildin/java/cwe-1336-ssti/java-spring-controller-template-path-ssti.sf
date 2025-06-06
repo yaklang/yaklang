@@ -116,10 +116,19 @@ CODE)> as $haveCall;
 
 $source - $haveCall as $withoutCall;
 alert $withoutCall for {
-    message: "Template Path Injection(Direct Use of User Input)",
-    level: high,
-    type: vuln,
-};
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	message: "Template Path Injection(Direct Use of User Input)",
+	type: "vuln",
+	title: "",
+	title_zh: "",
+	solution: <<<CODE
+
+CODE
+}
+
 
 $haveCall<dataflow(<<<CODE
 * - $haveCall as $other;
@@ -131,15 +140,33 @@ CODE)> as $filteredSink;
 
 $haveCall - $filteredSink as $unsafeFilteredSink;
 alert $unsafeFilteredSink for {
-    message: "Template Path Injection(Filtered Use of User Input)",
-    level: mid,
-    type: vuln,
-};
+	type: "vuln",
+	title: "",
+	title_zh: "",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+	message: "Template Path Injection(Filtered Use of User Input)",
+}
+
 alert $filteredSink for {
-    message: "The String or Content Filter is used. It is recommended to use the filter to prevent SSTI.",
-    level: low,
-    type: audit,
-};
+	message: "The String or Content Filter is used. It is recommended to use the filter to prevent SSTI.",
+	type: "audit",
+	title: "",
+	title_zh: "",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+}
+
 
 
 

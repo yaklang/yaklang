@@ -1,14 +1,11 @@
 desc(
-	title: "Find Java SQL String Append"
+	title: "Detect Java SQL String Append Vulnerability"
 	type: audit
 	level: low
 	risk:sqli
 	desc: <<<DESC
-### 1.规则目的
-该规则用于审计Java代码中可能导致SQL注入的安全风险。它通过识别使用`StringBuilder`或`StringBuffer`等类对象进行字符串拼接构建SQL查询语句的代码，旨在标记潜在的不安全数据处理场景。
-
-### 2.规则详细
-1. **风险原理**
+### 漏洞描述
+1. **漏洞原理**
 SQL注入是由于应用程序将用户提供的、未经充分过滤或转义的数据直接拼接到SQL查询字符串中，攻击者可以通过构造恶意输入来改变查询的逻辑，甚至执行非预期的数据库命令。
 
 本文中的规则侧重于识别`StringBuilder`或`StringBuffer`对象的`append()`方法中用于SQL构建的部分，特别是当append的内容为非常量时，这增加了SQL注入的风险。
@@ -24,7 +21,7 @@ Statement stmt = connection.createStatement();
 ResultSet rs = stmt.executeQuery(sqlString.toString());
 ```
 
-在上述示例中，如果用户输入 `1 OR 1=1`，最终执行的SQL将变为 `SELECT * FROM users WHERE id = 1 OR 1=1`，导致繞過應用程序原有的查詢邏輯。
+在上述示例中，如果用户输入 `1 OR 1=1`，最终执行的SQL将变为 `SELECT * FROM users WHERE id = 1 OR 1=1`，导致绕過應用程序原有的查詢邏輯。
 
 3. **潜在影响**
 - 绕过身份验证或访问控制。
@@ -33,7 +30,7 @@ ResultSet rs = stmt.executeQuery(sqlString.toString());
 - 通过数据库作为跳板，对内部网络进行进一步攻击。
 DESC
 	rule_id: "e53aa369-2d16-445a-a9e9-fb2155791246"
-	title_zh: "查找Java拼接SQL字符串"
+	title_zh: "检测Java拼接SQL字符串漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -95,7 +92,18 @@ check $params;
 $params?{!opcode: const}#{
     hook: `*?{opcode: const && have: 'WHERE'}<show> as $flag`,
 }->
-alert $flag;
+alert $flag for {
+	level: "low",
+	title: "Detect Java SQL String Append Vulnerability",
+	title_zh: "检测Java拼接SQL字符串漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+}
+
 
 
 desc(

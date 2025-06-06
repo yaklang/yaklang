@@ -1,5 +1,5 @@
 desc(
-	title: "Check Golang Reflected XSS using template.HTML"
+	title: "Detect Golang Reflected XSS using template.HTML"
 	type: audit
 	severity: high
 	desc: <<<DESC
@@ -99,10 +99,16 @@ template.HTML(* #-> as $source)
 $source?{have: '.GetSession'} as $high
 
 alert $high for {
-    title: 'Reflected XSS detected',
-    title_zh: '检测到反射XSS',
-    type: 'vuln',
-    level: 'high',
+	level: "high",
+	type: "vuln",
+	title: "Reflected XSS detected",
+	title_zh: "检测到反射XSS",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
 }
 
 desc(

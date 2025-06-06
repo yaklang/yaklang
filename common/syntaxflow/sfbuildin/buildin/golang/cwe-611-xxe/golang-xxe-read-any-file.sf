@@ -36,24 +36,24 @@ desc(
 
    func main() {
        xmlData := `<?xml version="1.0"?>
-   <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
-   <person>
+<!DOCTYPE foo [<ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<person>
        <name>&xxe;</name>
        <age>30</age>
-   </person>``
+</person>`
 
-    var person Person
-    decoder := xml.NewDecoder(strings.NewReader(xmlData))
+       var person Person
+       decoder := xml.NewDecoder(strings.NewReader(xmlData))
 
-    // 启用外部实体解析（可能导致漏洞）
-    decoder.Strict = true
-    // decoder.Entity = xml.HTMLEntity // 如果不禁用，HTMLEntity也会解析，但system entities会处理file://等
+       // 启用外部实体解析（可能导致漏洞）
+       decoder.Strict = true
+       // decoder.Entity = xml.HTMLEntity // 如果不禁用，HTMLEntity也会解析，但system entities会处理file://等
 
-    err := decoder.Decode(&person)
-    if err != nil {
-        fmt.Println("Error unmarshalling XML:", err)
-        return
-    }
+       err := decoder.Decode(&person)
+       if err != nil {
+           fmt.Println("Error unmarshalling XML:", err)
+           return
+       }
 
        fmt.Println("Name:", person.Name) // 如果XXE成功，会输出/etc/passwd的内容
    }
@@ -95,11 +95,11 @@ type Person struct {
 func main() {
     // 模拟用户 XML 输入
     xmlData := `<?xml version="1.0"?>
-<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<!DOCTYPE foo [<ENTITY xxe SYSTEM "file:///etc/passwd">]>
 <person>
     <name>&xxe;</name>
     <age>30</age>
-</person>``
+</person>`
 
     var person Person
     decoder := xml.NewDecoder(strings.NewReader(xmlData))
@@ -134,10 +134,16 @@ REFERENCE
 $sink.Strict?{!have: 'false'} as $high
 
 alert $high for {
-    title: 'xxe read any file check',
-    title_zh: '检测到XXE漏洞读取任意文件',
-    type: 'vuln',
-    level: 'high',
+	title_zh: "检测到文件路径未授权",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	type: "vuln",
+	title: "xxe read any file check",
 }
 
 desc(

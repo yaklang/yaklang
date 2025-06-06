@@ -105,7 +105,7 @@ func (v *SyntaxFlowVisitor) VisitHereDoc(i any) string {
 	}
 	if item.LfHereDoc() != nil {
 		doc, ok := item.LfHereDoc().(*sf.LfHereDocContext)
-		if ok {
+		if ok && doc.LfText() != nil {
 			return doc.LfText().GetText()
 		}
 		return ""

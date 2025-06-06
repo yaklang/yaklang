@@ -10,7 +10,7 @@ desc(
 [JCA 1.6 Specification - Work Management](https://download.oracle.com/otndocs/jcp/jca-1.6-fr-spec/index.html)
 REFERENCE
 	description: <<<DESCRIPTION
-    J2EE 标准明确限制在Web应用中直接管理线程，因其在容器环境中存在高风险。线程控制不仅实现复杂，更可能引发不可控的容器冲突。即便未触发容器异常，仍可能引发隐蔽性极强的并发问题，包括死锁、竞态条件及资源争用等同步缺陷。
+
 DESCRIPTION
 	rule_id: "8e009f30-c716-4c22-b4c4-9d394e88c824"
 	solution: <<<SOLUTION
@@ -92,25 +92,60 @@ SOLUTION
 Thread()?{<typeName>?{have:'java.lang.Thread'}} as $thread;
 Thread?{<typeName>?{have:'java.lang.Thread'}}.currentThread() as $thread;
 alert $thread for {
-    message: '检测到Java项目中使用了Thread类',
-    level: info,
+	title: "Unmanaged Thread Usage",
+	title_zh: "未管理线程使用",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "info",
+	message: "检测到Java项目中使用了Thread类",
 }
 
 ThreadLocal()?{<typeName>?{have:'java.lang.ThreadLocal'}} as $threadLocal;
 alert $threadLocal for {
-    message: '检测到Java项目中使用了ThreadLocal类',
+	desc: <<<CODE
+
+CODE
+	level: "info",
+	message: "检测到Java项目中使用了ThreadLocal类",
+	title: "ThreadLocal Usage",
+	title_zh: "ThreadLocal使用",
+	solution: <<<CODE
+
+CODE
 }
 
 $thread./^(destroy|interrupt|join|resume|start|stop|suspend)$/ as $weak;
 // Thread.sleep
 Thread./^(sleep|yield)$/?{<typeName>?{have:'java.lang'}} as $weak;
 alert $weak for {
-    message:'检测到Java项目中使用了Thread类的destroy、interrupt、join、resume、sleep、start、stop、suspend或yield方法',
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "info",
+	message: "检测到Java项目中使用了Thread类的destroy、interrupt、join、resume、sleep、start、stop、suspend或yield方法",
+	title: "Deprecated Thread Methods",
+	title_zh: "废弃的线程方法",
 }
 
 run?{opcode:function}<getInterfaceBlueprint>?{have:'Runnable'} as $run
 alert $run for {
-    message:'检测到Java项目中使用了Runnable接口并且实现了run方法',
+	title_zh: "",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "",
+	message: "检测到Java项目中使用了Runnable接口并且实现了run方法",
+	title: "",
 }
 
 desc(

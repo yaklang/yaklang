@@ -38,7 +38,6 @@ desc(
    - 绕过认证：绕过应用程序的登录验证，以管理员身份访问系统。
    - 执行任意命令：在某些情况下，攻击者可能通过 SQL 注入执行操作系统命令。
    - 拒绝服务：通过构造恶意查询导致数据库服务器过载或崩溃。
-
 DESC
 	rule_id: "6702b6aa-bb87-4be9-9b11-b91359ded6b6"
 	solution: <<<SOLUTION
@@ -104,10 +103,16 @@ $client.User.Query().Where(* #-> as $param);
 $param?{have: 'Parameter'} as $high;
 
 alert $high for {
-    title: 'SQL Injection detected',
-    title_zh: '检测到SQL注入',
-    type: 'vuln',
-    level: 'high',
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	type: "vuln",
+	title: "SQL Injection detected",
+	title_zh: "检测到SQL注入",
+	solution: <<<CODE
+
+CODE
 }
 
 desc(

@@ -21,7 +21,7 @@ import java.util.Map;
 public class InsecureHashConfig {
     public static void main(String[] args) {
         // 使用 System.setProperty() 方法配置不安全的哈希函数 (MD5)
-        System.setProperty("jasypt.encryptor.algorithm", "MD5"); // <-- 风险点
+        System.setProperty("jasypt.encryptor.algorithm", "MD5"); // -- 风险点
 
         String password = "mysecretpassword";
         // ... 使用哈希算法处理password ... 

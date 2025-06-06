@@ -81,10 +81,16 @@ $allParams?{<self> #{include: <<<CODE
 CODE
 }->} as $sink
 
-alert $sink for{
-    title: "PHP Unfiltered Directory Reading",
-    title_zh: "PHP未过滤目录读取",
-    level: "high",
+alert $sink for {
+	title_zh: "PHP未过滤目录读取漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	title: "PHP Unfiltered Directory Reading Vulnerability",
 }
 desc(
 	lang: "php"

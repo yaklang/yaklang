@@ -141,10 +141,16 @@ $param #{until: `* & $target`}-> as $check;
 $target as $high
 
 alert $high for {
-    title: 'open redirect vulnerability check',
-    title_zh: '检测到重定向漏洞',
-    type: 'vuln',
-    level: 'high',
+	title: "open redirect vulnerability check",
+	title_zh: "检测到重定向漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	type: "vuln",
 }
 
 desc(

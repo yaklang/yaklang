@@ -43,7 +43,17 @@ pop?{<fullTypeName>?{have: 'github.com/gobuffalo/pop'}} as $entry;
 $entry.Connect <getCall> as $db;
 $db <getMembers> as $output;
 
-alert $output
+alert $output for {
+	level: "info",
+	title: "Audit Golang Database Pop Usage",
+	title_zh: "审计 Go 语言 Database Pop 库使用",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+}
 
 desc(
 	lang: golang

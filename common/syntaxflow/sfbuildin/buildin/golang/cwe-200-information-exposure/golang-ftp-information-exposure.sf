@@ -12,7 +12,7 @@ desc(
   - **当前工作路径泄露**: 调用`CurrentDir()`等函数时，泄露当前FTP连接所在服务器的绝对或相对路径。
   - **服务器系统类型识别**: 调用`SystemType()`等函数时，泄露服务器操作系统的类型信息。
 
-这些信息通常被攻击者用于信息收集阶段，帮助他们更好地了解目标环境，寻找进一步 атаки点。
+这些信息通常被攻击者用于信息收集阶段，帮助他们更好地了解目标环境，寻找进一步攻击点。
 
 2. **触发场景**
 当应用程序连接到FTP服务器并执行了上述可能泄露信息的函数（如`List()`, `CurrentDir()`, `SystemType()`），并且其输出被直接或间接（通过日志、调试信息等）暴露给了非受信的用户或环境时，就可能触发信息泄露。例如，一个内部工具在处理用户上传文件时，将处理过程中的FTP目录列表或当前路径信息打印到日志中，而这些日志又被非法访问。
@@ -20,10 +20,9 @@ desc(
 3. **潜在影响**
 攻击者利用泄露的信息可以：
   - 枚举服务器文件和目录，发现潜在的敏感文件或配置。
-  - 了解服务器路径结构，辅助进行路径穿越或文件操作 атаки。
+  - 了解服务器路径结构，辅助进行路径穿越或文件操作攻击。
   - 识别服务器操作系统类型，从而针对性地利用已知漏洞。
   - 在某些情况下，泄露的信息可能提供关于内部网络结构或应用程序逻辑的线索。
-
 DESC
 	rule_id: "4c742090-cd2c-456b-b8e5-4cb2740abbbd"
 	title_zh: "检测Golang FTP信息泄露"
@@ -86,7 +85,6 @@ func listFiles(conn *ftp.ServerConn, dir string) {
 
 5. **日志安全管理**
 如果必须记录FTP操作的详细信息，确保相关的日志文件存储在安全的位置，并且只有授权人员才能访问。
-
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-200: Information Exposure](https://cwe.mitre.org/data/definitions/200.html)
@@ -100,10 +98,16 @@ $sink.CurrentDir() as $low;
 $sink.SystemType() as $low;
 
 alert $low for {
-    title: 'FTP Information Exposure',
-    title_zh: '检测到FTP信息泄露',
-    type: 'vuln',
-    level: 'low',
+	title_zh: "检测到FTP信息泄露",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	type: "vuln",
+	title: "FTP Information Exposure",
 }
 
 desc(

@@ -59,9 +59,17 @@ $sink #{
 }-> as $high;
 
 alert $high for {
-    message: "发现Java Spring Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
-    risk: "Groovy-Shell代码执行",
-    level: high,
+	title_zh: "",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	message: "发现Java Spring Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
+	risk: "Groovy-Shell代码执行",
+	title: "",
 }
 
 $sink #{
@@ -70,9 +78,17 @@ $sink #{
 $result - $high as $low;
 
 alert $low for {
-    message: "发现Java Spring Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
-    risk: "Groovy-Shell代码执行",
-    level: low,
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	message: "发现Java Spring Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
+	risk: "Groovy-Shell代码执行",
+	title: "",
+	title_zh: "",
+	solution: <<<CODE
+
+CODE
 }
 
 desc(

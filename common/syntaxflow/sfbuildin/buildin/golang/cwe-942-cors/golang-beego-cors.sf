@@ -19,10 +19,16 @@ $sink -{
 $data?{have:".Ctx.ResponseWriter.Header"} as $high
 
 alert $high for {
-    title: 'CORS detected',
-    title_zh: '检测到CORS',
-    type: 'vuln',
-    level: 'high',
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	type: "vuln",
+	title: "CORS detected",
+	title_zh: "检测到CORS",
+	solution: <<<CODE
+
+CODE
 }
 
 desc(

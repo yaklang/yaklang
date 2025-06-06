@@ -1,15 +1,26 @@
 desc(
-	title: "Find Java javax.script.* ScriptEngineManager eval Sink"
+	title: "Detect Java ScriptEngineManager eval Risk"
 	type: audit
 	lib: "java-js-sink"
 	rule_id: "f72c0172-5edc-4436-901f-c33606c18899"
 	solution: <<<SOLUTION
-none
+### 修复建议
+1. **避免直接使用用户输入**
+   不应直接将用户输入传递给`eval`方法，而是应该首先验证输入的有效性和安全性。例如，可以使用白名单验证方法来确保输入仅包含允许的操作。
+
+2. **使用安全替代方案**
+   尽量使用安全的替代方案，例如，可以通过预定义的函数或方法来执行特定的操作，而不是动态执行用户提供的代码。
+
+3. **输入验证和过滤**
+   在将用户输入传递给`eval`之前，应对其进行严格的验证和过滤，以防止恶意代码的执行。可以考虑使用正则表达式或其他验证技术来实现这一点。
+
+4. **沙箱环境**
+   如果必须使用`eval`执行用户输入，应将其置于沙箱环境中，限制其执行权限，以减少潜在的风险。
 SOLUTION
 	reference: <<<REFERENCE
 none
 REFERENCE
-	title_zh: "查找Java javax.script.* ScriptEngineManager eval Sink"
+	title_zh: "检测Java ScriptEngineManager eval 风险"
 	desc: <<<DESC
 ### 1.规则目的
 该规则用于查找Java代码中使用了`javax.script.*`包下的`ScriptEngineManager`类及其相关方法的代码片段。特别是关注`getEngineByName`, `getEngineByExtension`, `getEngineByMimeType`方法获取`ScriptEngine`对象后，对该对象的`eval`、`put`、`compile`等方法的使用。
@@ -60,7 +71,18 @@ $engine.put(,* as $params);
 $engine.compile(,* as $params);
 check $params;
 $params as $output;
-alert $output;
+alert $output for {
+	title: "Detect Java ScriptEngineManager eval Risk",
+	title_zh: "检测Java ScriptEngineManager eval 风险",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+}
+
 
 
 desc(

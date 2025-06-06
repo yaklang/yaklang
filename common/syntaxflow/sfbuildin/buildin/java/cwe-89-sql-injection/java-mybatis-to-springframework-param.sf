@@ -1,6 +1,6 @@
 desc(
-	title: "Find Java MyBatis/iBatis XML Weak ('${...}') Params to Spring Params"
-	title_zh: "查找 Java MyBatis/iBatis XML Mapper 不安全(${...})参数"
+	title: "Detect Java MyBatis/iBatis XML Weak ('${...}') Params to Spring Params"
+	title_zh: "检测 Java MyBatis/iBatis XML Mapper 不安全(${...})参数"
 	type: vuln
 	level: middle
 	risk: sqli
@@ -105,16 +105,32 @@ $all<dataflow(
     include=`* & $filter`
 )> as $mid
 
-alert $mid for{
-    message:"发现Mybatis SQL注入，但是数据流中有过滤函数。",
-    level:mid,
+alert $mid for {
+	title: "Detect Java MyBatis/iBatis XML Weak ('${...}') Params to Spring Params",
+	title_zh: "检测 Java MyBatis/iBatis XML Mapper 不安全(${...})参数",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+	message: "发现Mybatis SQL注入，但是数据流中有过滤函数。",
 }
 
 $all - $mid as $high
 
 alert $high for {
-    message:"发现Mybatis SQL注入，并且数据流中没有过滤函数。",
-    level:high,
+	message: "发现Mybatis SQL注入，并且数据流中没有过滤函数。",
+	title: "Detect Java MyBatis/iBatis XML Weak ('${...}') Params to Spring Params",
+	title_zh: "检测 Java MyBatis/iBatis XML Mapper 不安全(${...})参数",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
 }
 desc(
 	language: java

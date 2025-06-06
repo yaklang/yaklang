@@ -33,7 +33,6 @@ DESC
 将 `sqlite-jdbc` 库升级到 3.36.0 或之后的版本。新版本中修复了 JDBC URL 解析相关的漏洞，包括 CVE-2020-15358。这是最直接且有效的修复方法。
 
 ```xml
-<!-- Maven 示例 -->
 <dependency>
     <groupId>org.xerial</groupId>
     <artifactId>sqlite-jdbc</artifactId>
@@ -74,7 +73,15 @@ __dependency__.*sqlite*jdbc.version as $ver;
 
 $ver in [3.8.9,3.36.0] as $vuln_sqlite_jdbc;
 alert $vuln_sqlite_jdbc for {
-    message: 'SCA: sqlite-jdbc versions between 3.8.9 and 3.36.0 have an SQL injection vulnerability',
-    cve: 'CVE-2020-15358',
-    level: 'high',
+	level: "high",
+	message: "SCA: sqlite-jdbc versions between 3.8.9 and 3.36.0 have an SQL injection vulnerability",
+	cve: "CVE-2020-15358",
+	title: "SCA: Check Java sqlite-jdbc Vulnerability",
+	title_zh: "SCA: 检测 Java sqlite-jdbc 依赖漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
 }

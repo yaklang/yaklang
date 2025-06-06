@@ -130,10 +130,16 @@ $sink?{have: 'Parameter'} as $check;
 $check as $high;
 
 alert $high for {
-    title: 'Reflected XSS detected',
-    title_zh: '检测到命令注入',
-    type: 'vuln',
-    level: 'high',
+	level: "high",
+	type: "vuln",
+	title: "Detect Golang Command Injection Vulnerability",
+	title_zh: "检测Golang命令注入漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
 }
 
 desc(

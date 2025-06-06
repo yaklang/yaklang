@@ -118,8 +118,16 @@ $fromXML?{ <getObject>?{!.setMode && !.allowType* && !.setupDefaultSecurity && !
 
 check $vuln;
 alert $vuln for {
-    message: "XStream Unsafe Use in Context Sink",
-    level: "warning",
+	title: "Check Java XStream Unsafe Deserialization",
+	title_zh: "检测 Java XStream 不安全反序列化",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "warning",
+	message: "XStream Unsafe Use in Context Sink",
 }
 
 desc(

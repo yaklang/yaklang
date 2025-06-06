@@ -6,8 +6,7 @@ desc(
 http://docs.oracle.com/javase/8/docs/api/java/net/Socket.html
 REFERENCE
 	description: <<<DESCRIPTION
-    在 Web 应用程序中直接使用基于套接字的底层通信协议时，尤其是在与陈旧系统集成的场景中，极易引入安全漏洞。开发自定义通信协议需要自行解决输入/输出信号验证、协议版本兼容性、通信通道加密缺失（如未启用 TLS/SSL）、错误处理机制缺陷、防火墙穿透与网络限制规避、会话管理与重放攻击防护等复杂安全问题。即使使用标准协议，若未正确配置安全机制，攻击者仍可借助公开的协议规范和漏洞库发起定向攻击。
-    值得注意的是，主流标准协议（如 HTTP/SMTP）通常拥有成熟的漏洞修复方案，而自定义协议缺乏社区支持和持续安全更新。
+
 DESCRIPTION
 	solution: <<<SOLUTION
 ### 修复建议
@@ -50,15 +49,25 @@ DESCRIPTION
 
 4. **通过API网关隔离遗留系统风险**
    对于必须与采用非标准协议或存在安全风险的遗留系统交互的场景，考虑在应用外部署API网关或协议转换中间件。应用通过标准的、安全的协议与网关通信，由网关负责与遗留系统进行风险交互。
+
 SOLUTION
 	rule_id: "a6d1d49b-6bd2-4097-a3c9-dfaabe042d54"
 )
 
 *Socket*?{<typeName>?{have:'javax.net'}}  as $weak;
 alert $weak for {
-    message: "发现Java J2EE 使用socket",
-    level:info,
-};
+	title: "Unvalidated Java J2EE Socket Usage",
+	title_zh: "未验证的Java J2EE套接字使用",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "info",
+	message: "发现Java J2EE 使用socket",
+}
+
 
 desc(
 	lang:java

@@ -85,10 +85,19 @@ SimpleEmail()?{<typeName>?{have:'org.apache.commons.mail'}} as $simpleEmail;
 check $simpleEmail;
 $simpleEmail?{!(.setSSLCheckServerIdentity)} as $sink;
 alert $sink for {
-    message_zh: "SimpleEmail 未验证务器的SSL证书",
-    message: "SimpleEmail has not verified the server’s security certificate.",
-    level:info,
-};
+	title_zh: "检测Java SimpleEmail证书校验",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "info",
+	message_zh: "SimpleEmail 未验证务器的SSL证书",
+	message: "SimpleEmail has not verified the server’s security certificate.",
+	title: "Check Java SimpleEmail Certificate Verification",
+}
+
 
 desc(
 	lang: java

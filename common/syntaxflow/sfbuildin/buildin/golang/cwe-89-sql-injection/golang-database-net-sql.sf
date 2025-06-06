@@ -16,26 +16,26 @@ desc(
    **示例代码**
    ```go
    func login(w http.ResponseWriter, r *http.Request) {
-   	username := r.FormValue("username")
-   	password := r.FormValue("password")
+       username := r.FormValue("username")
+       password := r.FormValue("password")
 
-   	// 不安全的 SQL 查询
-   	query := fmt.Sprintf("SELECT * FROM users WHERE username='%s' AND password='%s'", username, password)
+       // 不安全的 SQL 查询
+       query := fmt.Sprintf("SELECT * FROM users WHERE username='%s' AND password='%s'", username, password)
 
-   	db, err := sql.Open("mysql", "user:password@/dbname")
-   	if err != nil {
-   		log.Fatal(err)
-   	}
-   	defer db.Close()
+       db, err := sql.Open("mysql", "user:password@/dbname")
+       if err != nil {
+           log.Fatal(err)
+       }
+       defer db.Close()
 
-   	var userID int
-   	err = db.QueryRow(query).Scan(&userID)
-   	if err != nil {
-   		http.Error(w, "Invalid login", http.StatusUnauthorized)
-   		return
-   	}
+       var userID int
+       err = db.QueryRow(query).Scan(&userID)
+       if err != nil {
+           http.Error(w, "Invalid login", http.StatusUnauthorized)
+           return
+       }
 
-   	fmt.Fprintf(w, "User ID: %d", userID)
+       fmt.Fprintf(w, "User ID: %d", userID)
    }
    ```
 
@@ -43,7 +43,6 @@ desc(
    - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
    - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
    - 通过数据库提权进一步渗透至服务器或其他系统组件。
-
 DESC
 	rule_id: "1c99dff2-ccc4-452a-8a95-2594dd2340d8"
 	title_zh: "检测Golang SQL注入漏洞"
@@ -56,31 +55,31 @@ DESC
    ```go
    // 修复代码示例
    func login(w http.ResponseWriter, r *http.Request) {
-   	username := r.FormValue("username")
-   	password := r.FormValue("password")
+       username := r.FormValue("username")
+       password := r.FormValue("password")
 
-   	db, err := sql.Open("mysql", "user:password@/dbname")
-   	if err != nil {
-   		log.Fatal(err)
-   	}
-   	defer db.Close()
+       db, err := sql.Open("mysql", "user:password@/dbname")
+       if err != nil {
+           log.Fatal(err)
+       }
+       defer db.Close()
 
-   	// 安全的参数化查询
-   	query := "SELECT * FROM users WHERE username = ? AND password = ?"
-   	stmt, err := db.Prepare(query)
-   	if err != nil {
-   		log.Fatal(err)
-   	}
-   	defer stmt.Close()
+       // 安全的参数化查询
+       query := "SELECT * FROM users WHERE username = ? AND password = ?"
+       stmt, err := db.Prepare(query)
+       if err != nil {
+           log.Fatal(err)
+       }
+       defer stmt.Close()
 
-   	var userID int
-   	err = stmt.QueryRow(username, password).Scan(&userID)
-   	if err != nil {
-   		http.Error(w, "Invalid login", http.StatusUnauthorized)
-   		return
-   	}
+       var userID int
+       err = stmt.QueryRow(username, password).Scan(&userID)
+       if err != nil {
+           http.Error(w, "Invalid login", http.StatusUnauthorized)
+           return
+       }
 
-   	fmt.Fprintf(w, "User ID: %d", userID)
+       fmt.Fprintf(w, "User ID: %d", userID)
    }
    ```
 
@@ -100,10 +99,16 @@ $sink.QueryRow( * #-> as $param);
 $param?{have: 'Parameter'} as $high;
 
 alert $high for {
-    title: 'SQL Injection detected',
-    title_zh: '检测到SQL注入',
-    type: 'vuln',
-    level: 'high',
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	type: "vuln",
+	title: "SQL Injection detected",
+	title_zh: "检测到SQL注入",
+	solution: <<<CODE
+
+CODE
 }
 
 desc(

@@ -137,10 +137,16 @@ $sink #{include: `$check`}-> as $safe;
 $sink #{exclude: `$safe`}-> as $low;
 
 alert $low for {
-    title: 'Reflected XSS detected',
-    title_zh: '检测到未过滤路径',
-    type: 'vuln',
-    level: 'low',
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	type: "vuln",
+	title: "Reflected XSS detected",
+	title_zh: "检测到未过滤路径",
 }
 
 desc(

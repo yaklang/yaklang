@@ -14,8 +14,10 @@ desc(
    示例（概念）：
    ```xml
    <?xml version="1.0" encoding="ISO-8859-1"?>
-   <!DOCTYPE foo [ <!ELEMENT foo ANY >
-     <!ENTITY xxe SYSTEM "file:///etc/passwd" >]>
+   <!DOCTYPE foo [
+     <!ELEMENT foo ANY>
+     <!ENTITY xxe SYSTEM "file:///etc/passwd">
+   ]>
    <feed>
      <title>&xxe;</title>
      ...
@@ -89,7 +91,15 @@ REFERENCE
 __dependency__.*rome.version as $ver;
 $ver in (,1.15.0] as $vuln_rome;
 alert $vuln_rome for {
-    message: 'SCA: rome versions between 1 and 1.15.0 have an XXE vulnerability',
-    cve: 'CVE-2020-15250',
-    level: 'high',
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	message: "SCA: rome versions between 1 and 1.15.0 have an XXE vulnerability",
+	cve: "CVE-2020-15250",
+	title: "SCA: Check Java rome XXE Vulnerability",
+	title_zh: "SCA: 检测Java rome XXE漏洞",
+	solution: <<<CODE
+
+CODE
 }

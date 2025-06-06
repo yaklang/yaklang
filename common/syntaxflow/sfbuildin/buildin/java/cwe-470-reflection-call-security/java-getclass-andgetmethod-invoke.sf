@@ -65,7 +65,7 @@ if (methodName != null && allowedMethods.contains(methodName)) {
 #### 3. 使用安全沙箱或权限控制
 如果应用程序运行环境支持，可以考虑使用Java安全管理器（SecurityManager）或类似的沙箱机制，限制反射操作的权限，例如不允许调用执行系统命令的方法。
 
-#### 4. 最小化反射の使用
+#### 4. 最小化反射的使用
 评估是否确实需要使用反射。许多情况下，可以通过接口、抽象类或工厂模式等更安全的设计模式替代反射，从而降低风险。
 SOLUTION
 	reference: <<<REFERENCE
@@ -79,10 +79,19 @@ $entry #{
     until: `*?{opcode: param}<var(params)> as $__next__`,
 }->;
 alert $params for {
-    message: "Java Reflection Call Security Vulnerability via getClass() and getMethod()",
-    level: mid,
-    type: audit,
-};
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+	message: "Java Reflection Call Security Vulnerability via getClass() and getMethod()",
+	type: "audit",
+	title: "Java Reflection Call Security Vulnerability via getClass() and getMethod()",
+	title_zh: "Java 反射调用安全漏洞（getClass() 和 getMethod()）",
+}
+
 
 
 desc(

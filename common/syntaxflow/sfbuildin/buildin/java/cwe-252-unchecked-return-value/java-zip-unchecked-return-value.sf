@@ -107,17 +107,33 @@ REFERENCE
 
 .getInputStream() as $toCheck;
 $toCheck?{<typeName>?{have:'java.util.zip.ZipFile' }}?{!<getUsers>} as $weak1;
-alert $weak1 for{
-    message:"发现Java java.util.zip.ZipFile未检查返回值的API",
-    risk:'api-abuse',
-    level:info,
+alert $weak1 for {
+	title: "Check Java Zip Unchecked Return Value",
+	title_zh: "检测Java Zip未检查返回值的API",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "info",
+	message: "发现Java java.util.zip.ZipFile未检查返回值的API",
+	risk: "api-abuse",
 }
 
 $toCheck?{<typeName>?{have:'org.apache.commons.compress.archivers.zip.ZipFile'}}?{!<getUsers>} as $weak2;
-alert $weak2 for{
-    message:"发现Java org.apache.commons.compress.archivers.zip.ZipFile未检查返回值的API",
-    risk:'api-abuse',
-    level:low,
+alert $weak2 for {
+	title: "Check Java Zip Unchecked Return Value",
+	title_zh: "检测Java Zip未检查返回值的API",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	message: "发现Java org.apache.commons.compress.archivers.zip.ZipFile未检查返回值的API",
+	risk: "api-abuse",
 }
 
 desc(

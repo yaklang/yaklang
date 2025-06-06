@@ -22,7 +22,7 @@ desc(
 
 3. **潜在影响**
    - **降低密码破解难度:** 攻击者可以利用已知的硬编码盐值对截获的密文进行离线攻击，结合弱密码策略，可以大幅度提高破解速度和成功率。
-   - **影响系统安全性:** 如果PBE用于加密敏感数据（ zoals wachtwoorden, geheime sleutels, configuratiebestanden），硬编码盐值使得这些敏感信息更容易被解密，导致数据泄露、身份冒用等严重安全问题。
+   - **影响系统安全性:** 如果PBE用于加密敏感数据（如用户凭证、秘密密钥、配置文件），硬编码盐值使得这些敏感信息更容易被解密，导致数据泄露、身份冒用等严重安全问题。
    - **违反安全最佳实践:** 硬编码密码学参数违反了机密性和完整性的安全原则，不符合现代加密实践的要求。
 
 ### 规则目的
@@ -90,8 +90,17 @@ $salt?{!(.*#{exclude:`* ?{opcode:const}`}->)} as $toCheck;
 // salt没有被如random.nextBytes(salt)这样的函数修正过
 $toCheck?{!<getCall>?{have:/(?i)(random|next)/}} as $risk
 
-alert $risk for{
-    message:"发现Java代码中使用硬编码的PBE盐值",
+alert $risk for {
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	message: "发现Java代码中使用硬编码的PBE盐值",
+	title: "Detect Java Risky Hardcoded PBE Salt",
+	title_zh: "检测Java 哈希算法使用硬编码的PBE盐值",
 }
 
 desc(

@@ -32,7 +32,7 @@ String jdbcUrl = new String(b); // 存在风险，解码的是二进制数据，
 3. **潜在影响**
 - **数据丢失与损坏：** 原始字节数据无法正确还原，导致信息丢失或变为乱码。
 - **程序逻辑错误：** 基于损坏字符串进行的后续操作（如解析、比较、进一步处理）产生非预期结果。
-- **哈希校验失败/冲突：** 基于损坏字符串计算的哈希值不正确，影响 데이터完整性验证，甚至可能在特定情况下增加哈希冲突的风险。
+- **哈希校验失败/冲突：** 基于损坏字符串计算的哈希值不正确，影响数据完整性验证，甚至可能在特定情况下增加哈希冲突的风险。
 - **安全功能绕过：** 在依赖于正确数据解析的安全检查（如文件类型魔术字节检查、输入格式验证）中，错误的字符串转换可能导致安全功能被绕过。
 - **调试困难：** 错误隐藏在数据转换过程中，难以快速定位问题根源。
 DESC
@@ -92,7 +92,17 @@ REFERENCE
 String() as $string_constructor 
 $string_constructor?{<getActualParams()>* <fullTypeName()>?{have:"byte"}} as $target 
 
-alert $target 
+alert $target for {
+	title: "Check Java Insecure Byte Array to String Converion",
+	title_zh: "检测Java不安全的字节数组到字符串转换",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+}
 
 
 

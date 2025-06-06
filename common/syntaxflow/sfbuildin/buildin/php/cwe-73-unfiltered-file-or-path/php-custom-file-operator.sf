@@ -102,12 +102,18 @@ CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high for{
-    title: 'Direct file manipulation,not call method',
-    type: 'vuln',
-    level: 'high'
-}
+alert $high for {
+	title: "Unfiltered PHP File Manipulation Vulnerability",
+	title_zh: "PHP未过滤文件操作漏洞",
+	solution: <<<CODE
 
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	type: "vuln",
+}
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
 CODE,exclude=<<<CODE
@@ -116,20 +122,31 @@ CODE)> as $highAndMid
 
 $highAndMid - $high as $middle
 
-alert $middle for{
-    title_zh: '存在文件操作，文件操作经过函数，但未检出过滤',
-    title: 'File operations exist, file operations pass through functions, but no filter is checked out',
-    type: 'mid',
-    level: 'mid'
-}
+alert $middle for {
+	level: "mid",
+	type: "mid",
+	title: "PHP File Operation with Insufficient Filtering",
+	title_zh: "PHP文件操作，过滤不足",
+	solution: <<<CODE
 
+CODE
+	desc: <<<CODE
+
+CODE
+}
 $sink - $high - $middle as $low
 
-alert $low for{
-    title_zh: '存在文件操作，文件操作经过函数，检出过滤',
-    title: 'File operations exist, file operations pass through functions,  filter is checked out',
-    type: 'low',
-    level: 'low'
+alert $low for {
+	title: "PHP File Operation with Filtering Mechanism",
+	title_zh: "PHP文件操作，存在过滤机制",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	type: "low",
 }
 desc(
 	lang: php

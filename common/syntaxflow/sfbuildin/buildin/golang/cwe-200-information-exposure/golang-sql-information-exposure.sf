@@ -110,10 +110,16 @@ $param #{
 }-> as $low;
 
 alert $low for {
-    title: 'FTP Information Exposure',
-    title_zh: '检测到SQL信息泄露',
-    type: 'vuln',
-    level: 'low',
+	title: "Detect Golang SQL Information Exposure",
+	title_zh: "检测Golang SQL信息泄露",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	type: "vuln",
 }
 
 desc(

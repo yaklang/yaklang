@@ -110,16 +110,33 @@ $controlled_source_site<dataflow(
 )> as $high_source_site 
 
 
-alert $high_source_site for{
-    message: "发现Java代码中存在命令注入漏洞，并且数据流中间没有进行任何过滤。",
-    level: high,
-};
+alert $high_source_site for {
+	title: "Check Java Command Injection from Servlet and SpringMVC",
+	title_zh: "检测Java Servlet和SpringMVC中的命令注入漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	message: "发现Java代码中存在命令注入漏洞，并且数据流中间没有进行任何过滤。",
+}
+
 
 $controlled_source_site - $high_source_site as $normal_source_side 
 
 alert $normal_source_side for {
-    message: "发现Java代码存在命令注入漏洞，数据流中存在过滤", 
-    level: mid, 
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+	message: "发现Java代码存在命令注入漏洞，数据流中存在过滤",
+	title: "Check Java Command Injection from Servlet and SpringMVC",
+	title_zh: "检测Java Servlet和SpringMVC中的命令注入漏洞",
 }
 
 
@@ -127,10 +144,19 @@ $controlled_source_site<getPredecessors()>  as $controlled_sink_site
 $sink - $controlled_sink_site as $low_risk_sink 
 
 
-alert $low_risk_sink for{
-    message: "发现Java代码中可能存在命令注入，但并没有发现参数可控。",
-    level: low,
-};
+alert $low_risk_sink for {
+	level: "low",
+	message: "发现Java代码中可能存在命令注入，但并没有发现参数可控。",
+	title: "Check Java Command Injection from Servlet and SpringMVC",
+	title_zh: "检测Java Servlet和SpringMVC中的命令注入漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+}
+
 
 desc(
 	language: java

@@ -28,7 +28,17 @@ REFERENCE
 
 filepath?{<fullTypeName>?{have: 'path/filepath'}} as $output
 
-alert $output
+alert $output for {
+	title: "Audit Golang File Path Handling",
+	title_zh: "审计Golang文件路径处理",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "info",
+}
 
 desc(
 	lang: golang

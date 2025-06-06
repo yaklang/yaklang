@@ -95,7 +95,7 @@ REFERENCE
 )
 
 <include('golang-template')> as $sink;
-<include('golang-http-source')> as $source 
+<include('golang-http-source')> as $source
 
 $sink.Must(* #{
     hook:`.Parse(*<slice(index=1)>  as  $target)`,
@@ -108,10 +108,16 @@ $target #{
 
 
 alert $high for {
-    title: 'SSTI detected',
-    title_zh: '检测到SSTI',
-    type: 'vuln',
-    level: 'high',
+	type: "vuln",
+	title: "SSTI detected",
+	title_zh: "检测到SSTI",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
 }
 
 desc(

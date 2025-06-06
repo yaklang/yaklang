@@ -38,7 +38,6 @@ desc(
    - **数据篡改或删除**：能够修改、增加或删除数据库中的任意数据。
    - **权限提升**：在某些配置下，可以通过注入语句获取更高权限，甚至执行操作系统命令。
    - **服务中断**：通过注入恶意语句导致数据库崩溃或应用程序异常。
-
 DESC
 	rule_id: "62323f1d-76c2-40da-9058-f497ae7cfc60"
 	solution: <<<SOLUTION
@@ -104,7 +103,6 @@ DESC
 
 #### 4. 最小权限原则
 为数据库用户分配最小必需的权限，限制其只能执行应用程序需要的操作。即使发生注入攻击，也能限制攻击者能造成的损害。
-
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-89: Injection](https://cwe.mitre.org/data/definitions/89.html)
@@ -132,9 +130,15 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high for {
-    title: 'Unvalidated PostgreSQL Parameter Injection',
-    title_zh: 'PostgreSQL未验证参数注入风险',
-    level: 'high',
+	title: "Unvalidated PostgreSQL Parameter Injection",
+	title_zh: "PostgreSQL未验证参数注入风险",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -146,17 +150,29 @@ $highAndMid - $high as $mid
 
 
 alert $mid for {
-    title: 'Insufficient PostgreSQL Parameter Filtering',
-    title_zh: 'PostgreSQL参数过滤不充分',
-    level: 'mid',
+	title_zh: "PostgreSQL参数过滤不充分",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+	title: "Insufficient PostgreSQL Parameter Filtering",
 }
 
 $sink - $high - $mid as $low
 
 alert $low for {
-    title: 'Potential PostgreSQL Access Control Bypass',
-    title_zh: 'PostgreSQL访问控制潜在绕过风险',
-    level: 'low',
+	title_zh: "PostgreSQL访问控制潜在绕过风险",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	title: "Potential PostgreSQL Access Control Bypass",
 }
 
 desc(

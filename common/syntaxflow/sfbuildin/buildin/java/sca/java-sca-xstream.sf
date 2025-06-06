@@ -18,7 +18,7 @@ desc(
        <interface>java.lang.Comparable</interface>
        <handler class="beans. infections. FunkyBeanFactory">
          <target class="java.lang.Runtime"/>
-         < methodName>exec</ methodName>
+         <methodName>exec</methodName>
          <params>
            <string>touch /tmp/vulnerable</string>
          </params>
@@ -36,7 +36,6 @@ desc(
    - **数据泄露与篡改**: 攻击者可以访问、修改或删除存储在服务器或数据库中的敏感数据。
    - **拒绝服务（DoS）**: 攻击者可能通过构造耗费资源的XML导致应用程序崩溃或资源耗尽。
    - **进一步渗透**: 攻击者可以利用受控服务器作为跳板，对内网其他系统发起攻击。
-
 DESC
 	rule_id: "13ffa65e-263b-44d1-842c-52419fbea084"
 	title_zh: "SCA: 检测Java XStream反序列化漏洞"
@@ -86,7 +85,15 @@ REFERENCE
 __dependency__.*xstream.version as $ver;
 $ver in [1.4.11.1,1.4.17] as $vuln_xstream;
 alert $vuln_xstream for {
-    message: 'SCA: xstream versions between 1.4.11.1 and 1.4.17 have multiple deserialization vulnerabilities',
-    cve: 'CVE-2021-39152',
-    level: 'high',
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	cve: "CVE-2021-39152",
+	message: "SCA: xstream versions between 1.4.11.1 and 1.4.17 have multiple deserialization vulnerabilities",
+	title: "SCA: Check Java XStream Deserialization Vulnerabilities",
+	title_zh: "SCA: 检测Java XStream反序列化漏洞",
 }

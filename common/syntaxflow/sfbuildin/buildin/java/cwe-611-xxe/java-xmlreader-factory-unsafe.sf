@@ -4,8 +4,8 @@ desc(
 	type: security
 	risk: XXE
 	reference: <<<REFERENCE
-https://docs.oracle.com/javase/8/docs/api/org/xml/sax/helpers/XMLReaderFactory.html
-https://cwe.mitre.org/data/definitions/611.html
+[XMLReaderFactory](https://docs.oracle.com/javase/8/docs/api/org/xml/sax/helpers/XMLReaderFactory.html)
+[CWE-611](https://cwe.mitre.org/data/definitions/611.html)
 REFERENCE
 	desc: <<<DESC
 ### 漏洞描述
@@ -18,7 +18,7 @@ REFERENCE
    - **远程代码执行**：在某些配置下，通过结合其他漏洞或利用特定的协议（如 Expect），攻击者甚至可能触发远程代码执行。
 
 2. **触发场景**
-   当应用程序使用 `XMLReaderFactory.createXMLReader()` 创建 XMLReader 实例来解析用户提供的 XML 数据，并且没有正确配置安全特性（如禁用外部实体和参数实体）时，就可能存在 XXE 漏洞。例如，未设置 `http://xml.org/sax/features/external-general-entities` 和 `http://xml.org/sax/features/external-parameter-entities` 为 `false`，或者未设置 `http://apache.org/xml/features/disallow-doctype-decl` 为 `true`，或者未使用安全的 `EntityResolver`。攻击者可以构造包含 `<!DOCTYPE>` 声明和外部实体引用的恶意 XML 输入来触发漏洞。
+   当应用程序使用 `XMLReaderFactory.createXMLReader()` 创建 XMLReader 实例来解析用户提供的 XML 数据，并且没有正确配置安全特性（如禁用外部实体和参数实体）时，就可能存在 XXE 漏洞。例如，未设置 `http://xml.org/sax/features/external-general-entities` 和 `http://xml.org/sax/features/external-parameter-entities` 为 `false`，或者未设置 `http://apache.org/xml/features/disallow-doctype-decl` 为 `true`，或者未使用安全的 `EntityResolver`。攻击者可以构造包含 `<DOCTYPE>` 声明和外部实体引用的恶意 XML 输入来触发漏洞。
 
    ```java
    import org.xml.sax.SAXException;
@@ -133,7 +133,7 @@ reader.parse(xml);
 ```
 
 #### 3. 输入验证
-在解析 XML 之前，对输入的 XML 数据进行基本的验证，例如检查是否存在 `<!DOCTYPE>` 声明或外部实体引用。
+在解析 XML 之前，对输入的 XML 数据进行基本的验证，例如检查是否存在 `<DOCTYPE>` 声明或外部实体引用。
 SOLUTION
 )
 
@@ -152,8 +152,16 @@ $excludeReader./((parse*)|(read*))/() as $excludeCall
 
 $toCheckCall - $excludeCall as $vulCall;
 alert $vulCall for {
-    message: "检测到不安全的 XMLReaderFactory.createXMLReader() 使用，可能导致 XXE 漏洞。",
-    level: "warning",
+	message: "检测到不安全的 XMLReaderFactory.createXMLReader() 使用，可能导致 XXE 漏洞。",
+	title: "Check Java XMLReaderFactory Unsafe Use",
+	title_zh: "检测 Java XMLReaderFactory 不安全使用",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "warning",
 }
 
 desc(

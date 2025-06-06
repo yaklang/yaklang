@@ -5,13 +5,13 @@ desc(
 	level: low
 	risk : '不安全加密算法',
 	reference: <<<REFERENCE
-https://cwe.mitre.org/data/definitions/327.html
+[CWE-327](https://cwe.mitre.org/data/definitions/327.html)
 REFERENCE
 	desc: <<<DESC
 ### 漏洞描述
 
 1.  **漏洞原理**
-    在使用`java.security.MessageDigest`进行哈希计算时，如果指定了已知的不安全或已废弃的哈希算法（如MD2、MD4、MD5、SHA-0、SHA-1、RIPEMD160、SHA等），这些算法由于其固有的密码学弱点，可能存在碰撞、预映像攻击等风险。 공격자 може створити повідомлення, яке має такий же хеш, як і оригінальне повідомлення, що може привести до фальсифікації даних або обходу контролів цілісності даних.
+    在使用`java.security.MessageDigest`进行哈希计算时，如果指定了已知的不安全或已废弃的哈希算法（如MD2、MD4、MD5、SHA-0、SHA-1、RIPEMD160、SHA等），这些算法由于其固有的密码学弱点，可能存在碰撞、预映像攻击等风险。攻击者可能伪造数据使其具有与原始数据相同的哈希值，从而绕过完整性校验。
 
 2.  **触发场景**
     当在 Java 代码中通过 `MessageDigest.getInstance()` 方法使用了不安全的哈希算法时，例如：
@@ -78,9 +78,17 @@ $algorithm#{
     exclude:`*?{any:'SHA256','SHA384','SHA512' }`
 }-> as $sink;
 
-alert $sink for{
-    message:"Find the use of broken or risky encryption algorithm",
-    level:low,
+alert $sink for {
+	title: "Check Java java.security use of broken or risky hash algorithm",
+	title_zh: "检测Java java.security使用不安全的哈希算法",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	message: "Find the use of broken or risky encryption algorithm",
 }
 
 desc(

@@ -1,5 +1,5 @@
 desc(
-	title: "Detect PHP Information Exposure"
+	title: "Detect PHP Information Exposure Risk"
 	title_zh: "检测PHP信息泄露风险"
 	type: vul
 	risk: "sql-information-exposure"
@@ -27,7 +27,6 @@ if (!$conn) {
 - 攻击者获取详细的错误信息，帮助其定向构建SQL注入或漏洞利用代码。
 - 攻击者获取应用程序文件路径、服务器信息等，辅助进行其他攻击，如路径遍历或远程代码执行。
 - 导致业务逻辑或敏感数据被攻击者猜测或发现。
-
 DESC
 	rule_id: "082ac5f8-c196-4312-8c0f-0244f7ffa8d1"
 	solution: <<<SOLUTION
@@ -75,20 +74,31 @@ $param?{<self> #{include: <<<CODE
 * & $mysql_information
 CODE}->} as $mysql_sink
 
-alert $mysql_sink for{
-   title: "MySQL Information Exposure",
-   title_zh: "MySQL数据库信息泄露风险"
-   level: "low",
-}
+alert $mysql_sink for {
+	solution: <<<CODE
 
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	title: "Detect PHP MySQL Information Exposure Risk",
+	title_zh: "检测PHP MySQL数据库信息泄露风险",
+}
 $param?{<self> #{include: <<<CODE
 * & $pg_information
 CODE}->} as $pg_sink
 
-alert $pg_sink for{
-   title: "PostgreSQL Information Exposure",
-   title_zh: "PostgreSQL数据库信息泄露风险"
-   level: "low",
+alert $pg_sink for {
+	title: "Detect PHP PostgreSQL Information Exposure Risk",
+	title_zh: "检测PHP PostgreSQL数据库信息泄露风险",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
 }
 desc(
 	lang: "php"

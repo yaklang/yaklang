@@ -9,7 +9,7 @@ desc(
 
 ### 规则详细
 1. **作为基础检测库**
-   属于 `golang-file-read-ioutil` 基础库规则（`lib` 类型），用于识别 `io/ioutil` 包中的文件读取相关函数。通常需要结合更高级别的规则（如数据流跟踪规则）来检测潜在的安全风险或性能问题。
+   属于 `golang-file-read-ioutil` 基础库规则（`lib` 类型），用于识别 `io/ioutil` 包中的文件读取相关函数。通常需要结合更高级别的规则（如数据流跟踪规则）来检测潜在安全风险或性能问题。
 
 2. **识别相关函数**
    规则识别 `io/ioutil` 包中的 `ReadAll` 和 `ReadFile` 方法的调用。
@@ -19,8 +19,6 @@ desc(
 
 4. **审计意义**
    该规则有助于识别代码中潜在的性能风险和使用已废弃功能的点，提示开发者考虑使用更流式化或推荐的文件读取方法。
-
-
 DESC
 	rule_id: "21f220e7-4e85-4113-ada9-a3c1cffae028"
 	title_zh: "审计Golang ioutil文件读取方法"
@@ -84,7 +82,6 @@ for {
 ```
 
 通过采用流式或分块读取的方式，可以有效降低内存消耗，提高程序处理大型文件时的性能和稳定性。
-
 SOLUTION
 	reference: <<<REFERENCE
 [Go io/ioutil Documentation (Deprecated)](https://pkg.go.dev/io/ioutil)
@@ -98,7 +95,17 @@ $entry.ReadFile().* as $output
 $entry.ReadAll(* #-> as $output) 
 $entry.ReadFile(* #-> as $output)
 
-alert $output
+alert $output for {
+	title: "Audit Golang File Read ioutil Methods",
+	title_zh: "审计Golang ioutil文件读取方法",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "info",
+}
 
 desc(
 	lang: golang

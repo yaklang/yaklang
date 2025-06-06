@@ -32,7 +32,6 @@ desc(
    - 绕过应用程序的认证和授权机制，获取未授权访问权限。
    - 通过数据库的特性（如外部存储过程、UDF）进一步攻击操作系统或内部网络。
    - 导致应用程序崩溃或拒绝服务。
-
 DESC
 	rule_id: "56f41530-4175-41ec-96ac-198315171c10"
 	title_zh: "检测Golang SQL注入漏洞(pop)"
@@ -120,10 +119,16 @@ $sink.RawQuery(* #-> as $param);
 $param?{have: 'Parameter'} as $high;
 
 alert $high for {
-    title: 'SQL Injection detected',
-    title_zh: '检测到SQL注入',
-    type: 'vuln',
-    level: 'high',
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	type: "vuln",
+	title: "SQL Injection detected",
+	title_zh: "检测到SQL注入",
 }
 
 desc(
