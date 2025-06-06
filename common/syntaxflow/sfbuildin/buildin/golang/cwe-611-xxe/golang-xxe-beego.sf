@@ -19,10 +19,16 @@ $entry.New(* as $param)
 $param?{have: "XMLParseNoEnt"} as $high
 
 alert $high for {
-    title: 'xxe read any file check',
-    title_zh: '检测到XXE漏洞',
-    type: 'vuln',
-    level: 'high',
+	title_zh: "检测到XXE漏洞",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	type: "vuln",
+	title: "xxe read any file check",
 }
 
 desc(

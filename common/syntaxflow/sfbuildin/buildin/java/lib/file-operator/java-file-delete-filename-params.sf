@@ -53,44 +53,15 @@ Files?{<typeName>?{have: 'java.nio'}}.delete(,* as $output);
 Files?{<typeName>?{have: 'java.nio'}}.deleteIfExists(,* as $output);
 
 alert $output for {
-	title: "Untrusted File Deletion",
 	title_zh: "不信任的文件删除",
 	solution: <<<CODE
-### 修复建议
-#### 1. 验证文件路径来源
-确保文件路径来源于可信源，避免直接使用用户输入作为文件路径。
-
-#### 2. 使用安全的文件删除方法
-尽量使用安全的文件删除方法，并在删除前进行必要的检查。
-
-#### 3. 限制文件删除操作的范围
-对文件删除操作进行权限控制，限制只有特定用户或角色才能执行文件删除操作。
-
-#### 4. 日志记录
-对文件删除操作进行日志记录，以便在发生问题时进行追踪和审计。
 
 CODE
 	desc: <<<CODE
-### 漏洞描述
-1. **漏洞原理**
-   由于程序未对文件路径进行严格的验证，攻击者可以通过构造特殊的文件路径来删除任意文件，导致系统文件被误删除。
-
-2. **触发场景**
-   // 存在漏洞的代码示例
-   ```java
-   String filePath = request.getParameter("filePath");
-   File file = new File(filePath);
-   file.delete();
-   ```
-   攻击者可以通过传入特殊路径如 "../etc/passwd" 来删除系统文件。
-
-3. **潜在影响**
-   - 系统文件被误删除，导致系统不稳定或无法启动。
-   - 敏感数据泄露。
-   - 服务不可用。
 
 CODE
 	level: "high",
+	title: "Untrusted File Deletion",
 }
 
 desc(

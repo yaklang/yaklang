@@ -119,8 +119,16 @@ $sink #{
 }->as  $high;
 
 alert $high for {
-    message: "发现Java SnakeYAML反序列化漏洞,并且没有任何数据流过滤。",
-    level: high,
+	title: "",
+	title_zh: "",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	message: "发现Java SnakeYAML反序列化漏洞,并且没有任何数据流过滤。",
 }
 
 $sink #{
@@ -130,8 +138,16 @@ $sink #{
 $result - $high as $low;
 
 alert $low for {
-    message: "发现Java SnakeYAML反序列化漏洞,但是有数据流过滤。",
-    level: low,
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	message: "发现Java SnakeYAML反序列化漏洞,但是有数据流过滤。",
+	title: "",
+	title_zh: "",
 }
 
 desc(

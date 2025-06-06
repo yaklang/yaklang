@@ -80,99 +80,16 @@ __dependency__./org.springframework.boot:spring-boot-starter-test/  as $weak;
 
 check $weak;
 alert $weak for {
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
 	level: "info",
 	message: "检测到Java Spring Boot Devtools的使用",
 	title: "Detected Java Spring Boot Devtools Usage",
 	title_zh: "检测到Java Spring Boot Devtools的使用",
-	solution: <<<CODE
-### 修复建议
-
-#### 1. 在生产环境中排除 Devtools 依赖
-确保在构建用于生产环境的打包件（JAR或WAR）时，`spring-boot-starter-devtools` 依赖被正确排除。通常可以通过构建工具的配置来实现。
-
-**Maven 示例 (pom.xml):**
-
-在 `dependency` 定义中添加 `<optional>true</optional>` 或者 `<scope>runtime</scope>` 并结合特定的构建 profile 来排除。
-
-```xml
-<dependencies>
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-devtools</artifactId>
-        <scope>runtime</scope>  <!-- 或者 <optional>true</optional> -->
-        <optional>true</optional>
-    </dependency>
-</dependencies>
-
-<!-- 使用 profile 在生产环境激活时不包含 devtools -->
-<profiles>
-    <profile>
-        <id>prod</id>
-        <build>
-            <plugins>
-                <plugin>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-maven-plugin</artifactId>
-                    <configuration>
-                        <excludeDevtools>true</excludeDevtools>
-                    </configuration>
-                </plugin>
-            </plugins>
-        </build>
-    </profile>
-</profiles>
-```
-
-构建生产环境打包件时，激活 `prod` profile：`mvn clean package -P prod`
-
-**Gradle 示例 (build.gradle):**
-
-使用 `developmentOnly` 配置或者在生产构建任务中排除。
-
-```gradle
-dependencies {
-    developmentOnly 'org.springframework.boot:spring-boot-starter-devtools'
-}
-```
-
-#### 2. 确保远程调试关闭
-如果在某些场景下仍需构建包含 Devtools 的包，务必确保远程调试功能在生产环境中是关闭的。通过设置配置属性 `spring.devtools.remote.secret` 为空或不配置相关的远程 Devtools 属性。
-
-#### 3. 配置生产环境 Profile
-使用 Spring Profile 区分开发和生产环境，并在生产环境下禁用 Devtools 的相关配置。
-
-```properties
-# application-prod.properties
-spring.devtools.restart.enabled=false
-spring.devtools.livereload.enabled=false
-spring.devtools.remote.enabled=false
-```
-
-CODE
-	desc: <<<CODE
-### 漏洞描述
-
-#### 1. 漏洞原理
-Devtools在开发环境中非常有用，但在生产环境中可能会引入安全风险，例如开启远程调试功能。
-
-#### 2. 触发场景
-以下为使用Devtools的示例代码段：
-
-```xml
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-devtools</artifactId>
-    <scope>runtime</scope>
-</dependency>
-```
-
-#### 3. 潜在影响
-在生产环境中使用Devtools可能导致以下风险：
-- 远程调试功能被意外开启，暴露敏感信息。
-- 自动重启功能可能导致服务不稳定。
-- 其他未预期的安全漏洞。
-
-CODE
 }
 
 desc(

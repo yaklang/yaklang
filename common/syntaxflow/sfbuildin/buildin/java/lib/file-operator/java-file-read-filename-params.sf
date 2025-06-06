@@ -63,29 +63,10 @@ alert $output for {
 	title: "Detect Java File Read Sinks",
 	title_zh: "检测 Java 文件读取接收点",
 	solution: <<<CODE
-### 修复建议
-#### 1. 验证文件路径
-在使用文件路径之前，应先验证其合法性，确保路径不是来自不受信任的来源，并且不会指向敏感文件。
 
-#### 2. 使用安全的文件读取方法
-尽量使用具有安全特性的方法或库，例如使用安全的文件路径解析器来确保路径的安全性。
-
-#### 3. 限制文件访问权限
-确保文件访问权限设置适当，避免不必要的读取权限。
 CODE
 	desc: <<<CODE
-### 1.规则目的
-该规则旨在识别 Java 代码中潜在的文件读取接收点（sinks），这些接收点可能会导致敏感文件泄露或未经授权的文件访问。
 
-### 2.规则详细
-属于`java-read-filename-sink`库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测文件读取漏洞，提供核心函数识别能力。通过检查 `FileReader`、`FileInputStream`、`java.nio.file.Files` 以及 `RandomAccessFile` 类中的文件读取方法，可以识别出那些直接从不可信源（如用户输入或外部配置）获取文件名并用于文件读取操作的代码路径。这种不安全的做法可能会使应用程序容易受到路径遍历攻击或任意文件读取漏洞的攻击，从而暴露敏感信息或允许攻击者读取系统上的任意文件。具体检测以下方法：
-
-- `java.io.FileReader` 构造函数
-- `java.io.FileInputStream` 构造函数
-- `java.nio.file.Files` 类中所有以 `read` 开头的方法 (如 `readAllBytes`, `readString`)
-- `java.nio.file.Files` 类中的 `newBufferedReader` 方法
-- `java.nio.file.Files` 类中的 `newInputStream` 方法
-- `java.io.RandomAccessFile` 构造函数
 CODE
 	level: "mid",
 }

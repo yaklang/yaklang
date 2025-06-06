@@ -96,8 +96,17 @@ $socket -{
 
 $safe<getPredecessors()> as $safeSocket;
 $socket - $safeSocket as $weak;
-alert $weak for{
-    message:"检测到java.io未释放的资源",
+alert $weak for {
+	title_zh: "",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "",
+	message: "检测到java.io未释放的资源",
+	title: "",
 }
 
 desc(

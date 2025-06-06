@@ -26,10 +26,16 @@ $param?{<self>-{
 }->} as $mid;
 
 alert $mid for {
-    title: 'SQL Injection detected',
-    title_zh: '检测到SQL注入',
-    type: 'vuln',
-    level: 'mid',
+	desc: <<<CODE
+
+CODE
+	level: "mid",
+	type: "vuln",
+	title: "SQL Injection detected",
+	title_zh: "检测到SQL注入",
+	solution: <<<CODE
+
+CODE
 }
 
 desc(
