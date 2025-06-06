@@ -223,6 +223,10 @@ func (m *Memory) PushToolCallResults(t *aitool.ToolResult) {
 	m.timeline.PushToolResult(t)
 }
 
+func (m *Memory) PushUserInteraction(stage UserInteractionStage, seq int64, question, userInput string) {
+	m.timeline.PushUserInteraction(stage, seq, question, userInput)
+}
+
 func (m *Memory) Timeline() string {
 	return m.timeline.Dump()
 }
@@ -272,10 +276,6 @@ func (m *Memory) CurrentTaskTimeline() string {
 // timeline limit set
 func (m *Memory) SetTimelineLimit(i int) {
 	m.timeline.setTimelineLimit(i)
-}
-
-func (m *Memory) SetTimelineAICaller(caller AICaller) {
-
 }
 
 func (m *Memory) PromptForToolCallResultsForLastN(n int) string {

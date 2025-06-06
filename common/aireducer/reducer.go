@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"io"
 	"os"
@@ -42,15 +43,15 @@ func (r *Reducer) Run() error {
 	}
 }
 
-func NewReducerFromReader(r io.Reader, opts ...Option) (*Reducer, error) {
+func NewReducerEx(chunk *chanx.UnlimitedChan[chunkmaker.Chunk], opts ...Option) (*Reducer, error) {
 	config := NewConfig(opts...)
-	chunk := chunkmaker.NewChunkChannelFromReader(config.ctx, r)
 	if chunk == nil {
 		return nil, errors.New("failed to create chunk channel from reader")
 	}
 	cm, err := chunkmaker.NewChunkMakerEx(chunk, chunkmaker.NewConfig(
 		chunkmaker.WithTimeTrigger(config.TimeTriggerInterval),
 		chunkmaker.WithChunkSize(config.ChunkSize),
+		chunkmaker.WithSeparatorTrigger(config.SeparatorTrigger),
 	))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chunk maker: %w", err)
@@ -64,6 +65,11 @@ func NewReducerFromReader(r io.Reader, opts ...Option) (*Reducer, error) {
 		input:  cm,
 		config: config,
 	}, nil
+}
+
+func NewReducerFromReader(r io.Reader, opts ...Option) (*Reducer, error) {
+	config := NewConfig(opts...)
+	return NewReducerEx(chunkmaker.NewChunkChannelFromReader(config.ctx, r), opts...)
 }
 
 func NewReducerFromFile(filename string, opts ...Option) (*Reducer, error) {
