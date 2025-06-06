@@ -5,12 +5,12 @@ desc(
 	level: mid
 	risk:'rce'
 	desc: <<<DESC
-### 漏洞原理
+### 漏洞描述
 
+1. **漏洞原理**
 命令注入（Command Injection）漏洞发生在应用程序将用户可控数据作为命令的一部分执行时，且未对数据进行充分过滤或转义。攻击者可以注入恶意命令，并通过应用程序的权限在服务器上执行，这可能导致敏感信息泄露、系统文件被修改甚至服务器被完全控制。
 
-### 触发场景
-
+2. **触发场景**
 该漏洞通常发生在当PHP脚本使用`system()`, `exec()`, `shell_exec()`, `` ` `` (反引号)等函数执行外部命令，并将用户输入直接或间接拼接到命令字符串中，而未对用户输入进行安全过滤或参数化。
 例如，以下代码就存在明显的命令注入漏洞：
 
@@ -23,8 +23,7 @@ system("cat " . $filename);
 ```
 攻击者可以输入 `?file=test.txt; id`，使得最终执行的命令变为 `cat test.txt; id`，从而在服务器上执行 `id` 命令。
 
-### 潜在影响
-
+3. **潜在影响**
 - **任意命令执行：** 攻击者可以在服务器上执行任何具有应用程序权限的系统命令。
 - **数据泄露：** 攻击者可以读取、复制或删除服务器上的任意文件，包括敏感配置文件和数据库凭据。
 - **服务器控制：** 通过执行提权命令、安装后门或创建新的系统用户，攻击者可能完全控制受影响的服务器。
@@ -35,34 +34,29 @@ DESC
 ### 修复建议
 
 #### 1. 避免执行外部命令
-
 除非绝对必要，应尽量避免在应用程序中执行外部系统命令。许多常用的功能可以通过内置的PHP函数或库来实现，这样可以大大降低命令注入的风险。
 
 #### 2. 使用安全的函数，如 `escapeshellarg()` 和 `escapeshellcmd()`
-
 如果确实需要执行外部命令，应该使用PHP提供的安全函数来处理用户输入。`escapeshellarg()` 用于转义单个参数，确保参数被当作一个整体传递给命令；`escapeshellcmd()` 用于转义整个命令字符串，防止攻击者注入额外的命令或参数。
 
 ```php
 <?php
 $filename = $_GET['file'];
 // 使用 escapeshellarg() 转义用户输入
-$ साफname = escapeshellarg($filename);
+$escapedFilename = escapeshellarg($filename);
 system("cat " . $escapedFilename);
 ?>
 ```
 请注意，`escapeshellcmd()` 函数虽然可以转义命令字符串，但并不能防止所有形式的命令注入，例如允许通过管道符 (`|`) 或重定向符 (`>`) 注入的攻击。因此，最好结合使用 `escapeshellarg()`。
 
 #### 3. 使用白名单机制
-
 如果需要执行的命令是固定的集合，可以采用白名单机制，只允许执行预定义的合法命令，并对参数进行严格验证。
 
 #### 4. 限制命令执行权限
-
 在操作系统层面，为运行PHP应用程序的用户配置最小权限，限制其可以执行的命令范围。
 
 #### 5. 输入验证和过滤
-
-对所有用户输入进行严格的输入验证和过滤，移除或转义所有可能导致命令注入的特殊字符，例如分号 (`;`)、管道符 (`|`)、与号 (`&`)、反引号 (`` ` ``) 等。
+对所有用户输入进行严格的输入验证和过滤，移除或转义所有可能导致命令注入的特殊字符，例如分号 (`;`)、管道符 (`|`)、与号 (`&`)、反引号 (` `) 等。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-78: Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')](https://cwe.mitre.org/data/definitions/78.html)
@@ -85,12 +79,69 @@ CODE,exclude=<<<CODE
 <self>?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high for{
-    title_zh: '检测到命令执行，且没有经过任何函数',
-    type: 'vuln',
-    level: 'high'
-}
+alert $high for {
+	desc: <<<CODE
+### 漏洞描述
 
+此警报表示代码中存在命令执行的风险，并且没有经过任何过滤函数处理用户输入。这使得攻击者可以轻松地注入恶意命令，并在服务器上执行。
+
+### 触发场景
+
+当 PHP 脚本直接使用 `system()`, `exec()`, `shell_exec()` 等函数执行外部命令，并且将用户输入直接或间接拼接到命令字符串中，而未对用户输入进行任何安全过滤或参数化时，就会触发此警报。
+
+例如：
+
+```php
+<?php
+$command = $_GET['cmd'];
+system($command);
+?>
+```
+
+### 潜在影响
+
+- 任意命令执行：攻击者可以在服务器上执行任何具有应用程序权限的系统命令。
+- 数据泄露：攻击者可以读取、复制或删除服务器上的任意文件，包括敏感配置文件和数据库凭据。
+- 服务器控制：通过执行提权命令、安装后门或创建新的系统用户，攻击者可能完全控制受影响的服务器。
+- 拒绝服务：攻击者可以执行例如 `fork bomb` 等命令导致服务器资源耗尽，造成拒绝服务。
+CODE
+	level: "high",
+	type: "vuln",
+	title: "Unfiltered PHP Command Execution",
+	title_zh: "PHP未过滤命令执行",
+	solution: <<<CODE
+### 修复建议
+
+#### 1. 严格过滤用户输入
+对所有用户输入进行严格的验证和过滤，移除或转义可能导致命令注入的特殊字符，例如分号 (`;`)、管道符 (`|`)、与号 (`&`)、反引号 (` `) 等。
+
+```php
+<?php
+$command = $_GET['cmd'];
+// 使用 preg_replace 函数移除危险字符
+$command = preg_replace('/[\;\|\&\`]/', '', $command);
+system($command);
+?>
+```
+
+#### 2. 使用 escapeshellarg() 函数
+使用 `escapeshellarg()` 函数对用户输入进行转义，确保参数被当作一个整体传递给命令。
+
+```php
+<?php
+$command = $_GET['cmd'];
+$command = escapeshellarg($command);
+system("ls -l " . $command);
+?>
+```
+
+#### 3. 避免使用危险函数
+尽量避免使用 `system()`, `exec()`, `shell_exec()` 等函数执行外部命令。如果确实需要执行命令，考虑使用白名单机制，只允许执行预定义的合法命令。
+
+#### 4. 最小权限原则
+确保运行 PHP 应用程序的用户拥有最小的权限，以限制潜在的命令注入攻击的影响。
+CODE
+}
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
 CODE,exclude=<<<CODE
@@ -99,20 +150,126 @@ CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
 
-alert $mid for{
-    title_zh: '检测到命令执行，经过函数过滤，但未检出过滤函数',
-    type: 'vuln',
-    level: 'mid'
-}
+alert $mid for {
+	title: "Partially Filtered PHP Command Execution",
+	title_zh: "PHP部分过滤命令执行",
+	solution: <<<CODE
+### 修复建议
 
+#### 1. 完善过滤规则
+检查现有的过滤函数，确保它们能够有效地防御各种命令注入攻击。考虑使用更严格的过滤规则，例如移除所有特殊字符，或者只允许执行预定义的命令。
+
+```php
+<?php
+$command = $_GET['cmd'];
+// 完善过滤规则，移除更多危险字符
+$command = preg_replace('/[^a-zA-Z0-9_\-\.\/]/', '', $command);
+system($command);
+?>
+```
+
+#### 2. 使用 escapeshellarg() 函数
+即使已经使用了过滤函数，仍然建议使用 `escapeshellarg()` 函数对用户输入进行转义，以确保参数被当作一个整体传递给命令。
+
+```php
+<?php
+$command = $_GET['cmd'];
+$command = filter($command);
+$command = escapeshellarg($command);
+system("ls -l " . $command);
+?>
+```
+
+#### 3. 白名单机制
+考虑使用白名单机制，只允许执行预定义的合法命令，并对参数进行严格验证。
+CODE
+	desc: <<<CODE
+### 漏洞描述
+
+此警报表示代码中存在命令执行的风险，并且经过了函数过滤，但是过滤函数可能存在缺陷或不足，未能完全防御命令注入攻击。
+
+### 触发场景
+
+当 PHP 脚本使用 `system()`, `exec()`, `shell_exec()` 等函数执行外部命令，并且将用户输入经过了过滤函数处理，但是过滤函数未能移除所有可能导致命令注入的特殊字符时，就会触发此警报。
+
+例如：
+
+```php
+<?php
+$command = $_GET['cmd'];
+$command = filter($command); // 过滤函数未能移除所有危险字符
+system($command);
+?>
+```
+
+### 潜在影响
+
+- 任意命令执行：攻击者可能通过构造特殊输入绕过过滤函数，执行任意命令。
+- 数据泄露：攻击者可能读取、复制或删除服务器上的任意文件，包括敏感配置文件和数据库凭据。
+- 服务器控制：攻击者可能通过执行提权命令、安装后门或创建新的系统用户，攻击者可能完全控制受影响的服务器。
+- 拒绝服务：攻击者可能执行例如 `fork bomb` 等命令导致服务器资源耗尽，造成拒绝服务。
+CODE
+	level: "mid",
+	type: "vuln",
+}
 $sink - $mid - $high as $low
 
-alert $low for{
-    title_zh: '检测到命令执行，但是经过函数过滤',
-    type:   'info',
-    level: 'low'
-}
+alert $low for {
+	title: "Filtered PHP Command Execution",
+	title_zh: "PHP过滤命令执行",
+	solution: <<<CODE
+### 建议进行代码审计
 
+#### 1. 检查过滤函数
+尽管代码已经包含过滤机制，但仍应检查过滤函数是否存在潜在缺陷，例如是否遗漏了某些特殊字符，或者是否存在绕过过滤的可能。
+
+```php
+<?php
+$command = $_GET['cmd'];
+$command = filter($command); // 仔细检查过滤函数
+system($command);
+?>
+```
+
+#### 2. 考虑使用 escapeshellarg() 函数
+如果可能，建议使用 `escapeshellarg()` 函数对用户输入进行转义，以增强安全性。
+
+```php
+<?php
+$command = $_GET['cmd'];
+$command = filter($command);
+$command = escapeshellarg($command);
+system("ls -l " . $command);
+?>
+```
+
+CODE
+	desc: <<<CODE
+### 风险描述
+
+此警报表示代码中存在命令执行的风险，但是经过了过滤函数处理，通常无需处理，但建议安全人员检查过滤函数是否存在潜在缺陷。
+
+### 触发场景
+
+当 PHP 脚本使用 `system()`, `exec()`, `shell_exec()` 等函数执行外部命令，并且将用户输入经过了较为完善的过滤函数处理时，就会触发此警报。
+
+例如：
+
+```php
+<?php
+$command = $_GET['cmd'];
+$command = filter($command); // 经过较为完善的过滤函数
+system($command);
+?>
+```
+
+### 潜在影响
+
+由于已经进行了过滤，潜在影响较低，但仍存在被绕过的可能性。
+CODE
+	level: "low",
+	type: "info",
+}
 desc(
 	lang: 'php'
 	alert_min: 3

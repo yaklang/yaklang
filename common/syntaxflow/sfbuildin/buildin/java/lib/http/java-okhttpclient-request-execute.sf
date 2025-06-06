@@ -1,12 +1,12 @@
 desc(
-	title: "Find Java OkHttpClient Uses and Executing Request"
+	title: "Audit Java OkHttpClient Uses and Executing Request"
 	type: audit
 	lib: "java-okhttpclient-request-execute"
 	rule_id: "d884f15e-5dc5-4fe2-8d62-49e0b7874a13"
 	reference: <<<REFERENCE
 none
 REFERENCE
-	title_zh: "查找Java OkHttpClient使用及请求执行"
+	title_zh: "审计Java OkHttpClient使用及请求执行"
 	desc: <<<DESC
 ### 1. 规则目的
 该规则用于审计Java项目中对OkHttpClient库的使用情况，并特别关注`newCall().execute()`方法的调用。OkHttpClient是一个流行的第三方HTTP客户端库，在许多应用程序中用于发起网络请求。审计其使用对于理解程序的外部通信行为、发现潜在的SSRF（服务器端请求伪造）或其他与网络请求相关的安全风险非常重要。
@@ -66,12 +66,94 @@ public class OkHttpClientExample {
 ```
 DESC
 	solution: <<<SOLUTION
-none
+### 修复建议
+#### 1. 验证用户输入
+在使用用户输入构建URL时，应严格验证URL的有效性和安全性，避免直接使用未经验证的用户输入。
+
+#### 2. 使用安全的网络请求库
+考虑使用具有更强大安全特性的网络请求库，如Spring的RestTemplate，它提供了更多的安全选项和默认的安全设置。
+
+#### 3. 限制外部请求的范围
+将外部请求限制在可信的域名列表内，避免应用程序因用户输入而发起不受信任的网络请求。
 SOLUTION
 )
 
 Request.Builder()?{<typeName>?{have: 'okhttp'}}...url(,* as $output);
-alert $output;
+alert $output for {
+	title: "Audit Java OkHttpClient Uses and Executing Request",
+	title_zh: "审计Java OkHttpClient使用及请求执行",
+	solution: <<<CODE
+### 修复建议
+#### 1. 验证用户输入
+在使用用户输入构建URL时，应严格验证URL的有效性和安全性，避免直接使用未经验证的用户输入。
+
+#### 2. 使用安全的网络请求库
+考虑使用具有更强大安全特性的网络请求库，如Spring的RestTemplate，它提供了更多的安全选项和默认的安全设置。
+
+#### 3. 限制外部请求的范围
+将外部请求限制在可信的域名列表内，避免应用程序因用户输入而发起不受信任的网络请求。
+CODE
+	desc: <<<CODE
+### 1. 规则目的
+该规则用于审计Java项目中对OkHttpClient库的使用情况，并特别关注`newCall().execute()`方法的调用。OkHttpClient是一个流行的第三方HTTP客户端库，在许多应用程序中用于发起网络请求。审计其使用对于理解程序的外部通信行为、发现潜在的SSRF（服务器端请求伪造）或其他与网络请求相关的安全风险非常重要。
+
+### 2. 规则详细
+1. **作为基础检测库**
+   属于`java-okhttpclient-request-execute`库规则（`lib`类型），主要用于定位 OkHttpClient 发起请求的核心操作点，需要结合数据流分析等其他规则来进一步判断是否存在风险。
+
+2. **覆盖关健方法**
+   该规则通过模式匹配，识别 `Request.Builder()` 的构建过程，并最终定位到 `newCall().execute()` 方法的调用位置。`execute()` 方法是同步执行 HTTP 请求的关键方法。
+
+3. **典型场景**
+   规则能够识别以下典型场景：
+   - 直接使用 OkHttpClient 发起请求。
+   - 在 Web 应用程序控制器中根据用户输入动态构建 URL 并使用 OkHttpClient 发起请求。
+
+**示例代码:**
+
+```java
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+
+public class OkHttpClientExample {
+    public static void main(String[] args) {
+        OkHttpClient client = new OkHttpClient();
+        Request request = new Request.Builder()
+                .url("https://api.github.com/users/github")
+                .build();
+        try {
+            // 执行请求
+            Response response = client.newCall(request).execute();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+```java
+public class OkHttpClientExample {
+    @RequestMapping(value = "/three")
+        public String Three(@RequestParam(value = "url") String imageUrl) {
+            try {
+                URL url = new URL(imageUrl);
+                OkHttpClient client = new OkHttpClient();
+                com.squareup.okhttp.Request request = new com.squareup.okhttp.Request.Builder().get().url(url).build();
+                Call call = client.newCall(request);
+                Response response = call.execute();
+                return response.toString();
+            } catch (IOException var1) {
+                System.out.println(var1);
+                return "Hello";
+            }
+        }
+}
+```
+CODE
+	level: "mid",
+}
+
 
 desc(
 	lang: java

@@ -5,9 +5,7 @@ desc(
 	severity: mid
 	risk:sqli
 	description: <<<DESCRIPTION
-在Java中，SQL语句拼接的不安全写法主要体现在使用字符串拼接来构建SQL查询时，用户输入的参数直接被插入到SQL语句中。
 
-这种做法容易导致SQL注入攻击，攻击者可以通过恶意构造的输入操控SQL查询，从而获取敏感数据或执行未授权的操作。
 DESCRIPTION
 	rule_id: "b8ede24d-8ff0-4d81-ab97-903495a6cb61"
 	reference: <<<REFERENCE
@@ -26,7 +24,6 @@ REFERENCE
 String userInput = request.getParameter("id");
 String sql = "SELECT * FROM users WHERE id = ?";  // 使用占位符
 try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-    // 根据实际情况选择合适的set方法，并进行类型转换/校验
     pstmt.setInt(1, Integer.parseInt(userInput)); 
     ResultSet rs = pstmt.executeQuery();
     // 处理结果集
@@ -53,7 +50,6 @@ User user = sqlSession.selectOne("getUserById", Integer.parseInt(userInput));
 // 示例：校验输入为数字且范围合法
 String userInput = request.getParameter("id");
 if (!userInput.matches("^[0-9]+$")) {
-    // 处理非法输入，例如抛出异常或返回错误
     throw new IllegalArgumentException("ID输入格式不正确");
 }
 int id = Integer.parseInt(userInput);
@@ -61,8 +57,9 @@ int id = Integer.parseInt(userInput);
 if (id < 1 || id > 1000) {
     throw new IllegalArgumentException("ID超出有效范围");
 }
-// 此时可以将id用于安全的SQL操作（最好是参数化询）
+// 此时可以将id用于安全的SQL操作（最好是参数化查询）
 ```
+
 SOLUTION
 )
 
@@ -85,7 +82,79 @@ INCLUDE
 
 $directly + $indirectly as $vuln 
 
-alert $vuln;
+alert $vuln for {
+	title_zh: "MySQL未验证参数注入风险",
+	solution: <<<CODE
+### 修复建议
+
+#### 1. 使用参数化查询（PreparedStatement）
+通过预编译SQL语句并绑定用户输入，隔离代码与数据，避免恶意输入篡改逻辑。
+```java
+// 修复代码示例
+String userInput = request.getParameter("id");
+String sql = "SELECT * FROM users WHERE id = ?";  // 使用占位符
+try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+    pstmt.setInt(1, Integer.parseInt(userInput)); 
+    ResultSet rs = pstmt.executeQuery();
+    // 处理结果集
+}
+```
+
+#### 2. 输入合法性校验
+对用户输入实施类型、格式或范围限制，拒绝非法输入。
+```java
+// 示例：校验输入为数字且范围合法
+String userInput = request.getParameter("id");
+if (!userInput.matches("^[0-9]+$")) {
+    throw new IllegalArgumentException("ID输入格式不正确");
+}
+int id = Integer.parseInt(userInput);
+// 如果需要，进一步校验数值范围
+if (id < 1 || id > 1000) {
+    throw new IllegalArgumentException("ID超出有效范围");
+}
+```
+
+#### 3. 使用ORM框架
+通过ORM（如Hibernate、MyBatis）内置的安全机制自动处理参数化，避免手动拼接SQL。
+```java
+// MyBatis示例 (XML映射文件)
+<select id="getUserById" resultType="User">
+    SELECT * FROM users WHERE id = #{userId}  <!-- 安全参数占位符 -->
+</select>
+```
+```java
+// 调用代码 (避免直接拼接)
+String userInput = request.getParameter("id");
+User user = sqlSession.selectOne("getUserById", Integer.parseInt(userInput));
+```
+
+CODE
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+   由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
+
+2. **触发场景**
+   // 存在漏洞的代码示例
+   ```java
+   String userInput = request.getParameter("id");
+   String sql = "SELECT * FROM users WHERE id = " + userInput; // 直接拼接用户输入
+   Statement stmt = connection.createStatement();
+   ResultSet rs = stmt.executeQuery(sql);
+   ```
+   攻击者输入 `1 OR 1=1` 可绕过业务逻辑，泄露所有用户数据；输入 `1; DROP TABLE users` 可能导致数据表被删除。
+
+3. **潜在影响**
+   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+   - 通过数据库提权进一步渗透至服务器或其他系统组件。
+CODE
+	level: "high",
+	title: "Unvalidated MySQL Parameter Injection",
+}
+
 
 
 desc(

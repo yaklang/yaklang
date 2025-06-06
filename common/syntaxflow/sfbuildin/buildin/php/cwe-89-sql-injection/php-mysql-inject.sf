@@ -102,11 +102,60 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high for {
-    title: 'Unvalidated MySQL Parameter Injection',
-    title_zh: 'MySQL未验证参数注入风险',
-    level: 'high',
-}
+	title: "Unvalidated MySQL Parameter Injection",
+	title_zh: "MySQL未验证参数注入风险",
+	solution: <<<CODE
+### 修复建议
+#### 1. 使用参数化查询（PreparedStatement）
+通过预编译SQL语句并绑定用户输入，隔离代码与数据，避免恶意输入篡改逻辑。
+    ```php
+    // 修复代码示例
+       $id = $_GET['id'];
+       $mysqli = new mysqli("localhost", "user", "password", "database");
+       $stmt = $mysqli->prepare("SELECT * FROM users WHERE id = ?"); // 使用占位符
+       $stmt->bind_param("i", $id); // 绑定参数，指定类型为整数
+       $stmt->execute();
+       $result = $stmt->get_result();
+       // 处理结果集
+    ```
+#### 2. 输入合法性校验
+对用户输入实施类型、格式或范围限制，拒绝非法输入。
+    ```php
+    // 示例：校验输入为数字且范围合法
+       $id = (int)$_GET['id']; // 强制类型转换
+       if(!is_int($id)){
+            throw new Exception("id 必须要是int类型");
+       }
+    ```
+#### 3. 使用ORM框架
+通过ORM（如Laravel, ThinkPHP）内置的安全机制自动处理参数化，避免手动拼接SQL。
+    ```php
+    //Laravel示例
+    DB::table('users')->where('id', $id)->get();
+    ```
+CODE
+	desc: <<<CODE
+### 漏洞描述
 
+1.  **漏洞原理**
+    由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
+
+2. **触发场景**
+    // 存在漏洞的代码示例
+    ```php
+    $id = $_GET['id']; // 未过滤的用户输入
+    $query = "SELECT * FROM users WHERE id = " . $id; // 直接拼接
+    $result = mysql_query($query);
+    ```
+    攻击者输入 `1 OR 1=1` 可绕过业务逻辑，泄露所有用户数据；输入 `1; DROP TABLE users` 可能导致数据表被删除。
+
+3. **潜在影响**
+   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+   - 通过数据库提权进一步渗透至服务器或其他系统组件。
+CODE
+	level: "high",
+}
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
 CODE,exclude=<<<CODE
@@ -116,20 +165,66 @@ CODE)> as $highAndMid
 $highAndMid - $high as $mid
 
 alert $mid for {
-    title: 'Insufficient MySQL Parameter Filtering',
-    title_zh: 'MySQL参数过滤不充分',
-    level: 'mid',
-}
+	title: "Insufficient MySQL Parameter Filtering",
+	title_zh: "MySQL参数过滤不充分",
+	solution: <<<CODE
+### 修复建议
 
+#### 1. 增强输入验证与过滤
+除了使用addslashes(), 还可以结合其他过滤函数，例如htmlspecialchars()等，对用户输入进行多重过滤，以减少被绕过的可能性。
+
+#### 2. 进一步审查可疑点
+由于该路径被判断为mid风险，建议安全人员对该处代码逻辑进行复查，特别是与数据库查询相关的部分，确认是否存在潜在的安全风险。
+
+#### 3. 考虑使用更安全的替代方案
+如果条件允许，尽量避免直接拼接SQL语句，考虑使用参数化查询或ORM框架，以降低SQL注入的风险。
+CODE
+	desc: <<<CODE
+### 风险描述
+
+1. **风险原因**
+尽管代码中使用了`addslashes()`函数对用户输入进行了处理，但是此函数仅对部分特殊字符进行转义，可能无法完全防止所有类型的SQL注入攻击。
+
+2. **触发场景**
+当攻击者构造的恶意输入能够绕过`addslashes()`函数的过滤时，例如，使用宽字节注入等方式，可能导致SQL注入漏洞。
+
+3. **潜在影响**
+如果攻击成功，可能导致数据泄露、数据篡改或非法访问等安全风险，具体风险程度取决于攻击者能够执行的SQL语句。
+CODE
+	level: "mid",
+}
 $sink - $high - $mid as $low
 
 check $low
 alert $low for {
-    title: 'Potential MySQL Access Control Bypass',
-    title_zh: 'MySQL访问控制潜在绕过风险',
-    level: 'low',
-}
+	desc: <<<CODE
+### 风险描述
 
+1. **风险原因**
+尽管路径已包含过滤机制，但仍有可能存在潜在的绕过风险，例如，过滤函数本身的缺陷或未考虑到的特殊情况。
+
+2. **触发场景**
+在某些特定的输入组合下，攻击者可能绕过现有的访问控制机制，执行未经授权的操作。
+
+3. **潜在影响**
+如果绕过成功，可能导致未经授权的数据访问或操作，破坏数据的完整性和保密性。
+CODE
+	level: "low",
+	title: "Potential MySQL Access Control Bypass",
+	title_zh: "MySQL访问控制潜在绕过风险",
+	solution: <<<CODE
+### 修复建议
+
+#### 1. 强化白名单机制
+除了现有的过滤函数外，可以结合白名单机制，只允许特定格式或类型的数据通过，不在白名单内的数据一律拒绝。
+
+#### 2. 关注过滤函数的潜在缺陷
+定期检查所使用的过滤函数是否存在已知的安全漏洞，及时更新或修复。
+
+#### 3. 实施最小权限原则
+确保MySQL用户只拥有完成其任务所需的最小权限，避免过度授权，降低潜在风险。
+CODE
+}
 desc(
 	lang: php
 	alert_low: 1

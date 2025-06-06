@@ -6,10 +6,10 @@ desc(
 https://docs.oracle.com/javase/8/docs/api/java/io/PrintStream.html
 REFERENCE
 	description: <<<DESCRIPTION
-    该规则用于检测Java项目中是否使用了System.out输出流。System.out是Java中的标准输出流，通常用于打印调试信息或日志。然而，在生产环境中使用System.out输出流可能会导致性能问题和安全隐患。建议使用日志框架（如Log4j、SLF4J等）来替代System.out输出流，以便更好地管理日志记录和输出。
+
 DESCRIPTION
 	fix: <<<FIX
-    建议使用日志框架（如Log4j、SLF4J等）来替代System.out输出流，以便更好地管理日志记录和输出。
+
 FIX
 	rule_id: "e1315696-3f1e-404c-9906-06c1db41a6b0"
 )
@@ -17,7 +17,63 @@ FIX
 System.out.print*() as $out;
 check $out;
 alert $out for {
-    message: '检测到Java项目中使用了System.out输出流',
-    level: info,
+	title_zh: "检测到Java使用System.out输出流",
+	solution: <<<CODE
+### 修复建议
+
+#### 1. 使用日志框架
+建议使用日志框架（如Log4j、SLF4J等）来替代System.out输出流，以便更好地管理日志记录和输出。
+
+```java
+// 使用Log4j示例
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+public class Example {
+    private static final Logger logger = LogManager.getLogger(Example.class);
+
+    public static void main(String[] args) {
+        logger.info("This is an info message");
+        logger.error("This is an error message");
+    }
+}
+```
+
+#### 2. 配置日志级别
+根据不同的环境（开发、测试、生产）配置不同的日志级别，避免在生产环境中输出过多的调试信息。
+
+```java
+// 配置Log4j日志级别
+import org.apache.logging.log4j.Level;
+
+public class LogConfig {
+    public static void main(String[] args) {
+        Logger logger = LogManager.getLogger(LogConfig.class);
+        logger.setLevel(Level.INFO); // 设置日志级别为INFO
+    }
+}
+```
+
+#### 3. 审查现有代码
+审查现有代码中的System.out调用，逐步替换为日志框架的调用。
+CODE
+	desc: <<<CODE
+### 规则目的
+该规则用于检测Java项目中是否使用了System.out输出流。System.out是Java中的标准输出流，通常用于打印调试信息或日志。然而，在生产环境中使用System.out输出流可能会导致性能问题和安全隐患。建议使用日志框架（如Log4j、SLF4J等）来替代System.out输出流，以便更好地管理日志记录和输出。
+
+### 规则详细
+1. **检测对象**
+   System.out.print*() 方法，包括System.out.println、System.out.print等。
+
+2. **潜在问题**
+   - **性能影响**：频繁的System.out调用可能会影响应用程序的性能。
+   - **安全隐患**：输出敏感信息可能导致信息泄露。
+
+3. **推荐做法**
+   使用成熟的日志框架进行日志管理，例如Log4j、SLF4J等，这些框架提供了更灵活的日志级别控制、日志格式化以及日志的异步处理功能。
+CODE
+	level: "info",
+	message: "检测到Java项目中使用了System.out输出流",
+	title: "Java System.out Usage Detected",
 }
 

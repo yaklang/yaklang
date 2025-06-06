@@ -32,7 +32,29 @@ sql?{<fullTypeName>?{have: 'database/sql'}} as $entry;
 $entry.Open <getCall> as $db;
 $db <getMembers> as $output;
 
-alert $output
+alert $output for {
+	solution: <<<CODE
+none
+CODE
+	desc: <<<CODE
+### 规则目的
+此审计规则旨在检查Go语言项目中是否正确使用了`database/sql`包来操作数据库。`database/sql`包提供了对SQL数据库的通用接口，包括打开和关闭数据库连接、执行SQL语句以及查询数据。
+
+### 规则详细
+此规则属于`golang-database-sql`库规则（`lib`类型），主要用于标记所有对`database/sql`包中`Open`函数的调用点及其返回的数据库连接对象。这些标记点可以作为后续规则（例如，检测SQL注入或其他不安全数据库操作的规则）的起点或基础数据，从而更精确地追踪潜在的安全问题。
+
+**检测目标:**
+
+1.  识别并标记所有`database/sql`包的引用。
+2.  识别并标记所有对`database/sql.Open`函数的调用。
+3.  识别并标记`database/sql.Open`函数调用返回的`*sql.DB`数据库连接对象及其成员函数（如`Exec`, `Query`, `Prepare`等）。
+
+通过标记这些关键的数据库操作点，可以为更高级别的安全审计规则提供必要的信息流和数据依赖关系。
+CODE
+	level: "info",
+	title: "Audit Golang Database/SQL Usage",
+	title_zh: "审计Golang Database/SQL使用",
+}
 
 desc(
 	lang: golang

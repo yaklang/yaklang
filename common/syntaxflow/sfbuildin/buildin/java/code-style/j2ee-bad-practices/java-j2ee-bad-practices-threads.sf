@@ -10,7 +10,7 @@ desc(
 [JCA 1.6 Specification - Work Management](https://download.oracle.com/otndocs/jcp/jca-1.6-fr-spec/index.html)
 REFERENCE
 	description: <<<DESCRIPTION
-    J2EE 标准明确限制在Web应用中直接管理线程，因其在容器环境中存在高风险。线程控制不仅实现复杂，更可能引发不可控的容器冲突。即便未触发容器异常，仍可能引发隐蔽性极强的并发问题，包括死锁、竞态条件及资源争用等同步缺陷。
+
 DESCRIPTION
 	rule_id: "8e009f30-c716-4c22-b4c4-9d394e88c824"
 	solution: <<<SOLUTION
@@ -92,25 +92,202 @@ SOLUTION
 Thread()?{<typeName>?{have:'java.lang.Thread'}} as $thread;
 Thread?{<typeName>?{have:'java.lang.Thread'}}.currentThread() as $thread;
 alert $thread for {
-    message: '检测到Java项目中使用了Thread类',
-    level: info,
+	solution: <<<CODE
+### 修复建议
+
+在 J2EE 应用中避免直接创建和管理线程，应充分利用容器提供的并发管理机制。
+
+#### 1. 使用容器管理的线程池 (JCA WorkManager)
+
+大多数现代应用服务器都提供了 JCA (Java EE Connector Architecture) WorkManager，它允许应用程序通过容器管理的线程池异步执行任务。这是在 J2EE 应用中执行异步操作的标准和推荐方式。
+
+```java
+    // 示例：通过 WorkManager 提交任务
+    // 需要在部署描述符中配置 WorkManager 资源
+    @Resource(lookup = "java:comp/env/wm/MyWorkManager") // 查找 WorkManager
+    private WorkManager workManager;
+
+    public class MyServlet extends HttpServlet {
+        protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+            try {
+                Work task = new MyWork(); // 实现 org.jboss.resource.adapter.work.Work 接口
+                workManager.scheduleWork(task); // 提交任务给容器管理的线程池
+            } catch (WorkException e) {
+                e.printStackTrace();
+                // 处理异常
+            }
+        }
+    }
+
+    class MyWork implements org.jboss.resource.adapter.work.Work {
+        @Override
+        public void run() {
+            // 在容器管理的线程中执行任务逻辑
+            System.out.println("Executing task in WorkManager thread");
+        }
+
+        @Override
+        public void release() {
+            // 清理资源
+        }
+    }
+```
+
+#### 2. 使用异步 Servlet (N/A)
+
+对于需要长时间运行的请求，可以考虑使用 Servlet 3.0+ 引入的异步处理 API，避免阻塞容器线程。但这不适用于在业务逻辑中创建新的背景线程。
+
+#### 3. 使用 Java EE Concurrency Utilities
+
+Java EE 7 引入了 Concurrency Utilities (JSR 236)，提供了 `ManagedExecutorService`, `ManagedScheduledExecutorService`, `ManagedThreadFactory` 和 `ManagedTask` 等接口，允许应用程序安全地使用容器管理的线程池。
+
+```java
+    // 示例：使用 ManagedExecutorService
+    @Resource // 注入 ManagedExecutorService
+    private ManagedExecutorService executorService;
+
+    public class AnotherServlet extends HttpServlet {
+        protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+             executorService.submit(() -> {
+                 // 在容器管理的线程中执行异步任务
+                 System.out.println("Executing task in ManagedExecutorService thread");
+             });
+        }
+    }
+```
+
+#### 4. 避免使用 ThreadLocal
+
+在 J2EE 组件中应避免使用 `ThreadLocal`，因为它可能导致在线程池复用线程时数据混乱。如果需要线程局部的数据，考虑使用请求范围或会话范围的对象来存储上下文信息。
+
+#### 5. 避免调用不推荐的 Thread 方法
+
+永远不要在 J2EE 组件中调用 `Thread.stop()`, `Thread.suspend()`, `Thread.resume()` 等方法，它们已经被废弃且非常危险。对于 `Thread.sleep()` 和 `Thread.yield()`，虽然它们不一定直接导致容器问题，但在 Web 请求处理线程中长时间休眠或频繁让步通常表明设计问题，应考虑异步处理或其他方式来避免阻塞。
+
+总之，在 J2EE 环境下，应优先使用平台提供的并发管理工具，而不是直接操作底层线程。
+CODE
+	desc: <<<CODE
+### 漏洞描述
+检测到Java项目中使用了未管理的线程，这可能导致在容器环境中出现不可控的并发问题，如死锁、竞态条件等。J2EE标准推荐使用容器管理的线程池来避免这些问题。
+
+#### 触发场景
+```java
+Thread t = new Thread(() -> {
+    // 线程任务
+});
+```
+
+#### 潜在影响
+- 引发死锁或竞态条件。
+- 导致容器资源管理混乱。
+- 影响系统稳定性和性能。
+CODE
+	level: "info",
+	message: "检测到Java项目中使用了Thread类",
+	title: "Unmanaged Thread Usage",
+	title_zh: "未管理线程使用",
 }
 
 ThreadLocal()?{<typeName>?{have:'java.lang.ThreadLocal'}} as $threadLocal;
 alert $threadLocal for {
-    message: '检测到Java项目中使用了ThreadLocal类',
+	title: "ThreadLocal Usage",
+	title_zh: "ThreadLocal使用",
+	solution: <<<CODE
+### 修复建议
+
+在 J2EE 组件中应避免使用 `ThreadLocal`，因为它可能导致在线程池复用线程时数据混乱。如果需要线程局部的数据，考虑使用请求范围或会话范围的对象来存储上下文信息。
+
+#### 替代方案
+
+使用请求范围或会话范围的对象来存储上下文信息，例如使用 `HttpServletRequest` 或 `HttpSession`。
+
+```java
+// 示例：使用 HttpSession 存储数据
+HttpSession session = request.getSession();
+session.setAttribute("key", "value");
+```
+
+#### 潜在影响
+
+使用 `ThreadLocal` 可能导致在线程池复用线程时数据混乱，影响应用程序的稳定性和可靠性。
+CODE
+	desc: <<<CODE
+### 漏洞描述
+检测到Java项目中使用了 `ThreadLocal`，这可能导致在线程池复用线程时数据混乱，影响应用程序的稳定性和可靠性。
+
+#### 触发场景
+```java
+ThreadLocal<String> threadLocal = new ThreadLocal<>();
+threadLocal.set("value");
+```
+
+#### 潜在影响
+- 线程池复用时数据混乱。
+- 影响应用程序的稳定性和可靠性。
+CODE
+	level: "info",
+	message: "检测到Java项目中使用了ThreadLocal类",
 }
 
 $thread./^(destroy|interrupt|join|resume|start|stop|suspend)$/ as $weak;
 // Thread.sleep
 Thread./^(sleep|yield)$/?{<typeName>?{have:'java.lang'}} as $weak;
 alert $weak for {
-    message:'检测到Java项目中使用了Thread类的destroy、interrupt、join、resume、sleep、start、stop、suspend或yield方法',
+	title_zh: "废弃的线程方法",
+	solution: <<<CODE
+### 修复建议
+
+永远不要在 J2EE 组件中调用 `Thread.stop()`, `Thread.suspend()`, `Thread.resume()` 等方法，它们已经被废弃且非常危险。对于 `Thread.sleep()` 和 `Thread.yield()`，虽然它们不一定直接导致容器问题，但在 Web 请求处理线程中长时间休眠或频繁让步通常表明设计问题，应考虑异步处理或其他方式来避免阻塞。
+
+#### 替代方案
+
+使用异步处理或其他方式来避免阻塞，例如使用 `ManagedExecutorService` 或 `CompletableFuture`。
+
+```java
+// 示例：使用 CompletableFuture 进行异步处理
+CompletableFuture.runAsync(() -> {
+    // 异步任务
+});
+```
+
+#### 潜在影响
+
+调用废弃的线程方法可能导致系统不稳定或性能问题，应尽量避免使用。
+CODE
+	desc: <<<CODE
+### 漏洞描述
+检测到Java项目中使用了废弃的线程方法，如 `Thread.stop()`, `Thread.suspend()`, `Thread.resume()` 等，这些方法已经被废弃且非常危险。
+
+#### 触发场景
+```java
+Thread t = new Thread(() -> {
+    // 线程任务
+});
+t.stop(); // 废弃且危险的方法
+```
+
+#### 潜在影响
+- 系统不稳定。
+- 性能问题。
+- 安全风险。
+CODE
+	level: "info",
+	message: "检测到Java项目中使用了Thread类的destroy、interrupt、join、resume、sleep、start、stop、suspend或yield方法",
+	title: "Deprecated Thread Methods",
 }
 
 run?{opcode:function}<getInterfaceBlueprint>?{have:'Runnable'} as $run
 alert $run for {
-    message:'检测到Java项目中使用了Runnable接口并且实现了run方法',
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "",
+	message: "检测到Java项目中使用了Runnable接口并且实现了run方法",
+	title: "",
+	title_zh: "",
 }
 
 desc(

@@ -36,7 +36,34 @@ REFERENCE
 <include('golang-http-gin')> as $output;
 <include('golang-http-net')> as $output;
 
-alert $output
+alert $output for {
+	title: "Audit Golang HTTP Sink",
+	title_zh: "审计Golang HTTP输出点",
+	solution: <<<CODE
+none
+CODE
+	desc: <<<CODE
+### 规则目的
+
+该规则旨在审计Golang应用程序中与处理HTTP响应输出相关的代码。
+
+### 规则详细
+
+1.  **作为基础审计库**
+    属于 `golang-http-sink` 库规则（`lib` 类型），通常配合其他规则（如数据源跟踪规则）共同审计潜在的Web漏洞，提供关键输出函数的识别能力。
+
+2.  **识别 HTTP 响应输出函数**
+    该规则识别将数据写入 HTTP 响应体或生成 HTTP 响应的核心函数。这包括但不限于：
+    *   `w.Write()`：直接将字节切片写入响应体。
+    *   `fmt.Fprintf(w, ...)`：格式化输出到响应体。
+    *   模板引擎的执行函数（如 `template.Execute()`、`html/template.Execute()`），这些函数将模板渲染结果写入响应体。
+    *   其他可能直接或间接向 HTTP 响应体写入内容的函数或方法。
+
+3.  **结合数据流分析**
+    单独使用时，此规则仅标记可能的输出位置。其真正威力在于与数据流分析相结合。通过跟踪用户输入（如请求参数、请求体）是否流入这些输出函数，可以有效地识别潜在的反射型跨站脚本 (XSS) 漏洞、注入漏洞或其他直接通过 HTTP 响应返回敏感信息的问题。
+CODE
+	level: "info",
+}
 
 desc(
 	lang: golang

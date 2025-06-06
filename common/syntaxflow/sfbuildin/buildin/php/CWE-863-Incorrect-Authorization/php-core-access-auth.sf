@@ -107,11 +107,67 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high for {
-   title: "Direct File Operation Without Validation",
-   title_zh: "未经验证的文件操作高危漏洞",
-   level: "high",
+	desc: <<<CODE
+### 漏洞描述
+
+1.  **漏洞原理**
+    - 当应用程序未经充分验证或过滤地将用户提供的输入（如文件名或路径）直接传递给文件操作函数时，存在此风险。
+
+2.  **触发场景**
+    - 攻击者可以构造恶意输入，例如使用路径遍历字符 `../` 访问受限目录或文件。
+
+3.  **潜在影响**
+    - 敏感信息泄露，数据损坏，拒绝服务，远程代码执行。
+CODE
+	level: "high",
+	title: "Direct File Operation Without Validation",
+	title_zh: "未经验证的文件操作高危漏洞",
+	solution: <<<CODE
+### 修复建议
+
+1.  **使用白名单验证**
+    - 维护一个允许的文件和目录列表。用户输入必须与此列表中的项完全匹配才能被接受。
+
+2.  **路径规范化**
+    - 使用 `realpath()` 函数将用户提供的路径转换为绝对路径，然后验证此路径是否在允许的目录内。
+
+3.  **输入过滤**
+    - 移除或替换用户输入中的危险字符，例如 `../` 和 `./`，防止路径遍历攻击。
+    ```php
+    $filename = $_GET['filename'];
+    $filename = str_replace(['../', './'], '', $filename);
+    $safe_path = '/safe/directory/' . $filename;
+    ```
+
+4.  **权限控制**
+    - 确保 Web 服务器进程仅具有访问必要文件和目录的最小权限。
+
+**示例代码:**
+```php
+<?php
+
+$allowed_paths = [
+    '/var/www/safe/directory/',
+    '/var/www/public/uploads/'
+];
+
+$user_path = $_GET['path'];
+
+// 使用 realpath 规范化路径
+$real_path = realpath($user_path);
+
+// 检查路径是否在允许的列表中
+if (in_array(dirname($real_path) . '/', $allowed_paths)) {
+    echo "Accessing: " . $real_path;
+    // 执行文件操作
+} else {
+    echo "Access Denied.";
 }
 
+?>
+```
+CODE
+}
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
 CODE,exclude=<<<CODE
@@ -119,19 +175,98 @@ CODE,exclude=<<<CODE
 CODE)> as $mid
 
 alert $mid for {
-   title: "Insufficient Parameter Filtering",
-   title_zh: "参数过滤不完整风险",
-   level: "mid",
+	title: "Insufficient Parameter Filtering",
+	title_zh: "参数过滤不完整风险",
+	solution: <<<CODE
+### 修复建议
+
+1.  **强化输入过滤**
+    - 使用更严格的过滤规则，例如正则表达式，来移除或替换用户输入中的危险字符和模式。
+
+2.  **多层验证**
+    - 在不同的处理阶段对用户输入执行多层验证，确保没有遗漏的危险输入。
+
+3.  **使用安全的API**
+    - 尽可能使用安全的 API，并确保它们具有内置的验证机制。
+
+**示例代码:**
+```php
+<?php
+
+$user_input = $_GET['input'];
+
+// 使用正则表达式过滤
+$safe_input = preg_replace('/[^a-zA-Z0-9_\-\.]/', '', $user_input);
+
+// 确保结果不为空
+if (empty($safe_input)) {
+    die('Invalid input.');
 }
 
+// 执行操作
+// ...
+
+?>
+```
+CODE
+	desc: <<<CODE
+### 风险描述
+
+1.  **风险原理**
+    - 当应用程序对用户提供的输入执行了基本的过滤，但存在过滤规则不完整或易于绕过的风险时，可能导致安全漏洞。
+
+2.  **触发场景**
+    - 攻击者可能构造特殊输入，绕过现有的过滤规则。
+
+3.  **潜在影响**
+    - 可能导致敏感信息泄露，数据篡改，拒绝服务，远程代码执行。
+CODE
+	level: "mid",
+}
 $sink - $high - $mid  as $low
 
 alert $low for {
-   title: "Potential Access Control Bypass",
-   title_zh: "潜在访问控制绕过风险",
-   level: "low",
+	title: "Potential Access Control Bypass",
+	title_zh: "潜在访问控制绕过风险",
+	solution: <<<CODE
+### 修复建议
+
+1.  **代码审查**
+    - 定期进行代码审查，寻找潜在的访问控制绕过风险。
+
+2.  **安全审计**
+    - 执行安全审计，检查访问控制机制是否按预期工作。
+
+3.  **最小权限原则**
+    - 实施最小权限原则，确保用户和进程仅具有执行其任务所需的最小权限。
+```php
+<?php
+
+// 检查用户是否具有访问权限
+if (!check_user_permission($user, $resource)) {
+    die('Access Denied.');
 }
 
+// 执行操作
+// ...
+
+?>
+```
+CODE
+	desc: <<<CODE
+### 风险描述
+
+1.  **风险原理**
+    - 尽管应用层已实施一定的访问控制，但仍可能存在绕过这些控制的潜在方法。
+
+2.  **触发场景**
+    - 攻击者可能利用访问控制机制中的缺陷或漏洞绕过限制。
+
+3.  **潜在影响**
+    - 用户或进程可能未经授权访问受保护的资源。
+CODE
+	level: "low",
+}
 desc(
 	lang: "php"
 	alert_min: 1

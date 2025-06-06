@@ -35,4 +35,29 @@ fmt?{<fullTypeName>?{have: 'fmt'}} as $entry
 $entry.Println(* #-> as $output)
 $entry.Printf(* #-> as $output)
 
-alert $output
+alert $output for {
+	solution: <<<CODE
+none
+CODE
+	desc: <<<CODE
+### 规则目的
+该规则旨在审计Go语言代码中对`fmt`包中打印系列函数（如`Println`、`Printf`等）的使用情况，帮助开发者识别代码中输出信息的位置。这对于代码审计、信息追踪或者查找潜在的日志输出敏感信息等场景非常有用。
+
+### 规则详细
+1. **作为基础审计库**
+   属于`golang-fmt-print`库规则（`lib`类型），主要用于定位所有调用了`fmt`包中打印函数的语句。
+2. **覆盖主要打印函数**
+   规则目前覆盖了`fmt`包中常用的打印函数，包括：
+   - `fmt.Println`
+   - `fmt.Printf`
+   等未来可扩展的其他打印输出函数。
+
+通过识别这些函数的使用位置，可以方便进行后续的分析，例如：
+- 追踪哪些位置输出了调试信息。
+- 检查是否有敏感信息被直接打印到控制台或日志中。
+- 分析代码的执行流程。
+CODE
+	level: "info",
+	title: "Audit Golang fmt Print Method",
+	title_zh: "审计Golang fmt打印方法",
+}
