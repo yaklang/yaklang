@@ -102,20 +102,25 @@ SOLUTION
 REFERENCE
 )
 
-g"SELECT*" as $sqlConst;
-g"select*" as $sqlConst;
+g"SELECT*" as $allConst;
+g"select*" as $allConst;
+// 搜索作为memberCall的key的const
+$allConst<string()> as  $name
+<fuzztag(".{{name}} as $filed")><eval()>  as $stmts
+<delete("stmts")>
+// 排除作为memberCall的key的const
+$filed<getObject()> as $object
+$allConst?{!<getUsers()> & $object} as $sqlConst
 
 // 检测 SQL 字符串被传入到了某一个执行函数中，执行函数符合常见的 SQL 执行命名规范
 $sqlConst -{
-    until: <<<CODE
-*?{opcode: call && <getCallee><name>?{have: /(?i)(query)|(execut)|(insert)|(native)|(update)/}<show>}<var(sink)> as $__next__;
-CODE
+    until: `*?{opcode: call && <getCallee><name>?{have: /(?i)(query)|(execut)|(insert)|(native)|(update)/}}as $sink`
 }->;
 check $sink;
 
 // 检测 SQL 字符串是否被 add 操作拼接，add 操作是字符串拼接的常见操作
 // 这里虽然会不全面，但是可以作为一个案例，可以支持更多规则来实现这个细节检测
-$sqlConst?{<self>#>?{opcode: add}<var(op)> || <self>->?{opcode: add}<var(op)>};
+$sqlConst?{* #>?{opcode: add}<var(op)> || *->?{opcode: add}<var(op)>};
 check $op;
 
 alert $op	for {
@@ -129,6 +134,7 @@ alert $op	for {
 
 desc(
 	lang: java
+	alert_num:1
 	"file://a.java": <<<FILE
 package com.itstyle.quartz.service.impl;
 
