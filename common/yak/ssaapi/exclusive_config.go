@@ -1,5 +1,7 @@
 package ssaapi
 
+import "context"
+
 type OperationConfig struct {
 	// 限制递归深度，每一次递归核心函数，计数器都会加一
 	// 上下文计数器受到这个限制
@@ -9,6 +11,7 @@ type OperationConfig struct {
 	// Hook
 	HookEveryNode        []func(*Value) error
 	AllowIgnoreCallStack bool
+	ctx                  context.Context
 
 	//用来记录上一次的值
 	lastValue *Value
@@ -58,11 +61,20 @@ func WithHookEveryNode(hookNode func(*Value) error) OperationOption {
 	}
 }
 
+func WithExclusiveContext(ctx context.Context) OperationOption {
+	return func(operationConfig *OperationConfig) {
+		if operationConfig.ctx != nil {
+			operationConfig.ctx = ctx
+		}
+	}
+}
+
 func NewOperations(opt ...OperationOption) *OperationConfig {
 	config := &OperationConfig{
 		MaxDepth:             500,
 		MinDepth:             -500,
 		AllowIgnoreCallStack: true,
+		ctx:                  context.Background(),
 	}
 
 	for _, o := range opt {

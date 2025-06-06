@@ -896,8 +896,8 @@
   {
     "rule_id": "21d79f98-a435-4c84-81be-055ac21b94ef",
     "rule_name": "检查 Java SQL 语句拼接",
-    "hash": "83d136d76374f4ad3ad70bea8dff1129a77fe7921f91d278ecc1fc0e3f1b192b",
-    "version": "20250604.0001"
+    "hash": "b23ae4c8396bc4780dbdb2e1cef3ad57c874c1403c90f94bc396268a9442c607",
+    "version": "20250606.0001"
   },
   {
     "rule_id": "b8ede24d-8ff0-4d81-ab97-903495a6cb61",
