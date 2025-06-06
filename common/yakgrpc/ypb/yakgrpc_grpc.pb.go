@@ -485,6 +485,7 @@ const (
 	Yak_ExportNote_FullMethodName                                 = "/ypb.Yak/ExportNote"
 	Yak_StartAITask_FullMethodName                                = "/ypb.Yak/StartAITask"
 	Yak_QueryAITask_FullMethodName                                = "/ypb.Yak/QueryAITask"
+	Yak_StartAITriage_FullMethodName                              = "/ypb.Yak/StartAITriage"
 	Yak_CreateAIForge_FullMethodName                              = "/ypb.Yak/CreateAIForge"
 	Yak_UpdateAIForge_FullMethodName                              = "/ypb.Yak/UpdateAIForge"
 	Yak_DeleteAIForge_FullMethodName                              = "/ypb.Yak/DeleteAIForge"
@@ -1100,6 +1101,7 @@ type YakClient interface {
 	// AI Task
 	StartAITask(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent], error)
 	QueryAITask(ctx context.Context, in *AITaskQueryRequest, opts ...grpc.CallOption) (*AITaskQueryResponse, error)
+	StartAITriage(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AITriageInputEvent, AIOutputEvent], error)
 	// AI forge curd
 	CreateAIForge(ctx context.Context, in *AIForge, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	UpdateAIForge(ctx context.Context, in *AIForge, opts ...grpc.CallOption) (*DbOperateMessage, error)
@@ -6460,6 +6462,19 @@ func (c *yakClient) QueryAITask(ctx context.Context, in *AITaskQueryRequest, opt
 	return out, nil
 }
 
+func (c *yakClient) StartAITriage(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AITriageInputEvent, AIOutputEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[84], Yak_StartAITriage_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[AITriageInputEvent, AIOutputEvent]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_StartAITriageClient = grpc.BidiStreamingClient[AITriageInputEvent, AIOutputEvent]
+
 func (c *yakClient) CreateAIForge(ctx context.Context, in *AIForge, opts ...grpc.CallOption) (*DbOperateMessage, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DbOperateMessage)
@@ -6502,7 +6517,7 @@ func (c *yakClient) QueryAIForge(ctx context.Context, in *QueryAIForgeRequest, o
 
 func (c *yakClient) StartMcpServer(ctx context.Context, in *StartMcpServerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StartMcpServerResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[84], Yak_StartMcpServer_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[85], Yak_StartMcpServer_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7172,6 +7187,7 @@ type YakServer interface {
 	// AI Task
 	StartAITask(grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]) error
 	QueryAITask(context.Context, *AITaskQueryRequest) (*AITaskQueryResponse, error)
+	StartAITriage(grpc.BidiStreamingServer[AITriageInputEvent, AIOutputEvent]) error
 	// AI forge curd
 	CreateAIForge(context.Context, *AIForge) (*DbOperateMessage, error)
 	UpdateAIForge(context.Context, *AIForge) (*DbOperateMessage, error)
@@ -8591,6 +8607,9 @@ func (UnimplementedYakServer) StartAITask(grpc.BidiStreamingServer[AIInputEvent,
 }
 func (UnimplementedYakServer) QueryAITask(context.Context, *AITaskQueryRequest) (*AITaskQueryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryAITask not implemented")
+}
+func (UnimplementedYakServer) StartAITriage(grpc.BidiStreamingServer[AITriageInputEvent, AIOutputEvent]) error {
+	return status.Errorf(codes.Unimplemented, "method StartAITriage not implemented")
 }
 func (UnimplementedYakServer) CreateAIForge(context.Context, *AIForge) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateAIForge not implemented")
@@ -16391,6 +16410,13 @@ func _Yak_QueryAITask_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_StartAITriage_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(YakServer).StartAITriage(&grpc.GenericServerStream[AITriageInputEvent, AIOutputEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_StartAITriageServer = grpc.BidiStreamingServer[AITriageInputEvent, AIOutputEvent]
+
 func _Yak_CreateAIForge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AIForge)
 	if err := dec(in); err != nil {
@@ -18567,6 +18593,12 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "StartAITask",
 			Handler:       _Yak_StartAITask_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "StartAITriage",
+			Handler:       _Yak_StartAITriage_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},

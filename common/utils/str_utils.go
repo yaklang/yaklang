@@ -1612,3 +1612,34 @@ func UnquoteCSV(s string) string {
 	}
 	return s
 }
+
+func RuneIndex(s, sub []rune) int {
+	n := len(sub)
+	switch {
+	case n == 0:
+		return 0
+	case n == 1:
+		return strings.IndexRune(string(s), sub[0])
+	case n == len(s):
+		if string(sub) == string(s) {
+			return 0
+		}
+		return -1
+	case n > len(s):
+		return -1
+	default:
+	}
+	for i := 0; i <= len(s)-len(sub); i++ {
+		match := true
+		for j := 0; j < len(sub); j++ {
+			if s[i+j] != sub[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return i
+		}
+	}
+	return -1
+}

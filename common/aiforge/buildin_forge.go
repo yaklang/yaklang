@@ -18,7 +18,7 @@ import (
 )
 
 //go:embed buildinforge/**
-var basePlugin embed.FS
+var buildInForge embed.FS
 
 func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
@@ -43,39 +43,42 @@ func init() {
 		registerBuildInForge("recon")
 		registerBuildInForge("forge_triage")
 		registerBuildInForge("biography")
+		registerBuildInForge("intent_recognition")
 		return nil
 	})
 }
 
 func BuildInForgeHash() (string, error) {
-	return filesys.CreateEmbedFSHash(basePlugin)
+	return filesys.CreateEmbedFSHash(buildInForge)
 }
 
-func getForgeYakScript(name string) (*schema.AIForge, bool) {
+func getBuildInForgeYakScript(name string) (*schema.AIForge, error) {
 	var fullName string
 	if !strings.HasSuffix(name, ".yak") {
 		fullName = name + ".yak"
 	}
-	codeBytes, err := basePlugin.ReadFile(fmt.Sprintf("buildinforge/%v", fullName))
+	codeBytes, err := buildInForge.ReadFile(fmt.Sprintf("buildinforge/%v", fullName))
 	if err != nil {
-		return nil, false
+		return nil, err
 	}
+	return buildAIForgeFromYakCode(name, codeBytes)
+}
 
+func buildAIForgeFromYakCode(forgeName string, codeBytes []byte) (*schema.AIForge, error) {
 	prog, err := static_analyzer.SSAParse(string(codeBytes), "yak")
 	if err != nil {
-		return nil, false
+		return nil, err
 	}
 
-	scriptMetadata, err := metadata.ParseYakScriptMetadataProg(name, prog)
+	scriptMetadata, err := metadata.ParseYakScriptMetadataProg(forgeName, prog)
 	if err != nil {
-		log.Errorf("parse yak script metadata failed: %v", err)
-		return nil, false
+
+		return nil, utils.Errorf("parse yak script metadata failed: %v", err)
 	}
 
 	uiParamsConfig, _, err := information.GenerateParameterFromProgram(prog)
 	if err != nil {
-		log.Errorf("generate yak script parameters failed: %v", err)
-		return nil, false
+		return nil, utils.Errorf("generate yak script parameters failed: %v", err)
 	}
 
 	return &schema.AIForge{
@@ -84,19 +87,23 @@ func getForgeYakScript(name string) (*schema.AIForge, bool) {
 		Tags:           strings.Join(scriptMetadata.Keywords, ","),
 		ForgeContent:   string(codeBytes),
 		ParamsUIConfig: uiParamsConfig,
-	}, true
+	}, nil
 }
 
-func getForgeConfig(name string) (string, *schema.AIForge, bool) {
-	forge := &schema.AIForge{}
+func getBuildInForgeConfig(name string) (string, *schema.AIForge, error) {
 	p := fmt.Sprintf("buildinforge/%v", name)
 	loadDefaultPrompt := func(promptName string) string {
-		promptBytes, _ := basePlugin.ReadFile(fmt.Sprintf("%v/%v.txt", p, promptName))
+		promptBytes, _ := buildInForge.ReadFile(fmt.Sprintf("%v/%v.txt", p, promptName))
 		return string(promptBytes)
 	}
-	codeContent, _ := basePlugin.ReadFile(fmt.Sprintf("%v/%v.yak", p, name))
-	configBytes, err := basePlugin.ReadFile(fmt.Sprintf("%v/forge_cfg.json", p))
-	if err != nil {
+	codeContent, _ := buildInForge.ReadFile(fmt.Sprintf("%v/%v.yak", p, name))
+	configBytes, _ := buildInForge.ReadFile(fmt.Sprintf("%v/forge_cfg.json", p))
+	return buildAIForgeFromConfig(name, configBytes, codeContent, loadDefaultPrompt)
+}
+
+func buildAIForgeFromConfig(name string, configBytes []byte, codeContent []byte, loadDefaultPrompt func(string) string) (string, *schema.AIForge, error) {
+	forge := &schema.AIForge{}
+	if len(configBytes) <= 0 {
 		// If config file doesn't exist, try to read prompt files directly
 		initPrompt := loadDefaultPrompt("init")
 		persistentPrompt := loadDefaultPrompt("persistent")
@@ -104,7 +111,7 @@ func getForgeConfig(name string) (string, *schema.AIForge, bool) {
 		resultPrompt := loadDefaultPrompt("result")
 
 		if len(initPrompt) == 0 && len(persistentPrompt) == 0 && len(planPrompt) == 0 && len(resultPrompt) == 0 {
-			return "", nil, false
+			return "", nil, utils.Errorf("forge configuration failed for %v", name)
 		}
 		forge.ForgeName = name
 		forge.InitPrompt = string(initPrompt)
@@ -115,10 +122,9 @@ func getForgeConfig(name string) (string, *schema.AIForge, bool) {
 	} else {
 		// 使用结构体解析forge_cfg.json
 		var cfg YakForgeBlueprintConfig
-		err = json.Unmarshal(configBytes, &cfg)
+		err := json.Unmarshal(configBytes, &cfg)
 		if err != nil {
-			log.Errorf("parse forge config failed: %v", err)
-			return "", nil, false
+			return "", nil, utils.Errorf("parse forge config failed: %v", err)
 		}
 
 		if cfg.InitPrompt == "" {
@@ -148,17 +154,17 @@ func getForgeConfig(name string) (string, *schema.AIForge, bool) {
 		forge.ForgeContent = cfg.ForgeContent
 		forge.Tags = cfg.Tags
 	}
-	return string(configBytes), forge, true
+	return string(configBytes), forge, nil
 }
 
 func getBuildInForgeFromFS(name string) (*schema.AIForge, error) {
 	var forge *schema.AIForge
 	// First try to get forge code
-	forge, ok := getForgeYakScript(name)
-	if !ok {
+	forge, err := getBuildInForgeYakScript(name)
+	if err != nil {
 		// Try to get forge config
-		_, forge, ok = getForgeConfig(name)
-		if !ok {
+		_, forge, err = getBuildInForgeConfig(name)
+		if err != nil {
 			return nil, fmt.Errorf(`failed to find forge config for "%v"`, name)
 		}
 		forge.ForgeName = name
@@ -204,7 +210,7 @@ func UpdateForgesMetaData(inputDir, outputDir string, concurrency int, forceUpda
 			swg.Add(1)
 			go func() {
 				defer swg.Done()
-				err := updateForgeMetaData(fileInfo, forceUpdate)
+				err := updateSystemFSForgeMetaData(fileInfo, forceUpdate)
 				if err != nil {
 					errorChan <- fmt.Errorf("error processing %s: %v", fileInfo.Path, err)
 				}
@@ -234,10 +240,16 @@ func UpdateForgesMetaData(inputDir, outputDir string, concurrency int, forceUpda
 	return nil
 }
 
-func updateForgeMetaData(fileinfo *utils.FileInfo, forceUpdate bool) error {
+func updateSystemFSForgeMetaData(fileinfo *utils.FileInfo, forceUpdate bool) error {
 	if fileinfo.IsDir {
-		simpleCfg, forge, ok := getForgeConfig(fileinfo.Name)
-		if !ok {
+		codeContent, _ := os.ReadFile(fmt.Sprintf("%v/%v.yak", fileinfo.Path, fileinfo.Name))
+		configBytes, _ := os.ReadFile(fmt.Sprintf("%v/forge_cfg.json", fileinfo.Path))
+		loadDefaultPrompt := func(promptName string) string {
+			promptBytes, _ := os.ReadFile(fmt.Sprintf("%v/%v.txt", fileinfo.Path, promptName))
+			return string(promptBytes)
+		}
+		simpleCfg, forge, err := buildAIForgeFromConfig(fileinfo.Name, configBytes, codeContent, loadDefaultPrompt)
+		if err != nil {
 			return fmt.Errorf(`failed to find forge config for "%v"`, fileinfo.Path)
 		}
 		if forceUpdate || forge.Tags == "" || forge.Description == "" {
@@ -271,9 +283,13 @@ func updateForgeMetaData(fileinfo *utils.FileInfo, forceUpdate bool) error {
 		if !strings.HasSuffix(fileinfo.Name, ".yak") {
 			return nil
 		}
+		codeBytes, err := os.ReadFile(fileinfo.Path)
+		if err != nil {
+			return nil
+		}
 
-		forge, ok := getForgeYakScript(fileinfo.Name)
-		if !ok {
+		forge, err := buildAIForgeFromYakCode(strings.TrimSuffix(fileinfo.Name, ".yak"), codeBytes)
+		if err != nil {
 			return fmt.Errorf(`failed to get yak script forge for "%v"`, fileinfo.Path)
 		}
 		if forceUpdate || forge.Tags == "" || forge.Description == "" {

@@ -63,9 +63,9 @@ func (cm *ChunkMaker) loop(i chan struct{}) {
 		go func() { // Run flushing in a new goroutine to avoid deadlocks
 			defer tempDst.Close() // Close tempDst when flushing is done
 			if flushAllData {
-				bufferChunk.FlushAllChunkSizeTo(tempDst, cm.config.chunkSize)
+				bufferChunk.FlushAllChunkSizeTo(tempDst, cm.config.chunkSize, cm.config.separator)
 			} else {
-				bufferChunk.FlushFullChunkSizeTo(tempDst, cm.config.chunkSize)
+				bufferChunk.FlushFullChunkSizeTo(tempDst, cm.config.chunkSize, cm.config.separator)
 			}
 		}()
 		processAndLinkChunks(tempDst)

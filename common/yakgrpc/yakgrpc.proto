@@ -845,6 +845,8 @@ service Yak {
   rpc StartAITask(stream AIInputEvent) returns(stream AIOutputEvent);
   rpc QueryAITask(AITaskQueryRequest) returns (AITaskQueryResponse);
 
+  rpc StartAITriage(stream AITriageInputEvent) returns(stream AIOutputEvent);
+
   // AI forge curd
   rpc CreateAIForge(AIForge) returns (DbOperateMessage);
   rpc UpdateAIForge(AIForge) returns (DbOperateMessage);
@@ -940,6 +942,20 @@ message AIInputEvent {
   bool IsSyncMessage = 6;
   string SyncType = 7;
 }
+
+
+message AITriageInputEvent {
+  bool IsStart = 1;
+  AIStartParams Params = 2;
+
+  bool IsInteractiveMessage = 3;
+  string InteractiveId = 4;
+  string InteractiveJSONInput = 5;
+
+  bool IsFreeInput = 6;
+  string FreeInput = 7;
+}
+
 
 message McpConfig {
   string Type = 1;

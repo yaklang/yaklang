@@ -1,3 +1,7 @@
+__DESC__ = "根据用户输入和上下文信息，识别用户意图，推荐合适的AI Forge。如果用户选择了Forge，则输出包含Forge名字的JSON结果。"
+
+__KEYWORDS__ = "意图识别,forge推荐,用户意图,上下文理解,forge搜索,结果输出"
+
 cli.String("query",cli.setHelp("用户输入"),cli.setVerboseName("用户输入") )
 cli.String("context", cli.setHelp("上下文信息"))
 cli.check()

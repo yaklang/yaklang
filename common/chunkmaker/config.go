@@ -13,6 +13,9 @@ type Config struct {
 	chunkSize           int64
 	enableTimeTrigger   bool
 	timeTriggerInterval time.Duration
+
+	// separator for chunk data
+	separator string
 }
 
 type Option func(c *Config)
@@ -24,6 +27,12 @@ func WithTimeTrigger(interval time.Duration) Option {
 		}
 		c.enableTimeTrigger = true
 		c.timeTriggerInterval = interval
+	}
+}
+
+func WithSeparatorTrigger(separator string) Option {
+	return func(c *Config) {
+		c.separator = separator
 	}
 }
 
