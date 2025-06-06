@@ -110,6 +110,7 @@ $groovy.parse?{*().run}(*<slice(index=1)> as $output);
 // run(GroovyCodeSource source, List<String> args)  # 不审计
 $groovy.run(*<slice(index=1)>?{<typeName>?{any:'File','Reader','String'}} as $output);
 alert $output for {
+	level: "",
 	title: "",
 	title_zh: "",
 	solution: <<<CODE
@@ -118,7 +119,6 @@ CODE
 	desc: <<<CODE
 
 CODE
-	level: "",
 }
 
 

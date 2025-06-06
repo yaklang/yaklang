@@ -104,93 +104,15 @@ exec?{<fullTypeName>?{have: 'os/exec'}} as $entry
 $entry.Command(* as $output) 
 
 alert $output for {
-	level: "high",
 	title: "Unvalidated Command Execution",
 	title_zh: "未验证的命令执行",
 	solution: <<<CODE
-### 修复建议
-
-#### 1. 使用参数化命令
-通过使用参数化命令，避免直接将用户输入拼接到命令中，从而减少命令注入的风险。
-```go
-func safeCommand(input string) {
-	cmd := exec.Command("program", input)
-	output, err := cmd.Output()
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	fmt.Println(string(output))
-}
-```
-
-#### 2. 输入验证
-对用户输入进行严格的验证，确保输入符合预期的格式和范围。
-```go
-func validateInput(input string) bool {
-	// 示例：验证输入只包含字母和数字
-	return regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString(input)
-}
-```
-
-#### 3. 使用安全库
-考虑使用更安全的库来执行外部命令，例如使用`shlex`库来处理命令参数。
-```go
-import "github.com/alecthomas/shlex"
-
-func safeExec(input string) {
-	args, err := shlex.Split(input)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	cmd := exec.Command(args[0], args[1:]...)
-	output, err := cmd.Output()
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	fmt.Println(string(output))
-}
-```
 
 CODE
 	desc: <<<CODE
-### 漏洞描述
 
-#### 1. 漏洞原理
-由于未对传递给`exec.Command`的输入进行验证，攻击者可能通过构造特殊输入执行任意命令，导致系统被入侵。
-
-#### 2. 触发场景
-```go
-package main
-
-import (
-	"fmt"
-	"os/exec"
-)
-
-func main() {
-	// 创建一个命令
-	cmd := exec.Command("ls", "-l") // 在 Unix/Linux 系统中，使用 "dir" 对于 Windows 系统
-
-	// 执行命令并获取输出
-	output, err := cmd.Output()
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-
-	// 打印输出
-	fmt.Println(string(output))
-}
-```
-
-#### 3. 潜在影响
-- 攻击者可能通过控制输入参数执行任意命令，导致系统被入侵。
-- 可能泄露敏感信息或导致数据被篡改。
-- 系统稳定性受到影响，可能导致服务中断。
 CODE
+	level: "high",
 }
 
 desc(

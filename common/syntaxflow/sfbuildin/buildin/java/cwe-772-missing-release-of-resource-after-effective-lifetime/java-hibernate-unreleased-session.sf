@@ -198,7 +198,16 @@ $getSession -{
 $safe<getPredecessors()> as $safeGetSession;
 $getSession - $safeGetSession as $weak;
 alert $weak for {
-    message:"检测到Hibernate Session 未释放资源",
+	desc: <<<CODE
+
+CODE
+	level: "",
+	message: "检测到Hibernate Session 未释放资源",
+	title: "",
+	title_zh: "",
+	solution: <<<CODE
+
+CODE
 }
 
 desc(

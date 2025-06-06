@@ -111,10 +111,41 @@ SOLUTION
 $output.URL.Query().Get() #-> as $sink;
 $sink?{opcode: param} as $mid
 
-alert $high for {
+alert $mid for {
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+服务器端请求伪造（Server-Side Request Forgery, SSRF）是一种安全漏洞，攻击者能够控制或影响服务器端应用程序请求的目标。在 Go 语言应用中，如果程序接收用户输入的 URL 或相关参数，并在未对输入进行充分验证和过滤的情况下，直接将用户输入用于发起网络请求（如HTTP、文件读取等），则可能导致 SSRF 漏洞。攻击者可以构造恶意请求，使服务器请求内部网络资源、敏感服务，甚至进行端口扫描或攻击内网其他主机，从而导致敏感信息泄露、内部系统受攻击等风险。
+
+2. **触发场景**
+SSRF 漏洞通常发生在应用程序需要从外部获取资源的情况下，例如：
+* 通过 URL 参数获取网页内容、图片或文件。
+* 调用外部服务的 API。
+* 进行文件上传或下载时指定外部 URL。
+
+未对用户提供的 URL 或相关参数进行严格的白名单验证或黑名单过滤，是触发 SSRF 漏洞的关键。
+
+例如，以下 Go 代码片段直接使用用户输入的 `url` 参数发起 HTTP 请求：
+```golang
+func handler(w http.ResponseWriter, r *http.Request) {
+	url := r.URL.Query().Get("url") // 直接从查询参数获取URL
+	resp, err := http.Get(url) // 直接使用用户输入的URL发起HTTP请求
+	// ...
+}
+```
+CODE
+	level: "mid",
+	type: "vuln",
 	title: "SSRF detected",
 	title_zh: "检测到SSRF",
 	solution: <<<CODE
+
+#### 2. 提取修复建议（solution）
+
+修复建议部分将包含针对SSRF漏洞的修复措施。以下是从当前文件中提取并格式化的内容：
+
+```plaintext
 ### 修复建议
 
 #### 1. 严格校验和过滤用户输入的 URL
@@ -171,49 +202,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	resp, err := http.Get(urlParam)
 	// ... rest of handler logic
 }
-```
 
-#### 2. 限制请求的协议和目标地址
-仅允许程序发起特定协议 (如 HTTP/HTTPS) 的请求，并限制请求的目标主机或 IP 地址范围。
-
-#### 3. 禁用重定向
-在发起 HTTP 请求时，禁用客户端的自动重定向功能，防止攻击者利用重定向绕过安全校验。
-
-#### 4. 减少不必要的服务暴露
-内网服务、管理接口等敏感资源，应该避免直接通过公网访问，或设置严格的访问控制和认证。
 CODE
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-服务器端请求伪造（Server-Side Request Forgery, SSRF）是一种安全漏洞，攻击者能够控制或影响服务器端应用程序请求的目标。在 Go 语言应用中，如果程序接收用户输入的 URL 或相关参数，并在未对输入进行充分验证和过滤的情况下，直接将用户输入用于发起网络请求（如HTTP、文件读取等），则可能导致 SSRF 漏洞。攻击者可以构造恶意请求，使服务器请求内部网络资源、敏感服务，甚至进行端口扫描或攻击内网其他主机，从而导致敏感信息泄露、内部系统受攻击等风险。
-
-2. **触发场景**
-SSRF 漏洞通常发生在应用程序需要从外部获取资源的情况下，例如：
-* 通过 URL 参数获取网页内容、图片或文件。
-* 调用外部服务的 API。
-* 进行文件上传或下载时指定外部 URL。
-
-未对用户提供的 URL 或相关参数进行严格的白名单验证或黑名单过滤，是触发 SSRF 漏洞的关键。
-
-例如，以下 Go 代码片段直接使用用户输入的 `url` 参数发起 HTTP 请求：
-```golang
-func handler(w http.ResponseWriter, r *http.Request) {
-	url := r.URL.Query().Get("url") // 直接从查询参数获取URL
-	resp, err := http.Get(url) // 直接使用用户输入的URL发起HTTP请求
-	// ...
-}
-```
-攻击者可以构造 `?url=http://localhost/admin` 或 `?url=file:///etc/passwd` 等恶意请求，尝试访问服务器内部资源。
-
-3. **潜在影响**
-* 敏感信息泄露：访问内网服务、数据库或其他敏感文件。
-* 攻击内网主机：利用服务器作为跳板进行端口扫描、内网服务枚举或攻击内部系统。
-* DDoS放大攻击：构造请求攻击外部第三方服务。
-* 绕过防火墙和访问控制策略。
-CODE
-	level: "high",
-	type: "vuln",
 }
 
 desc(

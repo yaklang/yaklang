@@ -82,72 +82,16 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high for {
-	type: "vuln",
 	title: "Unfiltered PHP Variable Overwrite Detected",
 	title_zh: "未过滤PHP变量覆盖",
 	solution: <<<CODE
-### 修复建议
 
-#### 1. 避免使用高风险函数
-尽量避免使用 `extract()`、`parse_str()` 等可以直接将用户输入转化为变量的函数。如果必须使用，务必确保输入数据是可信的或经过严格的过滤和校验。
-
-```php
-// 修复示例：使用白名单过滤变量
-$allowed_params = ['username', 'email'];
-$user_data = [];
-foreach ($allowed_params as $param) {
-    if (isset($_GET[$param])) {
-        // 对获取到的参数进行过滤和校验
-        $user_data[$param] = htmlspecialchars($_GET[$param]);
-    }
-}
-// 使用$user_data数组中的数据，而不是直接使用$username, $email等变量
-print_r($user_data);
-```
-
-#### 2. 对用户输入进行严格过滤和校验
-在使用用户输入设置变量前，对输入进行类型、格式、长度等方面的校验，并使用过滤函数（如 `htmlspecialchars()`、`strip_tags()` 等）对数据进行清理，尤其是在输出到页面时。
-
-```php
-// 修复示例：使用 htmlspecialchars() 进行转义
-$username = htmlspecialchars($_GET['username'], ENT_QUOTES, 'UTF-8');
-```
-
-#### 3. 使用白名单过滤变量
-如果需要从用户输入中获取特定变量，使用白名单的方式明确指定允许使用的变量名，而不是直接将所有输入转化为变量。例如，手动从超全局变量中获取所需参数。
-
-```php
-// 修复示例：手动获取参数并过滤
-if (isset($_GET['id']) && is_numeric($_GET['id'])) {
-    $id = intval($_GET['id']);
-}
-```
 CODE
 	desc: <<<CODE
-### 漏洞描述
-该规则检测到存在变量覆盖漏洞，且未发现任何过滤机制。
 
-1. **漏洞原理**
-变量覆盖漏洞是指应用程序未能正确处理用户输入，导致用户输入的数据覆盖了程序中原有的变量值。未经处理的用户输入可以修改程序运行时的变量，改变程序的执行流程、绕过身份验证、泄露敏感信息甚至执行任意代码。此漏洞通常发生在程序使用如 `extract()` 函数，或者直接使用 `$_GET`、`$_POST` 等超全局变量时。
-
-2. **触发场景**
-代码中使用 `extract($_GET)` 直接从GET请求中提取变量，并且没有任何过滤。
-
-```php
-<?php
-$id = 123;
-extract($_GET); // 如果GET请求中存在id参数，将覆盖$id变量
-echo $id;
-?>
-```
-
-3. **潜在影响**
-- 敏感信息泄露：覆盖控制查询条件的变量，导致泄露所有数据。
-- 权限绕过：覆盖用于身份验证或权限判断的变量。
-- 代码执行：如果覆盖的变量影响到文件包含或代码执行函数，可能导致远程代码执行。
-- 逻辑错误：改变程序变量，导致非预期的执行结果。
 CODE
 	level: "high",
+	type: "vuln",
 }
 $sink<dataflow(include=<<<CODE
 * & $source as $__next__
@@ -156,139 +100,30 @@ CODE,exclude=<<<CODE
 CODE)> as $middle
 
 alert $middle for {
-	level: "mid",
-	type: "mid",
 	title: "PHP Variable Overwrite with Missing Filter Function",
 	title_zh: "PHP变量覆盖，缺少过滤函数",
 	solution: <<<CODE
-### 修复建议
 
-#### 1. 使用白名单过滤变量
-明确定义允许使用的变量，并从超全局变量中手动获取它们，确保只处理预期的输入。
-
-```php
-// 修复示例：使用白名单
-$allowed = ['name', 'email'];
-$input = [];
-foreach ($allowed as $key) {
-    if (isset($_GET[$key])) {
-        $input[$key] = htmlspecialchars($_GET[$key]); // 进行转义
-    }
-}
-```
-
-#### 2. 输入验证与转义
-对所有用户输入进行验证，确保其符合预期的格式和类型。使用适当的转义函数（例如，`htmlspecialchars()` 对于HTML输出，`addslashes()` 对于数据库查询）来防止注入攻击。
-
-```php
-// 修复示例：输入验证和转义
-$id = isset($_GET['id']) ? intval($_GET['id']) : 0; // 验证和强制类型转换
-$name = isset($_GET['name']) ? htmlspecialchars($_GET['name']) : ''; // 转义
-```
-
-#### 3. 避免高风险函数
-避免使用 `extract()` 和 `parse_str()` 等函数，因为它们可以直接将用户输入转换为变量。如果必须使用，请确保对输入进行严格的验证和清理。
 CODE
 	desc: <<<CODE
-### 漏洞描述
 
-该规则检测到可能存在变量覆盖漏洞，但未检测到用于过滤或清理用户输入的函数。虽然可能存在其他类型的保护措施，但建议进一步审查此代码。
-
-1. **漏洞原理**
-变量覆盖漏洞发生在应用程序允许用户控制变量名和变量值时。攻击者可以通过修改现有变量或创建新变量来覆盖程序的逻辑，从而导致未授权访问、信息泄露或其他恶意行为。当代码使用 `extract()` 或 `parse_str()` 等函数时，没有适当的过滤或验证，用户输入可以覆盖已有的变量。
-
-2. **触发场景**
-程序中使用 `extract()` 直接从 $_GET、$_POST 或 $_REQUEST 中提取变量，但未检测到任何用于过滤或转义输入的函数调用。
-
-```php
-<?php
-$admin = false;
-extract($_GET); // 如果 GET 请求中包含 admin=true，则覆盖 $admin
-if ($admin) {
-    // 管理员权限逻辑
-}
-?>
-```
-
-3. **潜在影响**
-- **权限绕过：** 覆盖 `$admin` 等权限变量，导致未授权用户获得管理员权限。
-- **配置更改：** 覆盖影响应用程序行为的配置变量。
-- **代码执行：** 在某些情况下，可能导致远程代码执行。
 CODE
+	level: "mid",
+	type: "mid",
 }
 $sink - $high - $middle  as $low;
 
 alert $low for {
-	type: "low",
-	title: "PHP Variable Overwrite with Filter Function",
 	title_zh: "PHP变量覆盖，检测到过滤函数",
 	solution: <<<CODE
-### 修复建议
 
-#### 1. 审查过滤函数的有效性
-检查使用的过滤函数是否能够有效地防御各种攻击。例如，`htmlspecialchars()` 只能防止 XSS 攻击，而不能防止 SQL 注入攻击。确保使用适当的过滤函数来防御各种类型的攻击。
-
-```php
-// 修复示例：使用 htmlspecialchars 进行 HTML 转义
-$username = htmlspecialchars($_GET['username'], ENT_QUOTES, 'UTF-8');
-```
-
-#### 2. 验证输入数据的类型和格式
-除了过滤输入数据之外，还应该验证输入数据的类型和格式。例如，如果需要一个整数，应该使用 `intval()` 函数将其转换为整数。
-
-```php
-// 修复示例：验证输入数据的类型和格式
-$id = intval($_GET['id']); // 转换为整数
-if ($id > 0) {
-    // 使用 ID 进行操作
-}
-```
-
-#### 3. 使用白名单策略
-与其尝试过滤所有可能的恶意输入，不如使用白名单策略，只允许特定的输入通过。这可以大大减少攻击的可能性。
-
-```php
-// 修复示例：使用白名单策略
-$allowed_params = ['username', 'email'];
-$user_data = [];
-foreach ($allowed_params as $param) {
-    if (isset($_GET[$param])) {
-        $user_data[$param] = htmlspecialchars($_GET[$param]);
-    }
-}
-```
 CODE
 	desc: <<<CODE
-### 漏洞描述
 
-尽管检测到存在变量覆盖漏洞，并且使用了过滤函数，但建议进一步审查这些过滤函数，以确保其有效性和适用性。
-
-1. **漏洞原理**
-当应用程序允许用户控制变量名和变量值时，变量覆盖漏洞可能发生。如果用户能够覆盖现有变量，他们可能会修改程序的行为，绕过安全检查或执行恶意代码。当使用 `extract()` 或 `parse_str()` 等函数处理用户输入时，如果没有充分的验证和过滤，就可能出现这种漏洞。
-
-2. **触发场景**
-程序中使用 `extract()` 从 `$_GET` 或 `$_POST` 中提取变量，并且使用了过滤函数，但这些过滤函数可能不足以防御所有类型的攻击。
-
-```php
-<?php
-$safe = false;
-function filter($input) {
-    // 简单的过滤函数，可能存在绕过
-    return str_replace('<script>', '', $input);
-}
-extract(filter($_GET));
-if ($safe) {
-    // 执行敏感操作
-}
-?>
-```
-
-3. **潜在影响**
-- 绕过安全检查：如果过滤函数存在缺陷，攻击者可能绕过安全检查，执行未经授权的操作。
-- 代码注入：尽管进行了过滤，但仍可能存在代码注入漏洞，例如通过双重编码或其他绕过技术。
-- 数据篡改：攻击者可以修改重要变量的值，导致应用程序行为异常。
 CODE
 	level: "low",
+	type: "low",
+	title: "PHP Variable Overwrite with Filter Function",
 }
 
 

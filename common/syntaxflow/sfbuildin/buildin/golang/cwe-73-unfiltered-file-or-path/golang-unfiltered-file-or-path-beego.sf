@@ -26,10 +26,16 @@ $sink?{have: "GetString"} as $low;
 $sink?{have: "GetFile"} as $low;
 
 alert $low for {
-    title: 'Reflected XSS detected',
-    title_zh: '检测到未过滤路径',
-    type: 'vuln',
-    level: 'low',
+	title: "Reflected XSS detected",
+	title_zh: "检测到未过滤路径",
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "low",
+	type: "vuln",
 }
 
 desc(
