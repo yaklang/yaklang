@@ -1,9 +1,11 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/utils"
+import (
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 type InstructionsIndex interface {
-	Delete(string) error
+	Delete(string, Instruction) error
 	Add(string, Instruction) error
 	ForEach(func(string, []Instruction))
 }
@@ -21,8 +23,13 @@ func NewInstructionsIndexMem() *InstructionsIndexMem {
 	}
 }
 
-func (c *InstructionsIndexMem) Delete(key string) error {
-	c.instructions.Delete(key)
+func (c *InstructionsIndexMem) Delete(key string, inst Instruction) error {
+	data, ok := c.instructions.Get(key)
+	if !ok {
+		return nil
+	}
+	data = utils.RemoveSliceItem(data, inst)
+	c.instructions.Set(key, data)
 	return nil
 }
 
@@ -55,7 +62,7 @@ func NewInstructionsIndexDB(
 	}
 }
 
-func (c *InstructionsIndexDB) Delete(key string) error {
+func (c *InstructionsIndexDB) Delete(key string, inst Instruction) error {
 	// Implement database deletion logic here
 	return nil
 }
