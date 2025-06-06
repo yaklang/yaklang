@@ -2,8 +2,12 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
 	"os"
 	"strconv"
@@ -180,4 +184,146 @@ dump(res)
 	if err != nil {
 		panic(err)
 	}
+}
+
+func TestServer_ScanWithFingerprintGroup(t *testing.T) {
+	// 创建指纹扫描规则并加入组
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	token1 := uuid.NewString()
+	token2 := uuid.NewString()
+	ruleExpr1 := fmt.Sprintf("body=\"%s\"", token1)
+	ruleExpr2 := fmt.Sprintf("body=\"%s\"", token2)
+
+	ruleName1 := "rule1" + uuid.NewString()
+	ruleName2 := "rule2" + uuid.NewString()
+	groupName1 := "group1" + uuid.NewString()
+	groupName2 := "group2" + uuid.NewString()
+
+	_, err = client.CreateFingerprint(context.Background(), &ypb.CreateFingerprintRequest{
+		Rule: &ypb.FingerprintRule{
+			RuleName:        ruleName1,
+			CPE:             nil,
+			WebPath:         "",
+			ExtInfo:         "",
+			MatchExpression: ruleExpr1,
+			GroupName:       []string{groupName1},
+		},
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		yakit.DeleteGeneralRuleByName(consts.GetGormProfileDatabase(), ruleName1)
+		yakit.DeleteGeneralRuleGroupByName(consts.GetGormProfileDatabase(), []string{groupName1})
+	})
+
+	_, err = client.CreateFingerprint(context.Background(), &ypb.CreateFingerprintRequest{
+		Rule: &ypb.FingerprintRule{
+			RuleName:        ruleName2,
+			CPE:             nil,
+			WebPath:         "",
+			ExtInfo:         "",
+			MatchExpression: ruleExpr2,
+			GroupName:       []string{groupName2},
+		},
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		yakit.DeleteGeneralRuleByName(consts.GetGormProfileDatabase(), ruleName1)
+		yakit.DeleteGeneralRuleGroupByName(consts.GetGormProfileDatabase(), []string{groupName2})
+	})
+
+	// mock http server
+	host, port := utils.DebugMockHTTP([]byte(fmt.Sprintf(
+		"HTTP 1.1 200 OK\r\nServer: nginx\r\nContent-Length: 0\r\n\r\n%s\r\n%s",
+		token1,
+		token2,
+	)))
+
+	t.Run("test port scan with one fingerprint group", func(t *testing.T) {
+		// port scan with one group
+		r, err := client.PortScan(context.Background(), &ypb.PortScanRequest{
+			Targets:                host,
+			Ports:                  strconv.Itoa(port),
+			Mode:                   "fingerprint",
+			Proto:                  []string{"tcp"},
+			Concurrent:             50,
+			Active:                 false,
+			ScriptNames:            []string{},
+			SkippedHostAliveScan:   true,
+			FingerprintGroup:       []string{groupName1},
+			EnableFingerprintGroup: true,
+		})
+		_ = r
+		require.Nil(t, err)
+		checkGroup1 := false
+		for {
+			result, err := r.Recv()
+			if err != nil {
+				if !errors.Is(err, io.EOF) {
+					require.Nilf(t, err, "stream error: %v", err)
+				}
+				break
+			}
+			spew.Dump(result)
+			var msg msg
+			if result.IsMessage && result.GetMessage() != nil {
+				err := json.Unmarshal(result.GetMessage(), &msg)
+				require.NoError(t, err)
+				if msg.Content.Level == "json" {
+					data := msg.Content.Data
+					if strings.Contains(data, "fingerprint") && strings.Contains(data, ruleName1) {
+						checkGroup1 = true
+					}
+				}
+			}
+		}
+		require.True(t, checkGroup1, "没有发现使用group1的指纹扫描结果")
+	})
+
+	t.Run("test port scan with all fingerprint group", func(t *testing.T) {
+
+		// port scan with all group
+		r2, err := client.PortScan(context.Background(), &ypb.PortScanRequest{
+			Targets:                host,
+			Ports:                  strconv.Itoa(port),
+			Mode:                   "fingerprint",
+			Proto:                  []string{"tcp"},
+			Concurrent:             50,
+			Active:                 false,
+			ScriptNames:            []string{},
+			SkippedHostAliveScan:   true,
+			FingerprintGroup:       []string{}, //传空使用所有组
+			EnableFingerprintGroup: true,
+		})
+		require.Nil(t, err)
+		checkAllGroup1 := false
+		checkAllGroup2 := false
+		for {
+			result, err := r2.Recv()
+			if err != nil {
+				if !errors.Is(err, io.EOF) {
+					require.Nilf(t, err, "stream error: %v", err)
+				}
+				break
+			}
+			spew.Dump(result)
+			var msg msg
+			if result.IsMessage && result.GetMessage() != nil {
+				err := json.Unmarshal(result.GetMessage(), &msg)
+				require.NoError(t, err)
+				if msg.Content.Level == "json" {
+					data := msg.Content.Data
+					if strings.Contains(data, "fingerprint") && strings.Contains(data, ruleName1) {
+						checkAllGroup1 = true
+					}
+					if strings.Contains(data, "fingerprint") && strings.Contains(data, ruleName2) {
+						checkAllGroup2 = true
+					}
+				}
+			}
+		}
+		require.True(t, checkAllGroup1, "没有发现使用group1的指纹扫描结果")
+		require.True(t, checkAllGroup2, "没有发现使用group2的指纹扫描结果")
+	})
 }

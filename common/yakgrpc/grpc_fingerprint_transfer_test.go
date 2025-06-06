@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -207,4 +210,167 @@ func TestGRPCMUSTPASS_Fingerprint_Export_And_Import(t *testing.T) {
 			Password:   password,
 		})
 	})
+}
+
+func TestGRPCMUSTPASS_Fingerprint_Import_Json(t *testing.T) {
+	t.Run("test import json file", func(t *testing.T) {
+		// 测试导入json文件
+		dir := os.TempDir()
+		jsonFile := filepath.Join(dir, "export.json")
+		file, err := os.Create(jsonFile)
+		require.NoError(t, err)
+		defer file.Close()
+
+		ruleName1 := fmt.Sprintf("rule1_%s", uuid.NewString())
+		ruleName2 := fmt.Sprintf("rule2_%s", uuid.NewString())
+
+		token1 := uuid.NewString()
+		token2 := uuid.NewString()
+		ruleExpr1 := fmt.Sprintf(`header_Server=\"%s\"`, token1)
+		ruleExpr2 := fmt.Sprintf(`body=\"generator\" content=\"%s\"`, token2)
+		_, err = file.WriteString(fmt.Sprintf(`[
+    {
+      "ExtInfo": "",
+      "edition": "",
+      "language": "",
+      "part": "",
+      "product": "",
+      "update": "",
+      "vendor": "",
+      "version": "",
+      "web路径": "",
+      "指纹名称": "%s",
+      "指纹规则": "%s"
+    },
+    {
+      "edition": "",
+      "language": "",
+      "part": "",
+      "product": "",
+      "update": "",
+      "vendor": "",
+      "version": "",
+      "web路径": "",
+      "指纹名称": "%s",
+      "指纹规则": "%s"
+    }
+  ]
+ `, ruleName1, ruleExpr1, ruleName2, ruleExpr2))
+		require.NoError(t, err)
+
+		client, err := NewLocalClient()
+		require.NoError(t, err)
+		db := consts.GetGormProfileDatabase()
+
+		stream, err := client.ImportFingerprint(context.Background(), &ypb.ImportFingerprintRequest{
+			InputPath: jsonFile,
+			Password:  "",
+		})
+		require.NoError(t, err)
+
+		progress := 0.0
+		for {
+			msg, err := stream.Recv()
+			if err != nil {
+				if !errors.Is(err, io.EOF) {
+					t.Logf("import stream error: %v", err)
+				}
+				break
+			}
+			progress = msg.Progress
+		}
+		require.Equal(t, 1.0, progress)
+
+		rules1, err := yakit.QueryGeneralRuleFast(db, &ypb.FingerprintFilter{
+			RuleName: []string{ruleName1},
+		})
+		require.NoError(t, err)
+		require.Len(t, rules1, 1)
+		require.Contains(t, rules1[0].MatchExpression, token1)
+
+		rules2, err := yakit.QueryGeneralRuleFast(db, &ypb.FingerprintFilter{
+			RuleName: []string{ruleName2},
+		})
+		require.NoError(t, err)
+		require.Len(t, rules2, 1)
+		require.Contains(t, rules2[0].MatchExpression, token2)
+		t.Cleanup(func() {
+			yakit.DeleteGeneralRuleByName(db, ruleName1)
+			yakit.DeleteGeneralRuleByName(db, ruleName2)
+		})
+
+		// 名字重复进行覆盖
+		jsonFile2 := filepath.Join(dir, "export.json")
+		file2, err := os.Create(jsonFile2)
+		require.NoError(t, err)
+		defer file.Close()
+
+		token3 := uuid.NewString()
+		token4 := uuid.NewString()
+		ruleExpr3 := fmt.Sprintf(`header_Server=\"%s\"`, token3)
+		ruleExpr4 := fmt.Sprintf(`body=\"generator\" content=\"%s\"`, token4)
+		_, err = file2.WriteString(fmt.Sprintf(`[
+    {
+      "ExtInfo": "",
+      "edition": "",
+      "language": "",
+      "part": "",
+      "product": "",
+      "update": "",
+      "vendor": "",
+      "version": "",
+      "web路径": "",
+      "指纹名称": "%s",
+      "指纹规则": "%s"
+    },
+    {
+      "edition": "",
+      "language": "",
+      "part": "",
+      "product": "",
+      "update": "",
+      "vendor": "",
+      "version": "",
+      "web路径": "",
+      "指纹名称": "%s",
+      "指纹规则": "%s"
+    }
+  ]
+ `, ruleName1, ruleExpr3, ruleName2, ruleExpr4))
+		require.NoError(t, err)
+
+		stream2, err := client.ImportFingerprint(context.Background(), &ypb.ImportFingerprintRequest{
+			InputPath: jsonFile,
+			Password:  "",
+		})
+		require.NoError(t, err)
+
+		progress2 := 0.0
+		for {
+			msg, err := stream2.Recv()
+			if err != nil {
+				if !errors.Is(err, io.EOF) {
+					t.Logf("import stream error: %v", err)
+				}
+				break
+			}
+			progress2 = msg.Progress
+		}
+		require.Equal(t, 1.0, progress2)
+
+		rules3, err := yakit.QueryGeneralRuleFast(db, &ypb.FingerprintFilter{
+			RuleName: []string{ruleName1},
+		})
+		require.NoError(t, err)
+		require.Len(t, rules3, 1)
+		require.Contains(t, rules3[0].MatchExpression, token3)
+
+		rules4, err := yakit.QueryGeneralRuleFast(db, &ypb.FingerprintFilter{
+			RuleName: []string{ruleName2},
+		})
+		require.NoError(t, err)
+		require.Len(t, rules4, 1)
+		require.Contains(t, rules4[0].MatchExpression, token4)
+	})
+
 }

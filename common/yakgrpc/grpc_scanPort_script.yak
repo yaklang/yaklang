@@ -24,6 +24,8 @@ synScanNetInterface = cli.String("syn-scan-net-interface", cli.setDefault(""))
 protos = cli.String("proto", cli.setDefault("tcp"))
 
 fpMode = cli.String("fp-mode", cli.setDefault("all"))
+useFpGroup = cli.Bool("use-fp-group", cli.setDefault(false))
+fpGroups = cli.String("fp-groups")
 scriptNames = cli.YakitPlugin()
 
 excludeHosts = cli.String("exclude-hosts")
@@ -153,6 +155,15 @@ if fpMode == "service" {
 
 if fpMode == "all" {
 	opts = append(opts, servicescan.all())
+}
+
+if useFpGroup{
+    if fpGroups =="" {
+        opts = append(opts, servicescan.withRuleGroupAll())
+    } else{
+        groups = str.Split(fpGroups, ",")
+        opts = append(opts, servicescan.withRuleGroup(groups...))
+    }
 }
 
 // 设置排除端口和主机
