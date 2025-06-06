@@ -62,6 +62,7 @@ type Config struct {
 	// time trigger mean chunk trigger interval, if set to 0, it will not trigger by time.
 	TimeTriggerInterval time.Duration
 	ChunkSize           int64
+	SeparatorTrigger    string
 
 	// Reducer Worker Callback
 	callback ReducerCallbackType
@@ -96,6 +97,18 @@ func WithReducerCallback(callback ReducerCallbackType) Option {
 func WithMemory(memory *aid.Memory) Option {
 	return func(c *Config) {
 		c.Memory = memory
+	}
+}
+
+func WithChunkSize(size int64) Option {
+	return func(c *Config) {
+		c.ChunkSize = size
+	}
+}
+
+func WithSeparatorTrigger(separator string) Option {
+	return func(c *Config) {
+		c.SeparatorTrigger = separator
 	}
 }
 

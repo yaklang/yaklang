@@ -1,6 +1,7 @@
 package aid
 
 import (
+	"context"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"io"
@@ -78,6 +79,10 @@ type RequireInteractiveRequest struct {
 }
 
 func (c *Config) RequireUserPromptWithEndpointResult(prompt string, opts ...*RequireInteractiveRequestOption) (aitool.InvokeParams, *Endpoint, error) {
+	return c.RequireUserPromptWithEndpointResultEx(c.ctx, prompt, opts...)
+}
+
+func (c *Config) RequireUserPromptWithEndpointResultEx(ctx context.Context, prompt string, opts ...*RequireInteractiveRequestOption) (aitool.InvokeParams, *Endpoint, error) {
 	ep := c.epm.createEndpointWithEventType(EVENT_TYPE_REQUIRE_USER_INTERACTIVE)
 	ep.SetDefaultSuggestionContinue()
 
@@ -87,7 +92,7 @@ func (c *Config) RequireUserPromptWithEndpointResult(prompt string, opts ...*Req
 		Options: opts,
 	}
 	c.EmitRequireUserInteractive(req, ep.id)
-	c.doWaitAgreeWithPolicy(c.ctx, AgreePolicyManual, ep)
+	c.doWaitAgreeWithPolicy(ctx, AgreePolicyManual, ep)
 	params := ep.GetParams()
 	c.ReleaseInteractiveEvent(ep.id, params)
 	return params, ep, nil
@@ -110,5 +115,6 @@ func (c *Config) EmitRequireUserInteractive(i *RequireInteractiveRequest, id str
 			log.Errorf("Failed to submit checkpoint request: %v", err)
 		}
 	}
+
 	c.emitInteractiveJson(id, EVENT_TYPE_REQUIRE_USER_INTERACTIVE, "require-user-interact", i)
 }
