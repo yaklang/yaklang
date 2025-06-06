@@ -2,6 +2,7 @@ package sfvm
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"io"
 	"strconv"
 	"strings"
@@ -24,7 +25,8 @@ type RuleFormat struct {
 
 	requireDescKeyType map[SFDescKeyType]bool // 第一个desc语句中需要的desc item key类型，没有会补全
 	// desc handler
-	descHandler func(key, value string) string
+	descHandler  func(key, value string) string
+	alertHandler func(name, key, value string) string
 }
 
 type RuleFormatOption func(*RuleFormat)
@@ -34,6 +36,12 @@ func NewRuleFormat(w io.Writer) *RuleFormat {
 		ruleID:             uuid.NewString(),
 		write:              w,
 		requireDescKeyType: map[SFDescKeyType]bool{SFDescKeyType_Rule_Id: false},
+		descHandler: func(key, value string) string {
+			return value
+		},
+		alertHandler: func(name, key, value string) string {
+			return value
+		},
 	}
 }
 
@@ -76,6 +84,11 @@ func RuleFormatWithRequireDescKeyType(typ ...SFDescKeyType) RuleFormatOption {
 func RuleFormatWithDescHandler(handler func(key, value string) string) RuleFormatOption {
 	return func(f *RuleFormat) {
 		f.descHandler = handler
+	}
+}
+func RuleFormatWithAlertHandler(h func(name, key, value string) string) RuleFormatOption {
+	return func(format *RuleFormat) {
+		format.alertHandler = h
 	}
 }
 
@@ -140,8 +153,67 @@ func (f *RuleFormat) Visit(flow sf.IFlowContext, editor *memedit.MemEditor) {
 				f.VisitDescription(stmt.DescriptionStatement())
 			}
 			descCount++
+		case *sf.AlertContext:
+			f.VisitAlertStatement(stmt.AlertStatement())
 		default:
 			f.Write(f.GetTextFromToken(stmt))
+		}
+	}
+}
+func (f *RuleFormat) VisitAlertStatement(alert sf.IAlertStatementContext) {
+	alertStmt, ok := alert.(*sf.AlertStatementContext)
+	if !ok || alertStmt == nil {
+		return
+	}
+	alertMsg := map[string]string{
+		"title":    "",
+		"title_zh": "",
+		"solution": "",
+		"desc":     "",
+		"level":    "",
+	}
+	if refVariable, ok := alertStmt.RefVariable().(*sf.RefVariableContext); !ok {
+		return
+	} else {
+		variable := yakunquote.TryUnquote(refVariable.Identifier().GetText())
+		defer func() {
+			f.Write(fmt.Sprintf("alert $%s for {\n", variable))
+			for key, value := range alertMsg {
+				switch key {
+				case "desc", "solution":
+					f.Write(fmt.Sprintf(`	%s: <<<CODE
+%s
+CODE
+`, key, f.alertHandler(variable, key, value)))
+				default:
+					f.Write(fmt.Sprintf("\t%s: \"%s\",\n", key, f.alertHandler(variable, key, value)))
+				}
+			}
+			f.Write("}\n")
+		}()
+		if alertStmt.DescriptionItems() == nil {
+			return
+		}
+		for _, descItemInterface := range alertStmt.DescriptionItems().(*sf.DescriptionItemsContext).AllDescriptionItem() {
+			ret, ok := descItemInterface.(*sf.DescriptionItemContext)
+			if !ok || ret.Comment() != nil { // skip comment
+				continue
+			}
+			key := mustUnquoteSyntaxFlowString(ret.StringLiteral().GetText())
+			value := ""
+			if ret.DescriptionItemValue() == nil {
+				continue
+			}
+			if valueItem, ok := ret.DescriptionItemValue().(*sf.DescriptionItemValueContext); ok && valueItem != nil {
+				if valueItem.HereDoc() != nil {
+					value = f.VisitHereDoc(valueItem.HereDoc())
+				} else if valueItem.StringLiteral() != nil {
+					value = mustUnquoteSyntaxFlowString(valueItem.StringLiteral().GetText())
+				} else {
+					value = valueItem.GetText()
+				}
+			}
+			alertMsg[strings.ToLower(key)] = value
 		}
 	}
 }

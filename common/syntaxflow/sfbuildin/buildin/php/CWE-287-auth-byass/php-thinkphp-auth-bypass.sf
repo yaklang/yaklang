@@ -1,142 +1,90 @@
 desc(
-	title: "Audit PHP ThinkPHP Auth Bypass"
-	title_zh: "审计PHP ThinkPHP认证绕过"
+	title: "Audit PHP ThinkPHP Authentication Bypass"
+	title_zh: "审计PHP ThinkPHP认证绕过漏洞"
 	risk: "audit"
 	level: "low"
 	desc: <<<DESC
-### 1.规则目的
-该规则用于审计PHP ThinkPHP框架中可能存在的认证绕过漏洞。通过识别代码中对用户传入的请求参数进行处理，特别是与安全或权限相关的逻辑，来发现潜在的绕过点。
+### 漏洞描述
 
-### 2.规则详细
-1. **检测目标**：主要审计ThinkPHP控制器中处理用户输入的参数，特别是与身份验证、权限控制相关的逻辑。
-2. **模式识别**：识别从请求中获取参数并直接在安全判断或业务逻辑中使用的模式。
-3. **潜在绕过**：例如，通过操纵输入参数（如修改用户ID、角色信息、或者跳过某些验证步骤所需的参数）来绕过正常的认证或授权检查。
-4. **结合其他规则**：该规则通常需要与其他规则（如用户输入到敏感函数的跟踪规则）结合使用，以更全面地发现漏洞。它作为审计特定框架认证逻辑的基础。
+1. **漏洞原理**
+   ThinkPHP框架中的认证绕过漏洞通常由于开发者未能正确实施身份验证和授权控制机制。攻击者可以通过操纵请求参数、利用逻辑缺陷或直接访问未经保护的端点来绕过认证流程。这种漏洞的核心在于应用程序对用户权限的验证不充分，导致未授权用户可以执行敏感操作。
 
-### 触发场景示例
-```php
-namespace app\index\controller;
-use think\Controller;
-use think\facade\Request;
+2. **触发场景**
+   在ThinkPHP应用中，认证绕过可能出现在以下场景：
+   - 控制器方法未应用中间件进行权限校验
+   - 直接从请求参数获取用户标识而未验证其合法性
+   - 认证逻辑存在缺陷，如可预测的令牌或可绕过的条件检查
 
-class User extends Controller
-{
-    public function deleteUser()
-    {
-        // 从请求中获取用户ID，可能存在未授权删除风险
-        $userId = Request::param('user_id');
-        // 假设没有充分的权限检查，恶意用户可以删除任意用户
-        $result = <! -- delete user logic based on $userId -- >;
-        return json(['status' => 'success', 'message' => 'User deleted']);
-    }
+   ```php
+   // 存在漏洞的代码示例
+   namespace app\index\controller;
+   use think\Controller;
+   
+   class User extends Controller {
+       public function deleteUser() {
+           $userId = input('user_id'); // 未经验证的用户输入
+           // 直接执行删除操作，未检查当前用户权限
+           $this->model->where('id', $userId)->delete();
+       }
+   }
+   ```
 
-    public function auth()
-    {
-        $uri = Request::uri();
-        // 示例代码，可能存在认证逻辑绕过风险
-        if (preg_match('/^\/index\/user\/auth$/', $uri, $matches)){
-            $user = Request::param('user');
-            $password = Request::param('password');
-            // 认证逻辑... 如果认证逻辑存在缺陷，例如可以通过特定参数绕过密码验证，则存在漏洞。
-        }
-    }
-}
-```
-上面的`deleteUser`方法中，如果未对`user_id`进行充分的权限检查，恶意用户可能通过修改`user_id`参数来删除任意用户账户。`auth`方法中的认证逻辑如果存在缺陷（例如，对特定输入未进行严格校验），也可能导致认证绕过。
+3. **潜在影响**
+   - 未授权访问敏感功能或数据
+   - 恶意用户可提升自身权限
+   - 系统关键功能被未授权操纵
+   - 可能导致数据泄露或系统完整性破坏
+
 DESC
 	rule_id: "f0c086d0-c004-4367-abd7-d16ca50de3d9"
 	solution: <<<SOLUTION
 ### 修复建议
-#### 1. 严格的身份验证和权限控制
-在处理任何敏感操作（如下载、删除、修改、查看私有信息等）之前，务必进行严格的身份验证和权限控制。确保当前登录用户有权执行请求的操作。
 
-#### 2. 对用户输入进行严格校验
-对所有来自用户的输入进行严格的类型、格式和值校验。不要完全信任用户发送的数据。
-
-#### 3. 使用框架提供的安全机制
-充分利用ThinkPHP框架提供的安全特性，如中间件、请求参数过滤、权限验证注解等，而不是自己实现复杂的安全逻辑。
-
-#### 4. 输入参数白名单或黑名单
-对于接收的参数，考虑使用参数白名单，只允许必要的参数传入。避免接收并直接使用一些不应该由用户控制的参数（如用户状态、权限标志等）。
-
-#### 5. 代码示例（ThinkPHP 6.0 示例 - 权限控制）
-使用中间件进行权限校验。
-
-**定义中间件 (`app/middleware/AuthCheck.php`)**
+#### 1. 实施严格的中间件验证
+在ThinkPHP中应当为所有需要认证的路由应用认证中间件：
 ```php
-<?php
-declare (strict_types = 1);
-
-namespace app\middleware;
-
-use think\Request;
-
-class AuthCheck
-{
-    /**
-     * 处理请求
-     *
-     * @param 	hink\Request $request
-     * @param \Closure       $next
-     * @return Response
-     */
-    public function handle(Request $request, \Closure $next)
-    {
-        // 这里实现你的认证和权限检查逻辑
-        // 例如，检查用户是否登录，检查用户是否有执行当前操作的权限
+// 定义认证中间件
+class AuthMiddleware {
+    public function handle($request, \Closure $next) {
         if (!session('user_id')) {
-            // 如果用户未登录，则跳转到登录页面或返回错误
             return redirect('/login');
         }
-
-        // 检查特定权限 (示例：只有管理员可以访问deleteUser)
-        if ($request->route() === 'deleteUser') {
-            $user = \app\model\User::find(session('user_id'));
-            if (!$user || !$user->isAdmin) {
-                return json(['status' => 'error', 'message' => 'Permission denied'], 403);
-            }
-        }
-
         return $next($request);
     }
 }
+
+// 路由中应用中间件
+Route::rule('user/profile', 'user/profile')->middleware(AuthMiddleware::class);
 ```
 
-**在控制器或路由中应用中间件**
+#### 2. 实现权限控制系统
+对于敏感操作应当实现细粒度的权限控制：
 ```php
-// 在控制器中应用中间件
-class UserController extends Controller
-{
-    protected $middleware = [\app\middleware\AuthCheck::class];
-
-    // ... 其他方法
-}
-
-// 或者在路由中应用中间件
-Route::post('user/deleteUser', 'user/deleteUser')->middleware(\app\middleware\AuthCheck::class);
-```
-
-#### 6. 代码示例（ThinkPHP 6.0 示例 - 参数过滤）
-使用助手函数或Request对象的`param`方法进行参数过滤。
-
-```php
-use think\facade\Request;
-
-public function deleteUser()
-{
-    // 对 user_id 参数进行整数类型过滤，并设置默认值或进行范围检查
-    $userId = Request::param('user_id/d', 0); // /d 表示转换为整数，0 是默认值
-
-    if ($userId <= 0) {
-        return json(['status' => 'error', 'message' => 'Invalid user id']);
+// 在控制器中检查权限
+public function deleteUser() {
+    if (!auth()->user()->can('delete_users')) {
+        throw new \think\exception\UnauthorizedException;
     }
-
-    // ... 后续删除逻辑，确保在执行删除前进行权限检查
+    // 安全删除逻辑
 }
 ```
+
+#### 3. 参数安全处理
+对所有的用户输入进行严格验证：
+```php
+// 使用验证器确保参数安全
+$validate = Validate::rule('user_id', 'require|number|gt:0');
+if (!$validate->check(input())) {
+    throw new \think\exception\ValidateException;
+}
+```
+
+#### 4. 定期安全审计
+建议定期使用安全扫描工具检查应用中的认证缺陷，并及时更新框架版本以修复已知漏洞。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-287: Improper Authentication](https://cwe.mitre.org/data/definitions/287.html)
+[ThinkPHP Security Best Practices](https://www.thinkphp.cn/doc)
 REFERENCE
 )
 
@@ -149,10 +97,88 @@ $allParams?{<self> #{include: <<<CODE
 * & $source
 CODE}->} as $sink
 
-alert $sink for{
-   title: "PHP ThinkPHP Auth Bypass",
-   title_zh: "PHP ThinkPHP认证绕过",
-   level: "high",
+alert $sink for {
+	title: "Detect PHP ThinkPHP Authentication Bypass Vulnerability",
+	title_zh: "检测PHP ThinkPHP认证绕过漏洞",
+	solution: <<<CODE
+### 修复建议
+
+#### 1. 实施严格的中间件验证
+在ThinkPHP中应当为所有需要认证的路由应用认证中间件：
+```php
+// 定义认证中间件
+class AuthMiddleware {
+    public function handle($request, \Closure $next) {
+        if (!session('user_id')) {
+            return redirect('/login');
+        }
+        return $next($request);
+    }
+}
+
+// 路由中应用中间件
+Route::rule('user/profile', 'user/profile')->middleware(AuthMiddleware::class);
+```
+
+#### 2. 实现权限控制系统
+对于敏感操作应当实现细粒度的权限控制：
+```php
+// 在控制器中检查权限
+public function deleteUser() {
+    if (!auth()->user()->can('delete_users')) {
+        throw new \think\exception\UnauthorizedException;
+    }
+    // 安全删除逻辑
+}
+```
+
+#### 3. 参数安全处理
+对所有的用户输入进行严格验证：
+```php
+// 使用验证器确保参数安全
+$validate = Validate::rule('user_id', 'require|number|gt:0');
+if (!$validate->check(input())) {
+    throw new \think\exception\ValidateException;
+}
+```
+
+#### 4. 定期安全审计
+建议定期使用安全扫描工具检查应用中的认证缺陷，并及时更新框架版本以修复已知漏洞。
+CODE
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+   ThinkPHP框架中的认证绕过漏洞通常由于开发者未能正确实施身份验证和授权控制机制。攻击者可以通过操纵请求参数、利用逻辑缺陷或直接访问未经保护的端点来绕过认证流程。这种漏洞的核心在于应用程序对用户权限的验证不充分，导致未授权用户可以执行敏感操作。
+
+2. **触发场景**
+   在ThinkPHP应用中，认证绕过可能出现在以下场景：
+   - 控制器方法未应用中间件进行权限校验
+   - 直接从请求参数获取用户标识而未验证其合法性
+   - 认证逻辑存在缺陷，如可预测的令牌或可绕过的条件检查
+
+   ```php
+   // 存在漏洞的代码示例
+   namespace app\index\controller;
+   use think\Controller;
+   
+   class User extends Controller {
+       public function deleteUser() {
+           $userId = input('user_id'); // 未经验证的用户输入
+           // 直接执行删除操作，未检查当前用户权限
+           $this->model->where('id', $userId)->delete();
+       }
+   }
+   ```
+
+3. **潜在影响**
+   - 未授权访问敏感功能或数据
+   - 恶意用户可提升自身权限
+   - 系统关键功能被未授权操纵
+   - 可能导致数据泄露或系统完整性破坏
+
+CODE
+	level: "high",
 }
 desc(
 	lang: "php"
