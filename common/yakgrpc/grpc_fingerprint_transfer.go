@@ -1,8 +1,12 @@
 package yakgrpc
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/mattn/go-sqlite3"
 	"github.com/samber/lo"
@@ -87,81 +91,112 @@ func (s *Server) ImportFingerprint(req *ypb.ImportFingerprintRequest, stream ypb
 	progress := 0.0
 	db := s.GetProfileDatabase()
 
-	opts := make([]bizhelper.ImportOption, 0)
-	if req.GetPassword() != "" {
-		opts = append(opts, bizhelper.WithImportPassword(req.GetPassword()))
+	path := req.GetInputPath()
+	if path == "" {
+		return utils.Error("input path is required")
 	}
-	var metadata bizhelper.MetaData
-
-	opts = append(opts, bizhelper.WithMetaDataHandler(func(m bizhelper.MetaData) error {
-		metadata = m
-		ruleCount = utils.InterfaceToInt(metadata["count"])
-		if ruleCount == 0 {
-			return utils.Error("metadata: invalid rule count")
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".json":
+		var commonRules []*schema.GeneralRule
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return utils.Wrap(err, "import fingerprint rule failed")
 		}
-		return nil
-	}))
+		if err := json.Unmarshal(raw, &commonRules); err != nil {
+			return utils.Wrap(err, "unmarshal fingerprint rule json failed")
+		}
+		if len(commonRules) == 0 {
+			return utils.Error("no fingerprint rule found in json")
+		}
+		ruleCount = len(commonRules)
+		for _, rule := range commonRules {
+			err := yakit.CreateOrUpdateGeneralRule(db, rule)
+			if err != nil {
+				return utils.Wrapf(err, "create or update fingerprint rule failed: %s", rule.RuleName)
+			}
+			handled++
+			progress = float64(handled) / float64(ruleCount)
+			stream.Send(&ypb.DataTransferProgress{Progress: progress})
+		}
+	default:
+		opts := make([]bizhelper.ImportOption, 0)
+		if req.GetPassword() != "" {
+			opts = append(opts, bizhelper.WithImportPassword(req.GetPassword()))
+		}
+		var metadata bizhelper.MetaData
 
-	opts = append(opts, bizhelper.WithImportAfterReadHandler(func(name string, b []byte, metadata bizhelper.MetaData) {
-		handled++
-		progress = float64(handled) / float64(ruleCount)
-		stream.Send(&ypb.DataTransferProgress{
-			Progress: progress,
-		})
-	}))
+		opts = append(opts, bizhelper.WithMetaDataHandler(func(m bizhelper.MetaData) error {
+			metadata = m
+			ruleCount = utils.InterfaceToInt(metadata["count"])
+			if ruleCount == 0 {
+				return utils.Error("metadata: invalid rule count")
+			}
+			return nil
+		}))
 
-	opts = append(opts, bizhelper.WithImportErrorHandler(func(err error) (newErr error) {
-		var sqlErr sqlite3.Error
-		if errors.As(err, &sqlErr) && sqlErr.Code == sqlite3.ErrConstraint {
-			// ignore duplicate error, just send message
-			err = nil
+		opts = append(opts, bizhelper.WithImportAfterReadHandler(func(name string, b []byte, metadata bizhelper.MetaData) {
+			handled++
+			progress = float64(handled) / float64(ruleCount)
 			stream.Send(&ypb.DataTransferProgress{
-				Verbose: fmt.Sprintf("duplicate rule, skip: %s", sqlErr.Error()),
+				Progress: progress,
 			})
-		}
-		return err
-	}))
+		}))
 
-	ruleDB := db.Model(&schema.GeneralRule{})
-	err := bizhelper.ImportTableZip[*schema.GeneralRule](stream.Context(), ruleDB, req.GetInputPath(), opts...)
-	if err != nil {
-		return err
-	}
-
-	// recover groups
-	iGroups, ok := metadata["relationship"]
-	if !ok {
-		return utils.Error("metadata: invalid metadata")
-	}
-	m, ok := iGroups.([]any)
-	if !ok {
-		return utils.Error("metadata: invalid metadata type")
-	}
-	for _, iItem := range m {
-		item, ok := iItem.(map[string]any)
-		if !ok {
-			return utils.Error("metadata: invalid metadata item")
-		}
-		ruleName, ok := item["rule_name"].(string)
-		if !ok {
-			return utils.Error("metadata: rule_name invalid")
-		}
-		iGroupNames, ok := item["group_names"].([]any)
-		if !ok {
-			return utils.Error("metadata: group_names invalid")
-		}
-		if len(iGroupNames) > 0 {
-			groupNames := lo.Map(iGroupNames, func(item any, index int) string { return utils.InterfaceToString(item) })
-
-			rule, err := yakit.GetGeneralRuleByRuleName(db, ruleName)
-			if err != nil {
-				return utils.Wrapf(err, "not found rule: %s", ruleName)
+		opts = append(opts, bizhelper.WithImportErrorHandler(func(err error) (newErr error) {
+			var sqlErr sqlite3.Error
+			if errors.As(err, &sqlErr) && sqlErr.Code == sqlite3.ErrConstraint {
+				// ignore duplicate error, just send message
+				err = nil
+				stream.Send(&ypb.DataTransferProgress{
+					Verbose: fmt.Sprintf("duplicate rule, skip: %s", sqlErr.Error()),
+				})
 			}
-			_, err = yakit.BatchAppendGeneralRuleGroupAssociations(db, []*schema.GeneralRule{rule}, groupNames)
-			if err != nil {
-				return utils.Wrap(err, "batch add groups for rules failed")
+			return err
+		}))
+
+		ruleDB := db.Model(&schema.GeneralRule{})
+		err := bizhelper.ImportTableZip[*schema.GeneralRule](stream.Context(), ruleDB, req.GetInputPath(), opts...)
+		if err != nil {
+			return err
+		}
+
+		// recover groups
+		iGroups, ok := metadata["relationship"]
+		if !ok {
+			return utils.Error("metadata: invalid metadata")
+		}
+		m, ok := iGroups.([]any)
+		if !ok {
+			return utils.Error("metadata: invalid metadata type")
+		}
+		for _, iItem := range m {
+			item, ok := iItem.(map[string]any)
+			if !ok {
+				return utils.Error("metadata: invalid metadata item")
+			}
+			ruleName, ok := item["rule_name"].(string)
+			if !ok {
+				return utils.Error("metadata: rule_name invalid")
+			}
+			iGroupNames, ok := item["group_names"].([]any)
+			if !ok {
+				return utils.Error("metadata: group_names invalid")
+			}
+			if len(iGroupNames) > 0 {
+				groupNames := lo.Map(iGroupNames, func(item any, index int) string { return utils.InterfaceToString(item) })
+
+				rule, err := yakit.GetGeneralRuleByRuleName(db, ruleName)
+				if err != nil {
+					return utils.Wrapf(err, "not found rule: %s", ruleName)
+				}
+				_, err = yakit.BatchAppendGeneralRuleGroupAssociations(db, []*schema.GeneralRule{rule}, groupNames)
+				if err != nil {
+					return utils.Wrap(err, "batch add groups for rules failed")
+				}
 			}
 		}
 	}
+
 	return nil
 }
