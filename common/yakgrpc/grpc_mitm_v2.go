@@ -754,6 +754,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 
 		taskInfo.Status = Hijack_Status_Response
+		taskInfo.Request = httpctx.GetRequestBytes(req)
 		taskInfo.Response = rsp
 		taskInfo.TraceInfo = model.ToLowhttpTraceInfoGRPCModel(traceInfo)
 		httpctx.SetResponseViewedByUser(req)
@@ -917,7 +918,6 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		})
 
 		httpctx.SetMatchedRule(originReqIns, make([]*ypb.MITMContentReplacer, 0))
-		originReqRaw := req[:]
 		fixReq := lowhttp.FixHTTPRequest(req)
 		fixReqIns, _ := lowhttp.ParseBytesToHttpRequest(fixReq)
 		method := originReqIns.Method
@@ -1134,9 +1134,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 					return nil
 				}
 
-				// 原封不动转发
 				if controlReq.GetForward() {
-					return originReqRaw
+					return req
 				}
 
 				if controlReq.GetSendPacket() {
