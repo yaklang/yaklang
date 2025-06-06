@@ -64,6 +64,12 @@ func NewDatabaseCacheWithKey[K comparable, T any](
 		close:            atomic.Bool{},
 	}
 	cache.SetExpirationCallback(func(_ string, key K, reason EvictionReason) {
+		// Check if saving to database is disabled
+		if ret.IsSaveDisabled() {
+			log.Debugf("Save to database is disabled, skipping save for key: %v", key)
+			ret.notifyCache.Set(InterfaceToString(key), key)
+			return
+		}
 		log.Debugf("expire key: %v", key)
 		ret.save(key, reason)
 	})
@@ -158,13 +164,6 @@ func (c *DataBaseCacheWithKey[K, T]) save(key K, reason EvictionReason) {
 		// recover c.notifyCache
 		c.notifyCache.Set(InterfaceToString(key), key)
 		c.updateStatus(item, DatabaseCacheItemNormal)
-	}
-
-	// Check if saving to database is disabled
-	if c.IsSaveDisabled() {
-		log.Debugf("Save to database is disabled, skipping save for key: %v", key)
-		recoverData()
-		return
 	}
 
 	defer func() {
