@@ -9,15 +9,13 @@ desc(
 REFERENCE
 	desc: <<<DESC
 ### 规则目的
-
 该规则用于识别Java Spring MVC框架中控制器（Controller）层处理方法的用户可控输入参数。这些参数是数据流分析的起点，对于检测多种Web安全漏洞至关重要。
 
 ### 规则详细
-
 该规则属于查找代码或审计代码的规则，旨在全面覆盖Spring MVC中获取用户输入的常见方式，包括：
 
-1.  **声明式参数绑定（注解方式）**：识别通过 `@RequestParam`, `@PathVariable`, `@RequestHeader`, `@CookieValue`, `@RequestBody`, `@RequestPart`, `@MatrixVariable`, `@SessionAttribute`, `@RequestAttribute`, `@ModelAttribute` 等注解绑定到方法参数上的用户输入。这些注解简化了从HTTP请求中提取数据到Java方法参数的过程，但也是潜在的攻击入口点。
-2.  **原生请求处理（HttpServletRequest/ServletRequest）**：识别直接通过 `javax.servlet.http.HttpServletRequest` 或 `javax.servlet.ServletRequest` 对象获取用户输入的场景。这包括调用 `getParameter()`, `getParameterValues()`, `getParameterNames()`, `getHeader()`, `getHeaderNames()`, `getCookies()` 等方法。虽然Spring MVC鼓励使用注解方式，但在某些场景下，开发者仍可能直接操作原生请求对象获取更原始或复杂的输入。
+1. **声明式参数绑定（注解方式）**：识别通过 `@RequestParam`, `@PathVariable`, `@RequestHeader`, `@CookieValue`, `@RequestBody`, `@RequestPart`, `@MatrixVariable`, `@SessionAttribute`, `@RequestAttribute`, `@ModelAttribute` 等注解绑定到方法参数上的用户输入。这些注解简化了从HTTP请求中提取数据到Java方法参数的过程，但也是潜在的攻击入口点。
+2. **原生请求处理（HttpServletRequest/ServletRequest）**：识别直接通过 `javax.servlet.http.HttpServletRequest` 或 `javax.servlet.ServletRequest` 对象获取用户输入的场景。这包括调用 `getParameter()`, `getParameterValues()`, `getParameterNames()`, `getHeader()`, `getHeaderNames()`, `getCookies()` 等方法。虽然Spring MVC鼓励使用注解方式，但在某些场景下，开发者仍可能直接操作原生请求对象获取更原始或复杂的输入。
 
 这条规则作为基础性的“污染源”（source）查找规则，主要用于构建更复杂的Web漏洞（如SQL注入、XSS、命令注入、路径遍历等）的数据流分析链。通过准确识别所有可能的输入点，可以确保后续的流分析能够覆盖到应用程序处理用户输入的所有关键位置。
 DESC
@@ -61,7 +59,27 @@ $params?{!<typeName>?{have:'javax.servlet.http'}} as $output;
 $params?{<typeName>?{have:'javax.servlet.http.HttpServletRequest'}} as $request;
 $request.get*() as $output;
 
-alert $output;
+alert $output for {
+	title: "Find Java Spring MVC Controller User Controllable Input Parameters",
+	title_zh: "查找Java Spring MVC 控制层用户可控输入参数",
+	solution: <<<CODE
+none
+CODE
+	desc: <<<CODE
+### 规则目的
+该规则用于识别Java Spring MVC框架中控制器（Controller）层处理方法的用户可控输入参数。这些参数是数据流分析的起点，对于检测多种Web安全漏洞至关重要。
+
+### 规则详细
+该规则属于查找代码或审计代码的规则，旨在全面覆盖Spring MVC中获取用户输入的常见方式，包括：
+
+1. **声明式参数绑定（注解方式）**：识别通过 `@RequestParam`, `@PathVariable`, `@RequestHeader`, `@CookieValue`, `@RequestBody`, `@RequestPart`, `@MatrixVariable`, `@SessionAttribute`, `@RequestAttribute`, `@ModelAttribute` 等注解绑定到方法参数上的用户输入。这些注解简化了从HTTP请求中提取数据到Java方法参数的过程，但也是潜在的攻击入口点。
+2. **原生请求处理（HttpServletRequest/ServletRequest）**：识别直接通过 `javax.servlet.http.HttpServletRequest` 或 `javax.servlet.ServletRequest` 对象获取用户输入的场景。这包括调用 `getParameter()`, `getParameterValues()`, `getParameterNames()`, `getHeader()`, `getHeaderNames()`, `getCookies()` 等方法。虽然Spring MVC鼓励使用注解方式，但在某些场景下，开发者仍可能直接操作原生请求对象获取更原始或复杂的输入。
+
+这条规则作为基础性的“污染源”（source）查找规则，主要用于构建更复杂的Web漏洞（如SQL注入、XSS、命令注入、路径遍历等）的数据流分析链。通过准确识别所有可能的输入点，可以确保后续的流分析能够覆盖到应用程序处理用户输入的所有关键位置。
+CODE
+	level: "mid",
+}
+
 
 desc(
 	lang: java

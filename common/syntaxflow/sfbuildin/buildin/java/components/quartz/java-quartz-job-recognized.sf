@@ -73,7 +73,69 @@ $execute?{<getObject>.__interface__?{have: 'Job'}} as $jobClass;
 check $jobClass;
 $jobClass(*<show>);
 alert $jobClass for {
-    message:" Found Java Quartz Job Class",
+	message: " Found Java Quartz Job Class",
+	title: "Audit Java Quartz Job Class Identification",
+	title_zh: "审计 Java Quartz Job 类识别",
+	solution: <<<CODE
+### 建议或下一步审计方向
+此规则本身不直接涉及漏洞检测，而是识别审计对象。针对识别出的 Quartz Job 类，建议进行以下安全审计和改进：
+
+1. **审查 Job 执行逻辑**
+    - 仔细检查 `execute` 方法中的所有业务逻辑和外部调用，确保输入数据得到充分验证和过滤。
+    - 遵循最小权限原则，限制 Job 执行时对系统资源和外部服务的访问权限。
+
+2. **安全处理 JobDataMap 参数**
+    - 从 `JobDataMap` 获取数据时，应进行严格的类型转换和合法性校验。
+    - 避免直接将外部输入（如来自数据库、配置文件或消息队列）未经验证地存储到 `JobDataMap` 中。
+
+3. **警惕与重构动态方法调用**
+    - 强烈不建议在 Job 中使用反射机制根据外部输入动态调用方法，这极易导致远程代码执行漏洞（如示例代码所示）。
+    - 如果确实需要根据不同数据执行不同操作，应使用更安全的设计模式，例如策略模式、基于枚举或常量硬编码允许的方法列表进行 switch 判断，或者使用预定义的接口和实现类，而不是动态调用方法名。
+    - **示例重构（使用预定义接口或枚举）:**
+      ```java
+      // 不安全的代码片段（示例中存在）
+      // Method method = job.getClass().getMethod(methodName);
+      // method.invoke(job);
+      
+      // 建议的更安全方式（示例：使用枚举或常量检查合法方法名）
+      String methodName = dataMap.getString("jobMethodName");
+      if ("executeTaskA".equals(methodName)) {
+          executeTaskA();
+      } else if ("executeTaskB".equals(methodName)) {
+          executeTaskB();
+      } else {
+          // 处理非法方法名，抛出异常或记录错误
+          throw new IllegalArgumentException("Unsupported job method: " + methodName);
+      }
+      // 或者结合工厂模式/策略模式根据methodName获取并执行特定Task接口的实现
+      ```
+
+4. **审计依赖库**
+    - 检查 Quartz 框架版本及其依赖库是否存在已知的安全漏洞，及时更新至安全版本。
+
+5. **权限控制与隔离**
+    - 如果可能，考虑使用独立的系统用户或容器来运行 Quartz 调度服务，并限制其对宿主系统的访问权限，以最小化潜在漏洞的影响范围。
+CODE
+	desc: <<<CODE
+### 规则目的
+Quartz 是一个开源的作业调度框架，用于在 Java 应用程序中定时执行任务。此规则旨在识别 Java 应用程序中实现 `org.quartz.Job` 接口的类，这些类代表了 Quartz 框架中的具体调度任务。识别这些 Job 类的位置对于全面审计 Quartz 作业的配置、逻辑和潜在的安全风险至关重要。
+
+### 规则详细
+1. **识别 Job 实现类**
+    该规则通过检查类是否实现了 `org.quartz.Job` 接口来 pinpoint 所有 Quartz Job 类。这些类包含了实现 Quartz 调度逻辑的核心代码。
+
+2. **审计焦点**
+    识别出 Job 类后，后续的审计工作可以进一步关注这些类的具体实现，例如：
+    - **任务逻辑的安全性**：检查 `execute` 方法中的业务逻辑，是否存在 Command Injection, SQL Injection, Path Traversal 等漏洞。
+    - **参数处理的安全性**：审计如何从 `JobDataMap` 中获取和使用参数，防止通过 Job 参数注入恶意数据。
+    - **依赖与资源访问**：检查 Job 类访问的外部资源（数据库、文件系统、网络服务）是否安全，是否存在权限不足或过度授权的问题。
+    - **动态方法调用**：特别关注使用反射机制动态调用方法的场景（如示例代码中的 `Method method = job.getClass().getMethod(methodName); method.invoke(job);`），这可能引入严重的安全风险（如远程代码执行），需要严格控制输入 `methodName` 的来源和合法性。
+    - **并发控制**：检查 `@DisallowConcurrentExecution` 等注解的使用是否符合预期，防止并发执行导致的问题。
+
+3. **作为审计基础**
+    此规则是 Quartz 框架审计的基础，后续的规则可以基于识别出的 Job 类进一步分析具体的安全脆弱点，例如检测动态方法调用、敏感操作等。
+CODE
+	level: "mid",
 }
 
 desc(

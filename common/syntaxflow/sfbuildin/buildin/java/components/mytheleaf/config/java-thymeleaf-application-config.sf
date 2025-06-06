@@ -23,7 +23,45 @@ DESC
 	rule_id: "d2434f8f-e41c-447d-a900-3823e56248c8"
 	title_zh: "审计Java Thymeleaf应用程序配置"
 	solution: <<<SOLUTION
-none
+### 修复建议
+
+#### 1. 确保缓存配置正确
+在生产环境中启用缓存以提高性能，在开发环境中禁用缓存以便实时查看修改。
+```java
+// application.properties示例
+spring.thymeleaf.cache=true
+```
+
+#### 2. 配置安全的模板路径
+确保模板文件放在安全的、不可直接访问的目录下，例如`classpath:/templates/`。
+```java
+// application.properties示例
+spring.thymeleaf.prefix=classpath:/templates/
+spring.thymeleaf.suffix=.html
+```
+
+#### 3. 选择正确的模板解析模式
+根据内容选择正确的模式，特别是对于`JAVASCRIPT`和`CSS`模式，使用Thymeleaf提供的特定处理以防止潜在的注入问题。
+```java
+// application.properties示例
+spring.thymeleaf.mode=HTML
+```
+
+#### 4. 设置一致的编码
+确保模板文件的编码一致，避免乱码问题。
+```java
+// application.properties示例
+spring.thymeleaf.encoding=UTF-8
+```
+
+#### 5. 设置正确的Content-Type
+确保响应头的`Content-Type`正确，有助于浏览器正确解析内容。
+```java
+// application.properties示例
+spring.thymeleaf.content-type=text/html
+```
+
+通过以上步骤，可以确保Thymeleaf配置的安全性和性能，预防潜在的配置错误和未来的漏洞或性能瓶颈。
 SOLUTION
 	reference: <<<REFERENCE
 none

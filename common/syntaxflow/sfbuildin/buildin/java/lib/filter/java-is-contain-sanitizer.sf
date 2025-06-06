@@ -20,7 +20,23 @@ none
 REFERENCE
 )
 $input?{opcode:call && have:"contain"} as $output;
-alert $output;
+alert $output for {
+	title: "Find Java Contain Sanitizer",
+	title_zh: "查找Java含有contain方法的过滤器",
+	solution: <<<CODE
+none
+CODE
+	desc: <<<CODE
+### 1.规则目的
+该规则用于查找Java代码中是否有方法包含"contain"。该规则期望输入的参数的opcode为call，如果该call名称包含"contain"则会返回call原值。
+该规则常用于确认数据流分析中是否有白名单校验、字符串检验等操作。
+
+### 2.规则详细
+该规则属于查找类规则，常用于辅助数据流分析，用于识别代码中可能存在的字符串包含校验、白名单过滤等操作。通过识别包含"contain"关键字的方法调用，可以进一步分析这些方法是否被用于实现安全过滤或输入验证机制，从而判断数据流是否经过了适当的净化处理。
+CODE
+	level: "mid",
+}
+
 
 desc(
 	lang:"java"

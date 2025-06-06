@@ -36,4 +36,27 @@ REFERENCE
 <include('golang-database-sqlx')> as $output;
 <include('golang-database-from-param')> as $output;
 
-alert $output;
+alert $output for {
+	title: "Audit Golang Database Sink",
+	title_zh: "审计Golang数据库函数",
+	solution: <<<CODE
+none
+CODE
+	desc: <<<CODE
+### 1. 规则目的
+该规则旨在审计Go语言项目中数据库操作函数的使用情况。通过检查项目中是否使用了常见的数据库库（如GORM、Pop、Reform、标准库的sql以及sqlx等），可以识别出潜在的数据处理逻辑和数据流。这有助于发现潜在的数据安全漏洞，例如SQL注入、不安全的数据库连接配置等。尽管本审计规则级别为信息级，但它为进一步的代码审查和安全加固提供了基础。
+
+### 2. 规则详细
+该规则主要用于审计Go语言代码中与数据库操作相关的函数调用。
+
+1. **作为基础检测库**
+    属于`golang-database-sink`库规则（`lib`类型），可以作为其他规则（如数据流分析规则）的基础，帮助识别数据最终进入数据库的“Sink”（汇聚点）。通过识别这些Sink，可以进一步分析数据是否经过了恰当的验证和处理，从而发现潜在的安全漏洞。
+
+2. **覆盖常见数据库库**
+    规则覆盖了Go语言生态中常用的数据库库，包括：
+    - 标准库：`database/sql`
+    - 常用第三方库：`gorm.io/gorm` (GORM), `github.com/gobuffalo/pop` (Pop), `github.com/go-reform/reform` (Reform), `github.com/jmoiron/sqlx` (sqlx)
+    这些库的使用涵盖了大量的Go项目，使得本规则具有较广的审计范围。
+CODE
+	level: "info",
+}

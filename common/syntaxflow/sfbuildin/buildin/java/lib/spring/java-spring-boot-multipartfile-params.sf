@@ -30,4 +30,25 @@ MultipartFile?{<typeName>?{have:'org.springframework.web.multipart.MultipartFile
 // void transferTo(File dest)
 // void transferTo(Path dest)
 $multipartFile.transferTo(* <slice(index=1)> as $output)
-alert $output;
+alert $output for {
+	level: "mid",
+	title: "Audit Spring MultipartFile TransferTo Target",
+	title_zh: "审计 Spring MultipartFile TransferTo 目标",
+	solution: <<<CODE
+none
+CODE
+	desc: <<<CODE
+### 1.规则目的
+该审计规则旨在识别 Java 代码中 Spring Framework MultipartFile 库的 `transferTo` 方法的目标路径。`transferTo` 方法用于将上传的文件传输到指定的目标位置。
+
+### 2.规则详细
+该规则属于 `java-spring-multipartfile-transferTo-target` 库规则（`lib` 类型），主要用于审计 `org.springframework.web.multipart.MultipartFile` 类中的 `transferTo` 方法。通过识别此方法调用的目标文件路径，可以帮助安全审计人员追踪用户上传文件的存储位置，从而发现潜在的任意文件上传或其他文件操作相关的安全风险。
+
+**该规则审计的类为:**
+- `org.springframework.web.multipart.MultipartFile`
+
+**该规则覆盖方法包括:**
+- `void transferTo(File dest)`: 将接收到的文件传输到给定的目标文件。
+- `void transferTo(Path dest)`: 将接收到的文件传输到给定的目标路径。
+CODE
+}

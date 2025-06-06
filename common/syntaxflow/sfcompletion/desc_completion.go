@@ -7,15 +7,17 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/aiforge"
+	_ "github.com/yaklang/yaklang/common/aiforge/aibp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
+	"strconv"
 )
 
 // CompleteRuleDesc 用于给sf rule文件的desc中信息项内容补全，包括title、title_zh、desc、solution等
-func CompletegRuleDesc(
+func CompleteRuleDesc(
 	fileName, ruleContent string,
 	aiConfig ...aispec.AIConfigOption,
 ) (string, error) {
@@ -64,15 +66,31 @@ func CompletegRuleDesc(
 			return got
 		}
 		if got := params.GetInt(key); got != 0 {
-			return string(got)
+			return strconv.FormatInt(got, 10)
 		}
 		return value
 	}
-
 	var opts []sfvm.RuleFormatOption
 	opts = append(opts,
 		sfvm.RuleFormatWithRequireDescKeyType(sfvm.GetSupplyInfoDescKeyType()...),
 		sfvm.RuleFormatWithDescHandler(handler),
+		sfvm.RuleFormatWithAlertHandler(func(name, key, value string) string {
+			array := params.GetObjectArray("alert")
+			if len(array) == 0 {
+				return value
+			}
+			for _, invokeParams := range array {
+				if name != invokeParams.GetString("name") {
+					continue
+				}
+				aiVal := invokeParams.GetString(key)
+				if aiVal == "" {
+					return value
+				}
+				return aiVal
+			}
+			return value
+		}),
 	)
 	content, err := sfvm.FormatRule(ruleContent, opts...)
 	if err != nil {
