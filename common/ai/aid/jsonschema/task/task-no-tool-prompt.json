@@ -5,10 +5,7 @@
     "@action": {
       "type": "string",
       "enum": ["require-more-tool", "finished"],
-      "x-generation-rules": [
-        "根据调用结果检查是否完成当前子任务，如果你认为未完成，需要调用更多工具，则使用require-more-tool",
-        "如果你认为任务已经完成，请使用finished"
-      ]
+      "description": "(前文提到了任务树的状态)根据上下文检查当前子任务（任务树中标注“执行中”）是否满足退出条件，如果不满足退出条件，可以通过require-more-tool，申请更多的工具调用来继续执行任务，或者通过finished来结束当前执行中的任务（进入下一步子任务）。"
     },
     "status_summary": {
       "type": "string",
