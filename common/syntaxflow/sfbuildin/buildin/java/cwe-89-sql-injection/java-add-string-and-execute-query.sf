@@ -102,15 +102,8 @@ SOLUTION
 REFERENCE
 )
 
-g"SELECT*" as $allConst;
-g"select*" as $allConst;
-// 搜索作为memberCall的key的const
-$allConst<string()> as  $name
-<fuzztag(".{{name}} as $filed")><eval()>  as $stmts
-<delete("stmts")>
-// 排除作为memberCall的key的const
-$filed<getObject()> as $object
-$allConst?{!<getUsers()> & $object} as $sqlConst
+g"SELECT*" as $sqlConst;
+g"select*" as $sqlConst;
 
 // 检测 SQL 字符串被传入到了某一个执行函数中，执行函数符合常见的 SQL 执行命名规范
 $sqlConst -{

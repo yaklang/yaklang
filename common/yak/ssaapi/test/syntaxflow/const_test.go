@@ -125,6 +125,42 @@ UNTIL}->*)`,
 	})
 }
 
+func TestConstsSearchPlaceholderConst(t *testing.T) {
+	t.Run("const as member call key should not be searched", func(t *testing.T) {
+		code := `
+a = {"hello":"world"}
+a.b = "test"
+`
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			vals, err := prog.SyntaxFlowWithError(`e"b" as $result`)
+			require.NoError(t, err)
+			result := vals.GetValues("result")
+			result.Show()
+			require.Equal(t, 0, result.Len())
+			return nil
+		})
+	})
+
+	t.Run("const as blue print container key should not be searched", func(t *testing.T) {
+		code := `
+package org.example;
+class Test {
+	public void foo() {
+	System.out.println("Hello, World!");
+}
+}
+`
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			vals, err := prog.SyntaxFlowWithError(`g"fo*" as $result`)
+			require.NoError(t, err)
+			result := vals.GetValues("result")
+			result.Show()
+			require.Equal(t, 0, result.Len())
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+}
+
 func TestConstCompare(t *testing.T) {
 	t.Run("test compare const equal:simple ", func(t *testing.T) {
 		code := ` a = 1;`

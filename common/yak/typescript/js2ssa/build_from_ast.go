@@ -1099,7 +1099,7 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 			if class.GetNormalMember(identifierName) != nil {
 				obj := b.PeekValue("this")
 				if obj != nil {
-					if value := b.ReadMemberCallValue(obj, b.EmitConstInst(identifierName), true); value != nil {
+					if value := b.ReadMemberCallValue(obj, b.EmitConstInst(identifierName, true)); value != nil {
 						return nil, value
 					}
 				}
