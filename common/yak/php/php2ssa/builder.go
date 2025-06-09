@@ -52,7 +52,7 @@ func initHandler(fb *ssa.FunctionBuilder) {
 	fb.AssignVariable(fb.CreateVariable("global-container"), container)
 	initHandler := func(name ...string) {
 		for _, _name := range name {
-			variable := fb.CreateMemberCallVariable(container, fb.EmitConstInst(_name))
+			variable := fb.CreateMemberCallVariable(container, fb.EmitConstInst(_name, true))
 			emptyContainer := fb.EmitEmptyContainer()
 			fb.AssignVariable(variable, emptyContainer)
 		}
