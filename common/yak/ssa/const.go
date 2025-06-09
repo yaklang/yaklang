@@ -60,15 +60,24 @@ func NewConstWithUnary(i any, un int) *ConstInst {
 	return c
 }
 
-func NewConst(i any) *ConstInst {
+func NewConst(i any, isPlaceHolder ...bool) *ConstInst {
+	placeHolder := false
+	if len(isPlaceHolder) > 0 {
+		placeHolder = isPlaceHolder[0]
+	}
+
 	c := newConstByMap(i)
 	if c == nil {
 		c = newConstCreate(i)
 	}
 	ci := &ConstInst{
-		Const:   c,
-		anValue: NewValue(),
-		Unary:   0,
+		Const:     c,
+		anValue:   NewValue(),
+		Unary:     0,
+		ConstType: ConstTypeNormal,
+	}
+	if placeHolder {
+		ci.ConstType = ConstTypePlaceholder
 	}
 	ci.SetType(c.GetType())
 	return ci

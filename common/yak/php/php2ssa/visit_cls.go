@@ -771,16 +771,16 @@ func (y *builder) VisitMemberCallKey(raw phpparser.IMemberCallKeyContext) ssa.Va
 
 	_ = i
 	if i.Identifier() != nil {
-		return y.EmitConstInst(y.VisitIdentifier(i.Identifier()))
+		return y.EmitConstInst(y.VisitIdentifier(i.Identifier()), true)
 	}
 
 	if i.Variable() != nil {
 		name := y.VisitVariable(i.Variable())
 		value := y.ReadValue(name)
 		if value.IsUndefined() {
-			return y.EmitConstInst(strings.TrimPrefix(value.GetName(), "$"))
+			return y.EmitConstInst(strings.TrimPrefix(value.GetName(), "$"), true)
 		} else {
-			return y.EmitConstInst(value.String())
+			return y.EmitConstInst(value.String(), true)
 		}
 	}
 
@@ -814,7 +814,7 @@ func (y *builder) VisitFullyQualifiedNamespaceExpr(raw phpparser.IFullyQualified
 	} else {
 		bluePrint := y.GetBluePrint(i.GetText())
 		if bluePrint != nil {
-			inst := y.EmitConstInst(bluePrint.Name)
+			inst := y.EmitConstInst(bluePrint.Name, true)
 			inst.SetType(bluePrint)
 			return inst
 		}

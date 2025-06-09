@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-
 	"github.com/samber/lo"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -385,7 +384,7 @@ func (b *FunctionBuilder) GenerateDependence(pkgs []*dxtypes.Package, filename s
 			"version":  pkg.Version,
 			"filename": filename,
 		} {
-			constInst := b.EmitConstInst(v)
+			constInst := b.EmitConstInst(v, true)
 			if rng != nil {
 				constInst.SetRange(rng)
 			}
@@ -430,11 +429,11 @@ func (b *FunctionBuilder) GenerateProjectConfig() {
 			} else {
 				b.SetEmptyRange()
 			}
-			variable := b.CreateMemberCallVariable(config, b.EmitConstInst(k))
-			b.AssignVariable(variable, b.EmitConstInst(cv))
+			variable := b.CreateMemberCallVariable(config, b.EmitConstInst(k, true))
+			b.AssignVariable(variable, b.EmitConstInst(cv, true))
 
 			val := b.CreateVariable("test")
-			b.AssignVariable(val, b.EmitConstInst(cv))
+			b.AssignVariable(val, b.EmitConstInst(cv, true))
 		}
 	}
 	return

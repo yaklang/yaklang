@@ -693,12 +693,23 @@ var (
 
 // ----------- Const
 // ConstInst also have block pointer, which block set this const to variable
+type ConstType string
+
+const (
+	ConstTypeNormal ConstType = "normal"
+
+	// ConstTypePlaceholder stands for unValid const, like member call's key.
+	// We don't consider it a normal constant, but just a placeholder
+	ConstTypePlaceholder ConstType = "placeholder"
+)
+
 type ConstInst struct {
 	*Const
 	anValue
 	Unary      int
 	isIdentify bool // field key
 	Origin     User
+	ConstType  ConstType
 }
 
 // ConstInst cont set Type

@@ -21,11 +21,11 @@ func (y *builder) VisitArrayInitializer(raw javaparser.IArrayInitializerContext)
 	if len(allVariableInitializer) == 0 {
 		return y.EmitMakeBuildWithType(
 			ssa.NewSliceType(ssa.CreateAnyType()),
-			y.EmitConstInst(0), y.EmitConstInst(0),
+			y.EmitConstInst(0, true), y.EmitConstInst(0, true),
 		)
 	}
 	obj := y.InterfaceAddFieldBuild(len(allVariableInitializer),
-		func(i int) ssa.Value { return y.EmitConstInst(i) },
+		func(i int) ssa.Value { return y.EmitConstInst(i, true) },
 		func(i int) ssa.Value {
 			return y.VisitVariableInitializer(allVariableInitializer[i])
 		})

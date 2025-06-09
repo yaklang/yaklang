@@ -109,7 +109,7 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 		annotationContainerVariable = val
 		annotationContainerInstance = container
 		for name, member := range data {
-			val := y.CreateMemberCallVariable(container, y.EmitConstInst(name))
+			val := y.CreateMemberCallVariable(container, y.EmitConstInst(name, true))
 			val.AddRange(annotationRange, true)
 			log.Infof("create annotation-key: %v.%v -> %v", annotationName, name, member)
 			y.AssignVariable(val, member)
@@ -123,10 +123,10 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 			recoverRange := y.SetCurrent(v)
 			defer recoverRange()
 
-			annotation := y.ReadMemberCallValue(v, y.EmitConstInst("annotation"))
-			thisAnnotation := y.ReadMemberCallValue(annotation, y.EmitConstInst(annotationName))
+			annotation := y.ReadMemberCallValue(v, y.EmitConstInst("annotation", true))
+			thisAnnotation := y.ReadMemberCallValue(annotation, y.EmitConstInst(annotationName, true))
 			for name, v := range data {
-				variable := y.CreateMemberCallVariable(thisAnnotation, y.EmitConstInst(name))
+				variable := y.CreateMemberCallVariable(thisAnnotation, y.EmitConstInst(name, true))
 				y.AssignVariable(variable, v)
 			}
 		}, func(value ssa.Value) {
@@ -148,12 +148,12 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 			// create @RequestMap.ref -> @RequestMap (ref or _)
 			log.Infof("start to build annotation ref to def: (%v)%v", value.GetId(), value.GetName())
 			annotationToRef := "__ref__"
-			ref := y.CreateMemberCallVariable(annotationContainerInstance, y.EmitConstInst(annotationToRef))
+			ref := y.CreateMemberCallVariable(annotationContainerInstance, y.EmitConstInst(annotationToRef, true))
 			y.AssignVariable(ref, value)
 			//for _, v := range annotationContainerInstance.GetAllMember() {
 			//	y.AssignVariable(y.CreateMemberCallVariable(v, y.EmitConstInst(annotationToRef)), value)
 			//}
-			annotationContainer := y.CreateMemberCallVariable(value, y.EmitConstInst("annotation"))
+			annotationContainer := y.CreateMemberCallVariable(value, y.EmitConstInst("annotation", true))
 			annotationCollector := y.EmitEmptyContainer()
 
 			y.AssignVariable(annotationContainer, annotationCollector)
@@ -161,7 +161,7 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 			if annotationName == "" {
 				fieldAnnotationName = annotationContainerInstance.GetName()
 			}
-			y.AssignVariable(y.CreateMemberCallVariable(annotationCollector, y.EmitConstInst(fieldAnnotationName)), annotationContainerInstance)
+			y.AssignVariable(y.CreateMemberCallVariable(annotationCollector, y.EmitConstInst(fieldAnnotationName, true)), annotationContainerInstance)
 			// set fullType Name
 			t := y.AddFullTypeNameFromMap(annotationName, annotationContainerInstance.GetType())
 			annotationContainerInstance.SetType(t)

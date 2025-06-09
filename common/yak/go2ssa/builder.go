@@ -193,11 +193,11 @@ func (b *astbuilder) AddGlobalVariable(name string, value ssa.Value) {
 	scope := b.CurrentBlock.ScopeTable
 	for _, v := range scope.GetAllVariables() {
 		if object := v.GetValue().GetObject(); object != nil && object.GetId() == value.GetId() {
-			variable := b.CreateMemberCallVariable(b.GetProgram().GlobalScope, b.EmitConstInst(v.GetName()))
+			variable := b.CreateMemberCallVariable(b.GetProgram().GlobalScope, b.EmitConstInst(v.GetName(), true))
 			b.AssignVariable(variable, v.GetValue())
 		}
 	}
-	variable := b.CreateMemberCallVariable(b.GetProgram().GlobalScope, b.EmitConstInst(name))
+	variable := b.CreateMemberCallVariable(b.GetProgram().GlobalScope, b.EmitConstInst(name, true))
 	b.AssignVariable(variable, value)
 }
 

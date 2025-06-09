@@ -47,7 +47,7 @@ func hookJavaEEMemberCallMethod(y *builder, obj ssa.Value, key ssa.Value, args .
 		jspMethod := t.GetTemplateServerName()
 		jspObj := y.EmitUndefined(t.GetClassName())
 		jspObj.SetType(jspBlueprint)
-		methodCall := y.ReadMemberCallMethod(jspObj, y.EmitConstInst(jspMethod))
+		methodCall := y.ReadMemberCallMethod(jspObj, y.EmitConstInst(jspMethod, true))
 		jspArgs := []ssa.Value{obj, obj}
 		y.EmitCall(y.NewCall(methodCall, jspArgs))
 	}

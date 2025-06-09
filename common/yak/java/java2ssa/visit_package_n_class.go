@@ -572,7 +572,7 @@ func (y *builder) VisitRecordDeclaration(raw javaparser.IRecordDeclarationContex
 	}
 
 	return i.Identifier().GetText(), []ssa.Value{
-		y.EmitConstInst(i.GetText()),
+		y.EmitConstInst(i.GetText(), true),
 	}
 }
 
@@ -915,7 +915,7 @@ func (y *builder) VisitThrowsClause(i Ithrows) []ssa.Value {
 		name := strings.Join(names, ".")
 		typ := ssa.NewBasicType(ssa.ErrorTypeKind, names[len(names)-1])
 		typ.AddFullTypeName(name)
-		value := y.EmitConstInst(name)
+		value := y.EmitConstInst(name, true)
 		value.SetType(typ)
 		vs = append(vs, value)
 
