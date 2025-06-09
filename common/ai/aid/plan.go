@@ -162,16 +162,16 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 			}
 			switch action.ActionType() {
 			case "plan":
-				rootTask.Name = action.GetString("main_task")
-				rootTask.Goal = action.GetString("main_task_goal")
+				rootTask.Name = action.GetAnyToString("main_task")
+				rootTask.Goal = action.GetAnyToString("main_task_goal")
 				for _, subtask := range action.GetInvokeParamsArray("tasks") {
-					if subtask.GetString("subtask_name") == "" {
+					if subtask.GetAnyToString("subtask_name") == "" {
 						continue
 					}
 					rootTask.Subtasks = append(rootTask.Subtasks, &aiTask{
 						config: pr.config,
-						Name:   subtask.GetString("subtask_name"),
-						Goal:   subtask.GetString("subtask_goal"),
+						Name:   subtask.GetAnyToString("subtask_name"),
+						Goal:   subtask.GetAnyToString("subtask_goal"),
 					})
 				}
 				if rootTask.Name == "" {
