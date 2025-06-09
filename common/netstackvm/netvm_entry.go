@@ -38,8 +38,21 @@ func GetDefaultNetStackVirtualMachine() (*NetStackVirtualMachine, error) {
 	return DefaultNetStackVirtualMachine, nil
 }
 
+func GetDefaultNetStackVirtualMachineWithoutDHCP() (*NetStackVirtualMachine, error) {
+	DefaultNetStackVirtualMachineMutex.Lock()
+	defer DefaultNetStackVirtualMachineMutex.Unlock()
+	if DefaultNetStackVirtualMachine == nil {
+		vm, err := NewSystemNetStackVM(WithForceSystemNetStack(true))
+		if err != nil {
+			return nil, utils.Errorf("create netstack virtual machine failed: %v", err)
+		}
+		DefaultNetStackVirtualMachine = vm
+	}
+	return DefaultNetStackVirtualMachine, nil
+}
+
 func GetDefaultICMPClient() *icmpClient.Client {
-	vm, err := GetDefaultNetStackVirtualMachine()
+	vm, err := GetDefaultNetStackVirtualMachineWithoutDHCP()
 	if err != nil {
 		return nil
 	}
