@@ -2,8 +2,6 @@ package aid
 
 import (
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
-	"text/template"
 	"time"
 )
 
@@ -35,7 +33,7 @@ func CallAITransaction(
 	for i := int64(0); i < trcRetry; i++ {
 		rsp, err := callAi(
 			NewAIRequest(
-				RetryPromptBuilder(prompt, postHandlerErr),
+				c.RetryPromptBuilder(prompt, postHandlerErr),
 				WithAIRequest_SeqId(seq),
 				WithAIRequest_OnAcquireSeq(func(i int64) {
 					seq = i
@@ -97,7 +95,7 @@ var retryPromptTemplate = `
 
 `
 
-func RetryPromptBuilder(rawPrompt string, retryErr error) string {
+func (c *Config) RetryPromptBuilder(rawPrompt string, retryErr error) string {
 	if retryErr == nil {
 		return rawPrompt
 	}
@@ -105,14 +103,10 @@ func RetryPromptBuilder(rawPrompt string, retryErr error) string {
 		"RetryReason": rawPrompt,
 		"RawPrompt":   retryErr.Error(),
 	}
-	tmpl, err := template.New("retry-prompt").Parse(retryPromptTemplate)
+	res, err := c.quickBuildPrompt(retryPromptTemplate, templateData)
 	if err != nil {
+		c.EmitError("failed to build retry prompt: %v", err)
 		return rawPrompt
 	}
-	var promptBuilder strings.Builder
-	err = tmpl.Execute(&promptBuilder, templateData)
-	if err != nil {
-		return rawPrompt
-	}
-	return promptBuilder.String()
+	return res
 }
