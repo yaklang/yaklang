@@ -679,7 +679,7 @@ func (b *astbuilder) AssignList(forceAssign bool, stmt assignlist) []ssa.Value {
 				length = it.Len
 				if len(leftVariables) == length {
 					for i := range leftVariables {
-						value := b.ReadMemberCallValue(c, b.EmitConstInst(i))
+						value := b.ReadMemberCallValue(c, b.EmitConstInst(i, true))
 						b.AssignVariable(leftVariables[i], value)
 					}
 					return
@@ -689,7 +689,7 @@ func (b *astbuilder) AssignList(forceAssign bool, stmt assignlist) []ssa.Value {
 				for i := range leftVariables {
 					b.AssignVariable(
 						leftVariables[i],
-						b.ReadMemberCallValue(c, b.EmitConstInst(i)),
+						b.ReadMemberCallValue(c, b.EmitConstInst(i, true)),
 					)
 				}
 				return
@@ -719,7 +719,7 @@ func (b *astbuilder) AssignList(forceAssign bool, stmt assignlist) []ssa.Value {
 					continue
 				}
 				// this call type is tuple type, can read member
-				value := b.ReadMemberCallValue(c, b.EmitConstInst(i))
+				value := b.ReadMemberCallValue(c, b.EmitConstInst(i, true))
 				b.AssignVariable(leftVariables[i], value)
 			}
 			return
@@ -773,7 +773,7 @@ func (b *astbuilder) AssignList(forceAssign bool, stmt assignlist) []ssa.Value {
 			}
 
 			for i, variable := range leftVariables {
-				idxVar := b.ReadMemberCallValue(inter, b.EmitConstInst(i))
+				idxVar := b.ReadMemberCallValue(inter, b.EmitConstInst(i, true))
 				b.AssignVariable(variable, idxVar)
 			}
 		case leftLen == 1:
@@ -946,7 +946,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 			recoverRange := b.SetRange(s.BaseParserRuleContext)
 			if id := s.Identifier(); id != nil {
 				idText := id.GetText()
-				callee := b.EmitConstInst(idText)
+				callee := b.EmitConstInst(idText, true)
 				ret = b.CreateMemberCallVariable(expr, callee)
 			} else if id := s.IdentifierWithDollar(); id != nil {
 				key := b.ReadValue(id.GetText()[1:])
@@ -1029,7 +1029,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		exprx := b.buildExpression(expr)
 		if id := s.Identifier(); id != nil {
 			idText := id.GetText()
-			return b.ReadMemberCallValue(exprx, b.EmitConstInst(idText))
+			return b.ReadMemberCallValue(exprx, b.EmitConstInst(idText, true))
 		} else if id := s.IdentifierWithDollar(); id != nil {
 			key := b.ReadValue(id.GetText()[1:])
 			if key == nil {
@@ -1357,7 +1357,7 @@ func (b *astbuilder) buildMakeExpression(stmt *yak.MakeExpressionContext) ssa.Va
 	if s, ok := stmt.ExpressionListMultiline().(*yak.ExpressionListMultilineContext); ok {
 		exprs = b.buildExpressionListMultiline(s)
 	}
-	zero := b.EmitConstInst(0)
+	zero := b.EmitConstInst(0, true)
 	switch typ.GetTypeKind() {
 	case ssa.SliceTypeKind, ssa.BytesTypeKind:
 		if len(exprs) == 0 {
@@ -1603,7 +1603,7 @@ func (b *astbuilder) buildSliceCall(stmt *yak.SliceCallContext) []ssa.Value {
 		if s, ok := expr.(*yak.ExpressionContext); ok {
 			values[i] = b.buildExpression(s)
 		} else {
-			values[i] = b.EmitConstInst(0)
+			values[i] = b.EmitConstInst(0, true)
 		}
 	}
 	return values
