@@ -48,6 +48,32 @@ func (p InvokeParams) GetString(key string, backups ...string) string {
 	return ""
 }
 
+func (p InvokeParams) GetAnyToString(key string, backups ...string) string {
+	var results string
+	if !utils.IsNil(p) {
+		results = utils.InterfaceToString(utils.MapGetRaw(p, key))
+	}
+	if len(backups) <= 0 {
+		return results
+	}
+	if results == "" {
+		for _, i := range backups {
+			if i != "" {
+				return i
+			}
+		}
+	}
+	return ""
+}
+
+func (p InvokeParams) Has(key string) bool {
+	if !utils.IsNil(p) {
+		_, ok := p[key]
+		return ok
+	}
+	return false
+}
+
 func (p InvokeParams) GetStringSlice(key string, backups ...[]string) []string {
 	var results []string
 	if !utils.IsNil(p) {
