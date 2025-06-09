@@ -58,3 +58,9 @@ $top_b<getPredecessors> as $b
 		}, ssaapi.WithLanguage(ssaapi.Yak))
 	})
 }
+func TestGetRoot(t *testing.T) {
+	code := `a.b().c.d();`
+	ssatest.CheckSyntaxFlow(t, code, `.d<root> as $sink`, map[string][]string{
+		"sink": {"Undefined-a"},
+	})
+}
