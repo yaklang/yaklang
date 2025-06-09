@@ -143,6 +143,9 @@ type Config struct {
 	TCPSACKEnabled bool
 	// TCPRACKLossDetection specifies the TCP loss detection algorithm
 	TCPRACKLossDetection tcpip.TCPRecovery
+
+	// force use system net stack, not dhcp
+	ForceSystemNetStack bool
 }
 
 func loadStackOptions(config *Config, stackIns *stack.Stack) error {
@@ -246,6 +249,13 @@ func WithPCAPInboundFilter(filter func(packet gopacket.Packet) bool) Option {
 func WithPCAPOutboundFilter(filter func(packet gopacket.Packet) bool) Option {
 	return func(c *Config) error {
 		c.pcapOutboundFilter = filter
+		return nil
+	}
+}
+
+func WithForceSystemNetStack(force bool) Option {
+	return func(c *Config) error {
+		c.ForceSystemNetStack = force
 		return nil
 	}
 }

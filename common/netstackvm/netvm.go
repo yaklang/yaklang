@@ -135,14 +135,23 @@ func NewSystemNetStackVM(opts ...Option) (*NetStackVirtualMachine, error) {
 		}
 
 		if publicIfaceName == nic.Name { // if the interface is the public interface, start dhcp, make sure gateway can use
-			if err := vm.StartDHCP(); err != nil {
-				log.Errorf("StartDHCP failed: %v", err)
-				continue
+			if config.ForceSystemNetStack {
+				err = vm.InheritPcapInterfaceConfig()
+				if err != nil {
+					log.Errorf("nic[%s] failed to inherit public config: %v", nic.Name, err)
+					continue
+				}
+			} else {
+				if err := vm.StartDHCP(); err != nil {
+					log.Errorf("StartDHCP failed: %v", err)
+					continue
+				}
+				if err := vm.WaitDHCPFinished(context.Background()); err != nil {
+					log.Errorf("Wait DHCP finished failed: %v", err)
+					continue
+				}
 			}
-			if err := vm.WaitDHCPFinished(context.Background()); err != nil {
-				log.Errorf("Wait DHCP finished failed: %v", err)
-				continue
-			}
+
 		} else { // if the interface is lan interface, inherit the pcap interface ip and route, not need set default route.
 			err = vm.InheritPcapInterfaceIP()
 			if err != nil {
