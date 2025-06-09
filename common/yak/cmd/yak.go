@@ -391,6 +391,9 @@ var startGRPCServerCommand = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
+		if c.String("home") != "" {
+			os.Setenv("YAKIT_HOME", c.String("home"))
+		}
 		if c.Bool("pprof") && c.IsSet("auto-pprof") {
 			return utils.Error("Parameters 'pprof' and 'auto-pprof' cannot be set at the same time")
 		}
@@ -453,10 +456,6 @@ var startGRPCServerCommand = cli.Command{
 			if err != nil {
 				log.Warnf("mkdir certdir[%s] failed: %s", certDir, err)
 			}
-		}
-
-		if c.String("home") != "" {
-			os.Setenv("YAKIT_HOME", c.String("home"))
 		}
 
 		secret := c.String("secret")
