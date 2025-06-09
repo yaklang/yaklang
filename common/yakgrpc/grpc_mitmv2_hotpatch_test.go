@@ -325,6 +325,182 @@ assert rsp.RawPacket.Contains("`+rspToken+`")
 	}
 }
 
+func TestGRPCMUSTPASS_MITMV2_HotPatch_BeforeRequest_AfterRequestManualHijackMode(t *testing.T) {
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(100))
+	defer cancel()
+
+	originReqToken := utils.RandStringBytes(16)
+	hijackReqToken := utils.RandStringBytes(16)
+	reqToken := utils.RandStringBytes(16)
+	originRspToken := utils.RandStringBytes(16)
+	hijackRspToken := utils.RandStringBytes(16)
+	rspToken := utils.RandStringBytes(16)
+
+	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		spew.Dump(req)
+		if !bytes.Contains(req, []byte(reqToken)) {
+			panic("req token not found")
+		}
+		return []byte("HTTP/1.1 200 OK\r\nContent-Length: 16\r\n\r\n" + originRspToken + "\r\n\r\n")
+	})
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := client.MITMV2(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream.Send(&ypb.MITMV2Request{
+		Host: "127.0.0.1",
+		Port: uint32(mitmPort),
+	})
+
+	hotPatchScript := `hijackHTTPRequest = func(isHttps, url, req, forward , drop) {
+    req = poc.AppendHTTPPacketHeader(req,"` + hijackReqToken + `","ok")
+    forward(req)
+}
+
+beforeRequest = func(ishttps,oreq,req){
+	if !oreq.Contains("` + originReqToken + `") { // check oreq correct
+		return req
+	}
+	if !req.Contains("` + hijackReqToken + `") { // check hijackrequest correct
+		return req
+	}
+    return poc.AppendHTTPPacketHeader(req, "` + reqToken + `","ok")
+}
+
+hijackHTTPResponse = func(isHttps, url, rsp, forward, drop) {
+    rsp = poc.AppendHTTPPacketHeader(rsp,"` + hijackRspToken + `","ok")
+    forward(rsp)
+}
+
+afterRequest = func(ishttps,oreq,req,orsp,rsp){
+
+	if !oreq.Contains("` + originReqToken + `") { // check oreq correct
+		println("oreq error")
+		return rsp
+	}	
+	
+	if !req.Contains("` + reqToken + `") { // check req correct
+		println("req error")
+		return rsp
+	}
+
+	if !orsp.Contains("` + originRspToken + `") { // check orsp correct
+		println("orsp error")
+		return rsp
+	}
+
+	if !rsp.Contains("` + hijackRspToken + `") { // check hijack req correct
+		println("rsp error")
+		return rsp
+	}
+    return poc.AppendHTTPPacketHeader(rsp, "` + rspToken + `","ok")
+}
+
+
+
+`
+
+	for {
+		data, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			break
+		default:
+
+		}
+		if data.GetMessage().GetIsMessage() {
+			msg := string(data.GetMessage().GetMessage())
+			if !strings.Contains(msg, "starting mitm server") {
+				continue
+			}
+			// load hot-patch mitm plugin
+			stream.Send(&ypb.MITMV2Request{
+				SetYakScript:     true,
+				YakScriptContent: hotPatchScript,
+			})
+			stream.Send(&ypb.MITMV2Request{
+				SetAutoForward:   true,
+				AutoForwardValue: false,
+			})
+		} else if data.GetCurrentHook && len(data.GetHooks()) > 0 {
+			// send packet
+			go func() {
+				defer cancel()
+				packet := `GET / HTTP/1.1
+Host: ` + utils.HostPort(mockHost, mockPort) + `
+
+` + originReqToken + `
+`
+				packetBytes := lowhttp.FixHTTPRequest([]byte(packet))
+				_, err := yak.Execute(`
+rsp, req = poc.HTTPEx(packet, poc.proxy(mitmProxy))~
+dump(rsp.RawPacket)
+assert rsp.RawPacket.Contains("`+rspToken+`")
+`, map[string]any{
+					"packet":    string(packetBytes),
+					"mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort),
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}()
+		} else if data.ManualHijackListAction == "add" {
+			require.Len(t, data.ManualHijackList, 1)
+			hijackTask := data.ManualHijackList[0]
+			require.Equal(t, hijackTask.Status, Hijack_Status_Request)
+			// send packet
+			if !bytes.Contains(hijackTask.Request, []byte(hijackReqToken)) {
+				t.Fatal("hijack req token not found")
+			}
+			stream.Send(&ypb.MITMV2Request{
+				ManualHijackMessage: &ypb.SingleManualHijackControlMessage{
+					TaskID:         hijackTask.TaskID,
+					Forward:        true,
+					HijackResponse: true,
+				},
+				ManualHijackControl: true,
+			})
+
+		} else if data.ManualHijackListAction == "update" {
+			require.Len(t, data.ManualHijackList, 1)
+			hijackTask := data.ManualHijackList[0]
+			if hijackTask.Status != Hijack_Status_Response {
+				continue
+			}
+
+			if !bytes.Contains(hijackTask.Request, []byte(hijackReqToken)) {
+				t.Fatal("hijack request token not found at manual hijack resp")
+			}
+			if !bytes.Contains(hijackTask.Request, []byte(reqToken)) {
+				t.Fatal("before requset token not found")
+			}
+
+			// send packet
+			if !bytes.Contains(hijackTask.Response, []byte(hijackRspToken)) {
+				t.Fatal("hijack rsp token not found at manual hijack resp")
+			}
+
+			stream.Send(&ypb.MITMV2Request{
+				ManualHijackMessage: &ypb.SingleManualHijackControlMessage{
+					TaskID:  hijackTask.TaskID,
+					Forward: true,
+				},
+				ManualHijackControl: true,
+			})
+		}
+
+	}
+}
+
 func TestGRPCMUSTPASS_MITMV2_HotPatch_HijackAndMirrorURL(t *testing.T) {
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(5))
 	defer cancel()
