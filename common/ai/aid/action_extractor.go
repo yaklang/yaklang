@@ -37,6 +37,10 @@ func (q *Action) GetString(key string, defaults ...string) string {
 	return q.params.GetString(key, defaults...)
 }
 
+func (q *Action) GetAnyToString(key string, defaults ...string) string {
+	return q.params.GetAnyToString(key, defaults...)
+}
+
 func (q *Action) GetStringSlice(key string, defaults ...[]string) []string {
 	return q.params.GetStringSlice(key, defaults...)
 }
@@ -82,14 +86,14 @@ func ExtractActionFromStream(reader io.Reader, actionName string, alias ...strin
 			if stopped.IsSet() {
 				return
 			}
-
-			target, ok := data["@action"]
-			if !ok {
+			dataParams := aitool.InvokeParams(data)
+			if !dataParams.Has("@action") {
 				return
 			}
-			for _, name := range actions {
-				if target == name {
-					ac.name = name
+			targetString := dataParams.GetString("@action")
+			if targetString != "" {
+				if utils.StringArrayContains(actions, targetString) {
+					ac.name = targetString
 					ac.params = data
 					if ac.params == nil {
 						ac.params = make(map[string]any)
@@ -97,6 +101,22 @@ func ExtractActionFromStream(reader io.Reader, actionName string, alias ...strin
 					close(sigchan)
 					stopped.Set()
 					return
+				}
+			} else {
+				target := dataParams.GetObject("@action")
+				for _, v := range target {
+					targetString = utils.InterfaceToString(v)
+					if utils.StringArrayContains(actions, targetString) {
+						ac.name = targetString
+						ac.params = data
+						if ac.params == nil {
+							ac.params = make(map[string]any)
+						}
+						ac.params["@action"] = targetString
+						close(sigchan)
+						stopped.Set()
+						return
+					}
 				}
 			}
 		}))
