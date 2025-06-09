@@ -651,7 +651,6 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				hijackRsp = newHijackRsp
 			}
 		}()
-		originRspRaw := rsp[:]
 		plainResponse := getPlainResponseBytes(req)
 		if len(plainResponse) > 0 {
 			httpctx.SetPlainResponseBytes(req, plainResponse)
@@ -778,7 +777,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 					return nil
 				}
 				if controlMessage.GetForward() {
-					return originRspRaw
+					return rsp
 				}
 
 				if controlMessage.GetSendPacket() {
@@ -791,11 +790,11 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 					rspModified, _, err := lowhttp.FixHTTPResponse(response)
 					if err != nil {
 						log.Errorf("fix http response[req:%v] failed: %s", ptr, err.Error())
-						return originRspRaw
+						return rsp
 					}
 					if rspModified == nil {
 						log.Error("BUG: http response is empty... use origin")
-						return originRspRaw
+						return rsp
 					}
 					return rspModified
 				}
