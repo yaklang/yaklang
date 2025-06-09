@@ -75,7 +75,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		text := ret.Parent_().GetText()
 		parent := y.PeekValue(text)
 		if parent == nil {
-			parent = y.EmitConstInst(text)
+			parent = y.EmitConstInst(text, true)
 		}
 		currentBlueprint := y.Function.GetCurrentBlueprint()
 		if currentBlueprint != nil {
@@ -671,7 +671,7 @@ func (y *builder) VisitKeyedSimpleFieldName(raw phpparser.IKeyedSimpleFieldNameC
 
 	var val ssa.Value
 	if i.Identifier() != nil {
-		val = y.EmitConstInst(y.VisitIdentifier(i.Identifier()))
+		val = y.EmitConstInst(y.VisitIdentifier(i.Identifier()), true)
 	} else if i.Expression() != nil {
 		val = y.VisitExpression(i.Expression())
 	} else {
@@ -739,7 +739,7 @@ func (y *builder) VisitFunctionCall(raw phpparser.IFunctionCallContext) ssa.Valu
 	var c *ssa.Call
 	args, ellipsis := y.VisitActualArguments(i.ActualArguments())
 	if _, exit := y.GetProgram().ExternInstance[strings.ToLower(v.String())]; exit {
-		c = y.NewCall(y.EmitConstInst(strings.ToLower(v.String())), args)
+		c = y.NewCall(y.EmitConstInst(strings.ToLower(v.String()), true), args)
 	} else {
 		c = y.NewCall(v, args)
 	}
@@ -862,7 +862,7 @@ func (y *builder) VisitArrayItemList(raw phpparser.IArrayItemListContext) ([][2]
 
 		k, v := y.VisitArrayItem(a)
 		if utils.IsNil(k) {
-			k = y.EmitConstInst(countIndex)
+			k = y.EmitConstInst(countIndex, true)
 			countIndex++
 		}
 		kv := [2]ssa.Value{k, v}
@@ -1024,7 +1024,7 @@ func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerCon
 	case *phpparser.ArrayInitializerContext:
 		if ret.ArrayItemList() != nil {
 			results, l := y.VisitArrayItemList(ret.ArrayItemList())
-			array := y.EmitMakeWithoutType(y.EmitConstInst(l), y.EmitConstInst(l))
+			array := y.EmitMakeWithoutType(y.EmitConstInst(l, true), y.EmitConstInst(l, true))
 			for _, values := range results {
 				k, v := values[0], values[1]
 				variable := y.CreateMemberCallVariable(array, k)
@@ -1032,7 +1032,7 @@ func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerCon
 			}
 			return array
 		} else {
-			array := y.EmitMakeWithoutType(y.EmitConstInst(0), y.EmitConstInst(0))
+			array := y.EmitMakeWithoutType(y.EmitConstInst(0, true), y.EmitConstInst(0, true))
 			return array
 		}
 	case *phpparser.ExpressionitializerContext:
@@ -1353,5 +1353,5 @@ func (y *builder) VisitDefineExpr(raw phpparser.IDefineExprContext) ssa.Value {
 			flag = true
 		}
 	}
-	return y.EmitConstInst(flag)
+	return y.EmitConstInst(flag, true)
 }

@@ -1082,7 +1082,7 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 			if class.GetNormalMember(identifierName) != nil {
 				obj := b.PeekValue("this")
 				if obj != nil {
-					return b.CreateMemberCallVariable(obj, b.EmitConstInst(identifierName)), nil
+					return b.CreateMemberCallVariable(obj, b.EmitConstInst(identifierName), true), nil
 				}
 			}
 			return b.CreateJSVariable(identifierName), nil
@@ -1099,7 +1099,7 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 			if class.GetNormalMember(identifierName) != nil {
 				obj := b.PeekValue("this")
 				if obj != nil {
-					if value := b.ReadMemberCallValue(obj, b.EmitConstInst(identifierName)); value != nil {
+					if value := b.ReadMemberCallValue(obj, b.EmitConstInst(identifierName), true); value != nil {
 						return nil, value
 					}
 				}
@@ -1123,7 +1123,7 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 		if (obj == nil && bp == nil) || propName == "" {
 			return nil, nil
 		}
-		name := b.EmitConstInst(propName)
+		name := b.EmitConstInst(propName, true)
 		if isLval {
 			return b.CreateMemberCallVariable(obj, name), nil
 		}
@@ -1666,7 +1666,7 @@ func (b *builder) VisitObjectLiteralExpression(objLiteral *ast.ObjectLiteralExpr
 				// 目前为了简化，我们仅创建函数但不实现其内部逻辑
 
 				if methodName != "" {
-					key := b.EmitConstInst(methodName)
+					key := b.EmitConstInst(methodName, true)
 					keys = append(keys, key)
 					values = append(values, newFunc)
 				}
@@ -1704,7 +1704,7 @@ func (b *builder) VisitObjectLiteralExpression(objLiteral *ast.ObjectLiteralExpr
 				// 标记这是一个getter或setter
 				// 目前为了简化，我们仅创建函数但不实现其内部逻辑
 
-				key := b.EmitConstInst(accessorName)
+				key := b.EmitConstInst(accessorName, true)
 				keys = append(keys, key)
 				values = append(values, newFunc)
 			}
@@ -2794,7 +2794,7 @@ func (b *builder) ProcessObjectBindingPattern(pattern *ast.BindingPattern, sourc
 		} else if bindingElement.Name() != nil && ast.IsIdentifier(bindingElement.Name()) {
 			// 简写形式: let { a } = obj
 			propName := bindingElement.Name().AsIdentifier().Text
-			propertyKey = b.EmitConstInst(propName)
+			propertyKey = b.EmitConstInst(propName, true)
 		} else {
 			// 没有有效的属性名
 			b.NewError(ssa.Error, TAG, InvalidPropertyBinding())
@@ -2888,7 +2888,7 @@ func (b *builder) ProcessArrayBindingPattern(pattern *ast.BindingPattern, source
 			continue
 		} else {
 			// 普通元素: arr[i]
-			indexValue := b.EmitConstInst(i)
+			indexValue := b.EmitConstInst(i, true)
 			elementValue = b.ReadMemberCallValue(sourceArr, indexValue)
 		}
 

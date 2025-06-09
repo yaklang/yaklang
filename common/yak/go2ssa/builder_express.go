@@ -23,7 +23,7 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) 
 			return rightv
 		} else {
 			b.NewError(ssa.Error, TAG, "can't get expression")
-			return b.EmitConstInst(0)
+			return b.EmitConstInst(0, true)
 		}
 	}
 	getVariable := func(single getSingleExpr, i int) *ssa.Variable {
@@ -48,7 +48,7 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) 
 			op1 := getValue(exp, 0)
 			if op1 == nil {
 				b.NewError(ssa.Error, TAG, NeedTwoExpression())
-				return b.EmitConstInst(0), b.CreateVariable("")
+				return b.EmitConstInst(0, true), b.CreateVariable("")
 			}
 
 			switch op.GetText() {
@@ -76,7 +76,7 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) 
 
 			if op1 == nil {
 				b.NewError(ssa.Error, TAG, NeedTwoExpression())
-				return b.EmitConstInst(0), b.CreateVariable("")
+				return b.EmitConstInst(0, true), b.CreateVariable("")
 			}
 			if ssaop == "" {
 				return op1, nil
@@ -103,11 +103,11 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) 
 			op2 := getValue(exp, 1)
 			if op1 == nil {
 				b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
-				return b.EmitConstInst(0), b.CreateVariable("")
+				return b.EmitConstInst(0, true), b.CreateVariable("")
 			}
 			if op2 == nil {
 				b.NewError(ssa.Error, TAG, AssignRightSideEmpty())
-				return b.EmitConstInst(0), b.CreateVariable("")
+				return b.EmitConstInst(0, true), b.CreateVariable("")
 			}
 			return b.EmitBinOp(ssaop, op1, op2), nil
 		}
@@ -137,11 +137,11 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) 
 			op2 := getValue(exp, 1)
 			if op1 == nil {
 				b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
-				return b.EmitConstInst(0), b.CreateVariable("")
+				return b.EmitConstInst(0, true), b.CreateVariable("")
 			}
 			if op2 == nil {
 				b.NewError(ssa.Error, TAG, AssignRightSideEmpty())
-				return b.EmitConstInst(0), b.CreateVariable("")
+				return b.EmitConstInst(0, true), b.CreateVariable("")
 			}
 			return b.EmitBinOp(ssaop, op1, op2), nil
 		}
@@ -169,11 +169,11 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) 
 			op2 := getValue(exp, 1)
 			if op1 == nil {
 				b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
-				return b.EmitConstInst(0), b.CreateVariable("")
+				return b.EmitConstInst(0, true), b.CreateVariable("")
 			}
 			if op2 == nil {
 				b.NewError(ssa.Error, TAG, AssignRightSideEmpty())
-				return b.EmitConstInst(0), b.CreateVariable("")
+				return b.EmitConstInst(0, true), b.CreateVariable("")
 			}
 			return b.EmitBinOp(ssaop, op1, op2), nil
 		}
@@ -182,7 +182,7 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) 
 			op1 := getValue(exp, 0)
 			if op1 == nil {
 				b.NewError(ssa.Error, TAG, NeedTwoExpression())
-				return b.EmitConstInst(0), b.CreateVariable("")
+				return b.EmitConstInst(0, true), b.CreateVariable("")
 			}
 			switch op.GetText() {
 			case "*":
@@ -193,7 +193,7 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) 
 		}
 	}
 
-	return b.EmitConstInst(0), b.CreateVariable("")
+	return b.EmitConstInst(0, true), b.CreateVariable("")
 }
 
 func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValue bool, isFunction ...bool) (ssa.Value, *ssa.Variable) {
@@ -228,7 +228,7 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 
 			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
 				if typ.GetTypeKind() == ssa.PointerKind {
-					rv = b.ReadMemberCallValue(rv, b.EmitConstInst("@value"))
+					rv = b.ReadMemberCallValue(rv, b.EmitConstInst("@value", true))
 					if typ, ok := ssa.ToObjectType(rv.GetType()); ok {
 						handleObjectType(rv, typ)
 					}
@@ -256,7 +256,7 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			}
 
 			if leftv == nil {
-				leftv = b.CreateMemberCallVariable(rv, b.EmitConstInst(text))
+				leftv = b.CreateMemberCallVariable(rv, b.EmitConstInst(text, true))
 			}
 		}
 	} else {
@@ -295,7 +295,7 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 
 			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
 				if typ.GetTypeKind() == ssa.PointerKind {
-					rv = b.ReadMemberCallValue(rv, b.EmitConstInst("@value"))
+					rv = b.ReadMemberCallValue(rv, b.EmitConstInst("@value", true))
 					if typ, ok := ssa.ToObjectType(rv.GetType()); ok {
 						handleObjectType(rv, typ)
 					}
@@ -330,7 +330,7 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			}
 
 			if rightv == nil {
-				rightv = readMemberCall(rv, b.EmitConstInst(text))
+				rightv = readMemberCall(rv, b.EmitConstInst(text, true))
 				rightv.SetType(HandleFullTypeNames(rightv.GetType(), rv.GetType().GetFullTypeNames()))
 			}
 			// log.Infof("rightv = %v", rightv)
@@ -366,7 +366,7 @@ func (b *astbuilder) buildMethodExpression(exp *gol.MethodExprContext, IslValue 
 
 	// TODO
 	b.NewError(ssa.Error, TAG, ToDo())
-	return b.EmitConstInst(0), b.CreateVariable("")
+	return b.EmitConstInst(0, true), b.CreateVariable("")
 }
 
 func (b *astbuilder) buildConversion(exp *gol.ConversionContext, IslValue bool) (ssa.Value, *ssa.Variable) {
@@ -388,7 +388,7 @@ func (b *astbuilder) buildConversion(exp *gol.ConversionContext, IslValue bool) 
 	case ssa.SliceTypeKind, ssa.BytesTypeKind:
 		obj := b.InterfaceAddFieldBuild(len(values),
 			func(i int) ssa.Value {
-				return b.EmitConstInst(i)
+				return b.EmitConstInst(i, true)
 			},
 			func(i int) ssa.Value {
 				return values[i]
@@ -517,7 +517,7 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 		}
 
 		if c, ok := b.CheckSpecialValueByStr(text); ok {
-			return b.EmitConstInst(c)
+			return b.EmitConstInst(c, true)
 		}
 
 		v := b.PeekValue(text)
