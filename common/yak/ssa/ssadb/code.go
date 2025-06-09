@@ -101,6 +101,8 @@ type IrCode struct {
 
 	// not important information
 	ExtraInformation string `json:"extra_information" gorm:"type:text"`
+
+	ConstType string `json:"const_type" gorm:"index"`
 }
 
 func emptyIrCode() *IrCode {
