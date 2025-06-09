@@ -212,6 +212,12 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		ir.Point = point.GetId()
 	}
 
+	if inst.GetOpcode() == SSAOpcodeConstInst {
+		if constInst, ok := ToConst(inst); ok {
+			ir.ConstType = string(constInst.ConstType)
+		}
+	}
+
 	ir.TypeID = SaveTypeToDB(value.GetType(), inst.GetProgramName())
 }
 
