@@ -75,7 +75,7 @@ func ExactSearchVariable(DB *gorm.DB, ctx context.Context, mod int, value string
 	db := DB.Model(&IrIndex{})
 	if mod&ConstType != 0 {
 		//指定opcode为const
-		_db := DB.Model(&IrCode{}).Where("opcode=5 and string=?", value)
+		_db := DB.Model(&IrCode{}).Where("opcode=5 AND const_type = 'normal' AND string=? ", value)
 		return yieldIrCodes(_db, ctx)
 	}
 	switch mod {
@@ -98,7 +98,7 @@ func GlobSearchVariable(DB *gorm.DB, ctx context.Context, mod int, value string)
 func RegexpSearchVariable(DB *gorm.DB, ctx context.Context, mod int, value string) chan *IrCode {
 	db := DB.Model(&IrIndex{})
 	if mod&ConstType != 0 {
-		_db := DB.Model(&IrCode{}).Where("opcode=5 and string REGEXP ?", value)
+		_db := DB.Model(&IrCode{}).Where("opcode=5 AND const_type = 'normal' AND string REGEXP ?", value)
 		return yieldIrCodes(_db, ctx)
 	}
 	switch mod {

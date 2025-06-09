@@ -444,7 +444,9 @@ func (f *FunctionBuilder) EmitConstInst(i any, isPlaceholder ...bool) *ConstInst
 	}
 	ci := NewConst(i, isPlaceholder...)
 	f.emit(ci)
-	f.GetProgram().AddConstInstruction(ci)
+	if ci.IsNormalConst() {
+		f.GetProgram().AddConstInstruction(ci)
+	}
 	return ci
 }
 

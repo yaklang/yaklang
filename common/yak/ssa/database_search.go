@@ -124,6 +124,7 @@ func (c *Cache) _getByVariableEx(
 	var ins []Instruction
 	if mod&ssadb.ConstType != 0 {
 		c.constCache.ForEach(func(s string, instruction []Instruction) {
+
 			for _, i := range instruction {
 				if checkValue(i.String()) {
 					ins = append(ins, i)

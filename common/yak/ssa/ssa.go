@@ -715,6 +715,12 @@ type ConstInst struct {
 // ConstInst cont set Type
 func (c *ConstInst) GetType() Type   { return c.anValue.GetType() }
 func (c *ConstInst) SetType(ts Type) { c.anValue.SetType(ts) }
+func (c *ConstInst) IsNormalConst() bool {
+	if c == nil {
+		return false
+	}
+	return c.ConstType == ConstTypeNormal
+}
 
 var (
 	_ Node        = (*ConstInst)(nil)
