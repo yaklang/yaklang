@@ -4,30 +4,20 @@ desc(
 	risk:"资源泄漏",
 	level:high
 	reference: <<<REFERENCE
-https://docs.oracle.com/javase/8/docs/api/java/sql/package-summary.html
+[CWE-772](https://cwe.mitre.org/data/definitions/772.html)
+[Java JDBC API 文档](https://docs.oracle.com/javase/8/docs/api/java/sql/package-summary.html)
 REFERENCE
 	description: <<<DESCRIPTION
-    ## 漏洞描述
 
-    应用程序在使用 JDBC API 进行数据库操作时，未能正确关闭数据库资源（Connection、Statement、ResultSet）。这些资源在超出生命周期后未被释放，导致资源泄漏。
-
-    ## 风险影响
-
-    - 数据库连接池耗尽，无法创建新的连接
-    - 系统资源（内存、文件句柄等）过度消耗
-    - 应用程序性能随时间逐渐下降
-    - 长时间运行后可能导致应用崩溃或拒绝服务
-    - 可能引发数据库服务器连接数超限
-    - 事务可能无法正确提交或回滚
 DESCRIPTION
 	solution: <<<SOLUTION
 ### 修复建议
 
-确保在数据库资源（Connection, Statement, ResultSet）使用完毕后及时、正确地关闭。
+确保在数据库资源（`Connection`、`Statement`、`ResultSet`）使用完毕后及时、正确地关闭。
 
 #### 1. 使用 try-finally 块手动关闭资源
 
-在 `finally` 块中确保所有资源都被关闭，即使在 `try` 块中发生异常也会执行。关闭资源时应按照获取顺序的逆序关闭（ResultSet -> Statement -> Connection）。并且每个资源的关闭操作都应该包裹在独立的 `try-catch`块中，以防止一个资源的关闭失败影响其他资源的关闭。
+在 `finally` 块中确保所有资源都被关闭，即使在 `try` 块中发生异常也会执行。关闭资源时应按照获取顺序的逆序关闭（`ResultSet` -> `Statement` -> `Connection`）。并且每个资源的关闭操作都应该包裹在独立的 `try-catch` 块中，以防止一个资源的关闭失败影响其他资源的关闭。
 
 ```java
 // 修复代码示例 (使用 try-finally)
@@ -42,11 +32,10 @@ try {
     while (rs.next()) {
         // 处理结果
     }
-} catch (SQLException e){
+} catch (SQLException e) {
     // 处理SQL异常
     e.printStackTrace();
-}finally {
-    // 按获取顺序的逆序关闭
+} finally {
     if (rs != null) {
         try { rs.close(); } catch (SQLException e) { /* 记录日志 */ }
     }
@@ -67,7 +56,6 @@ try {
 // 修复代码示例 (使用 try-with-resources)
 String query = "SELECT * FROM users WHERE role = ?";
 try (
-     // 资源会按照声明顺序的逆序自动关闭
      Connection conn = dataSource.getConnection();
      PreparedStatement stmt = conn.prepareStatement(query);
 ) {
@@ -78,14 +66,14 @@ try (
         }
     } // ResultSet 自动关闭
 } catch (SQLException e) {
-    //处理异常
+    // 处理异常
     e.printStackTrace();
 } // PreparedStatement 和 Connection 自动关闭
 ```
 
 #### 3. 使用数据库操作工具或框架
 
-许多现代的数据库访问框架（如 Spring JDBC Template, MyBatis, Hibernate/JPA 等）提供了自身管理资源的方式，通常会自动处理连接的获取和释放。使用这些框架可以大大降低资源泄漏的风险。
+许多现代的数据库访问框架（如 Spring JDBC Template、MyBatis、Hibernate/JPA 等）提供了自身管理资源的方式，通常会自动处理连接的获取和释放。使用这些框架可以大大降低资源泄漏的风险。
 
 ```java
 // 使用 Spring JdbcTemplate 示例
@@ -95,7 +83,7 @@ List<User> users = jdbcTemplate.query(
     new Object[] { "active" },
     (rs, rowNum) -> new User(rs.getLong("id"), rs.getString("name"))
 );
-// 在这个例子中，JdbcTemplate 负责管理 Connection, Statement, ResultSet 的生命周期和关闭。
+// 在这个例子中，JdbcTemplate 负责管理 Connection、Statement、ResultSet 的生命周期和关闭。
 ```
 
 #### 4. 实现工具类统一关闭资源
@@ -158,16 +146,7 @@ $getConnection -{
 $safe<getPredecessors()> as $safeGetConnection;
 $getConnection - $safeGetConnection as $weak;
 alert $weak for {
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
-	level: "",
 	message: "检测到java.sql.Connection未释放资源",
-	title: "",
-	title_zh: "",
 }
 
 desc(

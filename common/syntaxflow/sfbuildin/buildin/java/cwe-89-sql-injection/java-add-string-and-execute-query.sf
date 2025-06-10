@@ -1,6 +1,6 @@
 desc(
-	title: "Check Java SQL Statement Concatenation"
-	title_zh: "检查 Java SQL 语句拼接"
+	title: "Check Java SQL Statement Concatenation Vulnerability"
+	title_zh: "检测 Java SQL 语句拼接漏洞"
 	risk:sqli
 	desc: <<<DESC
 ### 漏洞描述
@@ -119,17 +119,11 @@ $sqlConst?{<self>#>?{opcode: add}<var(op)> || <self>->?{opcode: add}<var(op)>};
 check $op;
 
 alert $op for {
-	desc: <<<CODE
-
-CODE
+	title: "SQL Statement Concatenation Detected",
+	title_zh: "SQL 字符串拼接位置：疑似 SQL 语句拼接并执行到数据库查询的代码",
 	level: "mid",
 	severity: "medium",
 	type: "audit",
-	title: "SQL Statement Concatenation Detected",
-	title_zh: "SQL 字符串拼接位置：疑似 SQL 语句拼接并执行到数据库查询的代码",
-	solution: <<<CODE
-
-CODE
 }
 
 

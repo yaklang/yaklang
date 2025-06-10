@@ -35,7 +35,7 @@ DESC
 none
 SOLUTION
 	reference: <<<REFERENCE
-none
+[CWE-20](https://cwe.mitre.org/data/definitions/20.html)
 REFERENCE
 )
 _POST.* as $param1
@@ -46,12 +46,6 @@ _COOKIE.* as $param4
 
 $param1 + $param2 + $param3 + $param4 + $extra as $output
 alert $output for {
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "low",
 	title: "Audit PHP Custom Extern Variable",
 	title_zh: "审计PHP自定义外部变量使用",

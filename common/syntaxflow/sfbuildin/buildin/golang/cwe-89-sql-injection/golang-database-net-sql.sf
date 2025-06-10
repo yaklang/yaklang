@@ -6,12 +6,11 @@ desc(
 ### 漏洞描述
 
 1. **漏洞原理**
-   SQL注入漏洞是一种严重的安全漏洞，它允许攻击者通过输入恶意的 SQL 代码来操纵后端数据库。在 Golang 中，如果开发者不正确地使用 `database/sql` 包，特别是当直接将用户输入拼接到 SQL 查询中时，就可能导致 SQL 注入漏洞。攻击者可以利用这个漏洞来绕过认证、访问或修改敏感数据，甚至执行数据库管理操作，如删除表或数据。
+   SQL注入漏洞是一种严重的安全漏洞，它允许攻击者通过输入恶意的SQL代码来操纵后端数据库。在Golang中，如果开发者不正确地使用`database/sql`包，特别是当直接将用户输入拼接到SQL查询中时，就可能导致SQL注入漏洞。例如，当用户输入未经过验证或参数化处理时，攻击者可以利用这些输入执行非预期的数据库操作，如数据泄露、篡改和权限绕过。
 
 2. **触发场景**
-   SQL 注入漏洞通常发生在以下场景：
-   - 用户输入被直接拼接到 SQL 查询字符串中，例如 `db.QueryRow("SELECT * FROM users WHERE username='" + username + "'")`。
-   - 未对用户输入进行参数化处理或验证，导致恶意输入被解释为 SQL 命令。
+   - 用户输入被直接拼接到SQL查询字符串中，例如：`db.QueryRow("SELECT * FROM users WHERE username='" + username + "'")`。
+   - 未对用户输入进行参数化处理或验证，导致恶意输入被解释为SQL命令。
 
    **示例代码**
    ```go
@@ -43,6 +42,7 @@ desc(
    - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
    - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
    - 通过数据库提权进一步渗透至服务器或其他系统组件。
+
 DESC
 	rule_id: "1c99dff2-ccc4-452a-8a95-2594dd2340d8"
 	title_zh: "检测Golang SQL注入漏洞"
@@ -87,7 +87,7 @@ DESC
    许多ORM框架（如GORM、Xorm等）默认提供安全机制来处理数据库操作，它们通常会自动执行参数化查询。
 
 3. **输入验证**
-   在将用户输入用于SQL查询之前，进行严格的输入验证和 sanitization。根据预期的输入类型（如数字、字符串）进行格式、长度和内容的合法性检查。
+   在将用户输入用于SQL查询之前，进行严格的输入验证和sanitization。根据预期的输入类型（如数字、字符串）进行格式、长度和内容的合法性检查。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')](https://cwe.mitre.org/data/definitions/89.html)
@@ -99,16 +99,95 @@ $sink.QueryRow( * #-> as $param);
 $param?{have: 'Parameter'} as $high;
 
 alert $high for {
-	desc: <<<CODE
+	type: "vuln",
+	title: "Check Golang SQL Injection Vulnerability",
+	title_zh: "检测Golang SQL注入漏洞",
+	solution: <<<CODE
+### 修复建议
 
+1. **使用参数化查询（Prepared Statements）**
+   通过使用预编译SQL语句和参数占位符，确保用户输入被视为数据而不是SQL代码的一部分，从而防止注入攻击。
+
+   ```go
+   // 修复代码示例
+   func login(w http.ResponseWriter, r *http.Request) {
+       username := r.FormValue("username")
+       password := r.FormValue("password")
+
+       db, err := sql.Open("mysql", "user:password@/dbname")
+       if err != nil {
+           log.Fatal(err)
+       }
+       defer db.Close()
+
+       // 安全的参数化查询
+       query := "SELECT * FROM users WHERE username = ? AND password = ?"
+       stmt, err := db.Prepare(query)
+       if err != nil {
+           log.Fatal(err)
+       }
+       defer stmt.Close()
+
+       var userID int
+       err = stmt.QueryRow(username, password).Scan(&userID)
+       if err != nil {
+           http.Error(w, "Invalid login", http.StatusUnauthorized)
+           return
+       }
+
+       fmt.Fprintf(w, "User ID: %!d(MISSING)", userID)
+   }
+   ```
+
+2. **使用ORM框架**
+   许多ORM框架（如GORM、Xorm等）默认提供安全机制来处理数据库操作，它们通常会自动执行参数化查询。
+
+3. **输入验证**
+   在将用户输入用于SQL查询之前，进行严格的输入验证和 sanitization。根据预期的输入类型（如数字、字符串）进行格式、长度和内容的合法性检查。
+CODE
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+   SQL注入漏洞是一种严重的安全漏洞，它允许攻击者通过输入恶意的 SQL 代码来操纵后端数据库。在 Golang 中，如果开发者不正确地使用 `database/sql` 包，特别是当直接将用户输入拼接到 SQL 查询中时，就可能导致 SQL 注入漏洞。攻击者可以利用这个漏洞来绕过认证、访问或修改敏感数据，甚至执行数据库管理操作，如删除表或数据。
+
+2. **触发场景**
+   SQL 注入漏洞通常发生在以下场景：
+   - 用户输入被直接拼接到 SQL 查询字符串中，例如 `db.QueryRow("SELECT * FROM users WHERE username='" + username + "'")`。
+   - 未对用户输入进行参数化处理或验证，导致恶意输入被解释为 SQL 命令。
+
+   **示例代码**
+   ```go
+   func login(w http.ResponseWriter, r *http.Request) {
+       username := r.FormValue("username")
+       password := r.FormValue("password")
+
+       // 不安全的 SQL 查询
+       query := fmt.Sprintf("SELECT * FROM users WHERE username='%!s(MISSING)' AND password='%!s(MISSING)'", username, password)
+
+       db, err := sql.Open("mysql", "user:password@/dbname")
+       if err != nil {
+           log.Fatal(err)
+       }
+       defer db.Close()
+
+       var userID int
+       err = db.QueryRow(query).Scan(&userID)
+       if err != nil {
+           http.Error(w, "Invalid login", http.StatusUnauthorized)
+           return
+       }
+
+       fmt.Fprintf(w, "User ID: %!d(MISSING)", userID)
+   }
+   ```
+
+3. **潜在影响**
+   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+   - 通过数据库提权进一步渗透至服务器或其他系统组件。
 CODE
 	level: "high",
-	type: "vuln",
-	title: "SQL Injection detected",
-	title_zh: "检测到SQL注入",
-	solution: <<<CODE
-
-CODE
 }
 
 desc(

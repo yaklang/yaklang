@@ -15,7 +15,6 @@ desc(
    以下是一个可能存在过滤绕风险的代码示例：
    ```java
    private String clearXss(String value) {
-
        if (value == null || "".equals(value)) {
            return value;
        }
@@ -105,12 +104,6 @@ $paramEntry.../(?i)replace(all)?/() as $replacers;
 
 check $entryCall then "Find XSS Escaper" else "No XSS Escaper";
 alert $entryCall for {
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "low",
 	title: "Audit Java XSS Filter Bypass",
 	title_zh: "审计 Java XSS 白名单绕过",

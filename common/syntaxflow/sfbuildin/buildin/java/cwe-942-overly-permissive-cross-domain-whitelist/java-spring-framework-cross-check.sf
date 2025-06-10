@@ -92,12 +92,6 @@ $co.origins?{=="*"} as $result;
 alert $result for {
 	title: "Check Java Spring Framework Overly Permissive Cross-Domain Whitelist",
 	title_zh: "检测Java Spring Framework跨域白名单过于宽松",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "low",
 	message: "发现Java Spring Framework跨域白名单过于宽松",
 }

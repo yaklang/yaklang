@@ -54,6 +54,7 @@ desc(
    * 泄露系统资源，导致性能下降甚至服务不可用（拒绝服务）。
    * 数据处理流程出错，可能导致数据丢失、损坏或不一致。
    * 在特定上下文中，可能为攻击者利用其他漏洞创造可乘之机。
+
 DESC
 	rule_id: "a3cccdec-1f7c-4392-81fc-a28ad6cfccd2"
 	solution: <<<SOLUTION
@@ -130,17 +131,11 @@ REFERENCE
 /^(supportsCrossJoin|supportsFullJoin|supportsInnerJoin|supportsLeftOuterJoin|supportsRightOuterJoin|getShowDeleted|getEscapeProcessing|isReadOnly|getAutoCommit|supportsUpdatableView|is*)$/<getCall> as $toCheck;
 $toCheck?{<typeName>?{have:'javax.sql.rowset'}}?{!<getUsers>} as $weak;
 alert $weak for {
-	title: "Check Java Javax Sql Rowset Unchecked Return Value",
-	title_zh: "检测Java javax.sql.rowset库未检查返回值的API",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "info",
 	message: "发现Java javax.sql.rowset库未检查返回值的API",
 	risk: "api-abuse",
+	title: "Check Java Javax Sql Rowset Unchecked Return Value",
+	title_zh: "检测Java javax.sql.rowset库未检查返回值的API",
 }
 
 desc(

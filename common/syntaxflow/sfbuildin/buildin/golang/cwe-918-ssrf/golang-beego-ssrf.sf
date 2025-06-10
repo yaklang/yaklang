@@ -1,17 +1,122 @@
 desc(
-	title: "golang SSRF(beego)"
-	title_zh: "golang 服务器端请求伪造(beego)",
+	title: "Detect Golang SSRF Vulnerability in Beego Framework"
+	title_zh: "检测Golang Beego框架中的SSRF漏洞"
 	type: vuln
 	severity: mid
 	risk: ssrf
-	desc: <<<TEXT
-服务器端请求伪造（Server-Side Request Forgery, SSRF）漏洞（CWE-918）允许攻击者诱导服务器对内部或外部网络地址发起请求。在 Go 语言应用中，如果应用从用户输入中读取 URL 并直接发起 HTTP 请求，而没有对 URL 进行充分的验证和过滤，就可能导致 SSRF 漏洞。攻击者可以利用此漏洞绕过防火墙、扫描内网、攻击内网其他应用或进行端口扫描等，从而获取敏感信息或进一步控制服务器。
+	desc: <<<DESC
+### 漏洞描述
 
-SSRF 漏洞通常发生在以下场景：
-1. 应用程序从用户输入中获取 URL 并直接用于发起 HTTP 请求，例如 `http.Get(url)`。
-2. 未对目标 URL 进行验证，导致攻击者可以构造恶意 URL，使服务器请求内部网络或敏感服务。
-TEXT
+1. **漏洞原理**
+   服务器端请求伪造（Server-Side Request Forgery, SSRF）漏洞（CWE-918）允许攻击者诱导服务器对内部或外部网络地址发起请求。在Go语言应用中，如果应用程序从用户输入中读取URL并直接发起HTTP请求，而没有对目标URL进行充分验证和过滤，就可能导致SSRF漏洞。通过此漏洞，攻击者可以绕过防火墙、扫描内网、访问敏感服务或进行端口扫描等。
+
+2. **触发场景**
+   以下是一个存在SSRF漏洞的代码示例：
+   ```go
+   package main
+
+   import (
+       "net/http"
+       "io/ioutil"
+       beego "github.com/beego/beego/v2/server/web"
+   )
+
+   type SSRFVuln1Controller struct {
+       beego.Controller
+   }
+
+   func (c *SSRFVuln1Controller) Get() {
+       url := c.GetString("url", "http://www.example.com")
+       res, err := http.Get(url)
+       if err != nil {
+           panic(err)
+       }
+       defer res.Body.Close()
+       body, err := ioutil.ReadAll(res.Body)
+       if err != nil {
+           panic(err)
+       }
+       c.Ctx.ResponseWriter.Write(body)
+   }
+   ```
+   攻击者可以通过传入恶意URL，例如`http://localhost:2375/containers/json`，使服务器请求内部Docker守护进程，从而泄露敏感信息。
+
+3. **潜在影响**
+   - 绕过防火墙限制，访问内部资源。
+   - 扫描内部网络，获取其他敏感服务的信息。
+   - 发起端口扫描，进一步渗透到内部系统。
+   - 窃取敏感数据或控制内部关键服务。
+
+DESC
 	rule_id: "08ce9bcf-71ed-4839-8732-01e8a533a1a3"
+	reference: <<<REFERENCE
+[CWE-918](https://cwe.mitre.org/data/definitions/918.html)
+[SSRF漏洞详解](https://owasp.org/www-community/attacks/Server_Side_Request_Forgery)
+REFERENCE
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 对用户输入的URL进行严格校验
+   验证用户输入的URL是否符合预期的格式，例如仅允许特定域名或IP范围，并拒绝非法输入。
+   ```go
+   import (
+       "net/url"
+       "regexp"
+   )
+
+   func isValidURL(input string) bool {
+       parsedURL, err := url.Parse(input)
+       if err != nil {
+           return false
+       }
+       // 允许的域名列表
+       allowedDomains := []string{"example.com"}
+       for _, domain := range allowedDomains {
+           matched, _ := regexp.MatchString(domain, parsedURL.Hostname())
+           if matched {
+               return true
+           }
+       }
+       return false
+   }
+   ```
+
+#### 2. 使用白名单机制
+   定义一个可信的域名或IP地址白名单，仅允许访问白名单内的目标。
+   ```go
+   var whitelist = map[string]bool{
+       "example.com": true,
+       "api.trusted.com": true,
+   }
+
+   func isWhitelisted(host string) bool {
+       return whitelist[host]
+   }
+   ```
+
+#### 3. 禁止访问本地和私有IP地址
+   在发起请求之前，检查目标地址是否为本地或私有IP地址。
+   ```go
+   import (
+       "net"
+   )
+
+   func isPrivateIP(ip string) bool {
+       parsedIP := net.ParseIP(ip)
+       for _, cidr := range []string{"127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"} {
+           _, ipNet, _ := net.ParseCIDR(cidr)
+           if ipNet.Contains(parsedIP) {
+               return true
+           }
+       }
+       return false
+   }
+   ```
+
+#### 4. 使用安全库或代理
+   考虑使用专门的安全库（如OWASP提供的工具）或通过代理层来隔离和验证所有对外部的请求。
+
+SOLUTION
 )
 
 <include('golang-http-source')> as $source 
@@ -29,16 +134,10 @@ $param #{
 }-> as $mid 
 
 alert $mid for {
-	desc: <<<CODE
-
-CODE
-	level: "mid",
 	type: "vuln",
 	title: "SSRF detected",
 	title_zh: "检测到SSRF",
-	solution: <<<CODE
-
-CODE
+	level: "mid",
 }
 
 desc(

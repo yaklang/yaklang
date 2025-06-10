@@ -23,129 +23,89 @@ DESCRIPTION
 大多数现代应用服务器都提供了 JCA (Java EE Connector Architecture) WorkManager，它允许应用程序通过容器管理的线程池异步执行任务。这是在 J2EE 应用中执行异步操作的标准和推荐方式。
 
 ```java
-    // 示例：通过 WorkManager 提交任务
-    // 需要在部署描述符中配置 WorkManager 资源
-    @Resource(lookup = "java:comp/env/wm/MyWorkManager") // 查找 WorkManager
-    private WorkManager workManager;
+// 示例：通过 WorkManager 提交任务
+@Resource(lookup = "java:comp/env/wm/MyWorkManager") // 查找 WorkManager
+private WorkManager workManager;
 
-    public class MyServlet extends HttpServlet {
-        protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
-            try {
-                Work task = new MyWork(); // 实现 org.jboss.resource.adapter.work.Work 接口
-                workManager.scheduleWork(task); // 提交任务给容器管理的线程池
-            } catch (WorkException e) {
-                e.printStackTrace();
-                // 处理异常
-            }
+public class MyServlet extends HttpServlet {
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+        try {
+            Work task = new MyWork(); // 实现 org.jboss.resource.adapter.work.Work 接口
+            workManager.scheduleWork(task); // 提交任务给容器管理的线程池
+        } catch (WorkException e) {
+            e.printStackTrace();
         }
     }
+}
 
-    class MyWork implements org.jboss.resource.adapter.work.Work {
-        @Override
-        public void run() {
-            // 在容器管理的线程中执行任务逻辑
-            System.out.println("Executing task in WorkManager thread");
-        }
-
-        @Override
-        public void release() {
-            // 清理资源
-        }
+class MyWork implements org.jboss.resource.adapter.work.Work {
+    @Override
+    public void run() {
+        // 在容器管理的线程中执行任务逻辑
+        System.out.println("Executing task in WorkManager thread");
     }
+
+    @Override
+    public void release() {
+        // 清理资源
+    }
+}
 ```
 
-#### 2. 使用异步 Servlet (N/A)
-
-对于需要长时间运行的请求，可以考虑使用 Servlet 3.0+ 引入的异步处理 API，避免阻塞容器线程。但这不适用于在业务逻辑中创建新的背景线程。
-
-#### 3. 使用 Java EE Concurrency Utilities
+#### 2. 使用 Java EE Concurrency Utilities
 
 Java EE 7 引入了 Concurrency Utilities (JSR 236)，提供了 `ManagedExecutorService`, `ManagedScheduledExecutorService`, `ManagedThreadFactory` 和 `ManagedTask` 等接口，允许应用程序安全地使用容器管理的线程池。
 
 ```java
-    // 示例：使用 ManagedExecutorService
-    @Resource // 注入 ManagedExecutorService
-    private ManagedExecutorService executorService;
+@Resource // 注入 ManagedExecutorService
+private ManagedExecutorService executorService;
 
-    public class AnotherServlet extends HttpServlet {
-        protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
-             executorService.submit(() -> {
-                 // 在容器管理的线程中执行异步任务
-                 System.out.println("Executing task in ManagedExecutorService thread");
-             });
-        }
+public class AnotherServlet extends HttpServlet {
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+         executorService.submit(() -> {
+             // 在容器管理的线程中执行异步任务
+             System.out.println("Executing task in ManagedExecutorService thread");
+         });
     }
+}
 ```
 
-#### 4. 避免使用 ThreadLocal
+#### 3. 避免使用 ThreadLocal
 
 在 J2EE 组件中应避免使用 `ThreadLocal`，因为它可能导致在线程池复用线程时数据混乱。如果需要线程局部的数据，考虑使用请求范围或会话范围的对象来存储上下文信息。
-
-#### 5. 避免调用不推荐的 Thread 方法
-
-永远不要在 J2EE 组件中调用 `Thread.stop()`, `Thread.suspend()`, `Thread.resume()` 等方法，它们已经被废弃且非常危险。对于 `Thread.sleep()` 和 `Thread.yield()`，虽然它们不一定直接导致容器问题，但在 Web 请求处理线程中长时间休眠或频繁让步通常表明设计问题，应考虑异步处理或其他方式来避免阻塞。
-
-总之，在 J2EE 环境下，应优先使用平台提供的并发管理工具，而不是直接操作底层线程。
 SOLUTION
 )
 
 Thread()?{<typeName>?{have:'java.lang.Thread'}} as $thread;
 Thread?{<typeName>?{have:'java.lang.Thread'}}.currentThread() as $thread;
 alert $thread for {
+	message: "检测到Java项目中使用了Thread类",
 	title: "Unmanaged Thread Usage",
 	title_zh: "未管理线程使用",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "info",
-	message: "检测到Java项目中使用了Thread类",
 }
 
 ThreadLocal()?{<typeName>?{have:'java.lang.ThreadLocal'}} as $threadLocal;
 alert $threadLocal for {
-	desc: <<<CODE
-
-CODE
-	level: "info",
-	message: "检测到Java项目中使用了ThreadLocal类",
 	title: "ThreadLocal Usage",
 	title_zh: "ThreadLocal使用",
-	solution: <<<CODE
-
-CODE
+	level: "info",
+	message: "检测到Java项目中使用了ThreadLocal类",
 }
 
 $thread./^(destroy|interrupt|join|resume|start|stop|suspend)$/ as $weak;
 // Thread.sleep
 Thread./^(sleep|yield)$/?{<typeName>?{have:'java.lang'}} as $weak;
 alert $weak for {
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
-	level: "info",
-	message: "检测到Java项目中使用了Thread类的destroy、interrupt、join、resume、sleep、start、stop、suspend或yield方法",
 	title: "Deprecated Thread Methods",
 	title_zh: "废弃的线程方法",
+	level: "info",
+	message: "检测到Java项目中使用了Thread类的destroy、interrupt、join、resume、sleep、start、stop、suspend或yield方法",
 }
 
 run?{opcode:function}<getInterfaceBlueprint>?{have:'Runnable'} as $run
 alert $run for {
-	title_zh: "",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
-	level: "",
 	message: "检测到Java项目中使用了Runnable接口并且实现了run方法",
-	title: "",
 }
 
 desc(

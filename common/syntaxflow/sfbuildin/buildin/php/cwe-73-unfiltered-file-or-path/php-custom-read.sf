@@ -1,7 +1,7 @@
 
 desc(
-	title: "Check PHP Unfiltered Directory Reading"
-	title_zh: "检测PHP未过滤目录读取"
+	title: "Check PHP Unfiltered Directory Reading Vulnerability"
+	title_zh: "检测PHP未过滤目录读取漏洞"
 	risk: "audit"
 	level: "low"
 	desc: <<<DESC
@@ -82,15 +82,9 @@ CODE
 }->} as $sink
 
 alert $sink for {
-	title_zh: "PHP未过滤目录读取漏洞",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
-	level: "high",
 	title: "PHP Unfiltered Directory Reading Vulnerability",
+	title_zh: "PHP未过滤目录读取漏洞",
+	level: "high",
 }
 desc(
 	lang: "php"

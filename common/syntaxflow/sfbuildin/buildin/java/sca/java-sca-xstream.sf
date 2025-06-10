@@ -16,8 +16,8 @@ desc(
    String maliciousXml = "<sorted-set>
      <dynamic-proxy>
        <interface>java.lang.Comparable</interface>
-       <handler class="beans. infections. FunkyBeanFactory">
-         <target class="java.lang.Runtime"/>
+       <handler class=\"beans.infections.FunkyBeanFactory\">
+         <target class=\"java.lang.Runtime\"/>
          <methodName>exec</methodName>
          <params>
            <string>touch /tmp/vulnerable</string>
@@ -85,12 +85,6 @@ REFERENCE
 __dependency__.*xstream.version as $ver;
 $ver in [1.4.11.1,1.4.17] as $vuln_xstream;
 alert $vuln_xstream for {
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "high",
 	cve: "CVE-2021-39152",
 	message: "SCA: xstream versions between 1.4.11.1 and 1.4.17 have multiple deserialization vulnerabilities",

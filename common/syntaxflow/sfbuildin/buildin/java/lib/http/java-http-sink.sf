@@ -11,22 +11,85 @@ desc(
 ### 规则详细
 该规则属于库规则（`lib`类型），旨在提供一个集中的列表，列举多种常见Java库和API中用于发起HTTP请求或处理URL的关键方法调用。这些方法通常是SSRF漏洞链的末端。该规则通过包含以下子规则来实现此目的：
 
-1.  `java-alibaba-druid-httpclientutil`: 识别Alibaba Druid库中的HttpClientUtil相关方法。
-2.  `java-apache-commons-httpclient`: 识别Apache Commons HttpClient库的相关方法。
-3.  `java-apache-http-request-url`: 识别Apache HttpComponents库中处理请求URL的方法。
-4.  `java-http-fluent-request`: 识别Apache HttpClients Fluent API的相关方法。
-5.  `java-image-io-read-url`: 识别javax.imageio.ImageIO.read()方法，该方法可以直接从URL读取图像，是潜在的SSRF触发点。
-6.  `java-net-url-connect`: 识别java.net.URL.openConnection()和java.net.URL.openStream()等方法，这些是Java标准库中发起HTTP连接的基本方式。
-7.  `java-okhttpclient-request-execute`: 识别OkHttpClient库中发起请求的方法。
-8.  `java-spring-rest-template-request-params`: 识别Spring RestTemplate中处理请求参数的方法。
+1. `java-alibaba-druid-httpclientutil`: 识别Alibaba Druid库中的HttpClientUtil相关方法。
+2. `java-apache-commons-httpclient`: 识别Apache Commons HttpClient库的相关方法。
+3. `java-apache-http-request-url`: 识别Apache HttpComponents库中处理请求URL的方法。
+4. `java-http-fluent-request`: 识别Apache HttpClients Fluent API的相关方法。
+5. `java-image-io-read-url`: 识别javax.imageio.ImageIO.read()方法，该方法可以直接从URL读取图像，是潜在的SSRF触发点。
+6. `java-net-url-connect`: 识别java.net.URL.openConnection()和java.net.URL.openStream()等方法，这些是Java标准库中发起HTTP连接的基本方式。
+7. `java-okhttpclient-request-execute`: 识别OkHttpClient库中发起请求的方法。
+8. `java-spring-rest-template-request-params`: 识别Spring RestTemplate中处理请求参数的方法。
 
 将这些常见的HTTP请求下沉点集中在一个规则中，可以方便地与其他污点跟踪规则（比如追踪来自用户输入的污点）结合使用，构建完整的SSRF漏洞检测链。当来自不受信任来源的数据流入这些下沉点时，就可能存在SSRF漏洞。
+
+#### 示例代码
+```java
+package src.main.b;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.net.URL;
+
+public class ImageDownloadExample {
+    public static void main(String[] args) {
+        try {
+            URL imageUrl = new URL("http://example.com/image.jpg");
+            BufferedImage image = ImageIO.read(imageUrl);
+        } catch (IOException e) {
+            System.out.println("Error occurred while trying to read the image.");
+        }
+    }
+}
+```
 DESC
 	solution: <<<SOLUTION
-none
+### 修复建议
+
+#### 1. 验证并过滤用户输入
+在任何情况下都不应直接使用未经验证的用户输入作为URL的一部分。可以使用白名单机制对输入进行校验，确保其符合预期格式。
+```java
+// 示例：校验URL是否为允许的域名
+private boolean isValidUrl(String url) {
+    try {
+        URL parsedUrl = new URL(url);
+        String host = parsedUrl.getHost();
+        return host.endsWith(".example.com"); // 允许的域名后缀
+    } catch (Exception e) {
+        return false; // 解析失败视为非法
+    }
+}
+```
+
+#### 2. 使用内部DNS解析
+对于必须访问外部资源的情况，可以通过内部DNS解析服务限制目标地址范围，避免直接连接到恶意IP。
+
+#### 3. 禁止私有网络访问
+如果应用程序不需要访问内部网络资源，则可以在防火墙或代理层面禁止对私有IP段（如`10.x.x.x`, `192.168.x.x`等）的访问。
+
+#### 4. 对敏感操作增加日志记录
+在发起外部请求之前，将完整的目标URL记录到日志中供后续审计。
+```java
+// 示例：记录目标URL
+logger.info("Attempting to access external resource: " + url);
+```
+
+#### 5. 使用安全的HTTP客户端封装
+创建统一的安全HTTP客户端工具类，在其中集成上述防护措施，强制所有外部请求都经过这个封装。
+```java
+public class SecureHttpClient {
+    public static String fetchResource(String url) throws IOException {
+        if (!isValidUrl(url)) {
+            throw new IllegalArgumentException("Invalid URL detected");
+        }
+        // 安全地发起请求
+        return new OkHttpClient().newCall(new Request.Builder().url(url).build()).execute().body().string();
+    }
+}
+```
 SOLUTION
 	reference: <<<REFERENCE
-none
+[CWE-918: Server-Side Request Forgery (SSRF)](https://cwe.mitre.org/data/definitions/918.html)
+[OWASP SSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html)
 REFERENCE
 )
 
@@ -39,12 +102,6 @@ REFERENCE
 <include('java-okhttpclient-request-execute')> as $output;
 <include('java-spring-rest-template-request-params')> as $output
 alert $output for {
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "mid",
 	title: "Find HTTP Sink in Java (Multiple Libraries)",
 	title_zh: "查找Java中的HTTP Sink (多库)",

@@ -6,7 +6,7 @@ desc(
 ### 漏洞描述
 
 1. **漏洞原理**
-   此规则用于检查Java项目中是否存在aspectjweaver库的已知漏洞版本。aspectjweaver是一个用于Java的AOP（面向切面编程）库，它允许开发者在不修改源代码的情况下向程序添加横切关注点。如果项目中使用的aspectjweaver版本低于1.9.6，则可能存在反射性文件下载漏洞（CVE-2020-5398），该漏洞是由于在处理某些特殊输入时，aspectjweaver未对用户提供的文件名进行充分的安全校验，导致攻击者可以构造恶意的文件名，利用反射机制下载并执行任意文件，从而危害系统的安全性。
+   此规则用于检查Java项目中是否存在aspectjweaver库的已知漏洞版本。aspectjweaver是一个用于Java的AOP（面向切面编程）库，它允许开发者在不修改源代码的情况下向程序添加横切关注点。如果项目中使用的aspectjweaver版本低于1.9.6，则可能存在反射性文件下载漏洞（CVE-2020-5398）。该漏洞是由于在处理某些特殊输入时，aspectjweaver未对用户提供的文件名进行充分的安全校验，导致攻击者可以构造恶意的文件名，利用反射机制下载并执行任意文件，从而危害系统的安全性。
 
 2. **触发场景**
    当攻击者可以控制加载到使用存在漏洞版本的aspectjweaver库的应用中的某些数据或配置时，即可触发该漏洞。攻击者可以构造特定的输入，使得应用在处理时触发反射性文件下载逻辑，下载并执行恶意文件。具体的触发方式取决于应用如何集成和使用aspectjweaver以及攻击者可控的输入点。
@@ -55,15 +55,9 @@ REFERENCE
 __dependency__.*aspectjweaver.version as $ver;
 $ver in (,1.9.5] as $vuln_aspectjweaver;
 alert $vuln_aspectjweaver for {
-	message: "SCA: aspectjweaver version 1.9.5 has a reflective file download vulnerability",
 	cve: "CVE-2020-5398",
 	title: "SCA: Check Java Aspectjweaver Vulnerability",
 	title_zh: "SCA: 检测Java Aspectjweaver 依赖漏洞",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "mid",
+	message: "SCA: aspectjweaver version 1.9.5 has a reflective file download vulnerability",
 }

@@ -4,7 +4,7 @@ desc(
 	type: audit
 	desc: <<<DESC
 ### 规则目的
-该规则旨在于查找Java代码中第三方库中可能导致命令执行的Sink点。通过识别对`java-command-exec-sink`库的引用以及特定的第三方库（如Apache Commons Exec、Picocli、System-Command-Executor、zt-exec、NuProcess、org.apache.hadoop.util.Shell等）中用于执行外部命令的方法，本规则旨在帮助开发者和安全审计人员发现潜在的命令执行漏洞。
+该规则旨在查找Java代码中第三方库中可能导致命令执行的Sink点。通过识别对`java-command-exec-sink`库的引用以及特定的第三方库（如Apache Commons Exec、Picocli、System-Command-Executor、zt-exec、NuProcess、org.apache.hadoop.util.Shell等）中用于执行外部命令的方法，本规则旨在帮助开发者和安全审计人员发现潜在的命令执行漏洞。
 
 ### 规则详细
 1. **作为基础检测库**
@@ -77,10 +77,7 @@ ProcessBuilder pb = new ProcessBuilder("cat", userInput);
 对所有涉及执行外部命令的代码进行严格的安全审查，特别关注数据流，确保不受信任的数据不会流入命令执行点。
 SOLUTION
 	reference: <<<REFERENCE
-[
-  {"name": "OWASP Command Injection", "url": "https://owasp.org/www-community/attacks/Command_Injection"},
-  {"name": "CWE-78: Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')", "url": "https://cwe.mitre.org/data/definitions/78.html"}
-]
+[{"name": "OWASP Command Injection", "url": "https://owasp.org/www-community/attacks/Command_Injection"}, {"name": "CWE-78: Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')", "url": "https://cwe.mitre.org/data/definitions/78.html"}]
 REFERENCE
 )
 
@@ -114,15 +111,9 @@ $apacheCommandLine as $output;
 $ztExecParam as $output;
 
 alert $output for {
+	level: "mid",
 	title: "Detect Java Thirdparty CommandLine Executing Sink",
 	title_zh: "查找Java第三方库命令执行Sink",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
-	level: "mid",
 }
 
 

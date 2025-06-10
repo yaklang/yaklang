@@ -55,29 +55,22 @@ DESCRIPTION
            return addr.isSiteLocalAddress();
        }
 
-       private void grantAccess() {// ...}
-       private void denyAccess() {// ...}
+       private void grantAccess() { /* ... */ }
+       private void denyAccess() { /* ... */ }
    }
    ```
    **请注意**：仅仅基于IP地址进行认证也不总是完全安全的，因为IP地址可以被欺骗或通过代理转发。最安全的做法是结合多种认证和授权机制。
-
 SOLUTION
 	rule_id: "7501f545-a313-4bb7-b6bb-48aab80cb284"
 )
 
 InetAddress?{<typeName>?{have:'java.net'}}./(get.*By.*|getLocalHost|getLoopbackAddress)/ as $weak;
 alert $weak for {
+	title: "Check Java java.net.InetAddress DNS Lookup",
 	title_zh: "检测Java java.net.InetAddress 进行DNS查询",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "low",
 	message: "发现Java java.net.InetAddress 进行DNS查询",
 	risk: "api-abuse",
-	title: "Check Java java.net.InetAddress DNS Lookup",
 }
 
 

@@ -3,24 +3,13 @@ desc(
 	type: audit
 	lib: "java-net-url-connect"
 	desc: <<<DESC
-### 1. 规则目的
-该规则用于审计Java代码中使用`java.net.URL.openConnection()`或`java.net.URL.openStream()`方法的场景。这些方法用于建立网络连接，但也可能引入安全风险，需要审计其使用以确保采用了安全实践。
+### 漏洞描述
 
-### 2. 规则详细
-1. **作为基础审计库**
-   属于`java-net-url-connect`库规则（`lib`类型），主要用于识别代码中调用了`openConnection()`或`openStream()`方法的关键点。
+1. **漏洞原理**
+   `java.net.URL.openConnection()` 和 `java.net.URL.openStream()` 方法在建立网络连接时，如果未对输入的URL进行严格校验或处理，可能导致SSRF（服务器端请求伪造）等安全问题。攻击者可能利用这些方法访问内部资源、绕过防火墙或发起拒绝服务攻击。
 
-2. **潜在风险点**
-   *   **未验证输入**: 如果URL是基于用户输入构造的，未经验证可能导致SSRF（服务器端请求伪造）或其他与网络相关的攻击。
-   *   **未处理异常**: 缺乏适当的异常处理可能导致应用程序中断或泄露敏感信息。
-   *   **未使用安全连接**: 默认使用HTTP而不是HTTPS连接可能导致敏感数据在传输过程中被窃取或篡改。
-   *   **未设置连接超时**: 未设置超时参数可能导致应用程序长时间等待响应，引起拒绝服务问题。
-
-3. **审计范围**
-   规则重点审计`URL.openConnection()`和`URL.openStream()`方法的调用。
-
-**触发场景示例:**
-```java
+2. **触发场景**
+   ```java
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -53,6 +42,13 @@ public class HttpGetExample {
     }
 }
 ```
+   在上述代码中，`openConnection()` 调用未验证用户提供的URL，且未设置连接超时参数，导致潜在的安全风险。
+
+3. **潜在影响**
+   - 攻击者可以伪造恶意请求访问内部系统资源（如Redis、数据库、文件系统等），造成敏感信息泄露。
+   - 缺乏超时设置可能引发拒绝服务攻击，影响应用程序稳定性。
+   - 使用不安全协议（如HTTP）传输数据可能导致中间人攻击或数据被窃取。
+
 DESC
 	rule_id: "ac4cd901-cba2-4e21-86fa-7eb6d68c834c"
 	title_zh: "审计Java URL连接使用"
@@ -67,7 +63,6 @@ DESC
 
 #### 3. 设置连接超时和读取超时
 设置适当的超时时间，避免因为网络问题导致长时间等待，影响应用程序可用性。
-
 ```java
 // 修复代码示例：设置超时时间
 import java.net.HttpURLConnection;
@@ -83,7 +78,6 @@ connection.setReadTimeout(5000);    // 设置读取超时5秒
 
 #### 4. 完善异常处理
 捕获并处理可能发生的各种IOException，或使用try-with-resources语句确保资源正确关闭。
-
 ```java
 // 修复代码示例：使用try-with-resources关闭资源
 import java.io.BufferedReader;
@@ -128,21 +122,15 @@ try {
 结合检测SSRF、路径遍历等相关安全规则，对URL的构造来源和使用方式进行全面审计。
 SOLUTION
 	reference: <<<REFERENCE
-none
+[CWE-918: Server-Side Request Forgery (SSRF)](https://cwe.mitre.org/data/definitions/918.html)
 REFERENCE
 )
 
 URL?{<getCall>?{.openConnection() || .openStream()}}(,* as $output);
 alert $output for {
-	desc: <<<CODE
-
-CODE
-	level: "info",
 	title: "Audit Java URL Connection Use",
 	title_zh: "审计Java URL连接使用",
-	solution: <<<CODE
-
-CODE
+	level: "info",
 }
 
 

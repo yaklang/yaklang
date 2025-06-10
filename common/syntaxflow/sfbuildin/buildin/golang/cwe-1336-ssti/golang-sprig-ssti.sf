@@ -1,15 +1,118 @@
 desc(
-	title: "golang SSTI(sprig)"
-	title_zh: "golang SSTI 漏洞(sprig)",
+	title: "Detect Golang SSTI Vulnerability with Sprig"
+	title_zh: "检测Golang中使用Sprig的SSTI漏洞"
 	type: vuln
 	severity: low
 	risk: ssti
-	desc: <<<TEXT
-在 Go 语言中，CWE-1336（Server-Side Template Injection, SSTI）漏洞通常发生在使用模板引擎时，未对用户输入进行严格过滤，导致攻击者可以注入恶意代码。SSTI 漏洞可能导致任意代码执行、敏感信息泄露或服务中断，因此属于高风险漏洞。
+	desc: <<<DESC
+### 漏洞描述
 
-Sprig 函数库风险：sprig.FuncMap() 提供了大量内置函数（如文件操作、系统命令执行等），攻击者可能利用这些函数执行任意代码。
-TEXT
+1. **漏洞原理**
+   在Go语言中，CWE-1336（Server-Side Template Injection, SSTI）漏洞通常发生在使用模板引擎时，未对用户输入进行严格过滤，导致攻击者可以注入恶意代码。这种漏洞可能导致任意代码执行、敏感信息泄露或服务中断，因此属于高危漏洞。
+
+   Sprig函数库风险：`sprig.FuncMap()` 提供了大量内置函数（如文件操作、系统命令执行等），攻击者可能利用这些函数执行任意代码。
+
+2. **触发场景**
+   ```go
+package main
+
+import (
+	"bytes"
+	"html/template"
+	"io/ioutil"
+	"os"
+	"github.com/Masterminds/sprig"
+)
+
+func main() {
+	usertemplate := "{{ . | sprigFunc }}"
+	t := template.New("ssti").Funcs(sprig.FuncMap())
+	t, _ = t.Parse(usertemplate)
+	buff := bytes.Buffer{}
+	err := t.Execute(&buff, struct{}{})
+	if err != nil {
+		panic(err)
+	}
+	data, err := ioutil.ReadAll(&buff)
+	if err != nil {
+		panic(err)
+	}
+	println(string(data))
+}
+   ```
+   攻击者可以通过提交类似 `{{ getenv "SECRET_KEY" }}` 的模板语法，提取环境变量中的敏感数据，或者通过执行操作系统命令实现远程代码执行。
+
+3. **潜在影响**
+   - 敏感信息泄露（如配置文件、环境变量等）。
+   - 任意代码执行，完全控制目标服务器。
+   - 服务中断，例如通过无限循环或删除关键文件导致拒绝服务。
+
+DESC
 	rule_id: "017cae33-9b73-4470-9e98-adbdd10dbc3a"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 输入校验与过滤
+   对所有用户输入的数据进行严格的校验和过滤，避免直接将用户输入传递给模板解析引擎。
+   ```go
+package main
+
+import (
+	"regexp"
+	"net/http"
+)
+
+func validateInput(input string) bool {
+	// 禁止包含模板语法符号
+	matched, _ := regexp.MatchString(`\{\{.*\}\}`, input)
+	return !matched
+}
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	input := r.FormValue("template")
+	if !validateInput(input) {
+		http.Error(w, "Invalid input", http.StatusBadRequest)
+		return
+	}
+	// 安全处理逻辑
+}
+   ```
+
+#### 2. 使用沙箱模式
+   配置模板引擎以限制其功能，例如禁止危险函数的调用。
+   ```go
+package main
+
+import (
+	"html/template"
+	"net/http"
+)
+
+func safeTemplate() *template.Template {
+	funcs := template.FuncMap{
+		"safeFunc": func(input string) string {
+			// 仅允许安全操作
+			return "Safe: " + input
+		},
+	}
+	return template.New("safe").Funcs(funcs)
+}
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	t := safeTemplate()
+	t.Parse(r.FormValue("template"))
+	t.Execute(w, nil)
+}
+   ```
+
+#### 3. 避免使用高危库
+   如果不需要复杂功能，尽量避免引入像 `sprig` 这样的高危库，选择功能性更小、安全性更高的替代品。
+
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-1336](https://cwe.mitre.org/data/definitions/1336.html)
+[Server-Side Template Injection](https://portswigger.net/research/server-side-template-injection)
+REFERENCE
 )
 
 <include('golang-template')> as $sink;
@@ -19,16 +122,95 @@ $new().Funcs(* as $param);
 $param?{have: 'sprig'} as $low;
 
 alert $low for {
-	type: "vuln",
 	title: "SSTI detected",
 	title_zh: "检测到SSTI",
 	solution: <<<CODE
+### 修复建议
 
+#### 1. 避免直接使用用户输入作为模板内容
+通过避免直接将未经验证的用户输入传递给模板引擎，可以有效防止SSTI漏洞。
+
+```go
+// 示例：对用户输入进行严格的验证和过滤
+usertemplate := c.GetString("template", "default-template")
+if !isValidTemplate(usertemplate) { // 自定义验证函数
+    return errors.New("invalid template content")
+}
+```
+
+#### 2. 使用安全模板配置
+对于Go语言中的Sprig库，可以通过限制其提供的函数集来降低风险。例如，仅允许有限的安全函数。
+
+```go
+// 示例：限制Sprig函数范围
+safeFuncs := sprig.GenericFuncMap() // 仅使用通用安全函数
+safeFuncs["env"] = nil // 禁用敏感函数
+
+t := template.New("ssti").Funcs(safeFuncs)
+t, _ = t.Parse(usertemplate)
+```
+
+#### 3. 沙盒机制
+在执行模板时，考虑引入沙盒机制以隔离潜在的恶意代码执行环境。
+
+```go
+// 示例：使用第三方沙盒工具（如seccomp）
+sandbox.Run(func() {
+    err := t.Execute(&buff, struct{}{})
+    if err != nil {
+        panic(err)
+    }
+})
+```
 CODE
 	desc: <<<CODE
+### 漏洞描述
 
+1. **漏洞原理**
+   在Go语言中，CWE-1336（Server-Side Template Injection, SSTI）漏洞通常发生在使用模板引擎时，未对用户输入进行严格过滤，导致攻击者可以注入恶意代码。SSTI漏洞可能导致任意代码执行、敏感信息泄露或服务中断，因此属于高风险漏洞。
+
+2. **触发场景**
+   Sprig函数库风险：`sprig.FuncMap()` 提供了大量内置函数（如文件操作、系统命令执行等），攻击者可能利用这些函数执行任意代码。
+
+   ```go
+   package main
+
+   import (
+       "bytes"
+       "html/template"
+       "io/ioutil"
+       "os"
+
+       "github.com/Masterminds/sprig"
+   )
+
+   func main() {
+       os.Setenv("go-sec-code-secret-key", "b81024f158eefcf60792ae9df9524f82")
+       usertemplate := os.Args[1] // 用户可控的模板输入
+       t := template.New("ssti").Funcs(sprig.FuncMap())
+       t, _ = t.Parse(usertemplate)
+       buff := bytes.Buffer{}
+       err := t.Execute(&buff, struct{}{})
+       if err != nil {
+           panic(err)
+       }
+       data, err := ioutil.ReadAll(&buff)
+       if err != nil {
+           panic(err)
+       }
+       println(string(data))
+   }
+   ```
+
+   攻击者可通过构造特殊输入（如 `{{. | env}}` 或 `{{. | exec}}`）获取敏感环境变量或执行系统命令。
+
+3. **潜在影响**
+   - 执行任意代码，完全控制服务器。
+   - 泄露敏感信息，如环境变量、数据库凭据等。
+   - 导致服务中断或数据破坏。
 CODE
 	level: "low",
+	type: "vuln",
 }
 
 desc(

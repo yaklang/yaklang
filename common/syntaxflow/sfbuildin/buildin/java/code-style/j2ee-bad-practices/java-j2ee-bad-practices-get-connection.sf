@@ -105,16 +105,10 @@ SOLUTION
 
 DriverManager?{<typeName>?{have:'java.sql.DriverManager'}}.getConnection() as $get;
 alert $get for {
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
+	title_zh: "未验证的DriverManager getConnection使用",
 	level: "info",
 	message: "检测到Java项目中使用了DriverManager.getConnection()方法",
 	title: "Unvalidated DriverManager getConnection Usage",
-	title_zh: "未验证的DriverManager getConnection使用",
 }
 
 desc(

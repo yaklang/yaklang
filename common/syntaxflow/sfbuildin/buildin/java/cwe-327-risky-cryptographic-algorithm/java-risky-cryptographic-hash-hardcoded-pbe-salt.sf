@@ -8,14 +8,12 @@ desc(
 ### 漏洞描述
 
 1. **漏洞原理**
-   PBE（Password-Based Encryption）是一种基于密码的加密算法，通过将用户提供的密码与一个随机的盐（Salt）结合，并经过多次迭代（Iteration Count）生成加密密钥。盐的目的是为了增加密码的复杂性，防止攻击者通过预先计算的哈希表（如彩虹表）进行破解。硬编码的盐意味着所有使用该代码的用户或系统都共享同一个固定盐值。一旦攻击者获取了该盐值（通过逆向工程、代码审计、内存dump等方式），将极大地降低破解密文所需的时间和计算资源，因为他们现在只需对可能的密码进行预计算，而无需考虑随机盐带来的额外随机性。
+   PBE（Password-Based Encryption）是一种基于密码的加密算法，通过将用户提供的密码与一个随机的盐（Salt）结合，并经过多次迭代生成加密密钥。盐的目的是为了增加密码的复杂性，防止攻击者通过预先计算的哈希表（如彩虹表）进行破解。硬编码的盐意味着所有使用该代码的用户或系统都共享同一个固定盐值。一旦攻击者获取了该盐值，将极大地降低破解密文所需的时间和计算资源。
 
 2. **触发场景**
-   当 Java 代码中使用 `javax.crypto.spec.PBEParameterSpec` 类，并且其构造函数中传入的 `salt` 参数是一个硬编码为常量、字面量数组或未经过随机生成器（如 `java.security.SecureRandom`）初始化的 byte 数组时，就会触发此规则。例如：
+   当 Java 代码中使用 `javax.crypto.spec.PBEParameterSpec` 类，并且其构造函数中传入的 `salt` 参数是一个硬编码为常量、字面量数组或未经过随机生成器初始化的 byte 数组时，就会触发此规则。例如：
    ```java
-   // 存在漏洞的代码示例
    private static final byte[] FIXED_SALT = { ... }; // 硬编码的盐值
-   ...
    AlgorithmParameterSpec paramSpec = new PBEParameterSpec(FIXED_SALT, ITERATION_COUNT);
    ```
    在这种情况下，`FIXED_SALT` 的值在编译时就已经确定且无法改变，任何拥有代码或者了解系统内部实现细节的攻击者都可以轻易获得这个盐值。
@@ -33,50 +31,31 @@ DESC
 	solution: <<<SOLUTION
 ### 修复建议
 
-解决硬编码PBE盐值问题的核心是使用随机、唯一的盐值。对于PBE加密的每一次操作（如存储用户密码或者加密特定数据块），都应该生成一个新的、随机的盐值。
+解决硬编码PBE盐值问题的核心是使用随机、唯一的盐值。对于PBE加密的每一次操作，都应该生成一个新的、随机的盐值。
 
 #### 1. 使用安全的随机数生成器生成盐值
 
-  在 Java 中，推荐使用 `java.security.SecureRandom` 类来生成加密所需的随机盐值。`SecureRandom` 提供了密码学上强的随机数生成器，比普通的 `java.util.Random` 更适合用于安全相关的操作。
+在 Java 中，推荐使用 `java.security.SecureRandom` 类来生成加密所需的随机盐值。`SecureRandom` 提供了密码学上强的随机数生成器。
+```java
+import java.security.SecureRandom;
+import javax.crypto.spec.PBEParameterSpec;
 
-  ```java
-  // 修复代码示例
-  import java.security.SecureRandom;
-  import javax.crypto.spec.PBEParameterSpec;
-  import java.security.spec.AlgorithmParameterSpec;
+private static final int SALT_LENGTH = 8; // 建议盐值长度至少为8字节
+private static final int ITERATION_COUNT = 65536; // 增加迭代次数提高安全性
 
-  ...
-
-  private static final int SALT_LENGTH = 8; // 建议盐值长度至少为8字节
-  private static final int ITERATION_COUNT = 65536; // 增加迭代次数提高安全性
-
-  public AlgorithmParameterSpec createPBEParameters(int iterationCount) {
-      byte[] salt = new byte[SALT_LENGTH];
-      SecureRandom random = new SecureRandom(); // 使用安全的随机数生成器
-      random.nextBytes(salt); // 生成随机盐
-      return new PBEParameterSpec(salt, iterationCount);
-  }
-
-  public static void main(String[] args) throws Exception {
-      // ... 获取密码和迭代次数
-      
-      // 创建PBEParameterSpec，传入随机生成的盐
-      HardcodedSaltExample example = new HardcodedSaltExample(); // Assuming HardcodedSaltExample contains the method
-      AlgorithmParameterSpec paramSpec = example.createPBEParameters(ITERATION_COUNT);
-
-      // ... 继续后续的PBE操作
-  }
-  ```
+public AlgorithmParameterSpec createPBEParameters(int iterationCount) {
+    byte[] salt = new byte[SALT_LENGTH];
+    SecureRandom random = new SecureRandom(); // 使用安全的随机数生成器
+    random.nextBytes(salt); // 生成随机盐
+    return new PBEParameterSpec(salt, iterationCount);
+}
+```
 
 #### 2. 将盐值与密文一起存储
-
-  由于盐值是公开的（不需要保密），并且解密时需要使用与加密时相同的盐值，因此通常将生成的随机盐值与对应的密文一起存储。在对数据进行解密时，先提取出存储的盐值，再结合用户密码进行密钥派生。
-
-  例如，在存储用户密码的场景中，数据库表中通常会有一个额外的列用于存储该用户密码对应的盐值。
+由于盐值是公开的（不需要保密），并且解密时需要使用与加密时相同的盐值，因此通常将生成的随机盐值与对应的密文一起存储。
 
 #### 3. 增加迭代次数
-
-  除了使用随机盐值，还应增加 PBE 密钥派生函数的迭代次数（Iteration Count）。更高的迭代次数会显著增加密钥派生所需的时间和计算资源，这使得暴力破解更加困难，即使攻击者知道了盐值。现代推荐的迭代次数通常在数万到数十万之间，具体取决于可接受的计算延迟。
+更高的迭代次数会显著增加密钥派生所需的时间和计算资源，这使得暴力破解更加困难，即使攻击者知道了盐值。现代推荐的迭代次数通常在数万到数十万之间，具体取决于可接受的计算延迟。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-327: Use of a Broken or Risky Cryptographic Algorithm](https://cwe.mitre.org/data/definitions/327.html)
@@ -91,16 +70,10 @@ $salt?{!(.*#{exclude:`* ?{opcode:const}`}->)} as $toCheck;
 $toCheck?{!<getCall>?{have:/(?i)(random|next)/}} as $risk
 
 alert $risk for {
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
-	level: "low",
-	message: "发现Java代码中使用硬编码的PBE盐值",
 	title: "Detect Java Risky Hardcoded PBE Salt",
 	title_zh: "检测Java 哈希算法使用硬编码的PBE盐值",
+	level: "low",
+	message: "发现Java代码中使用硬编码的PBE盐值",
 }
 
 desc(

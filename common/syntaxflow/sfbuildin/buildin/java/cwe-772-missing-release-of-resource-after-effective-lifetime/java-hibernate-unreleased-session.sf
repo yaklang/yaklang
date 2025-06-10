@@ -8,83 +8,102 @@ desc(
 [CWE-772: Missing Release of Resource after Effective Lifetime](https://cwe.mitre.org/data/definitions/772.html)
 REFERENCE
 	description: <<<DESCRIPTION
-    ## 漏洞描述
 
-    在使用 Hibernate 框架进行数据库操作时，通过 `getSession()` 方法获取的 Session 资源未在使用完毕后正确关闭。这属于 CWE-772（有效生命周期后未释放资源）漏洞，会导致数据库连接资源泄漏。
+DESCRIPTION
+	rule_id: "b70c9711-31ed-4147-a982-35a6b5605078"
+	solution: <<<SOLUTION
+### 修复建议
 
-    ## 风险影响
-
-    - 数据库连接池耗尽，无法创建新的连接
-    - 系统资源（内存、文件描述符等）过度消耗
-    - 应用程序性能逐渐下降
-    - 严重情况下可能导致应用程序崩溃或拒绝服务
-    - 长时间运行的应用中，问题会随时间累积
-    solution:<<<TEXT
-    ### 1. 使用 try-finally 确保资源释放
-
-    ```java
+#### 1. 使用 try-finally 确保资源释放
+始终在 `finally` 块中调用 `session.close()` 方法，以确保不论程序是否抛出异常，Session 资源都能被释放。在关闭前，检查 Session 对象是否为 null。
+```java
+public void safeMethodWithTryFinally() throws HibernateException {
+    DatabaseConnection conn = new DatabaseConnection();
     Session session = null;
+
     try {
-        session = connection.getSession();
-        // 使用 session 进行操作
+        session = conn.getSession();
         List users = session.find("from User");
+        System.out.println("查询到 " + users.size() + " 个用户");
     } finally {
-        // 确保 session 总是关闭
         if (session != null) {
             try {
                 session.close();
             } catch (HibernateException e) {
-                logger.error("关闭 Session 时出错", e);
+                System.err.println("关闭 Session 时出错: " + e.getMessage());
             }
         }
     }
-    ```
+}
+```
 
-    ### 2. 使用 try-with-resources (Java 7+)
+#### 2. 使用 try-with-resources (Java 7+)
+如果使用的 Hibernate Session 实现了 `AutoCloseable` 接口（现代版本的 Hibernate 通常都实现了），可以使用 try-with-resources 结构，这能更简洁地确保资源在 try 块结束后被自动关闭。
+```java
+public void safeMethodWithTryWithResources() throws HibernateException {
+    DatabaseConnection conn = new DatabaseConnection();
 
-    ```java
-    try (Session session = connection.getSession()) {
-        // 使用 session 进行操作
+    try (Session session = conn.getSession()) {
         List users = session.find("from User");
+        System.out.println("查询到 " + users.size() + " 个用户");
     } // session 自动关闭
-    ```
+}
+```
 
-    ### 3. 在 DAO 层统一管理会话
+#### 3. 在 DAO 层统一管理会话
+在数据访问对象（DAO）层抽象出统一的方法来管理 Session 的生命周期，例如使用模板方法模式，在其中处理 Session 的获取、操作、事务管理和关闭。
+```java
+public abstract class BaseHibernateDAO {
+    protected Session getSession() throws HibernateException {
+        return HibernateUtil.getSessionFactory().getCurrentSession();
+    }
 
-    ```java
-    public abstract class BaseHibernateDAO {
-        protected Session getSession() throws HibernateException {
-            return HibernateUtil.getSessionFactory().getCurrentSession();
-        }
-
-        protected void executeInTransaction(SessionCallback callback) throws Exception {
-            Session session = null;
-            Transaction tx = null;
-            try {
-                session = getSession();
-                tx = session.beginTransaction();
-                callback.execute(session);
-                tx.commit();
-            } catch (Exception e) {
-                if (tx != null) tx.rollback();
-                throw e;
-            } finally {
-                // 在这里统一关闭会话
-                if (session != null && session.isOpen()) {
-                    session.close();
-                }
+    protected void executeInTransaction(SessionCallback callback) throws Exception {
+        Session session = null;
+        Transaction tx = null;
+        try {
+            session = getSession();
+            tx = session.beginTransaction();
+            callback.execute(session);
+            tx.commit();
+        } catch (Exception e) {
+            if (tx != null) tx.rollback();
+            throw e;
+        } finally {
+            if (session != null && session.isOpen()) {
+                session.close();
             }
         }
-
-        // 回调接口
-        interface SessionCallback {
-            void execute(Session session) throws Exception;
-        }
     }
-    ```
-DESCRIPTION
-	rule_id: "b70c9711-31ed-4147-a982-35a6b5605078"
-	solution: <<<SOLUTION
+
+    interface SessionCallback {
+        void execute(Session session) throws Exception;
+    }
+}
+```
+
+#### 4. 利用事务管理框架
+使用 Spring 等框架提供的事务管理功能，它们可以自动管理 Hibernate Session 的生命周期，确保在事务结束时 Session 正确关闭。
+
+SOLUTION
+)
+
+// 获取session的单例方法
+*?{opcode:function}?{<getReturns()><typeName()>?{have:"net.sf.hibernate.Session"}} as $fun;
+// 方法调用点
+$fun() as $getSession;
+// 直接调用
+.openSession()?{<typeName()>?{have:"net.sf.hibernate"}} as $getSession;
+$getSession -{
+    include:`*.close`
+}-> as $safe
+
+$safe<getPredecessors()> as $safeGetSession;
+$getSession - $safeGetSession as $weak;
+alert $weak for {
+	title: "Check Java Hibernate Session Unreleased Resource",
+	title_zh: "检测Java Hibernate Session 数据库资源未释放",
+	solution: <<<CODE
 ### 修复建议
 
 #### 1. 使用 try-finally 确保资源释放
@@ -182,32 +201,22 @@ public abstract class BaseHibernateDAO {
 #### 5. 审查并关闭所有 openSession 调用
 
 仔细审计代码中所有 `SessionFactory.openSession()` 的调用点，确保它们都被相应的 `session.close()` 调用配对。
-SOLUTION
-)
-
-// 获取session的单例方法
-*?{opcode:function}?{<getReturns()><typeName()>?{have:"net.sf.hibernate.Session"}} as $fun;
-// 方法调用点
-$fun() as $getSession;
-// 直接调用
-.openSession()?{<typeName()>?{have:"net.sf.hibernate"}} as $getSession;
-$getSession -{
-    include:`*.close`
-}-> as $safe
-
-$safe<getPredecessors()> as $safeGetSession;
-$getSession - $safeGetSession as $weak;
-alert $weak for {
+CODE
 	desc: <<<CODE
+## 漏洞描述
 
+在使用 Hibernate 框架进行数据库操作时，通过 `getSession()` 方法获取的 Session 资源未在使用完毕后正确关闭。这属于 CWE-772（有效生命周期后未释放资源）漏洞，会导致数据库连接资源泄漏。
+
+## 风险影响
+
+- 数据库连接池耗尽，无法创建新的连接
+- 系统资源（内存、文件描述符等）过度消耗
+- 应用程序性能逐渐下降
+- 严重情况下可能导致应用程序崩溃或拒绝服务
+- 长时间运行的应用中，问题会随时间累积
 CODE
-	level: "",
+	level: "high",
 	message: "检测到Hibernate Session 未释放资源",
-	title: "",
-	title_zh: "",
-	solution: <<<CODE
-
-CODE
 }
 
 desc(
