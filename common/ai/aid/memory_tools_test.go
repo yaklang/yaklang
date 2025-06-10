@@ -120,7 +120,7 @@ func TestCoodinator_Delete_Memory(t *testing.T) {
 				rsp.EmitOutputStream(strings.NewReader(
 					fmt.Sprintf(`{"@action": "call-tool", "tool": "delete_memory", "params": {"id": %d}}`, testCallKey)))
 				return rsp, nil
-			} else if utils.MatchAllOfSubString(request.GetPrompt(), `"require-more-tool"`, `"finished"`, `"status_summary"`) {
+			} else if utils.MatchAllOfSubString(request.GetPrompt(), `"continue-current-task"`, `"finished"`, `"status_summary"`) {
 				if firstToolDecision {
 					firstToolDecision = false
 					keys := timeline.idToTimelineItem.Keys()
@@ -134,7 +134,7 @@ func TestCoodinator_Delete_Memory(t *testing.T) {
 					}
 					testCallKey = keys[0]
 					timeLineSaveCheck = true
-					rsp.EmitReasonStream(strings.NewReader(`{"@action": "require-more-tool"}`))
+					rsp.EmitReasonStream(strings.NewReader(`{"@action": "continue-current-task"}`))
 				} else {
 					if timeline.idToTimelineItem.Len() != 1 {
 						panic("timeline.summary.Len() != 1")
@@ -254,7 +254,7 @@ func TestCoodinator_Add_Persistent_Memory(t *testing.T) {
 				rsp.EmitOutputStream(strings.NewReader(
 					`{"@action": "call-tool", "tool": "now", "params": {"content": "` + persistentMemory + `"}}}`))
 				return rsp, nil
-			} else if utils.MatchAllOfSubString(request.GetPrompt(), `"require-more-tool"`, `"finished"`, `"status_summary"`) {
+			} else if utils.MatchAllOfSubString(request.GetPrompt(), `"continue-current-task"`, `"finished"`, `"status_summary"`) {
 				config.memory.PushPersistentData(persistentMemory)
 				if timeline.idToTimelineItem.Len() > 0 {
 					panic("skip add persistent memory to timeline fail")

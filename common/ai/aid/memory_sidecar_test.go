@@ -70,8 +70,8 @@ func TestCoordinator_SidecarMemory_Timeline_ToolUse_TooMany_TimelineShrink(t *te
 				return rsp, nil
 			}
 
-			if strings.Contains(request.GetPrompt(), `"require-more-tool"`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-more-tool"}`))
+			if strings.Contains(request.GetPrompt(), `"continue-current-task"`) {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "continue-current-task"}`))
 				requireMoreToolCount++
 				return rsp, nil
 			}
@@ -220,8 +220,8 @@ func memoryTestBasic(t *testing.T) *Memory {
 				return rsp, nil
 			}
 
-			if strings.Contains(request.GetPrompt(), `"require-more-tool"`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-more-tool"}`))
+			if strings.Contains(request.GetPrompt(), `"continue-current-task"`) {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "continue-current-task"}`))
 				requireMoreToolCount++
 				return rsp, nil
 			}

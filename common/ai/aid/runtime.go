@@ -76,6 +76,9 @@ func (t *aiTask) dumpProgressEx(i int, w io.Writer, details bool) {
 			taskNameShow = t.Index + ". " + taskNameShow
 		}
 	}
+	if strings.TrimSpace(note) == "" {
+		note = "(未开始)"
+	}
 	_, _ = fmt.Fprintf(w, "%s -[%v] %s %v\n", prefix, fill, taskNameShow, note)
 	if len(t.Subtasks) > 0 {
 		for _, subtask := range t.Subtasks {
