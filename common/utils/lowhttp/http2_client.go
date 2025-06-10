@@ -81,6 +81,16 @@ type http2ClientStream struct {
 	readHeaderEnd bool
 
 	readEndStreamSignal chan struct{}
+
+	callbackLock           *sync.Mutex
+	readFirstFrameCallback func()
+	firstFrameCallbackOnce sync.Once // only read first frame callback once
+}
+
+func (s *http2ClientStream) SetReadFirstFrameCallback(callback func()) {
+	s.callbackLock.Lock()
+	defer s.callbackLock.Unlock()
+	s.readFirstFrameCallback = callback
 }
 
 type http2ClientConnReadLoop struct {
@@ -170,6 +180,7 @@ func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte) (*htt
 	cs.h2Conn = h2Conn
 	cs.ID = newStreamID
 	cs.resp = new(http.Response)
+	cs.resp.ProtoMajor = 2
 	cs.streamWindowControl = newControl(int64(h2Conn.initialWindowSize))
 	cs.bodyBuffer = new(bytes.Buffer)
 	cs.hPackByte = new(bytes.Buffer)
@@ -177,6 +188,8 @@ func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte) (*htt
 	cs.sentEndStream = false
 	cs.readEndStream = false
 	cs.readEndStreamSignal = make(chan struct{}, 1)
+	cs.callbackLock = new(sync.Mutex)
+	cs.firstFrameCallbackOnce = sync.Once{}
 	cs.req = req
 	cs.reqPacket = packet
 	cs.resp.Header = make(http.Header) // init header
@@ -437,6 +450,14 @@ func (rl *http2ClientConnReadLoop) processHeaders(f *http2.HeadersFrame) {
 		log.Errorf("h2 stream-id %v processHeaders error: %v", f.StreamID, err)
 		return
 	}
+
+	cs.firstFrameCallbackOnce.Do(func() {
+		if cs.readFirstFrameCallback != nil {
+			cs.callbackLock.Lock()
+			defer cs.callbackLock.Unlock()
+			cs.readFirstFrameCallback()
+		}
+	})
 
 	cs.hPackByte.Write(f.HeaderBlockFragment()) // 存入 hPack缓冲区
 
