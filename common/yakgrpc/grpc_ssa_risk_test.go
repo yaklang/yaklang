@@ -323,7 +323,7 @@ func TestSSARiskFeedbackToOnline(t *testing.T) {
 		mockey.Mock((*yaklib.OnlineClient).UploadToOnline).To(func(ctx context.Context, token string, raw []byte, urlStr string) error {
 			assert.Equal(t, token, "valid_token")
 
-			var reqBody yaklib.QueryUploadRiskOnlineRequest
+			var reqBody yaklib.UploadOnlineRequest
 			err := json.Unmarshal(raw, &reqBody)
 			assert.NoError(t, err)
 			assert.NotNil(t, reqBody)

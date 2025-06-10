@@ -167,9 +167,8 @@ func uploadRule(ctx context.Context, client *yaklib.OnlineClient, token string, 
 		return fmt.Errorf("序列化失败: %w", err)
 	}
 
-	raw, err := json.Marshal(yaklib.QueryUploadRiskOnlineRequest{
-		ProjectName: "",
-		Content:     content,
+	raw, err := json.Marshal(yaklib.UploadOnlineRequest{
+		Content: content,
 	})
 	if err != nil {
 		return fmt.Errorf("请求构造失败: %w", err)
