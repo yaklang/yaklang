@@ -179,14 +179,18 @@ func (f *RuleFormat) VisitAlertStatement(alert sf.IAlertStatementContext) {
 		defer func() {
 			f.Write(fmt.Sprintf("alert $%s for {\n", variable))
 			for key, value := range alertMsg {
+				newVal := f.alertHandler(variable, key, value)
+				if newVal == "" {
+					continue
+				}
 				switch key {
 				case "desc", "solution":
 					f.Write(fmt.Sprintf(`	%s: <<<CODE
 %s
 CODE
-`, key, f.alertHandler(variable, key, value)))
+`, key, newVal))
 				default:
-					f.Write(fmt.Sprintf("\t%s: \"%s\",\n", key, f.alertHandler(variable, key, value)))
+					f.Write(fmt.Sprintf("\t%s: \"%s\",\n", key, newVal))
 				}
 			}
 			f.Write("}\n")
