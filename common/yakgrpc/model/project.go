@@ -37,18 +37,20 @@ func ToProjectGRPCModel(p *schema.Project, db *gorm.DB) *ypb.ProjectDescription 
 		fileSize = formatFileSize(fileInfo.Size())
 	}
 	return &ypb.ProjectDescription{
-		ProjectName:     p.ProjectName,
-		Description:     p.Description,
-		Id:              int64(p.ID),
-		DatabasePath:    p.DatabasePath,
-		CreatedAt:       p.CreatedAt.Unix(),
-		FolderId:        p.FolderID,
-		ChildFolderId:   p.ChildFolderID,
-		Type:            p.Type,
-		UpdateAt:        p.UpdatedAt.Unix(),
-		FolderName:      folderName,
-		ChildFolderName: childFolderName,
-		FileSize:        fileSize,
+		ProjectName:         p.ProjectName,
+		Description:         p.Description,
+		Id:                  int64(p.ID),
+		DatabasePath:        p.DatabasePath,
+		CreatedAt:           p.CreatedAt.Unix(),
+		FolderId:            p.FolderID,
+		ChildFolderId:       p.ChildFolderID,
+		Type:                p.Type,
+		UpdateAt:            p.UpdatedAt.Unix(),
+		FolderName:          folderName,
+		ChildFolderName:     childFolderName,
+		FileSize:            fileSize,
+		ExternalModule:      p.ExternalModule,
+		ExternalProjectCode: p.ExternalProjectCode,
 	}
 }
 

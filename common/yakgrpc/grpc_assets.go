@@ -686,6 +686,8 @@ func (s *Server) UploadRiskToOnline(ctx context.Context, req *ypb.UploadRiskToOn
 		raw, err := json.Marshal(yaklib.QueryUploadRiskOnlineRequest{
 			req.ProjectName,
 			content,
+			req.ExternalProjectCode,
+			req.ExternalModule,
 		})
 		if err != nil {
 			continue
@@ -1040,8 +1042,7 @@ func (s *Server) RiskFeedbackToOnline(ctx context.Context, req *ypb.UploadRiskTo
 		if err != nil {
 			continue
 		}
-		raw, err := json.Marshal(yaklib.QueryUploadRiskOnlineRequest{
-			"",
+		raw, err := json.Marshal(yaklib.UploadOnlineRequest{
 			content,
 		})
 		if err != nil {

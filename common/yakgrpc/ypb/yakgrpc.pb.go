@@ -11080,16 +11080,18 @@ func (x *IsProjectNameValidRequest) GetType() string {
 }
 
 type NewProjectRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProjectName   string                 `protobuf:"bytes,1,opt,name=ProjectName,proto3" json:"ProjectName,omitempty"`
-	Description   string                 `protobuf:"bytes,2,opt,name=Description,proto3" json:"Description,omitempty"`
-	FolderId      int64                  `protobuf:"varint,3,opt,name=FolderId,proto3" json:"FolderId,omitempty"`
-	ChildFolderId int64                  `protobuf:"varint,4,opt,name=ChildFolderId,proto3" json:"ChildFolderId,omitempty"`
-	Type          string                 `protobuf:"bytes,5,opt,name=Type,proto3" json:"Type,omitempty"`
-	Id            int64                  `protobuf:"varint,6,opt,name=Id,proto3" json:"Id,omitempty"`
-	Database      string                 `protobuf:"bytes,7,opt,name=Database,proto3" json:"Database,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	ProjectName         string                 `protobuf:"bytes,1,opt,name=ProjectName,proto3" json:"ProjectName,omitempty"`
+	Description         string                 `protobuf:"bytes,2,opt,name=Description,proto3" json:"Description,omitempty"`
+	FolderId            int64                  `protobuf:"varint,3,opt,name=FolderId,proto3" json:"FolderId,omitempty"`
+	ChildFolderId       int64                  `protobuf:"varint,4,opt,name=ChildFolderId,proto3" json:"ChildFolderId,omitempty"`
+	Type                string                 `protobuf:"bytes,5,opt,name=Type,proto3" json:"Type,omitempty"`
+	Id                  int64                  `protobuf:"varint,6,opt,name=Id,proto3" json:"Id,omitempty"`
+	Database            string                 `protobuf:"bytes,7,opt,name=Database,proto3" json:"Database,omitempty"`
+	ExternalModule      string                 `protobuf:"bytes,8,opt,name=ExternalModule,proto3" json:"ExternalModule,omitempty"`
+	ExternalProjectCode string                 `protobuf:"bytes,9,opt,name=ExternalProjectCode,proto3" json:"ExternalProjectCode,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *NewProjectRequest) Reset() {
@@ -11171,6 +11173,20 @@ func (x *NewProjectRequest) GetDatabase() string {
 	return ""
 }
 
+func (x *NewProjectRequest) GetExternalModule() string {
+	if x != nil {
+		return x.ExternalModule
+	}
+	return ""
+}
+
+func (x *NewProjectRequest) GetExternalProjectCode() string {
+	if x != nil {
+		return x.ExternalProjectCode
+	}
+	return ""
+}
+
 type NewProjectResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            int64                  `protobuf:"varint,1,opt,name=Id,proto3" json:"Id,omitempty"`
@@ -11234,10 +11250,12 @@ type GetProjectsRequest struct {
 	Type string `protobuf:"bytes,6,opt,name=Type,proto3" json:"Type,omitempty"`
 	// this type effect response.ProjectTotal, this type mark kind of frontend
 	// "project"(yakit) | "ssa_project"(irify)
-	FrontendType   string `protobuf:"bytes,7,opt,name=FrontendType,proto3" json:"FrontendType,omitempty"`
-	AfterUpdatedAt int64  `protobuf:"varint,8,opt,name=AfterUpdatedAt,proto3" json:"AfterUpdatedAt,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	FrontendType        string `protobuf:"bytes,7,opt,name=FrontendType,proto3" json:"FrontendType,omitempty"`
+	AfterUpdatedAt      int64  `protobuf:"varint,8,opt,name=AfterUpdatedAt,proto3" json:"AfterUpdatedAt,omitempty"`
+	ExternalModule      string `protobuf:"bytes,9,opt,name=ExternalModule,proto3" json:"ExternalModule,omitempty"`
+	ExternalProjectCode string `protobuf:"bytes,10,opt,name=ExternalProjectCode,proto3" json:"ExternalProjectCode,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *GetProjectsRequest) Reset() {
@@ -11326,6 +11344,20 @@ func (x *GetProjectsRequest) GetAfterUpdatedAt() int64 {
 	return 0
 }
 
+func (x *GetProjectsRequest) GetExternalModule() string {
+	if x != nil {
+		return x.ExternalModule
+	}
+	return ""
+}
+
+func (x *GetProjectsRequest) GetExternalProjectCode() string {
+	if x != nil {
+		return x.ExternalProjectCode
+	}
+	return ""
+}
+
 type ProjectDescription struct {
 	state        protoimpl.MessageState `protogen:"open.v1"`
 	ProjectName  string                 `protobuf:"bytes,1,opt,name=ProjectName,proto3" json:"ProjectName,omitempty"`
@@ -11333,16 +11365,18 @@ type ProjectDescription struct {
 	Id           int64                  `protobuf:"varint,3,opt,name=Id,proto3" json:"Id,omitempty"`
 	DatabasePath string                 `protobuf:"bytes,4,opt,name=DatabasePath,proto3" json:"DatabasePath,omitempty"`
 	// 创建时间
-	CreatedAt       int64  `protobuf:"varint,5,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
-	FolderId        int64  `protobuf:"varint,6,opt,name=FolderId,proto3" json:"FolderId,omitempty"`
-	ChildFolderId   int64  `protobuf:"varint,7,opt,name=ChildFolderId,proto3" json:"ChildFolderId,omitempty"`
-	Type            string `protobuf:"bytes,8,opt,name=Type,proto3" json:"Type,omitempty"`
-	UpdateAt        int64  `protobuf:"varint,9,opt,name=UpdateAt,proto3" json:"UpdateAt,omitempty"`
-	FolderName      string `protobuf:"bytes,10,opt,name=FolderName,proto3" json:"FolderName,omitempty"`
-	ChildFolderName string `protobuf:"bytes,11,opt,name=ChildFolderName,proto3" json:"ChildFolderName,omitempty"`
-	FileSize        string `protobuf:"bytes,12,opt,name=FileSize,proto3" json:"FileSize,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	CreatedAt           int64  `protobuf:"varint,5,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
+	FolderId            int64  `protobuf:"varint,6,opt,name=FolderId,proto3" json:"FolderId,omitempty"`
+	ChildFolderId       int64  `protobuf:"varint,7,opt,name=ChildFolderId,proto3" json:"ChildFolderId,omitempty"`
+	Type                string `protobuf:"bytes,8,opt,name=Type,proto3" json:"Type,omitempty"`
+	UpdateAt            int64  `protobuf:"varint,9,opt,name=UpdateAt,proto3" json:"UpdateAt,omitempty"`
+	FolderName          string `protobuf:"bytes,10,opt,name=FolderName,proto3" json:"FolderName,omitempty"`
+	ChildFolderName     string `protobuf:"bytes,11,opt,name=ChildFolderName,proto3" json:"ChildFolderName,omitempty"`
+	FileSize            string `protobuf:"bytes,12,opt,name=FileSize,proto3" json:"FileSize,omitempty"`
+	ExternalModule      string `protobuf:"bytes,13,opt,name=ExternalModule,proto3" json:"ExternalModule,omitempty"`
+	ExternalProjectCode string `protobuf:"bytes,14,opt,name=ExternalProjectCode,proto3" json:"ExternalProjectCode,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *ProjectDescription) Reset() {
@@ -11455,6 +11489,20 @@ func (x *ProjectDescription) GetChildFolderName() string {
 func (x *ProjectDescription) GetFileSize() string {
 	if x != nil {
 		return x.FileSize
+	}
+	return ""
+}
+
+func (x *ProjectDescription) GetExternalModule() string {
+	if x != nil {
+		return x.ExternalModule
+	}
+	return ""
+}
+
+func (x *ProjectDescription) GetExternalProjectCode() string {
+	if x != nil {
+		return x.ExternalProjectCode
 	}
 	return ""
 }
@@ -23921,12 +23969,14 @@ func (x *NewRiskReadRequest) GetFilter() *QueryRisksRequest {
 }
 
 type UploadRiskToOnlineRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Token         string                 `protobuf:"bytes,1,opt,name=Token,proto3" json:"Token,omitempty"`
-	ProjectName   string                 `protobuf:"bytes,2,opt,name=ProjectName,proto3" json:"ProjectName,omitempty"`
-	Hash          []string               `protobuf:"bytes,3,rep,name=Hash,proto3" json:"Hash,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Token               string                 `protobuf:"bytes,1,opt,name=Token,proto3" json:"Token,omitempty"`
+	ProjectName         string                 `protobuf:"bytes,2,opt,name=ProjectName,proto3" json:"ProjectName,omitempty"`
+	Hash                []string               `protobuf:"bytes,3,rep,name=Hash,proto3" json:"Hash,omitempty"`
+	ExternalModule      string                 `protobuf:"bytes,4,opt,name=ExternalModule,proto3" json:"ExternalModule,omitempty"`
+	ExternalProjectCode string                 `protobuf:"bytes,5,opt,name=ExternalProjectCode,proto3" json:"ExternalProjectCode,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *UploadRiskToOnlineRequest) Reset() {
@@ -23978,6 +24028,20 @@ func (x *UploadRiskToOnlineRequest) GetHash() []string {
 		return x.Hash
 	}
 	return nil
+}
+
+func (x *UploadRiskToOnlineRequest) GetExternalModule() string {
+	if x != nil {
+		return x.ExternalModule
+	}
+	return ""
+}
+
+func (x *UploadRiskToOnlineRequest) GetExternalProjectCode() string {
+	if x != nil {
+		return x.ExternalProjectCode
+	}
+	return ""
 }
 
 type SetTagForRiskRequest struct {
@@ -24685,13 +24749,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -33848,8 +33912,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -37199,12 +37263,14 @@ func (x *QueryHTTPFlowRequest) GetPayloadKeyword() string {
 }
 
 type HTTPFlowsToOnlineRequest struct {
-	state              protoimpl.MessageState `protogen:"open.v1"`
-	Token              string                 `protobuf:"bytes,1,opt,name=Token,proto3" json:"Token,omitempty"`
-	ProjectName        string                 `protobuf:"bytes,2,opt,name=ProjectName,proto3" json:"ProjectName,omitempty"`
-	ProjectDescription string                 `protobuf:"bytes,3,opt,name=ProjectDescription,proto3" json:"ProjectDescription,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Token               string                 `protobuf:"bytes,1,opt,name=Token,proto3" json:"Token,omitempty"`
+	ProjectName         string                 `protobuf:"bytes,2,opt,name=ProjectName,proto3" json:"ProjectName,omitempty"`
+	ProjectDescription  string                 `protobuf:"bytes,3,opt,name=ProjectDescription,proto3" json:"ProjectDescription,omitempty"`
+	ExternalModule      string                 `protobuf:"bytes,4,opt,name=ExternalModule,proto3" json:"ExternalModule,omitempty"`
+	ExternalProjectCode string                 `protobuf:"bytes,5,opt,name=ExternalProjectCode,proto3" json:"ExternalProjectCode,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *HTTPFlowsToOnlineRequest) Reset() {
@@ -37254,6 +37320,20 @@ func (x *HTTPFlowsToOnlineRequest) GetProjectName() string {
 func (x *HTTPFlowsToOnlineRequest) GetProjectDescription() string {
 	if x != nil {
 		return x.ProjectDescription
+	}
+	return ""
+}
+
+func (x *HTTPFlowsToOnlineRequest) GetExternalModule() string {
+	if x != nil {
+		return x.ExternalModule
+	}
+	return ""
+}
+
+func (x *HTTPFlowsToOnlineRequest) GetExternalProjectCode() string {
+	if x != nil {
+		return x.ExternalProjectCode
 	}
 	return ""
 }
@@ -53952,7 +54032,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vProjectName\x18\x01 \x01(\tR\vProjectName\x12\x1a\n" +
 	"\bFolderId\x18\x02 \x01(\x03R\bFolderId\x12$\n" +
 	"\rChildFolderId\x18\x03 \x01(\x03R\rChildFolderId\x12\x12\n" +
-	"\x04Type\x18\x04 \x01(\tR\x04Type\"\xd9\x01\n" +
+	"\x04Type\x18\x04 \x01(\tR\x04Type\"\xb3\x02\n" +
 	"\x11NewProjectRequest\x12 \n" +
 	"\vProjectName\x18\x01 \x01(\tR\vProjectName\x12 \n" +
 	"\vDescription\x18\x02 \x01(\tR\vDescription\x12\x1a\n" +
@@ -53960,10 +54040,12 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\rChildFolderId\x18\x04 \x01(\x03R\rChildFolderId\x12\x12\n" +
 	"\x04Type\x18\x05 \x01(\tR\x04Type\x12\x0e\n" +
 	"\x02Id\x18\x06 \x01(\x03R\x02Id\x12\x1a\n" +
-	"\bDatabase\x18\a \x01(\tR\bDatabase\"F\n" +
+	"\bDatabase\x18\a \x01(\tR\bDatabase\x12&\n" +
+	"\x0eExternalModule\x18\b \x01(\tR\x0eExternalModule\x120\n" +
+	"\x13ExternalProjectCode\x18\t \x01(\tR\x13ExternalProjectCode\"F\n" +
 	"\x12NewProjectResponse\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x12 \n" +
-	"\vProjectName\x18\x02 \x01(\tR\vProjectName\"\xa7\x02\n" +
+	"\vProjectName\x18\x02 \x01(\tR\vProjectName\"\x81\x03\n" +
 	"\x12GetProjectsRequest\x12 \n" +
 	"\vProjectName\x18\x01 \x01(\tR\vProjectName\x12 \n" +
 	"\vDescription\x18\x02 \x01(\tR\vDescription\x12+\n" +
@@ -53974,7 +54056,10 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\rChildFolderId\x18\x05 \x01(\x03R\rChildFolderId\x12\x12\n" +
 	"\x04Type\x18\x06 \x01(\tR\x04Type\x12\"\n" +
 	"\fFrontendType\x18\a \x01(\tR\fFrontendType\x12&\n" +
-	"\x0eAfterUpdatedAt\x18\b \x01(\x03R\x0eAfterUpdatedAt\"\x82\x03\n" +
+	"\x0eAfterUpdatedAt\x18\b \x01(\x03R\x0eAfterUpdatedAt\x12&\n" +
+	"\x0eExternalModule\x18\t \x01(\tR\x0eExternalModule\x120\n" +
+	"\x13ExternalProjectCode\x18\n" +
+	" \x01(\tR\x13ExternalProjectCode\"\xdc\x03\n" +
 	"\x12ProjectDescription\x12 \n" +
 	"\vProjectName\x18\x01 \x01(\tR\vProjectName\x12 \n" +
 	"\vDescription\x18\x02 \x01(\tR\vDescription\x12\x0e\n" +
@@ -53990,7 +54075,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	" \x01(\tR\n" +
 	"FolderName\x12(\n" +
 	"\x0fChildFolderName\x18\v \x01(\tR\x0fChildFolderName\x12\x1a\n" +
-	"\bFileSize\x18\f \x01(\tR\bFileSize\"\xcf\x01\n" +
+	"\bFileSize\x18\f \x01(\tR\bFileSize\x12&\n" +
+	"\x0eExternalModule\x18\r \x01(\tR\x0eExternalModule\x120\n" +
+	"\x13ExternalProjectCode\x18\x0e \x01(\tR\x13ExternalProjectCode\"\xcf\x01\n" +
 	"\x13GetProjectsResponse\x123\n" +
 	"\bProjects\x18\x01 \x03(\v2\x17.ypb.ProjectDescriptionR\bProjects\x12+\n" +
 	"\n" +
@@ -55003,11 +55090,13 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x12NewRiskReadRequest\x12\x18\n" +
 	"\aAfterId\x18\x01 \x01(\x03R\aAfterId\x12\x10\n" +
 	"\x03Ids\x18\x02 \x03(\x03R\x03Ids\x12.\n" +
-	"\x06Filter\x18\x03 \x01(\v2\x16.ypb.QueryRisksRequestR\x06Filter\"g\n" +
+	"\x06Filter\x18\x03 \x01(\v2\x16.ypb.QueryRisksRequestR\x06Filter\"\xc1\x01\n" +
 	"\x19UploadRiskToOnlineRequest\x12\x14\n" +
 	"\x05Token\x18\x01 \x01(\tR\x05Token\x12 \n" +
 	"\vProjectName\x18\x02 \x01(\tR\vProjectName\x12\x12\n" +
-	"\x04Hash\x18\x03 \x03(\tR\x04Hash\"N\n" +
+	"\x04Hash\x18\x03 \x03(\tR\x04Hash\x12&\n" +
+	"\x0eExternalModule\x18\x04 \x01(\tR\x0eExternalModule\x120\n" +
+	"\x13ExternalProjectCode\x18\x05 \x01(\tR\x13ExternalProjectCode\"N\n" +
 	"\x14SetTagForRiskRequest\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x12\x12\n" +
 	"\x04Hash\x18\x02 \x01(\tR\x04Hash\x12\x12\n" +
@@ -56193,11 +56282,13 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0fExcludeKeywords\x18, \x03(\tR\x0fExcludeKeywords\x12 \n" +
 	"\vKeywordType\x18- \x01(\tR\vKeywordType\x12 \n" +
 	"\vAnalyzedIds\x18. \x03(\x03R\vAnalyzedIds\x12&\n" +
-	"\x0ePayloadKeyword\x18/ \x01(\tR\x0ePayloadKeyword\"\x82\x01\n" +
+	"\x0ePayloadKeyword\x18/ \x01(\tR\x0ePayloadKeyword\"\xdc\x01\n" +
 	"\x18HTTPFlowsToOnlineRequest\x12\x14\n" +
 	"\x05Token\x18\x01 \x01(\tR\x05Token\x12 \n" +
 	"\vProjectName\x18\x02 \x01(\tR\vProjectName\x12.\n" +
-	"\x12ProjectDescription\x18\x03 \x01(\tR\x12ProjectDescription\"\xd9\x01\n" +
+	"\x12ProjectDescription\x18\x03 \x01(\tR\x12ProjectDescription\x12&\n" +
+	"\x0eExternalModule\x18\x04 \x01(\tR\x0eExternalModule\x120\n" +
+	"\x13ExternalProjectCode\x18\x05 \x01(\tR\x13ExternalProjectCode\"\xd9\x01\n" +
 	"\x16AnalyzeHTTPFlowRequest\x12\"\n" +
 	"\fHotPatchCode\x18\x01 \x01(\tR\fHotPatchCode\x126\n" +
 	"\tReplacers\x18\x02 \x03(\v2\x18.ypb.MITMContentReplacerR\tReplacers\x122\n" +
