@@ -58,16 +58,12 @@ func TestMustPass_Debug(t *testing.T) {
 	}
 
 	prog, err := ssaapi.ParseProjectWithFS(filesys.NewEmbedFS(sourceCodeSample), ssaapi.WithProgramName(MUSTPASS_JAVA_CACHE_KEY), ssaapi.WithLanguage(ssaapi.JAVA))
-	if err != nil {
-		t.Fatalf("compile failed: %v", err)
-	}
+	require.NoError(t, err, "compile failed")
 	// defer ssadb.DeleteProgram(ssadb.GetDB(), MUSTPASS_JAVA_CACHE_KEY)
 
 	keyword := "local-file-write.sf"
 	// prog, err := ssaapi.FromDatabase(MUSTPASS_JAVA_CACHE_KEY)
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
+	// require.NoError(t, err, "load from database ")
 
 	code := filesys.NewEmbedFS(mustpassFS)
 
