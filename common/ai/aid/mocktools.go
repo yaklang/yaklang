@@ -522,3 +522,34 @@ func TimeEstimateTool() *aitool.Tool {
 
 	return tool
 }
+
+// PrintTool 直接输出工具
+func PrintTool() *aitool.Tool {
+	callback := func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+		output := params.GetString("output")
+		errString := params.GetString("err")
+		if output != "" {
+			stdout.Write([]byte(output))
+		}
+
+		if errString != "" {
+			stderr.Write([]byte(errString))
+		}
+
+		return nil, nil
+	}
+
+	// 创建交通工具
+	tool, _ := aitool.New("print",
+		aitool.WithDescription("输出测试工具"),
+		aitool.WithCallback(callback),
+		aitool.WithStringParam("output",
+			aitool.WithParam_Description("输出"),
+		),
+		aitool.WithStringParam("err",
+			aitool.WithParam_Description("错误输出"),
+		),
+	)
+
+	return tool
+}
