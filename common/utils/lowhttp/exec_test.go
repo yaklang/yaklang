@@ -663,6 +663,37 @@ Host: %v
 	swg.Wait()
 }
 
+func TestLowhttpH2TraceInfo(t *testing.T) {
+	ctx := utils.TimeoutContext(10 * time.Second)
+	count := 100
+	if utils.InGithubActions() {
+		count = 4
+	}
+	swg := utils.NewSizedWaitGroup(1)
+	for i := 0; i < count; i++ {
+		swg.Add(1)
+		httpsHost, httpsPort := utils.DebugMockHTTP2(ctx, func(req []byte) []byte {
+			time.Sleep(50 * time.Millisecond)
+			return req
+		})
+		go func() {
+			defer swg.Done()
+
+			t.Run("http2 trace info check", func(t *testing.T) {
+				rsp, err := HTTPWithoutRedirect(WithPacketBytes([]byte(fmt.Sprintf(`GET / HTTP/2
+Host: %v 
+
+`, utils.HostPort(httpsHost, httpsPort)))), WithHttps(true), WithConnPool(false))
+				require.NoError(t, err)
+				spew.Dump(rsp.RawPacket)
+				require.NotNilf(t, rsp.TraceInfo, "TraceInfo should not be nil")
+				require.Greater(t, rsp.TraceInfo.ServerTime.Nanoseconds(), int64(0))
+			})
+		}()
+	}
+	swg.Wait()
+}
+
 func TestLowhttpH2Downgrade_NG(t *testing.T) {
 	count := 10
 	if utils.InGithubActions() {
