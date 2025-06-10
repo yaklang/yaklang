@@ -1,7 +1,6 @@
 package aid
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -95,9 +94,12 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 
 	t.config.EmitInfo("start to invoke tool:%v 's callback function", targetTool.Name)
 	// 调用工具
-	stdoutBuf := bytes.NewBuffer(nil)
-	stderrBuf := bytes.NewBuffer(nil)
-	t.config.EmitToolCallStd(targetTool.Name, stdoutBuf, stderrBuf, t.Index)
+	stdoutReader, stdoutWriter := utils.NewPipe()
+	defer stdoutWriter.Close()
+	stderrReader, stderrWriter := utils.NewPipe()
+	defer stderrWriter.Close()
+
+	t.config.EmitToolCallStd(targetTool.Name, stdoutReader, stderrReader, t.Index)
 
 	// DANGER: 这个值永远不应该暴露给用户，只有内部工具才有资格设置它
 	if targetTool.NoNeedUserReview {
@@ -128,7 +130,7 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 		}
 	}
 	t.config.EmitInfo("start to execute tool:%v", targetTool.Name)
-	toolResult, err := targetTool.InvokeWithParams(callToolParams, t.config.toolCallOpts(stdoutBuf, stderrBuf)...)
+	toolResult, err := targetTool.InvokeWithParams(callToolParams, t.config.toolCallOpts(stdoutWriter, stderrWriter)...)
 	if err != nil {
 		toolResult.Error = fmt.Sprintf("error invoking tool[%v]: %v", targetTool.Name, err)
 		toolResult.Success = false

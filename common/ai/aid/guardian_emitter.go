@@ -53,13 +53,14 @@ func (e *guardianEmitter) emitExStreamEvent(s *streamEvent) {
 		defer e.streamWaitGroup.Done()
 
 		io.Copy(&eventWriteProducer{
-			coordinatorId: e.coordinatorId,
-			nodeId:        s.nodeId,
-			isSystem:      s.isSystem,
-			isReason:      s.isReason,
-			handler:       e.emitter,
-			timeStamp:     s.startTime.Unix(),
-			taskIndex:     s.taskIndex,
+			coordinatorId:   e.coordinatorId,
+			disableMarkdown: s.disableMarkdown,
+			nodeId:          s.nodeId,
+			isSystem:        s.isSystem,
+			isReason:        s.isReason,
+			handler:         e.emitter,
+			timeStamp:       s.startTime.Unix(),
+			taskIndex:       s.taskIndex,
 		}, s.reader)
 	}()
 }
