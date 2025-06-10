@@ -484,7 +484,11 @@ staticClassExpr
 
 staticClassExprFunctionMember: staticClass '::' identifier;
 
-staticClassExprVariableMember : staticClass '::' flexiVariable; 
+staticClassExprVariableMember
+    : staticClass '::' variable
+    | staticClass '::' variable OpenSquareBracket expression? CloseSquareBracket
+
+    ;
 
 staticClass 
     : fullyQualifiedNamespaceExpr    
@@ -512,14 +516,13 @@ expression
     : Clone expression                                            # CloneExpression
     | newExpr                                                     # KeywordNewExpression
     | fullyQualifiedNamespaceExpr                                 # FullyQualifiedNamespaceExpression
-    | Parent_ DoubleColon memberCallKey                          # ParentExpression
-    | expression ObjectOperator memberCallKey                               #MemberCallExpression
+    | Parent_ DoubleColon memberCallKey                           # ParentExpression
+    | expression ObjectOperator memberCallKey                     # MemberCallExpression
     | expression '[' indexMemberCallKey ']'                       # IndexCallExpression
     | expression ObjectOperator?  OpenCurlyBracket indexMemberCallKey? CloseCurlyBracket  # IndexLegacyCallExpression
-    | expression arguments                                        # FunctionCallExpression
+    | '\\'? staticClassExpr                                        # StaticClassAccessExpression
     | identifier                                                  # ShortQualifiedNameExpression
     | '\\' identifier                                             # ShortQualifiedNameExpression
-    | '\\'? staticClassExpr                                        # StaticClassAccessExpression
     | '&'? flexiVariable                                          # VariableExpression
     | arrayCreation                                               # ArrayCreationExpression
     | constant                                                    # ScalarExpression
@@ -533,13 +536,12 @@ expression
     | Set_Include_Path expression                                 # IncludeExpression
     | Yield                                                       # SpecialWordExpression
     | List '(' assignmentList ')' Eq expression                   # SpecialWordExpression
-//    | IsSet '(' chainList ')'                                     # SpecialWordExpression
-//    | Empty '(' chain ')'                                         # SpecialWordExpression
-//    | (Exit|Die)  ('(' expression? ')')?                          # SpecialWordExpression
     | Throw expression                                            # SpecialWordExpression
     | lambdaFunctionExpr                                          # LambdaFunctionExpression
     | matchExpr                                                   # MatchExpression
     | '(' castOperation ')' expression                            # CastExpression
+    | expression arguments                                        # FunctionCallExpression
+    | staticClassExprVariableMember assignmentOperator expression # StaticClassMemberCallAssignmentExpression
     | ('~' | '@') expression                                      # UnaryOperatorExpression
     | ('!' | '+' | '-') expression                                # UnaryOperatorExpression
     | ('++' | '--') flexiVariable                                 # PrefixIncDecExpression
@@ -559,11 +561,8 @@ expression
     | expression op = QuestionMark expression? ':' expression     # ConditionalExpression
     | expression op = '??' expression                             # NullCoalescingExpression
     | expression op = '<=>' expression                            # SpaceshipExpression
-    //  assign 
     | leftArrayCreation Eq expression                             # ArrayCreationUnpackExpression
-    | staticClassExprVariableMember assignmentOperator expression               # StaticClassMemberCallAssignmentExpression
     | flexiVariable assignmentOperator expression                  # OrdinaryAssignmentExpression
-    // logical 
     | expression op = LogicalAnd expression                       # LogicalExpression
     | expression op = LogicalXor expression                       # LogicalExpression
     | expression op = LogicalOr expression                        # LogicalExpression

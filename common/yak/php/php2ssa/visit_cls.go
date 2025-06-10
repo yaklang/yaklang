@@ -635,12 +635,7 @@ func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassE
 	if i == nil {
 		return nil, "'"
 	}
-
-	value := y.VisitRightValue(i.FlexiVariable())
-	key := value.GetName()
-	if key == "" {
-		key = value.String()
-	}
+	key := yakunquote.TryUnquote(i.Variable().GetText())
 	bluePrint := y.VisitStaticClass(i.StaticClass())
 	if strings.HasPrefix(key, "$") {
 		key = key[1:]
@@ -680,6 +675,7 @@ func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) ss
 				if member := bluePrint.GetStaticMember(key); !utils.IsNil(member) {
 					return member
 				}
+				return y.ReadMemberCallValue(bluePrint.Container(), y.EmitConstInst(key))
 			}
 		}
 		return y.EmitUndefined(raw.GetText())

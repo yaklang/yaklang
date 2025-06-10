@@ -142,7 +142,6 @@ println($a->a);
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 
-	//todo: fix fullTypename member
 	t.Run("test no import", func(t *testing.T) {
 		code := `<?php
 namespace A\B\C{
@@ -155,7 +154,7 @@ namespace {
     println($a->a);
 }`
 		ssatest.CheckSyntaxFlow(t, code, `println(* as $param);$param<fullTypeName><show> as $end`, map[string][]string{
-			"end": {`"main.A"`},
+			"end": {`"A.A"`},
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 	t.Run("parent class", func(t *testing.T) {
@@ -361,4 +360,27 @@ eval("echo $input");
 			return nil
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
+}
+
+func TestCode2(t *testing.T) {
+	code := `<?php
+$template = $twig->createTemplate("cccc");
+$twig->addFilter(new \Twig\TwigFilter('filter_func', $_GET["hahah"])); // 危险过滤器
+
+echo $template->render(['filter_func' => 'ccc']);`
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		prog.Show()
+		return nil
+	}, ssaapi.WithLanguage(ssaapi.PHP))
+}
+func TestOopStaticBlueprint(t *testing.T) {
+	code := `<?php
+Yii::$app->request->post();
+`
+	ssatest.CheckSyntaxFlow(t, code, `Yii.* as $obj
+$obj.* as $sink
+`, map[string][]string{
+		"obj":  {"Undefined-Yii.app"},
+		"sink": {"Undefined-Yii.app.request(valid)"},
+	}, ssaapi.WithLanguage(ssaapi.PHP))
 }
