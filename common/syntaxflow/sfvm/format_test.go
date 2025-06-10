@@ -128,6 +128,9 @@ desc(
 		)
 	})
 }
+func TestName(t *testing.T) {
+
+}
 
 func TestRealFormatCheck(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
