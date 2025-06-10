@@ -57,7 +57,7 @@ func (c *Blueprint) storeBlueprintRelation(other *Blueprint, relation BlueprintR
 	otherName := other._container.GetVerboseName()
 
 	builder := c._container.GetFunc().builder
-	val := builder.CreateMemberCallVariable(c._container, builder.EmitConstInst(string(relation), true))
+	val := builder.CreateMemberCallVariable(c._container, builder.EmitConstInstPlaceholder(string(relation)))
 	builder.AssignVariable(val, other._container)
 	other._container.SetVerboseName(otherName)
 	// set relative relation
@@ -66,7 +66,7 @@ func (c *Blueprint) storeBlueprintRelation(other *Blueprint, relation BlueprintR
 	if string(relativeRela) == "" {
 		return
 	}
-	otherVal := otherBuilder.CreateMemberCallVariable(other._container, otherBuilder.EmitConstInst(string(relativeRela), true))
+	otherVal := otherBuilder.CreateMemberCallVariable(other._container, otherBuilder.EmitConstInstPlaceholder(string(relativeRela)))
 	otherBuilder.AssignVariable(otherVal, c._container)
 	c._container.SetVerboseName(cName)
 }

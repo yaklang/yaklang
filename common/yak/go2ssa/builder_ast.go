@@ -50,7 +50,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			global := application.GlobalScope
 
 			initHandler := func(name string) {
-				variable := b.CreateMemberCallVariable(global, b.EmitConstInst(name, true))
+				variable := b.CreateMemberCallVariable(global, b.EmitConstInstPlaceholder(name))
 				emptyContainer := b.EmitEmptyContainer()
 				b.AssignVariable(variable, emptyContainer)
 			}
@@ -69,7 +69,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				lib.VisitAst(ast)
 			}()
 			lib.PushEditor(prog.GetCurrentEditor())
-			lib.GlobalScope = b.ReadMemberCallValue(global, b.EmitConstInst(pkgNameCurrent, true))
+			lib.GlobalScope = b.ReadMemberCallValue(global, b.EmitConstInstPlaceholder(pkgNameCurrent))
 
 			init := lib.GetAndCreateFunction(pkgNameCurrent, string(ssa.MainFunctionName))
 			init.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.CreateAnyType()}, ssa.CreateAnyType(), false))
@@ -463,7 +463,7 @@ func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []
 			length = it.Len
 			if len(leftVariables) == length {
 				for i := range leftVariables {
-					value := b.ReadMemberCallValue(c, b.EmitConstInst(i, true))
+					value := b.ReadMemberCallValue(c, b.EmitConstInstPlaceholder(i))
 					b.AssignVariable(leftVariables[i], value)
 				}
 				return
@@ -473,7 +473,7 @@ func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []
 			for i := range leftVariables {
 				b.AssignVariable(
 					leftVariables[i],
-					b.ReadMemberCallValue(c, b.EmitConstInst(i, true)),
+					b.ReadMemberCallValue(c, b.EmitConstInstPlaceholder(i)),
 				)
 			}
 			return
@@ -500,7 +500,7 @@ func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []
 				b.AssignVariable(leftVariables[i], c)
 				continue
 			}
-			value := b.ReadMemberCallValue(c, b.EmitConstInst(i, true))
+			value := b.ReadMemberCallValue(c, b.EmitConstInstPlaceholder(i))
 			b.AssignVariable(leftVariables[i], value)
 		}
 	}

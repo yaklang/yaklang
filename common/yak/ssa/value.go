@@ -208,8 +208,8 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 			b.CurrentBlock.ScopeTable = scopet
 			obj := variable.object
 
-			v := b.CreateMemberCallVariable(obj, b.EmitConstInst("@value", true))
-			p := b.CreateMemberCallVariable(obj, b.EmitConstInst("@pointer", true))
+			v := b.CreateMemberCallVariable(obj, b.EmitConstInstPlaceholder("@value"))
+			p := b.CreateMemberCallVariable(obj, b.EmitConstInstPlaceholder("@pointer"))
 			p.SetKind(ssautil.PointerVariable)
 			scopet.AssignVariable(v, value)
 			if p.GetValue() == nil {
@@ -236,8 +236,8 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 				}()
 				b.CurrentBlock.ScopeTable = scopet
 
-				v := b.ReadMemberCallValue(obj, b.EmitConstInst("@value", true))
-				p := b.ReadMemberCallValue(obj, b.EmitConstInst("@pointer", true))
+				v := b.ReadMemberCallValue(obj, b.EmitConstInstPlaceholder("@value"))
+				p := b.ReadMemberCallValue(obj, b.EmitConstInstPlaceholder("@pointer"))
 
 				n := strings.TrimPrefix(p.String(), "&")
 				originName, _ := SplitName(n)

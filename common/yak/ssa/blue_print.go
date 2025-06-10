@@ -345,7 +345,7 @@ func (c *Blueprint) storeField(name string, val Value, _type BlueprintFieldKind)
 
 	container := c._container
 	builder := container.GetFunc().builder
-	createVariable(builder, builder.CreateMemberCallVariable(c._container, builder.EmitConstInst(name, true)))
+	createVariable(builder, builder.CreateMemberCallVariable(c._container, builder.EmitConstInstPlaceholder(name)))
 }
 
 func (b *Blueprint) InitializeWithContainer(con *Make) error {
