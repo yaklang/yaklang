@@ -128,8 +128,7 @@ func (s *Server) SSARiskFeedbackToOnline(ctx context.Context, req *ypb.SSARiskFe
 		}
 		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
 
-		raw, err := json.Marshal(yaklib.QueryUploadRiskOnlineRequest{
-			"",
+		raw, err := json.Marshal(yaklib.UploadOnlineRequest{
 			content,
 		})
 		err = client.UploadToOnline(ctx, req.Token, raw, "api/ssa/risk/feed/back")

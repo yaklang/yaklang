@@ -11,8 +11,14 @@ import (
 )
 
 type QueryUploadRiskOnlineRequest struct {
-	ProjectName string `json:"projectName"`
-	Content     []byte `json:"content"`
+	ProjectName         string `json:"projectName"`
+	Content             []byte `json:"content"`
+	ExternalModule      string `json:"externalModule"`
+	ExternalProjectCode string `json:"externalProjectCode"`
+}
+
+type UploadOnlineRequest struct {
+	Content []byte `json:"content"`
 }
 
 func (s *OnlineClient) UploadToOnline(ctx context.Context,

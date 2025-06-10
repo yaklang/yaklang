@@ -169,6 +169,12 @@ func (s *Server) NewProject(ctx context.Context, req *ypb.NewProjectRequest) (*y
 		FolderID:      req.FolderId,
 		ChildFolderID: req.ChildFolderId,
 	}
+	if req.ExternalProjectCode != "" {
+		projectData.ExternalProjectCode = req.ExternalProjectCode
+	}
+	if req.ExternalModule != "" {
+		projectData.ExternalModule = req.ExternalModule
+	}
 
 	// create
 	// insert database row
@@ -218,6 +224,12 @@ func (s *Server) UpdateProject(ctx context.Context, req *ypb.NewProjectRequest) 
 		Type:          req.Type,
 		FolderID:      req.FolderId,
 		ChildFolderID: req.ChildFolderId,
+	}
+	if req.ExternalProjectCode != "" {
+		projectData.ExternalProjectCode = req.ExternalProjectCode
+	}
+	if req.ExternalModule != "" {
+		projectData.ExternalModule = req.ExternalModule
 	}
 	err = yakit.UpdateProject(s.GetProfileDatabase(), req.GetId(), projectData)
 	if err != nil {

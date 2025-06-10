@@ -1,50 +1,48 @@
 package yaklib
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
-	"io/ioutil"
-	"net/http"
-	"net/url"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type QueryHTTPFlowOnlineRequest struct {
-	ProjectName        string `json:"projectName"`
-	Content            []byte `json:"content"`
-	ProjectDescription string `json:"projectDescription"`
+	ProjectName         string `json:"projectName"`
+	Content             []byte `json:"content"`
+	ProjectDescription  string `json:"projectDescription"`
+	ExternalModule      string `json:"externalModule"`
+	ExternalProjectCode string `json:"externalProjectCode"`
 }
 
-func (s *OnlineClient) UploadHTTPFlowToOnline(ctx context.Context, token, projectName, projectDescription string, content []byte) error {
-	urlIns, err := url.Parse(s.genUrl("/api/httpflow/upload"))
-	if err != nil {
-		return utils.Errorf("parse url-instance failed: %s", err)
-	}
+func (s *OnlineClient) UploadHTTPFlowToOnline(ctx context.Context, params *ypb.HTTPFlowsToOnlineRequest, content []byte) error {
 	raw, err := json.Marshal(QueryHTTPFlowOnlineRequest{
-		Content:            content,
-		ProjectName:        projectName,
-		ProjectDescription: projectDescription,
+		Content:             content,
+		ProjectName:         params.ProjectName,
+		ProjectDescription:  params.ProjectDescription,
+		ExternalModule:      params.ExternalModule,
+		ExternalProjectCode: params.ExternalProjectCode,
 	})
 	if err != nil {
 		return utils.Errorf("marshal params failed: %s", err)
 	}
 
-	req, err := http.NewRequest("POST", urlIns.String(), bytes.NewBuffer(raw))
+	rsp, _, err := poc.DoPOST(
+		fmt.Sprintf("%v/%v", consts.GetOnlineBaseUrl(), "/api/httpflow/upload"),
+		poc.WithReplaceHttpPacketHeader("Authorization", params.Token),
+		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
+		poc.WithReplaceHttpPacketBody(raw, false),
+		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
+	)
 	if err != nil {
-		return utils.Errorf(err.Error())
+		return utils.Wrapf(err, "UploadToOnline failed: http error")
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", token)
-	rsp, err := s.client.Do(req)
-	if err != nil {
-		return utils.Errorf("HTTP Post %v failed: %v ", urlIns.String(), err)
-	}
+	rawResponse := lowhttp.GetHTTPPacketBody(rsp.RawPacket)
 
-	rawResponse, err := ioutil.ReadAll(rsp.Body)
-	if err != nil {
-		return utils.Errorf("read body failed: %s", err)
-	}
 	var responseData map[string]interface{}
 	err = json.Unmarshal(rawResponse, &responseData)
 	if err != nil {

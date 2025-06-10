@@ -22,6 +22,9 @@ type Project struct {
 	ChildFolderID    int64
 	Type             string
 	// Hash string `gorm:"unique_index"`
+	// 企业版 项目模块及项目编号
+	ExternalModule      string
+	ExternalProjectCode string
 }
 
 type BackProject struct {

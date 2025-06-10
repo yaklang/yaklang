@@ -330,6 +330,8 @@ func QueryProjectTotal(db *gorm.DB, req *ypb.GetProjectsRequest) (*bizhelper.Pag
 	db = filterType(db, req.FrontendType)
 	db = filterFrontendType(db, req.FrontendType)
 	db = db.Where(" NOT (project_name = ? AND folder_id = false AND child_folder_id = false AND type = 'project' )", TEMPORARY_PROJECT_NAME)
+	db = bizhelper.FuzzQueryLike(db, "external_project_code", req.ExternalProjectCode)
+	db = bizhelper.FuzzQueryLike(db, "external_module", req.ExternalModule)
 	var ret []*schema.Project
 	paging, db := bizhelper.Paging(db, int(params.Page), int(params.Limit), &ret)
 	if db.Error != nil {
