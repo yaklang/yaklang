@@ -65,8 +65,8 @@ func TestCoordinator_Timeline_ToolUse_TooMany_TimelineReducer(t *testing.T) {
 			fmt.Println("========================================================")
 			fmt.Println(request.GetPrompt())
 
-			if strings.Contains(request.GetPrompt(), `"require-more-tool"`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-more-tool"}`))
+			if strings.Contains(request.GetPrompt(), `"continue-current-task"`) {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "continue-current-task"}`))
 				requireMoreToolCount++
 				if requireMoreToolCount > 10 {
 					log.Info("requireMoreToolCount reached 10")

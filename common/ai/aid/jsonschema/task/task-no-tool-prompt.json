@@ -4,12 +4,12 @@
   "properties": {
     "@action": {
       "type": "string",
-      "enum": ["require-more-tool", "finished"],
-      "description": "(前文提到了任务树的状态)根据上下文检查当前子任务（任务树中标注“执行中”）是否满足退出条件，如果不满足退出条件，可以通过require-more-tool，申请更多的工具调用来继续执行任务，或者通过finished来结束当前执行中的任务（进入下一步子任务）。"
+      "enum": ["continue-current-task", "finished"],
+      "description": "(前文提到了任务树的状态)根据上下文检查当前子任务（任务树中标注“执行中”）是否满足退出条件，如果不满足退出条件，可以通过continue-current-task，申请更多的工具调用来继续执行任务，或者通过finished来结束当前执行中的任务（进入下一步子任务）。"
     },
     "status_summary": {
       "type": "string",
-      "description": "当前执行工具调用后，有什么启发？需要包含当前任务的进度和总结信息和下一次任务的提示信息，这些提示信息会在后续的任务中使用到，帮助下一步进行更好决策"
+      "description": "当前尝试执行子任务的时候，判定子任务没有执行完，continue-current-task 将会继续执行这个子任务，需要总结当前子任务状态，以便后续决策"
     },
     "task_long_summary": {
       "type": "string",

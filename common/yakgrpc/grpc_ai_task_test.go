@@ -137,7 +137,7 @@ func TestAITaskWithBreadth(t *testing.T) {
 					}
 				  }`, fName), nil
 			}
-		} else if utils.MatchAllOfSubString(prompt, `"require-more-tool"`, `"finished"`, `"status_summary"`) {
+		} else if utils.MatchAllOfSubString(prompt, `"continue-current-task"`, `"finished"`, `"status_summary"`) {
 			return `{"@action": "finished"}`, nil
 		} else if strings.Contains(prompt, "你是一个按Schema输出JSON的上下文总结者") {
 			fName := ""

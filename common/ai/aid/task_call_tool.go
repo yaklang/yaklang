@@ -52,7 +52,7 @@ func (t *aiTask) getToolResultAction(response string) string {
 		gjsonResult := gjson.Parse(toolRequiredJSON)
 		action := gjsonResult.Get("@action").String()
 		switch action {
-		case "require-more-tool", "finished":
+		case "continue-current-task", "finished":
 			return action
 		}
 	}
@@ -159,12 +159,12 @@ func (t *aiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitoo
 		}
 
 		// 获取下一步决策
-		action, err := ExtractAction(string(nextResponse), "require-more-tool", "finished")
+		action, err := ExtractAction(string(nextResponse), "continue-current-task", "finished")
 		if err != nil {
 			return utils.Errorf("error extracting action: %v", err)
 		}
 		actionFinal = action.Name()
-		if actionFinal != "require-more-tool" && actionFinal != "finished" {
+		if actionFinal != "continue-current-task" && actionFinal != "finished" {
 			return utils.Errorf("error extracting action: %v", actionFinal)
 		}
 		if ret := action.GetString("status_summary"); ret != "" {
