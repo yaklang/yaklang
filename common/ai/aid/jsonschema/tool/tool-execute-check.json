@@ -5,14 +5,11 @@
     "@action": {
       "type": "string",
       "enum": ["continue-current-task", "finished"],
-      "x-generation-rules": [
-        "根据调用结果检查是否完成当前子任务，如果你认为未完成，需要调用更多工具，则使用continue-current-task",
-        "如果你认为任务已经完成，请使用finished"
-      ]
+      "description": "(前文提到了任务树的状态)根据上下文检查当前子任务（任务树中标注“执行中”）是否满足退出条件，如果不满足退出条件，可以通过continue-current-task，申请更多的工具调用来继续执行任务，如果某个任务失败次数过多或者你认为无意义，可以选择放弃这个任务，或者通过finished来结束当前执行中的任务（进入下一步子任务）。"
     },
     "status_summary": {
       "type": "string",
-      "description": "当前执行工具调用后，有什么启发？需要包含当前任务的进度和总结信息和下一次任务的提示信息，这些提示信息会在后续的任务中使用到，帮助下一步进行更好决策"
+      "description": "当前尝试执行子任务的时候，判定子任务没有执行完，continue-current-task 将会继续执行这个子任务，需要总结当前子任务状态，以便后续决策，这个字段也可以用来记录中间失败次数或者中间状态累计信息"
     },
     "task_long_summary": {
       "type": "string",
