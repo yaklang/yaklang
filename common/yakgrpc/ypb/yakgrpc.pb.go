@@ -1555,20 +1555,21 @@ func (x *GetAIToolListRequest) GetPagination() *Paging {
 }
 
 type AIOutputEvent struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CoordinatorId string                 `protobuf:"bytes,1,opt,name=CoordinatorId,proto3" json:"CoordinatorId,omitempty"`
-	Type          string                 `protobuf:"bytes,2,opt,name=Type,proto3" json:"Type,omitempty"`
-	NodeId        string                 `protobuf:"bytes,3,opt,name=NodeId,proto3" json:"NodeId,omitempty"`
-	IsSystem      bool                   `protobuf:"varint,4,opt,name=IsSystem,proto3" json:"IsSystem,omitempty"`
-	IsStream      bool                   `protobuf:"varint,5,opt,name=IsStream,proto3" json:"IsStream,omitempty"`
-	IsReason      bool                   `protobuf:"varint,6,opt,name=IsReason,proto3" json:"IsReason,omitempty"`
-	StreamDelta   []byte                 `protobuf:"bytes,7,opt,name=StreamDelta,proto3" json:"StreamDelta,omitempty"`
-	IsJson        bool                   `protobuf:"varint,8,opt,name=IsJson,proto3" json:"IsJson,omitempty"`
-	Content       []byte                 `protobuf:"bytes,9,opt,name=Content,proto3" json:"Content,omitempty"`
-	Timestamp     int64                  `protobuf:"varint,10,opt,name=Timestamp,proto3" json:"Timestamp,omitempty"`
-	TaskIndex     string                 `protobuf:"bytes,11,opt,name=TaskIndex,proto3" json:"TaskIndex,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	CoordinatorId   string                 `protobuf:"bytes,1,opt,name=CoordinatorId,proto3" json:"CoordinatorId,omitempty"`
+	Type            string                 `protobuf:"bytes,2,opt,name=Type,proto3" json:"Type,omitempty"`
+	NodeId          string                 `protobuf:"bytes,3,opt,name=NodeId,proto3" json:"NodeId,omitempty"`
+	IsSystem        bool                   `protobuf:"varint,4,opt,name=IsSystem,proto3" json:"IsSystem,omitempty"`
+	IsStream        bool                   `protobuf:"varint,5,opt,name=IsStream,proto3" json:"IsStream,omitempty"`
+	IsReason        bool                   `protobuf:"varint,6,opt,name=IsReason,proto3" json:"IsReason,omitempty"`
+	StreamDelta     []byte                 `protobuf:"bytes,7,opt,name=StreamDelta,proto3" json:"StreamDelta,omitempty"`
+	IsJson          bool                   `protobuf:"varint,8,opt,name=IsJson,proto3" json:"IsJson,omitempty"`
+	Content         []byte                 `protobuf:"bytes,9,opt,name=Content,proto3" json:"Content,omitempty"`
+	Timestamp       int64                  `protobuf:"varint,10,opt,name=Timestamp,proto3" json:"Timestamp,omitempty"`
+	TaskIndex       string                 `protobuf:"bytes,11,opt,name=TaskIndex,proto3" json:"TaskIndex,omitempty"`
+	DisableMarkdown bool                   `protobuf:"varint,13,opt,name=DisableMarkdown,proto3" json:"DisableMarkdown,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *AIOutputEvent) Reset() {
@@ -1676,6 +1677,13 @@ func (x *AIOutputEvent) GetTaskIndex() string {
 		return x.TaskIndex
 	}
 	return ""
+}
+
+func (x *AIOutputEvent) GetDisableMarkdown() bool {
+	if x != nil {
+		return x.DisableMarkdown
+	}
+	return false
 }
 
 type AIInputEvent struct {
@@ -52345,7 +52353,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bToolName\x18\x02 \x01(\tR\bToolName\x12+\n" +
 	"\n" +
 	"Pagination\x18\x03 \x01(\v2\v.ypb.PagingR\n" +
-	"Pagination\"\xc5\x02\n" +
+	"Pagination\"\xef\x02\n" +
 	"\rAIOutputEvent\x12$\n" +
 	"\rCoordinatorId\x18\x01 \x01(\tR\rCoordinatorId\x12\x12\n" +
 	"\x04Type\x18\x02 \x01(\tR\x04Type\x12\x16\n" +
@@ -52358,7 +52366,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\aContent\x18\t \x01(\fR\aContent\x12\x1c\n" +
 	"\tTimestamp\x18\n" +
 	" \x01(\x03R\tTimestamp\x12\x1c\n" +
-	"\tTaskIndex\x18\v \x01(\tR\tTaskIndex\"\xa4\x02\n" +
+	"\tTaskIndex\x18\v \x01(\tR\tTaskIndex\x12(\n" +
+	"\x0fDisableMarkdown\x18\r \x01(\bR\x0fDisableMarkdown\"\xa4\x02\n" +
 	"\fAIInputEvent\x12\x18\n" +
 	"\aIsStart\x18\x01 \x01(\bR\aIsStart\x12*\n" +
 	"\x06Params\x18\x02 \x01(\v2\x12.ypb.AIStartParamsR\x06Params\x122\n" +
