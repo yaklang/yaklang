@@ -60,7 +60,9 @@ func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) (*ssa.Blueprint, s
 			return bluePrint, i.QualifiedNamespaceName().GetText()
 		}
 		name, s := y.VisitQualifiedNamespaceName(i.QualifiedNamespaceName())
-		//namespace := y.GetProgram().CurrentNameSpace
+		if len(name) == 1 && name[0] == s {
+			name = []string{""}
+		}
 		if library, _ := y.GetProgram().GetApplication().GetOrCreateLibrary(strings.Join(name, ".")); !utils.IsNil(library) {
 			if bluePrint := library.GetBluePrint(s); !utils.IsNil(bluePrint) {
 				return bluePrint, s

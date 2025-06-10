@@ -154,7 +154,7 @@ namespace {
     println($a->a);
 }`
 		ssatest.CheckSyntaxFlow(t, code, `println(* as $param);$param<fullTypeName><show> as $end`, map[string][]string{
-			"end": {`"A.A"`},
+			"end": {`"main.A"`},
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 	t.Run("parent class", func(t *testing.T) {

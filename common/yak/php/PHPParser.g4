@@ -487,7 +487,6 @@ staticClassExprFunctionMember: staticClass '::' identifier;
 staticClassExprVariableMember
     : staticClass '::' variable
     | staticClass '::' variable OpenSquareBracket expression? CloseSquareBracket
-
     ;
 
 staticClass 
