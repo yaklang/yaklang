@@ -84,14 +84,6 @@ $sink #{
 }-> as $mid;
 
 alert $mid for {
-	title: "",
-	title_zh: "",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "mid",
 	message: "发现Java cn.hutool.captcha验证码拒绝服务漏洞。",
 }
@@ -102,14 +94,6 @@ $sink #{
 
 $result - $mid as $low;
 alert $low for {
-	title: "",
-	title_zh: "",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "low",
 	message: "发现可能存在Java cn.hutool.captcha验证码拒绝服务漏洞。",
 }

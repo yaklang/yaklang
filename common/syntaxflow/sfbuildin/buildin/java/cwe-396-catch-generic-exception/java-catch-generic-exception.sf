@@ -23,7 +23,6 @@ try {
     logger.error("An error occurred", e);
 }
 ```
-
 在这个例子中，`performOperation()` 方法可能抛出 `IOException`、`SQLException`、`NullPointerException` 等多种异常，但都被同一个 `catch (Exception e)` 块捕获并处理，导致无法根据异常类型执行不同的错误处理逻辑。
 
 3. **潜在影响**
@@ -31,6 +30,7 @@ try {
 - **掩盖逻辑错误**：意外捕获 `RuntimeException` 等本应导致程序中止的异常，使得潜在的编程错误（如空指针、类型转换错误）被掩盖，导致程序行为异常但无明显错误提示。
 - **可维护性下降**：当方法抛出新的异常类型时，泛型捕获块不会强制开发者更新异常处理逻辑，可能导致新引入的异常未得到正确处理。
 - **调试困难**：由于异常被泛型捕获，堆栈跟踪可能不够精确，增加调试复杂性。
+
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -92,15 +92,9 @@ REFERENCE
 $exception?{<typeName()>?{have:/^(Exception|Throwable|Error|RuntimeException)$/}} as $generic_exception
 
 alert $generic_exception for {
-	level: "low",
 	title: "Detect Java Generic Exception Catching",
 	title_zh: "检测Java泛型异常捕获",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
+	level: "low",
 }
 
 desc(

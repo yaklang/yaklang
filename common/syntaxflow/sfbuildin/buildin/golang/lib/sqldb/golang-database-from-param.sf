@@ -13,17 +13,7 @@ TEXT
 *.QueryRow<getFunc><getFormalParams> as $entry 
 $entry #-> as $output;
 
-alert $output for {
-	title_zh: "",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
-	level: "",
-	title: "",
-}
+alert $output
 
 desc(
 	lang: golang

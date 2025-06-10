@@ -19,7 +19,7 @@ desc(
    // 存在漏洞的代码示例
    namespace app\index\controller;
    use think\Controller;
-   
+
    class User extends Controller {
        public function deleteUser() {
            $userId = input('user_id'); // 未经验证的用户输入
@@ -34,7 +34,6 @@ desc(
    - 恶意用户可提升自身权限
    - 系统关键功能被未授权操纵
    - 可能导致数据泄露或系统完整性破坏
-
 DESC
 	rule_id: "f0c086d0-c004-4367-abd7-d16ca50de3d9"
 	solution: <<<SOLUTION
@@ -100,12 +99,6 @@ CODE}->} as $sink
 alert $sink for {
 	title: "Detect PHP ThinkPHP Authentication Bypass Vulnerability",
 	title_zh: "检测PHP ThinkPHP认证绕过漏洞",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "high",
 }
 desc(

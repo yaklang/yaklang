@@ -58,12 +58,6 @@ REFERENCE
 /^(echo|print|print_r|exit|die|sprint|var_dump|var_export|show_source|highlight_file)$/ as $output
 
 alert $output for {
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "info",
 	title: "Audit PHP XSS Methods",
 	title_zh: "审计PHP XSS相关方法",

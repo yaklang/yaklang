@@ -4,12 +4,24 @@ desc(
 	type: audit
 	lib: 'is-contain-sanitizer'
 	desc: <<<DESC
-### 1.规则目的
-该规则用于查找Java代码中是否有方法包含"contain"。该规则期望输入的参数的opcode为call，如果该call名称包含"contain"则会返回call原值。
-该规则常用于确认数据流分析中是否有白名单校验、字符串检验等操作。
+### 1. 规则目的
+该规则用于查找Java代码中是否存在包含"contain"关键字的方法调用。此规则期望输入参数的操作码为`call`，如果该调用名称包含"contain"，则返回调用的原始值。该规则常用于确认数据流分析中是否涉及白名单校验、字符串校验等操作。
 
-### 2.规则详细
-该规则属于查找类规则，常用于辅助数据流分析，用于识别代码中可能存在的字符串包含校验、白名单过滤等操作。通过识别包含"contain"关键字的方法调用，可以进一步分析这些方法是否被用于实现安全过滤或输入验证机制，从而判断数据流是否经过了适当的净化处理。
+### 2. 规则详细
+该规则属于查找类规则，主要用于辅助数据流分析，识别代码中可能存在的字符串包含校验或白名单过滤操作。通过识别包含"contain"关键字的方法调用，可以进一步分析这些方法是否用于实现安全过滤或输入验证机制，从而判断数据流是否经过了适当的净化处理。
+
+例如，在以下场景中，该规则能够检测到相关调用：
+```java
+public class Demo {
+    public static void main(String[] args) {
+        String str = "hello";
+        if (str.contains("he")) { // 包含"contain"关键字的调用
+            System.out.println("ok");
+        }
+    }
+}
+```
+上述代码中的`str.contains("he")`调用会被匹配并返回。
 DESC
 	rule_id: "43b46725-0b30-4e2f-9559-0d7a30e6b668"
 	solution: <<<SOLUTION
@@ -23,12 +35,6 @@ $input?{opcode:call && have:"contain"} as $output;
 alert $output for {
 	title: "Find Java Contain Sanitizer",
 	title_zh: "查找Java含有contain方法的过滤器",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "mid",
 }
 

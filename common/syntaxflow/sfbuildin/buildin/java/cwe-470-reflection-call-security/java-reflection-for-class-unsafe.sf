@@ -16,7 +16,6 @@ desc(
    - 反序列化过程中使用用户控制的类名。
    - Web框架中通过请求参数指定要调用的Service或Controller类。
    
-   // 存在漏洞的代码示例
    ```java
    package org.learn;
    import java.util.ArrayList;
@@ -95,15 +94,9 @@ $resource #{
 }->
 check $calc;
 alert $calc for {
-	title_zh: "审计Java中Class.forName的不安全反射调用",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
-	level: "low",
 	title: "Audit Java Unsafe Reflection for Class.forName",
+	title_zh: "审计Java中Class.forName的不安全反射调用",
+	level: "low",
 }
 
 

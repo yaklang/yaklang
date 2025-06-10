@@ -78,12 +78,6 @@ check $vuln;
 alert $vuln for {
 	title: "Check PHP simplexml_load_string for XXE Vulnerability",
 	title_zh: "检测PHP simplexml_load_string XXE漏洞",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "high",
 }
 

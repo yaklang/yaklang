@@ -12,7 +12,7 @@ desc(
    在 Java 中，`finally` 块通常用来执行必要的资源清理操作，例如关闭文件流、数据库连接等，无论 `try` 块是否抛出异常都会执行。然而，如果在 `finally` 块中本身又抛出了一个新的异常，这个新的异常将会取代并覆盖掉 `try` 或 `catch` 块中可能抛出的原始异常。这意味着原始异常的信息将会丢失，并且 `finally` 块中所有后续的代码（包括重要的资源清理代码）都将不会被执行。这会导致资源泄漏，并使调试变得困难，因为真正的错误原因（原始异常）被隐藏了（对应 CWE-460: Improper Cleanup on Thrown Exception）。
 
 2. **触发场景**
-   当 `finally` 块中包含可能抛出异常的代码，并且 `try` 或 `catch` 块中也抛出了异常时，就会触发此问题。例如，在关闭资源时如果再次发生异常，且该异常未被妥善处理，就可能覆盖先前の异常，导致资源清理不完全。
+   当 `finally` 块中包含可能抛出异常的代码，并且 `try` 或 `catch` 块中也抛出了异常时，就会触发此问题。例如，在关闭资源时如果再次发生异常，且该异常未被妥善处理，就可能覆盖先前的异常，导致资源清理不完全。
 
    ```java
    public void processData() throws SomeBusinessException {
@@ -144,12 +144,6 @@ $finally<scanInstruction>?{opcode:throw} as $throw
 alert $throw for {
 	title: "Check Java Improper Cleanup on Thrown Exception Vulnerability",
 	title_zh: "检测Java异常抛出时资源未清理漏洞",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "mid",
 }
 

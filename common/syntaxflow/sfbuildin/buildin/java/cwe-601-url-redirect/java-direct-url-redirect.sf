@@ -24,13 +24,14 @@ desc(
      String site = request.getParameter("site");
      return "redirect:http://" + site + ".example.com/welcome"; // 如果site包含特殊字符，可能被绕过
      ```
-     攻击者可能构造 `?site=malicious-site.com/..
+     攻击者可能构造 `?site=malicious-site.com/..`
 
 3. **潜在影响**
    - **网络钓鱼：** 攻击者将用户重定向到外观逼真但虚假的登录页面，窃取用户凭据。
    - **恶意软件分发：** 将用户重定向到包含恶意软件下载链接的页面。
    - **XSS攻击辅助：** 在某些特定配置下，开放重定向可以被利用来绕过Same-Origin Policy，辅助实施XSS攻击。
    - **绕过安全检查：** 可能被用于绕过一些基于来源判断的安全检查或统计。
+
 DESC
 	rule_id: "56a91b23-787c-4c35-a4b9-dcf51521c20f"
 	solution: <<<SOLUTION
@@ -109,6 +110,7 @@ public class SecureRedirectController {
 }
 ```
 在上述示例中，`safeRedirect` 方法通过白名单校验目标URL的域名，`safeRelativeRedirect` 限制重定向到应用内的相对路径。实际应用中应根据具体需求选择和组合这些防御方法。
+
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-601: URL Redirection to Untrusted Site ('Open Redirect')](https://cwe.mitre.org/data/definitions/601.html)
@@ -132,33 +134,21 @@ $sink #{
 }->as $result;
 
 alert $result for {
-	title_zh: "检测Java URL重定向漏洞",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
-	level: "high",
 	message: "Find direct URL redirect vulnerability for java",
 	type: "vuln",
 	title: "Check Java URL Redirect Vulnerability",
+	title_zh: "检测Java URL重定向漏洞",
+	level: "high",
 }
 
 
 $result - $high  as $low;
 alert $low for {
+	level: "low",
 	type: "vuln",
+	message: "Find possible URL redirect vulnerability for java",
 	title: "Check Java URL Redirect Vulnerability",
 	title_zh: "检测Java URL重定向漏洞",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
-	level: "low",
-	message: "Find possible URL redirect vulnerability for java",
 }
 
 

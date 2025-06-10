@@ -15,27 +15,31 @@ desc(
    此规则属于`java-alibaba-druid-httpclientutil`库规则（`lib`类型），其主要目的是作为基础审计规则，帮助定位使用了`HttpClientUtils`进行HTTP请求的代码位置。它本身并不直接检测具体的漏洞，而是为后续更精细的规则提供检测目标。
 4. **潜在风险**
    尽管`HttpClientUtils`在某些场景下便捷，但在处理复杂的网络环境、需要高级安全特性（如严格的SSL/TLS配置、代理设置、连接池管理等）或面对恶意构造的HTTP响应时，可能不如行业标准库安全可靠。不恰当的使用也可能导致敏感信息泄露或请求伪造。
+
+### 示例代码
+以下为一个使用`HttpClientUtils`的示例代码：
+```java
+import com.alibaba.druid.util.HttpClientUtils;
+
+public class HttpClientUtilsExample {
+    public static void main(String[] args) {
+        // 发送 GET 请求
+        String url = "https://api.github.com/users/github";
+        String responseGet = HttpClientUtils.get(url);
+        System.out.println("GET Response: " + responseGet);
+
+        // 发送 POST 请求
+        String postUrl = "http://httpbin.org/post";
+        String postData = "{\"name\":\"DruidUser\",\"job\":\"Developer\"}";
+        String responsePost = HttpClientUtils.post(postUrl, postData);
+        System.out.println("POST Response: " + responsePost);
+    }
+}
+```
 DESC
 	rule_id: "169acfeb-d24a-4f93-ab9e-9c0f38ce77e4"
 	solution: <<<SOLUTION
-### 修复建议
-
-#### 1. 考虑使用更成熟的HTTP客户端库
-对于生产环境或对安全性要求较高的场景，建议优先考虑使用业界广泛认可和维护更积极的HTTP客户端库，如：
-- **Apache HttpClient:** 功能丰富、稳定，提供了细致的配置选项。
-- **OkHttp:** 现代、高效，被广泛用于Android和Java应用程序。
-这些库通常在安全性、性能和可靠性方面有更好的表现。
-
-#### 2. 仔细审查和验证使用`HttpClientUtils`的代码
-如果必须使用`HttpClientUtils`，请对相关代码进行全面审计，特别关注以下几点：
-*   **URL验证:** 确保请求的URL是预期的，防止开放重定向或请求伪造。
-*   **请求参数和头部:** 对用户提供的参数和头部进行严格的输入清理和验证，防止注入攻击或其他数据篡改。
-*   **响应处理:** 安全地处理收到的HTTP响应，特别是JSON、XML或其他结构化数据，避免解析漏洞。
-*   **错误处理:** 合理处理HTTP请求过程中可能出现的异常，防止敏感信息泄露或拒绝服务。
-*   **SSL/TLS配置:** 确认HTTPS连接的证书验证是启用的，并且使用最新的安全协议版本。
-
-#### 3. 在可能的情况下替换为标准库
-逐步将代码中对`HttpClientUtils`的依赖替换为更安全的HTTP客户端库，如Apache HttpClient或OkHttp。虽然替换可能需要一些工作量，但能显著提升应用程序的安全性。
+none
 SOLUTION
 	reference: <<<REFERENCE
 none
@@ -46,15 +50,9 @@ REFERENCE
 HttpClientUtils?{<fullTypeName>?{have: 'alibaba.druid'}} as $entry;
 $entry./get|post/(, * as $output,);
 alert $output for {
-	desc: <<<CODE
-
-CODE
-	level: "mid",
 	title: "Audit Java Alibaba Druid HttpClientUtils Uses",
 	title_zh: "审计Java Alibaba Druid HttpClientUtils的使用",
-	solution: <<<CODE
-
-CODE
+	level: "mid",
 }
 
 

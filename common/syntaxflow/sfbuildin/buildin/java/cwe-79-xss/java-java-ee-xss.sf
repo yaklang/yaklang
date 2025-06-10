@@ -25,7 +25,7 @@ desc(
    </head>
    <body>
        <h2>User Input:</h2>
-       <div>${sessionScope.userInput}</div> <%-- 直接输出session中的用户输入，存在XSS风险 --%>
+       <div>${sessionScope.userInput}</div> <!-- 直接输出session中的用户输入，存在XSS风险 -->
    </body>
    </html>
    ```
@@ -45,7 +45,7 @@ DESC
   ```jsp
   <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
   ...
-  <div><c:out value="${sessionScope.userInput}"/></div> <%-- JSTL <c:out> 标签自动进行转义 --%>
+  <div><c:out value="${sessionScope.userInput}"/></div> <!-- JSTL <c:out> 标签自动进行转义 -->
   ```
 
 - **手动使用转义工具类**：部分第三方库（如OWASP ESAPI, Apache Commons Text）提供了专门用于各种上下文（HTML、JavaScript、CSS等）的安全转义函数。
@@ -60,7 +60,7 @@ DESC
   ```jsp
   <%@ taglib uri="/WEB-INF/tlds/myfunctions.tld" prefix="my" %>
   ...
-  <div>${my:escapeHtml(sessionScope.userInput)}</div> <%-- 自定义转义EL函数 --%>
+  <div>${my:escapeHtml(sessionScope.userInput)}</div> <!-- 自定义转义EL函数 -->
   ```
 
 #### 2. 采用安全的模板引擎或UI框架
@@ -86,17 +86,11 @@ $sink #{
     exclude:`* <getCallee> & $filter`
 }-> as $result;
 alert $result for {
-	message: "Find Java EE's XSS Vulnerability",
-	type: "vuln",
 	title: "Check Java EE XSS Vulnerability",
 	title_zh: "检测Java EE的XSS漏洞",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "high",
+	message: "Find Java EE's XSS Vulnerability",
+	type: "vuln",
 }
 
 

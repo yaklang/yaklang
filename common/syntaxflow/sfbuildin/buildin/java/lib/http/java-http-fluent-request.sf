@@ -3,19 +3,44 @@ desc(
 	type: audit
 	lib: "java-http-fluent-request"
 	desc: <<<DESC
-### 1.规则目的
-该规则用于审计使用Apache HttpClient Fluent API发送HTTP请求的代码。Fluent API提供了一种简化发送HTTP请求的方式，但如果没有适当的安全措施，可能会引入安全风险。
+### 规则描述
 
-### 2.规则详细
-1. **作为基础审计库**
-   属于`java-http-fluent-request`库规则(`lib`类型)，用于识别代码中使用了Apache HttpClient Fluent API发送请求的位置。
+1. **规则目的**
+   该规则用于审计使用Apache HttpClient Fluent API发送HTTP请求的代码。Fluent API提供了一种简化发送HTTP请求的方式，但如果没有适当的安全措施，可能会引入安全风险。
 
-2. **识别HTTP请求方法**
-   识别以下HTTP请求方法：`Get`, `Post`, `Put`, `Delete`, `Patch`, `Options`, `Head`, `Trace`。
+2. **规则详细**
+   - **作为基础审计库**
+     属于`java-http-fluent-request`库规则(`lib`类型)，用于识别代码中使用了Apache HttpClient Fluent API发送请求的位置。
+   - **识别HTTP请求方法**
+     识别以下HTTP请求方法：`Get`, `Post`, `Put`, `Delete`, `Patch`, `Options`, `Head`, `Trace`。
+
+3. **触发场景**
+   ```java
+   package src.main.b;
+   import org.apache.http.client.fluent.Request;
+   import org.apache.http.client.fluent.Response;
+
+   public class FluentGetExample {
+       public static void main(String[] args) {
+           try {
+               // 发送 GET 请求并获取响应
+               Response response = Request.Get("http://httpbin.org/get")
+                       .execute();
+               String responseBody = response.returnContent().asString();
+
+               System.out.println("Response Body:");
+               System.out.println(responseBody);
+           } catch (Exception e) {
+               e.printStackTrace();
+           }
+       }
+   }
+   ```
+   在上述示例中，开发者使用了Apache HttpClient Fluent API来发送一个GET请求。如果目标URL或参数被攻击者控制，可能引发SSRF（服务器端请求伪造）等安全问题。
 DESC
 	rule_id: "9323ce34-f898-40ca-b03d-4e4ffcc16dc8"
 	reference: <<<REFERENCE
-none
+[CWE-20](https://cwe.mitre.org/data/definitions/20.html)
 REFERENCE
 	title_zh: "审计Java HTTP Fluent Request"
 	solution: <<<SOLUTION
@@ -31,12 +56,6 @@ $execMethods(,* as $output);
 <delete(methods)>
 <delete(execMethods)>
 alert $output for {
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "mid",
 	title: "Audit Java HTTP Fluent Request",
 	title_zh: "审计Java HTTP Fluent Request",

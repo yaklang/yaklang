@@ -89,12 +89,6 @@ check $output;
 alert $output for {
 	title: "Audit Java JDBC Prepared Statement Execute Query",
 	title_zh: "审计Java JDBC PreparedStatement 执行查询",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "mid",
 }
 

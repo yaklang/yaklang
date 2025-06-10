@@ -14,9 +14,7 @@ SSRF 漏洞通常发生在应用程序需要从外部获取资源的情况下，
 * 调用外部服务的 API。
 * 进行文件上传或下载时指定外部 URL。
 
-未对用户提供的 URL 或相关参数进行严格的白名单验证或黑名单过滤，是触发 SSRF 漏洞的关键。
-
-例如，以下 Go 代码片段直接使用用户输入的 `url` 参数发起 HTTP 请求：
+以下代码片段展示了漏洞可能被触发的情况：
 ```golang
 func handler(w http.ResponseWriter, r *http.Request) {
 	url := r.URL.Query().Get("url") // 直接从查询参数获取URL
@@ -45,6 +43,7 @@ REFERENCE
 * 黑名单机制：如果场景复杂无法使用白名单，则使用黑名单机制过滤掉危险协议（如 `file://`, `gopher://`）、本地 IP 地址（如 `127.0.0.1`, `0.0.0.0`, 内网 IP 段）、以及指向敏感服务的端口。但黑名单容易被绕过，不如白名单安全。
 * URL 解析与验证：使用 Go 标准库 `net/url` 解析 URL，然后对解析出的协议、主机名、端口等部分进行单独验证，而不是直接匹配字符串。这可以防止解析差异导致的绕过。
 
+示例代码如下：
 ```golang
 import (
 	"net/url"
@@ -112,98 +111,10 @@ $output.URL.Query().Get() #-> as $sink;
 $sink?{opcode: param} as $mid
 
 alert $mid for {
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-服务器端请求伪造（Server-Side Request Forgery, SSRF）是一种安全漏洞，攻击者能够控制或影响服务器端应用程序请求的目标。在 Go 语言应用中，如果程序接收用户输入的 URL 或相关参数，并在未对输入进行充分验证和过滤的情况下，直接将用户输入用于发起网络请求（如HTTP、文件读取等），则可能导致 SSRF 漏洞。攻击者可以构造恶意请求，使服务器请求内部网络资源、敏感服务，甚至进行端口扫描或攻击内网其他主机，从而导致敏感信息泄露、内部系统受攻击等风险。
-
-2. **触发场景**
-SSRF 漏洞通常发生在应用程序需要从外部获取资源的情况下，例如：
-* 通过 URL 参数获取网页内容、图片或文件。
-* 调用外部服务的 API。
-* 进行文件上传或下载时指定外部 URL。
-
-未对用户提供的 URL 或相关参数进行严格的白名单验证或黑名单过滤，是触发 SSRF 漏洞的关键。
-
-例如，以下 Go 代码片段直接使用用户输入的 `url` 参数发起 HTTP 请求：
-```golang
-func handler(w http.ResponseWriter, r *http.Request) {
-	url := r.URL.Query().Get("url") // 直接从查询参数获取URL
-	resp, err := http.Get(url) // 直接使用用户输入的URL发起HTTP请求
-	// ...
-}
-```
-CODE
-	level: "mid",
-	type: "vuln",
 	title: "SSRF detected",
 	title_zh: "检测到SSRF",
-	solution: <<<CODE
-
-#### 2. 提取修复建议（solution）
-
-修复建议部分将包含针对SSRF漏洞的修复措施。以下是从当前文件中提取并格式化的内容：
-
-```plaintext
-### 修复建议
-
-#### 1. 严格校验和过滤用户输入的 URL
-* 白名单机制：优先使用白名单机制，只允许请求预设的、安全的域名或 IP 地址。对于不在许可范围内的 URL，拒绝请求。
-* 黑名单机制：如果场景复杂无法使用白名单，则使用黑名单机制过滤掉危险协议（如 `file://`, `gopher://`）、本地 IP 地址（如 `127.0.0.1`, `0.0.0.0`, 内网 IP 段）、以及指向敏感服务的端口。但黑名单容易被绕过，不如白名单安全。
-* URL 解析与验证：使用 Go 标准库 `net/url` 解析 URL，然后对解析出的协议、主机名、端口等部分进行单独验证，而不是直接匹配字符串。这可以防止解析差异导致的绕过。
-
-```golang
-import (
-	"net/url"
-	"net/http"
-	"strings"
-	"net"
-)
-
-func isSafeURL(inputURL string) bool {
-	p, err := url.Parse(inputURL)
-	if err != nil {
-		return false // 解析错误
-	}
-
-	// 白名单：只允许http和https协议
-	if p.Scheme != "http" && p.Scheme != "https" {
-		return false
-	}
-
-	// 黑名单：不允许本地IP和内网IP
-	host := p.Hostname()
-	addrs, err := net.LookupIP(host) // 解析域名获取IP
-	if err != nil {
-		return false // 无法解析的域名
-	}
-	for _, addr := range addrs {
-		if addr.IsLoopback() || addr.IsPrivate() { // 判断是否为本地或内网IP
-			return false
-		}
-	}
-	return true
-}
-
-func handler(w http.ResponseWriter, r *http.Request) {
-	urlParam := r.URL.Query().Get("url")
-	if urlParam == "" {
-		http.Error(w, "URL parameter is missing", http.StatusBadRequest)
-		return
-	}
-
-	if !isSafeURL(urlParam) {
-		http.Error(w, "Unsafe URL", http.StatusBadRequest)
-		return
-	}
-
-	// 发送请求 (使用已验证的 urlParam)
-	resp, err := http.Get(urlParam)
-	// ... rest of handler logic
-}
-
-CODE
+	level: "mid",
+	type: "vuln",
 }
 
 desc(

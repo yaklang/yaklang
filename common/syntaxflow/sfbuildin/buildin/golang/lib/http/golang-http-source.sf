@@ -28,17 +28,7 @@ REFERENCE
 http.Request.URL.Query().Get() as $output 
 
 
-alert $output for {
-	title: "",
-	title_zh: "",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
-	level: "",
-}
+alert $output
 
 
 desc(

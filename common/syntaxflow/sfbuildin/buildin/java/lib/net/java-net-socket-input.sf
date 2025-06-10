@@ -27,7 +27,8 @@ DESC
 none
 SOLUTION
 	reference: <<<REFERENCE
-none
+https://owasp.org/www-community/vulnerabilities/Unvalidated_Input
+https://cwe.mitre.org/data/definitions/20.html
 REFERENCE
 )
 
@@ -38,15 +39,9 @@ REFERENCE
 .read()?{<typeName>?{have: 'java.nio.channels.SocketChannel'}} as $output;
 
 alert $output for {
+	level: "mid",
 	title: "Audit Java TCP Data Reception Point",
 	title_zh: "审计Java TCP数据接收点",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
-	level: "mid",
 }
 
 

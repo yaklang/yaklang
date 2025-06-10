@@ -4,6 +4,7 @@ desc(
 	risk:DDOS
 	reference: <<<REFERENCE
 [URL](https://docs.oracle.com/javase/8/docs/api/java/lang/StringBuilder.html)
+[CWE-400](https://cwe.mitre.org/data/definitions/400.html)
 REFERENCE
 	rule_id: "76220d53-28f1-45e2-bc45-b059e76739dd"
 	solution: <<<SOLUTION
@@ -83,16 +84,10 @@ $sink#{
 }-> as $result;
 
 alert $result for {
+	title_zh: "检测Java StringBuilder 拒绝服务漏洞",
 	level: "mid",
 	message: "发现Java的java.lang.StringBuilder可能存在ddos漏洞",
 	title: "Check Java StringBuilder Denial of Service Vulnerability",
-	title_zh: "检测Java StringBuilder 拒绝服务漏洞",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 }
 
 desc(

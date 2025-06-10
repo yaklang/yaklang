@@ -2,6 +2,7 @@ package sfvm
 
 import (
 	"fmt"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"io"
 	"strconv"
@@ -180,7 +181,7 @@ func (f *RuleFormat) VisitAlertStatement(alert sf.IAlertStatementContext) {
 			f.Write(fmt.Sprintf("alert $%s for {\n", variable))
 			for key, value := range alertMsg {
 				newVal := f.alertHandler(variable, key, value)
-				if newVal == "" {
+				if lo.Contains([]string{"none", ""}, newVal) {
 					continue
 				}
 				switch key {

@@ -24,7 +24,7 @@ desc(
    - **数据篡改**: 攻击者可以修改或删除数据库中的数据。
    - **权限绕过**: 攻击者可以绕过应用程序的认证或授权机制。
    - **拒绝服务**: 攻击者可以通过执行耗费资源的查询或操作导致数据库性能下降甚至崩溃。
-   - **进一步渗透**: 在某些情况下，攻擊者可以利用数据库的特性执行操作系统命令或读取文件，从而进一步攻击服务器。
+   - **进一步渗透**: 在某些情况下，攻击者可以利用数据库的特性执行操作系统命令或读取文件，从而进一步攻击服务器。
 DESC
 	rule_id: "b86d3bfb-98d4-437d-bf7b-d5c43e012425"
 	title_zh: "检测Java SQL字符串拼接查询"
@@ -91,12 +91,6 @@ $params?{!opcode: const}#{
 alert $flag for {
 	title: "Check Java SQL String Append Query",
 	title_zh: "检测Java SQL字符串拼接查询",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "low",
 }
 

@@ -178,12 +178,6 @@ check $readObj;
 alert $readObj for {
 	title: "Check Java Native Deserialization Vulnerability",
 	title_zh: "检测Java原生反序列化漏洞",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "info",
 	message: "发现使用ObjectInputStream的readObject()方法进行反序列化操作，可能存在反序列化漏洞",
 }
@@ -198,16 +192,10 @@ $sink #{
 }-> as $mid;
 
 alert $mid for {
-	title: "Check Java Native Deserialization Vulnerability",
-	title_zh: "检测Java原生反序列化漏洞",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "mid",
 	message: "发现从用户可控输入到ObjectInputStream的readObject的数据流，可能存在反序列化漏洞",
+	title: "Check Java Native Deserialization Vulnerability",
+	title_zh: "检测Java原生反序列化漏洞",
 }
 
 

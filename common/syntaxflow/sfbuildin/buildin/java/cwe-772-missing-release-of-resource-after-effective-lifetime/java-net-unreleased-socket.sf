@@ -3,24 +3,11 @@ desc(
 	title: "Check Java Socket Unreleased Resource"
 	risk:"资源泄漏",
 	reference: <<<REFERENCE
-https://docs.oracle.com/javase/8/docs/api/java/net/Socket.html
-https://cwe.mitre.org/data/definitions/772.html
+[CWE-772](https://cwe.mitre.org/data/definitions/772.html)
+[Java Socket 文档](https://docs.oracle.com/javase/8/docs/api/java/net/Socket.html)
 REFERENCE
 	description: <<<DESCRIPTION
-## 漏洞描述
 
-应用程序创建了 `java.net.Socket`、`java.net.ServerSocket` 或 `java.net.SocketImpl` 类的实例后，未在使用完毕时通过调用 `close()` 方法正确关闭这些网络资源。这属于 CWE-772（有效生命周期后未释放资源）漏洞，会导致网络端口和系统资源泄漏。
-
-网络套接字比普通文件句柄更加关键，因为它们会占用有限的网络端口资源。如果套接字未正确关闭，对应的端口可能会长时间处于 TIME_WAIT 状态，无法被重新使用，直到操作系统的超时机制生效。
-
-## 风险影响
-
-- 网络端口资源泄漏，导致可用端口耗尽
-- TCP 连接无法正常关闭，占用系统网络栈资源
-- 应用可能遇到 "Address already in use" 或 "Too many open files" 错误
-- 服务器性能随时间下降，尤其在高并发环境中
-- 长时间运行的服务可能需要定期重启以释放资源
-- 可能影响其他应用程序的网络连接能力
 DESCRIPTION
 	solution: <<<SOLUTION
 ### 修复建议
@@ -79,8 +66,9 @@ executor.submit(() -> {
         System.err.println("处理客户端连接时出错: " + e.getMessage());
     }
 });
-```
 并且，确保在应用程序关闭时或不再需要监听时，正确关闭 `ServerSocket` 以及关联的线程池。
+```
+
 SOLUTION
 	rule_id: "4dd5053f-36a9-4f35-83a9-aeb40fc43094"
 )
@@ -97,16 +85,7 @@ $socket -{
 $safe<getPredecessors()> as $safeSocket;
 $socket - $safeSocket as $weak;
 alert $weak for {
-	title_zh: "",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
-	level: "",
 	message: "检测到java.io未释放的资源",
-	title: "",
 }
 
 desc(
