@@ -40,7 +40,7 @@ func (t *aiTask) execute() error {
 
 		action, err = ExtractAction(response, "direct-answer", `require-tool`)
 		if err != nil {
-			return utils.Errorf("error extracting action (direct-answer/require-tool): %w", err)
+			return utils.Errorf("error extracting @action (direct-answer/require-tool): %w， check miss \"@action\" field in object or @action bad str value", err)
 		}
 
 		if action.GetString("@action") == "direct-answer" {

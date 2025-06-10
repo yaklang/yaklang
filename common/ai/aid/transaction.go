@@ -86,13 +86,14 @@ func (c *Config) callAiTransaction(
 }
 
 var retryPromptTemplate = `
-你现在正在处理一个任务，但由于某些原因需要重新开始。请根据以下信息回答：
-# 重试原因
-{{ .RetryReason }}
-
-# 原始提示
 {{ .RawPrompt }}
 
+# 错误处理：
+注意，你生成的结果在之前已经犯过错误，这是上次失败的原因：
+{{ .RetryReason }}
+请你在生成结果时，注意不要再犯同样的错误。
+# 如何修正？
+如果要生成 action/@action JSON 可以参考后面的案例，注意格式遵守：{"@action": "...", ... }
 `
 
 func (c *Config) RetryPromptBuilder(rawPrompt string, retryErr error) string {
