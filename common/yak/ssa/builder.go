@@ -384,7 +384,7 @@ func (b *FunctionBuilder) GenerateDependence(pkgs []*dxtypes.Package, filename s
 			"version":  pkg.Version,
 			"filename": filename,
 		} {
-			constInst := b.EmitConstInst(v, true)
+			constInst := b.EmitConstInstPlaceholder(v)
 			if rng != nil {
 				constInst.SetRange(rng)
 			}
@@ -429,11 +429,11 @@ func (b *FunctionBuilder) GenerateProjectConfig() {
 			} else {
 				b.SetEmptyRange()
 			}
-			variable := b.CreateMemberCallVariable(config, b.EmitConstInst(k, true))
-			b.AssignVariable(variable, b.EmitConstInst(cv, true))
+			variable := b.CreateMemberCallVariable(config, b.EmitConstInstPlaceholder(k))
+			b.AssignVariable(variable, b.EmitConstInstPlaceholder(cv))
 
 			val := b.CreateVariable("test")
-			b.AssignVariable(val, b.EmitConstInst(cv, true))
+			b.AssignVariable(val, b.EmitConstInstPlaceholder(cv))
 		}
 	}
 	return

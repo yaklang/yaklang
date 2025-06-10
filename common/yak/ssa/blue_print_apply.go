@@ -113,7 +113,7 @@ func (c *Blueprint) Apply(obj Value) Type {
 	for rawKey, member := range c.NormalMember {
 		typ := member.GetType()
 		value := member
-		key := builder.EmitConstInst(rawKey, true)
+		key := builder.EmitConstInstPlaceholder(rawKey)
 		log.Infof("apply key: %s, member: %v", key, member)
 
 		objTyp.AddField(key, typ)

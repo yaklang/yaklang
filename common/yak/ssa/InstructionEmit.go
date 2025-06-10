@@ -389,8 +389,8 @@ func (f *FunctionBuilder) EmitConstInstNil() *ConstInst {
 }
 
 func (f *FunctionBuilder) EmitConstPointer(o *Variable) Value {
-	keys := []Value{f.EmitConstInst("@pointer", true), f.EmitConstInst("@value", true)}
-	values := []Value{f.EmitConstInst(fmt.Sprintf("%s#%d", o.GetName(), o.GetGlobalIndex()), true), o.GetValue()}
+	keys := []Value{f.EmitConstInstPlaceholder("@pointer"), f.EmitConstInstPlaceholder("@value")}
+	values := []Value{f.EmitConstInstPlaceholder(fmt.Sprintf("%s#%d", o.GetName(), o.GetGlobalIndex())), o.GetValue()}
 
 	pointer := f.InterfaceAddFieldBuild(2, func(i int) Value {
 		return keys[i]
@@ -407,15 +407,15 @@ func (f *FunctionBuilder) EmitConstPointer(o *Variable) Value {
 }
 
 func (f *FunctionBuilder) GetOriginPointer(p Value) *Variable {
-	o := f.CreateMemberCallVariable(p, f.EmitConstInst("@pointer", true), true)
+	o := f.CreateMemberCallVariable(p, f.EmitConstInstPlaceholder("@pointer"), true)
 	o.SetKind(ssautil.PointerVariable)
 
 	return o
 }
 
 func (f *FunctionBuilder) GetOriginValue(obj Value) Value {
-	v := f.ReadMemberCallValue(obj, f.EmitConstInst("@value", true))
-	p := f.ReadMemberCallValue(obj, f.EmitConstInst("@pointer", true))
+	v := f.ReadMemberCallValue(obj, f.EmitConstInstPlaceholder("@value"))
+	p := f.ReadMemberCallValue(obj, f.EmitConstInstPlaceholder("@pointer"))
 
 	n := strings.TrimPrefix(p.String(), "&")
 	originName, originGlobalId := SplitName(n)
@@ -437,12 +437,20 @@ func (f *FunctionBuilder) EmitConstInstWithUnary(i any, un int) *ConstInst {
 	return ci
 }
 
-func (f *FunctionBuilder) EmitConstInst(i any, isPlaceholder ...bool) *ConstInst {
+func (f *FunctionBuilder) EmitConstInstPlaceholder(i any) *ConstInst {
+	return f.emitConstInst(i, true)
+}
+
+func (f *FunctionBuilder) EmitConstInst(i any) *ConstInst {
+	return f.emitConstInst(i, false)
+}
+
+func (f *FunctionBuilder) emitConstInst(i any, isPlaceholder bool) *ConstInst {
 	safeString := memedit.NewSafeString(i)
 	if safeString.Len() > 1024*5 {
 		i = safeString.SliceBeforeStart(1024 * 5)
 	}
-	ci := NewConst(i, isPlaceholder...)
+	ci := NewConst(i, isPlaceholder)
 	f.emit(ci)
 	if ci.IsNormalConst() {
 		f.GetProgram().AddConstInstruction(ci)
@@ -484,9 +492,9 @@ func (f *FunctionBuilder) EmitNext(iter Value, isIn bool) (key, field, ok Value)
 	}
 	n := f.EmitNextOnly(iter, isIn)
 	// n iter-type: map[T]U   n-type {key: T, field: U, ok: bool}
-	key = f.ReadMemberCallValue(n, f.EmitConstInst(NextKey.String(), true))
-	field = f.ReadMemberCallValue(n, f.EmitConstInst(NextField.String(), true))
-	ok = f.ReadMemberCallValue(n, f.EmitConstInst(NextOk.String(), true))
+	key = f.ReadMemberCallValue(n, f.EmitConstInstPlaceholder(NextKey.String()))
+	field = f.ReadMemberCallValue(n, f.EmitConstInstPlaceholder(NextField.String()))
+	ok = f.ReadMemberCallValue(n, f.EmitConstInstPlaceholder(NextOk.String()))
 	return
 }
 

@@ -692,15 +692,15 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.
 			recover = y.SetRange(ret)
 			text := ret.GetText()
 			log.Infof("visitMethodCall: %s: range: %s", text, y.CurrentRange.String())
-			memberKey = y.EmitConstInst(ret.GetText(), true)
+			memberKey = y.EmitConstInstPlaceholder(ret.GetText())
 		} else if ret := i.THIS(); ret != nil {
 			// get clazz
 			recover = y.SetRangeFromTerminalNode(ret)
-			memberKey = y.EmitConstInst(ret.GetText(), true)
+			memberKey = y.EmitConstInstPlaceholder(ret.GetText())
 		} else if ret = i.SUPER(); ret != nil {
 			// get parent class
 			recover = y.SetRangeFromTerminalNode(ret)
-			memberKey = y.EmitConstInst(ret.GetText(), true)
+			memberKey = y.EmitConstInstPlaceholder(ret.GetText())
 		}
 		methodCall := y.ReadMemberCallMethod(object, memberKey)
 		recover()
@@ -741,14 +741,14 @@ func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
 		if value := y.PeekValue(text); value != nil {
 			return value
 		}
-		return y.EmitConstInst(text, true)
+		return y.EmitConstInstPlaceholder(text)
 	}
 
 	if ret := i.SUPER(); ret != nil {
 		text := ret.GetText()
 		parent := y.PeekValue(text)
 		if parent == nil {
-			parent = y.EmitConstInst(text, true)
+			parent = y.EmitConstInstPlaceholder(text)
 		}
 		cls := y.MarkedThisClassBlueprint.GetSuperBlueprint()
 		if parent != nil {
@@ -960,7 +960,7 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) {
 		if finallyBlock := ret.FinallyBlock(); finallyBlock != nil {
 			tryBuilder.BuildFinally(func() {
 				y.VisitBlock(finallyBlock.(*javaparser.FinallyBlockContext).Block())
-				key := y.EmitConstInst("close", true)
+				key := y.EmitConstInstPlaceholder("close")
 				if shouldClosedValue != nil {
 					for _, value := range shouldClosedValue {
 						y.ReadMemberCallValue(value, key)
@@ -969,7 +969,7 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) {
 			})
 		} else {
 			tryBuilder.BuildFinally(func() {
-				key := y.EmitConstInst("close", true)
+				key := y.EmitConstInstPlaceholder("close")
 				if shouldClosedValue != nil {
 					for _, value := range shouldClosedValue {
 						y.ReadMemberCallMethod(value, key)
@@ -1740,10 +1740,10 @@ func (y *builder) VisitArrayCreatorRest(raw javaparser.IArrayCreatorRestContext,
 	var slice ssa.Value
 	if allExpr == nil {
 		slice = y.EmitMakeBuildWithType(ssa.NewSliceType(ssa.CreateAnyType()),
-			y.EmitConstInst(0, true), y.EmitConstInst(0, true))
+			y.EmitConstInstPlaceholder(0), y.EmitConstInstPlaceholder(0))
 	}
 	slice = y.InterfaceAddFieldBuild(len(allExpr),
-		func(i int) ssa.Value { return y.EmitConstInst(i, true) },
+		func(i int) ssa.Value { return y.EmitConstInstPlaceholder(i) },
 		func(i int) ssa.Value { return y.VisitExpression(allExpr[i]) },
 	)
 	if utils.IsNil(slice) {
@@ -1801,7 +1801,7 @@ func (y *builder) VisitCreatedName(raw javaparser.ICreatedNameContext) ssa.Type 
 				log.Infof("VisitCreatedName: get first object type: %v", typ.GetFullTypeNames())
 				object.SetType(typ)
 			} else {
-				key := y.EmitConstInst(name, true)
+				key := y.EmitConstInstPlaceholder(name)
 				typ := y.CreateSubType(name, object.GetType())
 				log.Infof("VisitCreatedName: get sub  type: %v", typ.GetFullTypeNames())
 				object = y.ReadMemberCallValue(object, key)
@@ -1935,7 +1935,7 @@ func (y *builder) VisitIdentifier(raw javaparser.IIdentifierContext, wantVariabl
 		if class.GetNormalMember(name) != nil {
 			obj := y.PeekValue("this")
 			if obj != nil {
-				variable = y.CreateMemberCallVariable(obj, y.EmitConstInst(name, true))
+				variable = y.CreateMemberCallVariable(obj, y.EmitConstInstPlaceholder(name))
 				return variable, nil
 			}
 		}
@@ -1971,7 +1971,7 @@ func (y *builder) VisitIdentifier(raw javaparser.IIdentifierContext, wantVariabl
 		if class.GetNormalMember(name) != nil {
 			obj := y.PeekValue("this")
 			if obj != nil {
-				if value = y.ReadMemberCallValue(obj, y.EmitConstInst(name, true)); value != nil {
+				if value = y.ReadMemberCallValue(obj, y.EmitConstInstPlaceholder(name)); value != nil {
 					return nil, value
 				}
 			}
@@ -2218,7 +2218,7 @@ func (y *builder) VisitLeftMemberCall(raw javaparser.ILeftMemberCallContext, obj
 		return nil
 	}
 	name := i.Identifier().GetText()
-	return y.CreateMemberCallVariable(object, y.EmitConstInst(name, true))
+	return y.CreateMemberCallVariable(object, y.EmitConstInstPlaceholder(name))
 }
 
 func (y *builder) GetOuterClassFieldVariable(name string) *ssa.Variable {
@@ -2238,7 +2238,7 @@ func (y *builder) GetOuterClassFieldVariable(name string) *ssa.Variable {
 	if ret := bp.GetNormalMember(name); ret != nil {
 		obj := y.PeekValue("this")
 		if obj != nil {
-			variable = y.CreateMemberCallVariable(obj, y.EmitConstInst(name, true))
+			variable = y.CreateMemberCallVariable(obj, y.EmitConstInstPlaceholder(name))
 			return variable
 		}
 	}

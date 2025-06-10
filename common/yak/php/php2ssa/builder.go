@@ -2,10 +2,11 @@ package php2ssa
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/sca"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"os"
 	"path/filepath"
+
+	"github.com/yaklang/yaklang/common/sca"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/consts"
@@ -52,7 +53,7 @@ func initHandler(fb *ssa.FunctionBuilder) {
 	fb.AssignVariable(fb.CreateVariable("global-container"), container)
 	initHandler := func(name ...string) {
 		for _, _name := range name {
-			variable := fb.CreateMemberCallVariable(container, fb.EmitConstInst(_name, true))
+			variable := fb.CreateMemberCallVariable(container, fb.EmitConstInstPlaceholder(_name))
 			emptyContainer := fb.EmitEmptyContainer()
 			fb.AssignVariable(variable, emptyContainer)
 		}
