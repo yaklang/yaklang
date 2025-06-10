@@ -4,8 +4,8 @@ desc(
 	risk:"资源泄漏",
 	level:high
 	reference: <<<REFERENCE
-https://docs.oracle.com/javase/8/docs/api/java/sql/Statement.html
-https://cwe.mitre.org/data/definitions/772.html
+[CWE-772](https://cwe.mitre.org/data/definitions/772.html)
+[java.sql.Statement 文档](https://docs.oracle.com/javase/8/docs/api/java/sql/Statement.html)
 REFERENCE
 	description: <<<DESCRIPTION
 
@@ -14,9 +14,7 @@ DESCRIPTION
 ### 修复建议
 
 #### 1. 使用 try-with-resources 自动关闭 ResultSet (Java 7+)
-
 利用 Java 7 引入的 try-with-resources 语法，确保 `ResultSet`、`Statement` 和 `Connection` 在 try 块结束时自动关闭。
-
 ```java
 try (
     Connection conn = dataSource.getConnection();
@@ -30,9 +28,7 @@ try (
 ```
 
 #### 2. 使用 try-finally 手动关闭 ResultSet
-
 在早于 Java 7 的版本或特定场景下，使用 try-finally 块手动关闭资源。务必在 finally 块中以资源获取的**逆序**关闭 `ResultSet`、`Statement` 和 `Connection`，并在关闭操作中捕获并处理 `SQLException`。
-
 ```java
 Connection conn = null;
 Statement stmt = null;
@@ -54,9 +50,7 @@ try {
 ```
 
 #### 3. 在循环中执行多个查询时确保关闭前一个 ResultSet
-
 如果在一个方法内部执行多个查询并返回 `ResultSet`，必须在前一个 `ResultSet` 被新的 `ResultSet` 覆盖之前关闭它。使用嵌套的 try-with-resources 是一个清晰的解决方案。
-
 ```java
 try (
     Connection conn = dataSource.getConnection();
@@ -75,9 +69,7 @@ try (
 ```
 
 #### 4. 使用数据访问框架自动管理 ResultSet 资源
-
 推荐使用成熟的数据访问框架（如 Spring JdbcTemplate, Hibernate, MyBatis）来处理数据库操作。这些框架通常会自动管理资源的生命周期，包括 `ResultSet` 的关闭，从而减少手动资源管理的错误。
-
 ```java
 // 使用 Spring JdbcTemplate
 JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
@@ -107,12 +99,6 @@ alert $weak for {
 	message: "检测到java.sql.ResultSet未释放资源",
 	title: "Unreleased ResultSet Resource",
 	title_zh: "未释放的ResultSet资源",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "high",
 }
 

@@ -6,11 +6,11 @@ desc(
 ### 风险描述
 
 1. **风险原理**
-   Java的`java.io`库中，一些方法（如`File.delete()`, `InputStream.read()`, `RandomAccessFile.skipBytes()`等）会返回一个布尔值、整型或其他类型的值，用以指示操作是否成功、读取到的字节数、跳过的字节数等。如果调用者没有检查并处理这些返回值，就无法得知操作是否按预期执行，可能导致以下问题：
+   Java的`java.io`库中，一些方法（如`File.delete()`、`InputStream.read()`、`RandomAccessFile.skipBytes()`等）会返回一个布尔值、整型或其他类型的值，用以指示操作是否成功、读取到的字节数、跳过的字节数等。如果调用者没有检查并处理这些返回值，就无法得知操作是否按预期执行，可能导致以下问题：
    - **错误屏蔽**: 操作失败的信号（如文件删除失败、读取未达预期）被忽略，程序继续执行，可能导致后续逻辑错误。
    - **资源泄露**: 例如未能正确判断文件是否删除成功，可能导致临时文件或敏感文件残留。
    - **逻辑缺陷**: 未检查`read()`返回的-1（表示 stream 结束）可能导致无限循环或数据处理不完整。
-   - **安全隐患**: 在某些涉及权限、文件状态判断的方法（如`canExecute`, `exists`, `isDirectory`）中，未检查返回值可能导致错误的逻辑判断，从而引入安全风险。
+   - **安全隐患**: 在某些涉及权限、文件状态判断的方法（如`canExecute`、`exists`、`isDirectory`）中，未检查返回值可能导致错误的逻辑判断，从而引入安全风险。
 
 2. **触发场景**
    任何调用了`java.io`库中会返回操作结果的方法，但未对返回值进行有效判断或处理的代码都可能触发此规则。例如：
@@ -93,17 +93,11 @@ REFERENCE
 /^(read|skip|skipBytes|implies|delete|canRead|canWrite|exists|isAbsolute|isDirectory|isFile|isHidden|mkdir|mkdirs|renameTo)$/<getCall> as $toCheck;
 $toCheck?{<typeName>?{have:'java.io'}}?{!<getUsers>} as $weak;
 alert $weak for {
-	title: "Check Java IO Unchecked Return Value",
 	title_zh: "检测Java IO库未检查返回值的API",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "info",
 	message: "发现Java IO库未检查返回值的API",
 	risk: "api-abuse",
+	title: "Check Java IO Unchecked Return Value",
 }
 
 

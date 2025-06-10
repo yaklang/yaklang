@@ -109,7 +109,8 @@ if ($id === null) {
 ```
 SOLUTION
 	reference: <<<REFERENCE
-https://www.thinkphp.cn/document/6.0/
+[CWE-89](https://cwe.mitre.org/data/definitions/89.html)
+[ThinkPHP 官方文档](https://www.thinkphp.cn/document/6.0/)
 REFERENCE
 )
 
@@ -124,16 +125,10 @@ CODE
 }->} as $sink
 
 alert $sink for {
-	title: "Unvalidated SQL Injection",
-	title_zh: "SQL注入风险",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "low",
 	risk: "sqli-inject",
+	title: "Unvalidated SQL Injection",
+	title_zh: "SQL注入风险",
 }
 
 

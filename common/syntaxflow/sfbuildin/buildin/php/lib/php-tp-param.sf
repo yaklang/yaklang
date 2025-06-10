@@ -9,30 +9,98 @@ desc(
 
 ### 2. 规则详细
 1. **作为基础检测库**
-    属于 ThinkPHP 外部变量参数源 (`php-tp-all-extern-variable-param-source`) 库规则 (`lib` 类型)。它与用户输入跟踪规则配合使用，用于标识 ThinkPHP 中通过 `param` 或 `request` 对象相关方法获取用户输入的代码位置，作为污点分析的起点。
+   属于 ThinkPHP 外部变量参数源 (`php-tp-all-extern-variable-param-source`) 库规则 (`lib` 类型)。它与用户输入跟踪规则配合使用，用于标识 ThinkPHP 中通过 `param` 或 `request` 对象相关方法获取用户输入的代码位置，作为污点分析的起点。
 
 2. **覆盖的关键方法**
-    规则主要检测以下 ThinkPHP 中用于获取请求参数的方法：
-    - `input()` （无参数或带请求类型参数）
-    - `I()` （ThinkPHP 3.x 兼容方法）
-    - `param()`
-    - `request()`
-    - `server()`
-    - `cookie()`
-    - `get()`
-    - `post()`
-    - `only()`
-    - `except()`
-    - `file()`
-    - `Request::instance()->param()` 等通过 `Request` 对象调用的相关方法。
+   规则主要检测以下 ThinkPHP 中用于获取请求参数的方法：
+   - `input()` （无参数或带请求类型参数）
+   - `I()` （ThinkPHP 3.x 兼容方法）
+   - `param()`
+   - `request()`
+   - `server()`
+   - `cookie()`
+   - `get()`
+   - `post()`
+   - `only()`
+   - `except()`
+   - `file()`
+   - `Request::instance()->param()` 等通过 `Request` 对象调用的相关方法。
+
+示例代码：
+```php
+<?php
+class A extends BaseController {
+    public function index() {
+        $id = $this->request->param('id');
+        $name = $this->request->param('name');
+        $age = $this->request->param('age');
+        input('get.name', '', 'htmlspecialchars'); // 获取 GET 变量并用 htmlspecialchars 函数过滤
+        input('username', '', 'strip_tags'); // 获取 param 变量并用 strip_tags 函数过滤
+        input('post.name', '', 'org\Filter::safeHtml'); // 获取 POST 变量并用 org\Filter 类的 safeHtml 方法过滤
+        input('get.id/d');
+        input('post.name/s');
+        input('post.ids/a');
+        input('get.');
+        input('name');
+        Request::instance()->param("name");
+    }
+}
+```
+
 DESC
 	rule_id: "ce83fe54-a8de-4794-abf7-f3476892bdec"
 	title_zh: "审计PHP ThinkPHP Param 参数使用"
 	solution: <<<SOLUTION
-none
+### 修复建议
+#### 1. 输入过滤和验证
+对于所有用户输入，必须进行严格的过滤和验证。可以通过内置的过滤函数或自定义逻辑实现。
+示例代码：
+```php
+<?php
+use think\Request;
+
+$request = Request::instance();
+$id = intval($request->param('id')); // 将输入强制转换为整数
+$name = trim(htmlspecialchars($request->param('name'))); // 去除多余空格并转义 HTML 特殊字符
+$age = filter_var($request->param('age'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 120]]);
+if ($age === false) {
+    throw new \Exception("年龄参数无效");
+}
+```
+
+#### 2. 使用框架提供的安全机制
+ThinkPHP 提供了多种内置的安全机制，比如自动过滤和数据绑定，可以有效减少手动编码错误。
+示例代码：
+```php
+<?php
+namespace app\index\controller;
+
+use think\Controller;
+
+class Index extends Controller {
+    public function index() {
+        $data = input('post.', [], 'htmlspecialchars'); // 批量过滤 POST 数据
+        return json($data);
+    }
+}
+```
+
+#### 3. 避免直接拼接用户输入
+在执行数据库查询或其他敏感操作时，避免直接拼接用户输入以防止 SQL 注入等漏洞。
+示例代码：
+```php
+<?php
+use think\Db;
+
+$id = input('get.id');
+// 使用查询构造器防止 SQL 注入
+$user = Db::table('users')->where('id', $id)->find();
+```
+
 SOLUTION
 	reference: <<<REFERENCE
-none
+[ThinkPHP 官方文档](https://www.kancloud.cn/manual/thinkphp6_0/1037481)
+[CWE-20: Improper Input Validation](https://cwe.mitre.org/data/definitions/20.html)
 REFERENCE
 )
 
@@ -43,15 +111,9 @@ $function?{<getObject>?{opcode: call && any: "Request"}} as $sink
 $function?{<getObject>?{any: "Request","request"}} as $sink
 $sink?{<getFunc><getCurrentBlueprint><fullTypeName>?{any: "Controller","controller"}}  as $output
 alert $output for {
-	desc: <<<CODE
-
-CODE
 	level: "info",
 	title: "Audit PHP ThinkPHP Param Usage",
 	title_zh: "审计PHP ThinkPHP Param 参数使用",
-	solution: <<<CODE
-
-CODE
 }
 
 desc(

@@ -96,12 +96,6 @@ alert $flag for {
 	level: "low",
 	title: "Detect Java SQL String Append Vulnerability",
 	title_zh: "检测Java拼接SQL字符串漏洞",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 }
 
 

@@ -4,21 +4,49 @@ desc(
 	level: info
 	lib: 'golang-ldap-sink'
 	desc: <<<DESC
-### 1. 规则目的
-该规则旨在审计 Golang 代码中与 LDAP (Lightweight Directory Access Protocol) 服务器建立连接的关键操作。它通过识别对 `gopkg.in/ldap.v2`、`github.com/nmcclain/ldap` 或 `github.com/go-ldap/ldap` 等常见 LDAP 库的 `Dial()` 方法的调用，定位与 LDAP 服务器进行通信的潜在汇点。这些连接点是进行 LDAP 操作的基础，对于后续审计 LDAP 绑定、搜索等操作中的潜在安全风险至关重要。
+### 规则描述
 
-### 2. 规则详细
-1. **作为基础检测库**
-   属于 `golang-ldap-sink` 库规则 (`lib` 类型)，需配合其他规则（如用户输入跟踪规则）共同审计 LDAP 操作中的安全问题，提供 LDAP 连接点的识别能力。
+1. **规则目的**
+   该规则旨在审计 Golang 代码中与 LDAP (Lightweight Directory Access Protocol) 服务器建立连接的关键操作。它通过识别对 `gopkg.in/ldap.v2`、`github.com/nmcclain/ldap` 或 `github.com/go-ldap/ldap` 等常见 LDAP 库的 `Dial()` 方法的调用，定位与 LDAP 服务器进行通信的潜在汇点。这些连接点是进行 LDAP 操作的基础，对于后续审计 LDAP 绑定、搜索等操作中的潜在安全风险至关重要。
 
-2. **覆盖主流 LDAP 库**
-   规则检测以下 Go 语言中常用的 LDAP 库的连接方法：
-   - `gopkg.in/ldap.v2`
-   - `github.com/nmcclain/ldap`
-   - `github.com/go-ldap/ldap`
+2. **规则详细**
+   - **作为基础检测库**：属于 `golang-ldap-sink` 库规则 (`lib` 类型)，需配合其他规则（如用户输入跟踪规则）共同审计 LDAP 操作中的安全问题，提供 LDAP 连接点的识别能力。
+   - **覆盖主流 LDAP 库**：规则检测以下 Go 语言中常用的 LDAP 库的连接方法：
+     - `gopkg.in/ldap.v2`
+     - `github.com/nmcclain/ldap`
+     - `github.com/go-ldap/ldap`
+   - **识别连接方法**：规则通过识别对上述库中 `Dial()` 或其他建立 LDAP 连接的方法调用，标记出代码中与外部 LDAP 服务器交互的起始点。
 
-3. **识别连接方法**
-   规则通过识别对上述库中 `Dial()` 或其他建立 LDAP 连接的方法调用，标记出代码中与外部 LDAP 服务器交互的起始点。
+3. **触发场景**
+   ```go
+   package main
+
+   import (
+       "log"
+       ldap "gopkg.in/ldap.v2"
+   )
+
+   func authenticate(username, password string) bool {
+       l, err := ldap.Dial("tcp", "ldap.example.com:389") // 潜在的 LDAP 注入风险
+       if err != nil {
+           log.Fatalf("Failed to connect to LDAP server: %s", err)
+       }
+       defer l.Close()
+
+       err = l.Bind("cn=admin,dc=example,dc=com", password)
+       if err != nil {
+           log.Fatalf("Failed to bind: %s", err)
+       }
+
+       return true
+   }
+   ```
+   上述代码示例展示了直接调用 `Dial()` 方法连接到 LDAP 服务器的情况，但未对用户输入进行严格校验，可能导致潜在的 LDAP 注入风险。
+
+4. **潜在影响**
+   - 攻击者可以通过构造恶意的 LDAP 查询实现非授权访问或获取敏感信息。
+   - 可能被利用来执行任意查询操作，例如枚举目录结构或修改数据。
+   - 如果绑定账户权限过高，攻击者可能进一步渗透系统。
 DESC
 	rule_id: "a284316a-5ca8-4f87-a325-fbf8e487d27e"
 	title_zh: "查找 Golang LDAP 连接汇点"
@@ -101,15 +129,9 @@ $entry.Dial() as $db;
 $db.* as $output;
 
 alert $output for {
-	title: "Find Golang LDAP Dial Sink",
 	title_zh: "查找 Golang LDAP 连接汇点",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "info",
+	title: "Find Golang LDAP Dial Sink",
 }
 
 desc(

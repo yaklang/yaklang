@@ -4,17 +4,15 @@ desc(
 	level: info
 	lib: 'golang-ftp-sink'
 	desc: <<<DESC
-### 1.规则目的
-该规则主要用于审计Go语言代码中对`github.com/jlaffaye/ftp`包的使用情况。该库提供了Go语言连接和操作FTP服务器的功能。
+### 1. 规则目的
+该规则主要用于审计Go语言代码中对`github.com/jlaffaye/ftp`包的使用情况。此库提供了Go语言连接和操作FTP服务器的功能，常用于实现文件传输等场景。
 
-### 2.规则详细
+### 2. 规则详细
 1. **作为基础检测库**
-   属于`golang-ftp-sink`库规则（`lib`类型），主要用于识别代码中是否引入和使用了`github.com/jlaffaye/ftp`包及其相关函数，例如FTP连接的`Dial`、用户登录的`Login`等操作。
+   属于`golang-ftp-sink`库规则（`lib`类型），主要用于识别代码中是否引入并使用了`github.com/jlaffaye/ftp`包及其相关函数，例如FTP连接的`Dial`、用户登录的`Login`等操作。
 
 2. **识别潜在的敏感操作点**
    该规则通过识别对`Dial`函数的调用及其后续结果 (`$output`)，可以帮助分析人员快速定位到程序中进行FTP连接操作的代码段。这对于安全审计过程中识别潜在的硬编码凭据、明文传输敏感数据等风险点非常有用。
-
-   虽然此规则本身不直接检测漏洞，但它是更高级别规则（例如检测FTP明文密码、不安全连接等的规则）的基础组件，能够提供目标审计的起点。
 
 3. **示例代码分析**
    规则附带的示例代码展示了如何连接到一个FTP服务器 (`ftp.Dial`) 并进行用户登录 (`conn.Login`)。这种模式在实际应用中可能包含敏感信息，例如服务器地址、用户名和密码，是审计过程中需要重点关注的部分。
@@ -70,12 +68,6 @@ $ftp.Dial().* as $output
 alert $output for {
 	title: "Audit Golang FTP Library Usage",
 	title_zh: "审计Golang FTP库使用情况",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "info",
 }
 

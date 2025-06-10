@@ -18,25 +18,63 @@ desc(
    - `java.nio.file.Files.delete(Path path)`：删除指定的文件。
    - `java.nio.file.Files.deleteIfExists(Path path)`：删除指定的文件（如果存在）。
 
+示例代码：
+```java
+// 使用 Files.delete() 删除文件
+Path path = Paths.get("untrusted-input-path");
+Files.delete(path);
+
+// 使用 File.delete() 删除文件
+File file = new File("untrusted-input-path");
+file.delete();
+```
+攻击场景：如果上述代码中的路径来自用户输入且未经验证，攻击者可以构造恶意路径删除系统关键文件。
 DESC
 	rule_id: "63713c0b-d9c9-4720-a270-e4832cfd8dc5"
 	solution: <<<SOLUTION
 ### 修复建议
 #### 1. 验证文件路径来源
-确保文件路径来源于可信源，避免直接使用用户输入作为文件路径。
+确保文件路径来源于可信源，避免直接使用用户输入作为文件路径。通过白名单或正则表达式校验路径合法性。
+```java
+String userInput = request.getParameter("filePath");
+if (!userInput.matches("^[a-zA-Z0-9_\\-.]+$") || !userInput.startsWith("/safe/directory/")) {
+    throw new IllegalArgumentException("非法路径");
+}
+```
 
 #### 2. 使用安全的文件删除方法
-尽量使用安全的文件删除方法，并在删除前进行必要的检查。
+尽量使用安全的文件删除方法，并在删除前进行必要的检查。例如，限制只能删除特定目录下的文件。
+```java
+Path path = Paths.get("/safe/directory/", userProvidedFileName);
+if (path.startsWith(Paths.get("/safe/directory/"))) {
+    Files.delete(path);
+} else {
+    throw new SecurityException("拒绝访问此路径");
+}
+```
 
 #### 3. 限制文件删除操作的范围
 对文件删除操作进行权限控制，限制只有特定用户或角色才能执行文件删除操作。
+```java
+if (!currentUser.hasRole("ADMIN")) {
+    throw new SecurityException("无权执行文件删除操作");
+}
+```
 
 #### 4. 日志记录
 对文件删除操作进行日志记录，以便在发生问题时进行追踪和审计。
-
+```java
+try {
+    Files.delete(path);
+    log.info("File deleted: " + path.toString() + " by user " + currentUser.getName());
+} catch (IOException e) {
+    log.error("Failed to delete file: " + path.toString(), e);
+}
+```
 SOLUTION
 	reference: <<<REFERENCE
-none
+[CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')](https://cwe.mitre.org/data/definitions/22.html)
+[Java File Deletion Documentation](https://docs.oracle.com/javase/8/docs/api/java/io/File.html#delete--)
 REFERENCE
 )
 
@@ -53,15 +91,9 @@ Files?{<typeName>?{have: 'java.nio'}}.delete(,* as $output);
 Files?{<typeName>?{have: 'java.nio'}}.deleteIfExists(,* as $output);
 
 alert $output for {
-	title_zh: "不信任的文件删除",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
-	level: "high",
 	title: "Untrusted File Deletion",
+	title_zh: "不信任的文件删除",
+	level: "high",
 }
 
 desc(

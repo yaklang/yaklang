@@ -24,6 +24,7 @@ desc(
 *   **数据泄露或篡改:** 攻击者可能通过执行代码访问、窃取或篡改数据库及其他敏感文件。
 *   **拒绝服务 (DoS):** 攻击者可能上传超大文件，消耗服务器磁盘空间或带宽，导致服务不可用。
 *   **网站内容被篡改:** 上传恶意文件覆盖网站原有文件，修改网站内容。
+
 DESC
 	rule_id: "2e6a2485-77c7-4b0e-a421-476b5804a941"
 	solution: <<<SOLUTION
@@ -47,6 +48,47 @@ DESC
 4.  **限制上传文件大小:** 设置文件上传的最大大小限制，防止拒绝服务攻击。
 
 5.  **定期安全扫描:** 对上传目录进行定期或实时的安全扫描，检测是否存在恶意文件。
+```java
+// 示例：生成随机文件名并校验文件类型
+@PostMapping("/upload")
+public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile file) {
+    // 允许的文件扩展名白名单
+    List<String> allowedExtensions = Arrays.asList("jpg", "png", "pdf");
+
+    // 获取文件扩展名
+    String fileName = file.getOriginalFilename();
+    String extension = fileName.substring(fileName.lastIndexOf(".") + 1);
+
+    // 检查扩展名是否在白名单中
+    if (!allowedExtensions.contains(extension.toLowerCase())) {
+        return ResponseEntity.badRequest().body("不允许的文件类型");
+    }
+
+    // 校验文件内容（魔术字节示例）
+    try (InputStream is = file.getInputStream()) {
+        byte[] headerBytes = new byte[8];
+        is.read(headerBytes);
+        String headerHex = DatatypeConverter.printHexBinary(headerBytes).toLowerCase();
+        if (!headerHex.startsWith("ffd8") && !headerHex.startsWith("8950")) { // JPG/PNG 魔术字节
+            return ResponseEntity.badRequest().body("非法文件内容");
+        }
+    } catch (IOException e) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("文件读取失败");
+    }
+
+    // 生成随机文件名
+    String randomFileName = UUID.randomUUID().toString() + "." + extension;
+    Path savePath = Paths.get("/safe/upload/path/" + randomFileName);
+
+    // 保存文件
+    try {
+        Files.copy(file.getInputStream(), savePath, StandardCopyOption.REPLACE_EXISTING);
+        return ResponseEntity.ok("文件上传成功: " + randomFileName);
+    } catch (IOException e) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("文件保存失败");
+    }
+}
+```
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-434: Unrestricted Upload of File with Dangerous Type](https://cwe.mitre.org/data/definitions/434.html)
@@ -62,16 +104,10 @@ $sink #{
 }->  as  $mid;
 
 alert $mid for {
-	title: "Check Java Spring MVC Arbitrary File Upload Vulnerability",
-	title_zh: "检测Spring MVC任意文件上传漏洞",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "mid",
 	message: "发现Java SpringBoot任意文件上传漏洞。",
+	title: "Check Java Spring MVC Arbitrary File Upload Vulnerability",
+	title_zh: "检测Spring MVC任意文件上传漏洞",
 }
 
 $sink #{
@@ -81,16 +117,10 @@ $sink #{
 $result - $mid as $low;
 
 alert $low for {
+	title: "Check Java Spring MVC Arbitrary File Upload Vulnerability",
 	title_zh: "检测Spring MVC任意文件上传漏洞",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "low",
 	message: "发现Java SpringBoot可能存在文件上传漏洞",
-	title: "Check Java Spring MVC Arbitrary File Upload Vulnerability",
 }
 
 desc(

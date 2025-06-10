@@ -19,32 +19,32 @@ REFERENCE
 攻击者可能通过分析加密数据、截获通信或利用已知加密算法的弱点来破解使用不安全或有风险算法加密的数据。例如，在文件存储、数据库加密或网络通信中使用这些算法的场景都可能成为攻击目标。
 
 ```java
-    // 存在风险的代码示例
-    import javax.crypto.Cipher;
-    import javax.crypto.spec.SecretKeySpec;
-    import java.util.Base64;
+// 存在风险的代码示例
+import javax.crypto.Cipher;
+import javax.crypto.spec.SecretKeySpec;
+import java.util.Base64;
 
-    public class WeakCipher {
+public class WeakCipher {
 
-        private static final String ALGORITHM_DES = "DES/ECB/PKCS5Padding";
-        private static final String ALGORITHM_RC4 = "RC4";
+    private static final String ALGORITHM_DES = "DES/ECB/PKCS5Padding";
+    private static final String ALGORITHM_RC4 = "RC4";
 
-        public static String encryptDES(String key, String data) throws Exception {
-            Cipher cipher = Cipher.getInstance(ALGORITHM_DES);
-            SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), "DES");
-            cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);
-            byte[] encrypted = cipher.doFinal(data.getBytes());
-            return Base64.getEncoder().encodeToString(encrypted);
-        }
-
-         public static String encryptRC4(String key, String data) throws Exception {
-                    Cipher cipher = Cipher.getInstance(ALGORITHM_RC4);
-                    SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), "RC4");
-                    cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);
-                    byte[] encrypted = cipher.doFinal(data.getBytes());
-                    return Base64.getEncoder().encodeToString(encrypted);
-           }
+    public static String encryptDES(String key, String data) throws Exception {
+        Cipher cipher = Cipher.getInstance(ALGORITHM_DES);
+        SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), "DES");
+        cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);
+        byte[] encrypted = cipher.doFinal(data.getBytes());
+        return Base64.getEncoder().encodeToString(encrypted);
     }
+
+    public static String encryptRC4(String key, String data) throws Exception {
+        Cipher cipher = Cipher.getInstance(ALGORITHM_RC4);
+        SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), "RC4");
+        cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);
+        byte[] encrypted = cipher.doFinal(data.getBytes());
+        return Base64.getEncoder().encodeToString(encrypted);
+    }
+}
 ```
 
 3. **潜在影响**
@@ -62,28 +62,28 @@ DESC
 建议采用经过时间验证且广泛认可的、具有更高安全强度的对称加密算法，如 AES（高级加密标准）。AES 提供了更长的密钥长度（128, 192 或 256位）和更强的安全性。
 
 ```java
-    // 修复代码示例：使用 AES 加密算法
-    import javax.crypto.Cipher;
-    import javax.crypto.spec.SecretKeySpec;
-    import java.util.Base64;
-    import java.security.Key;
+// 修复代码示例：使用 AES 加密算法
+import javax.crypto.Cipher;
+import javax.crypto.spec.SecretKeySpec;
+import java.util.Base64;
+import java.security.Key;
 
-    public class SecureCipher {
+public class SecureCipher {
 
-        private static final String ALGORITHM_AES = "AES/ECB/PKCS5Padding"; // 或者使用其他合适的模式如 CBC, GCM
+    private static final String ALGORITHM_AES = "AES/ECB/PKCS5Padding"; // 或者使用其他合适的模式如 CBC, GCM
 
-        public static String encryptAES(String key, String data) throws Exception {
-            // 对于 AES 密钥长度通常为 16, 24 或 32 字节 (128, 192, 256 bits)
-            // 确保密钥长度正确且安全生成
-            Key aesKey = new SecretKeySpec(key.getBytes(), "AES");
-            Cipher cipher = Cipher.getInstance(ALGORITHM_AES);
-            cipher.init(Cipher.ENCRYPT_MODE, aesKey);
-            byte[] encrypted = cipher.doFinal(data.getBytes());
-            return Base64.getEncoder().encodeToString(encrypted);
-        }
-
-        // 注意：生产环境密钥应妥善管理，不应硬编码或以不安全的方式存储和传输
+    public static String encryptAES(String key, String data) throws Exception {
+        // 对于 AES 密钥长度通常为 16, 24 或 32 字节 (128, 192, 256 bits)
+        // 确保密钥长度正确且安全生成
+        Key aesKey = new SecretKeySpec(key.getBytes(), "AES");
+        Cipher cipher = Cipher.getInstance(ALGORITHM_AES);
+        cipher.init(Cipher.ENCRYPT_MODE, aesKey);
+        byte[] encrypted = cipher.doFinal(data.getBytes());
+        return Base64.getEncoder().encodeToString(encrypted);
     }
+
+    // 注意：生产环境密钥应妥善管理，不应硬编码或以不安全的方式存储和传输
+}
 ```
 
 #### 2. 选用合适的加密模式和填充方式
@@ -104,12 +104,6 @@ $algorithm#{
 }-> as $sink;
 
 alert $sink for {
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "low",
 	message: "发现Java代码中使用了不安全的加密算法",
 	title: "Check Java Cipher Weak Encryption Algorithm",

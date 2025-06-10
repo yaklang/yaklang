@@ -6,35 +6,36 @@ desc(
 	desc: <<<DESC
 ### 漏洞描述
 
-1.  **漏洞原理**
-    当应用程序开发者未妥善处理错误或调试信息时，可能无意中将敏感的内部信息暴露给攻击者。这些信息可能包括但不限于：详细的错误堆栈跟踪、数据库连接字符串、API密钥、文件路径、调试数据、服务器配置信息或应用程序内部逻辑的细节。这些信息可以帮助攻击者理解应用程序的内部结构和潜在的弱点，从而更容易地构造进一步的攻击。
+1. **漏洞原理**
+   当应用程序开发者未妥善处理错误或调试信息时，可能无意中将敏感的内部信息暴露给攻击者。这些信息可能包括但不限于：详细的错误堆栈跟踪、数据库连接字符串、API密钥、文件路径、调试数据、服务器配置信息或应用程序内部逻辑的细节。这些信息可以帮助攻击者理解应用程序的内部结构和潜在的弱点，从而更容易地构造进一步的攻击。
 
-2.  **触发场景**
-    -   **错误日志暴露**：在生产环境中，错误信息直接显示在用户的浏览器界面上，包含详细的错误信息。
-    -   **调试模式未关闭**：应用程序在生产环境中开启了调试模式，导致敏感信息输出。
-    -   **信息泄露函数的使用不当**：规则中检测的函数 (`preg_last_error`, `preg_last_error_msg`, `error_get_last`, `debug_backtrace`, `apd_callstack`, `apd_dump_persistent_resources`, `apd_dump_regular_resources`, `apd_get_active_symbols`) 本身用于提供调试或错误信息，如果其返回的结果未经处理直接输出到用户界面，就会导致信息泄露。
+2. **触发场景**
+   - **错误日志暴露**：在生产环境中，错误信息直接显示在用户的浏览器界面上，包含详细的错误信息。
+   - **调试模式未关闭**：应用程序在生产环境中开启了调试模式，导致敏感信息输出。
+   - **信息泄露函数的使用不当**：规则中检测的函数 (`preg_last_error`, `preg_last_error_msg`, `error_get_last`, `debug_backtrace`, `apd_callstack`, `apd_dump_persistent_resources`, `apd_dump_regular_resources`, `apd_get_active_symbols`) 本身用于提供调试或错误信息，如果其返回的结果未经处理直接输出到用户界面，就会导致信息泄露。
 
-    // 存在漏洞的代码示例
-    ```php
-    <?php
-        // 示例1：直接输出错误信息
-        $result = preg_match('/[a-z]+/', 'abc', $matches);
-        if ($result === false) {
-            echo preg_last_error_msg(); // 直接输出详细错误信息
-        }
+   // 存在漏洞的代码示例
+   ```php
+   <?php
+       // 示例1：直接输出错误信息
+       $result = preg_match('/[a-z]+/', 'abc', $matches);
+       if ($result === false) {
+           echo preg_last_error_msg(); // 直接输出详细错误信息
+       }
 
-        // 示例2：根据 GET 参数输出调试信息
-        if (isset($_GET['debug']) && $_GET['debug'] == 'true') {
-            print_r(debug_backtrace()); // 暴露调用栈信息
-        }
-    ?>
-    ```
+       // 示例2：根据 GET 参数输出调试信息
+       if (isset($_GET['debug']) && $_GET['debug'] == 'true') {
+           print_r(debug_backtrace()); // 暴露调用栈信息
+       }
+   ?>
+   ```
 
-3.  **潜在影响**
-    -   **攻击面扩大**：攻击者获取内部信息后，可以更精准地识别其他潜在漏洞，例如SQL注入、文件包含、远程代码执行等。
-    -   **敏感数据泄露**：错误信息中可能包含数据库凭据、API密钥等敏感数据，导致数据泄露。
-    -   **绕过安全措施**：攻击者可以利用泄露的信息来绕过应用程序或系统的安全防护措施。
-    -   **服务中断**：如果泄露的信息被用于恶意攻击，可能导致应用程序或服务中断。
+3. **潜在影响**
+   - **攻击面扩大**：攻击者获取内部信息后，可以更精准地识别其他潜在漏洞，例如SQL注入、文件包含、远程代码执行等。
+   - **敏感数据泄露**：错误信息中可能包含数据库凭据、API密钥等敏感数据，导致数据泄露。
+   - **绕过安全措施**：攻击者可以利用泄露的信息来绕过应用程序或系统的安全防护措施。
+   - **服务中断**：如果泄露的信息被用于恶意攻击，可能导致应用程序或服务中断。
+
 DESC
 	rule_id: "8bf5c4b5-51c2-49b5-b30c-c7552a7be29b"
 	solution: <<<SOLUTION
@@ -98,76 +99,14 @@ $source?{<self> #{include: <<<CODE
 CODE}->} as $sink
 
 alert $sink for {
-    solution: <<<SOLUTION
-#### 修复方案
-
-1. **禁用直接输出敏感信息**
-   - 避免在生产环境中直接输出以下函数的返回值：
-     ```php
-     // 不安全示例（直接输出）
-     echo debug_backtrace();
-     print_r(error_get_last());
-     ```
-   - 替换为通用错误提示：
-     ```php
-     // 安全示例
-     echo "An error occurred. Contact administrator.";
-     ```
-
-2. **使用日志记录替代前端输出**
-   - 将调试信息重定向到安全日志文件：
-     ```php
-     // 记录到日志文件
-     error_log("Debug Trace: " . json_encode(debug_backtrace()));
-     ```
-   - 配置 `php.ini` 确保错误不显示：
-     ```ini
-     display_errors = Off
-     log_errors = On
-     error_log = /var/log/php_errors.log
-     ```
-
-3. **严格权限控制**
-   - 限制调试功能的访问权限：
-     ```php
-     // 仅允许管理员访问调试信息
-     if ($user->isAdmin()) {
-         var_dump(debug_backtrace());
-     }
-     ```
-SOLUTION
-	desc: <<<CODE
-#### 漏洞描述
-
-- **风险类型**
-  信息泄露（Information Exposure，CWE-200）
-
-- **漏洞特征**
-  检测到以下高风险操作：
-  - 直接输出 `debug_backtrace()` 的调用栈信息
-  - 未过滤显示 `error_get_last()` 的错误详情
-  - 通过 `echo`/`print_r` 暴露 `preg_last_error_msg()` 等调试函数结果
-
-- **攻击者利用方式**
-  1. 通过错误信息获取服务器路径、数据库结构等敏感数据
-  2. 分析调用栈推断业务逻辑弱点
-  3. 结合其他漏洞（如SQL注入）扩大攻击面
-
-- **实际影响案例**
-  ```php
-  // 漏洞代码示例
-  if ($_GET['debug']) {
-      print_r(apd_callstack()); // 暴露所有函数调用记录
-  }
-CODE
 	level: "low",
 	title: "Unsafe Error Handling and Information Exposure",
 	title_zh: "不安全的错误处理与信息泄露风险",
 }
 desc(
 	lang: 'php'
-	alert_min: 2,
-	alert_low: 2,
+	alert_min: 2
+	alert_low: 2
 	'file:///unsafe.php': <<<CODE
 <?php
     $error = error_get_last();

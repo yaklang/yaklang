@@ -4,22 +4,78 @@ desc(
 	level: info
 	lib: 'golang-database-reform'
 	desc: <<<DESC
-### 1.规则目的
-此规则旨在审计Go项目中是否使用了`github.com/hedonist/reform`库进行数据库操作。`reform`库是一个ORM（对象关系映射）工具，用于在Go应用程序中更方便地与数据库进行交互。审计的目的是确保数据库操作符合安全最佳实践，包括但不限于防止SQL注入攻击、确保数据完整性和安全性。
+### 漏洞描述
 
-### 2.规则详细
-该规则通过检测代码中是否存在对`github.com/hedonist/reform`库的引用，特别是对`reform.NewDB()`方法的调用，来识别`reform`库的使用。这有助于安全审计人员快速定位数据库交互相关的代码段，进而进行人工审查或配合其他规则（如SQL语句构建规则）分析是否存在更深层次的安全问题，例如：
+1. **漏洞原理**
+   SQL注入攻击是由于应用程序未对用户输入进行严格的验证或参数化处理，攻击者可以通过构造特殊输入篡改SQL语句逻辑。尽管ORM（如`reform`）库旨在减少直接拼接SQL的风险，但若在查询条件中直接嵌入未经净化的用户输入，仍可能导致SQL注入。
 
-- **潜在的SQL注入风险：** 尽管ORM旨在减少注入风险，但不当的使用（例如，直接在Criteria或Where子句中拼接未经净化的用户输入）仍可能导致注入。
-- **数据泄露或篡改风险：** 审计`reform`库的操作（Select, Insert, Update, Delete）可以帮助发现是否对敏感数据进行了不必要的查询、更新或删除。
-- **连接管理和错误处理：** 检查数据库连接的生命周期管理、连接池配置以及错误处理是否得当，防止资源耗尽或敏感错误信息泄露。
+2. **触发场景**
+   以下是存在潜在风险的代码示例：
+   ```go
+   userInput := r.URL.Query().Get("name")
+   query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", userInput)
+   err := reformDB.Select(&users, query)
+   if err != nil {
+       log.Fatal(err)
+   }
+   ```
+   如果攻击者输入 `name=' OR '1'='1`，则上述代码可能被利用来泄露所有用户数据。
+
+3. **潜在影响**
+   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+   - 攻击者可通过恶意输入执行任意SQL语句，包括插入、删除或修改数据。
+   - 通过数据库提权进一步渗透至服务器或其他系统组件。
+
+4. **规则详细**
+   该规则通过检测是否使用了`github.com/hedonist/reform`库及其方法（如`NewDB`），帮助审计人员快速定位数据库操作相关的代码段，并结合其他规则分析是否存在SQL注入等安全问题。
+
 DESC
 	rule_id: "ff1e08f0-1c18-43bb-920b-436a6bfa8dcd"
 	solution: <<<SOLUTION
-none
+### 修复建议
+
+#### 1. 使用参数化查询
+通过`reform`提供的内置参数化功能，避免手动拼接SQL语句。
+```go
+userInput := r.URL.Query().Get("name")
+err := reformDB.Select(&users, "SELECT * FROM users WHERE name = ?", userInput)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+#### 2. 输入合法性校验
+在接收用户输入时实施严格的验证，拒绝非法字符。
+```go
+import "regexp"
+
+func validateInput(input string) bool {
+    matched, _ := regexp.MatchString(`^[a-zA-Z0-9_]+$`, input)
+    return matched
+}
+
+userInput := r.URL.Query().Get("name")
+if !validateInput(userInput) {
+    log.Fatal("非法输入")
+}
+```
+
+#### 3. 配置连接池与错误处理
+确保数据库连接池配置合理以防止资源耗尽，同时避免返回详细的错误信息。
+```go
+sqlDB, err := sql.Open("sqlite", "example.db")
+if err != nil {
+    log.Fatal(err)
+}
+sqlDB.SetMaxOpenConns(10)
+sqlDB.SetMaxIdleConns(5)
+reformDB := reform.NewDB(sqlDB, reform.NewDialect("sqlite"))
+```
+
 SOLUTION
 	reference: <<<REFERENCE
 [GitHub - hedonist/reform](https://github.com/hedonist/reform)
+[CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')](https://cwe.mitre.org/data/definitions/89.html)
 REFERENCE
 	title_zh: "审计Golang Database Reform的使用"
 )
@@ -28,15 +84,9 @@ reform?{<fullTypeName>?{have: 'github.com/hedonist/reform'}} as $entry;
 $entry.NewDB() as $output;
 
 alert $output for {
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
-	level: "info",
 	title: "Audit Golang Database Reform Usage",
 	title_zh: "审计Golang Database Reform的使用",
+	level: "info",
 }
 
 desc(

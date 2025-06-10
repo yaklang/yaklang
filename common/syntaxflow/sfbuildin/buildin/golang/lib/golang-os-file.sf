@@ -23,6 +23,41 @@ desc(
   - `ReadDir`: 读取目录内容
 
 通过识别这些关键函数的使用，结合数据流分析，可以追踪不受控的数据是否被用于文件路径、命令参数或其他敏感操作，从而发现潜在的安全漏洞。
+
+#### 3. 漏洞原理
+路径穿越攻击是由于未对用户输入进行严格验证，攻击者可以通过构造特殊路径（如`../../`）访问本不应访问的文件或目录，可能导致敏感信息泄露或系统完整性破坏。
+
+#### 4. 触发场景
+```go
+package main
+
+import (
+    "net/http"
+    "os"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+    filePath := r.URL.Query().Get("file")
+    file, err := os.Open(filePath) // 直接拼接用户输入
+    if err != nil {
+        http.Error(w, "File not found", http.StatusNotFound)
+        return
+    }
+    defer file.Close()
+    // 返回文件内容
+}
+
+func main() {
+    http.HandleFunc("/read", handler)
+    http.ListenAndServe(":8080", nil)
+}
+```
+攻击者通过访问`/read?file=../../etc/passwd`可读取系统敏感文件。
+
+#### 5. 潜在影响
+- 敏感文件（如配置文件、密码文件）被非法读取。
+- 系统关键目录或文件被删除、篡改。
+- 权限提升或进一步渗透至服务器。
 DESC
 	rule_id: "4ba61a38-efec-4cf2-9d38-f77352e05185"
 	title_zh: "审计Golang os包使用"
@@ -31,15 +66,6 @@ DESC
 
 #### 1. 使用安全库
 建议使用更安全的库来替代直接使用`os`包，例如使用`afero`库来处理文件操作，它提供了更安全的文件操作接口。
-
-#### 2. 输入验证
-对用户输入进行严格的验证，确保输入符合预期的格式和范围，避免路径穿越等安全问题。
-
-#### 3. 权限控制
-确保文件操作时的权限控制得当，避免权限过高导致的安全风险。
-
-#### 4. 日志记录
-对关键文件操作进行日志记录，便于事后审计和问题追踪。
 
 ```go
 // 示例：使用afero库进行文件操作
@@ -58,9 +84,60 @@ func safeCreateFile(path string) error {
     return nil
 }
 ```
+
+#### 2. 输入验证
+对用户输入进行严格的验证，确保输入符合预期的格式和范围，避免路径穿越等安全问题。
+
+```go
+// 示例：验证文件路径
+import (
+    "path/filepath"
+    "strings"
+)
+
+func validateFilePath(basePath, userPath string) (string, error) {
+    fullPath := filepath.Join(basePath, filepath.Base(userPath))
+    if !strings.HasPrefix(fullPath, basePath) {
+        return "", fmt.Errorf("Invalid file path")
+    }
+    return fullPath, nil
+}
+```
+
+#### 3. 权限控制
+确保文件操作时的权限控制得当，避免权限过高导致的安全风险。
+
+#### 4. 日志记录
+对关键文件操作进行日志记录，便于事后审计和问题追踪。
+
+```go
+// 示例：记录文件操作日志
+import (
+    "log"
+    "os"
+)
+
+func logFileOperation(operation, path string) {
+    log.Printf("%s: %s\n", operation, path)
+}
+
+func createFile(path string) error {
+    file, err := os.Create(path)
+    if err != nil {
+        return err
+    }
+    defer file.Close()
+    logFileOperation("Create", path)
+    return nil
+}
+```
+
+#### 5. 使用沙箱环境
+对于高危操作，考虑使用沙箱环境隔离代码运行，防止对主机造成直接影响。
 SOLUTION
 	reference: <<<REFERENCE
-none
+[CWE-22](https://cwe.mitre.org/data/definitions/22.html)
+[Go os package documentation](https://pkg.go.dev/os)
 REFERENCE
 )
 
@@ -74,15 +151,9 @@ $entry.MkdirAll(* #-> as $output)
 $entry.ReadDir(* #-> as $output) 
 
 alert $output for {
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
+	title_zh: "未验证的文件操作",
 	level: "info",
 	title: "Unvalidated File Operation",
-	title_zh: "未验证的文件操作",
 }
 
 desc(

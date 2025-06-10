@@ -32,7 +32,7 @@ desc(
        response.setContentType("text/html");
        PrintWriter out = response.getWriter();
        String data = request.getParameter("data");
-       out.println("<script>var userInput = '\"" + data + "\"; eval(userInput);</script>"); // 将data嵌入到JS字符串中并执行，未转义
+       out.println("<script>var userInput = '" + data + "'; eval(userInput);</script>"); // 将data嵌入到JS字符串中并执行，未转义
    }
    ```
 
@@ -69,7 +69,7 @@ DESC
     }
     ```
 
-*   **JavaScript上下文转义:** 如果用户输入要嵌入到JavaScript代码中，需要进行JavaScript字符串转义，例如将单引号`)`、双引号`("`)、反斜杠`\`、换行符`\n`、回车符`\r`等特殊字符转义为`\'`、`\"`、`\\`、`\n`、`\r`。同样推荐使用安全编码库。
+*   **JavaScript上下文转义:** 如果用户输入要嵌入到JavaScript代码中，需要进行JavaScript字符串转义，例如将单引号`(`)`、双引号`(")`、反斜杠`\`、换行符`\n`、回车符`\r`等特殊字符转义为`\'`、`\"`、`\\`、`\n`、`\r`。同样推荐使用安全编码库。
 
     ```java
     // 修复代码示例：使用OWASP Java Encoder进行JavaScript转义
@@ -117,17 +117,11 @@ $sink#{
     exclude:` *<getCallee> & $filter`
 }-> as $mid;
 alert $mid for {
-	type: "vuln",
+	message: "发现Java Servlet的XSS漏洞，并且数据流没有使用任何转义方法。",
 	title: "Check Java Servlet XSS Vulnerability",
 	title_zh: "检测Java Servlet XSS漏洞",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "mid",
-	message: "发现Java Servlet的XSS漏洞，并且数据流没有使用任何转义方法。",
+	type: "vuln",
 }
 
 
@@ -137,17 +131,11 @@ $sink#{
 $all - $mid as $low;
 
 alert $low for {
-	title: "Check Java Servlet XSS Vulnerability",
-	title_zh: "检测Java Servlet XSS漏洞",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "low",
 	message: "发现Java Servlet的XSS漏洞,并且数据流中使用了转义方法。",
 	type: "vuln",
+	title: "Check Java Servlet XSS Vulnerability",
+	title_zh: "检测Java Servlet XSS漏洞",
 }
 
 

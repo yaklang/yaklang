@@ -11,7 +11,7 @@ desc(
 该漏洞源于滥用 Java 的反射 API（如 `setAccessible(true)`）强行修改类/方法/字段的访问修饰符（如 private/protected），绕过 Java 语言层面的访问控制机制。攻击者可能利用此特性访问或修改敏感内部状态，导致非预期的行为和潜在的安全风险。
 
 2. **触发场景**
-攻击者可能通过构造 악意的反射链，利用 `setAccessible(true)` 访问或修改应用程序的内部状态。例如，攻击者可能通过反射修改 Tomcat 的 `filterConfigs` 字段注入恶意过滤器，访问 Spring 框架内部缓存窃取用户会话，或者篡改数据库连接池配置实现中间人攻击。这些行为违反最小权限原则，且具有以下风险：权限提升、隐蔽后门和兼容性破坏。
+攻击者可能通过构造恶意的反射链，利用 `setAccessible(true)` 访问或修改应用程序的内部状态。例如，攻击者可能通过反射修改 Tomcat 的 `filterConfigs` 字段注入恶意过滤器，访问 Spring 框架内部缓存窃取用户会话，或者篡改数据库连接池配置实现中间人攻击。这些行为违反最小权限原则，且具有以下风险：权限提升、隐蔽后门和兼容性破坏。
 
    ```java
    // 存在漏洞的代码示例
@@ -101,15 +101,9 @@ $set_accessible_true?{<getCallee()><fullTypeName()>?{have: "java.lang.reflect"} 
 
 // alert 
 alert $target for {
+	level: "high",
 	title: "Detect Java Reflection setAccessible Vulnerability",
 	title_zh: "检测Java反射setAccessible函数滥用漏洞",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
-	level: "high",
 }
 
 

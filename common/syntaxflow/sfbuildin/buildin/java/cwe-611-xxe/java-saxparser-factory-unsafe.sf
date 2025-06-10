@@ -109,16 +109,10 @@ $toCheckCall - $excludeCall as $vulnCall;
 
 check $vulnCall;
 alert $vulnCall for {
-	title: "Detect Java SAXParserFactory Unsafe Use",
-	title_zh: "检测 Java SAXParserFactory 不安全使用",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "mid",
 	message: "SAXParserFactory() Unsafe Use in Context Sink",
+	title: "Detect Java SAXParserFactory Unsafe Use",
+	title_zh: "检测 Java SAXParserFactory 不安全使用",
 }
 
 desc(

@@ -158,17 +158,11 @@ $process?{*-{
 }->} as $result
 
 alert $result for {
-	desc: <<<CODE
-
-CODE
-	level: "mid",
 	message: "发现Java的Process.waitFor方法可能导致DDOS漏洞",
 	type: "vuln",
 	title: "Check Java Unsafe Process WaitFor",
 	title_zh: "检测Java不安全Process WaitFor使用",
-	solution: <<<CODE
-
-CODE
+	level: "mid",
 }
 
 desc(

@@ -1,5 +1,5 @@
 desc(
-	title: "Check Java Insecure Byte Array to String Converion"
+	title: "Check Java Insecure Byte Array to String Conversion"
 	title_zh: "检测Java不安全的字节数组到字符串转换"
 	type: Vulnerability
 	severity: Medium
@@ -95,12 +95,6 @@ $string_constructor?{<getActualParams()>* <fullTypeName()>?{have:"byte"}} as $ta
 alert $target for {
 	title: "Check Java Insecure Byte Array to String Converion",
 	title_zh: "检测Java不安全的字节数组到字符串转换",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "mid",
 }
 

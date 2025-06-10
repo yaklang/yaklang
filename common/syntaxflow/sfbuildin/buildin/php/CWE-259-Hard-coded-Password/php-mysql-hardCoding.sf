@@ -85,12 +85,6 @@ REFERENCE
 alert $sink for {
 	title: "Hardcoded MySQL Credentials Detected",
 	title_zh: "检测到MySQL凭据硬编码",
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "low",
 }
 desc(

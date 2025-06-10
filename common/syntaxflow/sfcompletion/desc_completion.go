@@ -53,8 +53,22 @@ func CompleteRuleDesc(
 	if err != nil {
 		return "", utils.Errorf("complete rule failed: %v", err)
 	}
-	params := forgeResult.GetInvokeParams("params")
-	if params == nil {
+	alertResult, err := aiforge.ExecuteForge("sf_alert_completion", context.Background(), []*ypb.ExecParamItem{
+		{
+			Key: "file_name", Value: fileName,
+		},
+		{
+			Key: "file_content", Value: ruleContent,
+		},
+	},
+		aid.WithAgreeYOLO(true),
+		aid.WithAICallback(aiCallback))
+	if err != nil {
+		return "", err
+	}
+	descParams := forgeResult.GetInvokeParams("params")
+	alertParams := alertResult.GetInvokeParams("params")
+	if descParams == nil {
 		return "", utils.Errorf("complete rule failed: ai response have  no params")
 	}
 
@@ -62,10 +76,10 @@ func CompleteRuleDesc(
 		if typ := sfvm.ValidDescItemKeyType(key); typ == sfvm.SFDescKeyType_Unknown {
 			return value
 		}
-		if got := params.GetString(key); got != "" {
+		if got := descParams.GetString(key); got != "" {
 			return got
 		}
-		if got := params.GetInt(key); got != 0 {
+		if got := descParams.GetInt(key); got != 0 {
 			return strconv.FormatInt(got, 10)
 		}
 		return value
@@ -75,7 +89,7 @@ func CompleteRuleDesc(
 		sfvm.RuleFormatWithRequireDescKeyType(sfvm.GetSupplyInfoDescKeyType()...),
 		sfvm.RuleFormatWithDescHandler(handler),
 		sfvm.RuleFormatWithAlertHandler(func(name, key, value string) string {
-			array := params.GetObjectArray("alert")
+			array := alertParams.GetObjectArray("alert")
 			if len(array) == 0 {
 				return value
 			}
