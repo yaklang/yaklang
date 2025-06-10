@@ -158,7 +158,7 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 		func(rsp *AIResponse) error {
 			action, err := ExtractActionFromStream(rsp.GetOutputStreamReader("plan", false, pr.config), "plan", "require-user-interact")
 			if err != nil {
-				return utils.Error("parse action from AI response failed: " + err.Error())
+				return utils.Error("parse @action field from AI response failed: " + err.Error())
 			}
 			switch action.ActionType() {
 			case "plan":
