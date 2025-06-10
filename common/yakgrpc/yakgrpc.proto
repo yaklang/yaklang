@@ -929,6 +929,7 @@ message AIOutputEvent {
   bytes Content = 9;
   int64 Timestamp = 10;
   string TaskIndex = 11;
+  bool DisableMarkdown = 13;
 }
 
 message AIInputEvent {
