@@ -294,15 +294,32 @@ class A {
     	}
 	}}
 `
-	ssatest.CheckSyntaxFlowContain(t, code, `in<fullTypeName> as $in;out<fullTypeName> as $out;`,
-		map[string][]string{
-			"in":  {"\"java.io.FileInputStream\"", "\"java.io.InputStream\""},
-			"out": {"\"java.io.FileOutputStream\"", "\"java.io.OutputStream\""},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
-	ssatest.CheckSyntaxFlowContain(t, code, `.close<fullTypeName> as $close;`,
-		map[string][]string{
-			"close": []string{"\"java.io.FileInputStream\"", "\"java.io.FileOutputStream\"", "\"java.io.InputStream\"", "\"java.io.OutputStream\""},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	t.Run("test in and out", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowContain(t, code, `in<fullTypeName> as $in;out<fullTypeName> as $out;`,
+			map[string][]string{
+				"in":  {"\"java.io.FileInputStream\"", "\"java.io.InputStream\""},
+				"out": {"\"java.io.FileOutputStream\"", "\"java.io.OutputStream\""},
+			},
+			ssaapi.WithLanguage(ssaapi.JAVA),
+		)
+	})
+
+	t.Run("test close ", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowContain(t, code, `
+		.close as $closeInst 
+		$closeInst<fullTypeName> as $close;
+		`,
+			map[string][]string{
+				"close": []string{
+					"\"java.io.FileInputStream\"",
+					"\"java.io.FileOutputStream\"",
+					"\"java.io.InputStream\"",
+					"\"java.io.OutputStream\"",
+				},
+			},
+			ssaapi.WithLanguage(ssaapi.JAVA),
+		)
+	})
 }
 
 func TestJava_Lambda(t *testing.T) {

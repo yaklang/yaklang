@@ -962,19 +962,15 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) {
 			tryBuilder.BuildFinally(func() {
 				y.VisitBlock(finallyBlock.(*javaparser.FinallyBlockContext).Block())
 				key := y.EmitConstInstPlaceholder("close")
-				if shouldClosedValue != nil {
-					for _, value := range shouldClosedValue {
-						y.ReadMemberCallValue(value, key)
-					}
+				for _, value := range shouldClosedValue {
+					y.ReadMemberCallValue(value, key)
 				}
 			})
 		} else {
 			tryBuilder.BuildFinally(func() {
 				key := y.EmitConstInstPlaceholder("close")
-				if shouldClosedValue != nil {
-					for _, value := range shouldClosedValue {
-						y.ReadMemberCallMethod(value, key)
-					}
+				for _, value := range shouldClosedValue {
+					y.ReadMemberCallMethod(value, key)
 				}
 			})
 		}
