@@ -53,6 +53,7 @@ func CallAITransaction(
 			}
 		}
 		postHandlerErr = postHandler(rsp)
+		postHandlerErr = utils.Error("testsssssssssssssssssssssssssssssssssssssss")
 		if postHandlerErr != nil {
 			c.EmitError("ai transaction in postHandler error: %v, retry and block it", postHandlerErr)
 			select {
@@ -100,8 +101,8 @@ func (c *Config) RetryPromptBuilder(rawPrompt string, retryErr error) string {
 		return rawPrompt
 	}
 	templateData := map[string]interface{}{
-		"RetryReason": rawPrompt,
-		"RawPrompt":   retryErr.Error(),
+		"RetryReason": retryErr.Error(),
+		"RawPrompt":   rawPrompt,
 	}
 	res, err := c.quickBuildPrompt(retryPromptTemplate, templateData)
 	if err != nil {
