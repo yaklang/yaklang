@@ -1,9 +1,10 @@
 package java2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"path/filepath"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 const (
@@ -47,7 +48,7 @@ func hookJavaEEMemberCallMethod(y *builder, obj ssa.Value, key ssa.Value, args .
 		jspMethod := t.GetTemplateServerName()
 		jspObj := y.EmitUndefined(t.GetClassName())
 		jspObj.SetType(jspBlueprint)
-		methodCall := y.ReadMemberCallMethod(jspObj, y.EmitConstInst(jspMethod, true))
+		methodCall := y.ReadMemberCallMethod(jspObj, y.EmitConstInstPlaceholder(jspMethod))
 		jspArgs := []ssa.Value{obj, obj}
 		y.EmitCall(y.NewCall(methodCall, jspArgs))
 	}

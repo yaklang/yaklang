@@ -282,9 +282,9 @@ func (y *builder) VisitConstantDeclarator(c *javaparser.ConstantDeclaratorContex
 		}
 		for i := 0; i < dim; i++ {
 			if m == nil {
-				m = y.EmitMakeWithoutType(y.EmitConstInst(0, true), y.EmitConstInst(0, true))
+				m = y.EmitMakeWithoutType(y.EmitConstInstPlaceholder(0), y.EmitConstInstPlaceholder(0))
 			} else {
-				m = y.EmitMakeSlice(m, y.EmitConstInst(0, true), y.EmitConstInst(0, true), y.EmitConstInst(0, true))
+				m = y.EmitMakeSlice(m, y.EmitConstInstPlaceholder(0), y.EmitConstInstPlaceholder(0), y.EmitConstInstPlaceholder(0))
 			}
 		}
 		if m != nil {
