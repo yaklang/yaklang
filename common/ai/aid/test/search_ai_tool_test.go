@@ -96,7 +96,7 @@ func TestDecodeBase64BySearchTool(t *testing.T) {
 		// 判断任务情况
 		{
 			"判断任务情况",
-			nil, `{"@action": "require-more-tool"}`,
+			nil, `{"@action": "continue-current-task"}`,
 		},
 		// 申请解码工具
 		{

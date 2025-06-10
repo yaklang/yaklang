@@ -4,9 +4,9 @@
   "properties": {
     "@action": {
       "type": "string",
-      "enum": ["require-more-tool", "finished"],
+      "enum": ["continue-current-task", "finished"],
       "x-generation-rules": [
-        "根据调用结果检查是否完成当前子任务，如果你认为未完成，需要调用更多工具，则使用require-more-tool",
+        "根据调用结果检查是否完成当前子任务，如果你认为未完成，需要调用更多工具，则使用continue-current-task",
         "如果你认为任务已经完成，请使用finished"
       ]
     },

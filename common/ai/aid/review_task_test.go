@@ -56,7 +56,7 @@ func TestCoordinator_TaskReview(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(request.GetPrompt(), `["require-more-tool", "finished"]`) {
+			if utils.MatchAllOfSubString(request.GetPrompt(), `["continue-current-task", "finished"]`) {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "finished"}`))
 				return rsp, nil
 			}

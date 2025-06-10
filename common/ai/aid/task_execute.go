@@ -98,7 +98,7 @@ TOOLREQUIRED:
 		}
 
 		switch action {
-		case "require-more-tool":
+		case "continue-current-task":
 			t.config.EmitInfo("require more tool in task: %#v", t.Name)
 			moreToolPrompt, err := t.generateTaskPrompt()
 			if err != nil {
