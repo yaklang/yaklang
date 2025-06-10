@@ -64,17 +64,18 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 				currentCoordinatorId = e.CoordinatorId
 			})
 			event := &ypb.AIOutputEvent{
-				CoordinatorId: e.CoordinatorId,
-				Type:          string(e.Type),
-				NodeId:        utils.EscapeInvalidUTF8Byte([]byte(e.NodeId)),
-				IsSystem:      e.IsSystem,
-				IsStream:      e.IsStream,
-				IsReason:      e.IsReason,
-				StreamDelta:   e.StreamDelta,
-				IsJson:        e.IsJson,
-				Content:       e.Content,
-				Timestamp:     e.Timestamp,
-				TaskIndex:     e.TaskIndex,
+				CoordinatorId:   e.CoordinatorId,
+				Type:            string(e.Type),
+				NodeId:          utils.EscapeInvalidUTF8Byte([]byte(e.NodeId)),
+				IsSystem:        e.IsSystem,
+				IsStream:        e.IsStream,
+				IsReason:        e.IsReason,
+				StreamDelta:     e.StreamDelta,
+				IsJson:          e.IsJson,
+				Content:         e.Content,
+				Timestamp:       e.Timestamp,
+				TaskIndex:       e.TaskIndex,
+				DisableMarkdown: e.DisableMarkdown,
 			}
 			err := stream.Send(event)
 			if err != nil {
@@ -195,8 +196,6 @@ func buildAIAgentOption(ctx context.Context, CoordinatorId string, extendOption 
 
 func buildAIDOption(startParams *ypb.AIStartParams) []aid.Option {
 	aidOption := make([]aid.Option, 0)
-
-	aidOption = append(aidOption, aid.WithQwenNoThink())
 
 	if startParams.GetEnableSystemFileSystemOperator() {
 		aidOption = append(aidOption, aid.WithSystemFileOperator())

@@ -1,7 +1,6 @@
 package aid
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -66,6 +65,8 @@ type Event struct {
 
 	// task index
 	TaskIndex string
+	// disable markdown render
+	DisableMarkdown bool
 }
 
 func (e *Event) GetInteractiveId() string {
@@ -123,13 +124,14 @@ func (e *Event) String() string {
 }
 
 type eventWriteProducer struct {
-	isReason      bool
-	isSystem      bool
-	coordinatorId string
-	nodeId        string
-	taskIndex     string
-	handler       func(event *Event)
-	timeStamp     int64
+	isReason        bool
+	isSystem        bool
+	disableMarkdown bool
+	coordinatorId   string
+	nodeId          string
+	taskIndex       string
+	handler         func(event *Event)
+	timeStamp       int64
 }
 
 func (e *eventWriteProducer) Write(b []byte) (int, error) {
@@ -143,15 +145,16 @@ func (e *eventWriteProducer) Write(b []byte) (int, error) {
 	}
 
 	event := &Event{
-		CoordinatorId: e.coordinatorId,
-		NodeId:        e.nodeId,
-		Type:          EVENT_TYPE_STREAM,
-		IsSystem:      e.isSystem,
-		IsReason:      e.isReason,
-		IsStream:      true,
-		StreamDelta:   utils.CopyBytes(b),
-		Timestamp:     e.timeStamp, // the event in same stream should have the same timestamp
-		TaskIndex:     e.taskIndex,
+		CoordinatorId:   e.coordinatorId,
+		NodeId:          e.nodeId,
+		Type:            EVENT_TYPE_STREAM,
+		IsSystem:        e.isSystem,
+		IsReason:        e.isReason,
+		IsStream:        true,
+		StreamDelta:     utils.CopyBytes(b),
+		Timestamp:       e.timeStamp, // the event in same stream should have the same timestamp
+		TaskIndex:       e.taskIndex,
+		DisableMarkdown: e.disableMarkdown,
 	}
 	e.handler(event)
 	return len(b), nil
@@ -297,20 +300,25 @@ func (r *Config) EmitErrorWithName(name string, fmtlog string, items ...any) {
 	r.emitLogWithLevel("error", name, fmtlog, items...)
 }
 
-func (r *Config) EmitToolCallStd(toolName string, stdOut, stdErr *bytes.Buffer, taskIndex string) {
+func (r *Config) EmitToolCallStd(toolName string, stdOut, stdErr io.Reader, taskIndex string) {
 	startTime := time.Now()
-	r.EmitStreamEvent(fmt.Sprintf("tool-%v-stdout", toolName), startTime, stdOut, taskIndex)
-	r.EmitStreamEvent(fmt.Sprintf("tool-%v-stderr", toolName), startTime, stdErr, taskIndex)
+	r.EmitStreamEventEx(fmt.Sprintf("tool-%v-stdout", toolName), startTime, stdOut, taskIndex, true)
+	r.EmitStreamEventEx(fmt.Sprintf("tool-%v-stderr", toolName), startTime, stdErr, taskIndex, true)
 }
 
 func (r *Config) EmitStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string) {
+	r.EmitStreamEventEx(nodeId, startTime, reader, taskIndex, false)
+}
+
+func (r *Config) EmitStreamEventEx(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, disableMarkdown bool) {
 	r.emitExStreamEvent(&streamEvent{
-		startTime: startTime,
-		isSystem:  false,
-		isReason:  false,
-		reader:    reader,
-		nodeId:    nodeId,
-		taskIndex: taskIndex,
+		disableMarkdown: disableMarkdown,
+		startTime:       startTime,
+		isSystem:        false,
+		isReason:        false,
+		reader:          reader,
+		nodeId:          nodeId,
+		taskIndex:       taskIndex,
 	})
 }
 
@@ -421,12 +429,13 @@ func (r *Config) EmitSystemPrompt(step string, prompt string) {
 }
 
 type streamEvent struct {
-	startTime time.Time
-	isSystem  bool
-	isReason  bool
-	reader    io.Reader
-	nodeId    string
-	taskIndex string
+	startTime       time.Time
+	isSystem        bool
+	isReason        bool
+	reader          io.Reader
+	nodeId          string
+	taskIndex       string
+	disableMarkdown bool
 }
 
 func (r *Config) emitExStreamEvent(e *streamEvent) {
@@ -435,13 +444,14 @@ func (r *Config) emitExStreamEvent(e *streamEvent) {
 		defer r.streamWaitGroup.Done()
 
 		io.Copy(&eventWriteProducer{
-			coordinatorId: r.id,
-			nodeId:        e.nodeId,
-			isSystem:      e.isSystem,
-			isReason:      e.isReason,
-			handler:       r.emit,
-			timeStamp:     e.startTime.Unix(),
-			taskIndex:     e.taskIndex,
+			coordinatorId:   r.id,
+			nodeId:          e.nodeId,
+			disableMarkdown: e.disableMarkdown,
+			isSystem:        e.isSystem,
+			isReason:        e.isReason,
+			handler:         r.emit,
+			timeStamp:       e.startTime.Unix(),
+			taskIndex:       e.taskIndex,
 		}, e.reader)
 	}()
 	return

@@ -48,10 +48,35 @@ func (p InvokeParams) GetString(key string, backups ...string) string {
 	return ""
 }
 
+var specialAttr = []string{
+	"value",
+	"const",
+	"description",
+	"desc",
+}
+
+func invokeParamAnyToString(rawValue any) string {
+	if utils.IsNil(rawValue) {
+		return ""
+	}
+	switch v := rawValue.(type) {
+	case string:
+		return v
+	default:
+		resMap := InvokeParams(utils.InterfaceToGeneralMap(rawValue))
+		for _, s := range specialAttr {
+			if res := resMap.GetString(s); res != "" {
+				return res
+			}
+		}
+	}
+	return ""
+}
+
 func (p InvokeParams) GetAnyToString(key string, backups ...string) string {
 	var results string
 	if !utils.IsNil(p) {
-		results = utils.InterfaceToString(utils.MapGetRaw(p, key))
+		results = invokeParamAnyToString(utils.MapGetRaw(p, key))
 	}
 	if len(backups) <= 0 {
 		return results
