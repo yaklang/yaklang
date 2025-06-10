@@ -53,7 +53,6 @@ func CallAITransaction(
 			}
 		}
 		postHandlerErr = postHandler(rsp)
-		postHandlerErr = utils.Error("testsssssssssssssssssssssssssssssssssssssss")
 		if postHandlerErr != nil {
 			c.EmitError("ai transaction in postHandler error: %v, retry and block it", postHandlerErr)
 			select {
