@@ -121,15 +121,15 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 
 	// not function
 	if !ir.IsFunction {
-		if fun, err := NewInstructionFromLazy(ir.CurrentFunction, ToFunction); err == nil {
+		if fun, ok := ToFunction(inst.GetInstructionById(ir.CurrentFunction)); ok {
 			inst.SetFunc(fun)
 		} else {
-			log.Errorf("BUG: set CurrentFunction[%d]: %v", ir.CurrentFunction, err)
+			log.Errorf("BUG: set CurrentFunction[%d]: ", ir.CurrentFunction)
 		}
-		if block, err := NewInstructionFromLazy(ir.CurrentBlock, ToBasicBlock); err == nil {
+		if block, ok := ToBasicBlock(inst.GetInstructionById(ir.CurrentBlock)); ok {
 			inst.SetBlock(block)
 		} else {
-			log.Errorf("BUG: set CurrentBlock[%d]: %v", ir.CurrentBlock, err)
+			log.Errorf("BUG: set CurrentBlock[%d]:", ir.CurrentBlock)
 		}
 	}
 	editor, start, end, err := ir.GetStartAndEndPositions()

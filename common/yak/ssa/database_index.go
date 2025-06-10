@@ -33,19 +33,18 @@ func SaveVariableIndex(inst Instruction, name, member string) {
 			return
 		}
 		variable := value.GetVariable(name)
-		if variable == nil {
-			return
+		if variable != nil {
+			index.VersionID = variable.GetVersion()
+			// TODO : scope ID
+			scope := variable.GetScope()
+			index.ScopeName = scope.GetScopeName()
 		}
-		index.VersionID = variable.GetVersion()
 
 		// field
 		if member != "" {
 			index.FieldName = member
 		}
 
-		// TODO : scope ID
-		scope := variable.GetScope()
-		index.ScopeName = scope.GetScopeName()
 	}
 }
 

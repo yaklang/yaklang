@@ -222,6 +222,7 @@ func (c *DataBaseCacheWithKey[K, T]) IsClose() bool {
 func (c *DataBaseCacheWithKey[K, T]) Close() {
 	c.notifyCache.Close()
 	c.data.Clear()
+	c.DisableSave()
 }
 
 func (c *DataBaseCacheWithKey[K, T]) ForEach(f func(K, T) bool) {
