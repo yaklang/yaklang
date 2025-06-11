@@ -56,8 +56,8 @@ func TestCoordinator_TaskReview(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(request.GetPrompt(), `["continue-current-task", "finished"]`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "finished"}`))
+			if utils.MatchAllOfSubString(request.GetPrompt(), "continue-current-task", "proceed-next-task") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "proceed-next-task"}`))
 				return rsp, nil
 			}
 			if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: now`, `"call-tool"`) {

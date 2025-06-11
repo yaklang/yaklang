@@ -4,10 +4,9 @@
   "properties": {
     "@action": {
       "type": "string",
-      "enum": ["continue-current-task", "proceed-next-task","task-failed", "task-skipped"],
+      "enum": ["proceed-next-task","task-failed", "task-skipped"],
       "description": "(前文提到了任务树的状态)根据上下文检查当前子任务（任务树中标注“执行中”）是否满足退出条件，来判断下一步的行为",
       "enumDescriptions": {
-        "continue-current-task": "如果不满足退出条件，可以通过continue-current-task，申请更多的工具调用来继续执行任务",
         "proceed-next-task": "如果当前任务执行结束，可以通过proceed-next-task来结束当前执行中的任务，进入下一步子任务。",
         "task-failed": "如果当前任务遇到了致命错误，可以通过task-failed来抛出错误，结束退出任务。",
         "task-skipped": "如果某个任务失败次数过多或者你认为无意义，可以通过task-skipped选择放弃这个任务，进入下一步子任务。"
@@ -15,7 +14,7 @@
     },
     "status_summary": {
       "type": "string",
-      "description": "当前尝试执行子任务的时候，判定子任务没有执行完，continue-current-task 将会继续执行这个子任务，需要总结当前子任务状态，以便后续决策，这个字段也可以用来记录中间失败次数或者中间状态累计信息"
+      "description": "当前尝试执行子任务的时候，需要总结当前子任务状态，以便后续决策，这个字段也可以用来记录中间失败次数或者中间状态累计信息"
     },
     "task_long_summary": {
       "type": "string",

@@ -2,6 +2,7 @@ package jsonextractor
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 	"io"
@@ -85,6 +86,30 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 		objectValueInArray       bool
 		arrayCurrentKeyIndex     int
 		legalArrayItem           bool
+	}
+
+	peekUntil := func(checkFunc func(b byte) bool) (byte, error) { // peek until meet the conditions
+		i := 0
+		for {
+			i++
+			res, err := reader.PeekN(i)
+			if err != nil {
+				return 0, err
+			}
+			if len(res) < i {
+				return 0, fmt.Errorf("invalid peek , want %d but got %d", i, len(res))
+			}
+
+			if checkFunc(res[i-1]) {
+				return res[i-1], nil
+			}
+		}
+	}
+
+	peekUntilNoWhiteSpace := func() (byte, error) {
+		return peekUntil(func(b byte) bool {
+			return b != ' ' && b != '\t' && b != '\f' && b != '\v'
+		})
 	}
 
 	bufManager := newBufStackManager(func(key any, val any) {
@@ -270,9 +295,6 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 				}
 				pushState(state_DoubleQuoteString)
 				continue
-			case '\'':
-				pushState(state_SingleQuoteString)
-				continue
 			case '}':
 				if !currentStateIns().objectValueInArray {
 					popState()
@@ -292,11 +314,18 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 					pushStateWithIdx(state_objectKey, index+1)
 				}
 			case ',':
-				popState()
-				if currentState() == state_jsonArray {
-					goto RETRY // in json array every ',' and ']' should process in state_jsonArray
+				if currentStateIns().objectValueInArray {
+					popState()
+					goto RETRY
 				}
-				pushStateWithIdx(state_objectKey, index+1)
+				peekByte, err := peekUntilNoWhiteSpace()
+				if err != nil {
+					return err
+				}
+				if peekByte == '"' || peekByte == '\n' || peekByte == '\r' {
+					popState()
+					pushStateWithIdx(state_objectKey, index+1)
+				}
 				continue
 			case ']':
 				if currentStateIns().objectValueInArray {
@@ -336,9 +365,6 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 			case '"':
 				pushState(state_DoubleQuoteString)
 				continue
-			case '\'':
-				pushState(state_SingleQuoteString)
-				continue
 			case '[':
 				currentStateIns().isArray = true
 				pushState(state_jsonArray)
@@ -350,9 +376,6 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 				continue
 			case '"':
 				pushState(state_DoubleQuoteString)
-				continue
-			case '\'':
-				pushState(state_SingleQuoteString)
 				continue
 			//case '`':
 			//	pushState(state_esExpr)
@@ -374,15 +397,6 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 				continue
 			case '"':
 				popStateWithIdx(index + 1)
-				continue
-			}
-		case state_SingleQuoteString:
-			switch ch {
-			case '\\':
-				pushState(state_quote)
-				continue
-			case '\'':
-				popState()
 				continue
 			}
 		case state_quote:

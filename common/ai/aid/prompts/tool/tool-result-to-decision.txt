@@ -13,30 +13,36 @@
 
 {{ .Memory.TimelineWithout .Result.ID }}
 
-## 当前需要做什么
-
-在执行完一个工具的时候，你需要重新review当前任务的执行情况，并且做出相应决策：
-
-1. 根据上下文判断如果当前任务已经完成，则需要将当前任务标记为完成，并且输出符合Schema的JSON数据实例，并给出相应的总结
-2. 如果当前任务的上下文你认为无法判定为结束，请你根据下面Schema，使用"continue-current-task"来进一步执行任务。
-3. 你可以在 continue-current-task 中通过 status_summary 更新任务状态，更新失败次数，失败次数过多，可以直接 finished 标注结束
-4. 注意：你必须专注当前任务是否满足需要即可，其他的任务会有别的办法完成。
-
-当前任务是根据工具结果决策是否需要再调用额外工具还是把当前任务标记为结束。
-
 {{ if .Memory.PersistentMemory }}# 牢记
 {{ .Memory.PersistentMemory}}
 {{end}}
 
-# 注意
+## 当前需要做什么
 
-在你执行完任务后，需要生成符合下方Schema的JSON数据实例，禁止返回Schema结构。在这次回答中，尤其要注意检查任务状态
+在执行完一个工具的时候，你需要重新review当前任务的执行情况，并且做出相应决策：
+
+{{ if .Memory.CurrentTask.CanContinue }}
+当前任务可以继续，你需要判断是否需要继续执行当前任务，并输出符合Schema的JSON数据实例。
+1. 根据上下文判断如果当前任务已经完成，则需要将当前任务标记为完成，并且输出符合Schema的JSON数据实例，并给出相应的总结
+2. 如果当前任务的上下文你认为无法判定为结束，请你根据下面Schema，使用"continue-current-task"来进一步执行任务。
+3. 你可以在 continue-current-task 中通过 status_summary 更新任务状态。
+4. 注意：你必须专注当前任务是否满足需要即可，其他的任务会有别的办法完成。
+{{ else }}
+当前任务已经超过了最大执行次数，你不能在继续执行这个任务了，并输出符合Schema的JSON数据实例。
+1. 根据上下文判断如果当前任务已经完成，则需要将当前任务标记为完成，并且输出符合Schema的JSON数据实例，并给出相应的总结
+2. 你已经超过了单任务的继续执行次数限制，因此需要判断是否此任务可以不再执行，如果满足了一定的效果既可以标记结束或者跳过，继续执行后面的任务
+3. 注意：你必须专注当前任务是否满足需要即可，其他的任务会有别的办法完成。
+{{ end}}
 
 ## 任务状态如下
 {{ .Memory.CurrentTaskInfo }}
 
-明确判断当前正在执行中的任务是否应该结束，如果未结束，则需要使用"continue-current-task"来进行下一次工具的使用。
-
+# 注意
+在你执行完任务后，需要生成符合下方Schema的JSON数据实例，禁止返回Schema结构。在这次回答中，尤其要注意检查任务状态
 ```schema
+{{ if .Memory.CurrentTask.CanContinue }}
 {{ .Memory.Schema.ToolExecuteCheckSchema }}
+{{else}}
+{{ .Memory.Schema.ToolExecuteCheckSchemaWithoutContinue }}
+{{end}}
 ```

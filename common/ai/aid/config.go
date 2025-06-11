@@ -129,6 +129,8 @@ type Config struct {
 	generateReport bool
 
 	forgeName string // if coordinator is create from a forge, this is the forge name
+
+	maxTaskContinue int64
 }
 
 func (c *Config) HandleSearch(query string, items *omap.OrderedMap[string, []string]) ([]*searchtools.KeywordSearchResult, error) {
@@ -283,6 +285,11 @@ func (c *Config) SetSyncCallback(i SyncType, callback func() any) {
 }
 
 func (c *Config) emit(e *Event) {
+	select {
+	case <-c.ctx.Done():
+		return
+	default:
+	}
 	c.m.Lock()
 	defer c.m.Unlock()
 
@@ -416,6 +423,7 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		timelineContentSizeLimit:    30 * 1024,
 		aiToolManagerOption:         make([]buildinaitools.ToolManagerOption, 0),
 		planUserInteractMaxCount:    3,
+		maxTaskContinue:             10,
 	}
 	c.epm.config = c // review
 	if err := initDefaultTools(c); err != nil {
@@ -949,6 +957,19 @@ func WithForgeName(forgeName string) Option {
 		defer config.m.Unlock()
 
 		config.forgeName = forgeName
+		return nil
+	}
+}
+
+func WithMaxTaskContinue(i int64) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+
+		if i <= 0 {
+			i = 10
+		}
+		config.maxTaskContinue = i
 		return nil
 	}
 }

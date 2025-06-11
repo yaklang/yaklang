@@ -93,14 +93,6 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 	}
 
 	t.config.EmitInfo("start to invoke tool:%v 's callback function", targetTool.Name)
-	// 调用工具
-	stdoutReader, stdoutWriter := utils.NewPipe()
-	defer stdoutWriter.Close()
-	stderrReader, stderrWriter := utils.NewPipe()
-	defer stderrWriter.Close()
-
-	t.config.EmitToolCallStd(targetTool.Name, stdoutReader, stderrReader, t.Index)
-
 	// DANGER: 这个值永远不应该暴露给用户，只有内部工具才有资格设置它
 	if targetTool.NoNeedUserReview {
 		t.config.EmitInfo("tool[%v] (internal helper tool) no need user review, skip review", targetTool.Name)
@@ -129,6 +121,14 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 		default:
 		}
 	}
+
+	// 调用工具
+	stdoutReader, stdoutWriter := utils.NewPipe()
+	defer stdoutWriter.Close()
+	stderrReader, stderrWriter := utils.NewPipe()
+	defer stderrWriter.Close()
+
+	t.config.EmitToolCallStd(targetTool.Name, stdoutReader, stderrReader, t.Index)
 	t.config.EmitInfo("start to execute tool:%v", targetTool.Name)
 	toolResult, err := targetTool.InvokeWithParams(callToolParams, t.config.toolCallOpts(stdoutWriter, stderrWriter)...)
 	if err != nil {
@@ -149,7 +149,7 @@ func (t *aiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitoo
 		return "", NewNonRetryableTaskStackError(err)
 	}
 
-	var actionFinal string
+	var action *Action
 	err = t.config.callAiTransaction(decisionPrompt, func(request *AIRequest) (*AIResponse, error) {
 		request.SetTaskIndex(t.Index)
 		return t.callAI(request)
@@ -161,13 +161,9 @@ func (t *aiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitoo
 		}
 
 		// 获取下一步决策
-		action, err := ExtractAction(string(nextResponse), "continue-current-task", "finished")
+		action, err = ExtractAction(string(nextResponse), taskContinue, taskProceedNext, taskContinue, taskFailed)
 		if err != nil {
 			return utils.Errorf("error extracting action: %v", err)
-		}
-		actionFinal = action.Name()
-		if actionFinal != "continue-current-task" && actionFinal != "finished" {
-			return utils.Errorf("error extracting action: %v", actionFinal)
 		}
 		if ret := action.GetString("status_summary"); ret != "" {
 			t.StatusSummary = ret
@@ -192,12 +188,12 @@ func (t *aiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitoo
 			t.TaskSummary = t.LongSummary
 		}
 
-		t.config.EmitInfo("tool[%v] and next do the action: %v", targetTool.Name, actionFinal)
+		t.config.EmitInfo("tool[%v] and next do the action: %v", targetTool.Name, action.Name())
 		return nil
 	})
 	if err != nil {
 		t.config.EmitWarning("no action found, using default action, finished")
 		return "", NewNonRetryableTaskStackError(err)
 	}
-	return actionFinal, nil
+	return action.Name(), nil
 }

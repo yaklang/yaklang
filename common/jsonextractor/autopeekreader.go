@@ -1,6 +1,7 @@
 package jsonextractor
 
 import (
+	"fmt"
 	"io"
 )
 
@@ -89,15 +90,27 @@ func (pr *autoPeekReader) ReadByte() (byte, error) {
 
 // Peek 返回下一个字节但不消费
 func (pr *autoPeekReader) Peek() (byte, error) {
-	if err := pr.ensureBuffer(1); err != nil && len(pr.buffer) <= pr.bufferPos {
+	res, err := pr.PeekN(1)
+	if err != nil {
 		return 0, err
+	}
+	if len(res) < 1 {
+		return 0, fmt.Errorf("invalid peek , want %d but got %d", 1, len(res))
+	}
+	return res[0], nil
+}
+
+// Peek 返回下n个字节但不消费
+func (pr *autoPeekReader) PeekN(n int) ([]byte, error) {
+	if err := pr.ensureBuffer(n); err != nil && len(pr.buffer) <= pr.bufferPos {
+		return nil, err
 	}
 
 	if pr.bufferPos >= len(pr.buffer) {
-		return 0, io.EOF
+		return nil, io.EOF
 	}
 
-	return pr.buffer[pr.bufferPos], nil
+	return pr.buffer[pr.bufferPos : pr.bufferPos+n], nil
 }
 
 // Buffered 返回缓冲区中当前可读的所有内容
