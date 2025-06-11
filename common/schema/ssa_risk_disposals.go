@@ -11,7 +11,7 @@ type SSARiskDisposals struct {
 
 	User    string `json:"user" gorm:"index"`
 	Status  string `json:"status" gorm:"index"`
-	Comment string `json:"comments" gorm:"type:text"`
+	Comment string `json:"comment" gorm:"type:text"`
 	RiskId  int64  `json:"risk_id" gorm:"index"`
 
 	Hash string `json:"hash" gorm:"unique_index"`
