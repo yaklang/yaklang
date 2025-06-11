@@ -1,7 +1,7 @@
 package ssa
 
 import (
-	"reflect"
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -15,6 +15,13 @@ import (
 
 	syncAtomic "sync/atomic"
 )
+
+type fetchedIdResult struct {
+	id     int64
+	irCode *ssadb.IrCode
+}
+
+const fetchIdSize = 50
 
 type instructionCachePair struct {
 	inst   Instruction
@@ -43,18 +50,23 @@ type Cache struct {
 
 	IrCodeChan      chan *ssadb.IrCode
 	IrCodeWaitGroup sync.WaitGroup
+
+	// For pre-fetching IDs
+	fetchIdCancel context.CancelFunc
 }
 
-var ChanSize = 1000
+var ChanSize = 50
 
 // NewDBCache : create a new ssa db cache. if ttl is 0, the cache will never expire, and never save to database.
 func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) *Cache {
+	cacheCtx := context.Background()
 	ttl := time.Duration(0)
 	cache := &Cache{
 		program: prog,
 		// set ttl
 		IrCodeChan:      make(chan *ssadb.IrCode, ChanSize),
 		IrCodeWaitGroup: sync.WaitGroup{},
+		fetchIdCancel:   func() {},
 	}
 	if databaseEnable {
 		if len(ConfigTTL) > 0 {
@@ -67,12 +79,71 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 	// init instruction cache and fetchId
 	var save func(int64, *instructionCachePair, utils.EvictionReason) bool
 	var load func(int64) (*instructionCachePair, error)
+
 	if databaseEnable {
 		programName := prog.GetProgramName()
 		cache.DB = ssadb.GetDB().Where("program_name = ?", programName)
-		cache.fetchId = func() (int64, *ssadb.IrCode) {
-			return ssadb.RequireIrCode(cache.DB, programName)
+
+		fetchIdChan := make(chan fetchedIdResult, fetchIdSize)
+		// Start the ID pre-fetcher goroutine
+		fetchIdCtx, fetchIdCancel := context.WithCancel(cacheCtx)
+		cache.fetchIdCancel = fetchIdCancel
+		show := func() {
+			if len(fetchIdChan) < fetchIdSize/2 {
+				log.Errorf("fetchIdChan is too small: %d, program: %s", len(fetchIdChan), programName)
+			}
 		}
+		go func() {
+			defer close(fetchIdChan)
+			for {
+				show()
+				select {
+				case <-fetchIdCtx.Done():
+					result := make([]int, 0, fetchIdSize)
+					for len(fetchIdChan) > 0 {
+						res := <-fetchIdChan
+						result = append(result, int(res.id))
+					}
+					ssadb.DeleteIRCode(cache.DB, result...)
+					return
+				default:
+					loadSize := 5
+					result := make([]fetchedIdResult, 0, loadSize)
+					// log.Errorf("load from db with transaction ")
+					utils.GormTransaction(cache.DB, func(tx *gorm.DB) error {
+						for i := 0; i < loadSize; i++ {
+							// log.Errorf("load from db with transaction: %v ", i)
+							id, irCode := ssadb.RequireIrCode(tx, programName)
+							if irCode == nil || id <= 0 {
+								continue
+							}
+							result = append(result, fetchedIdResult{id: id, irCode: irCode})
+						}
+						return nil
+					})
+
+					// log.Errorf("load from db with transaction done ")
+					for _, res := range result {
+						select {
+						case fetchIdChan <- res:
+						case <-fetchIdCtx.Done():
+							ssadb.DeleteIRCode(cache.DB, int(res.id))
+						}
+					}
+				}
+			}
+		}()
+
+		cache.fetchId = func() (int64, *ssadb.IrCode) {
+			start := time.Now()
+			defer func() {
+				syncAtomic.AddUint64(&FetchInstructionTime, uint64(time.Since(start)))
+				syncAtomic.AddUint64(&FetchInstructionCount, 1)
+			}()
+			result := <-fetchIdChan
+			return result.id, result.irCode
+		}
+
 		save = func(i int64, s *instructionCachePair, reason utils.EvictionReason) bool {
 			if reason == utils.EvictionReasonExpired {
 				if s.inst.GetOpcode() == SSAOpcodeFunction || s.inst.GetOpcode() == SSAOpcodeBasicBlock {
@@ -87,6 +158,11 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 			return false
 		}
 		load = func(id int64) (*instructionCachePair, error) {
+			start := time.Now()
+			defer func() {
+				syncAtomic.AddUint64(&LoadInstructionTime, uint64(time.Since(start)))
+				syncAtomic.AddUint64(&LoadInstructionCount, 1)
+			}()
 			irCode := ssadb.GetIrCodeById(cache.DB, id)
 			inst, err := NewLazyInstructionFromIrCode(irCode, cache.program, true)
 			if err != nil {
@@ -117,6 +193,7 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 					return nil
 				})
 				syncAtomic.AddUint64(&_SSASaveIrCodeDBCost, uint64(time.Since(start)))
+				syncAtomic.AddUint64(&_SSASaveIrCodeDBCount, 1)
 				if cache.afterSaveNotify != nil {
 					cache.afterSaveNotify(len(irCodes))
 				}
@@ -135,14 +212,19 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 
 	} else {
 		id := atomic.NewInt64(0)
+
 		cache.fetchId = func() (int64, *ssadb.IrCode) {
+			start := time.Now()
+			defer func() {
+				syncAtomic.AddUint64(&FetchInstructionTime, uint64(time.Since(start)))
+				syncAtomic.AddUint64(&FetchInstructionCount, 1)
+			}()
 			return id.Inc(), nil
 		}
 		load = func(i int64) (*instructionCachePair, error) {
 			return nil, utils.Errorf("load from database is disabled")
 		}
 		save = func(i int64, icp *instructionCachePair, reason utils.EvictionReason) bool {
-			cache.marshalInstruction(icp)
 			return false // disable save to database
 		}
 	}
@@ -193,66 +275,41 @@ func (c *Cache) HaveDatabaseBackend() bool {
 
 // =============================================== Instruction =======================================================
 
-func (c *Cache) Refresh(insts any) {
-	if c.InstructionCache.IsClose() {
-		return
-	}
-	if utils.IsNil(insts) {
-		return
-	}
-	refresh := func(inst Instruction) {
-		id := inst.GetId()
-		if id <= 0 {
-			c.SetInstruction(inst)
-			return
-		}
-		if item, ok := c.InstructionCache.GetPure(id); ok {
-			if item.inst != inst {
-				if item.inst.IsLazy() {
-					item.inst = inst
-					c.InstructionCache.Set(id, item)
-				}
-			}
-		} else {
-			c.InstructionCache.Set(id, &instructionCachePair{
-				inst:   inst,
-				irCode: ssadb.GetIrCodeById(ssadb.GetDB(), id),
-			})
-		}
-	}
-	t := reflect.TypeOf(insts).Kind()
-	if t == reflect.Array || t == reflect.Slice {
-		len := reflect.ValueOf(insts).Len()
-		for i := 0; i < len; i++ {
-			if ins, ok := reflect.ValueOf(insts).Index(i).Interface().(Instruction); ok {
-				refresh(ins)
-			}
-		}
-	} else {
-		if ins, ok := insts.(Instruction); ok {
-			refresh(ins)
-		}
-	}
-}
-
 // SetInstruction : set instruction to cache.
 func (c *Cache) SetInstruction(inst Instruction) {
+	{
+		start := time.Now()
+		defer func() {
+			syncAtomic.AddUint64(&SetInstructionTime, uint64(time.Since(start)))
+			syncAtomic.AddUint64(&SetInstructionCount, 1)
+		}()
+	}
+
+	var start time.Time
 	id := inst.GetId()
 	_ = id
+
 	if inst.GetId() <= 0 {
 		// new instruction, use new ID
+		start = time.Now()
 		id, irCode := c.fetchId()
+		syncAtomic.AddUint64(&Site1, uint64(time.Since(start)))
 		inst.SetId(id)
 		if id <= 0 {
 			log.Errorf("BUG: fetchId return invalid id: %d", id)
 			return
 		}
+
+		start = time.Now()
 		c.InstructionCache.Set(id, &instructionCachePair{
 			inst:   inst,
 			irCode: irCode,
 		})
+		syncAtomic.AddUint64(&Site2, uint64(time.Since(start)))
 	} else {
-		c.Refresh(inst)
+		start = time.Now()
+		c.InstructionCache.Get(id)
+		syncAtomic.AddUint64(&Site3, uint64(time.Since(start)))
 	}
 }
 
@@ -262,6 +319,11 @@ func (c *Cache) DeleteInstruction(inst Instruction) {
 
 // GetInstruction : get instruction from cache.
 func (c *Cache) GetInstruction(id int64) Instruction {
+	start := time.Now()
+	defer func() {
+		syncAtomic.AddUint64(&GetInstructionTime, uint64(time.Since(start)))
+		syncAtomic.AddUint64(&GetInstructionCount, 1)
+	}()
 	if id == 0 {
 		return nil
 	}
@@ -354,17 +416,20 @@ func (c *Cache) marshalInstruction(instIr *instructionCachePair) bool {
 		log.Errorf("BUG: saveInstruction called with empty opcode: %v", instIr.inst.GetName())
 	}
 	syncAtomic.AddUint64(&_SSASaveIrCodeCPUCost, uint64(time.Since(start)))
+	syncAtomic.AddUint64(&_SSASaveIrCodeCPUCount, 1)
 	return true
 }
 
 func (c *Cache) SaveToDatabase(cb ...func(int)) {
+	start := time.Now()
+	syncAtomic.AddUint64(&SaveDBWait, uint64(time.Since(start)))
+	c.fetchIdCancel()
 	// if !c.HaveDatabaseBackend() {
 	// 	return
 	// }
 	if len(cb) > 0 {
 		c.afterSaveNotify = cb[0]
 	}
-	c.InstructionCache.EnableSave()
 	c.InstructionCache.Close()
 	close(c.IrCodeChan)
 	c.IrCodeWaitGroup.Wait()

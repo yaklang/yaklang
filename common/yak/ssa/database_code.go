@@ -13,7 +13,8 @@ import (
 func Instruction2IrCode(inst Instruction, ir *ssadb.IrCode) error {
 	start := time.Now()
 	defer func() {
-		atomic.AddUint64(&InstructoinMarshal, uint64(time.Since(start)))
+		atomic.AddUint64(&InstructionMarshal, uint64(time.Since(start)))
+		atomic.AddUint64(&InstructionMarshalCount, 1)
 	}()
 	if ir.ID != uint(inst.GetId()) {
 		return utils.Errorf("marshal instruction id not match")
@@ -58,25 +59,28 @@ func fitRange(c *ssadb.IrCode, rangeIns memedit.RangeIf) {
 
 func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	start := time.Now()
-	defer func() { atomic.AddUint64(&Instruction2IRcode, uint64(time.Since(start))) }()
+	defer func() {
+		atomic.AddUint64(&Instruction2IRcode, uint64(time.Since(start)))
+		atomic.AddUint64(&Instruction2IRcodeCount, 1)
+	}()
 
 	// --- Section 1 Start ---
-	start1 := time.Now()
+	// start1 := time.Now()
 	// name
 	ir.Name = inst.GetName()
 	ir.VerboseName = inst.GetVerboseName()
 	ir.ShortVerboseName = inst.GetShortVerboseName()
-	ir.String = inst.String()
-	ir.ReadableName = LineDisASM(inst)
-	ir.ReadableNameShort = LineShortDisASM(inst)
+	// ir.String = inst.String()
+	// ir.ReadableName = LineDisASM(inst)
+	// ir.ReadableNameShort = LineShortDisASM(inst)
 	// opcode
 	ir.Opcode = int64(inst.GetOpcode())
 	ir.OpcodeName = SSAOpcode2Name[inst.GetOpcode()]
-	atomic.AddUint64(&Marshal1, uint64(time.Since(start1)))
+	// atomic.AddUint64(&Marshal1, uint64(time.Since(start1)))
 	// --- Section 1 End ---
 
 	// --- Section 2 Start ---
-	start2 := time.Now()
+	// start2 := time.Now()
 	var codeRange memedit.RangeIf
 	if ret := inst.GetRange(); ret != nil {
 		codeRange = ret
@@ -97,16 +101,16 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	}
 
 	if codeRange == nil {
-		switch ret := inst.(type) {
-		case *BasicBlock:
-			if len(ret.Insts) > 0 {
-				codeRange = ret.GetInstructionById(ret.Insts[0]).GetRange()
-			}
-		case *Function:
-			if len(ret.Blocks) > 0 {
-				codeRange = ret.GetBasicBlockByID(ret.Blocks[0]).GetRange()
-			}
-		}
+		// switch ret := inst.(type) {
+		// case *BasicBlock:
+		// 	if len(ret.Insts) > 0 {
+		// 		codeRange = ret.GetInstructionById(ret.Insts[0]).GetRange()
+		// 	}
+		// case *Function:
+		// 	if len(ret.Blocks) > 0 {
+		// 		codeRange = ret.GetBasicBlockByID(ret.Blocks[0]).GetRange()
+		// 	}
+		// }
 	}
 
 	if codeRange == nil {
@@ -115,11 +119,11 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 
 	inst.SetRange(codeRange)
 	fitRange(ir, codeRange)
-	atomic.AddUint64(&Marshal2, uint64(time.Since(start2)))
+	// atomic.AddUint64(&Marshal2, uint64(time.Since(start2)))
 	// --- Section 2 End ---
 
 	// --- Section 3 Start ---
-	start3 := time.Now()
+	// start3 := time.Now()
 	if fun := inst.GetFunc(); fun != nil {
 		ir.CurrentFunction = fun.GetId()
 	}
@@ -128,7 +132,7 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	}
 
 	ir.IsExternal = inst.IsExtern()
-	atomic.AddUint64(&Marshal3, uint64(time.Since(start3)))
+	// atomic.AddUint64(&Marshal3, uint64(time.Since(start3)))
 	// --- Section 3 End ---
 }
 
@@ -163,7 +167,10 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 
 func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	start := time.Now()
-	defer func() { atomic.AddUint64(&Value2IrCode, uint64(time.Since(start))) }()
+	defer func() {
+		atomic.AddUint64(&Value2IrCode, uint64(time.Since(start)))
+		atomic.AddUint64(&Value2IrCodeCount, 1)
+	}()
 	defer func() {
 		if msg := recover(); msg != nil {
 			log.Errorf("value2IrCode panic: %s", msg)
