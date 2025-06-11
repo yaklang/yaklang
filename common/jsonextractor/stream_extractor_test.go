@@ -326,3 +326,27 @@ func TestStreamExtractorArray_BASIC7(t *testing.T) {
 	}))
 	assert.True(t, resultLengthCheck)
 }
+
+func TestStreamExtractor_BASIC8(t *testing.T) {
+	resultLengthCheck := false
+	var result map[string]interface{}
+	raw := `json { "@action": "continue-current-task", "status_summary": "当前任务状态：已测试 '<test>"' 的回显情况，JavaScript 输出未被编码或过滤。下一步将测试其他特殊字符（如 >, & 等）的回显情况，以确认是否存在更复杂的过滤机制。", "summary_tool_call_result": "使用 send_http_request_by_url 向 name 参数注入了特殊字符组合 '<test>\"'，返回的 HTML 页面中 JavaScript 成功输出原始字符串，未发现明显编码或过滤痕迹。" } `
+	err := ExtractStructuredJSON(raw, WithObjectCallback(func(data map[string]any) {
+		resultLengthCheck = len(data) == 3
+		result = data
+	}))
+	require.NoError(t, err)
+	spew.Dump(result)
+	require.True(t, resultLengthCheck)
+	assert.Equal(t, "continue-current-task", result["@action"])
+	assert.Equal(t, "当前任务状态：已测试 '<test>\"' 的回显情况，JavaScript 输出未被编码或过滤。下一步将测试其他特殊字符（如 >, & 等）的回显情况，以确认是否存在更复杂的过滤机制。", result["status_summary"])
+	assert.Equal(t, "使用 send_http_request_by_url 向 name 参数注入了特殊字符组合 '<test>\"'，返回的 HTML 页面中 JavaScript 成功输出原始字符串，未发现明显编码或过滤痕迹。", result["summary_tool_call_result"])
+}
+
+func TestStreamExtractor_BASIC9(t *testing.T) {
+	raw := `{"@action": "require-tool", "tool": "now"}`
+	ExtractStructuredJSON(raw, WithObjectCallback(func(data map[string]any) {
+		spew.Dump(data)
+	}))
+
+}

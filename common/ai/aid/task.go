@@ -54,6 +54,9 @@ type aiTask struct {
 	TaskSummary       string `json:"task_summary"`
 	ShortSummary      string `json:"short_summary"`
 	LongSummary       string `json:"long_summary"`
+
+	// task continue count
+	TaskContinueCount int64 `json:"task_continue_count"` // 任务继续执行的次数
 }
 
 func (t *aiTask) callAI(request *AIRequest) (*AIResponse, error) {
@@ -347,4 +350,8 @@ func (t *aiTask) QuoteName() string {
 
 func (t *aiTask) QuoteGoal() string {
 	return strconv.Quote(t.Goal)
+}
+
+func (t *aiTask) CanContinue() bool {
+	return t.TaskContinueCount < t.config.maxTaskContinue
 }

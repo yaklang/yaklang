@@ -27,6 +27,7 @@ func TestCoordinator_Timeline_ToolUse_TooMany_TimelineShrink(t *testing.T) {
 		"test",
 		WithEventInputChan(inputChan),
 		WithSystemFileOperator(),
+		WithMaxTaskContinue(100),
 		WithEventHandler(func(event *Event) {
 			outputChan <- event
 		}),

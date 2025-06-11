@@ -120,7 +120,7 @@ func TestCoodinator_Delete_Memory(t *testing.T) {
 				rsp.EmitOutputStream(strings.NewReader(
 					fmt.Sprintf(`{"@action": "call-tool", "tool": "delete_memory", "params": {"id": %d}}`, testCallKey)))
 				return rsp, nil
-			} else if utils.MatchAllOfSubString(request.GetPrompt(), `"continue-current-task"`, `"finished"`, `"status_summary"`) {
+			} else if utils.MatchAllOfSubString(request.GetPrompt(), `"continue-current-task"`, `"proceed-next-task"`, `"status_summary"`) {
 				if firstToolDecision {
 					firstToolDecision = false
 					keys := timeline.idToTimelineItem.Keys()
@@ -254,7 +254,7 @@ func TestCoodinator_Add_Persistent_Memory(t *testing.T) {
 				rsp.EmitOutputStream(strings.NewReader(
 					`{"@action": "call-tool", "tool": "now", "params": {"content": "` + persistentMemory + `"}}}`))
 				return rsp, nil
-			} else if utils.MatchAllOfSubString(request.GetPrompt(), `"continue-current-task"`, `"finished"`, `"status_summary"`) {
+			} else if utils.MatchAllOfSubString(request.GetPrompt(), `"continue-current-task"`, `"proceed-next-task"`, `"status_summary"`) {
 				config.memory.PushPersistentData(persistentMemory)
 				if timeline.idToTimelineItem.Len() > 0 {
 					panic("skip add persistent memory to timeline fail")

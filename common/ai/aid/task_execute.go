@@ -10,6 +10,13 @@ import (
 	"text/template"
 )
 
+var (
+	taskContinue    = "continue-current-task"
+	taskProceedNext = "proceed-next-task"
+	taskFailed      = "task-failed"
+	taskSkipped     = "task-skipped"
+)
+
 func (t *aiTask) execute() error {
 	t.config.memory.StoreCurrentTask(t)
 	// 生成初始执行任务的prompt
@@ -98,7 +105,8 @@ TOOLREQUIRED:
 		}
 
 		switch action {
-		case "continue-current-task":
+		case taskContinue:
+			atomic.AddInt64(&t.TaskContinueCount, 1)
 			t.config.EmitInfo("require more tool in task: %#v", t.Name)
 			moreToolPrompt, err := t.generateTaskPrompt()
 			if err != nil {
@@ -120,9 +128,14 @@ TOOLREQUIRED:
 				return fmt.Errorf("error calling AI transaction: %w", err)
 			}
 			continue
-		case "finished":
+		case taskProceedNext:
 			t.config.EmitInfo("task[%v] finished", t.Name)
 			break TOOLREQUIRED
+		case taskFailed:
+			t.config.EmitError("task[%v] failed", t.Name)
+			break TOOLREQUIRED
+		case taskSkipped:
+			t.config.EmitInfo("task[%v] skipped, continue to next task", t.Name)
 		default:
 			t.config.EmitError("unknown action: %v, skip tool require", action)
 			break TOOLREQUIRED
