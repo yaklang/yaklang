@@ -178,23 +178,31 @@ func (f *RuleFormat) VisitAlertStatement(alert sf.IAlertStatementContext) {
 	} else {
 		variable := yakunquote.TryUnquote(refVariable.Identifier().GetText())
 		defer func() {
-			f.Write(fmt.Sprintf("alert $%s for {\n", variable))
-			for key, value := range alertMsg {
-				newVal := f.alertHandler(variable, key, value)
-				if lo.Contains([]string{"none", ""}, newVal) {
-					continue
+			isNull := true
+			for _, s := range alertMsg {
+				if s != "" {
+					isNull = false
 				}
-				switch key {
-				case "desc", "solution":
-					f.Write(fmt.Sprintf(`	%s: <<<CODE
+			}
+			if !isNull {
+				f.Write(fmt.Sprintf("alert $%s for {\n", variable))
+				for key, value := range alertMsg {
+					newVal := f.alertHandler(variable, key, value)
+					if lo.Contains([]string{"none", ""}, newVal) {
+						continue
+					}
+					switch key {
+					case "desc", "solution":
+						f.Write(fmt.Sprintf(`	%s: <<<CODE
 %s
 CODE
 `, key, newVal))
-				default:
-					f.Write(fmt.Sprintf("\t%s: \"%s\",\n", key, newVal))
+					default:
+						f.Write(fmt.Sprintf("\t%s: \"%s\",\n", key, newVal))
+					}
 				}
+				f.Write("}\n")
 			}
-			f.Write("}\n")
 		}()
 		if alertStmt.DescriptionItems() == nil {
 			return
