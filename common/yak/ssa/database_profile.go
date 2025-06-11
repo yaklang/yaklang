@@ -10,24 +10,51 @@ import (
 )
 
 var (
-	_SSASaveIrCodeCPUCost uint64
+	_SSASaveIrCodeCPUCost  uint64
+	_SSASaveIrCodeCPUCount uint64
 
-	Marshal1 uint64
-	Marshal2 uint64
-	Marshal3 uint64
+	Site1 uint64
+	Site2 uint64
+	Site3 uint64
 
-	_SSASaveIrCodeDBCost    uint64
-	_SSACacheToDatabaseCost uint64
-	_CostCallback           []func()
-	_compileFileHit         = make(map[string]int64)
+	_SSASaveIrCodeDBCost  uint64
+	_SSASaveIrCodeDBCount uint64
 
-	InstructoinMarshal uint64
-	Instruction2IRcode uint64
-	Value2IrCode       uint64
-	Function2IrCode    uint64
-	BasicBlock2IrCode  uint64
-	SetExtraInfo       uint64
-	SaveValueOff       uint64
+	// _SSACacheToDatabaseCost  uint64
+	// _SSACacheToDatabaseCount uint64
+
+	_CostCallback []func()
+
+	_compileFileHit = make(map[string]int64)
+
+	InstructionMarshal      uint64
+	InstructionMarshalCount uint64
+
+	Instruction2IRcode      uint64
+	Instruction2IRcodeCount uint64
+
+	Value2IrCode      uint64
+	Value2IrCodeCount uint64
+
+	Function2IrCode   uint64
+	BasicBlock2IrCode uint64
+
+	SetExtraInfo uint64
+	SaveValueOff uint64
+
+	SaveDBWait uint64
+
+	SetInstructionTime  uint64
+	SetInstructionCount uint64
+
+	GetInstructionTime  uint64
+	GetInstructionCount uint64
+
+	LoadInstructionTime  uint64
+	LoadInstructionCount uint64
+
+	FetchInstructionTime  uint64
+	FetchInstructionCount uint64
 )
 
 var _compileFileHitMutex = new(sync.Mutex)
@@ -60,27 +87,99 @@ type fileCounter struct {
 }
 
 func ShowDatabaseCacheCost() {
-	log.Errorf("SSA Database SaveIrCode CPU Cost: %v", GetSSASaveIrCodeCPUCost())
-	log.Errorf("SSA Database SaveIrCode DB  Cost: %v", GetSSASaveIRcodeDBCast())
+	log.Errorf("FetchInstruction Time: %v, Count: %v, Avg: %v",
+		time.Duration(syncAtomic.LoadUint64(&FetchInstructionTime)),
+		syncAtomic.LoadUint64(&FetchInstructionCount),
+		time.Duration(syncAtomic.LoadUint64(&FetchInstructionTime))/time.Duration(syncAtomic.LoadUint64(&FetchInstructionCount)),
+	)
+
+	log.Errorf("GetInstruction Time: %v, Count: %v, Avg: %v",
+		time.Duration(syncAtomic.LoadUint64(&GetInstructionTime)),
+		syncAtomic.LoadUint64(&GetInstructionCount),
+		time.Duration(syncAtomic.LoadUint64(&GetInstructionTime))/time.Duration(syncAtomic.LoadUint64(&GetInstructionCount)),
+	)
+	log.Errorf("SetInstruction Time: %v, Count: %v, Avg: %v",
+		time.Duration(syncAtomic.LoadUint64(&SetInstructionTime)),
+		syncAtomic.LoadUint64(&SetInstructionCount),
+		time.Duration(syncAtomic.LoadUint64(&SetInstructionTime))/time.Duration(syncAtomic.LoadUint64(&SetInstructionCount)),
+	)
+
+	if LoadInstructionCount != 0 {
+		log.Errorf("LoadInstruction Time: %v, Count: %v, Avg: %v",
+			time.Duration(syncAtomic.LoadUint64(&LoadInstructionTime)),
+			syncAtomic.LoadUint64(&LoadInstructionCount),
+			time.Duration(syncAtomic.LoadUint64(&LoadInstructionTime))/time.Duration(syncAtomic.LoadUint64(&LoadInstructionCount)),
+		)
+	} else {
+		log.Errorf("LoadInstruction Count: 0")
+	}
+
+	log.Errorf("--------------------------------------------------")
+
+	if _SSASaveIrCodeCPUCount != 0 {
+		log.Errorf("SSA Database SaveIrCode CPU Time: %v, Count: %v, Avg: %v",
+			GetSSASaveIrCodeCPUCost(),
+			syncAtomic.LoadUint64(&_SSASaveIrCodeCPUCount),
+			GetSSASaveIrCodeCPUCost()/time.Duration(syncAtomic.LoadUint64(&_SSASaveIrCodeCPUCount)),
+		)
+	} else {
+		log.Errorf("SSA Database SaveIrCode CPU Count: 0")
+	}
+	if _SSASaveIrCodeDBCount != 0 {
+		log.Errorf("SSA Database SaveIrCode DB  Cost: %v, Count: %v, Avg: %v",
+			GetSSASaveIRcodeDBCast(),
+			syncAtomic.LoadUint64(&_SSASaveIrCodeDBCount),
+			GetSSASaveIRcodeDBCast()/time.Duration(syncAtomic.LoadUint64(&_SSASaveIrCodeDBCount)),
+		)
+	} else {
+		log.Errorf("SSA Database SaveIrCode DB Count: 0")
+	}
 	log.Errorf("SSA Database SaveIndex Cost: %v", ssadb.GetSSAIndexCost())
 	log.Errorf("SSA Database SaveSourceCode Cost: %v", ssadb.GetSSASourceCodeCost())
 	log.Errorf("SSA Database SaveType Cost: %v", ssadb.GetSSASaveTypeCost())
-	log.Errorf("SSA Database CacheToDatabase Cost: %v", GetSSACacheToDatabaseCost())
+	// log.Errorf("SSA Database CacheToDatabase Cost: %v", GetSSACacheToDatabaseCost())
+	log.Errorf("SSA Database SaveDBWait Cost: %v", time.Duration(syncAtomic.LoadUint64(&SaveDBWait)))
 
 	log.Errorf("--------------------------------------------------")
-	log.Errorf("SSA database instruction marshal all cost: %v", time.Duration(syncAtomic.LoadUint64(&InstructoinMarshal)))
+	if InstructionMarshalCount != 0 {
+		log.Errorf("SSA database instruction marshal all Cost: %v, Count: %v, Avg: %v",
+			time.Duration(syncAtomic.LoadUint64(&InstructionMarshal)),
+			syncAtomic.LoadUint64(&InstructionMarshalCount),
+			time.Duration(syncAtomic.LoadUint64(&InstructionMarshal))/time.Duration(syncAtomic.LoadUint64(&InstructionMarshalCount)),
+		)
+	} else {
+		log.Errorf("SSA database instruction marshal all Count: 0")
+	}
 
-	log.Errorf("SSA Database Instruction2IRcode Cost: %v", time.Duration(syncAtomic.LoadUint64(&Instruction2IRcode)))
-	log.Errorf("SSA Database Value2IrCode Cost: %v", time.Duration(syncAtomic.LoadUint64(&Value2IrCode)))
+	if Instruction2IRcodeCount != 0 {
+		log.Errorf("SSA Database Instruction2IRcode Cost: %v, Count: %v, Avg: %v",
+			time.Duration(syncAtomic.LoadUint64(&Instruction2IRcode)),
+			syncAtomic.LoadUint64(&Instruction2IRcodeCount),
+			time.Duration(syncAtomic.LoadUint64(&Instruction2IRcode))/time.Duration(syncAtomic.LoadUint64(&Instruction2IRcodeCount)),
+		)
+	} else {
+		log.Errorf("SSA Database Instruction2IRcode Count: 0")
+	}
+
+	if Value2IrCodeCount != 0 {
+		log.Errorf("SSA Database Value2IrCode Cost: %v, Count: %v, Avg: %v",
+			time.Duration(syncAtomic.LoadUint64(&Value2IrCode)),
+			syncAtomic.LoadUint64(&Value2IrCodeCount),
+			time.Duration(syncAtomic.LoadUint64(&Value2IrCode))/time.Duration(syncAtomic.LoadUint64(&Value2IrCodeCount)),
+		)
+	} else {
+		log.Errorf("SSA Database Value2IrCode Count: 0")
+	}
 	log.Errorf("SSA Database Function2IrCode Cost: %v", time.Duration(syncAtomic.LoadUint64(&Function2IrCode)))
 	log.Errorf("SSA Database BasicBlock2IrCode Cost: %v", time.Duration(syncAtomic.LoadUint64(&BasicBlock2IrCode)))
+
 	log.Errorf("SSA Database SetExtraInfo Cost: %v", time.Duration(syncAtomic.LoadUint64(&SetExtraInfo)))
 	log.Errorf("SSA Database SaveValueOff Cost: %v", time.Duration(syncAtomic.LoadUint64(&SaveValueOff)))
 
 	log.Errorf("--------------------------------------------------")
-	log.Errorf("SSA Database Marshal1 Cost: %v", time.Duration(syncAtomic.LoadUint64(&Marshal1)))
-	log.Errorf("SSA Database Marshal2 Cost: %v", time.Duration(syncAtomic.LoadUint64(&Marshal2)))
-	log.Errorf("SSA Database Marshal3 Cost: %v", time.Duration(syncAtomic.LoadUint64(&Marshal3)))
+	log.Errorf("Site1 Cost: %v", time.Duration(syncAtomic.LoadUint64(&Site1)))
+	log.Errorf("Site2 Cost: %v", time.Duration(syncAtomic.LoadUint64(&Site2)))
+	log.Errorf("Site3 Cost: %v", time.Duration(syncAtomic.LoadUint64(&Site3)))
 	log.Errorf("--------------------------------------------------")
 
 	var li []fileCounter
@@ -102,6 +201,6 @@ func ShowDatabaseCacheCost() {
 	}
 }
 
-func GetSSACacheToDatabaseCost() time.Duration {
-	return time.Duration(syncAtomic.LoadUint64(&_SSACacheToDatabaseCost))
-}
+// func GetSSACacheToDatabaseCost() time.Duration {
+// 	return time.Duration(syncAtomic.LoadUint64(&_SSACacheToDatabaseCost))
+// }

@@ -198,6 +198,10 @@ func (b *BasicBlock) String() string {
 		ret += " <- "
 		for _, id := range b.Preds {
 			pred := b.GetBasicBlockByID(id)
+			if utils.IsNil(pred) {
+				log.Infof("pred is nil: %v", id)
+				continue
+			}
 			ret += pred.GetName() + " "
 		}
 	}
