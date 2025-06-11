@@ -23,6 +23,7 @@ var SSAProjectTables = []any{
 	&AuditNode{},
 	&AuditEdge{},
 	&schema.SSARisk{},
+	&schema.SSARiskDisposals{},
 
 	&schema.SyntaxFlowScanTask{},
 
