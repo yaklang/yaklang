@@ -37,9 +37,7 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/dop251/goja v0.0.0-20240220182346-e401ed450204
 	github.com/dop251/goja_nodejs v0.0.0-20240221231712-27eeffc9c235
-	github.com/emersion/go-imap/v2 v2.0.0-beta.2
 	github.com/emersion/go-message v0.18.0
-	github.com/emersion/go-sasl v0.0.0-20231106173351-e73c9f7bad43
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/fxsjy/RF.go v0.0.0-20140710024358-46700521f302
 	github.com/gilliek/go-opml v1.0.0
@@ -118,6 +116,7 @@ require (
 	github.com/vjeantet/grok v1.0.0
 	github.com/xdg-go/pbkdf2 v1.0.0
 	github.com/xdg-go/scram v1.1.2
+	github.com/xdg-go/stringprep v1.0.4
 	github.com/xuri/excelize/v2 v2.9.0
 	github.com/yaklang/fastgocaptcha v1.0.4
 	github.com/yaklang/pcap v1.0.5
@@ -228,7 +227,6 @@ require (
 	github.com/wenlng/go-captcha-assets v1.0.5 // indirect
 	github.com/wenlng/go-captcha/v2 v2.0.3 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
-	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/xuri/efp v0.0.0-20240408161823-9ad904a10d6d // indirect
 	github.com/xuri/nfp v0.0.0-20240318013403-ab9948c2c4a7 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
