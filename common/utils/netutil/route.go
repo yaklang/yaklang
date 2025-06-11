@@ -144,7 +144,6 @@ func Route(timeout time.Duration, target string) (iface *net.Interface, gateway,
 		log.Debugf("finished for finding gateway: %s, iface: %v srcIP: %v", gateway, interfaceIns.Name, srcIP.String())
 		return interfaceIns, gateway, srcIP, nil
 	}
-
 	ifIns, ip1, ip2, err := nativeRoute()
 	if err == nil {
 		return ifIns, ip1, ip2, nil

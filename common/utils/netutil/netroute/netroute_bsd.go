@@ -112,11 +112,18 @@ func New() (routing.Router, error) {
 			}
 		}
 		routeInfo.OutputIface = uint32(m.Index)
-
 		switch m.Addrs[0].(type) {
 		case *route.Inet4Addr:
+			if routeInfo.Dst.Contains(net.ParseIP("0.0.0.0")) {
+				rtr.defaultRouteV4 = routeInfo
+				continue
+			}
 			rtr.v4 = append(rtr.v4, routeInfo)
 		case *route.Inet6Addr:
+			if routeInfo.Dst.Contains(net.ParseIP("::")) {
+				rtr.defaultRouteV6 = routeInfo
+				continue
+			}
 			rtr.v6 = append(rtr.v6, routeInfo)
 		}
 	}
