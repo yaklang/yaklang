@@ -45,9 +45,10 @@ func (r routeSlice) Swap(i, j int) {
 }
 
 type router struct {
-	ifaces map[int]net.Interface
-	addrs  map[int]ipAddrs
-	v4, v6 routeSlice
+	ifaces                         map[int]net.Interface
+	addrs                          map[int]ipAddrs
+	v4, v6                         routeSlice
+	defaultRouteV4, defaultRouteV6 *rtInfo
 }
 
 func (r *router) String() string {
@@ -115,16 +116,15 @@ func (r *router) route(isV6 bool, routes routeSlice, input net.HardwareAddr, src
 		}
 	}
 	var mostSpecificRt *rtInfo
-
-	for idx, rt := range routes {
+	handle := func(index int, rt *rtInfo) *rtInfo {
 		if rt.InputIface != 0 && rt.InputIface != inputIndex {
-			continue
+			return nil
 		}
 		if src != nil && rt.Src != nil && !rt.Src.Contains(src) {
-			continue
+			return nil
 		}
 		if rt.Dst != nil && !rt.Dst.Contains(dst) {
-			continue
+			return nil
 		}
 		if mostSpecificRt != nil {
 			var candSpec, curSpec int
@@ -148,21 +148,31 @@ func (r *router) route(isV6 bool, routes routeSlice, input net.HardwareAddr, src
 			}
 
 			if candSpec < curSpec {
-				continue
+				return nil
 			}
-			log.Debugf("%v gateway: %v, found new route to %v, mask size: %v(>=%v), use out-iface: %v(%v->%v)", idx, rt.Gateway, dst.String(), candSpec, curSpec, rt.OutputIface, rt.Src, rt.Dst)
+			log.Debugf("%v gateway: %v, found new route to %v, mask size: %v(>=%v), use out-iface: %v(%v->%v)", index, rt.Gateway, dst.String(), candSpec, curSpec, rt.OutputIface, rt.Src, rt.Dst)
 		}
 
+		//todo: 无网关应该和默认路由比较??
 		if rt.Gateway.To4() == nil {
-			log.Debugf("skip link-local route: %v", rt)
-			continue
+			log.Debugf("skip link-local route: %v", rt) //没有网关
 		}
-		mostSpecificRt = rt
+		return rt
+	}
+	for idx, rt := range routes {
+		if info := handle(idx, rt); info != nil {
+			mostSpecificRt = info
+		}
 	}
 	if mostSpecificRt != nil {
 		return int(mostSpecificRt.OutputIface), mostSpecificRt.Gateway, mostSpecificRt.PrefSrc, nil
 	}
-
+	if defaultV4 := handle(-1, r.defaultRouteV4); defaultV4 != nil {
+		return int(defaultV4.OutputIface), defaultV4.Gateway, defaultV4.PrefSrc, nil
+	}
+	if defaultV6 := handle(-1, r.defaultRouteV6); defaultV6 != nil {
+		return int(defaultV6.OutputIface), defaultV6.Gateway, defaultV6.PrefSrc, nil
+	}
 	err = fmt.Errorf("no route found for %v", dst)
 	return
 }
