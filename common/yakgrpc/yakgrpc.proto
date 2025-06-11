@@ -792,6 +792,14 @@ service Yak {
   rpc UpdateSSARiskTags(UpdateSSARiskTagsRequest)returns(DbOperateMessage);
   rpc GetSSARiskFieldGroup(Empty) returns (SSARiskFieldGroupResponse);
   rpc NewSSARiskRead(NewSSARiskReadRequest) returns (NewSSARiskReadResponse);
+  // SSA Risk Disposal CURD
+  rpc CreateSSARiskDisposals(CreateSSARiskDisposalsRequest) returns (CreateSSARiskDisposalsResponse);
+  rpc QuerySSARiskDisposals(QuerySSARiskDisposalsRequest) returns (QuerySSARiskDisposalsResponse);
+  rpc UpdateSSARiskDisposals(UpdateSSARiskDisposalsRequest) returns (UpdateSSARiskDisposalsResponse);
+  rpc DeleteSSARiskDisposals(DeleteSSARiskDisposalsRequest) returns (DeleteSSARiskDisposalsResponse);
+  rpc GetSSARiskDisposal(GetSSARiskDisposalRequest) returns (GetSSARiskDisposalResponse);
+  // 查询已经创建SSA Risk处置的用户
+  rpc QuerySSARiskDisposalCreatedUsers(QuerySSARiskDisposalCreatedUsersRequest) returns (QuerySSARiskDisposalCreatedUsersResponse);
 
   rpc SSARiskFeedbackToOnline(SSARiskFeedbackToOnlineRequest) returns (Empty);
 
@@ -6671,6 +6679,85 @@ message NewSSARiskReadResponse {
 message SSARiskFeedbackToOnlineRequest {
   string Token = 1;
   SSARisksFilter Filter = 2;
+}
+
+message SSARiskDisposalData{
+  int64 Id =1 ;
+  int64 CreatedAt = 2;
+  int64 UpdatedAt = 3;
+
+  string User = 4;
+  string Status =5;
+  string Comment = 6;
+
+  int64 RiskId = 7;
+}
+
+message SSARiskDisposalsFilter {
+  repeated int64 ID = 1;
+  repeated string User = 2;
+  repeated string Status = 3;
+  repeated int64 RiskId = 4;
+
+  // for fuzz search
+  string Search = 5;
+}
+
+message CreateSSARiskDisposalsRequest {
+  repeated int64 RiskIds = 1;
+  string User = 2 ;
+  string Status = 3;
+  string Comment = 4;
+}
+
+message CreateSSARiskDisposalsResponse {
+  repeated SSARiskDisposalData Data = 1;
+}
+
+message QuerySSARiskDisposalsRequest {
+    Paging  Pagination=1;
+    SSARiskDisposalsFilter Filter = 2;
+}
+
+message QuerySSARiskDisposalsResponse {
+  Paging Pagination = 1;
+  repeated SSARiskDisposalData Data = 2;
+  int64 Total =3;
+}
+
+message UpdateSSARiskDisposalsRequest {
+  SSARiskDisposalsFilter Filter = 1;
+  string User = 2;
+  string Status = 3;
+  string Comment = 4;
+}
+
+message UpdateSSARiskDisposalsResponse {
+  repeated SSARiskDisposalData Data = 1;
+}
+
+message DeleteSSARiskDisposalsRequest {
+  SSARiskDisposalsFilter Filter = 1;
+}
+
+message DeleteSSARiskDisposalsResponse {
+  DbOperateMessage Message = 1;
+}
+
+message GetSSARiskDisposalRequest{
+  int64 RiskId = 1;
+}
+
+message GetSSARiskDisposalResponse{
+ repeated SSARiskDisposalData Data = 1;
+}
+
+message QuerySSARiskDisposalCreatedUsersRequest{
+
+}
+
+message QuerySSARiskDisposalCreatedUsersResponse{
+  repeated string Users = 1;
 }
 
 message ExportSyntaxFlowsRequest {
