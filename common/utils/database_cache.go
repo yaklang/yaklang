@@ -54,15 +54,14 @@ func NewDatabaseCacheWithKey[K comparable, T any](
 	save SaveDatabase[K, T],
 	load LoadFromDatabase[K, T],
 ) *DataBaseCacheWithKey[K, T] {
-	cache := NewCacheExWithKey[string, K](WithCacheTTL(ttl))
 	ret := &DataBaseCacheWithKey[K, T]{
-		notifyCache:      cache,
 		data:             NewSafeMapWithKey[K, databaseCacheItem[K, T]](),
 		saveDatabase:     save,
 		loadFromDatabase: load,
 		wait:             &sync.WaitGroup{},
 		close:            atomic.Bool{},
 	}
+	cache := NewCacheExWithKey[string, K]()
 	cache.SetExpirationCallback(func(_ string, key K, reason EvictionReason) {
 		// Check if saving to database is disabled
 		if ret.IsSaveDisabled() {
@@ -73,6 +72,7 @@ func NewDatabaseCacheWithKey[K comparable, T any](
 		log.Debugf("expire key: %v", key)
 		ret.save(key, reason)
 	})
+	ret.notifyCache = cache
 	return ret
 }
 
@@ -220,6 +220,7 @@ func (c *DataBaseCacheWithKey[K, T]) IsClose() bool {
 }
 
 func (c *DataBaseCacheWithKey[K, T]) Close() {
+	c.EnableSave()
 	c.notifyCache.Close()
 	c.data.Clear()
 	c.DisableSave()

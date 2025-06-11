@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"io/fs"
 	"path/filepath"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -16,6 +17,15 @@ func (c *config) parseProjectWithFS(
 	filesystem filesys_interface.FileSystem,
 	processCallback func(float64, string, ...any),
 ) (*Program, error) {
+
+	var calculateTime, preHandlerTime, parseTime, saveTime time.Duration
+	defer func() {
+		log.Errorf("calculate time: %v", calculateTime)
+		log.Errorf("pre-handler time: %v", preHandlerTime)
+		log.Errorf("parse time: %v", parseTime)
+		log.Errorf("save time: %v", saveTime)
+	}()
+
 	defer func() {
 		if r := recover(); r != nil {
 			//err = utils.Errorf("parse [%s] error %v  ", path, r)
@@ -47,6 +57,7 @@ func (c *config) parseProjectWithFS(
 
 	prog.ProcessInfof("parse project in fs: %v, path: %v", filesystem, c.info)
 	prog.ProcessInfof("calculate total size of project")
+	start := time.Now()
 	// get total size
 	err = filesys.Recursive(programPath,
 		filesys.WithFileSystem(filesystem),
@@ -75,6 +86,7 @@ func (c *config) parseProjectWithFS(
 			return nil
 		}),
 	)
+	calculateTime = time.Since(start)
 	if err != nil {
 		return nil, err
 	}
@@ -94,6 +106,7 @@ func (c *config) parseProjectWithFS(
 	}
 	prog.SetPreHandler(true)
 	prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", filesystem, c.info)
+	start = time.Now()
 	filesys.Recursive(programPath,
 		filesys.WithFileSystem(filesystem),
 		filesys.WithContext(c.ctx),
@@ -130,6 +143,7 @@ func (c *config) parseProjectWithFS(
 			return nil
 		}),
 	)
+	preHandlerTime = time.Since(start)
 	if c.isStop() {
 		return nil, ErrContextCancel
 	}
@@ -147,6 +161,7 @@ func (c *config) parseProjectWithFS(
 		process = 0.4 + (float64(handlerNum)/float64(handlerTotal))*0.5
 	}
 	prog.SetPreHandler(false)
+	start = time.Now()
 	err = ssareducer.ReducerCompile(
 		programPath, // base
 		ssareducer.WithFileSystem(filesystem),
@@ -190,6 +205,7 @@ func (c *config) parseProjectWithFS(
 			return exclude, nil
 		}),
 	)
+	parseTime = time.Since(start)
 	if err != nil {
 		return nil, utils.Wrap(err, "parse project error")
 	}
@@ -205,6 +221,7 @@ func (c *config) parseProjectWithFS(
 	prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, total) // %90
 	index := 0
 	prevProcess := 0.9
+	start = time.Now()
 	prog.Cache.SaveToDatabase(func(size int) {
 		index += size
 		process = 0.9 + (float64(index)/float64(total))*0.1
@@ -213,6 +230,7 @@ func (c *config) parseProjectWithFS(
 			prevProcess = process
 		}
 	})
+	saveTime = time.Since(start)
 	_ = prevProcess
 	return NewProgram(prog, c), nil
 }

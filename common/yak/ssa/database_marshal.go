@@ -102,17 +102,6 @@ func fetchIds(origin any) any {
 func marshalExtraInformation(raw Instruction) map[string]any {
 	setExtraInfoStart := time.Now()
 	defer func() { atomic.AddUint64(&SetExtraInfo, uint64(time.Since(setExtraInfoStart))) }()
-	marshalValues := func(vs []Value) []int64 {
-		ids := make([]int64, len(vs))
-		for index, v := range vs {
-			if v == nil {
-				log.Errorf("BUG: marshalValues[%s: %s]: nil value in slice", raw, raw.GetRange())
-				continue
-			}
-			ids[index] = v.GetId()
-		}
-		return ids
-	}
 
 	params := make(map[string]any)
 	switch ret := raw.(type) {
