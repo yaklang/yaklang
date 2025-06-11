@@ -118,7 +118,7 @@ func TestDecodeBase64BySearchTool(t *testing.T) {
 		},
 		{
 			"判断任务完成情况",
-			"status_summary", `{"@action": "finished"}`,
+			"status_summary", `{"@action": "proceed-next-task"}`,
 		},
 		{
 			"task summary",

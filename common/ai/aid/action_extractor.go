@@ -19,6 +19,9 @@ type Action struct {
 }
 
 func (q *Action) Name() string {
+	if q == nil {
+		return ""
+	}
 	return q.name
 }
 
