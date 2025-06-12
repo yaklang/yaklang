@@ -74,9 +74,22 @@ func GenerateCRLWithExistedList(ca, key []byte, existedRevoked ...pkix.RevokedCe
 	}
 
 	caKeyBlock, _ := pem.Decode(key)
+
+	// 首先尝试 PKCS1 格式
 	caKey, err := x509.ParsePKCS1PrivateKey(caKeyBlock.Bytes)
 	if err != nil {
-		return nil, errors.Errorf("parse private key error: %s", err)
+		// 如果 PKCS1 失败，尝试 PKCS8 格式
+		parsedKey, err2 := x509.ParsePKCS8PrivateKey(caKeyBlock.Bytes)
+		if err2 != nil {
+			return nil, errors.Errorf("parse private key error (tried both PKCS1 and PKCS8): PKCS1: %s, PKCS8: %s", err, err2)
+		}
+
+		// 检查是否为 RSA 私钥
+		var ok bool
+		caKey, ok = parsedKey.(*rsa.PrivateKey)
+		if !ok {
+			return nil, errors.Errorf("parsed key is not an RSA private key, got %T", parsedKey)
+		}
 	}
 
 	now := time.Now()
@@ -141,9 +154,22 @@ func ParsePEMCertificateAndKey(ca, key []byte) (*x509.Certificate, *rsa.PrivateK
 	}
 
 	caKeyBlock, _ := pem.Decode(key)
+
+	// 首先尝试 PKCS1 格式
 	caKey, err := x509.ParsePKCS1PrivateKey(caKeyBlock.Bytes)
 	if err != nil {
-		return nil, nil, errors.Errorf("parse private key error: %s", err)
+		// 如果 PKCS1 失败，尝试 PKCS8 格式
+		parsedKey, err2 := x509.ParsePKCS8PrivateKey(caKeyBlock.Bytes)
+		if err2 != nil {
+			return nil, nil, errors.Errorf("parse private key error (tried both PKCS1 and PKCS8): PKCS1: %s, PKCS8: %s", err, err2)
+		}
+
+		// 检查是否为 RSA 私钥
+		var ok bool
+		caKey, ok = parsedKey.(*rsa.PrivateKey)
+		if !ok {
+			return nil, nil, errors.Errorf("parsed key is not an RSA private key, got %T", parsedKey)
+		}
 	}
 
 	return caCert, caKey, nil
@@ -266,9 +292,22 @@ func SignServerCrtNKeyWithParams(ca []byte, key []byte, cn string, notAfter time
 	}
 
 	caKeyBlock, _ := pem.Decode(key)
+
+	// 首先尝试 PKCS1 格式
 	caKey, err := x509.ParsePKCS1PrivateKey(caKeyBlock.Bytes)
 	if err != nil {
-		return nil, nil, errors.Errorf("parse private key error: %s", err)
+		// 如果 PKCS1 失败，尝试 PKCS8 格式
+		parsedKey, err2 := x509.ParsePKCS8PrivateKey(caKeyBlock.Bytes)
+		if err2 != nil {
+			return nil, nil, errors.Errorf("parse private key error (tried both PKCS1 and PKCS8): PKCS1: %s, PKCS8: %s", err, err2)
+		}
+
+		// 检查是否为 RSA 私钥
+		var ok bool
+		caKey, ok = parsedKey.(*rsa.PrivateKey)
+		if !ok {
+			return nil, nil, errors.Errorf("parsed key is not an RSA private key, got %T", parsedKey)
+		}
 	}
 
 	sCrt, err := x509.CreateCertificate(cryptorand.Reader, &template, caCert, &sPriv.PublicKey, caKey)
@@ -423,9 +462,22 @@ func SignClientCrtNKeyWithParams(ca, key []byte, cn string, notAfter time.Time, 
 	}
 
 	caKeyBlock, _ := pem.Decode(key)
+
+	// 首先尝试 PKCS1 格式
 	caKey, err := x509.ParsePKCS1PrivateKey(caKeyBlock.Bytes)
 	if err != nil {
-		return nil, nil, errors.Errorf("parse private key error: %s", err)
+		// 如果 PKCS1 失败，尝试 PKCS8 格式
+		parsedKey, err2 := x509.ParsePKCS8PrivateKey(caKeyBlock.Bytes)
+		if err2 != nil {
+			return nil, nil, errors.Errorf("parse private key error (tried both PKCS1 and PKCS8): PKCS1: %s, PKCS8: %s", err, err2)
+		}
+
+		// 检查是否为 RSA 私钥
+		var ok bool
+		caKey, ok = parsedKey.(*rsa.PrivateKey)
+		if !ok {
+			return nil, nil, errors.Errorf("parsed key is not an RSA private key, got %T", parsedKey)
+		}
 	}
 
 	sCrt, err := x509.CreateCertificate(cryptorand.Reader, &template, caCert, &sPriv.PublicKey, caKey)
