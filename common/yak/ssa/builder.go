@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-
 	"github.com/samber/lo"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -285,18 +284,18 @@ func (b *FunctionBuilder) ReferenceParameter(name string, index int) {
 	b.RefParameter[name] = struct{ Index int }{Index: index}
 }
 func (b *FunctionBuilder) ClassConstructor(bluePrint *Blueprint, args []Value) Value {
-	method := bluePrint.GetMagicMethod(Constructor)
+	method := bluePrint.GetMagicMethod(Constructor, b)
 	constructor := b.NewCall(method, args)
 	b.EmitCall(constructor)
 	constructor.SetType(bluePrint)
-	destructor := bluePrint.GetMagicMethod(Destructor)
+	destructor := bluePrint.GetMagicMethod(Destructor, b)
 	call := b.NewCall(destructor, []Value{constructor})
 	b.EmitDefer(call)
 	return constructor
 }
 
 func (b *FunctionBuilder) ClassConstructorWithoutDeferDestructor(bluePrint *Blueprint, args []Value) Value {
-	method := bluePrint.GetMagicMethod(Constructor)
+	method := bluePrint.GetMagicMethod(Constructor, b)
 	constructor := b.NewCall(method, args)
 	b.EmitCall(constructor)
 	return constructor

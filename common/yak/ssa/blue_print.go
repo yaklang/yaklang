@@ -83,6 +83,7 @@ type Blueprint struct {
 	_container Value
 
 	GeneralUndefined func(string) *Undefined
+	Tokenizer        CanStartStopToken // 标记blueprint声明的位置
 
 	ParentBlueprints    []*Blueprint
 	InterfaceBlueprints []*Blueprint
