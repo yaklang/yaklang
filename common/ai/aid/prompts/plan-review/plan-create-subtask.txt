@@ -10,13 +10,14 @@
 {{ .ExtraPrompt }}
 <extra_user_prompt_{{ .NONCE }}>{{ end }}
 
-{{ if .Memory.PlanHelp }}
-<plan_help_{{ .NONCE }}># 规划任务帮助信息
+{{ if .Memory.PlanHelp }}<plan_help_{{ .NONCE }}>
+# 规划任务帮助信息
 {{ .Memory.PlanHelp }}
 </plan_help_{{ .NONCE }}>
 {{end}}
 
-<original_user_input_{{ .NONCE }}># 最原始用户输入
+<original_user_input_{{ .NONCE }}>
+# 最原始用户输入
 {{ .Memory.Query }}
 </original_user_input_{{ .NONCE }}>
 
