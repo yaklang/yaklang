@@ -161,7 +161,7 @@ func (t *aiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitoo
 		}
 
 		// 获取下一步决策
-		action, err = ExtractAction(string(nextResponse), taskContinue, taskProceedNext, taskContinue, taskFailed)
+		action, err = ExtractAction(string(nextResponse), taskContinue, taskProceedNext, taskSkipped, taskFailed)
 		if err != nil {
 			return utils.Errorf("error extracting action: %v", err)
 		}
