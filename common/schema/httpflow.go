@@ -54,7 +54,7 @@ type HTTPFlow struct {
 	// 用来计算 websocket hash, 每次连接都不一样，一般来说，内部对象 req 指针足够了
 	WebsocketHash string `json:"websocket_hash,omitempty"`
 
-	RuntimeId   string         `json:"runtime_id,omitempty"`
+	RuntimeId   string         `json:"runtime_id,omitempty" gorm:"index"`
 	FromPlugin  string         `json:"from_plugin,omitempty"`
 	ProcessName sql.NullString `json:"process_name,omitempty"`
 
