@@ -47,9 +47,11 @@ func (b *FunctionBuilder) SetBlueprint(name string, class *Blueprint) {
 // but because of the 'this/super', we will still keep the concept 'Class'
 // for ref the method/function, the blueprint is a container too,
 // saving the static variables and util methods.
-func (b *FunctionBuilder) CreateBlueprintWithPkgName(name string, tokenizer ...CanStartStopToken) *Blueprint {
-	if len(tokenizer) > 0 {
-		recoverRange := b.SetRange(tokenizer[0])
+func (b *FunctionBuilder) CreateBlueprintWithPkgName(name string, tokenizers ...CanStartStopToken) *Blueprint {
+	var tokenizer CanStartStopToken
+	if len(tokenizers) > 0 {
+		tokenizer = tokenizers[0]
+		recoverRange := b.SetRange(tokenizer)
 		defer recoverRange()
 	}
 	prog := b.prog
@@ -57,13 +59,15 @@ func (b *FunctionBuilder) CreateBlueprintWithPkgName(name string, tokenizer ...C
 	if prog.Blueprint == nil {
 		prog.Blueprint = omap.NewEmptyOrderedMap[string, *Blueprint]()
 	}
-	blueprint.GeneralUndefined = func(s string) *Undefined {
-		if len(tokenizer) > 0 {
-			recoverRange := b.SetRange(tokenizer[0])
-			defer recoverRange()
-		}
-		return b.EmitUndefined(s)
-	}
+	//blueprint.GeneralUndefined = func(s string) *Undefined {
+	//	if len(tokenizer) > 0 {
+	//		recoverRange := b.SetRange(tokenizer[0])
+	//		defer recoverRange()
+	//	}
+	//	return b.EmitUndefined(s)
+	//}
+	blueprint.Tokenizer = tokenizer
+
 	b.SetBlueprint(name, blueprint)
 	blueprintContainer := b.EmitEmptyContainer()
 	blueprintContainer.SetName(name)
@@ -72,9 +76,9 @@ func (b *FunctionBuilder) CreateBlueprintWithPkgName(name string, tokenizer ...C
 
 	// search this blueprint-declare can use ${blueprint-name} or ${blueprint-name}_declare
 	variableName := fmt.Sprintf("%s_declare", name)
-	var1 := b.CreateVariable(variableName, tokenizer...)
+	var1 := b.CreateVariable(variableName, tokenizers...)
 	b.AssignVariable(var1, blueprintContainer)
-	var2 := b.CreateVariable(name, tokenizer...)
+	var2 := b.CreateVariable(name, tokenizers...)
 	b.AssignVariable(var2, blueprintContainer)
 
 	if err := blueprint.InitializeWithContainer(blueprintContainer); err != nil {
