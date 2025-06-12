@@ -6,7 +6,7 @@
     "@action": {
       "const": "plan-create-subtask"
     },
-    "subtask": {
+    "subtasks": {
       "type": "array",
       "description": "把用户需要拆分的任务拆分后的结果",
       "minItems": 2,
@@ -16,7 +16,7 @@
         "properties": {
           "parent_index": {
             "type": "string",
-            "description": "当前正在拆分的任务的索引，使用x-y格式的任务层级索引，其中x表示主任务序号，y表示子任务序号（如1-1表示第一个主任务的第一个子任务）"
+            "description": "当前正在拆分的任务的索引，x-y格式表示任务层级索引，其中x表示主任务序号，y表示子任务序号（如1-1表示第一个主任务的第一个子任务）"
           },
           "name": {
             "type": "string",
