@@ -1027,6 +1027,8 @@ message AIStartParams {
 
   // 是否允许生成报告，默认不允许
   bool AllowGenerateReport = 24;
+
+  int64 TaskMaxContinueCount = 25;
 }
 
 message AITaskFilter {

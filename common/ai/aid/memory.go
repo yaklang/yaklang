@@ -273,6 +273,10 @@ func (m *Memory) CurrentTaskTimeline() string {
 	return stl.Dump()
 }
 
+func (m *Memory) TaskMaxContinue() int64 {
+	return m.CurrentTask.config.maxTaskContinue
+}
+
 // timeline limit set
 func (m *Memory) SetTimelineLimit(i int) {
 	m.timeline.setTimelineLimit(i)
