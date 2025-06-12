@@ -266,6 +266,9 @@ jobs:
               go test --timeout 3m  ./common/yak/yakdoc/...
               # jwt
               go test --timeout 1m ./common/authhack/...
+          - name: Test AI RAG
+            run: |
+              go test -timeout 1m ./common/ai/rag
 
     steps:
       - name: Cache YakLang Project
