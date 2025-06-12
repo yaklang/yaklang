@@ -67,6 +67,7 @@ func TestGraph_Builder(t *testing.T) {
 
 		// Use GraphBuilder to build the graph
 		builder := graph.NewDFSGraphBuilder[string, string](
+			context.Background(),
 			func(node string) (string, error) {
 				saveNode = append(saveNode, node)
 				return node, nil
