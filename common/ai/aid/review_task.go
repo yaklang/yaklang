@@ -81,6 +81,9 @@ func (t *aiTask) handleReviewResult(param aitool.InvokeParams) error {
 			t.config.EmitError("root aiTask is nil, plan failed")
 			return utils.Errorf("coordinator: root aiTask is nil")
 		}
+		for _, subtask := range rsp.RootTask.Subtasks {
+			subtask.ParentTask = t
+		}
 		t.Subtasks = rsp.RootTask.Subtasks
 		r := &runtime{
 			config: t.config,
