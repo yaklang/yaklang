@@ -213,6 +213,7 @@ func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlow(db *gorm.DB) (errs error) {
 		m.notifyProcess(1)
 		if err := recover(); err != nil {
 			errs = utils.JoinErrors(errs, utils.Errorf("panic: %s", err))
+			utils.PrintCurrentGoroutineRuntimeStack()
 			return
 		}
 	}()
@@ -220,6 +221,7 @@ func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlow(db *gorm.DB) (errs error) {
 	source := m.source
 	if source == nil {
 		m.AnalyzeHTTPFlowFromDb(db)
+		return nil
 	}
 
 	if source.SourceType == AnalyzeHTTPFlowSourceDatabase {
@@ -273,7 +275,17 @@ func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlowFromDb(db *gorm.DB) {
 	for flow := range flowCh {
 		swg.Add(1)
 		go func(f *schema.HTTPFlow) {
-			defer swg.Done()
+			defer func() {
+				swg.Done()
+				// 处理完成后更新计数和进度
+				atomic.AddInt64(&m.handledHTTPFlowCount, 1)
+				m.notifyProcess(float64(atomic.LoadInt64(&m.handledHTTPFlowCount)) / float64(atomic.LoadInt64(&m.allHTTPFlowCount)))
+				m.notifyHandleFlowNum()
+			}()
+
+			if f == nil {
+				return
+			}
 			// 处理websocket流量
 			if f.IsWebsocket {
 				m.handleWebsocket(db, f)
@@ -284,10 +296,7 @@ func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlowFromDb(db *gorm.DB) {
 			if err := m.ExecReplacerRule(db, f); err != nil {
 				log.Errorf("AnalyzeHTTPFlowFromDb ExecReplacerRule failed: %s", err)
 			}
-			// 处理完成后更新计数和进度
-			atomic.AddInt64(&m.handledHTTPFlowCount, 1)
-			m.notifyProcess(float64(atomic.LoadInt64(&m.handledHTTPFlowCount)) / float64(atomic.LoadInt64(&m.allHTTPFlowCount)))
-			m.notifyHandleFlowNum()
+
 		}(flow)
 	}
 	swg.Wait()
