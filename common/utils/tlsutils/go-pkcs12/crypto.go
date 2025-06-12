@@ -16,9 +16,10 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
-	"github.com/yaklang/yaklang/common/utils/tlsutils/go-pkcs12/rc2"
 	"hash"
 	"io"
+
+	"github.com/yaklang/yaklang/common/utils/tlsutils/go-pkcs12/rc2"
 
 	"golang.org/x/crypto/pbkdf2"
 )
@@ -27,6 +28,7 @@ var (
 	oidPBEWithSHAAnd3KeyTripleDESCBC = asn1.ObjectIdentifier([]int{1, 2, 840, 113549, 1, 12, 1, 3})
 	oidPBEWithSHAAnd128BitRC2CBC     = asn1.ObjectIdentifier([]int{1, 2, 840, 113549, 1, 12, 1, 5})
 	oidPBEWithSHAAnd40BitRC2CBC      = asn1.ObjectIdentifier([]int{1, 2, 840, 113549, 1, 12, 1, 6})
+	oidPBEWithSHAAndDES              = asn1.ObjectIdentifier([]int{1, 2, 840, 113549, 1, 5, 10})
 	oidPBES2                         = asn1.ObjectIdentifier([]int{1, 2, 840, 113549, 1, 5, 13})
 	oidPBKDF2                        = asn1.ObjectIdentifier([]int{1, 2, 840, 113549, 1, 5, 12})
 	oidHmacWithSHA1                  = asn1.ObjectIdentifier([]int{1, 2, 840, 113549, 2, 7})
@@ -104,6 +106,9 @@ func pbeCipherFor(algorithm pkix.AlgorithmIdentifier, password []byte) (cipher.B
 		cipherType = shaWith128BitRC2CBC{}
 	case algorithm.Algorithm.Equal(oidPBEWithSHAAnd40BitRC2CBC):
 		cipherType = shaWith40BitRC2CBC{}
+	case algorithm.Algorithm.Equal(oidPBEWithSHAAndDES):
+		// PKCS#5 PBE-SHA1-DES uses PBKDF1, not PKCS#12 PBKDF
+		return pbkdf1CipherFor(algorithm, password)
 	case algorithm.Algorithm.Equal(oidPBES2):
 		// rfc7292#appendix-B.1 (the original PKCS#12 PBE) requires passwords formatted as BMPStrings.
 		// However, rfc8018#section-3 recommends that the password for PBES2 follow ASCII or UTF-8.
@@ -322,4 +327,56 @@ func makePBES2Parameters(rand io.Reader, salt []byte, iterations int) ([]byte, e
 	}
 
 	return asn1.Marshal(params)
+}
+
+// PBKDF1 implementation for PKCS#5 PBE algorithms
+func pbkdf1(hashFunc func() hash.Hash, password, salt []byte, iterationCount, dkLen int) []byte {
+	if dkLen > 20 {
+		// PBKDF1 can only generate up to hash length bytes
+		return nil
+	}
+
+	h := hashFunc()
+	h.Write(password)
+	h.Write(salt)
+	u := h.Sum(nil)
+
+	for i := 1; i < iterationCount; i++ {
+		h.Reset()
+		h.Write(u)
+		u = h.Sum(nil)
+	}
+
+	return u[:dkLen]
+}
+
+// Handle PKCS#5 PBE-SHA1-DES using PBKDF1
+func pbkdf1CipherFor(algorithm pkix.AlgorithmIdentifier, password []byte) (cipher.Block, []byte, error) {
+	var params pbeParams
+	if err := unmarshal(algorithm.Parameters.FullBytes, &params); err != nil {
+		return nil, nil, err
+	}
+
+	// Convert BMPString password to UTF-8 for PKCS#5
+	originalPassword, err := decodeBMPString(password)
+	if err != nil {
+		return nil, nil, err
+	}
+	utf8Password := []byte(originalPassword)
+
+	// PBKDF1 with SHA-1 to derive 16 bytes (8 for key + 8 for IV)
+	derived := pbkdf1(sha1.New, utf8Password, params.Salt, params.Iterations, 16)
+	if derived == nil {
+		return nil, nil, errors.New("pbkdf1 derivation failed")
+	}
+
+	key := derived[:8]  // DES key is 8 bytes
+	iv := derived[8:16] // IV is 8 bytes
+
+	block, err := des.NewCipher(key)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return block, iv, nil
 }
