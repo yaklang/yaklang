@@ -1977,9 +1977,10 @@ type AIStartParams struct {
 	// 在任务规划的时候，如果AI允许问用户问题，那么最多问几次？
 	PlanUserInteractMaxCount int64 `protobuf:"varint,23,opt,name=PlanUserInteractMaxCount,proto3" json:"PlanUserInteractMaxCount,omitempty"`
 	// 是否允许生成报告，默认不允许
-	AllowGenerateReport bool `protobuf:"varint,24,opt,name=AllowGenerateReport,proto3" json:"AllowGenerateReport,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	AllowGenerateReport  bool  `protobuf:"varint,24,opt,name=AllowGenerateReport,proto3" json:"AllowGenerateReport,omitempty"`
+	TaskMaxContinueCount int64 `protobuf:"varint,25,opt,name=TaskMaxContinueCount,proto3" json:"TaskMaxContinueCount,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *AIStartParams) Reset() {
@@ -2171,6 +2172,13 @@ func (x *AIStartParams) GetAllowGenerateReport() bool {
 		return x.AllowGenerateReport
 	}
 	return false
+}
+
+func (x *AIStartParams) GetTaskMaxContinueCount() int64 {
+	if x != nil {
+		return x.TaskMaxContinueCount
+	}
+	return 0
 }
 
 type AITaskFilter struct {
@@ -52387,7 +52395,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tMcpConfig\x12\x12\n" +
 	"\x04Type\x18\x01 \x01(\tR\x04Type\x12\x10\n" +
 	"\x03Key\x18\x02 \x01(\tR\x03Key\x12\x10\n" +
-	"\x03Url\x18\x03 \x01(\tR\x03Url\"\x81\t\n" +
+	"\x03Url\x18\x03 \x01(\tR\x03Url\"\xb5\t\n" +
 	"\rAIStartParams\x12$\n" +
 	"\rCoordinatorId\x18\x11 \x01(\tR\rCoordinatorId\x12\x1a\n" +
 	"\bSequence\x18\x12 \x01(\x03R\bSequence\x12.\n" +
@@ -52414,7 +52422,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x15EnableQwenNoThinkMode\x18\x13 \x01(\bR\x15EnableQwenNoThinkMode\x124\n" +
 	"\x15AllowPlanUserInteract\x18\x14 \x01(\bR\x15AllowPlanUserInteract\x12:\n" +
 	"\x18PlanUserInteractMaxCount\x18\x17 \x01(\x03R\x18PlanUserInteractMaxCount\x120\n" +
-	"\x13AllowGenerateReport\x18\x18 \x01(\bR\x13AllowGenerateReport\"\x0e\n" +
+	"\x13AllowGenerateReport\x18\x18 \x01(\bR\x13AllowGenerateReport\x122\n" +
+	"\x14TaskMaxContinueCount\x18\x19 \x01(\x03R\x14TaskMaxContinueCount\"\x0e\n" +
 	"\fAITaskFilter\"l\n" +
 	"\x12AITaskQueryRequest\x12+\n" +
 	"\n" +

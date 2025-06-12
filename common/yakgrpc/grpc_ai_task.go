@@ -197,8 +197,6 @@ func buildAIAgentOption(ctx context.Context, CoordinatorId string, extendOption 
 func buildAIDOption(startParams *ypb.AIStartParams) []aid.Option {
 	aidOption := make([]aid.Option, 0)
 
-	aidOption = append(aidOption, aid.WithMaxTaskContinue(3))
-
 	if startParams.GetEnableSystemFileSystemOperator() {
 		aidOption = append(aidOption, aid.WithSystemFileOperator())
 		aidOption = append(aidOption, aid.WithJarOperator())
@@ -275,6 +273,10 @@ func buildAIDOption(startParams *ypb.AIStartParams) []aid.Option {
 
 	if startParams.GetCoordinatorId() != "" {
 		aidOption = append(aidOption, aid.WithCoordinatorId(startParams.GetCoordinatorId()))
+	}
+
+	if startParams.GetTaskMaxContinueCount() > 0 {
+		aidOption = append(aidOption, aid.WithMaxTaskContinue(startParams.GetTaskMaxContinueCount()))
 	}
 
 	return aidOption

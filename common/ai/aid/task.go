@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -55,6 +56,8 @@ type aiTask struct {
 	ShortSummary      string `json:"short_summary"`
 	LongSummary       string `json:"long_summary"`
 
+	ToolCallCount int64 `json:"tool_call_count"`
+
 	// task continue count
 	TaskContinueCount int64 `json:"task_continue_count"` // 任务继续执行的次数
 }
@@ -76,6 +79,7 @@ func (t *aiTask) callAI(request *AIRequest) (*AIResponse, error) {
 func (t *aiTask) PushToolCallResult(i *aitool.ToolResult) {
 	t.toolCallResultIds.Set(i.GetID(), i)
 	t.config.memory.PushToolCallResults(i)
+	atomic.AddInt64(&t.ToolCallCount, 1)
 }
 
 // MarshalJSON 实现自定义的JSON序列化，跳过AICallback字段
