@@ -168,7 +168,7 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		// save ret
 		if config.save {
 			process(float64(total-1)/float64(total), "save result")
-			resultID, err := ret.Save(config.kind, config.taskID)
+			resultID, err := ret.SaveWithContext(config.ctx, config.kind, config.taskID)
 			_ = resultID
 			if err != nil {
 				return ret, utils.Wrap(err, "SyntaxflowQuery: save to DB failed")

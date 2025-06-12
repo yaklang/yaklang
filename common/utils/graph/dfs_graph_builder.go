@@ -1,7 +1,10 @@
 package graph
 
+import "context"
+
 // DFSGraphBuilder is a utility struct to construct a graph using Depth-First Search (DFS) traversal.
 type DFSGraphBuilder[K, T comparable] struct {
+	ctx context.Context
 	// Function to generate a unique key for a given node
 	getNodeKey func(T) (K, error)
 
@@ -39,6 +42,13 @@ func (g *DFSGraphBuilder[K, T]) BuildGraph(startNode T) error {
 
 // Internal implementation of Depth-First Search (DFS)
 func (g *DFSGraphBuilder[K, T]) dfs(node T, isroots ...bool) (K, error) {
+	select {
+	case <-g.ctx.Done():
+		return g.visited[node], g.ctx.Err()
+	default:
+		// Continue with DFS traversal
+	}
+
 	isroot := false
 	// if len(isroots) > 0 {
 	// 	isroot = isroots[0]
@@ -85,26 +95,33 @@ func (g *DFSGraphBuilder[K, T]) GetVisited(node T) (key K, ok bool) {
 }
 
 func NewDFSGraphBuilder[K comparable, T comparable](
+	ctx context.Context,
 	getNodeKey func(T) (K, error), // Function to generate a unique key for a node
 	getNeighbors func(T) []*Neighbor[T], // Function to retrieve neighboring nodes and edge types
 	handleEdge func(from K, to K, edgeType string, extraMsg map[string]any), // Function to process an edge
 ) *DFSGraphBuilder[K, T] {
 	// Initialize and return a new GraphBuilder instance
-	return &DFSGraphBuilder[K, T]{
+	builder := &DFSGraphBuilder[K, T]{
+		ctx:          context.Background(),
 		getNodeKey:   getNodeKey,
 		getNeighbors: getNeighbors,
 		handleEdge:   handleEdge,
 		visited:      make(map[T]K),
 	}
+	if ctx != nil {
+		builder.ctx = ctx
+	}
+	return builder
 }
 
 func BuildGraphWithDFS[K comparable, T comparable](
+	ctx context.Context,
 	startNode T,
 	getNodeKey func(T) (K, error),
 	getNeighbors func(T) []*Neighbor[T],
 	handleEdge func(from K, to K, edgeType string, extraMsg map[string]any),
 ) error {
-	builder := NewDFSGraphBuilder[K, T](getNodeKey, getNeighbors, handleEdge)
+	builder := NewDFSGraphBuilder[K, T](ctx, getNodeKey, getNeighbors, handleEdge)
 	return builder.BuildGraph(startNode)
 }
 
