@@ -178,6 +178,7 @@ func (f *RuleFormat) VisitAlertStatement(alert sf.IAlertStatementContext) {
 	} else {
 		variable := yakunquote.TryUnquote(refVariable.Identifier().GetText())
 		defer func() {
+			f.Write(fmt.Sprintf("alert $%s", variable))
 			isNull := true
 			for _, s := range alertMsg {
 				if s != "" {
@@ -185,7 +186,7 @@ func (f *RuleFormat) VisitAlertStatement(alert sf.IAlertStatementContext) {
 				}
 			}
 			if !isNull {
-				f.Write(fmt.Sprintf("alert $%s for {\n", variable))
+				f.Write(fmt.Sprintf("\tfor {\n"))
 				for key, value := range alertMsg {
 					newVal := f.alertHandler(variable, key, value)
 					if lo.Contains([]string{"none", ""}, newVal) {
