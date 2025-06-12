@@ -113,7 +113,10 @@ TOOLREQUIRED:
 				log.Errorf("error generating aiTask prompt: %v", err)
 				break TOOLREQUIRED
 			}
-			err = t.config.callAiTransaction(moreToolPrompt, t.callAI, func(responseReader *AIResponse) error {
+			err = t.config.callAiTransaction(moreToolPrompt, func(request *AIRequest) (*AIResponse, error) {
+				request.SetTaskIndex(t.Index)
+				return t.callAI(request)
+			}, func(responseReader *AIResponse) error {
 				responseBytes, err := io.ReadAll(responseReader.GetOutputStreamReader("execute", false, t.config))
 				if err != nil {
 					return fmt.Errorf("error reading AI response: %w", err)
