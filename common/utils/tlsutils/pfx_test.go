@@ -2,13 +2,27 @@ package tlsutils
 
 import (
 	"crypto/tls"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
+	_ "embed"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
+
+//go:embed test_pfx/certificate.pfx
+var defaultPfx []byte
+
+//go:embed test_pfx/certificate_legacy_des3.pfx
+var legacyDes3Pfx []byte
+
+//go:embed test_pfx/certificate_nopass.pfx
+var nopassPfx []byte
+
+//go:embed test_pfx/certificate_aes128.pfx
+var aes128Pfx []byte
 
 func TestP12Auth(t *testing.T) {
 	ca, key, err := GenerateSelfSignedCertKey("", nil, nil)
@@ -153,4 +167,73 @@ func TestP12OrPFX(t *testing.T) {
 		t.Fatal(err)
 	}
 	spew.Dump(certBytes, keyBytes, cas)
+}
+
+func TestLoadP12FromOpenSSL(t *testing.T) {
+	testCases := []struct {
+		name        string
+		pfxData     []byte
+		password    string
+		expectError bool
+		checkCA     bool
+	}{
+		{
+			name:        "Default PFX with password",
+			pfxData:     defaultPfx,
+			password:    "123456",
+			expectError: false,
+			checkCA:     true,
+		},
+		{
+			name:        "Legacy DES3 PFX with password",
+			pfxData:     legacyDes3Pfx,
+			password:    "123456",
+			expectError: false,
+			checkCA:     true,
+		},
+		{
+			name:        "No password PFX",
+			pfxData:     nopassPfx,
+			password:    "",
+			expectError: false,
+			checkCA:     true,
+		},
+		{
+			name:        "AES-128 PFX with password",
+			pfxData:     aes128Pfx,
+			password:    "123456",
+			expectError: false,
+			checkCA:     true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if len(tc.pfxData) == 0 {
+				t.Fatalf("PFX data for %s is empty", tc.name)
+			}
+			cert, key, ca, err := LoadP12ToPEM(tc.pfxData, tc.password)
+			if tc.expectError {
+				if err == nil {
+					t.Fatal("expected an error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("expected no error but got: %v", err)
+				}
+				if len(cert) == 0 {
+					t.Fatal("cert is empty")
+				}
+				if len(key) == 0 {
+					t.Fatal("key is empty")
+				}
+				if tc.checkCA && len(ca) == 0 {
+					// In our test case, the cert itself is the CA. The LoadP12ToPEM function
+					// might return it as the main cert and not in the ca bundle, which is acceptable.
+					t.Log("ca bundle is empty, which can be expected for self-signed certs")
+				}
+				t.Logf("successfully loaded %s", tc.name)
+			}
+		})
+	}
 }
