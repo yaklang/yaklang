@@ -576,7 +576,12 @@ func (s *Server) DeleteProject(ctx context.Context, req *ypb.DeleteProjectReques
 	}
 
 	// close current program
-	consts.GetGormProjectDatabase().Close()
+	switch req.GetType() {
+	case yakit.TypeProject:
+		consts.GetGormProjectDatabase().Close()
+	case yakit.TypeSSAProject:
+		consts.GetGormDefaultSSADataBase().Close()
+	}
 
 	// set default to current
 	defaultProg, err := s.GetDefaultProjectEx(ctx, &ypb.GetDefaultProjectExRequest{Type: req.GetType()})
