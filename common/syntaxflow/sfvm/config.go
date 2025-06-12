@@ -59,7 +59,9 @@ func WithFailFast(b ...bool) Option {
 
 func WithContext(ctx context.Context) Option {
 	return func(config *Config) {
-		config.ctx = ctx
+		if ctx != nil {
+			config.ctx = ctx
+		}
 	}
 }
 

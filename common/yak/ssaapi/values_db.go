@@ -29,6 +29,7 @@ type saveValueCtx struct {
 	db *gorm.DB
 	ssadb.AuditNodeStatus
 
+	ctx        context.Context
 	entryValue *Value
 
 	visitedNode map[*Value]*ssadb.AuditNode
@@ -39,6 +40,12 @@ type SaveValueOption func(c *saveValueCtx)
 func OptionSaveValue_TaskID(taskID string) SaveValueOption {
 	return func(c *saveValueCtx) {
 		c.TaskId = taskID
+	}
+}
+
+func OptionSaveValue_Context(ctx context.Context) SaveValueOption {
+	return func(c *saveValueCtx) {
+		c.ctx = ctx
 	}
 }
 
@@ -95,23 +102,24 @@ func SaveValue(value *Value, opts ...SaveValueOption) error {
 	if db == nil {
 		return utils.Error("db is nil")
 	}
-	ctx := &saveValueCtx{
+	saveValueConfig := &saveValueCtx{
 		db:          db,
 		entryValue:  value,
 		visitedNode: make(map[*Value]*ssadb.AuditNode),
 	}
 	for _, o := range opts {
-		o(ctx)
+		o(saveValueConfig)
 	}
-	if ctx.ProgramName == "" {
+	if saveValueConfig.ProgramName == "" {
 		return utils.Error("program info is empty")
 	}
 	// log.Infof("SaveValue: %v: %v", ctx, value)
 	err := graph.BuildGraphWithDFS[*ssadb.AuditNode, *Value](
+		saveValueConfig.ctx,
 		value,
-		ctx.SaveNode,
-		ctx.getNeighbors,
-		ctx.SaveEdge,
+		saveValueConfig.SaveNode,
+		saveValueConfig.getNeighbors,
+		saveValueConfig.SaveEdge,
 	)
 	return err
 }

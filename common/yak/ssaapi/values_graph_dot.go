@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
 
@@ -55,6 +56,7 @@ func NewValueGraph(v ...*Value) *ValueGraph {
 	}
 	for _, value := range v {
 		graph.BuildGraphWithDFS[int, *Value](
+			context.Background(),
 			value,
 			g.createNode,
 			g.getNeighbors,

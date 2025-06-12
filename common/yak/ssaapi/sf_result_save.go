@@ -100,6 +100,17 @@ func CountSyntaxFlowResult(db *gorm.DB) (int, error) {
 }
 
 func (r *SyntaxFlowResult) Save(kind schema.SyntaxflowResultKind, TaskIDs ...string) (uint, error) {
+	return r.save(context.Background(), kind, TaskIDs...)
+}
+
+func (r *SyntaxFlowResult) SaveWithContext(ctx context.Context, kind schema.SyntaxflowResultKind, TaskIDs ...string) (uint, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return r.save(ctx, kind, TaskIDs...)
+}
+
+func (r *SyntaxFlowResult) save(ctx context.Context, kind schema.SyntaxflowResultKind, TaskIDs ...string) (uint, error) {
 	if r == nil || r.memResult == nil || r.program == nil {
 		return 0, utils.Error("result or program  is nil")
 	}
@@ -125,7 +136,7 @@ func (r *SyntaxFlowResult) Save(kind schema.SyntaxflowResultKind, TaskIDs ...str
 	result.ProgramName = r.program.GetProgramName()
 	// value
 	var errs error
-	if err := r.saveValue(result); err != nil {
+	if err := r.saveValue(ctx, result); err != nil {
 		errs = utils.JoinErrors(errs, err)
 	}
 	result.RiskCount = uint64(len(r.riskMap))
@@ -139,7 +150,7 @@ func (r *SyntaxFlowResult) Save(kind schema.SyntaxflowResultKind, TaskIDs ...str
 	return result.ID, errs
 }
 
-func (r *SyntaxFlowResult) saveValue(result *ssadb.AuditResult) error {
+func (r *SyntaxFlowResult) saveValue(ctx context.Context, result *ssadb.AuditResult) error {
 	// result := r.dbResult
 	if result == nil {
 		return utils.Error("result is nil")
@@ -156,6 +167,8 @@ func (r *SyntaxFlowResult) saveValue(result *ssadb.AuditResult) error {
 		OptionSaveValue_RuleTitle(result.RuleTitle),
 		// program
 		OptionSaveValue_ProgramName(result.ProgramName),
+		// ctx
+		OptionSaveValue_Context(ctx),
 	}
 	saveVariable := func(name string, values Values) {
 		opts := append(opts, OptionSaveValue_ResultVariable(name))
