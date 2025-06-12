@@ -934,6 +934,10 @@ message AIOutputEvent {
 
 message AIInputEvent {
   bool IsStart = 1;
+
+  bool IsConfigHotpatch = 8;
+  string HotpatchType = 9;
+  // 如果是配置热补丁，那么 Params 就是热补丁的参数
   AIStartParams Params = 2;
 
   bool IsInteractiveMessage = 3;

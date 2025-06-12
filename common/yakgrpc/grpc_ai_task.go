@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/utils/reducer"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -84,8 +85,11 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 		}),
 		aid.WithEventInputChan(inputEvent),
 	}
+
 	aidOption = append(aidOption, buildAIDOption(startParams)...)
 
+	var hotpatchBroadcaster = chanx.NewBroadcastChannel[aid.Option](baseCtx, 10)
+	aidOption = append(aidOption, aid.WithHotpatchOptionChanFactory(hotpatchBroadcaster.Subscribe))
 	go func() {
 		defer cancel()
 		for {
@@ -128,6 +132,28 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 					continue
 				case <-baseCtx.Done():
 					return
+				}
+			}
+
+			if event.IsConfigHotpatch {
+				params := event.GetParams()
+				var updateOption aid.Option
+				switch event.HotpatchType {
+				case "ReviewPolicy":
+					switch params.GetReviewPolicy() {
+					case "yolo":
+						updateOption = aid.WithAgreeYOLO(true)
+					case "ai":
+						updateOption = aid.WithAIAgree()
+					case "manual":
+						updateOption = aid.WithAgreeManual()
+					}
+				default:
+					log.Errorf("unknown hotpatch type: %s", event.HotpatchType)
+					continue
+				}
+				if updateOption == nil {
+					hotpatchBroadcaster.Submit(updateOption)
 				}
 			}
 		}

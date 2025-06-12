@@ -47,6 +47,8 @@ const (
 	EVENT_TYPE_REVIEW_RELEASE EventType = "review_release"
 
 	EVENT_TYPE_INPUT EventType = "input"
+
+	EVENT_TYPE_AID_CONFIG = "aid_config" // aid config event, used to emit the current config information
 )
 
 type Event struct {
@@ -353,6 +355,10 @@ func (r *Config) EmitSystemReasonStreamEvent(nodeId string, startTime time.Time,
 		nodeId:    nodeId,
 		taskIndex: taskIndex,
 	})
+}
+
+func (r *Config) EmitCurrentConfigInfo() {
+	r.emitJson(EVENT_TYPE_AID_CONFIG, "system", r.SimpleInfoMap())
 }
 
 func (r *Config) EmitInfo(fmtlog string, items ...any) {

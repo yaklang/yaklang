@@ -54,6 +54,7 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...Opt
 		return nil, utils.Errorf("coordinator: load tools (post-init) failed: %v", err)
 	}
 	config.startEventLoop(ctx)
+	config.startHotpatchLoop(ctx)
 	config.guardian.setOutputEmitter(config.id, config.eventHandler)
 	c := &Coordinator{
 		config:    config,
@@ -78,6 +79,7 @@ func (c *Coordinator) GetConfig() *Config {
 }
 
 func (c *Coordinator) Run() error {
+	c.config.EmitCurrentConfigInfo()
 	c.CreateDatabaseSchema(c.userInput)
 	c.config.EmitInfo("start to create plan request")
 	planReq, err := c.createPlanRequest(c.userInput)

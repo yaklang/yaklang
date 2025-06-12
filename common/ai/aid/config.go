@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 	"math/rand/v2"
 	"strings"
 	"sync"
@@ -61,6 +62,9 @@ type Config struct {
 
 	m  *sync.Mutex
 	id string
+
+	startHotpatchOnce  sync.Once
+	hotpatchOptionChan *chanx.UnlimitedChan[Option]
 
 	eventInputChan chan *InputEvent
 	epm            *endpointManager
@@ -774,6 +778,21 @@ func WithEventInputChan(ch chan *InputEvent) Option {
 		defer config.m.Unlock()
 
 		config.eventInputChan = ch
+		return nil
+	}
+}
+
+func WithHotpatchOptionChanFactory(handle func() *chanx.UnlimitedChan[Option]) Option {
+	return func(config *Config) error {
+		return WithHotpatchOptionChan(handle())(config)
+	}
+}
+
+func WithHotpatchOptionChan(ch *chanx.UnlimitedChan[Option]) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.hotpatchOptionChan = ch
 		return nil
 	}
 }
