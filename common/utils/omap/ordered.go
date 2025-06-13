@@ -101,8 +101,16 @@ func (o *OrderedMap[T, V]) Add(v V) error {
 }
 
 func (o *OrderedMap[T, V]) Set(key T, v V) {
+	if o.lock == nil {
+		o.lock = new(sync.RWMutex)
+	}
 	o.lock.Lock()
 	defer o.lock.Unlock()
+
+	if o.m == nil {
+		o.m = make(map[T]V)
+		o.keyChain = make([]T, 0)
+	}
 
 	_, ok := o.m[key]
 	if !ok {

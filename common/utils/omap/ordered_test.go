@@ -1,8 +1,9 @@
 package omap
 
 import (
-	"github.com/davecgh/go-spew/spew"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 func TestWalk(t *testing.T) {
@@ -50,4 +51,17 @@ func TestMarshalJSON(t *testing.T) {
 		t.Fatal(string(raw) + ": not right")
 	}
 	spew.Dump(raw)
+}
+
+func TestSetOnNilMap(t *testing.T) {
+	// a map created with new() will have a nil inner map
+	var m = new(OrderedMap[string, any])
+	m.Set("a", 1)
+	v, ok := m.Get("a")
+	if !ok {
+		t.Fatal("expected to get a value, but got none")
+	}
+	if v.(int) != 1 {
+		t.Fatalf("expected value to be 1, but got %v", v)
+	}
 }
