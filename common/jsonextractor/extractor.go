@@ -81,6 +81,8 @@ func ExtractObjectIndexes(c string) [][2]int {
 	var index = -1
 	var objectDepth = 0
 	var objectDepthIndexTable = make(map[int]int)
+	var arrayDepth = 0
+	var arrayDepthIndexTable = make(map[int]int)
 
 	var results [][2]int
 	stack := vmstack.New()
@@ -89,6 +91,11 @@ func ExtractObjectIndexes(c string) [][2]int {
 			objectDepth++
 			if _, existed := objectDepthIndexTable[objectDepth]; !existed {
 				objectDepthIndexTable[objectDepth] = index
+			}
+		} else if i == state_jsonArray {
+			arrayDepth++
+			if _, existed := arrayDepthIndexTable[arrayDepth]; !existed {
+				arrayDepthIndexTable[arrayDepth] = index
 			}
 		}
 		stack.Push(i)
@@ -108,6 +115,17 @@ func ExtractObjectIndexes(c string) [][2]int {
 					objectDepthIndexTable = make(map[int]int)
 				}
 				objectDepth--
+			} else if ok && raw == state_jsonArray {
+				// 记录数组结果
+				ret, ok := arrayDepthIndexTable[arrayDepth]
+				if ok && ret >= 0 {
+					results = append(results, [2]int{arrayDepthIndexTable[arrayDepth], index + 1})
+				}
+				delete(arrayDepthIndexTable, arrayDepth)
+				if arrayDepth == 0 {
+					arrayDepthIndexTable = make(map[int]int)
+				}
+				arrayDepth--
 			}
 		}
 	}
@@ -166,7 +184,28 @@ func ExtractObjectIndexes(c string) [][2]int {
 			//case '`':
 			//	pushState(state_esExpr)
 			//	continue
+			case '[':
+				pushState(state_jsonArray)
+				continue
 			case '}':
+				popState()
+				continue
+			}
+		case state_jsonArray:
+			switch ch {
+			case '{':
+				pushState(state_jsonObj)
+				continue
+			case '"':
+				pushState(state_DoubleQuoteString)
+				continue
+			case '\'':
+				pushState(state_SingleQuoteString)
+				continue
+			case '[':
+				pushState(state_jsonArray)
+				continue
+			case ']':
 				popState()
 				continue
 			}

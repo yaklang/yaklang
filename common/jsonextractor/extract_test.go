@@ -1,9 +1,10 @@
 package jsonextractor
 
 import (
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestFixJson(t *testing.T) {
@@ -87,4 +88,32 @@ func TestExtractJsonStringQuote(t *testing.T) {
 	res := ExtractStandardJSON("`" + `{"a":"c:\\"}`)
 	assert.Equal(t, 1, len(res))
 	assert.Equal(t, "{\"a\":\"c:\\\\\"}", res[0])
+}
+
+func TestExtractJsonArray(t *testing.T) {
+	// 测试简单的JSON数组
+	res := ExtractStandardJSON(`[{"key": "value"}]`)
+	assert.Equal(t, 1, len(res))
+	assert.Equal(t, `[{"key": "value"}]`, res[0])
+
+	// 测试包含多个对象的数组
+	res = ExtractStandardJSON(`[{"key1": "value1"}, {"key2": "value2"}]`)
+	assert.Equal(t, 1, len(res))
+	assert.Equal(t, `[{"key1": "value1"}, {"key2": "value2"}]`, res[0])
+
+	// 测试混合文本中的JSON数组
+	res = ExtractStandardJSON(`some text [{"key": "value"}] more text`)
+	assert.Equal(t, 1, len(res))
+	assert.Equal(t, `[{"key": "value"}]`, res[0])
+
+	// 测试对象包含数组
+	res = ExtractStandardJSON(`{"array": [{"key": "value"}]}`)
+	assert.Equal(t, 1, len(res))
+	assert.Equal(t, `{"array": [{"key": "value"}]}`, res[0])
+
+	// 测试数组和对象混合
+	res = ExtractStandardJSON(`text [{"key": "value"}] and {"another": "object"}`)
+	assert.Equal(t, 2, len(res))
+	assert.Equal(t, `[{"key": "value"}]`, res[0])
+	assert.Equal(t, `{"another": "object"}`, res[1])
 }
