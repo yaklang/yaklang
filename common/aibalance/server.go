@@ -5,8 +5,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/go-funk"
 	"io"
 	"net"
 	"net/http"
@@ -18,6 +16,9 @@ import (
 	"sync/atomic"
 	"text/template"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/go-funk"
 
 	"github.com/yaklang/yaklang/common/aibalance/aiforwarder"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -181,6 +182,12 @@ func (e *Entrypoints) PeekOrderedProviders(model string) []*Provider {
 	}
 
 	log.Infof("PeekOrderedProviders for model %s: found %d providers", model, len(providers))
+
+	// 如果只有一个提供者，无论其健康状况如何，都直接返回
+	if len(providers) == 1 {
+		log.Infof("Only one provider found for model %s, returning it directly.", model)
+		return providers
+	}
 
 	// 过滤出延迟小于10秒的提供者
 	var validProviders []*Provider
@@ -506,6 +513,17 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 
 	// 使用 PeekOrderedProviders 获取按优先级排序的提供者列表
 	providers := c.Entrypoints.PeekOrderedProviders(modelName)
+	if len(providers) == 0 {
+		// 如果找不到，尝试从数据库重新加载
+		c.logWarn("No valid providers found for model %s, trying to reload from database...", modelName)
+		if err := LoadProvidersFromDatabase(c); err != nil {
+			c.logError("Failed to reload providers from database: %v", err)
+		} else {
+			c.logInfo("Successfully reloaded providers from database, retrying to find providers.")
+			providers = c.Entrypoints.PeekOrderedProviders(modelName)
+		}
+	}
+
 	if len(providers) == 0 {
 		c.logError("No valid providers found for model %s (all providers have latency >= 10s)", modelName)
 		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 404 Not Found\r\nX-Reason: no valid provider found for %v, all providers have high latency\r\n\r\n", modelName)))

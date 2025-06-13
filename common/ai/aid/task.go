@@ -118,6 +118,9 @@ func (t *aiTask) UnmarshalJSON(data []byte) error {
 	t.Name = aux.Name
 	t.Goal = aux.Goal
 	t.Subtasks = aux.Subtasks
+	if t.toolCallResultIds == nil {
+		t.toolCallResultIds = omap.NewOrderedMap(make(map[int64]*aitool.ToolResult))
+	}
 	return nil
 }
 
