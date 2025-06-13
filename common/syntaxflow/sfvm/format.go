@@ -183,6 +183,7 @@ func (f *RuleFormat) VisitAlertStatement(alert sf.IAlertStatementContext) {
 			for _, s := range alertMsg {
 				if s != "" {
 					isNull = false
+					break
 				}
 			}
 			if !isNull {
@@ -374,7 +375,24 @@ func (f *RuleFormat) VisitHereDoc(raw sf.IHereDocContext) string {
 	if !ok || i == nil {
 		return ""
 	}
+	if i.LfHereDoc() != nil {
+		return f.VisitLfHereDoc(i.LfHereDoc())
+	}
 	return f.VisitCrlfHereDoc(i.CrlfHereDoc())
+}
+func (f *RuleFormat) VisitLfHereDoc(raw sf.ILfHereDocContext) string {
+	if raw == nil {
+		return ""
+	}
+	i, ok := raw.(*sf.LfHereDocContext)
+	if !ok || i == nil {
+		return ""
+	}
+	if i.LfText() != nil {
+		return i.LfText().GetText()
+	} else {
+		return ""
+	}
 }
 
 func (f *RuleFormat) VisitCrlfHereDoc(raw sf.ICrlfHereDocContext) string {
