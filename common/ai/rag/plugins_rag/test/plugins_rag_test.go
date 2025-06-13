@@ -1,10 +1,9 @@
-package tests
+package test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
 	"github.com/yaklang/yaklang/common/consts"
@@ -32,20 +31,6 @@ func (m *MockEmbedder) Embedding(text string) ([]float64, error) {
 		return []float64{0.3, 0.3, 0.3}, nil
 	}
 	return []float64{0.1, 0.1, 0.1}, nil
-}
-
-func init() {
-	plugins_rag.GenerateYakScriptMetadata = func(script string) (*plugins_rag.GenerateResult, error) {
-		res, err := metadata.GenerateYakScriptMetadata(script)
-		if err != nil {
-			return nil, err
-		}
-		return &plugins_rag.GenerateResult{
-			Language:    res.Language,
-			Description: res.Description,
-			Keywords:    res.Keywords,
-		}, nil
-	}
 }
 
 // 创建测试用插件

@@ -5,26 +5,12 @@ import (
 	"os"
 
 	"github.com/urfave/cli"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-func init() {
-	plugins_rag.GenerateYakScriptMetadata = func(script string) (*plugins_rag.GenerateResult, error) {
-		res, err := metadata.GenerateYakScriptMetadata(script)
-		if err != nil {
-			return nil, err
-		}
-		return &plugins_rag.GenerateResult{
-			Language:    res.Language,
-			Description: res.Description,
-			Keywords:    res.Keywords,
-		}, nil
-	}
-}
 func main() {
 	yakit.LoadGlobalNetworkConfig()
 	app := cli.NewApp()
