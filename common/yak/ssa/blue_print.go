@@ -82,8 +82,7 @@ type Blueprint struct {
 	// _container is an inner ssa.Valueorigin cls container
 	_container Value
 
-	GeneralUndefined func(string) *Undefined
-	Tokenizer        CanStartStopToken // 标记blueprint声明的位置
+	Tokenizer CanStartStopToken // 标记blueprint声明的位置
 
 	ParentBlueprints    []*Blueprint
 	InterfaceBlueprints []*Blueprint

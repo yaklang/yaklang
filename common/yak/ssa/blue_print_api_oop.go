@@ -59,13 +59,7 @@ func (b *FunctionBuilder) CreateBlueprintWithPkgName(name string, tokenizers ...
 	if prog.Blueprint == nil {
 		prog.Blueprint = omap.NewEmptyOrderedMap[string, *Blueprint]()
 	}
-	//blueprint.GeneralUndefined = func(s string) *Undefined {
-	//	if len(tokenizer) > 0 {
-	//		recoverRange := b.SetRange(tokenizer[0])
-	//		defer recoverRange()
-	//	}
-	//	return b.EmitUndefined(s)
-	//}
+
 	blueprint.Tokenizer = tokenizer
 
 	b.SetBlueprint(name, blueprint)
