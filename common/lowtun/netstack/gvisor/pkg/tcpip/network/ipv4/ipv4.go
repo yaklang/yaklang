@@ -1816,7 +1816,7 @@ func (p *protocol) isSubnetLocalBroadcastAddress(addr tcpip.Address) bool {
 func (p *protocol) parseAndValidate(pkt *stack.PacketBuffer) (*buffer.View, bool) {
 	transProtoNum, hasTransportHdr, ok := p.Parse(pkt)
 	if !ok {
-		log.Infof("MalformedPacketsReceived cannot parse transproto: %v", pkt.NetworkHeader())
+		log.Debugf("MalformedPacketsReceived cannot parse transproto: %v", pkt.NetworkHeader())
 		return nil, false
 	}
 
@@ -1824,7 +1824,7 @@ func (p *protocol) parseAndValidate(pkt *stack.PacketBuffer) (*buffer.View, bool
 	// Do not include the link header's size when calculating the size of the IP
 	// packet.
 	if l := pkt.Size() - len(pkt.LinkHeader().Slice()); !h.IsValid(l) {
-		log.Infof("MalformedPacketsReceived cannot verify size: pkt.Size() - len(pkt.LinkHeader().Slice()): %v - %v = %v", pkt.Size(), len(pkt.LinkHeader().Slice()), l)
+		log.Debugf("MalformedPacketsReceived cannot verify size: pkt.Size() - len(pkt.LinkHeader().Slice()): %v - %v = %v", pkt.Size(), len(pkt.LinkHeader().Slice()), l)
 		return nil, false
 	}
 
