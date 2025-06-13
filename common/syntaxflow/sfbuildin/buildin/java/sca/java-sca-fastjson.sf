@@ -173,7 +173,7 @@ CODE
 
 $ver in (,1.2.68] as $vuln_1_2_68;
 alert $vuln_1_2_68 for {
-	level: "high",
+	level: "critical",
 	message: "SCA: com.alibaba.fastjson <= 1.2.68 RCE Mid to exploit",
 	title: "SCA: Check Java Fastjson Vulnerabilities",
 	title_zh: "SCA: 检测Java Fastjson依赖漏洞",
@@ -330,7 +330,7 @@ CODE
 
 审计此规则是为了检测项目中是否使用了存在上述反序列化漏洞的 Fastjson 版本，包括但不限于 `1.2.47`、`1.2.68` 及其之前的一些版本，以及部分 `1.2.83` 之前的版本。及时发现并升级到安全版本对于防范此类高危漏洞至关重要。
 CODE
-	level: "mid",
+	level: "critical",
 	message: "SCA: com.alibaba.fastjson < 1.2.83 RCE Hard to exploit",
 	title: "SCA: Check Java Fastjson Vulnerabilities",
 }
