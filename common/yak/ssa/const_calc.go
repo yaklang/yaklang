@@ -58,13 +58,15 @@ const (
 
 func HandlerBinOp(b *BinOp) (ret Value) {
 	defer func() {
-		if c, ok := ToConst(ret); ok {
-			c.Origin = b
+		if c, ok := ToConstInst(ret); ok {
+			c.Origin = b.GetId()
 		}
 	}()
 
-	if cX, ok := ToConst(b.X); ok {
-		if cY, ok := ToConst(b.Y); ok {
+	x := b.GetValueById(b.X)
+	y := b.GetValueById(b.Y)
+	if cX, ok := ToConstInst(x); ok {
+		if cY, ok := ToConstInst(y); ok {
 			// both const
 			if v := CalcConstBinary(cX, cY, b.Op); v != nil {
 				return v
@@ -72,14 +74,14 @@ func HandlerBinOp(b *BinOp) (ret Value) {
 
 		} else {
 			// x const
-			if v := CalcConstBinarySide(cX, b.Y, b.Op); v != nil {
+			if v := CalcConstBinarySide(cX, y, b.Op); v != nil {
 				return v
 			}
 		}
 	}
-	if c, ok := ToConst(b.Y); ok {
+	if c, ok := ToConstInst(y); ok {
 		// y const
-		if v := CalcConstBinarySide(c, b.X, b.Op); v != nil {
+		if v := CalcConstBinarySide(c, x, b.Op); v != nil {
 			return v
 		}
 	}
@@ -91,12 +93,13 @@ func HandlerBinOp(b *BinOp) (ret Value) {
 
 func HandlerUnOp(u *UnOp) (ret Value) {
 	defer func() {
-		if c, ok := ToConst(ret); ok {
-			c.Origin = u
+		if c, ok := ToConstInst(ret); ok {
+			c.Origin = u.GetId()
 		}
 	}()
 
-	if c, ok := ToConst(u.X); ok {
+	x := u.GetValueById(u.X)
+	if c, ok := ToConstInst(x); ok {
 		if v := CalcConstUnary(c, u.Op); v != nil {
 			return v
 		}
@@ -105,9 +108,11 @@ func HandlerUnOp(u *UnOp) (ret Value) {
 }
 
 func CalcBinary(b *BinOp) Value {
-	isNot := func(x, y Value) bool {
+	isNot := func(xid, yid int64) bool {
+		x := b.GetValueById(xid)
+		y := b.GetValueById(yid)
 		if u, ok := x.(*UnOp); ok {
-			if u.X == y && u.Op == OpNot {
+			if u.X == y.GetId() && u.Op == OpNot {
 				return true
 			}
 		}
@@ -198,7 +203,7 @@ func CalcConstBinary(x, y *ConstInst, op BinaryOpcode) *ConstInst {
 		}
 	case OpAdd:
 		if x.IsFloat() && y.IsFloat() {
-		    return NewConst(x.Float() + y.Float())
+			return NewConst(x.Float() + y.Float())
 		}
 		if x.IsNumber() && y.IsNumber() {
 			return NewConst(x.Number() + y.Number())
@@ -208,24 +213,24 @@ func CalcConstBinary(x, y *ConstInst, op BinaryOpcode) *ConstInst {
 		}
 	case OpSub:
 		if x.IsFloat() && y.IsFloat() {
-		    return NewConst(x.Float() - y.Float())
+			return NewConst(x.Float() - y.Float())
 		}
 		if x.IsNumber() && y.IsNumber() {
 			return NewConst(x.Number() - y.Number())
 		}
 	case OpMul:
 		if x.IsFloat() && y.IsFloat() {
-		    return NewConst(x.Float() * y.Float())
+			return NewConst(x.Float() * y.Float())
 		}
 		if x.IsNumber() && y.IsNumber() {
 			return NewConst(x.Number() * y.Number())
 		}
 	case OpDiv:
 		if x.IsFloat() && y.IsFloat() {
-		    if x.Float() == 0 || y.Float() == 0 {
-		        return NewConst(0)
+			if x.Float() == 0 || y.Float() == 0 {
+				return NewConst(0)
 			}
-		    return NewConst(x.Float() / y.Float())
+			return NewConst(x.Float() / y.Float())
 		}
 		if x.IsNumber() && y.IsNumber() {
 			if x.Number() == 0 || y.Number() == 0 {

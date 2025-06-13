@@ -3,6 +3,8 @@ package sfcompletion
 import (
 	"context"
 	_ "embed"
+	"io"
+
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -10,8 +12,8 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
 )
 
 // CompleteRuleDesc 用于给sf rule文件的desc中信息项内容补全，包括title、title_zh、desc、solution等
@@ -64,7 +66,7 @@ func CompletegRuleDesc(
 			return got
 		}
 		if got := params.GetInt(key); got != 0 {
-			return string(got)
+			return codec.AnyToString(got)
 		}
 		return value
 	}

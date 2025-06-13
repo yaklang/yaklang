@@ -4,7 +4,7 @@ import "github.com/yaklang/yaklang/common/utils"
 
 func (b *FunctionBuilder) CreateObjectWithSlice(vs []Value) *Make {
 	return b.BuildObjectAddFieldBuild(len(vs),
-		func(i int) Value { return NewConst(i) },
+		func(i int) Value { return b.EmitConstInst(i) },
 		func(i int) Value { return vs[i] },
 	)
 }

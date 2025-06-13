@@ -116,10 +116,6 @@ func (p *Program) GetErrors() ssa.SSAErrors {
 	return p.Program.GetErrors()
 }
 
-func (p *Program) GetInstructionById(id int64) ssa.Instruction {
-	return p.Program.GetInstructionById(id)
-}
-
 func (p *Program) Ref(name string) Values {
 	return lo.FilterMap(
 		ssa.MatchInstructionByExact(

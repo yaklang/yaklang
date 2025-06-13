@@ -506,7 +506,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			},
 			ssa.TernaryExpressionVariable,
 		)
-		if condValue, ok := ssa.ToConst(conditionValue); ok {
+		if condValue, ok := ssa.ToConstInst(conditionValue); ok {
 			cond, ok := condValue.GetRawValue().(bool)
 			if !ok {
 				return value
@@ -691,7 +691,8 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.
 		if ret := i.Identifier(); ret != nil {
 			recover = y.SetRange(ret)
 			text := ret.GetText()
-			log.Infof("visitMethodCall: %s: range: %s", text, y.CurrentRange.String())
+			_ = text
+			// log.Infof("visitMethodCall: %s: range: %s", text, y.CurrentRange.String())
 			memberKey = y.EmitConstInst(ret.GetText())
 		} else if ret := i.THIS(); ret != nil {
 			// get clazz
@@ -961,19 +962,15 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) {
 			tryBuilder.BuildFinally(func() {
 				y.VisitBlock(finallyBlock.(*javaparser.FinallyBlockContext).Block())
 				key := y.EmitConstInst("close")
-				if shouldClosedValue != nil {
-					for _, value := range shouldClosedValue {
-						y.ReadMemberCallValue(value, key)
-					}
+				for _, value := range shouldClosedValue {
+					y.ReadMemberCallValue(value, key)
 				}
 			})
 		} else {
 			tryBuilder.BuildFinally(func() {
 				key := y.EmitConstInst("close")
-				if shouldClosedValue != nil {
-					for _, value := range shouldClosedValue {
-						y.ReadMemberCallMethod(value, key)
-					}
+				for _, value := range shouldClosedValue {
+					y.ReadMemberCallMethod(value, key)
 				}
 			})
 		}

@@ -33,6 +33,7 @@ type CacheEx[T any] struct {
 // CacheExWithKey is a synchronized map of items that can auto-expire once stale
 type CacheExWithKey[U comparable, T any] struct {
 	*ttlcache.Cache[U, T]
+	config                *cacheExConfig
 	expireCallback        expireCallback[U, T]
 	newItemCallback       itemCallback[U, T]
 	ttl                   time.Duration
@@ -43,11 +44,13 @@ type CacheExWithKey[U comparable, T any] struct {
 
 // Can only close once
 func (cache *CacheExWithKey[U, T]) Close() {
-	cache.stopOnce.Do(func() {
-		cache.Cache.DeleteAll()
-		cache.Cache.Stop()
-		cache.evictionCallbackClear()
-	})
+	// close
+	cache.Cache.DeleteAll()
+	cache.Cache.Stop()
+	cache.evictionCallbackClear()
+
+	// reset
+	cache.reset()
 }
 
 // Set is a thread-safe way to add new items to the map
@@ -165,23 +168,28 @@ func NewCacheExWithKey[U comparable, T any](opt ...cacheExOption) *CacheExWithKe
 	}
 
 	cache := &CacheExWithKey[U, T]{
-		Cache: ttlcache.New[U, T](
-			ttlcache.WithCapacity[U, T](config.capacity),
-		),
-		stopOnce: new(sync.Once),
-		ttl:      config.ttl,
+		config: config,
+		ttl:    config.ttl,
 	}
-	cache.evictionCallbackClear = cache.Cache.OnEviction(func(ctx context.Context, raw_reason ttlcache.EvictionReason, i *ttlcache.Item[U, T]) {
-		reason := EvictionReason(raw_reason)
-		if cache.expireCallback != nil {
-			cache.expireCallback(i.Key(), i.Value(), reason)
-		}
-	})
-	cache.Cache.OnInsertion(func(ctx context.Context, i *ttlcache.Item[U, T]) {
-		if cache.newItemCallback != nil {
-			cache.newItemCallback(i.Key(), i.Value())
-		}
-	})
-	go cache.Cache.Start()
+	cache.reset()
 	return cache
+}
+
+func (c *CacheExWithKey[U, T]) reset() {
+	c.Cache = ttlcache.New[U, T](
+		ttlcache.WithCapacity[U, T](c.config.capacity),
+	)
+
+	c.evictionCallbackClear = c.Cache.OnEviction(func(ctx context.Context, raw_reason ttlcache.EvictionReason, i *ttlcache.Item[U, T]) {
+		reason := EvictionReason(raw_reason)
+		if c.expireCallback != nil {
+			c.expireCallback(i.Key(), i.Value(), reason)
+		}
+	})
+	c.Cache.OnInsertion(func(ctx context.Context, i *ttlcache.Item[U, T]) {
+		if c.newItemCallback != nil {
+			c.newItemCallback(i.Key(), i.Value())
+		}
+	})
+	go c.Cache.Start()
 }

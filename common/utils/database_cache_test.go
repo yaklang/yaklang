@@ -1,6 +1,7 @@
 package utils_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -285,4 +286,22 @@ func TestDatabaseCache_DisableEnableSave(t *testing.T) {
 	data1, ok = cache.Get(1)
 	require.True(t, ok)
 	require.Equal(t, "1", data1)
+}
+
+func TestA(t *testing.T) {
+	cache := utils.NewCacheExWithKey[string, string]()
+	log.Infof("set key 1")
+	for i := 0; i < 1000; i++ {
+		key := fmt.Sprintf("key%d", i)
+		cache.Set(key, "value1")
+	}
+
+	cache.SetExpirationCallback(func(key, value string, reason utils.EvictionReason) {
+		log.Infof("set key 2 ")
+		cache.Set(key, value)
+	})
+
+	log.Infof("close ")
+	cache.Close()
+	log.Infof("close done ")
 }
