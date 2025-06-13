@@ -129,7 +129,8 @@ REFERENCE
 /^curl_init|curl_setopt|curl_exec|curl_close|fsockopen|file_get_contents|fopen$/ as $curlFunction;
 
 check $curlFunction;
-alert $curlFunction for {
+alert $curlFunction	for {
+	level: "info",
 	title: "ssrf function detected, please pay attention",
 	title_zh: "检测到为ssrf函数，请注意关注",
 	desc: <<<CODE
@@ -143,7 +144,6 @@ alert $curlFunction for {
    检测以下7个PHP函数：
    `curl_init`, `curl_setopt`, `curl_exec`, `curl_close`, `fsockopen`, `file_get_contents`, `fopen`。
 CODE
-	level: "info",
 }
 
 /$curl_setopt|fsockopen|file_get_contents^/as $ssrfFunction
@@ -162,10 +162,7 @@ CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high for {
-	level: "high",
-	title: "Unvalidated SSRF Parameter Injection",
-	title_zh: "SSRF未验证参数注入风险",
+alert $high	for {
 	solution: <<<CODE
 ### 修复建议
 
@@ -282,6 +279,9 @@ CODE
    - 攻击者利用服务请求作为跳板与其他服务器进行通信，隐藏攻击来源。
    - 端口扫描。
 CODE
+	level: "high",
+	title: "Unvalidated SSRF Parameter Injection",
+	title_zh: "SSRF未验证参数注入风险",
 }
 
 $all<dataflow(include=<<<CODE
@@ -292,7 +292,8 @@ CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
 
-alert $mid for {
+alert $mid	for {
+	level: "mid",
 	title: "Insufficient SSRF Parameter Filtering",
 	title_zh: "SSRF参数过滤不充分",
 	solution: <<<CODE
@@ -374,11 +375,10 @@ CODE
    - 可能导致攻击者访问非预期的内部资源。
    - 存在一定的信息泄露风险。
 CODE
-	level: "mid",
 }
 
 $sink - $high - $mid  as $low
-alert $low for {
+alert $low	for {
 	title: "Potential SSRF Access Control Bypass",
 	title_zh: "SSRF访问控制潜在绕过风险",
 	solution: <<<CODE

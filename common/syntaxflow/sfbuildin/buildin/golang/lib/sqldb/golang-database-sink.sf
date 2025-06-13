@@ -80,8 +80,8 @@ REFERENCE
 <include('golang-database-sqlx')> as $output;
 <include('golang-database-from-param')> as $output;
 
-alert $output for {
+alert $output	for {
+	level: "info",
 	title: "Audit Golang Database Sink",
 	title_zh: "审计Golang数据库函数",
-	level: "info",
 }

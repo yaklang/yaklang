@@ -140,7 +140,7 @@ $url.Parse(* #-> as $param);
 $param #{until: `* & $target`}-> as $check;
 $target as $high
 
-alert $high for {
+alert $high	for {
 	title: "Check Golang Open Redirect Vulnerability",
 	title_zh: "检测 Golang 开放重定向漏洞",
 	solution: <<<CODE

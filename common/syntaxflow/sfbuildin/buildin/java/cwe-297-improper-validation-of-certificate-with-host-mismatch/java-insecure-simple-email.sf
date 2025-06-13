@@ -84,7 +84,11 @@ REFERENCE
 SimpleEmail()?{<typeName>?{have:'org.apache.commons.mail'}} as $simpleEmail;
 check $simpleEmail;
 $simpleEmail?{!(.setSSLCheckServerIdentity)} as $sink;
-alert $sink for {
+alert $sink	for {
+	message_zh: "SimpleEmail 未验证务器的SSL证书",
+	message: "SimpleEmail has not verified the server’s security certificate.",
+	title: "Check Java SimpleEmail Certificate Verification",
+	title_zh: "检测Java SimpleEmail证书校验",
 	solution: <<<CODE
 ### 修复建议
 
@@ -157,10 +161,6 @@ CODE
    - **服务中断或滥用**: 攻击者可能通过劫持连接来干扰正常的邮件发送流程，甚至利用被劫持的连接发送垃圾邮件或进行钓鱼攻击。
 CODE
 	level: "info",
-	message_zh: "SimpleEmail 未验证务器的SSL证书",
-	message: "SimpleEmail has not verified the server’s security certificate.",
-	title: "Check Java SimpleEmail Certificate Verification",
-	title_zh: "检测Java SimpleEmail证书校验",
 }
 
 

@@ -64,7 +64,6 @@ $flag<getCall><getCallee> as $sink;
 check $sink;
 alert $sink
 
-
 desc(
 	language: java
 	'file://download.java': <<<TEXT

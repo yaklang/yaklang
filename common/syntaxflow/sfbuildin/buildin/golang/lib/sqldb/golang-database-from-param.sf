@@ -14,7 +14,6 @@ TEXT
 $entry #-> as $output;
 
 alert $output
-
 desc(
 	lang: golang
 	alert_min: 1

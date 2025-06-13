@@ -95,11 +95,11 @@ $stmt -{
 $safe<getPredecessors()> as $safeStmt;
 
 $stmt - $safeStmt as $weak;
-alert $weak for {
-	message: "检测到java.sql.ResultSet未释放资源",
+alert $weak	for {
 	title: "Unreleased ResultSet Resource",
 	title_zh: "未释放的ResultSet资源",
 	level: "high",
+	message: "检测到java.sql.ResultSet未释放资源",
 }
 
 desc(

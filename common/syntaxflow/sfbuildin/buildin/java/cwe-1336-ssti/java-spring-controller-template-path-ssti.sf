@@ -115,7 +115,7 @@ $source<dataflow(<<<CODE
 CODE)> as $haveCall;
 
 $source - $haveCall as $withoutCall;
-alert $withoutCall for {
+alert $withoutCall	for {
 	title_zh: "检测Spring控制器中未调用的SSTI漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -226,7 +226,9 @@ $calls?{<getCallee><name><isSanitizeName>} as $__next__;
 CODE)> as $filteredSink;
 
 $haveCall - $filteredSink as $unsafeFilteredSink;
-alert $unsafeFilteredSink for {
+alert $unsafeFilteredSink	for {
+	message: "Template Path Injection(Filtered Use of User Input)",
+	title: "Check Java SSTI in Spring Controller With Filtered Input",
 	title_zh: "检测Spring控制器中经过过滤但仍存在风险的SSTI漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -323,13 +325,9 @@ CODE
 CODE
 	level: "mid",
 	type: "vuln",
-	message: "Template Path Injection(Filtered Use of User Input)",
-	title: "Check Java SSTI in Spring Controller With Filtered Input",
 }
 
-alert $filteredSink for {
-	title: "Audit Java SSTI in Spring Controller With Filtered Input",
-	title_zh: "审计Spring控制器中已过滤的SSTI防护措施",
+alert $filteredSink	for {
 	desc: <<<CODE
 ### 规则目的
 该规则用于审计Java代码中针对SSTI漏洞的过滤机制。它通过识别是否存在有效的输入过滤函数，判断现有防护措施是否足以防止模板注入攻击。
@@ -347,6 +345,8 @@ CODE
 	level: "low",
 	message: "The String or Content Filter is used. It is recommended to use the filter to prevent SSTI.",
 	type: "audit",
+	title: "Audit Java SSTI in Spring Controller With Filtered Input",
+	title_zh: "审计Spring控制器中已过滤的SSTI防护措施",
 }
 
 

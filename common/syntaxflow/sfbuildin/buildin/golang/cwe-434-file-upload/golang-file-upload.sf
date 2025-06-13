@@ -138,7 +138,9 @@ $path.IsAbs(* #-> as $check);
 $sink #{include: `$check`}-> as $safe;
 $sink #{exclude: `$safe`}-> as $high;
 
-alert $high for {
+alert $high	for {
+	title: "Unvalidated File Upload Path in Golang",
+	title_zh: "检测到Golang文件上传路径未验证风险",
 	solution: <<<CODE
 ### 修复建议
 
@@ -256,8 +258,6 @@ func main() {
 CODE
 	level: "high",
 	type: "vuln",
-	title: "Unvalidated File Upload Path in Golang",
-	title_zh: "检测到Golang文件上传路径未验证风险",
 }
 
 desc(

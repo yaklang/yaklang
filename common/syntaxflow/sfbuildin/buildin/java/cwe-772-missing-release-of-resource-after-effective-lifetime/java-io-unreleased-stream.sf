@@ -112,7 +112,7 @@ $stream -{
 
 $safe<getPredecessors()> as $safeStream;
 $stream - $safeStream as $weak;
-alert $weak for {
+alert $weak	for {
 	message: "检测到java.io未释放的资源",
 }
 

@@ -54,10 +54,10 @@ REFERENCE
 
 __dependency__.*aspectjweaver.version as $ver;
 $ver in (,1.9.5] as $vuln_aspectjweaver;
-alert $vuln_aspectjweaver for {
-	cve: "CVE-2020-5398",
+alert $vuln_aspectjweaver	for {
 	title: "SCA: Check Java Aspectjweaver Vulnerability",
 	title_zh: "SCA: 检测Java Aspectjweaver 依赖漏洞",
 	level: "mid",
+	cve: "CVE-2020-5398",
 	message: "SCA: aspectjweaver version 1.9.5 has a reflective file download vulnerability",
 }

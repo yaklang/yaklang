@@ -129,9 +129,7 @@ $sink?{have: 'Parameter'} as $check;
 
 $check as $high;
 
-alert $high for {
-	level: "high",
-	type: "vuln",
+alert $high	for {
 	title: "Detect Golang Command Injection Vulnerability",
 	title_zh: "检测Golang命令注入漏洞",
 	solution: <<<CODE
@@ -249,6 +247,8 @@ CODE
    - 访问敏感数据，例如读取系统文件或数据库凭证。
    - 控制服务器，例如通过反向 Shell 获取服务器权限。
 CODE
+	level: "high",
+	type: "vuln",
 }
 
 desc(

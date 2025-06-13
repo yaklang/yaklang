@@ -85,8 +85,8 @@ REFERENCE
 <include('golang-file-write-ioutil')> as $output;
 <include('golang-file-write-os')> as $output;
 
-alert $output for {
+alert $output	for {
+	title_zh: "审计Golang文件写入功能汇点",
 	level: "info",
 	title: "Audit Golang File Write Sink",
-	title_zh: "审计Golang文件写入功能汇点",
 }

@@ -131,10 +131,10 @@ os?{<fullTypeName>?{have: 'os'}} as $os
 $os.ReadFile(* #-> as $param)
 $param?{!have: 'Parameter'} as $output;
 
-alert $output for {
-	title: "Audit Golang File Read Function",
+alert $output	for {
 	title_zh: "审计Golang文件读取功能",
 	level: "info",
+	title: "Audit Golang File Read Function",
 }
 
 desc(

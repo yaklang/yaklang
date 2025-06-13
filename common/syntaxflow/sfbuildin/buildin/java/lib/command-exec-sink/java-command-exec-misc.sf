@@ -110,7 +110,7 @@ $systemcommandexecutorBuilderParam as $output;
 $apacheCommandLine as $output;
 $ztExecParam as $output;
 
-alert $output for {
+alert $output	for {
 	level: "mid",
 	title: "Detect Java Thirdparty CommandLine Executing Sink",
 	title_zh: "查找Java第三方库命令执行Sink",

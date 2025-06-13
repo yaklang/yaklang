@@ -118,9 +118,7 @@ $sink #{
     exclude: `*?{opcode:call}?{!* & $source}?{!* & $sink}`,
 }->as  $high;
 
-alert $high for {
-	title: "Check Java XMLDecoder Unserialization Vulnerability",
-	title_zh: "检测Java XMLDecoder反序列化漏洞",
+alert $high	for {
 	solution: <<<CODE
 ### 修复建议
 
@@ -220,6 +218,8 @@ CODE
 CODE
 	level: "high",
 	message: "发现Java SnakeYAML反序列化漏洞,并且没有任何数据流过滤。",
+	title: "Check Java XMLDecoder Unserialization Vulnerability",
+	title_zh: "检测Java XMLDecoder反序列化漏洞",
 }
 
 $sink #{
@@ -228,7 +228,7 @@ $sink #{
 
 $result - $high as $low;
 
-alert $low for {
+alert $low	for {
 	desc: <<<CODE
 该规则用于识别可能存在的 `java.beans.XMLDecoder` 反序列化漏洞，但由于路径中已包含一定数据流过滤，因此风险较低。
 

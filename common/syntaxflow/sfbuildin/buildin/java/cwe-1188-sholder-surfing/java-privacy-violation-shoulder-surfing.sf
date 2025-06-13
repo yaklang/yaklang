@@ -65,7 +65,7 @@ PasswordCallback?{<typeName>?{have:'javax.security.auth.callback.PasswordCallbac
 $toCheck ?{* #{
     include:`* ?{opcode:const && have:'true'} `
 }->} as $risk;
-alert $risk for {
+alert $risk	for {
 	title: "Check Java Privacy Violation - Shoulder Surfing",
 	title_zh: "检查Java隐私泄露 - 肩窥",
 	level: "low",

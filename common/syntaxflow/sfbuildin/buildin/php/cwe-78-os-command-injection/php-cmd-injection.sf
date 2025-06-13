@@ -79,8 +79,7 @@ CODE,exclude=<<<CODE
 <self>?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high for {
-	title: "Unfiltered PHP Command Execution",
+alert $high	for {
 	title_zh: "PHP未过滤命令执行",
 	solution: <<<CODE
 ### 修复建议
@@ -137,6 +136,7 @@ system("cat " . $filename);
 CODE
 	level: "high",
 	type: "vuln",
+	title: "Unfiltered PHP Command Execution",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -146,7 +146,8 @@ CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
 
-alert $mid for {
+alert $mid	for {
+	title: "Partially Filtered PHP Command Execution",
 	title_zh: "PHP部分过滤命令执行",
 	solution: <<<CODE
 ### 修复建议
@@ -203,11 +204,14 @@ system("cat " . $filename);
 CODE
 	level: "mid",
 	type: "vuln",
-	title: "Partially Filtered PHP Command Execution",
 }
 $sink - $mid - $high as $low
 
-alert $low for {
+alert $low	for {
+	level: "low",
+	type: "info",
+	title: "Filtered PHP Command Execution",
+	title_zh: "PHP过滤命令执行",
 	desc: <<<CODE
 ### 规则目的
 该规则用于检查PHP代码中是否存在命令注入漏洞，但已针对用户输入进行了过滤。它通过识别经过一定过滤的用户输入并分析其是否仍然存在风险，帮助开发人员进一步确认程序的安全性。
@@ -220,10 +224,6 @@ alert $low for {
 2. **过滤逻辑分析**
 仅分析那些已包含过滤机制的代码路径，判断过滤逻辑是否足够有效，以防止命令注入漏洞。
 CODE
-	level: "low",
-	type: "info",
-	title: "Filtered PHP Command Execution",
-	title_zh: "PHP过滤命令执行",
 }
 desc(
 	lang: 'php'

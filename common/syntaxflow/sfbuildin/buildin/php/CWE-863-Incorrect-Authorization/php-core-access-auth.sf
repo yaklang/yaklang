@@ -106,7 +106,7 @@ CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high for {
+alert $high	for {
 	title: "Direct File Operation Without Validation",
 	title_zh: "未经验证的文件操作高危漏洞",
 	solution: <<<CODE
@@ -196,7 +196,8 @@ CODE,exclude=<<<CODE
 *?{opcode: call && <self><getCallee> & $filter} as $__next__
 CODE)> as $mid
 
-alert $mid for {
+alert $mid	for {
+	title: "Insufficient Parameter Filtering",
 	title_zh: "参数过滤不完整风险",
 	solution: <<<CODE
 ### 修复建议
@@ -278,12 +279,10 @@ CODE
 - **远程代码执行**: 在某些情况下，如果攻击者可以控制写入文件的内容，结合其他漏洞（如文件包含），可能导致远程代码执行。
 CODE
 	level: "mid",
-	title: "Insufficient Parameter Filtering",
 }
 $sink - $high - $mid  as $low
 
-alert $low for {
-	level: "low",
+alert $low	for {
 	title: "Potential Access Control Bypass",
 	title_zh: "潜在访问控制绕过风险",
 	solution: <<<CODE
@@ -365,6 +364,7 @@ CODE
 - **权限绕过**: 通过创建符号链接或硬链接，攻击者可能绕过某些文件访问控制。
 - **远程代码执行**: 在某些情况下，如果攻击者可以控制写入文件的内容，结合其他漏洞（如文件包含），可能导致远程代码执行。
 CODE
+	level: "low",
 }
 desc(
 	lang: "php"

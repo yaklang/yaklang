@@ -103,7 +103,7 @@ $algorithm#{
     until:`* ?{opcode:const && have:/(DES|3?DES((-|_)?ede)?|3DES|TRIPLE(-|_)?DES|ARCFOUR|RC[24])/}`,
 }-> as $sink;
 
-alert $sink for {
+alert $sink	for {
 	level: "low",
 	message: "发现Java代码中使用了不安全的加密算法",
 	title: "Check Java Cipher Weak Encryption Algorithm",

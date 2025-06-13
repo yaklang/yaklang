@@ -100,7 +100,8 @@ $getSession -{
 
 $safe<getPredecessors()> as $safeGetSession;
 $getSession - $safeGetSession as $weak;
-alert $weak for {
+alert $weak	for {
+	message: "检测到Hibernate Session 未释放资源",
 	title: "Check Java Hibernate Session Unreleased Resource",
 	title_zh: "检测Java Hibernate Session 数据库资源未释放",
 	solution: <<<CODE
@@ -216,7 +217,6 @@ CODE
 - 长时间运行的应用中，问题会随时间累积
 CODE
 	level: "high",
-	message: "检测到Hibernate Session 未释放资源",
 }
 
 desc(

@@ -132,9 +132,7 @@ REFERENCE
 
 $sink.Strict?{!have: 'false'} as $high
 
-alert $high for {
-	type: "vuln",
-	title: "Check Golang XXE Read Any File",
+alert $high	for {
 	title_zh: "检测Golang XXE任意文件读取漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -256,6 +254,8 @@ CODE
    - **远程代码执行 (在特定配置和环境下):** 在某些极端情况下，结合其他漏洞或特定的系统配置，XXE 可能被提升为远程代码执行。
 CODE
 	level: "high",
+	type: "vuln",
+	title: "Check Golang XXE Read Any File",
 }
 
 desc(

@@ -111,18 +111,18 @@ $ver in (,1.2.83) as $vulnerable;
 check $vulnerable;
 
 FastJsonHttpMessageConverter()?{<getCall><getCallee><name>?{have: '.add'}} as $config;
-alert $config for {
+alert $config	for {
+	message_zh: "FastJson 配置类中使用了 FastJsonHttpMessageConverter",
+	message: "FastJson configuration class uses FastJsonHttpMessageConverter",
 	title: "SCA: Check Java FastJson Vulnerability",
 	title_zh: "SCA: 检测Java FastJson依赖漏洞",
 	level: "high",
-	message_zh: "FastJson 配置类中使用了 FastJsonHttpMessageConverter",
-	message: "FastJson configuration class uses FastJsonHttpMessageConverter",
 }
 
 
 // 检查 FastJson 的 parseObject 方法
 JSON?{<typeName>?{have: 'alibaba'}}.parse*(,* as $dataSource) as $parseObjectCall;
-alert $parseObjectCall for {
+alert $parseObjectCall	for {
 	level: "high",
 	message_zh: "FastJson 使用了不安全的 parseObject/parse 方法",
 	message: "FastJson uses the unsafe parseObject/parse method",
@@ -137,12 +137,12 @@ $entry -{
 * & $dataSource <var(reachable)> as $__next__
 CODE
 }->;
-alert $reachable for {
-	title: "SCA: Check Java FastJson Vulnerability",
-	title_zh: "SCA: 检测Java FastJson依赖漏洞",
+alert $reachable	for {
 	level: "high",
 	message_zh: "FastJson 使用了不安全的 parseObject/parse 方法(Springboot / Servlet参数可达)",
 	message: "FastJson uses the unsafe parseObject/parse method (parameter reachable)",
+	title: "SCA: Check Java FastJson Vulnerability",
+	title_zh: "SCA: 检测Java FastJson依赖漏洞",
 }
 
 

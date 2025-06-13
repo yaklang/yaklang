@@ -136,7 +136,9 @@ $path.Join(* #-> as $check);
 $sink #{include: `$check`}-> as $safe;
 $sink #{exclude: `$safe`}-> as $low;
 
-alert $low for {
+alert $low	for {
+	level: "low",
+	type: "vuln",
 	title: "Check Golang Unfiltered File Path Vulnerability",
 	title_zh: "检测Golang未过滤文件路径漏洞",
 	solution: <<<CODE
@@ -254,8 +256,6 @@ CODE
     - 在某些情况下，攻击者可能通过上传特定文件然后利用此漏洞执行任意代码，例如通过路径遍历访问上传的WebShell。
     - 泄露敏感信息可能导致进一步的攻击，如数据库注入、权限提升等。
 CODE
-	level: "low",
-	type: "vuln",
 }
 
 desc(

@@ -58,8 +58,7 @@ $sink #{
     exclude:`*?{opcode:phi}`,
 }-> as $high;
 
-alert $high for {
-	title: "Detect Java Spring Boot Groovy Shell Code Injection Vulnerability",
+alert $high	for {
 	title_zh: "检测Java Spring Boot Groovy Shell代码注入漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -158,6 +157,7 @@ CODE
 	level: "high",
 	message: "发现Java Spring Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
 	risk: "Groovy-Shell代码执行",
+	title: "Detect Java Spring Boot Groovy Shell Code Injection Vulnerability",
 }
 
 $sink #{
@@ -165,8 +165,8 @@ $sink #{
 }-> as  $result;
 $result - $high as $low;
 
-alert $low for {
-	risk: "Groovy-Shell代码执行",
+alert $low	for {
+	message: "发现Java Spring Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
 	title: "Detect Java Spring Boot Groovy Shell Code Injection Vulnerability with Limited Risk",
 	title_zh: "检测具有有限风险的Java Spring Boot Groovy Shell代码注入漏洞",
 	solution: <<<CODE
@@ -247,7 +247,7 @@ CODE
    * **隐蔽攻击:** 攻击者可能利用低风险路径作为突破口，逐步扩大攻击范围。
 CODE
 	level: "low",
-	message: "发现Java Spring Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
+	risk: "Groovy-Shell代码执行",
 }
 
 desc(

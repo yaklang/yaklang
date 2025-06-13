@@ -92,7 +92,7 @@ check $params;
 $params?{!opcode: const}#{
     hook: `*?{opcode: const && have: 'WHERE'}<show> as $flag`,
 }->
-alert $flag for {
+alert $flag	for {
 	level: "low",
 	title: "Detect Java SQL String Append Vulnerability",
 	title_zh: "检测Java拼接SQL字符串漏洞",

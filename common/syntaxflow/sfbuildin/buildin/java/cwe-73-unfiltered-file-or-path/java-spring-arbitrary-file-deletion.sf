@@ -87,9 +87,7 @@ $sink #{
     exclude:`* ?{opcode:phi}`,
 }->as $high;
 
-alert $high for {
-	title: "Detect Java Spring Boot Arbitrary File Deletion",
-	title_zh: "检测 Java Spring Boot 任意文件删除",
+alert $high	for {
 	solution: <<<CODE
 ### 修复建议
 
@@ -161,6 +159,8 @@ CODE
 	level: "high",
 	message: "发现Java Spring Boot应用中的任意文件删除漏洞。",
 	type: "vuln",
+	title: "Detect Java Spring Boot Arbitrary File Deletion",
+	title_zh: "检测 Java Spring Boot 任意文件删除",
 }
 
 
@@ -169,7 +169,7 @@ $sink #{
 }->as $result;
 
 $result - $high as $low;
-alert $low for {
+alert $low	for {
 	title: "Detect Java Spring Boot Arbitrary File Deletion",
 	title_zh: "检测 Java Spring Boot 任意文件删除",
 	desc: <<<CODE

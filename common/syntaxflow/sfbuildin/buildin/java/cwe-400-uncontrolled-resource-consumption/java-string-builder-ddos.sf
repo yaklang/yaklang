@@ -83,7 +83,7 @@ $sink#{
     exclude : `*.length()`,
 }-> as $result;
 
-alert $result for {
+alert $result	for {
 	title_zh: "检测Java StringBuilder 拒绝服务漏洞",
 	level: "mid",
 	message: "发现Java的java.lang.StringBuilder可能存在ddos漏洞",

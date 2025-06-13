@@ -101,7 +101,7 @@ REFERENCE
 
 /^(file_get_contents|file|readfile|fgetss|fgets|fread|fgetc|stream_get_line|fscanf|fopen)$/ as $output
 
-alert $output for {
+alert $output	for {
 	title: "Audit PHP File Read Functions",
 	title_zh: "审计PHP文件读取函数",
 	level: "info",
