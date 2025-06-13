@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
@@ -426,4 +427,49 @@ func TestGRPC_FingerprintGroupSet(t *testing.T) {
 	require.Contains(t, groupNameSet, testGroupAll)
 	require.Contains(t, groupNameSet, testGroup1)
 	require.Contains(t, groupNameSet, testGroup2)
+}
+
+func TestGPRC_FingerprintCompositeConditionDeletion(t *testing.T) {
+	ruleName1 := utils.RandStringBytes(10)
+	ruleName2 := utils.RandStringBytes(10)
+	groupName1 := utils.RandStringBytes(10)
+
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	{
+		_, err = client.CreateFingerprint(context.Background(), &ypb.CreateFingerprintRequest{
+			Rule: &ypb.FingerprintRule{
+				RuleName:  ruleName1,
+				GroupName: []string{groupName1},
+			},
+		})
+		require.NoError(t, err)
+
+		_, err = client.CreateFingerprint(context.Background(), &ypb.CreateFingerprintRequest{
+			Rule: &ypb.FingerprintRule{
+				RuleName: ruleName2,
+			},
+		})
+		require.NoError(t, err)
+	}
+
+	db := consts.GetGormProfileDatabase()
+	rules, err := yakit.QueryGeneralRuleFast(db, &ypb.FingerprintFilter{
+		RuleName: []string{ruleName2},
+	})
+	require.NoError(t, err)
+	require.Len(t, rules, 1)
+	rule2 := rules[0]
+
+	// 测试复合条件删除
+	dbMsg, err := client.DeleteFingerprint(context.Background(), &ypb.DeleteFingerprintRequest{
+		Filter: &ypb.FingerprintFilter{
+			IncludeId: []int64{int64(rule2.ID)},
+			GroupName: []string{groupName1},
+		},
+	})
+	require.NoError(t, err)
+	spew.Dump(dbMsg)
+	require.Equal(t, int64(2), dbMsg.EffectRows)
 }
