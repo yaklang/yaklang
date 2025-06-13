@@ -28453,8 +28453,11 @@ type PortScanRequest struct {
 	BasicCrawlerEnableJSParser bool     `protobuf:"varint,29,opt,name=BasicCrawlerEnableJSParser,proto3" json:"BasicCrawlerEnableJSParser,omitempty"`
 	UserFingerprintFiles       []string `protobuf:"bytes,30,rep,name=UserFingerprintFiles,proto3" json:"UserFingerprintFiles,omitempty"`
 	SkipCveBaseLine            bool     `protobuf:"varint,31,opt,name=SkipCveBaseLine,proto3" json:"SkipCveBaseLine,omitempty"`
-	unknownFields              protoimpl.UnknownFields
-	sizeCache                  protoimpl.SizeCache
+	// 指纹规则组
+	EnableFingerprintGroup bool     `protobuf:"varint,32,opt,name=EnableFingerprintGroup,proto3" json:"EnableFingerprintGroup,omitempty"`
+	FingerprintGroup       []string `protobuf:"bytes,33,rep,name=FingerprintGroup,proto3" json:"FingerprintGroup,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *PortScanRequest) Reset() {
@@ -28702,6 +28705,20 @@ func (x *PortScanRequest) GetSkipCveBaseLine() bool {
 		return x.SkipCveBaseLine
 	}
 	return false
+}
+
+func (x *PortScanRequest) GetEnableFingerprintGroup() bool {
+	if x != nil {
+		return x.EnableFingerprintGroup
+	}
+	return false
+}
+
+func (x *PortScanRequest) GetFingerprintGroup() []string {
+	if x != nil {
+		return x.FingerprintGroup
+	}
+	return nil
 }
 
 type DeletePortsRequest struct {
@@ -54641,7 +54658,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"ReportName\x18\x01 \x01(\tR\n" +
 	"ReportName\x12\x1c\n" +
-	"\tRuntimeId\x18\x02 \x01(\tR\tRuntimeId\"\xc0\t\n" +
+	"\tRuntimeId\x18\x02 \x01(\tR\tRuntimeId\"\xa4\n" +
+	"\n" +
 	"\x0fPortScanRequest\x12\x18\n" +
 	"\aTargets\x18\x01 \x01(\tR\aTargets\x12\x14\n" +
 	"\x05Ports\x18\x02 \x01(\tR\x05Ports\x12\x12\n" +
@@ -54676,7 +54694,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x10LinkPluginConfig\x18\x1c \x01(\v2\x1b.ypb.HybridScanPluginConfigR\x10LinkPluginConfig\x12>\n" +
 	"\x1aBasicCrawlerEnableJSParser\x18\x1d \x01(\bR\x1aBasicCrawlerEnableJSParser\x122\n" +
 	"\x14UserFingerprintFiles\x18\x1e \x03(\tR\x14UserFingerprintFiles\x12(\n" +
-	"\x0fSkipCveBaseLine\x18\x1f \x01(\bR\x0fSkipCveBaseLine\"\xc2\x01\n" +
+	"\x0fSkipCveBaseLine\x18\x1f \x01(\bR\x0fSkipCveBaseLine\x126\n" +
+	"\x16EnableFingerprintGroup\x18  \x01(\bR\x16EnableFingerprintGroup\x12*\n" +
+	"\x10FingerprintGroup\x18! \x03(\tR\x10FingerprintGroup\"\xc2\x01\n" +
 	"\x12DeletePortsRequest\x12\x14\n" +
 	"\x05Hosts\x18\x01 \x01(\tR\x05Hosts\x12\x14\n" +
 	"\x05Ports\x18\x02 \x01(\tR\x05Ports\x12\x0e\n" +

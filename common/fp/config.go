@@ -3,6 +3,10 @@ package fp
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io/ioutil"
 	"sync"
 	"time"
@@ -176,9 +180,11 @@ func WithCache(b bool) ConfigOption {
 // ```
 // result, err := servicescan.Scan("127.0.0.1", "22,80,443", servicescan.onOpen(result => dump(result.String())))
 // die(err)
-// for i in result {
-//		println(i.String())
-//	}
+//
+//	for i in result {
+//			println(i.String())
+//		}
+//
 // ```
 func WithOnPortOpenCallback(cb func(*MatchResult)) ConfigOption {
 	return func(config *Config) {
@@ -191,8 +197,9 @@ func WithOnPortOpenCallback(cb func(*MatchResult)) ConfigOption {
 // @return {ConfigOption} 返回配置项
 // Example:
 // ```
-// 	result, err := servicescan.Scan("127.0.0.1", "22,80,443", servicescan.onFinish(result => dump(result.String())))
-// 	die(err)
+//
+//	result, err := servicescan.Scan("127.0.0.1", "22,80,443", servicescan.onFinish(result => dump(result.String())))
+//	die(err)
 //	for i in result {
 //		println(i.String())
 //	}
@@ -600,7 +607,41 @@ func WithWebFingerprintRule(rs ...any) ConfigOption {
 		if allRules == nil {
 			return
 		}
-		config.WebFingerprintRules = allRules
+		config.WebFingerprintRules = append(config.WebFingerprintRules, allRules...)
+	}
+}
+
+func WithFingerprintRuleGroup(groups ...string) ConfigOption {
+	rules, err := yakit.QueryGeneralRuleByGroup(consts.GetGormProfileDatabase(), groups...)
+	if err != nil {
+		log.Errorf("query fingerprint rule by group %v failed: %s", groups, err)
+	}
+	allRules, err := parsers.ParseExpRule(rules...)
+	if err != nil {
+		log.Errorf("parse fingerprint rule by group %v failed: %s", groups, err)
+	}
+	return func(config *Config) {
+		if allRules == nil {
+			return
+		}
+		config.WebFingerprintRules = append(config.WebFingerprintRules, allRules...)
+	}
+}
+
+func WithFingerprintRuleGroupAll() ConfigOption {
+	rules, err := yakit.QueryGeneralRuleFast(consts.GetGormProfileDatabase(), &ypb.FingerprintFilter{})
+	if err != nil {
+		log.Errorf("query fingerprint rule fast failed: %s", err)
+	}
+	allRules, err := parsers.ParseExpRule(rules...)
+	if err != nil {
+		log.Errorf("parse fingerprint rule fast failed: %s", err)
+	}
+	return func(config *Config) {
+		if allRules == nil {
+			return
+		}
+		config.WebFingerprintRules = append(config.WebFingerprintRules, allRules...)
 	}
 }
 

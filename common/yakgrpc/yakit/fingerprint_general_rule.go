@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"encoding/json"
+
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
@@ -49,6 +50,19 @@ func QueryGeneralRule(db *gorm.DB, filter *ypb.FingerprintFilter, paging *ypb.Pa
 
 func QueryGeneralRuleFast(db *gorm.DB, filter *ypb.FingerprintFilter) ([]*schema.GeneralRule, error) {
 	db = db.Model(&schema.GeneralRule{}).Preload("Groups")
+	db = FilterGeneralRule(db, filter)
+	var ret []*schema.GeneralRule
+	if err := db.Find(&ret).Error; err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
+func QueryGeneralRuleByGroup(db *gorm.DB, groups ...string) ([]*schema.GeneralRule, error) {
+	db = db.Model(&schema.GeneralRule{}).Preload("Groups")
+	filter := &ypb.FingerprintFilter{
+		GroupName: groups,
+	}
 	db = FilterGeneralRule(db, filter)
 	var ret []*schema.GeneralRule
 	if err := db.Find(&ret).Error; err != nil {
@@ -178,16 +192,33 @@ func DeleteGeneralRuleByID(db *gorm.DB, id int64) (fErr error) {
 
 func DeleteGeneralRuleByFilter(outDb *gorm.DB, filter *ypb.FingerprintFilter) (rowCount int64, fErr error) {
 	fErr = utils.GormTransaction(outDb, func(tx *gorm.DB) error {
-		db := FilterGeneralRule(tx, filter)
+		tx = tx.Debug()
+		deleteGroup := tx
+		tx = tx.Model(&schema.GeneralRule{})
+
+		includeId := filter.GetIncludeId()
+		filter.IncludeId = nil // 清除includeId,避免影响联表查询
+
+		query := tx
+		query = FilterGeneralRule(query, filter)
+
 		var ids []uint
-		if err := db.Model(&schema.GeneralRule{}).Pluck("id", &ids).Error; err != nil {
-			return utils.Errorf("query GeneralRule ids failed: %s", err)
+		query.Pluck("general_rules.id", &ids)
+
+		for _, id := range includeId {
+			if id > 0 && !lo.Contains(ids, uint(id)) {
+				ids = append(ids, uint(id))
+			}
 		}
-		if db = db.Unscoped().Delete(&schema.GeneralRule{}); db.Error != nil {
-			return utils.Errorf("delete GeneralRule failed: %s", db.Error)
+		if len(ids) == 0 {
+			return nil
 		}
-		rowCount = db.RowsAffected
-		return DeleteGeneralRuleGroupAssociationsByIDOR(tx, ids, nil)
+		tx = tx.Where("id IN (?)", ids)
+		if tx = tx.Unscoped().Delete(&schema.GeneralRule{}); tx.Error != nil {
+			return utils.Errorf("delete GeneralRule failed: %s", tx.Error)
+		}
+		rowCount = tx.RowsAffected
+		return DeleteGeneralRuleGroupAssociationsByIDOR(deleteGroup, ids, nil)
 	})
 	return
 }
@@ -231,4 +262,49 @@ func InsertBuiltinGeneralRules(db *gorm.DB) error {
 
 func CreateGeneralRuleGroupFromRule(db *gorm.DB, rule *schema.GeneralRule) error {
 	return CreateGeneralMultipleRuleGroup(db, rule.Groups)
+}
+
+// CreateOrUpdateGeneralRule create or update general rule by rule name
+// If rule exists (by rule_name), update it; otherwise create new one
+func CreateOrUpdateGeneralRule(db *gorm.DB, rule *schema.GeneralRule) error {
+	if rule.RuleName == "" {
+		return utils.Errorf("rule name cannot be empty")
+	}
+
+	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+		var existingRule schema.GeneralRule
+		err := tx.Where("rule_name = ?", rule.RuleName).First(&existingRule).Error
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return err
+		}
+		isCreate := false
+		if err == gorm.ErrRecordNotFound {
+			isCreate = true
+			if err := tx.Omit("Groups").Create(rule).Error; err != nil {
+				return utils.Errorf("create rule failed: %s", err)
+			}
+		} else {
+			rule.ID = existingRule.ID
+			if err := tx.Model(&existingRule).Omit("Groups", "rule_name").Updates(rule).Error; err != nil {
+				return utils.Errorf("update rule failed: %s", err)
+			}
+		}
+
+		if err := CreateGeneralRuleGroupFromRule(tx, rule); err != nil {
+			return err
+		}
+
+		if rule.Groups != nil {
+			if isCreate {
+				if err := CreateGeneralRuleAndGroupAssociations(tx, []*schema.GeneralRule{rule}, rule.Groups); err != nil {
+					return err
+				}
+			} else {
+				if err := UpdateGeneralRuleAndGroupAssociations(tx, []*schema.GeneralRule{rule}, rule.Groups); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
 }
