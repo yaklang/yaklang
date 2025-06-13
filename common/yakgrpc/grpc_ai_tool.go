@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata/genmetadata"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -82,7 +82,7 @@ func (s *Server) GetAIToolList(ctx context.Context, req *ypb.GetAIToolListReques
 }
 
 func (s *Server) AIToolGenerateMetadata(ctx context.Context, req *ypb.AIToolGenerateMetadataRequest) (*ypb.AIToolGenerateMetadataResponse, error) {
-	metadata, err := metadata.GenerateMetadataFromCodeContent(req.GetToolName(), req.GetContent())
+	metadata, err := genmetadata.GenerateMetadataFromCodeContent(req.GetToolName(), req.GetContent())
 	if err != nil {
 		return nil, utils.Errorf("failed to generate AI tool metadata: %s", err)
 	}

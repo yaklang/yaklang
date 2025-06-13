@@ -15,14 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-var GenerateYakScriptMetadata func(script string) (*GenerateResult, error)
-
-type GenerateResult struct {
-	Language    string   `json:"language"`
-	Description string   `json:"description"`
-	Keywords    []string `json:"keywords"`
-}
-
 // PluginsRagManager 插件 RAG 管理器
 type PluginsRagManager struct {
 	db             *gorm.DB        // 数据库连接
