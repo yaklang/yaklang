@@ -117,9 +117,7 @@ $sink #{
     exclude:`* ?{opcode:phi}`,
 }->as $high;
 
-alert $high for {
-	type: "vuln",
-	title: "Check Java Path Traversal Vulnerability",
+alert $high	for {
 	title_zh: "检测Java路径穿越漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -218,7 +216,9 @@ CODE
    - **进一步攻击**: 获取的敏感信息可能被用于进行更复杂的攻击，如提权、内网渗透等。
 CODE
 	level: "high",
+	type: "vuln",
 	message: "Java代码中发现路径穿越漏洞，并且数据流中间没有进行任何过滤。",
+	title: "Check Java Path Traversal Vulnerability",
 }
 
 
@@ -227,7 +227,11 @@ $sink #{
 }->as $result;
 
 $result - $high as $low;
-alert $low for {
+alert $low	for {
+	message: "Java代码中可能存在路径穿越漏洞。",
+	type: "vuln",
+	title: "Check Java Path Traversal Vulnerability",
+	title_zh: "检测Java路径穿越漏洞",
 	desc: <<<CODE
 ### 漏洞描述
 
@@ -266,10 +270,6 @@ alert $low for {
    - **进一步攻击**: 获取的敏感信息可能被用于进行更复杂的攻击，如提权、内网渗透等。
 CODE
 	level: "low",
-	message: "Java代码中可能存在路径穿越漏洞。",
-	type: "vuln",
-	title: "Check Java Path Traversal Vulnerability",
-	title_zh: "检测Java路径穿越漏洞",
 }
 
 

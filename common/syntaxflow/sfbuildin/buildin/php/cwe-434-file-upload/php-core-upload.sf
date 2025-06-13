@@ -140,7 +140,8 @@ CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high for {
+alert $high	for {
+	level: "high",
 	title: "Unsafe File Upload Without Validation",
 	title_zh: "未经验证的高危文件上传",
 	solution: <<<CODE
@@ -190,7 +191,7 @@ alert $high for {
 
             // 4. 生成安全的文件名，而不是使用原始文件名
             $ext = array_search($mimeType, $allowedTypes, true);
-            $newName = sprintf('%!s(MISSING).%!s(MISSING)', sha1_file($file['tmp_name']), $ext);
+            $newName = sprintf('%!!(MISSING)s(MISSING).%!!(MISSING)s(MISSING)', sha1_file($file['tmp_name']), $ext);
             $targetPath = $uploadDir . $newName;
 
             // 5. 移动上传的文件
@@ -251,7 +252,6 @@ c. **文件名和路径操纵**: 攻击者可能通过修改请求中的文件�
 - 消耗服务器资源，导致拒绝服务。
 - 与其他漏洞（如文件包含）结合，导致更严重的危害。
 CODE
-	level: "high",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -260,7 +260,7 @@ CODE,exclude=<<<CODE
 CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
-alert $mid for {
+alert $mid	for {
 	title: "Insecure File Type Detection",
 	title_zh: "不安全的文件类型检测",
 	desc: <<<CODE
@@ -277,9 +277,7 @@ CODE
 }
 $sink - $high - $mid as $low
 
-alert $low for {
-	title: "Potential File Storage Path Misconfiguration",
-	title_zh: "潜在的文件存储路径配置问题",
+alert $low	for {
 	desc: <<<CODE
 该规则用于审计PHP代码中，文件上传后的存储路径配置是否存在潜在风险。虽然可能已存在一些基础的过滤措施，但仍需关注存储路径的安全性，确保上传的文件不会被直接暴露在Web可访问目录中，或存储到非预期的敏感位置。
 
@@ -291,6 +289,8 @@ alert $low for {
 - 使用随机化文件名以减少文件覆盖或路径操纵的风险。
 CODE
 	level: "low",
+	title: "Potential File Storage Path Misconfiguration",
+	title_zh: "潜在的文件存储路径配置问题",
 }
 desc(
 	lang: "php"

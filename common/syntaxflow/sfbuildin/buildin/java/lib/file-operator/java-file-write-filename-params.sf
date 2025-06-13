@@ -87,9 +87,9 @@ $printWriterFilenames as $output;
 $javaIOFileStreamName as $output;
 $javaIOFileName as $output;
 $nioParam as $output;
-alert $output for {
+alert $output	for {
+	title: "Audit Java File Write Operation Sinks",
 	title_zh: "审计 Java 文件写入操作接收点",
 	level: "mid",
-	title: "Audit Java File Write Operation Sinks",
 }
 

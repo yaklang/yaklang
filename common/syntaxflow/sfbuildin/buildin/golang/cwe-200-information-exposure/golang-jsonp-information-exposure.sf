@@ -106,7 +106,8 @@ $obj #{
 	include:`*?{opcode:const}`,
 }-> as $low;
 
-alert $low for {
+alert $low	for {
+	title_zh: "检测到Golang Json信息泄露",
 	solution: <<<CODE
 ### 修复建议
 #### 1. 避免敏感信息序列化
@@ -192,7 +193,6 @@ CODE
 	level: "low",
 	type: "vuln",
 	title: "Detect Golang Json Information Exposure",
-	title_zh: "检测到Golang Json信息泄露",
 }
 
 desc(

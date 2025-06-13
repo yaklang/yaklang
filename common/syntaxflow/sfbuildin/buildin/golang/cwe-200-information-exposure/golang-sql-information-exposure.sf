@@ -109,7 +109,9 @@ $param #{
 	include:`*?{opcode:const}?{have:'SELECT version()'}`,
 }-> as $low;
 
-alert $low for {
+alert $low	for {
+	title: "Detect Golang SQL Information Exposure",
+	title_zh: "检测Golang SQL信息泄露",
 	solution: <<<CODE
 ### 修复建议
 
@@ -201,8 +203,6 @@ CODE
 CODE
 	level: "low",
 	type: "vuln",
-	title: "Detect Golang SQL Information Exposure",
-	title_zh: "检测Golang SQL信息泄露",
 }
 
 desc(

@@ -151,7 +151,8 @@ $reader?{.setEntityResolver?(,* ?{!any:"DTDEntityResolver","ResourceEntityResolv
 $excludeReader./((parse*)|(read*))/() as $excludeCall
 
 $toCheckCall - $excludeCall as $vulCall;
-alert $vulCall for {
+alert $vulCall	for {
+	message: "检测到不安全的 XMLReaderFactory.createXMLReader() 使用，可能导致 XXE 漏洞。",
 	title: "Check Java XMLReaderFactory Unsafe Use",
 	title_zh: "检测 Java XMLReaderFactory 不安全使用",
 	solution: <<<CODE
@@ -282,7 +283,6 @@ CODE
    - 在特定条件下，可能导致远程代码执行。
 CODE
 	level: "high",
-	message: "检测到不安全的 XMLReaderFactory.createXMLReader() 使用，可能导致 XXE 漏洞。",
 }
 
 desc(

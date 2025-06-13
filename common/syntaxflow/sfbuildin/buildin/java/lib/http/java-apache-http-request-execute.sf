@@ -68,7 +68,8 @@ REFERENCE
 $request<getCallee>?{<fullTypeName>?{have: /Http(Get|Post|Put|Delete|Patch|Options|Head|Trace)/}}(,* as $output);
 $request<getCallee>?{<fullTypeName>?{have: /BasicHttpRequest/}}(,,* as $output);
 <delete(request)>
-alert $output for {
+alert $output	for {
+	level: "info",
 	title: "Unvalidated Apache HttpClient Execution",
 	title_zh: "未验证的Apache HttpClient执行风险",
 	desc: <<<CODE
@@ -101,7 +102,6 @@ alert $output for {
    - 执行未经授权的操作。
    - 作为其他攻击的跳板。
 CODE
-	level: "info",
 }
 
 

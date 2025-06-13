@@ -99,7 +99,7 @@ CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high for {
+alert $high	for {
 	title: "Unsafe File Operation Without Validation",
 	title_zh: "未经验证的文件操作",
 	solution: <<<CODE
@@ -184,9 +184,7 @@ CODE,exclude=<<<CODE
 CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
-alert $mid for {
-	title: "Insecure File Type Detection",
-	title_zh: "不安全的文件类型检测",
+alert $mid	for {
 	solution: <<<CODE
 ### 修复建议
 
@@ -246,9 +244,13 @@ CODE
    - 系统敏感资源面临被篡改或窃取的风险。
 CODE
 	level: "mid",
+	title: "Insecure File Type Detection",
+	title_zh: "不安全的文件类型检测",
 }
 $all - $high - $mid as $low
-alert $low for {
+alert $low	for {
+	title: "Potential File Storage Path Misconfiguration",
+	title_zh: "潜在的文件存储路径配置问题",
 	desc: <<<CODE
 ### 1. 规则目的
    该规则用于识别PHP代码中可能存在的文件存储路径配置问题。尽管当前路径已包含过滤机制，但仍需检查过滤函数是否存在潜在缺陷。
@@ -265,8 +267,6 @@ alert $low for {
       根据数据流分析结果和过滤情况，规则可能区分出高、中、低不同风险等级的告警。
 CODE
 	level: "low",
-	title: "Potential File Storage Path Misconfiguration",
-	title_zh: "潜在的文件存储路径配置问题",
 }
 desc(
 	lang: "php"

@@ -121,9 +121,7 @@ $sink.New as $new;
 $new().Funcs(* as $param);
 $param?{have: 'sprig'} as $low;
 
-alert $low for {
-	title: "SSTI detected",
-	title_zh: "检测到SSTI",
+alert $low	for {
 	solution: <<<CODE
 ### 修复建议
 
@@ -211,6 +209,8 @@ CODE
 CODE
 	level: "low",
 	type: "vuln",
+	title: "SSTI detected",
+	title_zh: "检测到SSTI",
 }
 
 desc(

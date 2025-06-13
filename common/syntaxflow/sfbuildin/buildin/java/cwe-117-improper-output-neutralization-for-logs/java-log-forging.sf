@@ -71,11 +71,11 @@ REFERENCE
 $log#{include:`* & $source`}-> as $dest;
 $dest<getPredecessors> as $sink;
 
-alert $sink for {
-	title: "Check Java Log Forging Attack",
-	title_zh: "检测Java 日志伪造攻击",
+alert $sink	for {
 	level: "low",
 	message: "发现可能存在Java 日志伪造攻击",
+	title: "Check Java Log Forging Attack",
+	title_zh: "检测Java 日志伪造攻击",
 }
 
 desc(

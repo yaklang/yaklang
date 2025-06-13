@@ -78,7 +78,7 @@ getClass()<show>.getMethod(*<slice(index=1)> as $entry).invoke(,* as $entry);
 $entry #{
     until: `*?{opcode: param}<var(params)> as $__next__`,
 }->;
-alert $params for {
+alert $params	for {
 	desc: <<<CODE
 ### 漏洞描述
 

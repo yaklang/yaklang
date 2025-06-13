@@ -110,10 +110,10 @@ I() as $sink
 $function?{<getObject>?{opcode: call && any: "Request"}} as $sink
 $function?{<getObject>?{any: "Request","request"}} as $sink
 $sink?{<getFunc><getCurrentBlueprint><fullTypeName>?{any: "Controller","controller"}}  as $output
-alert $output for {
-	level: "info",
+alert $output	for {
 	title: "Audit PHP ThinkPHP Param Usage",
 	title_zh: "审计PHP ThinkPHP Param 参数使用",
+	level: "info",
 }
 
 desc(

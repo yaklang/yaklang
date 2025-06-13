@@ -102,8 +102,7 @@ CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high for {
-	title: "Unfiltered PHP File Manipulation Vulnerability",
+alert $high	for {
 	title_zh: "PHP未过滤文件操作漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -175,6 +174,7 @@ CODE
 CODE
 	level: "high",
 	type: "vuln",
+	title: "Unfiltered PHP File Manipulation Vulnerability",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -184,7 +184,33 @@ CODE)> as $highAndMid
 
 $highAndMid - $high as $middle
 
-alert $middle for {
+alert $middle	for {
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+文件操作是Web应用程序中常见的功能，如果未经过充分的安全检查，可能会导致文件路径遍历（Path Traversal）漏洞。攻击者可以通过构造恶意文件路径，访问或修改服务器上的敏感文件，进而导致信息泄露、文件损坏等安全问题。
+
+2. **触发场景**
+在PHP应用程序中，如果开发者未能正确验证或过滤用户输入的文件路径，直接使用用户输入进行文件读取、写入、删除等操作，就可能触发文件路径遍历漏洞。例如，当应用程序需要读取位于特定目录下的文件时，如果用户能够控制文件名或路径的一部分，就可能通过构造如 `../../../../etc/passwd` 的路径来访问服务器上的任意文件。
+
+示例：
+```php
+<?php
+    // 存在漏洞的代码示例
+    $filename = $_GET['file']; // 直接获取用户输入的文件名
+    readfile('/var/www/html/uploads/' . $filename); // 未对输入进行校验
+?>
+```
+攻击者可以输入 `../etc/passwd` 作为 `file` 参数的值，从而读取 `/etc/passwd` 文件。
+
+3. **潜在影响**
+- 泄露服务器敏感文件内容，如配置文件、源代码、用户数据等。
+- 修改或删除关键系统文件，导致服务不可用或系统崩溃。
+- 在某些情况下，如果与本地文件包含（LFI）漏洞结合，可能导致远程代码执行（RCE）。
+- 对应用程序的完整性、可用性和保密性造成严重影响。
+CODE
+	level: "mid",
 	type: "mid",
 	title: "PHP File Operation with Insufficient Filtering",
 	title_zh: "PHP文件操作，过滤不足",
@@ -231,39 +257,10 @@ alert $middle for {
 #### 4. 配置目录权限
 为存放用户可访问文件的目录设置严格的权限，限制Web服务器进程的读写执行权限，即使发生路径遍历，也能降低危害。
 CODE
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-文件操作是Web应用程序中常见的功能，如果未经过充分的安全检查，可能会导致文件路径遍历（Path Traversal）漏洞。攻击者可以通过构造恶意文件路径，访问或修改服务器上的敏感文件，进而导致信息泄露、文件损坏等安全问题。
-
-2. **触发场景**
-在PHP应用程序中，如果开发者未能正确验证或过滤用户输入的文件路径，直接使用用户输入进行文件读取、写入、删除等操作，就可能触发文件路径遍历漏洞。例如，当应用程序需要读取位于特定目录下的文件时，如果用户能够控制文件名或路径的一部分，就可能通过构造如 `../../../../etc/passwd` 的路径来访问服务器上的任意文件。
-
-示例：
-```php
-<?php
-    // 存在漏洞的代码示例
-    $filename = $_GET['file']; // 直接获取用户输入的文件名
-    readfile('/var/www/html/uploads/' . $filename); // 未对输入进行校验
-?>
-```
-攻击者可以输入 `../etc/passwd` 作为 `file` 参数的值，从而读取 `/etc/passwd` 文件。
-
-3. **潜在影响**
-- 泄露服务器敏感文件内容，如配置文件、源代码、用户数据等。
-- 修改或删除关键系统文件，导致服务不可用或系统崩溃。
-- 在某些情况下，如果与本地文件包含（LFI）漏洞结合，可能导致远程代码执行（RCE）。
-- 对应用程序的完整性、可用性和保密性造成严重影响。
-CODE
-	level: "mid",
 }
 $sink - $high - $middle as $low
 
-alert $low for {
-	level: "low",
-	type: "low",
-	title: "PHP File Operation with Filtering Mechanism",
+alert $low	for {
 	title_zh: "PHP文件操作，存在过滤机制",
 	desc: <<<CODE
 ### 规则目的
@@ -279,6 +276,9 @@ alert $low for {
 
 此规则主要适用于静态代码审计阶段，在动态分析前提供初步风险评估依据。
 CODE
+	level: "low",
+	type: "low",
+	title: "PHP File Operation with Filtering Mechanism",
 }
 desc(
 	lang: php

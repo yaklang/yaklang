@@ -98,7 +98,10 @@ SOLUTION
 exec?{<fullTypeName>?{have: 'os/exec'}} as $entry
 $entry.Command(* as $output) 
 
-alert $output for {
+alert $output	for {
+	level: "high",
+	title: "Unvalidated Command Execution",
+	title_zh: "未验证的命令执行",
 	solution: <<<CODE
 ### 修复建议
 
@@ -183,9 +186,6 @@ func main() {
    - 可能泄露敏感信息或导致数据被篡改。
    - 影响系统稳定性，可能导致服务中断。
 CODE
-	level: "high",
-	title: "Unvalidated Command Execution",
-	title_zh: "未验证的命令执行",
 }
 
 desc(

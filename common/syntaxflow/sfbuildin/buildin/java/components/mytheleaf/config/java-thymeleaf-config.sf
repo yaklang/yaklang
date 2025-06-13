@@ -61,14 +61,14 @@ REFERENCE
 )
 
 SpringResourceTemplateResolver() as $templateResolver;
-alert $templateResolver for {
+alert $templateResolver	for {
 	level: "info",
 	title: "Audit Java Thymeleaf Configuration",
 	title_zh: "审计Java Thymeleaf配置",
 }
 
 $templateResolver.set*(*?{opcode: const} as $params);
-alert $params for {
+alert $params	for {
 	level: "info",
 	message: "SpringResourceTemplateResolver is used with some params",
 	title: "Audit Java Thymeleaf Configuration Parameters",

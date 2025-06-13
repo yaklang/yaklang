@@ -88,10 +88,10 @@ check $params;
 $params?{!opcode: const}#{
     hook: `*?{opcode: const && have: 'WHERE'}<show> as $flag`,
 }->
-alert $flag for {
+alert $flag	for {
+	level: "low",
 	title: "Check Java SQL String Append Query",
 	title_zh: "检测Java SQL字符串拼接查询",
-	level: "low",
 }
 
 

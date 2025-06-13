@@ -91,10 +91,10 @@ REFERENCE
 
 ImageIO.read(*?{<typeName>?{have: URL}} as $params);
 $params<getCallee>(,* as $output);
-alert $output for {
-	level: "mid",
+alert $output	for {
 	title: "Audit Java ImageIo Read URL",
 	title_zh: "审计Java ImageIo 读取 URL 的方法",
+	level: "mid",
 }
 
 

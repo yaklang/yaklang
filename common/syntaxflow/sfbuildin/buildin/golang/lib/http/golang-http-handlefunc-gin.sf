@@ -102,10 +102,10 @@ $entry.Default() as $default;
 $default.*(*<slice(index=2)> as $handle);
 $handle<getFormalParams> as $output
 
-alert $output for {
+alert $output	for {
+	level: "info",
 	title: "Audit Golang Gin HTTP Handler",
 	title_zh: "审计Golang gin HTTP Handler",
-	level: "info",
 }
 
 desc(

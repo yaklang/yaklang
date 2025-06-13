@@ -30,7 +30,6 @@ http.Request.URL.Query().Get() as $output
 
 alert $output
 
-
 desc(
 	lang: golang
 	alert_min: 1

@@ -76,8 +76,7 @@ File().get*() -{
 check $flag;
 $flag-> as $output;
 check $output;
-alert $output for {
-	title: "Detect Java Path Traversal Vulnerability",
+alert $output	for {
 	title_zh: "检测Java路径遍历漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -138,4 +137,5 @@ CODE
 此规则通过检测Java代码中File类相关操作是否使用了用户输入的字符串且未进行有效过滤，来识别潜在的路径遍历风险。
 CODE
 	level: "low",
+	title: "Detect Java Path Traversal Vulnerability",
 }

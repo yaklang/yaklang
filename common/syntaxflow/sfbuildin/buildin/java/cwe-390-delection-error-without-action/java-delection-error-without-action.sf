@@ -113,8 +113,7 @@ REFERENCE
 *?{opcode: try}.catch  as $catch 
 $catch.body?{!<scanInstruction()>} as $no_instruction_catch_body
 
-alert $no_instruction_catch_body for {
-	title_zh: "不应该编写空的Catch块",
+alert $no_instruction_catch_body	for {
 	solution: <<<CODE
 ### 修复建议
 
@@ -217,13 +216,13 @@ CODE
 CODE
 	level: "low",
 	title: "Check Java Empty Catch Block",
+	title_zh: "不应该编写空的Catch块",
 }
 
 $catch?{!.body & $no_instruction_catch_body} as $normal_catch 
 $normal_catch.exception as $exception 
 $exception?{!(<getUsers()>?{!opcode:catch})} as $unuse_exception 
-alert $unuse_exception for {
-	level: "low",
+alert $unuse_exception	for {
 	title: "Check Java Empty Catch Block",
 	title_zh: "在非空Catch块中没有对异常进行任何处理",
 	solution: <<<CODE
@@ -326,6 +325,7 @@ CODE
    - 无法及时发现和响应异常事件，增加了被攻击的风险。
    - 导致系统状态不一致，可能引发数据丢失或损坏。
 CODE
+	level: "low",
 }
 
 desc(

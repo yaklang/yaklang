@@ -91,7 +91,7 @@ $stmt -{
 $safe<getPredecessors()> as $safeStmt;
 
 $stmt - $safeStmt as $weak;
-alert $weak for {
+alert $weak	for {
 	message: "检测到java.sql.Statement未释放资源",
 }
 

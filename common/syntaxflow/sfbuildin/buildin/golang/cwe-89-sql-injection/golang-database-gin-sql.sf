@@ -88,7 +88,7 @@ $param?{<self>-{
    until: `* & $sink`,
 }->} as $high;
 
-alert $high for {
+alert $high	for {
 	title: "SQL Injection detected",
 	title_zh: "检测到SQL注入",
 	solution: <<<CODE
