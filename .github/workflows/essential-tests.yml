@@ -65,6 +65,9 @@ jobs:
               go test -timeout 20s ./common/yak/cartesian  
               go test -timeout 20s ./common/jsonpath  
               go test -timeout 20s ./common/domainextractor  
+              # --- OMAP with race detection ---
+              go test -timeout 30s -race ./common/utils/omap/...
+              # -----------------------------
               go test -timeout 1m ./common/utils
               go test -timeout 10s ./common/utils/xml2
               go test -timeout 20s ./common/utils/tlsutils/... 
