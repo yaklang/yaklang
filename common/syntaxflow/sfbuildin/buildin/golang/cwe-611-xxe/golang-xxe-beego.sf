@@ -120,7 +120,9 @@ parser?{<fullTypeName>?{have: 'github.com/lestrrat-go/libxml2/parser'}} as $entr
 $entry.New(* as $param)
 $param?{have: "XMLParseNoEnt"} as $high
 
-alert $high for {
+alert $high	for {
+	title: "Check Golang XML External Entity (XXE) Vulnerability in Beego",
+	title_zh: "检测Golang Beego框架中的XML外部实体(XXE)漏洞",
 	solution: <<<CODE
 ### 修复建议
 
@@ -218,8 +220,6 @@ CODE
 CODE
 	level: "high",
 	type: "vuln",
-	title: "Check Golang XML External Entity (XXE) Vulnerability in Beego",
-	title_zh: "检测Golang Beego框架中的XML外部实体(XXE)漏洞",
 }
 
 desc(

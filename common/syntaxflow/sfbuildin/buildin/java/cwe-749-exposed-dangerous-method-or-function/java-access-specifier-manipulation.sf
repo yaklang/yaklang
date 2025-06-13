@@ -100,7 +100,7 @@ setAccessible(<slice(index=1)>?{==true}) as $set_accessible_true
 $set_accessible_true?{<getCallee()><fullTypeName()>?{have: "java.lang.reflect"} } as $target 
 
 // alert 
-alert $target for {
+alert $target	for {
 	level: "high",
 	title: "Detect Java Reflection setAccessible Vulnerability",
 	title_zh: "检测Java反射setAccessible函数滥用漏洞",

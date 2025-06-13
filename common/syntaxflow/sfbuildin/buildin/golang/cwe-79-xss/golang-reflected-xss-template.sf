@@ -98,49 +98,7 @@ $target #{include: `*?{have: 'template.HTML'}`}-> as $high;
 template.HTML(* #-> as $source)
 $source?{have: '.GetSession'} as $high
 
-alert $high for {
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   反射型跨站脚本攻击（Reflected XSS）是一种常见的 Web 安全漏洞，攻击者通过构造包含恶意脚本的 URL，诱使受害者点击该链接。当受害者浏览器加载该页面时，恶意脚本会被执行，从而允许攻击者窃取受害者的敏感信息或执行其他恶意操作。在 Go 语言编写的 Web 应用中，如果未对用户输入进行适当的过滤或转义，直接将用户输入嵌入到 HTML 页面中，就可能导致反射型 XSS 漏洞。
-
-2. **触发场景**
-   当 Go 语言模板引擎中使用 `template.HTML` 类型来包装用户输入时，模板引擎会认为这段内容是安全的 HTML，从而跳过自动转义。如果用户输入包含恶意脚本，并且被 `template.HTML` 包装后直接渲染到页面上，就会触发反射型 XSS。
-   ```go
-   // 存在漏洞的代码示例
-   import (
-   	"html/template"
-   	"net/http"
-   )
-
-   func handler(w http.ResponseWriter, r *http.Request) {
-   	tmpl := template.Must(template.New("example").Parse(`
-           <html>
-           <body>
-               <h1>Hello, {{ .Name }}</h1>
-           </body>
-           </html>
-       `))
-
-   	data := struct {
-   		Name string
-   	}{
-   		Name: template.HTML(r.FormValue("name")), // 直接使用 template.HTML 包装用户输入
-   	}
-
-   	tmpl.Execute(w, data)
-   }
-   ```
-   攻击者构造类似 `?name=<script>alert('XSS')</script>` 的URL，如果未对用户输入进行其他安全处理，该脚本将在受害者浏览器中执行。
-
-3. **潜在影响**
-   - 窃取用户Cookie或其他敏感信息。
-   - 执行任意JavaScript代码，例如进行钓鱼攻击或页面篡改。
-   - 会话劫持，攻击者冒充用户进行操作。
-CODE
-	level: "high",
-	type: "vuln",
+alert $high	for {
 	title: "Reflected XSS detected",
 	title_zh: "检测到反射XSS",
 	solution: <<<CODE
@@ -183,6 +141,48 @@ func handler(w http.ResponseWriter, r *http.Request) {
 #### 4. 对于必须输出 HTML 片段的场景
 如果业务确实需要在模板中输出用户提供的部分 HTML 内容，应考虑使用专门的 HTML 清洗（sanitization）库，例如 `github.com/microcosm-cc/bluemonday`，而不是简单地使用 `template.HTML`。
 CODE
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+   反射型跨站脚本攻击（Reflected XSS）是一种常见的 Web 安全漏洞，攻击者通过构造包含恶意脚本的 URL，诱使受害者点击该链接。当受害者浏览器加载该页面时，恶意脚本会被执行，从而允许攻击者窃取受害者的敏感信息或执行其他恶意操作。在 Go 语言编写的 Web 应用中，如果未对用户输入进行适当的过滤或转义，直接将用户输入嵌入到 HTML 页面中，就可能导致反射型 XSS 漏洞。
+
+2. **触发场景**
+   当 Go 语言模板引擎中使用 `template.HTML` 类型来包装用户输入时，模板引擎会认为这段内容是安全的 HTML，从而跳过自动转义。如果用户输入包含恶意脚本，并且被 `template.HTML` 包装后直接渲染到页面上，就会触发反射型 XSS。
+   ```go
+   // 存在漏洞的代码示例
+   import (
+   	"html/template"
+   	"net/http"
+   )
+
+   func handler(w http.ResponseWriter, r *http.Request) {
+   	tmpl := template.Must(template.New("example").Parse(`
+           <html>
+           <body>
+               <h1>Hello, {{ .Name }}</h1>
+           </body>
+           </html>
+       `))
+
+   	data := struct {
+   		Name string
+   	}{
+   		Name: template.HTML(r.FormValue("name")), // 直接使用 template.HTML 包装用户输入
+   	}
+
+   	tmpl.Execute(w, data)
+   }
+   ```
+   攻击者构造类似 `?name=<script>alert('XSS')</script>` 的URL，如果未对用户输入进行其他安全处理，该脚本将在受害者浏览器中执行。
+
+3. **潜在影响**
+   - 窃取用户Cookie或其他敏感信息。
+   - 执行任意JavaScript代码，例如进行钓鱼攻击或页面篡改。
+   - 会话劫持，攻击者冒充用户进行操作。
+CODE
+	level: "high",
+	type: "vuln",
 }
 
 desc(

@@ -61,10 +61,10 @@ $entry.Connect <getCall> as $db;
 $entry.Open <getCall> as $db;
 $db <getMembers> as $output;
 
-alert $output for {
+alert $output	for {
+	title: "Audit Golang sqlx Library Usage",
 	title_zh: "审计Golang sqlx库使用情况",
 	level: "info",
-	title: "Audit Golang sqlx Library Usage",
 }
 
 desc(

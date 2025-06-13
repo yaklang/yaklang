@@ -85,12 +85,12 @@ $sink #{
     include:`*...setAttribute(,* as $attribute)`,
     exclude:`* <getCallee> & $filter`
 }-> as $result;
-alert $result for {
-	title: "Check Java EE XSS Vulnerability",
+alert $result	for {
 	title_zh: "检测Java EE的XSS漏洞",
 	level: "high",
 	message: "Find Java EE's XSS Vulnerability",
 	type: "vuln",
+	title: "Check Java EE XSS Vulnerability",
 }
 
 

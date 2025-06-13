@@ -81,8 +81,7 @@ CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high for {
-	level: "high",
+alert $high	for {
 	type: "vuln",
 	title: "Unfiltered PHP Variable Overwrite Detected",
 	title_zh: "未过滤PHP变量覆盖",
@@ -138,6 +137,7 @@ echo $id;
 - 代码执行：如果覆盖的变量影响到文件包含或代码执行函数，可能导致远程代码执行。
 - 逻辑错误：改变程序变量，导致非预期的执行结果或拒绝服务。
 CODE
+	level: "high",
 }
 $sink<dataflow(include=<<<CODE
 * & $source as $__next__
@@ -145,7 +145,8 @@ CODE,exclude=<<<CODE
 *?{opcode:call && <self><getCallee> & $filter} as $__next__
 CODE)> as $middle
 
-alert $middle for {
+alert $middle	for {
+	type: "mid",
 	title: "PHP Variable Overwrite with Missing Filter Function",
 	title_zh: "PHP变量覆盖，缺少过滤函数",
 	solution: <<<CODE
@@ -201,11 +202,10 @@ echo $id;
 - 逻辑错误：改变程序变量，导致非预期的执行结果或拒绝服务。
 CODE
 	level: "mid",
-	type: "mid",
 }
 $sink - $high - $middle  as $low;
 
-alert $low for {
+alert $low	for {
 	title: "PHP Variable Overwrite with Filter Function",
 	title_zh: "PHP变量覆盖，检测到过滤函数",
 	desc: <<<CODE

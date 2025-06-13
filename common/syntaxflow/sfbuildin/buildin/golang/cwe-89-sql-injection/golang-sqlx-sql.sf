@@ -90,7 +90,8 @@ REFERENCE
 $sink.Select(*<slice(index=2)> #-> as $param);
 $param?{have: 'Parameter'} as $high;
 
-alert $high for {
+alert $high	for {
+	type: "vuln",
 	title: "SQL Injection detected",
 	title_zh: "检测到SQL注入",
 	solution: <<<CODE
@@ -156,7 +157,7 @@ CODE
    // 不安全的查询示例，直接拼接用户输入的username
    username := r.FormValue("username")
    var users []User
-   query := fmt.Sprintf("SELECT * FROM users WHERE name = '%!s(MISSING)'", username)
+   query := fmt.Sprintf("SELECT * FROM users WHERE name = '%!!(MISSING)s(MISSING)'", username)
    err = db.Select(&users, query) // 存在SQL注入风险
    ```
    攻击者可以输入 `' OR '1'='1`，使得查询变为 `SELECT * FROM users WHERE name = '' OR '1'='1'`，从而绕过用户名验证，查询到所有用户的数据。
@@ -169,7 +170,6 @@ CODE
    - **拒绝服务:** 通过执行耗时或资源密集型的SQL查询，导致数据库性能下降甚至瘫痪。
 CODE
 	level: "high",
-	type: "vuln",
 }
 
 desc(

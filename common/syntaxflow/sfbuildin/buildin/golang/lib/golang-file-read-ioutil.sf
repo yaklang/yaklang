@@ -115,7 +115,7 @@ $entry.ReadFile().* as $output
 $entry.ReadAll(* #-> as $output) 
 $entry.ReadFile(* #-> as $output)
 
-alert $output for {
+alert $output	for {
 	title: "Audit Golang File Read ioutil Methods",
 	title_zh: "审计Golang ioutil文件读取方法",
 	solution: <<<CODE

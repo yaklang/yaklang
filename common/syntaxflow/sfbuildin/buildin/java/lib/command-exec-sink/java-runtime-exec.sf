@@ -58,7 +58,7 @@ REFERENCE
 )
 
 Runtime.getRuntime().exec(,* as $output);
-alert $output for {
+alert $output	for {
 	level: "high",
 	title: "Detect Java Command Execution Vulnerability",
 	title_zh: "检测Java命令执行漏洞",

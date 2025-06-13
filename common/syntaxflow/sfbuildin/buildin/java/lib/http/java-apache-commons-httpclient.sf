@@ -105,7 +105,7 @@ REFERENCE
 *.executeMethod(,* as $arg);
 $arg<getCallee()>?{<fullTypeName>?{have: /commons\.httpclient\.methods\.(Get|Post|Put|Delete|Patch|Options|Head|Trace)Method/}}(,* as $output);
 <delete(arg)>
-alert $output for {
+alert $output	for {
 	title: "Audit Java Apache Commons HttpClient Usage",
 	title_zh: "审计 Java Apache Commons HttpClient 使用",
 	level: "mid",

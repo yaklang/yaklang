@@ -130,12 +130,12 @@ REFERENCE
 
 /^(supportsCrossJoin|supportsFullJoin|supportsInnerJoin|supportsLeftOuterJoin|supportsRightOuterJoin|getShowDeleted|getEscapeProcessing|isReadOnly|getAutoCommit|supportsUpdatableView|is*)$/<getCall> as $toCheck;
 $toCheck?{<typeName>?{have:'javax.sql.rowset'}}?{!<getUsers>} as $weak;
-alert $weak for {
+alert $weak	for {
+	title: "Check Java Javax Sql Rowset Unchecked Return Value",
+	title_zh: "检测Java javax.sql.rowset库未检查返回值的API",
 	level: "info",
 	message: "发现Java javax.sql.rowset库未检查返回值的API",
 	risk: "api-abuse",
-	title: "Check Java Javax Sql Rowset Unchecked Return Value",
-	title_zh: "检测Java javax.sql.rowset库未检查返回值的API",
 }
 
 desc(

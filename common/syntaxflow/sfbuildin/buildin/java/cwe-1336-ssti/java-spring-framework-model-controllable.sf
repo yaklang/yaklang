@@ -70,8 +70,7 @@ $source<dataflow(exclude=<<<CODE
 *<show>?{opcode: call && <getCallee><name>?{!have: "ModelAndView"}}
 CODE)> as $filteredSource
 <delete(param)>
-alert $filteredSource for {
-	title_zh: "未验证的 Java Spring Framework ModelAndView SSTI",
+alert $filteredSource	for {
 	solution: <<<CODE
 ### 修复建议
 
@@ -164,6 +163,7 @@ CODE
 	message_zh: "识别到 Java Spring Framework 中 ModelAndView 构造函数可控",
 	message: "Recognize Java Spring Framework code that can control the ModelAndView constructor",
 	title: "Unvalidated Java Spring Framework ModelAndView SSTI",
+	title_zh: "未验证的 Java Spring Framework ModelAndView SSTI",
 }
 
 

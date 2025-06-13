@@ -108,7 +108,8 @@ $controlled_source_site<dataflow(
 )> as $high_source_site 
 
 
-alert $high_source_site for {
+alert $high_source_site	for {
+	title: "Check Java Command Injection from Servlet and SpringMVC",
 	title_zh: "检测Java Servlet和SpringMVC中的命令注入漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -194,53 +195,12 @@ CODE
 CODE
 	level: "high",
 	message: "发现Java代码中存在命令注入漏洞，并且数据流中间没有进行任何过滤。",
-	title: "Check Java Command Injection from Servlet and SpringMVC",
 }
 
 
 $controlled_source_site - $high_source_site as $normal_source_side 
 
-alert $normal_source_side for {
-	level: "mid",
-	message: "发现Java代码存在命令注入漏洞，数据流中存在过滤",
-	title: "Check Java Command Injection from Servlet and SpringMVC",
-	title_zh: "检测Java Servlet和SpringMVC中的命令注入漏洞",
-	solution: <<<CODE
-### 修复建议
-
-#### 1. 避免直接拼接外部输入到命令中
-尽量避免将用户可控的、复杂的字符串直接作为命令的参数传递给命令执行函数。如果必须执行外部命令，应采用更安全的方式。
-
-#### 2. 使用ProcessBuilder的参数列表形式
-`ProcessBuilder`提供了一种更安全的执行命令的方式，即将命令和每个参数作为单独的字符串项传递给构造函数或`command()`方法，而不要将整个命令字符串传递给一个参数。这样系统会负责处理参数分隔，避免了命令注入。
-```java
-// 修复代码示例
-String userInput = request.getParameter("arg");
-// ProcessBuilder安全用法：命令和参数分开
-ProcessBuilder pb = new ProcessBuilder("ls", "-l", userInput); // 假设只想列出特定文件
-pb.redirectErrorStream(true);
-Process process = pb.start();
-```
-
-#### 3. 对外部输入进行严格的白名单或强校验
-如果需要基于用户输入动态构建命令，只允许执行白名单中的命令或参数，并对所有输入进行严格的格式、类型和内容校验，拒绝一切不符合预期的输入。例如，如果只允许执行ping命令，并且参数只能是IP地址或域名，则应对输入进行相应的格式校验。
-```java
-// 修复代码示例：白名单校验参数
-String userInput = request.getParameter("target");
-// 假设只允许ping一个合法的IP地址或域名
-if (!isValidHostnameOrIp(userInput)) { // 实现isValidHostnameOrIp方法进行校验
-    throw new IllegalArgumentException("Invalid ping target");
-}
-ProcessBuilder pb = new ProcessBuilder("ping", "-c 4", userInput);
-Process process = pb.start();
-```
-
-#### 4. 最小化命令执行权限
-运行应用程序的用户应具有执行外部命令的最低限度权限，以限制即使发生命令注入时攻击者能够造成的损害范围。
-
-#### 5. 考虑替代方案
-许多系统命令的功能可以通过Java标准库或第三方库来实现，例如使用Java的文件操作API代替`ls`或`rm`命令。尽量利用安全的API代替直接调用外部命令。
-CODE
+alert $normal_source_side	for {
 	desc: <<<CODE
 ### 漏洞描述
 
@@ -287,6 +247,46 @@ CODE
    - 利用受感染服务器作为跳板攻击其他系统。
    - 拒绝服务攻击。
 CODE
+	level: "mid",
+	message: "发现Java代码存在命令注入漏洞，数据流中存在过滤",
+	title: "Check Java Command Injection from Servlet and SpringMVC",
+	title_zh: "检测Java Servlet和SpringMVC中的命令注入漏洞",
+	solution: <<<CODE
+### 修复建议
+
+#### 1. 避免直接拼接外部输入到命令中
+尽量避免将用户可控的、复杂的字符串直接作为命令的参数传递给命令执行函数。如果必须执行外部命令，应采用更安全的方式。
+
+#### 2. 使用ProcessBuilder的参数列表形式
+`ProcessBuilder`提供了一种更安全的执行命令的方式，即将命令和每个参数作为单独的字符串项传递给构造函数或`command()`方法，而不要将整个命令字符串传递给一个参数。这样系统会负责处理参数分隔，避免了命令注入。
+```java
+// 修复代码示例
+String userInput = request.getParameter("arg");
+// ProcessBuilder安全用法：命令和参数分开
+ProcessBuilder pb = new ProcessBuilder("ls", "-l", userInput); // 假设只想列出特定文件
+pb.redirectErrorStream(true);
+Process process = pb.start();
+```
+
+#### 3. 对外部输入进行严格的白名单或强校验
+如果需要基于用户输入动态构建命令，只允许执行白名单中的命令或参数，并对所有输入进行严格的格式、类型和内容校验，拒绝一切不符合预期的输入。例如，如果只允许执行ping命令，并且参数只能是IP地址或域名，则应对输入进行相应的格式校验。
+```java
+// 修复代码示例：白名单校验参数
+String userInput = request.getParameter("target");
+// 假设只允许ping一个合法的IP地址或域名
+if (!isValidHostnameOrIp(userInput)) { // 实现isValidHostnameOrIp方法进行校验
+    throw new IllegalArgumentException("Invalid ping target");
+}
+ProcessBuilder pb = new ProcessBuilder("ping", "-c 4", userInput);
+Process process = pb.start();
+```
+
+#### 4. 最小化命令执行权限
+运行应用程序的用户应具有执行外部命令的最低限度权限，以限制即使发生命令注入时攻击者能够造成的损害范围。
+
+#### 5. 考虑替代方案
+许多系统命令的功能可以通过Java标准库或第三方库来实现，例如使用Java的文件操作API代替`ls`或`rm`命令。尽量利用安全的API代替直接调用外部命令。
+CODE
 }
 
 
@@ -294,7 +294,7 @@ $controlled_source_site<getPredecessors()>  as $controlled_sink_site
 $sink - $controlled_sink_site as $low_risk_sink 
 
 
-alert $low_risk_sink for {
+alert $low_risk_sink	for {
 	desc: <<<CODE
 ### 漏洞描述
 

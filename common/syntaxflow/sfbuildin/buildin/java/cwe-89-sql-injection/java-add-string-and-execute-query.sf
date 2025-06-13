@@ -118,12 +118,12 @@ check $sink;
 $sqlConst?{<self>#>?{opcode: add}<var(op)> || <self>->?{opcode: add}<var(op)>};
 check $op;
 
-alert $op for {
-	title: "SQL Statement Concatenation Detected",
-	title_zh: "SQL 字符串拼接位置：疑似 SQL 语句拼接并执行到数据库查询的代码",
+alert $op	for {
 	level: "mid",
 	severity: "medium",
 	type: "audit",
+	title: "SQL Statement Concatenation Detected",
+	title_zh: "SQL 字符串拼接位置：疑似 SQL 语句拼接并执行到数据库查询的代码",
 }
 
 

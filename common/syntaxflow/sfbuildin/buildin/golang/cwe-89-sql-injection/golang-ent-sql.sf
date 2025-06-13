@@ -102,7 +102,7 @@ $entry.Open() <getMembers> as $client;
 $client.User.Query().Where(* #-> as $param);
 $param?{have: 'Parameter'} as $high;
 
-alert $high for {
+alert $high	for {
 	title: "Check Golang SQL Injection(ent)",
 	title_zh: "检测 Golang SQL 注入漏洞(ent)",
 	solution: <<<CODE
@@ -176,7 +176,7 @@ CODE
    		log.Fatal(err)
    	}
    	defer client.Close()
-   	input := fmt.Sprintf("SELECT * FROM users WHERE name = '%!s(MISSING)'", username)
+   	input := fmt.Sprintf("SELECT * FROM users WHERE name = '%!!(MISSING)s(MISSING)'", username)
    	ctx := context.Background()
    	users, err := client.User.Query().Where(user.Name(input)).All(ctx) // 这里存在SQL注入风险
    	if err != nil {

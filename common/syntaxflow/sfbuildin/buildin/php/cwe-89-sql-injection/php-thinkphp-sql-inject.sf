@@ -124,11 +124,11 @@ $allParams?{<self> #{include: <<<CODE
 CODE
 }->} as $sink
 
-alert $sink for {
-	level: "low",
-	risk: "sqli-inject",
+alert $sink	for {
 	title: "Unvalidated SQL Injection",
 	title_zh: "SQL注入风险",
+	level: "low",
+	risk: "sqli-inject",
 }
 
 

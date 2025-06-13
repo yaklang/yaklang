@@ -108,7 +108,7 @@ $excludeNewInstance.new*().transform() as $excludeTransform;
 $toCheckTransform - $excludeTransform as $vuln;
 
 check $vuln;
-alert $vuln for {
+alert $vuln	for {
 	solution: <<<CODE
 ### 修复建议
 

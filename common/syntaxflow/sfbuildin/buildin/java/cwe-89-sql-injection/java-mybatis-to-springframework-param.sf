@@ -105,20 +105,20 @@ $all<dataflow(
     include=`* & $filter`
 )> as $mid
 
-alert $mid for {
-	level: "mid",
-	message: "发现Mybatis SQL注入，但是数据流中有过滤函数。",
+alert $mid	for {
 	title: "Detect Java MyBatis/iBatis XML Weak ('${...}') Params to Spring Params",
 	title_zh: "检测 Java MyBatis/iBatis XML Mapper 不安全(${...})参数",
+	level: "mid",
+	message: "发现Mybatis SQL注入，但是数据流中有过滤函数。",
 }
 
 $all - $mid as $high
 
-alert $high for {
-	title: "Detect Java MyBatis/iBatis XML Weak ('${...}') Params to Spring Params",
-	title_zh: "检测 Java MyBatis/iBatis XML Mapper 不安全(${...})参数",
+alert $high	for {
 	level: "high",
 	message: "发现Mybatis SQL注入，并且数据流中没有过滤函数。",
+	title: "Detect Java MyBatis/iBatis XML Weak ('${...}') Params to Spring Params",
+	title_zh: "检测 Java MyBatis/iBatis XML Mapper 不安全(${...})参数",
 }
 desc(
 	language: java

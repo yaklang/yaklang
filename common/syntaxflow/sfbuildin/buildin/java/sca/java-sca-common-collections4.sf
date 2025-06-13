@@ -75,7 +75,7 @@ REFERENCE
 
 __dependency__.*commons*collections4.version as $ver;
 $ver in [4.0,4.1) as $vuln_commons_collections4;
-alert $vuln_commons_collections4 for {
+alert $vuln_commons_collections4	for {
 	level: "high",
 	message: "SCA: commons-collections4 version 4 has an unsafe deserialization vulnerability",
 	cve: "CVE-2015-6420",

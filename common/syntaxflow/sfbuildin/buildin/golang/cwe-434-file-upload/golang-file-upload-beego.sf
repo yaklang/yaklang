@@ -90,7 +90,7 @@ $path.IsAbs(* #-> as $check);
 $sink #{include: `$check`}-> as $safe;
 $sink #{exclude: `$safe`}-> as $high;
 
-alert $high for {
+alert $high	for {
 	title: "Check Golang File Upload Vulnerability",
 	title_zh: "检测到Golang文件路径未授权漏洞",
 	solution: <<<CODE

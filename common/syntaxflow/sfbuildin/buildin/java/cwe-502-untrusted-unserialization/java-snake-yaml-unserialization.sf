@@ -87,9 +87,7 @@ $sink #{
     exclude: `*?{opcode:call}?{!* & $source}?{!* & $sink}`,
 }->as  $high;
 
-alert $high for {
-	level: "high",
-	message: "发现Java SnakeYAML反序列化漏洞,并且没有任何数据流过滤。",
+alert $high	for {
 	title: "Check Java SnakeYAML Unserialization Vulnerability",
 	title_zh: "检测Java SnakeYAML反序列化漏洞",
 	solution: <<<CODE
@@ -157,6 +155,8 @@ CODE
 - loadAll()
 - loadAs()
 CODE
+	level: "high",
+	message: "发现Java SnakeYAML反序列化漏洞,并且没有任何数据流过滤。",
 }
 
 $sink #{
@@ -164,7 +164,7 @@ $sink #{
 }->as  $result;
 
 $result - $high as $low;
-alert $low for {
+alert $low	for {
 	title: "Check Java SnakeYAML Unserialization Vulnerability",
 	title_zh: "检测Java SnakeYAML反序列化漏洞",
 	desc: <<<CODE

@@ -83,9 +83,7 @@ $fileInputStream as $output;
 $nioFileRead as $output;
 $nioBufferedReader as $output;
 $nioInputStream as $output;
-alert $output for {
-	level: "info",
-	title: "Detect Java File Read Sinks",
+alert $output	for {
 	title_zh: "检测 Java 文件读取接收点",
 	desc: <<<CODE
 ### 1.规则目的
@@ -101,5 +99,7 @@ alert $output for {
 - `java.nio.file.Files` 类中的 `newInputStream` 方法
 - `java.io.RandomAccessFile` 构造函数
 CODE
+	level: "info",
+	title: "Detect Java File Read Sinks",
 }
 

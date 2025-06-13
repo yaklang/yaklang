@@ -90,7 +90,9 @@ $sink #{
     exclude: `* ?{opcode:call}?{!* & $source}?{!* & $sink}`,
 }->  as  $mid;
 
-alert $mid for {
+alert $mid	for {
+	message: "发现Java Framework SPEL表达式注入漏洞",
+	title: "Check Java Spring SPEL Parser Injection",
 	title_zh: "检测Java Spring SPEL Parser表达式注入漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -164,8 +166,6 @@ public class SPELController {
 - 控制受影响的服务器，导致更广泛的安全漏洞
 CODE
 	level: "middle",
-	message: "发现Java Framework SPEL表达式注入漏洞",
-	title: "Check Java Spring SPEL Parser Injection",
 }
 
 $sink #{
@@ -174,7 +174,7 @@ $sink #{
 
 $result - $mid as $low;
 
-alert $low for {
+alert $low	for {
 	title: "Check Java Spring SPEL Parser Injection",
 	title_zh: "检测Java Spring SPEL Parser表达式注入漏洞",
 	solution: <<<CODE

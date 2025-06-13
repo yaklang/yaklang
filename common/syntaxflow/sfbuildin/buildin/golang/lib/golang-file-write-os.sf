@@ -93,7 +93,8 @@ os?{<fullTypeName>?{have: 'os'}} as $os
 $os.WriteFile(* #-> as $param)
 $param?{!have: 'Parameter'} as $output;
 
-alert $output for {
+alert $output	for {
+	level: "info",
 	title: "Unvalidated File Write Operation",
 	title_zh: "未验证的文件写入操作",
 	solution: <<<CODE
@@ -119,7 +120,7 @@ if !strings.HasPrefix(filePath, "/var/www/uploads/") {
 ```go
 err = os.WriteFile(safePath, []byte(content), 0644)
 if err != nil {
-    return fmt.Errorf("error writing file: %!v(MISSING)", err)
+    return fmt.Errorf("error writing file: %!!(MISSING)v(MISSING)", err)
 }
 ```
 CODE
@@ -134,7 +135,6 @@ CODE
 * **覆盖函数**
   该规则主要识别对`os.WriteFile`函数的调用。
 CODE
-	level: "info",
 }
 
 desc(

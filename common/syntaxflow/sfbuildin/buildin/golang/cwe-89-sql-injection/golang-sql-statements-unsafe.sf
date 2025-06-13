@@ -131,11 +131,11 @@ $param?{<self>-{
    until: `* & $sink`,
 }->} as $mid;
 
-alert $mid for {
-	level: "mid",
-	type: "vuln",
+alert $mid	for {
 	title: "SQL Injection detected",
 	title_zh: "检测到SQL注入",
+	level: "mid",
+	type: "vuln",
 }
 
 desc(

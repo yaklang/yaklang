@@ -73,12 +73,12 @@ $sink #{
 $sinkModel.addAttribute(,,* as $attribute);
 $attribute &  $source ->as $res;
 
-alert $res for {
+alert $res	for {
+	title_zh: "检测Java Spring Boot框架模板引擎XSS漏洞",
 	level: "high",
 	message: "Find Java Spring Boot's Template Language XSS Vulnerability",
 	type: "vuln",
 	title: "Check Java Spring Boot's Template Engine XSS Vulnerability",
-	title_zh: "检测Java Spring Boot框架模板引擎XSS漏洞",
 }
 
 

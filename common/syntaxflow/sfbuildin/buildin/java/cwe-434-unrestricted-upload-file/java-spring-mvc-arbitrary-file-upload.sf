@@ -103,11 +103,11 @@ $sink #{
     exclude: `*?{opcode:call}?{!* & $source}?{!* & $sink}`,
 }->  as  $mid;
 
-alert $mid for {
-	level: "mid",
+alert $mid	for {
 	message: "发现Java SpringBoot任意文件上传漏洞。",
 	title: "Check Java Spring MVC Arbitrary File Upload Vulnerability",
 	title_zh: "检测Spring MVC任意文件上传漏洞",
+	level: "mid",
 }
 
 $sink #{
@@ -116,11 +116,11 @@ $sink #{
 
 $result - $mid as $low;
 
-alert $low for {
-	title: "Check Java Spring MVC Arbitrary File Upload Vulnerability",
+alert $low	for {
 	title_zh: "检测Spring MVC任意文件上传漏洞",
 	level: "low",
 	message: "发现Java SpringBoot可能存在文件上传漏洞",
+	title: "Check Java Spring MVC Arbitrary File Upload Vulnerability",
 }
 
 desc(

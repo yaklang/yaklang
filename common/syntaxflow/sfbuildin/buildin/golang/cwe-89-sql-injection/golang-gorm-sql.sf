@@ -69,32 +69,7 @@ REFERENCE
 $sink.Raw(* #-> as $param);
 $param?{have: 'Parameter'} as $high;
 
-alert $high for {
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   SQL注入是一种严重的安全漏洞，它允许攻击者通过操控应用程序的数据库查询，执行任意 SQL 代码。在 Go 语言中使用 GORM 框架时，如果直接将用户输入拼接到 SQL 查询中，而未进行适当的过滤或参数化，攻击者可能会利用此漏洞绕过认证、访问或修改敏感数据，甚至执行数据库管理操作，如删除表或关闭数据库服务。
-
-2. **触发场景**
-   SQL 注入漏洞通常发生在以下场景：
-   - 用户输入被直接拼接到 SQL 查询字符串中，例如 `db.Raw("SELECT * FROM users WHERE name = '" + username + "'")`。
-   - 未对用户输入进行参数化处理或验证，导致恶意输入被解释为 SQL 命令。
-   - 如下方示例代码中，`username` 直接由用户输入获取，并拼接到GORM的`Raw`查询中，未经过任何过滤或参数化处理，存在明显的SQL注入风险。攻击者可以通过构造恶意的`username`输入来执行任意SQL语句。
-   ```go
-   // 不安全的查询
-   var users []User
-   query := fmt.Sprintf("SELECT * FROM users WHERE name = '%!s(MISSING)'", username)
-   db.Raw(query).Scan(&users)
-   ```
-
-3. **潜在影响**
-   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
-   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
-   - 通过数据库提权进一步渗透至服务器或其他系统组件。
-   - 绕过认证和授权机制。
-CODE
-	level: "high",
+alert $high	for {
 	type: "vuln",
 	title: "SQL Injection detected",
 	title_zh: "检测到SQL注入",
@@ -130,6 +105,31 @@ CODE
 3. **避免直接拼接用户输入到 SQL 语句中**
    即使是构建复杂的查询，也应尽可能使用 GORM 提供的方法，避免手动拼接用户输入。
 CODE
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+   SQL注入是一种严重的安全漏洞，它允许攻击者通过操控应用程序的数据库查询，执行任意 SQL 代码。在 Go 语言中使用 GORM 框架时，如果直接将用户输入拼接到 SQL 查询中，而未进行适当的过滤或参数化，攻击者可能会利用此漏洞绕过认证、访问或修改敏感数据，甚至执行数据库管理操作，如删除表或关闭数据库服务。
+
+2. **触发场景**
+   SQL 注入漏洞通常发生在以下场景：
+   - 用户输入被直接拼接到 SQL 查询字符串中，例如 `db.Raw("SELECT * FROM users WHERE name = '" + username + "'")`。
+   - 未对用户输入进行参数化处理或验证，导致恶意输入被解释为 SQL 命令。
+   - 如下方示例代码中，`username` 直接由用户输入获取，并拼接到GORM的`Raw`查询中，未经过任何过滤或参数化处理，存在明显的SQL注入风险。攻击者可以通过构造恶意的`username`输入来执行任意SQL语句。
+   ```go
+   // 不安全的查询
+   var users []User
+   query := fmt.Sprintf("SELECT * FROM users WHERE name = '%!!(MISSING)s(MISSING)'", username)
+   db.Raw(query).Scan(&users)
+   ```
+
+3. **潜在影响**
+   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+   - 通过数据库提权进一步渗透至服务器或其他系统组件。
+   - 绕过认证和授权机制。
+CODE
+	level: "high",
 }
 
 desc(

@@ -78,11 +78,11 @@ $algorithm#{
     exclude:`*?{any:'SHA256','SHA384','SHA512' }`
 }-> as $sink;
 
-alert $sink for {
-	title_zh: "检测Java java.security使用不安全的哈希算法",
+alert $sink	for {
 	level: "low",
 	message: "Find the use of broken or risky encryption algorithm",
 	title: "Check Java java.security use of broken or risky hash algorithm",
+	title_zh: "检测Java java.security使用不安全的哈希算法",
 }
 
 desc(
