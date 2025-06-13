@@ -296,6 +296,21 @@ func (s *SyntaxFlowRule) ToGRPCModel() *ypb.SyntaxFlowRule {
 	}
 	alertmsg := make(map[string]*ypb.AlertMessage)
 	for name, info := range s.AlertDesc {
+		if info.Title == "" {
+			info.Title = s.Title
+		}
+		if info.TitleZh == "" {
+			info.TitleZh = s.TitleZh
+		}
+		if info.Description == "" {
+			info.Description = s.Description
+		}
+		if info.Severity == "" {
+			info.Severity = s.Severity
+		}
+		if info.Solution == "" {
+			info.Solution = s.Solution
+		}
 		alertmsg[name] = info.ToYpbSyntaxFlowRuleDesc()
 	}
 	sfRule := &ypb.SyntaxFlowRule{
