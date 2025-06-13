@@ -586,14 +586,17 @@ func _protobufRecordsFromYAML(i interface{}) *ProtobufRecords {
 }
 
 var FuzzExports = map[string]interface{}{
-	"Strings":            _fuzz,
-	"StringsWithParam":   _fuzzFuncEx,
-	"StringsFunc":        _fuzzFunc,
-	"HTTPRequest":        mutate.NewFuzzHTTPRequest,
-	"MustHTTPRequest":    mutate.NewMustFuzzHTTPRequest,
-	"https":              mutate.WithPoolOpt_Https,
-	"proxy":              mutate.WithPoolOpt_Proxy,
-	"context":            mutate.WithPoolOpt_Context,
+	"Strings":          _fuzz,
+	"StringsWithParam": _fuzzFuncEx,
+	"StringsFunc":      _fuzzFunc,
+	"HTTPRequest":      mutate.NewFuzzHTTPRequest,
+	"MustHTTPRequest":  mutate.NewMustFuzzHTTPRequest,
+	"https":            mutate.WithPoolOpt_Https,
+	"proxy":            mutate.WithPoolOpt_Proxy,
+	"context":          mutate.WithPoolOpt_Context,
+	"retry":            mutate.WithPoolOpt_RetryTimes,
+	"noFollowRedirect": mutate.WithPoolOpt_NoFollowRedirect,
+
 	"noEncode":           mutate.OptDisableAutoEncode,
 	"showTag":            mutate.OptFriendlyDisplay,
 	"UrlsToHTTPRequests": mutate.UrlsToHTTPRequests,
