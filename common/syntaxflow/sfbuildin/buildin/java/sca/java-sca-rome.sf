@@ -91,9 +91,9 @@ REFERENCE
 __dependency__.*rome.version as $ver;
 $ver in (,1.15.0] as $vuln_rome;
 alert $vuln_rome	for {
-	title_zh: "SCA: 检测Java rome XXE漏洞",
 	level: "high",
 	message: "SCA: rome versions between 1 and 1.15.0 have an XXE vulnerability",
 	cve: "CVE-2020-15250",
 	title: "SCA: Check Java rome XXE Vulnerability",
+	title_zh: "SCA: 检测Java rome XXE漏洞",
 }

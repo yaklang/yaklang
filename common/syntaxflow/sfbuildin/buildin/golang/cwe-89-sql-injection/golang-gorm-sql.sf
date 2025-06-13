@@ -70,7 +70,6 @@ $sink.Raw(* #-> as $param);
 $param?{have: 'Parameter'} as $high;
 
 alert $high	for {
-	type: "vuln",
 	title: "SQL Injection detected",
 	title_zh: "检测到SQL注入",
 	solution: <<<CODE
@@ -119,7 +118,7 @@ CODE
    ```go
    // 不安全的查询
    var users []User
-   query := fmt.Sprintf("SELECT * FROM users WHERE name = '%!!(MISSING)s(MISSING)'", username)
+   query := fmt.Sprintf("SELECT * FROM users WHERE name = '%!!(MISSING)!(MISSING)s(MISSING)'", username)
    db.Raw(query).Scan(&users)
    ```
 
@@ -130,6 +129,7 @@ CODE
    - 绕过认证和授权机制。
 CODE
 	level: "high",
+	type: "vuln",
 }
 
 desc(

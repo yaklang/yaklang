@@ -139,6 +139,61 @@ $sink #{include: `$check`}-> as $safe;
 $sink #{exclude: `$safe`}-> as $high;
 
 alert $high	for {
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+文件上传功能允许用户向服务器上传文件。如果应用程序未对用户上传的文件进行充分的安全检查，攻击者可能绕过验证机制，上传恶意文件（如WebShell），从而在服务器上执行任意代码。此外，如果未正确处理文件名和路径，可能存在路径穿越漏洞（Path Traversal），攻击者可以通过构造恶意路径（如 `../`）访问或覆盖服务器上的任意文件，甚至上传文件到非预期目录。
+
+2. **触发场景**
+上传文件时，应用程序直接使用用户提供的文件名或未对路径进行充分验证。
+
+**不安全代码示例：**
+
+```go
+package main
+
+import (
+    "fmt"
+    "io"
+    "net/http"
+    "os"
+    "path/filepath"
+    "strings"
+)
+
+func main() {
+    http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
+		file, handler, err := r.FormFile("file")
+		if err != nil {
+			http.Error(w, "Error retrieving the file", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		// 保存文件，直接使用用户提供的文件名，存在路径穿越风险
+		dst, err := os.Create(handler.Filename)
+		if err != nil {
+			http.Error(w, "Error creating the file", http.StatusInternalServerError)
+			return
+		}
+		defer dst.Close()
+
+		io.Copy(dst, file)
+		fmt.Fprintf(w, "File uploaded successfully")
+	})
+}
+```
+在这个示例中，`os.Create(handler.Filename)` 直接使用了用户上传文件时提供的文件名 (`handler.Filename`)。如果攻击者上传的文件名为 `../../../../etc/passwd`，服务器可能会在 `/etc/passwd` 写入文件，导致敏感信息泄露或系统文件被覆盖。
+
+3. **潜在影响**
+- **远程代码执行 (RCE)**: 上传WebShell后，攻击者可以在服务器上执行任意命令。
+- **敏感信息泄露**: 通过路径穿越读取 `/etc/passwd`, `/etc/shadow` 等敏感文件。
+- **服务拒绝 (DoS)**: 上传超大文件或恶意文件导致服务器资源耗尽或程序崩溃。
+- **网站篡改或恶意内容传播**: 上传恶意网页或病毒文件。
+CODE
+	level: "high",
+	type: "vuln",
 	title: "Unvalidated File Upload Path in Golang",
 	title_zh: "检测到Golang文件上传路径未验证风险",
 	solution: <<<CODE
@@ -203,61 +258,6 @@ func main() {
 #### 4. 将文件上传到隔离区域
 将用户上传的文件保存在与Web服务器隔离的区域，避免直接通过Web访问执行。
 CODE
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-文件上传功能允许用户向服务器上传文件。如果应用程序未对用户上传的文件进行充分的安全检查，攻击者可能绕过验证机制，上传恶意文件（如WebShell），从而在服务器上执行任意代码。此外，如果未正确处理文件名和路径，可能存在路径穿越漏洞（Path Traversal），攻击者可以通过构造恶意路径（如 `../`）访问或覆盖服务器上的任意文件，甚至上传文件到非预期目录。
-
-2. **触发场景**
-上传文件时，应用程序直接使用用户提供的文件名或未对路径进行充分验证。
-
-**不安全代码示例：**
-
-```go
-package main
-
-import (
-    "fmt"
-    "io"
-    "net/http"
-    "os"
-    "path/filepath"
-    "strings"
-)
-
-func main() {
-    http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
-		file, handler, err := r.FormFile("file")
-		if err != nil {
-			http.Error(w, "Error retrieving the file", http.StatusBadRequest)
-			return
-		}
-		defer file.Close()
-
-		// 保存文件，直接使用用户提供的文件名，存在路径穿越风险
-		dst, err := os.Create(handler.Filename)
-		if err != nil {
-			http.Error(w, "Error creating the file", http.StatusInternalServerError)
-			return
-		}
-		defer dst.Close()
-
-		io.Copy(dst, file)
-		fmt.Fprintf(w, "File uploaded successfully")
-	})
-}
-```
-在这个示例中，`os.Create(handler.Filename)` 直接使用了用户上传文件时提供的文件名 (`handler.Filename`)。如果攻击者上传的文件名为 `../../../../etc/passwd`，服务器可能会在 `/etc/passwd` 写入文件，导致敏感信息泄露或系统文件被覆盖。
-
-3. **潜在影响**
-- **远程代码执行 (RCE)**: 上传WebShell后，攻击者可以在服务器上执行任意命令。
-- **敏感信息泄露**: 通过路径穿越读取 `/etc/passwd`, `/etc/shadow` 等敏感文件。
-- **服务拒绝 (DoS)**: 上传超大文件或恶意文件导致服务器资源耗尽或程序崩溃。
-- **网站篡改或恶意内容传播**: 上传恶意网页或病毒文件。
-CODE
-	level: "high",
-	type: "vuln",
 }
 
 desc(

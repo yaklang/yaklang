@@ -116,7 +116,6 @@ CODE)> as $haveCall;
 
 $source - $haveCall as $withoutCall;
 alert $withoutCall	for {
-	title_zh: "检测Spring控制器中未调用的SSTI漏洞",
 	solution: <<<CODE
 ### 修复建议
 
@@ -214,6 +213,7 @@ CODE
 	message: "Template Path Injection(Direct Use of User Input)",
 	type: "vuln",
 	title: "Check Java SSTI in Spring Controller Without Call",
+	title_zh: "检测Spring控制器中未调用的SSTI漏洞",
 }
 
 
@@ -227,9 +227,6 @@ CODE)> as $filteredSink;
 
 $haveCall - $filteredSink as $unsafeFilteredSink;
 alert $unsafeFilteredSink	for {
-	message: "Template Path Injection(Filtered Use of User Input)",
-	title: "Check Java SSTI in Spring Controller With Filtered Input",
-	title_zh: "检测Spring控制器中经过过滤但仍存在风险的SSTI漏洞",
 	solution: <<<CODE
 ### 修复建议
 
@@ -324,7 +321,10 @@ CODE
     - **服务中断：** 错误的或恶意的模板指令可能导致应用程序崩溃或拒绝服务。
 CODE
 	level: "mid",
+	message: "Template Path Injection(Filtered Use of User Input)",
 	type: "vuln",
+	title: "Check Java SSTI in Spring Controller With Filtered Input",
+	title_zh: "检测Spring控制器中经过过滤但仍存在风险的SSTI漏洞",
 }
 
 alert $filteredSink	for {

@@ -201,52 +201,6 @@ CODE
 $controlled_source_site - $high_source_site as $normal_source_side 
 
 alert $normal_source_side	for {
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   命令注入（Command Injection）漏洞发生在应用程序将用户可控的数据拼接到系统命令中执行时，攻击者可以构造恶意输入，改变原始命令的逻辑或执行任意系统命令。当Java应用程序通过`Runtime.getRuntime().exec()`、`ProcessBuilder`等方法执行外部命令，并且命令字符串中直接或间接包含了来自用户请求（如Servlet或SpringMVC的参数）且未经充分过滤验证的数据时，就可能存在命令注入漏洞。
-
-2. **触发场景**
-   以下示例展示了在Servlet和SpringMVC中通过直接使用用户输入构建并执行命令的场景：
-   
-   **Servlet示例：**
-   ```java
-   protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-       String userInput = request.getParameter("command");
-       // 直接使用用户输入拼接到命令中
-       Process process = Runtime.getRuntime().exec(userInput);
-       // ... 处理命令执行结果 ...
-   }
-   ```
-   攻击者可以通过`command`参数注入恶意命令，例如输入`ls -l /; rm -rf /`。
-   
-   **SpringMVC示例：**
-   ```java
-   @GetMapping("/execute/{command}")
-   public String executeCommand(@PathVariable String command) {
-       try {
-           // 直接使用路径变量作为命令
-           Process process = Runtime.getRuntime().exec(command);
-           // ... 处理命令执行结果 ...
-       } catch (IOException e) {
-           // ... 错误处理 ...
-       }
-       return "Output";
-   }
-   ```
-   攻击者可以通过`{command}`路径变量注入恶意命令。
-   
-   此外，规则还覆盖了其他常见的命令执行汇聚点，如Apache Commons Exec, Picocli, System-Command-Executor, zt-exec, NuProcess, org.apache.hadoop.util.Shell等，以及通过ProcessBuilder构建并执行命令的场景。
-
-3. **潜在影响**
-   - 执行任意系统命令，可能导致服务器被完全控制。
-   - 读取、修改或删除系统文件。
-   - 安装恶意软件或后门。
-   - 窃取敏感数据。
-   - 利用受感染服务器作为跳板攻击其他系统。
-   - 拒绝服务攻击。
-CODE
 	level: "mid",
 	message: "发现Java代码存在命令注入漏洞，数据流中存在过滤",
 	title: "Check Java Command Injection from Servlet and SpringMVC",
@@ -287,14 +241,6 @@ Process process = pb.start();
 #### 5. 考虑替代方案
 许多系统命令的功能可以通过Java标准库或第三方库来实现，例如使用Java的文件操作API代替`ls`或`rm`命令。尽量利用安全的API代替直接调用外部命令。
 CODE
-}
-
-
-$controlled_source_site<getPredecessors()>  as $controlled_sink_site 
-$sink - $controlled_sink_site as $low_risk_sink 
-
-
-alert $low_risk_sink	for {
 	desc: <<<CODE
 ### 漏洞描述
 
@@ -341,10 +287,64 @@ alert $low_risk_sink	for {
    - 利用受感染服务器作为跳板攻击其他系统。
    - 拒绝服务攻击。
 CODE
+}
+
+
+$controlled_source_site<getPredecessors()>  as $controlled_sink_site 
+$sink - $controlled_sink_site as $low_risk_sink 
+
+
+alert $low_risk_sink	for {
 	level: "low",
 	message: "发现Java代码中可能存在命令注入，但并没有发现参数可控。",
 	title: "Check Java Command Injection from Servlet and SpringMVC",
 	title_zh: "检测Java Servlet和SpringMVC中的命令注入漏洞",
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+   命令注入（Command Injection）漏洞发生在应用程序将用户可控的数据拼接到系统命令中执行时，攻击者可以构造恶意输入，改变原始命令的逻辑或执行任意系统命令。当Java应用程序通过`Runtime.getRuntime().exec()`、`ProcessBuilder`等方法执行外部命令，并且命令字符串中直接或间接包含了来自用户请求（如Servlet或SpringMVC的参数）且未经充分过滤验证的数据时，就可能存在命令注入漏洞。
+
+2. **触发场景**
+   以下示例展示了在Servlet和SpringMVC中通过直接使用用户输入构建并执行命令的场景：
+   
+   **Servlet示例：**
+   ```java
+   protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+       String userInput = request.getParameter("command");
+       // 直接使用用户输入拼接到命令中
+       Process process = Runtime.getRuntime().exec(userInput);
+       // ... 处理命令执行结果 ...
+   }
+   ```
+   攻击者可以通过`command`参数注入恶意命令，例如输入`ls -l /; rm -rf /`。
+   
+   **SpringMVC示例：**
+   ```java
+   @GetMapping("/execute/{command}")
+   public String executeCommand(@PathVariable String command) {
+       try {
+           // 直接使用路径变量作为命令
+           Process process = Runtime.getRuntime().exec(command);
+           // ... 处理命令执行结果 ...
+       } catch (IOException e) {
+           // ... 错误处理 ...
+       }
+       return "Output";
+   }
+   ```
+   攻击者可以通过`{command}`路径变量注入恶意命令。
+   
+   此外，规则还覆盖了其他常见的命令执行汇聚点，如Apache Commons Exec, Picocli, System-Command-Executor, zt-exec, NuProcess, org.apache.hadoop.util.Shell等，以及通过ProcessBuilder构建并执行命令的场景。
+
+3. **潜在影响**
+   - 执行任意系统命令，可能导致服务器被完全控制。
+   - 读取、修改或删除系统文件。
+   - 安装恶意软件或后门。
+   - 窃取敏感数据。
+   - 利用受感染服务器作为跳板攻击其他系统。
+   - 拒绝服务攻击。
+CODE
 }
 
 

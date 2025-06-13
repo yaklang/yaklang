@@ -214,7 +214,6 @@ CODE
 
 $toCheck?{<typeName>?{have:'org.apache.commons.compress.archivers.zip.ZipFile'}}?{!<getUsers>} as $weak2;
 alert $weak2	for {
-	risk: "api-abuse",
 	title: "Check Java Zip Unchecked Return Value",
 	title_zh: "检测Java Zip未检查返回值的API",
 	solution: <<<CODE
@@ -315,6 +314,7 @@ public class ZipFileExample {
 因此，在调用这些返回对象的方法后，建议检查返回值并根据需要进行处理（例如，赋值给变量进行后续操作，或者确保资源被正确管理和释放）。
 CODE
 	level: "low",
+	risk: "api-abuse",
 	message: "发现Java org.apache.commons.compress.archivers.zip.ZipFile未检查返回值的API",
 }
 

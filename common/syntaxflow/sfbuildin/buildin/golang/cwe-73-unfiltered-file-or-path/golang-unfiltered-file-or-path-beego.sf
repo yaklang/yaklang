@@ -105,6 +105,8 @@ $sink?{have: "GetString"} as $low;
 $sink?{have: "GetFile"} as $low;
 
 alert $low	for {
+	level: "low",
+	type: "vuln",
 	title: "Detect Golang Unfiltered File-or-Path Vulnerability",
 	title_zh: "检测Golang未过滤的文件或路径漏洞",
 	solution: <<<CODE
@@ -177,8 +179,6 @@ func (c *PathTraversalVuln1Controller) Get() {
 - 可能导致更严重的后果，如远程代码执行或权限提升。
 - 系统完整性受到威胁，可能导致数据泄露或服务中断。
 CODE
-	level: "low",
-	type: "vuln",
 }
 
 desc(

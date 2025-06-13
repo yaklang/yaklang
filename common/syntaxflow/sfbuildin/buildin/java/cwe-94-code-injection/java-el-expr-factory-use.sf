@@ -80,9 +80,9 @@ REFERENCE
 ExpressionFactory.newInstance().createValueExpression(*?{!<typeName>?{any: ExpressionFactory,StandardELContext }} as $params) as $vuln;
 check $params;
 alert $params	for {
+	title_zh: "未验证的EL表达式注入风险",
 	level: "low",
 	title: "Unvalidated EL Expression Injection",
-	title_zh: "未验证的EL表达式注入风险",
 }
 
 desc(

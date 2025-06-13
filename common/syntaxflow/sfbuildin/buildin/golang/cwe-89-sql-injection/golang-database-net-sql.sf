@@ -99,49 +99,6 @@ $sink.QueryRow( * #-> as $param);
 $param?{have: 'Parameter'} as $high;
 
 alert $high	for {
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   SQL注入漏洞是一种严重的安全漏洞，它允许攻击者通过输入恶意的 SQL 代码来操纵后端数据库。在 Golang 中，如果开发者不正确地使用 `database/sql` 包，特别是当直接将用户输入拼接到 SQL 查询中时，就可能导致 SQL 注入漏洞。攻击者可以利用这个漏洞来绕过认证、访问或修改敏感数据，甚至执行数据库管理操作，如删除表或数据。
-
-2. **触发场景**
-   SQL 注入漏洞通常发生在以下场景：
-   - 用户输入被直接拼接到 SQL 查询字符串中，例如 `db.QueryRow("SELECT * FROM users WHERE username='" + username + "'")`。
-   - 未对用户输入进行参数化处理或验证，导致恶意输入被解释为 SQL 命令。
-
-   **示例代码**
-   ```go
-   func login(w http.ResponseWriter, r *http.Request) {
-       username := r.FormValue("username")
-       password := r.FormValue("password")
-
-       // 不安全的 SQL 查询
-       query := fmt.Sprintf("SELECT * FROM users WHERE username='%!!(MISSING)s(MISSING)' AND password='%!!(MISSING)s(MISSING)'", username, password)
-
-       db, err := sql.Open("mysql", "user:password@/dbname")
-       if err != nil {
-           log.Fatal(err)
-       }
-       defer db.Close()
-
-       var userID int
-       err = db.QueryRow(query).Scan(&userID)
-       if err != nil {
-           http.Error(w, "Invalid login", http.StatusUnauthorized)
-           return
-       }
-
-       fmt.Fprintf(w, "User ID: %!!(MISSING)d(MISSING)", userID)
-   }
-   ```
-
-3. **潜在影响**
-   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
-   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
-   - 通过数据库提权进一步渗透至服务器或其他系统组件。
-CODE
-	level: "high",
 	type: "vuln",
 	title: "Check Golang SQL Injection Vulnerability",
 	title_zh: "检测Golang SQL注入漏洞",
@@ -178,7 +135,7 @@ CODE
            return
        }
 
-       fmt.Fprintf(w, "User ID: %!!(MISSING)d(MISSING)", userID)
+       fmt.Fprintf(w, "User ID: %!!(MISSING)!(MISSING)d(MISSING)", userID)
    }
    ```
 
@@ -188,6 +145,49 @@ CODE
 3. **输入验证**
    在将用户输入用于SQL查询之前，进行严格的输入验证和 sanitization。根据预期的输入类型（如数字、字符串）进行格式、长度和内容的合法性检查。
 CODE
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+   SQL注入漏洞是一种严重的安全漏洞，它允许攻击者通过输入恶意的 SQL 代码来操纵后端数据库。在 Golang 中，如果开发者不正确地使用 `database/sql` 包，特别是当直接将用户输入拼接到 SQL 查询中时，就可能导致 SQL 注入漏洞。攻击者可以利用这个漏洞来绕过认证、访问或修改敏感数据，甚至执行数据库管理操作，如删除表或数据。
+
+2. **触发场景**
+   SQL 注入漏洞通常发生在以下场景：
+   - 用户输入被直接拼接到 SQL 查询字符串中，例如 `db.QueryRow("SELECT * FROM users WHERE username='" + username + "'")`。
+   - 未对用户输入进行参数化处理或验证，导致恶意输入被解释为 SQL 命令。
+
+   **示例代码**
+   ```go
+   func login(w http.ResponseWriter, r *http.Request) {
+       username := r.FormValue("username")
+       password := r.FormValue("password")
+
+       // 不安全的 SQL 查询
+       query := fmt.Sprintf("SELECT * FROM users WHERE username='%!!(MISSING)!(MISSING)s(MISSING)' AND password='%!!(MISSING)!(MISSING)s(MISSING)'", username, password)
+
+       db, err := sql.Open("mysql", "user:password@/dbname")
+       if err != nil {
+           log.Fatal(err)
+       }
+       defer db.Close()
+
+       var userID int
+       err = db.QueryRow(query).Scan(&userID)
+       if err != nil {
+           http.Error(w, "Invalid login", http.StatusUnauthorized)
+           return
+       }
+
+       fmt.Fprintf(w, "User ID: %!!(MISSING)!(MISSING)d(MISSING)", userID)
+   }
+   ```
+
+3. **潜在影响**
+   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+   - 通过数据库提权进一步渗透至服务器或其他系统组件。
+CODE
+	level: "high",
 }
 
 desc(

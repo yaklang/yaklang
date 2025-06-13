@@ -57,6 +57,8 @@ SOLUTION
 
 *Socket*?{<typeName>?{have:'javax.net'}}  as $weak;
 alert $weak	for {
+	title: "Unvalidated Java J2EE Socket Usage",
+	title_zh: "未验证的Java J2EE套接字使用",
 	solution: <<<CODE
 ### 修复建议
 
@@ -134,8 +136,6 @@ CODE
 CODE
 	level: "info",
 	message: "发现Java J2EE 使用socket",
-	title: "Unvalidated Java J2EE Socket Usage",
-	title_zh: "未验证的Java J2EE套接字使用",
 }
 
 

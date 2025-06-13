@@ -96,8 +96,6 @@ $entry -{
 CODE
 }->;
 alert $sink	for {
-	title: "Check Java Springboot File Download Vulnerability",
-	title_zh: "检测Java Springboot文件下载漏洞",
 	solution: <<<CODE
 ### 修复建议
 
@@ -173,6 +171,8 @@ CODE
     - **进一步攻击：** 获取的敏感信息可能被用于进一步的攻击，例如通过泄露的凭证访问数据库或利用配置信息发现其他漏洞。
 CODE
 	level: "warning",
+	title: "Check Java Springboot File Download Vulnerability",
+	title_zh: "检测Java Springboot文件下载漏洞",
 }
 
 
