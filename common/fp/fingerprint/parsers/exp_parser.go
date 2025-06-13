@@ -31,6 +31,9 @@ func ParseExpRule(rules ...*schema.GeneralRule) ([]*rule.FingerPrintRule, error)
 			errs = append(errs, fmt.Errorf("parse exp %s error: %v", exp, err))
 			continue
 		}
+		if cpe != nil && cpe.Product == "" {
+			cpe.Product = ruleInfo.RuleName
+		}
 		r.MatchParam.Info = cpe
 		res = append(res, r)
 	}

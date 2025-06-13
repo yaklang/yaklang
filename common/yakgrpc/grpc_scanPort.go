@@ -242,6 +242,15 @@ func (s *Server) PortScan(req *ypb.PortScanRequest, stream ypb.Yak_PortScanServe
 		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "basic-crawler-enable-jsparser", Value: ""})
 	}
 
+	if req.GetEnableFingerprintGroup() {
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "use-fp-group"})
+	}
+	if len(utils.StringArrayFilterEmpty(req.GetFingerprintGroup())) > 0 {
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
+			Key:   "fp-groups",
+			Value: strings.Join(req.GetFingerprintGroup(), ","),
+		})
+	}
 	return s.DebugPlugin(reqParams, stream)
 }
 
