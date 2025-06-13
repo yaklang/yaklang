@@ -955,7 +955,7 @@ func (b *astbuilder) buildParameterDecl(para *gol.ParameterDeclContext) []ssa.Ty
 					continue
 				}
 				if exlib := b.PeekValue(bp.ParentBlueprints[0].Name); exlib != nil {
-					method := bp.GetMagicMethod(ssa.Constructor)
+					method := bp.GetMagicMethod(ssa.Constructor, b.FunctionBuilder)
 					lv := b.CreateMemberCallVariable(exlib, method)
 					b.AssignVariable(lv, p)
 				}

@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"fmt"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/slices"
@@ -42,7 +41,7 @@ func (c *Blueprint) RegisterMagicMethod(name BlueprintMagicMethodKind, val Value
 	c.storeField(val.GetName(), val, BluePrintMagicMethod)
 }
 
-func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind) Value {
+func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind, fb *FunctionBuilder) Value {
 	var _method Value
 	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
 		switch name {
@@ -75,10 +74,16 @@ func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind) Value {
 		}
 	})
 	if utils.IsNil(_method) {
+		if c.Tokenizer != nil {
+			recoverRng := fb.SetRange(c.Tokenizer)
+			defer recoverRng()
+		}
+
 		switch name {
 		case Constructor:
 			_name := fmt.Sprintf("%s-constructor", c.Name)
-			constructor := c.GeneralUndefined(_name)
+			//constructor := c.GeneralUndefined(_name)
+			constructor := fb.EmitUndefined(_name)
 			_method = constructor
 			functionType := NewFunctionType(fmt.Sprintf("%s-%s", c.Name, string(name)), []Type{c}, c, true)
 			functionType.SetFullTypeNames(c.GetFullTypeNames())
@@ -86,7 +91,7 @@ func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind) Value {
 			c.RegisterMagicMethod(Constructor, _method)
 		case Destructor:
 			_name := fmt.Sprintf("%s-destructor", c.Name)
-			destructor := c.GeneralUndefined(_name)
+			destructor := fb.EmitUndefined(_name)
 			_method = destructor
 			functionType := NewFunctionType(fmt.Sprintf("%s-%s", c.Name, string(name)), []Type{c}, c, true)
 			functionType.SetFullTypeNames(c.GetFullTypeNames())
