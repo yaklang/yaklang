@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
 	"github.com/yaklang/yaklang/common/amap"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -276,6 +277,16 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 			Name:    "amap",
 			Verbose: "高德地图",
 			Items:   amapOptions,
+		})
+	}
+	embeddingOptions, err := utils.ParseAppTagToOptions(&plugins_rag.EmbeddingEndpointConfig{})
+	if err != nil {
+		log.Errorf("parse embedding endpoint app config tag to options failed: %v", err)
+	} else {
+		opts = append(opts, &ypb.GetThirdPartyAppConfigTemplate{
+			Name:    "embedding_endpoint",
+			Verbose: "Embedding Endpoint",
+			Items:   embeddingOptions,
 		})
 	}
 	//githubOpt := &ypb.GetThirdPartyAppConfigTemplate{
