@@ -178,9 +178,49 @@ const (
 	NativeCall_GetRootParentBlueprint = "getRootParentBlueprint"
 
 	NativeCall_Length = "len"
+
+	NativeCall_GetRoot = "root"
 )
 
 func init() {
+	registerNativeCall(NativeCall_GetRoot, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		var result []sfvm.ValueOperator
+		prog, err := fetchProgram(v)
+		if err != nil {
+			return false, nil, err
+		}
+		var getRoot func(value ssa.Value)
+		getRoot = func(value ssa.Value) {
+			if utils.IsNil(value) {
+				return
+			}
+			call, isCall := ssa.ToCall(value)
+			if isCall {
+				getRoot(call.Method)
+				return
+			}
+			obj := value.GetObject()
+			if utils.IsNil(obj) {
+				newValue, err2 := prog.NewValue(value)
+				if err2 != nil {
+					return
+				}
+				result = append(result, newValue)
+				return
+			}
+			getRoot(obj)
+		}
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *Program:
+				return nil
+			case *Value:
+				getRoot(ret.innerValue)
+			}
+			return nil
+		})
+		return true, sfvm.NewValues(result), nil
+	}))
 
 	registerNativeCall(NativeCall_GetRootParentBlueprint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var result []sfvm.ValueOperator
