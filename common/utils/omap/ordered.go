@@ -38,9 +38,15 @@ func (o *OrderedMap[T, V]) init() {
 		return
 	}
 	o.initOnce.Do(func() {
-		o.lock = new(sync.RWMutex)
-		o.m = make(map[T]V)
-		o.keyChain = make([]T, 0)
+		if o.lock == nil {
+			o.lock = new(sync.RWMutex)
+		}
+		if o.m == nil {
+			o.m = make(map[T]V)
+		}
+		if o.keyChain == nil {
+			o.keyChain = make([]T, 0)
+		}
 	})
 }
 
@@ -601,13 +607,16 @@ func (s *OrderedMap[T, V]) Copy() *OrderedMap[T, V] {
 	}
 	ks := make([]T, len(s.keyChain))
 	copy(ks, s.keyChain)
-	return &OrderedMap[T, V]{
+	newMap := &OrderedMap[T, V]{
 		lock:     new(sync.RWMutex),
 		m:        m,
 		keyChain: ks,
-		parent:   s,
+		parent:   nil,
 		namedKey: s.namedKey,
 	}
+	newMap.initOnce.Do(func() {})
+
+	return newMap
 }
 
 func (s *OrderedMap[T, V]) SearchKey(i ...string) (*OrderedMap[T, V], error) {
