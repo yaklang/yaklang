@@ -83,3 +83,7 @@ type AIClient interface {
 	StructuredStreamer
 	ModelListCaller
 }
+
+type EmbeddingCaller interface {
+	Embedding(string) ([]float64, error)
+}

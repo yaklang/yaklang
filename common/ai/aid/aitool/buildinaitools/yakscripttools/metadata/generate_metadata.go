@@ -20,6 +20,9 @@ var aitool_generate_key_word_prompt string
 //go:embed prompt/generate_keyword_forge.txt
 var aiforge_generate_key_word_prompt string
 
+//go:embed prompt/generate_keyword_yakscript.txt
+var aiyakscript_generate_key_word_prompt string
+
 // 定义结构体来存储结果
 type GenerateResult struct {
 	Language    string   `json:"language"`
@@ -27,15 +30,19 @@ type GenerateResult struct {
 	Keywords    []string `json:"keywords"`
 }
 
+func GenerateYakScriptMetadata(script string) (*GenerateResult, error) {
+	return generateMetadata(script, aiyakscript_generate_key_word_prompt, false)
+}
+
 func GenerateYakScriptAIToolMetadata(code string) (*GenerateResult, error) {
-	return generateMetadata(code, aitool_generate_key_word_prompt)
+	return generateMetadata(code, aitool_generate_key_word_prompt, true)
 }
 
 func GenerateForgeMetadata(forgeContent string) (*GenerateResult, error) {
-	return generateMetadata(forgeContent, aiforge_generate_key_word_prompt)
+	return generateMetadata(forgeContent, aiforge_generate_key_word_prompt, true)
 }
 
-func generateMetadata(code string, promptFormat string) (*GenerateResult, error) {
+func generateMetadata(code string, promptFormat string, debug bool) (*GenerateResult, error) {
 	promptTemplate := template.Must(template.New("generate_keywords").Parse(promptFormat))
 
 	// Create a buffer to store the executed template
@@ -53,7 +60,7 @@ func generateMetadata(code string, promptFormat string) (*GenerateResult, error)
 	}
 
 	// Get response from AI
-	response, err := ai.Chat(promptBuffer.String(), aispec.WithDebugStream(true))
+	response, err := ai.Chat(promptBuffer.String(), aispec.WithDebugStream(debug))
 	if err != nil {
 		log.Errorf("failed to get AI response: %v", err)
 		return nil, fmt.Errorf("failed to get AI response: %v", err)
