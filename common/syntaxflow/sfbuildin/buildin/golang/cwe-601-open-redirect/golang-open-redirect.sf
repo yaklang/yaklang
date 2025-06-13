@@ -141,8 +141,6 @@ $param #{until: `* & $target`}-> as $check;
 $target as $high
 
 alert $high	for {
-	title: "Check Golang Open Redirect Vulnerability",
-	title_zh: "检测 Golang 开放重定向漏洞",
 	solution: <<<CODE
 ### 修复建议
 
@@ -266,6 +264,8 @@ CODE
 CODE
 	level: "high",
 	type: "vuln",
+	title: "Check Golang Open Redirect Vulnerability",
+	title_zh: "检测 Golang 开放重定向漏洞",
 }
 
 desc(

@@ -73,32 +73,6 @@ REFERENCE
 __dependency__.*vaadin*server.version as $ver;
 $ver in (,7.7.14] as $vuln_vaadin_server;
 alert $vuln_vaadin_server	for {
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   此规则旨在检测Java项目中引入的 `vaadin-server` 库是否使用了存在已知漏洞的版本。`vaadin-server` 是一个用于构建Web应用程序的Java框架。特定版本的 `vaadin-server` 中存在跨站脚本攻击（XSS）漏洞。XSS 漏洞是由于应用程序未能对用户提供的输入进行充分的过滤或转义，导致恶意脚本被嵌入到网页中并在用户浏览器上执行。攻击者可以利用此漏洞窃取用户的 cookie、会话令牌或其他敏感信息，执行恶意操作，甚至劫持用户会话。
-
-2. **触发场景**
-   当应用程序使用了存在漏洞的 `vaadin-server` 版本（例如 7.7.14 及以下版本），并且在生成页面时直接或间接使用了未经验证或转义的用户输入时，攻击者可以通过构造包含恶意脚本的输入触发漏洞。恶意脚本会在访问受影响页面的用户浏览器中执行。
-
-   ```java
-   // 示例：假设存在漏洞的vaadin版本中，某个组件直接输出了用户输入
-   TextField userInputField = new TextField("Your Input");
-   Layout layout = new VerticalLayout(userInputField);
-   // ... 在特定操作中，直接将 userInputField 的值显示到页面上，且vaadin版本存在XSS漏洞
-   ```
-   攻击者可以在 `userInputField` 中输入 `<script>alert('XSS')</script>` 等恶意代码，当其他用户访问包含此组件的页面时，恶意脚本就会执行。
-
-3. **潜在影响**
-   - **敏感信息泄露:** 攻击者可以窃取用户的 cookie、会话令牌、登录凭证等信息。
-   - **会话劫持:** 攻击者可以使用窃取的会话令牌冒充合法用户进行操作。
-   - **内容篡改:** 攻击者可以修改网页内容，进行钓鱼或其他欺诈活动。
-   - **恶意软件传播:** 在某些情况下，攻击者可以利用XSS漏洞诱导用户下载或执行恶意软件。
-   - **客户端重定向:** 将用户浏览器重定向到恶意网站。
-CODE
-	level: "mid",
-	message: "SCA: vaadin-server version 7.7.14 has an XSS vulnerability",
 	cve: "CVE-2021-37714",
 	title: "SCA: Check Java vaadin-server Vulnerability",
 	title_zh: "SCA: 检测Java vaadin-server依赖漏洞",
@@ -137,4 +111,30 @@ implementation 'com.vaadin:vaadin-server:YOUR_SAFE_VERSION' // 将 YOUR_SAFE_VER
 *   **使用安全的 Vaadin 组件:** 优先使用 Vaadin 提供的标准组件，这些组件通常已经内置了对抗 XSS 的保护措施。
 *   **避免直接使用 `Element.setInnerHTML()` 或类似的未经转义的输出方法:** 如果必须直接操作 DOM 或输出 HTML/JavaScript，请务必对数据进行充分的转义，使用 Vaadin 提供的 `Html.escape()` 或其他安全的转义方法。
 CODE
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+   此规则旨在检测Java项目中引入的 `vaadin-server` 库是否使用了存在已知漏洞的版本。`vaadin-server` 是一个用于构建Web应用程序的Java框架。特定版本的 `vaadin-server` 中存在跨站脚本攻击（XSS）漏洞。XSS 漏洞是由于应用程序未能对用户提供的输入进行充分的过滤或转义，导致恶意脚本被嵌入到网页中并在用户浏览器上执行。攻击者可以利用此漏洞窃取用户的 cookie、会话令牌或其他敏感信息，执行恶意操作，甚至劫持用户会话。
+
+2. **触发场景**
+   当应用程序使用了存在漏洞的 `vaadin-server` 版本（例如 7.7.14 及以下版本），并且在生成页面时直接或间接使用了未经验证或转义的用户输入时，攻击者可以通过构造包含恶意脚本的输入触发漏洞。恶意脚本会在访问受影响页面的用户浏览器中执行。
+
+   ```java
+   // 示例：假设存在漏洞的vaadin版本中，某个组件直接输出了用户输入
+   TextField userInputField = new TextField("Your Input");
+   Layout layout = new VerticalLayout(userInputField);
+   // ... 在特定操作中，直接将 userInputField 的值显示到页面上，且vaadin版本存在XSS漏洞
+   ```
+   攻击者可以在 `userInputField` 中输入 `<script>alert('XSS')</script>` 等恶意代码，当其他用户访问包含此组件的页面时，恶意脚本就会执行。
+
+3. **潜在影响**
+   - **敏感信息泄露:** 攻击者可以窃取用户的 cookie、会话令牌、登录凭证等信息。
+   - **会话劫持:** 攻击者可以使用窃取的会话令牌冒充合法用户进行操作。
+   - **内容篡改:** 攻击者可以修改网页内容，进行钓鱼或其他欺诈活动。
+   - **恶意软件传播:** 在某些情况下，攻击者可以利用XSS漏洞诱导用户下载或执行恶意软件。
+   - **客户端重定向:** 将用户浏览器重定向到恶意网站。
+CODE
+	level: "mid",
+	message: "SCA: vaadin-server version 7.7.14 has an XSS vulnerability",
 }

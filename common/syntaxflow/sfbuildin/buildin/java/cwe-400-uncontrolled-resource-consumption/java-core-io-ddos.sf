@@ -102,11 +102,11 @@ $sink?{* #{
 INCLUDE
 }->} as $vul;
 alert $vul	for {
-	title: "Detect Java Core IO Denial of Service Vulnerability",
-	title_zh: "检测Java IO库拒绝服务漏洞",
 	level: "low",
 	type: "vuln",
 	message: "发现Java的java.io库可能存在ddos漏洞",
+	title: "Detect Java Core IO Denial of Service Vulnerability",
+	title_zh: "检测Java IO库拒绝服务漏洞",
 }
 
 desc(

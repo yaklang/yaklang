@@ -143,11 +143,6 @@ check $jwt;
 $jwt.parser().setSigningKey().parse() as $riskParse;
 
 alert $riskParse	for {
-	title: "Check Java JWT Unsafe Parse Method",
-	level: "mid",
-	message: "JWT uses the unsafe parse method",
-	message_zh: "JWT 使用了不安全的 parse 方法",
-	title_zh: "检查 Java JWT 不安全的解析方法",
 	solution: <<<CODE
 ### 修复建议
 
@@ -201,8 +196,13 @@ JWT（JSON Web Tokens）是一种用于在各方之间安全传输信息的开�
 
 总而言之，不当的 JWT 使用可能严重破坏应用程序的安全性，允许攻击者获取未授权访问和控制。
 CODE
+	message: "JWT uses the unsafe parse method",
 	type: "vuln",
 	risk: "auth-bypass",
+	title: "Check Java JWT Unsafe Parse Method",
+	title_zh: "检查 Java JWT 不安全的解析方法",
+	level: "mid",
+	message_zh: "JWT 使用了不安全的 parse 方法",
 }
 
 .signWith?{<typeName>?{have:'io.jsonwebtoken'}}(,,*  as $key)
@@ -211,6 +211,10 @@ $key?{opcode: call && <getCallee>?{<getObject><name>?{have:base64 || BASE64  || 
 $simpleKey + $base64EncodedKey as $hardcodedKey;
 alert $hardcodedKey	for {
 	risk: "auth-bypass",
+	message_zh: "JWT 使用了硬编码的密钥",
+	type: "vuln",
+	message: "JWT uses the hardcoded key",
+	title: "Check Java JWT Hardcoded Key",
 	title_zh: "检查 Java JWT 硬编码的密钥",
 	solution: <<<CODE
 ### 修复建议
@@ -268,13 +272,13 @@ public class JWTVotesEndpoint extends AssignmentEndpoint {
 总而言之，不当的 JWT 使用可能严重破坏应用程序的安全性，允许攻击者获取未授权访问和控制。
 CODE
 	level: "high",
-	message_zh: "JWT 使用了硬编码的密钥",
-	message: "JWT uses the hardcoded key",
-	type: "vuln",
-	title: "Check Java JWT Hardcoded Key",
 }
 
 alert $sink	for {
+	message_zh: "JWT 使用了不安全的密钥",
+	type: "vuln",
+	title: "Check Java JWT Insecure Key Usage",
+	title_zh: "检查 Java JWT 不安全的密钥使用",
 	solution: <<<CODE
 ### 修复建议
 
@@ -294,6 +298,7 @@ public class JwtService {
 }
 ```
 CODE
+	risk: "auth-bypass",
 	desc: <<<CODE
 ### 漏洞描述
 
@@ -315,11 +320,6 @@ JWT（JSON Web Tokens）是一种用于在各方之间安全传输信息的开�
 CODE
 	level: "mid",
 	message: "JWT uses the unsafe key",
-	title_zh: "检查 Java JWT 不安全的密钥使用",
-	message_zh: "JWT 使用了不安全的密钥",
-	type: "vuln",
-	risk: "auth-bypass",
-	title: "Check Java JWT Insecure Key Usage",
 }
 
 desc(

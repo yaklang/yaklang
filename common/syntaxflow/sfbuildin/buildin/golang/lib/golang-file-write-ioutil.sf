@@ -121,23 +121,6 @@ $entry.WriteAll(*<slice(index=1)> #-> as $output)
 $entry.WriteFile(*<slice(index=1)> #-> as $output)
 
 alert $output	for {
-	desc: <<<CODE
-### 1. 规则目的
-
-该规则主要用于审计 Golang 项目中是否有使用 `io/ioutil` 包进行文件写入的操作。尽管 `ioutil` 包自 Go 1.16 版本起已经被标记为废弃，其功能已分别迁移至 `io` 和 `os` 包下，但在仍在使用旧版本 Go 或维护旧代码的项目中，`ioutil` 包的使用依然普遍。审计这些写入操作有助于发现潜在的文件操作安全风险，如未经校验的数据写入、路径遍历等，从而提醒开发者关注并迁移至更安全的现代 Go API。
-
-### 2. 规则详细
-
-该规则特别针对 `io/ioutil` 包中的两个关键文件写入函数进行识别：
-
-*   `ioutil.WriteFile(filename string, data []byte, perm os.FileMode)`：该函数读取 `data` 字节数组并将其完整地写入由 `filename` 指定的文件中，如果文件不存在，则创建文件；如果文件已存在，则先清空文件内容再写入。`perm` 参数指定了新创建文件的权限。
-*   `ioutil.WriteAll(w io.Writer, buf []byte)`：**注意：在标准库 `io/ioutil` 包中并没有 `WriteAll` 这个函数。** 标准库中与写入相关且常被使用的函数包括 `io.WriteString`、`io.Copy` 等。如果规则中提及了 `ioutil.WriteAll`，这可能意味着自定义的库或对标准库的误解。**考虑到标准 `io/ioutil` 包，规则应重点关注 `WriteFile` 和可能的 `io.Writev`（虽然 `ioutil` 中也无此函数，但 `io` 包中有）。** 审计的原始规则可能存在对标准函数名的误写或引用了非标准库函数。
-
-规则通过查找对 `ioutil.WriteFile` 函数的调用来标记潜在的代码位置。**鉴于标准库中不存在 `ioutil.WriteAll`，规则的实际检测范围应限于 `ioutil.WriteFile`。** 识别这些调用可以帮助开发者定位需要审查和迁移的文件写入操作，以增强代码的安全性。
-CODE
-	level: "info",
-	title: "Audit Golang File Write using ioutil",
-	title_zh: "审计Golang文件写入(ioutil)",
 	solution: <<<CODE
 ### 修复建议
 
@@ -155,7 +138,7 @@ CODE
     ...
     err := os.WriteFile(fileName, data, 0644)
     if err != nil {
-       log.Fatalf("Error writing to file: %!!(MISSING)s(MISSING)", err)
+       log.Fatalf("Error writing to file: %!!(MISSING)!(MISSING)s(MISSING)", err)
     }
     ```
 
@@ -173,7 +156,7 @@ CODE
     	// 打开文件，如果不存在则创建，以追加模式写入，权限为0644
     	file, err := os.OpenFile(fileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
     	if err != nil {
-    		return fmt.Errorf("failed to open file: %!!(MISSING)w(MISSING)", err)
+    		return fmt.Errorf("failed to open file: %!!(MISSING)!(MISSING)w(MISSING)", err)
     	}
     	defer file.Close() // 确保关闭文件
 
@@ -182,13 +165,13 @@ CODE
     
     	_, err = writer.Write(data)
     	if err != nil {
-    		return fmt.Errorf("failed to write data: %!!(MISSING)w(MISSING)", err)
+    		return fmt.Errorf("failed to write data: %!!(MISSING)!(MISSING)w(MISSING)", err)
     	}
 
         // 写入任何留在缓冲中的数据
         err = writer.Flush()
         if err != nil {
-            return fmt.Errorf("failed to flush writer: %!!(MISSING)w(MISSING)", err)
+            return fmt.Errorf("failed to flush writer: %!!(MISSING)!(MISSING)w(MISSING)", err)
         }
 
     	return nil
@@ -197,7 +180,7 @@ CODE
     // 调用示例
     // dataToAppend := []byte("\nAdditional line.")
     // if err := appendToFile("example.txt", dataToAppend); err != nil {
-    // 	log.Printf("Error appending to file: %!!(MISSING)v(MISSING)", err)
+    // 	log.Printf("Error appending to file: %!!(MISSING)!(MISSING)v(MISSING)", err)
     // }
     ```
 
@@ -212,6 +195,23 @@ CODE
 
 确保执行文件写入操作的进程或用户具有最小必需的权限，避免因权限过高导致安全问题。
 CODE
+	desc: <<<CODE
+### 1. 规则目的
+
+该规则主要用于审计 Golang 项目中是否有使用 `io/ioutil` 包进行文件写入的操作。尽管 `ioutil` 包自 Go 1.16 版本起已经被标记为废弃，其功能已分别迁移至 `io` 和 `os` 包下，但在仍在使用旧版本 Go 或维护旧代码的项目中，`ioutil` 包的使用依然普遍。审计这些写入操作有助于发现潜在的文件操作安全风险，如未经校验的数据写入、路径遍历等，从而提醒开发者关注并迁移至更安全的现代 Go API。
+
+### 2. 规则详细
+
+该规则特别针对 `io/ioutil` 包中的两个关键文件写入函数进行识别：
+
+*   `ioutil.WriteFile(filename string, data []byte, perm os.FileMode)`：该函数读取 `data` 字节数组并将其完整地写入由 `filename` 指定的文件中，如果文件不存在，则创建文件；如果文件已存在，则先清空文件内容再写入。`perm` 参数指定了新创建文件的权限。
+*   `ioutil.WriteAll(w io.Writer, buf []byte)`：**注意：在标准库 `io/ioutil` 包中并没有 `WriteAll` 这个函数。** 标准库中与写入相关且常被使用的函数包括 `io.WriteString`、`io.Copy` 等。如果规则中提及了 `ioutil.WriteAll`，这可能意味着自定义的库或对标准库的误解。**考虑到标准 `io/ioutil` 包，规则应重点关注 `WriteFile` 和可能的 `io.Writev`（虽然 `ioutil` 中也无此函数，但 `io` 包中有）。** 审计的原始规则可能存在对标准函数名的误写或引用了非标准库函数。
+
+规则通过查找对 `ioutil.WriteFile` 函数的调用来标记潜在的代码位置。**鉴于标准库中不存在 `ioutil.WriteAll`，规则的实际检测范围应限于 `ioutil.WriteFile`。** 识别这些调用可以帮助开发者定位需要审查和迁移的文件写入操作，以增强代码的安全性。
+CODE
+	level: "info",
+	title: "Audit Golang File Write using ioutil",
+	title_zh: "审计Golang文件写入(ioutil)",
 }
 
 desc(

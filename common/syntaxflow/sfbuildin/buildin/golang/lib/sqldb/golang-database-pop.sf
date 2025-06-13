@@ -116,9 +116,9 @@ $entry.Connect <getCall> as $db;
 $db <getMembers> as $output;
 
 alert $output	for {
-	title: "Audit Golang Database Pop Usage",
 	title_zh: "审计 Go 语言 Database Pop 库使用",
 	level: "info",
+	title: "Audit Golang Database Pop Usage",
 }
 
 desc(

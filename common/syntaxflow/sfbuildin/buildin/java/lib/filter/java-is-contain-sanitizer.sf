@@ -33,9 +33,9 @@ REFERENCE
 )
 $input?{opcode:call && have:"contain"} as $output;
 alert $output	for {
+	title: "Find Java Contain Sanitizer",
 	title_zh: "查找Java含有contain方法的过滤器",
 	level: "mid",
-	title: "Find Java Contain Sanitizer",
 }
 
 

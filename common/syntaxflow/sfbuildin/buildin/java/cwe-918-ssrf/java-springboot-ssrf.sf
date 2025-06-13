@@ -114,6 +114,8 @@ $sink #{
 }->as  $mid;
 
 alert $mid	for {
+	message: "发现Java SpringBoot SSRF漏洞,并且没有任何数据流过滤。",
+	title: "Detect Java SpringBoot SSRF Vulnerability",
 	title_zh: "检测Java SpringBoot 服务端请求伪造(SSRF)漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -215,8 +217,6 @@ CODE
 CODE
 	level: "mid",
 	risk: "ssrf",
-	message: "发现Java SpringBoot SSRF漏洞,并且没有任何数据流过滤。",
-	title: "Detect Java SpringBoot SSRF Vulnerability",
 }
 
 $sink #{

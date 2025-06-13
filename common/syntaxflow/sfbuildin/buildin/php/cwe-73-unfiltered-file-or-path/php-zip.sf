@@ -147,7 +147,6 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high	for {
-	level: "high",
 	title: "Unsafe File Unzip Without Validation",
 	title_zh: "未经验证的高危文件压缩",
 	solution: <<<CODE
@@ -265,6 +264,7 @@ CODE
 - **信息泄露:** 攻击者可以将敏感文件（如配置文件、日志文件）添加到ZIP包中，并在后续操作中下载该ZIP包，导致信息泄露。
 - **拒绝服务:** 攻击者可以创建大量文件或解压到非预期的目录，耗尽磁盘空间或系统资源。
 CODE
+	level: "high",
 }
 $all<dataflow(exclude=<<<CODE
 <self>?{opcode: call && <self><getCallee> & $filter} as $__next__
@@ -273,6 +273,9 @@ CODE)> as $highAndMid
 $highAndMid - $high as $mid
 
 alert $mid	for {
+	level: "mid",
+	title: "Insecure File Type Detection",
+	title_zh: "文件压缩经过了某些函数，但未检查到过滤",
 	desc: <<<CODE
 ### 漏洞描述
 
@@ -320,13 +323,12 @@ alert $mid	for {
 - **信息泄露:** 攻击者可以将敏感文件（如配置文件、日志文件）添加到ZIP包中，并在后续操作中下载该ZIP包，导致信息泄露。
 - **拒绝服务:** 攻击者可以创建大量文件或解压到非预期的目录，耗尽磁盘空间或系统资源。
 CODE
-	level: "mid",
-	title: "Insecure File Type Detection",
-	title_zh: "文件压缩经过了某些函数，但未检查到过滤",
 }
 $sink - $high - $mid as $low
 
 alert $low	for {
+	title: "Potential File Storage Path Misconfiguration",
+	title_zh: "潜在的文件存储路径配置问题",
 	desc: <<<CODE
 ### 漏洞描述
 
@@ -375,8 +377,6 @@ alert $low	for {
 - **拒绝服务:** 攻击者可以创建大量文件或解压到非预期的目录，耗尽磁盘空间或系统资源。
 CODE
 	level: "low",
-	title: "Potential File Storage Path Misconfiguration",
-	title_zh: "潜在的文件存储路径配置问题",
 }
 desc(
 	lang: 'php'

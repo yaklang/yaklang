@@ -62,9 +62,9 @@ $entry.HandleFunc(*<slice(index=1)> as $handle);
 $handle<getFormalParams> as $output
 
 alert $output	for {
-	level: "info",
 	title: "Audit Golang net/http Handlers",
 	title_zh: "审计 Golang net/http 请求处理函数",
+	level: "info",
 }
 
 desc(

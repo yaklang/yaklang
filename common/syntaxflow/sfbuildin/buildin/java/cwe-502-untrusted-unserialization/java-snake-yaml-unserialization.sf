@@ -88,6 +88,7 @@ $sink #{
 }->as  $high;
 
 alert $high	for {
+	message: "发现Java SnakeYAML反序列化漏洞,并且没有任何数据流过滤。",
 	title: "Check Java SnakeYAML Unserialization Vulnerability",
 	title_zh: "检测Java SnakeYAML反序列化漏洞",
 	solution: <<<CODE
@@ -156,7 +157,6 @@ CODE
 - loadAs()
 CODE
 	level: "high",
-	message: "发现Java SnakeYAML反序列化漏洞,并且没有任何数据流过滤。",
 }
 
 $sink #{
@@ -165,6 +165,8 @@ $sink #{
 
 $result - $high as $low;
 alert $low	for {
+	level: "low",
+	message: "发现Java SnakeYAML反序列化漏洞,但是有数据流过滤。",
 	title: "Check Java SnakeYAML Unserialization Vulnerability",
 	title_zh: "检测Java SnakeYAML反序列化漏洞",
 	desc: <<<CODE
@@ -207,8 +209,6 @@ alert $low	for {
 - loadAll()
 - loadAs()
 CODE
-	level: "low",
-	message: "发现Java SnakeYAML反序列化漏洞,但是有数据流过滤。",
 }
 
 desc(
