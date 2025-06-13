@@ -3,9 +3,11 @@ package yakit
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"gopkg.in/yaml.v2"
 
@@ -431,6 +433,14 @@ func QueryYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.
 	}
 	//
 	db = db.Model(&schema.YakScript{}) // .Debug()
+
+	if params.GetVectorSearchContent() != "" {
+		ids, err := plugins_rag.SearchPluginIds(params.GetVectorSearchContent(), -1)
+		if err != nil {
+			return nil, nil, err
+		}
+		db = db.Where("id IN (?)", ids)
+	}
 
 	/*pagination*/
 	if params.Pagination == nil {

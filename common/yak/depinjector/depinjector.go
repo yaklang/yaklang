@@ -1,6 +1,8 @@
 package depinjector
 
 import (
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"
+	"github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
 	"github.com/yaklang/yaklang/common/mcp"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
@@ -21,4 +23,15 @@ func DependencyInject() {
 		}
 		return v, nil
 	})
+	plugins_rag.GenerateYakScriptMetadata = func(script string) (*plugins_rag.GenerateResult, error) {
+		res, err := metadata.GenerateYakScriptMetadata(script)
+		if err != nil {
+			return nil, err
+		}
+		return &plugins_rag.GenerateResult{
+			Language:    res.Language,
+			Description: res.Description,
+			Keywords:    res.Keywords,
+		}, nil
+	}
 }

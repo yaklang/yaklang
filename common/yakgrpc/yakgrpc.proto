@@ -4390,6 +4390,7 @@ message QueryYakScriptRequest {
   repeated string ExcludeTypes = 19;
   int64 IsMITMParamPlugins = 20; //0->默认全部 1->是mitm带参数插件 2->mitm不带参数
   string FieldKeywords = 21;
+  string VectorSearchContent = 22;
 }
 
 message PluginGroup {
