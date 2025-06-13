@@ -97,13 +97,46 @@ func matchCallMethodName(content) {
     methodName = matchInfo[1]
     return methodName
 }
+
+func matchMybatisPlaceholder(content) {
+    compile = re.Compile(`\$\{([^}]*)`)~  // 捕获 ${xxx 或 ${xxx}
+    matchPart = compile.FindAllStringSubmatch(content, -1)
+    if matchPart.Len() == 0 {
+        yakit.Error("syntaxFlowTemplate is placeholder, but not match placeholder content")
+        return
+    }
+
+    matchInfo = matchPart[0]
+    if matchInfo.Len() < 2 {
+        yakit.Error(
+            "syntaxFlowTemplate is placeholder, but match part is: %s",
+            matchInfo,
+        )
+        return
+    }
+
+    placeholderKey = matchInfo[1] // 提取出 xxx 部分
+    return placeholderKey
+}
+
 func processContent(content) {
     content = str.TrimSpace(content)
     // call
     if kind == "const" {
         return content
     }
-    
+
+    // MyBatis 占位符语法识别：${xxx} 或 ${xxx（未闭合）
+    if re.Match(`^\$\{[^}]*\}?$`, content) {
+        kind = "placeholder"
+        return matchMybatisPlaceholder(content)
+    }
+
+     // 注解语法糖识别：@xxx
+    if re.Match(`^@[\w.]+$`, content) {
+        kind = "annotation"
+        return content[1:] // 去掉开头的 @
+    }
 
     if re.Match(`(\b[a-zA-Z_]\w*)\(`, content) {
         kind = "call"
@@ -131,7 +164,16 @@ func fileProcess(content) {
         return content
     }
 }
-
+func mybatisPlaceHolderProcess(content) {
+    if fuzzSearch && content == ""{
+        return `\$\{\w*\}`
+    }
+    if fuzzSearch {
+        return sprintf(`\$\{%s\w*\}`, re.QuoteMeta(content))
+    }else{
+        return sprintf(`\$\{%s\}`, re.QuoteMeta(content))
+    }
+}
 templateMap = map[string]any{"const": (i) => {
     i = normalProcess(i)
     return sprintf(`g<<<CODE
@@ -140,8 +182,8 @@ CODE as $const`, i)
 }, "file": (i) => {
     i = fileProcess(i)
     return sprintf(
-        `<getFullFileName(filename="%s")> as $file`, 
-        i, 
+        `<getFullFileName(filename="%s")> as $file`,
+        i,
     )
 }, "function": (i) => {
     i = normalProcess(i)
@@ -152,7 +194,14 @@ CODE as $const`, i)
 }, "symbol": (i) => {
     i = normalProcess(i)
     return sprintf(`%s as $symbol`, i)
-}}
+}, "annotation": (i) => {
+    i = normalProcess(i)
+    return sprintf(`%s?{opcode: make && .__ref__} as $annotation`, i)
+},"placeholder": (i) => {
+    i = mybatisPlaceHolderProcess(i)
+    return sprintf(`${*.xml}.regexp(/%s/) as $placeholder`, i)
+},
+}
 
 // process
 rule = processContent(input)
@@ -172,10 +221,10 @@ if kind != "all" {
     rule = targetRule
 }
 
-// set output, because kind will modify by processContent, like: () set to call 
+// set output, because kind will modify by processContent, like: () set to call
 // so use kind_input, if kind_input is all, will output all kind
 if kind_input == "all" {
-    rule += "$const + $file + $function + $call + $symbol as $all"
+    rule += "$const + $file + $function + $call + $symbol + $annotation + $placeholder as $all"
 }
 
 
