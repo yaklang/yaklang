@@ -9,6 +9,7 @@ import (
 
 	"github.com/urfave/cli"
 	yaktool "github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata/genmetadata"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -196,7 +197,7 @@ func processYakScript(info utils.FileInfo, inputDir, outputDir string, forceUpda
 	// 检查是否需要生成元数据
 	needUpdate := forceUpdate || len(metadata.Keywords) == 0 || metadata.Description == ""
 	if needUpdate { // 从代码中生成描述和关键词
-		generatedMetadata, err := yaktool.GenerateMetadataFromCodeContent(fileName, string(content))
+		generatedMetadata, err := genmetadata.GenerateMetadataFromCodeContent(fileName, string(content))
 		if err != nil {
 			log.Errorf("Failed to generate metadata for tool: %s error: %v", metadata.Name, err)
 			return err

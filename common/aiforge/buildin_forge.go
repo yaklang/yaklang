@@ -1,9 +1,14 @@
 package aiforge
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -13,12 +18,78 @@ import (
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"os"
-	"strings"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 //go:embed buildinforge/**
 var buildInForge embed.FS
+
+var generateMetadataPrompt = `
+# AI forge 元数据生成器
+
+你是一个专门的AI模型，负责为Yak的ai forge智能体生成准确的描述和关键词。你需要理解forge的核心功能和用途。
+
+## 指令:
+1. 分析提供的forge信息，理解这个forge的功能和目的，这个信息可能是一段yaklang代码或者json配置文件
+2. **重点**：完全忽略代码中的注释内容，仅基于代码的实际功能生成描述
+3. 生成一个简洁但全面的forge描述，说明forge能做什么，解决什么问题
+4. 生成能够准确表达forge功能的关键词列表(最多10个)
+5. 关键词应围绕forge的功能、应用场景和解决的问题
+6. 每个关键词应该是单个词或短语(1-3个词)，且为小写中文
+7. 如果forge没有强调ai问题，请不要包含ai相关的关键词
+
+## 注意事项：
+- 描述应当简明清晰地表达"这个forge能做什么"
+- 不要在描述中包含代码注释中的信息
+- 不要解释实现细节，只关注forge的实际功能 
+`
+
+func GenerateForgeMetadata(forgeContent string) (*GenerateMetadataResult, error) {
+	var lfopts []LiteForgeOption
+	lfopts = append(lfopts,
+		WithLiteForge_Prompt(generateMetadataPrompt))
+	lfopts = append(lfopts, WithLiteForge_OutputSchema(
+		aitool.WithStringParam("language", aitool.WithParam_Required(true), aitool.WithParam_Description("语言，固定为chinese")),
+		aitool.WithStringParam("description", aitool.WithParam_Required(true), aitool.WithParam_Description("forge功能描述")),
+		aitool.WithStringArrayParam("keywords", aitool.WithParam_Required(true), aitool.WithParam_Description("关键词数组")),
+	))
+
+	lf, err := NewLiteForge("generate_metadata", lfopts...)
+	if err != nil {
+		return nil, err
+	}
+	result, err := lf.Execute(context.Background(), []*ypb.ExecParamItem{
+		{
+			Key:   "query",
+			Value: forgeContent,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if result.Action == nil {
+		return nil, fmt.Errorf("extract action failed")
+	}
+
+	// Extract the result
+	params := result.Action.GetInvokeParams("params")
+	language := params.GetString("language")
+	description := params.GetString("description")
+	keywords := params.GetStringSlice("keywords")
+
+	return &GenerateMetadataResult{
+		Language:    language,
+		Description: description,
+		Keywords:    keywords,
+	}, nil
+}
+
+type GenerateMetadataResult struct {
+	Language    string   `json:"language"`
+	Description string   `json:"description"`
+	Keywords    []string `json:"keywords"`
+}
 
 func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
@@ -257,7 +328,7 @@ func updateSystemFSForgeMetaData(fileinfo *utils.FileInfo, forceUpdate bool) err
 			if err2 != nil {
 				return err2
 			}
-			metaData, err := metadata.GenerateForgeMetadata(string(completeForgeBytes))
+			metaData, err := GenerateForgeMetadata(string(completeForgeBytes))
 			if err != nil {
 				return err
 			}
@@ -293,7 +364,7 @@ func updateSystemFSForgeMetaData(fileinfo *utils.FileInfo, forceUpdate bool) err
 			return fmt.Errorf(`failed to get yak script forge for "%v"`, fileinfo.Path)
 		}
 		if forceUpdate || forge.Tags == "" || forge.Description == "" {
-			metaData, err := metadata.GenerateForgeMetadata(forge.ForgeContent)
+			metaData, err := GenerateForgeMetadata(forge.ForgeContent)
 			if err != nil {
 				return fmt.Errorf("failed to generate metadata for %s: %v", fileinfo.Path, err)
 			}

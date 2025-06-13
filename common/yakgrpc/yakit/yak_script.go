@@ -6,7 +6,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
 	"github.com/yaklang/yaklang/common/schema"
 
 	"gopkg.in/yaml.v2"
@@ -19,6 +18,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+var SearchPluginIdsFunc func(query string, limit int) ([]int64, error)
 
 var yakScriptOpLock = new(sync.Mutex)
 
@@ -435,7 +436,10 @@ func QueryYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.
 	db = db.Model(&schema.YakScript{}) // .Debug()
 
 	if params.GetVectorSearchContent() != "" {
-		ids, err := plugins_rag.SearchPluginIds(params.GetVectorSearchContent(), -1)
+		if SearchPluginIdsFunc == nil {
+			return nil, nil, utils.Errorf("SearchPluginIdsFunc is not set")
+		}
+		ids, err := SearchPluginIdsFunc(params.GetVectorSearchContent(), -1)
 		if err != nil {
 			return nil, nil, err
 		}
