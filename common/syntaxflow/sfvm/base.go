@@ -36,6 +36,8 @@ func validSSAOpcode(raw string) ssa.Opcode {
 		return ssa.SSAOpcodeLoop
 	case "typecast":
 		return ssa.SSAOpcodeTypeCast
+	case "make":
+		return ssa.SSAOpcodeMake
 	default:
 		return -1
 	}
