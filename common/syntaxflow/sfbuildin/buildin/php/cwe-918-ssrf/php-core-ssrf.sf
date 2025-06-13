@@ -130,9 +130,6 @@ REFERENCE
 
 check $curlFunction;
 alert $curlFunction	for {
-	level: "info",
-	title: "ssrf function detected, please pay attention",
-	title_zh: "检测到为ssrf函数，请注意关注",
 	desc: <<<CODE
 该规则用于识别可能与SSRF漏洞相关的PHP函数，例如`curl_init`, `curl_setopt`, `curl_exec`, `curl_close`, `fsockopen`, `file_get_contents`, `fopen`等。这些函数如果未对用户提供的URL进行严格校验和限制，可能会被攻击者利用，导致服务器端请求伪造（SSRF）漏洞。
 
@@ -144,6 +141,9 @@ alert $curlFunction	for {
    检测以下7个PHP函数：
    `curl_init`, `curl_setopt`, `curl_exec`, `curl_close`, `fsockopen`, `file_get_contents`, `fopen`。
 CODE
+	level: "info",
+	title: "ssrf function detected, please pay attention",
+	title_zh: "检测到为ssrf函数，请注意关注",
 }
 
 /$curl_setopt|fsockopen|file_get_contents^/as $ssrfFunction
@@ -163,6 +163,62 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high	for {
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+   服务器端请求伪造（SSRF）漏洞的产生是由于应用程序未能对用户提供的URL进行充分的有效性检查，导致攻击者能够使服务器端应用程序向任意目标发起请求。攻击者可以利用这一漏洞探测内网服务、访问内部系统、获取敏感信息，甚至可能进一步利用其他漏洞进行攻击。
+
+2. **触发场景**
+   当应用程序使用了 `curl_init`, `curl_setopt`, `fsockopen`, `file_get_contents`, `fopen` 等函数从用户提供的或可控的URL加载资源，且未对URL进行严格的校验和限制时，就可能存在SSRF漏洞。
+
+   **存在漏洞的代码示例**
+   ```php
+   <?php
+   function curl($url){
+       $ch = curl_init();
+       curl_setopt($ch,CURLOPT_URL,$url);
+       #curl_setopt($ch,CUPLOPT_HEADER,1);
+       curl_exec($ch);
+       curl_close($ch);
+   }
+   $url = $_GET['url']; // 用户可控的URL输入
+   curl($url);
+   ?>
+   ```
+
+   ```php
+   <?php
+   $host=$_GET['url']; // 用户可控的URL输入
+   $fp = fsockopen("$host", 80, $errno, $errstr, 30);
+   if (!$fp) {
+       echo "$errstr ($errno)<br />
+";
+   } else {
+       $out = "GET / HTTP/1.1\r\n";
+       $out .= "Host: $host\r\n";
+       $out .= "Connection: Close\r\n\r\n";
+       fwrite($fp, $out);
+       while (!feof($fp)) {
+           echo fgets($fp, 128);
+       }
+       fclose($fp);
+   }
+   ?>
+   ```
+
+   攻击者可以通过构造恶意URL（如 `http://localhost:8080/admin` 或 `file:///etc/passwd`）来访问非预期的资源。
+
+3. **潜在影响**
+   - 探测内网网络结构和开放服务。
+   - 访问内网敏感系统或接口。
+   - 读取服务器本地文件。
+   - 攻击者利用服务请求作为跳板与其他服务器进行通信，隐藏攻击来源。
+   - 端口扫描。
+CODE
+	level: "high",
+	title: "Unvalidated SSRF Parameter Injection",
+	title_zh: "SSRF未验证参数注入风险",
 	solution: <<<CODE
 ### 修复建议
 
@@ -226,62 +282,6 @@ alert $high	for {
 3. **对返回结果进行严格限制**
    不返回原始的、未经处理的响应数据给用户，避免泄露敏感信息。
 CODE
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   服务器端请求伪造（SSRF）漏洞的产生是由于应用程序未能对用户提供的URL进行充分的有效性检查，导致攻击者能够使服务器端应用程序向任意目标发起请求。攻击者可以利用这一漏洞探测内网服务、访问内部系统、获取敏感信息，甚至可能进一步利用其他漏洞进行攻击。
-
-2. **触发场景**
-   当应用程序使用了 `curl_init`, `curl_setopt`, `fsockopen`, `file_get_contents`, `fopen` 等函数从用户提供的或可控的URL加载资源，且未对URL进行严格的校验和限制时，就可能存在SSRF漏洞。
-
-   **存在漏洞的代码示例**
-   ```php
-   <?php
-   function curl($url){
-       $ch = curl_init();
-       curl_setopt($ch,CURLOPT_URL,$url);
-       #curl_setopt($ch,CUPLOPT_HEADER,1);
-       curl_exec($ch);
-       curl_close($ch);
-   }
-   $url = $_GET['url']; // 用户可控的URL输入
-   curl($url);
-   ?>
-   ```
-
-   ```php
-   <?php
-   $host=$_GET['url']; // 用户可控的URL输入
-   $fp = fsockopen("$host", 80, $errno, $errstr, 30);
-   if (!$fp) {
-       echo "$errstr ($errno)<br />
-";
-   } else {
-       $out = "GET / HTTP/1.1\r\n";
-       $out .= "Host: $host\r\n";
-       $out .= "Connection: Close\r\n\r\n";
-       fwrite($fp, $out);
-       while (!feof($fp)) {
-           echo fgets($fp, 128);
-       }
-       fclose($fp);
-   }
-   ?>
-   ```
-
-   攻击者可以通过构造恶意URL（如 `http://localhost:8080/admin` 或 `file:///etc/passwd`）来访问非预期的资源。
-
-3. **潜在影响**
-   - 探测内网网络结构和开放服务。
-   - 访问内网敏感系统或接口。
-   - 读取服务器本地文件。
-   - 攻击者利用服务请求作为跳板与其他服务器进行通信，隐藏攻击来源。
-   - 端口扫描。
-CODE
-	level: "high",
-	title: "Unvalidated SSRF Parameter Injection",
-	title_zh: "SSRF未验证参数注入风险",
 }
 
 $all<dataflow(include=<<<CODE
@@ -293,9 +293,6 @@ CODE)> as $highAndMid
 $highAndMid - $high as $mid
 
 alert $mid	for {
-	level: "mid",
-	title: "Insufficient SSRF Parameter Filtering",
-	title_zh: "SSRF参数过滤不充分",
 	solution: <<<CODE
 ### 修复建议
 
@@ -375,12 +372,13 @@ CODE
    - 可能导致攻击者访问非预期的内部资源。
    - 存在一定的信息泄露风险。
 CODE
+	level: "mid",
+	title: "Insufficient SSRF Parameter Filtering",
+	title_zh: "SSRF参数过滤不充分",
 }
 
 $sink - $high - $mid  as $low
 alert $low	for {
-	title: "Potential SSRF Access Control Bypass",
-	title_zh: "SSRF访问控制潜在绕过风险",
 	solution: <<<CODE
 ### 修复建议
 
@@ -459,6 +457,8 @@ CODE
    - 可能导致信息泄露或其他非预期行为。
 CODE
 	level: "low",
+	title: "Potential SSRF Access Control Bypass",
+	title_zh: "SSRF访问控制潜在绕过风险",
 }
 
 desc(

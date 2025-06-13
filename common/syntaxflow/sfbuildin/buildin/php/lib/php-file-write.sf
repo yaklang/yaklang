@@ -100,9 +100,9 @@ SOLUTION
 
 /^(fwrite|file_put_contents)$/ as $output
 alert $output	for {
-	title: "Unvalidated PHP File Write",
 	title_zh: "未验证的PHP文件写入",
 	level: "info",
+	title: "Unvalidated PHP File Write",
 }
 
 desc(

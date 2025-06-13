@@ -87,10 +87,10 @@ alert $thread	for {
 
 ThreadLocal()?{<typeName>?{have:'java.lang.ThreadLocal'}} as $threadLocal;
 alert $threadLocal	for {
-	level: "info",
-	message: "检测到Java项目中使用了ThreadLocal类",
 	title: "ThreadLocal Usage",
 	title_zh: "ThreadLocal使用",
+	level: "info",
+	message: "检测到Java项目中使用了ThreadLocal类",
 }
 
 $thread./^(destroy|interrupt|join|resume|start|stop|suspend)$/ as $weak;

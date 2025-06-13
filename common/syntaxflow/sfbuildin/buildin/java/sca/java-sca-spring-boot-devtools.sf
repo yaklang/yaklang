@@ -78,7 +78,6 @@ __dependency__./org.springframework.boot:spring-boot-starter-test/  as $weak;
 
 check $weak;
 alert $weak	for {
-	message: "检测到Java Spring Boot Devtools的使用",
 	title: "Detected Java Spring Boot Devtools Usage",
 	title_zh: "检测到Java Spring Boot Devtools的使用",
 	solution: <<<CODE
@@ -173,6 +172,7 @@ CODE
    - 远程调试功能若未关闭，可能允许攻击者利用未授权的远程连接入侵系统。
 CODE
 	level: "info",
+	message: "检测到Java Spring Boot Devtools的使用",
 }
 
 desc(

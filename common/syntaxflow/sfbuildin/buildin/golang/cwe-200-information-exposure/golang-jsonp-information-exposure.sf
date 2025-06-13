@@ -107,6 +107,7 @@ $obj #{
 }-> as $low;
 
 alert $low	for {
+	title: "Detect Golang Json Information Exposure",
 	title_zh: "检测到Golang Json信息泄露",
 	solution: <<<CODE
 ### 修复建议
@@ -192,7 +193,6 @@ func (c *JsonpVuln1Controller) Get() {
 CODE
 	level: "low",
 	type: "vuln",
-	title: "Detect Golang Json Information Exposure",
 }
 
 desc(

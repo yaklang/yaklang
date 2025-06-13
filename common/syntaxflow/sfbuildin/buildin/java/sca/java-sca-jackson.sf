@@ -62,6 +62,7 @@ __dependency__.*jackson*core.version as $ver;
 $ver in [2.13.0,2.13.3] as $vuln_jackson_core;
 alert $vuln_jackson_core	for {
 	cve: "CVE-2022-42003",
+	message: "SCA: jackson-core versions between 2.13.0 and 2.13.3 have a denial of service vulnerability",
 	title: "SCA: Check Java jackson-core Vulnerability",
 	title_zh: "SCA: 检测Java jackson-core 依赖漏洞",
 	solution: <<<CODE
@@ -114,5 +115,4 @@ CODE
 该规则通过检查项目中依赖的 `jackson-core` 库的版本，识别是否存在已知拒绝服务漏洞的版本范围。具体检测版本为 `2.13.0` 到 `2.13.3`（包含边界版本）。如果项目依赖该版本范围内的 `jackson-core` 库，则报警提示存在依赖漏洞。
 CODE
 	level: "mid",
-	message: "SCA: jackson-core versions between 2.13.0 and 2.13.3 have a denial of service vulnerability",
 }

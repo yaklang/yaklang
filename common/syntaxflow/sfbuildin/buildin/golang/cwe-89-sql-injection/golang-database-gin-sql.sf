@@ -89,6 +89,8 @@ $param?{<self>-{
 }->} as $high;
 
 alert $high	for {
+	level: "high",
+	type: "vuln",
 	title: "SQL Injection detected",
 	title_zh: "检测到SQL注入",
 	solution: <<<CODE
@@ -162,8 +164,6 @@ CODE
    - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
    - 通过数据库提权进一步渗透至服务器或其他系统组件。
 CODE
-	level: "high",
-	type: "vuln",
 }
 
 desc(

@@ -91,7 +91,6 @@ $sink #{
 }->  as  $mid;
 
 alert $mid	for {
-	message: "发现Java Framework SPEL表达式注入漏洞",
 	title: "Check Java Spring SPEL Parser Injection",
 	title_zh: "检测Java Spring SPEL Parser表达式注入漏洞",
 	solution: <<<CODE
@@ -166,6 +165,7 @@ public class SPELController {
 - 控制受影响的服务器，导致更广泛的安全漏洞
 CODE
 	level: "middle",
+	message: "发现Java Framework SPEL表达式注入漏洞",
 }
 
 $sink #{
@@ -175,6 +175,42 @@ $sink #{
 $result - $mid as $low;
 
 alert $low	for {
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+Spring Framework 默认对用户输入的SPEL表达式进行解析，因此当应用程序没有对用户输入的表达式进行严格的限制时，可能产生SPEL表达式注入，从而导致远程代码执行，进而威胁系统安全。
+
+2. **触发场景**
+当应用程序使用`SpelExpressionParser().parseExpression(ex)`等方法直接解析用户可控变量时，例如通过 `@RequestParam` 或 `@ResponseBody` 获取用户输入，攻击者可以构造恶意的SPEL表达式，例如 `T(java.lang.Runtime).getRuntime().exec("calc.exe")` 来执行任意命令。
+
+```java
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
+
+@Controller
+@RequestMapping("/spel")
+public class SPELController {
+
+    @GetMapping("/vul")
+    @ResponseBody
+    public String vul(@RequestParam String ex) {
+        ExpressionParser parser = new SpelExpressionParser();
+        String result = parser.parseExpression(ex).getValue().toString();
+        return "Result: " + result;
+    }
+}
+```
+
+3. **潜在影响**
+- 敏感数据泄露
+- 执行任意系统命令，实现远程代码执行 (RCE)
+- 控制受影响的服务器，导致更广泛的安全漏洞
+CODE
+	level: "low",
+	message: "发现Java 可能存在Framework SPEL表达式注入漏洞",
 	title: "Check Java Spring SPEL Parser Injection",
 	title_zh: "检测Java Spring SPEL Parser表达式注入漏洞",
 	solution: <<<CODE
@@ -214,42 +250,6 @@ public class SPELController {
 #### 3. 避免在可控输入中直接解析复杂表达式
 如果业务逻辑允许，尽量避免直接解析用户输入的完整和复杂的SPEL表达式。考虑使用更安全的机制，例如预定义的模板或简单的表达式语言。
 CODE
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-Spring Framework 默认对用户输入的SPEL表达式进行解析，因此当应用程序没有对用户输入的表达式进行严格的限制时，可能产生SPEL表达式注入，从而导致远程代码执行，进而威胁系统安全。
-
-2. **触发场景**
-当应用程序使用`SpelExpressionParser().parseExpression(ex)`等方法直接解析用户可控变量时，例如通过 `@RequestParam` 或 `@ResponseBody` 获取用户输入，攻击者可以构造恶意的SPEL表达式，例如 `T(java.lang.Runtime).getRuntime().exec("calc.exe")` 来执行任意命令。
-
-```java
-import org.springframework.expression.ExpressionParser;
-import org.springframework.expression.spel.standard.SpelExpressionParser;
-import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.*;
-
-@Controller
-@RequestMapping("/spel")
-public class SPELController {
-
-    @GetMapping("/vul")
-    @ResponseBody
-    public String vul(@RequestParam String ex) {
-        ExpressionParser parser = new SpelExpressionParser();
-        String result = parser.parseExpression(ex).getValue().toString();
-        return "Result: " + result;
-    }
-}
-```
-
-3. **潜在影响**
-- 敏感数据泄露
-- 执行任意系统命令，实现远程代码执行 (RCE)
-- 控制受影响的服务器，导致更广泛的安全漏洞
-CODE
-	level: "low",
-	message: "发现Java 可能存在Framework SPEL表达式注入漏洞",
 }
 
 desc(

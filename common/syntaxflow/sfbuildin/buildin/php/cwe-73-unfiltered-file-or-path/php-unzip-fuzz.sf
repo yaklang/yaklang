@@ -121,6 +121,7 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high	for {
+	level: "high",
 	title: "Detect PHP Unsafe File Unzip Without Validation",
 	title_zh: "检测PHP未经验证的高危文件解压",
 	solution: <<<CODE
@@ -212,7 +213,6 @@ CODE
    - 攻击者可以将恶意文件写入Web目录，执行恶意脚本（WebShell）。
    - 攻击者可以覆盖或篡改系统关键配置或程序文件。   - 攻击者可以实现任意文件写入或删除，导致数据丢失或系统破坏。   - 攻击者可能通过解压超大文件或大量小文件造成拒绝服务。
 CODE
-	level: "high",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -223,6 +223,8 @@ CODE)> as $highAndMid
 $highAndMid - $high as $mid
 
 alert $mid	for {
+	title: "Detect PHP Insecure File Type Detection",
+	title_zh: "检测PHP文件解压类型检测不安全",
 	desc: <<<CODE
 ### 风险描述
 
@@ -249,14 +251,10 @@ alert $mid	for {
    - 攻击者可以覆盖或篡改系统关键配置或程序文件。   - 攻击者可以实现任意文件写入或删除，导致数据丢失或系统破坏。   - 攻击者可能通过解压超大文件或大量小文件造成拒绝服务。
 CODE
 	level: "mid",
-	title: "Detect PHP Insecure File Type Detection",
-	title_zh: "检测PHP文件解压类型检测不安全",
 }
 $sink - $high - $mid as $low
 
 alert $low	for {
-	title: "Audit PHP Potential File Storage Path Misconfiguration",
-	title_zh: "审计PHP潜在的文件存储路径配置问题",
 	desc: <<<CODE
 ### 风险描述
 
@@ -283,6 +281,8 @@ alert $low	for {
    - 攻击者可以覆盖或篡改系统关键配置或程序文件。   - 攻击者可以实现任意文件写入或删除，导致数据丢失或系统破坏。   - 攻击者可能通过解压超大文件或大量小文件造成拒绝服务。
 CODE
 	level: "low",
+	title: "Audit PHP Potential File Storage Path Misconfiguration",
+	title_zh: "审计PHP潜在的文件存储路径配置问题",
 }
 desc(
 	lang: php

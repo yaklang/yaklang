@@ -205,7 +205,6 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high	for {
-	title: "Unvalidated parameter injection",
 	title_zh: "未验证参数注入风险",
 	solution: <<<CODE
 ### 修复建议
@@ -294,6 +293,7 @@ CODE
     攻击者可以完全控制服务器，执行任意操作系统命令，获取敏感数据，篡改文件，甚至利用服务器作为跳板进行内网渗透。导致服务器失陷，造成严重的安全后果。
 CODE
 	level: "high",
+	title: "Unvalidated parameter injection",
 }
 
 $all<dataflow(include=<<<INCLUDE
@@ -305,6 +305,7 @@ CODE)> as $highAndMid
 $highAndMid - $high as $mid
 
 alert $mid	for {
+	title: "Insufficient parameter filtering",
 	title_zh: "参数过滤不充分，可能存在代码执行风险",
 	solution: <<<CODE
 ### 修复建议
@@ -393,44 +394,11 @@ CODE
     攻击者可以完全控制服务器，执行任意操作系统命令，获取敏感数据，篡改文件，甚至利用服务器作为跳板进行内网渗透。导致服务器失陷，造成严重的安全后果。
 CODE
 	level: "mid",
-	title: "Insufficient parameter filtering",
 }
 
 $all - $high - $mid as $low
 
 alert $low	for {
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   当 PHP 代码中直接使用了 `eval()`、`create_function()` 或 `assert()` 等函数，并且这些函数的参数可控，来源于未经过充分过滤或验证的外部输入（如 GET、POST、COOKIE 参数），攻击者可以注入恶意代码并执行，从而实现代码执行攻击。
-
-2. **触发场景**
-
-   *   **直接使用未经验证的外部输入作为 `eval()` 参数：**
-       ```php
-       <?php
-       eval($_GET["code"]);
-       ?>
-       ```
-   *   **使用未经验证的外部输入作为 `create_function()` 的匿名函数体：**
-       ```php
-       <?php
-           $func = create_function('$a', $_COOKIE['func_body']);
-           $func(1);
-       ?>
-       ```
-   *   **使用未经验证的外部输入作为 `assert()` 的参数：**
-       ```php
-       <?php
-           assert($_GET['code']);
-       ?>
-       ```
-
-3. **潜在影响**
-    攻击者可以完全控制服务器，执行任意操作系统命令，获取敏感数据，篡改文件，甚至利用服务器作为跳板进行内网渗透。导致服务器失陷，造成严重的安全后果。
-CODE
-	level: "low",
 	title: "Potential code execution risk",
 	title_zh: "潜在代码执行风险",
 	solution: <<<CODE
@@ -488,6 +456,38 @@ CODE
    ?>
    ```
 CODE
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+   当 PHP 代码中直接使用了 `eval()`、`create_function()` 或 `assert()` 等函数，并且这些函数的参数可控，来源于未经过充分过滤或验证的外部输入（如 GET、POST、COOKIE 参数），攻击者可以注入恶意代码并执行，从而实现代码执行攻击。
+
+2. **触发场景**
+
+   *   **直接使用未经验证的外部输入作为 `eval()` 参数：**
+       ```php
+       <?php
+       eval($_GET["code"]);
+       ?>
+       ```
+   *   **使用未经验证的外部输入作为 `create_function()` 的匿名函数体：**
+       ```php
+       <?php
+           $func = create_function('$a', $_COOKIE['func_body']);
+           $func(1);
+       ?>
+       ```
+   *   **使用未经验证的外部输入作为 `assert()` 的参数：**
+       ```php
+       <?php
+           assert($_GET['code']);
+       ?>
+       ```
+
+3. **潜在影响**
+    攻击者可以完全控制服务器，执行任意操作系统命令，获取敏感数据，篡改文件，甚至利用服务器作为跳板进行内网渗透。导致服务器失陷，造成严重的安全后果。
+CODE
+	level: "low",
 }
 desc(
 	lang: "php"
@@ -530,9 +530,9 @@ $source #{
 }-> as $mid
 
 alert $mid_risk	for {
+	level: "mid",
 	title: "Insufficient parameter filtering",
 	title_zh: "参数过滤不充分，可能存在代码执行风险",
-	level: "mid",
 }
 
 $allRisk - $high - $mid as $low

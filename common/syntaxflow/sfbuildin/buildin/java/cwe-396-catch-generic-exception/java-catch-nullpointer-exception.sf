@@ -74,9 +74,9 @@ REFERENCE
 $exception?{<typeName()>?{have:/^NullPointerException$/}} as $null_pointer_exception
 
 alert $null_pointer_exception	for {
+	level: "mid",
 	title: "Audit Java Catch NullPointerException",
 	title_zh: "审计Java捕获NullPointerException",
-	level: "mid",
 }
 
 

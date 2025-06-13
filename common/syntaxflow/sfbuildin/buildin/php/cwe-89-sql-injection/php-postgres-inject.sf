@@ -130,9 +130,6 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high	for {
-	level: "high",
-	title: "Unvalidated PostgreSQL Parameter Injection",
-	title_zh: "PostgreSQL未验证参数注入风险",
 	solution: <<<CODE
 ### 修复建议
 
@@ -232,6 +229,9 @@ CODE
    - **权限提升**：在某些配置下，可以通过注入语句获取更高权限，甚至执行操作系统命令。
    - **服务中断**：通过注入恶意语句导致数据库崩溃或应用程序异常。
 CODE
+	level: "high",
+	title: "Unvalidated PostgreSQL Parameter Injection",
+	title_zh: "PostgreSQL未验证参数注入风险",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -243,28 +243,6 @@ $highAndMid - $high as $mid
 
 
 alert $mid	for {
-	desc: <<<CODE
-### 风险描述
-
-1. **风险原理**
-   在处理PostgreSQL数据库操作时，若未对用户输入进行充分过滤或验证，可能会存在SQL注入的风险。尽管部分输入可能已经经过过滤函数处理，但如果过滤不足或使用不当，仍可能存在安全漏洞。
-
-2. **触发场景**
-   - **存在中危问题的代码示例**
-     ```php
-     <?php
-         $email = xxxx($_POST['email']); // 使用了过滤函数，但可能不够充分或被绕过
-         $res = pg_exec($conn, "UPDATE accounts SET email = '$email' WHERE id = 123"); // 中危漏洞
-     ?>
-     ```
-
-3. **潜在影响**
-   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
-   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
-   - 通过数据库提权进一步渗透至服务器或其他系统组件。
-   - 通过注入恶意语句导致数据库崩溃或应用程序异常。
-CODE
-	level: "mid",
 	title: "Insufficient PostgreSQL Parameter Filtering",
 	title_zh: "PostgreSQL参数过滤不充分",
 	solution: <<<CODE
@@ -331,13 +309,33 @@ CODE
 #### 4. 最小权限原则
 为数据库用户分配最小必需的权限，限制其只能执行应用程序需要的操作。即使发生注入攻击，也能限制攻击者能造成的损害。
 CODE
+	desc: <<<CODE
+### 风险描述
+
+1. **风险原理**
+   在处理PostgreSQL数据库操作时，若未对用户输入进行充分过滤或验证，可能会存在SQL注入的风险。尽管部分输入可能已经经过过滤函数处理，但如果过滤不足或使用不当，仍可能存在安全漏洞。
+
+2. **触发场景**
+   - **存在中危问题的代码示例**
+     ```php
+     <?php
+         $email = xxxx($_POST['email']); // 使用了过滤函数，但可能不够充分或被绕过
+         $res = pg_exec($conn, "UPDATE accounts SET email = '$email' WHERE id = 123"); // 中危漏洞
+     ?>
+     ```
+
+3. **潜在影响**
+   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+   - 通过数据库提权进一步渗透至服务器或其他系统组件。
+   - 通过注入恶意语句导致数据库崩溃或应用程序异常。
+CODE
+	level: "mid",
 }
 
 $sink - $high - $mid as $low
 
 alert $low	for {
-	title: "Potential PostgreSQL Access Control Bypass",
-	title_zh: "PostgreSQL访问控制潜在绕过风险",
 	desc: <<<CODE
 ### 规则目的
 该规则用于审计PHP代码中可能出现的PostgreSQL访问控制潜在绕过风险。它通过识别直接使用用户输入调用PostgreSQL相关函数的情况，定位可能存在的访问控制缺陷，防止攻击者利用信任机制绕过正常的安全防护。
@@ -351,6 +349,8 @@ alert $low	for {
    `pg_exec`, `pg_query`, `pg_execute`。
 CODE
 	level: "low",
+	title: "Potential PostgreSQL Access Control Bypass",
+	title_zh: "PostgreSQL访问控制潜在绕过风险",
 }
 
 desc(

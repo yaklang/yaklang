@@ -129,6 +129,7 @@ CODE
 
 $result - $high  as $low;
 alert $low	for {
+	title: "Check Java LDAP Injection Vulnerability",
 	title_zh: "检测Java LDAP注入漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -179,7 +180,6 @@ NamingEnumeration answer = ctx.search("dc=example,dc=com", searchFilter, searchC
 CODE
 	level: "low",
 	message: "发现Java代码中可能存在LDAP注入漏洞。",
-	title: "Check Java LDAP Injection Vulnerability",
 }
 
 

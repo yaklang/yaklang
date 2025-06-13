@@ -101,10 +101,6 @@ $toCheckCall - $excludeCall as $vulnCall;
 check $vulnCall;
 
 alert $vulnCall	for {
-	level: "high",
-	message: "STAX XMLInputFactory() Unsafe Use",
-	title: "Check Java STAX XMLInputFactory Unsafe Use",
-	title_zh: "检测 Java STAX XMLInputFactory 不安全使用",
 	solution: <<<CODE
 ### 修复建议
 
@@ -179,6 +175,10 @@ CODE
    - **拒绝服务 (DoS)**: 攻击者可以构造递归或无限循环的实体引用，导致解析器陷入死循环或消耗大量资源，造成服务不可用。
    - **端口扫描**: 通过错误信息或延迟差异，攻击者可以探测内部网络的开放端口。
 CODE
+	level: "high",
+	message: "STAX XMLInputFactory() Unsafe Use",
+	title: "Check Java STAX XMLInputFactory Unsafe Use",
+	title_zh: "检测 Java STAX XMLInputFactory 不安全使用",
 }
 
 desc(
