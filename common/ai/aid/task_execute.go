@@ -88,7 +88,10 @@ TOOLREQUIRED:
 		atomic.AddInt64(toolCallCount, 1)
 
 		targetTool := toolRequired[0]
-		result, err := t.callTool(targetTool)
+		result, directlyAnswerFlag, err := t.callTool(targetTool)
+		if directlyAnswerFlag {
+			break TOOLREQUIRED
+		}
 		if err != nil {
 			t.config.EmitError("error calling tool: %v", err)
 			return err
@@ -139,6 +142,7 @@ TOOLREQUIRED:
 			break TOOLREQUIRED
 		case taskSkipped:
 			t.config.EmitInfo("task[%v] skipped, continue to next task", t.Name)
+			break TOOLREQUIRED
 		default:
 			t.config.EmitError("unknown action: %v, skip tool require", action)
 			break TOOLREQUIRED

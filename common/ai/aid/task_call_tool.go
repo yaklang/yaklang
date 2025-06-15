@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"sync"
 
+	"github.com/segmentio/ksuid"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/jsonextractor"
@@ -58,14 +60,49 @@ func (t *aiTask) getToolResultAction(response string) string {
 	return "unknown"
 }
 
-func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, err error) {
+func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, directlyAnswer bool, err error) {
 	t.config.EmitInfo("start to generate tool[%v] params in task:%#v", targetTool.Name, t.Name)
+
+	callToolId := ksuid.New().String()
+	t.config.EmitToolCallStart(callToolId, targetTool)
+	// tool-call with stats: generating-params -> review-params -> invoking -> done/finished
+	callToolDoneOnce := new(sync.Once)
+
+	handleResultDoneCallback := func() {
+		callToolDoneOnce.Do(func() {
+			t.config.EmitToolCallStatus(callToolId, "done")
+			t.config.EmitToolCallDone(callToolId)
+		})
+	}
+	handleResultUserCancel := func(reason any) {
+		callToolDoneOnce.Do(func() {
+			t.config.EmitToolCallStatus(callToolId, fmt.Sprintf("cancelled by reason: %v", reason))
+			t.config.EmitToolCallUserCancel(callToolId)
+		})
+	}
+	handleResultErr := func(err any) {
+		callToolDoneOnce.Do(func() {
+			t.config.EmitToolCallError(callToolId, err)
+		})
+	}
+
+	var (
+		_ = handleResultDoneCallback
+		_ = handleResultUserCancel
+		_ = handleResultErr
+	)
+
+	defer func() {
+		handleResultDoneCallback()
+	}()
+
 	// 生成申请工具详细描述的prompt
 	paramsPrompt, err := t.generateRequireToolResponsePrompt(targetTool, targetTool.Name)
 	if err != nil {
 		err = utils.Errorf("error generate require tool response prompt: %v", err)
 		t.config.EmitError("error generate require tool response prompt: %v", err)
-		return nil, NewNonRetryableTaskStackError(err)
+		handleResultErr(fmt.Sprintf("error generate require tool response prompt: %v", err))
+		return nil, false, NewNonRetryableTaskStackError(err)
 	}
 
 	var callToolParams = t.config.MakeInvokeParams()
@@ -89,7 +126,8 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 	if err != nil {
 		err = utils.Errorf("calling AI transaction failed: %v", err)
 		t.config.EmitError("critical err: %v", err)
-		return nil, NewNonRetryableTaskStackError(err)
+		handleResultErr(err)
+		return nil, false, NewNonRetryableTaskStackError(err)
 	}
 
 	t.config.EmitInfo("start to invoke tool:%v 's callback function", targetTool.Name)
@@ -105,19 +143,25 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 		params := ep.GetParams()
 		t.config.ReleaseInteractiveEvent(ep.id, params)
 		if params == nil {
-			t.config.EmitError("user review params is nil, plan failed")
-			return nil, NewNonRetryableTaskStackError(utils.Errorf("user review params is nil"))
+			t.config.EmitError("user review params is nil, tool use failed")
+			handleResultErr("user review params is nil, tool use failed")
+			return nil, false, NewNonRetryableTaskStackError(utils.Errorf("user review params is nil"))
 		}
 		var overrideResult *aitool.ToolResult
 		var next HandleToolUseNext
-		targetTool, callToolParams, overrideResult, next, err = t.handleToolUseReview(targetTool, callToolParams, params)
+		targetTool, callToolParams, overrideResult, next, err = t.handleToolUseReview(
+			targetTool, callToolParams, params, handleResultUserCancel,
+		)
 		if err != nil {
 			t.config.EmitError("error handling tool use review: %v", err)
-			return nil, NewNonRetryableTaskStackError(err)
+			handleResultErr(fmt.Sprintf("error handling tool use review: %v", err))
+			return nil, false, NewNonRetryableTaskStackError(err)
 		}
 		switch next {
 		case HandleToolUseNext_Override:
-			return overrideResult, nil
+			return overrideResult, false, nil
+		case HandleToolUseNext_DirectlyAnswer:
+			return nil, true, nil
 		default:
 		}
 	}
@@ -139,7 +183,7 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, e
 	t.config.EmitInfo("start to generate and feedback tool[%v] result in task:%#v", targetTool.Name, t.Name)
 	// 生成调用工具结果的prompt
 
-	return toolResult, nil
+	return toolResult, false, nil
 }
 
 func (t *aiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitool.Tool) (string, error) {
