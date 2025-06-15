@@ -85,7 +85,11 @@ func (t *aiTask) handleToolUseReview(
 			return targetTool, param, nil, "", nil
 		}
 		userCancelHandler("tool reselect")
-		result, err := t.callTool(targetTool)
+		result, directlyAnswer, err := t.callTool(targetTool)
+		if directlyAnswer {
+			userCancelHandler("tool directly answer")
+			return targetTool, param, nil, HandleToolUseNext_DirectlyAnswer, nil
+		}
 		if err != nil {
 			t.config.EmitError("error handling tool review: %v", err)
 			return targetTool, param, nil, "", nil
