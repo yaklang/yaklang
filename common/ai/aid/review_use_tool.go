@@ -52,11 +52,15 @@ var ToolUseReviewSuggestions = []*ToolUseReviewSuggestion{
 type HandleToolUseNext string
 
 const (
-	HandleToolUseNext_Override HandleToolUseNext = "override"
-	HandleToolUseNext_Default  HandleToolUseNext = ""
+	HandleToolUseNext_Override       HandleToolUseNext = "override"
+	HandleToolUseNext_DirectlyAnswer HandleToolUseNext = "directly-answer"
+	HandleToolUseNext_Default        HandleToolUseNext = ""
 )
 
-func (t *aiTask) handleToolUseReview(targetTool *aitool.Tool, param aitool.InvokeParams, userInput aitool.InvokeParams) (*aitool.Tool, aitool.InvokeParams, *aitool.ToolResult, HandleToolUseNext, error) {
+func (t *aiTask) handleToolUseReview(
+	targetTool *aitool.Tool, param aitool.InvokeParams, userInput aitool.InvokeParams,
+	userCancelHandler func(reason any),
+) (*aitool.Tool, aitool.InvokeParams, *aitool.ToolResult, HandleToolUseNext, error) {
 	// 1. 获取审查建议
 	suggestion := userInput.GetString("suggestion")
 	if suggestion == "" {
@@ -80,6 +84,7 @@ func (t *aiTask) handleToolUseReview(targetTool *aitool.Tool, param aitool.Invok
 			t.config.EmitError("error handling tool review: %v", err)
 			return targetTool, param, nil, "", nil
 		}
+		userCancelHandler("tool reselect")
 		result, err := t.callTool(targetTool)
 		if err != nil {
 			t.config.EmitError("error handling tool review: %v", err)
@@ -89,7 +94,8 @@ func (t *aiTask) handleToolUseReview(targetTool *aitool.Tool, param aitool.Invok
 	case "wrong_params":
 		return targetTool, param, nil, "", nil
 	case "direct_answer":
-		return targetTool, param, nil, "", nil
+		userCancelHandler("direct answer without tool")
+		return targetTool, param, nil, HandleToolUseNext_DirectlyAnswer, nil
 	default:
 		t.config.EmitError("unknown review suggestion: %s", suggestion)
 		return targetTool, param, nil, "", utils.Errorf("unknown review suggestion: %s", suggestion)
