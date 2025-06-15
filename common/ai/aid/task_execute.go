@@ -139,6 +139,7 @@ TOOLREQUIRED:
 			break TOOLREQUIRED
 		case taskSkipped:
 			t.config.EmitInfo("task[%v] skipped, continue to next task", t.Name)
+			break TOOLREQUIRED
 		default:
 			t.config.EmitError("unknown action: %v, skip tool require", action)
 			break TOOLREQUIRED
