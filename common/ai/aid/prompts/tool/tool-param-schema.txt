@@ -1,6 +1,5 @@
 ## 任务状态与进度
 {{ .Memory.CurrentTaskInfo }}
-{{ .Memory.Timeline }}
 
 {{ if .Memory.PersistentMemory }}# 牢记
 {{ .Memory.PersistentMemory}}
@@ -35,7 +34,14 @@
 • 嵌套对象保持合理深度层级
 • 仅输出JSON对象即可，不需要输出解释/执行流程/注意事项等
 
+# History
+{{ .Memory.Timeline }}
+
 ```schema
 {{ .ToolJSONSchema }}
 ```
-请根据Schema描述构造有效JSON对象来调用此工具，系统会执行工具内容
+请根据Schema描述构造有效JSON对象来调用此工具，系统会执行工具内容。
+
+一般来说，你应该生成数据类似于：`{"@action": "call-tool", "tool": ..., "params": ... }`。
+
+注意观察历史记录中已有的参数，不要重复使用相似参数执行工具，已经执行过的结果不要重复执行

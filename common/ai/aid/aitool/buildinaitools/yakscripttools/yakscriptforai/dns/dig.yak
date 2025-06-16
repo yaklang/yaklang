@@ -5,6 +5,10 @@ __KEYWORDS__ = "domain name,域名解析,a记录,dns查询,dns helper,aaaa recor
 target = cli.String("domain", cli.setRequired(true), cli.setHelp("the target domain u want to check")) //"www.example.com"
 cli.check()
 
+yakit.AutoInitYakit()
+
+yakit.Info("start to check NS/A/AAAA/AXFR/TXT records for %v", target)
+
 m = sync.NewMutex()
 output = (typeName, domain, result) => {
     m.Lock()
@@ -17,32 +21,50 @@ wg.Add()
 go func{
     defer wg.Done()
     defer recover()
+    count := 0
     for i in dns.QueryNS(target /*type: string*/, dns.timeout(5)) {
+        count++
         output("NS", target, i)
     }
+    if count <= 0 {
+        yakit.Info("No NS found in %v", target)
+    }
 }
 wg.Add()
 go func{
     defer wg.Done()
     defer recover()
+    count := 0
     for i in dns.QueryIPAll(target /*type: string*/, dns.timeout(5)) {
         output("A/AAAA", target, i)
+        count++
+    }
+    if count <= 0 {
+        yakit.Info("NO A/AAAA found in %v", target)
     }
 }
 wg.Add()
 go func{
     defer wg.Done()
     defer recover()
+    count := 0
     for i in dns.QuertAxfr(target /*type: string*/, dns.timeout(5)) {
         output("AXFR", target, i)
+        count++
     }
+    if count <= 0 { yakit.Info("NO AXFR record found in %v", target)}
 }
 wg.Add()
 go func{
     defer wg.Done()
     defer recover()
+    count := 0
     for i in dns.QueryTXT(target /*type: string*/, dns.timeout(5)) {
         output("TXT", target, i)
+        count++
+    }
+    if count <= 0 {
+        yakit.Info("No TXT Record found in %v", target)
     }
 }
 wg.Wait()
