@@ -87,9 +87,9 @@ REFERENCE
 .api?{ <getFormalParams>?{<typeName>?{have: SwaggerProperties} } } as $config;
 check $config
 alert $config	for {
+	level: "low",
 	title: "Audit Java Springfox Configuration",
 	title_zh: "审计Java Springfox配置",
-	level: "low",
 }
 
 

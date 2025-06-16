@@ -114,7 +114,9 @@ $sink #{
 }->as  $mid;
 
 alert $mid	for {
+	level: "mid",
 	message: "发现Java SpringBoot SSRF漏洞,并且没有任何数据流过滤。",
+	risk: "ssrf",
 	title: "Detect Java SpringBoot SSRF Vulnerability",
 	title_zh: "检测Java SpringBoot 服务端请求伪造(SSRF)漏洞",
 	solution: <<<CODE
@@ -215,8 +217,6 @@ CODE
    - **拒绝服务攻击(DoS)**: 攻击者可以利用应用程序对内部或外部服务发起大量请求，导致服务不可用。
    - **云环境下的风险**: 在云环境中，SSRF可用于访问云服务提供商的元数据服务（如AWS的`http://169.254.169.254/latest/meta-data/`），获取敏感信息（如IAM角色凭证）。
 CODE
-	level: "mid",
-	risk: "ssrf",
 }
 
 $sink #{
@@ -226,66 +226,6 @@ $sink #{
 $result - $mid as $low;
 
 alert $low	for {
-	title: "Detect Java SpringBoot SSRF Vulnerability",
-	title_zh: "检测Java SpringBoot 服务端请求伪造(SSRF)漏洞",
-	solution: <<<CODE
-### 修复建议
-
-#### 1. 严格的URL验证和过滤
-
-对用户的URL输入进行严格的白名单验证。只允许访问经过明确允许的特定域名、IP或URL模式。限制协议类型（例如，只允许`http`和`https`，禁止`file`、`ftp`等）。
-
-```java
-import java.net.URL;
-import java.net.MalformedURLException;
-
-// ...
-
-@GetMapping("/fetch-url")
-public String fetchUrl(@RequestParam("url") String url) {
-    try {
-        URL validatedUrl = new URL(url);
-        String host = validatedUrl.getHost();
-
-        // 白名单示例：只允许访问特定的域名
-        if (!"*.example.com".equals(host) && !"api.mydomain.com".equals(host)) {
-             // 或者使用更复杂的逻辑判断IP地址是否是内网IP
-             // if (isPrivateIp(host)) throw new SecurityException("Cannot access private IP");
-             throw new SecurityException("Invalid host: " + host);
-        }
-
-        RestTemplate restTemplate = new RestTemplate();
-        String result = restTemplate.getForObject(url, String.class);
-        return result;
-    } catch (MalformedURLException e) {
-        return "Error: Invalid URL format";
-    } catch (SecurityException e) {
-        return "Error: " + e.getMessage();
-    } catch (Exception e) {
-        return "Error: " + e.getMessage();
-    }
-}
-
-// 辅助方法：判断是否为内网IP (需要实现)
-// private boolean isPrivateIp(String host) { ... }
-```
-
-#### 2. 禁用或限制重定向
-
-许多HTTP客户端（包括 `RestTemplate`）默认会跟随HTTP重定向。攻击者可以通过重定向绕过初始的URL验证。配置HTTP客户端禁用自动重定向，或者在重定向发生后对重定向的目标URL再次进行验证。
-
-#### 3. 限制端口和协议
-
-除了限制域名/IP，还应限制可以访问的端口（例如，只允许标准的HTTP/HTTPS端口80, 443）和协议（明确禁止`file://`, `gopher://` 等协议）。
-
-#### 4. 使用专业的SSRF防护库或服务
-
-考虑使用专门用于防止SSRF的库或服务，这些工具通常集成了更全面的校验逻辑，包括IP地址类型判断（公网/私网）、端口限制、协议限制等。
-
-#### 5. 最小权限原则
-
-运行应用程序的用户或服务应遵循最小权限原则，限制其访问敏感资源的权限，即使发生SSRF漏洞，也能降低攻击成功率。
-CODE
 	desc: <<<CODE
 ### 漏洞描述
 
@@ -329,6 +269,66 @@ CODE
 	level: "low",
 	risk: "ssrf",
 	message: "发现Java SpringBoot SSRF漏洞,但是有数据流过滤。",
+	title: "Detect Java SpringBoot SSRF Vulnerability",
+	title_zh: "检测Java SpringBoot 服务端请求伪造(SSRF)漏洞",
+	solution: <<<CODE
+### 修复建议
+
+#### 1. 严格的URL验证和过滤
+
+对用户的URL输入进行严格的白名单验证。只允许访问经过明确允许的特定域名、IP或URL模式。限制协议类型（例如，只允许`http`和`https`，禁止`file`、`ftp`等）。
+
+```java
+import java.net.URL;
+import java.net.MalformedURLException;
+
+// ...
+
+@GetMapping("/fetch-url")
+public String fetchUrl(@RequestParam("url") String url) {
+    try {
+        URL validatedUrl = new URL(url);
+        String host = validatedUrl.getHost();
+
+        // 白名单示例：只允许访问特定的域名
+        if (!"*.example.com".equals(host) && !"api.mydomain.com".equals(host)) {
+             // 或者使用更复杂的逻辑判断IP地址是否是内网IP
+             // if (isPrivateIp(host)) throw new SecurityException("Cannot access private IP");
+             throw new SecurityException("Invalid host: " + host);
+        }
+
+        RestTemplate restTemplate = new RestTemplate();
+        String result = restTemplate.getForObject(url, String.class);
+        return result;
+    } catch (MalformedURLException e) {
+        return "Error: Invalid URL format";
+    } catch (SecurityException e) {
+        return "Error: " + e.getMessage();
+    } catch (Exception e) {
+        return "Error: " + e.getMessage();
+    }
+}
+
+// 辅助方法：判断是否为内网IP (需要实现)
+// private boolean isPrivateIp(String host) { ... }
+```
+
+#### 2. 禁用或限制重定向
+
+许多HTTP客户端（包括 `RestTemplate`）默认会跟随HTTP重定向。攻击者可以通过重定向绕过初始的URL验证。配置HTTP客户端禁用自动重定向，或者在重定向发生后对重定向的目标URL再次进行验证。
+
+#### 3. 限制端口和协议
+
+除了限制域名/IP，还应限制可以访问的端口（例如，只允许标准的HTTP/HTTPS端口80, 443）和协议（明确禁止`file://`, `gopher://` 等协议）。
+
+#### 4. 使用专业的SSRF防护库或服务
+
+考虑使用专门用于防止SSRF的库或服务，这些工具通常集成了更全面的校验逻辑，包括IP地址类型判断（公网/私网）、端口限制、协议限制等。
+
+#### 5. 最小权限原则
+
+运行应用程序的用户或服务应遵循最小权限原则，限制其访问敏感资源的权限，即使发生SSRF漏洞，也能降低攻击成功率。
+CODE
 }
 
 desc(

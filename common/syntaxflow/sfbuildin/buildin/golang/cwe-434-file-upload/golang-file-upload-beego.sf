@@ -91,6 +91,44 @@ $sink #{include: `$check`}-> as $safe;
 $sink #{exclude: `$safe`}-> as $high;
 
 alert $high	for {
+	desc: <<<CODE
+### 漏洞描述
+1. **漏洞原理**
+此审计规则旨在验证用户输入及传入的文件路径是否经过适当的过滤与授权。如果文件路径未经过验证，攻击者可能通过构造恶意路径实现文件覆盖、删除或路径穿越攻击，从而导致安全风险。路径穿越攻击允许攻击者访问或修改应用程序之外的敏感文件，甚至可能导致服务器被完全控制。
+
+2. **触发场景**
+以下代码示例展示了存在漏洞的文件上传逻辑：
+```go
+package main
+
+import (
+	"fmt"
+	"time"
+	beego "github.com/beego/beego/v2/server/web"
+)
+
+func (c *FileUploadVuln1Controller) Post() {
+	userid := c.GetString("userid")
+	_, h, err := c.GetFile("file")
+	if err != nil {
+		panic(err)
+	}
+	savePath := "static/upload/" + userid + fmt.Sprint(time.Now().Unix()) + h.Filename
+	c.SaveToFile("file", savePath)
+	c.Data["savePath"] = savePath
+	c.TplName = "fileUpload.tpl"
+}
+```
+在上述代码中，用户的输入`userid`和文件名`h.Filename`未经任何验证，直接拼接到保存路径中，导致潜在的路径穿越风险。
+
+3. **潜在影响**
+- 攻击者能够通过构造恶意路径访问或修改系统上的任意文件。
+- 敏感配置文件（如`/etc/passwd`）可能被篡改。
+- 攻击者可能利用该漏洞植入恶意脚本或木马程序，进一步危害系统安全。
+- 在极端情况下，可能导致服务器被完全控制。
+CODE
+	level: "high",
+	type: "vuln",
 	title: "Check Golang File Upload Vulnerability",
 	title_zh: "检测到Golang文件路径未授权漏洞",
 	solution: <<<CODE
@@ -148,44 +186,6 @@ savePath := filepath.Join("/var/www/uploads/", hex.EncodeToString(fileHash[:]))
 chmod 750 /var/www/uploads/
 ```
 CODE
-	desc: <<<CODE
-### 漏洞描述
-1. **漏洞原理**
-此审计规则旨在验证用户输入及传入的文件路径是否经过适当的过滤与授权。如果文件路径未经过验证，攻击者可能通过构造恶意路径实现文件覆盖、删除或路径穿越攻击，从而导致安全风险。路径穿越攻击允许攻击者访问或修改应用程序之外的敏感文件，甚至可能导致服务器被完全控制。
-
-2. **触发场景**
-以下代码示例展示了存在漏洞的文件上传逻辑：
-```go
-package main
-
-import (
-	"fmt"
-	"time"
-	beego "github.com/beego/beego/v2/server/web"
-)
-
-func (c *FileUploadVuln1Controller) Post() {
-	userid := c.GetString("userid")
-	_, h, err := c.GetFile("file")
-	if err != nil {
-		panic(err)
-	}
-	savePath := "static/upload/" + userid + fmt.Sprint(time.Now().Unix()) + h.Filename
-	c.SaveToFile("file", savePath)
-	c.Data["savePath"] = savePath
-	c.TplName = "fileUpload.tpl"
-}
-```
-在上述代码中，用户的输入`userid`和文件名`h.Filename`未经任何验证，直接拼接到保存路径中，导致潜在的路径穿越风险。
-
-3. **潜在影响**
-- 攻击者能够通过构造恶意路径访问或修改系统上的任意文件。
-- 敏感配置文件（如`/etc/passwd`）可能被篡改。
-- 攻击者可能利用该漏洞植入恶意脚本或木马程序，进一步危害系统安全。
-- 在极端情况下，可能导致服务器被完全控制。
-CODE
-	level: "high",
-	type: "vuln",
 }
 
 desc(

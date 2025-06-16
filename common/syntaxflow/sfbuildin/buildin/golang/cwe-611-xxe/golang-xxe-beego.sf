@@ -121,8 +121,6 @@ $entry.New(* as $param)
 $param?{have: "XMLParseNoEnt"} as $high
 
 alert $high	for {
-	type: "vuln",
-	title: "Check Golang XML External Entity (XXE) Vulnerability in Beego",
 	title_zh: "检测Golang Beego框架中的XML外部实体(XXE)漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -220,6 +218,8 @@ CODE
    - 可能导致服务器被完全控制。
 CODE
 	level: "high",
+	type: "vuln",
+	title: "Check Golang XML External Entity (XXE) Vulnerability in Beego",
 }
 
 desc(

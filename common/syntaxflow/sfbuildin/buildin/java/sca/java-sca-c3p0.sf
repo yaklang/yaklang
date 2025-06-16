@@ -55,9 +55,9 @@ REFERENCE
 __dependency__.*c3p0.version as $ver;
 $ver in [0.9.5.2,0.9.5.7] as $vuln_c3p0;
 alert $vuln_c3p0	for {
+	level: "high",
 	cve: "CVE-2019-5427",
+	message: "SCA: c3p0 versions between 0.9.5.2 and 0.9.5.7 have an unsafe class loading vulnerability",
 	title: "SCA: Check Java c3p0 Vulnerability",
 	title_zh: "SCA: 检测Java c3p0 依赖漏洞",
-	level: "high",
-	message: "SCA: c3p0 versions between 0.9.5.2 and 0.9.5.7 have an unsafe class loading vulnerability",
 }

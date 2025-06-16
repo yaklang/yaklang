@@ -82,9 +82,9 @@ CODE
 }->} as $sink
 
 alert $sink	for {
-	title: "PHP Unfiltered Directory Reading Vulnerability",
 	title_zh: "PHP未过滤目录读取漏洞",
 	level: "high",
+	title: "PHP Unfiltered Directory Reading Vulnerability",
 }
 desc(
 	lang: "php"

@@ -83,7 +83,6 @@ $sink #{
 }->as $high;
 
 alert $high	for {
-	title: "Check Java XPath Injection Vulnerability",
 	title_zh: "检测Java XPath注入漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -146,6 +145,7 @@ CODE
 CODE
 	level: "high",
 	message: "Find LDAP direct injection vulnerability",
+	title: "Check Java XPath Injection Vulnerability",
 }
 
 

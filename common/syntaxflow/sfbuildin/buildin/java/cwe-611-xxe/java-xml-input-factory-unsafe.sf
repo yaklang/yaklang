@@ -101,6 +101,9 @@ $toCheckCall - $excludeCall as $vulnCall;
 check $vulnCall;
 
 alert $vulnCall	for {
+	message: "STAX XMLInputFactory() Unsafe Use",
+	title: "Check Java STAX XMLInputFactory Unsafe Use",
+	title_zh: "检测 Java STAX XMLInputFactory 不安全使用",
 	solution: <<<CODE
 ### 修复建议
 
@@ -176,9 +179,6 @@ CODE
    - **端口扫描**: 通过错误信息或延迟差异，攻击者可以探测内部网络的开放端口。
 CODE
 	level: "high",
-	message: "STAX XMLInputFactory() Unsafe Use",
-	title: "Check Java STAX XMLInputFactory Unsafe Use",
-	title_zh: "检测 Java STAX XMLInputFactory 不安全使用",
 }
 
 desc(

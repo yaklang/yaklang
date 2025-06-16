@@ -71,8 +71,6 @@ REFERENCE
 /^(eval|exec|assert|system|shell_exec|pcntl_exec|popen|ob_start)$/ as $output
 
 alert $output	for {
-	title: "Unvalidated PHP OS Command Execution",
-	title_zh: "PHP未验证的命令执行",
 	solution: <<<CODE
 ### 修复建议
 
@@ -132,6 +130,8 @@ CODE
    - **拒绝服务 (DoS)**: 攻击者可以执行消耗大量系统资源的命令，导致服务不可用。
 CODE
 	level: "info",
+	title: "Unvalidated PHP OS Command Execution",
+	title_zh: "PHP未验证的命令执行",
 }
 desc(
 	lang: php

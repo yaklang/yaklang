@@ -130,6 +130,9 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high	for {
+	level: "high",
+	title: "Unvalidated PostgreSQL Parameter Injection",
+	title_zh: "PostgreSQL未验证参数注入风险",
 	solution: <<<CODE
 ### 修复建议
 
@@ -229,9 +232,6 @@ CODE
    - **权限提升**：在某些配置下，可以通过注入语句获取更高权限，甚至执行操作系统命令。
    - **服务中断**：通过注入恶意语句导致数据库崩溃或应用程序异常。
 CODE
-	level: "high",
-	title: "Unvalidated PostgreSQL Parameter Injection",
-	title_zh: "PostgreSQL未验证参数注入风险",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -336,6 +336,8 @@ CODE
 $sink - $high - $mid as $low
 
 alert $low	for {
+	title: "Potential PostgreSQL Access Control Bypass",
+	title_zh: "PostgreSQL访问控制潜在绕过风险",
 	desc: <<<CODE
 ### 规则目的
 该规则用于审计PHP代码中可能出现的PostgreSQL访问控制潜在绕过风险。它通过识别直接使用用户输入调用PostgreSQL相关函数的情况，定位可能存在的访问控制缺陷，防止攻击者利用信任机制绕过正常的安全防护。
@@ -349,8 +351,6 @@ alert $low	for {
    `pg_exec`, `pg_query`, `pg_execute`。
 CODE
 	level: "low",
-	title: "Potential PostgreSQL Access Control Bypass",
-	title_zh: "PostgreSQL访问控制潜在绕过风险",
 }
 
 desc(

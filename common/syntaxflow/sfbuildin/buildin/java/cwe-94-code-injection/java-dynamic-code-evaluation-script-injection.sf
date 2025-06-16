@@ -104,11 +104,11 @@ INCLUDE,
 }->} as $mid;
 
 alert $mid	for {
+	title: "Detect Java Script Injection Vulnerability in Dynamic Code Execution",
+	title_zh: "检测Java动态代码执行中的脚本注入漏洞",
 	level: "mid",
 	message: "Find Java Dynamic Code Evaluation Script Injection Vulnerability",
 	risk: "rce-code",
-	title: "Detect Java Script Injection Vulnerability in Dynamic Code Execution",
-	title_zh: "检测Java动态代码执行中的脚本注入漏洞",
 }
 
 desc(

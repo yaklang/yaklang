@@ -79,10 +79,10 @@ $algorithm#{
 }-> as $sink;
 
 alert $sink	for {
+	level: "low",
 	message: "Find the use of broken or risky encryption algorithm",
 	title: "Check Java java.security use of broken or risky hash algorithm",
 	title_zh: "检测Java java.security使用不安全的哈希算法",
-	level: "low",
 }
 
 desc(

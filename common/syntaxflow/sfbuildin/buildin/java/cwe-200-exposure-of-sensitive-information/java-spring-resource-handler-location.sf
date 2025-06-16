@@ -89,15 +89,17 @@ check $params;
 $params.addResourceHandler(*<slice(start=1)> as $results);
 $results ?{have: 'swagger'} as $swaggerVariable;
 alert $swaggerVariable	for {
-	title: "Swagger Resource Handler Location",
-	title_zh: "Swagger资源处理程序位置",
 	desc: <<<CODE
 该规则用于检测Spring应用中Swagger相关的资源处理程序配置。Swagger通常用于生成API文档，但如果其资源路径被错误映射到敏感文件或目录，则可能导致信息泄露风险。确保Swagger的资源配置仅指向预期的静态资源目录，避免暴露任何敏感数据或内部实现细节。
 CODE
 	level: "info",
+	title: "Swagger Resource Handler Location",
+	title_zh: "Swagger资源处理程序位置",
 }
 
 alert $params	for {
+	level: "low",
+	title: "Resource Handler Location",
 	title_zh: "资源处理程序位置",
 	solution: <<<CODE
 ### 修复建议
@@ -173,8 +175,6 @@ CODE
 
 该规则用于检测Spring应用中资源处理程序（ResourceHandlerRegistry）的配置，特别是关注`addResourceLocations()` 方法中指定的路径。通过静态分析查找不安全的资源映射位置，例如指向文件系统根目录、当前目录或其他包含敏感信息的目录，以识别潜在的敏感信息泄露风险。
 CODE
-	level: "low",
-	title: "Resource Handler Location",
 }
 
 

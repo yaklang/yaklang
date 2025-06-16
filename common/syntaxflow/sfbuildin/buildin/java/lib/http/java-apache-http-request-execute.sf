@@ -69,8 +69,6 @@ $request<getCallee>?{<fullTypeName>?{have: /Http(Get|Post|Put|Delete|Patch|Optio
 $request<getCallee>?{<fullTypeName>?{have: /BasicHttpRequest/}}(,,* as $output);
 <delete(request)>
 alert $output	for {
-	title: "Unvalidated Apache HttpClient Execution",
-	title_zh: "未验证的Apache HttpClient执行风险",
 	desc: <<<CODE
 ### 规则目的
 该规则用于审计Java代码中使用Apache HttpClient执行HTTP请求的安全风险。它通过识别HttpClient的执行点，帮助开发者和管理员识别潜在的SSRF（服务器端请求伪造）攻击风险。
@@ -102,6 +100,8 @@ alert $output	for {
    - 作为其他攻击的跳板。
 CODE
 	level: "info",
+	title: "Unvalidated Apache HttpClient Execution",
+	title_zh: "未验证的Apache HttpClient执行风险",
 }
 
 

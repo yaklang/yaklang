@@ -104,10 +104,10 @@ $sink #{
 }->  as  $mid;
 
 alert $mid	for {
-	title: "Check Java Spring MVC Arbitrary File Upload Vulnerability",
-	title_zh: "检测Spring MVC任意文件上传漏洞",
 	level: "mid",
 	message: "发现Java SpringBoot任意文件上传漏洞。",
+	title: "Check Java Spring MVC Arbitrary File Upload Vulnerability",
+	title_zh: "检测Spring MVC任意文件上传漏洞",
 }
 
 $sink #{
