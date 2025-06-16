@@ -61,9 +61,9 @@ REFERENCE
 /^(htmlspecialchars|strip_tags|mysql_real_escape_string|addslashes|filter|is_numeric|str_replace|ereg|strpos|preg_replace|trim)$/ as $output
 
 alert $output	for {
+	title_zh: "审计PHP自定义过滤函数使用情况",
 	level: "info",
 	title: "Audit PHP Custom Filter Function Usage",
-	title_zh: "审计PHP自定义过滤函数使用情况",
 }
 
 desc(

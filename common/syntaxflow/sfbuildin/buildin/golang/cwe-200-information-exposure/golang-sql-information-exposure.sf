@@ -110,9 +110,6 @@ $param #{
 }-> as $low;
 
 alert $low	for {
-	level: "low",
-	type: "vuln",
-	title: "Detect Golang SQL Information Exposure",
 	title_zh: "检测Golang SQL信息泄露",
 	solution: <<<CODE
 ### 修复建议
@@ -203,6 +200,9 @@ CODE
 3. **潜在影响**
    攻击者利用泄露的信息可以更好地了解目标系统的架构、所使用的数据库类型和版本、操作系统等，从而辅助他们选择更具针对性的攻击手段，例如利用已知漏洞、进行字典攻击等。间接增加了被攻擊的风险。
 CODE
+	level: "low",
+	type: "vuln",
+	title: "Detect Golang SQL Information Exposure",
 }
 
 desc(

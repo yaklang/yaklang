@@ -109,7 +109,6 @@ $toCheckTransform - $excludeTransform as $vuln;
 
 check $vuln;
 alert $vuln	for {
-	message: "Transformer Unsafe Use in Context Sink",
 	title: "Detect Java TransformerFactory Unsafe Use",
 	title_zh: "检测 Java TransformerFactory 不安全使用",
 	solution: <<<CODE
@@ -201,6 +200,7 @@ CODE
    - 远程代码执行（在特定配置下）。
 CODE
 	level: "high",
+	message: "Transformer Unsafe Use in Context Sink",
 }
 
 // ---------------------------------------CODE----------------------------------------------

@@ -230,7 +230,6 @@ CODE)> as $highAndMid
 $highAndMid - $high as $mid
 
 alert $mid	for {
-	title: "Insufficient FTP Parameter Filtering",
 	title_zh: "FTP参数过滤不充分",
 	desc: <<<CODE
 ### 漏洞描述
@@ -278,11 +277,11 @@ function sanitizeInput($input) {
 - 在某些FTP配置和场景下，可能导致进一步的服务器访问权限绕过或远程代码执行。
 CODE
 	level: "mid",
+	title: "Insufficient FTP Parameter Filtering",
 }
 $sink - $high - $mid as $low
 
 alert $low	for {
-	title_zh: "FTP访问控制潜在绕过风险",
 	solution: <<<CODE
 ### 修复建议
 
@@ -377,6 +376,7 @@ function sanitizeInput($input) {
 CODE
 	level: "low",
 	title: "Potential FTP Access Control Bypass",
+	title_zh: "FTP访问控制潜在绕过风险",
 }
 desc(
 	lang: "php"

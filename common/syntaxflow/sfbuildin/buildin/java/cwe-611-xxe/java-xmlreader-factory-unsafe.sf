@@ -152,8 +152,6 @@ $excludeReader./((parse*)|(read*))/() as $excludeCall
 
 $toCheckCall - $excludeCall as $vulCall;
 alert $vulCall	for {
-	title: "Check Java XMLReaderFactory Unsafe Use",
-	title_zh: "检测 Java XMLReaderFactory 不安全使用",
 	solution: <<<CODE
 ### 修复建议
 
@@ -283,6 +281,8 @@ CODE
 CODE
 	level: "high",
 	message: "检测到不安全的 XMLReaderFactory.createXMLReader() 使用，可能导致 XXE 漏洞。",
+	title: "Check Java XMLReaderFactory Unsafe Use",
+	title_zh: "检测 Java XMLReaderFactory 不安全使用",
 }
 
 desc(

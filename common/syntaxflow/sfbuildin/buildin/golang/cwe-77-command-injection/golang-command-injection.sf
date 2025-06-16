@@ -130,6 +130,55 @@ $sink?{have: 'Parameter'} as $check;
 $check as $high;
 
 alert $high	for {
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+   命令注入漏洞（Command Injection）允许攻击者通过输入恶意数据来执行任意命令。在 Golang 应用程序中，如果使用 `os/exec` 包执行外部命令时未对用户输入进行适当的清理和验证，攻击者可以通过构造特殊的输入来执行不受信任的命令，进而控制服务器或访问敏感数据。
+
+2. **触发场景**
+   这种漏洞通常发生在以下场景：
+   - 将用户输入直接拼接到命令字符串中，例如 `exec.Command("echo", userInput)`。
+   - 使用不安全的函数或方法构建命令，例如通过字符串拼接或格式化。
+
+   以下是一个存在漏洞的代码示例：
+   ```golang
+   package main
+
+   import (
+       "fmt"
+       "os/exec"
+   )
+
+   func executeCommand(userInput string) {
+       // 不安全的做法：直接将用户输入拼接到命令中
+       cmd := exec.Command("echo", userInput)
+       output, err := cmd.CombinedOutput()
+       if err != nil {
+           fmt.Println("Error:", err)
+           return
+       }
+       fmt.Println(string(output))
+   }
+
+   func main() {
+       var userInput string
+       fmt.Print("Enter your command: ")
+       fmt.Scanln(&userInput) // 接收用户输入
+       executeCommand(userInput)
+   }
+   ```
+
+3. **潜在影响**
+   攻击者可以利用命令注入漏洞执行以下操作：
+   - 执行任意系统命令，例如删除文件、修改配置或启动恶意进程。
+   - 访问敏感数据，例如读取系统文件或数据库凭证。
+   - 控制服务器，例如通过反向 Shell 获取服务器权限。
+CODE
+	level: "high",
+	type: "vuln",
+	title: "Detect Golang Command Injection Vulnerability",
+	title_zh: "检测Golang命令注入漏洞",
 	solution: <<<CODE
 ### 修复建议
 
@@ -200,55 +249,6 @@ func main() {
 #### 3. 谨慎使用 `os/exec` 执行外部命令
 考虑是否有其他更安全的方式实现相同的功能，避免直接执行外部命令。
 CODE
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   命令注入漏洞（Command Injection）允许攻击者通过输入恶意数据来执行任意命令。在 Golang 应用程序中，如果使用 `os/exec` 包执行外部命令时未对用户输入进行适当的清理和验证，攻击者可以通过构造特殊的输入来执行不受信任的命令，进而控制服务器或访问敏感数据。
-
-2. **触发场景**
-   这种漏洞通常发生在以下场景：
-   - 将用户输入直接拼接到命令字符串中，例如 `exec.Command("echo", userInput)`。
-   - 使用不安全的函数或方法构建命令，例如通过字符串拼接或格式化。
-
-   以下是一个存在漏洞的代码示例：
-   ```golang
-   package main
-
-   import (
-       "fmt"
-       "os/exec"
-   )
-
-   func executeCommand(userInput string) {
-       // 不安全的做法：直接将用户输入拼接到命令中
-       cmd := exec.Command("echo", userInput)
-       output, err := cmd.CombinedOutput()
-       if err != nil {
-           fmt.Println("Error:", err)
-           return
-       }
-       fmt.Println(string(output))
-   }
-
-   func main() {
-       var userInput string
-       fmt.Print("Enter your command: ")
-       fmt.Scanln(&userInput) // 接收用户输入
-       executeCommand(userInput)
-   }
-   ```
-
-3. **潜在影响**
-   攻击者可以利用命令注入漏洞执行以下操作：
-   - 执行任意系统命令，例如删除文件、修改配置或启动恶意进程。
-   - 访问敏感数据，例如读取系统文件或数据库凭证。
-   - 控制服务器，例如通过反向 Shell 获取服务器权限。
-CODE
-	level: "high",
-	type: "vuln",
-	title: "Detect Golang Command Injection Vulnerability",
-	title_zh: "检测Golang命令注入漏洞",
 }
 
 desc(

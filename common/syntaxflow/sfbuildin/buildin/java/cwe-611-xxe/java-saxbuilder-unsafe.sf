@@ -104,6 +104,8 @@ $builder?{<typeName>?{have: SAXBuilder} && !.setFeature* }./((build*)|(parse*))/
 check $vulnCall;
 
 alert $vulnCall	for {
+	level: "mid",
+	message: "SAXBuilder() Unsafe Use in Context Sink",
 	title: "Check Java SAXBuilder Unsafe Use",
 	title_zh: "检测 Java SAXBuilder 非安全使用",
 	solution: <<<CODE
@@ -194,8 +196,6 @@ CODE
 
 总之，SAXBuilder 未经安全配置的使用是将应用程序暴露在多种严重风险之下。
 CODE
-	level: "mid",
-	message: "SAXBuilder() Unsafe Use in Context Sink",
 }
 
 desc(

@@ -73,8 +73,6 @@ $result<dataflow(
 )> as $high 
 
 alert $high	for {
-	level: "high",
-	message: "发现Java代码中存在LDAP注入漏洞，并且数据流中间没有进行任何过滤。",
 	title: "Check Java LDAP Injection Vulnerability",
 	title_zh: "检测Java LDAP注入漏洞",
 	solution: <<<CODE
@@ -124,6 +122,8 @@ NamingEnumeration answer = ctx.search("dc=example,dc=com", searchFilter, searchC
 - **数据篡改或删除**: 在某些配置下，攻击者可能能够执行写操作，修改或删除目录服务中的数据。
 - **拒绝服务**: 攻击者可能构造复杂的查询，导致目录服务资源耗尽，引发拒绝服务。
 CODE
+	level: "high",
+	message: "发现Java代码中存在LDAP注入漏洞，并且数据流中间没有进行任何过滤。",
 }
 
 

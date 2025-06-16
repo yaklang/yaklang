@@ -100,6 +100,7 @@ REFERENCE
 setCipherKey(*<slice(index=1)> as $key);
 $key?{opcode: call && <getCallee>?{<getObject><name>?{have: Base64} && <name>?{have: 'Base64.decode'}}(, *?{opcode: const}<var(base64EncodedKey)>) } as $sink;
 alert $base64EncodedKey	for {
+	level: "high",
 	title: "Detect Java Shiro Hardcoded Encryption Key",
 	title_zh: "检测Java Shiro硬编码加密密钥",
 	solution: <<<CODE
@@ -186,7 +187,6 @@ CODE
    - **敏感信息泄露:** 如果 RememberMe cookie 中包含敏感信息，硬编码密钥可能导致这些信息被解密和窃取。
    - **远程代码执行 (特定版本漏洞):** 在 Apache Shiro 1.2.4 版本及之前，结合硬编码密钥，攻击者可以构造恶意的序列化数据在目标服务器上执行任意代码，这是一个非常严重的漏洞。
 CODE
-	level: "high",
 }
 
 alert $sink	for {

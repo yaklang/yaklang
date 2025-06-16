@@ -117,11 +117,11 @@ $sqlConst?{* #>?{opcode: add}<var(op)> || *->?{opcode: add}<var(op)>};
 check $op;
 
 alert $op	for {
-	type: "audit",
-	severity: "medium",
 	title: "SQL Statement Concatenation Detected",
 	title_zh: "SQL 字符串拼接位置：疑似 SQL 语句拼接并执行到数据库查询的代码",
 	level: "mid",
+	type: "audit",
+	severity: "medium",
 }
 
 

@@ -134,10 +134,10 @@ $param #{
 }-> as $mid 
 
 alert $mid	for {
-	title: "SSRF detected",
-	title_zh: "检测到SSRF",
 	level: "mid",
 	type: "vuln",
+	title: "SSRF detected",
+	title_zh: "检测到SSRF",
 }
 
 desc(

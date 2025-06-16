@@ -190,7 +190,7 @@ alert $high	for {
 
             // 4. 生成安全的文件名，而不是使用原始文件名
             $ext = array_search($mimeType, $allowedTypes, true);
-            $newName = sprintf('%!!(MISSING)!(MISSING)!(MISSING)s(MISSING).%!!(MISSING)!(MISSING)!(MISSING)s(MISSING)', sha1_file($file['tmp_name']), $ext);
+            $newName = sprintf('%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING).%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING)', sha1_file($file['tmp_name']), $ext);
             $targetPath = $uploadDir . $newName;
 
             // 5. 移动上传的文件
@@ -261,6 +261,8 @@ CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
 alert $mid	for {
+	title: "Insecure File Type Detection",
+	title_zh: "不安全的文件类型检测",
 	desc: <<<CODE
 该规则用于识别PHP代码中，文件上传功能对文件类型的检测是否足够安全。通常情况下，在某些场景下可能存在部分防护机制，但仍可能被绕过的情况。例如，虽然进行了MIME类型检查，但未对文件头（Magic Number）进行校验，仍可能上传恶意文件。
 
@@ -272,12 +274,13 @@ alert $mid	for {
 - 对关键文件操作（如移动、存储）增加额外的安全性检查。
 CODE
 	level: "mid",
-	title: "Insecure File Type Detection",
-	title_zh: "不安全的文件类型检测",
 }
 $sink - $high - $mid as $low
 
 alert $low	for {
+	level: "low",
+	title: "Potential File Storage Path Misconfiguration",
+	title_zh: "潜在的文件存储路径配置问题",
 	desc: <<<CODE
 该规则用于审计PHP代码中，文件上传后的存储路径配置是否存在潜在风险。虽然可能已存在一些基础的过滤措施，但仍需关注存储路径的安全性，确保上传的文件不会被直接暴露在Web可访问目录中，或存储到非预期的敏感位置。
 
@@ -288,9 +291,6 @@ alert $low	for {
 - 将上传文件存储至Web根目录之外，避免直接暴露于公网。
 - 使用随机化文件名以减少文件覆盖或路径操纵的风险。
 CODE
-	level: "low",
-	title: "Potential File Storage Path Misconfiguration",
-	title_zh: "潜在的文件存储路径配置问题",
 }
 desc(
 	lang: "php"
