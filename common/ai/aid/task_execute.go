@@ -2,6 +2,7 @@ package aid
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -93,8 +94,49 @@ TOOLREQUIRED:
 			break TOOLREQUIRED
 		}
 		if err != nil {
-			t.config.EmitError("error calling tool: %v", err)
-			return err
+			if errors.Is(err, shouldDirectAnswer) {
+				// 生成直接回答的prompt
+				prompt, err := t.generateDirectAnswerPrompt()
+				if err != nil {
+					return fmt.Errorf("error generating aiTask prompt: %w", err)
+				}
+				err = t.config.callAiTransaction(prompt, func(request *AIRequest) (*AIResponse, error) {
+					request.SetTaskIndex(t.Index)
+					return t.callAI(request)
+				}, func(rsp *AIResponse) error {
+					responseBytes, err := io.ReadAll(rsp.GetOutputStreamReader("execute", false, t.config))
+					if err != nil {
+						return fmt.Errorf("error reading AI response: %w", err)
+					}
+					response = string(responseBytes)
+					if len(response) <= 0 {
+						return utils.Errorf("AI response is empty, retry it or check your AI model")
+					}
+
+					action, err = ExtractAction(response, "direct-answer")
+					if err != nil {
+						return utils.Errorf("error extracting @action (direct-answer): %w， check miss \"@action\" field in object or @action bad str value", err)
+					}
+					directlyAnswer = action.GetString("direct_answer")
+					if directlyAnswer == "" {
+						return utils.Errorf("error: direct answer is empty, retry it until direct answer finished")
+					}
+					t.config.ProcessExtendedActionCallback(directlyAnswer)
+					directlyAnswerLong = action.GetString("direct_answer_long")
+					if directlyAnswerLong == "" {
+						log.Errorf("error: direct answer long is empty, retry it until direct answer finished")
+					}
+					t.config.EmitInfo("task[%v] finished, directly answer: %v", t.Name, directlyAnswer)
+					return nil
+				})
+				if err != nil {
+					return utils.Errorf("call ai transaction failed: %v", err)
+				}
+				break TOOLREQUIRED
+			} else {
+				t.config.EmitError("error calling tool: %v", err)
+				return err
+			}
 		}
 		if !targetTool.NoNeedTimelineRecorded {
 			result.ID = t.config.AcquireId()
