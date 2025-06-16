@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "params-suggestion": {
+      "type": "string",
+      "description": "重新生成参数的建议"
+    },
+    "new-params": {
+      "type": "object",
+      "description": "直接设置参数"
+    }
+  }
+}
+
+
