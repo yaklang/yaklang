@@ -2,6 +2,7 @@ package aitool
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -59,7 +60,7 @@ func (r *ToolExecutionResult) GetJSONSchemaString() string {
 }
 
 // ExecuteToolWithCapture 执行工具并捕获stdout和stderr
-func (t *Tool) ExecuteToolWithCapture(params map[string]any, stdout, stderr io.Writer) (*ToolExecutionResult, error) {
+func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any, stdout, stderr io.Writer) (*ToolExecutionResult, error) {
 	// 创建stdout和stderr的缓冲区
 	stdoutBuf := new(bytes.Buffer)
 	stderrBuf := new(bytes.Buffer)
@@ -75,7 +76,7 @@ func (t *Tool) ExecuteToolWithCapture(params map[string]any, stdout, stderr io.W
 	}
 
 	// 执行回调函数
-	result, err := t.Callback(params, stdout, stderr)
+	result, err := t.Callback(ctx, params, stdout, stderr)
 
 	// 创建执行结果
 	execResult := &ToolExecutionResult{

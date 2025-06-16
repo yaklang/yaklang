@@ -22,9 +22,9 @@ func (i ToolInvokeConfig) GetStderr() io.Writer {
 	return i.stderr
 }
 
-func NewToolInvokeConfig(ctx context.Context) *ToolInvokeConfig {
+func NewToolInvokeConfig() *ToolInvokeConfig {
 	return &ToolInvokeConfig{
-		ctx: ctx,
+		ctx: context.Background(),
 	}
 }
 
@@ -45,5 +45,11 @@ func WithStderr(stderr io.Writer) ToolInvokeOptions {
 func WithInvokeHook(hook toolInvokeHook) ToolInvokeOptions {
 	return func(config *ToolInvokeConfig) {
 		config.invokeHook = hook
+	}
+}
+
+func WithContext(ctx context.Context) ToolInvokeOptions {
+	return func(config *ToolInvokeConfig) {
+		config.ctx = ctx
 	}
 }

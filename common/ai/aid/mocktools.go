@@ -553,3 +553,23 @@ func PrintTool() *aitool.Tool {
 
 	return tool
 }
+
+// TimeDelayedTool 模拟延时工具
+func TimeDelayTool() *aitool.Tool {
+	callback := func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+		delay := params.GetInt("delay")
+		time.Sleep(time.Duration(delay) * time.Second)
+		return nil, nil
+	}
+
+	// 创建交通工具
+	tool, _ := aitool.New("delay",
+		aitool.WithDescription("延时测试工具"),
+		aitool.WithCallback(callback),
+		aitool.WithIntegerParam("delay",
+			aitool.WithParam_Description("延时时间（秒）"),
+		),
+	)
+
+	return tool
+}

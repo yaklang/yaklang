@@ -1,6 +1,7 @@
 package aitool
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,7 +15,7 @@ import (
 )
 
 // InvokeCallback 定义工具调用回调函数的签名
-type InvokeCallback func(params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error)
+type InvokeCallback func(ctx context.Context, params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error)
 
 type Tool struct {
 	*mcp.Tool
@@ -96,7 +97,18 @@ func WithKeywords(keywords []string) ToolOption {
 }
 
 // WithCallback 设置工具的回调函数
-func WithCallback(callback InvokeCallback) ToolOption {
+func WithCallback(callback func(params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error)) ToolOption {
+	return func(t *Tool) {
+		t.Callback = func(ctx context.Context, params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			if callback == nil {
+				return nil, errors.New("callback function is nil")
+			}
+			return callback(params, stdout, stderr)
+		}
+	}
+}
+
+func WithCallbackWithContext(callback InvokeCallback) ToolOption {
 	return func(t *Tool) {
 		t.Callback = callback
 	}
