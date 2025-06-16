@@ -8,6 +8,14 @@ cli.check()
 
 domain = codec.EncodeUrl(domainString)
 
+yakit.AutoInitYakit()
+
+startTime = time.Now()
+yakit.Info("query www.iana.org/whois?q=%v", domain)
+defer func() {
+    yakit.Info("query www.iana.org/whois?q=%v done, query time: %v no more results", domain, time.Since(startTime))
+}()
+
 pkt := f`GET /whois?q=${domain} HTTP/1.1
 Host: www.iana.org
 Accept-Encoding: gzip, deflate, br
