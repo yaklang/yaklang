@@ -54,6 +54,9 @@ REFERENCE
 __dependency__.*commons*beanutils.version as $ver;
 $ver in [1.9.2,1.9.4] as $vuln_commons_beanutils;
 alert $vuln_commons_beanutils	for {
+	message: "SCA: commons-beanutils versions between 1.9.2 and 1.9.4 have an unsafe deserialization vulnerability",
+	title: "SCA: Check Java Commons BeanUtils Vulnerability",
+	title_zh: "SCA: 检测Java Commons BeanUtils 依赖漏洞",
 	solution: <<<CODE
 ### 修复建议
 
@@ -97,7 +100,4 @@ CODE
 CODE
 	level: "high",
 	cve: "CVE-2019-10086",
-	message: "SCA: commons-beanutils versions between 1.9.2 and 1.9.4 have an unsafe deserialization vulnerability",
-	title: "SCA: Check Java Commons BeanUtils Vulnerability",
-	title_zh: "SCA: 检测Java Commons BeanUtils 依赖漏洞",
 }

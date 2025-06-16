@@ -142,9 +142,9 @@ $try.finally as $finally
 $finally<scanInstruction>?{opcode:throw} as $throw  
 
 alert $throw	for {
-	level: "mid",
 	title: "Check Java Improper Cleanup on Thrown Exception Vulnerability",
 	title_zh: "检测Java异常抛出时资源未清理漏洞",
+	level: "mid",
 }
 
 desc(

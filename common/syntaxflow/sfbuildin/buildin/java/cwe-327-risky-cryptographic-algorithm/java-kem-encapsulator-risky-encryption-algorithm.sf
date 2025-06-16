@@ -79,8 +79,8 @@ $algorithm#{
 }-> as $sink;
 
 alert $sink	for {
-	level: "low",
 	message: "发现Java代码中使用了不安全的加密算法",
+	level: "low",
 }
 
 desc(

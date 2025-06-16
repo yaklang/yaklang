@@ -128,9 +128,9 @@ REFERENCE
 
 URL?{<getCall>?{.openConnection() || .openStream()}}(,* as $output);
 alert $output	for {
+	level: "info",
 	title: "Audit Java URL Connection Use",
 	title_zh: "审计Java URL连接使用",
-	level: "info",
 }
 
 

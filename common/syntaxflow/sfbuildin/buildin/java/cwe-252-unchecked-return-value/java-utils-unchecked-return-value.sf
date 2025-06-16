@@ -75,6 +75,9 @@ REFERENCE
 
 .tryLock()?{<typeName>?{have:'java.util.concurrent.locks'}}?{!<getUsers>} as $weak;
 alert $weak	for {
+	message: "发现Java java.util.concurrent.locks库的Lock.tryLock未检查返回值的API",
+	title: "Check Java Util Unchecked Return Value",
+	title_zh: "检测Java Util库未检查返回值的API",
 	solution: <<<CODE
 ### 修复建议
 
@@ -126,9 +129,6 @@ Java的`java.util`库中，尤其是与资源管理、并发控制相关的API�
 CODE
 	level: "info",
 	risk: "api-abuse",
-	message: "发现Java java.util.concurrent.locks库的Lock.tryLock未检查返回值的API",
-	title: "Check Java Util Unchecked Return Value",
-	title_zh: "检测Java Util库未检查返回值的API",
 }
 
 desc(

@@ -130,7 +130,6 @@ REFERENCE
 
 check $curlFunction;
 alert $curlFunction	for {
-	level: "info",
 	title: "ssrf function detected, please pay attention",
 	title_zh: "检测到为ssrf函数，请注意关注",
 	desc: <<<CODE
@@ -144,6 +143,7 @@ alert $curlFunction	for {
    检测以下7个PHP函数：
    `curl_init`, `curl_setopt`, `curl_exec`, `curl_close`, `fsockopen`, `file_get_contents`, `fopen`。
 CODE
+	level: "info",
 }
 
 /$curl_setopt|fsockopen|file_get_contents^/as $ssrfFunction
@@ -293,7 +293,6 @@ CODE)> as $highAndMid
 $highAndMid - $high as $mid
 
 alert $mid	for {
-	title: "Insufficient SSRF Parameter Filtering",
 	title_zh: "SSRF参数过滤不充分",
 	solution: <<<CODE
 ### 修复建议
@@ -375,12 +374,11 @@ CODE
    - 存在一定的信息泄露风险。
 CODE
 	level: "mid",
+	title: "Insufficient SSRF Parameter Filtering",
 }
 
 $sink - $high - $mid  as $low
 alert $low	for {
-	title: "Potential SSRF Access Control Bypass",
-	title_zh: "SSRF访问控制潜在绕过风险",
 	solution: <<<CODE
 ### 修复建议
 
@@ -459,6 +457,8 @@ CODE
    - 可能导致信息泄露或其他非预期行为。
 CODE
 	level: "low",
+	title: "Potential SSRF Access Control Bypass",
+	title_zh: "SSRF访问控制潜在绕过风险",
 }
 
 desc(

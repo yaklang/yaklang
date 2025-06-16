@@ -73,31 +73,6 @@ __dependency__.*sqlite*jdbc.version as $ver;
 
 $ver in [3.8.9,3.36.0] as $vuln_sqlite_jdbc;
 alert $vuln_sqlite_jdbc	for {
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-sqlite-jdbc 是一个用于 Java 应用程序与 SQLite 数据库进行交互的库。在 sqlite-jdbc 3.36.0 之前的版本中存在由于 JDBC 连接字符串解析不当导致的 SQL 注入漏洞（CVE-2020-15358）。攻击者可以通过在 JDBC URL 中注入恶意的 SQL 语句，利用该漏洞执行任意 SQL 命令。
-
-2. **触发场景**
-当应用程序使用受影响版本的 sqlite-jdbc 库，并且 JDBC 连接字符串的部分或全部来源于用户可控的输入时，攻击者可以构造恶意的 JDBC URL，例如在数据库文件路径中注入 SQL Payload。
-
-```java
-String dbPath = request.getParameter("db"); // 用户输入
-String url = "jdbc:sqlite:" + dbPath; // 拼接用户输入到 JDBC URL
-Connection connection = DriverManager.getConnection(url);
-```
-
-攻击者可以输入 `database.sqlite?journal_mode=DELETE;DROP TABLE sensitive_data;--` 到 `db` 参数中，导致连接时执行恶意的 SQL 语句。
-
-3. **潜在影响**
-- 数据库中的敏感信息（如用户数据、配置信息）被泄露。
-- 数据库中的数据被篡改或删除。
-- 拒绝服务攻击导致应用程序不可用。
-- 在某些情况下，可能通过其他漏洞利用进一步获取系统权限。
-CODE
-	level: "high",
-	message: "SCA: sqlite-jdbc versions between 3.8.9 and 3.36.0 have an SQL injection vulnerability",
 	cve: "CVE-2020-15358",
 	title: "SCA: Check Java sqlite-jdbc Vulnerability",
 	title_zh: "SCA: 检测 Java sqlite-jdbc 依赖漏洞",
@@ -138,4 +113,29 @@ Connection connection = DriverManager.getConnection(url);
 #### 3. 对用户输入进行严格过滤和转义
 对所有用户提供的输入进行严格的清洗、校验和转义，特别是涉及到文件路径、数据库名称等敏感信息时，防止恶意字符和 SQL 语法的注入。
 CODE
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+sqlite-jdbc 是一个用于 Java 应用程序与 SQLite 数据库进行交互的库。在 sqlite-jdbc 3.36.0 之前的版本中存在由于 JDBC 连接字符串解析不当导致的 SQL 注入漏洞（CVE-2020-15358）。攻击者可以通过在 JDBC URL 中注入恶意的 SQL 语句，利用该漏洞执行任意 SQL 命令。
+
+2. **触发场景**
+当应用程序使用受影响版本的 sqlite-jdbc 库，并且 JDBC 连接字符串的部分或全部来源于用户可控的输入时，攻击者可以构造恶意的 JDBC URL，例如在数据库文件路径中注入 SQL Payload。
+
+```java
+String dbPath = request.getParameter("db"); // 用户输入
+String url = "jdbc:sqlite:" + dbPath; // 拼接用户输入到 JDBC URL
+Connection connection = DriverManager.getConnection(url);
+```
+
+攻击者可以输入 `database.sqlite?journal_mode=DELETE;DROP TABLE sensitive_data;--` 到 `db` 参数中，导致连接时执行恶意的 SQL 语句。
+
+3. **潜在影响**
+- 数据库中的敏感信息（如用户数据、配置信息）被泄露。
+- 数据库中的数据被篡改或删除。
+- 拒绝服务攻击导致应用程序不可用。
+- 在某些情况下，可能通过其他漏洞利用进一步获取系统权限。
+CODE
+	level: "high",
+	message: "SCA: sqlite-jdbc versions between 3.8.9 and 3.36.0 have an SQL injection vulnerability",
 }

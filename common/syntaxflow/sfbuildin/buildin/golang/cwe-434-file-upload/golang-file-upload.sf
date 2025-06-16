@@ -139,7 +139,6 @@ $sink #{include: `$check`}-> as $safe;
 $sink #{exclude: `$safe`}-> as $high;
 
 alert $high	for {
-	title_zh: "检测到Golang文件上传路径未验证风险",
 	solution: <<<CODE
 ### 修复建议
 
@@ -258,6 +257,7 @@ CODE
 	level: "high",
 	type: "vuln",
 	title: "Unvalidated File Upload Path in Golang",
+	title_zh: "检测到Golang文件上传路径未验证风险",
 }
 
 desc(

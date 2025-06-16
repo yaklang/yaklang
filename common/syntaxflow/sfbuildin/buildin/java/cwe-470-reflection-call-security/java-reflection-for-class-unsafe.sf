@@ -94,9 +94,9 @@ $resource #{
 }->
 check $calc;
 alert $calc	for {
+	level: "low",
 	title: "Audit Java Unsafe Reflection for Class.forName",
 	title_zh: "审计Java中Class.forName的不安全反射调用",
-	level: "low",
 }
 
 

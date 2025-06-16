@@ -93,7 +93,6 @@ REFERENCE
 /^(unlink|rmdir)$/ as $output
 
 alert $output	for {
-	title_zh: "检测PHP文件删除函数",
 	desc: <<<CODE
 ### 1.规则目的
 该规则用于审计PHP代码中用于文件或目录删除的关键函数`unlink`和`rmdir`的使用情况。目的是识别出代码中所有调用这些函数的地方，以便人工审计其输入源是否经过充分的验证和过滤，防止因用户输入或外部不可信数据直接或间接影响删除路径，从而导致路径遍历、任意文件删除等安全问题，或因误用导致非预期的数据丢失。
@@ -142,6 +141,7 @@ alert $output	for {
 CODE
 	level: "info",
 	title: "Detect PHP File Deletion Functions",
+	title_zh: "检测PHP文件删除函数",
 }
 
 desc(

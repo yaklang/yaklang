@@ -60,9 +60,9 @@ $params?{<typeName>?{have:'javax.servlet.http.HttpServletRequest'}} as $request;
 $request.get*() as $output;
 
 alert $output	for {
-	level: "mid",
 	title: "Find Java Spring MVC Controller User Controllable Input Parameters",
 	title_zh: "查找Java Spring MVC 控制层用户可控输入参数",
+	level: "mid",
 }
 
 

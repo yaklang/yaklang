@@ -114,8 +114,6 @@ $sink #{
 }->as  $mid;
 
 alert $mid	for {
-	title: "Detect Java SpringBoot SSRF Vulnerability",
-	title_zh: "检测Java SpringBoot 服务端请求伪造(SSRF)漏洞",
 	solution: <<<CODE
 ### 修复建议
 
@@ -217,6 +215,8 @@ CODE
 	level: "mid",
 	message: "发现Java SpringBoot SSRF漏洞,并且没有任何数据流过滤。",
 	risk: "ssrf",
+	title: "Detect Java SpringBoot SSRF Vulnerability",
+	title_zh: "检测Java SpringBoot 服务端请求伪造(SSRF)漏洞",
 }
 
 $sink #{
@@ -226,10 +226,6 @@ $sink #{
 $result - $mid as $low;
 
 alert $low	for {
-	risk: "ssrf",
-	message: "发现Java SpringBoot SSRF漏洞,但是有数据流过滤。",
-	title: "Detect Java SpringBoot SSRF Vulnerability",
-	title_zh: "检测Java SpringBoot 服务端请求伪造(SSRF)漏洞",
 	solution: <<<CODE
 ### 修复建议
 
@@ -329,6 +325,10 @@ CODE
    - **云环境下的风险**: 在云环境中，SSRF可用于访问云服务提供商的元数据服务（如AWS的`http://169.254.169.254/latest/meta-data/`），获取敏感信息（如IAM角色凭证）。
 CODE
 	level: "low",
+	risk: "ssrf",
+	message: "发现Java SpringBoot SSRF漏洞,但是有数据流过滤。",
+	title: "Detect Java SpringBoot SSRF Vulnerability",
+	title_zh: "检测Java SpringBoot 服务端请求伪造(SSRF)漏洞",
 }
 
 desc(

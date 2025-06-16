@@ -126,6 +126,7 @@ $sink #{
 }-> as $high 
 
 alert $high	for {
+	title: "Reflected XSS detected",
 	title_zh: "检测到反射XSS",
 	solution: <<<CODE
 ### 修复建议
@@ -237,7 +238,6 @@ func main() {
 CODE
 	level: "high",
 	type: "vuln",
-	title: "Reflected XSS detected",
 }
 
 desc(

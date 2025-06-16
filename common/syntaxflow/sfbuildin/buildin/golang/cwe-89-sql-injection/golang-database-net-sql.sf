@@ -99,7 +99,6 @@ $sink.QueryRow( * #-> as $param);
 $param?{have: 'Parameter'} as $high;
 
 alert $high	for {
-	type: "vuln",
 	title: "Check Golang SQL Injection Vulnerability",
 	title_zh: "检测Golang SQL注入漏洞",
 	solution: <<<CODE
@@ -135,7 +134,7 @@ alert $high	for {
            return
        }
 
-       fmt.Fprintf(w, "User ID: %!!(MISSING)!(MISSING)!(MISSING)!(MISSING)d(MISSING)", userID)
+       fmt.Fprintf(w, "User ID: %!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)d(MISSING)", userID)
    }
    ```
 
@@ -163,7 +162,7 @@ CODE
        password := r.FormValue("password")
 
        // 不安全的 SQL 查询
-       query := fmt.Sprintf("SELECT * FROM users WHERE username='%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING)' AND password='%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING)'", username, password)
+       query := fmt.Sprintf("SELECT * FROM users WHERE username='%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING)' AND password='%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING)'", username, password)
 
        db, err := sql.Open("mysql", "user:password@/dbname")
        if err != nil {
@@ -178,7 +177,7 @@ CODE
            return
        }
 
-       fmt.Fprintf(w, "User ID: %!!(MISSING)!(MISSING)!(MISSING)!(MISSING)d(MISSING)", userID)
+       fmt.Fprintf(w, "User ID: %!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)d(MISSING)", userID)
    }
    ```
 
@@ -188,6 +187,7 @@ CODE
    - 通过数据库提权进一步渗透至服务器或其他系统组件。
 CODE
 	level: "high",
+	type: "vuln",
 }
 
 desc(

@@ -121,46 +121,6 @@ $entry.New(* as $param)
 $param?{have: "XMLParseNoEnt"} as $high
 
 alert $high	for {
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   XXE（XML External Entity）漏洞（CWE-611）是指应用程序在解析XML时未禁用外部实体解析，攻击者可以通过构造恶意XML文件加载服务器上的敏感文件（如 `/etc/passwd`），甚至可能执行远程代码。
-
-2. **触发场景**
-   ```go
-   package main
-
-   import (
-       "bytes"
-       "github.com/beevik/etree"
-   )
-
-   func vulnerableParse(input []byte) {
-       doc := etree.NewDocument()
-       doc.ReadSettings.Entity = true // 外部实体解析开启
-       err := doc.ReadFrom(bytes.NewReader(input))
-       if err != nil {
-           panic(err)
-       }
-   }
-   ```
-   攻击者可以传入恶意XML，例如：
-   ```xml
-   <!DOCTYPE foo [
-       <!ENTITY xxe SYSTEM "file:///etc/passwd">
-   ]>
-   <foo>&xxe;</foo>
-   ```
-   这将导致服务器泄露敏感信息。
-
-3. **潜在影响**
-   - 泄露服务器上的任意文件，包括系统配置文件、密钥等。
-   - 执行远程代码或发起SSRF（服务器端请求伪造）攻击。
-   - 可能导致服务器被完全控制。
-CODE
-	level: "high",
-	type: "vuln",
 	title: "Check Golang XML External Entity (XXE) Vulnerability in Beego",
 	title_zh: "检测Golang Beego框架中的XML外部实体(XXE)漏洞",
 	solution: <<<CODE
@@ -220,6 +180,46 @@ func parseWithEncodingXML(input []byte) {
 }
 ```
 CODE
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+   XXE（XML External Entity）漏洞（CWE-611）是指应用程序在解析XML时未禁用外部实体解析，攻击者可以通过构造恶意XML文件加载服务器上的敏感文件（如 `/etc/passwd`），甚至可能执行远程代码。
+
+2. **触发场景**
+   ```go
+   package main
+
+   import (
+       "bytes"
+       "github.com/beevik/etree"
+   )
+
+   func vulnerableParse(input []byte) {
+       doc := etree.NewDocument()
+       doc.ReadSettings.Entity = true // 外部实体解析开启
+       err := doc.ReadFrom(bytes.NewReader(input))
+       if err != nil {
+           panic(err)
+       }
+   }
+   ```
+   攻击者可以传入恶意XML，例如：
+   ```xml
+   <!DOCTYPE foo [
+       <!ENTITY xxe SYSTEM "file:///etc/passwd">
+   ]>
+   <foo>&xxe;</foo>
+   ```
+   这将导致服务器泄露敏感信息。
+
+3. **潜在影响**
+   - 泄露服务器上的任意文件，包括系统配置文件、密钥等。
+   - 执行远程代码或发起SSRF（服务器端请求伪造）攻击。
+   - 可能导致服务器被完全控制。
+CODE
+	level: "high",
+	type: "vuln",
 }
 
 desc(
