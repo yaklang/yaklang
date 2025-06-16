@@ -50,6 +50,8 @@ const (
 	EVENT_TYPE_PLAN_REVIEW_REQUIRE     EventType = "plan_review_require"
 	EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE EventType = "tool_use_review_require"
 
+	EVENT_TYPE_TOOL_CALL_WATCHER EventType = "tool_call_watcher" // tool call watcher event, used to emit the tool call watcher information. user can cancel this tool call
+
 	EVENT_TYPE_REVIEW_RELEASE EventType = "review_release"
 
 	EVENT_TYPE_INPUT EventType = "input"
@@ -87,7 +89,9 @@ func (e *Event) GetInteractiveId() string {
 				EVENT_TYPE_TASK_REVIEW_REQUIRE,
 				EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE,
 				EVENT_TYPE_PERMISSION_REQUIRE,
-				EVENT_TYPE_REQUIRE_USER_INTERACTIVE:
+				EVENT_TYPE_REQUIRE_USER_INTERACTIVE,
+				EVENT_TYPE_TOOL_CALL_WATCHER,
+				EVENT_TYPE_REVIEW_RELEASE:
 				if id, ok := i["id"].(string); ok {
 					return id
 				}
@@ -306,6 +310,17 @@ func (r *Config) EmitInfoWithName(name string, fmtlog string, items ...any) {
 
 func (r *Config) EmitErrorWithName(name string, fmtlog string, items ...any) {
 	r.emitLogWithLevel("error", name, fmtlog, items...)
+}
+
+func (r *Config) EmitToolCallWatcher(id string, tool *aitool.Tool, params aitool.InvokeParams) {
+	reqs := map[string]any{
+		"id":               id,
+		"tool":             tool.Name,
+		"tool_description": tool.Description,
+		"params":           params,
+		"selectors":        ToolCallWatcher,
+	}
+	r.emitInteractiveJson(id, EVENT_TYPE_TOOL_CALL_WATCHER, "review-require", reqs)
 }
 
 func (r *Config) EmitToolCallStart(callToolId string, tool *aitool.Tool) {
