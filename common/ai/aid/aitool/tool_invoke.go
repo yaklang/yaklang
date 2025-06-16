@@ -1,9 +1,9 @@
 package aitool
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -93,7 +93,7 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 	if _, ok := params["@action"]; ok {
 		delete(params, "@action")
 	}
-	cfg := NewToolInvokeConfig(context.Background())
+	cfg := NewToolInvokeConfig()
 	for _, opt := range opts {
 		opt(cfg)
 	}
@@ -101,7 +101,7 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 	if cfg.invokeHook != nil {
 		return cfg.invokeHook(t, params, cfg)
 	}
-	execResult, err := t.ExecuteToolWithCapture(params, cfg.stdout, cfg.stderr)
+	execResult, err := t.ExecuteToolWithCapture(cfg.ctx, params, cfg.stdout, cfg.stderr)
 	if err != nil {
 		return &ToolResult{
 			Param:       params,
@@ -222,7 +222,7 @@ func (t *Tool) ValidateJSONString(jsonStr string) (bool, []string) {
 }
 
 // NewToolFromJSON 从JSON定义创建工具
-func NewToolFromJSON(jsonStr string, callback InvokeCallback) (*Tool, error) {
+func NewToolFromJSON(jsonStr string, callback func(params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error)) (*Tool, error) {
 	var toolDef struct {
 		Name        string           `json:"name"`
 		Description string           `json:"description"`
