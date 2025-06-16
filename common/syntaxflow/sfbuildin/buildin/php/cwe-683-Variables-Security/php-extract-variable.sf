@@ -82,6 +82,31 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high	for {
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+变量覆盖漏洞是指应用程序未能正确处理用户输入，导致用户输入的数据覆盖了程序中的原有变量。攻击者可以利用这一漏洞修改程序运行时的变量值，从而改变程序的执行流程、绕过身份验证、泄露敏感信息甚至执行任意代码。这种漏洞通常发生在程序使用了如 `extract()` 函数，或者对 `$_GET`、`$_POST`、`$_REQUEST`、`$_COOKIE` 等超全局变量处理不当。
+
+2. **触发场景**
+当程序直接或间接使用用户输入来设置或覆盖变量时，可能触发变量覆盖漏洞。例如，以下代码使用了 `extract($_GET)`，如果用户通过GET请求传入 `id=new_value`，则程序中的 `$id` 变量将被覆盖。
+```php
+<?php
+$id = 123;
+extract($_GET); // 如果GET请求中存在id参数，将覆盖$id变量
+echo $id;
+?>
+```
+攻击者发送 `?id=hacked` 的GET请求，原本的代码逻辑可能被改变。
+
+3. **潜在影响**
+- 敏感信息泄露：覆盖控制查询条件的变量，导致泄露所有数据。
+- 权限绕过：覆盖用于身份验证或权限判断的变量。
+- 代码执行：如果覆盖的变量影响到文件包含或代码执行函数，可能导致远程代码执行。
+- 逻辑错误：改变程序变量，导致非预期的执行结果或拒绝服务。
+CODE
+	level: "high",
+	type: "vuln",
 	title: "Unfiltered PHP Variable Overwrite Detected",
 	title_zh: "未过滤PHP变量覆盖",
 	solution: <<<CODE
@@ -113,31 +138,6 @@ print_r($user_data);
 #### 4. 限制变量作用域
 在使用可能引入外部输入的函数时，限制变量的作用域，例如在函数内部使用局部变量，避免覆盖全局变量。
 CODE
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-变量覆盖漏洞是指应用程序未能正确处理用户输入，导致用户输入的数据覆盖了程序中的原有变量。攻击者可以利用这一漏洞修改程序运行时的变量值，从而改变程序的执行流程、绕过身份验证、泄露敏感信息甚至执行任意代码。这种漏洞通常发生在程序使用了如 `extract()` 函数，或者对 `$_GET`、`$_POST`、`$_REQUEST`、`$_COOKIE` 等超全局变量处理不当。
-
-2. **触发场景**
-当程序直接或间接使用用户输入来设置或覆盖变量时，可能触发变量覆盖漏洞。例如，以下代码使用了 `extract($_GET)`，如果用户通过GET请求传入 `id=new_value`，则程序中的 `$id` 变量将被覆盖。
-```php
-<?php
-$id = 123;
-extract($_GET); // 如果GET请求中存在id参数，将覆盖$id变量
-echo $id;
-?>
-```
-攻击者发送 `?id=hacked` 的GET请求，原本的代码逻辑可能被改变。
-
-3. **潜在影响**
-- 敏感信息泄露：覆盖控制查询条件的变量，导致泄露所有数据。
-- 权限绕过：覆盖用于身份验证或权限判断的变量。
-- 代码执行：如果覆盖的变量影响到文件包含或代码执行函数，可能导致远程代码执行。
-- 逻辑错误：改变程序变量，导致非预期的执行结果或拒绝服务。
-CODE
-	level: "high",
-	type: "vuln",
 }
 $sink<dataflow(include=<<<CODE
 * & $source as $__next__
@@ -206,6 +206,8 @@ CODE
 $sink - $high - $middle  as $low;
 
 alert $low	for {
+	type: "low",
+	title: "PHP Variable Overwrite with Filter Function",
 	title_zh: "PHP变量覆盖，检测到过滤函数",
 	desc: <<<CODE
 ### 规则目的
@@ -220,8 +222,6 @@ alert $low	for {
 `extract`, `parse_str`, `import_request_variables`。
 CODE
 	level: "low",
-	type: "low",
-	title: "PHP Variable Overwrite with Filter Function",
 }
 
 

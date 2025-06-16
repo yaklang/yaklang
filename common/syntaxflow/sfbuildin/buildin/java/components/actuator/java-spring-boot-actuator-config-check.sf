@@ -88,8 +88,6 @@ __projectConfig__."endpoints.health.sensitive"?{have:'false'} as $weak;
 check $weak then "Java Spring Boot Actuator配置存在安全风险"
 
 alert $weak	for {
-	risk: "info-exposure",
-	title: "Check Java Spring Boot Actuator Config",
 	title_zh: "检查Java Spring Boot Actuator配置",
 	desc: <<<CODE
 ### 风险描述
@@ -107,7 +105,9 @@ alert $weak	for {
 
 CODE
 	level: "low",
+	risk: "info-exposure",
 	message: "Java Spring Boot Actuator配置存在安全风险",
+	title: "Check Java Spring Boot Actuator Config",
 }
 
 WebSecurity?{<typeName>?{have:'org.springframework.security.config.annotation.web.builders.WebSecurity'}} as $webSecurity;

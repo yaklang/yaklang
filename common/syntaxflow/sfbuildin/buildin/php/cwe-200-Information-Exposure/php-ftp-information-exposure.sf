@@ -118,9 +118,9 @@ CODE}->} as $sink
 
 
 alert $sink	for {
-	level: "low",
 	title: "Check PHP FTP Information Exposure Vulnerability",
 	title_zh: "检测PHP FTP信息泄露漏洞",
+	level: "low",
 }
 
 desc(

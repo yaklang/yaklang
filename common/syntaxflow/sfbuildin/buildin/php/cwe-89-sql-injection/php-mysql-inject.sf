@@ -103,8 +103,6 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high	for {
-	level: "high",
-	title: "Unvalidated MySQL Parameter Injection",
 	title_zh: "MySQL未验证参数注入风险",
 	solution: <<<CODE
 ### 修复建议
@@ -173,6 +171,8 @@ CODE
    - **拒绝服务**: 攻击者可以通过执行大量耗时或恶意的SQL查询，导致数据库服务器负载过高，影响正常服务。
    - **操作系统命令执行**: 在某些配置不当的情况下，攻击者甚至可能通过SQL注入执行操作系统命令。
 CODE
+	level: "high",
+	title: "Unvalidated MySQL Parameter Injection",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__

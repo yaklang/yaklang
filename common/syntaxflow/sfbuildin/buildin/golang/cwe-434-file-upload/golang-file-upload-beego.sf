@@ -91,7 +91,6 @@ $sink #{include: `$check`}-> as $safe;
 $sink #{exclude: `$safe`}-> as $high;
 
 alert $high	for {
-	title: "Check Golang File Upload Vulnerability",
 	title_zh: "检测到Golang文件路径未授权漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -186,6 +185,7 @@ func (c *FileUploadVuln1Controller) Post() {
 CODE
 	level: "high",
 	type: "vuln",
+	title: "Check Golang File Upload Vulnerability",
 }
 
 desc(

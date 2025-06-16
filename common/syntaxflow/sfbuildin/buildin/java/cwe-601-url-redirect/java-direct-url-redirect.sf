@@ -134,21 +134,21 @@ $sink #{
 }->as $result;
 
 alert $result	for {
-	title: "Check Java URL Redirect Vulnerability",
-	title_zh: "检测Java URL重定向漏洞",
 	level: "high",
 	type: "vuln",
 	message: "Find direct URL redirect vulnerability for java",
+	title: "Check Java URL Redirect Vulnerability",
+	title_zh: "检测Java URL重定向漏洞",
 }
 
 
 $result - $high  as $low;
 alert $low	for {
+	message: "Find possible URL redirect vulnerability for java",
+	title: "Check Java URL Redirect Vulnerability",
 	title_zh: "检测Java URL重定向漏洞",
 	level: "low",
 	type: "vuln",
-	message: "Find possible URL redirect vulnerability for java",
-	title: "Check Java URL Redirect Vulnerability",
 }
 
 

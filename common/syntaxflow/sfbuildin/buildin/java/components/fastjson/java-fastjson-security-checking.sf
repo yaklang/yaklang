@@ -112,11 +112,11 @@ check $vulnerable;
 
 FastJsonHttpMessageConverter()?{<getCall><getCallee><name>?{have: '.add'}} as $config;
 alert $config	for {
+	title: "SCA: Check Java FastJson Vulnerability",
+	title_zh: "SCA: 检测Java FastJson依赖漏洞",
 	level: "high",
 	message_zh: "FastJson 配置类中使用了 FastJsonHttpMessageConverter",
 	message: "FastJson configuration class uses FastJsonHttpMessageConverter",
-	title: "SCA: Check Java FastJson Vulnerability",
-	title_zh: "SCA: 检测Java FastJson依赖漏洞",
 }
 
 
@@ -138,11 +138,11 @@ $entry -{
 CODE
 }->;
 alert $reachable	for {
-	title_zh: "SCA: 检测Java FastJson依赖漏洞",
-	level: "high",
 	message_zh: "FastJson 使用了不安全的 parseObject/parse 方法(Springboot / Servlet参数可达)",
 	message: "FastJson uses the unsafe parseObject/parse method (parameter reachable)",
 	title: "SCA: Check Java FastJson Vulnerability",
+	title_zh: "SCA: 检测Java FastJson依赖漏洞",
+	level: "high",
 }
 
 

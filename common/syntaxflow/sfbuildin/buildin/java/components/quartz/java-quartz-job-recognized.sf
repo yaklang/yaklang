@@ -36,10 +36,10 @@ $execute?{<getObject>.__interface__?{have: 'Job'}} as $jobClass;
 check $jobClass;
 $jobClass(*<show>);
 alert $jobClass	for {
-	message: " Found Java Quartz Job Class",
 	title: "Audit Java Quartz Job Class Identification",
 	title_zh: "审计 Java Quartz Job 类识别",
 	level: "mid",
+	message: " Found Java Quartz Job Class",
 }
 
 desc(

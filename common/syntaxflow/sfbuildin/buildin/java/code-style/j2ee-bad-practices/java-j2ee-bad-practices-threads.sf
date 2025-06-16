@@ -79,28 +79,28 @@ SOLUTION
 Thread()?{<typeName>?{have:'java.lang.Thread'}} as $thread;
 Thread?{<typeName>?{have:'java.lang.Thread'}}.currentThread() as $thread;
 alert $thread	for {
-	level: "info",
-	message: "检测到Java项目中使用了Thread类",
 	title: "Unmanaged Thread Usage",
 	title_zh: "未管理线程使用",
+	level: "info",
+	message: "检测到Java项目中使用了Thread类",
 }
 
 ThreadLocal()?{<typeName>?{have:'java.lang.ThreadLocal'}} as $threadLocal;
 alert $threadLocal	for {
-	level: "info",
 	message: "检测到Java项目中使用了ThreadLocal类",
 	title: "ThreadLocal Usage",
 	title_zh: "ThreadLocal使用",
+	level: "info",
 }
 
 $thread./^(destroy|interrupt|join|resume|start|stop|suspend)$/ as $weak;
 // Thread.sleep
 Thread./^(sleep|yield)$/?{<typeName>?{have:'java.lang'}} as $weak;
 alert $weak	for {
+	title_zh: "废弃的线程方法",
 	level: "info",
 	message: "检测到Java项目中使用了Thread类的destroy、interrupt、join、resume、sleep、start、stop、suspend或yield方法",
 	title: "Deprecated Thread Methods",
-	title_zh: "废弃的线程方法",
 }
 
 run?{opcode:function}<getInterfaceBlueprint>?{have:'Runnable'} as $run

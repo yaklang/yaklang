@@ -88,6 +88,7 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high	for {
+	type: "vuln",
 	title: "Check PHP LDAP Direct Injection Vulnerability (No Filter)",
 	title_zh: "检测PHP LDAP无过滤直接注入漏洞",
 	solution: <<<CODE
@@ -151,7 +152,6 @@ CODE
    - 在某些情况下，可能导致拒绝服务。
 CODE
 	level: "high",
-	type: "vuln",
 }
 
 
@@ -162,6 +162,7 @@ CODE,exclude=<<<CODE
 CODE)> as $highAndMid;
 $highAndMid - $high as $mid
 alert $mid	for {
+	title_zh: "审计PHP LDAP注入带无效过滤",
 	solution: <<<CODE
 ### 修复建议
 
@@ -209,14 +210,12 @@ CODE
 	level: "mid",
 	type: "mid",
 	title: "Audit PHP LDAP Injection with Ineffective Filter",
-	title_zh: "审计PHP LDAP注入带无效过滤",
 }
 
 
 $sink - $high - $mid as $low;
 
 alert $low	for {
-	level: "low",
 	type: "info",
 	title: "Audit PHP LDAP Injection with Effective Filter",
 	title_zh: "审计PHP LDAP注入带有效过滤",
@@ -232,6 +231,7 @@ alert $low	for {
    检测以下多个PHP查询函数：
    `ldap_search`, `ldap_list`, `ldap_read`, `ldap_add`, `ldap_delete`, `ldap_mod_add`, `ldap_mod_del`, `ldap_mod_replace`, `ldap_compare`。
 CODE
+	level: "low",
 }
 
 

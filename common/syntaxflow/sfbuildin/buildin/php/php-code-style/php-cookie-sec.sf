@@ -75,6 +75,7 @@ setcookie?(*<len>?{==6}) as $checkCookie
 $checkCookie<getCallee>?(*<slice(index=5)>?{have: "false"}) as $sinkCookie
 
 alert $sinkCookie	for {
+	level: "low",
 	title: "Detect PHP Cookie Missing Secure Flag",
 	title_zh: "检测PHP Cookie缺少Secure标志",
 	solution: <<<CODE
@@ -125,7 +126,6 @@ Httponly属性是用来防止客户端脚本通过 `document.cookie` 等方式�
 - **敏感信息泄露**: Cookie中存储的敏感信息（如用户ID、认证Token）在不安全的连接中被监听和获取。
 - **XSS攻击辅助**: 当应用程序存在XSS漏洞时，缺乏Httponly的Cookie使得攻击者更容易通过脚本获取用户Cookie。
 CODE
-	level: "low",
 }
 
 setcookie?(*<slice(index=6)>?{have: 'false'}) as $noHttpOnlyCookie

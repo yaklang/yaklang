@@ -77,9 +77,9 @@ $entry.Open <getCall> as $db;
 $db <getMembers> as $output;
 
 alert $output	for {
-	level: "info",
 	title: "Audit Golang Sqlx Library Usage",
 	title_zh: "审计Golang Sqlx库使用情况",
+	level: "info",
 }
 
 desc(

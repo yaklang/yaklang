@@ -92,9 +92,9 @@ REFERENCE
 $exception?{<typeName()>?{have:/^(Exception|Throwable|Error|RuntimeException)$/}} as $generic_exception
 
 alert $generic_exception	for {
+	level: "low",
 	title: "Detect Java Generic Exception Catching",
 	title_zh: "检测Java泛型异常捕获",
-	level: "low",
 }
 
 desc(

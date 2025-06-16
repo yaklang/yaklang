@@ -62,9 +62,6 @@ __dependency__.*shiro*core.version as $ver;
 __dependency__.*shiro*spring.version as $ver;
 $ver in (,1.10.1] as $vuln_shiro_core;
 alert $vuln_shiro_core	for {
-	message: "SCA: shiro-core versions between 1.10.0 and 1.10.1 have an authentication bypass vulnerability",
-	title: "SCA: Check Java shiro-core Vulnerability",
-	title_zh: "SCA: 检测Java shiro-core 依赖漏洞",
 	solution: <<<CODE
 ### 修复建议
 
@@ -107,7 +104,10 @@ Apache Shiro 是一个广泛使用的 Java 安全框架，提供认证、授权�
 - 绕过内部访问控制策略，对系统造成更严重的破坏。
 CODE
 	level: "high",
+	message: "SCA: shiro-core versions between 1.10.0 and 1.10.1 have an authentication bypass vulnerability",
 	cve: "CVE-2023-22602",
+	title: "SCA: Check Java shiro-core Vulnerability",
+	title_zh: "SCA: 检测Java shiro-core 依赖漏洞",
 }
 
 desc(

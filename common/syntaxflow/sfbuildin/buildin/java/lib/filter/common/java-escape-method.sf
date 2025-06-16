@@ -86,9 +86,9 @@ REFERENCE
 
 /(?i)(sanitiz|encod(e|ing)|entit(y|ies)|escap(e|ing)|replace|regex|normaliz|canonical|anti|safe|purif|purg|pure|validate|strip|clean|clear|special|convert|remov)/ as $output;
 alert $output	for {
+	level: "mid",
 	title: "Find Java Escape Method",
 	title_zh: "查找Java转义方法",
-	level: "mid",
 }
 
 

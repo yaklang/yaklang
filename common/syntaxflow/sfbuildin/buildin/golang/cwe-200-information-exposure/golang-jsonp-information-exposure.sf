@@ -107,6 +107,8 @@ $obj #{
 }-> as $low;
 
 alert $low	for {
+	level: "low",
+	type: "vuln",
 	title: "Detect Golang Json Information Exposure",
 	title_zh: "检测到Golang Json信息泄露",
 	solution: <<<CODE
@@ -191,8 +193,6 @@ func (c *JsonpVuln1Controller) Get() {
 - 用户凭证（如密码）泄露，可能导致账户被非法访问。
 - 攻击者可利用获取到的信息辅助后续攻击，例如提权或横向移动。
 CODE
-	level: "low",
-	type: "vuln",
 }
 
 desc(

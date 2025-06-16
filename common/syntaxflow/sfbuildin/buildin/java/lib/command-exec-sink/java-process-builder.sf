@@ -102,8 +102,6 @@ $method<getCall()>?{.setAccessible(*<slice(index=1)>?{==true})}.invoke as $invok
 $invoke(,* ?{!=false && !have:"nil" }as $output)
 
 alert $output	for {
-	level: "high",
-	title: "Unvalidated Command Execution",
 	title_zh: "未验证的命令执行",
 	solution: <<<CODE
 ### 修复建议
@@ -163,6 +161,8 @@ CODE
    - 破坏系统完整性，导致服务中断。
 
 CODE
+	level: "high",
+	title: "Unvalidated Command Execution",
 }
 
 

@@ -141,8 +141,6 @@ $param #{until: `* & $target`}-> as $check;
 $target as $high
 
 alert $high	for {
-	level: "high",
-	type: "vuln",
 	title: "Check Golang Open Redirect Vulnerability",
 	title_zh: "检测 Golang 开放重定向漏洞",
 	solution: <<<CODE
@@ -266,6 +264,8 @@ CODE
    - **恶意软件传播**: 将用户重定向到包含恶意软件下载链接的页面。
    - **绕过安全策略**: 在某些情况下，可利用开放重定向绕过网站的Referer检查或其他安全限制。
 CODE
+	level: "high",
+	type: "vuln",
 }
 
 desc(
