@@ -19,10 +19,13 @@ type runtime struct {
 }
 
 func (c *Coordinator) createRuntime() *runtime {
-	return &runtime{
+	r := &runtime{
 		config: c.config,
 		Stack:  utils.NewStack[*aiTask](),
 	}
+	c.config.aiTaskRuntime = r
+
+	return r
 }
 
 func (t *aiTask) dumpProgressEx(i int, w io.Writer, details bool) {
@@ -144,28 +147,30 @@ func (r *runtime) invokeSubtask(idx int, task *aiTask) error {
 	}()
 
 	if len(task.Subtasks) > 0 {
-		// why not use for-range but use while-loop?
-		// because subsequent subtasks may be changed during the execution
-		currentID := -1
-		for {
-			currentID++
-			if currentID >= len(task.Subtasks) {
-				break
-			}
-			subtask := task.Subtasks[currentID]
-			err := r.invokeSubtask(idx+currentID+1, subtask)
-			if err != nil {
-				r.config.EmitError("invoke subtask failed: %v", err)
-				// invoke subtask failed
-				// retry via user!
-				return err
-			}
-			r.config.EmitInfo("invoke subtask success: %v with %d tool call results", subtask.Name, subtask.toolCallResultIds.Len())
-		}
-		return nil
+		return r.executeSubTask(idx, task)
 	}
 
 	return task.executeTask()
+}
+
+func (r *runtime) executeSubTask(idx int, task *aiTask) error {
+	currentID := -1
+	for {
+		currentID++
+		if currentID >= len(task.Subtasks) {
+			break
+		}
+		subtask := task.Subtasks[currentID]
+		err := r.invokeSubtask(idx+currentID+1, subtask)
+		if err != nil {
+			r.config.EmitError("invoke subtask failed: %v", err)
+			// invoke subtask failed
+			// retry via user!
+			return err
+		}
+		r.config.EmitInfo("invoke subtask success: %v with %d tool call results", subtask.Name, subtask.toolCallResultIds.Len())
+	}
+	return nil
 }
 
 func (r *runtime) Invoke(task *aiTask) {
