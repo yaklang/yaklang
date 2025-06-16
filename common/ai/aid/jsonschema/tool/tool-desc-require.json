@@ -26,5 +26,9 @@
       "type": "string",
       "description": "direct_answer的长文本版本，包含更多的细节和解释，适用于需要更详细信息的场景"
     }
+  },
+  "example": {
+    "@action": "require-tool",
+    "tool": "example_tool"
   }
 }
