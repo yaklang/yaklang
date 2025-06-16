@@ -254,7 +254,12 @@ func buildAIDOption(startParams *ypb.AIStartParams) []aid.Option {
 	}
 
 	if startParams.GetUseDefaultAIConfig() {
-		aidOption = append(aidOption, aid.WithAICallback(aid.AIChatToAICallbackType(ai.Chat)))
+		wrapperChat := aid.AIChatToAICallbackType(ai.Chat)
+		aidOption = append(aidOption, aid.WithAICallback(func(config *aid.Config, req *aid.AIRequest) (*aid.AIResponse, error) {
+			//fmt.Println(req.GetPrompt())
+			//time.Sleep(100 * time.Millisecond)
+			return wrapperChat(config, req)
+		}))
 	}
 
 	if mockedAIChat != nil {

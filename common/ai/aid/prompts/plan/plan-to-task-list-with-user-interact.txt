@@ -28,6 +28,7 @@
 *. 任务规划只能输出JSON，禁止输出非JSON的内容，注意JSON的格式，避免出现语法错误
 *. **易错点**：时刻记住输出JSON时注意string使用"闭合，string内的内容合理转义，不转义会造成解析结构数据失败
 *. 在任务输出时，任务目标或者详情中只允许出现工具名和简要说明，不允许出现特殊符号，尤其是"避免破坏JSON结构
+*. 为了减少用户理解成本，子任务尽量不超过5个
 
 ```schema
 {{ .Memory.Schema.PlanWithUserInteractJsonSchema }}
