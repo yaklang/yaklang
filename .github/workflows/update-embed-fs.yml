@@ -6,6 +6,10 @@ on:
     types: [ opened, synchronize, reopened ]
     paths:
       - 'common/syntaxflow/sfbuildin/buildin/**'
+      - 'common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai/**'
+      - 'common/aiforge/buildinforge/**'
+      - 'common/coreplugin/base-yak-plugin/**'
+      
 jobs:
   generate-commit:
     runs-on: ubuntu-22.04

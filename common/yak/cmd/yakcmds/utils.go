@@ -54,8 +54,8 @@ var UtilsCommands = []*cli.Command{
 	createYakToolMetadataCommand(),
 	createBuildInForgeMetadataCommand(),
 	{
-		Name:  "embed-fs-hash",
-		Usage: `Generate Current Embed File System(yak/syntaxflow) Hash`,
+		Name:  "embed-fs-hash", // 此命令会被CI调用，用于自动生成hash.go文件。如果希望在提交代码时自动更新静态资源的哈希值，需要在.github/workflows/update-embed-fs.yml中添加对应的静态资源路径
+		Usage: `Generate Current Embed File System(yak/syntaxflow/aiforge/aitool) Hash`,
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name: "type",
