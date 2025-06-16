@@ -77,6 +77,7 @@ check $flag;
 $flag-> as $output;
 check $output;
 alert $output	for {
+	title_zh: "检测Java路径遍历漏洞",
 	solution: <<<CODE
 ### 修复建议
 
@@ -137,5 +138,4 @@ CODE
 CODE
 	level: "low",
 	title: "Detect Java Path Traversal Vulnerability",
-	title_zh: "检测Java路径遍历漏洞",
 }

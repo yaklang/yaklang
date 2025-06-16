@@ -100,31 +100,6 @@ REFERENCE
 setCipherKey(*<slice(index=1)> as $key);
 $key?{opcode: call && <getCallee>?{<getObject><name>?{have: Base64} && <name>?{have: 'Base64.decode'}}(, *?{opcode: const}<var(base64EncodedKey)>) } as $sink;
 alert $base64EncodedKey	for {
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   Apache Shiro 是一个广泛使用的 Java 安全框架。当 Shiro 的记住我（RememberMe）功能启用时，它使用一个加密密钥对用户身份信息进行加密和解密，并存储在 cookie 中。如果应用程序开发者在代码中硬编码了这个加密密钥，那么一旦攻击者能够获取到应用程序的源代码或配置文件，他们就可以直接获得这个密钥。攻击者可以使用该硬编码密钥伪造一个 RememberMe cookie，其中包含任意用户或管理员的身份信息，从而绕过身份验证机制，以伪造的身份登录系统。
-
-2. **触发场景**
-   当应用程序使用了 Apache Shiro 框架，并且开启了 RememberMe 功能，同时在 Shiro 的配置类中，例如 `ShiroConfig.java`，通过硬编码的方式设置了 `CookieRememberMeManager` 的 `cipherKey`，就会触发此规则。常见的硬编码方式包括直接在代码中指定密钥字符串，或者使用 `Base64.decode` 方法解码硬编码的 Base64 字符串作为密钥。
-
-   示例代码:
-   ```java
-   public CookieRememberMeManager rememberMeManager() {
-       CookieRememberMeManager cookieRememberMeManager = new CookieRememberMeManager();
-       cookieRememberMeManager.setCookie(rememberMeCookie());
-       cookieRememberMeManager.setCipherKey(Base64.decode("fCq+/xW488hMTCD+cmJ3aQ==")); // 硬编码的密钥
-       return cookieRememberMeManager;
-   }
-   ```
-
-3. **潜在影响**
-   - **身份认证绕过:** 攻击者可以通过伪造 RememberMe cookie 以任意用户（包括管理员）的身份登录系统。
-   - **敏感信息泄露:** 如果 RememberMe cookie 中包含敏感信息，硬编码密钥可能导致这些信息被解密和窃取。
-   - **远程代码执行 (特定版本漏洞):** 在 Apache Shiro 1.2.4 版本及之前，结合硬编码密钥，攻击者可以构造恶意的序列化数据在目标服务器上执行任意代码，这是一个非常严重的漏洞。
-CODE
-	level: "high",
 	title: "Detect Java Shiro Hardcoded Encryption Key",
 	title_zh: "检测Java Shiro硬编码加密密钥",
 	solution: <<<CODE
@@ -187,6 +162,31 @@ CODE
 4. **禁用 RememberMe 功能 (如果不需要)**
    如果应用场景不需要记住用户登录状态，可以禁用 RememberMe 功能，从而消除与密钥相关的风险。
 CODE
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+   Apache Shiro 是一个广泛使用的 Java 安全框架。当 Shiro 的记住我（RememberMe）功能启用时，它使用一个加密密钥对用户身份信息进行加密和解密，并存储在 cookie 中。如果应用程序开发者在代码中硬编码了这个加密密钥，那么一旦攻击者能够获取到应用程序的源代码或配置文件，他们就可以直接获得这个密钥。攻击者可以使用该硬编码密钥伪造一个 RememberMe cookie，其中包含任意用户或管理员的身份信息，从而绕过身份验证机制，以伪造的身份登录系统。
+
+2. **触发场景**
+   当应用程序使用了 Apache Shiro 框架，并且开启了 RememberMe 功能，同时在 Shiro 的配置类中，例如 `ShiroConfig.java`，通过硬编码的方式设置了 `CookieRememberMeManager` 的 `cipherKey`，就会触发此规则。常见的硬编码方式包括直接在代码中指定密钥字符串，或者使用 `Base64.decode` 方法解码硬编码的 Base64 字符串作为密钥。
+
+   示例代码:
+   ```java
+   public CookieRememberMeManager rememberMeManager() {
+       CookieRememberMeManager cookieRememberMeManager = new CookieRememberMeManager();
+       cookieRememberMeManager.setCookie(rememberMeCookie());
+       cookieRememberMeManager.setCipherKey(Base64.decode("fCq+/xW488hMTCD+cmJ3aQ==")); // 硬编码的密钥
+       return cookieRememberMeManager;
+   }
+   ```
+
+3. **潜在影响**
+   - **身份认证绕过:** 攻击者可以通过伪造 RememberMe cookie 以任意用户（包括管理员）的身份登录系统。
+   - **敏感信息泄露:** 如果 RememberMe cookie 中包含敏感信息，硬编码密钥可能导致这些信息被解密和窃取。
+   - **远程代码执行 (特定版本漏洞):** 在 Apache Shiro 1.2.4 版本及之前，结合硬编码密钥，攻击者可以构造恶意的序列化数据在目标服务器上执行任意代码，这是一个非常严重的漏洞。
+CODE
+	level: "high",
 }
 
 alert $sink	for {

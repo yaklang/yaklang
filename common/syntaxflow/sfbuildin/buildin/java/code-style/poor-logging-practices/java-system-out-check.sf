@@ -17,9 +17,9 @@ FIX
 System.out.print*() as $out;
 check $out;
 alert $out	for {
-	level: "info",
-	message: "检测到Java项目中使用了System.out输出流",
 	title: "Java System.out Usage Detected",
 	title_zh: "检测到Java使用System.out输出流",
+	level: "info",
+	message: "检测到Java项目中使用了System.out输出流",
 }
 

@@ -56,7 +56,7 @@ DESC
 	fix: <<<FIX
     在使用Groovy脚本引擎时，确保对输入进行严格的验证和过滤。避免直接执行用户输入的Groovy代码，或者使用安全的沙箱环境来限制代码的执行权限。此外，可以考虑使用其他更安全的脚本语言或框架来实现动态脚本执行的需求。
 FIX
-    ref: <<<REF
+	ref: <<<REF
     https://docs.groovy-lang.org/next/html/api/groovy/lang/GroovyShell.html
 REF
 	rule_id: "2446f3b6-3db3-4414-b593-4219073220c4"
@@ -72,10 +72,6 @@ $sink #{
 }-> as $high;
 
 alert $high	for {
-	level: "high",
-	message: "发现Java Servlet Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
-	risk: "Groovy-Shell代码执行漏洞",
-	title: "Check Java Servlet Groovy Shell Code Injection Vulnerability",
 	title_zh: "检测Java Servlet Groovy Shell代码注入漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -225,6 +221,10 @@ CODE
    - **权限提升:** 攻击者可能利用服务器上的其他漏洞或配置错误来提升权限。
    - **作为攻击跳板:** 受感染的服务器可能被用于发起对内部网络或其他外部目标的攻击。
 CODE
+	level: "high",
+	message: "发现Java Servlet Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
+	risk: "Groovy-Shell代码执行漏洞",
+	title: "Check Java Servlet Groovy Shell Code Injection Vulnerability",
 }
 
 $sink #{

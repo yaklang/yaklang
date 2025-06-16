@@ -88,7 +88,9 @@ __projectConfig__."endpoints.health.sensitive"?{have:'false'} as $weak;
 check $weak then "Java Spring Boot Actuator配置存在安全风险"
 
 alert $weak	for {
+	level: "low",
 	message: "Java Spring Boot Actuator配置存在安全风险",
+	risk: "info-exposure",
 	title: "Check Java Spring Boot Actuator Config",
 	title_zh: "检查Java Spring Boot Actuator配置",
 	desc: <<<CODE
@@ -106,8 +108,6 @@ alert $weak	for {
    - 允许攻击者访问Actuator提供的其他管理功能，增加攻击面。
 
 CODE
-	level: "low",
-	risk: "info-exposure",
 }
 
 WebSecurity?{<typeName>?{have:'org.springframework.security.config.annotation.web.builders.WebSecurity'}} as $webSecurity;
@@ -121,11 +121,6 @@ $allow#{
 }-> as $sink;
 
 alert $sink	for {
-	level: "mid",
-	message: "Java Spring Boot Actuator配置存在安全风险,并且Spring Security默认允许所有请求访问Actuator端点。",
-	risk: "info-exposure",
-	title: "Check Java Spring Boot Actuator Config",
-	title_zh: "检查Java Spring Boot Actuator配置",
 	solution: <<<CODE
 ### 修复建议
 
@@ -180,6 +175,11 @@ CODE
    - 允许攻击者访问Actuator提供的其他管理功能，增加攻击面。
 
 CODE
+	level: "mid",
+	message: "Java Spring Boot Actuator配置存在安全风险,并且Spring Security默认允许所有请求访问Actuator端点。",
+	risk: "info-exposure",
+	title: "Check Java Spring Boot Actuator Config",
+	title_zh: "检查Java Spring Boot Actuator配置",
 }
 
 desc(

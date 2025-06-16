@@ -100,6 +100,8 @@ REFERENCE
 
 check $evalFunction;
 alert $evalFunction	for {
+	title: "Detected dangerous function, possible code execution risk",
+	title_zh: "检测到危险函数，可能存在代码执行风险",
 	solution: <<<CODE
 ### 修复建议
 
@@ -187,8 +189,6 @@ CODE
     攻击者可以完全控制服务器，执行任意操作系统命令，获取敏感数据，篡改文件，甚至利用服务器作为跳板进行内网渗透。导致服务器失陷，造成严重的安全后果。
 CODE
 	level: "low",
-	title: "Detected dangerous function, possible code execution risk",
-	title_zh: "检测到危险函数，可能存在代码执行风险",
 }
 <include('php-param')> as $params;
 <include('php-tp-all-extern-variable-param-source')> as $params
@@ -205,6 +205,7 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high	for {
+	title: "Unvalidated parameter injection",
 	title_zh: "未验证参数注入风险",
 	solution: <<<CODE
 ### 修复建议
@@ -293,7 +294,6 @@ CODE
     攻击者可以完全控制服务器，执行任意操作系统命令，获取敏感数据，篡改文件，甚至利用服务器作为跳板进行内网渗透。导致服务器失陷，造成严重的安全后果。
 CODE
 	level: "high",
-	title: "Unvalidated parameter injection",
 }
 
 $all<dataflow(include=<<<INCLUDE
@@ -305,8 +305,6 @@ CODE)> as $highAndMid
 $highAndMid - $high as $mid
 
 alert $mid	for {
-	title: "Insufficient parameter filtering",
-	title_zh: "参数过滤不充分，可能存在代码执行风险",
 	solution: <<<CODE
 ### 修复建议
 
@@ -394,13 +392,13 @@ CODE
     攻击者可以完全控制服务器，执行任意操作系统命令，获取敏感数据，篡改文件，甚至利用服务器作为跳板进行内网渗透。导致服务器失陷，造成严重的安全后果。
 CODE
 	level: "mid",
+	title: "Insufficient parameter filtering",
+	title_zh: "参数过滤不充分，可能存在代码执行风险",
 }
 
 $all - $high - $mid as $low
 
 alert $low	for {
-	title: "Potential code execution risk",
-	title_zh: "潜在代码执行风险",
 	solution: <<<CODE
 ### 修复建议
 
@@ -488,6 +486,8 @@ CODE
     攻击者可以完全控制服务器，执行任意操作系统命令，获取敏感数据，篡改文件，甚至利用服务器作为跳板进行内网渗透。导致服务器失陷，造成严重的安全后果。
 CODE
 	level: "low",
+	title: "Potential code execution risk",
+	title_zh: "潜在代码执行风险",
 }
 desc(
 	lang: "php"
@@ -530,9 +530,9 @@ $source #{
 }-> as $mid
 
 alert $mid_risk	for {
-	level: "mid",
 	title: "Insufficient parameter filtering",
 	title_zh: "参数过滤不充分，可能存在代码执行风险",
+	level: "mid",
 }
 
 $allRisk - $high - $mid as $low

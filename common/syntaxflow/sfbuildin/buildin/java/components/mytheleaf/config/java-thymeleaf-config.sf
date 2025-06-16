@@ -62,9 +62,9 @@ REFERENCE
 
 SpringResourceTemplateResolver() as $templateResolver;
 alert $templateResolver	for {
+	level: "info",
 	title: "Audit Java Thymeleaf Configuration",
 	title_zh: "审计Java Thymeleaf配置",
-	level: "info",
 }
 
 $templateResolver.set*(*?{opcode: const} as $params);

@@ -68,9 +68,9 @@ xml?{<fullTypeName>?{have: 'encoding/xml'}} as $entry
 $entry.NewDecoder() as $output
 
 alert $output	for {
+	level: "mid",
 	title: "Audit Golang XML Parsing",
 	title_zh: "审计Golang XML解析",
-	level: "mid",
 }
 
 desc(

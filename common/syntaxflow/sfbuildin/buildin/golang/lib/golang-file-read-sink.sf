@@ -150,7 +150,7 @@ REFERENCE
 <include('golang-file-read-os')> as $output;
 
 alert $output	for {
+	title: "Audit Golang File Read Sink",
 	title_zh: "审计Golang文件读取汇聚点",
 	level: "info",
-	title: "Audit Golang File Read Sink",
 }

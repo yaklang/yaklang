@@ -171,6 +171,7 @@ CODE)> as $filteredSink;
 
 $haveCall - $filteredSink as $unsafeFilteredSink;
 alert $unsafeFilteredSink	for {
+	level: "mid",
 	type: "vuln",
 	title: "Check Java SpringBoot RestController XSS Vulnerability",
 	title_zh: "检测Java SpringBoot RestController XSS漏洞",
@@ -236,10 +237,12 @@ CODE
    * **恶意重定向**: 攻击者可以将用户重定向到钓鱼网站。
    * **客户端的其他恶意行为**: 攻击者可以执行各种JavaScript代码，进行端口扫描、本地文件读取尝试（取决于浏览器和环境）等。
 CODE
-	level: "mid",
 }
 
 alert $filteredSink	for {
+	message: "The String or Content Filter is used. It is recommended to use the filter to prevent XSS.",
+	title: "Check Java SpringBoot RestController XSS Vulnerability",
+	title_zh: "检测Java SpringBoot RestController XSS漏洞",
 	desc: <<<CODE
 ### 规则目的
 该规则用于审计Java Spring Boot RestController中可能导致XSS（跨站脚本攻击）的安全漏洞。它通过识别直接输出用户输入的关键函数（例如返回原始字符串），定位未经验证/转义的数据输出点，防止攻击者注入恶意脚本窃取用户数据或劫持会话。
@@ -272,9 +275,6 @@ alert $filteredSink	for {
 CODE
 	level: "low",
 	type: "audit",
-	message: "The String or Content Filter is used. It is recommended to use the filter to prevent XSS.",
-	title: "Check Java SpringBoot RestController XSS Vulnerability",
-	title_zh: "检测Java SpringBoot RestController XSS漏洞",
 }
 
 

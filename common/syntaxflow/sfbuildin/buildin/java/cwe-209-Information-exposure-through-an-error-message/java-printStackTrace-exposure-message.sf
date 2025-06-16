@@ -75,12 +75,12 @@ REFERENCE
 .printStackTrace() as $sink
 check $sink then "发现PrintStackTrace打印异常堆栈信息"
 alert $sink	for {
+	title: "Check Java Information Exposure Through PrintStackTrace",
+	title_zh: "检查Java通过PrintStackTrace泄露信息",
 	level: "low",
 	message: "通过PrintStackTrace泄露信息",
 	severity: "low",
 	risk: "info-exposure",
-	title: "Check Java Information Exposure Through PrintStackTrace",
-	title_zh: "检查Java通过PrintStackTrace泄露信息",
 }
 
 desc(

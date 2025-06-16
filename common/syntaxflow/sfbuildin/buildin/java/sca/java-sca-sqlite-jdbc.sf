@@ -73,8 +73,6 @@ __dependency__.*sqlite*jdbc.version as $ver;
 
 $ver in [3.8.9,3.36.0] as $vuln_sqlite_jdbc;
 alert $vuln_sqlite_jdbc	for {
-	level: "high",
-	cve: "CVE-2020-15358",
 	message: "SCA: sqlite-jdbc versions between 3.8.9 and 3.36.0 have an SQL injection vulnerability",
 	title: "SCA: Check Java sqlite-jdbc Vulnerability",
 	title_zh: "SCA: 检测 Java sqlite-jdbc 依赖漏洞",
@@ -138,4 +136,6 @@ Connection connection = DriverManager.getConnection(url);
 - 拒绝服务攻击导致应用程序不可用。
 - 在某些情况下，可能通过其他漏洞利用进一步获取系统权限。
 CODE
+	level: "high",
+	cve: "CVE-2020-15358",
 }

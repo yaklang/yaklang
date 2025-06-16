@@ -116,6 +116,7 @@ $entry.ReadAll(* #-> as $output)
 $entry.ReadFile(* #-> as $output)
 
 alert $output	for {
+	title: "Audit Golang File Read ioutil Methods",
 	title_zh: "审计Golang ioutil文件读取方法",
 	solution: <<<CODE
 ### 解决方案
@@ -196,7 +197,6 @@ CODE
    该规则有助于识别代码中潜在的性能风险和使用已废弃功能的点，提示开发者考虑使用更流式化或推荐的文件读取方法。
 CODE
 	level: "info",
-	title: "Audit Golang File Read ioutil Methods",
 }
 
 desc(

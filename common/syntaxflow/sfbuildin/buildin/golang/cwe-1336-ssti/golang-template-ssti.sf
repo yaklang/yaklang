@@ -159,7 +159,7 @@ CODE
 
 2. **触发场景**
    SSTI 漏洞通常发生在以下场景：
-   - 用户输入直接嵌入模板：将用户输入直接拼接到模板字符串中，例如 `tmpl := fmt.Sprintf("Hello, %!!(MISSING)!(MISSING)s(MISSING)!", username)`。
+   - 用户输入直接嵌入模板：将用户输入直接拼接到模板字符串中，例如 `tmpl := fmt.Sprintf("Hello, %!!(MISSING)!(MISSING)!(MISSING)s(MISSING)!", username)`。
    - 未转义用户输入：未对用户输入进行转义或过滤，导致模板引擎将其解析为可执行的代码。
 
    ```go
@@ -177,7 +177,7 @@ CODE
            username := r.URL.Query().Get("name")
 
            // 直接拼接用户输入到模板中，存在SSTI风险
-           tmpl := fmt.Sprintf("Hello, %!!(MISSING)!(MISSING)s(MISSING)!", username)
+           tmpl := fmt.Sprintf("Hello, %!!(MISSING)!(MISSING)!(MISSING)s(MISSING)!", username)
 
            // 渲染模板
            t := template.Must(template.New("greet").Parse(tmpl))

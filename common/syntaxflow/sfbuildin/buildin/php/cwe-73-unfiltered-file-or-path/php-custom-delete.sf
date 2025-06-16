@@ -100,6 +100,8 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high	for {
+	title: "Unsafe File Operation Without Validation",
+	title_zh: "未经验证的文件操作",
 	solution: <<<CODE
 ### 修复建议
 
@@ -174,8 +176,6 @@ CODE
    - 服务器控制：攻击者可能获得服务器的完全控制权。
 CODE
 	level: "high",
-	title: "Unsafe File Operation Without Validation",
-	title_zh: "未经验证的文件操作",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -185,6 +185,7 @@ CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
 alert $mid	for {
+	level: "mid",
 	title: "Insecure File Type Detection",
 	title_zh: "不安全的文件类型检测",
 	solution: <<<CODE
@@ -245,7 +246,6 @@ CODE
    - 文件上传后可能被执行为恶意脚本。
    - 系统敏感资源面临被篡改或窃取的风险。
 CODE
-	level: "mid",
 }
 $all - $high - $mid as $low
 alert $low	for {

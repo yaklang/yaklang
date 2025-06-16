@@ -96,9 +96,6 @@ SOLUTION
 .frameOptions()...disable() as $vuln;
 check $vuln;
 alert $vuln	for {
-	level: "low",
-	title: "Check Java Clickjacking Vulnerability",
-	title_zh: "检测Java点击劫持漏洞",
 	solution: <<<CODE
 ### 修复建议
 
@@ -183,6 +180,9 @@ public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Excepti
 - **会话劫持:** 配合其他漏洞（如XSS）或钓鱼手段，攻击者可能劫持用户会话。
 - **绕过安全防护:** 在某些情况下，点击劫持可能被用于绕过CSRF防护。
 CODE
+	level: "low",
+	title: "Check Java Clickjacking Vulnerability",
+	title_zh: "检测Java点击劫持漏洞",
 }
 
 

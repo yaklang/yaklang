@@ -102,19 +102,6 @@ $getSession -{
 $safe<getPredecessors()> as $safeGetSession;
 $getSession - $safeGetSession as $weak;
 alert $weak	for {
-	desc: <<<CODE
-## 漏洞描述
-
-在使用 Hibernate 框架进行数据库操作时，通过 `getSession()` 方法获取的 Session 资源未在使用完毕后正确关闭。这属于 CWE-772（有效生命周期后未释放资源）漏洞，会导致数据库连接资源泄漏。
-
-## 风险影响
-
-- 数据库连接池耗尽，无法创建新的连接
-- 系统资源（内存、文件描述符等）过度消耗
-- 应用程序性能逐渐下降
-- 严重情况下可能导致应用程序崩溃或拒绝服务
-- 长时间运行的应用中，问题会随时间累积
-CODE
 	level: "high",
 	message: "检测到Hibernate Session 未释放资源",
 	title: "Check Java Hibernate Session Unreleased Resource",
@@ -217,6 +204,19 @@ public abstract class BaseHibernateDAO {
 #### 5. 审查并关闭所有 openSession 调用
 
 仔细审计代码中所有 `SessionFactory.openSession()` 的调用点，确保它们都被相应的 `session.close()` 调用配对。
+CODE
+	desc: <<<CODE
+## 漏洞描述
+
+在使用 Hibernate 框架进行数据库操作时，通过 `getSession()` 方法获取的 Session 资源未在使用完毕后正确关闭。这属于 CWE-772（有效生命周期后未释放资源）漏洞，会导致数据库连接资源泄漏。
+
+## 风险影响
+
+- 数据库连接池耗尽，无法创建新的连接
+- 系统资源（内存、文件描述符等）过度消耗
+- 应用程序性能逐渐下降
+- 严重情况下可能导致应用程序崩溃或拒绝服务
+- 长时间运行的应用中，问题会随时间累积
 CODE
 }
 

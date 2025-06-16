@@ -171,22 +171,22 @@ CODE)> as $highAndMid
 $highAndMid - $high as $mid
 
 alert $mid	for {
-	title: "Audit PHP Partially Validated Unzip Path Vulnerability",
-	title_zh: "审计PHP部分验证文件解压路径漏洞",
 	desc: <<<CODE
 该规则作用是审计PHP代码中可能存在部分验证的文件解压路径漏洞。为了确保安全性，需结合上下文进一步审查代码逻辑，确认是否存在潜在风险。
 CODE
 	level: "mid",
+	title: "Audit PHP Partially Validated Unzip Path Vulnerability",
+	title_zh: "审计PHP部分验证文件解压路径漏洞",
 }
 $sink - $high - $mid as $low
 
 alert $low	for {
+	title: "Audit PHP Low Risk File Unzip Operation",
+	title_zh: "审计PHP低风险文件解压操作",
 	desc: <<<CODE
 该规则用于审计PHP代码中低风险的文件解压操作。通常情况下，这类操作已经包含了基本的过滤机制，但仍需检查过滤函数是否存在潜在缺陷，以确保代码安全性。
 CODE
 	level: "low",
-	title: "Audit PHP Low Risk File Unzip Operation",
-	title_zh: "审计PHP低风险文件解压操作",
 }
 desc(
 	lang: "php"
