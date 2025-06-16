@@ -178,8 +178,8 @@ func (f *RuleFormat) VisitAlertStatement(alert sf.IAlertStatementContext) {
 	} else {
 		variable := yakunquote.TryUnquote(refVariable.Identifier().GetText())
 		defer func() {
-			f.Write(fmt.Sprintf("alert $%s", variable))
 			isNull := true
+			f.Write(fmt.Sprintf("alert $%s", variable))
 			for _, s := range alertMsg {
 				if s != "" {
 					isNull = false
@@ -204,7 +204,9 @@ CODE
 					}
 				}
 				f.Write("}\n")
+				return
 			}
+			f.Write("\n")
 		}()
 		if alertStmt.DescriptionItems() == nil {
 			return
