@@ -111,6 +111,8 @@ $groovy.parse?{*().run}(*<slice(index=1)> as $output);
 // run(GroovyCodeSource source, List<String> args)  # 不审计
 $groovy.run(*<slice(index=1)>?{<typeName>?{any:'File','Reader','String'}} as $output);
 alert $output	for {
+	level: "high",
+	title: "Audit Java GroovyShell Code Execution Sink",
 	title_zh: "审计Java GroovyShell 代码执行Sink点",
 	solution: <<<CODE
 ### 修复建议
@@ -176,8 +178,6 @@ CODE
    - 泄露敏感信息，如数据库密码、用户数据等。
    - 通过服务器进一步渗透内网。
 CODE
-	level: "high",
-	title: "Audit Java GroovyShell Code Execution Sink",
 }
 
 

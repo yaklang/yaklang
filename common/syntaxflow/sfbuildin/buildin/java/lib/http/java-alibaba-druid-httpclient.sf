@@ -50,9 +50,9 @@ REFERENCE
 HttpClientUtils?{<fullTypeName>?{have: 'alibaba.druid'}} as $entry;
 $entry./get|post/(, * as $output,);
 alert $output	for {
+	level: "mid",
 	title: "Audit Java Alibaba Druid HttpClientUtils Uses",
 	title_zh: "审计Java Alibaba Druid HttpClientUtils的使用",
-	level: "mid",
 }
 
 

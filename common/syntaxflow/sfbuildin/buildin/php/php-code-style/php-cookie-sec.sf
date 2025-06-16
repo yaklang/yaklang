@@ -75,28 +75,6 @@ setcookie?(*<len>?{==6}) as $checkCookie
 $checkCookie<getCallee>?(*<slice(index=5)>?{have: "false"}) as $sinkCookie
 
 alert $sinkCookie	for {
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-Cookie是Web应用程序中用于存储用户会话信息的重要机制。如果cookie的设置不当，可能会导致安全漏洞，如会话劫持、跨站脚本攻击（XSS）等。在PHP应用程序中，使用setcookie函数设置cookie时，应确保cookie的属性（如`secure`、`httponly`、`samesite`等）被正确设置，并且cookie的值经过充分的验证和过滤，以防止敏感信息泄露或被篡改。
-
-2. **触发场景**
-Httponly属性是用来防止客户端脚本通过 `document.cookie` 等方式获取cookie，缺少该属性会导致存储了敏感数据的cookie能够被恶意脚本获取，导致敏感数据泄露。Secure属性是用来确保cookie只在HTTPS连接下发送，如果缺少该属性，cookie可能会在**不安全的HTTP连接**中被泄露，导致被窃取和会话劫持。
-
-**存在漏洞的代码示例**
-```php
-<?php
-    setcookie("user", "JohnDoe", time() + 3600); // 缺少安全属性，如 secure 和 httponly
-?>
-```
-
-3. **潜在影响**
-- **会话劫持**: 攻击者窃取用户的会话Cookie，假冒合法用户执行操作。
-- **敏感信息泄露**: Cookie中存储的敏感信息（如用户ID、认证Token）在不安全的连接中被监听和获取。
-- **XSS攻击辅助**: 当应用程序存在XSS漏洞时，缺乏Httponly的Cookie使得攻击者更容易通过脚本获取用户Cookie。
-CODE
-	level: "low",
 	title: "Detect PHP Cookie Missing Secure Flag",
 	title_zh: "检测PHP Cookie缺少Secure标志",
 	solution: <<<CODE
@@ -126,13 +104,34 @@ CODE
 #### 4. 使用安全的会话管理机制
 除了Cookie属性设置，还应结合安全的会话管理机制，如定期更换会话ID、限制会话有效期等。
 CODE
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+Cookie是Web应用程序中用于存储用户会话信息的重要机制。如果cookie的设置不当，可能会导致安全漏洞，如会话劫持、跨站脚本攻击（XSS）等。在PHP应用程序中，使用setcookie函数设置cookie时，应确保cookie的属性（如`secure`、`httponly`、`samesite`等）被正确设置，并且cookie的值经过充分的验证和过滤，以防止敏感信息泄露或被篡改。
+
+2. **触发场景**
+Httponly属性是用来防止客户端脚本通过 `document.cookie` 等方式获取cookie，缺少该属性会导致存储了敏感数据的cookie能够被恶意脚本获取，导致敏感数据泄露。Secure属性是用来确保cookie只在HTTPS连接下发送，如果缺少该属性，cookie可能会在**不安全的HTTP连接**中被泄露，导致被窃取和会话劫持。
+
+**存在漏洞的代码示例**
+```php
+<?php
+    setcookie("user", "JohnDoe", time() + 3600); // 缺少安全属性，如 secure 和 httponly
+?>
+```
+
+3. **潜在影响**
+- **会话劫持**: 攻击者窃取用户的会话Cookie，假冒合法用户执行操作。
+- **敏感信息泄露**: Cookie中存储的敏感信息（如用户ID、认证Token）在不安全的连接中被监听和获取。
+- **XSS攻击辅助**: 当应用程序存在XSS漏洞时，缺乏Httponly的Cookie使得攻击者更容易通过脚本获取用户Cookie。
+CODE
+	level: "low",
 }
 
 setcookie?(*<slice(index=6)>?{have: 'false'}) as $noHttpOnlyCookie
 setcookie?(*<len>?{<=6}) as $noHttpOnlyCookie
 
 alert $noHttpOnlyCookie	for {
-	level: "low",
 	title: "Detect PHP Cookie Missing HttpOnly Flag",
 	title_zh: "检测PHP Cookie缺少HttpOnly标志",
 	solution: <<<CODE
@@ -183,6 +182,7 @@ Httponly属性是用来防止客户端脚本通过 `document.cookie` 等方式�
 - **敏感信息泄露**: Cookie中存储的敏感信息（如用户ID、认证Token）在不安全的连接中被监听和获取。
 - **XSS攻击辅助**: 当应用程序存在XSS漏洞时，缺乏Httponly的Cookie使得攻击者更容易通过脚本获取用户Cookie。
 CODE
+	level: "low",
 }
 
 desc(

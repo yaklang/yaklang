@@ -76,9 +76,9 @@ REFERENCE
 LIBXML_NOENT<getCall><getCallee><name>?{have: simplexml_load_string} as $vuln;
 check $vuln;
 alert $vuln	for {
-	level: "high",
 	title: "Check PHP simplexml_load_string for XXE Vulnerability",
 	title_zh: "检测PHP simplexml_load_string XXE漏洞",
+	level: "high",
 }
 
 

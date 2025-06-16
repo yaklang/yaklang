@@ -83,9 +83,9 @@ REFERENCE
 /mysql_connect|mysql_pconnect/?(,,*?{opcode: const} as $sink,)
 
 alert $sink	for {
-	title: "Hardcoded MySQL Credentials Detected",
 	title_zh: "检测到MySQL凭据硬编码",
 	level: "low",
+	title: "Hardcoded MySQL Credentials Detected",
 }
 desc(
 	lang: "php"

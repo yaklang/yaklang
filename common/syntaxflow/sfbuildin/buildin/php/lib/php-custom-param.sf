@@ -46,9 +46,9 @@ _COOKIE.* as $param4
 
 $param1 + $param2 + $param3 + $param4 + $extra as $output
 alert $output	for {
+	level: "low",
 	title: "Audit PHP Custom Extern Variable",
 	title_zh: "审计PHP自定义外部变量使用",
-	level: "low",
 }
 
 desc(

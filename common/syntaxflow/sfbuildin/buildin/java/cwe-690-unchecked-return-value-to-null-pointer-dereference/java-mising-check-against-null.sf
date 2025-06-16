@@ -163,36 +163,6 @@ check $toCheck
 $toCheck?{.*()<var(memberCall)>} as $haveMemberCall
 $haveMemberCall?{!<getUsers(depth=2)>?{opcode:if} && !<getUsers(depth=3)>?{opcode:if}} as $weak
 alert $weak	for {
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   某些方法（如 `System.getProperty()`、`request.getParameter()`、`Class.getResource()`）可能返回 `null`。直接使用这些返回值而不检查是否为 `null` 可能导致空指针异常（`NullPointerException`），造成程序崩溃或意外行为。这属于 CWE-476（空指针解引用）安全问题。
-
-2. **触发场景**
-   ```java
-   public class RiskyExample {
-       public static void main(String[] args) {
-           // 获取可能为 null 的系统属性
-           String homeDir = System.getProperty("user.home.custom");
-
-           // 直接使用，没有检查 null
-           // 如果属性不存在，将导致 NullPointerException
-           int length = homeDir.length();  // allocated -> used 转换，触发错误
-           System.out.println("Home directory length: " + length);
-       }
-   }
-   ```
-
-3. **潜在影响**
-   - 程序运行时抛出 `NullPointerException`，可能导致服务中断。
-   - 系统行为变得不可预测，影响用户体验。
-   - 在极端情况下，攻击者可能利用此问题进行拒绝服务攻击（DoS）。
-CODE
-	level: "low",
-	message: "检测到未检查返回值可能导致空指针异常",
-	title: "Check Java Unchecked Return Value to Null Pointer Dereference",
-	title_zh: "检测Java 未检测返回值是否为null导致空指针",
 	solution: <<<CODE
 ### 修复建议
 
@@ -268,6 +238,36 @@ CODE
    }
    ```
 CODE
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+   某些方法（如 `System.getProperty()`、`request.getParameter()`、`Class.getResource()`）可能返回 `null`。直接使用这些返回值而不检查是否为 `null` 可能导致空指针异常（`NullPointerException`），造成程序崩溃或意外行为。这属于 CWE-476（空指针解引用）安全问题。
+
+2. **触发场景**
+   ```java
+   public class RiskyExample {
+       public static void main(String[] args) {
+           // 获取可能为 null 的系统属性
+           String homeDir = System.getProperty("user.home.custom");
+
+           // 直接使用，没有检查 null
+           // 如果属性不存在，将导致 NullPointerException
+           int length = homeDir.length();  // allocated -> used 转换，触发错误
+           System.out.println("Home directory length: " + length);
+       }
+   }
+   ```
+
+3. **潜在影响**
+   - 程序运行时抛出 `NullPointerException`，可能导致服务中断。
+   - 系统行为变得不可预测，影响用户体验。
+   - 在极端情况下，攻击者可能利用此问题进行拒绝服务攻击（DoS）。
+CODE
+	level: "low",
+	message: "检测到未检查返回值可能导致空指针异常",
+	title: "Check Java Unchecked Return Value to Null Pointer Dereference",
+	title_zh: "检测Java 未检测返回值是否为null导致空指针",
 }
 
 desc(

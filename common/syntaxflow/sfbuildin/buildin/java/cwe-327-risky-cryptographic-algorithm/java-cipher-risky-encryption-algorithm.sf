@@ -104,10 +104,10 @@ $algorithm#{
 }-> as $sink;
 
 alert $sink	for {
+	title_zh: "检测Java Cipher使用不安全或有风险的加密算法",
 	level: "low",
 	message: "发现Java代码中使用了不安全的加密算法",
 	title: "Check Java Cipher Weak Encryption Algorithm",
-	title_zh: "检测Java Cipher使用不安全或有风险的加密算法",
 }
 
 desc(

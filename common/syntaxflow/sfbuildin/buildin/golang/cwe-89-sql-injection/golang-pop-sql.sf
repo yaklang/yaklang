@@ -120,7 +120,6 @@ $sink.RawQuery(* #-> as $param);
 $param?{have: 'Parameter'} as $high;
 
 alert $high	for {
-	title: "SQL Injection detected",
 	title_zh: "检测到SQL注入",
 	solution: <<<CODE
 ### 修复建议
@@ -201,7 +200,7 @@ CODE
    SQL注入是一种严重的安全漏洞，它允许攻击者通过操控应用程序的数据库查询，执行任意 SQL 代码。在 Go 语言中使用 Pop 库进行数据库操作时，如果直接将用户输入拼接到 SQL 查询中（例如使用 `db.RawQuery` 或 `fmt.Sprintf` 构建查询字符串），而未进行适当的过滤或参数化，攻击者可能会利用此漏洞绕过认证、访问或修改敏感数据，甚至执行数据库管理操作，如删除表或关闭数据库服务。
 
 2. **触发场景**
-   当应用程序接收用户输入（如表单数据、URL参数）并将其直接拼接到构建 Pop 库的查询字符串中使用时，例如 `db.RawQuery(fmt.Sprintf("SELECT * FROM users WHERE name = '%!!(MISSING)!(MISSING)!(MISSING)s(MISSING)'", username))`，如果 `username` 变量包含恶意 SQL 代码（如 `' OR '1'='1` 或 `' ; DROP TABLE users; --`），则可能导致SQL注入。
+   当应用程序接收用户输入（如表单数据、URL参数）并将其直接拼接到构建 Pop 库的查询字符串中使用时，例如 `db.RawQuery(fmt.Sprintf("SELECT * FROM users WHERE name = '%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING)'", username))`，如果 `username` 变量包含恶意 SQL 代码（如 `' OR '1'='1` 或 `' ; DROP TABLE users; --`），则可能导致SQL注入。
    
    ```golang
    // 存在漏洞的 Go 代码示例 (使用 Pop 库)
@@ -210,7 +209,7 @@ CODE
    	// ...连接数据库代码...
    	var users []User
    	// 直接拼接用户输入到 RawQuery 中，存在 SQL 注入风险
-   	query := fmt.Sprintf("SELECT * FROM users WHERE name = '%!!(MISSING)!(MISSING)!(MISSING)s(MISSING)'", username)
+   	query := fmt.Sprintf("SELECT * FROM users WHERE name = '%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING)'", username)
    	if err := db.RawQuery(query).Scan(&users); err != nil {
    		log.Fatal(err)
    	}
@@ -227,6 +226,7 @@ CODE
 CODE
 	level: "high",
 	type: "vuln",
+	title: "SQL Injection detected",
 }
 
 desc(

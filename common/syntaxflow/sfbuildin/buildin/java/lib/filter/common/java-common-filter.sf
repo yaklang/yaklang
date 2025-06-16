@@ -38,7 +38,7 @@ REFERENCE
 
 /(?i).*(sanitize|filter|escape|clean|validate|check|secure|scrub|strip|encode|decode|prevent|safe|block|remove|replace|purge|whitelist|blacklist|neutralize|defense|harden|mitigate).*/ as  $output;
 alert $output	for {
-	level: "mid",
 	title: "Find Java Common Filter Methods",
 	title_zh: "查找Java过滤方法",
+	level: "mid",
 }

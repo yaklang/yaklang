@@ -39,9 +39,9 @@ REFERENCE
 .read()?{<typeName>?{have: 'java.nio.channels.SocketChannel'}} as $output;
 
 alert $output	for {
+	title: "Audit Java TCP Data Reception Point",
 	title_zh: "审计Java TCP数据接收点",
 	level: "mid",
-	title: "Audit Java TCP Data Reception Point",
 }
 
 

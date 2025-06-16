@@ -110,10 +110,10 @@ $sink<dataflow(
 )> as $mid;
 
 alert $mid	for {
-	level: "mid",
-	type: "vuln",
 	title: "Reflected XSS detected",
 	title_zh: "检测到反射XSS",
+	level: "mid",
+	type: "vuln",
 }
 
 desc(

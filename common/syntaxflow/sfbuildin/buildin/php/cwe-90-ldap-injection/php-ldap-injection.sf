@@ -88,6 +88,8 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high	for {
+	title: "Check PHP LDAP Direct Injection Vulnerability (No Filter)",
+	title_zh: "检测PHP LDAP无过滤直接注入漏洞",
 	solution: <<<CODE
 ### 修复建议
 
@@ -150,8 +152,6 @@ CODE
 CODE
 	level: "high",
 	type: "vuln",
-	title: "Check PHP LDAP Direct Injection Vulnerability (No Filter)",
-	title_zh: "检测PHP LDAP无过滤直接注入漏洞",
 }
 
 
@@ -162,8 +162,6 @@ CODE,exclude=<<<CODE
 CODE)> as $highAndMid;
 $highAndMid - $high as $mid
 alert $mid	for {
-	title: "Audit PHP LDAP Injection with Ineffective Filter",
-	title_zh: "审计PHP LDAP注入带无效过滤",
 	solution: <<<CODE
 ### 修复建议
 
@@ -210,6 +208,8 @@ CODE
 CODE
 	level: "mid",
 	type: "mid",
+	title: "Audit PHP LDAP Injection with Ineffective Filter",
+	title_zh: "审计PHP LDAP注入带无效过滤",
 }
 
 

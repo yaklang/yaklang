@@ -125,10 +125,10 @@ CODE
 }->} as $sink
 
 alert $sink	for {
+	risk: "sqli-inject",
 	title: "Unvalidated SQL Injection",
 	title_zh: "SQL注入风险",
 	level: "low",
-	risk: "sqli-inject",
 }
 
 

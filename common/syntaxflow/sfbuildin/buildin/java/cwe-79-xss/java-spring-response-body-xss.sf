@@ -91,40 +91,6 @@ CODE)> as $haveCall;
 
 $source - $haveCall as $withoutCall;
 alert $withoutCall	for {
-	title: "Check Java SpringBoot RestController XSS Vulnerability",
-	title_zh: "检测Java SpringBoot RestController XSS漏洞",
-	solution: <<<CODE
-### 修复建议
-
-1. **HTML转义（HTML Escaping）**
-   对所有用户输入在输出到HTTP响应体之前进行HTML转义。这将把输入中的特殊HTML字符（如`<`, `>`, `&`, `"`, `'`）转换为其对应的HTML实体，从而阻止浏览器将其解释为HTML或JavaScript代码。
-   ```java
-   // 修复代码示例 (使用Spring自带的HtmlUtils)
-   import org.springframework.web.bind.annotation.*;
-   import org.springframework.web.util.HtmlUtils;
-
-   @RestController
-   @RequestMapping("/xss")
-   public class XSSController {
-
-       @GetMapping("/echo")
-       public String echo(@RequestParam("input") String input) {
-           String safeInput = HtmlUtils.htmlEscape(input);
-           return "Your input: " + safeInput;
-       }
-   }
-   ```
-   也可以使用其他库或方法进行HTML转义。
-
-2. **使用安全的视图技术（对于Controller而不是RestController）**
-   虽然规则主要针对`@RestController`，但如果使用`@Controller`返回视图（如JSP、Thymeleaf、FreeMarker），应确保使用的视图技术默认或配置为对变量进行自动化转义。
-
-3. **输入验证和过滤**
-   在处理用户输入时，进行严格的输入验证和过滤，移除或限制潜在的恶意字符或模式。例如，如果期望输入是纯文本，则可以过滤掉所有HTML和JavaScript标签。
-
-4. **内容安全策略 (CSP)**
-   部署内容安全策略（CSP）HTTP响应头，限制浏览器可以加载的资源的来源，即使发生XSS漏洞，也能降低其潜在危害。例如，可以配置为只允许执行来自特定域的脚本。
-CODE
 	desc: <<<CODE
 ### 漏洞描述
 
@@ -157,6 +123,40 @@ CODE
 CODE
 	level: "high",
 	type: "vuln",
+	title: "Check Java SpringBoot RestController XSS Vulnerability",
+	title_zh: "检测Java SpringBoot RestController XSS漏洞",
+	solution: <<<CODE
+### 修复建议
+
+1. **HTML转义（HTML Escaping）**
+   对所有用户输入在输出到HTTP响应体之前进行HTML转义。这将把输入中的特殊HTML字符（如`<`, `>`, `&`, `"`, `'`）转换为其对应的HTML实体，从而阻止浏览器将其解释为HTML或JavaScript代码。
+   ```java
+   // 修复代码示例 (使用Spring自带的HtmlUtils)
+   import org.springframework.web.bind.annotation.*;
+   import org.springframework.web.util.HtmlUtils;
+
+   @RestController
+   @RequestMapping("/xss")
+   public class XSSController {
+
+       @GetMapping("/echo")
+       public String echo(@RequestParam("input") String input) {
+           String safeInput = HtmlUtils.htmlEscape(input);
+           return "Your input: " + safeInput;
+       }
+   }
+   ```
+   也可以使用其他库或方法进行HTML转义。
+
+2. **使用安全的视图技术（对于Controller而不是RestController）**
+   虽然规则主要针对`@RestController`，但如果使用`@Controller`返回视图（如JSP、Thymeleaf、FreeMarker），应确保使用的视图技术默认或配置为对变量进行自动化转义。
+
+3. **输入验证和过滤**
+   在处理用户输入时，进行严格的输入验证和过滤，移除或限制潜在的恶意字符或模式。例如，如果期望输入是纯文本，则可以过滤掉所有HTML和JavaScript标签。
+
+4. **内容安全策略 (CSP)**
+   部署内容安全策略（CSP）HTTP响应头，限制浏览器可以加载的资源的来源，即使发生XSS漏洞，也能降低其潜在危害。例如，可以配置为只允许执行来自特定域的脚本。
+CODE
 }
 
 
@@ -171,8 +171,6 @@ CODE)> as $filteredSink;
 
 $haveCall - $filteredSink as $unsafeFilteredSink;
 alert $unsafeFilteredSink	for {
-	level: "mid",
-	type: "vuln",
 	title: "Check Java SpringBoot RestController XSS Vulnerability",
 	title_zh: "检测Java SpringBoot RestController XSS漏洞",
 	solution: <<<CODE
@@ -237,12 +235,11 @@ CODE
    * **恶意重定向**: 攻击者可以将用户重定向到钓鱼网站。
    * **客户端的其他恶意行为**: 攻击者可以执行各种JavaScript代码，进行端口扫描、本地文件读取尝试（取决于浏览器和环境）等。
 CODE
+	level: "mid",
+	type: "vuln",
 }
 
 alert $filteredSink	for {
-	message: "The String or Content Filter is used. It is recommended to use the filter to prevent XSS.",
-	title: "Check Java SpringBoot RestController XSS Vulnerability",
-	title_zh: "检测Java SpringBoot RestController XSS漏洞",
 	desc: <<<CODE
 ### 规则目的
 该规则用于审计Java Spring Boot RestController中可能导致XSS（跨站脚本攻击）的安全漏洞。它通过识别直接输出用户输入的关键函数（例如返回原始字符串），定位未经验证/转义的数据输出点，防止攻击者注入恶意脚本窃取用户数据或劫持会话。
@@ -274,7 +271,10 @@ alert $filteredSink	for {
    - 会话劫持：攻击者可以通过脚本窃取用户的Cookie，冒充用户身份。
 CODE
 	level: "low",
+	message: "The String or Content Filter is used. It is recommended to use the filter to prevent XSS.",
 	type: "audit",
+	title: "Check Java SpringBoot RestController XSS Vulnerability",
+	title_zh: "检测Java SpringBoot RestController XSS漏洞",
 }
 
 

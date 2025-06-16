@@ -120,9 +120,6 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high	for {
-	level: "high",
-	type: "vuln",
-	title: "PHP Unserialization Vulnerability - High Risk",
 	title_zh: "PHP反序列化漏洞 - 高风险",
 	solution: <<<CODE
 ### 修复建议
@@ -214,6 +211,9 @@ unserialize($data); // 直接反序列化用户输入
 - **拒绝服务 (DoS)**：构造特殊序列化字符串，导致服务器崩溃或资源耗尽。
 - **其他漏洞触发**：通过反序列化触发其他类型的漏洞，如XXE、SSRF等。
 CODE
+	level: "high",
+	type: "vuln",
+	title: "PHP Unserialization Vulnerability - High Risk",
 }
 
 $sink<dataflow(include=<<<CODE
@@ -225,6 +225,7 @@ CODE)> as $highAndMid
 $highAndMid - $high as $mid
 
 alert $mid	for {
+	title_zh: "PHP反序列化漏洞 - 中风险",
 	solution: <<<CODE
 ### 修复建议
 
@@ -318,12 +319,14 @@ CODE
 	level: "mid",
 	type: "mid",
 	title: "PHP Unserialization Vulnerability - Medium Risk",
-	title_zh: "PHP反序列化漏洞 - 中风险",
 }
 
 $sink - $mid - $high as $low
 
 alert $low	for {
+	level: "low",
+	type: "low",
+	title: "PHP Unserialization Vulnerability - Low Risk",
 	title_zh: "PHP反序列化漏洞 - 低风险",
 	solution: <<<CODE
 ### 修复建议
@@ -415,9 +418,6 @@ unserialize($data); // 直接反序列化用户输入
 - **拒绝服务 (DoS)**：构造特殊序列化字符串，导致服务器崩溃或资源耗尽。
 - **其他漏洞触发**：通过反序列化触发其他类型的漏洞，如XXE、SSRF等。
 CODE
-	level: "low",
-	type: "low",
-	title: "PHP Unserialization Vulnerability - Low Risk",
 }
 unserialize?(*?{!opcode: const}) as $info
 alert $info	for {

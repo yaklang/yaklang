@@ -97,9 +97,9 @@ SOLUTION
 template?{<fullTypeName>?{have: 'html/template'}} as $output
 
 alert $output	for {
-	title: "Audit Golang html/template Usage",
 	title_zh: "审计Golang html/template使用",
 	level: "info",
+	title: "Audit Golang html/template Usage",
 }
 
 desc(

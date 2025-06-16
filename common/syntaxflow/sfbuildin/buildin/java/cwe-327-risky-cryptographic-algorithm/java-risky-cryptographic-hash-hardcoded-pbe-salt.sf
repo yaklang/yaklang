@@ -70,10 +70,10 @@ $salt?{!(.*#{exclude:`* ?{opcode:const}`}->)} as $toCheck;
 $toCheck?{!<getCall>?{have:/(?i)(random|next)/}} as $risk
 
 alert $risk	for {
+	level: "low",
 	message: "发现Java代码中使用硬编码的PBE盐值",
 	title: "Detect Java Risky Hardcoded PBE Salt",
 	title_zh: "检测Java 哈希算法使用硬编码的PBE盐值",
-	level: "low",
 }
 
 desc(
