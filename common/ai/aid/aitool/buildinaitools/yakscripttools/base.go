@@ -10,6 +10,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"
@@ -22,40 +23,36 @@ import (
 //go:embed yakscriptforai/**
 var yakScriptFS embed.FS
 
+func init() {
+	yakit.RegisterPostInitDatabaseFunction(func() error {
+		if !consts.IsDevMode() {
+			const key = "2b709ef7252a06a0c1cfbb952f77f976"
+			if yakit.Get(key) == consts.ExistedBuildInAIToolEmbedFSHash {
+				return nil
+			}
+			log.Debug("start to load build in ai tools")
+			defer func() {
+				hash, _ := BuildInAIToolHash()
+				yakit.Set(key, hash)
+			}()
+		}
+		OverrideYakScriptAiTools()
+		return nil
+	})
+}
+
+func BuildInAIToolHash() (string, error) {
+	return filesys.CreateEmbedFSHash(yakScriptFS)
+}
+
 var overrideYakScriptAiToolsOnce sync.Once
 
 func OverrideYakScriptAiTools() {
 	overrideYakScriptAiToolsOnce.Do(func() {
 		db := consts.GetGormProfileDatabase()
-		allToolNames := []string{}
-		efs := filesys.NewEmbedFS(yakScriptFS)
-		_ = filesys.Recursive(".", filesys.WithFileSystem(efs), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
-			filename := info.Name()
-			_, filename = efs.PathSplit(filename)
-			if efs.Ext(filename) != ".yak" {
-				return nil
-			}
-			toolname := strings.TrimSuffix(filename, ".yak")
-			allToolNames = append(allToolNames, toolname)
-			return nil
-		}))
-		update := false
-		for _, toolname := range allToolNames {
-			aiTool, err := schema.GetAIYakTool(db, toolname)
-			if err != nil {
-				update = true
-				break
-			}
-			if aiTool == nil {
-				update = true
-				break
-			}
-		}
-		if update {
-			aiTools := loadAllYakScriptFromEmbedFS()
-			for _, aiTool := range aiTools {
-				schema.SaveAIYakTool(db, aiTool)
-			}
+		aiTools := loadAllYakScriptFromEmbedFS()
+		for _, aiTool := range aiTools {
+			schema.SaveAIYakTool(db, aiTool)
 		}
 	})
 }
@@ -131,7 +128,6 @@ func covertTools(tools []*schema.AIYakTool) []*aitool.Tool {
 }
 
 func GetAllYakScriptAiTools() []*aitool.Tool {
-	OverrideYakScriptAiTools()
 	db := consts.GetGormProfileDatabase()
 	allAiTools, err := schema.SearchAIYakTool(db, "")
 	if err != nil {
@@ -141,7 +137,6 @@ func GetAllYakScriptAiTools() []*aitool.Tool {
 	return covertTools(allAiTools)
 }
 func GetYakScriptAiTools(names ...string) []*aitool.Tool {
-	OverrideYakScriptAiTools()
 	db := consts.GetGormProfileDatabase()
 	tools := []*schema.AIYakTool{}
 	toolsNameMap := map[string]struct{}{}
