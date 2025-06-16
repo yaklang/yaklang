@@ -6,8 +6,9 @@ desc(
 [CWE-20](https://cwe.mitre.org/data/definitions/20.html)
 [Java Socket Documentation](http://docs.oracle.com/javase/8/docs/api/java/net/Socket.html)
 REFERENCE
-	description: <<<DESCRIPTION
-
+	desc: <<<DESCRIPTION
+在 Web 应用程序中直接使用基于套接字的底层通信协议时，尤其是在与陈旧系统集成的场景中，极易引入安全漏洞。开发自定义通信协议需要自行解决输入/输出信号验证、协议版本兼容性、通信通道加密缺失（如未启用 TLS/SSL）、错误处理机制缺陷、防火墙穿透与网络限制规避、会话管理与重放攻击防护等复杂安全问题。即使使用标准协议，若未正确配置安全机制，攻击者仍可借助公开的协议规范和漏洞库发起定向攻击。
+值得注意的是，主流标准协议（如 HTTP/SMTP）通常拥有成熟的漏洞修复方案，而自定义协议缺乏社区支持和持续安全更新。
 DESCRIPTION
 	solution: <<<SOLUTION
 ### 修复建议

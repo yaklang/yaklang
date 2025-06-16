@@ -7,7 +7,7 @@ desc(
 [CWE-489](https://cwe.mitre.org/data/definitions/489.html)
 REFERENCE
 	description: <<<DESCRIPTION
-
+该规则检测Java Spring Boot项目中是否使用了Devtools。Devtools是Spring Boot的一个开发工具包，提供了热部署、自动重启等功能，但在生产环境中不应使用。
 DESCRIPTION
 	rule_id: "2e7fd1d6-962f-48ac-a8dd-369272833d06"
 	solution: <<<SOLUTION

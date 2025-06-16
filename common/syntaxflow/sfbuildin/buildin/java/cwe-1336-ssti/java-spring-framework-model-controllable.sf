@@ -7,8 +7,8 @@ desc(
 	harm_zh: "这种漏洞可能导致服务器端模板注入(SSTI)攻击。攻击者可以通过控制ModelAndView构造函数的参数来注入恶意模板，从而执行任意代码、访问敏感数据或进行其他未授权操作。",
 	harm: "This vulnerability may lead to Server-Side Template Injection (SSTI) attacks. Attackers can inject malicious templates by controlling the parameters of the ModelAndView constructor, potentially executing arbitrary code, accessing sensitive data, or performing other unauthorized operations."
 	fix_zh: "建议使用安全的模板引擎，并避免直接将用户输入作为模板路径或内容的一部分。",
-	fix: <<<FIX
-
+	solution: <<<FIX
+Use a secure template engine and avoid directly using user input as part of the template path or content.
 FIX
 	desc: <<<DESC
 ### 漏洞描述

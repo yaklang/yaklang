@@ -6,7 +6,20 @@ desc(
 [Hibernate ConnectionProvider 文档](https://docs.atlassian.com/hibernate2/2.1.8/api/net/sf/hibernate/connection/ConnectionProvider.html)
 [CWE-772: Missing Release of Resource after Effective Lifetime](https://cwe.mitre.org/data/definitions/772.html)
 REFERENCE
-	description: <<<DESCRIPTION
+	desc: <<<DESCRIPTION
+ ## 漏洞描述
+
+    应用程序通过 Hibernate 的 `ConnectionProvider.getConnection()` 方法直接获取数据库连接后，未正确关闭这些连接资源。尽管 Hibernate 通常会管理自己的连接，但当直接使用 ConnectionProvider 接口获取连接时，应用程序需要负责关闭这些连接。
+
+    此漏洞会导致数据库连接泄漏，随着时间推移耗尽连接池资源，最终可能导致应用程序无法与数据库建立新连接。
+
+    ## 风险影响
+
+    - 数据库连接持续泄漏，耗尽连接池配额
+    - 应用长时间运行后可能出现 "Too many connections" 错误
+    - 连接未及时归还池，导致其他操作无法获取连接
+    - 服务器资源消耗增加，可能导致性能下降
+    - 在高负载情况下，可能引发数据库服务拒绝服务
 
 DESCRIPTION
 	solution: <<<SOLUTION

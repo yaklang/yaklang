@@ -7,8 +7,9 @@ desc(
 [Hibernate Session API 文档 (Hibernate 2.x)](https://docs.atlassian.com/hibernate2/2.1.8/api/net/sf/hibernate/Session.html)
 [CWE-772: Missing Release of Resource after Effective Lifetime](https://cwe.mitre.org/data/definitions/772.html)
 REFERENCE
-	description: <<<DESCRIPTION
-
+	desc: <<<DESCRIPTION
+## 漏洞描述
+在使用 Hibernate 框架进行数据库操作时，通过 `getSession()` 方法获取的 Session 资源未在使用完毕后正确关闭。这属于 CWE-772（有效生命周期后未释放资源）漏洞，会导致数据库连接资源泄漏。
 DESCRIPTION
 	rule_id: "b70c9711-31ed-4147-a982-35a6b5605078"
 	solution: <<<SOLUTION

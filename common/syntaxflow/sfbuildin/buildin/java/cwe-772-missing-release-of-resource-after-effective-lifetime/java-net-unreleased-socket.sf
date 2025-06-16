@@ -7,7 +7,20 @@ desc(
 [Java Socket 文档](https://docs.oracle.com/javase/8/docs/api/java/net/Socket.html)
 REFERENCE
 	description: <<<DESCRIPTION
+## 漏洞描述
 
+应用程序创建了 `java.net.Socket`、`java.net.ServerSocket` 或 `java.net.SocketImpl` 类的实例后，未在使用完毕时通过调用 `close()` 方法正确关闭这些网络资源。这属于 CWE-772（有效生命周期后未释放资源）漏洞，会导致网络端口和系统资源泄漏。
+
+网络套接字比普通文件句柄更加关键，因为它们会占用有限的网络端口资源。如果套接字未正确关闭，对应的端口可能会长时间处于 TIME_WAIT 状态，无法被重新使用，直到操作系统的超时机制生效。
+
+## 风险影响
+
+- 网络端口资源泄漏，导致可用端口耗尽
+- TCP 连接无法正常关闭，占用系统网络栈资源
+- 应用可能遇到 "Address already in use" 或 "Too many open files" 错误
+- 服务器性能随时间下降，尤其在高并发环境中
+- 长时间运行的服务可能需要定期重启以释放资源
+- 可能影响其他应用程序的网络连接能力
 DESCRIPTION
 	solution: <<<SOLUTION
 ### 修复建议

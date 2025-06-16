@@ -8,7 +8,18 @@ desc(
 [Java JDBC API 文档](https://docs.oracle.com/javase/8/docs/api/java/sql/package-summary.html)
 REFERENCE
 	description: <<<DESCRIPTION
+    ## 漏洞描述
 
+    应用程序在使用 JDBC API 进行数据库操作时，未能正确关闭数据库资源（Connection、Statement、ResultSet）。这些资源在超出生命周期后未被释放，导致资源泄漏。
+
+    ## 风险影响
+
+    - 数据库连接池耗尽，无法创建新的连接
+    - 系统资源（内存、文件句柄等）过度消耗
+    - 应用程序性能随时间逐渐下降
+    - 长时间运行后可能导致应用崩溃或拒绝服务
+    - 可能引发数据库服务器连接数超限
+    - 事务可能无法正确提交或回滚
 DESCRIPTION
 	solution: <<<SOLUTION
 ### 修复建议

@@ -8,7 +8,7 @@ desc(
 [Log4j API](https://logging.apache.org/log4j/2.x/javadoc/log4j-api/org/apache/logging/log4j/Logger.html)
 REFERENCE
 	description: <<<DESCRIPTION
-
+该规则用于检测Java应用程序中的日志记录方法。日志记录是应用程序中重要的调试和监控工具，但不当的日志记录可能导致信息泄露或其他安全问题。此规则审计了可能受到用户输入影响的日志记录点，特别是那些使用`log.info()`、`log.error()`等方法进行日志记录的点。
 DESCRIPTION
 	rule_id: "78903daf-72e2-454b-8275-91771836659b"
 	solution: <<<SOLUTION
