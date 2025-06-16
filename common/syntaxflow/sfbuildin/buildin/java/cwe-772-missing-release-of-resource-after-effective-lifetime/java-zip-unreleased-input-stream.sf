@@ -11,7 +11,19 @@ desc(
 [Apache Commons Compress ZipFile API Documentation](https://commons.apache.org/proper/commons-compress/apidocs/org/apache/commons/compress/archivers/zip/ZipFile.html)
 REFERENCE
 	description: <<<DESCRIPTION
+    ## 漏洞描述
 
+    应用程序通过 `ZipFile.getInputStream()` 方法获取 ZIP 文件条目的输入流后，未正确关闭这些 `InputStream` 资源。每次调用 `getInputStream()` 都会创建一个新的输入流，必须单独关闭，即使关闭了父级 `ZipFile` 对象也不足以完全释放相关资源。
+
+    这属于 CWE-772（有效生命周期后未释放资源）漏洞，可能导致文件句柄和内存资源泄漏。
+
+    ## 风险影响
+
+    - 文件句柄泄漏，可能导致"Too many open files"错误
+    - 内存泄漏，特别是处理大型 ZIP 文件或多个 ZIP 文件时
+    - 系统资源不断消耗，应用程序性能随时间逐渐下降
+    - 在长时间运行的应用中更为严重，可能导致应用程序崩溃
+    - 处理大量 ZIP 条目时可能迅速耗尽系统资源
 DESCRIPTION
 	solution: <<<SOLUTION
 ### 修复建议

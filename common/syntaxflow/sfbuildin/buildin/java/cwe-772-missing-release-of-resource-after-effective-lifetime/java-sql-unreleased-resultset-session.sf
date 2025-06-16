@@ -8,7 +8,17 @@ desc(
 [java.sql.Statement 文档](https://docs.oracle.com/javase/8/docs/api/java/sql/Statement.html)
 REFERENCE
 	description: <<<DESCRIPTION
+   ## 漏洞描述
 
+    应用程序通过 `Statement.executeQuery()` 方法执行 SQL 查询，获取 ResultSet 对象后未正确关闭这些资源。ResultSet 对象持有数据库资源，如游标和结果集数据。即使关闭了父级 Statement 对象，最佳实践仍然要求显式关闭每个 ResultSet 对象，以确保及时释放资源。
+
+    ## 风险影响
+
+    - 未关闭的 ResultSet 对象会占用数据库和应用程序内存资源
+    - 可能导致数据库游标泄漏，许多数据库系统对每个连接的活动游标数有限制
+    - 长时间运行的查询结果集如未关闭，会长时间占用服务器端资源
+    - 在高并发环境中，游标泄漏可能迅速耗尽数据库资源
+    - 可能导致应用程序性能下降和稳定性问题
 DESCRIPTION
 	solution: <<<SOLUTION
 ### 修复建议

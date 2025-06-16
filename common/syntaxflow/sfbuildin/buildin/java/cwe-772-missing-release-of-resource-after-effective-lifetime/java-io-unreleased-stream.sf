@@ -9,8 +9,18 @@ desc(
 [CWE-772: Missing Release of Resource after Effective Lifetime](https://cwe.mitre.org/data/definitions/772.html)
 [The try-with-resources Statement - Oracle Documentation](https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceKem.html)
 REFERENCE
-	description: <<<DESCRIPTION
+	desc: <<<DESCRIPTION
+应用程序创建 `InputStreamReader`、`FileInputStream`、`FileOutputStream` 等 I/O 流资源后，未在使用完毕时通过调用 `close()` 方法正确关闭这些资源。这属于 CWE-772（有效生命周期后未释放资源）漏洞，会导致文件句柄泄漏和系统资源耗尽。
 
+即使 Java 垃圾回收机制最终会回收这些对象，但关联的底层系统资源（如文件描述符）可能不会被及时释放，直到垃圾回收发生，这种行为既不可预测也不可靠。
+
+## 风险影响
+
+- 文件句柄泄漏，导致"Too many open files"错误
+- 长时间运行的应用性能逐渐下降
+- 文件可能被锁定，无法被其他进程访问或修改
+- 在高并发环境下，资源消耗会迅速增加
+- 可能导致系统稳定性问题和应用程序崩溃
 DESCRIPTION
 	solution: <<<SOLUTION
 ### 修复建议

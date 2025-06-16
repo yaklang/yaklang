@@ -6,8 +6,10 @@ desc(
 [CWE-247: Reliance on DNS Lookups in a Security Decision](https://cwe.mitre.org/data/definitions/247.html)
 [Oracle JavaDocs: java.net.InetAddress](https://docs.oracle.com/javase/8/docs/api/java/net/InetAddress.html)
 REFERENCE
-	description: <<<DESCRIPTION
-
+	desc: <<<DESCRIPTION
+该规则检测对 java.net.InetAddress 类方法的误用，这些方法在与认证相关的安全决策中依赖 DNS 查询，可能导致安全风险。
+该规则审计的类:
+- java.net.InetAddress
 DESCRIPTION
 	solution: <<<SOLUTION
 ### 修复建议

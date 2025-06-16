@@ -41,10 +41,10 @@ desc(
    * **进一步渗透:** 攻击者可以利用受控服务器作为跳板，对内网其他系统进行攻击。
 DESC
 	fix: <<<FIX
-
+    在使用Groovy脚本引擎时，确保对输入进行严格的验证和过滤。避免直接执行用户输入的Groovy代码，或者使用安全的沙箱环境来限制代码的执行权限。此外，可以考虑使用其他更安全的脚本语言或框架来实现动态脚本执行的需求。
 FIX
-	ref: <<<REF
-
+    ref: <<<REF
+    https://docs.groovy-lang.org/next/html/api/groovy/lang/GroovyShell.html
 REF
 	rule_id: "44a473d8-3763-44c3-9819-17100cf17ad6"
 )
