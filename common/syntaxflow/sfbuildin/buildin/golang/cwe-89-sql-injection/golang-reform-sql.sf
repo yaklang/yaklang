@@ -145,10 +145,6 @@ CODE
 }-> as $high
 
 alert $high	for {
-	level: "high",
-	type: "vuln",
-	title: "SQL Injection detected",
-	title_zh: "检测到SQL注入",
 	solution: <<<CODE
 ### 修复建议
 
@@ -181,7 +177,7 @@ func login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintf(w, "Welcome, %!!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING)!", user.Name)
+	fmt.Fprintf(w, "Welcome, %!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING)!", user.Name)
 }
 
 // 或者使用 Select 的参数化方式 (如果需要更灵活的查询)
@@ -255,7 +251,7 @@ func login(w http.ResponseWriter, r *http.Request) {
 
 	var users []User
 	// 不安全的查询
-	query := fmt.Sprintf("SELECT * FROM users WHERE name = '%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING)'", username)
+	query := fmt.Sprintf("SELECT * FROM users WHERE name = '%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING)'", username)
 	_, err = reformDB.Select(&users, query) // 直接拼接用户输入导致SQL注入
 	if err != nil {
 		log.Fatal(err)
@@ -274,6 +270,10 @@ func main() {
 * 攻击者可能绕过身份验证或授权机制。
 * 攻击者可能利用数据库漏洞进行进一步攻击。
 CODE
+	level: "high",
+	type: "vuln",
+	title: "SQL Injection detected",
+	title_zh: "检测到SQL注入",
 }
 
 desc(

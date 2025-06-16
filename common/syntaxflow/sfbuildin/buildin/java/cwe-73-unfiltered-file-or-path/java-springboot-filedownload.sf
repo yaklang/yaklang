@@ -96,7 +96,6 @@ $entry -{
 CODE
 }->;
 alert $sink	for {
-	title_zh: "检测Java Springboot文件下载漏洞",
 	solution: <<<CODE
 ### 修复建议
 
@@ -173,6 +172,7 @@ CODE
 CODE
 	level: "warning",
 	title: "Check Java Springboot File Download Vulnerability",
+	title_zh: "检测Java Springboot文件下载漏洞",
 }
 
 

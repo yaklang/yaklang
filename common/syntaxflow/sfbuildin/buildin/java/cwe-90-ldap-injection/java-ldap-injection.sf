@@ -73,8 +73,6 @@ $result<dataflow(
 )> as $high 
 
 alert $high	for {
-	title: "Check Java LDAP Injection Vulnerability",
-	title_zh: "检测Java LDAP注入漏洞",
 	solution: <<<CODE
 ### 修复建议
 
@@ -124,6 +122,8 @@ NamingEnumeration answer = ctx.search("dc=example,dc=com", searchFilter, searchC
 CODE
 	level: "high",
 	message: "发现Java代码中存在LDAP注入漏洞，并且数据流中间没有进行任何过滤。",
+	title: "Check Java LDAP Injection Vulnerability",
+	title_zh: "检测Java LDAP注入漏洞",
 }
 
 

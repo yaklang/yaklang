@@ -99,6 +99,10 @@ check $reader;
 $reader?{!.setFeature && !.setEntityResolver && !.setAllow* && !.setType*}.read() as $vulnCall;
 check $vulnCall;
 alert $vulnCall	for {
+	level: "warning",
+	message: "SAXReader() Unsafe Use in Context Sink",
+	title: "Check Java SAXReader Unsafe Use",
+	title_zh: "检测 Java SAXReader 未安全使用",
 	solution: <<<CODE
 ### 修复建议
 
@@ -181,10 +185,6 @@ CODE
    - 服务器端请求伪造（SSRF）（通过引用内网资源）
    - 在一些特定条件下可能导致任意代码执行（通过引用包含恶意代码的文件）
 CODE
-	level: "warning",
-	message: "SAXReader() Unsafe Use in Context Sink",
-	title: "Check Java SAXReader Unsafe Use",
-	title_zh: "检测 Java SAXReader 未安全使用",
 }
 
 desc(

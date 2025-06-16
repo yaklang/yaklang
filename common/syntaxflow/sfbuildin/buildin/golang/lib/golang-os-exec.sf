@@ -99,8 +99,6 @@ exec?{<fullTypeName>?{have: 'os/exec'}} as $entry
 $entry.Command(* as $output) 
 
 alert $output	for {
-	title: "Unvalidated Command Execution",
-	title_zh: "未验证的命令执行",
 	solution: <<<CODE
 ### 修复建议
 
@@ -186,6 +184,8 @@ func main() {
    - 影响系统稳定性，可能导致服务中断。
 CODE
 	level: "high",
+	title: "Unvalidated Command Execution",
+	title_zh: "未验证的命令执行",
 }
 
 desc(

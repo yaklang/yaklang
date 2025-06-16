@@ -205,7 +205,6 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high	for {
-	title: "Unvalidated parameter injection",
 	title_zh: "未验证参数注入风险",
 	solution: <<<CODE
 ### 修复建议
@@ -294,6 +293,7 @@ CODE
     攻击者可以完全控制服务器，执行任意操作系统命令，获取敏感数据，篡改文件，甚至利用服务器作为跳板进行内网渗透。导致服务器失陷，造成严重的安全后果。
 CODE
 	level: "high",
+	title: "Unvalidated parameter injection",
 }
 
 $all<dataflow(include=<<<INCLUDE
@@ -399,7 +399,6 @@ CODE
 $all - $high - $mid as $low
 
 alert $low	for {
-	title: "Potential code execution risk",
 	title_zh: "潜在代码执行风险",
 	solution: <<<CODE
 ### 修复建议
@@ -488,6 +487,7 @@ CODE
     攻击者可以完全控制服务器，执行任意操作系统命令，获取敏感数据，篡改文件，甚至利用服务器作为跳板进行内网渗透。导致服务器失陷，造成严重的安全后果。
 CODE
 	level: "low",
+	title: "Potential code execution risk",
 }
 desc(
 	lang: "php"
@@ -538,9 +538,9 @@ alert $mid_risk	for {
 $allRisk - $high - $mid as $low
 
 alert $low_risk	for {
-	title_zh: "潜在代码执行风险",
 	level: "low",
 	title: "Potential code execution risk",
+	title_zh: "潜在代码执行风险",
 }
 desc(
 	lang: "php"

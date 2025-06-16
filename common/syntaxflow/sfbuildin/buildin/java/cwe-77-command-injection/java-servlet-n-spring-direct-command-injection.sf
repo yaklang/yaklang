@@ -109,8 +109,6 @@ $controlled_source_site<dataflow(
 
 
 alert $high_source_site	for {
-	level: "high",
-	message: "发现Java代码中存在命令注入漏洞，并且数据流中间没有进行任何过滤。",
 	title: "Check Java Command Injection from Servlet and SpringMVC",
 	title_zh: "检测Java Servlet和SpringMVC中的命令注入漏洞",
 	solution: <<<CODE
@@ -195,12 +193,17 @@ CODE
    - 利用受感染服务器作为跳板攻击其他系统。
    - 拒绝服务攻击。
 CODE
+	level: "high",
+	message: "发现Java代码中存在命令注入漏洞，并且数据流中间没有进行任何过滤。",
 }
 
 
 $controlled_source_site - $high_source_site as $normal_source_side 
 
 alert $normal_source_side	for {
+	message: "发现Java代码存在命令注入漏洞，数据流中存在过滤",
+	title: "Check Java Command Injection from Servlet and SpringMVC",
+	title_zh: "检测Java Servlet和SpringMVC中的命令注入漏洞",
 	solution: <<<CODE
 ### 修复建议
 
@@ -284,9 +287,6 @@ CODE
    - 拒绝服务攻击。
 CODE
 	level: "mid",
-	message: "发现Java代码存在命令注入漏洞，数据流中存在过滤",
-	title: "Check Java Command Injection from Servlet and SpringMVC",
-	title_zh: "检测Java Servlet和SpringMVC中的命令注入漏洞",
 }
 
 
@@ -295,7 +295,6 @@ $sink - $controlled_sink_site as $low_risk_sink
 
 
 alert $low_risk_sink	for {
-	title: "Check Java Command Injection from Servlet and SpringMVC",
 	title_zh: "检测Java Servlet和SpringMVC中的命令注入漏洞",
 	desc: <<<CODE
 ### 漏洞描述
@@ -345,6 +344,7 @@ alert $low_risk_sink	for {
 CODE
 	level: "low",
 	message: "发现Java代码中可能存在命令注入，但并没有发现参数可控。",
+	title: "Check Java Command Injection from Servlet and SpringMVC",
 }
 
 

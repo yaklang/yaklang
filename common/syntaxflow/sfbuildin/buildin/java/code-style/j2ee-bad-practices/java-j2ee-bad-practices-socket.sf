@@ -58,6 +58,39 @@ SOLUTION
 
 *Socket*?{<typeName>?{have:'javax.net'}}  as $weak;
 alert $weak	for {
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+   在J2EE环境中直接使用`Socket`类进行网络通信是一种不推荐的做法，因为这种低级别操作无法充分利用容器提供的高级功能（例如连接池、事务管理、安全性等）。此外，手动处理网络通信容易引入安全漏洞，例如缺乏适当的加密、身份验证不足或资源泄漏等问题。
+
+2. **触发场景**
+   下面是一个示例代码，展示了直接在J2EE组件中初始化`SSLSocket`的情况：
+   ```java
+   import javax.net.ssl.SSLSocket;
+   import javax.net.ssl.SSLSocketFactory;
+   import javax.servlet.http.HttpServlet;
+   import javax.servlet.http.HttpServletRequest;
+   import javax.servlet.http.HttpServletResponse;
+   import java.io.IOException;
+
+   public class BadSocketServlet extends HttpServlet {
+       @Override
+       protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+           // 直接在 J2EE 组件中初始化 SSLSocket
+           SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+           try (SSLSocket socket = (SSLSocket) factory.createSocket("example.com", 443)) {
+               resp.getWriter().println("Connected to example.com via SSL socket.");
+           }
+       }
+   }
+   ```
+
+3. **潜在影响**
+   - 直接使用`Socket`可能导致安全措施缺失，例如没有启用TLS/SSL加密，从而暴露敏感数据。
+   - 手动管理网络资源可能导致资源泄漏、性能问题或难以维护的代码。
+   - 容器无法对其行为进行有效监控或优化，违背了J2EE设计原则中的“容器托管”理念。
+CODE
 	level: "info",
 	message: "发现Java J2EE 使用socket",
 	title: "Unvalidated Java J2EE Socket Usage",
@@ -103,39 +136,6 @@ alert $weak	for {
 
 4. **通过API网关隔离遗留系统风险**
    对于必须与采用非标准协议或存在安全风险的遗留系统交互的场景，考虑在应用外部署API网关或协议转换中间件。应用通过标准的、安全的协议与网关通信，由网关负责与遗留系统进行风险交互。
-CODE
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   在J2EE环境中直接使用`Socket`类进行网络通信是一种不推荐的做法，因为这种低级别操作无法充分利用容器提供的高级功能（例如连接池、事务管理、安全性等）。此外，手动处理网络通信容易引入安全漏洞，例如缺乏适当的加密、身份验证不足或资源泄漏等问题。
-
-2. **触发场景**
-   下面是一个示例代码，展示了直接在J2EE组件中初始化`SSLSocket`的情况：
-   ```java
-   import javax.net.ssl.SSLSocket;
-   import javax.net.ssl.SSLSocketFactory;
-   import javax.servlet.http.HttpServlet;
-   import javax.servlet.http.HttpServletRequest;
-   import javax.servlet.http.HttpServletResponse;
-   import java.io.IOException;
-
-   public class BadSocketServlet extends HttpServlet {
-       @Override
-       protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-           // 直接在 J2EE 组件中初始化 SSLSocket
-           SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-           try (SSLSocket socket = (SSLSocket) factory.createSocket("example.com", 443)) {
-               resp.getWriter().println("Connected to example.com via SSL socket.");
-           }
-       }
-   }
-   ```
-
-3. **潜在影响**
-   - 直接使用`Socket`可能导致安全措施缺失，例如没有启用TLS/SSL加密，从而暴露敏感数据。
-   - 手动管理网络资源可能导致资源泄漏、性能问题或难以维护的代码。
-   - 容器无法对其行为进行有效监控或优化，违背了J2EE设计原则中的“容器托管”理念。
 CODE
 }
 

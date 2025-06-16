@@ -88,6 +88,7 @@ $sink #{
 }->as  $high;
 
 alert $high	for {
+	title: "Check Java SnakeYAML Unserialization Vulnerability",
 	title_zh: "检测Java SnakeYAML反序列化漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -156,7 +157,6 @@ CODE
 CODE
 	level: "high",
 	message: "发现Java SnakeYAML反序列化漏洞,并且没有任何数据流过滤。",
-	title: "Check Java SnakeYAML Unserialization Vulnerability",
 }
 
 $sink #{

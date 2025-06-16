@@ -127,6 +127,8 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high	for {
+	level: "high",
+	type: "vuln",
 	title: "Unfiltered PHP File Inclusion Vulnerability",
 	title_zh: "未过滤的PHP文件包含漏洞",
 	solution: <<<CODE
@@ -149,7 +151,7 @@ if (in_array($page, $allowed_pages)) {
 ```
 
 2. **对用户输入进行严格过滤和校验**
-移除或过滤用户输入中的恶意字符，特别是路径遍历字符（`../`、`..\`）、空字节（`%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)`(MISSING)）等。同时，限制输入的文件名格式，例如只允许字母数字、下划线等。
+移除或过滤用户输入中的恶意字符，特别是路径遍历字符（`../`、`..\`）、空字节（`%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)`(MISSING)）等。同时，限制输入的文件名格式，例如只允许字母数字、下划线等。
 
 ```php
 <?php
@@ -222,7 +224,7 @@ $template = $_GET['template'];
 include('templates/' . $template . '.php'); // 将用户输入拼接到路径中
 ?>
 ```
-攻击者可以构造 `?template=../../etc/passwd%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)`(MISSING) （利用目录穿越和空字节截断）来包含本地文件。
+攻击者可以构造 `?template=../../etc/passwd%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)`(MISSING) （利用目录穿越和空字节截断）来包含本地文件。
 
 3. **潜在影响**
 - **敏感信息泄露**：包含并显示服务器上的任意文件，如配置文件、源代码、日志文件等，泄露敏感信息。
@@ -230,8 +232,6 @@ include('templates/' . $template . '.php'); // 将用户输入拼接到路径中
 - **拒绝服务**：包含大文件或设备文件可能导致服务器资源耗尽。
 文件包含漏洞对系统安全构成严重威胁，可能导致数据泄露、系统被控等后果。
 CODE
-	level: "high",
-	type: "vuln",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -242,6 +242,8 @@ CODE)> as $highAndMid
 $highAndMid - $high as $middle
 
 alert $middle	for {
+	title: "PHP File Inclusion with Insufficient Filtering",
+	title_zh: "PHP文件包含漏洞，但过滤不充分",
 	solution: <<<CODE
 ### 修复建议
 
@@ -262,7 +264,7 @@ if (in_array($page, $allowed_pages)) {
 ```
 
 2. **对用户输入进行严格过滤和校验**
-移除或过滤用户输入中的恶意字符，特别是路径遍历字符（`../`、`..\`）、空字节（`%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)`(MISSING)）等。同时，限制输入的文件名格式，例如只允许字母数字、下划线等。
+移除或过滤用户输入中的恶意字符，特别是路径遍历字符（`../`、`..\`）、空字节（`%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)`(MISSING)）等。同时，限制输入的文件名格式，例如只允许字母数字、下划线等。
 
 ```php
 <?php
@@ -335,7 +337,7 @@ $template = $_GET['template'];
 include('templates/' . $template . '.php'); // 将用户输入拼接到路径中
 ?>
 ```
-攻击者可以构造 `?template=../../etc/passwd%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)`(MISSING) （利用目录穿越和空字节截断）来包含本地文件。
+攻击者可以构造 `?template=../../etc/passwd%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)`(MISSING) （利用目录穿越和空字节截断）来包含本地文件。
 
 3. **潜在影响**
 - **敏感信息泄露**：包含并显示服务器上的任意文件，如配置文件、源代码、日志文件等，泄露敏感信息。
@@ -345,15 +347,11 @@ include('templates/' . $template . '.php'); // 将用户输入拼接到路径中
 CODE
 	level: "mid",
 	type: "mid",
-	title: "PHP File Inclusion with Insufficient Filtering",
-	title_zh: "PHP文件包含漏洞，但过滤不充分",
 }
 
 $sink - $high - $middle as $low;
 
 alert $low	for {
-	level: "low",
-	type: "audit",
 	title: "PHP File Inclusion with Filtering Functions",
 	title_zh: "PHP文件包含漏洞，检出过滤函数",
 	desc: <<<CODE
@@ -368,10 +366,13 @@ alert $low	for {
 3. **潜在影响**
 虽然存在过滤机制，但仍可能存在某些边界场景未被覆盖，导致潜在的安全隐患。
 CODE
+	level: "low",
+	type: "audit",
 }
 
 include(*?{!opcode: const}) as $info
 alert $info	for {
+	title: "PHP File Inclusion Detected - Further Review Recommended",
 	title_zh: "检测到PHP文件包含，建议进一步审查",
 	desc: <<<CODE
 ### 检测目的
@@ -382,7 +383,6 @@ alert $info	for {
 CODE
 	level: "info",
 	type: "audit",
-	title: "PHP File Inclusion Detected - Further Review Recommended",
 }
 desc(
 	lang: php

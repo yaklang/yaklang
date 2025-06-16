@@ -176,10 +176,10 @@ REFERENCE
 check $readObj;
 
 alert $readObj	for {
-	title: "Check Java Native Deserialization Vulnerability",
 	title_zh: "检测Java原生反序列化漏洞",
 	level: "info",
 	message: "发现使用ObjectInputStream的readObject()方法进行反序列化操作，可能存在反序列化漏洞",
+	title: "Check Java Native Deserialization Vulnerability",
 }
 
 

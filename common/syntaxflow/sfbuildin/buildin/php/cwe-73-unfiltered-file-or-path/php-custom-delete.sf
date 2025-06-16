@@ -249,7 +249,6 @@ CODE
 }
 $all - $high - $mid as $low
 alert $low	for {
-	level: "low",
 	title: "Potential File Storage Path Misconfiguration",
 	title_zh: "潜在的文件存储路径配置问题",
 	desc: <<<CODE
@@ -267,6 +266,7 @@ alert $low	for {
    3. **区分不同风险等级**
       根据数据流分析结果和过滤情况，规则可能区分出高、中、低不同风险等级的告警。
 CODE
+	level: "low",
 }
 desc(
 	lang: "php"

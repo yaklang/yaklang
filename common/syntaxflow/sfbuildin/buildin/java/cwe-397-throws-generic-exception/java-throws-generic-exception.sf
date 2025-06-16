@@ -68,9 +68,9 @@ REFERENCE
 $throws?{have:/^(Exception|Throwable)$/} as $generic_throws 
 
 alert $generic_throws	for {
-	level: "low",
 	title: "Audit Java Generic Exception Throws Declaration",
 	title_zh: "审计Java方法声明中抛出过于宽泛的异常",
+	level: "low",
 }
 
 desc(

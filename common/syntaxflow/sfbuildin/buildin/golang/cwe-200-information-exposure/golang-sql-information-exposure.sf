@@ -110,6 +110,50 @@ $param #{
 }-> as $low;
 
 alert $low	for {
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+   SQL信息泄露漏洞通常不是由 SQL 注入本身引起，而是由于应用程序在执行特定 SQL 查询时，将数据库或服务器的敏感信息（而非业务数据）作为查询结果返回给用户或日志中。这些查询可能被硬编码在代码中，或者通过不安全的输入方式构建。泄露的信息可能包括数据库的名称、版本、操作系统信息、甚至文件路径，这些信息对于攻击者进行下一步的攻击（如选择攻击手法、判断攻击目标环境）至关重要。
+
+2. **触发场景**
+   当 Golang 应用程序执行包含以下敏感查询的 SQL 语句，并且查询结果被输出到用户界面、API 响应、日志文件或错误信息中时，可能发生信息泄露：
+   - 查询数据库版本（如 `SELECT version()`）
+   - 查询当前数据库名称（如 `SELECT current_database()`）
+   - 查询文件路径或目录结构（如通过某些数据库函数，尽管在标准 SQL 中不常见，但在特定数据库扩展或错误处理中可能出现）
+   - 查询操作系统信息等
+
+   ```go
+   // 存在漏洞的代码示例
+   func getCurrentDatabase(db *sql.DB) {
+       var dbName string
+       // 直接查询数据库名称并输出
+       err := db.QueryRow("SELECT current_database()").Scan(&dbName)
+       if err != nil {
+           fmt.Println("Failed to get current database:", err)
+           return
+       }
+       fmt.Println("Current database:", dbName) // 泄露数据库名称
+   }
+
+   func getServerVersion(db *sql.DB) {
+       var version string
+       // 直接查询数据库版本并输出
+       err := db.QueryRow("SELECT version()").Scan(&version)
+       if err != nil {
+           fmt.Println("Failed to get server version:", err)
+           return
+       }
+       fmt.Println("Server version:", version) // 泄露服务器版本信息
+   }
+   ```
+
+3. **潜在影响**
+   攻击者利用泄露的信息可以更好地了解目标系统的架构、所使用的数据库类型和版本、操作系统等，从而辅助他们选择更具针对性的攻击手段，例如利用已知漏洞、进行字典攻击等。间接增加了被攻擊的风险。
+CODE
+	level: "low",
+	type: "vuln",
+	title: "Detect Golang SQL Information Exposure",
 	title_zh: "检测Golang SQL信息泄露",
 	solution: <<<CODE
 ### 修复建议
@@ -159,50 +203,6 @@ func getServerVersion(db *sql.DB) {
 #### 3. 最小化日志或错误输出中的敏感信息
 配置日志系统，避免在日志中记录包含敏感系统信息的 SQL 查询结果或详细的错误堆栈信息，尤其是那些可能暴露在外部的日志。对于外部用户，提供通用的错误消息，而不是详细的技术错误。
 CODE
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   SQL信息泄露漏洞通常不是由 SQL 注入本身引起，而是由于应用程序在执行特定 SQL 查询时，将数据库或服务器的敏感信息（而非业务数据）作为查询结果返回给用户或日志中。这些查询可能被硬编码在代码中，或者通过不安全的输入方式构建。泄露的信息可能包括数据库的名称、版本、操作系统信息、甚至文件路径，这些信息对于攻击者进行下一步的攻击（如选择攻击手法、判断攻击目标环境）至关重要。
-
-2. **触发场景**
-   当 Golang 应用程序执行包含以下敏感查询的 SQL 语句，并且查询结果被输出到用户界面、API 响应、日志文件或错误信息中时，可能发生信息泄露：
-   - 查询数据库版本（如 `SELECT version()`）
-   - 查询当前数据库名称（如 `SELECT current_database()`）
-   - 查询文件路径或目录结构（如通过某些数据库函数，尽管在标准 SQL 中不常见，但在特定数据库扩展或错误处理中可能出现）
-   - 查询操作系统信息等
-
-   ```go
-   // 存在漏洞的代码示例
-   func getCurrentDatabase(db *sql.DB) {
-       var dbName string
-       // 直接查询数据库名称并输出
-       err := db.QueryRow("SELECT current_database()").Scan(&dbName)
-       if err != nil {
-           fmt.Println("Failed to get current database:", err)
-           return
-       }
-       fmt.Println("Current database:", dbName) // 泄露数据库名称
-   }
-
-   func getServerVersion(db *sql.DB) {
-       var version string
-       // 直接查询数据库版本并输出
-       err := db.QueryRow("SELECT version()").Scan(&version)
-       if err != nil {
-           fmt.Println("Failed to get server version:", err)
-           return
-       }
-       fmt.Println("Server version:", version) // 泄露服务器版本信息
-   }
-   ```
-
-3. **潜在影响**
-   攻击者利用泄露的信息可以更好地了解目标系统的架构、所使用的数据库类型和版本、操作系统等，从而辅助他们选择更具针对性的攻击手段，例如利用已知漏洞、进行字典攻击等。间接增加了被攻擊的风险。
-CODE
-	level: "low",
-	type: "vuln",
-	title: "Detect Golang SQL Information Exposure",
 }
 
 desc(

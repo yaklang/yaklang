@@ -93,7 +93,6 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high	for {
-	type: "vuln",
 	title: "Check PHP Unvalidated Redirect Vulnerability",
 	title_zh: "检测PHP未验证重定向漏洞",
 	solution: <<<CODE
@@ -158,6 +157,7 @@ CODE
 - **损害网站信誉**：网站可能被攻击者滥用作为钓鱼攻击的跳板，损害其用户信任和品牌声誉。
 CODE
 	level: "high",
+	type: "vuln",
 }
 $all<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -167,6 +167,7 @@ CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
 alert $mid	for {
+	title: "Check PHP Insufficient Redirect Validation",
 	title_zh: "检测PHP重定向验证不充分",
 	desc: <<<CODE
 ### 规则目的
@@ -181,11 +182,11 @@ alert $mid	for {
 CODE
 	level: "mid",
 	type: "mid",
-	title: "Check PHP Insufficient Redirect Validation",
 }
 $sink - $high - $mid as $low
 
 alert $low	for {
+	title_zh: "检测PHP重定向验证潜在绕过风险",
 	desc: <<<CODE
 ### 规则目的
 该规则用于识别PHP代码中已具备基本的重定向验证机制但仍可能存在高级绕过风险的代码路径。
@@ -200,7 +201,6 @@ CODE
 	level: "low",
 	type: "low",
 	title: "Check PHP Potential Redirect Validation Bypass",
-	title_zh: "检测PHP重定向验证潜在绕过风险",
 }
 desc(
 	lang: "php"
