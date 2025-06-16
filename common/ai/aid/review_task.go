@@ -1,12 +1,16 @@
 package aid
 
 import (
+	_ "embed"
 	"io"
 	"slices"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+//go:embed jsonschema/plan-review/re-plan-suggestion.json
+var schemaRePlanSuggestion string
 
 type ReviewSuggestion struct {
 	Value             string `json:"value"`
@@ -33,6 +37,7 @@ var TaskReviewSuggestions = []*ReviewSuggestion{
 		Suggestion:        "思考不够深入，根据当前上下文，为当前任务拆分更多子任务",
 		SuggestionEnglish: "Not deep enough, split more sub-tasks for the current task according to the current context",
 		AllowExtraPrompt:  true,
+		ParamSchema:       schemaRePlanSuggestion,
 	},
 	{
 		Value:             "inaccurate",
@@ -47,9 +52,10 @@ var TaskReviewSuggestions = []*ReviewSuggestion{
 	},
 	{
 		Value:             "adjust_plan",
-		Suggestion:        "任务需要调整，用户会输入更新后任务",
+		Suggestion:        "任务需要调整，用户会输入更新后任务建议",
 		SuggestionEnglish: "The task needs to be adjusted, and the user will enter the updated task",
 		AllowExtraPrompt:  true,
+		ParamSchema:       schemaRePlanSuggestion,
 	},
 }
 
@@ -64,32 +70,12 @@ func (t *aiTask) handleReviewResult(param aitool.InvokeParams) error {
 	switch suggestion {
 	case "deeply_think":
 		t.config.EmitInfo("deeply think")
-		planReq, err := createPlanRequest(t.Goal)
-		if err != nil {
-			t.config.EmitError("create planRequest failed: %v", err)
-			return utils.Errorf("coordinator: create planRequest failed: %v", err)
-		}
-		planReq.config = t.config
-		t.config.EmitInfo("start to invoke plan request")
-		rsp, err := planReq.Invoke()
+		err := t.DeepThink(utils.InterfaceToString(param))
 		if err != nil {
 			t.config.EmitError("invoke planRequest failed: %v", err)
 			return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
 		}
-
-		if rsp.RootTask == nil {
-			t.config.EmitError("root aiTask is nil, plan failed")
-			return utils.Errorf("coordinator: root aiTask is nil")
-		}
-		for _, subtask := range rsp.RootTask.Subtasks {
-			subtask.ParentTask = t
-		}
-		t.Subtasks = rsp.RootTask.Subtasks
-		r := &runtime{
-			config: t.config,
-			Stack:  utils.NewStack[*aiTask](),
-		}
-		r.Invoke(t)
+		return t.config.aiTaskRuntime.executeSubTask(1, t)
 	case "inaccurate":
 		t.config.EmitInfo("inaccurate")
 		return t.executeTask()
@@ -113,13 +99,13 @@ func (t *aiTask) handleReviewResult(param aitool.InvokeParams) error {
 		}
 		parentTask.Subtasks = parentTask.Subtasks[:index+1]
 	case "adjust_plan":
-		plan := param.GetString("plan")
-		if plan == "" {
-			t.config.EmitError("plan is empty")
-			return utils.Error("plan is empty")
+		suggestion := param.GetString("suggestion")
+		if suggestion == "" {
+			t.config.EmitError("suggestion is empty")
+			return utils.Error("suggestion is empty")
 		}
 		t.config.EmitInfo("adjust plan")
-		planPrompt, err := t.generateDynamicPlanPrompt(plan)
+		planPrompt, err := t.generateDynamicPlanPrompt(suggestion)
 		if err != nil {
 			t.config.EmitError("error generating dynamic plan prompt: %v", err)
 			return utils.Errorf("error generating dynamic plan prompt: %v", err)

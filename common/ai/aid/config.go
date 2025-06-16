@@ -135,6 +135,8 @@ type Config struct {
 	forgeName string // if coordinator is create from a forge, this is the forge name
 
 	maxTaskContinue int64
+
+	aiTaskRuntime *runtime
 }
 
 func (c *Config) HandleSearch(query string, items *omap.OrderedMap[string, []string]) ([]*searchtools.KeywordSearchResult, error) {

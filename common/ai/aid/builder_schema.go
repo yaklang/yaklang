@@ -22,6 +22,9 @@ var taskSummarySchema string
 //go:embed jsonschema/tool/tool-desc-require.json
 var toolDescRequireSchema string
 
+//go:embed jsonschema/task/task-direct-answer.json
+var directAnswerSchema string
+
 //go:embed jsonschema/tool/tool-execute-check.json
 var toolExecuteCheckSchema string
 
@@ -54,5 +57,6 @@ func planJSONSchema(toolNames []string) map[string]string {
 	res["ToolExecuteCheckSchemaWithoutContinue"] = toolExecuteCheckSchemaWithoutContinue
 	res["PlanCreateSubtaskSchema"] = planReviewCreateSubtasksSchema
 	res["KeywordSearchSchema"] = keywordSearchSchema
+	res["DirectAnswerSchema"] = directAnswerSchema
 	return res
 }
