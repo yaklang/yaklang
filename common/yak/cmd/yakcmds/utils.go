@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"github.com/yaklang/yaklang/common/aiforge"
 	"io"
 	"io/fs"
 	"io/ioutil"
@@ -17,6 +16,9 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
+	"github.com/yaklang/yaklang/common/aiforge"
 
 	"github.com/antchfx/xmlquery"
 	"github.com/yaklang/pcap"
@@ -77,7 +79,7 @@ var UtilsCommands = []*cli.Command{
 
 			rets := []string{strings.ToLower(c.String("type"))}
 			if c.Bool("all") {
-				rets = []string{"yak", "syntaxflow", "forge"}
+				rets = []string{"yak", "syntaxflow", "forge", "aitool"}
 			}
 			for _, ret := range rets {
 				switch ret {
@@ -155,7 +157,7 @@ var UtilsCommands = []*cli.Command{
 					}
 					fmt.Println(result)
 					if c.Bool("override") {
-						if consts.ExistedSyntaxFlowEmbedFSHash == result {
+						if consts.ExistedBuildInForgeEmbedFSHash == result {
 							continue
 						}
 						if matched, _ := regexp_utils.NewYakRegexpUtils("[0-9a-fA-F]+").MatchString(result); !matched {
@@ -167,6 +169,39 @@ var UtilsCommands = []*cli.Command{
 						}
 
 						re := regexp.MustCompile(`(const ExistedBuildInForgeEmbedFSHash string = ")([a-zA-Z0-9]*)(")`)
+						newContent := re.ReplaceAllString(string(templ), "${1}"+result+"${3}")
+						err = os.RemoveAll(template + ".bak")
+						if err != nil {
+							return err
+						}
+						err = os.Rename(template, template+".bak")
+						if err != nil {
+							return err
+						}
+						err = os.WriteFile(template, []byte(newContent), 0o644)
+						if err != nil {
+							return err
+						}
+					}
+				case "aitool":
+					result, err := yakscripttools.BuildInAIToolHash()
+					if err != nil {
+						return err
+					}
+					fmt.Println(result)
+					if c.Bool("override") {
+						if consts.ExistedBuildInAIToolEmbedFSHash == result {
+							continue
+						}
+						if matched, _ := regexp_utils.NewYakRegexpUtils("[0-9a-fA-F]+").MatchString(result); !matched {
+							return utils.Errorf("invalid hash: %v", result)
+						}
+						templ, err := os.ReadFile(template)
+						if err != nil {
+							return err
+						}
+
+						re := regexp.MustCompile(`(const ExistedBuildInAIToolEmbedFSHash string = ")([a-zA-Z0-9]*)(")`)
 						newContent := re.ReplaceAllString(string(templ), "${1}"+result+"${3}")
 						err = os.RemoveAll(template + ".bak")
 						if err != nil {
