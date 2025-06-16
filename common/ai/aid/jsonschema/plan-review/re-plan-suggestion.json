@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "suggestion": {
+      "type": "string",
+      "description": "规划任务的建议，描述如何重新规划任务或子任务"
+    }
+  }
+}
+
+

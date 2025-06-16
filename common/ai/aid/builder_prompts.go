@@ -8,6 +8,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+//go:embed prompts/plan/deepthink-plan.txt
+var __prompt_DeepthinkTaskListPrompt string
+
 //go:embed prompts/plan/plan-to-task-list.txt
 var __prompt_GenerateTaskListPrompt string
 
@@ -52,6 +55,12 @@ var __prompt_PlanHelp string
 
 //go:embed prompts/tool/tool-re-select.txt
 var __prompt_toolReSelect string
+
+//go:embed prompts/tool/tool-param-regenerate.txt
+var __prompt_ParamsReGenerate string
+
+//go:embed prompts/task/task-direct-answer.txt
+var __prompt_DirectAnswer string
 
 //go:embed prompts/search/aitool-keyword-search.txt
 var __prompt_KeywordSearchPrompt string
