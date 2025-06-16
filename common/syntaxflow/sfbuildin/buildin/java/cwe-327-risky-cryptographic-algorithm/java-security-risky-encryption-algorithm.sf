@@ -6,8 +6,12 @@ desc(
 [CWE-327](https://cwe.mitre.org/data/definitions/327.html)
 [Java AlgorithmParameters Documentation](https://docs.oracle.com/javase/8/docs/api/java/security/AlgorithmParameters.html)
 REFERENCE
-	description: <<<DESCRIPTION
-
+	desc: <<<DESCRIPTION
+该规则用于检测Java代码中是否使用了不安全的加密算法。使用已破解或存在风险的加密算法可能会使敏感数据面临泄露的风险。这些算法由于存在已知的漏洞或弱点，可能无法为数据提供足够的安全性。
+- 规则审计的类：
+    java.security.AlgorithmParameters
+- 规则审计的方法：
+    getInstance()
 DESCRIPTION
 	rule_id: "fa6435fb-0def-4db7-9201-6223941859d4"
 	solution: <<<SOLUTION

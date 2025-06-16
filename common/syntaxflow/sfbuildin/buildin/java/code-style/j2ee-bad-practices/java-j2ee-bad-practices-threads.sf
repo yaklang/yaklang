@@ -10,7 +10,7 @@ desc(
 [JCA 1.6 Specification - Work Management](https://download.oracle.com/otndocs/jcp/jca-1.6-fr-spec/index.html)
 REFERENCE
 	description: <<<DESCRIPTION
-
+J2EE 标准明确限制在Web应用中直接管理线程，因其在容器环境中存在高风险。线程控制不仅实现复杂，更可能引发不可控的容器冲突。即便未触发容器异常，仍可能引发隐蔽性极强的并发问题，包括死锁、竞态条件及资源争用等同步缺陷。
 DESCRIPTION
 	rule_id: "8e009f30-c716-4c22-b4c4-9d394e88c824"
 	solution: <<<SOLUTION

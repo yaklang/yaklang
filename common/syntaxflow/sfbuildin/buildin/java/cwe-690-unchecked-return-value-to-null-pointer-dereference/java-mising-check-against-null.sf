@@ -7,7 +7,7 @@ desc(
 [CWE-476: NULL Pointer Dereference](https://cwe.mitre.org/data/definitions/476.html)
 REFERENCE
 	description: <<<DESCRIPTION
-
+某些方法（如 System.getProperty(), request.getParameter(), Class.getResource()）可能返回null。直接使用这些返回值而不检查是否为null可能导致空指针异常（NullPointerException），造成程序崩溃或意外行为。这属于CWE-476（空指针解引用）安全问题。
 DESCRIPTION
 	solution: <<<SOLUTION
 ### 修复建议

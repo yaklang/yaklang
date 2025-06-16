@@ -8,7 +8,17 @@ desc(
 [Java SE Documentation: java.sql.Connection](https://docs.oracle.com/javase/8/docs/api/java/sql/Connection.html)
 REFERENCE
 	description: <<<DESCRIPTION
+应用程序通过 `Connection.createStatement()`、`Connection.prepareStatement()` 或 `Connection.prepareCall()` 创建了 JDBC Statement 对象后，未正确关闭这些资源。这些 Statement 对象在不再使用时必须显式关闭，否则会导致资源泄漏。
 
+    即使关闭了父级 Connection 对象，最佳实践仍然要求显式关闭每个 Statement 对象，以确保及时释放资源，特别是在连接池环境中。
+
+    ## 风险影响
+
+    - 未关闭的 Statement 对象会占用数据库和应用程序内存资源
+    - 可能导致游标泄漏，尤其在某些数据库系统中游标数量有限制
+    - 在连接池环境中，未关闭的 Statement 可能会导致连接池资源管理问题
+    - 大量未关闭的 Statement 会增加内存占用，可能导致内存溢出
+    - 长时间运行的应用程序性能会因资源泄漏而逐渐下降
 DESCRIPTION
 	solution: <<<SOLUTION
 ### 修复建议

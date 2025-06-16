@@ -8,7 +8,27 @@ desc(
 [Spring RestTemplate Documentation](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/client/RestTemplate.html)
 REFERENCE
 	description: <<<DESCRIPTION
-
+此规则旨在查找Java代码中SpringBoot RestTemplate库中网络发包方法的Url参数。
+    该规则主要用于辅助审计SSRF(Server-Side Request Forgery)漏洞。
+    规则审计的类为:
+    - org.springframework.web.client.RestTemplate
+    规则覆盖方法包括:
+    - delete(String url, Object... uriVariables)
+    - delete(String url, Map<String,?> uriVariables)
+    - delete(URI url)
+    - put(String url, Object request, Object... uriVariables)
+    - put(String url, Object request, Map<String,?> uriVariables)
+    - put(URI url, Object request)
+    - exchange(String url, HttpMethod method, HttpEntity<?> requestEntity, Class<T> responseType, Object... uriVariables)
+    - exchange(String url, HttpMethod method, HttpEntity<?> requestEntity, Class<T> responseType, Map<String,?> uriVariables)
+    - exchange(URI url, HttpMethod method, HttpEntity<?> requestEntity, Class<T> responseType)
+    - getForEntity(String url, Class<T> responseType, Object... uriVariables)
+    - getForObject(String url, Class<T> responseType, Object... uriVariables)
+    - headForHeaders(String url, Object... uriVariables)
+    - patchForObject(String url, Object request, Class<T> responseType, Object... uriVariables)
+    - postForEntity(String url, Object request, Class<T> responseType, Object... uriVariables)
+    - postForObject(String url, Object request, Class<T> responseType, Object... uriVariables)
+    - postForLocation(String url, Object request, Object... uriVariables)
 DESCRIPTION
 	rule_id: "a8705f0b-2e87-4a81-99da-2f2d0c7c25ea"
 	solution: <<<SOLUTION

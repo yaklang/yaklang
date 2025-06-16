@@ -5,7 +5,7 @@ desc(
 	risk:"日志伪造",
 	level:low
 	description: <<<DESCRIPTION
-
+该规则检测Java应用程序中的日志伪造攻击。日志伪造攻击是指攻击者通过操纵日志记录的输入数据，导致生成的日志信息被篡改或伪造，从而误导系统管理员或安全分析人员。此规则审计了可能受到用户输入影响的日志记录点，特别是那些使用`log.info()`、`log.error()`等方法进行日志记录的点。
 DESCRIPTION
 	solution: <<<SOLUTION
 ### 修复建议
