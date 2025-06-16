@@ -43,7 +43,7 @@ DESC
 	fix: <<<FIX
     在使用Groovy脚本引擎时，确保对输入进行严格的验证和过滤。避免直接执行用户输入的Groovy代码，或者使用安全的沙箱环境来限制代码的执行权限。此外，可以考虑使用其他更安全的脚本语言或框架来实现动态脚本执行的需求。
 FIX
-    ref: <<<REF
+	ref: <<<REF
     https://docs.groovy-lang.org/next/html/api/groovy/lang/GroovyShell.html
 REF
 	rule_id: "44a473d8-3763-44c3-9819-17100cf17ad6"
@@ -59,6 +59,7 @@ $sink #{
 }-> as $high;
 
 alert $high	for {
+	title_zh: "检测Java Spring Boot Groovy Shell代码注入漏洞",
 	solution: <<<CODE
 ### 修复建议
 
@@ -157,7 +158,6 @@ CODE
 	message: "发现Java Spring Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
 	risk: "Groovy-Shell代码执行",
 	title: "Detect Java Spring Boot Groovy Shell Code Injection Vulnerability",
-	title_zh: "检测Java Spring Boot Groovy Shell代码注入漏洞",
 }
 
 $sink #{
@@ -166,11 +166,6 @@ $sink #{
 $result - $high as $low;
 
 alert $low	for {
-	level: "low",
-	message: "发现Java Spring Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
-	risk: "Groovy-Shell代码执行",
-	title: "Detect Java Spring Boot Groovy Shell Code Injection Vulnerability with Limited Risk",
-	title_zh: "检测具有有限风险的Java Spring Boot Groovy Shell代码注入漏洞",
 	solution: <<<CODE
 ### 修复建议
 
@@ -248,6 +243,11 @@ CODE
    * **信息泄露:** 可能暴露关键系统信息。
    * **隐蔽攻击:** 攻击者可能利用低风险路径作为突破口，逐步扩大攻击范围。
 CODE
+	level: "low",
+	message: "发现Java Spring Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
+	risk: "Groovy-Shell代码执行",
+	title: "Detect Java Spring Boot Groovy Shell Code Injection Vulnerability with Limited Risk",
+	title_zh: "检测具有有限风险的Java Spring Boot Groovy Shell代码注入漏洞",
 }
 
 desc(

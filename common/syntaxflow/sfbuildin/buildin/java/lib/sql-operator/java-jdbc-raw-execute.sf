@@ -82,7 +82,6 @@ check $sink;
 
 $sink as $output;
 alert $output	for {
-	level: "info",
 	title: "Check Java JDBC Statement ExecuteQuery Call",
 	title_zh: "检测 Java JDBC Statement.executeQuery 调用",
 	desc: <<<CODE
@@ -110,6 +109,7 @@ alert $output	for {
    - **拒绝服务**: 攻击者可能执行耗时的查询或恶意的数据库操作，导致数据库性能下降或无法访问。
    - **权限提升**: 在某些情况下，攻击者可能通过SQL注入漏洞获取数据库管理员权限，进一步控制整个数据库系统，甚至通过数据库服务提权至操作系统层面。
 CODE
+	level: "info",
 }
 
 

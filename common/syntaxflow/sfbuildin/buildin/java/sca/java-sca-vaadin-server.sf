@@ -73,7 +73,9 @@ REFERENCE
 __dependency__.*vaadin*server.version as $ver;
 $ver in (,7.7.14] as $vuln_vaadin_server;
 alert $vuln_vaadin_server	for {
+	level: "mid",
 	cve: "CVE-2021-37714",
+	message: "SCA: vaadin-server version 7.7.14 has an XSS vulnerability",
 	title: "SCA: Check Java vaadin-server Vulnerability",
 	title_zh: "SCA: 检测Java vaadin-server依赖漏洞",
 	solution: <<<CODE
@@ -135,6 +137,4 @@ CODE
    - **恶意软件传播:** 在某些情况下，攻击者可以利用XSS漏洞诱导用户下载或执行恶意软件。
    - **客户端重定向:** 将用户浏览器重定向到恶意网站。
 CODE
-	level: "mid",
-	message: "SCA: vaadin-server version 7.7.14 has an XSS vulnerability",
 }

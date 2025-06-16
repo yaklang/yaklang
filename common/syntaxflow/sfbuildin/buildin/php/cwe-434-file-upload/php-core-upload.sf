@@ -190,7 +190,7 @@ alert $high	for {
 
             // 4. 生成安全的文件名，而不是使用原始文件名
             $ext = array_search($mimeType, $allowedTypes, true);
-            $newName = sprintf('%!!(MISSING)!(MISSING)s(MISSING).%!!(MISSING)!(MISSING)s(MISSING)', sha1_file($file['tmp_name']), $ext);
+            $newName = sprintf('%!!(MISSING)!(MISSING)!(MISSING)s(MISSING).%!!(MISSING)!(MISSING)!(MISSING)s(MISSING)', sha1_file($file['tmp_name']), $ext);
             $targetPath = $uploadDir . $newName;
 
             // 5. 移动上传的文件
@@ -261,8 +261,6 @@ CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
 alert $mid	for {
-	title: "Insecure File Type Detection",
-	title_zh: "不安全的文件类型检测",
 	desc: <<<CODE
 该规则用于识别PHP代码中，文件上传功能对文件类型的检测是否足够安全。通常情况下，在某些场景下可能存在部分防护机制，但仍可能被绕过的情况。例如，虽然进行了MIME类型检查，但未对文件头（Magic Number）进行校验，仍可能上传恶意文件。
 
@@ -274,6 +272,8 @@ alert $mid	for {
 - 对关键文件操作（如移动、存储）增加额外的安全性检查。
 CODE
 	level: "mid",
+	title: "Insecure File Type Detection",
+	title_zh: "不安全的文件类型检测",
 }
 $sink - $high - $mid as $low
 

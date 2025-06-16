@@ -71,8 +71,6 @@ $source<dataflow(exclude=<<<CODE
 CODE)> as $filteredSource
 <delete(param)>
 alert $filteredSource	for {
-	message_zh: "识别到 Java Spring Framework 中 ModelAndView 构造函数可控",
-	message: "Recognize Java Spring Framework code that can control the ModelAndView constructor",
 	title: "Unvalidated Java Spring Framework ModelAndView SSTI",
 	title_zh: "未验证的 Java Spring Framework ModelAndView SSTI",
 	solution: <<<CODE
@@ -164,6 +162,8 @@ CODE
     - 服务拒绝 (DoS)。
 CODE
 	level: "high",
+	message_zh: "识别到 Java Spring Framework 中 ModelAndView 构造函数可控",
+	message: "Recognize Java Spring Framework code that can control the ModelAndView constructor",
 }
 
 

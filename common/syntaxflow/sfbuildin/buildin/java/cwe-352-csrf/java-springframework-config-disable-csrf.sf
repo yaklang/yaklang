@@ -103,6 +103,8 @@ check $configEntry;
 $configEntry ... csrf().disable() as $disableCSRF;
 check $disableCSRF;
 alert $disableCSRF	for {
+	title: "Check Java Spring Framework CSRF Protection",
+	title_zh: "检查 Java Spring Framework CSRF 保护",
 	solution: <<<CODE
 ### 修复建议
 
@@ -190,8 +192,6 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 - 可能导致账户被盗、数据泄露或其他业务损失。
 CODE
 	level: "low",
-	title: "Check Java Spring Framework CSRF Protection",
-	title_zh: "检查 Java Spring Framework CSRF 保护",
 }
 
 

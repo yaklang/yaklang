@@ -64,11 +64,11 @@ REFERENCE
 $toCheck?{<typeName>?{have:'java.lang'}}?{!<getUsers>} as $weak;
 
 alert $weak	for {
-	title: "Check Java Lang Unchecked Return Value",
-	title_zh: "检测Java Lang库未检查返回值的API",
 	level: "info",
 	risk: "api-abuse",
 	message: "发现Java Lang库未检查返回值的API",
+	title: "Check Java Lang Unchecked Return Value",
+	title_zh: "检测Java Lang库未检查返回值的API",
 }
 
 

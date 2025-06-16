@@ -122,6 +122,8 @@ $new().Funcs(* as $param);
 $param?{have: 'sprig'} as $low;
 
 alert $low	for {
+	level: "low",
+	type: "vuln",
 	title: "SSTI detected",
 	title_zh: "检测到SSTI",
 	solution: <<<CODE
@@ -209,8 +211,6 @@ CODE
    - 泄露敏感信息，如环境变量、数据库凭据等。
    - 导致服务中断或数据破坏。
 CODE
-	level: "low",
-	type: "vuln",
 }
 
 desc(

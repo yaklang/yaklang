@@ -71,9 +71,9 @@ REFERENCE
 __dependency__.*commons*collections.version as $ver;
 $ver in (,3.2.1] as $vuln_commons_collections;
 alert $vuln_commons_collections	for {
+	level: "high",
 	message: "SCA: commons-collections version 3.2.1 has an unsafe deserialization vulnerability",
 	cve: "CVE-2015-6420",
 	title: "SCA: Check Java commons-collections Vulnerability",
 	title_zh: "SCA: 检测Java commons-collections 依赖漏洞",
-	level: "high",
 }

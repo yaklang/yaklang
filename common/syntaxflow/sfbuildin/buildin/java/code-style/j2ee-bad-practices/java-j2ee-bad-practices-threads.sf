@@ -97,10 +97,10 @@ $thread./^(destroy|interrupt|join|resume|start|stop|suspend)$/ as $weak;
 // Thread.sleep
 Thread./^(sleep|yield)$/?{<typeName>?{have:'java.lang'}} as $weak;
 alert $weak	for {
+	message: "检测到Java项目中使用了Thread类的destroy、interrupt、join、resume、sleep、start、stop、suspend或yield方法",
 	title: "Deprecated Thread Methods",
 	title_zh: "废弃的线程方法",
 	level: "info",
-	message: "检测到Java项目中使用了Thread类的destroy、interrupt、join、resume、sleep、start、stop、suspend或yield方法",
 }
 
 run?{opcode:function}<getInterfaceBlueprint>?{have:'Runnable'} as $run
