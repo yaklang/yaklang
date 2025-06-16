@@ -356,14 +356,14 @@ func ToValidUTF8(s string, replacement string) string {
 	return strings.ToValidUTF8(s, replacement)
 }
 
-// ExtractJson 尝试提取字符串中的 JSON 并进行修复返回
+// ExtractJson 尝试提取字符串中的 JSON 并进行修复, 返回中的元素都是Object
 // Example:
 // ```
 // str.ExtractJson("hello yak") // []
 // str.ExtractJson(`{"hello": "yak"}`) // [{"hello": "yak"}]
 // ```
 func extractValidJson(i interface{}) []string {
-	return jsonextractor.ExtractStandardJSON(utils.InterfaceToString(i))
+	return jsonextractor.ExtractObjectsOnly(utils.InterfaceToString(i))
 }
 
 // ExtractJsonWithRaw 尝试提取字符串中的 JSON 并返回，第一个返回值返回经过修复后的JSON字符串数组，第二个返回值返回原始JSON字符串数组(如果修复失败)

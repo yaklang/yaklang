@@ -333,7 +333,71 @@ func ExtractJSONWithRaw(raw string) (results []string, rawStr []string) {
 	return
 }
 
+// ExtractJSON 尝试提取字符串中的 JSON 并进行修复, 返回中的元素都是原始 Json
+// Example:
+// ```
+// json.ExtractJson("hello yak") // []
+// res = json.ExtractJson(`[{"hello": "yak"}]`) // [[{"key": "value"}]]
+// assert(res[0]==`[{"key": "value"}]`)
+// ```
 func ExtractStandardJSON(raw string) []string {
 	jsonStr, _ := ExtractJSONWithRaw(raw)
 	return jsonStr
+}
+
+// ExtractObjectsOnly 从输入中提取所有对象, 为了保持兼容性
+// 不管输入是对象、数组还是混合文本，最终只返回对象
+func ExtractObjectsOnly(raw string) []string {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("extract objects only failed: %s", err)
+		}
+	}()
+
+	var results []string
+
+	// 首先提取所有的 JSON 结构
+	for _, obj := range ExtractObjectIndexes(raw) {
+		jsonStr := raw[obj[0]:obj[1]]
+
+		// 尝试解析为 JSON
+		var jsonBytes []byte
+		var valid bool
+
+		if json.Valid([]byte(jsonStr)) {
+			jsonBytes = []byte(jsonStr)
+			valid = true
+		} else {
+			// 尝试修复 JSON
+			if ret, ok := JsonValidObject([]byte(jsonStr)); ok {
+				jsonBytes = ret
+				valid = true
+			}
+		}
+
+		if !valid {
+			continue
+		}
+
+		// 使用 gjson 解析
+		result := gjson.ParseBytes(jsonBytes)
+
+		// 如果是对象，直接添加
+		if result.IsObject() {
+			results = append(results, result.Raw)
+		} else if result.IsArray() {
+			// 如果是数组，提取其中的对象
+			result.ForEach(func(key, value gjson.Result) bool {
+				if value.IsObject() {
+					// 将对象转换为字符串
+					objStr := value.Raw
+					results = append(results, objStr)
+				}
+				return true // 继续遍历
+			})
+		}
+		// 忽略其他类型（字符串、数字、布尔值等）
+	}
+
+	return results
 }
