@@ -60,9 +60,9 @@ var (
 	goVersion  string
 )
 
-func initializeDatabase(projectDatabase string, profileDBName string) error {
+func initializeDatabase(projectDatabase string, profileDBName string, isIRify ...bool) error {
 	// project and profile
-	consts.InitializeYakitDatabase(projectDatabase, profileDBName)
+	consts.InitializeYakitDatabase(projectDatabase, profileDBName, isIRify...)
 
 	// cve
 	_, err := consts.InitializeCVEDatabase()
@@ -433,7 +433,9 @@ var startGRPCServerCommand = cli.Command{
 			go startPProf(pprofSec)
 		}
 		log.Info("start to initialize database")
-		err := initializeDatabase(c.String("project-db"), c.String("profile-db"))
+
+		isIRify := c.String("frontend") == "irify"
+		err := initializeDatabase(c.String("project-db"), c.String("profile-db"), isIRify)
 		if err != nil {
 			log.Errorf("init database failed: %s", err)
 			return err
