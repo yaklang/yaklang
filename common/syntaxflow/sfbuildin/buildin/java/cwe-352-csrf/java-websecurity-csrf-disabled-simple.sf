@@ -76,6 +76,7 @@ SOLUTION
 .csrf().disable() as $vuln;
 check $vuln;
 alert $vuln	for {
+	level: "low",
 	title: "Check Java Simple Trail of CSRF Disabled",
 	title_zh: "检测Java简单CSRF禁用痕迹",
 	solution: <<<CODE
@@ -141,7 +142,6 @@ public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Excepti
 - **信任链破坏**: 攻击者利用受害者的身份进行恶意操作，会损害用户对该应用的信任。
 虽然在某些非交互式场景（如纯API服务）可以考虑禁用CSRF，但在大多数Web应用中，禁用CSRF会引入严重的安全风险。
 CODE
-	level: "low",
 }
 
 

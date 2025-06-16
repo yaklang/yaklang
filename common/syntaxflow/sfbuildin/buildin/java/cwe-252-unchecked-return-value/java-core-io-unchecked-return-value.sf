@@ -93,11 +93,11 @@ REFERENCE
 /^(read|skip|skipBytes|implies|delete|canRead|canWrite|exists|isAbsolute|isDirectory|isFile|isHidden|mkdir|mkdirs|renameTo)$/<getCall> as $toCheck;
 $toCheck?{<typeName>?{have:'java.io'}}?{!<getUsers>} as $weak;
 alert $weak	for {
+	title: "Check Java IO Unchecked Return Value",
+	title_zh: "检测Java IO库未检查返回值的API",
 	level: "info",
 	message: "发现Java IO库未检查返回值的API",
 	risk: "api-abuse",
-	title: "Check Java IO Unchecked Return Value",
-	title_zh: "检测Java IO库未检查返回值的API",
 }
 
 

@@ -130,6 +130,7 @@ REFERENCE
 
 check $curlFunction;
 alert $curlFunction	for {
+	level: "info",
 	title: "ssrf function detected, please pay attention",
 	title_zh: "检测到为ssrf函数，请注意关注",
 	desc: <<<CODE
@@ -143,7 +144,6 @@ alert $curlFunction	for {
    检测以下7个PHP函数：
    `curl_init`, `curl_setopt`, `curl_exec`, `curl_close`, `fsockopen`, `file_get_contents`, `fopen`。
 CODE
-	level: "info",
 }
 
 /$curl_setopt|fsockopen|file_get_contents^/as $ssrfFunction
@@ -293,6 +293,7 @@ CODE)> as $highAndMid
 $highAndMid - $high as $mid
 
 alert $mid	for {
+	title: "Insufficient SSRF Parameter Filtering",
 	title_zh: "SSRF参数过滤不充分",
 	solution: <<<CODE
 ### 修复建议
@@ -374,46 +375,10 @@ CODE
    - 存在一定的信息泄露风险。
 CODE
 	level: "mid",
-	title: "Insufficient SSRF Parameter Filtering",
 }
 
 $sink - $high - $mid  as $low
 alert $low	for {
-	desc: <<<CODE
-### 风险描述
-
-1. **风险原理**
-   该风险表示在某些情况下，虽然对用户提供的URL进行了基本的过滤，但由于过滤逻辑不够严格，仍可能存在绕过的情况。例如，攻击者可以通过构造特殊的URL（如畸形编码、嵌套重定向等）来绕过现有的过滤机制。
-
-2. **触发场景**
-   当应用程序使用了类似`curl_setopt`或`fsockopen`等函数，并且对URL进行了基本过滤（如简单正则匹配），但未完全覆盖所有可能的风险点时，就可能存在SSRF访问控制潜在绕过风险。
-
-   **示例代码**
-   ```php
-   <?php
-   function curl($url) {
-       if (strpos($url, 'localhost') === false) { // 简单过滤localhost
-           $ch = curl_init();
-           curl_setopt($ch, CURLOPT_URL, $url);
-           curl_exec($ch);
-           curl_close($ch);
-       } else {
-           die('Access denied');
-       }
-   }
-
-   $url = $_GET['url'];
-   curl($url);
-   ?>
-   ```
-
-   攻击者可以通过构造复杂的URL（如`http://127.0.0.1`或`http://[::1]`）来绕过过滤逻辑。
-
-3. **潜在影响**
-   - 存在较低概率的访问控制绕过风险。
-   - 可能导致信息泄露或其他非预期行为。
-CODE
-	level: "low",
 	title: "Potential SSRF Access Control Bypass",
 	title_zh: "SSRF访问控制潜在绕过风险",
 	solution: <<<CODE
@@ -459,6 +424,41 @@ CODE
 2. **定期审查代码**
    定期审查代码中的过滤逻辑，确保其能够抵御最新的攻击手段。
 CODE
+	desc: <<<CODE
+### 风险描述
+
+1. **风险原理**
+   该风险表示在某些情况下，虽然对用户提供的URL进行了基本的过滤，但由于过滤逻辑不够严格，仍可能存在绕过的情况。例如，攻击者可以通过构造特殊的URL（如畸形编码、嵌套重定向等）来绕过现有的过滤机制。
+
+2. **触发场景**
+   当应用程序使用了类似`curl_setopt`或`fsockopen`等函数，并且对URL进行了基本过滤（如简单正则匹配），但未完全覆盖所有可能的风险点时，就可能存在SSRF访问控制潜在绕过风险。
+
+   **示例代码**
+   ```php
+   <?php
+   function curl($url) {
+       if (strpos($url, 'localhost') === false) { // 简单过滤localhost
+           $ch = curl_init();
+           curl_setopt($ch, CURLOPT_URL, $url);
+           curl_exec($ch);
+           curl_close($ch);
+       } else {
+           die('Access denied');
+       }
+   }
+
+   $url = $_GET['url'];
+   curl($url);
+   ?>
+   ```
+
+   攻击者可以通过构造复杂的URL（如`http://127.0.0.1`或`http://[::1]`）来绕过过滤逻辑。
+
+3. **潜在影响**
+   - 存在较低概率的访问控制绕过风险。
+   - 可能导致信息泄露或其他非预期行为。
+CODE
+	level: "low",
 }
 
 desc(

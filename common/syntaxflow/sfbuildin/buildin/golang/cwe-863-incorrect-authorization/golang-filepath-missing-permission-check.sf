@@ -204,7 +204,7 @@ func deleteFileSafe(w http.ResponseWriter, r *http.Request) {
 	// 执行安全的文件删除操作
 	err := os.Remove(cleanPath)
 	if err != nil {
-		fmt.Fprintf(w, "Failed to delete file: %!!(MISSING)!(MISSING)!(MISSING)v(MISSING)", err)
+		fmt.Fprintf(w, "Failed to delete file: %!!(MISSING)!(MISSING)!(MISSING)!(MISSING)v(MISSING)", err)
 		return
 	}
 
@@ -251,7 +251,7 @@ CODE
        // 潜在危险的文件操作，如果 filePath 包含 "../"，可能删除应用程序目录之外的文件
        err := os.Remove(filePath)
        if err != nil {
-           fmt.Fprintf(w, "Failed to delete file: %!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)v(MISSING)", err)
+           fmt.Fprintf(w, "Failed to delete file: %!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)v(MISSING)", err)
            return
        }
 

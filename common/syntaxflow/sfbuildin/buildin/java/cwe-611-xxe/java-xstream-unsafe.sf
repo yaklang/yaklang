@@ -118,8 +118,6 @@ $fromXML?{ <getObject>?{!.setMode && !.allowType* && !.setupDefaultSecurity && !
 
 check $vuln;
 alert $vuln	for {
-	level: "high",
-	message: "XStream Unsafe Use in Context Sink",
 	title: "Check Java XStream Unsafe Deserialization",
 	title_zh: "检测 Java XStream 不安全反序列化",
 	solution: <<<CODE
@@ -225,6 +223,8 @@ CODE
 
 该规则检测XStream对象在调用`fromXML`方法进行反序列化时，是否未设置关键的安全配置，如`setMode`、`allowType`、`setupDefaultSecurity`、`addPermission`、`allowTypeHierarchy`等，从而识别潜在的不安全使用点。
 CODE
+	level: "high",
+	message: "XStream Unsafe Use in Context Sink",
 }
 
 desc(

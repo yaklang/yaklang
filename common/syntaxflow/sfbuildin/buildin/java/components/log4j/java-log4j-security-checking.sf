@@ -115,9 +115,6 @@ $sink #{
 }->as $high;
 
 alert $high	for {
-	level: "high",
-	message: "发现Java代码中存在Log4j远程代码执行漏洞，并且数据流中间没有进行任何过滤。",
-	risk: "rce",
 	title: "Detect Java Log4j Remote Code Execution Vulnerability",
 	title_zh: "检测Java Log4j远程代码执行漏洞",
 	solution: <<<CODE
@@ -203,6 +200,9 @@ CODE
     - 拒绝服务（DoS）。
 
 CODE
+	level: "high",
+	message: "发现Java代码中存在Log4j远程代码执行漏洞，并且数据流中间没有进行任何过滤。",
+	risk: "rce",
 }
 
 
@@ -212,6 +212,8 @@ $sink #{
 
 $result - $high  as $low;
 alert $low	for {
+	title: "Detect Java Log4j Remote Code Execution Vulnerability",
+	title_zh: "检测Java Log4j远程代码执行漏洞",
 	solution: <<<CODE
 ### 修复建议
 
@@ -298,8 +300,6 @@ CODE
 	level: "low",
 	message: "发现Java代码中可能存在Log4j远程代码执行漏洞。",
 	risk: "rce",
-	title: "Detect Java Log4j Remote Code Execution Vulnerability",
-	title_zh: "检测Java Log4j远程代码执行漏洞",
 }
 
 

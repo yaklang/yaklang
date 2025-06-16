@@ -118,7 +118,6 @@ $sink #{
 }->as $high;
 
 alert $high	for {
-	type: "vuln",
 	title: "Check Java Path Traversal Vulnerability",
 	title_zh: "检测Java路径穿越漏洞",
 	solution: <<<CODE
@@ -218,6 +217,7 @@ CODE
    - **进一步攻击**: 获取的敏感信息可能被用于进行更复杂的攻击，如提权、内网渗透等。
 CODE
 	level: "high",
+	type: "vuln",
 	message: "Java代码中发现路径穿越漏洞，并且数据流中间没有进行任何过滤。",
 }
 
@@ -228,6 +228,7 @@ $sink #{
 
 $result - $high as $low;
 alert $low	for {
+	type: "vuln",
 	title: "Check Java Path Traversal Vulnerability",
 	title_zh: "检测Java路径穿越漏洞",
 	desc: <<<CODE
@@ -269,7 +270,6 @@ alert $low	for {
 CODE
 	level: "low",
 	message: "Java代码中可能存在路径穿越漏洞。",
-	type: "vuln",
 }
 
 

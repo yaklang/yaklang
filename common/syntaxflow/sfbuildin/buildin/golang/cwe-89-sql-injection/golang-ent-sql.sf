@@ -103,10 +103,6 @@ $client.User.Query().Where(* #-> as $param);
 $param?{have: 'Parameter'} as $high;
 
 alert $high	for {
-	level: "high",
-	type: "vuln",
-	title: "Check Golang SQL Injection(ent)",
-	title_zh: "检测 Golang SQL 注入漏洞(ent)",
 	solution: <<<CODE
 ### 修复建议
 
@@ -178,7 +174,7 @@ CODE
    		log.Fatal(err)
    	}
    	defer client.Close()
-   	input := fmt.Sprintf("SELECT * FROM users WHERE name = '%!!(MISSING)!(MISSING)!(MISSING)s(MISSING)'", username)
+   	input := fmt.Sprintf("SELECT * FROM users WHERE name = '%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING)'", username)
    	ctx := context.Background()
    	users, err := client.User.Query().Where(user.Name(input)).All(ctx) // 这里存在SQL注入风险
    	if err != nil {
@@ -195,6 +191,10 @@ CODE
    - 执行任意命令：在某些情况下，攻击者可能通过 SQL 注入执行操作系统命令。
    - 拒绝服务：通过构造恶意查询导致数据库服务器过载或崩溃。
 CODE
+	level: "high",
+	type: "vuln",
+	title: "Check Golang SQL Injection(ent)",
+	title_zh: "检测 Golang SQL 注入漏洞(ent)",
 }
 
 desc(

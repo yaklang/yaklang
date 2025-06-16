@@ -111,6 +111,7 @@ $opParam?{opcode: const} as $__next__;
 CODE)> as $unsafeParams;
 
 alert $unsafeParams	for {
+	title: "Check Java Hibernate SQL Injection Vulnerability",
 	title_zh: "检测Java Hibernate SQL注入漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -202,7 +203,6 @@ CODE
 	level: "high",
 	type: "audit",
 	message: "SQL concatenation is used in the query creation, which may lead to SQL injection vulnerabilities.",
-	title: "Check Java Hibernate SQL Injection Vulnerability",
 }
 
 desc(

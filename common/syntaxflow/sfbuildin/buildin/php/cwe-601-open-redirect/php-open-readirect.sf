@@ -93,30 +93,6 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high	for {
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-开放重定向漏洞（Open Redirect）是指应用程序接收用户提供的、未经严格验证的URL作为重定向目标，并将用户导向该URL。攻击者可以利用这一特性，构造恶意链接，将用户重定向到钓鱼网站、恶意软件下载页面或其他恶意资源，从而实施网络钓鱼诈骗、传播恶意软件或窃取用户凭证等。
-
-2. **触发场景**
-当应用程序使用HTTP响应头中的`Location`字段或者通过脚本（如JavaScript的`window.location`）进行页面重定向，并且重定向的目标地址直接或间接地来源于用户输入（如URL参数、表单提交数据）时，如果没有对输入进行充分的验证和过滤，就可能存在开放重定向漏洞。
-例如，以下PHP代码直接使用GET参数作为重定向目标：
-```php
-<?php
-    $url = $_GET["url"];
-    header("Location: ".$url);
-?>
-```
-攻击者可以构造类似于 `http://vulnerable-site.com/redirect.php?url=http://malicious-site.com` 的链接，诱导用户点击后被重定向到恶意网站。
-
-3. **潜在影响**
-- **网络钓鱼**：用户被重定向到外观相似的钓鱼网站，诱骗其输入敏感信息（如用户名、密码、银行卡号）。
-- **恶意软件传播**：用户被重定向到包含恶意软件下载或利用工具的网站。
-- **绕过安全策略**：在某些情况下，开放重定向可能被用来绕过同源策略（Same-Origin Policy）或其他安全限制，例如通过将恶意代码嵌入合法域名的URL中。
-- **损害网站信誉**：网站可能被攻击者滥用作为钓鱼攻击的跳板，损害其用户信任和品牌声誉。
-CODE
-	level: "high",
 	type: "vuln",
 	title: "Check PHP Unvalidated Redirect Vulnerability",
 	title_zh: "检测PHP未验证重定向漏洞",
@@ -158,6 +134,30 @@ CODE
 #### 5. 避免依赖客户端重定向
 如果可能，尽量使用服务器端重定向（如HTTP Location头），避免使用客户端脚本进行的重定向，因为客户端脚本更容易受到绕过或篡改。
 CODE
+	desc: <<<CODE
+### 漏洞描述
+
+1. **漏洞原理**
+开放重定向漏洞（Open Redirect）是指应用程序接收用户提供的、未经严格验证的URL作为重定向目标，并将用户导向该URL。攻击者可以利用这一特性，构造恶意链接，将用户重定向到钓鱼网站、恶意软件下载页面或其他恶意资源，从而实施网络钓鱼诈骗、传播恶意软件或窃取用户凭证等。
+
+2. **触发场景**
+当应用程序使用HTTP响应头中的`Location`字段或者通过脚本（如JavaScript的`window.location`）进行页面重定向，并且重定向的目标地址直接或间接地来源于用户输入（如URL参数、表单提交数据）时，如果没有对输入进行充分的验证和过滤，就可能存在开放重定向漏洞。
+例如，以下PHP代码直接使用GET参数作为重定向目标：
+```php
+<?php
+    $url = $_GET["url"];
+    header("Location: ".$url);
+?>
+```
+攻击者可以构造类似于 `http://vulnerable-site.com/redirect.php?url=http://malicious-site.com` 的链接，诱导用户点击后被重定向到恶意网站。
+
+3. **潜在影响**
+- **网络钓鱼**：用户被重定向到外观相似的钓鱼网站，诱骗其输入敏感信息（如用户名、密码、银行卡号）。
+- **恶意软件传播**：用户被重定向到包含恶意软件下载或利用工具的网站。
+- **绕过安全策略**：在某些情况下，开放重定向可能被用来绕过同源策略（Same-Origin Policy）或其他安全限制，例如通过将恶意代码嵌入合法域名的URL中。
+- **损害网站信誉**：网站可能被攻击者滥用作为钓鱼攻击的跳板，损害其用户信任和品牌声誉。
+CODE
+	level: "high",
 }
 $all<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -186,8 +186,6 @@ CODE
 $sink - $high - $mid as $low
 
 alert $low	for {
-	title: "Check PHP Potential Redirect Validation Bypass",
-	title_zh: "检测PHP重定向验证潜在绕过风险",
 	desc: <<<CODE
 ### 规则目的
 该规则用于识别PHP代码中已具备基本的重定向验证机制但仍可能存在高级绕过风险的代码路径。
@@ -201,6 +199,8 @@ alert $low	for {
 CODE
 	level: "low",
 	type: "low",
+	title: "Check PHP Potential Redirect Validation Bypass",
+	title_zh: "检测PHP重定向验证潜在绕过风险",
 }
 desc(
 	lang: "php"
