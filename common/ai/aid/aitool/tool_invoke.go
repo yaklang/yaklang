@@ -236,7 +236,7 @@ func NewToolFromJSON(jsonStr string, callback func(params InvokeParams, stdout i
 	// 创建工具
 	tool, err := New(toolDef.Name,
 		WithDescription(toolDef.Description),
-		WithCallback(callback),
+		WithSimpleCallback(callback),
 	)
 
 	if err != nil {

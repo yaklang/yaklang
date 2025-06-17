@@ -39,7 +39,7 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 			tool,
 			aitool.WithDescription(aiTool.Description),
 			aitool.WithKeywords(strings.Split(aiTool.Keywords, ",")),
-			aitool.WithCallbackWithContext(func(ctx context.Context, params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			aitool.WithCallback(func(ctx context.Context, params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
 				runtimeId := params.GetString("runtime_id")

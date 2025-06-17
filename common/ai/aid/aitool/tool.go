@@ -36,7 +36,7 @@ func New(name string, options ...ToolOption) (*Tool, error) {
 
 	// 检查是否设置了回调函数
 	if tool.Callback == nil {
-		return nil, errors.New("WithCallback is needed, normal ai.Tool should have callback anyway")
+		return nil, errors.New("WithSimpleCallback is needed, normal ai.Tool should have callback anyway")
 	}
 
 	return tool, nil
@@ -96,8 +96,8 @@ func WithKeywords(keywords []string) ToolOption {
 	}
 }
 
-// WithCallback 设置工具的回调函数
-func WithCallback(callback func(params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error)) ToolOption {
+// WithSimpleCallback 设置工具的回调函数
+func WithSimpleCallback(callback func(params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error)) ToolOption {
 	return func(t *Tool) {
 		t.Callback = func(ctx context.Context, params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			if callback == nil {
@@ -108,7 +108,7 @@ func WithCallback(callback func(params InvokeParams, stdout io.Writer, stderr io
 	}
 }
 
-func WithCallbackWithContext(callback InvokeCallback) ToolOption {
+func WithCallback(callback InvokeCallback) ToolOption {
 	return func(t *Tool) {
 		t.Callback = callback
 	}

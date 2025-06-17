@@ -52,7 +52,7 @@ func TestToolInvoke(t *testing.T) {
 			toolBuilder: func() (*Tool, error) {
 				return New("echoTool",
 					WithDescription("回显工具"),
-					WithCallback(echoCallback),
+					WithSimpleCallback(echoCallback),
 					WithStringParam("message",
 						WithParam_Description("要回显的消息"),
 						WithParam_Required(),
@@ -79,7 +79,7 @@ func TestToolInvoke(t *testing.T) {
 			toolBuilder: func() (*Tool, error) {
 				return New("validationTool",
 					WithDescription("验证工具"),
-					WithCallback(validationCallback),
+					WithSimpleCallback(validationCallback),
 					WithStringParam("query",
 						WithParam_Description("查询字符串"),
 						WithParam_Required(),
@@ -102,7 +102,7 @@ func TestToolInvoke(t *testing.T) {
 			toolBuilder: func() (*Tool, error) {
 				return New("nameTool",
 					WithDescription("名称工具"),
-					WithCallback(echoCallback),
+					WithSimpleCallback(echoCallback),
 				)
 			},
 			inputJSON: `{
@@ -121,7 +121,7 @@ func TestToolInvoke(t *testing.T) {
 			toolBuilder: func() (*Tool, error) {
 				return New("errorTool",
 					WithDescription("错误工具"),
-					WithCallback(errorCallback),
+					WithSimpleCallback(errorCallback),
 				)
 			},
 			inputJSON: `{
@@ -140,7 +140,7 @@ func TestToolInvoke(t *testing.T) {
 			toolBuilder: func() (*Tool, error) {
 				return New("parseTool",
 					WithDescription("解析工具"),
-					WithCallback(echoCallback),
+					WithSimpleCallback(echoCallback),
 				)
 			},
 			inputJSON: `{
@@ -161,7 +161,7 @@ func TestToolInvoke(t *testing.T) {
 			toolBuilder: func() (*Tool, error) {
 				return New("complexTool",
 					WithDescription("复杂工具"),
-					WithCallback(echoCallback),
+					WithSimpleCallback(echoCallback),
 					WithStringParam("stringParam",
 						WithParam_Description("字符串参数"),
 						WithParam_Required(),
@@ -589,7 +589,7 @@ func TestInvokeWithParamsLargeContent(t *testing.T) {
 	// 创建测试工具
 	tool, err := New("largeContentTool",
 		WithDescription("生成大内容的工具"),
-		WithCallback(largeContentCallback),
+		WithSimpleCallback(largeContentCallback),
 	)
 	require.NoError(t, err, "创建工具失败")
 

@@ -28,7 +28,7 @@ func CreateJarOperator() ([]*aitool.Tool, error) {
 			aitool.WithParam_Default("."),
 			aitool.WithParam_Description("directory path inside JAR to list (default is root)"),
 		),
-		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			jarPath := params.GetString("jar_path")
 			dirPath := params.GetString("dir_path")
 			if dirPath == "" {
@@ -69,7 +69,7 @@ func CreateJarOperator() ([]*aitool.Tool, error) {
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("path to class file inside JAR (e.g., 'com/example/Main.class')"),
 		),
-		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			jarPath := params.GetString("jar_path")
 			classPath := params.GetString("class_path")
 
@@ -115,7 +115,7 @@ func CreateJarOperator() ([]*aitool.Tool, error) {
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("path to file inside JAR"),
 		),
-		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			jarPath := params.GetString("jar_path")
 			filePath := params.GetString("file_path")
 
@@ -143,7 +143,7 @@ func CreateJarOperator() ([]*aitool.Tool, error) {
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("path to JAR file"),
 		),
-		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			jarPath := params.GetString("jar_path")
 
 			jarParser, err := jar.NewJarParser(jarPath)
@@ -181,7 +181,7 @@ func CreateJarOperator() ([]*aitool.Tool, error) {
 			aitool.WithParam_Default("true"),
 			aitool.WithParam_Description("whether to include classes from nested JARs"),
 		),
-		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			jarPath := params.GetString("jar_path")
 			includeNestedJars := params.GetBool("include_nested_jars")
 
@@ -219,7 +219,7 @@ func CreateJarOperator() ([]*aitool.Tool, error) {
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("class name to find (with or without .class extension)"),
 		),
-		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			jarPath := params.GetString("jar_path")
 			className := params.GetString("class_name")
 
