@@ -95,7 +95,12 @@ func GetCoordinatorRuntime(db *gorm.DB, uuid string) (*schema.AiCoordinatorRunti
 
 func FilterCoordinatorRuntime(db *gorm.DB, filter *ypb.AITaskFilter) *gorm.DB {
 	db = db.Model(&schema.AiCoordinatorRuntime{})
-	// todo
+	db = bizhelper.ExactQueryStringArrayOr(db, "forge_name", filter.GetForgeName())
+	db = bizhelper.ExactQueryStringArrayOr(db, "uuid", filter.GetCoordinatorId())
+	db = bizhelper.ExactQueryStringArrayOr(db, "name", filter.GetName())
+	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
+		"name", "quoted_user_input", "forge_name",
+	}, filter.GetKeyword(), false)
 	return db
 }
 
@@ -108,4 +113,12 @@ func QueryCoordinatorRuntime(db *gorm.DB, filter *ypb.AITaskFilter, paging *ypb.
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
 	}
 	return pag, aiTasks, nil
+}
+
+func DeleteCoordinatorRuntime(db *gorm.DB, filter *ypb.AITaskFilter) (int64, error) {
+	db = FilterCoordinatorRuntime(db, filter)
+	if db = db.Unscoped().Delete(&schema.AiCoordinatorRuntime{}); db.Error != nil {
+		return 0, db.Error
+	}
+	return db.RowsAffected, nil
 }
