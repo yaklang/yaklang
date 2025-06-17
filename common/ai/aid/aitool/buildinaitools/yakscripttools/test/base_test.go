@@ -2,6 +2,7 @@ package test
 
 import (
 	"bytes"
+	"context"
 	"strconv"
 	"strings"
 	"testing"
@@ -22,7 +23,7 @@ func TestGetYakScript(t *testing.T) {
 		if ait.Name == "send_http_request_by_url" {
 			hasDoHttp = true
 			w1, w2 := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
-			ait.Callback(aitool.InvokeParams{
+			ait.Callback(context.Background(), aitool.InvokeParams{
 				"url": "http://" + host + ":" + strconv.Itoa(port),
 			}, w1, w2)
 			assert.Assert(t, strings.Contains(w1.String(), flag))

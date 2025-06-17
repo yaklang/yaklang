@@ -258,7 +258,7 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 			name: "简单工具",
 			tool: newTool("testTool",
 				WithDescription("测试工具"),
-				WithCallback(testCallback),
+				WithCallbackWithContext(testCallback),
 				WithStringParam("param1",
 					WithParam_Description("字符串参数"),
 					WithParam_Required(),
@@ -307,7 +307,7 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 			name: "带数组参数的工具",
 			tool: newTool("arrayTool",
 				WithDescription("带数组的工具"),
-				WithCallback(testCallback),
+				WithCallbackWithContext(testCallback),
 				WithStringArrayParamEx("stringArray",
 					[]PropertyOption{
 						WithParam_Description("字符串数组"),
@@ -354,7 +354,7 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 			name: "无参数工具",
 			tool: newTool("noParamTool",
 				WithDescription("无参数工具"),
-				WithCallback(testCallback),
+				WithCallbackWithContext(testCallback),
 			),
 			want: map[string]interface{}{
 				"$schema":     "http://json-schema.org/draft-07/schema#",
@@ -378,7 +378,7 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 		{
 			name: "无描述工具",
 			tool: newTool("noDescTool",
-				WithCallback(testCallback),
+				WithCallbackWithContext(testCallback),
 				WithStringParam("param1",
 					WithParam_Required(),
 				),
@@ -415,7 +415,7 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 			name: "多种类型参数工具",
 			tool: newTool("multiTypeTool",
 				WithDescription("多种类型参数工具"),
-				WithCallback(testCallback),
+				WithCallbackWithContext(testCallback),
 				WithStringParam("stringParam",
 					WithParam_Description("字符串参数"),
 					WithParam_Required(),
@@ -488,7 +488,7 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 			name: "特殊名称工具",
 			tool: newTool("special-tool-名称",
 				WithDescription("带有特殊字符的工具名称"),
-				WithCallback(testCallback),
+				WithCallbackWithContext(testCallback),
 				WithStringParam("special_param-名称",
 					WithParam_Description("带有特殊字符的参数名称"),
 					WithParam_Required(),
@@ -547,7 +547,7 @@ func TestTool_ToJSONSchemaString(t *testing.T) {
 func TestComplexNestedStructures(t *testing.T) {
 	complexTool := newTool("complexTool",
 		WithDescription("复杂嵌套结构工具"),
-		WithCallback(testCallback),
+		WithCallbackWithContext(testCallback),
 		WithArrayParamEx("complexParam", []PropertyOption{
 			WithParam_Description("复杂参数"),
 			WithParam_Required(),
@@ -648,7 +648,7 @@ func TestDeepNestedStructures(t *testing.T) {
 	deepNestedTool := newTool(
 		"deepNestedTool",
 		WithDescription("深层嵌套结构工具"),
-		WithCallback(testCallback),
+		WithCallbackWithContext(testCallback),
 		WithArrayParamEx("deepNested", []PropertyOption{
 			WithParam_Description("深层嵌套参数"),
 		},
@@ -738,11 +738,11 @@ func TestJSONSchemaValidity(t *testing.T) {
 	tools := []*Tool{
 		newTool("validationTool1",
 			WithDescription("验证工具1"),
-			WithCallback(testCallback),
+			WithCallbackWithContext(testCallback),
 		),
 		newTool("validationTool2",
 			WithDescription("验证工具2"),
-			WithCallback(testCallback),
+			WithCallbackWithContext(testCallback),
 			WithStringParam("param1",
 				WithParam_Required(),
 				WithParam_Description("参数1"),
