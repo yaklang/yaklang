@@ -32,10 +32,10 @@ func (s *OnlineClient) UploadHTTPFlowToOnline(ctx context.Context, params *ypb.H
 	}
 
 	rsp, _, err := poc.DoPOST(
-		fmt.Sprintf("%v/%v", consts.GetOnlineBaseUrl(), "/api/httpflow/upload"),
+		fmt.Sprintf("%v/%v", consts.GetOnlineBaseUrl(), "api/httpflow/upload"),
 		poc.WithReplaceHttpPacketHeader("Authorization", params.Token),
 		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
-		poc.WithReplaceHttpPacketBody(raw, false),
+		poc.WithReplaceHttpPacketBody(raw, true),
 		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
 	)
 	if err != nil {

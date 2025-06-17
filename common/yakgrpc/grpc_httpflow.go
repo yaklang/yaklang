@@ -704,18 +704,29 @@ func (s *Server) HTTPFlowsToOnline(ctx context.Context, req *ypb.HTTPFlowsToOnli
 	if req.Token == "" || req.ProjectName == "" {
 		return nil, utils.Errorf("params empty")
 	}
+
+	cancelCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	limit := make(chan struct{}, 20)
 	var (
-		successHash []string
-		wg          sync.WaitGroup
-		count       = 0
-		mu          sync.Mutex
+		successHash  []string
+		wg           sync.WaitGroup
+		count        = 0
+		mu           sync.Mutex
+		tokenExpired bool // 标记token是否过期
+		tokenErr     error
 	)
 
 	db := s.GetProjectDatabase()
 	db = db.Where("upload_online <> '1' ")
-	ret := yakit.YieldHTTPFlows(db, context.Background())
+	ret := yakit.YieldHTTPFlows(db, cancelCtx)
+
 	for httpFlow := range ret {
+		// 如果token已过期，立即退出循环
+		if tokenExpired {
+			break
+		}
+
 		wg.Add(1)
 
 		limit <- struct{}{}
@@ -723,9 +734,17 @@ func (s *Server) HTTPFlowsToOnline(ctx context.Context, req *ypb.HTTPFlowsToOnli
 		go func(httpFlow *schema.HTTPFlow) {
 			defer func() {
 				<-limit
+				wg.Done()
 			}()
-			defer wg.Done()
-			httpFlowShareData, extractedData, websocketFlowsData, projectGeneralStorage := s.HTTPFlowsData(ctx, httpFlow)
+
+			// 检查上下文是否已取消
+			select {
+			case <-cancelCtx.Done():
+				return
+			default:
+			}
+
+			httpFlowShareData, extractedData, websocketFlowsData, projectGeneralStorage := s.HTTPFlowsData(cancelCtx, httpFlow)
 			content := HTTPFlowShare{
 				HTTPFlow:              httpFlowShareData,
 				ExtractedList:         extractedData,
@@ -738,10 +757,17 @@ func (s *Server) HTTPFlowsToOnline(ctx context.Context, req *ypb.HTTPFlowsToOnli
 				return
 			}
 			client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
-			err = client.UploadHTTPFlowToOnline(ctx, req, data)
+			err = client.UploadHTTPFlowToOnline(cancelCtx, req, data)
 			if err != nil {
 				if strings.Contains(err.Error(), "token过期") {
-					log.Errorf("httpflow to online failed: %s", err.Error())
+					log.Errorf("token过期, 停止上传")
+					// 设置token过期标志并取消上下文
+					mu.Lock()
+					tokenExpired = true
+					tokenErr = err
+					mu.Unlock()
+
+					cancel() // 取消所有后续操作
 					return
 				}
 				log.Errorf("httpflow to online failed: %s", err.Error())
@@ -754,12 +780,22 @@ func (s *Server) HTTPFlowsToOnline(ctx context.Context, req *ypb.HTTPFlowsToOnli
 
 		count++
 		if count == 20 {
-			time.Sleep(1 * time.Second)
-			count = 0
+			select {
+			case <-cancelCtx.Done():
+				break
+			case <-time.After(1 * time.Second):
+				count = 0
+			}
 		}
 	}
+
 	// 等待所有协程执行完毕
 	wg.Wait()
+
+	if tokenExpired {
+		return nil, tokenErr
+	}
+
 	for _, v := range funk.ChunkStrings(successHash, 100) {
 		err := yakit.HTTPFlowToOnline(s.GetProjectDatabase(), v)
 		if err != nil {

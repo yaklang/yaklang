@@ -183,6 +183,7 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 	}
 	host, port, _ := utils.ParseStringToHostPort(flow.Url)
 	flow.HostPort = utf8safe(utils.HostPort(host, port))
+	flow.Host = host
 
 	flow.BodySizeVerbose = utf8safe(utils.ByteSize(uint64(flow.BodyLength)))
 
