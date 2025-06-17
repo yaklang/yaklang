@@ -1,4 +1,4 @@
-package yakgrpc
+package ssaapi
 
 import (
 	"context"
@@ -9,26 +9,26 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-type SsaCompareConfig struct {
+type SsaCompareItemConfig struct {
 	RuleName        string
 	RuleContentHash string
 	VariableName    string
 }
 
-type WithCompareOpts func(*SsaCompareConfig)
+type WithCompareOpts func(*SsaCompareItemConfig)
 
 func WithRuleName(name string) WithCompareOpts {
-	return func(config *SsaCompareConfig) {
+	return func(config *SsaCompareItemConfig) {
 		config.RuleName = name
 	}
 }
 func WithRuleContentHash(hash string) WithCompareOpts {
-	return func(config *SsaCompareConfig) {
+	return func(config *SsaCompareItemConfig) {
 		config.RuleContentHash = hash
 	}
 }
 func WithVariableName(variable string) WithCompareOpts {
-	return func(config *SsaCompareConfig) {
+	return func(config *SsaCompareItemConfig) {
 		config.VariableName = variable
 	}
 }
@@ -43,13 +43,12 @@ const (
 
 type Item[T any] struct {
 	ProgramName string
-
 	//两个项目比较时，根据RuleName/RuleId来确定
 	GetCompareValue func(context.Context) <-chan T
 }
 
 func NewCompareRiskItem(progName string, opts ...WithCompareOpts) *Item[*schema.SSARisk] {
-	s := new(SsaCompareConfig)
+	s := new(SsaCompareItemConfig)
 	item := new(Item[*schema.SSARisk])
 	for _, opt := range opts {
 		opt(s)
@@ -65,7 +64,7 @@ func NewCompareRiskItem(progName string, opts ...WithCompareOpts) *Item[*schema.
 	return item
 }
 func NewCompareCustomVariableItem(progName string, opts ...WithCompareOpts) *Item[*ssadb.AuditNode] {
-	s := new(SsaCompareConfig)
+	s := new(SsaCompareItemConfig)
 	item := new(Item[*ssadb.AuditNode])
 	for _, opt := range opts {
 		opt(s)
@@ -82,41 +81,79 @@ func NewCompareCustomVariableItem(progName string, opts ...WithCompareOpts) *Ite
 	return item
 }
 
+type CompareOptions[T any] struct {
+	onResultCallBack []func(result *CompareResult[T])
+	getValueInfo     func(value T) (rule string, originHash string, diffHash string)
+}
+
+type CompareOpts[T any] func(options *CompareOptions[T])
+
+func WithCompareResultCallback[T any](cb func(result *CompareResult[T])) func(options *CompareOptions[T]) {
+	return func(options *CompareOptions[T]) {
+		options.onResultCallBack = append(options.onResultCallBack, cb)
+	}
+}
+func WithCompareResultGetValueInfo[T any](generate func(value T) (rule string, originHash string, diffHash string)) func(options *CompareOptions[T]) {
+	return func(options *CompareOptions[T]) {
+		options.getValueInfo = generate
+	}
+}
+
 type SsaCompare[T any] struct {
-	generateHash func(value T) string
-	baseItem     *Item[T]
+	baseItem *Item[T]
+	config   *CompareOptions[T]
+}
+
+type CompareResultItem[T any] struct {
+	Val  T
+	Hash string
+
+	rule string
 }
 type CompareResult[T any] struct {
 	BaseValue T
 	NewValue  T
-	Status    CompareStatus
+	FromRule  string
+
+	//riskHash
+	BaseValHash string
+	NewValHash  string
+	Status      CompareStatus
 }
 
-func (s *SsaCompare[T]) WithGenerateHash(f func(T) string) *SsaCompare[T] {
-	s.generateHash = f
-	return s
-}
-
-func (s *SsaCompare[T]) Compare(ctx context.Context, item *Item[T]) <-chan *CompareResult[T] {
+func (s *SsaCompare[T]) Compare(ctx context.Context, item *Item[T], opts ...CompareOpts[T]) <-chan *CompareResult[T] {
 	// todo: 切换更流式的compare算法
 	hashMap := make(map[string]int)
-	string2BaseItemValue := make(map[string]T)
-	string2CompareItemValue := make(map[string]T)
+	string2BaseItemValue := make(map[string]*CompareResultItem[T])
+	string2CompareItemValue := make(map[string]*CompareResultItem[T])
 	result := make(chan *CompareResult[T])
-	if s.generateHash == nil {
+	for _, opt := range opts {
+		opt(s.config)
+	}
+	if s.config.getValueInfo == nil {
 		log.Errorf("generateHash function is not set for SsaCompare, using default hash function")
 		close(result)
 		return result
 	}
 	for v := range s.baseItem.GetCompareValue(ctx) {
-		hash := s.generateHash(v)
-		string2BaseItemValue[hash] = v
-		hashMap[hash]++
+		rule, hash, diffHash := s.config.getValueInfo(v)
+		string2BaseItemValue[diffHash] = &CompareResultItem[T]{
+			Val:  v,
+			Hash: hash,
+
+			rule: rule,
+		}
+		hashMap[diffHash]++
 	}
 	for t := range item.GetCompareValue(ctx) {
-		hash := s.generateHash(t)
-		string2CompareItemValue[hash] = t
-		hashMap[hash]--
+		rule, hash, diffHash := s.config.getValueInfo(t)
+		string2CompareItemValue[diffHash] = &CompareResultItem[T]{
+			Val:  t,
+			Hash: hash,
+
+			rule: rule,
+		}
+		hashMap[diffHash]--
 	}
 	addChannel := func(compareResult *CompareResult[T]) bool {
 		select {
@@ -124,6 +161,9 @@ func (s *SsaCompare[T]) Compare(ctx context.Context, item *Item[T]) <-chan *Comp
 			close(result)
 			return false
 		case result <- compareResult:
+			for _, f := range s.config.onResultCallBack {
+				f(compareResult)
+			}
 			return true
 		}
 	}
@@ -139,9 +179,12 @@ func (s *SsaCompare[T]) Compare(ctx context.Context, item *Item[T]) <-chan *Comp
 					continue
 				}
 				if !addChannel(&CompareResult[T]{
-					BaseValue: zeroValue,
-					NewValue:  compareValue,
-					Status:    Add,
+					BaseValue:   zeroValue,
+					FromRule:    compareValue.rule,
+					NewValue:    compareValue.Val,
+					BaseValHash: "",
+					NewValHash:  compareValue.Hash,
+					Status:      Add,
 				}) {
 					return
 				}
@@ -152,9 +195,12 @@ func (s *SsaCompare[T]) Compare(ctx context.Context, item *Item[T]) <-chan *Comp
 					continue
 				}
 				if !addChannel(&CompareResult[T]{
-					BaseValue: baseValue,
-					NewValue:  zeroValue,
-					Status:    Del,
+					BaseValue:   baseValue.Val,
+					NewValue:    zeroValue,
+					BaseValHash: baseValue.Hash,
+					FromRule:    baseValue.rule,
+					NewValHash:  "",
+					Status:      Del,
 				}) {
 					return
 				}
@@ -165,9 +211,12 @@ func (s *SsaCompare[T]) Compare(ctx context.Context, item *Item[T]) <-chan *Comp
 					continue
 				}
 				if !addChannel(&CompareResult[T]{
-					BaseValue: baseValue,
-					NewValue:  compareValue,
-					Status:    Equal,
+					BaseValue:   baseValue.Val,
+					NewValue:    compareValue.Val,
+					BaseValHash: baseValue.Hash,
+					NewValHash:  compareValue.Hash,
+					FromRule:    compareValue.rule,
+					Status:      Equal,
 				}) {
 					return
 				}
@@ -178,7 +227,7 @@ func (s *SsaCompare[T]) Compare(ctx context.Context, item *Item[T]) <-chan *Comp
 }
 func NewSsaCompare[T any](item *Item[T]) *SsaCompare[T] {
 	return &SsaCompare[T]{
-		baseItem:     item,
-		generateHash: nil,
+		baseItem: item,
+		config:   new(CompareOptions[T]),
 	}
 }
