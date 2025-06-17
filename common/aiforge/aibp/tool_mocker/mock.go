@@ -99,7 +99,7 @@ func NewAiToolMockServer(aiOptions ...aispec.AIConfigOption) *AiToolMockServer {
 				aitool.WithParam_Required(true),
 				aitool.WithParam_Description("The name of the tool to query, can describe tool requirements using natural language."),
 			),
-			aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 				query := params.GetString("query")
 				suggestions, err := mocker.QueryToolSuggestion(context.Background(), query)
 				if err != nil {
@@ -248,7 +248,7 @@ func (s *AiToolMockServer) SearchTool(ctx context.Context, name string) (*aitool
 		}
 	}
 	var mockTool *aitool.Tool
-	opts = append(opts, aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+	opts = append(opts, aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 		return s.CallTool(mockTool, params, stdout, stderr)
 	}))
 	factory.RegisterTool(mockDefinition.ToolName, opts...)
