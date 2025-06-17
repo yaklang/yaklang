@@ -33,7 +33,7 @@ func TestAIForgeBaseCurd(t *testing.T) {
 	require.NoError(t, err)
 
 	forge, err := queryForge(ctx, client, &ypb.AIForgeFilter{
-		ForgeName: name,
+		ForgeName: []string{name},
 	})
 	require.NoError(t, err)
 	require.Len(t, forge, 1)
@@ -56,7 +56,7 @@ func TestAIForgeBaseCurd(t *testing.T) {
 	require.NoError(t, err)
 
 	forge, err = queryForge(ctx, client, &ypb.AIForgeFilter{
-		ForgeName: name,
+		ForgeName: []string{name},
 	})
 	require.NoError(t, err)
 	require.Len(t, forge, 1)
@@ -64,12 +64,12 @@ func TestAIForgeBaseCurd(t *testing.T) {
 	require.Equal(t, newContent, forge[0].ForgeContent)
 
 	_, err = client.DeleteAIForge(ctx, &ypb.AIForgeFilter{
-		ForgeName: name,
+		ForgeName: []string{name},
 	})
 	require.NoError(t, err)
 
 	forge, err = queryForge(ctx, client, &ypb.AIForgeFilter{
-		ForgeName: name,
+		ForgeName: []string{name},
 	})
 	require.NoError(t, err)
 	require.Len(t, forge, 0)
