@@ -38186,6 +38186,7 @@ type HTTPFlow struct {
 	DurationMs    int64    `protobuf:"varint,48,opt,name=DurationMs,proto3" json:"DurationMs,omitempty"`
 	HiddenIndex   string   `protobuf:"bytes,49,opt,name=HiddenIndex,proto3" json:"HiddenIndex,omitempty"`
 	FromPlugin    string   `protobuf:"bytes,50,opt,name=FromPlugin,proto3" json:"FromPlugin,omitempty"`
+	Host          string   `protobuf:"bytes,52,opt,name=Host,proto3" json:"Host,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -38559,6 +38560,13 @@ func (x *HTTPFlow) GetHiddenIndex() string {
 func (x *HTTPFlow) GetFromPlugin() string {
 	if x != nil {
 		return x.FromPlugin
+	}
+	return ""
+}
+
+func (x *HTTPFlow) GetHost() string {
+	if x != nil {
+		return x.Host
 	}
 	return ""
 }
@@ -56354,7 +56362,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06Header\x18\x01 \x01(\tR\x06Header\x12\x14\n" +
 	"\x05Value\x18\x02 \x01(\tR\x05Value\".\n" +
 	"\tHTTPFlows\x12!\n" +
-	"\x04Data\x18\x01 \x03(\v2\r.ypb.HTTPFlowR\x04Data\"\xde\x0e\n" +
+	"\x04Data\x18\x01 \x03(\v2\r.ypb.HTTPFlowR\x04Data\"\xf2\x0e\n" +
 	"\bHTTPFlow\x12\x18\n" +
 	"\aIsHTTPS\x18\x02 \x01(\bR\aIsHTTPS\x12\x10\n" +
 	"\x03Url\x18\x03 \x01(\tR\x03Url\x125\n" +
@@ -56417,7 +56425,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vHiddenIndex\x181 \x01(\tR\vHiddenIndex\x12\x1e\n" +
 	"\n" +
 	"FromPlugin\x182 \x01(\tR\n" +
-	"FromPlugin\"\xa9\x01\n" +
+	"FromPlugin\x12\x12\n" +
+	"\x04Host\x184 \x01(\tR\x04Host\"\xa9\x01\n" +
 	"\rFuzzableParam\x12\x1a\n" +
 	"\bPosition\x18\x01 \x01(\tR\bPosition\x12\x1c\n" +
 	"\tParamName\x18\x02 \x01(\tR\tParamName\x12 \n" +
