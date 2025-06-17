@@ -1124,7 +1124,8 @@ message AITask {
 }
 
 message AIForgeFilter {
-  repeated string ForgeName = 1;
+  string ForgeName = 1;
+  repeated string ForgeNames = 11;
   string ForgeType = 2; // enum: yak or config
   string Keyword = 3;
   // tag

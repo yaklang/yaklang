@@ -87,7 +87,8 @@ func GetAIForgeByName(db *gorm.DB, name string) (*schema.AIForge, error) {
 
 func FilterAIForge(db *gorm.DB, filter *ypb.AIForgeFilter) *gorm.DB {
 	db = db.Model(&schema.AIForge{})
-	db = bizhelper.ExactOrQueryStringArrayOr(db, "forge_name", filter.GetForgeName())
+	db = bizhelper.FuzzQueryLike(db, "forge_name", filter.GetForgeName())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "forge_name", filter.GetForgeNames())
 	db = bizhelper.ExactQueryString(db, "forge_type", filter.GetForgeType())
 	db = bizhelper.FuzzSearchEx(db, []string{
 		"forge_name", "forge_content", "init_prompt", "persistent_prompt", "plan_prompt", "result_prompt",
