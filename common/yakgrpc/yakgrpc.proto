@@ -794,6 +794,8 @@ service Yak {
   rpc UpdateSSARiskTags(UpdateSSARiskTagsRequest)returns(DbOperateMessage);
   rpc GetSSARiskFieldGroup(Empty) returns (SSARiskFieldGroupResponse);
   rpc NewSSARiskRead(NewSSARiskReadRequest) returns (NewSSARiskReadResponse);
+  // SSA risk diff
+  rpc NewSSADiff(SSADiffRequest) returns (stream SSADiffResponse);
 
   rpc SSARiskFeedbackToOnline(SSARiskFeedbackToOnlineRequest) returns (Empty);
 
@@ -6297,7 +6299,6 @@ message SyntaxFlowRuleFilter {
   string FilterLibRuleKind = 14; // "lib"library规则，"noLib"非library规则，空为所有规则
 }
 
-
 message SSAProgram{
   // basic info
   int64 CreateAt = 1;
@@ -6319,6 +6320,24 @@ message SSAProgram{
   int64 WarnRiskNumber = 11;   
   int64 LowRiskNumber = 12;    
   int64 InfoRiskNumber = 14; 
+}
+
+message SSADiffItem{
+  string Program = 1;
+  string ruleName = 2;
+  string Variable = 3;
+}
+message SSADiffRequest{
+  SSADiffItem Base = 1;
+  SSADiffItem Compare = 2;
+  int64 Type = 3;
+  bool SaveDb = 4;
+}
+message SSADiffResponse{
+  SSARisk BaseRisk = 1;
+  SSARisk CompareRisk = 2;
+  string RuleName = 3;
+  int64 Status = 4;
 }
 
 message SSAProgramInput {
