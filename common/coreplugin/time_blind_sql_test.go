@@ -20,6 +20,7 @@ func TestGRPCMUSTPASS_SQLTimeBlind(t *testing.T) {
 		path           string
 		header         []*ypb.KVPair
 		expectedResult map[string]int
+		maxRetries     int
 	}{
 		{
 			name: "Safe ID",
@@ -34,6 +35,7 @@ func TestGRPCMUSTPASS_SQLTimeBlind(t *testing.T) {
 			expectedResult: map[string]int{
 				"SQL Time-Blind-Based Injection": 1,
 			},
+			maxRetries: 5, // 时间盲注测试需要多次重试
 		},
 	}
 
@@ -44,6 +46,7 @@ func TestGRPCMUSTPASS_SQLTimeBlind(t *testing.T) {
 				ExpectedResult: tc.expectedResult,
 				StrictMode:     false,
 				Headers:        tc.header,
+				MaxRetries:     tc.maxRetries,
 			}
 			Must(CoreMitmPlugTest(pluginName, server, vul, client, t))
 		})

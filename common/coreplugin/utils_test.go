@@ -38,6 +38,7 @@ type VulInfo struct {
 	StrictMode     bool
 	RawHTTPRequest []byte
 	Id             string
+	MaxRetries     int // 最大重试次数
 }
 
 var (
@@ -109,75 +110,109 @@ func CoreMitmPlugTest(pluginName string, vulServer VulServerInfo, vulInfo VulInf
 	// run
 	host, port, _ := utils.ParseStringToHostPort(vulServer.VulServerAddr)
 
-	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
-		Code:       string(codeBytes),
-		PluginType: "mitm",
-		Input:      utils.HostPort(host, port),
-		HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
-			Path:             vulInfo.Path,
-			Headers:          vulInfo.Headers,
-			IsHttps:          vulServer.IsHttps,
-			Body:             vulInfo.Body,
-			IsRawHTTPRequest: len(vulInfo.RawHTTPRequest) != 0,
-			RawHTTPRequest:   vulInfo.RawHTTPRequest,
-			Method:           vulInfo.Method,
-		},
-	})
-	if err != nil {
-		panic(err)
+	// 重试次数
+	maxRetries := vulInfo.MaxRetries
+	if maxRetries <= 0 {
+		maxRetries = 1
 	}
 
-	var runtimeId string
-	for {
-		exec, err := stream.Recv()
+	for i := 0; i < maxRetries; i++ {
+		stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
+			Code:       string(codeBytes),
+			PluginType: "mitm",
+			Input:      utils.HostPort(host, port),
+			HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
+				Path:             vulInfo.Path,
+				Headers:          vulInfo.Headers,
+				IsHttps:          vulServer.IsHttps,
+				Body:             vulInfo.Body,
+				IsRawHTTPRequest: len(vulInfo.RawHTTPRequest) != 0,
+				RawHTTPRequest:   vulInfo.RawHTTPRequest,
+				Method:           vulInfo.Method,
+			},
+		})
 		if err != nil {
-			if err == io.EOF {
-				break
+			if i < maxRetries-1 {
+				continue
 			}
-			log.Warn(err)
+			panic(err)
 		}
+
+		var runtimeId string
+		for {
+			exec, err := stream.Recv()
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				log.Warn(err)
+			}
+			if runtimeId == "" {
+				runtimeId = exec.RuntimeID
+			}
+		}
+
 		if runtimeId == "" {
-			runtimeId = exec.RuntimeID
+			if i < maxRetries-1 {
+				continue
+			}
+			panic("NO RUNTIME ID SET")
 		}
-	}
 
-	if runtimeId == "" {
-		panic("NO RUNTIME ID SET")
-	}
-
-	expected := make(map[string]int)
-	for k := range vulInfo.ExpectedResult {
-		expected[k] = 0
-	}
-	risks := yakit.YieldRisksByRuntimeId(consts.GetGormProjectDatabase(), context.Background(), runtimeId)
-
-	for risk := range risks {
-		match := false
-		riskInfo, _ := json.Marshal(risk)
+		expected := make(map[string]int)
 		for k := range vulInfo.ExpectedResult {
-			if vulInfo.StrictMode && (risk.TitleVerbose == k || risk.Title == k) {
-				expected[k] = expected[k] + 1
-				match = true
-			} else if !vulInfo.StrictMode {
-				if strings.Contains(string(riskInfo), k) || strings.Contains(risk.TitleVerbose, k) {
+			expected[k] = 0
+		}
+		risks := yakit.YieldRisksByRuntimeId(consts.GetGormProjectDatabase(), context.Background(), runtimeId)
+
+		for risk := range risks {
+			match := false
+			riskInfo, _ := json.Marshal(risk)
+			for k := range vulInfo.ExpectedResult {
+				if vulInfo.StrictMode && (risk.TitleVerbose == k || risk.Title == k) {
 					expected[k] = expected[k] + 1
 					match = true
+				} else if !vulInfo.StrictMode {
+					if strings.Contains(string(riskInfo), k) || strings.Contains(risk.TitleVerbose, k) {
+						expected[k] = expected[k] + 1
+						match = true
+					}
 				}
 			}
+			if !match {
+				println(riskInfo)
+			}
 		}
-		if !match {
-			println(riskInfo)
+
+		// 检查是否所有预期的漏洞都被发现
+		allFound := true
+		for k, expectedCount := range vulInfo.ExpectedResult {
+			if expected[k] != expectedCount {
+				allFound = false
+				break
+			}
+		}
+
+		if allFound {
+			return true
+		}
+
+		// 如果不是最后一次重试，继续
+		if i < maxRetries-1 {
+			continue
+		}
+
+		// 最后一次重试失败，输出错误信息
+		for k, expectedCount := range vulInfo.ExpectedResult {
+			if expected[k] != expectedCount {
+				vulinfo := fmt.Sprintf(",VulInfo Id: %v", vulInfo.Id)
+				t.Fatalf("Risk Keyword:[%v] Should Found Vul: %v but got: %v%v", k, expectedCount, expected[k], vulinfo)
+				t.FailNow()
+			}
 		}
 	}
 
-	for k, expectedCount := range vulInfo.ExpectedResult {
-		if expected[k] != expectedCount {
-			vulinfo := fmt.Sprintf(",VulInfo Id: %v", vulInfo.Id)
-			t.Fatalf("Risk Keyword:[%v] Should Found Vul: %v but got: %v%v", k, expectedCount, expected[k], vulinfo)
-			t.FailNow()
-		}
-	}
-	return true
+	return false
 }
 
 func Must(condition bool, errMsg ...string) {
