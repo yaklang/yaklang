@@ -236,9 +236,29 @@ func (y *builder) VisitElementValue(raw javaparser.IElementValueContext) (v ssa.
 		//TODO: handler element value
 
 	} else if ret := i.ElementValueArrayInitializer(); ret != nil {
+		return y.VisitElementValueArrayInitializer(ret)
 	} else {
 		// log.Errorf("")
 	}
 
 	return
+}
+
+func (y *builder) VisitElementValueArrayInitializer(raw javaparser.IElementValueArrayInitializerContext) (v ssa.Value) {
+	v = nil
+	if y == nil || raw == nil || y.IsStop() {
+		return
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i, _ := raw.(*javaparser.ElementValueArrayInitializerContext)
+	if i == nil {
+		return
+	}
+
+	for _, evContext := range i.AllElementValue() {
+		y.VisitElementValue(evContext)
+	}
+
+	return nil
 }

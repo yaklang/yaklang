@@ -1,23 +1,37 @@
+/*
+预期搜索功能的效果：
+检查输入：
+
+任何情况都可以搜索file/const
+如果是[a-z,A-Z,0-9,_]，则几种kind都可以用。
+如果存在()$或($， 则是call，
+如果存在^@.*，则是注解搜索，影响symbol/funciton/call
+symbol/function/call关系是：
+
+$call = $function()
+$function = symbol?{opcode: func}
+*/
+
 yakit.AutoInitYakit()
 
 fuzzSearch = cli.Bool("fuzz", cli.setHelp("是否进行模糊搜索，默认开启"), cli.setRequired(true), cli.setDefault(true))
 kinds = cli.StringSlice(
-    "kind", 
-    cli.setSelectOption("全部", "all"), 
-    cli.setSelectOption("符号", "symbol"), 
-    cli.setSelectOption("函数", "function"), 
-    cli.setSelectOption("函数调用", "call"), 
-    cli.setSelectOption("文件", "file"), 
-    cli.setSelectOption("常量", "const"), 
-    cli.setRequired(true), 
-    cli.setDefault("all"), 
+    "kind",
+    cli.setSelectOption("全部", "all"),
+    cli.setSelectOption("符号", "symbol"),
+    cli.setSelectOption("函数", "function"),
+    cli.setSelectOption("函数调用", "call"),
+    cli.setSelectOption("文件", "file"),
+    cli.setSelectOption("常量", "const"),
+    cli.setRequired(true),
+    cli.setDefault("all"),
 )
-input = cli.String(
-    "rule", 
+userInput = cli.String(
+    "rule",
     cli.setHelp(`输入的内容，输入的内容将会进行正则校验，比如：
     a(                  将会被补充成一个Call
-`), 
-    cli.setRequired(true), 
+`),
+    cli.setRequired(true),
 )
 
 progName = cli.String("progName", cli.setHelp("输入当前的项目名，将从数据库进行索引"), cli.setRequired(true))
@@ -25,7 +39,7 @@ progName = cli.String("progName", cli.setHelp("输入当前的项目名，将从
 cli.check()
 
 yakit.SetProgress(0)
-
+useCache = true
 kind_input = "all"
 if len(kinds) > 0 {
     kind_input = kinds[0]
@@ -35,11 +49,11 @@ kind = kind_input
 var resultID = ""
 // check cache
 func getCache(k) {
-    key := sprint([progName, k, input])
+    key := sprint([progName, k, userInput, fuzzSearch ? "true": "false"])
     value := db.GetKey(key)
     if value == "" {
         // skip cache
-        return "" 
+        return ""
     }
     resID := parseInt(value)
     // check  result id is valid
@@ -52,102 +66,38 @@ func getCache(k) {
         return ""
     }
 }
-resultID := getCache("all")
-if resultID != "" {
-    yakit.SetProgress(1)
-    yakit.Output(resultID)
-    return 
+if useCache{
+    resultID := getCache("all")
+    if resultID != "" {
+        yakit.SetProgress(1)
+        yakit.Output(resultID)
+        return
+    }
+    resultID = getCache(kind)
+    if resultID != "" {
+        yakit.SetProgress(1)
+        yakit.Output(resultID)
+        return
+    }
 }
-
-
-resultID = getCache(kind)
-if resultID != "" {
-    yakit.SetProgress(1)
-    yakit.Output(resultID)
-    return 
-}
-
-
 defer func {
-    key := sprint([progName, kind, input])
-    // 10 day cache 
-    db.SetKeyWithTTL(key, resultID, 10 * 24 * 60 * 60)
+    if useCache{
+        key := sprint([progName, kind, userInput, fuzzSearch ? "true": "false"])
+        // 10 day cache
+        db.SetKeyWithTTL(key, resultID, 10 * 24 * 60 * 60)
+    }
 }
+
 
 // define process handler
 
-func matchCallMethodName(content) {
-    compile = re.Compile(`(\b[a-zA-Z_]\w*)\(`)~
-    matchPart = compile.FindAllStringSubmatch(content, -1)
-    if matchPart.Len() == 0 {
-        yakit.Error("syntaxFlowTemplate is call,but not match this methodName")
-        return
-    }
-    
-
-    matchInfo = matchPart[0]
-    if matchInfo.Len() < 2 {
-        yakit.Error(
-            "syntaxflowTemplate is call,but match part is: %s", 
-            matchInfo, 
-        )
-        return
-    }
-
-    methodName = matchInfo[1]
-    return methodName
+func isAnnotationPattern(content) {
+    return re.Match(`^@[\w.]+$`, content)
 }
 
-func matchMybatisPlaceholder(content) {
-    compile = re.Compile(`\$\{([^}]*)`)~  // 捕获 ${xxx 或 ${xxx}
-    matchPart = compile.FindAllStringSubmatch(content, -1)
-    if matchPart.Len() == 0 {
-        yakit.Error("syntaxFlowTemplate is placeholder, but not match placeholder content")
-        return
-    }
-
-    matchInfo = matchPart[0]
-    if matchInfo.Len() < 2 {
-        yakit.Error(
-            "syntaxFlowTemplate is placeholder, but match part is: %s",
-            matchInfo,
-        )
-        return
-    }
-
-    placeholderKey = matchInfo[1] // 提取出 xxx 部分
-    return placeholderKey
-}
-
-func processContent(content) {
-    content = str.TrimSpace(content)
-    // call
-    if kind == "const" {
-        return content
-    }
-
+func isBatisPattern(content) {
     // MyBatis 占位符语法识别：${xxx} 或 ${xxx（未闭合）
-    if re.Match(`^\$\{[^}]*\}?$`, content) {
-        kind = "placeholder"
-        return matchMybatisPlaceholder(content)
-    }
-
-     // 注解语法糖识别：@xxx
-    if re.Match(`^@[\w.]+$`, content) {
-        kind = "annotation"
-        return content[1:] // 去掉开头的 @
-    }
-
-    if re.Match(`(\b[a-zA-Z_]\w*)\(`, content) {
-        kind = "call"
-        return matchCallMethodName(content)
-    }
-
-//file
-    if re.Match(`[/|\\]`, content) {
-        kind = "file"
-    }
-    return content
+    return re.Match(`^\$\{[^}]*\}?$`, content)
 }
 
 func normalProcess(content) {
@@ -157,55 +107,192 @@ func normalProcess(content) {
         return content
     }
 }
+
+func constProcess(content) {
+    if isBatisPattern(content){
+        compile = re.Compile(`\$\{([^}]*)`)~  // 捕获 ${xxx 或 ${xxx}
+        matchPart = compile.FindAllStringSubmatch(content, -1)
+        if matchPart.Len() == 0 {
+            yakit.Error("syntaxFlowTemplate is placeholder, but not match placeholder content")
+            return
+        }
+
+        matchInfo = matchPart[0]
+        if matchInfo.Len() < 2 {
+            yakit.Error(
+                "syntaxFlowTemplate is placeholder, but match part is: %s",
+                matchInfo,
+            )
+            return
+        }
+
+        placeholderKey = matchInfo[1] // 提取出 xxx 部分
+        if fuzzSearch && placeholderKey == ""{
+            return sprintf(
+`${*.xml}.regexp(/%s/) as $const1
+r<<<CODE
+\$\{[^}]+\}
+CODE as $const2
+$const1 + $const2 as $const
+`, `\$\{\w*\}`)
+        }
+        if fuzzSearch {
+            return sprintf(
+`${*.xml}.regexp(/%s/) as $const1
+r<<<CODE
+^\$\{[^}]*%s[^}]*\}$
+CODE as $const2
+$const1 + $const2 as $const
+`, sprintf(`\$\{%s\w*\}`, re.QuoteMeta(placeholderKey)), content)
+        }else{
+            return sprintf(
+`${*.xml}.regexp(/%s/) as $const1
+r<<<CODE
+\$\{%s\}
+CODE as $const2
+$const1 + $const2 as $const
+`, sprintf(`\$\{%s\}`, re.QuoteMeta(placeholderKey)), content)
+        }
+    }
+
+        return sprintf(`
+g<<<CODE
+%s
+CODE as $const
+`, normalProcess(content))
+
+}
+
 func fileProcess(content) {
     if fuzzSearch {
-        return sprintf("**%s**", content)
-    } else {
-        return content
-    }
-}
-func mybatisPlaceHolderProcess(content) {
-    if fuzzSearch && content == ""{
-        return `\$\{\w*\}`
-    }
-    if fuzzSearch {
-        return sprintf(`\$\{%s\w*\}`, re.QuoteMeta(content))
-    }else{
-        return sprintf(`\$\{%s\}`, re.QuoteMeta(content))
-    }
-}
-templateMap = map[string]any{"const": (i) => {
-    i = normalProcess(i)
-    return sprintf(`g<<<CODE
-%s
-CODE as $const`, i)
-}, "file": (i) => {
-    i = fileProcess(i)
-    return sprintf(
+        return sprintf(
         `<getFullFileName(filename="%s")> as $file`,
-        i,
-    )
-}, "function": (i) => {
-    i = normalProcess(i)
-    return sprintf(`%s?{opcode: function} as $function`, i)
-}, "call": (i) => {
-    i = normalProcess(i)
-    return sprintf(`%s() as $call`, i)
-}, "symbol": (i) => {
-    i = normalProcess(i)
-    return sprintf(`%s as $symbol`, i)
-}, "annotation": (i) => {
-    i = normalProcess(i)
-    return sprintf(`%s?{opcode: make && .__ref__} as $annotation`, i)
-},"placeholder": (i) => {
-    i = mybatisPlaceHolderProcess(i)
-    return sprintf(`${*.xml}.regexp(/%s/) as $placeholder`, i)
+        sprintf("**%s**", content)
+        )
+    } else {
+        return sprintf(
+        `<getFullFileName(filename="%s")> as $file`,
+        content
+        )
+    }
+}
+
+func functionProcess(content) {
+     // 注解语法糖识别：@xxx
+    if isAnnotationPattern(content){
+        annotationName =  content[1:] // 去掉开头的 @
+        return sprintf(
+`%s?{opcode: make && .__ref__} as $annotation_mark
+$annotation_mark.__ref__?{opcode: function} as $function`, normalProcess(annotationName))
+    }
+    return sprintf(`%s?{opcode: function} as $function`, normalProcess(content))
+
+}
+
+func callProcess(content) {
+    if isAnnotationPattern(content){
+        annotationName =  content[1:] // 去掉开头的 @
+        return sprintf(
+`%s?{opcode: make && .__ref__} as $annotations
+$annotations.__ref__ as $annotated
+$annotated() as $call
+`, normalProcess(annotationName))
+    }
+
+    compile = re.Compile(`(\b[a-zA-Z_]\w*)\(`)~
+    matchPart = compile.FindAllStringSubmatch(content, -1)
+    if matchPart.Len() == 0 {
+        return sprintf(`%s() as $call`, normalProcess(content))
+    }
+
+    matchInfo = matchPart[0]
+    if matchInfo.Len() < 2 {
+        yakit.Error(
+            "syntaxflowTemplate is call,but match part is: %s",
+            matchInfo,
+        )
+        return sprintf(`%s() as $call`, normalProcess(content))
+    }
+
+    methodName = matchInfo[1]
+    return sprintf(`%s() as $call`, normalProcess(methodName))
+}
+
+func symbolProcess(content){
+     if isAnnotationPattern(content){
+        anntationName =  content[1:] // 去掉开头的 @
+        return sprintf(
+`%s?{opcode: make} as $symbol
+`, normalProcess(anntationName))
+    }
+    compile = re.Compile(`(\b[a-zA-Z_]\w*)\(`)~
+    matchPart = compile.FindAllStringSubmatch(content, -1)
+    if matchPart.Len() == 0 {
+        return sprintf(`%s as $symbol`, normalProcess(content))
+    }
+    matchInfo = matchPart[0]
+    methodName = matchInfo[1]
+    return sprintf(`%s as $symbol`, normalProcess(methodName))
+}
+
+templateMap = map[string]any{
+"const": (i) => {
+    return constProcess(i)
+},
+"file": (i) => {
+    return fileProcess(i)
+},
+"function": (i) => {
+    return functionProcess(i)
+},
+"call": (i) => {
+    return callProcess(i)
+},
+"symbol": (i) => {
+    return symbolProcess(i)
 },
 }
 
+func isInputLegalFilter(content){
+    return re.Match(`^(?:\@|\*|[a-zA-Z_*][a-zA-Z_*0-9]*|\/[^\/\n\r]+\/)`, content)
+}
+
+func isCallLike(content){
+    return re.Match(`\b[a-zA-Z_]\w*\(`, content)
+}
+
+func isFunctionLike(content){
+    return re.Match(`^(?:\*|[a-zA-Z_*][a-zA-Z_*0-9]*|\/[^\/\n\r]+\/)`, content)
+}
+
+func generateSearchStratergy(content) {
+    search = map[string]bool{
+        "const": true,
+        "file": true,
+        "function": false,
+        "call": false,
+        "symbol": false
+    }
+    if !isInputLegalFilter(content){
+        return search
+    }
+    search["symbol"] = true
+    if isCallLike(content){
+        search["call"] = true
+        return search
+    }
+    search["call"] = true
+    search["function"] = true
+    return search
+}
+
 // process
-rule = processContent(input)
+rule = str.TrimSpace(userInput)
+searchStratergy = generateSearchStratergy(rule)
 if kind != "all" {
+    if !searchStratergy[kind]{
+        return
+    }
     f = templateMap[kind]
     if f == nil {
         yakit.Error("get template render fail")
@@ -215,8 +302,11 @@ if kind != "all" {
 } else {
     targetRule := ""
     for k, f := range templateMap {
-        tmprule = f(rule)
-        targetRule += tmprule + "\n"
+        if searchStratergy[k]{
+            tmprule = f(rule)
+            targetRule += tmprule + "\n"
+        }
+
     }
     rule = targetRule
 }
@@ -224,7 +314,7 @@ if kind != "all" {
 // set output, because kind will modify by processContent, like: () set to call
 // so use kind_input, if kind_input is all, will output all kind
 if kind_input == "all" {
-    rule += "$const + $file + $function + $call + $symbol + $annotation + $placeholder as $all"
+    rule += "$const + $file + $function + $call + $symbol as $all"
 }
 
 
