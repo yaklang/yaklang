@@ -3,6 +3,7 @@ package aitool
 import (
 	"encoding/json"
 	"fmt"
+	"golang.org/x/net/context"
 	"io"
 	"strings"
 	"testing"
@@ -111,7 +112,7 @@ func TestExecuteToolWithCapture(t *testing.T) {
 		"warning": false,
 	}
 
-	result1, err := tool.ExecuteToolWithCapture(params1, nil, nil)
+	result1, err := tool.ExecuteToolWithCapture(context.Background(), params1, nil, nil)
 	if err != nil {
 		t.Errorf("执行工具失败: %v", err)
 	}
@@ -130,7 +131,7 @@ func TestExecuteToolWithCapture(t *testing.T) {
 		"warning": true,
 	}
 
-	result2, err := tool.ExecuteToolWithCapture(params2, nil, nil)
+	result2, err := tool.ExecuteToolWithCapture(context.Background(), params2, nil, nil)
 	if err != nil {
 		t.Errorf("执行工具失败: %v", err)
 	}
