@@ -32,7 +32,7 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 	err = factory.RegisterTool("ls",
 		aitool.WithDescription("list files in directory or get file info"),
 		aitool.WithStringParam("path", aitool.WithParam_Required(true)),
-		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			pathName := params.GetString("path")
 
 			// Check if path exists first
@@ -112,7 +112,7 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 			aitool.WithParam_Default(2048),
 			aitool.WithParam_Description("chunk size to read"),
 		),
-		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			pathName := params.GetString("path")
 			offset := params.GetInt("offset")
 			chunkSize := params.GetInt("chunk_size")
@@ -179,7 +179,7 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("file path"),
 		),
-		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			pathName := params.GetString("path")
 			err := fsys.Delete(pathName)
 			if err != nil {
@@ -203,7 +203,7 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("file content"),
 		),
-		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			pathName := params.GetString("path")
 			content := params.GetString("content")
 			err := fsys.WriteFile(pathName, []byte(content), 0644)
@@ -227,7 +227,7 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("destination file path"),
 		),
-		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			src := params.GetString("src")
 			dst := params.GetString("dst")
 			r, err := fsys.OpenFile(src, os.O_RDONLY, 0444)
@@ -270,7 +270,7 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 		aitool.WithStringParam("path", aitool.WithParam_Required(true)),
 		aitool.WithIntegerParam("limit", aitool.WithParam_Required(true), aitool.WithParam_Default(20)),
 		aitool.WithIntegerParam("offset", aitool.WithParam_Default(0)),
-		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			path := params.GetString("path")
 			limit := params.GetInt("limit")
 			offset := params.GetInt("offset")

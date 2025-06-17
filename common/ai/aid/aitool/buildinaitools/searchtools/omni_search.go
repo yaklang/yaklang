@@ -24,7 +24,7 @@ func CreateOmniSearchTools() ([]*aitool.Tool, error) {
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("search query"),
 		),
-		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			searchType := "brave"
 			query := params.GetString("query")
 

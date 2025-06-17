@@ -21,7 +21,7 @@ func CreateYaklangTools() ([]*aitool.Tool, error) {
 		aitool.WithDescription("run yaklang code syntax check"),
 		aitool.WithStringParam("content", aitool.WithParam_Description("yaklang code content")),
 		aitool.WithStringParam("path", aitool.WithParam_Description("yaklang code file path")),
-		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			codeContent := params.GetString("content")
 			if codeContent == "" {
 				path := params.GetString("path")
@@ -46,7 +46,7 @@ func CreateYaklangTools() ([]*aitool.Tool, error) {
 		aitool.WithDescription("query yaklang document"),
 		aitool.WithStringParam("keyword", aitool.WithParam_Description("yaklang code keyword")),
 		aitool.WithStringParam("lib", aitool.WithParam_Description("yaklang code lib name")),
-		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			codeContent := params.GetString("keyword")
 			libName := params.GetString("lib")
 			if libName != "" {

@@ -23,7 +23,7 @@ func GetBasicBuildInTools() []*aitool.Tool {
 			aitool.WithParam_Required(false),
 			aitool.WithParam_Description("timezone for now, like 'Asia/Shanghai' or 'UTC' ... "),
 		),
-		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			return time.Now().String(), nil
 		}),
 	)

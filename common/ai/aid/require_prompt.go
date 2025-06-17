@@ -38,7 +38,7 @@ func (c *Config) CreateRequireUserInteract() (*aitool.Tool, error) {
 			[]aitool.PropertyOption{},
 			aitool.WithStringParam("value", aitool.WithParam_Description("选项的值")),
 		),
-		aitool.WithCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			basicPrompt := params.GetString("prompt")
 			if basicPrompt == "" {
 				basicPrompt = "AI Need Helps, Please Input Your Advice:"
