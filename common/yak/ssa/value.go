@@ -194,7 +194,7 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	name := variable.GetName()
 	_ = name
 	if utils.IsNil(value) {
-		log.Infof("assign nil value to variable: %v, it will not work on ssa ir format", name)
+		log.Debugf("assign nil value to variable: %v, it will not work on ssa ir format", name)
 		return
 	}
 	scope := b.CurrentBlock.ScopeTable

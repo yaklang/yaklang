@@ -187,7 +187,7 @@ func (c *config) parseProjectWithFS(
 			}
 			exclude := prog.GetIncludeFiles()
 			if len(exclude) > 0 {
-				log.Infof("program include files: %v will not be as the entry from project", len(exclude))
+				log.Debugf("program include files: %v will not be as the entry from project", len(exclude))
 			}
 			return exclude, nil
 		}),

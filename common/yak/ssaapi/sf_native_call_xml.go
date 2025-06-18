@@ -211,7 +211,7 @@ var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 			if element.Name.Local == "mapper" {
 				mapper := mapperStack.Pop()
 				if mapper != nil {
-					log.Infof("mapper: %v", mapper)
+					log.Debugf("mapper: %v", mapper)
 				}
 			}
 			if element.Name.Local == "resultMap" {
