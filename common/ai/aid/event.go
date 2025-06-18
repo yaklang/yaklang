@@ -312,8 +312,9 @@ func (r *Config) EmitErrorWithName(name string, fmtlog string, items ...any) {
 	r.emitLogWithLevel("error", name, fmtlog, items...)
 }
 
-func (r *Config) EmitToolCallWatcher(id string, tool *aitool.Tool, params aitool.InvokeParams) {
+func (r *Config) EmitToolCallWatcher(toolCallID string, id string, tool *aitool.Tool, params aitool.InvokeParams) {
 	reqs := map[string]any{
+		"call_tool_id":     toolCallID,
 		"id":               id,
 		"tool":             tool.Name,
 		"tool_description": tool.Description,
