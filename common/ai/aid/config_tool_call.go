@@ -1,9 +1,11 @@
 package aid
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"golang.org/x/net/context"
 	"io"
@@ -11,13 +13,18 @@ import (
 
 var ToolCallWatcher = []*ToolUseReviewSuggestion{
 	{
-		Value:             "stop-tool-call",
-		Suggestion:        "手动停止工具执行",
-		SuggestionEnglish: "Manually stop tool execution",
+		Value:             "enough-cancel",
+		Suggestion:        "工具输出足够，可以取消工具执行，继续后面的任务",
+		SuggestionEnglish: "Tool output is sufficient, can cancel tool execution and continue with the next task",
 	},
 }
 
-func (c *Config) toolCallOpts(stdoutBuf, stderrBuf io.Writer) []aitool.ToolInvokeOptions {
+var (
+	ToolCallAction_Enough_Cancel = "enough-cancel"
+	ToolCallAction_Finish        = "finish"
+)
+
+func (c *Config) toolCallOpts(toolCallID string, cancelHandle, resultErrHandle func(any), stdoutBuf, stderrBuf io.Writer) []aitool.ToolInvokeOptions {
 	return []aitool.ToolInvokeOptions{
 		aitool.WithStdout(stdoutBuf),
 		aitool.WithStderr(stderrBuf),
@@ -33,57 +40,75 @@ func (c *Config) toolCallOpts(stdoutBuf, stderrBuf io.Writer) []aitool.ToolInvok
 			if err != nil {
 				return nil, err
 			}
-
 			ctx, cancel := context.WithCancel(c.ctx)
 			defer cancel()
-
 			ep := c.epm.createEndpointWithEventType(EVENT_TYPE_TOOL_CALL_WATCHER)
-			c.EmitToolCallWatcher(ep.id, t, params)
+			c.EmitToolCallWatcher(toolCallID, ep.id, t, params)
 
-			go func() {
-				ep.WaitContext(ctx)
-				select {
-				case <-ctx.Done():
-					c.ReleaseInteractiveEvent(ep.id, nil)
-				default:
-					cancel()
+			toolCallSuccess := func(result *aitool.ToolExecutionResult) (*aitool.ToolResult, error) {
+				res := &aitool.ToolResult{
+					Param:       params,
+					Name:        t.Name,
+					Description: t.Description,
+					Success:     true,
+					Data:        result,
 				}
-			}()
-
-			var execResult *aitool.ToolExecutionResult
-			var execErr error
-			var execFished = make(chan struct{})
-			go func() {
-				execResult, execErr = t.ExecuteToolWithCapture(ctx, params, config.GetStdout(), config.GetStderr())
-				close(execFished)
-			}()
-
-			select {
-			case <-ctx.Done():
-			case <-execFished:
+				err = c.submitToolCallResponse(toolCheckpoint, res)
+				if err != nil {
+					return nil, err
+				}
+				return res, nil
 			}
-			if execErr != nil {
+
+			toolCallErr := func(err error) (*aitool.ToolResult, error) {
+				resultErrHandle(err)
 				return &aitool.ToolResult{
 					Param:       params,
 					Name:        t.Name,
 					Description: t.Description,
 					Success:     false,
 					Error:       fmt.Sprintf("工具执行失败: %v", err),
-				}, execErr
-			}
-			res := &aitool.ToolResult{
-				Name:        t.Name,
-				Description: t.Description,
-				Param:       params,
-				Success:     true,
-				Data:        execResult,
+				}, err
 			}
 
-			err = c.submitToolCallResponse(toolCheckpoint, res)
-			if err != nil {
-				return nil, err
+			outBuf, errBuf := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
+			stdOutWriter := io.MultiWriter(config.GetStdout(), outBuf)
+			stdErrWriter := io.MultiWriter(config.GetStderr(), errBuf)
+
+			var execResult *aitool.ToolExecutionResult
+			var execErr error
+			go func() {
+				execResult, execErr = t.ExecuteToolWithCapture(ctx, params, stdOutWriter, stdErrWriter)
+				c.ReleaseInteractiveEvent(ep.id, map[string]any{
+					"suggestion": "finish",
+				})
+			}()
+
+			ep.WaitContext(ctx)
+			userSuggestion := ep.GetParams()
+			switch userSuggestion.GetString("suggestion") {
+			case ToolCallAction_Enough_Cancel:
+				cancel()
+				cancelHandle("用户取消工具调用，继续后续任务")
+				return toolCallSuccess(&aitool.ToolExecutionResult{
+					Stdout: outBuf.String(),
+					Stderr: errBuf.String(),
+				})
+			case ToolCallAction_Finish:
+				if execErr != nil {
+					return toolCallErr(execErr)
+				}
+				if execResult == nil {
+					return toolCallSuccess(&aitool.ToolExecutionResult{
+						Stdout: outBuf.String(),
+						Stderr: errBuf.String(),
+					})
+				}
+				return toolCallSuccess(execResult)
+			default:
+				actionErr := utils.Errorf("tool call unknown user suggestion: %s", userSuggestion.GetString("suggestion"))
+				return toolCallErr(actionErr)
 			}
-			return res, nil
 		}),
 	}
 }

@@ -174,7 +174,7 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, d
 
 	t.config.EmitToolCallStd(targetTool.Name, stdoutReader, stderrReader, t.Index)
 	t.config.EmitInfo("start to execute tool:%v", targetTool.Name)
-	toolResult, err := targetTool.InvokeWithParams(callToolParams, t.config.toolCallOpts(stdoutWriter, stderrWriter)...)
+	toolResult, err := targetTool.InvokeWithParams(callToolParams, t.config.toolCallOpts(callToolId, handleResultUserCancel, handleResultErr, stdoutWriter, stderrWriter)...)
 	if err != nil {
 		toolResult.Error = fmt.Sprintf("error invoking tool[%v]: %v", targetTool.Name, err)
 		toolResult.Success = false
