@@ -59,7 +59,7 @@ func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bo
 	if functionRange := f.GetRange(); functionRange != nil {
 		b.SetRange(functionRange)
 	} else if name == "entry" {
-		log.Infof("func$%v entry 's range is nil, set entry block range to empty in first building", f.name)
+		log.Debugf("func$%v entry 's range is nil, set entry block range to empty in first building", f.name)
 	} else {
 		log.Errorf("function$%v 's range is nil, missed block range (%v)", f.name, name)
 	}

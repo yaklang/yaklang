@@ -113,13 +113,13 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 	case *ssa.Call:
 		method := inst.Method
 		if method == nil {
-			log.Infof("fallback: (call instruction 's method/func is not *Function) unknown caller, got: %v", inst.Method.String())
+			log.Debugf("fallback: (call instruction 's method/func is not *Function) unknown caller, got: %v", inst.Method.String())
 			return v.visitUserFallback(actx, opt...)
 		}
 		actx.pushCall(inst)
 		//分析的当前值相同，说明进来就是当前值
 		if ValueCompare(v, actx.Self) {
-			log.Infof("value analysis: (call instruction) caller is self")
+			log.Debugf("value analysis: (call instruction) caller is self")
 			return v.visitUserFallback(actx, opt...)
 		}
 		existed := map[int64]struct{}{}

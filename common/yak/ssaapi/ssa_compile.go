@@ -89,7 +89,7 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 	// path is empty, use language or YakLang as default
 	if c.SelectedLanguageBuilder == nil {
 		c.LanguageBuilder = LanguageBuilders[Yak]
-		log.Infof("use default language [%s] for empty path", Yak)
+		log.Debugf("use default language [%s] for empty path", Yak)
 	} else {
 		c.LanguageBuilder = c.SelectedLanguageBuilder
 	}

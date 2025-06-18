@@ -33,7 +33,7 @@ func DeleteInst(i Instruction) {
 
 	b := i.GetBlock()
 	if b == nil {
-		log.Infof("void block!! %s:%s", i, i.GetRange())
+		log.Debugf("void block!! %s:%s", i, i.GetRange())
 		return
 	}
 	if phi, ok := ToPhi(i); ok {

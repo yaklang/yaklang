@@ -372,7 +372,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			}
 			calledInstance, ok := ssa.ToCall(called.innerValue)
 			if !ok {
-				log.Infof("BUG: Parameter getCalledByValue called is not callInstruction %s", called.GetOpcode())
+				log.Debugf("BUG: Parameter getCalledByValue called is not callInstruction %s", called.GetOpcode())
 				return Values{}
 			}
 			var actualParam ssa.Value
@@ -389,7 +389,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			} else {
 				// parameter
 				if inst.FormalParameterIndex >= len(calledInstance.Args) {
-					log.Infof("formal parameter index: %d is out of range", inst.FormalParameterIndex)
+					log.Debugf("formal parameter index: %d is out of range", inst.FormalParameterIndex)
 					return getMemberCall(i, i.innerValue, actx)
 				}
 				actualParam = calledInstance.Args[inst.FormalParameterIndex]
