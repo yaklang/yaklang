@@ -196,7 +196,7 @@ func init() {
 			}
 			call, isCall := ssa.ToCall(value)
 			if isCall {
-				getRoot(call.Method)
+				getRoot(call.GetValueById(call.Method))
 				return
 			}
 			obj := value.GetObject()
