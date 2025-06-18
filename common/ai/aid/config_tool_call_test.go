@@ -10,7 +10,10 @@ import (
 	"time"
 )
 
-func TestAccc(t *testing.T) {
+func TestLocalUserCancel(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip("Github Actions")
+	}
 	for i := 0; i < 10; i++ {
 		TestConfig_EmitToolCallUserCancel(t)
 	}
