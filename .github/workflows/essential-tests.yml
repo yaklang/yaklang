@@ -271,6 +271,11 @@ jobs:
               go test -timeout 1m ./common/ai/rag
 
     steps:
+      - name: "Checkout"
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
       - name: Cache YakLang Project
         uses: actions/cache/restore@v3
         id: cache-project
