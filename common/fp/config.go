@@ -611,6 +611,18 @@ func WithWebFingerprintRule(rs ...any) ConfigOption {
 	}
 }
 
+// service servicescan 的配置选项，用于指定指纹库中的指纹组。
+// @return {ConfigOption} 返回配置选项
+// Example:
+// ```
+// result,err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.withRuleGroup("group1","group2")) // 使用"group1"和"group2"指纹组的指纹进行扫描
+// die(err) // 如果错误非空则报错
+// for res := range result { // 通过遍历管道的形式获取管道中的结果，一旦有结果返回就会执行循环体的代码
+//
+//	   println(res.String()) // 输出结果，调用String方法获取可读字符串
+//	}
+//
+// ```
 func WithFingerprintRuleGroup(groups ...string) ConfigOption {
 	rules, err := yakit.QueryGeneralRuleByGroup(consts.GetGormProfileDatabase(), groups...)
 	if err != nil {
@@ -628,6 +640,18 @@ func WithFingerprintRuleGroup(groups ...string) ConfigOption {
 	}
 }
 
+// service servicescan 的配置选项，用于指定使用指纹组的全部指纹。
+// @return {ConfigOption} 返回配置选项
+// Example:
+// ```
+// result,err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.withRuleGroupAll()) // 使用全部指纹组的指纹进行扫描
+// die(err) // 如果错误非空则报错
+// for res := range result { // 通过遍历管道的形式获取管道中的结果，一旦有结果返回就会执行循环体的代码
+//
+//	   println(res.String()) // 输出结果，调用String方法获取可读字符串
+//	}
+//
+// ```
 func WithFingerprintRuleGroupAll() ConfigOption {
 	rules, err := yakit.QueryGeneralRuleFast(consts.GetGormProfileDatabase(), &ypb.FingerprintFilter{})
 	if err != nil {

@@ -1636,7 +1636,7 @@ func Do(method string, urlStr string, opts ...PocConfigOption) (rspInst *lowhttp
 // 关于结构体中的可用字段和方法可以使用 desc 函数进行查看
 // Example:
 // ```
-// poc.Get("https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的GET请求
+// rsp,req = poc.Get("https://yaklang.com", poc.https(true))~ // 向yaklang.com发送一个基于HTTPS协议的GET请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
 func DoGET(urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
@@ -1647,7 +1647,7 @@ func DoGET(urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpResp
 // 关于结构体中的可用字段和方法可以使用 desc 函数进行查看
 // Example:
 // ```
-// poc.Post("https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的POST请求
+// rsp,req = poc.Post("https://yaklang.com", poc.https(true))~ // 向yaklang.com发送一个基于HTTPS协议的POST请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
 func DoPOST(urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
@@ -1658,7 +1658,7 @@ func DoPOST(urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpRes
 // 关于结构体中的可用字段和方法可以使用 desc 函数进行查看
 // Example:
 // ```
-// poc.Head("https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的HEAD请求
+// rsp,req = poc.Head("https://yaklang.com", poc.https(true))~ // 向yaklang.com发送一个基于HTTPS协议的HEAD请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
 func DoHEAD(urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
@@ -1669,7 +1669,7 @@ func DoHEAD(urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpRes
 // 关于结构体中的可用字段和方法可以使用 desc 函数进行查看
 // Example:
 // ```
-// poc.Delete("https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的DELETE请求
+// rsp,req = poc.Delete("https://yaklang.com", poc.https(true))~ // 向yaklang.com发送一个基于HTTPS协议的DELETE请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
 func DoDELETE(urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
@@ -1680,7 +1680,7 @@ func DoDELETE(urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpR
 // 关于结构体中的可用字段和方法可以使用 desc 函数进行查看
 // Example:
 // ```
-// poc.Options("https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的Options请求
+// rsp,req = poc.Options("https://yaklang.com", poc.https(true))~ // 向yaklang.com发送一个基于HTTPS协议的Options请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
 func DoOPTIONS(urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
