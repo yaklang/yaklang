@@ -9,56 +9,85 @@
         "信息不足时：选择require-user-interact，询问关键缺失信息",
         "信息充足时：选择plan，直接制定任务分解计划"
       ],
-      "description": "选择当前操作类型。如果信息不足无法制定完整计划，选择'require-user-interact'询问用户；如果信息充足可以直接制定任务计划，选择'plan'。"
+      "description": "决定下一步行动：如果基于当前信息足以制定详细计划，则选择 'plan'；如果信息不足，需要用户补充关键信息才能继续，则选择 'require-user-interact'。"
     },
     "question": {
       "type": "string",
-      "description": "【仅当@action为require-user-interact时生效】向用户提出的具体问题，用于获取制定计划所需的关键信息。问题应该明确、具体，避免模糊表达。"
+      "description": "【仅当 `@action` 为 'require-user-interact' 时填写】向用户提出的具体问题。此问题旨在获取那些**缺失的、且对于制定有效计划至关重要**的关键信息。确保问题明确、具体，直指所需信息点，避免含糊不清。"
     },
     "options": {
+      "type": "object",
+      "description": "【仅当 `@action` 为 'require-user-interact' 时填写】为用户提供的一组预设选项，以帮助用户快速、准确地回答 `question` 中提出的问题。设计选项时应确保它们**清晰、互斥，并尽可能覆盖用户可能的主要回答方向**。",
+      "items": {
         "type": "object",
-        "description": "【仅当@action为require-user-interact时使用】为用户提供的选择选项，帮助用户快速回答问题。每个选项应该清晰、互斥且涵盖主要可能性。",
-        "items": {
-            "type": "object",
-            "required": ["option_name", "option_description"],
-            "properties": {
-                "option_name": {
-                    "type": "string",
-                    "description": "选项名称，简洁明了地描述选项内容，长度控制在10个字以内。单个选项的完整描述，格式：'选项名称：详细说明'"
-                },
-                "option_description": {
-                    "type": "string",
-                    "description": "选项的详细说明，提供足够的信息帮助用户理解选项的含义和用途。"
-                }
-            }
+        "required": ["option_name", "option_description"],
+        "properties": {
+          "option_name": {
+            "type": "string",
+            "description": "选项的**简洁名称或标签**，用于在用户界面上展示。应确保其高度概括选项核心内容，**长度建议控制在10个汉字（或等效字符数）以内**，力求一目了然。"
+          },
+          "option_description": {
+            "type": "string",
+            "description": "对 `option_name` 的详细解释和补充说明。此描述应提供充足的上下文信息，帮助用户**准确理解该选项的具体含义、潜在影响或选择该选项的理由**。"
+          }
         }
+      }
     },
     "main_task": {
       "type": "string",
-      "description": "【仅当@action为plan时必填】将用户原始需求重新表述为清晰、具体、可执行的主任务描述。使用动词开头，明确说明要做什么。"
+      "description": "【仅当 `@action` 为 'plan' 时必填】对用户原始需求进行提炼和重述，形成一个**清晰、具体、且可直接执行的主任务**。应以**动词开头**，明确指出核心行动，例如：'创建一个营销活动计划' 或 '分析用户流失数据'。"
     },
     "main_task_goal": {
       "type": "string",
-      "description": "【仅当@action为plan时必填】总任务的目标和完成标准。必须明确描述：1）任务执行到什么程度才算完成；2）具体的成功衡量指标；3）预期的最终交付成果。避免模糊表述，提供可验证的完成标准。"
+      "description": "【仅当 `@action` 为 'plan' 时必填】定义主任务的最终目标及衡量其完成的明确标准。**必须清晰、无歧义地阐述以下三点**：1）**完成状态**：任务推进到何种程度可被视为已完成？2）**成功指标**：用哪些具体的、可量化的指标来评估任务是否成功达成目标？3）**交付成果**：任务完成后，预期的最终产出或交付物是什么？目标是提供一个**可验证的、客观的完成基准**。"
     },
     "tasks": {
       "type": "array",
-      "description": "【仅当@action为plan时必填】将主任务分解为有序的子任务列表。子任务应该逻辑清晰、相互独立、可并行或顺序执行。",
+      "description": "【仅当 `@action` 为 'plan' 时必填】将 `main_task` 分解成一系列具体的、可操作的子任务步骤。这个列表应**有序排列**（指明执行顺序或依赖关系）。每个子任务应设计为：**逻辑清晰**，**尽可能相互独立**（以便于并行处理或分工），并且共同服务于 `main_task_goal` 的达成。",
       "items": {
         "type": "object",
         "required": ["subtask_name", "subtask_goal"],
         "properties": {
           "subtask_name": {
             "type": "string",
-            "description": "子任务的简洁名称，使用动词+名词的格式（如'设计界面'、'编写代码'），长度控制在20个字内，便于引用和跟踪。",
+            "description": "子任务的简洁、概括性名称。**强烈推荐采用‘动词+名词’的格式**（例如：'设计用户调研问卷'、'部署测试环境'），以便清晰表达子任务的核心动作和对象。**长度建议控制在20个汉字（或等效字符数）以内**，以方便在任务管理和沟通中引用与追踪。",
             "minLength": 1
           },
           "subtask_goal": {
             "type": "string",
-            "description": "子任务的具体目标和完成标准。必须包含：1）明确的完成条件（什么情况下认为任务完成）；2）具体的输出要求或交付物；3）可量化的成功指标。例如：'获取到目标的A记录和AAAA记录IP地址列表'而非'收集域名信息'。避免使用'进一步分析'、'补充信息'等模糊表述。",
+            "description": "定义该子任务的具体目标和衡量其完成的明确标准。**必须清晰、无歧义地阐述以下三点**：1）**完成条件**：在什么具体情况下可以认定此子任务已完成？2）**交付物/输出要求**：此子任务完成后，应产出哪些具体的成果或达到哪些明确的输出标准？3）**成功指标（若适用）**：如果可能，提供可量化的指标来衡量子任务的完成质量。**目标是确保每个子任务都有一个明确、可验证的终点。** 例如，应描述为‘生成包含至少三个设计方案的初步设计稿’，而非‘进行初步设计’。避免使用如‘进一步分析’、‘收集相关信息’等缺乏明确完成标志的模糊描述。",
             "minLength": 1
           }
         }
+      }
+    }
+  },
+  "example_for_plan": {
+    "@action": "plan",
+    "main_task": "优化用户输入的任务描述",
+    "main_task_goal": "确保任务描述清晰、具体，便于后续执行和跟踪",
+    "tasks": [
+      {
+        "subtask_name": "分析用户输入",
+        "subtask_goal": "提取出用户输入中的关键信息和需求"
+      },
+      {
+        "subtask_name": "优化任务描述",
+        "subtask_goal": "将用户输入改写为更清晰、具体的任务描述"
+      }
+    ]
+  },
+  "example_for_require-user-interact": {
+    "@action": "require-user-interact",
+    "question": "请提供更多关于任务的具体细节，例如目标、范围和预期结果。",
+    "options": {
+      "option1": {
+        "option_name": "目标明确",
+        "option_description": "任务的目标和预期结果已经清晰定义"
+      },
+      "option2": {
+        "option_name": "需要更多信息",
+        "option_description": "需要用户提供更多细节才能制定计划"
       }
     }
   }
