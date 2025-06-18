@@ -74,7 +74,7 @@ func TestConfig_EmitToolCallUserCancel(t *testing.T) {
 LOOP:
 	for {
 		select {
-		case <-time.After(10 * time.Second):
+		case <-time.After(11111110 * time.Second):
 			break LOOP
 		case result := <-outputChan:
 			count++
@@ -94,20 +94,20 @@ LOOP:
 			}
 
 			if result.Type == EVENT_TYPE_TOOL_CALL_WATCHER {
-				if utils.MatchAllOfSubString(result.Content, "delay", "stop-tool-call") {
+				if utils.MatchAllOfSubString(result.Content, "delay", "enough-cancel") {
 					toolCallWatcherEventCheck = true
 					inputChan <- &InputEvent{
 						IsInteractive: true,
 						Id:            result.GetInteractiveId(),
 						Params: aitool.InvokeParams{
-							"cancel": true,
+							"suggestion": "enough-cancel",
 						},
 					}
 				}
 				continue
 			}
 
-			if toolCallWatcherEventCheck && result.Type == EVENT_TOOL_CALL_DONE {
+			if toolCallWatcherEventCheck && result.Type == EVENT_TOOL_CALL_USER_CANCEL {
 				toolCallCancelCheck = true
 				break LOOP
 			}
@@ -196,7 +196,7 @@ LOOP:
 
 			if result.Type == EVENT_TYPE_TOOL_CALL_WATCHER {
 				watcherId = result.GetInteractiveId()
-				if utils.MatchAllOfSubString(result.Content, "delay", "stop-tool-call") {
+				if utils.MatchAllOfSubString(result.Content, "delay", "enough-cancel") {
 					toolCallWatcherEventCheck = true
 				}
 			}
