@@ -986,7 +986,7 @@ func (m *MixPluginCaller) GetNativeCaller() *YakToCallerManager {
 func (m *MixPluginCaller) CallAnalyzeHTTPFlow(
 	runtimeCtx context.Context,
 	flow *schema.HTTPFlow,
-	extract func(ruleName string, httpFlow *schema.HTTPFlow),
+	extract func(ruleName string, httpFlow *schema.HTTPFlow, content ...string),
 ) {
 	if m.callers.ShouldCallByName(HOOK_Analyze_HTTPFlow) {
 		m.callers.Call(
