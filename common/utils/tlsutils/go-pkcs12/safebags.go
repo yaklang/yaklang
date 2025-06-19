@@ -6,10 +6,13 @@
 package pkcs12
 
 import (
+	"crypto/dsa"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
 	"io"
+	"math/big"
 )
 
 var (
@@ -18,7 +21,25 @@ var (
 	oidKeyBag                  = asn1.ObjectIdentifier([]int{1, 2, 840, 113549, 1, 12, 10, 1, 1})
 	oidPKCS8ShroundedKeyBag    = asn1.ObjectIdentifier([]int{1, 2, 840, 113549, 1, 12, 10, 1, 2})
 	oidCertBag                 = asn1.ObjectIdentifier([]int{1, 2, 840, 113549, 1, 12, 10, 1, 3})
+	oidDSA                     = asn1.ObjectIdentifier([]int{1, 2, 840, 10040, 4, 1}) // DSA OID
 )
+
+// DSA私钥PKCS8结构
+type pkcs8DSAPrivateKey struct {
+	Version    int
+	Algorithm  pkix.AlgorithmIdentifier
+	PrivateKey []byte
+}
+
+// DSA参数结构
+type dsaAlgorithmParameters struct {
+	P, Q, G *big.Int
+}
+
+// DSA私钥结构
+type dsaPrivateKey struct {
+	X *big.Int
+}
 
 type certBag struct {
 	Id   asn1.ObjectIdentifier
@@ -36,16 +57,55 @@ func decodePkcs8ShroudedKeyBag(asn1Data, password []byte) (privateKey interface{
 		return nil, errors.New("pkcs12: error decrypting PKCS#8 shrouded key bag: " + err.Error())
 	}
 
-	ret := new(asn1.RawValue)
-	if err = unmarshal(pkData, ret); err != nil {
-		return nil, errors.New("pkcs12: error unmarshaling decrypted private key: " + err.Error())
-	}
-
-	if privateKey, err = x509.ParsePKCS8PrivateKey(pkData); err != nil {
+	// 先尝试标准解析
+	privateKey, err = x509.ParsePKCS8PrivateKey(pkData)
+	if err != nil {
+		// 检查是否是DSA错误
+		if err.Error() == "x509: PKCS#8 wrapping contained private key with unknown algorithm: 1.2.840.10040.4.1" {
+			return parseDSAPrivateKey(pkData)
+		}
 		return nil, errors.New("pkcs12: error parsing PKCS#8 private key: " + err.Error())
 	}
 
 	return privateKey, nil
+}
+
+// 解析DSA私钥
+func parseDSAPrivateKey(data []byte) (*dsa.PrivateKey, error) {
+	var privKey pkcs8DSAPrivateKey
+	if _, err := asn1.Unmarshal(data, &privKey); err != nil {
+		return nil, errors.New("pkcs12: error unmarshaling DSA private key: " + err.Error())
+	}
+
+	if !privKey.Algorithm.Algorithm.Equal(oidDSA) {
+		return nil, errors.New("pkcs12: not a DSA private key")
+	}
+
+	// 解析DSA参数
+	var params dsaAlgorithmParameters
+	if _, err := asn1.Unmarshal(privKey.Algorithm.Parameters.FullBytes, &params); err != nil {
+		return nil, errors.New("pkcs12: error unmarshaling DSA parameters: " + err.Error())
+	}
+
+	// 从私钥字节中提取X值（简单处理，不需要复杂的ASN.1解析）
+	x := new(big.Int).SetBytes(privKey.PrivateKey)
+
+	// 构造DSA私钥
+	key := &dsa.PrivateKey{
+		PublicKey: dsa.PublicKey{
+			Parameters: dsa.Parameters{
+				P: params.P,
+				Q: params.Q,
+				G: params.G,
+			},
+		},
+		X: x,
+	}
+
+	// 计算Y值
+	key.Y = new(big.Int).Exp(key.Parameters.G, key.X, key.Parameters.P)
+
+	return key, nil
 }
 
 func encodePkcs8ShroudedKeyBag(rand io.Reader, privateKey interface{}, algoID asn1.ObjectIdentifier, password []byte, iterations int, saltLen int) (asn1Data []byte, err error) {

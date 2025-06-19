@@ -6,6 +6,7 @@ package pkcs12
 
 import (
 	"bytes"
+	"crypto/md5"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
@@ -19,6 +20,12 @@ var (
 // sha1Sum returns the SHA-1 hash of in.
 func sha1Sum(in []byte) []byte {
 	sum := sha1.Sum(in)
+	return sum[:]
+}
+
+// md5Sum returns the MD5 hash of in.
+func md5Sum(in []byte) []byte {
+	sum := md5.Sum(in)
 	return sum[:]
 }
 
