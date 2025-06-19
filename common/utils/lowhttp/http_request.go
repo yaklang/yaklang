@@ -39,6 +39,13 @@ func HTTPPacketForceChunked(raw []byte) []byte {
 	return ReplaceHTTPPacketBodyEx([]byte(header), body, true, false)
 }
 
+func HTTPHeaderForceChunked(raw []byte) []byte {
+	header, body := SplitHTTPHeadersAndBodyFromPacket(raw)
+	newPacket := ReplaceHTTPPacketBodyEx([]byte(header), body, true, false)
+	newHeader, _ := SplitHTTPHeadersAndBodyFromPacket(newPacket)
+	return []byte(newHeader + string(body))
+}
+
 func AppendHeaderToHTTPPacket(raw []byte, line string) []byte {
 	header, body := SplitHTTPHeadersAndBodyFromPacket(raw)
 	header = strings.TrimRight(header, "\r\n") + CRLF + strings.TrimSpace(line) + CRLF + CRLF

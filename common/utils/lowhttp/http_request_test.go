@@ -611,3 +611,94 @@ func TestHTTPPacketCRLF_EmptyResult(t *testing.T) {
 	as := FixHTTPPacketCRLF(nil, true)
 	spew.Dump(as)
 }
+
+func TestHTTPHeaderForceChunked(t *testing.T) {
+	// 测试将Content-Length转换为chunked传输编码
+	t.Run("Content-Length to chunked", func(t *testing.T) {
+		rawRequest := `POST /api/test HTTP/1.1
+Host: example.com
+Content-Type: application/json
+Content-Length: 17
+
+{"message":"test"}`
+
+		result := HTTPHeaderForceChunked([]byte(rawRequest))
+		resultStr := string(result)
+
+		// 验证Transfer-Encoding: chunked存在
+		require.Contains(t, resultStr, "Transfer-Encoding: chunked", "should have Transfer-Encoding: chunked")
+
+		// 验证Content-Length不存在
+		require.NotContains(t, resultStr, "Content-Length:", "should not contain Content-Length")
+
+		// 验证body保持不变
+		require.Contains(t, resultStr, `{"message":"test"}`, "body should be preserved")
+
+		// 验证其他头部保持不变
+		require.Contains(t, resultStr, "Host: example.com", "Host header should be preserved")
+		require.Contains(t, resultStr, "Content-Type: application/json", "Content-Type header should be preserved")
+	})
+
+	// 测试已经是chunked的情况
+	t.Run("Already chunked", func(t *testing.T) {
+		rawRequest := `POST /api/test HTTP/1.1
+Host: example.com
+Transfer-Encoding: chunked
+
+test data`
+
+		result := HTTPHeaderForceChunked([]byte(rawRequest))
+		resultStr := string(result)
+
+		// 验证Transfer-Encoding: chunked存在
+		require.Contains(t, resultStr, "Transfer-Encoding: chunked", "should have Transfer-Encoding: chunked")
+
+		// 验证body保持不变
+		require.Contains(t, resultStr, "test data", "body should be preserved")
+	})
+
+	// 测试空body
+	t.Run("Empty body", func(t *testing.T) {
+		rawRequest := `GET /api/test HTTP/1.1
+Host: example.com
+Content-Length: 0
+
+`
+
+		result := HTTPHeaderForceChunked([]byte(rawRequest))
+		resultStr := string(result)
+
+		// 验证Transfer-Encoding: chunked存在
+		require.Contains(t, resultStr, "Transfer-Encoding: chunked", "should have Transfer-Encoding: chunked")
+
+		// 验证Content-Length不存在
+		require.NotContains(t, resultStr, "Content-Length:", "should not contain Content-Length")
+	})
+
+	// 测试multipart body
+	t.Run("Multipart body", func(t *testing.T) {
+		rawRequest := `POST /upload HTTP/1.1
+Host: example.com
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary
+Content-Length: 145
+
+------WebKitFormBoundary
+Content-Disposition: form-data; name="file"; filename="test.txt"
+
+file content
+------WebKitFormBoundary--`
+
+		result := HTTPHeaderForceChunked([]byte(rawRequest))
+		resultStr := string(result)
+
+		// 验证Transfer-Encoding: chunked存在
+		require.Contains(t, resultStr, "Transfer-Encoding: chunked", "should have Transfer-Encoding: chunked")
+
+		// 验证Content-Length不存在
+		require.NotContains(t, resultStr, "Content-Length:", "should not contain Content-Length")
+
+		// 验证multipart内容保持不变
+		require.Contains(t, resultStr, "------WebKitFormBoundary", "multipart boundary should be preserved")
+		require.Contains(t, resultStr, "file content", "file content should be preserved")
+	})
+}
