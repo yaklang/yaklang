@@ -123,7 +123,7 @@ func (c *Blueprint) addParentBlueprintEx(parent *Blueprint, relation BlueprintRe
 	if parent == nil || c == nil {
 		return
 	}
-	if relation == BlueprintRelationParents {
+	if relation == BlueprintRelationParents || relation == BlueprintRelationInterface {
 		isExist := false
 		c.getFieldWithParent(func(bluePrint *Blueprint) bool {
 			if bluePrint == parent {
