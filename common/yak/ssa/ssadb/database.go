@@ -28,6 +28,9 @@ var SSAProjectTables = []any{
 
 	// report
 	&schema.ReportRecord{},
+
+	//diff result
+	&schema.SSADiffResult{},
 }
 
 func init() {

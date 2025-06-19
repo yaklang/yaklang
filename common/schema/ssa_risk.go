@@ -78,6 +78,9 @@ func SSARiskTypeVerbose(s string) string {
 	}
 }
 func (s *SSARisk) ToGRPCModel() *ypb.SSARisk {
+	if utils.IsNil(s) {
+		return new(ypb.SSARisk)
+	}
 	return &ypb.SSARisk{
 		Id:                  int64(s.ID),
 		CreatedAt:           s.CreatedAt.Unix(),
