@@ -2,8 +2,8 @@ package ssa
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+
 	"golang.org/x/exp/slices"
 )
 

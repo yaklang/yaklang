@@ -2,8 +2,6 @@ package ssa
 
 import (
 	"fmt"
-
-	"github.com/yaklang/yaklang/common/log"
 )
 
 func (f *Function) GetDeferBlock() *BasicBlock {

@@ -8,7 +8,6 @@ import (
 
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/slices"

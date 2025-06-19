@@ -1,9 +1,5 @@
 package ssa
 
-import (
-	"github.com/yaklang/yaklang/common/log"
-)
-
 type LanguageConfigOpt func(config *LanguageConfig)
 
 func (b *FunctionBuilder) SetLanguageConfig(opts ...LanguageConfigOpt) {

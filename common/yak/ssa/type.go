@@ -6,8 +6,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/yaklang/yaklang/common/log"
-
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/slices"

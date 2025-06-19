@@ -3,10 +3,13 @@ package ssareducer
 import (
 	"context"
 	"embed"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssalog"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
+
+var log = ssalog.Log
 
 type (
 	compileMethod func(string, string) ([]string, error)
