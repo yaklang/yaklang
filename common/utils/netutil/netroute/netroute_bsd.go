@@ -15,6 +15,7 @@ package netroute
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"net"
 	"sort"
 	"syscall"
@@ -23,14 +24,14 @@ import (
 	"golang.org/x/net/route"
 )
 
-func toIPAddr(a route.Addr) (net.IP, error) {
+func toIPAddr(a syscall.Sockaddr) (net.IP, error) {
 	switch t := a.(type) {
-	case *route.Inet4Addr:
-		ip := net.IPv4(t.IP[0], t.IP[1], t.IP[2], t.IP[3])
+	case *syscall.SockaddrInet4:
+		ip := net.IPv4(t.Addr[0], t.Addr[1], t.Addr[2], t.Addr[3])
 		return ip, nil
-	case *route.Inet6Addr:
+	case *syscall.SockaddrInet6:
 		ip := make(net.IP, net.IPv6len)
-		copy(ip, t.IP[:])
+		copy(ip, t.Addr[:])
 		return ip, nil
 	default:
 		return net.IP{}, fmt.Errorf("unknown family: %v", t)
@@ -50,6 +51,7 @@ const (
 	RTF_LOCAL     = 0x200000
 	RTF_BROADCAST = 0x400000
 	RTF_MULTICAST = 0x800000
+	RTF_IFSCOPE   = 0x1000000
 )
 
 func New() (routing.Router, error) {
@@ -60,68 +62,74 @@ func New() (routing.Router, error) {
 	if err != nil {
 		return nil, err
 	}
-	msgs, err := route.ParseRIB(route.RIBTypeRoute, tab)
+	msgs, err := syscall.ParseRoutingMessage(tab)
 	if err != nil {
 		return nil, err
 	}
 	var ipn *net.IPNet
 	for _, msg := range msgs {
-		m := msg.(*route.RouteMessage)
+		m := msg.(*syscall.RouteMessage)
 		// We ignore the error (m.Err) here. It's not clear what this error actually means,
 		// and it makes us miss routes that _should_ be included.
 		routeInfo := new(rtInfo)
-
-		if m.Version < 3 || m.Version > 5 {
-			return nil, fmt.Errorf("unexpected RIB message version: %d", m.Version)
+		if int(m.Header.Version) < 3 || m.Header.Version > 5 {
+			return nil, fmt.Errorf("unexpected RIB message version: %d", m.Header.Type)
 		}
-		if m.Type != 4 /* RTM_GET */ {
-			return nil, fmt.Errorf("unexpected RIB message type: %d", m.Type)
-		}
-
-		if m.Flags&RTF_UP == 0 ||
-			m.Flags&(RTF_REJECT|RTF_BLACKHOLE) != 0 {
+		if m.Header.Type != syscall.RTM_ADD && m.Header.Type != syscall.RTM_GET { // 修正为检查 RTM_ADD 和 RTM_GET
+			log.Debugf("Unexpected RIB message type: %d, skipping.", m.Header.Type)
 			continue
 		}
-
-		dst, err := toIPAddr(m.Addrs[0])
+		if m.Header.Flags&RTF_UP == 0 ||
+			m.Header.Flags&(RTF_REJECT|RTF_BLACKHOLE) != 0 {
+			continue
+		}
+		sockaddrs, err := syscall.ParseRoutingSockaddr(m)
+		if err != nil {
+			log.Debugf("Failed to parse Sockaddrs from RouteMessage data: %v, skipping. Message: %+v", err, m)
+			continue
+		}
+		routeInfo.Priority = m.Header.Rmx.Hopcount
+		dst, err := toIPAddr(sockaddrs[0])
 		if err == nil {
-			mask, _ := toIPAddr(m.Addrs[2])
+			mask, _ := toIPAddr(sockaddrs[2])
 			if mask == nil {
 				mask = net.IP(net.CIDRMask(0, 8*len(dst)))
 			}
 			ipn = &net.IPNet{IP: dst, Mask: net.IPMask(mask)}
-			if m.Flags&RTF_HOST != 0 {
+			if m.Header.Flags&RTF_HOST != 0 {
 				ipn.Mask = net.CIDRMask(8*len(ipn.IP), 8*len(ipn.IP))
+			}
+			if m.Header.Flags&RTF_IFSCOPE != 0 {
+				routeInfo.IsScoped = true
 			}
 			routeInfo.Dst = ipn
 		} else {
 			return nil, fmt.Errorf("unexpected RIB destination: %v", err)
 		}
-
-		if m.Flags&RTF_GATEWAY != 0 {
-			if gw, err := toIPAddr(m.Addrs[1]); err == nil {
+		if m.Header.Flags&RTF_GATEWAY != 0 {
+			if gw, err := toIPAddr(sockaddrs[1]); err == nil {
 				routeInfo.Gateway = gw
 			}
 		}
-		if src, err := toIPAddr(m.Addrs[5]); err == nil {
+		if src, err := toIPAddr(sockaddrs[5]); err == nil {
 			ipn = &net.IPNet{IP: src, Mask: net.CIDRMask(8*len(src), 8*len(src))}
 			routeInfo.Src = ipn
 			routeInfo.PrefSrc = src
-			if m.Flags&0x2 != 0 /* RTF_GATEWAY */ {
+			if m.Header.Flags&0x2 != 0 /* RTF_GATEWAY */ {
 				routeInfo.Src.Mask = net.CIDRMask(0, 8*len(routeInfo.Src.IP))
 			}
 		}
-		routeInfo.OutputIface = uint32(m.Index)
-		switch m.Addrs[0].(type) {
-		case *route.Inet4Addr:
-			if routeInfo.Dst.Contains(net.ParseIP("0.0.0.0")) {
-				rtr.defaultRouteV4 = routeInfo
+		routeInfo.OutputIface = uint32(m.Header.Index)
+		switch sockaddrs[0].(type) {
+		case *syscall.SockaddrInet4:
+			if routeInfo.Dst.IP.Equal(net.ParseIP("0.0.0.0")) {
+				rtr.defaultRouteV4 = append(rtr.defaultRouteV4, routeInfo)
 				continue
 			}
 			rtr.v4 = append(rtr.v4, routeInfo)
-		case *route.Inet6Addr:
-			if routeInfo.Dst.Contains(net.ParseIP("::")) {
-				rtr.defaultRouteV6 = routeInfo
+		case *syscall.SockaddrInet6:
+			if routeInfo.Dst.IP.Equal(net.ParseIP("::")) {
+				rtr.defaultRouteV6 = append(rtr.defaultRouteV6, routeInfo)
 				continue
 			}
 			rtr.v6 = append(rtr.v6, routeInfo)
