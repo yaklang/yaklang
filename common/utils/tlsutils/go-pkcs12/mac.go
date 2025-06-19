@@ -7,6 +7,7 @@ package pkcs12
 
 import (
 	"crypto/hmac"
+	"crypto/md5"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
@@ -31,6 +32,7 @@ var (
 	oidSHA1   = asn1.ObjectIdentifier([]int{1, 3, 14, 3, 2, 26})
 	oidSHA256 = asn1.ObjectIdentifier([]int{2, 16, 840, 1, 101, 3, 4, 2, 1})
 	oidSHA512 = asn1.ObjectIdentifier([]int{2, 16, 840, 1, 101, 3, 4, 2, 3})
+	oidMD5    = asn1.ObjectIdentifier([]int{1, 2, 840, 113549, 2, 5})
 )
 
 func doMac(macData *macData, message, password []byte) ([]byte, error) {
@@ -46,6 +48,9 @@ func doMac(macData *macData, message, password []byte) ([]byte, error) {
 	case macData.Mac.Algorithm.Algorithm.Equal(oidSHA512):
 		hFn = sha512.New
 		key = pbkdf(sha512Sum, 64, 128, macData.MacSalt, password, macData.Iterations, 3, 64)
+	case macData.Mac.Algorithm.Algorithm.Equal(oidMD5):
+		hFn = md5.New
+		key = pbkdf(md5Sum, 16, 64, macData.MacSalt, password, macData.Iterations, 3, 16)
 	default:
 		return nil, NotImplementedError("MAC digest algorithm not supported: " + macData.Mac.Algorithm.Algorithm.String())
 	}

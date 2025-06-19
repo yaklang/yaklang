@@ -10,6 +10,8 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/des"
+	"crypto/md5"
+	"crypto/rc4"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
@@ -26,6 +28,7 @@ import (
 
 var (
 	oidPBEWithSHAAnd3KeyTripleDESCBC = asn1.ObjectIdentifier([]int{1, 2, 840, 113549, 1, 12, 1, 3})
+	oidPBEWithSHAAnd128BitRC4        = asn1.ObjectIdentifier([]int{1, 2, 840, 113549, 1, 12, 1, 1})
 	oidPBEWithSHAAnd128BitRC2CBC     = asn1.ObjectIdentifier([]int{1, 2, 840, 113549, 1, 12, 1, 5})
 	oidPBEWithSHAAnd40BitRC2CBC      = asn1.ObjectIdentifier([]int{1, 2, 840, 113549, 1, 12, 1, 6})
 	oidPBEWithSHAAndDES              = asn1.ObjectIdentifier([]int{1, 2, 840, 113549, 1, 5, 10})
@@ -34,6 +37,7 @@ var (
 	oidHmacWithSHA1                  = asn1.ObjectIdentifier([]int{1, 2, 840, 113549, 2, 7})
 	oidHmacWithSHA256                = asn1.ObjectIdentifier([]int{1, 2, 840, 113549, 2, 9})
 	oidHmacWithSHA512                = asn1.ObjectIdentifier([]int{1, 2, 840, 113549, 2, 11})
+	oidHmacWithMD5                   = asn1.ObjectIdentifier([]int{1, 2, 840, 113549, 2, 5})
 	oidAES128CBC                     = asn1.ObjectIdentifier([]int{2, 16, 840, 1, 101, 3, 4, 1, 2})
 	oidAES192CBC                     = asn1.ObjectIdentifier([]int{2, 16, 840, 1, 101, 3, 4, 1, 22})
 	oidAES256CBC                     = asn1.ObjectIdentifier([]int{2, 16, 840, 1, 101, 3, 4, 1, 42})
@@ -91,6 +95,25 @@ func (shaWith40BitRC2CBC) deriveIV(salt, password []byte, iterations int) []byte
 	return pbkdf(sha1Sum, 20, 64, salt, password, iterations, 2, 8)
 }
 
+type shaWith128BitRC4 struct{}
+
+func (shaWith128BitRC4) create(key []byte) (cipher.Block, error) {
+	// 由于RC4是流密码而非块密码，我们返回一个特殊标记
+	return nil, nil
+}
+
+func (shaWith128BitRC4) deriveKey(salt, password []byte, iterations int) []byte {
+	return pbkdf(sha1Sum, 20, 64, salt, password, iterations, 1, 16)
+}
+
+func (shaWith128BitRC4) deriveIV(salt, password []byte, iterations int) []byte {
+	// RC4不使用IV
+	return nil
+}
+
+// rc4CipherImpl结构不再需要
+// type rc4CipherImpl struct {}
+
 type pbeParams struct {
 	Salt       []byte
 	Iterations int
@@ -106,6 +129,8 @@ func pbeCipherFor(algorithm pkix.AlgorithmIdentifier, password []byte) (cipher.B
 		cipherType = shaWith128BitRC2CBC{}
 	case algorithm.Algorithm.Equal(oidPBEWithSHAAnd40BitRC2CBC):
 		cipherType = shaWith40BitRC2CBC{}
+	case algorithm.Algorithm.Equal(oidPBEWithSHAAnd128BitRC4):
+		cipherType = shaWith128BitRC4{}
 	case algorithm.Algorithm.Equal(oidPBEWithSHAAndDES):
 		// PKCS#5 PBE-SHA1-DES uses PBKDF1, not PKCS#12 PBKDF
 		return pbkdf1CipherFor(algorithm, password)
@@ -132,6 +157,12 @@ func pbeCipherFor(algorithm pkix.AlgorithmIdentifier, password []byte) (cipher.B
 	key := cipherType.deriveKey(params.Salt, password, params.Iterations)
 	iv := cipherType.deriveIV(params.Salt, password, params.Iterations)
 
+	// 检查是否是RC4算法
+	if algorithm.Algorithm.Equal(oidPBEWithSHAAnd128BitRC4) {
+		// RC4特殊处理，返回nil作为block，key作为数据
+		return nil, key, nil
+	}
+
 	block, err := cipherType.create(key)
 	if err != nil {
 		return nil, nil, err
@@ -146,10 +177,42 @@ func pbDecrypterFor(algorithm pkix.AlgorithmIdentifier, password []byte) (cipher
 		return nil, 0, err
 	}
 
+	// RC4特殊处理
+	if algorithm.Algorithm.Equal(oidPBEWithSHAAnd128BitRC4) {
+		// RC4不使用CBC模式，我们返回nil和特殊标记
+		return nil, -1, nil
+	}
+
 	return cipher.NewCBCDecrypter(block, iv), block.BlockSize(), nil
 }
 
 func pbDecrypt(info decryptable, password []byte) (decrypted []byte, err error) {
+	// 检查是否是RC4算法
+	if info.Algorithm().Algorithm.Equal(oidPBEWithSHAAnd128BitRC4) {
+		// RC4特殊处理
+		_, key, err := pbeCipherFor(info.Algorithm(), password)
+		if err != nil {
+			return nil, err
+		}
+
+		// 使用RC4密钥进行解密
+		encrypted := info.Data()
+		if len(encrypted) == 0 {
+			return nil, errors.New("pkcs12: empty encrypted data")
+		}
+
+		// 创建真正的RC4密码流
+		rc4Cipher, err := rc4.NewCipher(key)
+		if err != nil {
+			return nil, err
+		}
+
+		// RC4解密
+		decrypted = make([]byte, len(encrypted))
+		rc4Cipher.XORKeyStream(decrypted, encrypted)
+		return decrypted, nil
+	}
+
 	cbc, blockSize, err := pbDecrypterFor(info.Algorithm(), password)
 	if err != nil {
 		return nil, err
@@ -235,6 +298,8 @@ func pbes2CipherFor(algorithm pkix.AlgorithmIdentifier, password []byte) (cipher
 		prf = sha512.New
 	case kdfParams.Prf.Algorithm.Equal(oidHmacWithSHA1):
 		prf = sha1.New
+	case kdfParams.Prf.Algorithm.Equal(oidHmacWithMD5):
+		prf = md5.New
 	case kdfParams.Prf.Algorithm.Equal(asn1.ObjectIdentifier([]int{})):
 		prf = sha1.New
 	default:
