@@ -79,9 +79,8 @@ func (c *Config) toolCallOpts(toolCallID string, cancelHandle, resultErrHandle f
 			var execErr error
 			go func() {
 				execResult, execErr = t.ExecuteToolWithCapture(ctx, params, stdOutWriter, stdErrWriter)
-				c.ReleaseInteractiveEvent(ep.id, map[string]any{
-					"suggestion": "finish",
-				})
+				ep.ActiveWithParams(ctx, map[string]any{"suggestion": "finish"})
+				c.ReleaseInteractiveEvent(ep.id, map[string]any{"suggestion": "finish"})
 			}()
 
 			ep.WaitContext(ctx)
