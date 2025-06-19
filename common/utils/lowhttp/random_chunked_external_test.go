@@ -172,7 +172,7 @@ User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Geck
 Content-Type: application/json
 
 %s`, utils.HostPort(host, port), tt.requestBody)),
-				lowhttp.WithForceChunked(true),
+				lowhttp.WithEnableRandomChunkedChunked(true),
 				lowhttp.WithChunkedLength(tt.minChunkLength, tt.maxChunkLength),
 			}
 
