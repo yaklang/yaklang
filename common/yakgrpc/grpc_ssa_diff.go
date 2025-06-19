@@ -22,19 +22,32 @@ func (s *Server) NewSSADiff(req *ypb.SSADiffRequest, server ypb.Yak_NewSSADiffSe
 	if req.Base == nil || req.Compare == nil {
 		return utils.Error("base and compare are required")
 	}
+	if req.Base.Program == "" && req.Base.RiskRuntimeId == "" {
+		return utils.Error("base and compare are required")
+	}
+	kind := schema.Prog
+	if req.Base.Program == "" {
+		kind = schema.RuntimeId
+	}
 	taskChannel := make(chan *ssaapi.CompareResult[*schema.SSARisk], 1)
 	processor := utils.NewBatchProcessor[*ssaapi.CompareResult[*schema.SSARisk]](context, taskChannel, utils.WithBatchProcessorCallBack(func(risks []*ssaapi.CompareResult[*schema.SSARisk]) {
 		utils.GormTransactionReturnDb(consts.GetGormDefaultSSADataBase(), func(tx *gorm.DB) {
 			for _, risk := range risks {
-				tx.Save(&schema.SSADiffResult{
-					BaseProgram:     req.Base.Program,
-					CompareProgram:  req.Compare.Program,
+				result := &schema.SSADiffResult{
+					BaseItem:        req.Base.Program,
+					CompareItem:     req.Compare.Program,
 					RuleName:        risk.FromRule,
 					BaseRiskHash:    risk.BaseValHash,
 					CompareRiskHash: risk.NewValHash,
 					Status:          int(risk.Status),
 					CompareType:     int(Risk),
-				})
+					DiffResultKind:  kind,
+				}
+				if kind == schema.RuntimeId {
+					result.BaseItem = req.Base.RiskRuntimeId
+					result.CompareItem = req.Compare.RiskRuntimeId
+				}
+				tx.Save(result)
 			}
 		})
 	}),
@@ -44,14 +57,23 @@ func (s *Server) NewSSADiff(req *ypb.SSADiffRequest, server ypb.Yak_NewSSADiffSe
 	case int64(Custom):
 		return utils.Error("custom diff type not supported")
 	case int64(Risk):
-		compare := ssaapi.NewSsaCompare[*schema.SSARisk](ssaapi.NewCompareRiskItem(req.GetBase().GetProgram(),
-			ssaapi.WithVariableName(req.GetBase().GetVariable()),
-			ssaapi.WithRuleName(req.GetBase().GetRuleName()),
-		))
-		res := compare.Compare(context, ssaapi.NewCompareRiskItem(req.GetCompare().GetProgram(),
-			ssaapi.WithVariableName(req.GetCompare().GetVariable()),
-			ssaapi.WithRuleName(req.GetCompare().GetRuleName()),
-		),
+		baseItem, err := ssaapi.NewCompareRiskItem(
+			ssaapi.DiffWithVariableName(req.GetBase().GetVariable()),
+			ssaapi.DiffWithRuleName(req.GetBase().GetRuleName()),
+			ssaapi.DiffWithProgram(req.GetBase().GetProgram()),
+		)
+		if err != nil {
+			return err
+		}
+		compare := ssaapi.NewSsaCompare[*schema.SSARisk](baseItem)
+		compareItem, err := ssaapi.NewCompareRiskItem(
+			ssaapi.DiffWithVariableName(req.GetCompare().GetVariable()),
+			ssaapi.DiffWithRuleName(req.GetCompare().GetRuleName()),
+			ssaapi.DiffWithProgram(req.GetCompare().GetProgram()))
+		if err != nil {
+			return err
+		}
+		res := compare.Compare(context, compareItem,
 			ssaapi.WithCompareResultCallback(func(re *ssaapi.CompareResult[*schema.SSARisk]) {
 				taskChannel <- re
 			}),
