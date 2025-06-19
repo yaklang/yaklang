@@ -43,13 +43,14 @@ func (s *Server) GetAIToolList(ctx context.Context, req *ypb.GetAIToolListReques
 					Content:     tool.Content,
 					ToolPath:    tool.Path,
 					Keywords:    strings.Split(tool.Keywords, ","),
+					IsFavorite:  tool.IsFavorite,
 				},
 			},
 		}, nil
 	}
 
 	// Otherwise use Query for fuzzy search with pagination
-	pagination, tools, err = schema.SearchAIYakToolWithPagination(db, req.GetQuery(), req.GetPagination())
+	pagination, tools, err = schema.SearchAIYakToolWithPagination(db, req.GetQuery(), req.GetOnlyFavorites(), req.GetPagination())
 	if err != nil {
 		log.Errorf("failed to search AI tools: %s", err)
 		return &ypb.GetAIToolListResponse{
@@ -66,6 +67,7 @@ func (s *Server) GetAIToolList(ctx context.Context, req *ypb.GetAIToolListReques
 			Content:     tool.Content,
 			ToolPath:    tool.Path,
 			Keywords:    strings.Split(tool.Keywords, ","),
+			IsFavorite:  tool.IsFavorite,
 		})
 	}
 
@@ -132,5 +134,31 @@ func (s *Server) DeleteAITool(ctx context.Context, req *ypb.DeleteAIToolRequest)
 		TableName:  (&schema.AIYakTool{}).TableName(),
 		Operation:  "delete",
 		EffectRows: affected,
+	}, nil
+}
+
+func (s *Server) ToggleAIToolFavorite(ctx context.Context, req *ypb.ToggleAIToolFavoriteRequest) (*ypb.ToggleAIToolFavoriteResponse, error) {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return nil, utils.Errorf("database not initialized")
+	}
+
+	if req.GetToolName() == "" {
+		return nil, utils.Errorf("tool name cannot be empty")
+	}
+
+	isFavorite, err := schema.ToggleAIYakToolFavorite(db, req.GetToolName())
+	if err != nil {
+		return nil, utils.Errorf("failed to toggle AI tool favorite status: %s", err)
+	}
+
+	message := "Tool added to favorites"
+	if !isFavorite {
+		message = "Tool removed from favorites"
+	}
+
+	return &ypb.ToggleAIToolFavoriteResponse{
+		IsFavorite: isFavorite,
+		Message:    message,
 	}, nil
 }

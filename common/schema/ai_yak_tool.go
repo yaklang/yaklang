@@ -17,6 +17,7 @@ type AIYakTool struct {
 	Params      string `json:"params" gorm:"type:text"`
 	Path        string `json:"path" gorm:"type:text;index"`
 	Hash        string `json:"hash"`
+	IsFavorite  bool   `json:"is_favorite" gorm:"default:false;index"`
 }
 
 func (*AIYakTool) TableName() string {
@@ -79,7 +80,7 @@ func DeleteAIYakTools(db *gorm.DB, names ...string) (int64, error) {
 }
 
 // SearchAIYakToolWithPagination adds pagination support to AIYakTool search
-func SearchAIYakToolWithPagination(db *gorm.DB, keywords string, paging *ypb.Paging) (*bizhelper.Paginator, []*AIYakTool, error) {
+func SearchAIYakToolWithPagination(db *gorm.DB, keywords string, onlyFavorites bool, paging *ypb.Paging) (*bizhelper.Paginator, []*AIYakTool, error) {
 	orderBy := paging.GetOrderBy()
 	order := paging.GetOrder()
 	page := int(paging.GetPage())
@@ -90,6 +91,11 @@ func SearchAIYakToolWithPagination(db *gorm.DB, keywords string, paging *ypb.Pag
 	// Apply fuzzy search if keywords provided
 	if keywords != "" {
 		db = bizhelper.FuzzSearchEx(db, []string{"name", "keywords", "description", "path"}, keywords, false)
+	}
+
+	// Apply favorite filter if requested
+	if onlyFavorites {
+		db = db.Where("is_favorite = ?", true)
 	}
 
 	// Apply ordering
@@ -109,4 +115,23 @@ func SearchAIYakToolWithPagination(db *gorm.DB, keywords string, paging *ypb.Pag
 	}
 
 	return paginator, tools, nil
+}
+
+// ToggleAIYakToolFavorite toggles the favorite status of an AI tool
+func ToggleAIYakToolFavorite(db *gorm.DB, toolName string) (bool, error) {
+	db = db.Model(&AIYakTool{})
+
+	var tool AIYakTool
+	if err := db.Where("name = ?", toolName).First(&tool).Error; err != nil {
+		return false, utils.Errorf("AI tool not found: %s", err)
+	}
+
+	// Toggle the favorite status
+	tool.IsFavorite = !tool.IsFavorite
+
+	if err := db.Save(&tool).Error; err != nil {
+		return false, utils.Errorf("failed to update AI tool favorite status: %s", err)
+	}
+
+	return tool.IsFavorite, nil
 }
