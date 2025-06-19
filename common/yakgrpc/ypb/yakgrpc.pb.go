@@ -37456,6 +37456,10 @@ type HTTPFlowRuleData struct {
 	HTTPFlowId      int64                  `protobuf:"varint,2,opt,name=HTTPFlowId,proto3" json:"HTTPFlowId,omitempty"`
 	RuleVerboseName string                 `protobuf:"bytes,3,opt,name=RuleVerboseName,proto3" json:"RuleVerboseName,omitempty"`
 	Rule            string                 `protobuf:"bytes,4,opt,name=Rule,proto3" json:"Rule,omitempty"`
+	StatusCode      int64                  `protobuf:"varint,5,opt,name=StatusCode,proto3" json:"StatusCode,omitempty"`
+	Url             string                 `protobuf:"bytes,6,opt,name=Url,proto3" json:"Url,omitempty"`
+	Method          string                 `protobuf:"bytes,7,opt,name=Method,proto3" json:"Method,omitempty"`
+	IPAddress       string                 `protobuf:"bytes,8,opt,name=IPAddress,proto3" json:"IPAddress,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -37514,6 +37518,34 @@ func (x *HTTPFlowRuleData) GetRuleVerboseName() string {
 func (x *HTTPFlowRuleData) GetRule() string {
 	if x != nil {
 		return x.Rule
+	}
+	return ""
+}
+
+func (x *HTTPFlowRuleData) GetStatusCode() int64 {
+	if x != nil {
+		return x.StatusCode
+	}
+	return 0
+}
+
+func (x *HTTPFlowRuleData) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *HTTPFlowRuleData) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *HTTPFlowRuleData) GetIPAddress() string {
+	if x != nil {
+		return x.IPAddress
 	}
 	return ""
 }
@@ -55539,14 +55571,20 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x16AnalyzedHTTPFlowFilter\x12\x1c\n" +
 	"\tResultIds\x18\x01 \x03(\tR\tResultIds\x12*\n" +
 	"\x10RuleVerboseNames\x18\x02 \x03(\tR\x10RuleVerboseNames\x12\x12\n" +
-	"\x04Rule\x18\x03 \x03(\tR\x04Rule\"\x80\x01\n" +
+	"\x04Rule\x18\x03 \x03(\tR\x04Rule\"\xe8\x01\n" +
 	"\x10HTTPFlowRuleData\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x12\x1e\n" +
 	"\n" +
 	"HTTPFlowId\x18\x02 \x01(\x03R\n" +
 	"HTTPFlowId\x12(\n" +
 	"\x0fRuleVerboseName\x18\x03 \x01(\tR\x0fRuleVerboseName\x12\x12\n" +
-	"\x04Rule\x18\x04 \x01(\tR\x04Rule\"\x85\x01\n" +
+	"\x04Rule\x18\x04 \x01(\tR\x04Rule\x12\x1e\n" +
+	"\n" +
+	"StatusCode\x18\x05 \x01(\x03R\n" +
+	"StatusCode\x12\x10\n" +
+	"\x03Url\x18\x06 \x01(\tR\x03Url\x12\x16\n" +
+	"\x06Method\x18\a \x01(\tR\x06Method\x12\x1c\n" +
+	"\tIPAddress\x18\b \x01(\tR\tIPAddress\"\x85\x01\n" +
 	"\x16ExportHTTPFlowsRequest\x12;\n" +
 	"\vExportWhere\x18\x01 \x01(\v2\x19.ypb.QueryHTTPFlowRequestR\vExportWhere\x12\x10\n" +
 	"\x03Ids\x18\x02 \x03(\x03R\x03Ids\x12\x1c\n" +
