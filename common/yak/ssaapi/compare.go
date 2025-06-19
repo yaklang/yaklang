@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
@@ -13,21 +14,28 @@ type SsaCompareItemConfig struct {
 	RuleName        string
 	RuleContentHash string
 	VariableName    string
+	RuntimeId       string
+	ProgramName     string
 }
 
 type WithCompareOpts func(*SsaCompareItemConfig)
 
-func WithRuleName(name string) WithCompareOpts {
+func DiffWithProgram(name string) WithCompareOpts {
+	return func(itemConfig *SsaCompareItemConfig) {
+		itemConfig.ProgramName = name
+	}
+}
+func DiffWithRuleName(name string) WithCompareOpts {
 	return func(config *SsaCompareItemConfig) {
 		config.RuleName = name
 	}
 }
-func WithRuleContentHash(hash string) WithCompareOpts {
+func DiffWithRuleContentHash(hash string) WithCompareOpts {
 	return func(config *SsaCompareItemConfig) {
 		config.RuleContentHash = hash
 	}
 }
-func WithVariableName(variable string) WithCompareOpts {
+func DiffWithVariableName(variable string) WithCompareOpts {
 	return func(config *SsaCompareItemConfig) {
 		config.VariableName = variable
 	}
@@ -43,27 +51,33 @@ const (
 
 type Item[T any] struct {
 	ProgramName string
+	TaskId      string
+	Kind        schema.SSADiffResultKind
 	//两个项目比较时，根据RuleName/RuleId来确定
 	GetCompareValue func(context.Context) <-chan T
 }
 
-func NewCompareRiskItem(progName string, opts ...WithCompareOpts) *Item[*schema.SSARisk] {
+func NewCompareRiskItem(opts ...WithCompareOpts) (*Item[*schema.SSARisk], error) {
 	s := new(SsaCompareItemConfig)
 	item := new(Item[*schema.SSARisk])
 	for _, opt := range opts {
 		opt(s)
 	}
+	if s.ProgramName == "" && s.RuntimeId == "" {
+		return nil, utils.Error("program name or runtime id must be set for compare risk item")
+	}
 	item.GetCompareValue = func(ctx context.Context) <-chan *schema.SSARisk {
 		db := consts.GetGormDefaultSSADataBase().Model(&schema.SSARisk{})
-		db = bizhelper.ExactQueryString(db, "program_name", progName)
+		db = bizhelper.ExactQueryString(db, "program_name", s.ProgramName)
+		db = bizhelper.ExactQueryString(db, "runtime_id", s.RuntimeId)
 		db = bizhelper.ExactQueryString(db, "from_rule", s.RuleName)
 		db = bizhelper.ExactQueryString(db, "variable", s.VariableName)
 		db = bizhelper.QueryOrder(db, "variable", "asc")
 		return bizhelper.YieldModel[*schema.SSARisk](ctx, db)
 	}
-	return item
+	return item, nil
 }
-func NewCompareCustomVariableItem(progName string, opts ...WithCompareOpts) *Item[*ssadb.AuditNode] {
+func NewCompareCustomVariableItem(opts ...WithCompareOpts) *Item[*ssadb.AuditNode] {
 	s := new(SsaCompareItemConfig)
 	item := new(Item[*ssadb.AuditNode])
 	for _, opt := range opts {
@@ -71,7 +85,7 @@ func NewCompareCustomVariableItem(progName string, opts ...WithCompareOpts) *Ite
 	}
 	item.GetCompareValue = func(ctx context.Context) <-chan *ssadb.AuditNode {
 		db := consts.GetGormDefaultSSADataBase().Model(&schema.SSARisk{})
-		db = bizhelper.ExactQueryString(db, "program_name", progName)
+		db = bizhelper.ExactQueryString(db, "program_name", s.ProgramName)
 		db = bizhelper.ExactQueryString(db, "rule_name", s.RuleName)
 		db = bizhelper.ExactQueryString(db, "result_variable", s.VariableName)
 		db = bizhelper.QueryOrder(db, "variable", "asc")
