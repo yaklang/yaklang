@@ -5,20 +5,30 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+type SSADiffResultKind int64
+
+const (
+	Unknown   SSADiffResultKind = iota
+	RuntimeId                   //task ID
+	Prog                        //利用Program来进行对比
+)
+
 type SSADiffResult struct {
 	gorm.Model
-	BaseProgram     string // base/last program name
-	CompareProgram  string // compare program name
-	ResultHash      string `gorm:"index"` // hash(baseProg+CompareProg)
+	BaseItem        string
+	CompareItem     string
+	ResultHash      string `gorm:"index"` // hash(BaseItem + CompareItem)
 	RuleName        string // rule name
 	BaseRiskHash    string
 	CompareRiskHash string
 	Status          int
-	CompareType     int
+	//CompareType 比较类型，是custom还是risk
+	CompareType    int
+	DiffResultKind SSADiffResultKind //结果类型，是taskID还是program
 }
 
 func (d *SSADiffResult) CalcHash() string {
-	return utils.CalcMd5(d.BaseProgram, d.CompareProgram)
+	return utils.CalcMd5(d.BaseItem, d.CompareItem)
 }
 func (d *SSADiffResult) BeforeCreate(tx *gorm.DB) (err error) {
 	d.ResultHash = d.CalcHash()
