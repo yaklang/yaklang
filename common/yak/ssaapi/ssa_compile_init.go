@@ -7,7 +7,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"

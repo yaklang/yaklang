@@ -3,10 +3,11 @@ package java
 import (
 	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/log"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )

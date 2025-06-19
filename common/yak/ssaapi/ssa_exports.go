@@ -14,7 +14,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -75,6 +74,8 @@ type config struct {
 	ctx context.Context
 
 	excludeFile func(path, filename string) bool
+
+	logLevel string
 }
 
 func defaultConfig(opts ...Option) (*config, error) {
@@ -94,6 +95,7 @@ func defaultConfig(opts ...Option) (*config, error) {
 		excludeFile: func(path, filename string) bool {
 			return false
 		},
+		logLevel: "error",
 	}
 
 	for _, opt := range opts {
@@ -141,6 +143,14 @@ func (c *config) Processf(process float64, format string, arg ...any) {
 		c.process(msg, process)
 	} else {
 		log.Info(msg, process)
+	}
+}
+
+func WithLogLevel(level string) Option {
+	return func(c *config) error {
+		log.SetLevel(level)
+		c.logLevel = level
+		return nil
 	}
 }
 

@@ -1,7 +1,6 @@
 package ssaapi
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 )

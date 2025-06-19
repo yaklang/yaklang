@@ -9,7 +9,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/log"
+
 	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
@@ -61,7 +61,6 @@ func TestReducerCompiling_NORMAL(t *testing.T) {
 					break
 				}
 			}
-
 			log.Infof("start to Compile %s", s)
 			spew.Dump(visited)
 			return visited, nil

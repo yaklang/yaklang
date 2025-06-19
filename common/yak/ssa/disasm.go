@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/log"
-
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 )

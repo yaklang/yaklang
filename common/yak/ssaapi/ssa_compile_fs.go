@@ -4,7 +4,6 @@ import (
 	"io/fs"
 	"path/filepath"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -17,7 +16,6 @@ func (c *config) parseProjectWithFS(
 	filesystem filesys_interface.FileSystem,
 	processCallback func(float64, string, ...any),
 ) (*Program, error) {
-
 	defer func() {
 		if r := recover(); r != nil {
 			//err = utils.Errorf("parse [%s] error %v  ", path, r)

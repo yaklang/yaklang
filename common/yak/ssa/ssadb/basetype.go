@@ -4,7 +4,6 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
-	"github.com/yaklang/yaklang/common/log"
 	"reflect"
 	"strconv"
 	"strings"
