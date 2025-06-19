@@ -100,6 +100,13 @@ type LowhttpExecConfig struct {
 	Dialer func(duration time.Duration, addr string) (net.Conn, error)
 
 	ExtendDialOption []netx.DialXOption // for test
+
+	// chunked
+	ForceChunked      bool
+	MinChunkedLength  int
+	MaxChunkedLength  int
+	MinChunkDelayTime time.Duration
+	MaxChunkDelayTime time.Duration
 }
 
 type LowhttpResponse struct {
@@ -733,5 +740,25 @@ func WithDialer(dialer func(duration time.Duration, addr string) (net.Conn, erro
 func WithExtendDialXOption(options ...netx.DialXOption) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.ExtendDialOption = options
+	}
+}
+
+func WithForceChunked(enable bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.ForceChunked = enable
+	}
+}
+
+func WithChunkedLength(min, max int) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.MinChunkedLength = min
+		o.MaxChunkedLength = max
+	}
+}
+
+func WithChunkDelayTime(min, max time.Duration) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.MinChunkDelayTime = min
+		o.MaxChunkDelayTime = max
 	}
 }
