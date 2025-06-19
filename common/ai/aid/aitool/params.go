@@ -1,6 +1,8 @@
 package aitool
 
 import (
+	"reflect"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -21,7 +23,22 @@ func (p InvokeParams) GetObjectArray(key string) []InvokeParams {
 		if !ok {
 			return result
 		}
-		funk.ForEach(r, func(v any) {
+
+		var itemsToIterate any
+		if r != nil {
+			kind := reflect.TypeOf(r).Kind()
+			if kind == reflect.Map || kind == reflect.Struct {
+				itemsToIterate = funk.Values(r)
+			} else {
+				itemsToIterate = r
+			}
+		}
+
+		if itemsToIterate == nil {
+			return result
+		}
+
+		funk.ForEach(itemsToIterate, func(v any) {
 			item := utils.InterfaceToGeneralMap(v)
 			result = append(result, item)
 		})

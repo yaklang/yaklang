@@ -3,6 +3,10 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -13,9 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/reducer"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"sync"
-	"time"
 )
 
 type aiChatType func(string, ...aispec.AIConfigOption) (string, error)
@@ -237,6 +238,7 @@ func buildAIDOption(startParams *ypb.AIStartParams) []aid.Option {
 		aidOption = append(aidOption, aid.WithAgreeManual())
 	}
 
+	aidOption = append(aidOption, aid.WithQwenNoThink())
 	if startParams.GetEnableQwenNoThinkMode() {
 		aidOption = append(aidOption, aid.WithQwenNoThink())
 	}
