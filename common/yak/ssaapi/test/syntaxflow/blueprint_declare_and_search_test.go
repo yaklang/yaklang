@@ -50,7 +50,7 @@ func Test_PHP_Blueprint_name2declare(t *testing.T) {
 		E.__parents__ as $retG // A
 		`, map[string][]string{
 			"retA": {"B", "E"},
-			"retB": {"CC", "D", "E"},
+			"retB": {"D", "E"},
 			"retC": {"A"},
 			"retD": {"C"},
 			"retE": {"C"},
