@@ -273,7 +273,7 @@ func TestRandomChunkedSender_hanlder(t *testing.T) {
 
 		blockNum := 0
 		options := []RandomChunkedHTTPOption{
-			WithRandomChunkedSize(10, 25),
+			WithRandomChunkedLength(10, 25),
 			WithRandomChunkedDelay(time.Millisecond*100, time.Millisecond*500),
 			WithRandomChunkedHandler(func(chunkIndex int, chunkRaw []byte, totalDuration time.Duration, chunkDuration time.Duration) {
 				m := make(map[string]any)

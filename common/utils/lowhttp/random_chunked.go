@@ -33,7 +33,7 @@ func WithRandomChunkedContext(ctx context.Context) RandomChunkedHTTPOption {
 	}
 }
 
-func WithRandomChunkedSize(minChunk, maxChunk int) RandomChunkedHTTPOption {
+func WithRandomChunkedLength(minChunk, maxChunk int) RandomChunkedHTTPOption {
 	return func(r *randomChunkedSender) {
 		if maxChunk > 0 && minChunk > 0 && maxChunk >= minChunk {
 			r.maxChunkLength = maxChunk
