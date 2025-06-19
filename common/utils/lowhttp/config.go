@@ -102,12 +102,12 @@ type LowhttpExecConfig struct {
 	ExtendDialOption []netx.DialXOption // for test
 
 	// chunked
-	ForceChunked      bool
-	MinChunkedLength  int
-	MaxChunkedLength  int
-	MinChunkDelayTime time.Duration
-	MaxChunkDelayTime time.Duration
-	ChunkedHandler    ChunkedResultHandler
+	EnableRandomChunked bool
+	MinChunkedLength    int
+	MaxChunkedLength    int
+	MinChunkDelayTime   time.Duration
+	MaxChunkDelayTime   time.Duration
+	ChunkedHandler      ChunkedResultHandler
 }
 
 type LowhttpResponse struct {
@@ -744,9 +744,9 @@ func WithExtendDialXOption(options ...netx.DialXOption) LowhttpOpt {
 	}
 }
 
-func WithForceChunked(enable bool) LowhttpOpt {
+func WithEnableRandomChunkedChunked(enable bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
-		o.ForceChunked = enable
+		o.EnableRandomChunked = enable
 	}
 }
 
