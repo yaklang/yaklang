@@ -5,7 +5,6 @@ import (
 	"runtime"
 
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 	"golang.org/x/exp/slices"
 )

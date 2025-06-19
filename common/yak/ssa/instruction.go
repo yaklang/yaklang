@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/log"
 )
 
 func NewMake(parentI Value, typ Type, low, high, step, Len, Cap Value) *Make {

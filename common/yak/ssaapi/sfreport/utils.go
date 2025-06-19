@@ -1,8 +1,8 @@
 package sfreport
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssalog"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
@@ -16,6 +16,10 @@ const (
 
 	// echo file will show the full content in the report
 	IRifyFullReportType ReportType = "irify-full"
+)
+
+var (
+	log = ssalog.Log
 )
 
 func ReportTypeFromString(s string) ReportType {

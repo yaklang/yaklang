@@ -3,8 +3,6 @@ package ssautil
 import (
 	"fmt"
 	"regexp"
-
-	"github.com/yaklang/yaklang/common/log"
 )
 
 // ForEachCapturedVariable call the handler for each captured by base scope Variable

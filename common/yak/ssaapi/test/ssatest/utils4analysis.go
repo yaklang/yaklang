@@ -3,6 +3,7 @@ package ssatest
 import (
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"io/fs"
 	"sort"
 	"strings"
@@ -26,7 +27,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/log"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
@@ -42,6 +42,7 @@ const (
 
 func CheckWithFS(fs fi.FileSystem, t require.TestingT, handler func(ssaapi.Programs) error, opt ...ssaapi.Option) {
 	// only in memory
+	opt = append(opt, ssaapi.WithLogLevel("debug"))
 	{
 		prog, err := ssaapi.ParseProjectWithFS(fs, opt...)
 		require.Nil(t, err)
@@ -88,6 +89,7 @@ func CheckWithName(
 	opt ...ssaapi.Option,
 ) {
 	// only in memory
+	opt = append(opt, ssaapi.WithLogLevel("debug"))
 	{
 		prog, err := ssaapi.Parse(code, opt...)
 		require.Nil(t, err)
@@ -137,6 +139,7 @@ func CheckWithNameOnlyInMemory(
 	handler func(prog *ssaapi.Program) error,
 	opt ...ssaapi.Option,
 ) {
+	opt = append(opt, ssaapi.WithLogLevel("debug"))
 	// only in memory
 	{
 		prog, err := ssaapi.Parse(code, opt...)
@@ -220,6 +223,7 @@ func ProfileJavaCheck(t *testing.T, code string, handler func(inMemory bool, pro
 }
 
 func CheckProfileWithFS(fs fi.FileSystem, t require.TestingT, handler func(p ParseStage, prog ssaapi.Programs, start time.Time) error, opt ...ssaapi.Option) {
+	opt = append(opt, ssaapi.WithLogLevel("debug"))
 	// only in memory
 	{
 		start := time.Now()
@@ -266,6 +270,7 @@ func CheckFSWithProgram(
 	t *testing.T, programName string,
 	codeFS, ruleFS fi.FileSystem, opt ...ssaapi.Option,
 ) {
+	opt = append(opt, ssaapi.WithLogLevel("debug"))
 	if programName == "" {
 		programName = "test-" + uuid.New().String()
 	}

@@ -1,9 +1,9 @@
 package ssaapi
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 

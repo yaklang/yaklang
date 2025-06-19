@@ -1,7 +1,6 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"

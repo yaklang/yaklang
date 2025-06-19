@@ -4,7 +4,6 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 

@@ -6,7 +6,6 @@ import (
 	"regexp"
 
 	"github.com/gobwas/glob"
-	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"

@@ -6,7 +6,6 @@ import (
 
 	"github.com/gobwas/glob"
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"golang.org/x/exp/slices"
 )
