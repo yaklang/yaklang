@@ -106,6 +106,7 @@ type LowhttpExecConfig struct {
 	MaxChunkedLength  int
 	MinChunkDelayTime time.Duration
 	MaxChunkDelayTime time.Duration
+	ChunkedHandler    ChunkedResultHandler
 }
 
 type LowhttpResponse struct {
@@ -736,9 +737,15 @@ func WithChunkedLength(min, max int) LowhttpOpt {
 	}
 }
 
-func WithChunkDelayTime(min, max time.Duration) LowhttpOpt {
+func WithChunkedDelayTime(min, max time.Duration) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.MinChunkDelayTime = min
 		o.MaxChunkDelayTime = max
+	}
+}
+
+func WithChunkedHandler(handler ChunkedResultHandler) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.ChunkedHandler = handler
 	}
 }
