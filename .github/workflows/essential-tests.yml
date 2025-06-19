@@ -28,6 +28,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
+      - name: Check directory contents
+        run: ls -la
+
       - name: Set up Go 1.x
         uses: actions/setup-go@v4
         with:
