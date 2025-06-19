@@ -855,6 +855,7 @@ RECONNECT:
 			httpctx.SetBareRequestBytes(reqIns, requestPacket)
 		}
 		currentRPS.Add(1)
+
 		if option.ForceChunked {
 			if err != nil {
 				return response, errors.Wrap(err, "build chunked request failed")
@@ -864,6 +865,7 @@ RECONNECT:
 				WithRandomChunkedDelay(option.MinChunkDelayTime, option.MaxChunkDelayTime),
 				WithRandomChunkedContext(option.Ctx),
 				WithRandomChunkedSize(option.MinChunkedLength, option.MaxChunkedLength),
+				WithRandomChunkedHandler(option.ChunkedHandler),
 			}
 			err = SendRandomChunkedHTTP(
 				conn,
@@ -872,6 +874,7 @@ RECONNECT:
 			)
 			if err != nil {
 				log.Errorf("[lowhttp] send chunked request failed: %s", err)
+				goto RECONNECT
 			}
 		} else {
 			if oldVersionProxyChecking {
