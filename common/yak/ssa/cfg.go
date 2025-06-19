@@ -51,7 +51,8 @@ func (b *BasicBlock) IsBlock(name string) bool {
 }
 
 func (b *BasicBlock) GetBlockById(name string) *BasicBlock {
-	for _, prev := range b.Preds {
+	for _, id := range b.Preds {
+		prev := b.GetValueById(id)
 		if prev.IsBlock(name) {
 			result, ok := ToBasicBlock(prev)
 			if !ok {
@@ -199,7 +200,7 @@ func (lb *LoopBuilder) Finish() {
 
 	LoopBuilder := ssautil.NewLoopStmt(ssautil.ScopedVersionedTableIF[Value](scope), func(name string) Value {
 		phi := NewPhi(condition, name)
-		condition.Phis = append(condition.Phis, phi)
+		condition.Phis = append(condition.Phis, phi.GetId())
 		return phi
 	})
 
@@ -558,6 +559,7 @@ func (t *TryBuilder) Finish() {
 	builder.CurrentBlock = tryBlock
 	builder.EmitJump(target)
 	for _, catch := range errorHandler.Catch {
+		catch := errorHandler.GetValueById(catch)
 		builder.CurrentBlock = catch.GetBlock()
 		builder.EmitJump(target)
 	}

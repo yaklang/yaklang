@@ -68,8 +68,9 @@ func (c *config) init(filesystem filesys_interface.FileSystem) (*ssa.Program, *s
 		newCodeEditor.SetUrl(filePath)
 		fb.SetEditor(newCodeEditor)
 		if originEditor == nil && newCodeEditor != nil {
-			if fb.EnterBlock != nil && fb.EnterBlock.GetRange() == nil {
-				fb.EnterBlock.SetRange(src.GetFullRange())
+			enter := fb.GetBasicBlockByID(fb.EnterBlock)
+			if enter != nil && enter.GetRange() == nil {
+				enter.SetRange(src.GetFullRange())
 			}
 		}
 		if originEditor != nil {

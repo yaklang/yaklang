@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -39,8 +41,8 @@ func NewFunctionCFG(function *ssa.Function) *FunctionCFG {
 
 	// 首先添加所有基本块节点
 	for _, blockInst := range function.Blocks {
-		block, ok := ssa.ToBasicBlock(blockInst)
-		if !ok {
+		block := function.GetBasicBlockByID(blockInst)
+		if block == nil {
 			continue
 		}
 		g.addBlockNode(block)
@@ -48,8 +50,8 @@ func NewFunctionCFG(function *ssa.Function) *FunctionCFG {
 
 	// 然后添加边
 	for _, blockInst := range function.Blocks {
-		block, ok := ssa.ToBasicBlock(blockInst)
-		if !ok {
+		block := function.GetBasicBlockByID(blockInst)
+		if block == nil {
 			continue
 		}
 		fromNodeId, exists := g.Block2Node[block]
@@ -59,8 +61,8 @@ func NewFunctionCFG(function *ssa.Function) *FunctionCFG {
 
 		// 添加后继边
 		for _, succInst := range block.Succs {
-			succ, ok := ssa.ToBasicBlock(succInst)
-			if !ok {
+			succ := function.GetBasicBlockByID(succInst)
+			if succ == nil {
 				continue
 			}
 			toNodeId, exists := g.Block2Node[succ]
@@ -88,6 +90,10 @@ func (g *FunctionCFG) addBlockNode(block *ssa.BasicBlock) int {
 
 	// 添加块内指令到标签
 	for _, inst := range block.Insts {
+		inst := block.GetInstructionById(inst)
+		if utils.IsNil(inst) {
+			log.Infof("bbbbbbb")
+		}
 		instStr := inst.String()
 		_, isConstIns := inst.(*ssa.ConstInst)
 		if instStr != "" && !isConstIns {

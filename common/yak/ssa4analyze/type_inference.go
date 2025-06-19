@@ -28,12 +28,13 @@ func (t *TypeInference) Run(prog *ssa.Program) {
 func (t *TypeInference) RunOnFunction(fun *ssa.Function) {
 	t.DeleteInst = make([]ssa.Instruction, 0)
 	for _, bRaw := range fun.Blocks {
-		b, ok := ssa.ToBasicBlock(bRaw)
-		if !ok {
-			log.Errorf("TypeInference: %s is not a basic block", bRaw.GetName())
+		b := fun.GetBasicBlockByID(bRaw)
+		if b == nil {
+			log.Errorf("TypeInference: %s is not a basic block", b.GetName())
 			continue
 		}
-		for _, inst := range b.Insts {
+		for _, instId := range b.Insts {
+			inst := b.GetInstructionById(instId)
 			t.InferenceOnInstruction(inst)
 		}
 	}
@@ -52,6 +53,7 @@ func (t *TypeInference) RunOnFunction(fun *ssa.Function) {
 		return
 	}
 	for name, fv := range fun.FreeValues {
+		fv := fun.GetValueById(fv)
 		param, ok := ssa.ToParameter(fv)
 		if !ok {
 			log.Warnf("free value %s is not a parameter", name)
@@ -127,18 +129,18 @@ func checkType(v ssa.Value, typ ssa.Type) bool {
 func (t *TypeInference) TypeInferencePhi(phi *ssa.Phi) {
 	// check
 	// TODO: handler Acyclic graph
-	if t.checkValuesNotFinish(phi.Edge) {
+	if t.checkValuesNotFinish(phi.GetValues()) {
 		return
 	}
 
 	// set type
 	typs := collectTypeFromValues(
-		phi.Edge,
+		phi.GetValues(),
 		// // skip unreachable block
 		func(index int, value ssa.Value) bool {
 			blockRaw := phi.GetBlock().Preds[index]
-			block, ok := blockRaw.(*ssa.BasicBlock)
-			if !ok {
+			block := phi.GetBasicBlockByID(blockRaw)
+			if block == nil {
 				log.Warnf("BUG: block is not *ssa.BasicBlock")
 				return true
 			}
@@ -151,7 +153,8 @@ func (t *TypeInference) TypeInferencePhi(phi *ssa.Phi) {
 }
 
 func (t *TypeInference) TypeInferenceCall(call *ssa.Call) {
-	iFuncType := call.Method.GetType()
+	method := call.GetValueById(call.Method)
+	iFuncType := method.GetType()
 	funcType, ok := iFuncType.(*ssa.FunctionType)
 	if !ok {
 		return
@@ -185,7 +188,8 @@ func (t *TypeInference) TypeInferenceCall(call *ssa.Call) {
 				if i >= argFuncParams {
 					break
 				}
-				argFunc.Params[i].SetType(paramFuncType.Parameter[i])
+				argFunc := call.GetValueById(argFunc.Params[i])
+				argFunc.SetType(paramFuncType.Parameter[i])
 				argFuncType.Parameter[i] = paramFuncType.Parameter[i]
 			}
 		} else if argTyp == ssa.GetAnyType() {
@@ -200,7 +204,7 @@ func (t *TypeInference) TypeInferenceCall(call *ssa.Call) {
 			}
 			if i == paramsLen-1 && funcType.IsVariadic {
 				for j := i; j < len(args); j++ {
-					arg := args[j]
+					arg := call.GetValueById(args[j])
 					paramTyp, ok := ssa.ToObjectType(paramTyp)
 					if ok && paramTyp.Kind == ssa.SliceTypeKind {
 						typeInferenceArgWithParam(arg, arg.GetType(), paramTyp.FieldType)
@@ -209,7 +213,7 @@ func (t *TypeInference) TypeInferenceCall(call *ssa.Call) {
 				break
 			}
 
-			arg := args[i]
+			arg := call.GetValueById(args[i])
 			typeInferenceArgWithParam(arg, arg.GetType(), paramTyp)
 		}
 	}
@@ -217,11 +221,11 @@ func (t *TypeInference) TypeInferenceCall(call *ssa.Call) {
 }
 
 func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) {
-	if bin == nil || bin.X == nil || bin.Y == nil {
+	if bin == nil || bin.X <= 0 || bin.Y <= 0 {
 		return
 	}
-	XTyps := bin.X.GetType()
-	YTyps := bin.Y.GetType()
+	XTyps := bin.GetValueById(bin.X).GetType()
+	YTyps := bin.GetValueById(bin.Y).GetType()
 
 	handlerBinOpType := func(x, y ssa.Type) ssa.Type {
 		if x == nil {

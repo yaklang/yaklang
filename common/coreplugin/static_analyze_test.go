@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
@@ -27,6 +28,22 @@ func staticCheck(code, pluginType string, t *testing.T) {
 func TestAnalyzeMustPASS_CorePlugin(t *testing.T) {
 	yakit.CallPostInitDatabase()
 	for _, plugin := range buildInPlugin {
+		t.Run(fmt.Sprintf("plugin(%s) %s", plugin.Type, plugin.ScriptName), func(t *testing.T) {
+			staticCheck(plugin.Content, plugin.Type, t)
+		})
+	}
+}
+
+func TestAnalyzeMustPASS_CorePlugin_Debug(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip("Skip in Github Actions")
+	}
+	target := "SSA 项目探测"
+	yakit.CallPostInitDatabase()
+	for _, plugin := range buildInPlugin {
+		if plugin.ScriptName != target {
+			continue
+		}
 		t.Run(fmt.Sprintf("plugin(%s) %s", plugin.Type, plugin.ScriptName), func(t *testing.T) {
 			staticCheck(plugin.Content, plugin.Type, t)
 		})
