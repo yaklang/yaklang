@@ -6270,6 +6270,7 @@ message AlertMessage{
   string Tag = 10;
   map<string, string> Extra = 11;
 }
+
 message  SyntaxFlowRuleInput{
   string RuleName = 1; // RuleName作为索引，因此不能update RuleName
   string Content = 2;
@@ -6316,23 +6317,26 @@ message SSAProgram{
   uint32 Id = 13;
   // risk number
   int64 CriticalRiskNumber = 10;
-  int64 HighRiskNumber = 9;    
-  int64 WarnRiskNumber = 11;   
-  int64 LowRiskNumber = 12;    
-  int64 InfoRiskNumber = 14; 
+  int64 HighRiskNumber = 9;
+  int64 WarnRiskNumber = 11;
+  int64 LowRiskNumber = 12;
+  int64 InfoRiskNumber = 14;
 }
 
 message SSADiffItem{
   string Program = 1;
   string ruleName = 2;
   string Variable = 3;
+  string RiskRuntimeId = 4;
 }
+
 message SSADiffRequest{
   SSADiffItem Base = 1;
   SSADiffItem Compare = 2;
   int64 Type = 3;
-  bool SaveDb = 4;
+  bool DefaultCompare = 4;
 }
+
 message SSADiffResponse{
   SSARisk BaseRisk = 1;
   SSARisk CompareRisk = 2;
