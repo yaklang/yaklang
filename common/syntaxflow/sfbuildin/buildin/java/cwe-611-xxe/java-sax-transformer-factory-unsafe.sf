@@ -110,10 +110,10 @@ SAXTransformerFactory.newInstance() as $ins;
 $ins?{!.setAttribute}.newTransformerHandler().setResult() as $vuln;
 check $vuln;
 alert $vuln	for {
-	title: "Check Java SAXTransformerFactory Unsafe Use (XXE)",
-	title_zh: "检测 Java SAXTransformerFactory 不安全使用 (XXE)",
 	level: "warning",
 	message: "SAXTransformerFactory Unsafe Use in Context Sink",
+	title: "Check Java SAXTransformerFactory Unsafe Use (XXE)",
+	title_zh: "检测 Java SAXTransformerFactory 不安全使用 (XXE)",
 }
 
 desc(

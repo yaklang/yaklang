@@ -75,6 +75,7 @@ $param?{<self> #{include: <<<CODE
 CODE}->} as $mysql_sink
 
 alert $mysql_sink	for {
+	title: "Detect PHP MySQL Information Exposure Risk",
 	title_zh: "检测PHP MySQL数据库信息泄露风险",
 	solution: <<<CODE
 ### 修复建议
@@ -130,7 +131,6 @@ if (!$conn) {
 - 导致业务逻辑或敏感数据被攻击者猜测或发现。
 CODE
 	level: "low",
-	title: "Detect PHP MySQL Information Exposure Risk",
 }
 $param?{<self> #{include: <<<CODE
 * & $pg_information

@@ -102,6 +102,7 @@ $method<getCall()>?{.setAccessible(*<slice(index=1)>?{==true})}.invoke as $invok
 $invoke(,* ?{!=false && !have:"nil" }as $output)
 
 alert $output	for {
+	title: "Unvalidated Command Execution",
 	title_zh: "未验证的命令执行",
 	solution: <<<CODE
 ### 修复建议
@@ -162,7 +163,6 @@ CODE
 
 CODE
 	level: "high",
-	title: "Unvalidated Command Execution",
 }
 
 

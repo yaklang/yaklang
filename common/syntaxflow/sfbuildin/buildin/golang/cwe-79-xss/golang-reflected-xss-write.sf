@@ -126,6 +126,7 @@ $sink #{
 }-> as $high 
 
 alert $high	for {
+	type: "vuln",
 	title: "Reflected XSS detected",
 	title_zh: "检测到反射XSS",
 	solution: <<<CODE
@@ -237,7 +238,6 @@ func main() {
 -   攻击者可以篡改网页内容，进行恶意植入或传播恶意软件。
 CODE
 	level: "high",
-	type: "vuln",
 }
 
 desc(

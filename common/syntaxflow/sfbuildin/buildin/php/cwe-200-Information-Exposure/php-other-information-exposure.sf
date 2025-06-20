@@ -99,9 +99,9 @@ $source?{<self> #{include: <<<CODE
 CODE}->} as $sink
 
 alert $sink	for {
+	level: "low",
 	title: "Unsafe Error Handling and Information Exposure",
 	title_zh: "不安全的错误处理与信息泄露风险",
-	level: "low",
 }
 desc(
 	lang: 'php'

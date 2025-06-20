@@ -141,6 +141,7 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high	for {
+	title: "Unsafe File Upload Without Validation",
 	title_zh: "未经验证的高危文件上传",
 	solution: <<<CODE
 ### 修复建议
@@ -189,7 +190,7 @@ alert $high	for {
 
             // 4. 生成安全的文件名，而不是使用原始文件名
             $ext = array_search($mimeType, $allowedTypes, true);
-            $newName = sprintf('%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING).%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING)', sha1_file($file['tmp_name']), $ext);
+            $newName = sprintf('%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING).%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING)', sha1_file($file['tmp_name']), $ext);
             $targetPath = $uploadDir . $newName;
 
             // 5. 移动上传的文件
@@ -251,7 +252,6 @@ c. **文件名和路径操纵**: 攻击者可能通过修改请求中的文件�
 - 与其他漏洞（如文件包含）结合，导致更严重的危害。
 CODE
 	level: "high",
-	title: "Unsafe File Upload Without Validation",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__

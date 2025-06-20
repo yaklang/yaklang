@@ -405,8 +405,14 @@ func (p *Program) FileFilter(path string, match string, rule map[string]string, 
 	}
 
 	var res []sfvm.ValueOperator
-	addRes := func(index Index, editor *memedit.MemEditor) {
+	addRes := func(index Index, editor *memedit.MemEditor, offsetMap *memedit.RuneOffsetMap) {
 		// get range of match string
+		if startRune, ok := offsetMap.ByteOffsetToRuneIndex(index.Start); ok {
+			index.Start = startRune
+		}
+		if endRune, ok := offsetMap.ByteOffsetToRuneIndex(index.End); ok {
+			index.End = endRune
+		}
 		rangeIf := editor.GetRangeOffset(index.Start, index.End)
 		val := p.NewConstValue(rangeIf.GetText(), rangeIf)
 		res = append(res, val)
@@ -417,13 +423,13 @@ func (p *Program) FileFilter(path string, match string, rule map[string]string, 
 		if me == nil {
 			return
 		}
-
+		offsetMap := memedit.NewRuneOffsetMap(me.GetSourceCode())
 		if filter.matchFile(s) {
 			matchFile = true
 			if filter.matchContent != nil {
 				matches := filter.matchContent(me.GetSourceCode())
 				for _, match := range matches {
-					addRes(match, me)
+					addRes(match, me, offsetMap)
 				}
 			}
 		}

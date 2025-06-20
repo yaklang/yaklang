@@ -91,7 +91,6 @@ $sink #{include: `$check`}-> as $safe;
 $sink #{exclude: `$safe`}-> as $high;
 
 alert $high	for {
-	title_zh: "检测到Golang文件路径未授权漏洞",
 	solution: <<<CODE
 ### 修复建议
 #### 1. 验证并过滤用户输入的文件路径
@@ -186,6 +185,7 @@ CODE
 	level: "high",
 	type: "vuln",
 	title: "Check Golang File Upload Vulnerability",
+	title_zh: "检测到Golang文件路径未授权漏洞",
 }
 
 desc(

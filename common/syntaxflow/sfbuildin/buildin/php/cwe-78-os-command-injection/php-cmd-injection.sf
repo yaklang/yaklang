@@ -147,7 +147,6 @@ CODE)> as $highAndMid
 $highAndMid - $high as $mid
 
 alert $mid	for {
-	type: "vuln",
 	title: "Partially Filtered PHP Command Execution",
 	title_zh: "PHP部分过滤命令执行",
 	solution: <<<CODE
@@ -204,10 +203,13 @@ system("cat " . $filename);
 - **拒绝服务：** 攻击者可以执行例如 `fork bomb` 等命令导致服务器资源耗尽，造成拒绝服务。
 CODE
 	level: "mid",
+	type: "vuln",
 }
 $sink - $mid - $high as $low
 
 alert $low	for {
+	type: "info",
+	title: "Filtered PHP Command Execution",
 	title_zh: "PHP过滤命令执行",
 	desc: <<<CODE
 ### 规则目的
@@ -222,8 +224,6 @@ alert $low	for {
 仅分析那些已包含过滤机制的代码路径，判断过滤逻辑是否足够有效，以防止命令注入漏洞。
 CODE
 	level: "low",
-	type: "info",
-	title: "Filtered PHP Command Execution",
 }
 desc(
 	lang: 'php'
