@@ -345,6 +345,8 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 	} else {
 		fReq, _ = mutate.NewFuzzHTTPRequest(reqRaw)
 	}
+	host, _, _ := utils.ParseStringToHostPort(url)
+	flow.Host = host
 
 	ip, _, _ := utils.ParseStringToHostPort(remoteAddr)
 	if ip != "" {

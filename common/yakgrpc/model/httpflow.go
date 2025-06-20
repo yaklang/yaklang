@@ -155,6 +155,7 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 		Payloads: lo.Map(strings.Split(f.Payload, ","), func(i string, _ int) string {
 			return utf8safe(i)
 		}),
+		Host: f.Host,
 	}
 	// 设置 title
 	var (
@@ -183,7 +184,9 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 	}
 	host, port, _ := utils.ParseStringToHostPort(flow.Url)
 	flow.HostPort = utf8safe(utils.HostPort(host, port))
-	flow.Host = host
+	if f.Host == "" {
+		flow.Host = host
+	}
 
 	flow.BodySizeVerbose = utf8safe(utils.ByteSize(uint64(flow.BodyLength)))
 
