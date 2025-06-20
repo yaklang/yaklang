@@ -280,8 +280,8 @@ func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlowFromDb(db *gorm.DB) {
 				swg.Done()
 				// 处理完成后更新计数和进度
 				atomic.AddInt64(&m.handledHTTPFlowCount, 1)
-				m.notifyProcess(float64(atomic.LoadInt64(&m.handledHTTPFlowCount)) / float64(atomic.LoadInt64(&m.allHTTPFlowCount)))
 				m.notifyHandleFlowNum()
+				m.notifyProcess(float64(atomic.LoadInt64(&m.handledHTTPFlowCount)) / float64(atomic.LoadInt64(&m.allHTTPFlowCount)))
 			}()
 
 			if f == nil {
