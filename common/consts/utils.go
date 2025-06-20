@@ -152,3 +152,29 @@ func GetVulinboxPath() string {
 	}
 	return utils.GetFirstExistedFile(paths...)
 }
+
+func GetLlamaServerPath() string {
+	defaultPath := GetDefaultYakitProjectsDir()
+	var paths []string
+	if runtime.GOOS == "windows" {
+		paths = append(paths, filepath.Join(defaultPath, "libs", "llama-server", "build", "bin", "llama-server.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "libs", "llama-server", "llama-server.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "libs", "llama-server"))
+
+	} else {
+		paths = append(paths, filepath.Join(defaultPath, "libs", "llama-server", "build", "bin", "llama-server"))
+		paths = append(paths, filepath.Join(defaultPath, "libs", "llama-server", "llama-server"))
+		paths = append(paths, filepath.Join(defaultPath, "libs", "llama-server"))
+		paths = append(paths, "llama-server")
+		paths = append(paths, filepath.Join("/", "usr", "local", "bin", "llama-server"))
+		paths = append(paths, filepath.Join("/", "bin", "llama-server"))
+		paths = append(paths, filepath.Join("/", "usr", "bin", "llama-server"))
+	}
+	return utils.GetFirstExistedFile(paths...)
+}
+
+func GetAIModelPath() string {
+	defaultPath := GetDefaultYakitProjectsDir()
+	modelsDir := filepath.Join(defaultPath, "libs", "models")
+	return modelsDir
+}

@@ -497,6 +497,12 @@ const (
 	Yak_SaveAITool_FullMethodName                                 = "/ypb.Yak/SaveAITool"
 	Yak_ToggleAIToolFavorite_FullMethodName                       = "/ypb.Yak/ToggleAIToolFavorite"
 	Yak_AIToolGenerateMetadata_FullMethodName                     = "/ypb.Yak/AIToolGenerateMetadata"
+	Yak_IsLlamaServerReady_FullMethodName                         = "/ypb.Yak/IsLlamaServerReady"
+	Yak_IsLocalModelReady_FullMethodName                          = "/ypb.Yak/IsLocalModelReady"
+	Yak_InstallLlamaServer_FullMethodName                         = "/ypb.Yak/InstallLlamaServer"
+	Yak_StartLocalModel_FullMethodName                            = "/ypb.Yak/StartLocalModel"
+	Yak_DownloadLocalModel_FullMethodName                         = "/ypb.Yak/DownloadLocalModel"
+	Yak_GetSupportedLocalModels_FullMethodName                    = "/ypb.Yak/GetSupportedLocalModels"
 )
 
 // YakClient is the client API for Yak service.
@@ -1116,6 +1122,13 @@ type YakClient interface {
 	SaveAITool(ctx context.Context, in *SaveAIToolRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	ToggleAIToolFavorite(ctx context.Context, in *ToggleAIToolFavoriteRequest, opts ...grpc.CallOption) (*ToggleAIToolFavoriteResponse, error)
 	AIToolGenerateMetadata(ctx context.Context, in *AIToolGenerateMetadataRequest, opts ...grpc.CallOption) (*AIToolGenerateMetadataResponse, error)
+	// Local Model Management
+	IsLlamaServerReady(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*IsLlamaServerReadyResponse, error)
+	IsLocalModelReady(ctx context.Context, in *IsLocalModelReadyRequest, opts ...grpc.CallOption) (*IsLocalModelReadyResponse, error)
+	InstallLlamaServer(ctx context.Context, in *InstallLlamaServerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
+	StartLocalModel(ctx context.Context, in *StartLocalModelRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
+	DownloadLocalModel(ctx context.Context, in *DownloadLocalModelRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
+	GetSupportedLocalModels(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetSupportedLocalModelsResponse, error)
 }
 
 type yakClient struct {
@@ -6596,6 +6609,93 @@ func (c *yakClient) AIToolGenerateMetadata(ctx context.Context, in *AIToolGenera
 	return out, nil
 }
 
+func (c *yakClient) IsLlamaServerReady(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*IsLlamaServerReadyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(IsLlamaServerReadyResponse)
+	err := c.cc.Invoke(ctx, Yak_IsLlamaServerReady_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) IsLocalModelReady(ctx context.Context, in *IsLocalModelReadyRequest, opts ...grpc.CallOption) (*IsLocalModelReadyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(IsLocalModelReadyResponse)
+	err := c.cc.Invoke(ctx, Yak_IsLocalModelReady_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) InstallLlamaServer(ctx context.Context, in *InstallLlamaServerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[86], Yak_InstallLlamaServer_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[InstallLlamaServerRequest, ExecResult]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_InstallLlamaServerClient = grpc.ServerStreamingClient[ExecResult]
+
+func (c *yakClient) StartLocalModel(ctx context.Context, in *StartLocalModelRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[87], Yak_StartLocalModel_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StartLocalModelRequest, ExecResult]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_StartLocalModelClient = grpc.ServerStreamingClient[ExecResult]
+
+func (c *yakClient) DownloadLocalModel(ctx context.Context, in *DownloadLocalModelRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[88], Yak_DownloadLocalModel_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[DownloadLocalModelRequest, ExecResult]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_DownloadLocalModelClient = grpc.ServerStreamingClient[ExecResult]
+
+func (c *yakClient) GetSupportedLocalModels(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetSupportedLocalModelsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSupportedLocalModelsResponse)
+	err := c.cc.Invoke(ctx, Yak_GetSupportedLocalModels_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility.
@@ -7213,6 +7313,13 @@ type YakServer interface {
 	SaveAITool(context.Context, *SaveAIToolRequest) (*DbOperateMessage, error)
 	ToggleAIToolFavorite(context.Context, *ToggleAIToolFavoriteRequest) (*ToggleAIToolFavoriteResponse, error)
 	AIToolGenerateMetadata(context.Context, *AIToolGenerateMetadataRequest) (*AIToolGenerateMetadataResponse, error)
+	// Local Model Management
+	IsLlamaServerReady(context.Context, *Empty) (*IsLlamaServerReadyResponse, error)
+	IsLocalModelReady(context.Context, *IsLocalModelReadyRequest) (*IsLocalModelReadyResponse, error)
+	InstallLlamaServer(*InstallLlamaServerRequest, grpc.ServerStreamingServer[ExecResult]) error
+	StartLocalModel(*StartLocalModelRequest, grpc.ServerStreamingServer[ExecResult]) error
+	DownloadLocalModel(*DownloadLocalModelRequest, grpc.ServerStreamingServer[ExecResult]) error
+	GetSupportedLocalModels(context.Context, *Empty) (*GetSupportedLocalModelsResponse, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -8656,6 +8763,24 @@ func (UnimplementedYakServer) ToggleAIToolFavorite(context.Context, *ToggleAIToo
 }
 func (UnimplementedYakServer) AIToolGenerateMetadata(context.Context, *AIToolGenerateMetadataRequest) (*AIToolGenerateMetadataResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AIToolGenerateMetadata not implemented")
+}
+func (UnimplementedYakServer) IsLlamaServerReady(context.Context, *Empty) (*IsLlamaServerReadyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method IsLlamaServerReady not implemented")
+}
+func (UnimplementedYakServer) IsLocalModelReady(context.Context, *IsLocalModelReadyRequest) (*IsLocalModelReadyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method IsLocalModelReady not implemented")
+}
+func (UnimplementedYakServer) InstallLlamaServer(*InstallLlamaServerRequest, grpc.ServerStreamingServer[ExecResult]) error {
+	return status.Errorf(codes.Unimplemented, "method InstallLlamaServer not implemented")
+}
+func (UnimplementedYakServer) StartLocalModel(*StartLocalModelRequest, grpc.ServerStreamingServer[ExecResult]) error {
+	return status.Errorf(codes.Unimplemented, "method StartLocalModel not implemented")
+}
+func (UnimplementedYakServer) DownloadLocalModel(*DownloadLocalModelRequest, grpc.ServerStreamingServer[ExecResult]) error {
+	return status.Errorf(codes.Unimplemented, "method DownloadLocalModel not implemented")
+}
+func (UnimplementedYakServer) GetSupportedLocalModels(context.Context, *Empty) (*GetSupportedLocalModelsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSupportedLocalModels not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 func (UnimplementedYakServer) testEmbeddedByValue()             {}
@@ -16624,6 +16749,93 @@ func _Yak_AIToolGenerateMetadata_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_IsLlamaServerReady_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).IsLlamaServerReady(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_IsLlamaServerReady_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).IsLlamaServerReady(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_IsLocalModelReady_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IsLocalModelReadyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).IsLocalModelReady(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_IsLocalModelReady_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).IsLocalModelReady(ctx, req.(*IsLocalModelReadyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_InstallLlamaServer_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(InstallLlamaServerRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).InstallLlamaServer(m, &grpc.GenericServerStream[InstallLlamaServerRequest, ExecResult]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_InstallLlamaServerServer = grpc.ServerStreamingServer[ExecResult]
+
+func _Yak_StartLocalModel_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StartLocalModelRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).StartLocalModel(m, &grpc.GenericServerStream[StartLocalModelRequest, ExecResult]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_StartLocalModelServer = grpc.ServerStreamingServer[ExecResult]
+
+func _Yak_DownloadLocalModel_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(DownloadLocalModelRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).DownloadLocalModel(m, &grpc.GenericServerStream[DownloadLocalModelRequest, ExecResult]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_DownloadLocalModelServer = grpc.ServerStreamingServer[ExecResult]
+
+func _Yak_GetSupportedLocalModels_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetSupportedLocalModels(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetSupportedLocalModels_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetSupportedLocalModels(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -18199,6 +18411,18 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "AIToolGenerateMetadata",
 			Handler:    _Yak_AIToolGenerateMetadata_Handler,
 		},
+		{
+			MethodName: "IsLlamaServerReady",
+			Handler:    _Yak_IsLlamaServerReady_Handler,
+		},
+		{
+			MethodName: "IsLocalModelReady",
+			Handler:    _Yak_IsLocalModelReady_Handler,
+		},
+		{
+			MethodName: "GetSupportedLocalModels",
+			Handler:    _Yak_GetSupportedLocalModels_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -18643,6 +18867,21 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "StartMcpServer",
 			Handler:       _Yak_StartMcpServer_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "InstallLlamaServer",
+			Handler:       _Yak_InstallLlamaServer_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "StartLocalModel",
+			Handler:       _Yak_StartLocalModel_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "DownloadLocalModel",
+			Handler:       _Yak_DownloadLocalModel_Handler,
 			ServerStreams: true,
 		},
 	},
