@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"golang.org/x/exp/slices"
 	"io"
 	"os"
 	"path"
@@ -588,6 +589,9 @@ func (s *Server) ExportHTTPFlows(ctx context.Context, req *ypb.ExportHTTPFlowsRe
 		if err != nil {
 			return nil, utils.Errorf("cannot convert httpflow failed: %s", err)
 		}
+		if !slices.Contains(req.FieldName, "host") {
+			m.Host = ""
+		}
 		res = append(res, m)
 	}
 	cost := time.Now().Sub(start)
@@ -683,6 +687,7 @@ func (s *Server) HTTPFlowsData(ctx context.Context, httpFlow *schema.HTTPFlow) (
 		IsReadTooSlowResponse:      httpFlow.IsReadTooSlowResponse,
 		TooLargeResponseHeaderFile: httpFlow.TooLargeResponseHeaderFile,
 		TooLargeResponseBodyFile:   httpFlow.TooLargeResponseBodyFile,
+		Host:                       httpFlow.Host,
 	}
 	projectStoragesWhere := []string{strconv.Quote(strconv.FormatInt(int64(httpFlow.ID), 10) + "_response"), strconv.Quote(strconv.FormatInt(int64(httpFlow.ID), 10) + "_request")}
 	projectStorages, _ := yakit.GetProjectKeyByWhere(s.GetProjectDatabase(), projectStoragesWhere)
