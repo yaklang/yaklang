@@ -376,7 +376,7 @@ func (m *HTTPFlowAnalyzeManger) ExecHotPatch(db *gorm.DB, flow *schema.HTTPFlow)
 			log.Infof("save analyze result failed: %s", err)
 		}
 		atomic.AddInt64(&m.matchedHTTPFlowCount, 1)
-		m.notifyResult(analyzed, nil, flow)
+		m.notifyResult(analyzed, extractDatas, flow)
 		m.notifyMatchedHTTPFlowNum()
 	}
 
