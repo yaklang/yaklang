@@ -2,6 +2,7 @@ package schema
 
 import (
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 )
@@ -56,8 +57,7 @@ func (a *AIForge) AfterDelete(tx *gorm.DB) (err error) {
 	return nil
 }
 
-//todo  schema2grpc model
-
+// todo  schema2grpc model
 func (a *AIForge) ToGRPC() *ypb.AIForge {
 	return &ypb.AIForge{
 		ForgeName:          a.ForgeName,
@@ -67,10 +67,10 @@ func (a *AIForge) ToGRPC() *ypb.AIForge {
 		Params:             a.Params,
 		UserPersistentData: a.UserPersistentData,
 		Description:        a.Description,
-		ToolNames:          strings.Split(a.Tools, ","),
-		ToolKeywords:       strings.Split(a.ToolKeywords, ","),
+		ToolNames:          utils.StringSplitAndStrip(a.Tools, ","),
+		ToolKeywords:       utils.StringSplitAndStrip(a.ToolKeywords, ","),
 		Action:             a.Actions,
-		Tag:                strings.Split(a.Tags, ","),
+		Tag:                utils.StringSplitAndStrip(a.Tags, ","),
 		InitPrompt:         a.InitPrompt,
 		PersistentPrompt:   a.PersistentPrompt,
 		PlanPrompt:         a.PlanPrompt,
