@@ -9,7 +9,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
-type GuardianEventTrigger func(event *Event, emitter GuardianEmitter)
+type GuardianEventTrigger func(event *Event, emitter GuardianEmitter, aicaller AICaller)
+
 type GuardianMirrorStreamTrigger func(unlimitedChan *chanx.UnlimitedChan[*Event], emitter GuardianEmitter)
 
 type asyncGuardian struct {
@@ -19,6 +20,7 @@ type asyncGuardian struct {
 	outputEmitter        GuardianEmitter
 	mirrorCallback       map[string]*mirrorEventStream
 	eventTriggerCallback map[EventType][]GuardianEventTrigger
+	aiCaller             AICaller
 }
 
 type mirrorEventStream struct {
@@ -29,7 +31,7 @@ type mirrorEventStream struct {
 	trigger       GuardianMirrorStreamTrigger
 }
 
-func newAysncGuardian(ctx context.Context, coordinatorId string) *asyncGuardian {
+func newAsyncGuardian(ctx context.Context, coordinatorId string) *asyncGuardian {
 	g := &asyncGuardian{
 		ctx:                  ctx,
 		outputEmitter:        newGuardianEmitter(coordinatorId, func(event *Event) {}),
@@ -53,6 +55,12 @@ func (a *asyncGuardian) setOutputEmitter(coordinatorId string, emitter func(*Eve
 	a.callbackMutex.Lock()
 	defer a.callbackMutex.Unlock()
 	a.outputEmitter = newGuardianEmitter(coordinatorId, emitter)
+}
+
+func (a *asyncGuardian) setAiCaller(caller AICaller) {
+	a.callbackMutex.Lock()
+	defer a.callbackMutex.Unlock()
+	a.aiCaller = caller
 }
 
 func (a *asyncGuardian) feed(event *Event) {
@@ -114,7 +122,7 @@ func (a *asyncGuardian) emitEvent(event *Event) {
 
 	if triggers, ok := a.eventTriggerCallback[event.Type]; ok {
 		for _, trigger := range triggers {
-			trigger(event, a.outputEmitter)
+			trigger(event, a.outputEmitter, a.aiCaller)
 		}
 	}
 

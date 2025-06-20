@@ -18,7 +18,7 @@ func TestNewAsyncGuardian(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	g := newAysncGuardian(ctx, "test_coordinator_id")
+	g := newAsyncGuardian(ctx, "test_coordinator_id")
 	assert.NotNil(t, g, "Guardian should not be nil")
 	assert.Equal(t, ctx, g.ctx, "Guardian context should be the one provided")
 	assert.NotNil(t, g.unlimitedInput, "Guardian unlimitedInput channel should not be nil")
@@ -33,7 +33,7 @@ func TestAsyncGuardian_SetOutputEmitterAndFeed(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	g := newAysncGuardian(ctx, "test_coordinator_id")
+	g := newAsyncGuardian(ctx, "test_coordinator_id")
 	assert.NotNil(t, g)
 
 	var emittedEvents []*Event
@@ -48,7 +48,7 @@ func TestAsyncGuardian_SetOutputEmitterAndFeed(t *testing.T) {
 
 	testEvent := &Event{Type: "test_event_type", Content: []byte("test_data")}
 
-	err := g.registerEventTrigger(testEvent.Type, func(evt *Event, e GuardianEmitter) {
+	err := g.registerEventTrigger(testEvent.Type, func(evt *Event, e GuardianEmitter, caller AICaller) {
 		e.EmitStructured(string(evt.Type), evt)
 	})
 	assert.NoError(t, err, "Failed to register event trigger for test")
@@ -87,7 +87,7 @@ func TestAsyncGuardian_RegisterEventTrigger(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	g := newAysncGuardian(ctx, "test_coordinator_id")
+	g := newAsyncGuardian(ctx, "test_coordinator_id")
 	assert.NotNil(t, g)
 
 	var triggerCalled bool
@@ -98,7 +98,7 @@ func TestAsyncGuardian_RegisterEventTrigger(t *testing.T) {
 	testEventType := EventType("specific_event")
 	triggerNodeId := "node_from_specific_trigger"
 
-	trigger := func(event *Event, emitter GuardianEmitter) {
+	trigger := func(event *Event, emitter GuardianEmitter, caller AICaller) {
 		triggerCalled = true
 		receivedEventInTrigger = event
 		emitter.EmitStructured(triggerNodeId, &Event{Type: "event_from_trigger", Content: []byte("trigger_data")})
@@ -161,7 +161,7 @@ func TestAsyncGuardian_RegisterMirrorEventTrigger(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	g := newAysncGuardian(ctx, "test_coordinator_id")
+	g := newAsyncGuardian(ctx, "test_coordinator_id")
 	assert.NotNil(t, g)
 
 	var mirrorTriggerCalled bool
@@ -223,7 +223,7 @@ func TestAsyncGuardian_RegisterMirrorEventTrigger(t *testing.T) {
 func TestAsyncGuardian_EventLoop_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	g := newAysncGuardian(ctx, "test_coordinator_id")
+	g := newAsyncGuardian(ctx, "test_coordinator_id")
 	assert.NotNil(t, g)
 
 	var emittedEvents []*Event
@@ -235,7 +235,7 @@ func TestAsyncGuardian_EventLoop_ContextCancellation(t *testing.T) {
 	})
 
 	initialEventType := EventType("initial_event_type_for_cancel_test")
-	g.registerEventTrigger(initialEventType, func(event *Event, emitter GuardianEmitter) {
+	g.registerEventTrigger(initialEventType, func(event *Event, emitter GuardianEmitter, caller AICaller) {
 		emitter.EmitStructured(string(event.Type), event)
 	})
 
@@ -277,15 +277,15 @@ func TestAsyncGuardian_EventLoop_ContextCancellation(t *testing.T) {
 func TestAsyncGuardian_MultipleEventTriggers(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	g := newAysncGuardian(ctx, "test_coordinator_id")
+	g := newAsyncGuardian(ctx, "test_coordinator_id")
 
 	var trigger1Called, trigger2Called bool
 	eventType := EventType("multi_trigger_event")
 
-	g.registerEventTrigger(eventType, func(event *Event, emitter GuardianEmitter) {
+	g.registerEventTrigger(eventType, func(event *Event, emitter GuardianEmitter, caller AICaller) {
 		trigger1Called = true
 	})
-	g.registerEventTrigger(eventType, func(event *Event, emitter GuardianEmitter) {
+	g.registerEventTrigger(eventType, func(event *Event, emitter GuardianEmitter, caller AICaller) {
 		trigger2Called = true
 	})
 
@@ -300,7 +300,7 @@ func TestAsyncGuardian_MultipleEventTriggers(t *testing.T) {
 func TestAsyncGuardian_EventAndMirrorTriggers(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	g := newAysncGuardian(ctx, "test_coordinator_id")
+	g := newAsyncGuardian(ctx, "test_coordinator_id")
 
 	var eventTriggerCalled, mirrorTriggerCalled bool
 	specificEventType := EventType("specific_for_interaction_test")
@@ -324,7 +324,7 @@ func TestAsyncGuardian_EventAndMirrorTriggers(t *testing.T) {
 		}
 	})
 
-	g.registerEventTrigger(specificEventType, func(event *Event, emitter GuardianEmitter) {
+	g.registerEventTrigger(specificEventType, func(event *Event, emitter GuardianEmitter, caller AICaller) {
 		eventTriggerCalled = true
 		emitter.EmitStructured("event_trigger_node", &Event{Type: "from_event_trigger"})
 	})
