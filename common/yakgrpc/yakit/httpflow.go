@@ -601,12 +601,20 @@ func AppendHTTPFlowTagsByHiddenIndexEx(hiddenIndex string, tags ...string) error
 }
 
 func GetHTTPFlow(db *gorm.DB, id int64) (*schema.HTTPFlow, error) {
-	var req schema.HTTPFlow
-	if db := db.Model(&schema.HTTPFlow{}).Where("id = ?", id).First(&req); db.Error != nil {
-		return nil, utils.Errorf("get HTTPFlow failed: %s", db.Error)
+	//var req schema.HTTPFlow
+	//if db := db.Model(&schema.HTTPFlow{}).Where("id = ?", id).First(&req); db.Error != nil {
+	//	return nil, utils.Errorf("get HTTPFlow failed: %s", db.Error)
+	//}
+	_, httpflows, err := QueryHTTPFlow(db, &ypb.QueryHTTPFlowRequest{
+		IncludeId: []int64{id},
+	})
+	if err != nil {
+		return nil, err
 	}
-
-	return &req, nil
+	if len(httpflows) != 1 {
+		return nil, utils.Errorf("get HTTPFlow failed: %s", fmt.Sprintf("id %d not found", id))
+	}
+	return httpflows[0], nil
 }
 
 func GetHTTPFlowByIDOrHash(db *gorm.DB, id int64, hash string) (*schema.HTTPFlow, error) {
@@ -650,12 +658,20 @@ func GetHttpFlowByRuntimeId(db *gorm.DB, rid string) (*schema.HTTPFlow, error) {
 }
 
 func GetHTTPFlowByHash(db *gorm.DB, hash string) (*schema.HTTPFlow, error) {
-	var req schema.HTTPFlow
-	if db := db.Model(&schema.HTTPFlow{}).Where("hash = ?", hash).First(&req); db.Error != nil {
-		return nil, utils.Errorf("get HTTPFlow failed: %s", db.Error)
+	//var req schema.HTTPFlow
+	//if db := db.Model(&schema.HTTPFlow{}).Where("hash = ?", hash).First(&req); db.Error != nil {
+	//	return nil, utils.Errorf("get HTTPFlow failed: %s", db.Error)
+	//}
+	_, httpflows, err := QueryHTTPFlow(db, &ypb.QueryHTTPFlowRequest{
+		IncludeHash: []string{hash},
+	})
+	if err != nil {
+		return nil, err
 	}
-
-	return &req, nil
+	if len(httpflows) != 1 {
+		return nil, utils.Errorf("get HTTPFlow failed: %s", fmt.Sprintf("hash %s not found", hash))
+	}
+	return httpflows[0], nil
 }
 
 func GetHTTPFlowByHiddenIndex(db *gorm.DB, index string) (*schema.HTTPFlow, error) {
