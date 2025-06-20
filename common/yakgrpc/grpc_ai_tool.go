@@ -80,6 +80,7 @@ func (s *Server) GetAIToolList(ctx context.Context, req *ypb.GetAIToolListReques
 			OrderBy: req.GetPagination().GetOrderBy(),
 			Order:   req.GetPagination().GetOrder(),
 		},
+		Total: int64(pagination.TotalRecord),
 	}, nil
 }
 
