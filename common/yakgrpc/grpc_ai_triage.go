@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/consts"
@@ -63,7 +62,6 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 		aid.WithEventInputChan(inputEvent),
 	}
 	aidOption = append(aidOption, buildAIDOption(startParams)...)
-	aidOption = append(aidOption, aid.WithAICallback(aiforge.GetHoldAICallback()))
 
 	freeInputChan := chanx.NewUnlimitedChan[chunkmaker.Chunk](baseCtx, 1000)
 	seqClear := regexp.MustCompile("\n\n+")
@@ -150,11 +148,11 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 				defer cancel()
 				res, err := yak.ExecuteForge("intent_recognition",
 					query,
-					yak.WithAICallback(aiforge.GetHoldAICallback()),
-					yak.WithDisallowRequireForUserPrompt(),
-					yak.WithMemory(memory),
-					yak.WithContext(subCtx),
-				)
+					append(
+						buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), aidOption...),
+						yak.WithMemory(memory),
+						yak.WithDisallowRequireForUserPrompt(),
+						yak.WithContext(subCtx)))
 				if err != nil {
 					log.Errorf("ExecuteForge: %v", err)
 					return
