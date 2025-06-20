@@ -809,20 +809,54 @@ RECONNECT:
 			httpctx.SetBareRequestBytes(reqIns, requestPacket)
 		}
 		currentRPS.Add(1)
+
+		sendPacketWithRandomChunk := func() error {
+			chunkedOpts := []RandomChunkedHTTPOption{
+				WithRandomChunkedDelay(option.MinChunkDelayTime, option.MaxChunkDelayTime),
+				WithRandomChunkedContext(option.Ctx),
+				WithRandomChunkedLength(option.MinChunkedLength, option.MaxChunkedLength),
+				WithRandomChunkedHandler(option.ChunkedHandler),
+			}
+			err = SendRandomChunkedHTTP(
+				conn,
+				requestPacket,
+				chunkedOpts...,
+			)
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+
 		if oldVersionProxyChecking {
 			var legacyRequest []byte
 			legacyRequest, err = BuildLegacyProxyRequest(requestPacket)
 			if err != nil {
 				return response, err
 			}
-			_, err = conn.Write(legacyRequest)
+			if option.EnableRandomChunked {
+				err = sendPacketWithRandomChunk()
+				if err != nil {
+					log.Errorf("[lowhttp] send random chunked http failed: %v", err)
+					goto RECONNECT
+				}
+			} else {
+				_, err = conn.Write(legacyRequest)
+			}
 		} else {
-			_, err = conn.Write(requestPacket)
+			if option.EnableRandomChunked {
+				err = sendPacketWithRandomChunk()
+				if err != nil {
+					log.Errorf("[lowhttp] send random chunked http failed: %v", err)
+					goto RECONNECT
+				}
+			} else {
+				_, err = conn.Write(requestPacket)
+			}
 		}
 		if err != nil {
 			return response, errors.Wrap(err, "write request failed")
 		}
-
 		// TeeReader 用于畸形响应包: 即 ReadHTTPResponseFromBufioReader 无法解析但是conn中存在数据的情况
 		if option.DefaultBufferSize <= 0 {
 			option.DefaultBufferSize = 4096
