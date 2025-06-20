@@ -223,6 +223,7 @@ $catch?{!.body & $no_instruction_catch_body} as $normal_catch
 $normal_catch.exception as $exception 
 $exception?{!(<getUsers()>?{!opcode:catch})} as $unuse_exception 
 alert $unuse_exception	for {
+	title: "Check Java Empty Catch Block",
 	title_zh: "在非空Catch块中没有对异常进行任何处理",
 	solution: <<<CODE
 ### 修复建议
@@ -325,7 +326,6 @@ CODE
    - 导致系统状态不一致，可能引发数据丢失或损坏。
 CODE
 	level: "low",
-	title: "Check Java Empty Catch Block",
 }
 
 desc(

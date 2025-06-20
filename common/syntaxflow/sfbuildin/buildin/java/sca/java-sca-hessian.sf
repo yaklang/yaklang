@@ -61,6 +61,7 @@ REFERENCE
 __dependency__.*hessian.version as $ver;
 $ver in (,4.0.63] as $vuln_hessian;
 alert $vuln_hessian	for {
+	title_zh: "SCA: 检测Java Hessian依赖漏洞",
 	solution: <<<CODE
 ### 修复建议
 
@@ -111,16 +112,12 @@ CODE
 	message: "SCA: hessian version 4.0.63 has an unsafe deserialization vulnerability",
 	cve: "CVE-2021-43297",
 	title: "SCA: Check Java Hessian Vulnerability",
-	title_zh: "SCA: 检测Java Hessian依赖漏洞",
 }
 
 // 检查 com.alibaba:hessian-lite 版本小于 3.2.13 的不安全反序列化漏洞
 __dependency__.*alibaba*hessian*lite.version as $ver_hessian_lite;
 $ver_hessian_lite in (,3.2.13) as $vuln_hessian_lite;
 alert $vuln_hessian_lite	for {
-	level: "critical",
-	cve: "CVE-2022-38371",
-	message: "SCA: com.alibaba:hessian-lite 版本低于 3.2.13 存在不安全的反序列化漏洞",
 	title: "SCA: Check Java Hessian Vulnerability",
 	title_zh: "SCA: 检测Java Hessian依赖漏洞",
 	solution: <<<CODE
@@ -169,11 +166,15 @@ CODE
 
 此规则致力于检测Java项目中对 Hessian 库 (包括 `hessian`, `hessian-lite`, `sofa-hessian`, `camel-hessian`, `solon.serialization.hessian`) 的依赖，并识别已知存在不安全反序列化漏洞的版本，以便及时响应和修复。
 CODE
+	level: "critical",
+	cve: "CVE-2022-38371",
+	message: "SCA: com.alibaba:hessian-lite 版本低于 3.2.13 存在不安全的反序列化漏洞",
 }
 
 // 检查 com.alibaba:hessian-lite 版本小于 3.2.12 的远程代码执行漏洞
 $ver_hessian_lite in (,3.2.12) as $vuln_hessian_lite_rce;
 alert $vuln_hessian_lite_rce	for {
+	title: "SCA: Check Java Hessian Vulnerability",
 	title_zh: "SCA: 检测Java Hessian依赖漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -224,13 +225,13 @@ CODE
 	level: "critical",
 	cve: "CVE-2022-26136",
 	message: "SCA: com.alibaba:hessian-lite 版本低于 3.2.12 存在远程代码执行漏洞",
-	title: "SCA: Check Java Hessian Vulnerability",
 }
 
 // 检查 com.alipay.sofa:hessian 版本小于 3.5.5 的不安全反序列化漏洞（严重）
 __dependency__.*alipay*hessian.version as $ver_sofa_hessian;
 $ver_sofa_hessian in (,3.5.5) as $vuln_sofa_hessian_critical;
 alert $vuln_sofa_hessian_critical	for {
+	title: "SCA: Check Java Hessian Vulnerability",
 	title_zh: "SCA: 检测Java Hessian依赖漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -280,12 +281,13 @@ CODE
 CODE
 	level: "critical",
 	message: "SCA: com.alipay.sofa:hessian 版本低于 3.5.5 存在不安全的反序列化漏洞",
-	title: "SCA: Check Java Hessian Vulnerability",
 }
 
 // 检查 com.alipay.sofa:hessian 版本小于 4.0.3 的不安全反序列化漏洞（高）
 $ver_sofa_hessian in (,4.0.3) as $vuln_sofa_hessian_high;
 alert $vuln_sofa_hessian_high	for {
+	message: "SCA: com.alipay.sofa:hessian 版本低于 4.0.3 存在不安全的反序列化漏洞",
+	title: "SCA: Check Java Hessian Vulnerability",
 	title_zh: "SCA: 检测Java Hessian依赖漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -334,8 +336,6 @@ CODE
 此规则致力于检测Java项目中对 Hessian 库 (包括 `hessian`, `hessian-lite`, `sofa-hessian`, `camel-hessian`, `solon.serialization.hessian`) 的依赖，并识别已知存在不安全反序列化漏洞的版本，以便及时响应和修复。
 CODE
 	level: "critical",
-	message: "SCA: com.alipay.sofa:hessian 版本低于 4.0.3 存在不安全的反序列化漏洞",
-	title: "SCA: Check Java Hessian Vulnerability",
 }
 
 // 检查 com.caucho:hessian 存在漏洞的版本区间

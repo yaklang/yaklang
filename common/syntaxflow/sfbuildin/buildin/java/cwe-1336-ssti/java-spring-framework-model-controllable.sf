@@ -71,52 +71,6 @@ $source<dataflow(exclude=<<<CODE
 CODE)> as $filteredSource
 <delete(param)>
 alert $filteredSource	for {
-	title: "Unvalidated Java Spring Framework ModelAndView SSTI",
-	title_zh: "未验证的 Java Spring Framework ModelAndView SSTI",
-	solution: <<<CODE
-### 修复建议
-
-#### 1. 避免直接使用用户输入作为模板路径或内容
-不要将未经验证和过滤的用户输入直接用于`ModelAndView`的视图名或模板路径。确保所有模板路径由开发者严格控制。
-
-```java
-@GetMapping("/")
-public ModelAndView handleRequest(@RequestParam String viewName) {
-    // 使用白名单验证用户输入，防止恶意注入
-    if (!viewName.matches("^[a-zA-Z0-9_-]+$")) {
-        throw new IllegalArgumentException("Invalid view name");
-    }
-    return new ModelAndView(viewName);
-}
-```
-
-#### 2. 使用安全的模板引擎配置
-确保模板引擎配置为安全模式，避免渲染危险表达式。例如，在Thymeleaf中启用HTML转义功能：
-
-```properties
-spring.thymeleaf.enable-spring-el-compiler=false
-spring.thymeleaf.template-resolver-order=LEGACYHTML5
-```
-
-#### 3. 输入验证与过滤
-对用户输入进行严格的验证和过滤，仅允许预期格式的数据通过。例如，限制`id`为数字类型：
-
-```java
-@GetMapping(MODEL + "/edit.do")
-public ModelAndView edit(String id) {
-    if (!id.matches("^[0-9]+$")) {
-        throw new IllegalArgumentException("Invalid id format");
-    }
-    ModelAndView view = new ModelAndView("/admin/org" + id + "/edit.html");
-    CoreOrg org = orgConsoleService.queryById(id);
-    view.addObject("org", org);
-    return view;
-}
-```
-
-#### 4. 定期代码审查
-定期进行代码审查，寻找可能直接使用用户输入构建模板路径的场景，并及时修复潜在漏洞。
-CODE
 	desc: <<<CODE
 ### 漏洞描述
 
@@ -164,6 +118,52 @@ CODE
 	level: "high",
 	message_zh: "识别到 Java Spring Framework 中 ModelAndView 构造函数可控",
 	message: "Recognize Java Spring Framework code that can control the ModelAndView constructor",
+	title: "Unvalidated Java Spring Framework ModelAndView SSTI",
+	title_zh: "未验证的 Java Spring Framework ModelAndView SSTI",
+	solution: <<<CODE
+### 修复建议
+
+#### 1. 避免直接使用用户输入作为模板路径或内容
+不要将未经验证和过滤的用户输入直接用于`ModelAndView`的视图名或模板路径。确保所有模板路径由开发者严格控制。
+
+```java
+@GetMapping("/")
+public ModelAndView handleRequest(@RequestParam String viewName) {
+    // 使用白名单验证用户输入，防止恶意注入
+    if (!viewName.matches("^[a-zA-Z0-9_-]+$")) {
+        throw new IllegalArgumentException("Invalid view name");
+    }
+    return new ModelAndView(viewName);
+}
+```
+
+#### 2. 使用安全的模板引擎配置
+确保模板引擎配置为安全模式，避免渲染危险表达式。例如，在Thymeleaf中启用HTML转义功能：
+
+```properties
+spring.thymeleaf.enable-spring-el-compiler=false
+spring.thymeleaf.template-resolver-order=LEGACYHTML5
+```
+
+#### 3. 输入验证与过滤
+对用户输入进行严格的验证和过滤，仅允许预期格式的数据通过。例如，限制`id`为数字类型：
+
+```java
+@GetMapping(MODEL + "/edit.do")
+public ModelAndView edit(String id) {
+    if (!id.matches("^[0-9]+$")) {
+        throw new IllegalArgumentException("Invalid id format");
+    }
+    ModelAndView view = new ModelAndView("/admin/org" + id + "/edit.html");
+    CoreOrg org = orgConsoleService.queryById(id);
+    view.addObject("org", org);
+    return view;
+}
+```
+
+#### 4. 定期代码审查
+定期进行代码审查，寻找可能直接使用用户输入构建模板路径的场景，并及时修复潜在漏洞。
+CODE
 }
 
 

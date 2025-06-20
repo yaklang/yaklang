@@ -75,36 +75,6 @@ SOLUTION
 LIBXML_NOENT<getCall><getCallee>?{<getObject><name>?{have: DOMDocument} && <name>?{have: load} } as $vuln;
 check $vuln;
 alert $vuln	for {
-	solution: <<<CODE
-### 修复建议
-
-1. **禁用外部实体加载**
-   最有效的方法是禁用LIBXML_NOENT选项以及其他可能导致外部实体被处理的选项。对于DOMDocument::loadXML 或 DOMDocument::load，可以通过传递合适的选项来禁用：
-   ```php
-   // 修复代码示例：禁用外部实体加载
-   $xml = $_POST['xml_data'];
-   $doc = new DOMDocument();
-   // 禁用 LIBXML_NOENT 和 LIBXML_NOEXTERNALENT
-   // LIBXML_NONOCENT = 2048 (自 PHP 5.2.10)
-   // LIBXML_NOEXTERNALENT = 16 (自 PHP 5.1.2)
-   // 在较新版本PHP中，LIBXML_NOENT默认是关闭的，但显式禁用更安全
-   $options = 0; // 默认无特殊选项
-   // 如果需要处理DTD，但禁用外部实体，可以使用其他更精细的选项或进行白名单限制。
-   try {
-       $doc->loadXML($xml, $options);
-       // 处理XML
-   } catch (Exception $e) {
-       // 错误处理，例如XML格式错误
-   }
-   ```
-   或者，直接设置 `libxml_disable_entity_loader(true)` 函数来全局禁用实体加载 (但在PHP 8+中已被弃用)。在现代PHP版本中，推荐通过libxml的选项来更精细地控制。
-
-2. **输入验证和清理**
-   在解析XML之前，对用户输入的XML数据进行严格的验证和清理。例如，使用黑名单或白名单过滤掉DOCCYPE声明、SYSTEM或PUBLIC标识符。
-
-3. **最小权限原则**
-   运行XML解析服务的用户或进程应具有最小必要的权限，以限制即使发生XXE漏洞时攻击者能够访问的资源范围。
-CODE
 	desc: <<<CODE
 ### 漏洞描述
 
@@ -140,6 +110,36 @@ CODE
 	level: "high",
 	title: "Detect PHP DOMDocument Load XXE Vulnerability",
 	title_zh: "检测PHP DOMDocument load XXE漏洞",
+	solution: <<<CODE
+### 修复建议
+
+1. **禁用外部实体加载**
+   最有效的方法是禁用LIBXML_NOENT选项以及其他可能导致外部实体被处理的选项。对于DOMDocument::loadXML 或 DOMDocument::load，可以通过传递合适的选项来禁用：
+   ```php
+   // 修复代码示例：禁用外部实体加载
+   $xml = $_POST['xml_data'];
+   $doc = new DOMDocument();
+   // 禁用 LIBXML_NOENT 和 LIBXML_NOEXTERNALENT
+   // LIBXML_NONOCENT = 2048 (自 PHP 5.2.10)
+   // LIBXML_NOEXTERNALENT = 16 (自 PHP 5.1.2)
+   // 在较新版本PHP中，LIBXML_NOENT默认是关闭的，但显式禁用更安全
+   $options = 0; // 默认无特殊选项
+   // 如果需要处理DTD，但禁用外部实体，可以使用其他更精细的选项或进行白名单限制。
+   try {
+       $doc->loadXML($xml, $options);
+       // 处理XML
+   } catch (Exception $e) {
+       // 错误处理，例如XML格式错误
+   }
+   ```
+   或者，直接设置 `libxml_disable_entity_loader(true)` 函数来全局禁用实体加载 (但在PHP 8+中已被弃用)。在现代PHP版本中，推荐通过libxml的选项来更精细地控制。
+
+2. **输入验证和清理**
+   在解析XML之前，对用户输入的XML数据进行严格的验证和清理。例如，使用黑名单或白名单过滤掉DOCCYPE声明、SYSTEM或PUBLIC标识符。
+
+3. **最小权限原则**
+   运行XML解析服务的用户或进程应具有最小必要的权限，以限制即使发生XXE漏洞时攻击者能够访问的资源范围。
+CODE
 }
 
 

@@ -107,6 +107,40 @@ $obj #{
 }-> as $low;
 
 alert $low	for {
+	desc: <<<CODE
+### 漏洞描述
+1. **漏洞原理**
+由于应用程序在使用`json.Marshal`等函数时未对敏感信息进行过滤或脱敏处理，攻击者可能通过构造特定请求获取服务器上的敏感数据。这些数据包括但不限于目录结构、工作路径以及系统类型等。
+2. **触发场景**
+// 存在漏洞的代码示例
+```go
+package main
+
+import (
+	"encoding/json"
+	"github.com/beego/beego/v2/server/web"
+)
+
+func (c *JsonpVuln1Controller) Get() {
+	callback := c.GetString("callback")
+	c.Ctx.ResponseWriter.Header().Set("Content-Type", "application/javascript")
+	jsonp := make(map[string]interface{})
+	jsonp["username"] = "admin"
+	jsonp["password"] = "admin@123" // 包含敏感信息
+	data, err := json.Marshal(jsonp)
+	output := callback + "(" + string(data) + ")"
+	if err != nil {
+		panic(err)
+	}
+	c.Ctx.ResponseWriter.Write([]byte(output))
+}
+```
+攻击者可以通过调用该接口获取包含用户名和密码的JSONP响应，进一步利用这些信息发起后续攻击。
+3. **潜在影响**
+- 目录结构、工作路径等敏感信息泄露，导致攻击者能够更好地了解系统架构。
+- 用户凭证（如密码）泄露，可能导致账户被非法访问。
+- 攻击者可利用获取到的信息辅助后续攻击，例如提权或横向移动。
+CODE
 	level: "low",
 	type: "vuln",
 	title: "Detect Golang Json Information Exposure",
@@ -158,40 +192,6 @@ fmt.Println(string(data)) // 密码字段被替换为 *****
 
 #### 3. 审查输出内容
 确保所有通过API返回的数据都经过审查，并仅包含必要的非敏感信息。
-CODE
-	desc: <<<CODE
-### 漏洞描述
-1. **漏洞原理**
-由于应用程序在使用`json.Marshal`等函数时未对敏感信息进行过滤或脱敏处理，攻击者可能通过构造特定请求获取服务器上的敏感数据。这些数据包括但不限于目录结构、工作路径以及系统类型等。
-2. **触发场景**
-// 存在漏洞的代码示例
-```go
-package main
-
-import (
-	"encoding/json"
-	"github.com/beego/beego/v2/server/web"
-)
-
-func (c *JsonpVuln1Controller) Get() {
-	callback := c.GetString("callback")
-	c.Ctx.ResponseWriter.Header().Set("Content-Type", "application/javascript")
-	jsonp := make(map[string]interface{})
-	jsonp["username"] = "admin"
-	jsonp["password"] = "admin@123" // 包含敏感信息
-	data, err := json.Marshal(jsonp)
-	output := callback + "(" + string(data) + ")"
-	if err != nil {
-		panic(err)
-	}
-	c.Ctx.ResponseWriter.Write([]byte(output))
-}
-```
-攻击者可以通过调用该接口获取包含用户名和密码的JSONP响应，进一步利用这些信息发起后续攻击。
-3. **潜在影响**
-- 目录结构、工作路径等敏感信息泄露，导致攻击者能够更好地了解系统架构。
-- 用户凭证（如密码）泄露，可能导致账户被非法访问。
-- 攻击者可利用获取到的信息辅助后续攻击，例如提权或横向移动。
 CODE
 }
 

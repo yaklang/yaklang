@@ -61,6 +61,8 @@ SOLUTION
 __dependency__.*mysql*connector*java.version as $ver;
 $ver in [8.0.17,8.0.27] as $vuln_mysql_connector_java;
 alert $vuln_mysql_connector_java	for {
+	cve: "CVE-2021-2471",
+	message: "SCA: mysql-connector-java versions between 8.0.17 and 8.0.27 have an information disclosure vulnerability",
 	title: "SCA: Check Java Mysql Connector Vulnerability",
 	title_zh: "SCA: 检测Java jdbc mysql-connector 依赖漏洞",
 	solution: <<<CODE
@@ -113,6 +115,4 @@ CODE
    - 系统的整体安全性受到威胁。
 CODE
 	level: "mid",
-	cve: "CVE-2021-2471",
-	message: "SCA: mysql-connector-java versions between 8.0.17 and 8.0.27 have an information disclosure vulnerability",
 }

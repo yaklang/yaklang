@@ -103,6 +103,7 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high	for {
+	title: "Unvalidated MySQL Parameter Injection",
 	title_zh: "MySQL未验证参数注入风险",
 	solution: <<<CODE
 ### 修复建议
@@ -172,7 +173,6 @@ CODE
    - **操作系统命令执行**: 在某些配置不当的情况下，攻击者甚至可能通过SQL注入执行操作系统命令。
 CODE
 	level: "high",
-	title: "Unvalidated MySQL Parameter Injection",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -247,6 +247,7 @@ $sink - $high - $mid as $low
 
 check $low
 alert $low	for {
+	level: "low",
 	title: "Potential MySQL Access Control Bypass",
 	title_zh: "MySQL访问控制潜在绕过风险",
 	desc: <<<CODE
@@ -272,7 +273,6 @@ alert $low	for {
    ?>
    ```
 CODE
-	level: "low",
 }
 desc(
 	lang: php

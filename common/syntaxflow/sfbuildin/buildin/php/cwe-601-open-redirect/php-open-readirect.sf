@@ -186,6 +186,7 @@ CODE
 $sink - $high - $mid as $low
 
 alert $low	for {
+	title: "Check PHP Potential Redirect Validation Bypass",
 	title_zh: "检测PHP重定向验证潜在绕过风险",
 	desc: <<<CODE
 ### 规则目的
@@ -200,7 +201,6 @@ alert $low	for {
 CODE
 	level: "low",
 	type: "low",
-	title: "Check PHP Potential Redirect Validation Bypass",
 }
 desc(
 	lang: "php"

@@ -163,7 +163,6 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high	for {
-	title: "Unvalidated SSRF Parameter Injection",
 	title_zh: "SSRF未验证参数注入风险",
 	solution: <<<CODE
 ### 修复建议
@@ -282,6 +281,7 @@ CODE
    - 端口扫描。
 CODE
 	level: "high",
+	title: "Unvalidated SSRF Parameter Injection",
 }
 
 $all<dataflow(include=<<<CODE
@@ -293,6 +293,8 @@ CODE)> as $highAndMid
 $highAndMid - $high as $mid
 
 alert $mid	for {
+	level: "mid",
+	title: "Insufficient SSRF Parameter Filtering",
 	title_zh: "SSRF参数过滤不充分",
 	solution: <<<CODE
 ### 修复建议
@@ -373,12 +375,12 @@ CODE
    - 可能导致攻击者访问非预期的内部资源。
    - 存在一定的信息泄露风险。
 CODE
-	level: "mid",
-	title: "Insufficient SSRF Parameter Filtering",
 }
 
 $sink - $high - $mid  as $low
 alert $low	for {
+	title: "Potential SSRF Access Control Bypass",
+	title_zh: "SSRF访问控制潜在绕过风险",
 	solution: <<<CODE
 ### 修复建议
 
@@ -457,8 +459,6 @@ CODE
    - 可能导致信息泄露或其他非预期行为。
 CODE
 	level: "low",
-	title: "Potential SSRF Access Control Bypass",
-	title_zh: "SSRF访问控制潜在绕过风险",
 }
 
 desc(

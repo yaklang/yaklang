@@ -72,7 +72,9 @@ $sink #{
 }-> as $high;
 
 alert $high	for {
+	level: "high",
 	risk: "Groovy-Shell代码执行漏洞",
+	message: "发现Java Servlet Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
 	title: "Check Java Servlet Groovy Shell Code Injection Vulnerability",
 	title_zh: "检测Java Servlet Groovy Shell代码注入漏洞",
 	solution: <<<CODE
@@ -223,8 +225,6 @@ CODE
    - **权限提升:** 攻击者可能利用服务器上的其他漏洞或配置错误来提升权限。
    - **作为攻击跳板:** 受感染的服务器可能被用于发起对内部网络或其他外部目标的攻击。
 CODE
-	level: "high",
-	message: "发现Java Servlet Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
 }
 
 $sink #{
@@ -233,6 +233,8 @@ $sink #{
 $result - $high as $low;
 
 alert $low	for {
+	title: "Check Java Servlet Groovy Shell Code Injection Vulnerability with Data Flow Filtering",
+	title_zh: "检测带数据流过滤的Java Servlet Groovy Shell代码注入漏洞",
 	desc: <<<CODE
 ### 规则目的
 该规则旨在识别是否存在潜在的Java Servlet Groovy Shell代码注入漏洞，但与高风险级别不同的是，它适用于具有一定数据流过滤机制的场景。这些过滤机制可能包括但不限于参数清理、白名单验证或沙箱限制等。
@@ -252,8 +254,6 @@ CODE
 	level: "low",
 	risk: "Groovy-Shell代码执行漏洞",
 	message: "发现Java Servlet Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
-	title: "Check Java Servlet Groovy Shell Code Injection Vulnerability with Data Flow Filtering",
-	title_zh: "检测带数据流过滤的Java Servlet Groovy Shell代码注入漏洞",
 }
 
 desc(

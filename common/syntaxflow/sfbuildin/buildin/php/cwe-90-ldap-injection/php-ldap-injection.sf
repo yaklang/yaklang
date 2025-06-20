@@ -88,8 +88,6 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high	for {
-	type: "vuln",
-	title: "Check PHP LDAP Direct Injection Vulnerability (No Filter)",
 	title_zh: "检测PHP LDAP无过滤直接注入漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -152,6 +150,8 @@ CODE
    - 在某些情况下，可能导致拒绝服务。
 CODE
 	level: "high",
+	type: "vuln",
+	title: "Check PHP LDAP Direct Injection Vulnerability (No Filter)",
 }
 
 
@@ -162,6 +162,8 @@ CODE,exclude=<<<CODE
 CODE)> as $highAndMid;
 $highAndMid - $high as $mid
 alert $mid	for {
+	type: "mid",
+	title: "Audit PHP LDAP Injection with Ineffective Filter",
 	title_zh: "审计PHP LDAP注入带无效过滤",
 	solution: <<<CODE
 ### 修复建议
@@ -208,17 +210,12 @@ CODE
    - 在某些情况下，可能导致拒绝服务。
 CODE
 	level: "mid",
-	type: "mid",
-	title: "Audit PHP LDAP Injection with Ineffective Filter",
 }
 
 
 $sink - $high - $mid as $low;
 
 alert $low	for {
-	type: "info",
-	title: "Audit PHP LDAP Injection with Effective Filter",
-	title_zh: "审计PHP LDAP注入带有效过滤",
 	desc: <<<CODE
 ### 规则目的
 该规则用于审计PHP代码中已实现有效过滤的LDAP注入情况，用于确认过滤机制是否足够安全。它通过识别LDAP查询相关的关键PHP函数（如`ldap_search`、`ldap_list`等），定位经过过滤的数据处理点，防止攻击者注入恶意脚本。
@@ -232,6 +229,9 @@ alert $low	for {
    `ldap_search`, `ldap_list`, `ldap_read`, `ldap_add`, `ldap_delete`, `ldap_mod_add`, `ldap_mod_del`, `ldap_mod_replace`, `ldap_compare`。
 CODE
 	level: "low",
+	type: "info",
+	title: "Audit PHP LDAP Injection with Effective Filter",
+	title_zh: "审计PHP LDAP注入带有效过滤",
 }
 
 

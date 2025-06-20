@@ -97,6 +97,7 @@ $sink.CurrentDir() as $low;
 $sink.SystemType() as $low;
 
 alert $low	for {
+	title: "FTP Information Exposure",
 	title_zh: "检测到FTP信息泄露",
 	solution: <<<CODE
 ### 修复建议
@@ -182,7 +183,6 @@ CODE
 CODE
 	level: "low",
 	type: "vuln",
-	title: "FTP Information Exposure",
 }
 
 desc(

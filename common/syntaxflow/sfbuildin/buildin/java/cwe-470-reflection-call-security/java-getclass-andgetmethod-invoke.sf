@@ -79,9 +79,6 @@ $entry #{
     until: `*?{opcode: param}<var(params)> as $__next__`,
 }->;
 alert $params	for {
-	level: "mid",
-	message: "Java Reflection Call Security Vulnerability via getClass() and getMethod()",
-	type: "audit",
 	title: "Detect Java Reflection Call Security Vulnerability via getClass() and getMethod()",
 	title_zh: "检测 Java 反射调用安全漏洞（getClass() 和 getMethod()）",
 	solution: <<<CODE
@@ -147,6 +144,9 @@ CODE
     - 泄露敏感信息（如果反射调用了读取系统配置或私有数据的方法）。
     - 拒绝服务（如果攻击者通过反射调用导致资源耗尽或崩溃）。
 CODE
+	level: "mid",
+	message: "Java Reflection Call Security Vulnerability via getClass() and getMethod()",
+	type: "audit",
 }
 
 

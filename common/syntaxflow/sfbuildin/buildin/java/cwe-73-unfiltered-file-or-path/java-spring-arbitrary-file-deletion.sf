@@ -88,6 +88,7 @@ $sink #{
 }->as $high;
 
 alert $high	for {
+	message: "发现Java Spring Boot应用中的任意文件删除漏洞。",
 	title: "Detect Java Spring Boot Arbitrary File Deletion",
 	title_zh: "检测 Java Spring Boot 任意文件删除",
 	solution: <<<CODE
@@ -160,7 +161,6 @@ CODE
 CODE
 	level: "high",
 	type: "vuln",
-	message: "发现Java Spring Boot应用中的任意文件删除漏洞。",
 }
 
 
@@ -170,7 +170,6 @@ $sink #{
 
 $result - $high as $low;
 alert $low	for {
-	message: "发现Java Spring Boot应用中可能存在任意文件删除漏洞。",
 	type: "vuln",
 	title: "Detect Java Spring Boot Arbitrary File Deletion",
 	title_zh: "检测 Java Spring Boot 任意文件删除",
@@ -190,4 +189,5 @@ alert $low	for {
    本规则主要关注用户输入是否直接或间接流入上述文件删除方法，且未经过充分的验证和过滤。例如，当用户的输入参数直接传递给这些方法时，将触发告警。
 CODE
 	level: "low",
+	message: "发现Java Spring Boot应用中可能存在任意文件删除漏洞。",
 }
