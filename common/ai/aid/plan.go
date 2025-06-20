@@ -102,8 +102,8 @@ func (pr *planRequest) GenerateFirstPlanPrompt() (string, error) {
 	}
 }
 
-func (pr *Config) newPlanResponse(rootTask *aiTask) *PlanResponse {
-	pr.SetSyncCallback(SYNC_TYPE_PLAN, func() any {
+func (c *Config) newPlanResponse(rootTask *aiTask) *PlanResponse {
+	c.SetSyncCallback(SYNC_TYPE_PLAN, func() any {
 		return rootTask
 	})
 	return &PlanResponse{

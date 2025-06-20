@@ -406,3 +406,31 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 		return resp, nil
 	}
 }
+
+type ProxyAICaller struct {
+	proxyFunc func(request *AIRequest) *AIRequest
+	callFunc  func(request *AIRequest) (*AIResponse, error)
+}
+
+func CreateProxyAICaller(
+	caller AICaller,
+	proxyFunc func(request *AIRequest) *AIRequest,
+) *ProxyAICaller {
+	return &ProxyAICaller{
+		callFunc:  caller.callAI,
+		proxyFunc: proxyFunc,
+	}
+}
+
+func (p ProxyAICaller) callAI(request *AIRequest) (*AIResponse, error) {
+	if p.proxyFunc != nil {
+		request = p.proxyFunc(request)
+		if request == nil {
+			return nil, utils.Error("proxy function returned nil request")
+		}
+	}
+	if p.callFunc != nil {
+		return p.callFunc(request)
+	}
+	return nil, utils.Error("proxy function returned nil request")
+}

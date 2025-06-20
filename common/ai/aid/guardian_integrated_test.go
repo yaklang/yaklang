@@ -96,7 +96,7 @@ func TestCoordinator_GUARDIAN_OUTPUT_SMOKING_ToolUseReview(t *testing.T) {
 			return rsp, nil
 		}),
 		WithAIAgree(),
-		WithGuardianEventTrigger(EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *Event, emitter GuardianEmitter) {
+		WithGuardianEventTrigger(EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *Event, emitter GuardianEmitter, caller AICaller) {
 			if event.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				guardianSmokingTestPassed = true
 			} else {
@@ -270,7 +270,7 @@ func TestCoordinator_GUARDIAN_SMOKING_ToolUseReview(t *testing.T) {
 			return rsp, nil
 		}),
 		WithAIAgree(),
-		WithGuardianEventTrigger(EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *Event, emitter GuardianEmitter) {
+		WithGuardianEventTrigger(EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *Event, emitter GuardianEmitter, caller AICaller) {
 			if event.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				guardianSmokingTestPassed = true
 			} else {

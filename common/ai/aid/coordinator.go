@@ -56,6 +56,10 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...Opt
 	config.startEventLoop(ctx)
 	config.startHotpatchLoop(ctx)
 	config.guardian.setOutputEmitter(config.id, config.eventHandler)
+	config.guardian.setAiCaller(CreateProxyAICaller(config, func(request *AIRequest) *AIRequest {
+		request.detachCheckpoint = true
+		return request
+	}))
 	c := &Coordinator{
 		config:    config,
 		userInput: userInput,
