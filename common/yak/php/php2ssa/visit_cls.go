@@ -241,7 +241,6 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 						}
 						iface.SetKind(ssa.BlueprintInterface)
 						blueprint.AddParentBlueprint(iface)
-						blueprint.AddInterfaceBlueprint(iface)
 					})
 				}
 			}
