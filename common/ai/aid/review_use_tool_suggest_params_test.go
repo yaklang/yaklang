@@ -11,15 +11,14 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func TestCoordinator_ToolUseReview_WrongTool_SuggestionTools(t *testing.T) {
+func TestCoordinator_ToolUseReview_SuggestParams(t *testing.T) {
+	coordinatorTestMutex.Lock()
+	defer coordinatorTestMutex.Unlock()
+
 	inputChan := make(chan *InputEvent)
 	outputChan := make(chan *Event)
-
-	lsReviewed := false
-	nowReviewed := false
-
 	coordinator, err := NewCoordinator(
-		"test",
+		"test-suggest-params",
 		WithEventInputChan(inputChan),
 		WithSystemFileOperator(),
 		WithEventHandler(func(event *Event) {
@@ -30,19 +29,22 @@ func TestCoordinator_ToolUseReview_WrongTool_SuggestionTools(t *testing.T) {
 			defer func() {
 				rsp.Close()
 			}()
+			prompt := request.GetPrompt()
 
-			if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: ls`, `"call-tool"`, "const") {
+			// After user suggestion, AI should call with /new-path
+			if utils.MatchAllOfSubString(prompt, `工具名称: ls`, `"/new-path"`) {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "call-tool", "tool": "ls", "params": {"path": "/new-path"}}`))
+				return rsp, nil
+			}
+
+			// AI first suggests ls with /abc-target, this is a call for params
+			if utils.MatchAllOfSubString(prompt, `工具名称: ls`) && !strings.Contains(prompt, `当前任务:`) {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "call-tool", "tool": "ls", "params": {"path": "/abc-target"}}`))
 				return rsp, nil
-			} else if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: now`, `"call-tool"`, "const") {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "call-tool", "tool": "now", "params": {}}`))
-				return rsp, nil
-			} else if utils.MatchAllOfSubString(request.GetPrompt(), `当前任务: "扫描目录结构"`, `"require-tool"`) {
-				if utils.MatchAllOfSubString(request.GetPrompt(), `"direct-answer"`) {
-					rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-tool", "tool": "ls"}`))
-				} else {
-					rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-tool", "tool": "now"}`))
-				}
+			}
+
+			if utils.MatchAllOfSubString(prompt, `当前任务: "扫描目录结构"`) {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-tool", "tool": "ls"}`))
 				return rsp, nil
 			}
 
@@ -79,14 +81,13 @@ func TestCoordinator_ToolUseReview_WrongTool_SuggestionTools(t *testing.T) {
 LOOP:
 	for {
 		select {
-		case <-time.After(30 * time.Second):
+		case <-time.After(2 * time.Second):
 			break LOOP
 		case result := <-outputChan:
 			count++
 			if count > 100 {
 				break LOOP
 			}
-			fmt.Println("result:" + result.String())
 			if result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				inputChan <- &InputEvent{
 					Id: result.GetInteractiveId(),
@@ -94,59 +95,35 @@ LOOP:
 						"suggestion": "continue",
 					},
 				}
-				continue
 			}
 
 			if result.Type == EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
+				useToolReview = true
 				var a = make(aitool.InvokeParams)
 				json.Unmarshal(result.Content, &a)
-				toolname := a.GetString("tool")
-				if toolname == "ls" {
-					lsReviewed = true
-				} else if toolname == "now" {
-					nowReviewed = true
+				if a.GetObject("params").GetString("path") == "/abc-target" && a.GetString("tool") == "ls" {
 					inputChan <- &InputEvent{
 						Id: result.GetInteractiveId(),
 						Params: aitool.InvokeParams{
-							"suggestion": "continue",
+							"suggestion":        "suggest_params",
+							"suggestion_params": `{"path": "/new-path"}`,
 						},
 					}
-				}
-				if a.GetObject("params").GetString("path") == "/abc-target" &&
-					a.GetString("tool") == "ls" && a.GetString("tool_description") != "" {
-					useToolReview = true
-					inputChan <- &InputEvent{
-						Id: result.GetInteractiveId(),
-						Params: aitool.InvokeParams{
-							"suggestion":      "wrong_tool",
-							"suggestion_tool": "tree,now",
-						},
-					}
-					continue
 				}
 			}
 
-			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to execute tool:", "now") {
+			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to execute tool:", "ls", `"/new-path"`) {
 				useToolReviewPass = true
 				break LOOP
 			}
-			fmt.Println("review task result:" + result.String())
 		}
 	}
 
 	if !useToolReview {
-		t.Fatal("tool review fail")
+		t.Fatal("tool review did not happen")
 	}
 
 	if !useToolReviewPass {
-		t.Fatal("tool review not finished")
-	}
-
-	if !lsReviewed {
-		t.Fatal("ls tool review not finished")
-	}
-
-	if !nowReviewed {
-		t.Fatal("now tool review not finished")
+		t.Fatal("tool was not executed with new params")
 	}
 }
