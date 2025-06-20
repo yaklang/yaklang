@@ -132,6 +132,43 @@ class D extends AA implements BB {}
 	})
 }
 
+func Test_PHP_Blueprint_Cycle(t *testing.T) {
+	/*
+		TODO: PHP当前没有处理 \JsonSerializable这种情况 后续需要特殊处理
+	*/
+	code := `
+<?php
+
+namespace Stripe;
+
+// JsonSerializable only exists in PHP 5.4+. Stub if out if it doesn't exist
+if (interface_exists('\JsonSerializable', false)) {
+    interface JsonSerializable extends \JsonSerializable
+    {
+    }
+} else {
+    // PSR2 wants each interface to have its own file.
+    // @codingStandardsIgnoreStart
+    interface JsonSerializable
+    {
+        // @codingStandardsIgnoreEnd
+        public function jsonSerialize();
+    }
+}
+interface ArrayAccess{}
+class Account extends ApiResource{}
+abstract class ApiResource extends StripeObject{}
+class StripeObject implements ArrayAccess, JsonSerializable{}
+`
+	t.Run("no cycle", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `
+		JsonSerializable.__implement__ as $retA
+		`, map[string][]string{
+			"retA": {"StripeObject"},
+		}, ssaapi.WithLanguage(ssaapi.PHP))
+	})
+}
+
 func Test_JAVA_Blueprint_name2declare(t *testing.T) {
 	code := `
 	class A {}
