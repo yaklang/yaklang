@@ -1779,6 +1779,58 @@ func (s *Server) GetCurrentRules(c context.Context, req *ypb.Empty) (*ypb.MITMCo
 	return &ypb.MITMContentReplacers{Rules: rules}, nil
 }
 
+func (s *Server) QueryMITMReplacerRules(ctx context.Context, req *ypb.QueryMITMReplacerRulesRequest) (*ypb.QueryMITMReplacerRulesResponse, error) {
+	// 所有替换规则
+	result := yakit.GetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords)
+	var allRules []*ypb.MITMContentReplacer
+	if result != "" {
+		err := json.Unmarshal([]byte(result), &allRules)
+		if err != nil {
+			return nil, utils.Errorf("unmarshal MITM replacer rules failed: %s", err)
+		}
+	}
+
+	keyword := strings.TrimSpace(req.GetKeyWord())
+
+	// 如果没有关键字，返回所有规则
+	if keyword == "" {
+		return &ypb.QueryMITMReplacerRulesResponse{
+			Rules: &ypb.MITMContentReplacers{Rules: allRules},
+		}, nil
+	}
+
+	// 根据关键字过滤规则
+	var filteredRules []*ypb.MITMContentReplacer
+	keywordLower := strings.ToLower(keyword)
+
+	for _, rule := range allRules {
+		// 检查规则VerboseName
+		if rule.GetVerboseName() != "" &&
+			strings.Contains(strings.ToLower(rule.GetVerboseName()), keywordLower) {
+			filteredRules = append(filteredRules, rule)
+			continue
+		}
+
+		// 检查规则内容
+		if rule.GetRule() != "" &&
+			strings.Contains(strings.ToLower(rule.GetRule()), keywordLower) {
+			filteredRules = append(filteredRules, rule)
+			continue
+		}
+
+		// 检查替换结果
+		if rule.GetResult() != "" &&
+			strings.Contains(strings.ToLower(rule.GetResult()), keywordLower) {
+			filteredRules = append(filteredRules, rule)
+			continue
+		}
+	}
+
+	return &ypb.QueryMITMReplacerRulesResponse{
+		Rules: &ypb.MITMContentReplacers{Rules: filteredRules},
+	}, nil
+}
+
 func truncate(u string) string {
 	if len(u) > 64 {
 		return u[:64] + "..."
