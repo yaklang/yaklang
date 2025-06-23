@@ -144,4 +144,54 @@ func TestRealFormatCheck(t *testing.T) {
 	t.Run("duplicate desc", func(t *testing.T) {
 
 	})
+
+	t.Run("with format string", func(t *testing.T) {
+		rule := `
+desc(
+	rule_id: "id"
+	desc: <<<CODE
+Test Rule ` + "`%s`" + ` t
+CODE
+)
+`
+		CheckFormatDesc(t, rule, rule)
+	})
+
+	// t.Run("real", func(t *testing.T) {
+	// 	// "sfbuildin/buildin/golang/lib/golang-file-write-bufio.sf"
+	// 	rule, err := sfdb.GetRule("审计Golang使用bufio进行文件写入的代码")
+	// 	require.NoError(t, err)
+	// 	CheckFormatDesc(t, rule.Content, rule.Content)
+	// })
+}
+
+func TestAlert(t *testing.T) {
+	t.Run("normal alert with desc", func(t *testing.T) {
+		CheckFormatDesc(t, `
+desc()
+alert $output
+`, `
+desc(
+	rule_id: "id"
+)
+alert $output
+`)
+	})
+
+	t.Run("alert with desc sort", func(t *testing.T) {
+		rule := `
+desc(
+	rule_id: "id"
+)
+
+alert $output for {
+	title: "a",
+	level: "high",
+	desc: <<<CODE
+This is a test alert description.
+CODE
+}
+`
+		CheckFormatDesc(t, rule, rule)
+	})
 }
