@@ -856,50 +856,23 @@ RECONNECT:
 		}
 		currentRPS.Add(1)
 
-		sendPacketWithRandomChunk := func() error {
-			chunkedOpts := []RandomChunkedHTTPOption{
-				WithRandomChunkedDelay(option.MinChunkDelayTime, option.MaxChunkDelayTime),
-				WithRandomChunkedContext(option.Ctx),
-				WithRandomChunkedLength(option.MinChunkedLength, option.MaxChunkedLength),
-				WithRandomChunkedHandler(option.ChunkedHandler),
-			}
-			err = SendRandomChunkedHTTP(
-				conn,
-				requestPacket,
-				chunkedOpts...,
-			)
-			if err != nil {
-				return err
-			}
-			return nil
-		}
-
 		if oldVersionProxyChecking {
-			var legacyRequest []byte
-			legacyRequest, err = BuildLegacyProxyRequest(requestPacket)
+			requestPacket, err = BuildLegacyProxyRequest(requestPacket)
 			if err != nil {
 				return response, err
 			}
-			if option.EnableRandomChunked {
-				err = sendPacketWithRandomChunk()
-				if err != nil {
-					log.Errorf("[lowhttp] send random chunked http failed: %v", err)
-					goto RECONNECT
-				}
-			} else {
-				_, err = conn.Write(legacyRequest)
-			}
-		} else {
-			if option.EnableRandomChunked {
-				err = sendPacketWithRandomChunk()
-				if err != nil {
-					log.Errorf("[lowhttp] send random chunked http failed: %v", err)
-					goto RECONNECT
-				}
-			} else {
-				_, err = conn.Write(requestPacket)
-			}
 		}
+
+		if option.EnableRandomChunked {
+			chunkSender, err := option.CreateChunkSender(requestPacket)
+			if err != nil {
+				return response, errors.Wrap(err, "get or create chunk sender failed")
+			}
+			err = chunkSender.Send(conn)
+		} else {
+			_, err = conn.Write(requestPacket)
+		}
+
 		if err != nil {
 			return response, errors.Wrap(err, "write request failed")
 		}
