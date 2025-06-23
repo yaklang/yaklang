@@ -813,7 +813,7 @@ RECONNECT:
 			option:      option,
 			writeErrCh:  writeErrCh,
 		}
-		pc.writeCh <- writeRequest{reqPacket: requestPacket, ch: writeErrCh, reqInstance: reqIns}
+		pc.writeCh <- writeRequest{reqPacket: requestPacket, ch: writeErrCh, reqInstance: reqIns, options: option}
 		//beforeLog(option)
 		select {
 		case re := <-resc:
@@ -864,11 +864,11 @@ RECONNECT:
 		}
 
 		if option.EnableRandomChunked {
-			chunkSender, err := option.CreateChunkSender(requestPacket)
+			chunkSender, err := option.GetOrCreateChunkSender()
 			if err != nil {
 				return response, errors.Wrap(err, "get or create chunk sender failed")
 			}
-			err = chunkSender.Send(conn)
+			err = chunkSender.Send(requestPacket, conn)
 		} else {
 			_, err = conn.Write(requestPacket)
 		}
