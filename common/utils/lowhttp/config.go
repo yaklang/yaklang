@@ -109,6 +109,7 @@ type LowhttpExecConfig struct {
 	MinChunkDelayTime   time.Duration
 	MaxChunkDelayTime   time.Duration
 	ChunkedHandler      ChunkedResultHandler
+	chunkedSender       *RandomChunkedSender
 }
 
 type LowhttpResponse struct {
@@ -771,7 +772,10 @@ func WithChunkedHandler(handler ChunkedResultHandler) LowhttpOpt {
 	}
 }
 
-func (o *LowhttpExecConfig) CreateChunkSender(requestPacket []byte) (*RandomChunkedSender, error) {
+func (o *LowhttpExecConfig) GetOrCreateChunkSender() (*RandomChunkedSender, error) {
+	if o.chunkedSender != nil {
+		return o.chunkedSender, nil
+	}
 	chunkedOpts := []RandomChunkedHTTPOption{
 		WithRandomChunkedDelay(o.MinChunkDelayTime, o.MaxChunkDelayTime),
 		WithRandomChunkedContext(o.Ctx),
@@ -779,10 +783,10 @@ func (o *LowhttpExecConfig) CreateChunkSender(requestPacket []byte) (*RandomChun
 		WithRandomChunkedHandler(o.ChunkedHandler),
 	}
 
-	sender, err := NewRandomChunkedSender(requestPacket, chunkedOpts...)
+	sender, err := newRandomChunkedSender(chunkedOpts...)
 	if err != nil {
 		return nil, err
 	}
-
+	o.chunkedSender = sender
 	return sender, nil
 }

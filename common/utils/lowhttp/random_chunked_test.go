@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -46,7 +47,7 @@ func TestRandomChunkedSender_getRandomDelayTime(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sender := &randomChunkedSender{
+			sender := &RandomChunkedSender{
 				minDelay: tt.minDelay,
 				maxDelay: tt.maxDelay,
 			}
@@ -94,7 +95,7 @@ func TestRandomChunkedSender_calcRandomChunkedLen(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sender := &randomChunkedSender{
+			sender := &RandomChunkedSender{
 				minChunkLength: tt.minChunkLength,
 				maxChunkLength: tt.maxChunkLength,
 			}
@@ -235,7 +236,7 @@ Transfer-Encoding: chunked
 			requestPacket := []byte(fmt.Sprintf(tt.requestPacket, originalBody))
 
 			var buffer bytes.Buffer
-			sender := &randomChunkedSender{
+			sender := &RandomChunkedSender{
 				ctx:            context.Background(),
 				requestPacket:  requestPacket,
 				minChunkLength: tt.minChunkLength,
@@ -245,7 +246,7 @@ Transfer-Encoding: chunked
 				handler:        tt.handler,
 			}
 
-			err := sender.send(&buffer)
+			err := sender.Send([]byte(tt.requestPacket), &buffer)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -292,11 +293,11 @@ func TestRandomChunkedSender_hanlder(t *testing.T) {
 
 		%s
 		`, token)
-		sender, err := NewRandomChunkedSender([]byte(req), options...)
+		sender, err := newRandomChunkedSender(options...)
 		require.NoError(t, err)
 
 		var buffer bytes.Buffer
-		sender.send(&buffer)
+		sender.Send([]byte(req), &buffer)
 
 		require.GreaterOrEqual(t, blockNum, minBlock)
 		require.LessOrEqual(t, blockNum, maxBlock)

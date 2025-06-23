@@ -57,15 +57,14 @@ func WithRandomChunkedHandler(handler ChunkedResultHandler) RandomChunkedHTTPOpt
 	}
 }
 
-func NewRandomChunkedSender(requestPacket []byte, opts ...RandomChunkedHTTPOption) (*RandomChunkedSender, error) {
+func newRandomChunkedSender(opts ...RandomChunkedHTTPOption) (*RandomChunkedSender, error) {
 	// 设置默认值
 	sender := &RandomChunkedSender{
 		ctx:            context.Background(),
-		requestPacket:  HTTPHeaderForceChunked(requestPacket), // header换成chunked的 body保持不变
-		maxChunkLength: 1024,                                  // 默认最大1KB
-		minChunkLength: 256,                                   // 默认最小256B
-		maxDelay:       100 * time.Millisecond,                // 默认最大100ms
-		minDelay:       50 * time.Millisecond,                 // 默认最小50ms
+		maxChunkLength: 1024,                   // 默认最大1KB
+		minChunkLength: 256,                    // 默认最小256B
+		maxDelay:       100 * time.Millisecond, // 默认最大100ms
+		minDelay:       50 * time.Millisecond,  // 默认最小50ms
 		handler:        nil,
 	}
 
@@ -108,21 +107,14 @@ func (r *RandomChunkedSender) calcRandomChunkedLen() int {
 	return randomLength + r.minChunkLength
 }
 
-func (r *RandomChunkedSender) Send(writer io.Writer) error {
+func (r *RandomChunkedSender) Send(rawPacket []byte, writer io.Writer) error {
+	// header换成chunked的 body保持不变
+	r.requestPacket = HTTPHeaderForceChunked(rawPacket)
 	headers, body := SplitHTTPHeadersAndBodyFromPacket(r.requestPacket)
 
 	// 发送HTTP头部
 	if _, err := writer.Write([]byte(headers)); err != nil {
 		return utils.Errorf("send headers failed: %s", err)
-	}
-
-	// 处理空body的情况
-	if len(body) == 0 {
-		endChunk := []byte(fmt.Sprintf("0%s", DoubleCRLF))
-		if _, err := writer.Write(endChunk); err != nil {
-			return utils.Errorf("send empty end chunk failed: %s", err)
-		}
-		return nil
 	}
 
 	reader := bytes.NewReader(body)

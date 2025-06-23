@@ -315,6 +315,7 @@ type writeRequest struct {
 	reqPacket   []byte
 	ch          chan error
 	reqInstance *http.Request
+	options     *LowhttpExecConfig
 }
 
 type packetInfo struct {
@@ -571,6 +572,7 @@ func (pc *persistConn) readLoop() {
 							reqPacket:   authReq,
 							ch:          rc.writeErrCh,
 							reqInstance: rc.reqInstance,
+							options:     rc.option,
 						}
 					}
 					firstAuth = false
@@ -633,7 +635,20 @@ func (pc *persistConn) writeLoop() {
 		select {
 		case wr := <-pc.writeCh:
 			currentRPS.Add(1)
-			_, err := pc.bw.Write(wr.reqPacket)
+			var err error
+			if wr.options != nil && wr.options.EnableRandomChunked {
+				// 随机分块写入
+				sender, err := wr.options.GetOrCreateChunkSender()
+				if err != nil {
+					closeErr = err
+					return
+				}
+				err = sender.Send(wr.reqPacket, pc.bw)
+			} else {
+				// 正常写入
+				_, err = pc.bw.Write(wr.reqPacket)
+			}
+
 			if err == nil {
 				err = pc.bw.Flush()
 				pc.serverStartTime = time.Now()
