@@ -111,9 +111,9 @@ func (s *Server) GenerateExtractRule(
 
 	matched := handleRegexpMeta(string(req.GetSelected()))
 	rsp := &ypb.GenerateExtractRuleResponse{
-		PrefixRegexp:   string(pre),
-		SuffixRegexp:   string(suf),
-		SelectedRegexp: string(matched),
+		PrefixRegexp:   pre,
+		SuffixRegexp:   suf,
+		SelectedRegexp: utils.EscapeInvalidUTF8Byte([]byte(matched)),
 	}
 	return rsp, nil
 }
