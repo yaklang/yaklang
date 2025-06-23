@@ -2,12 +2,14 @@ package sfvm
 
 import (
 	"fmt"
-	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"io"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/google/uuid"
@@ -24,7 +26,8 @@ type RuleFormat struct {
 	editor *memedit.MemEditor
 	once   sync.Once
 
-	requireDescKeyType map[SFDescKeyType]bool // 第一个desc语句中需要的desc item key类型，没有会补全
+	// requireDescKeyType map[SFDescKeyType]bool // 第一个desc语句中需要的desc item key类型，没有会补全
+	requireDescKeyType *omap.OrderedMap[SFDescKeyType, bool] // 第一个desc语句中需要的desc item key类型，没有会补全
 	// desc handler
 	descHandler  func(key, value string) string
 	alertHandler func(name, key, value string) string
@@ -36,7 +39,7 @@ func NewRuleFormat(w io.Writer) *RuleFormat {
 	return &RuleFormat{
 		ruleID:             uuid.NewString(),
 		write:              w,
-		requireDescKeyType: map[SFDescKeyType]bool{SFDescKeyType_Rule_Id: false},
+		requireDescKeyType: omap.NewOrderedMap(map[SFDescKeyType]bool{SFDescKeyType_Rule_Id: false}),
 		descHandler: func(key, value string) string {
 			return value
 		},
@@ -74,10 +77,10 @@ func RuleFormatWithRuleID(ruleID string) RuleFormatOption {
 func RuleFormatWithRequireDescKeyType(typ ...SFDescKeyType) RuleFormatOption {
 	return func(f *RuleFormat) {
 		if f.requireDescKeyType == nil {
-			f.requireDescKeyType = make(map[SFDescKeyType]bool)
+			f.requireDescKeyType = omap.NewEmptyOrderedMap[SFDescKeyType, bool]()
 		}
 		for _, t := range typ {
-			f.requireDescKeyType[t] = false
+			f.requireDescKeyType.Set(t, false)
 		}
 	}
 }
@@ -160,57 +163,27 @@ func (f *RuleFormat) Visit(flow sf.IFlowContext, editor *memedit.MemEditor) {
 			f.Write(f.GetTextFromToken(stmt))
 		}
 	}
+
+	if descCount == 0 {
+		f.Write("desc(\n")
+		f.Write("\trule_id: \"id\"\n")
+		f.Write(")\n")
+	}
+
 }
 func (f *RuleFormat) VisitAlertStatement(alert sf.IAlertStatementContext) {
 	alertStmt, ok := alert.(*sf.AlertStatementContext)
 	if !ok || alertStmt == nil {
 		return
 	}
-	alertMsg := map[string]string{
-		"title":    "",
-		"title_zh": "",
-		"solution": "",
-		"desc":     "",
-		"level":    "",
-	}
-	if refVariable, ok := alertStmt.RefVariable().(*sf.RefVariableContext); !ok {
+	refVariable, ok := alertStmt.RefVariable().(*sf.RefVariableContext)
+	if !ok {
 		return
-	} else {
-		variable := yakunquote.TryUnquote(refVariable.Identifier().GetText())
-		defer func() {
-			isNull := true
-			f.Write(fmt.Sprintf("alert $%s", variable))
-			for _, s := range alertMsg {
-				if s != "" {
-					isNull = false
-					break
-				}
-			}
-			if !isNull {
-				f.Write(fmt.Sprintf("\tfor {\n"))
-				for key, value := range alertMsg {
-					newVal := f.alertHandler(variable, key, value)
-					if lo.Contains([]string{"none", ""}, newVal) {
-						continue
-					}
-					switch key {
-					case "desc", "solution":
-						f.Write(fmt.Sprintf(`	%s: <<<CODE
-%s
-CODE
-`, key, newVal))
-					default:
-						f.Write(fmt.Sprintf("\t%s: \"%s\",\n", key, newVal))
-					}
-				}
-				f.Write("}\n")
-				return
-			}
-			f.Write("\n")
-		}()
-		if alertStmt.DescriptionItems() == nil {
-			return
-		}
+	}
+
+	alertMsg := omap.NewEmptyOrderedMap[string, string]()
+	variable := yakunquote.TryUnquote(refVariable.Identifier().GetText())
+	if descItem, ok := alertStmt.DescriptionItems().(*sf.DescriptionItemsContext); ok && descItem != nil {
 		for _, descItemInterface := range alertStmt.DescriptionItems().(*sf.DescriptionItemsContext).AllDescriptionItem() {
 			ret, ok := descItemInterface.(*sf.DescriptionItemContext)
 			if !ok || ret.Comment() != nil { // skip comment
@@ -230,9 +203,36 @@ CODE
 					value = valueItem.GetText()
 				}
 			}
-			alertMsg[strings.ToLower(key)] = value
+			alertMsg.Set(strings.ToLower(key), value)
 		}
 	}
+	f.Write(fmt.Sprintf("alert $%s", variable))
+	if alertMsg.Len() == 0 {
+		f.Write("\n")
+		return
+	}
+
+	f.Write(" for {\n")
+	alertMsg.ForEach(func(key, value string) bool {
+		if value == "" {
+			return true
+		}
+		newVal := f.alertHandler(variable, key, value)
+		if lo.Contains([]string{"none", ""}, newVal) {
+			return true
+		}
+		switch key {
+		case "desc", "solution":
+			f.Write(fmt.Sprintf(`	%s: <<<CODE
+%s
+CODE
+`, key, newVal))
+		default:
+			f.Write(fmt.Sprintf("\t%s: \"%s\",\n", key, newVal))
+		}
+		return true
+	})
+	f.Write("}\n")
 }
 
 // VisitInfoDescription针对第一个desc语句进行处理，主要补全一些规则描述性信息
@@ -258,6 +258,9 @@ func (f *RuleFormat) VisitInfoDescription(desc sf.IDescriptionStatementContext) 
 			}
 
 			descType := ValidDescItemKeyType(key)
+			if descType == SFDescKeyType_Solution {
+				log.Info("b")
+			}
 			// 记录访问过的desc item key类型，以便后续确认还缺少哪些key
 			f.visitRequireInfoDescKeyType(descType)
 			// 不进行字段补全
@@ -416,7 +419,7 @@ func (f *RuleFormat) needCompletion(descType SFDescKeyType) bool {
 	if f == nil || f.requireDescKeyType == nil {
 		return false
 	}
-	_, ok := f.requireDescKeyType[descType]
+	_, ok := f.requireDescKeyType.Get(descType)
 	return ok
 }
 
@@ -425,9 +428,9 @@ func (f *RuleFormat) visitRequireInfoDescKeyType(descType SFDescKeyType) {
 		return
 	}
 
-	_, ok := f.requireDescKeyType[descType]
+	_, ok := f.requireDescKeyType.Get(descType)
 	if ok {
-		f.requireDescKeyType[descType] = true
+		f.requireDescKeyType.Set(descType, true)
 	}
 }
 
@@ -436,11 +439,12 @@ func (f *RuleFormat) getDescKeyTypesToAdd() []SFDescKeyType {
 		return []SFDescKeyType{}
 	}
 	var ret []SFDescKeyType
-	for keyType, ok := range f.requireDescKeyType {
-		if !ok {
-			ret = append(ret, keyType)
+	f.requireDescKeyType.ForEach(func(i SFDescKeyType, v bool) bool {
+		if !v {
+			ret = append(ret, i)
 		}
-	}
+		return true
+	})
 	return ret
 }
 
