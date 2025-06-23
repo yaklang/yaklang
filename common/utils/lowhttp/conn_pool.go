@@ -8,14 +8,15 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/gmsm/gmtls"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"io"
 	"net"
 	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 
 	utls "github.com/refraction-networking/utls"
 	"github.com/yaklang/yaklang/common/log"

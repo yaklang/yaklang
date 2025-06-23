@@ -3,7 +3,6 @@ package lowhttp
 import (
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/netx"
 	"io"
 	"mime/multipart"
 	"net"
@@ -11,6 +10,8 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/netx"
 
 	"github.com/yaklang/yaklang/common/schema"
 
@@ -768,4 +769,20 @@ func WithChunkedHandler(handler ChunkedResultHandler) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.ChunkedHandler = handler
 	}
+}
+
+func (o *LowhttpExecConfig) CreateChunkSender(requestPacket []byte) (*RandomChunkedSender, error) {
+	chunkedOpts := []RandomChunkedHTTPOption{
+		WithRandomChunkedDelay(o.MinChunkDelayTime, o.MaxChunkDelayTime),
+		WithRandomChunkedContext(o.Ctx),
+		WithRandomChunkedLength(o.MinChunkedLength, o.MaxChunkedLength),
+		WithRandomChunkedHandler(o.ChunkedHandler),
+	}
+
+	sender, err := NewRandomChunkedSender(requestPacket, chunkedOpts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return sender, nil
 }
