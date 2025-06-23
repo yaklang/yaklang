@@ -1032,3 +1032,199 @@ abc`)
 	require.Len(t, extractedData, 1)
 	require.Equal(t, "a, b, c", extractedData[0].Data)
 }
+
+func TestGRPCMUSTPASS_QueryMITMReplacerRules(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	// 清理现有规则
+	_, err = client.SetCurrentRules(ctx, &ypb.MITMContentReplacers{Rules: []*ypb.MITMContentReplacer{}})
+	require.NoError(t, err)
+
+	// 创建测试规则
+	testRules := []*ypb.MITMContentReplacer{
+		{
+			Index:            1,
+			VerboseName:      "测试规则1 - API密钥检测",
+			Rule:             `(?i)(api[_-]?key|access[_-]?token)`,
+			Result:           "***HIDDEN***",
+			Color:            "red",
+			EnableForRequest: true,
+			EnableForHeader:  true,
+			EnableForBody:    true,
+			Disabled:         false,
+		},
+		{
+			Index:            2,
+			VerboseName:      "SQL注入检测",
+			Rule:             `(?i)(union\s+select|information_schema)`,
+			Result:           "",
+			Color:            "orange",
+			NoReplace:        true,
+			EnableForRequest: true,
+			EnableForBody:    true,
+			Disabled:         false,
+		},
+		{
+			Index:            3,
+			VerboseName:      "用户代理替换",
+			Rule:             `User-Agent: .*`,
+			Result:           "User-Agent: TestBot/1.0",
+			EnableForRequest: true,
+			EnableForHeader:  true,
+			Disabled:         false,
+		},
+		{
+			Index:            4,
+			VerboseName:      "禁用规则",
+			Rule:             `disabled-rule`,
+			Result:           "replacement",
+			EnableForRequest: true,
+			Disabled:         true, // 这个规则被禁用
+		},
+		{
+			Index:             5,
+			VerboseName:       "XSS检测",
+			Rule:              `<script[^>]*>.*?</script>`,
+			Result:            "",
+			Color:             "yellow",
+			NoReplace:         true,
+			EnableForResponse: true,
+			EnableForBody:     true,
+			Disabled:          false,
+		},
+	}
+
+	// 设置测试规则
+	_, err = client.SetCurrentRules(ctx, &ypb.MITMContentReplacers{Rules: testRules})
+	require.NoError(t, err)
+
+	testCases := []struct {
+		name          string
+		keyword       string
+		expectedCount int
+		expectedNames []string
+		description   string
+	}{
+		{
+			name:          "空关键字查询所有规则",
+			keyword:       "",
+			expectedCount: 5,
+			expectedNames: []string{"测试规则1 - API密钥检测", "SQL注入检测", "用户代理替换", "禁用规则", "XSS检测"},
+			description:   "应该返回所有规则包括禁用的",
+		},
+		{
+			name:          "按规则名称搜索",
+			keyword:       "API",
+			expectedCount: 1,
+			expectedNames: []string{"测试规则1 - API密钥检测"},
+			description:   "应该匹配VerboseName中包含'API'的规则",
+		},
+		{
+			name:          "按规则内容搜索",
+			keyword:       "union",
+			expectedCount: 1,
+			expectedNames: []string{"SQL注入检测"},
+			description:   "应该匹配Rule字段中包含'union'的规则",
+		},
+		{
+			name:          "按替换结果搜索",
+			keyword:       "TestBot",
+			expectedCount: 1,
+			expectedNames: []string{"用户代理替换"},
+			description:   "应该匹配Result字段中包含'TestBot'的规则",
+		},
+		{
+			name:          "大小写不敏感搜索",
+			keyword:       "user-agent",
+			expectedCount: 1,
+			expectedNames: []string{"用户代理替换"},
+			description:   "搜索应该忽略大小写",
+		},
+		{
+			name:          "中文搜索",
+			keyword:       "检测",
+			expectedCount: 3,
+			expectedNames: []string{"测试规则1 - API密钥检测", "SQL注入检测", "XSS检测"},
+			description:   "应该支持中文关键字搜索",
+		},
+		{
+			name:          "搜索禁用规则",
+			keyword:       "禁用",
+			expectedCount: 1,
+			expectedNames: []string{"禁用规则"},
+			description:   "应该能搜索到禁用的规则",
+		},
+		{
+			name:          "无匹配结果",
+			keyword:       "不存在的关键字xyz123",
+			expectedCount: 0,
+			expectedNames: []string{},
+			description:   "不匹配任何规则时应该返回空列表",
+		},
+		{
+			name:          "部分匹配",
+			keyword:       "script",
+			expectedCount: 1,
+			expectedNames: []string{"XSS检测"},
+			description:   "应该支持部分匹配",
+		},
+		{
+			name:          "正则表达式字符搜索",
+			keyword:       "select",
+			expectedCount: 1,
+			expectedNames: []string{"SQL注入检测"},
+			description:   "应该能搜索包含正则表达式字符的内容",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			resp, err := client.QueryMITMReplacerRules(ctx, &ypb.QueryMITMReplacerRulesRequest{
+				KeyWord: tc.keyword,
+			})
+			require.NoError(t, err, "查询规则时出错")
+			require.NotNil(t, resp, "响应不应该为空")
+			require.NotNil(t, resp.Rules, "响应的Rules字段不应该为空")
+
+			actualCount := len(resp.Rules.Rules)
+			assert.Equal(t, tc.expectedCount, actualCount,
+				"关键字'%s': %s - 期望%d个结果，实际得到%d个",
+				tc.keyword, tc.description, tc.expectedCount, actualCount)
+
+			if tc.expectedCount > 0 {
+				actualNames := make([]string, 0, len(resp.Rules.Rules))
+				for _, rule := range resp.Rules.Rules {
+					actualNames = append(actualNames, rule.VerboseName)
+				}
+
+				for _, expectedName := range tc.expectedNames {
+					assert.Contains(t, actualNames, expectedName,
+						"关键字'%s': 期望找到规则'%s'", tc.keyword, expectedName)
+				}
+
+				// 验证返回的规则确实包含关键字
+				if tc.keyword != "" {
+					keywordLower := strings.ToLower(tc.keyword)
+					for _, rule := range resp.Rules.Rules {
+						nameMatch := rule.VerboseName != "" &&
+							strings.Contains(strings.ToLower(rule.VerboseName), keywordLower)
+						ruleMatch := rule.Rule != "" &&
+							strings.Contains(strings.ToLower(rule.Rule), keywordLower)
+						resultMatch := rule.Result != "" &&
+							strings.Contains(strings.ToLower(rule.Result), keywordLower)
+
+						assert.True(t, nameMatch || ruleMatch || resultMatch,
+							"规则'%s'应该在名称、规则内容或结果中包含关键字'%s'",
+							rule.VerboseName, tc.keyword)
+					}
+				}
+			}
+		})
+	}
+
+	_, err = client.SetCurrentRules(ctx, &ypb.MITMContentReplacers{Rules: []*ypb.MITMContentReplacer{}})
+	require.NoError(t, err)
+}
