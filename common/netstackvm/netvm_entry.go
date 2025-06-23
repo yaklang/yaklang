@@ -2,6 +2,8 @@ package netstackvm
 
 import (
 	"context"
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/arp"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/icmp"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/tcp"
@@ -42,7 +44,21 @@ func GetDefaultNetStackVirtualMachineWithoutDHCP() (*NetStackVirtualMachine, err
 	DefaultNetStackVirtualMachineMutex.Lock()
 	defer DefaultNetStackVirtualMachineMutex.Unlock()
 	if DefaultNetStackVirtualMachine == nil {
-		vm, err := NewSystemNetStackVM(WithForceSystemNetStack(true))
+		vm, err := NewSystemNetStackVM(
+			WithForceSystemNetStack(true),
+			WithPCAPOutboundFilter(func(packet gopacket.Packet) bool {
+				if ret := packet.TransportLayer(); ret != nil && ret.LayerType() == layers.LayerTypeTCP {
+					tcpLayerIns, ok := ret.(*layers.TCP)
+					if !ok {
+						return true
+					}
+					if tcpLayerIns.RST {
+						return false
+					}
+				}
+				return true
+			}),
+		)
 		if err != nil {
 			return nil, utils.Errorf("create netstack virtual machine failed: %v", err)
 		}
