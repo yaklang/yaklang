@@ -388,6 +388,8 @@ func chr(i interface{}) string {
 // ```
 func ord(i interface{}) int {
 	switch ret := i.(type) {
+	case rune:
+		return int(ret)
 	case byte:
 		return int(ret)
 	default:
