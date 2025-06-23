@@ -374,6 +374,69 @@ func (s *VulinServer) getEncryptSQLinj() []*VulInfo {
 				}
 			},
 		},
+		{
+			Path:  "/challenge-api-docs",
+			Title: "动态挑战响应API靶场（20250623）",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+				html := `
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>动态挑战-响应 API 安全靶场</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; max-width: 800px; margin: auto; }
+        h1, h2 { color: #333; }
+        code { background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; }
+        .workflow { text-align: center; margin: 20px 0; }
+        .key { color: #c7254e; background-color: #f9f2f4; padding: 2px 4px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>动态挑战-响应 API 安全靶场</h1>
+    <p>这是一个模拟真实世界高安全性API的靶场。它使用动态挑战-响应机制来防止重放攻击，并对业务数据进行加密传输。常规的Fuzzer很难成功请求此类型API。</p>
+    
+    <h2>交互流程</h2>
+    <div class="workflow">
+        <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+        <script>mermaid.initialize({startOnLoad:true});</script>
+        <div class="mermaid">
+        sequenceDiagram
+            participant Client as 客户端
+            participant Server as 服务器
+            Client->>Server: 1. GET /api/get-challenge
+            Server-->>Client: 返回 {"challenge": "...", "iv": "..."}
+            Client->>Client: 2. 解密 challenge 获取 nonce<br/>3. 使用 HMAC-SHA256(nonce) 计算签名
+            Client->>Server: 4. GET /api/user/info<br/>Header: X-Auth-Signature: &lt;signature&gt;
+            Server->>Server: 5. 验证签名，若通过则加密业务数据
+            alt 签名有效
+                Server-->>Client: 200 OK {"data": "...", "iv": "..."}
+            else 签名/挑战无效
+                Server-->>Client: 401 / 403 错误
+            end
+            Client->>Client: 6. 解密 data 获取最终信息
+        </div>
+    </div>
+
+    <h2>任务步骤</h2>
+    <ol>
+        <li>向 <code><a href="/api/get-challenge" target="_blank">/api/get-challenge</a></code> 发起GET请求，获取加密后的挑战 <code>challenge</code> 和初始化向量 <code>iv</code>。</li>
+        <li>使用预共享的AES密钥和获取到的 <code>iv</code> 解密 <code>challenge</code>，得到原始的 <code>nonce</code>。
+            <ul><li>AES密钥: <code class="key">YakitVulinboxAES</code></li></ul>
+        </li>
+        <li>使用预共享的HMAC密钥，通过HMAC-SHA256算法计算 <code>nonce</code> 的签名。
+            <ul><li>HMAC密钥: <code class="key">YakitVulinboxHMACKey-SIGNATURE</code></li></ul>
+        </li>
+        <li>将计算出的签名（Hex格式）放入 <code>X-Auth-Signature</code> 请求头，向 <code>/api/user/info</code> 发起GET请求。</li>
+        <li>如果签名正确，你将收到加密的业务数据。再次使用AES密钥和响应中的新 <code>iv</code> 解密，即可看到最终的敏感信息。</li>
+    </ol>
+</body>
+</html>
+`
+				writer.Write([]byte(html))
+			},
+		},
 	}
 	return vroutes
 }
