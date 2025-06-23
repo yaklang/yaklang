@@ -292,7 +292,7 @@ func TestRandomChunkedSender_hanlder(t *testing.T) {
 
 		%s
 		`, token)
-		sender, err := newRandomChunkedSender([]byte(req), options...)
+		sender, err := NewRandomChunkedSender([]byte(req), options...)
 		require.NoError(t, err)
 
 		var buffer bytes.Buffer
