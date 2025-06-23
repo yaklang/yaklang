@@ -950,10 +950,14 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 						extra := make(map[string]string)
 						if config.MirrorHTTPFlow != nil {
 							if ret := config.MirrorHTTPFlow(targetRequest, rsp, existedParams); ret != nil {
-								for k, v := range ret {
+								generalMap := utils.InterfaceToGeneralMap(ret)
+								for k, vRaw := range generalMap {
+									v := utils.InterfaceToString(vRaw)
 									// duplicated existed params should not be extra info
 									if old, ok := existedParams[k]; !ok || old != v {
 										extra[k] = v
+									} else {
+										extra[k] = old
 									}
 								}
 							}
