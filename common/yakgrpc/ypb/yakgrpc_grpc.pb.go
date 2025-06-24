@@ -377,6 +377,7 @@ const (
 	Yak_HTTPRequestBuilder_FullMethodName                         = "/ypb.Yak/HTTPRequestBuilder"
 	Yak_DebugPlugin_FullMethodName                                = "/ypb.Yak/DebugPlugin"
 	Yak_SmokingEvaluatePlugin_FullMethodName                      = "/ypb.Yak/SmokingEvaluatePlugin"
+	Yak_EvaluateSyntaxFlowRule_FullMethodName                     = "/ypb.Yak/EvaluateSyntaxFlowRule"
 	Yak_SmokingEvaluatePluginBatch_FullMethodName                 = "/ypb.Yak/SmokingEvaluatePluginBatch"
 	Yak_GetSystemDefaultDnsServers_FullMethodName                 = "/ypb.Yak/GetSystemDefaultDnsServers"
 	Yak_DiagnoseNetwork_FullMethodName                            = "/ypb.Yak/DiagnoseNetwork"
@@ -984,6 +985,7 @@ type YakClient interface {
 	// rpc DeleteHTTPRequestBuilder(DeleteHTTPRequestBuilderRequest) returns (Empty);
 	DebugPlugin(ctx context.Context, in *DebugPluginRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
 	SmokingEvaluatePlugin(ctx context.Context, in *SmokingEvaluatePluginRequest, opts ...grpc.CallOption) (*SmokingEvaluatePluginResponse, error)
+	EvaluateSyntaxFlowRule(ctx context.Context, in *EvaluateSyntaxFlowRuleRequest, opts ...grpc.CallOption) (*EvaluateSyntaxFlowRuleResponse, error)
 	SmokingEvaluatePluginBatch(ctx context.Context, in *SmokingEvaluatePluginBatchRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SmokingEvaluatePluginBatchResponse], error)
 	GetSystemDefaultDnsServers(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*DefaultDnsServerResponse, error)
 	// 诊断网络发生的问题
@@ -5257,6 +5259,16 @@ func (c *yakClient) SmokingEvaluatePlugin(ctx context.Context, in *SmokingEvalua
 	return out, nil
 }
 
+func (c *yakClient) EvaluateSyntaxFlowRule(ctx context.Context, in *EvaluateSyntaxFlowRuleRequest, opts ...grpc.CallOption) (*EvaluateSyntaxFlowRuleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EvaluateSyntaxFlowRuleResponse)
+	err := c.cc.Invoke(ctx, Yak_EvaluateSyntaxFlowRule_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) SmokingEvaluatePluginBatch(ctx context.Context, in *SmokingEvaluatePluginBatchRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SmokingEvaluatePluginBatchResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[62], Yak_SmokingEvaluatePluginBatch_FullMethodName, cOpts...)
@@ -7338,6 +7350,7 @@ type YakServer interface {
 	// rpc DeleteHTTPRequestBuilder(DeleteHTTPRequestBuilderRequest) returns (Empty);
 	DebugPlugin(*DebugPluginRequest, grpc.ServerStreamingServer[ExecResult]) error
 	SmokingEvaluatePlugin(context.Context, *SmokingEvaluatePluginRequest) (*SmokingEvaluatePluginResponse, error)
+	EvaluateSyntaxFlowRule(context.Context, *EvaluateSyntaxFlowRuleRequest) (*EvaluateSyntaxFlowRuleResponse, error)
 	SmokingEvaluatePluginBatch(*SmokingEvaluatePluginBatchRequest, grpc.ServerStreamingServer[SmokingEvaluatePluginBatchResponse]) error
 	GetSystemDefaultDnsServers(context.Context, *Empty) (*DefaultDnsServerResponse, error)
 	// 诊断网络发生的问题
@@ -8594,6 +8607,9 @@ func (UnimplementedYakServer) DebugPlugin(*DebugPluginRequest, grpc.ServerStream
 }
 func (UnimplementedYakServer) SmokingEvaluatePlugin(context.Context, *SmokingEvaluatePluginRequest) (*SmokingEvaluatePluginResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SmokingEvaluatePlugin not implemented")
+}
+func (UnimplementedYakServer) EvaluateSyntaxFlowRule(context.Context, *EvaluateSyntaxFlowRuleRequest) (*EvaluateSyntaxFlowRuleResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method EvaluateSyntaxFlowRule not implemented")
 }
 func (UnimplementedYakServer) SmokingEvaluatePluginBatch(*SmokingEvaluatePluginBatchRequest, grpc.ServerStreamingServer[SmokingEvaluatePluginBatchResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method SmokingEvaluatePluginBatch not implemented")
@@ -15011,6 +15027,24 @@ func _Yak_SmokingEvaluatePlugin_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_EvaluateSyntaxFlowRule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EvaluateSyntaxFlowRuleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).EvaluateSyntaxFlowRule(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_EvaluateSyntaxFlowRule_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).EvaluateSyntaxFlowRule(ctx, req.(*EvaluateSyntaxFlowRuleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_SmokingEvaluatePluginBatch_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(SmokingEvaluatePluginBatchRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -18476,6 +18510,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SmokingEvaluatePlugin",
 			Handler:    _Yak_SmokingEvaluatePlugin_Handler,
+		},
+		{
+			MethodName: "EvaluateSyntaxFlowRule",
+			Handler:    _Yak_EvaluateSyntaxFlowRule_Handler,
 		},
 		{
 			MethodName: "GetSystemDefaultDnsServers",
