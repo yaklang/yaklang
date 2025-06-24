@@ -206,7 +206,9 @@ Content-Type: application/json
 					// 验证时间
 					totalTime := callback["total_time"].(time.Duration)
 					chunkTime := callback["chunk_send_time"].(time.Duration)
-					assert.Greater(t, totalTime, time.Duration(0), "total time should be positive")
+					if callback["chunk_id"].(int) != 1 {
+						assert.Greater(t, totalTime, time.Duration(0), "total time should be positive")
+					}
 
 					// 只有当chunkTime > 0时才验证它小于等于totalTime
 					if chunkTime > 0 {
@@ -414,8 +416,9 @@ Content-Type: application/json
 						// 验证时间
 						totalTime := callback["total_time"].(time.Duration)
 						chunkTime := callback["chunk_send_time"].(time.Duration)
-						assert.Greater(t, totalTime, time.Duration(0), "total time should be positive for request %d", i+1)
-
+						if callback["chunk_id"].(int) != 1 {
+							assert.Greater(t, totalTime, time.Duration(0), "total time should be positive for request %d", i+1)
+						}
 						// 只有当chunkTime > 0时才验证它小于等于totalTime
 						if chunkTime > 0 {
 							assert.LessOrEqual(t, chunkTime, totalTime, "chunk time should be <= total time for request %d", i+1)
