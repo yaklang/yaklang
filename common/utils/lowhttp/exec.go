@@ -1055,7 +1055,9 @@ RECONNECT:
 			}
 			return false
 		}
-		retryFlag = statusCodeRetry(firstResponse.StatusCode)
+		if firstResponse != nil {
+			retryFlag = statusCodeRetry(firstResponse.StatusCode)
+		}
 	}
 
 	if retryFlag && (retryTimes < maxRetryTimes || retryHandler != nil) {
