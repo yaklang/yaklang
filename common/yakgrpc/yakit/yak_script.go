@@ -194,6 +194,16 @@ func GetYakScriptByName(db *gorm.DB, name string) (*schema.YakScript, error) {
 	return &req, nil
 }
 
+func GetSyntaxFlowRuleByName(db *gorm.DB, name string) (*schema.SyntaxFlowRule, error) {
+	var req schema.SyntaxFlowRule
+
+	if db := db.Model(&schema.SyntaxFlowRule{}).Where("rule_name = ?", name).First(&req); db.Error != nil {
+		return nil, utils.Errorf("get SyntaxFlowRule failed: %s", db.Error)
+	}
+
+	return &req, nil
+}
+
 // GetNucleiYakScriptByName
 func GetNucleiYakScriptByName(db *gorm.DB, scriptName string) (*schema.YakScript, error) {
 	var req schema.YakScript
