@@ -46,6 +46,7 @@ type LowhttpExecConfig struct {
 	RetryTimes                       int
 	RetryInStatusCode                []int
 	RetryNotInStatusCode             []int
+	RetryHandler                     func(https bool, req []byte, rsp []byte) bool
 	RetryWaitTime                    time.Duration
 	RetryMaxWaitTime                 time.Duration
 	JsRedirect                       bool
@@ -562,6 +563,25 @@ func WithTimeoutFloat(i float64) LowhttpOpt {
 func WithRetryTimes(retryTimes int) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.RetryTimes = retryTimes
+	}
+}
+
+// WithRetryHandler sets a retry handler function that will be called when a request fails.
+// return true for retry, return false for not retry.
+func WithRetryHandler(retryHandler func(https bool, req []byte, rsp []byte) bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		if !utils.IsNil(retryHandler) {
+			o.RetryHandler = func(https bool, req []byte, rsp []byte) (ret bool) {
+				defer func() {
+					if err := recover(); err != nil {
+						ret = false
+						log.Errorf("retry handler failed: %v\n%v", err, utils.ErrorStack(err))
+					}
+				}()
+				ret = retryHandler(https, req, rsp)
+				return
+			}
+		}
 	}
 }
 
