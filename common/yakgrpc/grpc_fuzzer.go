@@ -789,7 +789,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				time.Duration(req.GetRandomChunkedMinDelay())*time.Millisecond,
 				time.Duration(req.GetRandomChunkedMaxDelay())*time.Millisecond,
 			))
-			httpPoolOpts = append(httpPoolOpts)
 		}
 		fuzzMode := req.GetFuzzTagMode() // ""/"close"/"standard"/"legacy"
 		forceFuzz := req.GetForceFuzz()  // true/false
@@ -1007,6 +1006,12 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				OriginalContentType:        lowhttpResponse.OriginContentType,
 				FixContentType:             lowhttpResponse.FixContentType,
 				IsSetContentTypeOptions:    lowhttpResponse.IsSetContentTypeOptions,
+			}
+
+			if req.GetEnableRandomChunked() && result.RandomChunkedData != nil {
+				for _, chunkInfo := range result.RandomChunkedData {
+					rsp.RandomChunkedData = append(rsp.RandomChunkedData, chunkInfo.ToGRPCModel())
+				}
 			}
 
 			redirectPacket := result.LowhttpResponse.RedirectRawPackets

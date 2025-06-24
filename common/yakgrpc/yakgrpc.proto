@@ -5160,6 +5160,7 @@ message FuzzerResponse {
   string OriginalContentType = 59;
   string FixContentType = 60;
   bool IsSetContentTypeOptions = 61;
+  repeated RandomChunkedResponse RandomChunkedData = 62;
 }
 
 message RandomChunkedResponse{
@@ -5167,8 +5168,7 @@ message RandomChunkedResponse{
   bytes Data = 2; // 当前的 chunked 数据
   int64 ChunkedLength = 3; // 当前的 chunked 长度
   int64 CurrentChunkedDelayTime = 4; // 当前的 chunked 延迟时间
-  int64 TotalDelayTime = 5; // 总的 chunked 数量
-  bool IsEnd = 6; // 是否是最后一个 chunked
+  int64 TotalDelayTime = 5; // 总的发送耗时
 }
 
 message RedirectHTTPFlow {
