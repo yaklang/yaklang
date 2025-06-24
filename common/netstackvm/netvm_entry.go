@@ -2,8 +2,6 @@ package netstackvm
 
 import (
 	"context"
-	"github.com/gopacket/gopacket"
-	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/arp"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/icmp"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/tcp"
@@ -16,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/dhcp"
-	icmpClient "github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/icmp"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/ipv4"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/ipv6"
@@ -24,55 +21,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-var DefaultNetStackVirtualMachine *NetStackVirtualMachine
-var DefaultNetStackVirtualMachineMutex sync.Mutex
-
-func GetDefaultNetStackVirtualMachine() (*NetStackVirtualMachine, error) {
-	DefaultNetStackVirtualMachineMutex.Lock()
-	defer DefaultNetStackVirtualMachineMutex.Unlock()
-	if DefaultNetStackVirtualMachine == nil {
-		vm, err := NewSystemNetStackVM()
-		if err != nil {
-			return nil, utils.Errorf("create netstack virtual machine failed: %v", err)
-		}
-		DefaultNetStackVirtualMachine = vm
-	}
-	return DefaultNetStackVirtualMachine, nil
-}
-
-func GetDefaultNetStackVirtualMachineWithoutDHCP() (*NetStackVirtualMachine, error) {
-	DefaultNetStackVirtualMachineMutex.Lock()
-	defer DefaultNetStackVirtualMachineMutex.Unlock()
-	if DefaultNetStackVirtualMachine == nil {
-		vm, err := NewSystemNetStackVM(
-			WithForceSystemNetStack(true),
-			WithPCAPOutboundFilter(func(packet gopacket.Packet) bool {
-				if ret := packet.TransportLayer(); ret != nil && ret.LayerType() == layers.LayerTypeTCP {
-					tcpLayerIns, ok := ret.(*layers.TCP)
-					if !ok {
-						return true
-					}
-					if tcpLayerIns.RST {
-						return false
-					}
-				}
-				return true
-			}),
-		)
-		if err != nil {
-			return nil, utils.Errorf("create netstack virtual machine failed: %v", err)
-		}
-		DefaultNetStackVirtualMachine = vm
-	}
-	return DefaultNetStackVirtualMachine, nil
-}
-
-func GetDefaultICMPClient() *icmpClient.Client {
-	vm, err := GetDefaultNetStackVirtualMachineWithoutDHCP()
-	if err != nil {
-		return nil
-	}
-	return icmpClient.NewClient(vm.GetStack())
+func NewSystemNetStackVMWithoutDHCP(entryOption ...Option) (*NetStackVirtualMachine, error) {
+	return NewSystemNetStackVM(append(entryOption, WithForceSystemNetStack(true))...)
 }
 
 type NetStackVirtualMachineEntry struct {
