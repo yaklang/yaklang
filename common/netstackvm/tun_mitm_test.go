@@ -11,7 +11,7 @@ import (
 )
 
 func TestMitmTun(t *testing.T) {
-	vm, err := netstackvm.GetDefaultNetStackVirtualMachine()
+	vm, err := netstackvm.NewSystemNetStackVM()
 	require.NoError(t, err)
 	server, err := yaklib.NewMITMServer(
 		yaklib.MITMConfigDialer(vm.DialTCP),
