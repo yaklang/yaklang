@@ -148,10 +148,13 @@ func TestRandomChunkedHTTPExternal(t *testing.T) {
 			host, port := utils.DebugMockHTTPHandlerFunc(tt.serverHandler)
 
 			var handlerCallbacks []map[string]interface{}
-			var actualHandler func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration)
+			var actualHandler func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration, isEnd bool)
 
 			if tt.validateHandler {
-				actualHandler = func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration) {
+				actualHandler = func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration, isEnd bool) {
+					if isEnd {
+						return
+					}
 					callback := map[string]interface{}{
 						"chunk_id":        id,
 						"chunk_raw":       string(chunkRaw),
@@ -173,13 +176,13 @@ User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Geck
 Content-Type: application/json
 
 %s`, utils.HostPort(host, port), tt.requestBody)),
-				lowhttp.WithEnableRandomChunkedChunked(true),
-				lowhttp.WithChunkedLength(tt.minChunkLength, tt.maxChunkLength),
+				lowhttp.WithEnableRandomChunked(true),
+				lowhttp.WithRandomChunkedLength(tt.minChunkLength, tt.maxChunkLength),
 			}
 
-			opts = append(opts, lowhttp.WithChunkedDelayTime(tt.minDelay, tt.maxDelay))
+			opts = append(opts, lowhttp.WithRandomChunkedDelay(tt.minDelay, tt.maxDelay))
 			if actualHandler != nil {
-				opts = append(opts, lowhttp.WithChunkedHandler(actualHandler))
+				opts = append(opts, lowhttp.WithRandomChunkedHandler(actualHandler))
 			}
 
 			// 发送请求
@@ -356,10 +359,13 @@ func TestRandomChunkedHTTPWithConnectionPool(t *testing.T) {
 
 			for i := 0; i < tt.requestCount; i++ {
 				var handlerCallbacks []map[string]interface{}
-				var actualHandler func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration)
+				var actualHandler func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration, isEnd bool)
 
 				if tt.validateHandler {
-					actualHandler = func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration) {
+					actualHandler = func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration, isEnd bool) {
+						if isEnd {
+							return
+						}
 						callback := map[string]interface{}{
 							"chunk_id":        id,
 							"chunk_raw":       string(chunkRaw),
@@ -384,16 +390,16 @@ User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Geck
 Content-Type: application/json
 
 %s`, utils.HostPort(host, port), tt.requestBody)),
-					lowhttp.WithEnableRandomChunkedChunked(true),
-					lowhttp.WithChunkedLength(tt.minChunkLength, tt.maxChunkLength),
-					lowhttp.WithChunkedDelayTime(tt.minDelay, tt.maxDelay),
+					lowhttp.WithEnableRandomChunked(true),
+					lowhttp.WithRandomChunkedLength(tt.minChunkLength, tt.maxChunkLength),
+					lowhttp.WithRandomChunkedDelay(tt.minDelay, tt.maxDelay),
 					// 启用连接池
 					lowhttp.WithConnPool(true),
 					lowhttp.ConnPool(customPool),
 				}
 
 				if actualHandler != nil {
-					opts = append(opts, lowhttp.WithChunkedHandler(actualHandler))
+					opts = append(opts, lowhttp.WithRandomChunkedHandler(actualHandler))
 				}
 
 				// 发送请求

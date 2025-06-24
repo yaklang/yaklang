@@ -26,6 +26,7 @@ import (
 
 var poolingList sync.Map
 
+type RandomChunkedResultHandler func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration, isEnd bool)
 type httpPoolConfig struct {
 	Size                         int
 	SizedWaitGroupInstance       *utils.SizedWaitGroup
@@ -110,6 +111,14 @@ type httpPoolConfig struct {
 	FromPlugin string
 
 	SNI *string
+
+	// Random Chunked
+	EnableRandomChunked      bool
+	MinChunkedLength         int
+	MaxChunkedLength         int
+	MinChunkDelayTime        time.Duration
+	MaxChunkDelayTime        time.Duration
+	RandomChunkResultHandler RandomChunkedResultHandler
 }
 
 // WithPoolOpt_DNSNoCache is not effective
@@ -567,6 +576,32 @@ func _httpPool_withSaveHTTPFlow(randomSession bool) HttpPoolConfigOption {
 	}
 }
 
+func _httpPool_enableRandomChunked(b bool) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.EnableRandomChunked = b
+	}
+}
+
+func _httpPool_RandomChunkedLength(min, max int) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.MinChunkedLength = min
+		config.MaxChunkedLength = max
+	}
+}
+
+func _httpPool_RandomChunkDelayTime(min, max time.Duration) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.MinChunkDelayTime = min
+		config.MaxChunkDelayTime = max
+	}
+}
+
+func _httpPool_RandomChunkHandler(handler RandomChunkedResultHandler) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.RandomChunkResultHandler = handler
+	}
+}
+
 type HttpPoolConfigOption func(config *httpPoolConfig)
 
 type HttpResult struct {
@@ -920,6 +955,13 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithPayloads(payloads))
 						}
 
+						if config.EnableRandomChunked {
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithEnableRandomChunked(config.EnableRandomChunked))
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithRandomChunkedLength(config.MinChunkedLength, config.MaxChunkedLength))
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithRandomChunkedDelay(config.MinChunkDelayTime, config.MaxChunkDelayTime))
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithRandomChunkedHandler(lowhttp.ChunkedResultHandler(config.RandomChunkResultHandler)))
+						}
+
 						if config.HookAfterRequest != nil {
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithSaveHTTPFlowHandler(func(rspIns *lowhttp.LowhttpResponse) {
 								newRspRaw := config.HookAfterRequest(https, nil, targetRequest, nil, rspIns.RawPacket)
@@ -1226,4 +1268,8 @@ var (
 	WithPoolOpt_WithPayloads               = _httpPool_withPayloads
 	WithPoolOpt_RandomSession              = _httpPool_withRandomSession
 	WithPoolOpt_SaveHTTPFlow               = _httpPool_withSaveHTTPFlow
+	WithPoolOpt_EnableRandomChunked        = _httpPool_enableRandomChunked
+	WithPoolOpt_RandomChunkedLength        = _httpPool_RandomChunkedLength
+	WithPoolOpt_RandomChunkDelayTime       = _httpPool_RandomChunkDelayTime
+	WithPoolOpt_RandomChunkHandler         = _httpPool_RandomChunkHandler
 )
