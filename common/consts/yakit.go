@@ -79,6 +79,8 @@ func InitializeYakitDatabase(projectDB string, profileDB string, isIRify ...bool
 		irify = isIRify[0]
 	}
 
+	initializeYakitDirectories()
+
 	// profile
 	profileDBName := GetProfileDatabaseNameFromEnv()
 	if profileDB != "" {
@@ -98,6 +100,17 @@ func InitializeYakitDatabase(projectDB string, profileDB string, isIRify ...bool
 	SetSSADatabaseInfo(ssaProjectDatabaseRaw)
 
 	initYakitDatabase()
+}
+
+// initializeYakitDirectories 确保所有必要的Yakit目录在项目初始化时就被创建
+func initializeYakitDirectories() {
+	GetDefaultYakitProjectsDir() // yakit-projects/projects
+	GetDefaultYakitPayloadsDir() // yakit-projects/payloads
+	GetDefaultYakitEngineDir()   // yakit-projects/yak-engine
+	GetDefaultYakitPprofDir()    // yakit-projects/pprof-log
+	GetDefaultYakitBaseTempDir() // yakit-projects/temp
+
+	log.Debug("yakit directories initialized")
 }
 
 func initYakitDatabase() {
