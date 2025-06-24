@@ -480,6 +480,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_Mirror_Duplicated_ExtractorResults(t *
 			break
 		}
 		count++
+		spew.Dump(rsp.ExtractedResults)
 		require.Len(t, rsp.ExtractedResults, 1)
 		require.Equal(t, "a", rsp.ExtractedResults[0].Key)
 		valueStr := rsp.ExtractedResults[0].Value
