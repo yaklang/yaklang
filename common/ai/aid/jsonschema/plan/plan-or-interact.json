@@ -16,7 +16,7 @@
       "description": "【仅当 `@action` 为 'require-user-interact' 时填写】向用户提出的具体问题。此问题旨在获取那些**缺失的、且对于制定有效计划至关重要**的关键信息。确保问题明确、具体，直指所需信息点，避免含糊不清。"
     },
     "options": {
-      "type": "object",
+      "type": "array",
       "description": "【仅当 `@action` 为 'require-user-interact' 时填写】为用户提供的一组预设选项，以帮助用户快速、准确地回答 `question` 中提出的问题。设计选项时应确保它们**清晰、互斥，并尽可能覆盖用户可能的主要回答方向**。",
       "items": {
         "type": "object",

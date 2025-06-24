@@ -3,6 +3,7 @@ package aitool
 import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
+	"reflect"
 )
 
 type InvokeParams map[string]any
@@ -21,10 +22,20 @@ func (p InvokeParams) GetObjectArray(key string) []InvokeParams {
 		if !ok {
 			return result
 		}
-		funk.ForEach(r, func(v any) {
-			item := utils.InterfaceToGeneralMap(v)
-			result = append(result, item)
-		})
+		var arrType = reflect.ValueOf(r).Type()
+		if arrType.Kind() == reflect.Slice || arrType.Kind() == reflect.Array {
+			funk.ForEach(r, func(v any) {
+				item := utils.InterfaceToGeneralMap(v)
+				result = append(result, item)
+			})
+		} else if arrType.Kind() == reflect.Map {
+			funk.ForEach(r, func(k any, v any) {
+				item := utils.InterfaceToGeneralMap(v)
+				result = append(result, item)
+			})
+		} else {
+			result = append(result, utils.InterfaceToGeneralMap(r))
+		}
 		return result
 	}
 	return result
