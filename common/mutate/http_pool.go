@@ -62,7 +62,7 @@ type httpPoolConfig struct {
 	HookBeforeRequest func(https bool, originReq []byte, req []byte) []byte
 	HookAfterRequest  func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte
 	MirrorHTTPFlow    func([]byte, []byte, map[string]string) map[string]string
-	RetryHandler      func(https bool, req []byte, rsp []byte) bool
+	RetryHandler      func(https bool, retryCount int, req []byte, rsp []byte) bool
 	MutateHook        func([]byte) [][]byte
 
 	// 请求来源
@@ -203,7 +203,7 @@ func _hoopPool_SetHookCaller(
 	before func(bool, []byte, []byte) []byte,
 	after func(bool, []byte, []byte, []byte, []byte) []byte,
 	extractor func([]byte, []byte, map[string]string) map[string]string,
-	retryHandler func(bool, []byte, []byte) bool,
+	retryHandler func(bool, int, []byte, []byte) bool,
 ) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.HookBeforeRequest = before

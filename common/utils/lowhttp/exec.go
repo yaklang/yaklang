@@ -226,6 +226,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		clientHelloSpec      = option.ClientHelloSpec
 		dialer               = option.Dialer
 	)
+
 	connectTimeout = 2 * time.Second
 	if reqIns == nil {
 		// create new request instance for httpctx
@@ -1019,9 +1020,7 @@ RECONNECT:
 
 	// status code retry
 	var (
-		retryFlag        = false
-		retryNotInFlag   = true
-		haveRetryHandler = false
+		retryFlag = false
 	)
 
 	if retryHandler != nil {
@@ -1029,47 +1028,40 @@ RECONNECT:
 		if err != nil {
 			rspRaw = rawBytes
 		}
-		haveRetryHandler = true
 		var httpsFlag = https
-		var rawReq []byte = requestPacket
+		var rawReq = requestPacket
 		if utils.IsNil(response) {
 			httpsFlag = response.Https
 			rawReq = response.RawRequest
 		}
-		if retryHandler(httpsFlag, rawReq, rspRaw) {
-			retryFlag = true
-			goto RETRY_TRIGGER
-		}
+		retryFlag = retryHandler(httpsFlag, retryTimes, rawReq, rspRaw)
 	} else {
-		// not in statuscode
-		if len(retryNotInStatusCode) > 0 {
-			// 3xx status code can't retry
-			for _, sc := range retryNotInStatusCode {
-				if firstResponse.StatusCode == sc || (firstResponse.StatusCode >= 300 && firstResponse.StatusCode < 400) {
-					retryNotInFlag = false
-					break
+		statusCodeRetry := func(statusCode int) bool {
+			var retryNotIn = true
+			for _, sc := range retryNotInStatusCode { // black list first
+				// 3xx code can't retry
+				if statusCode == sc || (statusCode >= 300 && statusCode < 400) {
+					retryNotIn = false
 				}
 			}
-			if retryNotInFlag {
-				retryFlag = true
-				goto RETRY_TRIGGER
+			if retryNotIn {
+				return true
 			}
-		}
-
-		// in statuscode
-		for _, sc := range retryInStatusCode {
-			if firstResponse.StatusCode == sc {
-				retryFlag = true
-				break
+			// in statuscode
+			for _, sc := range retryInStatusCode {
+				if statusCode == sc {
+					return true
+				}
 			}
+			return false
 		}
+		retryFlag = statusCodeRetry(firstResponse.StatusCode)
 	}
 
-RETRY_TRIGGER:
-	if retryFlag && (retryTimes < maxRetryTimes || haveRetryHandler) {
+	if retryFlag && (retryTimes < maxRetryTimes || retryHandler != nil) {
 		retryTimes += 1
 		time.Sleep(utils.JitterBackoff(retryWaitTime, retryMaxWaitTime, retryTimes))
-		log.Infof("retry reconnect because of status code [%d / %d]", retryTimes, maxRetryTimes)
+		log.Infof("retry reconnect because [%d / %d]", retryTimes, maxRetryTimes)
 		goto RECONNECT
 	}
 
