@@ -102,12 +102,12 @@ type LowhttpExecConfig struct {
 
 	ExtendDialOption []netx.DialXOption // for test
 
-	// chunked
+	// random chunked
 	EnableRandomChunked bool
 	MinChunkedLength    int
 	MaxChunkedLength    int
-	MinChunkDelayTime   time.Duration
-	MaxChunkDelayTime   time.Duration
+	MinChunkDelay       time.Duration
+	MaxChunkDelay       time.Duration
 	ChunkedHandler      ChunkedResultHandler
 	chunkedSender       *RandomChunkedSender
 }
@@ -746,27 +746,27 @@ func WithExtendDialXOption(options ...netx.DialXOption) LowhttpOpt {
 	}
 }
 
-func WithEnableRandomChunkedChunked(enable bool) LowhttpOpt {
+func WithEnableRandomChunked(enable bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.EnableRandomChunked = enable
 	}
 }
 
-func WithChunkedLength(min, max int) LowhttpOpt {
+func WithRandomChunkedLength(min, max int) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.MinChunkedLength = min
 		o.MaxChunkedLength = max
 	}
 }
 
-func WithChunkedDelayTime(min, max time.Duration) LowhttpOpt {
+func WithRandomChunkedDelay(min, max time.Duration) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
-		o.MinChunkDelayTime = min
-		o.MaxChunkDelayTime = max
+		o.MinChunkDelay = min
+		o.MaxChunkDelay = max
 	}
 }
 
-func WithChunkedHandler(handler ChunkedResultHandler) LowhttpOpt {
+func WithRandomChunkedHandler(handler ChunkedResultHandler) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.ChunkedHandler = handler
 	}
@@ -776,14 +776,14 @@ func (o *LowhttpExecConfig) GetOrCreateChunkSender() (*RandomChunkedSender, erro
 	if o.chunkedSender != nil {
 		return o.chunkedSender, nil
 	}
-	chunkedOpts := []RandomChunkedHTTPOption{
-		WithRandomChunkedDelay(o.MinChunkDelayTime, o.MaxChunkDelayTime),
-		WithRandomChunkedContext(o.Ctx),
-		WithRandomChunkedLength(o.MinChunkedLength, o.MaxChunkedLength),
-		WithRandomChunkedHandler(o.ChunkedHandler),
-	}
-
-	sender, err := newRandomChunkedSender(chunkedOpts...)
+	sender, err := NewRandomChunkedSender(
+		o.Ctx,
+		o.MinChunkedLength,
+		o.MaxChunkedLength,
+		o.MinChunkDelay,
+		o.MaxChunkDelay,
+		o.ChunkedHandler,
+	)
 	if err != nil {
 		return nil, err
 	}

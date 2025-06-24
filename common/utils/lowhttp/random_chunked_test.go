@@ -236,17 +236,16 @@ Transfer-Encoding: chunked
 			requestPacket := []byte(fmt.Sprintf(tt.requestPacket, originalBody))
 
 			var buffer bytes.Buffer
-			sender := &RandomChunkedSender{
-				ctx:            context.Background(),
-				requestPacket:  requestPacket,
-				minChunkLength: tt.minChunkLength,
-				maxChunkLength: tt.maxChunkLength,
-				minDelay:       tt.minDelay,
-				maxDelay:       tt.maxDelay,
-				handler:        tt.handler,
-			}
 
-			err := sender.Send([]byte(tt.requestPacket), &buffer)
+			sender, err := NewRandomChunkedSender(
+				context.Background(),
+				tt.minChunkLength,
+				tt.maxChunkLength,
+				tt.minDelay,
+				tt.maxDelay,
+			)
+			require.NoError(t, err)
+			err = sender.Send(requestPacket, &buffer)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -273,19 +272,7 @@ func TestRandomChunkedSender_hanlder(t *testing.T) {
 		log.Info("maxBlock:", maxBlock)
 
 		blockNum := 0
-		options := []RandomChunkedHTTPOption{
-			WithRandomChunkedLength(10, 25),
-			WithRandomChunkedDelay(time.Millisecond*100, time.Millisecond*500),
-			WithRandomChunkedHandler(func(chunkIndex int, chunkRaw []byte, totalDuration time.Duration, chunkDuration time.Duration) {
-				m := make(map[string]any)
-				m["id"] = chunkIndex
-				m["totalTime"] = totalDuration
-				m["data"] = string(chunkRaw)
-				m["chunkDuration"] = chunkDuration
-				t.Log(m)
-				blockNum = chunkIndex + 1
-			}),
-		}
+
 		token := strings.Repeat("A", 200)
 		req := fmt.Sprintf(`POST /api/test HTTP/1.1
 	Host: example.com
@@ -293,7 +280,23 @@ func TestRandomChunkedSender_hanlder(t *testing.T) {
 
 		%s
 		`, token)
-		sender, err := newRandomChunkedSender(options...)
+		sender, err := NewRandomChunkedSender(
+			context.Background(),
+			10,
+			25,
+			time.Millisecond*100,
+			time.Millisecond*500,
+			func(chunkIndex int, chunkRaw []byte, totalDuration time.Duration, chunkDuration time.Duration, isEnd bool) {
+				m := make(map[string]any)
+				m["id"] = chunkIndex
+				m["totalTime"] = totalDuration
+				m["data"] = string(chunkRaw)
+				m["chunkDuration"] = chunkDuration
+				m["isEnd"] = isEnd
+				t.Log(m)
+				blockNum = chunkIndex + 1
+			},
+		)
 		require.NoError(t, err)
 
 		var buffer bytes.Buffer

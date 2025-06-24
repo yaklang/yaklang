@@ -11,7 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type ChunkedResultHandler func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration)
+type ChunkedResultHandler func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration, isEnd bool)
 
 type RandomChunkedSender struct {
 	ctx            context.Context
@@ -25,51 +25,26 @@ type RandomChunkedSender struct {
 
 type RandomChunkedHTTPOption func(*RandomChunkedSender)
 
-func WithRandomChunkedContext(ctx context.Context) RandomChunkedHTTPOption {
-	return func(r *RandomChunkedSender) {
-		if ctx != nil {
-			r.ctx = ctx
-		}
-	}
-}
-
-func WithRandomChunkedLength(minChunk, maxChunk int) RandomChunkedHTTPOption {
-	return func(r *RandomChunkedSender) {
-		if maxChunk > 0 && minChunk > 0 && maxChunk >= minChunk {
-			r.maxChunkLength = maxChunk
-			r.minChunkLength = minChunk
-		}
-	}
-}
-
-func WithRandomChunkedDelay(minDelay, maxDelay time.Duration) RandomChunkedHTTPOption {
-	return func(r *RandomChunkedSender) {
-		if maxDelay > 0 && minDelay > 0 && maxDelay >= minDelay {
-			r.maxDelay = maxDelay
-			r.minDelay = minDelay
-		}
-	}
-}
-
-func WithRandomChunkedHandler(handler ChunkedResultHandler) RandomChunkedHTTPOption {
-	return func(r *RandomChunkedSender) {
-		r.handler = handler
-	}
-}
-
-func newRandomChunkedSender(opts ...RandomChunkedHTTPOption) (*RandomChunkedSender, error) {
-	// 设置默认值
+func NewRandomChunkedSender(
+	ctx context.Context,
+	minChunkLength, maxChunkLength int,
+	minDelay, maxDelay time.Duration,
+	handler ...ChunkedResultHandler,
+) (*RandomChunkedSender, error) {
 	sender := &RandomChunkedSender{
 		ctx:            context.Background(),
-		maxChunkLength: 1024,                   // 默认最大1KB
-		minChunkLength: 256,                    // 默认最小256B
-		maxDelay:       100 * time.Millisecond, // 默认最大100ms
-		minDelay:       50 * time.Millisecond,  // 默认最小50ms
+		maxChunkLength: maxChunkLength,
+		minChunkLength: minChunkLength,
+		maxDelay:       maxDelay,
+		minDelay:       minDelay,
 		handler:        nil,
 	}
 
-	for _, opt := range opts {
-		opt(sender)
+	if ctx != nil {
+		sender.ctx = ctx
+	}
+	if len(handler) > 0 {
+		sender.handler = handler[0]
 	}
 
 	// 验证配置
@@ -79,7 +54,7 @@ func newRandomChunkedSender(opts ...RandomChunkedHTTPOption) (*RandomChunkedSend
 	if sender.maxChunkLength < sender.minChunkLength {
 		return nil, utils.Error("chunked config error: max chunk length should greater than min chunk length")
 	}
-	if sender.maxDelay <= 0 || sender.minDelay <= 0 {
+	if sender.maxDelay < 0 || sender.minDelay < 0 {
 		return nil, utils.Error("chunked config error: delay should greater than zero")
 	}
 	if sender.maxDelay < sender.minDelay {
@@ -181,15 +156,18 @@ func (r *RandomChunkedSender) Send(rawPacket []byte, writer io.Writer) error {
 		totalDuration := time.Since(startTime)
 		chunkDuration := time.Since(chunkStartTime)
 		if r.handler != nil {
-			r.handler(chunkCount, buffer[:n], totalDuration, chunkDuration)
+			r.handler(chunkCount, buffer[:n], totalDuration, chunkDuration, false)
 		}
 	}
 
 	// 发送结束分块标记
+	endChunkNow := time.Now()
 	endChunk := fmt.Sprintf("0%s", DoubleCRLF)
 	if _, err := writer.Write([]byte(endChunk)); err != nil {
 		return utils.Errorf("send end chunk failed: %s", err)
 	}
-
+	if r.handler != nil {
+		r.handler(chunkCount+1, []byte(endChunk), time.Since(startTime), time.Since(endChunkNow), true)
+	}
 	return nil
 }

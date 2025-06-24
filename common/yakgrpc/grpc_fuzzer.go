@@ -782,6 +782,15 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_SNI(req.GetSNI()))
 		}
 
+		if req.GetEnableRandomChunked() {
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_EnableRandomChunked(req.GetEnableRandomChunked()))
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_RandomChunkedLength(int(req.GetRandomChunkedMinLength()), int(req.GetRandomChunkedMaxLength())))
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_RandomChunkDelayTime(
+				time.Duration(req.GetRandomChunkedMinDelay())*time.Millisecond,
+				time.Duration(req.GetRandomChunkedMaxDelay())*time.Millisecond,
+			))
+			httpPoolOpts = append(httpPoolOpts)
+		}
 		fuzzMode := req.GetFuzzTagMode() // ""/"close"/"standard"/"legacy"
 		forceFuzz := req.GetForceFuzz()  // true/false
 		if fuzzMode == "" {              // 以forceFuzz为准
