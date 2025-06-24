@@ -286,13 +286,12 @@ func TestRandomChunkedSender_hanlder(t *testing.T) {
 			25,
 			time.Millisecond*100,
 			time.Millisecond*500,
-			func(chunkIndex int, chunkRaw []byte, totalDuration time.Duration, chunkDuration time.Duration, isEnd bool) {
+			func(chunkIndex int, chunkRaw []byte, totalDuration time.Duration, chunkDuration time.Duration) {
 				m := make(map[string]any)
 				m["id"] = chunkIndex
 				m["totalTime"] = totalDuration
 				m["data"] = string(chunkRaw)
 				m["chunkDuration"] = chunkDuration
-				m["isEnd"] = isEnd
 				t.Log(m)
 				blockNum = chunkIndex + 1
 			},

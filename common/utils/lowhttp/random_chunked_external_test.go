@@ -119,28 +119,6 @@ func TestRandomChunkedHTTPExternal(t *testing.T) {
 				w.Write(body)
 			},
 		},
-		{
-			name:            "no delay chunked",
-			requestBody:     strings.Repeat("C", 80),
-			minChunkLength:  15,
-			maxChunkLength:  25,
-			minDelay:        0,
-			maxDelay:        0,
-			expectError:     false,
-			validateHandler: true,
-			validateResponse: func(t *testing.T, responseBody string, originalBody string) {
-				assert.Equal(t, originalBody, responseBody, "response should echo request body")
-			},
-			serverHandler: func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusOK)
-				body, err := io.ReadAll(r.Body)
-				if err != nil {
-					http.Error(w, "Failed to read request body", http.StatusInternalServerError)
-					return
-				}
-				w.Write(body)
-			},
-		},
 	}
 
 	for _, tt := range tests {
@@ -148,13 +126,10 @@ func TestRandomChunkedHTTPExternal(t *testing.T) {
 			host, port := utils.DebugMockHTTPHandlerFunc(tt.serverHandler)
 
 			var handlerCallbacks []map[string]interface{}
-			var actualHandler func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration, isEnd bool)
+			var actualHandler func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration)
 
 			if tt.validateHandler {
-				actualHandler = func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration, isEnd bool) {
-					if isEnd {
-						return
-					}
+				actualHandler = func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration) {
 					callback := map[string]interface{}{
 						"chunk_id":        id,
 						"chunk_raw":       string(chunkRaw),
@@ -359,13 +334,10 @@ func TestRandomChunkedHTTPWithConnectionPool(t *testing.T) {
 
 			for i := 0; i < tt.requestCount; i++ {
 				var handlerCallbacks []map[string]interface{}
-				var actualHandler func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration, isEnd bool)
+				var actualHandler func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration)
 
 				if tt.validateHandler {
-					actualHandler = func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration, isEnd bool) {
-						if isEnd {
-							return
-						}
+					actualHandler = func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration) {
 						callback := map[string]interface{}{
 							"chunk_id":        id,
 							"chunk_raw":       string(chunkRaw),

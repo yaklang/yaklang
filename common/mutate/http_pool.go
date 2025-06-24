@@ -113,12 +113,11 @@ type httpPoolConfig struct {
 	SNI *string
 
 	// Random Chunked
-	EnableRandomChunked      bool
-	MinChunkedLength         int
-	MaxChunkedLength         int
-	MinChunkDelayTime        time.Duration
-	MaxChunkDelayTime        time.Duration
-	RandomChunkResultHandler RandomChunkedResultHandler
+	EnableRandomChunked bool
+	MinChunkedLength    int
+	MaxChunkedLength    int
+	MinChunkDelayTime   time.Duration
+	MaxChunkDelayTime   time.Duration
 }
 
 // WithPoolOpt_DNSNoCache is not effective
@@ -596,12 +595,6 @@ func _httpPool_RandomChunkDelayTime(min, max time.Duration) HttpPoolConfigOption
 	}
 }
 
-func _httpPool_RandomChunkHandler(handler RandomChunkedResultHandler) HttpPoolConfigOption {
-	return func(config *httpPoolConfig) {
-		config.RandomChunkResultHandler = handler
-	}
-}
-
 type HttpPoolConfigOption func(config *httpPoolConfig)
 
 type HttpResult struct {
@@ -623,6 +616,30 @@ type HttpResult struct {
 	ExtraInfo map[string]string
 
 	LowhttpResponse *lowhttp.LowhttpResponse
+
+	RandomChunkedData []*RandomChunkedInfo
+}
+
+// RandomChunkedInfo 记录单个分块的信息
+type RandomChunkedInfo struct {
+	Index            int
+	Data             []byte
+	ChunkedLength    int
+	CurrentDelayTime time.Duration
+	TotalDelayTime   time.Duration
+}
+
+func (r *RandomChunkedInfo) ToGRPCModel() *ypb.RandomChunkedResponse {
+	if r == nil {
+		return nil
+	}
+	return &ypb.RandomChunkedResponse{
+		Index:                   int64(r.Index),
+		Data:                    r.Data,
+		ChunkedLength:           int64(r.ChunkedLength),
+		CurrentChunkedDelayTime: r.CurrentDelayTime.Milliseconds(),
+		TotalDelayTime:          r.TotalDelayTime.Milliseconds(),
+	}
 }
 
 func NewDefaultHttpPoolConfig(opts ...HttpPoolConfigOption) *httpPoolConfig {
@@ -955,11 +972,25 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithPayloads(payloads))
 						}
 
+						var chunkedData []*RandomChunkedInfo
 						if config.EnableRandomChunked {
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithEnableRandomChunked(config.EnableRandomChunked))
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithRandomChunkedLength(config.MinChunkedLength, config.MaxChunkedLength))
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithRandomChunkedDelay(config.MinChunkDelayTime, config.MaxChunkDelayTime))
-							lowhttpOptions = append(lowhttpOptions, lowhttp.WithRandomChunkedHandler(lowhttp.ChunkedResultHandler(config.RandomChunkResultHandler)))
+
+							chunkedHandler := func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration) {
+								chunkedInfo := &RandomChunkedInfo{
+									Index:            id,
+									Data:             make([]byte, len(chunkRaw)),
+									ChunkedLength:    len(chunkRaw),
+									CurrentDelayTime: chunkSendTime,
+									TotalDelayTime:   totalTime,
+								}
+								copy(chunkedInfo.Data, chunkRaw)
+
+								chunkedData = append(chunkedData, chunkedInfo)
+							}
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithRandomChunkedHandler(chunkedHandler))
 						}
 
 						if config.HookAfterRequest != nil {
@@ -1027,27 +1058,29 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 								RequestRaw:  targetRequest,
 								ResponseRaw: nil,
 								//DurationMs:      rspInstance.TraceInfo.GetServerDurationMS(),
-								Timestamp:       time.Now().Unix(),
-								Payloads:        payloads,
-								Source:          config.Source,
-								LowhttpResponse: rspInstance,
-								ExtraInfo:       extra,
+								Timestamp:         time.Now().Unix(),
+								Payloads:          payloads,
+								Source:            config.Source,
+								LowhttpResponse:   rspInstance,
+								ExtraInfo:         extra,
+								RandomChunkedData: chunkedData,
 							}
 							return
 						}
 						finalResult = &HttpResult{
-							Url:              urlStr,
-							Request:          reqIns,
-							Error:            err,
-							ExtraInfo:        extra,
-							RequestRaw:       targetRequest,
-							ResponseRaw:      rsp,
-							DurationMs:       rspInstance.TraceInfo.GetServerDurationMS(),
-							ServerDurationMs: rspInstance.TraceInfo.GetServerDurationMS(),
-							Timestamp:        time.Now().Unix(),
-							Payloads:         payloads,
-							Source:           config.Source,
-							LowhttpResponse:  rspInstance,
+							Url:               urlStr,
+							Request:           reqIns,
+							Error:             err,
+							ExtraInfo:         extra,
+							RequestRaw:        targetRequest,
+							ResponseRaw:       rsp,
+							DurationMs:        rspInstance.TraceInfo.GetServerDurationMS(),
+							ServerDurationMs:  rspInstance.TraceInfo.GetServerDurationMS(),
+							Timestamp:         time.Now().Unix(),
+							Payloads:          payloads,
+							Source:            config.Source,
+							LowhttpResponse:   rspInstance,
+							RandomChunkedData: chunkedData,
 						}
 						if len(rsp) <= 0 {
 							finalResult.Error = utils.Error("服务端没有任何返回数据: empty response (timeout empty)")
@@ -1271,5 +1304,4 @@ var (
 	WithPoolOpt_EnableRandomChunked        = _httpPool_enableRandomChunked
 	WithPoolOpt_RandomChunkedLength        = _httpPool_RandomChunkedLength
 	WithPoolOpt_RandomChunkDelayTime       = _httpPool_RandomChunkDelayTime
-	WithPoolOpt_RandomChunkHandler         = _httpPool_RandomChunkHandler
 )
