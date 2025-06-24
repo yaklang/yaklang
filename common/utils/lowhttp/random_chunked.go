@@ -11,7 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type ChunkedResultHandler func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration, isEnd bool)
+type ChunkedResultHandler func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration)
 
 type RandomChunkedSender struct {
 	ctx            context.Context
@@ -99,13 +99,13 @@ func (r *RandomChunkedSender) Send(rawPacket []byte, writer io.Writer) error {
 
 	// 记录发送开始时间
 	startTime := time.Now()
+	lastChunkTime := time.Now()
 	for sentBytes < totalSize {
 		select {
 		case <-r.ctx.Done():
 			return r.ctx.Err()
 		default:
 		}
-		chunkStartTime := time.Now()
 
 		chunkSize := r.calcRandomChunkedLen()
 		remainingBytes := totalSize - sentBytes
@@ -124,7 +124,7 @@ func (r *RandomChunkedSender) Send(rawPacket []byte, writer io.Writer) error {
 			break
 		}
 
-		// 发送分块长度头 (十六进制格式)
+		// 发送分块长度头
 		chunkHeader := fmt.Sprintf("%x\r\n", n)
 		if _, err := writer.Write([]byte(chunkHeader)); err != nil {
 			return utils.Errorf("send chunk %d header failed: %s", chunkCount, err)
@@ -139,6 +139,13 @@ func (r *RandomChunkedSender) Send(rawPacket []byte, writer io.Writer) error {
 		sentBytes += n
 		chunkCount++
 
+		totalDuration := time.Since(startTime)
+		chunkDuration := time.Since(lastChunkTime)
+		lastChunkTime = time.Now()
+		if r.handler != nil {
+			r.handler(chunkCount, buffer[:n], totalDuration, chunkDuration)
+		}
+
 		// 添加随机延迟
 		if sentBytes < totalSize {
 			delay := r.getRandomDelayTime()
@@ -147,27 +154,15 @@ func (r *RandomChunkedSender) Send(rawPacket []byte, writer io.Writer) error {
 				case <-r.ctx.Done():
 					return r.ctx.Err()
 				case <-time.After(delay):
-					// 延迟完成，继续下一个分块
 				}
 			}
-		}
-
-		// 每个块的结果
-		totalDuration := time.Since(startTime)
-		chunkDuration := time.Since(chunkStartTime)
-		if r.handler != nil {
-			r.handler(chunkCount, buffer[:n], totalDuration, chunkDuration, false)
 		}
 	}
 
 	// 发送结束分块标记
-	endChunkNow := time.Now()
 	endChunk := fmt.Sprintf("0%s", DoubleCRLF)
 	if _, err := writer.Write([]byte(endChunk)); err != nil {
 		return utils.Errorf("send end chunk failed: %s", err)
-	}
-	if r.handler != nil {
-		r.handler(chunkCount+1, []byte(endChunk), time.Since(startTime), time.Since(endChunkNow), true)
 	}
 	return nil
 }
