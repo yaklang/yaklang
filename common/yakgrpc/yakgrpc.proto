@@ -5033,10 +5033,10 @@ message FuzzerRequest {// last index 68
 
   // Random Chunked
   bool EnableRandomChunked = 64;
-  int64 RandomChunkedMinLength = 65; // 默认 10
-  int64 RandomChunkedMaxLength = 66; // 默认 25
-  int64 RandomChunkedMinDelay = 67; // 默认 10ms
-  int64 RandomChunkedMaxDelay = 68; // 默认 100ms
+  int64 RandomChunkedMinLength = 65;
+  int64 RandomChunkedMaxLength = 66;
+  int64 RandomChunkedMinDelay = 67;
+  int64 RandomChunkedMaxDelay = 68;
 }
 
 message MutateMethod {
