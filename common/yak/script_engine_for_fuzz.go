@@ -26,7 +26,7 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 	func(https bool, originReq []byte, req []byte) []byte,
 	func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte,
 	func([]byte, []byte, map[string]string) map[string]string,
-	func(bool, []byte, []byte) bool,
+	func(bool, int, []byte, []byte) bool,
 ) {
 	// 发送数据包之前的 hook
 	scriptEngine := NewScriptEngine(2)
@@ -109,7 +109,7 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 	var hookBefore func(https bool, originReq []byte, req []byte) []byte = nil
 	var hookAfter func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte = nil
 	var mirrorFlow func(req []byte, rsp []byte, handle map[string]string) map[string]string = nil
-	var retryHandler func(https bool, req []byte, rsp []byte) bool = nil
+	var retryHandler func(https bool, retryCount int, req []byte, rsp []byte) bool = nil
 
 	if beforeRequestOk {
 		hookBefore = func(https bool, originReq []byte, req []byte) []byte {
@@ -213,7 +213,7 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 	}
 
 	if retryHandlerOk {
-		retryHandler = func(https bool, req []byte, rsp []byte) bool {
+		retryHandler = func(https bool, retryCount int, req []byte, rsp []byte) bool {
 			hookLock.Lock()
 			defer hookLock.Unlock()
 
