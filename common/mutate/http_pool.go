@@ -62,6 +62,7 @@ type httpPoolConfig struct {
 	HookBeforeRequest func(https bool, originReq []byte, req []byte) []byte
 	HookAfterRequest  func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte
 	MirrorHTTPFlow    func([]byte, []byte, map[string]string) map[string]string
+	RetryHandler      func(https bool, req []byte, rsp []byte) bool
 	MutateHook        func([]byte) [][]byte
 
 	// 请求来源
@@ -198,11 +199,17 @@ func _httpPool_RetryNotInStatusCode(codes []int) HttpPoolConfigOption {
 	}
 }
 
-func _hoopPool_SetHookCaller(before func(bool, []byte, []byte) []byte, after func(bool, []byte, []byte, []byte, []byte) []byte, extractor func([]byte, []byte, map[string]string) map[string]string) HttpPoolConfigOption {
+func _hoopPool_SetHookCaller(
+	before func(bool, []byte, []byte) []byte,
+	after func(bool, []byte, []byte, []byte, []byte) []byte,
+	extractor func([]byte, []byte, map[string]string) map[string]string,
+	retryHandler func(bool, []byte, []byte) bool,
+) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.HookBeforeRequest = before
 		config.HookAfterRequest = after
 		config.MirrorHTTPFlow = extractor
+		config.RetryHandler = retryHandler
 	}
 }
 
@@ -878,6 +885,10 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttp.WithConnPool(config.WithConnPool),
 							lowhttp.WithDebugCount(beforeCount, afterCount),
 							lowhttp.WithSaveHTTPFlow(config.SaveHTTPFlow),
+						}
+
+						if config.RetryHandler != nil {
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithRetryHandler(config.RetryHandler))
 						}
 
 						if config.ConnPool != nil {

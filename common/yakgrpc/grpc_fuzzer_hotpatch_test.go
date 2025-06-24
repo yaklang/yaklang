@@ -523,3 +523,210 @@ func TestGRPCMUSTPASS_HTTPFuzzer_DynHotPatch(t *testing.T) {
 	}
 	require.GreaterOrEqual(t, count, 10)
 }
+
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_retryHandler(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count := 0
+	flag := utils.RandStringBytes(16)
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		count++
+		if count > 3 {
+			w.Write([]byte(flag))
+			return
+		}
+		w.Write([]byte("no ready"))
+	})
+	target := utils.HostPort(host, port)
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
+		Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n{{yak(handle)}}",
+		HotPatchCode: `handle = result => x"{{int(1)}}"
+flag = "` + string(flag) + `"
+mirrorHTTPFlow = (req, rsp) => {
+	// check if the response contains the flag
+    if string(rsp).Contains(flag) {
+		println(rsp)
+		return {"abc": "aaa"} 
+	}
+	return {"abc": "no right"}
+}
+
+retryHandler = (https, req, rsp) => {
+	if rsp.Contains("no ready") { return true }
+	return false
+}
+
+`,
+		ForceFuzz: true,
+	})
+	if err != nil {
+		t.Fatalf("expect nil, got %v", err)
+	}
+	responseCount := 0
+	for {
+		rsp, err := recv.Recv()
+		if err != nil {
+			break
+		}
+		responseCount++
+		check := false
+		for _, kv := range rsp.GetExtractedResults() {
+			if kv.GetKey() == "abc" {
+				if kv.GetValue() == "aaa" {
+					check = true
+				}
+			}
+		}
+		if !check {
+			spew.Dump(rsp.ExtractedResults)
+			t.Fatal("mirror http flow output extractor data failed")
+		}
+	}
+	if responseCount != 1 {
+		t.Fatalf("expect 1 response, got %v", responseCount)
+	}
+	if count < 3 {
+		t.Fatalf("expect 3 retry response, got %v", count)
+	}
+}
+
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_retryHandler_2(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count := 0
+	flag := utils.RandStringBytes(16)
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		count++
+		if count > 3 {
+			w.Write([]byte(flag))
+			return
+		}
+		w.Write([]byte("no ready"))
+	})
+	target := utils.HostPort(host, port)
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
+		Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n{{yak(handle)}}",
+		HotPatchCode: `handle = result => x"{{int(1)}}"
+flag = "` + string(flag) + `"
+mirrorHTTPFlow = (req, rsp) => {
+	// check if the response contains the flag
+    if string(rsp).Contains(flag) {
+		println(rsp)
+		return {"abc": "aaa"} 
+	}
+	return {"abc": "no right"}
+}
+
+retryHandler = (req, rsp) => {
+	if rsp.Contains("no ready") { return true }
+	return false
+}
+
+`,
+		ForceFuzz: true,
+	})
+	if err != nil {
+		t.Fatalf("expect nil, got %v", err)
+	}
+	responseCount := 0
+	for {
+		rsp, err := recv.Recv()
+		if err != nil {
+			break
+		}
+		responseCount++
+		check := false
+		for _, kv := range rsp.GetExtractedResults() {
+			if kv.GetKey() == "abc" {
+				if kv.GetValue() == "aaa" {
+					check = true
+				}
+			}
+		}
+		if !check {
+			spew.Dump(rsp.ExtractedResults)
+			t.Fatal("mirror http flow output extractor data failed")
+		}
+	}
+	if responseCount != 1 {
+		t.Fatalf("expect 1 response, got %v", responseCount)
+	}
+	if count < 3 {
+		t.Fatalf("expect 3 retry response, got %v", count)
+	}
+}
+
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_retryHandler_3(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count := 0
+	flag := utils.RandStringBytes(16)
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		count++
+		if count > 3 {
+			w.Write([]byte(flag))
+			return
+		}
+		w.Write([]byte("no ready"))
+	})
+	target := utils.HostPort(host, port)
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
+		Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n{{yak(handle)}}",
+		HotPatchCode: `handle = result => x"{{int(1)}}"
+flag = "` + string(flag) + `"
+mirrorHTTPFlow = (req, rsp) => {
+	// check if the response contains the flag
+    if string(rsp).Contains(flag) {
+		println(rsp)
+		return {"abc": "aaa"} 
+	}
+	return {"abc": "no right"}
+}
+
+retryHandler = rsp => {
+	if rsp.Contains("no ready") { return true }
+	return false
+}
+
+`,
+		ForceFuzz: true,
+	})
+	if err != nil {
+		t.Fatalf("expect nil, got %v", err)
+	}
+	responseCount := 0
+	for {
+		rsp, err := recv.Recv()
+		if err != nil {
+			break
+		}
+		responseCount++
+		check := false
+		for _, kv := range rsp.GetExtractedResults() {
+			if kv.GetKey() == "abc" {
+				if kv.GetValue() == "aaa" {
+					check = true
+				}
+			}
+		}
+		if !check {
+			spew.Dump(rsp.ExtractedResults)
+			t.Fatal("mirror http flow output extractor data failed")
+		}
+	}
+	if responseCount != 1 {
+		t.Fatalf("expect 1 response, got %v", responseCount)
+	}
+	if count < 3 {
+		t.Fatalf("expect 3 retry response, got %v", count)
+	}
+}
