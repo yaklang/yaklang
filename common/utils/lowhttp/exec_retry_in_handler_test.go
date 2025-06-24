@@ -3,6 +3,7 @@ package lowhttp
 import (
 	"bytes"
 	"fmt"
+	"github.com/google/uuid"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -39,7 +40,7 @@ User-Agent: yaklang-test/1.0
 		[]byte(packet)),
 		WithTimeout(time.Second),
 		WithRetryWaitTime(20*time.Millisecond),
-		WithRetryHandler(func(https bool, req []byte, rsp []byte) bool {
+		WithRetryHandler(func(https bool, retryCount int, req []byte, rsp []byte) bool {
 			if strings.Contains(string(req), flag2) {
 				checkReq = true
 			}
@@ -55,6 +56,36 @@ User-Agent: yaklang-test/1.0
 	fmt.Println(string(rsp.RawPacket))
 	require.True(t, checkReq)
 	require.True(t, strings.Contains(string(rsp.RawPacket), string(flag)))
+}
+
+func TestHTTP_RetryWithHandlerCount(t *testing.T) {
+	count := 0
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		count++
+		writer.Write([]byte(uuid.New().String()))
+	})
+	hostport := utils.HostPort(host, port)
+	packet := `GET / HTTP/1.1
+Host: ` + hostport + `
+User-Agent: yaklang-test/1.0
+
+`
+
+	rsp, err := HTTP(WithPacketBytes(
+		[]byte(packet)),
+		WithTimeout(time.Second),
+		WithRetryWaitTime(20*time.Millisecond),
+		WithRetryHandler(func(https bool, retryCount int, req []byte, rsp []byte) bool {
+			if retryCount < 3 {
+				return true
+			}
+			return false
+		}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(string(rsp.RawPacket))
+	require.Equal(t, count, 4)
 }
 
 func TestHTTP_RetryWithHandler_StopImmediately(t *testing.T) {
@@ -76,7 +107,7 @@ User-Agent: yaklang-test/1.0
 		[]byte(packet)),
 		WithTimeout(time.Second),
 		WithRetryWaitTime(20*time.Millisecond),
-		WithRetryHandler(func(https bool, req []byte, rsp []byte) bool {
+		WithRetryHandler(func(https bool, hasRetryCount int, req []byte, rsp []byte) bool {
 			retryCount++
 			return false // stop immediately
 		}))
@@ -115,7 +146,7 @@ User-Agent: yaklang-test/1.0
 		WithRetryWaitTime(20*time.Millisecond),
 		WithHttps(true),
 		WithVerifyCertificate(false),
-		WithRetryHandler(func(https bool, req []byte, rsp []byte) bool {
+		WithRetryHandler(func(https bool, retryCount int, req []byte, rsp []byte) bool {
 			if https {
 				httpsParamCorrect = true
 			}
