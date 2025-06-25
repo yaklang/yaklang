@@ -190,7 +190,7 @@ CODE
 desc(
 	lang: "java"
 	alert_num: 1
-	"file://safefile.java": <<<UNSAFE
+	"file://unsafefile.java": <<<UNSAFE
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.io.SAXReader;
@@ -213,7 +213,7 @@ UNSAFE
 
 desc(
 	lang: "java"
-	"file://safe.java": <<<SAFE
+	"safefile://safe.java": <<<SAFE
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.io.SAXReader;

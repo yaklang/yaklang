@@ -1,6 +1,9 @@
 package tests
 
 import (
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -38,4 +41,33 @@ $writer.write(, * as $text) as $write_site
 		"text": {`"aaaa"`},
 	}, ssaapi.WithLanguage(consts.JAVA))
 
+}
+
+func TestArrayType(t *testing.T) {
+	byteType := ssa.CreateByteType()
+	byteType.AddFullTypeName("byte")
+
+	generatedType := java2ssa.TypeAddBracketLevel(byteType, 0)
+	require.ElementsMatch(t, generatedType.GetFullTypeNames(), []string{"byte"})
+
+	generatedType = java2ssa.TypeAddBracketLevel(byteType, 1)
+	require.ElementsMatch(t, generatedType.GetFullTypeNames(), []string{"byte[]"})
+
+	generatedType = java2ssa.TypeAddBracketLevel(byteType, 2)
+	require.ElementsMatch(t, generatedType.GetFullTypeNames(), []string{"byte[][]"})
+
+	generatedType = java2ssa.TypeAddBracketLevel(byteType, 3)
+	require.ElementsMatch(t, generatedType.GetFullTypeNames(), []string{"byte[][][]"})
+
+	objSlice, ok := ssa.ToObjectType(generatedType)
+	require.True(t, ok)
+	require.ElementsMatch(t, objSlice.FieldType.GetFullTypeNames(), []string{"byte[][]"})
+
+	objSlice1, ok := ssa.ToObjectType(objSlice.FieldType)
+	require.True(t, ok)
+	require.ElementsMatch(t, objSlice1.FieldType.GetFullTypeNames(), []string{"byte[]"})
+
+	objSlice2, ok := ssa.ToObjectType(objSlice1.FieldType)
+	require.True(t, ok)
+	require.ElementsMatch(t, objSlice2.FieldType.GetFullTypeNames(), []string{"byte"})
 }

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/log"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -232,8 +234,43 @@ func (y *builder) RemoveCastTypeFlag(typ ssa.Type) ssa.Type {
 }
 
 func TypeAddBracketLevel(typ ssa.Type, level int) ssa.Type {
-	for i := 0; i < level; i++ {
-		typ = ssa.NewSliceType(typ)
+	if level == 0 {
+		return typ
 	}
+
+	// Get the base element type's full type names once
+	baseElementFullTypeNames := typ.GetFullTypeNames()
+	var baseElementTypeStr string
+	if len(baseElementFullTypeNames) == 0 {
+		log.Warn("no fullTypeName found in ssa.Type")
+		baseElementTypeStr = typ.String()
+	}
+
+	// Create nested slice types and set fullTypeName for each level
+	for i := 0; i < level; i++ {
+		// Create the slice type
+		sliceType := ssa.NewSliceType(typ)
+
+		// Set fullTypeName for this level
+		currentLevel := i + 1
+		if len(baseElementFullTypeNames) > 0 {
+			for _, elementTypeName := range baseElementFullTypeNames {
+				if elementTypeName != "" {
+					// Add the correct number of brackets for current level
+					brackets := strings.Repeat("[]", currentLevel)
+					arrayTypeName := elementTypeName + brackets
+					sliceType.AddFullTypeName(arrayTypeName)
+				}
+			}
+		} else if baseElementTypeStr != "" {
+			// Fallback: use element type string representation
+			brackets := strings.Repeat("[]", currentLevel)
+			arrayTypeName := baseElementTypeStr + brackets
+			sliceType.AddFullTypeName(arrayTypeName)
+		}
+
+		typ = sliceType
+	}
+
 	return typ
 }
