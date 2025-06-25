@@ -776,13 +776,14 @@ func (o *LowhttpExecConfig) GetOrCreateChunkSender() (*RandomChunkedSender, erro
 	if o.chunkedSender != nil {
 		return o.chunkedSender, nil
 	}
+	options := []randomChunkedHTTPOption{
+		_withRandomChunkCtx(o.Ctx),
+		_withRandomChunkChunkLength(o.MinChunkedLength, o.MaxChunkedLength),
+		_withRandomChunkDelay(o.MinChunkDelay, o.MaxChunkDelay),
+		_withRandomChunkResultHandler(o.ChunkedHandler),
+	}
 	sender, err := NewRandomChunkedSender(
-		o.Ctx,
-		o.MinChunkedLength,
-		o.MaxChunkedLength,
-		o.MinChunkDelay,
-		o.MaxChunkDelay,
-		o.ChunkedHandler,
+		options...,
 	)
 	if err != nil {
 		return nil, err
