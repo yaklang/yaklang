@@ -83,10 +83,11 @@ SOLUTION
 REFERENCE
 )
 
-addResourceHandlers(*?{<typeName>?{have: ResourceHandlerRegistry,springframework}} as $params);
-check $params;
+addResourceHandlers<getFormalParams()> as $params;
+$params?{<typeName>?{have: ResourceHandlerRegistry,springframework}} as $filtered_params
+check $filtered_params;
 
-$params.addResourceHandler(*<slice(start=1)> as $results);
+$filtered_params.addResourceHandler(*<slice(start=1)> as $results);
 $results ?{have: 'swagger'} as $swaggerVariable;
 alert $swaggerVariable for {
 	title: "Swagger Resource Handler Location",

@@ -176,7 +176,7 @@ UNSAFE
 
 desc(
 	lang: "java"
-	"file://safefile.java": <<<SAFE
+	"safefile://safefile.java": <<<SAFE
 package com.example.sax;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;

@@ -111,6 +111,12 @@ desc(
 	"file://x.java": <<<CODE
 package org.joychou.config;
 
+import org.apache.catalina.core.StandardContext; // For StandardContext
+import org.apache.catalina.loader.WebappClassLoaderBase; // For WebappClassLoaderBase
+import javax.servlet.Filter; // For the Filter interface
+import java.lang.reflect.Field; // For Field
+import java.util.Map; // For Map
+
 public class TomcatFilterMemShell implements Filter {
     static{
         try {
@@ -130,8 +136,10 @@ public class TomcatFilterMemShell implements Filter {
             Configs.setAccessible(true);
             // 获取当前tomcat标准上下文中已经存在的filterConfigs
             Map filterConfigs = (Map) Configs.get(standardContext);
+        }catch (Exception e) {
+
         }
-    }
+   }
 }
 CODE
 )

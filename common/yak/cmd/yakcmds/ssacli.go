@@ -423,7 +423,15 @@ var syntaxFlowCreate = &cli.Command{
 var syntaxFlowTest = &cli.Command{
 	Name:    "syntaxflow-test",
 	Aliases: []string{"sftest", "sf-test"},
+	Usage:   "Runs syntax flow tests on .sf files. Use --strict for strict mode.", // Added usage
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "strict,s",
+			Usage: "Enable strict mode for evaluation",
+		},
+	},
 	Action: func(c *cli.Context) error {
+		isStrict := c.Bool("strict")
 		testingTInstance := utils.NewRequireTestT(func(msg string, args ...any) {
 			log.Errorf(msg, args...)
 		}, func() {})
@@ -437,7 +445,7 @@ var syntaxFlowTest = &cli.Command{
 					if err != nil {
 						return err
 					}
-					err = ssatest.EvaluateVerifyFilesystem(string(raw), testingTInstance)
+					err = ssatest.EvaluateVerifyFilesystem(string(raw), testingTInstance, isStrict)
 					if err != nil {
 						return err
 					}
@@ -467,7 +475,7 @@ var syntaxFlowTest = &cli.Command{
 				if err != nil {
 					return err
 				}
-				err = ssatest.EvaluateVerifyFilesystem(string(raw), testingTInstance)
+				err = ssatest.EvaluateVerifyFilesystem(string(raw), testingTInstance, isStrict)
 				if err != nil {
 					return err
 				}
