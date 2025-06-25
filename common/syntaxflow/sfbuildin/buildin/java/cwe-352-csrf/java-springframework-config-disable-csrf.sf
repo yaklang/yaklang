@@ -97,7 +97,7 @@ SOLUTION
 REFERENCE
 )
 
-configure(* as $configEntry);
+configure<getFormalParams()> as $configEntry;
 check $configEntry;
 
 $configEntry ... csrf().disable() as $disableCSRF;

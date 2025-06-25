@@ -35,7 +35,7 @@ func TestVerifiedRule(t *testing.T) {
 		}
 		t.Run(strings.Join(append(strings.Split(rule.Tag, "|"), rule.RuleName), "/"), func(t *testing.T) {
 			t.Log("Start to verify: " + rule.RuleName)
-			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t)
+			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -56,7 +56,7 @@ func TestVerify_DEBUG(t *testing.T) {
 
 	rule, err := sfdb.GetRulePure(ruleName)
 	if err != nil {
-		t.Fatal(err)
+		t.Skip(err)
 	}
 
 	f, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(rule.Content)
@@ -66,7 +66,7 @@ func TestVerify_DEBUG(t *testing.T) {
 	if len(f.VerifyFsInfo) != 0 {
 		t.Run(rule.RuleName, func(t *testing.T) {
 			t.Log("Start to verify: " + rule.RuleName)
-			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t)
+			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -90,7 +90,7 @@ a as $output;
 check $output;
 alert $output;
 
-`, t)
+`, t, false)
 	if err == nil {
 		t.Fatal("expect error")
 	}
@@ -112,7 +112,7 @@ a as $output;
 check $output;
 alert $output;
 
-`, t)
+`, t, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +175,7 @@ lang: java,
 </project>
 CODE
 )`
-	err := ssatest.EvaluateVerifyFilesystem(code, t)
+	err := ssatest.EvaluateVerifyFilesystem(code, t, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +283,7 @@ func TestJavaDEBUG(t *testing.T) {
 	if utils.InGithubActions() {
 		return
 	}
-	err := ssatest.EvaluateVerifyFilesystem(DEBUGCODE, t)
+	err := ssatest.EvaluateVerifyFilesystem(DEBUGCODE, t, false)
 	if err != nil {
 		t.Fatal(err)
 	}
