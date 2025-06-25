@@ -218,18 +218,14 @@ func (s *Server) UpdateProject(ctx context.Context, req *ypb.NewProjectRequest) 
 	}
 
 	projectData := schema.Project{
-		ProjectName:   req.GetProjectName(),
-		Description:   req.GetDescription(),
-		DatabasePath:  pathName,
-		Type:          req.Type,
-		FolderID:      req.FolderId,
-		ChildFolderID: req.ChildFolderId,
-	}
-	if req.ExternalProjectCode != "" {
-		projectData.ExternalProjectCode = req.ExternalProjectCode
-	}
-	if req.ExternalModule != "" {
-		projectData.ExternalModule = req.ExternalModule
+		ProjectName:         req.GetProjectName(),
+		Description:         req.GetDescription(),
+		DatabasePath:        pathName,
+		Type:                req.Type,
+		FolderID:            req.FolderId,
+		ChildFolderID:       req.ChildFolderId,
+		ExternalProjectCode: req.ExternalProjectCode,
+		ExternalModule:      req.ExternalModule,
 	}
 	err = yakit.UpdateProject(s.GetProfileDatabase(), req.GetId(), projectData)
 	if err != nil {
