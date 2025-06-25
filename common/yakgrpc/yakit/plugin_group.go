@@ -196,7 +196,7 @@ func QueryGroupCount(db *gorm.DB, excludeType []string, isMITMParamPlugins int64
 	case 1:
 		db = db.Where("Y.params!='\"null\"' and Y.params is not null and LENGTH(Y.params)>0")
 	case 2:
-		db = db.Where("(Y.params='\"null\"' or Y.params is null or LENGTH(Y.params)<=0) or Y.type='port-scan'")
+		db = db.Where("(Y.params='\"null\"' or Y.params is null or LENGTH(Y.params)<=0) or Y.type!='mitm'")
 	}
 	db = db.Group(" `group`,`temporary_id`,`is_poc_built_in` ").Order(`count desc`).Scan(&req)
 	if db.Error != nil {

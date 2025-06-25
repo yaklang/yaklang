@@ -421,12 +421,14 @@ func GetProjectByWhere(db *gorm.DB, name string, folderID, childFolderID int64, 
 
 func UpdateProject(db *gorm.DB, id int64, i schema.Project) error {
 	db = db.Model(&schema.Project{}).Where("id = ?", id).Update(map[string]interface{}{
-		"ProjectName":   i.ProjectName,
-		"Description":   i.Description,
-		"DatabasePath":  i.DatabasePath,
-		"Type":          i.Type,
-		"FolderID":      i.FolderID,
-		"ChildFolderID": i.ChildFolderID,
+		"ProjectName":         i.ProjectName,
+		"Description":         i.Description,
+		"DatabasePath":        i.DatabasePath,
+		"Type":                i.Type,
+		"FolderID":            i.FolderID,
+		"ChildFolderID":       i.ChildFolderID,
+		"ExternalModule":      i.ExternalModule,
+		"ExternalProjectCode": i.ExternalProjectCode,
 	})
 	if db.Error != nil || db.RowsAffected == 0 {
 		return utils.Errorf("update project: %s", db.Error)
