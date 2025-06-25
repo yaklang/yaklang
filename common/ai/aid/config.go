@@ -3,8 +3,10 @@ package aid
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"math/rand/v2"
 	"strings"
 	"sync"
@@ -73,6 +75,9 @@ type Config struct {
 	planMocker               func(*Config) *PlanResponse
 	allowPlanUserInteract    bool  // allow user to interact before planning.
 	planUserInteractMaxCount int64 // max user interact count before planning, default is 3
+
+	// origin ai callback
+	originalAICallback AICallbackType //!!!! provide branch tasks
 
 	// need to think
 	coordinatorAICallback AICallbackType
@@ -416,7 +421,7 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		epm:                         newEndpointManagerContext(ctx),
 		streamWaitGroup:             new(sync.WaitGroup),
 		memory:                      nil, // default mem cannot create in config
-		guardian:                    newAsyncGuardian(ctx, id),
+		guardian:                    newAysncGuardian(ctx, id),
 		syncMutex:                   new(sync.RWMutex),
 		syncMap:                     make(map[string]func() any),
 		inputConsumption:            new(int64),
@@ -572,6 +577,7 @@ func WithAICallback(cb AICallbackType) Option {
 		config.m.Lock()
 		defer config.m.Unlock()
 		warpedCb := config.wrapper(cb)
+		config.originalAICallback = cb
 		config.coordinatorAICallback = warpedCb
 		config.taskAICallback = warpedCb
 		config.planAICallback = warpedCb
@@ -979,6 +985,80 @@ func WithForgeName(forgeName string) Option {
 
 		config.forgeName = forgeName
 		return nil
+	}
+}
+
+func WithTaskAnalysis(b bool) Option {
+	return func(config *Config) error {
+		return WithGuardianEventTrigger(EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *Event, emitter GuardianEmitter, caller AICaller) {
+			var evnetContent map[string]any
+			err := json.Unmarshal(event.Content, &evnetContent)
+			if err != nil {
+				return
+			}
+			var plansUUID string
+			id, ok := evnetContent["plans_id"]
+			if ok {
+				plansUUID = utils.InterfaceToString(id)
+			}
+
+			plans, ok := evnetContent["plans"]
+			if !ok {
+				return
+			}
+
+			planTreeMap, ok := plans.(map[string]any)
+			if !ok {
+				return
+			}
+
+			planTreeData, err := json.Marshal(planTreeMap)
+			if err != nil {
+				return
+			}
+
+			planTree := aitool.InvokeParams(planTreeMap).GetObject("root_task")
+			analyze := func(task aitool.InvokeParams) {
+				if !task.Has("index") {
+					return
+				}
+				param := []*ypb.ExecParamItem{
+					{
+						Key:   "current_task_goal",
+						Value: task.GetString("goal"),
+					},
+					{
+						Key:   "task_tree",
+						Value: string(planTreeData),
+					},
+				}
+
+				action, err := ExecuteAIForge(config.ctx, "task-analyst", param, WithAICallback(config.originalAICallback))
+				if err != nil {
+					return
+				}
+				obj := action.GetInvokeParams("params")
+				desc := obj.GetString("description")
+				keywords := obj.GetStringSlice("keywords")
+				emitter.EmitJson(EVENT_PLAN_TASK_ANALYSIS, "task-analyst", map[string]any{
+					"plans_id":    plansUUID,
+					"description": desc,
+					"keywords":    keywords,
+					"index":       task.GetString("index"),
+				})
+			}
+
+			var foreach func(params aitool.InvokeParams)
+			foreach = func(task aitool.InvokeParams) {
+				subTaskList := task.GetObjectArray("subtasks")
+				for _, subTask := range subTaskList {
+					foreach(subTask)
+				}
+				go analyze(task)
+			}
+
+			foreach(planTree)
+		})(config)
 	}
 }
 

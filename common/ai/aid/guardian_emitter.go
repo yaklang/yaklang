@@ -12,6 +12,7 @@ type GuardianEmitter interface {
 	EmitStatus(key string, value any)
 	EmitStructured(nodeId string, result any)
 	EmitGuardianStreamEvent(nodeId string, startTime time.Time, reader io.Reader)
+	EmitJson(typeName EventType, nodeId string, i any)
 }
 
 type guardianEmitter struct {
@@ -81,6 +82,10 @@ func (e *guardianEmitter) EmitGuardianStreamEvent(nodeId string, startTime time.
 
 func (e *guardianEmitter) EmitStructured(nodeId string, result any) {
 	e.emitJson(EVENT_TYPE_STRUCTURED, nodeId, result)
+}
+
+func (e *guardianEmitter) EmitJson(typeName EventType, nodeId string, i any) {
+	e.emitJson(typeName, nodeId, i)
 }
 
 var _ GuardianEmitter = (*guardianEmitter)(nil)
