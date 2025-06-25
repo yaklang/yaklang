@@ -160,3 +160,48 @@ User-Agent: yaklang-test/1.0
 	require.GreaterOrEqual(t, count, 3, "server should be called at least 3 times")
 	require.True(t, strings.Contains(string(rsp.RawPacket), string(flag)), "final response should contain the flag")
 }
+
+func TestHTTP2_RetryWithHandler(t *testing.T) {
+	flag := utils.RandStringBytes(100)
+	count := 0
+
+	host, port := utils.DebugMockHTTP2(utils.TimeoutContextSeconds(5), func(req []byte) []byte {
+		count++
+		var body string
+		if count < 3 {
+			body = "not ready"
+		} else {
+			body = flag
+		}
+		return []byte(body)
+	})
+
+	hostport := utils.HostPort(host, port)
+	packet := `GET / HTTP/1.1
+Host: ` + hostport + `
+User-Agent: yaklang-test/1.0
+
+`
+
+	httpsParamCorrect := false
+	rsp, err := HTTP(WithPacketBytes(
+		[]byte(packet)),
+		WithTimeout(time.Second),
+		WithRetryWaitTime(20*time.Millisecond),
+		WithHttps(true),
+		WithHttp2(true),
+		WithVerifyCertificate(false),
+		WithRetryHandler(func(https bool, retryCount int, req []byte, rsp []byte) bool {
+			if https {
+				httpsParamCorrect = true
+			}
+			if bytes.Contains(rsp, []byte(flag)) {
+				return false
+			}
+			return true
+		}))
+	require.NoError(t, err)
+	require.True(t, httpsParamCorrect, "https parameter in handler should be true")
+	require.GreaterOrEqual(t, count, 3, "server should be called at least 3 times")
+	require.True(t, strings.Contains(string(rsp.RawPacket), string(flag)), "final response should contain the flag")
+}
