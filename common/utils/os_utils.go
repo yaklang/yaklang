@@ -199,6 +199,44 @@ func EnableDebug() {
 	os.Setenv("YAKLANGDEBUG", "1")
 }
 
+func DebugMockHTTP2HandlerFuncContext(ctx context.Context, handlerFunc http.HandlerFunc) (string, int) {
+	time.Sleep(100 * time.Millisecond)
+	host := "127.0.0.1"
+	port := GetRandomAvailableTCPPort()
+	go func() {
+		origin := GetDefaultTLSConfig(5)
+		copied := *origin
+		copied.NextProtos = []string{"h2"}
+		lis, err := tls.Listen("tcp", HostPort(host, port), &copied)
+		if err != nil {
+			panic(err)
+		}
+		go func() {
+			select {
+			case <-ctx.Done():
+			}
+			lis.Close()
+		}()
+		srv := &http.Server{Addr: HostPort(host, port), Handler: handlerFunc}
+		err = http2.ConfigureServer(srv, &http2.Server{})
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		go func() {
+			log.Infof("START TO SERVE HTTP2")
+			srv.Serve(lis)
+		}()
+		return
+	}()
+
+	err := WaitConnect(HostPort(host, port), 3)
+	if err != nil {
+		panic(err)
+	}
+	return host, port
+}
+
 func DebugMockHTTPHandlerFunc(handlerFunc http.HandlerFunc) (string, int) {
 	return DebugMockHTTPHandlerFuncContext(TimeoutContext(time.Minute*5), handlerFunc)
 }
