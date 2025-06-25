@@ -843,3 +843,143 @@ Host: `+utils.HostPort(host, port)+"\r\n\r\n")), WithBodyStreamReaderHandler(fun
 	// 只要有一次测试通过就算通过
 	require.True(t, testPassed, "Test failed in all 5 iterations")
 }
+
+func TestHTTP_RetryWithStatusCode(t *testing.T) {
+	flag := utils.RandStringBytes(100)
+
+	t.Run("not in statuscode", func(t *testing.T) {
+		count := 0
+		host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+			count++
+			if count < 3 {
+				return []byte("HTTP/1.1 403 Forbidden\r\nServer: nginx\r\n\r\n")
+			}
+			return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length: %d\r\n\r\n%s", len(flag), flag))
+		})
+
+		hostport := utils.HostPort(host, port)
+		packet := `GET / HTTP/1.1
+Host: ` + hostport + `
+User-Agent: yaklang-test/1.0
+
+`
+
+		rsp, err := HTTP(WithPacketBytes(
+			[]byte(packet)),
+			WithTimeout(time.Second),
+			WithRetryWaitTime(20*time.Millisecond),
+			WithRetryNotInStatusCode([]int{200}),
+			WithRetryTimes(10),
+		)
+		require.NoError(t, err)
+		require.Equal(t, count, 3, "server should be called at 3 times")
+		require.True(t, strings.Contains(string(rsp.RawPacket), string(flag)), "final response should contain the flag")
+
+	})
+
+	t.Run("in statuscode", func(t *testing.T) {
+		count := 0
+		host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+			count++
+			if count < 3 {
+				return []byte("HTTP/1.1 403 Forbidden\r\nServer: nginx\r\n\r\n")
+			}
+			return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length: %d\r\n\r\n%s", len(flag), flag))
+		})
+
+		hostport := utils.HostPort(host, port)
+		packet := `GET / HTTP/1.1
+Host: ` + hostport + `
+User-Agent: yaklang-test/1.0
+
+`
+
+		rsp, err := HTTP(WithPacketBytes(
+			[]byte(packet)),
+			WithTimeout(time.Second),
+			WithRetryWaitTime(20*time.Millisecond),
+			WithRetryInStatusCode([]int{403}),
+			WithRetryTimes(10),
+		)
+		require.NoError(t, err)
+		require.Equal(t, count, 3, "server should be called at 3 times")
+		require.True(t, strings.Contains(string(rsp.RawPacket), string(flag)), "final response should contain the flag")
+
+	})
+
+	t.Run("statuscode", func(t *testing.T) {
+		count := 0
+		host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+			count++
+			if count < 3 {
+				return []byte("HTTP/1.1 403 Forbidden\r\nServer: nginx\r\n\r\n")
+			}
+			if count < 6 {
+				return []byte("HTTP/1.1 500 Internal Server Error\r\nServer: nginx\r\n\r\n")
+			}
+
+			return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length: %d\r\n\r\n%s", len(flag), flag))
+		})
+
+		hostport := utils.HostPort(host, port)
+		packet := `GET / HTTP/1.1
+Host: ` + hostport + `
+User-Agent: yaklang-test/1.0
+
+`
+
+		rsp, err := HTTP(WithPacketBytes(
+			[]byte(packet)),
+			WithTimeout(time.Second),
+			WithRetryWaitTime(20*time.Millisecond),
+			WithRetryNotInStatusCode([]int{500, 200}),
+			WithRetryInStatusCode([]int{500}),
+			WithRetryTimes(10),
+		)
+		require.NoError(t, err)
+		require.Equal(t, count, 6, "server should be called at 6 times")
+		require.True(t, strings.Contains(string(rsp.RawPacket), string(flag)), "final response should contain the flag")
+
+	})
+
+	t.Run("h2 statuscode", func(t *testing.T) {
+		count := 0
+		ctx := utils.TimeoutContext(5 * time.Second)
+		host, port := utils.DebugMockHTTP2HandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+			count++
+			if count < 3 {
+				writer.WriteHeader(403)
+				return
+			}
+			if count < 6 {
+				writer.WriteHeader(500)
+				return
+			}
+			writer.WriteHeader(200)
+			writer.Write([]byte(flag))
+			return
+		})
+
+		hostport := utils.HostPort(host, port)
+		packet := `GET / HTTP/2
+Host: ` + hostport + `
+User-Agent: yaklang-test/1.0
+
+`
+
+		rsp, err := HTTP(WithPacketBytes(
+			[]byte(packet)),
+			WithTimeout(time.Second),
+			WithHttp2(true),
+			WithHttps(true),
+			WithVerifyCertificate(false),
+			WithRetryWaitTime(20*time.Millisecond),
+			WithRetryNotInStatusCode([]int{500, 200}),
+			WithRetryInStatusCode([]int{500}),
+			WithRetryTimes(10),
+		)
+		require.NoError(t, err)
+		require.Equal(t, count, 6, "server should be called at 6 times")
+		require.True(t, strings.Contains(string(rsp.RawPacket), string(flag)), "final response should contain the flag")
+	})
+}
