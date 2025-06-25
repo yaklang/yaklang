@@ -9,14 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-type compareType int64
-
-const (
-	Unknown compareType = iota
-	Custom
-	Risk
-)
-
 func (s *Server) NewSSADiff(req *ypb.SSADiffRequest, server ypb.Yak_NewSSADiffServer) error {
 	context := server.Context()
 	if req.Base == nil || req.Compare == nil {
@@ -30,9 +22,9 @@ func (s *Server) NewSSADiff(req *ypb.SSADiffRequest, server ypb.Yak_NewSSADiffSe
 		kind = schema.RuntimeId
 	}
 	switch req.Type {
-	case int64(Custom):
+	case int64(schema.CustomDiff):
 		return utils.Error("custom diff type not supported")
-	case int64(Risk):
+	case int64(schema.RiskDiff):
 		baseItem, err := ssaapi.NewCompareRiskItem(
 			ssaapi.DiffWithVariableName(req.GetBase().GetVariable()),
 			ssaapi.DiffWithRuleName(req.GetBase().GetRuleName()),
@@ -60,7 +52,7 @@ func (s *Server) NewSSADiff(req *ypb.SSADiffRequest, server ypb.Yak_NewSSADiffSe
 							BaseRiskHash:    risk.BaseValHash,
 							CompareRiskHash: risk.NewValHash,
 							Status:          int(risk.Status),
-							CompareType:     int(Risk),
+							CompareType:     int(schema.RiskDiff),
 							DiffResultKind:  kind,
 						}
 						if kind == schema.RuntimeId {

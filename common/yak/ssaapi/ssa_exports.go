@@ -522,6 +522,10 @@ var Exports = map[string]any{
 	"withDiffRuntimeId":         DiffWithRuntimeId,
 	"withGenerateHash":          WithRiskCompareGenerate,
 	"withCompareResultCallback": WithRiskCompareCallback,
+	"withDefaultRiskSave":       WithRiskSaveValueFunc,
+	//diff compare kind
+	"progName":  schema.Prog,
+	"runtimeId": schema.RuntimeId,
 
 	// language:
 	"Javascript": JS,
