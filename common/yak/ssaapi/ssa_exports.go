@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"strings"
 	"time"
@@ -496,6 +497,8 @@ var Exports = map[string]any{
 	"ParseProject":       ParseProject,
 	"NewFromProgramName": FromDatabase,
 	"NewProgramFromDB":   FromDatabase,
+	"NewRiskCompare":     NewSsaCompare[*schema.SSARisk],
+	"NewRiskCompareItem": NewCompareRiskItem,
 
 	"withLanguage":           WithRawLanguage,
 	"withConfigInfo":         WithConfigInfo,
@@ -511,6 +514,14 @@ var Exports = map[string]any{
 	"withPeepholeSize":       WithPeepholeSize,
 	"withExcludeFile":        WithExcludeFile,
 	"withDefaultExcludeFunc": DefaultExcludeFunc,
+
+	//diff compare
+	"withDiffProgName":          DiffWithProgram,
+	"withDiffRuleName":          DiffWithRuleName,
+	"withDiffVariableName":      DiffWithVariableName,
+	"withDiffRuntimeId":         DiffWithRuntimeId,
+	"withGenerateHash":          WithRiskCompareGenerate,
+	"withCompareResultCallback": WithRiskCompareCallback,
 
 	// language:
 	"Javascript": JS,
