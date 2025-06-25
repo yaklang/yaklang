@@ -3,8 +3,8 @@ package aid
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"math/rand/v2"
@@ -421,7 +421,7 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		epm:                         newEndpointManagerContext(ctx),
 		streamWaitGroup:             new(sync.WaitGroup),
 		memory:                      nil, // default mem cannot create in config
-		guardian:                    newAysncGuardian(ctx, id),
+		guardian:                    newAsyncGuardian(ctx, id),
 		syncMutex:                   new(sync.RWMutex),
 		syncMap:                     make(map[string]func() any),
 		inputConsumption:            new(int64),
@@ -991,45 +991,43 @@ func WithForgeName(forgeName string) Option {
 func WithTaskAnalysis(b bool) Option {
 	return func(config *Config) error {
 		return WithGuardianEventTrigger(EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *Event, emitter GuardianEmitter, caller AICaller) {
-			var evnetContent map[string]any
-			err := json.Unmarshal(event.Content, &evnetContent)
-			if err != nil {
-				return
-			}
 			var plansUUID string
-			id, ok := evnetContent["plans_id"]
-			if ok {
-				plansUUID = utils.InterfaceToString(id)
+			var planTree string
+			type analyzeItem struct {
+				Index string `json:"index"`
+				Goal  string `json:"goal"`
 			}
-
-			plans, ok := evnetContent["plans"]
-			if !ok {
-				return
-			}
-
-			planTreeMap, ok := plans.(map[string]any)
-			if !ok {
-				return
-			}
-
-			planTreeData, err := json.Marshal(planTreeMap)
+			var analyzeItemList = make([]*analyzeItem, 0)
+			err := jsonextractor.ExtractStructuredJSON(string(event.Content), jsonextractor.WithObjectCallback(func(data map[string]any) {
+				if aitool.InvokeParams(data).Has("index") {
+					analyzeItemList = append(analyzeItemList, &analyzeItem{
+						Index: utils.InterfaceToString(data["index"]),
+						Goal:  utils.InterfaceToString(data["goal"]),
+					})
+				}
+			}), jsonextractor.WithRootMapCallback(func(data map[string]any) {
+				id, ok := data["plans_id"]
+				if ok {
+					plansUUID = utils.InterfaceToString(id)
+				}
+				plans, ok := data["plans"]
+				if ok {
+					planTree = utils.InterfaceToString(plans)
+				}
+			}))
 			if err != nil {
 				return
 			}
 
-			planTree := aitool.InvokeParams(planTreeMap).GetObject("root_task")
-			analyze := func(task aitool.InvokeParams) {
-				if !task.Has("index") {
-					return
-				}
+			analyze := func(currentPlanTree, currentUUID string, task *analyzeItem) {
 				param := []*ypb.ExecParamItem{
 					{
 						Key:   "current_task_goal",
-						Value: task.GetString("goal"),
+						Value: task.Goal,
 					},
 					{
 						Key:   "task_tree",
-						Value: string(planTreeData),
+						Value: currentPlanTree,
 					},
 				}
 
@@ -1041,23 +1039,16 @@ func WithTaskAnalysis(b bool) Option {
 				desc := obj.GetString("description")
 				keywords := obj.GetStringSlice("keywords")
 				emitter.EmitJson(EVENT_PLAN_TASK_ANALYSIS, "task-analyst", map[string]any{
-					"plans_id":    plansUUID,
+					"plans_id":    currentUUID,
 					"description": desc,
 					"keywords":    keywords,
-					"index":       task.GetString("index"),
+					"index":       task.Index,
 				})
 			}
-
-			var foreach func(params aitool.InvokeParams)
-			foreach = func(task aitool.InvokeParams) {
-				subTaskList := task.GetObjectArray("subtasks")
-				for _, subTask := range subTaskList {
-					foreach(subTask)
-				}
-				go analyze(task)
+			for _, item := range analyzeItemList {
+				go analyze(planTree, plansUUID, item)
 			}
 
-			foreach(planTree)
 		})(config)
 	}
 }
