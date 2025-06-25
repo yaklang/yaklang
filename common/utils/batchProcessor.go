@@ -3,17 +3,24 @@ package utils
 import (
 	"context"
 	"sync"
+	"time"
 )
 
 type BatchProcessorConfig[T any] struct {
-	size int
-	cb   []func([]T)
+	size    int
+	timeout int
+	cb      []func([]T)
 }
 type BatchProcessorOption[T any] func(*BatchProcessorConfig[T])
 
 func WithBatchProcessorSize[T any](size int) BatchProcessorOption[T] {
 	return func(b *BatchProcessorConfig[T]) {
 		b.size = size
+	}
+}
+func WithBatchProcessorTimeout[T any](timeout int) BatchProcessorOption[T] {
+	return func(b *BatchProcessorConfig[T]) {
+		b.timeout = timeout
 	}
 }
 func WithBatchProcessorCallBack[T any](cb func([]T)) BatchProcessorOption[T] {
@@ -32,12 +39,24 @@ type BatchProcessor[T any] struct {
 func (b *BatchProcessor[T]) Start() {
 	b.wg.Add(1)
 	go func() {
+		ticker := time.NewTicker(time.Hour)
+		if b.config.timeout > 0 {
+			ticker = time.NewTicker(time.Second * time.Duration(b.config.timeout))
+		}
 		defer b.wg.Done()
 		var batch []T
 		for {
 			select {
 			case <-b.ctx.Done():
+				//做默认处理
+				for _, f := range b.config.cb {
+					f(batch)
+				}
 				return
+			case <-ticker.C:
+				for _, f := range b.config.cb {
+					f(batch)
+				}
 			case data, ok := <-b.dataChannel:
 				if !ok {
 					if len(batch) > 0 {

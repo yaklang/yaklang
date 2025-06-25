@@ -496,6 +496,7 @@ const (
 	Yak_GetAIToolList_FullMethodName                              = "/ypb.Yak/GetAIToolList"
 	Yak_DeleteAITool_FullMethodName                               = "/ypb.Yak/DeleteAITool"
 	Yak_SaveAITool_FullMethodName                                 = "/ypb.Yak/SaveAITool"
+	Yak_ToggleAIToolFavorite_FullMethodName                       = "/ypb.Yak/ToggleAIToolFavorite"
 	Yak_AIToolGenerateMetadata_FullMethodName                     = "/ypb.Yak/AIToolGenerateMetadata"
 	Yak_IsLlamaServerReady_FullMethodName                         = "/ypb.Yak/IsLlamaServerReady"
 	Yak_IsLocalModelReady_FullMethodName                          = "/ypb.Yak/IsLocalModelReady"
@@ -1123,6 +1124,7 @@ type YakClient interface {
 	GetAIToolList(ctx context.Context, in *GetAIToolListRequest, opts ...grpc.CallOption) (*GetAIToolListResponse, error)
 	DeleteAITool(ctx context.Context, in *DeleteAIToolRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	SaveAITool(ctx context.Context, in *SaveAIToolRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	ToggleAIToolFavorite(ctx context.Context, in *ToggleAIToolFavoriteRequest, opts ...grpc.CallOption) (*ToggleAIToolFavoriteResponse, error)
 	AIToolGenerateMetadata(ctx context.Context, in *AIToolGenerateMetadataRequest, opts ...grpc.CallOption) (*AIToolGenerateMetadataResponse, error)
 	// Local Model Management
 	IsLlamaServerReady(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*IsLlamaServerReadyResponse, error)
@@ -7421,6 +7423,15 @@ func (c *yakClient) SaveAITool(ctx context.Context, in *SaveAIToolRequest, opts 
 	return out, nil
 }
 
+func (c *yakClient) ToggleAIToolFavorite(ctx context.Context, in *ToggleAIToolFavoriteRequest, opts ...grpc.CallOption) (*ToggleAIToolFavoriteResponse, error) {
+	out := new(ToggleAIToolFavoriteResponse)
+	err := c.cc.Invoke(ctx, Yak_ToggleAIToolFavorite_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) AIToolGenerateMetadata(ctx context.Context, in *AIToolGenerateMetadataRequest, opts ...grpc.CallOption) (*AIToolGenerateMetadataResponse, error) {
 	out := new(AIToolGenerateMetadataResponse)
 	err := c.cc.Invoke(ctx, Yak_AIToolGenerateMetadata_FullMethodName, in, out, opts...)
@@ -8135,6 +8146,7 @@ type YakServer interface {
 	GetAIToolList(context.Context, *GetAIToolListRequest) (*GetAIToolListResponse, error)
 	DeleteAITool(context.Context, *DeleteAIToolRequest) (*DbOperateMessage, error)
 	SaveAITool(context.Context, *SaveAIToolRequest) (*DbOperateMessage, error)
+	ToggleAIToolFavorite(context.Context, *ToggleAIToolFavoriteRequest) (*ToggleAIToolFavoriteResponse, error)
 	AIToolGenerateMetadata(context.Context, *AIToolGenerateMetadataRequest) (*AIToolGenerateMetadataResponse, error)
 	// Local Model Management
 	IsLlamaServerReady(context.Context, *Empty) (*IsLlamaServerReadyResponse, error)
@@ -9580,6 +9592,9 @@ func (UnimplementedYakServer) DeleteAITool(context.Context, *DeleteAIToolRequest
 }
 func (UnimplementedYakServer) SaveAITool(context.Context, *SaveAIToolRequest) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SaveAITool not implemented")
+}
+func (UnimplementedYakServer) ToggleAIToolFavorite(context.Context, *ToggleAIToolFavoriteRequest) (*ToggleAIToolFavoriteResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ToggleAIToolFavorite not implemented")
 }
 func (UnimplementedYakServer) AIToolGenerateMetadata(context.Context, *AIToolGenerateMetadataRequest) (*AIToolGenerateMetadataResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AIToolGenerateMetadata not implemented")
@@ -18532,6 +18547,24 @@ func _Yak_SaveAITool_Handler(srv interface{}, ctx context.Context, dec func(inte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_ToggleAIToolFavorite_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ToggleAIToolFavoriteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ToggleAIToolFavorite(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_ToggleAIToolFavorite_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ToggleAIToolFavorite(ctx, req.(*ToggleAIToolFavoriteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_AIToolGenerateMetadata_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AIToolGenerateMetadataRequest)
 	if err := dec(in); err != nil {
@@ -20203,6 +20236,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SaveAITool",
 			Handler:    _Yak_SaveAITool_Handler,
+		},
+		{
+			MethodName: "ToggleAIToolFavorite",
+			Handler:    _Yak_ToggleAIToolFavorite_Handler,
 		},
 		{
 			MethodName: "AIToolGenerateMetadata",

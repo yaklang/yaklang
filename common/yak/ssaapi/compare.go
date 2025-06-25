@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"sync"
 )
 
 type SsaCompareItemConfig struct {
@@ -23,6 +24,11 @@ type WithCompareOpts func(*SsaCompareItemConfig)
 func DiffWithProgram(name string) WithCompareOpts {
 	return func(itemConfig *SsaCompareItemConfig) {
 		itemConfig.ProgramName = name
+	}
+}
+func DiffWithRuntimeId(runtimeId string) WithCompareOpts {
+	return func(itemConfig *SsaCompareItemConfig) {
+		itemConfig.RuntimeId = runtimeId
 	}
 }
 func DiffWithRuleName(name string) WithCompareOpts {
@@ -96,21 +102,34 @@ func NewCompareCustomVariableItem(opts ...WithCompareOpts) *Item[*ssadb.AuditNod
 }
 
 type CompareOptions[T any] struct {
-	onResultCallBack []func(result *CompareResult[T])
+	onResultCallback []func(result *CompareResult[T])
 	getValueInfo     func(value T) (rule string, originHash string, diffHash string)
+	saveValueFunc    func(result []*CompareResult[T])
 }
 
 type CompareOpts[T any] func(options *CompareOptions[T])
 
 func WithCompareResultCallback[T any](cb func(result *CompareResult[T])) func(options *CompareOptions[T]) {
 	return func(options *CompareOptions[T]) {
-		options.onResultCallBack = append(options.onResultCallBack, cb)
+		options.onResultCallback = append(options.onResultCallback, cb)
 	}
 }
+func WithRiskCompareCallback(cb func(result *CompareResult[*schema.Risk])) func(options *CompareOptions[*schema.Risk]) {
+	return WithCompareResultCallback(cb)
+}
+func WithSaveValueFunc[T any](f func([]*CompareResult[T])) func(options *CompareOptions[T]) {
+	return func(options *CompareOptions[T]) {
+		options.saveValueFunc = f
+	}
+}
+
 func WithCompareResultGetValueInfo[T any](generate func(value T) (rule string, originHash string, diffHash string)) func(options *CompareOptions[T]) {
 	return func(options *CompareOptions[T]) {
 		options.getValueInfo = generate
 	}
+}
+func WithRiskCompareGenerate(f func(risk *schema.SSARisk) (rule string, originHash string, diffHash string)) func(options *CompareOptions[*schema.SSARisk]) {
+	return WithCompareResultGetValueInfo(f)
 }
 
 type SsaCompare[T any] struct {
@@ -144,6 +163,11 @@ func (s *SsaCompare[T]) Compare(ctx context.Context, item *Item[T], opts ...Comp
 	for _, opt := range opts {
 		opt(s.config)
 	}
+	if s.config.saveValueFunc == nil {
+		log.Errorf("saveValueFunc function is not set for SsaCompare, using default saveValueFunc function")
+		close(result)
+		return result
+	}
 	if s.config.getValueInfo == nil {
 		log.Errorf("generateHash function is not set for SsaCompare, using default hash function")
 		close(result)
@@ -169,20 +193,39 @@ func (s *SsaCompare[T]) Compare(ctx context.Context, item *Item[T], opts ...Comp
 		}
 		hashMap[diffHash]--
 	}
+	wg := new(sync.WaitGroup)
+	taskChan := make(chan *CompareResult[T], 1)
+	processor := utils.NewBatchProcessor[*CompareResult[T]](ctx, taskChan, utils.WithBatchProcessorCallBack[*CompareResult[T]](s.config.saveValueFunc))
+	processor.Start()
 	addChannel := func(compareResult *CompareResult[T]) bool {
+		wg.Add(1)
+		//进行前置的保存操作
+		go func() {
+			defer wg.Done()
+			select {
+			case <-ctx.Done():
+				return
+			case taskChan <- compareResult:
+			}
+		}()
 		select {
 		case <-ctx.Done():
 			close(result)
 			return false
 		case result <- compareResult:
-			for _, f := range s.config.onResultCallBack {
+			for _, f := range s.config.onResultCallback {
 				f(compareResult)
 			}
 			return true
 		}
 	}
 	go func() {
-		defer close(result)
+		defer func() {
+			wg.Wait()
+			close(taskChan)
+			processor.Wait()
+			close(result)
+		}()
 		var zeroValue T
 		for s, i := range hashMap {
 			switch {
