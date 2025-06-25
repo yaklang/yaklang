@@ -60,9 +60,9 @@ var (
 	goVersion  string
 )
 
-func initializeDatabase(projectDatabase string, profileDBName string, isIRify ...bool) error {
+func initializeDatabase(projectDatabase string, profileDBName string, frontendName string) error {
 	// project and profile
-	consts.InitializeYakitDatabase(projectDatabase, profileDBName, isIRify...)
+	consts.InitializeYakitDatabase(projectDatabase, profileDBName, frontendName)
 
 	// cve
 	_, err := consts.InitializeCVEDatabase()
@@ -152,7 +152,7 @@ func init() {
 	} else if len(os.Args) == 2 && (os.Args[1] == "-v" || os.Args[1] == "-version") {
 
 	} else {
-		err := initializeDatabase("", "")
+		err := initializeDatabase("", "", "")
 		if err != nil {
 			log.Warnf("initialize database failed: %s", err)
 		}
@@ -434,8 +434,8 @@ var startGRPCServerCommand = cli.Command{
 		}
 		log.Info("start to initialize database")
 
-		isIRify := c.String("frontend") == "irify"
-		err := initializeDatabase(c.String("project-db"), c.String("profile-db"), isIRify)
+		frontendName := c.String("frontend")
+		err := initializeDatabase(c.String("project-db"), c.String("profile-db"), frontendName)
 		if err != nil {
 			log.Errorf("init database failed: %s", err)
 			return err
