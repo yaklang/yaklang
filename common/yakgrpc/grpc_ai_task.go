@@ -57,6 +57,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	var currentCoordinatorId = startParams.CoordinatorId
 	var coordinatorIdOnce sync.Once
 	var aidOption = []aid.Option{
+		aid.WithTaskAnalysis(true),
 		aid.WithEventHandler(func(e *aid.Event) {
 			if e.Timestamp <= 0 {
 				e.Timestamp = time.Now().Unix() // fallback
