@@ -2,8 +2,8 @@ package ssaapi
 
 import (
 	"context"
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -114,13 +114,32 @@ func WithCompareResultCallback[T any](cb func(result *CompareResult[T])) func(op
 		options.onResultCallback = append(options.onResultCallback, cb)
 	}
 }
-func WithRiskCompareCallback(cb func(result *CompareResult[*schema.Risk])) func(options *CompareOptions[*schema.Risk]) {
+func WithRiskCompareCallback(cb func(result *CompareResult[*schema.SSARisk])) func(options *CompareOptions[*schema.SSARisk]) {
 	return WithCompareResultCallback(cb)
 }
 func WithSaveValueFunc[T any](f func([]*CompareResult[T])) func(options *CompareOptions[T]) {
 	return func(options *CompareOptions[T]) {
 		options.saveValueFunc = f
 	}
+}
+func WithRiskSaveValueFunc(baseItem, compareItem string, kind schema.SSADiffResultKind) func(options *CompareOptions[*schema.SSARisk]) {
+	return WithSaveValueFunc(func(risks []*CompareResult[*schema.SSARisk]) {
+		utils.GormTransactionReturnDb(consts.GetGormDefaultSSADataBase(), func(tx *gorm.DB) {
+			for _, risk := range risks {
+				result := &schema.SSADiffResult{
+					BaseItem:        baseItem,
+					CompareItem:     compareItem,
+					RuleName:        risk.FromRule,
+					BaseRiskHash:    risk.BaseValHash,
+					CompareRiskHash: risk.NewValHash,
+					Status:          int(risk.Status),
+					CompareType:     int(schema.RiskDiff),
+					DiffResultKind:  kind,
+				}
+				tx.Save(result)
+			}
+		})
+	})
 }
 
 func WithCompareResultGetValueInfo[T any](generate func(value T) (rule string, originHash string, diffHash string)) func(options *CompareOptions[T]) {

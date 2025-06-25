@@ -58,7 +58,7 @@ eval($a);
 		diff, err := client.NewSSADiff(context.Background(), &ypb.SSADiffRequest{
 			Base:    &ypb.SSADiffItem{Program: baseProg},
 			Compare: &ypb.SSADiffItem{Program: newProg},
-			Type:    int64(Risk),
+			Type:    int64(schema.RiskDiff),
 		})
 		require.NoError(t, err)
 		flag := false
@@ -103,7 +103,7 @@ include($_GET[1]);
 				Program:  newProg,
 				RuleName: "检测PHP代码执行漏洞",
 			},
-			Type: int64(Risk),
+			Type: int64(schema.RiskDiff),
 		})
 		require.NoError(t, err)
 		for {
