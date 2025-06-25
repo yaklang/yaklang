@@ -29,30 +29,6 @@ func (s *Server) NewSSADiff(req *ypb.SSADiffRequest, server ypb.Yak_NewSSADiffSe
 	if req.Base.Program == "" {
 		kind = schema.RuntimeId
 	}
-	taskChannel := make(chan *ssaapi.CompareResult[*schema.SSARisk], 1)
-	processor := utils.NewBatchProcessor[*ssaapi.CompareResult[*schema.SSARisk]](context, taskChannel, utils.WithBatchProcessorCallBack(func(risks []*ssaapi.CompareResult[*schema.SSARisk]) {
-		utils.GormTransactionReturnDb(consts.GetGormDefaultSSADataBase(), func(tx *gorm.DB) {
-			for _, risk := range risks {
-				result := &schema.SSADiffResult{
-					BaseItem:        req.Base.Program,
-					CompareItem:     req.Compare.Program,
-					RuleName:        risk.FromRule,
-					BaseRiskHash:    risk.BaseValHash,
-					CompareRiskHash: risk.NewValHash,
-					Status:          int(risk.Status),
-					CompareType:     int(Risk),
-					DiffResultKind:  kind,
-				}
-				if kind == schema.RuntimeId {
-					result.BaseItem = req.Base.RiskRuntimeId
-					result.CompareItem = req.Compare.RiskRuntimeId
-				}
-				tx.Save(result)
-			}
-		})
-	}),
-	)
-	processor.Start()
 	switch req.Type {
 	case int64(Custom):
 		return utils.Error("custom diff type not supported")
@@ -74,8 +50,26 @@ func (s *Server) NewSSADiff(req *ypb.SSADiffRequest, server ypb.Yak_NewSSADiffSe
 			return err
 		}
 		res := compare.Compare(context, compareItem,
-			ssaapi.WithCompareResultCallback(func(re *ssaapi.CompareResult[*schema.SSARisk]) {
-				taskChannel <- re
+			ssaapi.WithSaveValueFunc(func(risks []*ssaapi.CompareResult[*schema.SSARisk]) {
+				utils.GormTransactionReturnDb(consts.GetGormDefaultSSADataBase(), func(tx *gorm.DB) {
+					for _, risk := range risks {
+						result := &schema.SSADiffResult{
+							BaseItem:        req.Base.Program,
+							CompareItem:     req.Compare.Program,
+							RuleName:        risk.FromRule,
+							BaseRiskHash:    risk.BaseValHash,
+							CompareRiskHash: risk.NewValHash,
+							Status:          int(risk.Status),
+							CompareType:     int(Risk),
+							DiffResultKind:  kind,
+						}
+						if kind == schema.RuntimeId {
+							result.BaseItem = req.Base.RiskRuntimeId
+							result.CompareItem = req.Compare.RiskRuntimeId
+						}
+						tx.Save(result)
+					}
+				})
 			}),
 			ssaapi.WithCompareResultGetValueInfo[*schema.SSARisk](func(value *schema.SSARisk) (rule string, originHash string, diffHash string) {
 				return value.FromRule, value.Hash, utils.CalcMd5(value.FromRule, value.CodeFragment, value.Variable)
@@ -89,8 +83,8 @@ func (s *Server) NewSSADiff(req *ypb.SSADiffRequest, server ypb.Yak_NewSSADiffSe
 				Status:      int64(re.Status),
 			})
 		}
-		close(taskChannel)
-		processor.Wait()
+		//close(taskChannel)
+		//processor.Wait()
 		return nil
 	default:
 		return utils.Error("unknown diff type")
