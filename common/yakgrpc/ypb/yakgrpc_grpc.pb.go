@@ -6631,6 +6631,15 @@ func (c *yakClient) ToggleAIToolFavorite(ctx context.Context, in *ToggleAIToolFa
 	return out, nil
 }
 
+func (c *yakClient) ToggleAIToolFavorite(ctx context.Context, in *ToggleAIToolFavoriteRequest, opts ...grpc.CallOption) (*ToggleAIToolFavoriteResponse, error) {
+	out := new(ToggleAIToolFavoriteResponse)
+	err := c.cc.Invoke(ctx, Yak_ToggleAIToolFavorite_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) AIToolGenerateMetadata(ctx context.Context, in *AIToolGenerateMetadataRequest, opts ...grpc.CallOption) (*AIToolGenerateMetadataResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(AIToolGenerateMetadataResponse)
