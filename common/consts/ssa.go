@@ -54,34 +54,33 @@ const (
 )
 
 var (
-	SSA_PROJECT_YAKIT_DB_RAW = "default-yakitssa.db"
-	SSA_PROJECT_DB_RAW       = "default-yakssa.db"
-	SSA_PROJECT_DB_DIALECT   = SQLiteExtend
-	ssaDatabase              *gorm.DB
+	SSA_PROJECT_DB_RAW     = "default-yakssa.db"
+	SSA_PROJECT_DB_DIALECT = SQLiteExtend
+	ssaDatabase            *gorm.DB
 )
 
 const (
-	YAK_SSA_PROJECT_DB_DEFAULT = "default-yakssa.db"
-	YAK_SSA_PROJECT_DB_DIALECT = SQLiteExtend
+	SSA_PROJECT_YAKIT_DB_RAW       = "default-yakitssa.db" // 前端是yakit使用这个名字
+	SSA_PROJECT_Default_DB_DEFAULT = "default-yakssa.db"   // yakit和命令行使用这个名字
 )
 
-func GetSSADatabaseInfoFromEnv(isIRify bool) string {
+func GetSSADatabaseInfoFromEnv(frontendName string) string {
 	raw := os.Getenv(CONST_SSA_DATABASE_RAW)
 	if raw == "" {
-		if isIRify {
-			raw = SSA_PROJECT_DB_RAW
-		} else {
+		if frontendName == "yakit" {
 			raw = SSA_PROJECT_YAKIT_DB_RAW
+		} else {
+			raw = SSA_PROJECT_Default_DB_DEFAULT
 		}
 	}
 	return raw
 }
 
 func GetSSADataBaseInfo() (string, string) {
-	if !filepath.IsAbs(SSA_PROJECT_YAKIT_DB_RAW) {
-		SSA_PROJECT_YAKIT_DB_RAW = filepath.Join(GetDefaultYakitBaseDir(), SSA_PROJECT_YAKIT_DB_RAW)
+	if !filepath.IsAbs(SSA_PROJECT_DB_RAW) {
+		SSA_PROJECT_DB_RAW = filepath.Join(GetDefaultYakitBaseDir(), SSA_PROJECT_DB_RAW)
 	}
-	return SSA_PROJECT_DB_DIALECT, SSA_PROJECT_YAKIT_DB_RAW
+	return SSA_PROJECT_DB_DIALECT, SSA_PROJECT_DB_RAW
 }
 
 func parseDatabaseURL(raw string) (string, string) {
@@ -117,7 +116,7 @@ func SetSSADatabaseInfo(raw string) {
 
 	dialect, connectionDetails := parseDatabaseURL(raw)
 	SSA_PROJECT_DB_DIALECT = dialect
-	SSA_PROJECT_YAKIT_DB_RAW = connectionDetails
+	SSA_PROJECT_DB_RAW = connectionDetails
 }
 
 func SetGormSSAProjectDatabaseByInfo(raw string) error {
