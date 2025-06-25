@@ -3,6 +3,7 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"io"
 	"strings"
 	"time"
@@ -49,6 +50,8 @@ const (
 	EVENT_TYPE_TASK_REVIEW_REQUIRE     EventType = "task_review_require"
 	EVENT_TYPE_PLAN_REVIEW_REQUIRE     EventType = "plan_review_require"
 	EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE EventType = "tool_use_review_require"
+
+	EVENT_PLAN_TASK_ANALYSIS EventType = "plan_task_analysis" // plan task analysis event, used to emit the plan task analysis information
 
 	EVENT_TYPE_TOOL_CALL_WATCHER EventType = "tool_call_watcher" // tool call watcher event, used to emit the tool call watcher information. user can cancel this tool call
 
@@ -226,6 +229,7 @@ func (r *Config) EmitRequireReviewForPlan(rsp *PlanResponse, id string) {
 		"id":        id,
 		"selectors": r.getPlanReviewSuggestion(),
 		"plans":     rsp,
+		"plans_id":  uuid.New().String(),
 	}
 	if ep, ok := r.epm.loadEndpoint(id); ok {
 		ep.SetReviewMaterials(reqs)
