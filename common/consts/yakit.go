@@ -73,10 +73,10 @@ func GetGormProjectDatabase() *gorm.DB {
 	return projectDataBase
 }
 
-func InitializeYakitDatabase(projectDB string, profileDB string, isIRify ...bool) {
-	var irify bool
-	if len(isIRify) > 0 {
-		irify = isIRify[0]
+func InitializeYakitDatabase(projectDB string, profileDB string, frontendNames ...string) {
+	var frontendName string
+	if len(frontendNames) > 0 {
+		frontendName = frontendNames[0]
 	}
 
 	initializeYakitDirectories()
@@ -96,7 +96,7 @@ func InitializeYakitDatabase(projectDB string, profileDB string, isIRify ...bool
 	SetDefaultYakitProjectDatabaseName(projectName)
 
 	// ssa check env
-	ssaProjectDatabaseRaw := GetSSADatabaseInfoFromEnv(irify)
+	ssaProjectDatabaseRaw := GetSSADatabaseInfoFromEnv(frontendName)
 	SetSSADatabaseInfo(ssaProjectDatabaseRaw)
 
 	initYakitDatabase()
