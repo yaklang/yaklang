@@ -97,6 +97,14 @@ type PocConfig struct {
 	GmTLS       bool
 	GmTLSOnly   bool
 	GmTLSPrefer bool
+
+	// random chunked
+	EnableRandomChunked bool
+	MinChunkedLength    int
+	MaxChunkedLength    int
+	MinChunkDelay       time.Duration
+	MaxChunkDelay       time.Duration
+	ChunkedHandler      func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration)
 }
 
 func (c *PocConfig) IsHTTPS() bool {
@@ -220,6 +228,12 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	}
 	if c.GmTLSPrefer {
 		opts = append(opts, lowhttp.WithGmTLSPrefer(c.GmTLSPrefer))
+	}
+	if c.EnableRandomChunked {
+		opts = append(opts, lowhttp.WithEnableRandomChunked(c.EnableRandomChunked))
+		opts = append(opts, lowhttp.WithRandomChunkedLength(c.MinChunkedLength, c.MaxChunkedLength))
+		opts = append(opts, lowhttp.WithRandomChunkedDelay(c.MinChunkDelay, c.MaxChunkDelay))
+		opts = append(opts, lowhttp.WithRandomChunkedHandler(c.ChunkedHandler))
 	}
 	return opts
 }
@@ -1367,6 +1381,128 @@ func WithDeleteForm(key string) PocConfigOption {
 	}
 }
 
+// randomChunked 是一个请求选项参数，用于启用随机分块传输，默认不启用
+// Example:
+// ```
+// data = `
+// POST /post HTTP/1.1
+// Host: pie.dev
+// Content-Type: multipart/form-data; boundary=------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm
+// Content-Length: 308
+//
+// --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm
+// Content-Disposition: form-data; name="aaa"
+//
+// bbb
+// --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm
+// Content-Disposition: form-data; name="ccc"
+//
+// ddd
+// --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm--
+// `
+//
+// poc.HTTP(data,poc.randomChunked(true),poc.randomChunkedLength(10,25),poc.randomChunkedDelay(50,200))~
+// ```
+func WithEnableRandomChunked(b bool) PocConfigOption {
+	return func(c *PocConfig) {
+		c.EnableRandomChunked = b
+	}
+}
+
+// randomChunkedLength 是一个请求选项参数，用于设置随机分块传输的分块长度范围，默认最小长度为10，最大长度为25
+// Example:
+// ```
+// data = `
+// POST /post HTTP/1.1
+// Host: pie.dev
+// Content-Type: multipart/form-data; boundary=------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm
+// Content-Length: 308
+//
+// --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm
+// Content-Disposition: form-data; name="aaa"
+//
+// bbb
+// --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm
+// Content-Disposition: form-data; name="ccc"
+//
+// ddd
+// --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm--
+// `
+//
+// poc.HTTP(data,poc.randomChunked(true),poc.randomChunkedLength(10,25),poc.randomChunkedDelay(50,200))~
+// ```
+func WithRandomChunkedLength(min, max int) PocConfigOption {
+	return func(c *PocConfig) {
+		c.MinChunkedLength = min
+		c.MaxChunkedLength = max
+	}
+}
+
+// randomChunkedDelay是一个请求选项参数，用于设置随机分块传输的分块延迟范围，默认最小延迟为50毫秒，最大延迟为100毫秒
+// Example:
+// ```
+// data = `
+// POST /post HTTP/1.1
+// Host: pie.dev
+// Content-Type: multipart/form-data; boundary=------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm
+// Content-Length: 308
+//
+// --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm
+// Content-Disposition: form-data; name="aaa"
+//
+// bbb
+// --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm
+// Content-Disposition: form-data; name="ccc"
+//
+// ddd
+// --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm--
+// `
+//
+// poc.HTTP(data,poc.randomChunked(true),poc.randomChunkedLength(10,25),poc.randomChunkedDelay(50,200))~
+// ```
+func WithRandomChunkedDelay(min, max int) PocConfigOption {
+	return func(c *PocConfig) {
+		c.MinChunkDelay = time.Duration(min) * time.Millisecond
+		c.MaxChunkDelay = time.Duration(max) * time.Millisecond
+	}
+}
+
+// randomChunkedResultHandler 是一个请求选项参数，用于设置随机分块传输的结果处理函数
+// 处理函数接受四个参数，id为分块的ID，chunkRaw为分块的原始数据，totalTime为总耗时，chunkSendTime为分块发送的耗时
+// Example:
+// ```
+// data = `
+// POST /post HTTP/1.1
+// Host: pie.dev
+// Content-Type: multipart/form-data; boundary=------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm
+// Content-Length: 308
+//
+// --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm
+// Content-Disposition: form-data; name="aaa"
+//
+// bbb
+// --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm
+// Content-Disposition: form-data; name="ccc"
+//
+// ddd
+// --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm--
+// `
+//
+// poc.HTTP(data,poc.randomChunked(true),
+// poc.randomChunkedLength(10,25),
+// poc.randomChunkedDelay(50,200),
+//
+//	poc.randomChunkedResultHandler(func(id,data,totalTime,chunkTime){
+//		print(sprintf("id:%v\tdata:%s\ttotalTime:%vms\tdelay:%vms\n", id,data,totalTime,chunkTime))
+//	}))~
+//
+// ```
+func WithRandomChunkedResultHandler(f func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration)) PocConfigOption {
+	return func(c *PocConfig) {
+		c.ChunkedHandler = f
+	}
+}
+
 func FixPacketByPocOptions(packet []byte, opts ...PocConfigOption) []byte {
 	config := NewDefaultPoCConfig()
 	for _, opt := range opts {
@@ -1943,6 +2079,11 @@ var PoCExports = map[string]interface{}{
 	"deleteQueryParam":                   WithDeleteQueryParam,
 	"deletePostParam":                    WithDeletePostParam,
 	"deleteForm":                         WithDeleteForm,
+	// random chunked
+	"randomChunked":              WithEnableRandomChunked,
+	"randomChunkedLength":        WithRandomChunkedLength,
+	"randomChunkedDelay":         WithRandomChunkedDelay,
+	"randomChunkedResultHandler": WithRandomChunkedResultHandler,
 
 	// split
 	"Split":           split,
