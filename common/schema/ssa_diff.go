@@ -13,6 +13,13 @@ const (
 	Prog                        //利用Program来进行对比
 )
 
+type compareType int64
+
+const (
+	CustomDiff compareType = iota + 1
+	RiskDiff
+)
+
 type SSADiffResult struct {
 	gorm.Model
 	BaseItem        string
