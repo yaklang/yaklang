@@ -236,13 +236,13 @@ Transfer-Encoding: chunked
 			requestPacket := []byte(fmt.Sprintf(tt.requestPacket, originalBody))
 
 			var buffer bytes.Buffer
-
+			options := []randomChunkedHTTPOption{
+				_withRandomChunkCtx(context.Background()),
+				_withRandomChunkChunkLength(tt.minChunkLength, tt.maxChunkLength),
+				_withRandomChunkDelay(tt.minDelay, tt.minDelay),
+			}
 			sender, err := NewRandomChunkedSender(
-				context.Background(),
-				tt.minChunkLength,
-				tt.maxChunkLength,
-				tt.minDelay,
-				tt.maxDelay,
+				options...,
 			)
 			require.NoError(t, err)
 			err = sender.Send(requestPacket, &buffer)
@@ -280,13 +280,11 @@ func TestRandomChunkedSender_hanlder(t *testing.T) {
 
 		%s
 		`, token)
-		sender, err := NewRandomChunkedSender(
-			context.Background(),
-			10,
-			25,
-			time.Millisecond*100,
-			time.Millisecond*500,
-			func(chunkIndex int, chunkRaw []byte, totalDuration time.Duration, chunkDuration time.Duration) {
+		options := []randomChunkedHTTPOption{
+			_withRandomChunkCtx(context.Background()),
+			_withRandomChunkChunkLength(10, 25),
+			_withRandomChunkDelay(100, 500),
+			_withRandomChunkResultHandler(func(chunkIndex int, chunkRaw []byte, totalDuration time.Duration, chunkDuration time.Duration) {
 				m := make(map[string]any)
 				m["id"] = chunkIndex
 				m["totalTime"] = totalDuration
@@ -294,7 +292,10 @@ func TestRandomChunkedSender_hanlder(t *testing.T) {
 				m["chunkDuration"] = chunkDuration
 				t.Log(m)
 				blockNum = chunkIndex + 1
-			},
+			}),
+		}
+		sender, err := NewRandomChunkedSender(
+			options...,
 		)
 		require.NoError(t, err)
 

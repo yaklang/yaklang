@@ -23,30 +23,54 @@ type RandomChunkedSender struct {
 	handler        ChunkedResultHandler
 }
 
-type RandomChunkedHTTPOption func(*RandomChunkedSender)
+type randomChunkedHTTPOption func(*RandomChunkedSender)
 
-func NewRandomChunkedSender(
-	ctx context.Context,
-	minChunkLength, maxChunkLength int,
-	minDelay, maxDelay time.Duration,
-	handler ...ChunkedResultHandler,
-) (*RandomChunkedSender, error) {
-	sender := &RandomChunkedSender{
+func _withRandomChunkCtx(ctx context.Context) randomChunkedHTTPOption {
+	return func(r *RandomChunkedSender) {
+		if ctx != nil {
+			r.ctx = ctx
+		}
+	}
+}
+
+func _withRandomChunkChunkLength(min, max int) randomChunkedHTTPOption {
+	return func(r *RandomChunkedSender) {
+		r.maxChunkLength = max
+		r.minChunkLength = min
+	}
+}
+
+func _withRandomChunkDelay(min, max time.Duration) randomChunkedHTTPOption {
+	return func(r *RandomChunkedSender) {
+		r.maxDelay = max
+		r.minDelay = min
+	}
+}
+
+func _withRandomChunkResultHandler(f ChunkedResultHandler) randomChunkedHTTPOption {
+	return func(r *RandomChunkedSender) {
+		r.handler = f
+	}
+}
+
+func newDefaultRandomChunkSender() *RandomChunkedSender {
+	return &RandomChunkedSender{
 		ctx:            context.Background(),
-		maxChunkLength: maxChunkLength,
-		minChunkLength: minChunkLength,
-		maxDelay:       maxDelay,
-		minDelay:       minDelay,
+		maxChunkLength: 25,
+		minChunkLength: 10,
+		maxDelay:       time.Millisecond * 100,
+		minDelay:       time.Millisecond * 50,
 		handler:        nil,
 	}
+}
 
-	if ctx != nil {
-		sender.ctx = ctx
+func NewRandomChunkedSender(
+	options ...randomChunkedHTTPOption,
+) (*RandomChunkedSender, error) {
+	sender := newDefaultRandomChunkSender()
+	for _, option := range options {
+		option(sender)
 	}
-	if len(handler) > 0 {
-		sender.handler = handler[0]
-	}
-
 	// 验证配置
 	if sender.maxChunkLength <= 0 || sender.minChunkLength <= 0 {
 		return nil, utils.Error("chunked config error: chunk length should greater than zero")
