@@ -190,6 +190,8 @@ Content-Type: application/json
 				// 重建所有chunk数据
 				var reconstructedData []byte
 				for i, callback := range handlerCallbacks {
+					chunkId := callback["chunk_id"].(int)
+
 					// 验证chunkIndex递增
 					assert.Equal(t, i+1, callback["chunk_id"], "chunk index should be sequential starting from 1")
 
@@ -206,12 +208,12 @@ Content-Type: application/json
 					// 验证时间
 					totalTime := callback["total_time"].(time.Duration)
 					chunkTime := callback["chunk_send_time"].(time.Duration)
-					if callback["chunk_id"].(int) != 1 {
+					if chunkId != 1 {
 						assert.Greater(t, totalTime, time.Duration(0), "total time should be positive")
 					}
 
 					// 只有当chunkTime > 0时才验证它小于等于totalTime
-					if chunkTime > 0 {
+					if chunkId > 1 {
 						assert.LessOrEqual(t, chunkTime, totalTime, "chunk time should be <= total time")
 					}
 					// 收集数据重建
@@ -400,8 +402,9 @@ Content-Type: application/json
 					// 重建所有chunk数据
 					var reconstructedData []byte
 					for j, callback := range handlerCallbacks {
+						chunkId := callback["chunk_id"].(int)
 						// 验证chunkIndex递增
-						assert.Equal(t, j+1, callback["chunk_id"], "chunk index should be sequential starting from 1 for request %d", i+1)
+						assert.Equal(t, j+1, chunkId, "chunk index should be sequential starting from 1 for request %d", i+1)
 
 						// 验证数据大小在范围内
 						chunkLength := callback["chunk_length"].(int)
@@ -416,11 +419,11 @@ Content-Type: application/json
 						// 验证时间
 						totalTime := callback["total_time"].(time.Duration)
 						chunkTime := callback["chunk_send_time"].(time.Duration)
-						if callback["chunk_id"].(int) != 1 {
+						if chunkId != 1 {
 							assert.Greater(t, totalTime, time.Duration(0), "total time should be positive for request %d", i+1)
 						}
 						// 只有当chunkTime > 0时才验证它小于等于totalTime
-						if chunkTime > 0 {
+						if chunkId > 1 {
 							assert.LessOrEqual(t, chunkTime, totalTime, "chunk time should be <= total time for request %d", i+1)
 						}
 						// 收集数据重建
