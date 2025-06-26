@@ -87,17 +87,20 @@ func (c *config) init(filesystem filesys_interface.FileSystem) (*ssa.Program, *s
 			application.PopEditor(save)
 		}()
 
-		if ret := fb.GetEditor(); ret != nil {
-			cache := application.Cache
-			progName := application.GetProgramName()
-			hash := ret.GetIrSourceHash(programName)
-			if cache.IsExistedSourceCodeHash(progName, hash) {
-				c.DatabaseProgramCacheHitter(fb)
+			if editor := fb.GetEditor(); editor != nil {
+				cache := application.Cache
+				progName := application.GetProgramName()
+				go func() {
+					hash := editor.GetIrSourceHash(programName)
+					if cache.IsExistedSourceCodeHash(progName, hash) {
+						c.DatabaseProgramCacheHitter(fb)
+					}
+				}()
+			} else {
+				log.Warnf("(BUG or in DEBUG Mode)Range not found for %s", fb.GetName())
 			}
-		} else {
-			log.Warnf("(BUG or in DEBUG Mode)Range not found for %s", fb.GetName())
-		}
-		return LanguageBuilder.Build(src.GetSourceCode(), c.ignoreSyntaxErr, fb)
+			err = LanguageBuilder.Build(src.GetSourceCode(), c.ignoreSyntaxErr, fb)
+		return err
 	}
 	builder := application.GetAndCreateFunctionBuilder(string(ssa.MainFunctionName), string(ssa.MainFunctionName))
 	// TODO: this extern info should be set in program
