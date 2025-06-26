@@ -389,7 +389,7 @@ func WithETCHosts(hosts map[string]string) LowhttpOpt {
 	}
 }
 
-func WithBodyStreamReaderHandler(t func([]byte, io.ReadCloser)) LowhttpOpt {
+func WithBodyStreamReaderHandler(t func(headerBytes []byte, bodyReader io.ReadCloser)) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.BodyStreamReaderHandler = t
 	}

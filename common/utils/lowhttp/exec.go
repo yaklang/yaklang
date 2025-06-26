@@ -842,7 +842,10 @@ RECONNECT:
 	} else {
 		// 不使用连接池分支
 		if conn != nil {
-			defer func() {
+			readConnEndCtx, readConnEnd := context.WithCancel(ctx)
+			defer readConnEnd()
+			go func() {
+				<-readConnEndCtx.Done()
 				conn.Close()
 			}()
 		}
@@ -951,7 +954,7 @@ RECONNECT:
 		_ = conn.SetReadDeadline(serverTimeStart.Add(timeout))
 		firstByte, err := httpResponseReader.Peek(1)
 		if err != nil {
-			return response, err
+			return response, utils.Errorf("read first byte failed: %v", err)
 		}
 		//log.Infof("dns time + dial time cost + write request finished + peek 1: %v", time.Since(dnsStart))
 		//log.Infof("[lowhttp] first byte in %v", time.Since(serverTimeStart))
