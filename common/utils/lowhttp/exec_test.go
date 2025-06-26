@@ -983,3 +983,50 @@ User-Agent: yaklang-test/1.0
 		require.True(t, strings.Contains(string(rsp.RawPacket), string(flag)), "final response should contain the flag")
 	})
 }
+
+func TestHTTP_ContentLengthEdgeAndNegativeCases(t *testing.T) {
+	tests := []struct {
+		name             string
+		contentLength    string
+		description      string
+		expectedResponse string
+	}{
+		{
+			name:             "negative content-length",
+			contentLength:    "-10",
+			description:      "negative content-length should return 400",
+			expectedResponse: "HTTP/1.1 400 Bad Request",
+		},
+		{
+			name:             "zero content-length",
+			contentLength:    "0",
+			description:      "zero content-length should return 200",
+			expectedResponse: "HTTP/1.1 200 OK",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+				writer.Write([]byte("test response"))
+			})
+
+			packet := `POST / HTTP/1.1
+Host: ` + utils.HostPort(host, port) + `
+Content-Length: ` + tt.contentLength + `
+Content-Type: application/json
+
+{"test": "data"}`
+
+			rsp, err := HTTP(WithPacketBytes([]byte(packet)), WithTimeout(5*time.Second), WithNoFixContentLength(true))
+
+			require.NoError(t, err, "Request with %s should not fail", tt.name)
+			require.NotNil(t, rsp, "Response should not be nil")
+			require.Contains(t, string(rsp.RawPacket), tt.expectedResponse, "Response should contain expected status: %s", tt.expectedResponse)
+
+			t.Logf("Successfully handled %s", tt.description)
+			t.Logf("Expected: %s", tt.expectedResponse)
+			t.Logf("Response: %s", string(rsp.RawPacket))
+		})
+	}
+}
