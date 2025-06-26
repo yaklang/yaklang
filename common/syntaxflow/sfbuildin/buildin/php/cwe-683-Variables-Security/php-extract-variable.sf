@@ -81,7 +81,7 @@ CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high	for {
+alert $high for {
 	desc: <<<CODE
 ### 漏洞描述
 
@@ -145,7 +145,7 @@ CODE,exclude=<<<CODE
 *?{opcode:call && <self><getCallee> & $filter} as $__next__
 CODE)> as $middle
 
-alert $middle	for {
+alert $middle for {
 	level: "mid",
 	type: "mid",
 	title: "PHP Variable Overwrite with Missing Filter Function",
@@ -205,7 +205,7 @@ CODE
 }
 $sink - $high - $middle  as $low;
 
-alert $low	for {
+alert $low for {
 	type: "low",
 	title: "PHP Variable Overwrite with Filter Function",
 	title_zh: "PHP变量覆盖，检测到过滤函数",

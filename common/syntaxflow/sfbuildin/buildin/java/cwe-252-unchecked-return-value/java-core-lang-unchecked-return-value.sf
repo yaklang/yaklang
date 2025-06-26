@@ -63,7 +63,7 @@ REFERENCE
 /^(getRuntime|exec|waitFor|getInCheck|holdsLock|interrupted|concat|replace(All|First)?|substring|to(String|(Lower|Upper)Case)|trim|valueOf)$/<getCall> as $toCheck;
 $toCheck?{<typeName>?{have:'java.lang'}}?{!<getUsers>} as $weak;
 
-alert $weak	for {
+alert $weak for {
 	title: "Check Java Lang Unchecked Return Value",
 	title_zh: "检测Java Lang库未检查返回值的API",
 	level: "info",

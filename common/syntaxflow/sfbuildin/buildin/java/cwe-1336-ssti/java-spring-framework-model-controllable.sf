@@ -70,7 +70,7 @@ $source<dataflow(exclude=<<<CODE
 *<show>?{opcode: call && <getCallee><name>?{!have: "ModelAndView"}}
 CODE)> as $filteredSource
 <delete(param)>
-alert $filteredSource	for {
+alert $filteredSource for {
 	title: "Unvalidated Java Spring Framework ModelAndView SSTI",
 	title_zh: "未验证的 Java Spring Framework ModelAndView SSTI",
 	solution: <<<CODE

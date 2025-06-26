@@ -74,7 +74,7 @@ $param?{<self> #{include: <<<CODE
 * & $mysql_information
 CODE}->} as $mysql_sink
 
-alert $mysql_sink	for {
+alert $mysql_sink for {
 	title_zh: "检测PHP MySQL数据库信息泄露风险",
 	solution: <<<CODE
 ### 修复建议
@@ -136,7 +136,7 @@ $param?{<self> #{include: <<<CODE
 * & $pg_information
 CODE}->} as $pg_sink
 
-alert $pg_sink	for {
+alert $pg_sink for {
 	title: "Detect PHP PostgreSQL Information Exposure Risk",
 	title_zh: "检测PHP PostgreSQL数据库信息泄露风险",
 	solution: <<<CODE

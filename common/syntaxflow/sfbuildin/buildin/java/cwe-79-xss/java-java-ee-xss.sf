@@ -85,7 +85,7 @@ $sink #{
     include:`*...setAttribute(,* as $attribute)`,
     exclude:`* <getCallee> & $filter`
 }-> as $result;
-alert $result	for {
+alert $result for {
 	level: "high",
 	message: "Find Java EE's XSS Vulnerability",
 	type: "vuln",

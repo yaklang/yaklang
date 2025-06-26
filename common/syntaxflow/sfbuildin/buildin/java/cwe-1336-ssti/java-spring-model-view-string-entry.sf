@@ -91,7 +91,7 @@ $source<dataflow(exclude=<<<CODE
 *?{opcode: call}
 CODE)> as $filteredSource
 <delete(param)>
-alert $filteredSource	for {
+alert $filteredSource for {
 	title: "Audit Java Spring Framework ModelAndView String Parameter",
 	title_zh: "审计 Java Spring Framework 处理 ModelAndView 时直接传入 String 参数",
 	level: "mid",

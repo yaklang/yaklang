@@ -102,7 +102,7 @@ CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high	for {
+alert $high for {
 	title_zh: "MySQL未验证参数注入风险",
 	solution: <<<CODE
 ### 修复建议
@@ -182,7 +182,7 @@ CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
 
-alert $mid	for {
+alert $mid for {
 	title: "Insufficient MySQL Parameter Filtering",
 	title_zh: "MySQL参数过滤不充分",
 	solution: <<<CODE
@@ -246,7 +246,7 @@ CODE
 $sink - $high - $mid as $low
 
 check $low
-alert $low	for {
+alert $low for {
 	title: "Potential MySQL Access Control Bypass",
 	title_zh: "MySQL访问控制潜在绕过风险",
 	desc: <<<CODE

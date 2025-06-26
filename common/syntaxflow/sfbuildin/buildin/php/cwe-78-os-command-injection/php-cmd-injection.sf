@@ -79,7 +79,7 @@ CODE,exclude=<<<CODE
 <self>?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high	for {
+alert $high for {
 	type: "vuln",
 	title: "Unfiltered PHP Command Execution",
 	title_zh: "PHP未过滤命令执行",
@@ -146,7 +146,7 @@ CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
 
-alert $mid	for {
+alert $mid for {
 	type: "vuln",
 	title: "Partially Filtered PHP Command Execution",
 	title_zh: "PHP部分过滤命令执行",
@@ -207,7 +207,7 @@ CODE
 }
 $sink - $mid - $high as $low
 
-alert $low	for {
+alert $low for {
 	title_zh: "PHP过滤命令执行",
 	desc: <<<CODE
 ### 规则目的

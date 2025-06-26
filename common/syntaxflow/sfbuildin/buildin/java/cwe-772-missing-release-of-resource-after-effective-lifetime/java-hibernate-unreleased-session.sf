@@ -101,7 +101,7 @@ $getSession -{
 
 $safe<getPredecessors()> as $safeGetSession;
 $getSession - $safeGetSession as $weak;
-alert $weak	for {
+alert $weak for {
 	solution: <<<CODE
 ### 修复建议
 

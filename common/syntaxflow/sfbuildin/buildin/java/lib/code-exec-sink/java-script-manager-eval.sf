@@ -106,7 +106,7 @@ $engine.put(,* as $params);
 $engine.compile(,* as $params);
 check $params;
 $params as $output;
-alert $output	for {
+alert $output for {
 	level: "high",
 	title: "Detect Java ScriptEngineManager eval Risk",
 	title_zh: "检测Java ScriptEngineManager eval 风险",

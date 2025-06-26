@@ -129,7 +129,7 @@ REFERENCE
 /^curl_init|curl_setopt|curl_exec|curl_close|fsockopen|file_get_contents|fopen$/ as $curlFunction;
 
 check $curlFunction;
-alert $curlFunction	for {
+alert $curlFunction for {
 	title: "ssrf function detected, please pay attention",
 	title_zh: "检测到为ssrf函数，请注意关注",
 	desc: <<<CODE
@@ -162,7 +162,7 @@ CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high	for {
+alert $high for {
 	title: "Unvalidated SSRF Parameter Injection",
 	title_zh: "SSRF未验证参数注入风险",
 	solution: <<<CODE
@@ -292,7 +292,7 @@ CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
 
-alert $mid	for {
+alert $mid for {
 	title_zh: "SSRF参数过滤不充分",
 	solution: <<<CODE
 ### 修复建议
@@ -378,7 +378,7 @@ CODE
 }
 
 $sink - $high - $mid  as $low
-alert $low	for {
+alert $low for {
 	solution: <<<CODE
 ### 修复建议
 

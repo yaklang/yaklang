@@ -133,7 +133,7 @@ $param #{
 	until: "* & $source" 
 }-> as $mid 
 
-alert $mid	for {
+alert $mid for {
 	type: "vuln",
 	title: "SSRF detected",
 	title_zh: "检测到SSRF",

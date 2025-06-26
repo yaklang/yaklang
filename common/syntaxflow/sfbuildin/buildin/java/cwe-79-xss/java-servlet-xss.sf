@@ -116,7 +116,7 @@ $sink#{
     include:` * & $source`,
     exclude:` *<getCallee> & $filter`
 }-> as $mid;
-alert $mid	for {
+alert $mid for {
 	title: "Check Java Servlet XSS Vulnerability",
 	title_zh: "检测Java Servlet XSS漏洞",
 	level: "mid",
@@ -130,7 +130,7 @@ $sink#{
 }-> as $all;
 $all - $mid as $low;
 
-alert $low	for {
+alert $low for {
 	message: "发现Java Servlet的XSS漏洞,并且数据流中使用了转义方法。",
 	title: "Check Java Servlet XSS Vulnerability",
 	title_zh: "检测Java Servlet XSS漏洞",

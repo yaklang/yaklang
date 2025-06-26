@@ -90,7 +90,7 @@ Files?{<typeName>?{have: 'java.nio'}}.delete(,* as $output);
 // java.nio.file.Files.deleteIfExists
 Files?{<typeName>?{have: 'java.nio'}}.deleteIfExists(,* as $output);
 
-alert $output	for {
+alert $output for {
 	level: "high",
 	title: "Untrusted File Deletion",
 	title_zh: "不信任的文件删除",

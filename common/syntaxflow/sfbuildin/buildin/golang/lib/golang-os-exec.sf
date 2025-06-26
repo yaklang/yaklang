@@ -98,7 +98,7 @@ SOLUTION
 exec?{<fullTypeName>?{have: 'os/exec'}} as $entry
 $entry.Command(* as $output) 
 
-alert $output	for {
+alert $output for {
 	solution: <<<CODE
 ### 修复建议
 

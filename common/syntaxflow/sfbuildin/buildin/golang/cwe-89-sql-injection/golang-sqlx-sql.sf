@@ -90,7 +90,7 @@ REFERENCE
 $sink.Select(*<slice(index=2)> #-> as $param);
 $param?{have: 'Parameter'} as $high;
 
-alert $high	for {
+alert $high for {
 	solution: <<<CODE
 ### 修复建议
 

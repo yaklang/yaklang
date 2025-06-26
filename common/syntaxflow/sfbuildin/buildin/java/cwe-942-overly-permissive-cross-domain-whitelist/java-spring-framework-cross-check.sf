@@ -89,7 +89,7 @@ REFERENCE
 
 CrossOrigin?{<typeName>?{have:"org.springframework.web.bind.annotation.CrossOrigin"}} as $co;
 $co.origins?{=="*"} as $result;
-alert $result	for {
+alert $result for {
 	title: "Check Java Spring Framework Overly Permissive Cross-Domain Whitelist",
 	title_zh: "检测Java Spring Framework跨域白名单过于宽松",
 	level: "low",

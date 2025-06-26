@@ -86,7 +86,7 @@ $conn.prepareStatement(*<slice(start=1)> as $output) as $stmt;
 $stmt.executeQuery() as $call;
 check $call;
 check $output;
-alert $output	for {
+alert $output for {
 	title_zh: "审计Java JDBC PreparedStatement 执行查询",
 	level: "mid",
 	title: "Audit Java JDBC Prepared Statement Execute Query",

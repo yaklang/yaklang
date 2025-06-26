@@ -119,7 +119,7 @@ REFERENCE
 $sink.RawQuery(* #-> as $param);
 $param?{have: 'Parameter'} as $high;
 
-alert $high	for {
+alert $high for {
 	type: "vuln",
 	title: "SQL Injection detected",
 	title_zh: "检测到SQL注入",

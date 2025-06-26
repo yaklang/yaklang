@@ -98,7 +98,7 @@ $source?{<self> #{include: <<<CODE
 * & $info_function
 CODE}->} as $sink
 
-alert $sink	for {
+alert $sink for {
 	title: "Unsafe Error Handling and Information Exposure",
 	title_zh: "不安全的错误处理与信息泄露风险",
 	level: "low",

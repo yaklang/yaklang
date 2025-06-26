@@ -113,7 +113,7 @@ $sink #{
     exclude: `*?{opcode:call}?{!* & $source}?{!* & $sink}`,
 }->as  $mid;
 
-alert $mid	for {
+alert $mid for {
 	solution: <<<CODE
 ### 修复建议
 
@@ -225,7 +225,7 @@ $sink #{
 
 $result - $mid as $low;
 
-alert $low	for {
+alert $low for {
 	solution: <<<CODE
 ### 修复建议
 

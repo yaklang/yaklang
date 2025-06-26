@@ -3,6 +3,6 @@
 package consts
 
 const ExistedCorePluginEmbedFSHash string = "bce862870939df3daa6cd3c51de8c7e7ae600fbd329e4835c1901d316ae19997"
-const ExistedSyntaxFlowEmbedFSHash string = "5f17e7d98a0488c7a9c608a54bcc21e2ed1f040f5a47bcd3fc36531fe7c234c8"
+const ExistedSyntaxFlowEmbedFSHash string = "ea63f27bfef3b7374a8a4e947406473ec69662e702521a76201094a0d66fae67"
 const ExistedBuildInForgeEmbedFSHash string = "745e9d0cc6df156b18efd0a93958d8857d5c4ff7d989aec3d449a97f5565551d"
 const ExistedBuildInAIToolEmbedFSHash string = "5da16783186920554729e90511391ce4963bce66fd9c0da8d42d857eedf09751"

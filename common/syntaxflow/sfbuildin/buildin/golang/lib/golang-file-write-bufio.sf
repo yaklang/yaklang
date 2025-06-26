@@ -118,7 +118,7 @@ bufio?{<fullTypeName>?{have: 'bufio'}} as $entry;
 $entry.NewWriter <getCall> as $writer;
 $writer.WriteString(* #-> as $output);
 
-alert $output	for {
+alert $output for {
 	title: "Audit Golang File Write With Bufio",
 	title_zh: "审计Golang使用bufio进行文件写入的代码",
 	solution: <<<CODE

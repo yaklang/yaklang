@@ -109,7 +109,7 @@ REFERENCE
 
 <include('java-spring-mvc-param')>?{<typeName>?{have: "MultipartFile"}} as $entry;
 $entry.getInputStream()<getCall>?{<getCallee><name>?{have: /(?i)save|copy|transfer|fileutil/}} as $result;
-alert $result	for {
+alert $result for {
 	title: "Audit Java Spring Framework Multipart File Saving",
 	title_zh: "审计Java Spring Framework文件上传保存",
 	level: "mid",

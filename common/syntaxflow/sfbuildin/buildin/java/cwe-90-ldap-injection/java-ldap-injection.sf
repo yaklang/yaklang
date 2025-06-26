@@ -72,7 +72,7 @@ $result<dataflow(
     exclude:`*?{opcode:phi}`,
 )> as $high 
 
-alert $high	for {
+alert $high for {
 	solution: <<<CODE
 ### 修复建议
 
@@ -128,7 +128,7 @@ CODE
 
 
 $result - $high  as $low;
-alert $low	for {
+alert $low for {
 	title: "Check Java LDAP Injection Vulnerability",
 	title_zh: "检测Java LDAP注入漏洞",
 	solution: <<<CODE

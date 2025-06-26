@@ -121,7 +121,7 @@ $sink.New as $new;
 $new().Funcs(* as $param);
 $param?{have: 'sprig'} as $low;
 
-alert $low	for {
+alert $low for {
 	solution: <<<CODE
 ### 修复建议
 

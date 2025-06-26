@@ -105,7 +105,7 @@ $all<dataflow(
     include=`* & $filter`
 )> as $mid
 
-alert $mid	for {
+alert $mid for {
 	title: "Detect Java MyBatis/iBatis XML Weak ('${...}') Params to Spring Params",
 	title_zh: "检测 Java MyBatis/iBatis XML Mapper 不安全(${...})参数",
 	level: "mid",
@@ -114,7 +114,7 @@ alert $mid	for {
 
 $all - $mid as $high
 
-alert $high	for {
+alert $high for {
 	title: "Detect Java MyBatis/iBatis XML Weak ('${...}') Params to Spring Params",
 	title_zh: "检测 Java MyBatis/iBatis XML Mapper 不安全(${...})参数",
 	level: "high",

@@ -129,7 +129,7 @@ $sink?{have: 'Parameter'} as $check;
 
 $check as $high;
 
-alert $high	for {
+alert $high for {
 	type: "vuln",
 	title: "Detect Golang Command Injection Vulnerability",
 	title_zh: "检测Golang命令注入漏洞",

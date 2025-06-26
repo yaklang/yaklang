@@ -108,7 +108,7 @@ $controlled_source_site<dataflow(
 )> as $high_source_site 
 
 
-alert $high_source_site	for {
+alert $high_source_site for {
 	title: "Check Java Command Injection from Servlet and SpringMVC",
 	title_zh: "检测Java Servlet和SpringMVC中的命令注入漏洞",
 	solution: <<<CODE
@@ -200,7 +200,7 @@ CODE
 
 $controlled_source_site - $high_source_site as $normal_source_side 
 
-alert $normal_source_side	for {
+alert $normal_source_side for {
 	message: "发现Java代码存在命令注入漏洞，数据流中存在过滤",
 	title: "Check Java Command Injection from Servlet and SpringMVC",
 	title_zh: "检测Java Servlet和SpringMVC中的命令注入漏洞",
@@ -294,7 +294,7 @@ $controlled_source_site<getPredecessors()>  as $controlled_sink_site
 $sink - $controlled_sink_site as $low_risk_sink 
 
 
-alert $low_risk_sink	for {
+alert $low_risk_sink for {
 	title_zh: "检测Java Servlet和SpringMVC中的命令注入漏洞",
 	desc: <<<CODE
 ### 漏洞描述

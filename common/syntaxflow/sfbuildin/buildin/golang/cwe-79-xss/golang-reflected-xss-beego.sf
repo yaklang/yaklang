@@ -109,7 +109,7 @@ $sink<dataflow(
 	include:" * ?{have: 'GetString'}",
 )> as $mid;
 
-alert $mid	for {
+alert $mid for {
 	title: "Reflected XSS detected",
 	title_zh: "检测到反射XSS",
 	level: "mid",

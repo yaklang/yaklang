@@ -129,7 +129,7 @@ CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high	for {
+alert $high for {
 	title_zh: "PostgreSQL未验证参数注入风险",
 	solution: <<<CODE
 ### 修复建议
@@ -242,7 +242,7 @@ CODE)> as $highAndMid
 $highAndMid - $high as $mid
 
 
-alert $mid	for {
+alert $mid for {
 	desc: <<<CODE
 ### 风险描述
 
@@ -335,7 +335,7 @@ CODE
 
 $sink - $high - $mid as $low
 
-alert $low	for {
+alert $low for {
 	title: "Potential PostgreSQL Access Control Bypass",
 	title_zh: "PostgreSQL访问控制潜在绕过风险",
 	desc: <<<CODE

@@ -101,7 +101,7 @@ REFERENCE
 <include('java-net-url-connect')> as $output;
 <include('java-okhttpclient-request-execute')> as $output;
 <include('java-spring-rest-template-request-params')> as $output
-alert $output	for {
+alert $output for {
 	level: "mid",
 	title: "Find HTTP Sink in Java (Multiple Libraries)",
 	title_zh: "查找Java中的HTTP Sink (多库)",

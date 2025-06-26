@@ -143,7 +143,7 @@ $path.IsAbs(* #-> as $check);
 $sink #{include: `$check`}-> as $safe;
 $sink #{exclude: `$safe`}-> as $low;
 
-alert $low	for {
+alert $low for {
 	desc: <<<CODE
 ### 漏洞描述
 

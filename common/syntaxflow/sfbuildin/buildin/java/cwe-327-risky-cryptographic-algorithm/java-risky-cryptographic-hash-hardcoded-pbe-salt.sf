@@ -69,7 +69,7 @@ $salt?{!(.*#{exclude:`* ?{opcode:const}`}->)} as $toCheck;
 // salt没有被如random.nextBytes(salt)这样的函数修正过
 $toCheck?{!<getCall>?{have:/(?i)(random|next)/}} as $risk
 
-alert $risk	for {
+alert $risk for {
 	level: "low",
 	message: "发现Java代码中使用硬编码的PBE盐值",
 	title: "Detect Java Risky Hardcoded PBE Salt",

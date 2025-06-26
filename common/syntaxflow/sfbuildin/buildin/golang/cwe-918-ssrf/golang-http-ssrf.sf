@@ -110,7 +110,7 @@ SOLUTION
 $output.URL.Query().Get() #-> as $sink;
 $sink?{opcode: param} as $mid
 
-alert $mid	for {
+alert $mid for {
 	title: "SSRF detected",
 	title_zh: "检测到SSRF",
 	level: "mid",

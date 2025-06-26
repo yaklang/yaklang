@@ -35,7 +35,7 @@ REFERENCE
 )
 
 $input<const(r="([?#]|[^?#:/\\\\][/\\\\])|^/$")> as $output;
-alert $output	for {
+alert $output for {
 	level: "mid",
 	title: "Audit Java Hostname Prefix Filter",
 	title_zh: "审计Java主机名前缀过滤器",

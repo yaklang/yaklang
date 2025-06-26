@@ -115,7 +115,7 @@ $source<dataflow(<<<CODE
 CODE)> as $haveCall;
 
 $source - $haveCall as $withoutCall;
-alert $withoutCall	for {
+alert $withoutCall for {
 	title: "Check Java SSTI in Spring Controller Without Call",
 	title_zh: "检测Spring控制器中未调用的SSTI漏洞",
 	solution: <<<CODE
@@ -226,7 +226,7 @@ $calls?{<getCallee><name><isSanitizeName>} as $__next__;
 CODE)> as $filteredSink;
 
 $haveCall - $filteredSink as $unsafeFilteredSink;
-alert $unsafeFilteredSink	for {
+alert $unsafeFilteredSink for {
 	title: "Check Java SSTI in Spring Controller With Filtered Input",
 	title_zh: "检测Spring控制器中经过过滤但仍存在风险的SSTI漏洞",
 	solution: <<<CODE
@@ -327,7 +327,7 @@ CODE
 	type: "vuln",
 }
 
-alert $filteredSink	for {
+alert $filteredSink for {
 	type: "audit",
 	title: "Audit Java SSTI in Spring Controller With Filtered Input",
 	title_zh: "审计Spring控制器中已过滤的SSTI防护措施",

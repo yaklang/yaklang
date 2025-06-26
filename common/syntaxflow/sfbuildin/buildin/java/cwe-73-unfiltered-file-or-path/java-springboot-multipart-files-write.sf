@@ -149,7 +149,7 @@ $sink #{
 }->
 
 check $inter then "Upload and Write Files directly" else "No Upload and Files.write"
-alert $inter	for {
+alert $inter for {
 	title: "Check Java MultipartFile Path Traversal Vulnerability",
 	title_zh: "检测Java MultipartFile路径穿越漏洞",
 	level: "warning",

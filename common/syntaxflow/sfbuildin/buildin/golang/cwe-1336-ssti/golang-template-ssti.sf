@@ -107,7 +107,7 @@ $target #{
 }-> as $high;
 
 
-alert $high	for {
+alert $high for {
 	desc: <<<CODE
 ### 漏洞描述
 

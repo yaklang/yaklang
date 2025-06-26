@@ -133,7 +133,7 @@ $sink #{
     exclude:`*?{opcode:phi}`,
 }->as $result;
 
-alert $result	for {
+alert $result for {
 	level: "high",
 	type: "vuln",
 	message: "Find direct URL redirect vulnerability for java",
@@ -143,7 +143,7 @@ alert $result	for {
 
 
 $result - $high  as $low;
-alert $low	for {
+alert $low for {
 	message: "Find possible URL redirect vulnerability for java",
 	title: "Check Java URL Redirect Vulnerability",
 	title_zh: "检测Java URL重定向漏洞",

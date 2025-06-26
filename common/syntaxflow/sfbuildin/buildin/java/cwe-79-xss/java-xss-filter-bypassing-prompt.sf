@@ -103,7 +103,7 @@ $entryCall(* as $paramEntry);
 $paramEntry.../(?i)replace(all)?/() as $replacers;
 
 check $entryCall then "Find XSS Escaper" else "No XSS Escaper";
-alert $entryCall	for {
+alert $entryCall for {
 	title: "Audit Java XSS Filter Bypass",
 	title_zh: "审计 Java XSS 白名单绕过",
 	level: "low",

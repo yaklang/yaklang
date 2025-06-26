@@ -102,7 +102,7 @@ CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high	for {
+alert $high for {
 	title: "Unfiltered PHP File Manipulation Vulnerability",
 	title_zh: "PHP未过滤文件操作漏洞",
 	solution: <<<CODE
@@ -184,7 +184,7 @@ CODE)> as $highAndMid
 
 $highAndMid - $high as $middle
 
-alert $middle	for {
+alert $middle for {
 	desc: <<<CODE
 ### 漏洞描述
 
@@ -260,7 +260,7 @@ CODE
 }
 $sink - $high - $middle as $low
 
-alert $low	for {
+alert $low for {
 	desc: <<<CODE
 ### 规则目的
 该规则用于识别PHP代码中可能存在过滤机制但仍需进一步观察的文件操作行为。它通过检测文件操作函数调用时是否存在任何形式的过滤逻辑，定位潜在的风险点并分类其严重程度。

@@ -87,7 +87,7 @@ CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high	for {
+alert $high for {
 	level: "high",
 	type: "vuln",
 	title: "Detect PHP Direct Input XSS Vulnerability",
@@ -161,7 +161,7 @@ CODE)> as $highAndMid
 
 $highAndMid - $high as $middle
 
-alert $middle	for {
+alert $middle for {
 	desc: <<<CODE
 ### 风险描述
 
@@ -211,7 +211,7 @@ CODE
 
 $sink - $high - $middle as $low
 
-alert $low	for {
+alert $low for {
 	desc: <<<CODE
 ### 规则目的
 该规则用于审计PHP代码中已使用过滤函数处理过的用户输入，但仍可能存在未被完全过滤的风险。

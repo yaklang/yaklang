@@ -54,7 +54,7 @@ REFERENCE
 
 __dependency__.*aspectjweaver.version as $ver;
 $ver in (,1.9.5] as $vuln_aspectjweaver;
-alert $vuln_aspectjweaver	for {
+alert $vuln_aspectjweaver for {
 	title: "SCA: Check Java Aspectjweaver Vulnerability",
 	title_zh: "SCA: 检测Java Aspectjweaver 依赖漏洞",
 	level: "mid",

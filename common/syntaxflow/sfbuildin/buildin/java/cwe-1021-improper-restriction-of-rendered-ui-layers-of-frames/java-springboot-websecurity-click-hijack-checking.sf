@@ -95,7 +95,7 @@ SOLUTION
 
 .frameOptions()...disable() as $vuln;
 check $vuln;
-alert $vuln	for {
+alert $vuln for {
 	title: "Check Java Clickjacking Vulnerability",
 	title_zh: "检测Java点击劫持漏洞",
 	solution: <<<CODE
