@@ -455,7 +455,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			log.Warnf("request \n%v\n have both `Transfer-Encoding` and `Content-Length` header, maybe pipeline or smuggle, please enable noFixContentLength", spew.Sdump(requestPacket))
 		}
 		// noFixContentLength = true
-	} else if haveCL && !haveTE && len(originBody) > clInt {
+	} else if haveCL && !haveTE && clInt >= 0 && len(originBody) > clInt {
 		SplitHTTPPacket(originBody[clInt:], func(method string, requestUri string, proto string) error {
 			if ret := len(proto); ret > 5 && ret <= 8 && strings.HasPrefix(proto, "HTTP/") && proto[5] >= '0' && proto[5] <= '9' {
 				if _, ok := commonHTTPMethod[method]; ok {
