@@ -104,7 +104,7 @@ REFERENCE
 $sink?{have: "GetString"} as $low;
 $sink?{have: "GetFile"} as $low;
 
-alert $low	for {
+alert $low for {
 	solution: <<<CODE
 ### 修复建议
 

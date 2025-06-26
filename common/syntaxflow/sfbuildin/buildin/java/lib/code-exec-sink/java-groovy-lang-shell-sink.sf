@@ -110,7 +110,7 @@ $groovy.parse?{*().run}(*<slice(index=1)> as $output);
 // run(GroovyCodeSource source, String[] args)  # 不审计
 // run(GroovyCodeSource source, List<String> args)  # 不审计
 $groovy.run(*<slice(index=1)>?{<typeName>?{any:'File','Reader','String'}} as $output);
-alert $output	for {
+alert $output for {
 	level: "high",
 	title: "Audit Java GroovyShell Code Execution Sink",
 	title_zh: "审计Java GroovyShell 代码执行Sink点",

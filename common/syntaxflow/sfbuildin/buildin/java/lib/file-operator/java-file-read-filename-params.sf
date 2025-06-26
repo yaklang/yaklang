@@ -83,7 +83,7 @@ $fileInputStream as $output;
 $nioFileRead as $output;
 $nioBufferedReader as $output;
 $nioInputStream as $output;
-alert $output	for {
+alert $output for {
 	desc: <<<CODE
 ### 1.规则目的
 该规则旨在识别 Java 代码中潜在的文件读取接收点（sinks），这些接收点可能会导致敏感文件泄露或未经授权的文件访问。

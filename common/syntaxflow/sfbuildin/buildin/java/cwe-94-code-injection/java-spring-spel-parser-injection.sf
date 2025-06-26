@@ -90,7 +90,7 @@ $sink #{
     exclude: `* ?{opcode:call}?{!* & $source}?{!* & $sink}`,
 }->  as  $mid;
 
-alert $mid	for {
+alert $mid for {
 	title: "Check Java Spring SPEL Parser Injection",
 	title_zh: "检测Java Spring SPEL Parser表达式注入漏洞",
 	solution: <<<CODE
@@ -174,7 +174,7 @@ $sink #{
 
 $result - $mid as $low;
 
-alert $low	for {
+alert $low for {
 	desc: <<<CODE
 ### 漏洞描述
 

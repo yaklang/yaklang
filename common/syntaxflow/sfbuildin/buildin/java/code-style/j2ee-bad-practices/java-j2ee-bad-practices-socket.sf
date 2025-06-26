@@ -57,7 +57,7 @@ SOLUTION
 )
 
 *Socket*?{<typeName>?{have:'javax.net'}}  as $weak;
-alert $weak	for {
+alert $weak for {
 	desc: <<<CODE
 ### 漏洞描述
 

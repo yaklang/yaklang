@@ -98,7 +98,7 @@ check $reader;
 
 $reader?{!.setFeature && !.setEntityResolver && !.setAllow* && !.setType*}.read() as $vulnCall;
 check $vulnCall;
-alert $vulnCall	for {
+alert $vulnCall for {
 	level: "warning",
 	message: "SAXReader() Unsafe Use in Context Sink",
 	title: "Check Java SAXReader Unsafe Use",

@@ -55,7 +55,7 @@ $execMethods(,* as $output);
 <delete(root)>
 <delete(methods)>
 <delete(execMethods)>
-alert $output	for {
+alert $output for {
 	title_zh: "审计Java HTTP Fluent Request",
 	level: "mid",
 	title: "Audit Java HTTP Fluent Request",

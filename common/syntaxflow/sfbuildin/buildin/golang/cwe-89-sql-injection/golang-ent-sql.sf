@@ -102,7 +102,7 @@ $entry.Open() <getMembers> as $client;
 $client.User.Query().Where(* #-> as $param);
 $param?{have: 'Parameter'} as $high;
 
-alert $high	for {
+alert $high for {
 	title: "Check Golang SQL Injection(ent)",
 	title_zh: "检测 Golang SQL 注入漏洞(ent)",
 	solution: <<<CODE

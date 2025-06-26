@@ -72,7 +72,7 @@ REFERENCE
 
 __dependency__.*vaadin*server.version as $ver;
 $ver in (,7.7.14] as $vuln_vaadin_server;
-alert $vuln_vaadin_server	for {
+alert $vuln_vaadin_server for {
 	desc: <<<CODE
 ### 漏洞描述
 

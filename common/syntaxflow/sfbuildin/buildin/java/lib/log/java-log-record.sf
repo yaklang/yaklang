@@ -17,7 +17,7 @@ SOLUTION
 )
 
 /(?i)log/./(?:errorf?|infof?|warn(ing)?|log(?:rb|p)?|debug|fatal|trace|^e$)/()  as $output;
-alert $output	for {
+alert $output for {
 	title_zh: "查找Java日志记录方法",
 	level: "info",
 	title: "Find Java Logging Method",

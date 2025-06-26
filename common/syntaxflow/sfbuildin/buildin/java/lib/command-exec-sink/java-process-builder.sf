@@ -101,7 +101,7 @@ $clazz.getDeclaredMethod?{*(*<slice(index=1)>?{=="start"})} as $method
 $method<getCall()>?{.setAccessible(*<slice(index=1)>?{==true})}.invoke as $invoke
 $invoke(,* ?{!=false && !have:"nil" }as $output)
 
-alert $output	for {
+alert $output for {
 	title_zh: "未验证的命令执行",
 	solution: <<<CODE
 ### 修复建议

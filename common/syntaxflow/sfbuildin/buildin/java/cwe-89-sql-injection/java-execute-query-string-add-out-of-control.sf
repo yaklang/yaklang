@@ -79,7 +79,7 @@ INCLUDE
 
 $directly + $indirectly as $vuln 
 
-alert $vuln	for {
+alert $vuln for {
 	level: "high",
 	title: "Unvalidated MySQL Parameter Injection",
 	title_zh: "MySQL未验证参数注入风险",

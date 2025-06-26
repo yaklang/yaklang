@@ -117,7 +117,7 @@ fromXML as $fromXML;
 $fromXML?{ <getObject>?{!.setMode && !.allowType* && !.setupDefaultSecurity && !.addPermission && !.allowTypeHierarchy && <typeName>?{have: XStream} } }() as $vuln;
 
 check $vuln;
-alert $vuln	for {
+alert $vuln for {
 	desc: <<<CODE
 ### 漏洞描述
 

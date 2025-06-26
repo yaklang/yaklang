@@ -90,7 +90,7 @@ $source<dataflow(<<<CODE
 CODE)> as $haveCall;
 
 $source - $haveCall as $withoutCall;
-alert $withoutCall	for {
+alert $withoutCall for {
 	title: "Check Java SpringBoot RestController XSS Vulnerability",
 	title_zh: "检测Java SpringBoot RestController XSS漏洞",
 	solution: <<<CODE
@@ -170,7 +170,7 @@ $calls?{<getCallee><name>?{have: /(?i)(sanitiz|encod(e|ing)|entit(y|ies)|escap(e
 CODE)> as $filteredSink;
 
 $haveCall - $filteredSink as $unsafeFilteredSink;
-alert $unsafeFilteredSink	for {
+alert $unsafeFilteredSink for {
 	solution: <<<CODE
 ### 修复建议
 
@@ -239,7 +239,7 @@ CODE
 	title_zh: "检测Java SpringBoot RestController XSS漏洞",
 }
 
-alert $filteredSink	for {
+alert $filteredSink for {
 	level: "low",
 	message: "The String or Content Filter is used. It is recommended to use the filter to prevent XSS.",
 	type: "audit",

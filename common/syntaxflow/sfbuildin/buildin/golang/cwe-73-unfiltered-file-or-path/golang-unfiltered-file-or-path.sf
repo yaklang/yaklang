@@ -136,7 +136,7 @@ $path.Join(* #-> as $check);
 $sink #{include: `$check`}-> as $safe;
 $sink #{exclude: `$safe`}-> as $low;
 
-alert $low	for {
+alert $low for {
 	title: "Check Golang Unfiltered File Path Vulnerability",
 	title_zh: "检测Golang未过滤文件路径漏洞",
 	solution: <<<CODE

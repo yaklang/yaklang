@@ -110,7 +110,7 @@ $opParam?{opcode: const} as $__next__;
 <delete(opParam)><delete(op)>
 CODE)> as $unsafeParams;
 
-alert $unsafeParams	for {
+alert $unsafeParams for {
 	type: "audit",
 	message: "SQL concatenation is used in the query creation, which may lead to SQL injection vulnerabilities.",
 	title: "Check Java Hibernate SQL Injection Vulnerability",

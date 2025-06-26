@@ -125,7 +125,7 @@ $sink #{
 	until: "* & $source",
 }-> as $high 
 
-alert $high	for {
+alert $high for {
 	title: "Reflected XSS detected",
 	title_zh: "检测到反射XSS",
 	solution: <<<CODE

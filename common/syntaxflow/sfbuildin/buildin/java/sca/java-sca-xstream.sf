@@ -84,7 +84,7 @@ REFERENCE
 
 __dependency__.*xstream.version as $ver;
 $ver in [1.4.11.1,1.4.17] as $vuln_xstream;
-alert $vuln_xstream	for {
+alert $vuln_xstream for {
 	title: "SCA: Check Java XStream Deserialization Vulnerabilities",
 	title_zh: "SCA: 检测Java XStream反序列化漏洞",
 	level: "high",

@@ -120,7 +120,7 @@ ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
 $entry.WriteAll(*<slice(index=1)> #-> as $output)
 $entry.WriteFile(*<slice(index=1)> #-> as $output)
 
-alert $output	for {
+alert $output for {
 	title_zh: "审计Golang文件写入(ioutil)",
 	solution: <<<CODE
 ### 修复建议

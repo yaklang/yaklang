@@ -56,7 +56,7 @@ getTemplate(,*?{!opcode: const} as $sink).process(,* as $params,);
 check $params;
 $params.put(,,* as $sink);
 check $sink then "Found Freemarker Process Using" else "No Freemarker Process Simple";
-alert $sink	for {
+alert $sink for {
 	title: "Check Java Freemarker SSTI Vulnerability",
 	title_zh: "检测Java Freemarker模板注入漏洞",
 	solution: <<<CODE

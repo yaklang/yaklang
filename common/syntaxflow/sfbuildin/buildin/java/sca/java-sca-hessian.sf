@@ -60,7 +60,7 @@ REFERENCE
 
 __dependency__.*hessian.version as $ver;
 $ver in (,4.0.63] as $vuln_hessian;
-alert $vuln_hessian	for {
+alert $vuln_hessian for {
 	solution: <<<CODE
 ### 修复建议
 
@@ -117,7 +117,7 @@ CODE
 // 检查 com.alibaba:hessian-lite 版本小于 3.2.13 的不安全反序列化漏洞
 __dependency__.*alibaba*hessian*lite.version as $ver_hessian_lite;
 $ver_hessian_lite in (,3.2.13) as $vuln_hessian_lite;
-alert $vuln_hessian_lite	for {
+alert $vuln_hessian_lite for {
 	level: "critical",
 	cve: "CVE-2022-38371",
 	message: "SCA: com.alibaba:hessian-lite 版本低于 3.2.13 存在不安全的反序列化漏洞",
@@ -173,7 +173,7 @@ CODE
 
 // 检查 com.alibaba:hessian-lite 版本小于 3.2.12 的远程代码执行漏洞
 $ver_hessian_lite in (,3.2.12) as $vuln_hessian_lite_rce;
-alert $vuln_hessian_lite_rce	for {
+alert $vuln_hessian_lite_rce for {
 	title_zh: "SCA: 检测Java Hessian依赖漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -230,7 +230,7 @@ CODE
 // 检查 com.alipay.sofa:hessian 版本小于 3.5.5 的不安全反序列化漏洞（严重）
 __dependency__.*alipay*hessian.version as $ver_sofa_hessian;
 $ver_sofa_hessian in (,3.5.5) as $vuln_sofa_hessian_critical;
-alert $vuln_sofa_hessian_critical	for {
+alert $vuln_sofa_hessian_critical for {
 	title_zh: "SCA: 检测Java Hessian依赖漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -285,7 +285,7 @@ CODE
 
 // 检查 com.alipay.sofa:hessian 版本小于 4.0.3 的不安全反序列化漏洞（高）
 $ver_sofa_hessian in (,4.0.3) as $vuln_sofa_hessian_high;
-alert $vuln_sofa_hessian_high	for {
+alert $vuln_sofa_hessian_high for {
 	title_zh: "SCA: 检测Java Hessian依赖漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -342,7 +342,7 @@ CODE
 __dependency__.*caucho*hessian.version as $ver_caucho_hessian;
 $ver_caucho_hessian in [2.5.0,2.6.9) as $vuln_caucho_hessian;
 $ver_caucho_hessian in [2.7.0,2.7.8) as $vuln_caucho_hessian;
-alert $vuln_caucho_hessian	for {
+alert $vuln_caucho_hessian for {
 	desc: <<<CODE
 ### 漏洞描述
 
@@ -399,7 +399,7 @@ CODE
 __dependency__.*camel*hessian.version as $ver_camel_hessian;
 $ver_camel_hessian in (,2.19.4) as $vuln_camel_hessian
 $ver_camel_hessian in [2.20.0,2.20.1) as $vuln_camel_hessian;
-alert $vuln_camel_hessian	for {
+alert $vuln_camel_hessian for {
 	title: "SCA: Check Java Hessian Vulnerability",
 	title_zh: "SCA: 检测Java Hessian依赖漏洞",
 	solution: <<<CODE
@@ -455,7 +455,7 @@ CODE
 // 检查 org.noear:solon.serialization.hessian 版本小于 2.3.3 的输入验证不当漏洞
 __dependency__."*noear*serialization*hessian".version as $ver_noear_hessian;
 $ver_noear_hessian in (,2.3.3) as $vuln_noear_hessian;
-alert $vuln_noear_hessian	for {
+alert $vuln_noear_hessian for {
 	desc: <<<CODE
 ### 漏洞描述
 

@@ -71,7 +71,7 @@ REFERENCE
 $log#{include:`* & $source`}-> as $dest;
 $dest<getPredecessors> as $sink;
 
-alert $sink	for {
+alert $sink for {
 	level: "low",
 	message: "发现可能存在Java 日志伪造攻击",
 	title: "Check Java Log Forging Attack",

@@ -76,7 +76,7 @@ File().get*() -{
 check $flag;
 $flag-> as $output;
 check $output;
-alert $output	for {
+alert $output for {
 	title: "Detect Java Path Traversal Vulnerability",
 	title_zh: "检测Java路径遍历漏洞",
 	solution: <<<CODE

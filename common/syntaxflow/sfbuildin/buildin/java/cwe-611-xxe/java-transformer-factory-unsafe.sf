@@ -108,7 +108,7 @@ $excludeNewInstance.new*().transform() as $excludeTransform;
 $toCheckTransform - $excludeTransform as $vuln;
 
 check $vuln;
-alert $vuln	for {
+alert $vuln for {
 	message: "Transformer Unsafe Use in Context Sink",
 	title: "Detect Java TransformerFactory Unsafe Use",
 	title_zh: "检测 Java TransformerFactory 不安全使用",

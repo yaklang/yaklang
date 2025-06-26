@@ -53,7 +53,7 @@ $algorithm#{
     until:`* ?{opcode:const && have:/DES|DESede|3DES|TripleDES|ARCFOUR|RC4|RC2/}`
 }-> as $sink;
 
-alert $sink	for {
+alert $sink for {
 	title: "Detect Java java.security.AlgorithmParameters use of broken or risky encryption algorithm",
 	title_zh: "检测Java java.security.AlgorithmParameters使用不安全的加密算法",
 	level: "low",

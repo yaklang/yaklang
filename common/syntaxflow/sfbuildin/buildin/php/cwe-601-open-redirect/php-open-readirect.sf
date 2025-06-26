@@ -92,7 +92,7 @@ CODE,exclude=<<<CODE
 <self>?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high	for {
+alert $high for {
 	title: "Check PHP Unvalidated Redirect Vulnerability",
 	title_zh: "检测PHP未验证重定向漏洞",
 	solution: <<<CODE
@@ -166,7 +166,7 @@ CODE,exclude=<<<CODE
 CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
-alert $mid	for {
+alert $mid for {
 	title: "Check PHP Insufficient Redirect Validation",
 	title_zh: "检测PHP重定向验证不充分",
 	desc: <<<CODE
@@ -185,7 +185,7 @@ CODE
 }
 $sink - $high - $mid as $low
 
-alert $low	for {
+alert $low for {
 	title_zh: "检测PHP重定向验证潜在绕过风险",
 	desc: <<<CODE
 ### 规则目的

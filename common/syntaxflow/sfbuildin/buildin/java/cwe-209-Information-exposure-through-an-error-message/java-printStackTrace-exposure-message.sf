@@ -74,7 +74,7 @@ REFERENCE
 
 .printStackTrace() as $sink
 check $sink then "发现PrintStackTrace打印异常堆栈信息"
-alert $sink	for {
+alert $sink for {
 	level: "low",
 	message: "通过PrintStackTrace泄露信息",
 	severity: "low",

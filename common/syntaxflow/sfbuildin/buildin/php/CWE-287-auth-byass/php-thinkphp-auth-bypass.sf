@@ -96,7 +96,7 @@ $allParams?{<self> #{include: <<<CODE
 * & $source
 CODE}->} as $sink
 
-alert $sink	for {
+alert $sink for {
 	title: "Detect PHP ThinkPHP Authentication Bypass Vulnerability",
 	title_zh: "检测PHP ThinkPHP认证绕过漏洞",
 	level: "high",

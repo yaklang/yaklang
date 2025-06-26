@@ -88,7 +88,7 @@ check $params;
 
 $params.addResourceHandler(*<slice(start=1)> as $results);
 $results ?{have: 'swagger'} as $swaggerVariable;
-alert $swaggerVariable	for {
+alert $swaggerVariable for {
 	title: "Swagger Resource Handler Location",
 	title_zh: "Swagger资源处理程序位置",
 	desc: <<<CODE
@@ -97,7 +97,7 @@ CODE
 	level: "info",
 }
 
-alert $params	for {
+alert $params for {
 	solution: <<<CODE
 ### 修复建议
 

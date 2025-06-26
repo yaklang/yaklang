@@ -101,7 +101,7 @@ $sink?{* #{
     <self> & $source
 INCLUDE
 }->} as $vul;
-alert $vul	for {
+alert $vul for {
 	level: "low",
 	message: "发现Java的java.io库可能存在ddos漏洞",
 	type: "vuln",

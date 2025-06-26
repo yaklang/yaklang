@@ -94,7 +94,7 @@ CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high	for {
+alert $high for {
 	level: "high",
 	title: "Check PHP Unsafe File Unzip Vulnerability",
 	title_zh: "检测PHP未验证文件解压漏洞",
@@ -170,7 +170,7 @@ CODE,exclude=<<<CODE
 CODE)> as $highAndMid
 $highAndMid - $high as $mid
 
-alert $mid	for {
+alert $mid for {
 	desc: <<<CODE
 该规则作用是审计PHP代码中可能存在部分验证的文件解压路径漏洞。为了确保安全性，需结合上下文进一步审查代码逻辑，确认是否存在潜在风险。
 CODE
@@ -180,7 +180,7 @@ CODE
 }
 $sink - $high - $mid as $low
 
-alert $low	for {
+alert $low for {
 	desc: <<<CODE
 该规则用于审计PHP代码中低风险的文件解压操作。通常情况下，这类操作已经包含了基本的过滤机制，但仍需检查过滤函数是否存在潜在缺陷，以确保代码安全性。
 CODE

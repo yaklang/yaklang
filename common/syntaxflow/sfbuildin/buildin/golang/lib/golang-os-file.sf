@@ -150,7 +150,7 @@ $entry.Mkdir(* #-> as $output)
 $entry.MkdirAll(* #-> as $output) 
 $entry.ReadDir(* #-> as $output) 
 
-alert $output	for {
+alert $output for {
 	title: "Unvalidated File Operation",
 	title_zh: "未验证的文件操作",
 	level: "info",

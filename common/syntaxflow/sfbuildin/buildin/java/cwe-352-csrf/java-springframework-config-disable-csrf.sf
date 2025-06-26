@@ -102,7 +102,7 @@ check $configEntry;
 
 $configEntry ... csrf().disable() as $disableCSRF;
 check $disableCSRF;
-alert $disableCSRF	for {
+alert $disableCSRF for {
 	title: "Check Java Spring Framework CSRF Protection",
 	title_zh: "检查 Java Spring Framework CSRF 保护",
 	solution: <<<CODE

@@ -88,7 +88,7 @@ REFERENCE
 
 __dependency__.*alibaba*fastjson.version as $ver;
 $ver in (,1.2.47] as $vuln_1_2_47;
-alert $vuln_1_2_47	for {
+alert $vuln_1_2_47 for {
 	severity: "critical",
 	cvss: "9.8",
 	message: "SCA: com.alibaba.fastjson <= 1.2.47 RCE Easy to exploit",
@@ -172,7 +172,7 @@ CODE
 }
 
 $ver in (,1.2.68] as $vuln_1_2_68;
-alert $vuln_1_2_68	for {
+alert $vuln_1_2_68 for {
 	title_zh: "SCA: 检测Java Fastjson依赖漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -254,7 +254,7 @@ CODE
 }
 
 $ver in (,1.2.83) as $vuln_1_2_80;
-alert $vuln_1_2_80	for {
+alert $vuln_1_2_80 for {
 	message: "SCA: com.alibaba.fastjson < 1.2.83 RCE Hard to exploit",
 	title: "SCA: Check Java Fastjson Vulnerabilities",
 	title_zh: "SCA: 检测Java Fastjson依赖漏洞",

@@ -103,7 +103,7 @@ check $builder;
 $builder?{<typeName>?{have: SAXBuilder} && !.setFeature* }./((build*)|(parse*))/() as $vulnCall;
 check $vulnCall;
 
-alert $vulnCall	for {
+alert $vulnCall for {
 	solution: <<<CODE
 ### 修复建议
 

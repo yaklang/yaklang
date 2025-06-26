@@ -90,7 +90,7 @@ REFERENCE
 
 __dependency__.*rome.version as $ver;
 $ver in (,1.15.0] as $vuln_rome;
-alert $vuln_rome	for {
+alert $vuln_rome for {
 	level: "high",
 	message: "SCA: rome versions between 1 and 1.15.0 have an XXE vulnerability",
 	cve: "CVE-2020-15250",

@@ -132,7 +132,7 @@ REFERENCE
 
 $sink.Strict?{!have: 'false'} as $high
 
-alert $high	for {
+alert $high for {
 	type: "vuln",
 	title: "Check Golang XXE Read Any File",
 	title_zh: "检测Golang XXE任意文件读取漏洞",

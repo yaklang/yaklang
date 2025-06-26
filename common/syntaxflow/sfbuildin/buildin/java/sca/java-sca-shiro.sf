@@ -61,7 +61,7 @@ REFERENCE
 __dependency__.*shiro*core.version as $ver;
 __dependency__.*shiro*spring.version as $ver;
 $ver in (,1.10.1] as $vuln_shiro_core;
-alert $vuln_shiro_core	for {
+alert $vuln_shiro_core for {
 	solution: <<<CODE
 ### 修复建议
 

@@ -72,7 +72,7 @@ REFERENCE
 __dependency__.*sqlite*jdbc.version as $ver;
 
 $ver in [3.8.9,3.36.0] as $vuln_sqlite_jdbc;
-alert $vuln_sqlite_jdbc	for {
+alert $vuln_sqlite_jdbc for {
 	cve: "CVE-2020-15358",
 	title: "SCA: Check Java sqlite-jdbc Vulnerability",
 	title_zh: "SCA: 检测 Java sqlite-jdbc 依赖漏洞",

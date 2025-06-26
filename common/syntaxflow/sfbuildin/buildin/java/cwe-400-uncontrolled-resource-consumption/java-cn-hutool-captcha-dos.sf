@@ -83,7 +83,7 @@ $sink #{
     exclude: `*?{opcode:call}?{!* & $source}?{!* & $sink}`,
 }-> as $mid;
 
-alert $mid	for {
+alert $mid for {
 	level: "mid",
 	message: "发现Java cn.hutool.captcha验证码拒绝服务漏洞。",
 }
@@ -93,7 +93,7 @@ $sink #{
 }-> as $result;
 
 $result - $mid as $low;
-alert $low	for {
+alert $low for {
 	level: "low",
 	message: "发现可能存在Java cn.hutool.captcha验证码拒绝服务漏洞。",
 }

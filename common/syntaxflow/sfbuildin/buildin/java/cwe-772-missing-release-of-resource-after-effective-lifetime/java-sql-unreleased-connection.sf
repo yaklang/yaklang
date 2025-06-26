@@ -156,7 +156,7 @@ $getConnection -{
 
 $safe<getPredecessors()> as $safeGetConnection;
 $getConnection - $safeGetConnection as $weak;
-alert $weak	for {
+alert $weak for {
 	message: "检测到java.sql.Connection未释放资源",
 }
 

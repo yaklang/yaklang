@@ -81,7 +81,7 @@ $keySize#{
     include:`* ?{opcode:const}`
 }-> as $size;
 $size in (,2048) as $risk;
-alert $risk	for {
+alert $risk for {
 	title: "Check Java Weak Encryption - Insufficient Key Size",
 	title_zh: "检测Java弱加密 - 密钥长度不足",
 	level: "low",
