@@ -180,7 +180,8 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 		block := f.GetBasicBlockByID(b)
 		_ = block
 		if utils.IsNil(block) {
-			log.Infof("bb")
+			log.Errorf("function %s has nil block: %d", f.GetName(), b)
+			continue
 		}
 		ShowBlock(f.GetBasicBlockByID(b))
 	}

@@ -29,7 +29,7 @@ func NewCall(target Value, args Values, binding map[string]Value, block *BasicBl
 		SideEffectValue: map[string]int64{},
 	}
 	if c.Method <= 0 {
-		log.Infof("bb")
+		log.Errorf("NewCall: method id is %d, target: %s", c.Method, target.String())
 	}
 	return c
 }
