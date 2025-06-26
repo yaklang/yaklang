@@ -163,7 +163,7 @@ func (c *CRLFSafe1Controller) Get() {
 	c.Ctx.ResponseWriter.Write([]byte(""))
 }
 ```
-在此代码中，攻击者可以通过提交包含`\r\n`的恶意输入，例如`header=%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)d(MISSING)%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)a(MISSING)Set-Cookie:malicious=value`，从而篡改HTTP头部并插入恶意Cookie。
+在此代码中，攻击者可以通过提交包含`\r\n`的恶意输入，例如`header=Set-Cookie:malicious=value`，从而篡改HTTP头部并插入恶意Cookie。
 
 3. **潜在影响**
 - 攻击者能够伪造HTTP响应，实施缓存投毒攻击。

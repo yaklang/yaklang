@@ -119,7 +119,7 @@ CODE
    ```go
    // 不安全的查询
    var users []User
-   query := fmt.Sprintf("SELECT * FROM users WHERE name = '%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING)'", username)
+   query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
    db.Raw(query).Scan(&users)
    ```
 

@@ -189,7 +189,7 @@ alert $high	for {
 
             // 4. 生成安全的文件名，而不是使用原始文件名
             $ext = array_search($mimeType, $allowedTypes, true);
-            $newName = sprintf('%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING).%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING)', sha1_file($file['tmp_name']), $ext);
+            $newName = sprintf('%s.%s', sha1_file($file['tmp_name']), $ext);
             $targetPath = $uploadDir . $newName;
 
             // 5. 移动上传的文件

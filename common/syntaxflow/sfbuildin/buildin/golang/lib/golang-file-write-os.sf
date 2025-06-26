@@ -118,7 +118,7 @@ if !strings.HasPrefix(filePath, "/var/www/uploads/") {
 ```go
 err = os.WriteFile(safePath, []byte(content), 0644)
 if err != nil {
-    return fmt.Errorf("error writing file: %!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)v(MISSING)", err)
+    return fmt.Errorf("error writing file: %v", err)
 }
 ```
 CODE
