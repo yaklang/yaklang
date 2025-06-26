@@ -153,8 +153,16 @@ func generateSM4KeyIV(password string) (key, iv []byte) {
 	dk := pbkdf2.Key([]byte(password), nil, 10000, 32, sha256.New)
 	return dk[:sm4.BlockSize], dk[sm4.BlockSize:]
 }
-
 func ImportTableZip[T any](ctx context.Context, db *gorm.DB, filepath string, options ...ImportOption) (err error) {
+	return ImportTableZipWithMarshalFunc[T](ctx, db, filepath, func(b []byte) (*T, error) {
+		d := new(T)
+		if err := json.Unmarshal(b, &d); err != nil {
+			return d, err
+		}
+		return d, nil
+	}, options...)
+}
+func ImportTableZipWithMarshalFunc[T any](ctx context.Context, db *gorm.DB, filepath string, unmarshalFunc func(b []byte) (*T, error), options ...ImportOption) (err error) {
 	config := NewImportConfig(filepath)
 	for _, option := range options {
 		option(config)
@@ -262,7 +270,7 @@ func ImportTableZip[T any](ctx context.Context, db *gorm.DB, filepath string, op
 			}
 		}
 		d := new(T)
-		if err = json.Unmarshal(b, d); err != nil {
+		if d, err = unmarshalFunc(b); err != nil {
 			if err = config.CallErrorHandler(err); err != nil {
 				return err
 			}
@@ -338,6 +346,12 @@ func ImportTableZip[T any](ctx context.Context, db *gorm.DB, filepath string, op
 }
 
 func ExportTableZip[T any](ctx context.Context, db *gorm.DB, filepath string, options ...ExportOption) (err error) {
+	return ExportTableZipWithMarshalFunc[T](ctx, db, filepath, func(v T) ([]byte, error) {
+		return json.Marshal(v)
+	}, options...)
+}
+
+func ExportTableZipWithMarshalFunc[T any](ctx context.Context, db *gorm.DB, filepath string, marshalFunc func(v T) ([]byte, error), options ...ExportOption) (err error) {
 	config := NewExportConfig(filepath)
 	for _, option := range options {
 		option(config)
@@ -421,7 +435,7 @@ func ExportTableZip[T any](ctx context.Context, db *gorm.DB, filepath string, op
 					id.SetUint(0)
 				}
 			}
-			b, err := json.Marshal(d)
+			b, err := marshalFunc(d)
 			if err != nil {
 				chErr <- err
 				return

@@ -2,6 +2,7 @@ package plugins_rag
 
 import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/consts"
 )
 
@@ -75,10 +76,16 @@ func DeletePlugin(scriptName string) error {
 	return manager.RemovePlugin(scriptName)
 }
 
+func IsReady() bool {
+	db := consts.GetGormProfileDatabase()
+	return rag.IsReadyCollection(db, PLUGIN_RAG_COLLECTION_NAME)
+}
+
 // 导出函数列表
 var Exports = map[string]interface{}{
-	"CreateManager":   CreateDefaultSQLiteManager,
+	// "CreateManager":   CreateDefaultSQLiteManager,
 	"IndexAllPlugins": IndexAllPlugins,
 	"IndexPlugin":     IndexPlugin,
 	"SearchPlugins":   SearchPlugins,
+	"IsReady":         IsReady,
 }
