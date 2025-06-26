@@ -3,7 +3,6 @@ package lowhttp
 import (
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/netx"
 	"io"
 	"mime/multipart"
 	"net"
@@ -11,6 +10,8 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/netx"
 
 	"github.com/yaklang/yaklang/common/schema"
 
@@ -379,7 +380,7 @@ func WithETCHosts(hosts map[string]string) LowhttpOpt {
 	}
 }
 
-func WithBodyStreamReaderHandler(t func([]byte, io.ReadCloser)) LowhttpOpt {
+func WithBodyStreamReaderHandler(t func(headerBytes []byte, bodyReader io.ReadCloser)) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.BodyStreamReaderHandler = t
 	}
