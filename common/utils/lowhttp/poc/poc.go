@@ -596,7 +596,11 @@ func WithPostParams(i any) PocConfigOption {
 		if utils.IsMap(i) {
 			WithReplaceHttpPacketHeader("Content-Type", "application/x-www-form-urlencoded")(c)
 			for k, v := range utils.InterfaceToMap(i) {
-				WithReplaceHttpPacketPostParam(k, utils.InterfaceToString(v))(c)
+				if len(v) > 0 {
+					WithReplaceHttpPacketPostParam(k, strings.Join(v, ","))(c)
+				} else {
+					WithReplaceHttpPacketPostParam(k, "")(c)
+				}
 			}
 		} else {
 			WithPostData(utils.InterfaceToString(i))(c)
