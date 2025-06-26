@@ -1228,3 +1228,54 @@ func TestGRPCMUSTPASS_QueryMITMReplacerRules(t *testing.T) {
 	_, err = client.SetCurrentRules(ctx, &ypb.MITMContentReplacers{Rules: []*ypb.MITMContentReplacer{}})
 	require.NoError(t, err)
 }
+
+func TestMITMReplaceRule_matchByPacketInfo(t *testing.T) {
+	// Test data from user - this is a response
+	bodyRaw := `HTTP/1.1 200 OK
+Date: Thu, 26 Jun 2025 07:30:37 GMT
+Content-Type: text/plain; charset=utf-8
+Content-Length: 15
+
+"/path/to/file"`
+
+	// Create MITM Rule - Try with a simpler regex that should work correctly
+	rule := &MITMReplaceRule{
+		MITMContentReplacer: &ypb.MITMContentReplacer{
+			Rule:              `(?:"|')(((?:[a-zA-Z]{1,10}://|//)[^"'/]{1,}\.[a-zA-Z]{2,}[^"']{0,})|((?:/|\.\./|\./)[^"'><,;|*()(%%$^/\\\[\]][^"'><,;|()]{1,})|([a-zA-Z0-9_\-/]{1,}/[a-zA-Z0-9_\-/]{1,}\.(?:[a-zA-Z]{1,4}|action)(?:[\?|#][^"|']{0,}|))|([a-zA-Z0-9_\-/]{1,}/[a-zA-Z0-9_\-/]{3,}(?:[\?|#][^"|']{0,}|))|([a-zA-Z0-9_\-]{1,}\.(?:\w)(?:[\?|#][^"|']{0,}|)))(?:"|')`, // Simple pattern to match quoted strings and capture the content
+			EnableForResponse: true,                                                                                                                                                                                                                                                                                                                                               // Enable for response
+			EnableForBody:     true,                                                                                                                                                                                                                                                                                                                                               // Enable for body matching
+			EnableForRequest:  false,                                                                                                                                                                                                                                                                                                                                              // Disable for request
+			EnableForHeader:   false,                                                                                                                                                                                                                                                                                                                                              // Disable for header
+			EnableForURI:      false,                                                                                                                                                                                                                                                                                                                                              // Disable for URI
+			RegexpGroups:      []int64{1},                                                                                                                                                                                                                                                                                                                                         // Explicitly specify to extract group 1
+		},
+	}
+
+	// Add debug info
+	t.Logf("Rule: %s", rule.Rule)
+	t.Logf("EnableForResponse: %v", rule.EnableForResponse)
+	t.Logf("EnableForBody: %v", rule.EnableForBody)
+	t.Logf("RegexpGroups: %v", rule.GetRegexpGroups())
+
+	// Test using MatchPacket method which handles the isReq parameter correctly
+	packetInfo, results, err := rule.MatchPacket([]byte(bodyRaw), false) // false = this is a response
+	require.NoError(t, err, "MatchPacket should not return error")
+
+	// Add more debug info
+	t.Logf("PacketInfo.IsRequest: %v", packetInfo.IsRequest)
+	t.Logf("PacketInfo.BodyRaw: %q", string(packetInfo.BodyRaw))
+	t.Logf("Number of results: %d", len(results))
+	for i, result := range results {
+		t.Logf("Result %d: %q", i, result.MatchResult)
+	}
+
+	require.NotEmpty(t, results, "Should find at least one match")
+
+	// Verify the match result
+	assert.Len(t, results, 1, "Should find exactly one match")
+	assert.Equal(t, "/path/to/file", results[0].MatchResult, "Should match the file path")
+	assert.False(t, results[0].IsMatchRequest, "Should be marked as response match")
+	assert.False(t, packetInfo.IsRequest, "PacketInfo should be marked as response")
+
+	t.Logf("Match result: %s", results[0].MatchResult)
+}
