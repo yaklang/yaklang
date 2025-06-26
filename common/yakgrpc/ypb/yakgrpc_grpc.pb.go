@@ -1133,9 +1133,9 @@ type YakClient interface {
 	// Local Model Management
 	IsLlamaServerReady(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*IsLlamaServerReadyResponse, error)
 	IsLocalModelReady(ctx context.Context, in *IsLocalModelReadyRequest, opts ...grpc.CallOption) (*IsLocalModelReadyResponse, error)
-	InstallLlamaServer(ctx context.Context, in *InstallLlamaServerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
-	StartLocalModel(ctx context.Context, in *StartLocalModelRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
-	DownloadLocalModel(ctx context.Context, in *DownloadLocalModelRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
+	InstallLlamaServer(ctx context.Context, in *InstallLlamaServerRequest, opts ...grpc.CallOption) (Yak_InstallLlamaServerClient, error)
+	StartLocalModel(ctx context.Context, in *StartLocalModelRequest, opts ...grpc.CallOption) (Yak_StartLocalModelClient, error)
+	DownloadLocalModel(ctx context.Context, in *DownloadLocalModelRequest, opts ...grpc.CallOption) (Yak_DownloadLocalModelClient, error)
 	GetSupportedLocalModels(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetSupportedLocalModelsResponse, error)
 	IsSearchVectorDatabaseReady(ctx context.Context, in *IsSearchVectorDatabaseReadyRequest, opts ...grpc.CallOption) (*IsSearchVectorDatabaseReadyResponse, error)
 	InitSearchVectorDatabase(ctx context.Context, in *InitSearchVectorDatabaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
@@ -6651,9 +6651,8 @@ func (c *yakClient) AIToolGenerateMetadata(ctx context.Context, in *AIToolGenera
 }
 
 func (c *yakClient) IsLlamaServerReady(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*IsLlamaServerReadyResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(IsLlamaServerReadyResponse)
-	err := c.cc.Invoke(ctx, Yak_IsLlamaServerReady_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, Yak_IsLlamaServerReady_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6661,22 +6660,20 @@ func (c *yakClient) IsLlamaServerReady(ctx context.Context, in *Empty, opts ...g
 }
 
 func (c *yakClient) IsLocalModelReady(ctx context.Context, in *IsLocalModelReadyRequest, opts ...grpc.CallOption) (*IsLocalModelReadyResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(IsLocalModelReadyResponse)
-	err := c.cc.Invoke(ctx, Yak_IsLocalModelReady_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, Yak_IsLocalModelReady_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *yakClient) InstallLlamaServer(ctx context.Context, in *InstallLlamaServerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[86], Yak_InstallLlamaServer_FullMethodName, cOpts...)
+func (c *yakClient) InstallLlamaServer(ctx context.Context, in *InstallLlamaServerRequest, opts ...grpc.CallOption) (Yak_InstallLlamaServerClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[87], Yak_InstallLlamaServer_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[InstallLlamaServerRequest, ExecResult]{ClientStream: stream}
+	x := &yakInstallLlamaServerClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -6686,16 +6683,29 @@ func (c *yakClient) InstallLlamaServer(ctx context.Context, in *InstallLlamaServ
 	return x, nil
 }
 
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type Yak_InstallLlamaServerClient = grpc.ServerStreamingClient[ExecResult]
+type Yak_InstallLlamaServerClient interface {
+	Recv() (*ExecResult, error)
+	grpc.ClientStream
+}
 
-func (c *yakClient) StartLocalModel(ctx context.Context, in *StartLocalModelRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[87], Yak_StartLocalModel_FullMethodName, cOpts...)
+type yakInstallLlamaServerClient struct {
+	grpc.ClientStream
+}
+
+func (x *yakInstallLlamaServerClient) Recv() (*ExecResult, error) {
+	m := new(ExecResult)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *yakClient) StartLocalModel(ctx context.Context, in *StartLocalModelRequest, opts ...grpc.CallOption) (Yak_StartLocalModelClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[88], Yak_StartLocalModel_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[StartLocalModelRequest, ExecResult]{ClientStream: stream}
+	x := &yakStartLocalModelClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -6705,16 +6715,29 @@ func (c *yakClient) StartLocalModel(ctx context.Context, in *StartLocalModelRequ
 	return x, nil
 }
 
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type Yak_StartLocalModelClient = grpc.ServerStreamingClient[ExecResult]
+type Yak_StartLocalModelClient interface {
+	Recv() (*ExecResult, error)
+	grpc.ClientStream
+}
 
-func (c *yakClient) DownloadLocalModel(ctx context.Context, in *DownloadLocalModelRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[88], Yak_DownloadLocalModel_FullMethodName, cOpts...)
+type yakStartLocalModelClient struct {
+	grpc.ClientStream
+}
+
+func (x *yakStartLocalModelClient) Recv() (*ExecResult, error) {
+	m := new(ExecResult)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *yakClient) DownloadLocalModel(ctx context.Context, in *DownloadLocalModelRequest, opts ...grpc.CallOption) (Yak_DownloadLocalModelClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[89], Yak_DownloadLocalModel_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[DownloadLocalModelRequest, ExecResult]{ClientStream: stream}
+	x := &yakDownloadLocalModelClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -6724,13 +6747,26 @@ func (c *yakClient) DownloadLocalModel(ctx context.Context, in *DownloadLocalMod
 	return x, nil
 }
 
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type Yak_DownloadLocalModelClient = grpc.ServerStreamingClient[ExecResult]
+type Yak_DownloadLocalModelClient interface {
+	Recv() (*ExecResult, error)
+	grpc.ClientStream
+}
+
+type yakDownloadLocalModelClient struct {
+	grpc.ClientStream
+}
+
+func (x *yakDownloadLocalModelClient) Recv() (*ExecResult, error) {
+	m := new(ExecResult)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
 
 func (c *yakClient) GetSupportedLocalModels(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetSupportedLocalModelsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetSupportedLocalModelsResponse)
-	err := c.cc.Invoke(ctx, Yak_GetSupportedLocalModels_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, Yak_GetSupportedLocalModels_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7408,9 +7444,9 @@ type YakServer interface {
 	// Local Model Management
 	IsLlamaServerReady(context.Context, *Empty) (*IsLlamaServerReadyResponse, error)
 	IsLocalModelReady(context.Context, *IsLocalModelReadyRequest) (*IsLocalModelReadyResponse, error)
-	InstallLlamaServer(*InstallLlamaServerRequest, grpc.ServerStreamingServer[ExecResult]) error
-	StartLocalModel(*StartLocalModelRequest, grpc.ServerStreamingServer[ExecResult]) error
-	DownloadLocalModel(*DownloadLocalModelRequest, grpc.ServerStreamingServer[ExecResult]) error
+	InstallLlamaServer(*InstallLlamaServerRequest, Yak_InstallLlamaServerServer) error
+	StartLocalModel(*StartLocalModelRequest, Yak_StartLocalModelServer) error
+	DownloadLocalModel(*DownloadLocalModelRequest, Yak_DownloadLocalModelServer) error
 	GetSupportedLocalModels(context.Context, *Empty) (*GetSupportedLocalModelsResponse, error)
 	IsSearchVectorDatabaseReady(context.Context, *IsSearchVectorDatabaseReadyRequest) (*IsSearchVectorDatabaseReadyResponse, error)
 	InitSearchVectorDatabase(*InitSearchVectorDatabaseRequest, grpc.ServerStreamingServer[ExecResult]) error
@@ -8872,13 +8908,13 @@ func (UnimplementedYakServer) IsLlamaServerReady(context.Context, *Empty) (*IsLl
 func (UnimplementedYakServer) IsLocalModelReady(context.Context, *IsLocalModelReadyRequest) (*IsLocalModelReadyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method IsLocalModelReady not implemented")
 }
-func (UnimplementedYakServer) InstallLlamaServer(*InstallLlamaServerRequest, grpc.ServerStreamingServer[ExecResult]) error {
+func (UnimplementedYakServer) InstallLlamaServer(*InstallLlamaServerRequest, Yak_InstallLlamaServerServer) error {
 	return status.Errorf(codes.Unimplemented, "method InstallLlamaServer not implemented")
 }
-func (UnimplementedYakServer) StartLocalModel(*StartLocalModelRequest, grpc.ServerStreamingServer[ExecResult]) error {
+func (UnimplementedYakServer) StartLocalModel(*StartLocalModelRequest, Yak_StartLocalModelServer) error {
 	return status.Errorf(codes.Unimplemented, "method StartLocalModel not implemented")
 }
-func (UnimplementedYakServer) DownloadLocalModel(*DownloadLocalModelRequest, grpc.ServerStreamingServer[ExecResult]) error {
+func (UnimplementedYakServer) DownloadLocalModel(*DownloadLocalModelRequest, Yak_DownloadLocalModelServer) error {
 	return status.Errorf(codes.Unimplemented, "method DownloadLocalModel not implemented")
 }
 func (UnimplementedYakServer) GetSupportedLocalModels(context.Context, *Empty) (*GetSupportedLocalModelsResponse, error) {
@@ -16940,33 +16976,63 @@ func _Yak_InstallLlamaServer_Handler(srv interface{}, stream grpc.ServerStream) 
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(YakServer).InstallLlamaServer(m, &grpc.GenericServerStream[InstallLlamaServerRequest, ExecResult]{ServerStream: stream})
+	return srv.(YakServer).InstallLlamaServer(m, &yakInstallLlamaServerServer{stream})
 }
 
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type Yak_InstallLlamaServerServer = grpc.ServerStreamingServer[ExecResult]
+type Yak_InstallLlamaServerServer interface {
+	Send(*ExecResult) error
+	grpc.ServerStream
+}
+
+type yakInstallLlamaServerServer struct {
+	grpc.ServerStream
+}
+
+func (x *yakInstallLlamaServerServer) Send(m *ExecResult) error {
+	return x.ServerStream.SendMsg(m)
+}
 
 func _Yak_StartLocalModel_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(StartLocalModelRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(YakServer).StartLocalModel(m, &grpc.GenericServerStream[StartLocalModelRequest, ExecResult]{ServerStream: stream})
+	return srv.(YakServer).StartLocalModel(m, &yakStartLocalModelServer{stream})
 }
 
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type Yak_StartLocalModelServer = grpc.ServerStreamingServer[ExecResult]
+type Yak_StartLocalModelServer interface {
+	Send(*ExecResult) error
+	grpc.ServerStream
+}
+
+type yakStartLocalModelServer struct {
+	grpc.ServerStream
+}
+
+func (x *yakStartLocalModelServer) Send(m *ExecResult) error {
+	return x.ServerStream.SendMsg(m)
+}
 
 func _Yak_DownloadLocalModel_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(DownloadLocalModelRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(YakServer).DownloadLocalModel(m, &grpc.GenericServerStream[DownloadLocalModelRequest, ExecResult]{ServerStream: stream})
+	return srv.(YakServer).DownloadLocalModel(m, &yakDownloadLocalModelServer{stream})
 }
 
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type Yak_DownloadLocalModelServer = grpc.ServerStreamingServer[ExecResult]
+type Yak_DownloadLocalModelServer interface {
+	Send(*ExecResult) error
+	grpc.ServerStream
+}
+
+type yakDownloadLocalModelServer struct {
+	grpc.ServerStream
+}
+
+func (x *yakDownloadLocalModelServer) Send(m *ExecResult) error {
+	return x.ServerStream.SendMsg(m)
+}
 
 func _Yak_GetSupportedLocalModels_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
