@@ -91,13 +91,14 @@ func (i *BasicBlock) _GetRange() memedit.RangeIf {
 	// }
 	return nil
 }
-func (i *BasicBlock) GetRange() memedit.RangeIf {
-	result := i._GetRange()
-	if result != nil && i.anValue.R == nil {
-		i.SetRange(result)
-	}
-	return result
-}
+
+// func (i *BasicBlock) GetRange() memedit.RangeIf {
+// 	result := i._GetRange()
+// 	if result != nil && i.anValue.R == nil {
+// 		i.SetRange(result)
+// 	}
+// 	return result
+// }
 
 func (i *Function) _GetRange() memedit.RangeIf {
 	if i == nil || i.anValue.id <= 0 {
@@ -121,13 +122,13 @@ func (i *Function) _GetRange() memedit.RangeIf {
 	return nil
 }
 
-func (i *Function) GetRange() memedit.RangeIf {
-	result := i._GetRange()
-	if result != nil && i.anValue.R == nil {
-		i.SetRange(result)
-	}
-	return result
-}
+// func (i *Function) GetRange() memedit.RangeIf {
+// result := i._GetRange()
+// if result != nil && i.anValue.R == nil {
+// 	i.SetRange(result)
+// }
+// return result
+// }
 
 func (i *ParameterMember) GetOpcode() Opcode { return SSAOpcodeParameterMember }
 func (i *Parameter) GetOpcode() Opcode {
