@@ -1,9 +1,6 @@
 package ssa
 
 import (
-	"sync/atomic"
-	"time"
-
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -11,11 +8,6 @@ import (
 
 // Instruction2IrCode : marshal instruction to ir code, used in cache, to save to database
 func Instruction2IrCode(inst Instruction, ir *ssadb.IrCode) error {
-	start := time.Now()
-	defer func() {
-		atomic.AddUint64(&InstructionMarshal, uint64(time.Since(start)))
-		atomic.AddUint64(&InstructionMarshalCount, 1)
-	}()
 	if ir.ID != uint(inst.GetId()) {
 		return utils.Errorf("marshal instruction id not match")
 	}
@@ -29,7 +21,6 @@ func Instruction2IrCode(inst Instruction, ir *ssadb.IrCode) error {
 	function2IrCode(inst, ir)
 	basicBlock2IrCode(inst, ir)
 	ir.SetExtraInfo(marshalExtraInformation(inst))
-	go SaveValueOffset(inst)
 	return nil
 }
 
@@ -58,11 +49,6 @@ func fitRange(c *ssadb.IrCode, rangeIns memedit.RangeIf) {
 }
 
 func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
-	start := time.Now()
-	defer func() {
-		atomic.AddUint64(&Instruction2IRcode, uint64(time.Since(start)))
-		atomic.AddUint64(&Instruction2IRcodeCount, 1)
-	}()
 
 	// --- Section 1 Start ---
 	// start1 := time.Now()
@@ -117,13 +103,9 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		log.Errorf("Range not found for %s", inst.GetName())
 	}
 
-	inst.SetRange(codeRange)
+	// inst.SetRange(codeRange)
 	fitRange(ir, codeRange)
-	// atomic.AddUint64(&Marshal2, uint64(time.Since(start2)))
-	// --- Section 2 End ---
 
-	// --- Section 3 Start ---
-	// start3 := time.Now()
 	if fun := inst.GetFunc(); fun != nil {
 		ir.CurrentFunction = fun.GetId()
 	}
@@ -132,12 +114,9 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	}
 
 	ir.IsExternal = inst.IsExtern()
-	// atomic.AddUint64(&Marshal3, uint64(time.Since(start3)))
-	// --- Section 3 End ---
 }
 
 func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
-	// id
 	inst.SetId(ir.GetIdInt64())
 
 	// name
@@ -166,27 +145,23 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 }
 
 func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
-	start := time.Now()
-	defer func() {
-		atomic.AddUint64(&Value2IrCode, uint64(time.Since(start)))
-		atomic.AddUint64(&Value2IrCodeCount, 1)
-	}()
 	defer func() {
 		if msg := recover(); msg != nil {
 			log.Errorf("value2IrCode panic: %s", msg)
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-	value, ok := ToValue(inst)
-	if !ok {
+	var value Value
+	value, _ = ToValue(inst)
+	var anValue *anValue
+	if utils.IsNil(value) {
 		log.Errorf("not value: %s", inst.GetName())
 		return
 	}
-
 	// ir.String = value.String()
 	ir.HasDefs = value.HasValues()
 
-	anValue := value.getAnValue()
+	anValue = value.getAnValue()
 
 	// user
 	ir.Users = anValue.userList
@@ -218,7 +193,6 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		if v.GetValue() == nil {
 			log.Errorf("aa")
 		}
-		go SaveVariableOffset(v, i, anValue.id)
 		return true
 	})
 
@@ -237,7 +211,7 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		}
 	}
 
-	ir.TypeID = SaveTypeToDB(anValue.GetType(), ir.ProgramName)
+	// ir.TypeID = SaveTypeToDB(anValue.GetType(), ir.ProgramName)
 }
 
 func (c *Cache) valueFromIrCode(inst Instruction, ir *ssadb.IrCode) {
@@ -285,8 +259,6 @@ func (c *Cache) valueFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 }
 
 func function2IrCode(inst Instruction, ir *ssadb.IrCode) {
-	start := time.Now()
-	defer func() { atomic.AddUint64(&Function2IrCode, uint64(time.Since(start))) }()
 	f, ok := ToFunction(inst)
 	if !ok {
 		return
@@ -345,8 +317,6 @@ func function2IrCode(inst Instruction, ir *ssadb.IrCode) {
 }
 
 func basicBlock2IrCode(inst Instruction, ir *ssadb.IrCode) {
-	start := time.Now()
-	defer func() { atomic.AddUint64(&BasicBlock2IrCode, uint64(time.Since(start))) }()
 	block, ok := ToBasicBlock(inst)
 	if !ok {
 		return
