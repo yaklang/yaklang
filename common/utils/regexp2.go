@@ -14,7 +14,7 @@ func Regexp2Compile(rawRule string, opts ...int) (string, regexp2.RegexOptions, 
 		regexp2Opt = regexp2.RegexOptions(regexp2.ECMAScript | regexp2.Multiline)
 	}
 
-	var rule string
+	rule := rawRule
 	if strings.HasPrefix(rawRule, "(?") {
 		rightParenIndex := strings.IndexRune(rawRule, ')')
 		modes := rawRule[2:rightParenIndex]
