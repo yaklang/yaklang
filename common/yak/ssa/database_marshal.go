@@ -2,8 +2,6 @@ package ssa
 
 import (
 	"reflect"
-	"sync/atomic"
-	"time"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
@@ -100,8 +98,6 @@ func fetchIds(origin any) any {
 }
 
 func marshalExtraInformation(raw Instruction) map[string]any {
-	setExtraInfoStart := time.Now()
-	defer func() { atomic.AddUint64(&SetExtraInfo, uint64(time.Since(setExtraInfoStart))) }()
 
 	params := make(map[string]any)
 	switch ret := raw.(type) {
