@@ -59,6 +59,9 @@ const (
 
 // implement value
 func (f *Function) String() string {
+	if f == nil || utils.IsNil(f) {
+		return ""
+	}
 	return f.DisAsm(DisAsmDefault)
 }
 func (f *Function) DisAsm(flag FunctionAsmFlag) string {
@@ -187,6 +190,9 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 
 // ----------- basic block
 func (b *BasicBlock) String() string {
+	if b == nil || utils.IsNil(b) {
+		return ""
+	}
 	ret := b.GetName() + ":"
 	if len(b.Preds) != 0 {
 		ret += " <- "
@@ -219,6 +225,9 @@ func (c *ConstInst) String() string {
 
 // ----------- undefined
 func (u *Undefined) String() string {
+	if u == nil || utils.IsNil(u) {
+		return ""
+	}
 	valid := ""
 	if u.Kind == UndefinedMemberValid {
 		valid = "(valid)"
@@ -231,19 +240,29 @@ func (u *Undefined) String() string {
 
 // ----------- Phi
 func (p *Phi) String() string {
+	if p == nil || utils.IsNil(p) {
+		return ""
+	}
 	ret := fmt.Sprintf("%s = phi ", getStr(p))
 	for _, v := range p.GetValues() {
 		if utils.IsNil(v) {
 			continue
 		}
 		b := v.GetBlock()
-		ret += fmt.Sprintf("[%s, %s] ", getStr(v), b.GetVerboseName())
+		var verboseName string
+		if b != nil {
+			verboseName = b.GetVerboseName()
+		}
+		ret += fmt.Sprintf("[%s, %s] ", getStr(v), verboseName)
 	}
 	return ret
 }
 
 // ----------- Parameter
 func (p *ParameterMember) String() string {
+	if p == nil || utils.IsNil(p) {
+		return ""
+	}
 	switch p.MemberCallKind {
 	case NoMemberCall:
 		return "normal-member-call"
@@ -257,31 +276,49 @@ func (p *ParameterMember) String() string {
 	return ""
 }
 func (p *Parameter) String() string {
+	if p == nil || utils.IsNil(p) {
+		return ""
+	}
 	return p.GetName()
 }
 
 func (e *ExternLib) String() string {
+	if e == nil || utils.IsNil(e) {
+		return ""
+	}
 	return e.GetName()
 }
 
 // ----------- Jump
 func (j *Jump) String() string {
+	if j == nil || utils.IsNil(j) {
+		return ""
+	}
 	return fmt.Sprintf("jump -> %v", j.GetValueById(j.To).GetName())
 }
 
 // ----------- IF
 func (i *If) String() string {
+	if i == nil || utils.IsNil(i) {
+		return ""
+	}
 	// return i.StringByFunc(DefaultValueString)
 	return fmt.Sprintf("If [%s] true -> %s, false -> %s", getStr(i.GetValueById(i.Cond)), i.GetValueById(i.True).GetName(), i.GetValueById(i.False).GetName())
 }
 
 // ----------- Loop
 func (l *Loop) String() string {
+	if l == nil || utils.IsNil(l) {
+		return ""
+	}
 	return fmt.Sprintf("Loop [%s; %s; %s] body -> %s, exit -> %s", getStr(l.GetValueById(l.Init)), getStr(l.GetValueById(l.Cond)), getStr(l.GetValueById(l.Step)), l.GetValueById(l.Body).GetName(), l.GetValueById(l.Exit).GetName())
 }
 
 // ----------- Return
 func (r *Return) String() string {
+	if r == nil || utils.IsNil(r) {
+		return ""
+	}
 	return fmt.Sprintf(
 		"ret %s",
 		strings.Join(
@@ -293,6 +330,9 @@ func (r *Return) String() string {
 
 // ----------- Call
 func (c *Call) String() string {
+	if c == nil || utils.IsNil(c) {
+		return ""
+	}
 	methodStr := getStr(c.GetValueById(c.Method))
 	argStr := strings.Join(
 		lo.Map(c.Args, func(id int64, index int) string {
@@ -332,11 +372,17 @@ func (c *Call) String() string {
 	}
 }
 func (s *SideEffect) String() string {
+	if s == nil || utils.IsNil(s) {
+		return ""
+	}
 	return fmt.Sprintf("%s = side-effect %s [%s] by %s", getStr(s), getStr(s.GetValueById(s.Value)), s.GetVerboseName(), getStr(s.GetValueById(s.CallSite)))
 }
 
 // ----------- Switch
 func (sw *Switch) String() string {
+	if sw == nil || utils.IsNil(sw) {
+		return ""
+	}
 	return fmt.Sprintf(
 		"switch %s default:[%s] {%s}",
 		getStr(sw.GetValueById(sw.Cond)),
@@ -352,16 +398,25 @@ func (sw *Switch) String() string {
 
 // ----------- BinOp
 func (b *BinOp) String() string {
+	if b == nil || utils.IsNil(b) {
+		return ""
+	}
 	return fmt.Sprintf("%s = %s %s %s", getStr(b), getStr(b.GetValueById(b.X)), b.Op, getStr(b.GetValueById(b.Y)))
 }
 
 // ----------- UnOp
 func (u *UnOp) String() string {
+	if u == nil || utils.IsNil(u) {
+		return ""
+	}
 	return fmt.Sprintf("%s = %s %s", getStr(u), u.Op, getStr(u.GetValueById(u.X)))
 }
 
 // ----------- Interface
 func (i *Make) String() string {
+	if i == nil || utils.IsNil(i) {
+		return ""
+	}
 	if i.parentI > 0 {
 		return fmt.Sprintf(
 			"%s = %s [%s:%s:%s]",
@@ -380,6 +435,9 @@ func (i *Make) String() string {
 }
 
 func (t *TypeCast) String() string {
+	if t == nil || utils.IsNil(t) {
+		return ""
+	}
 	return fmt.Sprintf(
 		"%s = type-case[%s] %s",
 		getStr(t), t.GetType(), getStr(t.GetValueById(t.Value)),
@@ -387,6 +445,9 @@ func (t *TypeCast) String() string {
 }
 
 func (t *TypeValue) String() string {
+	if t == nil || utils.IsNil(t) {
+		return ""
+	}
 	return fmt.Sprintf(
 		"%s = type-value[%s]",
 		getStr(t), t.GetType(),
@@ -394,6 +455,9 @@ func (t *TypeValue) String() string {
 }
 
 func (a *Assert) String() string {
+	if a == nil || utils.IsNil(a) {
+		return ""
+	}
 	msg := a.Msg
 	if a.MsgValue > 0 {
 		msg = getStr(a.GetValueById(a.MsgValue))
@@ -406,6 +470,9 @@ func (a *Assert) String() string {
 }
 
 func (n *Next) String() string {
+	if n == nil || utils.IsNil(n) {
+		return ""
+	}
 	return fmt.Sprintf(
 		"%s = next[%s]",
 		getStr(n), getStr(n.GetValueById(n.Iter)),
@@ -413,6 +480,9 @@ func (n *Next) String() string {
 }
 
 func (e *ErrorHandler) String() string {
+	if e == nil || utils.IsNil(e) {
+		return ""
+	}
 	finalName := "nil"
 	if e.Final > 0 {
 		finalName = e.GetValueById(e.Final).GetName()
@@ -427,6 +497,9 @@ func (e *ErrorHandler) String() string {
 }
 
 func (e *ErrorCatch) String() string {
+	if e == nil || utils.IsNil(e) {
+		return ""
+	}
 	return fmt.Sprintf(
 		"catch %s; body %s; exception %s",
 		e.GetName(), getStr(e.GetValueById(e.CatchBody)), getStr(e.GetValueById(e.Exception)),
@@ -434,6 +507,9 @@ func (e *ErrorCatch) String() string {
 }
 
 func (p *Panic) String() string {
+	if p == nil || utils.IsNil(p) {
+		return ""
+	}
 	return fmt.Sprintf(
 		"panic %s",
 		getStr(p.GetValueById(p.Info)),
@@ -441,5 +517,8 @@ func (p *Panic) String() string {
 }
 
 func (r *Recover) String() string {
+	if r == nil || utils.IsNil(r) {
+		return ""
+	}
 	return getStr(r) + " = recover"
 }
