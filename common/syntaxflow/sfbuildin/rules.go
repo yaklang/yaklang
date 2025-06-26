@@ -19,6 +19,10 @@ import (
 //go:embed buildin/***
 var ruleFS embed.FS
 
+func GetRuleFS() *embed.FS {
+	return &ruleFS
+}
+
 func SyncEmbedRule(notifies ...func(process float64, ruleName string)) (err error) {
 	defer DoneEmbedRule()
 	log.Infof("start sync embed rule")

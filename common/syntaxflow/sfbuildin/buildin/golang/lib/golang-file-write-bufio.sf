@@ -139,7 +139,7 @@ func secureWrite(baseDir, filename string, content []byte) error {
     // 1. 校验filename是否安全，防止路径遍历
     cleanPath := filepath.Clean(filename)
     if filepath.IsAbs(cleanPath) || filepath.Contains(cleanPath, "..") {
-        return fmt.Errorf("invalid filename: %!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING)", filename)
+        return fmt.Errorf("invalid filename: %s", filename)
     }
 
     // 2. 组合安全的文件路径
@@ -148,7 +148,7 @@ func secureWrite(baseDir, filename string, content []byte) error {
     // 3. 创建或打开文件，设置合适的权限 (例如: 0644)
     file, err := os.OpenFile(fullPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
     if err != nil {
-        return fmt.Errorf("failed to open file %!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING): %!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)w(MISSING)", fullPath, err)
+        return fmt.Errorf("failed to open file %s: %w", fullPath, err)
     }
     defer file.Close()
 
@@ -156,12 +156,12 @@ func secureWrite(baseDir, filename string, content []byte) error {
     writer := bufio.NewWriter(file)
     _, err = writer.Write(content)
     if err != nil {
-        return fmt.Errorf("failed to write to file: %!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)w(MISSING)", err)
+        return fmt.Errorf("failed to write to file: %w", err)
     }
 
     // 5. 确保刷新缓冲区
     if err := writer.Flush(); err != nil {
-        return fmt.Errorf("failed to flush writer: %!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)w(MISSING)", err)
+        return fmt.Errorf("failed to flush writer: %w", err)
     }
 
     return nil

@@ -157,12 +157,6 @@ CODE
 		CheckFormatDesc(t, rule, rule)
 	})
 
-	// t.Run("real", func(t *testing.T) {
-	// 	// "sfbuildin/buildin/golang/lib/golang-file-write-bufio.sf"
-	// 	rule, err := sfdb.GetRule("审计Golang使用bufio进行文件写入的代码")
-	// 	require.NoError(t, err)
-	// 	CheckFormatDesc(t, rule.Content, rule.Content)
-	// })
 }
 
 func TestAlert(t *testing.T) {
@@ -188,7 +182,27 @@ alert $output for {
 	title: "a",
 	level: "high",
 	desc: <<<CODE
-This is a test alert description.
+This is a test alert description .
+CODE
+}
+`
+		CheckFormatDesc(t, rule, rule)
+	})
+
+}
+
+func Test_FormatString(t *testing.T) {
+	t.Run("alert with desc with format string  ", func(t *testing.T) {
+		rule := `
+desc(
+	rule_id: "id"
+)
+
+alert $output for {
+	title: "a",
+	level: "high",
+	desc: <<<CODE
+description: %s .
 CODE
 }
 `

@@ -134,7 +134,7 @@ alert $high	for {
            return
        }
 
-       fmt.Fprintf(w, "User ID: %!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)d(MISSING)", userID)
+       fmt.Fprintf(w, "User ID: %d", userID)
    }
    ```
 
@@ -162,7 +162,7 @@ CODE
        password := r.FormValue("password")
 
        // 不安全的 SQL 查询
-       query := fmt.Sprintf("SELECT * FROM users WHERE username='%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING)' AND password='%!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING)'", username, password)
+       query := fmt.Sprintf("SELECT * FROM users WHERE username='%s' AND password='%s'", username, password)
 
        db, err := sql.Open("mysql", "user:password@/dbname")
        if err != nil {
@@ -177,7 +177,7 @@ CODE
            return
        }
 
-       fmt.Fprintf(w, "User ID: %!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)d(MISSING)", userID)
+       fmt.Fprintf(w, "User ID: %d", userID)
    }
    ```
 

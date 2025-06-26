@@ -57,7 +57,12 @@ func (f *RuleFormat) Write(format string, args ...any) error {
 	if f.write == nil {
 		return nil
 	}
-	s := fmt.Sprintf(format, args...)
+	var s string
+	if len(args) == 0 {
+		s = format
+	} else {
+		s = fmt.Sprintf(format, args...)
+	}
 	_, err := f.write.Write([]byte(s))
 	return err
 }
@@ -203,10 +208,13 @@ func (f *RuleFormat) VisitAlertStatement(alert sf.IAlertStatementContext) {
 					value = valueItem.GetText()
 				}
 			}
+			if strings.Contains(value, "MISSING") {
+				log.Warnf("desc item %s value is missing, please check the rule: %s", key, f.ruleID)
+			}
 			alertMsg.Set(strings.ToLower(key), value)
 		}
 	}
-	f.Write(fmt.Sprintf("alert $%s", variable))
+	f.Write("alert $%s", variable)
 	if alertMsg.Len() == 0 {
 		f.Write("\n")
 		return
@@ -223,12 +231,20 @@ func (f *RuleFormat) VisitAlertStatement(alert sf.IAlertStatementContext) {
 		}
 		switch key {
 		case "desc", "solution":
-			f.Write(fmt.Sprintf(`	%s: <<<CODE
+			res := fmt.Sprintf(`	%s: <<<CODE
 %s
 CODE
-`, key, newVal))
+`, key, newVal)
+			if strings.Contains(res, "MISSING") {
+				log.Warnf("alert item %s value is missing, please check the rule: %s", key, res)
+			}
+			f.Write(res)
 		default:
-			f.Write(fmt.Sprintf("\t%s: \"%s\",\n", key, newVal))
+			res := fmt.Sprintf("\t%s: \"%s\",\n", key, newVal)
+			if strings.Contains(res, "MISSING") {
+				log.Warnf("alert item %s value is missing, please check the rule: %s", key, res)
+			}
+			f.Write(res)
 		}
 		return true
 	})
@@ -286,6 +302,9 @@ func (f *RuleFormat) VisitInfoDescription(desc sf.IDescriptionStatementContext) 
 			} else if valueItem.HereDoc() != nil {
 				value := f.VisitHereDoc(valueItem.HereDoc())
 				newValue := f.descHandler(key, value)
+				if strings.Contains(newValue, "MISSING") {
+					log.Warnf("desc item %s value is missing, please check the rule: %s", key, f.ruleID)
+				}
 				upperKey := strings.ToUpper(key)
 				f.Write("\t%s: <<<%s\n", key, upperKey)
 				f.Write("%s\n", newValue)
