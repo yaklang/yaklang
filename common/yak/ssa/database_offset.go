@@ -1,12 +1,13 @@
 package ssa
 
 import (
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-func SaveValueOffset(inst Instruction) {
+func SaveValueOffset(db *gorm.DB, inst Instruction) {
 	if inst.GetId() == -1 {
 		return
 	}
@@ -28,10 +29,10 @@ func SaveValueOffset(inst Instruction) {
 	irOffset.ProgramName = inst.GetProgram().GetProgramName()
 	// value id
 	irOffset.ValueID = int64(inst.GetId())
-	ssadb.SaveIrOffset(irOffset)
+	ssadb.SaveIrOffset(db, irOffset)
 }
 
-func SaveVariableOffset(v *Variable, variableName string, valueID int64) {
+func SaveVariableOffset(db *gorm.DB, v *Variable, variableName string, valueID int64) {
 	if v.GetId() == -1 {
 		return
 	}
@@ -45,7 +46,7 @@ func SaveVariableOffset(v *Variable, variableName string, valueID int64) {
 		// variable name
 		irOffset.VariableName = variableName
 		irOffset.ValueID = valueID
-		ssadb.SaveIrOffset(irOffset)
+		ssadb.SaveIrOffset(db, irOffset)
 	}
 
 	add(v.DefRange)

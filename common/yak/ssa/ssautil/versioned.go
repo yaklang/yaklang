@@ -83,6 +83,7 @@ const (
 type Versioned[T versionedValue] struct {
 	// origin desc the variable's last or renamed version
 	captureVariable VersionedIF[T]
+	lock            sync.RWMutex
 	versionIndex    int64
 	globalIndex     int
 	lexicalName     string
@@ -275,10 +276,14 @@ func (v *Versioned[T]) GetName() string {
 	return v.lexicalName
 }
 func (v *Versioned[T]) SetVersion(version int64) {
+	v.lock.Lock()
+	defer v.lock.Unlock()
 	v.versionIndex = version
 }
 
 func (v *Versioned[T]) GetVersion() int64 {
+	v.lock.RLock()
+	defer v.lock.RUnlock()
 	return v.versionIndex
 }
 

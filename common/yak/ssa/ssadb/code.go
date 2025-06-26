@@ -228,10 +228,10 @@ func (r *IrCode) GetSourceCodeContext(n int) string {
 	return result
 }
 
-func DeleteIRCode(DB *gorm.DB, id ...int) error {
+func DeleteIRCode(DB *gorm.DB, id ...int64) error {
 	db := DB.Model(&IrCode{}).Where("id IN (?)", id).Delete(&IrCode{})
 	for _, i := range id {
-		irCodeCache.Remove(int64(i))
+		irCodeCache.Remove(i)
 	}
 	return db.Error
 }

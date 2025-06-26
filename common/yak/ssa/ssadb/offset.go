@@ -29,8 +29,7 @@ func CreateOffset(rng memedit.RangeIf, projectName string) *IrOffset {
 	ret.ValueID = -1
 	return ret
 }
-func SaveIrOffset(idx *IrOffset) {
-	db := GetDB()
+func SaveIrOffset(db *gorm.DB, idx *IrOffset) {
 	db.Save(idx)
 }
 
