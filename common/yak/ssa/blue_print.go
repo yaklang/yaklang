@@ -359,7 +359,15 @@ func (c *Blueprint) CheckExtendedBy(parentBlueprint *Blueprint) bool {
 	return false
 }
 
-func (c *Blueprint) getFieldWithParent(get func(bluePrint *Blueprint) bool) bool {
+func (c *Blueprint) getFieldWithParent(get func(bluePrint *Blueprint) bool, recursiveLevel ...int) bool {
+	currentRecursiveLevel := 0
+	if recursiveLevel != nil {
+		currentRecursiveLevel = recursiveLevel[0]
+	}
+	if currentRecursiveLevel > MaxInheritanceDepth {
+		log.Error("failed to get field from parents, inherit chain too long")
+		return false
+	}
 	// if current class can get this field, just return true
 	if ok := get(c); ok {
 		return true
@@ -367,7 +375,7 @@ func (c *Blueprint) getFieldWithParent(get func(bluePrint *Blueprint) bool) bool
 		// if current class can't get this field, then check the parent class
 		for _, class := range c.ParentBlueprints {
 			// if parent class can get this field, just return true
-			if ex := class.getFieldWithParent(get); ex {
+			if ex := class.getFieldWithParent(get, currentRecursiveLevel); ex {
 				return true
 			}
 		}
