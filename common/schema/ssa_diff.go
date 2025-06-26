@@ -21,7 +21,7 @@ const (
 )
 
 type SSADiffResult struct {
-	gorm.Model
+	*gorm.Model
 	BaseItem        string
 	CompareItem     string
 	ResultHash      string `gorm:"index"` // hash(BaseItem + CompareItem)
