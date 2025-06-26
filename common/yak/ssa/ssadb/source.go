@@ -88,7 +88,7 @@ func SaveFile(filename, content string, programName string, folderPaths []string
 		FolderPath:     fullPath,
 		IsBigFile:      false,
 	}
-	irSource.save()
+	go irSource.save()
 	return irSource.SourceCodeHash
 }
 
