@@ -1,4 +1,4 @@
-package utils
+package databasex
 
 import (
 	"sync"
@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 )
 
 type databaseCacheItemStatus int
@@ -26,15 +28,15 @@ type databaseCacheItem[K comparable, T any] struct {
 
 // save to database
 // attention: this function should be blocking
-type SaveDatabase[K comparable, T any] func(K, T, EvictionReason) bool
+type SaveDatabase[K comparable, T any] func(K, T, utils.EvictionReason) bool
 
 // load data from database by key
 // attention: this function should be blocking
 type LoadFromDatabase[K comparable, T any] func(K) (T, error)
 
 type DataBaseCacheWithKey[K comparable, T any] struct {
-	notifyCache *CacheExWithKey[string, K]
-	data        *SafeMapWithKey[K, databaseCacheItem[K, T]]
+	notifyCache *utils.CacheExWithKey[string, K]
+	data        *utils.SafeMapWithKey[K, databaseCacheItem[K, T]]
 
 	saveDatabase     SaveDatabase[K, T]
 	loadFromDatabase LoadFromDatabase[K, T]
@@ -55,18 +57,18 @@ func NewDatabaseCacheWithKey[K comparable, T any](
 	load LoadFromDatabase[K, T],
 ) *DataBaseCacheWithKey[K, T] {
 	ret := &DataBaseCacheWithKey[K, T]{
-		data:             NewSafeMapWithKey[K, databaseCacheItem[K, T]](),
+		data:             utils.NewSafeMapWithKey[K, databaseCacheItem[K, T]](),
 		saveDatabase:     save,
 		loadFromDatabase: load,
 		wait:             &sync.WaitGroup{},
 		close:            atomic.Bool{},
 	}
-	cache := NewCacheExWithKey[string, K]()
-	cache.SetExpirationCallback(func(_ string, key K, reason EvictionReason) {
+	cache := utils.NewCacheExWithKey[string, K](utils.WithCacheTTL(ttl))
+	cache.SetExpirationCallback(func(_ string, key K, reason utils.EvictionReason) {
 		// Check if saving to database is disabled
 		if ret.IsSaveDisabled() {
 			log.Debugf("Save to database is disabled, skipping save for key: %v", key)
-			ret.notifyCache.Set(InterfaceToString(key), key)
+			ret.notifyCache.Set(utils.InterfaceToString(key), key)
 			return
 		}
 		log.Debugf("expire key: %v", key)
@@ -101,7 +103,7 @@ func (c *DataBaseCacheWithKey[K, T]) Set(key K, memValue T) {
 		log.Debugf("BUG:: already exist in cache, key: %v", key)
 		// return
 	}
-	c.notifyCache.Set(InterfaceToString(key), key)
+	c.notifyCache.Set(utils.InterfaceToString(key), key)
 	c.data.Set(key, databaseCacheItem[K, T]{
 		status:     DatabaseCacheItemNormal,
 		key:        key,
@@ -124,22 +126,37 @@ func (c *DataBaseCacheWithKey[K, T]) GetPure(key K) (T, bool) {
 }
 
 func (c *DataBaseCacheWithKey[K, T]) Get(key K) (T, bool) {
+	var ret T
+	var ok bool
 	// log.Errorf("Get key: %v", key)
-	if item, ok := c.GetPure(key); ok {
-		return item, true
+	f1 := func() {
+		ret, ok = c.GetPure(key)
 	}
 
 	// no in cache, load from database
-	if memValue, err := c.loadFromDatabase(key); err == nil {
-		if item, ok := c.data.Get(key); ok {
-			return item.memoryItem, true
+	f2 := func() {
+		if ok {
+			return
 		}
-		c.Set(key, memValue)
-		return memValue, true
+		if memValue, err := c.loadFromDatabase(key); err == nil {
+			if item, ok := c.data.Get(key); ok {
+				ret = item.memoryItem
+				ok = true
+				return
+				// return item.memoryItem, true
+			}
+			c.Set(key, memValue)
+			ret = memValue
+			ok = true
+			return
+			// return memValue, true
+		}
 	}
 
-	var zero T
-	return zero, false
+	ssaprofile.ProfileAdd(true, "DatabaseCacheWithKey.Get", f1, f2)
+	return ret, ok
+	// var zero T
+	// return zero, false
 }
 
 func (c *DataBaseCacheWithKey[K, T]) GetAll() map[K]T {
@@ -151,7 +168,7 @@ func (c *DataBaseCacheWithKey[K, T]) GetAll() map[K]T {
 	return ret
 }
 
-func (c *DataBaseCacheWithKey[K, T]) save(key K, reason EvictionReason) {
+func (c *DataBaseCacheWithKey[K, T]) save(key K, reason utils.EvictionReason) {
 	// in goroutine
 	item, ok := c.data.Get(key)
 	if !ok {
@@ -162,14 +179,14 @@ func (c *DataBaseCacheWithKey[K, T]) save(key K, reason EvictionReason) {
 
 	recoverData := func() {
 		// recover c.notifyCache
-		c.notifyCache.Set(InterfaceToString(key), key)
+		c.notifyCache.Set(utils.InterfaceToString(key), key)
 		c.updateStatus(item, DatabaseCacheItemNormal)
 	}
 
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("save failed: %v", err)
-			PrintCurrentGoroutineRuntimeStack()
+			utils.PrintCurrentGoroutineRuntimeStack()
 
 			// recover data
 			recoverData()
@@ -208,7 +225,7 @@ func (c *DataBaseCacheWithKey[K, T]) save(key K, reason EvictionReason) {
 }
 
 func (c *DataBaseCacheWithKey[K, T]) Delete(key K) {
-	c.notifyCache.Delete(InterfaceToString(key))
+	c.notifyCache.Delete(utils.InterfaceToString(key))
 }
 
 func (c *DataBaseCacheWithKey[K, T]) Count() int {
