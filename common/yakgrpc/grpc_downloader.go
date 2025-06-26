@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -13,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/progresswriter"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -53,23 +53,40 @@ func (s *Server) DownloadWithStream(proxy string, fileGetter func() (urlStr stri
 	}
 
 	info(0, "获取下载材料大小: Fetching Download Material Basic Info")
-	client := utils.NewDefaultHTTPClientWithProxy(proxy)
-	client.Timeout = time.Hour
 
-	// 使用带上下文的HEAD请求
-	req, err := http.NewRequestWithContext(ctx, "HEAD", targetUrl, nil)
+	// 构建HEAD请求包
+	isHttps, headRequest, err := lowhttp.ParseUrlToHttpRequestRaw("HEAD", targetUrl)
 	if err != nil {
-		return err
+		return utils.Errorf("parse URL failed: %v", err)
 	}
-	rsp, err := client.Do(req)
-	if err != nil {
-		return err
+	// 配置lowhttp选项
+	opts := []lowhttp.LowhttpOpt{
+		lowhttp.WithPacketBytes([]byte(headRequest)),
+		lowhttp.WithHttps(isHttps),
+		lowhttp.WithContext(ctx),
 	}
-	rsp.Body.Close()
 
-	i, err := strconv.Atoi(rsp.Header.Get("Content-Length"))
+	// 如果提供了代理，添加代理配置
+	if proxy != "" {
+		opts = append(opts, lowhttp.WithProxy(proxy))
+	}
+
+	// 发送HEAD请求获取文件大小
+	rsp, err := lowhttp.HTTPWithoutRedirect(opts...)
 	if err != nil {
-		return utils.Errorf("cannot fetch cl: %v", err)
+		return utils.Errorf("HEAD request failed: %v", err)
+	}
+
+	// 解析Content-Length
+	contentLength := lowhttp.GetHTTPPacketHeader(rsp.RawPacket, "Content-Length")
+
+	if contentLength == "" {
+		return utils.Errorf("cannot find Content-Length header")
+	}
+
+	i, err := strconv.Atoi(contentLength)
+	if err != nil {
+		return utils.Errorf("cannot parse Content-Length: %v", err)
 	}
 	info(0, "共需下载大小为：Download %v Total", utils.ByteSize(uint64(i)))
 
@@ -80,17 +97,6 @@ func (s *Server) DownloadWithStream(proxy string, fileGetter func() (urlStr stri
 		return ctx.Err()
 	default:
 	}
-
-	// 使用带上下文的GET请求
-	req, err = http.NewRequestWithContext(ctx, "GET", targetUrl, nil)
-	if err != nil {
-		return err
-	}
-	rsp, err = client.Do(req)
-	if err != nil {
-		return utils.Errorf("download material failed: %s", err)
-	}
-	defer rsp.Body.Close()
 
 	dirPath := filepath.Join(
 		consts.GetDefaultYakitProjectsDir(),
@@ -129,35 +135,59 @@ func (s *Server) DownloadWithStream(proxy string, fileGetter func() (urlStr stri
 		}
 	}()
 
-	// 创建可取消的reader
-	cancelableReader := &cancelableReaderImpl{
-		ctx: ctx,
-		r:   io.TeeReader(rsp.Body, prog),
+	isEndCtx, sendEnd := context.WithCancel(context.Background())
+	defer sendEnd()
+	// 构建GET请求包
+	isHttps, getRequest, err := lowhttp.ParseUrlToHttpRequestRaw("GET", targetUrl)
+	if err != nil {
+		return utils.Errorf("parse URL failed: %v", err)
 	}
 
-	// 在goroutine中执行复制操作
-	copyDone := make(chan error, 1)
-	go func() {
-		_, copyErr := io.Copy(fp, cancelableReader)
-		copyDone <- copyErr
-	}()
-
-	// 等待下载完成或上下文取消
-	select {
-	case <-ctx.Done():
-		// 上下文取消，清理文件
-		fp.Close()
-		os.Remove(fPath)
-		info(0, "下载已取消，文件已清理: Download Cancelled, File Cleaned")
-		return ctx.Err()
-	case err := <-copyDone:
-		if err != nil {
-			info(0, "下载文件失败: Download Failed: %s", err)
-			return err
+	var downloadError error
+	// 使用相同的选项配置GET请求
+	opts = []lowhttp.LowhttpOpt{
+		lowhttp.WithPacketBytes([]byte(getRequest)),
+		lowhttp.WithHttps(isHttps),
+		lowhttp.WithContext(ctx),
+	}
+	if proxy != "" {
+		opts = append(opts, lowhttp.WithProxy(proxy))
+	}
+	opts = append(opts, lowhttp.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
+		cancelableReader := &cancelableReaderImpl{
+			ctx: ctx,
+			r:   io.TeeReader(closer, prog),
 		}
-		info(100, "下载文件成功：Download Finished")
-		return nil
+
+		copyDone := make(chan error, 1)
+		go func() {
+			_, copyErr := io.Copy(fp, cancelableReader)
+			copyDone <- copyErr
+		}()
+
+		select {
+		case <-ctx.Done():
+			fp.Close()
+			os.Remove(fPath)
+			info(0, "下载已取消，文件已清理: Download Cancelled, File Cleaned")
+			downloadError = ctx.Err()
+			sendEnd()
+		case err := <-copyDone:
+			if err != nil {
+				info(0, "下载文件失败: Download Failed: %s", err)
+				downloadError = err
+			}
+			info(100, "下载文件成功：Download Finished")
+			sendEnd()
+		}
+	}))
+
+	_, err = lowhttp.HTTPWithoutRedirect(opts...)
+	if err != nil {
+		return err
 	}
+	<-isEndCtx.Done()
+	return downloadError
 }
 
 // cancelableReaderImpl 实现可取消的Reader
@@ -167,14 +197,12 @@ type cancelableReaderImpl struct {
 }
 
 func (cr *cancelableReaderImpl) Read(p []byte) (n int, err error) {
-	// 检查上下文是否取消
 	select {
 	case <-cr.ctx.Done():
 		return 0, cr.ctx.Err()
 	default:
 	}
 
-	// 使用goroutine执行实际读取，以便能响应上下文取消
 	done := make(chan struct{})
 	var readN int
 	var readErr error
