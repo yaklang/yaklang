@@ -13,7 +13,7 @@ import (
 	"testing"
 )
 
-func TestCompare(t *testing.T) {
+func TestGRPCMUSTPASS_SyntaxFlow_SSAReusltCompare(t *testing.T) {
 	code := `<?php
 $a = $_GET[1];
 eval($a);
