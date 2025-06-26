@@ -139,7 +139,7 @@ alert $output	for {
     ...
     err := os.WriteFile(fileName, data, 0644)
     if err != nil {
-       log.Fatalf("Error writing to file: %!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)s(MISSING)", err)
+       log.Fatalf("Error writing to file: %s", err)
     }
     ```
 
@@ -157,7 +157,7 @@ alert $output	for {
     	// 打开文件，如果不存在则创建，以追加模式写入，权限为0644
     	file, err := os.OpenFile(fileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
     	if err != nil {
-    		return fmt.Errorf("failed to open file: %!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)w(MISSING)", err)
+    		return fmt.Errorf("failed to open file: %w", err)
     	}
     	defer file.Close() // 确保关闭文件
 
@@ -166,13 +166,13 @@ alert $output	for {
     
     	_, err = writer.Write(data)
     	if err != nil {
-    		return fmt.Errorf("failed to write data: %!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)w(MISSING)", err)
+    		return fmt.Errorf("failed to write data: %w", err)
     	}
 
         // 写入任何留在缓冲中的数据
         err = writer.Flush()
         if err != nil {
-            return fmt.Errorf("failed to flush writer: %!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)w(MISSING)", err)
+            return fmt.Errorf("failed to flush writer: %w", err)
         }
 
     	return nil
@@ -181,7 +181,7 @@ alert $output	for {
     // 调用示例
     // dataToAppend := []byte("\nAdditional line.")
     // if err := appendToFile("example.txt", dataToAppend); err != nil {
-    // 	log.Printf("Error appending to file: %!!(MISSING)!(MISSING)!(MISSING)!(MISSING)!(MISSING)v(MISSING)", err)
+    // 	log.Printf("Error appending to file: %v", err)
     // }
     ```
 
