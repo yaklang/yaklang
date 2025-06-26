@@ -6,6 +6,9 @@ import (
 
 type BlueprintFieldKind int
 
+// 定义最大继承深度
+const MaxInheritanceDepth = 100
+
 const (
 	// method: static normal magic
 	BluePrintStaticMethod BlueprintFieldKind = iota
@@ -110,6 +113,62 @@ func NewBlueprint(name string) *Blueprint {
 }
 
 // ======================= class blueprint=======================
+
+// HasCircularDependency 检查两个蓝图之间是否存在循环依赖
+func HasCircularDependency(b1, b2 *Blueprint) bool {
+	if b1 == nil || b2 == nil {
+		return false
+	}
+
+	// 检查 b1 的继承链中是否包含 b2
+	// 每次独立检查时都初始化新的 visited 集合和从0开始的深度
+	visited1 := make(map[*Blueprint]bool)
+	if b1.inheritsFromWithVisited(b2, visited1, 0) {
+		return true
+	}
+	visited1 = nil
+
+	// 检查 b2 的继承链中是否包含 b1
+	visited2 := make(map[*Blueprint]bool)
+	if b2.inheritsFromWithVisited(b1, visited2, 0) {
+		return true
+	}
+
+	return false
+}
+
+// inheritsFromWithVisited 递归检查当前蓝图是否继承自目标蓝图，
+// 并使用 visited 集合避免重复访问，同时进行深度控制。
+func (c *Blueprint) inheritsFromWithVisited(target *Blueprint, visited map[*Blueprint]bool, currentDepth int) bool {
+	// 深度控制：如果超过最大允许深度，则认为无法找到或存在过深的继承链，直接返回 false
+	if currentDepth > MaxInheritanceDepth {
+		// 可以在这里选择记录一个警告，表示继承链过深
+		log.Warnf("Inheritance chain for blueprint '%s' exceeded max depth of %d. Potential issue or too deep hierarchy.", c.Name, MaxInheritanceDepth)
+		return false
+	}
+
+	// 如果当前蓝图已经访问过，直接返回 false，避免无限递归和重复计算
+	if visited[c] {
+		return false
+	}
+	visited[c] = true // 标记当前蓝图为已访问
+
+	// 如果当前蓝图就是目标蓝图，说明存在继承关系
+	if c == target {
+		return true
+	}
+
+	// 遍历父蓝图，深度递增
+	for _, parent := range c.ParentBlueprints {
+		if parent.inheritsFromWithVisited(target, visited, currentDepth+1) {
+			return true
+		}
+	}
+
+	// 所有路径都探索完毕，没有找到目标蓝图
+	return false
+}
+
 func (c *Blueprint) AddParentBlueprint(parent *Blueprint) {
 	c.addParentBlueprintEx(parent, BlueprintRelationParents)
 }
@@ -122,30 +181,13 @@ func (c *Blueprint) addParentBlueprintEx(parent *Blueprint, relation BlueprintRe
 	if parent == nil || c == nil {
 		return
 	}
-	if relation == BlueprintRelationParents {
-		isExist := false
-		c.getFieldWithParent(func(bluePrint *Blueprint) bool {
-			if bluePrint == parent {
-				isExist = true
-				return true
-			}
-			return false
-		})
-		if !isExist {
-			parent.getFieldWithParent(func(bluePrint *Blueprint) bool {
-				if bluePrint == c {
-					isExist = true
-					return true
-				}
-				return false
-			})
-		}
-		// check loop
-		if isExist {
-			log.Errorf("BUG!: add parent blueprint error: loop. blueprint name: %v, parent name: %v", c.Name, parent.Name)
-			return
-		}
+
+	// 使用新的循环依赖检查函数
+	if HasCircularDependency(c, parent) {
+		log.Errorf("BUG!: add parent blueprint error: loop. blueprint name: %v, parent name: %v", c.Name, parent.Name)
+		return
 	}
+
 	c.setBlueprintRelation(parent, relation)
 	for name, f := range parent.NormalMethod {
 		c.RegisterNormalMethod(name, f, false)
@@ -316,7 +358,15 @@ func (c *Blueprint) CheckExtendedBy(parentBlueprint *Blueprint) bool {
 	return false
 }
 
-func (c *Blueprint) getFieldWithParent(get func(bluePrint *Blueprint) bool) bool {
+func (c *Blueprint) getFieldWithParent(get func(bluePrint *Blueprint) bool, recursiveLevel ...int) bool {
+	currentRecursiveLevel := 0
+	if recursiveLevel != nil {
+		currentRecursiveLevel = recursiveLevel[0]
+	}
+	if currentRecursiveLevel > MaxInheritanceDepth {
+		log.Error("failed to get field from parents, inherit chain too long")
+		return false
+	}
 	// if current class can get this field, just return true
 	if ok := get(c); ok {
 		return true
@@ -324,7 +374,7 @@ func (c *Blueprint) getFieldWithParent(get func(bluePrint *Blueprint) bool) bool
 		// if current class can't get this field, then check the parent class
 		for _, class := range c.ParentBlueprints {
 			// if parent class can get this field, just return true
-			if ex := class.getFieldWithParent(get); ex {
+			if ex := class.getFieldWithParent(get, currentRecursiveLevel); ex {
 				return true
 			}
 		}
