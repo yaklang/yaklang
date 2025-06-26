@@ -114,7 +114,7 @@ $sink #{
     exclude:`* ?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`,
 }->as $high;
 
-alert $high	for {
+alert $high for {
 	solution: <<<CODE
 ### 修复建议
 
@@ -211,7 +211,7 @@ $sink #{
 }->as $result;
 
 $result - $high  as $low;
-alert $low	for {
+alert $low for {
 	desc: <<<CODE
 ### 漏洞描述
 

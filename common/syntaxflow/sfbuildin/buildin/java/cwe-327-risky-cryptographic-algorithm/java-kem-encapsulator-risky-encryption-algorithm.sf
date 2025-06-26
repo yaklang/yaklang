@@ -78,7 +78,7 @@ $algorithm#{
     until:`*?{opcode:const && have:/DES|DESede|3DES|TripleDES|ARCFOUR|RC4|RC2/}`
 }-> as $sink;
 
-alert $sink	for {
+alert $sink for {
 	message: "发现Java代码中使用了不安全的加密算法",
 	level: "low",
 }

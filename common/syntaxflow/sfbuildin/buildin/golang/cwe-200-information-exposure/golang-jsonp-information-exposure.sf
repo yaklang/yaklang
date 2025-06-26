@@ -106,7 +106,7 @@ $obj #{
 	include:`*?{opcode:const}`,
 }-> as $low;
 
-alert $low	for {
+alert $low for {
 	level: "low",
 	type: "vuln",
 	title: "Detect Golang Json Information Exposure",

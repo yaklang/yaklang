@@ -118,7 +118,7 @@ $sink #{
     exclude: `*?{opcode:call}?{!* & $source}?{!* & $sink}`,
 }->as  $high;
 
-alert $high	for {
+alert $high for {
 	desc: <<<CODE
 ### 漏洞描述
 
@@ -228,7 +228,7 @@ $sink #{
 
 $result - $high as $low;
 
-alert $low	for {
+alert $low for {
 	level: "low",
 	message: "发现Java SnakeYAML反序列化漏洞,但是有数据流过滤。",
 	title: "Check Java XMLDecoder Unserialization Vulnerability with Limited Filtering",

@@ -175,7 +175,7 @@ REFERENCE
 .readObject?{<typeName>?{have: "java.io.ObjectInputStream"} } as $readObj;
 check $readObj;
 
-alert $readObj	for {
+alert $readObj for {
 	title_zh: "检测Java原生反序列化漏洞",
 	level: "info",
 	message: "发现使用ObjectInputStream的readObject()方法进行反序列化操作，可能存在反序列化漏洞",
@@ -191,7 +191,7 @@ $sink #{
     until: `* & $source`,
 }-> as $mid;
 
-alert $mid	for {
+alert $mid for {
 	title: "Check Java Native Deserialization Vulnerability",
 	title_zh: "检测Java原生反序列化漏洞",
 	level: "mid",

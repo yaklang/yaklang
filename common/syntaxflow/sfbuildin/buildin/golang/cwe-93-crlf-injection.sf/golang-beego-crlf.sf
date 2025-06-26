@@ -86,7 +86,7 @@ $sink -{
 
 $data?{have:".Ctx.ResponseWriter.Header"} as $high
 
-alert $high	for {
+alert $high for {
 	solution: <<<CODE
 ### 修复建议
 

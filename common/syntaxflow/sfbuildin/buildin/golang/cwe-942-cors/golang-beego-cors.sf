@@ -97,7 +97,7 @@ $sink -{
 
 $data?{have:".Ctx.ResponseWriter.Header"} as $high
 
-alert $high	for {
+alert $high for {
 	type: "vuln",
 	title: "CORS detected",
 	title_zh: "检测到CORS",

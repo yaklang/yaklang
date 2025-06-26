@@ -100,7 +100,7 @@ $excludeFactory...createXMLStreamReader() as $excludeCall;
 $toCheckCall - $excludeCall as $vulnCall;
 check $vulnCall;
 
-alert $vulnCall	for {
+alert $vulnCall for {
 	title: "Check Java STAX XMLInputFactory Unsafe Use",
 	title_zh: "检测 Java STAX XMLInputFactory 不安全使用",
 	solution: <<<CODE

@@ -74,7 +74,7 @@ setcookie?(*<len>?{<6}) as $sinkCookie
 setcookie?(*<len>?{==6}) as $checkCookie
 $checkCookie<getCallee>?(*<slice(index=5)>?{have: "false"}) as $sinkCookie
 
-alert $sinkCookie	for {
+alert $sinkCookie for {
 	level: "low",
 	title: "Detect PHP Cookie Missing Secure Flag",
 	title_zh: "检测PHP Cookie缺少Secure标志",
@@ -131,7 +131,7 @@ CODE
 setcookie?(*<slice(index=6)>?{have: 'false'}) as $noHttpOnlyCookie
 setcookie?(*<len>?{<=6}) as $noHttpOnlyCookie
 
-alert $noHttpOnlyCookie	for {
+alert $noHttpOnlyCookie for {
 	title: "Detect PHP Cookie Missing HttpOnly Flag",
 	title_zh: "检测PHP Cookie缺少HttpOnly标志",
 	solution: <<<CODE

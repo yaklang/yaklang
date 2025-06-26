@@ -117,7 +117,7 @@ REFERENCE
 <include('golang-http-gin')> as $output;
 <include('golang-http-net')> as $output;
 
-alert $output	for {
+alert $output for {
 	level: "info",
 	title: "Audit Golang HTTP Sink",
 	title_zh: "审计Golang HTTP输出点",

@@ -68,7 +68,7 @@ SOLUTION
 
 ftp_login(,,*?{opcode: const}) as $sink
 
-alert $sink	for {
+alert $sink for {
 	level: "low",
 	title: "Hard-coded FTP Password Detected",
 	title_zh: "检测到硬编码的FTP密码",

@@ -95,7 +95,7 @@ $entry -{
 * & $bodyParam <var(sink)> as $__next__;
 CODE
 }->;
-alert $sink	for {
+alert $sink for {
 	solution: <<<CODE
 ### 修复建议
 

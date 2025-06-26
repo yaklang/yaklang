@@ -120,7 +120,7 @@ CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high	for {
+alert $high for {
 	level: "high",
 	title: "Detect PHP Unsafe File Unzip Without Validation",
 	title_zh: "检测PHP未经验证的高危文件解压",
@@ -222,7 +222,7 @@ CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
 
-alert $mid	for {
+alert $mid for {
 	title: "Detect PHP Insecure File Type Detection",
 	title_zh: "检测PHP文件解压类型检测不安全",
 	desc: <<<CODE
@@ -254,7 +254,7 @@ CODE
 }
 $sink - $high - $mid as $low
 
-alert $low	for {
+alert $low for {
 	desc: <<<CODE
 ### 风险描述
 

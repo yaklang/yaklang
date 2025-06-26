@@ -151,7 +151,7 @@ $reader?{.setEntityResolver?(,* ?{!any:"DTDEntityResolver","ResourceEntityResolv
 $excludeReader./((parse*)|(read*))/() as $excludeCall
 
 $toCheckCall - $excludeCall as $vulCall;
-alert $vulCall	for {
+alert $vulCall for {
 	title: "Check Java XMLReaderFactory Unsafe Use",
 	title_zh: "检测 Java XMLReaderFactory 不安全使用",
 	solution: <<<CODE

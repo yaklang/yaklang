@@ -92,7 +92,7 @@ REFERENCE
 String() as $string_constructor 
 $string_constructor?{<getActualParams()>* <fullTypeName()>?{have:"byte"}} as $target 
 
-alert $target	for {
+alert $target for {
 	level: "mid",
 	title: "Check Java Insecure Byte Array to String Converion",
 	title_zh: "检测Java不安全的字节数组到字符串转换",

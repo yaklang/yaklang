@@ -103,7 +103,7 @@ $sink?{* #{
 INCLUDE,
 }->} as $mid;
 
-alert $mid	for {
+alert $mid for {
 	level: "mid",
 	message: "Find Java Dynamic Code Evaluation Script Injection Vulnerability",
 	risk: "rce-code",

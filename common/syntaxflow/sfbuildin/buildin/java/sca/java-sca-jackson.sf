@@ -60,7 +60,7 @@ REFERENCE
 
 __dependency__.*jackson*core.version as $ver;
 $ver in [2.13.0,2.13.3] as $vuln_jackson_core;
-alert $vuln_jackson_core	for {
+alert $vuln_jackson_core for {
 	level: "mid",
 	cve: "CVE-2022-42003",
 	message: "SCA: jackson-core versions between 2.13.0 and 2.13.3 have a denial of service vulnerability",

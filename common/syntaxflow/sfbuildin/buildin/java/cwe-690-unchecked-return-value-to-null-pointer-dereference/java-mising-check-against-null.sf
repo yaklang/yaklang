@@ -162,7 +162,7 @@ check $toCheck
 
 $toCheck?{.*()<var(memberCall)>} as $haveMemberCall
 $haveMemberCall?{!<getUsers(depth=2)>?{opcode:if} && !<getUsers(depth=3)>?{opcode:if}} as $weak
-alert $weak	for {
+alert $weak for {
 	title: "Check Java Unchecked Return Value to Null Pointer Dereference",
 	title_zh: "检测Java 未检测返回值是否为null导致空指针",
 	solution: <<<CODE

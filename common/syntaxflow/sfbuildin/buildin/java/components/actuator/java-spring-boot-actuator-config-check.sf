@@ -87,7 +87,7 @@ __projectConfig__."management.security.enabled"?{have:'false'} as $weak;
 __projectConfig__."endpoints.health.sensitive"?{have:'false'} as $weak;
 check $weak then "Java Spring Boot Actuator配置存在安全风险"
 
-alert $weak	for {
+alert $weak for {
 	title_zh: "检查Java Spring Boot Actuator配置",
 	desc: <<<CODE
 ### 风险描述
@@ -120,7 +120,7 @@ $allow#{
     include:`*?{opcode:const && have:'/actuator/**'}`,
 }-> as $sink;
 
-alert $sink	for {
+alert $sink for {
 	title: "Check Java Spring Boot Actuator Config",
 	title_zh: "检查Java Spring Boot Actuator配置",
 	solution: <<<CODE

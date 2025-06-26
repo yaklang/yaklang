@@ -142,7 +142,7 @@ Jwts?{<typeName>?{have: 'io.jsonwebtoken'}} as $jwt;
 check $jwt;
 $jwt.parser().setSigningKey().parse() as $riskParse;
 
-alert $riskParse	for {
+alert $riskParse for {
 	desc: <<<CODE
 ### 漏洞描述
 
@@ -209,7 +209,7 @@ CODE
 $key?{opcode:const} as $simpleKey;
 $key?{opcode: call && <getCallee>?{<getObject><name>?{have:base64 || BASE64  || Base64}}(*<slice(index=1)>*?{opcode: const}<var(base64EncodedKey)>) } as $sink;
 $simpleKey + $base64EncodedKey as $hardcodedKey;
-alert $hardcodedKey	for {
+alert $hardcodedKey for {
 	level: "high",
 	risk: "auth-bypass",
 	message: "JWT uses the hardcoded key",
@@ -274,7 +274,7 @@ CODE
 	type: "vuln",
 }
 
-alert $sink	for {
+alert $sink for {
 	message: "JWT uses the unsafe key",
 	solution: <<<CODE
 ### 修复建议

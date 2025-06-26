@@ -116,7 +116,7 @@ check $sink;
 $sqlConst?{* #>?{opcode: add}<var(op)> || *->?{opcode: add}<var(op)>};
 check $op;
 
-alert $op	for {
+alert $op for {
 	level: "mid",
 	type: "audit",
 	severity: "medium",

@@ -70,7 +70,7 @@ REFERENCE
 
 /^(eval|exec|assert|system|shell_exec|pcntl_exec|popen|ob_start)$/ as $output
 
-alert $output	for {
+alert $output for {
 	title: "Unvalidated PHP OS Command Execution",
 	title_zh: "PHP未验证的命令执行",
 	solution: <<<CODE

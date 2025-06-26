@@ -128,7 +128,7 @@ ldap?{<fullTypeName>?{have: 'github.com/go-ldap/ldap'}} as $entry;
 $entry.Dial() as $db;
 $db.* as $output;
 
-alert $output	for {
+alert $output for {
 	level: "info",
 	title: "Find Golang LDAP Dial Sink",
 	title_zh: "查找 Golang LDAP 连接汇点",

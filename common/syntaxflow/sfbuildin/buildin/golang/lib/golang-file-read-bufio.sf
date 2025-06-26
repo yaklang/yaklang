@@ -64,7 +64,7 @@ $reader.ReadString().* as $output;
 
 $reader.ReadString(* #-> as $output);
 
-alert $output	for {
+alert $output for {
 	title: "Audit Golang File Read bufio",
 	title_zh: "审计Golang文件读取bufio包使用",
 	level: "info",

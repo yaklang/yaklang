@@ -96,7 +96,7 @@ $sink.List() as $low;
 $sink.CurrentDir() as $low;
 $sink.SystemType() as $low;
 
-alert $low	for {
+alert $low for {
 	title_zh: "检测到FTP信息泄露",
 	solution: <<<CODE
 ### 修复建议

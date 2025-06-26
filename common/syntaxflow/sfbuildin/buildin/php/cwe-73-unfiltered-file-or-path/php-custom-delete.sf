@@ -99,7 +99,7 @@ CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high	for {
+alert $high for {
 	title: "Unsafe File Operation Without Validation",
 	title_zh: "未经验证的文件操作",
 	solution: <<<CODE
@@ -184,7 +184,7 @@ CODE,exclude=<<<CODE
 CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
-alert $mid	for {
+alert $mid for {
 	title: "Insecure File Type Detection",
 	title_zh: "不安全的文件类型检测",
 	solution: <<<CODE
@@ -248,7 +248,7 @@ CODE
 	level: "mid",
 }
 $all - $high - $mid as $low
-alert $low	for {
+alert $low for {
 	title: "Potential File Storage Path Misconfiguration",
 	title_zh: "潜在的文件存储路径配置问题",
 	desc: <<<CODE

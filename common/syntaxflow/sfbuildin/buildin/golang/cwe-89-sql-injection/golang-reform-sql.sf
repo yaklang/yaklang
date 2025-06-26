@@ -144,7 +144,7 @@ $param #{
 CODE
 }-> as $high
 
-alert $high	for {
+alert $high for {
 	solution: <<<CODE
 ### 修复建议
 

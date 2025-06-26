@@ -87,7 +87,7 @@ CODE,exclude=<<<CODE
 *?{opcode: call && <getCallee><name>?{have: ldap_escape}} as $__next__
 CODE)> as $high
 
-alert $high	for {
+alert $high for {
 	type: "vuln",
 	title: "Check PHP LDAP Direct Injection Vulnerability (No Filter)",
 	title_zh: "检测PHP LDAP无过滤直接注入漏洞",
@@ -161,7 +161,7 @@ CODE,exclude=<<<CODE
 *?{opcode: call && !(have: ldap_escape)} as $__next__
 CODE)> as $highAndMid;
 $highAndMid - $high as $mid
-alert $mid	for {
+alert $mid for {
 	title_zh: "审计PHP LDAP注入带无效过滤",
 	solution: <<<CODE
 ### 修复建议
@@ -215,7 +215,7 @@ CODE
 
 $sink - $high - $mid as $low;
 
-alert $low	for {
+alert $low for {
 	type: "info",
 	title: "Audit PHP LDAP Injection with Effective Filter",
 	title_zh: "审计PHP LDAP注入带有效过滤",

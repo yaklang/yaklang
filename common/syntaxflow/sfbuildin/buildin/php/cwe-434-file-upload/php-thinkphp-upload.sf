@@ -117,7 +117,7 @@ CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high	for {
+alert $high for {
 	title: "Unsafe File Upload Without Validation in ThinkPHP",
 	title_zh: "ThinkPHP中未经验证的高危文件上传",
 	solution: <<<CODE
@@ -220,7 +220,7 @@ CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
 
-alert $mid	for {
+alert $mid for {
 	title_zh: "ThinkPHP中不安全的文件类型检测",
 	solution: <<<CODE
 ### 修复建议
@@ -319,7 +319,7 @@ CODE
 // 低风险：潜在的文件存储路径配置问题（这里假设ThinkPHP的putFile也可能涉及路径问题）
 $sink - $high - $mid as $low
 
-alert $low	for {
+alert $low for {
 	title: "Potential File Storage Path Misconfiguration in ThinkPHP",
 	title_zh: "ThinkPHP中潜在的文件存储路径配置问题",
 	desc: <<<CODE

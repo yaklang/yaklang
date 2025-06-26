@@ -98,7 +98,7 @@ $target #{include: `*?{have: 'template.HTML'}`}-> as $high;
 template.HTML(* #-> as $source)
 $source?{have: '.GetSession'} as $high
 
-alert $high	for {
+alert $high for {
 	solution: <<<CODE
 ### 修复建议
 

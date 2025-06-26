@@ -74,7 +74,7 @@ SOLUTION
 
 LIBXML_NOENT<getCall><getCallee>?{<getObject><name>?{have: DOMDocument} && <name>?{have: load} } as $vuln;
 check $vuln;
-alert $vuln	for {
+alert $vuln for {
 	solution: <<<CODE
 ### 修复建议
 

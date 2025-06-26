@@ -82,7 +82,7 @@ $sink #{
     exclude:`<self>?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`
 }->as $high;
 
-alert $high	for {
+alert $high for {
 	title: "Check Java XPath Injection Vulnerability",
 	title_zh: "检测Java XPath注入漏洞",
 	solution: <<<CODE

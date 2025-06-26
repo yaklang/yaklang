@@ -93,7 +93,7 @@ os?{<fullTypeName>?{have: 'os'}} as $os
 $os.WriteFile(* #-> as $param)
 $param?{!have: 'Parameter'} as $output;
 
-alert $output	for {
+alert $output for {
 	title_zh: "未验证的文件写入操作",
 	solution: <<<CODE
 ### 修复建议

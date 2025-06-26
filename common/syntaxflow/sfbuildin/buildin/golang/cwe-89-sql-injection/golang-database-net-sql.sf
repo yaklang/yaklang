@@ -98,7 +98,7 @@ REFERENCE
 $sink.QueryRow( * #-> as $param);
 $param?{have: 'Parameter'} as $high;
 
-alert $high	for {
+alert $high for {
 	title: "Check Golang SQL Injection Vulnerability",
 	title_zh: "检测Golang SQL注入漏洞",
 	solution: <<<CODE

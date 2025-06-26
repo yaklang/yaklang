@@ -109,7 +109,7 @@ $param #{
 	include:`*?{opcode:const}?{have:'SELECT version()'}`,
 }-> as $low;
 
-alert $low	for {
+alert $low for {
 	desc: <<<CODE
 ### 漏洞描述
 

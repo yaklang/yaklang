@@ -77,7 +77,7 @@ SOLUTION
 __dependency__./org.springframework.boot:spring-boot-starter-test/  as $weak;
 
 check $weak;
-alert $weak	for {
+alert $weak for {
 	title: "Detected Java Spring Boot Devtools Usage",
 	title_zh: "检测到Java Spring Boot Devtools的使用",
 	solution: <<<CODE

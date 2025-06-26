@@ -71,7 +71,7 @@ $sink #{
     exclude:`*?{opcode:phi}`,
 }-> as $high;
 
-alert $high	for {
+alert $high for {
 	risk: "Groovy-Shell代码执行漏洞",
 	title: "Check Java Servlet Groovy Shell Code Injection Vulnerability",
 	title_zh: "检测Java Servlet Groovy Shell代码注入漏洞",
@@ -232,7 +232,7 @@ $sink #{
 }-> as  $result;
 $result - $high as $low;
 
-alert $low	for {
+alert $low for {
 	desc: <<<CODE
 ### 规则目的
 该规则旨在识别是否存在潜在的Java Servlet Groovy Shell代码注入漏洞，但与高风险级别不同的是，它适用于具有一定数据流过滤机制的场景。这些过滤机制可能包括但不限于参数清理、白名单验证或沙箱限制等。

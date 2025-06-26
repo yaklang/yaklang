@@ -119,7 +119,7 @@ CODE,exclude=<<<CODE
 <self>?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high	for {
+alert $high for {
 	title: "PHP Unserialization Vulnerability - High Risk",
 	title_zh: "PHP反序列化漏洞 - 高风险",
 	solution: <<<CODE
@@ -224,7 +224,7 @@ CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
 
-alert $mid	for {
+alert $mid for {
 	title: "PHP Unserialization Vulnerability - Medium Risk",
 	title_zh: "PHP反序列化漏洞 - 中风险",
 	solution: <<<CODE
@@ -323,7 +323,7 @@ CODE
 
 $sink - $mid - $high as $low
 
-alert $low	for {
+alert $low for {
 	type: "low",
 	title: "PHP Unserialization Vulnerability - Low Risk",
 	title_zh: "PHP反序列化漏洞 - 低风险",
@@ -420,7 +420,7 @@ CODE
 	level: "low",
 }
 unserialize?(*?{!opcode: const}) as $info
-alert $info	for {
+alert $info for {
 	title_zh: "检测到PHP反序列化函数",
 	desc: <<<CODE
 ### 描述

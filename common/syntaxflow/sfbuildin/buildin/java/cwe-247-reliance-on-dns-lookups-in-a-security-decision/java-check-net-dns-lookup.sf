@@ -67,7 +67,7 @@ SOLUTION
 )
 
 InetAddress?{<typeName>?{have:'java.net'}}./(get.*By.*|getLocalHost|getLoopbackAddress)/ as $weak;
-alert $weak	for {
+alert $weak for {
 	risk: "api-abuse",
 	message: "发现Java java.net.InetAddress 进行DNS查询",
 	title: "Check Java java.net.InetAddress DNS Lookup",

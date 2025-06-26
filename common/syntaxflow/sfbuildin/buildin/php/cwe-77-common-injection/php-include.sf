@@ -126,7 +126,7 @@ CODE,exclude=<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $high
 
-alert $high	for {
+alert $high for {
 	level: "high",
 	type: "vuln",
 	title: "Unfiltered PHP File Inclusion Vulnerability",
@@ -241,7 +241,7 @@ CODE)> as $highAndMid
 
 $highAndMid - $high as $middle
 
-alert $middle	for {
+alert $middle for {
 	title: "PHP File Inclusion with Insufficient Filtering",
 	title_zh: "PHP文件包含漏洞，但过滤不充分",
 	solution: <<<CODE
@@ -351,7 +351,7 @@ CODE
 
 $sink - $high - $middle as $low;
 
-alert $low	for {
+alert $low for {
 	title: "PHP File Inclusion with Filtering Functions",
 	title_zh: "PHP文件包含漏洞，检出过滤函数",
 	desc: <<<CODE
@@ -371,7 +371,7 @@ CODE
 }
 
 include(*?{!opcode: const}) as $info
-alert $info	for {
+alert $info for {
 	title: "PHP File Inclusion Detected - Further Review Recommended",
 	title_zh: "检测到PHP文件包含，建议进一步审查",
 	desc: <<<CODE
