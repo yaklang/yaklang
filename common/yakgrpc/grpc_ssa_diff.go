@@ -75,8 +75,6 @@ func (s *Server) NewSSADiff(req *ypb.SSADiffRequest, server ypb.Yak_NewSSADiffSe
 				Status:      int64(re.Status),
 			})
 		}
-		//close(taskChannel)
-		//processor.Wait()
 		return nil
 	default:
 		return utils.Error("unknown diff type")

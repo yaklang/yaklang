@@ -20,6 +20,19 @@ eval($a);
 `
 	baseProg := uuid.NewString()
 	newProg := uuid.NewString()
+	rulename := uuid.NewString()
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	client.CreateSyntaxFlowRule(context.Background(), &ypb.CreateSyntaxFlowRuleRequest{
+		SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
+			Content: `eval() as $sink 
+alert $sink for{
+level: high
+}`,
+			RuleName: rulename,
+			Language: "php",
+		},
+	})
 	defer func() {
 		yakit.DeleteSSAProgram(consts.GetGormDefaultSSADataBase(), &ypb.SSAProgramFilter{
 			ProgramNames: []string{baseProg},
@@ -32,7 +45,7 @@ eval($a);
 		ssaapi.WithProgramName(baseProg),
 	)
 	require.NoError(t, err2)
-	result, err2 := program.SyntaxFlowRuleName(`检测PHP代码执行漏洞`, ssaapi.QueryWithSave(schema.SFResultKindScan))
+	result, err2 := program.SyntaxFlowRuleName(rulename, ssaapi.QueryWithSave(schema.SFResultKindScan))
 	require.NoError(t, err2)
 	result.Show()
 
@@ -40,6 +53,11 @@ eval($a);
 		defer func() {
 			yakit.DeleteSSAProgram(consts.GetGormDefaultSSADataBase(), &ypb.SSAProgramFilter{
 				ProgramNames: []string{newProg},
+			})
+			client.DeleteSyntaxFlowRule(context.Background(), &ypb.DeleteSyntaxFlowRuleRequest{
+				Filter: &ypb.SyntaxFlowRuleFilter{
+					RuleNames: []string{rulename},
+				},
 			})
 		}()
 		virtualFs := filesys.NewVirtualFs()
@@ -49,12 +67,10 @@ eval($a);
 			ssaapi.WithProgramName(newProg),
 		)
 		require.NoError(t, err2)
-		result, err2 := program.SyntaxFlowRuleName(`检测PHP代码执行漏洞`, ssaapi.QueryWithSave(schema.SFResultKindScan))
+		result, err2 := program.SyntaxFlowRuleName(rulename, ssaapi.QueryWithSave(schema.SFResultKindScan))
 		require.NoError(t, err2)
 		result.Show()
 
-		client, err := NewLocalClient()
-		require.NoError(t, err)
 		diff, err := client.NewSSADiff(context.Background(), &ypb.SSADiffRequest{
 			Base:    &ypb.SSADiffItem{Program: baseProg},
 			Compare: &ypb.SSADiffItem{Program: newProg},
@@ -92,8 +108,6 @@ include($_GET[1]);
 		program.SyntaxFlowRuleName("审计PHP文件包含漏洞", ssaapi.QueryWithSave(schema.SFResultKindScan))
 		require.NoError(t, err2)
 		result.Show()
-		client, err := NewLocalClient()
-		require.NoError(t, err)
 		diff, err := client.NewSSADiff(context.Background(), &ypb.SSADiffRequest{
 			Base: &ypb.SSADiffItem{
 				Program:  baseProg,
