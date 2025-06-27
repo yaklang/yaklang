@@ -115,6 +115,7 @@ func init() {
 		registerBuildInForge("forge_triage")
 		registerBuildInForge("biography")
 		registerBuildInForge("intent_recognition")
+		registerBuildInForge("entity_identify")
 		return nil
 	})
 }
