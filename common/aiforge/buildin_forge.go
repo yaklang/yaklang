@@ -112,7 +112,6 @@ func init() {
 		registerBuildInForge("pimatrix")
 		registerBuildInForge("netscan")
 		registerBuildInForge("recon")
-		registerBuildInForge("forge_triage")
 		registerBuildInForge("biography")
 		registerBuildInForge("intent_recognition")
 		registerBuildInForge("entity_identify")
