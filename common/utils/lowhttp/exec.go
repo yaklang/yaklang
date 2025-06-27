@@ -275,9 +275,11 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		connPool = DefaultLowHttpConnPool
 	}
 
-	bodyStreamReaderHandled := utils.NewAtomicBool()
+	// 用于检查 BodyStreamReaderHandler 是否被正常调用
+	bodyStreamReaderHandledCheckCh := make(chan bool)
 	defer func() {
-		if option != nil && option.BodyStreamReaderHandler != nil && !bodyStreamReaderHandled.IsSet() {
+		isNormal := <-bodyStreamReaderHandledCheckCh
+		if option != nil && option.BodyStreamReaderHandler != nil && !isNormal {
 			r, w := utils.NewPipe()
 			w.Close()
 			option.BodyStreamReaderHandler([]byte{}, r)
@@ -929,9 +931,10 @@ RECONNECT:
 					}
 				}
 				if err != nil {
+					bodyStreamReaderHandledCheckCh <- false
 					log.Warnf("Normal handle BodyStreamReaderHandler read response failed: %s", err)
 				} else {
-					bodyStreamReaderHandled.Set()
+					bodyStreamReaderHandledCheckCh <- true
 					option.BodyStreamReaderHandler(responseHeader.Bytes(), bodyReader)
 				}
 			}()
@@ -947,7 +950,7 @@ RECONNECT:
 		_ = conn.SetReadDeadline(serverTimeStart.Add(timeout))
 		firstByte, err := httpResponseReader.Peek(1)
 		if err != nil {
-			return response, utils.Errorf("read first byte failed: %v", err)
+			return response, errors.Wrap(err, "read first byte failed")
 		}
 		//log.Infof("dns time + dial time cost + write request finished + peek 1: %v", time.Since(dnsStart))
 		//log.Infof("[lowhttp] first byte in %v", time.Since(serverTimeStart))

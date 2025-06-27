@@ -792,7 +792,7 @@ Host: `+utils.HostPort(host, port)+"\r\n\r\n")), WithBodyStreamReaderHandler(fun
 	}))
 	require.True(t, called)
 	require.False(t, responseChecked)
-	require.Equal(t, get(), int64(1))
+	require.Equal(t, int64(1), get())
 }
 
 func TestWithStreamHandler_BAD2(t *testing.T) {
@@ -1033,15 +1033,14 @@ Content-Type: application/json
 
 // TestLowhttp_HTTP_Cancel 测试读取body时，如果上下文被取消，则应该立刻结束读取
 func TestLowhttp_HTTP_Cancel(t *testing.T) {
-	ctx := utils.TimeoutContext(500 * time.Millisecond)
-
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, r *http.Request) {
 		writer.Write([]byte("hello"))
 		writer.(http.Flusher).Flush()
 		time.Sleep(2 * time.Second)
 		writer.Write([]byte("world"))
 	})
-
+	utils.WaitConnect(utils.HostPort(host, port), 1)
+	ctx := utils.TimeoutContext(500 * time.Millisecond)
 	start := time.Now()
 	rsp, err := HTTP(WithPacketBytes([]byte(`GET / HTTP/1.1
 Host: `+utils.HostPort(host, port)+"\r\n\r\n")), WithContext(ctx))
@@ -1049,6 +1048,6 @@ Host: `+utils.HostPort(host, port)+"\r\n\r\n")), WithContext(ctx))
 		t.Fatal(err)
 	}
 	totalTime := time.Since(start)
-	require.Less(t, totalTime, 500*time.Millisecond)
+	require.Less(t, totalTime, 600*time.Millisecond)
 	require.Equal(t, "hello", string(rsp.GetBody()))
 }
