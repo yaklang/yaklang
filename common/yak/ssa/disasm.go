@@ -59,7 +59,7 @@ const (
 
 // implement value
 func (f *Function) String() string {
-	if f == nil || utils.IsNil(f) {
+	if utils.IsNil(f) {
 		return ""
 	}
 	return f.DisAsm(DisAsmDefault)
@@ -190,7 +190,7 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 
 // ----------- basic block
 func (b *BasicBlock) String() string {
-	if b == nil || utils.IsNil(b) {
+	if utils.IsNil(b) {
 		return ""
 	}
 	ret := b.GetName() + ":"
@@ -225,7 +225,7 @@ func (c *ConstInst) String() string {
 
 // ----------- undefined
 func (u *Undefined) String() string {
-	if u == nil || utils.IsNil(u) {
+	if utils.IsNil(u) {
 		return ""
 	}
 	valid := ""
@@ -240,7 +240,7 @@ func (u *Undefined) String() string {
 
 // ----------- Phi
 func (p *Phi) String() string {
-	if p == nil || utils.IsNil(p) {
+	if utils.IsNil(p) {
 		return ""
 	}
 	ret := fmt.Sprintf("%s = phi ", getStr(p))
@@ -260,7 +260,7 @@ func (p *Phi) String() string {
 
 // ----------- Parameter
 func (p *ParameterMember) String() string {
-	if p == nil || utils.IsNil(p) {
+	if utils.IsNil(p) {
 		return ""
 	}
 	switch p.MemberCallKind {
@@ -276,14 +276,14 @@ func (p *ParameterMember) String() string {
 	return ""
 }
 func (p *Parameter) String() string {
-	if p == nil || utils.IsNil(p) {
+	if utils.IsNil(p) {
 		return ""
 	}
 	return p.GetName()
 }
 
 func (e *ExternLib) String() string {
-	if e == nil || utils.IsNil(e) {
+	if utils.IsNil(e) {
 		return ""
 	}
 	return e.GetName()
@@ -291,7 +291,7 @@ func (e *ExternLib) String() string {
 
 // ----------- Jump
 func (j *Jump) String() string {
-	if j == nil || utils.IsNil(j) {
+	if utils.IsNil(j) {
 		return ""
 	}
 	return fmt.Sprintf("jump -> %v", j.GetValueById(j.To).GetName())
@@ -299,7 +299,7 @@ func (j *Jump) String() string {
 
 // ----------- IF
 func (i *If) String() string {
-	if i == nil || utils.IsNil(i) {
+	if utils.IsNil(i) {
 		return ""
 	}
 	// return i.StringByFunc(DefaultValueString)
@@ -308,7 +308,7 @@ func (i *If) String() string {
 
 // ----------- Loop
 func (l *Loop) String() string {
-	if l == nil || utils.IsNil(l) {
+	if utils.IsNil(l) {
 		return ""
 	}
 	return fmt.Sprintf("Loop [%s; %s; %s] body -> %s, exit -> %s", getStr(l.GetValueById(l.Init)), getStr(l.GetValueById(l.Cond)), getStr(l.GetValueById(l.Step)), l.GetValueById(l.Body).GetName(), l.GetValueById(l.Exit).GetName())
@@ -316,7 +316,7 @@ func (l *Loop) String() string {
 
 // ----------- Return
 func (r *Return) String() string {
-	if r == nil || utils.IsNil(r) {
+	if utils.IsNil(r) {
 		return ""
 	}
 	return fmt.Sprintf(
@@ -330,7 +330,7 @@ func (r *Return) String() string {
 
 // ----------- Call
 func (c *Call) String() string {
-	if c == nil || utils.IsNil(c) {
+	if utils.IsNil(c) {
 		return ""
 	}
 	methodStr := getStr(c.GetValueById(c.Method))
@@ -372,7 +372,7 @@ func (c *Call) String() string {
 	}
 }
 func (s *SideEffect) String() string {
-	if s == nil || utils.IsNil(s) {
+	if utils.IsNil(s) {
 		return ""
 	}
 	return fmt.Sprintf("%s = side-effect %s [%s] by %s", getStr(s), getStr(s.GetValueById(s.Value)), s.GetVerboseName(), getStr(s.GetValueById(s.CallSite)))
@@ -380,7 +380,7 @@ func (s *SideEffect) String() string {
 
 // ----------- Switch
 func (sw *Switch) String() string {
-	if sw == nil || utils.IsNil(sw) {
+	if utils.IsNil(sw) {
 		return ""
 	}
 	return fmt.Sprintf(
@@ -398,7 +398,7 @@ func (sw *Switch) String() string {
 
 // ----------- BinOp
 func (b *BinOp) String() string {
-	if b == nil || utils.IsNil(b) {
+	if utils.IsNil(b) {
 		return ""
 	}
 	return fmt.Sprintf("%s = %s %s %s", getStr(b), getStr(b.GetValueById(b.X)), b.Op, getStr(b.GetValueById(b.Y)))
@@ -406,7 +406,7 @@ func (b *BinOp) String() string {
 
 // ----------- UnOp
 func (u *UnOp) String() string {
-	if u == nil || utils.IsNil(u) {
+	if utils.IsNil(u) {
 		return ""
 	}
 	return fmt.Sprintf("%s = %s %s", getStr(u), u.Op, getStr(u.GetValueById(u.X)))
@@ -414,7 +414,7 @@ func (u *UnOp) String() string {
 
 // ----------- Interface
 func (i *Make) String() string {
-	if i == nil || utils.IsNil(i) {
+	if utils.IsNil(i) {
 		return ""
 	}
 	if i.parentI > 0 {
@@ -435,7 +435,7 @@ func (i *Make) String() string {
 }
 
 func (t *TypeCast) String() string {
-	if t == nil || utils.IsNil(t) {
+	if utils.IsNil(t) {
 		return ""
 	}
 	return fmt.Sprintf(
@@ -445,7 +445,7 @@ func (t *TypeCast) String() string {
 }
 
 func (t *TypeValue) String() string {
-	if t == nil || utils.IsNil(t) {
+	if utils.IsNil(t) {
 		return ""
 	}
 	return fmt.Sprintf(
@@ -455,7 +455,7 @@ func (t *TypeValue) String() string {
 }
 
 func (a *Assert) String() string {
-	if a == nil || utils.IsNil(a) {
+	if utils.IsNil(a) {
 		return ""
 	}
 	msg := a.Msg
@@ -470,7 +470,7 @@ func (a *Assert) String() string {
 }
 
 func (n *Next) String() string {
-	if n == nil || utils.IsNil(n) {
+	if utils.IsNil(n) {
 		return ""
 	}
 	return fmt.Sprintf(
@@ -480,7 +480,7 @@ func (n *Next) String() string {
 }
 
 func (e *ErrorHandler) String() string {
-	if e == nil || utils.IsNil(e) {
+	if utils.IsNil(e) {
 		return ""
 	}
 	finalName := "nil"
@@ -497,7 +497,7 @@ func (e *ErrorHandler) String() string {
 }
 
 func (e *ErrorCatch) String() string {
-	if e == nil || utils.IsNil(e) {
+	if utils.IsNil(e) {
 		return ""
 	}
 	return fmt.Sprintf(
@@ -507,7 +507,7 @@ func (e *ErrorCatch) String() string {
 }
 
 func (p *Panic) String() string {
-	if p == nil || utils.IsNil(p) {
+	if utils.IsNil(p) {
 		return ""
 	}
 	return fmt.Sprintf(
@@ -517,7 +517,7 @@ func (p *Panic) String() string {
 }
 
 func (r *Recover) String() string {
-	if r == nil || utils.IsNil(r) {
+	if utils.IsNil(r) {
 		return ""
 	}
 	return getStr(r) + " = recover"

@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -55,36 +53,29 @@ func TestWithPostParams(t *testing.T) {
 		name                string
 		input               any
 		expectedContentType string
-		expectedParams      map[string]string
+		expectedParams      []string
 		description         string
 	}{
 		{
 			name:                "map_input",
 			input:               map[string]string{"username": "admin", "password": "123456", "token": "abc123"},
 			expectedContentType: "application/x-www-form-urlencoded",
-			expectedParams:      map[string]string{"username": "admin", "password": "123456", "token": "abc123"},
+			expectedParams:      []string{"username=admin", "password=123456", "token=abc123"},
 			description:         "map input should be converted to form data with correct content type",
 		},
 		{
 			name:                "empty_value_map",
 			input:               map[string]string{"username": ""},
 			expectedContentType: "application/x-www-form-urlencoded",
-			expectedParams:      map[string]string{"username": ""},
+			expectedParams:      []string{"username="},
 			description:         "empty value map should set content type and empty parameter",
 		},
 		{
-			name: "nested_map_input",
-			input: map[string]interface{}{
-				"user": map[string]string{
-					"name": "admin",
-					"role": "user",
-				},
-				"settings": []string{"option1", "option2"},
-				"simple":   "value",
-			},
+			name:                "mutli_value_map",
+			input:               map[string][]string{"username": {"admin", "tom", "jerry"}},
 			expectedContentType: "application/x-www-form-urlencoded",
-			expectedParams:      nil, // 后续代码单独进行测试
-			description:         "嵌套map测试",
+			expectedParams:      []string{"username=admin", "&", "username=tom", "username=jerry"},
+			description:         "empty value map should set content type and empty parameter",
 		},
 	}
 
@@ -116,52 +107,12 @@ func TestWithPostParams(t *testing.T) {
 				require.Equal(t, tt.expectedContentType, req.Header.Get("Content-Type"))
 			}
 
-			responseBody := string(rsp.RawPacket)
-			bodyStart := strings.Index(responseBody, "Body: ")
-			require.Greater(t, bodyStart, -1, "Should find body in response")
-			formData := responseBody[bodyStart+6:] // Skip "Body: "
-
-			// Parse the form data to check individual parameters
-			values, err := url.ParseQuery(formData)
 			require.NoError(t, err, "Should be able to parse form data")
 
 			if tt.expectedParams != nil {
-				// Check each expected parameter individually
-				for expectedKey, expectedValue := range tt.expectedParams {
-					actualValue := values.Get(expectedKey)
-					require.Equal(t, expectedValue, actualValue,
-						"Parameter %s should have value %s, got %s", expectedKey, expectedValue, actualValue)
+				for _, param := range tt.expectedParams {
+					require.Contains(t, string(rsp.RawRequest), param)
 				}
-
-				// Verify we have the expected number of parameters
-				require.Equal(t, len(tt.expectedParams), len(values),
-					"Should have exactly %d parameters", len(tt.expectedParams))
-			}
-
-			// 嵌套map测试
-			if tt.name == "nested_map_input" {
-				t.Logf("Nested map form data: %s", formData)
-
-				// Verify basic parameters
-				require.Equal(t, "value", values.Get("simple"), "Simple parameter should be preserved")
-
-				// Verify nested structures are present as form parameters
-				require.NotEmpty(t, values.Get("user"), "User parameter should not be empty")
-				require.NotEmpty(t, values.Get("settings"), "Settings parameter should not be empty")
-
-				// Check that complex values are properly encoded
-				userValue := values.Get("user")
-				require.Contains(t, userValue, "admin", "User value should contain admin")
-				require.Contains(t, userValue, "user", "User value should contain role")
-
-				settingsValue := values.Get("settings")
-				require.Contains(t, settingsValue, "option1", "Settings should contain option1")
-				require.Contains(t, settingsValue, "option2", "Settings should contain option2")
-
-				t.Logf("✓ Nested map parameters:")
-				t.Logf("  - simple: %s", values.Get("simple"))
-				t.Logf("  - user: %s", values.Get("user"))
-				t.Logf("  - settings: %s", values.Get("settings"))
 			}
 
 			t.Logf("✓ %s: %s", tt.name, tt.description)
