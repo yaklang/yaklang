@@ -598,8 +598,6 @@ func WithPostParams(i any) PocConfigOption {
 			for k, v := range utils.InterfaceToMap(i) {
 				if len(v) == 0 {
 					WithReplaceHttpPacketPostParam(k, "")(c)
-				} else if len(v) == 1 {
-					WithReplaceHttpPacketPostParam(k, utils.InterfaceToString(v[0]))(c)
 				} else {
 					for _, vv := range v {
 						WithAppendPostParam(k, utils.InterfaceToString(vv))(c)
