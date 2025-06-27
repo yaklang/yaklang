@@ -106,14 +106,30 @@ func (r *RandomChunkedSender) calcRandomChunkedLen() int {
 	return randomLength + r.minChunkLength
 }
 
+// writeAndFlush 写入数据并立即flush，确保数据及时发送到服务端
+func (r *RandomChunkedSender) writeAndFlush(writer io.Writer, data []byte, errMsg string) error {
+	if _, err := writer.Write(data); err != nil {
+		return utils.Errorf("%s: %s", errMsg, err)
+	}
+
+	// 检查writer是否支持Flush，如果支持则立即flush
+	if flusher, ok := writer.(interface{ Flush() error }); ok {
+		if err := flusher.Flush(); err != nil {
+			return utils.Errorf("flush after %s: %s", errMsg, err)
+		}
+	}
+
+	return nil
+}
+
 func (r *RandomChunkedSender) Send(rawPacket []byte, writer io.Writer) error {
 	// header换成chunked的 body保持不变
 	r.requestPacket = HTTPHeaderForceChunked(rawPacket)
 	headers, body := SplitHTTPHeadersAndBodyFromPacket(r.requestPacket)
 
 	// 发送HTTP头部
-	if _, err := writer.Write([]byte(headers)); err != nil {
-		return utils.Errorf("send headers failed: %s", err)
+	if err := r.writeAndFlush(writer, []byte(headers), "send headers"); err != nil {
+		return err
 	}
 
 	reader := bytes.NewReader(body)
@@ -150,14 +166,14 @@ func (r *RandomChunkedSender) Send(rawPacket []byte, writer io.Writer) error {
 
 		// 发送分块长度头
 		chunkHeader := fmt.Sprintf("%x\r\n", n)
-		if _, err := writer.Write([]byte(chunkHeader)); err != nil {
-			return utils.Errorf("send chunk %d header failed: %s", chunkCount, err)
+		if err := r.writeAndFlush(writer, []byte(chunkHeader), "send chunk header"); err != nil {
+			return err
 		}
 
 		// 发送分块内容
 		chunkData := append(buffer[:n], []byte(CRLF)...)
-		if _, err := writer.Write(chunkData); err != nil {
-			return utils.Errorf("send chunk %d content failed: %s", chunkCount, err)
+		if err := r.writeAndFlush(writer, chunkData, "send chunk content"); err != nil {
+			return err
 		}
 
 		sentBytes += n
@@ -185,8 +201,8 @@ func (r *RandomChunkedSender) Send(rawPacket []byte, writer io.Writer) error {
 
 	// 发送结束分块标记
 	endChunk := fmt.Sprintf("0%s", DoubleCRLF)
-	if _, err := writer.Write([]byte(endChunk)); err != nil {
-		return utils.Errorf("send end chunk failed: %s", err)
+	if err := r.writeAndFlush(writer, []byte(endChunk), "send end chunk"); err != nil {
+		return err
 	}
 	return nil
 }
