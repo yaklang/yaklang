@@ -477,7 +477,7 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRule(db *gorm.DB, flow *schema.HTTPF
 		}
 
 		if rule.EnableForRequest {
-			match, _ := re.MatchString(flow.Request)
+			match, _ := re.MatchString(flow.GetRequest())
 			if match {
 				extracts := extractData(pattern, rule, flow, true)
 				if len(extracts) == 0 {
@@ -492,7 +492,7 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRule(db *gorm.DB, flow *schema.HTTPF
 		}
 
 		if rule.EnableForResponse {
-			match, _ := re.MatchString(flow.Response)
+			match, _ := re.MatchString(flow.GetResponse())
 			if match {
 				extracts := extractData(pattern, rule, flow, false)
 				if len(extracts) == 0 {

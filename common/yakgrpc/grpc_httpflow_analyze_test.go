@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"strings"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"io"
-	"strings"
-	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -774,4 +775,112 @@ Accept: */*
 	}
 	require.Greater(t, tagCount, 0)
 	require.Greater(t, colorCount, 0)
+}
+
+func TestGRPCMUSTPASS_AnalyzeHTTPFlow_SessionKeyRegex(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	token := uuid.NewString()
+	req := `GET /api/login HTTP/1.1
+Host: api.example.com
+Content-Type: application/json
+`
+
+	rsp := `HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Thu, 26 Jun 2025 06:30:36 GMT
+Content-Length: 116
+
+{"code":200,"message":"success","user":{"openid":"user12345","session_id":"sess_abcdefg12345","session_key":"aaa"}}`
+
+	url := fmt.Sprintf("https://api.example.com/login?%s", token)
+	err, deleteFlow := createHTTPFlow(url, req, rsp)
+	defer deleteFlow()
+	require.NoError(t, err)
+
+	ruleVerboseName := uuid.NewString()
+	tag := uuid.NewString()
+	color := "purple"
+	regexRule := `(?i)\"session[_]?key\"`
+
+	stream, err := client.AnalyzeHTTPFlow(context.Background(), &ypb.AnalyzeHTTPFlowRequest{
+		HotPatchCode: "",
+		Replacers: []*ypb.MITMContentReplacer{
+			{
+				EnableForBody:     true,
+				EnableForResponse: true,
+				Rule:              regexRule,
+				VerboseName:       ruleVerboseName,
+				Color:             color,
+				ExtraTag:          []string{tag},
+				NoReplace:         true,
+			},
+		},
+		Source: &ypb.AnalyzedDataSource{
+			SourceType: AnalyzeHTTPFlowSourceDatabase,
+			HTTPFlowFilter: &ypb.QueryHTTPFlowRequest{
+				SearchURL: url,
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	var resultId string
+	{
+		for {
+			rsp, err := stream.Recv()
+			if err == io.EOF {
+				break
+			}
+			require.NoError(t, err)
+			resultId = rsp.ExecResult.GetRuntimeID()
+			result := rsp.GetExecResult().GetMessage()
+			var msg msg
+			json.Unmarshal(result, &msg)
+			ruleData := rsp.GetRuleData()
+			if ruleData != nil {
+				fmt.Printf("Found session_key match: %+v\n", ruleData)
+			}
+		}
+	}
+
+	var result *schema.AnalyzedHTTPFlow
+	{
+		results := yakit.QueryAnalyzedHTTPFlowRule(consts.GetGormProjectDatabase(), []string{resultId})
+		require.NoError(t, err)
+		fmt.Println(results)
+		require.Equal(t, 1, len(results))
+		result = results[0]
+		require.Equal(t, ruleVerboseName, result.RuleVerboseName)
+
+		httpflowId := result.HTTPFlowId
+		queryFlow, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
+			IncludeId: []int64{httpflowId},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 1, len(queryFlow.Data))
+		flow := queryFlow.Data[0]
+		fmt.Printf("Analyzed flow: %+v\n", flow)
+
+		// 验证color和tag是否正确设置
+		require.Contains(t, flow.Tags, tag, "Flow should contain the specified tag")
+		require.Contains(t, flow.Tags, schema.COLORPREFIX+strings.ToUpper(color), "Flow should contain the color tag")
+
+		// 验证响应体确实包含session_key
+		require.Contains(t, string(flow.Response), "session_key", "Response should contain session_key")
+		require.Contains(t, string(flow.Response), `"session_key":"aaa"`, "Response should contain the exact session_key value")
+	}
+
+	{
+		// 通过analyzed flow id查询HTTPFlow
+		flows, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
+			AnalyzedIds: []int64{int64(result.ID)},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 1, len(flows.Data))
+
+		t.Logf("Successfully matched session_key with regex: %s", regexRule)
+		t.Logf("Flow tags: %s", flows.Data[0].Tags)
+	}
 }
