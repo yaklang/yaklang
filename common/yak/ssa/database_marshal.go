@@ -98,6 +98,7 @@ func fetchIds(origin any) any {
 }
 
 func marshalExtraInformation(raw Instruction) map[string]any {
+
 	params := make(map[string]any)
 	switch ret := raw.(type) {
 	case *Function:

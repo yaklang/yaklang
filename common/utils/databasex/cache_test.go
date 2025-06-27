@@ -1,13 +1,13 @@
-package utils_test
+package databasex_test
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/databasex"
 )
 
 func TestDatabaseCache(t *testing.T) {
@@ -15,7 +15,7 @@ func TestDatabaseCache(t *testing.T) {
 	_ = database
 	ttl := time.Millisecond * 100
 
-	cache := utils.NewDatabaseCacheWithKey[int, string](
+	cache := databasex.NewDatabaseCacheWithKey[int, string](
 		ttl,
 		func(i int, s string, reason utils.EvictionReason) bool {
 			log.Infof("save to database, key: %v, value: %v", i, s)
@@ -63,7 +63,7 @@ func TestDatabaseCache_WithDatabaseTime(t *testing.T) {
 
 	load := utils.NewSafeMapWithKey[int, struct{}]()
 
-	cache := utils.NewDatabaseCacheWithKey[int, string](
+	cache := databasex.NewDatabaseCacheWithKey[int, string](
 		ttl,
 		func(i int, s string, reason utils.EvictionReason) bool {
 			log.Infof("save to database, key: %v, value: %v", i, s)
@@ -118,7 +118,7 @@ func TestDatabaseCache_ManualDelete(t *testing.T) {
 	ttl := time.Millisecond * 100
 	log.SetLevel(log.DebugLevel)
 
-	cache := utils.NewDatabaseCacheWithKey[int, string](
+	cache := databasex.NewDatabaseCacheWithKey[int, string](
 		time.Second*10,
 		func(i int, s string, reason utils.EvictionReason) bool {
 			log.Infof("save to database, key: %v, value: %v", i, s)
@@ -157,7 +157,7 @@ func TestDatabaseCache_NoDatabase(t *testing.T) {
 	// just in memory
 	ttl := time.Millisecond * 100
 	log.SetLevel(log.DebugLevel)
-	cache := utils.NewDatabaseCacheWithKey[int, string](
+	cache := databasex.NewDatabaseCacheWithKey[int, string](
 		ttl,
 		func(i int, s string, reason utils.EvictionReason) bool {
 			log.Infof("save to database, key: %v, value: %v", i, s)
@@ -190,7 +190,7 @@ func TestDatabaseCache_Close(t *testing.T) {
 	_ = database
 	ttl := time.Millisecond * 100
 
-	cache := utils.NewDatabaseCacheWithKey[int, string](
+	cache := databasex.NewDatabaseCacheWithKey[int, string](
 		ttl,
 		func(i int, s string, reason utils.EvictionReason) bool {
 			log.Infof("save to database, key: %v, value: %v", i, s)
@@ -224,11 +224,11 @@ func TestDatabaseCache_Close(t *testing.T) {
 	require.Contains(t, "2", data2DB)
 }
 func TestDatabaseCache_DisableEnableSave(t *testing.T) {
-	// log.SetLevel(log.DebugLevel)
+	log.SetLevel(log.DebugLevel)
 	database := utils.NewSafeMapWithKey[int, string]()
 	ttl := time.Millisecond * 100
 
-	cache := utils.NewDatabaseCacheWithKey[int, string](
+	cache := databasex.NewDatabaseCacheWithKey[int, string](
 		ttl,
 		func(i int, s string, reason utils.EvictionReason) bool {
 			log.Infof("save to database, key: %v, value: %v", i, s)
@@ -286,22 +286,4 @@ func TestDatabaseCache_DisableEnableSave(t *testing.T) {
 	data1, ok = cache.Get(1)
 	require.True(t, ok)
 	require.Equal(t, "1", data1)
-}
-
-func TestA(t *testing.T) {
-	cache := utils.NewCacheExWithKey[string, string]()
-	log.Infof("set key 1")
-	for i := 0; i < 1000; i++ {
-		key := fmt.Sprintf("key%d", i)
-		cache.Set(key, "value1")
-	}
-
-	cache.SetExpirationCallback(func(key, value string, reason utils.EvictionReason) {
-		log.Infof("set key 2 ")
-		cache.Set(key, value)
-	})
-
-	log.Infof("close ")
-	cache.Close()
-	log.Infof("close done ")
 }

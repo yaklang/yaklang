@@ -33,17 +33,16 @@ func (i *IrIndex) TableName() string {
 	return "ir_indices"
 }
 
-func CreateIndex() *IrIndex {
+func CreateIndex(db *gorm.DB) *IrIndex {
 	ret := &IrIndex{}
-	GetDB().Model(&IrIndex{}).Create(ret)
+	db.Model(&IrIndex{}).Create(ret)
 	return ret
 }
-func SaveIrIndex(idx *IrIndex) {
+func SaveIrIndex(db *gorm.DB, idx *IrIndex) {
 	start := time.Now()
 	defer func() {
 		atomic.AddUint64(&_SSAIndexCost, uint64(time.Now().Sub(start).Nanoseconds()))
 	}()
-	db := GetDB()
 	db.Save(idx)
 }
 

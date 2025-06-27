@@ -1,19 +1,27 @@
 package ssa
 
 import (
-	"reflect"
+	"context"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils/databasex"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"go.uber.org/atomic"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-
-	syncAtomic "sync/atomic"
 )
+
+type fetchedIdResult struct {
+	id     int64
+	irCode *ssadb.IrCode
+}
+
+const fetchIdSize = 100
 
 type instructionCachePair struct {
 	inst   Instruction
@@ -31,40 +39,189 @@ type Cache struct {
 	program          *Program // mark which program handled
 	DB               *gorm.DB
 	fetchId          func() (int64, *ssadb.IrCode) // fetch a new id
-	InstructionCache *utils.DataBaseCacheWithKey[int64, *instructionCachePair]
+	InstructionCache *databasex.DataBaseCacheWithKey[int64, *instructionCachePair]
+	Saver            *databasex.Saver[*ssadb.IrCode]
 
 	VariableIndex InstructionsIndex
 	MemberIndex   InstructionsIndex
 	ClassIndex    InstructionsIndex
 	ConstCache    InstructionsIndex
+	OffsetCache   InstructionsIndex
 
-	afterSaveNotify func()
+	afterSaveNotify func(int)
+
+	waitGroup *sync.WaitGroup // wait for all goroutines to finish
+
+	// For pre-fetching IDs
+	fetchIdCancel context.CancelFunc
 }
+
+const (
+	chanSize = 200
+	saveSize = 2000
+	saveTime = time.Second * 1
+)
 
 // NewDBCache : create a new ssa db cache. if ttl is 0, the cache will never expire, and never save to database.
 func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) *Cache {
+	cacheCtx := context.Background()
 	ttl := time.Duration(0)
 	cache := &Cache{
 		program: prog,
+		// set ttl
+		fetchIdCancel: func() {},
+		waitGroup:     &sync.WaitGroup{},
 	}
-	// set ttl
+	var programName string
 	if databaseEnable {
 		if len(ConfigTTL) > 0 {
 			ttl = ConfigTTL[0]
 		} else {
 			ttl = time.Second * 8
 		}
+		programName = prog.GetProgramName()
+		cache.DB = ssadb.GetDB().Where("program_name = ?", programName)
+	}
+
+	// set index
+	if databaseEnable {
+		cache.VariableIndex = NewInstructionsIndexDB(
+			func(items []InstructionsIndexItem) {
+				utils.GormTransaction(cache.DB, func(tx *gorm.DB) error {
+					for _, item := range items {
+						SaveVariableIndexByName(tx, item.Name, item.Inst)
+					}
+					return nil
+				})
+			},
+		)
+		cache.MemberIndex = NewInstructionsIndexDB(
+			func(items []InstructionsIndexItem) {
+				utils.GormTransaction(cache.DB, func(tx *gorm.DB) error {
+					for _, item := range items {
+						SaveVariableIndexByMember(tx, item.Name, item.Inst)
+					}
+					return nil
+				})
+			},
+		)
+
+		cache.ClassIndex = NewInstructionsIndexDB(
+			func(items []InstructionsIndexItem) {
+				utils.GormTransaction(cache.DB, func(tx *gorm.DB) error {
+					for _, item := range items {
+						SaveClassIndex(tx, item.Name, item.Inst)
+					}
+					return nil
+				})
+			},
+		)
+
+		cache.OffsetCache = NewInstructionsIndexDB(func(iii []InstructionsIndexItem) {
+			utils.GormTransaction(cache.DB, func(tx *gorm.DB) error {
+				for _, item := range iii {
+					SaveValueOffset(tx, item.Inst)
+					if value, ok := ToValue(item.Inst); ok {
+						for _, variable := range value.GetAllVariables() {
+							if variable.GetId() <= 0 {
+								continue // skip variable without id
+							}
+							SaveVariableOffset(tx, variable, variable.GetName(), int64(value.GetId()))
+						}
+					}
+				}
+				return nil
+			})
+
+		})
+
+		cache.ConstCache = NewInstructionsIndexDB(
+			func(ii []InstructionsIndexItem) {
+			},
+		)
+
+	} else {
+		cache.VariableIndex = NewInstructionsIndexMem()
+		cache.MemberIndex = NewInstructionsIndexMem()
+		cache.ClassIndex = NewInstructionsIndexMem()
+		cache.ConstCache = NewInstructionsIndexMem()
+		cache.OffsetCache = NewInstructionsIndexMem()
 	}
 
 	// init instruction cache and fetchId
 	var save func(int64, *instructionCachePair, utils.EvictionReason) bool
 	var load func(int64) (*instructionCachePair, error)
+
 	if databaseEnable {
-		programName := prog.GetProgramName()
-		cache.DB = ssadb.GetDB().Where("program_name = ?", programName)
-		cache.fetchId = func() (int64, *ssadb.IrCode) {
-			return ssadb.RequireIrCode(cache.DB, programName)
+
+		irFetch := databasex.NewFetch(func() []fetchedIdResult {
+			result := make([]fetchedIdResult, 0, fetchIdSize)
+			utils.GormTransaction(cache.DB, func(tx *gorm.DB) error {
+				// tx := cache.DB
+				for len(result) < fetchIdSize {
+					id, irCode := ssadb.RequireIrCode(tx, programName)
+					if utils.IsNil(irCode) || id <= 0 {
+						// return nil // no more id to fetch
+						continue
+					}
+					result = append(result, fetchedIdResult{
+						id:     id,
+						irCode: irCode,
+					})
+				}
+				return nil
+			})
+			return result
+		},
+			databasex.WithBufferSize(fetchIdSize),
+			databasex.WithContext(cacheCtx),
+		)
+
+		cache.fetchIdCancel = func() {
+			irFetch.Close(func(fir ...fetchedIdResult) {
+				ids := lo.Map(fir, func(item fetchedIdResult, _ int) int64 {
+					return item.id
+				})
+				ssadb.DeleteIRCode(cache.DB, ids...)
+			})
 		}
+
+		cache.fetchId = func() (int64, *ssadb.IrCode) {
+			var result fetchedIdResult
+			result, err := irFetch.Fetch()
+			if err != nil {
+				log.Errorf("fetchId error: %v", err)
+				return -1, nil
+			} else {
+				return result.id, result.irCode
+			}
+		}
+
+		saver := databasex.NewSaver(func(t []*ssadb.IrCode) {
+			defer func() {
+				if err := recover(); err != nil {
+					log.Errorf("DATABASE: Save IR Codes panic: %v", err)
+					utils.PrintCurrentGoroutineRuntimeStack()
+				}
+			}()
+			utils.GormTransaction(cache.DB, func(tx *gorm.DB) error {
+				for _, irCode := range t {
+					if err := irCode.Save(tx); err != nil {
+						log.Errorf("DATABASE: save irCode to database error: %v", err)
+					}
+				}
+				return nil
+			})
+			if cache.afterSaveNotify != nil {
+				cache.afterSaveNotify(len(t))
+			}
+		},
+			databasex.WithBufferSize(chanSize),
+			databasex.WithSaveSize(saveSize),
+			databasex.WithSaveTimeout(saveTime),
+		)
+		cache.Saver = saver
+
 		save = func(i int64, s *instructionCachePair, reason utils.EvictionReason) bool {
 			if reason == utils.EvictionReasonExpired {
 				if s.inst.GetOpcode() == SSAOpcodeFunction || s.inst.GetOpcode() == SSAOpcodeBasicBlock {
@@ -72,7 +229,12 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 					return false
 				}
 			}
-			return cache.saveInstruction(s)
+			if cache.marshalInstruction(s) {
+				cache.OffsetCache.Add("", s.inst)
+				saver.Save(s.irCode)
+				return true
+			}
+			return false
 		}
 		load = func(id int64) (*instructionCachePair, error) {
 			irCode := ssadb.GetIrCodeById(cache.DB, id)
@@ -87,6 +249,7 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 		}
 	} else {
 		id := atomic.NewInt64(0)
+
 		cache.fetchId = func() (int64, *ssadb.IrCode) {
 			return id.Inc(), nil
 		}
@@ -97,43 +260,8 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 			return false // disable save to database
 		}
 	}
-	cache.InstructionCache = utils.NewDatabaseCacheWithKey(ttl, save, load)
+	cache.InstructionCache = databasex.NewDatabaseCacheWithKey(ttl, save, load)
 	cache.InstructionCache.DisableSave()
-
-	// set index
-	if databaseEnable {
-		cache.VariableIndex = NewInstructionsIndexDB(
-			func(s string, i Instruction) error {
-				SaveVariableIndexByName(s, i)
-				return nil
-			},
-		)
-		cache.MemberIndex = NewInstructionsIndexDB(
-			func(s string, i Instruction) error {
-				SaveVariableIndexByMember(s, i)
-				return nil
-			},
-		)
-
-		cache.ClassIndex = NewInstructionsIndexDB(
-			func(s string, i Instruction) error {
-				SaveClassIndex(s, i)
-				return nil
-			},
-		)
-
-		cache.ConstCache = NewInstructionsIndexDB(
-			func(s string, i Instruction) error {
-				return nil
-			},
-		)
-
-	} else {
-		cache.VariableIndex = NewInstructionsIndexMem()
-		cache.MemberIndex = NewInstructionsIndexMem()
-		cache.ClassIndex = NewInstructionsIndexMem()
-		cache.ConstCache = NewInstructionsIndexMem()
-	}
 
 	return cache
 }
@@ -143,48 +271,6 @@ func (c *Cache) HaveDatabaseBackend() bool {
 }
 
 // =============================================== Instruction =======================================================
-
-func (c *Cache) Refresh(insts any) {
-	if c.InstructionCache.IsClose() {
-		return
-	}
-	if utils.IsNil(insts) {
-		return
-	}
-	refresh := func(inst Instruction) {
-		id := inst.GetId()
-		if id <= 0 {
-			c.SetInstruction(inst)
-			return
-		}
-		if item, ok := c.InstructionCache.GetPure(id); ok {
-			if item.inst != inst {
-				if item.inst.IsLazy() {
-					item.inst = inst
-					c.InstructionCache.Set(id, item)
-				}
-			}
-		} else {
-			c.InstructionCache.Set(id, &instructionCachePair{
-				inst:   inst,
-				irCode: ssadb.GetIrCodeById(ssadb.GetDB(), id),
-			})
-		}
-	}
-	t := reflect.TypeOf(insts).Kind()
-	if t == reflect.Array || t == reflect.Slice {
-		len := reflect.ValueOf(insts).Len()
-		for i := 0; i < len; i++ {
-			if ins, ok := reflect.ValueOf(insts).Index(i).Interface().(Instruction); ok {
-				refresh(ins)
-			}
-		}
-	} else {
-		if ins, ok := insts.(Instruction); ok {
-			refresh(ins)
-		}
-	}
-}
 
 // SetInstruction : set instruction to cache.
 func (c *Cache) SetInstruction(inst Instruction) {
@@ -198,13 +284,16 @@ func (c *Cache) SetInstruction(inst Instruction) {
 			log.Errorf("BUG: fetchId return invalid id: %d", id)
 			return
 		}
+
 		c.InstructionCache.Set(id, &instructionCachePair{
 			inst:   inst,
 			irCode: irCode,
 		})
-	} else {
-		c.Refresh(inst)
 	}
+	if inst.GetId() > 0 {
+		c.InstructionCache.Get(id)
+	}
+
 }
 
 func (c *Cache) DeleteInstruction(inst Instruction) {
@@ -241,7 +330,6 @@ func (c *Cache) AddVariable(name string, inst Instruction) {
 		}
 	}
 	if member != "" {
-		log.Infof("add member %s : %v", name, inst)
 		c.MemberIndex.Add(member, inst)
 	} else {
 		c.VariableIndex.Add(name, inst)
@@ -262,7 +350,6 @@ func (c *Cache) RemoveVariable(name string, inst Instruction) {
 	}
 
 	if member != "" {
-		log.Infof("remove member %s : %v", name, inst)
 		c.MemberIndex.Delete(member, inst)
 	} else {
 		c.VariableIndex.Delete(name, inst)
@@ -275,13 +362,16 @@ func (c *Cache) AddClassInstance(name string, inst Instruction) {
 
 // =============================================== Database =======================================================
 // only LazyInstruction and false marshal will not be saved to database
-func (c *Cache) saveInstruction(instIr *instructionCachePair) bool {
+func (c *Cache) marshalInstruction(instIr *instructionCachePair) bool {
+	if utils.IsNil(instIr) || utils.IsNil(instIr.inst) {
+		log.Errorf("BUG: marshalInstruction called with nil instruction")
+		return false
+	}
 	if instIr.inst.GetId() == -1 {
 		log.Errorf("[BUG]: instruction id is -1: %s", codec.AnyToString(instIr.inst))
 		return false
 	}
 	// log.Infof("save instruction : %v", instIr.inst.GetId())
-	start := time.Now()
 	if !c.HaveDatabaseBackend() {
 		log.Errorf("BUG: saveInstruction called when DB is nil")
 		return false
@@ -304,27 +394,26 @@ func (c *Cache) saveInstruction(instIr *instructionCachePair) bool {
 	if instIr.irCode.Opcode == 0 {
 		log.Errorf("BUG: saveInstruction called with empty opcode: %v", instIr.inst.GetName())
 	}
-	if err := instIr.irCode.Save(c.DB); err != nil {
-		log.Errorf("Save irCode error: %v", err)
-	}
-	syncAtomic.AddUint64(&_SSASaveIrCodeCost, uint64(time.Since(start)))
-	if c.afterSaveNotify != nil {
-		c.afterSaveNotify()
-	}
-
 	return true
 }
 
-func (c *Cache) SaveToDatabase(cb ...func()) {
+func (c *Cache) SaveToDatabase(cb ...func(int)) {
 	if !c.HaveDatabaseBackend() {
 		return
 	}
 	if len(cb) > 0 {
 		c.afterSaveNotify = cb[0]
 	}
-	c.InstructionCache.EnableSave()
 	c.InstructionCache.Close()
-	c.InstructionCache.DisableSave()
+	if !utils.IsNil(c.Saver) {
+		c.Saver.Close()
+	}
+	c.VariableIndex.Close()
+	c.MemberIndex.Close()
+	c.ClassIndex.Close()
+	c.ConstCache.Close()
+	c.OffsetCache.Close()
+	c.fetchIdCancel()
 }
 
 func (c *Cache) CountInstruction() int {
