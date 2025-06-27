@@ -1,8 +1,13 @@
 package yak
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/consts"
@@ -10,15 +15,11 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"os"
-	"testing"
-
-	"github.com/davecgh/go-spew/spew"
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid"
-	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"os"
+	"strings"
+	"testing"
 )
 
 func TestBuildInForge(t *testing.T) {
@@ -219,4 +220,60 @@ func TestReducerIntentRecognition(t *testing.T) {
 	err = reducer.Run()
 	require.NoError(t, err)
 	select {}
+}
+
+func TestWebLogMonitor(t *testing.T) {
+	yakit.InitialDatabase()
+	filePath := "C:\\Users\\Rookie\\Desktop\\ai-balance-log.txt.4"
+	fp, err := os.Open(filePath)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	cod, err := aid.NewCoordinatorContext(ctx, "", aid.WithAICallback(aiforge.GetHoldAICallback()))
+	require.NoError(t, err)
+	memory := cod.GetConfig().GetMemory()
+
+	var cacheBuffer []string
+
+	reducer, err := aireducer.NewReducerFromReader(
+		fp,
+		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.Memory, chunk chunkmaker.Chunk) error {
+			spew.Dump(strings.Trim(string(chunk.Data()), "[INFO]"))
+			cacheBuffer = append(cacheBuffer, string(chunk.Data()))
+			if len(cacheBuffer) < 10 {
+				return nil
+			}
+			defer func() {
+				cacheBuffer = make([]string, 0)
+			}()
+			logBuffer := strings.Join(cacheBuffer, "\n")
+			res, err := ExecuteForge("entity_identify",
+				logBuffer,
+				WithAICallback(aiforge.GetHoldAICallback()),
+				WithDisallowRequireForUserPrompt(),
+				WithMemory(memory),
+			)
+			if err != nil {
+				return err
+			}
+			spew.Dump(res)
+			return nil
+		}),
+		aireducer.WithSeparatorTrigger("[INFO]"),
+		aireducer.WithContext(ctx),
+		aireducer.WithMemory(memory),
+	)
+	require.NoError(t, err)
+	err = reducer.Run()
+	require.NoError(t, err)
+	select {}
+}
+
+func TestAAA(t *testing.T) {
+	reader := bytes.NewReader([]byte("abc"))
+	read, err := reader.Read(make([]byte, 100))
+	if err != nil {
+		spew.Dump(err)
+	}
+	spew.Dump(read)
 }
