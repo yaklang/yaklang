@@ -285,8 +285,8 @@ func TestRandomChunkedHTTPWithConnectionPool(t *testing.T) {
 			requestBody:     `{"test":"connection_pool","data":"` + strings.Repeat("X", 50) + `"}`,
 			minChunkLength:  10,
 			maxChunkLength:  25,
-			minDelay:        0,
-			maxDelay:        10 * time.Millisecond,
+			minDelay:        100,
+			maxDelay:        200 * time.Millisecond,
 			poolSize:        2,
 			requestCount:    3,
 			validateHandler: true,
@@ -296,11 +296,22 @@ func TestRandomChunkedHTTPWithConnectionPool(t *testing.T) {
 			serverHandler: func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
+
+				// 记录服务端接收时间
+				startReceive := time.Now()
+				t.Logf("Server: Started receiving request at %v", startReceive)
+
 				body, err := io.ReadAll(r.Body)
 				if err != nil {
 					http.Error(w, "Failed to read request body", http.StatusInternalServerError)
 					return
 				}
+
+				endReceive := time.Now()
+				receiveDuration := endReceive.Sub(startReceive)
+				t.Logf("Server: Finished receiving request at %v, total receive duration: %v", endReceive, receiveDuration)
+				t.Logf("Server: Received %d bytes in %v (%.2f KB/s)", len(body), receiveDuration, float64(len(body))/1024.0/receiveDuration.Seconds())
+
 				w.Write(body)
 			},
 		},
