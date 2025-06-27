@@ -78,10 +78,59 @@ type SymmetricCryptFunc func(key []byte, i interface{}, iv []byte) ([]byte, erro
 var AESCBCEncrypt = AESEncryptCBCWithPKCSPadding
 var AESCBCDecrypt = AESDecryptCBCWithPKCSPadding
 
-var AESEncryptCBCWithPKCSPadding = AESEncFactory(PKCS5Padding, CBC)
-var AESEncryptCBCWithZeroPadding = AESEncFactory(ZeroPadding, CBC)
-var AESDecryptCBCWithPKCSPadding = AESDecFactory(PKCS5UnPadding, CBC)
-var AESDecryptCBCWithZeroPadding = AESDecFactory(ZeroUnPadding, CBC)
+// AESCBCEncryptWithPKCS7Padding 使用 AES 算法，在 CBC 模式下，使用 PKCS5 填充来加密数据。
+// 它接受一个密钥（key）、需要加密的数据（data to encrypt）和一个初始化向量（iv）。
+// 密钥的长度必须是 16、24 或 32 字节（分别对应 AES-128、AES-192 或 AES-256）。
+// 如果iv为 nil，则使用key的前16字节作为iv。
+// 注意：AESCBCEncrypt AESEncrypt 和 AESCBCEncryptWithPKCS7Padding 是同一个函数的别名
+// example：
+// ```
+//
+//	codec.AESCBCEncryptWithPKCS7Padding("1234567890123456", "hello world", "1234567890123456")
+//
+// ```
+func AESEncryptCBCWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
+	return AESEncFactory(PKCS5Padding, CBC)(key, i, iv)
+}
+
+// AESCBCDecryptWithPKCS7Padding 使用 AES 算法，在 CBC 模式下，使用 PKCS5 填充来解密数据。
+// 它接受一个密钥（key）、需要解密的数据（data to decrypt）和一个初始化向量（iv）。
+// 密钥的长度必须是 16、24 或 32 字节（分别对应 AES-128、AES-192 或 AES-256）。
+// 如果iv为 nil，则使用key的前16字节作为iv。
+// 注意：AESCBCDecrypt AESDecrypt 和 AESCBCDecryptWithPKCS7Padding 是同一个函数的别名
+// example：
+// ```
+//
+//	codec.AESCBCDecryptWithPKCS7Padding("1234567890123456", ciphertext, "1234567890123456")
+//
+// ```
+func AESDecryptCBCWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
+	return AESDecFactory(PKCS5UnPadding, CBC)(key, i, iv)
+}
+
+// AESCBCEncryptWithZeroPadding 使用 AES 算法，在 CBC 模式下，使用 Zero 填充来加密数据。
+// 它接受一个密钥（key）、需要加密的数据（data to encrypt）和一个初始化向量（iv）。
+// 密钥的长度必须是 16、24 或 32 字节（分别对应 AES-128、AES-192 或 AES-256）。
+// 如果iv为 nil，则使用key的前16字节作为iv。
+// example：
+// ```
+// codec.AESCBCEncryptWithZeroPadding("1234567890123456", "hello world", "1234567890123456")
+// ```
+func AESEncryptCBCWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
+	return AESEncFactory(ZeroPadding, CBC)(key, i, iv)
+}
+
+// AESCBCDecryptWithZeroPadding 使用 AES 算法，在 CBC 模式下，使用 Zero 填充来解密数据。
+// 它接受一个密钥（key）、需要解密的数据（data to decrypt）和一个初始化向量（iv）。
+// 密钥的长度必须是 16、24 或 32 字节（分别对应 AES-128、AES-192 或 AES-256）。
+// 如果iv为 nil，则使用key的前16字节作为iv。
+// example：
+// ```
+// codec.AESCBCDecryptWithZeroPadding("1234567890123456", ciphertext, "1234567890123456")
+// ```
+func AESDecryptCBCWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
+	return AESDecFactory(ZeroUnPadding, CBC)(key, i, iv)
+}
 
 func AESEncFactory(paddingFunc func([]byte, int) []byte, mode string) SymmetricCryptFunc {
 	return func(key []byte, i interface{}, iv []byte) ([]byte, error) {

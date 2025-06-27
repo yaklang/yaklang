@@ -78,7 +78,52 @@ package codec
 var AESECBDecrypt = AESDecryptECBWithPKCSPadding
 var AESECBEncrypt = AESEncryptECBWithPKCSPadding
 
-var AESEncryptECBWithPKCSPadding = AESEncFactory(PKCS5Padding, ECB)
-var AESEncryptECBWithZeroPadding = AESEncFactory(ZeroPadding, ECB)
-var AESDecryptECBWithPKCSPadding = AESDecFactory(PKCS5UnPadding, ECB)
-var AESDecryptECBWithZeroPadding = AESDecFactory(ZeroUnPadding, ECB)
+// AESCBCEncryptWithZeroPadding 使用 AES 算法，在 ECB 模式下对数据进行加密，使用 PKCSPadding 填充方式
+// 它接受一个密钥（key）、需要加密的数据（data to encrypt）。
+// ecb 模式下iv 无用。
+// 密钥的长度必须是 16、24 或 32 字节（分别对应 AES-128、AES-192 或 AES-256）。
+// AESECBEncrypt 和 AESECBEncryptWithPKCSPadding 是同一个函数。
+// example:
+// ```
+// codec.AESECBEncryptWithPKCS7Padding("1234567890123456", "hello world", nil)
+// ```
+func AESEncryptECBWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
+	return AESEncFactory(PKCS5Padding, ECB)(key, i, iv)
+}
+
+// AESCBCEncryptWithZeroPadding 使用 AES 算法，在 ECB 模式下对数据进行加密，使用 ZeroPadding 填充方式
+// 它接受一个密钥（key）、需要加密的数据（data to encrypt）。
+// ecb 模式下iv 无用。
+// 密钥的长度必须是 16、24 或 32 字节（分别对应 AES-128、AES-192 或 AES-256）。
+// example:
+// ```
+// codec.AESECBEncryptWithZeroPadding("1234567890123456", "hello world", nil)
+// ```
+func AESEncryptECBWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
+	return AESEncFactory(ZeroPadding, ECB)(key, i, iv)
+}
+
+// AESDecryptECBWithPKCSPadding 使用 AES 算法，在 ECB 模式下对数据进行解密，使用 PKCSPadding 填充方式
+// 它接受一个密钥（key）、需要解密的数据（data to decrypt）。
+// ecb 模式下iv 无用。
+// 密钥的长度必须是 16、24 或 32 字节（分别对应 AES-128、AES-192 或 AES-256）。
+// AESECBDecrypt 和 AESDecryptECBWithPKCSPadding 是同一个函数。
+// example:
+// ```
+// codec.AESECBDecryptWithPKCS7Padding("1234567890123456", "hello world", nil)
+// ```
+func AESDecryptECBWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
+	return AESDecFactory(PKCS5UnPadding, ECB)(key, i, iv)
+}
+
+// AESDecryptECBWithZeroPadding 使用 AES 算法，在 ECB 模式下对数据进行解密，使用 ZeroPadding 填充方式
+// 它接受一个密钥（key）、需要解密的数据（data to decrypt）。
+// ecb 模式下iv 无用。
+// 密钥的长度必须是 16、24 或 32 字节（分别对应 AES-128、AES-192 或 AES-256）。
+// example:
+// ```
+// codec.AESECBDecryptWithZeroPadding("1234567890123456", "hello world", nil)
+// ```
+func AESDecryptECBWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
+	return AESDecFactory(ZeroUnPadding, ECB)(key, i, iv)
+}
