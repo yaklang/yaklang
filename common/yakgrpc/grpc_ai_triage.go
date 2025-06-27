@@ -152,16 +152,20 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 						buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), aidOption...),
 						yak.WithMemory(memory),
 						yak.WithDisallowRequireForUserPrompt(),
-						yak.WithContext(subCtx)))
+						yak.WithContext(subCtx))...)
 				if err != nil {
 					log.Errorf("ExecuteForge: %v", err)
 					return
 				}
 
-				resString := utils.InterfaceToString(res)
+				intent, ok := res.(aitool.InvokeParams)
+				if !ok {
+					return
+				}
+				//fmt.Println(intent.GetString("detail_intention"))
 				//fmt.Println(resString)
-				if resString != "" {
-					forgeList, err := searchHandler(resString, getForge())
+				if intentAssertion := intent.GetString("assertion"); intentAssertion != "" {
+					forgeList, err := searchHandler(intentAssertion, getForge())
 					if err != nil {
 						log.Errorf("searchHandler: %v", err)
 						return
