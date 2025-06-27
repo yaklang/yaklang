@@ -28,10 +28,10 @@ jobs:
         run: echo ${{ env.YAK_VERSION }}
 
       - name: Download Last Published Version
-        run: wget -q -O previous_version.txt https://aliyun-oss.yaklang.com/yak/latest/version.txt
+        run: wget -q -O previous_version.txt https://yaklang.oss-accelerate.aliyuncs.comyak/latest/version.txt
 
       - name: Download CI Needed Yak Linux(amd64) Version to operator
-        run: wget -q -O './yak' https://aliyun-oss.yaklang.com/yak/ci/yak_linux_amd64 && chmod +x ./yak
+        run: wget -q -O './yak' https://yaklang.oss-accelerate.aliyuncs.com/yak/ci/yak_linux_amd64 && chmod +x ./yak
 
       - name: Download Binaries
         run: |
@@ -46,7 +46,9 @@ jobs:
           )
           
           # Base URL for downloads
-          base_url="https://aliyun-oss.yaklang.com/yak/${{ env.YAK_VERSION }}"
+          # in ci try https://yaklang.oss-accelerate.aliyuncs.com will be faster
+          # base_url="https://aliyun-oss.yaklang.com/yak/${{ env.YAK_VERSION }}"
+          base_url="https://yaklang.oss-accelerate.aliyuncs.com/yak/${{ env.YAK_VERSION }}"
           
           # Loop over the os_archs dictionary to download each file
           for arch in "${!os_archs[@]}"; do
