@@ -205,8 +205,9 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 			return result, nil
 		}
 
-		f.log("start web fingerprint detection for %v:%v", host, port)
-		return f.webDetector(result, ctx, config, host, ip, port)
+		// f.log("start web fingerprint detection for %v:%v", host, port)
+		// return f.webDetector(result, ctx, config, host, ip, port)
+		return result, nil
 	}
 
 	var matchResult *MatchResult
