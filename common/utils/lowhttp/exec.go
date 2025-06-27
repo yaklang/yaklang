@@ -276,10 +276,12 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	}
 
 	// 用于检查 BodyStreamReaderHandler 是否被正常调用
-	bodyStreamReaderHandledCheckCh := make(chan bool)
+	bodyStreamReaderHandled := utils.NewAtomicBool()
+	// 等待 BodyStreamReaderHandler 调用结束
+	waitBodyStreamReaderHandledCallEnd := sync.WaitGroup{}
 	defer func() {
-		isNormal := <-bodyStreamReaderHandledCheckCh
-		if option != nil && option.BodyStreamReaderHandler != nil && !isNormal {
+		waitBodyStreamReaderHandledCallEnd.Wait()
+		if option != nil && option.BodyStreamReaderHandler != nil && !bodyStreamReaderHandled.IsSet() {
 			r, w := utils.NewPipe()
 			w.Close()
 			option.BodyStreamReaderHandler([]byte{}, r)
@@ -888,6 +890,7 @@ RECONNECT:
 				log.Infof("close reader and writer")
 				writer.Close()
 			}()
+			waitBodyStreamReaderHandledCallEnd.Add(1)
 			//startHandlerStream := time.Now()
 			//onceForHeader := new(sync.Once)
 			//onceForBody := new(sync.Once)
@@ -899,6 +902,7 @@ RECONNECT:
 						log.Errorf("BodyStreamReaderHandler panic: %v", err)
 						utils.PrintCurrentGoroutineRuntimeStack()
 					}
+					waitBodyStreamReaderHandledCallEnd.Done()
 				}()
 
 				packetReader := bufio.NewReader(reader)
@@ -931,10 +935,9 @@ RECONNECT:
 					}
 				}
 				if err != nil {
-					bodyStreamReaderHandledCheckCh <- false
 					log.Warnf("Normal handle BodyStreamReaderHandler read response failed: %s", err)
 				} else {
-					bodyStreamReaderHandledCheckCh <- true
+					bodyStreamReaderHandled.Set()
 					option.BodyStreamReaderHandler(responseHeader.Bytes(), bodyReader)
 				}
 			}()
