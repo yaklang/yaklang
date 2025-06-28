@@ -98,7 +98,7 @@ require (
 	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/refraction-networking/utls v1.6.7
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca
-	github.com/samber/lo v1.38.1
+	github.com/samber/lo v1.51.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1
 	github.com/segmentio/ksuid v1.0.4
 	github.com/shirou/gopsutil/v3 v3.23.4

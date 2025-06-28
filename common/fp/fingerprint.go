@@ -211,8 +211,8 @@ func (m *MatchResult) GetResponseRaw() []byte {
 		return nil
 	}
 	if len(m.Fingerprint.HttpFlows) > 0 {
-		flow, err := lo.Last(m.Fingerprint.HttpFlows)
-		if err != nil {
+		flow, exists := lo.Last(m.Fingerprint.HttpFlows)
+		if !exists {
 			return nil
 		}
 		return lowhttp.ReplaceHTTPPacketBodyFast(flow.ResponseHeader, flow.ResponseBody)
@@ -226,8 +226,8 @@ func (m *MatchResult) GetRequestRaw() (bool, []byte) {
 		return false, nil
 	}
 	if len(m.Fingerprint.HttpFlows) > 0 {
-		flow, err := lo.Last(m.Fingerprint.HttpFlows)
-		if err != nil {
+		flow, exists := lo.Last(m.Fingerprint.HttpFlows)
+		if !exists {
 			return false, nil
 		}
 		return flow.IsHTTPS, lowhttp.ReplaceHTTPPacketBodyFast(flow.RequestHeader, flow.RequestBody)
