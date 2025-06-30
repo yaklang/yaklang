@@ -33,8 +33,10 @@ func (i *IrIndex) TableName() string {
 	return "ir_indices"
 }
 
-func CreateIndex(db *gorm.DB) *IrIndex {
-	ret := &IrIndex{}
+func CreateIndex(db *gorm.DB, progName string) *IrIndex {
+	ret := &IrIndex{
+		ProgramName: progName,
+	}
 	db.Model(&IrIndex{}).Create(ret)
 	return ret
 }
