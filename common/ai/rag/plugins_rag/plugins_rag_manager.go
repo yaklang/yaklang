@@ -184,9 +184,7 @@ func (m *PluginsRagManager) metadataProducer(producerID int, scriptChan <-chan s
 			}
 
 			// 准备插件元数据
-			metaMap := map[string]any{
-				"id": yakScript.ScriptName,
-			}
+			metaMap := map[string]any{}
 
 			// 准备插件内容，组合多个字段以提高搜索质量
 			documentContent := fmt.Sprintf(`脚本名称: %s
@@ -430,38 +428,35 @@ func (m *PluginsRagManager) SearchPlugins(query string, limit int) ([]*PluginSea
 	}
 
 	// 提取插件 ID 并查询完整插件信息
-	var scriptIDs []int64
-	var idToScore = make(map[int64]float64)
+	var scriptNames []string
+	var idToScore = make(map[string]float64)
 	for _, result := range results {
-		if id, ok := result.Document.Metadata["id"].(float64); ok {
-			scriptIDs = append(scriptIDs, int64(id))
-			idToScore[int64(id)] = result.Score
-		}
+		scriptNames = append(scriptNames, result.Document.ID)
+		idToScore[result.Document.ID] = result.Score
 	}
 
 	// 查询插件
 	var scripts []schema.YakScript
-	if err := m.db.Where("id IN (?)", scriptIDs).Find(&scripts).Error; err != nil {
+	if err := m.db.Where("script_name IN (?)", scriptNames).Find(&scripts).Error; err != nil {
 		return nil, utils.Errorf("查询插件详情失败: %v", err)
 	}
 
 	// 将插件转换为 YakScript 格式并按相关性排序
-	scriptMap := make(map[int64]*ypb.YakScript)
+	scriptMap := make(map[string]*ypb.YakScript)
 	for _, script := range scripts {
-		scriptMap[int64(script.ID)] = script.ToGRPCModel()
+		scriptMap[script.ScriptName] = script.ToGRPCModel()
 	}
 
 	// 按相关性排序结果
 	var sortedScripts []*PluginSearchResult
 	for _, result := range results {
-		if id, ok := result.Document.Metadata["id"].(float64); ok {
-			if script, exists := scriptMap[int64(id)]; exists {
-				// 添加相似度得分
-				sortedScripts = append(sortedScripts, &PluginSearchResult{
-					Script: script,
-					Score:  result.Score,
-				})
-			}
+		scriptName := result.Document.ID
+		if script, exists := scriptMap[scriptName]; exists {
+			// 添加相似度得分
+			sortedScripts = append(sortedScripts, &PluginSearchResult{
+				Script: script,
+				Score:  result.Score,
+			})
 		}
 	}
 

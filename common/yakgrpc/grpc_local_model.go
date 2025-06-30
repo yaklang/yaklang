@@ -473,7 +473,7 @@ func (s *Server) InitSearchVectorDatabase(req *ypb.InitSearchVectorDatabaseReque
 		})
 
 		db := consts.GetGormProfileDatabase()
-		err = rag.ImportVectorData(db, filepath.Join(consts.GetDefaultYakitProjectsDir(), tmpFileName))
+		err = rag.ImportVectorDataFullUpdate(db, filepath.Join(consts.GetDefaultYakitProjectsDir(), tmpFileName))
 		if err != nil {
 			return err
 		}
