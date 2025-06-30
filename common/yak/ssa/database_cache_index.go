@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/databasex"
 )
@@ -60,14 +61,14 @@ type InstructionsIndexItem struct {
 	Inst Instruction
 }
 type InstructionsIndexDB struct {
-	save *databasex.Saver[InstructionsIndexItem]
+	save *databasex.Save[InstructionsIndexItem]
 }
 
 func NewInstructionsIndexDB(
 	save func([]InstructionsIndexItem),
 ) *InstructionsIndexDB {
 	return &InstructionsIndexDB{
-		save: databasex.NewSaver(save),
+		save: databasex.NewSave(save),
 	}
 }
 
@@ -91,4 +92,75 @@ func (c *InstructionsIndexDB) ForEach(f func(string, []Instruction)) {
 
 func (c *InstructionsIndexDB) Close() {
 	c.save.Close()
+}
+
+func NewInstructionIndex(enable bool, saveFunc func([]InstructionsIndexItem)) InstructionsIndex {
+	if enable {
+		return NewInstructionsIndexDB(saveFunc)
+	} else {
+		return NewInstructionsIndexMem()
+	}
+}
+
+func (c *ProgramCache) initIndex(databaseEnable bool) {
+	c.VariableIndex = NewInstructionIndex(
+		databaseEnable,
+		func(items []InstructionsIndexItem) {
+			utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
+				for _, item := range items {
+					SaveVariableIndexByName(tx, item.Name, item.Inst)
+				}
+				return nil
+			})
+		},
+	)
+	c.MemberIndex = NewInstructionIndex(
+		databaseEnable,
+		func(items []InstructionsIndexItem) {
+			utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
+				for _, item := range items {
+					SaveVariableIndexByMember(tx, item.Name, item.Inst)
+				}
+				return nil
+			})
+		},
+	)
+
+	c.ClassIndex = NewInstructionIndex(
+		databaseEnable,
+		func(items []InstructionsIndexItem) {
+			utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
+				for _, item := range items {
+					SaveClassIndex(tx, item.Name, item.Inst)
+				}
+				return nil
+			})
+		},
+	)
+
+	c.OffsetCache = NewInstructionIndex(
+		databaseEnable,
+		func(items []InstructionsIndexItem) {
+			utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
+				for _, item := range items {
+					SaveValueOffset(tx, item.Inst)
+					if value, ok := ToValue(item.Inst); ok {
+						for _, variable := range value.GetAllVariables() {
+							if variable.GetId() <= 0 {
+								continue // skip variable without id
+							}
+							SaveVariableOffset(tx, variable, variable.GetName(), int64(value.GetId()))
+						}
+					}
+				}
+				return nil
+			})
+		},
+	)
+
+	c.ConstCache = NewInstructionIndex(
+		databaseEnable,
+		func(ii []InstructionsIndexItem) {
+		},
+	)
 }

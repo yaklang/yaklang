@@ -106,7 +106,7 @@ func (v Values) GetIds() []int64 {
 	}
 	return ret
 }
-func GetEx[T any](c *Cache, Cover func(Instruction) (T, bool), id int64) T {
+func GetEx[T any](c *ProgramCache, Cover func(Instruction) (T, bool), id int64) T {
 	var zero T
 	if c == nil {
 		return zero
@@ -118,7 +118,7 @@ func GetEx[T any](c *Cache, Cover func(Instruction) (T, bool), id int64) T {
 	return slice[0]
 }
 
-func GetExs[T any](c *Cache, Cover func(Instruction) (T, bool), ids ...int64) []T {
+func GetExs[T any](c *ProgramCache, Cover func(Instruction) (T, bool), ids ...int64) []T {
 	if c == nil {
 		return nil
 	}

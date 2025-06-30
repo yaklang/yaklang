@@ -7,11 +7,17 @@ import (
 )
 
 type config struct {
-	waitGroup   *sync.WaitGroup
-	bufferSize  int
+	waitGroup *sync.WaitGroup
+
+	// buffer
+	bufferSize int
+
+	// save
 	saveSize    int
 	saveTimeout time.Duration
-	ctx         context.Context
+
+	// context
+	ctx context.Context
 }
 
 type Option func(*config)

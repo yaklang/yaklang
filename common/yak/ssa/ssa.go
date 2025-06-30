@@ -237,7 +237,7 @@ type Program struct {
 	editorMap             *omap.OrderedMap[string, *memedit.MemEditor]
 	CurrentIncludingStack *utils.Stack[string]
 
-	Cache *Cache
+	Cache *ProgramCache
 
 	/*
 		when build : ref: common/yak/ssa/lazy_builder.go
