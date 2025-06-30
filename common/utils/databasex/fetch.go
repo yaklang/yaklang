@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
-type Fetch[T Item] struct {
+type Fetch[T any] struct {
 	fetchFromDB func() []T
 	buffer      *chanx.UnlimitedChan[T]
 	wg          *sync.WaitGroup
@@ -18,7 +18,7 @@ type Fetch[T Item] struct {
 	cancel      context.CancelFunc
 }
 
-func NewFetch[T Item](
+func NewFetch[T any](
 	fetchFromDB func() []T,
 	opt ...Option,
 ) *Fetch[T] {
@@ -76,7 +76,7 @@ func (f *Fetch[T]) Fetch() (T, error) {
 }
 
 // Close stops the background goroutine and closes the buffer channel.
-func (f *Fetch[T]) Close(delete ...func(...T)) {
+func (f *Fetch[T]) Close(delete ...func([]T)) {
 	// stop the background goroutine
 	f.cancel()
 	f.wg.Wait()
@@ -92,11 +92,8 @@ func (f *Fetch[T]) Close(delete ...func(...T)) {
 			if !ok {
 				break
 			}
-			if utils.IsNil(item) {
-				log.Errorf("BUG: item is nil in Fetch.Close")
-			}
 			items = append(items, item)
 		}
-		delete[0](items...)
+		delete[0](items)
 	}
 }

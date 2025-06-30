@@ -24,7 +24,7 @@ func TestNewSaver(t *testing.T) {
 		savedItems = append(savedItems, items...)
 	}
 
-	saver := databasex.NewSaver(saveFn)
+	saver := databasex.NewSave(saveFn)
 	require.NotNil(t, saver)
 	// We can't directly access internal fields of Saver from the test package
 	// Just verify that the saver is created successfully and can be closed
@@ -33,7 +33,7 @@ func TestNewSaver(t *testing.T) {
 	// Test with custom options
 	wg := &sync.WaitGroup{}
 	ctx := context.Background()
-	saver = databasex.NewSaver(
+	saver = databasex.NewSave(
 		saveFn,
 		databasex.WithWaitGroup(wg),
 		databasex.WithBufferSize(200),
@@ -54,7 +54,7 @@ func TestSaver_Save(t *testing.T) {
 	}
 
 	ttl := 100 * time.Millisecond
-	saver := databasex.NewSaver(saveFn,
+	saver := databasex.NewSave(saveFn,
 		databasex.WithSaveTimeout(ttl),
 	)
 	defer saver.Close()
@@ -114,7 +114,7 @@ func TestSaver_Close(t *testing.T) {
 		savedItems = append(savedItems, items...)
 	}
 
-	saver := databasex.NewSaver(saveFn)
+	saver := databasex.NewSave(saveFn)
 
 	// Save some items
 	items := []TestItem{
@@ -148,7 +148,7 @@ func TestSaver_WithCustomContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	saver := databasex.NewSaver(saveFn, databasex.WithContext(ctx))
+	saver := databasex.NewSave(saveFn, databasex.WithContext(ctx))
 	defer saver.Close()
 
 	// Save an item
