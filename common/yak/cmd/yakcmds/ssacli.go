@@ -6,19 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
 	"github.com/gobwas/glob"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfcompletion"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
-	"github.com/yaklang/yaklang/common/utils/bizhelper"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"golang.org/x/exp/slices"
 	"io"
 	"io/fs"
 	"math/rand"
@@ -29,10 +23,19 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfcompletion"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+	"golang.org/x/exp/slices"
+
 	"github.com/segmentio/ksuid"
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfanalyzer"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -420,7 +423,15 @@ var syntaxFlowCreate = &cli.Command{
 var syntaxFlowTest = &cli.Command{
 	Name:    "syntaxflow-test",
 	Aliases: []string{"sftest", "sf-test"},
+	Usage:   "Runs syntax flow tests on .sf files. Use --strict for strict mode.", // Added usage
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "strict,s",
+			Usage: "Enable strict mode for evaluation",
+		},
+	},
 	Action: func(c *cli.Context) error {
+		isStrict := c.Bool("strict")
 		testingTInstance := utils.NewRequireTestT(func(msg string, args ...any) {
 			log.Errorf(msg, args...)
 		}, func() {})
@@ -434,7 +445,7 @@ var syntaxFlowTest = &cli.Command{
 					if err != nil {
 						return err
 					}
-					err = ssatest.EvaluateVerifyFilesystem(string(raw), testingTInstance)
+					err = ssatest.EvaluateVerifyFilesystem(string(raw), testingTInstance, isStrict)
 					if err != nil {
 						return err
 					}
@@ -464,7 +475,7 @@ var syntaxFlowTest = &cli.Command{
 				if err != nil {
 					return err
 				}
-				err = ssatest.EvaluateVerifyFilesystem(string(raw), testingTInstance)
+				err = ssatest.EvaluateVerifyFilesystem(string(raw), testingTInstance, isStrict)
 				if err != nil {
 					return err
 				}
@@ -1053,6 +1064,189 @@ var ssaCodeScan = &cli.Command{
 	},
 }
 
+var syntaxFlowEvaluate = &cli.Command{
+	Name:    "syntaxflow-evaluate",
+	Aliases: []string{"sf-evaluate"},
+	Usage:   "evaluate SyntaxFlow rule quality and provide score",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "target,t",
+			Usage: "target file or directory to evaluate",
+		},
+		cli.StringFlag{
+			Name:  "output,o",
+			Usage: "output file for evaluation result (json format)",
+		},
+		cli.BoolFlag{
+			Name:  "verbose,v",
+			Usage: "verbose output with detailed problems",
+		},
+		cli.BoolFlag{
+			Name:  "json",
+			Usage: "output in JSON format",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		target := c.String("target")
+		output := c.String("output")
+		verbose := c.Bool("verbose")
+		jsonOutput := c.Bool("json")
+
+		if target == "" {
+			return utils.Error("target file or directory is required")
+		}
+
+		// Check if target exists
+		if !utils.IsFile(target) && !utils.IsDir(target) {
+			return utils.Errorf("target file or directory not found: %v", target)
+		}
+
+		results := make(map[string]*sfanalyzer.SyntaxFlowRuleAnalyzeResult)
+
+		// Process single file or directory
+		if utils.IsFile(target) {
+			if !strings.HasSuffix(target, ".sf") {
+				return utils.Error("target file must be a .sf file")
+			}
+
+			content, err := os.ReadFile(target)
+			if err != nil {
+				return utils.Errorf("failed to read file %s: %v", target, err)
+			}
+			fileName := filepath.Base(target)
+
+			analyzer := sfanalyzer.NewSyntaxFlowAnalyzer(string(content), fileName)
+			result := analyzer.Analyze()
+			results[fileName] = result
+		} else {
+			// Process directory
+			err := filesys.Recursive(target, filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+				if !strings.HasSuffix(s, ".sf") {
+					return nil
+				}
+
+				content, err := os.ReadFile(s)
+				if err != nil {
+					log.Errorf("failed to read file %s: %v", s, err)
+					return nil
+				}
+				fileName := filepath.Base(s)
+				analyzer := sfanalyzer.NewSyntaxFlowAnalyzer(string(content), fileName)
+				result := analyzer.Analyze()
+				results[fileName] = result
+				return nil
+			}))
+			if err != nil {
+				return utils.Errorf("failed to process directory: %v", err)
+			}
+		}
+
+		if len(results) == 0 {
+			return utils.Error("no .sf files found to evaluate")
+		}
+
+		// Output results
+		if jsonOutput || output != "" {
+			// JSON output
+			jsonData, err := json.MarshalIndent(results, "", "  ")
+			if err != nil {
+				return utils.Errorf("failed to marshal results to JSON: %v", err)
+			}
+
+			if output != "" {
+				err = os.WriteFile(output, jsonData, 0o666)
+				if err != nil {
+					return utils.Errorf("failed to write output file: %v", err)
+				}
+				log.Infof("Evaluation results written to %s", output)
+			} else {
+				fmt.Println(string(jsonData))
+			}
+		} else {
+			// Human-readable output
+			for fileName, result := range results {
+				fmt.Printf("\n=== %s ===\n", fileName)
+				fmt.Printf("得分: %d/%d\n", result.Score, result.MaxScore)
+				grade := sfanalyzer.GetGrade(result.Score)
+				fmt.Printf("等级: %s (%s)\n", grade, sfanalyzer.GetGradeDescription(grade))
+
+				// 始终显示问题概览
+				if len(result.Problems) > 0 {
+					errorCount := 0
+					warningCount := 0
+					infoCount := 0
+
+					for _, problem := range result.Problems {
+						switch problem.Severity {
+						case sfanalyzer.Error:
+							errorCount++
+						case sfanalyzer.Warning:
+							warningCount++
+						case sfanalyzer.Info:
+							infoCount++
+						}
+					}
+
+					fmt.Printf("问题概览: ")
+					if errorCount > 0 {
+						fmt.Printf("%d个错误 ", errorCount)
+					}
+					if warningCount > 0 {
+						fmt.Printf("%d个警告 ", warningCount)
+					}
+					if infoCount > 0 {
+						fmt.Printf("%d个建议 ", infoCount)
+					}
+					fmt.Printf("\n")
+
+					// 简要显示主要问题
+					fmt.Printf("主要问题:\n")
+					for i, problem := range result.Problems {
+						if i >= 3 && !verbose { // 非详细模式只显示前3个问题
+							fmt.Printf("  ... (还有 %d 个问题，使用 -v 查看详情)\n", len(result.Problems)-3)
+							break
+						}
+						fmt.Printf("  • [%s] %s\n", problem.Severity, problem.Description)
+					}
+				} else {
+					fmt.Printf("✓ 未发现问题\n")
+				}
+
+				// 详细模式显示完整信息
+				if verbose && len(result.Problems) > 0 {
+					fmt.Printf("\n详细问题信息:\n")
+					for i, problem := range result.Problems {
+						fmt.Printf("  %d. [%s] %s\n", i+1, problem.Severity, problem.Description)
+						if problem.Suggestion != "" {
+							fmt.Printf("     💡 建议: %s\n", problem.Suggestion)
+						}
+						if problem.Range != nil {
+							fmt.Printf("     📍 位置: 第%d行第%d列 - 第%d行第%d列\n",
+								problem.Range.StartLine, problem.Range.StartColumn,
+								problem.Range.EndLine, problem.Range.EndColumn)
+						}
+						fmt.Printf("\n")
+					}
+				}
+			}
+
+			// Summary
+			if len(results) > 1 {
+				fmt.Printf("\n=== 总结 ===\n")
+				total := 0
+				for _, result := range results {
+					total += result.Score
+				}
+				average := float64(total) / float64(len(results))
+				fmt.Printf("平均得分: %.1f/100\n", average)
+				fmt.Printf("评估文件数: %d\n", len(results))
+			}
+		}
+
+		return nil
+	},
+}
+
 var ssaQuery = &cli.Command{
 	Name:    "ssa-query",
 	Aliases: []string{"sf", "syntaxFlow"},
@@ -1306,6 +1500,7 @@ var SSACompilerCommands = []*cli.Command{
 	syntaxflowCompletion, // complete syntaxflow rule with AI
 	syntaxFlowSave,       // save rule to database
 	syntaxFlowTest,       // test rule
+	syntaxFlowEvaluate,   // evaluate rule quality
 	syntaxFlowExport,     // export rule to file
 	syntaxFlowImport,     // import rule from file
 	syncRule,             // sync rule from embed to database

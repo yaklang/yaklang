@@ -66,7 +66,7 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 	}
 
 	extraDesc := NewExtraDesc()
-	haveDesc := false
+	haveFileSystem := false
 	for _, item := range i.DescriptionItems().(*sf.DescriptionItemsContext).AllDescriptionItem() {
 		ret, ok := item.(*sf.DescriptionItemContext)
 		if !ok || ret.Comment() != nil { // skip comment
@@ -102,7 +102,10 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 		case SFDescKeyType_Level:
 			y.rule.Severity = schema.ValidSeverityType(value)
 		case SFDescKeyType_Lang:
-			y.rule.Language = value
+			if y.rule.Language == "" {
+				y.rule.Language = value
+			}
+			extraDesc.language = value
 		case SFDescKeyType_CVE:
 			y.rule.CVE = value
 		case SFDescKeyType_Risk:
@@ -112,8 +115,9 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 		case SFDescKeyType_Rule_Id:
 			y.rule.RuleId = value
 		default:
-			haveDesc = true
 			if strings.Contains(key, "://") {
+				haveFileSystem = true
+				// add to file
 				urlIns, _ := url.Parse(key)
 				if urlIns != nil {
 					switch ret := urlIns.Scheme; ret {
@@ -121,25 +125,23 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 						if strings.HasPrefix(key, ret+"://") {
 							filename := strings.TrimPrefix(key, ret+"://")
 							extraDesc.verifyFilesystem[filename] = value
-							continue
 						}
-					case "safe-file", "safefile", "safe-fs", "safefs", "safe-filesystem", "safefilesystem", "negative-file", "negativefs", "nfs":
+					case "safe", "safe-file", "safefile", "safe-fs", "safefs", "safe-filesystem", "safefilesystem", "negative-file", "negativefs", "nfs":
 						if strings.HasPrefix(key, ret+"://") {
 							filename := strings.TrimPrefix(key, ret+"://")
 							extraDesc.negativeFilesystem[filename] = value
-							continue
 						}
 					}
 				}
+			} else {
+				extraDesc.rawDesc[key] = value
 			}
-			extraDesc.rawDesc[key] = value
-		}
-		if haveDesc {
-			y.verifyFsInfo = append(y.verifyFsInfo, extraDesc)
 		}
 		y.EmitAddDescription(key, value)
 	}
-
+	if haveFileSystem {
+		y.verifyFsInfo = append(y.verifyFsInfo, extraDesc)
+	}
 	return nil
 }
 
