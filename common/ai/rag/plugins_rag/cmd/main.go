@@ -7,6 +7,7 @@ import (
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
@@ -50,7 +51,7 @@ func main() {
 		cli.StringFlag{
 			Name:        "collection, c",
 			Usage:       "SQLite 集合名称",
-			Value:       plugins_rag.DefaultCollectionName,
+			Value:       plugins_rag.PLUGIN_RAG_COLLECTION_NAME,
 			Destination: &collectionName,
 		},
 		cli.StringFlag{
@@ -80,7 +81,8 @@ func main() {
 				if baseURL != "" {
 					opts = append(opts, aispec.WithBaseURL(baseURL))
 				}
-				manager, err := plugins_rag.CreateSQLiteManager(collectionName, model, dimension, opts...)
+				db := consts.GetGormProfileDatabase()
+				manager, err := plugins_rag.NewSQLitePluginsRagManager(db, collectionName, model, dimension, opts...)
 				if err != nil {
 					log.Errorf("创建插件 RAG 管理器失败: %v", err)
 					return err
@@ -114,7 +116,8 @@ func main() {
 				if baseURL != "" {
 					opts = append(opts, aispec.WithBaseURL(baseURL))
 				}
-				manager, err := plugins_rag.CreateSQLiteManager(collectionName, model, dimension, opts...)
+				db := consts.GetGormProfileDatabase()
+				manager, err := plugins_rag.NewSQLitePluginsRagManager(db, collectionName, model, dimension, opts...)
 				if err != nil {
 					log.Errorf("创建插件 RAG 管理器失败: %v", err)
 					return err

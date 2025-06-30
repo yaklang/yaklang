@@ -19,7 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-var SearchPluginIdsFunc func(query string, limit int) ([]int64, error)
+var SearchPluginIdsFunc func(db *gorm.DB, pagination *ypb.Paging, key string) (*bizhelper.Paginator, []string, error)
 
 var yakScriptOpLock = new(sync.Mutex)
 
@@ -432,19 +432,12 @@ func QueryYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.
 		}
 		return p, yakScripts, err
 	}
-	//
-	db = db.Model(&schema.YakScript{}) // .Debug()
 
 	if params.GetVectorSearchContent() != "" {
-		if SearchPluginIdsFunc == nil {
-			return nil, nil, utils.Errorf("SearchPluginIdsFunc is not set")
-		}
-		ids, err := SearchPluginIdsFunc(params.GetVectorSearchContent(), -1)
-		if err != nil {
-			return nil, nil, err
-		}
-		db = db.Where("id IN (?)", ids)
+		return QueryYakScriptByVectorSearch(db, params)
 	}
+
+	db = db.Model(&schema.YakScript{}) // .Debug()
 
 	/*pagination*/
 	if params.Pagination == nil {
@@ -464,6 +457,31 @@ func QueryYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
 	}
 
+	return paging, ret, nil
+}
+
+func QueryYakScriptByVectorSearch(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.Paginator, []*schema.YakScript, error) {
+	if SearchPluginIdsFunc == nil {
+		return nil, nil, utils.Errorf("SearchPluginIdsFunc is not set")
+	}
+	if params.Pagination == nil {
+		params.Pagination = &ypb.Paging{
+			Page:    1,
+			Limit:   30,
+			OrderBy: "updated_at",
+			Order:   "desc",
+		}
+	}
+	paging, ids, err := SearchPluginIdsFunc(db, params.Pagination, params.GetVectorSearchContent())
+	if err != nil {
+		return nil, nil, err
+	}
+	db = db.Model(&schema.YakScript{})
+	db = db.Where("script_name IN (?)", ids)
+	var ret []*schema.YakScript
+	if err := db.Scan(&ret).Error; err != nil {
+		return nil, nil, utils.Errorf("scan failed: %s", err)
+	}
 	return paging, ret, nil
 }
 
