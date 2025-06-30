@@ -402,7 +402,7 @@ type BuildInVectorDBLink struct {
 var buildInVectorDBLink = map[string]BuildInVectorDBLink{
 	plugins_rag.PLUGIN_RAG_COLLECTION_NAME: {
 		Description: "插件向量数据库，包含所有插件的向量数据，可以用于搜索插件",
-		DownloadURL: "https://github.com/yaklang/yaklang/releases/download/v1.0.0/plugins_rag.zip",
+		DownloadURL: "https://oss-qn.yaklang.com/yaklang-rag/plugins_rag.zip",
 	},
 }
 
@@ -427,16 +427,11 @@ func (s *Server) GetAllVectorStoreCollections(ctx context.Context, req *ypb.Empt
 }
 
 func (s *Server) IsSearchVectorDatabaseReady(ctx context.Context, req *ypb.IsSearchVectorDatabaseReadyRequest) (*ypb.IsSearchVectorDatabaseReadyResponse, error) {
-	collections, err := rag.GetAllCollections()
-	if err != nil {
-		return nil, err
-	}
-
 	notReadyCollectionNames := []string{}
 	db := consts.GetGormProfileDatabase()
-	for _, collection := range collections {
-		if !rag.IsReadyCollection(db, collection.Name) {
-			notReadyCollectionNames = append(notReadyCollectionNames, collection.Name)
+	for _, collectionName := range req.GetCollectionNames() {
+		if !rag.IsReadyCollection(db, collectionName) {
+			notReadyCollectionNames = append(notReadyCollectionNames, collectionName)
 		}
 	}
 
@@ -445,7 +440,19 @@ func (s *Server) IsSearchVectorDatabaseReady(ctx context.Context, req *ypb.IsSea
 		NotReadyCollectionNames: notReadyCollectionNames,
 	}, nil
 }
-
+func (s *Server) DeleteSearchVectorDatabase(ctx context.Context, req *ypb.DeleteSearchVectorDatabaseRequest) (*ypb.GeneralResponse, error) {
+	collectionNames := req.GetCollectionNames()
+	errs := []error{}
+	for _, collectionName := range collectionNames {
+		err := rag.RemoveCollection(consts.GetGormProfileDatabase(), collectionName)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return &ypb.GeneralResponse{
+		Ok: len(errs) == 0,
+	}, utils.JoinErrors(errs...)
+}
 func (s *Server) InitSearchVectorDatabase(req *ypb.InitSearchVectorDatabaseRequest, stream ypb.Yak_InitSearchVectorDatabaseServer) error {
 	collectionNames := req.GetCollectionNames()
 	for _, collectionName := range collectionNames {
@@ -472,15 +479,16 @@ func (s *Server) InitSearchVectorDatabase(req *ypb.InitSearchVectorDatabaseReque
 			Message:   []byte(fmt.Sprintf("下载完成，开始导入 %s 向量数据", collection)),
 		})
 
+		zipPath := filepath.Join(consts.GetDefaultYakitProjectsDir(), "libs", tmpFileName)
 		db := consts.GetGormProfileDatabase()
-		err = rag.ImportVectorDataFullUpdate(db, filepath.Join(consts.GetDefaultYakitProjectsDir(), tmpFileName))
+		err = rag.ImportVectorDataFullUpdate(db, zipPath)
 		if err != nil {
 			return err
 		}
-
+		os.Remove(zipPath)
 		stream.Send(&ypb.ExecResult{
 			IsMessage: true,
-			Message:   []byte(fmt.Sprintf("导入 %s 向量数据完成", collection)),
+			Message:   []byte(fmt.Sprintf("导入 %s 向量数据完成，已删除临时文件 %s", collection, zipPath)),
 		})
 	}
 

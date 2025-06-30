@@ -53,17 +53,28 @@ func NewSQLiteVectorStore(db *gorm.DB, collectionName string, modelName string, 
 		collectionID:   collection.ID,
 	}, nil
 }
-
-func (s *SQLiteVectorStore) Remove() {
-	utils.GormTransaction(s.db, func(tx *gorm.DB) error {
-		if err := tx.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", s.collectionID).Unscoped().Delete(&schema.VectorStoreDocument{}).Error; err != nil {
+func RemoveCollection(db *gorm.DB, collectionName string) error {
+	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+		var collections []schema.VectorStoreCollection
+		if err := tx.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).Find(&collections).Error; err != nil {
 			return err
 		}
-		if err := tx.Model(&schema.VectorStoreCollection{}).Where("id = ?", s.collectionID).Unscoped().Delete(&schema.VectorStoreCollection{}).Error; err != nil {
+		if len(collections) == 0 {
+			return utils.Errorf("集合 %s 不存在", collectionName)
+		}
+		collection := collections[0]
+
+		if err := tx.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).Unscoped().Delete(&schema.VectorStoreDocument{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&schema.VectorStoreCollection{}).Where("id = ?", collection.ID).Unscoped().Delete(&schema.VectorStoreCollection{}).Error; err != nil {
 			return err
 		}
 		return nil
 	})
+}
+func (s *SQLiteVectorStore) Remove() {
+	RemoveCollection(s.db, s.collectionName)
 }
 
 // 将 schema.VectorStoreDocument 转换为 Document
