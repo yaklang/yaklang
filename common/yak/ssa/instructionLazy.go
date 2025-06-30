@@ -24,7 +24,7 @@ type LazyInstruction struct {
 	variable    map[string]*Variable
 	ir          *ssadb.IrCode
 	programName string
-	cache       *Cache
+	cache       *ProgramCache
 	prog        *Program
 	Modify      bool
 }
@@ -161,7 +161,7 @@ func (lz *LazyInstruction) check() {
 		}
 		inst.SetProgram(lz.prog)
 		lz.Instruction = inst
-		lz.cache.IrCodeToInstruction(inst, lz.ir)
+		lz.cache.IrCodeToInstruction(inst, lz.ir, lz.cache)
 		// set range for instruction
 		lz.GetRange()
 	}

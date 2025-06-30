@@ -8,9 +8,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
-// Saver provides a way to collect items and save them in batches using a background goroutine.
+// Save provides a way to collect items and save them in batches using a background goroutine.
 // It buffers items and periodically passes them to a save function for processing.
-type Saver[T Item] struct {
+type Save[T any] struct {
 	saveToDB func([]T) // Function to save items to the database
 
 	buffer *chanx.UnlimitedChan[T] // Channel for buffering items
@@ -21,16 +21,16 @@ type Saver[T Item] struct {
 	cancel context.CancelFunc // Function to cancel the context
 }
 
-// NewSaver creates a new Saver with the specified buffer size and save function.
+// NewSave creates a new Saver with the specified buffer size and save function.
 // It starts a background goroutine to process items from the buffer.
-func NewSaver[T Item](
+func NewSave[T any](
 	saveToDB func([]T),
 	opt ...Option,
-) *Saver[T] {
+) *Save[T] {
 	cfg := NewConfig(opt...)
 
 	ctx, cancel := context.WithCancel(cfg.ctx)
-	s := &Saver[T]{
+	s := &Save[T]{
 		saveToDB: saveToDB,
 		buffer:   chanx.NewUnlimitedChan[T](ctx, cfg.bufferSize),
 		ctx:      ctx,
@@ -51,7 +51,7 @@ func NewSaver[T Item](
 // const SaveTime = 1 * time.Second
 
 // processBuffer runs in a background goroutine and periodically processes items from the buffer.
-func (s *Saver[T]) processBuffer() {
+func (s *Save[T]) processBuffer() {
 	saveSize := s.config.saveSize
 	saveTime := s.config.saveTimeout
 	timer := time.NewTimer(saveTime)
@@ -89,7 +89,7 @@ func (s *Saver[T]) processBuffer() {
 
 // Save adds an item to the buffer for saving.
 // It will be processed by the background goroutine.
-func (s *Saver[T]) Save(item T) {
+func (s *Save[T]) Save(item T) {
 	if !utils.IsNil(item) {
 		s.buffer.SafeFeed(item)
 	}
@@ -99,7 +99,7 @@ const MaxSize = 300
 
 // Close stops the background goroutine and waits for it to finish.
 // It also processes any remaining items in the buffer before returning.
-func (s *Saver[T]) Close() {
+func (s *Save[T]) Close() {
 	s.buffer.Close()          // Close the buffer
 	s.config.waitGroup.Wait() // Wait for the background goroutine to finish
 }
