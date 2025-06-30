@@ -727,3 +727,171 @@ retryHandler = (req, rsp,retry)  => {
 		t.Fatalf("expect 3 retry response, got %v", count)
 	}
 }
+
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_forceFailureHandler(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	flag := utils.RandStringBytes(16)
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(flag))
+	})
+	target := utils.HostPort(host, port)
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
+		Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n{{yak(handle)}}",
+		HotPatchCode: `handle = result => x"{{int(1)}}"
+flag = "` + string(flag) + `"
+
+forceFailureHandler = (https, req, rsp) => {
+	if rsp.Contains(flag) { return true }
+	return false
+}
+
+`,
+		ForceFuzz: true,
+	})
+	if err != nil {
+		t.Fatalf("expect nil, got %v", err)
+	}
+	responseCount := 0
+	for {
+		rsp, err := recv.Recv()
+		if err != nil {
+			break
+		}
+		responseCount++
+
+		spew.Dump(rsp)
+		require.NotEmpty(t, rsp.Reason)
+		require.Contains(t, rsp.Reason, "request failed intentionally by force failure handler")
+		require.Contains(t, string(rsp.ResponseRaw), flag)
+		spew.Dump(rsp.ExtractedResults)
+	}
+	require.Equal(t, 1, responseCount)
+}
+
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_forceFailureHandler_2_args(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	flag := utils.RandStringBytes(16)
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(flag))
+	})
+	target := utils.HostPort(host, port)
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
+		Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n{{yak(handle)}}",
+		HotPatchCode: `handle = result => x"{{int(1)}}"
+flag = "` + string(flag) + `"
+
+forceFailureHandler = (req, rsp) => {
+	if rsp.Contains(flag) { return true }
+	return false
+}
+
+`,
+		ForceFuzz: true,
+	})
+	if err != nil {
+		t.Fatalf("expect nil, got %v", err)
+	}
+	responseCount := 0
+	for {
+		rsp, err := recv.Recv()
+		if err != nil {
+			break
+		}
+		responseCount++
+		require.NotEmpty(t, rsp.Reason)
+		require.Contains(t, rsp.Reason, "request failed intentionally by force failure handler")
+		require.Contains(t, string(rsp.ResponseRaw), flag)
+
+	}
+	require.Equal(t, 1, responseCount)
+}
+
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_forceFailureHandler_1_arg(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	flag := utils.RandStringBytes(16)
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(flag))
+	})
+	target := utils.HostPort(host, port)
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
+		Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n{{yak(handle)}}",
+		HotPatchCode: `handle = result => x"{{int(1)}}"
+flag = "` + string(flag) + `"
+
+forceFailureHandler = rsp => {
+	if rsp.Contains(flag) { return true }
+	return false
+}
+
+`,
+		ForceFuzz: true,
+	})
+	if err != nil {
+		t.Fatalf("expect nil, got %v", err)
+	}
+	responseCount := 0
+	for {
+		rsp, err := recv.Recv()
+		if err != nil {
+			break
+		}
+		responseCount++
+
+		require.NotEmpty(t, rsp.Reason)
+		require.Contains(t, rsp.Reason, "request failed intentionally by force failure handler")
+		require.Contains(t, string(rsp.ResponseRaw), flag)
+
+	}
+	require.Equal(t, 1, responseCount)
+}
+
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_forceFailureHandler_no_fail(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	flag := utils.RandStringBytes(16)
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(flag))
+	})
+	target := utils.HostPort(host, port)
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
+		Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n{{yak(handle)}}",
+		HotPatchCode: `handle = result => x"{{int(1)}}"
+flag = "` + string(flag) + `"
+
+forceFailureHandler = (https, req, rsp) => {
+	return false
+}
+
+`,
+		ForceFuzz: true,
+	})
+	if err != nil {
+		t.Fatalf("expect nil, got %v", err)
+	}
+	responseCount := 0
+	for {
+		rsp, err := recv.Recv()
+		if err != nil {
+			break
+		}
+		responseCount++
+		require.Empty(t, rsp.Reason)
+		require.Contains(t, string(rsp.ResponseRaw), flag)
+	}
+	require.Equal(t, 1, responseCount)
+}
