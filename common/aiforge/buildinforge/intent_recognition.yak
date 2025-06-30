@@ -8,25 +8,42 @@ prompt = <<<prompt
 1.  仔细阅读用户输入，并结合下文提供的上下文信息，判断理解用户的意图。上下文信息可能包括用户的历史对话、当前对话的主题等。
 2.  你需要输出两部分数据：
     - 上下文信息以及用户输入的总体概括
-    - 用户目前最有可能的意图
+    - 用户目前的意图断言 这一断言要求必须是简洁干净的，不要对上下文信息的总结，直接对用户的意图进行断言。意图断言是对用户当前意图的直接描述，避免使用模糊或冗长的表达。此断言会交给关键词搜索工具使用，多余的描述会污染语义。注意用户输入的转折，如果是“还”这样的追加意图，则需要在意图断言中体现出来。如果表现出来意图转变则应在此项中省略之前的意图过程。
 prompt
 
 schema = <<<schema
 {
-"$schema": "http://json-schema.org/draft-07/schema#",
-"type": "object",
-"required": ["@action", "intention"],
-"additionalProperties": false,
-"properties": {
-    "@action": {
-    "const": "recognite",
-    "description": "标识当前操作的具体类型"
-    },
-    "intention": {
-    "type": "string",
-    "description": "识别结果"
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": [
+        "@action",
+        "intention"
+    ],
+    "additionalProperties": false,
+    "properties": {
+        "@action": {
+            "const": "recognite",
+            "description": "标识当前操作的具体类型"
+        },
+        "intention": {
+            "type": "object",
+            "description": "识别结果",
+            "required": [
+                "assertion",
+                "detail_intention"
+            ],
+            "properties": {
+                "assertion": {
+                    "type": "string",
+                    "description": "直接的断言*现在*用户的意图是什么：要做什么，禁止做什么。不描述之前的行为或历史，只关注综合起来当前意图结论。"
+                },
+                "detail_intention": {
+                    "type": "string",
+                    "description": "详细的识别结果"
+                }
+            }
+        }
     }
-}
 }
 schema
 
@@ -43,5 +60,5 @@ forgeHandle = func(params) {
     if err != nil {
 		return nil
 	}
-    return res.GetString("intention")
+    return res.GetInvokeParams("intention")
 }
