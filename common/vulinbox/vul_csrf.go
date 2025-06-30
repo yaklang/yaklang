@@ -3,6 +3,7 @@ package vulinbox
 import (
 	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"html/template"
 	"math/rand"
 	"net/http"
@@ -69,6 +70,10 @@ func (s *VulinServer) registerCsrf() {
 			Path:         "/unsafe",
 			Title:        "没有保护的表单",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				if !cookieCheck(writer, request, "/csrf/unsafe") {
+					return
+				}
+
 				data := map[string]string{
 					"Info": info,
 				}
@@ -198,6 +203,21 @@ func (s *VulinServer) registerCsrf() {
 		addRouteWithVulInfo(csrfGroup, v)
 	}
 
+}
+
+func cookieCheck(writer http.ResponseWriter, request *http.Request, location string) bool {
+	raw, _ := utils.HttpDumpWithBody(request, true)
+	vulCookie := lowhttp.GetHTTPPacketCookieFirst(raw, "vulCookie")
+	if vulCookie == "" {
+		http.SetCookie(writer, &http.Cookie{
+			Name:  "vulCookie",
+			Value: "confidential_cookie",
+		})
+		writer.Header().Set("Location", location)
+		writer.WriteHeader(302)
+		return false
+	}
+	return true
 }
 
 func updateInfo(writer http.ResponseWriter, request *http.Request, data map[string]string, tpl string) {
