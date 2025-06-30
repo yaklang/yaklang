@@ -90,5 +90,5 @@ func (c *InstructionsIndexDB) ForEach(f func(string, []Instruction)) {
 }
 
 func (c *InstructionsIndexDB) Close() {
-
+	c.save.Close()
 }

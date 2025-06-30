@@ -52,7 +52,7 @@ func NewConfig(opts ...Option) *config {
 		ctx:        context.Background(),
 		waitGroup:  &sync.WaitGroup{},
 
-		saveSize:    1000,
+		saveSize:    100,
 		saveTimeout: 500 * time.Millisecond, // 0.5s
 	}
 	for _, opt := range opts {
