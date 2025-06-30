@@ -134,38 +134,30 @@ func (s *SyntaxFlowAnalyzer) checkBasicSyntax(result *SyntaxFlowRuleAnalyzeResul
 
 // checkDescriptionCompleteness 检查描述信息完整性
 func (s *SyntaxFlowAnalyzer) checkDescriptionCompleteness(result *SyntaxFlowRuleAnalyzeResult, frame *sfvm.SFFrame) {
-	// 检查必要的描述字段
-	requiredFields := map[string]int{
-		"description": MissingDescriptionPenalty, // 详细描述信息包含正反测试例子
-		"solution":    MissingSolutionPenalty,    // 解决方案
+	// 按固定顺序检查必要的描述字段，确保问题列表顺序一致
+
+	// 1. 检查description字段
+	hasDetailedDescription := frame.GetRule().Description != ""
+	if !hasDetailedDescription {
+		result.Problems = append(result.Problems, SyntaxFlowRuleProblem{
+			Type:        ProblemTypeLackDescriptionField,
+			Severity:    Warning,
+			Description: "缺少必要的描述字段: description",
+			Suggestion:  "建议在desc()中添加description字段",
+		})
+		result.Score -= MissingDescriptionPenalty
 	}
 
-	for field, penalty := range requiredFields {
-		switch field {
-		case "description":
-			hasDetailedDescription := frame.GetRule().Description != ""
-			if !hasDetailedDescription {
-				result.Problems = append(result.Problems, SyntaxFlowRuleProblem{
-					Type:        ProblemTypeLackDescriptionField,
-					Severity:    Warning,
-					Description: fmt.Sprintf("缺少必要的描述字段: %s", field),
-					Suggestion:  fmt.Sprintf("建议在desc()中添加%s字段", field),
-				})
-				result.Score -= penalty
-			}
-		case "solution":
-			hasDetailedSolution := frame.GetRule().Solution != ""
-			if !hasDetailedSolution {
-				result.Problems = append(result.Problems, SyntaxFlowRuleProblem{
-					Type:        ProblemTypeLackSolutionField,
-					Severity:    Warning,
-					Description: fmt.Sprintf("缺少必要的描述字段: %s", field),
-					Suggestion:  fmt.Sprintf("建议在desc()中添加%s字段", field),
-				})
-				result.Score -= penalty
-			}
-		}
-
+	// 2. 检查solution字段
+	hasDetailedSolution := frame.GetRule().Solution != ""
+	if !hasDetailedSolution {
+		result.Problems = append(result.Problems, SyntaxFlowRuleProblem{
+			Type:        ProblemTypeLackSolutionField,
+			Severity:    Warning,
+			Description: "缺少必要的描述字段: solution",
+			Suggestion:  "建议在desc()中添加solution字段",
+		})
+		result.Score -= MissingSolutionPenalty
 	}
 }
 
