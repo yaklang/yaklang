@@ -47,8 +47,7 @@ func matchInstructionByOpcodes(ctx context.Context, prog *Program, opcodes ...Op
 		return insts
 	}
 
-	for _, cache := range prog.Cache.InstructionCache.GetAll() {
-		inst := cache.inst
+	for _, inst := range prog.Cache.InstructionCache.GetAll() {
 		if slices.Contains(opcodes, inst.GetOpcode()) {
 			insts = append(insts, inst)
 		}
@@ -116,7 +115,7 @@ func matchInstructionsByVariable(
 	return res
 }
 
-func (c *Cache) _getByVariableEx(
+func (c *ProgramCache) _getByVariableEx(
 	mod int,
 	checkValue func(string) bool,
 ) []Instruction {

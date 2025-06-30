@@ -4,7 +4,43 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
+
+func marshalInstruction(enableDatabase bool, inst Instruction, irCode *ssadb.IrCode) bool {
+	if utils.IsNil(inst) || utils.IsNil(irCode) {
+		log.Errorf("BUG: marshalInstruction called with nil instruction")
+		return false
+	}
+	if inst.GetId() == -1 {
+		log.Errorf("[BUG]: instruction id is -1: %s", codec.AnyToString(inst))
+		return false
+	}
+	// log.Infof("save instruction : %v", inst.GetId())
+	if !enableDatabase {
+		log.Errorf("BUG: saveInstruction called when DB is nil")
+		return false
+	}
+
+	// all instruction from database will be lazy instruction
+	if lz, ok := ToLazyInstruction(inst); ok {
+		// we just check if this lazy-instruction should be saved again?
+		if !lz.ShouldSave() {
+			return false
+		}
+	}
+
+	err := Instruction2IrCode(inst, irCode)
+	if err != nil {
+		log.Errorf("FitIRCode error: %s", err)
+		return false
+	}
+
+	if irCode.Opcode == 0 {
+		log.Errorf("BUG: saveInstruction called with empty opcode: %v", inst.GetName())
+	}
+	return true
+}
 
 // Instruction2IrCode : marshal instruction to ir code, used in cache, to save to database
 func Instruction2IrCode(inst Instruction, ir *ssadb.IrCode) error {
@@ -25,9 +61,9 @@ func Instruction2IrCode(inst Instruction, ir *ssadb.IrCode) error {
 }
 
 // IrCodeToInstruction : unmarshal ir code to instruction, used in LazyInstruction
-func (c *Cache) IrCodeToInstruction(inst Instruction, ir *ssadb.IrCode) Instruction {
+func (c *ProgramCache) IrCodeToInstruction(inst Instruction, ir *ssadb.IrCode, cache *ProgramCache) Instruction {
 	instructionFromIrCode(inst, ir)
-	c.valueFromIrCode(inst, ir)
+	c.valueFromIrCode(cache, inst, ir)
 	basicBlockFromIrCode(inst, ir)
 
 	// extern info
@@ -151,13 +187,15 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-	var value Value
-	value, _ = ToValue(inst)
-	var anValue *anValue
-	if utils.IsNil(value) {
-		log.Errorf("not value: %s", inst.GetName())
+	value, ok := ToValue(inst)
+	if !ok {
 		return
 	}
+	if utils.IsNil(value) {
+		return
+	}
+	var anValue *anValue
+
 	// ir.String = value.String()
 	ir.HasDefs = value.HasValues()
 
@@ -211,10 +249,9 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		}
 	}
 
-	// ir.TypeID = SaveTypeToDB(anValue.GetType(), ir.ProgramName)
 }
 
-func (c *Cache) valueFromIrCode(inst Instruction, ir *ssadb.IrCode) {
+func (c *ProgramCache) valueFromIrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
 	value, ok := ToValue(inst)
 	if !ok {
 		return
@@ -255,7 +292,6 @@ func (c *Cache) valueFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 
 	// type
 	value.SetIsFromDB(true)
-	value.SetType(GetTypeFromDB(ir.TypeID))
 }
 
 func function2IrCode(inst Instruction, ir *ssadb.IrCode) {
