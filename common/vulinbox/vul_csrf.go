@@ -3,12 +3,13 @@ package vulinbox
 import (
 	_ "embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"html/template"
 	"math/rand"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -141,7 +142,9 @@ func (s *VulinServer) registerCsrf() {
 				if err != nil || sessionCookie.Value == "" {
 					if request.Method == http.MethodPost {
 						log.Warnf("csrf bruteforce check failed, session cookie not found on post")
-						http.Error(writer, "session cookie not found", http.StatusForbidden)
+						newSessionID := utils.RandStringBytes(32)
+						http.SetCookie(writer, &http.Cookie{Name: "session_id", Value: newSessionID, Path: "/"})
+						http.Redirect(writer, request, "/csrf/bruteforce", http.StatusFound)
 						return
 					}
 					sessionID = utils.RandStringBytes(32)
@@ -154,13 +157,16 @@ func (s *VulinServer) registerCsrf() {
 				if request.Method == http.MethodPost {
 					// 2. CSRF Token validation
 					submittedToken := request.PostFormValue("csrf_token")
-					expectedToken, ok := sessionToToken.LoadAndDelete(sessionID)
+					expectedToken, ok := sessionToToken.Load(sessionID)
 
 					if !ok || submittedToken == "" || submittedToken != expectedToken.(string) {
 						log.Warnf("csrf token check failed for bruteforce with session %s, submitted: %s, expected: %v, ok: %v", sessionID, submittedToken, expectedToken, ok)
-						http.Error(writer, "csrf_token check error", http.StatusForbidden)
+						newSessionID := utils.RandStringBytes(32)
+						http.SetCookie(writer, &http.Cookie{Name: "session_id", Value: newSessionID, Path: "/"})
+						http.Redirect(writer, request, "/csrf/bruteforce", http.StatusFound)
 						return
 					}
+					sessionToToken.Delete(sessionID)
 
 					// 3. Regenerate Session ID for single-use POST
 					sessionID = utils.RandStringBytes(32)
