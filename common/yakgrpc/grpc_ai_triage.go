@@ -3,6 +3,8 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/aireducer"
@@ -21,6 +23,12 @@ import (
 	"time"
 )
 
+var (
+	Triage_Event_Log        string = "triage_log"
+	Triage_Event_Forge_List string = "triage_forge_list"
+	Triage_Event_Finish     string = "triage_finish"
+)
+
 func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 	firstMsg, err := stream.Recv()
 	if err != nil {
@@ -35,29 +43,33 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 	baseCtx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
 
+	sendEvent := func(e *aid.Event) {
+		if e.Timestamp <= 0 {
+			e.Timestamp = time.Now().Unix() // fallback
+		}
+		event := &ypb.AIOutputEvent{
+			CoordinatorId: e.CoordinatorId,
+			Type:          string(e.Type),
+			NodeId:        utils.EscapeInvalidUTF8Byte([]byte(e.NodeId)),
+			IsSystem:      e.IsSystem,
+			IsStream:      e.IsStream,
+			IsReason:      e.IsReason,
+			StreamDelta:   e.StreamDelta,
+			IsJson:        e.IsJson,
+			Content:       e.Content,
+			Timestamp:     e.Timestamp,
+			TaskIndex:     e.TaskIndex,
+		}
+		err := stream.Send(event)
+		if err != nil {
+			log.Errorf("send event failed: %v", err)
+		}
+	}
+
 	inputEvent := make(chan *aid.InputEvent, 1000)
 	var aidOption = []aid.Option{
 		aid.WithEventHandler(func(e *aid.Event) {
-			if e.Timestamp <= 0 {
-				e.Timestamp = time.Now().Unix() // fallback
-			}
-			event := &ypb.AIOutputEvent{
-				CoordinatorId: e.CoordinatorId,
-				Type:          string(e.Type),
-				NodeId:        utils.EscapeInvalidUTF8Byte([]byte(e.NodeId)),
-				IsSystem:      e.IsSystem,
-				IsStream:      e.IsStream,
-				IsReason:      e.IsReason,
-				StreamDelta:   e.StreamDelta,
-				IsJson:        e.IsJson,
-				Content:       e.Content,
-				Timestamp:     e.Timestamp,
-				TaskIndex:     e.TaskIndex,
-			}
-			err := stream.Send(event)
-			if err != nil {
-				log.Errorf("send event failed: %v", err)
-			}
+			sendEvent(e)
 		}),
 		aid.WithEventInputChan(inputEvent),
 	}
@@ -111,6 +123,7 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 	if err != nil {
 		return err
 	}
+
 	memory := cod.GetConfig().GetMemory()
 	searchHandler := func(query string, searchList []*schema.AIForge) ([]*schema.AIForge, error) {
 		keywords := omap.NewOrderedMap[string, []string](nil)
@@ -139,55 +152,63 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 		return forgeList
 	}
 
+	emitEvent := func(nodeId string, content []byte) {
+		sendEvent(&aid.Event{
+			Type:     aid.EVENT_TYPE_STREAM,
+			NodeId:   nodeId,
+			IsSystem: true,
+			Content:  content,
+		})
+	}
 	reducer, err := aireducer.NewReducerEx(
 		freeInputChan,
 		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.Memory, chunk chunkmaker.Chunk) error {
-			query := string(chunk.Data())
-			go func() {
-				subCtx, cancel := context.WithCancel(baseCtx)
-				defer cancel()
-				res, err := yak.ExecuteForge("intent_recognition",
-					query,
-					append(
-						buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), aidOption...),
-						yak.WithMemory(memory),
-						yak.WithDisallowRequireForUserPrompt(),
-						yak.WithContext(subCtx))...)
+			query := strings.TrimSpace(string(chunk.Data()))
+			memory.PushUserInteraction(aid.UserInteractionStage_FreeInput, cod.GetConfig().AcquireId(), "", query) // push user input timeline
+			defer emitEvent(Triage_Event_Finish, []byte("意图识别完成"))
+			emitEvent(Triage_Event_Log, []byte(fmt.Sprintf("正在识别意图：%s", query)))
+			res, err := yak.ExecuteForge("intent_recognition",
+				query,
+				append(
+					buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), aidOption...),
+					yak.WithMemory(memory),
+					yak.WithDisallowRequireForUserPrompt(),
+					yak.WithContext(baseCtx))...)
+			if err != nil {
+				log.Errorf("ExecuteForge: %v", err)
+				return nil
+			}
+
+			intent, ok := res.(aitool.InvokeParams)
+			if !ok {
+				log.Errorf("yak.ExecuteForge: %v", res)
+				return nil
+			}
+			detailIntention := intent.GetString("detail_intention")
+			intentAssertion := intent.GetString("assertion")
+			emitEvent(Triage_Event_Log, []byte(fmt.Sprintf("当前意图：%s\n理由：%s", intentAssertion, detailIntention)))
+
+			if intentAssertion != "" {
+				emitEvent(Triage_Event_Log, []byte(fmt.Sprintf("搜索关联aiforge")))
+				forgeList, err := searchHandler(intentAssertion, getForge())
 				if err != nil {
-					log.Errorf("ExecuteForge: %v", err)
-					return
+					log.Errorf("searchHandler: %v", err)
+					return nil
 				}
 
-				intent, ok := res.(aitool.InvokeParams)
-				if !ok {
-					return
-				}
-				//fmt.Println(intent.GetString("detail_intention"))
-				//fmt.Println(resString)
-				if intentAssertion := intent.GetString("assertion"); intentAssertion != "" {
-					forgeList, err := searchHandler(intentAssertion, getForge())
+				forgeName := lo.Map(forgeList, func(item *schema.AIForge, _ int) string {
+					return item.GetName()
+				})
+
+				if len(forgeName) > 0 {
+					forgeNameListContent, err := json.Marshal(forgeName)
 					if err != nil {
-						log.Errorf("searchHandler: %v", err)
-						return
+						log.Errorf("marshal: %v", err)
+						return nil
 					}
-					var opts []*aid.RequireInteractiveRequestOption
-					for idx, opt := range forgeList {
-						//fmt.Printf("%d\t%s:[%s]\n", idx, opt.ForgeName, opt.Description)
-						opts = append(opts, &aid.RequireInteractiveRequestOption{
-							Index:       idx,
-							PromptTitle: opt.ForgeName,
-							Prompt:      opt.Description,
-						})
-					}
-					param, _, err := cod.GetConfig().RequireUserPromptWithEndpointResultEx(subCtx, "suggest forge for you", opts...)
-					if err != nil {
-						return
-					}
-					_ = param // param is the selected forge option
-					//spew.Dump(param)
+					emitEvent(Triage_Event_Forge_List, forgeNameListContent)
 				}
-			}()
-			memory.PushUserInteraction(aid.UserInteractionStage_FreeInput, cod.GetConfig().AcquireId(), "", query) // push user input timeline
+			}
 			return nil
 		}),
 		aireducer.WithSeparatorTrigger("\n\n"),
