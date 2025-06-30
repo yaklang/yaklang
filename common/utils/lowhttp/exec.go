@@ -200,6 +200,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		retryInStatusCode    = option.RetryInStatusCode
 		retryNotInStatusCode = option.RetryNotInStatusCode
 		retryHandler         = option.RetryHandler
+		forceFailureHandler  = option.ForceFailureHandler
 		retryWaitTime        = option.RetryWaitTime
 		retryMaxWaitTime     = option.RetryMaxWaitTime
 		noFixContentLength   = option.NoFixContentLength
@@ -793,6 +794,14 @@ RECONNECT:
 				log.Infof("retry reconnect because [%d / %d]", retryTimes, maxRetryTimes)
 				goto RETRY
 			}
+
+			// force failure handler check: if it returns true, make the request fail intentionally
+			if forceFailureHandler != nil {
+				if forceFailureHandler(https, requestPacket, responsePacket) {
+					return response, utils.Error("request failed intentionally by force failure handler")
+				}
+			}
+
 			return response, nil
 		}
 	}
@@ -1124,10 +1133,26 @@ RECONNECT:
 			response.FixContentType = fixHeader
 		}
 		response.RawPacket = rspRaw
+
+		// force failure handler check: if it returns true, make the request fail intentionally
+		if forceFailureHandler != nil {
+			if forceFailureHandler(https, requestPacket, response.RawPacket) {
+				return response, utils.Error("request failed intentionally by force failure handler")
+			}
+		}
+
 		return response, nil
 	}
 
 	// 如果不修复的话，默认服务器返回的东西也有点复杂，不适合做其他处理
 	response.RawPacket = rawBytes
+
+	// force failure handler check: if it returns true, make the request fail intentionally
+	if forceFailureHandler != nil {
+		if forceFailureHandler(https, requestPacket, response.RawPacket) {
+			return response, utils.Error("request failed intentionally by force failure handler")
+		}
+	}
+
 	return response, nil
 }

@@ -27,6 +27,7 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 	func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte,
 	func([]byte, []byte, map[string]string) map[string]string,
 	func(bool, int, []byte, []byte, func(...[]byte)),
+	func(bool, []byte, []byte) bool,
 ) {
 	// 发送数据包之前的 hook
 	scriptEngine := NewScriptEngine(2)
@@ -70,7 +71,7 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 	engine, err = scriptEngine.ExecuteEx(raw, make(map[string]interface{}))
 	if err != nil {
 		log.Errorf("eval hookCode failed: %s", err)
-		return nil, nil, nil, nil
+		return nil, nil, nil, nil, nil
 	}
 
 	before, beforeRequestOk := engine.GetVar("beforeRequest")
@@ -104,12 +105,19 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 		retryHandlerInstanceNumIn = ret.GetNumIn()
 	}
 
+	forceFailureHandlerInstance, forceFailureHandlerOk := engine.GetVar("forceFailureHandler")
+	forceFailureHandlerInstanceNumIn := 3
+	if ret, ok := forceFailureHandlerInstance.(*yakvm.Function); ok {
+		forceFailureHandlerInstanceNumIn = ret.GetNumIn()
+	}
+
 	hookLock := new(sync.Mutex)
 
 	var hookBefore func(https bool, originReq []byte, req []byte) []byte = nil
 	var hookAfter func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte = nil
 	var mirrorFlow func(req []byte, rsp []byte, handle map[string]string) map[string]string = nil
-	var retryHandler func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte)) = nil
+	var retryHandler func(https bool, retryCount int, req []byte, rsp []byte) bool = nil
+	var forceFailureHandler func(https bool, req []byte, rsp []byte) bool = nil
 
 	if beforeRequestOk {
 		hookBefore = func(https bool, originReq []byte, req []byte) []byte {
@@ -239,7 +247,36 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 		}
 	}
 
-	return hookBefore, hookAfter, mirrorFlow, retryHandler
+	if forceFailureHandlerOk {
+		forceFailureHandler = func(https bool, req []byte, rsp []byte) bool {
+			hookLock.Lock()
+			defer hookLock.Unlock()
+
+			defer func() {
+				if err := recover(); err != nil {
+					log.Errorf("forceFailureHandler(request, response) data panic: %s", err)
+				}
+			}()
+
+			if engine != nil {
+				params := []any{https, req, rsp}
+				if forceFailureHandlerInstanceNumIn == 2 {
+					params = []any{req, rsp}
+				} else if forceFailureHandlerInstanceNumIn == 1 {
+					params = []any{rsp}
+				}
+				result, err := engine.CallYakFunction(context.Background(), "forceFailureHandler", params)
+				if err != nil {
+					log.Infof("eval forceFailureHandler hook failed: %s", err)
+				}
+
+				return utils.InterfaceToBoolean(result)
+			}
+			return false
+		}
+	}
+
+	return hookBefore, hookAfter, mirrorFlow, retryHandler, forceFailureHandler
 }
 
 func MutateWithParamsGetter(raw string) func() *mutate.RegexpMutateCondition {

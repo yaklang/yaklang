@@ -50,6 +50,7 @@ type LowhttpExecConfig struct {
 	RetryInStatusCode                []int
 	RetryNotInStatusCode             []int
 	RetryHandler                     RetryHandler
+	ForceFailureHandler              func(https bool, req []byte, rsp []byte) bool
 	RetryWaitTime                    time.Duration
 	RetryMaxWaitTime                 time.Duration
 	JsRedirect                       bool
@@ -590,6 +591,25 @@ func WithRetryHandler(retryHandler RetryHandler) LowhttpOpt {
 					}
 				}()
 				retryHandler(https, retryCount, req, rsp,retryFunc)
+				return
+			}
+		}
+	}
+}
+
+// WithForceFailureHandler sets a force failure handler function that will be called when a request succeeds.
+// return true to make the request fail intentionally, return false to keep the request successful.
+func WithForceFailureHandler(forceFailureHandler func(https bool, req []byte, rsp []byte) bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		if !utils.IsNil(forceFailureHandler) {
+			o.ForceFailureHandler = func(https bool, req []byte, rsp []byte) (ret bool) {
+				defer func() {
+					if err := recover(); err != nil {
+						ret = false
+						log.Errorf("force failure handler failed: %v\n%v", err, utils.ErrorStack(err))
+					}
+				}()
+				ret = forceFailureHandler(https, req, rsp)
 				return
 			}
 		}
