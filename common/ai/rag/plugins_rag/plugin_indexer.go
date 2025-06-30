@@ -7,13 +7,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// DefaultCollectionName 默认的集合名称
-const DefaultCollectionName = "yaklang_plugins_default"
-
 // NewSQLitePluginsRagManager 创建一个基于 SQLite 向量存储的插件 RAG 管理器
 func NewSQLitePluginsRagManager(db *gorm.DB, collectionName string, modelName string, dimension int, opts ...aispec.AIConfigOption) (*PluginsRagManager, error) {
 	if collectionName == "" {
-		collectionName = DefaultCollectionName
+		collectionName = PLUGIN_RAG_COLLECTION_NAME
 	}
 
 	// 创建基于 SQLite 的 RAG 系统

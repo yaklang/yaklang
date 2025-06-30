@@ -69,7 +69,7 @@ func AddText(rag *RAGSystem, text string, maxChunkSize int, overlap int, metadat
 // SearchAndGeneratePrompt 检索相关文档并生成提示
 func SearchAndGeneratePrompt(rag *RAGSystem, query string, limit int, threshold float64, promptTemplate string) (string, error) {
 	// 检索相关文档
-	results, err := rag.Query(query, limit)
+	results, err := rag.Query(query, 1, limit)
 	if err != nil {
 		return "", utils.Errorf("failed to query documents: %v", err)
 	}

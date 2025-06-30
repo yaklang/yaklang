@@ -70,7 +70,7 @@ func ImportVectorData(db *gorm.DB, filepath string) error {
 			}
 			collectionId = cs[0].ID
 			return nil
-		}))
+		}), bizhelper.WithImportUniqueIndexField("DocumentID"), bizhelper.WithImportAllowOverwrite(true))
 	})
 
 }
@@ -104,4 +104,70 @@ func ExportVectorData(db *gorm.DB, collectionName string, filepath string) error
 		})
 	}
 	return bizhelper.ExportTableZipWithMarshalFunc(context.Background(), exportDB, filepath, marshalFunc, opts...)
+}
+
+func ImportVectorDataFullUpdate(db *gorm.DB, filepath string) error {
+	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+		var collectionId uint
+		unmarshalFunc := func(b []byte) (*schema.VectorStoreDocument, error) {
+			var v ExportVectorStoreDocument
+			if err := json.Unmarshal(b, &v); err != nil {
+				return nil, err
+			}
+			collection := &schema.VectorStoreDocument{
+				DocumentID:   v.DocumentID,
+				Metadata:     v.Metadata,
+				Embedding:    v.Embedding,
+				CollectionID: collectionId,
+			}
+			return collection, nil
+		}
+		return bizhelper.ImportTableZipWithMarshalFunc(context.Background(), tx, filepath, unmarshalFunc, bizhelper.WithMetaDataHandler(func(metaData bizhelper.MetaData) error {
+			collectionName := metaData["collection_name"].(string)
+			collectionDescription := metaData["collection_description"].(string)
+			collectionModelName := metaData["collection_model_name"].(string)
+			collectionDimension := metaData["collection_dimension"].(float64)
+
+			var collections []*schema.VectorStoreCollection
+			err := tx.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).Find(&collections).Error
+			if err != nil {
+				return err
+			}
+
+			if len(collections) > 0 {
+				collectionId = collections[0].ID
+				err = tx.Unscoped().Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collectionId).Delete(&schema.VectorStoreDocument{}).Error
+				if err != nil {
+					return err
+				}
+				err = tx.Unscoped().Model(&schema.VectorStoreCollection{}).Where("id = ?", collectionId).Delete(&schema.VectorStoreCollection{}).Error
+				if err != nil {
+					return err
+				}
+			}
+
+			err = tx.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).Assign(&schema.VectorStoreCollection{
+				Name:        collectionName,
+				Description: collectionDescription,
+				ModelName:   collectionModelName,
+				Dimension:   int(collectionDimension),
+			}).FirstOrCreate(&schema.VectorStoreCollection{}).Error
+
+			if err != nil {
+				return err
+			}
+
+			cs := []*schema.VectorStoreCollection{}
+			err = tx.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).Find(&cs).Error
+			if err != nil {
+				return err
+			}
+
+			if len(cs) == 0 {
+				return utils.Errorf("save collection %s failed, collection not found", collectionName)
+			}
+			collectionId = cs[0].ID
+			return nil
+		}), bizhelper.WithImportUniqueIndexField("DocumentID"), bizhelper.WithImportAllowOverwrite(true))
+	})
 }

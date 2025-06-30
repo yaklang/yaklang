@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/gobwas/glob"
+	"github.com/jinzhu/gorm"
 
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
@@ -505,4 +506,12 @@ func IndexAllSubstrings(s string, patterns ...string) (result [][2]int) {
 		}
 	}
 	return
+}
+
+func CreateTempTestDatabaseInMemory() (*gorm.DB, error) {
+	db, err := gorm.Open("sqlite3", "file::memory:?cache=shared")
+	if err != nil {
+		return nil, err
+	}
+	return db, nil
 }

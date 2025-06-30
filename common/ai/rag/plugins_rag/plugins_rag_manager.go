@@ -185,7 +185,7 @@ func (m *PluginsRagManager) metadataProducer(producerID int, scriptChan <-chan s
 
 			// 准备插件元数据
 			metaMap := map[string]any{
-				"id": yakScript.Id,
+				"id": yakScript.ScriptName,
 			}
 
 			// 准备插件内容，组合多个字段以提高搜索质量
@@ -385,22 +385,27 @@ type PluginSearchResult struct {
 	Score  float64
 }
 
-func (m *PluginsRagManager) SearchPluginsIds(query string, limit int) ([]int64, error) {
+func (m *PluginsRagManager) SearchPluginsIds(query string, page, limit int) (int, []string, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	// 搜索 RAG 系统
-	results, err := m.ragSystem.Query(query, limit)
+
+	results, err := m.ragSystem.Query(query, page, limit)
 	if err != nil {
-		return nil, utils.Errorf("搜索 RAG 系统失败: %v", err)
+		return 0, nil, utils.Errorf("搜索 RAG 系统失败: %v", err)
 	}
-	ids := make([]int64, 0)
+
+	// 文档 id 和插件 id 相同
+	var ids []string
 	for _, result := range results {
-		if id, ok := result.Document.Metadata["id"].(float64); ok {
-			ids = append(ids, int64(id))
-		}
+		ids = append(ids, result.Document.ID)
 	}
-	return ids, nil
+	total, err := m.ragSystem.CountDocuments()
+	if err != nil {
+		return 0, nil, utils.Errorf("获取文档总数失败: %v", err)
+	}
+	return total, ids, nil
 }
 
 // SearchPlugins 使用自然语言搜索插件
@@ -414,7 +419,7 @@ func (m *PluginsRagManager) SearchPlugins(query string, limit int) ([]*PluginSea
 	// }
 
 	// 搜索 RAG 系统
-	results, err := m.ragSystem.Query(query, limit)
+	results, err := m.ragSystem.Query(query, 1, limit)
 	if err != nil {
 		return nil, utils.Errorf("搜索 RAG 系统失败: %v", err)
 	}

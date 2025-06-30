@@ -46,7 +46,7 @@ func (m *MemoryVectorStore) Add(docs ...Document) error {
 }
 
 // Search 根据查询文本检索相关文档
-func (m *MemoryVectorStore) Search(query string, limit int) ([]SearchResult, error) {
+func (m *MemoryVectorStore) Search(query string, page, limit int) ([]SearchResult, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -74,8 +74,6 @@ func (m *MemoryVectorStore) Search(query string, limit int) ([]SearchResult, err
 		results = append(results, SearchResult{
 			Document: doc,
 			Score:    similarity,
-			// 欧几里得距离可以作为额外的距离度量（可选）
-			Distance: 0, // 这里我们只使用余弦相似度
 		})
 	}
 
@@ -84,10 +82,15 @@ func (m *MemoryVectorStore) Search(query string, limit int) ([]SearchResult, err
 		return results[i].Score > results[j].Score
 	})
 
-	// 限制结果数量
-	if limit > 0 && limit < len(results) {
-		results = results[:limit]
+	// 计算分页
+	offset := (page - 1) * limit
+	if offset >= len(results) {
+		return []SearchResult{}, nil
 	}
+	if offset+limit > len(results) {
+		limit = len(results) - offset
+	}
+	results = results[offset : offset+limit]
 
 	return results, nil
 }
