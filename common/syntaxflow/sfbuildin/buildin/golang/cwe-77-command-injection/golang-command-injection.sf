@@ -125,9 +125,9 @@ REFERENCE
 )
 
 <include('golang-os-exec')> as $sink;
-$sink?{have: 'Parameter'} as $check;
+<include('golang-user-input')> as $input;
 
-$check as $high;
+$sink & $input as $high;
 
 alert $high for {
 	type: "vuln",
@@ -216,30 +216,33 @@ CODE
 
    以下是一个存在漏洞的代码示例：
    ```golang
-   package main
+package main
 
-   import (
-       "fmt"
-       "os/exec"
-   )
+import (
+    "fmt"
+    "os/exec"
+	"net/http"
+)
 
-   func executeCommand(userInput string) {
-       // 不安全的做法：直接将用户输入拼接到命令中
-       cmd := exec.Command("echo", userInput)
-       output, err := cmd.CombinedOutput()
-       if err != nil {
-           fmt.Println("Error:", err)
-           return
-       }
-       fmt.Println(string(output))
-   }
+func executeCommand(userInput string) {
+    // 不安全的做法：直接将用户输入拼接到命令中
+    cmd := exec.Command("echo", userInput)
+    output, err := cmd.CombinedOutput()
+    if err != nil {
+        fmt.Println("Error:", err)
+        return
+    }
+    fmt.Println(string(output))
+}
 
-   func main() {
-       var userInput string
-       fmt.Print("Enter your command: ")
-       fmt.Scanln(&userInput) // 接收用户输入
-       executeCommand(userInput)
-   }
+func handler(w http.ResponseWriter, r *http.Request) {
+	cmd := r.URL.Query().Get("cmd")
+  	executeCommand(cmd)
+}
+
+func main() {
+	http.HandleFunc("/", handler)
+}
    ```
 
 3. **潜在影响**
@@ -260,6 +263,7 @@ package main
 import (
     "fmt"
     "os/exec"
+	"net/http"
 )
 
 func executeCommand(userInput string) {
@@ -273,11 +277,13 @@ func executeCommand(userInput string) {
     fmt.Println(string(output))
 }
 
+func handler(w http.ResponseWriter, r *http.Request) {
+	cmd := r.URL.Query().Get("cmd")
+  	executeCommand(cmd)
+}
+
 func main() {
-    var userInput string
-    fmt.Print("Enter your command: ")
-    fmt.Scanln(&userInput) // 接收用户输入
-    executeCommand(userInput)
+	http.HandleFunc("/", handler)
 }
 UNSAFE
 	'safe://main.go': <<<SAFE
@@ -286,6 +292,7 @@ package main
 import (
     "fmt"
     "os/exec"
+	"net/http"
 )
 
 func executeCommand(userInput string) {
@@ -299,11 +306,13 @@ func executeCommand(userInput string) {
     fmt.Println(string(output))
 }
 
+func handler(w http.ResponseWriter, r *http.Request) {
+	cmd := r.URL.Query().Get("cmd")
+  	executeCommand(cmd)
+}
+
 func main() {
-    var userInput string
-    fmt.Print("Enter your command: ")
-    fmt.Scanln(&userInput) // 接收用户输入
-    executeCommand(userInput)
+	http.HandleFunc("/", handler)
 }
 SAFE
 )
