@@ -64,6 +64,7 @@ type httpPoolConfig struct {
 	HookAfterRequest  func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte
 	MirrorHTTPFlow    func([]byte, []byte, map[string]string) map[string]string
 	RetryHandler      func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte))
+	CustomFailureChecker func(https bool, req []byte, rsp []byte, fail func(string))
 	MutateHook        func([]byte) [][]byte
 
 	// 请求来源
@@ -212,14 +213,14 @@ func _hoopPool_SetHookCaller(
 	after func(bool, []byte, []byte, []byte, []byte) []byte,
 	extractor func([]byte, []byte, map[string]string) map[string]string,
 	retryHandler func(bool, int, []byte, []byte, func(...[]byte)),
-	forceFailureHandler func(bool, []byte, []byte) bool,
+	customFailureChecker func(bool, []byte, []byte, func(string)),
 ) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.HookBeforeRequest = before
 		config.HookAfterRequest = after
 		config.MirrorHTTPFlow = extractor
 		config.RetryHandler = retryHandler
-		config.ForceFailureHandler = forceFailureHandler
+		config.CustomFailureChecker = customFailureChecker
 	}
 }
 
@@ -945,8 +946,8 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithRetryHandler(config.RetryHandler))
 						}
 
-						if config.ForceFailureHandler != nil {
-							lowhttpOptions = append(lowhttpOptions, lowhttp.WithForceFailureHandler(config.ForceFailureHandler))
+						if config.CustomFailureChecker != nil {
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithCustomFailureChecker(config.CustomFailureChecker))
 						}
 
 						if config.ConnPool != nil {
