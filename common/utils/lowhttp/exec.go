@@ -200,7 +200,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		retryInStatusCode    = option.RetryInStatusCode
 		retryNotInStatusCode = option.RetryNotInStatusCode
 		retryHandler         = option.RetryHandler
-		forceFailureHandler  = option.ForceFailureHandler
+		customFailureChecker = option.CustomFailureChecker
 		retryWaitTime        = option.RetryWaitTime
 		retryMaxWaitTime     = option.RetryMaxWaitTime
 		noFixContentLength   = option.NoFixContentLength
@@ -271,6 +271,20 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			}
 			return false
 		}
+	}
+	failureChecker := func(rsp *LowhttpResponse) error {
+		if customFailureChecker != nil && rsp != nil {
+			var failureMsg string
+			var hasFailed bool
+			customFailureChecker(rsp.Https, rsp.RawRequest, rsp.BareResponse, func(msg string) {
+				failureMsg = msg
+				hasFailed = true
+			})
+			if hasFailed {
+				return utils.Errorf("request failed intentionally by custom failure checker: %s", failureMsg)
+			}
+		}
+		return nil
 	}
 
 RETRY:
@@ -795,14 +809,8 @@ RECONNECT:
 				goto RETRY
 			}
 
-			// force failure handler check: if it returns true, make the request fail intentionally
-			if forceFailureHandler != nil {
-				if forceFailureHandler(https, requestPacket, responsePacket) {
-					return response, utils.Error("request failed intentionally by force failure handler")
-				}
-			}
-
-			return response, nil
+			err = failureChecker(response)
+			return response, err
 		}
 	}
 	//log.Infof("dns time + dial time cost: %v", time.Since(dnsStart))
@@ -1134,25 +1142,13 @@ RECONNECT:
 		}
 		response.RawPacket = rspRaw
 
-		// force failure handler check: if it returns true, make the request fail intentionally
-		if forceFailureHandler != nil {
-			if forceFailureHandler(https, requestPacket, response.RawPacket) {
-				return response, utils.Error("request failed intentionally by force failure handler")
-			}
-		}
-
-		return response, nil
+		err = failureChecker(response)
+		return response, err
 	}
 
 	// 如果不修复的话，默认服务器返回的东西也有点复杂，不适合做其他处理
 	response.RawPacket = rawBytes
 
-	// force failure handler check: if it returns true, make the request fail intentionally
-	if forceFailureHandler != nil {
-		if forceFailureHandler(https, requestPacket, response.RawPacket) {
-			return response, utils.Error("request failed intentionally by force failure handler")
-		}
-	}
-
-	return response, nil
+	err = failureChecker(response)
+	return response, err
 }

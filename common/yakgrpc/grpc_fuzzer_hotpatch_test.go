@@ -728,7 +728,7 @@ retryHandler = (req, rsp,retry)  => {
 	}
 }
 
-func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_forceFailureHandler(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_customFailureChecker(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -744,9 +744,8 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_forceFailureHandler(t *testing.T) {
 		HotPatchCode: `handle = result => x"{{int(1)}}"
 flag = "` + string(flag) + `"
 
-forceFailureHandler = (https, req, rsp) => {
-	if rsp.Contains(flag) { return true }
-	return false
+customFailureChecker = (https, req, rsp, fail) => {
+	if (rsp.Contains(flag)) { fail("错误内容。。。") }
 }
 
 `,
@@ -765,14 +764,15 @@ forceFailureHandler = (https, req, rsp) => {
 
 		spew.Dump(rsp)
 		require.NotEmpty(t, rsp.Reason)
-		require.Contains(t, rsp.Reason, "request failed intentionally by force failure handler")
-		require.Contains(t, string(rsp.ResponseRaw), flag)
+		require.Contains(t, rsp.Reason, "request failed intentionally by custom failure checker")
+		require.Contains(t, rsp.Reason, "错误内容。。。")
+		require.Contains(t, string(rsp.ResponseRaw), flag) // 强制失败也有响应
 		spew.Dump(rsp.ExtractedResults)
 	}
 	require.Equal(t, 1, responseCount)
 }
 
-func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_forceFailureHandler_2_args(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_customFailureChecker_3_args(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -788,9 +788,8 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_forceFailureHandler_2_args(t *testing.
 		HotPatchCode: `handle = result => x"{{int(1)}}"
 flag = "` + string(flag) + `"
 
-forceFailureHandler = (req, rsp) => {
-	if rsp.Contains(flag) { return true }
-	return false
+customFailureChecker = (req, rsp, fail) => {
+	if (rsp.Contains(flag)) { fail("3 args 错误内容。。。") }
 }
 
 `,
@@ -807,14 +806,15 @@ forceFailureHandler = (req, rsp) => {
 		}
 		responseCount++
 		require.NotEmpty(t, rsp.Reason)
-		require.Contains(t, rsp.Reason, "request failed intentionally by force failure handler")
+		require.Contains(t, rsp.Reason, "request failed intentionally by custom failure checker")
+		require.Contains(t, rsp.Reason, "3 args 错误内容。。。")
 		require.Contains(t, string(rsp.ResponseRaw), flag)
 
 	}
 	require.Equal(t, 1, responseCount)
 }
 
-func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_forceFailureHandler_1_arg(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_customFailureChecker_2_args(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -830,9 +830,8 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_forceFailureHandler_1_arg(t *testing.T
 		HotPatchCode: `handle = result => x"{{int(1)}}"
 flag = "` + string(flag) + `"
 
-forceFailureHandler = rsp => {
-	if rsp.Contains(flag) { return true }
-	return false
+customFailureChecker = (rsp, fail) => {
+	if (rsp.Contains(flag)) { fail("2 args 错误内容。。。") }
 }
 
 `,
@@ -850,14 +849,15 @@ forceFailureHandler = rsp => {
 		responseCount++
 
 		require.NotEmpty(t, rsp.Reason)
-		require.Contains(t, rsp.Reason, "request failed intentionally by force failure handler")
+		require.Contains(t, rsp.Reason, "request failed intentionally by custom failure checker")
+		require.Contains(t, rsp.Reason, "2 args 错误内容。。。")
 		require.Contains(t, string(rsp.ResponseRaw), flag)
 
 	}
 	require.Equal(t, 1, responseCount)
 }
 
-func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_forceFailureHandler_no_fail(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_customFailureChecker_no_fail(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -873,8 +873,8 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_forceFailureHandler_no_fail(t *testing
 		HotPatchCode: `handle = result => x"{{int(1)}}"
 flag = "` + string(flag) + `"
 
-forceFailureHandler = (https, req, rsp) => {
-	return false
+customFailureChecker = (https, req, rsp, fail) => {
+	// Do not call fail function
 }
 
 `,

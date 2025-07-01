@@ -597,20 +597,18 @@ func WithRetryHandler(retryHandler RetryHandler) LowhttpOpt {
 	}
 }
 
-// WithForceFailureHandler sets a force failure handler function that will be called when a request succeeds.
-// return true to make the request fail intentionally, return false to keep the request successful.
-func WithForceFailureHandler(forceFailureHandler func(https bool, req []byte, rsp []byte) bool) LowhttpOpt {
+// WithCustomFailureChecker sets a custom failure checker function that will be called when a request succeeds.
+// The checker can call the fail function with an error message to mark the request as failed.
+func WithCustomFailureChecker(customFailureChecker func(https bool, req []byte, rsp []byte, fail func(string))) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
-		if !utils.IsNil(forceFailureHandler) {
-			o.ForceFailureHandler = func(https bool, req []byte, rsp []byte) (ret bool) {
+		if !utils.IsNil(customFailureChecker) {
+			o.CustomFailureChecker = func(https bool, req []byte, rsp []byte, fail func(string)) {
 				defer func() {
 					if err := recover(); err != nil {
-						ret = false
-						log.Errorf("force failure handler failed: %v\n%v", err, utils.ErrorStack(err))
+						log.Errorf("custom failure checker failed: %v\n%v", err, utils.ErrorStack(err))
 					}
 				}()
-				ret = forceFailureHandler(https, req, rsp)
-				return
+				customFailureChecker(https, req, rsp, fail)
 			}
 		}
 	}

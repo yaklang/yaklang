@@ -774,8 +774,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 
 		if !req.GetDisableHotPatch() {
-			beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler, forceFailureHandler := yak.MutateHookCaller(stream.Context(), req.GetHotPatchCode(), nil)
-			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_HookCodeCaller(beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler, forceFailureHandler))
+			beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler, customFailureChecker := yak.MutateHookCaller(stream.Context(), req.GetHotPatchCode(), nil)
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_HookCodeCaller(beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler, customFailureChecker))
 		}
 
 		if req.GetOverwriteSNI() {
