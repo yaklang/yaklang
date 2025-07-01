@@ -93,14 +93,16 @@ func MITM_MutualTLSClient(crt, key []byte, cas ...[]byte) MITMConfig {
 	}
 }
 
-func MITM_SetCaCertAndPrivKey(ca []byte, key []byte) MITMConfig {
+func MITM_SetCaCertAndPrivKey(ca []byte, key []byte, gmCA []byte, gmKey []byte) MITMConfig {
 	return func(server *MITMServer) error {
 		if ca == nil || key == nil {
-			return MITM_SetCaCertAndPrivKey(defaultCA, defaultKey)(server)
+			return MITM_SetCaCertAndPrivKey(defaultCA, defaultKey, gmCA, gmKey)(server)
 		}
 
+		if gmCA == nil || gmKey == nil {
+			return MITM_SetCaCertAndPrivKey(ca, key, defaultGMCA, defaultGMKey)(server)
+		}
 		c, err := tls.X509KeyPair(ca, key)
-		gmC, err := gmtls.X509KeyPair(defaultGMCA, defaultGMKey) // 当前暂时没有给用户自定义国密证书这个选项 默认就是用生成出来的自签证书
 		if err != nil {
 			// if not pem blocks
 			// try to parse as der
@@ -132,6 +134,31 @@ func MITM_SetCaCertAndPrivKey(ca []byte, key []byte) MITMConfig {
 			}
 		}
 
+		gmC, err := gmtls.X509KeyPair(gmCA, gmKey)
+		if err != nil {
+			caDer, err := gmx509.ParseCertificate(gmCA)
+			if err != nil {
+				return utils.Errorf("parse GM ca[pem/der] failed: %s", err)
+			}
+			gmCA = pem.EncodeToMemory(&pem.Block{Type: `CERTIFICATE`, Bytes: caDer.Raw})
+			keyDer, err := gmx509.ParsePKCS8PrivateKey(gmKey, nil)
+			if err != nil {
+				log.Warnf("parse GM key[pem/der] pkcs8 pkey failed: %s", err)
+				return utils.Errorf("parse GM key[pem/der] pkcs1/pkcs8 pkey failed: %s", err)
+			} else {
+				// pkcs8
+				keyRawBytes, err := gmx509.MarshalSm2PrivateKey(keyDer, nil)
+				if err != nil {
+					return utils.Errorf("marshal GM key[pem/der] pkcs8 pkey failed: %s", err)
+				}
+				key = pem.EncodeToMemory(&pem.Block{Type: `PRIVATE KEY`, Bytes: keyRawBytes})
+			}
+			gmC, err = gmtls.X509KeyPair(gmCA, gmKey)
+			if err != nil {
+				return utils.Errorf("parse GM ca and privKey (DER) failed: %s", err)
+			}
+		}
+
 		cert, err := x509.ParseCertificate(c.Certificate[0])
 		if err != nil {
 			return utils.Errorf("extract x509 cert failed: %s", err)
@@ -142,6 +169,7 @@ func MITM_SetCaCertAndPrivKey(ca []byte, key []byte) MITMConfig {
 		}
 		// compatible obsolete tls version
 		var opts []mitm.ConfigOption
+
 		gmCert, err := gmx509.ParseCertificate(gmC.Certificate[0])
 		if err != nil {
 			log.Errorf("parse gmx509 cert failed: %s", err)

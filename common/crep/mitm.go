@@ -493,7 +493,7 @@ func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
 
 	// MITM option configured above
 	if server.mitmConfig == nil { // currently seems it must be nil since no function is exposed to directly create
-		err := MITM_SetCaCertAndPrivKey(defaultCA, defaultKey)(server)
+		err := MITM_SetCaCertAndPrivKey(defaultCA, defaultKey, defaultGMCA, defaultGMKey)(server)
 		if err != nil {
 			return nil, utils.Errorf("set ca/key failed: %s", err)
 		}
