@@ -26,9 +26,8 @@ const (
 	defaultWaitTime    = time.Duration(100) * time.Millisecond
 	defaultMaxWaitTime = time.Duration(2000) * time.Millisecond
 )
-
-type RetryHandler func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte)
 type RetryHandler func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte))
+
 
 type LowhttpExecConfig struct {
 	Host              string
@@ -583,13 +582,13 @@ func WithRetryTimes(retryTimes int) LowhttpOpt {
 // return true for retry, return false for not retry.
 func WithRetryHandler(retryHandler RetryHandler) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
-			o.RetryHandler = func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte)) {
+		if !utils.IsNil(retryHandler) {
 			o.RetryHandler = func(https bool, retryCount int, req []byte, rsp []byte,retryFunc func(...[]byte)) {
 				defer func() {
 					if err := recover(); err != nil {
 						log.Errorf("retry handler failed: %v\n%v", err, utils.ErrorStack(err))
 					}
-				retryHandler(https, retryCount, req, rsp, retryFunc)
+				}()
 				retryHandler(https, retryCount, req, rsp,retryFunc)
 				return
 			}

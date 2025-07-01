@@ -554,9 +554,8 @@ mirrorHTTPFlow = (req, rsp) => {
 	return {"abc": "no right"}
 }
 
-retryHandler = (https, req, rsp) => {
-	if rsp.Contains("no ready") { return true }
-	return false
+retryHandler = (https,retryCount, req, rsp,retry) => {
+	if rsp.Contains("no ready") { retry() }
 }
 
 `,
@@ -623,9 +622,8 @@ mirrorHTTPFlow = (req, rsp) => {
 	return {"abc": "no right"}
 }
 
-retryHandler = (req, rsp) => {
-	if rsp.Contains("no ready") { return true }
-	return false
+retryHandler = (retryCount,req, rsp,retry) => {
+	if rsp.Contains("no ready") { return retry()}
 }
 
 `,
@@ -692,9 +690,8 @@ mirrorHTTPFlow = (req, rsp) => {
 	return {"abc": "no right"}
 }
 
-retryHandler = rsp => {
-	if rsp.Contains("no ready") { return true }
-	return false
+retryHandler = (req, rsp,retry)  => {
+	if rsp.Contains("no ready") { return retry()}
 }
 
 `,
