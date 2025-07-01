@@ -20,7 +20,9 @@ func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 			log.Errorf("=============================\n"+"replace value panic: %v", r)
 		}
 	}()
-
+	if v.GetId() == to.GetId() {
+		return
+	}
 	for _, variable := range v.GetAllVariables() {
 		// TODO: handler variable replace value
 		variable.Replace(v, to)

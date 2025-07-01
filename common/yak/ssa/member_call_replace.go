@@ -13,73 +13,66 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 	defer recoverScope()
 	createPhi := generatePhi(builder, nil, nil)
 
+	isDeclereMember := func(member Value) bool {
+		un, ok := ToUndefined(member)
+		if !ok {
+			return false
+		}
+		return un.Kind == UndefinedMemberInValid || un.Kind == UndefinedMemberValid
+	}
+	var replace func(Value, Value)
+	replace = func(key, member Value) {
+		// create member of `to` value with key
+		res := checkCanMemberCallExist(to, key)
+		name, typ := res.name, res.typ
+		toMember := builder.PeekValue(name)
+
+		// then, we will replace value, `member` to `toMember`
+		if !isDeclereMember(member) {
+			// memeber exist, not declere, just reset type/name/object
+			member.SetName(name)
+			member.SetType(typ)
+			setMemberCallRelationship(to, key, member)
+			if utils.IsNil(toMember) {
+				// if no toMember, just use member is fine
+				ret[name] = member
+			} else {
+				// if toMember is exist, should create phi
+				ret[name] = createPhi(name, []Value{toMember, member})
+			}
+			return
+		}
+		// if member call is declere
+		if utils.IsNil(toMember) {
+			// must create
+			toMember = builder.ReadMemberCallValue(to, key)
+		}
+		// memberT := member
+
+		// switch member.GetOpcode() {
+		// // Do nothing, it will be replaced later
+		// case SSAOpcodeBinOp:
+		// case SSAOpcodeUnOp:
+		// default:
+		ReplaceAllValue(member, toMember)
+		DeleteInst(member)
+		if member.IsObject() {
+			obj := member
+			for key, member := range obj.GetAllMember() {
+				obj.DeleteMember(key)
+				replace(key, member)
+			}
+		}
+		ret[name] = toMember
+	}
 	// replace object member-call
 	if v.IsObject() {
-		replace := func(index, member Value) {
-			// replace this member object to to
-			key := member.GetKey()
+		for key, member := range v.GetAllMember() {
 			// remove this member from v
-			v.DeleteMember(index)
-
-			// create member of `to` value with key
-			// if fun := GetMethod(value.GetType(), key.String()); fun != nil {
-			// 	return NewClassMethod(fun, value)
-			// }
-			// re-set type
-			res := checkCanMemberCallExist(to, index)
-			resk := checkCanMemberCallExist(to, key)
-			name, typ := res.name, res.typ
-			// toMember := builder.getOriginMember(name, typ, to, key)
-			toMember := builder.PeekValue(resk.name)
-
-			// then, we will replace value, `member` to `toMember`
-			if member.GetOpcode() != SSAOpcodeUndefined {
-				member.SetName(name)
-				member.SetType(typ)
-				setMemberCallRelationship(to, index, member)
-				log.Warn("ReplaceMemberCall can create phi, but we cannot find cfgEntryBlock")
-				if utils.IsNil(toMember) {
-					ret[name] = member
-				} else {
-					ret[name] = createPhi(name, []Value{toMember, member})
-				}
-			}
-			if utils.IsNil(toMember) {
-				toMember = builder.ReadMemberCallValue(to, index)
-			}
-
-			memberT := member
-			switch member.GetOpcode() {
-			// Do nothing, it will be replaced later
-			case SSAOpcodeBinOp:
-			case SSAOpcodeUnOp:
-			default:
-				ReplaceAllValue(member, toMember)
-				DeleteInst(member)
-				memberT = toMember
-			}
-			for n, v := range ReplaceMemberCall(member, toMember) {
-				ret[n] = v
-			}
-			if !member.IsObject() {
-				ret[name] = memberT
-			}
-		}
-		// call value需要优先替换
-		callMap := make(map[Value]Value)
-		for index, member := range v.GetAllMember() {
-			if _, ok := ToCall(member); ok {
-				callMap[index] = member
-				continue
-			}
-			replace(index, member)
-		}
-		for index, member := range callMap {
-			replace(index, member)
+			v.DeleteMember(key)
+			replace(key, member)
 		}
 	}
-
-	// TODO : this need more test, i think this code error
 	if v.IsMember() {
 		obj := v.GetObject()
 		setMemberCallRelationship(obj, v.GetKey(), v)
