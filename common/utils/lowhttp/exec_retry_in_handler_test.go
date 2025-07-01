@@ -40,15 +40,15 @@ User-Agent: yaklang-test/1.0
 		[]byte(packet)),
 		WithTimeout(time.Second),
 		WithRetryWaitTime(20*time.Millisecond),
-		WithRetryHandler(func(https bool, retryCount int, req []byte, rsp []byte) bool {
+		WithRetryHandler(func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(req ...[]byte)) {
 			if strings.Contains(string(req), flag2) {
 				checkReq = true
 			}
 			fmt.Println(string(rsp))
 			if bytes.Contains(rsp, []byte(flag)) {
-				return false
+				return
 			}
-			return true
+			retryFunc()
 		}))
 	if err != nil {
 		t.Fatal(err)
@@ -75,11 +75,11 @@ User-Agent: yaklang-test/1.0
 		[]byte(packet)),
 		WithTimeout(time.Second),
 		WithRetryWaitTime(20*time.Millisecond),
-		WithRetryHandler(func(https bool, retryCount int, req []byte, rsp []byte) bool {
+		WithRetryHandler(func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(req ...[]byte)) {
 			if retryCount < 3 {
-				return true
+				retryFunc()
 			}
-			return false
+			return
 		}))
 	if err != nil {
 		t.Fatal(err)
@@ -107,14 +107,46 @@ User-Agent: yaklang-test/1.0
 		[]byte(packet)),
 		WithTimeout(time.Second),
 		WithRetryWaitTime(20*time.Millisecond),
-		WithRetryHandler(func(https bool, hasRetryCount int, req []byte, rsp []byte) bool {
+		WithRetryHandler(func(https bool, _ int, req []byte, rsp []byte, retryFunc func(req ...[]byte)) {
 			retryCount++
-			return false // stop immediately
+			return // stop immediately
 		}))
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
 	require.Equal(t, 1, retryCount)
 	require.True(t, bytes.Contains(rsp.RawPacket, []byte(responseBody)))
+}
+
+func TestHTTP_RetryWithHandler_UpdateRequest(t *testing.T) {
+	requestToken := utils.RandStringBytes(100)
+	rspToken := utils.RandStringBytes(50)
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		if bytes.Contains(req, []byte(requestToken)) {
+			return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length: %d\r\n\r\n%s", len(rspToken), rspToken))
+		}
+		return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n\r\n"))
+	})
+	hostport := utils.HostPort(host, port)
+	packet := `GET / HTTP/1.1
+Host: ` + hostport + `
+User-Agent: yaklang-test/1.0
+
+`
+
+	rsp, err := HTTP(WithPacketBytes(
+		[]byte(packet)),
+		WithTimeout(time.Second),
+		WithRetryWaitTime(20*time.Millisecond),
+		WithRetryHandler(func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(req ...[]byte)) {
+			if !strings.Contains(string(rsp), rspToken) {
+				retryFunc(ReplaceHTTPPacketBody(req, []byte(requestToken), false))
+			}
+		}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(string(rsp.RawPacket))
+	require.True(t, strings.Contains(string(rsp.RawPacket), string(rspToken)))
 }
 
 func TestHTTPS_RetryWithHandler(t *testing.T) {
@@ -146,14 +178,14 @@ User-Agent: yaklang-test/1.0
 		WithRetryWaitTime(20*time.Millisecond),
 		WithHttps(true),
 		WithVerifyCertificate(false),
-		WithRetryHandler(func(https bool, retryCount int, req []byte, rsp []byte) bool {
+		WithRetryHandler(func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(req ...[]byte)) {
 			if https {
 				httpsParamCorrect = true
 			}
 			if bytes.Contains(rsp, []byte(flag)) {
-				return false
+				return
 			}
-			return true
+			retryFunc()
 		}))
 	require.NoError(t, err)
 	require.True(t, httpsParamCorrect, "https parameter in handler should be true")
@@ -191,14 +223,14 @@ User-Agent: yaklang-test/1.0
 		WithHttps(true),
 		WithHttp2(true),
 		WithVerifyCertificate(false),
-		WithRetryHandler(func(https bool, retryCount int, req []byte, rsp []byte) bool {
+		WithRetryHandler(func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(req ...[]byte)) {
 			if https {
 				httpsParamCorrect = true
 			}
 			if bytes.Contains(rsp, []byte(flag)) {
-				return false
+				return
 			}
-			return true
+			retryFunc()
 		}))
 	require.NoError(t, err)
 	require.True(t, httpsParamCorrect, "https parameter in handler should be true")
