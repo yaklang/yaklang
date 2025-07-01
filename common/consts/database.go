@@ -99,16 +99,19 @@ func createAndConfigDatabase(path string, drivers ...string) (*gorm.DB, error) {
 	}
 
 	if driver == SQLiteExtend || driver == SQLite {
-		err := checkAndTryFixDatabase(path)
-		if err != nil {
-			return nil, err
-		}
 		path = fmt.Sprintf("%s?cache=shared&mode=rwc", path)
 	} else {
 		path = fmt.Sprintf("%s?charset=utf8mb4&parseTime=True&loc=Local", path)
 	}
 
 	db, err := gorm.Open(driver, path)
+	if err != nil && (driver == SQLite || driver == SQLiteExtend) {
+		err = checkAndTryFixDatabase(path)
+		if err != nil {
+			return nil, err
+		}
+		db, err = gorm.Open(driver, path)
+	}
 	if err != nil {
 		return nil, err
 	}
