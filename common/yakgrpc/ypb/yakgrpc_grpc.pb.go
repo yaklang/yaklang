@@ -29,6 +29,7 @@ const (
 	Yak_GetMITMFilter_FullMethodName                              = "/ypb.Yak/GetMITMFilter"
 	Yak_ResetMITMFilter_FullMethodName                            = "/ypb.Yak/ResetMITMFilter"
 	Yak_DownloadMITMCert_FullMethodName                           = "/ypb.Yak/DownloadMITMCert"
+	Yak_DownloadMITMGMCert_FullMethodName                         = "/ypb.Yak/DownloadMITMGMCert"
 	Yak_MITMV2_FullMethodName                                     = "/ypb.Yak/MITMV2"
 	Yak_OpenPort_FullMethodName                                   = "/ypb.Yak/OpenPort"
 	Yak_Exec_FullMethodName                                       = "/ypb.Yak/Exec"
@@ -524,6 +525,7 @@ type YakClient interface {
 	GetMITMFilter(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*SetMITMFilterRequest, error)
 	ResetMITMFilter(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*SetMITMFilterRequest, error)
 	DownloadMITMCert(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MITMCert, error)
+	DownloadMITMGMCert(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MITMCert, error)
 	MITMV2(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[MITMV2Request, MITMV2Response], error)
 	// 开启端口
 	OpenPort(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[Input, Output], error)
@@ -1238,6 +1240,16 @@ func (c *yakClient) DownloadMITMCert(ctx context.Context, in *Empty, opts ...grp
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(MITMCert)
 	err := c.cc.Invoke(ctx, Yak_DownloadMITMCert_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DownloadMITMGMCert(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MITMCert, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MITMCert)
+	err := c.cc.Invoke(ctx, Yak_DownloadMITMGMCert_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6726,6 +6738,7 @@ type YakServer interface {
 	GetMITMFilter(context.Context, *Empty) (*SetMITMFilterRequest, error)
 	ResetMITMFilter(context.Context, *Empty) (*SetMITMFilterRequest, error)
 	DownloadMITMCert(context.Context, *Empty) (*MITMCert, error)
+	DownloadMITMGMCert(context.Context, *Empty) (*MITMCert, error)
 	MITMV2(grpc.BidiStreamingServer[MITMV2Request, MITMV2Response]) error
 	// 开启端口
 	OpenPort(grpc.BidiStreamingServer[Input, Output]) error
@@ -7372,6 +7385,9 @@ func (UnimplementedYakServer) ResetMITMFilter(context.Context, *Empty) (*SetMITM
 }
 func (UnimplementedYakServer) DownloadMITMCert(context.Context, *Empty) (*MITMCert, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DownloadMITMCert not implemented")
+}
+func (UnimplementedYakServer) DownloadMITMGMCert(context.Context, *Empty) (*MITMCert, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DownloadMITMGMCert not implemented")
 }
 func (UnimplementedYakServer) MITMV2(grpc.BidiStreamingServer[MITMV2Request, MITMV2Response]) error {
 	return status.Errorf(codes.Unimplemented, "method MITMV2 not implemented")
@@ -8984,6 +9000,24 @@ func _Yak_DownloadMITMCert_Handler(srv interface{}, ctx context.Context, dec fun
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).DownloadMITMCert(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DownloadMITMGMCert_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DownloadMITMGMCert(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DownloadMITMGMCert_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DownloadMITMGMCert(ctx, req.(*Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -16912,6 +16946,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DownloadMITMCert",
 			Handler:    _Yak_DownloadMITMCert_Handler,
+		},
+		{
+			MethodName: "DownloadMITMGMCert",
+			Handler:    _Yak_DownloadMITMGMCert_Handler,
 		},
 		{
 			MethodName: "QueryExecHistory",

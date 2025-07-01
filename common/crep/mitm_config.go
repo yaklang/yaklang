@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	gmx509 "github.com/yaklang/yaklang/common/gmsm/x509"
 	"net"
 	"net/http"
@@ -99,6 +100,7 @@ func MITM_SetCaCertAndPrivKey(ca []byte, key []byte) MITMConfig {
 		}
 
 		c, err := tls.X509KeyPair(ca, key)
+		gmC, err := gmtls.X509KeyPair(defaultGMCA, defaultGMKey) // 当前暂时没有给用户自定义国密证书这个选项 默认就是用生成出来的自签证书
 		if err != nil {
 			// if not pem blocks
 			// try to parse as der
@@ -134,14 +136,17 @@ func MITM_SetCaCertAndPrivKey(ca []byte, key []byte) MITMConfig {
 		if err != nil {
 			return utils.Errorf("extract x509 cert failed: %s", err)
 		}
-
+		gmx509FormCert, err := gmx509.ParseCertificate(c.Certificate[0])
+		if err != nil {
+			return utils.Errorf("extract x509 cert failed: %s", err)
+		}
 		// compatible obsolete tls version
 		var opts []mitm.ConfigOption
-		gmCert, err := gmx509.ParseCertificate(c.Certificate[0])
+		gmCert, err := gmx509.ParseCertificate(gmC.Certificate[0])
 		if err != nil {
 			log.Errorf("parse gmx509 cert failed: %s", err)
 		} else {
-			opts = append(opts, mitm.WithObsoleteTLS(gmCert, c.PrivateKey))
+			opts = append(opts, mitm.WithObsoleteTLS(gmx509FormCert, gmCert, c.PrivateKey, gmC.PrivateKey))
 		}
 
 		mc, err := mitm.NewConfig(cert, c.PrivateKey, opts...)

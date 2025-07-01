@@ -788,7 +788,9 @@ func (p *Proxy) TLSHandshake(ctx context.Context, conn net.Conn, serverUseH2 boo
 	var newConn net.Conn
 	var useH2 bool
 	if version < tls.VersionTLS12 {
-		tlsConn := gmtls.Server(peekConn, p.mitm.ObsoleteTLS("127.0.0.1", p.http2 && serverUseH2))
+		config := p.mitm.ObsoleteTLS("127.0.0.1", p.http2 && serverUseH2)
+		config.GMSupport = &gmtls.GMSupport{WorkMode: gmtls.ModeAutoSwitch}
+		tlsConn := gmtls.Server(peekConn, config)
 		if tlsConn != nil {
 			err := tlsConn.HandshakeContext(ctx)
 			if err != nil {

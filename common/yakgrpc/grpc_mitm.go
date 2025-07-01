@@ -1696,6 +1696,15 @@ func (s *Server) DownloadMITMCert(ctx context.Context, _ *ypb.Empty) (*ypb.MITMC
 	return &ypb.MITMCert{CaCerts: ca, LocalFile: crep.GetDefaultCaFilePath()}, nil
 }
 
+func (s *Server) DownloadMITMGMCert(ctx context.Context, _ *ypb.Empty) (*ypb.MITMCert, error) {
+	crep.InitMITMCert()
+	ca, _, err := crep.GetDefaultGMCaAndKey()
+	if err != nil {
+		return nil, utils.Errorf("fetch default GM ca/key failed: %s", err)
+	}
+	return &ypb.MITMCert{CaCerts: ca, LocalFile: crep.GetDefaultGMCaFilePath()}, nil
+}
+
 func (s *Server) ExportMITMReplacerRules(ctx context.Context, _ *ypb.Empty) (*ypb.ExportMITMReplacerRulesResponse, error) {
 	result := yakit.GetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords)
 	if result != "" {
