@@ -27,6 +27,9 @@ const (
 	defaultMaxWaitTime = time.Duration(2000) * time.Millisecond
 )
 
+type RetryHandler func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte)
+type RetryHandler func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte))
+
 type LowhttpExecConfig struct {
 	Host              string
 	Port              int
@@ -47,7 +50,7 @@ type LowhttpExecConfig struct {
 	RetryTimes                       int
 	RetryInStatusCode                []int
 	RetryNotInStatusCode             []int
-	RetryHandler                     func(https bool, retryCount int, req []byte, rsp []byte) bool
+	RetryHandler                     RetryHandler
 	RetryWaitTime                    time.Duration
 	RetryMaxWaitTime                 time.Duration
 	JsRedirect                       bool
@@ -578,17 +581,16 @@ func WithRetryTimes(retryTimes int) LowhttpOpt {
 
 // WithRetryHandler sets a retry handler function that will be called when a request fails.
 // return true for retry, return false for not retry.
-func WithRetryHandler(retryHandler func(https bool, retryCount int, req []byte, rsp []byte) bool) LowhttpOpt {
+func WithRetryHandler(retryHandler RetryHandler) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
-		if !utils.IsNil(retryHandler) {
-			o.RetryHandler = func(https bool, retryCount int, req []byte, rsp []byte) (ret bool) {
+			o.RetryHandler = func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte)) {
+			o.RetryHandler = func(https bool, retryCount int, req []byte, rsp []byte,retryFunc func(...[]byte)) {
 				defer func() {
 					if err := recover(); err != nil {
-						ret = false
 						log.Errorf("retry handler failed: %v\n%v", err, utils.ErrorStack(err))
 					}
-				}()
-				ret = retryHandler(https, retryCount, req, rsp)
+				retryHandler(https, retryCount, req, rsp, retryFunc)
+				retryHandler(https, retryCount, req, rsp,retryFunc)
 				return
 			}
 		}
