@@ -225,6 +225,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		randomJA3FingerPrint = option.RandomJA3FingerPrint
 		clientHelloSpec      = option.ClientHelloSpec
 		dialer               = option.Dialer
+		retryTimes           = 0
 	)
 
 	retry := func(rsp *LowhttpResponse, rawBytes []byte, retryTimes int) bool {
@@ -239,7 +240,14 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 				httpsFlag = rsp.Https
 				rawReq = rsp.RawRequest
 			}
-			return retryHandler(httpsFlag, retryTimes, rawReq, rspRaw)
+			var retryFlag bool
+			retryHandler(httpsFlag, retryTimes, rawReq, rspRaw, func(i ...[]byte) {
+				if len(i) > 0 {
+					requestPacket = i[0]
+				}
+				retryFlag = true
+			})
+			return retryFlag
 		} else {
 			statusCode := GetStatusCodeFromResponse(rawBytes)
 			if len(retryNotInStatusCode) > 0 {
@@ -264,6 +272,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		}
 	}
 
+RETRY:
 	connectTimeout = 2 * time.Second
 	if reqIns == nil {
 		// create new request instance for httpctx
@@ -545,8 +554,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 
 	// https://github.com/mattn/go-ieproxy
 	var (
-		conn       net.Conn
-		retryTimes int
+		conn net.Conn
 	)
 	if len(proxy) == 1 && proxy[0] == "" {
 		proxy = proxy[1:]
@@ -783,7 +791,7 @@ RECONNECT:
 				retryTimes += 1
 				time.Sleep(utils.JitterBackoff(retryWaitTime, retryMaxWaitTime, retryTimes))
 				log.Infof("retry reconnect because [%d / %d]", retryTimes, maxRetryTimes)
-				goto RECONNECT
+				goto RETRY
 			}
 			return response, nil
 		}
@@ -1083,7 +1091,7 @@ RECONNECT:
 		retryTimes += 1
 		time.Sleep(utils.JitterBackoff(retryWaitTime, retryMaxWaitTime, retryTimes))
 		log.Infof("retry reconnect because [%d / %d]", retryTimes, maxRetryTimes)
-		goto RECONNECT
+		goto RETRY
 	}
 
 	response.BareResponse = rawBytes
