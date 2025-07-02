@@ -2,6 +2,7 @@ package databasex
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -17,6 +18,7 @@ type Save[T any] struct {
 
 	config *config
 
+	wg     sync.WaitGroup
 	ctx    context.Context    // Context for cancellation
 	cancel context.CancelFunc // Function to cancel the context
 }
@@ -38,9 +40,9 @@ func NewSave[T any](
 		config:   cfg,
 	}
 
-	cfg.waitGroup.Add(1)
+	s.wg.Add(1)
 	go func() {
-		defer cfg.waitGroup.Done()
+		defer s.wg.Done()
 		s.processBuffer()
 	}()
 
@@ -100,6 +102,6 @@ const MaxSize = 300
 // Close stops the background goroutine and waits for it to finish.
 // It also processes any remaining items in the buffer before returning.
 func (s *Save[T]) Close() {
-	s.buffer.Close()          // Close the buffer
-	s.config.waitGroup.Wait() // Wait for the background goroutine to finish
+	s.buffer.Close() // Close the buffer
+	s.wg.Wait()      // Wait for the background goroutine to finish
 }
