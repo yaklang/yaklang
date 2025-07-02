@@ -24,6 +24,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/permutil"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/embed"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -430,7 +431,7 @@ func TestWebLogMonitor(t *testing.T) {
 		return
 	}
 	aiCB := aiforge.GetHoldAICallback()
-	aiCB = aiforge.GetAIBalance()
+	//aiCB = aiforge.GetAIBalance()
 
 	update := func(attackType string, entityValue string) {
 		entity := &Entity{
@@ -473,10 +474,9 @@ func TestWebLogMonitor(t *testing.T) {
 	}
 
 	yakit.InitialDatabase()
-	filePath := "C:\\Users\\Rookie\\Desktop\\ai-balance-log.txt"
-	//filePath := "C:\\Users\\Rookie\\Desktop\\test.log"
-	fp, err := os.Open(filePath)
+	content, err := embed.Asset("data/test.log.gz")
 	require.NoError(t, err)
+	fp := bytes.NewReader(content)
 
 	ctx := context.Background()
 	cod, err := aid.NewCoordinatorContext(ctx, "", aid.WithAICallback(aiCB))
