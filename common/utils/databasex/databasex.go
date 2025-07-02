@@ -119,4 +119,5 @@ func (c *Cache[T, D]) Delete(id int64) {
 	if c.cache == nil {
 		return
 	}
+	c.cache.Delete(id)
 }
