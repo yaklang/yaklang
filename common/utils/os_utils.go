@@ -512,12 +512,12 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 			copied := *origin
 			copied.NextProtos = []string{"h2"}
 			lis, err = tls.Listen("tcp", addr, &copied)
-		} else if gmtlsFlag {
-			log.Infof("gmtlsFlag: %v", gmtlsFlag)
-			lis, err = gmtls.Listen("tcp", addr, GetDefaultGMTLSConfig(5))
 		} else if onlyGmtls {
 			log.Infof("onlyGmtlsFlag: %v", onlyGmtls)
 			lis, err = gmtls.Listen("tcp", addr, GetDefaultOnlyGMTLSConfig(5))
+		} else if gmtlsFlag {
+			log.Infof("gmtlsFlag: %v", gmtlsFlag)
+			lis, err = gmtls.Listen("tcp", addr, GetDefaultGMTLSConfig(5))
 		} else {
 			lis, err = net.Listen("tcp", addr)
 		}
@@ -564,7 +564,7 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 
 		if gmtlsFlag || onlyGmtls {
 			if !https {
-				log.Error("gmtls only support https")
+				panic("gmtls only support https")
 			}
 
 			srv := &http.Server{Addr: HostPort(host, port), Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -583,7 +583,7 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 			})}
 
 			go func() {
-				log.Infof("START TO SERVE GMTLS HTTP SERVER")
+				log.Infof("START TO SERVE GMTLS HTTP SERVER at %s", srv.Addr)
 				srv.Serve(lis)
 			}()
 			return

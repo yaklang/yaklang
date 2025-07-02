@@ -6,8 +6,10 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/vulinbox"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -1931,6 +1933,196 @@ func TestGRPCMUSTTPASS_MITM_GM_Prefer(t *testing.T) {
 		rsp, _, err = poc.DoGET((TLSTarget), poc.WithProxy(proxy))
 		require.NoError(t, err)
 		require.Equal(t, rsp.GetStatusCode(), 200)
+	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
+	})
+}
+
+// TestGRPCMUSTTPASS_MITM_GM_Only_Client 测试客户端只支持国密TLS不允许降级的情况 例如某些金融业app
+func TestGRPCMUSTTPASS_MITM_GM_Only_Client_Transparent(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
+	defer cancel()
+
+	mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
+
+	host, port := utils.DebugMockOnlyGMHTTP(ctx, func(req []byte) []byte {
+		return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n" +
+			"Content-Length:0\r\n\r\n"))
+	})
+	GMTLSTarget := fmt.Sprintf("https://%s", utils.HostPort(host, port))
+
+	host, port = utils.DebugMockHTTPS([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n" +
+		"Content-Length:0\r\n\r\n")))
+	TLSTarget := fmt.Sprintf("https://%s", utils.HostPort(host, port))
+
+	RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
+		stream.Send(&ypb.MITMRequest{
+			Host:        mitmHost,
+			Port:        uint32(mitmPort),
+			EnableGMTLS: true,
+			PreferGMTLS: true,
+		})
+	}, func(stream ypb.Yak_MITMClient) {
+		defer cancel()
+
+		// 测试国密TLS连接：客户端 -(GMTLS)-> MITM -(GMTLS)-> 国密服务器
+		gmConfig := &gmtls.Config{
+			GMSupport:          &gmtls.GMSupport{WorkMode: gmtls.ModeGMSSLOnly},
+			InsecureSkipVerify: true,
+			ServerName:         mitmHost,
+		}
+
+		// 直接通过国密TLS连接到MITM代理
+		mitmAddr := utils.HostPort(mitmHost, mitmPort)
+		gmtlsConn, err := gmtls.Dial("tcp", mitmAddr, gmConfig)
+		require.NoError(t, err)
+		defer gmtlsConn.Close()
+
+		// 通过国密TLS连接发送HTTP请求到国密目标
+		targetHost := strings.TrimPrefix(GMTLSTarget, "https://")
+		httpReq := fmt.Sprintf("GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", GMTLSTarget, targetHost)
+		_, err = gmtlsConn.Write([]byte(httpReq))
+		require.NoError(t, err)
+
+		// 读取响应
+		response := make([]byte, 1024)
+		n, err := gmtlsConn.Read(response)
+		require.NoError(t, err)
+		require.Contains(t, string(response[:n]), "200 OK")
+
+		// 测试普通TLS目标（通过国密TLS连接到MITM，但目标是普通TLS服务器）
+		gmtlsConn2, err := gmtls.Dial("tcp", mitmAddr, gmConfig)
+		require.NoError(t, err)
+		defer gmtlsConn2.Close()
+
+		// 发送HTTP请求到普通TLS目标
+		targetHost2 := strings.TrimPrefix(TLSTarget, "https://")
+		httpReq2 := fmt.Sprintf("GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", TLSTarget, targetHost2)
+		_, err = gmtlsConn2.Write([]byte(httpReq2))
+		require.NoError(t, err)
+
+		// 读取响应
+		n, err = gmtlsConn2.Read(response)
+		require.NoError(t, err)
+		require.Contains(t, string(response[:n]), "200 OK")
+
+	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
+	})
+}
+
+func TestGRPCMUSTTPASS_MITM_GM_Only_Client_With_HTTPConnect(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
+	defer cancel()
+
+	mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
+
+	host, port := utils.DebugMockOnlyGMHTTP(ctx, func(req []byte) []byte {
+		return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n" +
+			"Content-Length:0\r\n\r\n"))
+	})
+	GMTLSTarget := utils.HostPort(host, port)
+
+	host, port = utils.DebugMockHTTPS([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n" +
+		"Content-Length:0\r\n\r\n")))
+	TLSTarget := utils.HostPort(host, port)
+
+	RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
+		stream.Send(&ypb.MITMRequest{
+			Host:        mitmHost,
+			Port:        uint32(mitmPort),
+			EnableGMTLS: true,
+			PreferGMTLS: true,
+		})
+	}, func(stream ypb.Yak_MITMClient) {
+		defer cancel()
+
+		// 测试国密TLS目标：客户端 -(TCP)-> MITM -(CONNECT)-> -(GMTLS tunnel)-> 国密服务器
+		mitmAddr := utils.HostPort(mitmHost, mitmPort)
+
+		// 1. 建立到MITM代理的TCP连接
+		proxyConn, err := net.Dial("tcp", mitmAddr)
+		require.NoError(t, err)
+		defer proxyConn.Close()
+
+		// 2. 发送CONNECT请求
+		connectReq := fmt.Sprintf("CONNECT %s HTTP/1.1\r\nHost: %s\r\nProxy-Connection: keep-alive\r\n\r\n",
+			GMTLSTarget, GMTLSTarget)
+		_, err = proxyConn.Write([]byte(connectReq))
+		require.NoError(t, err)
+
+		// 3. 读取CONNECT响应
+		buf := make([]byte, 1024)
+		n, err := proxyConn.Read(buf)
+		require.NoError(t, err)
+		connectResp := string(buf[:n])
+		require.Contains(t, connectResp, "200") // 期望 "HTTP/1.1 200 Connection established"
+
+		// 4. 在建立的隧道上升级为国密TLS
+		gmConfig := &gmtls.Config{
+			GMSupport:          &gmtls.GMSupport{},
+			InsecureSkipVerify: true,
+			ServerName:         host, // 使用目标服务器的hostname
+		}
+
+		gmtlsConn := gmtls.Client(proxyConn, gmConfig)
+		err = gmtlsConn.Handshake()
+		require.NoError(t, err)
+
+		// 5. 通过国密TLS隧道发送HTTP请求
+		httpReq := fmt.Sprintf("GET / HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", GMTLSTarget)
+		_, err = gmtlsConn.Write([]byte(httpReq))
+		require.NoError(t, err)
+
+		// 6. 读取HTTP响应
+		response := make([]byte, 1024)
+		n, err = gmtlsConn.Read(response)
+		require.NoError(t, err)
+		require.Contains(t, string(response[:n]), "200 OK")
+
+		// 测试普通TLS目标：客户端 -(TCP)-> MITM -(CONNECT)-> -(GMTLS tunnel)-> 普通TLS服务器
+
+		// 1. 建立到MITM代理的新TCP连接
+		proxyConn2, err := net.Dial("tcp", mitmAddr)
+		require.NoError(t, err)
+		defer proxyConn2.Close()
+
+		// 2. 发送CONNECT请求到普通TLS目标
+		connectReq2 := fmt.Sprintf("CONNECT %s HTTP/1.1\r\nHost: %s\r\nProxy-Connection: keep-alive\r\n\r\n",
+			TLSTarget, TLSTarget)
+		_, err = proxyConn2.Write([]byte(connectReq2))
+		require.NoError(t, err)
+
+		// 3. 读取CONNECT响应
+		n, err = proxyConn2.Read(buf)
+		require.NoError(t, err)
+		connectResp2 := string(buf[:n])
+		require.Contains(t, connectResp2, "200")
+
+		// 4. 在隧道上建立国密TLS连接（客户端只支持国密）
+		host2, _, _ := net.SplitHostPort(TLSTarget)
+		gmConfig2 := &gmtls.Config{
+			GMSupport:          &gmtls.GMSupport{},
+			InsecureSkipVerify: true,
+			ServerName:         host2,
+		}
+
+		gmtlsConn2 := gmtls.Client(proxyConn2, gmConfig2)
+		err = gmtlsConn2.Handshake()
+		require.NoError(t, err)
+
+		// 5. 发送HTTP请求
+		httpReq2 := fmt.Sprintf("GET / HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", TLSTarget)
+		_, err = gmtlsConn2.Write([]byte(httpReq2))
+		require.NoError(t, err)
+
+		// 6. 读取响应
+		n, err = gmtlsConn2.Read(response)
+		require.NoError(t, err)
+		require.Contains(t, string(response[:n]), "200 OK")
+
 	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
 	})
 }
