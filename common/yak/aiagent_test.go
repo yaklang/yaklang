@@ -474,7 +474,7 @@ func TestWebLogMonitor(t *testing.T) {
 	}
 
 	yakit.InitialDatabase()
-	content, err := embed.Asset("data/test.log.gz")
+	content, err := embed.Asset("data/test_ai_weblog.gz")
 	require.NoError(t, err)
 	fp := bytes.NewReader(content)
 
