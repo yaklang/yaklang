@@ -1,0 +1,116 @@
+prompt = <<<prompt
+你是一个顶级的日志分析专家和网络安全分析师。你的核心任务是接收一个包含多条、格式可能不同的原始日志文本块，然后将每一条日志都解析成一个结构化的 JSON 对象。
+你的能力必须超越简单的文本提取，你需要做到：
+1.  **识别日志类型**：判断每条日志是标准的“Web请求日志”还是“应用/系统日志”。
+2.  **智能状态推断**：对于没有明确 HTTP 状态码的日志（尤其是应用错误日志），你需要根据错误信息内容来推断请求的逻辑状态。例如，如果日志文本包含 “Unknown request path” 或 “file not found”，你应该能推断出这是一个“未找到 (NOT_FOUND)”的状态，类似于 HTTP 404。
+prompt
+
+schema = <<<schema
+{
+"$schema": "http://json-schema.org/draft-07/schema#",
+"type": "object",
+"required": [
+    "@action",
+    "logs"
+],
+"additionalProperties": false,
+"properties": {
+    "@action": {
+        "const": "format",
+        "description": "标识当前操作的具体类型"
+    },
+    "logs": {
+        "title": "扁平化实体列表",
+        "description": "一个从一批日志中提取出的所有实体的扁平化列表。",
+        "type": "array",
+        "items": {
+            "title": "统一日志事件 (增强版)",
+            "description": "单条日志的结构化表示",
+            "type": "object",
+            "properties": {
+                "log_type": {
+                    "description": "对日志内容的分类，判断其主要类型。",
+                    "type": "string",
+                    "enum": [
+                        "WEB_REQUEST",
+                        "APPLICATION_ERROR",
+                        "SYSTEM_INFO",
+                        "UNKNOWN"
+                    ]
+                },
+                "timestamp": {
+                    "description": "ISO 8601 格式的日志时间戳。",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "source_ip": {
+                    "description": "发起请求的客户端 IP 地址。如果日志中没有，则为 null。",
+                    "type": "string",
+                    "format": "ipv4"
+                },
+                "request_method": {
+                    "description": "HTTP 请求方法。如果日志非请求类型，则为 null。",
+                    "type": "string"
+                },
+                "request_uri": {
+                    "description": "完整的请求 URI。如果日志中无法提取，则为空",
+                    "type": "string"
+                },
+                "status_code": {
+                    "description": "日志中明确记录的 HTTP 状态码。如果没有，则为 0",
+                    "type": "integer"
+                },
+                "inferred_status": {
+                    "description": "根据日志内容推断出的请求逻辑状态，这在 status_code 为 null 时尤其重要。",
+                    "type": "string",
+                    "enum": [
+                        "SUCCESSFUL",
+                        "NOT_FOUND",
+                        "FORBIDDEN",
+                        "SERVER_ERROR",
+                        "CLIENT_ERROR",
+                        "NOT_APPLICABLE",
+                        "UNKNOWN"
+                    ]
+                },
+                "error_message": {
+                    "description": "从日志中提取的关键错误信息文本。如果没有，则为 null。",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "user_agent": {
+                    "description": "客户端的 User-Agent。如果没有，则为 null。",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "required": [
+                "log_type",
+                "timestamp",
+                "inferred_status"
+            ]
+        }
+    }
+}
+}
+schema
+
+
+forgeHandle = func(params) {
+    bp,err = aiagent.CreateLiteForge("log_event_formatter",
+        aiagent.liteForgePrompt(prompt),
+        aiagent.liteForgeOutputSchemaRaw("format",schema)
+    )
+    if err != nil {
+        return err
+    }
+    res,err = bp.Execute(context.Background(),params)
+    if err != nil {
+		return nil
+	}
+    return res.GetInvokeParamsArray("logs")
+}

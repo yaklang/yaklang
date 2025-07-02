@@ -325,7 +325,7 @@ func (c *Config) emit(e *Event) {
 		if c.debugEvent {
 			log.Info(e.String())
 		} else {
-			log.Info(utils.ShrinkString(e.String(), 200))
+			//log.Info(utils.ShrinkString(e.String(), 200))
 		}
 		return
 	}
