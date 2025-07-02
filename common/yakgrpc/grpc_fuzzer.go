@@ -274,9 +274,9 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	}()
 	// runtimeID
 	var runtimeID string
-	if fallback, ok := stream.(*httpFuzzerFallback); ok {
+	if wrapperStream, ok := stream.(*WrapperHTTPFuzzerStream); ok {
 		// runtimeID from webfuzzer sequence
-		runtimeID = fallback.runtimeID
+		runtimeID = wrapperStream.fallback.runtimeID
 	} else {
 		runtimeID = uuid.NewString()
 	}
