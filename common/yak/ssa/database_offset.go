@@ -26,7 +26,6 @@ func SaveValueOffset(db *gorm.DB, inst Instruction) {
 	}
 	irOffset := ssadb.CreateOffset(rng, inst.GetProgram().GetApplication().GetProgramName())
 	// program name \ file name \ offset
-	irOffset.ProgramName = inst.GetProgram().GetProgramName()
 	// value id
 	irOffset.ValueID = int64(inst.GetId())
 	ssadb.SaveIrOffset(db, irOffset)
@@ -42,7 +41,6 @@ func SaveVariableOffset(db *gorm.DB, v *Variable, variableName string, valueID i
 		}
 		irOffset := ssadb.CreateOffset(rng, v.GetProgram().GetApplication().GetProgramName())
 		// program name \ file name \ offset
-		irOffset.ProgramName = v.GetProgram().GetProgramName()
 		// variable name
 		irOffset.VariableName = variableName
 		irOffset.ValueID = valueID
