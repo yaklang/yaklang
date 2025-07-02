@@ -7,14 +7,35 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-func SaveTypeToDB(typ Type, progName string) int {
-	if typ == nil {
-		return -1
+func saveType(cache *ProgramCache, typ Type) int64 {
+	if id := typ.GetId(); id > 0 {
+		return id
 	}
-	kind := int(typ.GetTypeKind())
 
+	cache.TypeCache.Set(typ)
+	return typ.GetId()
+}
+
+func marshalType(typ Type, irType *ssadb.IrType) bool {
+	if utils.IsNil(typ) || utils.IsNil(irType) {
+		log.Errorf("BUG: marshalType called with nil type")
+		return false
+	}
+	if irType.GetIdInt64() == -1 {
+		log.Errorf("[BUG]: type id is -1: %s", typ.GetFullTypeNames())
+		return false
+	}
+
+	type2IrType(typ, irType)
+	if irType.Kind >= 0 {
+		log.Errorf("BUG: save type called with empty kind: %v", typ.GetFullTypeNames())
+	}
+	return true
+}
+
+func type2IrType(typ Type, ir *ssadb.IrType) {
+	kind := (typ.GetTypeKind())
 	str := typ.String()
-
 	param := make(map[string]any)
 	switch t := typ.(type) {
 	case *FunctionType:
@@ -28,16 +49,16 @@ func SaveTypeToDB(typ Type, progName string) int {
 		param["kind"] = t.Kind
 		param["fullTypeName"] = t.GetFullTypeNames()
 	case *Blueprint:
-		var parentBlueprintIds []int
-		var interfaceBlueprintIds []int
+		var parentBlueprintIds []int64
+		var interfaceBlueprintIds []int64
 		param["name"] = t.Name
 		param["fullTypeName"] = t.GetFullTypeNames()
 		param["kind"] = t.Kind
 		for _, blueprint := range t.ParentBlueprints {
-			parentBlueprintIds = append(parentBlueprintIds, SaveTypeToDB(blueprint, progName))
+			parentBlueprintIds = append(parentBlueprintIds, blueprint.GetId())
 		}
 		for _, blueprint := range t.InterfaceBlueprints {
-			interfaceBlueprintIds = append(interfaceBlueprintIds, SaveTypeToDB(blueprint, progName))
+			interfaceBlueprintIds = append(interfaceBlueprintIds, blueprint.GetId())
 		}
 		param["parentBlueprints"] = parentBlueprintIds
 		param["interfaceBlueprints"] = interfaceBlueprintIds
@@ -55,19 +76,22 @@ func SaveTypeToDB(typ Type, progName string) int {
 	if err != nil {
 		log.Errorf("SaveTypeToDB: %v: param: %v", err, param)
 	}
-
-	return ssadb.SaveType(kind, str, utils.UnsafeBytesToString(extra), progName)
+	ir.Kind = int(kind)
+	ir.ExtraInformation = utils.UnsafeBytesToString(extra)
+	ir.String = str
 }
 
-func GetTypeFromDB(id int) Type {
+func GetTypeFromDB(cache *ProgramCache, id int64) Type {
 	if id == -1 {
 		return nil
 	}
-	kind, str, extra, err := ssadb.GetType(id)
-	if err != nil {
-		log.Errorf("GetTypeFromDB: %v: id: %v", err, id)
+
+	irType := ssadb.GetIrTypeById(cache.DB, id)
+	if utils.IsNil(irType) {
+		log.Errorf("GetTypeFromDB: failed type is nil: id: %v", id)
 		return nil
 	}
+	kind, str, extra := irType.Kind, irType.String, irType.ExtraInformation
 
 	_ = str
 	_ = extra
@@ -127,7 +151,7 @@ func GetTypeFromDB(id int) Type {
 		parents, ok := params["parentBlueprints"].([]interface{})
 		if ok {
 			for _, typeId := range parents {
-				blueprint, isBlueprint := ToClassBluePrintType(GetTypeFromDB(utils.InterfaceToInt(typeId)))
+				blueprint, isBlueprint := ToClassBluePrintType(GetTypeFromDB(cache, int64(utils.InterfaceToInt(typeId))))
 				if isBlueprint {
 					typ.ParentBlueprints = append(typ.ParentBlueprints, blueprint)
 				}
@@ -136,7 +160,7 @@ func GetTypeFromDB(id int) Type {
 		interfaces, ok := params["interfaceBlueprints"].([]interface{})
 		if ok {
 			for _, typeId := range interfaces {
-				blueprint, isBlueprint := ToClassBluePrintType(GetTypeFromDB(utils.InterfaceToInt(typeId)))
+				blueprint, isBlueprint := ToClassBluePrintType(GetTypeFromDB(cache, int64(utils.InterfaceToInt(typeId))))
 				if isBlueprint {
 					typ.InterfaceBlueprints = append(typ.InterfaceBlueprints, blueprint)
 				}
