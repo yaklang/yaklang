@@ -203,13 +203,14 @@ func GetConnectedToHostPortFromHTTPRequest(t *http.Request) (string, error) {
 		if err != nil {
 			return "", err
 		}
-
-		var result string
-		if https {
-			result = strings.TrimSuffix(hostport, ":443")
-		} else {
-			result = strings.TrimSuffix(hostport, ":80")
-		}
+		result := hostport
+		//var result string
+		//if https {
+		//	result = strings.TrimSuffix(hostport, ":443")
+		//} else {
+		//	result = strings.TrimSuffix(hostport, ":80")
+		//}
+		httpctx.SetContextValueInfoFromRequest(t, httpctx.REQUEST_CONTEXT_KEY_IsHttps, https)
 		httpctx.SetContextValueInfoFromRequest(t, httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, result)
 		httpctx.SetContextValueInfoFromRequest(t, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, ExtractHost(result))
 		httpctx.SetContextValueInfoFromRequest(t, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, port)
@@ -222,31 +223,38 @@ func generateConnectedToFromHTTPRequest(t *http.Request) (bool, string, int, err
 	if t == nil {
 		return false, "", 0, Error("nil http request")
 	}
-
-	var port int
-	isHttps := (t.TLS != nil) || t.URL.Scheme == "https" || t.URL.Scheme == "wss"
-	if isHttps {
-		port = 443
-	} else {
-		port = 80
-	}
-
 	host := t.Host
 	if host == "" {
 		host = t.URL.Host
 	}
+	var port int
+	var hostname string
+
 	if ret := strings.LastIndex(host, ":"); ret > 0 {
-		var hostname string
 		hostname, port = host[:ret], codec.Atoi(host[ret+1:])
-		if port > 0 {
-			return isHttps, HostPort(hostname, port), port, nil
-		}
-		return false, "", 0, Errorf("invalid host: %v, cannot parse to host:port", host)
 	}
-	if ret := HostPort(host, port); strings.HasPrefix(ret, ":") {
+
+	var https = port == 443 || t.TLS != nil
+	if t.URL.Scheme != "" {
+		if t.URL.Scheme == "https" || t.URL.Scheme == "wss" {
+			https = true
+		} else {
+			https = false
+		}
+	}
+
+	if port <= 0 {
+		if https {
+			port = 443
+		} else {
+			port = 80
+		}
+	}
+
+	if ret := HostPort(hostname, port); strings.HasPrefix(ret, ":") {
 		return false, "", 0, Errorf("invalid host:port(%v) from %v", ret, host)
 	} else {
-		return isHttps, ret, port, nil
+		return https, ret, port, nil
 	}
 }
 
