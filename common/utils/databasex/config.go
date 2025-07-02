@@ -2,13 +2,10 @@ package databasex
 
 import (
 	"context"
-	"sync"
 	"time"
 )
 
 type config struct {
-	waitGroup *sync.WaitGroup
-
 	// buffer
 	bufferSize int
 
@@ -22,12 +19,6 @@ type config struct {
 }
 
 type Option func(*config)
-
-func WithWaitGroup(wg *sync.WaitGroup) Option {
-	return func(c *config) {
-		c.waitGroup = wg
-	}
-}
 
 func WithBufferSize(size int) Option {
 	return func(c *config) {
@@ -67,7 +58,6 @@ func NewConfig(opts ...Option) *config {
 	cfg := &config{
 		bufferSize: 100, // Default buffer size
 		ctx:        context.Background(),
-		waitGroup:  &sync.WaitGroup{},
 
 		saveSize:    100,
 		saveTimeout: 500 * time.Millisecond, // 0.5s
