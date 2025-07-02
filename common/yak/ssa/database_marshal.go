@@ -97,7 +97,7 @@ func fetchIds(origin any) any {
 	return ids
 }
 
-func marshalExtraInformation(raw Instruction) map[string]any {
+func marshalExtraInformation(cache *ProgramCache, raw Instruction) map[string]any {
 
 	params := make(map[string]any)
 	switch ret := raw.(type) {
@@ -111,7 +111,7 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["free_values"] = freeValues
 		params["current_blueprint"] = -1
 		if ret.currentBlueprint != nil {
-			typID := SaveTypeToDB(ret.currentBlueprint, ret.GetProgramName())
+			typID := saveType(cache, ret.currentBlueprint)
 			params["current_blueprint"] = typID
 		}
 		params["is_method"] = ret.isMethod
@@ -313,7 +313,7 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 	return params
 }
 
-func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
+func unmarshalExtraInformation(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
 	params := ir.GetExtraInfo()
 	switch ret := inst.(type) {
 	case *Assert:
@@ -435,9 +435,9 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		}
 		ret.ParameterMembers = utils.MapGetInt64Slice(params, "parameter_members")
 
-		currentBlueprint := utils.MapGetInt(params, "current_blueprint")
+		currentBlueprint := utils.MapGetInt64(params, "current_blueprint")
 		if currentBlueprint != -1 {
-			typ := GetTypeFromDB(currentBlueprint)
+			typ := GetTypeFromDB(cache, currentBlueprint)
 			blueprint, ok := ToClassBluePrintType(typ)
 			if ok {
 				ret.currentBlueprint = blueprint

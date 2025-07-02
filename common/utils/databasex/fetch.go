@@ -23,6 +23,12 @@ func NewFetch[T any](
 	opt ...Option,
 ) *Fetch[T] {
 	cfg := NewConfig(opt...)
+	return NewFetchWithConfig(fetchFromDB, cfg)
+}
+func NewFetchWithConfig[T any](
+	fetchFromDB func() []T,
+	cfg *config,
+) *Fetch[T] {
 	ctx, cancel := context.WithCancel(cfg.ctx)
 	f := &Fetch[T]{
 		fetchFromDB: fetchFromDB,

@@ -64,6 +64,7 @@ type BlueprintRelationKind string
 
 // Blueprint is a class blueprint, it is used to create a new class
 type Blueprint struct {
+	id   int64
 	Name string
 
 	Kind         BlueprintKind
@@ -95,8 +96,16 @@ type Blueprint struct {
 	lazyBuilder
 }
 
+func (b *Blueprint) GetId() int64 {
+	return b.id
+}
+func (b *Blueprint) SetId(id int64) {
+	b.id = id
+}
+
 func NewBlueprint(name string) *Blueprint {
 	class := &Blueprint{
+		id:           -1,
 		Name:         name,
 		Kind:         BlueprintNone,
 		NormalMember: make(map[string]Value),

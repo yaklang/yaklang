@@ -35,9 +35,9 @@ func NewCache[T MemoryItem, D DBItem](
 	load func(int64) (T, D, error),
 	opt ...Option,
 ) *Cache[T, D] {
-
-	fetcher := NewFetch(fetch, opt...)
-	saver := NewSave(save, opt...)
+	config := NewConfig(opt...)
+	fetcher := NewFetchWithConfig(fetch, config)
+	saver := NewSaveWithConfig(save, config)
 
 	cache := NewDatabaseCacheWithKey[int64, *CacheItem[T, D]](
 		ttl,
@@ -57,6 +57,9 @@ func NewCache[T MemoryItem, D DBItem](
 			}, nil
 		},
 	)
+	if !config.enableSave {
+		cache.DisableSave()
+	}
 
 	c := &Cache[T, D]{
 		cache:   cache,
@@ -64,7 +67,6 @@ func NewCache[T MemoryItem, D DBItem](
 		saver:   saver,
 		delete:  delete,
 	}
-	c.cache.DisableSave()
 	return c
 }
 

@@ -13,6 +13,7 @@ type config struct {
 	bufferSize int
 
 	// save
+	enableSave  bool
 	saveSize    int
 	saveTimeout time.Duration
 
@@ -31,6 +32,16 @@ func WithWaitGroup(wg *sync.WaitGroup) Option {
 func WithBufferSize(size int) Option {
 	return func(c *config) {
 		c.bufferSize = size
+	}
+}
+
+func WithEnableSave(enables ...bool) Option {
+	return func(c *config) {
+		if len(enables) > 0 {
+			c.enableSave = enables[0]
+		} else {
+			c.enableSave = true // default to true if not specified
+		}
 	}
 }
 

@@ -289,6 +289,9 @@ func IsObjectType(t Type) bool {
 }
 
 type Type interface {
+	GetId() int64
+	SetId(int64)
+
 	String() string        // only string
 	PkgPathString() string // package path string
 	RawString() string     // string contain inner information
@@ -399,6 +402,7 @@ const (
 )
 
 type baseType struct {
+	id           int64
 	method       map[string]*Function
 	methodGetter func() map[string]*Function
 	methodOnce   sync.Once
@@ -407,6 +411,13 @@ type baseType struct {
 
 func NewBaseType() *baseType {
 	return &baseType{}
+}
+
+func (b *baseType) SetId(id int64) {
+	b.id = id
+}
+func (b *baseType) GetId() int64 {
+	return b.id
 }
 
 func (b *baseType) SetMethodGetter(f func() map[string]*Function) {

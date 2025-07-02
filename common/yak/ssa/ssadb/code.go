@@ -90,7 +90,7 @@ type IrCode struct {
 	ProgramCompileHash string `json:"program_compile_hash" gorm:"index"`
 
 	// type
-	TypeID int `json:"type_id"`
+	TypeID int64 `json:"type_id"`
 
 	// reference
 	Point   int64      `json:"point" gorm:"type:text"`
@@ -228,8 +228,10 @@ func (r *IrCode) GetSourceCodeContext(n int) string {
 	return result
 }
 
-func DeleteIRCode(DB *gorm.DB, id ...int64) error {
-	db := DB.Model(&IrCode{}).Where("id IN (?)", id).Delete(&IrCode{})
+func DeleteIrCode(DB *gorm.DB, id ...int64) error {
+	// log.Errorf("DeleteIrCode: %d", len(id))
+	db := DB.Model(&IrCode{})
+	db = db.Where("id IN (?)", id).Unscoped().Delete(&IrCode{})
 	for _, i := range id {
 		irCodeCache.Remove(i)
 	}
