@@ -22,6 +22,7 @@ type ProgramCache struct {
 	program          *Program // mark which program handled
 	DB               *gorm.DB
 	InstructionCache Cache[Instruction]
+	TypeCache        Cache[Type]
 
 	VariableIndex InstructionsIndex
 	MemberIndex   InstructionsIndex
@@ -47,7 +48,7 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 	}
 	var programName string
 	if databaseEnable {
-		programName = prog.GetProgramName()
+		programName = prog.GetApplication().GetProgramName()
 		cache.DB = ssadb.GetDB().Where("program_name = ?", programName)
 	}
 
@@ -61,6 +62,11 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 			cache.OffsetCache.Add("", inst) // add to offset cache
 			cache.afterSaveNotify(1)        // notify after save
 		},
+	)
+	cache.TypeCache = createTypeCache(
+		databaseEnable,
+		cache.DB, prog,
+		programName,
 	)
 	return cache
 }
@@ -155,6 +161,7 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) {
 		c.afterSaveNotify = cb[0]
 	}
 	c.InstructionCache.Close()
+	c.TypeCache.Close()
 	c.VariableIndex.Close()
 	c.MemberIndex.Close()
 	c.ClassIndex.Close()
