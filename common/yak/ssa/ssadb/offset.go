@@ -23,6 +23,7 @@ type IrOffset struct {
 func CreateOffset(rng memedit.RangeIf, projectName string) *IrOffset {
 	ret := &IrOffset{}
 	ret.FileHash = rng.GetEditor().GetIrSourceHash(projectName)
+	ret.ProgramName = projectName
 	ret.StartOffset = int64(rng.GetStartOffset())
 	ret.EndOffset = int64(rng.GetEndOffset())
 	ret.VariableName = ""
