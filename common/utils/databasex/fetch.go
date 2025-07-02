@@ -51,17 +51,13 @@ func (f *Fetch[T]) fillBuffer() {
 			}
 			items := f.fetchFromDB()
 			// log.Errorf("Fetch: fetched %d items", len(items))
-			for _, item := range items {
+			for index, item := range items {
+				_ = index
 				if utils.IsNil(item) {
 					log.Errorf("BUG: item is nil in Fetch.fillBuffer")
 					continue
 				}
-				select {
-				case <-f.ctx.Done():
-					return
-				default:
-					f.buffer.SafeFeed(item)
-				}
+				f.buffer.SafeFeed(item)
 			}
 		}
 	}
@@ -87,7 +83,7 @@ func (f *Fetch[T]) Close(delete ...func([]T)) {
 	// drain the rest of the buffer
 	if len(delete) > 0 {
 		items := make([]T, 0, f.buffer.Len())
-		for i := 0; i < f.buffer.Len(); i++ {
+		for {
 			item, ok := <-f.buffer.OutputChannel()
 			if !ok {
 				break
