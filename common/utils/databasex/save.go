@@ -30,7 +30,13 @@ func NewSave[T any](
 	opt ...Option,
 ) *Save[T] {
 	cfg := NewConfig(opt...)
+	return NewSaveWithConfig(saveToDB, cfg)
+}
 
+func NewSaveWithConfig[T any](
+	saveToDB func([]T),
+	cfg *config,
+) *Save[T] {
 	ctx, cancel := context.WithCancel(cfg.ctx)
 	s := &Save[T]{
 		saveToDB: saveToDB,

@@ -7,18 +7,13 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-func marshalInstruction(enableDatabase bool, inst Instruction, irCode *ssadb.IrCode) bool {
+func marshalInstruction(cache *ProgramCache, inst Instruction, irCode *ssadb.IrCode) bool {
 	if utils.IsNil(inst) || utils.IsNil(irCode) {
 		log.Errorf("BUG: marshalInstruction called with nil instruction")
 		return false
 	}
 	if inst.GetId() == -1 {
 		log.Errorf("[BUG]: instruction id is -1: %s", codec.AnyToString(inst))
-		return false
-	}
-	// log.Infof("save instruction : %v", inst.GetId())
-	if !enableDatabase {
-		log.Errorf("BUG: saveInstruction called when DB is nil")
 		return false
 	}
 
@@ -30,7 +25,7 @@ func marshalInstruction(enableDatabase bool, inst Instruction, irCode *ssadb.IrC
 		}
 	}
 
-	err := Instruction2IrCode(inst, irCode)
+	err := Instruction2IrCode(cache, inst, irCode)
 	if err != nil {
 		log.Errorf("FitIRCode error: %s", err)
 		return false
@@ -43,7 +38,7 @@ func marshalInstruction(enableDatabase bool, inst Instruction, irCode *ssadb.IrC
 }
 
 // Instruction2IrCode : marshal instruction to ir code, used in cache, to save to database
-func Instruction2IrCode(inst Instruction, ir *ssadb.IrCode) error {
+func Instruction2IrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) error {
 	if ir.ID != uint(inst.GetId()) {
 		return utils.Errorf("marshal instruction id not match")
 	}
@@ -52,11 +47,11 @@ func Instruction2IrCode(inst Instruction, ir *ssadb.IrCode) error {
 	}
 
 	instruction2IrCode(inst, ir)
-	value2IrCode(inst, ir)
+	value2IrCode(cache, inst, ir)
 
 	function2IrCode(inst, ir)
 	basicBlock2IrCode(inst, ir)
-	ir.SetExtraInfo(marshalExtraInformation(inst))
+	ir.SetExtraInfo(marshalExtraInformation(cache, inst))
 	return nil
 }
 
@@ -67,7 +62,7 @@ func (c *ProgramCache) IrCodeToInstruction(inst Instruction, ir *ssadb.IrCode, c
 	basicBlockFromIrCode(inst, ir)
 
 	// extern info
-	unmarshalExtraInformation(inst, ir)
+	unmarshalExtraInformation(cache, inst, ir)
 
 	return inst
 }
@@ -180,7 +175,7 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 	inst.SetExtern(ir.IsExternal)
 }
 
-func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
+func value2IrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
 	defer func() {
 		if msg := recover(); msg != nil {
 			log.Errorf("value2IrCode panic: %s", msg)
@@ -249,7 +244,7 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		}
 	}
 
-	ir.TypeID = SaveTypeToDB(value.GetType(), value.GetProgramName())
+	ir.TypeID = saveType(cache, anValue.GetType())
 }
 
 func (c *ProgramCache) valueFromIrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
@@ -293,7 +288,7 @@ func (c *ProgramCache) valueFromIrCode(cache *ProgramCache, inst Instruction, ir
 
 	// type
 	value.SetIsFromDB(true)
-	value.SetType(GetTypeFromDB(ir.TypeID))
+	value.SetType(GetTypeFromDB(cache, ir.TypeID))
 }
 
 func function2IrCode(inst Instruction, ir *ssadb.IrCode) {
