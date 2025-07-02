@@ -422,7 +422,7 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 		return err
 	}
 	// 22 is the TLS handshake.
-	session.Set(httpctx.REQUEST_CONTEXT_KEY_IsHttps, isTLS)
+	session.Set(httpctx.REQUEST_CONTEXT_KEY_IsHttps, isTLS || httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsHttps))
 	if parsedConnectedToPort == 0 {
 		if isTLS {
 			parsedConnectedToPort = 443
