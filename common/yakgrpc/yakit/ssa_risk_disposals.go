@@ -20,14 +20,11 @@ func FilterSSARiskDisposals(db *gorm.DB, filter *ypb.SSARiskDisposalsFilter) *go
 	if len(filter.GetRiskId()) > 0 {
 		db = bizhelper.ExactQueryInt64ArrayOr(db, "risk_id", filter.GetRiskId())
 	}
-	if len(filter.GetUser()) > 0 {
-		db = bizhelper.ExactQueryStringArrayOr(db, "user", filter.GetUser())
-	}
 	if len(filter.GetStatus()) > 0 {
 		db = bizhelper.ExactQueryStringArrayOr(db, "status", filter.GetStatus())
 	}
 	if filter.GetSearch() != "" {
-		db = bizhelper.FuzzSearch(db, []string{"user", "status", "comment"}, filter.GetSearch())
+		db = bizhelper.FuzzSearchEx(db, []string{"comment", "status"}, filter.GetSearch(), false)
 	}
 	return db
 }
@@ -45,7 +42,6 @@ func CreateSSARiskDisposals(db *gorm.DB, req *ypb.CreateSSARiskDisposalsRequest)
 	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
 		for _, riskId := range riskIds {
 			disposal := schema.SSARiskDisposals{
-				User:    req.GetUser(),
 				Status:  req.GetStatus(),
 				Comment: req.GetComment(),
 				RiskId:  riskId,
@@ -105,26 +101,25 @@ func DeleteSSARiskDisposals(db *gorm.DB, req *ypb.DeleteSSARiskDisposalsRequest)
 }
 
 func UpdateSSARiskDisposals(db *gorm.DB, req *ypb.UpdateSSARiskDisposalsRequest) ([]schema.SSARiskDisposals, error) {
-	db = FilterSSARiskDisposals(db, req.GetFilter())
-	var existResult []schema.SSARiskDisposals
-	if err := db.Find(&existResult).Error; err != nil {
-		return nil, utils.Errorf("UpdateSSARiskDisposals failed: %v", err)
-	}
-	toUpdate := lo.Map(existResult, func(item schema.SSARiskDisposals, index int) schema.SSARiskDisposals {
-		item.User = req.GetUser()
-		item.Status = req.GetStatus()
-		item.Comment = req.GetComment()
-		return item
+	var toUpdate []schema.SSARiskDisposals
+	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
+		filteredDB := FilterSSARiskDisposals(tx, req.GetFilter())
+		var existResult []schema.SSARiskDisposals
+		if err := filteredDB.Find(&existResult).Error; err != nil {
+			return utils.Errorf("UpdateSSARiskDisposals failed: %v", err)
+		}
+		toUpdate = lo.Map(existResult, func(item schema.SSARiskDisposals, index int) schema.SSARiskDisposals {
+			item.Status = req.GetStatus()
+			item.Comment = req.GetComment()
+			return item
+		})
+		tx = tx.Model(&schema.SSARiskDisposals{})
+		for _, disposal := range toUpdate {
+			if err := tx.Save(&disposal).Error; err != nil {
+				return utils.Errorf("UpdateSSARiskDisposals failed during save: %v", err)
+			}
+		}
+		return nil
 	})
-	if err := db.Save(&toUpdate).Error; err != nil {
-		return nil, utils.Errorf("UpdateSSARiskDisposals failed during save: %v", err)
-	}
-	return toUpdate, nil
-}
-
-func GetSSARiskDisposalsCreatedUsers(db *gorm.DB) []string {
-	db = db.Model(&schema.SSARiskDisposals{})
-	var users []string
-	db.Select("distinct user").Pluck("user", &users)
-	return users
+	return toUpdate, err
 }
