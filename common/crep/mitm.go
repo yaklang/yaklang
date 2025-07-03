@@ -21,6 +21,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/gmsm/sm2"
+	gmx509 "github.com/yaklang/yaklang/common/gmsm/x509"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian"
@@ -31,13 +34,19 @@ import (
 )
 
 var (
-	initMITMCertOnce              = new(sync.Once)
-	defaultCAFile, defaultKeyFile = "yak-mitm-ca.crt", "yak-mitm-ca.key"
-	defaultCA, defaultKey         []byte
+	initMITMCertOnce                  = new(sync.Once)
+	defaultCAFile, defaultKeyFile     = "yak-mitm-ca.crt", "yak-mitm-ca.key"
+	defaultGMCAFile, defaultGMKeyFile = "yak-mitm-gm-ca.crt", "yak-mitm-gm-ca.key"
+	defaultCA, defaultKey             []byte
+	defaultGMCA, defaultGMKey         []byte
 )
 
 func GetDefaultCaFilePath() string {
 	return defaultCAFile
+}
+
+func GetDefaultGMCaFilePath() string {
+	return defaultGMCAFile
 }
 
 func init() {
@@ -45,6 +54,9 @@ func init() {
 	//_ = os.MkdirAll(homeDir, os.ModePerm)
 	defaultCAFile = filepath.Join(homeDir, defaultCAFile)
 	defaultKeyFile = filepath.Join(homeDir, defaultKeyFile)
+
+	defaultGMCAFile = filepath.Join(homeDir, defaultGMCAFile)
+	defaultGMKeyFile = filepath.Join(homeDir, defaultGMKeyFile)
 }
 
 func GetDefaultCAAndPrivRaw() ([]byte, []byte) {
@@ -92,12 +104,39 @@ func GetDefaultMITMCAAndPriv() (*x509.Certificate, *rsa.PrivateKey, error) {
 	return caCert, privKey, nil
 }
 
+func GetDefaultMITMCAAndPrivForGM() (*gmx509.Certificate, *sm2.PrivateKey, error) {
+	ca, key, err := GetDefaultGMCaAndKey()
+	if err != nil {
+		return nil, nil, err
+	}
+	p, _ := pem.Decode(ca)
+	caCert, err := gmx509.ParseCertificate(p.Bytes)
+	if err != nil {
+		return nil, nil, utils.Errorf("default ca failed: %s", err)
+	}
+
+	priv, _ := pem.Decode(key)
+	privKey, err := gmx509.ParseSm2PrivateKey(priv.Bytes)
+	if err != nil {
+		return nil, nil, utils.Errorf("default private key failed: %s", err)
+	}
+
+	return caCert, privKey, nil
+}
+
 func InitMITMCert() {
 	defaultCA, _ = ioutil.ReadFile(defaultCAFile)
 	defaultKey, _ = ioutil.ReadFile(defaultKeyFile)
 
+	defaultGMCA, _ = ioutil.ReadFile(defaultGMCAFile)
+	defaultGMKey, _ = ioutil.ReadFile(defaultGMKeyFile)
+
 	if defaultCA != nil && defaultKey != nil {
 		log.Debug("Successfully load cert and key from default files")
+	}
+
+	if defaultGMCA != nil && defaultGMKey != nil {
+		log.Debug("Successfully load GM cert and key from default files")
 		return
 	}
 
@@ -117,6 +156,25 @@ func InitMITMCert() {
 		err = ioutil.WriteFile(defaultKeyFile, defaultKey, 0o444)
 		if err != nil {
 			log.Error("write default key failed")
+		}
+	}
+
+	if defaultGMCA == nil || defaultGMKey == nil {
+		var err error
+		defaultGMCA, defaultGMKey, err = tlsutils.GenerateGMSelfSignedCertKey("Yakit MITM GM Root CA")
+		if err != nil {
+			log.Errorf("generate GM default ca/key failed: %s", err)
+			return
+		}
+
+		_ = os.MkdirAll(consts.GetDefaultYakitBaseDir(), 0o777)
+		err = ioutil.WriteFile(defaultGMCAFile, defaultGMCA, 0o444)
+		if err != nil {
+			log.Error("write default GM ca failed")
+		}
+		err = ioutil.WriteFile(defaultGMKeyFile, defaultGMKey, 0o444)
+		if err != nil {
+			log.Error("write default GM key failed")
 		}
 	}
 }
@@ -195,6 +253,13 @@ func GetDefaultCaAndKey() ([]byte, []byte, error) {
 		return nil, nil, utils.Error("cannot set ca/key for mitm")
 	}
 	return defaultCA, defaultKey, nil
+}
+
+func GetDefaultGMCaAndKey() ([]byte, []byte, error) {
+	if defaultGMCA == nil || defaultGMKey == nil {
+		return nil, nil, utils.Error("cannot set GM ca/key for mitm")
+	}
+	return defaultGMCA, defaultGMKey, nil
 }
 
 type ClientCertificationPair struct {
@@ -428,7 +493,7 @@ func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
 
 	// MITM option configured above
 	if server.mitmConfig == nil { // currently seems it must be nil since no function is exposed to directly create
-		err := MITM_SetCaCertAndPrivKey(defaultCA, defaultKey)(server)
+		err := MITM_SetCaCertAndPrivKey(defaultCA, defaultKey, defaultGMCA, defaultGMKey)(server)
 		if err != nil {
 			return nil, utils.Errorf("set ca/key failed: %s", err)
 		}

@@ -347,6 +347,15 @@ func handleBuildInMITMDefaultPageResponse(rsp *http.Response) error {
 		rsp.Header.Set("Content-Type", "octet-stream")
 		return nil
 	}
+	if rsp.Request.URL.Path == "/download-mitm-gm-crt" {
+		// 返回mitm-gm-server.crt内容
+		body := defaultGMCA
+		rsp.Body = io.NopCloser(bytes.NewReader(body))
+		rsp.ContentLength = int64(len(body))
+		rsp.Header.Set("Content-Disposition", `attachment; filename="mitm-gm-server.crt"`)
+		rsp.Header.Set("Content-Type", "octet-stream")
+		return nil
+	}
 
 	rsp.Body = io.NopCloser(bytes.NewReader(htmlContent))
 	rsp.ContentLength = int64(len(htmlContent))
