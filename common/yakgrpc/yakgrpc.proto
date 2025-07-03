@@ -670,7 +670,6 @@ service Yak {
   // rpc DeleteHTTPRequestBuilder(DeleteHTTPRequestBuilderRequest) returns (Empty);
   rpc DebugPlugin(DebugPluginRequest) returns (stream ExecResult);
   rpc SmokingEvaluatePlugin(SmokingEvaluatePluginRequest) returns (SmokingEvaluatePluginResponse);
-  rpc EvaluateSyntaxFlowRule(EvaluateSyntaxFlowRuleRequest) returns (EvaluateSyntaxFlowRuleResponse);
   rpc SmokingEvaluatePluginBatch(SmokingEvaluatePluginBatchRequest) returns (stream SmokingEvaluatePluginBatchResponse);
   rpc GetSystemDefaultDnsServers(Empty) returns (DefaultDnsServerResponse);
 
@@ -1746,13 +1745,10 @@ message SmokingEvaluatePluginRequest {
   string PluginName = 2;
 
   string Code = 3;
-  string PluginType = 4;
+  // "syntaxflow" | "nuclei" | "mitm" | "port-scan" | "codec" | "yak"
+  string PluginType = 4; 
 }
 
-message EvaluateSyntaxFlowRuleRequest {
-  string RuleName = 1;
-  string RuleInput = 2;
-}
 
 message SmokingEvaluateResult {
   string Item = 1;
@@ -1767,17 +1763,6 @@ message SmokingEvaluatePluginResponse {
   repeated SmokingEvaluateResult Results = 2;
 }
 
-message SyntaxFlowRuleEvaluateResult {
-  string Item = 1; // 评估信息来源
-  string Suggestion = 2;
-  Range Range = 3;
-  string Severity = 4; // Error || Warning
-}
-
-message EvaluateSyntaxFlowRuleResponse {
-  int64 Score = 1;
-  repeated SyntaxFlowRuleEvaluateResult Results = 2;
-}
 
 message IsVulinboxReadyRequest {
 
@@ -6013,6 +5998,8 @@ message RenderHTTPFuzzerPacketResponse {
 
 message SmokingEvaluatePluginBatchRequest {
   repeated string ScriptNames = 1;
+    // "syntaxflow" | "nuclei" | "mitm" | "port-scan" | "codec" | "yak"
+  string PluginType = 2; 
 }
 
 message SmokingEvaluatePluginBatchResponse {

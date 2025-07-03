@@ -42,7 +42,7 @@ test.* as $result &&& invalid syntax`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			analyzer := NewSyntaxFlowAnalyzer(tt.ruleContent, tt.name)
+			analyzer := NewSyntaxFlowAnalyzer(tt.ruleContent)
 			result := analyzer.Analyze()
 
 			// 验证分数
@@ -96,7 +96,7 @@ test.* as $result`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			analyzer := NewSyntaxFlowAnalyzer(tt.ruleContent, tt.name)
+			analyzer := NewSyntaxFlowAnalyzer(tt.ruleContent)
 			result := analyzer.Analyze()
 
 			// 确保分数不低于0
@@ -194,7 +194,7 @@ alert $result;`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			analyzer := NewSyntaxFlowAnalyzer(tt.ruleContent, tt.name)
+			analyzer := NewSyntaxFlowAnalyzer(tt.ruleContent)
 			result := analyzer.Analyze()
 
 			// 验证分数
@@ -396,7 +396,7 @@ alert $result;`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			analyzer := NewSyntaxFlowAnalyzer(tt.ruleContent, tt.name)
+			analyzer := NewSyntaxFlowAnalyzer(tt.ruleContent)
 			result := analyzer.Analyze()
 
 			// 验证分数
@@ -440,7 +440,7 @@ alert $result;`,
 func TestSyntaxFlowAnalyzer_CompleteRule(t *testing.T) {
 	// 使用嵌入的完整规则进行测试
 	if goodRuleDemo != "" {
-		analyzer := NewSyntaxFlowAnalyzer(goodRuleDemo, "完整规则测试")
+		analyzer := NewSyntaxFlowAnalyzer(goodRuleDemo)
 		result := analyzer.Analyze()
 
 		// 完整规则应该得高分（90分以上）

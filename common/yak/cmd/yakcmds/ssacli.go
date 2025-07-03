@@ -28,7 +28,6 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"golang.org/x/exp/slices"
 
 	"github.com/segmentio/ksuid"
@@ -417,72 +416,6 @@ var syntaxFlowCreate = &cli.Command{
 			filename += ".sf"
 		}
 		return os.WriteFile(filename, buf.Bytes(), 0o666)
-	},
-}
-
-var syntaxFlowTest = &cli.Command{
-	Name:    "syntaxflow-test",
-	Aliases: []string{"sftest", "sf-test"},
-	Usage:   "Runs syntax flow tests on .sf files. Use --strict for strict mode.", // Added usage
-	Flags: []cli.Flag{
-		&cli.BoolFlag{
-			Name:  "strict,s",
-			Usage: "Enable strict mode for evaluation",
-		},
-	},
-	Action: func(c *cli.Context) error {
-		isStrict := c.Bool("strict")
-		testingTInstance := utils.NewRequireTestT(func(msg string, args ...any) {
-			log.Errorf(msg, args...)
-		}, func() {})
-
-		fsi := filesys.NewLocalFs()
-
-		checkViaPath := func(pathRaw string) error {
-			err := filesys.Recursive(pathRaw, filesys.WithFileSystem(fsi), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
-				if fsi.Ext(s) == ".sf" || fsi.Ext(s) == "sf" {
-					raw, err := fsi.ReadFile(s)
-					if err != nil {
-						return err
-					}
-					err = ssatest.EvaluateVerifyFilesystem(string(raw), testingTInstance, isStrict)
-					if err != nil {
-						return err
-					}
-					return nil
-				}
-				return nil
-			}))
-			if err != nil {
-				return err
-			}
-			return nil
-		}
-
-		empty := len(c.Args()) <= 0
-		if empty {
-			return checkViaPath(".")
-		}
-		for _, i := range c.Args() {
-			if utils.IsDir(i) {
-				err := checkViaPath(i)
-				if err != nil {
-					return err
-				}
-			}
-			if ret := utils.GetFirstExistedFile(i); ret != "" {
-				raw, err := fsi.ReadFile(ret)
-				if err != nil {
-					return err
-				}
-				err = ssatest.EvaluateVerifyFilesystem(string(raw), testingTInstance, isStrict)
-				if err != nil {
-					return err
-				}
-			}
-
-		}
-		return nil
 	},
 }
 
@@ -1115,7 +1048,7 @@ var syntaxFlowEvaluate = &cli.Command{
 			}
 			fileName := filepath.Base(target)
 
-			analyzer := sfanalyzer.NewSyntaxFlowAnalyzer(string(content), fileName)
+			analyzer := sfanalyzer.NewSyntaxFlowAnalyzer(string(content))
 			result := analyzer.Analyze()
 			results[fileName] = result
 		} else {
@@ -1131,7 +1064,7 @@ var syntaxFlowEvaluate = &cli.Command{
 					return nil
 				}
 				fileName := filepath.Base(s)
-				analyzer := sfanalyzer.NewSyntaxFlowAnalyzer(string(content), fileName)
+				analyzer := sfanalyzer.NewSyntaxFlowAnalyzer(string(content))
 				result := analyzer.Analyze()
 				results[fileName] = result
 				return nil
@@ -1499,7 +1432,6 @@ var SSACompilerCommands = []*cli.Command{
 	syntaxflowFormat,     //  format syntaxflow rule
 	syntaxflowCompletion, // complete syntaxflow rule with AI
 	syntaxFlowSave,       // save rule to database
-	syntaxFlowTest,       // test rule
 	syntaxFlowEvaluate,   // evaluate rule quality
 	syntaxFlowExport,     // export rule to file
 	syntaxFlowImport,     // import rule from file

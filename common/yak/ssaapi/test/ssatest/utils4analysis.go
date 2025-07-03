@@ -643,6 +643,17 @@ func checkResult(verifyFs *sfvm.VerifyFileSystem, rule *schema.SyntaxFlowRule, r
 	return
 }
 func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t require.TestingT, isStrict bool) error {
+
+	/*
+		// TODO:
+			analyzer := sfanalyzer.NewSyntaxFlowAnalyzer(string(code))
+			result := analyzer.Analyze()
+			var err error
+			for _, prob := range result.Problems {
+				err = utils.JoinErrors(err, utils.Errorf("syntax flow rule analyze failed: %v", prob))
+			}
+	*/
+
 	frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(rule.Content)
 	if err != nil {
 		return err
