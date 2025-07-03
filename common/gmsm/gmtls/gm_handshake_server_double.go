@@ -197,7 +197,32 @@ func (hs *serverHandshakeStateGM) readClientHello() (isResume bool, err error) {
 
 	// just for test
 	c.config.getCertificate(hs.clientHelloInfo())
-	hs.cert = c.config.Certificates
+	// Edit:
+	//		通过获取证书方法获取 签名证书
+	//		通过获取证书方法获取 加密证书
+	if len(c.config.Certificates) < 2 && c.config.getCertificate != nil && c.config.GetKECertificate != nil {
+		// 在MITM中使用时会进入该分支 通过GetCertificate和GetKECertificate动态生成证书
+		sigCert, err := c.config.getCertificate(hs.clientHelloInfo())
+		if err != nil {
+			_ = c.sendAlert(alertInternalError)
+			return false, err
+		}
+		encCert, err := c.config.GetKECertificate(hs.clientHelloInfo())
+		if err != nil {
+			_ = c.sendAlert(alertInternalError)
+			return false, err
+		}
+		// GMT0024
+		if encCert == nil || sigCert == nil {
+			_ = c.sendAlert(alertInternalError)
+			return false, fmt.Errorf("tls: amount of server certificates must be greater than 2, which will sign and encipher respectively")
+		}
+		// 第1张证书为 签名证书、第2张为加密证书（用于密钥交换）
+		hs.cert = []Certificate{*sigCert, *encCert}
+	} else {
+		// 充当普通的国密服务器
+		hs.cert = c.config.Certificates
+	}
 
 	// GMT0024
 	if len(hs.cert) < 2 {

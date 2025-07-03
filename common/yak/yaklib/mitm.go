@@ -30,6 +30,7 @@ var MitmExports = map[string]interface{}{
 	"wscallback":           mitmConfigWSCallback,
 	"wsforcetext":          mitmConfigWSForceTextFrame,
 	"rootCA":               mitmConfigCertAndKey,
+	"gmRootCA":             mitmConfigGMCertAndKey,
 	"useDefaultCA":         mitmConfigUseDefault,
 	"gmtls":                mitmConfigGMTLS,
 	"gmtlsPrefer":          mitmConfigGMTLSPrefer,
@@ -50,19 +51,20 @@ func startMitm(
 }
 
 type mitmConfig struct {
-	ctx                context.Context
-	host               string
-	callback           func(isHttps bool, urlStr string, r *http.Request, rsp *http.Response)
-	wsForceTextFrame   bool
-	wscallback         func(data []byte, isRequest bool) interface{}
-	mitmCert, mitmPkey []byte
-	useDefaultMitmCert bool
-	maxContentLength   int
-	gmtls              bool
-	gmtlsPrefer        bool
-	gmtlsOnly          bool
-	dialer             func(timeout time.Duration, target string) (net.Conn, error)
-	tunMode            bool
+	ctx                    context.Context
+	host                   string
+	callback               func(isHttps bool, urlStr string, r *http.Request, rsp *http.Response)
+	wsForceTextFrame       bool
+	wscallback             func(data []byte, isRequest bool) interface{}
+	mitmCert, mitmPkey     []byte
+	mitmGMCert, mitmGMPKey []byte
+	useDefaultMitmCert     bool
+	maxContentLength       int
+	gmtls                  bool
+	gmtlsPrefer            bool
+	gmtlsOnly              bool
+	dialer                 func(timeout time.Duration, target string) (net.Conn, error)
+	tunMode                bool
 
 	// 是否开启透明劫持
 	isTransparent            bool
@@ -258,6 +260,18 @@ func mitmConfigCertAndKey(cert, key []byte) MitmConfigOpt {
 	return func(config *mitmConfig) {
 		config.mitmCert = cert
 		config.mitmPkey = key
+	}
+}
+
+// gmRootCA 是一个选项函数，用于指定中间人代理服务器的国密根证书和私钥
+// Example:
+// ```
+// mitm.Start(8080, mitm.gmRootCA(cert, key))
+// ```
+func mitmConfigGMCertAndKey(cert, key []byte) MitmConfigOpt {
+	return func(config *mitmConfig) {
+		config.mitmGMCert = cert
+		config.mitmGMPKey = key
 	}
 }
 
@@ -480,7 +494,7 @@ func initMitmServer(downstreamProxy []string, config *mitmConfig) (*crep.MITMSer
 			fmt.Println("-----------------------------")
 		}),
 		crep.MITM_SetDownstreamProxy(downstreamProxy...),
-		crep.MITM_SetCaCertAndPrivKey(config.mitmCert, config.mitmPkey),
+		crep.MITM_SetCaCertAndPrivKey(config.mitmCert, config.mitmPkey, config.mitmGMCert, config.mitmGMPKey),
 		crep.MITM_SetHTTPRequestHijackRaw(func(isHttps bool, reqIns *http.Request, req []byte) []byte {
 			if config.hijackRequest == nil {
 				return req

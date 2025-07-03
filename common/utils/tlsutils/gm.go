@@ -165,7 +165,12 @@ func GenerateGMSelfSignedCertKey(commonName string) ([]byte, []byte, error) {
 	template := x509.Certificate{
 		SerialNumber: sid,
 		Subject: pkix.Name{
-			CommonName: commonName,
+			Country:            []string{commonName},
+			Province:           []string{commonName},
+			Locality:           []string{commonName},
+			Organization:       []string{commonName},
+			OrganizationalUnit: []string{commonName},
+			CommonName:         commonName,
 		},
 		NotBefore: time.Unix(946656000, 0),
 		NotAfter:  time.Now().Add(time.Hour * 24 * 365 * 99),
@@ -177,6 +182,7 @@ func GenerateGMSelfSignedCertKey(commonName string) ([]byte, []byte, error) {
 		},
 		BasicConstraintsValid: true,
 		IsCA:                  true,
+		SignatureAlgorithm:    x509.SM2WithSM3,
 	}
 	derBytes, err := x509.CreateCertificate(&template, &template, pkey.Public().(*sm2.PublicKey), pkey)
 	if err != nil {
