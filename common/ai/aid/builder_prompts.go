@@ -47,6 +47,9 @@ var __prompt_ToolsList string
 //go:embed prompts/plan-review/plan-incomplete.txt
 var planReviewPrompts string
 
+//go:embed prompts/plan-review/plan-freedom-review.txt
+var planFreedomReviewPrompts string
+
 //go:embed prompts/plan-review/plan-create-subtask.txt
 var planReviewCreateSubtaskPrompts string
 

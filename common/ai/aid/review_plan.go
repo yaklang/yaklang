@@ -13,6 +13,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+//go:embed jsonschema/plan-review/freedom-plan-review.json
+var schemaFreedomReviewPlan string
+
 type PlanReviewSuggestion struct {
 	Id                string `json:"id"`
 	Value             string `json:"value"`
@@ -44,6 +47,13 @@ func (c *Config) getPlanReviewSuggestion() []*PlanReviewSuggestion {
 			Suggestion:        "需要拆分子任务",
 			SuggestionEnglish: "Create Subtask for current level task, if user not specified, auto evaluate how to modify the task",
 			AllowExtraPrompt:  true,
+		},
+		{
+			Value:             "freedom-review",
+			Suggestion:        "自由批阅模式的审查建议",
+			SuggestionEnglish: "User freely review the plan, can add more details or modify the plan",
+			AllowExtraPrompt:  true,
+			ParamSchema:       schemaFreedomReviewPlan,
 		},
 		{
 			Value:             "continue",
@@ -165,6 +175,28 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 			return newPlan, nil
 		}
 		return p.handleReviewPlanResponse(newPlan, params)
+	case "freedom-review":
+		p.config.EmitInfo("user uses freedom review mode to review the plan")
+		// 重新生成计划，但保留现有任务
+		extraPrompt := param.GetString("reviewed-task-tree")
+		newPlan, err := p.freedomReviewGenerateNewPlan(extraPrompt, rsp)
+		if err != nil {
+			p.config.EmitError("generate new plan failed: %v", err)
+			return nil, utils.Errorf("generate new plan failed: %v", err)
+		}
+
+		ep := p.config.epm.createEndpointWithEventType(EVENT_TYPE_PLAN_REVIEW_REQUIRE)
+		ep.SetDefaultSuggestionContinue()
+
+		p.config.EmitRequireReviewForPlan(newPlan, ep.id)
+		p.config.doWaitAgree(nil, ep)
+		params := ep.GetParams()
+		p.config.ReleaseInteractiveEvent(ep.id, params)
+		if params == nil {
+			p.config.EmitError("user review params is nil, plan failed")
+			return newPlan, nil
+		}
+		return p.handleReviewPlanResponse(newPlan, params)
 	default:
 		p.config.EmitError("unknown review suggestion: %s", suggestion)
 		return rsp, nil
@@ -219,6 +251,50 @@ func (p *planRequest) generateCreateSubtaskPlan(extraPrompt string, rsp *PlanRes
 	}
 	rsp.RootTask.GenerateIndex()
 	return rsp, nil
+}
+
+func (p *planRequest) freedomReviewGenerateNewPlan(extraPrompt string, rsp *PlanResponse) (*PlanResponse, error) {
+	// 生成新的计划，使用自由审查模式
+	tmpl, err := template.New("freedom-plan-review").Parse(planFreedomReviewPrompts)
+	if err != nil {
+		return nil, utils.Errorf("error parsing freedom plan review prompt: %v", err)
+	}
+
+	nonce := utils.RandStringBytes(6)
+	data := map[string]any{
+		"Memory":           p.config.memory,
+		"CurrentPlan":      rsp.RootTask,
+		"USER_REVIEW_PLAN": extraPrompt,
+		"NONCE":            nonce,
+	}
+
+	var planPrompt bytes.Buffer
+	err = tmpl.Execute(&planPrompt, data)
+	if err != nil {
+		return nil, utils.Errorf("error executing freedom plan review prompt: %v", err)
+	}
+
+	p.config.EmitInfo("freedom plan review prompt: %s", planPrompt.String())
+	prompt := planPrompt.String()
+
+	var task *aiTask
+	err = p.config.callAiTransaction(prompt, p.callAI, func(response *AIResponse) error {
+		responseReader := response.GetOutputStreamReader("freedom-plan-review", false, p.config)
+		taskResponse, err := io.ReadAll(responseReader)
+		if err != nil {
+			return utils.Errorf("error reading AI response: %v", err)
+		}
+
+		task, err = ExtractTaskFromRawResponse(p.config, string(taskResponse))
+		if err != nil {
+			return utils.Errorf("error extracting task from raw response: %v", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, utils.Error(err.Error())
+	}
+	return p.config.newPlanResponse(task), nil
 }
 
 // generateNewPlan 生成新的计划
