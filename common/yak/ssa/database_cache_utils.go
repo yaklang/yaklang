@@ -21,12 +21,11 @@ func (c *instructionCachePair) GetId() int64 {
 }
 
 const (
-	chanSize    = 200
-	saveSize    = 2000
-	saveTime    = time.Second * 1
-	cacheTTL    = 8 * time.Second
-	typeTTL     = 500 * time.Millisecond
-	fetchIdSize = 100
+	fetchSize = 300
+	saveSize  = 2000
+	saveTime  = time.Second * 1
+	cacheTTL  = 8 * time.Second
+	typeTTL   = 500 * time.Millisecond
 )
 
 type Cache[T any] interface {
@@ -80,10 +79,10 @@ func createInstructionCache(
 
 	// init instruction cache and fetchId
 	fetch := func() []*ssadb.IrCode {
-		result := make([]*ssadb.IrCode, 0, fetchIdSize)
+		result := make([]*ssadb.IrCode, 0, fetchSize)
 		utils.GormTransaction(db, func(tx *gorm.DB) error {
 			// tx := db
-			for len(result) < fetchIdSize {
+			for len(result) < fetchSize {
 				id, irCode := ssadb.RequireIrCode(tx, programName)
 				if utils.IsNil(irCode) || id <= 0 {
 					// return nil // no more id to fetch
@@ -137,11 +136,11 @@ func createInstructionCache(
 	}
 
 	opts := []databasex.Option{
-		databasex.WithBufferSize(chanSize),
+		databasex.WithBufferSize(fetchSize),
 		databasex.WithSaveSize(saveSize),
 		databasex.WithSaveTimeout(saveTime),
 	}
-	return databasex.NewCache[Instruction, *ssadb.IrCode](
+	return databasex.NewCache(
 		cacheTTL, marshal, fetch, delete, save, load, opts...,
 	)
 }
@@ -160,10 +159,10 @@ func createTypeCache(
 	}
 
 	fetch := func() []*ssadb.IrType {
-		result := make([]*ssadb.IrType, 0, fetchIdSize)
+		result := make([]*ssadb.IrType, 0, fetchSize)
 		utils.GormTransaction(db, func(tx *gorm.DB) error {
 			// tx := db
-			for len(result) < fetchIdSize {
+			for len(result) < fetchSize {
 				id, irType := ssadb.RequireIrType(tx, programName)
 				if utils.IsNil(irType) || id <= 0 {
 					// return nil // no more id to fetch
@@ -209,13 +208,13 @@ func createTypeCache(
 	}
 
 	opts := []databasex.Option{
-		databasex.WithBufferSize(chanSize),
+		databasex.WithBufferSize(fetchSize),
 		databasex.WithSaveSize(saveSize),
 		databasex.WithSaveTimeout(saveTime),
 		databasex.WithEnableSave(true), // always enable save for type cache
 	}
 
-	return databasex.NewCache[Type, *ssadb.IrType](
+	return databasex.NewCache(
 		typeTTL, marshal, fetch, delete, save, load, opts...,
 	)
 }
