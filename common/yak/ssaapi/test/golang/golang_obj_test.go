@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"testing"
 
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
@@ -60,7 +61,7 @@ func TestBasic_BasicObject(t *testing.T) {
 }
 
 func TestBasic_BasicObjectEx(t *testing.T) {
-	ssatest.CheckSyntaxFlowContain(t,`
+	ssatest.CheckSyntaxFlowContain(t, `
 		package main
 
 		type Queue struct {
@@ -80,8 +81,8 @@ func TestBasic_BasicObjectEx(t *testing.T) {
 	`, `
 		b #-> as $target
 	`, map[string][]string{
-			"target": {"1"},
-		},
+		"target": {"1"},
+	},
 		ssaapi.WithLanguage(ssaapi.GO),
 	)
 }
@@ -112,7 +113,7 @@ func TestBasic_Phi(t *testing.T) {
 	)
 }
 
-func TestBasic_BasicStruct(t *testing.T){
+func TestBasic_BasicStruct(t *testing.T) {
 	ssatest.CheckSyntaxFlowContain(t,
 		`package main
 
@@ -131,8 +132,36 @@ func main (){
 	`, `
 	println(* #-> as $a)
 	`, map[string][]string{
-			"a":  {"1"},
+			"a": {"1"},
 		},
 		ssaapi.WithLanguage(ssaapi.GO),
+	)
+}
+
+func TestParameter_MemberCall(t *testing.T) {
+	fs := filesys.NewVirtualFs()
+	fs.AddFile("test.go", `package main
+
+import (
+    "fmt"
+    "io/ioutil"
+    "net/http"
+    "path/filepath"
+    "strings"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+    userInput := r.URL.Query().Get("file")
+    content := ioutil.ReadFile(userInput)
+    w.Write(content)
+}
+`)
+
+	ssatest.CheckSyntaxFlowWithFS(t, fs, `
+ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
+$entry.ReadFile(* #-> as $output)
+		`, map[string][]string{
+		"output": {"\"file\"", "Parameter-r"},
+	}, true, ssaapi.WithLanguage(ssaapi.GO),
 	)
 }

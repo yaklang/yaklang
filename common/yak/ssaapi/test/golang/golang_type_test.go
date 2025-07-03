@@ -20,12 +20,12 @@ func Test_Struct(t *testing.T) {
 			return a.t
 	}
 	func main() {
-		b := B{A: A{t: 2}}
-		a2:=b.getA()
+		b  := B{A: A{t: 2}}
+		a2 := b.getA()
 	}
 `
 		ssatest.CheckSyntaxFlow(t, code, `a2 #-> * as $param`, map[string][]string{
-			"param": {"2"},
+			"param": {"ParameterMember-parameterMember[0].t"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 	t.Run("struct function inheritance", func(t *testing.T) {
@@ -61,10 +61,9 @@ func Test_Struct(t *testing.T) {
 			a2 #-> as $a2
 		`, true, map[string][]string{
 			"a1": {"1"},
-			"a2": {"2"},
+			"a2": {"ParameterMember-parameterMember[0].t"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
-
 	t.Run("struct function inheritance extend", func(t *testing.T) {
 		code := `package main
 
