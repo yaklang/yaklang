@@ -328,13 +328,11 @@ func SM2SignWithSM3WithPassword(priKeyBytes []byte, data interface{}, password [
 // signature, _ := codec.Sm2SignWithSM3(priKey, data)
 // err := codec.Sm2VerifyWithSM3(pubKey, data, signature)
 //
-//	if err == nil {
-//	    println("签名验证成功")
-//	} else {
-//
-//	    println("签名验证失败:", err.Error())
-//	}
-//
+// if err == nil {
+//    println("签名验证成功")
+// }else {
+//    println("签名验证失败:", err.Error())
+// }
 // ```
 func SM2VerifyWithSM3(pubKeyBytes []byte, originData interface{}, sign []byte) error {
 	// 检查数据是否为nil，如果是则报错
