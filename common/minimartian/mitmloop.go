@@ -276,7 +276,7 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, ctx *Context) {
 	/* TLS */
 	if isTLSConn {
 		s.MarkSecure()
-		s.Set(httpctx.REQUEST_CONTEXT_KEY_IsHttps, true)
+		s.Set(httpctx.REQUEST_CONTEXT_ConnectToHTTPS, true)
 		var serverUseH2 bool
 		if p.http2 {
 			// does remote server use h2?
@@ -422,7 +422,7 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 		return err
 	}
 	// 22 is the TLS handshake.
-	session.Set(httpctx.REQUEST_CONTEXT_KEY_IsHttps, isTLS || httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsHttps))
+	session.Set(httpctx.REQUEST_CONTEXT_ConnectToHTTPS, isTLS || httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_ConnectToHTTPS))
 	if parsedConnectedToPort == 0 {
 		if isTLS {
 			parsedConnectedToPort = 443
@@ -589,14 +589,12 @@ func (p *Proxy) handleProxyAuth(conn net.Conn, req *http.Request, timer *time.Ti
 
 		cs := tconn.ConnectionState()
 		req.TLS = &cs
-		req.URL.Scheme = "https"
 		isHttps = true
 		httpctx.SetRequestHTTPS(req, true)
 	}
 
 	if session.IsSecure() {
 		log.Debugf("mitm: forcing HTTPS inside secure session")
-		req.URL.Scheme = "https"
 	}
 
 	req.RemoteAddr = conn.RemoteAddr().String()
