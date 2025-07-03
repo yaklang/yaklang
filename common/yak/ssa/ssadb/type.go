@@ -107,5 +107,15 @@ func DeleteIrType(db *gorm.DB, id []int64) error {
 	if len(id) == 0 {
 		return utils.Errorf("delete type from database id is empty")
 	}
-	return db.Where("id IN (?)", id).Unscoped().Delete(&IrType{}).Error
+	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+		// split each 999
+		for i := 0; i < len(id); i += 999 {
+			end := i + 999
+			if end > len(id) {
+				end = len(id)
+			}
+			tx.Where("id IN (?)", id[i:end]).Unscoped().Delete(&IrType{})
+		}
+		return nil
+	})
 }

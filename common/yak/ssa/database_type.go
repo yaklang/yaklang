@@ -27,7 +27,7 @@ func marshalType(typ Type, irType *ssadb.IrType) bool {
 	}
 
 	type2IrType(typ, irType)
-	if irType.Kind >= 0 {
+	if irType.Kind < 0 {
 		log.Errorf("BUG: save type called with empty kind: %v", typ.GetFullTypeNames())
 	}
 	return true
