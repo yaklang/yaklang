@@ -178,8 +178,12 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 	case "freedom-review":
 		p.config.EmitInfo("user uses freedom review mode to review the plan")
 		// 重新生成计划，但保留现有任务
-		extraPrompt := param.GetString("reviewed-task-tree")
-		newPlan, err := p.freedomReviewGenerateNewPlan(extraPrompt, rsp)
+		extraPrompt := param.GetObject("reviewed-task-tree")
+		marshal, err := json.Marshal(extraPrompt)
+		if err != nil {
+			return nil, err
+		}
+		newPlan, err := p.freedomReviewGenerateNewPlan(string(marshal), rsp)
 		if err != nil {
 			p.config.EmitError("generate new plan failed: %v", err)
 			return nil, utils.Errorf("generate new plan failed: %v", err)
