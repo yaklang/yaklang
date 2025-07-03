@@ -47,6 +47,26 @@ type OutputBody struct {
 	Data string `json:"data"`
 }
 
+// OutputResult 将channel中输出的爬虫结果保存在本地
+//
+// 第一个参数为需要存储的结果 第二个参数为保存的本地路径 请确保本地文件可以正常写入
+//
+// Examples:
+//
+//		```
+//			targetUrl = "http://testphp.vulnweb.com/"
+//			ch, err = crawlerx.StartCrawler(targetUrl, crawlerx.pageTimeout(30), crawlerx.concurrent(3))
+//			resultList = []
+//			for item = range ch {
+//				yakit.Info(item.Method() + " " + item.Url())
+//				resultList = append(resultList, item)
+//			}
+//			err = crawlerx.OutputResult(resultList, "test.txt")
+//			if err != nil {
+//	            println(err)
+//			}
+//
+//		```
 func OutputData(data []interface{}, outputFile string) error {
 	var result []*OutputResult
 	for _, item := range data {
