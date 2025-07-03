@@ -210,7 +210,7 @@ func GetConnectedToHostPortFromHTTPRequest(t *http.Request) (string, error) {
 		//} else {
 		//	result = strings.TrimSuffix(hostport, ":80")
 		//}
-		httpctx.SetContextValueInfoFromRequest(t, httpctx.REQUEST_CONTEXT_KEY_IsHttps, https)
+		httpctx.SetContextValueInfoFromRequest(t, httpctx.REQUEST_CONTEXT_ConnectToHTTPS, https)
 		httpctx.SetContextValueInfoFromRequest(t, httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, result)
 		httpctx.SetContextValueInfoFromRequest(t, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, ExtractHost(result))
 		httpctx.SetContextValueInfoFromRequest(t, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, port)
@@ -232,9 +232,11 @@ func generateConnectedToFromHTTPRequest(t *http.Request) (bool, string, int, err
 
 	if ret := strings.LastIndex(host, ":"); ret > 0 {
 		hostname, port = host[:ret], codec.Atoi(host[ret+1:])
+	} else {
+		hostname = host
 	}
 
-	var https = port == 443 || t.TLS != nil
+	var https = port == 443
 	if t.URL.Scheme != "" {
 		if t.URL.Scheme == "https" || t.URL.Scheme == "wss" {
 			https = true
