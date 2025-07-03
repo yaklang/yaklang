@@ -207,11 +207,17 @@ func TestStartCrawler(t *testing.T) {
 		t.Error(err)
 		return
 	}
+	var saveList []interface{}
 	for item := range ch {
+		saveList = append(saveList, item)
 		t.Logf(`%s %s from %s`, item.Method(), item.Url(), item.From())
 	}
 	t.Log(`done!`)
 	t.Log(resultSave)
+	err = OutputData(saveList, "test.txt")
+	if err != nil {
+		t.Error(err)
+	}
 	return
 }
 

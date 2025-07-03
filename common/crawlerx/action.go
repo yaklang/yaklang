@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
+	"github.com/yaklang/yaklang/common/crawlerx/tools"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
@@ -89,10 +90,40 @@ func (starter *BrowserStarter) eventActionOnPage(page *rod.Page) error {
 	return nil
 }
 
+func (starter *BrowserStarter) eventActionOnPageV2(page *rod.Page) error {
+	originUrl, _ := getCurrentUrl(page)
+	err := starter.doInput(originUrl, page)
+	if err != nil {
+		return utils.Errorf(`do input error: %v`, err)
+	}
+	err = starter.extraInputElementsOperator(page)
+	if err != nil {
+		return utils.Errorf(`do extra input error: %v`, err)
+	}
+	selectorQueue, err := getEventElements(page)
+	selectorQueue.Range(func(eventSelector string, pos int) bool {
+		//err = starter.eventElementsExploit(page, originUrl, eventSelector)
+		//if err != nil {
+		//	log.Errorf(`Page %v click element %v error: %v`, originUrl, eventSelector, err.Error())
+		//	return false
+		//}
+		var currentSelectors []string
+		currentSelectors, err = starter.eventElementsExploitV2(page, originUrl, eventSelector)
+		if err != nil {
+			log.Errorf(`Page %v click element %v error: %v`, originUrl, eventSelector, err.Error())
+			return false
+		}
+		selectorQueue.Prepend(pos, currentSelectors...)
+		return true
+	})
+	return err
+}
+
 func (starter *BrowserStarter) ActionOnPage(page *rod.Page) error {
 	if starter.vue {
 		log.Debug("determined vue.")
-		return starter.eventActionOnPage(page)
+		//return starter.eventActionOnPage(page)
+		return starter.eventActionOnPageV2(page)
 	}
 	status, err := starter.vueCheck(page)
 	if err != nil {
@@ -100,7 +131,8 @@ func (starter *BrowserStarter) ActionOnPage(page *rod.Page) error {
 	}
 	if status {
 		log.Debug("presume vue")
-		return starter.eventActionOnPage(page)
+		//return starter.eventActionOnPage(page)
+		return starter.eventActionOnPageV2(page)
 	} else {
 		return starter.normalActionOnPage(page)
 	}
@@ -290,6 +322,23 @@ func (starter *BrowserStarter) generateGetEventElements() func(*rod.Page) ([]str
 		}
 		return results, nil
 	}
+}
+
+func getEventElements(page *rod.Page) (*tools.DynamicQueue, error) {
+	var queue = tools.NewDynamicQueue()
+	elementObjs, err := EvalOnPage(page, getClickEventElement)
+	if err != nil {
+		return queue, utils.Errorf(`page get click event listener elements error: %v`, err)
+	}
+	clickableElementArr := elementObjs.Value.Arr()
+	if len(clickableElementArr) == 0 {
+		log.Debug(`page with no event.`)
+		return queue, nil
+	}
+	for _, element := range clickableElementArr {
+		queue.Enqueue(element.String())
+	}
+	return queue, nil
 }
 
 func (starter *BrowserStarter) generateUrlsExploit() func(string, string) error {
@@ -499,6 +548,38 @@ func (starter *BrowserStarter) newEventElementsExploit() func(*rod.Page, string,
 		}
 		return nil
 	}
+}
+
+func (starter *BrowserStarter) eventElementsExploitV2(page *rod.Page, originUrl string, selector string) ([]string, error) {
+	var (
+		result []string
+		err    error
+	)
+	status := starter.clickElementOnPageBySelector(page, selector)
+	if !status {
+		return result, nil
+	}
+	currentUrl, _ := getCurrentUrl(page)
+	if currentUrl != "" && currentUrl != originUrl {
+		defer page.NavigateBack()
+		err = starter.urlsExploit(originUrl, currentUrl)
+		if err != nil {
+			return result, utils.Errorf(`Url %v from %v exploit error: %v`, currentUrl, originUrl, err.Error())
+		}
+	}
+	// get event selectors
+	var newSelectorQueue *tools.DynamicQueue
+	newSelectorQueue, err = getEventElements(page)
+	if err != nil {
+		return result, err
+	}
+	//clicks, err := EvalOnPage(page, getClickEventElement)
+	//if err != nil {
+	//	return result, err
+	//}
+	//fmt.Println("clicks: ", clicks)
+	result = newSelectorQueue.ToList()
+	return result, nil
 }
 
 func (starter *BrowserStarter) defaultUploadFile(element *rod.Element) error {

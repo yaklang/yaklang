@@ -5,6 +5,7 @@ package crawlerx
 var CrawlerXExports = map[string]interface{}{
 	"StartCrawler":   StartCrawler,
 	"PageScreenShot": NewPageScreenShot,
+	"OutputResult":   OutputData,
 
 	"browserInfo":       WithBrowserInfo,
 	"saveToDB":          WithSaveToDB,
@@ -52,4 +53,5 @@ var CrawlerXExports = map[string]interface{}{
 	"AllDomainScan":       mainDomain,
 	"SubMenuScan":         subDomain,
 	"UnlimitedDomainScan": unlimitedDomain,
+	"BoardDomain":         boardDomain,
 }
