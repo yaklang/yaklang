@@ -21,11 +21,11 @@ func (c *instructionCachePair) GetId() int64 {
 }
 
 const (
-	chanSize    = 200
-	saveSize    = 2000
-	saveTime    = time.Second * 1
-	cacheTTL    = 8 * time.Second
-	fetchIdSize = 100
+	fetchSize = 300
+	saveSize  = 2000
+	saveTime  = time.Second * 1
+	cacheTTL  = 8 * time.Second
+	typeTTL   = 500 * time.Millisecond
 )
 
 type Cache[T any] interface {
@@ -76,10 +76,10 @@ func createInstructionCache(
 
 	// init instruction cache and fetchId
 	fetch := func() []*ssadb.IrCode {
-		result := make([]*ssadb.IrCode, 0, fetchIdSize)
+		result := make([]*ssadb.IrCode, 0, fetchSize)
 		utils.GormTransaction(db, func(tx *gorm.DB) error {
 			// tx := db
-			for len(result) < fetchIdSize {
+			for len(result) < fetchSize {
 				id, irCode := ssadb.RequireIrCode(tx, programName)
 				if utils.IsNil(irCode) || id <= 0 {
 					// return nil // no more id to fetch
@@ -96,7 +96,7 @@ func createInstructionCache(
 		ids := lo.Map(fir, func(item *ssadb.IrCode, _ int) int64 {
 			return item.GetIdInt64()
 		})
-		ssadb.DeleteIRCode(db, ids...)
+		ssadb.DeleteIrCode(db, ids...)
 	}
 
 	save := func(t []*ssadb.IrCode) {
@@ -132,11 +132,11 @@ func createInstructionCache(
 	}
 
 	opts := []databasex.Option{
-		databasex.WithBufferSize(chanSize),
+		databasex.WithBufferSize(fetchSize),
 		databasex.WithSaveSize(saveSize),
 		databasex.WithSaveTimeout(saveTime),
 	}
-	return databasex.NewCache[Instruction, *ssadb.IrCode](
+	return databasex.NewCache(
 		cacheTTL, marshal, fetch, delete, save, load, opts...,
 	)
 }

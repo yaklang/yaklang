@@ -228,10 +228,20 @@ func (r *IrCode) GetSourceCodeContext(n int) string {
 	return result
 }
 
-func DeleteIRCode(DB *gorm.DB, id ...int64) error {
-	db := DB.Model(&IrCode{}).Where("id IN (?)", id).Delete(&IrCode{})
-	for _, i := range id {
-		irCodeCache.Remove(i)
+func DeleteIrCode(DB *gorm.DB, id ...int64) error {
+	// log.Errorf("DeleteIrType: %d", len(id))
+	if len(id) == 0 {
+		return utils.Errorf("delete type from database id is empty")
 	}
-	return db.Error
+	return utils.GormTransaction(DB, func(tx *gorm.DB) error {
+		// split each 999
+		for i := 0; i < len(id); i += 999 {
+			end := i + 999
+			if end > len(id) {
+				end = len(id)
+			}
+			tx.Where("id IN (?)", id[i:end]).Unscoped().Delete(&IrCode{})
+		}
+		return nil
+	})
 }
