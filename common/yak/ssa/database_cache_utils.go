@@ -214,7 +214,7 @@ func createTypeCache(
 		databasex.WithEnableSave(true), // always enable save for type cache
 	}
 
-	return databasex.NewCache[Type, *ssadb.IrType](
+	return databasex.NewCache(
 		typeTTL, marshal, fetch, delete, save, load, opts...,
 	)
 }
