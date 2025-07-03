@@ -460,7 +460,6 @@ const (
 	Yak_UpdateSSARiskDisposals_FullMethodName                     = "/ypb.Yak/UpdateSSARiskDisposals"
 	Yak_DeleteSSARiskDisposals_FullMethodName                     = "/ypb.Yak/DeleteSSARiskDisposals"
 	Yak_GetSSARiskDisposal_FullMethodName                         = "/ypb.Yak/GetSSARiskDisposal"
-	Yak_QuerySSARiskDisposalCreatedUsers_FullMethodName           = "/ypb.Yak/QuerySSARiskDisposalCreatedUsers"
 	Yak_SSARiskFeedbackToOnline_FullMethodName                    = "/ypb.Yak/SSARiskFeedbackToOnline"
 	Yak_GetAllPluginEnv_FullMethodName                            = "/ypb.Yak/GetAllPluginEnv"
 	Yak_QueryPluginEnv_FullMethodName                             = "/ypb.Yak/QueryPluginEnv"
@@ -1089,8 +1088,6 @@ type YakClient interface {
 	UpdateSSARiskDisposals(ctx context.Context, in *UpdateSSARiskDisposalsRequest, opts ...grpc.CallOption) (*UpdateSSARiskDisposalsResponse, error)
 	DeleteSSARiskDisposals(ctx context.Context, in *DeleteSSARiskDisposalsRequest, opts ...grpc.CallOption) (*DeleteSSARiskDisposalsResponse, error)
 	GetSSARiskDisposal(ctx context.Context, in *GetSSARiskDisposalRequest, opts ...grpc.CallOption) (*GetSSARiskDisposalResponse, error)
-	// 查询已经创建SSA Risk处置的用户
-	QuerySSARiskDisposalCreatedUsers(ctx context.Context, in *QuerySSARiskDisposalCreatedUsersRequest, opts ...grpc.CallOption) (*QuerySSARiskDisposalCreatedUsersResponse, error)
 	SSARiskFeedbackToOnline(ctx context.Context, in *SSARiskFeedbackToOnlineRequest, opts ...grpc.CallOption) (*Empty, error)
 	GetAllPluginEnv(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PluginEnvData, error)
 	QueryPluginEnv(ctx context.Context, in *QueryPluginEnvRequest, opts ...grpc.CallOption) (*PluginEnvData, error)
@@ -6196,16 +6193,6 @@ func (c *yakClient) GetSSARiskDisposal(ctx context.Context, in *GetSSARiskDispos
 	return out, nil
 }
 
-func (c *yakClient) QuerySSARiskDisposalCreatedUsers(ctx context.Context, in *QuerySSARiskDisposalCreatedUsersRequest, opts ...grpc.CallOption) (*QuerySSARiskDisposalCreatedUsersResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(QuerySSARiskDisposalCreatedUsersResponse)
-	err := c.cc.Invoke(ctx, Yak_QuerySSARiskDisposalCreatedUsers_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *yakClient) SSARiskFeedbackToOnline(ctx context.Context, in *SSARiskFeedbackToOnlineRequest, opts ...grpc.CallOption) (*Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Empty)
@@ -7423,8 +7410,6 @@ type YakServer interface {
 	UpdateSSARiskDisposals(context.Context, *UpdateSSARiskDisposalsRequest) (*UpdateSSARiskDisposalsResponse, error)
 	DeleteSSARiskDisposals(context.Context, *DeleteSSARiskDisposalsRequest) (*DeleteSSARiskDisposalsResponse, error)
 	GetSSARiskDisposal(context.Context, *GetSSARiskDisposalRequest) (*GetSSARiskDisposalResponse, error)
-	// 查询已经创建SSA Risk处置的用户
-	QuerySSARiskDisposalCreatedUsers(context.Context, *QuerySSARiskDisposalCreatedUsersRequest) (*QuerySSARiskDisposalCreatedUsersResponse, error)
 	SSARiskFeedbackToOnline(context.Context, *SSARiskFeedbackToOnlineRequest) (*Empty, error)
 	GetAllPluginEnv(context.Context, *Empty) (*PluginEnvData, error)
 	QueryPluginEnv(context.Context, *QueryPluginEnvRequest) (*PluginEnvData, error)
@@ -8821,9 +8806,6 @@ func (UnimplementedYakServer) DeleteSSARiskDisposals(context.Context, *DeleteSSA
 }
 func (UnimplementedYakServer) GetSSARiskDisposal(context.Context, *GetSSARiskDisposalRequest) (*GetSSARiskDisposalResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSSARiskDisposal not implemented")
-}
-func (UnimplementedYakServer) QuerySSARiskDisposalCreatedUsers(context.Context, *QuerySSARiskDisposalCreatedUsersRequest) (*QuerySSARiskDisposalCreatedUsersResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method QuerySSARiskDisposalCreatedUsers not implemented")
 }
 func (UnimplementedYakServer) SSARiskFeedbackToOnline(context.Context, *SSARiskFeedbackToOnlineRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SSARiskFeedbackToOnline not implemented")
@@ -16359,24 +16341,6 @@ func _Yak_GetSSARiskDisposal_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Yak_QuerySSARiskDisposalCreatedUsers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(QuerySSARiskDisposalCreatedUsersRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(YakServer).QuerySSARiskDisposalCreatedUsers(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Yak_QuerySSARiskDisposalCreatedUsers_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YakServer).QuerySSARiskDisposalCreatedUsers(ctx, req.(*QuerySSARiskDisposalCreatedUsersRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Yak_SSARiskFeedbackToOnline_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SSARiskFeedbackToOnlineRequest)
 	if err := dec(in); err != nil {
@@ -18712,10 +18676,6 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetSSARiskDisposal",
 			Handler:    _Yak_GetSSARiskDisposal_Handler,
-		},
-		{
-			MethodName: "QuerySSARiskDisposalCreatedUsers",
-			Handler:    _Yak_QuerySSARiskDisposalCreatedUsers_Handler,
 		},
 		{
 			MethodName: "SSARiskFeedbackToOnline",

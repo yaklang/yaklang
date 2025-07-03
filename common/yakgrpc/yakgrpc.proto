@@ -800,8 +800,6 @@ service Yak {
   rpc UpdateSSARiskDisposals(UpdateSSARiskDisposalsRequest) returns (UpdateSSARiskDisposalsResponse);
   rpc DeleteSSARiskDisposals(DeleteSSARiskDisposalsRequest) returns (DeleteSSARiskDisposalsResponse);
   rpc GetSSARiskDisposal(GetSSARiskDisposalRequest) returns (GetSSARiskDisposalResponse);
-  // 查询已经创建SSA Risk处置的用户
-  rpc QuerySSARiskDisposalCreatedUsers(QuerySSARiskDisposalCreatedUsersRequest) returns (QuerySSARiskDisposalCreatedUsersResponse);
 
   rpc SSARiskFeedbackToOnline(SSARiskFeedbackToOnlineRequest) returns (Empty);
 
@@ -6800,28 +6798,25 @@ message SSARiskDisposalData{
   int64 CreatedAt = 2;
   int64 UpdatedAt = 3;
 
-  string User = 4;
-  string Status =5;
-  string Comment = 6;
+  string Status =4;
+  string Comment = 5;
 
-  int64 RiskId = 7;
+  int64 RiskId = 6;
 }
 
 message SSARiskDisposalsFilter {
   repeated int64 ID = 1;
-  repeated string User = 2;
-  repeated string Status = 3;
-  repeated int64 RiskId = 4;
+  repeated string Status = 2;
+  repeated int64 RiskId = 3;
 
   // for fuzz search
-  string Search = 5;
+  string Search = 4;
 }
 
 message CreateSSARiskDisposalsRequest {
   repeated int64 RiskIds = 1;
-  string User = 2 ;
-  string Status = 3;
-  string Comment = 4;
+  string Status = 2;
+  string Comment = 3;
 }
 
 message CreateSSARiskDisposalsResponse {
@@ -6866,13 +6861,6 @@ message GetSSARiskDisposalResponse{
  repeated SSARiskDisposalData Data = 1;
 }
 
-message QuerySSARiskDisposalCreatedUsersRequest{
-
-}
-
-message QuerySSARiskDisposalCreatedUsersResponse{
-  repeated string Users = 1;
-}
 
 message ExportSyntaxFlowsRequest {
   SyntaxFlowRuleFilter Filter = 1;

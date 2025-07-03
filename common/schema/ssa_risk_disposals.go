@@ -9,7 +9,6 @@ import (
 type SSARiskDisposals struct {
 	gorm.Model
 
-	User    string `json:"user" gorm:"index"`
 	Status  string `json:"status" gorm:"index"`
 	Comment string `json:"comment" gorm:"type:text"`
 	RiskId  int64  `json:"risk_id" gorm:"index"`
@@ -18,7 +17,7 @@ type SSARiskDisposals struct {
 }
 
 func (s *SSARiskDisposals) CalcHash() string {
-	return utils.CalcSha1(s.User, s.Status, s.Comment, s.RiskId)
+	return utils.CalcSha1(s.Status, s.Comment, s.RiskId)
 }
 
 func (s *SSARiskDisposals) BeforeCreate() {
@@ -41,7 +40,6 @@ func (s *SSARiskDisposals) ToGRPCModel() *ypb.SSARiskDisposalData {
 		Id:        int64(s.ID),
 		CreatedAt: s.CreatedAt.Unix(),
 		UpdatedAt: s.UpdatedAt.Unix(),
-		User:      s.User,
 		Status:    s.Status,
 		Comment:   s.Comment,
 		RiskId:    s.RiskId,
@@ -55,11 +53,7 @@ const (
 	SSARiskDisposalStatus_NotSet     SSARiskDisposalStatus = "not_set"    // 未处置
 	SSARiskDisposalStatus_NotIssue   SSARiskDisposalStatus = "not_issue"  // 不是问题
 	SSARiskDisposalStatus_Suspicious SSARiskDisposalStatus = "suspicious" // 疑似问题
-
-	SSARiskDisposalStatus_HisrotyIssue SSARiskDisposalStatus = "history_issue" // 历史遗留问题
-	SSARiskDisposalStatus_BadPractice  SSARiskDisposalStatus = "bad_practice"  // 不良实践
-	SSARiskDisposalStatus_QualityIssue SSARiskDisposalStatus = "quality_issue" // 质量问题
-	SSARiskDisposalStatus_Vuln         SSARiskDisposalStatus = "vuln"          // 可利用的漏洞
+	SSARiskDisposalStatus_IsIssue    SSARiskDisposalStatus = "is_issue"   // 存在漏洞
 )
 
 func ValidSSARiskDisposalStatus(s string) SSARiskDisposalStatus {
@@ -68,14 +62,8 @@ func ValidSSARiskDisposalStatus(s string) SSARiskDisposalStatus {
 		return SSARiskDisposalStatus_NotIssue
 	case "suspicious", "possible":
 		return SSARiskDisposalStatus_Suspicious
-	case "history_issue":
-		return SSARiskDisposalStatus_HisrotyIssue
-	case "bad_practice":
-		return SSARiskDisposalStatus_BadPractice
-	case "quality_issue":
-		return SSARiskDisposalStatus_QualityIssue
-	case "exploit", "vuln":
-		return SSARiskDisposalStatus_Vuln
+	case "issue", "is_issue":
+		return SSARiskDisposalStatus_IsIssue
 	default:
 		return SSARiskDisposalStatus_NotSet
 	}
