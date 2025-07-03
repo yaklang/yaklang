@@ -17,7 +17,6 @@ import (
 // SyntaxFlowAnalyzer SyntaxFlow规则分析器
 type SyntaxFlowAnalyzer struct {
 	ruleContent string
-	ruleName    string
 }
 
 // SyntaxFlowRuleAnalyzeResult 完整分析结果
@@ -37,24 +36,25 @@ type SyntaxFlowRuleProblem struct {
 }
 
 // NewSyntaxFlowAnalyzer 创建新的分析器
-func NewSyntaxFlowAnalyzer(ruleContent, ruleName string) *SyntaxFlowAnalyzer {
+func NewSyntaxFlowAnalyzer(ruleContent string) *SyntaxFlowAnalyzer {
 	return &SyntaxFlowAnalyzer{
 		ruleContent: ruleContent,
-		ruleName:    ruleName,
 	}
 }
 
 // GetResponse 获取分析响应
-func (s *SyntaxFlowRuleAnalyzeResult) GetResponse() *ypb.EvaluateSyntaxFlowRuleResponse {
-	res := &ypb.EvaluateSyntaxFlowRuleResponse{
+func (s *SyntaxFlowRuleAnalyzeResult) GetResponse() *ypb.SmokingEvaluatePluginResponse {
+	res := &ypb.SmokingEvaluatePluginResponse{
 		Score: int64(s.Score),
 	}
+	res.Results = make([]*ypb.SmokingEvaluateResult, 0, len(s.Problems))
 	for _, problem := range s.Problems {
-		result := &ypb.SyntaxFlowRuleEvaluateResult{
+		result := &ypb.SmokingEvaluateResult{
 			Item:       problem.Type,
 			Suggestion: problem.Suggestion,
-			Range:      problem.Range,
-			Severity:   problem.Severity,
+
+			Range:    problem.Range,
+			Severity: problem.Severity,
 		}
 		res.Results = append(res.Results, result)
 	}
@@ -247,7 +247,7 @@ func BatchAnalyze(rules map[string]string) map[string]*SyntaxFlowRuleAnalyzeResu
 	results := make(map[string]*SyntaxFlowRuleAnalyzeResult)
 
 	for name, content := range rules {
-		analyzer := NewSyntaxFlowAnalyzer(content, name)
+		analyzer := NewSyntaxFlowAnalyzer(content)
 		results[name] = analyzer.Analyze()
 
 		log.Infof("分析规则 %s: 得分 %d/100", name, results[name].Score)
