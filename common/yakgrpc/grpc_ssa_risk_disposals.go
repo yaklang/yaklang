@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -70,7 +71,7 @@ func (s *Server) UpdateSSARiskDisposals(ctx context.Context, req *ypb.UpdateSSAR
 	})
 	return &ypb.UpdateSSARiskDisposalsResponse{
 		Data: result,
-	}, err
+	}, nil
 }
 
 func (s *Server) GetSSARiskDisposal(ctx context.Context, req *ypb.GetSSARiskDisposalRequest) (*ypb.GetSSARiskDisposalResponse, error) {
@@ -91,12 +92,5 @@ func (s *Server) GetSSARiskDisposal(ctx context.Context, req *ypb.GetSSARiskDisp
 	})
 	return &ypb.GetSSARiskDisposalResponse{
 		Data: result,
-	}, nil
-}
-
-func (s *Server) QuerySSARiskDisposalCreatedUsers(ctx context.Context, req *ypb.QuerySSARiskDisposalCreatedUsersRequest) (*ypb.QuerySSARiskDisposalCreatedUsersResponse, error) {
-	users := yakit.GetSSARiskDisposalsCreatedUsers(s.GetSSADatabase())
-	return &ypb.QuerySSARiskDisposalCreatedUsersResponse{
-		Users: users,
 	}, nil
 }
