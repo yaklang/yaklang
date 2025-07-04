@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"golang.org/x/exp/maps"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
+
+	"golang.org/x/exp/maps"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1248,4 +1249,22 @@ Host: www.example.com
 			t.Fatal("expect: ", expect, "actual: ", actual)
 		}
 	}
+}
+
+func TestGRPCMUSTPASS_HTTPFuzzerTaskToYaml_RenderFuzztagParamsToNucleiParams(t *testing.T) {
+	packet := `
+POST / HTTP/1.1
+Content-Type: application/json
+Host: www.example.com
+
+{{params(data)}}
+`
+	packet = RenderFuzztagParamsToNucleiParams(packet)
+	assert.Equal(t, packet, `
+POST / HTTP/1.1
+Content-Type: application/json
+Host: www.example.com
+
+{{data}}
+`)
 }
