@@ -282,6 +282,7 @@ func (n *anValue) SetKey(k Value) {
 }
 
 func (n *anValue) GetKey() Value {
+	log.Debugf("anValue.GetKey()  %v(%v) key: %v(%v)", n.Self(), n.GetId(), n.key, n.GetValueById(n.key))
 	return n.GetValueById(n.key)
 }
 
@@ -295,10 +296,15 @@ func (n *anValue) IsObject() bool {
 func (n *anValue) AddMember(k, v Value) {
 	// n.member = append(n.member, v)
 	// n.member[k] = v
+	if n.GetId() == 15 && k.GetId() == 29 {
+		log.Errorf("ab")
+	}
+	log.Debugf("anValue %v(%v).AddMember() key: %v(%v), value: %v(%v)", n.Self(), n.GetId(), k, k.GetId(), v, v.GetId())
 	n.member.Set(k.GetId(), v.GetId())
 }
 
 func (n *anValue) DeleteMember(k Value) {
+	log.Debugf("anValue %v(%v).DeleteMember() key: %v(%v)", n.Self(), n.GetId(), k, k.GetId())
 	n.member.Delete(k.GetId())
 }
 
@@ -349,6 +355,8 @@ func (n *anValue) GetAllMember() map[Value]Value {
 	return lo.MapEntries(n.member.GetMap(), func(key int64, value int64) (Value, Value) {
 		k := n.GetValueById(key)
 		v := n.GetValueById(value)
+		log.Debugf("anValue %v(%v).GetAllMember() key: %v(%v), value: %v(%v)", n.Self(), n.GetId(), k, key, v, value)
+
 		if utils.IsNil(v) {
 			log.Errorf("BUG in anValue.GetAllMember(), value is nil for key: %v", key)
 		}

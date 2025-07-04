@@ -69,6 +69,13 @@ var SSAOpcode2Name = map[Opcode]string{
 	SSAOpcodeFunction:        "Function",
 }
 
+func (op Opcode) String() string {
+	if name, ok := SSAOpcode2Name[op]; ok {
+		return name
+	}
+	return "UnKnow"
+}
+
 func (i *Function) GetOpcode() Opcode   { return SSAOpcodeFunction }
 func (i *BasicBlock) GetOpcode() Opcode { return SSAOpcodeBasicBlock }
 func (i *BasicBlock) _GetRange() memedit.RangeIf {

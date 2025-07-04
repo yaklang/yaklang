@@ -23,6 +23,7 @@ func (p *Program) SetVirtualRegister(i Instruction) {
 		return
 	}
 	p.Cache.SetInstruction(i)
+	log.Debugf("SetVirtualRegister: %s(%d) to program", i, i.GetId())
 }
 
 func (p *Program) GetInstructionById(id int64) Instruction {

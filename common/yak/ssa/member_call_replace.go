@@ -7,6 +7,12 @@ import (
 // ReplaceMemberCall replace all member or object relationship
 // and will fixup method function call
 func ReplaceMemberCall(v, to Value) map[string]Value {
+
+	log.Debugf("ReplaceMemberCall name  v [%v][%v](%v) ->  to [%v][%v](%v)",
+		v, v.GetOpcode().String(), v.GetId(),
+		to, to.GetOpcode().String(), to.GetId(),
+	)
+
 	ret := make(map[string]Value)
 	builder := v.GetFunc().builder
 	recoverScope := builder.SetCurrent(v)

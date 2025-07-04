@@ -43,6 +43,11 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 		// step 1
 		// this  value not change in this loop, should replace phi-value to header value
 		if phiValue == latch {
+			log.Debugf("Replace name(%v) phiValue [%v][%v](%v) to [%v][%v](%v)",
+				name,
+				phiValue, phiValue.GetOpcode().String(), phiValue.GetId(),
+				header, header.GetOpcode().String(), header.GetId(),
+			)
 			ReplaceAllValue(phiValue, header)
 			DeleteInst(phiValue)
 
