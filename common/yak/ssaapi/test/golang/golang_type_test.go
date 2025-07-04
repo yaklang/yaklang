@@ -110,6 +110,53 @@ func Test_Struct(t *testing.T) {
 	})
 }
 
+func Test_FullTypeName(t *testing.T) {
+	t.Run("fulltype name fakeimport", func(t *testing.T) {
+		code := `package main
+
+import (
+	"encoding/base64"
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"net/http"
+	"os/exec"
+)
+
+func CMD1(c *gin.Context) {
+	var ipaddr string
+	// Check the request method
+	if c.Request.Method == "GET" {
+		ipaddr = c.Query("ip")
+	} else if c.Request.Method == "POST" {
+		ipaddr = c.PostForm("ip")
+	}
+
+	Command := fmt.Sprintf("ping -c 4 %s", ipaddr)
+	output, err := exec.Command("/bin/sh", "-c", Command).Output()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	c.JSON(200, gin.H{
+		"success": string(output),
+	})
+}
+		`
+
+		ssatest.CheckSyntaxFlowEx(t, code, `
+exec?{<fullTypeName>?{have: 'os/exec'}} as $entry
+$entry.Command(* #-> as $sink) 
+
+*.Query(* #-> as $param)
+$param?{<fullTypeName>?{have: 'github.com/gin-gonic/gin'}} as $input
+
+$sink & $input as $high;
+		`, true, map[string][]string{
+			"high": {"Parameter-c"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
+}
+
 func Test_Template(t *testing.T) {
 	t.Run("type", func(t *testing.T) {
 		code := `package main
