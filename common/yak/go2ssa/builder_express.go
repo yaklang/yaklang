@@ -36,7 +36,7 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) 
 		}
 	}
 
-	fmt.Printf("exp = %v\n", exp.GetText())
+	// fmt.Printf("exp = %v\n", exp.GetText())
 
 	if ret := exp.PrimaryExpr(); ret != nil {
 		return b.buildPrimaryExpression(ret.(*gol.PrimaryExprContext), islValue)
@@ -214,6 +214,8 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 	var rightv ssa.Value = nil
 	var handleObjectType func(ssa.Value, *ssa.ObjectType)
 
+	// fmt.Printf("exp = %v\n", exp.GetText())
+
 	if IslValue {
 		rv, _ := b.buildPrimaryExpression(exp.PrimaryExpr().(*gol.PrimaryExprContext), false)
 
@@ -286,11 +288,11 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 				_ = a
 			}
 
-			readMemberCall := func(rv, key ssa.Value) ssa.Value {
+			readMemberCall := func(rv, key ssa.Value) (ssa.Value, bool) {
 				if len(isFunction) > 0 && isFunction[0] {
-					return b.ReadMemberCallMethod(rv, key)
+					return b.ReadMemberCallMethod(rv, key), false
 				}
-				return b.ReadMemberCallValue(rv, key)
+				return b.ReadMemberCallValue(rv, key), true
 			}
 
 			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
@@ -309,16 +311,13 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 						/*
 						 a.A.b
 						*/
-						rvt := rv
 						if key := a.GetKeybyName(text); !utils.IsNil(key) {
-							rvt = b.ReadMemberCallValueByName(rv, n)
-							if rvt == nil {
-								rvt = readMemberCall(rv, key)
-								rightv = rvt
-								break
+							rightv = b.ReadMemberCallValueByName(rv, n)
+							if rightv == nil {
+								rightv, _ = readMemberCall(rv, b.EmitConstInstPlaceholder(text))
 							}
 						}
-						handleObjectType(rvt, a)
+						handleObjectType(rightv, a)
 					}
 				}
 			}
@@ -330,8 +329,12 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			}
 
 			if rightv == nil {
-				rightv = readMemberCall(rv, b.EmitConstInstPlaceholder(text))
-				rightv.SetType(HandleFullTypeNames(rightv.GetType(), rv.GetType().GetFullTypeNames()))
+				var ok bool
+				if rightv, ok = readMemberCall(rv, b.EmitConstInstPlaceholder(text)); ok {
+					rightv.SetType(HandleFullTypeNames(rv.GetType(), rv.GetType().GetFullTypeNames()))
+				} else {
+					rightv.SetType(HandleFullTypeNames(rightv.GetType(), rv.GetType().GetFullTypeNames()))
+				}
 			}
 			// log.Infof("rightv = %v", rightv)
 			// log.Infof("rightv type = %v", rightv.GetType())

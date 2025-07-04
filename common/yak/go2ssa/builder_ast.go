@@ -2027,6 +2027,7 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 		if exportType == nil {
 			exportType = ssa.CreateAnyType()
 		}
+		exportType.AddFullTypeName(path)
 		return exportType
 	} else {
 		name := tname.IDENTIFIER().GetText()
