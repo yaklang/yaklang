@@ -42,10 +42,8 @@ func TestNewFetch(t *testing.T) {
 			return mockItems
 		}
 
-		wg := &sync.WaitGroup{}
 		fetch := databasex.NewFetch(fetchFromDB,
 			databasex.WithBufferSize(10),
-			databasex.WithWaitGroup(wg),
 		)
 		assert.NotNil(t, fetch)
 
@@ -130,7 +128,7 @@ func TestCloseWithDelete(t *testing.T) {
 		}
 
 		var deletedItems []FetchTestItem
-		deleteFunc := func(items ...FetchTestItem) {
+		deleteFunc := func(items []FetchTestItem) {
 			deletedItems = append(deletedItems, items...)
 		}
 

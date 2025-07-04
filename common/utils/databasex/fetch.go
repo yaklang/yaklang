@@ -2,9 +2,7 @@ package databasex
 
 import (
 	"context"
-	"reflect"
 	"sync"
-	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -52,7 +50,6 @@ func (f *Fetch[T]) fillBuffer() {
 				continue
 			}
 			items := f.fetchFromDB()
-			log.Errorf("Fetch: fetched %d items %v", len(items), reflect.TypeOf(items).String())
 			for index, item := range items {
 				_ = index
 				if utils.IsNil(item) {
@@ -76,14 +73,8 @@ func (f *Fetch[T]) Fetch() (T, error) {
 // Close stops the background goroutine and closes the buffer channel.
 func (f *Fetch[T]) Close(delete ...func([]T)) {
 	// stop the background goroutine
-	var zero T
-	log.Errorf("fetch cancel %v", reflect.TypeOf(zero).String())
 	f.cancel()
-	log.Errorf("fetch wait ")
-	start := time.Now()
 	f.wg.Wait()
-	since := time.Since(start)
-	log.Errorf("fetch wait done %v", since)
 
 	// close the buffer channel
 	f.buffer.Close()
