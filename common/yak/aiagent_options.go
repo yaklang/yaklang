@@ -146,14 +146,21 @@ var (
 func NewLiteForge(name string, opts ...any) (*aiforge.LiteForge, error) {
 	var extendAIDOptions []aid.Option
 	var liteForgeOpts []aiforge.LiteForgeOption
+	var aiagent = NewAgent()
 	for _, opt := range opts {
 		switch o := opt.(type) {
 		case aiforge.LiteForgeOption:
 			liteForgeOpts = append(liteForgeOpts, o)
 		case aid.Option:
 			extendAIDOptions = append(extendAIDOptions, o)
+		case AIAgentOption:
+			if err := o(aiagent); err != nil {
+				log.Errorf("failed to apply agent option: %v", err)
+				return nil, err
+			}
 		}
 	}
+	extendAIDOptions = append(extendAIDOptions, aiagent.AIDOptions()...)
 	return aiforge.NewLiteForge(name, append(liteForgeOpts, aiforge.WithExtendLiteForge_AIDOption(extendAIDOptions...))...)
 }
 

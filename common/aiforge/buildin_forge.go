@@ -115,6 +115,10 @@ func init() {
 		registerBuildInForge("forge_triage")
 		registerBuildInForge("biography")
 		registerBuildInForge("intent_recognition")
+		registerBuildInForge("entity_identify")
+		registerBuildInForge("log_event_formatter")
+		registerBuildInForge("event_analyzer")
+		registerBuildInForge("web_log_monitor")
 		return nil
 	})
 }

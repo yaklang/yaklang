@@ -139,8 +139,9 @@ var FunkExports = map[string]interface{}{
 		debug.FreeOSMemory()
 		debug.SetGCPercent(8)
 	},
-	"GCPercent":  debug.SetGCPercent,
-	"NewReducer": reducer.NewReducer,
+	"GCPercent":       debug.SetGCPercent,
+	"NewReducer":      reducer.NewReducer,
+	"NewEventWatcher": utils.NewEntityWatcher,
 }
 
 func min(i interface{}) interface{} {

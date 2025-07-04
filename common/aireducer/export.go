@@ -10,4 +10,6 @@ var Exports = map[string]any{
 	"timeTriggerIntervalSeconds": WithTimeTriggerIntervalSeconds,
 	"context":                    WithContext,
 	"memory":                     WithMemory,
+
+	"separator": WithSeparatorTrigger,
 }

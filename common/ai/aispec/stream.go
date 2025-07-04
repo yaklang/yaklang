@@ -158,11 +158,11 @@ func appendStreamHandlerPoCOptionEx(opts []poc.PocConfigOption) (io.Reader, io.R
 				}
 				if !handled {
 					if ret := codec.AnyToString(jsonpath.Find(j, `$..finish_reason`)); utils.IContains(ret, "stop") {
-						log.Info("finished normal")
+						//log.Info("finished normal")
 					} else if strings.TrimRight(codec.AnyToString(jsonpath.Find(j, `$..error`)), "[]\"'") != "" {
 						log.Errorf("error for stream fetching: %v", j)
 					} else {
-						log.Infof("extra ai stream json: %v", j)
+						//log.Infof("extra ai stream json: %v", j)
 					}
 				}
 			}
