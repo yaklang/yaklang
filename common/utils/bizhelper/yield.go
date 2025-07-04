@@ -2,6 +2,7 @@ package bizhelper
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -119,30 +120,10 @@ func YieldModelToMapEx(ctx context.Context, db *gorm.DB, countCallback func(int)
 				return
 			default:
 			}
-			columns := make([]interface{}, len(cols))
-			columnPointers := make([]interface{}, len(cols))
-			for i := range columns {
-
-				columnPointers[i] = &columns[i]
-			}
-
-			if err := rows.Scan(columnPointers...); err != nil {
-				return
-			}
-
-			m := make(map[string]interface{})
-			for i, colName := range cols {
-				val := columnPointers[i].(*interface{})
-				m[colName] = *val
-				colDBType := strings.ToLower(colTypes[i].DatabaseTypeName())
-				if colDBType == "bool" || colDBType == "boolean" {
-					v := (*val).(int64)
-					if v == 1 {
-						m[colName] = true
-					} else {
-						m[colName] = false
-					}
-				}
+			m, err := RawToMap(rows, cols, colTypes)
+			if err != nil {
+				log.Errorf("failed to convert row to map: %s", err)
+				continue
 			}
 			select {
 			case <-ctx.Done():
@@ -152,4 +133,33 @@ func YieldModelToMapEx(ctx context.Context, db *gorm.DB, countCallback func(int)
 		}
 	}()
 	return outC, nil
+}
+
+func RawToMap(rows *sql.Rows, cols []string, colTypes []*sql.ColumnType) (map[string]any, error) {
+	columns := make([]interface{}, len(cols))
+	columnPointers := make([]interface{}, len(cols))
+	for i := range columns {
+
+		columnPointers[i] = &columns[i]
+	}
+
+	if err := rows.Scan(columnPointers...); err != nil {
+		return nil, err
+	}
+
+	m := make(map[string]interface{})
+	for i, colName := range cols {
+		val := columnPointers[i].(*interface{})
+		m[colName] = *val
+		colDBType := strings.ToLower(colTypes[i].DatabaseTypeName())
+		if colDBType == "bool" || colDBType == "boolean" {
+			v := (*val).(int64)
+			if v == 1 {
+				m[colName] = true
+			} else {
+				m[colName] = false
+			}
+		}
+	}
+	return m, nil
 }
