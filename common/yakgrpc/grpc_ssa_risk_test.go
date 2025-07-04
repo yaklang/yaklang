@@ -394,7 +394,7 @@ func TestGRPCMUSTPASS_QuerySSARisks_LatestDisposalStatus(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Len(t, queryResp.Data, 1)
-		require.Equal(t, "not_set", queryResp.Data[0].DisposalStatus)
+		require.Equal(t, "not_set", queryResp.Data[0].LatestDisposalStatus)
 	})
 
 	// 为riskId1创建一个处置记录
@@ -414,7 +414,7 @@ func TestGRPCMUSTPASS_QuerySSARisks_LatestDisposalStatus(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Len(t, queryResp.Data, 1)
-		require.Equal(t, "is_issue", queryResp.Data[0].DisposalStatus)
+		require.Equal(t, "is_issue", queryResp.Data[0].LatestDisposalStatus)
 	})
 
 	// 稍等一下确保时间戳不同
@@ -437,7 +437,7 @@ func TestGRPCMUSTPASS_QuerySSARisks_LatestDisposalStatus(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Len(t, queryResp.Data, 1)
-		require.Equal(t, "not_issue", queryResp.Data[0].DisposalStatus)
+		require.Equal(t, "not_issue", queryResp.Data[0].LatestDisposalStatus)
 	})
 
 	// 为riskId2创建处置记录
@@ -461,7 +461,7 @@ func TestGRPCMUSTPASS_QuerySSARisks_LatestDisposalStatus(t *testing.T) {
 		// 建立ID到处置状态的映射
 		statusMap := make(map[int64]string)
 		for _, risk := range queryResp.Data {
-			statusMap[risk.Id] = risk.DisposalStatus
+			statusMap[risk.Id] = risk.LatestDisposalStatus
 		}
 
 		// 验证各风险的处置状态
@@ -488,7 +488,7 @@ func TestGRPCMUSTPASS_QuerySSARisks_LatestDisposalStatus(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Len(t, queryResp.Data, 1)
-		require.Equal(t, "is_issue", queryResp.Data[0].DisposalStatus, "应该返回最新的resolved状态")
+		require.Equal(t, "is_issue", queryResp.Data[0].LatestDisposalStatus)
 	})
 
 	// 测试场景6：通过搜索条件查询，验证处置状态仍然正确
@@ -505,7 +505,7 @@ func TestGRPCMUSTPASS_QuerySSARisks_LatestDisposalStatus(t *testing.T) {
 		foundRisk1 := false
 		for _, risk := range queryResp.Data {
 			if risk.Id == riskId1 {
-				require.Equal(t, "is_issue", risk.DisposalStatus)
+				require.Equal(t, "is_issue", risk.LatestDisposalStatus)
 				foundRisk1 = true
 				break
 			}
