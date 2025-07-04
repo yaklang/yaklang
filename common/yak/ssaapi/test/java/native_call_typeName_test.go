@@ -277,6 +277,40 @@ func TestParamTypeName(t *testing.T) {
 	}, ssaapi.WithLanguage(consts.JAVA))
 }
 
+func TestTypeMergeWithUndefinedAndByteArray(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("A.java",
+		`public class Jdbc {
+
+    /**
+     * <a href="https://github.com/JoyChou93/java-sec-code/wiki/CVE-2022-21724">CVE-2022-21724</a>
+     */ 
+    @RequestMapping("/postgresql")
+    public void postgresql(String jdbcUrlBase64) throws Exception{
+        byte[] b = java.util.Base64.getDecoder().decode(jdbcUrlBase64);
+        String jdbcUrl = new String(b);
+        log.info(jdbcUrl);
+        DriverManager.getConnection(jdbcUrl);
+    }
+
+    private String getImgBase64(String imgFile) throws IOException {
+        File f = new File(imgFile);
+        byte[] data = Files.readAllBytes(Paths.get(imgFile)); //FIXME: this not match 
+        return new String(Base64.encodeBase64(data));
+    }
+}
+		    `)
+	ssatest.CheckWithFS(vf, t, func(progs ssaapi.Programs) error {
+		prog := progs[0]
+		prog.Show()
+
+		obj := prog.SyntaxFlowChain(`String() as $string_constructor 
+$string_constructor?{<getActualParams()>* <fullTypeName()><var("aaa")>?{have:"byte"}} as $target `)
+		assert.Contains(t, obj.String(), "byte")
+		return nil
+	}, ssaapi.WithLanguage(consts.JAVA))
+}
+
 func TestTypeNamePriority(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("A.java",

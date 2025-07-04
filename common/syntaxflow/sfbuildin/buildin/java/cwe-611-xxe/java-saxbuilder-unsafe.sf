@@ -220,7 +220,7 @@ UNSAFE
 
 desc(
 	lang: "java"
-	"file://safefile.java": <<<SAFE
+	"safefile://safefile.java": <<<SAFE
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.input.SAXBuilder;
