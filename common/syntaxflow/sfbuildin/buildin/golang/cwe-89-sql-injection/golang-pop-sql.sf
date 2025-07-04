@@ -116,8 +116,9 @@ REFERENCE
 )
 
 <include('golang-database-pop')> as $sink;
+<include('golang-user-input')> as $input;
 $sink.RawQuery(* #-> as $param);
-$param?{have: 'Parameter'} as $high;
+$param & $input as $high;
 
 alert $high for {
 	type: "vuln",

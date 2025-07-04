@@ -1,0 +1,54 @@
+desc(
+	title: "Audit Golang User Input"
+	type: audit
+	level: info
+	lib: 'golang-user-input'
+	desc: <<<DESC
+### 规则描述
+
+#### 1. 规则目的
+用于判断关键参数是否可以由用户控制。
+DESC
+	rule_id: "d47f5ca9-7bab-441d-bc3b-8c642bac9e95"
+	title_zh: "用于判断关键参数是否可以由用户控制"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用安全的模板引擎
+通过使用Go语言内置的`html/template`包自动转义用户输入，避免直接拼接HTML内容。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')](https://cwe.mitre.org/data/definitions/79.html)
+[OWASP XSS Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html)
+REFERENCE
+)
+
+<include('golang-http-sink')> as $output;
+
+alert $output for {
+	level: "info",
+	title: "Audit Golang User Input",
+	title_zh: "用于判断关键参数是否可以由用户控制",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://user_input.go': <<<PARAM
+package main
+
+import (
+    "fmt"
+    "os/exec"
+	"net/http"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func main() {
+	http.HandleFunc("/", handler)
+}
+PARAM
+)
