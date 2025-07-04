@@ -8,16 +8,16 @@ import (
 
 type SSARiskDisposals struct {
 	gorm.Model
+	SSARiskID int64 `json:"risk_id" gorm:"index"`
 
 	Status  string `json:"status" gorm:"index"`
 	Comment string `json:"comment" gorm:"type:text"`
-	RiskId  int64  `json:"risk_id" gorm:"index"`
 
 	Hash string `json:"hash" gorm:"unique_index"`
 }
 
 func (s *SSARiskDisposals) CalcHash() string {
-	return utils.CalcSha1(s.Status, s.Comment, s.RiskId)
+	return utils.CalcSha1(s.Status, s.Comment, s.SSARiskID)
 }
 
 func (s *SSARiskDisposals) BeforeCreate() {
@@ -35,6 +35,25 @@ func (s *SSARiskDisposals) BeforeSave() {
 	s.Status = string(ValidSSARiskDisposalStatus(s.Status))
 }
 
+func (s *SSARiskDisposals) AfterCreate(tx *gorm.DB) error {
+	return s.updateRiskLatestDisposalStatus(tx)
+}
+
+func (s *SSARiskDisposals) AfterUpdate(tx *gorm.DB) error {
+	return s.updateRiskLatestDisposalStatus(tx)
+}
+
+func (s *SSARiskDisposals) AfterDelete(tx *gorm.DB) error {
+	return s.updateRiskLatestDisposalStatus(tx)
+}
+
+// updateRiskLatestDisposalStatus用于更新SSARisk的最新处置状态
+func (s *SSARiskDisposals) updateRiskLatestDisposalStatus(tx *gorm.DB) error {
+	return tx.Model(&SSARisk{}).
+		Where("id = ?", s.SSARiskID).
+		Update("latest_disposal_status", s.Status).Error
+}
+
 func (s *SSARiskDisposals) ToGRPCModel() *ypb.SSARiskDisposalData {
 	return &ypb.SSARiskDisposalData{
 		Id:        int64(s.ID),
@@ -42,7 +61,7 @@ func (s *SSARiskDisposals) ToGRPCModel() *ypb.SSARiskDisposalData {
 		UpdatedAt: s.UpdatedAt.Unix(),
 		Status:    s.Status,
 		Comment:   s.Comment,
-		RiskId:    s.RiskId,
+		RiskId:    s.SSARiskID,
 	}
 }
 
