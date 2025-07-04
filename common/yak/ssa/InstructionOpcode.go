@@ -69,6 +69,13 @@ var SSAOpcode2Name = map[Opcode]string{
 	SSAOpcodeFunction:        "Function",
 }
 
+func (op Opcode) String() string {
+	if name, ok := SSAOpcode2Name[op]; ok {
+		return name
+	}
+	return "UnKnow"
+}
+
 func (i *Function) GetOpcode() Opcode   { return SSAOpcodeFunction }
 func (i *BasicBlock) GetOpcode() Opcode { return SSAOpcodeBasicBlock }
 func (i *BasicBlock) _GetRange() memedit.RangeIf {
@@ -78,26 +85,27 @@ func (i *BasicBlock) _GetRange() memedit.RangeIf {
 	if i.anValue.R != nil {
 		return i.anValue.R
 	}
-	if len(i.Insts) == 1 {
-		return i.GetInstructionById(i.Insts[0]).GetRange()
-	} else if len(i.Insts) > 1 {
-		first := i.GetInstructionById(i.Insts[0])
-		last := i.GetInstructionById(i.Insts[len(i.Insts)-1])
-		firstRange := first.GetRange()
-		lastRange := last.GetRange()
-		if firstRange != nil && lastRange != nil {
-			return first.GetRange().GetEditor().GetRangeOffset(firstRange.GetStartOffset(), lastRange.GetEndOffset())
-		}
-	}
+	// if len(i.Insts) == 1 {
+	// 	return i.GetInstructionById(i.Insts[0]).GetRange()
+	// } else if len(i.Insts) > 1 {
+	// 	first := i.GetInstructionById(i.Insts[0])
+	// 	last := i.GetInstructionById(i.Insts[len(i.Insts)-1])
+	// 	firstRange := first.GetRange()
+	// 	lastRange := last.GetRange()
+	// 	if firstRange != nil && lastRange != nil {
+	// 		return first.GetRange().GetEditor().GetRangeOffset(firstRange.GetStartOffset(), lastRange.GetEndOffset())
+	// 	}
+	// }
 	return nil
 }
-func (i *BasicBlock) GetRange() memedit.RangeIf {
-	result := i._GetRange()
-	if result != nil && i.anValue.R == nil {
-		i.SetRange(result)
-	}
-	return result
-}
+
+// func (i *BasicBlock) GetRange() memedit.RangeIf {
+// 	result := i._GetRange()
+// 	if result != nil && i.anValue.R == nil {
+// 		i.SetRange(result)
+// 	}
+// 	return result
+// }
 
 func (i *Function) _GetRange() memedit.RangeIf {
 	if i == nil || i.anValue.id <= 0 {
@@ -121,13 +129,13 @@ func (i *Function) _GetRange() memedit.RangeIf {
 	return nil
 }
 
-func (i *Function) GetRange() memedit.RangeIf {
-	result := i._GetRange()
-	if result != nil && i.anValue.R == nil {
-		i.SetRange(result)
-	}
-	return result
-}
+// func (i *Function) GetRange() memedit.RangeIf {
+// result := i._GetRange()
+// if result != nil && i.anValue.R == nil {
+// 	i.SetRange(result)
+// }
+// return result
+// }
 
 func (i *ParameterMember) GetOpcode() Opcode { return SSAOpcodeParameterMember }
 func (i *Parameter) GetOpcode() Opcode {

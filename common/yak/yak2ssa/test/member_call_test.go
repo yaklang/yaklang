@@ -7,7 +7,9 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -322,6 +324,28 @@ func Test_CallMember_Cfg(t *testing.T) {
 			require.Contains(t, values.String(), "1")
 			return nil
 		}, ssaapi.WithLanguage(ssaapi.Yak))
+	})
+
+	t.Run("test loop pass", func(t *testing.T) {
+		code := `
+package a.b.c; 
+class A {
+    private String getRealJsonpFunc(HttpServletRequest req) {
+        String reqCallback = null;
+        for (String callback: this.callbacks) {
+            reqCallback = req.getParameter(callback);
+        }
+        return reqCallback;
+    }
+}
+`
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("A.java", code)
+
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			require.NotNil(t, prog)
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
 	})
 
 	t.Run("test loop", func(t *testing.T) {

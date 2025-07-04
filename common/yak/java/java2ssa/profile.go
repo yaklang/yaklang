@@ -1,10 +1,11 @@
 package java2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 var (
@@ -57,7 +58,6 @@ func ShowJavaCompilingCost() {
 }
 
 func init() {
-	ssa.RegisterCostCallback(ShowJavaCompilingCost)
 }
 
 func (y *builder) AssignVariable(variable *ssa.Variable, val ssa.Value) {

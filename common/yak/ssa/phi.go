@@ -2,9 +2,9 @@ package ssa
 
 import (
 	"fmt"
-	"runtime"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 	"golang.org/x/exp/slices"
 )
@@ -43,6 +43,11 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 		// step 1
 		// this  value not change in this loop, should replace phi-value to header value
 		if phiValue == latch {
+			log.Debugf("Replace name(%v) phiValue [%v][%v](%v) to [%v][%v](%v)",
+				name,
+				phiValue, phiValue.GetOpcode().String(), phiValue.GetId(),
+				header, header.GetOpcode().String(), header.GetId(),
+			)
 			ReplaceAllValue(phiValue, header)
 			DeleteInst(phiValue)
 
@@ -131,13 +136,13 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 	return func(name string, vst []Value) Value {
 		defer func() {
 			if msg := recover(); msg != nil {
-				var buffer = make([]byte, 4096)
-				stack := runtime.Stack(buffer, false)
-				fmt.Println("报错原因：" + string(buffer[:stack]))
+				log.Errorf("generatePhi panic: %s", msg)
 				fmt.Println("name: " + name)
 				for _, value := range vst {
 					fmt.Println("verbose: " + value.GetShortVerboseName())
 				}
+				utils.PrintCurrentGoroutineRuntimeStack()
+
 			}
 		}()
 		if block != nil {

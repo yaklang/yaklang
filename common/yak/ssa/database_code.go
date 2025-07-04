@@ -4,10 +4,41 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
+func marshalInstruction(cache *ProgramCache, inst Instruction, irCode *ssadb.IrCode) bool {
+	if utils.IsNil(inst) || utils.IsNil(irCode) {
+		log.Errorf("BUG: marshalInstruction called with nil instruction")
+		return false
+	}
+	if inst.GetId() == -1 {
+		log.Errorf("[BUG]: instruction id is -1: %s", codec.AnyToString(inst))
+		return false
+	}
+
+	// all instruction from database will be lazy instruction
+	if lz, ok := ToLazyInstruction(inst); ok {
+		// we just check if this lazy-instruction should be saved again?
+		if !lz.ShouldSave() {
+			return false
+		}
+	}
+
+	err := Instruction2IrCode(cache, inst, irCode)
+	if err != nil {
+		log.Errorf("FitIRCode error: %s", err)
+		return false
+	}
+
+	if irCode.Opcode == 0 {
+		log.Errorf("BUG: saveInstruction called with empty opcode: %v", inst.GetName())
+	}
+	return true
+}
+
 // Instruction2IrCode : marshal instruction to ir code, used in cache, to save to database
-func Instruction2IrCode(inst Instruction, ir *ssadb.IrCode) error {
+func Instruction2IrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) error {
 	if ir.ID != uint(inst.GetId()) {
 		return utils.Errorf("marshal instruction id not match")
 	}
@@ -16,23 +47,22 @@ func Instruction2IrCode(inst Instruction, ir *ssadb.IrCode) error {
 	}
 
 	instruction2IrCode(inst, ir)
-	value2IrCode(inst, ir)
+	value2IrCode(cache, inst, ir)
 
 	function2IrCode(inst, ir)
 	basicBlock2IrCode(inst, ir)
-	ir.SetExtraInfo(marshalExtraInformation(inst))
-	SaveValueOffset(inst)
+	ir.SetExtraInfo(marshalExtraInformation(cache, inst))
 	return nil
 }
 
 // IrCodeToInstruction : unmarshal ir code to instruction, used in LazyInstruction
-func (c *Cache) IrCodeToInstruction(inst Instruction, ir *ssadb.IrCode) Instruction {
+func (c *ProgramCache) IrCodeToInstruction(inst Instruction, ir *ssadb.IrCode, cache *ProgramCache) Instruction {
 	instructionFromIrCode(inst, ir)
-	c.valueFromIrCode(inst, ir)
+	c.valueFromIrCode(cache, inst, ir)
 	basicBlockFromIrCode(inst, ir)
 
 	// extern info
-	unmarshalExtraInformation(inst, ir)
+	unmarshalExtraInformation(cache, inst, ir)
 
 	return inst
 }
@@ -50,17 +80,24 @@ func fitRange(c *ssadb.IrCode, rangeIns memedit.RangeIf) {
 }
 
 func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
+
+	// --- Section 1 Start ---
+	// start1 := time.Now()
 	// name
 	ir.Name = inst.GetName()
 	ir.VerboseName = inst.GetVerboseName()
 	ir.ShortVerboseName = inst.GetShortVerboseName()
-	ir.String = inst.String()
-	ir.ReadableName = LineDisASM(inst)
-	ir.ReadableNameShort = LineShortDisASM(inst)
+	// ir.String = inst.String()
+	// ir.ReadableName = LineDisASM(inst)
+	// ir.ReadableNameShort = LineShortDisASM(inst)
 	// opcode
 	ir.Opcode = int64(inst.GetOpcode())
 	ir.OpcodeName = SSAOpcode2Name[inst.GetOpcode()]
+	// atomic.AddUint64(&Marshal1, uint64(time.Since(start1)))
+	// --- Section 1 End ---
 
+	// --- Section 2 Start ---
+	// start2 := time.Now()
 	var codeRange memedit.RangeIf
 	if ret := inst.GetRange(); ret != nil {
 		codeRange = ret
@@ -81,23 +118,23 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	}
 
 	if codeRange == nil {
-		switch ret := inst.(type) {
-		case *BasicBlock:
-			if len(ret.Insts) > 0 {
-				codeRange = ret.GetInstructionById(ret.Insts[0]).GetRange()
-			}
-		case *Function:
-			if len(ret.Blocks) > 0 {
-				codeRange = ret.GetBasicBlockByID(ret.Blocks[0]).GetRange()
-			}
-		}
+		// switch ret := inst.(type) {
+		// case *BasicBlock:
+		// 	if len(ret.Insts) > 0 {
+		// 		codeRange = ret.GetInstructionById(ret.Insts[0]).GetRange()
+		// 	}
+		// case *Function:
+		// 	if len(ret.Blocks) > 0 {
+		// 		codeRange = ret.GetBasicBlockByID(ret.Blocks[0]).GetRange()
+		// 	}
+		// }
 	}
 
 	if codeRange == nil {
 		log.Errorf("Range not found for %s", inst.GetName())
 	}
 
-	inst.SetRange(codeRange)
+	// inst.SetRange(codeRange)
 	fitRange(ir, codeRange)
 
 	if fun := inst.GetFunc(); fun != nil {
@@ -111,7 +148,6 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 }
 
 func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
-	// id
 	inst.SetId(ir.GetIdInt64())
 
 	// name
@@ -139,7 +175,7 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 	inst.SetExtern(ir.IsExternal)
 }
 
-func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
+func value2IrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
 	defer func() {
 		if msg := recover(); msg != nil {
 			log.Errorf("value2IrCode panic: %s", msg)
@@ -148,14 +184,17 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	}()
 	value, ok := ToValue(inst)
 	if !ok {
-		log.Errorf("not value: %s", inst.GetName())
 		return
 	}
+	if utils.IsNil(value) {
+		return
+	}
+	var anValue *anValue
 
 	// ir.String = value.String()
 	ir.HasDefs = value.HasValues()
 
-	anValue := value.getAnValue()
+	anValue = value.getAnValue()
 
 	// user
 	ir.Users = anValue.userList
@@ -179,7 +218,6 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		ir.ObjectParent = anValue.object
 		ir.ObjectKey = anValue.key
 	}
-
 	// variable
 
 	ir.Variable = make(ssadb.StringSlice, 0, anValue.variables.Len())
@@ -188,7 +226,6 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		if v.GetValue() == nil {
 			log.Errorf("aa")
 		}
-		go SaveVariableOffset(v, i, anValue.id)
 		return true
 	})
 
@@ -207,10 +244,10 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		}
 	}
 
-	ir.TypeID = SaveTypeToDB(anValue.GetType(), ir.ProgramName)
+	ir.TypeID = saveType(cache, anValue.GetType())
 }
 
-func (c *Cache) valueFromIrCode(inst Instruction, ir *ssadb.IrCode) {
+func (c *ProgramCache) valueFromIrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
 	value, ok := ToValue(inst)
 	if !ok {
 		return
@@ -251,7 +288,7 @@ func (c *Cache) valueFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 
 	// type
 	value.SetIsFromDB(true)
-	value.SetType(GetTypeFromDB(ir.TypeID))
+	value.SetType(GetTypeFromDB(cache, ir.TypeID))
 }
 
 func function2IrCode(inst Instruction, ir *ssadb.IrCode) {

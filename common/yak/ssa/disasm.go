@@ -180,7 +180,8 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 		block := f.GetBasicBlockByID(b)
 		_ = block
 		if utils.IsNil(block) {
-			log.Infof("bb")
+			log.Errorf("function %s has nil block: %d", f.GetName(), b)
+			continue
 		}
 		ShowBlock(f.GetBasicBlockByID(b))
 	}
@@ -198,6 +199,10 @@ func (b *BasicBlock) String() string {
 		ret += " <- "
 		for _, id := range b.Preds {
 			pred := b.GetBasicBlockByID(id)
+			if utils.IsNil(pred) {
+				log.Infof("pred is nil: %v", id)
+				continue
+			}
 			ret += pred.GetName() + " "
 		}
 	}

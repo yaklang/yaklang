@@ -66,6 +66,16 @@ func (sm *SafeMapWithKey[K, V]) ForEach(f func(key K, value V) bool) {
 	}
 }
 
+func (sm *SafeMapWithKey[K, V]) GetAll() map[K]V {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	ret := make(map[K]V, len(sm.m))
+	for k, v := range sm.m {
+		ret[k] = v
+	}
+	return ret
+}
+
 func (sm *SafeMapWithKey[K, V]) Count() int {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
