@@ -49,7 +49,6 @@ func prepareTestData(t *testing.T) (client ypb.YakClient, taskId string, riskIds
 func TestGRPCMUSTPASS_SSARiskDisposals_CreateAndQuery(t *testing.T) {
 	client, _, riskIds := prepareTestData(t)
 
-	// 为每个测试生成唯一的comment标识
 	testUUID := uuid.NewString()
 
 	tests := []struct {

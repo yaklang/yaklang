@@ -155,6 +155,10 @@ func FilterSSARisk(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
 	if filter.GetBeforeCreatedAt() > 0 {
 		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "created_at", 0, filter.GetBeforeCreatedAt())
 	}
+
+	if disposalStatuses := filter.GetLatestDisposalStatus(); len(disposalStatuses) > 0 {
+		db = bizhelper.ExactOrQueryStringArrayOr(db, "latest_disposal_status", disposalStatuses)
+	}
 	return db
 }
 

@@ -42,9 +42,9 @@ func CreateSSARiskDisposals(db *gorm.DB, req *ypb.CreateSSARiskDisposalsRequest)
 	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
 		for _, riskId := range riskIds {
 			disposal := schema.SSARiskDisposals{
-				Status:  req.GetStatus(),
-				Comment: req.GetComment(),
-				RiskId:  riskId,
+				Status:    req.GetStatus(),
+				Comment:   req.GetComment(),
+				SSARiskID: riskId,
 			}
 			if err := tx.Create(&disposal).Error; err != nil {
 				return utils.Errorf("CreateSSARiskDisposals failed during create: %v", err)
