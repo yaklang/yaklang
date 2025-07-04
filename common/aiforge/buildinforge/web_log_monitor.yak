@@ -1,0 +1,256 @@
+
+
+func RunSQLMigrations(eventDb) {
+    // Migration script for web_log_events
+    createWebLogTableSQL := `
+        CREATE TABLE IF NOT EXISTS web_log_events (
+            id            INTEGER PRIMARY KEY,
+            source_ip       TEXT,
+            request_method  TEXT,
+            request_uri     TEXT,
+            event_time      DATETIME,
+            user_agent      TEXT,
+            status_code     TEXT,
+            inferred_status TEXT,
+            error_message   TEXT,
+            log_type        TEXT
+        );
+    `
+    err := eventDb.Exec(createWebLogTableSQL).Error
+    if err != nil {
+        return err
+    }
+    // Migration script for entities
+    entitiesSQL := `
+         CREATE TABLE IF NOT EXISTS entities (
+            id         INTEGER PRIMARY KEY,
+            value      TEXT,
+            type       TEXT,
+            remark     TEXT,
+            CONSTRAINT idx_value_type UNIQUE (value, type)
+        );
+    `
+
+    return eventDb.Exec(entitiesSQL).Error
+}
+
+
+
+func NewWebLogEventDB() {
+	eventDB,err := db.OpenTempSqliteDatabase()
+    if err != nil {
+        return nil,err
+    }
+    err = RunSQLMigrations(eventDB)
+	if err != nil {
+        return nil,err
+    }
+	return eventDB, nil
+}
+
+
+
+func parseISO(isoTime) {
+    t,_ = time.Parse("2006-01-02T15:04:05Z07:00", isoTime)
+	return  t
+}
+
+func SaveEvent(eventDb,event)  {
+	sql := `
+		INSERT INTO web_log_events
+		(source_ip, request_method, request_uri, event_time, user_agent, status_code, inferred_status, error_message, log_type)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	result := eventDb.Exec(sql,
+		event.SourceIP,
+		event.RequestMethod,
+		event.RequestURI,
+		event.EventTime,
+		event.UserAgent,
+		event.StatusCode,
+		event.InferredStatus,
+		event.ErrorMessage,
+		event.LogType,
+	)
+	return result.Error
+}
+
+func QueryRecentEventRawSQL(eventDb , sourceIP , duration) {
+	//sql := "SELECT * FROM web_log_events WHERE source_ip = ? AND event_time > ? "
+	//cutOffTime := time.Now().Add(-duration)
+	// result := eventDb.Raw(sql, sourceIP, cutOffTime).Scan(ptr(events))
+	sql := "SELECT * FROM web_log_events WHERE source_ip = ?"
+	return db.ScanResult(eventDb, sql, sourceIP)
+}
+
+func SaveEntityRawSQL(eventDb, entity) {
+	sql := `
+		INSERT INTO entities (value, type, remark)
+		VALUES (?, ?, ?)
+		ON CONFLICT(value, type) DO UPDATE SET
+			remark = excluded.remark
+            `
+	return eventDb.Exec(sql, entity.Value, entity.Type, entity.Remark).Error
+}
+
+
+func UpdateEntityRemarkRawSQL(eventDb , entity, remark ) {
+	sql := `UPDATE entities SET remark = ? WHERE value = ? AND "type" = ?`
+	result := eventDb.Exec(sql, remark, entity.Value, entity.Type)
+	return result.Error
+}
+
+
+
+text = cli.String("text", cli.setHelp("直接输入的长文本"))
+filePath = cli.String("filePath", cli.setHelp("长文本文件"))
+cli.check()
+
+forgeHandle = func(params) {
+        var reader
+		if text != "" {
+            reader = str.NewReader(text)
+        }else if filePath != "" {
+            reader,err = file.Open(filePath)
+            if err != nil {
+                return nil
+            }
+        }else {
+            return nil
+        }
+
+        logDb,err = NewWebLogEventDB()
+        if err != nil {
+            return err
+        }
+
+        ew := x.NewEventWatcher(context.Background(), time.ParseDuration("5m")~, 20)
+
+        update := func(attackType, entityValue ) {
+            entity := {
+                "Value": entityValue,
+                "Type":  "ip_address",
+            }
+            err := UpdateEntityRemarkRawSQL(logDb, entity, sprintf("Detected %s attack from %s", attackType, entityValue))
+            if err != nil {
+                log.Error("UpdateEntityRemark failed: %v", err)
+                return
+            }
+	    }
+
+        analyzerWebRequest := func(sourceIP) {
+            event, err := QueryRecentEventRawSQL(logDb, sourceIP, time.ParseDuration("1h")~)
+            if err != nil {
+                return
+            }
+            if len(event) == 0 {
+                return
+            }
+            eventJsonString, err := json.Marshal(event)
+            if err != nil {
+                return
+            }
+
+            res, err := aiagent.ExecuteForge("event_analyzer",eventJsonString)
+            if err != nil {
+                return
+            }
+            report = res
+            if report.GetBool("is_malicious") {
+                risk.NewRisk(sourceIP,
+                    risk.title(sprintf("detect %s %s", sourceIP,report.GetString("attack_type"))),
+                    risk.description(report.GetString("behavior_summary")),
+                    risk.solution("ban corresponding IP address"),
+                    risk.level("mid"),
+                    risk.details(report.GetStringSlice("key_evidence"))
+                )
+            }
+            update(report.GetString("attack_type"), sourceIP)
+        }
+        entityMarshal := func(e) {
+            return {
+                "Value": e.GetString("entity_value"),
+                "Type":  e.GetString("entity_type"),
+                "Remark":"",
+            }
+        }
+
+        eventMarshal := func(e) {
+            return {
+                "SourceIP":       e.GetString("source_ip"),
+                "RequestMethod":  e.GetString("request_method"),
+                "RequestURI":     e.GetString("request_uri"),
+                "EventTime":      parseISO(e.GetString("timestamp")),
+                "UserAgent":      e.GetString("user_agent"),
+                "StatusCode":     e.GetInt("status_code"),
+                "InferredStatus": e.GetString("inferred_status"),
+                "ErrorMessage":   e.GetString("error_message"),
+                "LogType":        e.GetString("log_type"),
+            }
+        }
+
+        var cacheBuffer = make([]string,0)
+        reducer:= aireducer.NewReducerFromReader(reader,
+        aireducer.reducerCallback(func(config,memory,chunk){
+            cacheBuffer = append(cacheBuffer, string(chunk.Data()))
+            if len(cacheBuffer) < 10 {
+                return nil
+            }
+            defer func() {
+                cacheBuffer = make([]string, 0)
+            }()
+            logBuffer := str.Join(cacheBuffer, "\n")
+            wg := sync.NewWaitGroup()
+            wg.Add(1)
+            go func() {
+                defer wg.Done()
+                res, err := aiagent.ExecuteForge("entity_identify",
+                    logBuffer,
+                )
+                if err != nil {
+                    return
+                }
+                for _, params := range res {
+                    err := SaveEntityRawSQL(logDb, entityMarshal(params))
+                    if err != nil {
+                        log.Error("failed to save entity: %v", err)
+                        return
+                    }
+                }
+            }()
+
+            wg.Add(1)
+            go func() {
+                defer wg.Done()
+                res, err := aiagent.ExecuteForge("log_event_formatter",
+                    logBuffer,
+                )
+                if err != nil {
+                    return
+                }
+                for _, params := range res {
+                    event := eventMarshal(params)
+                    if event.LogType == "WEB_REQUEST" {
+                        ew.Watch(event.SourceIP, analyzerWebRequest)
+                    }
+                    err := SaveEvent(logDb, event)
+                    if err != nil {
+                        log.Error("failed to save event: %v", err)
+                        return
+                    }
+                }
+            }()
+
+                wg.Wait()
+                return nil
+            }),
+            aireducer.separator("[INFO]"),
+            aireducer.memory(aiagent.GetDefaultMemory()),
+        )~
+        err = reducer.Run()
+        if err != nil {
+            return err
+        }
+		return nil
+}
+
+
