@@ -7,9 +7,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -389,4 +392,105 @@ func (s *Server) StartLocalModel(req *ypb.StartLocalModelRequest, stream ypb.Yak
 			return nil
 		}
 	}
+}
+
+type BuildInVectorDBLink struct {
+	Description string
+	DownloadURL string
+}
+
+var buildInVectorDBLink = map[string]BuildInVectorDBLink{
+	plugins_rag.PLUGIN_RAG_COLLECTION_NAME: {
+		Description: "插件向量数据库，包含所有插件的向量数据，可以用于搜索插件",
+		DownloadURL: "https://oss-qn.yaklang.com/yaklang-rag/plugins_rag.zip",
+	},
+}
+
+func (s *Server) GetAllVectorStoreCollections(ctx context.Context, req *ypb.Empty) (*ypb.GetAllVectorStoreCollectionsResponse, error) {
+	collections := []string{}
+	for collectionName := range buildInVectorDBLink {
+		collections = append(collections, collectionName)
+	}
+	sort.Strings(collections)
+
+	collectionsPB := []*ypb.VectorStoreCollection{}
+	for _, collection := range collections {
+		info := buildInVectorDBLink[collection]
+		collectionsPB = append(collectionsPB, &ypb.VectorStoreCollection{
+			Name:        collection,
+			Description: info.Description,
+		})
+	}
+	return &ypb.GetAllVectorStoreCollectionsResponse{
+		Collections: collectionsPB,
+	}, nil
+}
+
+func (s *Server) IsSearchVectorDatabaseReady(ctx context.Context, req *ypb.IsSearchVectorDatabaseReadyRequest) (*ypb.IsSearchVectorDatabaseReadyResponse, error) {
+	notReadyCollectionNames := []string{}
+	db := consts.GetGormProfileDatabase()
+	for _, collectionName := range req.GetCollectionNames() {
+		if !rag.IsReadyCollection(db, collectionName) {
+			notReadyCollectionNames = append(notReadyCollectionNames, collectionName)
+		}
+	}
+
+	return &ypb.IsSearchVectorDatabaseReadyResponse{
+		IsReady:                 len(notReadyCollectionNames) == 0,
+		NotReadyCollectionNames: notReadyCollectionNames,
+	}, nil
+}
+func (s *Server) DeleteSearchVectorDatabase(ctx context.Context, req *ypb.DeleteSearchVectorDatabaseRequest) (*ypb.GeneralResponse, error) {
+	collectionNames := req.GetCollectionNames()
+	errs := []error{}
+	for _, collectionName := range collectionNames {
+		err := rag.RemoveCollection(consts.GetGormProfileDatabase(), collectionName)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return &ypb.GeneralResponse{
+		Ok: len(errs) == 0,
+	}, utils.JoinErrors(errs...)
+}
+func (s *Server) InitSearchVectorDatabase(req *ypb.InitSearchVectorDatabaseRequest, stream ypb.Yak_InitSearchVectorDatabaseServer) error {
+	collectionNames := req.GetCollectionNames()
+	for _, collectionName := range collectionNames {
+		if _, ok := buildInVectorDBLink[collectionName]; !ok {
+			return utils.Errorf("不支持的集合类型: %s", collectionName)
+		}
+	}
+
+	for _, collection := range collectionNames {
+		stream.Send(&ypb.ExecResult{
+			IsMessage: true,
+			Message:   []byte(fmt.Sprintf("开始下载 %s 向量数据", collection)),
+		})
+		tmpFileName := fmt.Sprintf("tmp_%s.zip", collection)
+		err := s.DownloadWithStream(req.GetProxy(), func() (urlStr string, name string, err error) {
+			return buildInVectorDBLink[collection].DownloadURL, tmpFileName, nil
+		}, stream)
+		if err != nil {
+			return err
+		}
+
+		stream.Send(&ypb.ExecResult{
+			IsMessage: true,
+			Message:   []byte(fmt.Sprintf("下载完成，开始导入 %s 向量数据", collection)),
+		})
+
+		zipPath := filepath.Join(consts.GetDefaultYakitProjectsDir(), "libs", tmpFileName)
+		db := consts.GetGormProfileDatabase()
+		err = rag.ImportVectorDataFullUpdate(db, zipPath)
+		if err != nil {
+			return err
+		}
+		os.Remove(zipPath)
+		stream.Send(&ypb.ExecResult{
+			IsMessage: true,
+			Message:   []byte(fmt.Sprintf("导入 %s 向量数据完成，已删除临时文件 %s", collection, zipPath)),
+		})
+	}
+
+	return nil
 }

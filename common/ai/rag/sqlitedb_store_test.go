@@ -50,7 +50,7 @@ func TestSQLiteVectorStore(t *testing.T) {
 	assert.Equal(t, "doc1", doc.ID)
 
 	// 测试搜索
-	results, err := store.Search("什么是Yaklang", 5)
+	results, err := store.Search("什么是Yaklang", 1, 5)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(results))
 	assert.Equal(t, "doc1", results[0].Document.ID)     // 第一个结果应该是Yaklang文档

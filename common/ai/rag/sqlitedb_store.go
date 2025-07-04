@@ -53,17 +53,28 @@ func NewSQLiteVectorStore(db *gorm.DB, collectionName string, modelName string, 
 		collectionID:   collection.ID,
 	}, nil
 }
-
-func (s *SQLiteVectorStore) Remove() {
-	utils.GormTransaction(s.db, func(tx *gorm.DB) error {
-		if err := tx.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", s.collectionID).Unscoped().Delete(&schema.VectorStoreDocument{}).Error; err != nil {
+func RemoveCollection(db *gorm.DB, collectionName string) error {
+	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+		var collections []schema.VectorStoreCollection
+		if err := tx.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).Find(&collections).Error; err != nil {
 			return err
 		}
-		if err := tx.Model(&schema.VectorStoreCollection{}).Where("id = ?", s.collectionID).Unscoped().Delete(&schema.VectorStoreCollection{}).Error; err != nil {
+		if len(collections) == 0 {
+			return utils.Errorf("集合 %s 不存在", collectionName)
+		}
+		collection := collections[0]
+
+		if err := tx.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).Unscoped().Delete(&schema.VectorStoreDocument{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&schema.VectorStoreCollection{}).Where("id = ?", collection.ID).Unscoped().Delete(&schema.VectorStoreCollection{}).Error; err != nil {
 			return err
 		}
 		return nil
 	})
+}
+func (s *SQLiteVectorStore) Remove() {
+	RemoveCollection(s.db, s.collectionName)
 }
 
 // 将 schema.VectorStoreDocument 转换为 Document
@@ -144,7 +155,7 @@ func (s *SQLiteVectorStore) Add(docs ...Document) error {
 }
 
 // Search 根据查询文本检索相关文档
-func (s *SQLiteVectorStore) Search(query string, limit int) ([]SearchResult, error) {
+func (s *SQLiteVectorStore) Search(query string, page, limit int) ([]SearchResult, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -187,10 +198,15 @@ func (s *SQLiteVectorStore) Search(query string, limit int) ([]SearchResult, err
 		return results[i].Score > results[j].Score
 	})
 
-	// 限制结果数量
-	if limit > 0 && limit < len(results) {
-		results = results[:limit]
+	// 计算分页
+	offset := (page - 1) * limit
+	if offset >= len(results) {
+		return []SearchResult{}, nil
 	}
+	if offset+limit > len(results) {
+		limit = len(results) - offset
+	}
+	results = results[offset : offset+limit]
 
 	return results, nil
 }
