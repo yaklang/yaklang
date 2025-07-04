@@ -90,6 +90,9 @@ func (i *anInstruction) ReplaceValue(Value, Value) {
 }
 
 func (i *anInstruction) GetVerboseName() string {
+	if utils.IsNil(i) {
+		return ""
+	}
 	if i.verboseName != "" {
 		return i.verboseName
 	}
@@ -100,6 +103,9 @@ func (i *anInstruction) GetVerboseName() string {
 }
 
 func (i *anInstruction) GetShortVerboseName() string {
+	if utils.IsNil(i) {
+		return ""
+	}
 	if i.name != "" {
 		return i.name
 	}
@@ -206,8 +212,18 @@ func (c *anInstruction) NewError(kind ErrorKind, tag ErrorTag, msg string) {
 // func (a *anInstruction) SetScope(s *Scope) { a.scope = s }
 
 // variable
-func (a *anInstruction) SetName(v string) { a.name = v }
-func (a *anInstruction) GetName() string  { return a.name }
+func (a *anInstruction) SetName(v string) {
+	if utils.IsNil(a) {
+		return
+	}
+	a.name = v
+}
+func (a *anInstruction) GetName() string {
+	if utils.IsNil(a) {
+		return ""
+	}
+	return a.name
+}
 
 // id
 func (a *anInstruction) SetId(id int64) { a.id = id }
@@ -226,6 +242,9 @@ func (a *anInstruction) GetOpcode() Opcode { return SSAOpcodeUnKnow } // cover b
 
 func (a *anInstruction) String() string {
 	this := a.GetValueById(a.GetId())
+	if utils.IsNil(this) {
+		return ""
+	}
 	return fmt.Sprintf("Instruction: %s %s", SSAOpcode2Name[this.GetOpcode()], this.GetName())
 }
 
