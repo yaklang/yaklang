@@ -9,6 +9,14 @@ var defaultInputMap = map[string]string{
 	"password": "password",
 	"captcha":  "captcha",
 	"username": "admin",
+	"email":    "admin@admin.com",
+	"phone":    "13900000001",
+	"num":      "1",
+	"code":     "1234",
+	"card":     "12345678",
+	"id":       "12345678",
+	"url":      "testurl.com",
+	"website":  "testurl.com",
 }
 
 var defaultChromeHeaders = map[string]string{
@@ -46,18 +54,21 @@ const (
 	mainDomain      scanRangeLevel = 0
 	subDomain       scanRangeLevel = 1
 	unlimitedDomain scanRangeLevel = 2
+	boardDomain     scanRangeLevel = 3
 )
 
 var ScanRangeLevelMap = map[int]scanRangeLevel{
 	0: mainDomain,
 	1: subDomain,
 	2: unlimitedDomain,
+	3: boardDomain,
 }
 
 var generalScanRangeMap = map[scanRangeLevel]func(string) []string{
 	mainDomain:      generalMainDomainRange,
 	subDomain:       generalSubDomainRange,
 	unlimitedDomain: generalUnlimitedDomainRange,
+	boardDomain:     generalBoardDomainRange,
 }
 
 var elementAttribute = []string{

@@ -98,7 +98,7 @@ func (starter *BrowserStarter) elementCheckGenerate() func(*rod.Element) bool {
 	if len(starter.baseConfig.sensitiveWords) == 0 {
 		return nil
 	}
-	var propertyList = []string{"innerHTML", "value"}
+	var propertyList = []string{"innerHTML", "value", "name"}
 	return func(element *rod.Element) bool {
 		var resultStr string
 		for _, property := range propertyList {
