@@ -3,9 +3,13 @@
 package crawlerx
 
 import (
+	"encoding/json"
+	"github.com/yaklang/yaklang/common/crawlerx/tools"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"regexp"
 	"strconv"
+	"strings"
 )
 
 type OutputResults struct {
@@ -43,6 +47,42 @@ type OutputBody struct {
 	Data string `json:"data"`
 }
 
+// OutputResult 将channel中输出的爬虫结果保存在本地
+//
+// 第一个参数为需要存储的结果 第二个参数为保存的本地路径 请确保本地文件可以正常写入
+//
+// Examples:
+//
+//		```
+//			targetUrl = "http://testphp.vulnweb.com/"
+//			ch, err = crawlerx.StartCrawler(targetUrl, crawlerx.pageTimeout(30), crawlerx.concurrent(3))
+//			resultList = []
+//			for item = range ch {
+//				yakit.Info(item.Method() + " " + item.Url())
+//				resultList = append(resultList, item)
+//			}
+//			err = crawlerx.OutputResult(resultList, "test.txt")
+//			if err != nil {
+//	            println(err)
+//			}
+//
+//		```
+func OutputData(data []interface{}, outputFile string) error {
+	var result []*OutputResult
+	for _, item := range data {
+		temp, ok := item.(ReqInfo)
+		if !ok {
+			continue
+		}
+		outputResult := GeneratorOutput(temp)
+		if outputResult != nil {
+			result = append(result, outputResult)
+		}
+	}
+	resultBytes, _ := json.MarshalIndent(result, "", "\t")
+	return tools.WriteFile(outputFile, resultBytes)
+}
+
 func GeneratorOutput(reqInfo ReqInfo) *OutputResult {
 	requestHeaders := reqInfo.RequestHeaders()
 	tempRequestHeaders := make([]*OutputHeader, 0)
@@ -52,6 +92,9 @@ func GeneratorOutput(reqInfo ReqInfo) *OutputResult {
 	responseHeaders := reqInfo.ResponseHeaders()
 	tempResponseHeaders := make([]*OutputHeader, 0)
 	for k, v := range responseHeaders {
+		if k == "Content-Type" && !checkContentType(v) {
+			return nil
+		}
 		tempResponseHeaders = append(tempResponseHeaders, &OutputHeader{k, v})
 	}
 	httpRaw, err := reqInfo.RequestRaw()
@@ -82,4 +125,16 @@ func GeneratorOutput(reqInfo ReqInfo) *OutputResult {
 		},
 	}
 	return &result
+}
+
+var contentTypeReg = regexp.MustCompile(`/json|/java|/xml|encoded`)
+
+func checkContentType(contentType string) bool {
+	if strings.HasPrefix(contentType, "text/") {
+		return true
+	}
+	if contentTypeReg.FindString(contentType) != "" {
+		return true
+	}
+	return false
 }

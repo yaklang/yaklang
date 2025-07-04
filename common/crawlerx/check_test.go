@@ -3,9 +3,11 @@
 package crawlerx
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"net/url"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -91,6 +93,41 @@ func TestGeneralSubDomainRange(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equalf(t, tt.want, generalSubDomainRange(tt.args.targetUrl), "generalSubDomainRange(%v)", tt.args.targetUrl)
+		})
+	}
+}
+
+func TestBoardDomainCompilerStr(t *testing.T) {
+	type args struct {
+		arg string
+	}
+	var testUrl = "4dogs.cn"
+	testFunc := func(targetUrl string) bool {
+		reg, err := regexp.Compile(fmt.Sprintf(boardDomainCompilerStr, testUrl))
+		if err != nil {
+			t.Fatal(err)
+			return false
+		}
+		return reg.MatchString(targetUrl)
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"case1", args{"http://www.4dogs.cn/abc"}, true},
+		{"case2", args{"http://test.4dogs.cn/abc"}, true},
+		{"case3", args{"https://www.4dogs.cn/abc"}, true},
+		{"case4", args{"https://www4dogs.cn/abc"}, false},
+		{"case5", args{"https://4dogs.cn/abc"}, true},
+		{"case6", args{"https://www.4dogs.cnabc"}, false},
+		{"case7", args{"https://abc/www.4dogs.cn/"}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := testFunc(tt.args.arg); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("urlRepeatCheckGenerator() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }

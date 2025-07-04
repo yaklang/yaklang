@@ -109,7 +109,7 @@ func StringArrayCover(array []string, element string) (bool, string) {
 		if s == "" {
 			continue
 		}
-		if strings.Contains(element, s) {
+		if strings.Contains(strings.ToLower(element), s) {
 			return true, s
 		}
 	}
