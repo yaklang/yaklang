@@ -2,7 +2,6 @@ package schema
 
 import (
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -12,26 +11,17 @@ type SSARiskDisposals struct {
 
 	Status  string `json:"status" gorm:"index"`
 	Comment string `json:"comment" gorm:"type:text"`
-
-	Hash string `json:"hash" gorm:"unique_index"`
-}
-
-func (s *SSARiskDisposals) CalcHash() string {
-	return utils.CalcSha1(s.Status, s.Comment, s.SSARiskID)
 }
 
 func (s *SSARiskDisposals) BeforeCreate() {
-	s.Hash = s.CalcHash()
 	s.Status = string(ValidSSARiskDisposalStatus(s.Status))
 }
 
 func (s *SSARiskDisposals) BeforeUpdate() {
-	s.Hash = s.CalcHash()
 	s.Status = string(ValidSSARiskDisposalStatus(s.Status))
 }
 
 func (s *SSARiskDisposals) BeforeSave() {
-	s.Hash = s.CalcHash()
 	s.Status = string(ValidSSARiskDisposalStatus(s.Status))
 }
 
