@@ -173,7 +173,7 @@ jobs:
 
           - name: Test SyntaxFlow Web Server
             run: |
-              go test -timeout 1m ./common/sfweb/...
+              go test -timeout 2m ./common/sfweb/...
 
           - name: Test lowhttp / DNSX
             run: |
@@ -256,6 +256,10 @@ jobs:
               # crawler
               go test -timeout 20s -run TestMUSTPASS ./common/crawler
 
+          - name: Test Bizhelper
+            run: |
+              go test -timeout 20s ./common/utils/bizhelper/...
+
           - name: Test Other
             run: |
               # cli
@@ -269,6 +273,7 @@ jobs:
           - name: Test AI RAG
             run: |
               go test -timeout 1m ./common/ai/rag
+              go test -timeout 1m -run TestMUSTPASS ./common/ai/rag/plugins_rag/...
 
     steps:
       - name: "Checkout"

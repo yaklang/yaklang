@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -19,6 +20,14 @@ import (
 var (
 	escapeRegexp = regexp.MustCompile(`[%_\[\]^\\]`)
 )
+
+func createTempTestDatabase() (*gorm.DB, error) {
+	db, err := gorm.Open("sqlite3", "file::memory:?cache=shared")
+	if err != nil {
+		return nil, err
+	}
+	return db, nil
+}
 
 type Range struct {
 	Min, Max uint64

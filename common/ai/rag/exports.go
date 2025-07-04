@@ -4,6 +4,8 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/embedding"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -67,7 +69,7 @@ func AddText(rag *RAGSystem, text string, maxChunkSize int, overlap int, metadat
 // SearchAndGeneratePrompt 检索相关文档并生成提示
 func SearchAndGeneratePrompt(rag *RAGSystem, query string, limit int, threshold float64, promptTemplate string) (string, error) {
 	// 检索相关文档
-	results, err := rag.Query(query, limit)
+	results, err := rag.Query(query, 1, limit)
 	if err != nil {
 		return "", utils.Errorf("failed to query documents: %v", err)
 	}
@@ -79,6 +81,13 @@ func SearchAndGeneratePrompt(rag *RAGSystem, query string, limit int, threshold 
 	prompt := FormatRagPrompt(query, filteredResults, promptTemplate)
 
 	return prompt, nil
+}
+
+func GetAllCollections() ([]*schema.VectorStoreCollection, error) {
+	db := consts.GetGormProfileDatabase()
+	collections := []*schema.VectorStoreCollection{}
+	db.Model(&schema.VectorStoreCollection{}).Find(&collections)
+	return collections, nil
 }
 
 // 导出的公共函数

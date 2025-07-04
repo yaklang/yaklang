@@ -3,7 +3,7 @@ package embedding
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
+	"net/url"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils"
@@ -56,7 +56,10 @@ func (c *OpenaiEmbeddingClient) Embedding(text string) ([]float64, error) {
 
 	var targetUrl string
 	if c.config.BaseURL != "" {
-		targetUrl = filepath.Join(c.config.BaseURL, "/embeddings")
+		targetUrl, err = url.JoinPath(c.config.BaseURL, "/embeddings")
+		if err != nil {
+			targetUrl = c.config.BaseURL + "/embeddings"
+		}
 	} else if c.config.Domain != "" {
 		if c.config.NoHttps {
 			targetUrl = fmt.Sprintf("http://%s/embeddings", c.config.Domain)

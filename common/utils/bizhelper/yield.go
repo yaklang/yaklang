@@ -6,6 +6,7 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type YieldModelConfig struct {
@@ -42,6 +43,7 @@ func WithYieldModel_PageSize(size int) YieldModelOpts {
 }
 
 func YieldModel[T any](ctx context.Context, db *gorm.DB, opts ...YieldModelOpts) chan T {
+
 	var t T
 	db = db.Table(db.NewScope(t).TableName())
 
@@ -55,13 +57,36 @@ func YieldModel[T any](ctx context.Context, db *gorm.DB, opts ...YieldModelOpts)
 	go func() {
 		defer close(outC)
 
-		paginator := NewFastPaginator(db, cfg.Size, WithFastPaginator_IndexField(cfg.IndexField))
+		index := 1
+
+		next := func(res *[]T) (bool, error) {
+			defer func() {
+				index++
+			}()
+			_, newDb := PagingByPagination(db, &ypb.Paging{
+				Page:  int64(index),
+				Limit: int64(cfg.Size),
+			}, res)
+			if newDb.Error != nil {
+				return false, newDb.Error
+			}
+			if len(*res) == 0 {
+				return false, nil
+			}
+			return true, nil
+		}
+
+		tmp := []T{}
+		paginator, _ := PagingByPagination(db, &ypb.Paging{
+			Page:  1,
+			Limit: 1,
+		}, &tmp)
 		if cfg.CountCallback != nil {
-			cfg.CountCallback(paginator.totalRecord)
+			cfg.CountCallback(paginator.TotalRecord)
 		}
 		for {
 			var items []T
-			if err, ok := paginator.Next(&items); !ok {
+			if ok, err := next(&items); !ok {
 				break
 			} else if err != nil {
 				log.Errorf("paging failed: %s", err)

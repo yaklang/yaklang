@@ -16,7 +16,6 @@ type Document struct {
 type SearchResult struct {
 	Document Document `json:"document"` // 检索到的文档
 	Score    float64  `json:"score"`    // 相似度得分 (-1 到 1 之间)
-	Distance float64  `json:"distance"` // 距离 (可选，取决于具体实现)
 }
 
 // EmbeddingClient 接口定义了嵌入向量生成的操作
@@ -30,7 +29,7 @@ type VectorStore interface {
 	Add(docs ...Document) error
 
 	// Search 根据查询文本检索相关文档
-	Search(query string, limit int) ([]SearchResult, error)
+	Search(query string, page, limit int) ([]SearchResult, error)
 
 	// Delete 根据 ID 删除文档
 	Delete(ids ...string) error
@@ -75,8 +74,8 @@ func (r *RAGSystem) AddDocuments(docs ...Document) error {
 }
 
 // Query 根据查询文本检索相关文档并返回结果
-func (r *RAGSystem) Query(query string, limit int) ([]SearchResult, error) {
-	return r.VectorStore.Search(query, limit)
+func (r *RAGSystem) Query(query string, page, limit int) ([]SearchResult, error) {
+	return r.VectorStore.Search(query, page, limit)
 }
 
 // DeleteDocuments 删除文档

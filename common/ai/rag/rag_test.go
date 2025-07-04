@@ -80,7 +80,7 @@ func TestMemoryVectorStore(t *testing.T) {
 	assert.Equal(t, "Yaklang是一种安全研究编程语言", doc.Content)
 
 	// 测试搜索
-	results, err := store.Search("什么是Yaklang", 5)
+	results, err := store.Search("什么是Yaklang", 1, 5)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(results))
 	assert.Equal(t, "doc1", results[0].Document.ID)     // 第一个结果应该是Yaklang文档
@@ -125,7 +125,7 @@ func TestRAGSystem(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 测试查询
-	results, err := ragSystem.Query("什么是RAG", 5)
+	results, err := ragSystem.Query("什么是RAG", 1, 5)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(results))
 	assert.Equal(t, "doc2", results[0].Document.ID) // 第一个结果应该是RAG文档
