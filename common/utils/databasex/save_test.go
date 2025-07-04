@@ -31,11 +31,9 @@ func TestNewSaver(t *testing.T) {
 	saver.Close()
 
 	// Test with custom options
-	wg := &sync.WaitGroup{}
 	ctx := context.Background()
 	saver = databasex.NewSave(
 		saveFn,
-		databasex.WithWaitGroup(wg),
 		databasex.WithBufferSize(200),
 		databasex.WithContext(ctx),
 	)
