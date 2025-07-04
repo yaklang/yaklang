@@ -91,6 +91,7 @@ var DnsExports = map[string]interface{}{
 	"QueryNS":    _dnsQueryNS,
 	"QueryTXT":   _dnsQueryTxt,
 	"QuertAxfr":  _dnsQueryAxfr,
+	"QueryAxfr":  _dnsQueryAxfr,
 
 	"timeout":    _dnsConfigOpt_WithTimeout,
 	"dnsServers": _dnsConfigOpt_WithDNSServers,
