@@ -54,6 +54,9 @@ type SSARisk struct {
 	ResultID uint64 `json:"result_id"` // result
 	Variable string `json:"variable"`  // result/variable
 	Index    int64  `json:"index"`     // result/variable/index
+
+	// 最新处置状态
+	LatestDisposalStatus string `json:"latest_disposal_status" gorm:"index;default:'not_set'"`
 }
 
 func (s *SSARisk) CalcHash() string {
@@ -77,40 +80,42 @@ func SSARiskTypeVerbose(s string) string {
 		return s
 	}
 }
+
 func (s *SSARisk) ToGRPCModel() *ypb.SSARisk {
 	if utils.IsNil(s) {
 		return new(ypb.SSARisk)
 	}
 	return &ypb.SSARisk{
-		Id:                  int64(s.ID),
-		CreatedAt:           s.CreatedAt.Unix(),
-		UpdatedAt:           s.UpdatedAt.Unix(),
-		Hash:                s.Hash,
-		ProgramName:         s.ProgramName,
-		CodeSourceUrl:       utils.EscapeInvalidUTF8Byte([]byte(s.CodeSourceUrl)),
-		CodeRange:           s.CodeRange,
-		CodeFragment:        utils.EscapeInvalidUTF8Byte([]byte(s.CodeFragment)),
-		Title:               s.Title,
-		TitleVerbose:        s.TitleVerbose,
-		RiskType:            s.RiskType,
-		RiskTypeVerbose:     SSARiskTypeVerbose(s.RiskType),
-		Details:             s.Details,
-		Severity:            string(s.Severity),
-		FromRule:            s.FromRule,
-		RuntimeID:           s.RuntimeId,
-		IsPotential:         s.IsPotential,
-		CVE:                 s.CVE,
-		CveAccessVector:     s.CveAccessVector,
-		CveAccessComplexity: s.CveAccessComplexity,
-		Tags:                s.Tags,
-		ResultID:            s.ResultID,
-		IsRead:              s.IsRead,
-		Variable:            s.Variable,
-		Index:               s.Index,
-		FunctionName:        s.FunctionName,
-		Line:                s.Line,
-		Description:         s.Description,
-		Solution:            s.Solution,
+		Id:                   int64(s.ID),
+		CreatedAt:            s.CreatedAt.Unix(),
+		UpdatedAt:            s.UpdatedAt.Unix(),
+		Hash:                 s.Hash,
+		ProgramName:          s.ProgramName,
+		CodeSourceUrl:        utils.EscapeInvalidUTF8Byte([]byte(s.CodeSourceUrl)),
+		CodeRange:            s.CodeRange,
+		CodeFragment:         utils.EscapeInvalidUTF8Byte([]byte(s.CodeFragment)),
+		Title:                s.Title,
+		TitleVerbose:         s.TitleVerbose,
+		RiskType:             s.RiskType,
+		RiskTypeVerbose:      SSARiskTypeVerbose(s.RiskType),
+		Details:              s.Details,
+		Severity:             string(s.Severity),
+		FromRule:             s.FromRule,
+		RuntimeID:            s.RuntimeId,
+		IsPotential:          s.IsPotential,
+		CVE:                  s.CVE,
+		CveAccessVector:      s.CveAccessVector,
+		CveAccessComplexity:  s.CveAccessComplexity,
+		Tags:                 s.Tags,
+		ResultID:             s.ResultID,
+		IsRead:               s.IsRead,
+		Variable:             s.Variable,
+		Index:                s.Index,
+		FunctionName:         s.FunctionName,
+		Line:                 s.Line,
+		Description:          s.Description,
+		Solution:             s.Solution,
+		LatestDisposalStatus: s.LatestDisposalStatus,
 	}
 }
 
