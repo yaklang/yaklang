@@ -115,7 +115,7 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 	var hookBefore func(https bool, originReq []byte, req []byte) []byte = nil
 	var hookAfter func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte = nil
 	var mirrorFlow func(req []byte, rsp []byte, handle map[string]string) map[string]string = nil
-	var retryHandler func(https bool, retryCount int, req []byte, rsp []byte) bool = nil
+	var retryHandler func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte)) = nil
 	var customFailureChecker func(https bool, req []byte, rsp []byte, fail func(string)) = nil
 
 	if beforeRequestOk {

@@ -26,8 +26,9 @@ const (
 	defaultWaitTime    = time.Duration(100) * time.Millisecond
 	defaultMaxWaitTime = time.Duration(2000) * time.Millisecond
 )
-type RetryHandler func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte))
 
+type RetryHandler func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte))
+type CustomFailureChecker func(https bool, req []byte, rsp []byte, fail func(string))
 
 type LowhttpExecConfig struct {
 	Host              string
@@ -50,7 +51,7 @@ type LowhttpExecConfig struct {
 	RetryInStatusCode                []int
 	RetryNotInStatusCode             []int
 	RetryHandler                     RetryHandler
-	ForceFailureHandler              func(https bool, req []byte, rsp []byte) bool
+	CustomFailureChecker             CustomFailureChecker
 	RetryWaitTime                    time.Duration
 	RetryMaxWaitTime                 time.Duration
 	JsRedirect                       bool
@@ -584,13 +585,13 @@ func WithRetryTimes(retryTimes int) LowhttpOpt {
 func WithRetryHandler(retryHandler RetryHandler) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		if !utils.IsNil(retryHandler) {
-			o.RetryHandler = func(https bool, retryCount int, req []byte, rsp []byte,retryFunc func(...[]byte)) {
+			o.RetryHandler = func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte)) {
 				defer func() {
 					if err := recover(); err != nil {
 						log.Errorf("retry handler failed: %v\n%v", err, utils.ErrorStack(err))
 					}
 				}()
-				retryHandler(https, retryCount, req, rsp,retryFunc)
+				retryHandler(https, retryCount, req, rsp, retryFunc)
 				return
 			}
 		}
@@ -599,7 +600,7 @@ func WithRetryHandler(retryHandler RetryHandler) LowhttpOpt {
 
 // WithCustomFailureChecker sets a custom failure checker function that will be called when a request succeeds.
 // The checker can call the fail function with an error message to mark the request as failed.
-func WithCustomFailureChecker(customFailureChecker func(https bool, req []byte, rsp []byte, fail func(string))) LowhttpOpt {
+func WithCustomFailureChecker(customFailureChecker CustomFailureChecker) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		if !utils.IsNil(customFailureChecker) {
 			o.CustomFailureChecker = func(https bool, req []byte, rsp []byte, fail func(string)) {
