@@ -279,5 +279,8 @@ func (b *FunctionBuilder) CheckMemberCallNilValue(value, key Value, funcName str
 	return nil
 }
 func getExternLibMemberCall(value, key Value) string {
-	return fmt.Sprintf("%s.%s", value.GetName(), key.String())
+	if key.GetName() == "" {
+		return fmt.Sprintf("%s.%s", value.GetName(), key.String())
+	}
+	return fmt.Sprintf("%s.%s", value.GetName(), key.GetName())
 }

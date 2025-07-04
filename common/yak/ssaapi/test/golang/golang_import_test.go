@@ -225,7 +225,6 @@ func TestImport_syntaxflow(t *testing.T) {
 			test.Println("Hello, World!") // function
 			a := test.A
 		}
-
 	`,
 			`
 			test?{<fullTypeName>?{have: 'github.com/yaklang/test'}} as $entry;

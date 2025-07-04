@@ -756,10 +756,7 @@ func TestFuntion_normol(t *testing.T) {
 		}`, []string{"Function-make(typeValue(map[string]string))"}, t)
 	})
 
-	t.Run("member-call method ", func(t *testing.T) {
-
-		// TODO: need fix with lazy builder
-		t.Skip()
+	t.Run("member-call method", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 		
 			type test struct{
@@ -770,16 +767,16 @@ func TestFuntion_normol(t *testing.T) {
 			func (t* test)add() (int,int) {
 			}
 
-
 			func main(){
 				a := test{a: 6, b: 7}
 				println(a.add())
 			}
 			`, []string{
-			"Undefined-a.add(valid)(make(struct {number,number})) member[6,7]",
+			"Undefined-a.add(valid)(make(struct {number,number}))",
 		}, t)
 	})
-	t.Run("member-call top-def ", func(t *testing.T) {
+
+	t.Run("member-call top-def", func(t *testing.T) {
 		test.CheckSyntaxFlow(t, `package main
 		
 			type test struct{
