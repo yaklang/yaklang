@@ -579,11 +579,14 @@ func TestWebLogMonitor(t *testing.T) {
 	select {}
 }
 
-func TestAAA(t *testing.T) {
-	reader := bytes.NewReader([]byte("abc"))
-	read, err := reader.Read(make([]byte, 100))
+func TestWebLogMonitorForge(t *testing.T) {
+	yakit.InitialDatabase()
+	_, err := ExecuteForge("web_log_monitor", []*ypb.ExecParamItem{
+		//{Key: "text", Value: monOncleJules},
+
+	}, WithAICallback(aiforge.GetHoldAICallback()))
 	if err != nil {
-		spew.Dump(err)
+		return
 	}
-	spew.Dump(read)
+
 }
