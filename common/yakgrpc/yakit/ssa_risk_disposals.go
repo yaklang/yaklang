@@ -18,7 +18,7 @@ func FilterSSARiskDisposals(db *gorm.DB, filter *ypb.SSARiskDisposalsFilter) *go
 		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", filter.GetID())
 	}
 	if len(filter.GetRiskId()) > 0 {
-		db = bizhelper.ExactQueryInt64ArrayOr(db, "risk_id", filter.GetRiskId())
+		db = bizhelper.ExactQueryInt64ArrayOr(db, "ssa_risk_id", filter.GetRiskId())
 	}
 	if len(filter.GetStatus()) > 0 {
 		db = bizhelper.ExactQueryStringArrayOr(db, "status", filter.GetStatus())
@@ -85,7 +85,9 @@ func QuerySSARiskDisposals(db *gorm.DB, req *ypb.QuerySSARiskDisposalsRequest) (
 func GetSSARiskDisposals(db *gorm.DB, riskId int64) ([]schema.SSARiskDisposals, error) {
 	db = db.Model(&schema.SSARiskDisposals{})
 	var disposals []schema.SSARiskDisposals
-	if err := db.Where("risk_id = ?", riskId).Find(&disposals).Error; err != nil {
+	if err := db.Where("ssa_risk_id = ?", riskId).
+		Order("updated_at DESC").
+		Find(&disposals).Error; err != nil {
 		return nil, utils.Errorf("GetSSARiskDisposals failed: %v", err)
 	}
 	return disposals, nil
