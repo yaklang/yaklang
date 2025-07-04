@@ -7,7 +7,7 @@ import (
 
 type SSARiskDisposals struct {
 	gorm.Model
-	SSARiskID int64 `json:"risk_id" gorm:"index"`
+	SSARiskID int64 `json:"ssa_risk_id" gorm:"index"`
 
 	Status  string `json:"status" gorm:"index"`
 	Comment string `json:"comment" gorm:"type:text"`
@@ -39,9 +39,23 @@ func (s *SSARiskDisposals) AfterDelete(tx *gorm.DB) error {
 
 // updateRiskLatestDisposalStatus用于更新SSARisk的最新处置状态
 func (s *SSARiskDisposals) updateRiskLatestDisposalStatus(tx *gorm.DB) error {
+	var latestDisposal SSARiskDisposals
+	err := tx.Where("ssa_risk_id = ?", s.SSARiskID).
+		Order("updated_at DESC").
+		First(&latestDisposal).Error
+
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return tx.Model(&SSARisk{}).
+				Where("id = ?", s.SSARiskID).
+				Update("latest_disposal_status", string(SSARiskDisposalStatus_NotSet)).Error
+		}
+		return err
+	}
+
 	return tx.Model(&SSARisk{}).
 		Where("id = ?", s.SSARiskID).
-		Update("latest_disposal_status", s.Status).Error
+		Update("latest_disposal_status", latestDisposal.Status).Error
 }
 
 func (s *SSARiskDisposals) ToGRPCModel() *ypb.SSARiskDisposalData {
