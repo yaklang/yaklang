@@ -66,11 +66,11 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.Function {
 	)
 
 	var (
-		StrTyp      = ssa.BasicTypes[ssa.StringTypeKind]
-		NumberTyp   = ssa.BasicTypes[ssa.NumberTypeKind]
-		BoolTyp     = ssa.BasicTypes[ssa.BooleanTypeKind]
-		AnyTyp      = ssa.BasicTypes[ssa.AnyTypeKind]
-		BytesTyp    = ssa.BasicTypes[ssa.BytesTypeKind]
+		StrTyp      = ssa.CreateStringType()
+		NumberTyp   = ssa.CreateNumberType()
+		BoolTyp     = ssa.CreateBooleanType()
+		AnyTyp      = ssa.CreateAnyType()
+		BytesTyp    = ssa.CreateBytesType()
 		HandlerFunc = func(arg, ret []ssa.Type, isVar bool) ssa.Type {
 			return ssa.NewFunctionTypeDefine("handler", arg, ret, isVar)
 		}

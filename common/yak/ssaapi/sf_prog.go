@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
+
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"regexp"
 
 	"github.com/gobwas/glob"
 	"github.com/samber/lo"

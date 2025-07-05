@@ -402,7 +402,7 @@ rsp.`,
 					item := getExactSuggestion(t, suggestions, "func")
 					require.Equal(t, "Method", item.Kind)
 					require.Equal(t, getFuncCompletionBySSAType("func",
-						ssa.NewFunctionTypeDefine("func", []ssa.Type{ssa.GetAnyType(), ssa.GetAnyType()}, []ssa.Type{ssa.GetNumberType()}, false)),
+						ssa.NewFunctionTypeDefine("func", []ssa.Type{ssa.CreateAnyType(), ssa.CreateAnyType()}, []ssa.Type{ssa.CreateNumberType()}, false)),
 						item.InsertText)
 				},
 			)

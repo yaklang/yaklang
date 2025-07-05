@@ -87,7 +87,7 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 			ret.typ = objTyp.FieldType
 			return
 		case BytesTypeKind, StringTypeKind:
-			ret.typ = BasicTypes[NumberTypeKind]
+			ret.typ = CreateNumberType()
 			return
 		default:
 			ret.typ = CreateAnyType()
@@ -135,7 +135,7 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 			log.Errorf("checkCanMemberCall: %v is structTypeKind but is not a ObjectType", value.GetType())
 			break
 		}
-		if TypeCompare(BasicTypes[StringTypeKind], key.GetType()) {
+		if TypeCompare(CreateStringType(), key.GetType()) {
 			if fieldTyp := typ.GetField(key); fieldTyp != nil {
 				ret.typ = fieldTyp
 				return
@@ -151,7 +151,7 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 			log.Errorf("checkCanMemberCall: %v is TupleTypeKind but is not a ObjectType", value.GetType())
 			break
 		}
-		if TypeCompare(BasicTypes[NumberTypeKind], key.GetType()) {
+		if TypeCompare(CreateNumberType(), key.GetType()) {
 			if fieldTyp := typ.GetField(key); fieldTyp != nil {
 				ret.typ = fieldTyp
 				return
@@ -181,7 +181,7 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 			log.Errorf("checkCanMemberCall: %v is SliceTypeKind but is not a ObjectType", value.GetType())
 			break
 		}
-		if TypeCompare(BasicTypes[NumberTypeKind], key.GetType()) {
+		if TypeCompare(CreateNumberType(), key.GetType()) {
 			if typ.FieldType.GetTypeKind() == AnyTypeKind {
 				if fieldTyp := typ.GetField(key); fieldTyp != nil {
 					ret.typ = fieldTyp
@@ -194,8 +194,8 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 			// type check error
 		}
 	case BytesTypeKind, StringTypeKind: // number
-		if TypeCompare(BasicTypes[NumberTypeKind], key.GetType()) {
-			ret.typ = BasicTypes[NumberTypeKind]
+		if TypeCompare(CreateNumberType(), key.GetType()) {
+			ret.typ = CreateNumberType()
 			return
 		} else {
 			// type check error

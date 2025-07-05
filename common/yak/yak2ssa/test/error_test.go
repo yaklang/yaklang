@@ -1571,7 +1571,7 @@ func TestErrorGenericFunc(t *testing.T) {
 a = [1]
 target = append(a, 2, "3")`,
 				Want: []string{
-					ssa.GenericTypeError(ssa.TypeT, ssa.TypeT, ssa.GetNumberType(), ssa.GetStringType()),
+					ssa.GenericTypeError(ssa.TypeT, ssa.TypeT, ssa.CreateNumberType(), ssa.CreateStringType()),
 					ssa4analyze.ArgumentTypeError(3, "string", "number", "append"),
 				},
 			},
@@ -1584,7 +1584,7 @@ target = append(a, 2, "3")`,
 a = b"asd"
 target = append(a, b"qwe", b"zxc")`,
 				Want: []string{
-					ssa.GenericTypeError(ssa.TypeT, ssa.TypeT, ssa.GetByteType(), ssa.GetBytesType()),
+					ssa.GenericTypeError(ssa.TypeT, ssa.TypeT, ssa.CreateByteType(), ssa.CreateBytesType()),
 				},
 			},
 		)

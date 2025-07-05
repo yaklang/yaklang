@@ -154,7 +154,7 @@ func (c *Call) handlerGeneric() {
 			if argTyp.GetTypeKind() == SliceTypeKind {
 				argTyp = argTyp.(*ObjectType).FieldType
 			} else if argTyp.GetTypeKind() == BytesTypeKind {
-				argTyp = GetByteType()
+				argTyp = CreateByteType()
 			} else {
 				// todo: should error
 			}
@@ -169,7 +169,7 @@ func (c *Call) handlerGeneric() {
 	// fallback
 	for typ := range genericTypes {
 		if _, ok := instanceTypeMap[typ.String()]; !ok {
-			instanceTypeMap[typ.String()] = GetAnyType()
+			instanceTypeMap[typ.String()] = CreateAnyType()
 		}
 	}
 
@@ -261,7 +261,7 @@ func (c *Call) handlerReturnType() {
 		if retType, ok := funcTyp.ReturnType.(*ObjectType); ok {
 			if retType.Combination && retType.FieldTypes[len(retType.FieldTypes)-1].GetTypeKind() == ErrorTypeKind {
 				if len(retType.FieldTypes) == 1 {
-					c.SetType(BasicTypes[NullTypeKind])
+					c.SetType(CreateNullType())
 				} else if len(retType.FieldTypes) == 2 {
 					// if len(t.FieldTypes) == 2 {
 					c.SetType(retType.FieldTypes[0])
@@ -279,7 +279,7 @@ func (c *Call) handlerReturnType() {
 			}
 		} else if t, ok := funcTyp.ReturnType.(*BasicType); ok && t.Kind == ErrorTypeKind {
 			// pass
-			c.SetType(BasicTypes[NullTypeKind])
+			c.SetType(CreateNullType())
 			for _, variable := range c.GetAllVariables() {
 				variable.NewError(Error, SSATAG, ValueIsNull())
 			}

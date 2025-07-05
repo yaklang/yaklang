@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -259,13 +260,13 @@ func (v *Value) Compare(other *Value) bool { return ValueCompare(v, other) }
 
 func (v *Value) GetType() *Type {
 	if v.IsNil() {
-		return Any
+		return NewType(ssa.CreateAnyType())
 	}
 	inst := v.getInstruction()
 	if n, ok := inst.(ssa.Typed); ok {
 		return NewType(n.GetType())
 	}
-	return Any
+	return NewType(ssa.CreateAnyType())
 }
 
 func (v *Value) GetTypeKind() ssa.TypeKind {
@@ -531,13 +532,13 @@ func (v *Value) GetConstValue() any {
 	}
 }
 
-func (v *Value) GetConst() *ssa.Const {
+func (v *Value) GetConst() *ssa.ConstInst {
 	if v.IsNil(true) {
 		return nil
 	}
 
 	if cInst, ok := ssa.ToConstInst(v.innerValue); ok {
-		return cInst.Const
+		return cInst
 	} else {
 		return nil
 	}

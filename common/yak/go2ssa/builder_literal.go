@@ -594,7 +594,7 @@ func (b *astbuilder) buildSliceTypeLiteral(stmt *gol.SliceTypeContext) ssa.Type 
 
 	var ssatyp ssa.Type
 	if stmt.GetText() == "[]byte" || stmt.GetText() == "[]uint8" {
-		return ssa.BasicTypes[ssa.BytesTypeKind]
+		return ssa.CreateBytesType()
 	}
 	if s, ok := stmt.ElementType().(*gol.ElementTypeContext); ok {
 		if eleTyp := b.buildType(s.Type_().(*gol.Type_Context)); eleTyp != nil {

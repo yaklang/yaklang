@@ -10,7 +10,7 @@ func (r *Return) calcType() Type {
 	handleType := func(v Value) Type {
 		if v == nil {
 			log.Errorf("Return[%s: %s] value is nil", r.String(), r.GetRange())
-			return BasicTypes[NullTypeKind]
+			return CreateNullType()
 		}
 		t := v.GetType()
 		if objTyp, ok := ToObjectType(t); ok {
@@ -21,7 +21,7 @@ func (r *Return) calcType() Type {
 
 	switch len(r.Results) {
 	case 0:
-		return BasicTypes[NullTypeKind]
+		return CreateNullType()
 	case 1:
 		return handleType(r.GetValueById(r.Results[0]))
 	default:
@@ -179,14 +179,14 @@ func handlerReturnType(rs []*Return, functionType *FunctionType) Type {
 
 	typs := lo.Keys(tmp)
 	if len(typs) == 0 {
-		return BasicTypes[NullTypeKind]
+		return CreateNullType()
 	} else if len(typs) == 1 {
 		return typs[0]
 	} else {
 		// TODO: how handler this? multiple return with different type
 		// should set Warn!!
 		// and ?? Type ??
-		return GetAnyType()
+		return CreateAnyType()
 	}
 }
 
