@@ -8,7 +8,7 @@ import (
 type Const struct {
 	value any
 	// only one type
-	typ Type
+	// typ Type
 	str string
 }
 
@@ -16,18 +16,18 @@ func (c *Const) GetRawValue() any {
 	return c.value
 }
 
-// get type
-func (c *Const) GetType() Type {
-	t := c.typ
-	if t == nil {
-		t = CreateAnyType()
-	}
-	return t
-}
+// // get type
+// func (c *Const) GetType() Type {
+// 	t := c.typ
+// 	if t == nil {
+// 		t = CreateAnyType()
+// 	}
+// 	return t
+// }
 
-func (c *Const) SetType(ts Type) {
-	// const don't need set type
-}
+// func (c *Const) SetType(ts Type) {
+// 	// const don't need set type
+// }
 
 var (
 	ConstMap      = make(map[any]*Const)
@@ -40,8 +40,8 @@ func init() {
 
 	ConstMap[nil] = &Const{
 		value: nil,
-		typ:   BasicTypes[NullTypeKind],
-		str:   "nil",
+		// typ:   CreateNullType(),
+		str: "nil",
 	}
 }
 
@@ -79,16 +79,14 @@ func NewConst(i any, isPlaceHolder ...bool) *ConstInst {
 	if placeHolder {
 		ci.ConstType = ConstTypePlaceholder
 	}
-	ci.SetType(c.GetType())
+	ci.SetType(GetType(i))
 	return ci
 }
 
 func newConstCreate(i any) *Const {
 	// build new const
-	typ := GetType(i)
 	c := &Const{
 		value: i,
-		typ:   typ,
 		str:   fmt.Sprintf("%v", i),
 	}
 	ConstMapMutex.Lock()
@@ -109,11 +107,11 @@ func newConstByMap(i any) *Const {
 	}
 }
 
-func (c *Const) GetTypeKind() TypeKind {
+func (c *ConstInst) GetTypeKind() TypeKind {
 	return c.typ.GetTypeKind()
 }
 
-func (c *Const) IsBoolean() bool {
+func (c *ConstInst) IsBoolean() bool {
 	return c.typ.GetTypeKind() == BooleanTypeKind
 }
 
@@ -121,7 +119,7 @@ func (c *Const) Boolean() bool {
 	return c.value.(bool)
 }
 
-func (c *Const) IsNumber() bool {
+func (c *ConstInst) IsNumber() bool {
 	return c.typ.GetTypeKind() == NumberTypeKind
 }
 
@@ -151,7 +149,7 @@ func (c *Const) Number() int64 {
 	return 0
 }
 
-func (c *Const) IsFloat() bool {
+func (c *ConstInst) IsFloat() bool {
 	switch c.value.(type) {
 	case float32:
 		return c.typ.GetTypeKind() == NumberTypeKind
@@ -171,7 +169,7 @@ func (c *Const) Float() float64 {
 	return float64(c.Number())
 }
 
-func (c *Const) IsString() bool {
+func (c *ConstInst) IsString() bool {
 	return c.typ.GetTypeKind() == StringTypeKind
 }
 

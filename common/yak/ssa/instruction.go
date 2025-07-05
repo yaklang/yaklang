@@ -64,7 +64,7 @@ func NewBinOp(op BinaryOpcode, x, y Value) *BinOp {
 		Y:       y.GetId(),
 	}
 	if op >= OpGt && op <= OpIn {
-		b.SetType(BasicTypes[BooleanTypeKind])
+		b.SetType(CreateBooleanType())
 	}
 	return b
 }

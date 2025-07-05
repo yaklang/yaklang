@@ -11,15 +11,6 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-func init() {
-	BasicTypes[ErrorTypeKind].AddMethod("Error", NewFunctionWithType("error.Error", NewFunctionTypeDefine(
-		"error.Error",
-		[]Type{BasicTypes[ErrorTypeKind]},
-		[]Type{BasicTypes[StringTypeKind]},
-		false,
-	)))
-}
-
 const MAXTypeCompareDepth = 10
 
 func typeEqualEx(t1, t2 Type, depth int) bool {
@@ -181,7 +172,7 @@ func typeCompareEx(t1, t2 Type, depth int) bool {
 		}
 		if t2kind == SliceTypeKind {
 			if o, ok := ToObjectType(t2); ok {
-				return typeCompareEx(GetByteType(), o.FieldType, depth)
+				return typeCompareEx(CreateByteType(), o.FieldType, depth)
 			}
 		}
 	case StringTypeKind:
@@ -551,18 +542,6 @@ func (b *BasicType) GetName() string {
 // 	return lo.Keys(b.method)
 // }
 
-var BasicTypes = map[TypeKind]*BasicType{
-	NumberTypeKind:    NewBasicType(NumberTypeKind, "number"),
-	StringTypeKind:    NewBasicType(StringTypeKind, "string"),
-	ByteTypeKind:      NewBasicType(ByteTypeKind, "byte"),
-	BytesTypeKind:     NewBasicType(BytesTypeKind, "bytes"),
-	BooleanTypeKind:   NewBasicType(BooleanTypeKind, "boolean"),
-	UndefinedTypeKind: NewBasicType(UndefinedTypeKind, "undefined"),
-	NullTypeKind:      NewBasicType(NullTypeKind, "null"),
-	AnyTypeKind:       NewBasicType(AnyTypeKind, "any"),
-	ErrorTypeKind:     NewBasicType(ErrorTypeKind, "error"),
-}
-
 func CreateNumberType() Type {
 	return NewBasicType(NumberTypeKind, "number")
 }
@@ -596,69 +575,43 @@ func CreateAnyType() Type {
 }
 
 func CreateErrorType() Type {
-	return NewBasicType(ErrorTypeKind, "error")
-}
-
-func GetNumberType() Type {
-	return BasicTypes[NumberTypeKind]
-}
-
-func GetByteType() Type {
-	return BasicTypes[ByteTypeKind]
-}
-
-func GetStringType() Type {
-	return BasicTypes[StringTypeKind]
-}
-
-func GetBytesType() Type {
-	return BasicTypes[BytesTypeKind]
-}
-
-func GetBooleanType() Type {
-	return BasicTypes[BooleanTypeKind]
-}
-
-func GetUndefinedType() Type {
-	return BasicTypes[UndefinedTypeKind]
-}
-
-func GetNullType() Type {
-	return BasicTypes[NullTypeKind]
-}
-
-func GetAnyType() Type {
-	return CreateAnyType()
-}
-
-func GetErrorType() Type {
-	return BasicTypes[ErrorTypeKind]
+	ret := NewBasicType(ErrorTypeKind, "error")
+	ret.AddMethod("Error", NewFunctionWithType("error.Error", NewFunctionTypeDefine(
+		"error.Error",
+		[]Type{ret},
+		[]Type{CreateStringType()},
+		false,
+	)))
+	return ret
 }
 
 func GetType(i any) Type {
+	if utils.IsNil(i) {
+		return CreateNullType()
+	}
 	if typ := GetTypeByStr(reflect.TypeOf(i).String()); typ != nil {
 		return typ
 	} else {
-		return GetAnyType()
+		return CreateAnyType()
 	}
 }
 
 func GetTypeByStr(typ string) Type {
 	switch typ {
 	case "uint", "uint8", "byte", "uint16", "uint32", "uint64", "int", "int8", "int16", "int32", "int64", "uintptr":
-		return BasicTypes[NumberTypeKind]
+		return CreateNumberType()
 	case "float", "float32", "float64", "double", "complex128", "complex64":
-		return BasicTypes[NumberTypeKind]
+		return CreateNumberType()
 	case "string":
-		return BasicTypes[StringTypeKind]
+		return CreateStringType()
 	case "bool":
-		return BasicTypes[BooleanTypeKind]
+		return CreateBooleanType()
 	case "bytes", "[]uint8", "[]byte":
-		return BasicTypes[BytesTypeKind]
+		return CreateBytesType()
 	case "interface {}", "var", "any":
 		return CreateAnyType()
 	case "error":
-		return BasicTypes[ErrorTypeKind]
+		return CreateErrorType()
 	default:
 		return nil
 	}
@@ -972,7 +925,7 @@ func NewObjectType() *ObjectType {
 func NewSliceType(elem Type) *ObjectType {
 	i := NewObjectType()
 	i.Kind = SliceTypeKind
-	i.KeyTyp = BasicTypes[NumberTypeKind]
+	i.KeyTyp = CreateNumberType()
 	i.FieldType = elem
 	return i
 }
@@ -1191,7 +1144,7 @@ func (f *FunctionType) SetModifySelf(b bool) { f.IsModifySelf = b }
 
 func CalculateType(ts []Type) Type {
 	if len(ts) == 0 {
-		return BasicTypes[NullTypeKind]
+		return CreateNullType()
 	} else if len(ts) == 1 {
 		return ts[0]
 	} else {

@@ -2277,7 +2277,7 @@ func (b *builder) VisitTemplateExpression(node *ast.TemplateExpression) ssa.Valu
 		for _, spanNode := range node.TemplateSpans.Nodes {
 			// 1. 表达式部分
 			exprVal := b.VisitRightValueExpression(spanNode.AsTemplateSpan().Expression)
-			exprStr := b.EmitTypeCast(exprVal, ssa.BasicTypes[ssa.StringTypeKind])
+			exprStr := b.EmitTypeCast(exprVal, ssa.CreateStringType())
 			result = b.EmitBinOp(ssa.OpAdd, result, exprStr)
 
 			// 2. 字符串字面量部分（tail 或 middle）

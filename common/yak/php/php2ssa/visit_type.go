@@ -1,8 +1,9 @@
 package php2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -130,21 +131,21 @@ func (y *builder) VisitCastOperation(raw phpparser.ICastOperationContext) ssa.Ty
 
 	switch {
 	case i.BoolType() != nil:
-		return ssa.GetBooleanType()
+		return ssa.CreateBooleanType()
 	case i.Int8Cast() != nil, i.IntType() != nil, i.Int16Cast() != nil, i.UintCast() != nil, i.DoubleCast() != nil, i.DoubleType() != nil, i.FloatCast() != nil:
-		return ssa.GetNumberType()
+		return ssa.CreateNumberType()
 	case i.StringType() != nil:
-		return ssa.GetStringType()
+		return ssa.CreateStringType()
 	case i.BinaryCast() != nil:
-		return ssa.GetBytesType()
+		return ssa.CreateBytesType()
 	case i.UnicodeCast() != nil:
-		return ssa.GetStringType()
+		return ssa.CreateStringType()
 	case i.Array() != nil:
 		return ssa.NewMapType(ssa.CreateAnyType(), ssa.CreateAnyType())
 	case i.ObjectType() != nil:
 		return ssa.CreateAnyType()
 	case i.Unset() != nil:
-		return ssa.GetNullType()
+		return ssa.CreateNullType()
 	default:
 		return ssa.CreateAnyType()
 	}

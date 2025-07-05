@@ -12,7 +12,7 @@ func fixFunctionOption() []ssaapi.Option {
 			ssa.NewFunctionTypeDefine(
 				id,
 				[]ssa.Type{ssa.NewAnyFunctionType()},
-				[]ssa.Type{ssa.GetBooleanType()},
+				[]ssa.Type{ssa.CreateBooleanType()},
 				false))
 		f.SetRange(b.CurrentRange)
 		return f

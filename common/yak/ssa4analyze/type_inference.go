@@ -70,7 +70,7 @@ func (t *TypeInference) InferenceOnInstruction(inst ssa.Instruction) {
 	if iv, ok := inst.(ssa.Value); ok {
 		t := iv.GetType()
 		if utils.IsNil(t) {
-			iv.SetType(ssa.BasicTypes[ssa.NullTypeKind])
+			iv.SetType(ssa.CreateNullType())
 		}
 	}
 
@@ -192,7 +192,7 @@ func (t *TypeInference) TypeInferenceCall(call *ssa.Call) {
 				argFunc.SetType(paramFuncType.Parameter[i])
 				argFuncType.Parameter[i] = paramFuncType.Parameter[i]
 			}
-		} else if argTyp == ssa.GetAnyType() {
+		} else if argTyp == ssa.CreateAnyType() {
 			arg.SetType(paramTyp)
 		}
 	}
@@ -244,7 +244,7 @@ func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) {
 
 		// if y.GetTypeKind() == ssa.Null {
 		if ssa.IsCompareOpcode(bin.Op) {
-			return ssa.BasicTypes[ssa.BooleanTypeKind]
+			return ssa.CreateBooleanType()
 		}
 		// }
 		return nil
@@ -257,7 +257,7 @@ func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) {
 
 	// typ := handler
 	if ssa.IsCompareOpcode(bin.Op) {
-		bin.SetType(ssa.BasicTypes[ssa.BooleanTypeKind])
+		bin.SetType(ssa.CreateBooleanType())
 		return
 	} else {
 		bin.SetType(retTyp)

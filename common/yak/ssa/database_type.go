@@ -13,6 +13,7 @@ func saveType(cache *ProgramCache, typ Type) int64 {
 	}
 
 	cache.TypeCache.Set(typ)
+	log.Errorf("ssa.saveType: saving type %s(%v)", typ, typ.GetId())
 	return typ.GetId()
 }
 

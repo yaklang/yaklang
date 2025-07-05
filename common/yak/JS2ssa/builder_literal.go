@@ -61,7 +61,7 @@ func (b *astbuilder) buildLiteral(stmt *JS.LiteralContext) ssa.Value {
 func (b *astbuilder) buildTemplateStringLiteral(stmt *JS.TemplateStringLiteralContext) ssa.Value {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
-	
+
 	type StringAtom interface {
 		GetText() string
 		SingleExpression() JS.ISingleExpressionContext
@@ -91,8 +91,8 @@ func (b *astbuilder) buildTemplateStringLiteral(stmt *JS.TemplateStringLiteralCo
 			tmpStr = ""
 			value = b.EmitBinOp(ssa.OpAdd, value, b.EmitConstInst(s))
 
-			v,_ := b.buildSingleExpression(expr,false)
-			t := b.EmitTypeCast(v, ssa.BasicTypes[ssa.StringTypeKind])
+			v, _ := b.buildSingleExpression(expr, false)
+			t := b.EmitTypeCast(v, ssa.CreateStringType())
 			value = b.EmitBinOp(ssa.OpAdd, value, t)
 		} else {
 			tmpStr += atom.GetText()

@@ -15,7 +15,7 @@ func Test_Type_ContainSelf(t *testing.T) {
 	})
 
 	t.Run("object type contain self", func(t *testing.T) {
-		objType := ssa.NewMapType(ssa.GetStringType(), ssa.GetAnyType())
+		objType := ssa.NewMapType(ssa.CreateStringType(), ssa.CreateAnyType())
 		objType.FieldType = objType
 		objType.Finish()
 		log.Infof("objType: %s", objType.String())

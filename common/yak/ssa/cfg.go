@@ -449,7 +449,7 @@ func (t *TryBuilder) BuildTryBlock(f func()) {
 }
 
 func defaultExceptionParameterType(v Value) {
-	v.SetType(BasicTypes[ErrorTypeKind])
+	v.SetType(CreateErrorType())
 }
 
 func (t *TryBuilder) BuildErrorCatch(
