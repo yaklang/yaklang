@@ -2,10 +2,11 @@ package java2ssa
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 
 	"github.com/yaklang/yaklang/common/log"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
@@ -111,7 +112,7 @@ func (y *builder) VisitIntegerLiteral(raw javaparser.IIntegerLiteralContext) ssa
 		// big.NewInt(0).SetString()
 		// return nil
 		v := y.EmitConstInst(intStr)
-		v.SetType(ssa.GetNumberType())
+		v.SetType(ssa.CreateNumberType())
 		return v
 	}
 	if resultInt64 > math.MaxInt {

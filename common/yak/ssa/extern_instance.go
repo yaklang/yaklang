@@ -307,7 +307,7 @@ func (prog *Program) handlerType(typ reflect.Type, level int) Type {
 	// before this check, code will not recursive.
 	// check level
 	if level >= MAXTYPELEVEL {
-		return GetAnyType()
+		return CreateAnyType()
 	}
 	level++
 	// below this code, will recursive

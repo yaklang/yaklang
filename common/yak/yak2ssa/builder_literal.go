@@ -135,7 +135,7 @@ func (b *astbuilder) buildSliceTypeLiteral(stmt *yak.SliceTypeLiteralContext) ss
 	defer recoverRange()
 	// fmt.Println(stmt.GetText())
 	if stmt.GetText() == "[]byte" || stmt.GetText() == "[]uint8" {
-		return ssa.BasicTypes[ssa.BytesTypeKind]
+		return ssa.CreateBytesType()
 	}
 	if s, ok := stmt.TypeLiteral().(*yak.TypeLiteralContext); ok {
 		if eleTyp := b.buildTypeLiteral(s); eleTyp != nil {
@@ -247,7 +247,7 @@ func (b *astbuilder) buildTemplateStringLiteral(stmt *yak.TemplateStringLiteralC
 			value = b.EmitBinOp(ssa.OpAdd, value, b.EmitConstInst(s))
 
 			v := b.buildExpression(expr.(*yak.ExpressionContext))
-			t := b.EmitTypeCast(v, ssa.BasicTypes[ssa.StringTypeKind])
+			t := b.EmitTypeCast(v, ssa.CreateStringType())
 			value = b.EmitBinOp(ssa.OpAdd, value, t)
 		} else {
 			tmpStr += atom.GetText()
@@ -389,7 +389,7 @@ ParseStrLit:
 	}
 
 	if prefix == 'b' {
-		ret.SetType(ssa.BasicTypes[ssa.BytesTypeKind])
+		ret.SetType(ssa.CreateBytesType())
 	}
 
 	return ret

@@ -36,17 +36,6 @@ func (t *Type) Compare(t2 *Type) bool {
 	return TypeCompare(t, t2)
 }
 
-var (
-	Number        = NewType(ssa.BasicTypes[ssa.NumberTypeKind])
-	String        = NewType(ssa.BasicTypes[ssa.StringTypeKind])
-	Bytes         = NewType(ssa.BasicTypes[ssa.BytesTypeKind])
-	Boolean       = NewType(ssa.BasicTypes[ssa.BooleanTypeKind])
-	UndefinedType = NewType(ssa.BasicTypes[ssa.UndefinedTypeKind])
-	Null          = NewType(ssa.BasicTypes[ssa.NullTypeKind])
-	Any           = NewType(ssa.BasicTypes[ssa.AnyTypeKind])
-	ErrorType     = NewType(ssa.BasicTypes[ssa.ErrorTypeKind])
-)
-
 func SliceOf(t *Type) *Type {
 	return NewType(ssa.NewSliceType(t.t))
 }
