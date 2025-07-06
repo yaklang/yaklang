@@ -150,7 +150,7 @@ func SignGMServerCrtNKeyWithParams(ca []byte, privateKey []byte, cn string, notA
 	return certBuffer.Bytes(), sPrivBytes, nil
 }
 
-func GenerateGMSelfSignedCertKey(commonName string) ([]byte, []byte, error) {
+func generateGMSelfSignedCertKey(commonName string) ([]byte, []byte, error) {
 	pkey, err := sm2.GenerateKey(cryptoRand.Reader)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "sm2.GenerateKey(cryptoRand.Reader)")
@@ -198,6 +198,23 @@ func GenerateGMSelfSignedCertKey(commonName string) ([]byte, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-
 	return certBuf.Bytes(), pKeyBytes, nil
+}
+
+func GenerateGMSelfSignedCertKey(commonName string) ([]byte, []byte, error) {
+	var ca, key []byte
+	var err error
+	for i := 0; i < 5; i++ {
+		// Attempt to generate a self-signed certificate and key
+		ca, key, err = generateGMSelfSignedCertKey(commonName)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "generateGMSelfSignedCertKey")
+		}
+		_, verifyErr := gmtls.X509KeyPair(ca, key)
+		if verifyErr != nil {
+			continue
+		}
+		return ca, key, nil
+	}
+	return nil, nil, errors.Wrap(err, "generateGMSelfSignedCertKey max retries exceeded")
 }
