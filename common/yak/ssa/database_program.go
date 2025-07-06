@@ -23,6 +23,7 @@ func GetProgram(program string, kind ssadb.ProgramKind) (*Program, error) {
 
 func NewProgramFromDB(p *ssadb.IrProgram) *Program {
 	prog := NewProgram(p.ProgramName, true, p.ProgramKind, nil, "")
+	prog.Cache.SaveToDatabase()
 	prog.irProgram = p
 	prog.Language = p.Language
 	prog.FileList = p.FileList
