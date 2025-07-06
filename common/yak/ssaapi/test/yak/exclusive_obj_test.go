@@ -569,8 +569,12 @@ func TestObject_Make(t *testing.T) {
 		m = []string{"i","j"}
 		print(m[1])
 		`
-		ssatest.CheckSyntaxFlowContain(t, code, `e"j" --> as $target`, map[string][]string{
-			"target": {`Undefined-print("j")`},
-		}, ssaapi.WithLanguage(ssaapi.Yak))
+		ssatest.CheckSyntaxFlowContain(t, code,
+			`
+			e"j" as $j
+			$j --> as $target
+			`, map[string][]string{
+				"target": {`Undefined-print("j")`},
+			}, ssaapi.WithLanguage(ssaapi.Yak))
 	})
 }

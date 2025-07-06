@@ -8,12 +8,14 @@ import (
 )
 
 func saveType(cache *ProgramCache, typ Type) int64 {
+	if utils.IsNil(typ) {
+		return -1
+	}
 	if id := typ.GetId(); id > 0 {
 		return id
 	}
 
 	cache.TypeCache.Set(typ)
-	log.Errorf("ssa.saveType: saving type %s(%v)", typ, typ.GetId())
 	return typ.GetId()
 }
 
