@@ -219,18 +219,18 @@ func lineDisASM(v Instruction, liner DisasmLiner) (ret string) {
 	case *Switch:
 		return fmt.Sprintf("switch(%s)", DisasmValue(v.Cond))
 	case *LazyInstruction:
-		switch liner.(type) {
-		case *NameDisasmLiner:
-			if s := v.ir.ReadableNameShort; s != "" {
-				return s
-			}
-		case *FullDisasmLiner:
-			if s := v.ir.ReadableName; s != "" {
-				return s
-			}
-		default:
-			// return ""
-		}
+		// switch liner.(type) {
+		// case *NameDisasmLiner:
+		// 	if s := v.ir.ReadableNameShort; s != "" {
+		// 		return s
+		// 	}
+		// case *FullDisasmLiner:
+		// 	// if s := v.ir.ReadableName; s != "" {
+		// 	// 	return s
+		// 	// }
+		// default:
+		// 	// return ""
+		// }
 		return lineDisASM(v.Self(), liner)
 
 	default:
