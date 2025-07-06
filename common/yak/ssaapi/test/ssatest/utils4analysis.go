@@ -3,12 +3,13 @@ package ssatest
 import (
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"io/fs"
 	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -418,11 +419,12 @@ func CheckBottomUser_Contain(variable string, want []string, forceCheckLength ..
 		if len(forceCheckLength) > 0 && forceCheckLength[0] {
 			checkLength = true
 		}
+		p.Show()
 		return checkFunctionEx(
 			func() ssaapi.Values {
-				return p.Ref(variable)
+				return p.Ref(variable).Show()
 			},
-			func(v *ssaapi.Value) ssaapi.Values { return v.GetBottomUses() },
+			func(v *ssaapi.Value) ssaapi.Values { return v.GetBottomUses().Show() },
 			checkLength, want,
 			func(v1 *ssaapi.Value, v2 string) bool {
 				return strings.Contains(v1.String(), v2)
