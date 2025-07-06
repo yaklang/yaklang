@@ -134,17 +134,15 @@ func GetTypeFromDB(cache *ProgramCache, id int64) Type {
 		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
 		return typ
 	case ObjectTypeKind, SliceTypeKind, MapTypeKind, TupleTypeKind, StructTypeKind:
-		typ := &ObjectType{}
+		typ := NewObjectType()
 		typ.Name = getParamStr("name")
 		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
 		typ.Kind = TypeKind(kind)
 		return typ
 	case NumberTypeKind, StringTypeKind, ByteTypeKind, BytesTypeKind, BooleanTypeKind,
 		UndefinedTypeKind, NullTypeKind, AnyTypeKind, ErrorTypeKind:
-		typ := &BasicType{}
-		typ.name = getParamStr("name")
+		typ := NewBasicType(TypeKind(kind), getParamStr("name"))
 		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
-		typ.Kind = TypeKind(kind)
 		return typ
 	case ClassBluePrintTypeKind:
 		typ := &Blueprint{}
