@@ -119,7 +119,7 @@ func TestSyncFromDatabase(t *testing.T) {
 		valueA := valuesA[0]
 		// valueA.GetId()
 
-		cache.SaveToDatabase()
+		// cache.SaveToDatabase() // not allow save again
 		lazyInst := cache.GetInstruction(valueA.GetId())
 		require.NotNil(t, lazyInst)
 
