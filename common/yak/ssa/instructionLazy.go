@@ -231,6 +231,15 @@ func (lz *LazyInstruction) GetOpcode() Opcode {
 	return Opcode(lz.ir.Opcode)
 }
 
+func (lz *LazyInstruction) RefreshString() {
+	lz.check()
+	if utils.IsNil(lz.Instruction) {
+		log.Errorf("BUG: lazyInstruction IrCode is nil")
+		return
+	}
+	lz.Instruction.RefreshString()
+}
+
 func (lz *LazyInstruction) String() string {
 	lz.check()
 	if utils.IsNil(lz.Instruction) {

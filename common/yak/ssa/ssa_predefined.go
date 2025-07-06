@@ -24,9 +24,28 @@ type anInstruction struct {
 	isAnnotation bool
 	isExtern     bool
 	isFromDB     bool
+
+	str               string
+	readableName      string
+	readableNameShort string
 }
 
 var _ Instruction = (*anInstruction)(nil)
+
+func (v *anInstruction) RefreshString() {
+	inst := v.Self()
+	if utils.IsNil(inst) {
+		return
+	}
+	if op := inst.GetOpcode(); op == SSAOpcodeFunction || op == SSAOpcodeBasicBlock {
+		v.str = fmt.Sprintf("[%s]%s", inst.GetOpcode().String(), inst.GetName())
+	} else {
+		v.str = inst.String()
+		v.readableName = LineDisASM(inst)
+	}
+
+	v.readableNameShort = LineShortDisASM(inst)
+}
 
 func (v *anInstruction) GetSourceCode() string {
 	r := v.GetRange()
@@ -82,7 +101,7 @@ func (i *anInstruction) IsFromDB() bool { return i.isFromDB }
 func (i *anInstruction) SetIsFromDB(b bool) { i.isFromDB = b }
 
 func (i *anInstruction) Self() Instruction {
-	return i
+	return i.GetProgram().GetInstructionById(i.GetId())
 }
 
 func (i *anInstruction) ReplaceValue(Value, Value) {

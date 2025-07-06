@@ -87,9 +87,11 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	ir.Name = inst.GetName()
 	ir.VerboseName = inst.GetVerboseName()
 	ir.ShortVerboseName = inst.GetShortVerboseName()
-	ir.String = inst.String()
-	ir.ReadableName = LineDisASM(inst)
-	ir.ReadableNameShort = LineShortDisASM(inst)
+	if anInst := inst.getAnInstruction(); anInst != nil {
+		ir.String = anInst.str
+		ir.ReadableName = anInst.readableName
+		ir.ReadableNameShort = anInst.readableNameShort
+	}
 	// opcode
 	ir.Opcode = int64(inst.GetOpcode())
 	ir.OpcodeName = SSAOpcode2Name[inst.GetOpcode()]
