@@ -325,6 +325,9 @@ func (c *Call) handleCalleeFunction() {
 
 				objectName := p.ObjectName
 				key := p.GetValueById(p.MemberCallKey)
+				if utils.IsNil(key) {
+					continue
+				}
 				object, ok := p.Get(c)
 				if !ok {
 					continue

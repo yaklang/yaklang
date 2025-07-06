@@ -16,6 +16,10 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 	// replace object member-call
 	if v.IsObject() {
 		replace := func(index, member Value) {
+			if utils.IsNil(index) || utils.IsNil(member) {
+				log.Errorf("BUG: replace member is nil key[%v] member[%v]", index, member)
+				return
+			}
 			// replace this member object to to
 			key := member.GetKey()
 			// remove this member from v
