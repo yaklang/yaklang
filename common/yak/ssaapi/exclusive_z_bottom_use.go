@@ -112,7 +112,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 	case *ssa.Call:
 		method := inst.GetValueById(inst.Method)
 		if method == nil {
-			log.Infof("fallback: (call instruction 's method/func is not *Function) unknown caller, got: %v", method.String())
+			log.Infof("fallback: (call instruction 's method/func is not *Function) unknown caller, ")
 			return v.visitUserFallback(actx, opt...)
 		}
 		actx.pushCall(inst)
