@@ -21,7 +21,6 @@ func SaveVariableIndex(db *gorm.DB, inst Instruction, name, member string) {
 	progName := prog.GetApplication().GetProgramName()
 
 	index := ssadb.CreateIndex(db, progName)
-	defer ssadb.SaveIrIndex(db, index)
 
 	// index
 	index.ProgramName = prog.GetApplication().Name
@@ -48,6 +47,7 @@ func SaveVariableIndex(db *gorm.DB, inst Instruction, name, member string) {
 		}
 
 	}
+	ssadb.SaveIrIndex(db, index)
 }
 
 func SaveClassIndex(db *gorm.DB, name string, inst Instruction) {
@@ -58,10 +58,10 @@ func SaveClassIndex(db *gorm.DB, name string, inst Instruction) {
 	progName := prog.GetApplication().GetProgramName()
 
 	index := ssadb.CreateIndex(db, progName)
-	defer ssadb.SaveIrIndex(db, index)
 
 	// index
 	index.ProgramName = prog.GetApplication().Name
 	index.ValueID = inst.GetId()
 	index.ClassName = name
+	ssadb.SaveIrIndex(db, index)
 }

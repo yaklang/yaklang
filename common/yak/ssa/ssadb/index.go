@@ -37,9 +37,9 @@ func CreateIndex(db *gorm.DB, progName string) *IrIndex {
 	ret := &IrIndex{
 		ProgramName: progName,
 	}
-	db.Model(&IrIndex{}).Create(ret)
 	return ret
 }
+
 func SaveIrIndex(db *gorm.DB, idx *IrIndex) {
 	start := time.Now()
 	defer func() {

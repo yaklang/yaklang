@@ -1,20 +1,19 @@
 package ssa
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-func SaveValueOffset(db *gorm.DB, inst Instruction) {
+func SaveValueOffset(inst Instruction) *ssadb.IrOffset {
 	if inst.GetId() == -1 {
-		return
+		return nil
 	}
 
 	if block, ok := ToBasicBlock(inst); ok {
 		if len(block.Preds) == 0 && len(block.Succs) == 0 && len(block.Insts) == 0 {
-			return
+			return nil
 		}
 	}
 
@@ -22,20 +21,21 @@ func SaveValueOffset(db *gorm.DB, inst Instruction) {
 	if utils.IsNil(rng) || utils.IsNil(rng.GetEditor()) {
 		// inst.GetRange()
 		// log.Errorf("%v: CreateOffset: rng or editor is nil", inst.GetVerboseName())
-		return
+		return nil
 	}
 	irOffset := ssadb.CreateOffset(rng, inst.GetProgram().GetApplication().GetProgramName())
 	// program name \ file name \ offset
 	// value id
 	irOffset.ValueID = int64(inst.GetId())
-	ssadb.SaveIrOffset(db, irOffset)
+	return irOffset
 }
 
-func SaveVariableOffset(db *gorm.DB, v *Variable, variableName string, valueID int64) {
+func SaveVariableOffset(v *Variable, variableName string, valueID int64) []*ssadb.IrOffset {
 	if v.GetId() == -1 {
-		return
+		return nil
 	}
-	add := func(rng memedit.RangeIf) {
+	ret := make([]*ssadb.IrOffset, 0, 10)
+	createOffset := func(rng memedit.RangeIf) {
 		if utils.IsNil(rng) || utils.IsNil(rng.GetEditor()) {
 			return
 		}
@@ -44,11 +44,12 @@ func SaveVariableOffset(db *gorm.DB, v *Variable, variableName string, valueID i
 		// variable name
 		irOffset.VariableName = variableName
 		irOffset.ValueID = valueID
-		ssadb.SaveIrOffset(db, irOffset)
+		ret = append(ret, irOffset)
 	}
 
-	add(v.DefRange)
+	createOffset(v.DefRange)
 	for r := range v.UseRange {
-		add(r)
+		createOffset(r)
 	}
+	return ret
 }
