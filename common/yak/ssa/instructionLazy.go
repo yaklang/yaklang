@@ -4,14 +4,13 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
-func init() {
-	ssautil.RegisterLazyInstructionBuilder(func(id int64) (ssautil.SSAValue, error) {
-		return NewLazyValue(id)
-	})
-}
+// func init() {
+// 	ssautil.RegisterLazyInstructionBuilder(func(id int64) (ssautil.SSAValue, error) {
+// 		return NewLazyValue(id)
+// 	})
+// }
 
 type LazyInstruction struct {
 	// self
@@ -35,17 +34,17 @@ var (
 	_ User        = (*LazyInstruction)(nil)
 )
 
-func NewLazyValue(id int64) (Value, error) {
-	inst, err := NewLazyEx(id, ToValue)
+func NewLazyValue(prog *Program, id int64) (Value, error) {
+	inst, err := NewLazyEx(prog, id, ToValue)
 	if err != nil {
 		return nil, err
 	}
 	return inst, nil
 }
 
-func NewLazyEx[T Instruction](id int64, Cover func(Instruction) (T, bool)) (T, error) {
+func NewLazyEx[T Instruction](prog *Program, id int64, Cover func(Instruction) (T, bool)) (T, error) {
 	var zero T
-	lz, err := NewLazyInstruction(id)
+	lz, err := NewLazyInstruction(prog, id)
 	if err != nil {
 		return zero, err
 	}
@@ -57,9 +56,9 @@ func NewLazyEx[T Instruction](id int64, Cover func(Instruction) (T, bool)) (T, e
 	return inst, nil
 }
 
-func NewInstructionFromLazy[T Instruction](id int64, Cover func(Instruction) (T, bool)) (T, error) {
+func NewInstructionFromLazy[T Instruction](prog *Program, id int64, Cover func(Instruction) (T, bool)) (T, error) {
 	var zero T
-	lz, err := NewLazyInstruction(id)
+	lz, err := NewLazyInstruction(prog, id)
 	if err != nil {
 		return zero, err
 	}
@@ -72,16 +71,16 @@ func NewInstructionFromLazy[T Instruction](id int64, Cover func(Instruction) (T,
 }
 
 // // NewLazyInstruction : create a new lazy instruction, only create in cache
-func NewLazyInstruction(id int64) (Instruction, error) {
+func NewLazyInstruction(prog *Program, id int64) (Instruction, error) {
 	ir := ssadb.GetIrCodeById(ssadb.GetDB(), id)
 	if ir == nil {
 		return nil, utils.Error("IrCode is nil")
 	}
-	prog, ok := GetProgramFromPool(ir.ProgramName)
-	if !ok {
-		log.Errorf("program not found: %s", ir.ProgramName)
-		return nil, utils.Errorf("program not found: %s", ir.ProgramName)
-	}
+	// prog, ok := GetProgramFromPool(ir.ProgramName)
+	// if !ok {
+	// log.Errorf("program not found: %s", ir.ProgramName)
+	// return nil, utils.Errorf("program not found: %s", ir.ProgramName)
+	// }
 	return NewLazyInstructionFromIrCode(ir, prog)
 }
 

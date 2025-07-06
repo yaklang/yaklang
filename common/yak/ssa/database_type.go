@@ -169,7 +169,7 @@ func GetTypeFromDB(cache *ProgramCache, id int64) Type {
 		}
 		containerId := utils.MapGetInt64Or(params, "container", -1)
 		if containerId != -1 {
-			if container, err := NewInstructionFromLazy(containerId, ToMake); err == nil {
+			if container, err := NewInstructionFromLazy(cache.program, containerId, ToMake); err == nil {
 				typ.InitializeWithContainer(container)
 			}
 		}
