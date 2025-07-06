@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
@@ -98,6 +99,12 @@ func (s *Save[T]) processBuffer() {
 // Save adds an item to the buffer for saving.
 // It will be processed by the background goroutine.
 func (s *Save[T]) Save(item T) {
+	defer func() {
+		if r := recover(); r != nil {
+			utils.Errorf("Save item panic: %v", r)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
 	if !utils.IsNil(item) {
 		s.buffer.SafeFeed(item)
 	}
@@ -108,6 +115,9 @@ const MaxSize = 300
 // Close stops the background goroutine and waits for it to finish.
 // It also processes any remaining items in the buffer before returning.
 func (s *Save[T]) Close() {
+	if s.config.name == "OffsetCache" {
+		log.Errorf("bb")
+	}
 	s.buffer.Close() // Close the buffer
 	s.wg.Wait()      // Wait for the background goroutine to finish
 }
