@@ -3,6 +3,8 @@ package ssa
 import (
 	"fmt"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type Const struct {
@@ -119,8 +121,9 @@ func (c *Const) Boolean() bool {
 	return c.value.(bool)
 }
 
-func (c *ConstInst) IsNumber() bool {
-	return c.typ.GetTypeKind() == NumberTypeKind
+func (c *Const) IsNumber() bool {
+	// utils.ToLowerAndStrip()
+	return utils.InterfaceToString(c.Number()) == utils.InterfaceToString(c.value)
 }
 
 func (c *Const) Number() int64 {
