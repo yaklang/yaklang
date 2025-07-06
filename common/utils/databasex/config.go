@@ -9,6 +9,8 @@ type config struct {
 	// buffer
 	bufferSize int
 
+	name string
+
 	// save
 	enableSave  bool
 	saveSize    int
@@ -19,6 +21,12 @@ type config struct {
 }
 
 type Option func(*config)
+
+func WithName(name string) Option {
+	return func(c *config) {
+		c.name = name
+	}
+}
 
 func WithBufferSize(size int) Option {
 	return func(c *config) {
