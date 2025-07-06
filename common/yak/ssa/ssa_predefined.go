@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -365,15 +364,17 @@ func (n *anValue) SetStringMember(key string, v Value) {
 }
 
 func (n *anValue) GetAllMember() map[Value]Value {
-	return lo.MapEntries(n.member.GetMap(), func(key int64, value int64) (Value, Value) {
+	ret := make(map[Value]Value, n.member.Len())
+	for key, value := range n.member.GetMap() {
 		k := n.GetValueById(key)
 		v := n.GetValueById(value)
-		if utils.IsNil(v) {
-			log.Errorf("BUG in anValue.GetAllMember(), value is nil for key: %v", key)
+		if utils.IsNil(k) || utils.IsNil(v) {
+			log.Errorf("BUG in anValue.GetAllMember(), is nil key[%v](%d) member[%v](%v)", key, k, value, v)
+			continue
 		}
-		return k, v
-		// return n.GetValueById(key), n.GetValueById(value)
-	})
+		ret[k] = v
+	}
+	return ret
 }
 
 func (n *anValue) ForEachMember(fn func(Value, Value) bool) {

@@ -64,7 +64,7 @@ func matchInstructionsByVariable(
 	// all application in database, just use sql
 	if prog.EnableDatabase {
 		var insts []Instruction
-		ch := ssadb.SearchVariable(ssadb.GetDBInProgram(prog.Name).Debug(), ctx, compareMode, matchMode, name)
+		ch := ssadb.SearchVariable(ssadb.GetDBInProgram(prog.Name), ctx, compareMode, matchMode, name)
 		for ir := range ch {
 			inst, err := NewLazyInstructionFromIrCode(ir, prog)
 			if err != nil {

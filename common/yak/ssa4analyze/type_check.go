@@ -3,6 +3,7 @@ package ssa4analyze
 import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"golang.org/x/exp/slices"
 )
@@ -193,9 +194,12 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 	// check argument number
 	func() {
 		wantParaLen := len(funcTyp.Parameter)
-		var gotPara ssa.Types = lo.Map(c.Args, func(argId int64, _ int) ssa.Type {
+		var gotPara ssa.Types = lo.FilterMap(c.Args, func(argId int64, _ int) (ssa.Type, bool) {
 			arg := c.GetValueById(argId)
-			return arg.GetType()
+			if utils.IsNil(arg) {
+				return nil, false
+			}
+			return arg.GetType(), true
 		})
 		gotParaLen := len(c.Args)
 		funName := ""

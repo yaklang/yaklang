@@ -44,7 +44,7 @@ func GetIrTypeById(db *gorm.DB, id int64) *IrType {
 	}
 	// check cache
 	ir := &IrType{}
-	db = db.Debug()
+	// db = db.Debug()
 	if db := db.Model(&IrType{}).Where("id = ?", id).First(ir); db.Error != nil {
 		return nil
 	}
