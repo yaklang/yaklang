@@ -92,9 +92,9 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	ir.Name = inst.GetName()
 	ir.VerboseName = inst.GetVerboseName()
 	ir.ShortVerboseName = inst.GetShortVerboseName()
-	// ir.String = inst.String()
-	// ir.ReadableName = LineDisASM(inst)
-	// ir.ReadableNameShort = LineShortDisASM(inst)
+	ir.String = inst.String()
+	ir.ReadableName = LineDisASM(inst)
+	ir.ReadableNameShort = LineShortDisASM(inst)
 	// opcode
 	ir.Opcode = int64(inst.GetOpcode())
 	ir.OpcodeName = SSAOpcode2Name[inst.GetOpcode()]
@@ -249,6 +249,7 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		}
 	}
 
+	ir.TypeID = SaveTypeToDB(value.GetType(), value.GetProgramName())
 }
 
 func (c *ProgramCache) valueFromIrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
@@ -292,6 +293,7 @@ func (c *ProgramCache) valueFromIrCode(cache *ProgramCache, inst Instruction, ir
 
 	// type
 	value.SetIsFromDB(true)
+	value.SetType(GetTypeFromDB(ir.TypeID))
 }
 
 func function2IrCode(inst Instruction, ir *ssadb.IrCode) {

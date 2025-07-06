@@ -9,6 +9,10 @@ import (
 
 // value
 func setMemberCallRelationship(obj, key, member Value) {
+	if utils.IsNil(obj) || utils.IsNil(key) || utils.IsNil(member) {
+		log.Errorf("BUG: setMemberCallRelationship called with nil value: %v, %v, %v", obj, key, member)
+		return
+	}
 	obj.AddMember(key, member)
 	if !member.IsMember() {
 		//todo：fix one value for more object-key
@@ -60,6 +64,10 @@ type checkMemberResult struct {
 
 // check can member call, return member name and type
 func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMemberResult) {
+	if utils.IsNil(value) || utils.IsNil(key) {
+		log.Errorf("BUG: checkCanMemberCallExist called with nil value: %v, %v", value, key)
+		return
+	}
 	ret.exist = true
 	ret.ObjType = value.GetType()
 	if constInst, ok := ToConstInst(key); ok {
