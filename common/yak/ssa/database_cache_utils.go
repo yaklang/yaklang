@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"context"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -68,6 +69,7 @@ func (c *memoryCache[T]) Close() {
 }
 
 func createInstructionCache(
+	ctx context.Context,
 	databaseEnable bool,
 	db *gorm.DB, prog *Program,
 	programName string,
@@ -139,6 +141,7 @@ func createInstructionCache(
 		databasex.WithBufferSize(fetchSize),
 		databasex.WithSaveSize(saveSize),
 		databasex.WithSaveTimeout(saveTime),
+		databasex.WithName("Instruction"),
 	}
 	return databasex.NewCache(
 		cacheTTL, marshal, fetch, delete, save, load, opts...,
@@ -146,6 +149,7 @@ func createInstructionCache(
 }
 
 func createTypeCache(
+	ctx context.Context,
 	databaseEnable bool,
 	db *gorm.DB, prog *Program,
 	programName string,
@@ -212,6 +216,7 @@ func createTypeCache(
 		databasex.WithSaveSize(saveSize),
 		databasex.WithSaveTimeout(saveTime),
 		databasex.WithEnableSave(true), // always enable save for type cache
+		databasex.WithName("Type"),
 	}
 
 	return databasex.NewCache(
