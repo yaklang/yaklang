@@ -86,7 +86,7 @@ func languageServerAnalyzeFromDatabase(req *ypb.YaklangLanguageSuggestionRequest
 	if err != nil {
 		return ret, err
 	}
-	if value, err := ssa.NewLazyInstruction(valueID); err != nil && !utils.IsNil(value) {
+	if value, err := ssa.NewLazyInstruction(ret.Program.Program, valueID); err != nil && !utils.IsNil(value) {
 		return ret, err
 	} else {
 		if v, err := ret.Program.NewValue(value); err == nil {

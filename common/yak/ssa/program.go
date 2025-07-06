@@ -19,20 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
-var progPool = utils.NewSafeMap[*Program]()
-
-func GetProgramFromPool(name string) (*Program, bool) {
-	if prog, ok := progPool.Get(name); ok {
-		return prog, true
-	}
-	if prog, err := GetProgram(name, Application); err == nil {
-		progPool.Set(name, prog)
-		return prog, true
-	} else {
-		return nil, false
-	}
-}
-
 func NewProgram(
 	ProgramName string, enableDatabase bool, kind ssadb.ProgramKind,
 	fs fi.FileSystem, programPath string,
@@ -68,7 +54,6 @@ func NewProgram(
 	if kind == Application {
 		prog.Application = prog
 		prog.Cache = NewDBCache(prog, enableDatabase, ttl...)
-		progPool.Set(ProgramName, prog)
 	}
 	prog.EnableDatabase = enableDatabase
 	prog.Loader = ssautil.NewPackageLoader(
@@ -286,7 +271,6 @@ func (prog *Program) Finish() {
 		v.Finish()
 		return true
 	})
-	progPool.Delete(prog.GetProgramName())
 }
 
 func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, offset int) {

@@ -1,27 +1,26 @@
 package ssa
 
-import (
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-)
+import "github.com/yaklang/yaklang/common/utils"
 
 func GetScopeFromIrScopeName(programName, ScopeName string) (*ScopeInstance, error) {
-	insts, err := ssadb.GetScope(programName, ScopeName)
-	if err != nil {
-		return nil, err
-	}
+	return nil, utils.Errorf("not implemented")
+	// insts, err := ssadb.GetScope(programName, ScopeName)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	ret := NewScope(nil, programName)
+	// ret := NewScope(nil, programName)
 
-	for _, index := range insts {
-		variable := ret.CreateVariable(index.VariableName, false)
-		value, err := NewLazyValue(index.ValueID)
-		if err != nil {
-			continue
-		}
-		ret.AssignVariable(variable, value)
-	}
+	// for _, index := range insts {
+	// 	variable := ret.CreateVariable(index.VariableName, false)
+	// 	value, err := NewLazyValue(index.ValueID)
+	// 	if err != nil {
+	// 		continue
+	// 	}
+	// 	ret.AssignVariable(variable, value)
+	// }
 
-	return ret, nil
+	// return ret, nil
 }
 
 func SyncFromDatabase(s *ScopeInstance) error {

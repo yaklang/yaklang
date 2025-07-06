@@ -112,52 +112,53 @@ func (v *Versioned[T]) SetScope(s ScopedVersionedTableIF[T]) {
 }
 
 var (
-	lazyInstructionBuilder             func(id int64) (SSAValue, error)
-	lazyInstructionBuilderRegisterOnce = new(sync.Once)
+// lazyInstructionBuilder             func(id int64) (SSAValue, error)
+// lazyInstructionBuilderRegisterOnce = new(sync.Once)
 )
 
-func NewLazyInstruction(id int64) (SSAValue, error) {
-	if lazyInstructionBuilder == nil {
-		return nil, utils.Error("lazyInstructionBuilder is not registered")
-	}
-	return lazyInstructionBuilder(id)
-}
+// func NewLazyInstruction(id int64) (SSAValue, error) {
+// 	if lazyInstructionBuilder == nil {
+// 		return nil, utils.Error("lazyInstructionBuilder is not registered")
+// 	}
+// 	return lazyInstructionBuilder(id)
+// }
 
-func RegisterLazyInstructionBuilder(builder func(id int64) (SSAValue, error)) {
-	lazyInstructionBuilderRegisterOnce.Do(func() {
-		lazyInstructionBuilder = builder
-	})
-}
+// func RegisterLazyInstructionBuilder(builder func(id int64) (SSAValue, error)) {
+// 	lazyInstructionBuilderRegisterOnce.Do(func() {
+// 		lazyInstructionBuilder = builder
+// 	})
+// }
 
 func (v *Versioned[T]) UnmarshalJSON(raw []byte) error {
-	if v == nil {
-		return nil
-	}
-	params := make(map[string]any)
-	err := json.Unmarshal(raw, &params)
-	if err != nil {
-		return err
-	}
-	capId := v.versionIndex
-	_ = capId
+	//TODO:
+	// if v == nil {
+	// 	return nil
+	// }
+	// params := make(map[string]any)
+	// err := json.Unmarshal(raw, &params)
+	// if err != nil {
+	// 	return err
+	// }
+	// capId := v.versionIndex
+	// _ = capId
 
-	v.versionIndex = utils.MapGetInt64(params, "version_index")
-	v.globalIndex = utils.MapGetIntEx(params, "global_index")
-	v.lexicalName = utils.MapGetString(params, "lexical_name")
-	v.local = utils.MapGetBool(params, "local")
-	v.isAssigned = utils.NewAtomicBool()
-	v.isAssigned.SetTo(utils.MapGetBool(params, "is_assigned"))
+	// v.versionIndex = utils.MapGetInt64(params, "version_index")
+	// v.globalIndex = utils.MapGetIntEx(params, "global_index")
+	// v.lexicalName = utils.MapGetString(params, "lexical_name")
+	// v.local = utils.MapGetBool(params, "local")
+	// v.isAssigned = utils.NewAtomicBool()
+	// v.isAssigned.SetTo(utils.MapGetBool(params, "is_assigned"))
 
-	valIdx := utils.MapGetIntEx(params, "value")
-	// lazy value for ssa.Value
-	if valIdx > 0 {
-		raw, err := NewLazyInstruction(int64(valIdx))
-		if err != nil {
-			log.Warnf("TBD or BUG: lazy value for ssa.Value: %v, reason: %v", valIdx, err)
-		} else {
-			v.Value = raw.(T)
-		}
-	}
+	// valIdx := utils.MapGetIntEx(params, "value")
+	// // lazy value for ssa.Value
+	// if valIdx > 0 {
+	// 	raw, err := NewLazyInstruction(int64(valIdx))
+	// 	if err != nil {
+	// 		log.Warnf("TBD or BUG: lazy value for ssa.Value: %v, reason: %v", valIdx, err)
+	// 	} else {
+	// 		v.Value = raw.(T)
+	// 	}
+	// }
 
 	// lazy scope, scope 可能是不需要的，
 	// 因为一般在反序列化这个结果的过程中，
