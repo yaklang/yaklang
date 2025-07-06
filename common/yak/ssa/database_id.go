@@ -23,6 +23,7 @@ func (p *Program) SetVirtualRegister(i Instruction) {
 		return
 	}
 	p.Cache.SetInstruction(i)
+	i.RefreshString()
 }
 
 func (p *Program) GetInstructionById(id int64) Instruction {

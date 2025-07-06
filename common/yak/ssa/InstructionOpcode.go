@@ -38,6 +38,13 @@ const (
 	SSAOpcodeFunction
 )
 
+func (op Opcode) String() string {
+	if name, ok := SSAOpcode2Name[op]; ok {
+		return name
+	}
+	return SSAOpcode2Name[SSAOpcodeUnKnow]
+}
+
 var SSAOpcode2Name = map[Opcode]string{
 	SSAOpcodeUnKnow:          "UnKnow",
 	SSAOpcodeAssert:          "Assert",

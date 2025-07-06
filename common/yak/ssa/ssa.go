@@ -80,6 +80,7 @@ type Instruction interface {
 
 	// string
 	String() string
+	RefreshString() // for refrensh string/name/short-name in anInstruction
 
 	getAnInstruction() *anInstruction
 }

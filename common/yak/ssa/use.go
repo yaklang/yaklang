@@ -45,6 +45,8 @@ func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 	for _, user := range deleteInst {
 		v.RemoveUser(user)
 	}
+	v.RefreshString()
+	to.RefreshString()
 }
 
 // ----------- Function
