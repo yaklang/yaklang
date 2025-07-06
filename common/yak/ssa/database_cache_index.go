@@ -4,6 +4,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/databasex"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
 type InstructionsIndex interface {
@@ -64,11 +65,18 @@ type InstructionsIndexDB struct {
 	save *databasex.Save[InstructionsIndexItem]
 }
 
+const (
+	IndexSaveSize = 2000
+)
+
 func NewInstructionsIndexDB(
 	save func([]InstructionsIndexItem),
 ) *InstructionsIndexDB {
 	return &InstructionsIndexDB{
-		save: databasex.NewSave(save),
+		save: databasex.NewSave(
+			save,
+			databasex.WithSaveSize(IndexSaveSize),
+		),
 	}
 }
 
@@ -103,6 +111,7 @@ func NewInstructionIndex(enable bool, saveFunc func([]InstructionsIndexItem)) In
 }
 
 func (c *ProgramCache) initIndex(databaseEnable bool) {
+
 	c.VariableIndex = NewInstructionIndex(
 		databaseEnable,
 		func(items []InstructionsIndexItem) {
@@ -141,20 +150,34 @@ func (c *ProgramCache) initIndex(databaseEnable bool) {
 	c.OffsetCache = NewInstructionIndex(
 		databaseEnable,
 		func(items []InstructionsIndexItem) {
-			utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
-				for _, item := range items {
-					SaveValueOffset(tx, item.Inst)
-					if value, ok := ToValue(item.Inst); ok {
-						for _, variable := range value.GetAllVariables() {
-							if variable.GetId() <= 0 {
-								continue // skip variable without id
-							}
-							SaveVariableOffset(tx, variable, variable.GetName(), int64(value.GetId()))
-						}
+			irOffset := make([]*ssadb.IrOffset, 0, len(items)*2)
+			add := func(i ...*ssadb.IrOffset) {
+				for _, item := range i {
+					if !utils.IsNil(item) {
+						irOffset = append(irOffset, item)
 					}
 				}
-				return nil
-			})
+			}
+			defer func() {
+				log.Errorf("DATABASE: Save IR Offsets: %d", len(irOffset))
+				utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
+					for _, item := range irOffset {
+						ssadb.SaveIrOffset(tx, item)
+					}
+					return nil
+				})
+			}()
+			for _, item := range items {
+				add(SaveValueOffset(item.Inst))
+				if value, ok := ToValue(item.Inst); ok {
+					for _, variable := range value.GetAllVariables() {
+						if variable.GetId() <= 0 {
+							continue // skip variable without id
+						}
+						add(SaveVariableOffset(variable, variable.GetName(), int64(value.GetId()))...)
+					}
+				}
+			}
 		},
 	)
 
