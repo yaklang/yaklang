@@ -132,11 +132,11 @@ func GetExs[T any](c *ProgramCache, Cover func(Instruction) (T, bool), ids ...in
 		v, ok := Cover(inst)
 		if !ok {
 			if utils.IsNil(inst) {
-				log.Errorf("BUG::: nil instruction %v err: %d", inst, id)
+				log.Debugf("BUG::: nil instruction %v err: %d", inst, id)
 			} else if IsControlInstruction(inst) {
 				// log.Errorf("BUG::: control instruction %v err: %d", inst, id)
 			} else {
-				log.Errorf("BUG::: %v err: %d", inst, id)
+				log.Debugf("BUG::: %v err: %d", inst, id)
 			}
 			continue
 		}
