@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"io"
+	"strings"
 	"text/template"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -178,12 +179,13 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 	case "freedom-review":
 		p.config.EmitInfo("user uses freedom review mode to review the plan")
 		// 重新生成计划，但保留现有任务
-		extraPrompt := param.GetObject("reviewed-task-tree")
-		marshal, err := json.Marshal(extraPrompt)
+		var userReviewTaskTree strings.Builder
+		err := generateReviewedTaskTree(param.GetObject("reviewed-task-tree"), &userReviewTaskTree, "")
 		if err != nil {
 			return nil, err
 		}
-		newPlan, err := p.freedomReviewGenerateNewPlan(string(marshal), rsp)
+
+		newPlan, err := p.freedomReviewGenerateNewPlan(userReviewTaskTree.String(), rsp)
 		if err != nil {
 			p.config.EmitError("generate new plan failed: %v", err)
 			return nil, utils.Errorf("generate new plan failed: %v", err)
@@ -205,6 +207,31 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 		p.config.EmitError("unknown review suggestion: %s", suggestion)
 		return rsp, nil
 	}
+}
+
+func generateReviewedTaskTree(task aitool.InvokeParams, buf *strings.Builder, prefix string) error {
+	write := func(content string) {
+		buf.WriteString(prefix)
+		buf.WriteString(content)
+	}
+	write(fmt.Sprintf("- 任务名称:%s ; 任务目标: %s\n", task.GetString("name"), task.GetString("goal")))
+	if remove := task.GetBool("isRemove"); remove {
+		write(fmt.Sprintln("   **此任务已被用户移除**"))
+	}
+	if desc := task.GetString("description"); desc != "" {
+		write(fmt.Sprintf("  任务描述: %s\n", desc))
+	}
+	if tools := task.GetStringSlice("tools"); len(tools) > 0 {
+		write(fmt.Sprintf("  任务关键词: %s\n", strings.Join(tools, ", ")))
+	}
+	subtasks := task.GetObjectArray("subtasks")
+	for _, subtask := range subtasks {
+		err := generateReviewedTaskTree(subtask, buf, prefix+"\t")
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (p *planRequest) generateCreateSubtaskPlan(extraPrompt string, rsp *PlanResponse) (*PlanResponse, error) {
