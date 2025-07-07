@@ -125,7 +125,7 @@ func createInstructionCache(
 
 	marshal := func(s Instruction, d *ssadb.IrCode) {
 		if marshalInstruction(prog.Cache, s, d) {
-			marshalFinish(s, d)
+			go marshalFinish(s, d)
 		}
 	}
 	load := func(id int64) (Instruction, *ssadb.IrCode, error) {
