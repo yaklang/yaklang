@@ -137,13 +137,7 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 	/*
 		handle hijack
 	*/
-	var isHttps bool
-	switch req.URL.Scheme {
-	case "https", "HTTPS":
-		isHttps = true
-	case "http", "HTTP":
-		isHttps = false
-	}
+	var isHttps = req.TLS != nil || httpctx.GetRequestHTTPS(req)
 	httpctx.SetRequestHTTPS(req, isHttps)
 
 	if m.requestHijackHandler != nil {

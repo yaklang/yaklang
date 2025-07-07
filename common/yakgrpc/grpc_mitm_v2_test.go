@@ -1182,3 +1182,123 @@ Host: %s
 	})
 	require.True(t, tokenCheck)
 }
+
+func TestGRPCMUSTPASS_MITM_HTTPFlowURL(t *testing.T) {
+	client, err := NewLocalClient()
+
+	t.Run("https url test", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(30))
+		defer cancel()
+
+		token := utils.RandStringBytes(16)
+
+		mockHost, mockPort := utils.DebugMockHTTPSEx(func(req []byte) []byte {
+			return []byte("HTTP/1.1 200 OK\r\nContent-length: 16\r\n\r\n" + token)
+		})
+		target := utils.HostPort(mockHost, mockPort)
+
+		mitmPort := utils.GetRandomAvailableTCPPort()
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		tokenCheck := false
+
+		var doOnece sync.Once
+
+		RunMITMV2TestServerEx(client, ctx, func(stream ypb.Yak_MITMV2Client) {
+			stream.Send(&ypb.MITMV2Request{
+				Host: "127.0.0.1",
+				Port: uint32(mitmPort),
+			})
+		}, func(stream ypb.Yak_MITMV2Client) {
+		}, func(stream ypb.Yak_MITMV2Client, msg *ypb.MITMV2Response) {
+			doOnece.Do(func() {
+				rsp, err := lowhttp.HTTP(
+					lowhttp.WithPacketBytes([]byte(fmt.Sprintf(`GET / HTTP/1.1
+Host: %s
+
+`, target))),
+					lowhttp.WithProxy(fmt.Sprintf("http://%s", utils.HostPort("127.0.0.1", mitmPort))),
+					lowhttp.WithHttps(true),
+				)
+
+				require.NoError(t, err)
+				spew.Dump(rsp)
+				require.Contains(t, string(rsp.RawPacket), token)
+				tokenCheck = true
+				cancel()
+			})
+		})
+		require.True(t, tokenCheck)
+
+		flows, err := QueryHTTPFlows(utils.TimeoutContextSeconds(5), client, &ypb.QueryHTTPFlowRequest{
+			Keyword:    token,
+			SourceType: "mitm",
+		}, 1)
+		require.NoError(t, err)
+		require.Len(t, flows.GetData(), 1)
+		if !strings.HasPrefix(flows.GetData()[0].GetUrl(), "https://") {
+			t.Fatal("test https test failed")
+		}
+	})
+
+	t.Run("http url test", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(30))
+		defer cancel()
+
+		token := utils.RandStringBytes(16)
+
+		mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+			return []byte("HTTP/1.1 200 OK\r\nContent-length: 16\r\n\r\n" + token)
+		})
+		target := utils.HostPort(mockHost, mockPort)
+
+		mitmPort := utils.GetRandomAvailableTCPPort()
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		tokenCheck := false
+
+		var doOnece sync.Once
+
+		RunMITMV2TestServerEx(client, ctx, func(stream ypb.Yak_MITMV2Client) {
+			stream.Send(&ypb.MITMV2Request{
+				Host: "127.0.0.1",
+				Port: uint32(mitmPort),
+			})
+		}, func(stream ypb.Yak_MITMV2Client) {
+		}, func(stream ypb.Yak_MITMV2Client, msg *ypb.MITMV2Response) {
+			doOnece.Do(func() {
+				rsp, err := lowhttp.HTTP(
+					lowhttp.WithPacketBytes([]byte(fmt.Sprintf(`GET / HTTP/1.1
+Host: %s
+
+`, target))),
+					lowhttp.WithProxy(fmt.Sprintf("http://%s", utils.HostPort("127.0.0.1", mitmPort))),
+				)
+
+				require.NoError(t, err)
+				spew.Dump(rsp)
+				require.Contains(t, string(rsp.RawPacket), token)
+				tokenCheck = true
+				cancel()
+			})
+		})
+		require.True(t, tokenCheck)
+
+		flows, err := QueryHTTPFlows(utils.TimeoutContextSeconds(5), client, &ypb.QueryHTTPFlowRequest{
+			Keyword:    token,
+			SourceType: "mitm",
+		}, 1)
+		require.NoError(t, err)
+		require.Len(t, flows.GetData(), 1)
+		if !strings.HasPrefix(flows.GetData()[0].GetUrl(), "http://") {
+			t.Fatal("test https test failed")
+		}
+	})
+
+}
