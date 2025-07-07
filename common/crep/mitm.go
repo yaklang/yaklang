@@ -11,6 +11,7 @@ import (
 	_ "embed"
 	"encoding/pem"
 	"fmt"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"io/ioutil"
 	"math/big"
 	"net"
@@ -136,8 +137,13 @@ func InitMITMCert() {
 	}
 
 	if defaultGMCA != nil && defaultGMKey != nil {
-		log.Debug("Successfully load GM cert and key from default files")
-		return
+		// just check if the cert is valid
+		if _, err := gmtls.X509KeyPair(defaultGMCA, defaultGMKey); err == nil {
+			log.Debug("Successfully load GM cert and key from default files")
+			return
+		}
+		defaultGMCA = nil
+		defaultGMKey = nil
 	}
 
 	if defaultCA == nil || defaultKey == nil {
