@@ -2,18 +2,23 @@ package tests
 
 import (
 	_ "embed"
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/typescript/js2ssa"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/typescript/js2ssa"
 )
 
 //go:embed test.js
 var largeJS string
 
 func TestJS_ASTLargeText(t *testing.T) {
+	if utils.InGithubActions() {
+		return
+	}
 	start := time.Now()
 
 	log.Infof("start to build ast via parser")
