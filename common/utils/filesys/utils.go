@@ -4,7 +4,7 @@ import (
 	"strings"
 )
 
-func splitWithSeparator(path string, sep rune) (string, string) {
+func SplitWithSeparator(path string, sep rune) (string, string) {
 	if len(path) == 0 {
 		return "", ""
 	}
