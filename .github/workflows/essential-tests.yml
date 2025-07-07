@@ -171,7 +171,7 @@ jobs:
               go test -timeout 20s ./common/yak/yak2ssa/test/...
               go test -timeout 1m ./common/yak/ssaapi/test/yak
               # Test js
-              go test -timeout 60s ./common/yak/JS2ssa/...
+              # go test -timeout 60s ./common/yak/JS2ssa/... // remove this frontend 
               go test -timeout 1m ./common/yak/ssaapi/test/javascript
 
           - name: Test SSA Frontend TypeScript

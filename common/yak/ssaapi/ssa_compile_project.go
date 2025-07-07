@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 )
 
 func ParseProjectFromPath(path string, opts ...Option) (Programs, error) {
@@ -36,6 +37,9 @@ func ParseProject(opts ...Option) (Programs, error) {
 }
 
 func (c *config) parseProject() (Programs, error) {
+	defer func() {
+		ssaprofile.ShowCacheCost()
+	}()
 	if c.reCompile {
 		c.Processf(0, "recompile project, delete old data...")
 		ssadb.DeleteProgramIrCode(ssadb.GetDB(), c.ProgramName)

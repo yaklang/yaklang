@@ -11,16 +11,21 @@ import (
 type PreHandlerAnalyzer interface {
 	InitHandler(builder *FunctionBuilder)
 	FilterPreHandlerFile(string) bool
-	PreHandlerProject(fi.FileSystem, *FunctionBuilder, string) error
-	PreHandlerFile(editor *memedit.MemEditor, builder *FunctionBuilder)
+
+	ParseAST(string) (FrontAST, error)
+	PreHandlerProject(fi.FileSystem, FrontAST, *FunctionBuilder, string) error
+	PreHandlerFile(FrontAST, *memedit.MemEditor, *FunctionBuilder)
+
 	AfterPreHandlerProject(builder *FunctionBuilder)
+}
+
+type FrontAST interface {
 }
 
 type Builder interface {
 	// create a new builder
 	Create() Builder
-
-	Build(string, bool, *FunctionBuilder) error
+	BuildFromAST(FrontAST, *FunctionBuilder) error
 	FilterFile(string) bool
 	GetLanguage() consts.Language
 	PreHandlerAnalyzer
@@ -80,13 +85,13 @@ func (d *PreHandlerInit) InitHandler(b *FunctionBuilder) {
 	})
 }
 
-func (d *PreHandlerInit) PreHandlerFile(editor *memedit.MemEditor, builder *FunctionBuilder) {
+func (d *PreHandlerInit) PreHandlerFile(ast FrontAST, editor *memedit.MemEditor, builder *FunctionBuilder) {
 }
 
 func (d *PreHandlerInit) FilterPreHandlerFile(string) bool {
 	return false
 }
 
-func (d *PreHandlerInit) PreHandlerProject(fi.FileSystem, *FunctionBuilder, string) error {
+func (d *PreHandlerInit) PreHandlerProject(fi.FileSystem, FrontAST, *FunctionBuilder, string) error {
 	return nil
 }

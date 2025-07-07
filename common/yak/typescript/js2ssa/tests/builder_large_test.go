@@ -22,7 +22,7 @@ func TestJS_ASTLargeText(t *testing.T) {
 	start := time.Now()
 
 	log.Infof("start to build ast via parser")
-	_, err := js2ssa.Frontend(largeJS, false)
+	_, err := js2ssa.Frontend(largeJS)
 	require.Nil(t, err)
 	log.Infof("finish to build ast via parser cost: %v", time.Now().Sub(start))
 

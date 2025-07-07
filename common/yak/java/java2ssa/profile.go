@@ -60,7 +60,7 @@ func ShowJavaCompilingCost() {
 func init() {
 }
 
-func (y *builder) AssignVariable(variable *ssa.Variable, val ssa.Value) {
+func (y *singleFileBuilder) AssignVariable(variable *ssa.Variable, val ssa.Value) {
 	start := time.Now()
 	defer func() {
 		deltaAssignVariableCostFrom(start)
