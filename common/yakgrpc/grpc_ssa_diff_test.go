@@ -2,6 +2,8 @@ package yakgrpc
 
 import (
 	"context"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -11,7 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
 )
 
 func TestGRPCMUSTPASS_SyntaxFlow_SSAReusltDiff(t *testing.T) {
@@ -78,7 +79,6 @@ level: high
 		diff, err := client.SSARiskDiff(context.Background(), &ypb.SSARiskDiffRequest{
 			BaseLine: &ypb.SSARiskDiffItem{ProgramName: baseProg},
 			Compare:  &ypb.SSARiskDiffItem{ProgramName: newProg},
-			Type:     "risk",
 		})
 		require.NoError(t, err)
 		flag := false
@@ -88,7 +88,7 @@ level: high
 			if err != nil {
 				break
 			}
-			if recv.Status == "equal" {
+			if recv.Status == string(ssaapi.Equal) {
 				flag = true
 				break
 			}
@@ -122,7 +122,6 @@ include($_GET[1]);
 				ProgramName: newProg,
 				RuleName:    "检测PHP代码执行漏洞",
 			},
-			Type: "risk",
 		})
 		require.NoError(t, err)
 		for {
@@ -133,5 +132,150 @@ include($_GET[1]);
 			spew.Dump(recv)
 			require.True(t, recv.RuleName == "检测PHP代码执行漏洞")
 		}
+	})
+}
+
+func TestGRPCMUSTPASS_SyntaxFlow_SSAReusltCompareWithTaskId(t *testing.T) {
+	createTask := func(t *testing.T, program string) string {
+		taskID := uuid.NewString()
+		// task := &schema.SyntaxFlowScanTask{
+		// 	TaskId:    taskID,
+		// 	Programs:  program,
+		// 	RiskCount: 10,
+		// }
+		// err := schema.SaveSyntaxFlowScanTask(ssadb.GetDB(), task)
+		// require.NoError(t, err)
+		return taskID
+	}
+
+	baseProg := uuid.NewString()
+	rulename := uuid.NewString()
+	rulename2 := uuid.NewString()
+	taskID1 := createTask(t, baseProg)
+	taskID2 := createTask(t, baseProg)
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	fs := filesys.NewVirtualFs()
+	fs.AddFile("test.go", `package main
+
+import (
+    "fmt"
+    "io/ioutil"
+    "net/http"
+    "path/filepath"
+    "strings"
+)
+
+const allowedBasePath = "/allowed/path/"
+
+func handler(w http.ResponseWriter, r *http.Request) {
+    userInput := r.URL.Query().Get("file")
+
+    requestedPath := filepath.Join(allowedBasePath, userInput)
+    cleanedPath := filepath.Clean(requestedPath)
+
+    if !strings.HasPrefix(cleanedPath, allowedBasePath) {
+        http.Error(w, "Invalid file path", http.StatusBadRequest)
+        return
+    }
+
+    content, err := ioutil.ReadFile(cleanedPath)
+    if err != nil {
+        http.Error(w, "File not found", http.StatusNotFound)
+        return
+    }
+
+    w.Write(content)
+}
+
+func main() {
+    http.HandleFunc("/", handler)
+    fmt.Println("Server is running on :8080")
+    http.ListenAndServe(":8080", nil)
+}
+`)
+	program, err := ssaapi.ParseProjectWithFS(fs,
+		ssaapi.WithLanguage(ssaapi.GO),
+		ssaapi.WithProgramName(baseProg),
+	)
+	require.NoError(t, err)
+	client.CreateSyntaxFlowRule(context.Background(), &ypb.CreateSyntaxFlowRuleRequest{
+		SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
+			Content: `
+ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
+$entry.ReadAll(* #-> as $sink) 
+$entry.ReadFile(* #-> as $sink)
+
+$sink?{have: 'Parameter'} as $high;
+alert $high for{
+level: high
+}`,
+			RuleName: rulename,
+			Language: "golang",
+		},
+	})
+	defer func() {
+		client.DeleteSyntaxFlowRule(context.Background(), &ypb.DeleteSyntaxFlowRuleRequest{
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				RuleNames: []string{rulename},
+			},
+		})
+		yakit.DeleteSSAProgram(consts.GetGormDefaultSSADataBase(), &ypb.SSAProgramFilter{
+			ProgramNames: []string{baseProg},
+		})
+	}()
+
+	t.Run("taskid compare", func(t *testing.T) {
+		client.CreateSyntaxFlowRule(context.Background(), &ypb.CreateSyntaxFlowRuleRequest{
+			SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
+				Content: `
+ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
+$entry.ReadAll(* #-> as $sink) 
+$entry.ReadFile(* #-> as $sink)
+
+$sink #-> as $high;
+alert $high for{
+level: high
+}`,
+				RuleName: rulename2,
+				Language: "golang",
+			},
+		})
+		defer func() {
+			client.DeleteSyntaxFlowRule(context.Background(), &ypb.DeleteSyntaxFlowRuleRequest{
+				Filter: &ypb.SyntaxFlowRuleFilter{
+					RuleNames: []string{rulename2},
+				},
+			})
+		}()
+
+		result, err := program.SyntaxFlowRuleName(rulename, ssaapi.QueryWithSave(schema.SFResultKindDebug))
+		result.Save(schema.SFResultKindDebug, taskID1)
+		result.Show()
+		require.NoError(t, err)
+
+		result2, err := program.SyntaxFlowRuleName(rulename2, ssaapi.QueryWithSave(schema.SFResultKindDebug))
+		require.NoError(t, err)
+		result2.Show()
+		result2.Save(schema.SFResultKindDebug, taskID2)
+
+		diff, err := client.SSARiskDiff(context.Background(), &ypb.SSARiskDiffRequest{
+			BaseLine: &ypb.SSARiskDiffItem{RiskRuntimeId: taskID1},
+			Compare:  &ypb.SSARiskDiffItem{RiskRuntimeId: taskID2},
+		})
+		require.NoError(t, err)
+		flag := false
+		for {
+			recv, err := diff.Recv()
+			if err != nil {
+				break
+			}
+			if recv.Status == string(ssaapi.Add) {
+				flag = true
+				break
+			}
+		}
+		require.True(t, flag)
 	})
 }
