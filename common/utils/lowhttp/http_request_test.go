@@ -702,3 +702,30 @@ file content
 		require.Contains(t, resultStr, "file content", "file content should be preserved")
 	})
 }
+
+func TestTrimTestForFixCRLF(t *testing.T) {
+	packet := "GET / HTTP/1.1\r\nHost: www.example.com\r\nTest: 1 \r\n\r\na"
+	result := FixHTTPPacketCRLF([]byte(packet), false)
+	spew.Dump(result)
+	require.Contains(t, string(result), "\r\nTest: 1 \r\n")
+}
+
+func TestTrimTestForFixCRLF_For_multipart(t *testing.T) {
+	packet := "GET / HTTP/1.1\r\nHost: www.example.com\r\nContent-Type: multipart/form-data; boundary=----WebKitFormBoundaryO8YOixBrea99FhJk  \r\nContent-Length: 139\r\n\r\n" +
+		"------WebKitFormBoundaryO8YOixBrea99FhJk\r\n" +
+		"Content-Disposition: form-data; name=\"key\"\r\n\r\n" +
+		"value\r\n------WebKitFormBoundaryO8YOixBrea99FhJk--\r\n"
+	result := FixHTTPPacketCRLF([]byte(packet), false)
+	spew.Dump(result)
+	require.Contains(t, string(result), "ea99FhJk  \r\nContent-Length")
+}
+
+func TestTrimTestForFixCRLF_For_multipart2(t *testing.T) {
+	packet := "GET / HTTP/1.1\r\nHost: www.example.com\r\nContent-Type: multipart/form-data; boundary=----WebKitFormBoundaryO8YOixBrea99FhJk\r\nContent-Length: 139\r\n\r\n" +
+		"------WebKitFormBoundaryO8YOixBrea99FhJk\r\n" +
+		"Content-Disposition: form-data; name=\"key\"\r\n\r\n" +
+		"value\r\n------WebKitFormBoundaryO8YOixBrea99FhJk--\r\n"
+	result := FixHTTPPacketCRLF([]byte(packet), false)
+	spew.Dump(result)
+	require.Contains(t, string(result), "ea99FhJk\r\nContent-Length")
+}
