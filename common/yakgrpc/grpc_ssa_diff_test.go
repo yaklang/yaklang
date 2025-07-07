@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
@@ -13,7 +14,7 @@ import (
 	"testing"
 )
 
-func TestGRPCMUSTPASS_SyntaxFlow_SSAReusltCompare(t *testing.T) {
+func TestGRPCMUSTPASS_SyntaxFlow_SSAReusltDiff(t *testing.T) {
 	code := `<?php
 $a = $_GET[1];
 eval($a);
@@ -23,6 +24,8 @@ eval($a);
 	rulename := uuid.NewString()
 	client, err := NewLocalClient()
 	require.NoError(t, err)
+
+	// 创建规则
 	client.CreateSyntaxFlowRule(context.Background(), &ypb.CreateSyntaxFlowRuleRequest{
 		SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
 			Content: `eval() as $sink 
@@ -38,6 +41,7 @@ level: high
 			ProgramNames: []string{baseProg},
 		})
 	}()
+
 	fs := filesys.NewVirtualFs()
 	fs.AddFile("test.php", code)
 	program, err2 := ssaapi.ParseProjectWithFS(fs,
@@ -71,19 +75,20 @@ level: high
 		require.NoError(t, err2)
 		result.Show()
 
-		diff, err := client.NewSSADiff(context.Background(), &ypb.SSADiffRequest{
-			Base:    &ypb.SSADiffItem{Program: baseProg},
-			Compare: &ypb.SSADiffItem{Program: newProg},
-			Type:    int64(schema.RiskDiff),
+		diff, err := client.SSARiskDiff(context.Background(), &ypb.SSARiskDiffRequest{
+			BaseLine: &ypb.SSARiskDiffItem{ProgramName: baseProg},
+			Compare:  &ypb.SSARiskDiffItem{ProgramName: newProg},
+			Type:     "risk",
 		})
 		require.NoError(t, err)
 		flag := false
 		for {
 			recv, err := diff.Recv()
+			spew.Dump(recv)
 			if err != nil {
 				break
 			}
-			if recv.Status == int64(ssaapi.Equal) {
+			if recv.Status == "equal" {
 				flag = true
 				break
 			}
@@ -108,16 +113,16 @@ include($_GET[1]);
 		program.SyntaxFlowRuleName("审计PHP文件包含漏洞", ssaapi.QueryWithSave(schema.SFResultKindScan))
 		require.NoError(t, err2)
 		result.Show()
-		diff, err := client.NewSSADiff(context.Background(), &ypb.SSADiffRequest{
-			Base: &ypb.SSADiffItem{
-				Program:  baseProg,
-				RuleName: "检测PHP代码执行漏洞",
+		diff, err := client.SSARiskDiff(context.Background(), &ypb.SSARiskDiffRequest{
+			BaseLine: &ypb.SSARiskDiffItem{
+				ProgramName: baseProg,
+				RuleName:    "检测PHP代码执行漏洞",
 			},
-			Compare: &ypb.SSADiffItem{
-				Program:  newProg,
-				RuleName: "检测PHP代码执行漏洞",
+			Compare: &ypb.SSARiskDiffItem{
+				ProgramName: newProg,
+				RuleName:    "检测PHP代码执行漏洞",
 			},
-			Type: int64(schema.RiskDiff),
+			Type: "risk",
 		})
 		require.NoError(t, err)
 		for {
@@ -125,6 +130,7 @@ include($_GET[1]);
 			if err != nil {
 				break
 			}
+			spew.Dump(recv)
 			require.True(t, recv.RuleName == "检测PHP代码执行漏洞")
 		}
 	})

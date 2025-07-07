@@ -497,8 +497,8 @@ var Exports = map[string]any{
 	"ParseProject":       ParseProject,
 	"NewFromProgramName": FromDatabase,
 	"NewProgramFromDB":   FromDatabase,
-	"NewRiskCompare":     NewSsaCompare[*schema.SSARisk],
-	"NewRiskCompareItem": NewCompareRiskItem,
+	"NewRiskCompare":     NewSSAComparator[*schema.SSARisk],
+	"NewRiskCompareItem": NewSSARiskComparisonItem,
 
 	"withLanguage":           WithRawLanguage,
 	"withConfigInfo":         WithConfigInfo,
@@ -520,11 +520,11 @@ var Exports = map[string]any{
 	"withDiffRuleName":          DiffWithRuleName,
 	"withDiffVariableName":      DiffWithVariableName,
 	"withDiffRuntimeId":         DiffWithRuntimeId,
-	"withGenerateHash":          WithRiskCompareGenerate,
-	"withCompareResultCallback": WithRiskCompareCallback,
-	"withDefaultRiskSave":       WithRiskSaveValueFunc,
+	"withGenerateHash":          WithSSARiskComparisonInfoGenerate,
+	"withCompareResultCallback": WithSSARiskDiffResultHandler,
+	"withDefaultRiskSave":       WithSSARiskDiffSaveResultHandler,
 	//diff compare kind
-	"progName":  schema.Prog,
+	"progName":  schema.Program,
 	"runtimeId": schema.RuntimeId,
 
 	// language:

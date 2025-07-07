@@ -11,7 +11,8 @@ import (
 	"sync"
 )
 
-type SsaCompareItemConfig struct {
+// SSAComparisonItemConfig 比较项的配置信息
+type SSAComparisonItemConfig struct {
 	RuleName        string
 	RuleContentHash string
 	VariableName    string
@@ -19,60 +20,63 @@ type SsaCompareItemConfig struct {
 	ProgramName     string
 }
 
-type WithCompareOpts func(*SsaCompareItemConfig)
+type SSAComparisonItemOption func(*SSAComparisonItemConfig)
 
-func DiffWithProgram(name string) WithCompareOpts {
-	return func(itemConfig *SsaCompareItemConfig) {
+func DiffWithProgram(name string) SSAComparisonItemOption {
+	return func(itemConfig *SSAComparisonItemConfig) {
 		itemConfig.ProgramName = name
 	}
 }
-func DiffWithRuntimeId(runtimeId string) WithCompareOpts {
-	return func(itemConfig *SsaCompareItemConfig) {
+func DiffWithRuntimeId(runtimeId string) SSAComparisonItemOption {
+	return func(itemConfig *SSAComparisonItemConfig) {
 		itemConfig.RuntimeId = runtimeId
 	}
 }
-func DiffWithRuleName(name string) WithCompareOpts {
-	return func(config *SsaCompareItemConfig) {
+func DiffWithRuleName(name string) SSAComparisonItemOption {
+	return func(config *SSAComparisonItemConfig) {
 		config.RuleName = name
 	}
 }
-func DiffWithRuleContentHash(hash string) WithCompareOpts {
-	return func(config *SsaCompareItemConfig) {
+func DiffWithRuleContentHash(hash string) SSAComparisonItemOption {
+	return func(config *SSAComparisonItemConfig) {
 		config.RuleContentHash = hash
 	}
 }
-func DiffWithVariableName(variable string) WithCompareOpts {
-	return func(config *SsaCompareItemConfig) {
+func DiffWithVariableName(variable string) SSAComparisonItemOption {
+	return func(config *SSAComparisonItemConfig) {
 		config.VariableName = variable
 	}
 }
 
-type CompareStatus int
+// 配置被比较的项
+type CompareStatus string
 
 const (
-	Equal CompareStatus = iota
-	Add
-	Del
+	Equal CompareStatus = "equal"
+	Add   CompareStatus = "add"
+	Del   CompareStatus = "del"
 )
 
-type Item[T any] struct {
+// ComparisonItem is a generic struct that holds the configuration for comparing items in the SSA system.
+type ComparisonItem[T any] struct {
 	ProgramName string
 	TaskId      string
 	Kind        schema.SSADiffResultKind
-	//两个项目比较时，根据RuleName/RuleId来确定
-	GetCompareValue func(context.Context) <-chan T
+	// GetComparisonValue 用于获取需要比较的值
+	GetComparisonValue func(context.Context) <-chan T
 }
 
-func NewCompareRiskItem(opts ...WithCompareOpts) (*Item[*schema.SSARisk], error) {
-	s := new(SsaCompareItemConfig)
-	item := new(Item[*schema.SSARisk])
+func NewSSARiskComparisonItem(opts ...SSAComparisonItemOption) (*ComparisonItem[*schema.SSARisk], error) {
+	s := new(SSAComparisonItemConfig)
+	item := new(ComparisonItem[*schema.SSARisk])
 	for _, opt := range opts {
 		opt(s)
 	}
 	if s.ProgramName == "" && s.RuntimeId == "" {
 		return nil, utils.Error("program name or runtime id must be set for compare risk item")
 	}
-	item.GetCompareValue = func(ctx context.Context) <-chan *schema.SSARisk {
+	item.GetComparisonValue = func(ctx context.Context) <-chan *schema.SSARisk {
+		//TODO: 感觉db不应该在这里声明一个
 		db := consts.GetGormDefaultSSADataBase().Model(&schema.SSARisk{})
 		db = bizhelper.ExactQueryString(db, "program_name", s.ProgramName)
 		db = bizhelper.ExactQueryString(db, "runtime_id", s.RuntimeId)
@@ -83,13 +87,14 @@ func NewCompareRiskItem(opts ...WithCompareOpts) (*Item[*schema.SSARisk], error)
 	}
 	return item, nil
 }
-func NewCompareCustomVariableItem(opts ...WithCompareOpts) *Item[*ssadb.AuditNode] {
-	s := new(SsaCompareItemConfig)
-	item := new(Item[*ssadb.AuditNode])
+
+func NewCompareCustomVariableItem(opts ...SSAComparisonItemOption) *ComparisonItem[*ssadb.AuditNode] {
+	s := new(SSAComparisonItemConfig)
+	item := new(ComparisonItem[*ssadb.AuditNode])
 	for _, opt := range opts {
 		opt(s)
 	}
-	item.GetCompareValue = func(ctx context.Context) <-chan *ssadb.AuditNode {
+	item.GetComparisonValue = func(ctx context.Context) <-chan *ssadb.AuditNode {
 		db := consts.GetGormDefaultSSADataBase().Model(&schema.SSARisk{})
 		db = bizhelper.ExactQueryString(db, "program_name", s.ProgramName)
 		db = bizhelper.ExactQueryString(db, "rule_name", s.RuleName)
@@ -101,40 +106,45 @@ func NewCompareCustomVariableItem(opts ...WithCompareOpts) *Item[*ssadb.AuditNod
 	return item
 }
 
-type CompareOptions[T any] struct {
-	onResultCallback []func(result *CompareResult[T])
-	getValueInfo     func(value T) (rule string, originHash string, diffHash string)
-	saveValueFunc    func(result []*CompareResult[T])
+// ComparatorConfig 比较器运行时的配置项
+type ComparatorConfig[T any] struct {
+	// resultHandler 用于处理比较结果的函数
+	resultHandler []func(result *ComparisonResult[T])
+	// getComparisonBasisInfo 获取比较结果的信息
+	getComparisonBasisInfo func(value T) (rule string, originHash string, diffHash string)
+	// saveResultHandler 用于处理比较结果的函数
+	saveResultHandler func(result []*ComparisonResult[T])
 }
 
-type CompareOpts[T any] func(options *CompareOptions[T])
+type ComparatorOptions[T any] func(options *ComparatorConfig[T])
 
-func WithCompareResultCallback[T any](cb func(result *CompareResult[T])) func(options *CompareOptions[T]) {
-	return func(options *CompareOptions[T]) {
-		options.onResultCallback = append(options.onResultCallback, cb)
+// WithComparatorSaveResultHandler is used to set the function that handles the comparison results.
+func WithComparatorSaveResultHandler[T any](f func([]*ComparisonResult[T])) func(options *ComparatorConfig[T]) {
+	return func(options *ComparatorConfig[T]) {
+		options.saveResultHandler = f
 	}
 }
-func WithRiskCompareCallback(cb func(result *CompareResult[*schema.SSARisk])) func(options *CompareOptions[*schema.SSARisk]) {
-	return WithCompareResultCallback(cb)
-}
-func WithSaveValueFunc[T any](f func([]*CompareResult[T])) func(options *CompareOptions[T]) {
-	return func(options *CompareOptions[T]) {
-		options.saveValueFunc = f
+
+func WithSSARiskDiffResultHandler(f func(result *ComparisonResult[*schema.SSARisk])) func(options *ComparatorConfig[*schema.SSARisk]) {
+	return func(options *ComparatorConfig[*schema.SSARisk]) {
+		options.resultHandler = append(options.resultHandler, f)
 	}
 }
-func WithRiskSaveValueFunc(baseItem, compareItem string, kind schema.SSADiffResultKind) func(options *CompareOptions[*schema.SSARisk]) {
-	return WithSaveValueFunc(func(risks []*CompareResult[*schema.SSARisk]) {
+
+// WithSSARiskDiffSaveResultHandler is used to set the function that handles the comparison results for SSARisk.
+func WithSSARiskDiffSaveResultHandler(baseItem, compareItem string, kind string) func(options *ComparatorConfig[*schema.SSARisk]) {
+	return WithComparatorSaveResultHandler(func(risks []*ComparisonResult[*schema.SSARisk]) {
 		utils.GormTransactionReturnDb(consts.GetGormDefaultSSADataBase(), func(tx *gorm.DB) {
 			for _, risk := range risks {
 				result := &schema.SSADiffResult{
-					BaseItem:        baseItem,
-					CompareItem:     compareItem,
-					RuleName:        risk.FromRule,
-					BaseRiskHash:    risk.BaseValHash,
-					CompareRiskHash: risk.NewValHash,
-					Status:          int(risk.Status),
-					CompareType:     int(schema.RiskDiff),
-					DiffResultKind:  kind,
+					BaseLineProgName: baseItem,
+					CompareProgName:  compareItem,
+					RuleName:         risk.FromRule,
+					BaseLineRiskHash: risk.BaseValHash,
+					CompareRiskHash:  risk.NewValHash,
+					Status:           string(risk.Status),
+					CompareType:      schema.RiskDiff,
+					DiffResultKind:   kind,
 				}
 				tx.Save(result)
 			}
@@ -142,27 +152,38 @@ func WithRiskSaveValueFunc(baseItem, compareItem string, kind schema.SSADiffResu
 	})
 }
 
-func WithCompareResultGetValueInfo[T any](generate func(value T) (rule string, originHash string, diffHash string)) func(options *CompareOptions[T]) {
-	return func(options *CompareOptions[T]) {
-		options.getValueInfo = generate
+// WithComparatorGetBasisInfo is used to set the function that generates the comparison basis information.
+func WithComparatorGetBasisInfo[T any](get func(value T) (
+	rule string,
+	originHash string,
+	diffHash string,
+)) func(options *ComparatorConfig[T]) {
+	return func(options *ComparatorConfig[T]) {
+		options.getComparisonBasisInfo = get
 	}
 }
-func WithRiskCompareGenerate(f func(risk *schema.SSARisk) (rule string, originHash string, diffHash string)) func(options *CompareOptions[*schema.SSARisk]) {
-	return WithCompareResultGetValueInfo(f)
+
+// WithSSARiskComparisonInfoGenerate 设置用于生成SSARisk比较信息的函数
+func WithSSARiskComparisonInfoGenerate(f func(risk *schema.SSARisk) (
+	rule string,
+	originHash string,
+	diffHash string,
+)) func(options *ComparatorConfig[*schema.SSARisk]) {
+	return WithComparatorGetBasisInfo(f)
 }
 
-type SsaCompare[T any] struct {
-	baseItem *Item[T]
-	config   *CompareOptions[T]
+type SSAComparator[T any] struct {
+	baseItem *ComparisonItem[T]
+	config   *ComparatorConfig[T]
 }
 
-type CompareResultItem[T any] struct {
+type ComparisonResultItem[T any] struct {
 	Val  T
 	Hash string
 
 	rule string
 }
-type CompareResult[T any] struct {
+type ComparisonResult[T any] struct {
 	BaseValue T
 	NewValue  T
 	FromRule  string
@@ -173,50 +194,63 @@ type CompareResult[T any] struct {
 	Status      CompareStatus
 }
 
-func (s *SsaCompare[T]) Compare(ctx context.Context, item *Item[T], opts ...CompareOpts[T]) <-chan *CompareResult[T] {
+func (s *SSAComparator[T]) Compare(
+	ctx context.Context,
+	item *ComparisonItem[T],
+	opts ...ComparatorOptions[T],
+) <-chan *ComparisonResult[T] {
 	// todo: 切换更流式的compare算法
-	hashMap := make(map[string]int)
-	string2BaseItemValue := make(map[string]*CompareResultItem[T])
-	string2CompareItemValue := make(map[string]*CompareResultItem[T])
-	result := make(chan *CompareResult[T])
+	diffHashMap := make(map[string]int)
+	string2BaseItemValue := make(map[string]*ComparisonResultItem[T])
+	string2CompareItemValue := make(map[string]*ComparisonResultItem[T])
+
+	result := make(chan *ComparisonResult[T])
 	for _, opt := range opts {
 		opt(s.config)
 	}
-	if s.config.saveValueFunc == nil {
-		log.Errorf("saveValueFunc function is not set for SsaCompare, using default saveValueFunc function")
-		close(result)
-		return result
-	}
-	if s.config.getValueInfo == nil {
-		log.Errorf("generateHash function is not set for SsaCompare, using default hash function")
-		close(result)
-		return result
-	}
-	for v := range s.baseItem.GetCompareValue(ctx) {
-		rule, hash, diffHash := s.config.getValueInfo(v)
-		string2BaseItemValue[diffHash] = &CompareResultItem[T]{
-			Val:  v,
-			Hash: hash,
 
-			rule: rule,
-		}
-		hashMap[diffHash]++
+	if s.config.saveResultHandler == nil {
+		log.Errorf("saveResultHandler function is not set for SSAComparator, using default saveResultHandler function")
+		close(result)
+		return result
 	}
-	for t := range item.GetCompareValue(ctx) {
-		rule, hash, diffHash := s.config.getValueInfo(t)
-		string2CompareItemValue[diffHash] = &CompareResultItem[T]{
+	if s.config.getComparisonBasisInfo == nil {
+		log.Errorf("generateHash function is not set for SSAComparator, using default hash function")
+		close(result)
+		return result
+	}
+
+	for v := range s.baseItem.GetComparisonValue(ctx) {
+		sfRule, riskHash, diffHash := s.config.getComparisonBasisInfo(v)
+		string2BaseItemValue[diffHash] = &ComparisonResultItem[T]{
+			Val:  v,
+			Hash: riskHash,
+			rule: sfRule,
+		}
+		diffHashMap[diffHash]++
+	}
+
+	for t := range item.GetComparisonValue(ctx) {
+		rule, hash, diffHash := s.config.getComparisonBasisInfo(t)
+		string2CompareItemValue[diffHash] = &ComparisonResultItem[T]{
 			Val:  t,
 			Hash: hash,
 
 			rule: rule,
 		}
-		hashMap[diffHash]--
+		diffHashMap[diffHash]--
 	}
 	wg := new(sync.WaitGroup)
-	taskChan := make(chan *CompareResult[T], 1)
-	processor := utils.NewBatchProcessor[*CompareResult[T]](ctx, taskChan, utils.WithBatchProcessorCallBack[*CompareResult[T]](s.config.saveValueFunc))
+	taskChan := make(chan *ComparisonResult[T], 1)
+	processor := utils.NewBatchProcessor[*ComparisonResult[T]](
+		ctx,
+		taskChan,
+		utils.WithBatchProcessorCallBack[*ComparisonResult[T]](s.config.saveResultHandler),
+	)
+
 	processor.Start()
-	addChannel := func(compareResult *CompareResult[T]) bool {
+
+	addChannel := func(compareResult *ComparisonResult[T]) bool {
 		wg.Add(1)
 		//进行前置的保存操作
 		go func() {
@@ -232,12 +266,13 @@ func (s *SsaCompare[T]) Compare(ctx context.Context, item *Item[T], opts ...Comp
 			close(result)
 			return false
 		case result <- compareResult:
-			for _, f := range s.config.onResultCallback {
+			for _, f := range s.config.resultHandler {
 				f(compareResult)
 			}
 			return true
 		}
 	}
+
 	go func() {
 		defer func() {
 			wg.Wait()
@@ -246,7 +281,7 @@ func (s *SsaCompare[T]) Compare(ctx context.Context, item *Item[T], opts ...Comp
 			close(result)
 		}()
 		var zeroValue T
-		for s, i := range hashMap {
+		for s, i := range diffHashMap {
 			switch {
 			case i < 0:
 				//只在compareItem中存在
@@ -254,7 +289,7 @@ func (s *SsaCompare[T]) Compare(ctx context.Context, item *Item[T], opts ...Comp
 				if !ok {
 					continue
 				}
-				if !addChannel(&CompareResult[T]{
+				if !addChannel(&ComparisonResult[T]{
 					BaseValue:   zeroValue,
 					FromRule:    compareValue.rule,
 					NewValue:    compareValue.Val,
@@ -270,7 +305,7 @@ func (s *SsaCompare[T]) Compare(ctx context.Context, item *Item[T], opts ...Comp
 				if !ok {
 					continue
 				}
-				if !addChannel(&CompareResult[T]{
+				if !addChannel(&ComparisonResult[T]{
 					BaseValue:   baseValue.Val,
 					NewValue:    zeroValue,
 					BaseValHash: baseValue.Hash,
@@ -286,7 +321,7 @@ func (s *SsaCompare[T]) Compare(ctx context.Context, item *Item[T], opts ...Comp
 				if !(ok1 && ok2) {
 					continue
 				}
-				if !addChannel(&CompareResult[T]{
+				if !addChannel(&ComparisonResult[T]{
 					BaseValue:   baseValue.Val,
 					NewValue:    compareValue.Val,
 					BaseValHash: baseValue.Hash,
@@ -299,11 +334,14 @@ func (s *SsaCompare[T]) Compare(ctx context.Context, item *Item[T], opts ...Comp
 			}
 		}
 	}()
+
 	return result
 }
-func NewSsaCompare[T any](item *Item[T]) *SsaCompare[T] {
-	return &SsaCompare[T]{
+
+// NewSSAComparator creates a new SSAComparator instance with the provided base item.
+func NewSSAComparator[T any](item *ComparisonItem[T]) *SSAComparator[T] {
+	return &SSAComparator[T]{
 		baseItem: item,
-		config:   new(CompareOptions[T]),
+		config:   new(ComparatorConfig[T]),
 	}
 }

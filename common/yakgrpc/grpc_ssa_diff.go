@@ -9,70 +9,95 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func (s *Server) NewSSADiff(req *ypb.SSADiffRequest, server ypb.Yak_NewSSADiffServer) error {
+func (s *Server) SSARiskDiff(req *ypb.SSARiskDiffRequest, server ypb.Yak_SSARiskDiffServer) error {
 	context := server.Context()
-	if req.Base == nil || req.Compare == nil {
+	if req.GetBaseLine() == nil || req.GetCompare() == nil {
 		return utils.Error("base and compare are required")
 	}
-	if req.Base.Program == "" && req.Base.RiskRuntimeId == "" {
+
+	if req.GetBaseLine().GetProgramName() == "" && req.GetBaseLine().GetRiskRuntimeId() == "" {
 		return utils.Error("base and compare are required")
 	}
-	kind := schema.Prog
-	if req.Base.Program == "" {
+
+	base := req.GetBaseLine()
+	compare := req.GetCompare()
+
+	kind := schema.Program
+	if base.GetProgramName() == "" {
 		kind = schema.RuntimeId
 	}
+
 	switch req.Type {
-	case int64(schema.CustomDiff):
+	case "custom":
+		// 自定义对比
 		return utils.Error("custom diff type not supported")
-	case int64(schema.RiskDiff):
-		baseItem, err := ssaapi.NewCompareRiskItem(
-			ssaapi.DiffWithVariableName(req.GetBase().GetVariable()),
-			ssaapi.DiffWithRuleName(req.GetBase().GetRuleName()),
-			ssaapi.DiffWithProgram(req.GetBase().GetProgram()),
+	case "risk":
+		// 对比Risk
+
+		// 使用baseLine项目的risk作为对比的基础
+		baseRiskItem, err := ssaapi.NewSSARiskComparisonItem(
+			ssaapi.DiffWithVariableName(base.GetVariable()),
+			ssaapi.DiffWithRuleName(base.GetRuleName()),
+			ssaapi.DiffWithProgram(base.GetProgramName()),
 		)
 		if err != nil {
 			return err
 		}
-		compare := ssaapi.NewSsaCompare[*schema.SSARisk](baseItem)
-		compareItem, err := ssaapi.NewCompareRiskItem(
-			ssaapi.DiffWithVariableName(req.GetCompare().GetVariable()),
-			ssaapi.DiffWithRuleName(req.GetCompare().GetRuleName()),
-			ssaapi.DiffWithProgram(req.GetCompare().GetProgram()))
+
+		// 创建比较器
+		resultComparator := ssaapi.NewSSAComparator[*schema.SSARisk](baseRiskItem)
+		// 使用compare项目的risk进行对比
+		compareRiskItem, err := ssaapi.NewSSARiskComparisonItem(
+			ssaapi.DiffWithVariableName(compare.GetVariable()),
+			ssaapi.DiffWithRuleName(compare.GetRuleName()),
+			ssaapi.DiffWithProgram(compare.GetProgramName()))
 		if err != nil {
 			return err
 		}
-		res := compare.Compare(context, compareItem,
-			ssaapi.WithSaveValueFunc(func(risks []*ssaapi.CompareResult[*schema.SSARisk]) {
+		// 执行对比
+		res := resultComparator.Compare(context, compareRiskItem,
+			// 对比结果保存到数据库
+			ssaapi.WithComparatorSaveResultHandler(func(risks []*ssaapi.ComparisonResult[*schema.SSARisk]) {
 				utils.GormTransactionReturnDb(consts.GetGormDefaultSSADataBase(), func(tx *gorm.DB) {
 					for _, risk := range risks {
 						result := &schema.SSADiffResult{
-							BaseItem:        req.Base.Program,
-							CompareItem:     req.Compare.Program,
-							RuleName:        risk.FromRule,
-							BaseRiskHash:    risk.BaseValHash,
-							CompareRiskHash: risk.NewValHash,
-							Status:          int(risk.Status),
-							CompareType:     int(schema.RiskDiff),
-							DiffResultKind:  kind,
+							BaseLineProgName: base.GetProgramName(),
+							CompareProgName:  compare.GetProgramName(),
+							RuleName:         risk.FromRule,
+							BaseLineRiskHash: risk.BaseValHash,
+							CompareRiskHash:  risk.NewValHash,
+							Status:           string(risk.Status),
+							CompareType:      req.GetType(),
+							DiffResultKind:   string(kind),
 						}
 						if kind == schema.RuntimeId {
-							result.BaseItem = req.Base.RiskRuntimeId
-							result.CompareItem = req.Compare.RiskRuntimeId
+							result.BaseLineProgName = base.RiskRuntimeId
+							result.CompareProgName = req.Compare.RiskRuntimeId
 						}
 						tx.Save(result)
 					}
 				})
 			}),
-			ssaapi.WithCompareResultGetValueInfo[*schema.SSARisk](func(value *schema.SSARisk) (rule string, originHash string, diffHash string) {
-				return value.FromRule, value.Hash, utils.CalcMd5(value.FromRule, value.CodeFragment, value.Variable)
+			// 设置回调函数，返回一些信息作为对比的依据
+			ssaapi.WithComparatorGetBasisInfo[*schema.SSARisk](func(risk *schema.SSARisk) (
+				rule string,
+				originHash string,
+				diffHash string,
+			) {
+				// 使用规则、代码片段和变量名作为对比的依据
+				return risk.FromRule, risk.Hash, utils.CalcMd5(
+					risk.FromRule,
+					risk.CodeFragment,
+					risk.Variable,
+				)
 			}),
 		)
 		for re := range res {
-			server.Send(&ypb.SSADiffResponse{
+			server.Send(&ypb.SSARiskDiffResponse{
 				BaseRisk:    re.BaseValue.ToGRPCModel(),
 				CompareRisk: re.NewValue.ToGRPCModel(),
 				RuleName:    re.FromRule,
-				Status:      int64(re.Status),
+				Status:      string(re.Status),
 			})
 		}
 		return nil
