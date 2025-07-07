@@ -612,27 +612,31 @@ func randFieldElement(c elliptic.Curve, random io.Reader) (k *big.Int, err error
 	}
 	params := c.Params()
 	b := make([]byte, params.BitSize/8+8)
-	_, err = io.ReadFull(random, b)
-	if err != nil {
-		return
-	}
 
-	// A simple randomness check.
-	zeroCount := 0
-	for _, B := range b {
-		if B == 0 {
-			zeroCount++
+	for i := 0; i < 10; i++ {
+		_, err = io.ReadFull(random, b)
+		if err != nil {
+			return nil, err
+		}
+
+		// Check if all bytes are zero, which indicates an RNG failure.
+		isAllZeros := true
+		for _, B := range b {
+			if B != 0 {
+				isAllZeros = false
+				break
+			}
+		}
+		if !isAllZeros {
+			k = new(big.Int).SetBytes(b)
+			n := new(big.Int).Sub(params.N, one)
+			k.Mod(k, n)
+			k.Add(k, one)
+			return k, nil
 		}
 	}
-	if zeroCount > len(b)/2 {
-		return nil, errors.New("randomness of key seems low")
-	}
 
-	k = new(big.Int).SetBytes(b)
-	n := new(big.Int).Sub(params.N, one)
-	k.Mod(k, n)
-	k.Add(k, one)
-	return
+	return nil, errors.New("failed to get non-zero random bytes after 10 retries")
 }
 
 func GenerateKey(random io.Reader) (*PrivateKey, error) {
@@ -642,36 +646,41 @@ func GenerateKey(random io.Reader) (*PrivateKey, error) {
 	}
 	params := c.Params()
 	b := make([]byte, params.BitSize/8+8)
-	_, err := io.ReadFull(random, b)
-	if err != nil {
-		return nil, err
-	}
+	var err error
 
-	// A simple randomness check.
-	zeroCount := 0
-	for _, B := range b {
-		if B == 0 {
-			zeroCount++
+	for i := 0; i < 10; i++ {
+		_, err = io.ReadFull(random, b)
+		if err != nil {
+			return nil, err
+		}
+
+		// Check if all bytes are zero, which indicates an RNG failure.
+		isAllZeros := true
+		for _, B := range b {
+			if B != 0 {
+				isAllZeros = false
+				break
+			}
+		}
+		if isAllZeros {
+			continue
+		}
+
+		k := new(big.Int).SetBytes(b)
+		n := new(big.Int).Sub(params.N, two)
+		k.Mod(k, n)
+		k.Add(k, one)
+		priv := new(PrivateKey)
+		priv.PublicKey.Curve = c
+		priv.D = k
+		priv.PublicKey.X, priv.PublicKey.Y = c.ScalarBaseMult(k.Bytes())
+
+		if priv.PublicKey.Curve.IsOnCurve(priv.PublicKey.X, priv.PublicKey.Y) {
+			return priv, nil
 		}
 	}
-	if zeroCount > len(b)/2 {
-		return nil, errors.New("randomness of key seems low")
-	}
 
-	k := new(big.Int).SetBytes(b)
-	n := new(big.Int).Sub(params.N, two)
-	k.Mod(k, n)
-	k.Add(k, one)
-	priv := new(PrivateKey)
-	priv.PublicKey.Curve = c
-	priv.D = k
-	priv.PublicKey.X, priv.PublicKey.Y = c.ScalarBaseMult(k.Bytes())
-
-	if !priv.PublicKey.Curve.IsOnCurve(priv.PublicKey.X, priv.PublicKey.Y) {
-		return nil, errors.New("generated public key is not on curve")
-	}
-
-	return priv, nil
+	return nil, errors.New("failed to generate valid key after 10 retries")
 }
 
 type zr struct {
