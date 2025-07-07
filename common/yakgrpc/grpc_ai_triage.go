@@ -152,12 +152,12 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 		return forgeList
 	}
 
-	emitEvent := func(nodeId string, content []byte) {
+	emitEvent := func(nodeId string, content any) {
 		sendEvent(&aid.Event{
 			Type:     aid.EVENT_TYPE_STREAM,
 			NodeId:   nodeId,
 			IsSystem: true,
-			Content:  content,
+			Content:  utils.InterfaceToBytes(content),
 		})
 	}
 	reducer, err := aireducer.NewReducerEx(
@@ -186,7 +186,8 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 			}
 			detailIntention := intent.GetString("detail_intention")
 			intentAssertion := intent.GetString("assertion")
-			emitEvent(Triage_Event_Log, []byte(fmt.Sprintf("当前意图：%s\n理由：%s", intentAssertion, detailIntention)))
+			keywords := intent.GetString("keywords")
+			emitEvent(Triage_Event_Log, []byte(fmt.Sprintf("当前意图：%s\n理由：%s\n关键词：%s", intentAssertion, detailIntention, keywords)))
 
 			if intentAssertion != "" {
 				emitEvent(Triage_Event_Log, []byte(fmt.Sprintf("搜索关联aiforge")))
@@ -201,12 +202,10 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 				})
 
 				if len(forgeName) > 0 {
-					forgeNameListContent, err := json.Marshal(forgeName)
-					if err != nil {
-						log.Errorf("marshal: %v", err)
-						return nil
-					}
-					emitEvent(Triage_Event_Forge_List, forgeNameListContent)
+					emitEvent(Triage_Event_Forge_List, map[string]any{
+						"forge_list": forgeName,
+						"keywords":   keywords,
+					})
 				}
 			}
 			return nil
