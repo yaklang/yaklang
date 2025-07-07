@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"errors"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -39,13 +41,17 @@ func (s *SSARiskDisposals) AfterDelete(tx *gorm.DB) error {
 
 // updateRiskLatestDisposalStatus用于更新SSARisk的最新处置状态
 func (s *SSARiskDisposals) updateRiskLatestDisposalStatus(tx *gorm.DB) error {
+	if s.SSARiskID == 0 {
+		return nil
+	}
+
 	var latestDisposal SSARiskDisposals
 	err := tx.Where("ssa_risk_id = ?", s.SSARiskID).
 		Order("updated_at DESC").
 		First(&latestDisposal).Error
 
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return tx.Model(&SSARisk{}).
 				Where("id = ?", s.SSARiskID).
 				Update("latest_disposal_status", string(SSARiskDisposalStatus_NotSet)).Error

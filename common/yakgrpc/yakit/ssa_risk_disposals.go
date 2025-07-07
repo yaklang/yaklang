@@ -94,12 +94,22 @@ func GetSSARiskDisposals(db *gorm.DB, riskId int64) ([]schema.SSARiskDisposals, 
 }
 
 func DeleteSSARiskDisposals(db *gorm.DB, req *ypb.DeleteSSARiskDisposalsRequest) (int64, error) {
-	db = FilterSSARiskDisposals(db, req.GetFilter())
-	db = db.Unscoped().Delete(&schema.SSARiskDisposals{})
-	if db.Error != nil {
-		return 0, utils.Errorf("DeleteSSARiskDisposals failed: %v", db.Error)
+	var toDelete []schema.SSARiskDisposals
+	filteredDB := FilterSSARiskDisposals(db, req.GetFilter())
+	if err := filteredDB.Find(&toDelete).Error; err != nil {
+		return 0, utils.Errorf("DeleteSSARiskDisposals failed to query records: %v", err)
 	}
-	return db.RowsAffected, nil
+
+	// 逐个删除记录，确保 AfterDelete 回调被触发
+	var deletedCount int64
+	for _, disposal := range toDelete {
+		if err := db.Unscoped().Delete(&disposal).Error; err != nil {
+			return deletedCount, utils.Errorf("DeleteSSARiskDisposals failed to delete record %d: %v", disposal.ID, err)
+		}
+		deletedCount++
+	}
+
+	return deletedCount, nil
 }
 
 func UpdateSSARiskDisposals(db *gorm.DB, req *ypb.UpdateSSARiskDisposalsRequest) ([]schema.SSARiskDisposals, error) {
