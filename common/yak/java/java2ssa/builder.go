@@ -23,12 +23,15 @@ type SSABuilder struct {
 
 var Builder ssa.Builder = &SSABuilder{}
 
-func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
-	ast, err := Frontend(src, force)
-	if err != nil {
-		return err
+func (*SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
+	return Frontend(src, false)
+}
+func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error {
+	ast, ok := raw.(javaparser.ICompilationUnitContext)
+	if !ok {
+		return utils.Errorf("invalid AST type: %T, expected javaparser.ICompilationUnitContext", raw)
 	}
-	build := &builder{
+	build := &singleFileBuilder{
 		FunctionBuilder:   b,
 		ast:               ast,
 		constMap:          make(map[string]ssa.Value),
@@ -52,7 +55,7 @@ func (*SSABuilder) GetLanguage() consts.Language {
 
 // ========================================== Build Front End ==========================================
 
-type builder struct {
+type singleFileBuilder struct {
 	*ssa.FunctionBuilder
 	ast      javaparser.ICompilationUnitContext
 	constMap map[string]ssa.Value
@@ -84,7 +87,7 @@ func Frontend(src string, force bool) (javaparser.ICompilationUnitContext, error
 	return nil, utils.Errorf("parse AST FrontEnd error: %v", errListener.GetErrorString())
 }
 
-func (b *builder) AssignConst(name string, value ssa.Value) bool {
+func (b *singleFileBuilder) AssignConst(name string, value ssa.Value) bool {
 	if ConstValue, ok := b.constMap[name]; ok {
 		log.Warnf("const %v has been defined value is %v", name, ConstValue.String())
 		return false
@@ -94,21 +97,21 @@ func (b *builder) AssignConst(name string, value ssa.Value) bool {
 	return true
 }
 
-func (b *builder) ReadConst(name string) (ssa.Value, bool) {
+func (b *singleFileBuilder) ReadConst(name string) (ssa.Value, bool) {
 	v, ok := b.constMap[name]
 	return v, ok
 }
 
-func (b *builder) AssignClassConst(className, key string, value ssa.Value) {
+func (b *singleFileBuilder) AssignClassConst(className, key string, value ssa.Value) {
 	name := fmt.Sprintf("%s_%s", className, key)
 	b.AssignConst(name, value)
 }
-func (b *builder) ReadClassConst(className, key string) (ssa.Value, bool) {
+func (b *singleFileBuilder) ReadClassConst(className, key string) (ssa.Value, bool) {
 	name := fmt.Sprintf("%s_%s", className, key)
 	return b.ReadConst(name)
 }
 
-func (b *builder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() {
+func (b *singleFileBuilder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() {
 	t := b.StoreFunctionBuilder()
 	b.LoadBuilder(s)
 	return func() {
@@ -116,11 +119,11 @@ func (b *builder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() {
 	}
 }
 
-func (b *builder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
+func (b *singleFileBuilder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
 	b.FunctionBuilder = s.Current
 	b.LoadFunctionBuilder(s.Store)
 }
 
-func (b *builder) initImport() {
+func (b *singleFileBuilder) initImport() {
 	b.allImportPkgSlice = append(b.allImportPkgSlice, []string{"java", "lang", "*"})
 }
