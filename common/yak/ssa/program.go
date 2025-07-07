@@ -10,7 +10,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/exp/slices"
 
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -151,26 +150,26 @@ func (prog *Program) GetLibrary(name string) (*Program, bool) {
 		app.AddUpStream(p)
 		return p, hasFile(p)
 	}
-	if !app.EnableDatabase {
-		return nil, false
-	}
-	version := ""
-	if p := app.GetSCAPackageByName(name); p != nil {
-		version = p.Version
-	} else {
-		return nil, false
-	}
+	// if !app.EnableDatabase {
+	return nil, false
+	// }
+	// version := ""
+	// if p := app.GetSCAPackageByName(name); p != nil {
+	// 	version = p.Version
+	// } else {
+	// 	return nil, false
+	// }
 	// library in  database, load and set relation
-	p, err := GetLibrary(name, version)
-	if err != nil {
-		return nil, false
-	}
-	app.AddUpStream(p)
-	if !slices.Contains(p.irProgram.UpStream, name) {
-		// update up-down stream
-		prog.AddUpStream(p)
-	}
-	return p, hasFile(p)
+	// p, err := GetLibrary(name, version)
+	// if err != nil {
+	// 	return nil, false
+	// }
+	// app.AddUpStream(p)
+	// if !slices.Contains(p.irProgram.UpStream, name) {
+	// 	// update up-down stream
+	// 	prog.AddUpStream(p)
+	// }
+	// return p, hasFile(p)
 }
 
 func (prog *Program) AddUpStream(sub *Program) {

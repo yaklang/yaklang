@@ -2,7 +2,7 @@ package java2ssa
 
 import "github.com/yaklang/yaklang/common/yak/ssa"
 
-func (y *builder) GetBluePrint(name string) *ssa.Blueprint {
+func (y *singleFileBuilder) GetBluePrint(name string) *ssa.Blueprint {
 	if y == nil {
 		return nil
 	}

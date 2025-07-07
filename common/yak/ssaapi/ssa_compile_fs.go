@@ -2,7 +2,6 @@ package ssaapi
 
 import (
 	"io/fs"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -47,7 +46,7 @@ func (c *config) parseProjectWithFS(
 
 	process := 0.0
 	prog.ProcessInfof = func(s string, v ...any) {
-		processCallback(
+		go processCallback(
 			process,
 			s, v...,
 		)
@@ -55,6 +54,9 @@ func (c *config) parseProjectWithFS(
 
 	preHandlerTotal := 0
 	handlerTotal := 0
+	preHandlerFiles := make([]string, 0)
+	handlerFilesMap := make(map[string]struct{})
+	handlerFiles := make([]string, 0)
 
 	prog.ProcessInfof("parse project in fs: %v, path: %v", filesystem, c.info)
 	prog.ProcessInfof("calculate total size of project")
@@ -80,9 +82,12 @@ func (c *config) parseProjectWithFS(
 			}
 			if c.checkLanguage(path) == nil {
 				handlerTotal++
+				handlerFiles = append(handlerFiles, path)
+				handlerFilesMap[path] = struct{}{}
 			}
 			if c.checkLanguagePreHandler(path) == nil {
 				preHandlerTotal++
+				preHandlerFiles = append(preHandlerFiles, path)
 			}
 			return nil
 		}),
@@ -108,42 +113,21 @@ func (c *config) parseProjectWithFS(
 	prog.SetPreHandler(true)
 	prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", filesystem, c.info)
 	start = time.Now()
-	filesys.Recursive(programPath,
-		filesys.WithFileSystem(filesystem),
-		filesys.WithContext(c.ctx),
-		filesys.WithDirStat(func(s string, fi fs.FileInfo) error {
-			_, name := filesystem.PathSplit(s)
-			if name == "test" || name == ".git" {
-				return filesys.SkipDir
-			}
-			return nil
-		}),
-		filesys.WithFileStat(func(path string, fi fs.FileInfo) (err error) {
-			defer func() {
-				if r := recover(); r != nil {
-					err = utils.Errorf("parse [%s] error %v  ", path, r)
-					utils.PrintCurrentGoroutineRuntimeStack()
-				}
-			}()
-			if fi.Size() == 0 {
-				return nil
-			}
-			//check exclude_file
-			if c.excludeFile(path, fi.Name()) {
-				return nil
-			}
-			// check
-			if err := c.checkLanguagePreHandler(path); err != nil {
-				return nil
-			}
-			preHandlerProcess()
-			if language := c.LanguageBuilder; language != nil {
-				language.InitHandler(builder)
-				language.PreHandlerProject(filesystem, builder, path)
-			}
-			return nil
-		}),
-	)
+
+	fileContets := make([]*ssareducer.FileContent, 0, preHandlerTotal)
+	for fileContent := range c.getFileHandler(
+		filesystem, preHandlerFiles, handlerFilesMap,
+	) {
+		fileContets = append(fileContets, fileContent)
+
+		preHandlerProcess() // notify the process
+		// handler
+		if language := c.LanguageBuilder; language != nil {
+			language.InitHandler(builder)
+			language.PreHandlerProject(filesystem, fileContent.AST, builder, fileContent.Path)
+		}
+	}
+	// },
 	preHandlerTime = time.Since(start)
 	if c.isStop() {
 		return nil, ErrContextCancel
@@ -163,53 +147,37 @@ func (c *config) parseProjectWithFS(
 	}
 	prog.SetPreHandler(false)
 	start = time.Now()
-	err = ssareducer.ReducerCompile(
-		programPath, // base
-		ssareducer.WithFileSystem(filesystem),
-		ssareducer.WithProgramName(c.ProgramName),
-		ssareducer.WithEntryFiles(c.entryFile...),
-		ssareducer.WithContext(c.ctx),
-		ssareducer.WithStrictMode(c.strictMode),
-		// ssareducer.with
-		ssareducer.WithCompileMethod(func(path string, raw string) (includeFiles []string, err error) {
-			defer func() {
-				if r := recover(); r != nil {
-					// ret = nil
-					includeFiles = prog.GetIncludeFiles()
-					// TODO: panic shuold be upload
-					// err = utils.Errorf("parse error with panic : %v", r)
-					log.Errorf("parse [%s] error %v  ", path, r)
-					utils.PrintCurrentGoroutineRuntimeStack()
-				}
-			}()
-			dir, file := filepath.Split(path)
-			if c.excludeFile(dir, file) {
-				return nil, nil
-			}
 
-			// check
-			if err := c.checkLanguage(path); err != nil {
-				log.Warnf("parse file %s error: %v", path, err)
-				return nil, nil
+	// ssareducer.FilesHandler(
+	// 	c.ctx, filesystem, handlerFiles,
+	// 	func(path string, content []byte) {
+	for _, fileContent := range fileContets {
+		if _, needBuild := handlerFilesMap[fileContent.Path]; !needBuild {
+			continue // skip if not in handlerFilesMap
+		}
+		path := fileContent.Path
+		content := fileContent.Content
+		ast := fileContent.AST
+		defer func() {
+			if r := recover(); r != nil {
+				log.Errorf("parse [%s] error %v  ", path, r)
+				utils.PrintCurrentGoroutineRuntimeStack()
 			}
-			handlerProcess()
+		}()
 
-			// build
-			if err := prog.Build(path, memedit.NewMemEditor(raw), builder); err != nil {
-				log.Debugf("parse %#v failed: %v", path, err)
-				return nil, utils.Wrapf(err, "parse file %s error", path)
-			}
-			exclude := prog.GetIncludeFiles()
-			if len(exclude) > 0 {
-				log.Debugf("program include files: %v will not be as the entry from project", len(exclude))
-			}
-			return exclude, nil
-		}),
-	)
-	parseTime = time.Since(start)
-	if err != nil {
-		return nil, utils.Wrap(err, "parse project error")
+		handlerProcess()
+
+		// build
+		if err := prog.Build(ast, path, memedit.NewMemEditorByBytes(content), builder); err != nil {
+			log.Errorf("parse %#v failed: %v", path, err)
+			continue
+		}
 	}
+
+	parseTime = time.Since(start)
+	// if err != nil {
+	// 	return nil, utils.Wrap(err, "parse project error")
+	// }
 	if c.isStop() {
 		return nil, ErrContextCancel
 	}
