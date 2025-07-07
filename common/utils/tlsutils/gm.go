@@ -5,16 +5,18 @@ import (
 	cryptoRand "crypto/rand"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"math/big"
+	"sync"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/gmsm/sm2"
-	"math/big"
-	"time"
 
 	cryptorand "crypto/rand"
-)
 
-import "github.com/yaklang/yaklang/common/gmsm/x509"
+	"github.com/yaklang/yaklang/common/gmsm/x509"
+)
 
 func GetX509GMServerTlsConfigWithAuth(ca, server, serverKey []byte, auth bool) (*gmtls.Config, error) {
 	p := x509.NewCertPool()
@@ -201,7 +203,12 @@ func generateGMSelfSignedCertKey(commonName string) ([]byte, []byte, error) {
 	return certBuf.Bytes(), pKeyBytes, nil
 }
 
+var certGenMutex sync.Mutex
+
 func GenerateGMSelfSignedCertKey(commonName string) ([]byte, []byte, error) {
+	certGenMutex.Lock()
+	defer certGenMutex.Unlock()
+
 	var ca, key []byte
 	var err error
 	for i := 0; i < 5; i++ {
