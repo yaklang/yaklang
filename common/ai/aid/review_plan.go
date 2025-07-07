@@ -32,6 +32,13 @@ type PlanReviewSuggestion struct {
 func (c *Config) getPlanReviewSuggestion() []*PlanReviewSuggestion {
 	opt := []*PlanReviewSuggestion{
 		{
+			Value:             "freedom-review",
+			Suggestion:        "审阅模式",
+			SuggestionEnglish: "User freely review the plan, can add more details or modify the plan",
+			AllowExtraPrompt:  true,
+			ParamSchema:       schemaFreedomReviewPlan,
+		},
+		{
 			Value:             "unclear",
 			Suggestion:        "目标不明确",
 			SuggestionEnglish: `The plan is too vague and fuzzy, needs more specific objectives and clearer definition`,
@@ -48,13 +55,6 @@ func (c *Config) getPlanReviewSuggestion() []*PlanReviewSuggestion {
 			Suggestion:        "需要拆分子任务",
 			SuggestionEnglish: "Create Subtask for current level task, if user not specified, auto evaluate how to modify the task",
 			AllowExtraPrompt:  true,
-		},
-		{
-			Value:             "freedom-review",
-			Suggestion:        "自由批阅模式的审查建议",
-			SuggestionEnglish: "User freely review the plan, can add more details or modify the plan",
-			AllowExtraPrompt:  true,
-			ParamSchema:       schemaFreedomReviewPlan,
 		},
 		{
 			Value:             "continue",
