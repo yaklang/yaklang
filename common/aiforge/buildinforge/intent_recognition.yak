@@ -40,6 +40,10 @@ schema = <<<schema
                 "detail_intention": {
                     "type": "string",
                     "description": "详细的识别结果"
+                },
+                "keywords": {
+                    "type": "string",
+                    "description": "意图关键词，使用逗号分割",
                 }
             }
         }
