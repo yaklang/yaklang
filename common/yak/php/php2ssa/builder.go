@@ -29,6 +29,7 @@ func (*SSABuild) FilterPreHandlerFile(path string) bool {
 	extension := filepath.Ext(path)
 	return extension == ".php" || extension == ".lock"
 }
+
 func (s *SSABuild) Create() ssa.Builder {
 	return &SSABuild{
 		PreHandlerInit: ssa.NewPreHandlerInit(initHandler).WithLanguageConfigOpts(
@@ -62,7 +63,7 @@ func initHandler(fb *ssa.FunctionBuilder) {
 	fb.GetProgram().GlobalScope = container
 }
 
-func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.FunctionBuilder, path string) error {
+func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST, builder *ssa.FunctionBuilder, path string) error {
 	prog := builder.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")
@@ -96,24 +97,30 @@ func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.Func
 		prog.SCAPackages = append(prog.SCAPackages, pkgs...)
 		builder.GenerateDependence(pkgs, filename)
 	} else {
-		file, err := fileSystem.ReadFile(path)
+		raw, err := fileSystem.ReadFile(path)
 		if err != nil {
 			log.Errorf("read file %s error: %v", path, err)
 			return nil
 		}
-		prog.Build(path, memedit.NewMemEditor(string(file)), builder)
+		data := string(raw)
+		prog.Build(ast, path, memedit.NewMemEditor(data), builder)
 	}
 	return nil
 }
 
-func (s *SSABuild) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	builder.GetProgram().GetApplication().Build("", editor, builder)
+func (s *SSABuild) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
+	builder.GetProgram().GetApplication().Build(ast, "", editor, builder)
+}
+func (s *SSABuild) ParseAST(src string) (ssa.FrontAST, error) {
+	return FrondEnd(src)
 }
 
-func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
-	ast, err := FrondEnd(src, force)
-	if err != nil {
-		return err
+// func (s *ssa.BasicBlock) BuildFromAst()
+
+func (s *SSABuild) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error {
+	ast, ok := raw.(phpparser.IHtmlDocumentContext)
+	if !ok {
+		return utils.Errorf("invalid AST type: %T, expected phpparser.IHtmlDocumentContext", raw)
 	}
 	// log.Infof("parse AST FrontEnd success: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	b.WithExternValue(phpBuildIn)
@@ -176,7 +183,7 @@ type builder struct {
 	currentInclude map[string]struct{}
 }
 
-func FrondEnd(src string, force bool) (phpparser.IHtmlDocumentContext, error) {
+func FrondEnd(src string) (phpparser.IHtmlDocumentContext, error) {
 	errListener := antlr4util.NewErrorListener()
 	lexer := phpparser.NewPHPLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
@@ -187,10 +194,10 @@ func FrondEnd(src string, force bool) (phpparser.IHtmlDocumentContext, error) {
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.HtmlDocument()
-	if force || len(errListener.GetErrors()) == 0 {
+	if len(errListener.GetErrors()) == 0 {
 		return ast, nil
 	}
-	return nil, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrorString())
+	return ast, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrorString())
 }
 
 func (b *builder) AssignConst(name string, value ssa.Value) bool {

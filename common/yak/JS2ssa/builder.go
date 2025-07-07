@@ -17,15 +17,15 @@ type SSABuild struct {
 	*ssa.PreHandlerInit
 }
 
-var Builder ssa.Builder = &SSABuild{}
+// var Builder ssa.Builder = &SSABuild{}
 
-func (s *SSABuild) Create() ssa.Builder {
-	return &SSABuild{
-		PreHandlerInit: ssa.NewPreHandlerInit().WithLanguageConfigOpts(
-			ssa.WithLanguageConfigBind(true),
-			ssa.WithLanguageBuilder(s)),
-	}
-}
+// func (s *SSABuild) Create() ssa.Builder {
+// 	return &SSABuild{
+// 		PreHandlerInit: ssa.NewPreHandlerInit().WithLanguageConfigOpts(
+// 			ssa.WithLanguageConfigBind(true),
+// 			ssa.WithLanguageBuilder(s)),
+// 	}
+// }
 
 func (*SSABuild) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
 	ast, err := Frontend(src, force)

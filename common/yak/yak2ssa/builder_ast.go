@@ -22,7 +22,15 @@ func (b *astbuilder) handlerWs(ws *yak.WsContext) {
 }
 
 // entry point
-func (b *astbuilder) build(ast *yak.ProgramContext) {
+func (b *astbuilder) build(raw ssa.FrontAST) {
+	if utils.IsNil(raw) {
+		return
+	}
+	ast, ok := raw.(*yak.ProgramContext)
+	if !ok {
+		return
+	}
+
 	prog := b.GetProgram()
 	currentEditor := prog.GetCurrentEditor()
 	hasFile := func(p *ssa.Program) bool {
