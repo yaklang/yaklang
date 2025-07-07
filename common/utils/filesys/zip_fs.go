@@ -160,7 +160,7 @@ func (z *ZipFS) GetSeparators() rune {
 }
 
 func (z *ZipFS) PathSplit(s string) (string, string) {
-	return splitWithSeparator(s, z.GetSeparators())
+	return SplitWithSeparator(s, z.GetSeparators())
 }
 
 func (z *ZipFS) Ext(i string) string {
