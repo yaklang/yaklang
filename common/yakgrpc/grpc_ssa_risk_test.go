@@ -343,14 +343,13 @@ func TestSSARiskFeedbackToOnline(t *testing.T) {
 
 }
 
-func TestGRPCMUSTPASS_QuerySSARisks_LatestDisposalStatus(t *testing.T) {
+func TestGRPCMUSTPASS_SSA_QuerySSARisks_LatestDisposalStatus(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
 	taskId := uuid.NewString()
 	testUUID := uuid.NewString()
 
-	// 创建测试用的风险记录
 	createRisk := func(filePath, severity, riskType string) int64 {
 		risk := &schema.SSARisk{
 			CodeSourceUrl: filePath,
@@ -366,12 +365,10 @@ func TestGRPCMUSTPASS_QuerySSARisks_LatestDisposalStatus(t *testing.T) {
 		return int64(risk.ID)
 	}
 
-	// 创建三个风险记录
 	riskId1 := createRisk("ssadb://prog1/1", "high", "sql-injection")
 	riskId2 := createRisk("ssadb://prog1/2", "medium", "xss")
 	riskId3 := createRisk("ssadb://prog2/1", "low", "path-traversal")
 
-	// 清理测试数据
 	defer func() {
 		yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{
 			RuntimeID: []string{taskId},
@@ -385,7 +382,6 @@ func TestGRPCMUSTPASS_QuerySSARisks_LatestDisposalStatus(t *testing.T) {
 
 	ctx := context.Background()
 
-	// 测试场景1：没有处置记录的风险
 	t.Run("风险无处置记录应返回not_set状态", func(t *testing.T) {
 		queryResp, err := client.QuerySSARisks(ctx, &ypb.QuerySSARisksRequest{
 			Filter: &ypb.SSARisksFilter{
@@ -397,7 +393,6 @@ func TestGRPCMUSTPASS_QuerySSARisks_LatestDisposalStatus(t *testing.T) {
 		require.Equal(t, "not_set", queryResp.Data[0].LatestDisposalStatus)
 	})
 
-	// 为riskId1创建一个处置记录
 	_, err = client.CreateSSARiskDisposals(ctx, &ypb.CreateSSARiskDisposalsRequest{
 		RiskIds: []int64{riskId1},
 		Status:  "is_issue",
@@ -405,7 +400,6 @@ func TestGRPCMUSTPASS_QuerySSARisks_LatestDisposalStatus(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// 测试场景2：有一个处置记录的风险
 	t.Run("风险有一个处置记录应返回该状态", func(t *testing.T) {
 		queryResp, err := client.QuerySSARisks(ctx, &ypb.QuerySSARisksRequest{
 			Filter: &ypb.SSARisksFilter{
@@ -417,10 +411,8 @@ func TestGRPCMUSTPASS_QuerySSARisks_LatestDisposalStatus(t *testing.T) {
 		require.Equal(t, "is_issue", queryResp.Data[0].LatestDisposalStatus)
 	})
 
-	// 稍等一下确保时间戳不同
 	time.Sleep(1 * time.Second)
 
-	// 为riskId1创建第二个处置记录（更新的）
 	_, err = client.CreateSSARiskDisposals(ctx, &ypb.CreateSSARiskDisposalsRequest{
 		RiskIds: []int64{riskId1},
 		Status:  "not_issue",
@@ -428,7 +420,6 @@ func TestGRPCMUSTPASS_QuerySSARisks_LatestDisposalStatus(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// 测试场景3：有多个处置记录的风险，应返回最新的状态
 	t.Run("风险有多个处置记录应返回最新状态", func(t *testing.T) {
 		queryResp, err := client.QuerySSARisks(ctx, &ypb.QuerySSARisksRequest{
 			Filter: &ypb.SSARisksFilter{
@@ -440,7 +431,6 @@ func TestGRPCMUSTPASS_QuerySSARisks_LatestDisposalStatus(t *testing.T) {
 		require.Equal(t, "not_issue", queryResp.Data[0].LatestDisposalStatus)
 	})
 
-	// 为riskId2创建处置记录
 	_, err = client.CreateSSARiskDisposals(ctx, &ypb.CreateSSARiskDisposalsRequest{
 		RiskIds: []int64{riskId2},
 		Status:  "suspicious",
@@ -448,7 +438,6 @@ func TestGRPCMUSTPASS_QuerySSARisks_LatestDisposalStatus(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// 测试场景4：批量查询多个风险，验证各自的处置状态
 	t.Run("批量查询多个风险应返回各自正确的处置状态", func(t *testing.T) {
 		queryResp, err := client.QuerySSARisks(ctx, &ypb.QuerySSARisksRequest{
 			Filter: &ypb.SSARisksFilter{
@@ -458,19 +447,16 @@ func TestGRPCMUSTPASS_QuerySSARisks_LatestDisposalStatus(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, queryResp.Data, 3)
 
-		// 建立ID到处置状态的映射
 		statusMap := make(map[int64]string)
 		for _, risk := range queryResp.Data {
 			statusMap[risk.Id] = risk.LatestDisposalStatus
 		}
 
-		// 验证各风险的处置状态
 		require.Equal(t, "not_issue", statusMap[riskId1], "riskId1应该是最新的not_issue状态")
 		require.Equal(t, "suspicious", statusMap[riskId2], "riskId2应该是suspicious状态")
 		require.Equal(t, "not_set", statusMap[riskId3], "riskId3应该是not_set状态（无处置记录）")
 	})
 
-	// 再次为riskId1创建更新的处置记录
 	time.Sleep(1 * time.Second)
 	_, err = client.CreateSSARiskDisposals(ctx, &ypb.CreateSSARiskDisposalsRequest{
 		RiskIds: []int64{riskId1},
@@ -479,7 +465,6 @@ func TestGRPCMUSTPASS_QuerySSARisks_LatestDisposalStatus(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// 测试场景5：验证最新状态确实是按时间排序的
 	t.Run("验证处置状态确实是最新的", func(t *testing.T) {
 		queryResp, err := client.QuerySSARisks(ctx, &ypb.QuerySSARisksRequest{
 			Filter: &ypb.SSARisksFilter{
@@ -491,7 +476,6 @@ func TestGRPCMUSTPASS_QuerySSARisks_LatestDisposalStatus(t *testing.T) {
 		require.Equal(t, "is_issue", queryResp.Data[0].LatestDisposalStatus)
 	})
 
-	// 测试场景6：通过搜索条件查询，验证处置状态仍然正确
 	t.Run("通过搜索条件查询验证处置状态", func(t *testing.T) {
 		queryResp, err := client.QuerySSARisks(ctx, &ypb.QuerySSARisksRequest{
 			Filter: &ypb.SSARisksFilter{
@@ -501,7 +485,6 @@ func TestGRPCMUSTPASS_QuerySSARisks_LatestDisposalStatus(t *testing.T) {
 		require.NoError(t, err)
 		require.GreaterOrEqual(t, len(queryResp.Data), 3)
 
-		// 验证搜索结果中包含正确的处置状态
 		foundRisk1 := false
 		for _, risk := range queryResp.Data {
 			if risk.Id == riskId1 {
