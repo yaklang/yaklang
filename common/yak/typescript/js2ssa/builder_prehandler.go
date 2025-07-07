@@ -1,11 +1,12 @@
 package js2ssa
 
 import (
+	"path/filepath"
+
 	"github.com/yaklang/yaklang/common/log"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"path/filepath"
 )
 
 func (s *SSABuilder) Create() ssa.Builder {
@@ -25,11 +26,11 @@ func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	return extension == ".js"
 }
 
-func (*SSABuilder) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	builder.GetProgram().GetApplication().Build("", editor, builder)
+func (s *SSABuilder) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
+	builder.GetProgram().GetApplication().Build(ast, "", editor, builder)
 }
 
-func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.FunctionBuilder, path string) error {
+func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST, fb *ssa.FunctionBuilder, path string) error {
 	prog := fb.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")
@@ -40,6 +41,6 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 		log.Errorf("read file %s error: %v", path, err)
 		return nil
 	}
-	prog.Build(path, memedit.NewMemEditor(string(file)), fb)
+	prog.Build(ast, path, memedit.NewMemEditor(string(file)), fb)
 	return nil
 }

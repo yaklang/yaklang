@@ -62,7 +62,9 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 		programName,
 		func(inst Instruction, instIr *ssadb.IrCode) {
 			cache.OffsetCache.Add("", inst) // add to offset cache
-			cache.afterSaveNotify(1)        // notify after save
+		},
+		func(i int) {
+			cache.afterSaveNotify(i)
 		},
 	)
 	cache.TypeCache = createTypeCache(

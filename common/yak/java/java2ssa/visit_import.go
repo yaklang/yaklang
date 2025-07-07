@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
+func (y *singleFileBuilder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 	if y == nil || i == nil || y.IsStop() {
 		return
 	}

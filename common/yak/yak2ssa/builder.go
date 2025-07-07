@@ -1,8 +1,9 @@
 package yak2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/consts"
 	"path/filepath"
+
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/utils"
@@ -11,14 +12,15 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-type SSABuilder struct {
+type singleFileBuilder struct {
 	*ssa.PreHandlerInit
 }
 
-var Builder = &SSABuilder{}
+var _ ssa.Builder = (*singleFileBuilder)(nil)
+var Builder = &singleFileBuilder{}
 
-func (s *SSABuilder) Create() ssa.Builder {
-	return &SSABuilder{
+func (s *singleFileBuilder) Create() ssa.Builder {
+	return &singleFileBuilder{
 		PreHandlerInit: ssa.NewPreHandlerInit().WithLanguageConfigOpts(
 			ssa.WithLanguageConfigShouldBuild(func(filename string) bool {
 				return true
@@ -28,11 +30,11 @@ func (s *SSABuilder) Create() ssa.Builder {
 	}
 }
 
-func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
-	ast, err := FrontEnd(src, force)
-	if err != nil {
-		return err
-	}
+func (*singleFileBuilder) ParseAST(src string) (ssa.FrontAST, error) {
+	return FrontEnd(src)
+}
+
+func (*singleFileBuilder) BuildFromAST(ast ssa.FrontAST, b *ssa.FunctionBuilder) error {
 	b.SupportClosure = true
 	astBuilder := &astbuilder{
 		FunctionBuilder: b,
@@ -41,13 +43,13 @@ func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	return nil
 }
 
-func (*SSABuilder) FilterFile(path string) bool {
+func (*singleFileBuilder) FilterFile(path string) bool {
 	a := filepath.Ext(path)
 	_ = a
 	return filepath.Ext(path) == ".yak"
 }
 
-func (*SSABuilder) GetLanguage() consts.Language {
+func (*singleFileBuilder) GetLanguage() consts.Language {
 	return consts.Yak
 }
 
@@ -55,7 +57,7 @@ type astbuilder struct {
 	*ssa.FunctionBuilder
 }
 
-func FrontEnd(src string, must bool) (*yak.ProgramContext, error) {
+func FrontEnd(src string) (yak.IProgramContext, error) {
 	errListener := antlr4util.NewErrorListener()
 	lexer := yak.NewYaklangLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
@@ -65,9 +67,10 @@ func FrontEnd(src string, must bool) (*yak.ProgramContext, error) {
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
-	ast := parser.Program().(*yak.ProgramContext)
-	if must || len(errListener.GetErrors()) == 0 {
-		return ast, nil
+	ast := parser.Program()
+	var err error
+	if len(errListener.GetErrors()) != 0 {
+		err = utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrorString())
 	}
-	return nil, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrorString())
+	return ast, err
 }
