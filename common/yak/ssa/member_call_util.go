@@ -10,7 +10,7 @@ import (
 // value
 func setMemberCallRelationship(obj, key, member Value) {
 	if utils.IsNil(obj) || utils.IsNil(key) || utils.IsNil(member) {
-		log.Errorf("BUG: setMemberCallRelationship called with nil value: %v, %v, %v", obj, key, member)
+		log.Debugf("BUG: setMemberCallRelationship called with nil value: %v, %v, %v", obj, key, member)
 		return
 	}
 	obj.AddMember(key, member)
