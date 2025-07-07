@@ -20,7 +20,7 @@ type VirtualFS struct {
 }
 
 func (f *VirtualFS) PathSplit(s string) (string, string) {
-	return splitWithSeparator(s, f.GetSeparators())
+	return SplitWithSeparator(s, f.GetSeparators())
 }
 func (f *VirtualFS) Ext(s string) string { return getExtension(s) }
 func (f *VirtualFS) IsAbs(name string) bool {
