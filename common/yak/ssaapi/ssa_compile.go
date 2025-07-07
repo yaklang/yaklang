@@ -70,13 +70,14 @@ func (c *config) parseFile() (ret *Program, err error) {
 }
 
 func (c *config) feed(prog *ssa.Program, code *memedit.MemEditor) error {
-	builder := prog.GetAndCreateFunctionBuilder(string(ssa.MainFunctionName), string(ssa.MainFunctionName))
-	if err := prog.Build("", code, builder); err != nil {
-		return err
-	}
-	builder.Finish()
-	ssa4analyze.RunAnalyzer(prog)
-	return nil
+	return utils.Errorf("not implemented")
+	// builder := prog.GetAndCreateFunctionBuilder(string(ssa.MainFunctionName), string(ssa.MainFunctionName))
+	// if err := prog.Build("", code, builder); err != nil {
+	// 	return err
+	// }
+	// builder.Finish()
+	// ssa4analyze.RunAnalyzer(prog)
+	// return nil
 }
 
 func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error) {
@@ -103,10 +104,14 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 	if err != nil {
 		return nil, err
 	}
-	c.LanguageBuilder.PreHandlerFile(r, builder)
+	ast, err := c.LanguageBuilder.ParseAST(r.GetSourceCode())
+	if err != nil {
+		return nil, utils.Errorf("parse file error: %v", err)
+	}
+	c.LanguageBuilder.PreHandlerFile(ast, r, builder)
 	// parse code
 	prog.SetPreHandler(false)
-	if err := prog.Build("", r, builder); err != nil {
+	if err := prog.Build(ast, "", r, builder); err != nil {
 		return nil, err
 	}
 	builder.Finish()

@@ -74,6 +74,7 @@ func createInstructionCache(
 	db *gorm.DB, prog *Program,
 	programName string,
 	marshalFinish func(Instruction, *ssadb.IrCode),
+	saveFinish func(int),
 ) Cache[Instruction] {
 	if !databaseEnable {
 		return newmemoryCache[Instruction]()
@@ -107,12 +108,12 @@ func createInstructionCache(
 	save := func(t []*ssadb.IrCode) {
 		defer func() {
 			if err := recover(); err != nil {
-				log.Errorf("DATABASE: Save IR Codes panic: %v", err)
+				// log.Errorf("DATABASE: Save IR Codes panic: %v", err)
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 		}()
 		utils.GormTransaction(db, func(tx *gorm.DB) error {
-			log.Errorf("DATABASE: Save IR: %d", len(t))
+			// log.Errorf("DATABASE: Save IR: %d", len(t))
 			for _, irCode := range t {
 				if err := irCode.Save(tx); err != nil {
 					log.Errorf("DATABASE: save irCode to database error: %v", err)
@@ -120,12 +121,12 @@ func createInstructionCache(
 			}
 			return nil
 		})
-
+		go saveFinish(len(t)) // notify after save
 	}
 
 	marshal := func(s Instruction, d *ssadb.IrCode) {
 		if marshalInstruction(prog.Cache, s, d) {
-			go marshalFinish(s, d)
+			marshalFinish(s, d)
 		}
 	}
 	load := func(id int64) (Instruction, *ssadb.IrCode, error) {
@@ -189,12 +190,12 @@ func createTypeCache(
 	save := func(t []*ssadb.IrType) {
 		defer func() {
 			if err := recover(); err != nil {
-				log.Errorf("DATABASE: Save IR Types panic: %v", err)
+				// log.Errorf("DATABASE: Save IR Types panic: %v", err)
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 		}()
 		utils.GormTransaction(db, func(tx *gorm.DB) error {
-			log.Errorf("DATABASE: Save IR Types: %d", len(t))
+			// log.Errorf("DATABASE: Save IR Types: %d", len(t))
 			for _, irType := range t {
 				_ = irType
 				if err := irType.Save(tx); err != nil {

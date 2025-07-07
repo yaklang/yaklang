@@ -163,7 +163,7 @@ func (c *ProgramCache) initIndex(databaseEnable bool) {
 				}
 			}
 			defer func() {
-				log.Errorf("DATABASE: Save IR Offsets: %d", len(irOffset))
+				// log.Errorf("DATABASE: Save IR Offsets: %d", len(irOffset))
 				utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
 					for _, item := range irOffset {
 						ssadb.SaveIrOffset(tx, item)

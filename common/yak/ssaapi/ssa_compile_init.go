@@ -23,7 +23,7 @@ func (c *config) init(filesystem filesys_interface.FileSystem) (*ssa.Program, *s
 		log.Info(msg)
 	}
 	application.Build = func(
-		filePath string, src *memedit.MemEditor, fb *ssa.FunctionBuilder,
+		ast ssa.FrontAST, filePath string, src *memedit.MemEditor, fb *ssa.FunctionBuilder,
 	) (err error) {
 		application.ProcessInfof("start to compile : %v", filePath)
 		start := time.Now()
@@ -87,19 +87,19 @@ func (c *config) init(filesystem filesys_interface.FileSystem) (*ssa.Program, *s
 			application.PopEditor(save)
 		}()
 
-			if editor := fb.GetEditor(); editor != nil {
-				cache := application.Cache
-				progName := application.GetProgramName()
-				go func() {
-					hash := editor.GetIrSourceHash(programName)
-					if cache.IsExistedSourceCodeHash(progName, hash) {
-						c.DatabaseProgramCacheHitter(fb)
-					}
-				}()
-			} else {
-				log.Warnf("(BUG or in DEBUG Mode)Range not found for %s", fb.GetName())
-			}
-			err = LanguageBuilder.Build(src.GetSourceCode(), c.ignoreSyntaxErr, fb)
+		if editor := fb.GetEditor(); editor != nil {
+			// cache := application.Cache
+			// progName := application.GetProgramName()
+			// go func() {
+			// 	hash := editor.GetIrSourceHash(programName)
+			// 	if cache.IsExistedSourceCodeHash(progName, hash) {
+			// 		c.DatabaseProgramCacheHitter(fb)
+			// 	}
+			// }()
+		} else {
+			log.Warnf("(BUG or in DEBUG Mode)Range not found for %s", fb.GetName())
+		}
+		err = LanguageBuilder.BuildFromAST(ast, fb)
 		return err
 	}
 	builder := application.GetAndCreateFunctionBuilder(string(ssa.MainFunctionName), string(ssa.MainFunctionName))

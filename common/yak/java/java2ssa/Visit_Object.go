@@ -6,7 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func (y *builder) VisitArrayInitializer(raw javaparser.IArrayInitializerContext) ssa.Value {
+func (y *singleFileBuilder) VisitArrayInitializer(raw javaparser.IArrayInitializerContext) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
