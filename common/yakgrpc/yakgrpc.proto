@@ -6333,8 +6333,7 @@ message SSARiskDiffItem{
 message SSARiskDiffRequest{
   SSARiskDiffItem BaseLine = 1; // 原项目
   SSARiskDiffItem Compare = 2; // 被对比的项目
-  string Type = 3; // custom / risk
-  bool DefaultCompare = 4;
+  bool DefaultCompare = 3;
 }
 
 message SSARiskDiffResponse{

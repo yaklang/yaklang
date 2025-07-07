@@ -2,13 +2,14 @@ package ssaapi
 
 import (
 	"context"
+	"sync"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"sync"
 )
 
 // SSAComparisonItemConfig 比较项的配置信息
@@ -52,9 +53,9 @@ func DiffWithVariableName(variable string) SSAComparisonItemOption {
 type CompareStatus string
 
 const (
-	Equal CompareStatus = "equal"
-	Add   CompareStatus = "add"
-	Del   CompareStatus = "del"
+	Equal CompareStatus = "Equal"
+	Add   CompareStatus = "Add"
+	Del   CompareStatus = "Del"
 )
 
 // ComparisonItem is a generic struct that holds the configuration for comparing items in the SSA system.
