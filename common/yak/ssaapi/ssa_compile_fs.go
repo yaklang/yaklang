@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"io/fs"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -219,15 +220,17 @@ func (c *config) parseProjectWithFS(
 	}
 	total := prog.Cache.CountInstruction()
 	prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, total) // %90
-	index := 0
+
+	var index int
 	prevProcess := 0.9
-	start = time.Now()
+	lock := sync.Mutex{}
 	prog.Cache.SaveToDatabase(func(size int) {
+		lock.Lock()
+		defer lock.Unlock()
 		index += size
 		process = 0.9 + (float64(index)/float64(total))*0.1
 		if (process - prevProcess) > 0.01 { // is 91.0%/92.0%/....
 			prog.ProcessInfof("Saving instructions: %d complete(total %d)", index, total)
-			prevProcess = process
 		}
 	})
 	saveTime = time.Since(start)
