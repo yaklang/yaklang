@@ -456,6 +456,11 @@ const (
 	Yak_GetSSARiskFieldGroup_FullMethodName                       = "/ypb.Yak/GetSSARiskFieldGroup"
 	Yak_NewSSARiskRead_FullMethodName                             = "/ypb.Yak/NewSSARiskRead"
 	Yak_SSARiskDiff_FullMethodName                                = "/ypb.Yak/SSARiskDiff"
+	Yak_CreateSSARiskDisposals_FullMethodName                     = "/ypb.Yak/CreateSSARiskDisposals"
+	Yak_QuerySSARiskDisposals_FullMethodName                      = "/ypb.Yak/QuerySSARiskDisposals"
+	Yak_UpdateSSARiskDisposals_FullMethodName                     = "/ypb.Yak/UpdateSSARiskDisposals"
+	Yak_DeleteSSARiskDisposals_FullMethodName                     = "/ypb.Yak/DeleteSSARiskDisposals"
+	Yak_GetSSARiskDisposal_FullMethodName                         = "/ypb.Yak/GetSSARiskDisposal"
 	Yak_SSARiskFeedbackToOnline_FullMethodName                    = "/ypb.Yak/SSARiskFeedbackToOnline"
 	Yak_GetAllPluginEnv_FullMethodName                            = "/ypb.Yak/GetAllPluginEnv"
 	Yak_QueryPluginEnv_FullMethodName                             = "/ypb.Yak/QueryPluginEnv"
@@ -1081,6 +1086,12 @@ type YakClient interface {
 	NewSSARiskRead(ctx context.Context, in *NewSSARiskReadRequest, opts ...grpc.CallOption) (*NewSSARiskReadResponse, error)
 	// SSA risk diff
 	SSARiskDiff(ctx context.Context, in *SSARiskDiffRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SSARiskDiffResponse], error)
+	// SSA Risk Disposal CURD
+	CreateSSARiskDisposals(ctx context.Context, in *CreateSSARiskDisposalsRequest, opts ...grpc.CallOption) (*CreateSSARiskDisposalsResponse, error)
+	QuerySSARiskDisposals(ctx context.Context, in *QuerySSARiskDisposalsRequest, opts ...grpc.CallOption) (*QuerySSARiskDisposalsResponse, error)
+	UpdateSSARiskDisposals(ctx context.Context, in *UpdateSSARiskDisposalsRequest, opts ...grpc.CallOption) (*UpdateSSARiskDisposalsResponse, error)
+	DeleteSSARiskDisposals(ctx context.Context, in *DeleteSSARiskDisposalsRequest, opts ...grpc.CallOption) (*DeleteSSARiskDisposalsResponse, error)
+	GetSSARiskDisposal(ctx context.Context, in *GetSSARiskDisposalRequest, opts ...grpc.CallOption) (*GetSSARiskDisposalResponse, error)
 	SSARiskFeedbackToOnline(ctx context.Context, in *SSARiskFeedbackToOnlineRequest, opts ...grpc.CallOption) (*Empty, error)
 	GetAllPluginEnv(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PluginEnvData, error)
 	QueryPluginEnv(ctx context.Context, in *QueryPluginEnvRequest, opts ...grpc.CallOption) (*PluginEnvData, error)
@@ -6156,6 +6167,56 @@ func (c *yakClient) SSARiskDiff(ctx context.Context, in *SSARiskDiffRequest, opt
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_SSARiskDiffClient = grpc.ServerStreamingClient[SSARiskDiffResponse]
 
+func (c *yakClient) CreateSSARiskDisposals(ctx context.Context, in *CreateSSARiskDisposalsRequest, opts ...grpc.CallOption) (*CreateSSARiskDisposalsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateSSARiskDisposalsResponse)
+	err := c.cc.Invoke(ctx, Yak_CreateSSARiskDisposals_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QuerySSARiskDisposals(ctx context.Context, in *QuerySSARiskDisposalsRequest, opts ...grpc.CallOption) (*QuerySSARiskDisposalsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QuerySSARiskDisposalsResponse)
+	err := c.cc.Invoke(ctx, Yak_QuerySSARiskDisposals_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateSSARiskDisposals(ctx context.Context, in *UpdateSSARiskDisposalsRequest, opts ...grpc.CallOption) (*UpdateSSARiskDisposalsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateSSARiskDisposalsResponse)
+	err := c.cc.Invoke(ctx, Yak_UpdateSSARiskDisposals_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteSSARiskDisposals(ctx context.Context, in *DeleteSSARiskDisposalsRequest, opts ...grpc.CallOption) (*DeleteSSARiskDisposalsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteSSARiskDisposalsResponse)
+	err := c.cc.Invoke(ctx, Yak_DeleteSSARiskDisposals_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetSSARiskDisposal(ctx context.Context, in *GetSSARiskDisposalRequest, opts ...grpc.CallOption) (*GetSSARiskDisposalResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSSARiskDisposalResponse)
+	err := c.cc.Invoke(ctx, Yak_GetSSARiskDisposal_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) SSARiskFeedbackToOnline(ctx context.Context, in *SSARiskFeedbackToOnlineRequest, opts ...grpc.CallOption) (*Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Empty)
@@ -7379,6 +7440,12 @@ type YakServer interface {
 	NewSSARiskRead(context.Context, *NewSSARiskReadRequest) (*NewSSARiskReadResponse, error)
 	// SSA risk diff
 	SSARiskDiff(*SSARiskDiffRequest, grpc.ServerStreamingServer[SSARiskDiffResponse]) error
+	// SSA Risk Disposal CURD
+	CreateSSARiskDisposals(context.Context, *CreateSSARiskDisposalsRequest) (*CreateSSARiskDisposalsResponse, error)
+	QuerySSARiskDisposals(context.Context, *QuerySSARiskDisposalsRequest) (*QuerySSARiskDisposalsResponse, error)
+	UpdateSSARiskDisposals(context.Context, *UpdateSSARiskDisposalsRequest) (*UpdateSSARiskDisposalsResponse, error)
+	DeleteSSARiskDisposals(context.Context, *DeleteSSARiskDisposalsRequest) (*DeleteSSARiskDisposalsResponse, error)
+	GetSSARiskDisposal(context.Context, *GetSSARiskDisposalRequest) (*GetSSARiskDisposalResponse, error)
 	SSARiskFeedbackToOnline(context.Context, *SSARiskFeedbackToOnlineRequest) (*Empty, error)
 	GetAllPluginEnv(context.Context, *Empty) (*PluginEnvData, error)
 	QueryPluginEnv(context.Context, *QueryPluginEnvRequest) (*PluginEnvData, error)
@@ -8764,6 +8831,21 @@ func (UnimplementedYakServer) NewSSARiskRead(context.Context, *NewSSARiskReadReq
 }
 func (UnimplementedYakServer) SSARiskDiff(*SSARiskDiffRequest, grpc.ServerStreamingServer[SSARiskDiffResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method SSARiskDiff not implemented")
+}
+func (UnimplementedYakServer) CreateSSARiskDisposals(context.Context, *CreateSSARiskDisposalsRequest) (*CreateSSARiskDisposalsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateSSARiskDisposals not implemented")
+}
+func (UnimplementedYakServer) QuerySSARiskDisposals(context.Context, *QuerySSARiskDisposalsRequest) (*QuerySSARiskDisposalsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QuerySSARiskDisposals not implemented")
+}
+func (UnimplementedYakServer) UpdateSSARiskDisposals(context.Context, *UpdateSSARiskDisposalsRequest) (*UpdateSSARiskDisposalsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateSSARiskDisposals not implemented")
+}
+func (UnimplementedYakServer) DeleteSSARiskDisposals(context.Context, *DeleteSSARiskDisposalsRequest) (*DeleteSSARiskDisposalsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteSSARiskDisposals not implemented")
+}
+func (UnimplementedYakServer) GetSSARiskDisposal(context.Context, *GetSSARiskDisposalRequest) (*GetSSARiskDisposalResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSSARiskDisposal not implemented")
 }
 func (UnimplementedYakServer) SSARiskFeedbackToOnline(context.Context, *SSARiskFeedbackToOnlineRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SSARiskFeedbackToOnline not implemented")
@@ -16223,6 +16305,96 @@ func _Yak_SSARiskDiff_Handler(srv interface{}, stream grpc.ServerStream) error {
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_SSARiskDiffServer = grpc.ServerStreamingServer[SSARiskDiffResponse]
 
+func _Yak_CreateSSARiskDisposals_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateSSARiskDisposalsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CreateSSARiskDisposals(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_CreateSSARiskDisposals_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CreateSSARiskDisposals(ctx, req.(*CreateSSARiskDisposalsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QuerySSARiskDisposals_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QuerySSARiskDisposalsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QuerySSARiskDisposals(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QuerySSARiskDisposals_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QuerySSARiskDisposals(ctx, req.(*QuerySSARiskDisposalsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateSSARiskDisposals_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateSSARiskDisposalsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateSSARiskDisposals(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateSSARiskDisposals_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateSSARiskDisposals(ctx, req.(*UpdateSSARiskDisposalsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteSSARiskDisposals_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteSSARiskDisposalsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteSSARiskDisposals(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteSSARiskDisposals_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteSSARiskDisposals(ctx, req.(*DeleteSSARiskDisposalsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetSSARiskDisposal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSSARiskDisposalRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetSSARiskDisposal(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetSSARiskDisposal_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetSSARiskDisposal(ctx, req.(*GetSSARiskDisposalRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_SSARiskFeedbackToOnline_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SSARiskFeedbackToOnlineRequest)
 	if err := dec(in); err != nil {
@@ -18556,6 +18728,26 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "NewSSARiskRead",
 			Handler:    _Yak_NewSSARiskRead_Handler,
+		},
+		{
+			MethodName: "CreateSSARiskDisposals",
+			Handler:    _Yak_CreateSSARiskDisposals_Handler,
+		},
+		{
+			MethodName: "QuerySSARiskDisposals",
+			Handler:    _Yak_QuerySSARiskDisposals_Handler,
+		},
+		{
+			MethodName: "UpdateSSARiskDisposals",
+			Handler:    _Yak_UpdateSSARiskDisposals_Handler,
+		},
+		{
+			MethodName: "DeleteSSARiskDisposals",
+			Handler:    _Yak_DeleteSSARiskDisposals_Handler,
+		},
+		{
+			MethodName: "GetSSARiskDisposal",
+			Handler:    _Yak_GetSSARiskDisposal_Handler,
 		},
 		{
 			MethodName: "SSARiskFeedbackToOnline",
