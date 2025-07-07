@@ -1,16 +1,48 @@
 package yakgrpc
 
 import (
+	"context"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"sync"
 )
 
+type SSARiskDiffRequestStream interface {
+	Send(response *ypb.SSARiskDiffResponse) error
+	Context() context.Context
+}
+
+type wrapperSSARiskDiffStream struct {
+	ctx            context.Context
+	root           ypb.Yak_SSARiskDiffServer
+	RequestHandler func(request *ypb.SSARiskDiffRequest) bool
+	sendMutex      *sync.Mutex
+}
+
+func newWrapperSSARiskDiffStream(ctx context.Context, stream ypb.Yak_SSARiskDiffServer) *wrapperSSARiskDiffStream {
+	return &wrapperSSARiskDiffStream{
+		root: stream, ctx: ctx,
+		sendMutex: new(sync.Mutex),
+	}
+}
+
+func (w *wrapperSSARiskDiffStream) Send(r *ypb.SSARiskDiffResponse) error {
+	w.sendMutex.Lock()
+	defer w.sendMutex.Unlock()
+	return w.root.Send(r)
+}
+
+func (w *wrapperSSARiskDiffStream) Context() context.Context {
+	return w.ctx
+}
+
 func (s *Server) SSARiskDiff(req *ypb.SSARiskDiffRequest, server ypb.Yak_SSARiskDiffServer) error {
-	context := server.Context()
+	stream := newWrapperSSARiskDiffStream(server.Context(), server)
+	context := stream.Context()
 	if req.GetBaseLine() == nil || req.GetCompare() == nil {
 		return utils.Error("base and compare are required")
 	}
@@ -93,7 +125,7 @@ func (s *Server) SSARiskDiff(req *ypb.SSARiskDiffRequest, server ypb.Yak_SSARisk
 			}),
 		)
 		for re := range res {
-			server.Send(&ypb.SSARiskDiffResponse{
+			stream.Send(&ypb.SSARiskDiffResponse{
 				BaseRisk:    re.BaseValue.ToGRPCModel(),
 				CompareRisk: re.NewValue.ToGRPCModel(),
 				RuleName:    re.FromRule,
