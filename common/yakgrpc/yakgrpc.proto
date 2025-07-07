@@ -6754,7 +6754,7 @@ message SSARisk {
   // other mesg
   string Solution = 28;
   string Description = 29 ;
-  string LatestDisposalStatus = 30; // 最新处置状态 no_set | is_issue | no_issue | suspicious
+  string LatestDisposalStatus = 30; // 最新处置状态 not_set | is_issue | not_issue | suspicious
 }
 
 message SSARisksFilter {
@@ -6775,7 +6775,7 @@ message SSARisksFilter {
   repeated string FunctionName = 14;
   int64 BeforeCreatedAt = 15;
   int64 AfterCreatedAt = 16;
-  repeated string LatestDisposalStatus = 17;  // no_set | is_issue | no_issue | suspicious
+  repeated string LatestDisposalStatus = 17;  // not_set | is_issue | not_issue | suspicious
 }
 
 message QuerySSARisksRequest {

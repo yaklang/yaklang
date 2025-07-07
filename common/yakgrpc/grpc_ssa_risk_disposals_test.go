@@ -15,7 +15,7 @@ import (
 func prepareTestData(t *testing.T) (client ypb.YakClient, taskId string, riskIds []int64) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
-
+	titleId := uuid.NewString()
 	taskId = uuid.NewString()
 
 	// create risk
@@ -25,7 +25,7 @@ func prepareTestData(t *testing.T) (client ypb.YakClient, taskId string, riskIds
 			Severity:      schema.ValidSeverityType(severity),
 			RiskType:      riskType,
 			RuntimeId:     taskId,
-			Title:         "Test Risk",
+			Title:         "Test Risk" + titleId,
 			TitleVerbose:  "Test Risk Verbose",
 			ProgramName:   "TestProgram",
 		}
