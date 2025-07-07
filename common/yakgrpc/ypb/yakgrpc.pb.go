@@ -49415,7 +49415,7 @@ type SSARisk struct {
 	// other mesg
 	Solution             string `protobuf:"bytes,28,opt,name=Solution,proto3" json:"Solution,omitempty"`
 	Description          string `protobuf:"bytes,29,opt,name=Description,proto3" json:"Description,omitempty"`
-	LatestDisposalStatus string `protobuf:"bytes,30,opt,name=LatestDisposalStatus,proto3" json:"LatestDisposalStatus,omitempty"` // 最新处置状态 no_set | is_issue | no_issue | suspicious
+	LatestDisposalStatus string `protobuf:"bytes,30,opt,name=LatestDisposalStatus,proto3" json:"LatestDisposalStatus,omitempty"` // 最新处置状态 not_set | is_issue | not_issue | suspicious
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -49678,7 +49678,7 @@ type SSARisksFilter struct {
 	FunctionName         []string               `protobuf:"bytes,14,rep,name=FunctionName,proto3" json:"FunctionName,omitempty"`
 	BeforeCreatedAt      int64                  `protobuf:"varint,15,opt,name=BeforeCreatedAt,proto3" json:"BeforeCreatedAt,omitempty"`
 	AfterCreatedAt       int64                  `protobuf:"varint,16,opt,name=AfterCreatedAt,proto3" json:"AfterCreatedAt,omitempty"`
-	LatestDisposalStatus []string               `protobuf:"bytes,17,rep,name=LatestDisposalStatus,proto3" json:"LatestDisposalStatus,omitempty"` // no_set | is_issue | no_issue | suspicious
+	LatestDisposalStatus []string               `protobuf:"bytes,17,rep,name=LatestDisposalStatus,proto3" json:"LatestDisposalStatus,omitempty"` // not_set | is_issue | not_issue | suspicious
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
