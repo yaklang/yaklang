@@ -5,39 +5,78 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type SSADiffResultKind int64
+type SSADiffResultKind string
 
 const (
-	Unknown   SSADiffResultKind = iota
-	RuntimeId                   //task ID
-	Prog                        //利用Program来进行对比
+	Unknown   SSADiffResultKind = "unknown"
+	RuntimeId SSADiffResultKind = "runtimeId" //task ID
+	Program   SSADiffResultKind = "program"   //利用Program来进行对比
 )
 
-type compareType int64
+type SSADiffCompareType string
 
 const (
-	CustomDiff compareType = iota + 1
-	RiskDiff
+	CustomDiff SSADiffCompareType = "custom"
+	RiskDiff                      = "risk"
 )
 
 type SSADiffResult struct {
 	*gorm.Model
-	BaseItem        string
-	CompareItem     string
-	ResultHash      string `gorm:"index"` // hash(BaseItem + CompareItem)
-	RuleName        string // rule name
-	BaseRiskHash    string
-	CompareRiskHash string
-	Status          int
+	BaseLineProgName string
+	CompareProgName  string
+	RuleName         string // rule name
+
+	BaseLineRiskHash string
+	CompareRiskHash  string
+
+	Status string
 	//CompareType 比较类型，是custom还是risk
-	CompareType    int
-	DiffResultKind SSADiffResultKind //结果类型，是taskID还是program
+	CompareType    string
+	DiffResultKind string //结果类型，是taskID还是program
+
+	Hash string `gorm:"uniqueIndex"`
+}
+
+func ValidSSADiffResultCompareType(typ string) SSADiffCompareType {
+	switch typ {
+	case "custom", "customType":
+		return CustomDiff
+	case "risk", "riskType":
+		return RiskDiff
+	default:
+		return RiskDiff
+	}
+}
+
+func ValidSSADiffResultKind(typ string) SSADiffResultKind {
+	switch typ {
+	case "runtimeId", "taskId", "taskID", "runtime":
+		return RuntimeId
+	case "prog", "program", "ssaProgram":
+		return Program
+	default:
+		return Unknown
+	}
 }
 
 func (d *SSADiffResult) CalcHash() string {
-	return utils.CalcMd5(d.BaseItem, d.CompareItem)
+	return utils.CalcSha1(d.BaseLineProgName, d.CompareProgName)
 }
-func (d *SSADiffResult) BeforeCreate(tx *gorm.DB) (err error) {
-	d.ResultHash = d.CalcHash()
-	return nil
+
+func (d *SSADiffResult) BeforeCreate() {
+	d.Hash = d.CalcHash()
+	d.CompareType = string(ValidSSADiffResultCompareType(d.CompareType))
+	d.DiffResultKind = string(ValidSSADiffResultKind(d.DiffResultKind))
+}
+
+func (d *SSADiffResult) BeforeUpdate() {
+	d.Hash = d.CalcHash()
+	d.CompareType = string(ValidSSADiffResultCompareType(d.CompareType))
+	d.DiffResultKind = string(ValidSSADiffResultKind(d.DiffResultKind))
+}
+
+func (d *SSADiffResult) BeforeSave() {
+	d.Hash = d.CalcHash()
+	d.CompareType = string(ValidSSADiffResultCompareType(d.CompareType))
+	d.DiffResultKind = string(ValidSSADiffResultKind(d.DiffResultKind))
 }

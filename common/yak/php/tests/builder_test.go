@@ -186,7 +186,7 @@ func TestParseSSA_WhileTag(t *testing.T) {
 	//	test.MockSSA(t, `
 	//<ul>
 	//<?php while ($i <= 5) : ?>
-	//    <li>Item <?php echo $i; ?></li>
+	//    <li>ComparisonItem <?php echo $i; ?></li>
 	//    <?php $i++; ?>
 	//<?php endwhile; ?>
 	//</ul>
