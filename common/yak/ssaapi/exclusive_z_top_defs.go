@@ -67,13 +67,13 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (resul
 }
 
 func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result Values) {
-	defer func() {
-		for _, ret := range result {
-			if ret.GetDependOn() != nil {
-				log.Errorf("BUG:(topdef's result is not a tree node:%s have depend on %s)", ret.String(), ret.GetDependOn().String())
-			}
-		}
-	}()
+	//defer func() {
+	//	for _, ret := range result {
+	//		if ret.GetDependOn() != nil {
+	//			log.Errorf("BUG:(topdef's result is not a tree node:%s have depend on %s)", ret.String(), ret.GetDependOn().String())
+	//		}
+	//	}
+	//}()
 	if i == nil {
 		return nil
 	}
