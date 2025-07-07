@@ -616,6 +616,18 @@ func randFieldElement(c elliptic.Curve, random io.Reader) (k *big.Int, err error
 	if err != nil {
 		return
 	}
+
+	// A simple randomness check.
+	zeroCount := 0
+	for _, B := range b {
+		if B == 0 {
+			zeroCount++
+		}
+	}
+	if zeroCount > len(b)/2 {
+		return nil, errors.New("randomness of key seems low")
+	}
+
 	k = new(big.Int).SetBytes(b)
 	n := new(big.Int).Sub(params.N, one)
 	k.Mod(k, n)
@@ -635,6 +647,17 @@ func GenerateKey(random io.Reader) (*PrivateKey, error) {
 		return nil, err
 	}
 
+	// A simple randomness check.
+	zeroCount := 0
+	for _, B := range b {
+		if B == 0 {
+			zeroCount++
+		}
+	}
+	if zeroCount > len(b)/2 {
+		return nil, errors.New("randomness of key seems low")
+	}
+
 	k := new(big.Int).SetBytes(b)
 	n := new(big.Int).Sub(params.N, two)
 	k.Mod(k, n)
@@ -643,6 +666,10 @@ func GenerateKey(random io.Reader) (*PrivateKey, error) {
 	priv.PublicKey.Curve = c
 	priv.D = k
 	priv.PublicKey.X, priv.PublicKey.Y = c.ScalarBaseMult(k.Bytes())
+
+	if !priv.PublicKey.Curve.IsOnCurve(priv.PublicKey.X, priv.PublicKey.Y) {
+		return nil, errors.New("generated public key is not on curve")
+	}
 
 	return priv, nil
 }
