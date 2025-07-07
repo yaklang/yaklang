@@ -2,15 +2,14 @@ package yakgrpc
 
 import (
 	"context"
-	"strings"
-	"testing"
-
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strings"
+	"testing"
 )
 
 func prepareTestData(t *testing.T) (client ypb.YakClient, taskId string, riskIds []int64) {
@@ -530,4 +529,119 @@ func TestGRPCMUSTPASS_SSARiskDisposals_FullWorkflow(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, queryResp2.Data, 0)
+}
+
+func TestGRPCMUSTPASS_SSARiskDisposals_DeleteAndUpdateRiskStatus(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	taskId := uuid.NewString()
+	testUUID := uuid.NewString()
+
+	// 创建测试用的风险记录
+	createRisk := func(filePath, severity, riskType string) int64 {
+		risk := &schema.SSARisk{
+			CodeSourceUrl: filePath,
+			Severity:      schema.ValidSeverityType(severity),
+			RiskType:      riskType,
+			RuntimeId:     taskId,
+			Title:         "Test Risk - " + testUUID,
+			TitleVerbose:  "Test Risk Verbose",
+			ProgramName:   "TestProgram",
+		}
+		err := yakit.CreateSSARisk(ssadb.GetDB(), risk)
+		require.NoError(t, err)
+		return int64(risk.ID)
+	}
+
+	// 创建风险记录
+	riskId := createRisk("ssadb://prog1/1", "high", "sql-injection")
+
+	// 清理测试数据
+	defer func() {
+		yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{
+			RuntimeID: []string{taskId},
+		})
+		yakit.DeleteSSARiskDisposals(ssadb.GetDB(), &ypb.DeleteSSARiskDisposalsRequest{
+			Filter: &ypb.SSARiskDisposalsFilter{
+				RiskId: []int64{riskId},
+			},
+		})
+	}()
+
+	ctx := context.Background()
+
+	// 第一步：验证初始状态为not_set
+	t.Run("验证初始状态为not_set", func(t *testing.T) {
+		queryResp, err := client.QuerySSARisks(ctx, &ypb.QuerySSARisksRequest{
+			Filter: &ypb.SSARisksFilter{
+				ID: []int64{riskId},
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, queryResp.Data, 1)
+		require.Equal(t, "not_set", queryResp.Data[0].LatestDisposalStatus)
+	})
+
+	// 第二步：创建处置记录
+	var disposalId int64
+	t.Run("创建处置记录", func(t *testing.T) {
+		createResp, err := client.CreateSSARiskDisposals(ctx, &ypb.CreateSSARiskDisposalsRequest{
+			RiskIds: []int64{riskId},
+			Status:  "is_issue",
+			Comment: "确认为安全问题-" + testUUID,
+		})
+		require.NoError(t, err)
+		require.Len(t, createResp.Data, 1)
+		disposalId = createResp.Data[0].Id
+		require.NotZero(t, disposalId)
+	})
+
+	// 第三步：验证处置记录创建后，风险状态更新
+	t.Run("验证处置记录创建后风险状态更新", func(t *testing.T) {
+		queryResp, err := client.QuerySSARisks(ctx, &ypb.QuerySSARisksRequest{
+			Filter: &ypb.SSARisksFilter{
+				ID: []int64{riskId},
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, queryResp.Data, 1)
+		require.Equal(t, "is_issue", queryResp.Data[0].LatestDisposalStatus)
+	})
+
+	// 第四步：删除处置记录
+	t.Run("删除处置记录", func(t *testing.T) {
+		deleteResp, err := client.DeleteSSARiskDisposals(ctx, &ypb.DeleteSSARiskDisposalsRequest{
+			Filter: &ypb.SSARiskDisposalsFilter{
+				ID: []int64{disposalId},
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, deleteResp)
+		require.NotNil(t, deleteResp.Message)
+		require.Equal(t, int64(1), deleteResp.Message.EffectRows)
+	})
+
+	// 第五步：验证删除处置记录后，风险状态重置为not_set
+	t.Run("验证删除处置记录后风险状态重置为not_set", func(t *testing.T) {
+		queryResp, err := client.QuerySSARisks(ctx, &ypb.QuerySSARisksRequest{
+			Filter: &ypb.SSARisksFilter{
+				ID: []int64{riskId},
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, queryResp.Data, 1)
+		require.Equal(t, "not_set", queryResp.Data[0].LatestDisposalStatus)
+	})
+
+	// 第六步：验证处置记录确实已被删除
+	t.Run("验证处置记录确实已被删除", func(t *testing.T) {
+		queryResp, err := client.QuerySSARiskDisposals(ctx, &ypb.QuerySSARiskDisposalsRequest{
+			Filter: &ypb.SSARiskDisposalsFilter{
+				ID: []int64{disposalId},
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, queryResp.Data, 0)
+	})
 }
