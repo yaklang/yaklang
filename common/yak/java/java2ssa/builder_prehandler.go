@@ -38,11 +38,11 @@ func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	return !slices.Contains(fileList, extension)
 }
 
-func (s *SSABuilder) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	builder.GetProgram().GetApplication().Build("", editor, builder)
+func (s *SSABuilder) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
+	builder.GetProgram().GetApplication().Build(ast, "", editor, builder)
 }
 
-func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.FunctionBuilder, path string) error {
+func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST, fb *ssa.FunctionBuilder, path string) error {
 	prog := fb.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")
@@ -89,7 +89,9 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 		if err != nil {
 			return err
 		}
-		prog.Build(path, memedit.NewMemEditor(string(raw)), fb)
+		data := string(raw)
+
+		prog.Build(ast, path, memedit.NewMemEditor(data), fb)
 	case ".jpg", ".png", ".gif", ".jpeg", ".css", ".js", ".avi", ".mp4", ".mp3", ".pdf", ".doc":
 		return nil
 	case ".jsp":
@@ -105,7 +107,8 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 		}
 		prog.SetTemplate(path, info)
 		saveExtraFile(path, raw)
-		err = prog.Build(path, memedit.NewMemEditor(info.GetContent()), fb)
+
+		err = prog.Build(ast, path, memedit.NewMemEditor(info.GetContent()), fb)
 		if err != nil {
 			return err
 		}
@@ -149,7 +152,8 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, fb *ssa.Functio
 			}
 			prog.SetTemplate(path, info)
 			saveExtraFile(path, raw)
-			err = prog.Build(path, memedit.NewMemEditor(info.GetContent()), fb)
+
+			err = prog.Build(ast, path, memedit.NewMemEditor(info.GetContent()), fb)
 			if err != nil {
 				return err
 			}

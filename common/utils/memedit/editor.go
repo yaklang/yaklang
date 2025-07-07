@@ -35,6 +35,11 @@ type MemEditor struct {
 	cursor             int // 模拟光标位置（指针功能）
 }
 
+func NewMemEditorByBytes(bs []byte) *MemEditor {
+	str := utils.UnsafeBytesToString(bs)
+	return NewMemEditor(str)
+}
+
 func NewMemEditor(sourceCode string) *MemEditor {
 	editor := &MemEditor{
 		safeSourceCode:     NewSafeString(sourceCode),

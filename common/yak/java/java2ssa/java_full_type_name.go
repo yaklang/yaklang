@@ -55,7 +55,7 @@ var ServletAnnotationMap = map[string]bool{
 	"WebServlet":           true,
 }
 
-func (y *builder) AddFullTypeNameRaw(typName string, typ ssa.Type) ssa.Type {
+func (y *singleFileBuilder) AddFullTypeNameRaw(typName string, typ ssa.Type) ssa.Type {
 	if b, ok := ssa.ToBasicType(typ); ok {
 		typ = ssa.NewBasicType(b.Kind, b.GetName())
 		typ.SetFullTypeNames(b.GetFullTypeNames())
@@ -69,7 +69,7 @@ func (y *builder) AddFullTypeNameRaw(typName string, typ ssa.Type) ssa.Type {
 }
 
 // func (y *builder) AddFullTypeNameForSubType(typeName string,  )
-func (y *builder) CreateSubType(subName string, typ ssa.Type) ssa.Type {
+func (y *singleFileBuilder) CreateSubType(subName string, typ ssa.Type) ssa.Type {
 	// 1. split subName by "."
 	parts := strings.Split(subName, ".")
 
@@ -112,7 +112,7 @@ func (y *builder) CreateSubType(subName string, typ ssa.Type) ssa.Type {
 	return newType
 }
 
-func (y *builder) AddFullTypeNameFromMap(typName string, typ ssa.Type) ssa.Type {
+func (y *singleFileBuilder) AddFullTypeNameFromMap(typName string, typ ssa.Type) ssa.Type {
 	if b, ok := ssa.ToBasicType(typ); ok {
 		typ = ssa.NewBasicType(b.Kind, b.GetName())
 		typ.SetFullTypeNames(b.GetFullTypeNames())
@@ -143,7 +143,7 @@ func (y *builder) AddFullTypeNameFromMap(typName string, typ ssa.Type) ssa.Type 
 	}
 }
 
-func (y *builder) MergeFullTypeNameForType(allTypName []string, typ ssa.Type) ssa.Type {
+func (y *singleFileBuilder) MergeFullTypeNameForType(allTypName []string, typ ssa.Type) ssa.Type {
 	if b, ok := ssa.ToBasicType(typ); ok {
 		typ = ssa.NewBasicType(b.Kind, b.GetName())
 		typ.SetFullTypeNames(b.GetFullTypeNames())
@@ -160,7 +160,7 @@ func (y *builder) MergeFullTypeNameForType(allTypName []string, typ ssa.Type) ss
 	return typ
 }
 
-func (y *builder) AddFullTypeNameForAllImport(typName string, typ ssa.Type) ssa.Type {
+func (y *singleFileBuilder) AddFullTypeNameForAllImport(typName string, typ ssa.Type) ssa.Type {
 	for _, ft := range y.allImportPkgSlice {
 		typStr := strings.Join(ft[:len(ft)-1], ".")
 		var typStrWithVersion string
@@ -186,7 +186,7 @@ func (y *builder) AddFullTypeNameForAllImport(typName string, typ ssa.Type) ssa.
 	return typ
 }
 
-func (y *builder) GetPkgSCAVersion(pkgName string) string {
+func (y *singleFileBuilder) GetPkgSCAVersion(pkgName string) string {
 	sca := y.GetProgram().GetApplication().GetSCAPackageByName(pkgName)
 	if sca != nil {
 		return sca.Version
@@ -194,7 +194,7 @@ func (y *builder) GetPkgSCAVersion(pkgName string) string {
 	return ""
 }
 
-func (y *builder) HaveCastType(typ ssa.Type) bool {
+func (y *singleFileBuilder) HaveCastType(typ ssa.Type) bool {
 	if typ == nil {
 		return false
 	}
@@ -205,7 +205,7 @@ func (y *builder) HaveCastType(typ ssa.Type) bool {
 	return fts[0] == "__castType__"
 }
 
-func (y *builder) SetCastTypeFlag(typ ssa.Type) ssa.Type {
+func (y *singleFileBuilder) SetCastTypeFlag(typ ssa.Type) ssa.Type {
 	if typ == nil {
 		return nil
 	}
@@ -218,7 +218,7 @@ func (y *builder) SetCastTypeFlag(typ ssa.Type) ssa.Type {
 	return typ
 }
 
-func (y *builder) RemoveCastTypeFlag(typ ssa.Type) ssa.Type {
+func (y *singleFileBuilder) RemoveCastTypeFlag(typ ssa.Type) ssa.Type {
 	if typ == nil {
 		return nil
 	}

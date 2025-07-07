@@ -191,7 +191,7 @@ type User interface {
 	ReplaceValue(Value, Value)
 }
 
-type Build func(string, *memedit.MemEditor, *FunctionBuilder) error
+type Build func(FrontAST, string, *memedit.MemEditor, *FunctionBuilder) error
 
 const (
 	Application = ssadb.Application
