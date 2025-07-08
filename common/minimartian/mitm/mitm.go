@@ -281,7 +281,7 @@ func (c *Config) ObsoleteTLS(hostname string, h2Verify bool) *gmtls.Config {
 					break
 				}
 			}
-			if gmFlag {
+			if gmFlag && !c.obsoleteConfig.disableMimicGMServer {
 				return c.obsoleteConfig.getSigningCert(host)
 			} else {
 				return c.obsoleteConfig.cert(host)
