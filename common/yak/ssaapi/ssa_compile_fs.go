@@ -183,8 +183,17 @@ func (c *config) parseProjectWithFS(
 	}
 	process = 0.9 // %90
 	prog.Finish()
+	wg := sync.WaitGroup{}
 	if prog.EnableDatabase { // save program
-		prog.UpdateToDatabase()
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			log.Errorf("program %s save to database", prog.Name)
+			start := time.Now()
+			prog.UpdateToDatabase()
+			since := time.Since(start)
+			log.Errorf("program %s save to database cost: %s", prog.Name, since)
+		}()
 	}
 	total := prog.Cache.CountInstruction()
 	prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, total) // %90
@@ -203,5 +212,6 @@ func (c *config) parseProjectWithFS(
 	})
 	saveTime = time.Since(start)
 	_ = prevProcess
+	wg.Wait()
 	return NewProgram(prog, c), nil
 }
