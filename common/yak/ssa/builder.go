@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssalog"
 
 	"github.com/samber/lo"
@@ -398,46 +397,6 @@ func (b *FunctionBuilder) GenerateDependence(pkgs []*dxtypes.Package, filename s
 		pkgItem := b.CreateMemberCallVariable(container, b.EmitUndefined(pkg.Name))
 		b.AssignVariable(pkgItem, sub)
 	}
-}
-
-func (b *FunctionBuilder) GenerateProjectConfig() {
-	prog := b.GetProgram()
-	if prog == nil {
-		return
-	}
-
-	config := b.PeekValue(ProjectConfigVariable)
-	if utils.IsNil(config) {
-		return
-	}
-	backUp := b.GetEditor()
-	defer b.SetEditor(backUp)
-
-	for k, pc := range prog.ProjectConfig {
-		cv := pc.ConfigValue
-		if content, ok := prog.ExtraFile[pc.Filepath]; ok {
-			var editor *memedit.MemEditor
-			if len(content) <= 128 {
-				hash := content
-				editor, _ = ssadb.GetIrSourceFromHash(hash)
-			} else {
-				editor = memedit.NewMemEditorWithFileUrl(content, pc.Filepath)
-			}
-			b.SetEditor(editor)
-			rng := b.GetRangesByText(k)
-			if len(rng) == 1 {
-				b.SetRangeByRangeIf(rng[0])
-			} else {
-				b.SetEmptyRange()
-			}
-			variable := b.CreateMemberCallVariable(config, b.EmitConstInstPlaceholder(k))
-			b.AssignVariable(variable, b.EmitConstInstPlaceholder(cv))
-
-			val := b.CreateVariable("test")
-			b.AssignVariable(val, b.EmitConstInstPlaceholder(cv))
-		}
-	}
-	return
 }
 
 func (b *FunctionBuilder) SetForceCapture(bo bool) {
