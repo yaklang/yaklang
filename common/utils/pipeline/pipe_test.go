@@ -24,7 +24,7 @@ func TestPipe(t *testing.T) {
 		return strconv.Itoa(item * 2), nil
 	}
 
-	p := pipeline.NewPipe(ctx, handler)
+	p := pipeline.NewPipe(ctx, 10, handler)
 
 	go func() {
 		for i := 0; i < 10; i++ {
@@ -47,13 +47,13 @@ func TestChainedPipe(t *testing.T) {
 
 	var results2 []int
 	// Pipe 1: item + 1
-	pipe1 := pipeline.NewPipe(ctx, func(item int) (int, error) {
+	pipe1 := pipeline.NewPipe(ctx, 10, func(item int) (int, error) {
 		log.Infof("pipe1 processing item: %d", item)
 		return item + 1, nil
 	})
 
 	// Pipe 2: item + 2
-	pipe2 := pipeline.NewPipe(ctx, func(item int) (int, error) {
+	pipe2 := pipeline.NewPipe(ctx, 10, func(item int) (int, error) {
 		log.Infof("pipe2 processing item: %d", item)
 		return item + 2, nil
 	})

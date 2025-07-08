@@ -35,31 +35,13 @@ func (c *config) parseProjectWithFS(
 	}()
 
 	programPath := c.programPath
-	prog, builder, err := c.init(filesystem)
-
-	if err != nil {
-		return nil, err
-	}
-	if prog.Name != "" {
-		ssadb.SaveFolder(prog.Name, []string{"/"})
-	}
-
-	process := 0.0
-	prog.ProcessInfof = func(s string, v ...any) {
-		go processCallback(
-			process,
-			s, v...,
-		)
-	}
-
 	preHandlerTotal := 0
 	handlerTotal := 0
 	preHandlerFiles := make([]string, 0)
 	handlerFilesMap := make(map[string]struct{})
 	handlerFiles := make([]string, 0)
 
-	prog.ProcessInfof("parse project in fs: %v, path: %v", filesystem, c.info)
-	prog.ProcessInfof("calculate total size of project")
+	var err error
 	start := time.Now()
 	// get total size
 	err = filesys.Recursive(programPath,
@@ -96,6 +78,27 @@ func (c *config) parseProjectWithFS(
 	if err != nil {
 		return nil, err
 	}
+
+	prog, builder, err := c.init(filesystem, handlerTotal)
+
+	if err != nil {
+		return nil, err
+	}
+	if prog.Name != "" {
+		ssadb.SaveFolder(prog.Name, []string{"/"})
+	}
+
+	process := 0.0
+	prog.ProcessInfof = func(s string, v ...any) {
+		processCallback(
+			process,
+			s, v...,
+		)
+	}
+
+	prog.ProcessInfof("parse project in fs: %v, path: %v", filesystem, c.info)
+	prog.ProcessInfof("calculate total size of project")
+
 	if c.isStop() {
 		return nil, ErrContextCancel
 	}
@@ -196,6 +199,7 @@ func (c *config) parseProjectWithFS(
 		}()
 	}
 	total := prog.Cache.CountInstruction()
+	process = 0.9
 	prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, total) // %90
 
 	var index int
@@ -206,8 +210,9 @@ func (c *config) parseProjectWithFS(
 		defer lock.Unlock()
 		index += size
 		process = 0.9 + (float64(index)/float64(total))*0.1
-		if (process - prevProcess) > 0.01 { // is 91.0%/92.0%/....
+		if (process - prevProcess) > 0.001 { // is 90.1%/90.2%/....
 			prog.ProcessInfof("Saving instructions: %d complete(total %d)", index, total)
+			prevProcess = process
 		}
 	})
 	saveTime = time.Since(start)

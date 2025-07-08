@@ -55,9 +55,7 @@ func (c *InstructionsIndexMem) ForEach(f func(string, []Instruction)) {
 	})
 }
 
-func (c *InstructionsIndexMem) Close() {
-
-}
+func (c *InstructionsIndexMem) Close() {}
 
 type InstructionsIndexItem struct {
 	Name string
@@ -73,13 +71,17 @@ const (
 
 func NewInstructionsIndexDB(
 	name string,
+	saveSize int,
 	save func([]InstructionsIndexItem),
 ) *InstructionsIndexDB {
+	if saveSize < IndexSaveSize {
+		saveSize = IndexSaveSize // Ensure minimum save size
+	}
 	return &InstructionsIndexDB{
 		save: databasex.NewSave(
 			save,
 			databasex.WithName(name),
-			databasex.WithSaveSize(IndexSaveSize),
+			databasex.WithSaveSize(saveSize),
 		),
 	}
 }
@@ -106,18 +108,18 @@ func (c *InstructionsIndexDB) Close() {
 	c.save.Close()
 }
 
-func NewInstructionIndex(enable bool, name string, saveFunc func([]InstructionsIndexItem)) InstructionsIndex {
+func NewInstructionIndex(enable bool, name string, saveSize int, saveFunc func([]InstructionsIndexItem)) InstructionsIndex {
 	if enable {
-		return NewInstructionsIndexDB(name, saveFunc)
+		return NewInstructionsIndexDB(name, saveSize, saveFunc)
 	} else {
 		return NewInstructionsIndexMem(name)
 	}
 }
 
-func (c *ProgramCache) initIndex(databaseEnable bool) {
+func (c *ProgramCache) initIndex(databaseEnable bool, saveSize int) {
 
 	c.VariableIndex = NewInstructionIndex(
-		databaseEnable, "VariableIndex",
+		databaseEnable, "VariableIndex", saveSize,
 		func(items []InstructionsIndexItem) {
 			utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
 				for _, item := range items {
@@ -128,7 +130,7 @@ func (c *ProgramCache) initIndex(databaseEnable bool) {
 		},
 	)
 	c.MemberIndex = NewInstructionIndex(
-		databaseEnable, "MemberIndex",
+		databaseEnable, "MemberIndex", saveSize,
 		func(items []InstructionsIndexItem) {
 			utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
 				for _, item := range items {
@@ -140,7 +142,7 @@ func (c *ProgramCache) initIndex(databaseEnable bool) {
 	)
 
 	c.ClassIndex = NewInstructionIndex(
-		databaseEnable, "ClassIndex",
+		databaseEnable, "ClassIndex", saveSize,
 		func(items []InstructionsIndexItem) {
 			utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
 				for _, item := range items {
@@ -152,7 +154,7 @@ func (c *ProgramCache) initIndex(databaseEnable bool) {
 	)
 
 	c.OffsetCache = NewInstructionIndex(
-		databaseEnable, "OffsetCache",
+		databaseEnable, "OffsetCache", saveSize,
 		func(items []InstructionsIndexItem) {
 			irOffset := make([]*ssadb.IrOffset, 0, len(items)*2)
 			add := func(i ...*ssadb.IrOffset) {
@@ -186,7 +188,7 @@ func (c *ProgramCache) initIndex(databaseEnable bool) {
 	)
 
 	c.ConstCache = NewInstructionIndex(
-		databaseEnable, "ConstCache",
+		databaseEnable, "ConstCache", saveSize,
 		func(ii []InstructionsIndexItem) {
 		},
 	)
