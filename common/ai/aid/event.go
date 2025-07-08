@@ -1,142 +1,19 @@
 package aid
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/segmentio/ksuid"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
-
-type EventType string
-
-const (
-	EVENT_TYPE_STREAM     EventType = "stream"
-	EVENT_TYPE_STRUCTURED EventType = "structured"
-
-	// Token 开销情况
-	EVENT_TYPE_CONSUMPTION EventType = "consumption" // token consumption include `{"input_"}`
-
-	// 探活
-	EVENT_TYPE_PONG EventType = "pong" // ping response ping-pong is a check for alive item
-
-	// 压力值
-	EVENT_TYPE_PRESSURE EventType = "pressure" // pressure for ai context percent
-
-	EVENT_TYPE_AI_FIRST_BYTE_COST_MS EventType = "ai_first_byte_cost_ms" // first byte cost
-	EVENT_TYPE_AI_TOTAL_COST_MS      EventType = "ai_total_cost_ms"      // first byte cost
-
-	// AI 请求用户交互
-	EVENT_TYPE_REQUIRE_USER_INTERACTIVE = "require_user_interactive"
-
-	// risk control prompt is the prompt for risk control
-	// contains score, reason, and other information to help uesr interactivation
-	EVENT_TYPE_RISK_CONTROL_PROMPT = "risk_control_prompt"
-
-	EVENT_TOOL_CALL_START       = "tool_call_start"       // tool call start event, used to emit the tool call start information
-	EVENT_TOOL_CALL_STATUS      = "tool_call_status"      // tool call status event, used to emit the tool call status information
-	EVENT_TOOL_CALL_USER_CANCEL = "tool_call_user_cancel" // tool call user cancel event, used to emit the tool call user cancel information
-	EVENT_TOOL_CALL_DONE        = "tool_call_done"        // tool call end event, used to emit the tool call end information
-	EVENT_TOOL_CALL_ERROR       = "tool_call_error"       // tool call error event, used to emit the tool call error information
-
-	EVENT_TYPE_PLAN                    EventType = "plan"
-	EVENT_TYPE_SELECT                  EventType = "select"
-	EVENT_TYPE_PERMISSION_REQUIRE      EventType = "permission_require"
-	EVENT_TYPE_TASK_REVIEW_REQUIRE     EventType = "task_review_require"
-	EVENT_TYPE_PLAN_REVIEW_REQUIRE     EventType = "plan_review_require"
-	EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE EventType = "tool_use_review_require"
-
-	EVENT_PLAN_TASK_ANALYSIS EventType = "plan_task_analysis" // plan task analysis event, used to emit the plan task analysis information
-
-	EVENT_TYPE_TOOL_CALL_WATCHER EventType = "tool_call_watcher" // tool call watcher event, used to emit the tool call watcher information. user can cancel this tool call
-
-	EVENT_TYPE_REVIEW_RELEASE EventType = "review_release"
-
-	EVENT_TYPE_INPUT EventType = "input"
-
-	EVENT_TYPE_AID_CONFIG = "aid_config" // aid config event, used to emit the current config information
-)
-
-type Event struct {
-	CoordinatorId string
-	Type          EventType
-
-	NodeId      string
-	IsSystem    bool
-	IsStream    bool
-	IsReason    bool
-	StreamDelta []byte
-	IsJson      bool
-	Content     []byte
-
-	Timestamp int64
-
-	// task index
-	TaskIndex string
-	// disable markdown render
-	DisableMarkdown bool
-}
-
-func (e *Event) GetInteractiveId() string {
-	if e.IsJson {
-		var i map[string]any
-		if err := json.Unmarshal(e.Content, &i); err == nil {
-			// 检查事件类型是否为需要交互的类型
-			switch e.Type {
-			case EVENT_TYPE_PLAN_REVIEW_REQUIRE,
-				EVENT_TYPE_TASK_REVIEW_REQUIRE,
-				EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE,
-				EVENT_TYPE_PERMISSION_REQUIRE,
-				EVENT_TYPE_REQUIRE_USER_INTERACTIVE,
-				EVENT_TYPE_TOOL_CALL_WATCHER,
-				EVENT_TYPE_REVIEW_RELEASE:
-				if id, ok := i["id"].(string); ok {
-					return id
-				}
-			}
-		}
-	}
-	return ""
-}
-
-func (e *Event) String() string {
-	var parts []string
-
-	if e.CoordinatorId != "" {
-		parts = append(parts, fmt.Sprintf("id: %s", utils.ShrinkString(e.CoordinatorId, 10)))
-	}
-	if e.Type != "" {
-		parts = append(parts, fmt.Sprintf("[type:%s]", e.Type))
-	}
-	if e.NodeId != "" {
-		parts = append(parts, fmt.Sprintf("[node:%v]", e.NodeId))
-	}
-	if e.IsSystem {
-		parts = append(parts, "system:true")
-	}
-	if e.IsStream {
-		parts = append(parts, "stream:true")
-	}
-	if e.IsReason {
-		parts = append(parts, "reason:true")
-	}
-	if len(e.StreamDelta) > 0 {
-		parts = append(parts, fmt.Sprintf("delta:%v", string(e.StreamDelta)))
-	}
-	if e.IsJson {
-		parts = append(parts, "json:true")
-	}
-	if len(e.Content) > 0 {
-		parts = append(parts, fmt.Sprintf("data:%s", string(e.Content)))
-	}
-
-	return fmt.Sprintf("event: %s", strings.Join(parts, ", "))
-}
 
 type eventWriteProducer struct {
 	isReason        bool
@@ -145,8 +22,9 @@ type eventWriteProducer struct {
 	coordinatorId   string
 	nodeId          string
 	taskIndex       string
-	handler         func(event *Event)
+	handler         func(event *schema.AiOutputEvent)
 	timeStamp       int64
+	eventWriterID   string
 }
 
 func (e *eventWriteProducer) Write(b []byte) (int, error) {
@@ -159,15 +37,16 @@ func (e *eventWriteProducer) Write(b []byte) (int, error) {
 		return 0, nil
 	}
 
-	event := &Event{
+	event := &schema.AiOutputEvent{
 		CoordinatorId:   e.coordinatorId,
 		NodeId:          e.nodeId,
-		Type:            EVENT_TYPE_STREAM,
+		Type:            schema.EVENT_TYPE_STREAM,
 		IsSystem:        e.isSystem,
 		IsReason:        e.isReason,
 		IsStream:        true,
 		StreamDelta:     utils.CopyBytes(b),
 		Timestamp:       e.timeStamp, // the event in same stream should have the same timestamp
+		EventUUID:       e.eventWriterID,
 		TaskIndex:       e.taskIndex,
 		DisableMarkdown: e.disableMarkdown,
 	}
@@ -175,8 +54,8 @@ func (e *eventWriteProducer) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
-func (r *Config) emitJson(typeName EventType, nodeId string, i any) {
-	event := &Event{
+func (r *Config) emitJson(typeName schema.EventType, nodeId string, i any) {
+	event := &schema.AiOutputEvent{
 		CoordinatorId: r.id,
 		Type:          typeName,
 		NodeId:        nodeId,
@@ -207,7 +86,7 @@ func (r *Config) EmitStream(nodeId string, content string) {
 }
 
 func (r *Config) EmitStructured(nodeId string, i any) {
-	r.emitJson(EVENT_TYPE_STRUCTURED, nodeId, i)
+	r.emitJson(schema.EVENT_TYPE_STRUCTURED, nodeId, i)
 }
 
 func (r *Config) EmitRequirePermission(title string, description ...string) {
@@ -215,7 +94,7 @@ func (r *Config) EmitRequirePermission(title string, description ...string) {
 		"title":       title,
 		"description": description,
 	}
-	r.emitJson(EVENT_TYPE_PERMISSION_REQUIRE, "permission", reqs)
+	r.emitJson(schema.EVENT_TYPE_PERMISSION_REQUIRE, "permission", reqs)
 }
 
 func (r *Config) EmitRequireReviewForTask(task *aiTask, id string) {
@@ -233,7 +112,7 @@ func (r *Config) EmitRequireReviewForTask(task *aiTask, id string) {
 			log.Errorf("submit request reivew to db for task failed: %v", err)
 		}
 	}
-	r.emitInteractiveJson(id, EVENT_TYPE_TASK_REVIEW_REQUIRE, "review-require", reqs)
+	r.emitInteractiveJson(id, schema.EVENT_TYPE_TASK_REVIEW_REQUIRE, "review-require", reqs)
 }
 
 func (r *Config) EmitRequireReviewForPlan(rsp *PlanResponse, id string) {
@@ -250,7 +129,7 @@ func (r *Config) EmitRequireReviewForPlan(rsp *PlanResponse, id string) {
 			log.Errorf("submit request reivew to db for task failed: %v", err)
 		}
 	}
-	r.emitInteractiveJson(id, EVENT_TYPE_PLAN_REVIEW_REQUIRE, "review-require", reqs)
+	r.emitInteractiveJson(id, schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, "review-require", reqs)
 }
 
 func (r *Config) EmitRequireReviewForToolUse(tool *aitool.Tool, params aitool.InvokeParams, id string) {
@@ -268,11 +147,11 @@ func (r *Config) EmitRequireReviewForToolUse(tool *aitool.Tool, params aitool.In
 			log.Errorf("submit request reivew to db for task failed: %v", err)
 		}
 	}
-	r.emitInteractiveJson(id, EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, "review-require", reqs)
+	r.emitInteractiveJson(id, schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, "review-require", reqs)
 }
 
-func (r *Config) emitInteractiveJson(id string, typeName EventType, nodeId string, i any) {
-	event := &Event{
+func (r *Config) emitInteractiveJson(id string, typeName schema.EventType, nodeId string, i any) {
+	event := &schema.AiOutputEvent{
 		CoordinatorId: r.id,
 		Type:          typeName,
 		NodeId:        nodeId,
@@ -289,9 +168,9 @@ func (r *Config) emitInteractiveRelease(eventId string, invokeParams aitool.Invo
 		"id":     eventId,
 		"params": invokeParams,
 	}
-	event := &Event{
+	event := &schema.AiOutputEvent{
 		CoordinatorId: r.id,
-		Type:          EVENT_TYPE_REVIEW_RELEASE,
+		Type:          schema.EVENT_TYPE_REVIEW_RELEASE,
 		NodeId:        "review-release",
 		IsJson:        true,
 		Content:       utils.Jsonify(release),
@@ -337,11 +216,11 @@ func (r *Config) EmitToolCallWatcher(toolCallID string, id string, tool *aitool.
 		"params":           params,
 		"selectors":        ToolCallWatcher,
 	}
-	r.emitInteractiveJson(id, EVENT_TYPE_TOOL_CALL_WATCHER, "review-require", reqs)
+	r.emitInteractiveJson(id, schema.EVENT_TYPE_TOOL_CALL_WATCHER, "review-require", reqs)
 }
 
 func (r *Config) EmitToolCallStart(callToolId string, tool *aitool.Tool) {
-	r.emitJson(EVENT_TOOL_CALL_START, callToolId, map[string]any{
+	r.emitJson(schema.EVENT_TOOL_CALL_START, callToolId, map[string]any{
 		"call_tool_id": callToolId,
 		"tool": map[string]any{
 			"name":        tool.Name,
@@ -351,28 +230,35 @@ func (r *Config) EmitToolCallStart(callToolId string, tool *aitool.Tool) {
 }
 
 func (r *Config) EmitToolCallStatus(callToolId string, status string) {
-	r.emitJson(EVENT_TOOL_CALL_STATUS, callToolId, map[string]any{
+	r.emitJson(schema.EVENT_TOOL_CALL_STATUS, callToolId, map[string]any{
 		"call_tool_id": callToolId,
 		"status":       status,
 	})
 }
 
 func (r *Config) EmitToolCallDone(callToolId string) {
-	r.emitJson(EVENT_TOOL_CALL_DONE, callToolId, map[string]any{
+	r.emitJson(schema.EVENT_TOOL_CALL_DONE, callToolId, map[string]any{
 		"call_tool_id": callToolId,
 	})
 }
 
 func (r *Config) EmitToolCallError(callToolId string, err any) {
-	r.emitJson(EVENT_TOOL_CALL_ERROR, callToolId, map[string]any{
+	r.emitJson(schema.EVENT_TOOL_CALL_ERROR, callToolId, map[string]any{
 		"call_tool_id": callToolId,
 		"error":        fmt.Sprintf("%v", err),
 	})
 }
 
 func (r *Config) EmitToolCallUserCancel(callToolId string) {
-	r.emitJson(EVENT_TOOL_CALL_USER_CANCEL, callToolId, map[string]any{
+	r.emitJson(schema.EVENT_TOOL_CALL_USER_CANCEL, callToolId, map[string]any{
 		"call_tool_id": callToolId,
+	})
+}
+
+func (r *Config) EmitToolCallSummary(callToolId string, summary string) {
+	r.emitJson(schema.EVENT_TOOL_CALL_SUMMARY, callToolId, map[string]any{
+		"call_tool_id": callToolId,
+		"summary":      summary,
 	})
 }
 
@@ -432,7 +318,7 @@ func (r *Config) EmitSystemReasonStreamEvent(nodeId string, startTime time.Time,
 }
 
 func (r *Config) EmitCurrentConfigInfo() {
-	r.emitJson(EVENT_TYPE_AID_CONFIG, "system", r.SimpleInfoMap())
+	r.emitJson(schema.EVENT_TYPE_AID_CONFIG, "system", r.SimpleInfoMap())
 }
 
 func (r *Config) EmitInfo(fmtlog string, items ...any) {
@@ -462,7 +348,7 @@ func (r *Config) EmitPopTask(task *aiTask) {
 }
 
 func (r *Config) EmitRiskControlPrompt(id string, result *RiskControlResult) {
-	r.emitJson(EVENT_TYPE_RISK_CONTROL_PROMPT, `risk-control`, map[string]any{
+	r.emitJson(schema.EVENT_TYPE_RISK_CONTROL_PROMPT, `risk-control`, map[string]any{
 		"id":     id,
 		"score":  result.Score,
 		"reason": result.Reason,
@@ -531,10 +417,54 @@ func (r *Config) emitExStreamEvent(e *streamEvent) {
 			isReason:        e.isReason,
 			handler:         r.emit,
 			timeStamp:       e.startTime.Unix(),
+			eventWriterID:   ksuid.New().String(),
 			taskIndex:       e.taskIndex,
 		}, e.reader)
 	}()
 	return
+}
+
+func (c *Config) pushProcess(newProcess *schema.AiProcess) *Config {
+	err := yakit.CreateAIProcess(consts.GetGormProjectDatabase(), newProcess)
+	if err != nil {
+		return nil
+	}
+	callBack := func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
+		event.Processes = append(event.Processes, newProcess)
+		return event
+	}
+	return c.pushEventBeforeSave(callBack)
+}
+
+func (c *Config) pushEventBeforeSave(newHandler func(event *schema.AiOutputEvent) *schema.AiOutputEvent) *Config {
+	var subConfig = new(Config)
+	*subConfig = *c
+	if subConfig.eventBeforeSave == nil {
+		subConfig.eventBeforeSave = utils.NewStack[func(event *schema.AiOutputEvent) *schema.AiOutputEvent]()
+	}
+	subConfig.eventBeforeSave.Push(newHandler)
+	return subConfig
+}
+
+func (c *Config) popEventBeforeSave() *Config {
+	var subConfig = new(Config)
+	*subConfig = *c
+	if subConfig.eventBeforeSave == nil {
+		return subConfig
+	}
+	subConfig.eventBeforeSave.Pop()
+	return subConfig
+}
+
+func (c *Config) callEventBeforeSave(event *schema.AiOutputEvent) *schema.AiOutputEvent {
+	if c.eventBeforeSave == nil || c.eventBeforeSave.Len() == 0 {
+		return event
+	}
+	c.eventBeforeSave.ForeachStack(func(f func(e *schema.AiOutputEvent) *schema.AiOutputEvent) bool {
+		event = f(event)
+		return true
+	})
+	return event
 }
 
 func (r *Config) WaitForStream() {
@@ -544,14 +474,18 @@ func (r *Config) WaitForStream() {
 type SyncType string
 
 const (
-	SYNC_TYPE_PLAN        SyncType = "plan"
-	SYNC_TYPE_CONSUMPTION SyncType = "consumption"
-	SYNC_TYPE_PING        SyncType = "ping"
+	SYNC_TYPE_PLAN          SyncType = "plan"
+	SYNC_TYPE_CONSUMPTION   SyncType = "consumption"
+	SYNC_TYPE_PING          SyncType = "ping"
+	SYNC_TYPE_PROCESS_EVENT SyncType = "sync_process_event"
+
+	ProcessID           string = "process_id"
+	SyncProcessEeventID        = "sync_process_event_id"
 )
 
 func ParseSyncType(s string) (SyncType, bool) {
 	for _, t := range []SyncType{
-		SYNC_TYPE_PLAN, SYNC_TYPE_CONSUMPTION, SYNC_TYPE_PING,
+		SYNC_TYPE_PLAN, SYNC_TYPE_CONSUMPTION, SYNC_TYPE_PING, SYNC_TYPE_PROCESS_EVENT,
 	} {
 		if string(t) == s {
 			return t, true

@@ -88,7 +88,10 @@ type Config struct {
 
 	// asyncGuardian can auto collect event handler data
 	guardian     *asyncGuardian
-	eventHandler func(e *Event)
+	eventHandler func(e *schema.AiOutputEvent)
+
+	// hook before emit
+	eventBeforeSave *utils.Stack[func(e *schema.AiOutputEvent) *schema.AiOutputEvent]
 
 	// tool manager
 	aiToolManager       *buildinaitools.AiToolManager
@@ -297,7 +300,7 @@ func (c *Config) SetSyncCallback(i SyncType, callback func() any) {
 	c.syncMap[string(i)] = callback
 }
 
-func (c *Config) emit(e *Event) {
+func (c *Config) emit(e *schema.AiOutputEvent) {
 	select {
 	case <-c.ctx.Done():
 		return
@@ -305,6 +308,16 @@ func (c *Config) emit(e *Event) {
 	}
 	c.m.Lock()
 	defer c.m.Unlock()
+
+	if c.eventBeforeSave != nil {
+		e = c.callEventBeforeSave(e)
+	}
+	if !e.IsSystem && !e.IsSync { // not save system and sync
+		err := yakit.CreateAIEvent(consts.GetGormProjectDatabase(), e)
+		if err != nil {
+			log.Errorf("create AI event failed: %v", err)
+		}
+	}
 
 	if c.guardian != nil {
 		c.guardian.feed(e)
@@ -322,7 +335,7 @@ func (c *Config) emit(e *Event) {
 			return
 		}
 
-		if e.Type == EVENT_TYPE_CONSUMPTION {
+		if e.Type == schema.EVENT_TYPE_CONSUMPTION {
 			if c.debugEvent {
 				log.Info(e.String())
 			}
@@ -777,7 +790,7 @@ func WithDebugPrompt(i ...bool) Option {
 	}
 }
 
-func WithEventHandler(h func(e *Event)) Option {
+func WithEventHandler(h func(e *schema.AiOutputEvent)) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -940,7 +953,7 @@ func WithRiskControlForgeName(forgeName string, callbackType AICallbackType) Opt
 	}
 }
 
-func WithGuardianEventTrigger(eventTrigger EventType, callback GuardianEventTrigger) Option {
+func WithGuardianEventTrigger(eventTrigger schema.EventType, callback GuardianEventTrigger) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -996,7 +1009,7 @@ func WithForgeName(forgeName string) Option {
 
 func WithTaskAnalysis(b bool) Option {
 	return func(config *Config) error {
-		return WithGuardianEventTrigger(EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *Event, emitter GuardianEmitter, caller AICaller) {
+		return WithGuardianEventTrigger(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller AICaller) {
 			var plansUUID string
 			var planTree string
 			type analyzeItem struct {
@@ -1044,7 +1057,7 @@ func WithTaskAnalysis(b bool) Option {
 				obj := action.GetInvokeParams("params")
 				desc := obj.GetString("description")
 				keywords := obj.GetStringSlice("keywords")
-				emitter.EmitJson(EVENT_PLAN_TASK_ANALYSIS, "task-analyst", map[string]any{
+				emitter.EmitJson(schema.EVENT_PLAN_TASK_ANALYSIS, "task-analyst", map[string]any{
 					"plans_id":    currentUUID,
 					"description": desc,
 					"keywords":    keywords,

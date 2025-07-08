@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/utils/reducer"
@@ -61,7 +62,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	var coordinatorIdOnce sync.Once
 	var aidOption = []aid.Option{
 		aid.WithTaskAnalysis(true),
-		aid.WithEventHandler(func(e *aid.Event) {
+		aid.WithEventHandler(func(e *schema.AiOutputEvent) {
 			if e.Timestamp <= 0 {
 				e.Timestamp = time.Now().Unix() // fallback
 			}
@@ -75,6 +76,8 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 				IsSystem:        e.IsSystem,
 				IsStream:        e.IsStream,
 				IsReason:        e.IsReason,
+				IsSync:          e.IsSync,
+				SyncID:          e.SyncID,
 				StreamDelta:     e.StreamDelta,
 				IsJson:          e.IsJson,
 				Content:         e.Content,
@@ -108,10 +111,16 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 					log.Errorf("parse sync type failed, got: %v", event.GetSyncType())
 					continue
 				}
+				var params = make(aitool.InvokeParams)
+				err := json.Unmarshal([]byte(event.GetSyncJsonInput()), &params)
+				if err != nil {
+					log.Errorf("unmarshal interactive json input failed: %v", err)
+				}
 				select {
 				case inputEvent <- &aid.InputEvent{
 					IsSyncInfo: true,
 					SyncType:   t,
+					Params:     params,
 				}:
 					continue
 				case <-baseCtx.Done():

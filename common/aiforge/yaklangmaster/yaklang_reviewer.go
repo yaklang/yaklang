@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"regexp"
 	"strings"
 	"text/template"
@@ -80,7 +81,7 @@ cli.check()
 				if !ok {
 					return nil, utils.Error("Interactive Event Not Found")
 				}
-				if eventIns.InteractiveEvent.Type == aid.EVENT_TYPE_TASK_REVIEW_REQUIRE {
+				if eventIns.InteractiveEvent.Type == schema.EVENT_TYPE_TASK_REVIEW_REQUIRE {
 					return analyzeToolCallResult(m), nil
 				}
 				return nil, nil

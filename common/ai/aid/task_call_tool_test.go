@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
@@ -15,14 +16,14 @@ func TestAITaskCallToolStdOut(t *testing.T) {
 	outputToken := uuid.New().String()
 	errToken := uuid.New().String()
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 	coordinator, err := NewCoordinator(
 		"test",
 		WithAgreeYOLO(true),
 		WithTools(PrintTool()),
 		WithEventInputChan(inputChan),
 		WithSystemFileOperator(),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
 		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
@@ -82,7 +83,7 @@ LOOP:
 			}
 			fmt.Println("result:" + result.String())
 
-			if result.Type == EVENT_TYPE_STREAM {
+			if result.Type == schema.EVENT_TYPE_STREAM {
 				if result.NodeId == "tool-print-stdout" {
 					require.True(t, result.DisableMarkdown)
 					outBuffer.Write(result.StreamDelta)
