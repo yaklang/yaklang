@@ -440,7 +440,16 @@ func (n *anValue) SetType(typ Type) {
 	}
 
 	value := n.GetValueById(n.GetId())
-
+	// i know is ugle, just is, and i will fix this after remove init value in ssa/next.go
+	if !utils.IsNil(value) {
+		if prog := value.GetProgram(); prog != nil {
+			if application := prog.GetApplication(); application != nil {
+				if cache := application.Cache; cache != nil && cache.HaveDatabaseBackend() {
+					saveType(cache, typ)
+				}
+			}
+		}
+	}
 	switch t := typ.(type) {
 	case *Blueprint:
 		n.typ = t.Apply(value)

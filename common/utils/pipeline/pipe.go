@@ -18,7 +18,7 @@ type Pipe[T, U any] struct {
 
 const defaultPipeSize = 200
 
-func NewPipe[T, U any](ctx context.Context, handler func(item T) (U, error)) *Pipe[T, U] {
+func NewPipe[T, U any](ctx context.Context, initBufSize int, handler func(item T) (U, error)) *Pipe[T, U] {
 	ret := &Pipe[T, U]{
 		ctx:     ctx,
 		in:      chanx.NewUnlimitedChan[T](ctx, defaultPipeSize),

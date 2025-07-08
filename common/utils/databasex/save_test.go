@@ -34,7 +34,7 @@ func TestNewSaver(t *testing.T) {
 	ctx := context.Background()
 	saver = databasex.NewSave(
 		saveFn,
-		databasex.WithBufferSize(200),
+		databasex.WithFetchSize(200),
 		databasex.WithContext(ctx),
 	)
 	require.NotNil(t, saver)
@@ -178,4 +178,33 @@ func TestSaver_WithCustomContext(t *testing.T) {
 	}
 	require.True(t, itemFound, "First item should be saved")
 	saveMutex.Unlock()
+}
+
+func TestSaveAutoSaveSize(t *testing.T) {
+	defaultSaveSize := 10
+	saveTimeout := 200 * time.Millisecond
+
+	var savedItemSize []int
+	var mu sync.Mutex
+
+	saveFn := func(items []int) {
+		mu.Lock()
+		defer mu.Unlock()
+		savedItemSize = append(savedItemSize, len(items))
+		// Make a copy of the slice
+	}
+
+	save := databasex.NewSave(saveFn,
+		databasex.WithSaveSize(defaultSaveSize),
+		databasex.WithSaveTimeout(saveTimeout),
+	)
+
+	for i := 0; i < 100; i++ {
+		save.Save(i)
+	}
+
+	time.Sleep(500 * time.Millisecond) // Wait for the saver to process
+	save.Close()
+
+	require.Equal(t, savedItemSize, []int{90, 10})
 }

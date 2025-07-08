@@ -26,7 +26,7 @@ func NewCache[T MemoryItem, D DBItem](
 	// marshal
 	marshal func(T, D),
 	// fetch
-	fetch func() []D,
+	fetch func(int) []D,
 
 	// delete
 	delete func([]D),
@@ -99,9 +99,9 @@ func (c *Cache[T, U]) Get(id int64) (T, bool) {
 }
 
 func (c *Cache[T, D]) Close() {
+	c.fetcher.Close(c.delete)
 	c.cache.EnableSave()
 	c.cache.Close()
-	c.fetcher.Close(c.delete)
 	c.saver.Close()
 }
 
