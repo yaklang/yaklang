@@ -28,18 +28,23 @@ func PeepholeCompile(fs fi.FileSystem, size int, opts ...Option) (Programs, erro
 	return ParseProject(opts...)
 }
 
-func ParseProject(opts ...Option) (Programs, error) {
+func ParseProject(opts ...Option) (prog Programs, err error) {
 	config, err := defaultConfig(opts...)
 	if err != nil {
 		return nil, err
 	}
-	return config.parseProject()
-}
-
-func (c *config) parseProject() (Programs, error) {
 	defer func() {
 		ssaprofile.ShowCacheCost()
 	}()
+	f1 := func() {
+		prog, err = config.parseProject()
+	}
+	ssaprofile.ProfileAdd(true, "ssaapi.ParseProject", f1)
+	return
+}
+
+func (c *config) parseProject() (Programs, error) {
+
 	if c.reCompile {
 		c.Processf(0, "recompile project, delete old data...")
 		ssadb.DeleteProgramIrCode(ssadb.GetDB(), c.ProgramName)

@@ -189,7 +189,9 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 		phi.GetProgram().SetVirtualRegister(phi)
 		phi.GetProgram().SetInstructionWithName(name, phi)
 		phi.SetVerboseName(vs[0].GetVerboseName())
-		phi.CFGEntryBasicBlock = cfgEntryBlock.GetId()
+		if !utils.IsNil(cfgEntryBlock) {
+			phi.CFGEntryBasicBlock = cfgEntryBlock.GetId()
+		}
 		return phi
 	}
 }
