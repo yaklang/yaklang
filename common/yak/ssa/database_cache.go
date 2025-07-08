@@ -87,7 +87,10 @@ func (c *ProgramCache) SetInstruction(inst Instruction) {
 		log.Errorf("BUG: SetInstruction called with nil instruction")
 		return
 	}
-	c.InstructionCache.Set(inst)
+	f1 := func() {
+		c.InstructionCache.Set(inst)
+	}
+	ProfileAdd(true, "ssa.ProgramCache.SetInstruction", f1)
 }
 
 func (c *ProgramCache) DeleteInstruction(inst Instruction) {
