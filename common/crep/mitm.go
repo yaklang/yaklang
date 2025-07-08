@@ -60,6 +60,14 @@ func init() {
 	defaultGMKeyFile = filepath.Join(homeDir, defaultGMKeyFile)
 }
 
+// DebugSetDefaultGMCAFileAndKey is used for test purpose. To simulate GM cert generation error
+// which can spawn malformed GM certs or can be used to test edge case where gmCA and gmKey are nil
+func DebugSetDefaultGMCAFileAndKey(ca, key []byte) {
+	initMITMCertOnce.Do(func() {})
+	defaultGMCA = ca
+	defaultGMKey = key
+}
+
 func GetDefaultCAAndPrivRaw() ([]byte, []byte) {
 	ca, key, err := tlsutils.GenerateSelfSignedCertKeyWithCommonName("yak-mitm", "yaklang.io", nil, nil)
 	if err != nil {

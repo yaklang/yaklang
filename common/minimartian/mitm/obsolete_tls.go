@@ -39,49 +39,69 @@ type ObsoleteTLSConfig struct {
 	// 分离两种GMTLS证书的缓存
 	signingCerts    map[string]*gmtls.Certificate // 签名证书缓存
 	encryptionCerts map[string]*gmtls.Certificate // 加密证书缓存
+
+	disableMimicGMServer bool // 是否关闭MITM充当中间人国密服务器功能
 }
 
 func NewObsoleteTLSConfig(ca, gmCA *gmx509.Certificate, privateKey, gmPrivateKey any) (*ObsoleteTLSConfig, error) {
+	var gmPriv *sm2.PrivateKey
+	var err error
+	disableMimicGMServer := false
+	roots := gmx509.NewCertPool()
+
+	if gmCA == nil || gmPrivateKey == nil {
+		disableMimicGMServer = true
+		log.Error("MITM mimic GM Server feature disabled due to GM certificates error")
+	}
+
 	_, ok := privateKey.(crypto.Signer)
 	if !ok {
 		return nil, errors.New("ca private key does not implement crypto.Signer")
 	}
-	_, ok = gmPrivateKey.(crypto.Signer)
-	if !ok {
-		return nil, errors.New("gm ca private key does not implement crypto.Signer")
-	}
-	roots := gmx509.NewCertPool()
 	roots.AddCert(ca)
-	roots.AddCert(gmCA)
+
+	if !disableMimicGMServer {
+		_, ok = gmPrivateKey.(crypto.Signer)
+		if ok {
+			roots.AddCert(gmCA)
+			gmPriv, err = sm2.GenerateKey(rand.Reader)
+			if err != nil {
+				log.Errorf("sm2.GenerateKey failed when initializing ObsoleteTLSConfig: %s", err)
+				disableMimicGMServer = true
+			}
+		} else {
+			log.Error("gm ca private key does not implement crypto.Signer")
+			disableMimicGMServer = true
+		}
+	}
 
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return nil, err
 	}
 
-	gmPriv, err := sm2.GenerateKey(rand.Reader)
-	if err != nil {
-		return nil, err
-	}
-
 	return &ObsoleteTLSConfig{
-		ca:              ca,
-		gmCA:            gmCA,
-		capriv:          privateKey,
-		gmCAPriv:        gmPrivateKey,
-		priv:            priv,
-		gmPriv:          gmPriv,
-		validity:        time.Hour,
-		org:             "MITMServer",
-		certs:           make(map[string]*gmtls.Certificate),
-		signingCerts:    make(map[string]*gmtls.Certificate),
-		encryptionCerts: make(map[string]*gmtls.Certificate),
-		roots:           roots,
+		ca:                   ca,
+		gmCA:                 gmCA,
+		capriv:               privateKey,
+		gmCAPriv:             gmPrivateKey,
+		priv:                 priv,
+		gmPriv:               gmPriv,
+		validity:             time.Hour,
+		org:                  "MITMServer",
+		certs:                make(map[string]*gmtls.Certificate),
+		signingCerts:         make(map[string]*gmtls.Certificate),
+		encryptionCerts:      make(map[string]*gmtls.Certificate),
+		roots:                roots,
+		disableMimicGMServer: disableMimicGMServer,
 	}, nil
 }
 
 // 生成签名证书（仅用于数字签名和身份验证）
 func (c *ObsoleteTLSConfig) getSigningCert(hostname string) (*gmtls.Certificate, error) {
+	if c.disableMimicGMServer {
+		return nil, errors.New("failed to obtain signing certificate for host due to gmCA cert not provided or malformed")
+	}
 	host, _, err := net.SplitHostPort(hostname)
 	if err == nil {
 		hostname = host
@@ -161,6 +181,9 @@ func (c *ObsoleteTLSConfig) getSigningCert(hostname string) (*gmtls.Certificate,
 
 // 生成加密证书（仅用于密钥交换和数据加密）
 func (c *ObsoleteTLSConfig) getEncryptionCert(hostname string) (*gmtls.Certificate, error) {
+	if c.disableMimicGMServer {
+		return nil, errors.New("failed to obtain encryption certificate for host due to gmCA cert not provided or malformed")
+	}
 	host, _, err := net.SplitHostPort(hostname)
 	if err == nil {
 		hostname = host
