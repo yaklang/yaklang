@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"runtime"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/gopacket/gopacket"
@@ -57,7 +58,11 @@ func (s *Scannerx) initHandle() error {
 	var bpf string
 	if s.config.Iface.Flags&net.FlagLoopback == 0 {
 		// Interface is not loopback, set the filter.
-		bpf = fmt.Sprintf("ether dst %s && (arp || udp  || tcp[tcpflags] == tcp-syn|tcp-ack)", s.config.Iface.HardwareAddr.String())
+		if s.config.Iface.HardwareAddr == nil || !strings.Contains(s.config.Iface.HardwareAddr.String(), ":") {
+			bpf = "arp || udp || tcp[tcpflags] == tcp-syn|tcp-ack"
+		} else {
+			bpf = fmt.Sprintf("ether dst %s && (arp || udp || tcp[tcpflags] == tcp-syn|tcp-ack)", s.config.Iface.HardwareAddr.String())
+		}
 	} else {
 		// Interface is loopback, set a different filter.
 		// Replace the following line with the appropriate filter for your use case.
@@ -65,7 +70,9 @@ func (s *Scannerx) initHandle() error {
 	}
 	err = handle.SetBPFFilter(bpf)
 	if err != nil {
-		return utils.Errorf("SetBPFFilter failed: %v", err)
+		if ferr := handle.SetBPFFilter(`arp || udp || tcp[tcpflags] == tcp-syn|tcp-ack`); ferr != nil {
+			return utils.Errorf("SetBPFFilter failed: %v, bpf: %v", err, bpf)
+		}
 	}
 
 	log.Infof("pcap set filter success: %s", bpf)
