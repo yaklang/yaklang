@@ -39,7 +39,7 @@ type ProgramCache struct {
 }
 
 // NewDBCache : create a new ssa db cache. if ttl is 0, the cache will never expire, and never save to database.
-func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) *ProgramCache {
+func NewDBCache(prog *Program, databaseEnable bool, fileSize int, ConfigTTL ...time.Duration) *ProgramCache {
 	compileCtx := context.Background()
 	cacheCtx, cancel := context.WithCancel(compileCtx)
 	cache := &ProgramCache{
@@ -53,24 +53,40 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 		programName = prog.GetApplication().GetProgramName()
 		cache.DB = ssadb.GetDB().Where("program_name = ?", programName)
 	}
-
-	cache.initIndex(databaseEnable)
+	fetchSize := min(max(fileSize*5, defaultFetchSize), maxFetchSize)
+	saveSize := min(max(fileSize*5, defaultSaveSize), maxSaveSize)
+	log.Debugf("Databasex Channel: ReSetSize: fileSize(%d) fetchSize(%d) saveSize(%d)", fileSize, fetchSize, saveSize)
+	cache.initIndex(databaseEnable, saveSize/2)
 	cache.afterSaveNotify = func(i int) {}
 	cache.InstructionCache = createInstructionCache(
 		cacheCtx, databaseEnable,
 		cache.DB, prog,
-		programName,
+		programName, fetchSize, saveSize,
 		func(inst Instruction, instIr *ssadb.IrCode) {
-			cache.OffsetCache.Add("", inst) // add to offset cache
+			// TODO: this offset too long time
+			// cache.OffsetCache.Add("", inst) // add to offset cache
 		},
-		func(i int) {
-			cache.afterSaveNotify(i)
+		func(count int) {
+			go func() {
+				step := 100
+				if cache.afterSaveNotify != nil {
+					i := 0
+					for i <= count {
+						cache.afterSaveNotify(step)
+						i += step // notify every step instructions
+					}
+					if rest := count % step; rest != 0 {
+						// notify the remaining count if not evenly divisible by step
+						cache.afterSaveNotify(rest)
+					}
+				}
+			}()
 		},
 	)
 	cache.TypeCache = createTypeCache(
 		cacheCtx, databaseEnable,
 		cache.DB, prog,
-		programName,
+		programName, fetchSize, saveSize,
 	)
 	return cache
 }

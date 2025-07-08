@@ -22,11 +22,13 @@ func (c *instructionCachePair) GetId() int64 {
 }
 
 const (
-	fetchSize = 300
-	saveSize  = 2000
-	saveTime  = time.Second * 1
-	cacheTTL  = 8 * time.Second
-	typeTTL   = 500 * time.Millisecond
+	defaultFetchSize = 200
+	maxFetchSize     = 15000
+	defaultSaveSize  = 200
+	maxSaveSize      = 15000
+	saveTime         = time.Second * 1
+	cacheTTL         = 8 * time.Second
+	typeTTL          = 500 * time.Millisecond
 )
 
 type Cache[T any] interface {
@@ -72,20 +74,25 @@ func createInstructionCache(
 	ctx context.Context,
 	databaseEnable bool,
 	db *gorm.DB, prog *Program,
-	programName string,
+	programName string, fetchSize, saveSize int,
 	marshalFinish func(Instruction, *ssadb.IrCode),
 	saveFinish func(int),
 ) Cache[Instruction] {
 	if !databaseEnable {
 		return newmemoryCache[Instruction]()
 	}
+	saveSize = min(max(saveSize, defaultSaveSize), maxSaveSize)
+	fetchSize = min(max(fetchSize, defaultFetchSize), maxFetchSize)
 
 	// init instruction cache and fetchId
-	fetch := func() []*ssadb.IrCode {
-		result := make([]*ssadb.IrCode, 0, fetchSize)
+	fetch := func(size int) []*ssadb.IrCode {
+		if size < defaultFetchSize {
+			size = defaultFetchSize // ensure at least fetchSize items are fetched
+		}
+		result := make([]*ssadb.IrCode, 0, size)
 		utils.GormTransaction(db, func(tx *gorm.DB) error {
 			// tx := db
-			for len(result) < fetchSize {
+			for len(result) < size {
 				id, irCode := ssadb.RequireIrCode(tx, programName)
 				if utils.IsNil(irCode) || id <= 0 {
 					// return nil // no more id to fetch
@@ -121,7 +128,7 @@ func createInstructionCache(
 			}
 			return nil
 		})
-		go saveFinish(len(t)) // notify after save
+		saveFinish(len(t)) // notify save finish
 	}
 
 	marshal := func(s Instruction, d *ssadb.IrCode) {
@@ -139,7 +146,7 @@ func createInstructionCache(
 	}
 
 	opts := []databasex.Option{
-		databasex.WithBufferSize(fetchSize),
+		databasex.WithFetchSize(fetchSize),
 		databasex.WithSaveSize(saveSize),
 		databasex.WithSaveTimeout(saveTime),
 		databasex.WithName("Instruction"),
@@ -154,20 +161,26 @@ func createTypeCache(
 	databaseEnable bool,
 	db *gorm.DB, prog *Program,
 	programName string,
+	fetchSize, saveSize int,
 ) Cache[Type] {
 	if !databaseEnable {
 		return newmemoryCache[Type]()
 	}
+	fetchSize = min(max(fetchSize, defaultFetchSize), maxFetchSize)
+	saveSize = min(max(saveSize, defaultSaveSize), maxSaveSize)
 
 	marshal := func(s Type, d *ssadb.IrType) {
 		marshalType(s, d)
 	}
 
-	fetch := func() []*ssadb.IrType {
-		result := make([]*ssadb.IrType, 0, fetchSize)
+	fetch := func(size int) []*ssadb.IrType {
+		if size < defaultFetchSize {
+			size = defaultFetchSize // ensure at least fetchSize items are fetched
+		}
+		result := make([]*ssadb.IrType, 0, size)
 		utils.GormTransaction(db, func(tx *gorm.DB) error {
 			// tx := db
-			for len(result) < fetchSize {
+			for len(result) < size {
 				id, irType := ssadb.RequireIrType(tx, programName)
 				if utils.IsNil(irType) || id <= 0 {
 					// return nil // no more id to fetch
@@ -213,7 +226,7 @@ func createTypeCache(
 	}
 
 	opts := []databasex.Option{
-		databasex.WithBufferSize(fetchSize),
+		databasex.WithFetchSize(fetchSize),
 		databasex.WithSaveSize(saveSize),
 		databasex.WithSaveTimeout(saveTime),
 		databasex.WithEnableSave(true), // always enable save for type cache
