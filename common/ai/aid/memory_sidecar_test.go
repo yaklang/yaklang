@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
@@ -22,7 +23,7 @@ func TestCoordinator_SidecarMemory_Timeline_ToolUse_TooMany_TimelineShrink(t *te
 	m.ClearRuntimeConfig()
 
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 
 	requireMoreToolCount := 0
 
@@ -42,7 +43,7 @@ func TestCoordinator_SidecarMemory_Timeline_ToolUse_TooMany_TimelineShrink(t *te
 		"test",
 		WithEventInputChan(inputChan),
 		WithSystemFileOperator(),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
 		WithMemory(m),
@@ -123,14 +124,14 @@ LOOP:
 				break LOOP
 			}
 
-			if result.Type == EVENT_TYPE_CONSUMPTION {
+			if result.Type == schema.EVENT_TYPE_CONSUMPTION {
 				continue
 			}
 			fmt.Println("result:" + result.String())
 			if haveSidecarMem {
 				break LOOP
 			}
-			if result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				inputChan <- &InputEvent{
 					Id: result.GetInteractiveId(),
 					Params: aitool.InvokeParams{
@@ -140,7 +141,7 @@ LOOP:
 				continue
 			}
 
-			if result.Type == EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
+			if result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
 				var a = make(aitool.InvokeParams)
 				json.Unmarshal(result.Content, &a)
 				if a.GetObject("params").GetString("path") == "/"+noexistedfileToken &&
@@ -168,7 +169,7 @@ LOOP:
 
 func memoryTestBasic(t *testing.T) *Memory {
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 
 	requireMoreToolCount := 0
 
@@ -191,7 +192,7 @@ func memoryTestBasic(t *testing.T) *Memory {
 		"test",
 		WithEventInputChan(inputChan),
 		WithSystemFileOperator(),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
 		WithMemory(m),
@@ -275,12 +276,12 @@ LOOP:
 				break LOOP
 			}
 
-			if result.Type == EVENT_TYPE_CONSUMPTION {
+			if result.Type == schema.EVENT_TYPE_CONSUMPTION {
 				continue
 			}
 
 			fmt.Println("result:" + result.String())
-			if result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				inputChan <- &InputEvent{
 					Id: result.GetInteractiveId(),
 					Params: aitool.InvokeParams{
@@ -290,7 +291,7 @@ LOOP:
 				continue
 			}
 
-			if result.Type == EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
+			if result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
 				var a = make(aitool.InvokeParams)
 				json.Unmarshal(result.Content, &a)
 				if a.GetObject("params").GetString("path") == "/"+noexistedfileToken &&

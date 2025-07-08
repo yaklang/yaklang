@@ -3,6 +3,7 @@ package aid
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -22,7 +23,7 @@ type PlanRecord struct { // todo
 }
 
 type InteractiveEventRecord struct {
-	InteractiveEvent *Event
+	InteractiveEvent *schema.AiOutputEvent
 	UserInput        aitool.InvokeParams
 }
 
@@ -195,7 +196,7 @@ func (m *Memory) StoreCurrentTask(task *aiTask) {
 }
 
 // interactive history memory
-func (m *Memory) StoreInteractiveEvent(eventID string, e *Event) {
+func (m *Memory) StoreInteractiveEvent(eventID string, e *schema.AiOutputEvent) {
 	m.InteractiveHistory.Set(eventID, &InteractiveEventRecord{
 		InteractiveEvent: e,
 	})

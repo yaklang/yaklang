@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"strings"
@@ -17,11 +18,11 @@ func TestCoordinator_ConfigHotpatch(t *testing.T) {
 	newKeywordsToken := uuid.New().String()
 	hotpatchOptionChan := chanx.NewUnlimitedChan[Option](ctx, 10)
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 	ins, err := NewCoordinator(
 		"test",
 		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
 		WithToolKeywords(keywordsToken),
@@ -70,7 +71,7 @@ LOOP:
 	for {
 		select {
 		case result := <-outputChan:
-			if result.Type == EVENT_TYPE_AID_CONFIG {
+			if result.Type == schema.EVENT_TYPE_AID_CONFIG {
 				if strings.Contains(string(result.Content), keywordsToken) {
 					originConfigCheck = true
 					hotpatchOptionChan.SafeFeed(WithToolKeywords(newKeywordsToken))
@@ -83,7 +84,7 @@ LOOP:
 			}
 
 			fmt.Println("result:" + result.String())
-			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				time.Sleep(100 * time.Millisecond)
 				inputChan <- &InputEvent{
 					Id: result.GetInteractiveId(),

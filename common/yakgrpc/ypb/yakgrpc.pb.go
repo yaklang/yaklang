@@ -1984,6 +1984,8 @@ type AIOutputEvent struct {
 	Timestamp       int64                  `protobuf:"varint,10,opt,name=Timestamp,proto3" json:"Timestamp,omitempty"`
 	TaskIndex       string                 `protobuf:"bytes,11,opt,name=TaskIndex,proto3" json:"TaskIndex,omitempty"`
 	DisableMarkdown bool                   `protobuf:"varint,13,opt,name=DisableMarkdown,proto3" json:"DisableMarkdown,omitempty"`
+	IsSync          bool                   `protobuf:"varint,12,opt,name=IsSync,proto3" json:"IsSync,omitempty"` // 是否是同步消息
+	SyncID          string                 `protobuf:"bytes,14,opt,name=SyncID,proto3" json:"SyncID,omitempty"`  // 用于同步消息的 ID
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -2102,6 +2104,20 @@ func (x *AIOutputEvent) GetDisableMarkdown() bool {
 	return false
 }
 
+func (x *AIOutputEvent) GetIsSync() bool {
+	if x != nil {
+		return x.IsSync
+	}
+	return false
+}
+
+func (x *AIOutputEvent) GetSyncID() string {
+	if x != nil {
+		return x.SyncID
+	}
+	return ""
+}
+
 type AIInputEvent struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	IsStart          bool                   `protobuf:"varint,1,opt,name=IsStart,proto3" json:"IsStart,omitempty"`
@@ -2114,6 +2130,7 @@ type AIInputEvent struct {
 	InteractiveJSONInput string         `protobuf:"bytes,5,opt,name=InteractiveJSONInput,proto3" json:"InteractiveJSONInput,omitempty"`
 	IsSyncMessage        bool           `protobuf:"varint,6,opt,name=IsSyncMessage,proto3" json:"IsSyncMessage,omitempty"`
 	SyncType             string         `protobuf:"bytes,7,opt,name=SyncType,proto3" json:"SyncType,omitempty"`
+	SyncJsonInput        string         `protobuf:"bytes,10,opt,name=SyncJsonInput,proto3" json:"SyncJsonInput,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -2207,6 +2224,13 @@ func (x *AIInputEvent) GetIsSyncMessage() bool {
 func (x *AIInputEvent) GetSyncType() string {
 	if x != nil {
 		return x.SyncType
+	}
+	return ""
+}
+
+func (x *AIInputEvent) GetSyncJsonInput() string {
+	if x != nil {
+		return x.SyncJsonInput
 	}
 	return ""
 }
@@ -54574,7 +54598,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"Pagination\x18\x03 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12$\n" +
-	"\rOnlyFavorites\x18\x04 \x01(\bR\rOnlyFavorites\"\xef\x02\n" +
+	"\rOnlyFavorites\x18\x04 \x01(\bR\rOnlyFavorites\"\x9f\x03\n" +
 	"\rAIOutputEvent\x12$\n" +
 	"\rCoordinatorId\x18\x01 \x01(\tR\rCoordinatorId\x12\x12\n" +
 	"\x04Type\x18\x02 \x01(\tR\x04Type\x12\x16\n" +
@@ -54588,7 +54612,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tTimestamp\x18\n" +
 	" \x01(\x03R\tTimestamp\x12\x1c\n" +
 	"\tTaskIndex\x18\v \x01(\tR\tTaskIndex\x12(\n" +
-	"\x0fDisableMarkdown\x18\r \x01(\bR\x0fDisableMarkdown\"\xf4\x02\n" +
+	"\x0fDisableMarkdown\x18\r \x01(\bR\x0fDisableMarkdown\x12\x16\n" +
+	"\x06IsSync\x18\f \x01(\bR\x06IsSync\x12\x16\n" +
+	"\x06SyncID\x18\x0e \x01(\tR\x06SyncID\"\x9a\x03\n" +
 	"\fAIInputEvent\x12\x18\n" +
 	"\aIsStart\x18\x01 \x01(\bR\aIsStart\x12*\n" +
 	"\x10IsConfigHotpatch\x18\b \x01(\bR\x10IsConfigHotpatch\x12\"\n" +
@@ -54598,7 +54624,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\rInteractiveId\x18\x04 \x01(\tR\rInteractiveId\x122\n" +
 	"\x14InteractiveJSONInput\x18\x05 \x01(\tR\x14InteractiveJSONInput\x12$\n" +
 	"\rIsSyncMessage\x18\x06 \x01(\bR\rIsSyncMessage\x12\x1a\n" +
-	"\bSyncType\x18\a \x01(\tR\bSyncType\"\xa8\x02\n" +
+	"\bSyncType\x18\a \x01(\tR\bSyncType\x12$\n" +
+	"\rSyncJsonInput\x18\n" +
+	" \x01(\tR\rSyncJsonInput\"\xa8\x02\n" +
 	"\x12AITriageInputEvent\x12\x18\n" +
 	"\aIsStart\x18\x01 \x01(\bR\aIsStart\x12*\n" +
 	"\x06Params\x18\x02 \x01(\v2\x12.ypb.AIStartParamsR\x06Params\x122\n" +

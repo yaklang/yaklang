@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
@@ -21,12 +22,12 @@ func TestLocalUserCancel(t *testing.T) {
 
 func TestConfig_EmitToolCallUserCancel(t *testing.T) {
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 	coordinator, err := NewCoordinator(
 		"test",
 		WithEventInputChan(inputChan),
 		WithTool(TimeDelayTool()),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
 		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
@@ -85,7 +86,7 @@ LOOP:
 				break LOOP
 			}
 			fmt.Println("result:" + result.String())
-			if result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE || result.Type == EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE || result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
 				inputChan <- &InputEvent{
 					IsInteractive: true,
 					Id:            result.GetInteractiveId(),
@@ -96,7 +97,7 @@ LOOP:
 				continue
 			}
 
-			if result.Type == EVENT_TYPE_TOOL_CALL_WATCHER {
+			if result.Type == schema.EVENT_TYPE_TOOL_CALL_WATCHER {
 				if utils.MatchAllOfSubString(result.Content, "delay", "enough-cancel") {
 					toolCallWatcherEventCheck = true
 					inputChan <- &InputEvent{
@@ -110,7 +111,7 @@ LOOP:
 				continue
 			}
 
-			if toolCallWatcherEventCheck && result.Type == EVENT_TOOL_CALL_USER_CANCEL {
+			if toolCallWatcherEventCheck && result.Type == schema.EVENT_TOOL_CALL_USER_CANCEL {
 				toolCallCancelCheck = true
 				break LOOP
 			}
@@ -123,12 +124,12 @@ LOOP:
 
 func TestConfig_EmitToolCallOK(t *testing.T) {
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 	coordinator, err := NewCoordinator(
 		"test",
 		WithEventInputChan(inputChan),
 		WithTool(TimeDelayTool()),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
 		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
@@ -187,7 +188,7 @@ LOOP:
 				break LOOP
 			}
 			fmt.Println("result:" + result.String())
-			if result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE || result.Type == EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE || result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
 				inputChan <- &InputEvent{
 					Id: result.GetInteractiveId(),
 					Params: aitool.InvokeParams{
@@ -197,14 +198,14 @@ LOOP:
 				continue
 			}
 
-			if result.Type == EVENT_TYPE_TOOL_CALL_WATCHER {
+			if result.Type == schema.EVENT_TYPE_TOOL_CALL_WATCHER {
 				watcherId = result.GetInteractiveId()
 				if utils.MatchAllOfSubString(result.Content, "delay", "enough-cancel") {
 					toolCallWatcherEventCheck = true
 				}
 			}
 
-			if toolCallWatcherEventCheck && result.Type == EVENT_TYPE_REVIEW_RELEASE && result.GetInteractiveId() == watcherId {
+			if toolCallWatcherEventCheck && result.Type == schema.EVENT_TYPE_REVIEW_RELEASE && result.GetInteractiveId() == watcherId {
 				watcherReleaseCheck = true
 				break LOOP
 			}

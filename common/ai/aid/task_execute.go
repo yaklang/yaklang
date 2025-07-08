@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"sync/atomic"
@@ -140,6 +141,10 @@ TOOLREQUIRED:
 			return err
 		}
 
+		if result.ShrinkResult != "" {
+			t.config.EmitToolCallSummary(result.ToolCallID, result.ShrinkResult)
+		}
+
 		switch action {
 		case taskContinue:
 			atomic.AddInt64(&t.TaskContinueCount, 1)
@@ -244,7 +249,7 @@ func (t *aiTask) executeTask() error {
 		return err
 	}
 	// start to wait for user review
-	ep := t.config.epm.createEndpointWithEventType(EVENT_TYPE_TASK_REVIEW_REQUIRE)
+	ep := t.config.epm.createEndpointWithEventType(schema.EVENT_TYPE_TASK_REVIEW_REQUIRE)
 	ep.SetDefaultSuggestionContinue()
 	t.config.EmitInfo("start to wait for user review current task")
 

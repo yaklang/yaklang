@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"strings"
 	"text/template"
@@ -103,7 +104,7 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 			return nil, utils.Errorf("generate new plan failed: %v", err)
 		}
 
-		ep := p.config.epm.createEndpointWithEventType(EVENT_TYPE_PLAN_REVIEW_REQUIRE)
+		ep := p.config.epm.createEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
 
 		p.config.EmitRequireReviewForPlan(newPlan, ep.id)
@@ -128,7 +129,7 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 			return nil, utils.Errorf("generate new plan failed: %v", err)
 		}
 
-		ep := p.config.epm.createEndpointWithEventType(EVENT_TYPE_PLAN_REVIEW_REQUIRE)
+		ep := p.config.epm.createEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
 
 		p.config.EmitRequireReviewForPlan(newPlan, ep.id)
@@ -164,7 +165,7 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 			return nil, utils.Errorf("generate new plan failed: %v", err)
 		}
 
-		ep := p.config.epm.createEndpointWithEventType(EVENT_TYPE_PLAN_REVIEW_REQUIRE)
+		ep := p.config.epm.createEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
 
 		p.config.EmitRequireReviewForPlan(newPlan, ep.id)
