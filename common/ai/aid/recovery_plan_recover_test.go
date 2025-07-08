@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
@@ -21,14 +22,14 @@ func recoverPlan(t *testing.T, uuid string) {
 	fmt.Println("----------------------------------------------------------------")
 	fmt.Println("----------------------------------------------------------------")
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 	recoverCtx, recoverCancel := context.WithCancel(context.Background())
 	defer recoverCancel()
 	ord, err := NewFastRecoverCoordinatorContext(
 		recoverCtx,
 		uuid,
 		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
 		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
@@ -52,7 +53,7 @@ LOOP:
 		select {
 		case result := <-outputChan:
 			fmt.Println("result:" + result.String())
-			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
 				break LOOP
 			}
@@ -68,11 +69,11 @@ LOOP:
 
 func TestCoordinator_RecoverCase(t *testing.T) {
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 	ins, err := NewCoordinator(
 		"test",
 		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
 		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
@@ -117,7 +118,7 @@ LOOP:
 		select {
 		case result := <-outputChan:
 			fmt.Println("result:" + result.String())
-			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
 
 				end := false
@@ -140,7 +141,7 @@ LOOP:
 				}
 				continue
 			}
-			if result.Type == EVENT_TYPE_CONSUMPTION {
+			if result.Type == schema.EVENT_TYPE_CONSUMPTION {
 				var data = map[string]any{}
 				err := json.Unmarshal([]byte(result.Content), &data)
 				if err != nil {

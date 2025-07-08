@@ -1,6 +1,8 @@
 package aid
 
 import (
+	"github.com/segmentio/ksuid"
+	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"sync"
 	"time"
@@ -12,16 +14,16 @@ type GuardianEmitter interface {
 	EmitStatus(key string, value any)
 	EmitStructured(nodeId string, result any)
 	EmitGuardianStreamEvent(nodeId string, startTime time.Time, reader io.Reader)
-	EmitJson(typeName EventType, nodeId string, i any)
+	EmitJson(typeName schema.EventType, nodeId string, i any)
 }
 
 type guardianEmitter struct {
 	streamWaitGroup *sync.WaitGroup
 	coordinatorId   string
-	emitter         func(*Event)
+	emitter         func(*schema.AiOutputEvent)
 }
 
-func newGuardianEmitter(coordinatorId string, emitter func(*Event)) *guardianEmitter {
+func newGuardianEmitter(coordinatorId string, emitter func(*schema.AiOutputEvent)) *guardianEmitter {
 	return &guardianEmitter{
 		coordinatorId:   coordinatorId,
 		emitter:         emitter,
@@ -29,8 +31,8 @@ func newGuardianEmitter(coordinatorId string, emitter func(*Event)) *guardianEmi
 	}
 }
 
-func (e *guardianEmitter) emitJson(typeName EventType, nodeId string, i any) {
-	e.emitter(&Event{
+func (e *guardianEmitter) emitJson(typeName schema.EventType, nodeId string, i any) {
+	e.emitter(&schema.AiOutputEvent{
 		CoordinatorId: e.coordinatorId,
 		Type:          typeName,
 		NodeId:        nodeId,
@@ -61,6 +63,7 @@ func (e *guardianEmitter) emitExStreamEvent(s *streamEvent) {
 			isReason:        s.isReason,
 			handler:         e.emitter,
 			timeStamp:       s.startTime.Unix(),
+			eventWriterID:   ksuid.New().String(),
 			taskIndex:       s.taskIndex,
 		}, s.reader)
 	}()
@@ -81,10 +84,10 @@ func (e *guardianEmitter) EmitGuardianStreamEvent(nodeId string, startTime time.
 }
 
 func (e *guardianEmitter) EmitStructured(nodeId string, result any) {
-	e.emitJson(EVENT_TYPE_STRUCTURED, nodeId, result)
+	e.emitJson(schema.EVENT_TYPE_STRUCTURED, nodeId, result)
 }
 
-func (e *guardianEmitter) EmitJson(typeName EventType, nodeId string, i any) {
+func (e *guardianEmitter) EmitJson(typeName schema.EventType, nodeId string, i any) {
 	e.emitJson(typeName, nodeId, i)
 }
 

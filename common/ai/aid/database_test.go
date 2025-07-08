@@ -17,11 +17,11 @@ import (
 
 func TestCoordinator_SyncTaskInDatabase(t *testing.T) {
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 	ins, err := NewCoordinator(
 		"test",
 		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
 		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
@@ -70,7 +70,7 @@ LOOP:
 		select {
 		case result := <-outputChan:
 			fmt.Println("result:" + result.String())
-			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
 				time.Sleep(100 * time.Millisecond)
 				inputChan <- &InputEvent{
@@ -81,7 +81,7 @@ LOOP:
 				}
 				continue
 			}
-			if result.Type == EVENT_TYPE_CONSUMPTION {
+			if result.Type == schema.EVENT_TYPE_CONSUMPTION {
 				var data = map[string]any{}
 				err := json.Unmarshal([]byte(result.Content), &data)
 				if err != nil {
@@ -105,7 +105,7 @@ LOOP:
 				}
 			}
 
-			if consumptionCheck && result.Type == EVENT_TYPE_PONG {
+			if consumptionCheck && result.Type == schema.EVENT_TYPE_PONG {
 				pingPongCheck = true
 				inputChan <- &InputEvent{
 					IsSyncInfo: true,
@@ -114,7 +114,7 @@ LOOP:
 				continue
 			}
 
-			if pingPongCheck && result.Type == EVENT_TYPE_PLAN {
+			if pingPongCheck && result.Type == schema.EVENT_TYPE_PLAN {
 				var i = make(aitool.InvokeParams, 0)
 				if err := json.Unmarshal([]byte(result.Content), &i); err != nil {
 					t.Fatal(err)

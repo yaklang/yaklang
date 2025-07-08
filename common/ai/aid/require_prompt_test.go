@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
@@ -19,7 +20,7 @@ func TestCoodinator_AllowRequireForUserInteract_UserAct(t *testing.T) {
 	token1 := utils.RandStringBytes(200)
 	token2 := utils.RandStringBytes(200)
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 	checkToken1 := false
 	checkToken2 := false
 	interactiveCheck := false
@@ -27,7 +28,7 @@ func TestCoodinator_AllowRequireForUserInteract_UserAct(t *testing.T) {
 		"test",
 		WithEventInputChan(inputChan),
 		WithSystemFileOperator(),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
 		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
@@ -87,14 +88,14 @@ LOOP:
 			if count > 100 {
 				break LOOP
 			}
-			if result.Type == EVENT_TYPE_CONSUMPTION {
+			if result.Type == schema.EVENT_TYPE_CONSUMPTION {
 				continue
 			}
 
 			if interactiveCheck {
 				if !checkToken2 {
 					if strings.Contains(result.String(), token2) {
-						if result.Type == EVENT_TYPE_REVIEW_RELEASE {
+						if result.Type == schema.EVENT_TYPE_REVIEW_RELEASE {
 							checkToken2 = true
 							break LOOP
 						}
@@ -106,7 +107,7 @@ LOOP:
 
 			if checkToken1 && !interactiveCheck {
 
-				if result.Type == EVENT_TYPE_REQUIRE_USER_INTERACTIVE {
+				if result.Type == schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE {
 					interactiveCheck = true
 					inputChan <- &InputEvent{
 						Id: result.GetInteractiveId(),
@@ -119,7 +120,7 @@ LOOP:
 				}
 			}
 
-			if result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				inputChan <- &InputEvent{
 					Id: result.GetInteractiveId(),
 					Params: aitool.InvokeParams{
@@ -129,7 +130,7 @@ LOOP:
 				continue
 			}
 
-			if result.Type == EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
+			if result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
 				t.Fatal("no tool review required")
 			}
 
@@ -153,14 +154,14 @@ func TestCoodinator_AllowRequireForUserInteract(t *testing.T) {
 
 	token1 := utils.RandStringBytes(200)
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 	checkToken1 := false
 	interactiveCheck := false
 	coordinator, err := NewCoordinator(
 		"test",
 		WithEventInputChan(inputChan),
 		WithSystemFileOperator(),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
 		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
@@ -216,19 +217,19 @@ LOOP:
 			if count > 100 {
 				break LOOP
 			}
-			if result.Type == EVENT_TYPE_CONSUMPTION {
+			if result.Type == schema.EVENT_TYPE_CONSUMPTION {
 				continue
 			}
 
 			if checkToken1 {
 				fmt.Println("result:" + result.String())
-				if result.Type == EVENT_TYPE_REQUIRE_USER_INTERACTIVE {
+				if result.Type == schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE {
 					interactiveCheck = true
 					break LOOP
 				}
 			}
 
-			if result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				inputChan <- &InputEvent{
 					Id: result.GetInteractiveId(),
 					Params: aitool.InvokeParams{
@@ -238,7 +239,7 @@ LOOP:
 				continue
 			}
 
-			if result.Type == EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
+			if result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
 				t.Fatal("no tool review required")
 			}
 

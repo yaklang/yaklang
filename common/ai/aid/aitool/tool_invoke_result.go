@@ -20,6 +20,7 @@ type ToolResult struct {
 	Success     bool   `json:"success"`
 	Data        any    `json:"data,omitempty"`
 	Error       string `json:"error,omitempty"`
+	ToolCallID  string `json:"call_tool_id,omitempty"` // 用于标识调用的工具ID，通常是一个唯一标识符
 
 	// shrink_similar_result 表示相似缩略信息，是相似度过高的工具调用引发的压缩。
 	ShrinkSimilarResult string `json:"shrink_similar_result,omitempty"`

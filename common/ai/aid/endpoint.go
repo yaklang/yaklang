@@ -53,7 +53,7 @@ func (e *endpointManager) feed(id string, params aitool.InvokeParams) {
 	}
 }
 
-func (e *endpointManager) createEndpointWithEventType(typeName EventType) *Endpoint {
+func (e *endpointManager) createEndpointWithEventType(typeName schema.EventType) *Endpoint {
 	id := ksuid.New().String()
 	endpoint := &Endpoint{
 		id:              id,
@@ -93,7 +93,7 @@ func (e *endpointManager) loadEndpoint(id string) (*Endpoint, bool) {
 type Endpoint struct {
 	id              string
 	sig             *signal
-	reviewType      EventType
+	reviewType      schema.EventType
 	activeParams    aitool.InvokeParams
 	reviewMaterials aitool.InvokeParams
 

@@ -84,7 +84,7 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 			c.aiAutoRetry = 1
 		}
 		tokenSize := estimateTokens([]byte(request.GetPrompt()))
-		c.emitJson(EVENT_TYPE_PRESSURE, "system", map[string]any{
+		c.emitJson(schema.EVENT_TYPE_PRESSURE, "system", map[string]any{
 			"current_cost_token_size": tokenSize,
 			"pressure_token_size":     c.aiCallTokenLimit,
 		})
@@ -145,14 +145,14 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 				}()
 
 				haveFirstByte.SetTo(true)
-				c.emitJson(EVENT_TYPE_AI_FIRST_BYTE_COST_MS, "system", map[string]any{
+				c.emitJson(schema.EVENT_TYPE_AI_FIRST_BYTE_COST_MS, "system", map[string]any{
 					"ms":     du.Milliseconds(),
 					"second": du.Seconds(),
 				})
 			}, func() {
 				du := time.Since(start)
 				c.EmitInfo("ai response close cost: %v", du)
-				c.emitJson(EVENT_TYPE_AI_TOTAL_COST_MS, "system", map[string]any{
+				c.emitJson(schema.EVENT_TYPE_AI_TOTAL_COST_MS, "system", map[string]any{
 					"ms":     du.Milliseconds(),
 					"second": du.Seconds(),
 				})

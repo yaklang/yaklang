@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"golang.org/x/net/context"
@@ -42,17 +43,22 @@ func (c *Config) toolCallOpts(toolCallID string, cancelHandle, resultErrHandle f
 			}
 			ctx, cancel := context.WithCancel(c.ctx)
 			defer cancel()
-			ep := c.epm.createEndpointWithEventType(EVENT_TYPE_TOOL_CALL_WATCHER)
+			ep := c.epm.createEndpointWithEventType(schema.EVENT_TYPE_TOOL_CALL_WATCHER)
 			c.EmitToolCallWatcher(toolCallID, ep.id, t, params)
 
-			toolCallSuccess := func(result *aitool.ToolExecutionResult) (*aitool.ToolResult, error) {
-				res := &aitool.ToolResult{
+			newToolCallRes := func() *aitool.ToolResult {
+				return &aitool.ToolResult{
 					Param:       params,
 					Name:        t.Name,
 					Description: t.Description,
-					Success:     true,
-					Data:        result,
+					ToolCallID:  toolCallID,
 				}
+			}
+
+			toolCallSuccess := func(result *aitool.ToolExecutionResult) (*aitool.ToolResult, error) {
+				res := newToolCallRes()
+				res.Success = true
+				res.Data = result
 				err = c.submitToolCallResponse(toolCheckpoint, res)
 				if err != nil {
 					return nil, err
@@ -62,13 +68,9 @@ func (c *Config) toolCallOpts(toolCallID string, cancelHandle, resultErrHandle f
 
 			toolCallErr := func(err error) (*aitool.ToolResult, error) {
 				resultErrHandle(err)
-				return &aitool.ToolResult{
-					Param:       params,
-					Name:        t.Name,
-					Description: t.Description,
-					Success:     false,
-					Error:       fmt.Sprintf("工具执行失败: %v", err),
-				}, err
+				res := newToolCallRes()
+				res.Error = fmt.Sprintf("工具执行失败: %v", err)
+				return res, err
 			}
 
 			outBuf, errBuf := bytes.NewBuffer(nil), bytes.NewBuffer(nil)

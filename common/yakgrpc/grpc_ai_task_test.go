@@ -5,8 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/jsonextractor"
+	"github.com/yaklang/yaklang/common/schema"
 	"math/rand"
 	"os"
 	"strings"
@@ -514,7 +514,7 @@ func TestAITaskForgeTriage(t *testing.T) {
 		if err != nil {
 			break
 		}
-		if event.Type == aid.EVENT_TYPE_REQUIRE_USER_INTERACTIVE {
+		if event.Type == schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE {
 			eventId := ""
 			jsonextractor.ExtractStructuredJSONFromStream(bytes.NewReader(event.Content), jsonextractor.WithObjectCallback(func(data map[string]any) {
 				if id, ok := data["id"]; ok {

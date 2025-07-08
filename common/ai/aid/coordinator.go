@@ -2,6 +2,7 @@ package aid
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/schema"
 	"io"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -100,7 +101,7 @@ func (c *Coordinator) Run() error {
 	}
 
 	// 审查
-	ep := c.config.epm.createEndpointWithEventType(EVENT_TYPE_PLAN_REVIEW_REQUIRE)
+	ep := c.config.epm.createEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
 	ep.SetDefaultSuggestionContinue()
 
 	c.config.EmitRequireReviewForPlan(rsp, ep.id)

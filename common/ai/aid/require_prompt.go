@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"strings"
 )
@@ -83,7 +84,7 @@ func (c *Config) RequireUserPromptWithEndpointResult(prompt string, opts ...*Req
 }
 
 func (c *Config) RequireUserPromptWithEndpointResultEx(ctx context.Context, prompt string, opts ...*RequireInteractiveRequestOption) (aitool.InvokeParams, *Endpoint, error) {
-	ep := c.epm.createEndpointWithEventType(EVENT_TYPE_REQUIRE_USER_INTERACTIVE)
+	ep := c.epm.createEndpointWithEventType(schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE)
 	ep.SetDefaultSuggestionContinue()
 
 	req := &RequireInteractiveRequest{
@@ -116,5 +117,5 @@ func (c *Config) EmitRequireUserInteractive(i *RequireInteractiveRequest, id str
 		}
 	}
 
-	c.emitInteractiveJson(id, EVENT_TYPE_REQUIRE_USER_INTERACTIVE, "require-user-interact", i)
+	c.emitInteractiveJson(id, schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE, "require-user-interact", i)
 }

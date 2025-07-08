@@ -2,6 +2,7 @@ package aid
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/schema"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -9,24 +10,24 @@ import (
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
-type GuardianEventTrigger func(event *Event, emitter GuardianEmitter, aicaller AICaller)
+type GuardianEventTrigger func(event *schema.AiOutputEvent, emitter GuardianEmitter, aicaller AICaller)
 
-type GuardianMirrorStreamTrigger func(unlimitedChan *chanx.UnlimitedChan[*Event], emitter GuardianEmitter)
+type GuardianMirrorStreamTrigger func(unlimitedChan *chanx.UnlimitedChan[*schema.AiOutputEvent], emitter GuardianEmitter)
 
 type asyncGuardian struct {
 	ctx                  context.Context
-	unlimitedInput       *chanx.UnlimitedChan[*Event]
+	unlimitedInput       *chanx.UnlimitedChan[*schema.AiOutputEvent]
 	callbackMutex        *sync.RWMutex
 	outputEmitter        GuardianEmitter
 	mirrorCallback       map[string]*mirrorEventStream
-	eventTriggerCallback map[EventType][]GuardianEventTrigger
+	eventTriggerCallback map[schema.EventType][]GuardianEventTrigger
 	aiCaller             AICaller
 }
 
 type mirrorEventStream struct {
 	triggerCallbackOnce *sync.Once
 
-	unlimitedChan *chanx.UnlimitedChan[*Event]
+	unlimitedChan *chanx.UnlimitedChan[*schema.AiOutputEvent]
 	emitter       GuardianEmitter
 	trigger       GuardianMirrorStreamTrigger
 }
@@ -34,10 +35,10 @@ type mirrorEventStream struct {
 func newAsyncGuardian(ctx context.Context, coordinatorId string) *asyncGuardian {
 	g := &asyncGuardian{
 		ctx:                  ctx,
-		outputEmitter:        newGuardianEmitter(coordinatorId, func(event *Event) {}),
-		unlimitedInput:       chanx.NewUnlimitedChan[*Event](ctx, 1000),
+		outputEmitter:        newGuardianEmitter(coordinatorId, func(event *schema.AiOutputEvent) {}),
+		unlimitedInput:       chanx.NewUnlimitedChan[*schema.AiOutputEvent](ctx, 1000),
 		callbackMutex:        new(sync.RWMutex),
-		eventTriggerCallback: make(map[EventType][]GuardianEventTrigger),
+		eventTriggerCallback: make(map[schema.EventType][]GuardianEventTrigger),
 		mirrorCallback:       make(map[string]*mirrorEventStream),
 	}
 	ch := make(chan struct{})
@@ -51,7 +52,7 @@ func newAsyncGuardian(ctx context.Context, coordinatorId string) *asyncGuardian 
 	return g
 }
 
-func (a *asyncGuardian) setOutputEmitter(coordinatorId string, emitter func(*Event)) {
+func (a *asyncGuardian) setOutputEmitter(coordinatorId string, emitter func(*schema.AiOutputEvent)) {
 	a.callbackMutex.Lock()
 	defer a.callbackMutex.Unlock()
 	a.outputEmitter = newGuardianEmitter(coordinatorId, emitter)
@@ -63,14 +64,14 @@ func (a *asyncGuardian) setAiCaller(caller AICaller) {
 	a.aiCaller = caller
 }
 
-func (a *asyncGuardian) feed(event *Event) {
+func (a *asyncGuardian) feed(event *schema.AiOutputEvent) {
 	if event == nil {
 		return
 	}
 	a.unlimitedInput.SafeFeed(event)
 }
 
-func (a *asyncGuardian) registerEventTrigger(eventType EventType, trigger GuardianEventTrigger) error {
+func (a *asyncGuardian) registerEventTrigger(eventType schema.EventType, trigger GuardianEventTrigger) error {
 	a.callbackMutex.Lock()
 	defer a.callbackMutex.Unlock()
 	if _, ok := a.eventTriggerCallback[eventType]; !ok {
@@ -88,7 +89,7 @@ func (a *asyncGuardian) registerMirrorEventTrigger(mirrorName string, trigger Gu
 	}
 	a.mirrorCallback[mirrorName] = &mirrorEventStream{
 		triggerCallbackOnce: new(sync.Once),
-		unlimitedChan:       chanx.NewUnlimitedChan[*Event](a.ctx, 1000),
+		unlimitedChan:       chanx.NewUnlimitedChan[*schema.AiOutputEvent](a.ctx, 1000),
 		emitter:             a.outputEmitter,
 		trigger:             trigger,
 	}
@@ -116,7 +117,7 @@ func (a *asyncGuardian) eventloop(ch chan struct{}) {
 	}
 }
 
-func (a *asyncGuardian) emitEvent(event *Event) {
+func (a *asyncGuardian) emitEvent(event *schema.AiOutputEvent) {
 	a.callbackMutex.RLock()
 	defer a.callbackMutex.RUnlock()
 

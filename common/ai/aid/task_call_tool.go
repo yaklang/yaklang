@@ -3,6 +3,7 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"sync"
 
@@ -64,6 +65,11 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, d
 	t.config.EmitInfo("start to generate tool[%v] params in task:%#v", targetTool.Name, t.Name)
 
 	callToolId := ksuid.New().String()
+	t.config = t.config.pushProcess(&schema.AiProcess{
+		ProcessId:   callToolId,
+		ProcessType: schema.AI_Call_Tool,
+	})
+
 	t.config.EmitToolCallStart(callToolId, targetTool)
 	// tool-call with stats: generating-params -> review-params -> invoking -> done/finished
 	callToolDoneOnce := new(sync.Once)
@@ -72,17 +78,20 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, d
 		callToolDoneOnce.Do(func() {
 			t.config.EmitToolCallStatus(callToolId, "done")
 			t.config.EmitToolCallDone(callToolId)
+			t.config = t.config.popEventBeforeSave()
 		})
 	}
 	handleResultUserCancel := func(reason any) {
 		callToolDoneOnce.Do(func() {
 			t.config.EmitToolCallStatus(callToolId, fmt.Sprintf("cancelled by reason: %v", reason))
 			t.config.EmitToolCallUserCancel(callToolId)
+			t.config = t.config.popEventBeforeSave()
 		})
 	}
 	handleResultErr := func(err any) {
 		callToolDoneOnce.Do(func() {
 			t.config.EmitToolCallError(callToolId, err)
+			t.config = t.config.popEventBeforeSave()
 		})
 	}
 
@@ -136,7 +145,7 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, d
 		t.config.EmitInfo("tool[%v] (internal helper tool) no need user review, skip review", targetTool.Name)
 	} else {
 		t.config.EmitInfo("start to require review for tool use")
-		ep := t.config.epm.createEndpointWithEventType(EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE)
+		ep := t.config.epm.createEndpointWithEventType(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
 		t.config.EmitRequireReviewForToolUse(targetTool, callToolParams, ep.id)
 		t.config.doWaitAgree(nil, ep)

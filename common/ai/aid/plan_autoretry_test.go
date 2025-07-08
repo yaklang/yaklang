@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
@@ -13,11 +14,11 @@ import (
 func TestPlanRetry(t *testing.T) {
 	count := 0
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 	ins, err := NewCoordinator(
 		"test",
 		WithEventInputChan(inputChan),
-		WithEventHandler(func(e *Event) {
+		WithEventHandler(func(e *schema.AiOutputEvent) {
 			outputChan <- e
 		}),
 		WithAIAutoRetry(2),
@@ -106,11 +107,11 @@ LOOP:
 func testRecoverPlanRetry(t *testing.T, uid string) {
 	count := 0
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 	ins, err := NewFastRecoverCoordinator(
 		uid,
 		WithEventInputChan(inputChan),
-		WithEventHandler(func(e *Event) {
+		WithEventHandler(func(e *schema.AiOutputEvent) {
 			outputChan <- e
 		}),
 		WithAIAutoRetry(2),
