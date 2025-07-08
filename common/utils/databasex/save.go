@@ -61,23 +61,15 @@ func NewSaveWithConfig[T any](
 
 // processBuffer runs in a background goroutine and periodically processes items from the buffer.
 func (s *Save[T]) processBuffer() {
-	saveSize := s.config.saveSize
 	saveTime := s.config.saveTimeout
 	timer := time.NewTimer(saveTime)
-	// sizeWg := utils.NewSizedWaitGroup(3)
-	sizeWg := sync.WaitGroup{}
-	defer func() {
-		f1 := func() {
-			sizeWg.Wait()
-		}
-		ssaprofile.ProfileAdd(true, "save.Save.Wait", f1)
-	}()
+
 	save := func(ts []T) {
 		if len(ts) == 0 {
 			return
 		}
 		if s.buffer.Len() != 0 {
-			log.Errorf("Save Count in save Loop: %s: need: %v, handled: %v",
+			log.Errorf("Databasex Channel: Save Count in save Loop: %s: need: %v, handled: %v",
 				s.config.name,
 				s.buffer.Len(),
 				len(ts),
@@ -85,22 +77,16 @@ func (s *Save[T]) processBuffer() {
 		}
 
 		f1 := func() {
-			sizeWg.Add(1)
-			go func(ts []T) {
-				defer sizeWg.Done()
-				if len(ts) > 0 {
-					f1 := func() {
-						s.saveToDB(ts)
-					}
-					ssaprofile.ProfileAdd(true, "save.Save.SaveToDB", f1)
-				}
-			}(ts)
+			if len(ts) > 0 {
+				s.saveToDB(ts)
+			}
 		}
 		ssaprofile.ProfileAdd(true, "save.Save", f1)
 	}
-
-	items := make([]T, 0, saveSize)
+	currentSaveSize := s.config.saveSize
+	items := make([]T, 0, currentSaveSize)
 	for {
+		saveSize := s.config.saveSize
 		select {
 		case item, ok := <-s.buffer.OutputChannel():
 			if !ok {
@@ -111,9 +97,18 @@ func (s *Save[T]) processBuffer() {
 			items = append(items, item)
 
 			// If we've reached the SaveSize, save immediately
-			if len(items) >= saveSize {
+			if len(items) >= currentSaveSize {
 				save(items)
-				items = make([]T, 0, saveSize)
+				bufferSize := s.buffer.Len()
+				if bufferSize > currentSaveSize {
+					currentSaveSize = (bufferSize / currentSaveSize) * currentSaveSize
+				} else if bufferSize > saveSize {
+					currentSaveSize = (bufferSize / saveSize) * saveSize
+				} else {
+					currentSaveSize = saveSize
+				}
+
+				items = make([]T, 0, currentSaveSize)
 				// Reset the timer since we just saved
 				timer.Reset(saveTime)
 			}
@@ -139,8 +134,6 @@ func (s *Save[T]) Save(item T) {
 		s.buffer.SafeFeed(item)
 	}
 }
-
-const MaxSize = 300
 
 // Close stops the background goroutine and waits for it to finish.
 // It also processes any remaining items in the buffer before returning.
