@@ -2,9 +2,10 @@ package chanx
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/log"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 // UnlimitedChan is an unbounded chan.
@@ -24,7 +25,13 @@ func (c *UnlimitedChan[T]) SafeFeed(i T) {
 	select {
 	case c.innerIn <- i:
 	case <-time.After(3 * time.Second):
-		log.Error("timeout for write in *UnlimitedChan, try to solve it to prevent mem-leak")
+		log.Errorf("timeout for write in *UnlimitedChan, try to solve it to prevent mem-leak: "+
+			"size: in: len(%v)  cap(%v), out len(%v)  cap(%v), buf: len(%v)  cap(%v)",
+			len(c.innerIn), cap(c.innerIn),
+			len(c.innerOut), cap(c.innerOut),
+			c.BufLen(), c.buffer.Capacity(),
+		)
+		PrintCurrentGoroutineRuntimeStack()
 	}
 }
 

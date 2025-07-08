@@ -2,11 +2,11 @@ package tests
 
 import (
 	_ "embed"
-	"io/fs"
 	"runtime"
 	"testing"
 	"time"
 
+	"net/http"
 	_ "net/http/pprof"
 
 	"github.com/google/uuid"
@@ -14,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -37,27 +36,31 @@ func TestA(t *testing.T) {
 		t.Skip()
 	}
 
+	go func() {
+		log.Println(http.ListenAndServe("localhost:18080", nil)) // 启动 pprof 服务
+	}()
+
 	runtime.SetBlockProfileRate(1)
 
-	path := `/Users/wlz/Developer/Target/yakssaExample/java-sec-code`
+	// path := `/Users/wlz/Developer/Target/yakssaExample/java-sec-code`
+	path := `/Users/wlz/Developer/Target/yakssaExample/spring-boot`
 
-	relfs := filesys.NewRelLocalFs(path)
-	filesys.Recursive(
-		".", filesys.WithFileSystem(relfs),
-		filesys.WithFileStat(func(s string, fi fs.FileInfo) error {
-			if fi.IsDir() {
-				return nil
-			}
-			if relfs.Ext(s) == ".java" {
-				data, err := relfs.ReadFile(s)
-				require.NoError(t, err)
-				java2ssa.Frontend(string(data), false)
-			}
-			return nil
-		}),
-	)
-
-	log.SetLevel(log.ErrorLevel)
+	// relfs := filesys.NewRelLocalFs(path)
+	// filesys.Recursive(
+	// 	".", filesys.WithFileSystem(relfs),
+	// 	filesys.WithFileStat(func(s string, fi fs.FileInfo) error {
+	// 		if fi.IsDir() {
+	// 			return nil
+	// 		}
+	// 		if relfs.Ext(s) == ".java" {
+	// 			data, err := relfs.ReadFile(s)
+	// 			require.NoError(t, err)
+	// 			java2ssa.Frontend(string(data), false)
+	// 		}
+	// 		return nil
+	// 	}),
+	// )
+	log.SetLevel(log.DebugLevel)
 	progName := uuid.NewString()
 	_ = progName
 	start := time.Now()
@@ -79,7 +82,7 @@ func TestA(t *testing.T) {
 	_ = databaseCost
 
 	start = time.Now()
-	if true {
+	if false {
 		// memory
 		ssaprofile.Refresh()
 		_, err := ssaapi.ParseProject(

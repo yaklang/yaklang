@@ -12,6 +12,7 @@ func saveType(cache *ProgramCache, typ Type) int64 {
 		return -1
 	}
 	if id := typ.GetId(); id > 0 {
+		// log.Errorf("saveType: type %v already has id %d", typ, id)
 		return id
 	}
 

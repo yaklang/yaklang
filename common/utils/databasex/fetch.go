@@ -3,6 +3,7 @@ package databasex
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -10,31 +11,29 @@ import (
 )
 
 type Fetch[T any] struct {
-	fetchFromDB func() []T
+	fetchFromDB func(int) []T
 	buffer      *chanx.UnlimitedChan[T]
 	cfg         *config
 	wg          sync.WaitGroup
-	size        int
 	ctx         context.Context
 	cancel      context.CancelFunc
 }
 
 func NewFetch[T any](
-	fetchFromDB func() []T,
+	fetchFromDB func(int) []T,
 	opt ...Option,
 ) *Fetch[T] {
 	cfg := NewConfig(opt...)
 	return NewFetchWithConfig(fetchFromDB, cfg)
 }
 func NewFetchWithConfig[T any](
-	fetchFromDB func() []T,
+	fetchFromDB func(int) []T,
 	cfg *config,
 ) *Fetch[T] {
 	ctx, cancel := context.WithCancel(cfg.ctx)
 	f := &Fetch[T]{
 		fetchFromDB: fetchFromDB,
 		buffer:      chanx.NewUnlimitedChan[T](cfg.ctx, cfg.bufferSize),
-		size:        cfg.bufferSize,
 		cfg:         cfg,
 		ctx:         ctx,
 		cancel:      cancel,
@@ -49,19 +48,44 @@ func NewFetchWithConfig[T any](
 }
 
 func (f *Fetch[T]) fillBuffer() {
+	// fetchSize := f.cfg.bufferSize
+	currentFetchSize := f.cfg.fetchSize
+	prevSendBuffer := 0
 	for {
+		fetchSize := f.cfg.fetchSize
 		select {
 		case <-f.ctx.Done():
 			return
 		default:
-			items := f.fetchFromDB()
-			log.Errorf("Fetch Count in fetch buffer : %v with fetchItem: %v",
-				f.buffer.Len(),
-				len(items),
+
+			if f.buffer.Len() > currentFetchSize*5 {
+				time.Sleep(100 * time.Millisecond) // Sleep for a short duration to avoid busy waiting
+				continue
+			}
+
+			bufferWeight := 1
+			bufferLen := f.buffer.Len()
+			if bufferLen < fetchSize/2 || prevSendBuffer < fetchSize/2 { // [:0.5]
+				bufferWeight = 10
+			} else if bufferLen < fetchSize || prevSendBuffer < fetchSize { // [0.5, 1]
+				bufferWeight = 5
+			} else if prevSendBuffer > bufferLen && prevSendBuffer-bufferLen > fetchSize/2 {
+				bufferWeight = 5
+			}
+
+			currentFetchSize = fetchSize * bufferWeight
+
+			items := f.fetchFromDB(currentFetchSize)
+
+			log.Errorf(
+				"Databasex Channel: Fetch Count in fetch buffer %s: buffer(%v|%v) prevBuf(%v) with fetchItem(%v): %v", f.cfg.name,
+				bufferLen, bufferWeight, prevSendBuffer,
+				currentFetchSize, len(items),
 			)
-			log.Errorf("Fetch %s len: %d", f.cfg.name, len(items))
-			for index, item := range items {
-				_ = index
+
+			prevSendBuffer = f.buffer.Len()
+
+			for _, item := range items {
 				if utils.IsNil(item) {
 					log.Errorf("BUG: item is nil in Fetch.fillBuffer")
 					continue
@@ -75,7 +99,7 @@ func (f *Fetch[T]) fillBuffer() {
 func (f *Fetch[T]) Fetch() (T, error) {
 	var zero T
 	if f.buffer.Len() == 0 {
-		log.Errorf("Fetch size length %T: len: %d", zero, f.buffer.Len())
+		log.Errorf("Databasex Channel: Fetch size length %T: len: %d ", zero, f.buffer.Len())
 	}
 
 	item := <-f.buffer.OutputChannel()

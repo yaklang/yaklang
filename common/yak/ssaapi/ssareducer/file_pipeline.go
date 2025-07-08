@@ -22,9 +22,9 @@ func FilesHandler(
 	paths []string,
 	handler func(path string, content []byte) (ssa.FrontAST, error),
 ) <-chan *FileContent {
-
+	bufSize := len(paths)
 	readFilePipe := pipeline.NewPipe[string, *FileContent](
-		ctx, func(path string) (*FileContent, error) {
+		ctx, bufSize, func(path string) (*FileContent, error) {
 			content, err := filesystem.ReadFile(path)
 			if err != nil {
 				return nil, err
@@ -38,7 +38,7 @@ func FilesHandler(
 	readFilePipe.FeedSlice(paths)
 
 	parseASTPipe := pipeline.NewPipe[*FileContent, *FileContent](
-		ctx, func(fileContent *FileContent) (*FileContent, error) {
+		ctx, bufSize, func(fileContent *FileContent) (*FileContent, error) {
 			ast, err := handler(fileContent.Path, fileContent.Content)
 			if err == nil {
 				fileContent.AST = ast
