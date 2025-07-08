@@ -12,6 +12,7 @@ import (
 type Fetch[T any] struct {
 	fetchFromDB func() []T
 	buffer      *chanx.UnlimitedChan[T]
+	cfg         *config
 	wg          sync.WaitGroup
 	size        int
 	ctx         context.Context
@@ -34,6 +35,7 @@ func NewFetchWithConfig[T any](
 		fetchFromDB: fetchFromDB,
 		buffer:      chanx.NewUnlimitedChan[T](cfg.ctx, cfg.bufferSize),
 		size:        cfg.bufferSize,
+		cfg:         cfg,
 		ctx:         ctx,
 		cancel:      cancel,
 		wg:          sync.WaitGroup{},
@@ -52,10 +54,12 @@ func (f *Fetch[T]) fillBuffer() {
 		case <-f.ctx.Done():
 			return
 		default:
-			if f.buffer.Len() >= f.size {
-				continue
-			}
 			items := f.fetchFromDB()
+			log.Errorf("Fetch Count in fetch buffer : %v with fetchItem: %v",
+				f.buffer.Len(),
+				len(items),
+			)
+			log.Errorf("Fetch %s len: %d", f.cfg.name, len(items))
 			for index, item := range items {
 				_ = index
 				if utils.IsNil(item) {
@@ -69,6 +73,11 @@ func (f *Fetch[T]) fillBuffer() {
 }
 
 func (f *Fetch[T]) Fetch() (T, error) {
+	var zero T
+	if f.buffer.Len() == 0 {
+		log.Errorf("Fetch size length %T: len: %d", zero, f.buffer.Len())
+	}
+
 	item := <-f.buffer.OutputChannel()
 	if utils.IsNil(item) {
 		return item, utils.Errorf("item is nil in Fetch.Fetch")
