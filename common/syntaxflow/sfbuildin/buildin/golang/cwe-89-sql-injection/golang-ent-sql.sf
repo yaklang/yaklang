@@ -100,7 +100,7 @@ REFERENCE
 ent?{<fullTypeName>?{have: 'entgo.io/ent'}} as $entry;
 $entry.Open() <getMembers> as $client;
 $client.User.Query().Where(* #-> as $param);
-$param?{have: 'Parameter'} as $high;
+$param.FormValue as $high;
 
 alert $high for {
 	title: "Check Golang SQL Injection(ent)",

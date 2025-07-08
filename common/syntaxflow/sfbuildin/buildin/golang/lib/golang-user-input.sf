@@ -1,0 +1,52 @@
+desc(
+	title: "Audit Golang User Input"
+	type: audit
+	level: info
+	lib: 'golang-user-input'
+	desc: <<<DESC
+该规则用于审计Golang代码中用户输入相关的处理。它主要检查在Golang程序中，是否有关键参数可以被用户直接控制，这可能会导致安全风险，如命令注入、SQL注入等。规则通过分析代码，识别出所有可能的用户输入点，并判断这些输入是否经过适当的过滤或验证。如果存在未经验证或过滤的用户输入，规则将生成告警，提示开发者进行相应的安全处理。
+DESC
+	rule_id: "ed507ba1-538b-7c40-98b3-f82e7ba8af9c"
+	title_zh: "审计Golang用户输入"
+	solution: <<<SOLUTION
+为了修复这类问题，建议对所有的用户输入进行验证和过滤。以下是一些常见的防御措施：
+1. 对用户输入进行类型、范围和格式的校验。
+2. 使用参数化查询或ORM框架来避免SQL注入。
+3. 对外部命令调用进行严格的输入验证，以防止命令注入。
+4. 使用Golang内置的或第三方库的安全函数对用户输入进行转义和编码。
+SOLUTION
+	reference: <<<REFERENCE
+none
+REFERENCE
+)
+
+<include('golang-http-sink')> as $output;
+<include('golang-gin-context')> as $output;
+
+alert $output for {
+	level: "info",
+	title: "Audit Golang User Input",
+	title_zh: "审计Golang用户输入",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://user_input.go': <<<PARAM
+package main
+
+import (
+    "fmt"
+    "os/exec"
+	"net/http"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func main() {
+	http.HandleFunc("/", handler)
+}
+PARAM
+)

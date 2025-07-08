@@ -2,7 +2,7 @@ desc(
 	title: "Audit Golang File Upload Authorization (Beego)"
 	title_zh: "审计Golang文件上传授权（Beego）"
 	type: audit
-	level: high
+	level: low
 	risk: "file-write"
 	desc: <<<DESC
 ### 漏洞描述
@@ -88,9 +88,10 @@ $path.Clean(* #-> as $check);
 $path.IsAbs(* #-> as $check);
 
 $sink #{include: `$check`}-> as $safe;
-$sink #{exclude: `$safe`}-> as $high;
+$sink - $safe as $data;
+$data?{!opcode:const && !have:'ExternLib'} as $low;
 
-alert $high for {
+alert $low for {
 	title_zh: "检测到Golang文件路径未授权漏洞",
 	solution: <<<CODE
 ### 修复建议
@@ -183,14 +184,14 @@ func (c *FileUploadVuln1Controller) Post() {
 - 攻击者可能利用该漏洞植入恶意脚本或木马程序，进一步危害系统安全。
 - 在极端情况下，可能导致服务器被完全控制。
 CODE
-	level: "high",
+	level: "low",
 	type: "vuln",
 	title: "Check Golang File Upload Vulnerability",
 }
 
 desc(
 	lang: golang
-	alert_high: 1
+	alert_low: 1
 	'file://main.go': <<<UNSAFE
 package main
 

@@ -141,7 +141,8 @@ $path.Clean(* #-> as $check);
 $path.IsAbs(* #-> as $check);
 
 $sink #{include: `$check`}-> as $safe;
-$sink #{exclude: `$safe`}-> as $low;
+$sink - $safe as $data;
+$data?{!opcode:const && !have:'ExternLib'} as $low;
 
 alert $low for {
 	desc: <<<CODE

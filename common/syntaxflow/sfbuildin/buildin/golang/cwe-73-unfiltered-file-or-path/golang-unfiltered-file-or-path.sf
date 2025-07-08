@@ -134,7 +134,8 @@ $path.IsAbs(* #-> as $check);
 $path.Join(* #-> as $check);
 
 $sink #{include: `$check`}-> as $safe;
-$sink #{exclude: `$safe`}-> as $low;
+$sink - $safe as $data;
+$data?{!opcode:const && !have:'ExternLib'} as $low;
 
 alert $low for {
 	title: "Check Golang Unfiltered File Path Vulnerability",
