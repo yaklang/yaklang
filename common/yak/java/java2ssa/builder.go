@@ -84,7 +84,7 @@ func Frontend(src string, force bool) (javaparser.ICompilationUnitContext, error
 	if force || len(errListener.GetErrors()) == 0 {
 		return ast, nil
 	}
-	return nil, utils.Errorf("parse AST FrontEnd error: %v", errListener.GetErrorString())
+	return ast, utils.Errorf("parse AST FrontEnd error: %v", errListener.GetErrorString())
 }
 
 func (b *singleFileBuilder) AssignConst(name string, value ssa.Value) bool {
