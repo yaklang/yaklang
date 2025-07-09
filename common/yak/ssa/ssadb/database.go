@@ -4,6 +4,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var SSAProjectTables = []any{
@@ -41,15 +42,21 @@ func GetDB() *gorm.DB {
 }
 
 func DeleteProgram(db *gorm.DB, program string) {
-	db.Model(&IrProgram{}).Where("program_name = ?", program).Unscoped().Delete(&IrProgram{})
-	deleteProgramCodeOnly(db, program)
-	deleteProgramAuditResult(db, program)
-	deleteProgramRiskAndScanTask(db, program)
+	utils.GormTransaction(db, func(tx *gorm.DB) error {
+		tx.Model(&IrProgram{}).Where("program_name = ?", program).Unscoped().Delete(&IrProgram{})
+		deleteProgramCodeOnly(tx, program)
+		deleteProgramAuditResult(tx, program)
+		deleteProgramRiskAndScanTask(tx, program)
+		return nil
+	})
 }
 
 func DeleteProgramIrCode(db *gorm.DB, program string) {
-	deleteProgramCodeOnly(db, program)
-	deleteProgramAuditResult(db, program) // because audit result depends on ir code
+	utils.GormTransaction(db, func(tx *gorm.DB) error {
+		deleteProgramCodeOnly(tx, program)
+		deleteProgramAuditResult(tx, program) // because audit result depends on ir code
+		return nil
+	})
 }
 
 func deleteProgramCodeOnly(db *gorm.DB, program string) {

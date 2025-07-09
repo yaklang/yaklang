@@ -21,6 +21,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -91,48 +92,75 @@ func CheckWithName(
 ) {
 	// only in memory
 	opt = append(opt, ssaapi.WithLogLevel("debug"))
-	{
-		prog, err := ssaapi.Parse(code, opt...)
-		require.Nil(t, err)
+	var f1, f2, f3, f4, f5, f6 func()
+	if false {
+		var prog *ssaapi.Program
+		var err error
 
-		log.Infof("only in memory ")
-		err = handler(prog)
-		require.Nil(t, err)
+		f1 = func() {
+			prog, err = ssaapi.Parse(code, opt...)
+			require.Nil(t, err)
+		}
+		f2 = func() {
+			log.Infof("only in memory ")
+			err = handler(prog)
+			require.Nil(t, err)
+		}
 	}
 
-	programID := uuid.NewString()
-	if name != "" {
-		programID = name
-		ssadb.DeleteProgram(ssadb.GetDB(), programID)
-	}
-	fmt.Println("------------------------------DEBUG PROGRAME ID------------------------------")
-	log.Info("Program ID: ", programID)
-	fmt.Println("-----------------------------------------------------------------------------")
-	// parse with database
+	var programID string
 	{
-		opt = append(opt, ssaapi.WithProgramName(programID))
-		prog, err := ssaapi.Parse(code, opt...)
-		defer func() {
-			ssadb.DeleteProgram(ssadb.GetDB(), programID)
-		}()
-		require.Nil(t, err)
-		// prog.Show()
+		var prog *ssaapi.Program
+		var err error
+		f3 = func() {
+			programID = uuid.NewString()
+			if name != "" {
+				programID = name
+				ssadb.DeleteProgram(ssadb.GetDB(), programID)
+			}
+			fmt.Println("------------------------------DEBUG PROGRAME ID------------------------------")
+			log.Info("Program ID: ", programID)
+			fmt.Println("-----------------------------------------------------------------------------")
+			// parse with database
+			{
+				opt = append(opt, ssaapi.WithProgramName(programID))
+				prog, err = ssaapi.Parse(code, opt...)
 
-		log.Infof("with database ")
-		_ = prog
-		err = handler(prog)
-		require.Nil(t, err)
+				require.Nil(t, err)
+				// prog.Show()
+			}
+		}
+		f4 = func() {
+			log.Infof("with database ")
+			_ = prog
+			err = handler(prog)
+			require.Nil(t, err)
+		}
 	}
 
 	// just use database
 	{
-		prog, err := ssaapi.FromDatabase(programID)
-		require.Nil(t, err)
-
-		log.Infof("only use database ")
-		err = handler(prog)
-		require.Nil(t, err)
+		var prog *ssaapi.Program
+		var err error
+		f5 = func() {
+			prog, err = ssaapi.FromDatabase(programID)
+			_ = prog
+			require.Nil(t, err)
+		}
+		f6 = func() {
+			log.Infof("only use database ")
+			err = handler(prog)
+			require.Nil(t, err)
+		}
 	}
+
+	f7 := func() {
+		// defer func() {
+		// ssadb.DeleteProgram(ssadb.GetDB(), programID)
+		// }()
+	}
+	ssaprofile.ProfileAdd(true, "ssatest.CheckWithName", f1, f2, f3, f4, f5, f6, f7)
+	ssaprofile.ShowCacheCost()
 }
 
 func CheckWithNameOnlyInMemory(
