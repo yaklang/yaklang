@@ -1300,5 +1300,4 @@ Host: %s
 			t.Fatal("test https test failed")
 		}
 	})
-
 }
