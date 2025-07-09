@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
@@ -497,8 +498,8 @@ var Exports = map[string]any{
 	"ParseProject":       ParseProject,
 	"NewFromProgramName": FromDatabase,
 	"NewProgramFromDB":   FromDatabase,
-	"NewRiskCompare":     NewSSAComparator[*schema.SSARisk],
-	"NewRiskCompareItem": NewSSARiskComparisonItem,
+	// "NewRiskCompare":     NewSSAComparator[*schema.SSARisk],
+	// "NewRiskCompareItem": NewSSARiskComparisonItem,
 
 	"withLanguage":           WithRawLanguage,
 	"withConfigInfo":         WithConfigInfo,
@@ -516,13 +517,13 @@ var Exports = map[string]any{
 	"withDefaultExcludeFunc": DefaultExcludeFunc,
 
 	//diff compare
-	"withDiffProgName":          DiffWithProgram,
-	"withDiffRuleName":          DiffWithRuleName,
-	"withDiffVariableName":      DiffWithVariableName,
-	"withDiffRuntimeId":         DiffWithRuntimeId,
-	"withGenerateHash":          WithSSARiskComparisonInfoGenerate,
-	"withCompareResultCallback": WithSSARiskDiffResultHandler,
-	"withDefaultRiskSave":       WithSSARiskDiffSaveResultHandler,
+	// "withDiffProgName":          DiffWithProgram,
+	// "withDiffRuleName":          DiffWithRuleName,
+	// "withDiffVariableName":      DiffWithVariableName,
+	// "withDiffRuntimeId":         DiffWithRuntimeId,
+	// "withGenerateHash":          WithSSARiskComparisonInfoGenerate,
+	// "withCompareResultCallback": WithSSARiskDiffResultHandler,
+	// "withDefaultRiskSave":       WithSSARiskDiffSaveResultHandler,
 	//diff compare kind
 	"progName":  schema.Program,
 	"runtimeId": schema.RuntimeId,
