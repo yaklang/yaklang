@@ -106,6 +106,7 @@ func (c *Config) startEventLoop(ctx context.Context) {
 										return
 									}
 									for _, queryEvent := range process.Events {
+										queryEvent.IsSync = true
 										queryEvent.SyncID = syncID
 										c.emit(queryEvent)
 									}
