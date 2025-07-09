@@ -735,3 +735,77 @@ func DebugMockEchoWs(point string) (string, int) {
 
 	return host, port
 }
+
+func DebugMockEchoWss(point string) (string, int) {
+	addr := GetRandomLocalAddr()
+	time.Sleep(time.Millisecond * 300)
+	host, port, _ := ParseStringToHostPort(addr)
+
+	upgrader := ws.Upgrader{
+		ReadBufferSize:    1024,
+		WriteBufferSize:   1024,
+		EnableCompression: true, // 启用压缩
+	}
+
+	http.HandleFunc("/"+point, func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		defer conn.Close()
+
+		for {
+			mt, message, err := conn.ReadMessage()
+			if err != nil && message == nil {
+				// 检查WebSocket是否正常关闭
+				if ws.IsCloseError(err, ws.CloseNormalClosure, ws.CloseGoingAway) {
+					log.Infof("Websocket closed normally: %v", err)
+				} else {
+					log.Errorf("read: %v", err)
+				}
+				return
+			}
+			serverMessage := []byte("server: " + string(message))
+			if err := conn.WriteMessage(mt, serverMessage); err != nil {
+				log.Errorf("write: %v", err)
+				return
+			}
+		}
+	})
+
+	server := &http.Server{Addr: addr}
+
+	go func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		origin := GetDefaultTLSConfig(5)
+		copied := *origin
+		lis, err := tls.Listen("tcp", HostPort(host, port), &copied)
+		if err != nil {
+			panic(err)
+		}
+		go func() {
+			select {
+			case <-ctx.Done():
+			}
+			lis.Close()
+		}()
+
+		go func() {
+			log.Infof("START TO SERVE HTTP2")
+		}()
+
+		err = server.Serve(lis)
+		if err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+	}()
+
+	err := WaitConnect(addr, 3)
+	if err != nil {
+		panic(err)
+	}
+
+	return host, port
+}
