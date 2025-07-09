@@ -35,7 +35,12 @@ func NewProgramFromDB(p *ssadb.IrProgram) *Program {
 }
 
 func (prog *Program) UpdateToDatabase() func() {
-	wg := sync.WaitGroup{}
+	wg := &sync.WaitGroup{}
+	prog.UpdateToDatabaseWithWG(wg)
+	return wg.Wait
+}
+
+func (prog *Program) UpdateToDatabaseWithWG(wg *sync.WaitGroup) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -52,7 +57,6 @@ func (prog *Program) UpdateToDatabase() func() {
 		ir.ExtraFile = prog.ExtraFile
 		ssadb.UpdateProgram(ir)
 	}()
-	return wg.Wait
 }
 
 func (p *Program) GetIrProgram() *ssadb.IrProgram {
