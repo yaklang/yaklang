@@ -59,27 +59,39 @@ func (d *DefaultServiceAuthInfo) GetBruteHandler() BruteCallback {
 		d.checkedTargetsMutex.Unlock()
 
 		if d.UnAuthVerify != nil {
-			// 使用读锁检查是否已经验证过
+			// 第一次检查：使用读锁检查是否已经验证过
 			d.checkedTargetsMutex.RLock()
 			_, ok := d.CheckedUnAuthTargets[item.Target]
 			d.checkedTargetsMutex.RUnlock()
 
 			if !ok {
-				result := d.UnAuthVerify(item)
-
-				// 使用写锁标记已验证
+				// 如果没有验证过，获取写锁进行double-check并执行验证
 				d.checkedTargetsMutex.Lock()
-				d.CheckedUnAuthTargets[item.Target] = struct{}{}
-				d.checkedTargetsMutex.Unlock()
+				// 再次检查，防止在等待写锁期间其他协程已经完成了验证
+				if _, ok := d.CheckedUnAuthTargets[item.Target]; !ok {
+					// 确保map已初始化
+					if d.CheckedUnAuthTargets == nil {
+						d.CheckedUnAuthTargets = make(map[string]struct{})
+					}
+					// 先标记已验证，再调用UnAuthVerify，避免重复调用
+					d.CheckedUnAuthTargets[item.Target] = struct{}{}
+					d.checkedTargetsMutex.Unlock()
 
-				if result.Ok {
-					result.Username = ""
-					result.Password = ""
-					return result
-				}
+					// 在锁外调用UnAuthVerify，避免长时间持有锁
+					result := d.UnAuthVerify(item)
 
-				if result.Finished {
-					return result
+					if result.Ok {
+						result.Username = ""
+						result.Password = ""
+						return result
+					}
+
+					if result.Finished {
+						return result
+					}
+				} else {
+					// 其他协程已经完成了验证，直接释放锁
+					d.checkedTargetsMutex.Unlock()
 				}
 			}
 		}
