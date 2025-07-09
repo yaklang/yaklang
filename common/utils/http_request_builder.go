@@ -214,7 +214,6 @@ func GetConnectedToHostPortFromHTTPRequest(t *http.Request) (string, error) {
 		httpctx.SetContextValueInfoFromRequest(t, httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, result)
 		httpctx.SetContextValueInfoFromRequest(t, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, ExtractHost(result))
 		httpctx.SetContextValueInfoFromRequest(t, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, port)
-		httpctx.SetContextValueInfoFromRequest(t, httpctx.REQUEST_CONTEXT_KEY_IsHttps, result)
 		return result, nil
 	}
 	return connectedTo, nil

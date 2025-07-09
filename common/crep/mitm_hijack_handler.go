@@ -50,13 +50,7 @@ func (m *MITMServer) setHijackHandler(rootCtx context.Context) {
 		websocketResponseMirror: m.websocketResponseMirror,
 		ProxyGetter:             m.GetMartianProxy,
 		RequestHijackCallback: func(req *http.Request) error {
-			var isHttps bool
-			switch req.URL.Scheme {
-			case "https", "HTTPS":
-				isHttps = true
-			case "http", "HTTP":
-				isHttps = false
-			}
+			var isHttps = req.TLS != nil || httpctx.GetRequestHTTPS(req)
 			hijackedRaw, err := utils.HttpDumpWithBody(req, true)
 			if err != nil {
 				log.Errorf("mitm-hijack marshal request to bytes failed: %s", err)
