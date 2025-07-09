@@ -408,7 +408,7 @@ func TestGRPCMUSTPASS_MITMV2_WebSocket(t *testing.T) {
 	token := utils.RandStringBytes(60)
 	token2 := utils.RandStringBytes(60)
 
-	host, port := utils.DebugMockEchoWss("enPayload")
+	host, port := utils.DebugMockEchoWss("enPayload2")
 	log.Infof("addr: %s:%d", host, port)
 	client, err := NewLocalClient()
 	if err != nil {
@@ -440,7 +440,7 @@ func TestGRPCMUSTPASS_MITMV2_WebSocket(t *testing.T) {
 			}
 
 			defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
-			wsClient, err := lowhttp.NewWebsocketClient([]byte(fmt.Sprintf(`GET /enPayload?token=%s HTTP/1.1
+			wsClient, err := lowhttp.NewWebsocketClient([]byte(fmt.Sprintf(`GET /enPayload2?token=%s HTTP/1.1
 Host: %s
 Accept-Encoding: gzip, deflate
 Sec-WebSocket-Extensions: permessage-deflate
