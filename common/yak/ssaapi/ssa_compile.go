@@ -54,18 +54,21 @@ func (c *config) isStop() bool {
 }
 
 func (c *config) parseFile() (ret *Program, err error) {
-	prog, err := c.parseSimple(c.originEditor)
+	var prog *ssa.Program
+	prog, err = c.parseSimple(c.originEditor)
 	if err != nil {
 		return nil, err
 	}
 	prog.Finish()
+	wait := func() {}
 	if prog.EnableDatabase { // save program
-		prog.UpdateToDatabase()
+		wait = prog.UpdateToDatabase()
 	}
 	total := prog.Cache.CountInstruction()
 	prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, total) // %90
 	prog.Cache.SaveToDatabase()
 	c.SaveConfig()
+	wait()
 	return NewProgram(prog, c), nil
 }
 
