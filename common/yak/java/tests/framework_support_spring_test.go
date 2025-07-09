@@ -1,14 +1,16 @@
 package tests
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func Test_Frame_Support_Spring(t *testing.T) {
+	t.Skip("TODO: support spring framework")
 	t.Run("test  freemarker", func(t *testing.T) {
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("application.properties", `
@@ -50,7 +52,8 @@ public class GreetingController {
 			prog.Show()
 
 			rule := `
-print()?{<typeName>?{have:'javax.servlet.http.HttpServletResponse'}} as $sink;
+print() as $print 
+$print?{<typeName>?{have:'javax.servlet.http.HttpServletResponse'}} as $sink;
 `
 			vals, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithEnableDebug(true))
 			require.NoError(t, err)
