@@ -1,6 +1,8 @@
 package ssa
 
 import (
+	"sync"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
@@ -32,19 +34,25 @@ func NewProgramFromDB(p *ssadb.IrProgram) *Program {
 	return prog
 }
 
-func (prog *Program) UpdateToDatabase() {
-	ir := prog.irProgram
-	if ir == nil {
-		ir = ssadb.CreateProgram(prog.Name, prog.Version, prog.ProgramKind)
-		prog.irProgram = ir
-	}
-	ir.Language = prog.Language
-	ir.ProgramKind = prog.ProgramKind
-	ir.ProgramName = prog.Name
-	ir.Version = prog.Version
-	ir.FileList = prog.FileList
-	ir.ExtraFile = prog.ExtraFile
-	ssadb.UpdateProgram(ir)
+func (prog *Program) UpdateToDatabase() func() {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		ir := prog.irProgram
+		if ir == nil {
+			ir = ssadb.CreateProgram(prog.Name, prog.Version, prog.ProgramKind)
+			prog.irProgram = ir
+		}
+		ir.Language = prog.Language
+		ir.ProgramKind = prog.ProgramKind
+		ir.ProgramName = prog.Name
+		ir.Version = prog.Version
+		ir.FileList = prog.FileList
+		ir.ExtraFile = prog.ExtraFile
+		ssadb.UpdateProgram(ir)
+	}()
+	return wg.Wait
 }
 
 func (p *Program) GetIrProgram() *ssadb.IrProgram {
