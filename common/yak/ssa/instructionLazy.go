@@ -150,11 +150,6 @@ func (lz *LazyInstruction) check() {
 	if utils.IsNil(lz.Instruction) {
 		inst := CreateInstruction(Opcode(lz.GetOpcode()))
 		if inst == nil {
-			ir := ssadb.GetIrCodeById(ssadb.GetDB(), lz.id)
-			if ir != nil && ir.Opcode != 0 {
-				log.Infof("bb")
-			}
-
 			log.Infof("unknown opcode: %d: %s", lz.GetOpcode(), lz.ir.OpcodeName)
 			return
 		}

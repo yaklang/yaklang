@@ -261,6 +261,7 @@ func (c *DataBaseCacheWithKey[K, T]) Close() {
 	wg.Wait()
 	// c.notifyCache.Close()
 	c.DisableSave()
+	c.data.Clear() // clear for function and basic block
 }
 
 func (c *DataBaseCacheWithKey[K, T]) ForEach(f func(K, T) bool) {
