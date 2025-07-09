@@ -1,4 +1,4 @@
-package ssaapi
+package yakit
 
 import (
 	"context"
@@ -6,10 +6,12 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 // SSAComparisonItemConfig 比较项的配置信息
@@ -345,4 +347,62 @@ func NewSSAComparator[T any](item *ComparisonItem[T]) *SSAComparator[T] {
 		baseItem: item,
 		config:   new(ComparatorConfig[T]),
 	}
+}
+
+func DoRiskDiff(context context.Context, base, compare *ypb.SSARiskDiffItem) (<-chan *ComparisonResult[*schema.SSARisk], error) {
+	// 使用baseLine项目的risk作为对比的基础
+	baseRiskItem, err := NewSSARiskComparisonItem(
+		DiffWithVariableName(base.GetVariable()),
+		DiffWithRuntimeId(base.GetRiskRuntimeId()),
+		DiffWithRuleName(base.GetRuleName()),
+		DiffWithProgram(base.GetProgramName()),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// 创建比较器
+	resultComparator := NewSSAComparator[*schema.SSARisk](baseRiskItem)
+	// 使用compare项目的risk进行对比
+	compareRiskItem, err := NewSSARiskComparisonItem(
+		DiffWithVariableName(compare.GetVariable()),
+		DiffWithRuntimeId(compare.GetRiskRuntimeId()),
+		DiffWithRuleName(compare.GetRuleName()),
+		DiffWithProgram(compare.GetProgramName()))
+	if err != nil {
+		return nil, err
+	}
+	// 执行对比
+	res := resultComparator.Compare(context, compareRiskItem,
+		// 对比结果保存到数据库
+		WithComparatorSaveResultHandler(func(risks []*ComparisonResult[*schema.SSARisk]) {
+			utils.GormTransactionReturnDb(consts.GetGormDefaultSSADataBase(), func(tx *gorm.DB) {
+				for _, risk := range risks {
+					result := &schema.SSADiffResult{
+						BaseLineProgName: base.GetProgramName(),
+						CompareProgName:  compare.GetProgramName(),
+						RuleName:         risk.FromRule,
+						BaseLineRiskHash: risk.BaseValHash,
+						CompareRiskHash:  risk.NewValHash,
+						Status:           string(risk.Status),
+					}
+					tx.Save(result)
+				}
+			})
+		}),
+		// 设置回调函数，返回一些信息作为对比的依据
+		WithComparatorGetBasisInfo[*schema.SSARisk](func(risk *schema.SSARisk) (
+			rule string,
+			originHash string,
+			diffHash string,
+		) {
+			// 使用规则、代码片段和变量名作为对比的依据
+			return risk.FromRule, risk.Hash, utils.CalcMd5(
+				risk.FromRule,
+				risk.CodeFragment,
+				risk.Variable,
+			)
+		}),
+	)
+	return res, nil
 }
