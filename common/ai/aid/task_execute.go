@@ -143,6 +143,8 @@ TOOLREQUIRED:
 
 		if result.ShrinkResult != "" {
 			t.config.EmitToolCallSummary(result.ToolCallID, result.ShrinkResult)
+		} else {
+			t.config.EmitToolCallSummary(result.ToolCallID, fmt.Sprintf("执行工具：%s [%s]", result.Name, result.Description))
 		}
 
 		switch action {
@@ -245,6 +247,17 @@ TOOLREQUIRED:
 
 // executeTask 实际执行任务并返回结果
 func (t *aiTask) executeTask() error {
+	t.config = t.config.pushEventBeforeSave(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
+		if event.TaskIndex == "" {
+			event.TaskIndex = t.Index
+		}
+		return event
+	})
+
+	defer func() {
+		t.config = t.config.popEventBeforeSave()
+	}()
+
 	if err := t.execute(); err != nil {
 		return err
 	}
