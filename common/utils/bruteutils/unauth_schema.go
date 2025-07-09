@@ -3,6 +3,7 @@ package bruteutils
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/utils"
 
@@ -21,6 +22,7 @@ type DefaultServiceAuthInfo struct {
 	BrutePass    func(i *BruteItem) *BruteItemResult
 
 	CheckedUnAuthTargets map[string]struct{}
+	checkedTargetsMutex  sync.RWMutex // 保护CheckedUnAuthTargets的并发访问
 }
 
 func (d *DefaultServiceAuthInfo) GetBruteHandler() BruteCallback {
@@ -49,15 +51,27 @@ func (d *DefaultServiceAuthInfo) GetBruteHandler() BruteCallback {
 			return r
 		}
 
+		// 使用锁保护CheckedUnAuthTargets的初始化
+		d.checkedTargetsMutex.Lock()
 		if d.CheckedUnAuthTargets == nil {
 			d.CheckedUnAuthTargets = make(map[string]struct{})
 		}
+		d.checkedTargetsMutex.Unlock()
 
 		if d.UnAuthVerify != nil {
+			// 使用读锁检查是否已经验证过
+			d.checkedTargetsMutex.RLock()
 			_, ok := d.CheckedUnAuthTargets[item.Target]
+			d.checkedTargetsMutex.RUnlock()
+
 			if !ok {
 				result := d.UnAuthVerify(item)
+
+				// 使用写锁标记已验证
+				d.checkedTargetsMutex.Lock()
 				d.CheckedUnAuthTargets[item.Target] = struct{}{}
+				d.checkedTargetsMutex.Unlock()
+
 				if result.Ok {
 					result.Username = ""
 					result.Password = ""
