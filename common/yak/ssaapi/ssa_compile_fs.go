@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"io/fs"
+	"strings"
 	"sync"
 	"time"
 
@@ -34,6 +35,8 @@ func (c *config) parseProjectWithFS(
 		}
 	}()
 
+	wg := sync.WaitGroup{}
+
 	programPath := c.programPath
 	preHandlerTotal := 0
 	handlerTotal := 0
@@ -48,10 +51,22 @@ func (c *config) parseProjectWithFS(
 		filesys.WithFileSystem(filesystem),
 		filesys.WithContext(c.ctx),
 		filesys.WithDirStat(func(s string, fi fs.FileInfo) error {
-			_, name := filesystem.PathSplit(s)
+			folder, name := filesystem.PathSplit(s)
 			if name == "test" || name == ".git" {
 				return filesys.SkipDir
 			}
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if c.ProgramName != "" {
+					folders := []string{c.ProgramName}
+					folders = append(folders,
+						strings.Split(folder, string(c.fs.GetSeparators()))...,
+					)
+					ssadb.SaveFolder(name, folders)
+				}
+			}()
 			return nil
 		}),
 		filesys.WithFileStat(func(path string, fi fs.FileInfo) error {
@@ -190,11 +205,10 @@ func (c *config) parseProjectWithFS(
 	}
 	process = 0.9 // %90
 	prog.Finish()
-	wait := func() {}
 	if prog.EnableDatabase { // save program
 		log.Errorf("program %s save to database", prog.Name)
 		start := time.Now()
-		wait = prog.UpdateToDatabase()
+		prog.UpdateToDatabaseWithWG(&wg)
 		since := time.Since(start)
 		log.Errorf("program %s save to database cost: %s", prog.Name, since)
 	}
@@ -217,6 +231,6 @@ func (c *config) parseProjectWithFS(
 	})
 	saveTime = time.Since(start)
 	_ = prevProcess
-	wait()
+	wg.Wait()
 	return NewProgram(prog, c), nil
 }
