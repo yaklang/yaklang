@@ -584,7 +584,7 @@ func (p *Proxy) handleProxyAuth(conn net.Conn, req *http.Request, timer *time.Ti
 	needAuth := (p.proxyUsername != "" || p.proxyPassword != "") && !ctx.GetSessionBoolValue(AUTH_FINISH)
 
 	var isHttps bool
-	if tconn, ok := conn.(*tls.Conn); ok {
+	if tconn, ok := conn.(*tls.Conn); ok { // check req self https or not
 		session.MarkSecure()
 
 		cs := tconn.ConnectionState()
@@ -680,6 +680,9 @@ func (p *Proxy) handleProxyAuth(conn net.Conn, req *http.Request, timer *time.Ti
 
 // handleRequest handles an ordinary HTTP request.
 func (p *Proxy) handleRequest(conn net.Conn, req *http.Request, ctx *Context) error {
+	if httpctx.GetRequestHTTPS(req) || ctx.GetSessionBoolValue(httpctx.REQUEST_CONTEXT_ConnectToHTTPS) {
+		req.URL.Scheme = "https"
+	}
 	session := ctx.Session()
 	brw := session.brw
 	if err := p.reqmod.ModifyRequest(req); err != nil {
