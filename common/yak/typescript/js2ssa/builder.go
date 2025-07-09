@@ -61,5 +61,5 @@ func Frontend(src string) (*ast.SourceFile, error) {
 	if len(jsast.Diagnostics()) != 0 {
 		err = utils.Errorf("parse AST FrontEnd error: %v", jsast.Diagnostics()[0].Message())
 	}
-	return nil, err
+	return jsast, err
 }

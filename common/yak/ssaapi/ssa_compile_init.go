@@ -88,14 +88,14 @@ func (c *config) init(filesystem filesys_interface.FileSystem, fileSize int) (*s
 		}()
 
 		if editor := fb.GetEditor(); editor != nil {
-			// cache := application.Cache
-			// progName := application.GetProgramName()
-			// go func() {
-			// 	hash := editor.GetIrSourceHash(programName)
-			// 	if cache.IsExistedSourceCodeHash(progName, hash) {
-			// 		c.DatabaseProgramCacheHitter(fb)
-			// 	}
-			// }()
+			cache := application.Cache
+			progName := application.GetProgramName()
+			go func() {
+				hash := editor.GetIrSourceHash(programName)
+				if cache.IsExistedSourceCodeHash(progName, hash) {
+					c.DatabaseProgramCacheHitter(fb)
+				}
+			}()
 		} else {
 			log.Warnf("(BUG or in DEBUG Mode)Range not found for %s", fb.GetName())
 		}

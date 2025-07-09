@@ -48,6 +48,9 @@ func (*singleFileBuilder) FilterFile(path string) bool {
 	_ = a
 	return filepath.Ext(path) == ".yak"
 }
+func (*singleFileBuilder) FilterPreHandlerFile(path string) bool {
+	return filepath.Ext(path) == ".yak" || filepath.Ext(path) == ".yaklang"
+}
 
 func (*singleFileBuilder) GetLanguage() consts.Language {
 	return consts.Yak

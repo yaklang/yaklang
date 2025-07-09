@@ -105,6 +105,10 @@ func (c *config) parseProjectWithFS(
 	if (handlerTotal + preHandlerTotal) == 0 {
 		return nil, ErrNoFoundCompiledFile
 	}
+	if preHandlerTotal < handlerTotal {
+		preHandlerTotal = handlerTotal
+		preHandlerFiles = handlerFiles
+	}
 	prog.ProcessInfof("calculate total size of project finish preHandler(len:%d) build(len:%d)", preHandlerTotal, handlerTotal)
 
 	// pre handler  0-40%
