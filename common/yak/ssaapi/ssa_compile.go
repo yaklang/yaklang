@@ -108,7 +108,7 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 		return nil, err
 	}
 	ast, err := c.LanguageBuilder.ParseAST(r.GetSourceCode())
-	if err != nil {
+	if !c.ignoreSyntaxErr && err != nil {
 		return nil, utils.Errorf("parse file error: %v", err)
 	}
 	c.LanguageBuilder.PreHandlerFile(ast, r, builder)
