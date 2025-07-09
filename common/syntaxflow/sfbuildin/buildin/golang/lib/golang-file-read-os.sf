@@ -128,8 +128,7 @@ REFERENCE
 )
 
 os?{<fullTypeName>?{have: 'os'}} as $os
-$os.ReadFile(* #-> as $param)
-$param?{!have: 'Parameter'} as $output;
+$os.ReadFile().* as $output
 
 alert $output for {
 	title: "Audit Golang File Read Function",

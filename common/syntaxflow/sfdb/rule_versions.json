@@ -56,14 +56,14 @@
   {
     "rule_id": "97bfc6e2-1e57-4329-87f7-5d61ca92b26b",
     "rule_name": "审计Golang文件上传授权（Beego）",
-    "hash": "827d519397f5d4c71775361575d4a45fc058c979550de694adfdc47af0ba8221",
-    "version": "20250626.0001"
+    "hash": "f355594178814c9eee1bb5e5498b45ebd23d6c8bfda0dbf31ca37e24ef663dd7",
+    "version": "20250709.0001"
   },
   {
     "rule_id": "e4420d8f-b1f9-4c46-8de7-f4998091d973",
     "rule_name": "审计Golang文件上传漏洞",
-    "hash": "b1deb4ac2456e8913939ff9bd66185298bf9680f8f9a4b09e66a8de285f4cef2",
-    "version": "20250626.0001"
+    "hash": "803b22dd3a45a61d99dfda8d33470ae4d152877ffeeeb8cbacc4ae056f0be3db",
+    "version": "20250709.0001"
   },
   {
     "rule_id": "7a0e24d2-1214-46f7-8939-528c1f1b666d",
@@ -92,14 +92,14 @@
   {
     "rule_id": "594bc621-80a3-4f25-81f9-9b7840bdf4f9",
     "rule_name": "检测Golang未过滤文件路径漏洞",
-    "hash": "fb3bcef6c2035c0788eeea342e7a813498af7212783d37428df69fb74b9c5413",
-    "version": "20250626.0001"
+    "hash": "36d74b0efccd6244764f1048dff200edda387b26736a94bdc1825132970cb893",
+    "version": "20250709.0001"
   },
   {
     "rule_id": "c12cbcab-12de-4e6a-8715-4143224a36ed",
     "rule_name": "检测Golang命令注入漏洞",
-    "hash": "8ef3545f406e7d78a02abb8862ec61823390a1944e1c49940630c0b21fccfbeb",
-    "version": "20250626.0001"
+    "hash": "d881354c9e1b9b9a4d965198b263d50f1aceaf54c13397a27c451b4d171b57ed",
+    "version": "20250709.0001"
   },
   {
     "rule_id": "c7872ddf-bab4-4cd5-8e12-d470a889dbd1",
@@ -122,8 +122,8 @@
   {
     "rule_id": "838bdd38-5913-46ed-88f7-8eced02db2bd",
     "rule_name": "检测Golang路径穿越漏洞",
-    "hash": "6306f4244e22e476fa908b4f185a214f0e5b4c22a353dc33dd1382e36303aca9",
-    "version": "20250626.0001"
+    "hash": "12ff59da9805b13a8ee9c50cbc5c596c7036ee50cf41da83ed2fb1d0843783d9",
+    "version": "20250709.0001"
   },
   {
     "rule_id": "ac672ab7-a78c-4866-8a92-76074034def7",
@@ -134,20 +134,20 @@
   {
     "rule_id": "6702b6aa-bb87-4be9-9b11-b91359ded6b6",
     "rule_name": "检测 Golang SQL 注入漏洞(ent)",
-    "hash": "e98d4e38a288539f3b2f367558e7a779ed4503ed6ca1c2447501bacce212ad7b",
-    "version": "20250626.0001"
+    "hash": "0f5c59a756d0b6ed9e795c1e5a407d76460288bb4eceeb0766dd4ed871fb9124",
+    "version": "20250709.0001"
   },
   {
     "rule_id": "cc9054ac-2c71-4641-84dd-ba12578093b0",
     "rule_name": "检测Golang SQL注入漏洞(GORM)",
-    "hash": "34ccdebd6ea202b621493215047327c3a88aaef1f7021577fced462cafd87e6f",
-    "version": "20250626.0001"
+    "hash": "e21b44be45c4fea4fd7b5b3fe596c1c8b86bdb3692948acb16faed444152ce36",
+    "version": "20250709.0001"
   },
   {
     "rule_id": "56f41530-4175-41ec-96ac-198315171c10",
     "rule_name": "检测Golang SQL注入漏洞(Pop)",
-    "hash": "cb4d4b962ad0a469b89227b6ea6302d070cd408cb22a92c6f55caa003b929a37",
-    "version": "20250626.0001"
+    "hash": "fb0c286a922cc40a0112c5083cc1a24ad53d1a705ce98b2be542c937b19aff98",
+    "version": "20250709.0001"
   },
   {
     "rule_id": "b06e92a2-0ff3-40a0-966e-7f0e4fe05480",
@@ -158,8 +158,8 @@
   {
     "rule_id": "cdc66b17-36b4-4436-813e-9d121964224b",
     "rule_name": "检测Golang Sqlx SQL注入漏洞",
-    "hash": "cadb5153e330a9532140487818e39351245a040755ea7a9b862f21a73a82bc5c",
-    "version": "20250626.0001"
+    "hash": "438c0e2f0001d8dad61c06d0ca9f526001f918c776f96dd15a62bcb428b1e09b",
+    "version": "20250709.0001"
   },
   {
     "rule_id": "2b4b5d82-965c-4e2c-ac36-72d950f9143e",
@@ -192,12 +192,6 @@
     "version": "20250626.0001"
   },
   {
-    "rule_id": "f3ae9721-59b8-40cb-bc31-a07934f40519",
-    "rule_name": "审计Golang sqlx库使用情况",
-    "hash": "37ed2c6689123dc97a08ce557ff45f85dc3ed0f4a6ef4da5bf28051c5c30881e",
-    "version": "20250626.0001"
-  },
-  {
     "rule_id": "b96da337-9ec5-41a9-9c43-fcc6a7043c45",
     "rule_name": "审计Golang文件路径处理",
     "hash": "ab6fe7a6baa0ae0adcea543624a54a479ab77e107f3244e1c47127ceaee6a521",
@@ -218,8 +212,8 @@
   {
     "rule_id": "130d8178-f5c8-49ad-a7a3-ba47da0e50f9",
     "rule_name": "审计Golang文件读取功能",
-    "hash": "1e44907840b61326691dbe04a351262eef1d811da9c230418b6156d851ec9bb9",
-    "version": "20250626.0001"
+    "hash": "6e1be8e08bb2c85f8b81439de0407adc2d2018671c0aa2e266a0d42a670b1739",
+    "version": "20250709.0001"
   },
   {
     "rule_id": "96d04555-9e4b-4e41-882a-82ec887c0a4c",
@@ -242,8 +236,8 @@
   {
     "rule_id": "785265e2-bc75-48f6-9e9b-1d329dc75f87",
     "rule_name": "审计Golang文件写入函数(os)",
-    "hash": "a26546035f74bb84d33e674176f7ffc3ae91efe9135c8567df204400d8dfc711",
-    "version": "20250626.0001"
+    "hash": "740c9e076384927ab58389b32392812a57346f32a1d10602c68e7f3d1bbe6546",
+    "version": "20250709.0001"
   },
   {
     "rule_id": "9e76eebf-5e33-4b13-811d-613a9846fa6d",
@@ -264,6 +258,12 @@
     "version": "20250626.0001"
   },
   {
+    "rule_id": "7c85dcea-a0f0-e8bb-3a35-1a059ed05d04",
+    "rule_name": "检测Golang gin-context 漏洞",
+    "hash": "11b3840596aea5e744ae2448fa35825dbe1b4b265aff4f6bcc61c49b66141138",
+    "version": "20250709.0001"
+  },
+  {
     "rule_id": "a284316a-5ca8-4f87-a325-fbf8e487d27e",
     "rule_name": "查找 Golang LDAP 连接汇点",
     "hash": "37c4d9dd0c588fa3e47c5658346226d7ff200406561a4f02ef37ed68edca3f62",
@@ -272,8 +272,8 @@
   {
     "rule_id": "c56c4a74-1d8a-4f91-a10f-11394b58506a",
     "rule_name": "审计Golang OS Exec命令使用",
-    "hash": "bcf5106adfc25816e0db8c2f0133a3f993da62bad297569ce90b10b9475cf161",
-    "version": "20250626.0001"
+    "hash": "6baba4779679e978565fce1452eff72d7f98e317775fe18580e0bb9b14a27178",
+    "version": "20250709.0001"
   },
   {
     "rule_id": "4ba61a38-efec-4cf2-9d38-f77352e05185",
@@ -286,6 +286,12 @@
     "rule_name": "审计Golang html/template使用",
     "hash": "6df3a555deac8ad8729934a8bb19b0caeca3fb65ad83fd1b1806adf464aca6c2",
     "version": "20250626.0001"
+  },
+  {
+    "rule_id": "ed507ba1-538b-7c40-98b3-f82e7ba8af9c",
+    "rule_name": "审计Golang用户输入",
+    "hash": "e863f6fbb06ef80b38ceed17d82ae6d69e25f457e8508c9d44da3bcb404eb6e3",
+    "version": "20250709.0001"
   },
   {
     "rule_id": "cc977fdf-90b8-44e5-a80d-468e05c15276",
@@ -319,9 +325,9 @@
   },
   {
     "rule_id": "3b8c73e6-7a99-4397-bd09-428b9073e5a1",
-    "rule_name": "golang-database-from-param",
-    "hash": "241f887633ecfac9c135d05f8cf51810791ef94853465bdbb058a498cacee23a",
-    "version": "20250613.0001"
+    "rule_name": "检查Go数据库操作安全性",
+    "hash": "858e29ab75d79fe9c54d186f95147541993e4b6faae685a418a45841d5a58e07",
+    "version": "20250709.0001"
   },
   {
     "rule_id": "5a878cb7-49c0-45e7-9689-ed17055f8544",

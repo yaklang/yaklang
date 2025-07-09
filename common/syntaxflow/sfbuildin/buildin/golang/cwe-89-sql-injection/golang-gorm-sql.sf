@@ -66,8 +66,14 @@ REFERENCE
 )
 
 <include('golang-database-gorm')> as $sink;
+<include('golang-user-input')> as $input;
 $sink.Raw(* #-> as $param);
-$param?{have: 'Parameter'} as $high;
+$sink.Exec( * #-> as $param);
+$sink.Row(* #-> as $param);
+$sink.Rows(* #-> as $param);
+$sink.ScanRows( * #-> as $param);
+
+$param & $input as $high;
 
 alert $high for {
 	type: "vuln",

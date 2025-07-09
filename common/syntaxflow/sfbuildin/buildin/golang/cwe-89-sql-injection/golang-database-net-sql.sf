@@ -95,8 +95,10 @@ REFERENCE
 )
 
 <include('golang-database-sql')> as $sink;
+<include('golang-user-input')> as $input;
+
 $sink.QueryRow( * #-> as $param);
-$param?{have: 'Parameter'} as $high;
+$param & $input as $high;
 
 alert $high for {
 	title: "Check Golang SQL Injection Vulnerability",
