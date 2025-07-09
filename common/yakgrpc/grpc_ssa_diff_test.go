@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -88,7 +89,7 @@ level: high
 			if err != nil {
 				break
 			}
-			if recv.Status == string(ssaapi.Equal) {
+			if recv.Status == string(yakit.Equal) {
 				flag = true
 				break
 			}
@@ -271,11 +272,77 @@ level: high
 			if err != nil {
 				break
 			}
-			if recv.Status == string(ssaapi.Add) {
+			if recv.Status == string(yakit.Add) {
 				flag = true
 				break
 			}
 		}
 		require.True(t, flag)
+	})
+}
+
+func TestGRPCMUSTPASS_SyntaxFlow_SSAReusltCompareInQuerySSARisk(t *testing.T) {
+	client, err := NewLocalClient(true) // use yakit handler local database, this test-case should use local grpc
+	require.NoError(t, err)
+
+	taskID1 := uuid.NewString()
+	taskID2 := uuid.NewString()
+	baseProg := uuid.NewString()
+
+	yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
+		Title:       "AA",
+		FromRule:    "AA",
+		RuntimeId:   taskID1,
+		ProgramName: baseProg,
+	})
+	yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
+		Title:       "BB",
+		FromRule:    "BB",
+		RuntimeId:   taskID2,
+		ProgramName: baseProg,
+	})
+	yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
+		Title:       "CC",
+		FromRule:    "CC",
+		RuntimeId:   taskID2,
+		ProgramName: baseProg,
+	})
+
+	defer func() {
+		yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{
+			Title:     "AA",
+			RuntimeID: []string{taskID1},
+		})
+		yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{
+			Title:     "BB",
+			RuntimeID: []string{taskID2},
+		})
+		yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{
+			Title:     "CC",
+			RuntimeID: []string{taskID2},
+		})
+	}()
+
+	t.Run("taskid compare in QuerySSARisk", func(t *testing.T) {
+		response, err := client.QuerySSARisks(context.Background(), &ypb.QuerySSARisksRequest{
+			Filter: &ypb.SSARisksFilter{
+				RuntimeID: []string{taskID1},
+				SSARiskDiffRequest: &ypb.SSARiskDiffRequest{
+					Compare: &ypb.SSARiskDiffItem{RiskRuntimeId: taskID2},
+				},
+			},
+			Pagination: &ypb.Paging{
+				Limit:   1,
+				Page:    1,
+				Order:   "desc",
+				OrderBy: "id",
+			},
+		})
+		require.NoError(t, err)
+
+		data := response.GetData()
+		require.Len(t, data, 2)
+		require.Equal(t, data[0].GetRuntimeID(), taskID2)
+		require.Equal(t, data[1].GetRuntimeID(), taskID2)
 	})
 }
