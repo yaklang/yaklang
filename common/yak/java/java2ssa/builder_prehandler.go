@@ -107,7 +107,10 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 		}
 		prog.SetTemplate(path, info)
 		saveExtraFile(path, raw)
-
+		ast, err := s.ParseAST(info.GetContent())
+		if err != nil {
+			return err
+		}
 		err = prog.Build(ast, path, memedit.NewMemEditor(info.GetContent()), fb)
 		if err != nil {
 			return err
@@ -152,6 +155,10 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 			}
 			prog.SetTemplate(path, info)
 			saveExtraFile(path, raw)
+			ast, err := s.ParseAST(info.GetContent())
+			if err != nil {
+				return err
+			}
 
 			err = prog.Build(ast, path, memedit.NewMemEditor(info.GetContent()), fb)
 			if err != nil {
