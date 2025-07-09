@@ -2738,6 +2738,7 @@ message DownloadOnlinePluginsRequest {
   repeated string ScriptName = 13;
   repeated string ExcludeTypes = 14;
   string FieldKeywords = 15;
+  repeated bool Official = 16;
 }
 
 message QueryPluginGroup {
