@@ -591,6 +591,18 @@ func (p *Proxy) handleProxyAuth(conn net.Conn, req *http.Request, timer *time.Ti
 		req.TLS = &cs
 		isHttps = true
 		httpctx.SetRequestHTTPS(req, true)
+	} else if gmConn, ok := conn.(*gmtls.Conn); ok {
+		session.MarkSecure()
+
+		cs := gmConn.ConnectionState()
+		req.TLS = &tls.ConnectionState{ // set simple message
+			Version:            cs.Version,
+			CipherSuite:        cs.CipherSuite,
+			NegotiatedProtocol: cs.NegotiatedProtocol,
+			ServerName:         cs.ServerName,
+		}
+		isHttps = true
+		httpctx.SetRequestHTTPS(req, true)
 	}
 
 	if session.IsSecure() {
@@ -682,6 +694,7 @@ func (p *Proxy) handleProxyAuth(conn net.Conn, req *http.Request, timer *time.Ti
 func (p *Proxy) handleRequest(conn net.Conn, req *http.Request, ctx *Context) error {
 	if httpctx.GetRequestHTTPS(req) || ctx.GetSessionBoolValue(httpctx.REQUEST_CONTEXT_ConnectToHTTPS) {
 		req.URL.Scheme = "https"
+		httpctx.SetRequestHTTPS(req, true)
 	}
 	session := ctx.Session()
 	brw := session.brw
