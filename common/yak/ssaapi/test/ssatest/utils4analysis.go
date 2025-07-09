@@ -93,7 +93,7 @@ func CheckWithName(
 	// only in memory
 	opt = append(opt, ssaapi.WithLogLevel("debug"))
 	var f1, f2, f3, f4, f5, f6 func()
-	if false {
+	if true {
 		var prog *ssaapi.Program
 		var err error
 

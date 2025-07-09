@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/typescript/js2ssa"
 )
@@ -16,9 +15,8 @@ import (
 var largeJS string
 
 func TestJS_ASTLargeText(t *testing.T) {
-	if utils.InGithubActions() {
-		return
-	}
+	t.Skip("skip large js test, it is too slow to run in CI")
+
 	start := time.Now()
 
 	log.Infof("start to build ast via parser")

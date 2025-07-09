@@ -137,9 +137,10 @@ func marshalExtraInformation(cache *ProgramCache, raw Instruction) map[string]an
 			sideEffects = append(sideEffects, element)
 		}
 		params["side_effect"] = sideEffects
-		if p := ret.GetParent(); p != nil {
-			params["parent"] = p.GetId()
-		}
+		params["parent"] = ret.parent
+		// if p := ret.GetParent(); p != nil {
+		// 	params["parent"] = p.GetId()
+		// }
 		params["throws"] = fetchIds(ret.Throws)
 		params["child_funcs"] = fetchIds(ret.ChildFuncs)
 		params["return"] = fetchIds(ret.Return)
