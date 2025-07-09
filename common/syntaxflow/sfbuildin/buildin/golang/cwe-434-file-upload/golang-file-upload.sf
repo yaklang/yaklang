@@ -1,7 +1,7 @@
 desc(
 	title: "Audit Golang File Upload Vulnerability"
 	type: audit
-	level: high
+	level: low
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -136,9 +136,10 @@ $path.Clean(* #-> as $check);
 $path.IsAbs(* #-> as $check);
 
 $sink #{include: `$check`}-> as $safe;
-$sink #{exclude: `$safe`}-> as $high;
+$sink - $safe as $data;
+$data?{!opcode:const && !have:'ExternLib'} as $low;
 
-alert $high for {
+alert $low for {
 	solution: <<<CODE
 ### 修复建议
 
@@ -254,7 +255,7 @@ func main() {
 - **服务拒绝 (DoS)**: 上传超大文件或恶意文件导致服务器资源耗尽或程序崩溃。
 - **网站篡改或恶意内容传播**: 上传恶意网页或病毒文件。
 CODE
-	level: "high",
+	level: "low",
 	type: "vuln",
 	title: "Unvalidated File Upload Path in Golang",
 	title_zh: "检测到Golang文件上传路径未验证风险",
@@ -262,7 +263,7 @@ CODE
 
 desc(
 	lang: golang
-	alert_high: 1
+	alert_low: 1
 	'file://main.go': <<<UNSAFE
 package main
 

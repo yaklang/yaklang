@@ -1995,7 +1995,9 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 		libName := qul.IDENTIFIER(0).GetText()
 		typName := qul.IDENTIFIER(1).GetText()
 		lib, path := b.GetImportPackage(libName)
-		path = path + "/" + typName
+		if path != "" {
+			path = path + "/" + typName
+		}
 
 		if lib != nil && path != "" {
 			if _, ok := lib.GetExportType(libName); !ok {
