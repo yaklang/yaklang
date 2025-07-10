@@ -1,3 +1,7 @@
+__DESC__ = "一个Yak插件查询工具，用于查询和展示可用的Yak插件列表。支持通过关键词搜索特定插件，显示插件名称和详细描述信息，方便用户了解和选择合适的插件。"
+
+__KEYWORDS__ = "插件查询,插件列表,关键词搜索,插件信息,插件描述,plugin query,plugin list,keyword search,plugin information,plugin description,yak plugin,script query"
+
 query = cli.String("query",cli.setVerboseName("查询关键词"), cli.setRequired(false),cli.setHelp("查询插件的关键词，如果未设置则默认查询所有插件"))
 cli.check()
 

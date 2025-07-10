@@ -1,0 +1,9 @@
+{
+	"name": "vulscan",
+	"description": "专业的漏洞扫描AI助手，能够执行全面的漏洞扫描任务，包括端口扫描、服务识别、指纹匹配、子域名发现、Web应用扫描等。通过调用多种扫描工具和插件，自动化发现和识别目标系统的安全漏洞。",
+	"cli_parameter_rule_yaklang_code": "target = cli.String(\"target\", cli.setHelp(\"扫描目标，可以是IP、域名或URL\"), cli.setRequired(true))\nscanType = cli.String(\"scan-type\", cli.setHelp(\"扫描类型：comprehensive(全面扫描)、quick(快速扫描)、port(端口扫描)、web(Web扫描)、subdomain(子域名扫描)\"), cli.setDefault(\"comprehensive\"))\nports = cli.String(\"ports\", cli.setHelp(\"指定端口范围，默认常用端口\"), cli.setDefault(\"22,80,443,8080,3306,3389,5432,6379\"))\nconcurrent = cli.Int(\"concurrent\", cli.setHelp(\"并发数量\"), cli.setDefault(50))\ntimeout = cli.Float(\"timeout\", cli.setHelp(\"超时时间(秒)\"), cli.setDefault(10.0))\nclassifyResults = cli.Bool(\"classify-results\", cli.setHelp(\"是否对结果进行分类整理\"), cli.setDefault(true))\ncli.check()",
+	"tool_keywords": "漏洞扫描,端口扫描,服务识别,指纹识别,Web扫描,子域名扫描,安全检测,渗透测试,漏洞发现,网络扫描,风险评估,暴力破解,域名查询,信息收集,网络侦察",
+	"tools": "port_scan,subdomain_scan,query_plugin_by_fp,call_yak_plugin,query_yak_plugins,match_fingerprint_by_packet,send_http_request_by_url,send_http_request_packet,simple_crawler,url_content_summary,cybersecurity-risk,brute,scan_tcp_port,syn_scan_tcp_port,whois",
+	"actions": "vulscan_result,scan_progress,vulnerability_found,scan_complete",
+	"tags": "漏洞扫描,安全测试,渗透测试,端口扫描,Web安全,网络安全,自动化扫描,安全评估"
+} 
