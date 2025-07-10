@@ -79,7 +79,7 @@ func NewProgram(prog *ssa.Program, config *config) *Program {
 	p := &Program{
 		Program:           prog,
 		config:            config,
-		enableDatabase:    config.enableDatabase,
+		enableDatabase:    config.enableDatabase != ssa.ProgramCacheMemory,
 		nodeId2ValueCache: utils.NewTTLCacheWithKey[uint, *Value](8 * time.Second),
 	}
 

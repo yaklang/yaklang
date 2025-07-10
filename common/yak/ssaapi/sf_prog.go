@@ -382,7 +382,7 @@ func (p *Program) ForEachFile(callBack func(string, *memedit.MemEditor)) {
 
 		var err error
 		var editor *memedit.MemEditor
-		if p.Program.EnableDatabase {
+		if p.Program.DatabaseKind != ssa.ProgramCacheMemory {
 			// if have database, get source code from database
 			editor, err = ssadb.GetIrSourceFromHash(data)
 			if err != nil {

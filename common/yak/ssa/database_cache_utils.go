@@ -12,6 +12,14 @@ import (
 	"go.uber.org/atomic"
 )
 
+type ProgramCacheKind int
+
+const (
+	ProgramCacheMemory  ProgramCacheKind = iota
+	ProgramCacheDBRead                   // fetch and save mode  // for compile
+	ProgramCacheDBWrite                  // only load from database // for scan
+)
+
 type instructionCachePair struct {
 	inst   Instruction
 	irCode *ssadb.IrCode
@@ -22,7 +30,7 @@ func (c *instructionCachePair) GetId() int64 {
 }
 
 const (
-	defaultFetchSize = 200
+	defaultFetchSize = 2
 	maxFetchSize     = 15000
 	defaultSaveSize  = 200
 	maxSaveSize      = 15000
@@ -72,71 +80,20 @@ func (c *memoryCache[T]) Close() {
 
 func createInstructionCache(
 	ctx context.Context,
-	databaseEnable bool,
+	databaseKind ProgramCacheKind,
 	db *gorm.DB, prog *Program,
 	programName string, fetchSize, saveSize int,
 	marshalFinish func(Instruction, *ssadb.IrCode),
 	saveFinish func(int),
 ) Cache[Instruction] {
-	if !databaseEnable {
+	if databaseKind == ProgramCacheMemory {
 		return newmemoryCache[Instruction]()
 	}
 	saveSize = min(max(saveSize, defaultSaveSize), maxSaveSize)
 	fetchSize = min(max(fetchSize, defaultFetchSize), maxFetchSize)
 
-	// init instruction cache and fetchId
-	fetch := func(size int) []*ssadb.IrCode {
-		if size < defaultFetchSize {
-			size = defaultFetchSize // ensure at least fetchSize items are fetched
-		}
-		result := make([]*ssadb.IrCode, 0, size)
-		utils.GormTransaction(db, func(tx *gorm.DB) error {
-			// tx := db
-			for len(result) < size {
-				id, irCode := ssadb.RequireIrCode(tx, programName)
-				if utils.IsNil(irCode) || id <= 0 {
-					// return nil // no more id to fetch
-					continue
-				}
-				result = append(result, irCode)
-			}
-			return nil
-		})
-		return result
-	}
-
-	delete := func(fir []*ssadb.IrCode) {
-		ids := lo.Map(fir, func(item *ssadb.IrCode, _ int) int64 {
-			return item.GetIdInt64()
-		})
-		ssadb.DeleteIrCode(db, ids...)
-	}
-
-	save := func(t []*ssadb.IrCode) {
-		defer func() {
-			if err := recover(); err != nil {
-				// log.Errorf("DATABASE: Save IR Codes panic: %v", err)
-				utils.PrintCurrentGoroutineRuntimeStack()
-			}
-		}()
-		utils.GormTransaction(db, func(tx *gorm.DB) error {
-			// log.Errorf("DATABASE: Save IR: %d", len(t))
-			for _, irCode := range t {
-				if err := irCode.Save(tx); err != nil {
-					log.Errorf("DATABASE: save irCode to database error: %v", err)
-				}
-			}
-			return nil
-		})
-		saveFinish(len(t)) // notify save finish
-	}
-
-	marshal := func(s Instruction, d *ssadb.IrCode) {
-		if marshalInstruction(prog.Cache, s, d) {
-			marshalFinish(s, d)
-		}
-	}
 	load := func(id int64) (Instruction, *ssadb.IrCode, error) {
+		// TODO: load instruction from db should fix n+1 problem
 		irCode := ssadb.GetIrCodeById(db, id)
 		inst, err := NewLazyInstructionFromIrCode(irCode, prog, true)
 		if err != nil {
@@ -145,8 +102,73 @@ func createInstructionCache(
 		return inst, irCode, nil
 	}
 
+	var fetch databasex.FetchFunc[*ssadb.IrCode]
+	var delete databasex.DeleteFunc[*ssadb.IrCode]
+	var save databasex.SaveFunc[*ssadb.IrCode]
+	var marshal databasex.MarshalFunc[Instruction, *ssadb.IrCode]
+
+	if databaseKind == ProgramCacheDBWrite {
+		// init instruction fetchId and marshal and save
+		fetch = func(size int) []*ssadb.IrCode {
+			if size < defaultFetchSize {
+				size = defaultFetchSize // ensure at least fetchSize items are fetched
+			}
+			result := make([]*ssadb.IrCode, 0, size)
+			utils.GormTransaction(db, func(tx *gorm.DB) error {
+				// tx := db
+				for len(result) < size {
+					id, irCode := ssadb.RequireIrCode(tx, programName)
+					if utils.IsNil(irCode) || id <= 0 {
+						// return nil // no more id to fetch
+						continue
+					}
+					result = append(result, irCode)
+				}
+				return nil
+			})
+			return result
+		}
+
+		delete = func(fir []*ssadb.IrCode) {
+			var ids []int64
+			f1 := func() {
+				ids = lo.Map(fir, func(item *ssadb.IrCode, _ int) int64 {
+					return item.GetIdInt64()
+				})
+			}
+			f2 := func() {
+				ssadb.DeleteIrCode(db, ids...)
+			}
+			ProfileAdd(true, "databasex.Cache.Instruction.Delete", f1, f2)
+		}
+
+		save = func(t []*ssadb.IrCode) {
+			defer func() {
+				if err := recover(); err != nil {
+					// log.Errorf("DATABASE: Save IR Codes panic: %v", err)
+					utils.PrintCurrentGoroutineRuntimeStack()
+				}
+			}()
+			utils.GormTransaction(db, func(tx *gorm.DB) error {
+				// log.Errorf("DATABASE: Save IR: %d", len(t))
+				for _, irCode := range t {
+					if err := irCode.Save(tx); err != nil {
+						log.Errorf("DATABASE: save irCode to database error: %v", err)
+					}
+				}
+				return nil
+			})
+			saveFinish(len(t)) // notify save finish
+		}
+
+		marshal = func(s Instruction, d *ssadb.IrCode) {
+			if marshalInstruction(prog.Cache, s, d) {
+				marshalFinish(s, d)
+			}
+		}
+	}
 	opts := []databasex.Option{
-		databasex.WithFetchSize(fetchSize),
+		databasex.WithFetchSize(fetchSize * 2),
 		databasex.WithSaveSize(saveSize),
 		databasex.WithSaveTimeout(saveTime),
 		databasex.WithName("Instruction"),
@@ -158,71 +180,82 @@ func createInstructionCache(
 
 func createTypeCache(
 	ctx context.Context,
-	databaseEnable bool,
+	databaseKind ProgramCacheKind,
 	db *gorm.DB, prog *Program,
 	programName string,
 	fetchSize, saveSize int,
 ) Cache[Type] {
-	if !databaseEnable {
+	if databaseKind == ProgramCacheMemory {
 		return newmemoryCache[Type]()
 	}
 	fetchSize = min(max(fetchSize, defaultFetchSize), maxFetchSize)
 	saveSize = min(max(saveSize, defaultSaveSize), maxSaveSize)
 
-	marshal := func(s Type, d *ssadb.IrType) {
-		marshalType(s, d)
-	}
-
-	fetch := func(size int) []*ssadb.IrType {
-		if size < defaultFetchSize {
-			size = defaultFetchSize // ensure at least fetchSize items are fetched
-		}
-		result := make([]*ssadb.IrType, 0, size)
-		utils.GormTransaction(db, func(tx *gorm.DB) error {
-			// tx := db
-			for len(result) < size {
-				id, irType := ssadb.RequireIrType(tx, programName)
-				if utils.IsNil(irType) || id <= 0 {
-					// return nil // no more id to fetch
-					continue
-				}
-				result = append(result, irType)
-			}
-			return nil
-		})
-		return result
-	}
-
-	delete := func(fir []*ssadb.IrType) {
-		ids := lo.Map(fir, func(item *ssadb.IrType, _ int) int64 {
-			return item.GetIdInt64()
-		})
-		ssadb.DeleteIrType(db, ids)
-	}
-
-	save := func(t []*ssadb.IrType) {
-		defer func() {
-			if err := recover(); err != nil {
-				// log.Errorf("DATABASE: Save IR Types panic: %v", err)
-				utils.PrintCurrentGoroutineRuntimeStack()
-			}
-		}()
-		utils.GormTransaction(db, func(tx *gorm.DB) error {
-			// log.Errorf("DATABASE: Save IR Types: %d", len(t))
-			for _, irType := range t {
-				_ = irType
-				if err := irType.Save(tx); err != nil {
-					log.Errorf("DATABASE: save irType to database error: %v", err)
-				}
-			}
-			return nil
-		})
-	}
-
 	load := func(id int64) (Type, *ssadb.IrType, error) {
 		irType := ssadb.GetIrTypeById(db, id)
 		typ := GetTypeFromDB(prog.Cache, id)
 		return typ, irType, nil
+	}
+	var fetch databasex.FetchFunc[*ssadb.IrType]
+	var delete databasex.DeleteFunc[*ssadb.IrType]
+	var marshal databasex.MarshalFunc[Type, *ssadb.IrType]
+	var save databasex.SaveFunc[*ssadb.IrType]
+	if databaseKind == ProgramCacheDBWrite {
+		marshal = func(s Type, d *ssadb.IrType) {
+			marshalType(s, d)
+		}
+
+		fetch = func(size int) []*ssadb.IrType {
+			if size < defaultFetchSize {
+				size = defaultFetchSize // ensure at least fetchSize items are fetched
+			}
+			result := make([]*ssadb.IrType, 0, size)
+			utils.GormTransaction(db, func(tx *gorm.DB) error {
+				// tx := db
+				for len(result) < size {
+					id, irType := ssadb.RequireIrType(tx, programName)
+					if utils.IsNil(irType) || id <= 0 {
+						// return nil // no more id to fetch
+						continue
+					}
+					result = append(result, irType)
+				}
+				return nil
+			})
+			return result
+		}
+
+		delete = func(fir []*ssadb.IrType) {
+			var ids []int64
+			f1 := func() {
+				ids = lo.Map(fir, func(item *ssadb.IrType, _ int) int64 {
+					return item.GetIdInt64()
+				})
+			}
+			f2 := func() {
+				ssadb.DeleteIrType(db, ids)
+			}
+			ProfileAdd(true, "databasex.Cache.Type.Delete", f1, f2)
+		}
+
+		save = func(t []*ssadb.IrType) {
+			defer func() {
+				if err := recover(); err != nil {
+					// log.Errorf("DATABASE: Save IR Types panic: %v", err)
+					utils.PrintCurrentGoroutineRuntimeStack()
+				}
+			}()
+			utils.GormTransaction(db, func(tx *gorm.DB) error {
+				// log.Errorf("DATABASE: Save IR Types: %d", len(t))
+				for _, irType := range t {
+					_ = irType
+					if err := irType.Save(tx); err != nil {
+						log.Errorf("DATABASE: save irType to database error: %v", err)
+					}
+				}
+				return nil
+			})
+		}
 	}
 
 	opts := []databasex.Option{
