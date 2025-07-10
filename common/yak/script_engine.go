@@ -4,13 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/aireducer"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/aireducer"
+	"github.com/yaklang/yaklang/common/fp/fingerprint"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
@@ -350,6 +352,9 @@ func initYaklangLib() {
 
 	// amap
 	yaklang.Import("amap", amap.YakExport)
+
+	// fp
+	yaklang.Import("fp", fingerprint.Exports)
 }
 
 type ScriptEngine struct {

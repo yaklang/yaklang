@@ -118,6 +118,7 @@ func init() {
 		registerBuildInForge("log_event_formatter")
 		registerBuildInForge("event_analyzer")
 		registerBuildInForge("web_log_monitor")
+		registerBuildInForge("shiro_detect")
 		return nil
 	})
 }
