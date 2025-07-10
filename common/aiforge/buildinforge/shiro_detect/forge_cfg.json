@@ -1,0 +1,8 @@
+{
+	"name": "shiro_detect",
+	"cli_parameter_rule_yaklang_code": "target = cli.String(\"target\", cli.setHelp(\"目标URL或IP地址\"), cli.setRequired(true))\ncli.check()",
+	"tool_keywords": "http,fs",
+	"tools": "do_http,http,packet,query_yak_plugins,call_yak_plugin,cybersecurity-risk",
+	"description": "该forge用于检测Apache Shiro反序列化漏洞。它会先请求目标站点并跟随跳转，检查响应包header中是否存在rememberMe字段，如果存在则可能存在Shiro反序列化漏洞，然后调用相关Yak插件进行进一步检测和利用。",
+	"tags": "shiro,反序列化,漏洞检测,web安全,渗透测试,apache shiro,deserialization,安全测试"
+} 

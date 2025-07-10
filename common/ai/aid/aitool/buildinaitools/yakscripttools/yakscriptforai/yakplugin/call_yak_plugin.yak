@@ -1,0 +1,64 @@
+pluginName = cli.String("name", cli.setVerboseName("插件名"),cli.setHelp("插件名"),cli.setRequired(true))
+pluginType = cli.String("type",cli.setVerboseName("插件类型"), cli.setHelp("插件类型(可选值：`mitm`、`port-scan`)"),cli.setRequired(true))
+
+// mitm 参数
+reqPacket = cli.Text("flow", cli.setHelp("请求报文（mitm插件的请求参数）"))
+isHttps = cli.Bool("isHttps", cli.setHelp("目标是否是https（mitm插件的请求参数）"))
+mitmParamsIsOk = reqPacket != ""
+
+cli.check()
+
+
+
+manager, err = hook.NewMixPluginCaller()
+if err != nil {
+    yakit.Error("创建mix plugin caller失败: %v", err)
+    return
+}
+manager.SetFeedback(func(i){
+    msg = json.loads(i.Message)
+    data = msg.content.data
+    level = msg.content.level 
+    switch msg.content.level{
+    case "info":
+        yakit.Info(data)
+    case "error":
+        yakit.Error(data)
+    default:
+        yakit.Info("收到信息，不支持的信息类型: [%s] %s",level,data)
+    }
+})
+callMitmPlugin = (name,reqPacket)=>{
+    if !mitmParamsIsOk{
+        return "参数不正确"
+    }
+
+    reqIns,err = str.ParseStringToHTTPRequest(reqPacket)
+    if err{
+        return "解析请求包失败: %v" % err
+    }
+    url = reqIns.URL.String()
+    body = poc.GetHTTPPacketBody(reqPacket)
+
+    manager.LoadPlugin(name)
+    rsp,req,err = poc.HTTP(reqPacket, poc.https(isHttps))
+    if err {
+        return "请求目标失败: %v" % err
+    }
+    manager.MirrorHTTPFlow(isHttps, url, req, rsp, body)
+}
+switch str.ToLower(pluginType){
+    case "mitm":
+        err = callMitmPlugin(pluginName, reqPacket)
+        if err {
+            yakit.Error("调用 %s 插件失败: %v" % [pluginName,err])
+        }
+    case "port-scan","portScan","port_scan":
+        yakit.Error("不支持的插件类型: %v", pluginType)
+        return
+    default:
+        yakit.Error("不支持的插件类型: %v", pluginType)
+        return
+}
+
+manager.Wait()

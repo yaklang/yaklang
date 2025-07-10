@@ -1,0 +1,310 @@
+config = {
+    "subdomain_limit" : 20,
+    
+}
+target = cli.String("target", cli.setHelp("目标列表，以逗号分隔"),cli.setRequired(true),cli.setVerboseName("扫描目标"))
+cli.check()
+
+targets = str.Split(target, ",")
+
+newPureTargetInfo=(scheme,host,port,isDomain,ip,url)=>{
+    return {
+        "isDomain" : isDomain,
+        "scheme": scheme,
+        "host": host,
+        "port": port,
+        "ip" :ip,
+        "url":url,
+    }
+}
+
+getPureTarget = (targets)=>{
+    pureTargets = []
+    pureTargetLock = sync.NewLock()
+    // 添加新目标信息
+    addPureTarget = d =>{
+        pureTargetLock.Lock()
+        pureTargets.Append(d)
+        pureTargetLock.Unlock()
+    }
+    // 构建目标信息
+    newTargetInfo=(scheme,host,port,isDomain,ip,url)=>{
+        addPureTarget(newPureTargetInfo(scheme, host, port, isDomain, ip,url))
+    }
+    
+    swg = sync.NewSizedWaitGroup(100)
+    for target in targets{
+        target := target
+        swg.Add()
+        go fn{
+            defer swg.Done()
+            isDomain = false
+            scheme = ""
+            host = ""
+            ip := ""
+            port = 0
+            url = ""
+            target = str.TrimSpace(target)
+            targetIns,err = str.ParseStringUrlToUrlInstance(target)
+            if err == nil {
+                url = target
+                scheme = targetIns.Scheme
+                h, p, err := str.ParseStringToHostPort(target)
+                if err {
+                    host = h
+                    p = 0
+                }else{
+                    host = h
+                    port = p
+                }
+            } else {
+                h, p, err := str.ParseStringToHostPort(target)
+                if err {
+                    host = h
+                    p = 0
+                }else{
+                    host = h
+                    port = p
+                }
+            }
+            isDomain = !str.IsIPv4(host) && !str.IsIPv6(host)
+            if isDomain {
+                dnsRes = dns.QueryIPAll(host)
+                if len(dnsRes) > 0{
+                    ip = dnsRes[0]
+                }else{
+                    ip = ""
+                }
+            }else{
+                ip = host
+            }
+            newTargetInfo(scheme,host,port,isDomain,ip,url)
+        }
+    }
+    swg.Wait()
+    return pureTargets
+}
+
+dumpPureTarget = (target)=>{
+    yakit.Info("scheme: %v, host: %v, port: %v, isDomain: %v", target.scheme,target.host,target.port,target.isDomain)
+}
+
+scanAllSubDomain = (pureTarget)=>{
+    allPureTarget = []
+    lock = sync.NewLock()
+    swg = sync.NewSizedWaitGroup(100)
+    for target in pureTarget{
+        swg.Add()
+        go fn{
+            defer swg.Done()
+            subdomainRes, err = subdomain.Scan(target.host, subdomain.recursive(false), subdomain.wildcardToStop(true))
+            if err != nil {
+                yakit.Error("构建子域名扫描失败：%v", err)
+                return
+            }
+            n = 0
+            for i in subdomainRes{
+                lock.Lock()
+                if n > config.subdomain_limit{
+                    return allPureTarget
+                }
+                allPureTarget.Append(newPureTargetInfo("",i.Domain,0,true,i.IP,""))
+                lock.Unlock()
+                n++
+            }
+        }
+    }
+    swg.Wait()
+    return allPureTarget
+}
+
+mergePureTarget = (targetLists...)=>{
+    res = []
+    hostMap = {}
+    for targetList in targetLists{
+        for target in targetList{
+            if target.host in hostMap{
+                continue
+            }else{
+                res.Append(target)
+                hostMap[target.host] = target
+            }
+        }
+    }
+    return res
+}
+_portScanTargets = (pureTargets)=>{
+    allTargetStrItems = []
+    for i in pureTargets{
+        allTargetStrItems.Append(str.HostPort(i.host, i.port))
+    }
+    allTargets = str.Join(allTargetStrItems,",")
+    yakit.Info(allTargets)
+    res,err = servicescan.Scan(allTargets,"", servicescan.probeTimeout(2))
+    if err {
+        yakit.Error("端口扫描执行失败: %v" % err)
+        return ""
+    }
+    resList = []
+    for i in res{
+        if i.IsOpen(){
+            resList.Append(i)
+        }
+    }
+    return resList
+}
+portScanTargets = (pureTargets)=>{
+    resList = []
+    resLock = sync.NewLock()
+    swg = sync.NewSizedWaitGroup(10)
+    for target in pureTargets{
+        target := target
+        swg.Add()
+        go fn{
+            defer swg.Done()
+            res,err = servicescan.Scan(target.host,"%v"%target.port, servicescan.probeTimeout(2))
+            if err {
+                yakit.Error("端口扫描执行失败: %v" % err)
+                return ""
+            }
+            resList = []
+            for i in res{
+                if i.IsOpen(){
+                    resLock.Lock()
+                    resList.Append(i)
+                    resLock.Unlock()
+                }
+            }
+        }
+    }
+    swg.Wait()
+    return resList
+}
+searchPluginsByFps = (fpnames...)=>{
+    allScript = db.YieldYakScriptAll()
+    scriptNames = []
+    for i in allScript{
+        sim = str.CalcSimilarity("shiro",str.ToLower(i.ScriptName))
+        if sim > 0.3{
+            scriptNames.Append(i.ScriptName)
+        }
+    }
+    return scriptNames
+}
+matchWebFp = (rsp) => {
+    return fp.MatchRsp(rsp)
+}
+scanTargetByFp = (target,fpname)=>{
+    plugins = searchPluginsByFps(fpname)
+    manager, err = hook.NewMixPluginCaller()
+    if err != nil {
+        yakit.Error("创建mix plugin caller失败: %v", err)
+        return
+    }
+    manager.SetFeedback(func(i){
+        msg = json.loads(i.Message)
+        data = msg.content.data
+        level = msg.content.level 
+        switch msg.content.level{
+        case "info":
+            yakit.Info(data)
+        case "error":
+            yakit.Error(data)
+        default:
+            yakit.Info("收到信息，不支持的信息类型: [%s] %s",level,data)
+        }
+    })
+    for plugin in plugins{
+        manager.LoadPlugin(plugin)
+    }
+    addr = str.HostPort(target.host, target.port)
+    isHttps = str.IsTLSServer(addr)
+    addr = isHttps ? "https://" + addr : "http://" + addr 
+    _,req,err = poc.ParseUrlToHTTPRequestRaw("GET", addr)
+    if err {
+        yakit.Error("构建请求失败: %v" % err)
+        return
+    }
+    rsp,req,err = poc.HTTP(req)
+    if err {
+        yakit.Error("请求失败: %v" % err)
+        return
+    }
+    body = poc.GetHTTPPacketBody(rsp)
+    manager.MirrorHTTPFlow(isHttps, addr, req, rsp, body)
+    manager.Wait()
+}
+
+scanVulByFpRes = (fpRes)=>{
+    for i in fpRes{
+        scanTargetByFp({
+            "host":i.Target,
+            "port":i.Port,
+        },i.GetServiceName())
+    }
+}
+scanUrls = (targets) =>{
+    urls = x.Map(targets, d=>d.url)
+    for url in urls{
+        isHttps,req,err = poc.ParseUrlToHTTPRequestRaw("GET", url)
+        if err {
+            yakit.Error("构建请求失败: %v" % err)
+            return
+        }
+        rsp,req,err = poc.HTTP(req)
+        if err {
+            yakit.Error("请求失败: %v" % err)
+            return
+        }
+        body = poc.GetHTTPPacketBody(rsp)
+        fps = matchWebFp(rsp)
+        plugins = searchPluginsByFps(fps...)
+
+        manager, err = hook.NewMixPluginCaller()
+        if err != nil {
+            yakit.Error("创建mix plugin caller失败: %v", err)
+            return
+        }
+        manager.SetFeedback(func(i){
+            msg = json.loads(i.Message)
+            data = msg.content.data
+            level = msg.content.level 
+            switch msg.content.level{
+            case "info":
+                yakit.Info(data)
+            case "error":
+                yakit.Error(data)
+            default:
+                yakit.Info("收到信息，不支持的信息类型: [%s] %s",level,data)
+            }
+        })
+        for plugin in plugins{
+            manager.LoadPlugin(plugin)
+        }
+        manager.MirrorHTTPFlow(isHttps, url, req, rsp, body)
+        manager.Wait()
+    }
+}
+main = ()=>{
+    // 数据清洗
+    yakit.Info("开始清洗数据")
+    pureTarget = getPureTarget(targets)
+    yakit.Info("共获得 %v 条数据" % len(pureTarget))
+    // 子域名扫描
+    yakit.Info("开始对目标进行子域名扫描")
+    domainTargets = x.Filter(pureTarget, d=>d.isDomain),
+    allSubdomain = scanAllSubDomain(domainTargets)
+    yakit.Info("共获得 %v 条数据" % len(allSubdomain))
+    // 数据去重
+    pureTarget = mergePureTarget(pureTarget,allSubdomain)
+    yakit.Info("数据合并去重共获得 %v 条数据" % len(pureTarget))
+    // 端口扫描
+    yakit.Info("开始端口扫描")
+    scanRes = portScanTargets(pureTarget)
+    yakit.Info("端口扫描共获得 %v 条数据" % len(scanRes))
+    // 漏洞扫描
+    scanVulByFpRes(scanRes)
+    // 扫描urls
+    scanUrls(x.Filter(pureTarget, d=>d.url != ""))
+}
+main()
