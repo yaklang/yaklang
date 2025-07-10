@@ -1,6 +1,8 @@
 package utils
 
-import "reflect"
+import (
+	"reflect"
+)
 
 func IsNil(input any) bool {
 	if input == nil {
@@ -11,10 +13,10 @@ func IsNil(input any) bool {
 	}
 	ref := reflect.ValueOf(input)
 	switch ref.Kind() {
-	case reflect.Ptr, reflect.Map, reflect.Slice, reflect.Chan:
+	case reflect.Chan, reflect.Func, reflect.Map, reflect.Pointer, reflect.UnsafePointer, reflect.Interface, reflect.Slice:
 		return reflect.ValueOf(input).IsNil()
 	default:
-		return false
+		return input == nil
 	}
 }
 
