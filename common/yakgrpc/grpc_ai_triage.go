@@ -43,7 +43,7 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 	baseCtx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
 
-	sendEvent := func(e *aid.Event) {
+	sendEvent := func(e *schema.AiOutputEvent) {
 		if e.Timestamp <= 0 {
 			e.Timestamp = time.Now().Unix() // fallback
 		}
@@ -68,7 +68,7 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 
 	inputEvent := make(chan *aid.InputEvent, 1000)
 	var aidOption = []aid.Option{
-		aid.WithEventHandler(func(e *aid.Event) {
+		aid.WithEventHandler(func(e *schema.AiOutputEvent) {
 			sendEvent(e)
 		}),
 		aid.WithEventInputChan(inputEvent),
@@ -153,8 +153,8 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 	}
 
 	emitEvent := func(nodeId string, content any) {
-		sendEvent(&aid.Event{
-			Type:     aid.EVENT_TYPE_STREAM,
+		sendEvent(&schema.AiOutputEvent{
+			Type:     schema.EVENT_TYPE_STREAM,
 			NodeId:   nodeId,
 			IsSystem: true,
 			Content:  utils.InterfaceToBytes(content),
