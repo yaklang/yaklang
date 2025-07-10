@@ -3,6 +3,7 @@ package yak
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
@@ -24,7 +25,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/permutil"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"github.com/yaklang/yaklang/embed"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -425,12 +425,15 @@ func (ew *EntityWatcher) WatchEntity(entityValue string, callback func(entityVal
 	}
 }
 
+//go:embed testdata/test_ai_weblog.gz
+var testAIWeblogGZIP []byte
+
 func TestWebLogMonitor(t *testing.T) {
 	db, err := NewTestWebLogEventDB(filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String()))
 	if err != nil {
 		return
 	}
-	aiCB := aiforge.GetHoldAICallback()
+	aiCB := aiforge.GetOpenRouterAICallbackGemini2_5flash()
 	//aiCB = aiforge.GetAIBalance()
 
 	update := func(attackType string, entityValue string) {
@@ -474,7 +477,7 @@ func TestWebLogMonitor(t *testing.T) {
 	}
 
 	yakit.InitialDatabase()
-	content, err := embed.Asset("data/test_ai_weblog.gz")
+	content, err := utils.GzipDeCompress(testAIWeblogGZIP)
 	require.NoError(t, err)
 	fp := bytes.NewReader(content)
 
@@ -584,7 +587,7 @@ func TestWebLogMonitorForge(t *testing.T) {
 	_, err := ExecuteForge("web_log_monitor", []*ypb.ExecParamItem{
 		//{Key: "text", Value: monOncleJules},
 
-	}, WithAICallback(aiforge.GetHoldAICallback()))
+	}, WithAICallback(aiforge.GetOpenRouterAICallbackGemini2_5flash()))
 	if err != nil {
 		return
 	}
