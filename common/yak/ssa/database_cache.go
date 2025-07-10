@@ -39,7 +39,7 @@ type ProgramCache struct {
 }
 
 // NewDBCache : create a new ssa db cache. if ttl is 0, the cache will never expire, and never save to database.
-func NewDBCache(prog *Program, databaseEnable bool, fileSize int, ConfigTTL ...time.Duration) *ProgramCache {
+func NewDBCache(prog *Program, databaseKind ProgramCacheKind, fileSize int, ConfigTTL ...time.Duration) *ProgramCache {
 	compileCtx := context.Background()
 	cacheCtx, cancel := context.WithCancel(compileCtx)
 	cache := &ProgramCache{
@@ -49,17 +49,17 @@ func NewDBCache(prog *Program, databaseEnable bool, fileSize int, ConfigTTL ...t
 		waitGroup:      &sync.WaitGroup{},
 	}
 	var programName string
-	if databaseEnable {
+	if databaseKind != ProgramCacheMemory { // database write/read
 		programName = prog.GetApplication().GetProgramName()
 		cache.DB = ssadb.GetDB().Where("program_name = ?", programName)
 	}
 	fetchSize := min(max(fileSize*5, defaultFetchSize), maxFetchSize)
 	saveSize := min(max(fileSize*5, defaultSaveSize), maxSaveSize)
-	log.Debugf("Databasex Channel: ReSetSize: fileSize(%d) fetchSize(%d) saveSize(%d)", fileSize, fetchSize, saveSize)
-	cache.initIndex(databaseEnable, saveSize/2)
+	log.Infof("Databasex Channel: ReSetSize: fileSize(%d) fetchSize(%d) saveSize(%d)", fileSize, fetchSize, saveSize)
+	cache.initIndex(databaseKind, saveSize/2)
 	cache.afterSaveNotify = func(i int) {}
 	cache.InstructionCache = createInstructionCache(
-		cacheCtx, databaseEnable,
+		cacheCtx, databaseKind,
 		cache.DB, prog,
 		programName, fetchSize, saveSize,
 		func(inst Instruction, instIr *ssadb.IrCode) {
@@ -84,7 +84,7 @@ func NewDBCache(prog *Program, databaseEnable bool, fileSize int, ConfigTTL ...t
 		},
 	)
 	cache.TypeCache = createTypeCache(
-		cacheCtx, databaseEnable,
+		cacheCtx, databaseKind,
 		cache.DB, prog,
 		programName, fetchSize, saveSize,
 	)
