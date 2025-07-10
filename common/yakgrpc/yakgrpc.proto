@@ -6545,6 +6545,8 @@ message SyntaxFlowScanRequest{
 
   // for new rule scan task
   SyntaxFlowRuleInput RuleInput = 6; // 用于新建规则时的调试功能
+  // 并发，默认5
+  uint32  Concurrency =7;
 }
 
 message QuerySyntaxFlowScanTaskRequest{
