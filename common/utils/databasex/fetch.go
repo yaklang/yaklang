@@ -48,6 +48,12 @@ func NewFetchWithConfig[T any](
 }
 
 func (f *Fetch[T]) fillBuffer() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Infof("Databasex Channel: Fetch panic: %v", r)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
 	// fetchSize := f.cfg.bufferSize
 	currentFetchSize := f.cfg.fetchSize
 	prevSendBuffer := 0
@@ -77,8 +83,7 @@ func (f *Fetch[T]) fillBuffer() {
 
 			items := f.fetchFromDB(currentFetchSize)
 
-			log.Errorf(
-				"Databasex Channel: Fetch Count in fetch buffer %s: buffer(%v|%v) prevBuf(%v) with fetchItem(%v): %v", f.cfg.name,
+			log.Infof("Databasex Channel: Fetch Count in fetch buffer %s: buffer(%v|%v) prevBuf(%v) with fetchItem(%v): %v", f.cfg.name,
 				bufferLen, bufferWeight, prevSendBuffer,
 				currentFetchSize, len(items),
 			)
@@ -99,7 +104,7 @@ func (f *Fetch[T]) fillBuffer() {
 func (f *Fetch[T]) Fetch() (T, error) {
 	var zero T
 	if f.buffer.Len() == 0 {
-		log.Errorf("Databasex Channel: Fetch size length %T: len: %d ", zero, f.buffer.Len())
+		log.Infof("Databasex Channel: Fetch size length %T: len: %d ", zero, f.buffer.Len())
 	}
 
 	item := <-f.buffer.OutputChannel()
@@ -128,6 +133,7 @@ func (f *Fetch[T]) Close(delete ...func([]T)) {
 			}
 			items = append(items, item)
 		}
+		log.Infof("Databasex Channel: Fetch Close: %s, items: %d", f.cfg.name, len(items))
 		delete[0](items)
 	}
 }
