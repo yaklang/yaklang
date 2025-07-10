@@ -1,0 +1,13 @@
+query = cli.String("query",cli.setVerboseName("查询关键词"), cli.setRequired(false),cli.setHelp("查询插件的关键词，如果未设置则默认查询所有插件"))
+cli.check()
+
+yak_plugins = []
+regYakPlugin = (name,desc)=>{
+    yak_plugins.Append({"name":name,"desc":desc})
+}
+
+regYakPlugin("Shiro 指纹识别 + 弱密码检测", "识别应用是否是 Shiro 应用，尝试检测默认 KEY (CBC/GCM 模式均支持)，当发现默认KEY之后进行一次利用链检测")
+
+for plugin_info in yak_plugins{
+    yakit.Info("插件名: %s, 插件描述: %s" % [plugin_info.name,plugin_info.desc])
+}
