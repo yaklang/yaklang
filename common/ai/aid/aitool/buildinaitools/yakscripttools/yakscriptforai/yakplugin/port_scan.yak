@@ -1,0 +1,93 @@
+__DESC__ = "一个全面的端口扫描工具，支持主机存活检测、SYN扫描和服务指纹识别。可以自定义扫描目标、端口范围、并发数、超时时间等参数，并能够进行多协议扫描（TCP等），支持服务识别和指纹探测。"
+
+__KEYWORDS__ = "端口扫描,服务扫描,指纹识别,主机存活,SYN扫描,网络扫描,安全扫描,渗透测试,port scan,service scan,fingerprint,host alive,network scanning,security scanning,penetration testing,syn scan,service detection,probe timeout,concurrent scan"
+
+hosts = cli.String("hosts", cli.setRequired(true))
+ports = cli.String("ports", cli.setDefault("22,443,445,80,8000-8004,3306,3389,5432,8080-8084,7000-7005"))
+
+probeTimeoutFloat = cli.Float("probe-timeout", cli.setDefault(5.0), cli.setRequired(false))
+probeMax = cli.Int("probe-max", cli.setRequired(false), cli.setDefault(4))
+
+// host alive scan
+skippedHostAliveScan = cli.Bool("skipped-host-alive-scan")
+hostAliveConcurrent = cli.Int("host-alive-concurrent", cli.setDefault(20), cli.setRequired(false))
+hostAliveTimeout = cli.Float("host-alive-timeout", cli.setDefault(5.0), cli.setRequired(false))
+hostAliveTCPPorts = cli.String("host-alive-ports", cli.setDefault("80,22,443"), cli.setRequired(false))
+
+
+concurrent = cli.Int("concurrent", cli.setDefault(50))
+synConcurrent = cli.Int("syn-concurrent", cli.setDefault(800))
+protos = cli.String("proto", cli.setDefault("tcp"))
+
+
+cli.check()
+
+if hosts == "" {
+	yakit.Error("未设置hosts")
+    return
+}
+
+opts = []
+
+if concurrent > 0 {
+    opts = append(opts, servicescan.concurrent(concurrent))
+}
+
+if protos != "" {
+    protoList = str.Split(protos, ",")
+	printf("PROTO: %#v\n", protos)
+    opts = append(opts, servicescan.proto(protoList...))
+}
+
+// 使用指纹检测规则条数
+if probeMax > 0 {
+	opts = append(opts, servicescan.maxProbes(probeMax))
+} else {
+	opts = append(opts, servicescan.maxProbes(3))
+}
+
+if probeTimeoutFloat > 0 {
+    opts = append(opts, servicescan.probeTimeout(probeTimeoutFloat))
+}
+
+opts = append(opts, servicescan.all())
+
+getPingScan = func() {
+	return ping.Scan(
+        hosts, ping.skip(skippedHostAliveScan), ping.tcpPingPorts(hostAliveTCPPorts),
+        ping.timeout(hostAliveTimeout), ping.concurrent(hostAliveConcurrent)
+    )
+}
+
+synResults, err := synscan.ScanFromPing(
+    getPingScan(), ports,
+    synscan.initHostFilter(hosts), synscan.initPortFilter(ports),
+    synscan.callback(func(i){
+        db.SavePortFromResult(i)
+    }),
+    synscan.concurrent(synConcurrent),
+)
+if err {
+    yakit.Error("synscan 失败: %v" % err)
+    return
+}
+
+res, err := servicescan.ScanFromSynResult(synResults, opts...)
+if err {
+    yakit.Error("service 扫描失败: %v" % err)
+    return
+}
+handleFpResult = func(result) {
+	defer func{
+		err = recover()
+		if err != nil { yakit.Error("call port-scan failed: %s", err) }
+	}
+
+    if result.IsOpen() {
+        yakit.Info("%v" % result.String())
+    }
+}
+for result := range res {
+    handleFpResult(result)
+}
+

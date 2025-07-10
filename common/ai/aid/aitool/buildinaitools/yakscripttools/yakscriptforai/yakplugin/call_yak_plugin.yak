@@ -1,14 +1,22 @@
+__DESC__ = "一个Yak插件调用器，支持调用不同类型的Yak插件（如MITM插件等）。可以通过指定插件名称和类型来执行插件，支持传递HTTP请求包等参数，并提供反馈机制来显示插件执行结果。"
+
+__KEYWORDS__ = "插件调用,MITM插件,插件执行,HTTP请求,插件管理,反馈机制,plugin caller,mitm plugin,plugin execution,http request,plugin management,feedback mechanism,yak plugin,hook manager"
+
 pluginName = cli.String("name", cli.setVerboseName("插件名"),cli.setHelp("插件名"),cli.setRequired(true))
-pluginType = cli.String("type",cli.setVerboseName("插件类型"), cli.setHelp("插件类型(可选值：`mitm`、`port-scan`)"),cli.setRequired(true))
 
 // mitm 参数
 reqPacket = cli.Text("flow", cli.setHelp("请求报文（mitm插件的请求参数）"))
-isHttps = cli.Bool("isHttps", cli.setHelp("目标是否是https（mitm插件的请求参数）"))
+isHttpsStr = cli.String("isHttps",cli.setVerboseName("是否是https站点"), cli.setHelp("目标是否是https（mitm插件的请求参数）"))
+isHttps = isHttpsStr == "true"
 mitmParamsIsOk = reqPacket != ""
 
 cli.check()
 
-
+script,err = db.GetYakitPluginByName(pluginName)
+if err {
+    yakit.Error("获取插件 `%v` 出错: %v" % [pluginName,err])
+}
+pluginType = script.Type
 
 manager, err = hook.NewMixPluginCaller()
 if err != nil {

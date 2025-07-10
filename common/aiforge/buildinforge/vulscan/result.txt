@@ -1,0 +1,144 @@
+基于扫描结果，请按照以下JSON格式输出漏洞扫描报告：
+
+```schema
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["@action", "scan_summary", "vulnerabilities", "recommendations"],
+  "properties": {
+    "@action": {
+      "const": "vulscan_result"
+    },
+    "scan_summary": {
+      "type": "object",
+      "required": ["target", "scan_type", "total_ports_scanned", "open_ports", "services_identified", "vulnerabilities_found"],
+      "properties": {
+        "target": {
+          "type": "string",
+          "description": "扫描目标"
+        },
+        "scan_type": {
+          "type": "string",
+          "description": "扫描类型"
+        },
+        "total_ports_scanned": {
+          "type": "integer",
+          "description": "扫描的端口总数"
+        },
+        "open_ports": {
+          "type": "integer",
+          "description": "发现的开放端口数量"
+        },
+        "services_identified": {
+          "type": "integer",
+          "description": "识别的服务数量"
+        },
+        "vulnerabilities_found": {
+          "type": "integer",
+          "description": "发现的漏洞数量"
+        }
+      }
+    },
+    "open_services": {
+      "type": "array",
+      "description": "发现的开放服务列表",
+      "items": {
+        "type": "object",
+        "required": ["port", "protocol", "service", "version"],
+        "properties": {
+          "port": {
+            "type": "integer",
+            "description": "端口号"
+          },
+          "protocol": {
+            "type": "string",
+            "description": "协议类型"
+          },
+          "service": {
+            "type": "string",
+            "description": "服务名称"
+          },
+          "version": {
+            "type": "string",
+            "description": "服务版本"
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "服务指纹信息"
+          }
+        }
+      }
+    },
+    "vulnerabilities": {
+      "type": "array",
+      "description": "发现的漏洞列表",
+      "items": {
+        "type": "object",
+        "required": ["vulnerability_id", "severity", "title", "description", "affected_service", "proof_of_concept"],
+        "properties": {
+          "vulnerability_id": {
+            "type": "string",
+            "description": "漏洞标识符（如CVE编号）"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["Critical", "High", "Medium", "Low", "Info"],
+            "description": "漏洞严重程度"
+          },
+          "title": {
+            "type": "string",
+            "description": "漏洞标题"
+          },
+          "description": {
+            "type": "string",
+            "description": "漏洞详细描述"
+          },
+          "affected_service": {
+            "type": "string",
+            "description": "受影响的服务"
+          },
+          "proof_of_concept": {
+            "type": "string",
+            "description": "漏洞证明或测试方法"
+          },
+          "impact": {
+            "type": "string",
+            "description": "漏洞影响"
+          },
+          "remediation": {
+            "type": "string",
+            "description": "修复建议"
+          }
+        }
+      }
+    },
+    "recommendations": {
+      "type": "object",
+      "required": ["immediate_actions", "security_improvements", "monitoring_suggestions"],
+      "properties": {
+        "immediate_actions": {
+          "type": "array",
+          "description": "需要立即执行的安全措施",
+          "items": {
+            "type": "string"
+          }
+        },
+        "security_improvements": {
+          "type": "array",
+          "description": "安全改进建议",
+          "items": {
+            "type": "string"
+          }
+        },
+        "monitoring_suggestions": {
+          "type": "array",
+          "description": "监控建议",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
+``` 
