@@ -241,7 +241,7 @@ forgeHandle = func(params) {
                     return
                 }
 
-                aidConfig.EmitStream(sprintf("解析日志分块[%d]实体",currentIndex),sprintf("解析到实体%d条：",len(res)))
+                aidConfig.EmitStream(sprintf("解析日志分块[%d]实体",currentIndex),sprintf("解析到实体%d条",len(res)))
                 for _, params := range res {
                     err := SaveEntityRawSQL(logDb, entityMarshal(params))
                     if err != nil {
