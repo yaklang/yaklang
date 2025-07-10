@@ -158,6 +158,5 @@ func GetIrSourceFromHash(hash string) (*memedit.MemEditor, error) {
 	//_, folder, _ := strings.Cut(source.FolderPath, source.ProgramName)
 	_, fileUrl := splitProjectPath(irSourceJoin(source.FolderPath, source.FileName))
 	editor := memedit.NewMemEditorWithFileUrl(code, fileUrl)
-	editor.SetUrl(fileUrl)
 	return editor, nil
 }
