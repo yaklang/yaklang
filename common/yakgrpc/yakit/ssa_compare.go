@@ -78,6 +78,9 @@ func NewSSARiskComparisonItem(opts ...SSAComparisonItemOption) (*ComparisonItem[
 	if s.ProgramName == "" && s.RuntimeId == "" {
 		return nil, utils.Error("program name or runtime id must be set for compare risk item")
 	}
+	item.ProgramName = s.ProgramName
+	item.TaskId = s.RuntimeId
+	// item.Kind = schema.RuntimeId
 	item.GetComparisonValue = func(ctx context.Context) <-chan *schema.SSARisk {
 		//TODO: 感觉db不应该在这里声明一个
 		db := consts.GetGormDefaultSSADataBase().Model(&schema.SSARisk{})
@@ -140,8 +143,8 @@ func WithSSARiskDiffSaveResultHandler(baseItem, compareItem string, kind string)
 		utils.GormTransactionReturnDb(consts.GetGormDefaultSSADataBase(), func(tx *gorm.DB) {
 			for _, risk := range risks {
 				result := &schema.SSADiffResult{
-					BaseLineProgName: baseItem,
-					CompareProgName:  compareItem,
+					BaseLine:         baseItem,
+					Compare:          compareItem,
 					RuleName:         risk.FromRule,
 					BaseLineRiskHash: risk.BaseValHash,
 					CompareRiskHash:  risk.NewValHash,
@@ -149,7 +152,7 @@ func WithSSARiskDiffSaveResultHandler(baseItem, compareItem string, kind string)
 					CompareType:      schema.RiskDiff,
 					DiffResultKind:   kind,
 				}
-				tx.Save(result)
+				SaveSSADiffResult(consts.GetGormDefaultSSADataBase(), result)
 			}
 		})
 	})
@@ -293,12 +296,12 @@ func (s *SSAComparator[T]) Compare(
 					continue
 				}
 				if !addChannel(&ComparisonResult[T]{
-					BaseValue:   zeroValue,
+					BaseValue:   compareValue.Val,
+					NewValue:    zeroValue,
 					FromRule:    compareValue.rule,
-					NewValue:    compareValue.Val,
-					BaseValHash: "",
-					NewValHash:  compareValue.Hash,
-					Status:      Add,
+					BaseValHash: compareValue.Hash,
+					NewValHash:  "",
+					Status:      Del,
 				}) {
 					return
 				}
@@ -309,12 +312,12 @@ func (s *SSAComparator[T]) Compare(
 					continue
 				}
 				if !addChannel(&ComparisonResult[T]{
-					BaseValue:   baseValue.Val,
-					NewValue:    zeroValue,
-					BaseValHash: baseValue.Hash,
+					BaseValue:   zeroValue,
+					NewValue:    baseValue.Val,
 					FromRule:    baseValue.rule,
-					NewValHash:  "",
-					Status:      Del,
+					BaseValHash: "",
+					NewValHash:  baseValue.Hash,
+					Status:      Add,
 				}) {
 					return
 				}
@@ -327,9 +330,9 @@ func (s *SSAComparator[T]) Compare(
 				if !addChannel(&ComparisonResult[T]{
 					BaseValue:   baseValue.Val,
 					NewValue:    compareValue.Val,
+					FromRule:    compareValue.rule,
 					BaseValHash: baseValue.Hash,
 					NewValHash:  compareValue.Hash,
-					FromRule:    compareValue.rule,
 					Status:      Equal,
 				}) {
 					return
@@ -372,21 +375,65 @@ func DoRiskDiff(context context.Context, base, compare *ypb.SSARiskDiffItem) (<-
 	if err != nil {
 		return nil, err
 	}
+
+	diffResults, err := GetSSADiffResult(consts.GetGormDefaultSSADataBase(), base.GetRiskRuntimeId(), compare.GetRiskRuntimeId())
+	if err != nil {
+		return nil, err
+	}
+	if len(diffResults) > 0 {
+		res := make(chan *ComparisonResult[*schema.SSARisk])
+		go func() {
+			for _, d := range diffResults {
+				compareResult := &ComparisonResult[*schema.SSARisk]{
+					BaseValue:   nil,
+					NewValue:    nil,
+					BaseValHash: d.BaseLineRiskHash,
+					NewValHash:  d.CompareRiskHash,
+					FromRule:    d.RuleName,
+					Status:      CompareStatus(d.Status),
+				}
+
+				if hash := d.BaseLineRiskHash; hash != "" {
+					if value, err := GetSSARiskByHash(consts.GetGormDefaultSSADataBase(), hash); err == nil {
+						compareResult.BaseValue = value
+					}
+				}
+
+				if hash := d.CompareRiskHash; hash != "" {
+					if value, err := GetSSARiskByHash(consts.GetGormDefaultSSADataBase(), hash); err == nil {
+						compareResult.NewValue = value
+					}
+				}
+
+				res <- compareResult
+			}
+		}()
+
+		return res, nil
+	}
+
 	// 执行对比
 	res := resultComparator.Compare(context, compareRiskItem,
 		// 对比结果保存到数据库
 		WithComparatorSaveResultHandler(func(risks []*ComparisonResult[*schema.SSARisk]) {
-			utils.GormTransactionReturnDb(consts.GetGormDefaultSSADataBase(), func(tx *gorm.DB) {
+			utils.GormTransactionReturnDb(consts.GetGormDefaultSSADataBase(), func(db *gorm.DB) {
+				kind := schema.Unknown
+				if base.RiskRuntimeId != "" {
+					kind = schema.RuntimeId
+				} else if base.ProgramName != "" {
+					kind = schema.Program
+				}
 				for _, risk := range risks {
 					result := &schema.SSADiffResult{
-						BaseLineProgName: base.GetProgramName(),
-						CompareProgName:  compare.GetProgramName(),
+						BaseLine:         base.GetRiskRuntimeId(),
+						Compare:          compare.GetRiskRuntimeId(),
 						RuleName:         risk.FromRule,
 						BaseLineRiskHash: risk.BaseValHash,
 						CompareRiskHash:  risk.NewValHash,
 						Status:           string(risk.Status),
+						DiffResultKind:   string(kind),
 					}
-					tx.Save(result)
+					SaveSSADiffResult(db, result)
 				}
 			})
 		}),
@@ -405,4 +452,67 @@ func DoRiskDiff(context context.Context, base, compare *ypb.SSARiskDiffItem) (<-
 		}),
 	)
 	return res, nil
+}
+
+func CreateSSADiffResult(DB *gorm.DB, r *schema.SSADiffResult) error {
+	if r == nil {
+		return utils.Errorf("create error: ssa-diff-result is nil")
+	}
+	if db := DB.Create(r); db.Error != nil {
+		return db.Error
+	}
+	return nil
+}
+
+func SaveSSADiffResult(DB *gorm.DB, r *schema.SSADiffResult) error {
+	if r == nil {
+		return utils.Errorf("save error: ssa-diff-result is nil")
+	}
+	if db := DB.Save(r); db.Error != nil {
+		return db.Error
+	}
+	return nil
+}
+
+func DeleteSSADiffResultByBaseLine(DB *gorm.DB, base []string, typs ...schema.SSADiffResultKind) error {
+	db := DB.Model(&schema.SSADiffResult{})
+	db = bizhelper.ExactQueryStringArrayOr(db, "base_line", base)
+	if len(typs) > 0 {
+		db = bizhelper.ExactQueryString(db, "diff_result_kind", string(typs[0]))
+	}
+	if db := db.Unscoped().Delete(&schema.SSADiffResult{}); db.Error != nil {
+		return db.Error
+	}
+	return nil
+}
+
+func DeleteSSADiffResultByCompare(DB *gorm.DB, compara []string, typs ...schema.SSADiffResultKind) error {
+	db := DB.Model(&schema.SSADiffResult{})
+	db = bizhelper.ExactQueryStringArrayOr(db, "compare", compara)
+	if len(typs) > 0 {
+		db = bizhelper.ExactQueryString(db, "diff_result_kind", string(typs[0]))
+	}
+	if db := db.Unscoped().Delete(&schema.SSADiffResult{}); db.Error != nil {
+		return db.Error
+	}
+	return nil
+}
+
+func DeleteSSADiffResultByRule(DB *gorm.DB, rules []string) error {
+	db := DB.Model(&schema.SSADiffResult{})
+	db = bizhelper.ExactQueryStringArrayOr(db, "rule_name", rules)
+	if db := db.Unscoped().Delete(&schema.SSADiffResult{}); db.Error != nil {
+		return db.Error
+	}
+	return nil
+}
+
+func GetSSADiffResult(DB *gorm.DB, baseline, compare string) ([]*schema.SSADiffResult, error) {
+	var r []*schema.SSADiffResult
+	if db := DB.Model(&schema.SSADiffResult{}).
+		Where("base_line = ?", baseline).
+		Where("compare = ?", compare).Find(&r); db.Error != nil {
+		return nil, utils.Errorf("get ssa-diff-result failed: %s", db.Error)
+	}
+	return r, nil
 }
