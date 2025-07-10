@@ -136,12 +136,17 @@ func (c *config) parseProjectWithFS(
 	prog.SetPreHandler(true)
 	prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", filesystem, c.info)
 	start = time.Now()
-
-	fileContets := make([]*ssareducer.FileContent, 0, preHandlerTotal)
+	var AstErr error
+	fileContents := make([]*ssareducer.FileContent, 0, preHandlerTotal)
 	for fileContent := range c.getFileHandler(
 		filesystem, preHandlerFiles, handlerFilesMap,
 	) {
-		fileContets = append(fileContets, fileContent)
+		fileContents = append(fileContents, fileContent)
+		if fileContent.Err != nil {
+			AstErr = utils.JoinErrors(AstErr,
+				utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err),
+			)
+		}
 
 		preHandlerProcess() // notify the process
 		// handler
@@ -150,8 +155,10 @@ func (c *config) parseProjectWithFS(
 			language.PreHandlerProject(filesystem, fileContent.AST, builder, fileContent.Path)
 		}
 	}
-	// },
 	preHandlerTime = time.Since(start)
+	if AstErr != nil && c.strictMode {
+		return nil, utils.Errorf("pre-handler parse project error: %v", AstErr)
+	}
 	if c.isStop() {
 		return nil, ErrContextCancel
 	}
@@ -174,7 +181,7 @@ func (c *config) parseProjectWithFS(
 	// ssareducer.FilesHandler(
 	// 	c.ctx, filesystem, handlerFiles,
 	// 	func(path string, content []byte) {
-	for _, fileContent := range fileContets {
+	for _, fileContent := range fileContents {
 		if _, needBuild := handlerFilesMap[fileContent.Path]; !needBuild {
 			continue // skip if not in handlerFilesMap
 		}
@@ -198,9 +205,6 @@ func (c *config) parseProjectWithFS(
 	}
 
 	parseTime = time.Since(start)
-	// if err != nil {
-	// 	return nil, utils.Wrap(err, "parse project error")
-	// }
 	if c.isStop() {
 		return nil, ErrContextCancel
 	}

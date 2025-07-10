@@ -14,6 +14,7 @@ type FileContent struct {
 	Path    string
 	Content []byte
 	AST     ssa.FrontAST
+	Err     error
 }
 
 func FilesHandler(
@@ -40,9 +41,8 @@ func FilesHandler(
 	parseASTPipe := pipeline.NewPipe[*FileContent, *FileContent](
 		ctx, bufSize, func(fileContent *FileContent) (*FileContent, error) {
 			ast, err := handler(fileContent.Path, fileContent.Content)
-			if err == nil {
-				fileContent.AST = ast
-			}
+			fileContent.AST = ast
+			fileContent.Err = err
 			return fileContent, nil
 		},
 	)
