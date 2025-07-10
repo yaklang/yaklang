@@ -114,9 +114,11 @@ forgeHandle = func(params) {
         }else if filePath != "" {
             reader,err = file.Open(filePath)
             if err != nil {
+                log.Error("open file path:[%s] fail:[%v]", filePath,err)
                 return nil
             }
         }else {
+            log.Error("not found can use params:[%v]", params)
             return nil
         }
 
