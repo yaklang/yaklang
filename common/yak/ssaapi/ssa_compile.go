@@ -61,7 +61,7 @@ func (c *config) parseFile() (ret *Program, err error) {
 	}
 	prog.Finish()
 	wait := func() {}
-	if prog.EnableDatabase { // save program
+	if prog.DatabaseKind != ssa.ProgramCacheMemory { // save program
 		wait = prog.UpdateToDatabase()
 	}
 	total := prog.Cache.CountInstruction()

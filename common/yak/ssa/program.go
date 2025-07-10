@@ -19,7 +19,7 @@ import (
 )
 
 func NewProgram(
-	ProgramName string, enableDatabase bool, kind ssadb.ProgramKind,
+	ProgramName string, databaseKind ProgramCacheKind, kind ssadb.ProgramKind,
 	fs fi.FileSystem, programPath string, fileSize int,
 	ttl ...time.Duration,
 ) *Program {
@@ -52,9 +52,9 @@ func NewProgram(
 	}
 	if kind == Application {
 		prog.Application = prog
-		prog.Cache = NewDBCache(prog, enableDatabase, fileSize, ttl...)
+		prog.Cache = NewDBCache(prog, databaseKind, fileSize, ttl...)
 	}
-	prog.EnableDatabase = enableDatabase
+	prog.DatabaseKind = databaseKind
 	prog.Loader = ssautil.NewPackageLoader(
 		ssautil.WithFileSystem(fs),
 		ssautil.WithIncludePath(programPath),
@@ -67,7 +67,7 @@ func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path 
 	fullPath := prog.GetCurrentEditor().GetFilename()
 	endPath := fs.Join(path...)
 	programPath, _, _ := strings.Cut(fullPath, endPath)
-	subProg := NewProgram(name, prog.EnableDatabase, kind, fs, programPath, 0)
+	subProg := NewProgram(name, prog.DatabaseKind, kind, fs, programPath, 0)
 	subProg.Application = prog.Application
 	subProg.config = prog.config
 

@@ -30,6 +30,9 @@ func NewFetchWithConfig[T any](
 	fetchFromDB func(int) []T,
 	cfg *config,
 ) *Fetch[T] {
+	if utils.IsNil(fetchFromDB) {
+		return nil
+	}
 	ctx, cancel := context.WithCancel(cfg.ctx)
 	f := &Fetch[T]{
 		fetchFromDB: fetchFromDB,

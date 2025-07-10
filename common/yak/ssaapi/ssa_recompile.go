@@ -10,7 +10,7 @@ import (
 
 // save to Profile SSAProgram
 func (c *config) SaveConfig() {
-	if c.enableDatabase {
+	if c.enableDatabase != ssa.ProgramCacheMemory {
 		irProg, err := ssadb.GetProgram(c.ProgramName, ssa.Application)
 		if err != nil {
 			log.Errorf("irProg is nil, save config failed: %v", err)
