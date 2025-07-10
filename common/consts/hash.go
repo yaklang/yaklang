@@ -4,5 +4,5 @@ package consts
 
 const ExistedCorePluginEmbedFSHash string = "e7fb28111fd8e3b7df4686ec8c8bd42f74031e0ccaca9869806494b03256e914"
 const ExistedSyntaxFlowEmbedFSHash string = "239c58e38308da71bfe4a669488fe93b70389fea1cd67522e311cd4abb74c8b4"
-const ExistedBuildInForgeEmbedFSHash string = "eb7d16972e3b7c54ac2502d079eb0a9f4b281a5e944ec0b2fd9d1ad946c9696c"
+const ExistedBuildInForgeEmbedFSHash string = "78bc90462d2480806079cd6a1a5f321737e383f96ada35e6fb2c66bcaf2075d3"
 const ExistedBuildInAIToolEmbedFSHash string = "f6af0a88bed71da387045134a67b12396ed97e2938b104687e67dd6ed50f3b5c"
