@@ -85,6 +85,30 @@ type AiOutputEvent struct {
 	Processes []*AiProcess `gorm:"many2many:ai_processes_and_events;"`
 }
 
+func (e *AiOutputEvent) ShouldSave() bool {
+	return !e.IsSync && e.Type != EVENT_TYPE_CONSUMPTION
+}
+
+func (e *AiOutputEvent) IsInteractive() bool {
+	if e.IsJson {
+		var i map[string]any
+		if err := json.Unmarshal(e.Content, &i); err == nil {
+			// 检查事件类型是否为需要交互的类型
+			switch e.Type {
+			case EVENT_TYPE_PLAN_REVIEW_REQUIRE,
+				EVENT_TYPE_TASK_REVIEW_REQUIRE,
+				EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE,
+				EVENT_TYPE_PERMISSION_REQUIRE,
+				EVENT_TYPE_REQUIRE_USER_INTERACTIVE,
+				EVENT_TYPE_TOOL_CALL_WATCHER,
+				EVENT_TYPE_REVIEW_RELEASE:
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (e *AiOutputEvent) GetInteractiveId() string {
 	if e.IsJson {
 		var i map[string]any
