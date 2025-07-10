@@ -1,0 +1,25 @@
+__DESC__ = "一个基于指纹名称查找相关插件的工具，通过计算指纹名称与插件名称的相似度来匹配和排序最相关的插件，支持模糊匹配和相似度计算。"
+
+__KEYWORDS__ = "插件查询,指纹匹配,相似度计算,插件搜索,数据库查询,模糊匹配,plugin query,fingerprint matching,similarity calculation,plugin search,database query,fuzzy matching,yak plugin,script search"
+
+fpName = cli.String("fingerprint", cli.setVerboseName("指纹名"),cli.setHelp("用于查找插件的指纹名"))
+
+limit = 5
+cli.check()
+
+allScript = db.YieldYakScriptAll()
+scriptNames = []
+scriptList = []
+for i in allScript{
+    sim = str.CalcSimilarity("shiro",str.ToLower(i.ScriptName))
+    scriptList.Append([sim,i])
+}
+x.Sort(scriptList, (x,y)=> scriptList[x][0] > scriptList[y][0])
+
+if len(scriptList) > limit{
+    scriptList = scriptList[:limit]
+}
+scriptNames = x.Map(scriptList, d=>d[1].ScriptName)
+for i in scriptNames{
+    yakit.Info("%v", i)
+}
