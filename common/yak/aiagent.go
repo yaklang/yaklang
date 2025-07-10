@@ -175,6 +175,7 @@ var AIAgentExport = map[string]any{
 	"disableToolUse":               WithDisableToolUse,
 	"aiAutoRetry":                  WithAIAutoRetry,
 	"aiTransactionRetry":           WithAITransactionRetry,
+	"disableOutputType":            WithDisableOutputType,
 
 	/*
 		ai utils api
