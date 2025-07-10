@@ -108,18 +108,18 @@ func (c *InstructionsIndexDB) Close() {
 	c.save.Close()
 }
 
-func NewInstructionIndex(enable bool, name string, saveSize int, saveFunc func([]InstructionsIndexItem)) InstructionsIndex {
-	if enable {
+func NewInstructionIndex(kind ProgramCacheKind, name string, saveSize int, saveFunc func([]InstructionsIndexItem)) InstructionsIndex {
+	if kind != ProgramCacheMemory {
 		return NewInstructionsIndexDB(name, saveSize, saveFunc)
 	} else {
 		return NewInstructionsIndexMem(name)
 	}
 }
 
-func (c *ProgramCache) initIndex(databaseEnable bool, saveSize int) {
+func (c *ProgramCache) initIndex(databaseKind ProgramCacheKind, saveSize int) {
 
 	c.VariableIndex = NewInstructionIndex(
-		databaseEnable, "VariableIndex", saveSize,
+		databaseKind, "VariableIndex", saveSize,
 		func(items []InstructionsIndexItem) {
 			utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
 				for _, item := range items {
@@ -130,7 +130,7 @@ func (c *ProgramCache) initIndex(databaseEnable bool, saveSize int) {
 		},
 	)
 	c.MemberIndex = NewInstructionIndex(
-		databaseEnable, "MemberIndex", saveSize,
+		databaseKind, "MemberIndex", saveSize,
 		func(items []InstructionsIndexItem) {
 			utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
 				for _, item := range items {
@@ -142,7 +142,7 @@ func (c *ProgramCache) initIndex(databaseEnable bool, saveSize int) {
 	)
 
 	c.ClassIndex = NewInstructionIndex(
-		databaseEnable, "ClassIndex", saveSize,
+		databaseKind, "ClassIndex", saveSize,
 		func(items []InstructionsIndexItem) {
 			utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
 				for _, item := range items {
@@ -154,7 +154,7 @@ func (c *ProgramCache) initIndex(databaseEnable bool, saveSize int) {
 	)
 
 	c.OffsetCache = NewInstructionIndex(
-		databaseEnable, "OffsetCache", saveSize,
+		databaseKind, "OffsetCache", saveSize,
 		func(items []InstructionsIndexItem) {
 			irOffset := make([]*ssadb.IrOffset, 0, len(items)*2)
 			add := func(i ...*ssadb.IrOffset) {
@@ -188,7 +188,7 @@ func (c *ProgramCache) initIndex(databaseEnable bool, saveSize int) {
 	)
 
 	c.ConstCache = NewInstructionIndex(
-		databaseEnable, "ConstCache", saveSize,
+		databaseKind, "ConstCache", saveSize,
 		func(ii []InstructionsIndexItem) {
 		},
 	)

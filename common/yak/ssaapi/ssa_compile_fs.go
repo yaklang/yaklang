@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 )
@@ -205,7 +206,7 @@ func (c *config) parseProjectWithFS(
 	}
 	process = 0.9 // %90
 	prog.Finish()
-	if prog.EnableDatabase { // save program
+	if prog.DatabaseKind != ssa.ProgramCacheMemory { // save program
 		log.Errorf("program %s save to database", prog.Name)
 		start := time.Now()
 		prog.UpdateToDatabaseWithWG(&wg)
