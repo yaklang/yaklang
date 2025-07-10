@@ -123,6 +123,7 @@ var (
 	WithDisableToolUse               = aid.WithDisableToolUse
 	WithAIAutoRetry                  = aid.WithAIAutoRetry
 	WithAITransactionRetry           = aid.WithAITransactionRetry
+	WithDisableOutputType            = aid.WithDisableOutputEvent
 
 	// aiforge options
 	WithAIDOptions           = aiforge.WithAIDOptions
