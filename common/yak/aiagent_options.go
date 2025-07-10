@@ -160,7 +160,7 @@ func NewLiteForge(name string, opts ...any) (*aiforge.LiteForge, error) {
 			}
 		}
 	}
-	extendAIDOptions = append(extendAIDOptions, aiagent.AIDOptions()...)
+	extendAIDOptions = append(aiagent.AIDOptions(), extendAIDOptions...)
 	return aiforge.NewLiteForge(name, append(liteForgeOpts, aiforge.WithExtendLiteForge_AIDOption(extendAIDOptions...))...)
 }
 
