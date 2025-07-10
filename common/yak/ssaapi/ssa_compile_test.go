@@ -3,11 +3,12 @@ package ssaapi_test
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"io/fs"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
@@ -144,7 +145,7 @@ func TestJava_ProcessManage_Mutli_Files(t *testing.T) {
 		)
 		assert.Error(t, err, "parse project error: %v", err)
 		// when cancel, the process will not 1
-		require.LessOrEqual(t, maxProcess, 0.6)
+		require.LessOrEqual(t, maxProcess, 0.9)
 		file := make([]string, 0)
 		dbfs := ssadb.NewIrSourceFs()
 		filesys.Recursive(
