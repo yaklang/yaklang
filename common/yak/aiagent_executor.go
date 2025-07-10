@@ -104,7 +104,7 @@ func (ag *Agent) AIDOptions() []aid.Option {
 	if ag.CoordinatorId != "" {
 		opts = append(opts, aid.WithCoordinatorId(ag.CoordinatorId))
 	}
-	opts = append(opts, ag.ExtendAIDOptions...)
+	opts = append(ag.ExtendAIDOptions, opts...)
 	return opts
 }
 

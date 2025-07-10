@@ -32,36 +32,36 @@ func (ew *EventWatcherManager) StopWatch(key string) {
 	}
 }
 
-func (ew *EventWatcherManager) Watch(key string, callback func(key string)) {
+func (ew *EventWatcherManager) Watch(key string, callback func(key string), firstWatch func(key string)) {
 	ew.mu.Lock()
-	defer ew.mu.Unlock()
-	if ch, exists := ew.watchingMap[key]; !exists {
+	ch, exists := ew.watchingMap[key]
+	ew.mu.Unlock()
+	if !exists {
+		firstWatch(key)
 		ctx, cancel := context.WithCancel(ew.ctx)
 		watchChannel := chanx.NewUnlimitedChan[struct{}](ctx, 2)
 		ew.watchingMap[key] = watchChannel
-		go func() {
-			defer ew.StopWatch(key)
-			defer cancel()
-			triggerCount := ew.triggerCount
-			count := 0
+		defer ew.StopWatch(key)
+		defer cancel()
+		triggerCount := ew.triggerCount
+		count := 0
 
-			tr := time.NewTimer(ew.triggerTime)
-			var ok bool
-			for !ok {
-				select {
-				case <-watchChannel.OutputChannel():
-					count++
-					if count >= triggerCount {
-						ok = true
-					}
-				case <-tr.C:
+		tr := time.NewTimer(ew.triggerTime)
+		var ok bool
+		for !ok {
+			select {
+			case <-watchChannel.OutputChannel():
+				count++
+				if count >= triggerCount {
 					ok = true
-				case <-ew.ctx.Done():
-					return
 				}
+			case <-tr.C:
+				ok = true
+			case <-ew.ctx.Done():
+				return
 			}
-			callback(key)
-		}()
+		}
+		callback(key)
 	} else {
 		ch.SafeFeed(struct{}{})
 	}
