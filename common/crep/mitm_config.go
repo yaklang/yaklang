@@ -124,19 +124,19 @@ func extractGMCertAndKey(gmC gmtls.Certificate) (*gmx509.Certificate, interface{
 func parseGMCertificateFromDER(gmCA, gmKey []byte) (*gmx509.Certificate, interface{}) {
 	caDer, err := gmx509.ParseCertificate(gmCA)
 	if err != nil {
-		log.Warnf("parse GM ca[pem/der] failed: %s", err)
+		log.Warnf("parse GM ca as [der] format failed: %s", err)
 		return nil, nil
 	}
 
 	keyDer, err := gmx509.ParsePKCS8PrivateKey(gmKey, nil)
 	if err != nil {
-		log.Warnf("parse GM key[pem/der] pkcs8 pkey failed: %s", err)
+		log.Warnf("parse GM key as [der] format pkcs8 pkey failed: %s", err)
 		return nil, nil
 	}
 
 	keyRawBytes, err := gmx509.MarshalSm2PrivateKey(keyDer, nil)
 	if err != nil {
-		log.Warnf("marshal GM key[pem/der] pkcs8 pkey failed: %s", err)
+		log.Warnf("marshal GM key as [der] format pkey failed: %s", err)
 		return nil, nil
 	}
 
@@ -154,11 +154,11 @@ func parseGMCertificateFromDER(gmCA, gmKey []byte) (*gmx509.Certificate, interfa
 
 func MITM_SetCaCertAndPrivKey(ca []byte, key []byte, gmCA []byte, gmKey []byte) MITMConfig {
 	return func(server *MITMServer) error {
-		if ca == nil || key == nil {
+		if (ca == nil || key == nil) && (defaultCA != nil && defaultKey != nil) {
 			return MITM_SetCaCertAndPrivKey(defaultCA, defaultKey, gmCA, gmKey)(server)
 		}
 
-		if (gmCA == nil || gmKey == nil) && (defaultGMCA != nil && defaultGMKey == nil) {
+		if (gmCA == nil || gmKey == nil) && (defaultGMCA != nil && defaultGMKey != nil) {
 			return MITM_SetCaCertAndPrivKey(ca, key, defaultGMCA, defaultGMKey)(server)
 		}
 
@@ -214,7 +214,7 @@ func MITM_SetCaCertAndPrivKey(ca []byte, key []byte, gmCA []byte, gmKey []byte) 
 func parseRegularCertificateFromDER(ca, key []byte) (tls.Certificate, error) {
 	caDer, err := x509.ParseCertificate(ca)
 	if err != nil {
-		return tls.Certificate{}, utils.Errorf("parse ca[pem/der] failed: %s", err)
+		return tls.Certificate{}, utils.Errorf("parse ca as [der] format failed: %s", err)
 	}
 
 	caPem := pem.EncodeToMemory(&pem.Block{Type: `CERTIFICATE`, Bytes: caDer.Raw})
@@ -233,7 +233,7 @@ func parseRegularPrivateKeyFromDER(key []byte) ([]byte, error) {
 		// 尝试PKCS1格式
 		keyDer, err = x509.ParsePKCS1PrivateKey(key)
 		if err != nil {
-			return nil, utils.Errorf("parse key[pem/der] pkcs1/pkcs8 pkey failed: %s", err)
+			return nil, utils.Errorf("parse key as [der] format pkcs1/pkcs8 pkey failed: %s", err)
 		}
 		// PKCS1格式
 		return pem.EncodeToMemory(&pem.Block{
@@ -245,7 +245,7 @@ func parseRegularPrivateKeyFromDER(key []byte) ([]byte, error) {
 	// PKCS8格式
 	keyRawBytes, err := x509.MarshalPKCS8PrivateKey(keyDer)
 	if err != nil {
-		return nil, utils.Errorf("marshal key[pem/der] pkcs8 pkey failed: %s", err)
+		return nil, utils.Errorf("marshal key as [der] format pkcs8 pkey failed: %s", err)
 	}
 	return pem.EncodeToMemory(&pem.Block{Type: `PRIVATE KEY`, Bytes: keyRawBytes}), nil
 }
