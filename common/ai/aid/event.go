@@ -194,6 +194,18 @@ func (r *Config) EmitStatus(key string, value any) {
 	})
 }
 
+func (r *Config) EmitStream(nodeId string, content string) {
+	r.emit(&Event{
+		CoordinatorId: r.id,
+		Type:          EVENT_TYPE_STREAM,
+		NodeId:        nodeId,
+		IsJson:        true,
+		IsStream:      true,
+		StreamDelta:   []byte(content),
+		Timestamp:     time.Now().Unix(),
+	})
+}
+
 func (r *Config) EmitStructured(nodeId string, i any) {
 	r.emitJson(EVENT_TYPE_STRUCTURED, nodeId, i)
 }

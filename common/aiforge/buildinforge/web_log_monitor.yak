@@ -97,14 +97,19 @@ func UpdateEntityRemarkRawSQL(eventDb, entity, remark) {
     return result.Error
 }
 
-// text = cli.String("text", cli.setHelp("直接输入的长文本"))
-text = ""
 filePaths = cli.FileNames("filePath", cli.setHelp("长文本文件"), cli.setVerboseName("分析目标文件"))
 chunkBatch = cli.Int("chunk", cli.setHelp("日志分片长度"), cli.setVerboseName("日志分片大小（行）"), cli.setDefault(30))
+concurrency = cli.Int("concurrency", cli.setHelp("ai并发调用限制"), cli.setVerboseName("ai并发调用限制"), cli.setDefault(20))
+triggerSec = cli.Int("triggerSec", cli.setHelp("ai分析实体行为触发器触发间隔"), cli.setVerboseName("触发器触发间隔（秒）"), cli.setDefault(30))
+triggerCount = cli.Int("triggerCount", cli.setHelp("ai分析实体行为触发器触发次数"), cli.setVerboseName("触发器触发次数"), cli.setDefault(20))
 cli.check()
 
 if chunkBatch <= 0 {
     chunkBatch = 10
+}
+
+if concurrency <= 0 {
+    concurrency = 20
 }
 
 filePath = filePaths[0]
@@ -133,7 +138,7 @@ forgeHandle = func(params) {
     }
 
     yakit.Info("start to build x.NewEventWatcher with trigger count: 20")
-    ew := x.NewEventWatcher(context.Background(), time.ParseDuration("5m")~, 20)
+    ew := x.NewEventWatcher(context.Background(), time.ParseDuration(sprintf("%ds",triggerSec))~, triggerCount)
 
     update := func(attackType, entityValue) {
         yakit.Info("start to update type: %v with value: %#v", attackType, entityValue)
@@ -149,7 +154,22 @@ forgeHandle = func(params) {
         }
     }
 
-    analyzerWebRequest := func(sourceIP) {
+    entityMarshal := func(e) {
+        return {"Value": e.GetString("entity_value"), "Type": e.GetString("entity_type"), "Remark": ""}
+    }
+
+    eventMarshal := func(e) {
+        return {"SourceIP": e.GetString("source_ip"), "RequestMethod": e.GetString("request_method"), "RequestURI": e.GetString("request_uri"), "EventTime": parseISO(e.GetString("timestamp")), "UserAgent": e.GetString("user_agent"), "StatusCode": e.GetInt("status_code"), "InferredStatus": e.GetString("inferred_status"), "ErrorMessage": e.GetString("error_message"), "LogType": e.GetString("log_type")}
+    }
+
+    cod,err :=  aiagent.NewExecutor("web_log_mintor",nil)
+    if err != nil {
+        log.Error("%v", err)
+        return err
+    }
+    aidConfig = cod.GetConfig()
+
+    analyzeLog := func(sourceIP) {
         yakit.Info("start to analyze web request with ip: %#v", sourceIP)
         event, err := QueryRecentEventRawSQL(logDb, sourceIP, time.ParseDuration("1h")~)
         if err != nil {
@@ -166,6 +186,7 @@ forgeHandle = func(params) {
             return
         }
 
+        aidConfig.EmitStream(sprintf("分析目标[%s]行为",sourceIP),eventJsonString)
         shrinked := len(eventJsonString) > 100 ? sprint(string(eventJsonString[:100])) : eventJsonString
         yakit.Info("start to call event_analyzer with len:%v data: %#v", len(eventJsonString), shrinked)
         res, err := aiagent.ExecuteForge("event_analyzer", eventJsonString)
@@ -190,16 +211,11 @@ forgeHandle = func(params) {
 
         update(reportIns.GetString("attack_type"), sourceIP)
     }
-    entityMarshal := func(e) {
-        return {"Value": e.GetString("entity_value"), "Type": e.GetString("entity_type"), "Remark": ""}
-    }
-
-    eventMarshal := func(e) {
-        return {"SourceIP": e.GetString("source_ip"), "RequestMethod": e.GetString("request_method"), "RequestURI": e.GetString("request_uri"), "EventTime": parseISO(e.GetString("timestamp")), "UserAgent": e.GetString("user_agent"), "StatusCode": e.GetInt("status_code"), "InferredStatus": e.GetString("inferred_status"), "ErrorMessage": e.GetString("error_message"), "LogType": e.GetString("log_type")}
-    }
-
     var cacheBuffer = make([]string, 0)
+
+    swg := sync.NewSizedWaitGroup(concurrency)
     count := 0
+    index := 0
     reducer := aireducer.NewReducerFromReader(
         reader,
         aireducer.reducerCallback(func(config, memory, chunk) {
@@ -210,20 +226,22 @@ forgeHandle = func(params) {
             if len(cacheBuffer) < chunkBatch {
                 return nil
             }
+            index += 1
+            currentIndex := index
 
             defer func() {
                 cacheBuffer = make([]string, 0)
             }()
             logBuffer := str.Join(cacheBuffer, "\n")
-            wg := sync.NewWaitGroup()
-            wg.Add(1)
+            swg.Add(1)
             go func() {
-                defer wg.Done()
-                res, err := aiagent.ExecuteForge("entity_identify", logBuffer)
+                defer swg.Done()
+                res, err := aiagent.ExecuteForge("entity_identify", logBuffer, aiagent.eventHandler(nil))
                 if err != nil {
                     return
                 }
 
+                aidConfig.EmitStream(sprintf("解析日志分块[%d]实体",currentIndex),sprintf("解析到实体%d条：",len(res)))
                 for _, params := range res {
                     err := SaveEntityRawSQL(logDb, entityMarshal(params))
                     if err != nil {
@@ -234,39 +252,41 @@ forgeHandle = func(params) {
             }()
 
 
-            wg.Add(1)
+            swg.Add(1)
             go func() {
-                defer wg.Done()
-                res, err := aiagent.ExecuteForge("log_event_formatter", logBuffer)
+                defer swg.Done()
+                res, err := aiagent.ExecuteForge("log_event_formatter", logBuffer,aiagent.eventHandler(nil))
                 if err != nil {
                     return
                 }
 
+                aidConfig.EmitStream(sprintf("解析日志分块[%d]事件",currentIndex),sprintf("解析日志事件%d条",len(res)))
                 for _, params := range res {
                     event := eventMarshal(params)
-                    if event.LogType == "WEB_REQUEST" {
-                        ew.Watch(event.SourceIP, analyzerWebRequest)
-                    }
-
                     err := SaveEvent(logDb, event)
                     if err != nil {
                         log.Error("failed to save event: %v", err)
                         return
                     }
+                    if event.LogType == "WEB_REQUEST" {
+                        ew.Watch(event.SourceIP,analyzeLog ,func(key) {
+                            aidConfig.EmitStream("开始监控目标",sprintf("监控访问目标：[%s], 检测足够相关事件后分析目标行为",key))
+                        })
+                    }
+
                 }
             }()
-
-
-            wg.Wait()
             return nil
         }),
         aireducer.separator("[INFO]"),
         aireducer.memory(aiagent.GetDefaultMemory()),
     )~
     err = reducer.Run()
+    swg.Wait()
     if err != nil {
         return err
     }
+
 
     return nil
 }
