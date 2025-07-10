@@ -100,7 +100,12 @@ func UpdateEntityRemarkRawSQL(eventDb, entity, remark) {
 // text = cli.String("text", cli.setHelp("直接输入的长文本"))
 text = ""
 filePaths = cli.FileNames("filePath", cli.setHelp("长文本文件"), cli.setVerboseName("分析目标文件"))
+chunkBatch = cli.Int("chunk", cli.setHelp("日志分片长度"), cli.setVerboseName("日志分片大小（行）"), cli.setDefault(30))
 cli.check()
+
+if chunkBatch <= 0 {
+    chunkBatch = 10
+}
 
 filePath = filePaths[0]
 
@@ -202,7 +207,7 @@ forgeHandle = func(params) {
             shrinked := len(chunk.Data()) > 200 ? string(chunk.Data()[:200]) : string(chunk.Data())
             yakit.Info("ai-reducer start to handle chunk[%v], len: %v data: %#v", count, chunk.BytesSize(), string(shrinked))
             cacheBuffer = append(cacheBuffer, string(chunk.Data()))
-            if len(cacheBuffer) < 10 {
+            if len(cacheBuffer) < chunkBatch {
                 return nil
             }
 
