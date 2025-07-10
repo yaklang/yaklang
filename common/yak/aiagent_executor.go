@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
@@ -44,6 +45,7 @@ func ExecuteForge(forgeName string, i any, iopts ...any) (any, error) {
 		// todo: support json config forge
 	}
 	var defaultForgeHandle func(items []*ypb.ExecParamItem, opts ...any) (any, error)
+
 	params := aiforge.Any2ExecParams(i)
 	engine := NewYakitVirtualClientScriptEngine(nil)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
@@ -71,7 +73,7 @@ func ExecuteForge(forgeName string, i any, iopts ...any) (any, error) {
 		BindAIConfigToEngine(engine, iopts...)
 		return nil
 	})
-	forgeCode := `query = cli.String("query", cli.setHelp("用户输入"),cli.setRequired(true))`
+	forgeCode := `query = cli.String("query", cli.setHelp("用户输入"),cli.setRequired(true), cli.setVerboseName("原始用户输入"))`
 	if forgeIns.ForgeContent != "" {
 		forgeCode = forgeIns.ForgeContent
 	}
@@ -82,11 +84,14 @@ func ExecuteForge(forgeName string, i any, iopts ...any) (any, error) {
 	if v, ok := subEngine.GetVar(HOOK_AI_FORGE); ok {
 		if yakFunc, ok := v.(*yakvm.Function); ok {
 			if yakFunc.IsVariableParameter() {
+				log.Infof("call yak function %s with params %v with variable parameter", HOOK_AI_FORGE, utils.ShrinkString(params, 200))
 				return subEngine.SafeCallYakFunction(ag.ctx, HOOK_AI_FORGE, append([]any{params}, iopts...))
 			} else {
+				log.Infof("call yak function %s with params %v", HOOK_AI_FORGE, utils.ShrinkString(params, 200))
 				return subEngine.SafeCallYakFunction(ag.ctx, HOOK_AI_FORGE, []any{params})
 			}
 		} else {
+			log.Infof("call yak function (defaultForgeHandle) %s with params %v", HOOK_AI_FORGE, utils.ShrinkString(params, 200))
 			return defaultForgeHandle(params, iopts...)
 		}
 	} else {

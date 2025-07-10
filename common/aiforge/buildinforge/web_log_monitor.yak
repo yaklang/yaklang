@@ -3,7 +3,6 @@ __DESC__ = "该forge用于处理和分析日志数据，能够创建和管理日
 __KEYWORDS__ = "日志处理,日志分析,数据库管理,事件监控,风险评估,实体识别,威胁检测,数据存储,web请求,日志结构化"
 
 func RunSQLMigrations(eventDb) {
-    // Migration script for web_log_events
     createWebLogTableSQL := `
         CREATE TABLE IF NOT EXISTS web_log_events (
             id            INTEGER PRIMARY KEY,
@@ -22,7 +21,8 @@ func RunSQLMigrations(eventDb) {
     if err != nil {
         return err
     }
-    // Migration script for entities
+
+// Migration script for entities
     entitiesSQL := `
          CREATE TABLE IF NOT EXISTS entities (
             id         INTEGER PRIMARY KEY,
@@ -36,167 +36,176 @@ func RunSQLMigrations(eventDb) {
     return eventDb.Exec(entitiesSQL).Error
 }
 
-
-
 func NewWebLogEventDB() {
-	eventDB,err := db.OpenTempSqliteDatabase()
+    eventDB, err := db.OpenTempSqliteDatabase()
     if err != nil {
-        return nil,err
+        return nil, err
     }
+
     err = RunSQLMigrations(eventDB)
-	if err != nil {
-        return nil,err
+    if err != nil {
+        return nil, err
     }
-	return eventDB, nil
+
+    return eventDB, nil
 }
-
-
 
 func parseISO(isoTime) {
-    t,_ = time.Parse("2006-01-02T15:04:05Z07:00", isoTime)
-	return  t
+    t, _ = time.Parse("2006-01-02T15:04:05Z07:00", isoTime)
+    return t
 }
 
-func SaveEvent(eventDb,event)  {
-	sql := `
+func SaveEvent(eventDb, event) {
+    sql := `
 		INSERT INTO web_log_events
 		(source_ip, request_method, request_uri, event_time, user_agent, status_code, inferred_status, error_message, log_type)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	result := eventDb.Exec(sql,
-		event.SourceIP,
-		event.RequestMethod,
-		event.RequestURI,
-		event.EventTime,
-		event.UserAgent,
-		event.StatusCode,
-		event.InferredStatus,
-		event.ErrorMessage,
-		event.LogType,
-	)
-	return result.Error
+    result := eventDb.Exec(
+        sql,
+        event.SourceIP,
+        event.RequestMethod,
+        event.RequestURI,
+        event.EventTime,
+        event.UserAgent,
+        event.StatusCode,
+        event.InferredStatus,
+        event.ErrorMessage,
+        event.LogType,
+    )
+    return result.Error
 }
 
-func QueryRecentEventRawSQL(eventDb , sourceIP , duration) {
-	//sql := "SELECT * FROM web_log_events WHERE source_ip = ? AND event_time > ? "
-	//cutOffTime := time.Now().Add(-duration)
-	// result := eventDb.Raw(sql, sourceIP, cutOffTime).Scan(ptr(events))
-	sql := "SELECT * FROM web_log_events WHERE source_ip = ?"
-	return db.ScanResult(eventDb, sql, sourceIP)
+func QueryRecentEventRawSQL(eventDb, sourceIP, duration) {
+    sql := "SELECT * FROM web_log_events WHERE source_ip = ?"
+    result, err = db.ScanResult(eventDb, sql, sourceIP)
+    return result, err
 }
 
 func SaveEntityRawSQL(eventDb, entity) {
-	sql := `
+    sql := `
 		INSERT INTO entities (value, type, remark)
 		VALUES (?, ?, ?)
 		ON CONFLICT(value, type) DO UPDATE SET
 			remark = excluded.remark
             `
-	return eventDb.Exec(sql, entity.Value, entity.Type, entity.Remark).Error
+    return eventDb.Exec(sql, entity.Value, entity.Type, entity.Remark).Error
 }
 
-
-func UpdateEntityRemarkRawSQL(eventDb , entity, remark ) {
-	sql := `UPDATE entities SET remark = ? WHERE value = ? AND "type" = ?`
-	result := eventDb.Exec(sql, remark, entity.Value, entity.Type)
-	return result.Error
+func UpdateEntityRemarkRawSQL(eventDb, entity, remark) {
+    sql := `UPDATE entities SET remark = ? WHERE value = ? AND "type" = ?`
+    result := eventDb.Exec(sql, remark, entity.Value, entity.Type)
+    return result.Error
 }
 
-
-
-text = cli.String("text", cli.setHelp("直接输入的长文本"))
-filePath = cli.String("filePath", cli.setHelp("长文本文件"))
+// text = cli.String("text", cli.setHelp("直接输入的长文本"))
+text = ""
+filePaths = cli.FileNames("filePath", cli.setHelp("长文本文件"), cli.setVerboseName("分析目标文件"))
 cli.check()
 
+filePath = filePaths[0]
+
 forgeHandle = func(params) {
-        var reader
-		if text != "" {
-            reader = str.NewReader(text)
-        }else if filePath != "" {
-            reader,err = file.Open(filePath)
-            if err != nil {
-                return nil
-            }
-        }else {
+    var reader
+    if text != "" {
+        reader = str.NewReader(text)
+    } else if filePath != "" {
+        reader, err = file.Open(filePath)
+        if err != nil {
             return nil
         }
 
-        logDb,err = NewWebLogEventDB()
+        defer reader.Close()
+    } else {
+        yakit.Error("text or filePath is all empty")
+        return nil
+    }
+
+
+    logDb, err = NewWebLogEventDB()
+    if err != nil {
+        yakit.Error("web log event db build err: %v", err)
+        return err
+    }
+
+    yakit.Info("start to build x.NewEventWatcher with trigger count: 20")
+    ew := x.NewEventWatcher(context.Background(), time.ParseDuration("5m")~, 20)
+
+    update := func(attackType, entityValue) {
+        yakit.Info("start to update type: %v with value: %#v", attackType, entityValue)
+        entity := {"Value": entityValue, "Type": "ip_address"}
+        err := UpdateEntityRemarkRawSQL(
+            logDb,
+            entity,
+            sprintf("Detected %s attack from %s", attackType, entityValue),
+        )
         if err != nil {
-            return err
+            log.Error("UpdateEntityRemark failed: %v", err)
+            return
+        }
+    }
+
+    analyzerWebRequest := func(sourceIP) {
+        yakit.Info("start to analyze web request with ip: %#v", sourceIP)
+        event, err := QueryRecentEventRawSQL(logDb, sourceIP, time.ParseDuration("1h")~)
+        if err != nil {
+            yakit.Error("queyr recent event raw sql: %v", err)
+            return
         }
 
-        ew := x.NewEventWatcher(context.Background(), time.ParseDuration("5m")~, 20)
-
-        update := func(attackType, entityValue ) {
-            entity := {
-                "Value": entityValue,
-                "Type":  "ip_address",
-            }
-            err := UpdateEntityRemarkRawSQL(logDb, entity, sprintf("Detected %s attack from %s", attackType, entityValue))
-            if err != nil {
-                log.Error("UpdateEntityRemark failed: %v", err)
-                return
-            }
-	    }
-
-        analyzerWebRequest := func(sourceIP) {
-            event, err := QueryRecentEventRawSQL(logDb, sourceIP, time.ParseDuration("1h")~)
-            if err != nil {
-                return
-            }
-            if len(event) == 0 {
-                return
-            }
-            eventJsonString, err := json.Marshal(event)
-            if err != nil {
-                return
-            }
-
-            res, err := aiagent.ExecuteForge("event_analyzer",eventJsonString)
-            if err != nil {
-                return
-            }
-            report = res
-            if report.GetBool("is_malicious") {
-                risk.NewRisk(sourceIP,
-                    risk.title(sprintf("detect %s %s", sourceIP,report.GetString("attack_type"))),
-                    risk.description(report.GetString("behavior_summary")),
-                    risk.solution("ban corresponding IP address"),
-                    risk.level("mid"),
-                    risk.details(report.GetStringSlice("key_evidence"))
-                )
-            }
-            update(report.GetString("attack_type"), sourceIP)
-        }
-        entityMarshal := func(e) {
-            return {
-                "Value": e.GetString("entity_value"),
-                "Type":  e.GetString("entity_type"),
-                "Remark":"",
-            }
+        if len(event) == 0 {
+            return
         }
 
-        eventMarshal := func(e) {
-            return {
-                "SourceIP":       e.GetString("source_ip"),
-                "RequestMethod":  e.GetString("request_method"),
-                "RequestURI":     e.GetString("request_uri"),
-                "EventTime":      parseISO(e.GetString("timestamp")),
-                "UserAgent":      e.GetString("user_agent"),
-                "StatusCode":     e.GetInt("status_code"),
-                "InferredStatus": e.GetString("inferred_status"),
-                "ErrorMessage":   e.GetString("error_message"),
-                "LogType":        e.GetString("log_type"),
-            }
+        eventJsonString, err := json.Marshal(event)
+        if err != nil {
+            return
         }
 
-        var cacheBuffer = make([]string,0)
-        reducer:= aireducer.NewReducerFromReader(reader,
-        aireducer.reducerCallback(func(config,memory,chunk){
+        shrinked := len(eventJsonString) > 100 ? sprint(string(eventJsonString[:100])) : eventJsonString
+        yakit.Info("start to call event_analyzer with len:%v data: %#v", len(eventJsonString), shrinked)
+        res, err := aiagent.ExecuteForge("event_analyzer", eventJsonString)
+        if err != nil {
+            yakit.Info("execute event analyzer failed: %v", err)
+            return
+        }
+
+        reportIns = res
+        dump(reportIns)
+        yakit.Info("fetch result: %v", reportIns)
+        if reportIns.GetBool("is_malicious") {
+            risk.NewRisk(
+                sourceIP,
+                risk.title(sprintf("detect %s %s", sourceIP, reportIns.GetString("attack_type"))),
+                risk.description(reportIns.GetString("behavior_summary")),
+                risk.solution("ban corresponding IP address"),
+                risk.level("mid"),
+                risk.details(reportIns.GetStringSlice("key_evidence")),
+            )
+        }
+
+        update(reportIns.GetString("attack_type"), sourceIP)
+    }
+    entityMarshal := func(e) {
+        return {"Value": e.GetString("entity_value"), "Type": e.GetString("entity_type"), "Remark": ""}
+    }
+
+    eventMarshal := func(e) {
+        return {"SourceIP": e.GetString("source_ip"), "RequestMethod": e.GetString("request_method"), "RequestURI": e.GetString("request_uri"), "EventTime": parseISO(e.GetString("timestamp")), "UserAgent": e.GetString("user_agent"), "StatusCode": e.GetInt("status_code"), "InferredStatus": e.GetString("inferred_status"), "ErrorMessage": e.GetString("error_message"), "LogType": e.GetString("log_type")}
+    }
+
+    var cacheBuffer = make([]string, 0)
+    count := 0
+    reducer := aireducer.NewReducerFromReader(
+        reader,
+        aireducer.reducerCallback(func(config, memory, chunk) {
+            count+=1
+            shrinked := len(chunk.Data()) > 200 ? string(chunk.Data()[:200]) : string(chunk.Data())
+            yakit.Info("ai-reducer start to handle chunk[%v], len: %v data: %#v", count, chunk.BytesSize(), string(shrinked))
             cacheBuffer = append(cacheBuffer, string(chunk.Data()))
             if len(cacheBuffer) < 10 {
                 return nil
             }
+
             defer func() {
                 cacheBuffer = make([]string, 0)
             }()
@@ -205,12 +214,11 @@ forgeHandle = func(params) {
             wg.Add(1)
             go func() {
                 defer wg.Done()
-                res, err := aiagent.ExecuteForge("entity_identify",
-                    logBuffer,
-                )
+                res, err := aiagent.ExecuteForge("entity_identify", logBuffer)
                 if err != nil {
                     return
                 }
+
                 for _, params := range res {
                     err := SaveEntityRawSQL(logDb, entityMarshal(params))
                     if err != nil {
@@ -220,20 +228,21 @@ forgeHandle = func(params) {
                 }
             }()
 
+
             wg.Add(1)
             go func() {
                 defer wg.Done()
-                res, err := aiagent.ExecuteForge("log_event_formatter",
-                    logBuffer,
-                )
+                res, err := aiagent.ExecuteForge("log_event_formatter", logBuffer)
                 if err != nil {
                     return
                 }
+
                 for _, params := range res {
                     event := eventMarshal(params)
                     if event.LogType == "WEB_REQUEST" {
                         ew.Watch(event.SourceIP, analyzerWebRequest)
                     }
+
                     err := SaveEvent(logDb, event)
                     if err != nil {
                         log.Error("failed to save event: %v", err)
@@ -242,15 +251,17 @@ forgeHandle = func(params) {
                 }
             }()
 
-                wg.Wait()
-                return nil
-            }),
-            aireducer.separator("[INFO]"),
-            aireducer.memory(aiagent.GetDefaultMemory()),
-        )~
-        err = reducer.Run()
-        if err != nil {
-            return err
-        }
-		return nil
+
+            wg.Wait()
+            return nil
+        }),
+        aireducer.separator("[INFO]"),
+        aireducer.memory(aiagent.GetDefaultMemory()),
+    )~
+    err = reducer.Run()
+    if err != nil {
+        return err
+    }
+
+    return nil
 }
