@@ -38,6 +38,9 @@ func NewSaveWithConfig[T any](
 	saveToDB func([]T),
 	cfg *config,
 ) *Save[T] {
+	if utils.IsNil(saveToDB) {
+		return nil
+	}
 	ctx, cancel := context.WithCancel(cfg.ctx)
 	s := &Save[T]{
 		saveToDB: saveToDB,

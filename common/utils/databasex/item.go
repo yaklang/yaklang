@@ -8,3 +8,9 @@ type MemoryItem interface {
 	GetId() int64
 	SetId(int64)
 }
+
+type MarshalFunc[T MemoryItem, D DBItem] func(T, D)
+type FetchFunc[D DBItem] func(int) []D
+type DeleteFunc[D DBItem] func([]D)
+type SaveFunc[D DBItem] func([]D)
+type LoadFunc[T MemoryItem, D DBItem] func(int64) (T, D, error)
