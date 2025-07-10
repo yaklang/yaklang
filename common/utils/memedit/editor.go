@@ -336,14 +336,13 @@ func (ve *MemEditor) ResetSourceCodeHash() {
 // recalculateLineMappings 重新计算行映射
 func (ve *MemEditor) recalculateLineMappings() {
 	ve.ResetSourceCodeHash()
-	ve.SourceCodeMd5()
-	ve.SourceCodeSha1()
-	ve.SourceCodeSha256()
 
-	ve.lineLensMap = make(map[int]int)
-	ve.lineStartOffsetMap = make(map[int]int)
-	currentOffset := 0
 	lines := strings.Split(ve.safeSourceCode.String(), "\n")
+	lineNums := len(lines)
+
+	ve.lineLensMap = make(map[int]int, lineNums)
+	ve.lineStartOffsetMap = make(map[int]int, lineNums)
+	currentOffset := 0
 	ve.lineStartOffsetMap[0] = 0
 	for lineNumber, line := range lines {
 		lineLen := 0
