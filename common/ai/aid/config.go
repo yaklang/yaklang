@@ -142,6 +142,8 @@ type Config struct {
 	maxTaskContinue int64
 
 	aiTaskRuntime *runtime
+
+	disableOutputEventType []string
 }
 
 func (c *Config) HandleSearch(query string, items *omap.OrderedMap[string, []string]) ([]*searchtools.KeywordSearchResult, error) {
@@ -306,6 +308,10 @@ func (c *Config) emit(e *Event) {
 
 	if c.guardian != nil {
 		c.guardian.feed(e)
+	}
+
+	if utils.StringArrayContains(c.disableOutputEventType, string(e.Type)) {
+		return
 	}
 
 	if c.eventHandler == nil {
@@ -1095,6 +1101,18 @@ func WithPlanUserInteractMaxCount(i int64) Option {
 			i = 3
 		}
 		config.planUserInteractMaxCount = i
+		return nil
+	}
+}
+
+func WithDisableOutputEvent(typeString ...string) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		if config.disableOutputEventType == nil {
+			config.disableOutputEventType = make([]string, 0)
+		}
+		config.disableOutputEventType = append(config.disableOutputEventType, typeString...)
 		return nil
 	}
 }

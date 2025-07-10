@@ -2,6 +2,7 @@ package aid
 
 import (
 	"context"
+	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/log"
 	"sync"
 	"time"
@@ -9,6 +10,7 @@ import (
 
 func (c *Config) startEventLoop(ctx context.Context) {
 	c.startInputEventOnce.Do(func() {
+		consumptionUUID := ksuid.New().String()
 		validator := make(chan struct{})
 		go func() {
 			log.Infof("config %s started, start to handle receiving loop", c.id)
@@ -24,6 +26,7 @@ func (c *Config) startEventLoop(ctx context.Context) {
 						map[string]any{
 							"input_consumption":  c.GetInputConsumption(),
 							"output_consumption": c.GetOutputConsumption(),
+							"consumption_uuid":   consumptionUUID,
 						},
 					)
 				}

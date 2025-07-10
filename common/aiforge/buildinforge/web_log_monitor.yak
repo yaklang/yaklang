@@ -236,7 +236,7 @@ forgeHandle = func(params) {
             swg.Add(1)
             go func() {
                 defer swg.Done()
-                res, err := aiagent.ExecuteForge("entity_identify", logBuffer, aiagent.eventHandler(nil))
+                res, err := aiagent.ExecuteForge("entity_identify", logBuffer, aiagent.disableOutputType("stream"))
                 if err != nil {
                     return
                 }
@@ -255,7 +255,7 @@ forgeHandle = func(params) {
             swg.Add(1)
             go func() {
                 defer swg.Done()
-                res, err := aiagent.ExecuteForge("log_event_formatter", logBuffer,aiagent.eventHandler(nil))
+                res, err := aiagent.ExecuteForge("log_event_formatter", logBuffer,aiagent.disableOutputType("stream"))
                 if err != nil {
                     return
                 }
@@ -281,6 +281,7 @@ forgeHandle = func(params) {
         aireducer.separator("[INFO]"),
         aireducer.memory(aiagent.GetDefaultMemory()),
     )~
+    aidConfig.EmitStream(sprintf("开始分析日志目标[%s]",filePaths),"")
     err = reducer.Run()
     swg.Wait()
     if err != nil {
