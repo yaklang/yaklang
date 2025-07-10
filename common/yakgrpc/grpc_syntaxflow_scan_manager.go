@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
@@ -60,6 +61,7 @@ type SyntaxFlowScanManager struct {
 	// query process
 	totalQuery int64
 
+	concurrency uint32
 	//}}
 }
 
@@ -135,6 +137,13 @@ func RemoveSyntaxFlowTaskByID(id string) {
 	syntaxFlowScanManagerMap.Delete(id)
 }
 
+func (m *SyntaxFlowScanManager) GetConcurrency() uint32 {
+	if m.concurrency == 0 {
+		return 5
+	}
+	return m.concurrency
+}
+
 // SaveTask save task info which is from manager to database
 func (m *SyntaxFlowScanManager) SaveTask() error {
 	if m.taskRecorder == nil {
@@ -143,10 +152,10 @@ func (m *SyntaxFlowScanManager) SaveTask() error {
 	m.taskRecorder.Programs = strings.Join(m.programs, schema.SYNTAXFLOWSCAN_PROGRAM_SPLIT)
 	m.taskRecorder.TaskId = m.taskID
 	m.taskRecorder.Status = m.status
-	m.taskRecorder.SuccessQuery = m.successQuery
-	m.taskRecorder.FailedQuery = m.failedQuery
-	m.taskRecorder.SkipQuery = m.skipQuery
-	m.taskRecorder.RiskCount = m.riskCount
+	m.taskRecorder.SuccessQuery = atomic.LoadInt64(&m.successQuery)
+	m.taskRecorder.FailedQuery = atomic.LoadInt64(&m.failedQuery)
+	m.taskRecorder.SkipQuery = atomic.LoadInt64(&m.skipQuery)
+	m.taskRecorder.RiskCount = atomic.LoadInt64(&m.riskCount)
 	m.taskRecorder.TotalQuery = m.totalQuery
 	m.taskRecorder.Kind = m.kind
 	m.taskRecorder.Config, _ = json.Marshal(m.config)
@@ -207,9 +216,13 @@ func (m *SyntaxFlowScanManager) initByConfig(stream SyntaxFlowScanStream) error 
 	}
 	m.programs = config.GetProgramName()
 	m.ignoreLanguage = config.GetIgnoreLanguage()
-
 	// init by stream
 	taskId := m.TaskId()
+	if config.GetConcurrency() != 0 {
+		m.concurrency = config.GetConcurrency()
+	} else {
+		m.concurrency = 5
+	}
 
 	m.stream = stream
 	yakitClient := yaklib.NewVirtualYakitClientWithRuntimeID(func(result *ypb.ExecResult) error {
@@ -302,7 +315,7 @@ func (m *SyntaxFlowScanManager) IsPause() bool {
 }
 
 func (m *SyntaxFlowScanManager) CurrentTaskIndex() int64 {
-	return m.skipQuery + m.failedQuery + m.successQuery
+	return atomic.LoadInt64(&m.skipQuery) + atomic.LoadInt64(&m.failedQuery) + atomic.LoadInt64(&m.successQuery)
 }
 
 func (m *SyntaxFlowScanManager) ScanNewTask() error {

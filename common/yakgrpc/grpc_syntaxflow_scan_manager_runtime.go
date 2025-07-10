@@ -50,21 +50,29 @@ func (m *SyntaxFlowScanManager) StartQuerySF(startIndex ...int64) error {
 		return utils.Errorf("SyntaxFlow scan start with a wrong task index")
 	}
 
-	cache := make(map[string]*ssaapi.Program)
+	cache := utils.NewSafeMap[*ssaapi.Program]()
 	getProgram := func(name string) (*ssaapi.Program, error) {
-		if prog, ok := cache[name]; ok {
+		if prog, ok := cache.Get(name); ok {
 			return prog, nil
 		}
 		prog, err := ssaapi.FromDatabase(name)
 		if err != nil {
 			return nil, err
 		}
-		cache[name] = prog
+		cache.Set(name, prog)
 		return prog, nil
 	}
 
+	swg := utils.NewSizedWaitGroup(int(m.GetConcurrency()))
 	var errs error
-	var taskIndex int64 // when taskIndex == totalQuery, the task start to run.
+	var taskIndex int64
+
+	var tasks []struct {
+		rule     *schema.SyntaxFlowRule
+		progName string
+		index    int64
+	}
+
 	for rule := range m.ruleChan {
 		if m.IsPause() || m.IsStop() {
 			break
@@ -77,16 +85,35 @@ func (m *SyntaxFlowScanManager) StartQuerySF(startIndex ...int64) error {
 			if taskIndex <= start {
 				continue
 			}
+			tasks = append(tasks, struct {
+				rule     *schema.SyntaxFlowRule
+				progName string
+				index    int64
+			}{rule: rule, progName: progName, index: taskIndex})
+		}
+	}
+
+	for _, task := range tasks {
+		if m.IsPause() || m.IsStop() {
+			break
+		}
+
+		if err := swg.AddWithContext(m.ctx, 1); err != nil {
+			break
+		}
+		go func(rule *schema.SyntaxFlowRule, progName string, index int64) {
+			defer swg.Done()
 
 			prog, err := getProgram(progName)
 			if err != nil {
-				errs = utils.JoinErrors(errs, err)
 				atomic.AddInt64(&m.skipQuery, 1)
-				continue
+				return
 			}
 			m.Query(rule, prog)
-		}
+		}(task.rule, task.progName, task.index)
 	}
+
+	swg.Wait()
 	m.notifyStatus("")
 	return errs
 }
@@ -119,7 +146,7 @@ func (m *SyntaxFlowScanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.
 }
 func (m *SyntaxFlowScanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
 	if riskLen := len(res.GetGRPCModelRisk()); riskLen != 0 {
-		m.riskCount += int64(riskLen)
+		atomic.AddInt64(&m.riskCount, int64(riskLen))
 	}
 	for key, count := range res.GetRiskCountMap() {
 		m.riskCountMap[key] = count
@@ -134,15 +161,20 @@ func (m *SyntaxFlowScanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
 }
 
 func (m *SyntaxFlowScanManager) notifyStatus(ruleName string) {
-	finishQuery := m.successQuery + m.failedQuery + m.skipQuery
+	successQuery := atomic.LoadInt64(&m.successQuery)
+	failedQuery := atomic.LoadInt64(&m.failedQuery)
+	skipQuery := atomic.LoadInt64(&m.skipQuery)
+	riskCount := atomic.LoadInt64(&m.riskCount)
+
+	finishQuery := successQuery + failedQuery + skipQuery
 	// process
 	m.client.StatusCard("已执行规则", fmt.Sprintf("%d/%d", finishQuery, m.totalQuery), "规则执行状态")
-	m.client.StatusCard("已跳过规则", m.skipQuery, "规则执行状态")
+	m.client.StatusCard("已跳过规则", skipQuery, "规则执行状态")
 	// runtime status
-	m.client.StatusCard("执行成功个数", m.successQuery, "规则执行状态")
-	m.client.StatusCard("执行失败个数", m.failedQuery, "规则执行状态")
+	m.client.StatusCard("执行成功个数", successQuery, "规则执行状态")
+	m.client.StatusCard("执行失败个数", failedQuery, "规则执行状态")
 	// risk status
-	m.client.StatusCard("检出漏洞/风险个数", m.riskCount, "漏洞/风险状态")
+	m.client.StatusCard("检出漏洞/风险个数", riskCount, "漏洞/风险状态")
 
 	// current rule  status
 	if finishQuery == m.totalQuery {
