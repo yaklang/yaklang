@@ -28,23 +28,18 @@ func (s *Server) QuerySSARisks(ctx context.Context, req *ypb.QuerySSARisksReques
 			ProgramName:   strings.Join(filter.GetProgramName(), ","),
 			RiskRuntimeId: strings.Join(filter.GetRuntimeID(), ","),
 		}
+		filter.SSARiskDiffRequest.BaseLine = baseline
 		res, err := yakit.DoRiskDiff(ctx, baseline, dr.GetCompare())
 		if err != nil {
 			return nil, err
 		}
 		for re := range res {
-			if re.Status == yakit.Add {
-				risks = append(risks, re.NewValue)
-			}
+			_ = re
 		}
-
-		p = &bizhelper.Paginator{}
-		p.TotalRecord = len(risks)
-	} else {
-		p, risks, err = yakit.QuerySSARisk(s.GetSSADatabase(), req.GetFilter(), req.GetPagination())
-		if err != nil {
-			return nil, err
-		}
+	}
+	p, risks, err = yakit.QuerySSARisk(s.GetSSADatabase(), filter, req.GetPagination())
+	if err != nil {
+		return nil, err
 	}
 
 	return &ypb.QuerySSARisksResponse{
