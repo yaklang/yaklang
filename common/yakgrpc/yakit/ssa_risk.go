@@ -97,6 +97,25 @@ func WithSSARiskFilterSearch(search string) SSARiskFilterOption {
 	}
 }
 
+func WithSSARiskFilterCompare(taskID1, taskID2 string) SSARiskFilterOption {
+	return func(sf *ypb.SSARisksFilter) {
+		if taskID1 == "" || taskID2 == "" {
+			return
+		}
+		res, err := DoRiskDiff(context.Background(), &ypb.SSARiskDiffItem{RiskRuntimeId: taskID1}, &ypb.SSARiskDiffItem{RiskRuntimeId: taskID2})
+		if err != nil {
+			return
+		}
+		for re := range res {
+			_ = re
+		}
+		sf.SSARiskDiffRequest = &ypb.SSARiskDiffRequest{
+			BaseLine: &ypb.SSARiskDiffItem{RiskRuntimeId: taskID1},
+			Compare:  &ypb.SSARiskDiffItem{RiskRuntimeId: taskID2},
+		}
+	}
+}
+
 func WithSSARiskFilterTaskID(taskID string) SSARiskFilterOption {
 	return func(sf *ypb.SSARisksFilter) {
 		if taskID == "" {
@@ -127,6 +146,35 @@ func FilterSSARisk(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
 	if filter == nil {
 		return db
 	}
+
+	// db = db.Debug()
+	// 新增：处理SSARiskDiffRequest，只查新增风险
+	if dr := filter.GetSSARiskDiffRequest(); dr != nil {
+		// 只查diff表中Status为"add"的CompareRiskHash
+		var diffResults []*schema.SSADiffResult
+		query := db.New().Model(&schema.SSADiffResult{})
+		if dr.GetBaseLine() != nil && dr.GetBaseLine().GetRiskRuntimeId() != "" {
+			query = query.Where("base_line = ?", dr.GetBaseLine().GetRiskRuntimeId())
+		}
+		if dr.GetCompare() != nil && dr.GetCompare().GetRiskRuntimeId() != "" {
+			query = query.Where("compare = ?", dr.GetCompare().GetRiskRuntimeId())
+		}
+		query = query.Where("status = ?", Add)
+		if err := query.Find(&diffResults).Error; err == nil && len(diffResults) > 0 {
+			hashes := make([]string, 0, len(diffResults))
+			for _, d := range diffResults {
+				if d.CompareRiskHash != "" {
+					hashes = append(hashes, d.CompareRiskHash)
+				}
+			}
+			if len(hashes) > 0 {
+				// 合并到现有hash过滤条件
+				allHashes := append(filter.GetHash(), hashes...)
+				db = bizhelper.ExactOrQueryStringArrayOr(db, "hash", allHashes)
+			}
+		}
+	}
+
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", filter.GetID())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "program_name", filter.GetProgramName())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "function_name", filter.GetFunctionName())

@@ -22,9 +22,9 @@ const (
 
 type SSADiffResult struct {
 	*gorm.Model
-	BaseLineProgName string
-	CompareProgName  string
-	RuleName         string // rule name
+	BaseLine string
+	Compare  string
+	RuleName string // rule name
 
 	BaseLineRiskHash string
 	CompareRiskHash  string
@@ -60,7 +60,7 @@ func ValidSSADiffResultKind(typ string) SSADiffResultKind {
 }
 
 func (d *SSADiffResult) CalcHash() string {
-	return utils.CalcSha1(d.BaseLineProgName, d.CompareProgName)
+	return utils.CalcSha1(d.BaseLine, d.Compare)
 }
 
 func (d *SSADiffResult) BeforeCreate() {
@@ -79,4 +79,9 @@ func (d *SSADiffResult) BeforeSave() {
 	d.Hash = d.CalcHash()
 	d.CompareType = string(ValidSSADiffResultCompareType(d.CompareType))
 	d.DiffResultKind = string(ValidSSADiffResultKind(d.DiffResultKind))
+}
+
+// TableName ensures GORM uses the correct table name
+func (SSADiffResult) TableName() string {
+	return "ssa_diff_results"
 }

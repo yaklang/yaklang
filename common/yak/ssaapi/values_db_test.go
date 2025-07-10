@@ -2,8 +2,9 @@ package ssaapi_test
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/google/uuid"
 	"github.com/samber/lo"
@@ -144,7 +145,7 @@ func TestValuesDB_Save_Audit_Node(t *testing.T) {
 			}
 
 			var edge3_4 []*ssadb.AuditEdge
-			db = db.Debug()
+			// db = db.Debug()
 			db.Model(&ssadb.AuditEdge{}).Where("program_name = ? AND from_node IN (?) AND to_node IN (?) ", progName, node3, node4).Find(&edge3_4)
 			// node3 -> node4 位于范围外，不会构建边
 			require.Equal(t, 0, len(edge3_4))
