@@ -3,6 +3,10 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -13,9 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/reducer"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"sync"
-	"time"
 )
 
 type aiChatType func(string, ...aispec.AIConfigOption) (string, error)
@@ -41,10 +42,12 @@ var RedirectForge = "redirect_forge"
 func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	firstMsg, err := stream.Recv()
 	if err != nil {
+		log.Infof("recv first msg failed: %v", err)
 		return utils.Errorf("recv first msg failed: %v", err)
 	}
 
 	if !firstMsg.IsStart {
+		log.Info("first msg is not start")
 		return utils.Error("first msg is not start")
 	}
 	startParams := firstMsg.Params
@@ -171,12 +174,14 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 
 	var res any
 	if forgeName != "" {
+		log.Infof("forgeName is %v, start call yak.ExecuteForge", forgeName)
 		res, err = yak.ExecuteForge(forgeName, params, buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), aidOption...)...)
 		if err != nil {
 			log.Errorf("run ai forge[%s] failed: %v", forgeName, err)
 			return err
 		}
 	} else {
+		log.Info("call without forgeName, use 'forge_triage' as default")
 		triageCache.Push(utils.InterfaceToString(params))
 		res, err = yak.ExecuteForge("forge_triage", map[string]any{
 			"query":   params,
@@ -186,12 +191,17 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 			log.Errorf("run ai forge[%s] failed: %v", forgeName, err)
 			return err
 		}
+
+		defer func() {
+			log.Info("call yak.ExecuteForge success forge_triage")
+		}()
 		if res != nil {
 			var redirectParam = &ypb.AIStartParams{
 				ForgeName: strings.ToLower(utils.InterfaceToString(res)),
 			}
 			redirectParamJson, err := json.Marshal(redirectParam)
 			if err != nil {
+				log.Errorf("marshal redirect param failed: %v", err)
 				return err
 			}
 			err = stream.Send(&ypb.AIOutputEvent{
@@ -201,6 +211,10 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 				Timestamp:     time.Now().Unix(),
 				IsJson:        true,
 			})
+			if err != nil {
+				log.Errorf("send redirect param failed: %v", err)
+				return err
+			}
 		}
 	}
 	return nil

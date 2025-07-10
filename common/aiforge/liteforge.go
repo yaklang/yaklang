@@ -15,6 +15,7 @@ import (
 
 // LiteForge 被设计只允许提取数据，生成结构化（单步），如果需要多步拆解，不能使用 LiteForge
 type LiteForge struct {
+	ForgeName        string
 	Prompt           string
 	RequireSchema    string
 	OutputSchema     string
@@ -79,7 +80,9 @@ func WithLiteForge_Prompt(i string) LiteForgeOption {
 }
 
 func NewLiteForge(i string, opts ...LiteForgeOption) (*LiteForge, error) {
-	lf := &LiteForge{}
+	lf := &LiteForge{
+		ForgeName: i,
+	}
 	for _, o := range opts {
 		err := o(lf)
 		if err != nil {
@@ -148,7 +151,10 @@ func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, op
 	}
 	var action *aid.Action
 	transactionErr := cod.CallAITransaction(buf.String(), func(response *aid.AIResponse) error {
-		raw, err := io.ReadAll(response.GetOutputStreamReader("liteforge", true, cod.GetConfig()))
+		if l.ForgeName == "" {
+			l.ForgeName = "unknown"
+		}
+		raw, err := io.ReadAll(response.GetOutputStreamReader(fmt.Sprintf(`liteforge[%v]`, l.ForgeName), true, cod.GetConfig()))
 		if err != nil {
 			return err
 		}
