@@ -68,13 +68,11 @@ func (s *Save[T]) processBuffer() {
 		if len(ts) == 0 {
 			return
 		}
-		if s.buffer.Len() != 0 {
-			log.Errorf("Databasex Channel: Save Count in save Loop: %s: need: %v, handled: %v",
-				s.config.name,
-				s.buffer.Len(),
-				len(ts),
-			)
-		}
+		log.Infof("Databasex Channel: Save Count in save Loop: %s: need: %v, handled: %v",
+			s.config.name,
+			s.buffer.Len(),
+			len(ts),
+		)
 
 		f1 := func() {
 			if len(ts) > 0 {
