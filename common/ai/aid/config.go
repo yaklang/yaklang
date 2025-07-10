@@ -312,7 +312,10 @@ func (c *Config) emit(e *schema.AiOutputEvent) {
 	if c.eventBeforeSave != nil {
 		e = c.callEventBeforeSave(e)
 	}
-	if !e.IsSystem && !e.IsSync { // not save system and sync
+	if e.NodeId == "call-tools" {
+		e.NodeId = "call-tools"
+	}
+	if e.ShouldSave() { // not save system and sync
 		err := yakit.CreateAIEvent(consts.GetGormProjectDatabase(), e)
 		if err != nil {
 			log.Errorf("create AI event failed: %v", err)
