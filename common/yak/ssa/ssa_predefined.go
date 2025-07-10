@@ -533,6 +533,9 @@ func (i *anValue) FlatOccultation() []Value {
 	handler = func(i *anValue) {
 		for _, id := range i.occultation {
 			v := i.GetValueById(id)
+			if utils.IsNil(v) {
+				continue
+			}
 			ret = append(ret, v)
 			if p, ok := ToPhi(v); ok {
 				handler(&p.anValue)
