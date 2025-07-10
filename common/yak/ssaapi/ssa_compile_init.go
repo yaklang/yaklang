@@ -56,7 +56,7 @@ func (c *config) init(filesystem filesys_interface.FileSystem, fileSize int) (*s
 		// in php include just build file in child program, will cause the same file save to sourceDB, when the file include multiple times
 		// this check should be more readable, we should use Editor and `prog.PushEditor..` save sourceDB.
 		if _, exist := application.FileList[filePath]; !exist {
-			if c.enableDatabase {
+			if c.enableDatabase != ssa.ProgramCacheMemory {
 				folderName, fileName := filesystem.PathSplit(filePath)
 				folders := strings.Split(folderName, string(filesystem.GetSeparators()))
 				ssadb.SaveFile(fileName, src.GetSourceCode(), programName, folders)
