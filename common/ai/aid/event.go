@@ -74,9 +74,9 @@ func (r *Config) EmitStatus(key string, value any) {
 }
 
 func (r *Config) EmitStream(nodeId string, content string) {
-	r.emit(&Event{
+	r.emit(&schema.AiOutputEvent{
 		CoordinatorId: r.id,
-		Type:          EVENT_TYPE_STREAM,
+		Type:          schema.EVENT_TYPE_STREAM,
 		NodeId:        nodeId,
 		IsJson:        true,
 		IsStream:      true,
@@ -439,28 +439,28 @@ func (c *Config) pushProcess(newProcess *schema.AiProcess) *Config {
 func (c *Config) pushEventBeforeSave(newHandler func(event *schema.AiOutputEvent) *schema.AiOutputEvent) *Config {
 	var subConfig = new(Config)
 	*subConfig = *c
-	if subConfig.eventBeforeSave == nil {
-		subConfig.eventBeforeSave = utils.NewStack[func(event *schema.AiOutputEvent) *schema.AiOutputEvent]()
+	if subConfig.eventProcessHandler == nil {
+		subConfig.eventProcessHandler = utils.NewStack[func(event *schema.AiOutputEvent) *schema.AiOutputEvent]()
 	}
-	subConfig.eventBeforeSave.Push(newHandler)
+	subConfig.eventProcessHandler.Push(newHandler)
 	return subConfig
 }
 
 func (c *Config) popEventBeforeSave() *Config {
 	var subConfig = new(Config)
 	*subConfig = *c
-	if subConfig.eventBeforeSave == nil {
+	if subConfig.eventProcessHandler == nil {
 		return subConfig
 	}
-	subConfig.eventBeforeSave.Pop()
+	subConfig.eventProcessHandler.Pop()
 	return subConfig
 }
 
 func (c *Config) callEventBeforeSave(event *schema.AiOutputEvent) *schema.AiOutputEvent {
-	if c.eventBeforeSave == nil || c.eventBeforeSave.Len() == 0 {
+	if c.eventProcessHandler == nil || c.eventProcessHandler.Len() == 0 {
 		return event
 	}
-	c.eventBeforeSave.ForeachStack(func(f func(e *schema.AiOutputEvent) *schema.AiOutputEvent) bool {
+	c.eventProcessHandler.ForeachStack(func(f func(e *schema.AiOutputEvent) *schema.AiOutputEvent) bool {
 		event = f(event)
 		return true
 	})
