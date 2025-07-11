@@ -92,6 +92,9 @@ type GenerateMetadataResult struct {
 }
 
 func init() {
+	db := consts.GetGormProfileDatabase()
+	db = db.Model(&schema.AIForge{})
+	db.Where("forge_name = ?", "vulscan").Unscoped().Delete(&schema.AIForge{})
 	yakit.RegisterPostInitDatabaseFunction(func() error {
 		if !consts.IsDevMode() {
 			const key = "6ef3c850244a2b26ed0b163d1fda9600"
@@ -228,6 +231,7 @@ func buildAIForgeFromConfig(name string, configBytes []byte, codeContent []byte,
 		forge.Actions = cfg.Actions
 		forge.ForgeContent = cfg.ForgeContent
 		forge.Tags = cfg.Tags
+		forge.Params = cfg.CLIParameterRuleYaklangCode
 	}
 	return string(configBytes), forge, nil
 }

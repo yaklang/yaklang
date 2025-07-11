@@ -160,6 +160,8 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
 	if err != nil {
 		return "", nil, utils.Errorf("render init prompt failed: %v", err)
 	}
+
+	fmt.Println("initPrompt", initPrompt)
 	persistentPrompt, err := f.renderPersistentPrompt("")
 	if err != nil {
 		return "", nil, utils.Errorf("render persistent prompt failed: %v", err)

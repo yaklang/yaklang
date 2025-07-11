@@ -68,7 +68,7 @@ AI 可能用到的工具关键词，多个用逗号分隔。
 - `{{.Forge.UserParams}}`: 用户参数
 - `{{.Forge.InitPrompt}}`: 初始化提示词
 - `{{.Forge.PersistentPrompt}}`: 持久化提示词
-- `{{.Forge.UserQuery}}`: 用户查询
+- `{{.Forge.UserParams}}`: 用户查询参数
 
 **示例模板用法：**
 ```text

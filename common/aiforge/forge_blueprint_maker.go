@@ -106,6 +106,7 @@ func (c *YakForgeBlueprintConfig) WithSchemaForge(forge *schema.AIForge) *YakFor
 	c.Description = forge.Description
 	c.Actions = forge.Actions
 	c.ForgeContent = forge.ForgeContent
+	c.CLIParameterRuleYaklangCode = forge.Params
 	return c
 }
 func (c *YakForgeBlueprintConfig) WithActionName(name string) *YakForgeBlueprintConfig {
