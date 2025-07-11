@@ -383,6 +383,9 @@ func DoRiskDiff(context context.Context, base, compare *ypb.SSARiskDiffItem) (<-
 	if len(diffResults) > 0 {
 		res := make(chan *ComparisonResult[*schema.SSARisk])
 		go func() {
+			defer func() {
+				close(res)
+			}()
 			for _, d := range diffResults {
 				compareResult := &ComparisonResult[*schema.SSARisk]{
 					BaseValue:   nil,
