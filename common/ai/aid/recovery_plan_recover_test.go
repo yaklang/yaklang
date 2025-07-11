@@ -171,5 +171,6 @@ LOOP:
 	if !consumptionCheck {
 		t.Fatal("consumption check failed")
 	}
+
 	recoverPlan(t, ins.config.id)
 }
