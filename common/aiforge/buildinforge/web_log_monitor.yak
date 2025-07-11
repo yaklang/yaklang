@@ -102,6 +102,7 @@ chunkBatch = cli.Int("chunk", cli.setHelp("日志分片长度"), cli.setVerboseN
 concurrency = cli.Int("concurrency", cli.setHelp("ai并发调用限制"), cli.setVerboseName("ai并发调用限制"), cli.setDefault(20))
 triggerSec = cli.Int("triggerSec", cli.setHelp("ai分析实体行为触发器触发间隔"), cli.setVerboseName("触发器触发间隔（秒）"), cli.setDefault(30))
 triggerCount = cli.Int("triggerCount", cli.setHelp("ai分析实体行为触发器触发次数"), cli.setVerboseName("触发器触发次数"), cli.setDefault(20))
+separator = cli.String("separator", cli.setHelp("日志切割符"), cli.setVerboseName("切割单条日志的分隔符"), cli.setDefault("\n"))
 cli.check()
 
 if chunkBatch <= 0 {
@@ -278,7 +279,7 @@ forgeHandle = func(params) {
             }()
             return nil
         }),
-        aireducer.separator("[INFO]"),
+        aireducer.separator(separator),
         aireducer.memory(aiagent.GetDefaultMemory()),
     )~
     aidConfig.EmitStream(sprintf("开始分析日志目标[%s]",filePaths),"")
