@@ -7,6 +7,7 @@ import (
 	"path"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -333,7 +334,7 @@ func TestSSARiskRequestParse(t *testing.T) {
 	})
 }
 
-func initRiskTest(t *testing.T, programName string) {
+func initRiskTest(t *testing.T, programName, RuntimeId string, extendPaths ...string) {
 	db := ssadb.GetDB()
 	/*
 		--programName (5)
@@ -366,13 +367,18 @@ func initRiskTest(t *testing.T, programName string) {
 				-- /c.go (1)
 					-- test5
 	*/
+	extendPath := ""
+	if len(extendPaths) > 0 {
+		extendPath = "/" + strings.Join(extendPaths, "/")
+	}
 
 	err := yakit.CreateSSARisk(db, &schema.SSARisk{
 		ProgramName:   programName,
-		CodeSourceUrl: fmt.Sprintf("/%s/a.go", programName),
+		CodeSourceUrl: fmt.Sprintf("/%s%s/a.go", programName, extendPath),
 		FunctionName:  "funcA",
 		Title:         "test1",
 		FromRule:      "rule1",
+		RuntimeId:     RuntimeId,
 		ResultID:      1,
 		Variable:      "a",
 		Index:         1,
@@ -381,10 +387,11 @@ func initRiskTest(t *testing.T, programName string) {
 
 	err = yakit.CreateSSARisk(db, &schema.SSARisk{
 		ProgramName:   programName,
-		CodeSourceUrl: fmt.Sprintf("/%s/b/b1.go", programName),
+		CodeSourceUrl: fmt.Sprintf("/%s%s/b/b1.go", programName, extendPath),
 		FunctionName:  "funcB1",
 		Title:         "test2",
 		FromRule:      "rule2",
+		RuntimeId:     RuntimeId,
 		ResultID:      2,
 		Variable:      "b1",
 		Index:         2,
@@ -393,10 +400,11 @@ func initRiskTest(t *testing.T, programName string) {
 
 	err = yakit.CreateSSARisk(db, &schema.SSARisk{
 		ProgramName:   programName,
-		CodeSourceUrl: fmt.Sprintf("/%s/b/b2.go", programName),
+		CodeSourceUrl: fmt.Sprintf("/%s%s/b/b2.go", programName, extendPath),
 		FunctionName:  "funcB2",
 		Title:         "test3",
 		FromRule:      "rule3",
+		RuntimeId:     RuntimeId,
 		ResultID:      3,
 		Variable:      "b2",
 		Index:         3,
@@ -405,10 +413,11 @@ func initRiskTest(t *testing.T, programName string) {
 
 	err = yakit.CreateSSARisk(db, &schema.SSARisk{
 		ProgramName:   programName,
-		CodeSourceUrl: fmt.Sprintf("/%s/c.go", programName),
+		CodeSourceUrl: fmt.Sprintf("/%s%s/c.go", programName, extendPath),
 		FunctionName:  "funcC",
 		Title:         "test4",
 		FromRule:      "rule2",
+		RuntimeId:     RuntimeId,
 		ResultID:      4,
 		Variable:      "c",
 		Index:         4,
@@ -417,10 +426,11 @@ func initRiskTest(t *testing.T, programName string) {
 
 	err = yakit.CreateSSARisk(db, &schema.SSARisk{
 		ProgramName:   programName,
-		CodeSourceUrl: fmt.Sprintf("/%s/c.go", programName),
+		CodeSourceUrl: fmt.Sprintf("/%s%s/c.go", programName, extendPath),
 		FunctionName:  "funcC",
 		Title:         "test5",
 		FromRule:      "",
+		RuntimeId:     RuntimeId,
 		ResultID:      5,
 		Variable:      "c",
 		Index:         5,
@@ -508,6 +518,7 @@ func GetSSARisk(t *testing.T, local ypb.YakClient, url *ypb.YakURL) map[string]d
 	}
 	return got
 }
+
 func urlProgramPath(progName string) string {
 	return "/" + progName
 }
@@ -534,9 +545,9 @@ func urlRuleSourcePath(progName, ruleName, source string) string {
 
 func TestRiskAction(t *testing.T) {
 	programName1 := uuid.NewString()
-	initRiskTest(t, programName1)
+	initRiskTest(t, programName1, "")
 	programName2 := uuid.NewString()
-	initRiskTest(t, programName2)
+	initRiskTest(t, programName2, "")
 
 	t.Cleanup(func() {
 		yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{ProgramName: []string{programName1}})
@@ -792,9 +803,23 @@ func TestRiskAction(t *testing.T) {
 
 func TestRiskActionRule(t *testing.T) {
 	programName1 := uuid.NewString()
-	initRiskTest(t, programName1)
 	programName2 := uuid.NewString()
-	initRiskTest(t, programName2)
+	taskID1 := uuid.NewString() // 旧的扫描结果
+	taskID2 := uuid.NewString() // 新的扫描结果
+	initRiskTest(t, programName1, taskID1)
+	initRiskTest(t, programName2, taskID2)
+	err := yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
+		ProgramName:   programName2,
+		CodeSourceUrl: fmt.Sprintf("/%s/d.go", programName2),
+		FunctionName:  "funcD",
+		Title:         "test6",
+		FromRule:      "rule4",
+		RuntimeId:     taskID2,
+		ResultID:      6,
+		Variable:      "d",
+		Index:         6,
+	})
+	require.NoError(t, err)
 
 	t.Cleanup(func() {
 		yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{ProgramName: []string{programName1}})
@@ -805,13 +830,15 @@ func TestRiskActionRule(t *testing.T) {
 		t.Error(err)
 	}
 
-	checkRuleAndSearch := func(path, search string, want map[string]data, contain ...bool) {
+	checkRuleAndSearch := func(path, search, base, compare string, want map[string]data, contain ...bool) {
 		url := &ypb.YakURL{
 			Schema: "ssarisk",
 			Path:   path,
 			Query: []*ypb.KVPair{
 				{Key: "search", Value: search},
 				{Key: "type", Value: "rule"},
+				{Key: "task_id", Value: base},
+				{Key: "compare", Value: compare},
 			},
 		}
 		got := GetSSARisk(t, local, url)
@@ -830,10 +857,10 @@ func TestRiskActionRule(t *testing.T) {
 			require.Equal(t, want, got)
 		}
 	}
-	t.Run("check rule root got program", func(t *testing.T) {
+	t.Run("check rule root get program", func(t *testing.T) {
 		// ssarisk://?type=rule
-		// got program
-		checkRuleAndSearch("/", "", map[string]data{
+		// get program
+		checkRuleAndSearch("/", "", "", "", map[string]data{
 			urlProgramPath(programName1): {
 				Name:  programName1,
 				Type:  "program",
@@ -842,7 +869,7 @@ func TestRiskActionRule(t *testing.T) {
 			urlProgramPath(programName2): {
 				Name:  programName2,
 				Type:  "program",
-				Count: 5,
+				Count: 6,
 			},
 		}, true)
 	})
@@ -850,7 +877,7 @@ func TestRiskActionRule(t *testing.T) {
 	t.Run("check rule program get rule", func(t *testing.T) {
 		// ssarisk://program?type=rule
 		// get rule
-		checkRuleAndSearch(urlProgramPath(programName1), "", map[string]data{
+		checkRuleAndSearch(urlProgramPath(programName1), "", "", "", map[string]data{
 			urlRulePath(programName1, "rule1"): {
 				Name:  "rule1",
 				Type:  "rule",
@@ -875,7 +902,7 @@ func TestRiskActionRule(t *testing.T) {
 		rule2Path := urlRulePath(programName1, "rule2")            // /program1/rule2
 		b1 := urlRuleSourcePath(programName1, "rule2", "/b/b1.go") //  /program1/rule2/b/b1.go
 		c := urlRuleSourcePath(programName1, "rule2", "c.go")      //  /program1/rule2/c.go
-		checkRuleAndSearch(rule2Path, "", map[string]data{
+		checkRuleAndSearch(rule2Path, "", "", "", map[string]data{
 			b1: {
 				Name:  sourcePath(programName1, "b/b1.go"),
 				Type:  "source",
@@ -908,7 +935,7 @@ func TestRiskActionRule(t *testing.T) {
 
 	t.Run("check rule program search", func(t *testing.T) {
 		// ssarisk://program?type=rule&search=test1
-		checkRuleAndSearch(urlProgramPath(programName1), "rule1", map[string]data{
+		checkRuleAndSearch(urlProgramPath(programName1), "rule1", "", "", map[string]data{
 			urlRulePath(programName1, "rule1"): {
 				Name:  "rule1",
 				Type:  "rule",
@@ -919,7 +946,7 @@ func TestRiskActionRule(t *testing.T) {
 
 	t.Run("check rule program search source", func(t *testing.T) {
 		// ssarisk://program?type=rule&search=/c.go
-		checkRuleAndSearch(urlProgramPath(programName1), "/c.go", map[string]data{
+		checkRuleAndSearch(urlProgramPath(programName1), "/c.go", "", "", map[string]data{
 			urlRulePath(programName1, "rule2"): {
 				Name:  "rule2",
 				Type:  "rule",
@@ -930,7 +957,7 @@ func TestRiskActionRule(t *testing.T) {
 
 	t.Run("check rule program search function", func(t *testing.T) {
 		// ssarisk://program?type=rule&search=funcC
-		checkRuleAndSearch(urlProgramPath(programName1), "funcC", map[string]data{
+		checkRuleAndSearch(urlProgramPath(programName1), "funcC", "", "", map[string]data{
 			urlRulePath(programName1, "rule2"): {
 				Name:  "rule2",
 				Type:  "rule",
@@ -940,26 +967,276 @@ func TestRiskActionRule(t *testing.T) {
 	})
 
 	t.Run("check rule path search source", func(t *testing.T) {
-		// ssarisk://program/test4?type=rule&search=/c.go
-		checkRuleAndSearch(urlRulePath(programName1, "rule2"), "/c.go", map[string]data{
+		// ssarisk://program/rule2?type=rule&search=/c.go
+		checkRuleAndSearch(urlRulePath(programName1, "rule2"), "/c.go", "", "", map[string]data{
 			urlRuleSourcePath(programName1, "rule2", "c.go"): {
 				Name:  sourcePath(programName1, "c.go"),
 				Type:  "source",
 				Count: 1,
 			},
 		})
-		checkRuleAndSearch(urlRulePath(programName1, "rule2"), "/b.go", map[string]data{})
+		checkRuleAndSearch(urlRulePath(programName1, "rule2"), "/b.go", "", "", map[string]data{})
 	})
 
 	t.Run("check rule path search function", func(t *testing.T) {
-		// ssarisk://program/test4?type=rule&search=funcC
-		checkRuleAndSearch(urlRulePath(programName1, "rule2"), "funcC", map[string]data{
+		// ssarisk://program/rule2?type=rule&search=funcC
+		checkRuleAndSearch(urlRulePath(programName1, "rule2"), "funcC", "", "", map[string]data{
 			urlRuleSourcePath(programName1, "rule2", "c.go"): {
 				Name:  sourcePath(programName1, "c.go"),
 				Type:  "source",
 				Count: 1,
 			},
 		})
-		checkRuleAndSearch(urlRulePath(programName1, "rule2"), "funcA", map[string]data{})
+		checkRuleAndSearch(urlRulePath(programName1, "rule2"), "funcA", "", "", map[string]data{})
+	})
+
+	t.Run("check rule root get program with diff", func(t *testing.T) {
+		// ssarisk://?type=rule&compare={runtimeId}
+		// get program
+		checkRuleAndSearch("/", "", taskID2, taskID1, map[string]data{
+			urlProgramPath(programName2): {
+				Name:  programName2,
+				Type:  "program",
+				Count: 1,
+			},
+		}, true)
+	})
+
+	t.Run("check rule program get rule with diff", func(t *testing.T) {
+		// ssarisk://program?type=rule&compare={runtimeId}
+		// get rule
+		checkRuleAndSearch(urlProgramPath(programName2), "", taskID2, taskID1, map[string]data{
+			urlRulePath(programName2, "rule4"): {
+				Name:  "rule4",
+				Type:  "rule",
+				Count: 1,
+			},
+		})
+	})
+
+	t.Run("check rule get source with diff", func(t *testing.T) {
+		// ssarisk://program/ruleName?type=rule
+		// get source
+		checkRuleAndSearch(urlRulePath(programName2, "rule4"), "", taskID2, taskID1, map[string]data{
+			urlRuleSourcePath(programName2, "rule4", "d.go"): {
+				Name:  sourcePath(programName2, "d.go"),
+				Type:  "source",
+				Count: 1,
+			},
+		})
+	})
+
+	t.Run("check rule path search source with diff", func(t *testing.T) {
+		// ssarisk://program/rule4?type=rule&search=/c.go&compare={runtimeId}
+		checkRuleAndSearch(urlRulePath(programName2, "rule4"), "/d.go", taskID2, taskID1, map[string]data{
+			urlRuleSourcePath(programName2, "rule4", "d.go"): {
+				Name:  sourcePath(programName2, "d.go"),
+				Type:  "source",
+				Count: 1,
+			},
+		})
+	})
+}
+
+func TestRiskActionCompare(t *testing.T) {
+	programName := uuid.NewString()
+	taskID1 := uuid.NewString() // 旧的扫描结果
+	taskID2 := uuid.NewString() // 新的扫描结果
+
+	extendPath := "test"
+	initRiskTest(t, programName, taskID1)
+	initRiskTest(t, programName, taskID2)
+	initRiskTest(t, programName, taskID2, extendPath)
+
+	t.Cleanup(func() {
+		yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{ProgramName: []string{programName}})
+		yakit.DeleteSSADiffResultByBaseLine(ssadb.GetDB(), []string{taskID1, taskID2}, schema.RuntimeId)
+		yakit.DeleteSSADiffResultByCompare(ssadb.GetDB(), []string{taskID1, taskID2}, schema.RuntimeId)
+	})
+	local, err := yakgrpc.NewLocalClient()
+	if err != nil {
+		t.Error(err)
+	}
+
+	checkRuleAndSearch_WithDiff := func(path, search, base, compare string, want map[string]data, contain ...bool) {
+		url := &ypb.YakURL{
+			Schema: "ssarisk",
+			Path:   path,
+			Query: []*ypb.KVPair{
+				{Key: "task_id", Value: base},
+				{Key: "search", Value: search},
+				{Key: "compare", Value: compare},
+			},
+		}
+		got := GetSSARisk(t, local, url)
+		log.Infof("got: %v", got)
+		log.Infof("want: %v", want)
+		if len(contain) > 0 && contain[0] {
+			// Check if got contains all entries from want
+			for wantPath, wantData := range want {
+				gotData, exists := got[wantPath]
+				require.True(t, exists, "Path %s not found in results", wantPath)
+				require.Equal(t, wantData.Name, gotData.Name, "Name mismatch for path %s", wantPath)
+				require.Equal(t, wantData.Type, gotData.Type, "Type mismatch for path %s", wantPath)
+				require.Equal(t, wantData.Count, gotData.Count, "Count mismatch for path %s", wantPath)
+			}
+		} else {
+			require.Equal(t, want, got)
+		}
+	}
+
+	t.Run("check path root with diff", func(t *testing.T) {
+		// ssarisk://?compare={runtimeId}
+		checkRuleAndSearch_WithDiff("/", "", taskID2, taskID1, map[string]data{
+			urlProgramPath(programName): {
+				Name:  programName,
+				Type:  "program",
+				Count: 5,
+			},
+		}, true)
+	})
+
+	t.Run("check path program with diff", func(t *testing.T) {
+		// ssarisk://program?compare={runtimeId}
+		checkRuleAndSearch_WithDiff(urlProgramPath(programName), "", taskID2, taskID1, map[string]data{
+			urlPath(programName, extendPath+"/a.go"): {
+				Name:  sourcePath(programName, extendPath+"/a.go"),
+				Type:  "source",
+				Count: 1,
+			},
+			urlPath(programName, extendPath+"/b/b1.go"): {
+				Name:  sourcePath(programName, extendPath+"/b/b1.go"),
+				Type:  "source",
+				Count: 1,
+			},
+			urlPath(programName, extendPath+"/b/b2.go"): {
+				Name:  sourcePath(programName, extendPath+"/b/b2.go"),
+				Type:  "source",
+				Count: 1,
+			},
+			urlPath(programName, extendPath+"/c.go"): {
+				Name:  sourcePath(programName, extendPath+"/c.go"),
+				Type:  "source",
+				Count: 2,
+			},
+		})
+	})
+
+	t.Run("check path source with diff", func(t *testing.T) {
+		// ssarisk://program/test/c.go?compare={runtimeId}
+		checkRuleAndSearch_WithDiff(urlPath(programName, extendPath+"/c.go"), "", taskID2, taskID1, map[string]data{
+			urlFunctionPath(programName, extendPath+"/c.go", "funcC"): {
+				Name:  "funcC",
+				Type:  "function",
+				Count: 2,
+			},
+		})
+	})
+
+	t.Run("check search source(file)", func(t *testing.T) {
+		// ssarisk://?search=/c.go&compare={runtimeId}
+		checkRuleAndSearch_WithDiff("/", "/c.go", taskID2, taskID1, map[string]data{
+			urlProgramPath(programName): {
+				Name:  programName,
+				Type:  "program",
+				Count: 2,
+			},
+			urlProgramPath(programName): {
+				Name:  programName,
+				Type:  "program",
+				Count: 2,
+			},
+		}, true)
+	})
+
+	t.Run("check search source(dir)", func(t *testing.T) {
+		// ssarisk://?search=/b/&compare={runtimeId}
+		checkRuleAndSearch_WithDiff("/", "/b/", taskID2, taskID1, map[string]data{
+			urlProgramPath(programName): {
+				Name:  programName,
+				Type:  "program",
+				Count: 2,
+			},
+			urlProgramPath(programName): {
+				Name:  programName,
+				Type:  "program",
+				Count: 2,
+			},
+		}, true)
+	})
+
+	t.Run("check search function", func(t *testing.T) {
+		// ssarisk://?search=funcA&compare={runtimeId}
+		checkRuleAndSearch_WithDiff("/", "funcA", taskID2, taskID1, map[string]data{
+			urlProgramPath(programName): {
+				Name:  programName,
+				Type:  "program",
+				Count: 1,
+			},
+			urlProgramPath(programName): {
+				Name:  programName,
+				Type:  "program",
+				Count: 1,
+			},
+		}, true)
+	})
+
+	t.Run("check search function fuzzy", func(t *testing.T) {
+		// ssarisk://?search=func&compare={runtimeId}
+		checkRuleAndSearch_WithDiff("/", "func", taskID2, taskID1, map[string]data{
+			urlProgramPath(programName): {
+				Name:  programName,
+				Type:  "program",
+				Count: 5,
+			},
+			urlProgramPath(programName): {
+				Name:  programName,
+				Type:  "program",
+				Count: 5,
+			},
+		}, true)
+	})
+
+	t.Run("check path program and search source", func(t *testing.T) {
+		// ssarisk://program/?search=/b&compare={runtimeId}
+		checkRuleAndSearch_WithDiff(urlProgramPath(programName), "/b", taskID2, taskID1, map[string]data{
+			urlPath(programName, extendPath+"/b/b1.go"): {
+				Name:  sourcePath(programName, extendPath+"/b/b1.go"),
+				Type:  "source",
+				Count: 1,
+			},
+			urlPath(programName, extendPath+"/b/b2.go"): {
+				Name:  sourcePath(programName, extendPath+"/b/b2.go"),
+				Type:  "source",
+				Count: 1,
+			},
+		})
+	})
+
+	t.Run("check path program and search function", func(t *testing.T) {
+		// ssarisk://program/?search=/funcB1&compare={runtimeId}
+		checkRuleAndSearch_WithDiff(urlProgramPath(programName), "funcB1", taskID2, taskID1, map[string]data{
+			urlPath(programName, extendPath+"/b/b1.go"): {
+				Name:  sourcePath(programName, extendPath+"/b/b1.go"),
+				Type:  "source",
+				Count: 1,
+			},
+		})
+	})
+
+	t.Run("check path source and search function", func(t *testing.T) {
+		// ssarisk://program/b/?search=/funcB1&compare={runtimeId}
+		checkRuleAndSearch_WithDiff(urlPath(programName, extendPath+"/b/b1.go"), "funcB1", taskID2, taskID1, map[string]data{
+			urlFunctionPath(programName, extendPath+"/b/b1.go", "funcB1"): {
+				Name:  "funcB1",
+				Type:  "function",
+				Count: 1,
+			},
+		})
+	})
+
+	t.Run("check path function and search function but not find", func(t *testing.T) {
+		// ssarisk://program/b/?search=/funcB1&compare={runtimeId}
+		checkRuleAndSearch_WithDiff(urlFunctionPath(programName, extendPath+"/b/b1.go", "funcB1"), "funcB2", taskID2, taskID1, map[string]data{})
 	})
 }

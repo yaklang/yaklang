@@ -6776,6 +6776,7 @@ message SSARisksFilter {
   int64 BeforeCreatedAt = 15;
   int64 AfterCreatedAt = 16;
   repeated string LatestDisposalStatus = 17;  // not_set | is_issue | not_issue | suspicious
+  SSARiskDiffRequest SSARiskDiffRequest = 18;
 }
 
 message QuerySSARisksRequest {
