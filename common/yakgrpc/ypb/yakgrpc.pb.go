@@ -47795,7 +47795,9 @@ type SyntaxFlowScanRequest struct {
 	// 其他参数
 	IgnoreLanguage bool `protobuf:"varint,4,opt,name=IgnoreLanguage,proto3" json:"IgnoreLanguage,omitempty"` // 是否忽略语言 默认为false 将会只运行和当前项目语言一致的规则，最后运行的规则可能会比当前选中的规则少一些。
 	// for new rule scan task
-	RuleInput     *SyntaxFlowRuleInput `protobuf:"bytes,6,opt,name=RuleInput,proto3" json:"RuleInput,omitempty"` // 用于新建规则时的调试功能
+	RuleInput *SyntaxFlowRuleInput `protobuf:"bytes,6,opt,name=RuleInput,proto3" json:"RuleInput,omitempty"` // 用于新建规则时的调试功能
+	// 并发，默认10
+	Concurrency   uint32 `protobuf:"varint,7,opt,name=Concurrency,proto3" json:"Concurrency,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -47870,6 +47872,13 @@ func (x *SyntaxFlowScanRequest) GetRuleInput() *SyntaxFlowRuleInput {
 		return x.RuleInput
 	}
 	return nil
+}
+
+func (x *SyntaxFlowScanRequest) GetConcurrency() uint32 {
+	if x != nil {
+		return x.Concurrency
+	}
+	return 0
 }
 
 type QuerySyntaxFlowScanTaskRequest struct {
@@ -58641,14 +58650,15 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vMessageType\x18\x03 \x01(\tR\vMessageType\"h\n" +
 	"\x1dDownloadSyntaxFlowRuleRequest\x12\x14\n" +
 	"\x05Token\x18\x01 \x01(\tR\x05Token\x121\n" +
-	"\x06Filter\x18\x02 \x01(\v2\x19.ypb.SyntaxFlowRuleFilterR\x06Filter\"\x92\x02\n" +
+	"\x06Filter\x18\x02 \x01(\v2\x19.ypb.SyntaxFlowRuleFilterR\x06Filter\"\xb4\x02\n" +
 	"\x15SyntaxFlowScanRequest\x12 \n" +
 	"\vControlMode\x18\x01 \x01(\tR\vControlMode\x121\n" +
 	"\x06Filter\x18\x02 \x01(\v2\x19.ypb.SyntaxFlowRuleFilterR\x06Filter\x12 \n" +
 	"\vProgramName\x18\x03 \x03(\tR\vProgramName\x12\"\n" +
 	"\fResumeTaskId\x18\x05 \x01(\tR\fResumeTaskId\x12&\n" +
 	"\x0eIgnoreLanguage\x18\x04 \x01(\bR\x0eIgnoreLanguage\x126\n" +
-	"\tRuleInput\x18\x06 \x01(\v2\x18.ypb.SyntaxFlowRuleInputR\tRuleInput\"\x84\x01\n" +
+	"\tRuleInput\x18\x06 \x01(\v2\x18.ypb.SyntaxFlowRuleInputR\tRuleInput\x12 \n" +
+	"\vConcurrency\x18\a \x01(\rR\vConcurrency\"\x84\x01\n" +
 	"\x1eQuerySyntaxFlowScanTaskRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +

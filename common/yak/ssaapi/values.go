@@ -447,7 +447,10 @@ func (v *Value) GetReturn() Values {
 	ret := make(Values, 0)
 	if f, ok := ssa.ToFunction(v.innerValue); ok {
 		for _, r := range f.Return {
-			r := f.GetValueById(r)
+			r, ok := f.GetValueById(r)
+			if !ok {
+				continue
+			}
 			ret = append(ret, v.NewValue(r))
 		}
 	}
@@ -461,7 +464,10 @@ func (v *Value) GetParameter(i int) *Value {
 
 	if f, ok := ssa.ToFunction(v.innerValue); ok {
 		if i < len(f.Params) {
-			param := f.GetValueById(f.Params[i])
+			param, ok := f.GetValueById(f.Params[i])
+			if !ok {
+				return nil
+			}
 			return v.NewValue(param)
 		}
 	}
@@ -474,7 +480,10 @@ func (v *Value) GetFreeValue(name string) *Value {
 	if variable := v.GetVariable(name); variable != nil {
 		if f, ok := ssa.ToFunction(v.innerValue); ok {
 			if fv, ok := f.FreeValues[variable]; ok {
-				fv := f.GetValueById(fv)
+				fv, ok := f.GetValueById(fv)
+				if !ok {
+					return nil
+				}
 				return v.NewValue(fv)
 			}
 		}
@@ -490,7 +499,10 @@ func (v *Value) GetParameters() Values {
 	ret := make(Values, 0)
 	if f, ok := ssa.ToFunction(v.innerValue); ok {
 		for _, param := range f.Params {
-			param := f.GetValueById(param)
+			param, ok := f.GetValueById(param)
+			if !ok {
+				continue
+			}
 			ret = append(ret, v.NewValue(param))
 		}
 	}
@@ -504,7 +516,10 @@ func (v *Value) GetCallArgs() Values {
 
 	if f, ok := ssa.ToCall(v.innerValue); ok {
 		return lo.FilterMap(f.Args, func(itemId int64, index int) (*Value, bool) {
-			item := f.GetValueById(itemId)
+			item, ok := f.GetValueById(itemId)
+			if !ok {
+				return nil, false
+			}
 			return v.NewValue(item), true
 		})
 	}
@@ -809,7 +824,10 @@ func (v *Value) getCallByEx(tmp map[int64]struct{}) Values {
 			if call == nil || call.Method <= 0 {
 				return
 			}
-			method := call.GetValueById(call.Method)
+			method, ok := call.GetValueById(call.Method)
+			if !ok || method == nil {
+				return
+			}
 			if method.GetId() == id {
 				vs = append(vs, v.NewValue(call))
 				return
@@ -827,9 +845,16 @@ func (v *Value) getCallByEx(tmp map[int64]struct{}) Values {
 				if len(function.ParameterMembers) <= index {
 					break
 				}
-				value := call.GetValueById(valueId)
+				value, ok := call.GetValueById(valueId)
+				if !ok || value == nil {
+					continue
+				}
 				if value.GetId() == id {
-					vs = append(vs, v.NewValue(call.GetValueById(function.ParameterMembers[index])).getCallByEx(tmp)...)
+					paramMember, ok := call.GetValueById(function.ParameterMembers[index])
+					if !ok {
+						continue
+					}
+					vs = append(vs, v.NewValue(paramMember).getCallByEx(tmp)...)
 					return
 				}
 			}
@@ -838,14 +863,21 @@ func (v *Value) getCallByEx(tmp map[int64]struct{}) Values {
 					break
 				}
 				if arg == id {
-					vv := v.NewValue(call.GetValueById(function.Params[index]))
+					param, ok := call.GetValueById(function.Params[index])
+					if !ok {
+						continue
+					}
+					vv := v.NewValue(param)
 					vs = append(vs, vv.getCallByEx(tmp)...)
 					return
 				}
 			}
 			searchBindVariable := func(name string) {
 				for _, valueId := range function.FreeValues {
-					value := call.GetValueById(valueId)
+					value, ok := call.GetValueById(valueId)
+					if !ok || value == nil {
+						continue
+					}
 					if value.GetName() == name {
 						vs = append(vs, v.NewValue(value).getCallByEx(tmp)...)
 						return

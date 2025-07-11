@@ -15,6 +15,9 @@ type Const struct {
 }
 
 func (c *Const) GetRawValue() any {
+	if c.value == nil {
+		return nil
+	}
 	return c.value
 }
 
