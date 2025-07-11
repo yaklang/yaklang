@@ -91,7 +91,8 @@ type Config struct {
 	eventHandler func(e *schema.AiOutputEvent)
 
 	// hook before emit
-	eventBeforeSave *utils.Stack[func(e *schema.AiOutputEvent) *schema.AiOutputEvent]
+	eventProcessHandler *utils.Stack[func(e *schema.AiOutputEvent) *schema.AiOutputEvent]
+	saveEvent           bool
 
 	// tool manager
 	aiToolManager       *buildinaitools.AiToolManager
@@ -309,13 +310,11 @@ func (c *Config) emit(e *schema.AiOutputEvent) {
 	c.m.Lock()
 	defer c.m.Unlock()
 
-	if c.eventBeforeSave != nil {
+	if c.eventProcessHandler != nil {
 		e = c.callEventBeforeSave(e)
 	}
-	if e.NodeId == "call-tools" {
-		e.NodeId = "call-tools"
-	}
-	if e.ShouldSave() { // not save system and sync
+
+	if c.saveEvent && e.ShouldSave() { // not save system and sync
 		err := yakit.CreateAIEvent(consts.GetGormProjectDatabase(), e)
 		if err != nil {
 			log.Errorf("create AI event failed: %v", err)
@@ -1129,6 +1128,15 @@ func WithDisableOutputEvent(typeString ...string) Option {
 			config.disableOutputEventType = make([]string, 0)
 		}
 		config.disableOutputEventType = append(config.disableOutputEventType, typeString...)
+		return nil
+	}
+}
+
+func WithSaveEvent(b bool) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.saveEvent = b
 		return nil
 	}
 }
