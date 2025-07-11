@@ -215,6 +215,7 @@ func CreateInstruction(op Opcode) Instruction {
 		}
 	case SSAOpcodeConstInst:
 		return &ConstInst{
+			Const:   &Const{value: nil, str: "nil"},
 			anValue: NewValue(),
 		}
 	case SSAOpcodeUndefined:
