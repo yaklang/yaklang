@@ -39,7 +39,7 @@ type ProgramCache struct {
 }
 
 // NewDBCache : create a new ssa db cache. if ttl is 0, the cache will never expire, and never save to database.
-func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) *ProgramCache {
+func NewDBCache(prog *Program, databaseKind ProgramCacheKind, fileSize int, ConfigTTL ...time.Duration) *ProgramCache {
 	compileCtx := context.Background()
 	cacheCtx, cancel := context.WithCancel(compileCtx)
 	cache := &ProgramCache{
@@ -49,26 +49,44 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 		waitGroup:      &sync.WaitGroup{},
 	}
 	var programName string
-	if databaseEnable {
+	if databaseKind != ProgramCacheMemory { // database write/read
 		programName = prog.GetApplication().GetProgramName()
 		cache.DB = ssadb.GetDB().Where("program_name = ?", programName)
 	}
-
-	cache.initIndex(databaseEnable)
+	fetchSize := min(max(fileSize*5, defaultFetchSize), maxFetchSize)
+	saveSize := min(max(fileSize*5, defaultSaveSize), maxSaveSize)
+	log.Infof("Databasex Channel: ReSetSize: fileSize(%d) fetchSize(%d) saveSize(%d)", fileSize, fetchSize, saveSize)
+	cache.initIndex(databaseKind, saveSize/2)
 	cache.afterSaveNotify = func(i int) {}
 	cache.InstructionCache = createInstructionCache(
-		cacheCtx, databaseEnable,
+		cacheCtx, databaseKind,
 		cache.DB, prog,
-		programName,
+		programName, fetchSize, saveSize,
 		func(inst Instruction, instIr *ssadb.IrCode) {
-			cache.OffsetCache.Add("", inst) // add to offset cache
-			cache.afterSaveNotify(1)        // notify after save
+			// TODO: this offset too long time
+			// cache.OffsetCache.Add("", inst) // add to offset cache
+		},
+		func(count int) {
+			go func() {
+				step := 100
+				if cache.afterSaveNotify != nil {
+					i := 0
+					for i <= count {
+						cache.afterSaveNotify(step)
+						i += step // notify every step instructions
+					}
+					if rest := count % step; rest != 0 {
+						// notify the remaining count if not evenly divisible by step
+						cache.afterSaveNotify(rest)
+					}
+				}
+			}()
 		},
 	)
 	cache.TypeCache = createTypeCache(
-		cacheCtx, databaseEnable,
+		cacheCtx, databaseKind,
 		cache.DB, prog,
-		programName,
+		programName, fetchSize, saveSize,
 	)
 	return cache
 }
@@ -85,7 +103,10 @@ func (c *ProgramCache) SetInstruction(inst Instruction) {
 		log.Errorf("BUG: SetInstruction called with nil instruction")
 		return
 	}
-	c.InstructionCache.Set(inst)
+	f1 := func() {
+		c.InstructionCache.Set(inst)
+	}
+	ProfileAdd(true, "ssa.ProgramCache.SetInstruction", f1)
 }
 
 func (c *ProgramCache) DeleteInstruction(inst Instruction) {

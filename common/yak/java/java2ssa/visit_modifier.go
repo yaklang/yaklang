@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func (y *builder) VisitModifiers(raw javaparser.IModifiersContext) (instanceCallback []func(ssa.Value), defCallback []func(ssa.Value), isStatic bool) {
+func (y *singleFileBuilder) VisitModifiers(raw javaparser.IModifiersContext) (instanceCallback []func(ssa.Value), defCallback []func(ssa.Value), isStatic bool) {
 	isStatic = false
 	if y == nil || raw == nil || y.IsStop() {
 		return
@@ -52,7 +52,7 @@ type AnnotationDescription struct {
 	Name string
 }
 
-func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContext) (instanceCallback func(ssa.Value), defCallback func(ssa.Value)) {
+func (y *singleFileBuilder) VisitAnnotation(annotationContext javaparser.IAnnotationContext) (instanceCallback func(ssa.Value), defCallback func(ssa.Value)) {
 	start := time.Now()
 	defer deltaAnnotationCostFrom(start)
 	recoverRange := y.SetRange(annotationContext)
@@ -168,11 +168,11 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 		}
 }
 
-func (y *builder) VisitStaticModifier(raw javaparser.IStaticModifierContext) ssa.BlueprintModifier {
+func (y *singleFileBuilder) VisitStaticModifier(raw javaparser.IStaticModifierContext) ssa.BlueprintModifier {
 	return ssa.NoneModifier
 }
 
-func (y *builder) VisitStaticClassModifier(raw javaparser.IStaticClassModifierContext) ssa.BlueprintModifier {
+func (y *singleFileBuilder) VisitStaticClassModifier(raw javaparser.IStaticClassModifierContext) ssa.BlueprintModifier {
 	if y == nil || raw == nil || y.IsStop() {
 		return ssa.NoneModifier
 	}
@@ -200,7 +200,7 @@ func (y *builder) VisitStaticClassModifier(raw javaparser.IStaticClassModifierCo
 	}
 }
 
-func (y *builder) VisitElementValuePair(raw javaparser.IElementValuePairContext) (name string, v ssa.Value) {
+func (y *singleFileBuilder) VisitElementValuePair(raw javaparser.IElementValuePairContext) (name string, v ssa.Value) {
 	name = ""
 	v = nil
 	if y == nil || raw == nil || y.IsStop() {
@@ -218,7 +218,7 @@ func (y *builder) VisitElementValuePair(raw javaparser.IElementValuePairContext)
 	return
 }
 
-func (y *builder) VisitElementValue(raw javaparser.IElementValueContext) (v ssa.Value) {
+func (y *singleFileBuilder) VisitElementValue(raw javaparser.IElementValueContext) (v ssa.Value) {
 	v = nil
 	if y == nil || raw == nil || y.IsStop() {
 		return
@@ -244,7 +244,7 @@ func (y *builder) VisitElementValue(raw javaparser.IElementValueContext) (v ssa.
 	return
 }
 
-func (y *builder) VisitElementValueArrayInitializer(raw javaparser.IElementValueArrayInitializerContext) (v ssa.Value) {
+func (y *singleFileBuilder) VisitElementValueArrayInitializer(raw javaparser.IElementValueArrayInitializerContext) (v ssa.Value) {
 	v = nil
 	if y == nil || raw == nil || y.IsStop() {
 		return

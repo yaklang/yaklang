@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 )
 
 // Save provides a way to collect items and save them in batches using a background goroutine.
@@ -38,6 +39,9 @@ func NewSaveWithConfig[T any](
 	saveToDB func([]T),
 	cfg *config,
 ) *Save[T] {
+	if utils.IsNil(saveToDB) {
+		return nil
+	}
 	ctx, cancel := context.WithCancel(cfg.ctx)
 	s := &Save[T]{
 		saveToDB: saveToDB,
@@ -61,36 +65,59 @@ func NewSaveWithConfig[T any](
 
 // processBuffer runs in a background goroutine and periodically processes items from the buffer.
 func (s *Save[T]) processBuffer() {
-	saveSize := s.config.saveSize
 	saveTime := s.config.saveTimeout
 	timer := time.NewTimer(saveTime)
-	items := make([]T, 0, saveSize)
-	save := func() {
-		if len(items) > 0 {
-			s.saveToDB(items)
-			items = make([]T, 0, saveSize) // Reset the items slice
-		}
-	}
 
+	save := func(ts []T) {
+		if len(ts) == 0 {
+			return
+		}
+		log.Infof("Databasex Channel: Save Count in save Loop: %s: need: %v, handled: %v",
+			s.config.name,
+			s.buffer.Len(),
+			len(ts),
+		)
+
+		f1 := func() {
+			if len(ts) > 0 {
+				s.saveToDB(ts)
+			}
+		}
+		ssaprofile.ProfileAdd(true, "save.Save", f1)
+	}
+	currentSaveSize := s.config.saveSize
+	items := make([]T, 0, currentSaveSize)
 	for {
+		saveSize := s.config.saveSize
 		select {
 		case item, ok := <-s.buffer.OutputChannel():
 			if !ok {
-				save()
+				save(items)
 				return
 			}
 
 			items = append(items, item)
 
 			// If we've reached the SaveSize, save immediately
-			if len(items) >= saveSize {
-				save()
+			if len(items) >= currentSaveSize {
+				save(items)
+				bufferSize := s.buffer.Len()
+				if bufferSize > currentSaveSize {
+					currentSaveSize = (bufferSize / currentSaveSize) * currentSaveSize
+				} else if bufferSize > saveSize {
+					currentSaveSize = (bufferSize / saveSize) * saveSize
+				} else {
+					currentSaveSize = saveSize
+				}
+
+				items = make([]T, 0, currentSaveSize)
 				// Reset the timer since we just saved
 				timer.Reset(saveTime)
 			}
 		case <-timer.C:
 			// Time's up, save whatever we have
-			save()
+			save(items)
+			items = make([]T, 0, saveSize)
 			timer.Reset(saveTime)
 		}
 	}
@@ -110,14 +137,9 @@ func (s *Save[T]) Save(item T) {
 	}
 }
 
-const MaxSize = 300
-
 // Close stops the background goroutine and waits for it to finish.
 // It also processes any remaining items in the buffer before returning.
 func (s *Save[T]) Close() {
-	if s.config.name == "OffsetCache" {
-		log.Errorf("bb")
-	}
 	s.buffer.Close() // Close the buffer
 	s.wg.Wait()      // Wait for the background goroutine to finish
 }

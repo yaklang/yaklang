@@ -195,16 +195,15 @@ public class A {
 }
 `)
 	fs.AddFile("b.java", `
-package com.example.demo1;
+	package com.example.demo1;
 
-import static com.example.demo2.A.a;
+	import static com.example.demo2.A.a;
 
-class A {
-	public static void main(){
-		println(a);
-		Method(1);
-	}
-}`)
+	class A {
+		public static void main(){
+			println(a);
+		}
+	}`)
 	ssatest.CheckSyntaxFlowWithFS(t, fs, `println(* #-> * as $param)`,
 		map[string][]string{
 			"param": {"1", "Parameter-a"},

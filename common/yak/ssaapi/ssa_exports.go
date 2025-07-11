@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
@@ -26,7 +27,7 @@ import (
 type ProcessFunc func(msg string, process float64)
 
 type config struct {
-	enableDatabase bool
+	enableDatabase ssa.ProgramCacheKind
 	// program
 	ProgramName        string
 	ProgramDescription string
@@ -378,7 +379,7 @@ func WithProgramDescription(desc string) Option {
 func WithProgramName(name string) Option {
 	return func(c *config) error {
 		c.ProgramName = name
-		c.enableDatabase = true
+		c.enableDatabase = ssa.ProgramCacheDBWrite
 		return nil
 	}
 }

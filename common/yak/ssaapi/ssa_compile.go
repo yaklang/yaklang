@@ -54,29 +54,33 @@ func (c *config) isStop() bool {
 }
 
 func (c *config) parseFile() (ret *Program, err error) {
-	prog, err := c.parseSimple(c.originEditor)
+	var prog *ssa.Program
+	prog, err = c.parseSimple(c.originEditor)
 	if err != nil {
 		return nil, err
 	}
 	prog.Finish()
-	if prog.EnableDatabase { // save program
-		prog.UpdateToDatabase()
+	wait := func() {}
+	if prog.DatabaseKind != ssa.ProgramCacheMemory { // save program
+		wait = prog.UpdateToDatabase()
 	}
 	total := prog.Cache.CountInstruction()
 	prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, total) // %90
 	prog.Cache.SaveToDatabase()
 	c.SaveConfig()
+	wait()
 	return NewProgram(prog, c), nil
 }
 
 func (c *config) feed(prog *ssa.Program, code *memedit.MemEditor) error {
-	builder := prog.GetAndCreateFunctionBuilder(string(ssa.MainFunctionName), string(ssa.MainFunctionName))
-	if err := prog.Build("", code, builder); err != nil {
-		return err
-	}
-	builder.Finish()
-	ssa4analyze.RunAnalyzer(prog)
-	return nil
+	return utils.Errorf("not implemented")
+	// builder := prog.GetAndCreateFunctionBuilder(string(ssa.MainFunctionName), string(ssa.MainFunctionName))
+	// if err := prog.Build("", code, builder); err != nil {
+	// 	return err
+	// }
+	// builder.Finish()
+	// ssa4analyze.RunAnalyzer(prog)
+	// return nil
 }
 
 func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error) {
@@ -96,17 +100,21 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 		c.LanguageBuilder = c.SelectedLanguageBuilder
 	}
 	c.LanguageBuilder = c.LanguageBuilder.Create()
-	prog, builder, err := c.init(c.fs)
+	prog, builder, err := c.init(c.fs, 1)
 	prog.SetPreHandler(true)
 	c.LanguageBuilder.InitHandler(builder)
 	// builder.SetRangeInit(r)
 	if err != nil {
 		return nil, err
 	}
-	c.LanguageBuilder.PreHandlerFile(r, builder)
+	ast, err := c.LanguageBuilder.ParseAST(r.GetSourceCode())
+	if !c.ignoreSyntaxErr && err != nil {
+		return nil, utils.Errorf("parse file error: %v", err)
+	}
+	c.LanguageBuilder.PreHandlerFile(ast, r, builder)
 	// parse code
 	prog.SetPreHandler(false)
-	if err := prog.Build("", r, builder); err != nil {
+	if err := prog.Build(ast, "", r, builder); err != nil {
 		return nil, err
 	}
 	builder.Finish()

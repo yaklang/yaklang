@@ -1,5 +1,7 @@
 package ssa
 
+// TODO: remove this value
+// this value will create in init function, is error
 var (
 	NextOk    = NewConst("ok")
 	NextField = NewConst("field")

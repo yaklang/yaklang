@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/databasex"
 )
 
@@ -25,7 +26,7 @@ func TestNewFetch(t *testing.T) {
 
 	// Test with default options
 	t.Run("DefaultOptions", func(t *testing.T) {
-		fetchFromDB := func() []FetchTestItem {
+		fetchFromDB := func(size int) []FetchTestItem {
 			return mockItems
 		}
 
@@ -38,12 +39,12 @@ func TestNewFetch(t *testing.T) {
 
 	// Test with custom buffer size
 	t.Run("CustomBufferSize", func(t *testing.T) {
-		fetchFromDB := func() []FetchTestItem {
+		fetchFromDB := func(size int) []FetchTestItem {
 			return mockItems
 		}
 
 		fetch := databasex.NewFetch(fetchFromDB,
-			databasex.WithBufferSize(10),
+			databasex.WithFetchSize(10),
 		)
 		assert.NotNil(t, fetch)
 
@@ -53,7 +54,7 @@ func TestNewFetch(t *testing.T) {
 
 	// Test with custom context
 	t.Run("CustomContext", func(t *testing.T) {
-		fetchFromDB := func() []FetchTestItem {
+		fetchFromDB := func(size int) []FetchTestItem {
 			return mockItems
 		}
 
@@ -79,7 +80,7 @@ func TestFetchOperation(t *testing.T) {
 
 	t.Run("FetchItems", func(t *testing.T) {
 		var fetchCount int
-		fetchFromDB := func() []FetchTestItem {
+		fetchFromDB := func(size int) []FetchTestItem {
 			fetchCount++
 			return mockItems
 		}
@@ -100,7 +101,7 @@ func TestFetchOperation(t *testing.T) {
 	})
 
 	t.Run("EmptyFetch", func(t *testing.T) {
-		fetchFromDB := func() []FetchTestItem {
+		fetchFromDB := func(size int) []FetchTestItem {
 			return []FetchTestItem{} // Return empty slice
 		}
 
@@ -123,7 +124,7 @@ func TestCloseWithDelete(t *testing.T) {
 	}
 
 	t.Run("DeleteOnClose", func(t *testing.T) {
-		fetchFromDB := func() []FetchTestItem {
+		fetchFromDB := func(size int) []FetchTestItem {
 			return mockItems
 		}
 
@@ -156,11 +157,11 @@ func TestConcurrency(t *testing.T) {
 	}
 
 	t.Run("ConcurrentFetch", func(t *testing.T) {
-		fetchFromDB := func() []FetchTestItem {
+		fetchFromDB := func(size int) []FetchTestItem {
 			return mockItems
 		}
 
-		fetch := databasex.NewFetch(fetchFromDB, databasex.WithBufferSize(100))
+		fetch := databasex.NewFetch(fetchFromDB, databasex.WithFetchSize(100))
 		assert.NotNil(t, fetch)
 
 		var wg sync.WaitGroup
@@ -183,4 +184,35 @@ func TestConcurrency(t *testing.T) {
 		wg.Wait()
 		fetch.Close()
 	})
+}
+
+func TestFetchAutoFetchSize(t *testing.T) {
+	defaultFetchSize := 10
+	fetchSizeItems := make([]int, 0)
+	fetchFromDB := func(size int) []int {
+		fetchSizeItems = append(fetchSizeItems, size)
+		ret := make([]int, 0, size)
+		for i := 0; i < size; i++ {
+			ret = append(ret, i)
+		}
+		return ret
+	}
+
+	fetch := databasex.NewFetch(fetchFromDB, databasex.WithFetchSize(defaultFetchSize))
+	for i := 0; i < 5; i++ {
+		item, err := fetch.Fetch()
+		assert.NoError(t, err)
+		assert.NotNil(t, item)
+	}
+	time.Sleep(100 * time.Millisecond) // Allow some time for the buffer to fill
+	for i := 0; i < 200; i++ {
+		item, err := fetch.Fetch()
+		assert.NoError(t, err)
+		assert.NotNil(t, item)
+	}
+
+	fetch.Close()
+
+	require.Equal(t, fetchSizeItems, []int{100, 100, 10})
+
 }

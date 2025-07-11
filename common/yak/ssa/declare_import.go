@@ -195,6 +195,7 @@ func (p *Program) ImportTypeStaticMemberFromLib(lib *Program, clsName string, na
 			errx := utils.Errorf("no support other type")
 			return errx
 		}
+		blueprint.Build()
 		for _, name := range names {
 			build(blueprint, name)
 		}
