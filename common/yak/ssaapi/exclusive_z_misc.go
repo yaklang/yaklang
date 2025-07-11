@@ -67,7 +67,13 @@ func (v *Value) GetDepth() int {
 }
 
 func (i *Value) AppendDependOn(vs ...*Value) *Value {
+	if i == nil {
+		return i
+	}
 	for _, v := range vs {
+		if v == nil {
+			continue
+		}
 		if i.GetId() == v.GetId() {
 			return i
 		}

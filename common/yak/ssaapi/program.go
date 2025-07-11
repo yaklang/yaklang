@@ -151,11 +151,17 @@ func (p *Program) GetAllOffsetItemsBefore(offset int) []*ssa.OffsetItem {
 
 func (v *Value) NewTopDefValue(value ssa.Value) *Value {
 	iv := v.NewValue(value)
+	if iv == nil {
+		return nil
+	}
 	return iv.AppendEffectOn(v)
 }
 
 func (v *Value) NewBottomUseValue(value ssa.Value) *Value {
 	iv := v.NewValue(value)
+	if iv == nil {
+		return nil
+	}
 	return iv.AppendDependOn(v)
 }
 

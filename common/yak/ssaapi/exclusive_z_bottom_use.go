@@ -189,8 +189,14 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 				if !ok {
 					return
 				}
-				val := v.NewBottomUseValue(fun.GetValueById(fun.Params[index]))
-				vals = append(vals, val.getBottomUses(actx, opt...)...)
+				paramValue := fun.GetValueById(fun.Params[index])
+				if paramValue == nil {
+					return
+				}
+				val := v.NewBottomUseValue(paramValue)
+				if val != nil {
+					vals = append(vals, val.getBottomUses(actx, opt...)...)
+				}
 			})
 			checkVal(inst.ArgMember, func(index int, arg int64) {
 				if index >= len(fun.ParameterMembers) {
@@ -200,8 +206,14 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 				if !ok {
 					return
 				}
-				val := v.NewBottomUseValue(fun.GetValueById(fun.ParameterMembers[index]))
-				vals = append(vals, val.getBottomUses(actx, opt...)...)
+				memberValue := fun.GetValueById(fun.ParameterMembers[index])
+				if memberValue == nil {
+					return
+				}
+				val := v.NewBottomUseValue(memberValue)
+				if val != nil {
+					vals = append(vals, val.getBottomUses(actx, opt...)...)
+				}
 			})
 		}
 		if vals.Len() > 0 {
