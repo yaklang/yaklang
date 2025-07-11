@@ -219,8 +219,8 @@ func (p *Program) NewValue(inst ssa.Instruction) (*Value, error) {
 
 // from ssa id  (IrCode)
 func (p *Program) GetValueById(id int64) (*Value, error) {
-	val := p.Program.GetInstructionById(id)
-	if val == nil {
+	val, ok := p.Program.GetInstructionById(id)
+	if !ok || val == nil {
 		return nil, utils.Errorf("instruction not found: %d", id)
 	}
 	v, err := p.NewValue(val)

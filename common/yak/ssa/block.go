@@ -17,7 +17,10 @@ func (f *Function) GetDeferBlock() *BasicBlock {
 	if f.DeferBlock <= 0 {
 		return newDefer()
 	}
-	block := f.GetBasicBlockByID(f.DeferBlock)
+	block, ok := f.GetBasicBlockByID(f.DeferBlock)
+	if !ok || block == nil {
+		return newDefer()
+	}
 	return block
 }
 
@@ -113,7 +116,10 @@ func (b *BasicBlock) HaveSubBlock(sub Value) bool {
 			return true
 		}
 
-		sub = subBlock.GetBasicBlockByID(subBlock.Parent)
+		sub, ok := subBlock.GetBasicBlockByID(subBlock.Parent)
+		if !ok || sub == nil {
+			return false
+		}
 	}
 }
 
@@ -126,12 +132,14 @@ func (b *BasicBlock) Reachable() BasicBlockReachableKind {
 		return BasicBlockUnknown
 	}
 
-	if c, ok := ToConstInst(b.GetInstructionById(b.Condition)); ok {
-		if c.IsBoolean() {
-			if c.Boolean() {
-				return BasicBlockReachable
-			} else {
-				return BasicBlockUnReachable
+	if inst, ok := b.GetInstructionById(b.Condition); ok && inst != nil {
+		if c, ok := ToConstInst(inst); ok {
+			if c.IsBoolean() {
+				if c.Boolean() {
+					return BasicBlockReachable
+				} else {
+					return BasicBlockUnReachable
+				}
 			}
 		}
 	}
@@ -145,5 +153,8 @@ func (b *BasicBlock) AddSucc(succ *BasicBlock) {
 }
 
 func (b *BasicBlock) LastInst() Instruction {
-	return b.GetInstructionById(b.Insts[len(b.Insts)-1])
+	if inst, ok := b.GetInstructionById(b.Insts[len(b.Insts)-1]); ok {
+		return inst
+	}
+	return nil
 }

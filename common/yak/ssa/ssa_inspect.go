@@ -19,8 +19,8 @@ func (p *Program) show(flag FunctionAsmFlag) {
 		// }
 
 		for _, childID := range f.ChildFuncs {
-			childValue := f.GetValueById(childID)
-			if childValue == nil {
+			childValue, ok := f.GetValueById(childID)
+			if !ok {
 				log.Warnf("function %d is not a ssa.Value", childID)
 				continue
 			}

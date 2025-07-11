@@ -101,7 +101,8 @@ func (i *anInstruction) IsFromDB() bool { return i.isFromDB }
 func (i *anInstruction) SetIsFromDB(b bool) { i.isFromDB = b }
 
 func (i *anInstruction) Self() Instruction {
-	return i.GetProgram().GetInstructionById(i.GetId())
+	inst, _ := i.GetProgram().GetInstructionById(i.GetId())
+	return inst
 }
 
 func (i *anInstruction) ReplaceValue(Value, Value) {
@@ -259,8 +260,8 @@ func (a *anInstruction) LineDisasm() string { return "" }
 func (a *anInstruction) GetOpcode() Opcode { return SSAOpcodeUnKnow } // cover by instruction
 
 func (a *anInstruction) String() string {
-	this := a.GetValueById(a.GetId())
-	if utils.IsNil(this) {
+	this, ok := a.GetValueById(a.GetId())
+	if !ok {
 		return ""
 	}
 	return fmt.Sprintf("Instruction: %s %s", SSAOpcode2Name[this.GetOpcode()], this.GetName())
@@ -311,7 +312,8 @@ func (n *anValue) SetObject(v Value) {
 }
 
 func (n *anValue) GetObject() Value {
-	return n.GetValueById(n.object)
+	obj, _ := n.GetValueById(n.object)
+	return obj
 }
 
 func (n *anValue) SetKey(k Value) {
@@ -319,7 +321,8 @@ func (n *anValue) SetKey(k Value) {
 }
 
 func (n *anValue) GetKey() Value {
-	return n.GetValueById(n.key)
+	key, _ := n.GetValueById(n.key)
+	return key
 }
 
 func (n *anValue) IsObject() bool {
@@ -344,7 +347,8 @@ func (n *anValue) GetMember(key Value) (Value, bool) {
 	if !ok {
 		return nil, false
 	}
-	return n.GetValueById(ret), true
+	val, ok := n.GetValueById(ret)
+	return val, ok
 }
 
 func (n *anValue) GetIndexMember(i int) (Value, bool) {
@@ -352,12 +356,16 @@ func (n *anValue) GetIndexMember(i int) (Value, bool) {
 	if !ok {
 		return nil, false
 	}
-	return n.GetValueById(id), ok
+	val, ok := n.GetValueById(id)
+	return val, ok
 }
 
 func (n *anValue) GetStringMember(key string) (Value, bool) {
 	for _, id := range n.member.Keys() {
-		i := n.GetValueById(id)
+		i, ok := n.GetValueById(id)
+		if !ok {
+			continue
+		}
 		lit, ok := i.(*ConstInst)
 		if !ok {
 			continue
@@ -371,7 +379,10 @@ func (n *anValue) GetStringMember(key string) (Value, bool) {
 
 func (n *anValue) SetStringMember(key string, v Value) {
 	for _, id := range n.member.Keys() {
-		i := n.GetValueById(id)
+		i, ok := n.GetValueById(id)
+		if !ok {
+			continue
+		}
 		lit, ok := i.(*ConstInst)
 		if !ok {
 			continue
@@ -385,9 +396,9 @@ func (n *anValue) SetStringMember(key string, v Value) {
 func (n *anValue) GetAllMember() map[Value]Value {
 	ret := make(map[Value]Value, n.member.Len())
 	for key, value := range n.member.GetMap() {
-		k := n.GetValueById(key)
-		v := n.GetValueById(value)
-		if utils.IsNil(k) || utils.IsNil(v) {
+		k, ok1 := n.GetValueById(key)
+		v, ok2 := n.GetValueById(value)
+		if !ok1 || !ok2 {
 			log.Errorf("BUG in anValue.GetAllMember(), is nil key[%v](%d) member[%v](%v)", key, k, value, v)
 			continue
 		}
@@ -398,7 +409,12 @@ func (n *anValue) GetAllMember() map[Value]Value {
 
 func (n *anValue) ForEachMember(fn func(Value, Value) bool) {
 	n.member.ForEach(func(i, v int64) bool {
-		return fn(n.GetValueById(i), n.GetValueById(v))
+		val1, ok1 := n.GetValueById(i)
+		val2, ok2 := n.GetValueById(v)
+		if !ok1 || !ok2 {
+			return true
+		}
+		return fn(val1, val2)
 	})
 }
 
@@ -439,7 +455,11 @@ func (n *anValue) SetType(typ Type) {
 		return
 	}
 
-	value := n.GetValueById(n.GetId())
+	value, ok := n.GetValueById(n.GetId())
+	if !ok {
+		n.typ = typ
+		return
+	}
 
 	switch t := typ.(type) {
 	case *Blueprint:
@@ -507,7 +527,8 @@ func (i *anValue) SetReference(v Value) {
 }
 
 func (i *anValue) GetReference() Value {
-	return i.GetValueById(i.reference)
+	ref, _ := i.GetValueById(i.reference)
+	return ref
 }
 
 func (i *anValue) AddPointer(v Value) {
@@ -532,8 +553,8 @@ func (i *anValue) FlatOccultation() []Value {
 
 	handler = func(i *anValue) {
 		for _, id := range i.occultation {
-			v := i.GetValueById(id)
-			if utils.IsNil(v) {
+			v, ok := i.GetValueById(id)
+			if !ok {
 				continue
 			}
 			ret = append(ret, v)

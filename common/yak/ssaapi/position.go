@@ -28,5 +28,9 @@ func (v *Value) IsReachable() ssa.BasicBlockReachableKind {
 
 func (v *Value) GetReachable() *Value {
 	node := v.innerValue
-	return v.NewValue(node.GetValueById(node.GetBlock().Condition))
+	condition, ok := node.GetValueById(node.GetBlock().Condition)
+	if !ok {
+		condition = nil
+	}
+	return v.NewValue(condition)
 }
