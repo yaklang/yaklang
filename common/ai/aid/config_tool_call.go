@@ -15,7 +15,7 @@ import (
 var ToolCallWatcher = []*ToolUseReviewSuggestion{
 	{
 		Value:             "enough-cancel",
-		Suggestion:        "工具输出足够，可以取消工具执行，继续后面的任务",
+		Suggestion:        "跳过",
 		SuggestionEnglish: "Tool output is sufficient, can cancel tool execution and continue with the next task",
 	},
 }
