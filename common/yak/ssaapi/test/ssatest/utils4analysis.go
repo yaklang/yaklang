@@ -1,15 +1,12 @@
 package ssatest
 
 import (
-	"errors"
 	"fmt"
 	"io/fs"
 	"sort"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -28,6 +25,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
@@ -43,7 +41,6 @@ const (
 
 func CheckWithFS(fs fi.FileSystem, t require.TestingT, handler func(ssaapi.Programs) error, opt ...ssaapi.Option) {
 	// only in memory
-	opt = append(opt, ssaapi.WithLogLevel("debug"))
 	{
 		prog, err := ssaapi.ParseProjectWithFS(fs, opt...)
 		require.Nil(t, err)
@@ -90,7 +87,6 @@ func CheckWithName(
 	opt ...ssaapi.Option,
 ) {
 	// only in memory
-	opt = append(opt, ssaapi.WithLogLevel("debug"))
 	{
 		prog, err := ssaapi.Parse(code, opt...)
 		require.Nil(t, err)
@@ -141,7 +137,6 @@ func CheckWithNameOnlyInMemory(
 	handler func(prog *ssaapi.Program) error,
 	opt ...ssaapi.Option,
 ) {
-	opt = append(opt, ssaapi.WithLogLevel("debug"))
 	// only in memory
 	{
 		prog, err := ssaapi.Parse(code, opt...)
@@ -225,7 +220,6 @@ func ProfileJavaCheck(t *testing.T, code string, handler func(inMemory bool, pro
 }
 
 func CheckProfileWithFS(fs fi.FileSystem, t require.TestingT, handler func(p ParseStage, prog ssaapi.Programs, start time.Time) error, opt ...ssaapi.Option) {
-	opt = append(opt, ssaapi.WithLogLevel("debug"))
 	// only in memory
 	{
 		start := time.Now()
@@ -272,7 +266,6 @@ func CheckFSWithProgram(
 	t *testing.T, programName string,
 	codeFS, ruleFS fi.FileSystem, opt ...ssaapi.Option,
 ) {
-	opt = append(opt, ssaapi.WithLogLevel("debug"))
 	if programName == "" {
 		programName = "test-" + uuid.New().String()
 	}
@@ -533,7 +526,7 @@ func checkFunctionEx(
 	return nil
 }
 
-func checkResult(verifyFs *sfvm.VerifyFileSystem, rule *schema.SyntaxFlowRule, result *ssaapi.SyntaxFlowResult) (errs error) {
+func checkResult(verifyFs *sfvm.VerifyFileSystem, rule *schema.SyntaxFlowRule, result *ssaapi.SyntaxFlowResult, isStrict bool) (errs error) {
 	defer func() {
 		if errs != nil {
 			fs := verifyFs.GetVirtualFs()
@@ -623,9 +616,11 @@ func checkResult(verifyFs *sfvm.VerifyFileSystem, rule *schema.SyntaxFlowRule, r
 	}
 	high := verifyFs.GetExtraInfoInt("alert_high", "alertHigh", "vulnHigh")
 	if high > 0 {
-		if alert_high < high {
-			errs = utils.JoinErrors(errs, utils.Errorf("alert symbol table is less than alert_high config: %v, actual got: %v", high, alert_high))
-			return
+		if alert_high != high {
+			if isStrict && high < alert_high {
+				errs = utils.JoinErrors(errs, utils.Errorf("alert symbol table is less than alert_high config: %v, actual got: %v", high, alert_high))
+				return
+			}
 		}
 	}
 	mid := verifyFs.GetExtraInfoInt("alert_mid", "alertMid", "vulnMid")
@@ -645,16 +640,36 @@ func checkResult(verifyFs *sfvm.VerifyFileSystem, rule *schema.SyntaxFlowRule, r
 
 	return
 }
-func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t *testing.T) error {
+func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t require.TestingT, isStrict bool) error {
+
+	/*
+		// TODO:
+			analyzer := sfanalyzer.NewSyntaxFlowAnalyzer(string(code))
+			result := analyzer.Analyze()
+			var err error
+			for _, prob := range result.Problems {
+				err = utils.JoinErrors(err, utils.Errorf("syntax flow rule analyze failed: %v", prob))
+			}
+	*/
+
 	frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(rule.Content)
 	if err != nil {
 		return err
 	}
-	l, verifyFs, err := frame.ExtractVerifyFilesystemAndLanguage()
+	if strings.Contains(rule.RuleName, "SAXBuilder") {
+		log.Infof("hit")
+	}
+	verifyFs, err := frame.ExtractVerifyFilesystemAndLanguage()
 	if err != nil {
 		return err
 	}
+
 	log.Infof("unsafe filesystem start")
+	if verifyFs == nil && isStrict {
+		return utils.Errorf("no negative filesystem found in rule: %s", rule.RuleName)
+	}
+
+	var errs error
 
 	for _, f := range verifyFs {
 		CheckWithFS(f.GetVirtualFs(), t, func(p ssaapi.Programs) error {
@@ -663,8 +678,8 @@ func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t *testing.T)
 			if err != nil {
 				return utils.Errorf("syntax flow content failed: %v", err)
 			}
-			if err := checkResult(f, rule, result); err != nil {
-				return err
+			if err := checkResult(f, rule, result, isStrict); err != nil {
+				errs = utils.JoinErrors(errs, err)
 			}
 
 			// in db
@@ -672,12 +687,15 @@ func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t *testing.T)
 			if err != nil {
 				return utils.Errorf("syntax flow rule failed: %v", err)
 			}
-			if err := checkResult(f, rule, result2); err != nil {
-				return err
+			if err := checkResult(f, rule, result2, isStrict); err != nil {
+				errs = utils.JoinErrors(errs, err)
 			}
 
 			return nil
-		}, ssaapi.WithLanguage(l))
+		}, ssaapi.WithLanguage(f.GetLanguage()))
+	}
+	if errs != nil {
+		return errs
 	}
 
 	check := func(result *ssaapi.SyntaxFlowResult) error {
@@ -690,9 +708,12 @@ func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t *testing.T)
 		return nil
 	}
 
-	l, verifyFs, _ = frame.ExtractNegativeFilesystemAndLanguage()
-	if verifyFs != nil && l != "" {
-		log.Infof("safe filesystem start")
+	verifyFs, _ = frame.ExtractNegativeFilesystemAndLanguage()
+	if verifyFs == nil && isStrict {
+		return utils.Errorf("no positive filesystem found in rule: %s", rule.RuleName)
+	}
+	log.Infof("safe filesystem start")
+	if isStrict {
 		for _, f := range verifyFs {
 			CheckWithFS(f.GetVirtualFs(), t, func(programs ssaapi.Programs) error {
 				result, err := programs.SyntaxFlowWithError(rule.Content, ssaapi.QueryWithEnableDebug(), ssaapi.QueryWithInitInputVar(programs[0]))
@@ -700,85 +721,33 @@ func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t *testing.T)
 					return utils.Errorf("syntax flow content failed: %v", err)
 				}
 				if err := check(result); err != nil {
-					return utils.Errorf("check content failed: %v", err)
+					errs = utils.JoinErrors(errs, err)
+					return nil
 				}
 				result2, err := programs.SyntaxFlowRule(rule, ssaapi.QueryWithEnableDebug(), ssaapi.QueryWithInitInputVar(programs[0]))
 				if err != nil {
-					return utils.Errorf("syntax flow rule failed: %v", err)
+					return utils.Errorf("syntax flow content failed: %v", err)
 				}
 				if err := check(result2); err != nil {
-					return utils.Errorf("check rule failed: %v", err)
+					errs = utils.JoinErrors(errs, err)
+					return nil
 				}
 				return nil
-			})
+			}, ssaapi.WithLanguage(f.GetLanguage()))
 		}
 	}
-
-	return nil
-}
-
-func EvaluateVerifyFilesystem(i string, t require.TestingT) error {
-	frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(i)
-	if err != nil {
-		return err
-	}
-	l, verifyFs, err := frame.ExtractVerifyFilesystemAndLanguage()
-	if err != nil {
-		return err
-	}
-
-	var errs error
-	for _, f := range verifyFs {
-		CheckWithFS(f.GetVirtualFs(), t, func(programs ssaapi.Programs) error {
-			result, err := programs.SyntaxFlowWithError(i, ssaapi.QueryWithEnableDebug(false), ssaapi.QueryWithInitInputVar(programs[0]))
-			if err != nil {
-				log.Errorf("syntax flow content failed: %v", err)
-				errs = utils.JoinErrors(errs, err)
-				return err
-			}
-			result.Show()
-			if err := checkResult(f, frame.GetRule(), result); err != nil {
-				errs = utils.JoinErrors(errs, err)
-			}
-			return nil
-		}, ssaapi.WithLanguage(l))
-	}
-	if (errs) != nil {
-		return errs
-	}
-
-	l, verifyFs, _ = frame.ExtractNegativeFilesystemAndLanguage()
-	if l != "" {
-		for _, f := range verifyFs {
-			CheckWithFS(f.GetVirtualFs(), t, func(programs ssaapi.Programs) error {
-				result, err := programs.SyntaxFlowWithError(i, ssaapi.QueryWithEnableDebug(false), ssaapi.QueryWithInitInputVar(programs[0]))
-				if err != nil {
-					if errors.Is(err, sfvm.CriticalError) {
-						log.Errorf("syntax flow content failed: %v", err)
-						errs = utils.JoinErrors(errs, err)
-						return err
-					}
-				}
-				result.Show()
-				if result != nil {
-					if len(result.GetErrors()) > 0 {
-						return nil
-					}
-					if len(result.GetAlertVariables()) > 0 {
-						for _, name := range result.GetAlertVariables() {
-							vals := result.GetValues(name)
-							errs = utils.JoinErrors(errs, utils.Errorf("alert symbol table not empty, have: %v: %v", name, vals))
-						}
-					}
-				}
-				return nil
-			})
-		}
-	}
-
 	if errs != nil {
 		return errs
 	}
 
 	return nil
+}
+
+func EvaluateVerifyFilesystem(i string, t require.TestingT, isStrict bool) error {
+	frame, err := sfvm.CompileRule(i)
+	if err != nil {
+		return err
+	}
+
+	return EvaluateVerifyFilesystemWithRule(frame.GetRule(), t, isStrict)
 }

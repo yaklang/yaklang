@@ -1745,8 +1745,10 @@ message SmokingEvaluatePluginRequest {
   string PluginName = 2;
 
   string Code = 3;
-  string PluginType = 4;
+  // "syntaxflow" | "nuclei" | "mitm" | "port-scan" | "codec" | "yak"
+  string PluginType = 4; 
 }
+
 
 message SmokingEvaluateResult {
   string Item = 1;
@@ -1760,6 +1762,7 @@ message SmokingEvaluatePluginResponse {
   int64 Score = 1;
   repeated SmokingEvaluateResult Results = 2;
 }
+
 
 message IsVulinboxReadyRequest {
 
@@ -5995,6 +5998,8 @@ message RenderHTTPFuzzerPacketResponse {
 
 message SmokingEvaluatePluginBatchRequest {
   repeated string ScriptNames = 1;
+    // "syntaxflow" | "nuclei" | "mitm" | "port-scan" | "codec" | "yak"
+  string PluginType = 2; 
 }
 
 message SmokingEvaluatePluginBatchResponse {

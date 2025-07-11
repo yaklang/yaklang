@@ -7443,8 +7443,9 @@ type SmokingEvaluatePluginRequest struct {
 	state    protoimpl.MessageState      `protogen:"open.v1"`
 	Requests []*HTTPRequestBuilderParams `protobuf:"bytes,1,rep,name=Requests,proto3" json:"Requests,omitempty"`
 	// 只支持插件名评估
-	PluginName    string `protobuf:"bytes,2,opt,name=PluginName,proto3" json:"PluginName,omitempty"`
-	Code          string `protobuf:"bytes,3,opt,name=Code,proto3" json:"Code,omitempty"`
+	PluginName string `protobuf:"bytes,2,opt,name=PluginName,proto3" json:"PluginName,omitempty"`
+	Code       string `protobuf:"bytes,3,opt,name=Code,proto3" json:"Code,omitempty"`
+	// "syntaxflow" | "nuclei" | "mitm" | "port-scan" | "codec" | "yak"
 	PluginType    string `protobuf:"bytes,4,opt,name=PluginType,proto3" json:"PluginType,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -42652,8 +42653,10 @@ func (x *RenderHTTPFuzzerPacketResponse) GetPacket() []byte {
 }
 
 type SmokingEvaluatePluginBatchRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ScriptNames   []string               `protobuf:"bytes,1,rep,name=ScriptNames,proto3" json:"ScriptNames,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	ScriptNames []string               `protobuf:"bytes,1,rep,name=ScriptNames,proto3" json:"ScriptNames,omitempty"`
+	// "syntaxflow" | "nuclei" | "mitm" | "port-scan" | "codec" | "yak"
+	PluginType    string `protobuf:"bytes,2,opt,name=PluginType,proto3" json:"PluginType,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -42693,6 +42696,13 @@ func (x *SmokingEvaluatePluginBatchRequest) GetScriptNames() []string {
 		return x.ScriptNames
 	}
 	return nil
+}
+
+func (x *SmokingEvaluatePluginBatchRequest) GetPluginType() string {
+	if x != nil {
+		return x.PluginType
+	}
+	return ""
 }
 
 type SmokingEvaluatePluginBatchResponse struct {
@@ -58195,9 +58205,12 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x1dRenderHTTPFuzzerPacketRequest\x12\x16\n" +
 	"\x06Packet\x18\x01 \x01(\fR\x06Packet\"8\n" +
 	"\x1eRenderHTTPFuzzerPacketResponse\x12\x16\n" +
-	"\x06Packet\x18\x01 \x01(\fR\x06Packet\"E\n" +
+	"\x06Packet\x18\x01 \x01(\fR\x06Packet\"e\n" +
 	"!SmokingEvaluatePluginBatchRequest\x12 \n" +
-	"\vScriptNames\x18\x01 \x03(\tR\vScriptNames\"|\n" +
+	"\vScriptNames\x18\x01 \x03(\tR\vScriptNames\x12\x1e\n" +
+	"\n" +
+	"PluginType\x18\x02 \x01(\tR\n" +
+	"PluginType\"|\n" +
 	"\"SmokingEvaluatePluginBatchResponse\x12\x1a\n" +
 	"\bProgress\x18\x01 \x01(\x01R\bProgress\x12\x18\n" +
 	"\aMessage\x18\x02 \x01(\tR\aMessage\x12 \n" +
