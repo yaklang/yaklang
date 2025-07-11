@@ -229,8 +229,7 @@ func (s *Server) DownloadOnlinePluginBatch(ctx context.Context, req *ypb.Downloa
 		return nil, utils.Errorf("download failed: %s", err.Error())
 	}
 	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
-	plugins := client.DownloadOnlinePluginsBatch(ctx, req.Token, req.IsPrivate, req.Keywords, req.PluginType, req.Tags, req.UserName, req.UserId,
-		req.TimeSearch, req.Group, req.ListType, req.Status, req.UUID, req.ScriptName)
+	plugins := client.DownloadOnlinePluginsBatchWhere(ctx, req)
 	successCount := 0
 	for pluginIns := range plugins.Chan {
 		err := client.Save(s.GetProfileDatabase(), pluginIns.Plugin)
@@ -255,8 +254,7 @@ func (s *Server) DownloadOnlinePlugins(req *ypb.DownloadOnlinePluginsRequest, st
 	}
 	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
 	var ch *yaklib.OnlineDownloadStream
-	ch = client.DownloadOnlinePluginsBatch(stream.Context(), req.Token, req.IsPrivate, req.Keywords, req.PluginType, req.Tags, req.UserName, req.UserId,
-		req.TimeSearch, req.Group, req.ListType, req.Status, req.UUID, req.ScriptName)
+	ch = client.DownloadOnlinePluginsBatchWhere(stream.Context(), req)
 
 	if ch == nil {
 		return utils.Error("BUG: download stream error: empty")
@@ -403,7 +401,7 @@ func (s *Server) SaveYakScriptToOnline(req *ypb.SaveYakScriptToOnlineRequest, st
 			})
 
 			plugins := client.DownloadOnlinePluginsBatch(context.Background(), req.Token, []bool{}, "", []string{}, []string{}, "", 0,
-				"", []string{}, "mine", []int64{}, []string{}, []string{result.ScriptName})
+				"", []string{}, "mine", []int64{}, []string{}, []string{result.ScriptName}, []bool{})
 			for pluginIns := range plugins.Chan {
 				err = client.Save(s.GetProfileDatabase(), pluginIns.Plugin)
 				if err != nil {

@@ -33,7 +33,7 @@ func TestNewOnlineClient(t *testing.T) {
 func TestDownloadOnlinePlugins(t *testing.T) {
 	client := NewOnlineClient("https://www.yaklang.com")
 
-	stream := client.DownloadOnlinePluginsBatch(context.Background(), "", []bool{}, "", []string{}, []string{}, "", 0, "", []string{}, "mine", []int64{}, []string{}, []string{})
+	stream := client.DownloadOnlinePluginsBatch(context.Background(), "", []bool{}, "", []string{}, []string{}, "", 0, "", []string{}, "mine", []int64{}, []string{}, []string{}, nil)
 	for result := range stream.Chan {
 		client.Save(consts.GetGormProfileDatabase(), result.Plugin)
 	}
