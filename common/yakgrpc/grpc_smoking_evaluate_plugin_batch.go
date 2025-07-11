@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -28,41 +30,57 @@ func (s *Server) SmokingEvaluatePluginBatch(req *ypb.SmokingEvaluatePluginBatchR
 
 	pluginTestingServer := NewPluginTestingEchoServer(stream.Context())
 
-	ch := yakit.YieldYakScripts(
-		bizhelper.ExactQueryStringArrayOr(s.GetProfileDatabase(), "script_name", req.GetScriptNames()),
-		stream.Context(),
-	)
-
 	all := utils.NewSet(req.GetScriptNames())
 	exist := utils.NewSet[string]()
 
 	send(0, "开始检测", "success")
 	pluginSize := len(req.GetScriptNames())
 	index := 0
-	for ins := range ch {
+	// define check with interface ScriptOrRule
+	check := func(ins schema.ScriptOrRule) {
 		progress := float64(index+1) / float64(pluginSize)
 		index++
-		exist.Add(ins.ScriptName)
-		code := ins.Content
-		pluginType := ins.Type
+		name := ins.GetScriptName()
+		exist.Add(name)
+		code := ins.GetContent()
+		pluginType := ins.GetType()
 		res, err := s.EvaluatePlugin(stream.Context(), code, pluginType, pluginTestingServer)
 		if err != nil {
-			msg := fmt.Sprintf("%s 启动插件检测失败", ins.ScriptName)
+			msg := fmt.Sprintf("%s 启动插件检测失败", name)
 			send(progress, msg, "error")
 			errorNum++
-			continue
+			return
 		}
 		if res.Score >= 60 {
-			msg := fmt.Sprintf("%s 插件得分: %d", ins.ScriptName, res.Score)
+			msg := fmt.Sprintf("%s 插件得分: %d", name, res.Score)
 			send(progress, msg, "success")
-			names = append(names, ins.ScriptName)
+			names = append(names, name)
 			successNum++
-			continue
+			return
 		} else {
-			msg := fmt.Sprintf("%s 插件得分: %d (<60)", ins.ScriptName, res.Score)
+			msg := fmt.Sprintf("%s 插件得分: %d (<60)", name, res.Score)
 			send(progress, msg, "error")
 			errorNum++
-			continue
+			return
+		}
+	}
+	// check
+	switch req.PluginType {
+	case "syntaxflow":
+		ch := sfdb.YieldSyntaxFlowRules(
+			bizhelper.ExactOrQueryStringArrayOr(s.GetSSADatabase(), "rule_name", req.GetScriptNames()),
+			stream.Context(),
+		)
+		for rule := range ch {
+			check(rule)
+		}
+	default:
+		ch := yakit.YieldYakScripts(
+			bizhelper.ExactQueryStringArrayOr(s.GetProfileDatabase(), "script_name", req.GetScriptNames()),
+			stream.Context(),
+		)
+		for ins := range ch {
+			check(ins)
 		}
 	}
 
