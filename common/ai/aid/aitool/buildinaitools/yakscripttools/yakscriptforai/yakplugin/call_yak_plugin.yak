@@ -7,7 +7,7 @@ pluginNames = cli.String("names", cli.setVerboseName("插件名列表"),cli.setH
 targetUrl = cli.Text("url",cli.setVerboseName("请求URL"), cli.setHelp("指定请求URL，用于插件调用"))
 reqPacket = cli.Text("requestPacket",cli.setVerboseName("请求报文"), cli.setHelp("指定请求包报文，用于插件调用，插件会通过此报文对目标发起请求"))
 isHttpsStr = cli.String("isHttps",cli.setVerboseName("是否是https站点"), cli.setHelp("目标是否是https站点"))
-isHttps = isHttpsStr == "true"
+isHttps = parseBool(isHttpsStr)
 mitmParamsIsOk = true
 if reqPacket == ""{
     if targetUrl != ""{
