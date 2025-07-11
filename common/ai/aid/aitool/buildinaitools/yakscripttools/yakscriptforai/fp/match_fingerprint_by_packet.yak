@@ -2,7 +2,7 @@ __DESC__ = "一个数据包指纹匹配工具，可以对输入的网络数据�
 
 __KEYWORDS__ = "数据包分析,指纹匹配,网络分析,协议识别,服务识别,流量分析,安全检测,packet analysis,fingerprint matching,network analysis,protocol identification,service identification,traffic analysis,security detection,response matching"
 
-packet = cli.Text("packet", cli.setVerboseName("数据包"),cli.setHelp("需要指纹匹配的数据包"))
+packet = cli.Text("packet", cli.setVerboseName("数据包"),cli.setHelp("需要指纹匹配的数据包原文"))
 cli.check()
 
 res = fp.MatchRsp(packet)

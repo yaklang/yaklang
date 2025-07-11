@@ -1,3 +1,0 @@
-__DESC__ = "用于检测Apache Shiro反序列化漏洞的forge，通过检查rememberMe字段并调用相关插件进行深度检测"
-
-__KEYWORDS__ = "shiro,反序列化,漏洞检测,web安全,渗透测试,apache shiro,deserialization,安全测试" 
