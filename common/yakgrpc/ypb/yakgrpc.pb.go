@@ -15819,6 +15819,7 @@ type DownloadOnlinePluginsRequest struct {
 	ScriptName    []string               `protobuf:"bytes,13,rep,name=ScriptName,proto3" json:"ScriptName,omitempty"`
 	ExcludeTypes  []string               `protobuf:"bytes,14,rep,name=ExcludeTypes,proto3" json:"ExcludeTypes,omitempty"`
 	FieldKeywords string                 `protobuf:"bytes,15,opt,name=FieldKeywords,proto3" json:"FieldKeywords,omitempty"`
+	Official      []bool                 `protobuf:"varint,16,rep,packed,name=Official,proto3" json:"Official,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -15956,6 +15957,13 @@ func (x *DownloadOnlinePluginsRequest) GetFieldKeywords() string {
 		return x.FieldKeywords
 	}
 	return ""
+}
+
+func (x *DownloadOnlinePluginsRequest) GetOfficial() []bool {
+	if x != nil {
+		return x.Official
+	}
+	return nil
 }
 
 type QueryPluginGroup struct {
@@ -55811,7 +55819,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	" DownloadOnlinePluginByIdsRequest\x12\x1c\n" +
 	"\tOnlineIDs\x18\x01 \x03(\x03R\tOnlineIDs\x12\x14\n" +
 	"\x05Token\x18\x02 \x01(\tR\x05Token\x12\x12\n" +
-	"\x04UUID\x18\x03 \x03(\tR\x04UUID\"\xbe\x03\n" +
+	"\x04UUID\x18\x03 \x03(\tR\x04UUID\"\xda\x03\n" +
 	"\x1cDownloadOnlinePluginsRequest\x12\x14\n" +
 	"\x05Token\x18\x01 \x01(\tR\x05Token\x12\x1c\n" +
 	"\tIsPrivate\x18\x02 \x03(\bR\tIsPrivate\x12\x1a\n" +
@@ -55834,7 +55842,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"ScriptName\x18\r \x03(\tR\n" +
 	"ScriptName\x12\"\n" +
 	"\fExcludeTypes\x18\x0e \x03(\tR\fExcludeTypes\x12$\n" +
-	"\rFieldKeywords\x18\x0f \x01(\tR\rFieldKeywords\"H\n" +
+	"\rFieldKeywords\x18\x0f \x01(\tR\rFieldKeywords\x12\x1a\n" +
+	"\bOfficial\x18\x10 \x03(\bR\bOfficial\"H\n" +
 	"\x10QueryPluginGroup\x12\x1e\n" +
 	"\n" +
 	"UnSetGroup\x18\x01 \x01(\bR\n" +
