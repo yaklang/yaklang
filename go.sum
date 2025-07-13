@@ -533,6 +533,8 @@ github.com/vmihailenco/tagparser/v2 v2.0.0 h1:y09buUbR+b5aycVFQs/g70pqKVZNBmxwAh
 github.com/vmihailenco/tagparser/v2 v2.0.0/go.mod h1:Wri+At7QHww0WTrCBeu4J6bNtoV6mEfg5OIWRZA9qds=
 github.com/wenlng/go-captcha-assets v1.0.4 h1:vf2sz1qCr/DwdxsHbA9VlK9DbjReIRQImrVgSvyty0U=
 github.com/wenlng/go-captcha-assets v1.0.4/go.mod h1:zinRACsdYcL/S6pHgI9Iv7FKTU41d00+43pNX+b9+MM=
+github.com/wenlng/go-captcha-assets v1.0.7 h1:tfF84A4un/i4p+TbRVHDqDPeQeatvddOfB2xbKvLVq8=
+github.com/wenlng/go-captcha-assets v1.0.7/go.mod h1:zinRACsdYcL/S6pHgI9Iv7FKTU41d00+43pNX+b9+MM=
 github.com/wenlng/go-captcha/v2 v2.0.3 h1:QTZ39/gVDisPSgvL9O2X2HbTuj5P/z8QsdGB/aayg9c=
 github.com/wenlng/go-captcha/v2 v2.0.3/go.mod h1:5hac1em3uXoyC5ipZ0xFv9umNM/waQvYAQdr0cx/h34=
 github.com/xanzy/ssh-agent v0.3.3 h1:+/15pJfg/RsTxqYcX6fHqOXZwwMP+2VyYWJeWM2qQFM=

@@ -224,7 +224,7 @@ require (
 	github.com/vmihailenco/msgpack/v5 v5.3.4 // indirect
 	github.com/vmihailenco/tagparser v0.1.2 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
-	github.com/wenlng/go-captcha-assets v1.0.5 // indirect
+	github.com/wenlng/go-captcha-assets v1.0.7 // indirect
 	github.com/wenlng/go-captcha/v2 v2.0.3 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xuri/efp v0.0.0-20240408161823-9ad904a10d6d // indirect
