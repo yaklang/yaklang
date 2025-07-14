@@ -140,7 +140,7 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 
 			}
 		}()
-		if block != nil {
+		if !utils.IsNil(block) {
 			recoverBlock := builder.CurrentBlock
 			builder.CurrentBlock = block
 			defer func() {
@@ -183,13 +183,19 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 		}
 		phi := builder.EmitPhi(name, vs)
 		phi.SetType(t)
-		if phi == nil {
+		if utils.IsNil(phi) {
 			return nil
 		}
 		phi.GetProgram().SetVirtualRegister(phi)
 		phi.GetProgram().SetInstructionWithName(name, phi)
 		phi.SetVerboseName(vs[0].GetVerboseName())
-		phi.CFGEntryBasicBlock = cfgEntryBlock.GetId()
+		// 不能直接进行cfgEntryBlock.GetId()，即便GetId会判断receiver为nil
+		// 但是cfgEntryBlock是接口类型，会产生interface panic
+		if !utils.IsNil(cfgEntryBlock) {
+			phi.CFGEntryBasicBlock = cfgEntryBlock.GetId()
+		} else {
+			phi.CFGEntryBasicBlock = -1
+		}
 		return phi
 	}
 }
