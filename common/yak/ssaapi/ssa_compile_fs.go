@@ -127,115 +127,138 @@ func (c *config) parseProjectWithFS(
 	}
 	prog.ProcessInfof("calculate total size of project finish preHandler(len:%d) build(len:%d)", preHandlerTotal, handlerTotal)
 
-	// pre handler  0-40%
-	preHandlerNum := 0
-	preHandlerProcess := func() {
-		preHandlerNum++
-		process = 0 + (float64(preHandlerNum)/float64(preHandlerTotal))*0.4
-	}
-	prog.SetPreHandler(true)
-	prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", filesystem, c.info)
-	start = time.Now()
 	var AstErr error
 	fileContents := make([]*ssareducer.FileContent, 0, preHandlerTotal)
-	for fileContent := range c.getFileHandler(
-		filesystem, preHandlerFiles, handlerFilesMap,
-	) {
-		fileContents = append(fileContents, fileContent)
-		if fileContent.Err != nil {
-			AstErr = utils.JoinErrors(AstErr,
-				utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err),
-			)
+	// pre handler  0-40%
+	f1 := func() error {
+		preHandlerNum := 0
+		preHandlerProcess := func() {
+			preHandlerNum++
+			process = 0 + (float64(preHandlerNum)/float64(preHandlerTotal))*0.4
 		}
-
-		preHandlerProcess() // notify the process
-		// handler
-		if language := c.LanguageBuilder; language != nil {
-			language.InitHandler(builder)
-			language.PreHandlerProject(filesystem, fileContent.AST, builder, fileContent.Path)
-		}
-	}
-	preHandlerTime = time.Since(start)
-	if AstErr != nil && c.strictMode {
-		return nil, utils.Errorf("pre-handler parse project error: %v", AstErr)
-	}
-	if c.isStop() {
-		return nil, ErrContextCancel
-	}
-	if language := c.LanguageBuilder; language != nil {
-		language.AfterPreHandlerProject(builder)
-	}
-	prog.ProcessInfof("pre-handler parse project finish")
-
-	process = 0.4 // 40%
-	// parse project 40%-90%
-	prog.ProcessInfof("parse project start")
-	handlerNum := 0
-	handlerProcess := func() {
-		handlerNum++
-		process = 0.4 + (float64(handlerNum)/float64(handlerTotal))*0.5
-	}
-	prog.SetPreHandler(false)
-	start = time.Now()
-
-	// ssareducer.FilesHandler(
-	// 	c.ctx, filesystem, handlerFiles,
-	// 	func(path string, content []byte) {
-	for _, fileContent := range fileContents {
-		if _, needBuild := handlerFilesMap[fileContent.Path]; !needBuild {
-			continue // skip if not in handlerFilesMap
-		}
-		path := fileContent.Path
-		content := fileContent.Content
-		ast := fileContent.AST
-		defer func() {
-			if r := recover(); r != nil {
-				log.Errorf("parse [%s] error %v  ", path, r)
-				utils.PrintCurrentGoroutineRuntimeStack()
+		prog.SetPreHandler(true)
+		prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", filesystem, c.info)
+		start = time.Now()
+		for fileContent := range c.getFileHandler(
+			filesystem, preHandlerFiles, handlerFilesMap,
+		) {
+			fileContents = append(fileContents, fileContent)
+			if fileContent.Err != nil {
+				AstErr = utils.JoinErrors(AstErr,
+					utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err),
+				)
 			}
-		}()
 
-		handlerProcess()
-
-		// build
-		if err := prog.Build(ast, path, memedit.NewMemEditorByBytes(content), builder); err != nil {
-			log.Errorf("parse %#v failed: %v", path, err)
-			continue
+			preHandlerProcess() // notify the process
+			// handler
+			if language := c.LanguageBuilder; language != nil {
+				language.InitHandler(builder)
+				language.PreHandlerProject(filesystem, fileContent.AST, builder, fileContent.Path)
+			}
 		}
-	}
-
-	parseTime = time.Since(start)
-	if c.isStop() {
-		return nil, ErrContextCancel
-	}
-	process = 0.9 // %90
-	prog.Finish()
-	if prog.DatabaseKind != ssa.ProgramCacheMemory { // save program
-		log.Errorf("program %s save to database", prog.Name)
-		start := time.Now()
-		prog.UpdateToDatabaseWithWG(&wg)
-		since := time.Since(start)
-		log.Errorf("program %s save to database cost: %s", prog.Name, since)
-	}
-	total := prog.Cache.CountInstruction()
-	process = 0.9
-	prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, total) // %90
-
-	var index int
-	prevProcess := 0.9
-	lock := sync.Mutex{}
-	prog.Cache.SaveToDatabase(func(size int) {
-		lock.Lock()
-		defer lock.Unlock()
-		index += size
-		process = 0.9 + (float64(index)/float64(total))*0.1
-		if (process - prevProcess) > 0.001 { // is 90.1%/90.2%/....
-			prog.ProcessInfof("Saving instructions: %d complete(total %d)", index, total)
-			prevProcess = process
+		preHandlerTime = time.Since(start)
+		if AstErr != nil && c.strictMode {
+			return utils.Errorf("pre-handler parse project error: %v", AstErr)
 		}
-	})
-	saveTime = time.Since(start)
-	_ = prevProcess
-	wg.Wait()
+		if c.isStop() {
+			return ErrContextCancel
+		}
+		return nil
+	}
+
+	f2 := func() error {
+		if language := c.LanguageBuilder; language != nil {
+			language.AfterPreHandlerProject(builder)
+		}
+		prog.ProcessInfof("pre-handler parse project finish")
+		return nil
+	}
+
+	f3 := func() error {
+		process = 0.4 // 40%
+		// parse project 40%-90%
+		prog.ProcessInfof("parse project start")
+		handlerNum := 0
+		handlerProcess := func() {
+			handlerNum++
+			process = 0.4 + (float64(handlerNum)/float64(handlerTotal))*0.5
+		}
+		prog.SetPreHandler(false)
+		start = time.Now()
+
+		// ssareducer.FilesHandler(
+		// 	c.ctx, filesystem, handlerFiles,
+		// 	func(path string, content []byte) {
+		for _, fileContent := range fileContents {
+			if _, needBuild := handlerFilesMap[fileContent.Path]; !needBuild {
+				continue // skip if not in handlerFilesMap
+			}
+			path := fileContent.Path
+			content := fileContent.Content
+			ast := fileContent.AST
+			defer func() {
+				if r := recover(); r != nil {
+					log.Errorf("parse [%s] error %v  ", path, r)
+					utils.PrintCurrentGoroutineRuntimeStack()
+				}
+			}()
+
+			handlerProcess()
+
+			// build
+			if err := prog.Build(ast, path, memedit.NewMemEditorByBytes(content), builder); err != nil {
+				log.Errorf("parse %#v failed: %v", path, err)
+				continue
+			}
+		}
+		parseTime = time.Since(start)
+		if c.isStop() {
+			return ErrContextCancel
+		}
+		return nil
+	}
+
+	f4 := func() error {
+		process = 0.9 // %90
+		prog.Finish()
+		if prog.DatabaseKind != ssa.ProgramCacheMemory { // save program
+			log.Errorf("program %s save to database", prog.Name)
+			start := time.Now()
+			prog.UpdateToDatabaseWithWG(&wg)
+			since := time.Since(start)
+			log.Errorf("program %s save to database cost: %s", prog.Name, since)
+		}
+		return nil
+	}
+
+	f5 := func() error {
+		total := prog.Cache.CountInstruction()
+		process = 0.9
+		prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, total) // %90
+
+		var index int
+		prevProcess := 0.9
+		_ = prevProcess
+		lock := sync.Mutex{}
+		prog.Cache.SaveToDatabase(func(size int) {
+			lock.Lock()
+			defer lock.Unlock()
+			index += size
+			process = 0.9 + (float64(index)/float64(total))*0.1
+			if (process - prevProcess) > 0.001 { // is 90.1%/90.2%/....
+				prog.ProcessInfof("Saving instructions: %d complete(total %d)", index, total)
+				prevProcess = process
+			}
+		})
+		saveTime = time.Since(start)
+		return nil
+	}
+	f6 := func() error {
+		wg.Wait()
+		folderSave.Close()
+		return nil
+	}
+	ssaprofile.ProfileAddWithError(true, "ParseProjectWithFS", f1, f2, f3, f4, f5, f6)
+
 	return NewProgram(prog, c), nil
 }
