@@ -153,6 +153,9 @@ func newCliParameter(name, typ, methodTyp string) *CliParameter {
 }
 
 func ParseCliParameter(prog *ssaapi.Program) ([]*CliParameter, []*UIInfo, []string) {
+	if prog == nil {
+		return nil, nil, nil
+	}
 	// prog.Show()
 	params := make([]*CliParameter, 0)
 	uiInfos := make([]*UIInfo, 0)
