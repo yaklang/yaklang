@@ -39,20 +39,22 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 			tool,
 			aitool.WithDescription(aiTool.Description),
 			aitool.WithKeywords(strings.Split(aiTool.Keywords, ",")),
-			aitool.WithCallback(func(ctx context.Context, params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			aitool.WithCallback(func(ctx context.Context, params aitool.InvokeParams, runtimeConfig *aitool.ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (any, error) {
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
-				runtimeId := params.GetString("runtime_id")
-				if runtimeId == "" {
-					runtimeId = uuid.New().String()
-				}
-				yakitClient := yaklib.NewVirtualYakitClientWithRuntimeID(func(i *ypb.ExecResult) error {
-					if i.IsMessage {
-						stdout.Write([]byte(yaklib.ConvertExecResultIntoLog(i)))
-						stdout.Write([]byte("\n"))
+				if runtimeConfig == nil {
+					runtimeConfig = &aitool.ToolRuntimeConfig{
+						RuntimeID: uuid.New().String(),
+						FeedBacker: func(result *ypb.ExecResult) error {
+							if result.IsMessage {
+								stdout.Write([]byte(yaklib.ConvertExecResultIntoLog(result)))
+								stdout.Write([]byte("\n"))
+							}
+							return nil
+						},
 					}
-					return nil
-				}, runtimeId)
+				}
+				yakitClient := yaklib.NewVirtualYakitClientWithRuntimeID(runtimeConfig.FeedBacker, runtimeConfig.RuntimeID)
 				engine := NewYakitVirtualClientScriptEngine(yakitClient)
 
 				var args []string
@@ -64,7 +66,7 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 					BindYakitPluginContextToEngine(
 						ae,
 						CreateYakitPluginContext(
-							runtimeId,
+							runtimeConfig.RuntimeID,
 						).WithContext(
 							ctx,
 						).WithContextCancel(
@@ -79,10 +81,10 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 				})
 
 				_, err = engine.ExecuteExWithContext(ctx, aiTool.Content, map[string]interface{}{
-					"RUNTIME_ID":   runtimeId,
+					"RUNTIME_ID":   runtimeConfig.RuntimeID,
 					"CTX":          ctx,
-					"PLUGIN_NAME":  runtimeId + ".yak",
-					"YAK_FILENAME": runtimeId + ".yak",
+					"PLUGIN_NAME":  aiTool.Name + ".yak",
+					"YAK_FILENAME": aiTool.Name + ".yak",
 				})
 				if err != nil {
 					log.Errorf("execute ex with context failed: %v", err)

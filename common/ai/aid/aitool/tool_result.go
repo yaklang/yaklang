@@ -61,6 +61,12 @@ func (r *ToolExecutionResult) GetJSONSchemaString() string {
 
 // ExecuteToolWithCapture 执行工具并捕获stdout和stderr
 func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any, stdout, stderr io.Writer, cancelCallback toolCallCancelCallback) (*ToolExecutionResult, error) {
+// ExecuteToolWithCaptureNoRuntime 执行工具并捕获stdout和stderr
+func (t *Tool) ExecuteToolWithCaptureNoRuntime(ctx context.Context, params map[string]any, stdout, stderr io.Writer) (*ToolExecutionResult, error) {
+	return t.ExecuteToolWithCapture(ctx, params, nil, stdout, stderr)
+}
+
+func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any, runtimeConfig *ToolRuntimeConfig, stdout, stderr io.Writer) (*ToolExecutionResult, error) {
 	// 创建stdout和stderr的缓冲区
 	stdoutBuf := new(bytes.Buffer)
 	stderrBuf := new(bytes.Buffer)

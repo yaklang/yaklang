@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"io"
+	"slices"
 	"strings"
 	"text/template"
 
@@ -216,5 +218,87 @@ func (t *aiTask) DeepThink(suggestion string) error {
 		return err
 	}
 
+	return nil
+}
+
+func (t *aiTask) AdjustPlan(suggestion string) error {
+	planPrompt, err := t.generateDynamicPlanPrompt(suggestion)
+	if err != nil {
+		t.config.EmitError("error generating dynamic plan prompt: %v", err)
+		return utils.Errorf("error generating dynamic plan prompt: %v", err)
+	}
+	defer func() {
+		// Ensure config is propagated to the new task and its subtasks
+		var propagateConfig func(task *aiTask)
+		propagateConfig = func(task *aiTask) {
+			if task == nil {
+				return
+			}
+			task.config = t.config
+			if task.toolCallResultIds == nil {
+				task.toolCallResultIds = omap.NewOrderedMap(make(map[int64]*aitool.ToolResult))
+			}
+			for _, sub := range task.Subtasks {
+				sub.ParentTask = task // Ensure parent is set
+				propagateConfig(sub)
+			}
+		}
+		propagateConfig(t)
+		t.GenerateIndex()
+	}()
+
+	err = t.config.callAiTransaction(
+		planPrompt,
+		t.callAI,
+		func(response *AIResponse) error {
+			// 读取 AI 的响应
+			responseReader := response.GetOutputStreamReader("dynamic-plan", false, t.config)
+			taskResponse, err := io.ReadAll(responseReader)
+			if err != nil {
+				t.config.EmitError("error reading AI response: %v", err)
+				return utils.Errorf("error reading AI response: %v", err)
+			}
+			nextPlanTask, err := ExtractNextPlanTaskFromRawResponse(t.config, string(taskResponse))
+			if err != nil {
+				t.config.EmitError("error extracting task from raw response: %v", err)
+				return utils.Errorf("error extracting task from raw response: %v", err)
+			}
+
+			if len(nextPlanTask) <= 0 {
+				t.config.EmitError("any task not found in next plan")
+				return utils.Errorf("any task not found in next plan task, re-do-plan")
+			}
+
+			// 解析 AI 的响应
+			parentTask := t.ParentTask
+			index := -1
+			for i, subtask := range parentTask.Subtasks {
+				if subtask.Name == t.Name {
+					index = i
+					break
+				}
+			}
+			if index == -1 {
+				t.config.EmitError("current task not found in parent task")
+				return utils.Error("current task not found in parent task")
+			}
+			// 保留之前的任务, 删除后续任务
+			parentTask.Subtasks = parentTask.Subtasks[:index+1]
+			parentTask.Subtasks = slices.Grow(parentTask.Subtasks, len(parentTask.Subtasks)+len(nextPlanTask))
+
+			// 添加新的任务
+			for _, subTask := range nextPlanTask {
+				subTask.config = t.config
+				subTask.ParentTask = parentTask
+				parentTask.Subtasks = append(parentTask.Subtasks, subTask)
+				subTask.config.EmitInfo("new dynamic plan: %s", subTask.Name)
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		t.config.EmitError("error calling AI transaction: %v", err)
+		return utils.Errorf("error calling AI transaction: %v", err)
+	}
 	return nil
 }
