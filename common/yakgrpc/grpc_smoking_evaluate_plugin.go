@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"math/rand"
 	"strings"
 	"sync"
@@ -15,7 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfanalyzer"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/embed"
 	"golang.org/x/exp/slices"
@@ -219,12 +219,13 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 		prog, err := static_analyzer.SSAParse(pluginCode, pluginType)
 		if err != nil {
 			pushSuggestion(`静态代码检测失败`, "ssa 编译失败", nil, Error)
+		} else {
+			parameters, _, _ := information.ParseCliParameter(prog)
+			if len(parameters) > 0 {
+				hasParameter = true
+			}
+			hasHttpRequest = information.GetHTTPRequestCount(prog) > 0
 		}
-		parameters, _, _ := information.ParseCliParameter(prog)
-		if len(parameters) > 0 {
-			hasParameter = true
-		}
-		hasHttpRequest = information.GetHTTPRequestCount(prog) > 0
 	}
 	// static analyze
 	if slices.Contains([]string{
