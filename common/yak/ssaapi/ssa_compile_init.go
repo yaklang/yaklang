@@ -67,8 +67,8 @@ func (c *config) init(filesystem filesys_interface.FileSystem) (*ssa.Program, *s
 		newCodeEditor.SetUrl(filePath)
 		fb.SetEditor(newCodeEditor)
 		if originEditor == nil && newCodeEditor != nil {
-			enter := fb.GetBasicBlockByID(fb.EnterBlock)
-			if enter != nil && enter.GetRange() == nil {
+			enter, ok := fb.GetBasicBlockByID(fb.EnterBlock)
+			if ok && enter != nil && enter.GetRange() == nil {
 				enter.SetRange(src.GetFullRange())
 			}
 		}
@@ -87,19 +87,19 @@ func (c *config) init(filesystem filesys_interface.FileSystem) (*ssa.Program, *s
 			application.PopEditor(save)
 		}()
 
-			if editor := fb.GetEditor(); editor != nil {
-				cache := application.Cache
-				progName := application.GetProgramName()
-				go func() {
-					hash := editor.GetIrSourceHash(programName)
-					if cache.IsExistedSourceCodeHash(progName, hash) {
-						c.DatabaseProgramCacheHitter(fb)
-					}
-				}()
-			} else {
-				log.Warnf("(BUG or in DEBUG Mode)Range not found for %s", fb.GetName())
-			}
-			err = LanguageBuilder.Build(src.GetSourceCode(), c.ignoreSyntaxErr, fb)
+		if editor := fb.GetEditor(); editor != nil {
+			cache := application.Cache
+			progName := application.GetProgramName()
+			go func() {
+				hash := editor.GetIrSourceHash(programName)
+				if cache.IsExistedSourceCodeHash(progName, hash) {
+					c.DatabaseProgramCacheHitter(fb)
+				}
+			}()
+		} else {
+			log.Warnf("(BUG or in DEBUG Mode)Range not found for %s", fb.GetName())
+		}
+		err = LanguageBuilder.Build(src.GetSourceCode(), c.ignoreSyntaxErr, fb)
 		return err
 	}
 	builder := application.GetAndCreateFunctionBuilder(string(ssa.MainFunctionName), string(ssa.MainFunctionName))

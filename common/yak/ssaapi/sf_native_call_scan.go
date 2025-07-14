@@ -107,16 +107,20 @@ func (b *basicBlockInfo) searchBlock(value ssa.Value) {
 	switch b.direction {
 	case Previous:
 		for _, pred := range block.Preds {
-			pred := block.GetValueById(pred)
-			b.searchBlock(pred)
+			pred, ok := block.GetValueById(pred)
+			if ok && pred != nil {
+				b.searchBlock(pred)
+			}
 			if b.isFinish {
 				break
 			}
 		}
 	case Next:
 		for _, succ := range block.Succs {
-			succ := block.GetValueById(succ)
-			b.searchBlock(succ)
+			succ, ok := block.GetValueById(succ)
+			if ok && succ != nil {
+				b.searchBlock(succ)
+			}
 			if b.isFinish {
 				break
 			}
@@ -132,11 +136,14 @@ func (b *basicBlockInfo) searchBlock(value ssa.Value) {
 
 func (b *basicBlockInfo) searchInsts(block *ssa.BasicBlock) {
 	for _, inst := range block.Insts {
-		inst := block.GetInstructionById(inst)
+		inst, ok := block.GetInstructionById(inst)
+		if !ok {
+			continue
+		}
 		if jump, ok := ssa.ToJump(inst); ok {
 			_ = jump
-			block := block.GetBasicBlockByID(jump.To)
-			if block != nil && b.currentBlock.HaveSubBlock(block) {
+			block, ok := block.GetBasicBlockByID(jump.To)
+			if ok && block != nil && b.currentBlock.HaveSubBlock(block) {
 				b.searchInsts(block)
 			}
 			continue

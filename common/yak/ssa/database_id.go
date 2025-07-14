@@ -26,11 +26,12 @@ func (p *Program) SetVirtualRegister(i Instruction) {
 	i.RefreshString()
 }
 
-func (p *Program) GetInstructionById(id int64) Instruction {
+func (p *Program) GetInstructionById(id int64) (Instruction, bool) {
 	if p == nil {
-		return nil
+		return nil, false
 	}
-	return p.Cache.GetInstruction(id)
+	inst := p.Cache.GetInstruction(id)
+	return inst, inst != nil
 }
 
 func (p *Program) AddConstInstruction(instruction Instruction) {

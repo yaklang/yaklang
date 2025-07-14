@@ -63,8 +63,14 @@ func HandlerBinOp(b *BinOp) (ret Value) {
 		}
 	}()
 
-	x := b.GetValueById(b.X)
-	y := b.GetValueById(b.Y)
+	x, ok := b.GetValueById(b.X)
+	if !ok || x == nil {
+		return CalcBinary(b)
+	}
+	y, ok := b.GetValueById(b.Y)
+	if !ok || y == nil {
+		return CalcBinary(b)
+	}
 	if cX, ok := ToConstInst(x); ok {
 		if cY, ok := ToConstInst(y); ok {
 			// both const
@@ -98,7 +104,10 @@ func HandlerUnOp(u *UnOp) (ret Value) {
 		}
 	}()
 
-	x := u.GetValueById(u.X)
+	x, ok := u.GetValueById(u.X)
+	if !ok || x == nil {
+		return u
+	}
 	if c, ok := ToConstInst(x); ok {
 		if v := CalcConstUnary(c, u.Op); v != nil {
 			return v
@@ -109,8 +118,14 @@ func HandlerUnOp(u *UnOp) (ret Value) {
 
 func CalcBinary(b *BinOp) Value {
 	isNot := func(xid, yid int64) bool {
-		x := b.GetValueById(xid)
-		y := b.GetValueById(yid)
+		x, ok := b.GetValueById(xid)
+		if !ok || x == nil {
+			return false
+		}
+		y, ok := b.GetValueById(yid)
+		if !ok || y == nil {
+			return false
+		}
 		if u, ok := x.(*UnOp); ok {
 			if u.X == y.GetId() && u.Op == OpNot {
 				return true
