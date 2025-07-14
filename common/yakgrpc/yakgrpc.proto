@@ -991,6 +991,7 @@ message AIOutputEvent {
   bool IsReason = 6;
   bytes StreamDelta = 7;
   bool IsJson = 8;
+  bool IsResult = 15;
   bytes Content = 9;
   int64 Timestamp = 10;
   string TaskIndex = 11;

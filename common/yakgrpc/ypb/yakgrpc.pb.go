@@ -1980,6 +1980,7 @@ type AIOutputEvent struct {
 	IsReason        bool                   `protobuf:"varint,6,opt,name=IsReason,proto3" json:"IsReason,omitempty"`
 	StreamDelta     []byte                 `protobuf:"bytes,7,opt,name=StreamDelta,proto3" json:"StreamDelta,omitempty"`
 	IsJson          bool                   `protobuf:"varint,8,opt,name=IsJson,proto3" json:"IsJson,omitempty"`
+	IsResult        bool                   `protobuf:"varint,15,opt,name=IsResult,proto3" json:"IsResult,omitempty"`
 	Content         []byte                 `protobuf:"bytes,9,opt,name=Content,proto3" json:"Content,omitempty"`
 	Timestamp       int64                  `protobuf:"varint,10,opt,name=Timestamp,proto3" json:"Timestamp,omitempty"`
 	TaskIndex       string                 `protobuf:"bytes,11,opt,name=TaskIndex,proto3" json:"TaskIndex,omitempty"`
@@ -2072,6 +2073,13 @@ func (x *AIOutputEvent) GetStreamDelta() []byte {
 func (x *AIOutputEvent) GetIsJson() bool {
 	if x != nil {
 		return x.IsJson
+	}
+	return false
+}
+
+func (x *AIOutputEvent) GetIsResult() bool {
+	if x != nil {
+		return x.IsResult
 	}
 	return false
 }
@@ -54750,7 +54758,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"Pagination\x18\x03 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12$\n" +
-	"\rOnlyFavorites\x18\x04 \x01(\bR\rOnlyFavorites\"\x9f\x03\n" +
+	"\rOnlyFavorites\x18\x04 \x01(\bR\rOnlyFavorites\"\xbb\x03\n" +
 	"\rAIOutputEvent\x12$\n" +
 	"\rCoordinatorId\x18\x01 \x01(\tR\rCoordinatorId\x12\x12\n" +
 	"\x04Type\x18\x02 \x01(\tR\x04Type\x12\x16\n" +
@@ -54759,7 +54767,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bIsStream\x18\x05 \x01(\bR\bIsStream\x12\x1a\n" +
 	"\bIsReason\x18\x06 \x01(\bR\bIsReason\x12 \n" +
 	"\vStreamDelta\x18\a \x01(\fR\vStreamDelta\x12\x16\n" +
-	"\x06IsJson\x18\b \x01(\bR\x06IsJson\x12\x18\n" +
+	"\x06IsJson\x18\b \x01(\bR\x06IsJson\x12\x1a\n" +
+	"\bIsResult\x18\x0f \x01(\bR\bIsResult\x12\x18\n" +
 	"\aContent\x18\t \x01(\fR\aContent\x12\x1c\n" +
 	"\tTimestamp\x18\n" +
 	" \x01(\x03R\tTimestamp\x12\x1c\n" +

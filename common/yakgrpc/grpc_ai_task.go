@@ -3,7 +3,6 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
-	"strings"
 	"sync"
 	"time"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
-	"github.com/yaklang/yaklang/common/utils/reducer"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -27,16 +25,6 @@ var mockedAIChat aiChatType = nil
 func RegisterMockAIChat(c aiChatType) {
 	mockedAIChat = c
 }
-
-var triageCache = reducer.NewReducer(10, func(data []string) string {
-	result, err := yak.ExecuteForge("fragment_summarizer", map[string]any{
-		"textSnippet": strings.Join(data, "\n"),
-	}, aid.WithAgreeYOLO(true))
-	if err != nil {
-		return ""
-	}
-	return utils.InterfaceToString(result)
-})
 
 var RedirectForge = "redirect_forge"
 
@@ -57,40 +45,25 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	defer cancel()
 
 	inputEvent := make(chan *aid.InputEvent, 1000)
-
 	var currentCoordinatorId = startParams.CoordinatorId
 	var coordinatorIdOnce sync.Once
+	var sendEvent = func(e *schema.AiOutputEvent) {
+		if e.Timestamp <= 0 {
+			e.Timestamp = time.Now().Unix() // fallback
+		}
+		coordinatorIdOnce.Do(func() {
+			currentCoordinatorId = e.CoordinatorId
+		})
+		err := stream.Send(e.ToGRPC())
+		if err != nil {
+			log.Errorf("send event failed: %v", err)
+		}
+	}
+
 	var aidOption = []aid.Option{
 		aid.WithSaveEvent(true),
 		aid.WithTaskAnalysis(true),
-		aid.WithEventHandler(func(e *schema.AiOutputEvent) {
-			if e.Timestamp <= 0 {
-				e.Timestamp = time.Now().Unix() // fallback
-			}
-			coordinatorIdOnce.Do(func() {
-				currentCoordinatorId = e.CoordinatorId
-			})
-			event := &ypb.AIOutputEvent{
-				CoordinatorId:   e.CoordinatorId,
-				Type:            string(e.Type),
-				NodeId:          utils.EscapeInvalidUTF8Byte([]byte(e.NodeId)),
-				IsSystem:        e.IsSystem,
-				IsStream:        e.IsStream,
-				IsReason:        e.IsReason,
-				IsSync:          e.IsSync,
-				SyncID:          e.SyncID,
-				StreamDelta:     e.StreamDelta,
-				IsJson:          e.IsJson,
-				Content:         e.Content,
-				Timestamp:       e.Timestamp,
-				TaskIndex:       e.TaskIndex,
-				DisableMarkdown: e.DisableMarkdown,
-			}
-			err := stream.Send(event)
-			if err != nil {
-				log.Errorf("send event failed: %v", err)
-			}
-		}),
+		aid.WithEventHandler(sendEvent),
 		aid.WithEventInputChan(inputEvent),
 	}
 
@@ -193,39 +166,24 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 		log.Infof("run ai forge[%s] success, result res: %v", forgeName, res)
 	} else {
 		log.Info("call without forgeName, use 'forge_triage' as default")
-		triageCache.Push(utils.InterfaceToString(params))
-		res, err = yak.ExecuteForge("forge_triage", map[string]any{
-			"query":   params,
-			"context": triageCache.Dump(),
-		}, buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), aidOption...)...)
+
+		cod, err := aid.NewCoordinatorContext(baseCtx, utils.InterfaceToString(params), append(aidOption, aid.WithCoordinatorId(currentCoordinatorId))...)
 		if err != nil {
-			log.Errorf("run ai forge[%s] failed: %v", forgeName, err)
+			log.Errorf("create ai coordinator failed: %v", err)
 			return err
 		}
-		defer func() {
-			log.Info("call yak.ExecuteForge success forge_triage")
-		}()
-		if res != nil {
-			var redirectParam = &ypb.AIStartParams{
-				ForgeName: strings.ToLower(utils.InterfaceToString(res)),
-			}
-			redirectParamJson, err := json.Marshal(redirectParam)
-			if err != nil {
-				log.Errorf("marshal redirect param failed: %v", err)
-				return err
-			}
-			err = stream.Send(&ypb.AIOutputEvent{
-				CoordinatorId: currentCoordinatorId,
-				Type:          RedirectForge,
-				Content:       redirectParamJson,
-				Timestamp:     time.Now().Unix(),
-				IsJson:        true,
-			})
-			if err != nil {
-				log.Errorf("send redirect param failed: %v", err)
-				return err
-			}
+		err = cod.Run()
+		if err != nil {
+			log.Errorf("run ai coordinator failed: %v", err)
+			return err
 		}
+	}
+	if res != nil {
+		stream.Send(&ypb.AIOutputEvent{
+			CoordinatorId: currentCoordinatorId,
+			IsReason:      true,
+			Content:       utils.InterfaceToBytes(res),
+		})
 	}
 	return nil
 }
