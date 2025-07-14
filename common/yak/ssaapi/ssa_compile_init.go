@@ -22,6 +22,7 @@ func (c *config) init(filesystem filesys_interface.FileSystem, fileSize int) (*s
 		msg := fmt.Sprintf(s, v...)
 		log.Info(msg)
 	}
+
 	application.Build = func(
 		ast ssa.FrontAST, filePath string, src *memedit.MemEditor, fb *ssa.FunctionBuilder,
 	) (err error) {
@@ -59,7 +60,7 @@ func (c *config) init(filesystem filesys_interface.FileSystem, fileSize int) (*s
 			if c.enableDatabase != ssa.ProgramCacheMemory {
 				folderName, fileName := filesystem.PathSplit(filePath)
 				folders := strings.Split(folderName, string(filesystem.GetSeparators()))
-				ssadb.SaveFile(fileName, src.GetSourceCode(), programName, folders)
+				ssadb.SaveFile(ssadb.GetDB(), fileName, src.GetSourceCode(), programName, folders)
 			}
 		}
 		// include source code will change the context of the origin editor
@@ -88,14 +89,14 @@ func (c *config) init(filesystem filesys_interface.FileSystem, fileSize int) (*s
 		}()
 
 		if editor := fb.GetEditor(); editor != nil {
-			cache := application.Cache
-			progName := application.GetProgramName()
-			go func() {
-				hash := editor.GetIrSourceHash(programName)
-				if cache.IsExistedSourceCodeHash(progName, hash) {
-					c.DatabaseProgramCacheHitter(fb)
-				}
-			}()
+			// cache := application.Cache
+			// progName := application.GetProgramName()
+			// go func() {
+			// 	hash := editor.GetIrSourceHash(programName)
+			// 	if cache.IsExistedSourceCodeHash(progName, hash) {
+			// 		c.DatabaseProgramCacheHitter(fb)
+			// 	}
+			// }()
 		} else {
 			log.Warnf("(BUG or in DEBUG Mode)Range not found for %s", fb.GetName())
 		}
