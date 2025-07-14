@@ -7,7 +7,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 )
 
 // Save provides a way to collect items and save them in batches using a background goroutine.
@@ -66,24 +65,31 @@ func NewSaveWithConfig[T any](
 func (s *Save[T]) processBuffer() {
 	saveTime := s.config.saveTimeout
 	timer := time.NewTimer(saveTime)
+	// wg := utils.NewSizedWaitGroup(2)
+	wg := sync.WaitGroup{}
+
+	defer func() {
+		// start := time.Now()
+		// log.Debugf("Databasex Channel: Save Count in processBuffer end : %s: waitToSave: %v, handled: %v, cost: %v",
+		// 	s.config.name, len(waitToSave), s.buffer.Len(), time.Since(start),
+		// )
+		wg.Wait()
+	}()
 
 	save := func(ts []T) {
 		if len(ts) == 0 {
 			return
 		}
-		log.Infof("Databasex Channel: Save Count in save Loop: %s: need: %v, handled: %v",
-			s.config.name,
-			s.buffer.Len(),
-			len(ts),
-		)
-
-		f1 := func() {
-			if len(ts) > 0 {
-				s.saveToDB(ts)
-			}
-		}
-		ssaprofile.ProfileAdd(true, "save.Save", f1)
+		// start := time.Now()
+		batchSave(ts, s.saveToDB, &wg)
+		// log.Debugf("Databasex Channel: Save Count in save Loop: %s: need: %v, handled: %v, cost: %v",
+		// 	s.config.name,
+		// 	s.buffer.Len(),
+		// 	len(ts),
+		// 	time.Since(start),
+		// )
 	}
+
 	currentSaveSize := s.config.saveSize
 	items := make([]T, 0, currentSaveSize)
 	for {
@@ -132,7 +138,7 @@ func (s *Save[T]) Save(item T) {
 		}
 	}()
 	if !utils.IsNil(item) {
-		s.buffer.SafeFeed(item)
+		s.buffer.FeedBlock(item)
 	}
 }
 
@@ -141,4 +147,19 @@ func (s *Save[T]) Save(item T) {
 func (s *Save[T]) Close() {
 	s.buffer.Close() // Close the buffer
 	s.wg.Wait()      // Wait for the background goroutine to finish
+}
+
+func batchSave[T any](data []T, handler func([]T), wg *sync.WaitGroup) {
+	size := defaultBatchSize
+	for i := 0; i < len(data); i += size {
+		end := i + size
+		if end > len(data) {
+			end = len(data)
+		}
+		wg.Add(1)
+		go func(chunk []T) {
+			defer wg.Done()
+			handler(chunk)
+		}(data[i:end])
+	}
 }

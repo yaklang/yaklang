@@ -21,6 +21,10 @@ type UnlimitedChan[T any] struct {
 	cancel   context.CancelFunc
 }
 
+func (c *UnlimitedChan[T]) FeedBlock(item T) {
+	c.innerIn <- item
+}
+
 func (c *UnlimitedChan[T]) SafeFeed(i T) {
 	select {
 	case c.innerIn <- i:
@@ -31,7 +35,6 @@ func (c *UnlimitedChan[T]) SafeFeed(i T) {
 			len(c.innerOut), cap(c.innerOut),
 			c.BufLen(), c.buffer.Capacity(),
 		)
-		PrintCurrentGoroutineRuntimeStack()
 	}
 }
 
