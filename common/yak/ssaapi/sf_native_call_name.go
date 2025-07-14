@@ -33,8 +33,10 @@ func getValueNames(val *Value) []string {
 		names = append(names, udef.GetMethodName())
 	}
 	if call, b := ssa.ToCall(val.GetSSAInst()); b {
-		method := call.GetValueById(call.Method)
-		names = append(names, method.GetName())
+		method, ok := call.GetValueById(call.Method)
+		if ok && method != nil {
+			names = append(names, method.GetName())
+		}
 		//todo: args?
 	}
 	return names

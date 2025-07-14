@@ -54,7 +54,10 @@ func (f *FunctionBuilder) EmitCall(c *Call) *Call {
 
 // handleMethod handle method for call,this call have more type,need handle this type
 func (c *Call) handleMethod() {
-	callMethod := c.GetValueById(c.Method)
+	callMethod, ok := c.GetValueById(c.Method)
+	if !ok || callMethod == nil {
+		return
+	}
 	/*
 		handle weakLanguage call
 	*/
@@ -88,7 +91,9 @@ func (c *Call) handleMethod() {
 			/*
 				from value to getFunc
 			*/
-			check(ret.GetValueById(ret.Value))
+			if value, ok := ret.GetValueById(ret.Value); ok && value != nil {
+				check(value)
+			}
 		case *Phi:
 			for _, value := range ret.GetValues() {
 				check(value)
@@ -101,8 +106,8 @@ func (c *Call) handleMethod() {
 }
 
 func (c *Call) handlerGeneric() {
-	newMethod := c.GetValueById(c.Method)
-	if !newMethod.IsExtern() || newMethod.GetOpcode() != SSAOpcodeFunction {
+	newMethod, ok := c.GetValueById(c.Method)
+	if !ok || newMethod == nil || !newMethod.IsExtern() || newMethod.GetOpcode() != SSAOpcodeFunction {
 		return
 	}
 	f := newMethod.(*Function)
@@ -133,7 +138,10 @@ func (c *Call) handlerGeneric() {
 
 	hasError := false
 	for i, id := range c.Args {
-		arg := c.GetValueById(id)
+		arg, ok := c.GetValueById(id)
+		if !ok || arg == nil {
+			continue
+		}
 		index := i
 		argTyp := arg.GetType()
 		if isVariadic && i > fType.ParameterLen-1 {
@@ -216,7 +224,10 @@ func (c *Call) handlerGeneric() {
 }
 func (c *Call) handlerObjectMethod() {
 	args := c.Args
-	target := c.GetValueById(c.Method)
+	target, ok := c.GetValueById(c.Method)
+	if !ok || target == nil {
+		return
+	}
 	// handler "this" in parameter
 	AddThis := func(this Value) {
 		if len(args) == 0 {
@@ -251,7 +262,10 @@ func (c *Call) handlerObjectMethod() {
 // handler Return type, and handle drop error
 func (c *Call) handlerReturnType() {
 	// get function type
-	method := c.GetValueById(c.Method)
+	method, ok := c.GetValueById(c.Method)
+	if !ok || method == nil {
+		return
+	}
 	funcTyp, ok := ToFunctionType(method.GetType())
 	if !ok {
 		return
@@ -299,7 +313,10 @@ func (c *Call) handleCalleeFunction() {
 	builder := function.builder
 
 	// get function type
-	method := c.GetValueById(c.Method)
+	method, ok := c.GetValueById(c.Method)
+	if !ok || method == nil {
+		return
+	}
 	funcTyp, ok := ToFunctionType(method.GetType())
 	if !ok { // for Test_SideEffect_Double_more
 		if param, ok := ToParameter(method); ok {
@@ -324,8 +341,8 @@ func (c *Call) handleCalleeFunction() {
 			for _, p := range funcTyp.ParameterMember {
 
 				objectName := p.ObjectName
-				key := p.GetValueById(p.MemberCallKey)
-				if utils.IsNil(key) {
+				key, ok := p.GetValueById(p.MemberCallKey)
+				if !ok || utils.IsNil(key) {
 					continue
 				}
 				object, ok := p.Get(c)
@@ -416,10 +433,12 @@ func (c *Call) HandleFreeValue(fvs []*Parameter) {
 			// skip instance function, or `go` with instance function,
 			// this function no variable, and code-range of call-site same as function.
 			// we don't mark error in call-site.
-			method := c.GetValueById(c.Method)
-			if fun, ok := ToFunction(method); ok {
-				if len(fun.GetAllVariables()) == 0 {
-					return
+			method, ok := c.GetValueById(c.Method)
+			if ok && method != nil {
+				if fun, ok := ToFunction(method); ok {
+					if len(fun.GetAllVariables()) == 0 {
+						return
+					}
 				}
 			}
 			// other code will mark error in function call-site

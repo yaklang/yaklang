@@ -14,16 +14,23 @@ func nativeCallOpCodes(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 	}
 
 	checkAndAddOpCode := func(block int64, f *ssa.Function) {
-		b := f.GetBasicBlockByID(block)
-		if b != nil {
+		b, ok := f.GetBasicBlockByID(block)
+		if !ok || b == nil {
 			log.Warnf("function %s has a non-block instruction: %T", f, block)
+			return
 		}
 		for _, p := range b.Phis {
-			p := b.GetValueById(p)
+			p, ok := b.GetValueById(p)
+			if !ok {
+				continue
+			}
 			opCodeMap[p.GetOpcode()] = struct{}{}
 		}
 		for _, id := range b.Insts {
-			inst := b.GetInstructionById(id)
+			inst, ok := b.GetInstructionById(id)
+			if !ok {
+				continue
+			}
 			opCodeMap[inst.GetOpcode()] = struct{}{}
 		}
 	}
@@ -41,19 +48,31 @@ func nativeCallOpCodes(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 		opCodeMap[f.GetOpcode()] = struct{}{}
 
 		for _, freeValue := range f.FreeValues {
-			freeValue := f.GetValueById(freeValue)
+			freeValue, ok := f.GetValueById(freeValue)
+			if !ok {
+				continue
+			}
 			opCodeMap[freeValue.GetOpcode()] = struct{}{}
 		}
 		for _, param := range f.Params {
-			param := f.GetValueById(param)
+			param, ok := f.GetValueById(param)
+			if !ok {
+				continue
+			}
 			opCodeMap[param.GetOpcode()] = struct{}{}
 		}
 		for _, paramMember := range f.ParameterMembers {
-			paramMember := f.GetValueById(paramMember)
+			paramMember, ok := f.GetValueById(paramMember)
+			if !ok {
+				continue
+			}
 			opCodeMap[paramMember.GetOpcode()] = struct{}{}
 		}
 		for _, returnIns := range f.Return {
-			returnIns := f.GetValueById(returnIns)
+			returnIns, ok := f.GetValueById(returnIns)
+			if !ok {
+				continue
+			}
 			opCodeMap[returnIns.GetOpcode()] = struct{}{}
 		}
 

@@ -108,7 +108,10 @@ func handleSideEffect(c *Call, funcTyp *FunctionType) {
 	builder := function.builder
 
 	for _, se := range funcTyp.SideEffects {
-		modify := c.GetValueById(se.Modify)
+		modify, ok := c.GetValueById(se.Modify)
+		if !ok || modify == nil {
+			continue
+		}
 		var variable *Variable
 		var modifyScope ScopeIF
 		modifyScope = modify.GetBlock().ScopeTable
@@ -128,7 +131,11 @@ func handleSideEffect(c *Call, funcTyp *FunctionType) {
 			if !ok {
 				continue
 			}
-			variable = builder.CreateMemberCallVariable(obj, c.GetValueById(se.MemberCallKey))
+			if key, ok := c.GetValueById(se.MemberCallKey); ok && key != nil {
+				variable = builder.CreateMemberCallVariable(obj, key)
+			} else {
+				continue
+			}
 		}
 
 		if sideEffect := builder.EmitSideEffect(se.Name, c, modify); sideEffect != nil {
@@ -151,7 +158,10 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 	builder := function.builder
 
 	for _, se := range funcTyp.SideEffects {
-		modify := c.GetValueById(se.Modify)
+		modify, ok := c.GetValueById(se.Modify)
+		if !ok || modify == nil {
+			continue
+		}
 		var variable, bindVariable *Variable
 		var bindScope, modifyScope ScopeIF
 		if se.Variable != nil {
@@ -192,10 +202,16 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			if !ok {
 				continue
 			}
-			variable = builder.CreateMemberCallVariable(obj, c.GetValueById(se.MemberCallKey))
+			if key, ok := c.GetValueById(se.MemberCallKey); ok && key != nil {
+				variable = builder.CreateMemberCallVariable(obj, key)
+			} else {
+				continue
+			}
 			if p, ok := ToParameter(modify); ok {
 				if len(c.Args) > p.FormalParameterIndex {
-					Point(modify, c.GetValueById(c.Args[p.FormalParameterIndex]))
+					if arg, ok := c.GetValueById(c.Args[p.FormalParameterIndex]); ok && arg != nil {
+						Point(modify, arg)
+					}
 				}
 			}
 		default:
@@ -204,7 +220,11 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				continue
 			}
 			// is object
-			variable = builder.CreateMemberCallVariable(obj, c.GetValueById(se.MemberCallKey))
+			if key, ok := c.GetValueById(se.MemberCallKey); ok && key != nil {
+				variable = builder.CreateMemberCallVariable(obj, key)
+			} else {
+				continue
+			}
 		}
 
 		if sideEffect := builder.EmitSideEffect(se.Name, c, modify); sideEffect != nil {
@@ -327,24 +347,33 @@ func (f *FunctionBuilder) SwitchFreevalueInSideEffectFromScope(name string, se *
 	if scope == nil {
 		return se
 	}
-	if phi, ok := ToPhi(f.GetValueById(se.Value)); ok {
-		for i, id := range phi.Edge {
-			edgeValue := f.GetValueById(id)
-			vs = append(vs, edgeValue)
-			if p, ok := ToParameter(edgeValue); ok && p.IsFreeValue {
-				if value := scope.ReadValue(name); value != nil {
-					vs[i] = value
+	if seValue, ok := f.GetValueById(se.Value); ok && seValue != nil {
+		if phi, ok := ToPhi(seValue); ok {
+			for i, id := range phi.Edge {
+				edgeValue, ok := f.GetValueById(id)
+				if !ok || edgeValue == nil {
+					continue
+				}
+				vs = append(vs, edgeValue)
+				if p, ok := ToParameter(edgeValue); ok && p.IsFreeValue {
+					if value := scope.ReadValue(name); value != nil {
+						vs[i] = value
+					}
+				}
+			}
+			phit := &Phi{
+				anValue:            phi.anValue,
+				CFGEntryBasicBlock: phi.CFGEntryBasicBlock,
+				Edge:               vs.GetIds(),
+			}
+
+			if callSite, ok := f.GetValueById(se.CallSite); ok && callSite != nil {
+				if call, ok := callSite.(*Call); ok {
+					sideEffect := f.EmitSideEffect(name, call, phit)
+					return sideEffect
 				}
 			}
 		}
-		phit := &Phi{
-			anValue:            phi.anValue,
-			CFGEntryBasicBlock: phi.CFGEntryBasicBlock,
-			Edge:               vs.GetIds(),
-		}
-
-		sideEffect := f.EmitSideEffect(name, f.GetValueById(se.CallSite).(*Call), phit)
-		return sideEffect
 	}
 	return se
 }

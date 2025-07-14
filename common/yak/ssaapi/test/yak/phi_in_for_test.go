@@ -34,7 +34,7 @@ os.System(input)
 			t.Fatal("not phi")
 		}
 		if targetIns.CFGEntryBasicBlock > 0 {
-			block := targetIns.GetValueById(targetIns.CFGEntryBasicBlock)
+			block, _ := targetIns.GetValueById(targetIns.CFGEntryBasicBlock)
 			next, ok := block.IsCFGEnterBlock()
 			if !ok {
 				t.Fatal("not enter block")
@@ -68,7 +68,7 @@ os.System(input)
 			t.Fatal("not phi")
 		}
 		if targetIns.CFGEntryBasicBlock > 0 {
-			block := targetIns.GetValueById(targetIns.CFGEntryBasicBlock)
+			block, _ := targetIns.GetValueById(targetIns.CFGEntryBasicBlock)
 			next, ok := block.IsCFGEnterBlock()
 			if !ok {
 				t.Fatal("not enter block")
@@ -111,7 +111,7 @@ os.System(input)
 		assert.Equal(t, 2, len(conds))
 
 		if targetIns.CFGEntryBasicBlock > 0 {
-			block := targetIns.GetValueById(targetIns.CFGEntryBasicBlock)
+			block, _ := targetIns.GetValueById(targetIns.CFGEntryBasicBlock)
 			next, ok := block.IsCFGEnterBlock()
 			if !ok {
 				t.Fatal("not enter block")
@@ -149,7 +149,7 @@ func TestPhiInCFG_If_Without_ElseStatement(t *testing.T) {
 		assert.Equal(t, 1, len(conds))
 
 		if targetIns.CFGEntryBasicBlock > 0 {
-			block := targetIns.GetValueById(targetIns.CFGEntryBasicBlock)
+			block, _ := targetIns.GetValueById(targetIns.CFGEntryBasicBlock)
 			next, ok := block.IsCFGEnterBlock()
 			if !ok {
 				t.Fatal("not enter block")

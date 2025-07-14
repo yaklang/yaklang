@@ -195,7 +195,9 @@ func init() {
 			}
 			call, isCall := ssa.ToCall(value)
 			if isCall {
-				getRoot(call.GetValueById(call.Method))
+				if method, ok := call.GetValueById(call.Method); ok && method != nil {
+					getRoot(method)
+				}
 				return
 			}
 			obj := value.GetObject()
@@ -595,7 +597,10 @@ func init() {
 			if !flag {
 				return nil
 			}
-			enter := function.GetBasicBlockByID(function.EnterBlock)
+			enter, ok := function.GetBasicBlockByID(function.EnterBlock)
+			if !ok || enter == nil {
+				return nil
+			}
 			result1 := searchAlongBasicBlock(enter.GetBlock(), prog, frame, params, Next)
 			result = append(result, result1...)
 			return nil
@@ -1091,10 +1096,15 @@ func init() {
 						return nil
 					}
 					for _, param := range rets.Params {
-						param := rets.GetValueById(param)
+						param, ok := rets.GetValueById(param)
+						if !ok || param == nil {
+							continue
+						}
 						newVal := val.NewValue(param)
-						newVal.AppendPredecessor(val, frame.WithPredecessorContext("getFormalParams"))
-						vals = append(vals, newVal)
+						if newVal != nil {
+							newVal.AppendPredecessor(val, frame.WithPredecessorContext("getFormalParams"))
+							vals = append(vals, newVal)
+						}
 					}
 				}
 				return nil
@@ -1123,16 +1133,24 @@ func init() {
 					return nil
 				}
 				for _, ret := range funcIns.Return {
-					ret := funcIns.GetValueById(ret)
+					ret, ok := funcIns.GetValueById(ret)
+					if !ok || ret == nil {
+						continue
+					}
 					retVal, ok := ssa.ToReturn(ret)
 					if !ok {
 						continue
 					}
 					for _, retIns := range retVal.Results {
-						retIns := funcIns.GetValueById(retIns)
+						retIns, ok := funcIns.GetValueById(retIns)
+						if !ok || retIns == nil {
+							continue
+						}
 						new := val.NewValue(retIns)
-						new.AppendPredecessor(val, frame.WithPredecessorContext("getReturns"))
-						vals = append(vals, new)
+						if new != nil {
+							new.AppendPredecessor(val, frame.WithPredecessorContext("getReturns"))
+							vals = append(vals, new)
+						}
 					}
 				}
 				return nil

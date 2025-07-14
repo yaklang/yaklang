@@ -46,7 +46,7 @@ func findFunctionInAllProgramFuncs(program *ssaapi.Program, namePattern string) 
 
 		// 检查子函数
 		for _, childValue := range fn.ChildFuncs {
-			childValue := fn.GetValueById(childValue)
+			childValue, _ := fn.GetValueById(childValue)
 			if childFn, ok := childValue.(*ssa.Function); ok {
 				if strings.Contains(childFn.GetName(), namePattern) {
 					result = childFn
