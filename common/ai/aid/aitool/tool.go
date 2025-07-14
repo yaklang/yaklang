@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 
 	// "github.com/yaklang/yaklang/common/ai/aid"
@@ -14,9 +15,14 @@ import (
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 )
 
-// InvokeCallback 定义工具调用回调函数的签名
-type InvokeCallback func(ctx context.Context, params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error)
+type ToolRuntimeConfig struct {
+	FeedBacker func(result *ypb.ExecResult) error
+	RuntimeID  string
+}
 
+// NoRuntimeInvokeCallback 定义工具调用回调函数的签名
+type NoRuntimeInvokeCallback func(ctx context.Context, params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error)
+type InvokeCallback func(ctx context.Context, params InvokeParams, invokeExConfig *ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (any, error)
 type Tool struct {
 	*mcp.Tool
 	// A list of keywords for tool indexing and searching.
@@ -99,11 +105,22 @@ func WithKeywords(keywords []string) ToolOption {
 // WithSimpleCallback 设置工具的回调函数
 func WithSimpleCallback(callback func(params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error)) ToolOption {
 	return func(t *Tool) {
-		t.Callback = func(ctx context.Context, params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+		t.Callback = func(ctx context.Context, params InvokeParams, runtimeConfig *ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (any, error) {
 			if callback == nil {
 				return nil, errors.New("callback function is nil")
 			}
 			return callback(params, stdout, stderr)
+		}
+	}
+}
+
+func WithNoRuntimeCallback(callback NoRuntimeInvokeCallback) ToolOption {
+	return func(t *Tool) {
+		t.Callback = func(ctx context.Context, params InvokeParams, runtimeConfig *ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (any, error) {
+			if callback == nil {
+				return nil, errors.New("callback function is nil")
+			}
+			return callback(ctx, params, stdout, stderr)
 		}
 	}
 }

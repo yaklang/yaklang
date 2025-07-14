@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 )
 
@@ -56,6 +57,8 @@ const (
 	EVENT_TYPE_INPUT EventType = "input"
 
 	EVENT_TYPE_AID_CONFIG = "aid_config" // aid config event, used to emit the current config information
+
+	EVENT_TYPE_YAKIT_EXEC_RESULT = "yak_exec_result" // yakit exec result event, used to emit the yakit exec result information
 )
 
 type AiOutputEvent struct {
@@ -163,4 +166,23 @@ func (e *AiOutputEvent) String() string {
 	}
 
 	return fmt.Sprintf("event: %s", strings.Join(parts, ", "))
+}
+
+func (e *AiOutputEvent) ToGRPC() *ypb.AIOutputEvent {
+	return &ypb.AIOutputEvent{
+		CoordinatorId:   e.CoordinatorId,
+		Type:            string(e.Type),
+		NodeId:          utils.EscapeInvalidUTF8Byte([]byte(e.NodeId)),
+		IsSystem:        e.IsSystem,
+		IsStream:        e.IsStream,
+		IsReason:        e.IsReason,
+		IsSync:          e.IsSync,
+		StreamDelta:     e.StreamDelta,
+		IsJson:          e.IsJson,
+		Content:         e.Content,
+		Timestamp:       e.Timestamp,
+		TaskIndex:       e.TaskIndex,
+		DisableMarkdown: e.DisableMarkdown,
+		SyncID:          e.SyncID,
+	}
 }

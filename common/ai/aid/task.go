@@ -85,6 +85,12 @@ func (t *aiTask) PushToolCallResult(i *aitool.ToolResult) {
 // MarshalJSON 实现自定义的JSON序列化，跳过AICallback字段
 func (t aiTask) MarshalJSON() ([]byte, error) {
 	type TaskAlias aiTask // 创建一个别名类型以避免递归调用
+	var progress string
+	if t.executed {
+		progress = "success"
+	} else if t.executing {
+		progress = "in-progress"
+	}
 
 	// 创建一个不包含AICallback的结构体
 	return json.Marshal(struct {
@@ -92,11 +98,13 @@ func (t aiTask) MarshalJSON() ([]byte, error) {
 		Name     string    `json:"name"`
 		Goal     string    `json:"goal"`
 		Subtasks []*aiTask `json:"subtasks,omitempty"`
+		Progress string    `json:"progress"` // 添加进度字段
 	}{
 		Index:    t.Index,
 		Name:     t.Name,
 		Goal:     t.Goal,
 		Subtasks: t.Subtasks,
+		Progress: progress,
 	})
 }
 

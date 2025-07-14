@@ -47,20 +47,7 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 		if e.Timestamp <= 0 {
 			e.Timestamp = time.Now().Unix() // fallback
 		}
-		event := &ypb.AIOutputEvent{
-			CoordinatorId: e.CoordinatorId,
-			Type:          string(e.Type),
-			NodeId:        utils.EscapeInvalidUTF8Byte([]byte(e.NodeId)),
-			IsSystem:      e.IsSystem,
-			IsStream:      e.IsStream,
-			IsReason:      e.IsReason,
-			StreamDelta:   e.StreamDelta,
-			IsJson:        e.IsJson,
-			Content:       e.Content,
-			Timestamp:     e.Timestamp,
-			TaskIndex:     e.TaskIndex,
-		}
-		err := stream.Send(event)
+		err := stream.Send(e.ToGRPC())
 		if err != nil {
 			log.Errorf("send event failed: %v", err)
 		}
