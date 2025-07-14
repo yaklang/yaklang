@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"time"
 
@@ -61,6 +62,20 @@ func (r *Config) emitJson(typeName schema.EventType, nodeId string, i any) {
 		NodeId:        nodeId,
 		IsJson:        true,
 		Content:       utils.Jsonify(i),
+		Timestamp:     time.Now().Unix(),
+	}
+	r.emit(event)
+}
+
+func (r *Config) EmitYakitExecResult(exec *ypb.ExecResult) {
+	if exec == nil {
+		return
+	}
+	event := &schema.AiOutputEvent{
+		CoordinatorId: r.id,
+		Type:          schema.EVENT_TYPE_YAKIT_EXEC_RESULT,
+		NodeId:        "yakit",
+		Content:       utils.Jsonify(exec),
 		Timestamp:     time.Now().Unix(),
 	}
 	r.emit(event)

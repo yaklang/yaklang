@@ -14,6 +14,7 @@ type ToolInvokeConfig struct {
 	errCallback    func(error) (*ToolResult, error)
 	resCallback    func(result *ToolExecutionResult) (*ToolResult, error)
 	cancelCallback toolCallCancelCallback
+	runtimeConfig *ToolRuntimeConfig
 }
 
 func (i ToolInvokeConfig) GetStdout() io.Writer {
