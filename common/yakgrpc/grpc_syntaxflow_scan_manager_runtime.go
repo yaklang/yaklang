@@ -63,15 +63,10 @@ func (m *SyntaxFlowScanManager) StartQuerySF(startIndex ...int64) error {
 		return prog, nil
 	}
 
-	swg := utils.NewSizedWaitGroup(int(m.GetConcurrency()))
 	var errs error
 	var taskIndex int64
 
-	var tasks []struct {
-		rule     *schema.SyntaxFlowRule
-		progName string
-		index    int64
-	}
+	swg := utils.NewSizedWaitGroup(int(m.GetConcurrency()))
 
 	for rule := range m.ruleChan {
 		if m.IsPause() || m.IsStop() {
@@ -85,34 +80,20 @@ func (m *SyntaxFlowScanManager) StartQuerySF(startIndex ...int64) error {
 			if taskIndex <= start {
 				continue
 			}
-			tasks = append(tasks, struct {
-				rule     *schema.SyntaxFlowRule
-				progName string
-				index    int64
-			}{rule: rule, progName: progName, index: taskIndex})
+
+			swg.Add(1)
+			go func(rule *schema.SyntaxFlowRule, progName string) {
+				defer swg.Done()
+
+				prog, err := getProgram(progName)
+				if err != nil {
+					atomic.AddInt64(&m.skipQuery, 1)
+					return
+				}
+				m.Query(rule, prog)
+			}(rule, progName)
 		}
 	}
-
-	for _, task := range tasks {
-		if m.IsPause() || m.IsStop() {
-			break
-		}
-
-		if err := swg.AddWithContext(m.ctx, 1); err != nil {
-			break
-		}
-		go func(rule *schema.SyntaxFlowRule, progName string, index int64) {
-			defer swg.Done()
-
-			prog, err := getProgram(progName)
-			if err != nil {
-				atomic.AddInt64(&m.skipQuery, 1)
-				return
-			}
-			m.Query(rule, prog)
-		}(task.rule, task.progName, task.index)
-	}
-
 	swg.Wait()
 	m.notifyStatus("")
 	return errs
