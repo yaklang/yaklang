@@ -24,11 +24,18 @@ func TestNewFetch(t *testing.T) {
 		{ID: 3, Name: "Item 3"},
 	}
 
+	fetchFromDB := func(ctx context.Context, size int) <-chan FetchTestItem {
+		ch := make(chan FetchTestItem, size)
+		go func() {
+			for _, item := range mockItems {
+				ch <- item
+			}
+			close(ch)
+		}()
+		return ch
+	}
 	// Test with default options
 	t.Run("DefaultOptions", func(t *testing.T) {
-		fetchFromDB := func(size int) []FetchTestItem {
-			return mockItems
-		}
 
 		fetch := databasex.NewFetch(fetchFromDB)
 		assert.NotNil(t, fetch)
@@ -39,9 +46,6 @@ func TestNewFetch(t *testing.T) {
 
 	// Test with custom buffer size
 	t.Run("CustomBufferSize", func(t *testing.T) {
-		fetchFromDB := func(size int) []FetchTestItem {
-			return mockItems
-		}
 
 		fetch := databasex.NewFetch(fetchFromDB,
 			databasex.WithFetchSize(10),
@@ -54,9 +58,6 @@ func TestNewFetch(t *testing.T) {
 
 	// Test with custom context
 	t.Run("CustomContext", func(t *testing.T) {
-		fetchFromDB := func(size int) []FetchTestItem {
-			return mockItems
-		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
@@ -77,13 +78,17 @@ func TestFetchOperation(t *testing.T) {
 		{ID: 2, Name: "Item 2"},
 		{ID: 3, Name: "Item 3"},
 	}
-
+	fetchFromDB := func(ctx context.Context, size int) <-chan FetchTestItem {
+		ch := make(chan FetchTestItem, size)
+		go func() {
+			for _, item := range mockItems {
+				ch <- item
+			}
+			close(ch)
+		}()
+		return ch
+	}
 	t.Run("FetchItems", func(t *testing.T) {
-		var fetchCount int
-		fetchFromDB := func(size int) []FetchTestItem {
-			fetchCount++
-			return mockItems
-		}
 
 		fetch := databasex.NewFetch(fetchFromDB)
 		assert.NotNil(t, fetch)
@@ -101,10 +106,6 @@ func TestFetchOperation(t *testing.T) {
 	})
 
 	t.Run("EmptyFetch", func(t *testing.T) {
-		fetchFromDB := func(size int) []FetchTestItem {
-			return []FetchTestItem{} // Return empty slice
-		}
-
 		fetch := databasex.NewFetch(fetchFromDB)
 		assert.NotNil(t, fetch)
 
@@ -123,11 +124,17 @@ func TestCloseWithDelete(t *testing.T) {
 		{ID: 3, Name: "Item 3"},
 	}
 
+	fetchFromDB := func(ctx context.Context, size int) <-chan FetchTestItem {
+		ch := make(chan FetchTestItem, size)
+		go func() {
+			for _, item := range mockItems {
+				ch <- item
+			}
+			close(ch)
+		}()
+		return ch
+	}
 	t.Run("DeleteOnClose", func(t *testing.T) {
-		fetchFromDB := func(size int) []FetchTestItem {
-			return mockItems
-		}
-
 		var deletedItems []FetchTestItem
 		deleteFunc := func(items []FetchTestItem) {
 			deletedItems = append(deletedItems, items...)
@@ -155,11 +162,18 @@ func TestConcurrency(t *testing.T) {
 		{ID: 2, Name: "Item 2"},
 		{ID: 3, Name: "Item 3"},
 	}
+	fetchFromDB := func(ctx context.Context, size int) <-chan FetchTestItem {
+		ch := make(chan FetchTestItem, size)
+		go func() {
+			for _, item := range mockItems {
+				ch <- item
+			}
+			close(ch)
+		}()
+		return ch
+	}
 
 	t.Run("ConcurrentFetch", func(t *testing.T) {
-		fetchFromDB := func(size int) []FetchTestItem {
-			return mockItems
-		}
 
 		fetch := databasex.NewFetch(fetchFromDB, databasex.WithFetchSize(100))
 		assert.NotNil(t, fetch)
@@ -189,15 +203,16 @@ func TestConcurrency(t *testing.T) {
 func TestFetchAutoFetchSize(t *testing.T) {
 	defaultFetchSize := 10
 	fetchSizeItems := make([]int, 0)
-	fetchFromDB := func(size int) []int {
-		fetchSizeItems = append(fetchSizeItems, size)
-		ret := make([]int, 0, size)
-		for i := 0; i < size; i++ {
-			ret = append(ret, i)
-		}
-		return ret
+	fetchFromDB := func(ctx context.Context, size int) <-chan int {
+		ch := make(chan int, size)
+		go func() {
+			for i := 0; i < size; i++ {
+				ch <- i
+			}
+			close(ch)
+		}()
+		return ch
 	}
-
 	fetch := databasex.NewFetch(fetchFromDB, databasex.WithFetchSize(defaultFetchSize))
 	for i := 0; i < 5; i++ {
 		item, err := fetch.Fetch()

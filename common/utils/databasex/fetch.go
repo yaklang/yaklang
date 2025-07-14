@@ -11,7 +11,7 @@ import (
 )
 
 type Fetch[T any] struct {
-	fetchFromDB func(int) []T
+	fetchFromDB func(context.Context, int) <-chan T
 	buffer      *chanx.UnlimitedChan[T]
 	cfg         *config
 	wg          sync.WaitGroup
@@ -20,14 +20,14 @@ type Fetch[T any] struct {
 }
 
 func NewFetch[T any](
-	fetchFromDB func(int) []T,
+	fetchFromDB func(context.Context, int) <-chan T,
 	opt ...Option,
 ) *Fetch[T] {
 	cfg := NewConfig(opt...)
 	return NewFetchWithConfig(fetchFromDB, cfg)
 }
 func NewFetchWithConfig[T any](
-	fetchFromDB func(int) []T,
+	fetchFromDB func(context.Context, int) <-chan T,
 	cfg *config,
 ) *Fetch[T] {
 	if utils.IsNil(fetchFromDB) {
@@ -53,20 +53,18 @@ func NewFetchWithConfig[T any](
 func (f *Fetch[T]) fillBuffer() {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Infof("Databasex Channel: Fetch panic: %v", r)
+			log.Debugf("Databasex Channel: Fetch panic: %v", r)
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
 	// fetchSize := f.cfg.bufferSize
 	currentFetchSize := f.cfg.fetchSize
-	prevSendBuffer := 0
 	for {
 		fetchSize := f.cfg.fetchSize
 		select {
 		case <-f.ctx.Done():
 			return
 		default:
-
 			if f.buffer.Len() > currentFetchSize*5 {
 				time.Sleep(100 * time.Millisecond) // Sleep for a short duration to avoid busy waiting
 				continue
@@ -74,43 +72,41 @@ func (f *Fetch[T]) fillBuffer() {
 
 			bufferWeight := 1
 			bufferLen := f.buffer.Len()
-			if bufferLen < fetchSize/2 || prevSendBuffer < fetchSize/2 { // [:0.5]
+			if bufferLen < fetchSize/2 { // [:0.5]
 				bufferWeight = 10
-			} else if bufferLen < fetchSize || prevSendBuffer < fetchSize { // [0.5, 1]
-				bufferWeight = 5
-			} else if prevSendBuffer > bufferLen && prevSendBuffer-bufferLen > fetchSize/2 {
+			} else if bufferLen < fetchSize { // [0.5, 1]
 				bufferWeight = 5
 			}
 
 			currentFetchSize = fetchSize * bufferWeight
 
-			items := f.fetchFromDB(currentFetchSize)
-
-			log.Infof("Databasex Channel: Fetch Count in fetch buffer %s: buffer(%v|%v) prevBuf(%v) with fetchItem(%v): %v", f.cfg.name,
-				bufferLen, bufferWeight, prevSendBuffer,
-				currentFetchSize, len(items),
-			)
-
-			prevSendBuffer = f.buffer.Len()
-
-			for _, item := range items {
+			// start := time.Now()
+			// _ = start
+			// log.Debugf("Databasex Channel: Fetch Count Start in fetch buffer %s: buffer(%v|%v) with fetchItem(%v)", f.cfg.name, bufferLen, bufferWeight, currentFetchSize)
+			var ch <-chan T
+			ch = f.fetchFromDB(f.ctx, currentFetchSize)
+			for item := range ch {
 				if utils.IsNil(item) {
 					log.Errorf("BUG: item is nil in Fetch.fillBuffer")
 					continue
 				}
 				f.buffer.SafeFeed(item)
 			}
+			// log.Debugf("Databasex Channel: Fetch Count in fetch buffer %s:  fetchItem(%v): Time(%v)", f.cfg.name, f.buffer.Len(), time.Since(start))
 		}
 	}
 }
 
 func (f *Fetch[T]) Fetch() (T, error) {
-	var zero T
+	// start := time.Now()
 	if f.buffer.Len() == 0 {
-		log.Infof("Databasex Channel: Fetch size length %T: len: %d ", zero, f.buffer.Len())
+		log.Debugf("Databasex Channel: Fetch buffer is empty %s: buffer(%v) with fetchItem", f.cfg.name, f.buffer.Len())
 	}
-
 	item := <-f.buffer.OutputChannel()
+	// since := time.Since(start)
+	// if since > time.Second {
+	// 	log.Debugf("Databasex Channel: Fetch too long time  %s: buffer(%v) with fetchItem: Time(%v)", f.cfg.name, f.buffer.Len(), since)
+	// }
 	if utils.IsNil(item) {
 		return item, utils.Errorf("item is nil in Fetch.Fetch")
 	}
@@ -122,13 +118,12 @@ func (f *Fetch[T]) Close(delete ...func([]T)) {
 	// stop the background goroutine
 	f.cancel()
 	f.wg.Wait()
-
 	// close the buffer channel
 	f.buffer.Close()
+	items := make([]T, 0, f.buffer.Len())
 
 	// drain the rest of the buffer
 	if len(delete) > 0 {
-		items := make([]T, 0, f.buffer.Len())
 		for {
 			item, ok := <-f.buffer.OutputChannel()
 			if !ok {
@@ -136,7 +131,7 @@ func (f *Fetch[T]) Close(delete ...func([]T)) {
 			}
 			items = append(items, item)
 		}
-		log.Infof("Databasex Channel: Fetch Close: %s, items: %d", f.cfg.name, len(items))
-		delete[0](items)
 	}
+	// log.Debugf("Databasex Channel: Fetch Close: %s, items: %d", f.cfg.name, len(items))
+	delete[0](items)
 }

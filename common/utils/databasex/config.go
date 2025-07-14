@@ -49,7 +49,7 @@ func WithEnableSave(enables ...bool) Option {
 
 func WithSaveSize(size int) Option {
 	return func(c *config) {
-		c.saveSize = size
+		c.saveSize = max(defaultBatchSize, size)
 	}
 }
 
@@ -71,8 +71,8 @@ func NewConfig(opts ...Option) *config {
 	cfg := &config{
 		bufferSize:  defaultBufferSize, // Default buffer size
 		ctx:         context.Background(),
-		fetchSize:   100,
-		saveSize:    100,
+		fetchSize:   defaultBatchSize,
+		saveSize:    defaultBatchSize,
 		saveTimeout: 500 * time.Millisecond, // 0.5s
 	}
 	for _, opt := range opts {
