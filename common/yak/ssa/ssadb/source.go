@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -61,7 +62,7 @@ func GetEditorByFileName(fileName string) (*memedit.MemEditor, error) {
 	return ret, nil
 }
 
-func SaveFile(filename, content string, programName string, folderPaths []string) string {
+func SaveFile(db *gorm.DB, filename, content string, programName string, folderPaths []string) string {
 	start := time.Now()
 	defer func() {
 		atomic.AddUint64(&_SSASourceCodeCost, uint64(time.Now().Sub(start).Nanoseconds()))
@@ -88,11 +89,11 @@ func SaveFile(filename, content string, programName string, folderPaths []string
 		FolderPath:     fullPath,
 		IsBigFile:      false,
 	}
-	go irSource.save()
+	go irSource.save(db)
 	return irSource.SourceCodeHash
 }
 
-func SaveFolder(folderName string, folderPaths []string) error {
+func SaveFolder(db *gorm.DB, folderName string, folderPaths []string) error {
 	start := time.Now()
 	defer func() {
 		atomic.AddUint64(&_SSASourceCodeCost, uint64(time.Now().Sub(start).Nanoseconds()))
@@ -112,17 +113,16 @@ func SaveFolder(folderName string, folderPaths []string) error {
 		FolderPath:     folderPath,
 		IsBigFile:      false,
 	}
-	irSource.save()
+	irSource.save(db)
 	return nil
 }
 
-func (irSource *IrSource) save() error {
+func (irSource *IrSource) save(db *gorm.DB) error {
 	if len(irSource.FolderPath) > 0 && irSource.FolderPath[0] != '/' {
 		irSource.FolderPath = "/" + irSource.FolderPath
 	}
 	// log.Infof("save source: %v", irSource)
 	// check existed
-	db := GetDB()
 	if err := db.Save(irSource).Error; err != nil {
 		return utils.Wrapf(err, "save ir source failed")
 	}
