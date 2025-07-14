@@ -1,7 +1,6 @@
 package ssadb
 
 import (
-	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -13,7 +12,7 @@ type IrType struct {
 	ProgramName      string `json:"program_name"`
 	String           string `json:"string" gorm:"type:text"`
 	ExtraInformation string `json:"extra_information" gorm:"type:text"`
-	Hash             string `json:"hash" gorm:"unique_index"`
+	// Hash             string `json:"hash" gorm:"unique_index"`
 }
 
 func (t *IrType) GetIdInt64() int64 {
@@ -29,7 +28,7 @@ func RequireIrType(DB *gorm.DB, program string) (int64, *IrType) {
 	irType := &IrType{}
 	irType.ProgramName = program
 	irType.Kind = -1
-	irType.Hash = irType.CalcHash(uuid.NewString())
+	// irType.Hash = irType.CalcHash(uuid.NewString())
 	db.Create(irType)
 	return int64(irType.ID), irType
 }

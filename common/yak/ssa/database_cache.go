@@ -55,7 +55,7 @@ func NewDBCache(prog *Program, databaseKind ProgramCacheKind, fileSize int, Conf
 	}
 	fetchSize := min(max(fileSize*5, defaultFetchSize), maxFetchSize)
 	saveSize := min(max(fileSize*5, defaultSaveSize), maxSaveSize)
-	log.Infof("Databasex Channel: ReSetSize: fileSize(%d) fetchSize(%d) saveSize(%d)", fileSize, fetchSize, saveSize)
+	log.Debugf("Databasex Channel: ReSetSize: fileSize(%d) fetchSize(%d) saveSize(%d)", fileSize, fetchSize, saveSize)
 	cache.initIndex(databaseKind, saveSize/2)
 	cache.afterSaveNotify = func(i int) {}
 	cache.InstructionCache = createInstructionCache(
@@ -64,23 +64,10 @@ func NewDBCache(prog *Program, databaseKind ProgramCacheKind, fileSize int, Conf
 		programName, fetchSize, saveSize,
 		func(inst Instruction, instIr *ssadb.IrCode) {
 			// TODO: this offset too long time
-			// cache.OffsetCache.Add("", inst) // add to offset cache
+			cache.OffsetCache.Add("", inst) // add to offset cache
 		},
 		func(count int) {
-			go func() {
-				step := 100
-				if cache.afterSaveNotify != nil {
-					i := 0
-					for i <= count {
-						cache.afterSaveNotify(step)
-						i += step // notify every step instructions
-					}
-					if rest := count % step; rest != 0 {
-						// notify the remaining count if not evenly divisible by step
-						cache.afterSaveNotify(rest)
-					}
-				}
-			}()
+			cache.afterSaveNotify(count)
 		},
 	)
 	cache.TypeCache = createTypeCache(
