@@ -82,6 +82,7 @@ func NewInstructionsIndexDB(
 			save,
 			databasex.WithName(name),
 			databasex.WithSaveSize(saveSize),
+			databasex.WithSaveTimeout(saveTime),
 		),
 	}
 }
