@@ -156,8 +156,8 @@ func (f *FunctionBuilder) appendParam(p *Parameter, token ...CanStartStopToken) 
 }
 
 func (f *Function) ReturnValue() []Value {
-	exitBlock := f.GetBasicBlockByID(f.ExitBlock)
-	if exitBlock == nil {
+	exitBlock, ok := f.GetBasicBlockByID(f.ExitBlock)
+	if !ok || exitBlock == nil {
 		log.Warnf("function exit block cannot convert to BasicBlock: %v", f.ExitBlock)
 		return nil
 	}
@@ -174,7 +174,11 @@ func (f *Function) GetParent() *Function {
 		return nil
 	}
 
-	parent := f.GetValueById(f.parent)
+	parent, ok := f.GetValueById(f.parent)
+	if !ok || parent == nil {
+		log.Warnf("function parent not found: %v", f.parent)
+		return nil
+	}
 	fu, ok := ToFunction(parent)
 	if ok {
 		return fu

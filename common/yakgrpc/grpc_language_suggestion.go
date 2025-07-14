@@ -1035,7 +1035,11 @@ func fixCompletionFunctionParams(suggestions []*ypb.SuggestionDescription, v *ss
 	if !ok {
 		return suggestions
 	}
-	funcTyp, ok := ssa.ToFunctionType(call.GetValueById(call.Method).GetType())
+	method, ok := call.GetValueById(call.Method)
+	if !ok || method == nil {
+		return suggestions
+	}
+	funcTyp, ok := ssa.ToFunctionType(method.GetType())
 	if !ok {
 		return suggestions
 	}
@@ -1245,7 +1249,10 @@ func fuzztagCompletion(fuzztagCode string, hotPatchCode string) []*ypb.Suggestio
 			mainFunc, ok := prog.Program.Funcs.Get(string(ssa.MainFunctionName))
 			if ok {
 				for _, childFunc := range mainFunc.ChildFuncs {
-					childFunc := mainFunc.GetValueById(childFunc)
+					childFunc, ok := mainFunc.GetValueById(childFunc)
+					if !ok || childFunc == nil {
+						continue
+					}
 					if utils.StringArrayContains(hotPatchBlacklist, childFunc.GetName()) {
 						continue
 					}

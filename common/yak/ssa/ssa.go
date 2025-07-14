@@ -72,9 +72,9 @@ type Instruction interface {
 	SetIsFromDB(bool)
 
 	// use program cache
-	GetInstructionById(id int64) Instruction
-	GetValueById(id int64) Value
-	GetUsersByID(id int64) User
+	GetInstructionById(id int64) (Instruction, bool)
+	GetValueById(id int64) (Value, bool)
+	GetUsersByID(id int64) (User, bool)
 	GetValuesByIDs([]int64) Values
 	GetUsersByIDs([]int64) Users
 
@@ -384,7 +384,10 @@ func (f *Function) GetMethodName() string {
 func (f *Function) FirstBlockInstruction() []Instruction {
 	if len(f.Blocks) > 0 {
 		firstBlockId := f.Blocks[0]
-		firstBlockValue := f.GetValueById(firstBlockId)
+		firstBlockValue, ok := f.GetValueById(firstBlockId)
+		if !ok || firstBlockValue == nil {
+			return nil
+		}
 		if block, ok := ToBasicBlock(firstBlockValue); ok {
 			return f.GetInstructionsByIDs(block.Insts)
 		} else {
@@ -453,9 +456,12 @@ func (b *BasicBlock) IsCFGEnterBlock() ([]Instruction, bool) {
 	if jmpId <= 0 || err != nil {
 		return nil, false
 	}
-	jmp := b.GetInstructionById(jmpId)
+	jmp, ok := b.GetInstructionById(jmpId)
+	if !ok || jmp == nil {
+		return nil, false
+	}
 
-	_, ok := jmp.(*LazyInstruction)
+	_, ok = jmp.(*LazyInstruction)
 	if ok {
 		jmp = jmp.(*LazyInstruction).Self()
 	}
@@ -466,7 +472,10 @@ func (b *BasicBlock) IsCFGEnterBlock() ([]Instruction, bool) {
 			log.Warnf("Jump To is nil: %T", ret)
 			return nil, false
 		}
-		to := b.GetInstructionById(ret.To)
+		to, ok := b.GetInstructionById(ret.To)
+		if !ok || to == nil {
+			return nil, false
+		}
 
 		toBlock, ok := ToBasicBlock(to)
 		if !ok {
@@ -478,7 +487,10 @@ func (b *BasicBlock) IsCFGEnterBlock() ([]Instruction, bool) {
 		if lastId <= 0 || err != nil {
 			return nil, false
 		}
-		last := b.GetInstructionById(lastId)
+		last, ok := b.GetInstructionById(lastId)
+		if !ok || last == nil {
+			return nil, false
+		}
 		// fetch essential instructions via jump
 		// if else(elif) condition
 		// for loop condition
@@ -499,13 +511,26 @@ func (b *BasicBlock) IsCFGEnterBlock() ([]Instruction, bool) {
 			}), true
 		case *Switch:
 			log.Warn("Swtich Statement (Condition/Label value should contains jmp) WARNING")
-			return lo.Map(ret.Label, func(label SwitchLabel, i int) Instruction {
-				var result Instruction = b.GetValueById(label.Value)
-				return result
+			return lo.FilterMap(ret.Label, func(label SwitchLabel, i int) (Instruction, bool) {
+				result, ok := b.GetValueById(label.Value)
+				if !ok || result == nil {
+					return nil, false
+				}
+				if inst, ok := result.(Instruction); ok {
+					return inst, true
+				}
+				return nil, false
 			}), true
 		case *Loop:
 			log.Warn("Loop Statement (Condition/Label value should contains jmp) WARNING")
-			return []Instruction{b.GetValueById(ret.Cond)}, true
+			condValue, ok := b.GetValueById(ret.Cond)
+			if !ok || condValue == nil {
+				return nil, false
+			}
+			if condInst, ok := condValue.(Instruction); ok {
+				return []Instruction{condInst}, true
+			}
+			return nil, false
 		default:
 			log.Warnf("unsupoorted CFG Entry Instruction: %T", ret)
 		}
@@ -640,7 +665,8 @@ func (p *parameterMemberInner) Get(c *Call) (obj Value, ok bool) {
 			return nil, false
 		}
 		// Changed: Fetch Value using GetValueById
-		return c.GetValueById(c.ArgMember[p.MemberCallObjectIndex]), true
+		obj, ok := c.GetValueById(c.ArgMember[p.MemberCallObjectIndex])
+		return obj, ok
 	case FreeValueMemberCall:
 		id, ok = c.Binding[p.MemberCallObjectName]
 	case CallMemberCall:
@@ -654,7 +680,7 @@ func (p *parameterMemberInner) Get(c *Call) (obj Value, ok bool) {
 		id, ok = c.Args[p.MemberCallObjectIndex], true
 	}
 	if id > 0 {
-		obj = c.GetValueById(id)
+		obj, ok = c.GetValueById(id)
 	}
 	return
 }
@@ -690,7 +716,8 @@ func (p *Parameter) ReplaceValue(v Value, to Value) {
 	}
 }
 func (p *Parameter) GetDefault() Value {
-	return p.GetValueById(p.defaultValue)
+	val, _ := p.GetValueById(p.defaultValue)
+	return val
 }
 
 func (p *Parameter) SetDefault(v Value) {
@@ -1061,7 +1088,11 @@ func (i *If) getSiblings(m map[int64]struct{}) []*If {
 		return nil
 	}
 
-	falseBlock, ok := ToBasicBlock(i.GetValueById(i.False))
+	val, ok := i.GetValueById(i.False)
+	if !ok {
+		return nil
+	}
+	falseBlock, ok := ToBasicBlock(val)
 	if !ok || len(falseBlock.Insts) == 0 {
 		return nil
 	}

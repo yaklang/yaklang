@@ -430,8 +430,8 @@ func (lz *LazyInstruction) GetRange() memedit.RangeIf {
 				var startRng memedit.RangeIf
 				if len(ret.Insts) > 0 {
 					for _, startId := range ret.Insts {
-						startInst := lz.prog.GetInstructionById(startId)
-						if startInst == nil {
+						startInst, ok := lz.prog.GetInstructionById(startId)
+						if !ok || startInst == nil {
 							continue
 						}
 						if rng := startInst.GetRange(); rng != nil {
@@ -441,8 +441,8 @@ func (lz *LazyInstruction) GetRange() memedit.RangeIf {
 					}
 				} else {
 					for _, startId := range ret.Preds {
-						startInst := lz.prog.GetInstructionById(startId)
-						if startInst == nil {
+						startInst, ok := lz.prog.GetInstructionById(startId)
+						if !ok || startInst == nil {
 							continue
 						}
 						if rng := startInst.GetRange(); rng != nil {
@@ -457,8 +457,8 @@ func (lz *LazyInstruction) GetRange() memedit.RangeIf {
 					// Iterate from the last instruction to find the end range
 					for i := len(ret.Insts) - 1; i >= 0; i-- {
 						endInstId := ret.Insts[i]
-						endInst := lz.prog.GetInstructionById(endInstId)
-						if endInst == nil {
+						endInst, ok := lz.prog.GetInstructionById(endInstId)
+						if !ok || endInst == nil {
 							continue
 						}
 						if rng := endInst.GetRange(); rng != nil {
@@ -468,8 +468,8 @@ func (lz *LazyInstruction) GetRange() memedit.RangeIf {
 					}
 				} else {
 					for _, endId := range ret.Succs {
-						endInst := lz.prog.GetInstructionById(endId)
-						if endInst == nil {
+						endInst, ok := lz.prog.GetInstructionById(endId)
+						if !ok || endInst == nil {
 							continue
 						}
 						if rng := endInst.GetRange(); rng != nil {
@@ -807,8 +807,8 @@ func (lz *LazyInstruction) FlatOccultation() []Value {
 	handler = func(i *anValue) {
 		for _, vId := range i.occultation {
 			// Corrected: Use GetValueById from the program's cache
-			v := lz.GetValueById(vId)
-			if v == nil {
+			v, ok := lz.GetValueById(vId)
+			if !ok || v == nil {
 				continue
 			}
 			ret = append(ret, v)
