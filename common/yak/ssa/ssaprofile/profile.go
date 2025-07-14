@@ -7,14 +7,16 @@ import (
 	syncAtomic "sync/atomic"
 	"time"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 )
 
 type Profile struct {
-	Name      string
-	TotalTime uint64
-	Count     uint64
-	Times     []uint64
+	Name       string
+	TotalTime  uint64
+	Count      uint64
+	ErrorCount uint64
+	Times      []uint64
 }
 
 func (profile *Profile) String() string {
@@ -62,8 +64,21 @@ func Refresh() {
 }
 
 func ProfileAdd(enable bool, name string, fs ...func()) {
+	fsWithErr := lo.FilterMap(fs, func(f func(), _ int) (func() error, bool) {
+		if f == nil {
+			return nil, false
+		}
+		return func() error {
+			f()
+			return nil
+		}, true
+	})
+	ProfileAddWithError(enable, name, fsWithErr...)
+}
+
+func ProfileAddWithError(enable bool, name string, fs ...func() error) error {
 	if name == "" {
-		return
+		return fmt.Errorf("ProfileAdd name is empty")
 	}
 
 	var p *Profile
@@ -83,7 +98,11 @@ func ProfileAdd(enable bool, name string, fs ...func()) {
 	for index, f := range fs {
 		start := time.Now()
 		if f != nil {
-			f()
+			if err := f(); err != nil {
+				log.Errorf("ProfileAdd %s error: %v", name, err)
+				syncAtomic.AddUint64(&p.ErrorCount, 1)
+				return err
+			}
 		}
 		since := uint64(time.Since(start))
 
@@ -102,6 +121,7 @@ func ProfileAdd(enable bool, name string, fs ...func()) {
 		profileListMap[name] = p
 		lock.Unlock()
 	}
+	return nil
 }
 
 func ShowCacheCost(pprof ...map[string]*Profile) {
