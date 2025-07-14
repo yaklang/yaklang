@@ -1,19 +1,28 @@
 package ssaapi
 
 import (
+	"fmt"
 	"io/fs"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/databasex"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 )
+
+type SaveFolder struct {
+	name string
+	path []string
+}
 
 func (c *config) parseProjectWithFS(
 	filesystem filesys_interface.FileSystem,
@@ -47,6 +56,26 @@ func (c *config) parseProjectWithFS(
 
 	var err error
 	start := time.Now()
+
+	processCallback(0.0, fmt.Sprintf("parse project in fs: %v, path: %v", filesystem, c.info))
+	processCallback(0.0, "calculate total size of project")
+
+	db := ssadb.GetDB()
+	folderSave := databasex.NewSave[SaveFolder](func(t []SaveFolder) {
+		utils.GormTransaction(db, func(tx *gorm.DB) error {
+			for _, sf := range t {
+				ssadb.SaveFolder(tx, sf.name, sf.path)
+			}
+			return nil
+		})
+	})
+	if c.enableDatabase != ssa.ProgramCacheMemory {
+		folderSave.Save(SaveFolder{
+			name: c.ProgramName,
+			path: []string{"/"},
+		})
+	}
+
 	// get total size
 	err = filesys.Recursive(programPath,
 		filesys.WithFileSystem(filesystem),
@@ -56,18 +85,16 @@ func (c *config) parseProjectWithFS(
 			if name == "test" || name == ".git" {
 				return filesys.SkipDir
 			}
-
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				if c.ProgramName != "" {
-					folders := []string{c.ProgramName}
-					folders = append(folders,
-						strings.Split(folder, string(c.fs.GetSeparators()))...,
-					)
-					ssadb.SaveFolder(name, folders)
-				}
-			}()
+			folders := []string{c.ProgramName}
+			folders = append(folders,
+				strings.Split(folder, string(c.fs.GetSeparators()))...,
+			)
+			if c.enableDatabase != ssa.ProgramCacheMemory {
+				folderSave.Save(SaveFolder{
+					name: name,
+					path: folders,
+				})
+			}
 			return nil
 		}),
 		filesys.WithFileStat(func(path string, fi fs.FileInfo) error {
@@ -96,12 +123,8 @@ func (c *config) parseProjectWithFS(
 	}
 
 	prog, builder, err := c.init(filesystem, handlerTotal)
-
 	if err != nil {
 		return nil, err
-	}
-	if prog.Name != "" {
-		ssadb.SaveFolder(prog.Name, []string{"/"})
 	}
 
 	process := 0.0
@@ -111,9 +134,6 @@ func (c *config) parseProjectWithFS(
 			s, v...,
 		)
 	}
-
-	prog.ProcessInfof("parse project in fs: %v, path: %v", filesystem, c.info)
-	prog.ProcessInfof("calculate total size of project")
 
 	if c.isStop() {
 		return nil, ErrContextCancel
