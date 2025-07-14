@@ -222,8 +222,8 @@ func (prog *Program) EachFunction(handler func(*Function)) {
 	handFunc = func(f *Function) {
 		handler(f)
 		for _, id := range f.ChildFuncs {
-			child := f.GetValueById(id)
-			if child == nil {
+			child, ok := f.GetValueById(id)
+			if !ok || child == nil {
 				log.Warnf("function %s child %d not found in function %s", f.GetName(), id, f.GetName())
 				continue
 			}

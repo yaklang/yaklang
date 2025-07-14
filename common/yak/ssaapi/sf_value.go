@@ -152,7 +152,11 @@ func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.ValueOperator
 
 	rets := make(Values, 0)
 	addvalue := func(id int64) {
-		ret := v.NewValue(call.GetValueById(id))
+		value, ok := call.GetValueById(id)
+		if !ok {
+			return
+		}
+		ret := v.NewValue(value)
 		ret.AppendPredecessor(v, sfvm.WithAnalysisContext_Label(
 			fmt.Sprintf("actual-args[%d](containRest:%v)", start, contain),
 		))

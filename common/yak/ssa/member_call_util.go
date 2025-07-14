@@ -23,7 +23,10 @@ func setMemberCallRelationship(obj, key, member Value) {
 
 	handlerMemberCall := func(obj Value) {
 		for _, edgeID := range obj.(*Phi).Edge {
-			edgeValue := obj.GetValueById(edgeID)
+			edgeValue, ok := obj.GetValueById(edgeID)
+			if !ok || edgeValue == nil {
+				continue
+			}
 			if _, ok := edgeValue.GetMember(key); ok { // 避免循环
 				continue
 			}
@@ -40,7 +43,10 @@ func setMemberCallRelationship(obj, key, member Value) {
 
 	if phi, ok := obj.(*Phi); ok {
 		for _, edgeId := range phi.Edge {
-			edgeValue := obj.GetValueById(edgeId)
+			edgeValue, ok := obj.GetValueById(edgeId)
+			if !ok || edgeValue == nil {
+				continue
+			}
 			if und, ok := ToUndefined(edgeValue); ok { // 遇到库类和return phi value
 				if und.Kind == UndefinedValueValid || und.Kind == UndefinedValueReturn {
 					handlerMemberCall(obj)

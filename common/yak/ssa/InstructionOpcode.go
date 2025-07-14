@@ -120,8 +120,8 @@ func (i *Function) _GetRange() memedit.RangeIf {
 		log.Warnf("function: %v's enter_block is not set, use the entry_block's range fallback", i.GetName())
 		return nil
 	}
-	enter := i.GetBasicBlockByID(i.EnterBlock)
-	if enter != nil {
+	enter, ok := i.GetBasicBlockByID(i.EnterBlock)
+	if ok && enter != nil {
 		log.Warnf("funcion: %v's range is not set, use the entry_block's range fallback", i.GetName())
 		return enter.GetRange()
 	}

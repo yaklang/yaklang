@@ -166,7 +166,11 @@ func marshalExtraInformation(cache *ProgramCache, raw Instruction) map[string]an
 			if ret.Condition > 0 {
 				params["block_condition"] = ret.Condition
 			} else {
-				log.Warnf("strange things happening when marshal BasicBlock: invalid condition(%T: %v) ", ret.Condition, ret.GetValueById(ret.Condition).String())
+				if condValue, ok := ret.GetValueById(ret.Condition); ok && condValue != nil {
+					log.Warnf("strange things happening when marshal BasicBlock: invalid condition(%T: %v) ", ret.Condition, condValue.String())
+				} else {
+					log.Warnf("strange things happening when marshal BasicBlock: invalid condition(%T: nil) ", ret.Condition)
+				}
 			}
 		}
 		params["block_insts"] = fetchIds(ret.Insts)

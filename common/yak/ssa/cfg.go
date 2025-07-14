@@ -50,7 +50,10 @@ func (b *BasicBlock) IsBlock(name string) bool {
 
 func (b *BasicBlock) GetBlockById(name string) *BasicBlock {
 	for _, id := range b.Preds {
-		prev := b.GetValueById(id)
+		prev, ok := b.GetValueById(id)
+		if !ok || prev == nil {
+			continue
+		}
 		if prev.IsBlock(name) {
 			result, ok := ToBasicBlock(prev)
 			if !ok {
@@ -556,8 +559,11 @@ func (t *TryBuilder) Finish() {
 
 	builder.CurrentBlock = tryBlock
 	builder.EmitJump(target)
-	for _, catch := range errorHandler.Catch {
-		catch := errorHandler.GetValueById(catch)
+	for _, catchId := range errorHandler.Catch {
+		catch, ok := errorHandler.GetValueById(catchId)
+		if !ok || catch == nil {
+			continue
+		}
 		builder.CurrentBlock = catch.GetBlock()
 		builder.EmitJump(target)
 	}

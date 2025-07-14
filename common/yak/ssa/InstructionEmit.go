@@ -27,7 +27,9 @@ func fixupUseChain(node Instruction) {
 func DeleteInst(i Instruction) {
 	_, ok := i.(*anInstruction)
 	if ok {
-		i = i.GetInstructionById(i.GetId())
+		if inst, ok := i.GetInstructionById(i.GetId()); ok && inst != nil {
+			i = inst
+		}
 	}
 
 	b := i.GetBlock()
@@ -163,7 +165,9 @@ func (b *FunctionBuilder) EmitFirst(i Instruction, blocks ...*BasicBlock) {
 	if len(block.Insts) == 0 {
 		b.emit(i)
 	} else {
-		b.EmitInstructionBefore(i, b.GetInstructionById(block.Insts[0]))
+		if inst, ok := b.GetInstructionById(block.Insts[0]); ok && inst != nil {
+			b.EmitInstructionBefore(i, inst)
+		}
 	}
 }
 
@@ -608,9 +612,15 @@ func (f *FunctionBuilder) SwitchFreevalueInSideEffect(name string, se *SideEffec
 	if variable := ReadVariableFromScopeAndParent(scope, name); variable != nil {
 		bindVariable = func(se *SideEffect) {
 			if se.CallSite > 0 {
-				callSide := f.GetValueById(se.CallSite)
+				callSide, ok := f.GetValueById(se.CallSite)
+				if !ok || callSide == nil {
+					return
+				}
 				if bindId, ok := callSide.(*Call).Binding[name]; ok {
-					bind := f.GetValueById(bindId)
+					bind, ok := f.GetValueById(bindId)
+					if !ok || bind == nil {
+						return
+					}
 					bindVariableId = bind.GetLastVariable().GetCaptured().GetId()
 					_ = bindVariableId
 				}
@@ -627,26 +637,28 @@ func (f *FunctionBuilder) SwitchFreevalueInSideEffect(name string, se *SideEffec
 		findVariable()
 
 		edge := []Value{}
-		if phi, ok := ToPhi(f.GetValueById(se.Value)); ok {
-			for _, e := range phi.GetValues() {
-				if se, ok := e.(*SideEffect); ok {
-					bindVariable(se)
-				}
-			}
-			edge = append(edge, phi.GetValues()...)
-			phit := f.EmitPhi(name, edge)
-
-			for i, e := range phit.GetValues() {
-				if p, ok := ToParameter(e); ok && p.IsFreeValue {
-					newParam := NewParam(name, true, f)
-					if bindVariableId == findVariableId {
-						value := variable.GetValue()
-						newParam.defaultValue = value.GetId()
-						phit.Edge[i] = newParam.GetId()
+		if seValue, ok := f.GetValueById(se.Value); ok && seValue != nil {
+			if phi, ok := ToPhi(seValue); ok {
+				for _, e := range phi.GetValues() {
+					if se, ok := e.(*SideEffect); ok {
+						bindVariable(se)
 					}
 				}
+				edge = append(edge, phi.GetValues()...)
+				phit := f.EmitPhi(name, edge)
+
+				for i, e := range phit.GetValues() {
+					if p, ok := ToParameter(e); ok && p.IsFreeValue {
+						newParam := NewParam(name, true, f)
+						if bindVariableId == findVariableId {
+							value := variable.GetValue()
+							newParam.defaultValue = value.GetId()
+							phit.Edge[i] = newParam.GetId()
+						}
+					}
+				}
+				se.Value = phit.GetId()
 			}
-			se.Value = phit.GetId()
 		}
 
 	}
@@ -674,9 +686,11 @@ func (f *FunctionBuilder) CopyValue(v Value) Value {
 				return members[i]
 			})
 	case *Phi:
-		edgeValues := make(Values, len(v.Edge))
-		for i, id := range v.Edge {
-			edgeValues[i] = f.GetValueById(id)
+		edgeValues := make(Values, 0, len(v.Edge))
+		for _, id := range v.Edge {
+			if value, ok := f.GetValueById(id); ok && value != nil {
+				edgeValues = append(edgeValues, value)
+			}
 		}
 		phi := f.EmitPhi(v.name, edgeValues)
 		phi.CFGEntryBasicBlock = v.CFGEntryBasicBlock
