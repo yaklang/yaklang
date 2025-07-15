@@ -304,6 +304,15 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.Function {
 			default:
 				name = ""
 			}
+		case ssa.OrTypeKind:
+			mp := make(map[ssa.TypeKind]bool)
+			for _, t := range t.(*ssa.OrType).GetTypes() {
+				if k, ok := mp[t.GetTypeKind()]; ok && k {
+					continue
+				}
+				mp[t.GetTypeKind()] = true
+				handleType(t)
+			}
 		}
 	}
 
