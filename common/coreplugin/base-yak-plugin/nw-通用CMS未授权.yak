@@ -1,0 +1,179 @@
+yakit.AutoInitYakit()
+
+variants = [
+    {
+        "path": "/nacos/v1/auth/users?pageNo=1&pageSize=100",
+        "signature": [`HTTP/1.1 200`, `totalCount`, `username`],
+        "description": "Nacos 未授权访问",
+        "severity": "high",
+        "cve": "CVE-2021-29441"
+    },
+    {
+        "path": "/zabbix.php?action=dashboard.view&dashboardid=1",
+        "signature": [`HTTP/1.1 200`, `Monitoring`, `Reports`],
+        "description": "Zabbix 未授权访问",
+        "severity": "high",
+        "cve": "CVE-2019-17382"
+    },
+    {
+        "path": "/druid/index.html",
+        "signature": [`HTTP/1.1 200`, `Druid Stat Index`, `DruidVersion`],
+        "description": "Druid 未授权访问",
+        "severity": "high",
+        "cve": ""
+    },
+    {
+        "path": "/solr/admin/info/system",
+        "signature": [`HTTP/1.1 200`, `classpath`, `version`],
+        "description": "Solr 未授权访问",
+        "severity": "high",
+        "cve": ""
+    },
+    {
+        "path": "/api/index.php/v1/config/application?public=true",
+        "signature": [`HTTP/1.1 200`, `JoomlaAPI`, `attributes`],
+        "description": "Joomla 未授权访问",
+        "severity": "high",
+        "cve": "CVE-2023-23752"
+    },
+    {
+        "path": "/v2/api-docs",
+        "signature": [`HTTP/1.1 200`, `"swagger"`, `"paths"`],
+        "description": "Swagger API Docs 未授权访问",
+        "severity": "medium",
+        "cve": ""
+    },
+    {
+        "path": "/actuator/info",
+        "signature": [`HTTP/1.1 200`, `build`, `version`],
+        "description": "Spring Boot Actuator info 未授权访问",
+        "severity": "medium",
+        "cve": ""
+    },
+    {
+        "path": "/admin/phpinfo.php",
+        "signature": [`HTTP/1.1 200`, `phpinfo()`, `PHP Version`],
+        "description": "PHPInfo 页面未授权访问",
+        "severity": "medium",
+        "cve": ""
+    },
+    {
+        "path": "/server-status",
+        "signature": [`HTTP/1.1 200`, `Apache Status`, `Server Version`],
+        "description": "Apache Server-Status 未授权访问",
+        "severity": "medium",
+        "cve": ""
+    },
+    {
+        "path": "/.DS_Store",
+        "signature": [`HTTP/1.1 200`, `Bud1`],
+        "description": ".DS_Store 文件泄露",
+        "severity": "low",
+        "cve": ""
+    },
+    {
+        "path": "/WEB-INF/web.xml",
+        "signature": [`HTTP/1.1 200`, `<web-app>`, `<servlet>`],
+        "description": "WEB-INF/web.xml 配置文件泄露",
+        "severity": "high",
+        "cve": ""
+    },
+    {
+        "path": "/jenkins/script",
+        "signature": [`HTTP/1.1 200`, `Groovy`, `script`],
+        "description": "Jenkins Groovy 脚本未授权访问",
+        "severity": "high",
+        "cve": "CVE-2019-1003000"
+    },
+    {
+        "path": "/wp-json/wp/v2/users",
+        "signature": [`HTTP/1.1 200`, `id`, `name`],
+        "description": "WordPress 用户信息未授权泄露",
+        "severity": "medium",
+        "cve": ""
+    },
+    {
+        "path": "/actuator/metrics",
+        "signature": [`HTTP/1.1 200`, `mem`, `heap`],
+        "description": "Spring Boot Actuator metrics 未授权访问",
+        "severity": "medium",
+        "cve": ""
+    },
+    {
+        "path": "/actuator/logfile",
+        "signature": [`HTTP/1.1 200`, `java.`, `INFO`],
+        "description": "Spring Boot Actuator logfile 未授权访问",
+        "severity": "high",
+        "cve": "CVE-2021-22118"
+    },
+    {
+        "path": "/api/v1/nodes",
+        "signature": [`HTTP/1.1 200`, `kind`, `NodeList`],
+        "description": "Kubernetes 未授权访问节点信息",
+        "severity": "high",
+        "cve": "CVE-2018-1002105"
+    },
+    {
+        "path": "/.svn/entries",
+        "signature": [`HTTP/1.1 200`, `dir`, `svn`],
+        "description": "SVN 信息泄露",
+        "severity": "high",
+        "cve": ""
+    }
+]
+
+handleCheck = func(target, port) {
+    addr = str.HostPort(target, port)
+    isTls = str.IsTLSServer(addr)
+
+    for variant in variants {
+        path = variant["path"]
+        sigs = str.ToStringSlice(variant["signature"])
+        desc = variant["description"]
+        severity = variant["severity"]
+        cve = variant["cve"]
+
+        packet = `GET {{params(vulpath)}} HTTP/1.1
+Host: {{params(target)}}
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36`
+
+        rsp, req, err = poc.HTTP(packet,
+            poc.params({"target": addr, "vulpath": path}),
+            poc.https(isTls),
+            poc.redirectTimes(0),
+        )
+
+        if err != nil || rsp == nil {
+            continue
+        }
+
+        if str.MatchAllOfSubString(rsp, sigs[0], sigs[1], sigs[2]) {
+            risk.NewRisk(
+                target,
+                risk.severity(severity),
+                risk.cve(cve),
+                risk.type("unauth-access"),
+                risk.title("通用CMS未授权检测 - " + desc),
+                risk.payload(path),
+                risk.request(req),
+                risk.response(rsp),
+                risk.details({
+                    "location": target,
+                    "payload_success_flag": sigs[1],
+                    "recognition_pattern": sigs
+                })
+            )
+        }
+    }
+}
+
+handle = func(result) {
+    if !result.IsOpen() {
+        return
+    }
+
+    if len(result.Fingerprint.HttpFlows) > 0 {
+        handleCheck(result.Target, result.Port)
+    }
+}

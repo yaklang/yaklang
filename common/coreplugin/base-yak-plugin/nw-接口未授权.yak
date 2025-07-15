@@ -1,0 +1,265 @@
+// https://www.elecfans.com/d/1898219.html
+api_re_rule=`[\'\"]((?:\/|\.\.\/|\.\/)[^\/\>\< \)\(\{\}\,\'\"\\]([^\>\< \)\(\{\}\,\'\"\\])*?)[\'\"]`
+
+static_file = ['.jpg','.png','.gif','.css','.svg','.ico','.js']
+
+has_handle,detect_output_dic,risk_output_dic,flow_total={},{},{},-1
+
+
+solution="以下是一些防止接口未授权漏洞的解决方案：\n1.实施适当的访问控制：确保对API接口实施适当的访问控制，只允许经过身份验证和授权的用户访问敏感接口。\n2.限制权限：为每个用户或角色分配最小必要权限，避免赋予过高的权限，以减少潜在的安全风险。\n3.密钥管理：有效管理API密钥和访问令牌，确保其安全性，避免泄露导致未经授权的访问。\n4.审计和监控：定期审计和监控API接口的访问情况，及时发现异常行为并采取相应措施。\n5.安全测试：进行安全测试，包括渗透测试和漏洞扫描，以发现潜在的接口未授权漏洞并及时修复。"
+description="接口未授权漏洞是指在应用程序或系统中存在未经授权的API接口，攻击者可以利用这些接口绕过身份验证机制，获取未授权的访问权限，并执行恶意操作。这种漏洞可能会导致敏感数据泄露、未经授权的系统访问以及其他安全风险。"
+
+
+root_url=cli.String("root_url",cli.setVerboseName("接口 host 地址"),cli.setCliGroup("插件额外参数"),cli.setHelp("为空默认为当前主机"))
+black_list=cli.LineDict("black_list",cli.setDefault("adapt\nadd\nadjust\nalter\namend\ncancel\nchange\nclear\nclose\ncorrect\ncreate\ndel\ndelete\ndestory\ndestruction\ndisable\ndiscard\ndrop\nedit\neliminate\nend\nerase\ngenerate\nhalt\nlogout\ninsert\nmodify\npause\nrectify\nreset\nrefine\nremove\nrestart\nrevise\nregister\nsave\nset\nshutdown\nstart\nstop\nsuspen\ntermin\ntweak\nupdate\nwrite"),cli.setVerboseName("接口黑名单"),cli.setCliGroup("插件额外参数"))
+white_list=cli.LineDict("white_list", cli.setDefault("article\nbak\ncollection\ncontent\ndata\ndetail\nelement\nentry\nexport\nfetch\nfield\nget\nhistory\ninfo\nitem\nlist\nlog\nquery\nrecord\nresource\nretrieve\nsearch\nselect\ntest"),cli.setVerboseName("接口白名单"),cli.setCliGroup("插件额外参数"))
+check_length=cli.Int("check_length",cli.setVerboseName("响应长度值"),cli.setCliGroup("插件额外参数"),cli.setHelp("json格式的响应，长度大于等于该值则认为漏洞存在"),cli.setDefault(100))
+
+
+//开始替换内容标志recognition_patten
+//待替换内容，勿动！
+recognition_patten=cli.StringSlice("recognition_patten", cli.setVerboseName("识别模式"),cli.setMultipleSelect(false),cli.setSelectOption("字典模式", "1"),cli.setSelectOption("机器学习模式", "2"),cli.setSelectOption("字典模式优先-机器学习辅助", "3"),cli.setSelectOption("字典模式-机器学习并行", "4"),cli.setSelectOption("机器学习优先-字典模式辅助", "5"),cli.setDefault("1"),cli.setHelp("检测识别模式"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志recognition_patten
+
+//开始替换内容标志task_type
+//待替换内容，勿动！
+task_type=cli.StringSlice("task_type", cli.setVerboseName("任务类型"),cli.setMultipleSelect(false),cli.setSelectOption("即时", "即时"),cli.setDefault("即时"),cli.setHelp("任务类型，mitm都为即时任务"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志task_type
+
+
+// 定义全局变量
+recognition_patten_dic={
+    "1":"字典模式",
+    "2":"机器学习模式",
+    "3":"字典模式优先-机器学习辅助",
+    "4":"字典模式-机器学习并行",
+    "5":"机器学习优先-字典模式辅助",
+}
+
+cli.check()
+
+
+
+
+// 定义用于打印的 base_info 变量
+base_info_script_name="js中接口未授权"
+base_info_task_creater=""
+base_info_task_type=task_type[0]
+base_info_detect_mode="mitm"
+base_info_task_mode=recognition_patten_dic[recognition_patten[0]]
+base_info_login=""   
+base_info_crediential=""
+base_info_user_define_header=""
+base_info_start_time=time.Now().String()
+base_info_end_time=""
+
+
+// 定义打印函数
+base_info_output=func(){
+    yakit_output(f"加载插件结束。配置的基本信息如下：任务名称为'${base_info_script_name}'、任务创建人为'${base_info_task_creater}'、任务类型为'${base_info_task_type}任务'、检测模式为'${base_info_detect_mode}模式'、任务模式为'${base_info_task_mode}'、登录入口信息为'${base_info_login}'、凭证信息为'${base_info_crediential}'、自定义请求头信息为'${base_info_user_define_header}'、任务开始时间为 ${base_info_start_time}、结束时间为${base_info_end_time}。")
+}
+base_info_output()
+
+
+
+
+pre_check=func(url){
+    if !str.MatchAnyOfSubString(url, [`.js`]...){
+        return false
+    }
+    return true
+}
+
+
+
+fuzz_bad_flag=[
+    `参数错误`,
+    `参数异常`,
+    `数据不存在`,
+    `(?i)not found`,
+    `(?i)Unauthorized`,
+    `(?i)(param|method) {0,}(error|invalid|miss)`,
+    `\u53c2\u6570\u9519\u8bef`,
+    `系统异常`,
+    `未授权`,
+    `code": {0,}[45]0[\d]`,
+    `(?i)((error|invaild|miss(ing){0,1}).*?(method|param))`,
+
+]
+
+
+
+
+api_fuzz=func(addr,api_path,isHttps){
+    packet = f`GET / HTTP/1.1
+Host: ${addr}
+Accept: */*
+Accept-Encoding: gzip, deflate
+Accept-Language: zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2
+Content-Type:application/x-www-form-urlencoded
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0`
+    freq=fuzz.HTTPRequest(packet, fuzz.https(isHttps))~
+    result=freq.FuzzMethod(["GET","POST"]...).FuzzPath(api_path).Exec(httpool.perRequestTimeout(10))~
+    for sub_res in result{
+        api_fuzz_check(sub_res,api_path)
+    }
+}
+
+
+api_fuzz_check=func(sub_res,api_path){
+    http_rsp=poc.ParseBytesToHTTPResponse(sub_res.ResponseRaw)~
+    if http_rsp.StatusCode!=200{
+        return
+    }
+    if http_rsp.ContentLength<check_length{
+        return
+    }
+
+    http_rsp_header,http_rsp_body=poc.Split(sub_res.ResponseRaw)
+    http_rsp_json_body=json.loads(string(http_rsp_body))
+    if http_rsp_json_body == {} {
+        return 
+    }
+
+    if str.MatchAnyOfRegexp(sub_res.ResponseRaw, fuzz_bad_flag...){
+
+        // yakit_output("badreg")
+        // for re_rule in fuzz_bad_flag{
+        //     if str.MatchAllOfRegexp(sub_res.ResponseRaw, re_rule){
+        //         yakit_output(re_rule)
+        //     }
+        // }
+        return
+    }else{
+        mitm_risk_output(sub_res.Url,sub_res.RequestRaw,sub_res.ResponseRaw,"逻辑漏洞","api未授权访问","middle",api_path,nil,"mitm_unauth_api_check")
+    }
+
+}
+
+mitm_risk_output=func(url,req,rsp,vul_type,vul_name,vul_severity,payload,payload_success_flag,pocname){
+    
+    // 告警的 url 为 js 中提取的url
+    // 计算url和string后的body md5进行去重
+    if task_type[0]=="即时" || task_type[0]=="定时" {
+        // 计算url和string后的body md5进行去重
+        header_md5_check,body_md5_check=poc.Split(req)
+        url_body_hash=codec.Md5(url+string(body_md5_check))
+        if url_body_hash in risk_output_dic{
+            //该条流已经告警输出，不再进行告警
+            return
+        }else{
+            //记录到告警去重字典中
+            risk_output_dic[url_body_hash]=1
+        }
+
+        //记录到检测去重字典中,借助库函数，拼接root_url和path
+        detect_root_url=str.ParseStringUrlToWebsiteRootPath(url)
+        detect_url_Instance,err=str.ParseStringUrlToUrlInstance(url)
+        if err!=nil{
+            die(err)
+        }
+        detect_path=detect_url_Instance.Path
+        detect_url_path_hash=codec.Md5(detect_root_url+detect_path)
+        if detect_url_path_hash in detect_output_dic{
+            //该条流已经检测，后续 mirrorFilteredHTTPFlow 不再进行检测
+        }else{
+            //记录到检测去重字典中
+            detect_output_dic[detect_url_path_hash]=1
+        }
+    }
+
+    risk.NewRisk(
+        url,
+        risk.title(f"发现 ${url} 中存在 ${vul_name} 漏洞"),
+        risk.type(vul_type),
+        risk.severity(vul_severity),
+        risk.request(string(req)),
+        risk.response(string(rsp)),
+        risk.payload(payload),
+        risk.solution(solution),
+        risk.description(description),
+        risk.details({
+            "location":url,
+            "pocname":pocname,
+            "payload_success_flag":payload_success_flag,
+            "recognition_patten":recognition_patten_dic[recognition_patten[0]]
+        })
+        )
+}
+
+
+api_handle=func(isHttps,addr,api_path){
+    api_url=string(isHttps)+addr+api_path
+    if api_url in has_handle{
+        return
+    }
+
+    if str.MatchAnyOfSubString(api_path, black_list...){
+        // yakit_output(f"匹配到黑名单 api ${api_path}")
+        // f,err=file.OpenFile(f"C:\\Users\\83584\\Desktop\\日常\\yak\\url\\black.txt", file.O_CREATE|file.O_APPEND|file.O_RDWR, 0777 /*type: os.FileMode*/)
+        // die(err)
+        // f.Write(api_path+"\n")
+        // f.Close()
+    }elif str.MatchAnyOfSubString(api_path, white_list...){
+        // todo 针对某个接口调试
+        // if api_path!="/api/baseInfo/tutorRecruitManage/selectTutorList"{
+        //     return
+        // }
+        api_fuzz(addr, api_path,isHttps)
+        // f,err=file.OpenFile(f"C:\\Users\\83584\\Desktop\\日常\\yak\\url\\white.txt", file.O_CREATE|file.O_APPEND|file.O_RDWR, 0777 /*type: os.FileMode*/)
+        // die(err)
+        // f.Write(api_path+"\n")
+        // f.Close()
+        // yakit_output(f"匹配到白名单 api ${api_path}")
+    }else{
+        // yakit_output(f"其他名单 api ${api_path}")
+        // f,err=file.OpenFile(f"C:\\Users\\83584\\Desktop\\日常\\yak\\url\\other.txt", file.O_CREATE|file.O_APPEND|file.O_RDWR, 0777 /*type: os.FileMode*/)
+        // die(err)
+        // f.Write(api_path+"\n")
+        // f.Close()
+    }
+    has_handle[api_url]=1
+}
+
+
+# mirrorNewWebsitePath 每新出现一个网站路径，关于这个网站路径的第一个请求，将会在这里被传入回调
+mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+
+    // 此处 url 不为告警url 无需进行检测去重，只需进行告警去重
+    if !pre_check(url){
+        return
+    }
+    // 单独针对某个js url调试
+    // if url!="http://graduatepy.cjlu.edu.cn/umi.a4453f3b.js"{
+    //     return
+    // }
+    // 从请求中提取addr 避免后端不识别443端口的addr
+
+    fuzz_addr,fuzz_https=nil,nil
+    if root_url==""{
+        http_req=poc.ParseBytesToHTTPRequest(req)~
+        fuzz_addr,fuzz_https=http_req.Host,isHttps
+    }else{
+        ip,port=str.ParseStringToHostPort(root_url)~
+        fuzz_addr=str.HostPort(ip /*type: string*/, port)
+        fuzz_https=str.IsTLSServer(fuzz_addr /*type: string*/)
+    }
+
+    yakit_output(f"开始对 ${url} 的接口未授权检测")
+    api_res=re.FindSubmatchAll(string(body), api_re_rule)
+    yakit_output(f"从 ${url} 提取接口数据共 ${len(api_res)} 条")
+
+    for sub_res in api_res{
+        // 后续考虑对这些静态文件进一步处理
+        if str.MatchAnyOfSubString(sub_res[1], static_file...){
+        //    yakit_output(f"发现静态文件 ${sub_res[1]}")
+           continue
+        }
+
+        api_handle(fuzz_https,fuzz_addr,sub_res[1])
+        
+
+
+    }
+    yakit_output(f"完成对 ${url} 的接口未授权检测")
+}
