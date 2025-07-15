@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/consts"
@@ -25,8 +26,8 @@ var UpgradeCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.IntFlag{
 			Name:  "timeout",
-			Usage: "Set Timeout for download yak binary, default 300s.",
-			Value: 300,
+			Usage: "Set Timeout for download yak binary, default 15 minutes.",
+			Value: 15,
 		},
 		cli.StringFlag{
 			Name:  "version,v",
@@ -52,7 +53,7 @@ var UpgradeCommand = cli.Command{
 	Action: func(c *cli.Context) error {
 		const activeVersions = `https://aliyun-oss.yaklang.com/yak/version-info/active_versions.txt`
 		if c.Bool("list") {
-			rsp, _, err := poc.DoGET(activeVersions)
+			rsp, _, err := poc.DoGET(activeVersions, poc.WithTimeout(10))
 			if err != nil {
 				log.Errorf("fetch active versions failed: %v", err)
 				return err
@@ -108,7 +109,7 @@ var UpgradeCommand = cli.Command{
 		_ = rsp
 		if rsp.GetStatusCode() >= 400 {
 			log.Infof("fetch yak binary failed: %v", rsp.GetStatusCode())
-			rsp, _, err := poc.DoGET(activeVersions)
+			rsp, _, err := poc.DoGET(activeVersions, poc.WithTimeout(10))
 			if err != nil {
 				log.Errorf("fetch active versions failed: %v", err)
 				return err
@@ -157,29 +158,30 @@ var UpgradeCommand = cli.Command{
 				continue
 			}
 			ctx, cancel := context.WithCancel(context.Background())
-			_, _, err = poc.DoGET(downloadUrl, poc.WithConnectTimeout(float64(c.Int("timeout"))), poc.WithTimeout(float64(c.Int("timeout"))), poc.WithBodyStreamReaderHandler(func(header []byte, bodyReader io.ReadCloser) {
-				defer cancel()
-				log.Infof("downloading yak binary...")
-				contentLength := lowhttp.GetHTTPPacketHeader(header, "content-length")
-				writer := progresswriter.New(uint64(codec.Atoi(contentLength)))
-				writer.ShowProgress("downloading", ctx)
+			_, _, err = poc.DoGET(downloadUrl, poc.WithTimeout((time.Duration(c.Int("timeout")) * time.Minute).Seconds()),
+				poc.WithBodyStreamReaderHandler(func(header []byte, bodyReader io.ReadCloser) {
+					defer cancel()
+					log.Infof("downloading yak binary...")
+					contentLength := lowhttp.GetHTTPPacketHeader(header, "content-length")
+					writer := progresswriter.New(uint64(codec.Atoi(contentLength)))
+					writer.ShowProgress("downloading", ctx)
 
-				// 使用带错误检查的io.Copy
-				written, copyErr := io.Copy(io.MultiWriter(fd, writer), bodyReader)
-				if copyErr != nil && copyErr != io.EOF {
-					log.Errorf("download yak failed: %v", copyErr)
-					return
-				}
-
-				// 检查文件大小是否正确
-				if contentLength != "" {
-					expectedSize := codec.Atoi(contentLength)
-					if written != int64(expectedSize) {
-						log.Errorf("download incomplete: expected %d bytes, got %d bytes", expectedSize, written)
+					// 使用带错误检查的io.Copy
+					written, copyErr := io.Copy(io.MultiWriter(fd, writer), bodyReader)
+					if copyErr != nil && copyErr != io.EOF {
+						log.Errorf("download yak failed: %v", copyErr)
 						return
 					}
-				}
-			}))
+
+					// 检查文件大小是否正确
+					if contentLength != "" {
+						expectedSize := codec.Atoi(contentLength)
+						if written != int64(expectedSize) {
+							log.Errorf("download incomplete: expected %d bytes, got %d bytes", expectedSize, written)
+							return
+						}
+					}
+				}))
 			fd.Sync()
 			fd.Close()
 			if err != nil {
