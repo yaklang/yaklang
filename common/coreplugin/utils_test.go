@@ -14,6 +14,8 @@ import (
 	. "github.com/bytedance/mockey"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -246,5 +248,28 @@ func TestCorePluginAstCompileTime(t *testing.T) {
 		avgDur /= time.Duration(times)
 		fmt.Printf("---avg ast compile time: [%s]---\n", avgDur)
 		require.LessOrEqual(t, avgDur.Milliseconds(), int64(600), fmt.Sprintf("core plugin [%s] ast compile timeout", pluginName))
+	}
+}
+
+func TestA(t *testing.T) {
+	db := consts.GetGormProfileDatabase()
+	db = bizhelper.StartswithStringLike(db, "script_name", "nw-")
+	ch := yakit.YieldYakScripts(db, context.Background())
+	relFs := filesys.NewRelLocalFs("./base-yak-plugin/")
+	_ = relFs
+	for script := range ch {
+		// fmt.Println(script.ScriptName)
+		fileName := script.ScriptName + ".yak"
+		_ = fileName
+		// relFs.WriteFile(fileName, []byte(script.Content), 0644)
+		code := fmt.Sprintf(`
+registerBuildInPlugin(
+	"mitm", "%s",
+	withPluginHelp("%s"),
+	withPluginTags([]string{"%v"}),
+)
+			`, script.ScriptName, script.ScriptName, script.Tags)
+		// log.Infof()
+		fmt.Println(code)
 	}
 }

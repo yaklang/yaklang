@@ -1,0 +1,377 @@
+// 水平越权-修改后建议遍历查询的参数值，真实场景下大概率无法拿到第二个登录凭证
+// 示例
+// fuzz_credential_dic={
+//      全部Cookie
+//     "Cookie":{"position":"cookie","value":"fuzz_cookie"}, 
+//     "header_name1":{"position":"header","value":"fuzz_token1"},
+//     "header_name2":{"position":"header","value":"fuzz_token2"},
+//     "get_param_name1":{"position":"get","value":"fuzz_get_value1"},
+//     "get_param_name2":{"position":"get","value":"fuzz_get_value2"},
+//     "post_param_name":{"position":"post","value":"fuzz_post_value1"},
+//     "json_param_name":{"position":"json","value":"fuzz_json_value1"},
+// }
+
+
+//开始替换内容标志fuzzCredential_type
+//待替换内容，勿动！
+fuzzCredential_type=cli.StringSlice("fuzzCredential_type", cli.setMultipleSelect(false),cli.setSelectOption("cookie", "cookie"),cli.setSelectOption("header", "header"),cli.setVerboseName("待测凭证类型"),cli.setRequired(true))
+//结束替换内容标志fuzzCredential_type
+
+//开始替换内容标志fuzzCredential
+//待替换内容，勿动！
+fuzzCredential=cli.Text("fuzzCredential", cli.setVerboseName("待测凭证"),cli.setRequired(true))
+//结束替换内容标志fuzzCredential
+
+//替换凭证逻辑
+fuzz_credential_dic={}
+fuzz_credential_list=fuzzCredential.Split("\n")
+for sub_fuzz_credential in fuzz_credential_list{
+    // 查找真实value,匹配第一个':',后索引加2,步过空格
+    fuzzCredential_key_index=sub_fuzz_credential.Find(":")
+    fuzzCredential_value_index=sub_fuzz_credential.Find(":")+2
+    fuzz_credential_dic[sub_fuzz_credential[:fuzzCredential_key_index]]={"position":fuzzCredential_type[0],"value":sub_fuzz_credential[fuzzCredential_value_index:]}
+}
+
+
+//可自定义其他需要测试水平越权-修改的路径关键字
+//开始替换内容标志path_list
+//待替换内容，勿动！
+path_list=cli.LineDict("path_list",cli.setDefault("update\nedit\nmodify\nchange\nreset\nset\nprofile\npassword\nconfig\nsettings"),cli.setVerboseName("url白名单"),cli.setHelp("可自定义其他需要测试水平越权-修改的路径关键字"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志path_list
+
+// 自定义黑名单，不会对黑名单中的路径关键字进行水平越权-修改检测
+//开始替换内容标志black_path_list
+//待替换内容，勿动！
+black_path_list=cli.LineDict("black_path_list",cli.setDefault("infoleak\njarheads\nlogin\nlogout\nsqli_id\ntruman\nwide"),cli.setVerboseName("url黑名单"),cli.setHelp("自定义黑名单，不会对黑名单中的路径关键字进行水平越权-修改检测"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志black_path_list
+
+
+// 如果确定响应中含有某个关键字（且该关键字不在html/css/js标签及属性中），一定存在水平越权-修改可额外配置
+//开始替换内容标志over_permission_flag_list
+//待替换内容，勿动！
+over_permission_flag_list=cli.LineDict("over_permission_flag_list",cli.setVerboseName("响应关键字字典"),cli.setHelp("如果确定响应中含有某个关键字（且该关键字不在html/css/js标签及属性中），一定存在水平越权-修改可额外配置"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志over_permission_flag_list
+
+//开始替换内容标志sim_value
+//待替换内容，勿动！
+sim_value=cli.Float("sim_value", cli.setDefault("0.9"),cli.setVerboseName("相似度阈值"),cli.setCliGroup("插件额外参数"),cli.setHelp("大于等于该阈值告警"))
+//结束替换内容标志sim_value
+
+//开始替换内容标志recognition_patten
+//待替换内容，勿动！
+recognition_patten=cli.StringSlice("recognition_patten", cli.setVerboseName("识别模式"),cli.setMultipleSelect(false),cli.setSelectOption("字典模式", "1"),cli.setSelectOption("机器学习模式", "2"),cli.setSelectOption("字典模式优先-机器学习辅助", "3"),cli.setSelectOption("字典模式-机器学习并行", "4"),cli.setSelectOption("机器学习优先-字典模式辅助", "5"),cli.setDefault("1"),cli.setHelp("检测识别模式"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志recognition_patten
+
+//开始替换内容标志task_type
+//待替换内容，勿动！
+task_type=cli.StringSlice("task_type", cli.setVerboseName("任务类型"),cli.setMultipleSelect(false),cli.setSelectOption("即时", "即时"),cli.setDefault("即时"),cli.setHelp("任务类型，mitm都为即时任务"),cli.setCliGroup("插件额外参数"))
+//结束替换内容标志task_type
+
+
+cli.check()
+//用于告警的去重，记录所有告警的检测（根据url(包括参数值)+string(body)进行hash去重）
+risk_output_dic={}
+
+//用于触发检测的去重，已经告警的url（不含参数）不会进行检测（根据url(不包括参数值)进行hash去重）
+detect_output_dic={}
+
+recognition_patten_dic={
+    "1":"字典模式",
+    "2":"机器学习模式",
+    "3":"字典模式优先-机器学习辅助",
+    "4":"字典模式-机器学习并行",
+    "5":"机器学习优先-字典模式辅助",
+}
+
+// 定义用于打印的 base_info 变量
+base_info_script_name="水平越权-修改检测"
+base_info_task_creater=""
+base_info_task_type="即时"
+base_info_detect_mode="mitm"
+base_info_task_mode=recognition_patten_dic[recognition_patten[0]]
+base_info_login=""
+base_info_crediential=""
+base_info_user_define_header=""
+base_info_start_time=time.Now().String()
+base_info_end_time=""
+
+
+// 定义打印函数
+base_info_output=func(){
+    yakit_output(f"加载插件结束。配置的基本信息如下：任务名称为'${base_info_script_name}'、任务创建人为'${base_info_task_creater}'、任务类型为'${base_info_task_type}任务'、检测模式为'${base_info_detect_mode}模式'、任务模式为'${base_info_task_mode}'、登录入口信息为'${base_info_login}'、凭证信息为'${base_info_crediential}'、自定义请求头信息为'${base_info_user_define_header}'、任务开始时间为 ${base_info_start_time}、结束时间为${base_info_end_time}。")
+}
+base_info_output()
+
+flow_total=-1
+bad_rsp_list=[
+    "<title>Login</title>",
+    "no_login",
+    "请登录",
+    "(?i)Unauthorized",
+    "系统异常",
+    "未授权"
+]
+
+
+bad_end_str_list=[
+".jpg", ".png", ".gif", ".css", ".js", ".pdf", ".mp3", ".mp4", ".avi", ".map", ".svg", ".ico", ".woff", ".woff2", ".ttf"
+]
+
+
+description="水平越权-修改漏洞发生在应用程序未正确验证用户身份或角色时。攻击者可以通过修改或伪造身份验证令牌或会话标识符，冒充其他用户的身份并访问其他用户的数据或执行特权操作"
+solution="1.身份验证和授权：确保在访问敏感信息之前进行适当的身份验证和授权检查。在服务器端验证用户的身份，确保只有合法用户才能查看对应的个人信息。\n2.会话管理：使用安全的会话管理机制，例如使用随机生成的会话标识符，并将其与用户身份关联。在每个请求中，验证会话标识符以确保用户的身份和权限。\n3.输入验证和过滤：对于用户提供的输入，包括用户ID，进行严格的验证和过滤。确保只有合法的用户ID才能被接受和处理。\n4.访问控制列表（ACL）：在服务器端实施访问控制列表，限制用户只能访问自己的个人信息。ACL可以基于用户ID进行配置，只允许用户访问与其ID匹配的信息。\n5.基于角色的访问控制（RBAC）：使用基于角色的访问控制模型，确保只有特定角色的用户才能查看个人信息。将访问权限与用户角色关联，并限制非授权用户的访问。\n6.安全审计和监测：定期审计和监测接口的使用情况，检查是否存在水平越权-修改访问行为。记录访问日志，并设置警报机制以及异常行为的检测。\n7.安全开发实践：采用安全的开发实践，包括输入验证、输出编码、安全配置等，以减少安全漏洞的风险。\n8.漏洞管理：定期进行安全评估和漏洞扫描，及时修复已知的安全漏洞，并确保接口的安全性得到持续改进和维护。"
+
+
+mitm_risk_output=func(url,req,rsp,vul_type,vul_name,vul_severity,param,payload,payload_success_flag,pocname){
+
+    // 计算url和string后的body md5进行去重
+    header_md5_check,body_md5_check=poc.Split(req)
+    url_body_hash=codec.Md5(url+string(body_md5_check))
+    if url_body_hash in risk_output_dic{
+        //该条流已经告警输出，不再进行告警
+        return
+    }else{
+        risk_output_dic[url_body_hash]=1
+    }
+
+    //记录到检测去重字典中,借助库函数，拼接root_url和path
+    detect_root_url=str.ParseStringUrlToWebsiteRootPath(url)
+    detect_url_Instance,err=str.ParseStringUrlToUrlInstance(url)
+    if err!=nil{
+        die(err)
+    }
+    detect_path=detect_url_Instance.Path
+    detect_url_path_hash=codec.Md5(detect_root_url+detect_path)
+    if detect_url_path_hash in detect_output_dic{
+        //该条流已经检测，后续 mirrorFilteredHTTPFlow 不再进行检测
+    }else{
+        //记录到检测去重字典中
+        detect_output_dic[detect_url_path_hash]=1
+    }
+    risk.NewRisk(
+        url,
+        risk.title(f"发现 ${url} 中存在 ${vul_name} 漏洞"),
+        risk.type(vul_type),
+        risk.severity(vul_severity),
+        risk.request(string(req)),
+        risk.response(string(rsp)),
+        risk.parameter(param),
+        risk.payload(payload),
+        risk.description(description),
+        risk.solution(solution),
+        risk.details({
+            "location":url,
+            "pocname":pocname,
+            "payload_success_flag":payload_success_flag,
+            "recognition_patten":recognition_patten_dic[recognition_patten[0]]
+        })
+        )
+}
+
+
+compare_fuzz_rsp=func(http_rsp,http_fuzz_rsp){
+    if http_rsp.StatusCode!=http_fuzz_rsp.StatusCode{
+        yakit_output(f"原始请求响应状态码 ${http_rsp.StatusCode} 不同于模拟 fuzz 重放后的响应状态码 ${http_fuzz_rsp.StatusCode} ，跳过后续检测")
+        return false
+    }
+    // dump(http_rsp.Header["Content-Type"][0])
+    // dump(http_csrf_rsp.Header["Content-Type"][0])
+    if http_rsp.Header["Content-Type"]!=nil && http_fuzz_rsp.Header["Content-Type"]!=nil {
+        http_rsp_content_type=http_rsp.Header["Content-Type"][0].ReplaceAll(" ","").Lower()
+        http_fuzz_rsp_content_type=http_fuzz_rsp.Header["Content-Type"][0].ReplaceAll(" ","").Lower()
+
+        // 针对text/html自动拼接charset=utf-8的处理
+        if "text/html" in http_rsp_content_type && "text/html" in http_fuzz_rsp_content_type{
+            return true
+        } 
+        if http_rsp_content_type!=http_fuzz_rsp_content_type{
+            yakit_output(f"原始请求响应 Content-Type ${http_rsp_content_type} 不同于模拟 fuzz 重放后的响应Content-Type ${http_fuzz_rsp_content_type} ，跳过后续检测")
+            return false
+        }
+    }elif http_rsp.Header["Content-Type"]==nil && http_fuzz_rsp.Header["Content-Type"]==nil {
+
+    }else{
+        yakit_output(f"原始请求响应 Content-Type 不同于模拟 fuzz 重放后的响应Content-Type ，跳过后续检测")
+        return false
+    }
+    return true
+}
+
+
+pre_check=func(http_req,http_rsp){
+
+    // 通过相似度检测的插件，可以先排除一部分无关流量
+    rsp=http.dump(http_rsp)~
+
+    if http_req.Method!="GET" && http_req.Method!="POST" {
+        return false
+    }
+
+    if str.MatchAnyOfSubString(http_req.URL.Path, bad_end_str_list...) {
+        return false
+    }
+
+    if str.MatchAnyOfRegexp(http_rsp.StatusCode, ["40\\d","50\\d"]...){
+        return false
+    }
+
+    if str.MatchAnyOfRegexp(rsp, bad_rsp_list...){
+        return false
+    }
+
+    return true
+}
+
+
+gen_fuzz_freq=func(freq){
+    param=""
+    payload=""
+    for fuzz_name in fuzz_credential_dic{
+        fuzz_position=fuzz_credential_dic[fuzz_name]["position"]
+        fuzz_value=fuzz_credential_dic[fuzz_name]["value"]
+        param=param+fuzz_name+"|"
+        payload=payload+fuzz_value+"|"
+        switch fuzz_position{
+            case "cookie":
+                freq=freq.FuzzCookieRaw(fuzz_value)
+            case "header":
+                freq=freq.FuzzHTTPHeader(fuzz_name, fuzz_value)
+            case "get":
+                freq=freq.FuzzGetParams(fuzz_name,fuzz_value)
+            case "post":
+                freq=freq.FuzzPostParams(fuzz_name,fuzz_value)
+            case "json":
+                freq=freq.FuzzPostJsonParams(fuzz_name,fuzz_value)
+        }
+
+    }
+    return freq,param[0:-1],payload[0:-1]
+}
+
+
+not_bad_result_check=func(result){
+    http_result=poc.ParseBytesToHTTPResponse(result.ResponseRaw)~
+    if "Set-Cookie" in http_result.Header{
+        yakit_output("在响应包中检测到 Set-Cookie 字段，跳过后续检测")
+        return false
+    }
+    // 检测响应中是否含有登录失败/登录界面等误报标识，出现表示凭证未通过鉴权
+    if str.MatchAnyOfRegexp(result.ResponseRaw, bad_rsp_list...){
+        return false
+    }
+    return true
+}
+
+
+over_permission=func(freq,http_rsp,rsp){
+    risk_output=false
+    payload_success_flag=nil
+    rsp_header,rsp_body=poc.Split(rsp)
+
+    //生成freq并取得fuzz后的结果
+    freq,param,payload=gen_fuzz_freq(freq)
+    result=freq.ExecFirst(httpool.redirectTimes(0))~
+    result_rsp_header,result_rsp_body=poc.Split(result.ResponseRaw)
+    http_result=poc.ParseBytesToHTTPResponse(result.ResponseRaw)~
+
+    // 先比较状态码/content-type/bad_res等字段，减少误报
+    if compare_fuzz_rsp(http_rsp, http_result) && not_bad_result_check(result){
+
+    }else{
+        return
+    }
+
+    // over_permission_flag_list优先级较高
+    if len(over_permission_flag_list)!=0 && str.MatchAnyOfSubString(result_rsp_body, over_permission_flag_list...){
+        yakit_output(f"替换访问凭证后的页面检测到 响应关键字")
+        risk_output=true
+        for over_permission_flag in over_permission_flag_list{
+            if str.MatchAnyOfSubString(result_rsp_body, over_permission_flag){
+                payload_success_flag=over_permission_flag
+                break
+            }
+        }
+    }
+
+    // 当over_permission_flag_list已经测试漏洞存在时，跳过相似度检测
+    if risk_output!=true{
+        sim_res=nil
+        //替换凭证前后页面为空 此时相似度检测为 0 的漏报处理
+        if rsp_body==result_rsp_body{
+            sim_res=1
+        }else{
+            sim_res=str.CalcSimilarity(rsp_body,result_rsp_body)~
+        }
+        yakit_output(f"计算替换访问凭证前后的页面响应相似度为 ${sim_res}")
+        if sim_res>sim_value{
+            risk_output=true
+            payload_success_flag=f"相似度检测=${sim_res}"
+        }
+    }
+    if risk_output{        
+        if payload=="" || payload=="|" || "||" in payload{
+            mitm_risk_output(result.url, result.RequestRaw, result.ResponseRaw, "逻辑漏洞", "未授权", "high",param, payload, payload_success_flag, "mitm_over_permission_check")
+        }else{
+            mitm_risk_output(result.url, result.RequestRaw, result.ResponseRaw, "逻辑漏洞", "水平越权-修改", "high",param, payload, payload_success_flag, "mitm_over_permission_check")
+        }
+    }
+}
+
+
+credential_output=func(){
+    for key in fuzz_credential_dic{
+        yakit_output(f"设置 ${fuzz_credential_dic[key]['position']} 处访问凭证 ${key} 值为 ${fuzz_credential_dic[key]['value']}")
+    }
+}
+
+
+
+# mirrorFilteredHTTPFlow 劫持到的流量为 MITM 自动过滤出的可能和 "业务" 有关的流量，会自动过滤掉 js / css 等流量
+mirrorFilteredHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+
+    // 手动对爬虫预检测流量进行过滤
+    // if flow_total==-1{
+    //     flow_total=flow_total+1
+    //     return
+    // }
+
+    detect_root_url=str.ParseStringUrlToWebsiteRootPath(url)
+    detect_url_Instance,err=str.ParseStringUrlToUrlInstance(url)
+    if err!=nil{
+        yakit_output("url 解析错误，脚本即将退出")
+        die(err)
+    }
+    detect_path=detect_url_Instance.Path
+    detect_url_path_hash=codec.Md5(detect_root_url+detect_path)
+    if detect_url_path_hash in detect_output_dic{
+        //该条流已经检测并告警，不再进行检测
+        yakit_output("detect_output_dic 去重")
+        return
+    }
+
+    // 计算url和string后的body md5进行去重
+    header_md5_check,body_md5_check=poc.Split(req)
+    url_body_hash=codec.Md5(url+string(body_md5_check))
+    if url_body_hash in risk_output_dic{
+        //该条流已经告警输出，不再进行检测
+        return
+    }
+
+    http_req = poc.ParseBytesToHTTPRequest(req)~
+    http_rsp=poc.ParseBytesToHTTPResponse(rsp)~
+    freq=fuzz.HTTPRequest(req,fuzz.https(isHttps))~
+    //credential_output()
+    if !pre_check(http_req,http_rsp){
+        return
+    }
+
+    // 在path_list且不在黑名单路径会进行检测
+    if str.MatchAnyOfSubString(http_req.URL.Path,path_list... ) && !str.MatchAnyOfRegexp(http_req.URL.Path, black_path_list...){
+        yakit_output(f"匹配到预设置的路径标识，开始对 ${url} 进行水平越权-修改检测...")
+    }else{
+        yakit_output(f"未在 ${url} 中检测到预设置的路径标识，插件即将退出")
+        return
+    }
+    over_permission(freq, http_rsp, rsp)
+    yakit_output(f"${url} 水平越权-修改检测完毕")
+}

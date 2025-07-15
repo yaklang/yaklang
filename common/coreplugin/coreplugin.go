@@ -355,6 +355,7 @@ func init() {
 		)
 
 		registerBuildInPlugin(
+<<<<<<< HEAD
 			"yak", "构建知识库",
 			withPluginHelp("将指定文件构建成知识库，支持多种文件格式"),
 			withPluginEnableGenerateParam(true),
@@ -377,6 +378,103 @@ func init() {
 			withPluginHelp("通过各种选项生成所需的证书文件"),
 			withPluginEnableGenerateParam(true),
 		)
+=======
+			"mitm", "nw-未授权遍历",
+			withPluginHelp("nw-未授权遍历"),
+			withPluginTags([]string{"逻辑漏洞检测,可能修改HTTP数据包"}),
+		)
+
+		registerBuildInPlugin(
+			"mitm", "nw-未授权添加",
+			withPluginHelp("nw-未授权添加"),
+			withPluginTags([]string{"逻辑漏洞检测,可能修改HTTP数据包"}),
+		)
+
+		registerBuildInPlugin(
+			"mitm", "nw-未授权访问",
+			withPluginHelp("nw-未授权访问"),
+			withPluginTags([]string{"逻辑漏洞检测,可能修改HTTP数据包"}),
+		)
+
+		registerBuildInPlugin(
+			"mitm", "nw-验证码回显",
+			withPluginHelp("nw-验证码回显"),
+			withPluginTags([]string{"逻辑漏洞检测"}),
+		)
+
+		registerBuildInPlugin(
+			"mitm", "nw-水平越权查询",
+			withPluginHelp("nw-水平越权查询"),
+			withPluginTags([]string{"逻辑漏洞检测"}),
+		)
+
+		registerBuildInPlugin(
+			"mitm", "nw-水平越权删除",
+			withPluginHelp("nw-水平越权删除"),
+			withPluginTags([]string{"逻辑漏洞检测"}),
+		)
+
+		registerBuildInPlugin(
+			"mitm", "nw-水平越权修改",
+			withPluginHelp("nw-水平越权修改"),
+			withPluginTags([]string{"逻辑漏洞检测"}),
+		)
+
+		registerBuildInPlugin(
+			"mitm", "nw-水平越权添加",
+			withPluginHelp("nw-水平越权添加"),
+			withPluginTags([]string{"逻辑漏洞检测"}),
+		)
+
+		registerBuildInPlugin(
+			"mitm", "nw-垂直越权查询",
+			withPluginHelp("nw-垂直越权查询"),
+			withPluginTags([]string{"逻辑漏洞检测"}),
+		)
+
+		registerBuildInPlugin(
+			"mitm", "nw-垂直越权删除",
+			withPluginHelp("nw-垂直越权删除"),
+			withPluginTags([]string{"逻辑漏洞检测"}),
+		)
+
+		registerBuildInPlugin(
+			"mitm", "nw-垂直越权修改",
+			withPluginHelp("nw-垂直越权修改"),
+			withPluginTags([]string{"逻辑漏洞检测"}),
+		)
+
+		registerBuildInPlugin(
+			"mitm", "nw-垂直越权添加",
+			withPluginHelp("nw-垂直越权添加"),
+			withPluginTags([]string{"逻辑漏洞检测"}),
+		)
+
+		registerBuildInPlugin(
+			"mitm", "nw-通用CMS未授权",
+			withPluginHelp("nw-通用CMS未授权"),
+			withPluginTags([]string{"逻辑漏洞检测"}),
+		)
+
+		registerBuildInPlugin(
+			"mitm", "nw-敏感信息遍历",
+			withPluginHelp("nw-敏感信息遍历"),
+			withPluginTags([]string{"逻辑漏洞检测"}),
+		)
+
+		registerBuildInPlugin(
+			"mitm", "nw-接口未授权",
+			withPluginHelp("nw-接口未授权"),
+			withPluginTags([]string{"逻辑漏洞检测"}),
+		)
+
+		registerBuildInPlugin(
+			"mitm", "nw-越权",
+			withPluginHelp("nw-越权"),
+			withPluginTags([]string{"逻辑漏洞检测"}),
+		)
+
+>>>>>>> 8d1994b08 (feat(coreplugin): add nw plugin)
 		return nil
 	}, "sync-core-plugin-for-yakit")
 

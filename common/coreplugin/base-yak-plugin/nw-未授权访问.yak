@@ -1,0 +1,226 @@
+// **--- 核心配置 ---**
+auth_type = cli.StringSlice(
+    "auth_type",
+    cli.setMultipleSelect(false),
+    cli.setSelectOption("Header", "header"),
+    cli.setSelectOption("Cookie", "cookie"),
+    cli.setVerboseName("凭证位置"),
+    cli.setHelp("请选择凭证所在的位置：'Header' 或 'Cookie'。"),
+    cli.setRequired(true),
+    cli.setDefault("header"),
+)
+auth_credentials = cli.Text(
+    "auth_credentials",
+    cli.setVerboseName("待移除的凭证列表"),
+    cli.setHelp(<<<HEAD
+当凭证位置为 'Header' 时: 在此处输入要移除的Header名称，每行一个。
+当凭-证位置为 'Cookie' 时: 此项内容将被忽略，插件会自动移除整个 'Cookie' 请求头。
+HEAD),
+    cli.setDefault(<<<HEAD
+Authorization:
+Token:
+token:
+X-API-Key:
+X-Access-Token:
+X-Auth-Token:
+X-CSRF-Token:
+X-XSRF-TOKEN:
+X-Requested-With:
+HEAD),
+    cli.setRequired(true),
+)
+sim_value = cli.Float(
+    "sim_value",
+    cli.setDefault("0.98"),
+    cli.setVerboseName("相似度阈值"),
+    cli.setHelp("当响应体相似度大于等于该阈值时判定为漏洞。推荐值: 0.98"),
+    cli.setCliGroup("插件额外参数"),
+)
+
+// **--- 新增：可配置的白名单 ---**
+whitelist_input = cli.LineDict(
+    "url_whitelist",
+    cli.setVerboseName("URL路径白名单 (高优先级)"),
+    cli.setHelp("如果URL路径包含这里的任意关键词，将无视所有黑名单，直接进入检测流程。"),
+    cli.setCliGroup("白名单与黑名单配置"),
+    cli.setDefault(<<<HEAD
+admin
+manage
+api
+user
+info
+profile
+account
+order
+address
+internal
+dashboard
+HEAD),
+)
+
+
+// **--- 可配置的黑名单 ---**
+static_media_blacklist_input = cli.LineDict(
+    "static_media_blacklist",
+    cli.setVerboseName("1. 静态资源黑名单"),
+    cli.setHelp("包含这些关键词的URL将被跳过检测，用于过滤静态文件。"),
+    cli.setCliGroup("白名单与黑名单配置"),
+    cli.setDefault(<<<HEAD
+.js
+.css
+.png
+.jpg
+.jpeg
+.gif
+.svg
+.ico
+.woff
+.woff2
+.ttf
+.pdf
+.mp3
+.mp4
+.map
+.vue
+.wasm
+HEAD),
+)
+dangerous_ops_blacklist_input = cli.LineDict(
+    "dangerous_ops_blacklist",
+    cli.setVerboseName("2. 危险操作黑名单"),
+    cli.setHelp("包含这些关键词的URL将被跳过，用于避免对删除、修改等危险操作进行重放。"),
+    cli.setCliGroup("白名单与黑名单配置"),
+    cli.setDefault(<<<HEAD
+delete
+remove
+destroy
+HEAD),
+)
+functional_public_blacklist_input = cli.LineDict(
+    "functional_public_blacklist",
+    cli.setVerboseName("3. 功能/公共页面黑名单"),
+    cli.setHelp("包含这些关键词的URL将被跳过，用于过滤登录、注册等无需凭证即可访问的页面。"),
+    cli.setCliGroup("白名单与黑名单配置"),
+    cli.setDefault(<<<HEAD
+index
+login
+logout
+signin
+signout
+register
+signup
+captcha
+HEAD),
+)
+
+cli.check()
+
+hijackHTTPRequest = func(isHttps, urlStr, req, forward, drop) {
+    yakit.Info("--- [未授权访问检测] 开始处理请求: %s ---", urlStr)
+    path := poc.GetHTTPRequestPathWithoutQuery(req)
+
+    // **--- 过滤逻辑重大升级：优先白名单，后黑名单 ---**
+    yakit.Info("[步骤1] 正在进行过滤检查，URL路径: %s", path)
+
+    // 首先，检查是否命中白名单
+    is_whitelisted = false
+    if len(whitelist_input) > 0 { // 仅当白名单不为空时检查
+        if str.MatchAnyOfSubString(path, whitelist_input...) {
+            is_whitelisted = true
+            yakit.Info("[优先通过] URL路径匹配白名单，将直接进入检测。")
+        }
+    }
+
+    // 如果没有命中白名单，才进行黑名单检查
+    if !is_whitelisted {
+        yakit.Info("URL未命中白名单，继续进行黑名单检查...")
+        if str.MatchAnyOfSubString(path, static_media_blacklist_input...) {
+            yakit.Info("[跳过] URL路径匹配【静态资源黑名单】，不进行检测。")
+            forward(req)
+            return
+        }
+        if str.MatchAnyOfSubString(path, dangerous_ops_blacklist_input...) {
+            yakit.Info("[跳过] URL路径匹配【危险操作黑名单】，不进行检测。")
+            forward(req)
+            return
+        }
+        if str.MatchAnyOfSubString(path, functional_public_blacklist_input...) {
+            yakit.Info("[跳过] URL路径匹配【功能页面黑名单】，不进行检测。")
+            forward(req)
+            return
+        }
+        yakit.Info("[通过] URL未匹配任何黑名单，继续执行。")
+    }
+    // 到这里，意味着请求要么命中了白名单，要么通过了黑名单检查，可以进行后续步骤
+
+    // ... 后续代码与上一版完全相同，这里省略 ...
+    yakit.Info("[步骤2] 正在发送原始请求...")
+    originalRsp, raw, err := poc.HTTP(req)
+    if err != nil { log.error("原始请求失败: %v", err); forward(req); return }
+    yakit.Info("原始请求成功，响应长度: %d", len(originalRsp))
+
+    yakit.Info("[步骤3] 正在构建并移除凭证...")
+    testReq := poc.BuildRequest(req, poc.https(isHttps))
+    selected_auth_type := auth_type[0]
+    yakit.Info("选择的凭证类型: %v", selected_auth_type)
+    if selected_auth_type == "header" {
+        headersList := str.Split(auth_credentials, "\n")
+        for _, hLine := range headersList {
+            hLine = str.TrimSpace(hLine)
+            if hLine == "" { continue }
+            headerName := str.Split(hLine, ":")[0]
+            if headerName != "" {
+                 testReq = poc.DeleteHTTPPacketHeader(testReq, headerName)
+                 yakit.Info("已移除 Header: %s", headerName)
+            }
+        }
+    } else if selected_auth_type == "cookie" {
+        testReq = poc.DeleteHTTPPacketHeader(testReq, "Cookie")
+        yakit.Info("已移除 Header: Cookie")
+    }
+
+    yakit.Info("[步骤4] 正在发送移除凭证后的测试请求...")
+    modifiedRsp, _, err := poc.HTTP(testReq, poc.https(isHttps))
+    if err != nil { log.error("修改后请求失败: %v", err); forward(req); return }
+    yakit.Info("修改后请求成功，响应长度: %d", len(modifiedRsp))
+
+    yakit.Info("[步骤5] 正在提取响应体并进行相似度比较...")
+    origBody := poc.GetHTTPPacketBody(originalRsp)
+    modBody := poc.GetHTTPPacketBody(modifiedRsp)
+    yakit.Info("原始响应体长度: %d, 修改后响应体长度: %d", len(origBody), len(modBody))
+
+    if len(origBody) == 0 {
+        yakit.Info("[跳过] 原始响应体为空，无法比较。")
+        forward(req)
+        return
+    }
+    
+    sim := str.CalcSimilarity(origBody, modBody)
+    yakit.Info("[决策点] 响应体相似度: %.4f (UI设定阈值: %.2f)", sim, sim_value)
+    
+    if sim >= sim_value {
+        yakit.Info("[漏洞发现!] 相似度达到阈值，判定为疑似未授权访问漏洞。")
+        risk.NewRisk(
+            urlStr,
+            risk.title("疑似未授权访问漏洞 (高相似度)"),
+            risk.severity("high"),
+            risk.titleVerbose(sprintf("通过移除`%s`凭证访问URL成功", selected_auth_type)),
+            risk.details(sprintf(
+                "该插件通过移除认证凭证（类型: %s）后重新请求，发现响应内容与原始请求的相似度高达 %.4f（超过设定的阈值 %.2f）。\n\n关键证据:\n- 原始响应体长度: %d\n- 修改后响应体长度: %d\n\n此情况极可能存在未授权访问漏洞，请人工验证。",
+                selected_auth_type,
+                sim,
+                sim_value,
+                len(origBody),
+                len(modBody),
+            )),
+            risk.request(string(testReq)),
+            risk.response(string(modifiedRsp)),
+            risk.cve("no cve"),
+        )
+    } else {
+        yakit.Info("[未发现漏洞] 相似度未达到阈值，忽略。")
+    }
+
+    yakit.Info("--- [未授权访问检测] 请求处理完毕: %s ---", urlStr)
+    forward(req)
+}

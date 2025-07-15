@@ -1,0 +1,35 @@
+yakit_output(MITM_PARAMS)
+
+payload = {
+    "Aliyun OSS URL": `[\\w.-]+\\.oss\\.aliyuncs\\.com`,
+    "Access Key": `LTAI[A-Za-z0-9]{12,20}`,
+    "API Key": `api_key=[0-9a-zA-Z]{32}`,
+    "GitHub Access Token": `[a-zA-Z0-9_-]*:[a-zA-Z0-9_\\-]+@github\\.com`,
+    "JWT（稳定）": `[= ]ey[A-Za-z0-9_-]+\\.[A-Za-z0-9._-]+`,
+    "JWT（所有）": `[= ]ey[A-Za-z0-9_/+-]+\\.[A-Za-z0-9._/+-]+`,
+    "内网 IP 地址": `(?:10\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})|(?:172\\.(?:1[6-9]|2\\d|3[01])\\.\\d{1,3}\\.\\d{1,3})|(?:192\\.168\\.\\d{1,3}\\.\\d{1,3})`,
+    "手机号": `(?<!\\d)((?:\\+86|0086)?1[3-9]\\d{9})(?!\\d)`,
+    "身份证号": `[1-9]\\d{5}(?:19|20)\\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\\d|3[01])\\d{3}[0-9Xx]`,
+}
+
+mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
+    for k, v = range payload {
+        matches = re.FindAll(body, v)
+        matches = str.RemoveRepeat(matches)
+
+        for _, match = range matches {
+            risk.NewRisk(
+                url,
+                risk.title("敏感信息遍历检测"),
+                risk.severity("middle"),
+                risk.type("信息泄露"),
+                risk.details({
+                    "__DEFAULT__": sprintf("关键字: %s\n匹配值: %s", k, match),
+                    "match_keyword": k,
+                    "match_value": match,
+                    "target": url,
+                }),
+            )
+        }
+    }
+}

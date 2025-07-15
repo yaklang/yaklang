@@ -1,0 +1,134 @@
+yakit_output(MITM_PARAMS)
+
+verification_code_list = ["check", "code", "data", "identifying", "key", "message", "msg", "sms", "verification", "verify", "yanzhengma", "yzm", "验证码"]
+
+// 为code额外设置的误报情况
+bad_code_list = ["ad", "bad", "city", "country", "err", "fail", "nation", "return", "rsp", "status", "state", "success", "verification_code"]
+
+tips_list = ["查收", "短信", "接收", "验证码"]
+
+phone_list = ["phone", "mobile"]
+
+code_re_rule = `\d+`
+science_re_rule = `([\+|-]?\d+(.{0}|.\d+))[Ee]{1}([\+|-]?\d+)`
+
+res_output = func(url, req, rsp, verification_code) {
+    risk.NewRisk(
+        url, 
+        risk.severity("middle"), 
+        risk.title(f"验证码接口：${url} 响应包中存在验证码"), 
+        risk.titleVerbose("响应包中存在验证码"), 
+        risk.type("other"), 
+        risk.typeVerbose("验证码回显"), 
+        risk.request(req),
+        risk.response(rsp),
+        risk.details({"verification_code_in_rsp": url, "verification_code": verification_code}),
+        risk.cve("no cve")
+    )
+}
+
+sub_res_check = func(re_res, valid_number, verification_code) {
+    for sub_re_res in re_res {
+        if (len(sub_re_res) == 4) || (len(sub_re_res) == 6) {
+            valid_number = valid_number + 1
+            verification_code = sub_re_res
+        }
+        
+    }
+    
+    return valid_number, verification_code
+}
+
+match_any_of_str = func(checked_data, str_list) {
+    for sub_str in str_list {
+        if str.MatchAllOfSubString(checked_data, sub_str) {
+            return true
+        }
+        
+    }
+    
+    return false
+}
+
+# mirrorFilteredHTTPFlow 劫持到的流量为 MITM 自动过滤出的可能和 "业务" 有关的流量，会自动过滤掉 js / css 等流量
+mirrorFilteredHTTPFlow = func(isHttps /* bool */, url /* string */, req /* []byte */, rsp /* []byte */, body /* []byte */) {
+    http_req, http_req_err = poc.ParseBytesToHTTPRequest(req)
+    http_rsp, http_rsp_err = poc.ParseBytesToHTTPResponse(rsp)
+    req_header_, req_body = poc.Split(req)
+    rsp_header_, rsp_body = poc.Split(rsp)
+    http_req_method = http_req.Method
+    http_rsp_header = http_rsp.Header
+
+    if http_req_err != nil {
+        die(http_req_err)
+    }
+    
+    if http_rsp_err != nil {
+        die(http_rsp_err)
+    }
+    
+    poc.HTTP(req, poc.https(isHttps))~
+
+    http_rsp_content_type = http_rsp_header["Content-Type"]
+    http_rsp_content_length = int(http_rsp_header["Content-Length"][0])
+    http_req_check_result = false
+
+    // 当请求URL或body中含有手机号标识时，才进行响应包验证码的判断
+    if http_req_method == "GET" || http_req_method == "POST" {
+        http_req_check_result = match_any_of_str(http_req.URL.RawQuery, phone_list) || match_any_of_str(req_body, phone_list)
+    }
+    
+    if http_req_check_result == false {
+        return
+    }
+    
+
+    if str.MatchAllOfSubString(http_rsp_content_type, "application/json") {
+        json_data = json.loads(rsp_body)
+
+        for key in json_data {
+            if match_any_of_str(key, verification_code_list) {
+                if str.MatchAllOfSubString(key, "code") && match_any_of_str(key, bad_code_list) {
+                    continue
+                }
+                
+
+                raw_data = string(json_data[key])
+
+                // 匹配特殊情况(数据大于999999时，被自动转化为科学计数法)
+                if re.Match(science_re_rule, raw_data) {
+                    continue
+                }
+                
+
+//提取验证码标识后跟的数字，判断位数是否为4或6位
+                re_res = re.FindAll(raw_data, code_re_rule)
+                valid_number, verification_code = sub_res_check(re_res, 0, nil)
+
+                if valid_number == 1 {
+                    res_output(url, req, rsp, verification_code)
+                    return
+                }
+                
+            }
+            
+        }
+        
+    } else {
+        if http_rsp_content_length < 50 {
+            if match_any_of_str(rsp_body, tips_list) {
+                re_res = re.FindAll(rsp_body, code_re_rule)
+                valid_number, verification_code = sub_res_check(re_res, 0, nil)
+
+                if valid_number == 1 {
+                    res_output(url, req, rsp, verification_code)
+                    return
+                }
+                
+            }
+            
+        }
+        
+    }
+    
+}
