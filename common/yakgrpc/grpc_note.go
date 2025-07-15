@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 
 	"github.com/samber/lo"
@@ -16,8 +17,49 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+// sanitizeFileName 清理文件名中的特殊字符，将不安全的字符替换为下划线
+// 主要处理路径分隔符和其他可能导致文件系统问题的字符
+func sanitizeFileName(filename string) string {
+	if filename == "" {
+		return "untitled"
+	}
+
+	// 替换 Windows 和 Linux 不允许的字符
+	// Windows: <>:"/\|?*
+	// Linux: /
+	illegalChars := regexp.MustCompile(`[<>:"/\\|?*\x00]`)
+	result := illegalChars.ReplaceAllString(filename, "_")
+
+	// 移除开头和结尾的空格、点号
+	result = strings.Trim(result, " .")
+
+	// 如果清理后为空，返回默认名称
+	if result == "" {
+		return "untitled"
+	}
+
+	// 将空格替换为下划线
+	result = strings.ReplaceAll(result, " ", "_")
+
+	// 移除连续的多个下划线
+	re := regexp.MustCompile(`_+`)
+	result = re.ReplaceAllString(result, "_")
+
+	// 移除开头和结尾的下划线
+	result = strings.Trim(result, "_")
+
+	// 如果清理后为空，返回默认名称
+	if result == "" {
+		return "untitled"
+	}
+
+	return result
+}
+
 func (s *Server) CreateNote(ctx context.Context, req *ypb.CreateNoteRequest) (*ypb.CreateNoteResponse, error) {
-	id, err := yakit.CreateNote(s.GetProjectDatabase(), req.GetTitle(), req.GetContent())
+	// 清理记事本标题中的特殊字符
+	safeTitle := sanitizeFileName(req.GetTitle())
+	id, err := yakit.CreateNote(s.GetProjectDatabase(), safeTitle, req.GetContent())
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +73,12 @@ func (s *Server) CreateNote(ctx context.Context, req *ypb.CreateNoteRequest) (*y
 }
 
 func (s *Server) UpdateNote(ctx context.Context, req *ypb.UpdateNoteRequest) (*ypb.DbOperateMessage, error) {
-	count, err := yakit.UpdateNote(s.GetProjectDatabase(), req.GetFilter(), req.GetUpdateTitle(), req.GetUpdateContent(), req.GetTitle(), req.GetContent())
+	// 如果更新标题，清理记事本标题中的特殊字符
+	title := req.GetTitle()
+	if req.GetUpdateTitle() {
+		title = sanitizeFileName(title)
+	}
+	count, err := yakit.UpdateNote(s.GetProjectDatabase(), req.GetFilter(), req.GetUpdateTitle(), req.GetUpdateContent(), title, req.GetContent())
 	return &ypb.DbOperateMessage{
 		TableName:  "note",
 		Operation:  DbOperationUpdate,
@@ -115,14 +162,17 @@ func (s *Server) ImportNote(req *ypb.ImportNoteRequest, stream ypb.Yak_ImportNot
 		fn := path.Base(file.Name)
 		fn = strings.TrimSuffix(fn, path.Ext(fn))
 
-		id, err := yakit.CreateNote(s.GetProjectDatabase(), fn, string(content))
+		// 清理文件名中的特殊字符，确保记事本标题安全
+		safeTitle := sanitizeFileName(fn)
+
+		id, err := yakit.CreateNote(s.GetProjectDatabase(), safeTitle, string(content))
 		if err != nil {
 			return fmt.Errorf("failed to create note: %v", err)
 		}
 		count += float64(len(content))
 
 		stream.Send(&ypb.ImportNoteResponse{
-			Verbose: fmt.Sprintf("Imported note: %s", fn),
+			Verbose: fmt.Sprintf("Imported note: %s", safeTitle),
 			Percent: count / total,
 			NoteId:  int64(id),
 		})
@@ -151,10 +201,12 @@ func (s *Server) ExportNote(req *ypb.ExportNoteRequest, stream ypb.Yak_ExportNot
 	titleMap := make(map[string]int)
 
 	for note := range ch {
-		fileName := fmt.Sprintf("%s.md", note.Title)
+		// 清理文件名中的特殊字符
+		safeTitle := sanitizeFileName(note.Title)
+		fileName := fmt.Sprintf("%s.md", safeTitle)
 		if i, ok := titleMap[fileName]; ok {
 			titleMap[fileName] = i + 1
-			fileName = fmt.Sprintf("%s(%d).md", note.Title, i+1)
+			fileName = fmt.Sprintf("%s(%d).md", safeTitle, i+1)
 		} else {
 			titleMap[fileName] = 0
 		}
