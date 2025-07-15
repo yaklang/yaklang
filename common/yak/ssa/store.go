@@ -86,7 +86,7 @@ func (b *FunctionBuilder) StoreFunctionBuilder() *StoredFunctionBuilder {
 		// RefParameter:               b.RefParameter,
 		// target:       b.target,
 		// labels:       b.labels,
-		// CurrentBlock: b.CurrentBlock,
+		CurrentBlock: b.CurrentBlock,
 		CurrentRange: b.CurrentRange,
 		// CurrentFile:  b.CurrentFile,
 		// parentScope:  b.parentScope,
