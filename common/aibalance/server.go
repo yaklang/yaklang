@@ -513,15 +513,15 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 
 	c.logInfo("Built prompt length: %d with image content: %d", prompt.Len(), len(imageContent))
 
-	model, ok := c.Models.Get(modelName)
-	if !ok {
-		c.logError("No model configuration found: %s", modelName)
-		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
-		return
-	}
+	// model, ok := c.Models.Get(modelName)
+	// if !ok {
+	// 	c.logError("No model configuration found: %s", modelName)
+	// 	conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+	// 	return
+	// }
 
-	c.logInfo("Key[%v] requesting model %s, starting to forward request", apiKeyForStat, modelName)
-	_ = model
+	// c.logInfo("Key[%v] requesting model %s, starting to forward request", apiKeyForStat, modelName)
+	// _ = model
 
 	// 使用 PeekOrderedProviders 获取按优先级排序的提供者列表
 	providers := c.Entrypoints.PeekOrderedProviders(modelName)
@@ -553,8 +553,7 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		sendHeaderOnce := sync.Once{}
 		sendHeader := func() {
 			c.logInfo("Successfully obtained AI client, starting to send response header")
-			var header string
-			header = "HTTP/1.1 200 OK\r\n" +
+			var header = "HTTP/1.1 200 OK\r\n" +
 				"Content-Type: application/json\r\n" +
 				"Transfer-Encoding: chunked\r\n" +
 				"\r\n"
