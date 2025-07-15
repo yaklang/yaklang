@@ -1,0 +1,224 @@
+yakit.AutoInitYakit()
+
+// --- UI配置: 采用高级UI组件 ---
+
+// -- 参数组: 核心检测配置 --
+add_keywords_whitelist = cli.LineDict(
+    "add_keywords",
+    cli.setVerboseName("“添加”操作关键词白名单"),
+    cli.setHelp("插件将只检测URL路径中包含这些关键词的请求。"),
+    cli.setCliGroup("核心检测配置"),
+    cli.setDefault(<<<HEAD
+add
+append
+apply
+baocun
+book
+charu
+chuangjian
+commit
+create
+fabu
+generate
+import
+insert
+join
+make
+new
+order
+post
+publish
+push
+put
+record
+register
+save
+send
+set
+shangchuan
+store
+submit
+tianjia
+tijiao
+update
+upload
+write
+xinjian
+add_
+create_
+new_
+_add
+_create
+user_add
+order_create
+item_add
+HEAD),
+)
+sim_value = cli.Float(
+    "sim_value",
+    cli.setDefault("0.95"),
+    cli.setVerboseName("内容相似度阈值"),
+    cli.setHelp("移除凭证后，若响应与原始响应的相似度大于等于此值，则判定为漏洞。"),
+    cli.setCliGroup("核心检测配置"),
+)
+
+// -- 参数组: 凭证配置 --
+auth_type = cli.StringSlice(
+    "auth_type",
+    cli.setMultipleSelect(false),
+    cli.setSelectOption("Header", "header"),
+    cli.setSelectOption("Cookie", "cookie"),
+    cli.setVerboseName("凭证位置"),
+    cli.setHelp("请选择凭证所在的位置。"),
+    cli.setRequired(true),
+    cli.setDefault("header"),
+    cli.setCliGroup("凭证配置"),
+)
+auth_credentials = cli.Text(
+    "auth_credentials",
+    cli.setVerboseName("待移除的凭证列表"),
+    cli.setHelp(<<<HEAD
+当凭证位置为 'Header' 时: 在此处输入要移除的Header名称，每行一个。
+当凭证位置为 'Cookie' 时: 此项内容将被忽略，插件会自动移除整个 'Cookie' 请求头。
+HEAD),
+    cli.setDefault(<<<HEAD
+Authorization
+Token
+token
+X-API-Key
+X-Access-Token
+X-Auth-Token
+X-CSRF-Token
+X-XSRF-TOKEN
+Cookie
+HEAD),
+    cli.setRequired(true),
+    cli.setCliGroup("凭证配置"),
+)
+
+// -- 参数组: 过滤配置 --
+whitelist_input = cli.LineDict(
+    "url_whitelist",
+    cli.setVerboseName("URL路径白名单 (高优先级)"),
+    cli.setHelp("如果URL路径包含这里的任意关键词，将无视所有黑名单，直接进入检测流程。"),
+    cli.setCliGroup("过滤配置"),
+    cli.setDefault(<<<HEAD
+/api/
+/v1/
+/v2/
+HEAD),
+)
+static_media_blacklist_input = cli.LineDict(
+    "static_media_blacklist",
+    cli.setVerboseName("1. 静态资源黑名单"),
+    cli.setHelp("包含这些关键词的URL将被跳过检测。"),
+    cli.setCliGroup("过滤配置"),
+    cli.setDefault(<<<HEAD
+.js
+.css
+.png
+.jpg
+.jpeg
+.gif
+.svg
+.ico
+.woff
+.woff2
+.ttf
+.pdf
+.mp3
+.mp4
+.map
+.vue
+.wasm
+HEAD),
+)
+functional_public_blacklist_input = cli.LineDict(
+    "functional_public_blacklist",
+    cli.setVerboseName("2. 功能/公共页面黑名单"),
+    cli.setHelp("包含这些关键词的URL将被跳过，用于过滤登录、注册等无需凭证即可访问的页面。"),
+    cli.setCliGroup("过滤配置"),
+    cli.setDefault(<<<HEAD
+login
+logout
+signin
+signout
+captcha
+HEAD),
+)
+
+cli.check()
+
+
+hijackHTTPRequest = func(isHttps, urlStr, req, forward, drop) {
+    forward(req)
+    
+    // --- 步骤1: 精细化过滤 ---
+    http_req, _ := poc.ParseBytesToHTTPRequest(req)
+    path := http_req.URL.Path
+
+    is_whitelisted = false
+    if len(whitelist_input) > 0 {
+        if str.MatchAnyOfSubString(path, whitelist_input...) {
+            is_whitelisted = true
+        }
+    }
+    if !is_whitelisted {
+        if str.MatchAnyOfSubString(path, static_media_blacklist_input...) { return }
+        if str.MatchAnyOfSubString(path, functional_public_blacklist_input...) { return }
+    }
+    if !str.MatchAnyOfSubString(str.ToLower(path), add_keywords_whitelist...) {
+        return
+    }
+    yakit.Info("--- [未授权添加检测] 请求通过过滤，开始处理: %s ---", urlStr)
+
+    // --- 步骤2: 获取原始响应 ---
+    originalRsp, _, err := poc.HTTP(req)
+    if err != nil { log.error("获取原始响应失败: %v", err); return }
+    originalBody := poc.GetHTTPPacketBody(originalRsp)
+    if len(originalBody) == 0 { yakit.Info("原始响应为空，跳过"); return }
+
+    // --- 步骤3: 移除凭证并发起测试请求 ---
+    testReq := poc.BuildRequest(req, poc.https(isHttps))
+    selected_auth_type := auth_type[0]
+    if selected_auth_type == "header" {
+        headersList := str.Split(auth_credentials, "\n")
+        for _, hLine := range headersList {
+            hLine = str.TrimSpace(hLine)
+            if hLine == "" { continue }
+            headerName := str.Split(hLine, ":")[0]
+            if headerName != "" { testReq = poc.DeleteHTTPPacketHeader(testReq, headerName) }
+        }
+    } else {
+        testReq = poc.DeleteHTTPPacketHeader(testReq, "Cookie")
+    }
+    
+    modifiedRsp, _, err := poc.HTTP(testReq)
+    if err != nil { log.error("修改后请求失败: %v", err); return }
+    modifiedBody := poc.GetHTTPPacketBody(modifiedRsp)
+    
+    // --- 步骤4: 漏洞判断（基于内容相似度）---
+    sim := str.CalcSimilarity(originalBody, modifiedBody)
+    yakit.Info("响应内容相似度: %.4f (阈值: %.2f)", sim, sim_value)
+    
+    if sim >= sim_value {
+        yakit.Info("[漏洞发现!] 相似度达到阈值，判定为疑似未授权添加漏洞。")
+        risk.NewRisk(
+            urlStr,
+            risk.title("疑似未授权添加漏洞 (高相似度)"),
+            risk.severity("high"),
+            risk.titleVerbose(sprintf("通过移除`%s`凭证执行添加操作成功", selected_auth_type)),
+            // **修改: 在详情中添加了响应大小作为关键证据**
+            risk.details(sprintf("该插件通过移除认证凭证（类型: %s）后重新发起“添加”操作的请求，发现响应内容与原始成功请求的相似度高达 %.4f。\n\n**关键证据:**\n- 原始响应大小: %d 字节 (Body: %d 字节)\n- 修改后响应大小: %d 字节 (Body: %d 字节)\n\n此情况极可能存在未授权的“添加”操作漏洞，允许攻击者在未登录的情况下创建数据。请人工验证。", 
+                selected_auth_type, sim,
+                len(originalRsp), len(originalBody),
+                len(modifiedRsp), len(modifiedBody),
+            )),
+            risk.request(string(testReq)),
+            risk.response(string(modifiedRsp)),
+            risk.cve("no cve"),
+        )
+    }
+    
+    yakit.Info("--- [未授权添加检测] 请求处理完毕: %s ---", urlStr)
+}
