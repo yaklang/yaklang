@@ -84,6 +84,7 @@ type PortalData struct {
 	Providers        []ProviderData
 	AllowedModels    map[string]string
 	APIKeys          []APIKeyData
+	AllModelsForForm []string
 }
 
 // Session represents a user session (application level, not DB schema)
@@ -343,7 +344,11 @@ func (c *ServerConfig) servePortal(conn net.Conn) {
 	var totalSuccess int64
 	healthyCount := 0
 
+	allModelNames := map[string]bool{}
 	for _, p := range providers {
+		if p.WrapperName != "" {
+			allModelNames[p.WrapperName] = true
+		}
 		// Calculate success rate
 		successRate := 0.0
 		if p.TotalRequests > 0 {
@@ -392,6 +397,14 @@ func (c *ServerConfig) servePortal(conn net.Conn) {
 	if data.TotalRequests > 0 {
 		data.SuccessRate = float64(totalSuccess) / float64(data.TotalRequests) * 100
 	}
+
+	finalModelList := []string{}
+	for modelName := range allModelNames {
+		finalModelList = append(finalModelList, modelName)
+		finalModelList = append(finalModelList, modelName+"-free")
+	}
+	//sort.Strings(finalModelList)
+	data.AllModelsForForm = finalModelList
 
 	// Get API keys and allowed models
 	data.AllowedModels = make(map[string]string)
