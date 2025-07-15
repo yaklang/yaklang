@@ -1,9 +1,9 @@
 desc(
 	title: "Check Golang Open Redirect Vulnerability (http)"
-    title_zh: "检测Golang开放重定向漏洞 (http)"
+	title_zh: "检测Golang开放重定向漏洞 (http)"
 	type: audit
 	level: high
-    risk: "url-redirect"
+	risk: "url-redirect"
 	desc: <<<DESC
 ### 漏洞描述
 
