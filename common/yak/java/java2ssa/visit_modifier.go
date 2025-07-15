@@ -116,10 +116,16 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 		}
 	}
 
+	// 这样要存一份functionBuilder的状态
+	// 因为注解回调函数会被setType使用
+	// 而不仅是在本functionBuilder
+	store := y.StoreFunctionBuilder()
 	return func(v ssa.Value) {
 			start := time.Now()
 			defer deltaAnnotationCostFrom(start)
 
+			switchHandler := y.SwitchFunctionBuilder(store)
+			defer switchHandler()
 			recoverRange := y.SetCurrent(v)
 			defer recoverRange()
 
@@ -137,6 +143,8 @@ func (y *builder) VisitAnnotation(annotationContext javaparser.IAnnotationContex
 					xmlStr.annotation.RequestParam.value = "xml_str"
 					RequestParam.__ref__ = xmlStr
 			*/
+			switchHandler := y.SwitchFunctionBuilder(store)
+			defer switchHandler()
 			start := time.Now()
 			defer deltaAnnotationCostFrom(start)
 
