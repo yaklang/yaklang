@@ -1,0 +1,261 @@
+yakit.AutoInitYakit()
+
+// --- UI配置: 为IDOR检测插件添加了完整的过滤配置 ---
+
+// -- 参数组: 核心IDOR配置 --
+id_param_list = cli.LineDict(
+    "id_params",
+    cli.setVerboseName("待检测的ID参数列表"),
+    cli.setHelp("插件将主动检测GET和POST请求中是否包含这些参数名，如果其值为数字，则进行遍历测试。"),
+    cli.setCliGroup("核心IDOR配置"),
+    cli.setDefault(<<<HEAD
+id
+uid
+user_id
+user
+userid
+member_id
+memberid
+profile_id
+account_id
+customer_id
+order_id
+orderid
+product_id
+item_id
+item
+article_id
+post_id
+photo_id
+gallery_id
+message_id
+file_id
+doc_id
+data_id
+record_id
+cart_id
+info_id
+shop_id
+employee_id
+request_id
+transaction_id
+payment_id
+invoice_id
+booking_id
+event_id
+page_id
+pk
+key
+value
+num
+number
+query_id
+HEAD),
+)
+
+size_tolerance = cli.Float(
+    "size_tolerance",
+    cli.setDefault("0.05"),
+    cli.setVerboseName("响应大小容忍度"),
+    cli.setHelp("当遍历ID后的响应大小与原始响应大小的差异在此容忍度（百分比）之内时，判定为成功。例如: 0.05 表示差异在5%以内。"),
+    cli.setCliGroup("核心IDOR配置"),
+)
+
+// -- 参数组: 白名单与黑名单配置 --
+whitelist_input = cli.LineDict(
+    "url_whitelist",
+    cli.setVerboseName("URL路径白名单 (高优先级)"),
+    cli.setHelp("如果URL路径包含这里的任意关键词，将无视所有黑名单，直接进入检测流程。"),
+    cli.setCliGroup("白名单与黑名单配置"),
+    cli.setDefault(<<<HEAD
+/api/
+/admin/
+/manage/
+/user/
+/info
+/profile
+/account
+/order
+/address
+/internal
+/dashboard
+HEAD),
+)
+static_media_blacklist_input = cli.LineDict(
+    "static_media_blacklist",
+    cli.setVerboseName("1. 静态资源黑名单"),
+    cli.setHelp("包含这些关键词的URL将被跳过检测。"),
+    cli.setCliGroup("白名单与黑名单配置"),
+    cli.setDefault(<<<HEAD
+.js
+.css
+.png
+.jpg
+.jpeg
+.gif
+.svg
+.ico
+.woff
+.woff2
+.ttf
+.pdf
+.mp3
+.mp4
+.map
+.vue
+.wasm
+HEAD),
+)
+dangerous_ops_blacklist_input = cli.LineDict(
+    "dangerous_ops_blacklist",
+    cli.setVerboseName("2. 危险操作黑名单"),
+    cli.setHelp("包含这些关键词的URL将被跳过，用于避免对删除、修改等危险操作进行重放。"),
+    cli.setCliGroup("白名单与黑名单配置"),
+    cli.setDefault(<<<HEAD
+delete
+remove
+destroy
+update
+edit
+set
+HEAD),
+)
+functional_public_blacklist_input = cli.LineDict(
+    "functional_public_blacklist",
+    cli.setVerboseName("3. 功能/公共页面黑名单"),
+    cli.setHelp("包含这些关键词的URL将被跳过，用于过滤登录、注册等公共页面。"),
+    cli.setCliGroup("白名单与黑名单配置"),
+    cli.setDefault(<<<HEAD
+login
+logout
+signin
+signout
+register
+signup
+captcha
+HEAD),
+)
+
+cli.check()
+
+// find_id_param 辅助函数
+find_id_param = func(req) {
+    http_req, err := poc.ParseBytesToHTTPRequest(req)
+    if err != nil { return false, "", "", "" }
+    query_params := http_req.URL.Query()
+    for _, param_name := range id_param_list {
+        if query_params.Has(param_name) {
+            param_value := query_params.Get(param_name)
+            if str.IsDigit(param_value) {
+                return true, param_name, param_value, "GET"
+            }
+        }
+    }
+    content_type := poc.GetHTTPPacketHeader(req, "Content-Type")
+    if str.Contains(content_type, "application/x-www-form-urlencoded") {
+        body_str := poc.GetHTTPPacketBody(req)
+        kv_pairs := str.Split(body_str, "&")
+        for _, pair := range kv_pairs {
+            parts := str.Split(pair, "=")
+            if len(parts) == 2 {
+                key, value := parts[0], parts[1]
+                for _, param_name := range id_param_list {
+                    if key == param_name && str.IsDigit(value) {
+                        return true, key, value, "POST"
+                    }
+                }
+            }
+        }
+    }
+    return false, "", "", ""
+}
+
+hijackHTTPRequest = func(isHttps, urlStr, req, forward, drop) {
+    forward(req)
+
+    // --- 步骤1: 完整的过滤逻辑 ---
+    http_req, _ := poc.ParseBytesToHTTPRequest(req)
+    path := http_req.URL.Path
+    is_whitelisted = false
+    if len(whitelist_input) > 0 {
+        if str.MatchAnyOfSubString(path, whitelist_input...) {
+            is_whitelisted = true
+        }
+    }
+    if !is_whitelisted {
+        if str.MatchAnyOfSubString(path, static_media_blacklist_input...) { return }
+        if str.MatchAnyOfSubString(path, dangerous_ops_blacklist_input...) { return }
+        if str.MatchAnyOfSubString(path, functional_public_blacklist_input...) { return }
+    }
+
+    // --- 步骤2: 查找可遍历的ID参数 (IDOR插件的核心) ---
+    found, paramName, paramValue, location := find_id_param(req)
+    if !found {
+        return // 如果没有ID参数，不执行任何操作
+    }
+
+    yakit.Info("--- [ID遍历检测] 请求通过过滤，开始处理: %s ---", urlStr)
+    
+    // --- 步骤3: 获取原始响应作为基准 ---
+    originalRsp, _, err := poc.HTTP(req)
+    if err != nil {
+        log.error("获取原始响应失败: %v", err)
+        return
+    }
+    originalSize := len(originalRsp)
+    if originalSize == 0 {
+        yakit.Info("原始响应为空，无法作为基准，跳过")
+        return
+    }
+    
+    originalId := int(paramValue)
+    
+    // --- 步骤4: 遍历ID并发起测试 ---
+    for i := -10; i <= 10; i++ {
+        if i == 0 { continue }
+        testId := originalId + i
+        if testId <= 0 { continue }
+
+        freq := fuzz.HTTPRequest(req, fuzz.https(isHttps))~
+        if location == "GET" {
+            freq = freq.FuzzGetParams(paramName, string(testId))
+        } else {
+            freq = freq.FuzzPostParams(paramName, string(testId))
+        }
+
+        result := freq.ExecFirst(httpool.redirectTimes(0))~
+        if result == nil || result.Error != nil { continue }
+
+        traversalReq := result.RequestRaw
+        modifiedRsp := result.ResponseRaw
+        modifiedSize := len(modifiedRsp)
+
+        diff := originalSize - modifiedSize
+        if diff < 0 { diff = -diff }
+
+        if (float(diff) / float(originalSize)) <= size_tolerance {
+            yakit.Info("[漏洞发现!] 响应大小相似。原始大小: %d, 测试ID(%d)大小: %d", originalSize, testId, modifiedSize)
+            risk.NewRisk(
+                urlStr,
+                risk.title("疑似未授权ID遍历/IDOR漏洞 (响应大小相似)"),
+                risk.severity("high"),
+                risk.titleVerbose(sprintf("遍历参数`%s`从`%d`到`%d`时，响应大小与原始请求相似", paramName, originalId, testId)),
+                // **确认: 详情中已包含您需要的数据包大小**
+                risk.details(sprintf("通过修改参数 `%s` 的值（从 `%d` 修改为 `%d`）并发起请求，发现服务器返回了与原始请求大小非常相似的响应。\n\n**关键证据:**\n- 检测参数: `%s` (位于%s)\n- 原始ID: `%d`\n- 成功遍历ID: `%d`\n- 原始响应大小: %d 字节\n- 遍历后响应大小: %d 字节\n\n此情况极可能存在不安全的直接对象引用（IDOR）或ID遍历漏洞，允许攻击者访问或操作不属于自己的数据。请人工验证。",
+                    paramName, originalId, testId,
+                    paramName, location,
+                    originalId,
+                    testId,
+                    originalSize,
+                    modifiedSize,
+                )),
+                risk.request(string(traversalReq)),
+                risk.response(string(modifiedRsp)),
+                risk.cve("no cve"),
+            )
+            return
+        }
+    }
+    
+    yakit.Info("--- [ID遍历检测] 请求处理完毕，未发现漏洞: %s ---", urlStr)
+}
