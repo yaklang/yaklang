@@ -1477,11 +1477,58 @@ func (c *OrType) AddFullTypeName(name string) {
 }
 
 func (c *OrType) GetTypeKind() TypeKind {
+	// var typ Type
+
+	// var checkAllTypes func(*OrType) bool
+	// checkAllTypes = func(or *OrType) bool {
+	// 	for _, t := range or.types {
+	// 		switch t := t.(type) {
+	// 		case *OrType:
+	// 			checkAllTypes(t)
+	// 		default:
+	// 			if typ == nil {
+	// 				typ = t
+	// 				continue
+	// 			}
+	// 			if typ.GetTypeKind() != t.GetTypeKind() {
+	// 				return false
+	// 			}
+	// 		}
+	// 	}
+	// 	return true
+	// }
+	// if checkAllTypes(c) {
+	// 	return typ.GetTypeKind()
+	// } else {
 	return OrTypeKind
+	// }
 }
 
 func (c *OrType) GetTypes() Types {
-	return c.types
+	var rets Types
+	types := make(map[Type]bool)
+
+	var checkAllTypes func(*OrType)
+	checkAllTypes = func(or *OrType) {
+		for _, t := range or.types {
+			switch t := t.(type) {
+			case *OrType:
+				checkAllTypes(t)
+			default:
+				if _, ok := types[t]; ok {
+					return
+				}
+				types[t] = true
+			}
+		}
+	}
+	checkAllTypes(c)
+	for t, _ := range types {
+		rets = append(rets, t)
+	}
+
+	return rets
+	// return c.types
 }
 
 func NewOrType(types ...Type) Type {
