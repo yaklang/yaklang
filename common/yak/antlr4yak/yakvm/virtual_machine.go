@@ -58,6 +58,8 @@ type (
 
 		// sandbox
 		sandboxMode bool
+
+		callFuncCallback func(caller *Value, wavy bool, args []*Value)
 	}
 )
 
@@ -95,6 +97,10 @@ func (n *VirtualMachine) GetExternalVariableNames() []string {
 		return nil
 	})
 	return vs
+}
+
+func (v *VirtualMachine) SetCallFuncCallback(callback func(caller *Value, wavy bool, args []*Value)) {
+	v.callFuncCallback = callback
 }
 
 func (v *VirtualMachine) SetDebug(debug bool) {
