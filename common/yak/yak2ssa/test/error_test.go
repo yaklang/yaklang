@@ -698,6 +698,23 @@ func TestType(t *testing.T) {
 			},
 		})
 	})
+
+	t.Run("check ortype", func(t *testing.T) {
+		test.CheckError(t, test.TestCase{
+			Code: `  
+ispost = cli.Bool("ispost")
+cli.check()
+Location = "AppendHTTPPacketQueryParam"
+
+if ispost {
+	Location = 9999
+}
+Location.HasPrefix("/")
+
+ `,
+			Want: []string{},
+		})
+	})
 }
 
 func TestCallParamReturn(t *testing.T) {
