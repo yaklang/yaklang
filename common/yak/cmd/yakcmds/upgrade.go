@@ -3,6 +3,12 @@ package yakcmds
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -11,11 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/utils/progresswriter"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"io"
-	"os"
-	"path/filepath"
-	"runtime"
-	"strings"
 )
 
 var UpgradeCommand = cli.Command{
@@ -24,8 +25,8 @@ var UpgradeCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.IntFlag{
 			Name:  "timeout",
-			Usage: "Set Timeout for download yak binary, default 60s.",
-			Value: 60,
+			Usage: "Set Timeout for download yak binary, default 300s.",
+			Value: 300,
 		},
 		cli.StringFlag{
 			Name:  "version,v",
@@ -41,6 +42,11 @@ var UpgradeCommand = cli.Command{
 			Name:  "n",
 			Usage: "Show latest N active versions.",
 			Value: 16,
+		},
+		cli.IntFlag{
+			Name:  "retry",
+			Usage: "Set retry times for yak binary download and sha256 check, default 3.",
+			Value: 3,
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -120,38 +126,84 @@ var UpgradeCommand = cli.Command{
 		}
 
 		newFilePath := filepath.Join(exeDir, "yak.new")
-		fd, err := os.OpenFile(newFilePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o766)
-		if err != nil {
-			log.Errorf("create temp file failed: %v", err)
-			return err
-		}
-		defer func() {
+		sha256Url := downloadUrl + ".sha256.txt"
+		maxRetries := c.Int("retry")
+		var lastErr error
+
+		for attempt := 1; attempt <= maxRetries; attempt++ {
+			if attempt > 1 {
+				log.Warnf("yak upgrade: retry attempt %d/%d", attempt, maxRetries)
+			}
+			// 1. 下载sha256校验值
+			var expectedSha256 string
+			shaRsp, _, shaErr := poc.DoGET(sha256Url, poc.WithTimeout(10))
+			if shaErr != nil {
+				lastErr = utils.Errorf("fetch yak sha256 failed: %v", shaErr)
+				continue
+			}
+			shaRaw := string(shaRsp.GetBody())
+			shaFields := strings.Fields(shaRaw)
+			if len(shaFields) > 0 {
+				expectedSha256 = shaFields[0]
+			} else {
+				lastErr = utils.Errorf("invalid sha256 file format")
+				continue
+			}
+
+			// 2. 下载二进制
+			fd, err := os.OpenFile(newFilePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o766)
+			if err != nil {
+				lastErr = utils.Errorf("create temp file failed: %v", err)
+				continue
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			_, _, err = poc.DoGET(downloadUrl, poc.WithConnectTimeout(float64(c.Int("timeout"))), poc.WithTimeout(float64(c.Int("timeout"))), poc.WithBodyStreamReaderHandler(func(header []byte, bodyReader io.ReadCloser) {
+				defer cancel()
+				log.Infof("downloading yak binary...")
+				contentLength := lowhttp.GetHTTPPacketHeader(header, "content-length")
+				writer := progresswriter.New(uint64(codec.Atoi(contentLength)))
+				writer.ShowProgress("downloading", ctx)
+
+				// 使用带错误检查的io.Copy
+				written, copyErr := io.Copy(io.MultiWriter(fd, writer), bodyReader)
+				if copyErr != nil && copyErr != io.EOF {
+					log.Errorf("download yak failed: %v", copyErr)
+					return
+				}
+
+				// 检查文件大小是否正确
+				if contentLength != "" {
+					expectedSize := codec.Atoi(contentLength)
+					if written != int64(expectedSize) {
+						log.Errorf("download incomplete: expected %d bytes, got %d bytes", expectedSize, written)
+						return
+					}
+				}
+			}))
 			fd.Sync()
 			fd.Close()
-		}()
-
-		binary := downloadUrl
-		log.Infof("start to download yak: %v", binary)
-		timeout := c.Int("timeout")
-		ctx, cancel := context.WithCancel(context.Background())
-		_, _, err = poc.DoGET(binary, poc.WithConnectTimeout(float64(timeout)), poc.WithBodyStreamReaderHandler(func(header []byte, bodyReader io.ReadCloser) {
-			defer func() {
-				cancel()
-			}()
-
-			log.Infof("downloading yak binary...")
-			contentLength := lowhttp.GetHTTPPacketHeader(header, "content-length")
-			writer := progresswriter.New(uint64(codec.Atoi(contentLength)))
-			writer.ShowProgress("downloading", ctx)
-			_, err := io.Copy(io.MultiWriter(fd, writer), bodyReader)
-			if err != nil && err != io.EOF {
-				log.Errorf("download yak failed: %v", err)
-				return
+			if err != nil {
+				os.Remove(newFilePath)
+				lastErr = utils.Errorf("download yak failed: %v", err)
+				continue
 			}
-		}))
-		if err != nil {
-			log.Errorf("download yak failed: %v", err)
-			return err
+
+			// 校验sha256
+			actualSha256 := utils.GetFileSha256(newFilePath)
+			if actualSha256 != expectedSha256 {
+				os.Remove(newFilePath)
+				lastErr = utils.Errorf("sha256 check failed: expected %s, got %s", expectedSha256, actualSha256)
+				continue
+			} else {
+				log.Infof("sha256 check success checksum %s as expected", expectedSha256)
+			}
+
+			// 校验通过，退出重试
+			lastErr = nil
+			break
+		}
+		if lastErr != nil {
+			return lastErr
 		}
 
 		destDir, _ := filepath.Split(exePath)

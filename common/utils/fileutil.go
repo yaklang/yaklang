@@ -421,6 +421,28 @@ func GetLatestFile(dir, suffix string) (filename string, err error) {
 	return fileTimesMap[fileTimes[len(fileTimes)-1]], nil
 }
 
+// GetFileSha256 计算文件的SHA256值
+func GetFileSha256(filepath string) string {
+	var f *os.File
+	var err error
+	var sha256Value string = ""
+	if _, err = os.Stat(filepath); err != nil {
+		return ""
+	}
+
+	if f, err = os.Open(filepath); err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, f); err != nil {
+		return ""
+	}
+	sha256Value = hex.EncodeToString(hasher.Sum(nil))
+	return sha256Value
+}
+
 func GetFileMd5(filepath string) string {
 	var f *os.File
 	var err error
