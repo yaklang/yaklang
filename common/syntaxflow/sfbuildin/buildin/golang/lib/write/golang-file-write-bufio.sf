@@ -116,7 +116,7 @@ REFERENCE
 
 bufio?{<fullTypeName>?{have: 'bufio'}} as $entry;
 $entry.NewWriter <getCall> as $writer;
-$writer.WriteString(* #-> as $output);
+$writer.WriteString(,* #-> as $output);
 
 alert $output for {
 	title: "Audit Golang File Write With Bufio",

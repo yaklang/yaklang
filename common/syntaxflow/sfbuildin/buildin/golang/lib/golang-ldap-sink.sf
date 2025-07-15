@@ -49,7 +49,7 @@ desc(
    - 如果绑定账户权限过高，攻击者可能进一步渗透系统。
 DESC
 	rule_id: "a284316a-5ca8-4f87-a325-fbf8e487d27e"
-	title_zh: "查找 Golang LDAP 连接汇点"
+	title_zh: "查找Golang LDAP连接汇点"
 	solution: <<<SOLUTION
 ### 审计建议
 

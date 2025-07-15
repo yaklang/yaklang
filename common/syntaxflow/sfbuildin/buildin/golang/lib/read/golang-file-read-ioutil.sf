@@ -101,6 +101,7 @@ for {
     // 例如：fmt.Println(string(buffer[:n]))
 }
 ```
+
 通过采用流式或分块读取的方式，可以有效降低内存消耗，提高程序处理大型文件时的性能和稳定性。
 SOLUTION
 	reference: <<<REFERENCE
@@ -112,9 +113,6 @@ ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
 $entry.ReadAll().* as $output
 $entry.ReadFile().* as $output
 
-$entry.ReadAll(* #-> as $output) 
-$entry.ReadFile(* #-> as $output)
-
 alert $output for {
 	title: "Audit Golang File Read ioutil Methods",
 	title_zh: "审计Golang ioutil文件读取方法",
@@ -123,7 +121,7 @@ alert $output for {
 
 #### 推荐使用 os 包中的替代方法
 
-对于 `ioutil.ReadFileFunc`，推荐使用 `os.ReadFile`，其功能和用法与 `ioutil.ReadFile` 相似，但属于较新的标准库。
+对于 `ioutil.ReadFile`，推荐使用 `os.ReadFile`，其功能和用法与 `ioutil.ReadFile` 相似，但属于较新的标准库。
 
 ```go
 // 示例：使用 os.ReadFile 读取文件

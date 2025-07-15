@@ -39,7 +39,7 @@ desc(
    - 执行任意命令：在某些情况下，攻击者可能通过 SQL 注入执行操作系统命令。
    - 拒绝服务：通过构造恶意查询导致数据库服务器过载或崩溃。
 DESC
-	rule_id: "6702b6aa-bb87-4be9-9b11-b91359ded6b6"
+	rule_id: "2edbaa7b-0cfb-4d71-9e9e-0e8771ba70cb"
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -94,7 +94,7 @@ SOLUTION
 	reference: <<<REFERENCE
 [CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')](https://cwe.mitre.org/data/definitions/89.html)
 REFERENCE
-	title_zh: "检测 Golang SQL 注入漏洞(ent)"
+	title_zh: "检测Golang SQL 注入漏洞(ent)"
 )
 
 ent?{<fullTypeName>?{have: 'entgo.io/ent'}} as $entry;
@@ -104,7 +104,7 @@ $param.FormValue as $high;
 
 alert $high for {
 	title: "Check Golang SQL Injection(ent)",
-	title_zh: "检测 Golang SQL 注入漏洞(ent)",
+	title_zh: "检测Golang SQL 注入漏洞(ent)",
 	solution: <<<CODE
 ### 修复建议
 

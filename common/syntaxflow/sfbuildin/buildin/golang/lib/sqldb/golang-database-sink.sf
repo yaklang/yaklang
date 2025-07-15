@@ -78,7 +78,9 @@ REFERENCE
 <include('golang-database-reform')> as $output;
 <include('golang-database-sql')> as $output;
 <include('golang-database-sqlx')> as $output;
-<include('golang-database-from-param')> as $output;
+sql.DB as $output;
+
+$output<getFunc><getCall>.* as $output
 
 alert $output for {
 	title: "Audit Golang Database Sink",

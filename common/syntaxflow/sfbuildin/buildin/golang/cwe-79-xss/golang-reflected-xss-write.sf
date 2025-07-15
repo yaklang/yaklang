@@ -2,6 +2,7 @@ desc(
 	title: "Check Golang Reflected XSS Vulnerability"
 	type: audit
 	severity: high
+	risk: "xss"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -117,12 +118,11 @@ SOLUTION
 REFERENCE
 )
 
-
-http.Request as $source 
+<include('golang-user-input')> as $input;
 <include('golang-http-sink')> as $output;
 $output.Write(* as $sink)
 $sink #{
-	until: "* & $source",
+	until: "* & $input",
 }-> as $high 
 
 alert $high for {

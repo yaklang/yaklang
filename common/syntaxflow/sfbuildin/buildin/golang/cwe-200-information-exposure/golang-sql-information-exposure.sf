@@ -101,6 +101,7 @@ REFERENCE
 <include('golang-database-sink')> as $sink;
 
 $sink.QueryRow(* #-> as $param)
+$sink.Query(* #-> as $param)
 
 $param #{ 
 	include:`*?{opcode:const}?{have:'SELECT current_database()'}`,
