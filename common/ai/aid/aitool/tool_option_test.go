@@ -17,7 +17,7 @@ import (
 )
 
 // 提供一个测试用的回调函数
-func testCallback(ctx context.Context, params InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+func testCallback(ctx context.Context, params InvokeParams, runtimeConfig *ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 	return params, nil
 }
 
@@ -33,7 +33,7 @@ func TestNewToolWithOptions(t *testing.T) {
 			builder: func() (*Tool, error) {
 				return New("simpleTool",
 					WithDescription("简单工具描述"),
-					WithNoRuntimeCallback(testCallback))
+					WithCallback(testCallback))
 			},
 			expected: &Tool{
 				Tool: &mcp.Tool{
@@ -51,7 +51,7 @@ func TestNewToolWithOptions(t *testing.T) {
 			builder: func() (*Tool, error) {
 				return New("paramTool",
 					WithDescription("带参数的工具"),
-					WithNoRuntimeCallback(testCallback),
+					WithCallback(testCallback),
 					WithStringParam("query",
 						WithParam_Description("查询参数"),
 						WithParam_Required(),
@@ -88,7 +88,7 @@ func TestNewToolWithOptions(t *testing.T) {
 			builder: func() (*Tool, error) {
 				return New("arrayTool",
 					WithDescription("带数组参数的工具"),
-					WithNoRuntimeCallback(testCallback),
+					WithCallback(testCallback),
 					WithStringArrayParamEx("items",
 						[]PropertyOption{
 							WithParam_Description("数组参数"),
@@ -123,7 +123,7 @@ func TestNewToolWithOptions(t *testing.T) {
 			builder: func() (*Tool, error) {
 				return New("nestedArrayTool",
 					WithDescription("嵌套数组参数工具"),
-					WithNoRuntimeCallback(testCallback),
+					WithCallback(testCallback),
 					WithArrayParamEx("nestedItems",
 						[]PropertyOption{
 							WithParam_Description("嵌套数组参数"),
@@ -171,7 +171,7 @@ func TestNewToolWithOptions(t *testing.T) {
 			builder: func() (*Tool, error) {
 				return New("multiParamTool",
 					WithDescription("多参数工具"),
-					WithNoRuntimeCallback(testCallback),
+					WithCallback(testCallback),
 					WithStringParam("stringParam",
 						WithParam_Description("字符串参数"),
 						WithParam_Required(),
@@ -269,7 +269,7 @@ func TestToolJSONSchemaGeneration(t *testing.T) {
 			name: "简单工具JSON Schema",
 			tool: newTool("simpleTool",
 				WithDescription("简单工具描述"),
-				WithNoRuntimeCallback(testCallback),
+				WithCallback(testCallback),
 			),
 			expectedFields: []string{"$schema", "type", "description", "properties", "required"},
 		},
@@ -277,7 +277,7 @@ func TestToolJSONSchemaGeneration(t *testing.T) {
 			name: "带参数工具JSON Schema",
 			tool: newTool("paramTool",
 				WithDescription("带参数的工具"),
-				WithNoRuntimeCallback(testCallback),
+				WithCallback(testCallback),
 				WithStringParam("query",
 					WithParam_Description("查询参数"),
 					WithParam_Required(),
@@ -331,7 +331,7 @@ func TestComplexToolCreation(t *testing.T) {
 	// 创建一个复杂工具
 	complexTool, err := New("complexTool",
 		WithDescription("复杂工具"),
-		WithNoRuntimeCallback(testCallback),
+		WithCallback(testCallback),
 		WithStringParam("simpleParam",
 			WithParam_Description("简单参数"),
 			WithParam_Required(),
@@ -403,7 +403,7 @@ func TestComplexToolCreation_2(t *testing.T) {
 	// 创建一个复杂工具
 	complexTool, err := New("complexTool",
 		WithDescription("复杂工具"),
-		WithNoRuntimeCallback(testCallback),
+		WithCallback(testCallback),
 		WithStructArrayParam("nestedObjectItems",
 			[]PropertyOption{
 				WithParam_Description("嵌套数组结构参数"),

@@ -25,7 +25,7 @@ func TestGetYakScript(t *testing.T) {
 			w1, w2 := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
 			ait.Callback(context.Background(), aitool.InvokeParams{
 				"url": "http://" + host + ":" + strconv.Itoa(port),
-			}, w1, w2)
+			}, nil, w1, w2)
 			assert.Assert(t, strings.Contains(w1.String(), flag))
 		}
 	}
