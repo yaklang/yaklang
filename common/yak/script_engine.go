@@ -384,6 +384,8 @@ type ScriptEngine struct {
 	debug         bool
 	debugInit     func(*yakvm.Debugger)
 	debugCallback func(*yakvm.Debugger)
+
+	callFuncCallback func(caller *yakvm.Value, wavy bool, args []*yakvm.Value)
 }
 
 func (s *ScriptEngine) GetTaskByTaskID(id string) (*Task, error) {
@@ -443,6 +445,10 @@ func (e *ScriptEngine) init() {
 
 func (e *ScriptEngine) RegisterEngineHooks(f func(engine *antlr4yak.Engine) error) {
 	e.engineHooks = append(e.engineHooks, f)
+}
+
+func (e *ScriptEngine) SetCallFuncCallback(f func(caller *yakvm.Value, wavy bool, args []*yakvm.Value)) {
+	e.callFuncCallback = f
 }
 
 func (e *ScriptEngine) SetYakitClient(client *yaklib.YakitClient) {
@@ -537,6 +543,7 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 	engine.SetDebugMode(e.debug)
 	engine.SetDebugCallback(e.debugCallback)
 	engine.SetDebugInit(e.debugInit)
+	engine.SetCallFuncCallback(e.callFuncCallback)
 
 	vars := make(map[string]any)
 	vars["id"] = id
