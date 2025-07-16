@@ -1,0 +1,36 @@
+desc(
+	title: "Audit Golang File Read Path Sink"
+	type: audit
+	level: info
+	lib: 'golang-file-read-path-sink'
+	desc: <<<DESC
+该规则用于审计Golang代码中可能存在的不安全的文件路径读取操作。它旨在识别出程序中所有使用文件的路径读取函数，如使用bufio、ioutil和os包中的相关函数，这些操作可能受到路径穿越攻击的影响。规则通过监测这些函数的使用，帮助开发者发现并修复潜在的安全问题。
+DESC
+	rule_id: "d2580919-8b45-444e-9f93-55633c0311e4"
+	title_zh: "审计Golang文件路径读取汇聚点"
+	solution: <<<SOLUTION
+为了防止路径穿越攻击，应确保所有文件路径读取操作都对输入进行了严格的验证。验证应包括但不限于检查路径是否为绝对路径、是否包含非法字符或目录遍历序列（如'..'）。同时，使用内置的文件路径处理函数时，应尽量避免手动拼接路径，而是使用安全的路径拼接方法或库函数。修复示例：\n```golang\n// 使用安全的路径操作函数
+import \"path/filepath\"
+safePath, err := filepath.Abs(userInput)
+if err != nil {
+    // 错误处理
+}
+// 使用safePath进行文件操作
+```
+
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22: Path Traversal](https://cwe.mitre.org/data/definitions/22.html)
+[OWASP Path Traversal](https://owasp.org/www-community/vulnerabilities/Path_Traversal)
+REFERENCE
+)
+
+<include('golang-file-read-path-bufio')> as $output;
+<include('golang-file-read-path-ioutil')> as $output;
+<include('golang-file-read-path-os')> as $output;
+
+alert $output for {
+	title_zh: "审计Golang文件路径读取汇聚点",
+	level: "info",
+	title: "Audit Golang File Read Path Sink",
+}

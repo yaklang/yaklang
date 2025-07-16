@@ -139,8 +139,9 @@ func main (){
 }
 
 func TestParameter_MemberCall(t *testing.T) {
-	fs := filesys.NewVirtualFs()
-	fs.AddFile("test.go", `package main
+	t.Run("membercall normal", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("test.go", `package main
 
 import (
     "fmt"
@@ -157,11 +158,56 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 `)
 
-	ssatest.CheckSyntaxFlowWithFS(t, fs, `
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `
 ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
 $entry.ReadFile(* #-> as $output)
 		`, map[string][]string{
-		"output": {"\"file\"", "Parameter-r"},
-	}, true, ssaapi.WithLanguage(ssaapi.GO),
-	)
+			"output": {"\"file\"", "Parameter-r"},
+		}, true, ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
+
+	t.Run("method normal", func(t *testing.T) {
+		code := `
+package main
+
+type Context struct{
+}
+
+func (c* Context)Cors1() {
+	c.Header("Access-Control-Allow-Origin", "*")
+	c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+}
+		`
+		ssatest.CheckSyntaxFlow(t, code, `
+			*.Header()?{have: "Access-Control-Allow-Origin"} as $header
+			$header<getCallee>(,,* #-> as $output)
+		`, map[string][]string{
+			"output": {"\"*\""},
+		},
+			ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
+
+	t.Run("get membercall with specific parameters", func(t *testing.T) {
+		code := `
+package main
+
+import "github.com/gin-gonic/gin"
+
+func Cors1(c *gin.Context) {
+	c.Header("Access-Control-Allow-Origin", "*")
+	c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+}
+		`
+		ssatest.CheckSyntaxFlow(t, code, `
+			gin.Context as $sink;
+			$sink.Header()?{have: "Access-Control-Allow-Origin"} as $header
+			$header<getCallee>(,,* #-> as $output)
+		`, map[string][]string{
+			"output": {"\"*\""},
+		},
+			ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
 }

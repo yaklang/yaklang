@@ -1,0 +1,108 @@
+desc(
+	title: "Audit Golang File Write With Path Bufio"
+	type: audit
+	level: info
+	lib: 'golang-file-write-path-bufio'
+	desc: <<<DESC
+The rule is designed to audit Golang code that writes files using the bufio package. This includes checking for potential Path Traversal vulnerabilities, which can occur when user input is not properly sanitized before being used in file operations. The rule identifies usage of bufio.NewWriter and its WriteString method, and alerts if the output path is derived from user input. This helps prevent attackers from manipulating file paths to access or modify sensitive files outside the intended directory. Path Traversal vulnerabilities can lead to unauthorized data access, data modification, or even system compromise. It is crucial to ensure that all user inputs are validated and sanitized before being used in file operations to mitigate this risk.
+DESC
+	rule_id: "58ce930c-65fc-4045-b511-904bcddeb4ed"
+	title_zh: "审计Golang使用bufio进行文件写入的代码"
+	solution: <<<SOLUTION
+To prevent Path Traversal vulnerabilities, developers should sanitize and validate all user inputs before using them in file operations. This can be achieved by implementing input validation checks, such as verifying that the input does not contain sequences like '../' that could be used to navigate to parent directories. Additionally, using absolute paths instead of relative paths can help avoid unintended access to files outside the designated directory. It is also recommended to use secure coding practices and adhere to the principle of least privilege when handling file operations.
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22](https://cwe.mitre.org/data/definitions/22.html)
+REFERENCE
+)
+
+bufio?{<fullTypeName>?{have: 'bufio'}} as $entry;
+$entry.NewWriter <getCall> as $writer;
+$writer.WriteString(* #-> as $output,);
+
+alert $output for {
+	title: "Audit Golang File Write With Bufio",
+	title_zh: "审计Golang使用bufio进行文件写入的代码",
+	level: "info",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://filewrite.go': <<<PARAM
+package main
+
+import (
+    "bufio"
+    "fmt"
+    "os"
+)
+
+func main() {
+    // 写入文件
+    writeToFile("example.txt", []string{"Hello, World!", "Welcome to Go programming.", "This is a buffered I/O example."})
+
+    // 读取文件
+    readFromFile("example.txt")
+}
+
+// writeToFile 使用 bufio 写入文本到文件
+func writeToFile(filename string, lines []string) {
+    // 创建或打开文件
+    file, err := os.Create(filename)
+    if err != nil {
+        fmt.Println("Error creating file:", err)
+        return
+    }
+    defer file.Close() // 确保在函数结束时关闭文件
+
+    // 创建一个带缓冲的写入器
+    writer := bufio.NewWriter(file)
+
+    // 写入每一行
+    for _, line := range lines {
+        _, err := writer.WriteString(line + "\n")
+        if err != nil {
+            fmt.Println("Error writing to file:", err)
+            return
+        }
+    }
+
+    // 确保所有缓冲的数据都写入文件
+    if err := writer.Flush(); err != nil {
+        fmt.Println("Error flushing to file:", err)
+        return
+    }
+
+    fmt.Println("Data written to", filename)
+}
+
+// readFromFile 使用 bufio 逐行读取文件
+func readFromFile(filename string) {
+    // 打开文件
+    file, err := os.Open(filename)
+    if err != nil {
+        fmt.Println("Error opening file:", err)
+        return
+    }
+    defer file.Close() // 确保在函数结束时关闭文件
+
+    // 创建一个带缓冲的读取器
+    reader := bufio.NewReader(file)
+
+    // 逐行读取文件
+    for {
+        line, err := reader.ReadString('\n')
+        if err != nil {
+            break // EOF 或其他错误
+        }
+        fmt.Print(line) // 打印读取的行
+    }
+
+    if err != nil && err.Error() != "EOF" {
+        fmt.Println("Error reading file:", err)
+        return
+    }
+}
+PARAM
+)

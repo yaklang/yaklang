@@ -1,0 +1,72 @@
+desc(
+	title: "Audit Golang File Write Path using ioutil"
+	type: audit
+	level: info
+	lib: 'golang-file-write-path-ioutil'
+	desc: <<<DESC
+该规则用于审计Golang代码中使用ioutil包进行文件写入的操作。文件写入操作可能因不正确的路径限制而导致路径穿越漏洞，使得攻击者可以访问或修改服务器上的任意文件。规则通过检测ioutil.WriteFile和ioutil.WriteAll函数的调用，来识别潜在的不安全文件写入路径。
+DESC
+	rule_id: "e329969f-7a20-489b-ba66-7033bb57d446"
+	reference: <<<REFERENCE
+[ioutil package - io/ioutil - Go Packages (go.dev)](https://pkg.go.dev/io/ioutil)
+[CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')](https://cwe.mitre.org/data/definitions/22.html)
+REFERENCE
+	title_zh: "审计Golang文件写入(ioutil)"
+	solution: <<<SOLUTION
+为了避免路径穿越漏洞，应确保文件写入操作时使用的路径是安全的。这可以通过以下方式实现：
+1. 对传入的路径参数进行验证，确保它们不包含向上导航的组件（如'..'）。
+2. 限制写入操作只能在与应用程序相关的目录内进行。
+3. 使用更安全的方法来处理文件路径，例如使用Go语言的path/filepath包来清洁和解析路径。
+SOLUTION
+)
+
+ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
+$entry.WriteAll(* #-> as $output,)
+$entry.WriteFile(* #-> as $output,)
+
+alert $output for {
+	title_zh: "审计Golang文件写入(ioutil)",
+	level: "info",
+	title: "Audit Golang File Write Path using ioutil",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://filewrite.go': <<<PARAM
+package main
+
+import (
+	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
+)
+
+func main() {
+	// 要写入的文件名
+	fileName := "example.txt"
+
+	// 写入数据到文件
+	data := []byte("Hello, Go Programming!\nThis is a simple file I/O example.")
+	err := ioutil.WriteFile(fileName, data, 0644) // 0644 是文件权限
+	if err != nil {
+		log.Fatalf("Error writing to file: %s", err)
+		return
+	}
+	fmt.Println("Data written to file successfully.")
+
+	// 读取文件内容
+	content, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		log.Fatalf("Error reading from file: %s", err)
+		return
+	}
+
+	// 打印文件内容
+	fmt.Println("File content:")
+	fmt.Println(string(content))
+}
+
+PARAM
+)

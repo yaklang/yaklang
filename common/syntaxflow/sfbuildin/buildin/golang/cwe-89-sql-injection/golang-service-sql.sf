@@ -1,0 +1,80 @@
+desc(
+	title: "Detect Golang Service SQL Injection Vulnerability"
+	type: audit
+	severity: high
+	desc: <<<DESC
+SQL注入是一种常见的攻击手段，攻击者通过在SQL查询中注入恶意SQL代码片段，以欺骗数据库执行非预期的操作。在本规则中，我们检测Golang服务中可能存在的SQL注入漏洞。该漏洞通常是由于未对用户输入进行适当的过滤和转义导致的。漏洞触发场景包括但不限于用户输入被直接拼接到SQL查询中。潜在影响包括数据泄露、数据损坏或数据库操作权限的提升。
+DESC
+	rule_id: "278c2a17-1b81-49d1-a4a9-d881fba1a0e9"
+	title_zh: "检测Golang Service SQL注入漏洞"
+	solution: <<<SOLUTION
+为防止SQL注入漏洞，建议采取以下措施：
+1. 使用参数化查询（Prepared Statements）代替拼接SQL查询。
+2. 对用户输入进行严格的验证和过滤。
+3. 实施最小权限原则，确保应用程序只拥有执行必要数据库操作的最小权限。
+SOLUTION
+	reference: <<<REFERENCE
+https://cwe.mitre.org/data/definitions/89.html
+REFERENCE
+)
+
+<include('golang-user-input')> as $input;
+
+*.LoginCheck(* #-> as $param)
+*.QueryByID(* #-> as $param)
+$param & $input as $high;
+
+alert $high for {
+	level: "high",
+	type: "vuln",
+	title: "SQL Injection detected",
+	title_zh: "检测到SQL注入",
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://main.go': <<<UNSAFE
+package main
+
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/godzeo/go-gin-vul/service/safe_service"
+	service "github.com/godzeo/go-gin-vul/service/vul_service"
+)
+
+func Sqlli(c *gin.Context) {
+	var User string
+	var Password string
+
+	if c.Request.Method == "GET" {
+		User = c.Query("username")
+		Password = c.Query("password")
+	} else if c.Request.Method == "POST" {
+		User = c.PostForm("username")
+		Password = c.PostForm("password")
+	}
+	println("Password=" + Password)
+
+	loginService := service.LogData{Username: User, Password: Password}
+	isExist, err := loginService.LoginCheck()
+	if err != nil {
+		c.JSON(500, gin.H{
+			"err": err,
+		})
+		return
+	}
+
+	if !isExist {
+		c.JSON(403, gin.H{
+			"success": "login fail",
+		})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"success": "login succeed " + User,
+	})
+}
+UNSAFE
+)

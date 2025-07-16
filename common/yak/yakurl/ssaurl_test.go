@@ -546,7 +546,7 @@ func main() {
 				.QueryRow(* #-> as $a)
 			`,
 			[]variableResult{
-				{variable: "a", number: 9},
+				{variable: "a", number: 8},
 				{variable: "_", number: 1},
 			},
 		)
@@ -560,7 +560,6 @@ func main() {
 			{riskHash: false, url: "/src/main/go/A/test1.go:5"},
 			{riskHash: false, url: "/src/main/go/A/test1.go:6"},
 			{riskHash: false, url: "/src/main/go/A/test1.go:13"},
-			{riskHash: false, url: "/src/main/go/A/test1.go:14"},
 			{riskHash: false, url: "/src/main/go/A/test1.go:14"},
 			{riskHash: false, url: "/src/main/go/A/test1.go:15"},
 			{riskHash: false, url: "/src/main/go/A/test1.go:18"},

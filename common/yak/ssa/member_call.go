@@ -10,7 +10,9 @@ func (b *FunctionBuilder) getFieldValue(object, key Value, wantFunction bool) Va
 	// normal member
 	// use name  peek value
 	if ret := b.PeekValueInThisFunction(res.name); ret != nil {
-		return ret
+		if _, ok := ToParameterMember(ret); !ok {
+			return ret
+		}
 	}
 
 	// default member
@@ -146,9 +148,9 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 		return un
 	}
 	if para, ok := ToParameter(object); ok {
-		if member, ok2 := para.GetStringMember(key.String()); ok2 {
-			return member
-		}
+		// if member, ok2 := para.GetStringMember(key.String()); ok2 {
+		// 	return member
+		// }
 		member := b.NewParameterMember(name, para, key)
 
 		memberHandler(member)

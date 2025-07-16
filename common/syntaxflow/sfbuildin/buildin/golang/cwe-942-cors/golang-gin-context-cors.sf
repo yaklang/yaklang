@@ -1,0 +1,68 @@
+desc(
+	title: "Detect Golang CORS Misconfiguration Vulnerability (gin.Context)"
+	title_zh: "检测Golang CORS配置错误漏洞 (gin.Context)"
+	type: vuln
+	severity: high
+	risk: ssti
+	desc: <<<DESC
+CORS（跨源资源共享）配置错误漏洞允许攻击者绕过同源策略限制，从而导致敏感数据泄露、会话劫持或执行恶意操作。该规则用于检测Golang中使用了gin框架的Context对象是否配置了不安全的CORS策略。通过分析代码，识别出设置了允许所有来源（*）或未正确校验来源的CORS配置，这可能导致潜在的跨源请求攻击。
+DESC
+	rule_id: "462d438a-5955-47c7-a0f9-1940a7f387c3"
+	reference: <<<REFERENCE
+https://owasp.org/www-community/vulnerabilities/Cross-Origin_Resource_Sharing_CORS#CORS_Policy_Misconfiguration
+REFERENCE
+	solution: <<<SOLUTION
+为了避免CORS配置错误，应确保仅允许来自可信域的请求。修复建议如下：
+1. 明确指定允许的来源（而不是使用*），例如：`c.Header("Access-Control-Allow-Origin", "https://trusteddomain.com")`
+2. 对于需要动态设置来源的情况，确保对来源进行适当的验证。
+3. 如果不需要CORS，则完全禁用CORS支持，不设置相关响应头。
+SOLUTION
+)
+
+<include('golang-gin-context')> as $sink 
+$sink.Header()?{have: "Access-Control-Allow-Origin"} as $header
+$header<getCallee>(,,* #-> as $output)
+
+$output?{opcode: const} as $safe
+$output - $safe as $high
+$output?{have: "parameterMember"} as $high
+
+alert $high for {
+	type: "vuln",
+	title: "CORS detected",
+	title_zh: "检测到CORS",
+	level: "high",
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://main.go': <<<UNSAFE
+package unAuth
+
+import "github.com/gin-gonic/gin"
+
+func Cors1(c *gin.Context) {
+
+	c.Header("Access-Control-Allow-Origin", "*")
+	c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+
+}
+
+func Cors2(c *gin.Context) {
+
+	origin := c.Request.Header.Get("Origin")
+	c.Header("Access-Control-Allow-Origin", origin)
+	c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+
+}
+
+func Corssafe(c *gin.Context) {
+	allowedOrigin := "https://test.com"
+
+	c.Header("Access-Control-Allow-Origin", allowedOrigin)
+	c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+
+}
+UNSAFE
+)
