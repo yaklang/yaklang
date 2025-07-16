@@ -5,13 +5,15 @@ import (
 	"io"
 )
 
-type toolInvokeHook func(t *Tool, params map[string]any, config *ToolInvokeConfig) (*ToolResult, error)
+type toolCallCancelCallback func(result *ToolExecutionResult, err error) (*ToolExecutionResult, error)
 
 type ToolInvokeConfig struct {
-	ctx        context.Context
-	stdout     io.Writer
-	stderr     io.Writer
-	invokeHook toolInvokeHook // hook toolCall
+	ctx            context.Context
+	stdout         io.Writer
+	stderr         io.Writer
+	errCallback    func(error) (*ToolResult, error)
+	resCallback    func(result *ToolExecutionResult) (*ToolResult, error)
+	cancelCallback toolCallCancelCallback
 }
 
 func (i ToolInvokeConfig) GetStdout() io.Writer {
@@ -42,14 +44,26 @@ func WithStderr(stderr io.Writer) ToolInvokeOptions {
 	}
 }
 
-func WithInvokeHook(hook toolInvokeHook) ToolInvokeOptions {
-	return func(config *ToolInvokeConfig) {
-		config.invokeHook = hook
-	}
-}
-
 func WithContext(ctx context.Context) ToolInvokeOptions {
 	return func(config *ToolInvokeConfig) {
 		config.ctx = ctx
+	}
+}
+
+func WithErrorCallback(callback func(error) (*ToolResult, error)) ToolInvokeOptions {
+	return func(config *ToolInvokeConfig) {
+		config.errCallback = callback
+	}
+}
+
+func WithResultCallback(callback func(result *ToolExecutionResult) (*ToolResult, error)) ToolInvokeOptions {
+	return func(config *ToolInvokeConfig) {
+		config.resCallback = callback
+	}
+}
+
+func WithCancelCallback(callback toolCallCancelCallback) ToolInvokeOptions {
+	return func(config *ToolInvokeConfig) {
+		config.cancelCallback = callback
 	}
 }
