@@ -7,9 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/databasex"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -60,22 +58,25 @@ func (c *config) parseProjectWithFS(
 	processCallback(0.0, fmt.Sprintf("parse project in fs: %v, path: %v", filesystem, c.info))
 	processCallback(0.0, "calculate total size of project")
 
-	db := ssadb.GetDB()
-	folderSave := databasex.NewSave[SaveFolder](func(t []SaveFolder) {
-		utils.GormTransaction(db, func(tx *gorm.DB) error {
-			for _, sf := range t {
-				ssadb.SaveFolder(tx, sf.name, sf.path)
-			}
-			return nil
-		})
-	})
-	if c.enableDatabase != ssa.ProgramCacheMemory {
-		folderSave.Save(SaveFolder{
-			name: c.ProgramName,
-			path: []string{"/"},
-		})
-	}
+	// db := ssadb.GetDB()
+	// folderSave := databasex.NewSave[SaveFolder](func(t []SaveFolder) {
+	// 	utils.GormTransaction(db, func(tx *gorm.DB) error {
+	// 		for _, sf := range t {
+	// 			ssadb.SaveFolder(tx, sf.name, sf.path)
+	// 		}
+	// 		return nil
+	// 	})
+	// })
+	// if c.enableDatabase != ssa.ProgramCacheMemory {
+	// 	folderSave.Save(SaveFolder{
+	// 		name: c.ProgramName,
+	// 		path: []string{"/"},
+	// 	})
+	// }
 
+	if c.ProgramName != "" {
+		ssadb.SaveFolder(c.ProgramName, []string{"/"})
+	}
 	// get total size
 	err = filesys.Recursive(programPath,
 		filesys.WithFileSystem(filesystem),
@@ -90,10 +91,11 @@ func (c *config) parseProjectWithFS(
 				strings.Split(folder, string(c.fs.GetSeparators()))...,
 			)
 			if c.enableDatabase != ssa.ProgramCacheMemory {
-				folderSave.Save(SaveFolder{
-					name: name,
-					path: folders,
-				})
+				ssadb.SaveFolder(c.ProgramName, folders)
+				// folderSave.Save(SaveFolder{
+				// 	name: name,
+				// 	path: folders,
+				// })
 			}
 			return nil
 		}),
@@ -275,7 +277,7 @@ func (c *config) parseProjectWithFS(
 	}
 	f6 := func() error {
 		wg.Wait()
-		folderSave.Close()
+		ssadb.SaveSource()
 		return nil
 	}
 	ssaprofile.ProfileAddWithError(true, "ParseProjectWithFS", f1, f2, f3, f4, f5, f6)

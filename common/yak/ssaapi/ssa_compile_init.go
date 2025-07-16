@@ -60,7 +60,7 @@ func (c *config) init(filesystem filesys_interface.FileSystem, fileSize int) (*s
 			if c.enableDatabase != ssa.ProgramCacheMemory {
 				folderName, fileName := filesystem.PathSplit(filePath)
 				folders := strings.Split(folderName, string(filesystem.GetSeparators()))
-				ssadb.SaveFile(ssadb.GetDB(), fileName, src.GetSourceCode(), programName, folders)
+				ssadb.SaveFile(fileName, src.GetSourceCode(), programName, folders)
 			}
 		}
 		// include source code will change the context of the origin editor
