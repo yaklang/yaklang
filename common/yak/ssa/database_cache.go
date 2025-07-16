@@ -90,10 +90,7 @@ func (c *ProgramCache) SetInstruction(inst Instruction) {
 		log.Errorf("BUG: SetInstruction called with nil instruction")
 		return
 	}
-	f1 := func() {
-		c.InstructionCache.Set(inst)
-	}
-	ProfileAdd(true, "ssa.ProgramCache.SetInstruction", f1)
+	c.InstructionCache.Set(inst)
 }
 
 func (c *ProgramCache) DeleteInstruction(inst Instruction) {
@@ -114,10 +111,7 @@ func (c *ProgramCache) GetInstruction(id int64) Instruction {
 // =============================================== Variable =======================================================
 
 func (c *ProgramCache) AddConst(inst Instruction) {
-	f1 := func() {
-		c.ConstCache.Add(inst.GetName(), inst)
-	}
-	ProfileAdd(true, "ssa.ProgramCache.AddConst", f1)
+	c.ConstCache.Add(inst.GetName(), inst)
 }
 
 func (c *ProgramCache) AddVariable(name string, inst Instruction) {
@@ -133,15 +127,9 @@ func (c *ProgramCache) AddVariable(name string, inst Instruction) {
 		}
 	}
 	if member != "" {
-		f1 := func() {
-			c.MemberIndex.Add(member, inst)
-		}
-		ProfileAdd(true, "ssa.ProgramCache.AddVariable.Member", f1)
+		c.MemberIndex.Add(member, inst)
 	} else {
-		f1 := func() {
-			c.VariableIndex.Add(name, inst)
-		}
-		ProfileAdd(true, "ssa.ProgramCache.AddVariable.Name", f1)
+		c.VariableIndex.Add(name, inst)
 	}
 }
 
@@ -166,10 +154,7 @@ func (c *ProgramCache) RemoveVariable(name string, inst Instruction) {
 }
 
 func (c *ProgramCache) AddClassInstance(name string, inst Instruction) {
-	f1 := func() {
-		c.ClassIndex.Add(name, inst)
-	}
-	ProfileAdd(true, "ssa.ProgramCache.AddClassInstance", f1)
+	c.ClassIndex.Add(name, inst)
 }
 
 // =============================================== Database =======================================================

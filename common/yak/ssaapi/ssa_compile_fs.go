@@ -58,22 +58,6 @@ func (c *config) parseProjectWithFS(
 	processCallback(0.0, fmt.Sprintf("parse project in fs: %v, path: %v", filesystem, c.info))
 	processCallback(0.0, "calculate total size of project")
 
-	// db := ssadb.GetDB()
-	// folderSave := databasex.NewSave[SaveFolder](func(t []SaveFolder) {
-	// 	utils.GormTransaction(db, func(tx *gorm.DB) error {
-	// 		for _, sf := range t {
-	// 			ssadb.SaveFolder(tx, sf.name, sf.path)
-	// 		}
-	// 		return nil
-	// 	})
-	// })
-	// if c.enableDatabase != ssa.ProgramCacheMemory {
-	// 	folderSave.Save(SaveFolder{
-	// 		name: c.ProgramName,
-	// 		path: []string{"/"},
-	// 	})
-	// }
-
 	if c.ProgramName != "" {
 		ssadb.SaveFolder(c.ProgramName, []string{"/"})
 	}
@@ -92,10 +76,6 @@ func (c *config) parseProjectWithFS(
 			)
 			if c.enableDatabase != ssa.ProgramCacheMemory {
 				ssadb.SaveFolder(c.ProgramName, folders)
-				// folderSave.Save(SaveFolder{
-				// 	name: name,
-				// 	path: folders,
-				// })
 			}
 			return nil
 		}),
@@ -254,7 +234,7 @@ func (c *config) parseProjectWithFS(
 	}
 
 	f5 := func() error {
-		total := prog.Cache.CountInstruction()
+		total := prog.Cache.CountInstruction() * 2
 		process = 0.9
 		prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, total) // %90
 

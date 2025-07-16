@@ -98,14 +98,13 @@ func (f *Fetch[T]) fillBuffer() {
 }
 
 func (f *Fetch[T]) Fetch() (T, error) {
-	// start := time.Now()
 	if f.buffer.Len() == 0 {
-		log.Debugf("Databasex Channel: Fetch buffer is empty %s: buffer(%v) with fetchItem", f.cfg.name, f.buffer.Len())
+		// log.Errorf("BUG: buffer is empty in Fetch.Fetch")
 	}
+	// start := time.Now()
 	item := <-f.buffer.OutputChannel()
-	// since := time.Since(start)
-	// if since > time.Second {
-	// 	log.Debugf("Databasex Channel: Fetch too long time  %s: buffer(%v) with fetchItem: Time(%v)", f.cfg.name, f.buffer.Len(), since)
+	// if time.Since(start) > time.Second {
+	// log.Errorf("DATABASE: Fetch.Fetch.%s took too long: %v", f.cfg.name, time.Since(start))
 	// }
 	if utils.IsNil(item) {
 		return item, utils.Errorf("item is nil in Fetch.Fetch")
