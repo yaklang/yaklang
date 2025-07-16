@@ -1,0 +1,147 @@
+yakit.AutoInitYakit()
+yakit.Info("开始解析参数")
+maxDepth = cli.Int("max-depth", cli.setDefault(4),cli.setHelp("设置爬虫的最大深度（逻辑深度，并不是级数）"),cli.setVerboseName("最大深度"),cli.setCliGroup("速率与限制"))
+concurrent = cli.Int("concurrent", cli.setDefault(50),cli.setHelp("爬虫的并发请求量（可以理解为线程数）"),cli.setVerboseName("并发量"),cli.setCliGroup("速率与限制"))
+maxLinks = cli.Int("max-links", cli.setDefault(10000),cli.setHelp("爬虫获取到的最大量URL（这个选项一般用来限制无限制的爬虫，一般不需要改动）\n"),cli.setVerboseName("最大URL数"),cli.setCliGroup("速率与限制"))
+
+maxReqs = cli.Int("max-requests", cli.setDefault(2000),cli.setHelp("本次爬虫最多发出多少个请求？（一般用于限制爬虫行为）"),cli.setVerboseName("最大请求数"),cli.setCliGroup("速率与限制"))
+
+timeoutPerRequest = cli.Int("timeout", cli.setDefault(10),cli.setHelp("每个请求的最大超时时间"),cli.setVerboseName("超时时间"),cli.setCliGroup("网络参数"))
+target = cli.String("target", cli.setDefault("www.baidu.com"),cli.setHelp("设置爬虫的目标信息，可以支持比较自由的格式，支持逗号分隔，可以输入 IP / 域名 / 主机名 / URL "),cli.setVerboseName("爬虫扫描目标"),cli.setRequired(true))
+
+proxy = cli.String("proxy", cli.setHelp("设置代理"),cli.setVerboseName("设置代理"),cli.setCliGroup("网络参数"))
+
+tryLoginUser = cli.String("login-user", cli.setDefault("admin"),cli.setHelp("如果遇到了登录名的话，可以通过这个登陆自动设置，但是无法保证成功"),cli.setVerboseName("尝试登录名"),cli.setCliGroup("登陆"))
+
+tryLoginPass = cli.String("login-pass", cli.setDefault("password"),cli.setHelp("如果遇到登陆密码，也许这个可以帮助你登陆，但是这个登陆并不一定能生效"),cli.setVerboseName("尝试登陆密码"),cli.setCliGroup("登陆"))
+
+ua =cli.String("user-agent", cli.setDefault("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36"),cli.setVerboseName("用户代理"))
+retry = cli.Int("retry", cli.setDefault(2),cli.setVerboseName("重试次数"))
+redirectTimes = cli.Int("redirectTimes", cli.setDefault(3),cli.setVerboseName("重定向次数"))
+
+// 基础认证
+basicAuth = cli.Bool("basic-auth", cli.setDefault(false),cli.setHelp("是否开启基础认证"),cli.setVerboseName("基础认证开关"))
+basicAuthUser = cli.String("basic-auth-user", cli.setVerboseName("基础认证用户名"))
+basicAuthPass = cli.String("basic-auth-pass", cli.setVerboseName("基础认证密码"))
+cookie = cli.String("cookie", cli.setHelp("设置原始 Cookie，一般用来解决登陆以后的情况"),cli.setVerboseName("原始 Cookie"),cli.setCliGroup("登陆"))
+
+jsParser = cli.Bool("js-parser", cli.setDefault(false),cli.setHelp("是否开启 JSSSA 解析"),cli.setVerboseName("JS 解析开关"))
+
+scriptNames = cli.YakitPlugin()
+
+debug = cli.Bool("debug")
+cli.check()
+
+if debug {
+    log.setLevel("debug")
+}
+if debug {
+    dump({
+        "retry": retry,
+        "redirectTimes": redirectTimes,
+        "proxy": proxy,
+    })
+}
+opts = [
+    crawler.maxDepth(maxDepth),
+    crawler.maxRequest(maxReqs),
+    crawler.maxUrls(maxLinks),
+    crawler.timeout(timeoutPerRequest),
+    crawler.userAgent(ua/*type: string*/),
+    crawler.maxRetry(retry),
+    crawler.maxRedirect(redirectTimes),
+]
+if jsParser && "jsParser" in crawler {
+    opts.Push(crawler.jsParser())
+}
+
+if tryLoginUser != "" {
+    opts.Push(crawler.autoLogin(tryLoginUser, tryLoginPass))
+}
+if cookie != "" {
+    opts.Push(crawler.header("Cookie", cookie))
+}
+appendOpt = func(opt) {
+    opts = append(opts, opt)
+}
+if basicAuth {
+    appendOpt(crawler.basicAuth(basicAuthUser, basicAuthPass))
+}
+if proxy != "" {
+    appendOpt(crawler.proxy(proxy))
+}
+yakit.Info("解析参数成功")
+// 加载 Yakit 插件
+swg = sync.NewSizedWaitGroup(concurrent)
+manager, err = hook.NewMixPluginCaller()
+if err != nil {
+    yakit.Error("build mix plugin caller failed: %s", err)
+    die(err)
+}
+x.Foreach(scriptNames, func(e){
+    yakit.Info("Start to Load Plugin: %v", e)
+    err = manager.LoadPlugin(e)
+    if err != nil {
+        yakit.Error("load plugin[%v] error: %v", e, err)
+    }
+    println(e + " Is Loaded")
+})
+// 控制插件处理与执行
+pluginCount = 0
+pluginTaskLock = sync.NewLock()
+addPluginTask = func() {
+    pluginTaskLock.Lock()
+    defer pluginTaskLock.Unlock()
+    pluginCount ++
+    yakit.StatusCard("正在执行插件任务", pluginCount)
+}
+subPluginTask = func() {
+    pluginTaskLock.Lock()
+    defer pluginTaskLock.Unlock()
+    pluginCount --
+    yakit.StatusCard("正在执行插件任务", pluginCount)
+}
+handleResult = func(r) {
+    swg.Add()
+    addPluginTask()
+    go func{
+        defer swg.Done()
+        defer func{ subPluginTask() }
+        defer func{
+            err = recover()
+            if err != nil {
+                yakit.Error("handle result met error: %s", err)
+            }
+        }
+        url = r.Url()
+        body = r.ResponseBody()
+        reqRaw = r.RequestRaw()
+        rspRaw = r.ResponseRaw()
+        ishttps = str.HasPrefix(url, "https")
+        manager.MirrorHTTPFlow(ishttps, url, reqRaw, rspRaw, body)
+    }
+}
+yakit.Info("开始准备进行爬虫：%v", target)
+yakit.EnableWebsiteTrees(target)
+res, err := crawler.Start(target,opts...)
+if err != nil {
+    yakit.Error(err.Error())
+    die(err)
+}
+yakit.Info("正在获取结果")
+for r := range res {
+    try {
+        rsp, err := r.Response()
+        if err != nil {
+            log.info("Met ERROR for %v: %v", r.Url(), err)
+            continue
+        }
+        handleResult(r)
+    } catch err {
+        yakit.Error(err.Error())
+    }
+}
+yakit.Info("基础爬虫执行结束，等待插件执行结果")
+swg.Wait()
+manager.Wait()
+yakit.Info("插件执行结束")
