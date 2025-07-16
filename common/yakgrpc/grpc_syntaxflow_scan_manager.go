@@ -52,9 +52,10 @@ type SyntaxFlowScanManager struct {
 	programs []string
 
 	// query execute
-	failedQuery  int64 // query failed
-	skipQuery    int64 // language not match, skip this rule
-	successQuery int64
+	failedQuery   int64 // query failed
+	skipQuery     int64 // language not match, skip this rule
+	successQuery  int64
+	finishedQuery int64 // total finished queries (success + failed + skip)
 	// risk
 	riskCount    int64
 	riskCountMap map[string]int64
@@ -189,6 +190,7 @@ func (m *SyntaxFlowScanManager) RestoreTask(stream SyntaxFlowScanStream) error {
 	m.successQuery = task.SuccessQuery
 	m.failedQuery = task.FailedQuery
 	m.skipQuery = task.SkipQuery
+	m.finishedQuery = task.SuccessQuery + task.FailedQuery + task.SkipQuery // 计算已完成的查询数
 	m.riskCount = task.RiskCount
 	m.totalQuery = task.TotalQuery
 	m.kind = task.Kind
@@ -220,8 +222,6 @@ func (m *SyntaxFlowScanManager) initByConfig(stream SyntaxFlowScanStream) error 
 	taskId := m.TaskId()
 	if config.GetConcurrency() != 0 {
 		m.concurrency = config.GetConcurrency()
-	} else {
-		m.concurrency = 5
 	}
 
 	m.stream = stream
@@ -315,7 +315,7 @@ func (m *SyntaxFlowScanManager) IsPause() bool {
 }
 
 func (m *SyntaxFlowScanManager) CurrentTaskIndex() int64 {
-	return atomic.LoadInt64(&m.skipQuery) + atomic.LoadInt64(&m.failedQuery) + atomic.LoadInt64(&m.successQuery)
+	return atomic.LoadInt64(&m.finishedQuery)
 }
 
 func (m *SyntaxFlowScanManager) ScanNewTask() error {
@@ -347,6 +347,34 @@ func (m *SyntaxFlowScanManager) ResumeTask() error {
 func (m *SyntaxFlowScanManager) StatusTask() error {
 	m.notifyStatus("")
 	return nil
+}
+
+// 规则执行成功
+func (m *SyntaxFlowScanManager) markRuleSuccess() {
+	atomic.AddInt64(&m.successQuery, 1)
+	atomic.AddInt64(&m.finishedQuery, 1)
+}
+
+// 规则执行失败
+func (m *SyntaxFlowScanManager) markRuleFailed() {
+	atomic.AddInt64(&m.failedQuery, 1)
+	atomic.AddInt64(&m.finishedQuery, 1)
+}
+
+// 规则跳过
+func (m *SyntaxFlowScanManager) markRuleSkipped() {
+	atomic.AddInt64(&m.skipQuery, 1)
+	atomic.AddInt64(&m.finishedQuery, 1)
+}
+
+// 添加风险计数（不影响完成计数）
+func (m *SyntaxFlowScanManager) addRiskCount(count int64) {
+	atomic.AddInt64(&m.riskCount, count)
+}
+
+// 获取当前完成进度（用于调试）
+func (m *SyntaxFlowScanManager) getProgress() (finished, total int64) {
+	return atomic.LoadInt64(&m.finishedQuery), m.totalQuery
 }
 
 func (m *SyntaxFlowScanManager) GetRiskCountMap() map[string]int64 {
