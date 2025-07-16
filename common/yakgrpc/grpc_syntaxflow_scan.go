@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"strings"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
@@ -17,7 +18,8 @@ type SyntaxFlowScanTaskConfig struct {
 }
 
 func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
-	return syntaxFlowScan(stream)
+	wrapperStream := newWrapperSyntaxFlowScanStream(stream.Context(), stream)
+	return syntaxFlowScan(wrapperStream)
 }
 
 type SyntaxFlowScanStream interface {
@@ -100,7 +102,8 @@ type syntaxFlowScanStreamImpl struct {
 	ctx    context.Context
 	stream syntaxFlowScanStreamCallback
 
-	request chan *ypb.SyntaxFlowScanRequest
+	request   chan *ypb.SyntaxFlowScanRequest
+	sendMutex *sync.Mutex
 }
 
 type syntaxFlowScanStreamCallback func(*ypb.SyntaxFlowScanResponse) error
@@ -108,11 +111,42 @@ type syntaxFlowScanStreamCallback func(*ypb.SyntaxFlowScanResponse) error
 func NewSyntaxFlowScanStream(ctx context.Context, callback syntaxFlowScanStreamCallback) *syntaxFlowScanStreamImpl {
 	ctx = context.WithoutCancel(ctx)
 	ret := &syntaxFlowScanStreamImpl{
-		ctx:    ctx,
-		stream: callback,
+		ctx:       ctx,
+		stream:    callback,
+		sendMutex: new(sync.Mutex),
 	}
 	ret.request = make(chan *ypb.SyntaxFlowScanRequest, 1)
 	return ret
+}
+
+var _ SyntaxFlowScanStream = (*wrapperSyntaxFlowScanStream)(nil)
+
+type wrapperSyntaxFlowScanStream struct {
+	ctx            context.Context
+	root           ypb.Yak_SyntaxFlowScanServer
+	RequestHandler func(request *ypb.SyntaxFlowScanRequest) bool
+	sendMutex      *sync.Mutex
+}
+
+func (w *wrapperSyntaxFlowScanStream) Recv() (*ypb.SyntaxFlowScanRequest, error) {
+	return w.root.Recv()
+}
+
+func newWrapperSyntaxFlowScanStream(ctx context.Context, stream ypb.Yak_SyntaxFlowScanServer) *wrapperSyntaxFlowScanStream {
+	return &wrapperSyntaxFlowScanStream{
+		root: stream, ctx: ctx,
+		sendMutex: new(sync.Mutex),
+	}
+}
+
+func (w *wrapperSyntaxFlowScanStream) Send(r *ypb.SyntaxFlowScanResponse) error {
+	w.sendMutex.Lock()
+	defer w.sendMutex.Unlock()
+	return w.root.Send(r)
+}
+
+func (w *wrapperSyntaxFlowScanStream) Context() context.Context {
+	return w.ctx
 }
 
 func (s *syntaxFlowScanStreamImpl) Done() {
@@ -143,6 +177,8 @@ func (s *syntaxFlowScanStreamImpl) Send(resp *ypb.SyntaxFlowScanResponse) error 
 		return utils.Error("context canceled")
 	default:
 		if s.stream != nil {
+			s.sendMutex.Lock()
+			defer s.sendMutex.Unlock()
 			return s.stream(resp)
 		}
 	}
