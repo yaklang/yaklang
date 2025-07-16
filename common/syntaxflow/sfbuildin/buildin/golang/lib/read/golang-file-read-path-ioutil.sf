@@ -1,0 +1,69 @@
+desc(
+	title: "Audit Golang File Read Path ioutil"
+	type: audit
+	level: info
+	lib: 'golang-file-read-path-ioutil'
+	desc: <<<DESC
+审计Golang代码中使用的ioutil包的文件读取功能。该规则检测使用ioutil.ReadAll或ioutil.ReadFile函数的代码段，这可能引发文件读取路径泄露的安全风险。规则目的是确保文件读取操作不会暴露敏感文件路径信息。
+DESC
+	rule_id: "46cba5f6-bb9e-492e-9842-980cc8514dbd"
+	title_zh: "审计Golang ioutil文件读取方法"
+	solution: <<<SOLUTION
+避免使用ioutil包进行文件读取操作。推荐使用更安全的文件读取方法，如使用os包中的ReadFile函数，并结合适当的安全检查，确保不会读取未授权的文件。
+SOLUTION
+	reference: <<<REFERENCE
+[Go io/ioutil Documentation (Deprecated)](https://pkg.go.dev/io/ioutil)
+REFERENCE
+)
+
+ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
+
+$entry.ReadAll(* #-> as $output) 
+$entry.ReadFile(* #-> as $output)
+
+alert $output for {
+	title: "Check Golang ioutil File Read Path",
+	title_zh: "审计Golang ioutil文件读取方法",
+	level: "info",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://fileread.go': <<<PARAM
+package main
+
+import (
+	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
+)
+
+func main() {
+	// 要写入的文件名
+	fileName := "example.txt"
+
+	// 写入数据到文件
+	data := []byte("Hello, Go Programming!\nThis is a simple file I/O example.")
+	err := ioutil.WriteFile(fileName, data, 0644) // 0644 是文件权限
+	if err != nil {
+		log.Fatalf("Error writing to file: %s", err)
+		return
+	}
+	fmt.Println("Data written to file successfully.")
+
+	// 读取文件内容
+	content, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		log.Fatalf("Error reading from file: %s", err)
+		return
+	}
+
+	// 打印文件内容
+	fmt.Println("File content:")
+	fmt.Println(string(content))
+}
+
+PARAM
+)

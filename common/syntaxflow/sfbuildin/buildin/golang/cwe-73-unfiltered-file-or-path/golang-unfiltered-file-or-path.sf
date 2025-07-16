@@ -125,8 +125,8 @@ SOLUTION
 )
 
 <include('golang-file-path')> as $path;
-<include('golang-file-read-sink')> as $sink;
-<include('golang-file-write-sink')> as $sink;
+<include('golang-file-read-path-sink')> as $sink;
+<include('golang-file-write-path-sink')> as $sink;
 
 strings.HasPrefix(* #-> as $check);
 $path.Clean(* #-> as $check);

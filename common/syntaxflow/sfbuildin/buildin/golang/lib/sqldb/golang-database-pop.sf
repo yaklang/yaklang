@@ -44,7 +44,7 @@ desc(
    规则通过`pop?{<fullTypeName>?{have: 'github.com/gobuffalo/pop'}} as $entry;` 语句识别代码中导入并使用的`pop`库。接着，通过`$entry.Connect <getCall> as $db;` 语句找到对`pop.Connect`方法的调用，并将返回的数据库连接对象标记为 `$db`。最后，`$db <getMembers> as $output;` 获取该数据库连接对象 `$db` 的所有可访问成员（方法和字段），这些成员通常包含执行各种数据库操作（如查询、插入、更新、删除、迁移等）的方法。
 DESC
 	rule_id: "98e2fca4-960c-4e90-8f1a-00098a97c2c8"
-	title_zh: "审计 Go 语言 Database Pop 库使用"
+	title_zh: "审计Golang Database Pop库使用"
 	solution: <<<SOLUTION
 ### 修复建议
 

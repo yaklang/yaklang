@@ -1,7 +1,9 @@
 desc(
 	title: "Detect Golang Path Traversal Vulnerability"
+	title_zh: "检测Golang路径穿越漏洞"
 	type: audit
 	level: low
+	risk: "path-traversal"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -47,7 +49,6 @@ desc(
    - **拒绝服务**: 通过删除关键系统文件，可能导致应用程序或整个系统瘫痪。
 DESC
 	rule_id: "838bdd38-5913-46ed-88f7-8eced02db2bd"
-	title_zh: "检测Golang路径穿越漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 

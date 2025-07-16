@@ -1,0 +1,62 @@
+desc(
+	title: "Audit Golang File Read Path Function"
+	type: audit
+	level: info
+	lib: 'golang-file-read-path-os'
+	desc: <<<DESC
+该规则用于审计Golang代码中文件路径读取相关的安全风险。它主要检查程序是否直接读取用户输入的文件路径，未经验证用户输入的合法性，可能导致路径穿越漏洞，攻击者可以利用这个漏洞读取任意文件，从而获取敏感信息或破坏系统文件。漏洞触发场景通常出现在程序通过HTTP请求获取文件路径参数，并直接使用该参数进行文件读取操作。潜在影响包括敏感数据泄露、系统文件损坏或恶意代码执行。
+DESC
+	rule_id: "a41bacfd-ec4d-4cbc-94cc-f189e2630d06"
+	solution: <<<SOLUTION
+修复建议包括：
+1. 对用户输入的文件路径进行严格的验证和过滤，确保其位于安全的目录内。
+2. 使用内置的安全函数或库来处理文件读取，避免直接使用用户输入作为文件路径。
+3. 对文件读取操作实施权限控制，确保只有授权用户才能访问特定文件。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')](https://cwe.mitre.org/data/definitions/22.html)
+REFERENCE
+	title_zh: "审计Golang文件路径读取功能"
+)
+
+os?{<fullTypeName>?{have: 'os'}} as $os
+$os.ReadFile(* #-> as $output)
+
+alert $output for {
+	title: "Check Golang File Read Path Function",
+	title_zh: "审计Golang文件路径读取功能",
+	level: "info",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://fileread.go': <<<PARAM
+package main
+
+import (
+    "fmt"
+    "net/http"
+    "os"
+)
+
+func readFile(w http.ResponseWriter, r *http.Request) {
+    filePath := r.URL.Query().Get("file")
+
+    // 未验证用户输入，直接读取文件
+    data, err := os.ReadFile(filePath)
+    if err != nil {
+        fmt.Fprintf(w, "Error: %v", err)
+        return
+    }
+
+    fmt.Fprintf(w, "File content: %s", data)
+}
+
+func main() {
+    http.HandleFunc("/read", readFile)
+    http.ListenAndServe(":8080", nil)
+}
+
+PARAM
+)

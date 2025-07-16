@@ -1,7 +1,9 @@
 desc(
-	title: "Check Golang Open Redirect Vulnerability"
+	title: "Check Golang Open Redirect Vulnerability (http)"
+	title_zh: "检测Golang开放重定向漏洞 (http)"
 	type: audit
 	level: high
+	risk: "url-redirect"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -53,8 +55,7 @@ desc(
    - **恶意软件传播**: 将用户重定向到包含恶意软件下载链接的页面。
    - **绕过安全策略**: 在某些情况下，可利用开放重定向绕过网站的Referer检查或其他安全限制。
 DESC
-	rule_id: "7a0e24d2-1214-46f7-8939-528c1f1b666d"
-	title_zh: "检测 Golang 开放重定向漏洞"
+	rule_id: "56ab7848-f020-4e02-baba-9b2d92a2be78"
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -142,7 +143,7 @@ $target as $high
 
 alert $high for {
 	title: "Check Golang Open Redirect Vulnerability",
-	title_zh: "检测 Golang 开放重定向漏洞",
+	title_zh: "检测Golang开放重定向漏洞",
 	solution: <<<CODE
 ### 修复建议
 

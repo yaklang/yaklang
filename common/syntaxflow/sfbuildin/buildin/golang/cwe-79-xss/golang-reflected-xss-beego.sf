@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang在Beego框架中的反射型跨站脚本攻击漏洞"
 	type: vuln
 	severity: mid
-	risk: xss
+	risk: "xss"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -104,10 +104,8 @@ SOLUTION
 REFERENCE
 )
 
-.Ctx.ResponseWriter.Write(* #-> as $sink)
-$sink<dataflow(
-	include:" * ?{have: 'GetString'}",
-)> as $mid;
+.Ctx.ResponseWriter.Write(* #-> as $sink);
+$sink.GetString as $mid;
 
 alert $mid for {
 	title: "Reflected XSS detected",

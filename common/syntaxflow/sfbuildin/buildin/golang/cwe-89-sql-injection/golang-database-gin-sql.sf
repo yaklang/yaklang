@@ -82,7 +82,8 @@ REFERENCE
 
 <include('golang-http-sink')> as $sink;
 <include('golang-database-sink')> as $db;
-$db.Query( * #-> as $param)
+$sink.QueryRow(* #-> as $param)
+$sink.Query(* #-> as $param)
 
 $param?{<self>-{
    until: `* & $sink`,

@@ -2,6 +2,7 @@ desc(
 	title: "Detect Golang Reflected XSS using template.HTML"
 	type: audit
 	severity: high
+	risk: "xss"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -42,7 +43,7 @@ desc(
    - 执行任意JavaScript代码，例如进行钓鱼攻击或页面篡改。
    - 会话劫持，攻击者冒充用户进行操作。
 DESC
-	rule_id: "bbd6022f-3cb9-4e59-a61a-ad28ed0f58a0"
+	rule_id: "f8fd1761-df87-496b-9aef-9a78b1566642"
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -92,11 +93,12 @@ REFERENCE
 <include('golang-template')> as $template;
 $template.New as $new;
 $new().Parse() -> as $param
-$param.Execute(* as $target) 
-$target #{include: `*?{have: 'template.HTML'}`}-> as $high;
+$template.ParseFiles().* -> as $param
+$param.Execute(* #-> as $target) 
+$target.HTML as $high;
 
-template.HTML(* #-> as $source)
-$source?{have: '.GetSession'} as $high
+$template.Must().ExecuteTemplate(,,,* #-> as $param2)
+$param2 -->?{have: "template.HTML"} as $high
 
 alert $high for {
 	solution: <<<CODE
