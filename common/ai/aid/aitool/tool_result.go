@@ -60,7 +60,7 @@ func (r *ToolExecutionResult) GetJSONSchemaString() string {
 }
 
 // ExecuteToolWithCapture 执行工具并捕获stdout和stderr
-func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any, stdout, stderr io.Writer) (*ToolExecutionResult, error) {
+func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any, stdout, stderr io.Writer, cancelCallback toolCallCancelCallback) (*ToolExecutionResult, error) {
 	// 创建stdout和stderr的缓冲区
 	stdoutBuf := new(bytes.Buffer)
 	stderrBuf := new(bytes.Buffer)
@@ -74,17 +74,31 @@ func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any
 	} else {
 		stderr = stderrBuf
 	}
+	var res any
+	var err error
+	var finsh chan struct{}
+	go func() {
+		res, err = t.Callback(ctx, params, stdout, stderr)
+	}()
 
-	// 执行回调函数
-	result, err := t.Callback(ctx, params, stdout, stderr)
-
-	// 创建执行结果
-	execResult := &ToolExecutionResult{
-		Stdout: stdoutBuf.String(),
-		Stderr: stderrBuf.String(),
-		Result: result,
+	var execResult *ToolExecutionResult
+	select {
+	case <-ctx.Done():
+		execResult = &ToolExecutionResult{
+			Stdout: stdoutBuf.String(),
+			Stderr: stderrBuf.String(),
+			Result: res,
+		}
+		if cancelCallback != nil {
+			execResult, err = cancelCallback(execResult, err)
+		}
+	case <-finsh:
+		execResult = &ToolExecutionResult{
+			Stdout: stdoutBuf.String(),
+			Stderr: stderrBuf.String(),
+			Result: res,
+		}
 	}
-
 	return execResult, err
 }
 
