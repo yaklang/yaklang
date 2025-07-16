@@ -103,7 +103,7 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 			strings.EqualFold(req.Method, http.MethodConnect)
 	}
 
-	headerReader := originReader
+	headerReader := NewPeekableReader(originReader)
 	rsp := new(http.Response)
 	firstLine, err := ReadLine(headerReader)
 	if err != nil {
@@ -150,7 +150,7 @@ HandleExpect100Continue:
 	defaultClose := (rsp.ProtoMajor == 1 && rsp.ProtoMinor == 0) || rsp.ProtoMajor < 1
 
 	for {
-		lineBytes, err := ReadLine(headerReader)
+		lineBytes, err := ReadHTTPHeader(headerReader)
 		if err != nil {
 			return nil, errors.Wrap(err, "read HTTPResponse header failed")
 		}
@@ -439,4 +439,24 @@ func TCPNoDelay(i net.Conn) {
 			tc.SetWriteBuffer(0)
 		}
 	}
+}
+
+func ReadHTTPHeader(reader *BufferedPeekableReader) ([]byte, error) {
+	var headerBytes []byte
+	var err error
+
+	for {
+		var line []byte
+		line, err = ReadLine(reader)
+		if err == nil {
+			headerBytes = append(headerBytes, line...)
+			peekBytes, _ := reader.Peek(1)
+			if len(peekBytes) > 0 && (peekBytes[0] == ' ' || peekBytes[0] == '\t') {
+				continue
+			}
+		}
+		break
+	}
+
+	return headerBytes, err
 }
