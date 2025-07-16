@@ -97,12 +97,11 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 	for _, opt := range opts {
 		opt(cfg)
 	}
-
-	if cfg.invokeHook != nil {
-		return cfg.invokeHook(t, params, cfg)
-	}
-	execResult, err := t.ExecuteToolWithCapture(cfg.ctx, params, cfg.stdout, cfg.stderr)
+	execResult, err := t.ExecuteToolWithCapture(cfg.ctx, params, cfg.stdout, cfg.stderr, cfg.cancelCallback)
 	if err != nil {
+		if cfg.errCallback != nil {
+			return cfg.errCallback(err)
+		}
 		return &ToolResult{
 			Param:       params,
 			Name:        t.Name,
@@ -124,6 +123,10 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 		execResult.Result = fmt.Sprintf("%s (total: %v, saved in file[%v]) see file use some other filesystem tool",
 			jsonResult, len(originJsonResult), filename)
 		log.Infof("large json result content saved to file: %s", filename)
+	}
+
+	if cfg.resCallback != nil {
+		return cfg.resCallback(execResult)
 	}
 
 	return &ToolResult{
