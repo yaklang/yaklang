@@ -253,6 +253,10 @@ func (c *Config) GetSequenceStart() int64 {
 	return c.idSequence
 }
 
+func (c *Config) getCurrentTaskPlan() *aiTask {
+	return c.aiTaskRuntime.RootTask
+}
+
 func (c *Config) CallAI(request *AIRequest) (*AIResponse, error) {
 	return c.callAI(request)
 }
