@@ -11,6 +11,7 @@ import (
 type CodecFlow struct {
 	gorm.Model
 	FlowName   string
+	FlowId     string
 	WorkFlow   []byte
 	WorkFlowUI string
 }
@@ -23,6 +24,7 @@ func (cf *CodecFlow) ToGRPC() *ypb.CustomizeCodecFlow {
 	}
 	return &ypb.CustomizeCodecFlow{
 		FlowName:   cf.FlowName,
+		FlowId:     cf.FlowId,
 		WorkFlow:   workFlow,
 		WorkFlowUI: cf.WorkFlowUI,
 	}
