@@ -20,7 +20,7 @@ func (m *SyntaxFlowScanManager) StartQuerySF(startIndex ...int64) error {
 			m.taskRecorder.Reason = fmt.Sprintf("%v", err)
 			m.status = schema.SYNTAXFLOWSCAN_ERROR
 		}
-		m.notifyStatus("")
+		m.StatusTask()
 		m.SaveTask()
 	}()
 
@@ -64,7 +64,7 @@ func (m *SyntaxFlowScanManager) StartQuerySF(startIndex ...int64) error {
 	}
 
 	var errs error
-	var taskIndex int64
+	var taskIndex atomic.Int64
 
 	swg := utils.NewSizedWaitGroup(int(m.GetConcurrency()))
 
@@ -76,18 +76,22 @@ func (m *SyntaxFlowScanManager) StartQuerySF(startIndex ...int64) error {
 			if m.IsPause() || m.IsStop() {
 				break
 			}
-			taskIndex++
-			if taskIndex <= start {
+
+			taskIndex.Add(1)
+			if taskIndex.Load() <= start {
 				continue
 			}
 
-			swg.Add(1)
+			swg.Add()
 			go func(rule *schema.SyntaxFlowRule, progName string) {
-				defer swg.Done()
+				defer func() {
+					m.StatusTask()
+					swg.Done()
+				}()
 
 				prog, err := getProgram(progName)
 				if err != nil {
-					atomic.AddInt64(&m.skipQuery, 1)
+					m.markRuleSkipped()
 					return
 				}
 				m.Query(rule, prog)
@@ -95,7 +99,7 @@ func (m *SyntaxFlowScanManager) StartQuerySF(startIndex ...int64) error {
 		}
 	}
 	swg.Wait()
-	m.notifyStatus("")
+	m.StatusTask()
 	return errs
 }
 
@@ -105,7 +109,7 @@ func (m *SyntaxFlowScanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.
 	// log.Infof("executing rule %s", rule.RuleName)
 	if !m.ignoreLanguage {
 		if rule.Language != string(consts.General) && string(rule.Language) != prog.GetLanguage() {
-			atomic.AddInt64(&m.skipQuery, 1)
+			m.markRuleSkipped()
 			// m.client.YakitInfo("program %s(lang:%s) exec rule %s(lang:%s) failed: language not match", programName, prog.GetLanguage(), rule.RuleName, rule.Language)
 			return
 		}
@@ -118,16 +122,16 @@ func (m *SyntaxFlowScanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.
 			m.client.StatusCard("当前执行规则进度", fmt.Sprintf("%.2f%%", f*100), "规则执行进度")
 		}),
 	); err == nil {
-		atomic.AddInt64(&m.successQuery, 1)
+		m.markRuleSuccess()
 		m.notifyResult(res)
 	} else {
-		atomic.AddInt64(&m.failedQuery, 1)
+		m.markRuleFailed()
 		m.client.YakitError("program %s exc rule %s failed: %s", prog.GetProgramName(), rule.RuleName, err)
 	}
 }
 func (m *SyntaxFlowScanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
 	if riskLen := len(res.GetGRPCModelRisk()); riskLen != 0 {
-		atomic.AddInt64(&m.riskCount, int64(riskLen))
+		m.addRiskCount(int64(riskLen))
 	}
 	for key, count := range res.GetRiskCountMap() {
 		m.riskCountMap[key] = count
@@ -142,12 +146,12 @@ func (m *SyntaxFlowScanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
 }
 
 func (m *SyntaxFlowScanManager) notifyStatus(ruleName string) {
+	// 直接读取已完成的总数（单次原子操作）
+	finishQuery := atomic.LoadInt64(&m.finishedQuery)
 	successQuery := atomic.LoadInt64(&m.successQuery)
 	failedQuery := atomic.LoadInt64(&m.failedQuery)
 	skipQuery := atomic.LoadInt64(&m.skipQuery)
 	riskCount := atomic.LoadInt64(&m.riskCount)
-
-	finishQuery := successQuery + failedQuery + skipQuery
 	// process
 	m.client.StatusCard("已执行规则", fmt.Sprintf("%d/%d", finishQuery, m.totalQuery), "规则执行状态")
 	m.client.StatusCard("已跳过规则", skipQuery, "规则执行状态")
