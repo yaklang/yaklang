@@ -76,9 +76,10 @@ func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any
 	}
 	var res any
 	var err error
-	var finsh chan struct{}
+	var finsh = make(chan struct{})
 	go func() {
 		res, err = t.Callback(ctx, params, stdout, stderr)
+		close(finsh)
 	}()
 
 	var execResult *ToolExecutionResult
