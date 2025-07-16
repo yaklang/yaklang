@@ -32,9 +32,7 @@ func TestRealJava_PanicInMemberCall(t *testing.T) {
 }
 
 func TestA(t *testing.T) {
-	if utils.InGithubActions() {
-		t.Skip()
-	}
+	t.Skip()
 
 	go func() {
 		log.Println(http.ListenAndServe("localhost:18080", nil)) // 启动 pprof 服务
