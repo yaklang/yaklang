@@ -3,6 +3,7 @@ package aid
 import (
 	_ "embed"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"io"
 )
@@ -73,6 +74,9 @@ func (t *aiTask) handleReviewResult(param aitool.InvokeParams) error {
 			t.config.EmitError("invoke planRequest failed: %v", err)
 			return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
 		}
+		t.config.emitJson(schema.EVENT_TYPE_PLAN, "system", map[string]any{
+			"root_task": t.config.getCurrentTaskPlan(),
+		})
 		return t.config.aiTaskRuntime.executeSubTask(1, t)
 	case "inaccurate":
 		t.config.EmitInfo("inaccurate")
@@ -96,6 +100,9 @@ func (t *aiTask) handleReviewResult(param aitool.InvokeParams) error {
 			return utils.Error("current task not found in parent task")
 		}
 		parentTask.Subtasks = parentTask.Subtasks[:index+1]
+		t.config.emitJson(schema.EVENT_TYPE_PLAN, "system", map[string]any{
+			"root_task": t.config.getCurrentTaskPlan(),
+		})
 	case "adjust_plan":
 		suggestion := param.GetString("suggestion")
 		if suggestion == "" {
@@ -108,6 +115,9 @@ func (t *aiTask) handleReviewResult(param aitool.InvokeParams) error {
 			t.config.EmitError("invoke planRequest failed: %v", err)
 			return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
 		}
+		t.config.emitJson(schema.EVENT_TYPE_PLAN, "system", map[string]any{
+			"root_task": t.config.getCurrentTaskPlan(),
+		})
 	default:
 		t.config.EmitError("unknown review suggestion: %s", suggestion)
 		return utils.Errorf("unknown review suggestion: %s", suggestion)

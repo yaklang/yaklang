@@ -150,7 +150,7 @@ func (r *runtime) invokeSubtask(idx int, task *aiTask) error {
 		return r.executeSubTask(idx, task)
 	}
 
-	return task.executeTask()
+	return task.executeTaskPushTaskIndex()
 }
 
 func (r *runtime) executeSubTask(idx int, task *aiTask) error {

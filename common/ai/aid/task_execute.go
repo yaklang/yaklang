@@ -245,8 +245,8 @@ TOOLREQUIRED:
 	return nil
 }
 
-// executeTask 实际执行任务并返回结果
-func (t *aiTask) executeTask() error {
+func (t *aiTask) executeTaskPushTaskIndex() error {
+	// 在执行任务之前，推送事件到事件栈
 	t.config = t.config.pushEventBeforeSave(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
 		if event.TaskIndex == "" {
 			event.TaskIndex = t.Index
@@ -258,6 +258,12 @@ func (t *aiTask) executeTask() error {
 		t.config = t.config.popEventBeforeSave()
 	}()
 
+	// 执行实际的任务
+	return t.executeTask()
+}
+
+// executeTask 实际执行任务并返回结果
+func (t *aiTask) executeTask() error {
 	if err := t.execute(); err != nil {
 		return err
 	}
