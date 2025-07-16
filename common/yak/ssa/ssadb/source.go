@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/databasex"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
@@ -62,7 +63,26 @@ func GetEditorByFileName(fileName string) (*memedit.MemEditor, error) {
 	return ret, nil
 }
 
-func SaveFile(db *gorm.DB, filename, content string, programName string, folderPaths []string) string {
+func SaveSource() {
+	sourceSave.Close()
+}
+
+var sourceSave = databasex.NewSave[*IrSource](func(is []*IrSource) {
+	db := GetDB()
+	utils.GormTransaction(db, func(tx *gorm.DB) error {
+		for _, irSource := range is {
+			if len(irSource.FolderPath) > 0 && irSource.FolderPath[0] != '/' {
+				irSource.FolderPath = "/" + irSource.FolderPath
+			}
+			if err := irSource.save(tx); err != nil {
+				log.Errorf("save source %v failed: %v", irSource, err)
+			}
+		}
+		return nil
+	})
+})
+
+func SaveFile(filename, content string, programName string, folderPaths []string) string {
 	start := time.Now()
 	defer func() {
 		atomic.AddUint64(&_SSASourceCodeCost, uint64(time.Now().Sub(start).Nanoseconds()))
@@ -89,11 +109,12 @@ func SaveFile(db *gorm.DB, filename, content string, programName string, folderP
 		FolderPath:     fullPath,
 		IsBigFile:      false,
 	}
-	go irSource.save(db)
+	// go irSource.save(db)
+	sourceSave.Save(irSource)
 	return irSource.SourceCodeHash
 }
 
-func SaveFolder(db *gorm.DB, folderName string, folderPaths []string) error {
+func SaveFolder(folderName string, folderPaths []string) error {
 	start := time.Now()
 	defer func() {
 		atomic.AddUint64(&_SSASourceCodeCost, uint64(time.Now().Sub(start).Nanoseconds()))
@@ -113,7 +134,8 @@ func SaveFolder(db *gorm.DB, folderName string, folderPaths []string) error {
 		FolderPath:     folderPath,
 		IsBigFile:      false,
 	}
-	irSource.save(db)
+	// irSource.save(db)
+	sourceSave.Save(irSource)
 	return nil
 }
 

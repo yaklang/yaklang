@@ -79,7 +79,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 		} else {
 			folders := strings.Split(dirname, string(fileSystem.GetSeparators()))
 			content := string(raw)
-			prog.ExtraFile[path] = ssadb.SaveFile(ssadb.GetDB(), filename, content, prog.GetProgramName(), folders)
+			prog.ExtraFile[path] = ssadb.SaveFile(filename, content, prog.GetProgramName(), folders)
 		}
 	}
 
