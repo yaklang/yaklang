@@ -134,6 +134,7 @@ const (
 	Yak_NewCodec_FullMethodName                                   = "/ypb.Yak/NewCodec"
 	Yak_GetAllCodecMethods_FullMethodName                         = "/ypb.Yak/GetAllCodecMethods"
 	Yak_SaveCodecFlow_FullMethodName                              = "/ypb.Yak/SaveCodecFlow"
+	Yak_UpdateCodecFlow_FullMethodName                            = "/ypb.Yak/UpdateCodecFlow"
 	Yak_DeleteCodecFlow_FullMethodName                            = "/ypb.Yak/DeleteCodecFlow"
 	Yak_GetAllCodecFlow_FullMethodName                            = "/ypb.Yak/GetAllCodecFlow"
 	Yak_PacketPrettifyHelper_FullMethodName                       = "/ypb.Yak/PacketPrettifyHelper"
@@ -660,6 +661,7 @@ type YakClient interface {
 	NewCodec(ctx context.Context, in *CodecRequestFlow, opts ...grpc.CallOption) (*CodecResponse, error)
 	GetAllCodecMethods(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*CodecMethods, error)
 	SaveCodecFlow(ctx context.Context, in *CustomizeCodecFlow, opts ...grpc.CallOption) (*Empty, error)
+	UpdateCodecFlow(ctx context.Context, in *UpdateCodecFlowRequest, opts ...grpc.CallOption) (*Empty, error)
 	DeleteCodecFlow(ctx context.Context, in *DeleteCodecFlowRequest, opts ...grpc.CallOption) (*Empty, error)
 	GetAllCodecFlow(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetCodecFlowResponse, error)
 	PacketPrettifyHelper(ctx context.Context, in *PacketPrettifyHelperRequest, opts ...grpc.CallOption) (*PacketPrettifyHelperResponse, error)
@@ -2479,6 +2481,16 @@ func (c *yakClient) SaveCodecFlow(ctx context.Context, in *CustomizeCodecFlow, o
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Empty)
 	err := c.cc.Invoke(ctx, Yak_SaveCodecFlow_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateCodecFlow(ctx context.Context, in *UpdateCodecFlowRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, Yak_UpdateCodecFlow_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7014,6 +7026,7 @@ type YakServer interface {
 	NewCodec(context.Context, *CodecRequestFlow) (*CodecResponse, error)
 	GetAllCodecMethods(context.Context, *Empty) (*CodecMethods, error)
 	SaveCodecFlow(context.Context, *CustomizeCodecFlow) (*Empty, error)
+	UpdateCodecFlow(context.Context, *UpdateCodecFlowRequest) (*Empty, error)
 	DeleteCodecFlow(context.Context, *DeleteCodecFlowRequest) (*Empty, error)
 	GetAllCodecFlow(context.Context, *Empty) (*GetCodecFlowResponse, error)
 	PacketPrettifyHelper(context.Context, *PacketPrettifyHelperRequest) (*PacketPrettifyHelperResponse, error)
@@ -7865,6 +7878,9 @@ func (UnimplementedYakServer) GetAllCodecMethods(context.Context, *Empty) (*Code
 }
 func (UnimplementedYakServer) SaveCodecFlow(context.Context, *CustomizeCodecFlow) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SaveCodecFlow not implemented")
+}
+func (UnimplementedYakServer) UpdateCodecFlow(context.Context, *UpdateCodecFlowRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateCodecFlow not implemented")
 }
 func (UnimplementedYakServer) DeleteCodecFlow(context.Context, *DeleteCodecFlowRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteCodecFlow not implemented")
@@ -10925,6 +10941,24 @@ func _Yak_SaveCodecFlow_Handler(srv interface{}, ctx context.Context, dec func(i
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).SaveCodecFlow(ctx, req.(*CustomizeCodecFlow))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateCodecFlow_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateCodecFlowRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateCodecFlow(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateCodecFlow_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateCodecFlow(ctx, req.(*UpdateCodecFlowRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -17664,6 +17698,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SaveCodecFlow",
 			Handler:    _Yak_SaveCodecFlow_Handler,
+		},
+		{
+			MethodName: "UpdateCodecFlow",
+			Handler:    _Yak_UpdateCodecFlow_Handler,
 		},
 		{
 			MethodName: "DeleteCodecFlow",
