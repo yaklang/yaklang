@@ -229,7 +229,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 
 		// check can use mitm
 		skipMitm := false
-		resp, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(__currentTarget.Request), lowhttp.WithHttps(__currentTarget.IsHttps), lowhttp.WithRuntimeId(taskId))
+		resp, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(__currentTarget.Request), lowhttp.WithHttps(__currentTarget.IsHttps), lowhttp.WithRuntimeId(taskId), lowhttp.WithProxy(proxy))
 		if err != nil {
 			skipMitm = true
 		}
