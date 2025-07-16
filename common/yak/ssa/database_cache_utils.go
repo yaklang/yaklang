@@ -141,26 +141,23 @@ func createInstructionCache(
 
 		delete = func(fir []*ssadb.IrCode) {
 			var ids []int64
-			f1 := func() {
-				ids = lo.Map(fir, func(item *ssadb.IrCode, _ int) int64 {
-					return item.GetIdInt64()
-				})
-			}
-			f2 := func() {
-				ssadb.DeleteIrCode(db, ids...)
-			}
-			ProfileAdd(true, "ssa.Cache.Instruction.Delete", f1, f2)
+			ids = lo.Map(fir, func(item *ssadb.IrCode, _ int) int64 {
+				return item.GetIdInt64()
+			})
+			log.Errorf("DATABASE: irCode delete from db : %d", len(ids))
+			ssadb.DeleteIrCode(db, ids...)
 		}
 
 		save = func(t []*ssadb.IrCode) {
 			defer func() {
 				if err := recover(); err != nil {
-					// log.Errorf("DATABASE: Save IR Codes panic: %v", err)
+					log.Errorf("DATABASE: Save IR Codes panic: %v", err)
 					utils.PrintCurrentGoroutineRuntimeStack()
 				}
 			}()
-			log.Errorf("DATABASE: Save IR: %d", len(t))
+			// log.Errorf("DATABASE: Save IR  : %d", len(t))
 			utils.GormTransaction(db, func(tx *gorm.DB) error {
+				// log.Errorf("DATABASE: Save IR: %d", len(t))
 				for _, irCode := range t {
 					if err := irCode.Save(tx); err != nil {
 						log.Errorf("DATABASE: save irCode to database error: %v", err)
@@ -168,14 +165,16 @@ func createInstructionCache(
 				}
 				return nil
 			})
-			saveFinish(len(t)) // notify save finish
+			saveFinish(len(t))
+			// log.Errorf("DATABASE: Save IR finish : %d", len(t))
 		}
 
 		marshal = func(s Instruction, d *ssadb.IrCode) {
-			var success bool
-			success = marshalInstruction(prog.Cache, s, d)
+			// log.Errorf("DATABASE: marshal instruction: %v", d.ID)
+			success := marshalInstruction(prog.Cache, s, d)
+			// log.Errorf("DATABASE: marshal instruction finish : %v, success: %v", d.ID, success)
 			if success {
-				marshalFinish(s, d)
+				go marshalFinish(s, d)
 			}
 		}
 	}
@@ -214,10 +213,9 @@ func createTypeCache(
 	var save databasex.SaveFunc[*ssadb.IrType]
 	if databaseKind == ProgramCacheDBWrite {
 		marshal = func(s Type, d *ssadb.IrType) {
-			f1 := func() {
-				marshalType(s, d)
-			}
-			ProfileAdd(true, "ssa.Cache.Type.marshal", f1)
+			// log.Infof("SAVE: marshal type: %v", d.ID)
+			marshalType(s, d)
+			// log.Infof("SAVE: marshal type finish : %v", d.ID)
 		}
 
 		fetch = func(ctx context.Context, size int) <-chan *ssadb.IrType {
@@ -228,57 +226,51 @@ func createTypeCache(
 			ch := make(chan *ssadb.IrType, size)
 			go func() {
 				defer close(ch)
-				f1 := func() {
-					utils.GormTransaction(db, func(tx *gorm.DB) error {
-						for i := 0; i < size; i++ {
-							select {
-							case <-ctx.Done():
-								return nil
-							default:
-								id, irType := ssadb.RequireIrType(tx, programName)
-								if utils.IsNil(irType) || id <= 0 {
-									// return nil // no more id to fetch
-									continue
-								}
-								ch <- (irType)
+				utils.GormTransaction(db, func(tx *gorm.DB) error {
+					db := tx
+					for i := 0; i < size; i++ {
+						select {
+						case <-ctx.Done():
+							return nil
+						default:
+							id, irType := ssadb.RequireIrType(db, programName)
+							if utils.IsNil(irType) || id <= 0 {
+								continue
 							}
+							ch <- (irType)
 						}
-						return nil
-					})
-				}
-				ProfileAdd(true, "ssa.Cache.Type.Fetch", f1)
+					}
+					return nil
+				})
 			}()
 			return ch
 		}
 
 		delete = func(fir []*ssadb.IrType) {
 			var ids []int64
-			f1 := func() {
-				ids = lo.Map(fir, func(item *ssadb.IrType, _ int) int64 {
-					return item.GetIdInt64()
-				})
-			}
-			f2 := func() {
-				ssadb.DeleteIrType(db, ids)
-			}
-			ProfileAdd(true, "ssa.Cache.Type.Delete", f1, f2)
+			ids = lo.Map(fir, func(item *ssadb.IrType, _ int) int64 {
+				return item.GetIdInt64()
+			})
+			ssadb.DeleteIrType(db, ids)
 		}
 
 		save = func(t []*ssadb.IrType) {
 			defer func() {
 				if err := recover(); err != nil {
-					// log.Errorf("DATABASE: Save IR Types panic: %v", err)
+					log.Errorf("DATABASE: Save IR Types panic: %v", err)
 					utils.PrintCurrentGoroutineRuntimeStack()
 				}
 			}()
-			log.Errorf("DATABASE: Save IR Types: %d", len(t))
+			// log.Errorf("DATABASE: type save to db : %d", len(t))
 			utils.GormTransaction(db, func(tx *gorm.DB) error {
+				// log.Errorf("DATABASE: Save IR Types: %d", len(t))
 				for _, irType := range t {
 					_ = irType
 					if err := irType.Save(tx); err != nil {
 						log.Errorf("DATABASE: save irType to database error: %v", err)
 					}
 				}
+				// log.Errorf("DATABASE: Save IR Types finish : %d", len(t))
 				return nil
 			})
 		}
