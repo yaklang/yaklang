@@ -5,7 +5,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 )
 
 type CacheItem[T MemoryItem, D DBItem] struct {
@@ -113,30 +112,21 @@ func (c *Cache[T, U]) Get(id int64) (T, bool) {
 }
 
 func (c *Cache[T, D]) Close() {
-	f1 := func() {
-		if c.fetcher == nil {
-			return
-		}
+	if c.fetcher == nil {
+		return
+	}
 
-		delete := make([]func([]D), 0, 1)
-		if !utils.IsNil(c.delete) {
-			delete = append(delete, c.delete)
-		}
-		c.fetcher.Close(delete...)
+	delete := make([]func([]D), 0, 1)
+	if !utils.IsNil(c.delete) {
+		delete = append(delete, c.delete)
 	}
-	f2 := func() {
-		c.cache.EnableSave()
+	c.fetcher.Close(delete...)
+	c.cache.EnableSave()
+	c.cache.Close()
+	if c.saver == nil {
+		return
 	}
-	f3 := func() {
-		c.cache.Close()
-	}
-	f4 := func() {
-		if c.saver == nil {
-			return
-		}
-		c.saver.Close()
-	}
-	ssaprofile.ProfileAdd(true, "databasex.Cache.Close."+c.config.name, f1, f2, f3, f4)
+	c.saver.Close()
 }
 
 func (c *Cache[T, U]) Count() int {

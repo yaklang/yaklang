@@ -7,7 +7,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 )
 
 type databaseCacheItemStatus int
@@ -136,37 +135,21 @@ func (c *DataBaseCacheWithKey[K, T]) GetPure(key K) (T, bool) {
 }
 
 func (c *DataBaseCacheWithKey[K, T]) Get(key K) (T, bool) {
-	var ret T
-	var ok bool
-	// log.Errorf("Get key: %v", key)
-	f1 := func() {
-		ret, ok = c.GetPure(key)
+	if ret, ok := c.GetPure(key); ok {
+		return ret, true
 	}
 
 	// no in cache, load from database
-	f2 := func() {
-		if ok {
-			return
+	if memValue, err := c.loadFromDatabase(key); err == nil {
+		if item, ok := c.data.Get(key); ok {
+			return item.memoryItem, true
 		}
-		if memValue, err := c.loadFromDatabase(key); err == nil {
-			if item, ok := c.data.Get(key); ok {
-				ret = item.memoryItem
-				ok = true
-				return
-				// return item.memoryItem, true
-			}
-			c.Set(key, memValue)
-			ret = memValue
-			ok = true
-			return
-			// return memValue, true
-		}
+		c.Set(key, memValue)
+		return memValue, true
 	}
 
-	ssaprofile.ProfileAdd(true, "DatabaseCacheWithKey.Get", f1, f2)
-	return ret, ok
-	// var zero T
-	// return zero, false
+	var zero T
+	return zero, false
 }
 
 func (c *DataBaseCacheWithKey[K, T]) GetAll() map[K]T {
