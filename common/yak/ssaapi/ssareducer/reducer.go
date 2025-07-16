@@ -104,7 +104,7 @@ func ReducerCompile(base string, opts ...Option) error {
 			folders = append(folders,
 				strings.Split(folder, string(c.fs.GetSeparators()))...,
 			)
-			ssadb.SaveFolder(ssadb.GetDB(), name, folders)
+			ssadb.SaveFolder(name, folders)
 		}
 		return nil
 	}))
