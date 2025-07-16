@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/google/uuid"
 	"github.com/h2non/filetype"
 	"github.com/yaklang/yaklang/common/authhack"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -1082,10 +1083,29 @@ func (s *Server) SaveCodecFlow(ctx context.Context, req *ypb.CustomizeCodecFlow)
 	}
 	cf := &schema.CodecFlow{
 		FlowName:   req.GetFlowName(),
+		FlowId:     uuid.New().String(),
 		WorkFlow:   flowByte,
 		WorkFlowUI: req.GetWorkFlowUI(),
 	}
-	err = yakit.CreateOrUpdateCodecFlow(s.GetProfileDatabase(), cf)
+	err = yakit.CreateCodecFlow(s.GetProfileDatabase(), cf)
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.Empty{}, nil
+}
+
+func (s *Server) UpdateCodecFlow(ctx context.Context, req *ypb.UpdateCodecFlowRequest) (*ypb.Empty, error) {
+	flowByte, err := json.Marshal(req.GetWorkFlow())
+	if err != nil {
+		return nil, err
+	}
+	cf := &schema.CodecFlow{
+		FlowName:   req.GetFlowName(),
+		FlowId:     req.GetFlowId(),
+		WorkFlow:   flowByte,
+		WorkFlowUI: req.GetWorkFlowUI(),
+	}
+	err = yakit.UpdateCodecFlow(s.GetProfileDatabase(), cf)
 	if err != nil {
 		return nil, err
 	}
