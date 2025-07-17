@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/google/uuid"
 	"github.com/h2non/filetype"
 	"github.com/yaklang/yaklang/common/authhack"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -1083,7 +1082,6 @@ func (s *Server) SaveCodecFlow(ctx context.Context, req *ypb.CustomizeCodecFlow)
 	}
 	cf := &schema.CodecFlow{
 		FlowName:   req.GetFlowName(),
-		FlowId:     uuid.New().String(),
 		WorkFlow:   flowByte,
 		WorkFlowUI: req.GetWorkFlowUI(),
 	}
@@ -1101,7 +1099,6 @@ func (s *Server) UpdateCodecFlow(ctx context.Context, req *ypb.UpdateCodecFlowRe
 	}
 	cf := &schema.CodecFlow{
 		FlowName:   req.GetFlowName(),
-		FlowId:     req.GetFlowId(),
 		WorkFlow:   flowByte,
 		WorkFlowUI: req.GetWorkFlowUI(),
 	}
