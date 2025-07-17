@@ -33737,7 +33737,6 @@ type CustomizeCodecFlow struct {
 	FlowName      string                 `protobuf:"bytes,1,opt,name=FlowName,proto3" json:"FlowName,omitempty"`
 	WorkFlow      []*CodecWork           `protobuf:"bytes,2,rep,name=WorkFlow,proto3" json:"WorkFlow,omitempty"`
 	WorkFlowUI    string                 `protobuf:"bytes,3,opt,name=WorkFlowUI,proto3" json:"WorkFlowUI,omitempty"`
-	FlowId        string                 `protobuf:"bytes,4,opt,name=FlowId,proto3" json:"FlowId,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -33789,13 +33788,6 @@ func (x *CustomizeCodecFlow) GetWorkFlow() []*CodecWork {
 func (x *CustomizeCodecFlow) GetWorkFlowUI() string {
 	if x != nil {
 		return x.WorkFlowUI
-	}
-	return ""
-}
-
-func (x *CustomizeCodecFlow) GetFlowId() string {
-	if x != nil {
-		return x.FlowId
 	}
 	return ""
 }
@@ -57430,14 +57422,13 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bWorkFlow\x18\x03 \x03(\v2\x0e.ypb.CodecWorkR\bWorkFlow\x12\x1e\n" +
 	"\n" +
 	"InputBytes\x18\x06 \x01(\fR\n" +
-	"InputBytes\"\x94\x01\n" +
+	"InputBytes\"|\n" +
 	"\x12CustomizeCodecFlow\x12\x1a\n" +
 	"\bFlowName\x18\x01 \x01(\tR\bFlowName\x12*\n" +
 	"\bWorkFlow\x18\x02 \x03(\v2\x0e.ypb.CodecWorkR\bWorkFlow\x12\x1e\n" +
 	"\n" +
 	"WorkFlowUI\x18\x03 \x01(\tR\n" +
-	"WorkFlowUI\x12\x16\n" +
-	"\x06FlowId\x18\x04 \x01(\tR\x06FlowId\"\x98\x01\n" +
+	"WorkFlowUI\"\x98\x01\n" +
 	"\x16UpdateCodecFlowRequest\x12\x16\n" +
 	"\x06FlowId\x18\x01 \x01(\tR\x06FlowId\x12\x1a\n" +
 	"\bFlowName\x18\x02 \x01(\tR\bFlowName\x12*\n" +
