@@ -26,7 +26,7 @@ peepholeSizes := cli.StringSlice(
 
 programName := cli.String("programName", cli.setVerboseName("项目名"), cli.setCliGroup("information"))
 description := cli.Text("description", cli.setVerboseName("项目描述"), cli.setCliGroup("information"))
-excludeFile := cli.String("excludeFile", cli.setVerboseName("排除文件/文件夹"),cli.setCliGroup("compile"),cli.setDefault("**/vendor/**,vendor/**,**/classes/**,**/target/**,**include**,**caches**,**cache**,**tmp**,**alipay**,**includes**,**temp**,**zh_cn**,**zh_en**,**plugins**,**PHPExcel**"))
+excludeFile := cli.String("excludeFile", cli.setVerboseName("排除文件/文件夹"),cli.setCliGroup("compile"),cli.setDefault("**/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**"))
 
 // {{ compile option
 entry := cli.FileNames("entry", cli.setVerboseName("项目入口文件"), cli.setCliGroup("compile"))

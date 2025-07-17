@@ -1,11 +1,12 @@
 package php
 
 import (
+	"path/filepath"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"path/filepath"
-	"testing"
 )
 
 func TestExclude(t *testing.T) {
@@ -63,4 +64,72 @@ println(2);
 	require.NoError(t, err)
 	values = result.GetValues("param")
 	require.True(t, values.Len() == 0)
+}
+
+func TestExcludeFile_Temp(t *testing.T) {
+	fs := filesys.NewVirtualFs()
+	fs.AddFile("src/main/main.go", `
+package main
+
+func main() {
+
+}		
+		`)
+	fs.AddFile("src/main/template.go", `
+package main
+
+import (
+	"encoding/base64"
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"net/http"
+	"os/exec"
+)
+
+func CMD1(c *gin.Context) {
+	var ipaddr string
+	// Check the request method
+	if c.Request.Method == "GET" {
+		ipaddr = c.Query("ip")
+	} else if c.Request.Method == "POST" {
+		ipaddr = c.PostForm("ip")
+	}
+
+	Command := fmt.Sprintf("ping -c 4 %s", ipaddr)
+	output, err := exec.Command("/bin/sh", "-c", Command).Output()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	c.JSON(200, gin.H{
+		"success": string(output),
+	})
+}
+`)
+	prog, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaapi.GO))
+	require.NoError(t, err)
+	result, err := prog.SyntaxFlowWithError(`exec.Command(*?{opcode:const} #-> as $param)`, ssaapi.QueryWithEnableDebug())
+	require.NoError(t, err)
+	values := result.GetValues("param")
+	require.True(t, values.Len() != 0)
+
+	filterFunc, err := ssaapi.DefaultExcludeFunc([]string{"**temp**"})
+	require.NoError(t, err)
+	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaapi.GO), filterFunc)
+	require.NoError(t, err)
+	prog.Show()
+	result, err = prog.SyntaxFlowWithError(`exec.Command(*?{opcode:const} #-> as $param)`, ssaapi.QueryWithEnableDebug())
+	require.NoError(t, err)
+	values = result.GetValues("param")
+	require.True(t, values.Len() == 0)
+
+	filterFunc, err = ssaapi.DefaultExcludeFunc([]string{"**temp/**"})
+	require.NoError(t, err)
+	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaapi.GO), filterFunc)
+	require.NoError(t, err)
+	prog.Show()
+	result, err = prog.SyntaxFlowWithError(`exec.Command(*?{opcode:const} #-> as $param)`, ssaapi.QueryWithEnableDebug())
+	require.NoError(t, err)
+	values = result.GetValues("param")
+	require.True(t, values.Len() != 0)
 }
