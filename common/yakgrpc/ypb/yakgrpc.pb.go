@@ -47944,6 +47944,7 @@ type QuerySyntaxFlowScanTaskRequest struct {
 	state         protoimpl.MessageState    `protogen:"open.v1"`
 	Pagination    *Paging                   `protobuf:"bytes,1,opt,name=Pagination,proto3" json:"Pagination,omitempty"`
 	Filter        *SyntaxFlowScanTaskFilter `protobuf:"bytes,2,opt,name=Filter,proto3" json:"Filter,omitempty"`
+	ShowDiffRisk  bool                      `protobuf:"varint,3,opt,name=ShowDiffRisk,proto3" json:"ShowDiffRisk,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -47990,6 +47991,13 @@ func (x *QuerySyntaxFlowScanTaskRequest) GetFilter() *SyntaxFlowScanTaskFilter {
 		return x.Filter
 	}
 	return nil
+}
+
+func (x *QuerySyntaxFlowScanTaskRequest) GetShowDiffRisk() bool {
+	if x != nil {
+		return x.ShowDiffRisk
+	}
+	return false
 }
 
 type SyntaxFlowScanTaskFilter struct {
@@ -48174,6 +48182,11 @@ type SyntaxFlowScanTask struct {
 	Kind       string                 `protobuf:"bytes,15,opt,name=Kind,proto3" json:"Kind,omitempty"` // "debug" | "scan"
 	// diff
 	NewRiskCount  int64 `protobuf:"varint,16,opt,name=NewRiskCount,proto3" json:"NewRiskCount,omitempty"`
+	InfoCount     int64 `protobuf:"varint,17,opt,name=InfoCount,proto3" json:"InfoCount,omitempty"`
+	LowCount      int64 `protobuf:"varint,18,opt,name=LowCount,proto3" json:"LowCount,omitempty"`
+	WarningCount  int64 `protobuf:"varint,19,opt,name=WarningCount,proto3" json:"WarningCount,omitempty"`
+	CriticalCount int64 `protobuf:"varint,20,opt,name=CriticalCount,proto3" json:"CriticalCount,omitempty"`
+	HighCount     int64 `protobuf:"varint,21,opt,name=HighCount,proto3" json:"HighCount,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -48316,6 +48329,41 @@ func (x *SyntaxFlowScanTask) GetKind() string {
 func (x *SyntaxFlowScanTask) GetNewRiskCount() int64 {
 	if x != nil {
 		return x.NewRiskCount
+	}
+	return 0
+}
+
+func (x *SyntaxFlowScanTask) GetInfoCount() int64 {
+	if x != nil {
+		return x.InfoCount
+	}
+	return 0
+}
+
+func (x *SyntaxFlowScanTask) GetLowCount() int64 {
+	if x != nil {
+		return x.LowCount
+	}
+	return 0
+}
+
+func (x *SyntaxFlowScanTask) GetWarningCount() int64 {
+	if x != nil {
+		return x.WarningCount
+	}
+	return 0
+}
+
+func (x *SyntaxFlowScanTask) GetCriticalCount() int64 {
+	if x != nil {
+		return x.CriticalCount
+	}
+	return 0
+}
+
+func (x *SyntaxFlowScanTask) GetHighCount() int64 {
+	if x != nil {
+		return x.HighCount
 	}
 	return 0
 }
@@ -58732,12 +58780,13 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vProgramName\x18\x03 \x03(\tR\vProgramName\x12\"\n" +
 	"\fResumeTaskId\x18\x05 \x01(\tR\fResumeTaskId\x12&\n" +
 	"\x0eIgnoreLanguage\x18\x04 \x01(\bR\x0eIgnoreLanguage\x126\n" +
-	"\tRuleInput\x18\x06 \x01(\v2\x18.ypb.SyntaxFlowRuleInputR\tRuleInput\"\x84\x01\n" +
+	"\tRuleInput\x18\x06 \x01(\v2\x18.ypb.SyntaxFlowRuleInputR\tRuleInput\"\xa8\x01\n" +
 	"\x1eQuerySyntaxFlowScanTaskRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x125\n" +
-	"\x06Filter\x18\x02 \x01(\v2\x1d.ypb.SyntaxFlowScanTaskFilterR\x06Filter\"\xe4\x01\n" +
+	"\x06Filter\x18\x02 \x01(\v2\x1d.ypb.SyntaxFlowScanTaskFilterR\x06Filter\x12\"\n" +
+	"\fShowDiffRisk\x18\x03 \x01(\bR\fShowDiffRisk\"\xe4\x01\n" +
 	"\x18SyntaxFlowScanTaskFilter\x12\x1a\n" +
 	"\bPrograms\x18\x01 \x03(\tR\bPrograms\x12\x16\n" +
 	"\x06Status\x18\x02 \x03(\tR\x06Status\x12\x18\n" +
@@ -58752,7 +58801,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12+\n" +
 	"\x04Data\x18\x02 \x03(\v2\x17.ypb.SyntaxFlowScanTaskR\x04Data\x12\x14\n" +
-	"\x05Total\x18\x03 \x01(\x03R\x05Total\"\xf0\x03\n" +
+	"\x05Total\x18\x03 \x01(\x03R\x05Total\"\x92\x05\n" +
 	"\x12SyntaxFlowScanTask\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x04R\x02Id\x12\x1c\n" +
 	"\tCreatedAt\x18\x02 \x01(\x03R\tCreatedAt\x12\x1c\n" +
@@ -58772,7 +58821,12 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"TotalQuery\x122\n" +
 	"\x06Config\x18\x0e \x01(\v2\x1a.ypb.SyntaxFlowScanRequestR\x06Config\x12\x12\n" +
 	"\x04Kind\x18\x0f \x01(\tR\x04Kind\x12\"\n" +
-	"\fNewRiskCount\x18\x10 \x01(\x03R\fNewRiskCount\"v\n" +
+	"\fNewRiskCount\x18\x10 \x01(\x03R\fNewRiskCount\x12\x1c\n" +
+	"\tInfoCount\x18\x11 \x01(\x03R\tInfoCount\x12\x1a\n" +
+	"\bLowCount\x18\x12 \x01(\x03R\bLowCount\x12\"\n" +
+	"\fWarningCount\x18\x13 \x01(\x03R\fWarningCount\x12$\n" +
+	"\rCriticalCount\x18\x14 \x01(\x03R\rCriticalCount\x12\x1c\n" +
+	"\tHighCount\x18\x15 \x01(\x03R\tHighCount\"v\n" +
 	"\x1fDeleteSyntaxFlowScanTaskRequest\x12\x1c\n" +
 	"\tDeleteAll\x18\x01 \x01(\bR\tDeleteAll\x125\n" +
 	"\x06Filter\x18\x02 \x01(\v2\x1d.ypb.SyntaxFlowScanTaskFilterR\x06Filter\"\xf3\x01\n" +

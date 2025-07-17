@@ -121,6 +121,9 @@ func (m *SyntaxFlowScanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
 	if riskLen := len(res.GetGRPCModelRisk()); riskLen != 0 {
 		m.riskCount += int64(riskLen)
 	}
+	for key, count := range res.GetRiskCountMap() {
+		m.riskCountMap[key] = count
+	}
 	// m.riskQuery
 	m.stream.Send(&ypb.SyntaxFlowScanResponse{
 		TaskID:   m.taskID,

@@ -55,7 +55,8 @@ type SyntaxFlowScanManager struct {
 	skipQuery    int64 // language not match, skip this rule
 	successQuery int64
 	// risk
-	riskCount int64
+	riskCount    int64
+	riskCountMap map[string]int64
 	// query process
 	totalQuery int64
 
@@ -100,6 +101,7 @@ func createEmptySyntaxFlowTaskByID(
 		status:       schema.SYNTAXFLOWSCAN_EXECUTING,
 		resumeSignal: sync.NewCond(&sync.Mutex{}),
 		isPaused:     utils.NewAtomicBool(),
+		riskCountMap: make(map[string]int64),
 		cancel:       cancel,
 	}
 	syntaxFlowScanManagerMap.Set(taskId, m)
@@ -149,6 +151,20 @@ func (m *SyntaxFlowScanManager) SaveTask() error {
 	m.taskRecorder.Kind = m.kind
 	m.taskRecorder.Config, _ = json.Marshal(m.config)
 	// m.taskRecorder.RuleNames, _ = json.Marshal(m.ruleNames)
+	for key, count := range m.GetRiskCountMap() {
+		switch schema.ValidSeverityType(key) {
+		case schema.SFR_SEVERITY_INFO:
+			m.taskRecorder.InfoCount = count
+		case schema.SFR_SEVERITY_WARNING:
+			m.taskRecorder.WarningCount = count
+		case schema.SFR_SEVERITY_CRITICAL:
+			m.taskRecorder.CriticalCount = count
+		case schema.SFR_SEVERITY_HIGH:
+			m.taskRecorder.HighCount = count
+		case schema.SFR_SEVERITY_LOW:
+			m.taskRecorder.LowCount = count
+		}
+	}
 	return schema.SaveSyntaxFlowScanTask(ssadb.GetDB(), m.taskRecorder)
 }
 
@@ -318,4 +334,8 @@ func (m *SyntaxFlowScanManager) ResumeTask() error {
 func (m *SyntaxFlowScanManager) StatusTask() error {
 	m.notifyStatus("")
 	return nil
+}
+
+func (m *SyntaxFlowScanManager) GetRiskCountMap() map[string]int64 {
+	return m.riskCountMap
 }

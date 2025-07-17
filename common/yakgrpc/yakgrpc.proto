@@ -6550,6 +6550,7 @@ message SyntaxFlowScanRequest{
 message QuerySyntaxFlowScanTaskRequest{
   Paging Pagination = 1;
   SyntaxFlowScanTaskFilter Filter = 2;
+  bool ShowDiffRisk = 3;
 }
 
 message SyntaxFlowScanTaskFilter{
@@ -6592,6 +6593,11 @@ message SyntaxFlowScanTask {
   string Kind = 15; // "debug" | "scan"
   // diff
   int64 NewRiskCount = 16;
+  int64 InfoCount = 17;
+  int64 LowCount = 18;
+  int64 WarningCount = 19;
+  int64 CriticalCount = 20;
+  int64 HighCount = 21;
 }
 
 message DeleteSyntaxFlowScanTaskRequest{
