@@ -19,10 +19,42 @@ func (s *Server) QuerySyntaxFlowScanTask(ctx context.Context, request *ypb.Query
 			Order:   "desc",
 		}
 	}
+
 	p, tasks, err := yakit.QuerySyntaxFlowScanTask(ssadb.GetDB(), request)
 	if err != nil {
 		return nil, err
 	}
+
+	if progNames := request.GetFilter().GetPrograms(); len(progNames) == 1 {
+		var lastTask *schema.SyntaxFlowScanTask
+		for i, task := range tasks {
+			risks := []*schema.SSARisk{}
+			if i == 0 {
+				lastTask = task
+				continue
+			}
+			baseline := &ypb.SSARiskDiffItem{
+				ProgramName:   progNames[0],
+				RiskRuntimeId: task.TaskId,
+			}
+			compare := &ypb.SSARiskDiffItem{
+				ProgramName:   progNames[0],
+				RiskRuntimeId: lastTask.TaskId,
+			}
+			res, err := yakit.DoRiskDiff(ctx, baseline, compare)
+			if err != nil {
+				return nil, err
+			}
+			for re := range res {
+				if re.Status == yakit.Add {
+					risks = append(risks, re.NewValue)
+				}
+			}
+			task.NewRiskCount = int64(len(risks))
+			lastTask = task
+		}
+	}
+
 	datas := lo.Map(tasks, func(task *schema.SyntaxFlowScanTask, index int) *ypb.SyntaxFlowScanTask {
 		data := task.ToGRPCModel()
 		return data

@@ -48169,9 +48169,11 @@ type SyntaxFlowScanTask struct {
 	// risk
 	RiskCount int64 `protobuf:"varint,12,opt,name=RiskCount,proto3" json:"RiskCount,omitempty"`
 	// query process
-	TotalQuery    int64                  `protobuf:"varint,13,opt,name=TotalQuery,proto3" json:"TotalQuery,omitempty"`
-	Config        *SyntaxFlowScanRequest `protobuf:"bytes,14,opt,name=Config,proto3" json:"Config,omitempty"`
-	Kind          string                 `protobuf:"bytes,15,opt,name=Kind,proto3" json:"Kind,omitempty"` // "debug" | "scan"
+	TotalQuery int64                  `protobuf:"varint,13,opt,name=TotalQuery,proto3" json:"TotalQuery,omitempty"`
+	Config     *SyntaxFlowScanRequest `protobuf:"bytes,14,opt,name=Config,proto3" json:"Config,omitempty"`
+	Kind       string                 `protobuf:"bytes,15,opt,name=Kind,proto3" json:"Kind,omitempty"` // "debug" | "scan"
+	// diff
+	NewRiskCount  int64 `protobuf:"varint,16,opt,name=NewRiskCount,proto3" json:"NewRiskCount,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -48309,6 +48311,13 @@ func (x *SyntaxFlowScanTask) GetKind() string {
 		return x.Kind
 	}
 	return ""
+}
+
+func (x *SyntaxFlowScanTask) GetNewRiskCount() int64 {
+	if x != nil {
+		return x.NewRiskCount
+	}
+	return 0
 }
 
 type DeleteSyntaxFlowScanTaskRequest struct {
@@ -58743,7 +58752,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12+\n" +
 	"\x04Data\x18\x02 \x03(\v2\x17.ypb.SyntaxFlowScanTaskR\x04Data\x12\x14\n" +
-	"\x05Total\x18\x03 \x01(\x03R\x05Total\"\xcc\x03\n" +
+	"\x05Total\x18\x03 \x01(\x03R\x05Total\"\xf0\x03\n" +
 	"\x12SyntaxFlowScanTask\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x04R\x02Id\x12\x1c\n" +
 	"\tCreatedAt\x18\x02 \x01(\x03R\tCreatedAt\x12\x1c\n" +
@@ -58762,7 +58771,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"TotalQuery\x18\r \x01(\x03R\n" +
 	"TotalQuery\x122\n" +
 	"\x06Config\x18\x0e \x01(\v2\x1a.ypb.SyntaxFlowScanRequestR\x06Config\x12\x12\n" +
-	"\x04Kind\x18\x0f \x01(\tR\x04Kind\"v\n" +
+	"\x04Kind\x18\x0f \x01(\tR\x04Kind\x12\"\n" +
+	"\fNewRiskCount\x18\x10 \x01(\x03R\fNewRiskCount\"v\n" +
 	"\x1fDeleteSyntaxFlowScanTaskRequest\x12\x1c\n" +
 	"\tDeleteAll\x18\x01 \x01(\bR\tDeleteAll\x125\n" +
 	"\x06Filter\x18\x02 \x01(\v2\x1d.ypb.SyntaxFlowScanTaskFilterR\x06Filter\"\xf3\x01\n" +

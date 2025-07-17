@@ -17,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -83,13 +84,17 @@ func checkSfScanRecvMsg(t *testing.T, stream ypb.Yak_SyntaxFlowScanClient, handl
 	}
 }
 
-func startScan(client ypb.YakClient, t *testing.T, progID string, ctx context.Context) (string, ypb.Yak_SyntaxFlowScanClient) {
+func startScan(client ypb.YakClient, t *testing.T, progID string, ctx context.Context, filters ...*ypb.SyntaxFlowRuleFilter) (string, ypb.Yak_SyntaxFlowScanClient) {
+	filter := &ypb.SyntaxFlowRuleFilter{}
+	if len(filters) > 0 {
+		filter = filters[0]
+	}
 	stream, err := client.SyntaxFlowScan(ctx)
 	require.NoError(t, err)
 
 	stream.Send(&ypb.SyntaxFlowScanRequest{
 		ControlMode: "start",
-		Filter:      &ypb.SyntaxFlowRuleFilter{},
+		Filter:      filter,
 		ProgramName: []string{
 			progID,
 		},
@@ -399,4 +404,242 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan_With_Group(t *testing.T) {
 	require.Equal(t, 1.0, finishProcess)
 	require.Equal(t, "done", finishStatus)
 	log.Infof("wait for task %v", taskID)
+}
+
+func TestGRPCMUSTPASS_SyntaxFlow_Scan_With_Diff(t *testing.T) {
+	client, err := NewLocalClient(true)
+	require.NoError(t, err)
+
+	progID := uuid.NewString()
+	ruleName1 := uuid.NewString()
+	taskID1 := ""
+	ruleName2 := uuid.NewString()
+	taskID2 := ""
+	_ = taskID1
+	_ = taskID2
+
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("example/src/main/a.go", `
+package unAuth
+
+import (
+	"encoding/base64"
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"net/http"
+	"os/exec"
+)
+
+func CMD1(c *gin.Context) {
+	var ipaddr string
+	// Check the request method
+	if c.Request.Method == "GET" {
+		ipaddr = c.Query("ip")
+	} else if c.Request.Method == "POST" {
+		ipaddr = c.PostForm("ip")
+	}
+
+	Command := fmt.Sprintf("ping -c 4 %s", ipaddr)
+	output, err := exec.Command("/bin/sh", "-c", Command).Output()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	c.JSON(200, gin.H{
+		"success": string(output),
+	})
+}
+	`)
+	prog, err := ssaapi.ParseProjectWithFS(vf,
+		ssaapi.WithLanguage(consts.GO),
+		ssaapi.WithProgramPath("example"),
+		ssaapi.WithProgramName(progID),
+	)
+	_ = prog
+	defer func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), progID)
+	}()
+	require.NoError(t, err)
+
+	client.CreateSyntaxFlowRule(context.Background(), &ypb.CreateSyntaxFlowRuleRequest{
+		SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
+			Content: `
+exec.Command(* #-> as $high)
+
+alert $high for {
+	type: "vuln",
+	level: "high",
+}`,
+			GroupNames: []string{"golang"},
+			RuleName:   ruleName1,
+			Language:   "golang",
+			Tags:       []string{"golang"},
+		},
+	})
+	defer func() {
+		client.DeleteSyntaxFlowRule(context.Background(), &ypb.DeleteSyntaxFlowRuleRequest{
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				RuleNames: []string{ruleName1},
+			},
+		})
+	}()
+
+	t.Run("test scan task risk count", func(t *testing.T) {
+		defer func() {
+			err = schema.DeleteSyntaxFlowScanTask(ssadb.GetDB(), taskID1)
+			require.NoError(t, err)
+		}()
+		stream, err := client.SyntaxFlowScan(context.Background())
+		require.NoError(t, err)
+
+		stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode: "start",
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				RuleNames: []string{ruleName1},
+			},
+			ProgramName: []string{
+				progID,
+			},
+		})
+
+		resp, err := stream.Recv()
+		taskID1 = resp.TaskID
+		require.NoError(t, err)
+		log.Infof("resp: %v", resp)
+		require.NoError(t, err)
+
+		finishProcess := 0.0
+		var finishStatus string
+		checkSfScanRecvMsg(t, stream, func(status string) {
+			finishStatus = status
+		}, func(process float64) {
+			finishProcess = process
+		})
+		require.Equal(t, 1.0, finishProcess)
+		require.Equal(t, "done", finishStatus)
+
+		rsp, err := client.QuerySyntaxFlowScanTask(context.Background(), &ypb.QuerySyntaxFlowScanTaskRequest{
+			Filter: &ypb.SyntaxFlowScanTaskFilter{
+				TaskIds: []string{resp.TaskID},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, len(rsp.Data), 1)
+		task := rsp.Data[0]
+		require.Equal(t, task.Programs, []string{progID})
+		require.Equal(t, task.Status, "done")
+		require.Equal(t, task.RiskCount, int64(12)) // 修改ssa可能导致这里不匹配，直接修改即可
+	})
+
+	t.Run("test scan task risk count with diff", func(t *testing.T) {
+		client.CreateSyntaxFlowRule(context.Background(), &ypb.CreateSyntaxFlowRuleRequest{
+			SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
+				Content: `
+		exec.Command(*?{opcode:const} #-> as $high)
+
+		alert $high for {
+			type: "vuln",
+			level: "high",
+		}`,
+				GroupNames: []string{"golang"},
+				RuleName:   ruleName2,
+				Language:   "golang",
+				Tags:       []string{"golang"},
+			},
+		})
+		defer func() {
+			client.DeleteSyntaxFlowRule(context.Background(), &ypb.DeleteSyntaxFlowRuleRequest{
+				Filter: &ypb.SyntaxFlowRuleFilter{
+					RuleNames: []string{ruleName2},
+				},
+			})
+			err = schema.DeleteSyntaxFlowScanTask(ssadb.GetDB(), taskID1)
+			require.NoError(t, err)
+			err = schema.DeleteSyntaxFlowScanTask(ssadb.GetDB(), taskID2)
+			require.NoError(t, err)
+			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormDefaultSSADataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
+			yakit.DeleteSSADiffResultByCompare(consts.GetGormDefaultSSADataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
+		}()
+
+		{
+			stream, err := client.SyntaxFlowScan(context.Background())
+			require.NoError(t, err)
+
+			stream.Send(&ypb.SyntaxFlowScanRequest{
+				ControlMode: "start",
+				Filter: &ypb.SyntaxFlowRuleFilter{
+					RuleNames: []string{ruleName1},
+				},
+				ProgramName: []string{
+					progID,
+				},
+			})
+
+			resp, err := stream.Recv()
+			taskID1 = resp.TaskID
+			require.NoError(t, err)
+			log.Infof("resp: %v", resp)
+			require.NoError(t, err)
+
+			finishProcess := 0.0
+			var finishStatus string
+			checkSfScanRecvMsg(t, stream, func(status string) {
+				finishStatus = status
+			}, func(process float64) {
+				finishProcess = process
+			})
+			require.Equal(t, 1.0, finishProcess)
+			require.Equal(t, "done", finishStatus)
+		}
+
+		{
+			stream, err := client.SyntaxFlowScan(context.Background())
+			require.NoError(t, err)
+
+			stream.Send(&ypb.SyntaxFlowScanRequest{
+				ControlMode: "start",
+				Filter: &ypb.SyntaxFlowRuleFilter{
+					RuleNames: []string{ruleName2},
+				},
+				ProgramName: []string{
+					progID,
+				},
+			})
+
+			resp, err := stream.Recv()
+			taskID2 = resp.TaskID
+			require.NoError(t, err)
+			log.Infof("resp: %v", resp)
+			require.NoError(t, err)
+
+			finishProcess := 0.0
+			var finishStatus string
+			checkSfScanRecvMsg(t, stream, func(status string) {
+				finishStatus = status
+			}, func(process float64) {
+				finishProcess = process
+			})
+			require.Equal(t, 1.0, finishProcess)
+			require.Equal(t, "done", finishStatus)
+		}
+
+		rsp, err := client.QuerySyntaxFlowScanTask(context.Background(), &ypb.QuerySyntaxFlowScanTaskRequest{
+			Filter: &ypb.SyntaxFlowScanTaskFilter{
+				Programs: []string{progID},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, len(rsp.Data), 2)
+
+		task := rsp.Data[0]
+		require.Equal(t, task.Programs, []string{progID})
+		require.Equal(t, task.Status, "done")
+		require.Equal(t, task.NewRiskCount, int64(0))
+		task = rsp.Data[1]
+		require.Equal(t, task.Programs, []string{progID})
+		require.Equal(t, task.Status, "done")
+		require.Equal(t, task.NewRiskCount, int64(9))
+	})
 }
