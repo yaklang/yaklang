@@ -38,12 +38,12 @@ func CreateCodecFlow(db *gorm.DB, flow *schema.CodecFlow) error {
 func UpdateCodecFlow(db *gorm.DB, flow *schema.CodecFlow) error {
 	var existingFlow schema.CodecFlow
 	result := db.Model(&schema.CodecFlow{}).
-		Where("flow_id = ?", flow.FlowId).
+		Where("flow_name = ?", flow.FlowName).
 		First(&existingFlow)
 
 	if result.Error == nil {
 		if err := db.Model(&schema.CodecFlow{}).
-			Where("flow_id = ?", flow.FlowId).
+			Where("flow_name = ?", flow.FlowName).
 			Updates(flow).Error; err != nil {
 			return utils.Errorf("update Codec Flow failed: %s", err)
 		}
@@ -69,13 +69,13 @@ func ClearCodecFlow(db *gorm.DB) error {
 	return nil
 }
 
-func GetCodecFlowByID(db *gorm.DB, flowID string) (*schema.CodecFlow, error) {
-	var flow schema.CodecFlow
-	if db := db.Model(&schema.CodecFlow{}).Where("flow_id = ?", flowID).First(&flow); db.Error != nil {
-		return nil, db.Error
-	}
-	return &flow, nil
-}
+// func GetCodecFlowByID(db *gorm.DB, flowID string) (*schema.CodecFlow, error) {
+// 	var flow schema.CodecFlow
+// 	if db := db.Model(&schema.CodecFlow{}).Where("flow_id = ?", flowID).First(&flow); db.Error != nil {
+// 		return nil, db.Error
+// 	}
+// 	return &flow, nil
+// }
 
 func GetCodecFlowByName(db *gorm.DB, flowName string) (*schema.CodecFlow, error) {
 	var flow schema.CodecFlow

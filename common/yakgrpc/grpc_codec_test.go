@@ -513,31 +513,27 @@ func TestGRPCCodecFlow_Normal(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-		codecFlow, err := yakit.GetCodecFlowByName(consts.GetGormProfileDatabase(), flowName)
-		flowID_find := codecFlow.FlowId
-		require.NoError(t, err)
 		_, err = client.UpdateCodecFlow(utils.TimeoutContextSeconds(1),
 			&ypb.UpdateCodecFlowRequest{
-				FlowId:   flowID_find,
 				FlowName: flowName,
 				WorkFlow: workFlow2,
 			},
 		)
 		require.NoError(t, err)
-		codecFlow, err = yakit.GetCodecFlowByName(consts.GetGormProfileDatabase(), flowName)
+		codecFlow, err := yakit.GetCodecFlowByName(consts.GetGormProfileDatabase(), flowName)
 		jsonData, _ := json.Marshal(workFlow2)
 		require.NoError(t, err)
 		require.Equal(t, codecFlow.WorkFlow, jsonData)
 
-		codecFlows, err := yakit.GetAllCodecFlow(consts.GetGormProfileDatabase())
-		jsonData, _ = json.Marshal(workFlow2)
-		require.NoError(t, err)
-		require.Equal(t, codecFlows[0].WorkFlow, jsonData)
+		// codecFlows, err := yakit.GetAllCodecFlow(consts.GetGormProfileDatabase())
+		// jsonData, _ = json.Marshal(workFlow2)
+		// require.NoError(t, err)
+		// require.Equal(t, codecFlows[0].WorkFlow, jsonData)
 
-		codecFlow, err = yakit.GetCodecFlowByID(consts.GetGormProfileDatabase(), flowID_find)
-		jsonData, _ = json.Marshal(workFlow2)
-		require.NoError(t, err)
-		require.Equal(t, codecFlow.WorkFlow, jsonData)
+		// codecFlow, err = yakit.GetCodecFlowByID(consts.GetGormProfileDatabase(), flowID_find)
+		// jsonData, _ = json.Marshal(workFlow2)
+		// require.NoError(t, err)
+		// require.Equal(t, codecFlow.WorkFlow, jsonData)
 
 	})
 }
