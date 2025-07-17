@@ -42,7 +42,8 @@ type SyntaxFlowScanTask struct {
 	SkipQuery    int64 // language not match, skip this rule
 	SuccessQuery int64
 	// risk
-	RiskCount int64
+	RiskCount    int64
+	NewRiskCount int64
 	// query process
 	TotalQuery int64
 
@@ -64,6 +65,7 @@ func (s *SyntaxFlowScanTask) ToGRPCModel() *ypb.SyntaxFlowScanTask {
 		SkipQuery:    s.SkipQuery,
 		SuccessQuery: s.SuccessQuery,
 		RiskCount:    s.RiskCount,
+		NewRiskCount: s.NewRiskCount,
 		TotalQuery:   s.TotalQuery,
 		Kind:         string(s.Kind),
 	}
