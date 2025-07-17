@@ -31,15 +31,17 @@ type SyntaxFlowResult struct {
 
 	unName Values
 
-	riskMap map[string]*schema.SSARisk
+	riskMap      map[string]*schema.SSARisk
+	riskCountMap map[string]int64
 	// cache
 	riskGRPCCache []*ypb.SSARisk
 }
 
 func createEmptyResult() *SyntaxFlowResult {
 	return &SyntaxFlowResult{
-		symbol:  make(map[string]Values),
-		riskMap: make(map[string]*schema.SSARisk),
+		symbol:       make(map[string]Values),
+		riskMap:      make(map[string]*schema.SSARisk),
+		riskCountMap: make(map[string]int64),
 	}
 }
 
@@ -191,4 +193,8 @@ func (r *SyntaxFlowResult) IsDatabase() bool {
 		return true
 	}
 	return false
+}
+
+func (r *SyntaxFlowResult) GetRiskCountMap() map[string]int64 {
+	return r.riskCountMap
 }

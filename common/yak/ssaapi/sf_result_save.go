@@ -139,6 +139,10 @@ func (r *SyntaxFlowResult) save(ctx context.Context, kind schema.SyntaxflowResul
 	if err := r.saveValue(ctx, result); err != nil {
 		errs = utils.JoinErrors(errs, err)
 	}
+
+	r.variable.ForEach(func(key string, value any) {
+		r.riskCountMap[key] = int64(value.(int))
+	})
 	result.RiskCount = uint64(len(r.riskMap))
 	result.RiskHashs = lo.MapValues(r.riskMap, func(risk *schema.SSARisk, name string) string {
 		return risk.Hash
