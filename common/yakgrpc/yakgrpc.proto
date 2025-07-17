@@ -6582,6 +6582,8 @@ message SyntaxFlowScanTask {
 
   SyntaxFlowScanRequest Config = 14;
   string Kind = 15; // "debug" | "scan"
+  // diff
+  int64 NewRiskCount = 16;
 }
 
 message DeleteSyntaxFlowScanTaskRequest{
