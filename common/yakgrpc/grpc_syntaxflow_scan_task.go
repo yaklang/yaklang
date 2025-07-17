@@ -25,7 +25,7 @@ func (s *Server) QuerySyntaxFlowScanTask(ctx context.Context, request *ypb.Query
 		return nil, err
 	}
 
-	if progNames := request.GetFilter().GetPrograms(); len(progNames) == 1 {
+	if progNames := request.GetFilter().GetPrograms(); len(progNames) == 1 && request.ShowDiffRisk {
 		var lastTask *schema.SyntaxFlowScanTask
 		for i, task := range tasks {
 			risks := []*schema.SSARisk{}
