@@ -241,6 +241,7 @@ func value2IrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
 	if inst.GetOpcode() == SSAOpcodeConstInst {
 		if constInst, ok := ToConstInst(inst); ok {
 			ir.ConstType = string(constInst.ConstType)
+			ir.String = constInst.String()
 		}
 	}
 
