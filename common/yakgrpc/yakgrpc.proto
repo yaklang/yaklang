@@ -327,6 +327,11 @@ service Yak {
   // 迁移旧的payload
   rpc MigratePayloads(Empty) returns (stream SavePayloadProgress);
 
+  rpc UploadPayloadsToOnline(UploadPayloadsToOnlineRequest) returns (Empty);
+  rpc DownloadAllPayloads(DownloadPayloadsRequest) returns (stream DownloadAllPayloadsProgress);
+  rpc DownloadBatchPayloads(DownloadPayloadsRequest) returns (Empty);
+
+
   // 自动生成补全
   rpc GetYakitCompletionRaw(Empty) returns (YakitCompletionRawResponse);
   rpc GetYakVMBuildInMethodCompletion(GetYakVMBuildInMethodCompletionRequest) returns (GetYakVMBuildInMethodCompletionResponse);
@@ -457,7 +462,7 @@ service Yak {
   rpc QueryReports(QueryReportsRequest) returns(QueryReportsResponse);
   rpc QueryReport(QueryReportRequest) returns (Report);
   rpc DeleteReport(DeleteReportRequest) returns (Empty);
-  rpc QueryAvailableReportFrom(Empty) returns (Fields); // no implement 
+  rpc QueryAvailableReportFrom(Empty) returns (Fields); // no implement
 
   rpc DownloadReport(DownloadReportRequest) returns (Empty);
 
@@ -2878,6 +2883,21 @@ message SavePayloadProgress {
   string Speed = 8;// 速度
   string RestDurationVerbose = 9;// 剩余时间
   string Message = 10;
+}
+
+message UploadPayloadsToOnlineRequest {
+  string Group = 1;
+  string Token = 2;
+}
+
+message DownloadPayloadsRequest {
+  string Group = 1;
+}
+
+message DownloadAllPayloadsProgress {
+  // 进度
+  double Progress = 1;
+  string Log = 2;
 }
 
 message DeletePluginByUserIDRequest {
