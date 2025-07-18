@@ -111,14 +111,16 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 		}, err
 	}
 
-	handleLargeContent(&execResult.Stdout, "stdout", nil)
+	handleLargeContent(&execResult.Stdout, "stdout", func(s string) {
+		log.Infof("large stdout content saved to file: %v", s)
+	})
 	handleLargeContent(&execResult.Stderr, "stderr", func(filename string) {
 		log.Infof("large stderr content saved to file: %s", filename)
 	})
 
 	if jsonResultRaw := utils.Jsonify(execResult.Result); len(jsonResultRaw) > 10*1024 {
 		originJsonResult := string(jsonResultRaw)
-		jsonResult := utils.ShrinkString(originJsonResult, 200)
+		jsonResult := utils.ShrinkString(originJsonResult, 2000)
 		filename := handleLargeContentToFile(originJsonResult, "json")
 		execResult.Result = fmt.Sprintf("%s (total: %v, saved in file[%v]) see file use some other filesystem tool",
 			jsonResult, len(originJsonResult), filename)
@@ -148,11 +150,16 @@ func handleLargeContent(content *string, contentType string, logCallback func(st
 	}
 
 	origContent := *content
-	*content = utils.ShrinkString(origContent, 200)
+	newData := utils.ShrinkString(origContent, 1024)
 	filename := handleLargeContentToFile(origContent, contentType)
 
-	*content += fmt.Sprintf(" (total: %v, saved in file[%v]) see file use some other filesystem tool",
-		len(origContent), filename)
+	newData += fmt.Sprintf(
+		"\n___________\n"+
+			" (total: %v, saved in file[%v]) see file use some other filesystem tool\n"+
+			"___________",
+		utils.ByteSize(uint64(len(origContent))),
+		filename)
+	*content = newData
 
 	if logCallback != nil {
 		logCallback(filename)
