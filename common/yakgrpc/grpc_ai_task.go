@@ -158,7 +158,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	var res any
 	if forgeName != "" {
 		log.Infof("forgeName is %v, start call yak.ExecuteForge", forgeName)
-		res, err = yak.ExecuteForge(forgeName, params, buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), aidOption...)...)
+		res, err = yak.ExecuteForge(forgeName, params, buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), sendEvent, aidOption...)...)
 		if err != nil {
 			log.Errorf("run ai forge[%s] failed: %v", forgeName, err)
 			return err
@@ -188,7 +188,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	return nil
 }
 
-func buildAIAgentOption(ctx context.Context, CoordinatorId string, extendOption ...aid.Option) []any {
+func buildAIAgentOption(ctx context.Context, CoordinatorId string, agentEventHandler func(e *schema.AiOutputEvent), extendOption ...aid.Option) []any {
 	agentOption := []any{
 		yak.WithContext(ctx),
 	}
@@ -198,6 +198,10 @@ func buildAIAgentOption(ctx context.Context, CoordinatorId string, extendOption 
 
 	if len(extendOption) > 0 {
 		agentOption = append(agentOption, yak.WithExtendAIDOptions(extendOption...))
+	}
+
+	if agentEventHandler != nil {
+		agentOption = append(agentOption, yak.WithAiAgentEventHandler(agentEventHandler))
 	}
 
 	return agentOption
