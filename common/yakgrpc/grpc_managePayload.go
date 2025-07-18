@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -1298,4 +1300,44 @@ func (s *Server) MigratePayloads(req *ypb.Empty, stream ypb.Yak_MigratePayloadsS
 
 	feedback(1)
 	return err
+}
+
+func (s *Server) UploadPayloadsToOnline(ctx context.Context, req *ypb.UploadPayloadsToOnlineRequest) (*ypb.Empty, error) {
+	if req.Token == "" || req.Group == "" {
+		return nil, utils.Errorf("params is empty")
+	}
+
+	db := bizhelper.ExactQueryString(s.GetProfileDatabase(), "`group`", req.GetGroup())
+	gen := yakit.YieldPayloads(db, context.Background())
+
+	for p := range gen {
+		data, err := json.Marshal(p)
+		if err != nil {
+			return nil, err
+		}
+		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+		err = client.UploadPayloadsToOnline(ctx, req.Token, data)
+		if err != nil {
+			return nil, utils.Errorf("payload to online failed: %v", err)
+		}
+	}
+
+	return &ypb.Empty{}, nil
+}
+
+func (s *Server) DownloadBatchPayloads(ctx context.Context, req *ypb.DownloadPayloadsRequest) (*ypb.Empty, error) {
+	if req.Group == "" {
+		return nil, utils.Errorf("params is empty")
+	}
+	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+	template, err := client.DownloadBatchPayloads(req.Group)
+	if err != nil {
+		return nil, utils.Errorf("save payload[%s] to database failed: %v", template.Name, err)
+	}
+
+	err = yakit.CreateOrUpdatePayload()
+	if err != nil {
+		return nil, utils.Errorf("save payload[%s] to database failed: %v", template.Name, err)
+	}
+	return &ypb.Empty{}, nil
 }
