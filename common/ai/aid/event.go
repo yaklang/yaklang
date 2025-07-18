@@ -71,14 +71,7 @@ func (r *Config) EmitYakitExecResult(exec *ypb.ExecResult) {
 	if exec == nil {
 		return
 	}
-	event := &schema.AiOutputEvent{
-		CoordinatorId: r.id,
-		Type:          schema.EVENT_TYPE_YAKIT_EXEC_RESULT,
-		NodeId:        "yakit",
-		Content:       utils.Jsonify(exec),
-		Timestamp:     time.Now().Unix(),
-	}
-	r.emit(event)
+	r.emitJson(schema.EVENT_TYPE_YAKIT_EXEC_RESULT, "yakit", exec)
 }
 
 func (r *Config) EmitStatus(key string, value any) {

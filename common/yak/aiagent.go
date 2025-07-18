@@ -7,7 +7,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
@@ -42,19 +41,25 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 			aitool.WithCallback(func(ctx context.Context, params aitool.InvokeParams, runtimeConfig *aitool.ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (any, error) {
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
-				if runtimeConfig == nil {
-					runtimeConfig = &aitool.ToolRuntimeConfig{
-						RuntimeID: uuid.New().String(),
-						FeedBacker: func(result *ypb.ExecResult) error {
-							if result.IsMessage {
-								stdout.Write([]byte(yaklib.ConvertExecResultIntoLog(result)))
-								stdout.Write([]byte("\n"))
-							}
-							return nil
-						},
-					}
+
+				var runtimeId string
+				var runtimeFeedBacker func(result *ypb.ExecResult) error
+				if runtimeConfig != nil {
+					runtimeId = runtimeConfig.RuntimeID
+					runtimeFeedBacker = runtimeConfig.FeedBacker
 				}
-				yakitClient := yaklib.NewVirtualYakitClientWithRuntimeID(runtimeConfig.FeedBacker, runtimeConfig.RuntimeID)
+
+				yakitClient := yaklib.NewVirtualYakitClientWithRuntimeID(func(result *ypb.ExecResult) error {
+					if result.IsMessage {
+						stdout.Write([]byte(yaklib.ConvertExecResultIntoLog(result)))
+						stdout.Write([]byte("\n"))
+					}
+					if runtimeFeedBacker != nil {
+						return runtimeFeedBacker(result)
+					}
+					return nil
+				}, runtimeId)
+
 				engine := NewYakitVirtualClientScriptEngine(yakitClient)
 
 				var args []string

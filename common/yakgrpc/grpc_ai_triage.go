@@ -157,7 +157,7 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 			res, err := yak.ExecuteForge("intent_recognition",
 				query,
 				append(
-					buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), aidOption...),
+					buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), sendEvent, aidOption...),
 					yak.WithMemory(memory),
 					yak.WithDisallowRequireForUserPrompt(),
 					yak.WithContext(baseCtx))...)
