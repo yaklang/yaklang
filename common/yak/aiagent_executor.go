@@ -2,6 +2,8 @@ package yak
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid"
@@ -47,7 +49,20 @@ func ExecuteForge(forgeName string, i any, iopts ...any) (any, error) {
 	var defaultForgeHandle func(items []*ypb.ExecParamItem, opts ...any) (any, error)
 
 	params := aiforge.Any2ExecParams(i)
-	engine := NewYakitVirtualClientScriptEngine(nil)
+	engine := NewYakitVirtualClientScriptEngine(yaklib.NewVirtualYakitClient(func(i *ypb.ExecResult) error {
+		if i != nil && ag.AgentEventHandler != nil {
+			event := &schema.AiOutputEvent{
+				CoordinatorId: ag.CoordinatorId,
+				Type:          schema.EVENT_TYPE_YAKIT_EXEC_RESULT,
+				NodeId:        "yakit",
+				Content:       utils.Jsonify(i),
+				Timestamp:     time.Now().Unix(),
+				IsJson:        true,
+			}
+			ag.AgentEventHandler(event)
+		}
+		return nil
+	}))
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 		defaultForgeHandle = buildDefaultForgeHandle(ag.ctx, forgeIns, engine)
 		engine.GetVM().SetVars(map[string]any{

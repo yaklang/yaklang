@@ -17,7 +17,7 @@ import (
 )
 
 // 提供一个测试用的回调函数
-func testCallback(ctx context.Context, params InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+func testCallback(ctx context.Context, params InvokeParams, runtimeConfig *ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 	return params, nil
 }
 

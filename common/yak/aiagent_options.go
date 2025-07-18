@@ -2,6 +2,7 @@ package yak
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/schema"
 	"slices"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
@@ -21,6 +22,8 @@ type Agent struct {
 
 	ExtendAIDOptions []aid.Option
 	AiForgeOptions   []aiforge.Option
+
+	AgentEventHandler func(e *schema.AiOutputEvent)
 }
 
 func NewAgent(iopts ...any) *Agent {
@@ -84,6 +87,13 @@ var (
 	WithCoordinatorId = func(id string) AIAgentOption {
 		return func(ag *Agent) error {
 			ag.CoordinatorId = id
+			return nil
+		}
+	}
+
+	WithAiAgentEventHandler = func(handler func(e *schema.AiOutputEvent)) AIAgentOption {
+		return func(ag *Agent) error {
+			ag.AgentEventHandler = handler
 			return nil
 		}
 	}
