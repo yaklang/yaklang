@@ -1943,19 +1943,19 @@ func TestReplaceHTTPPacketFormEncoded(t *testing.T) {
 		{
 			// append
 			origin: `GET / HTTP/1.1
-		Host: www.baidu.com
-		`,
+Host: www.baidu.com
+`,
 			key:   "a",
 			value: "1",
 		},
 		{
 			// append with no-form data
 			origin: `POST / HTTP/1.1
-		Host: www.baidu.com
-		Content-Type: application/x-www-form-urlencoded
-		Content-Length: 7
+Host: www.baidu.com
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 7
 
-		a=1&b=2`,
+a=1&b=2`,
 			key:   "a",
 			value: "1",
 		},

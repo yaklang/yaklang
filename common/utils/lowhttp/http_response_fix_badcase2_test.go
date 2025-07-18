@@ -2,6 +2,7 @@ package lowhttp
 
 import (
 	"bytes"
+	"github.com/davecgh/go-spew/spew"
 	"strings"
 	"testing"
 )
@@ -55,4 +56,18 @@ Transfer-Encoding: chunked
 	if !bytes.HasSuffix(rsp, []byte("Content-Length: 1\r\n\r\na")) {
 		t.Fatal("rsp should end with Content-Length: 1\\r\\n\\r\\na")
 	}
+}
+
+func TestFixHTTPResponse4(t *testing.T) {
+	packet2 := "  HTTP/1.1 200 OK\r\n" +
+		"    Server: nginx/abc.111\r\n" +
+		"    Content-Length: 3\r\n" +
+		"    \r\n" +
+		"    abc"
+	rsp, body, err := FixHTTPResponse([]byte(packet2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	spew.Dump(rsp)
+	spew.Dump(body)
 }
