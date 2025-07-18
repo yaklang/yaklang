@@ -3,6 +3,7 @@ package yaklib
 import (
 	"bufio"
 	"bytes"
+	"github.com/yaklang/yaklang/common/utils/bufpipe"
 	"io"
 	"reflect"
 
@@ -141,6 +142,24 @@ func _newScanner(i interface{}) (*bufio.Scanner, error) {
 	}
 }
 
+// bufio.NewPipe 创建一个新的管道，返回一个 PipeReader 和 PipeWriter
+// Example:
+// ```
+// r, w = bufio.NewPipe()
+//
+//	go func{
+//	    w.Write("Hello World");
+//	    w.Close()
+//	}
+//
+// data = io.ReadAll(r)~
+// println(string(data))
+// ```
+func _newPipe() (*bufpipe.PipeReader, *bufpipe.PipeWriter) {
+	r, w := bufpipe.NewPipe()
+	return r, w
+}
+
 var BufioExport = map[string]interface{}{
 	"NewBuffer":     _newBuffer,
 	"NewReader":     _newReader,
@@ -149,4 +168,5 @@ var BufioExport = map[string]interface{}{
 	"NewWriterSize": _newWriterSize,
 	"NewReadWriter": _newReadWriter,
 	"NewScanner":    _newScanner,
+	"NewPipe":       bufpipe.NewPipe,
 }
