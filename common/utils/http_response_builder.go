@@ -539,10 +539,11 @@ func ScanHTTPHeaderSimple(reader io.Reader, headerCallback func(rawHeader []byte
 			return errors.Wrap(err, "read HTTPResponse header failed")
 		}
 		lineBytes = trimPrefix(lineBytes)
-		emitHeaderRaw(lineBytes)
-		if lineBytes == nil || len(lineBytes) == 0 {
+		if len(bytes.TrimSpace(lineBytes)) == 0 {
+			emitHeaderRaw(nil)
 			return nil
 		}
+		emitHeaderRaw(lineBytes)
 	}
 }
 
