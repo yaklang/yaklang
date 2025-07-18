@@ -119,6 +119,7 @@ func init() {
 		registerBuildInForge("event_analyzer")
 		registerBuildInForge("web_log_monitor")
 		registerBuildInForge("vulscan")
+		registerBuildInForge("hostscan")
 		return nil
 	})
 }
