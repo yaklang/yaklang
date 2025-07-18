@@ -37,6 +37,7 @@ func (s *OnlineClient) UploadHTTPFlowToOnline(ctx context.Context, params *ypb.H
 		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
 		poc.WithReplaceHttpPacketBody(raw, true),
 		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
+		poc.WithSave(false),
 	)
 	if err != nil {
 		return utils.Wrapf(err, "UploadToOnline failed: http error")

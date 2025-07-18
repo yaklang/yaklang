@@ -29,6 +29,7 @@ func (s *OnlineClient) UploadToOnline(ctx context.Context,
 		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
 		poc.WithReplaceHttpPacketBody(raw, false),
 		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
+		poc.WithSave(false),
 	)
 	if err != nil {
 		return utils.Wrapf(err, "UploadToOnline failed: http error")
