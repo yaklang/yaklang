@@ -59,14 +59,11 @@ func (r *ToolExecutionResult) GetJSONSchemaString() string {
 	return string(data)
 }
 
-// ExecuteToolWithCapture 执行工具并捕获stdout和stderr
-func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any, stdout, stderr io.Writer, cancelCallback toolCallCancelCallback) (*ToolExecutionResult, error) {
-// ExecuteToolWithCaptureNoRuntime 执行工具并捕获stdout和stderr
-func (t *Tool) ExecuteToolWithCaptureNoRuntime(ctx context.Context, params map[string]any, stdout, stderr io.Writer) (*ToolExecutionResult, error) {
-	return t.ExecuteToolWithCapture(ctx, params, nil, stdout, stderr)
-}
+func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any, config *ToolInvokeConfig) (*ToolExecutionResult, error) {
+	runtimeConfig := config.GetRuntimeConfig()
+	stdout, stderr := config.GetStdout(), config.GetStderr()
+	cancelCallback := config.GetCancelCallback()
 
-func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any, runtimeConfig *ToolRuntimeConfig, stdout, stderr io.Writer) (*ToolExecutionResult, error) {
 	// 创建stdout和stderr的缓冲区
 	stdoutBuf := new(bytes.Buffer)
 	stderrBuf := new(bytes.Buffer)
@@ -84,7 +81,7 @@ func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any
 	var err error
 	var finsh = make(chan struct{})
 	go func() {
-		res, err = t.Callback(ctx, params, stdout, stderr)
+		res, err = t.Callback(ctx, params, runtimeConfig, stdout, stderr)
 		close(finsh)
 	}()
 

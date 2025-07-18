@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 )
 
@@ -95,7 +96,15 @@ func (t *aiTask) InvokeTool(targetTool *aitool.Tool, callToolParams aitool.Invok
 		aitool.WithContext(ctx),
 		aitool.WithErrorCallback(toolCallErr),
 		aitool.WithResultCallback(toolCallSuccess),
-		aitool.WithCancelCallback(toolCallCancel))
+		aitool.WithCancelCallback(toolCallCancel),
+		aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{
+			RuntimeID: c.id,
+			FeedBacker: func(result *ypb.ExecResult) error {
+				c.EmitYakitExecResult(result)
+				return nil
+			},
+		}),
+	)
 	ep.ActiveWithParams(ctx, map[string]any{"suggestion": "finish"})
 	c.ReleaseInteractiveEvent(ep.id, map[string]any{"suggestion": "finish"})
 
