@@ -135,6 +135,9 @@ func ReadVariableFromScope(scope ScopeIF, name string) *Variable {
 }
 
 func ReadVariableFromScopeAndParent(scope ScopeIF, name string) *Variable {
+	if utils.IsNil(scope) {
+		return nil
+	}
 	if ret := scope.ReadVariable(name); ret != nil {
 		if variable, ok := ret.(*Variable); ok {
 			return variable

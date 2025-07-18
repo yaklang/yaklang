@@ -79,8 +79,8 @@ func (b *FunctionBuilder) readValueFromIncludeStack(name string) Value {
 		if mainFunc == nil || mainFunc.ExitBlock == 0 {
 			return true
 		}
-		block := b.GetBasicBlockByID(mainFunc.ExitBlock)
-		if block == nil {
+		block, ok := b.GetBasicBlockByID(mainFunc.ExitBlock)
+		if !ok {
 			return true
 		}
 		if ret := ReadVariableFromScope(block.ScopeTable, name); ret != nil && ret.Value != nil {

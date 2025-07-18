@@ -662,8 +662,11 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 		}
 
 		for i, p := range fun.Params {
-			p := fun.GetValueById(p)
-			p.SetType(MarkedFunctionType.Parameter[i])
+			val, ok := fun.GetValueById(p)
+			if !ok {
+				continue
+			}
+			val.SetType(MarkedFunctionType.Parameter[i])
 		}
 		hitDefinedFunction = true
 	}
@@ -786,8 +789,11 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		}
 
 		for i, p := range fun.Params {
-			p := fun.GetValueById(p)
-			p.SetType(MarkedFunctionType.Parameter[i])
+			val, ok := fun.GetValueById(p)
+			if !ok {
+				continue
+			}
+			val.SetType(MarkedFunctionType.Parameter[i])
 		}
 		hitDefinedFunction = true
 	}
@@ -2087,8 +2093,11 @@ func (b *astbuilder) buildMethodSpec(stmt *gol.MethodSpecContext, interfacetyp *
 		}
 
 		for i, p := range fun.Params {
-			p := fun.GetValueById(p)
-			p.SetType(MarkedFunctionType.Parameter[i])
+			val, ok := fun.GetValueById(p)
+			if !ok {
+				continue
+			}
+			val.SetType(MarkedFunctionType.Parameter[i])
 		}
 		hitDefinedFunction = true
 	}

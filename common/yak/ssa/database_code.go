@@ -158,15 +158,19 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 
 	// not function
 	if !ir.IsFunction {
-		if fun, ok := ToFunction(inst.GetInstructionById(ir.CurrentFunction)); ok {
-			inst.SetFunc(fun)
-		} else {
-			log.Errorf("BUG: set CurrentFunction[%d]: ", ir.CurrentFunction)
+		if currentFunc, ok := inst.GetInstructionById(ir.CurrentFunction); ok && currentFunc != nil {
+			if fun, ok := ToFunction(currentFunc); ok {
+				inst.SetFunc(fun)
+			} else {
+				log.Errorf("BUG: set CurrentFunction[%d]: ", ir.CurrentFunction)
+			}
 		}
-		if block, ok := ToBasicBlock(inst.GetInstructionById(ir.CurrentBlock)); ok {
-			inst.SetBlock(block)
-		} else {
-			log.Errorf("BUG: set CurrentBlock[%d]:", ir.CurrentBlock)
+		if currentBlock, ok := inst.GetInstructionById(ir.CurrentBlock); ok && currentBlock != nil {
+			if block, ok := ToBasicBlock(currentBlock); ok {
+				inst.SetBlock(block)
+			} else {
+				log.Errorf("BUG: set CurrentBlock[%d]:", ir.CurrentBlock)
+			}
 		}
 	}
 	editor, start, end, err := ir.GetStartAndEndPositions()

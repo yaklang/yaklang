@@ -64,7 +64,7 @@ dump(c)
 	funcIns := prog.Program.GetFunction(string(ssa.MainFunctionName), "")
 	require.NotNil(t, funcIns)
 	brId := funcIns.Blocks[len(funcIns.Blocks)-1]
-	br := funcIns.GetBasicBlockByID(brId)
+	br, _ := funcIns.GetBasicBlockByID(brId)
 	block, _ := ssa.ToBasicBlock(br)
 	require.NotNil(t, block)
 	scope := block.ScopeTable

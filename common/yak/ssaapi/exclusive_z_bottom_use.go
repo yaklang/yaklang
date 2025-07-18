@@ -110,8 +110,8 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 	case *ssa.Phi:
 		return v.visitUserFallback(actx, opt...)
 	case *ssa.Call:
-		method := inst.GetValueById(inst.Method)
-		if method == nil {
+		method, ok := inst.GetValueById(inst.Method)
+		if !ok || method == nil {
 			log.Infof("fallback: (call instruction 's method/func is not *Function) unknown caller, ")
 			return v.visitUserFallback(actx, opt...)
 		}
@@ -146,7 +146,10 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 			if utils.IsNil(call) {
 				return method
 			}
-			function := call.GetValueById(call.Method)
+			function, ok := call.GetValueById(call.Method)
+			if !ok {
+				return method
+			}
 			toFunction, isFunction := ssa.ToFunction(function)
 			if !isFunction {
 				return method
@@ -171,7 +174,11 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 			if val <= 0 {
 				return method
 			}
-			return getRealMethod(call.GetValueById(val), callIndex+1)
+			valValue, ok := call.GetValueById(val)
+			if !ok {
+				return method
+			}
+			return getRealMethod(valValue, callIndex+1)
 		}
 		real := getRealMethod(method, 1)
 
@@ -189,8 +196,14 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 				if !ok {
 					return
 				}
-				val := v.NewBottomUseValue(fun.GetValueById(fun.Params[index]))
-				vals = append(vals, val.getBottomUses(actx, opt...)...)
+				paramValue, ok := fun.GetValueById(fun.Params[index])
+				if !ok || paramValue == nil {
+					return
+				}
+				val := v.NewBottomUseValue(paramValue)
+				if val != nil {
+					vals = append(vals, val.getBottomUses(actx, opt...)...)
+				}
 			})
 			checkVal(inst.ArgMember, func(index int, arg int64) {
 				if index >= len(fun.ParameterMembers) {
@@ -200,8 +213,14 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 				if !ok {
 					return
 				}
-				val := v.NewBottomUseValue(fun.GetValueById(fun.ParameterMembers[index]))
-				vals = append(vals, val.getBottomUses(actx, opt...)...)
+				memberValue, ok := fun.GetValueById(fun.ParameterMembers[index])
+				if !ok || memberValue == nil {
+					return
+				}
+				val := v.NewBottomUseValue(memberValue)
+				if val != nil {
+					vals = append(vals, val.getBottomUses(actx, opt...)...)
+				}
 			})
 		}
 		if vals.Len() > 0 {
