@@ -15,6 +15,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/davecgh/go-spew/spew"
@@ -1642,4 +1643,16 @@ func RuneIndex(s, sub []rune) int {
 		}
 	}
 	return -1
+}
+
+func CutBytesPrefixFunc(raw []byte, handle func(rune) bool) ([]byte, []byte, bool) {
+	index := bytes.IndexFunc(raw, handle)
+	if index < 0 {
+		return nil, raw, false
+	}
+	return raw[:index], raw[index:], true
+}
+
+func NotSpaceRune(r rune) bool {
+	return !unicode.IsSpace(r)
 }

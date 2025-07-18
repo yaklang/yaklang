@@ -65,7 +65,7 @@ var _contentTypeHeaderRegexp = regexp.MustCompile(`(?i)content-type: ?`)
 // ```
 func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 	// 移除左边空白字符
-	raw = TrimLeftHTTPPacket(raw)
+	raw = TrimLeftCRLF(raw)
 	if raw == nil || len(raw) == 0 {
 		return nil
 	}

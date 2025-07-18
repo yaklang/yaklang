@@ -299,6 +299,7 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool,
 	rawPacket.WriteString(CRLF)
 
 	// handle proto
+	perfix, firstLine, _ := CutBytesPrefixFunc(firstLine, NotSpaceRune)
 	method, uri, proto, ok := ParseHTTPRequestLine(string(firstLine))
 	if ok {
 		req.Method = method
@@ -335,14 +336,12 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool,
 	useContentLength := false
 	contentLengthInt := 0
 	useTransferEncodingChunked := false
-	for {
-		lineBytes, err := BufioReadLine(reader)
-		if err != nil && err != io.EOF {
-			return nil, Errorf(`Read Request Header Failed: %s`, err)
-		}
+
+	_ = ScanHTTPHeader(reader, func(lineBytes []byte) {
+
 		if len(bytes.TrimSpace(lineBytes)) == 0 {
 			rawPacket.WriteString(CRLF)
-			break
+			return
 		}
 		rawPacket.Write(lineBytes)
 		rawPacket.WriteString(CRLF)
@@ -383,14 +382,14 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool,
 
 		// add header
 		if keyStr == "" {
-			continue
+			return
 		}
 		if isSingletonHeader {
 			header[keyStr] = append(header[keyStr], valStr)
-			continue
+			return
 		}
 		header[keyStr] = append(header[keyStr], valStr)
-	}
+	}, perfix, false)
 
 	// uri is very complex
 	// utf8 valid or not
