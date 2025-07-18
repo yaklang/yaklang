@@ -103,7 +103,7 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 			strings.EqualFold(req.Method, http.MethodConnect)
 	}
 
-	headerReader := NewPeekableReader(originReader)
+	headerReader := originReader
 	rsp := new(http.Response)
 	firstLine, err := ReadLine(headerReader)
 	if err != nil {
@@ -149,19 +149,11 @@ HandleExpect100Continue:
 	useTransferEncodingChunked := false
 	defaultClose := (rsp.ProtoMajor == 1 && rsp.ProtoMinor == 0) || rsp.ProtoMajor < 1
 
-	for {
-		lineBytes, err := ReadHTTPHeader(headerReader)
-		if err != nil {
-			return nil, errors.Wrap(err, "read HTTPResponse header failed")
-		}
-		if len(bytes.TrimSpace(lineBytes)) == 0 {
-			rawPacket.WriteString(CRLF)
-			break
-		}
-		rawPacket.Write(lineBytes)
+	err = ScanHTTPHeaderWithHeaderFolding(headerReader, func(rawHeader []byte) {
+		rawPacket.Write(rawHeader)
 		rawPacket.WriteString(CRLF)
 
-		before, after, _ := bytes.Cut(lineBytes, []byte{':'})
+		before, after, _ := bytes.Cut(rawHeader, []byte{':'})
 		keyStr := string(before)
 		valStr := strings.TrimLeftFunc(string(after), unicode.IsSpace)
 
@@ -200,10 +192,15 @@ HandleExpect100Continue:
 		}
 		// add header
 		if keyStr == "" || alreadySet {
-			continue
+			return
 		}
 		header[keyStr] = append(header[keyStr], valStr)
+
+	}, nil)
+	if err != nil {
+		return nil, err
 	}
+	rawPacket.WriteString(CRLF)
 	rsp.Close = defaultClose
 	rsp.Header = header
 
@@ -441,22 +438,118 @@ func TCPNoDelay(i net.Conn) {
 	}
 }
 
-func ReadHTTPHeader(reader *BufferedPeekableReader) ([]byte, error) {
-	var headerBytes []byte
-	var err error
+const (
+	CommonHeaderStat string = "common-header"
+	HeaderCheckStat         = "header-Check"
+)
 
-	for {
-		var line []byte
-		line, err = ReadLine(reader)
-		if err == nil {
-			headerBytes = append(headerBytes, line...)
-			peekBytes, _ := reader.Peek(1)
-			if len(peekBytes) > 0 && (peekBytes[0] == ' ' || peekBytes[0] == '\t') {
-				continue
-			}
-		}
-		break
+func ScanHTTPHeaderWithHeaderFolding(reader io.Reader, headerCallback func(rawHeader []byte), prefix []byte) error {
+	var headerRawCache []byte
+	var currentSata = CommonHeaderStat
+	var headerFoldingPrefix = make([]byte, 0)
+
+	setHeaderFoldingPrefix := func(foldingPrefix []byte) {
+		headerFoldingPrefix = foldingPrefix
 	}
 
-	return headerBytes, err
+	setCurrentStat := func(stat string) {
+		currentSata = stat
+	}
+
+	pushHeaderRawData := func(raw []byte) {
+		headerRawCache = append(headerRawCache, raw...)
+	}
+
+	emitHeaderRaw := func() {
+		if len(headerRawCache) > 0 {
+			if headerCallback != nil {
+				headerCallback(headerRawCache)
+			}
+			headerRawCache = make([]byte, 0)
+		}
+	}
+
+	defer emitHeaderRaw()
+
+	trimPrefix := func(raw []byte) []byte {
+		minLen := Min(len(prefix), len(raw))
+		i := 0
+		for ; i < minLen; i++ {
+			if raw[i] != prefix[i] {
+				break
+			}
+		}
+		return raw[i:]
+	}
+
+	for {
+		lineBytes, err := ReadLine(reader)
+		if err != nil && err != io.EOF {
+			return errors.Wrap(err, "read HTTPResponse header failed")
+		}
+		lineBytes = trimPrefix(lineBytes)
+	Retry:
+		switch currentSata {
+		case CommonHeaderStat:
+			if len(lineBytes) == 0 {
+				return nil
+			}
+			for i, b := range lineBytes {
+				if b != ' ' && b != '\t' {
+					setHeaderFoldingPrefix(lineBytes[:i])
+					break
+				}
+			}
+			pushHeaderRawData(lineBytes)
+			setCurrentStat(HeaderCheckStat)
+		case HeaderCheckStat:
+			checkLine := bytes.TrimPrefix(lineBytes, headerFoldingPrefix)
+			if len(checkLine) > 0 && (checkLine[0] == ' ' || checkLine[0] == '\t') {
+				pushHeaderRawData(append([]byte(CRLF), checkLine...))
+			} else {
+				emitHeaderRaw()
+				setCurrentStat(CommonHeaderStat)
+				goto Retry
+			}
+		}
+	}
+}
+
+func ScanHTTPHeaderSimple(reader io.Reader, headerCallback func(rawHeader []byte), prefix []byte) error {
+	emitHeaderRaw := func(raw []byte) {
+		if len(raw) > 0 {
+			if headerCallback != nil {
+				headerCallback(raw)
+			}
+		}
+	}
+	trimPrefix := func(raw []byte) []byte {
+		minLen := Min(len(prefix), len(raw))
+		i := 0
+		for ; i < minLen; i++ {
+			if raw[i] != prefix[i] {
+				break
+			}
+		}
+		return raw[i:]
+	}
+
+	for {
+		lineBytes, err := ReadLine(reader)
+		if err != nil && err != io.EOF {
+			return errors.Wrap(err, "read HTTPResponse header failed")
+		}
+		lineBytes = trimPrefix(lineBytes)
+		if lineBytes == nil || len(lineBytes) == 0 {
+			return nil
+		}
+		emitHeaderRaw(lineBytes)
+	}
+}
+
+func ScanHTTPHeader(reader io.Reader, headerCallback func(rawHeader []byte), prefix []byte, isResp bool) error {
+	if isResp {
+		return ScanHTTPHeaderWithHeaderFolding(reader, headerCallback, prefix)
+	}
+	return ScanHTTPHeaderSimple(reader, headerCallback, prefix)
 }
