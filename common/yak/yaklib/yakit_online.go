@@ -727,6 +727,7 @@ func (s *OnlineClient) downloadNewOnlinePlugins(
 		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
 		poc.WithReplaceHttpPacketBody(raw, false),
 		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
+		poc.WithSave(false),
 	)
 	if err != nil {
 		return nil, nil, utils.Wrapf(err, "downloadNewOnlinePlugins failed: http error")
@@ -837,6 +838,7 @@ func (s *OnlineClient) SaveYakScriptToOnline(ctx context.Context,
 		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
 		poc.WithReplaceHttpPacketBody(raw, true),
 		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
+		poc.WithSave(false),
 	)
 	if err != nil {
 		return utils.Wrapf(err, "SaveYakScriptToOnline failed: http error")
@@ -883,6 +885,7 @@ func (s *OnlineClient) QueryPlugins(req *ypb.QueryOnlinePluginsRequest) ([]*Onli
 		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
 		poc.WithReplaceHttpPacketBody(raw, false),
 		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
+		poc.WithSave(false),
 	)
 	if err != nil {
 		return nil, nil, utils.Errorf("QueryPlugins failed: http error")

@@ -183,6 +183,7 @@ func (s *OnlineClient) downloadOnlineSyntaxFlowRule(
 		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
 		poc.WithReplaceHttpPacketBody(raw, false),
 		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
+		poc.WithSave(false),
 	)
 	if err != nil {
 		return nil, nil, utils.Errorf("SyntaxFlowRule UploadToOnline failed: http error")
