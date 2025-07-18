@@ -1,0 +1,312 @@
+query = cli.String("query", cli.setRequired(true), cli.setHelp("query"))
+cli.check()
+
+safeVar = (val,member) => {
+    try{
+        if val == nil || val == "" {
+            return ""
+        }
+        members = str.Split(member,".")
+        finallyVal = val
+        for i in members{
+            finallyVal = finallyVal.$i
+        }
+        return finallyVal
+    } catch e{
+        return ""
+    }
+}
+// generateCPULoadAverageText 生成CPU负载平均值文本
+func generateCPULoadAverageText(resourceStatus) {
+    loadAverage = safeVar(resourceStatus, "cpu.load_average")
+	if loadAverage != "" {
+        loads = []
+        for _, load := range loadAverage {
+            loads = append(loads, sprintf("%.2f", load))
+        }
+        return str.Join(loads, ", ")
+    }
+	return "无数据"
+}
+
+// generateNetworkInterfacesText 生成网络接口文本
+func generateNetworkInterfacesText(resourceStatus)  {
+    interfaces = safeVar(resourceStatus, "network.interfaces")
+	if interfaces != "" {
+        if len(interfaces) == 0 {
+            return "无网络接口信息"
+        }
+
+        lines = []
+        for _, ifaceMap := range interfaces {
+            name := safeVar(ifaceMap, "name")
+            ip := safeVar(ifaceMap, "ip")
+            status := safeVar(ifaceMap, "status")
+            lines = append(lines, sprintf("- **%s**: %s (%s)", name, ip, status))
+        }
+        return str.Join(lines, "\n")
+    }
+	return "无网络接口信息"
+}
+
+// generateOpenPortsTable 生成开放端口表格
+func generateOpenPortsTable(openPorts) {
+	if len(openPorts) == 0 {
+		return "✅ 未发现开放端口"
+	}
+
+	lines = []
+	lines = append(lines, "| 端口 | 协议 | 服务 | 版本 | 状态 |")
+	lines = append(lines, "|------|------|------|------|------|")
+
+	for _, port := range openPorts {
+		portNum := safeVar(port, "port")
+		protocol := safeVar(port, "protocol")
+		service := safeVar(port, "service")
+		version := safeVar(port, "version")
+		status := safeVar(port, "status")
+
+		if version == "" {
+			version = "-"
+		}
+
+		lines = append(lines, sprintf("| %v | %v | %v | %v | %v |", portNum, protocol, service, version, status))
+	}
+
+	return str.Join(lines, "\n")
+}
+
+// generateProcessesTable 生成进程表格
+func generateProcessesTable(processes) {
+	if len(processes) == 0 {
+		return "✅ 未发现关键进程信息"
+	}
+
+	lines = []
+	lines = append(lines, "| 进程名 | PID | CPU使用率 | 内存使用 | 状态 |")
+	lines = append(lines, "|--------|-----|-----------|----------|------|")
+
+	for _, process := range processes {
+		name := safeVar(process, "name")
+		pid := safeVar(process, "pid")
+		cpuPercent := safeVar(process, "cpu_percent")
+		memoryUsage := safeVar(process, "memory_usage")
+		status := safeVar(process, "status")
+
+		lines = append(lines, sprintf("| %v | %v | %v%% | %v | %v |", name, pid, cpuPercent, memoryUsage, status))
+	}
+
+	return str.Join(lines, "\n")
+}
+
+// generateSecurityIssuesText 生成安全问题文本
+func generateSecurityIssuesText(issues, level) {
+	if len(issues) == 0 {
+		return sprintf("✅ 未发现%s安全问题", level)
+	}
+
+	lines = []
+	for _, issue := range issues {
+		title := safeVar(issue, "title")
+		description := safeVar(issue, "description")
+		impact := safeVar(issue, "impact")
+		recommendation := safeVar(issue, "recommendation")
+
+		lines = append(lines, sprintf("#### %s", title))
+		lines = append(lines, sprintf("- **描述**: %s", description))
+		lines = append(lines, sprintf("- **影响**: %s", impact))
+		lines = append(lines, sprintf("- **建议**: %s", recommendation))
+		lines = append(lines, "")
+		lines = append(lines, "---")
+		lines = append(lines, "")
+	}
+
+	return str.Join(lines, "\n")
+}
+
+// generateRecommendationsText 生成修复建议文本
+func generateRecommendationsText(recommendations, level) {
+	if len(recommendations) == 0 {
+		return sprintf("✅ 暂无%s优化建议", level)
+	}
+
+	lines = []
+	for _, rec := range recommendations {
+		issue := safeVar(rec, "issue")
+		solution := safeVar(rec, "solution")
+		expectedResult := safeVar(rec, "expected_result")
+
+		lines = append(lines, sprintf("#### %s", issue))
+		lines = append(lines, sprintf("- **解决方案**: %s", solution))
+		lines = append(lines, sprintf("- **预期效果**: %s", expectedResult))
+		lines = append(lines, "")
+		lines = append(lines, "---")
+		lines = append(lines, "")
+	}
+
+	return str.Join(lines, "\n")
+}
+
+// generateSummaryMessage 生成总结信息
+func generateSummaryMessage(security_issues) {
+	messages = []
+
+	criticalCount := len(security_issues["critical"])
+	highCount := len(security_issues["high"])
+
+	if criticalCount > 0 {
+		messages = append(messages, sprintf("⚠️ **重点关注**: 发现 %d 个严重问题，建议立即处理", criticalCount))
+	}
+
+	if highCount > 0 {
+		messages = append(messages, sprintf("⚠️ **需要关注**: 发现 %d 个高危问题，建议尽快处理", highCount))
+	}
+
+	if criticalCount == 0 && highCount == 0 {
+		messages = append(messages, "✅ **安全状况良好**: 未发现严重或高危安全问题")
+	}
+
+	return str.Join(messages, "\n")
+}
+
+
+forgeHandle = func(params,opts...) {
+    result,err = __DEFAULT_FORGE_HANDLE__(params,opts...)
+    if err != nil {
+		return nil
+	}
+    scan_summary := result.Action.GetInvokeParams("scan_summary")
+	system_info := result.Action.GetInvokeParams("system_info")
+	resource_status := result.Action.GetInvokeParams("resource_status")
+	security_issues := result.Action.GetInvokeParams("security_issues")
+	recommendations := result.Action.GetInvokeParams("recommendations")
+    open_ports = result.Action.GetInvokeParamsArray("open_ports")
+    processes = result.Action.GetInvokeParamsArray("processes")
+    safeVar = (val,member) => {
+        try{
+            if val == nil || val == "" {
+                return ""
+            }
+            members = str.Split(member,".")
+            finallyVal = val
+            for i in members{
+                finallyVal = finallyVal.$i
+            }
+            return finallyVal
+        } catch e{
+            return ""
+        }
+    }
+    cpu_load_average_text = generateCPULoadAverageText(resource_status)
+	network_interfaces_text = generateNetworkInterfacesText(resource_status)
+	open_ports_table = generateOpenPortsTable(open_ports)
+	processes_table = generateProcessesTable(processes)
+	critical_issues_text = generateSecurityIssuesText(security_issues["critical"], "严重")
+	high_issues_text = generateSecurityIssuesText(security_issues["high"], "高危")
+	medium_issues_text = generateSecurityIssuesText(security_issues["medium"], "中等")
+	low_issues_text = generateSecurityIssuesText(security_issues["low"], "轻微")
+
+	// 生成修复建议文本
+	immediate_recommendations_text = generateRecommendationsText(recommendations["immediate"], "立即")
+	short_term_recommendations_text = generateRecommendationsText(recommendations["short_term"], "短期")
+	long_term_recommendations_text = generateRecommendationsText(recommendations["long_term"], "长期")
+
+	// 生成总结信息
+	summary_message = generateSummaryMessage(security_issues)
+    reportTemplate = f`# 主机体检报告
+
+## 📊 扫描摘要
+
+| 项目 | 值 |
+|------|-----|
+| **体检目标** | ${safeVar(scan_summary,"target")} |
+| **体检时间** | ${safeVar(scan_summary,"scan_time")} |
+| **体检耗时** | ${safeVar(scan_summary,"scan_duration")} |
+| **整体健康度** | ${safeVar(scan_summary,"overall_health")} |
+| **问题总数** | ${safeVar(scan_summary,"total_issues")} |
+
+## 💻 系统信息
+
+| 项目 | 值 |
+|------|-----|
+| **操作系统** | ${safeVar(system_info,"os")} |
+| **系统版本** | ${safeVar(system_info,"version")} |
+| **系统架构** | ${safeVar(system_info,"architecture")} |
+| **主机名** | ${safeVar(system_info,"hostname")} |
+| **运行时间** | ${safeVar(system_info,"uptime")} |
+
+## 📈 资源状态
+
+### CPU使用情况
+- **使用率**: ${safeVar(resource_status,"cpu.usage_percent")}%
+- **核心数**: ${safeVar(resource_status,"cpu.cores")}
+- **负载平均值**: ${cpu_load_average_text}
+
+### 内存使用情况
+- **总内存**: ${safeVar(resource_status,"memory.total")}
+- **已用内存**: ${safeVar(resource_status,"memory.used")}
+- **可用内存**: ${safeVar(resource_status,"memory.available")}
+- **使用率**: ${safeVar(resource_status,"memory.usage_percent")}%
+
+### 磁盘使用情况
+- **总空间**: ${safeVar(resource_status,"disk.total")}
+- **已用空间**: ${safeVar(resource_status,"disk.used")}
+- **可用空间**: ${safeVar(resource_status,"disk.available")}
+- **使用率**: ${safeVar(resource_status,"disk.usage_percent")}%
+
+### 网络状态
+- **活跃连接数**: ${safeVar(resource_status,"network.active_connections")}
+
+#### 网络接口
+${network_interfaces_text}
+
+## 🔌 开放端口
+
+${open_ports_table}
+
+## 🔄 关键进程
+
+${processes_table}
+
+## 🚨 安全问题
+
+### 🔴 严重问题
+${critical_issues_text}
+
+### 🟠 高危问题
+${high_issues_text}
+
+### 🟡 中等问题
+${medium_issues_text}
+
+### 🟢 轻微问题
+${low_issues_text}
+
+## 💡 修复建议
+
+### 🔴 需要立即执行的修复措施
+${immediate_recommendations_text}
+
+### 🟠 短期优化建议
+${short_term_recommendations_text}
+
+### 🔵 长期改进建议
+${long_term_recommendations_text}
+
+## 📋 总结
+
+本次体检共发现 **${safeVar(scan_summary,"total_issues")}** 个问题，系统整体健康度为 **${safeVar(scan_summary,"overall_health")}**。
+
+${summary_message}
+
+---
+*报告生成时间: ${safeVar(scan_summary,"scan_time")}* `
+    reportIns = report.New()
+    reportIns.From("主机体检 AIAgent")
+    reportIns.Title("主机体检报告 %v",time.Now().Format("2006-01-02 15:04:05"))
+    reportIns.Markdown(reportTemplate)
+
+    reportIns.Save()
+
+    return result
+}
