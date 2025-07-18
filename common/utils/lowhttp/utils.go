@@ -450,6 +450,16 @@ func SplitHTTPPacket(
 	rspFirstLine func(proto string, code int, codeMsg string) error,
 	hook ...func(line string) string,
 ) (string, []byte) {
+	return SplitHTTPPacketEx(raw, reqFirstLine, rspFirstLine, nil, hook...)
+}
+
+func SplitHTTPPacketEx(
+	raw []byte,
+	reqFirstLine func(method string, requestUri string, proto string) error,
+	rspFirstLine func(proto string, code int, codeMsg string) error,
+	rawFistLine func(string) error,
+	hook ...func(line string) string,
+) (string, []byte) {
 	reader := bufio.NewReader(bytes.NewBuffer(raw))
 	firstLineBytes, err := utils.BufioReadLine(reader)
 	if err != nil {
@@ -457,6 +467,13 @@ func SplitHTTPPacket(
 	}
 	prefix, firstLineBytes, _ := utils.CutBytesPrefixFunc(firstLineBytes, utils.NotSpaceRune)
 	firstLineBytes = TrimSpaceHTTPPacket(firstLineBytes)
+	if rawFistLine != nil {
+		err := rawFistLine(string(firstLineBytes))
+		if err != nil {
+			log.Debugf("rawFistLine error: %s", err)
+			return "", nil
+		}
+	}
 	var isResp = bytes.HasPrefix(firstLineBytes, []byte("HTTP/")) || bytes.HasPrefix(firstLineBytes, []byte("RTSP/"))
 	if isResp {
 		// rsp
