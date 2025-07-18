@@ -3,7 +3,6 @@ package lowhttp
 import (
 	"bufio"
 	"bytes"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/textproto"
@@ -117,6 +116,12 @@ func AddConnectionClosed(raw []byte) []byte {
 
 func TrimLeftHTTPPacket(raw []byte) []byte {
 	return bytes.TrimLeftFunc(raw, unicode.IsSpace)
+}
+
+func TrimLeftCRLF(raw []byte) []byte {
+	return bytes.TrimLeftFunc(raw, func(r rune) bool {
+		return r == '\r' || r == '\n'
+	})
 }
 
 func TrimRightHTTPPacket(raw []byte) []byte {
@@ -445,18 +450,15 @@ func SplitHTTPPacket(
 	rspFirstLine func(proto string, code int, codeMsg string) error,
 	hook ...func(line string) string,
 ) (string, []byte) {
-	raw = TrimLeftHTTPPacket(raw)
 	reader := bufio.NewReader(bytes.NewBuffer(raw))
-	var err error
 	firstLineBytes, err := utils.BufioReadLine(reader)
 	if err != nil {
 		return "", nil
 	}
+	prefix, firstLineBytes, _ := utils.CutBytesPrefixFunc(firstLineBytes, utils.NotSpaceRune)
 	firstLineBytes = TrimSpaceHTTPPacket(firstLineBytes)
-
-	var headers []string
-	headers = append(headers, string(firstLineBytes))
-	if bytes.HasPrefix(firstLineBytes, []byte("HTTP/")) || bytes.HasPrefix(firstLineBytes, []byte("RTSP/")) {
+	var isResp = bytes.HasPrefix(firstLineBytes, []byte("HTTP/")) || bytes.HasPrefix(firstLineBytes, []byte("RTSP/"))
+	if isResp {
 		// rsp
 		if rspFirstLine != nil {
 			proto, code, codeMsg, _ := utils.ParseHTTPResponseLine(string(firstLineBytes))
@@ -478,16 +480,11 @@ func SplitHTTPPacket(
 		}
 	}
 
+	var headers []string
+	headers = append(headers, string(firstLineBytes))
 	haveCl := false
-	for {
-		// lineBytes, _, err := reader.ReadLine()
-		line, err := utils.BufioReadLineString(reader)
-		if err != nil && err != io.EOF {
-			break
-		}
-		if strings.TrimSpace(line) == "" {
-			break
-		}
+	err = utils.ScanHTTPHeader(reader, func(rawHeader []byte) {
+		line := string(rawHeader)
 		skipHeader := false
 		for _, h := range hook {
 			hooked := h(line)
@@ -500,14 +497,14 @@ func SplitHTTPPacket(
 			line = hooked
 		}
 		if skipHeader {
-			continue
+			return
 		}
 		k, _ := SplitHTTPHeader(line)
 		if strings.ToLower(k) == "content-length" {
 			haveCl = true
 		}
 		headers = append(headers, line)
-	}
+	}, prefix,isResp)
 	headersRaw := strings.Join(headers, CRLF) + CRLF + CRLF
 	bodyRaw, _ := ioutil.ReadAll(reader)
 	if bodyRaw == nil {
