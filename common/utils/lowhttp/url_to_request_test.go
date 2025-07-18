@@ -112,7 +112,7 @@ aaa`), false, 302, nil)
 Host: example.com
 AAA: BBB
 Referer: http://example.com/asd
-		`
+`
 		CheckRequest(t, result, wantResult)
 	})
 	t.Run("302", func(t *testing.T) {
