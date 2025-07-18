@@ -2,6 +2,7 @@ package yaklib
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils/bufpipe"
 	"io"
 	"io/ioutil"
 	"os"
@@ -32,18 +33,20 @@ func _readFile(path string) ([]byte, error) {
 // ReadEvery1s 每秒读取 Reader 一次，直到读取到 EOF 或者回调函数返回 false
 // Example:
 // ```
-// r, w, err = io.Pipe() // 创建一个管道，返回一个读取端和一个写入端以及错误
-// die(err)
-// go func{
-// for {
-// w.WriteString("hello yak\n")
-// time.Sleep(1)
-// }
-// }
-// io.ReadEvery1s(context.New(), r, func(data) {
-// println(string(data))
-// return true
-// })
+// r, w = io.Pipe() // 创建一个管道，返回一个读取端和一个写入端
+//
+//	go func{
+//	    for {
+//		       w.WriteString("hello yak\n")
+//		       time.Sleep(1)
+//		   }
+//	}
+//
+//	io.ReadEvery1s(context.New(), r, func(data) {
+//	    println(string(data))
+//		   return true
+//	})
+//
 // ```
 func _readEvery1s(c context.Context, reader io.Reader, f func([]byte) bool) {
 	utils.ReadWithContextTickCallback(c, reader, f, 1*time.Second)
@@ -90,11 +93,10 @@ func _nopCloser(r io.Reader) io.ReadCloser {
 	return io.NopCloser(r)
 }
 
-// Pipe 创建一个管道，返回一个读取端和一个写入端以及错误
+// Pipe 创建一个管道，返回一个读取端和一个写入端以
 // Example:
 // ```
-// r, w, err = os.Pipe()
-// die(err)
+// r, w = io.Pipe()
 //
 //	go func {
 //	    w.WriteString("hello yak")
@@ -105,8 +107,8 @@ func _nopCloser(r io.Reader) io.ReadCloser {
 // die(err)
 // dump(bytes)
 // ```
-func _ioPipe() (r *os.File, w *os.File, err error) {
-	return os.Pipe()
+func _ioPipe() (*bufpipe.PipeReader, *bufpipe.PipeWriter) {
+	return bufpipe.NewPipe()
 }
 
 // Copy 将 reader 中的数据拷贝到 writer 中，直到读取到 EOF 或者发生错误，返回拷贝的字节数和错误

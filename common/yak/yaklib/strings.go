@@ -578,6 +578,19 @@ var StringsExport = map[string]interface{}{
 
 	"TextReaderSplit": utils.DefaultTextSplitter.SplitReader,
 	"TextSplit":       utils.DefaultTextSplitter.Split,
+
+	"ShrinkString": _shrinkString,
+}
+
+// str.ShrinkString 将会把一个字符串压缩成一个设定一个长度下的较短的字符串
+// Example:
+// ```
+// result = str.ShrinkString("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 20)
+// println(result)
+// /* output: aaaaaaaaaa...aaaaaaaaaa */
+// ```
+func _shrinkString(i any, size int) string {
+	return utils.ShrinkString(i, size)
 }
 
 func init() {
