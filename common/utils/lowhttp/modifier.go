@@ -114,16 +114,12 @@ func SetHTTPPacketUrl(packet []byte, rawURL string) []byte {
 // `, "GET /test HTTP/1.1")) // 向 example.com 发起请求，修改请求报文的第一行，请求/test路径
 // ```
 func ReplaceHTTPPacketFirstLine(packet []byte, firstLine string) []byte {
-	var isChunked bool
-	header := []string{firstLine}
-	_, body := SplitHTTPPacket(packet, nil, nil, func(line string) string {
-		if !isChunked {
-			isChunked = IsChunkedHeaderLine(line)
-		}
-		header = append(header, line)
+	headers := []string{firstLine}
+	_, body := SplitHTTPPacket(packet, nil,nil, func(line string) string {
+		headers = append(headers, line)
 		return line
 	})
-	return ReplaceHTTPPacketBody([]byte(strings.Join(header, CRLF)+CRLF), body, isChunked)
+	return append([]byte(strings.Join(headers, CRLF) + CRLF + CRLF ), body... )
 }
 
 // ReplaceHTTPPacketMethod 是一个辅助函数，用于改变请求报文，修改请求方法

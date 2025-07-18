@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"net/http"
 	"testing"
@@ -160,4 +161,38 @@ func TestHTTPResponseReaderWithBareBytes_3_ChunkedBad(t *testing.T) {
 	if !MatchAllOfSubString(httpctx.GetBareResponseBytes(req), "3\r\nabc\r\n4;aashiasdfhkasjdf\r\naaddaa\r\n0\r\n\r\n", "Transfer-Encoding: chunked\r\n\r\n3\r\n") {
 		t.Fatal("TestHTTPResponseReaderWithBareBytes_3_Chunked")
 	}
+}
+
+func TestHTTPResponseReaderWithBareBytes_4_obsolete_line_folding(t *testing.T) {
+	req := new(http.Request)
+	Table3 := "\t\t\t"
+	packet := []byte(`HTTP/1.1 200 OK` + CRLF +
+		`Server: www.example.com` + CRLF +
+		`Content-Security-Policy: ` + CRLF +
+		Table3 + `default-src 'self' https://jjg.zjjtzjy.com https://webapi.amap.com https://restapi.amap.com 'unsafe-inline' 'unsafe-eval' https://js.cdn.aliyun.dcloud.net.cn https://1880379958.ietheivaicai.com:22443;` + CRLF +
+		Table3 + `script-src 'self' https://jjg.zjjtzjy.com https://webapi.amap.com https://restapi.amap.com 'unsafe-inline' 'unsafe-eval' https://js.cdn.aliyun.dcloud.net.cn https://1880379958.ietheivaicai.com:22443 https://webapi.amap.com https://2061597170.ietheivaicai.com https://js.cdn.aliyun.dcloud.net.cn;` + CRLF +
+		Table3 + `script-src-elem 'self' https://jjg.zjjtzjy.com https://webapi.amap.com https://restapi.amap.com 'unsafe-inline' 'unsafe-eval' https://js.cdn.aliyun.dcloud.net.cn https://1880379958.ietheivaicai.com:22443 https://js.cdn.aliyun.dcloud.net.cn;` + CRLF +
+		Table3 + `connect-src 'self' https://jjg.zjjtzjy.com https://webapi.amap.com https://restapi.amap.com 'unsafe-inline' 'unsafe-eval' https://js.cdn.aliyun.dcloud.net.cn https://1880379958.ietheivaicai.com:22443 https://oss.esign.cn;` + CRLF +
+		Table3 + `img-src 'self' https://jjg.zjjtzjy.com blob: https://static.jeecg.com data:;` + CRLF +
+		Table3 + `font-src 'self' data:;` + CRLF +
+		Table3 + `frame-src 'self' https://jjg.zjjtzjy.com https://webapi.amap.com https://restapi.amap.com 'unsafe-inline' 'unsafe-eval' https://js.cdn.aliyun.dcloud.net.cn https://1880379958.ietheivaicai.com:22443 https://ch.zjkgs.cn:60443/;` + CRLF +
+		Table3 + `frame-ancestors 'self' https://ch.zjkgs.cn:60443/;` + CRLF +
+		Table3 + `object-src 'none';` + CRLF +
+		Table3 + `base-uri 'self';` + CRLF +
+		Table3 + `form-action 'self';` + CRLF +
+		Table3 + `upgrade-insecure-requests;` + CRLF +
+		Table3 + CRLF +
+		`Accept-Ranges: bytes` + CRLF + CRLF)
+	rsp, err := ReadHTTPResponseFromBytes(packet, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rsp.ContentLength > 0 {
+		spew.Dump(rsp.ContentLength)
+		t.Fatal("ContentLength unkown(chunked)")
+	}
+	fmt.Println(string(httpctx.GetBareResponseBytes(req)))
+	spew.Dump(httpctx.GetBareResponseBytes(req))
+	fmt.Println(rsp.Header.Get("Content-Security-Policy"))
+	require.Equal(t, rsp.Header.Get("Accept-Ranges"), "bytes", "Accept-Ranges should be bytes")
 }
