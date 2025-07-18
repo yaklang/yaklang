@@ -6,7 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclarationContext) ssa.Value {
+func (y *singleFileBuilder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclarationContext) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return y.EmitEmptyContainer()
 	}
@@ -54,7 +54,7 @@ func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclaration
 	return container
 }
 
-func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *ssa.Blueprint) interface{} {
+func (y *singleFileBuilder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *ssa.Blueprint) interface{} {
 	if y == nil || c == nil || y.IsStop() {
 		return nil
 	}
@@ -261,7 +261,7 @@ func (y *builder) VisitInterfaceBody(c *javaparser.InterfaceBodyContext, this *s
 	return nil
 }
 
-func (y *builder) VisitConstantDeclarator(c *javaparser.ConstantDeclaratorContext) (string, []ssa.Value) {
+func (y *singleFileBuilder) VisitConstantDeclarator(c *javaparser.ConstantDeclaratorContext) (string, []ssa.Value) {
 	if y == nil || c == nil || y.IsStop() {
 		return "", nil
 	}

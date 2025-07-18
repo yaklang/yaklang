@@ -39,7 +39,7 @@ type ProgramCache struct {
 }
 
 // NewDBCache : create a new ssa db cache. if ttl is 0, the cache will never expire, and never save to database.
-func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) *ProgramCache {
+func NewDBCache(prog *Program, databaseKind ProgramCacheKind, fileSize int, ConfigTTL ...time.Duration) *ProgramCache {
 	compileCtx := context.Background()
 	cacheCtx, cancel := context.WithCancel(compileCtx)
 	cache := &ProgramCache{
@@ -49,26 +49,31 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 		waitGroup:      &sync.WaitGroup{},
 	}
 	var programName string
-	if databaseEnable {
+	if databaseKind != ProgramCacheMemory { // database write/read
 		programName = prog.GetApplication().GetProgramName()
 		cache.DB = ssadb.GetDB().Where("program_name = ?", programName)
 	}
-
-	cache.initIndex(databaseEnable)
+	fetchSize := min(max(fileSize*5, defaultFetchSize), maxFetchSize)
+	saveSize := min(max(fileSize*5, defaultSaveSize), maxSaveSize)
+	log.Debugf("Databasex Channel: ReSetSize: fileSize(%d) fetchSize(%d) saveSize(%d)", fileSize, fetchSize, saveSize)
+	cache.initIndex(databaseKind, saveSize/2)
 	cache.afterSaveNotify = func(i int) {}
 	cache.InstructionCache = createInstructionCache(
-		cacheCtx, databaseEnable,
+		cacheCtx, databaseKind,
 		cache.DB, prog,
-		programName,
+		programName, fetchSize, saveSize,
 		func(inst Instruction, instIr *ssadb.IrCode) {
+			// TODO: this offset too long time
 			cache.OffsetCache.Add("", inst) // add to offset cache
-			cache.afterSaveNotify(1)        // notify after save
+		},
+		func(count int) {
+			cache.afterSaveNotify(count)
 		},
 	)
 	cache.TypeCache = createTypeCache(
-		cacheCtx, databaseEnable,
+		cacheCtx, databaseKind,
 		cache.DB, prog,
-		programName,
+		programName, fetchSize, saveSize,
 	)
 	return cache
 }
@@ -106,10 +111,7 @@ func (c *ProgramCache) GetInstruction(id int64) Instruction {
 // =============================================== Variable =======================================================
 
 func (c *ProgramCache) AddConst(inst Instruction) {
-	f1 := func() {
-		c.ConstCache.Add(inst.GetName(), inst)
-	}
-	ProfileAdd(true, "ssa.ProgramCache.AddConst", f1)
+	c.ConstCache.Add(inst.GetName(), inst)
 }
 
 func (c *ProgramCache) AddVariable(name string, inst Instruction) {
@@ -125,15 +127,9 @@ func (c *ProgramCache) AddVariable(name string, inst Instruction) {
 		}
 	}
 	if member != "" {
-		f1 := func() {
-			c.MemberIndex.Add(member, inst)
-		}
-		ProfileAdd(true, "ssa.ProgramCache.AddVariable.Member", f1)
+		c.MemberIndex.Add(member, inst)
 	} else {
-		f1 := func() {
-			c.VariableIndex.Add(name, inst)
-		}
-		ProfileAdd(true, "ssa.ProgramCache.AddVariable.Name", f1)
+		c.VariableIndex.Add(name, inst)
 	}
 }
 
@@ -158,10 +154,7 @@ func (c *ProgramCache) RemoveVariable(name string, inst Instruction) {
 }
 
 func (c *ProgramCache) AddClassInstance(name string, inst Instruction) {
-	f1 := func() {
-		c.ClassIndex.Add(name, inst)
-	}
-	ProfileAdd(true, "ssa.ProgramCache.AddClassInstance", f1)
+	c.ClassIndex.Add(name, inst)
 }
 
 // =============================================== Database =======================================================

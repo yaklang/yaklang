@@ -3,7 +3,6 @@ package filesys
 import (
 	"bytes"
 	"embed"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"io/fs"
 	"os"
@@ -12,6 +11,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -22,7 +23,7 @@ type embedFs struct {
 }
 
 func (f *embedFs) PathSplit(s string) (string, string) {
-	return splitWithSeparator(s, f.GetSeparators())
+	return SplitWithSeparator(s, f.GetSeparators())
 }
 
 func (f *embedFs) Ext(s string) string {
@@ -97,7 +98,7 @@ type LocalFs struct {
 }
 
 func (f *LocalFs) PathSplit(s string) (string, string) {
-	return splitWithSeparator(s, f.GetSeparators())
+	return SplitWithSeparator(s, f.GetSeparators())
 }
 
 func (f *LocalFs) Ext(s string) string {

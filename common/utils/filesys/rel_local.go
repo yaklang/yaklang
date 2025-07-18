@@ -20,7 +20,7 @@ type RelLocalFs struct {
 var _ fi.FileSystem = (*RelLocalFs)(nil)
 
 func (f *RelLocalFs) PathSplit(s string) (string, string) {
-	return splitWithSeparator(s, f.GetSeparators())
+	return SplitWithSeparator(s, f.GetSeparators())
 }
 
 func (f *RelLocalFs) Ext(s string) string {

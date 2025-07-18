@@ -1,8 +1,9 @@
 package java2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 const (
@@ -10,7 +11,7 @@ const (
 	SPRING_UI_MODEL_NAME = "org.springframework.ui.Model"
 )
 
-func hookSpringBootReturn(y *builder, value ssa.Value) {
+func hookSpringBootReturn(y *singleFileBuilder, value ssa.Value) {
 	if y == nil || y.IsStop() {
 		return
 	}
@@ -56,7 +57,7 @@ func hookSpringBootReturn(y *builder, value ssa.Value) {
 	}
 }
 
-func hookSpringBootMemberCallMethod(y *builder, obj ssa.Value, key ssa.Value, args ...ssa.Value) {
+func hookSpringBootMemberCallMethod(y *singleFileBuilder, obj ssa.Value, key ssa.Value, args ...ssa.Value) {
 	typ := obj.GetType()
 	if typ == nil {
 		return

@@ -422,8 +422,8 @@
   {
     "rule_id": "084c0adc-69ef-42ed-aeb4-5c24603634af",
     "rule_name": "检查Java Spring Boot Actuator配置",
-    "hash": "2482b68a39c59614fce79ac118fb30721d061504e437078129dd7bfa7ea17185",
-    "version": "20250715.0001"
+    "hash": "41216a6d07eb2f69c4cc6573c6fff50e7df8413227b746f7c7b62f7da64d120f",
+    "version": "20250716.0001"
   },
   {
     "rule_id": "a4abf901-de0e-4959-a310-5b0adbef046b",
@@ -572,8 +572,8 @@
   {
     "rule_id": "50d74e0f-2353-4367-a53c-18e8d48d22e1",
     "rule_name": "检测Java配置文件中不当的密码配置",
-    "hash": "3ab40c9cd743f12682a23541d7317d6545cb2bc2b6c807299fcafd9cd0dc2f71",
-    "version": "20250715.0001"
+    "hash": "f489ead8b9537998b9e0dc34ef795e7d9bcbd5d0405b2da92aa4c22ff5ac7bfe",
+    "version": "20250716.0001"
   },
   {
     "rule_id": "b717bf17-1dee-4b38-b048-61aaaf1957a1",

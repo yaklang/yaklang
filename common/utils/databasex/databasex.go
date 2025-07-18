@@ -16,23 +16,24 @@ type Cache[T MemoryItem, D DBItem] struct {
 	cache   *DataBaseCacheWithKey[int64, *CacheItem[T, D]]
 	fetcher *Fetch[D]
 	saver   *Save[D]
+	config  *config
 
-	delete func([]D)
+	delete DeleteFunc[D]
 }
 
 func NewCache[T MemoryItem, D DBItem](
 	ttl time.Duration,
 
 	// marshal
-	marshal func(T, D),
+	marshal MarshalFunc[T, D],
 	// fetch
-	fetch func() []D,
+	fetch FetchFunc[D],
 
 	// delete
-	delete func([]D),
+	delete DeleteFunc[D],
 	// save and load
-	save func([]D),
-	load func(int64) (T, D, error),
+	save SaveFunc[D],
+	load LoadFunc[T, D],
 	opt ...Option,
 ) *Cache[T, D] {
 	config := NewConfig(opt...)
@@ -42,11 +43,22 @@ func NewCache[T MemoryItem, D DBItem](
 	cache := NewDatabaseCacheWithKey[int64, *CacheItem[T, D]](
 		ttl,
 		func(k int64, v *CacheItem[T, D], reason utils.EvictionReason) bool {
+			// if not marshal function is set, disable this function
+			if utils.IsNil(marshal) {
+				log.Errorf("BUG: marshal function is not set")
+				return false
+			}
+
 			marshal(v.MemoryItem, v.DBItem)
 			saver.Save(v.DBItem)
 			return true
 		},
 		func(i int64) (*CacheItem[T, D], error) {
+			// if not set load, disable this function
+			if utils.IsNil(load) {
+				return nil, utils.Errorf("load function is not set")
+			}
+
 			t, d, err := load(i)
 			if err != nil {
 				return nil, utils.Errorf("failed to load item from database")
@@ -66,6 +78,7 @@ func NewCache[T MemoryItem, D DBItem](
 		fetcher: fetcher,
 		saver:   saver,
 		delete:  delete,
+		config:  config,
 	}
 	return c
 }
@@ -99,9 +112,20 @@ func (c *Cache[T, U]) Get(id int64) (T, bool) {
 }
 
 func (c *Cache[T, D]) Close() {
+	if c.fetcher == nil {
+		return
+	}
+
+	delete := make([]func([]D), 0, 1)
+	if !utils.IsNil(c.delete) {
+		delete = append(delete, c.delete)
+	}
+	c.fetcher.Close(delete...)
 	c.cache.EnableSave()
 	c.cache.Close()
-	c.fetcher.Close(c.delete)
+	if c.saver == nil {
+		return
+	}
 	c.saver.Close()
 }
 
