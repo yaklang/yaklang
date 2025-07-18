@@ -373,15 +373,8 @@ func ReplaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceCL bool) 
 	isChunked := false
 	var firstLine string
 	var headers []string
-	_, _ = SplitHTTPPacket(raw, func(method string, requestUri string, proto string) error {
-		firstLine = method + " " + requestUri + " " + proto
-		return nil
-	}, func(proto string, code int, codeMsg string) error {
-		if codeMsg == "" {
-			firstLine = proto + " " + fmt.Sprint(code)
-		} else {
-			firstLine = proto + " " + fmt.Sprint(code) + " " + codeMsg
-		}
+	_, _ = SplitHTTPPacketEx(raw, nil, nil, func(rawLine string) error {
+		firstLine = rawLine
 		return nil
 	}, func(line string) string {
 		if utils.IHasPrefix(line, "transfer-encoding:") && utils.IContains(line, "chunked") {
@@ -436,15 +429,8 @@ func ReplaceHTTPPacketBodyRaw(raw []byte, body []byte, fixCL bool) []byte {
 	var headers []string
 	var hasChunkHeader bool
 	var contentLengthLine = -1
-	_, _ = SplitHTTPPacket(raw, func(method string, requestUri string, proto string) error {
-		firstLine = method + " " + requestUri + " " + proto
-		return nil
-	}, func(proto string, code int, codeMsg string) error {
-		if codeMsg == "" {
-			firstLine = proto + " " + fmt.Sprint(code)
-		} else {
-			firstLine = proto + " " + fmt.Sprint(code) + " " + codeMsg
-		}
+	_, _ = SplitHTTPPacketEx(raw, nil, nil, func(rawLine string) error {
+		firstLine = rawLine
 		return nil
 	}, func(line string) string {
 		if utils.IHasPrefix(line, "transfer-encoding:") && utils.IContains(line, "chunked") {
