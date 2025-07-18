@@ -484,6 +484,9 @@ func SplitHTTPPacket(
 	headers = append(headers, string(firstLineBytes))
 	haveCl := false
 	err = utils.ScanHTTPHeader(reader, func(rawHeader []byte) {
+		if len(rawHeader) == 0 {
+			return
+		}
 		line := string(rawHeader)
 		skipHeader := false
 		for _, h := range hook {
@@ -504,7 +507,7 @@ func SplitHTTPPacket(
 			haveCl = true
 		}
 		headers = append(headers, line)
-	}, prefix,isResp)
+	}, prefix, isResp)
 	headersRaw := strings.Join(headers, CRLF) + CRLF + CRLF
 	bodyRaw, _ := ioutil.ReadAll(reader)
 	if bodyRaw == nil {

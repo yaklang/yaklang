@@ -338,8 +338,7 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool,
 	useTransferEncodingChunked := false
 
 	_ = ScanHTTPHeader(reader, func(lineBytes []byte) {
-
-		if len(bytes.TrimSpace(lineBytes)) == 0 {
+		if len(lineBytes) == 0 {
 			rawPacket.WriteString(CRLF)
 			return
 		}

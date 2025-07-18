@@ -150,6 +150,10 @@ HandleExpect100Continue:
 	defaultClose := (rsp.ProtoMajor == 1 && rsp.ProtoMinor == 0) || rsp.ProtoMajor < 1
 
 	err = ScanHTTPHeaderWithHeaderFolding(headerReader, func(rawHeader []byte) {
+		if len(rawHeader) <= 0 {
+			rawPacket.WriteString(CRLF)
+			return
+		}
 		rawPacket.Write(rawHeader)
 		rawPacket.WriteString(CRLF)
 
@@ -200,7 +204,6 @@ HandleExpect100Continue:
 	if err != nil {
 		return nil, err
 	}
-	rawPacket.WriteString(CRLF)
 	rsp.Close = defaultClose
 	rsp.Header = header
 
@@ -461,12 +464,10 @@ func ScanHTTPHeaderWithHeaderFolding(reader io.Reader, headerCallback func(rawHe
 	}
 
 	emitHeaderRaw := func() {
-		if len(headerRawCache) > 0 {
-			if headerCallback != nil {
-				headerCallback(headerRawCache)
-			}
-			headerRawCache = make([]byte, 0)
+		if headerCallback != nil {
+			headerCallback(headerRawCache)
 		}
+		headerRawCache = make([]byte, 0)
 	}
 
 	defer emitHeaderRaw()
@@ -517,10 +518,8 @@ func ScanHTTPHeaderWithHeaderFolding(reader io.Reader, headerCallback func(rawHe
 
 func ScanHTTPHeaderSimple(reader io.Reader, headerCallback func(rawHeader []byte), prefix []byte) error {
 	emitHeaderRaw := func(raw []byte) {
-		if len(raw) > 0 {
-			if headerCallback != nil {
-				headerCallback(raw)
-			}
+		if headerCallback != nil {
+			headerCallback(raw)
 		}
 	}
 	trimPrefix := func(raw []byte) []byte {
@@ -540,10 +539,10 @@ func ScanHTTPHeaderSimple(reader io.Reader, headerCallback func(rawHeader []byte
 			return errors.Wrap(err, "read HTTPResponse header failed")
 		}
 		lineBytes = trimPrefix(lineBytes)
+		emitHeaderRaw(lineBytes)
 		if lineBytes == nil || len(lineBytes) == 0 {
 			return nil
 		}
-		emitHeaderRaw(lineBytes)
 	}
 }
 

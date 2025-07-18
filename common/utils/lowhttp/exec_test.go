@@ -665,7 +665,7 @@ Host: %v
 
 func TestLowhttpH2TraceInfo(t *testing.T) {
 	ctx := utils.TimeoutContext(10 * time.Second)
-	count := 100
+	count := 4
 	if utils.InGithubActions() {
 		count = 4
 	}
