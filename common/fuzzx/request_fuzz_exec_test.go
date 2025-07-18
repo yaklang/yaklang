@@ -15,7 +15,7 @@ func TestParams_FuzzPostJson(t *testing.T) {
 	excepts := QuickMutateSimple(iFuzztag)
 	raw := []byte(`POST / HTTP/1.1
 Host: www.baidu.com
-	
+
 {"b":"0"}`)
 	freq := MustNewFuzzHTTPRequest(raw)
 	params := freq.GetPostJsonParams()

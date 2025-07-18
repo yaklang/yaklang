@@ -388,9 +388,8 @@ func ReplaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceCL bool) 
 		headers = append(headers, line)
 		return line
 	})
+	headers = append([]string{firstLine}, headers...)
 	var buf bytes.Buffer
-	buf.WriteString(firstLine)
-	buf.WriteString(CRLF)
 	// 空 body
 	if body == nil {
 		buf.WriteString(strings.Join(headers, CRLF) + CRLF + CRLF)
@@ -442,9 +441,8 @@ func ReplaceHTTPPacketBodyRaw(raw []byte, body []byte, fixCL bool) []byte {
 		headers = append(headers, line)
 		return line
 	})
+	headers = append([]string{firstLine}, headers...)
 	var buf bytes.Buffer
-	buf.WriteString(firstLine)
-	buf.WriteString(CRLF)
 
 	// 空 body
 	if body == nil {
@@ -454,7 +452,8 @@ func ReplaceHTTPPacketBodyRaw(raw []byte, body []byte, fixCL bool) []byte {
 
 	// fix CL and is CL
 	if fixCL && !hasChunkHeader && contentLengthLine > -1 {
-		headers[contentLengthLine] = fmt.Sprintf("Content-Length: %d", len(body))
+		// fix index append first line
+		headers[contentLengthLine+1] = fmt.Sprintf("Content-Length: %d", len(body))
 	}
 
 	buf.WriteString(strings.Join(headers, CRLF))
