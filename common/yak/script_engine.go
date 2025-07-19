@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/mimetype"
+	"github.com/yaklang/yaklang/common/utils/imageutils"
 	"io"
 	"os"
 	"path/filepath"
@@ -355,6 +357,10 @@ func initYaklangLib() {
 
 	// fp
 	yaklang.Import("fp", fingerprint.Exports)
+
+	// mimetype
+	yaklang.Import("mimetype", mimetype.Exports)
+	yaklang.Import("imageutils", imageutils.Exports)
 }
 
 type ScriptEngine struct {

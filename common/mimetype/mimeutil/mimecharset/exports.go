@@ -2,7 +2,6 @@ package mimecharset
 
 import (
 	"github.com/saintfish/chardet"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mimetype/mimeutil/basic_charset"
 	"golang.org/x/net/html/charset"
 	"strings"
@@ -13,7 +12,7 @@ func fallback(raw []byte, wrapper func([]byte) string) string {
 	case "", "windows-1252", "iso-8859-1":
 		results, err := defaultDetector.DetectAll(raw)
 		if err != nil {
-			log.Warnf("unknown plain text charset: %v", raw)
+			// log.Warnf("unknown plain text charset: %v", raw)
 			return ""
 		}
 		var (
