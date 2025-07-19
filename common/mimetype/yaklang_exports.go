@@ -2,10 +2,13 @@ package mimetype
 
 import (
 	"context"
+	jsonlib "encoding/json"
+	"fmt"
+	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -21,7 +24,7 @@ func _mimetypeDetectFile(i string) (*MIME, error) {
 		return nil, err
 	}
 	if stat.IsDir() {
-		return nil, utils.Errorf("%v is a directory, not a file", i)
+		return nil, errors.Errorf("%v is a directory, not a file", i)
 	}
 	return DetectFile(i)
 }
@@ -41,10 +44,81 @@ func _mimetypeDetect(i any) (*MIME, error) {
 		if len(results) > 0 {
 			return _mimetypeDetect(results)
 		}
-		return nil, utils.Errorf("cannot fetch data from io.Reader, reason: %v", err)
+		return nil, errors.Errorf("cannot fetch data from io.Reader, reason: %v", err)
 	default:
-		return Detect(utils.InterfaceToBytes(i)), nil
+		return Detect(AnyToBytes(i)), nil
 	}
 }
 
-var Exports = map[string]any{}
+func AnyToBytes(i interface{}) (result []byte) {
+	var b []byte
+	defer func() {
+		if err := recover(); err != nil {
+			result = []byte(fmt.Sprintf("%v", i))
+		}
+	}()
+
+	if i == nil {
+		return []byte{}
+	}
+
+	switch s := i.(type) {
+	case nil:
+		return []byte{}
+	case string:
+		b = []byte(s)
+	case []byte:
+		b = s[0:]
+	case bool:
+		b = []byte(strconv.FormatBool(s))
+	case float64:
+		return []byte(strconv.FormatFloat(s, 'f', -1, 64))
+	case float32:
+		return []byte(strconv.FormatFloat(float64(s), 'f', -1, 32))
+	case int:
+		return []byte(strconv.Itoa(s))
+	case int64:
+		return []byte(strconv.FormatInt(s, 10))
+	case int32:
+		return []byte(strconv.Itoa(int(s)))
+	case int16:
+		return []byte(strconv.FormatInt(int64(s), 10))
+	case int8:
+		return []byte(strconv.FormatInt(int64(s), 10))
+	case uint:
+		return []byte(strconv.FormatUint(uint64(s), 10))
+	case uint64:
+		return []byte(strconv.FormatUint(s, 10))
+	case uint32:
+		return []byte(strconv.FormatUint(uint64(s), 10))
+	case uint16:
+		return []byte(strconv.FormatUint(uint64(s), 10))
+	case uint8:
+		return []byte(strconv.FormatUint(uint64(s), 10))
+	case fmt.Stringer:
+		return []byte(s.String())
+	case error:
+		return []byte(s.Error())
+	// case io.Reader:
+	//	if ret != nil && ret.Read != nil {
+	//		bytes, _ = ioutil.ReadAll(ret)
+	//		return bytes
+	//	}
+	//	return []byte(fmt.Sprintf("%v", i))
+	default:
+		// 尝试将i作为map转换成JSON
+		if jsonBytes, err := jsonlib.Marshal(i); err == nil {
+			b = jsonBytes
+		} else {
+			// 如果转换失败，则回退到使用fmt.Sprintf
+			b = []byte(fmt.Sprintf("%v", i))
+		}
+	}
+
+	return b
+}
+
+var Exports = map[string]any{
+	"Detect":     _mimetypeDetect,
+	"DetectFile": _mimetypeDetectFile,
+}

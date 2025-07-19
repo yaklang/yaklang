@@ -127,6 +127,18 @@ import (
 //}
 
 func FixMultipartBody(i []byte) (boundary string, fixedBody []byte) {
+	return fixMultipartBodyWithPart(i, nil)
+}
+
+func FixMultipartBodyWithPart(i []byte, cb func(headers []byte, body []byte)) (boundary string, fixedBody []byte) {
+	return fixMultipartBodyWithPart(i, func(headers []byte, body []byte) {
+		if cb != nil {
+			cb(headers, body)
+		}
+	})
+}
+
+func fixMultipartBodyWithPart(i []byte, cb func(headers []byte, body []byte)) (boundary string, fixedBody []byte) {
 	buf := new(bytes.Buffer)
 	reader := multipart.NewReader(bytes.NewBuffer(i))
 	dashBoundary := ""
@@ -156,9 +168,13 @@ func FixMultipartBody(i []byte) (boundary string, fixedBody []byte) {
 			buf.WriteString(CRLF)
 		}
 
+		var mirror bytes.Buffer
 		if !part.NoBody() {
-			_, err = io.Copy(buf, part)
+			_, err = io.Copy(buf, io.TeeReader(part, &mirror))
 			buf.Write(multipart.CRLF)
+		}
+		if cb != nil {
+			cb(rawHeader, mirror.Bytes())
 		}
 	}
 	return reader.Boundary(), buf.Bytes()
