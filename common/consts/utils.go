@@ -173,6 +173,28 @@ func GetLlamaServerPath() string {
 	return utils.GetFirstExistedFile(paths...)
 }
 
+func GetPandocBinaryPath() string {
+	defaultPath := GetDefaultYakitProjectsDir()
+	var paths []string
+	if runtime.GOOS == "windows" {
+		paths = append(paths, filepath.Join(defaultPath, "base", "pandoc.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "libs", "pandoc.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "pandoc.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "pandoc.exe"))
+		paths = append(paths, "pandoc.exe")
+	} else {
+		paths = append(paths, filepath.Join(defaultPath, "base", "pandoc"))
+		paths = append(paths, filepath.Join(defaultPath, "libs", "pandoc"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "pandoc"))
+		paths = append(paths, filepath.Join(defaultPath, "pandoc"))
+		paths = append(paths, "pandoc")
+		paths = append(paths, filepath.Join("/", "usr", "local", "bin", "pandoc"))
+		paths = append(paths, filepath.Join("/", "bin", "pandoc"))
+		paths = append(paths, filepath.Join("/", "usr", "bin", "pandoc"))
+	}
+	return utils.GetFirstExistedFile(paths...)
+}
+
 func GetAIModelPath() string {
 	defaultPath := GetDefaultYakitProjectsDir()
 	modelsDir := filepath.Join(defaultPath, "libs", "models")
