@@ -63,8 +63,8 @@ func NewDBCache(prog *Program, databaseKind ProgramCacheKind, fileSize int, Conf
 		cache.DB, prog,
 		programName, fetchSize, saveSize,
 		func(inst Instruction, instIr *ssadb.IrCode) {
-			// TODO: this offset too long time
 			cache.OffsetCache.Add("", inst) // add to offset cache
+			cache.afterSaveNotify(1)
 		},
 		func(count int) {
 			cache.afterSaveNotify(count)
@@ -167,32 +167,40 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) {
 	if len(cb) > 0 {
 		c.afterSaveNotify = cb[0]
 	}
+	wg := sync.WaitGroup{}
 	f1 := func() {
-		c.InstructionCache.Close()
+		c.InstructionCache.Close(&wg)
+		log.Infof("Instruction cache closed")
 	}
 	f2 := func() {
-		c.TypeCache.Close()
+		c.TypeCache.Close(&wg)
+		log.Infof("Type Cache closed")
 	}
 	f3 := func() {
-		c.VariableIndex.Close()
 	}
 	f4 := func() {
-		c.MemberIndex.Close()
+		c.VariableIndex.Close()
 	}
 	f5 := func() {
-		c.ClassIndex.Close()
+		c.MemberIndex.Close()
 	}
 	f6 := func() {
-		c.ConstCache.Close()
+		c.ClassIndex.Close()
 	}
 	f7 := func() {
-		c.OffsetCache.Close()
+		c.ConstCache.Close()
 	}
 	f8 := func() {
+		c.OffsetCache.Close()
+	}
+	f9 := func() {
+		log.Info("wait for type and instruction save...")
+		wg.Wait()
+		log.Info("wait for type and instruction save done")
 		c.cacheCtxCancel()
 	}
 	ProfileAdd(true, "ssa.ProgramCache.SaveToDatabase",
-		f1, f2, f3, f4, f5, f6, f7, f8)
+		f1, f2, f3, f4, f5, f6, f7, f8, f9)
 }
 
 func (c *ProgramCache) CountInstruction() int {

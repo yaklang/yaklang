@@ -242,7 +242,6 @@ func (c *DataBaseCacheWithKey[K, T]) Close() {
 	})
 	c.data.Clear()
 	wg.Wait()
-	// c.notifyCache.Close()
 	c.DisableSave()
 	c.data.Clear() // clear for function and basic block
 }
