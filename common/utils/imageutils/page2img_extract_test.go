@@ -2,10 +2,16 @@ package imageutils
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils"
 	"testing"
 )
 
 func TestPage2ImageExtractor(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip()
+		return
+	}
+	
 	result, err := ExtractDocumentPagesContext(context.Background(), "/Users/v1ll4n/Projects/yaklang/vtestdata/demo.pdf")
 	if err != nil {
 		panic(err)
