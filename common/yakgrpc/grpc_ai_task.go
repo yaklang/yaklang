@@ -103,7 +103,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 		for {
 			event, err := stream.Recv()
 			if err != nil {
-				log.Errorf("receive event failed: %v", err)
+				log.Errorf("receive event failed (for sync messages): %v", err)
 				return
 			}
 			if event.IsSyncMessage {
@@ -190,6 +190,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 			log.Errorf("run ai forge[%s] failed: %v", forgeName, err)
 			return err
 		}
+		log.Infof("run ai forge[%s] success, result res: %v", forgeName, res)
 	} else {
 		log.Info("call without forgeName, use 'forge_triage' as default")
 		triageCache.Push(utils.InterfaceToString(params))
@@ -201,7 +202,6 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 			log.Errorf("run ai forge[%s] failed: %v", forgeName, err)
 			return err
 		}
-
 		defer func() {
 			log.Info("call yak.ExecuteForge success forge_triage")
 		}()
