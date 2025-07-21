@@ -198,5 +198,6 @@ func GetPage2ImgBinaryPath() string {
 func GetAIModelPath() string {
 	defaultPath := GetDefaultYakitProjectsDir()
 	modelsDir := filepath.Join(defaultPath, "libs", "models")
+	_ = os.MkdirAll(modelsDir, os.ModePerm)
 	return modelsDir
 }
