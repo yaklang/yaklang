@@ -1,8 +1,9 @@
 package ssaapi
 
 import (
+	"fmt"
 	"io/fs"
-	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -10,9 +11,16 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 )
+
+type SaveFolder struct {
+	name string
+	path []string
+}
 
 func (c *config) parseProjectWithFS(
 	filesystem filesys_interface.FileSystem,
@@ -35,38 +43,39 @@ func (c *config) parseProjectWithFS(
 		}
 	}()
 
+	wg := sync.WaitGroup{}
+
 	programPath := c.programPath
-	prog, builder, err := c.init(filesystem)
-
-	if err != nil {
-		return nil, err
-	}
-	if prog.Name != "" {
-		ssadb.SaveFolder(prog.Name, []string{"/"})
-	}
-
-	process := 0.0
-	prog.ProcessInfof = func(s string, v ...any) {
-		processCallback(
-			process,
-			s, v...,
-		)
-	}
-
 	preHandlerTotal := 0
 	handlerTotal := 0
+	preHandlerFiles := make([]string, 0)
+	handlerFilesMap := make(map[string]struct{})
+	handlerFiles := make([]string, 0)
 
-	prog.ProcessInfof("parse project in fs: %v, path: %v", filesystem, c.info)
-	prog.ProcessInfof("calculate total size of project")
+	var err error
 	start := time.Now()
+
+	processCallback(0.0, fmt.Sprintf("parse project in fs: %v, path: %v", filesystem, c.info))
+	processCallback(0.0, "calculate total size of project")
+
+	if c.ProgramName != "" {
+		ssadb.SaveFolder(c.ProgramName, []string{"/"})
+	}
 	// get total size
 	err = filesys.Recursive(programPath,
 		filesys.WithFileSystem(filesystem),
 		filesys.WithContext(c.ctx),
 		filesys.WithDirStat(func(s string, fi fs.FileInfo) error {
-			_, name := filesystem.PathSplit(s)
+			folder, name := filesystem.PathSplit(s)
 			if name == "test" || name == ".git" {
 				return filesys.SkipDir
+			}
+			folders := []string{c.ProgramName}
+			folders = append(folders,
+				strings.Split(folder, string(c.fs.GetSeparators()))...,
+			)
+			if c.enableDatabase != ssa.ProgramCacheMemory {
+				ssadb.SaveFolder(c.ProgramName, folders)
 			}
 			return nil
 		}),
@@ -80,9 +89,12 @@ func (c *config) parseProjectWithFS(
 			}
 			if c.checkLanguage(path) == nil {
 				handlerTotal++
+				handlerFiles = append(handlerFiles, path)
+				handlerFilesMap[path] = struct{}{}
 			}
 			if c.checkLanguagePreHandler(path) == nil {
 				preHandlerTotal++
+				preHandlerFiles = append(preHandlerFiles, path)
 			}
 			return nil
 		}),
@@ -91,149 +103,164 @@ func (c *config) parseProjectWithFS(
 	if err != nil {
 		return nil, err
 	}
+
+	prog, builder, err := c.init(filesystem, handlerTotal)
+	if err != nil {
+		return nil, err
+	}
+
+	process := 0.0
+	prog.ProcessInfof = func(s string, v ...any) {
+		processCallback(
+			process,
+			s, v...,
+		)
+	}
+
 	if c.isStop() {
 		return nil, ErrContextCancel
 	}
 	if (handlerTotal + preHandlerTotal) == 0 {
 		return nil, ErrNoFoundCompiledFile
 	}
+	if preHandlerTotal < handlerTotal {
+		preHandlerTotal = handlerTotal
+		preHandlerFiles = handlerFiles
+	}
 	prog.ProcessInfof("calculate total size of project finish preHandler(len:%d) build(len:%d)", preHandlerTotal, handlerTotal)
 
+	var AstErr error
+	fileContents := make([]*ssareducer.FileContent, 0, preHandlerTotal)
 	// pre handler  0-40%
-	preHandlerNum := 0
-	preHandlerProcess := func() {
-		preHandlerNum++
-		process = 0 + (float64(preHandlerNum)/float64(preHandlerTotal))*0.4
-	}
-	prog.SetPreHandler(true)
-	prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", filesystem, c.info)
-	start = time.Now()
-	filesys.Recursive(programPath,
-		filesys.WithFileSystem(filesystem),
-		filesys.WithContext(c.ctx),
-		filesys.WithDirStat(func(s string, fi fs.FileInfo) error {
-			_, name := filesystem.PathSplit(s)
-			if name == "test" || name == ".git" {
-				return filesys.SkipDir
+	f1 := func() error {
+		preHandlerNum := 0
+		preHandlerProcess := func() {
+			preHandlerNum++
+			process = 0 + (float64(preHandlerNum)/float64(preHandlerTotal))*0.4
+		}
+		prog.SetPreHandler(true)
+		prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", filesystem, c.info)
+		start = time.Now()
+		for fileContent := range c.getFileHandler(
+			filesystem, preHandlerFiles, handlerFilesMap,
+		) {
+			fileContents = append(fileContents, fileContent)
+			if fileContent.Err != nil {
+				AstErr = utils.JoinErrors(AstErr,
+					utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err),
+				)
 			}
-			return nil
-		}),
-		filesys.WithFileStat(func(path string, fi fs.FileInfo) (err error) {
-			defer func() {
-				if r := recover(); r != nil {
-					err = utils.Errorf("parse [%s] error %v  ", path, r)
-					utils.PrintCurrentGoroutineRuntimeStack()
-				}
-			}()
-			if fi.Size() == 0 {
-				return nil
-			}
-			//check exclude_file
-			if c.excludeFile(path, fi.Name()) {
-				return nil
-			}
-			// check
-			if err := c.checkLanguagePreHandler(path); err != nil {
-				return nil
-			}
-			preHandlerProcess()
+
+			preHandlerProcess() // notify the process
+			// handler
 			if language := c.LanguageBuilder; language != nil {
 				language.InitHandler(builder)
-				language.PreHandlerProject(filesystem, builder, path)
+				language.PreHandlerProject(filesystem, fileContent.AST, builder, fileContent.Path)
 			}
-			return nil
-		}),
-	)
-	preHandlerTime = time.Since(start)
-	if c.isStop() {
-		return nil, ErrContextCancel
+		}
+		preHandlerTime = time.Since(start)
+		if AstErr != nil && c.strictMode {
+			return utils.Errorf("pre-handler parse project error: %v", AstErr)
+		}
+		if c.isStop() {
+			return ErrContextCancel
+		}
+		return nil
 	}
-	if language := c.LanguageBuilder; language != nil {
-		language.AfterPreHandlerProject(builder)
-	}
-	prog.ProcessInfof("pre-handler parse project finish")
 
-	process = 0.4 // 40%
-	// parse project 40%-90%
-	prog.ProcessInfof("parse project start")
-	handlerNum := 0
-	handlerProcess := func() {
-		handlerNum++
-		process = 0.4 + (float64(handlerNum)/float64(handlerTotal))*0.5
+	f2 := func() error {
+		if language := c.LanguageBuilder; language != nil {
+			language.AfterPreHandlerProject(builder)
+		}
+		prog.ProcessInfof("pre-handler parse project finish")
+		return nil
 	}
-	prog.SetPreHandler(false)
-	start = time.Now()
-	err = ssareducer.ReducerCompile(
-		programPath, // base
-		ssareducer.WithFileSystem(filesystem),
-		ssareducer.WithProgramName(c.ProgramName),
-		ssareducer.WithEntryFiles(c.entryFile...),
-		ssareducer.WithContext(c.ctx),
-		ssareducer.WithStrictMode(c.strictMode),
-		// ssareducer.with
-		ssareducer.WithCompileMethod(func(path string, raw string) (includeFiles []string, err error) {
+
+	f3 := func() error {
+		process = 0.4 // 40%
+		// parse project 40%-90%
+		prog.ProcessInfof("parse project start")
+		handlerNum := 0
+		handlerProcess := func() {
+			handlerNum++
+			process = 0.4 + (float64(handlerNum)/float64(handlerTotal))*0.5
+		}
+		prog.SetPreHandler(false)
+		start = time.Now()
+
+		// ssareducer.FilesHandler(
+		// 	c.ctx, filesystem, handlerFiles,
+		// 	func(path string, content []byte) {
+		for _, fileContent := range fileContents {
+			if _, needBuild := handlerFilesMap[fileContent.Path]; !needBuild {
+				continue // skip if not in handlerFilesMap
+			}
+			path := fileContent.Path
+			content := fileContent.Content
+			ast := fileContent.AST
 			defer func() {
 				if r := recover(); r != nil {
-					// ret = nil
-					includeFiles = prog.GetIncludeFiles()
-					// TODO: panic shuold be upload
-					// err = utils.Errorf("parse error with panic : %v", r)
 					log.Errorf("parse [%s] error %v  ", path, r)
 					utils.PrintCurrentGoroutineRuntimeStack()
 				}
 			}()
-			dir, file := filepath.Split(path)
-			if c.excludeFile(dir, file) {
-				return nil, nil
-			}
 
-			// check
-			if err := c.checkLanguage(path); err != nil {
-				log.Warnf("parse file %s error: %v", path, err)
-				return nil, nil
-			}
 			handlerProcess()
 
 			// build
-			if err := prog.Build(path, memedit.NewMemEditor(raw), builder); err != nil {
-				log.Debugf("parse %#v failed: %v", path, err)
-				return nil, utils.Wrapf(err, "parse file %s error", path)
+			if err := prog.Build(ast, path, memedit.NewMemEditorByBytes(content), builder); err != nil {
+				log.Errorf("parse %#v failed: %v", path, err)
+				continue
 			}
-			exclude := prog.GetIncludeFiles()
-			if len(exclude) > 0 {
-				log.Debugf("program include files: %v will not be as the entry from project", len(exclude))
-			}
-			return exclude, nil
-		}),
-	)
-	parseTime = time.Since(start)
-	if err != nil {
-		return nil, utils.Wrap(err, "parse project error")
-	}
-	if c.isStop() {
-		return nil, ErrContextCancel
-	}
-	process = 0.9 // %90
-	prog.Finish()
-	if prog.EnableDatabase { // save program
-		prog.UpdateToDatabase()
-	}
-	total := prog.Cache.CountInstruction()
-	prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, total) // %90
-
-	var index int
-	prevProcess := 0.9
-	lock := sync.Mutex{}
-	prog.Cache.SaveToDatabase(func(size int) {
-		lock.Lock()
-		defer lock.Unlock()
-		index += size
-		process = 0.9 + (float64(index)/float64(total))*0.1
-		if (process - prevProcess) > 0.01 { // is 91.0%/92.0%/....
-			prog.ProcessInfof("Saving instructions: %d complete(total %d)", index, total)
 		}
-	})
-	saveTime = time.Since(start)
-	_ = prevProcess
+		parseTime = time.Since(start)
+		if c.isStop() {
+			return ErrContextCancel
+		}
+		return nil
+	}
+
+	f4 := func() error {
+		process = 0.9 // %90
+		prog.Finish()
+		if prog.DatabaseKind != ssa.ProgramCacheMemory { // save program
+			log.Errorf("program %s save to database", prog.Name)
+			start := time.Now()
+			prog.UpdateToDatabaseWithWG(&wg)
+			since := time.Since(start)
+			log.Errorf("program %s save to database cost: %s", prog.Name, since)
+		}
+		return nil
+	}
+
+	f5 := func() error {
+		total := prog.Cache.CountInstruction() * 2
+		process = 0.9
+		prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, total) // %90
+
+		var index int
+		prevProcess := 0.9
+		_ = prevProcess
+		lock := sync.Mutex{}
+		prog.Cache.SaveToDatabase(func(size int) {
+			lock.Lock()
+			defer lock.Unlock()
+			index += size
+			process = 0.9 + (float64(index)/float64(total))*0.1
+			if (process - prevProcess) > 0.0001 { // is 90.01%/90.02%/....
+				prog.ProcessInfof("Saving instructions: %d complete(total %d)", index, total)
+				prevProcess = process
+			}
+		})
+		saveTime = time.Since(start)
+		return nil
+	}
+	f6 := func() error {
+		wg.Wait()
+		ssadb.SaveSource()
+		return nil
+	}
+	ssaprofile.ProfileAddWithError(true, "ParseProjectWithFS", f1, f2, f3, f4, f5, f6)
+
 	return NewProgram(prog, c), nil
 }

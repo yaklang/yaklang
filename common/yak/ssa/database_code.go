@@ -87,11 +87,9 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	ir.Name = inst.GetName()
 	ir.VerboseName = inst.GetVerboseName()
 	ir.ShortVerboseName = inst.GetShortVerboseName()
-	if anInst := inst.getAnInstruction(); anInst != nil {
-		ir.String = anInst.str
-		ir.ReadableName = anInst.readableName
-		ir.ReadableNameShort = anInst.readableNameShort
-	}
+	// ir.String = inst.String()
+	// ir.ReadableName = LineDisASM(inst)
+	// ir.ReadableNameShort = LineShortDisASM(inst)
 	// opcode
 	ir.Opcode = int64(inst.GetOpcode())
 	ir.OpcodeName = SSAOpcode2Name[inst.GetOpcode()]
@@ -193,6 +191,10 @@ func value2IrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
 	}
 	var anValue *anValue
 
+	if typ := value.GetType(); !utils.IsNil(typ) && typ.GetId() <= 0 {
+		log.Errorf("BUG: value2IrCode called with nil type: %s %s", value.GetOpcode().String(), value.GetName())
+		return
+	}
 	// ir.String = value.String()
 	ir.HasDefs = value.HasValues()
 
@@ -243,9 +245,9 @@ func value2IrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
 	if inst.GetOpcode() == SSAOpcodeConstInst {
 		if constInst, ok := ToConstInst(inst); ok {
 			ir.ConstType = string(constInst.ConstType)
+			ir.String = constInst.String()
 		}
 	}
-
 	ir.TypeID = saveType(cache, anValue.GetType())
 }
 

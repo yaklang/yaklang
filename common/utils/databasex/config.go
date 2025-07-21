@@ -2,10 +2,12 @@ package databasex
 
 import (
 	"context"
+	"sync"
 	"time"
 )
 
 type config struct {
+	lock sync.RWMutex
 	// buffer
 	bufferSize int
 
@@ -13,6 +15,7 @@ type config struct {
 
 	// save
 	enableSave  bool
+	fetchSize   int
 	saveSize    int
 	saveTimeout time.Duration
 
@@ -28,9 +31,9 @@ func WithName(name string) Option {
 	}
 }
 
-func WithBufferSize(size int) Option {
+func WithFetchSize(size int) Option {
 	return func(c *config) {
-		c.bufferSize = size
+		c.fetchSize = size
 	}
 }
 
@@ -46,7 +49,7 @@ func WithEnableSave(enables ...bool) Option {
 
 func WithSaveSize(size int) Option {
 	return func(c *config) {
-		c.saveSize = size
+		c.saveSize = max(defaultBatchSize, size)
 	}
 }
 
@@ -62,16 +65,19 @@ func WithContext(ctx context.Context) Option {
 	}
 }
 
+const defaultBufferSize = 1000
+
 func NewConfig(opts ...Option) *config {
 	cfg := &config{
-		bufferSize: 100, // Default buffer size
-		ctx:        context.Background(),
-
-		saveSize:    100,
+		bufferSize:  defaultBufferSize, // Default buffer size
+		ctx:         context.Background(),
+		fetchSize:   defaultBatchSize,
+		saveSize:    defaultBatchSize,
 		saveTimeout: 500 * time.Millisecond, // 0.5s
 	}
 	for _, opt := range opts {
 		opt(cfg)
 	}
+	cfg.bufferSize = (max(cfg.fetchSize, cfg.saveSize)) * 4
 	return cfg
 }

@@ -1,26 +1,25 @@
 package ssa
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-func SaveVariableIndexByName(db *gorm.DB, name string, inst Instruction) {
-	SaveVariableIndex(db, inst, name, "")
+func SaveVariableIndexByName(name string, inst Instruction) *ssadb.IrIndex {
+	return SaveVariableIndex(inst, name, "")
 }
 
-func SaveVariableIndexByMember(db *gorm.DB, member string, inst Instruction) {
-	SaveVariableIndex(db, inst, "", member)
+func SaveVariableIndexByMember(member string, inst Instruction) *ssadb.IrIndex {
+	return SaveVariableIndex(inst, "", member)
 }
 
-func SaveVariableIndex(db *gorm.DB, inst Instruction, name, member string) {
+func SaveVariableIndex(inst Instruction, name, member string) *ssadb.IrIndex {
 	if inst.GetId() == -1 {
-		return
+		return nil
 	}
 	prog := inst.GetProgram()
 	progName := prog.GetApplication().GetProgramName()
 
-	index := ssadb.CreateIndex(db, progName)
+	index := ssadb.CreateIndex(progName)
 
 	// index
 	index.ProgramName = prog.GetApplication().Name
@@ -31,7 +30,7 @@ func SaveVariableIndex(db *gorm.DB, inst Instruction, name, member string) {
 		// variable and scope
 		value, ok := inst.(Value)
 		if !ok {
-			return
+			return nil
 		}
 		variable := value.GetVariable(name)
 		if variable != nil {
@@ -47,21 +46,21 @@ func SaveVariableIndex(db *gorm.DB, inst Instruction, name, member string) {
 		}
 
 	}
-	ssadb.SaveIrIndex(db, index)
+	return index
 }
 
-func SaveClassIndex(db *gorm.DB, name string, inst Instruction) {
+func SaveClassIndex(name string, inst Instruction) *ssadb.IrIndex {
 	if inst.GetId() == -1 {
-		return
+		return nil
 	}
 	prog := inst.GetProgram()
 	progName := prog.GetApplication().GetProgramName()
 
-	index := ssadb.CreateIndex(db, progName)
+	index := ssadb.CreateIndex(progName)
 
 	// index
 	index.ProgramName = prog.GetApplication().Name
 	index.ValueID = inst.GetId()
 	index.ClassName = name
-	ssadb.SaveIrIndex(db, index)
+	return index
 }

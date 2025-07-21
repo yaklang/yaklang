@@ -8,6 +8,7 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/databasex"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -28,7 +29,7 @@ type ProgramCache struct {
 	MemberIndex   InstructionsIndex
 	ClassIndex    InstructionsIndex
 	ConstCache    InstructionsIndex
-	OffsetCache   InstructionsIndex
+	OffsetCache   *databasex.Save[*ssadb.IrOffset]
 
 	afterSaveNotify func(int)
 
@@ -39,7 +40,7 @@ type ProgramCache struct {
 }
 
 // NewDBCache : create a new ssa db cache. if ttl is 0, the cache will never expire, and never save to database.
-func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) *ProgramCache {
+func NewDBCache(prog *Program, databaseKind ProgramCacheKind, fileSize int, ConfigTTL ...time.Duration) *ProgramCache {
 	compileCtx := context.Background()
 	cacheCtx, cancel := context.WithCancel(compileCtx)
 	cache := &ProgramCache{
@@ -49,26 +50,30 @@ func NewDBCache(prog *Program, databaseEnable bool, ConfigTTL ...time.Duration) 
 		waitGroup:      &sync.WaitGroup{},
 	}
 	var programName string
-	if databaseEnable {
+	if databaseKind != ProgramCacheMemory { // database write/read
 		programName = prog.GetApplication().GetProgramName()
 		cache.DB = ssadb.GetDB().Where("program_name = ?", programName)
 	}
-
-	cache.initIndex(databaseEnable)
+	fetchSize := min(max(fileSize*5, defaultFetchSize), maxFetchSize)
+	saveSize := min(max(fileSize*5, defaultSaveSize), maxSaveSize)
+	log.Debugf("Databasex Channel: ReSetSize: fileSize(%d) fetchSize(%d) saveSize(%d)", fileSize, fetchSize, saveSize)
+	cache.initIndex(databaseKind, saveSize/2)
 	cache.afterSaveNotify = func(i int) {}
 	cache.InstructionCache = createInstructionCache(
-		cacheCtx, databaseEnable,
+		cacheCtx, databaseKind,
 		cache.DB, prog,
-		programName,
+		programName, fetchSize, saveSize,
 		func(inst Instruction, instIr *ssadb.IrCode) {
-			cache.OffsetCache.Add("", inst) // add to offset cache
-			cache.afterSaveNotify(1)        // notify after save
+			cache.afterSaveNotify(1)
+		},
+		func(count int) {
+			cache.afterSaveNotify(count)
 		},
 	)
 	cache.TypeCache = createTypeCache(
-		cacheCtx, databaseEnable,
+		cacheCtx, databaseKind,
 		cache.DB, prog,
-		programName,
+		programName, fetchSize, saveSize,
 	)
 	return cache
 }
@@ -85,6 +90,7 @@ func (c *ProgramCache) SetInstruction(inst Instruction) {
 		log.Errorf("BUG: SetInstruction called with nil instruction")
 		return
 	}
+	c.OffsetCache.Save(ConvertValue2Offset(inst))
 	c.InstructionCache.Set(inst)
 }
 
@@ -106,10 +112,7 @@ func (c *ProgramCache) GetInstruction(id int64) Instruction {
 // =============================================== Variable =======================================================
 
 func (c *ProgramCache) AddConst(inst Instruction) {
-	f1 := func() {
-		c.ConstCache.Add(inst.GetName(), inst)
-	}
-	ProfileAdd(true, "ssa.ProgramCache.AddConst", f1)
+	c.ConstCache.Add(inst.GetName(), inst)
 }
 
 func (c *ProgramCache) AddVariable(name string, inst Instruction) {
@@ -125,15 +128,9 @@ func (c *ProgramCache) AddVariable(name string, inst Instruction) {
 		}
 	}
 	if member != "" {
-		f1 := func() {
-			c.MemberIndex.Add(member, inst)
-		}
-		ProfileAdd(true, "ssa.ProgramCache.AddVariable.Member", f1)
+		c.MemberIndex.Add(member, inst)
 	} else {
-		f1 := func() {
-			c.VariableIndex.Add(name, inst)
-		}
-		ProfileAdd(true, "ssa.ProgramCache.AddVariable.Name", f1)
+		c.VariableIndex.Add(name, inst)
 	}
 }
 
@@ -158,10 +155,7 @@ func (c *ProgramCache) RemoveVariable(name string, inst Instruction) {
 }
 
 func (c *ProgramCache) AddClassInstance(name string, inst Instruction) {
-	f1 := func() {
-		c.ClassIndex.Add(name, inst)
-	}
-	ProfileAdd(true, "ssa.ProgramCache.AddClassInstance", f1)
+	c.ClassIndex.Add(name, inst)
 }
 
 // =============================================== Database =======================================================
@@ -174,32 +168,40 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) {
 	if len(cb) > 0 {
 		c.afterSaveNotify = cb[0]
 	}
+	wg := sync.WaitGroup{}
 	f1 := func() {
-		c.InstructionCache.Close()
+		c.InstructionCache.Close(&wg)
+		log.Infof("Instruction cache closed")
 	}
 	f2 := func() {
-		c.TypeCache.Close()
+		c.TypeCache.Close(&wg)
+		log.Infof("Type Cache closed")
 	}
 	f3 := func() {
-		c.VariableIndex.Close()
 	}
 	f4 := func() {
-		c.MemberIndex.Close()
+		c.VariableIndex.Close()
 	}
 	f5 := func() {
-		c.ClassIndex.Close()
+		c.MemberIndex.Close()
 	}
 	f6 := func() {
-		c.ConstCache.Close()
+		c.ClassIndex.Close()
 	}
 	f7 := func() {
-		c.OffsetCache.Close()
+		c.ConstCache.Close()
 	}
 	f8 := func() {
+		c.OffsetCache.Close()
+	}
+	f9 := func() {
+		log.Info("wait for type and instruction save...")
+		wg.Wait()
+		log.Info("wait for type and instruction save done")
 		c.cacheCtxCancel()
 	}
 	ProfileAdd(true, "ssa.ProgramCache.SaveToDatabase",
-		f1, f2, f3, f4, f5, f6, f7, f8)
+		f1, f2, f3, f4, f5, f6, f7, f8, f9)
 }
 
 func (c *ProgramCache) CountInstruction() int {

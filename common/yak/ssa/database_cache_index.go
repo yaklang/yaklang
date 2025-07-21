@@ -55,9 +55,7 @@ func (c *InstructionsIndexMem) ForEach(f func(string, []Instruction)) {
 	})
 }
 
-func (c *InstructionsIndexMem) Close() {
-
-}
+func (c *InstructionsIndexMem) Close() {}
 
 type InstructionsIndexItem struct {
 	Name string
@@ -73,13 +71,18 @@ const (
 
 func NewInstructionsIndexDB(
 	name string,
+	saveSize int,
 	save func([]InstructionsIndexItem),
 ) *InstructionsIndexDB {
+	if saveSize < IndexSaveSize {
+		saveSize = IndexSaveSize // Ensure minimum save size
+	}
 	return &InstructionsIndexDB{
 		save: databasex.NewSave(
 			save,
 			databasex.WithName(name),
-			databasex.WithSaveSize(IndexSaveSize),
+			databasex.WithSaveSize(saveSize),
+			databasex.WithSaveTimeout(saveTime),
 		),
 	}
 }
@@ -106,87 +109,81 @@ func (c *InstructionsIndexDB) Close() {
 	c.save.Close()
 }
 
-func NewInstructionIndex(enable bool, name string, saveFunc func([]InstructionsIndexItem)) InstructionsIndex {
-	if enable {
-		return NewInstructionsIndexDB(name, saveFunc)
+func NewInstructionIndex(kind ProgramCacheKind, name string, saveSize int, saveFunc func([]InstructionsIndexItem)) InstructionsIndex {
+	if kind != ProgramCacheMemory {
+		return NewInstructionsIndexDB(name, saveSize, saveFunc)
 	} else {
 		return NewInstructionsIndexMem(name)
 	}
 }
 
-func (c *ProgramCache) initIndex(databaseEnable bool) {
+func (c *ProgramCache) initIndex(databaseKind ProgramCacheKind, saveSize int) {
+	offsetSaver := databasex.NewSave(func(t []*ssadb.IrOffset) {
+		utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
+			for _, item := range t {
+				ssadb.SaveIrOffset(tx, item)
+			}
+			return nil
+		})
+	}, databasex.WithSaveSize(saveSize), databasex.WithName("OffsetCache"))
+
+	saveIndex := func(db *gorm.DB, items []*ssadb.IrIndex) {
+		utils.GormTransaction(db, func(tx *gorm.DB) error {
+			for _, item := range items {
+				ssadb.SaveIrIndex(tx, item)
+			}
+			return nil
+		})
+	}
 
 	c.VariableIndex = NewInstructionIndex(
-		databaseEnable, "VariableIndex",
+		databaseKind, "VariableIndex", saveSize,
 		func(items []InstructionsIndexItem) {
-			utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
-				for _, item := range items {
-					SaveVariableIndexByName(tx, item.Name, item.Inst)
+			rets := make([]*ssadb.IrIndex, 0, len(items))
+			for _, item := range items {
+				ret := SaveVariableIndexByName(item.Name, item.Inst)
+				rets = append(rets, ret)
+
+				// save to offset
+				if value, ok := item.Inst.(Value); ok {
+					variable := value.GetVariable(item.Name)
+					for _, offset := range ConvertVariable2Offset(variable, item.Name, int64(value.GetId())) {
+						offsetSaver.Save(offset)
+					}
 				}
-				return nil
-			})
+			}
+			saveIndex(c.DB, rets)
 		},
 	)
 	c.MemberIndex = NewInstructionIndex(
-		databaseEnable, "MemberIndex",
+		databaseKind, "MemberIndex", saveSize,
 		func(items []InstructionsIndexItem) {
-			utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
-				for _, item := range items {
-					SaveVariableIndexByMember(tx, item.Name, item.Inst)
-				}
-				return nil
-			})
+			ret := make([]*ssadb.IrIndex, 0, len(items))
+			for _, item := range items {
+				item := SaveVariableIndexByMember(item.Name, item.Inst)
+				ret = append(ret, item)
+			}
+			saveIndex(c.DB, ret)
+
 		},
 	)
 
 	c.ClassIndex = NewInstructionIndex(
-		databaseEnable, "ClassIndex",
+		databaseKind, "ClassIndex", saveSize,
 		func(items []InstructionsIndexItem) {
-			utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
-				for _, item := range items {
-					SaveClassIndex(tx, item.Name, item.Inst)
-				}
-				return nil
-			})
+			ret := make([]*ssadb.IrIndex, 0, len(items))
+			for _, item := range items {
+				item := SaveClassIndex(item.Name, item.Inst)
+				ret = append(ret, item)
+			}
+			saveIndex(c.DB, ret)
 		},
 	)
 
-	c.OffsetCache = NewInstructionIndex(
-		databaseEnable, "OffsetCache",
-		func(items []InstructionsIndexItem) {
-			irOffset := make([]*ssadb.IrOffset, 0, len(items)*2)
-			add := func(i ...*ssadb.IrOffset) {
-				for _, item := range i {
-					if !utils.IsNil(item) {
-						irOffset = append(irOffset, item)
-					}
-				}
-			}
-			defer func() {
-				log.Errorf("DATABASE: Save IR Offsets: %d", len(irOffset))
-				utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
-					for _, item := range irOffset {
-						ssadb.SaveIrOffset(tx, item)
-					}
-					return nil
-				})
-			}()
-			for _, item := range items {
-				add(SaveValueOffset(item.Inst))
-				if value, ok := ToValue(item.Inst); ok {
-					for _, variable := range value.GetAllVariables() {
-						if variable.GetId() <= 0 {
-							continue // skip variable without id
-						}
-						add(SaveVariableOffset(variable, variable.GetName(), int64(value.GetId()))...)
-					}
-				}
-			}
-		},
-	)
+	c.OffsetCache = offsetSaver
 
 	c.ConstCache = NewInstructionIndex(
-		databaseEnable, "ConstCache",
+		databaseKind, "ConstCache", saveSize,
 		func(ii []InstructionsIndexItem) {
 		},
 	)

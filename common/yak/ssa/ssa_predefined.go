@@ -290,10 +290,12 @@ type anValue struct {
 	occultation []int64
 }
 
+var defaultAnyType = CreateAnyType()
+
 func NewValue() anValue {
 	return anValue{
 		anInstruction: NewInstruction(),
-		typ:           CreateAnyType(),
+		typ:           defaultAnyType,
 		userList:      make([]int64, 0),
 		member:        omap.NewOrderedMap(map[int64]int64{}),
 
@@ -440,6 +442,7 @@ func (n *anValue) SetType(typ Type) {
 	}
 
 	value := n.GetValueById(n.GetId())
+	saveTypeWithValue(value, typ)
 
 	switch t := typ.(type) {
 	case *Blueprint:

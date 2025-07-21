@@ -19,7 +19,7 @@ type Save[T any] struct {
 
 	config *config
 
-	wg     sync.WaitGroup
+	wg     *sync.WaitGroup
 	ctx    context.Context    // Context for cancellation
 	cancel context.CancelFunc // Function to cancel the context
 }
@@ -38,6 +38,9 @@ func NewSaveWithConfig[T any](
 	saveToDB func([]T),
 	cfg *config,
 ) *Save[T] {
+	if utils.IsNil(saveToDB) {
+		return nil
+	}
 	ctx, cancel := context.WithCancel(cfg.ctx)
 	s := &Save[T]{
 		saveToDB: saveToDB,
@@ -45,6 +48,7 @@ func NewSaveWithConfig[T any](
 		ctx:      ctx,
 		cancel:   cancel,
 		config:   cfg,
+		wg:       &sync.WaitGroup{},
 	}
 
 	s.wg.Add(1)
@@ -61,36 +65,59 @@ func NewSaveWithConfig[T any](
 
 // processBuffer runs in a background goroutine and periodically processes items from the buffer.
 func (s *Save[T]) processBuffer() {
-	saveSize := s.config.saveSize
 	saveTime := s.config.saveTimeout
 	timer := time.NewTimer(saveTime)
-	items := make([]T, 0, saveSize)
-	save := func() {
-		if len(items) > 0 {
-			s.saveToDB(items)
-			items = make([]T, 0, saveSize) // Reset the items slice
+
+	save := func(ts []T) {
+		if len(ts) == 0 {
+			return
 		}
+		// start := time.Now()
+		batchSave(ts, s.saveToDB, s.wg)
+		// log.Debugf("Databasex Channel: Save Count in save Loop: %s: need: %v, handled: %v, cost: %v",
+		// 	s.config.name,
+		// 	s.buffer.Len(),
+		// 	len(ts),
+		// 	time.Since(start),
+		// )
 	}
 
+	currentSaveSize := s.config.saveSize
+	items := make([]T, 0, currentSaveSize)
 	for {
+		saveSize := s.config.saveSize
 		select {
 		case item, ok := <-s.buffer.OutputChannel():
 			if !ok {
-				save()
+				save(items)
 				return
 			}
 
 			items = append(items, item)
 
 			// If we've reached the SaveSize, save immediately
-			if len(items) >= saveSize {
-				save()
+			if len(items) >= currentSaveSize {
+				save(items)
+				bufferSize := s.buffer.Len()
+				if bufferSize > currentSaveSize*2 {
+					currentSaveSize *= 10
+				} else if bufferSize > currentSaveSize {
+					currentSaveSize *= 5
+				} else if bufferSize > saveSize {
+					// currentSaveSize = currentSaveSize
+					// pass
+				} else {
+					currentSaveSize = saveSize
+				}
+
+				items = make([]T, 0, currentSaveSize)
 				// Reset the timer since we just saved
 				timer.Reset(saveTime)
 			}
 		case <-timer.C:
 			// Time's up, save whatever we have
-			save()
+			save(items)
+			items = make([]T, 0, saveSize)
 			timer.Reset(saveTime)
 		}
 	}
@@ -106,18 +133,44 @@ func (s *Save[T]) Save(item T) {
 		}
 	}()
 	if !utils.IsNil(item) {
-		s.buffer.SafeFeed(item)
+		start := time.Now()
+		s.buffer.FeedBlock(item)
+		if time.Since(start) > time.Second {
+			log.Errorf("Databasex Channel: Save Count in Save: %s: item(%v) took too long to save, cost: %v",
+				s.config.name, item, time.Since(start),
+			)
+		}
 	}
 }
-
-const MaxSize = 300
 
 // Close stops the background goroutine and waits for it to finish.
 // It also processes any remaining items in the buffer before returning.
 func (s *Save[T]) Close() {
-	if s.config.name == "OffsetCache" {
-		log.Errorf("bb")
-	}
 	s.buffer.Close() // Close the buffer
 	s.wg.Wait()      // Wait for the background goroutine to finish
+}
+
+func batchSave[T any](data []T, handler func([]T), wg *sync.WaitGroup) {
+	if len(data) == 0 {
+		return
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		handler(data)
+	}()
+
+	// size := defaultBatchSize
+	// for i := 0; i < len(data); i += size {
+	// 	end := i + size
+	// 	if end > len(data) {
+	// 		end = len(data)
+	// 	}
+	// 	wg.Add(1)
+	// 	go func(chunk []T) {
+	// 		defer wg.Done()
+	// 		handler(chunk)
+	// 	}(data[i:end])
+	// }
 }

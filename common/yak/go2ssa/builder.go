@@ -44,11 +44,11 @@ func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	return extension == ".go" || extension == ".mod"
 }
 
-func (s *SSABuilder) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	builder.GetProgram().GetApplication().Build("", editor, builder)
+func (s *SSABuilder) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
+	builder.GetProgram().GetApplication().Build(ast, "", editor, builder)
 }
 
-func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder *ssa.FunctionBuilder, path string) error {
+func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST, functionBuilder *ssa.FunctionBuilder, path string) error {
 	prog := functionBuilder.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")
@@ -61,7 +61,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 	dirname, filename := fileSystem.PathSplit(path)
 	_ = dirname
 	_ = filename
-	file, err := fileSystem.ReadFile(path)
+	raw, err := fileSystem.ReadFile(path)
 	if err != nil {
 		log.Errorf("read file %s error: %v", path, err)
 		return nil
@@ -88,15 +88,20 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 			prog.ExtraFile["go.mod"] = path[:len(path)-1]
 		}
 	}
-	prog.Build(path, memedit.NewMemEditor(string(file)), functionBuilder)
+	data := string(raw)
+	prog.Build(ast, path, memedit.NewMemEditor(data), functionBuilder)
 	prog.GetIncludeFiles()
 	return nil
 }
 
-func (s *SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
-	ast, err := Frontend(src, force)
-	if err != nil {
-		return err
+func (s *SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
+	return Frontend(src)
+}
+
+func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, builder *ssa.FunctionBuilder) error {
+	ast, ok := raw.(*gol.SourceFileContext)
+	if !ok {
+		return utils.Errorf("invalid AST type: expected *gol.SourceFileContext, got %T", raw)
 	}
 
 	SpecialTypes := map[string]ssa.Type{
@@ -145,7 +150,7 @@ type astbuilder struct {
 	SetGlobal      bool
 }
 
-func Frontend(src string, must bool) (*gol.SourceFileContext, error) {
+func Frontend(src string) (*gol.SourceFileContext, error) {
 	errListener := antlr4util.NewErrorListener()
 	lexer := gol.NewGoLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
@@ -156,10 +161,10 @@ func Frontend(src string, must bool) (*gol.SourceFileContext, error) {
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.SourceFile().(*gol.SourceFileContext)
-	if must || len(errListener.GetErrors()) == 0 {
+	if len(errListener.GetErrors()) == 0 {
 		return ast, nil
 	}
-	return nil, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrorString())
+	return ast, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrorString())
 }
 
 func (b *astbuilder) AddToCmap(key string) {

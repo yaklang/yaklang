@@ -191,7 +191,7 @@ type User interface {
 	ReplaceValue(Value, Value)
 }
 
-type Build func(string, *memedit.MemEditor, *FunctionBuilder) error
+type Build func(FrontAST, string, *memedit.MemEditor, *FunctionBuilder) error
 
 const (
 	Application = ssadb.Application
@@ -228,8 +228,8 @@ type Program struct {
 	// UpStream   map[string]*Program
 	UpStream *omap.OrderedMap[string, *Program]
 
-	EnableDatabase bool             // for compile, whether use database
-	irProgram      *ssadb.IrProgram // from database program
+	DatabaseKind ProgramCacheKind // for compile, whether use database
+	irProgram    *ssadb.IrProgram // from database program
 
 	// TODO: this four map should need????!
 	editorStack           *omap.OrderedMap[string, *memedit.MemEditor]

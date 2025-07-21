@@ -6,7 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-func SaveValueOffset(inst Instruction) *ssadb.IrOffset {
+func ConvertValue2Offset(inst Instruction) *ssadb.IrOffset {
 	if inst.GetId() == -1 {
 		return nil
 	}
@@ -30,7 +30,7 @@ func SaveValueOffset(inst Instruction) *ssadb.IrOffset {
 	return irOffset
 }
 
-func SaveVariableOffset(v *Variable, variableName string, valueID int64) []*ssadb.IrOffset {
+func ConvertVariable2Offset(v *Variable, variableName string, valueID int64) []*ssadb.IrOffset {
 	if v.GetId() == -1 {
 		return nil
 	}
