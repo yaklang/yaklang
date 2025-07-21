@@ -1,0 +1,27 @@
+__DESC__ = "mock"
+
+__KEYWORDS__ = "mock"
+
+yakit.StatusCard("statue","mock basic yakit")
+yakit.Info("mock info")
+yakit.Error("mokc error")
+yakit.Output("mock output")
+
+for i in 3 {
+    yakit.StatusCard("mock stautCard", i)
+}
+
+
+
+yakit.StatusCard("statue","mock httpflow")
+
+for i  in 10 {
+    poc.Get("https://www.baidu.com")
+}
+
+yakit.StatusCard("statue","mock risk")
+
+for i in 10 {
+    risk.NewRisk("127.0.0.1", risk.solution(""),risk.description(""))
+}
+
