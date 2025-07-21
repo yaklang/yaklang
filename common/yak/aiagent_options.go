@@ -2,6 +2,7 @@ package yak
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/schema"
 	"slices"
 
@@ -152,6 +153,9 @@ var (
 	WithLiteForgeRequireParams   = aiforge.WithLiteForge_RequireParams
 	WithLiteForgeOutputMemoryOP  = aiforge.WithLiteForge_OutputMemoryOP
 	WithLiteForgeOutputSchemaRaw = aiforge.WithLiteForge_OutputSchemaRaw
+
+	// aitools
+	AllYakScriptTools = yakscripttools.GetAllYakScriptAiTools
 )
 
 func NewLiteForge(name string, opts ...any) (*aiforge.LiteForge, error) {
