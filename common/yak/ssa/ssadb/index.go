@@ -1,9 +1,6 @@
 package ssadb
 
 import (
-	"sync/atomic"
-	"time"
-
 	"github.com/jinzhu/gorm"
 )
 
@@ -33,7 +30,7 @@ func (i *IrIndex) TableName() string {
 	return "ir_indices"
 }
 
-func CreateIndex(db *gorm.DB, progName string) *IrIndex {
+func CreateIndex(progName string) *IrIndex {
 	ret := &IrIndex{
 		ProgramName: progName,
 	}
@@ -41,10 +38,6 @@ func CreateIndex(db *gorm.DB, progName string) *IrIndex {
 }
 
 func SaveIrIndex(db *gorm.DB, idx *IrIndex) {
-	start := time.Now()
-	defer func() {
-		atomic.AddUint64(&_SSAIndexCost, uint64(time.Now().Sub(start).Nanoseconds()))
-	}()
 	db.Save(idx)
 }
 

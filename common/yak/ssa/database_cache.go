@@ -8,6 +8,7 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/databasex"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -28,7 +29,7 @@ type ProgramCache struct {
 	MemberIndex   InstructionsIndex
 	ClassIndex    InstructionsIndex
 	ConstCache    InstructionsIndex
-	OffsetCache   InstructionsIndex
+	OffsetCache   *databasex.Save[*ssadb.IrOffset]
 
 	afterSaveNotify func(int)
 
@@ -63,7 +64,6 @@ func NewDBCache(prog *Program, databaseKind ProgramCacheKind, fileSize int, Conf
 		cache.DB, prog,
 		programName, fetchSize, saveSize,
 		func(inst Instruction, instIr *ssadb.IrCode) {
-			cache.OffsetCache.Add("", inst) // add to offset cache
 			cache.afterSaveNotify(1)
 		},
 		func(count int) {
@@ -90,6 +90,7 @@ func (c *ProgramCache) SetInstruction(inst Instruction) {
 		log.Errorf("BUG: SetInstruction called with nil instruction")
 		return
 	}
+	c.OffsetCache.Save(ConvertValue2Offset(inst))
 	c.InstructionCache.Set(inst)
 }
 

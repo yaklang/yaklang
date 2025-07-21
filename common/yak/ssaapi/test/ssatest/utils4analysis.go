@@ -63,6 +63,7 @@ func CheckWithFS(fs fi.FileSystem, t require.TestingT, handler func(ssaapi.Progr
 			ssadb.DeleteProgram(ssadb.GetDB(), programID)
 		}()
 		require.Nil(t, err)
+		require.NotNil(t, prog)
 
 		log.Infof("with database ")
 		err = handler(prog)
