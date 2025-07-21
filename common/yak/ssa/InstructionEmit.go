@@ -360,6 +360,7 @@ func (f *FunctionBuilder) emitMake(parentI Value, typ Type, low, high, max, Len,
 	}
 	i := NewMake(parentI, typ, low, high, max, Len, Cap)
 	f.emit(i)
+	saveTypeWithValue(i, typ)
 	return i
 }
 
@@ -453,6 +454,7 @@ func (f *FunctionBuilder) emitConstInst(i any, isPlaceholder bool) *ConstInst {
 	if ci.IsNormalConst() {
 		f.GetProgram().AddConstInstruction(ci)
 	}
+	saveTypeWithValue(ci, ci.GetType())
 	return ci
 }
 
