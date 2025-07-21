@@ -187,7 +187,8 @@ var AIAgentExport = map[string]any{
 	/*
 		ai utils api
 	*/
-	"ExtractPlan":      aid.ExtractPlan,
-	"ExtractAction":    aid.ExtractAction,
-	"GetDefaultMemory": aid.GetDefaultMemory,
+	"ExtractPlan":         aid.ExtractPlan,
+	"ExtractAction":       aid.ExtractAction,
+	"GetDefaultMemory":    aid.GetDefaultMemory,
+	"AllYakScriptAiTools": AllYakScriptTools,
 }

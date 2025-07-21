@@ -1,0 +1,47 @@
+
+
+forgeHandle = func(params) {
+    yakit.StatusCard("statue", "mock forge")
+   tools := aiagent.AllYakScriptAiTools()
+   bp = aiagent.CreateForge("mock-forge",aiagent.tools(tools...),aiagent.aiCallback(func(config , request){
+        	rsp := config.NewAIResponse()
+			defer func() {
+				rsp.Close()
+			}()
+
+			if str.MatchAllOfSubString(request.GetPrompt(), `工具名称: `, `"call-tool"`, "const") {
+				rsp.EmitOutputStream(str.NewReader(`{"@action": "call-tool", "tool": "mock_basic", "params": {}}`))
+				return rsp, nil
+			} else if str.MatchAllOfSubString(request.GetPrompt(), `当前任务: "扫描目录结构"`) {
+				rsp.EmitOutputStream(str.NewReader(`{"@action": "require-tool", "tool": "mock_basic"}`))
+				return rsp, nil
+			}
+
+			println("===========" + "request:" + "===========\n" + request.GetPrompt())
+			rsp.EmitOutputStream(str.NewReader(`
+{
+    "@action": "plan",
+    "query": "找出 /Users/v1ll4n/Projects/yaklang 目录中最大的文件",
+    "main_task": "在给定路径下寻找体积最大的文件",
+    "main_task_goal": "识别 /Users/v1ll4n/Projects/yaklang 目录中占用存储空间最多的文件，并展示其完整路径与大小信息",
+    "tasks": [
+        {
+            "subtask_name": "扫描目录结构",
+            "subtask_goal": "递归遍历 /Users/v1ll4n/Projects/yaklang 目录下所有文件，记录每个文件的位置和占用空间"
+        },
+    ]
+}
+			`))
+			return rsp, nil
+    }))
+    ordr,err = bp.CreateCoordinator(context.Background(),params)
+    if err != nil {
+        return nil
+    }
+    err = ordr.Run()
+    if err != nil {
+        return nil
+    }
+    println(result)
+    return result
+}
