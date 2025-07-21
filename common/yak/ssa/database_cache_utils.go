@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -51,7 +52,7 @@ type Cache[T any] interface {
 	GetAll() map[int64]T
 
 	// close
-	Close()
+	Close(...*sync.WaitGroup)
 }
 
 var _ Cache[Instruction] = (*databasex.Cache[Instruction, *ssadb.IrCode])(nil)
@@ -77,7 +78,7 @@ func (c *memoryCache[T]) Set(item T) {
 	c.SafeMapWithKey.Set(id, item)
 	item.SetId(id)
 }
-func (c *memoryCache[T]) Close() {
+func (c *memoryCache[T]) Close(...*sync.WaitGroup) {
 }
 
 func createInstructionCache(
@@ -120,6 +121,11 @@ func createInstructionCache(
 			go func() {
 				defer close(ch)
 				utils.GormTransaction(db, func(tx *gorm.DB) error {
+					defer func() {
+						if err := recover(); err != nil {
+							log.Errorf("DATABASE: Fetch IR Code panic: %v", err)
+						}
+					}()
 					for i := 0; i < size; i++ {
 						select {
 						case <-ctx.Done():
@@ -155,17 +161,17 @@ func createInstructionCache(
 					utils.PrintCurrentGoroutineRuntimeStack()
 				}
 			}()
-			// log.Errorf("DATABASE: Save IR  : %d", len(t))
+			log.Errorf("Databasex Channel: Save IR  : %d", len(t))
 			utils.GormTransaction(db, func(tx *gorm.DB) error {
 				// log.Errorf("DATABASE: Save IR: %d", len(t))
 				for _, irCode := range t {
 					if err := irCode.Save(tx); err != nil {
 						log.Errorf("DATABASE: save irCode to database error: %v", err)
 					}
+					go saveFinish(1)
 				}
 				return nil
 			})
-			saveFinish(len(t))
 			// log.Errorf("DATABASE: Save IR finish : %d", len(t))
 		}
 
@@ -227,13 +233,18 @@ func createTypeCache(
 			go func() {
 				defer close(ch)
 				utils.GormTransaction(db, func(tx *gorm.DB) error {
-					db := tx
+					defer func() {
+						if err := recover(); err != nil {
+							log.Errorf("DATABASE: Fetch IR Types panic: %v", err)
+						}
+					}()
+					// db := tx
 					for i := 0; i < size; i++ {
 						select {
 						case <-ctx.Done():
 							return nil
 						default:
-							id, irType := ssadb.RequireIrType(db, programName)
+							id, irType := ssadb.RequireIrType(tx, programName)
 							if utils.IsNil(irType) || id <= 0 {
 								continue
 							}

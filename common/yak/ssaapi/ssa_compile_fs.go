@@ -247,7 +247,7 @@ func (c *config) parseProjectWithFS(
 			defer lock.Unlock()
 			index += size
 			process = 0.9 + (float64(index)/float64(total))*0.1
-			if (process - prevProcess) > 0.001 { // is 90.1%/90.2%/....
+			if (process - prevProcess) > 0.0001 { // is 90.01%/90.02%/....
 				prog.ProcessInfof("Saving instructions: %d complete(total %d)", index, total)
 				prevProcess = process
 			}
