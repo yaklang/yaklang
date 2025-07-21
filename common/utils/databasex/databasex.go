@@ -1,6 +1,7 @@
 package databasex
 
 import (
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -48,7 +49,6 @@ func NewCache[T MemoryItem, D DBItem](
 				log.Errorf("BUG: marshal function is not set")
 				return false
 			}
-
 			marshal(v.MemoryItem, v.DBItem)
 			saver.Save(v.DBItem)
 			return true
@@ -111,22 +111,38 @@ func (c *Cache[T, U]) Get(id int64) (T, bool) {
 	return item.MemoryItem, true
 }
 
-func (c *Cache[T, D]) Close() {
+func (c *Cache[T, D]) Close(wgs ...*sync.WaitGroup) {
 	if c.fetcher == nil {
 		return
 	}
 
-	delete := make([]func([]D), 0, 1)
-	if !utils.IsNil(c.delete) {
-		delete = append(delete, c.delete)
+	var wg *sync.WaitGroup
+	if len(wgs) > 0 {
+		wg = wgs[0]
+	} else {
+		wg = &sync.WaitGroup{}
+		defer wg.Wait()
 	}
-	c.fetcher.Close(delete...)
+
+	if !utils.IsNil(c.delete) {
+		wg.Add(1)
+		go func() {
+			wg.Done()
+			c.fetcher.DeleteRest(c.delete, wg)
+		}()
+	}
+
 	c.cache.EnableSave()
 	c.cache.Close()
-	if c.saver == nil {
-		return
+
+	if !utils.IsNil(c.saver) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			c.saver.Close()
+		}()
 	}
-	c.saver.Close()
+
 }
 
 func (c *Cache[T, U]) Count() int {
