@@ -173,24 +173,24 @@ func GetLlamaServerPath() string {
 	return utils.GetFirstExistedFile(paths...)
 }
 
-func GetPandocBinaryPath() string {
+func GetPage2ImgBinaryPath() string {
 	defaultPath := GetDefaultYakitProjectsDir()
 	var paths []string
 	if runtime.GOOS == "windows" {
-		paths = append(paths, filepath.Join(defaultPath, "base", "pandoc.exe"))
-		paths = append(paths, filepath.Join(defaultPath, "libs", "pandoc.exe"))
-		paths = append(paths, filepath.Join(defaultPath, "engine", "pandoc.exe"))
-		paths = append(paths, filepath.Join(defaultPath, "pandoc.exe"))
-		paths = append(paths, "pandoc.exe")
+		paths = append(paths, filepath.Join(defaultPath, "base", "page2img.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "libs", "page2img.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "page2img.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "page2img.exe"))
+		paths = append(paths, "page2img.exe")
 	} else {
-		paths = append(paths, filepath.Join(defaultPath, "base", "pandoc"))
-		paths = append(paths, filepath.Join(defaultPath, "libs", "pandoc"))
-		paths = append(paths, filepath.Join(defaultPath, "engine", "pandoc"))
-		paths = append(paths, filepath.Join(defaultPath, "pandoc"))
-		paths = append(paths, "pandoc")
-		paths = append(paths, filepath.Join("/", "usr", "local", "bin", "pandoc"))
-		paths = append(paths, filepath.Join("/", "bin", "pandoc"))
-		paths = append(paths, filepath.Join("/", "usr", "bin", "pandoc"))
+		paths = append(paths, filepath.Join(defaultPath, "base", "page2img"))
+		paths = append(paths, filepath.Join(defaultPath, "libs", "page2img"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "page2img"))
+		paths = append(paths, filepath.Join(defaultPath, "page2img"))
+		paths = append(paths, "page2img")
+		paths = append(paths, filepath.Join("/", "usr", "local", "bin", "page2img"))
+		paths = append(paths, filepath.Join("/", "bin", "page2img"))
+		paths = append(paths, filepath.Join("/", "usr", "bin", "page2img"))
 	}
 	return utils.GetFirstExistedFile(paths...)
 }

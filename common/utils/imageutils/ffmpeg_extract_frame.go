@@ -55,7 +55,7 @@ func ExtractVideoFrameContext(ctx context.Context, input string) (chan *ImageRes
 		cmd := exec.CommandContext(
 			ctx,
 			ffmpegBinaryPath, "-i", input,
-			`-vf`, `scdet=threshold=20,select='eq(n,0) + gt(floor(t), floor(prev_t)) + gt(scene, 0.2)',drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:text='tffset-timestamp\: %{eif\:t*1000\:d}ms':fontcolor=white:fontsize=24:box=1:boxcolor=black@0.5:x=(w-tw)/2:y=h-th-10,setpts=N/FR/TB`,
+			`-vf`, `scdet=threshold=20,select='eq(n,0) + gt(floor(t), floor(prev_t)) + gt(scene, 0.2)',drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:text='offset-timestamp\: %{eif\:t*1000\:d}ms':fontcolor=white:fontsize=24:box=1:boxcolor=black@0.5:x=(w-tw)/2:y=h-th-10,setpts=N/FR/TB`,
 			`-fps_mode`, `vfr`,
 			outputFmt,
 		)
