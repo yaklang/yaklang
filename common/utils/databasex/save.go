@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
@@ -18,7 +19,7 @@ type Save[T any] struct {
 
 	config *config
 
-	wg     sync.WaitGroup
+	wg     *sync.WaitGroup
 	ctx    context.Context    // Context for cancellation
 	cancel context.CancelFunc // Function to cancel the context
 }
@@ -47,6 +48,7 @@ func NewSaveWithConfig[T any](
 		ctx:      ctx,
 		cancel:   cancel,
 		config:   cfg,
+		wg:       &sync.WaitGroup{},
 	}
 
 	s.wg.Add(1)
@@ -65,23 +67,13 @@ func NewSaveWithConfig[T any](
 func (s *Save[T]) processBuffer() {
 	saveTime := s.config.saveTimeout
 	timer := time.NewTimer(saveTime)
-	// wg := utils.NewSizedWaitGroup(2)
-	wg := sync.WaitGroup{}
-
-	defer func() {
-		// start := time.Now()
-		// log.Debugf("Databasex Channel: Save Count in processBuffer end : %s: waitToSave: %v, handled: %v, cost: %v",
-		// 	s.config.name, len(waitToSave), s.buffer.Len(), time.Since(start),
-		// )
-		wg.Wait()
-	}()
 
 	save := func(ts []T) {
 		if len(ts) == 0 {
 			return
 		}
 		// start := time.Now()
-		batchSave(ts, s.saveToDB, &wg)
+		batchSave(ts, s.saveToDB, s.wg)
 		// log.Debugf("Databasex Channel: Save Count in save Loop: %s: need: %v, handled: %v, cost: %v",
 		// 	s.config.name,
 		// 	s.buffer.Len(),
@@ -107,10 +99,13 @@ func (s *Save[T]) processBuffer() {
 			if len(items) >= currentSaveSize {
 				save(items)
 				bufferSize := s.buffer.Len()
-				if bufferSize > currentSaveSize {
-					currentSaveSize = (bufferSize / currentSaveSize) * currentSaveSize
+				if bufferSize > currentSaveSize*2 {
+					currentSaveSize *= 10
+				} else if bufferSize > currentSaveSize {
+					currentSaveSize *= 5
 				} else if bufferSize > saveSize {
-					currentSaveSize = (bufferSize / saveSize) * saveSize
+					// currentSaveSize = currentSaveSize
+					// pass
 				} else {
 					currentSaveSize = saveSize
 				}
@@ -138,7 +133,13 @@ func (s *Save[T]) Save(item T) {
 		}
 	}()
 	if !utils.IsNil(item) {
+		start := time.Now()
 		s.buffer.FeedBlock(item)
+		if time.Since(start) > time.Second {
+			log.Errorf("Databasex Channel: Save Count in Save: %s: item(%v) took too long to save, cost: %v",
+				s.config.name, item, time.Since(start),
+			)
+		}
 	}
 }
 
@@ -150,16 +151,26 @@ func (s *Save[T]) Close() {
 }
 
 func batchSave[T any](data []T, handler func([]T), wg *sync.WaitGroup) {
-	size := defaultBatchSize
-	for i := 0; i < len(data); i += size {
-		end := i + size
-		if end > len(data) {
-			end = len(data)
-		}
-		wg.Add(1)
-		go func(chunk []T) {
-			defer wg.Done()
-			handler(chunk)
-		}(data[i:end])
+	if len(data) == 0 {
+		return
 	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		handler(data)
+	}()
+
+	// size := defaultBatchSize
+	// for i := 0; i < len(data); i += size {
+	// 	end := i + size
+	// 	if end > len(data) {
+	// 		end = len(data)
+	// 	}
+	// 	wg.Add(1)
+	// 	go func(chunk []T) {
+	// 		defer wg.Done()
+	// 		handler(chunk)
+	// 	}(data[i:end])
+	// }
 }
