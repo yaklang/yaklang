@@ -83,8 +83,8 @@ func (f *Fetch[T]) fillBuffer() {
 			// start := time.Now()
 			// _ = start
 			// log.Debugf("Databasex Channel: Fetch Count Start in fetch buffer %s: buffer(%v|%v) with fetchItem(%v)", f.cfg.name, bufferLen, bufferWeight, currentFetchSize)
-			var ch <-chan T
-			ch = f.fetchFromDB(f.ctx, currentFetchSize)
+			ch := batchFetch(f.fetchFromDB, f.ctx, currentFetchSize)
+			// ch := f.fetchFromDB(f.ctx, currentFetchSize)
 			for item := range ch {
 				if utils.IsNil(item) {
 					log.Errorf("BUG: item is nil in Fetch.fillBuffer")
@@ -99,13 +99,13 @@ func (f *Fetch[T]) fillBuffer() {
 
 func (f *Fetch[T]) Fetch() (T, error) {
 	if f.buffer.Len() == 0 {
-		// log.Errorf("BUG: buffer is empty in Fetch.Fetch")
+		log.Errorf("BUG: buffer is empty in Fetch.Fetch." + f.cfg.name)
 	}
-	// start := time.Now()
+	start := time.Now()
 	item := <-f.buffer.OutputChannel()
-	// if time.Since(start) > time.Second {
-	// log.Errorf("DATABASE: Fetch.Fetch.%s took too long: %v", f.cfg.name, time.Since(start))
-	// }
+	if time.Since(start) > time.Second {
+		log.Errorf("DATABASE: Fetch.Fetch.%s took too long: %v", f.cfg.name, time.Since(start))
+	}
 	if utils.IsNil(item) {
 		return item, utils.Errorf("item is nil in Fetch.Fetch")
 	}
@@ -113,24 +113,51 @@ func (f *Fetch[T]) Fetch() (T, error) {
 }
 
 // Close stops the background goroutine and closes the buffer channel.
-func (f *Fetch[T]) Close(delete ...func([]T)) {
+func (f *Fetch[T]) DeleteRest(delete func([]T), wg ...*sync.WaitGroup) {
+	f.Close()
+	items := make([]T, 0, f.buffer.Len())
+	// drain the rest of the buffer
+	for {
+		item, ok := <-f.buffer.OutputChannel()
+		if !ok {
+			break
+		}
+		items = append(items, item)
+	}
+	delete(items)
+}
+
+func (f *Fetch[T]) Close() {
 	// stop the background goroutine
 	f.cancel()
 	f.wg.Wait()
 	// close the buffer channel
 	f.buffer.Close()
-	items := make([]T, 0, f.buffer.Len())
+}
 
-	// drain the rest of the buffer
-	if len(delete) > 0 {
-		for {
-			item, ok := <-f.buffer.OutputChannel()
-			if !ok {
-				break
-			}
-			items = append(items, item)
+func batchFetch[T any](
+	fetch func(context.Context, int) <-chan T,
+	ctx context.Context, size int,
+) <-chan T {
+	ch := make(chan T, size)
+	wg := sync.WaitGroup{}
+	for i := 0; i < size; i += defaultBatchSize {
+
+		end := i + defaultBatchSize
+		if end > size {
+			end = size
 		}
+		wg.Add(1)
+		go func(size int) {
+			defer wg.Done()
+			for item := range fetch(ctx, size) {
+				ch <- item
+			}
+		}(end - i)
 	}
-	// log.Debugf("Databasex Channel: Fetch Close: %s, items: %d", f.cfg.name, len(items))
-	delete[0](items)
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+	return ch
 }
