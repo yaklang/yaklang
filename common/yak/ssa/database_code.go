@@ -191,6 +191,10 @@ func value2IrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
 	}
 	var anValue *anValue
 
+	if typ := value.GetType(); !utils.IsNil(typ) && typ.GetId() <= 0 {
+		log.Errorf("BUG: value2IrCode called with nil type: %s %s", value.GetOpcode().String(), value.GetName())
+		return
+	}
 	// ir.String = value.String()
 	ir.HasDefs = value.HasValues()
 
@@ -244,7 +248,6 @@ func value2IrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
 			ir.String = constInst.String()
 		}
 	}
-
 	ir.TypeID = saveType(cache, anValue.GetType())
 }
 
