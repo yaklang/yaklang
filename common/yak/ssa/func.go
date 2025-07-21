@@ -77,7 +77,7 @@ func (f *Function) GetType() Type {
 	if f != nil && f.Type != nil {
 		return f.Type
 	} else {
-		return CreateAnyType()
+		return defaultAnyType
 	}
 }
 
