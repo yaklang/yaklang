@@ -98,7 +98,7 @@ func UpdateEntityRemarkRawSQL(eventDb, entity, remark) {
 }
 
 filePaths = cli.FileNames("filePath", cli.setHelp("长文本文件"), cli.setVerboseName("分析目标文件"))
-chunkBatch = cli.Int("chunk", cli.setHelp("日志分片长度"), cli.setVerboseName("日志分片大小（行）"), cli.setDefault(30))
+chunkBatch = cli.Int("chunk", cli.setHelp("日志分片长度"), cli.setVerboseName("日志分片大小（行）"), cli.setDefault(20))
 concurrency = cli.Int("concurrency", cli.setHelp("ai并发调用限制"), cli.setVerboseName("ai并发调用限制"), cli.setDefault(20))
 triggerSec = cli.Int("triggerSec", cli.setHelp("ai分析实体行为触发器触发间隔"), cli.setVerboseName("触发器触发间隔（秒）"), cli.setDefault(30))
 triggerCount = cli.Int("triggerCount", cli.setHelp("ai分析实体行为触发器触发次数"), cli.setVerboseName("触发器触发次数"), cli.setDefault(20))
@@ -114,6 +114,8 @@ if concurrency <= 0 {
 }
 
 filePath = filePaths[0]
+yakit.Info("start log monitor params filepath:[%s] ; chunk:[%d] ; concurrency:[%d] ; triggersec:[%d];triggerCount:[%d] separator:[%s]", filePaths,chunkBatch,concurrency,triggerSec,triggerCount,separator)
+
 
 text = ""
 forgeHandle = func(params) {
@@ -255,7 +257,7 @@ forgeHandle = func(params) {
                 cacheBuffer = make([]string, 0)
             }()
             logBuffer := str.Join(cacheBuffer, "\n")
-            swg.Add(1)
+            swg.Add(2)
             go func() {
                 defer swg.Done()
                 res, err := aiagent.ExecuteForge("entity_identify", logBuffer, aiagent.disableOutputType("stream"))
@@ -274,8 +276,6 @@ forgeHandle = func(params) {
                 }
             }()
 
-
-            swg.Add(1)
             go func() {
                 defer swg.Done()
                 res, err := aiagent.ExecuteForge("log_event_formatter", logBuffer,aiagent.disableOutputType("stream"))
