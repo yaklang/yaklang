@@ -1,9 +1,13 @@
 package fp
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
+	"fmt"
+	"net"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestNewFingerprintMatcher(t *testing.T) {
@@ -52,4 +56,37 @@ func TestNewFingerprintMatcher1(t *testing.T) {
 	}
 
 	time.Sleep(7 * time.Second)
+}
+
+func TestNewFingerprintMatcher_TCP_No_http(t *testing.T) {
+	// start server tcp but no http
+	port := utils.GetRandomAvailableTCPPort()
+	go func() {
+		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+		if err != nil {
+			panic(err)
+		}
+		defer listener.Close()
+
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				panic(err)
+			}
+			go func(c net.Conn) {
+				c.Close()
+			}(conn)
+		}
+	}()
+
+	matcher, err := NewDefaultFingerprintMatcher(
+		NewConfig(WithTransportProtos(TCP), WithProbesMax(3),
+			WithProbeTimeoutHumanRead(2), WithActiveMode(true),
+			WithDebugLog(true),
+		))
+	require.NoError(t, err)
+	result, err := matcher.Match("127.0.0.1", port)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, OPEN, result.State)
 }
