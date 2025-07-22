@@ -19,6 +19,6 @@ func TestExtractVideoFrameContext(t *testing.T) {
 
 	for frame := range ch {
 		fmt.Println(frame.String())
-		t.Log(frame.String())
+		//t.Log(frame.String())
 	}
 }
