@@ -33,6 +33,10 @@ func (m *MIME) IsImage() bool {
 	return strings.HasPrefix(strings.ToLower(m.String()), "image")
 }
 
+func (m *MIME) IsVideo() bool {
+	return strings.HasPrefix(strings.ToLower(m.String()), "video")
+}
+
 func (m *MIME) Charset() string {
 	return m.charset
 }

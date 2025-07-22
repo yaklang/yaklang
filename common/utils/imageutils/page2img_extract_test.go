@@ -11,8 +11,8 @@ func TestPage2ImageExtractor(t *testing.T) {
 		t.Skip()
 		return
 	}
-	
-	result, err := ExtractDocumentPagesContext(context.Background(), "/Users/v1ll4n/Projects/yaklang/vtestdata/demo.pdf")
+
+	result, err := ExtractDocumentPagesContext(context.Background(), "/Users/v1ll4n/Projects/yaklang/vtestdata/demo1.pdf")
 	if err != nil {
 		panic(err)
 	}

@@ -2,8 +2,11 @@ package imageutils
 
 import (
 	"bytes"
+	"github.com/yaklang/yaklang/common/consts"
 	"image"
 	"image/gif"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync/atomic"
@@ -26,6 +29,17 @@ import (
 type ImageResult struct {
 	MIMEType *mimetype.MIME
 	RawImage []byte
+}
+
+func (i *ImageResult) SaveToFile() (string, error) {
+	outputTmp := consts.GetDefaultYakitBaseTempDir()
+	outputTmp = filepath.Join(outputTmp, "image-cache")
+	_ = os.MkdirAll(outputTmp, os.ModePerm)
+	outputTmp = filepath.Join(outputTmp, "image-result-"+utils.RandStringBytes(12)+".img")
+	if err := os.WriteFile(outputTmp, i.RawImage, 0644); err != nil {
+		return "", utils.Errorf("write image to file %s failed: %v", outputTmp, err)
+	}
+	return outputTmp, nil
 }
 
 func (i *ImageResult) Sha256() string {
