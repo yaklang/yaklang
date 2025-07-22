@@ -266,6 +266,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 	mitmPluginCaller.SetFeedback(execFeedback)
 	mitmPluginCaller.SetDividedContext(true)
+	mitmPluginCaller.EnableExecutionTracing(true)
 	mitmPluginCaller.SetConcurrent(20)
 	mitmPluginCaller.SetLoadPluginTimeout(10)
 	mitmPluginCaller.SetCallPluginTimeout(consts.GetGlobalCallerCallPluginTimeout())
