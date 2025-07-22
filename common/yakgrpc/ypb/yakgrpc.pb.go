@@ -25162,13 +25162,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -34393,8 +34393,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -47863,7 +47863,9 @@ type SyntaxFlowScanRequest struct {
 	// 其他参数
 	IgnoreLanguage bool `protobuf:"varint,4,opt,name=IgnoreLanguage,proto3" json:"IgnoreLanguage,omitempty"` // 是否忽略语言 默认为false 将会只运行和当前项目语言一致的规则，最后运行的规则可能会比当前选中的规则少一些。
 	// for new rule scan task
-	RuleInput     *SyntaxFlowRuleInput `protobuf:"bytes,6,opt,name=RuleInput,proto3" json:"RuleInput,omitempty"` // 用于新建规则时的调试功能
+	RuleInput *SyntaxFlowRuleInput `protobuf:"bytes,6,opt,name=RuleInput,proto3" json:"RuleInput,omitempty"` // 用于新建规则时的调试功能
+	// 并发，默认5
+	Concurrency   uint32 `protobuf:"varint,7,opt,name=Concurrency,proto3" json:"Concurrency,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -47938,6 +47940,13 @@ func (x *SyntaxFlowScanRequest) GetRuleInput() *SyntaxFlowRuleInput {
 		return x.RuleInput
 	}
 	return nil
+}
+
+func (x *SyntaxFlowScanRequest) GetConcurrency() uint32 {
+	if x != nil {
+		return x.Concurrency
+	}
+	return 0
 }
 
 type QuerySyntaxFlowScanTaskRequest struct {
@@ -58773,14 +58782,15 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vMessageType\x18\x03 \x01(\tR\vMessageType\"h\n" +
 	"\x1dDownloadSyntaxFlowRuleRequest\x12\x14\n" +
 	"\x05Token\x18\x01 \x01(\tR\x05Token\x121\n" +
-	"\x06Filter\x18\x02 \x01(\v2\x19.ypb.SyntaxFlowRuleFilterR\x06Filter\"\x92\x02\n" +
+	"\x06Filter\x18\x02 \x01(\v2\x19.ypb.SyntaxFlowRuleFilterR\x06Filter\"\xb4\x02\n" +
 	"\x15SyntaxFlowScanRequest\x12 \n" +
 	"\vControlMode\x18\x01 \x01(\tR\vControlMode\x121\n" +
 	"\x06Filter\x18\x02 \x01(\v2\x19.ypb.SyntaxFlowRuleFilterR\x06Filter\x12 \n" +
 	"\vProgramName\x18\x03 \x03(\tR\vProgramName\x12\"\n" +
 	"\fResumeTaskId\x18\x05 \x01(\tR\fResumeTaskId\x12&\n" +
 	"\x0eIgnoreLanguage\x18\x04 \x01(\bR\x0eIgnoreLanguage\x126\n" +
-	"\tRuleInput\x18\x06 \x01(\v2\x18.ypb.SyntaxFlowRuleInputR\tRuleInput\"\xa8\x01\n" +
+	"\tRuleInput\x18\x06 \x01(\v2\x18.ypb.SyntaxFlowRuleInputR\tRuleInput\x12 \n" +
+	"\vConcurrency\x18\a \x01(\rR\vConcurrency\"\xa8\x01\n" +
 	"\x1eQuerySyntaxFlowScanTaskRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
