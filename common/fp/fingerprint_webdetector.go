@@ -48,7 +48,7 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 			return &MatchResult{
 				Target: host,
 				Port:   port,
-				State:  CLOSED,
+				State:  result.State,
 				Reason: err.Error(),
 				Fingerprint: &FingerprintInfo{
 					IP:                ip.String(),
