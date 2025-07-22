@@ -58,7 +58,7 @@ type SyntaxFlowScanManager struct {
 	finishedQuery int64 // total finished queries (success + failed + skip)
 	// risk
 	riskCount    int64
-	riskCountMap map[string]int64
+	riskCountMap *utils.SafeMap[int64]
 	// query process
 	totalQuery int64
 
@@ -104,7 +104,7 @@ func createEmptySyntaxFlowTaskByID(
 		status:       schema.SYNTAXFLOWSCAN_EXECUTING,
 		resumeSignal: sync.NewCond(&sync.Mutex{}),
 		isPaused:     utils.NewAtomicBool(),
-		riskCountMap: make(map[string]int64),
+		riskCountMap: utils.NewSafeMap[int64](),
 		cancel:       cancel,
 	}
 	syntaxFlowScanManagerMap.Set(taskId, m)
@@ -161,18 +161,20 @@ func (m *SyntaxFlowScanManager) SaveTask() error {
 	m.taskRecorder.Kind = m.kind
 	m.taskRecorder.Config, _ = json.Marshal(m.config)
 	// m.taskRecorder.RuleNames, _ = json.Marshal(m.ruleNames)
-	for key, count := range m.GetRiskCountMap() {
-		switch schema.ValidSeverityType(key) {
-		case schema.SFR_SEVERITY_INFO:
-			m.taskRecorder.InfoCount = count
-		case schema.SFR_SEVERITY_WARNING:
-			m.taskRecorder.WarningCount = count
-		case schema.SFR_SEVERITY_CRITICAL:
-			m.taskRecorder.CriticalCount = count
-		case schema.SFR_SEVERITY_HIGH:
-			m.taskRecorder.HighCount = count
-		case schema.SFR_SEVERITY_LOW:
-			m.taskRecorder.LowCount = count
+	if riskCountMap := m.GetRiskCountMap(); riskCountMap != nil {
+		for key, count := range riskCountMap.GetAll() {
+			switch schema.ValidSeverityType(key) {
+			case schema.SFR_SEVERITY_INFO:
+				m.taskRecorder.InfoCount = count
+			case schema.SFR_SEVERITY_WARNING:
+				m.taskRecorder.WarningCount = count
+			case schema.SFR_SEVERITY_CRITICAL:
+				m.taskRecorder.CriticalCount = count
+			case schema.SFR_SEVERITY_HIGH:
+				m.taskRecorder.HighCount = count
+			case schema.SFR_SEVERITY_LOW:
+				m.taskRecorder.LowCount = count
+			}
 		}
 	}
 	return schema.SaveSyntaxFlowScanTask(ssadb.GetDB(), m.taskRecorder)
@@ -377,6 +379,6 @@ func (m *SyntaxFlowScanManager) getProgress() (finished, total int64) {
 	return atomic.LoadInt64(&m.finishedQuery), m.totalQuery
 }
 
-func (m *SyntaxFlowScanManager) GetRiskCountMap() map[string]int64 {
+func (m *SyntaxFlowScanManager) GetRiskCountMap() *utils.SafeMap[int64] {
 	return m.riskCountMap
 }
