@@ -96,7 +96,7 @@ func (s *Server) AnalyzeHTTPFlow(request *ypb.AnalyzeHTTPFlowRequest, stream ypb
 	}
 	// 添加匹配器
 	if len(request.GetMatchers()) > 0 {
-		opts = append(opts, WithMatchers(request.GetMatchers(), request.GetMatchersCondition()))
+		opts = append(opts, WithMatchers(request.GetMatchers()))
 	}
 
 	manger, err := NewHTTPFlowAnalyzeManger(
@@ -147,8 +147,7 @@ type HTTPFlowAnalyzeManger struct {
 	dedup        bool                    // 是否对单条数据进行去重
 
 	// 匹配器相关
-	matchers          []*YakFuzzerMatcher
-	matchersCondition string
+	matchers []*YakFuzzerMatcher
 
 	matchedHTTPFlowCount   int64
 	extractedHTTPFlowCount int64
@@ -186,7 +185,7 @@ func WithDataSource(source *ypb.AnalyzedDataSource) HTTPFlowAnalyzeMangerOption 
 	}
 }
 
-func WithMatchers(matchers []*ypb.HTTPResponseMatcher, condition string) HTTPFlowAnalyzeMangerOption {
+func WithMatchers(matchers []*ypb.HTTPResponseMatcher) HTTPFlowAnalyzeMangerOption {
 	return func(m *HTTPFlowAnalyzeManger) {
 		if len(matchers) > 0 {
 			m.matchers = make([]*YakFuzzerMatcher, 0)
@@ -194,10 +193,6 @@ func WithMatchers(matchers []*ypb.HTTPResponseMatcher, condition string) HTTPFlo
 				m.matchers = append(m.matchers, NewHttpFlowMatcherFromGRPCModel(matcher))
 			}
 		}
-		if condition == "" {
-			condition = "and"
-		}
-		m.matchersCondition = condition
 	}
 }
 
