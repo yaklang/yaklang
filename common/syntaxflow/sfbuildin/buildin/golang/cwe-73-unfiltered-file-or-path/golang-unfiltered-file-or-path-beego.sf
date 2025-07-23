@@ -1,6 +1,6 @@
 desc(
 	title: "Audit Golang Unfiltered File-or-Path Vulnerability in Beego"
-	title_zh: "审计Golang未过滤文件或路径漏洞（Beego框架）"
+	title_zh: "审计Golang未过滤文件或路径漏洞(Beego)"
 	type: audit
 	severity: low
 	risk: "path-traversal"

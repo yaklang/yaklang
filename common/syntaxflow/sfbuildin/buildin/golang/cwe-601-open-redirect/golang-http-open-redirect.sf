@@ -1,6 +1,6 @@
 desc(
-	title: "Check Golang Open Redirect Vulnerability (http)"
-	title_zh: "检测Golang开放重定向漏洞 (http)"
+	title: "Check Golang Open Redirect Vulnerability in Http"
+	title_zh: "检测Golang开放重定向漏洞(http)"
 	type: audit
 	level: high
 	risk: "url-redirect"
@@ -25,12 +25,6 @@ desc(
    func redirectHandler(w http.ResponseWriter, r *http.Request) {
        // 从查询参数中获取重定向目标
        target := r.URL.Query().Get("url")
-
-       // 未进行有效的验证
-       // if !isValidRedirectTarget(target) {
-       //     http.Error(w, "Invalid redirect target", http.StatusBadRequest)
-       //     return
-       // }
 
        // 直接将用户输入的 target 用于重定向
        http.Redirect(w, r, target, http.StatusFound)
@@ -132,18 +126,17 @@ SOLUTION
 REFERENCE
 )
 
+<include('golang-http-sink')> as $sink
+
 http?{<fullTypeName>?{have: 'net/http'}} as $http;
-$http.Redirect(*<slice(index=2)> #-> as $target);
+$http.Redirect(*<slice(index=2)> #-> as $param);
 
-url?{<fullTypeName>?{have: 'net/url'}} as $url;
-$url.Parse(* #-> as $param);
-
-$param #{until: `* & $target`}-> as $check;
-$target as $high
+$param.URL.Query() as $target
+$target.Get() #->?{!opcode:const} as $high
 
 alert $high for {
 	title: "Check Golang Open Redirect Vulnerability",
-	title_zh: "检测Golang开放重定向漏洞",
+	title_zh: "检测Golang开放重定向漏洞 (http)",
 	solution: <<<CODE
 ### 修复建议
 
@@ -235,12 +228,6 @@ CODE
    func redirectHandler(w http.ResponseWriter, r *http.Request) {
        // 从查询参数中获取重定向目标
        target := r.URL.Query().Get("url")
-
-       // 未进行有效的验证
-       // if !isValidRedirectTarget(target) {
-       //     http.Error(w, "Invalid redirect target", http.StatusBadRequest)
-       //     return
-       // }
 
        // 直接将用户输入的 target 用于重定向
        http.Redirect(w, r, target, http.StatusFound)

@@ -126,6 +126,7 @@ REFERENCE
 )
 
 gorm?{<fullTypeName>?{have: 'gorm.io/gorm'}} as $entry;
+gorm?{<fullTypeName>?{have: 'github.com/jinzhu/gorm'}} as $entry;
 $entry.Open <getCall> as $db;
 $db <getMembers> as $output;
 

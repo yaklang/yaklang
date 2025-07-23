@@ -1,0 +1,57 @@
+desc(
+	title: "Audit Golang text/template Usage"
+	type: audit
+	level: info
+	lib: 'golang-template-text'
+	desc: <<<DESC
+该规则用于审计Golang代码中使用text/template的情况。text/template是Golang的一个模板渲染库，如果不正确使用，可能会导致跨站脚本攻击（XSS）。规则通过识别代码中是否使用了text/template库来触发审计，确保开发者了解其使用方式和潜在风险。
+DESC
+	rule_id: "79d5f8c5-1c60-445f-bd25-08de89391e6e"
+	reference: <<<REFERENCE
+[CWE-79](https://cwe.mitre.org/data/definitions/79.html)
+REFERENCE
+	title_zh: "审计Golang text/template使用"
+	solution: <<<SOLUTION
+为了修复可能的XSS漏洞，建议开发者：
+1. 对所有模板进行严格的输入验证和转义，确保所有用户输入都不会被直接渲染在页面上。
+2. 使用text/template时，利用其内置的转义功能，避免用户输入被当作HTML代码执行。
+3. 定期审计代码，确保模板的使用符合安全最佳实践。
+SOLUTION
+)
+
+template?{<fullTypeName>?{have: 'text/template'}} as $output
+*temp*?{<fullTypeName>?{have: 'text/template'}} as $output
+Template?{<fullTypeName>?{have: 'text/template'}} as $output
+*Temp*?{<fullTypeName>?{have: 'text/template'}} as $output
+
+alert $output for {
+	level: "info",
+	title: "Audit Golang text/template Usage",
+	title_zh: "审计Golang text/template使用",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://template.go': <<<PARAM
+package vulinbox
+
+import (
+	"bytes"
+	textTemp "text/template"
+)
+
+func unsafeTemplate(html string, params map[string]any) ([]byte, error) {
+	temp, err := textTemp.New("TEST").Parse(html)
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	err = temp.Execute(&buf, params)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+PARAM
+)

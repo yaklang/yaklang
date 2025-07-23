@@ -2,6 +2,7 @@ desc(
 	title: "Check Golang XXE Read Any File"
 	type: audit
 	level: high
+    risk: "xxe"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -9,7 +10,7 @@ desc(
    XXE（XML External Entity）漏洞是 XML 解析器在解析 XML 文档时，未禁用外部实体引用所导致的一种安全问题。当应用程序支持 DOCTYPE 声明，并且允许引用外部实体时，攻击者可以通过构造恶意的 XML 输入，利用外部实体引用机制读取服务器上的任意文件，例如配置文件、系统敏感文件（如 `/etc/passwd`），甚至在某些情况下可能导致拒绝服务或远程代码执行。
 
 2. **触发场景**
-   当应用程序接收并解析用户提供的 XML 数据，并且所使用的 XML 解析库未配置为禁用外部实体（例如 `decoder.Strict = true` 在 Go 标准库 `encoding/xml` 中可能会导致外部实体被解析），攻击者可以向应用程序发送包含如下结构的恶意 XML：
+   当应用程序接收并解析用户提供的 XML 数据，并且所使用的 XML 解析库未配置为禁用外部实体（例如 `decoder.Strict = false` 在 Go 标准库 `encoding/xml` 中可能会导致外部实体被解析），攻击者可以向应用程序发送包含如下结构的恶意 XML：
 
    ```xml
    <?xml version="1.0" encoding="UTF-8"?>
@@ -45,8 +46,8 @@ desc(
        var person Person
        decoder := xml.NewDecoder(strings.NewReader(xmlData))
 
-       // 启用外部实体解析（可能导致漏洞）
-       decoder.Strict = true
+       // 启用非严格模式（可能导致漏洞）
+       decoder.Strict = false
        // decoder.Entity = xml.HTMLEntity // 如果不禁用，HTMLEntity也会解析，但system entities会处理file://等
 
        err := decoder.Decode(&person)
@@ -74,7 +75,7 @@ DESC
 最直接和有效的防御方法是配置 XML 解析器，禁用 XML 外部实体（External Entity）和 DTD（Document Type Definition）的处理。大多数现代 XML 解析库都提供了相应的配置选项。
 
 ** Golang `encoding/xml` 标准库：**
-Golang 的 `encoding/xml` 标准库的 `xml.Decoder` 在默认情况下（v1.11+）对外部实体是相对安全的，但为了明确禁用且兼容旧版本或避免潜在的配置错误，应确保不显式启用可能导致XXE的选项，例如避免设置 `decoder.Strict = true` 或 `decoder.Entity` 为允许外部实体解析的值。通常，建议基于较新的Go版本，并依赖其默认的安全行为。如果需要处理外部引用但又想安全，可以考虑使用专门设计来安全处理XML的第三方库或对输入进行严格验证过滤。
+Golang 的 `encoding/xml` 标准库的 `xml.Decoder` 在默认情况下（v1.11+）对外部实体是相对安全的，但为了明确禁用且兼容旧版本或避免潜在的配置错误，应确保不显式启用可能导致XXE的选项，例如避免设置 `decoder.Strict = false` 或 `decoder.Entity` 为允许外部实体解析的值。通常，建议基于较新的Go版本，并依赖其默认的安全行为。如果需要处理外部引用但又想安全，可以考虑使用专门设计来安全处理XML的第三方库或对输入进行严格验证过滤。
 
 ** 安全示例 (Golang):**
 ```go
@@ -103,7 +104,7 @@ func main() {
     var person Person
     decoder := xml.NewDecoder(strings.NewReader(xmlData))
 
-    // 避免显式设置 decoder.Strict = true 或 decoder.Entity 为不安全的值
+    // 避免显式设置 decoder.Strict = false 或 decoder.Entity 为不安全的值
     // 依赖 Go >= 1.11 的默认安全行为
 
     err := decoder.Decode(&person)
@@ -130,7 +131,8 @@ REFERENCE
 
 <include('golang-xml-sink')> as $sink;
 
-$sink.Strict?{!have: 'false'} as $high
+$sink.Strict?{have: 'false'} as $high;
+$sink.Entity?{!have: 'xml.HTMLEntity'} as $high;
 
 alert $high for {
 	type: "vuln",
@@ -143,7 +145,7 @@ alert $high for {
 最直接和有效的防御方法是配置 XML 解析器，禁用 XML 外部实体（External Entity）和 DTD（Document Type Definition）的处理。大多数现代 XML 解析库都提供了相应的配置选项。
 
 ** Golang `encoding/xml` 标准库：**
-Golang 的 `encoding/xml` 标准库的 `xml.Decoder` 在默认情况下（v1.11+）对外部实体是相对安全的，但为了明确禁用且兼容旧版本或避免潜在的配置错误，应确保不显式启用可能导致XXE的选项，例如避免设置 `decoder.Strict = true` 或 `decoder.Entity` 为允许外部实体解析的值。通常，建议基于较新的Go版本，并依赖其默认的安全行为。如果需要处理外部引用但又想安全，可以考虑使用专门设计来安全处理XML的第三方库或对输入进行严格验证过滤。
+Golang 的 `encoding/xml` 标准库的 `xml.Decoder` 在默认情况下（v1.11+）对外部实体是相对安全的，但为了明确禁用且兼容旧版本或避免潜在的配置错误，应确保不显式启用可能导致XXE的选项，例如避免设置 `decoder.Strict = false` 或 `decoder.Entity` 为允许外部实体解析的值。通常，建议基于较新的Go版本，并依赖其默认的安全行为。如果需要处理外部引用但又想安全，可以考虑使用专门设计来安全处理XML的第三方库或对输入进行严格验证过滤。
 
 ** 安全示例 (Golang):**
 ```go
@@ -172,7 +174,7 @@ func main() {
     var person Person
     decoder := xml.NewDecoder(strings.NewReader(xmlData))
 
-    // 避免显式设置 decoder.Strict = true 或 decoder.Entity 为不安全的值
+    // 避免显式设置 decoder.Strict = false 或 decoder.Entity 为不安全的值
     // 依赖 Go >= 1.11 的默认安全行为
 
     err := decoder.Decode(&person)
@@ -199,7 +201,7 @@ CODE
    XXE（XML External Entity）漏洞是 XML 解析器在解析 XML 文档时，未禁用外部实体引用所导致的一种安全问题。当应用程序支持 DOCTYPE 声明，并且允许引用外部实体时，攻击者可以通过构造恶意的 XML 输入，利用外部实体引用机制读取服务器上的任意文件，例如配置文件、系统敏感文件（如 `/etc/passwd`），甚至在某些情况下可能导致拒绝服务或远程代码执行。
 
 2. **触发场景**
-   当应用程序接收并解析用户提供的 XML 数据，并且所使用的 XML 解析库未配置为禁用外部实体（例如 `decoder.Strict = true` 在 Go 标准库 `encoding/xml` 中可能会导致外部实体被解析），攻击者可以向应用程序发送包含如下结构的恶意 XML：
+   当应用程序接收并解析用户提供的 XML 数据，并且所使用的 XML 解析库未配置为禁用外部实体（例如 `decoder.Strict = false` 在 Go 标准库 `encoding/xml` 中可能会导致外部实体被解析），攻击者可以向应用程序发送包含如下结构的恶意 XML：
 
    ```xml
    <?xml version="1.0" encoding="UTF-8"?>
@@ -235,8 +237,8 @@ CODE
        var person Person
        decoder := xml.NewDecoder(strings.NewReader(xmlData))
 
-       // 启用外部实体解析（可能导致漏洞）
-       decoder.Strict = true
+       // 启用非严格模式（可能导致漏洞）
+       decoder.Strict = false
        // decoder.Entity = xml.HTMLEntity // 如果不禁用，HTMLEntity也会解析，但system entities会处理file://等
 
        err := decoder.Decode(&person)
@@ -287,9 +289,12 @@ func main() {
     var person Person
     decoder := xml.NewDecoder(strings.NewReader(xmlData))
 
-    // 启用外部实体解析
-    decoder.Strict = true
-    decoder.Entity = xml.HTMLEntity
+    // 启用非严格模式
+    decoder.Strict = false
+    decoder.Entity = func(name string) (string, bool) {
+        // 不安全实现：直接返回外部内容
+        return fetchExternalEntity(name), true
+    }
 
     err := decoder.Decode(&person)
     if err != nil {

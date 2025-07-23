@@ -1,5 +1,5 @@
 desc(
-	title: "Check Golang SQL Injection(ent)"
+	title: "Check Golang SQL Injection in Ent"
 	type: audit
 	severity: high
 	desc: <<<DESC
@@ -40,6 +40,7 @@ desc(
    - 拒绝服务：通过构造恶意查询导致数据库服务器过载或崩溃。
 DESC
 	rule_id: "2edbaa7b-0cfb-4d71-9e9e-0e8771ba70cb"
+	risk: "sqli"
 	solution: <<<SOLUTION
 ### 修复建议
 

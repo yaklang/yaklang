@@ -335,6 +335,15 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			}
 			fun.AppendEffectOn(i)
 			switch inst.MemberCallKind {
+			case ssa.MoreParameterMember:
+				if para := fun.GetParameter(inst.MemberCallObjectIndex); para != nil {
+					memberKey, ok := inst.GetValueById(inst.MemberCallKey)
+					if !ok {
+						memberKey = nil
+					}
+					actx.pushObject(para, i.NewValue(memberKey), i.NewValue(ssa.NewConst("")))
+					return para.AppendEffectOn(fun).getTopDefs(actx, opt...)
+				}
 			case ssa.ParameterMemberCall:
 				if para := fun.GetParameter(inst.MemberCallObjectIndex); para != nil {
 					memberKey, ok := inst.GetValueById(inst.MemberCallKey)

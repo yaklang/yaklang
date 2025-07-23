@@ -1,0 +1,81 @@
+desc(
+	title: "Detect Golang Reflected XSS Vulnerability in gin.Context"
+	title_zh: "检测Golang在gin.Context框架中的反射型跨站脚本攻击漏洞"
+	type: vuln
+	severity: mid
+	risk: "xss"
+	desc: <<<DESC
+反射型跨站脚本攻击（XSS）是一种攻击方式，攻击者通过在受害者浏览器的地址栏、表单输入等地方注入恶意脚本，当受害者浏览这些注入了恶意脚本的页面时，脚本会在受害者浏览器上执行，从而达到攻击者的目的。在本规则中，我们关注的是在Golang中使用gin.Context框架时可能出现的反射型XSS漏洞。规则通过检测gin.Context的HTML方法，判断是否对用户输入进行了适当的转义处理，以防止XSS攻击的发生。
+DESC
+	rule_id: "023f453d-7d0c-4ef8-a105-a53188c9a31e"
+	solution: <<<SOLUTION
+为了修复反射型XSS漏洞，建议对用户输入进行适当的转义处理。在Golang的gin.Context框架中，可以使用`template.HTMLEscapeString`方法对用户输入进行转义，确保输出到页面的内容不会被浏览器解释为可执行的脚本。以下是一个修复的代码示例：
+
+```go
+query := c.Query("q")
+c.HTML(http.StatusOK, "vulns/xss_reflected.tmpl", gin.H{
+	"Query": template.HTMLEscapeString(query),
+})
+```
+
+在上述代码中，`template.HTMLEscapeString`方法被用来转义用户输入的查询参数`query`，以避免XSS攻击。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-79](https://cwe.mitre.org/data/definitions/79.html)
+[OWASP XSS Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html)
+REFERENCE
+)
+
+<include('golang-gin-context')> as $sink;
+$sink.HTML(*<slice(index=3)> #-> as $param)
+$param.HTMLEscapeString(* #-> as $safe)
+$param - $safe as $output
+$output?{!opcode:make} as $target
+$target.Query as $mid
+
+alert $mid for {
+	title: "Reflected XSS detected",
+	title_zh: "检测到反射XSS",
+	level: "mid",
+	type: "vuln",
+}
+
+desc(
+	lang: golang
+	alert_mid: 1
+	'file://unsafe.go': <<<UNSAFE
+package api
+
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/seaung/vhub/pkg/models"
+	"net/http"
+	"time"
+)
+
+// XSSReflectedHandler 处理反射型XSS演示页面
+func XSSReflectedHandler(c *gin.Context) {
+	query := c.Query("q")
+	c.HTML(http.StatusOK, "vulns/xss_reflected.tmpl", gin.H{
+		"Query": query,
+	})
+}
+UNSAFE
+	'file://safe.go': <<<SAFE
+package api
+
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/seaung/vhub/pkg/models"
+	"net/http"
+	"time"
+)
+
+func XSSReflectedHandler(c *gin.Context) {
+	query := c.Query("q")
+	c.HTML(http.StatusOK, "vulns/xss_reflected.tmpl", gin.H{
+		"Query": template.HTMLEscapeString(query),
+	})
+}
+SAFE
+)

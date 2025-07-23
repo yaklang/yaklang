@@ -1,9 +1,9 @@
 desc(
-	title: "Detect Golang CORS Misconfiguration Vulnerability (gin.Context)"
-	title_zh: "检测Golang CORS配置错误漏洞 (gin.Context)"
+	title: "Detect Golang CORS Misconfiguration Vulnerability in gin.Context"
+	title_zh: "检测Golang CORS配置错误漏洞(gin.Context)"
 	type: vuln
 	severity: high
-	risk: ssti
+	risk: "ssti"
 	desc: <<<DESC
 CORS（跨源资源共享）配置错误漏洞允许攻击者绕过同源策略限制，从而导致敏感数据泄露、会话劫持或执行恶意操作。该规则用于检测Golang中使用了gin框架的Context对象是否配置了不安全的CORS策略。通过分析代码，识别出设置了允许所有来源（*）或未正确校验来源的CORS配置，这可能导致潜在的跨源请求攻击。
 DESC
@@ -46,15 +46,13 @@ func Cors1(c *gin.Context) {
 
 	c.Header("Access-Control-Allow-Origin", "*")
 	c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-
 }
 
 func Cors2(c *gin.Context) {
-
 	origin := c.Request.Header.Get("Origin")
+
 	c.Header("Access-Control-Allow-Origin", origin)
 	c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-
 }
 
 func Corssafe(c *gin.Context) {
@@ -62,7 +60,6 @@ func Corssafe(c *gin.Context) {
 
 	c.Header("Access-Control-Allow-Origin", allowedOrigin)
 	c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-
 }
 UNSAFE
 )

@@ -1,7 +1,9 @@
 desc(
 	title: "Check Golang Unfiltered File Path Vulnerability"
+    title_zh: "检测Golang未过滤文件路径漏洞"
 	type: audit
 	severity: low
+    risk: "path-traversal"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -58,7 +60,6 @@ DESC
 	reference: <<<REFERENCE
 [CWE-73: External Control of File Name or Path](https://cwe.mitre.org/data/definitions/73.html)
 REFERENCE
-	title_zh: "检测Golang未过滤文件路径漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 

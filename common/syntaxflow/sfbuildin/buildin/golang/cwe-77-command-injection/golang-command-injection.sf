@@ -2,6 +2,7 @@ desc(
 	title: "Detect Golang Command Injection Vulnerability"
 	type: audit
 	severity: high
+	risk: "rce"
 	desc: <<<DESC
 ### 漏洞描述
 
