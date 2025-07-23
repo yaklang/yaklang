@@ -128,6 +128,8 @@ func initYaklangLib() {
 	yaklang.Import("os", yaklib.SystemExports)
 	yaklang.Import("file", yaklib.FileExport)
 	yaklang.Import("fileparser", fileparser.Exports)
+	//excel
+	yaklang.Import("excel", excelparser.ExcelExports)
 	yaklang.Import("filesys", filesys.Exports)
 	yaklang.Import("re", yaklib.RegexpExport)
 	yaklang.Import("re2", yaklib.Regexp2Export)
