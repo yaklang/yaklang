@@ -185,6 +185,7 @@ func SetEngineClient(e *antlr4yak.Engine, client *YakitClient) {
 	e.OverrideRuntimeGlobalVariables(map[string]any{
 		"yakit": GetExtYakitLibByClient(client),
 		"risk": map[string]any{
+			"Save":                      YakitSaveRiskBuilder(client),
 			"NewRisk":                   YakitNewRiskBuilder(client),
 			"CheckDNSLogByToken":        yakit.YakitNewCheckDNSLogByToken(yakit.YakitPluginInfo{}),
 			"CheckHTTPLogByToken":       yakit.YakitNewCheckHTTPLogByToken(yakit.YakitPluginInfo{}),
