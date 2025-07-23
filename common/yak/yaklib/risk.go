@@ -47,6 +47,46 @@ func YakitNewRiskBuilder(client *YakitClient) func(target string, opts ...yakit.
 	}
 }
 
+// Save 将漏洞记录结构体保存到数据库中其通常与 CreateRisk 一起使用
+// Example:
+// ```
+// r = risk.CreateRisk("http://example.com", risk.title("SQL注入漏洞"), risk.type("sqli"), risk.severity("high"))
+// risk.Save(r)
+// ```
+func YakitSaveRiskBuilder(client *YakitClient) func(r *schema.Risk) error {
+	return func(risk *schema.Risk) error {
+		err := yakit.SaveRisk(risk)
+		if err != nil {
+			return err
+		}
+		if risk != nil {
+			if botClient == nil {
+				log.Info("start to create bot client")
+				client := bot.FromEnv()
+				if client != nil && len(client.Configs()) > 0 {
+					botClient = client
+				}
+			}
+			if botClient != nil {
+				title := risk.TitleVerbose
+				if title == "" {
+					title = risk.Title
+				}
+				log.Infof("use bot notify risk: %s", risk.Title)
+				botClient.SendMarkdown(fmt.Sprintf(`# Yakit 发现 Risks
+
+风险标题：%v
+
+风险目标：%v
+
+`, title, risk.IP))
+			}
+		}
+		client.Output(risk)
+		return nil
+	}
+}
+
 // QueryRisks 根据风险记录的结构体查询风险记录，返回风险记录的管道
 // Example:
 // ```
@@ -214,7 +254,7 @@ var (
 	botClient   *bot.Client
 	RiskExports = map[string]interface{}{
 		"CreateRisk":                yakit.CreateRisk,
-		"Save":                      yakit.SaveRisk,
+		"Save":                      YakitSaveRiskBuilder(GetYakitClientInstance()),
 		"QueryRisksByKeyword":       QueryRisksByKeyword,
 		"NewRisk":                   YakitNewRiskBuilder(GetYakitClientInstance()),
 		"RegisterBeforeRiskSave":    yakit.RegisterBeforeRiskSave,

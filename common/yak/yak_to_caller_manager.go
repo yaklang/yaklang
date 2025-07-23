@@ -1053,6 +1053,19 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		return i
 	})
 
+	nIns.GetVM().RegisterMapMemberCallHandler("risk", "Save", func(i interface{}) interface{} {
+		originFunc, ok := i.(func(r *schema.Risk) error)
+		if ok {
+			return func(r *schema.Risk) error {
+				if runtimeId != "" {
+					r.RuntimeId = runtimeId
+				}
+				return originFunc(r)
+			}
+		}
+		return i
+	})
+
 	nIns.GetVM().RegisterMapMemberCallHandler("risk", "CheckDNSLogByToken", func(i interface{}) interface{} {
 		return yakit.YakitNewCheckDNSLogByToken(pluginContext.YakitPluginInfo)
 	})
