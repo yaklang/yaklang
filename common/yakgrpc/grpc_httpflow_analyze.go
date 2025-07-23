@@ -560,8 +560,9 @@ func (m *HTTPFlowAnalyzeManger) notifyHandleFlowNum() {
 		atomic.LoadInt64(&m.allHTTPFlowCount)))
 }
 
+// notifyDiscardFlowNum 跳过分析数目，匹配器使用【包含/丢弃】action会触发，但是流量分析视乎不需要这两种模式
 func (m *HTTPFlowAnalyzeManger) notifyDiscardFlowNum() {
-	m.client.StatusCard("丢弃流量数", atomic.LoadInt64(&m.discardFlowCount))
+	m.client.StatusCard("跳过分析数", atomic.LoadInt64(&m.discardFlowCount))
 }
 
 func (m *HTTPFlowAnalyzeManger) notifyResult(
@@ -599,12 +600,9 @@ func (m *HTTPFlowAnalyzeManger) executeMatchers(flow *schema.HTTPFlow) (discard 
 		return false
 	}
 
-	// 匹配逻辑和Fuzzer一样
 	matched, hitColors, discard := MatchColor(m.matchers, &httptpl.RespForMatch{RawPacket: []byte(rspRaw)}, nil)
 
-	// 如果匹配成功，处理颜色和标签
 	if matched && len(hitColors) > 0 {
-		// 直接更新HTTP Flow的标签
 		flow.AddTag(hitColors...)
 		err := yakit.UpdateHTTPFlowTags(consts.GetGormProjectDatabase(), flow)
 		if err != nil {
