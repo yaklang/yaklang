@@ -25,6 +25,9 @@ import (
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils/fileparser"
+
+	"github.com/yaklang/yaklang/common/utils/fileparser/excelparser"
+
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/pprofutils"
 
