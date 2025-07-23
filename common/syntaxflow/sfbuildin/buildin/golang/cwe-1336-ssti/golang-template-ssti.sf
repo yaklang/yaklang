@@ -2,6 +2,7 @@ desc(
 	title: "Check Golang Server-Side Template Injection Vulnerability"
 	type: audit
 	severity: high
+    risk: "ssti"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -94,7 +95,7 @@ SOLUTION
 REFERENCE
 )
 
-<include('golang-template')> as $sink;
+<include('golang-template-html')> as $sink;
 <include('golang-http-source')> as $source
 
 $sink.Must(* #{

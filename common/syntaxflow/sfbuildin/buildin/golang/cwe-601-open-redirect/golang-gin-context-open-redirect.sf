@@ -1,6 +1,6 @@
 desc(
-	title: "Check Golang Open Redirect Vulnerability"
-	title_zh: "检测Golang开放重定向漏洞"
+	title: "Check Golang Open Redirect Vulnerability in gin.Context"
+	title_zh: "检测Golang开放重定向漏洞(gin.Context)"
 	type: audit
 	level: high
 	risk: "url-redirect"
@@ -37,7 +37,7 @@ REFERENCE
 )
 
 <include('golang-gin-context')> as $sink 
-$sink.Redirect(,,* #-> as $param)
+$sink.Redirect(*<slice(index=2)> #-> as $param)
 
 $param.Query as $high
 $param.PostForm as $high

@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang SQL注入漏洞"
 	type: audit
 	severity: mid
-	risk: sqli
+	risk: "sqli"
 	desc: <<<DESC
 ### 漏洞描述
 

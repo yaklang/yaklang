@@ -90,15 +90,24 @@ REFERENCE
 	title_zh: "检测Golang模板引擎中的反射型XSS漏洞"
 )
 
-<include('golang-template')> as $template;
-$template.New as $new;
-$new().Parse() -> as $param
-$template.ParseFiles().* -> as $param
-$param.Execute(* #-> as $target) 
+<include('golang-template-html')> as $template;
+$template.New() as $new
+
+$new.Must() as $tmpl
+$new.ParseFiles().* as $tmpl
+$template.Must() as $tmpl
+$template.ParseFiles().* as $tmpl
+
+$tmpl.Execute(* #-> as $target);
 $target.HTML as $high;
 
-$template.Must().ExecuteTemplate(,,,* #-> as $param2)
-$param2 -->?{have: "template.HTML"} as $high
+$tmpl.ExecuteTemplate(*<slice(index=3)> #-> as $target2);
+$target2 -->?{have: "template.HTML"} as $high;
+
+<include('golang-template-text')> as $temptext;
+$temptext.New().Parse() as $target3;
+$temptext.ParseFiles().* -> as $target3;
+$target3.Execute as $high;
 
 alert $high for {
 	solution: <<<CODE

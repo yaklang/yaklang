@@ -1,0 +1,143 @@
+desc(
+	title: "Check Golang Models SQL Injection Vulnerability"
+	type: audit
+	severity: high
+	desc: <<<DESC
+SQL注入是一种常见的漏洞，当应用程序未对用户输入进行适当的验证或转义时，攻击者可以构造特殊的输入来篡改SQL语句的逻辑。在Golang中，使用`models`库进行数据库操作时，如果直接将用户输入拼接到SQL语句中，就可能发生SQL注入攻击。攻击者可以利用这种漏洞窃取、修改或删除数据库中的数据，甚至执行任意SQL命令。例如，在Golang代码中，如果使用`fmt.Sprintf`将用户输入直接拼接到SQL语句中，就存在SQL注入风险。
+
+为了防止SQL注入，应使用参数化查询或预编译的SQL语句。参数化查询可以确保用户输入作为参数传递，而不是SQL语句的一部分，从而避免SQL注入攻击。此外，还应确保对用户输入进行适当的验证和转义，以防止恶意输入。
+DESC
+	rule_id: "b89f27b3-35ee-48ae-ba75-415da669f60d"
+	title_zh: "检测Golang SQL注入漏洞(Models)"
+	risk: "sqli"
+	solution: <<<SOLUTION
+为了防止SQL注入，应使用参数化查询或预编译的SQL语句。参数化查询可以确保用户输入作为参数传递，而不是SQL语句的一部分，从而避免SQL注入攻击。此外，还应确保对用户输入进行适当的验证和转义，以防止恶意输入。例如，使用`database/sql`包中的`PreparedStatement`进行数据库操作，而不是直接拼接SQL语句。此外，可以使用Golang的`text/template`包对用户输入进行转义，以防止恶意脚本注入。在代码中，应该始终对用户输入进行严格的检查和验证，以确保其符合预期的格式和类型。
+SOLUTION
+	reference: <<<REFERENCE
+https://owasp.org/www-community/vulnerabilities/SQL_Injection
+REFERENCE
+)
+
+<include('golang-user-input')> as $input;
+models?{<fullTypeName>?{have:'github.com/seaung/vhub/pkg/models'}} as $entry
+$entry.DB.Exec(* #-> as $param) 
+$entry.DB.Raw(* #-> as $param) 
+
+$param & $input as $high;
+
+alert $high for {
+	type: "vuln",
+	title: "SQL Injection detected",
+	title_zh: "检测到SQL注入",
+	level: "high",
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://main.go': <<<UNSAFE
+package api
+
+import (
+	"database/sql"
+	"fmt"
+	"net/http"
+	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/seaung/vhub/pkg/models"
+)
+
+// SQLIHandler 展示SQL注入漏洞演示页面
+func SQLIHandler(c *gin.Context) {
+	c.HTML(http.StatusOK, "vulns/sqli.tmpl", gin.H{
+		"title": "SQL注入漏洞演示",
+	})
+}
+
+// SQLILoginHandler 演示登录验证中的SQL注入
+func SQLILoginHandler(c *gin.Context) {
+	username := c.PostForm("username")
+	password := c.PostForm("password")
+
+	// 故意使用字符串拼接构造SQL语句，易受SQL注入攻击
+	query := fmt.Sprintf("SELECT id, name FROM users WHERE name = '%s' AND password = '%s'", username, password)
+
+	var user models.Users
+	row := models.DB.Raw(query).Row()
+	err := row.Scan(&user.ID, &user.Name)
+
+	if err == sql.ErrNoRows {
+		c.HTML(http.StatusOK, "vulns/sqli.tmpl", gin.H{
+			"error": "用户名或密码错误",
+		})
+		return
+	}
+
+	if err != nil {
+		c.HTML(http.StatusOK, "vulns/sqli.tmpl", gin.H{
+			"error": "查询出错: " + err.Error(),
+		})
+		return
+	}
+
+	c.HTML(http.StatusOK, "vulns/sqli.tmpl", gin.H{
+		"success": true,
+		"message": fmt.Sprintf("欢迎回来，%s!", user.Name),
+	})
+}
+
+// SQLISearchHandler 演示消息搜索中的SQL注入
+func SQLISearchHandler(c *gin.Context) {
+	keyword := c.Query("keyword")
+
+	// 故意使用LIKE语句和字符串拼接，易受SQL注入攻击
+	query := fmt.Sprintf("SELECT id, content FROM messages WHERE content LIKE '%%%s%%'", keyword)
+
+	rows, err := models.DB.Raw(query).Rows()
+	if err != nil {
+		c.HTML(http.StatusOK, "vulns/sqli.tmpl", gin.H{
+			"error": "搜索出错: " + err.Error(),
+		})
+		return
+	}
+	defer rows.Close()
+
+	var messages []models.Message
+	for rows.Next() {
+		var msg models.Message
+		if err := rows.Scan(&msg.ID, &msg.Content); err != nil {
+			continue
+		}
+		messages = append(messages, msg)
+	}
+
+	c.HTML(http.StatusOK, "vulns/sqli.tmpl", gin.H{
+		"messages": messages,
+		"keyword":  keyword,
+	})
+}
+
+// SQLIUpdateHandler 演示用户信息更新中的SQL注入
+func SQLIUpdateHandler(c *gin.Context) {
+	userID := c.PostForm("user_id")
+	description := c.PostForm("description")
+
+	// 故意使用字符串拼接构造UPDATE语句，易受SQL注入攻击
+	query := fmt.Sprintf("UPDATE users SET description = '%s' WHERE id = %s", description, userID)
+
+	result := models.DB.Exec(query)
+	if err := result.Error; err != nil {
+		c.HTML(http.StatusOK, "vulns/sqli.tmpl", gin.H{
+			"error": "更新失败: " + err.Error(),
+		})
+		return
+	}
+
+	c.HTML(http.StatusOK, "vulns/sqli.tmpl", gin.H{
+		"success": true,
+		"message": "用户信息已更新",
+	})
+}
+UNSAFE
+)

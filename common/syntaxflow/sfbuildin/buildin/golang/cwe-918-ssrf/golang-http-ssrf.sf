@@ -1,7 +1,9 @@
 desc(
 	title: "Check Golang SSRF HTTP Vulnerability"
+	title_zh: "检测Golang HTTP SSRF漏洞"
 	type: audit
-	severity: high
+	severity: mid
+	risk: "ssrf"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -34,7 +36,6 @@ DESC
 	reference: <<<REFERENCE
 [CWE-918: Server-Side Request Forgery (SSRF)](https://cwe.mitre.org/data/definitions/918.html)
 REFERENCE
-	title_zh: "检测Golang HTTP SSRF漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -106,9 +107,13 @@ func handler(w http.ResponseWriter, r *http.Request) {
 SOLUTION
 )
 
-<include('golang-http-sink')> as $output;
-$output.URL.Query().Get() #-> as $sink;
-$sink?{opcode: param} as $mid
+<include('golang-user-input')> as $input;
+
+http.Get(* #-> as $param);
+
+$param #{
+	until: "* & $input" 
+}-> as $mid 
 
 alert $mid for {
 	title: "SSRF detected",
@@ -119,7 +124,7 @@ alert $mid for {
 
 desc(
 	lang: golang
-	alert_num: 1
+	alert_high: 1
 	'file://main.go': <<<UNSAFE
 package main
 

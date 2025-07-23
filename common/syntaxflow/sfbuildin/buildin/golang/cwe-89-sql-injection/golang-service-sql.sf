@@ -7,6 +7,7 @@ SQL注入是一种常见的攻击手段，攻击者通过在SQL查询中注入�
 DESC
 	rule_id: "278c2a17-1b81-49d1-a4a9-d881fba1a0e9"
 	title_zh: "检测Golang Service SQL注入漏洞"
+	risk: "sqli"
 	solution: <<<SOLUTION
 为防止SQL注入漏洞，建议采取以下措施：
 1. 使用参数化查询（Prepared Statements）代替拼接SQL查询。

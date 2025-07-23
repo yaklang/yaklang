@@ -1,0 +1,181 @@
+desc(
+	title: "Check Golang XXE Malicious Document References"
+	type: audit
+	level: high
+	risk: "xxe"
+	desc: <<<DESC
+此规则旨在审核 Golang 代码中是否存在与 XXE（XML 外部实体）攻击相关的漏洞。当应用程序解析包含外部实体引用的 XML 输入时，就会发生 XXE 攻击，这可能导致未经授权访问敏感数据、服务器端请求伪造 (SSRF) 或拒绝服务 (DoS) 攻击。该规则会检查使用 Golang `encoding/xml` 包解析 XML 数据且未对外部实体处理进行适当限制的情况。此外，还会检查是否使用了允许外部实体引用的不安全 XML 解析器，攻击者可以利用这些解析器执行 XXE 攻击。为了防止 XXE 攻击，该规则建议使用不允许外部实体引用的安全 XML 解析器或禁用外部实体处理。例如，在 Golang 中，建议使用 `xml.Decoder`，并将 `Strict` 设置为 `true`，将 `Entity` 设置为 `xml.HTMLEntity`。
+DESC
+	rule_id: "4a6e5ac2-d5d8-4f27-9844-35b5153f5944"
+	title_zh: "检测Golang XXE恶意文档引用"
+	solution: <<<SOLUTION
+为了缓解 Golang 应用程序中的 XXE 漏洞，建议使用安全的 XML 解析器，该解析器不允许引用外部实体，或者禁用外部实体处理。这可以通过使用 `xml.Decoder` 来实现，并将 `Strict` 设置为 `true`，并将 `Entity` 设置为 `xml.HTMLEntity`。以下是如何安全使用 `xml.Decoder` 的示例：
+
+```go
+import (
+	"encoding/xml"
+	"io/ioutil"
+	"net/http"
+)
+
+func parseXML(c *gin.Context) {
+	body, err := ioutil.ReadAll(c.Request.Body)
+	if err != nil {
+		// Handle error
+	}
+	decoder := xml.NewDecoder(body)
+	decoder.Strict = true
+	decoder.Entity = xml.HTMLEntity
+	var user struct {
+		XMLName xml.Name `xml:"user"`
+		Name string `xml:"name"`
+		Email string `xml:"email"`
+	}
+	err := decoder.Decode(&user)
+	if err != nil {
+		// Handle error
+	}
+	// Process user data
+}
+```
+此外，验证和清理所有用户输入以确保其不包含恶意 XML 实体也很重要。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-611: Improper Restriction of XML External Entity Reference ('XXE')](https://cwe.mitre.org/data/definitions/611.html)
+REFERENCE
+)
+
+<include('golang-user-input')> as $input;
+<include('golang-xml-sink')> as $decoder;
+
+xml?{<fullTypeName>?{have: 'encoding/xml'}} as $entry;
+$entry.Unmarshal(*<slice(index=0)> #-> as $sink);
+$sink & $input as $high;
+
+$decoder.Strict?{have: 'true'} as $safe;
+$decoder.Entity?{have: 'xml.HTMLEntity'} as $safe;
+
+alert $high for {
+	type: "vuln",
+	title: "Check Golang XXE Malicious Document References",
+	title_zh: "检测Golang XXE恶意文档引用",
+	level: "high",
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://main.go': <<<UNSAFE
+package api
+
+import (
+	"encoding/xml"
+	"io/ioutil"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+// User 定义用于演示的用户结构
+type User struct {
+	XMLName xml.Name 
+	Name    string   
+	Email   string  
+}
+
+// XXEHandler 处理XXE漏洞演示页面
+func XXEHandler(c *gin.Context) {
+	c.HTML(http.StatusOK, "vulns/xxe.tmpl", gin.H{
+		"title": "XXE漏洞演示",
+	})
+}
+
+// XXEParseHandler 处理XML数据解析（不安全的方式）
+func XXEParseHandler(c *gin.Context) {
+	body, err := ioutil.ReadAll(c.Request.Body)
+	if err != nil {
+		c.HTML(http.StatusOK, "vulns/xxe.tmpl", gin.H{
+			"title": "XXE漏洞演示",
+			"error": "读取请求数据失败: " + err.Error(),
+		})
+		return
+	}
+
+	// 故意使用不安全的XML解析方式
+	var user User
+	err = xml.Unmarshal(body, &user)
+	if err != nil {
+		c.HTML(http.StatusOK, "vulns/xxe.tmpl", gin.H{
+			"title": "XXE漏洞演示",
+			"error": "XML解析失败: " + err.Error(),
+		})
+		return
+	}
+
+	c.HTML(http.StatusOK, "vulns/xxe.tmpl", gin.H{
+		"title":    "XXE漏洞演示",
+		"success":  "XML解析成功",
+		"username": user.Name,
+		"email":    user.Email,
+	})
+}
+UNSAFE
+	'file://safe.go': <<<SAFE
+package api
+
+import (
+	"encoding/xml"
+	"io/ioutil"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+// User 定义用于演示的用户结构
+type User struct {
+	XMLName xml.Name 
+	Name    string   
+	Email   string  
+}
+
+// XXEHandler 处理XXE漏洞演示页面
+func XXEHandler(c *gin.Context) {
+	c.HTML(http.StatusOK, "vulns/xxe.tmpl", gin.H{
+		"title": "XXE漏洞演示",
+	})
+}
+
+// XXEParseHandler 处理XML数据解析（安全的方式）
+func XXEParseHandler(c *gin.Context) {
+	body, err := ioutil.ReadAll(c.Request.Body)
+	decoder := xml.NewDecoder(body)
+	decoder.Strict = true
+    decoder.Entity = xml.HTMLEntity
+
+	if err != nil {
+		c.HTML(http.StatusOK, "vulns/xxe.tmpl", gin.H{
+			"title": "XXE漏洞演示",
+			"error": "读取请求数据失败: " + err.Error(),
+		})
+		return
+	}
+
+	var user User
+	err = xml.Unmarshal(body, &user)
+	if err != nil {
+		c.HTML(http.StatusOK, "vulns/xxe.tmpl", gin.H{
+			"title": "XXE漏洞演示",
+			"error": "XML解析失败: " + err.Error(),
+		})
+		return
+	}
+
+	c.HTML(http.StatusOK, "vulns/xxe.tmpl", gin.H{
+		"title":    "XXE漏洞演示",
+		"success":  "XML解析成功",
+		"username": user.Name,
+		"email":    user.Email,
+	})
+}
+SAFE
+)

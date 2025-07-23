@@ -90,7 +90,7 @@ REFERENCE
 )
 
 os?{<fullTypeName>?{have: 'os'}} as $os
-$os.WriteFile(,* #-> as $output,)
+$os.WriteFile(*<slice(index=1)> #-> as $output)
 
 alert $output for {
 	title_zh: "未验证的文件写入操作",

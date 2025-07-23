@@ -29,6 +29,7 @@ desc(
 DESC
 	rule_id: "cdc66b17-36b4-4436-813e-9d121964224b"
 	title_zh: "检测Golang Sqlx SQL注入漏洞"
+	risk: "sqli"
 	solution: <<<SOLUTION
 ### 修复建议
 

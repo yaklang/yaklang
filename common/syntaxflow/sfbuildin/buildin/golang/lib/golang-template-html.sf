@@ -2,7 +2,7 @@ desc(
 	title: "Audit Golang html/template Usage"
 	type: audit
 	level: info
-	lib: 'golang-template'
+	lib: 'golang-template-html'
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -89,12 +89,15 @@ func main() {
    }
    ```
 
-#### 3. 避免使用`text/template`包
-   如果需要渲染HTML内容，请始终使用`html/template`而非`text/template`，因为后者不会自动转义特殊字符。
+#### 3. 避免使用`html/template`包
+   如果需要渲染HTML内容，请始终使用`html/template`而非`html/template`，因为后者不会自动转义特殊字符。
 SOLUTION
 )
 
 template?{<fullTypeName>?{have: 'html/template'}} as $output
+*temp*?{<fullTypeName>?{have: 'html/template'}} as $output
+Template?{<fullTypeName>?{have: 'html/template'}} as $output
+*Temp*?{<fullTypeName>?{have: 'html/template'}} as $output
 
 alert $output for {
 	level: "info",

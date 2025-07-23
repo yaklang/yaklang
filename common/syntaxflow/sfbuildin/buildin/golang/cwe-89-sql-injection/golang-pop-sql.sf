@@ -1,5 +1,5 @@
 desc(
-	title: "Check Golang SQL Injection Vulnerability (Pop)"
+	title: "Check Golang Pop SQL Injection Vulnerability"
 	type: audit
 	severity: high
 	desc: <<<DESC
@@ -36,6 +36,7 @@ desc(
 DESC
 	rule_id: "56f41530-4175-41ec-96ac-198315171c10"
 	title_zh: "检测Golang SQL注入漏洞(Pop)"
+	risk: "sqli"
 	solution: <<<SOLUTION
 ### 修复建议
 

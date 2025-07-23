@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang中使用Sprig的SSTI漏洞"
 	type: vuln
 	severity: low
-	risk: ssti
+	risk: "ssti"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -115,7 +115,7 @@ SOLUTION
 REFERENCE
 )
 
-<include('golang-template')> as $sink;
+<include('golang-template-html')> as $sink;
 
 $sink.New as $new;
 $new().Funcs(* as $param);
