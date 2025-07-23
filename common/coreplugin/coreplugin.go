@@ -241,11 +241,13 @@ func init() {
 			withPluginHelp("动态开启PPROF采样，用于性能调优"),
 			withPluginAuthors("csg"),
 			withPluginEnableGenerateParam(true),
+			withPluginEnableGenerateParam(true),
 		)
 		registerBuildInPlugin(
 			"yak", "崩溃日志收集",
 			withPluginHelp("收集本地项目日志中的崩溃信息，保存成 zip 以便分析"),
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginEnableGenerateParam(true),
 		)
 		// registerBuildInPlugin(
@@ -305,6 +307,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-未授权遍历",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-未授权遍历"),
 			withPluginTags([]string{"逻辑漏洞检测,可能修改HTTP数据包"}),
 		)
@@ -312,6 +315,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-未授权添加",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-未授权添加"),
 			withPluginTags([]string{"逻辑漏洞检测,可能修改HTTP数据包"}),
 		)
@@ -319,6 +323,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-未授权访问",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-未授权访问"),
 			withPluginTags([]string{"逻辑漏洞检测,可能修改HTTP数据包"}),
 		)
@@ -326,6 +331,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-验证码回显",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-验证码回显"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -333,6 +339,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-水平越权查询",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-水平越权查询"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -340,6 +347,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-水平越权删除",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-水平越权删除"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -347,6 +355,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-水平越权修改",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-水平越权修改"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -354,6 +363,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-水平越权添加",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-水平越权添加"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -361,6 +371,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-垂直越权查询",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-垂直越权查询"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -368,6 +379,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-垂直越权删除",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-垂直越权删除"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -375,6 +387,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-垂直越权修改",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-垂直越权修改"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -382,6 +395,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-垂直越权添加",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-垂直越权添加"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -389,6 +403,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-通用CMS未授权",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-通用CMS未授权"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -396,6 +411,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-敏感信息遍历",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-敏感信息遍历"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -403,6 +419,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-接口未授权",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-接口未授权"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -410,12 +427,14 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-越权",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-越权"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
 		registerBuildInPlugin(
 			"yak", "基础爬虫",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("基础爬虫"),
 			withPluginTags([]string{"信息收集", "功能类型"}),
 		)
