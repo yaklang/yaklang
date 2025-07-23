@@ -37952,10 +37952,9 @@ type AnalyzeHTTPFlowRequest struct {
 	// 分析数据源
 	Source *AnalyzedDataSource `protobuf:"bytes,4,opt,name=Source,proto3" json:"Source,omitempty"`
 	// 响应匹配器
-	Matchers          []*HTTPResponseMatcher `protobuf:"bytes,5,rep,name=Matchers,proto3" json:"Matchers,omitempty"`
-	MatchersCondition string                 `protobuf:"bytes,6,opt,name=MatchersCondition,proto3" json:"MatchersCondition,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	Matchers      []*HTTPResponseMatcher `protobuf:"bytes,5,rep,name=Matchers,proto3" json:"Matchers,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AnalyzeHTTPFlowRequest) Reset() {
@@ -38021,13 +38020,6 @@ func (x *AnalyzeHTTPFlowRequest) GetMatchers() []*HTTPResponseMatcher {
 		return x.Matchers
 	}
 	return nil
-}
-
-func (x *AnalyzeHTTPFlowRequest) GetMatchersCondition() string {
-	if x != nil {
-		return x.MatchersCondition
-	}
-	return ""
 }
 
 type AnalyzedDataSource struct {
@@ -38157,9 +38149,6 @@ type AnalyzeHTTPFlowResponse struct {
 	ExecResult       *ExecResult            `protobuf:"bytes,1,opt,name=ExecResult,proto3" json:"ExecResult,omitempty"`
 	RuleData         *HTTPFlowRuleData      `protobuf:"bytes,2,opt,name=RuleData,proto3" json:"RuleData,omitempty"`
 	ExtractedContent string                 `protobuf:"bytes,3,opt,name=ExtractedContent,proto3" json:"ExtractedContent,omitempty"`
-	// 匹配器结果
-	MatchedByMatcher bool   `protobuf:"varint,4,opt,name=MatchedByMatcher,proto3" json:"MatchedByMatcher,omitempty"`
-	HitColor         string `protobuf:"bytes,5,opt,name=HitColor,proto3" json:"HitColor,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -38211,20 +38200,6 @@ func (x *AnalyzeHTTPFlowResponse) GetRuleData() *HTTPFlowRuleData {
 func (x *AnalyzeHTTPFlowResponse) GetExtractedContent() string {
 	if x != nil {
 		return x.ExtractedContent
-	}
-	return ""
-}
-
-func (x *AnalyzeHTTPFlowResponse) GetMatchedByMatcher() bool {
-	if x != nil {
-		return x.MatchedByMatcher
-	}
-	return false
-}
-
-func (x *AnalyzeHTTPFlowResponse) GetHitColor() string {
-	if x != nil {
-		return x.HitColor
 	}
 	return ""
 }
@@ -57937,14 +57912,13 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vProjectName\x18\x02 \x01(\tR\vProjectName\x12.\n" +
 	"\x12ProjectDescription\x18\x03 \x01(\tR\x12ProjectDescription\x12&\n" +
 	"\x0eExternalModule\x18\x04 \x01(\tR\x0eExternalModule\x120\n" +
-	"\x13ExternalProjectCode\x18\x05 \x01(\tR\x13ExternalProjectCode\"\xbd\x02\n" +
+	"\x13ExternalProjectCode\x18\x05 \x01(\tR\x13ExternalProjectCode\"\x8f\x02\n" +
 	"\x16AnalyzeHTTPFlowRequest\x12\"\n" +
 	"\fHotPatchCode\x18\x01 \x01(\tR\fHotPatchCode\x126\n" +
 	"\tReplacers\x18\x02 \x03(\v2\x18.ypb.MITMContentReplacerR\tReplacers\x122\n" +
 	"\x06Config\x18\x03 \x01(\v2\x1a.ypb.AnalyzeHTTPFlowConfigR\x06Config\x12/\n" +
 	"\x06Source\x18\x04 \x01(\v2\x17.ypb.AnalyzedDataSourceR\x06Source\x124\n" +
-	"\bMatchers\x18\x05 \x03(\v2\x18.ypb.HTTPResponseMatcherR\bMatchers\x12,\n" +
-	"\x11MatchersCondition\x18\x06 \x01(\tR\x11MatchersCondition\"\xb9\x01\n" +
+	"\bMatchers\x18\x05 \x03(\v2\x18.ypb.HTTPResponseMatcherR\bMatchers\"\xb9\x01\n" +
 	"\x12AnalyzedDataSource\x12\x1e\n" +
 	"\n" +
 	"SourceType\x18\x01 \x01(\tR\n" +
@@ -57956,15 +57930,13 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vRawResponse\x18\x04 \x01(\tR\vRawResponse\"g\n" +
 	"\x15AnalyzeHTTPFlowConfig\x12 \n" +
 	"\vConcurrency\x18\x01 \x01(\x03R\vConcurrency\x12,\n" +
-	"\x11EnableDeduplicate\x18\x02 \x01(\bR\x11EnableDeduplicate\"\xf1\x01\n" +
+	"\x11EnableDeduplicate\x18\x02 \x01(\bR\x11EnableDeduplicate\"\xa9\x01\n" +
 	"\x17AnalyzeHTTPFlowResponse\x12/\n" +
 	"\n" +
 	"ExecResult\x18\x01 \x01(\v2\x0f.ypb.ExecResultR\n" +
 	"ExecResult\x121\n" +
 	"\bRuleData\x18\x02 \x01(\v2\x15.ypb.HTTPFlowRuleDataR\bRuleData\x12*\n" +
-	"\x10ExtractedContent\x18\x03 \x01(\tR\x10ExtractedContent\x12*\n" +
-	"\x10MatchedByMatcher\x18\x04 \x01(\bR\x10MatchedByMatcher\x12\x1a\n" +
-	"\bHitColor\x18\x05 \x01(\tR\bHitColor\"v\n" +
+	"\x10ExtractedContent\x18\x03 \x01(\tR\x10ExtractedContent\"v\n" +
 	"\x16AnalyzedHTTPFlowFilter\x12\x1c\n" +
 	"\tResultIds\x18\x01 \x03(\tR\tResultIds\x12*\n" +
 	"\x10RuleVerboseNames\x18\x02 \x03(\tR\x10RuleVerboseNames\x12\x12\n" +
