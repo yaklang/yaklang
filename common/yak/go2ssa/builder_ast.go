@@ -89,6 +89,18 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			}
 		}
 
+		for _, impo := range ast.AllImportDecl() {
+			names, paths := b.buildImportDecl(impo.(*gol.ImportDeclContext))
+
+			for i, name := range names {
+				pathl := strings.Split(paths[i], "/")
+				b.SetImportPackage(name, pathl[len(pathl)-1], paths[i], impo.(*gol.ImportDeclContext).ImportSpec(i))
+				if lib, _ := b.GetImportPackage(name); lib != nil {
+					b.GetProgram().ImportAll(lib)
+				}
+			}
+		}
+
 		for _, decl := range ast.AllDeclaration() {
 			if decl, ok := decl.(*gol.DeclarationContext); ok {
 				b.buildDeclaration(decl, true)
@@ -159,18 +171,6 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 						}
 					}
 				}, false)
-			}
-		}
-
-		for _, impo := range ast.AllImportDecl() {
-			names, paths := b.buildImportDecl(impo.(*gol.ImportDeclContext))
-
-			for i, name := range names {
-				pathl := strings.Split(paths[i], "/")
-				b.SetImportPackage(name, pathl[len(pathl)-1], paths[i], impo.(*gol.ImportDeclContext).ImportSpec(i))
-				if lib, _ := b.GetImportPackage(name); lib != nil {
-					b.GetProgram().ImportAll(lib)
-				}
 			}
 		}
 

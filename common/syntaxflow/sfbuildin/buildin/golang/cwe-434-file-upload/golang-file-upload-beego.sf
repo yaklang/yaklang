@@ -1,9 +1,9 @@
 desc(
-	title: "Audit Golang File Upload Authorization (Beego)"
-	title_zh: "审计Golang文件上传授权（Beego）"
+	title: "Audit Golang File Upload Authorization in Beego"
+	title_zh: "Beego中Golang文件上传授权审核"
 	type: audit
 	level: low
-	risk: "file-write"
+	risk: "file-upload"
 	desc: <<<DESC
 ### 漏洞描述
 

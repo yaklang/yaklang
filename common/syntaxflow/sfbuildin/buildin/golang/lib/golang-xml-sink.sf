@@ -64,8 +64,8 @@ SOLUTION
 REFERENCE
 )
 
-xml?{<fullTypeName>?{have: 'encoding/xml'}} as $entry
-$entry.NewDecoder() as $output
+xml?{<fullTypeName>?{have: 'encoding/xml'}} as $entry;
+$entry.NewDecoder() as $output;
 
 alert $output for {
 	title: "Audit Golang XML Parsing",

@@ -1,7 +1,9 @@
 desc(
 	title: "Audit Golang File Upload Vulnerability"
+	title_zh: "审计Golang文件上传漏洞"
 	type: audit
 	level: low
+	risk: "file-upload"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -125,7 +127,6 @@ SOLUTION
 	reference: <<<REFERENCE
 [CWE-434: Unrestricted Upload of File with Dangerous Type](https://cwe.mitre.org/data/definitions/434.html)
 REFERENCE
-	title_zh: "审计Golang文件上传漏洞"
 )
 
 <include('golang-file-path')> as $path;

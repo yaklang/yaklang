@@ -3,6 +3,7 @@ desc(
 	title_zh: "检测Golang Beego框架中的XXE漏洞"
 	type: vuln
 	level: high
+	risk: "xxe"
 	desc: <<<DESC
 ### 漏洞描述
 

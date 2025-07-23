@@ -23,6 +23,9 @@ REFERENCE
 <include('golang-http-sink')> as $output;
 <include('golang-gin-context')> as $output;
 
+.GetString(*<slice(index=0)> #-> as $beego);
+$beego?{<fullTypeName>?{have: 'github.com/beego/beego/v2/server/web'}} as $output;
+
 alert $output for {
 	level: "info",
 	title: "Audit Golang User Input",

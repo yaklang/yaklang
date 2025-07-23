@@ -677,13 +677,24 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 			if a := typ.TypeArgs(); a != nil {
 				b.tpHandler[b.Function.GetName()] = b.buildTypeArgs(a.(*gol.TypeArgsContext))
 			}
-			if p, ok := parent.(*ssa.ObjectType); ok {
-				structTyp.AnonymousField[typ.TypeName().GetText()] = p
-				structTyp.AddField(b.EmitConstInst(typ.TypeName().GetText()), p)
-			} else if a, ok := parent.(*ssa.AliasType); ok {
-				structTyp.AddField(b.EmitConstInst(a.Name), a.GetType())
-			} else if ba, ok := parent.(*ssa.BasicType); ok { // 遇到golang库时，会进入这里
-				structTyp.AddField(b.EmitConstInst(ba.GetName()), ba)
+
+			if fromUser, ok := parent.(*ssa.ObjectType); ok {
+				structTyp.AnonymousField[typ.TypeName().GetText()] = fromUser
+				structTyp.AddField(b.EmitConstInst(typ.TypeName().GetText()), fromUser)
+			} else if fromAlias, ok := parent.(*ssa.AliasType); ok {
+				if fromUser, ok := ssa.ToObjectType(fromAlias.GetType()); ok {
+					structTyp.AnonymousField[typ.TypeName().GetText()] = fromUser
+					structTyp.AddField(b.EmitConstInst(typ.TypeName().GetText()), fromUser)
+				}
+				structTyp.AddField(b.EmitConstInst(fromAlias.Name), fromAlias.GetType())
+			} else if fromLib, ok := parent.(*ssa.Blueprint); ok {
+				structTyp.AddField(b.EmitConstInst(fromLib.Name), fromLib)
+				for _, fn := range fromLib.GetFullTypeNames() {
+					structTyp.AddFullTypeName(fn)
+				}
+			} else if notUse, ok := parent.(*ssa.BasicType); ok {
+				// b.NewError(ssa.Warn, TAG, Unreachable())
+				structTyp.AddField(b.EmitConstInst(notUse.GetName()), notUse)
 			}
 		}
 	}

@@ -67,6 +67,7 @@ func main() {
 DESC
 	rule_id: "b06e92a2-0ff3-40a0-966e-7f0e4fe05480"
 	title_zh: "检测Golang Reform SQL注入漏洞"
+	risk: "sqli"
 	solution: <<<SOLUTION
 ### 修复建议
 

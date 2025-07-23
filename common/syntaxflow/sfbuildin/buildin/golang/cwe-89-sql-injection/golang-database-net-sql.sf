@@ -1,5 +1,5 @@
 desc(
-	title: "Check Golang SQL Injection Vulnerability"
+	title: "Check Golang SQL Injection Vulnerability in Net"
 	type: audit
 	severity: high
 	desc: <<<DESC
@@ -42,10 +42,10 @@ desc(
    - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
    - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
    - 通过数据库提权进一步渗透至服务器或其他系统组件。
-
 DESC
 	rule_id: "1c99dff2-ccc4-452a-8a95-2594dd2340d8"
 	title_zh: "检测Golang SQL注入漏洞"
+    risk: "sqli"
 	solution: <<<SOLUTION
 ### 修复建议
 
