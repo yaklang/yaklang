@@ -5377,6 +5377,9 @@ message AnalyzeHTTPFlowRequest{
   AnalyzeHTTPFlowConfig Config = 3 ;
   // 分析数据源
   AnalyzedDataSource Source = 4;
+  // 响应匹配器
+  repeated HTTPResponseMatcher Matchers = 5;
+  string MatchersCondition = 6;
 }
 
 message AnalyzedDataSource {
@@ -5398,6 +5401,9 @@ message AnalyzeHTTPFlowResponse{
   ExecResult ExecResult = 1;
   HTTPFlowRuleData RuleData = 2;
   string ExtractedContent = 3;
+  // 匹配器结果
+  bool MatchedByMatcher = 4;
+  string HitColor = 5;
 }
 
 
