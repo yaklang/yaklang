@@ -4,13 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"github.com/h2non/filetype"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/h2non/filetype"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -27,8 +28,11 @@ type AIConfig struct {
 	Timeout  float64 // `app:"name:请求超时时长"`
 	Deadline time.Time
 
-	APIKey              string `json:"api_key" app:"name:api_key,verbose:ApiKey,desc:APIKey / Token,required:true,id:1"`
-	Proxy               string `json:"proxy" app:"name:proxy,verbose:代理地址,id:5"`
+	APIKey string `json:"api_key" app:"name:api_key,verbose:ApiKey,desc:APIKey / Token,required:true,id:1"`
+	Proxy  string `json:"proxy" app:"name:proxy,verbose:代理地址,id:5"`
+	Host   string
+	Port   int
+
 	StreamHandler       func(io.Reader)
 	ReasonStreamHandler func(reader io.Reader)
 	Type                string `json:"Type"`
@@ -39,6 +43,18 @@ type AIConfig struct {
 	HTTPErrorHandler func(error)
 
 	Images []*ImageDescription
+}
+
+func WithHost(h string) AIConfigOption {
+	return func(c *AIConfig) {
+		c.Host = h
+	}
+}
+
+func WithPort(p int) AIConfigOption {
+	return func(c *AIConfig) {
+		c.Port = p
+	}
 }
 
 func WithNoHTTPS(b bool) AIConfigOption {
@@ -55,12 +71,15 @@ func NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
 			log.Errorf("ai request failed: %s", err)
 		},
 	}
-	for _, p := range opts {
-		p(c)
-	}
+	// 加载默认参数
 	err := consts.GetThirdPartyApplicationConfig(c.Type, c)
 	if err != nil {
 		log.Debug(err)
+	}
+
+	// 加载用户参数
+	for _, p := range opts {
+		p(c)
 	}
 	return c
 }

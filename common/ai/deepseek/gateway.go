@@ -69,7 +69,22 @@ func (g *GetawayClient) ChatStream(s string) (io.Reader, error) {
 	)
 }
 
+func (g *GetawayClient) newLoadOption(opt ...aispec.AIConfigOption) {
+	config := aispec.NewDefaultAIConfig(opt...)
+	g.config = config
+
+	if g.config.Model == "" {
+		g.config.Model = "deepseek-chat"
+	}
+
+	g.targetUrl = aispec.GetBaseURLFromConfig(g.config, "https://api.deepseek.com", "/chat/completions")
+}
+
 func (g *GetawayClient) LoadOption(opt ...aispec.AIConfigOption) {
+	if aispec.EnableNewLoadOption {
+		g.newLoadOption(opt...)
+		return
+	}
 	config := aispec.NewDefaultAIConfig(opt...)
 	g.config = config
 
@@ -116,5 +131,11 @@ func (g *GetawayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 		opts = append(opts, poc.WithConnectTimeout(g.config.Timeout))
 	}
 	opts = append(opts, poc.WithTimeout(600))
+	if g.config.Host != "" {
+		opts = append(opts, poc.WithHost(g.config.Host))
+	}
+	if g.config.Port > 0 {
+		opts = append(opts, poc.WithPort(g.config.Port))
+	}
 	return opts, nil
 }

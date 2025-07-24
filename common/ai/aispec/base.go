@@ -279,7 +279,7 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 
 	var pr, reasonPr io.Reader
 	var cancel context.CancelFunc
-	pr, reasonPr, opts, cancel = appendStreamHandlerPoCOptionEx(opts)
+	pr, reasonPr, opts, cancel = appendStreamHandlerPoCOptionEx(handleStream, opts)
 	wg := new(sync.WaitGroup)
 
 	noMerge := false

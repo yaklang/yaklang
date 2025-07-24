@@ -5,13 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/go-funk"
 	"io"
 	"net/http/httputil"
 	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/yaklang/yaklang/common/go-funk"
 
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 
@@ -313,7 +314,19 @@ func (d *DashScopeGateway) StructuredStream(s string, function ...any) (chan *ai
 	return objChannel, nil
 }
 
+func (d *DashScopeGateway) newLoadOption(opt ...aispec.AIConfigOption) {
+	config := aispec.NewDefaultAIConfig(opt...)
+	d.config = config
+	d.dashscopeAPIKey = config.APIKey
+
+	d.endpointUrl = aispec.GetBaseURLFromConfig(d.config, "https://dashscope.aliyuncs.com", "/api/v1/apps/"+strings.TrimSpace(d.dashscopeAppId)+"/completion")
+}
+
 func (d *DashScopeGateway) LoadOption(opt ...aispec.AIConfigOption) {
+	if aispec.EnableNewLoadOption {
+		d.newLoadOption(opt...)
+		return
+	}
 	config := aispec.NewDefaultAIConfig(opt...)
 	urlStr := `https://dashscope.aliyuncs.com/api/v1/apps/` + strings.TrimSpace(d.dashscopeAppId) + `/completion`
 	if config.BaseURL != "" {
@@ -342,6 +355,12 @@ func (d *DashScopeGateway) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 	}
 	if d.config.Timeout > 0 {
 		opts = append(opts, poc.WithConnectTimeout(d.config.Timeout))
+	}
+	if d.config.Host != "" {
+		opts = append(opts, poc.WithHost(d.config.Host))
+	}
+	if d.config.Port > 0 {
+		opts = append(opts, poc.WithPort(d.config.Port))
 	}
 	return opts, nil
 }

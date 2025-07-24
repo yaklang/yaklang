@@ -6,14 +6,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/jsonpath"
-	"github.com/yaklang/yaklang/common/utils/bufpipe"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/jsonpath"
+	"github.com/yaklang/yaklang/common/utils/bufpipe"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/bcicen/jstream"
 	"github.com/davecgh/go-spew/spew"
@@ -235,6 +236,12 @@ func (c *Client) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 	log.Debugf("Setting request timeout: %d seconds", requestTimeout)
 	opts = append(opts, poc.WithTimeout(float64(requestTimeout)))
 
+	if c.config.Host != "" {
+		opts = append(opts, poc.WithHost(c.config.Host))
+	}
+	if c.config.Port > 0 {
+		opts = append(opts, poc.WithPort(c.config.Port))
+	}
 	return opts, nil
 }
 
