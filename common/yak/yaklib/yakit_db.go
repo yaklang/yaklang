@@ -475,4 +475,11 @@ func init() {
 
 	// DeletePayload
 	YakitExports["DeletePayloadByGroup"] = deletePayloadByGroup
+
+	YakitExports["fileReadAction"] = FileReadAction
+	YakitExports["fileWriteAction"] = FileWriteAction
+	YakitExports["fileCreateAction"] = FileCreateAction
+	YakitExports["fileDeleteAction"] = FileDeleteAction
+	YakitExports["fileStatusAction"] = FileStatusAction
+	YakitExports["fileChmodAction"] = FileChmodAction
 }
