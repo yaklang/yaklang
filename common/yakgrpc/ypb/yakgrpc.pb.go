@@ -25222,13 +25222,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -34453,8 +34453,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -37579,6 +37579,7 @@ type QueryHTTPFlowRequest struct {
 	KeywordType        string   `protobuf:"bytes,45,opt,name=KeywordType,proto3" json:"KeywordType,omitempty"` // <empty> = all/response/request
 	AnalyzedIds        []int64  `protobuf:"varint,46,rep,packed,name=AnalyzedIds,proto3" json:"AnalyzedIds,omitempty"`
 	PayloadKeyword     string   `protobuf:"bytes,47,opt,name=PayloadKeyword,proto3" json:"PayloadKeyword,omitempty"`
+	ExcludeStatusCode  string   `protobuf:"bytes,48,opt,name=ExcludeStatusCode,proto3" json:"ExcludeStatusCode,omitempty"` // 排除状态码
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -37924,6 +37925,13 @@ func (x *QueryHTTPFlowRequest) GetAnalyzedIds() []int64 {
 func (x *QueryHTTPFlowRequest) GetPayloadKeyword() string {
 	if x != nil {
 		return x.PayloadKeyword
+	}
+	return ""
+}
+
+func (x *QueryHTTPFlowRequest) GetExcludeStatusCode() string {
+	if x != nil {
+		return x.ExcludeStatusCode
 	}
 	return ""
 }
@@ -57912,7 +57920,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tIsRequest\x18\x02 \x01(\bR\tIsRequest\x12\x18\n" +
 	"\aBufSize\x18\x03 \x01(\x03R\aBufSize\x12\x1c\n" +
 	"\tRuntimeId\x18\x04 \x01(\tR\tRuntimeId\x12\x16\n" +
-	"\x06IsRisk\x18\x05 \x01(\bR\x06IsRisk\"\xa1\f\n" +
+	"\x06IsRisk\x18\x05 \x01(\bR\x06IsRisk\"\xcf\f\n" +
 	"\x14QueryHTTPFlowRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
@@ -57969,7 +57977,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0fExcludeKeywords\x18, \x03(\tR\x0fExcludeKeywords\x12 \n" +
 	"\vKeywordType\x18- \x01(\tR\vKeywordType\x12 \n" +
 	"\vAnalyzedIds\x18. \x03(\x03R\vAnalyzedIds\x12&\n" +
-	"\x0ePayloadKeyword\x18/ \x01(\tR\x0ePayloadKeyword\"\xdc\x01\n" +
+	"\x0ePayloadKeyword\x18/ \x01(\tR\x0ePayloadKeyword\x12,\n" +
+	"\x11ExcludeStatusCode\x180 \x01(\tR\x11ExcludeStatusCode\"\xdc\x01\n" +
 	"\x18HTTPFlowsToOnlineRequest\x12\x14\n" +
 	"\x05Token\x18\x01 \x01(\tR\x05Token\x12 \n" +
 	"\vProjectName\x18\x02 \x01(\tR\vProjectName\x12.\n" +
