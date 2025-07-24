@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -54,6 +55,9 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 		coordinatorIdOnce.Do(func() {
 			currentCoordinatorId = e.CoordinatorId
 		})
+		if e.CoordinatorId != currentCoordinatorId {
+			fmt.Printf("e.CoordinatorId [%s] != currentCoordinatorId [%s]\n", e.CoordinatorId, currentCoordinatorId)
+		}
 		err := stream.Send(e.ToGRPC())
 		if err != nil {
 			log.Errorf("send event failed: %v", err)

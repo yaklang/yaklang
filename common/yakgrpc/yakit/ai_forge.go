@@ -94,7 +94,9 @@ func FilterAIForge(db *gorm.DB, filter *ypb.AIForgeFilter) *gorm.DB {
 		"forge_name", "forge_content", "init_prompt", "persistent_prompt", "plan_prompt", "result_prompt",
 	}, filter.GetKeyword(), false)
 	db = bizhelper.ExactQueryStringArrayOr(db, "tags", filter.GetTag())
-	db = bizhelper.ExactQueryInt64(db, "id", filter.GetId())
+	if filter.GetId() > 0 {
+		db = bizhelper.ExactQueryInt64(db, "id", filter.GetId())
+	}
 	return db
 }
 
