@@ -4,12 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/fuzztagx"
-	"github.com/yaklang/yaklang/common/fuzztagx/parser"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/fuzztagx"
 
 	"github.com/samber/lo"
 
@@ -274,18 +273,6 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 
 		isRenderFuzzTag := request.ForceFuzz || request.GetFuzzTagMode() != "close"
 		varToFuzztagMap := make(map[string]string)
-		var fuzztagToNucleiTag func(s string) string
-
-		if isRenderFuzzTag {
-			index := 0
-			fuzztagToNucleiTag = func(s string) string {
-				newString, newVarToFuzztagMap := ExtractAndReplaceFuzzTagFromStrings(s, index)
-				index += len(newVarToFuzztagMap)
-				utils.MergeToMap(varToFuzztagMap, newVarToFuzztagMap)
-				return newString
-			}
-		}
-
 		switch templateType {
 		case "path":
 			url, err := lowhttp.ExtractURLFromHTTPRequestRaw(request.RequestRaw, false)
@@ -299,12 +286,12 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 			method, _, _ := lowhttp.GetHTTPPacketFirstLine(request.RequestRaw)
 
 			if isRenderFuzzTag {
-				bulk.Method = fuzztagToNucleiTag(bulk.Method)
-				path = fuzztagToNucleiTag(path)
+				bulk.Method = RenderFuzztagParamsToNucleiParams(bulk.Method)
+				path = RenderFuzztagParamsToNucleiParams(path)
 				for k, v := range headers {
-					headers[k] = fuzztagToNucleiTag(v)
+					headers[k] = RenderFuzztagParamsToNucleiParams(v)
 				}
-				bulk.Body = fuzztagToNucleiTag(body)
+				bulk.Body = RenderFuzztagParamsToNucleiParams(body)
 			}
 			path = "{{RootURL}}" + path
 
@@ -322,7 +309,7 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 			// generalizedRequests := lowhttp.ReplaceHTTPPacketHeader(request.RequestRaw, "Host", "{{Hostname}}")
 			requestRaw := string(request.RequestRaw)
 			if isRenderFuzzTag {
-				requestRaw = fuzztagToNucleiTag(requestRaw)
+				requestRaw = RenderFuzztagParamsToNucleiParams(requestRaw)
 			}
 			requestRaw = string(lowhttp.ReplaceHTTPPacketHeader([]byte(requestRaw), "Host", "{{Hostname}}"))
 			bulk.HTTPRequests = append(bulk.HTTPRequests, &httptpl.YakHTTPRequestPacket{
@@ -446,26 +433,19 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 	}, nil
 }
 
-var fuzztagPattern = regexp.MustCompile(`\{\{.*?\}\}`)
-
-func ExtractAndReplaceFuzzTagFromStrings(s string, index int) (replaced string, varToFuzztagMap map[string]string) {
-	varToFuzztagMap = make(map[string]string)
-	nodes, err := fuzztagx.ParseFuzztag(s, false)
+func RenderFuzztagParamsToNucleiParams(s string) (replaced string) {
+	renderParamsFunc := func(s string) []string {
+		return []string{fmt.Sprintf("{{%s}}", s)}
+	}
+	res, err := fuzztagx.ExecuteWithStringHandler(s, map[string]func(string) []string{
+		"params": renderParamsFunc,
+		"param":  renderParamsFunc,
+		"p":      renderParamsFunc,
+	})
 	if err != nil {
-		return s, varToFuzztagMap
+		return s
 	}
-	replaced = ""
-	for _, node := range nodes {
-		switch node.(type) {
-		case parser.StringNode:
-			replaced += node.String()
-		default:
-			index++
-			replaced += fmt.Sprintf("{{payload%d}}", index)
-			varToFuzztagMap[fmt.Sprintf("payload%d", index)] = node.String()
-		}
-	}
-	return
+	return strings.Join(res, "")
 }
 
 func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
