@@ -183,14 +183,14 @@ func NewForgeBlueprint(name string, opts ...any) *aiforge.ForgeBlueprint {
 	ag := NewAgent(opts...)
 	ag.ForgeName = name
 	aiforgeOpts := slices.Clone(ag.AiForgeOptions)
-	aiforgeOpts = append(aiforgeOpts, aiforge.WithAIDOptions(ag.ExtendAIDOptions...))
+	aiforgeOpts = append(aiforgeOpts, aiforge.WithAIDOptions(ag.AIDOptions()...))
 	return aiforge.NewForgeBlueprint(name, aiforgeOpts...)
 }
 func NewExecutorFromForge(forge *aiforge.ForgeBlueprint, i any, opts ...any) (*aid.Coordinator, error) {
 	ag := NewAgent(opts...)
 	ag.ForgeName = forge.Name
 	params := aiforge.Any2ExecParams(i)
-	return forge.CreateCoordinator(context.Background(), params, ag.ExtendAIDOptions...)
+	return forge.CreateCoordinator(context.Background(), params, ag.AIDOptions()...)
 }
 func NewExecutorFromJson(json string, i any, opts ...any) (*aid.Coordinator, error) {
 	bp, err := aiforge.NewYakForgeBlueprintConfigFromJson(json)
@@ -204,7 +204,7 @@ func NewForgeExecutor(name string, i any, opts ...any) (*aid.Coordinator, error)
 	params := aiforge.Any2ExecParams(i)
 	ag := NewAgent(opts...)
 	bp := NewForgeBlueprint(name, opts...)
-	ins, err := bp.CreateCoordinator(context.Background(), params, ag.ExtendAIDOptions...)
+	ins, err := bp.CreateCoordinator(context.Background(), params, ag.AIDOptions()...)
 	if err != nil {
 		return nil, err
 	}
