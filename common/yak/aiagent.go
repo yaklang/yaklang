@@ -71,7 +71,7 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 					BindYakitPluginContextToEngine(
 						ae,
 						CreateYakitPluginContext(
-							runtimeConfig.RuntimeID,
+							runtimeId,
 						).WithContext(
 							ctx,
 						).WithContextCancel(
@@ -86,7 +86,7 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 				})
 
 				_, err = engine.ExecuteExWithContext(ctx, aiTool.Content, map[string]interface{}{
-					"RUNTIME_ID":   runtimeConfig.RuntimeID,
+					"RUNTIME_ID":   runtimeId,
 					"CTX":          ctx,
 					"PLUGIN_NAME":  aiTool.Name + ".yak",
 					"YAK_FILENAME": aiTool.Name + ".yak",
