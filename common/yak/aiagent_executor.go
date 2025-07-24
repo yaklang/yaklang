@@ -30,6 +30,7 @@ func ExecuteForge(forgeName string, i any, iopts ...any) (any, error) {
 	ag.ForgeName = forgeName
 	if ag.CoordinatorId == "" {
 		ag.CoordinatorId = uuid.NewString()
+		iopts = append(iopts, WithCoordinatorId(ag.CoordinatorId))
 	}
 
 	if ag.ctx == nil {
