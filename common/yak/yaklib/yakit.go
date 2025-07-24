@@ -576,45 +576,76 @@ func (c *YakitClient) YakitReport(i int) {
 	c.YakitDraw("report", fmt.Sprint(i))
 }
 
-func (c *YakitClient) YakitFile(fileName string, desc ...interface{}) {
-	title := fileName
-	descStr := ""
-	if len(desc) > 0 {
-		title = utils.InterfaceToString(desc[0])
-		if len(desc) > 1 {
-			descStr = utils.InterfaceToString(funk.Reduce(desc[1:], func(i interface{}, s interface{}) string {
-				return utils.InterfaceToString(i) + "," + utils.InterfaceToString(s)
-			}, ""))
-			descStr = strings.Trim(descStr, " \r\n,")
+func (c *YakitClient) YakitFile(fileName string, option ...interface{}) {
+	var rawDesc []string
+	var yakitFileAction []*YakitFileAction
+	for _, o := range option {
+		switch o.(type) {
+		case string:
+			rawDesc = append(rawDesc, o.(string))
+		case YakitFileAction:
+			action := o.(YakitFileAction)
+			yakitFileAction = append(yakitFileAction, &action)
+		case *YakitFileAction:
+			action := o.(*YakitFileAction)
+			yakitFileAction = append(yakitFileAction, action)
 		}
 	}
 
-	existed, _ := utils.PathExists(fileName)
-	var size uint64
 	isDir := utils.IsDir(fileName)
-	if existed && !isDir {
-		if info, _ := os.Stat(fileName); info != nil {
-			size = uint64(info.Size())
-		}
-	}
 	dir := fileName
 	if !isDir {
 		dir = filepath.Dir(dir)
 	}
-	raw, err := json.Marshal(map[string]interface{}{
-		"title":       title,
-		"description": descStr,
-		"path":        fileName,
-		"is_dir":      utils.IsDir(fileName),
-		"dir":         dir,
-		"is_existed":  existed,
-		"file_size":   utils.ByteSize(size),
-	})
-	if err != nil {
-		log.Errorf("error for build file struct data: %v", err)
-		return
+
+	if len(rawDesc) > 0 {
+		descStr := ""
+		title := rawDesc[0]
+		if len(rawDesc) > 1 {
+			descStr = utils.InterfaceToString(funk.Reduce(rawDesc[1:], func(i interface{}, s interface{}) string {
+				return utils.InterfaceToString(i) + "," + utils.InterfaceToString(s)
+			}, ""))
+			descStr = strings.Trim(descStr, " \r\n,")
+		}
+		existed, _ := utils.PathExists(fileName)
+		var size uint64
+		if existed && !isDir {
+			if info, _ := os.Stat(fileName); info != nil {
+				size = uint64(info.Size())
+			}
+		}
+		raw, err := json.Marshal(map[string]interface{}{
+			"title":       title,
+			"description": descStr,
+			"path":        fileName,
+			"is_dir":      utils.IsDir(fileName),
+			"dir":         dir,
+			"is_existed":  existed,
+			"file_size":   utils.ByteSize(size),
+		})
+		if err != nil {
+			log.Errorf("error for build file struct data: %v", err)
+			return
+		}
+		c.YakitDraw("file", string(raw))
 	}
-	c.YakitDraw("file", string(raw))
+
+	for _, action := range yakitFileAction {
+		raw, err := json.Marshal(map[string]interface{}{
+			"title":          fmt.Sprintf("operation file [%s] use asction [%s]", fileName, action.Action),
+			"action":         action.Action,
+			"path":           fileName,
+			"is_dir":         utils.IsDir(fileName),
+			"dir":            dir,
+			"action_message": action.Message,
+		})
+		if err != nil {
+			log.Errorf("error for build file struct data: %v", err)
+			return
+		}
+		c.YakitDraw("file", string(raw))
+	}
+
 }
 
 func (c *YakitClient) YakitError(tmp string, items ...interface{}) {
