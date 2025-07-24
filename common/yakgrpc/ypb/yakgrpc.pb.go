@@ -2954,6 +2954,7 @@ type AIForgeFilter struct {
 	Keyword    string                 `protobuf:"bytes,3,opt,name=Keyword,proto3" json:"Keyword,omitempty"`
 	// tag
 	Tag           []string `protobuf:"bytes,4,rep,name=Tag,proto3" json:"Tag,omitempty"`
+	Id            int64    `protobuf:"varint,5,opt,name=Id,proto3" json:"Id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3021,6 +3022,13 @@ func (x *AIForgeFilter) GetTag() []string {
 		return x.Tag
 	}
 	return nil
+}
+
+func (x *AIForgeFilter) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
 }
 
 type AIForge struct {
@@ -54851,7 +54859,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x04Name\x18\x02 \x01(\tR\x04Name\x12\x10\n" +
 	"\x03Seq\x18\x03 \x01(\x03R\x03Seq\x12\x1c\n" +
 	"\tUserInput\x18\x04 \x01(\tR\tUserInput\x12\x1c\n" +
-	"\tForgeName\x18\x05 \x01(\tR\tForgeName\"\x97\x01\n" +
+	"\tForgeName\x18\x05 \x01(\tR\tForgeName\"\xa7\x01\n" +
 	"\rAIForgeFilter\x12\x1c\n" +
 	"\tForgeName\x18\x01 \x01(\tR\tForgeName\x12\x1e\n" +
 	"\n" +
@@ -54859,7 +54867,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"ForgeNames\x12\x1c\n" +
 	"\tForgeType\x18\x02 \x01(\tR\tForgeType\x12\x18\n" +
 	"\aKeyword\x18\x03 \x01(\tR\aKeyword\x12\x10\n" +
-	"\x03Tag\x18\x04 \x03(\tR\x03Tag\"\x87\x04\n" +
+	"\x03Tag\x18\x04 \x03(\tR\x03Tag\x12\x0e\n" +
+	"\x02Id\x18\x05 \x01(\x03R\x02Id\"\x87\x04\n" +
 	"\aAIForge\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x12\x1c\n" +
 	"\tForgeName\x18\x02 \x01(\tR\tForgeName\x12\"\n" +
