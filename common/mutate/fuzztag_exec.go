@@ -163,20 +163,18 @@ func FuzzTagExec(input interface{}, opts ...FuzzConfigOpt) (_ []string, err erro
 	}
 	defer generator.Cancel()
 	var res []string
-	var verboses [][]string
 	count := 0
 	for count != config.resultLimit && generator.Next() {
 		result := generator.Result()
 		data := result.GetData()
 		res = append(res, string(data))
-		verboses = append(verboses, fuzztagx.GetResultVerbose(result))
-		count++
-	}
-
-	if config.resultHandler != nil {
-		for i, re := range res {
-			config.resultHandler(string(re), verboses[i])
+		if config.resultHandler != nil {
+			verbose := fuzztagx.GetResultVerbose(result)
+			if !config.resultHandler(string(data), verbose) {
+				return res, nil
+			}
 		}
+		count++
 	}
 	if err := generator.Error; err != nil {
 		return nil, err
