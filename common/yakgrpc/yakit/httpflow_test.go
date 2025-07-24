@@ -281,6 +281,135 @@ func TestHTTPFlow_StatusCode(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, flows, 0)
 	})
+
+	// Test ExcludeStatusCode field
+	t.Run("exclude single status code", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:           token,
+				ExcludeStatusCode: "200",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 4) // Should exclude 200, keep 201,202,203,204
+		for _, flow := range flows {
+			require.NotEqual(t, int64(200), flow.StatusCode)
+		}
+	})
+
+	t.Run("exclude multiple status codes", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:           token,
+				ExcludeStatusCode: "200,201,202",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 2) // Should exclude 200,201,202, keep 203,204
+		for _, flow := range flows {
+			require.NotContains(t, []int64{200, 201, 202}, flow.StatusCode)
+		}
+	})
+
+	t.Run("exclude status code range", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:           token,
+				ExcludeStatusCode: "200-202",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 2) // Should exclude 200,201,202, keep 203,204
+		for _, flow := range flows {
+			require.NotContains(t, []int64{200, 201, 202}, flow.StatusCode)
+		}
+	})
+
+	t.Run("exclude range and single code", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:           token,
+				ExcludeStatusCode: "200-201,204",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 2) // Should exclude 200,201,204, keep 202,203
+		for _, flow := range flows {
+			require.NotContains(t, []int64{200, 201, 204}, flow.StatusCode)
+		}
+	})
+
+	t.Run("exclude all status codes", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:           token,
+				ExcludeStatusCode: "200-204",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 0) // Should exclude all
+	})
+
+	t.Run("exclude non-existent status code", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:           token,
+				ExcludeStatusCode: "404",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 5) // Should exclude nothing, keep all 200-204
+	})
+
+	t.Run("exclude with prefix -", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:           token,
+				ExcludeStatusCode: "-200",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 5) // Invalid format should return normal results
+	})
+
+	t.Run("exclude with suffix -", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:           token,
+				ExcludeStatusCode: "200-",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 5) // Invalid format should return normal results
+	})
+
+	t.Run("exclude invalid format", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:           token,
+				ExcludeStatusCode: "abc",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 5) // Invalid format should return normal results
+	})
+
+	t.Run("exclude combined with include status code", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:           token,
+				StatusCode:        "200-204",
+				ExcludeStatusCode: "202",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 4) // Include 200-204, exclude 202, should get 200,201,203,204
+		for _, flow := range flows {
+			require.NotEqual(t, int64(202), flow.StatusCode)
+			require.Contains(t, []int64{200, 201, 203, 204}, flow.StatusCode)
+		}
+	})
+
 }
 
 func TestQueryHTTPFlowsProcessNames(t *testing.T) {

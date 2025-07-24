@@ -5343,6 +5343,7 @@ message QueryHTTPFlowRequest {
   repeated int64 AnalyzedIds = 46;
 
   string PayloadKeyword = 47;
+  string ExcludeStatusCode = 48; // 排除状态码
 }
 
 message HTTPFlowsToOnlineRequest {
