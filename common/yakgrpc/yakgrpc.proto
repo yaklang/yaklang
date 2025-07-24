@@ -6156,6 +6156,7 @@ message DbOperateMessage {
   string Operation = 2; // 操作 (增删改查)
   int64 EffectRows = 3; // 影响行数
   string ExtraMessage = 4; // 额外信息
+  int64 CreateID = 5;
 }
 
 message CPE {

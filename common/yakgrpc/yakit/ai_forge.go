@@ -41,7 +41,7 @@ func UpdateAIForgeByName(db *gorm.DB, name string, forge *schema.AIForge) error 
 
 func UpdateAIForgeByID(db *gorm.DB, id uint, forge *schema.AIForge) error {
 	db = db.Model(&schema.AIForge{})
-	if db := db.Where("id = ?", id).Updates(&schema.AIForge{}); db.Error != nil {
+	if db := db.Where("id = ?", id).Updates(forge); db.Error != nil {
 		return utils.Errorf("update AI Forge failed: %s", db.Error)
 	}
 	return nil

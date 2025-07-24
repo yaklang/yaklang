@@ -44295,6 +44295,7 @@ type DbOperateMessage struct {
 	Operation     string                 `protobuf:"bytes,2,opt,name=Operation,proto3" json:"Operation,omitempty"`       // 操作 (增删改查)
 	EffectRows    int64                  `protobuf:"varint,3,opt,name=EffectRows,proto3" json:"EffectRows,omitempty"`    // 影响行数
 	ExtraMessage  string                 `protobuf:"bytes,4,opt,name=ExtraMessage,proto3" json:"ExtraMessage,omitempty"` // 额外信息
+	CreateID      int64                  `protobuf:"varint,5,opt,name=CreateID,proto3" json:"CreateID,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -44355,6 +44356,13 @@ func (x *DbOperateMessage) GetExtraMessage() string {
 		return x.ExtraMessage
 	}
 	return ""
+}
+
+func (x *DbOperateMessage) GetCreateID() int64 {
+	if x != nil {
+		return x.CreateID
+	}
+	return 0
 }
 
 type CPE struct {
@@ -58503,14 +58511,15 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x04port\x18\b \x01(\x05R\x04port\"k\n" +
 	"#GenerateReverseShellCommandResponse\x12,\n" +
 	"\x06Status\x18\x01 \x01(\v2\x14.ypb.GeneralResponseR\x06Status\x12\x16\n" +
-	"\x06Result\x18\x02 \x01(\tR\x06Result\"\x92\x01\n" +
+	"\x06Result\x18\x02 \x01(\tR\x06Result\"\xae\x01\n" +
 	"\x10DbOperateMessage\x12\x1c\n" +
 	"\tTableName\x18\x01 \x01(\tR\tTableName\x12\x1c\n" +
 	"\tOperation\x18\x02 \x01(\tR\tOperation\x12\x1e\n" +
 	"\n" +
 	"EffectRows\x18\x03 \x01(\x03R\n" +
 	"EffectRows\x12\"\n" +
-	"\fExtraMessage\x18\x04 \x01(\tR\fExtraMessage\"\xb3\x01\n" +
+	"\fExtraMessage\x18\x04 \x01(\tR\fExtraMessage\x12\x1a\n" +
+	"\bCreateID\x18\x05 \x01(\x03R\bCreateID\"\xb3\x01\n" +
 	"\x03CPE\x12\x12\n" +
 	"\x04Part\x18\x01 \x01(\tR\x04Part\x12\x16\n" +
 	"\x06Vendor\x18\x02 \x01(\tR\x06Vendor\x12\x18\n" +
