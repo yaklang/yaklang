@@ -519,6 +519,7 @@ const (
 	Yak_InitSearchVectorDatabase_FullMethodName                   = "/ypb.Yak/InitSearchVectorDatabase"
 	Yak_GetAllVectorStoreCollections_FullMethodName               = "/ypb.Yak/GetAllVectorStoreCollections"
 	Yak_DeleteSearchVectorDatabase_FullMethodName                 = "/ypb.Yak/DeleteSearchVectorDatabase"
+	Yak_PluginTrace_FullMethodName                                = "/ypb.Yak/PluginTrace"
 )
 
 // YakClient is the client API for Yak service.
@@ -1163,6 +1164,8 @@ type YakClient interface {
 	InitSearchVectorDatabase(ctx context.Context, in *InitSearchVectorDatabaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
 	GetAllVectorStoreCollections(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetAllVectorStoreCollectionsResponse, error)
 	DeleteSearchVectorDatabase(ctx context.Context, in *DeleteSearchVectorDatabaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	// 插件执行跟踪双向流服务
+	PluginTrace(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PluginTraceRequest, PluginTraceResponse], error)
 }
 
 type yakClient struct {
@@ -6908,6 +6911,19 @@ func (c *yakClient) DeleteSearchVectorDatabase(ctx context.Context, in *DeleteSe
 	return out, nil
 }
 
+func (c *yakClient) PluginTrace(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PluginTraceRequest, PluginTraceResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[91], Yak_PluginTrace_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[PluginTraceRequest, PluginTraceResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_PluginTraceClient = grpc.BidiStreamingClient[PluginTraceRequest, PluginTraceResponse]
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility.
@@ -7550,6 +7566,8 @@ type YakServer interface {
 	InitSearchVectorDatabase(*InitSearchVectorDatabaseRequest, grpc.ServerStreamingServer[ExecResult]) error
 	GetAllVectorStoreCollections(context.Context, *Empty) (*GetAllVectorStoreCollectionsResponse, error)
 	DeleteSearchVectorDatabase(context.Context, *DeleteSearchVectorDatabaseRequest) (*GeneralResponse, error)
+	// 插件执行跟踪双向流服务
+	PluginTrace(grpc.BidiStreamingServer[PluginTraceRequest, PluginTraceResponse]) error
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -9059,6 +9077,9 @@ func (UnimplementedYakServer) GetAllVectorStoreCollections(context.Context, *Emp
 }
 func (UnimplementedYakServer) DeleteSearchVectorDatabase(context.Context, *DeleteSearchVectorDatabaseRequest) (*GeneralResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteSearchVectorDatabase not implemented")
+}
+func (UnimplementedYakServer) PluginTrace(grpc.BidiStreamingServer[PluginTraceRequest, PluginTraceResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method PluginTrace not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 func (UnimplementedYakServer) testEmbeddedByValue()             {}
@@ -17388,6 +17409,13 @@ func _Yak_DeleteSearchVectorDatabase_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_PluginTrace_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(YakServer).PluginTrace(&grpc.GenericServerStream[PluginTraceRequest, PluginTraceResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_PluginTraceServer = grpc.BidiStreamingServer[PluginTraceRequest, PluginTraceResponse]
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -19501,6 +19529,12 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "InitSearchVectorDatabase",
 			Handler:       _Yak_InitSearchVectorDatabase_Handler,
 			ServerStreams: true,
+		},
+		{
+			StreamName:    "PluginTrace",
+			Handler:       _Yak_PluginTrace_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
 		},
 	},
 	Metadata: "yakgrpc.proto",

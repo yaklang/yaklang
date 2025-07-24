@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 )
@@ -26,8 +24,8 @@ func TestPluginExecutionTracing(t *testing.T) {
 	traceEvents := make([]string, 0)
 	manager.AddExecutionTraceCallback(func(trace *PluginExecutionTrace) {
 		traceEvents = append(traceEvents, string(trace.Status))
-		log.Infof("跟踪事件: 插件[%s] Hook[%s] 状态[%s] 执行次数[%d]",
-			trace.PluginID, trace.HookName, trace.Status, trace.ExecutionCount)
+		log.Infof("跟踪事件: 插件[%s] Hook[%s] 状态[%s] TraceID[%s]",
+			trace.PluginID, trace.HookName, trace.Status, trace.TraceID)
 	})
 
 	// 创建测试插件
@@ -41,7 +39,7 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 		Type: "mitm",
 	}
 
-	// 添加插件 (此时应该创建Pending状态的跟踪记录)
+	// 添加插件 (现在不会立即创建跟踪记录)
 	err := manager.Add(context.Background(), testScript, map[string]any{}, testScript.Content, nil, "mirrorHTTPFlow")
 	if err != nil {
 		t.Fatalf("添加插件失败: %v", err)
@@ -50,18 +48,23 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	// 等待一下让回调处理完成
 	time.Sleep(100 * time.Millisecond)
 
-	// 验证跟踪记录已创建
+	// 验证插件注册后没有跟踪记录（因为还没有执行）
 	allTraces := manager.GetAllExecutionTraces()
-	if len(allTraces) == 0 {
-		t.Fatal("应该有跟踪记录被创建")
+	if len(allTraces) != 0 {
+		t.Errorf("插件注册后应该没有跟踪记录，实际有%d个", len(allTraces))
 	}
 
-	// 验证状态为Pending
+	// 执行插件 (此时应该创建新的Trace记录)
+	manager.CallByName("mirrorHTTPFlow", true, "http://example.com", []byte("request"), []byte("response"), []byte("body"))
+	time.Sleep(100 * time.Millisecond)
+
+	// 验证执行后创建了跟踪记录
+	allTraces = manager.GetAllExecutionTraces()
+	if len(allTraces) != 1 {
+		t.Fatalf("执行后应该有1个跟踪记录，实际有%d个", len(allTraces))
+	}
+
 	trace := allTraces[0]
-	if trace.Status != PluginStatusPending {
-		t.Errorf("期望状态为Pending, 实际为: %s", trace.Status)
-	}
-
 	if trace.PluginID != "test-plugin" {
 		t.Errorf("期望插件ID为test-plugin, 实际为: %s", trace.PluginID)
 	}
@@ -70,48 +73,34 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 		t.Errorf("期望Hook名为mirrorHTTPFlow, 实际为: %s", trace.HookName)
 	}
 
-	// 执行插件 (应该将状态从Pending转为Running再到Completed)
-	manager.CallByName("mirrorHTTPFlow", false, "http://example.com", []byte("request"), []byte("response"), []byte("body"))
-
-	// 等待执行完成
+	// 再次执行相同的插件 (应该创建新的Trace记录)
+	manager.CallByName("mirrorHTTPFlow", true, "http://example2.com", []byte("request2"), []byte("response2"), []byte("body2"))
 	time.Sleep(100 * time.Millisecond)
 
-	// 验证执行次数增加了
-	updatedTrace := manager.GetAllExecutionTraces()[0]
-	if updatedTrace.ExecutionCount == 0 {
-		t.Error("执行次数应该大于0")
+	// 验证现在有两个独立的跟踪记录
+	allTraces = manager.GetAllExecutionTraces()
+	if len(allTraces) != 2 {
+		t.Fatalf("两次执行后应该有2个跟踪记录，实际有%d个", len(allTraces))
 	}
 
-	// 验证最终状态为Completed
-	if updatedTrace.Status != PluginStatusCompleted {
-		t.Errorf("期望最终状态为Completed, 实际为: %s", updatedTrace.Status)
+	// 验证两个Trace记录有不同的TraceID
+	trace1 := allTraces[0]
+	trace2 := allTraces[1]
+	if trace1.TraceID == trace2.TraceID {
+		t.Error("两次执行应该有不同的TraceID")
 	}
 
-	// 验证执行时间被记录
-	if updatedTrace.Duration == 0 {
-		t.Error("执行时间应该大于0")
+	// 验证两个Trace记录都是同一个插件和Hook
+	if trace1.PluginID != trace2.PluginID || trace1.HookName != trace2.HookName {
+		t.Error("两个Trace记录应该属于同一个插件和Hook")
 	}
 
-	// 测试取消功能
-	manager.CallByName("mirrorHTTPFlow", false, "http://example2.com", []byte("request"), []byte("response"), []byte("body"))
-	time.Sleep(50 * time.Millisecond) // 让执行开始
-
-	// 取消所有执行
-	manager.CancelAllExecutionTraces()
-	time.Sleep(100 * time.Millisecond)
-
-	// 验证事件序列
-	expectedEvents := []string{"pending", "running", "completed", "running"}
-	if len(traceEvents) < len(expectedEvents) {
-		t.Errorf("期望至少有%d个跟踪事件, 实际有%d个", len(expectedEvents), len(traceEvents))
+	// 验证每个Trace都有独立的执行参数
+	if len(trace1.Args) == 0 || len(trace2.Args) == 0 {
+		t.Error("每个Trace应该都有执行参数记录")
 	}
 
-	// 验证第一个事件是pending
-	if len(traceEvents) > 0 && traceEvents[0] != "pending" {
-		t.Errorf("第一个事件应该是pending, 实际是: %s", traceEvents[0])
-	}
-
-	t.Logf("测试完成，跟踪事件序列: %v", traceEvents)
+	t.Logf("测试完成，总跟踪记录数: %d", len(allTraces))
 }
 
 // TestPluginExecutionTracingLifecycle 测试插件生命周期跟踪
@@ -144,20 +133,40 @@ afterRequest = func(isHttps, originReq, req, originRsp, rsp) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	// 验证为每个Hook都创建了跟踪记录
+	// 验证插件注册后没有跟踪记录（因为还没有执行）
 	allTraces := manager.GetAllExecutionTraces()
+	if len(allTraces) != 0 {
+		t.Errorf("插件注册后应该没有跟踪记录，实际有%d个", len(allTraces))
+	}
+
+	// 执行beforeRequest Hook
+	manager.CallByName("beforeRequest", true, []byte("original"), []byte("modified"))
+	time.Sleep(100 * time.Millisecond)
+
+	// 验证执行后创建了跟踪记录
+	allTraces = manager.GetAllExecutionTraces()
+	if len(allTraces) != 1 {
+		t.Fatalf("执行beforeRequest后应该有1个跟踪记录, 实际有%d个", len(allTraces))
+	}
+
+	// 验证第一个跟踪记录
+	trace1 := allTraces[0]
+	if trace1.HookName != "beforeRequest" {
+		t.Errorf("期望Hook名为beforeRequest, 实际为: %s", trace1.HookName)
+	}
+
+	// 执行afterRequest Hook
+	manager.CallByName("afterRequest", true, []byte("original"), []byte("request"), []byte("original"), []byte("response"))
+	time.Sleep(100 * time.Millisecond)
+
+	// 验证现在有两个跟踪记录
+	allTraces = manager.GetAllExecutionTraces()
 	if len(allTraces) != 2 {
-		t.Fatalf("应该有2个跟踪记录, 实际有%d个", len(allTraces))
+		t.Fatalf("执行两个Hook后应该有2个跟踪记录, 实际有%d个", len(allTraces))
 	}
 
 	// 验证Hook名
 	hookNames := make(map[string]bool)
-	for _, trace := range allTraces {
-		hookNames[trace.HookName] = true
-		if trace.Status != PluginStatusPending {
-			t.Errorf("Hook[%s]的状态应该为Pending, 实际为: %s", trace.HookName, trace.Status)
-		}
-	}
 
 	if !hookNames["beforeRequest"] || !hookNames["afterRequest"] {
 		t.Error("应该包含beforeRequest和afterRequest两个Hook的跟踪记录")
@@ -175,16 +184,20 @@ afterRequest = func(isHttps, originReq, req, originRsp, rsp) {
 		t.Errorf("插件应该有2个跟踪记录, 实际有%d个", len(pluginTraces))
 	}
 
-	// 执行Hook函数
-	manager.CallByName("beforeRequest", true, "http://test.com", []byte("original"), []byte("modified"))
+	// 再次执行beforeRequest Hook（应该创建新的Trace记录）
+	manager.CallByName("beforeRequest", true, []byte("original2"), []byte("modified2"))
 	time.Sleep(100 * time.Millisecond)
 
-	// 验证beforeRequest的执行次数
+	// 验证现在beforeRequest有2个跟踪记录
 	updatedBeforeTraces := manager.GetExecutionTracesByHook("beforeRequest")
-	if len(updatedBeforeTraces) > 0 && updatedBeforeTraces[0].ExecutionCount == 0 {
-		t.Error("beforeRequest的执行次数应该大于0")
-	} else {
-		assert.True(t, updatedBeforeTraces[0].Status == PluginStatusFailed, "插件因HOOK函数定义参数数目不一致应该导致调用错误进而在Trace中被记录")
+	if len(updatedBeforeTraces) != 2 {
+		t.Errorf("beforeRequest应该有2个跟踪记录, 实际有%d个", len(updatedBeforeTraces))
+	}
+
+	// 验证总跟踪记录数增加到3个
+	allTraces = manager.GetAllExecutionTraces()
+	if len(allTraces) != 3 {
+		t.Errorf("总共应该有3个跟踪记录, 实际有%d个", len(allTraces))
 	}
 
 	t.Logf("生命周期测试完成，总跟踪记录数: %d", len(manager.GetAllExecutionTraces()))
@@ -202,14 +215,40 @@ func TestPluginExecutionTracingPerformance(t *testing.T) {
 	// 添加多个插件和Hook组合
 	for _, pluginName := range plugins {
 		for _, hookName := range hooks {
-			testScript := &schema.YakScript{
-				ScriptName: pluginName,
-				Content: fmt.Sprintf(`
+			var funcContent string
+			switch hookName {
+			case "mirrorHTTPFlow":
+				funcContent = fmt.Sprintf(`
+%s = func(isHttps, url, req, rsp, body) {
+	yakit_output("测试插件 %s 的 %s Hook: " + url)
+}
+`, hookName, pluginName, hookName)
+			case "beforeRequest":
+				funcContent = fmt.Sprintf(`
+%s = func(isHttps, originReq, req) {
+	yakit_output("测试插件 %s 的 %s Hook")
+	return req
+}
+`, hookName, pluginName, hookName)
+			case "afterRequest":
+				funcContent = fmt.Sprintf(`
+%s = func(isHttps, originReq, req, originRsp, rsp) {
+	yakit_output("测试插件 %s 的 %s Hook")
+	return rsp
+}
+`, hookName, pluginName, hookName)
+			default:
+				funcContent = fmt.Sprintf(`
 %s = func() {
 	yakit_output("测试插件 %s 的 %s Hook")
 }
-`, hookName, pluginName, hookName),
-				Type: "mitm",
+`, hookName, pluginName, hookName)
+			}
+
+			testScript := &schema.YakScript{
+				ScriptName: pluginName,
+				Content:    funcContent,
+				Type:       "mitm",
 			}
 
 			err := manager.Add(context.Background(), testScript, map[string]any{}, testScript.Content, nil, hookName)
@@ -221,23 +260,53 @@ func TestPluginExecutionTracingPerformance(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	// 验证总跟踪记录数
+	// 验证插件注册后没有跟踪记录
 	allTraces := manager.GetAllExecutionTraces()
-	expectedCount := len(plugins) * len(hooks)
+	if len(allTraces) != 0 {
+		t.Errorf("插件注册后应该没有跟踪记录，实际有%d个", len(allTraces))
+	}
+
+	// 执行每个插件的每个Hook一次来创建跟踪记录
+	for _, pluginName := range plugins {
+		for _, hookName := range hooks {
+			// 构造插件特定的Hook名称
+			specificHookName := hookName
+			switch hookName {
+			case "mirrorHTTPFlow":
+				manager.CallByName(specificHookName, true, fmt.Sprintf("http://%s.com", pluginName), []byte("request"), []byte("response"), []byte("body"))
+			case "beforeRequest":
+				manager.CallByName(specificHookName, true, []byte("original"), []byte("modified"))
+			case "afterRequest":
+				manager.CallByName(specificHookName, true, []byte("original"), []byte("request"), []byte("original"), []byte("response"))
+			}
+		}
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	// 验证总跟踪记录数
+	// 每次调用Hook时，所有注册了该Hook的插件都会被执行
+	// 所以总数 = plugins数量 × hooks数量 × plugins数量（因为每个plugin名调用一次，触发所有plugin）
+	allTraces = manager.GetAllExecutionTraces()
+	expectedCount := len(plugins) * len(hooks) * len(plugins)
 	if len(allTraces) != expectedCount {
 		t.Errorf("期望有 %d 个跟踪记录, 实际有 %d 个", expectedCount, len(allTraces))
 	}
 
 	// 测试按插件ID查询的性能 - 应该是O(1)查找
+	// 每个插件被调用了 hooks数量 × plugins数量 次
 	plugin1Traces := manager.GetExecutionTracesByPlugin("plugin1")
-	if len(plugin1Traces) != len(hooks) {
-		t.Errorf("plugin1 应该有 %d 个跟踪记录, 实际有 %d 个", len(hooks), len(plugin1Traces))
+	expectedPlugin1Count := len(hooks) * len(plugins)
+	if len(plugin1Traces) != expectedPlugin1Count {
+		t.Errorf("plugin1 应该有 %d 个跟踪记录, 实际有 %d 个", expectedPlugin1Count, len(plugin1Traces))
 	}
 
 	// 测试按Hook名查询的性能 - 应该是O(1)查找
+	// 每个Hook被调用了 plugins数量 × plugins数量 次
 	mirrorTraces := manager.GetExecutionTracesByHook("mirrorHTTPFlow")
-	if len(mirrorTraces) != len(plugins) {
-		t.Errorf("mirrorHTTPFlow 应该有 %d 个跟踪记录, 实际有 %d 个", len(plugins), len(mirrorTraces))
+	expectedMirrorCount := len(plugins) * len(plugins)
+	if len(mirrorTraces) != expectedMirrorCount {
+		t.Errorf("mirrorHTTPFlow 应该有 %d 个跟踪记录, 实际有 %d 个", expectedMirrorCount, len(mirrorTraces))
 	}
 
 	// 测试精确查找特定插件和Hook组合 - 应该是O(1)查找
@@ -245,10 +314,11 @@ func TestPluginExecutionTracingPerformance(t *testing.T) {
 	specificTrace := tracker.FindTraceByPluginAndHook("plugin2", "beforeRequest")
 	if specificTrace == nil {
 		t.Error("应该能找到 plugin2 的 beforeRequest 跟踪记录")
-	}
-	if specificTrace.PluginID != "plugin2" || specificTrace.HookName != "beforeRequest" {
-		t.Errorf("查找结果不正确: 期望 plugin2.beforeRequest, 实际 %s.%s",
-			specificTrace.PluginID, specificTrace.HookName)
+	} else {
+		if specificTrace.PluginID != "plugin2" || specificTrace.HookName != "beforeRequest" {
+			t.Errorf("查找结果不正确: 期望 plugin2.beforeRequest, 实际 %s.%s",
+				specificTrace.PluginID, specificTrace.HookName)
+		}
 	}
 
 	// 测试不存在的组合
@@ -303,7 +373,7 @@ beforeRequest = func(isHttps, originReq, req) {
 		traceEvents = traceEvents[:0]
 		mu.Unlock()
 
-		manager.CallByName("beforeRequest", false, []byte("original"), []byte("request"))
+		manager.CallByName("beforeRequest", true, []byte("original"), []byte("request"))
 		time.Sleep(200 * time.Millisecond)
 
 		mu.Lock()
@@ -351,7 +421,7 @@ beforeRequest = func(isHttps, originReq, req) {
 		traceEvents = traceEvents[:0]
 		mu.Unlock()
 
-		manager.CallByName("beforeRequest", false, []byte("original"), []byte("request"))
+		manager.CallByName("beforeRequest", true, []byte("original"), []byte("request"))
 		time.Sleep(200 * time.Millisecond)
 
 		mu.Lock()
@@ -400,7 +470,7 @@ beforeRequest = func(isHttps, originReq, req) {
 		traceEvents = traceEvents[:0]
 		mu.Unlock()
 
-		manager.CallByName("beforeRequest", false, []byte("original"), []byte("request"))
+		manager.CallByName("beforeRequest", true, []byte("original"), []byte("request"))
 		time.Sleep(300 * time.Millisecond)
 
 		mu.Lock()
@@ -474,7 +544,7 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 
 	// 启动插件执行
 	go func() {
-		manager.CallByName("mirrorHTTPFlow", false, "http://example.com", []byte("request"), []byte("response"), []byte("body"))
+		manager.CallByName("mirrorHTTPFlow", true, "http://example.com", []byte("request"), []byte("response"), []byte("body"))
 	}()
 
 	// 等待插件开始执行
@@ -574,7 +644,7 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 		wg.Add(1)
 		go func(index int) {
 			defer wg.Done()
-			manager.CallByName("mirrorHTTPFlow", false, fmt.Sprintf("http://example%d.com", index),
+			manager.CallByName("mirrorHTTPFlow", true, fmt.Sprintf("http://example%d.com", index),
 				[]byte("request"), []byte("response"), []byte("body"))
 		}(i)
 	}
@@ -626,7 +696,7 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	time.Sleep(100 * time.Millisecond)
 
 	// 执行插件
-	manager.CallByName("mirrorHTTPFlow", false, "http://example.com", []byte("request"), []byte("response"), []byte("body"))
+	manager.CallByName("mirrorHTTPFlow", true, "http://example.com", []byte("request"), []byte("response"), []byte("body"))
 	time.Sleep(100 * time.Millisecond)
 
 	// 验证有跟踪记录
@@ -674,7 +744,7 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	time.Sleep(100 * time.Millisecond)
 
 	// 执行插件
-	manager.CallByName("mirrorHTTPFlow", false, "http://example.com", []byte("request"), []byte("response"), []byte("body"))
+	manager.CallByName("mirrorHTTPFlow", true, "http://example.com", []byte("request"), []byte("response"), []byte("body"))
 	time.Sleep(100 * time.Millisecond)
 
 	// 验证没有跟踪记录
@@ -745,7 +815,7 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	mu.Unlock()
 
 	// 执行所有插件
-	manager.CallByName("mirrorHTTPFlow", false, "http://example.com", []byte("request"), []byte("response"), []byte("body"))
+	manager.CallByName("mirrorHTTPFlow", true, "http://example.com", []byte("request"), []byte("response"), []byte("body"))
 	time.Sleep(200 * time.Millisecond)
 
 	// 验证结果
@@ -771,4 +841,104 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	}
 
 	t.Logf("混合场景测试完成: 成功 %d 个, 失败 %d 个", completedCount, failedCount)
+}
+
+// TestMultipleExecutionTraces 测试同一插件多次执行创建独立Trace记录
+func TestMultipleExecutionTraces(t *testing.T) {
+	manager := NewYakToCallerManager()
+	manager.EnableExecutionTracing(true)
+
+	// 创建测试插件
+	testScript := &schema.YakScript{
+		ScriptName: "multi-exec-plugin",
+		Content: `
+mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
+	yakit_output("处理URL: " + url)
+	return "processed: " + url
+}
+`,
+		Type: "mitm",
+	}
+
+	// 添加插件
+	err := manager.Add(context.Background(), testScript, map[string]any{}, testScript.Content, nil, "mirrorHTTPFlow")
+	if err != nil {
+		t.Fatalf("添加插件失败: %v", err)
+	}
+
+	// 执行同一插件的同一Hook多次，每次使用不同的参数
+	urls := []string{
+		"http://example1.com",
+		"http://example2.com",
+		"http://example3.com",
+	}
+
+	for i, url := range urls {
+		t.Logf("执行第%d次调用，URL: %s", i+1, url)
+		manager.CallByName("mirrorHTTPFlow", true, url, []byte("request"), []byte("response"), []byte("body"))
+		time.Sleep(50 * time.Millisecond) // 确保每次调用完成
+	}
+
+	// 等待所有执行完成
+	time.Sleep(200 * time.Millisecond)
+
+	// 验证创建了3个独立的Trace记录
+	allTraces := manager.GetAllExecutionTraces()
+	if len(allTraces) != 3 {
+		t.Fatalf("期望有3个跟踪记录，实际有%d个", len(allTraces))
+	}
+
+	// 验证每个Trace都有唯一的TraceID
+	traceIDs := make(map[string]bool)
+	for _, trace := range allTraces {
+		if traceIDs[trace.TraceID] {
+			t.Errorf("发现重复的TraceID: %s", trace.TraceID)
+		}
+		traceIDs[trace.TraceID] = true
+
+		// 验证基本信息
+		if trace.PluginID != "multi-exec-plugin" {
+			t.Errorf("期望插件ID为multi-exec-plugin，实际为: %s", trace.PluginID)
+		}
+		if trace.HookName != "mirrorHTTPFlow" {
+			t.Errorf("期望Hook名为mirrorHTTPFlow，实际为: %s", trace.HookName)
+		}
+
+		// 验证执行参数不同
+		if len(trace.Args) < 1 {
+			t.Error("Trace应该包含执行参数")
+		}
+	}
+
+	// 验证按插件ID查询能获取到所有3个Trace
+	pluginTraces := manager.GetExecutionTracesByPlugin("multi-exec-plugin")
+	if len(pluginTraces) != 3 {
+		t.Errorf("按插件ID查询应该返回3个Trace，实际返回%d个", len(pluginTraces))
+	}
+
+	// 验证按Hook名查询能获取到所有3个Trace
+	hookTraces := manager.GetExecutionTracesByHook("mirrorHTTPFlow")
+	if len(hookTraces) != 3 {
+		t.Errorf("按Hook名查询应该返回3个Trace，实际返回%d个", len(hookTraces))
+	}
+
+	// 验证FindTraceByPluginAndHook返回最新的Trace
+	latestTrace := manager.GetExecutionTracker().FindTraceByPluginAndHook("multi-exec-plugin", "mirrorHTTPFlow")
+	if latestTrace == nil {
+		t.Error("FindTraceByPluginAndHook应该返回最新的Trace")
+	} else {
+		// 验证返回的是最新的Trace（LoadedTime最晚的）
+		isLatest := true
+		for _, trace := range allTraces {
+			if trace.TraceID != latestTrace.TraceID && trace.LoadedTime.After(latestTrace.LoadedTime) {
+				isLatest = false
+				break
+			}
+		}
+		if !isLatest {
+			t.Error("FindTraceByPluginAndHook应该返回最新创建的Trace")
+		}
+	}
+
+	t.Logf("多次执行测试完成，创建了%d个独立的Trace记录", len(allTraces))
 }

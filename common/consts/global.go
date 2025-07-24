@@ -51,7 +51,7 @@ var (
 
 	GLOBAL_DB_SAVE_SYNC = utils.NewBool(false)
 
-	GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT = atomic.NewFloat64(60)
+	GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT = atomic.NewFloat64(300)
 
 	// tls global config
 	GLOBAL_TLS_MIN_VERSION uint16 = gmtls.VersionSSL30
