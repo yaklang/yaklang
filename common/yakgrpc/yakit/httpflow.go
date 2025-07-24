@@ -813,6 +813,21 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 			db = db.Where("true = false")
 		}
 	}
+	excludeStatusCodeRaw := params.GetExcludeStatusCode()
+	if strings.HasPrefix(excludeStatusCodeRaw, "-") || strings.HasSuffix(excludeStatusCodeRaw, "-") {
+		// 排除-200,200-这样的写法
+		// skip
+	} else {
+		excludeStatusCode := utils.ParseStringToPorts(excludeStatusCodeRaw)
+		if len(excludeStatusCode) > 0 {
+			db = bizhelper.ExactExcludeQueryInt64Array(db, "status_code", lo.Map(excludeStatusCode, func(item int, index int) int64 {
+				return int64(item)
+			}))
+		} else if len(excludeStatusCodeRaw) > 0 {
+			// 如果状态码不合理，应该返回空
+			// skip
+		}
+	}
 	if params.GetHaveBody() {
 		db = db.Where("body_length > 0")
 	}
