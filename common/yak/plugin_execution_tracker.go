@@ -23,44 +23,41 @@ const (
 
 // PluginExecutionTrace 插件执行跟踪信息
 type PluginExecutionTrace struct {
-	TraceID        string                `json:"trace_id"`        // 跟踪ID，唯一标识一次执行
-	PluginID       string                `json:"plugin_id"`       // 插件ID
-	HookName       string                `json:"hook_name"`       // Hook函数名
-	Status         PluginExecutionStatus `json:"status"`          // 执行状态
-	LoadedTime     time.Time             `json:"loaded_time"`     // 插件加载时间
-	StartTime      time.Time             `json:"start_time"`      // 执行开始时间
-	EndTime        time.Time             `json:"end_time"`        // 执行结束时间
-	Duration       time.Duration         `json:"duration"`        // 执行耗时
-	Args           []interface{}         `json:"args"`            // 执行参数
-	Result         interface{}           `json:"result"`          // 执行结果
-	Error          string                `json:"error"`           // 错误信息
-	CancelFunc     context.CancelFunc    `json:"-"`               // 取消函数
-	RuntimeCtx     context.Context       `json:"-"`               // 运行时上下文
-	ExecutionCount int64                 `json:"execution_count"` // 执行次数
+	TraceID    string                `json:"trace_id"`    // 跟踪ID，唯一标识一次执行
+	PluginID   string                `json:"plugin_id"`   // 插件ID
+	HookName   string                `json:"hook_name"`   // Hook函数名
+	Status     PluginExecutionStatus `json:"status"`      // 执行状态
+	LoadedTime time.Time             `json:"loaded_time"` // 插件加载时间
+	StartTime  time.Time             `json:"start_time"`  // 执行开始时间
+	EndTime    time.Time             `json:"end_time"`    // 执行结束时间
+	Duration   time.Duration         `json:"duration"`    // 执行耗时
+	Args       []interface{}         `json:"args"`        // 执行参数
+	Result     interface{}           `json:"result"`      // 执行结果
+	Error      string                `json:"error"`       // 错误信息
+	CancelFunc context.CancelFunc    `json:"-"`           // 取消函数
+	RuntimeCtx context.Context       `json:"-"`           // 运行时上下文
 }
 
 // PluginExecutionTracker 插件执行跟踪器
 type PluginExecutionTracker struct {
-	traces           *sync.Map                     // map[traceID]*PluginExecutionTrace
-	pluginHookTraces *sync.Map                     // map[pluginID_hookName]traceID 用于快速查找
-	pluginTraces     *sync.Map                     // map[pluginID][]traceID 按插件ID索引
-	hookTraces       *sync.Map                     // map[hookName][]traceID 按Hook名索引
-	callbacks        []func(*PluginExecutionTrace) // 回调函数列表
-	mu               sync.RWMutex
+	traces       *sync.Map                     // map[traceID]*PluginExecutionTrace
+	pluginTraces *sync.Map                     // map[pluginID][]traceID 按插件ID索引
+	hookTraces   *sync.Map                     // map[hookName][]traceID 按Hook名索引
+	callbacks    []func(*PluginExecutionTrace) // 回调函数列表
+	mu           sync.RWMutex
 }
 
 // NewPluginExecutionTracker 创建新的插件执行跟踪器
 func NewPluginExecutionTracker() *PluginExecutionTracker {
 	return &PluginExecutionTracker{
-		traces:           &sync.Map{},
-		pluginHookTraces: &sync.Map{},
-		pluginTraces:     &sync.Map{},
-		hookTraces:       &sync.Map{},
-		callbacks:        make([]func(*PluginExecutionTrace), 0),
+		traces:       &sync.Map{},
+		pluginTraces: &sync.Map{},
+		hookTraces:   &sync.Map{},
+		callbacks:    make([]func(*PluginExecutionTrace), 0),
 	}
 }
 
-// makePluginHookKey 创建插件和Hook的复合键
+// makePluginHookKey 创建插件和Hook的复合键（保留用于兼容性，但不再用于唯一性标识）
 func makePluginHookKey(pluginID, hookName string) string {
 	return pluginID + "_" + hookName
 }
@@ -147,33 +144,34 @@ func (t *PluginExecutionTracker) notifyCallbacks(trace *PluginExecutionTrace) {
 	}
 }
 
-// StartTrace 开始跟踪插件加载
-func (t *PluginExecutionTracker) StartTrace(pluginID, hookName string, runtimeCtx context.Context) *PluginExecutionTrace {
+// CreateTrace 创建新的插件执行跟踪记录（每次调用都创建新的Trace）
+func (t *PluginExecutionTracker) CreateTrace(pluginID, hookName string, runtimeCtx context.Context) *PluginExecutionTrace {
 	traceID := uuid.NewString()
 
 	ctx, cancel := context.WithCancel(runtimeCtx)
 
 	trace := &PluginExecutionTrace{
-		TraceID:        traceID,
-		PluginID:       pluginID,
-		HookName:       hookName,
-		Status:         PluginStatusPending,
-		LoadedTime:     time.Now(),
-		CancelFunc:     cancel,
-		RuntimeCtx:     ctx,
-		ExecutionCount: 0,
+		TraceID:    traceID,
+		PluginID:   pluginID,
+		HookName:   hookName,
+		Status:     PluginStatusPending,
+		LoadedTime: time.Now(),
+		CancelFunc: cancel,
+		RuntimeCtx: ctx,
 	}
 
 	// 存储跟踪记录
 	t.traces.Store(traceID, trace)
-	// 建立插件-Hook到TraceID的映射，用于快速查找
-	pluginHookKey := makePluginHookKey(pluginID, hookName)
-	t.pluginHookTraces.Store(pluginHookKey, traceID)
 	// 添加到索引
 	t.addToIndex(pluginID, hookName, traceID)
 
 	t.notifyCallbacks(trace)
 	return trace
+}
+
+// StartTrace 开始跟踪插件加载（保留用于向后兼容，但现在总是创建新的Trace）
+func (t *PluginExecutionTracker) StartTrace(pluginID, hookName string, runtimeCtx context.Context) *PluginExecutionTrace {
+	return t.CreateTrace(pluginID, hookName, runtimeCtx)
 }
 
 // StartExecution 开始执行跟踪（从Pending转为Running）
@@ -183,20 +181,56 @@ func (t *PluginExecutionTracker) StartExecution(traceID string, args []interface
 		trace.Status = PluginStatusRunning
 		trace.StartTime = time.Now()
 		trace.Args = args
-		trace.ExecutionCount++
 		t.notifyCallbacks(trace)
 		return true
 	}
 	return false
 }
 
-// FindTraceByPluginAndHook 根据插件ID和Hook名查找跟踪记录
+// FindTraceByPluginAndHook 根据插件ID和Hook名查找最新的跟踪记录
+// 注意：此方法现在返回最新创建的Trace记录，主要用于兼容性
 func (t *PluginExecutionTracker) FindTraceByPluginAndHook(pluginID, hookName string) *PluginExecutionTrace {
-	pluginHookKey := makePluginHookKey(pluginID, hookName)
-	if traceID, ok := t.pluginHookTraces.Load(pluginHookKey); ok {
-		if trace, exists := t.traces.Load(traceID.(string)); exists {
-			return trace.(*PluginExecutionTrace)
+	// 获取该插件和Hook的所有Trace记录
+	if value, ok := t.pluginTraces.Load(pluginID); ok {
+		traceIDs := value.([]string)
+		var latestTrace *PluginExecutionTrace
+		var latestTime time.Time
+
+		for _, traceID := range traceIDs {
+			if trace, exists := t.traces.Load(traceID); exists {
+				traceObj := trace.(*PluginExecutionTrace)
+				if traceObj.HookName == hookName {
+					if latestTrace == nil || traceObj.LoadedTime.After(latestTime) {
+						latestTrace = traceObj
+						latestTime = traceObj.LoadedTime
+					}
+				}
+			}
 		}
+		return latestTrace
+	}
+	return nil
+}
+
+// FindLatestRunningTraceByPluginAndHook 查找指定插件和Hook的最新正在运行的Trace
+func (t *PluginExecutionTracker) FindLatestRunningTraceByPluginAndHook(pluginID, hookName string) *PluginExecutionTrace {
+	if value, ok := t.pluginTraces.Load(pluginID); ok {
+		traceIDs := value.([]string)
+		var latestTrace *PluginExecutionTrace
+		var latestTime time.Time
+
+		for _, traceID := range traceIDs {
+			if trace, exists := t.traces.Load(traceID); exists {
+				traceObj := trace.(*PluginExecutionTrace)
+				if traceObj.HookName == hookName && traceObj.Status == PluginStatusRunning {
+					if latestTrace == nil || traceObj.StartTime.After(latestTime) {
+						latestTrace = traceObj
+						latestTime = traceObj.StartTime
+					}
+				}
+			}
+		}
+		return latestTrace
 	}
 	return nil
 }
@@ -336,15 +370,37 @@ func (t *PluginExecutionTracker) RemoveTrace(traceID string) bool {
 
 		// 删除跟踪记录
 		t.traces.Delete(traceID)
-		// 删除插件-Hook映射
-		pluginHookKey := makePluginHookKey(trace.PluginID, trace.HookName)
-		t.pluginHookTraces.Delete(pluginHookKey)
 		// 从索引中移除
 		t.removeFromIndex(trace.PluginID, trace.HookName, traceID)
 
 		return true
 	}
 	return false
+}
+
+// RemoveTracesByPluginAndHook 删除指定插件和Hook的所有跟踪记录
+func (t *PluginExecutionTracker) RemoveTracesByPluginAndHook(pluginID, hookName string) int {
+	removed := 0
+	if value, ok := t.pluginTraces.Load(pluginID); ok {
+		traceIDs := value.([]string)
+		var toRemove []string
+
+		for _, traceID := range traceIDs {
+			if trace, exists := t.traces.Load(traceID); exists {
+				traceObj := trace.(*PluginExecutionTrace)
+				if traceObj.HookName == hookName {
+					toRemove = append(toRemove, traceID)
+				}
+			}
+		}
+
+		for _, traceID := range toRemove {
+			if t.RemoveTrace(traceID) {
+				removed++
+			}
+		}
+	}
+	return removed
 }
 
 // GetPluginExecutionStatistics 获取插件执行统计信息

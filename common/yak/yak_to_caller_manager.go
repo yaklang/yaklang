@@ -550,11 +550,10 @@ func (y *YakToCallerManager) Remove(params *ypb.RemoveHookParams) {
 
 				// 如果启用了执行跟踪，清理相关的跟踪记录
 				if y.enableTracing {
-					trace := y.executionTracker.FindTraceByPluginAndHook(l.Id, k)
-					if trace != nil {
-						// 删除跟踪记录
-						y.executionTracker.RemoveTrace(trace.TraceID)
-						log.Debugf("清理插件执行跟踪: 插件[%s], Hook[%s]", l.Id, k)
+					// 删除该插件和Hook的所有跟踪记录
+					removed := y.executionTracker.RemoveTracesByPluginAndHook(l.Id, k)
+					if removed > 0 {
+						log.Debugf("清理插件执行跟踪: 插件[%s], Hook[%s], 删除了%d个跟踪记录", l.Id, k, removed)
 					}
 				}
 
@@ -771,14 +770,9 @@ func (y *YakToCallerManager) Add(ctx context.Context, script *schema.YakScript, 
 		}
 
 		// 如果启用了执行跟踪，为每个Hook函数创建跟踪记录
+		// 注意：这里不再创建跟踪记录，而是在实际调用时创建，以确保每次调用都有独立的跟踪记录
 		if y.enableTracing {
-			// 检查是否已存在跟踪记录
-			existingTrace := y.executionTracker.FindTraceByPluginAndHook(id, name)
-			if existingTrace == nil {
-				// 创建新的跟踪记录，状态为Pending
-				y.executionTracker.StartTrace(id, name, ctx)
-				log.Debugf("创建插件执行跟踪: 插件[%s], Hook[%s]", id, name)
-			}
+			log.Debugf("插件[%s] Hook[%s]已注册，将在执行时创建跟踪记录", id, name)
 		}
 
 		res, ok := y.table.Load(name)
@@ -961,17 +955,16 @@ func (y *YakToCallerManager) Call(name string, opts ...CallOpt) (results []any) 
 				items = append(items, i())
 			}
 
-			// 如果启用了执行跟踪，查找或创建跟踪记录
+			// 如果启用了执行跟踪，为每次调用创建新的跟踪记录
 			var trace *PluginExecutionTrace
 			if y.enableTracing {
-				// 查找已存在的跟踪记录
-				trace = y.executionTracker.FindTraceByPluginAndHook(i.Id, name)
-				if trace != nil {
-					// 开始执行
-					y.executionTracker.StartExecution(trace.TraceID, items)
-					// 使用跟踪的上下文替换原始上下文
-					runtimeCtx = trace.RuntimeCtx
-				}
+				// 为每次调用创建新的跟踪记录
+				trace = y.executionTracker.CreateTrace(i.Id, name, runtimeCtx)
+				// 开始执行
+				y.executionTracker.StartExecution(trace.TraceID, items)
+				// 使用跟踪的上下文替换原始上下文
+				runtimeCtx = trace.RuntimeCtx
+				log.Debugf("创建新的插件执行跟踪: 插件[%s], Hook[%s], TraceID[%s]", i.Id, name, trace.TraceID)
 			}
 
 			log.Debugf("call %v.%v(params...)", i.Id, name)
