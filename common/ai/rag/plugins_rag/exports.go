@@ -19,7 +19,7 @@ func CreateDefaultSQLiteManager(db *gorm.DB, collectionName string, opts ...aisp
 		return nil, err
 	}
 	opts = append(opts, aispec.WithBaseURL(cfg.BaseURL))
-	return NewSQLitePluginsRagManager(db, collectionName, cfg.Model, cfg.Dimension, opts...)
+	return NewSQLitePluginsRagManager(db, collectionName, cfg.Model, cfg.Dimension, "", opts...)
 }
 
 // IndexAllPlugins 索引所有未被忽略的插件
@@ -50,24 +50,6 @@ func SearchPlugins(query string, limit int) ([]*PluginSearchResult, error) {
 		return nil, err
 	}
 	return manager.SearchPlugins(query, limit)
-}
-
-func DeleteAllPlugins() error {
-	db := consts.GetGormProfileDatabase()
-	manager, err := CreateDefaultSQLiteManager(db, PLUGIN_RAG_COLLECTION_NAME)
-	if err != nil {
-		return err
-	}
-	return manager.Clear()
-}
-
-func DeletePlugin(scriptName string) error {
-	db := consts.GetGormProfileDatabase()
-	manager, err := CreateDefaultSQLiteManager(db, PLUGIN_RAG_COLLECTION_NAME)
-	if err != nil {
-		return err
-	}
-	return manager.RemovePlugin(scriptName)
 }
 
 func IsReady() bool {

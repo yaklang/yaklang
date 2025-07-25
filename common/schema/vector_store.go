@@ -8,8 +8,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// 为了在数据库中存储浮点数数组，我们需要创建一个自定义类型
-type FloatArray []float64
+// FloatArray 用于在数据库中存储浮点数数组的自定义类型
+// 实现了 driver.Valuer 和 sql.Scanner 接口，支持数据库存储和读取
+type FloatArray []float32
 
 // Value 实现 driver.Valuer 接口，用于将 []float64 转换为数据库可以存储的值
 func (f FloatArray) Value() (driver.Value, error) {
@@ -38,10 +39,11 @@ func (f *FloatArray) Scan(value interface{}) error {
 	return json.Unmarshal(bytes, f)
 }
 
-// MetadataMap 用于存储文档元数据
+// MetadataMap 用于存储文档元数据的自定义类型
+// 实现了 driver.Valuer 和 sql.Scanner 接口，支持在数据库中存储 map 类型数据
 type MetadataMap map[string]interface{}
 
-// Value 实现 driver.Valuer 接口
+// Value 实现 driver.Valuer 接口，用于将 map 转换为数据库可以存储的值
 func (m MetadataMap) Value() (driver.Value, error) {
 	if m == nil {
 		return nil, nil
@@ -50,7 +52,7 @@ func (m MetadataMap) Value() (driver.Value, error) {
 	return string(bytes), err
 }
 
-// Scan 实现 sql.Scanner 接口
+// Scan 实现 sql.Scanner 接口，用于将数据库存储的值转换回 map
 func (m *MetadataMap) Scan(value interface{}) error {
 	if value == nil {
 		*m = nil
@@ -68,41 +70,126 @@ func (m *MetadataMap) Scan(value interface{}) error {
 	return json.Unmarshal(bytes, m)
 }
 
+// GroupInfos 用于存储 HNSW 图结构中节点连接信息数组的自定义类型
+// 实现了 driver.Valuer 和 sql.Scanner 接口，支持在数据库中存储复杂结构数组
+type GroupInfos []GroupInfo
+
+// Value 实现 driver.Valuer 接口，用于将 GroupInfos 转换为数据库可以存储的值
+func (g GroupInfos) Value() (driver.Value, error) {
+	if g == nil {
+		return nil, nil
+	}
+	bytes, err := json.Marshal(g)
+	return string(bytes), err
+}
+
+// Scan 实现 sql.Scanner 接口，用于将数据库存储的值转换回 GroupInfos
+func (g *GroupInfos) Scan(value interface{}) error {
+	if value == nil {
+		*g = nil
+		return nil
+	}
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return utils.Errorf("不支持的类型: %T", value)
+	}
+
+	// 处理空字符串或空字节数组的情况
+	if len(bytes) == 0 {
+		*g = GroupInfos{}
+		return nil
+	}
+
+	return json.Unmarshal(bytes, g)
+}
+
+// GroupInfo 用于存储 HNSW 图结构中节点连接信息的自定义类型
+// 实现了 driver.Valuer 和 sql.Scanner 接口，支持在数据库中存储复杂结构
+type GroupInfo struct {
+	LayerLevel int
+	Key        string
+	Neighbors  []string
+}
+
+// Value 实现 driver.Valuer 接口，用于将 GroupInfo 转换为数据库可以存储的值
+func (g GroupInfo) Value() (driver.Value, error) {
+	bytes, err := json.Marshal(g)
+	return string(bytes), err
+}
+
+// Scan 实现 sql.Scanner 接口，用于将数据库存储的值转换回 GroupInfo
+func (g *GroupInfo) Scan(value interface{}) error {
+	if value == nil {
+		*g = GroupInfo{}
+		return nil
+	}
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return utils.Errorf("不支持的类型: %T", value)
+	}
+	return json.Unmarshal(bytes, g)
+}
+
 // VectorStoreCollection 表示向量存储中的集合
+// 用于管理一组具有相同向量维度和配置的文档
 type VectorStoreCollection struct {
 	gorm.Model
 
-	// 集合名称
+	// 集合名称，在系统中唯一
 	Name string `gorm:"unique_index;index:idx_name" json:"name"`
 
-	// 集合描述
-	Description string `json:"description"`
+	// 集合描述信息
+	Description string `gorm:"type:text" json:"description"`
 
-	// 模型名称
-	ModelName string `json:"model_name"`
+	// 使用的嵌入模型名称
+	ModelName string `gorm:"index:idx_model_name" json:"model_name"`
 
-	// 存储该集合中的向量维度
-	Dimension int `json:"dimension"`
+	// 向量维度，所有文档的嵌入向量必须具有相同的维度
+	Dimension int `gorm:"not null" json:"dimension"`
+
+	// HNSW 算法参数配置
+	M                int     `gorm:"default:16" json:"m"`                        // 最大邻居数，影响图的连接密度
+	Ml               float64 `gorm:"default:0.25" json:"ml"`                     // 层生成因子，控制层级分布
+	EfSearch         int     `gorm:"default:20" json:"ef_search"`                // 搜索时的候选节点数
+	EfConstruct      int     `gorm:"default:200" json:"ef_construct"`            // 构建时的候选节点数
+	DistanceFuncType string  `gorm:"default:'cosine'" json:"distance_func_type"` // 距离函数类型（cosine、euclidean等）
+
+	// HNSW 图连接信息，存储为 JSON 格式
+	GroupInfos GroupInfos `gorm:"type:text" json:"group_infos"`
 }
 
 // VectorStoreDocument 表示向量存储中的文档
+// 包含文档的嵌入向量、元数据和 HNSW 图相关信息
 type VectorStoreDocument struct {
 	gorm.Model
 
-	// 文档唯一标识符
-	DocumentID string `gorm:"unique_index" json:"document_id"`
+	// 文档唯一标识符，在整个系统中唯一
+	DocumentID string `gorm:"unique_index;not null" json:"document_id"`
 
-	// 所属集合的ID
-	CollectionID uint `json:"collection_id" gorm:"index"`
+	// 所属集合的ID，建立外键关系
+	CollectionID uint `gorm:"index:idx_collection_id;not null" json:"collection_id"`
 
-	// 文档元数据，以JSON格式存储
+	// 文档元数据，以 JSON 格式存储，包含原始文本、来源等信息
 	Metadata MetadataMap `gorm:"type:text" json:"metadata"`
 
-	// 文档的嵌入向量，以JSON格式存储
-	Embedding FloatArray `gorm:"type:text" json:"embedding"`
+	// 文档的嵌入向量，以 JSON 格式存储
+	Embedding FloatArray `gorm:"type:text;not null" json:"embedding"`
+
+	// HNSW 算法中节点存在的最高层级
+	MaxLayer int `gorm:"default:0" json:"max_layer"`
 }
 
 func init() {
-	// 注册到数据库模式中
+	// 注册数据库表结构到系统中
 	RegisterDatabaseSchema(KEY_SCHEMA_PROFILE_DATABASE, &VectorStoreCollection{}, &VectorStoreDocument{})
 }
