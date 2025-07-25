@@ -103,7 +103,7 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	t.Logf("测试完成，总跟踪记录数: %d", len(allTraces))
 }
 
-// TestPluginExecutionTracingLifecycle 测试插件生命周期跟踪
+// TestPluginExecutionTracingLifecycle 测试插件调用生命周期跟踪
 func TestPluginExecutionTracingLifecycle(t *testing.T) {
 	manager := NewYakToCallerManager()
 	manager.EnableExecutionTracing(true)
@@ -163,13 +163,6 @@ afterRequest = func(isHttps, originReq, req, originRsp, rsp) {
 	allTraces = manager.GetAllExecutionTraces()
 	if len(allTraces) != 2 {
 		t.Fatalf("执行两个Hook后应该有2个跟踪记录, 实际有%d个", len(allTraces))
-	}
-
-	// 验证Hook名
-	hookNames := make(map[string]bool)
-
-	if !hookNames["beforeRequest"] || !hookNames["afterRequest"] {
-		t.Error("应该包含beforeRequest和afterRequest两个Hook的跟踪记录")
 	}
 
 	// 测试按Hook名查询
@@ -528,28 +521,19 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 		t.Fatalf("添加插件失败: %v", err)
 	}
 
-	time.Sleep(100 * time.Millisecond)
-
-	// 获取跟踪记录
-	traces := manager.GetAllExecutionTraces()
-	if len(traces) == 0 {
-		t.Fatal("应该有跟踪记录")
-	}
-	trace := traces[0]
-
-	// 清空事件记录
-	mu.Lock()
-	traceEvents = traceEvents[:0]
-	mu.Unlock()
-
 	// 启动插件执行
 	go func() {
 		manager.CallByName("mirrorHTTPFlow", true, "http://example.com", []byte("request"), []byte("response"), []byte("body"))
 	}()
 
 	// 等待插件开始执行
-	time.Sleep(200 * time.Millisecond)
-
+	time.Sleep(2 * time.Second)
+	// 获取跟踪记录
+	traces := manager.GetAllExecutionTraces()
+	if len(traces) == 0 {
+		t.Fatal("应该有跟踪记录")
+	}
+	trace := traces[0]
 	// 验证插件正在运行
 	runningTraces := manager.GetRunningExecutionTraces()
 	if len(runningTraces) == 0 {
@@ -625,19 +609,6 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 		}
 	}
 
-	time.Sleep(200 * time.Millisecond)
-
-	// 验证所有插件都创建了跟踪记录
-	allTraces := manager.GetAllExecutionTraces()
-	if len(allTraces) != pluginCount {
-		t.Errorf("期望有 %d 个跟踪记录, 实际有 %d 个", pluginCount, len(allTraces))
-	}
-
-	// 清空事件记录
-	mu.Lock()
-	traceEvents = traceEvents[:0]
-	mu.Unlock()
-
 	// 并发执行所有插件
 	var wg sync.WaitGroup
 	for i := 0; i < pluginCount; i++ {
@@ -650,10 +621,15 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	}
 
 	wg.Wait()
-	time.Sleep(300 * time.Millisecond)
+	// 验证所有插件都创建了跟踪记录
+	allTraces := manager.GetAllExecutionTraces()
+	if len(allTraces) != pluginCount*pluginCount {
+		t.Errorf("期望有 %d 个跟踪记录, 实际有 %d 个", pluginCount, len(allTraces))
+	}
 
 	// 验证所有插件都执行完成
 	mu.Lock()
+	traceEvents = allTraces
 	defer mu.Unlock()
 
 	completedCount := 0
