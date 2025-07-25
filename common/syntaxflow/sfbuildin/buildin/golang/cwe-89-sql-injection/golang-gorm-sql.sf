@@ -28,7 +28,7 @@ desc(
 DESC
 	rule_id: "cc9054ac-2c71-4641-84dd-ba12578093b0"
 	title_zh: "检测Golang SQL注入漏洞(GORM)"
-   risk: "sqli"
+	risk: "sqli"
 	solution: <<<SOLUTION
 ### 修复建议
 
