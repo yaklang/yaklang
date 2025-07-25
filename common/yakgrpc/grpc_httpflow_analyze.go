@@ -303,7 +303,6 @@ func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlowFromDb(db *gorm.DB) {
 				atomic.AddInt64(&m.handledHTTPFlowCount, 1)
 				m.notifyHandleFlowNum()
 				m.notifyProcess(float64(atomic.LoadInt64(&m.handledHTTPFlowCount)) / float64(atomic.LoadInt64(&m.allHTTPFlowCount)))
-				m.notifyDiscardFlowNum()
 			}()
 
 			if f == nil {
@@ -313,6 +312,7 @@ func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlowFromDb(db *gorm.DB) {
 			discard := m.executeMatchers(f)
 			if discard {
 				atomic.AddInt64(&m.discardFlowCount, 1)
+				m.notifyDiscardFlowNum()
 				return
 			}
 			// 处理websocket流量
@@ -555,7 +555,6 @@ func (m *HTTPFlowAnalyzeManger) notifyHandleFlowNum() {
 		atomic.LoadInt64(&m.allHTTPFlowCount)))
 }
 
-// notifyDiscardFlowNum 跳过分析数目，匹配器使用【包含/丢弃】action会触发，但是流量分析视乎不需要这两种模式
 func (m *HTTPFlowAnalyzeManger) notifyDiscardFlowNum() {
 	m.client.StatusCard("跳过分析数", atomic.LoadInt64(&m.discardFlowCount))
 }
