@@ -21,6 +21,15 @@ func (cache *CacheWithKey[U, T]) SetExpirationCallback(callback expireCallbackWi
 	cache.expireCallback = callback
 }
 
+// GetOrLoad attempts to retrieve data from the cache for the given key.
+// If the data is not present, it will execute the dataLoader function to load it.
+// This method provides single-flight behavior: for a given key, the dataLoader function
+// is executed only once concurrently. Multiple concurrent requests for the same key
+// will wait for the single loading operation to complete and then receive its result.
+func (cache *CacheWithKey[U, T]) GetOrLoad(key U, dataLoader func() (T, error)) (T, error) {
+	return cache.CacheExWithKey.GetOrLoad(key, dataLoader)
+}
+
 // NewTTLCache is a helper to create instance of the Cache struct
 func NewTTLCache[T any](ttls ...time.Duration) *Cache[T] {
 	return &Cache[T]{
