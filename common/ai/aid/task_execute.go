@@ -3,6 +3,7 @@ package aid
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -141,11 +142,7 @@ TOOLREQUIRED:
 			return err
 		}
 
-		if result.ShrinkResult != "" {
-			t.config.EmitToolCallSummary(result.ToolCallID, result.ShrinkResult)
-		} else {
-			t.config.EmitToolCallSummary(result.ToolCallID, fmt.Sprintf("执行工具：%s [%s]", result.Name, result.Description))
-		}
+		t.config.EmitToolCallSummary(result.ToolCallID, SelectSummary(t, result))
 
 		switch action {
 		case taskContinue:
@@ -296,4 +293,20 @@ func (t *aiTask) GenerateTaskSummaryPrompt() (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+func SelectSummary(task *aiTask, callResult *aitool.ToolResult) string {
+	if callResult.ShrinkResult != "" {
+		return callResult.ShrinkResult
+	}
+	if callResult.ShrinkSimilarResult != "" {
+		return callResult.ShrinkSimilarResult
+	}
+	if task.TaskSummary != "" {
+		return task.TaskSummary
+	}
+	if task.StatusSummary != "" {
+		return task.StatusSummary
+	}
+	return string(utils.Jsonify(callResult.Data))
 }

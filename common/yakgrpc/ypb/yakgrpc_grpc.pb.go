@@ -495,6 +495,7 @@ const (
 	Yak_StartAITask_FullMethodName                                = "/ypb.Yak/StartAITask"
 	Yak_QueryAITask_FullMethodName                                = "/ypb.Yak/QueryAITask"
 	Yak_DeleteAITask_FullMethodName                               = "/ypb.Yak/DeleteAITask"
+	Yak_QueryAIEvent_FullMethodName                               = "/ypb.Yak/QueryAIEvent"
 	Yak_StartAITriage_FullMethodName                              = "/ypb.Yak/StartAITriage"
 	Yak_CreateAIForge_FullMethodName                              = "/ypb.Yak/CreateAIForge"
 	Yak_UpdateAIForge_FullMethodName                              = "/ypb.Yak/UpdateAIForge"
@@ -1135,6 +1136,7 @@ type YakClient interface {
 	StartAITask(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent], error)
 	QueryAITask(ctx context.Context, in *AITaskQueryRequest, opts ...grpc.CallOption) (*AITaskQueryResponse, error)
 	DeleteAITask(ctx context.Context, in *AITaskDeleteRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	QueryAIEvent(ctx context.Context, in *AIEventQueryRequest, opts ...grpc.CallOption) (*AIEventQueryResponse, error)
 	StartAITriage(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AITriageInputEvent, AIOutputEvent], error)
 	// AI forge curd
 	CreateAIForge(ctx context.Context, in *AIForge, opts ...grpc.CallOption) (*DbOperateMessage, error)
@@ -6618,6 +6620,16 @@ func (c *yakClient) DeleteAITask(ctx context.Context, in *AITaskDeleteRequest, o
 	return out, nil
 }
 
+func (c *yakClient) QueryAIEvent(ctx context.Context, in *AIEventQueryRequest, opts ...grpc.CallOption) (*AIEventQueryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIEventQueryResponse)
+	err := c.cc.Invoke(ctx, Yak_QueryAIEvent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) StartAITriage(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AITriageInputEvent, AIOutputEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[85], Yak_StartAITriage_FullMethodName, cOpts...)
@@ -7511,6 +7523,7 @@ type YakServer interface {
 	StartAITask(grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]) error
 	QueryAITask(context.Context, *AITaskQueryRequest) (*AITaskQueryResponse, error)
 	DeleteAITask(context.Context, *AITaskDeleteRequest) (*DbOperateMessage, error)
+	QueryAIEvent(context.Context, *AIEventQueryRequest) (*AIEventQueryResponse, error)
 	StartAITriage(grpc.BidiStreamingServer[AITriageInputEvent, AIOutputEvent]) error
 	// AI forge curd
 	CreateAIForge(context.Context, *AIForge) (*DbOperateMessage, error)
@@ -8974,6 +8987,9 @@ func (UnimplementedYakServer) QueryAITask(context.Context, *AITaskQueryRequest) 
 }
 func (UnimplementedYakServer) DeleteAITask(context.Context, *AITaskDeleteRequest) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteAITask not implemented")
+}
+func (UnimplementedYakServer) QueryAIEvent(context.Context, *AIEventQueryRequest) (*AIEventQueryResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryAIEvent not implemented")
 }
 func (UnimplementedYakServer) StartAITriage(grpc.BidiStreamingServer[AITriageInputEvent, AIOutputEvent]) error {
 	return status.Errorf(codes.Unimplemented, "method StartAITriage not implemented")
@@ -16986,6 +17002,24 @@ func _Yak_DeleteAITask_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_QueryAIEvent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AIEventQueryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryAIEvent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QueryAIEvent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryAIEvent(ctx, req.(*AIEventQueryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_StartAITriage_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(YakServer).StartAITriage(&grpc.GenericServerStream[AITriageInputEvent, AIOutputEvent]{ServerStream: stream})
 }
@@ -18924,6 +18958,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteAITask",
 			Handler:    _Yak_DeleteAITask_Handler,
+		},
+		{
+			MethodName: "QueryAIEvent",
+			Handler:    _Yak_QueryAIEvent_Handler,
 		},
 		{
 			MethodName: "CreateAIForge",
