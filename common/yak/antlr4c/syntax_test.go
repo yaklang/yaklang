@@ -54,6 +54,34 @@ type Container []struct {
 	Items int
 }
 
+// func TestExample_Tmp(t *testing.T) {
+// 	code := `
+// #include <stdio.h>
+
+// int main() {
+// 	int a;
+// 	switch (a) {
+// 		case 1:
+// 			a = 1;
+// 			break;
+// 		case 2:
+// 			a = 2;
+// 			break;
+// 		case 3:
+// 			a = 3;
+// 			break;
+// 		default:
+// 			a = 0;
+// 	}
+// 	println(a)
+// }
+// `
+// 	_, err := SyntaxBase(code, true)
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+// }
+
 func TestExample(t *testing.T) {
 	code := `#include <stdio.h>
 

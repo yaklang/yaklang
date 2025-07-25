@@ -187,3 +187,23 @@ func (b *astbuilder) GetGlobalVariables() map[string]ssa.Value {
 	}
 	return variables
 }
+
+func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
+	switch ityp.GetTypeKind() {
+	case ssa.NumberTypeKind:
+		return b.EmitConstInst(0)
+	case ssa.StringTypeKind:
+		return b.EmitConstInst("")
+	case ssa.BooleanTypeKind:
+		return b.EmitConstInst(false)
+	case ssa.FunctionTypeKind:
+		return b.EmitUndefined("func")
+	case ssa.AliasTypeKind:
+		alias, _ := ssa.ToAliasType(ityp)
+		return b.GetDefaultValue(alias.GetType())
+	case ssa.StructTypeKind, ssa.ObjectTypeKind, ssa.InterfaceTypeKind, ssa.SliceTypeKind, ssa.MapTypeKind:
+		return b.EmitMakeBuildWithType(ityp, nil, nil)
+	default:
+		return b.EmitConstInst(0)
+	}
+}

@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func (b *astbuilder) BuildExpression(ast *cparser.ExpressionContext) ssa.Value {
+func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext) ssa.Value {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
@@ -18,7 +18,7 @@ func (b *astbuilder) BuildExpression(ast *cparser.ExpressionContext) ssa.Value {
 	// 1. 一元运算符: unary_op = (Plus | Minus | Not | Caret | Star | And) expression
 	if ast.GetUnary_op() != nil && ast.Expression(0) != nil {
 		op := ast.GetUnary_op().GetText()
-		expr := b.BuildExpression(ast.Expression(0).(*cparser.ExpressionContext))
+		expr := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext))
 		if expr != nil {
 			switch op {
 			case "+":
@@ -43,8 +43,8 @@ func (b *astbuilder) BuildExpression(ast *cparser.ExpressionContext) ssa.Value {
 	// 2. 乘法/除法/取模/位移/按位与: expression mul_op = (Star | Div | Mod | LeftShift | RightShift | And) expression
 	if ast.GetMul_op() != nil && len(ast.AllExpression()) >= 2 {
 		op := ast.GetMul_op().GetText()
-		left := b.BuildExpression(ast.Expression(0).(*cparser.ExpressionContext))
-		right := b.BuildExpression(ast.Expression(1).(*cparser.ExpressionContext))
+		left := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext))
+		right := b.buildExpression(ast.Expression(1).(*cparser.ExpressionContext))
 		if left != nil && right != nil {
 			switch op {
 			case "*":
@@ -67,8 +67,8 @@ func (b *astbuilder) BuildExpression(ast *cparser.ExpressionContext) ssa.Value {
 	// 3. 加法/减法/按位或/按位异或: expression add_op = (Plus | Minus | Or | Caret) expression
 	if ast.GetAdd_op() != nil && len(ast.AllExpression()) >= 2 {
 		op := ast.GetAdd_op().GetText()
-		left := b.BuildExpression(ast.Expression(0).(*cparser.ExpressionContext))
-		right := b.BuildExpression(ast.Expression(1).(*cparser.ExpressionContext))
+		left := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext))
+		right := b.buildExpression(ast.Expression(1).(*cparser.ExpressionContext))
 		if left != nil && right != nil {
 			switch op {
 			case "+":
@@ -87,8 +87,8 @@ func (b *astbuilder) BuildExpression(ast *cparser.ExpressionContext) ssa.Value {
 	// 4. 关系运算符: expression rel_op = (Equal | NotEqual | Less | LessEqual | Greater | GreaterEqual) expression
 	if ast.GetRel_op() != nil && len(ast.AllExpression()) >= 2 {
 		op := ast.GetRel_op().GetText()
-		left := b.BuildExpression(ast.Expression(0).(*cparser.ExpressionContext))
-		right := b.BuildExpression(ast.Expression(1).(*cparser.ExpressionContext))
+		left := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext))
+		right := b.buildExpression(ast.Expression(1).(*cparser.ExpressionContext))
 		if left != nil && right != nil {
 			switch op {
 			case "==":
@@ -110,8 +110,8 @@ func (b *astbuilder) BuildExpression(ast *cparser.ExpressionContext) ssa.Value {
 
 	// 5. 逻辑与: expression AndAnd expression
 	if ast.AndAnd() != nil && len(ast.AllExpression()) >= 2 {
-		left := b.BuildExpression(ast.Expression(0).(*cparser.ExpressionContext))
-		right := b.BuildExpression(ast.Expression(1).(*cparser.ExpressionContext))
+		left := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext))
+		right := b.buildExpression(ast.Expression(1).(*cparser.ExpressionContext))
 		if left != nil && right != nil {
 			return b.EmitBinOp(ssa.OpLogicAnd, left, right)
 		}
@@ -120,8 +120,8 @@ func (b *astbuilder) BuildExpression(ast *cparser.ExpressionContext) ssa.Value {
 
 	// 6. 逻辑或: expression OrOr expression
 	if ast.OrOr() != nil && len(ast.AllExpression()) >= 2 {
-		left := b.BuildExpression(ast.Expression(0).(*cparser.ExpressionContext))
-		right := b.BuildExpression(ast.Expression(1).(*cparser.ExpressionContext))
+		left := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext))
+		right := b.buildExpression(ast.Expression(1).(*cparser.ExpressionContext))
 		if left != nil && right != nil {
 			return b.EmitBinOp(ssa.OpLogicOr, left, right)
 		}
@@ -130,41 +130,34 @@ func (b *astbuilder) BuildExpression(ast *cparser.ExpressionContext) ssa.Value {
 
 	// 7. 括号表达式: '(' expression ')'
 	if ast.LeftParen() != nil && ast.Expression(0) != nil && ast.RightParen() != nil {
-		return b.BuildExpression(ast.Expression(0).(*cparser.ExpressionContext))
+		return b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext))
 	}
 
 	// 8. 基本表达式: primaryExpression
 	if p := ast.PrimaryExpression(); p != nil {
-		ret, _ = b.BuildPrimaryExpression(p.(*cparser.PrimaryExpressionContext), false)
+		ret, _ = b.buildPrimaryExpression(p.(*cparser.PrimaryExpressionContext), false)
 		return ret
 	}
 
 	// 9. 赋值表达式: assignmentExpression
 	if a := ast.AssignmentExpression(); a != nil {
-		return b.BuildAssignmentExpression(a.(*cparser.AssignmentExpressionContext))
+		return b.buildAssignmentExpression(a.(*cparser.AssignmentExpressionContext))
 	}
 
 	// 10. 语句表达式: statementsExpression
 	if s := ast.StatementsExpression(); s != nil {
-		return b.BuildStatementsExpression(s.(*cparser.StatementsExpressionContext))
+		return b.buildStatementsExpression(s.(*cparser.StatementsExpressionContext))
 	}
 
 	// 11. 类型转换表达式: castExpression
 	if c := ast.CastExpression(); c != nil {
-		return b.BuildCastExpression(c.(*cparser.CastExpressionContext))
+		return b.buildCastExpression(c.(*cparser.CastExpressionContext))
 	}
 
 	return ret
 }
 
-func (b *astbuilder) BuildStatementsExpression(ast *cparser.StatementsExpressionContext) ssa.Value {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
-	defer recoverRange()
-
-	return nil
-}
-
-func (b *astbuilder) BuildAssignmentExpression(ast *cparser.AssignmentExpressionContext) ssa.Value {
+func (b *astbuilder) buildAssignmentExpression(ast *cparser.AssignmentExpressionContext) ssa.Value {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
@@ -173,18 +166,18 @@ func (b *astbuilder) BuildAssignmentExpression(ast *cparser.AssignmentExpression
 
 	getValue := func() {
 		if u := ast.UnaryExpression(); u != nil {
-			right, _ = b.BuildUnaryExpression(u.(*cparser.UnaryExpressionContext), false)
+			right, _ = b.buildUnaryExpression(u.(*cparser.UnaryExpressionContext), false)
 		} else if p := ast.PostfixExpression(); p != nil {
-			right, _ = b.BuildPostfixExpression(p.(*cparser.PostfixExpressionContext), false)
+			right, _ = b.buildPostfixExpression(p.(*cparser.PostfixExpressionContext), false)
 		} else if d := ast.DigitSequence(); d != nil {
 			// TODO
 		}
 	}
 	getVariable := func() {
 		if u := ast.UnaryExpression(); u != nil {
-			_, left = b.BuildUnaryExpression(u.(*cparser.UnaryExpressionContext), true)
+			_, left = b.buildUnaryExpression(u.(*cparser.UnaryExpressionContext), true)
 		} else if p := ast.PostfixExpression(); p != nil {
-			_, left = b.BuildPostfixExpression(p.(*cparser.PostfixExpressionContext), true)
+			_, left = b.buildPostfixExpression(p.(*cparser.PostfixExpressionContext), true)
 		} else if d := ast.DigitSequence(); d != nil {
 			// TODO
 		}
@@ -198,14 +191,15 @@ func (b *astbuilder) BuildAssignmentExpression(ast *cparser.AssignmentExpression
 			getValue()
 		}
 		if e := ast.Expression(); e != nil {
-			newRight = b.BuildExpression(e.(*cparser.ExpressionContext))
+			newRight = b.buildExpression(e.(*cparser.ExpressionContext))
 		}
 		if u := ast.UnaryExpression(); u != nil {
-			right, _ = b.BuildUnaryExpression(u.(*cparser.UnaryExpressionContext), false)
+			right, _ = b.buildUnaryExpression(u.(*cparser.UnaryExpressionContext), false)
 		}
 		op := a.(*cparser.AssignmentOperatorContext).GetText()
 		switch op {
 		case "=":
+			right = newRight
 		case "*=":
 			right = b.EmitBinOp(ssa.OpMul, right, newRight)
 		case "/=":
@@ -237,7 +231,7 @@ func (b *astbuilder) BuildAssignmentExpression(ast *cparser.AssignmentExpression
 	return right
 }
 
-func (b *astbuilder) BuildUnaryExpression(ast *cparser.UnaryExpressionContext, isLeft bool) (ssa.Value, *ssa.Variable) {
+func (b *astbuilder) buildUnaryExpression(ast *cparser.UnaryExpressionContext, isLeft bool) (ssa.Value, *ssa.Variable) {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 	var right ssa.Value
@@ -245,19 +239,19 @@ func (b *astbuilder) BuildUnaryExpression(ast *cparser.UnaryExpressionContext, i
 
 	// 1. postfixExpression
 	if p := ast.PostfixExpression(); p != nil {
-		right, left = b.BuildPostfixExpression(p.(*cparser.PostfixExpressionContext), isLeft)
+		right, left = b.buildPostfixExpression(p.(*cparser.PostfixExpressionContext), isLeft)
 	}
 
 	// 2. unaryOperator castExpression
 	if uo := ast.UnaryOperator(); uo != nil && ast.CastExpression() != nil {
-		b.BuildUnaryOperator(uo.(*cparser.UnaryOperatorContext))
-		b.BuildCastExpression(ast.CastExpression().(*cparser.CastExpressionContext))
+		b.buildUnaryOperator(uo.(*cparser.UnaryOperatorContext))
+		b.buildCastExpression(ast.CastExpression().(*cparser.CastExpressionContext))
 		return nil, nil
 	}
 
 	// 3. ('sizeof' | '_Alignof') '(' typeName ')'
 	if (ast.AllSizeof() != nil || ast.Alignof() != nil) && ast.TypeName() != nil {
-		b.BuildTypeName(ast.TypeName().(*cparser.TypeNameContext))
+		b.buildTypeName(ast.TypeName().(*cparser.TypeNameContext))
 		return nil, nil
 	}
 
@@ -270,14 +264,14 @@ func (b *astbuilder) BuildUnaryExpression(ast *cparser.UnaryExpressionContext, i
 	for i := 0; i < len(ast.AllPlusPlus()); i++ {
 		right = b.EmitBinOp(ssa.OpAdd, right, b.EmitConstInst(1))
 		if left == nil {
-			_, left = b.BuildPostfixExpression(ast.PostfixExpression().(*cparser.PostfixExpressionContext), true)
+			_, left = b.buildPostfixExpression(ast.PostfixExpression().(*cparser.PostfixExpressionContext), true)
 			b.AssignVariable(left, right)
 		}
 	}
 	for i := 0; i < len(ast.AllMinusMinus()); i++ {
 		right = b.EmitBinOp(ssa.OpSub, right, b.EmitConstInst(1))
 		if left == nil {
-			_, left = b.BuildPostfixExpression(ast.PostfixExpression().(*cparser.PostfixExpressionContext), true)
+			_, left = b.buildPostfixExpression(ast.PostfixExpression().(*cparser.PostfixExpressionContext), true)
 			b.AssignVariable(left, right)
 		}
 	}
@@ -285,7 +279,7 @@ func (b *astbuilder) BuildUnaryExpression(ast *cparser.UnaryExpressionContext, i
 	return right, left
 }
 
-func (b *astbuilder) BuildPostfixExpression(ast *cparser.PostfixExpressionContext, isLeft bool) (ssa.Value, *ssa.Variable) {
+func (b *astbuilder) buildPostfixExpression(ast *cparser.PostfixExpressionContext, isLeft bool) (ssa.Value, *ssa.Variable) {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
@@ -294,17 +288,17 @@ func (b *astbuilder) BuildPostfixExpression(ast *cparser.PostfixExpressionContex
 
 	// 1. primaryExpression
 	if p := ast.PrimaryExpression(); p != nil {
-		right, left = b.BuildPrimaryExpression(p.(*cparser.PrimaryExpressionContext), isLeft)
+		right, left = b.buildPrimaryExpression(p.(*cparser.PrimaryExpressionContext), isLeft)
 	}
 
 	// 2. 函数调用：postfixExpression '(' argumentExpressionList? ')'
 	for i := 0; i < len(ast.AllLeftParen()); i++ {
 		var args ssa.Values
 		if right == nil {
-			right, _ = b.BuildPrimaryExpression(ast.PrimaryExpression().(*cparser.PrimaryExpressionContext), false)
+			right, _ = b.buildPrimaryExpression(ast.PrimaryExpression().(*cparser.PrimaryExpressionContext), false)
 		}
 		if ael := ast.ArgumentExpressionList(i); ael != nil {
-			args = b.BuildArgumentExpressionList(ael.(*cparser.ArgumentExpressionListContext))
+			args = b.buildArgumentExpressionList(ael.(*cparser.ArgumentExpressionListContext))
 		}
 		b.EmitCall(b.NewCall(right, args))
 	}
@@ -312,7 +306,7 @@ func (b *astbuilder) BuildPostfixExpression(ast *cparser.PostfixExpressionContex
 	// 3. 数组下标：postfixExpression '[' expression ']'
 	for i := 0; i < len(ast.AllLeftBracket()); i++ {
 		if e := ast.Expression(i); e != nil {
-			b.BuildExpression(e.(*cparser.ExpressionContext))
+			b.buildExpression(e.(*cparser.ExpressionContext))
 		}
 	}
 
@@ -330,14 +324,14 @@ func (b *astbuilder) BuildPostfixExpression(ast *cparser.PostfixExpressionContex
 	for i := 0; i < len(ast.AllPlusPlus()); i++ {
 		right = b.EmitBinOp(ssa.OpAdd, right, b.EmitConstInst(1))
 		if left == nil {
-			_, left = b.BuildPrimaryExpression(ast.PrimaryExpression().(*cparser.PrimaryExpressionContext), true)
+			_, left = b.buildPrimaryExpression(ast.PrimaryExpression().(*cparser.PrimaryExpressionContext), true)
 			b.AssignVariable(left, right)
 		}
 	}
 	for i := 0; i < len(ast.AllMinusMinus()); i++ {
 		right = b.EmitBinOp(ssa.OpSub, right, b.EmitConstInst(1))
 		if left == nil {
-			_, left = b.BuildPrimaryExpression(ast.PrimaryExpression().(*cparser.PrimaryExpressionContext), true)
+			_, left = b.buildPrimaryExpression(ast.PrimaryExpression().(*cparser.PrimaryExpressionContext), true)
 			b.AssignVariable(left, right)
 		}
 	}
@@ -345,22 +339,22 @@ func (b *astbuilder) BuildPostfixExpression(ast *cparser.PostfixExpressionContex
 	return right, left
 }
 
-func (b *astbuilder) BuildUnaryOperator(ast *cparser.UnaryOperatorContext) {
+func (b *astbuilder) buildUnaryOperator(ast *cparser.UnaryOperatorContext) {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 }
 
-func (b *astbuilder) BuildCastExpression(ast *cparser.CastExpressionContext) ssa.Value {
+func (b *astbuilder) buildCastExpression(ast *cparser.CastExpressionContext) ssa.Value {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if t := ast.TypeName(); t != nil {
-		b.BuildTypeName(t.(*cparser.TypeNameContext))
+		b.buildTypeName(t.(*cparser.TypeNameContext))
 		if c := ast.CastExpression(); c != nil {
-			b.BuildCastExpression(c.(*cparser.CastExpressionContext))
+			b.buildCastExpression(c.(*cparser.CastExpressionContext))
 		}
 	} else if u := ast.UnaryExpression(); u != nil {
-		b.BuildUnaryExpression(u.(*cparser.UnaryExpressionContext), false)
+		b.buildUnaryExpression(u.(*cparser.UnaryExpressionContext), false)
 	} else if d := ast.DigitSequence(); d != nil {
 		// TODO
 	}
@@ -368,7 +362,7 @@ func (b *astbuilder) BuildCastExpression(ast *cparser.CastExpressionContext) ssa
 	return nil
 }
 
-func (b *astbuilder) BuildPrimaryExpression(ast *cparser.PrimaryExpressionContext, isLeft bool) (ssa.Value, *ssa.Variable) {
+func (b *astbuilder) buildPrimaryExpression(ast *cparser.PrimaryExpressionContext, isLeft bool) (ssa.Value, *ssa.Variable) {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
@@ -430,7 +424,7 @@ func (b *astbuilder) BuildPrimaryExpression(ast *cparser.PrimaryExpressionContex
 	}
 	// 4. '(' expression ')'
 	if ast.LeftParen() != nil && ast.Expression() != nil && ast.RightParen() != nil {
-		return b.BuildExpression(ast.Expression().(*cparser.ExpressionContext)), nil
+		return b.buildExpression(ast.Expression().(*cparser.ExpressionContext)), nil
 	}
 	// 5. genericSelection
 	if g := ast.GenericSelection(); g != nil {
@@ -438,7 +432,7 @@ func (b *astbuilder) BuildPrimaryExpression(ast *cparser.PrimaryExpressionContex
 	}
 	// 6. __extension__? '(' compoundStatement ')'
 	if ast.Extension() != nil && ast.LeftParen() != nil && ast.CompoundStatement() != nil && ast.RightParen() != nil {
-		b.BuildCompoundStatement(ast.CompoundStatement().(*cparser.CompoundStatementContext))
+		b.buildCompoundStatement(ast.CompoundStatement().(*cparser.CompoundStatementContext))
 
 	}
 	// 7. __builtin_va_arg '(' unaryExpression ',' typeName ')'
@@ -453,12 +447,12 @@ func (b *astbuilder) BuildPrimaryExpression(ast *cparser.PrimaryExpressionContex
 	return b.EmitConstInst(0), b.CreateVariable("")
 }
 
-func (b *astbuilder) BuildArgumentExpressionList(ast *cparser.ArgumentExpressionListContext) ssa.Values {
+func (b *astbuilder) buildArgumentExpressionList(ast *cparser.ArgumentExpressionListContext) ssa.Values {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 	var ret ssa.Values
 	for _, a := range ast.AllAssignmentExpression() {
-		ret = append(ret, b.BuildAssignmentExpression(a.(*cparser.AssignmentExpressionContext)))
+		ret = append(ret, b.buildAssignmentExpression(a.(*cparser.AssignmentExpressionContext)))
 	}
 	return ret
 }
