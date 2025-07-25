@@ -106,7 +106,7 @@ separator = cli.String("separator", cli.setHelp("日志切割符"), cli.setVerbo
 cli.check()
 
 if chunkBatch <= 0 {
-    chunkBatch = 10
+    chunkBatch = 20
 }
 
 if concurrency <= 0 {

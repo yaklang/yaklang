@@ -80,7 +80,7 @@ func (a *AIForge) ToGRPC() *ypb.AIForge {
 }
 
 func GRPC2AIForge(forge *ypb.AIForge) *AIForge {
-	return &AIForge{
+	forgeIns := &AIForge{
 		ForgeName:          forge.GetForgeName(),
 		ForgeContent:       forge.GetForgeContent(),
 		ForgeType:          forge.GetForgeType(),
@@ -97,4 +97,6 @@ func GRPC2AIForge(forge *ypb.AIForge) *AIForge {
 		PlanPrompt:         forge.GetPlanPrompt(),
 		ResultPrompt:       forge.GetResultPrompt(),
 	}
+	forgeIns.ID = uint(forge.Id)
+	return forgeIns
 }
