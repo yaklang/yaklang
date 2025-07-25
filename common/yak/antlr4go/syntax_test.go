@@ -68,7 +68,7 @@ func TestExample(t *testing.T) {
 	}
 }
 
-func TestExamplesALl(t *testing.T) {
+func TestExamplesAll(t *testing.T) {
 	exdir := "./test"
 	err := filepath.Walk(exdir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
