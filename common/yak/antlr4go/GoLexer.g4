@@ -1,37 +1,54 @@
 /*
  [The "BSD licence"]
  Copyright (c) 2017 Sasa Coh, Michał Błotniak
- Copyright (c) 2019 Ivan Kochurkin, kvanttt@gmail.com, Positive Technologies
- Copyright (c) 2019 Dmitry Rassadin, flipparassa@gmail.com, Positive Technologies
- Copyright (c) 2021 Martin Mirchev, mirchevmartin2203@gmail.com
+ Copyright (c) 2019 Ivan
+ Kochurkin, kvanttt@gmail.com, Positive Technologies
+ Copyright (c) 2019 Dmitry Rassadin,
+ flipparassa@gmail.com, Positive Technologies
+ Copyright (c) 2021 Martin Mirchev,
+ mirchevmartin2203@gmail.com
  All rights reserved.
-
- Redistribution and use in source and binary forms, with or without
+ 
+ Redistribution and use in source and binary
+ forms, with or without
  modification, are permitted provided that the following conditions
- are met:
+ are
+ met:
  1. Redistributions of source code must retain the above copyright
-    notice, this list of conditions and the following disclaimer.
- 2. Redistributions in binary form must reproduce the above copyright
-    notice, this list of conditions and the following disclaimer in the
-    documentation and/or other materials provided with the distribution.
- 3. The name of the author may not be used to endorse or promote products
-    derived from this software without specific prior written permission.
-
+ notice, this list of
+ conditions and the following disclaimer.
+ 2. Redistributions in binary form must reproduce the
+ above copyright
+ notice, this list of conditions and the following disclaimer in the
+ documentation
+ and/or other materials provided with the distribution.
+ 3. The name of the author may not be used
+ to endorse or promote products
+ derived from this software without specific prior written
+ permission.
+ 
  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ IMPLIED
+ WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ OF MERCHANTABILITY AND FITNESS
+ FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT,
+ INDIRECT,
  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ NOT LIMITED
+ TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ DATA, OR PROFITS; OR BUSINESS
+ INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ LIABILITY, OR TORT
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ THIS
+ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
 /*
  * A Go grammar for ANTLR 4 derived from the Go Language Specification
- * https://golang.org/ref/spec
+ https://golang.org/ref/spec
  */
 
 // $antlr-format alignTrailingComments true, columnLimit 150, maxEmptyLinesToKeep 1, reflowComments false, useTab false
@@ -40,7 +57,8 @@
 
 lexer grammar GoLexer;
 
-options {  }
+options {
+}
 
 // Keywords
 
@@ -136,9 +154,9 @@ BINARY_LIT  : '0' [bB] ('_'? BIN_DIGIT)+;
 OCTAL_LIT   : '0' [oO]? ('_'? OCTAL_DIGIT)+;
 HEX_LIT     : '0' [xX] ('_'? HEX_DIGIT)+;
 
-FLOAT_LIT: (DECIMAL_FLOAT_LIT | HEX_FLOAT_LIT);
-DECIMAL_FLOAT_LIT: DECIMALS ('.' DECIMALS? EXPONENT? | EXPONENT) | '.' DECIMALS EXPONENT?;
-HEX_FLOAT_LIT: '0' [xX] HEX_MANTISSA HEX_EXPONENT;
+FLOAT_LIT         : (DECIMAL_FLOAT_LIT | HEX_FLOAT_LIT);
+DECIMAL_FLOAT_LIT : DECIMALS ('.' DECIMALS? EXPONENT? | EXPONENT) | '.' DECIMALS EXPONENT?;
+HEX_FLOAT_LIT     : '0' [xX] HEX_MANTISSA HEX_EXPONENT;
 
 fragment HEX_MANTISSA:
     ('_'? HEX_DIGIT)+ ('.' ( '_'? HEX_DIGIT)*)?
@@ -164,17 +182,17 @@ BIG_U_VALUE:
 
 // String literals
 
-RAW_STRING_LIT         : '`' (.*?) '`' ;
-INTERPRETED_STRING_LIT : '"' (~["\\] | ESCAPED_VALUE)* '"' ;
+RAW_STRING_LIT         : '`' (.*?) '`';
+INTERPRETED_STRING_LIT : '"' (~["\\] | ESCAPED_VALUE)* '"';
 RAW_CHAR_LIT           : '\'' (~['\\] | ESCAPED_VALUE)? '\'';
 
 // Hidden tokens
 
-WSI:                     [ \t\r]+ -> skip;
-EOS:                    ([\t\r\n ;]+);
+WSI : [ \t\r]+ -> skip;
+EOS : ([\t\r\n ;]+);
 
-COMMENT      : '/*' .*? '*/' ->skip;
-LINE_COMMENT : '//' ~[\r\n]* ->skip;
+COMMENT      : '/*' .*? '*/' -> skip;
+LINE_COMMENT : '//' ~[\r\n]* -> skip;
 
 // Fragments
 
@@ -205,27 +223,21 @@ fragment UNICODE_DIGIT: [\p{Nd}];
 //[\p{L}] matches any kind of letter from any language
 fragment UNICODE_LETTER: [\p{L}];
 
-fragment IdentifierStart
-    : [\p{L}]
-    | [$_]
-    | '\\' UnicodeEscapeSequence
-    ;
+fragment IdentifierStart: [\p{L}] | [$_] | '\\' UnicodeEscapeSequence;
 
-fragment IdentifierPart
-    : IdentifierStart
+fragment IdentifierPart:
+    IdentifierStart
     | [\p{Mn}]
     | [\p{Nd}]
     | [\p{Pc}]
-    | '\u4E00'..'\u9FFF'
+    | '\u4E00' ..'\u9FFF'
     | '\u200C'
     | '\u200D'
-    ;
+;
 
-fragment UnicodeEscapeSequence
-    : 'u' HexDigit HexDigit HexDigit HexDigit
+fragment UnicodeEscapeSequence:
+    'u' HexDigit HexDigit HexDigit HexDigit
     | 'u' '{' HexDigit HexDigit+ '}'
-    ;
+;
 
-fragment HexDigit
-    : [_0-9a-fA-F]
-    ;    
+fragment HexDigit: [_0-9a-fA-F];
