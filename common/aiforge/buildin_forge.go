@@ -164,6 +164,7 @@ func buildAIForgeFromYakCode(forgeName string, codeBytes []byte) (*schema.AIForg
 		Tags:           strings.Join(scriptMetadata.Keywords, ","),
 		ForgeContent:   string(codeBytes),
 		ParamsUIConfig: uiParamsConfig,
+		ForgeType:      schema.FORGE_TYPE_YAK,
 	}, nil
 }
 
@@ -179,7 +180,9 @@ func getBuildInForgeConfig(name string) (string, *schema.AIForge, error) {
 }
 
 func buildAIForgeFromConfig(name string, configBytes []byte, codeContent []byte, loadDefaultPrompt func(string) string) (string, *schema.AIForge, error) {
-	forge := &schema.AIForge{}
+	forge := &schema.AIForge{
+		ForgeType: schema.FORGE_TYPE_Config,
+	}
 	if len(configBytes) <= 0 {
 		// If config file doesn't exist, try to read prompt files directly
 		initPrompt := loadDefaultPrompt("init")

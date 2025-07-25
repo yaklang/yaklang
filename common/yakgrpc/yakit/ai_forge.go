@@ -41,7 +41,7 @@ func UpdateAIForgeByName(db *gorm.DB, name string, forge *schema.AIForge) error 
 
 func UpdateAIForgeByID(db *gorm.DB, id uint, forge *schema.AIForge) error {
 	db = db.Model(&schema.AIForge{})
-	if db := db.Where("id = ?", id).Updates(&schema.AIForge{}); db.Error != nil {
+	if db := db.Where("id = ?", id).Updates(forge); db.Error != nil {
 		return utils.Errorf("update AI Forge failed: %s", db.Error)
 	}
 	return nil
@@ -80,6 +80,14 @@ func DeleteAIForge(db *gorm.DB, filter *ypb.AIForgeFilter) (int64, error) {
 func GetAIForgeByName(db *gorm.DB, name string) (*schema.AIForge, error) {
 	var forge schema.AIForge
 	if db := db.Where("forge_name = ?", name).First(&forge); db.Error != nil {
+		return nil, db.Error
+	}
+	return &forge, nil
+}
+
+func GetAIForgeByID(db *gorm.DB, id int64) (*schema.AIForge, error) {
+	var forge schema.AIForge
+	if db := db.Where("id = ?", id).First(&forge); db.Error != nil {
 		return nil, db.Error
 	}
 	return &forge, nil

@@ -864,6 +864,7 @@ service Yak {
   rpc UpdateAIForge(AIForge) returns (DbOperateMessage);
   rpc DeleteAIForge(AIForgeFilter) returns (DbOperateMessage);
   rpc QueryAIForge(QueryAIForgeRequest) returns (QueryAIForgeResponse);
+  rpc GetAIForge(GetAIForgeRequest) returns (AIForge);
 
   // mcp server
   rpc StartMcpServer(StartMcpServerRequest) returns(stream StartMcpServerResponse);
@@ -1172,6 +1173,10 @@ message QueryAIForgeResponse {
   Paging Pagination = 1;
   repeated AIForge Data = 2;
   int64 Total = 3;
+}
+
+message GetAIForgeRequest {
+  int64 ID = 1;
 }
 
 message StartMcpServerRequest {
@@ -6156,6 +6161,7 @@ message DbOperateMessage {
   string Operation = 2; // 操作 (增删改查)
   int64 EffectRows = 3; // 影响行数
   string ExtraMessage = 4; // 额外信息
+  int64 CreateID = 5;
 }
 
 message CPE {

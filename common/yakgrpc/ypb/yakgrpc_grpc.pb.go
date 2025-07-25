@@ -500,6 +500,7 @@ const (
 	Yak_UpdateAIForge_FullMethodName                              = "/ypb.Yak/UpdateAIForge"
 	Yak_DeleteAIForge_FullMethodName                              = "/ypb.Yak/DeleteAIForge"
 	Yak_QueryAIForge_FullMethodName                               = "/ypb.Yak/QueryAIForge"
+	Yak_GetAIForge_FullMethodName                                 = "/ypb.Yak/GetAIForge"
 	Yak_StartMcpServer_FullMethodName                             = "/ypb.Yak/StartMcpServer"
 	Yak_GetToolSetList_FullMethodName                             = "/ypb.Yak/GetToolSetList"
 	Yak_GetAIToolList_FullMethodName                              = "/ypb.Yak/GetAIToolList"
@@ -1140,6 +1141,7 @@ type YakClient interface {
 	UpdateAIForge(ctx context.Context, in *AIForge, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	DeleteAIForge(ctx context.Context, in *AIForgeFilter, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	QueryAIForge(ctx context.Context, in *QueryAIForgeRequest, opts ...grpc.CallOption) (*QueryAIForgeResponse, error)
+	GetAIForge(ctx context.Context, in *GetAIForgeRequest, opts ...grpc.CallOption) (*AIForge, error)
 	// mcp server
 	StartMcpServer(ctx context.Context, in *StartMcpServerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StartMcpServerResponse], error)
 	GetToolSetList(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetToolSetListResponse, error)
@@ -6669,6 +6671,16 @@ func (c *yakClient) QueryAIForge(ctx context.Context, in *QueryAIForgeRequest, o
 	return out, nil
 }
 
+func (c *yakClient) GetAIForge(ctx context.Context, in *GetAIForgeRequest, opts ...grpc.CallOption) (*AIForge, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIForge)
+	err := c.cc.Invoke(ctx, Yak_GetAIForge_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) StartMcpServer(ctx context.Context, in *StartMcpServerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StartMcpServerResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[86], Yak_StartMcpServer_FullMethodName, cOpts...)
@@ -7505,6 +7517,7 @@ type YakServer interface {
 	UpdateAIForge(context.Context, *AIForge) (*DbOperateMessage, error)
 	DeleteAIForge(context.Context, *AIForgeFilter) (*DbOperateMessage, error)
 	QueryAIForge(context.Context, *QueryAIForgeRequest) (*QueryAIForgeResponse, error)
+	GetAIForge(context.Context, *GetAIForgeRequest) (*AIForge, error)
 	// mcp server
 	StartMcpServer(*StartMcpServerRequest, grpc.ServerStreamingServer[StartMcpServerResponse]) error
 	GetToolSetList(context.Context, *Empty) (*GetToolSetListResponse, error)
@@ -8976,6 +8989,9 @@ func (UnimplementedYakServer) DeleteAIForge(context.Context, *AIForgeFilter) (*D
 }
 func (UnimplementedYakServer) QueryAIForge(context.Context, *QueryAIForgeRequest) (*QueryAIForgeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryAIForge not implemented")
+}
+func (UnimplementedYakServer) GetAIForge(context.Context, *GetAIForgeRequest) (*AIForge, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAIForge not implemented")
 }
 func (UnimplementedYakServer) StartMcpServer(*StartMcpServerRequest, grpc.ServerStreamingServer[StartMcpServerResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method StartMcpServer not implemented")
@@ -17049,6 +17065,24 @@ func _Yak_QueryAIForge_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_GetAIForge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAIForgeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetAIForge(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetAIForge_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetAIForge(ctx, req.(*GetAIForgeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_StartMcpServer_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(StartMcpServerRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -18906,6 +18940,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QueryAIForge",
 			Handler:    _Yak_QueryAIForge_Handler,
+		},
+		{
+			MethodName: "GetAIForge",
+			Handler:    _Yak_GetAIForge_Handler,
 		},
 		{
 			MethodName: "GetToolSetList",

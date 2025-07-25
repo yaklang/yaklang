@@ -63,6 +63,21 @@ func TestAIForgeBaseCurd(t *testing.T) {
 	require.Equal(t, name, forge[0].ForgeName)
 	require.Equal(t, newContent, forge[0].ForgeContent)
 
+	newContent = uuid.New().String()
+	_, err = client.UpdateAIForge(ctx, &ypb.AIForge{
+		Id:           forge[0].GetId(),
+		ForgeContent: newContent,
+	})
+	require.NoError(t, err)
+
+	forge, err = queryForge(ctx, client, &ypb.AIForgeFilter{
+		Id: forge[0].GetId(),
+	})
+	require.NoError(t, err)
+	require.Len(t, forge, 1)
+	require.Equal(t, name, forge[0].ForgeName)
+	require.Equal(t, newContent, forge[0].ForgeContent)
+
 	_, err = client.DeleteAIForge(ctx, &ypb.AIForgeFilter{
 		ForgeName: name,
 	})
