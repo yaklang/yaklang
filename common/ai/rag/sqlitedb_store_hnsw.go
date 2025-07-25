@@ -6,27 +6,78 @@ import (
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"github.com/yaklang/yaklang/common/ai/rag/config"
+	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 // SQLiteVectorStore 是一个基于 SQLite 的向量存储实现
-type SQLiteVectorStore struct {
-	db       *gorm.DB
-	embedder EmbeddingClient
-	mu       sync.RWMutex // 用于并发安全的互斥锁
+type SQLiteVectorStoreHNSW struct {
+	db         *gorm.DB
+	embedder   EmbeddingClient
+	mu         sync.RWMutex // 用于并发安全的互斥锁
+	collection *schema.VectorStoreCollection
+	// 是否自动更新 graph_infos
+	EnableAutoUpdateGraphInfos bool
+	hnsw                       *hnsw.Graph[string]
+}
 
-	// 集合信息
-	collectionName string
-	collectionID   uint
+func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder EmbeddingClient) (*SQLiteVectorStoreHNSW, error) {
+	var collections []*schema.VectorStoreCollection
+	dbErr := db.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).Find(&collections)
+	if dbErr.Error != nil {
+		return nil, utils.Errorf("查询集合失败: %v", dbErr.Error)
+	}
+
+	if len(collections) == 0 {
+		return nil, utils.Errorf("集合 %s 不存在", collectionName)
+	}
+
+	config := collections[0]
+	hnswGraph := hnsw.NewGraph(
+		hnsw.WithHNSWParameters[string](config.M, config.Ml, config.EfSearch),
+		hnsw.WithDistance[string](hnsw.GetDistanceFunc(config.DistanceFuncType)),
+	)
+
+	hnswGraph.Layers = ParseLayersInfo(&collections[0].GroupInfos, func(key string) []float32 {
+		var doc schema.VectorStoreDocument
+		db.Where("document_id = ?", key).First(&doc)
+		return []float32(doc.Embedding)
+	})
+	vectorStore := &SQLiteVectorStoreHNSW{
+		db:                         db,
+		EnableAutoUpdateGraphInfos: true,
+		embedder:                   embedder,
+		collection:                 collections[0],
+		hnsw:                       hnswGraph,
+	}
+	hnswGraph.OnLayersChange = func(layers []*hnsw.Layer[string]) {
+		if vectorStore.EnableAutoUpdateGraphInfos {
+			vectorStore.UpdateAutoUpdateGraphInfos()
+		}
+	}
+
+	return vectorStore, nil
+}
+
+func (s *SQLiteVectorStoreHNSW) UpdateAutoUpdateGraphInfos() error {
+	graphInfos := ConvertLayersInfoToGraph(s.hnsw.Layers, func(key string, vec []float32) {})
+	resDb := s.db.Model(&schema.VectorStoreCollection{}).Where("id = ?", s.collection.ID).Update("group_infos", graphInfos)
+	return resDb.Error
 }
 
 // NewSQLiteVectorStore 创建一个新的 SQLite 向量存储
-func NewSQLiteVectorStore(db *gorm.DB, collectionName string, modelName string, dimension int, embedder EmbeddingClient) (*SQLiteVectorStore, error) {
+func NewSQLiteVectorStoreHNSW(name string, description string, modelName string, dimension int, embedder EmbeddingClient, db *gorm.DB, options ...config.SQLiteVectorStoreHNSWOption) (*SQLiteVectorStoreHNSW, error) {
+	cfg := config.NewSQLiteVectorStoreHNSWConfig()
+	for _, option := range options {
+		option(cfg)
+	}
+
 	// 创建或获取集合
 	var collections []*schema.VectorStoreCollection
-	dbErr := db.Where("name = ?", collectionName).Find(&collections)
+	dbErr := db.Where("name = ?", name).Find(&collections)
 	if dbErr.Error != nil {
 		return nil, utils.Errorf("查询集合失败: %v", dbErr.Error)
 	}
@@ -34,10 +85,15 @@ func NewSQLiteVectorStore(db *gorm.DB, collectionName string, modelName string, 
 	if len(collections) == 0 {
 		// 创建新集合
 		collection = &schema.VectorStoreCollection{
-			Name:        collectionName,
-			Description: "Created by SQLiteVectorStore",
-			ModelName:   modelName,
-			Dimension:   dimension,
+			Name:             name,
+			Description:      description,
+			ModelName:        modelName,
+			Dimension:        dimension,
+			M:                cfg.M,
+			Ml:               cfg.Ml,
+			EfSearch:         cfg.EfSearch,
+			EfConstruct:      cfg.EfConstruct,
+			DistanceFuncType: cfg.DistanceFuncType,
 		}
 		if err := db.Create(&collection).Error; err != nil {
 			return nil, utils.Errorf("创建集合失败: %v", err)
@@ -46,14 +102,21 @@ func NewSQLiteVectorStore(db *gorm.DB, collectionName string, modelName string, 
 		collection = collections[0]
 	}
 
-	return &SQLiteVectorStore{
-		db:             db,
-		embedder:       embedder,
-		collectionName: collectionName,
-		collectionID:   collection.ID,
-	}, nil
+	vectorStore := &SQLiteVectorStoreHNSW{
+		db:                         db,
+		EnableAutoUpdateGraphInfos: true,
+		embedder:                   embedder,
+		collection:                 collection,
+		hnsw:                       hnsw.NewGraph[string](),
+	}
+	vectorStore.hnsw.OnLayersChange = func(layers []*hnsw.Layer[string]) {
+		if vectorStore.EnableAutoUpdateGraphInfos {
+			vectorStore.UpdateAutoUpdateGraphInfos()
+		}
+	}
+	return vectorStore, nil
 }
-func RemoveCollection(db *gorm.DB, collectionName string) error {
+func RemoveCollectionHNSW(db *gorm.DB, collectionName string) error {
 	return utils.GormTransaction(db, func(tx *gorm.DB) error {
 		var collections []schema.VectorStoreCollection
 		if err := tx.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).Find(&collections).Error; err != nil {
@@ -73,12 +136,30 @@ func RemoveCollection(db *gorm.DB, collectionName string) error {
 		return nil
 	})
 }
-func (s *SQLiteVectorStore) Remove() {
-	RemoveCollection(s.db, s.collectionName)
+func (s *SQLiteVectorStoreHNSW) Remove() error {
+	collectionName := s.collection.Name
+	return utils.GormTransaction(s.db, func(tx *gorm.DB) error {
+		var collections []schema.VectorStoreCollection
+		if err := tx.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).Find(&collections).Error; err != nil {
+			return err
+		}
+		if len(collections) == 0 {
+			return utils.Errorf("集合 %s 不存在", collectionName)
+		}
+		collection := collections[0]
+
+		if err := tx.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).Unscoped().Delete(&schema.VectorStoreDocument{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&schema.VectorStoreCollection{}).Where("id = ?", collection.ID).Unscoped().Delete(&schema.VectorStoreCollection{}).Error; err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 // 将 schema.VectorStoreDocument 转换为 Document
-func (s *SQLiteVectorStore) toDocument(doc *schema.VectorStoreDocument) Document {
+func (s *SQLiteVectorStoreHNSW) toDocument(doc *schema.VectorStoreDocument) Document {
 	return Document{
 		ID:        doc.DocumentID,
 		Metadata:  map[string]any(doc.Metadata),
@@ -87,17 +168,17 @@ func (s *SQLiteVectorStore) toDocument(doc *schema.VectorStoreDocument) Document
 }
 
 // 将 Document 转换为 schema.VectorStoreDocument
-func (s *SQLiteVectorStore) toSchemaDocument(doc Document) *schema.VectorStoreDocument {
+func (s *SQLiteVectorStoreHNSW) toSchemaDocument(doc Document) *schema.VectorStoreDocument {
 	return &schema.VectorStoreDocument{
 		DocumentID:   doc.ID,
-		CollectionID: s.collectionID,
+		CollectionID: s.collection.ID,
 		Metadata:     schema.MetadataMap(doc.Metadata),
 		Embedding:    schema.FloatArray(doc.Embedding),
 	}
 }
 
 // Add 添加文档到向量存储
-func (s *SQLiteVectorStore) Add(docs ...Document) error {
+func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -150,12 +231,27 @@ func (s *SQLiteVectorStore) Add(docs ...Document) error {
 		}
 	}
 
+	nodes := make([]hnsw.Node[string], len(docs))
+	for i, doc := range docs {
+		nodes[i] = hnsw.Node[string]{
+			Key: doc.ID,
+			Value: func() []float32 {
+				return doc.Embedding
+			},
+		}
+	}
+	err := tx.Commit().Error
+	if err != nil {
+		return err
+	}
+	s.hnsw.Add(nodes...)
+
 	// 提交事务
-	return tx.Commit().Error
+	return nil
 }
 
 // Search 根据查询文本检索相关文档
-func (s *SQLiteVectorStore) Search(query string, page, limit int) ([]SearchResult, error) {
+func (s *SQLiteVectorStoreHNSW) Search(query string, page, limit int) ([]SearchResult, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -165,9 +261,14 @@ func (s *SQLiteVectorStore) Search(query string, page, limit int) ([]SearchResul
 		return nil, utils.Errorf("为查询生成嵌入向量失败: %v", err)
 	}
 
-	// 获取所有文档
+	resultNodes := s.hnsw.Search(queryEmbedding, limit)
+	resultIds := make([]string, len(resultNodes))
+	for i, result := range resultNodes {
+		resultIds[i] = result.Key
+	}
+
 	var docs []schema.VectorStoreDocument
-	if err := s.db.Where("collection_id = ?", s.collectionID).Find(&docs).Error; err != nil {
+	if err := s.db.Where("collection_id = ?", s.collection.ID).Where("document_id IN (?)", resultIds).Find(&docs).Error; err != nil {
 		return nil, utils.Errorf("查询文档失败: %v", err)
 	}
 
@@ -212,7 +313,7 @@ func (s *SQLiteVectorStore) Search(query string, page, limit int) ([]SearchResul
 }
 
 // Delete 根据 ID 删除文档
-func (s *SQLiteVectorStore) Delete(ids ...string) error {
+func (s *SQLiteVectorStoreHNSW) Delete(ids ...string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -230,11 +331,20 @@ func (s *SQLiteVectorStore) Delete(ids ...string) error {
 		}
 	}
 
-	return tx.Commit().Error
+	err := tx.Commit().Error
+	if err != nil {
+		return err
+	}
+
+	for _, id := range ids {
+		s.hnsw.Delete(id)
+	}
+
+	return nil
 }
 
 // Get 根据 ID 获取文档
-func (s *SQLiteVectorStore) Get(id string) (Document, bool, error) {
+func (s *SQLiteVectorStoreHNSW) Get(id string) (Document, bool, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -252,12 +362,12 @@ func (s *SQLiteVectorStore) Get(id string) (Document, bool, error) {
 }
 
 // List 列出所有文档
-func (s *SQLiteVectorStore) List() ([]Document, error) {
+func (s *SQLiteVectorStoreHNSW) List() ([]Document, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	var docs []schema.VectorStoreDocument
-	if err := s.db.Where("collection_id = ?", s.collectionID).Find(&docs).Error; err != nil {
+	if err := s.db.Where("collection_id = ?", s.collection.ID).Find(&docs).Error; err != nil {
 		return nil, utils.Errorf("查询文档失败: %v", err)
 	}
 
@@ -270,17 +380,17 @@ func (s *SQLiteVectorStore) List() ([]Document, error) {
 }
 
 // Count 返回文档总数
-func (s *SQLiteVectorStore) Count() (int, error) {
+func (s *SQLiteVectorStoreHNSW) Count() (int, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	var count int
-	if err := s.db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", s.collectionID).Count(&count).Error; err != nil {
+	if err := s.db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", s.collection.ID).Count(&count).Error; err != nil {
 		return 0, utils.Errorf("计算文档数量失败: %v", err)
 	}
 
 	return count, nil
 }
 
-// 确保 SQLiteVectorStore 实现了 VectorStore 接口
-var _ VectorStore = (*SQLiteVectorStore)(nil)
+// 确保 SQLiteVectorStoreHNSW 实现了 VectorStore 接口
+var _ VectorStore = (*SQLiteVectorStoreHNSW)(nil)

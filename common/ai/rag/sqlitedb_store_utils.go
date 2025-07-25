@@ -23,7 +23,7 @@ func IsReadyCollection(db *gorm.DB, collectionName string) bool {
 type ExportVectorStoreDocument struct {
 	DocumentID string                 `json:"document_id"`
 	Metadata   map[string]interface{} `json:"metadata"`
-	Embedding  []float64              `json:"embedding"`
+	Embedding  []float32              `json:"embedding"`
 }
 
 func ImportVectorData(db *gorm.DB, filepath string) error {
