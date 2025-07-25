@@ -1232,8 +1232,8 @@ func (y *YakToCallerManager) fetchFunctionFromSourceCode(pluginContext *YakitPlu
 						if err := recover(); err != nil {
 							fmtErr := utils.Errorf("call hook function `%v` of `%v` plugin failed: %s", funcName, scriptName, err)
 							y.Err = fmtErr
-							log.Error(fmtErr)
-							fmt.Println()
+							//log.Error(fmtErr)
+							//fmt.Println()
 							errCh <- fmtErr
 							if os.Getenv("YAK_IN_TERMINAL_MODE") == "" {
 								utils.PrintCurrentGoroutineRuntimeStack()
@@ -1253,9 +1253,9 @@ func (y *YakToCallerManager) fetchFunctionFromSourceCode(pluginContext *YakitPlu
 				case value := <-valueCh:
 					return value
 				case err := <-errCh:
-					if err != nil && !errors.Is(err, context.Canceled) {
-						log.Errorf("call YakFunction (DividedCTX) error: \n%v", err)
-					}
+					//if err != nil && !errors.Is(err, context.Canceled) {
+					//	log.Errorf("call YakFunction (DividedCTX) error: \n%v", err)
+					//}
 					// 重要：抛出错误而不是返回nil，这样Call方法就能捕获到错误
 					panic(err)
 				case <-subCtx.Done():

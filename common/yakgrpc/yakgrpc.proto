@@ -7397,15 +7397,13 @@ message PluginTraceRequest {
 message PluginTraceResponse {
   // 响应类型
   string ResponseType = 1; // "trace_update", "trace_list", "control_result"
-  // 跟踪更新
-  PluginExecutionTrace Trace = 2;
   // 跟踪列表
-  repeated PluginExecutionTrace Traces = 3;
+  repeated PluginExecutionTrace Traces = 2;
   // 控制操作结果
-  bool Success = 4;
-  string Message = 5;
+  bool Success = 3;
+  string Message = 4;
   // 统计信息
-  PluginTraceStats Stats = 6;
+  PluginTraceStats Stats = 5;
 }
 
 message PluginTraceStats {
