@@ -1655,16 +1655,16 @@ func (s *Server) PluginTrace(stream ypb.Yak_PluginTraceServer) error {
 		// 批量处理的缓冲区
 		traceBatch := make([]*yak.PluginExecutionTrace, 0, 50)
 
-		// 定时器：3秒推送一次stats
-		statsTicker := time.NewTicker(3 * time.Second)
+		// 定时器：2秒推送一次stats
+		statsTicker := time.NewTicker(2 * time.Second)
 		defer statsTicker.Stop()
 
 		// 批量处理定时器：500ms收集一批trace进行推送
 		batchTicker := time.NewTicker(500 * time.Millisecond)
 		defer batchTicker.Stop()
 
-		// 长时间运行trace检测定时器：每10秒检查一次
-		longRunningTicker := time.NewTicker(10 * time.Second)
+		// 长时间运行trace检测定时器：每1秒检查一次
+		longRunningTicker := time.NewTicker(1 * time.Second)
 		defer longRunningTicker.Stop()
 
 		for {
@@ -1731,13 +1731,13 @@ func (s *Server) PluginTrace(stream ypb.Yak_PluginTraceServer) error {
 			continue
 		}
 
-		response := s.handlePluginTraceRequest(manager, req, stream)
+		response := s.handlePluginTraceRequest(manager, req)
 		_ = stream.Send(response)
 	}
 }
 
 // handlePluginTraceRequest 处理插件跟踪请求
-func (s *Server) handlePluginTraceRequest(manager *yak.YakToCallerManager, req *ypb.PluginTraceRequest, stream ypb.Yak_PluginTraceServer) *ypb.PluginTraceResponse {
+func (s *Server) handlePluginTraceRequest(manager *yak.YakToCallerManager, req *ypb.PluginTraceRequest) *ypb.PluginTraceResponse {
 	switch req.ControlMode {
 	case "start_stream":
 		// 返回空的trace列表，实际推送由callback处理
@@ -1843,6 +1843,12 @@ func (s *Server) sendTraceBatch(stream ypb.Yak_PluginTraceServer, traces []*yak.
 	pbTraces := make([]*ypb.PluginExecutionTrace, 0, len(traces))
 	for _, trace := range traces {
 		argsBytes, _ := json.Marshal(trace.Args)
+		var durationMS int64
+		if trace.EndTime.IsZero() { // trace still running
+			durationMS = time.Now().Sub(trace.StartTime).Milliseconds()
+		} else {
+			durationMS = trace.EndTime.Sub(trace.StartTime).Milliseconds()
+		}
 		pbTrace := &ypb.PluginExecutionTrace{
 			TraceID:       trace.TraceID,
 			PluginID:      trace.PluginID,
@@ -1852,7 +1858,7 @@ func (s *Server) sendTraceBatch(stream ypb.Yak_PluginTraceServer, traces []*yak.
 			EndTime:       trace.EndTime.Unix(),
 			ExecutionArgs: argsBytes,
 			ErrorMessage:  trace.Error,
-			DurationMs:    int64(trace.Duration.Milliseconds()),
+			DurationMs:    durationMS,
 			RuntimeId:     "", // 暂时为空
 		}
 		pbTraces = append(pbTraces, pbTrace)

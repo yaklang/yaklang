@@ -229,6 +229,9 @@ jobs:
           - name: Test gRPC MUSTPASSFingerprint
             run: go test -timeout 2m -run TestGRPCMUSTPASS_Fingerprint* ./common/yakgrpc/...
 
+          - name: Test gRPC MUSTPASS PluginTrace
+            run: go test -timeout 5m -run TestGRPCMUSTPASS_PluginTrace* ./common/yakgrpc/...
+
           - name: Test AI Task
             run: go test -timeout 1m -run TestAITaskWith ./common/yakgrpc/...
 
