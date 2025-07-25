@@ -6,10 +6,12 @@ import (
 )
 
 // DistanceFunc is a function that computes the distance between two vectors.
-type DistanceFunc func(a, b []float32) float32
+type DistanceFunc func(a, b Vector) float32
 
 // EuclideanDistance computes the Euclidean distance between two vectors.
-func EuclideanDistance(a, b []float32) float32 {
+func EuclideanDistance(af, bf Vector) float32 {
+	a := af()
+	b := bf()
 	// TODO: can we speedup with vek?
 	var sum float32 = 0
 	for i := range a {
@@ -40,4 +42,9 @@ func distanceFuncToName(fn DistanceFunc) (string, bool) {
 // exported and imported.
 func RegisterDistanceFunc(name string, fn DistanceFunc) {
 	distanceFuncs[name] = fn
+}
+
+// GetDistanceFunc returns the distance function with the given name.
+func GetDistanceFunc(name string) DistanceFunc {
+	return distanceFuncs[name]
 }

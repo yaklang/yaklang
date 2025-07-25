@@ -33,7 +33,7 @@ func TestMUSTPASS_ExportVectorData(t *testing.T) {
 	err = store.Add(rag.Document{
 		ID:      "Yakit 权威使用指南 v1",
 		Content: "Yakit 权威使用指南",
-		Embedding: []float64{
+		Embedding: []float32{
 			0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0,
 		},
 	})
@@ -43,7 +43,7 @@ func TestMUSTPASS_ExportVectorData(t *testing.T) {
 	err = store.Add(rag.Document{
 		ID:      "Yakit 权威使用指南 v2",
 		Content: "Yakit 权威使用指南",
-		Embedding: []float64{
+		Embedding: []float32{
 			0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0,
 		},
 	})
@@ -116,7 +116,7 @@ func TestMUSTPASS_ImportVectorData_ExistingCollection(t *testing.T) {
 	err = store.Add(rag.Document{
 		ID:      "original_doc",
 		Content: "Original document content",
-		Embedding: []float64{
+		Embedding: []float32{
 			0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0,
 		},
 	})
@@ -175,7 +175,7 @@ func TestMUSTPASS_ImportVectorData_ExistingDocument(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	originalEmbedding := []float64{0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0}
+	originalEmbedding := []float32{0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0}
 	err = store.Add(rag.Document{
 		ID:        "shared_doc_id",
 		Content:   "Original content",
@@ -209,7 +209,7 @@ func TestMUSTPASS_ImportVectorData_ExistingDocument(t *testing.T) {
 	err = store.Add(rag.Document{
 		ID:        "different_doc_id",
 		Content:   "Different document content",
-		Embedding: []float64{1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0},
+		Embedding: []float32{1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0},
 	})
 	assert.NoError(t, err)
 
@@ -262,7 +262,7 @@ func TestMUSTPASS_ImportVectorDataFullUpdate(t *testing.T) {
 	err = store.Add(rag.Document{
 		ID:      "Yakit 权威使用指南 v1",
 		Content: "Yakit 权威使用指南",
-		Embedding: []float64{
+		Embedding: []float32{
 			0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0,
 		},
 	})
@@ -280,7 +280,7 @@ func TestMUSTPASS_ImportVectorDataFullUpdate(t *testing.T) {
 	err = store.Add(rag.Document{
 		ID:      "Yakit 权威使用指南 v2",
 		Content: "Yakit 权威使用指南",
-		Embedding: []float64{
+		Embedding: []float32{
 			0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0,
 		},
 	})

@@ -49,7 +49,9 @@ func CosineSimilarity(a, b []float32) (float32, error) {
 // CosineDistance computes the cosine distance between two vectors.
 // The distance is defined as 1 - cosine_similarity.
 // It returns a value between 0 (perfectly similar) and 2 (perfectly opposite).
-func CosineDistance(a, b []float32) float32 {
+func CosineDistance(af, bf Vector) float32 {
+	a := af()
+	b := bf()
 	similarity, err := CosineSimilarity(a, b)
 	if err != nil {
 		// Pass the error up from the similarity calculation
