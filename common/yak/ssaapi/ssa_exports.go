@@ -417,8 +417,13 @@ func getUnifiedSeparatorFs(fs fi.FileSystem) fi.FileSystem {
 
 var ttlSSAParseCache = createCache(10 * time.Second)
 
-func createCache(ttl time.Duration) *utils.CacheWithKey[string, *Program] {
-	cache := utils.NewTTLCacheWithKey[string, *Program](ttl)
+type programResult struct {
+	prog *Program
+	err  error
+}
+
+func createCache(ttl time.Duration) *utils.CacheWithKey[string, *programResult] {
+	cache := utils.NewTTLCacheWithKey[string, *programResult](ttl)
 	return cache
 }
 
@@ -447,15 +452,23 @@ func ParseFromReader(input io.Reader, opts ...Option) (*Program, error) {
 	}
 
 	hash := config.CalcHash()
+	log.Errorf("check hash: %s", hash)
 	if config.EnableCache {
-		if prog, ok := ttlSSAParseCache.Get(hash); ok {
-			return prog, nil
+		if res, ok := ttlSSAParseCache.Get(hash); ok {
+			// log.Errorf("cache hit: %s", hash)
+			return res.prog, res.err
+		} else {
+			// log.Errorf("cache miss: %s", hash)
 		}
 	}
 
 	ret, err := config.parseFile()
-	if err == nil && config.EnableCache {
-		ttlSSAParseCache.SetWithTTL(hash, ret, 30*time.Minute)
+	if config.EnableCache {
+		// log.Errorf("cache set %s", hash)
+		ttlSSAParseCache.SetWithTTL(hash, &programResult{
+			prog: ret,
+			err:  err,
+		}, 30*time.Minute)
 	}
 	return ret, err
 }
