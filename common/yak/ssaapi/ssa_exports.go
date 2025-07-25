@@ -415,7 +415,7 @@ func getUnifiedSeparatorFs(fs fi.FileSystem) fi.FileSystem {
 	)
 }
 
-var ttlSSAParseCache = createCache(10 * time.Second)
+var ttlSSAParseCache = createCache(30 * time.Minute)
 
 type programResult struct {
 	prog *Program
@@ -452,24 +452,23 @@ func ParseFromReader(input io.Reader, opts ...Option) (*Program, error) {
 	}
 
 	hash := config.CalcHash()
-	log.Errorf("check hash: %s", hash)
 	if config.EnableCache {
-		if res, ok := ttlSSAParseCache.Get(hash); ok {
-			// log.Errorf("cache hit: %s", hash)
-			return res.prog, res.err
-		} else {
-			// log.Errorf("cache miss: %s", hash)
+		// Use single-flight behavior to ensure only one parsing operation per hash
+		result, err := ttlSSAParseCache.GetOrLoad(hash, func() (*programResult, error) {
+			ret, err := config.parseFile()
+			return &programResult{
+				prog: ret,
+				err:  err,
+			}, nil
+		})
+		if err != nil {
+			return nil, err
 		}
+		return result.prog, result.err
+	} else {
 	}
 
 	ret, err := config.parseFile()
-	if config.EnableCache {
-		// log.Errorf("cache set %s", hash)
-		ttlSSAParseCache.SetWithTTL(hash, &programResult{
-			prog: ret,
-			err:  err,
-		}, 30*time.Minute)
-	}
 	return ret, err
 }
 
