@@ -71,10 +71,17 @@ func NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
 			log.Errorf("ai request failed: %s", err)
 		},
 	}
+	// 加载Type参数
+	for _, p := range opts {
+		p(c)
+	}
+
 	// 加载默认参数
-	err := consts.GetThirdPartyApplicationConfig(c.Type, c)
-	if err != nil {
-		log.Debug(err)
+	if c.Type != "" {
+		err := consts.GetThirdPartyApplicationConfig(c.Type, c)
+		if err != nil {
+			log.Debug(err)
+		}
 	}
 
 	// 加载用户参数
