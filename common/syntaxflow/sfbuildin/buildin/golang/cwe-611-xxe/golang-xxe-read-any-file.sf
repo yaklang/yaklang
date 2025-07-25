@@ -2,7 +2,7 @@ desc(
 	title: "Check Golang XXE Read Any File"
 	type: audit
 	level: high
-    risk: "xxe"
+	risk: "xxe"
 	desc: <<<DESC
 ### 漏洞描述
 
