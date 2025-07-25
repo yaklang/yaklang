@@ -33,12 +33,12 @@ type embeddingRequest struct {
 
 type embeddingItem struct {
 	Index     int         `json:"index"`
-	Embedding [][]float64 `json:"embedding"`
+	Embedding [][]float32 `json:"embedding"`
 }
 
 type embeddingResponse []embeddingItem
 
-func (c *OpenaiEmbeddingClient) Embedding(text string) ([]float64, error) {
+func (c *OpenaiEmbeddingClient) Embedding(text string) ([]float32, error) {
 	// Prepare the request
 	req := embeddingRequest{
 		Input:          text,

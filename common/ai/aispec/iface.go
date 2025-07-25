@@ -85,5 +85,5 @@ type AIClient interface {
 }
 
 type EmbeddingCaller interface {
-	Embedding(string) ([]float64, error)
+	Embedding(string) ([]float32, error)
 }

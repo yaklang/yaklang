@@ -7,11 +7,11 @@ import (
 
 // dotProduct 计算两个向量的点积
 // A · B = Σ(Ai * Bi)
-func dotProduct(a, b []float64) (float64, error) {
+func dotProduct(a, b []float32) (float32, error) {
 	if len(a) != len(b) {
 		return 0, fmt.Errorf("vector lengths are not equal: %d != %d", len(a), len(b))
 	}
-	var sum float64
+	var sum float32
 	for i := 0; i < len(a); i++ {
 		sum += a[i] * b[i]
 	}
@@ -20,17 +20,17 @@ func dotProduct(a, b []float64) (float64, error) {
 
 // magnitude 计算向量的欧几里得范数（模长）
 // ||A|| = sqrt(Σ(Ai^2))
-func magnitude(vec []float64) float64 {
-	var sumOfSquares float64
+func magnitude(vec []float32) float32 {
+	var sumOfSquares float32
 	for _, val := range vec {
 		sumOfSquares += val * val
 	}
-	return math.Sqrt(sumOfSquares)
+	return float32(math.Sqrt(float64(sumOfSquares)))
 }
 
 // CosineSimilarity 计算两个向量的余弦相似度
 // 返回值在 [-1, 1] 之间。越接近1，表示越相似。
-func CosineSimilarity(a, b []float64) (float64, error) {
+func CosineSimilarity(a, b []float32) (float32, error) {
 	// 1. 计算点积
 	dot, err := dotProduct(a, b)
 	if err != nil {

@@ -24,13 +24,13 @@ func TestSQLiteVectorStore(t *testing.T) {
 			ID:        "doc1",
 			Content:   "Yaklang是一种安全研究编程语言",
 			Metadata:  map[string]any{"source": "Yaklang介绍"},
-			Embedding: []float64{1.0, 0.0, 0.0},
+			Embedding: []float32{1.0, 0.0, 0.0},
 		},
 		{
 			ID:        "doc2",
 			Content:   "RAG是一种结合检索和生成的AI技术",
 			Metadata:  map[string]any{"source": "RAG介绍"},
-			Embedding: []float64{0.0, 1.0, 0.0},
+			Embedding: []float32{0.0, 1.0, 0.0},
 		},
 	}
 
