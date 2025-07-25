@@ -6,7 +6,6 @@ import (
 
 	_ "embed"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -26,7 +25,7 @@ func GenerateYakScriptMetadata(forgeContent string) (*GenerateResult, error) {
 	))
 
 	lfopts = append(lfopts, aiforge.WithExtendLiteForge_AIDOption(
-		aid.WithDebugPrompt(true),
+	// aid.WithDebugPrompt(true),
 	))
 
 	lf, err := aiforge.NewLiteForge("generate_metadata", lfopts...)
