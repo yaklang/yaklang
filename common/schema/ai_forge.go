@@ -59,6 +59,9 @@ func (a *AIForge) AfterDelete(tx *gorm.DB) (err error) {
 
 // todo  schema2grpc model
 func (a *AIForge) ToGRPC() *ypb.AIForge {
+	if a.ForgeContent == "" { // fix forge content to forgeparams
+		a.ForgeContent = a.Params
+	}
 	return &ypb.AIForge{
 		Id:                 int64(a.ID),
 		ForgeName:          a.ForgeName,
