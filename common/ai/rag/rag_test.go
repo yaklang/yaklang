@@ -10,17 +10,17 @@ import (
 type MockEmbedder struct{}
 
 // Embedding 模拟实现 EmbeddingClient 接口
-func (m *MockEmbedder) Embedding(text string) ([]float64, error) {
+func (m *MockEmbedder) Embedding(text string) ([]float32, error) {
 	// 简单地生成一个固定的向量作为嵌入
 	// 在实际测试中，我们可以根据文本内容生成不同的向量
 	if text == "Yaklang介绍" || text == "什么是Yaklang" || text == "Yaklang是一种安全研究编程语言" {
-		return []float64{1.0, 0.0, 0.0}, nil
+		return []float32{1.0, 0.0, 0.0}, nil
 	} else if text == "RAG介绍" || text == "什么是RAG" || text == "RAG是一种结合检索和生成的AI技术" {
-		return []float64{0.0, 1.0, 0.0}, nil
+		return []float32{0.0, 1.0, 0.0}, nil
 	} else if text == "AI技术" {
-		return []float64{0.5, 0.5, 0.0}, nil
+		return []float32{0.5, 0.5, 0.0}, nil
 	}
-	return []float64{0.0, 0.0, 0.0}, nil
+	return []float32{0.0, 0.0, 0.0}, nil
 }
 
 // 测试文本分块功能
@@ -54,13 +54,13 @@ func TestMemoryVectorStore(t *testing.T) {
 			ID:        "doc1",
 			Content:   "Yaklang是一种安全研究编程语言",
 			Metadata:  map[string]any{"source": "Yaklang介绍"},
-			Embedding: []float64{1.0, 0.0, 0.0},
+			Embedding: []float32{1.0, 0.0, 0.0},
 		},
 		{
 			ID:        "doc2",
 			Content:   "RAG是一种结合检索和生成的AI技术",
 			Metadata:  map[string]any{"source": "RAG介绍"},
-			Embedding: []float64{0.0, 1.0, 0.0},
+			Embedding: []float32{0.0, 1.0, 0.0},
 		},
 	}
 
