@@ -165,21 +165,21 @@ expression
 
 // --- Declarations ---
 declaration
-    : declarationSpecifier initDeclaratorList? ';'
+    : declarationSpecifiers initDeclaratorList? ';'
     | staticAssertDeclaration
     ;
 
 declarationSpecifiers
-    : declarationSpecifier (',' declarationSpecifier)
+    : declarationSpecifier (',' declarationSpecifier)?
     ;
 
 declarationSpecifiers2
-    : declarationSpecifier (',' declarationSpecifier)
+    : declarationSpecifier (',' declarationSpecifier)?
     ;
 
 declarationSpecifier
     : storageClassSpecifier '*'?
-    | declarationSpecifier typeSpecifier '*'?
+    | (storageClassSpecifier | typeQualifier) typeSpecifier '*'?
     | typeSpecifier '*'?
     | typeQualifier '*'?
     | functionSpecifier
@@ -211,8 +211,6 @@ typeSpecifier
     | 'long'
     | 'float'
     | 'double'
-    | 'signed'
-    | 'unsigned'
     | '_Bool'
     | '_Complex'
     | '__m128'
@@ -285,6 +283,8 @@ typeQualifier
     | 'restrict'
     | 'volatile'
     | '_Atomic'
+    | 'signed'
+    | 'unsigned'
     ;
 
 functionSpecifier
@@ -424,7 +424,7 @@ staticAssertDeclaration
 
 // --- Statements ---
 statement
-    : labeledStatement
+    : Identifier ':' statement?
     | compoundStatement
     | expressionStatement
     | statementsExpression
@@ -432,6 +432,7 @@ statement
     | iterationStatement
     | jumpStatement
     | asmStatement
+    | ';'
     ;
 
 asmStatement
@@ -445,9 +446,8 @@ asmExprList
     ;
 
 labeledStatement
-    : Identifier ':' statement?
-    | 'case' expression ':' statement
-    | 'default' ':' statement
+    : 'case' expression ':' statement*
+    | 'default' ':' statement*
     ;
 
 compoundStatement
@@ -465,12 +465,11 @@ blockItem
 
 expressionStatement
     : assignmentExpression (',' assignmentExpression)* ';'?
-    | ';'
     ;
 
 selectionStatement
     : 'if' '(' expression ')' statement ('else' statement)?
-    | 'switch' '(' expression ')' statement
+    | 'switch' '(' expression ')' '{' labeledStatement* '}'
     ;
 
 iterationStatement

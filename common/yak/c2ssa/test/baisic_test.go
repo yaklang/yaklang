@@ -19,6 +19,22 @@ int main(int a,int b) {
 	})
 }
 
+// func TestBuild_Tmp(t *testing.T) {
+// 	t.Run("build", func(t *testing.T) {
+// 		test.CheckPrintlnValue(`
+// #include <stdio.h>
+
+// int main() {
+// 	int a;
+// 	if (a > 1) {
+// 		a = 7;
+// 	}
+// 	println(a);
+// }
+// 		`, []string{``}, t)
+// 	})
+// }
+
 func TestExpr_normol(t *testing.T) {
 	t.Run("add sub mul div", func(t *testing.T) {
 		test.CheckPrintlnValue(`
@@ -92,5 +108,105 @@ int main() {
 }
 
 		`, []string{"Function-add"}, t)
+	})
+}
+
+func TestStmt_normol(t *testing.T) {
+	t.Run("if expr", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+
+int main() {        
+	int a;
+	if (a > 1) {
+		a = 7;
+	}
+	println(a);
+}
+		`, []string{"phi(a)[7,0]"}, t)
+	})
+
+	t.Run("if expr else", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+
+int main() {        
+	int a;
+	if (a == 1) {
+		a = 6;
+	} else {
+		a = 7;
+	}
+	println(a);
+}
+		`, []string{"phi(a)[6,7]"}, t)
+	})
+
+	t.Run("switch exp case", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+
+int main() {        
+	int a;
+	switch (a) {
+		case 2:
+		a = 2;
+		case 3:
+		a = 3;
+	}
+	println(a);
+}
+		`, []string{"phi(a)[3,0]"}, t)
+	})
+
+	t.Run("switch exp case break", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+
+int main() {        
+	int a;
+	switch (a) {
+		case 1:
+			a = 1;
+			break;
+		case 2:
+			a = 2;
+			break;
+		case 3:
+			a = 3;
+			break;
+		default:
+			a = 0;
+	}
+	println(a);
+}
+		`, []string{"phi(a)[1,2,3,0]"}, t)
+	})
+
+	t.Run("for exp", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+
+int main() {        
+ 	int i = 0;
+	for ( ; i < 10; ) {
+		i++;
+	}
+	println(i);
+}
+		`, []string{"phi(i)[0,add(i, 1)]"}, t)
+	})
+
+	t.Run("for stmt;exp;stmt", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+
+int main() {        
+ 	int i = 0;
+	for (i = 1; i < 10; i++) {
+	}
+	println(i);
+}
+		`, []string{"phi(i)[1,add(i, 1)]"}, t)
 	})
 }
