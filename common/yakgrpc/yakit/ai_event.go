@@ -4,6 +4,8 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func CreateAIEvent(db *gorm.DB, event *schema.AiOutputEvent) error {
@@ -37,4 +39,21 @@ func SaveStreamAIEvent(outDb *gorm.DB, event *schema.AiOutputEvent) error {
 		}
 		return nil
 	})
+}
+
+func FilterEvent(db *gorm.DB, filter *ypb.AIEventFilter) *gorm.DB {
+	db = db.Model(&schema.AiOutputEvent{})
+	db = bizhelper.ExactQueryStringArrayOr(db, "event_uuid", filter.GetEventUUIDS())
+	db = bizhelper.ExactQueryStringArrayOr(db, "coordinator_id", filter.GetCoordinatorId())
+	db = bizhelper.ExactQueryStringArrayOr(db, "type", filter.GetEventType())
+	return db
+}
+
+func QueryAIEvent(db *gorm.DB, filter *ypb.AIEventFilter) ([]*schema.AiOutputEvent, error) {
+	var event []*schema.AiOutputEvent
+	db = FilterEvent(db, filter)
+	if db = db.Find(&event); db.Error != nil {
+		return nil, db.Error
+	}
+	return event, nil
 }
