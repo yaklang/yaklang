@@ -1105,6 +1105,9 @@ func (y *YakToCallerManager) LoadPluginContext(ctx context.Context, t string, ho
 
 // EnableExecutionTracing 启用插件执行跟踪
 func (y *YakToCallerManager) EnableExecutionTracing(enable bool) {
+	if !enable && y.enableTracing {
+		y.GetExecutionTracker().CleanupCompletedTraces(-time.Minute * 5)
+	}
 	y.enableTracing = enable
 }
 
