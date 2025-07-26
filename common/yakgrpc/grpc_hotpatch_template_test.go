@@ -204,6 +204,7 @@ func TestUploadHotPatchTemplateToOnline(t *testing.T) {
 
 func TestDownloadHotPatchTemplate(t *testing.T) {
 	mockey.PatchConvey("Test DownloadHotPatchTemplate", t, func() {
+		token := "test-token"
 		name := "test-template"
 		templateType := "test-type"
 		template := &yaklib.HotPatchTemplate{

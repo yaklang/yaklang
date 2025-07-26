@@ -327,9 +327,8 @@ service Yak {
   // 迁移旧的payload
   rpc MigratePayloads(Empty) returns (stream SavePayloadProgress);
 
-  rpc UploadPayloadsToOnline(UploadPayloadsToOnlineRequest) returns (Empty);
-  rpc DownloadAllPayloads(DownloadPayloadsRequest) returns (stream DownloadAllPayloadsProgress);
-  rpc DownloadBatchPayloads(DownloadPayloadsRequest) returns (Empty);
+  rpc UploadPayloadToOnline(UploadPayloadToOnlineRequest) returns (Empty);
+  rpc DownloadPayload(DownloadPayloadRequest) returns (stream DownloadProgress);
 
 
   // 自动生成补全
@@ -2885,19 +2884,22 @@ message SavePayloadProgress {
   string Message = 10;
 }
 
-message UploadPayloadsToOnlineRequest {
-  string Group = 1;
-  string Token = 2;
+message UploadPayloadToOnlineRequest {
+  string Token = 1;
+  string Group = 2;
+  string Folder = 3;
 }
 
-message DownloadPayloadsRequest {
-  string Group = 1;
+message DownloadPayloadRequest {
+  string Token = 1;
+  string Group = 2;
+  string Folder = 3;
 }
 
-message DownloadAllPayloadsProgress {
-  // 进度
+message DownloadProgress {
   double Progress = 1;
-  string Log = 2;
+  string Message = 2;
+  string MessageType = 3;
 }
 
 message DeletePluginByUserIDRequest {
@@ -7227,6 +7229,7 @@ message UploadHotPatchTemplateToOnlineRequest {
 message DownloadHotPatchTemplateRequest {
   string Name = 1;
   string Type = 2; // fuzzer/mitm/httpflow-analyze
+  string Token = 3;
 }
 message ExportHTTPFlowStreamRequest {
   QueryHTTPFlowRequest Filter = 1;

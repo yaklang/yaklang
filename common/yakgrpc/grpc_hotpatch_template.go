@@ -148,11 +148,14 @@ func (s *Server) UploadHotPatchTemplateToOnline(ctx context.Context, req *ypb.Up
 }
 
 func (s *Server) DownloadHotPatchTemplate(ctx context.Context, req *ypb.DownloadHotPatchTemplateRequest) (*ypb.Empty, error) {
+	if req.Token == "" {
+		return nil, utils.Errorf("token is empty")
+	}
 	if req.Type == "" || req.Name == "" {
 		return nil, utils.Errorf("params is empty")
 	}
 	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
-	template, err := client.DownloadHotPatchTemplate(req.Name, req.Type)
+	template, err := client.DownloadHotPatchTemplate(req.Token, req.Name, req.Type)
 	if err != nil {
 		return nil, utils.Errorf("save HotPatchTemplate[%s] to database failed: %v", template.Name, err)
 	}
