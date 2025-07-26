@@ -1302,21 +1302,34 @@ func (s *Server) MigratePayloads(req *ypb.Empty, stream ypb.Yak_MigratePayloadsS
 	return err
 }
 
-func (s *Server) UploadPayloadsToOnline(ctx context.Context, req *ypb.UploadPayloadsToOnlineRequest) (*ypb.Empty, error) {
+func (s *Server) UploadPayloadToOnline(ctx context.Context, req *ypb.UploadPayloadToOnlineRequest) (*ypb.Empty, error) {
 	if req.Token == "" || req.Group == "" {
 		return nil, utils.Errorf("params is empty")
 	}
-
-	db := bizhelper.ExactQueryString(s.GetProfileDatabase(), "`group`", req.GetGroup())
-	gen := yakit.YieldPayloads(db, context.Background())
+	db := s.GetProfileDatabase()
+	db = bizhelper.ExactQueryString(db, "`group`", req.GetGroup())
+	db = bizhelper.ExactQueryString(db, "folder", req.GetFolder())
+	gen := yakit.YieldPayloads(db.Debug(), context.Background())
 
 	for p := range gen {
+		var (
+			fileContent []byte
+			bigFile     bool
+			err         error
+		)
+		if *p.IsFile {
+			fileContent, bigFile, err = GetPayloadFile(ctx, *p.Content)
+			if fileContent != nil && bigFile {
+				log.Errorf("big file are not uploaded to online")
+				continue
+			}
+		}
 		data, err := json.Marshal(p)
 		if err != nil {
 			return nil, err
 		}
 		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
-		err = client.UploadPayloadsToOnline(ctx, req.Token, data)
+		err = client.UploadPayloadsToOnline(ctx, req.Token, data, fileContent)
 		if err != nil {
 			return nil, utils.Errorf("payload to online failed: %v", err)
 		}
@@ -1325,19 +1338,103 @@ func (s *Server) UploadPayloadsToOnline(ctx context.Context, req *ypb.UploadPayl
 	return &ypb.Empty{}, nil
 }
 
-func (s *Server) DownloadBatchPayloads(ctx context.Context, req *ypb.DownloadPayloadsRequest) (*ypb.Empty, error) {
-	if req.Group == "" {
-		return nil, utils.Errorf("params is empty")
-	}
-	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
-	template, err := client.DownloadBatchPayloads(req.Group)
-	if err != nil {
-		return nil, utils.Errorf("save payload[%s] to database failed: %v", template.Name, err)
+func GetPayloadFile(ctx context.Context, fileName string) ([]byte, bool, error) {
+	var size int64
+	{
+		if state, err := os.Stat(fileName); err != nil {
+			return nil, false, utils.Wrap(err, "query payload from file error")
+		} else {
+			size += state.Size()
+		}
 	}
 
-	err = yakit.CreateOrUpdatePayload()
+	lineCh, err := utils.FileLineReaderWithContext(fileName, ctx)
 	if err != nil {
-		return nil, utils.Errorf("save payload[%s] to database failed: %v", template.Name, err)
+		return nil, false, utils.Errorf("failed to read file: %s", err)
 	}
-	return &ypb.Empty{}, nil
+
+	var handlerSize int64 = 0
+
+	buf := bytes.NewBuffer(make([]byte, 0, size))
+	for line := range lineCh {
+		lineStr := string(line)
+		if unquoted, err := strconv.Unquote(lineStr); err == nil {
+			lineStr = unquoted
+		}
+		lineStr += "\n"
+		handlerSize += int64(len(lineStr) + 1)
+		buf.WriteString(lineStr)
+		if size > FiveMB && handlerSize > FiftyKB {
+			// If file is larger than 5MB, read only the first 50KB
+			return bytes.TrimRight(buf.Bytes(), "\n"), true, nil
+		}
+	}
+
+	return bytes.TrimRight(buf.Bytes(), "\n"), false, nil
+}
+
+func (s *Server) DownloadPayload(req *ypb.DownloadPayloadRequest, stream ypb.Yak_DownloadPayloadServer) error {
+	var (
+		ch              *yaklib.OnlineDownloadPayloadStream
+		total           int64
+		successCount    int
+		errorCount      int
+		count, progress float64
+	)
+	if req.Token == "" {
+		return utils.Errorf("token is empty")
+	}
+	if req.Group == "" && req.Folder == "" {
+		return utils.Errorf("params is empty")
+	}
+	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+	ch = client.DownloadBatchPayloads(stream.Context(), req.Token, req.GetGroup(), req.GetFolder())
+	if ch == nil {
+		return utils.Error("BUG: download stream error: empty")
+	}
+
+	stream.Send(&ypb.DownloadProgress{
+		Progress:    0,
+		Message:     "下载payload......",
+		MessageType: "info",
+	})
+	for payloadIns := range ch.Chan {
+		payload := payloadIns.PayloadData
+		total = payloadIns.Total
+		if total > 0 {
+			progress = count / float64(total)
+		}
+		count++
+		err := client.SavePayload(s.GetProfileDatabase(), payload)
+		if err != nil {
+			errorCount++
+			stream.Send(&ypb.DownloadProgress{
+				Progress:    progress,
+				Message:     fmt.Sprintf("save [%s] to local db failed: %s", payload.Group, err),
+				MessageType: "error",
+			})
+			continue
+		}
+		successCount++
+		stream.Send(&ypb.DownloadProgress{
+			Progress:    progress,
+			Message:     fmt.Sprintf("save [%s] to local db success: %s", payload.Group, err),
+			MessageType: "success",
+		})
+	}
+	// 发送最终结果
+	msg := fmt.Sprintf("完成: 成功 %d, 失败 %d", successCount, errorCount)
+	msgType := "success"
+	if errorCount > 0 {
+		msgType = "warning"
+	}
+	if successCount == 0 && errorCount > 0 {
+		msgType = "error"
+	}
+
+	return stream.Send(&ypb.DownloadProgress{
+		Progress:    1,
+		Message:     msg,
+		MessageType: msgType,
+	})
 }

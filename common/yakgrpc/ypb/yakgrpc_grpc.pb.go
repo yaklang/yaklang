@@ -163,9 +163,8 @@ const (
 	Yak_CoverPayloadGroupToDatabase_FullMethodName                = "/ypb.Yak/CoverPayloadGroupToDatabase"
 	Yak_ConvertPayloadGroupToDatabase_FullMethodName              = "/ypb.Yak/ConvertPayloadGroupToDatabase"
 	Yak_MigratePayloads_FullMethodName                            = "/ypb.Yak/MigratePayloads"
-	Yak_UploadPayloadsToOnline_FullMethodName                     = "/ypb.Yak/UploadPayloadsToOnline"
-	Yak_DownloadAllPayloads_FullMethodName                        = "/ypb.Yak/DownloadAllPayloads"
-	Yak_DownloadBatchPayloads_FullMethodName                      = "/ypb.Yak/DownloadBatchPayloads"
+	Yak_UploadPayloadToOnline_FullMethodName                      = "/ypb.Yak/UploadPayloadToOnline"
+	Yak_DownloadPayload_FullMethodName                            = "/ypb.Yak/DownloadPayload"
 	Yak_GetYakitCompletionRaw_FullMethodName                      = "/ypb.Yak/GetYakitCompletionRaw"
 	Yak_GetYakVMBuildInMethodCompletion_FullMethodName            = "/ypb.Yak/GetYakVMBuildInMethodCompletion"
 	Yak_StaticAnalyzeError_FullMethodName                         = "/ypb.Yak/StaticAnalyzeError"
@@ -724,9 +723,8 @@ type YakClient interface {
 	ConvertPayloadGroupToDatabase(ctx context.Context, in *NameRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SavePayloadProgress], error)
 	// 迁移旧的payload
 	MigratePayloads(ctx context.Context, in *Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SavePayloadProgress], error)
-	UploadPayloadsToOnline(ctx context.Context, in *UploadPayloadsToOnlineRequest, opts ...grpc.CallOption) (*Empty, error)
-	DownloadAllPayloads(ctx context.Context, in *DownloadPayloadsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadAllPayloadsProgress], error)
-	DownloadBatchPayloads(ctx context.Context, in *DownloadPayloadsRequest, opts ...grpc.CallOption) (*Empty, error)
+	UploadPayloadToOnline(ctx context.Context, in *UploadPayloadToOnlineRequest, opts ...grpc.CallOption) (*Empty, error)
+	DownloadPayload(ctx context.Context, in *DownloadPayloadRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadProgress], error)
 	// 自动生成补全
 	GetYakitCompletionRaw(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*YakitCompletionRawResponse, error)
 	GetYakVMBuildInMethodCompletion(ctx context.Context, in *GetYakVMBuildInMethodCompletionRequest, opts ...grpc.CallOption) (*GetYakVMBuildInMethodCompletionResponse, error)
@@ -2912,23 +2910,23 @@ func (c *yakClient) MigratePayloads(ctx context.Context, in *Empty, opts ...grpc
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_MigratePayloadsClient = grpc.ServerStreamingClient[SavePayloadProgress]
 
-func (c *yakClient) UploadPayloadsToOnline(ctx context.Context, in *UploadPayloadsToOnlineRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *yakClient) UploadPayloadToOnline(ctx context.Context, in *UploadPayloadToOnlineRequest, opts ...grpc.CallOption) (*Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Empty)
-	err := c.cc.Invoke(ctx, Yak_UploadPayloadsToOnline_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, Yak_UploadPayloadToOnline_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *yakClient) DownloadAllPayloads(ctx context.Context, in *DownloadPayloadsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadAllPayloadsProgress], error) {
+func (c *yakClient) DownloadPayload(ctx context.Context, in *DownloadPayloadRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[32], Yak_DownloadAllPayloads_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[32], Yak_DownloadPayload_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[DownloadPayloadsRequest, DownloadAllPayloadsProgress]{ClientStream: stream}
+	x := &grpc.GenericClientStream[DownloadPayloadRequest, DownloadProgress]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -2939,17 +2937,7 @@ func (c *yakClient) DownloadAllPayloads(ctx context.Context, in *DownloadPayload
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type Yak_DownloadAllPayloadsClient = grpc.ServerStreamingClient[DownloadAllPayloadsProgress]
-
-func (c *yakClient) DownloadBatchPayloads(ctx context.Context, in *DownloadPayloadsRequest, opts ...grpc.CallOption) (*Empty, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
-	err := c.cc.Invoke(ctx, Yak_DownloadBatchPayloads_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
+type Yak_DownloadPayloadClient = grpc.ServerStreamingClient[DownloadProgress]
 
 func (c *yakClient) GetYakitCompletionRaw(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*YakitCompletionRawResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -7353,9 +7341,8 @@ type YakServer interface {
 	ConvertPayloadGroupToDatabase(*NameRequest, grpc.ServerStreamingServer[SavePayloadProgress]) error
 	// 迁移旧的payload
 	MigratePayloads(*Empty, grpc.ServerStreamingServer[SavePayloadProgress]) error
-	UploadPayloadsToOnline(context.Context, *UploadPayloadsToOnlineRequest) (*Empty, error)
-	DownloadAllPayloads(*DownloadPayloadsRequest, grpc.ServerStreamingServer[DownloadAllPayloadsProgress]) error
-	DownloadBatchPayloads(context.Context, *DownloadPayloadsRequest) (*Empty, error)
+	UploadPayloadToOnline(context.Context, *UploadPayloadToOnlineRequest) (*Empty, error)
+	DownloadPayload(*DownloadPayloadRequest, grpc.ServerStreamingServer[DownloadProgress]) error
 	// 自动生成补全
 	GetYakitCompletionRaw(context.Context, *Empty) (*YakitCompletionRawResponse, error)
 	GetYakVMBuildInMethodCompletion(context.Context, *GetYakVMBuildInMethodCompletionRequest) (*GetYakVMBuildInMethodCompletionResponse, error)
@@ -8275,14 +8262,11 @@ func (UnimplementedYakServer) ConvertPayloadGroupToDatabase(*NameRequest, grpc.S
 func (UnimplementedYakServer) MigratePayloads(*Empty, grpc.ServerStreamingServer[SavePayloadProgress]) error {
 	return status.Errorf(codes.Unimplemented, "method MigratePayloads not implemented")
 }
-func (UnimplementedYakServer) UploadPayloadsToOnline(context.Context, *UploadPayloadsToOnlineRequest) (*Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UploadPayloadsToOnline not implemented")
+func (UnimplementedYakServer) UploadPayloadToOnline(context.Context, *UploadPayloadToOnlineRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UploadPayloadToOnline not implemented")
 }
-func (UnimplementedYakServer) DownloadAllPayloads(*DownloadPayloadsRequest, grpc.ServerStreamingServer[DownloadAllPayloadsProgress]) error {
-	return status.Errorf(codes.Unimplemented, "method DownloadAllPayloads not implemented")
-}
-func (UnimplementedYakServer) DownloadBatchPayloads(context.Context, *DownloadPayloadsRequest) (*Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DownloadBatchPayloads not implemented")
+func (UnimplementedYakServer) DownloadPayload(*DownloadPayloadRequest, grpc.ServerStreamingServer[DownloadProgress]) error {
+	return status.Errorf(codes.Unimplemented, "method DownloadPayload not implemented")
 }
 func (UnimplementedYakServer) GetYakitCompletionRaw(context.Context, *Empty) (*YakitCompletionRawResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetYakitCompletionRaw not implemented")
@@ -11769,52 +11753,34 @@ func _Yak_MigratePayloads_Handler(srv interface{}, stream grpc.ServerStream) err
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_MigratePayloadsServer = grpc.ServerStreamingServer[SavePayloadProgress]
 
-func _Yak_UploadPayloadsToOnline_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UploadPayloadsToOnlineRequest)
+func _Yak_UploadPayloadToOnline_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UploadPayloadToOnlineRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(YakServer).UploadPayloadsToOnline(ctx, in)
+		return srv.(YakServer).UploadPayloadToOnline(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Yak_UploadPayloadsToOnline_FullMethodName,
+		FullMethod: Yak_UploadPayloadToOnline_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YakServer).UploadPayloadsToOnline(ctx, req.(*UploadPayloadsToOnlineRequest))
+		return srv.(YakServer).UploadPayloadToOnline(ctx, req.(*UploadPayloadToOnlineRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Yak_DownloadAllPayloads_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(DownloadPayloadsRequest)
+func _Yak_DownloadPayload_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(DownloadPayloadRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(YakServer).DownloadAllPayloads(m, &grpc.GenericServerStream[DownloadPayloadsRequest, DownloadAllPayloadsProgress]{ServerStream: stream})
+	return srv.(YakServer).DownloadPayload(m, &grpc.GenericServerStream[DownloadPayloadRequest, DownloadProgress]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type Yak_DownloadAllPayloadsServer = grpc.ServerStreamingServer[DownloadAllPayloadsProgress]
-
-func _Yak_DownloadBatchPayloads_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DownloadPayloadsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(YakServer).DownloadBatchPayloads(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Yak_DownloadBatchPayloads_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YakServer).DownloadBatchPayloads(ctx, req.(*DownloadPayloadsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
+type Yak_DownloadPayloadServer = grpc.ServerStreamingServer[DownloadProgress]
 
 func _Yak_GetYakitCompletionRaw_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
@@ -18494,12 +18460,8 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_CreatePayloadFolder_Handler,
 		},
 		{
-			MethodName: "UploadPayloadsToOnline",
-			Handler:    _Yak_UploadPayloadsToOnline_Handler,
-		},
-		{
-			MethodName: "DownloadBatchPayloads",
-			Handler:    _Yak_DownloadBatchPayloads_Handler,
+			MethodName: "UploadPayloadToOnline",
+			Handler:    _Yak_UploadPayloadToOnline_Handler,
 		},
 		{
 			MethodName: "GetYakitCompletionRaw",
@@ -19909,8 +19871,8 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 		{
-			StreamName:    "DownloadAllPayloads",
-			Handler:       _Yak_DownloadAllPayloads_Handler,
+			StreamName:    "DownloadPayload",
+			Handler:       _Yak_DownloadPayload_Handler,
 			ServerStreams: true,
 		},
 		{

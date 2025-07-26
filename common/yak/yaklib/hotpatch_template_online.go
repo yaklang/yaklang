@@ -67,7 +67,7 @@ func (s *OnlineClient) UploadHotPatchTemplateToOnline(ctx context.Context, token
 }
 
 func (s *OnlineClient) DownloadHotPatchTemplate(
-	name, templateType string,
+	token, name, templateType string,
 ) (*HotPatchTemplate, error) {
 
 	raw, err := json.Marshal(DownloadHotPatchTemplateRequest{
@@ -80,7 +80,7 @@ func (s *OnlineClient) DownloadHotPatchTemplate(
 
 	rsp, _, err := poc.DoPOST(
 		fmt.Sprintf("%v/%v", consts.GetOnlineBaseUrl(), "api/hot/patch/template/download"),
-		//poc.WithReplaceHttpPacketHeader("Authorization", token),
+		poc.WithReplaceHttpPacketHeader("Authorization", token),
 		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
 		poc.WithReplaceHttpPacketBody(raw, true),
 		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
