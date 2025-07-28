@@ -177,14 +177,14 @@ func GetPage2ImgBinaryPath() string {
 	defaultPath := GetDefaultYakitProjectsDir()
 	var paths []string
 	if runtime.GOOS == "windows" {
-		paths = append(paths, filepath.Join(defaultPath, "base", "page2img.exe"))
 		paths = append(paths, filepath.Join(defaultPath, "libs", "page2img.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "base", "page2img.exe"))
 		paths = append(paths, filepath.Join(defaultPath, "engine", "page2img.exe"))
 		paths = append(paths, filepath.Join(defaultPath, "page2img.exe"))
 		paths = append(paths, "page2img.exe")
 	} else {
-		paths = append(paths, filepath.Join(defaultPath, "base", "page2img"))
 		paths = append(paths, filepath.Join(defaultPath, "libs", "page2img"))
+		paths = append(paths, filepath.Join(defaultPath, "base", "page2img"))
 		paths = append(paths, filepath.Join(defaultPath, "engine", "page2img"))
 		paths = append(paths, filepath.Join(defaultPath, "page2img"))
 		paths = append(paths, "page2img")
@@ -200,4 +200,38 @@ func GetAIModelPath() string {
 	modelsDir := filepath.Join(defaultPath, "libs", "models")
 	_ = os.MkdirAll(modelsDir, os.ModePerm)
 	return modelsDir
+}
+
+func GetWhisperModelPath() string {
+	modelPath := GetAIModelPath()
+	whisperModelPath := filepath.Join(modelPath, "whisper-tiny.gguf")
+	return whisperModelPath
+}
+
+func GetWhisperServerBinaryPath() string {
+	defaultPath := GetDefaultYakitProjectsDir()
+	var paths []string
+	if runtime.GOOS == "windows" {
+		paths = append(paths, filepath.Join(defaultPath, "libs", "whisper.cpp", "whisper-server.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "libs", "whisper-server.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "base", "whisper.cpp", "whisper-server.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "base", "whisper-server.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "whisper.cpp", "whisper-server.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "whisper-server.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "whisper-server.exe"))
+		paths = append(paths, "whisper-server.exe")
+	} else {
+		paths = append(paths, filepath.Join(defaultPath, "libs", "whisper.cpp", "whisper-server"))
+		paths = append(paths, filepath.Join(defaultPath, "libs", "whisper-server"))
+		paths = append(paths, filepath.Join(defaultPath, "base", "whisper.cpp", "whisper-server"))
+		paths = append(paths, filepath.Join(defaultPath, "base", "whisper-server"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "whisper.cpp", "whisper-server"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "whisper-server"))
+		paths = append(paths, filepath.Join(defaultPath, "whisper-server"))
+		paths = append(paths, "whisper-server")
+		paths = append(paths, filepath.Join("/", "usr", "local", "bin", "whisper-server"))
+		paths = append(paths, filepath.Join("/", "bin", "whisper-server"))
+		paths = append(paths, filepath.Join("/", "usr", "bin", "whisper-server"))
+	}
+	return utils.GetFirstExistedFile(paths...)
 }
