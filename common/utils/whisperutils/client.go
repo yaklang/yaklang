@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
@@ -76,6 +77,8 @@ func (c *LocalWhisperClient) Transcribe(filePath string) (*TranscriptionProcesso
 	// 7. Use lowhttp.HTTP to send the request
 	httpOpts := []lowhttp.LowhttpOpt{
 		lowhttp.WithRequest(req),
+		lowhttp.WithConnectTimeout(10 * time.Second),
+		lowhttp.WithTimeoutFloat(1800),
 	}
 	resp, err := lowhttp.HTTP(httpOpts...)
 	if err != nil {

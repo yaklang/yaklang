@@ -54,6 +54,32 @@ func (p *TranscriptionProcessor) ToSRT() string {
 	return b.String()
 }
 
+// aggregateSegmentsByInterval groups all transcribed segments by a specified time interval.
+// This is a more robust way to create block-based subtitles for CJK languages.
+func (p *TranscriptionProcessor) aggregateSegmentsByInterval(intervalSeconds int) map[int]string {
+	if intervalSeconds <= 0 {
+		intervalSeconds = 1 // Default to 1 second if invalid to avoid division by zero
+	}
+	// Use a map where the key is the start of the interval (e.g., 0, 30, 60)
+	// and the value is a list of words.
+	textsByInterval := make(map[int][]string)
+
+	// Iterate through all segments and all words within them.
+	for _, segment := range p.Response.Segments {
+		// group by the interval start time
+		intervalStart := int(segment.Start) / intervalSeconds * intervalSeconds
+		textsByInterval[intervalStart] = append(textsByInterval[intervalStart], strings.TrimSpace(segment.Text))
+	}
+
+	// Now, join the words for each interval into a single string.
+	result := make(map[int]string)
+	for intervalStart, texts := range textsByInterval {
+		result[intervalStart] = strings.Join(texts, "")
+	}
+
+	return result
+}
+
 // aggregateWordsByInterval groups all transcribed words by a specified time interval.
 // This is the core helper for creating block-based subtitles.
 func (p *TranscriptionProcessor) aggregateWordsByInterval(intervalSeconds int) map[int]string {
@@ -77,7 +103,7 @@ func (p *TranscriptionProcessor) aggregateWordsByInterval(intervalSeconds int) m
 	// Now, join the words for each interval into a single string.
 	result := make(map[int]string)
 	for intervalStart, words := range wordsByInterval {
-		result[intervalStart] = strings.Join(words, " ")
+		result[intervalStart] = strings.Join(words, "")
 	}
 
 	return result
@@ -92,12 +118,13 @@ func (p *TranscriptionProcessor) ToSRTTeleprompter(aggregationSeconds int) strin
 		aggregationSeconds = 30 // Default to 30 seconds if an invalid value is provided.
 	}
 	// First, get the text aggregated by the specified interval.
-	agg := p.aggregateWordsByInterval(aggregationSeconds)
+	agg := p.aggregateSegmentsByInterval(aggregationSeconds)
 
 	if len(agg) == 0 {
 		return ""
 	}
 
+	log.Infof("dumping aggregated text blocks for teleprompter")
 	var b strings.Builder
 
 	// We need to process the intervals in chronological order.

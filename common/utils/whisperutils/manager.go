@@ -15,14 +15,21 @@ import (
 
 // WhisperManager manages a whisper-server process.
 type WhisperManager struct {
-	binaryPath string
-	modelPath  string
-	port       int
-	ctx        context.Context
-	cancel     context.CancelFunc
-	cmd        *exec.Cmd
-	debug      bool
-	enableGPU  bool
+	binaryPath   string
+	modelPath    string
+	port         int
+	ctx          context.Context
+	cancel       context.CancelFunc
+	cmd          *exec.Cmd
+	debug        bool
+	enableGPU    bool
+	language     string
+	noContext    bool
+	threads      int
+	processors   int
+	flashAttn    bool
+	vad          bool
+	vadModelPath string
 }
 
 // Option is a functional option for WhisperManager.
@@ -39,6 +46,60 @@ func WithEnableGPU(enable bool) Option {
 func WithDebug(debug bool) Option {
 	return func(m *WhisperManager) {
 		m.debug = debug
+	}
+}
+
+// WithLanguage sets the language for the whisper server.
+func WithLanguage(lang string) Option {
+	return func(m *WhisperManager) {
+		m.language = lang
+	}
+}
+
+// WithNoContext enables or disables "no context" for the whisper server.
+func WithNoContext(nc bool) Option {
+	return func(m *WhisperManager) {
+		m.noContext = nc
+	}
+}
+
+// WithThreads sets the number of threads for the whisper server.
+// This controls the CPU thread count for processing.
+func WithThreads(threads int) Option {
+	return func(m *WhisperManager) {
+		m.threads = threads
+	}
+}
+
+// WithProcessors sets the number of processors for the whisper server.
+// This controls the number of parallel audio processors.
+func WithProcessors(processors int) Option {
+	return func(m *WhisperManager) {
+		m.processors = processors
+	}
+}
+
+// WithFlashAttn enables flash attention for the whisper server.
+// Flash attention is a memory-efficient attention mechanism that can speed up transcription on supported hardware.
+func WithFlashAttn(enable bool) Option {
+	return func(m *WhisperManager) {
+		m.flashAttn = enable
+	}
+}
+
+// WithVAD enables Voice Activity Detection for the whisper server.
+// VAD helps filter out silent parts of the audio, which can improve accuracy and speed.
+func WithVAD(enable bool) Option {
+	return func(m *WhisperManager) {
+		m.vad = enable
+	}
+}
+
+// WithVADModelPath sets the path to the Voice Activity Detection model.
+// This is required if VAD is enabled.
+func WithVADModelPath(path string) Option {
+	return func(m *WhisperManager) {
+		m.vadModelPath = path
 	}
 }
 
@@ -68,6 +129,12 @@ func NewWhisperManagerFromBinaryPath(binaryPath string, opts ...Option) (*Whispe
 	manager := &WhisperManager{
 		binaryPath: binaryPath,
 		port:       9000, // default port
+		language:   "zh",
+		noContext:  true,
+		threads:    4, // default number of threads
+		processors: 1, // default number of audio processors
+		flashAttn:  false,
+		vad:        false, // VAD is disabled by default as it requires a model path
 	}
 
 	for _, opt := range opts {
@@ -108,7 +175,46 @@ func (m *WhisperManager) Start() error {
 		args = append(args, "--no-gpu")
 	}
 
+	if m.language != "" {
+		args = append(args, "-l", m.language)
+	}
+
+	if m.noContext {
+		args = append(args, "-nc")
+	}
+
+	if m.threads > 0 {
+		args = append(args, "-t", strconv.Itoa(m.threads))
+	}
+
+	if m.processors > 0 {
+		args = append(args, "-p", strconv.Itoa(m.processors))
+	}
+
+	if m.flashAttn {
+		args = append(args, "--flash-attn")
+	}
+
+	if m.vad {
+		args = append(args, "--vad")
+		if m.vadModelPath != "" {
+			args = append(args, "--model-vad", m.vadModelPath)
+		}
+	}
+
 	// ./whisper-server -l zh --no-gpu -nc -m /Users/v1ll4n/Downloads/ggml-medium-q8_0.bin
+	/*
+			/Users/v1ll4n/yakit-projects/projects/libs/whisper-server \
+		  --port 55726 \
+		  -m /Users/v1ll4n/yakit-projects/projects/libs/models/whisper-medium-q5.gguf \
+		  -l zh \
+		  --no-gpu \
+		  --no-context \
+		  -t 8 \
+		  -p 2 \
+		  --flash-attn \
+		  --vad
+	*/
 	m.cmd = exec.CommandContext(m.ctx, m.binaryPath, args...)
 
 	if m.debug {
