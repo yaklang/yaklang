@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata/genmetadata"
 	"io"
 	"strings"
 
@@ -187,8 +188,10 @@ var AIAgentExport = map[string]any{
 	/*
 		ai utils api
 	*/
-	"ExtractPlan":         aid.ExtractPlan,
-	"ExtractAction":       aid.ExtractAction,
-	"GetDefaultMemory":    aid.GetDefaultMemory,
-	"AllYakScriptAiTools": AllYakScriptTools,
+	"ExtractPlan":             aid.ExtractPlan,
+	"ExtractAction":           aid.ExtractAction,
+	"GetDefaultMemory":        aid.GetDefaultMemory,
+	"AllYakScriptAiTools":     AllYakScriptTools,
+	"UpdateYakScriptMetaData": genmetadata.UpdateYakScriptMetaData,
+	"ParseYakScriptToAiTools": yakscripttools.LoadYakScriptToAiTools,
 }
