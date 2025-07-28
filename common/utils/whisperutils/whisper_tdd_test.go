@@ -25,14 +25,15 @@ func TestWhisperServerTDDUseCase(t *testing.T) {
 	}
 
 	randport := utils.GetRandomAvailableTCPPort()
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 	manager, err := NewWhisperManagerFromBinaryPath(
 		binaryPath,
 		WithPort(randport),
-		WithModelPath(consts.GetWhisperModelPath()),
+		WithModelPath(consts.GetWhisperModelMediumPath()),
 		WithContext(ctx),
 		WithDebug(true),
+		WithLanguage("zh"),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -43,7 +44,7 @@ func TestWhisperServerTDDUseCase(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ins, err := manager.TranscribeLocally(`/Users/v1ll4n/yakit-projects/projects/libs/whisper.cpp/output.wav`)
+	ins, err := manager.TranscribeLocally(`/Users/v1ll4n/yakit-projects/projects/libs/output.mp3`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +54,7 @@ func TestWhisperServerTDDUseCase(t *testing.T) {
 		t.Fatal("srt is empty")
 	}
 
-	srtbysec := ins.ToSRTTeleprompter(10)
+	srtbysec := ins.ToSRTTeleprompter(30)
 	if srtbysec == "" {
 		t.Fatal("srtbysec is empty")
 	}

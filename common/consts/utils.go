@@ -202,9 +202,27 @@ func GetAIModelPath() string {
 	return modelsDir
 }
 
-func GetWhisperModelPath() string {
+func GetWhisperModelSmallPath() string {
 	modelPath := GetAIModelPath()
-	whisperModelPath := filepath.Join(modelPath, "whisper-tiny.gguf")
+	whisperModelPath := filepath.Join(modelPath, "whisper-small-q8.gguf")
+	return whisperModelPath
+}
+
+func GetWhisperModelTinyPath() string {
+	modelPath := GetAIModelPath()
+	whisperModelPath := filepath.Join(modelPath, "whisper-tiny-q5.gguf")
+	return whisperModelPath
+}
+
+func GetWhisperModelMediumPath() string {
+	modelPath := GetAIModelPath()
+	whisperModelPath := filepath.Join(modelPath, "whisper-medium-q5.gguf")
+	return whisperModelPath
+}
+
+func GetWhisperModelBasePath() string {
+	modelPath := GetAIModelPath()
+	whisperModelPath := filepath.Join(modelPath, "whisper-base-q8.gguf")
 	return whisperModelPath
 }
 
