@@ -52,4 +52,5 @@ if n <= 0 && err != nil {
 }
 if n > 0 {
     yakit.Info("CHUNK[Total: %v]: %#v", size, string(raw))
+    yakit.File(t, yakit.fileReadAction(offset, n, "byte", string(raw)))
 }
