@@ -50,7 +50,7 @@ func FileCreateAction(isDir bool, chmodMode uint32) *YakitFileAction {
 	return &YakitFileAction{
 		Action: Create_Action,
 		Message: map[string]any{
-			"message":   fmt.Sprintf("create file, isDir: %t, chmodMode: %d", isDir, filemode.FileMode(chmodMode).String()),
+			"message":   fmt.Sprintf("create file, isDir: %t, chmodMode: %s", isDir, filemode.FileMode(chmodMode).String()),
 			"isDir":     isDir,
 			"chmodMode": filemode.FileMode(chmodMode).String(),
 		},
