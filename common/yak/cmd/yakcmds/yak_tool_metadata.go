@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/urfave/cli"
-	yaktool "github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata/genmetadata"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -188,36 +187,11 @@ func processYakScript(info utils.FileInfo, inputDir, outputDir string, forceUpda
 	}
 
 	fileName := filepath.Base(filePath)
-	metadata, err := yaktool.ParseYakScriptMetadata(fileName, string(content))
+	contentString, _, err := genmetadata.UpdateYakScriptMetaData(fileName, string(content), forceUpdate)
 	if err != nil {
-		log.Errorf("Failed to parse metadata for %s: %v", filePath, err)
 		return err
 	}
-
-	// 检查是否需要生成元数据
-	needUpdate := forceUpdate || len(metadata.Keywords) == 0 || metadata.Description == ""
-	if needUpdate { // 从代码中生成描述和关键词
-		generatedMetadata, err := genmetadata.GenerateMetadataFromCodeContent(fileName, string(content))
-		if err != nil {
-			log.Errorf("Failed to generate metadata for tool: %s error: %v", metadata.Name, err)
-			return err
-		}
-
-		// 如果原元数据缺失，使用生成的元数据
-		if metadata.Description == "" || forceUpdate {
-			metadata.Description = generatedMetadata.Description
-			log.Infof("Generated description for %s: %s", filePath, metadata.Description)
-		}
-
-		if len(metadata.Keywords) == 0 || forceUpdate {
-			metadata.Keywords = generatedMetadata.Keywords
-			log.Infof("Generated keywords for %s: %v", filePath, metadata.Keywords)
-		}
-
-		// 生成带有新Description和Keywords的脚本内容
-		newContent := yaktool.GenerateScriptWithMetadata(string(content), metadata.Description, metadata.Keywords)
-		content = []byte(newContent)
-	}
+	content = []byte(contentString)
 
 	// 确保输出目录存在
 	outputFilePath := filepath.Join(outputDir, relPath)
