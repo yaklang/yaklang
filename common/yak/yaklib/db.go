@@ -179,6 +179,15 @@ var DatabaseExports = map[string]interface{}{
 	"OpenTempSqliteDatabase": OpenTempSqliteDatabase,
 
 	"ScanResult": ScanResult,
+
+	"SaveAIYakScript": func(tool *schema.AIYakTool) error {
+		db := consts.GetGormProfileDatabase()
+		if db == nil {
+			return utils.Error("empty database connection")
+		}
+		_, err := yakit.SaveAIYakTool(db, tool)
+		return err
+	},
 }
 
 func OpenDatabase(dialect string, source string) (*gorm.DB, error) {
