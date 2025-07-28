@@ -33,5 +33,6 @@ for i in lineLimit {
     }
     buf.WriteByte('\n')~
 }
+yakit.File(filename, yakit.fileReadAction(0, lineLimit, "line", string(buf.String())))
 println(buf.String())
 yakit.Info("head to: %#v", buf.String())

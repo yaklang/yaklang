@@ -18,6 +18,7 @@ var (
 	Delete_Action = "DELETE"
 	Status_Action = "STATUS"
 	Chmod_Action  = "CHMOD"
+	Find_Action   = "FIND"
 )
 
 func FileReadAction(offset int, length int, unit string, content []byte) *YakitFileAction {
@@ -86,10 +87,32 @@ func FileChmodAction(chmodMode uint32) *YakitFileAction {
 	}
 }
 
+func FileFindAction(findMode string, findCondition string, findContent ...string) *YakitFileAction {
+	return &YakitFileAction{
+		Action: Find_Action,
+		Message: map[string]any{
+			"message":   fmt.Sprintf("find file [mode:%s] [condition:%s]", findMode, findCondition),
+			"mode":      findMode, // name | content | all
+			"content":   findContent,
+			"condition": findCondition,
+		},
+	}
+}
+
 func (a *YakitFileAction) String() string {
 	actionString, err := json.Marshal(a)
 	if err != nil {
 		return ""
 	}
 	return string(actionString)
+}
+
+func init() {
+	YakitExports["fileReadAction"] = FileReadAction
+	YakitExports["fileWriteAction"] = FileWriteAction
+	YakitExports["fileCreateAction"] = FileCreateAction
+	YakitExports["fileDeleteAction"] = FileDeleteAction
+	YakitExports["fileStatusAction"] = FileStatusAction
+	YakitExports["fileChmodAction"] = FileChmodAction
+	YakitExports["fileFindAction"] = FileFindAction
 }

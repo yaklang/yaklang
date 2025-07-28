@@ -42,5 +42,6 @@ if showLineNumber {
     yakit.Info(string(buf.String()))
     return
 }
+yakit.File(filename, yakit.fileReadAction(0, limit, "byte", string(raw)))
 yakit.Info("head %v bytes: %#v", limit, string(raw))
 return

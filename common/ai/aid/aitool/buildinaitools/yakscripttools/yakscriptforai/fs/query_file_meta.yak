@@ -11,4 +11,5 @@ if err != nil {
     yakit.Error("stat failed: %v", err)
     return
 }
+yakit.File(filename, yakit.fileStatusAction(info))
 yakit.Info("dir:%v size:%v mod:%v modify_time:%v", info.IsDir(), info.Size(), info.Mode(), info.ModTime())
