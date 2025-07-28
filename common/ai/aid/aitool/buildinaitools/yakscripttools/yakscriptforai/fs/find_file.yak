@@ -16,11 +16,13 @@ minSize = cli.Int("min-size", cli.setHelp("limit show file size min, unit: byte"
 maxSize = cli.Int("max-size", cli.setHelp("limit show file size max, unit: byte"))
 cli.check()
 
+findRes = []
 count = 0
 total = 0
 end = false
 buf = bufio.NewBuffer()
 filesys.Recursive(dirname, filesys.onStat((isDir, name, info) => {
+    yakit.File(name, yakit.fileStatusAction(info))
     total ++
     if end {
         return
@@ -54,6 +56,7 @@ filesys.Recursive(dirname, filesys.onStat((isDir, name, info) => {
             meta = "file[size:%v]" % info.Size()
         }
         buf.WriteString(sprintf("idx: %v, %v: %v\n", total, meta, name))
+        findRes = append(findRes, name)
     }
 
     switch str.TrimSpace(str.ToLower(patternMode)) {
@@ -87,3 +90,5 @@ filesys.Recursive(dirname, filesys.onStat((isDir, name, info) => {
 println(buf.String())
 yakit.Info(buf.String())
 yakit.Info("total: %v", total)
+
+yakit.File(dirname, yakit.fileFindAction("find-name", sprintf("patternmode:[%s] | pattern:[%s]", patternMode,pattern), findRes...))
