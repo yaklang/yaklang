@@ -70,7 +70,7 @@ func ExtractAudioFromVideo(inputFile string, opts ...Option) (*AudioExtractionRe
 	cmd := exec.CommandContext(o.ctx, ffmpegBinaryPath, args...)
 	if o.debug {
 		cmd.Stderr = log.NewLogWriter(log.DebugLevel)
-		log.Debugf("executing ffmpeg audio extraction: %s", cmd.String())
+		log.Infof("executing audio extraction: %s", cmd.String())
 	}
 
 	if err := cmd.Run(); err != nil {
@@ -123,7 +123,7 @@ func CompressAudio(inputFile, outputFile string, opts ...Option) error {
 	cmd := exec.CommandContext(o.ctx, ffmpegBinaryPath, args...)
 	if o.debug {
 		cmd.Stderr = log.NewLogWriter(log.DebugLevel)
-		log.Debugf("executing ffmpeg audio compression: %s", cmd.String())
+		log.Infof("executing audio compression: %s", cmd.String())
 	}
 
 	if err := cmd.Run(); err != nil {

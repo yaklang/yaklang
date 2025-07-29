@@ -53,7 +53,7 @@ func CompressImage(inputFile, outputFile string, opts ...Option) error {
 		cmd := exec.CommandContext(o.ctx, ffmpegBinaryPath, args...)
 		if o.debug {
 			cmd.Stderr = log.NewLogWriter(log.DebugLevel)
-			log.Debugf("executing image compression iteration %d (quality: %d): %s", i+1, currentQuality, cmd.String())
+			log.Infof("executing image compression: %s", cmd.String())
 		}
 
 		lastErr = cmd.Run()
