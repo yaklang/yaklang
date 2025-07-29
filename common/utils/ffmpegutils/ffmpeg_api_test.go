@@ -225,3 +225,99 @@ func TestFrameExtractionIncludingFirstAndLast(t *testing.T) {
 	assert.InDelta(t, 5, len(extractedFrames), 1, "should extract ~5 frames for 5s at 1fps")
 	assert.NotEmpty(t, extractedFrames, "should include first and subsequent frames")
 }
+
+func TestSmoke_CompressAudio(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
+	videoPath, cleanup := setupTestWithEmbeddedData(t)
+	defer cleanup()
+
+	// First, extract a piece of audio to use as input for compression
+	audioRes, err := ExtractAudioFromVideo(videoPath, WithStartEnd(0, 10*time.Second))
+	assert.NoError(t, err)
+	defer os.Remove(audioRes.FilePath)
+
+	// Now, compress the extracted audio
+	outputCompressed, err := ioutil.TempFile("", "compressed-*.mp3")
+	assert.NoError(t, err)
+	outputCompressed.Close()
+	defer os.Remove(outputCompressed.Name())
+
+	err = CompressAudio(audioRes.FilePath, outputCompressed.Name(),
+		WithDebug(true),
+		WithAudioBitrate("64k"),
+	)
+	assert.NoError(t, err)
+
+	originalInfo, err := os.Stat(audioRes.FilePath)
+	assert.NoError(t, err)
+	compressedInfo, err := os.Stat(outputCompressed.Name())
+	assert.NoError(t, err)
+
+	assert.Greater(t, compressedInfo.Size(), int64(0))
+	assert.Less(t, compressedInfo.Size(), originalInfo.Size(), "compressed audio should be smaller than original")
+}
+
+func TestSmoke_CompressImage(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
+	videoPath, cleanup := setupTestWithEmbeddedData(t)
+	defer cleanup()
+
+	// First, extract a frame to use as a test image
+	frameChan, err := ExtractImageFramesFromVideo(videoPath, WithFramesPerSecond(1), WithStartEnd(5*time.Second, 6*time.Second))
+	assert.NoError(t, err)
+	frame := <-frameChan
+	assert.NoError(t, frame.Error)
+	defer os.Remove(frame.FilePath)
+
+	// Now, compress the image to be under 20KB
+	outputCompressed, err := ioutil.TempFile("", "compressed-*.jpg")
+	assert.NoError(t, err)
+	outputCompressed.Close()
+	defer os.Remove(outputCompressed.Name())
+
+	targetSize := int64(20 * 1024)
+	err = CompressImage(frame.FilePath, outputCompressed.Name(),
+		WithDebug(true),
+		WithTargetImageSize(targetSize),
+	)
+	assert.NoError(t, err)
+
+	compressedInfo, err := os.Stat(outputCompressed.Name())
+	assert.NoError(t, err)
+	assert.LessOrEqual(t, compressedInfo.Size(), targetSize, "compressed image should be under the target size")
+}
+
+func TestSmoke_BurnInSubtitles(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
+	videoPath, videoCleanup := setupTestWithEmbeddedData(t)
+	defer videoCleanup()
+
+	// Create a temporary SRT file
+	srtFile, err := ioutil.TempFile("", "test-*.srt")
+	assert.NoError(t, err)
+	_, err = srtFile.Write(testVideoDataSRT)
+	assert.NoError(t, err)
+	srtFile.Close()
+	defer os.Remove(srtFile.Name())
+
+	// Create output video file path
+	outputVideo, err := ioutil.TempFile("", "subtitled-*.mp4")
+	assert.NoError(t, err)
+	outputVideo.Close()
+	defer func() {
+		// os.Remove(outputVideo.Name())
+		println(outputVideo.Name())
+	}()
+
+	// Execute burn-in
+	err = BurnInSubtitles(videoPath,
+		WithDebug(true),
+		WithSubtitleFile(srtFile.Name()),
+		WithOutputVideoFile(outputVideo.Name()),
+	)
+	assert.NoError(t, err)
+
+	info, err := os.Stat(outputVideo.Name())
+	assert.NoError(t, err)
+	assert.Greater(t, info.Size(), int64(0), "subtitled video should not be empty")
+}

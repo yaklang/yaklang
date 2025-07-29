@@ -12,14 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
-// AudioExtractionResult holds the results of an audio extraction operation.
-type AudioExtractionResult struct {
-	// FilePath is the path to the extracted audio file.
-	FilePath string
-	// Duration is the duration of the extracted audio.
-	Duration time.Duration
-}
-
 // formatDuration converts a time.Duration to ffmpeg's HH:MM:SS.ms format.
 func formatDuration(d time.Duration) string {
 	d = d.Round(time.Millisecond)
@@ -31,76 +23,6 @@ func formatDuration(d time.Duration) string {
 	d -= s * time.Second
 	ms := d / time.Millisecond
 	return fmt.Sprintf("%02d:%02d:%02d.%03d", h, m, s, ms)
-}
-
-// ExtractAudioFromVideo extracts audio from a video file and saves it as a new audio file.
-func ExtractAudioFromVideo(inputFile string, opts ...Option) (*AudioExtractionResult, error) {
-	// 1. Validate input file
-	if _, err := os.Stat(inputFile); os.IsNotExist(err) {
-		return nil, fmt.Errorf("input file does not exist: %s", inputFile)
-	}
-	if ffmpegBinaryPath == "" {
-		return nil, fmt.Errorf("ffmpeg binary path is not configured")
-	}
-
-	// 2. Apply options and perform validation
-	o := newDefaultOptions()
-	for _, opt := range opts {
-		opt(o)
-	}
-
-	// If no output file is specified, create a temporary one.
-	if o.outputAudioFile == "" {
-		tmpFile, err := ioutil.TempFile("", "extracted-audio-*.wav")
-		if err != nil {
-			return nil, fmt.Errorf("failed to create temporary audio file: %w", err)
-		}
-		o.outputAudioFile = tmpFile.Name()
-		tmpFile.Close() // Close the file, ffmpeg will write to the path
-	}
-
-	// 3. Construct ffmpeg command arguments safely
-	args := []string{
-		"-i", inputFile,
-		"-nostdin",
-		"-threads", strconv.Itoa(o.threads),
-		"-y", // Overwrite output file if it exists
-	}
-	if o.startTime > 0 {
-		args = append(args, "-ss", formatDuration(o.startTime))
-	}
-	if o.endTime > 0 {
-		args = append(args, "-to", formatDuration(o.endTime))
-	}
-	args = append(args,
-		"-ar", strconv.Itoa(o.audioSampleRate),
-		"-ac", strconv.Itoa(o.audioChannels),
-		"-c:a", "pcm_s16le",
-		"-f", "wav",
-		o.outputAudioFile,
-	)
-
-	// 4. Execute the command
-	cmd := exec.CommandContext(o.ctx, ffmpegBinaryPath, args...)
-	if o.debug {
-		cmd.Stderr = log.NewLogWriter(log.DebugLevel)
-		log.Debugf("executing ffmpeg audio extraction: %s", cmd.String())
-	}
-
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("ffmpeg execution failed: %w", err)
-	}
-
-	// 5. Return result
-	result := &AudioExtractionResult{
-		FilePath: o.outputAudioFile,
-		Duration: o.endTime - o.startTime,
-	}
-	if result.Duration < 0 {
-		result.Duration = 0 // Handle cases where only start or end is provided later
-	}
-
-	return result, nil
 }
 
 // FrameExtractionResult holds information about a single extracted frame.
@@ -130,8 +52,8 @@ func ExtractImageFramesFromVideo(inputFile string, opts ...Option) (<-chan *Fram
 		opt(o)
 	}
 
-	if o.mode == modeUnset {
-		return nil, fmt.Errorf("frame extraction mode not set; use WithSceneThreshold() or WithFramesPerSecond()")
+	if o.mode == modeUnset && o.customVideoFilter == "" {
+		return nil, fmt.Errorf("frame extraction mode not set; use WithSceneThreshold(), WithFramesPerSecond(), or WithCustomVideoFilter()")
 	}
 
 	// Ensure output directory exists and is safe
@@ -222,4 +144,60 @@ func ExtractImageFramesFromVideo(inputFile string, opts ...Option) (<-chan *Fram
 	}()
 
 	return resultsChan, nil
+}
+
+// BurnInSubtitles hard-codes subtitles from an SRT file into a video.
+func BurnInSubtitles(inputFile string, opts ...Option) error {
+	// 1. Validate inputs
+	if _, err := os.Stat(inputFile); os.IsNotExist(err) {
+		return fmt.Errorf("input video file does not exist: %s", inputFile)
+	}
+	if ffmpegBinaryPath == "" {
+		return fmt.Errorf("ffmpeg binary path is not configured")
+	}
+
+	o := newDefaultOptions()
+	for _, opt := range opts {
+		opt(o)
+	}
+
+	if o.subtitleFile == "" {
+		return fmt.Errorf("subtitle file is required; use WithSubtitleFile()")
+	}
+	if _, err := os.Stat(o.subtitleFile); os.IsNotExist(err) {
+		return fmt.Errorf("subtitle file does not exist: %s", o.subtitleFile)
+	}
+	if o.outputVideoFile == "" {
+		return fmt.Errorf("output video file is required; use WithOutputVideoFile()")
+	}
+
+	// 2. Construct command.
+	// The filter `subtitles=FILENAME` will burn the SRT file onto the video.
+	// NOTE: This requires ffmpeg to be compiled with --enable-libass.
+	// The paths in the filter need to be escaped for ffmpeg.
+	escapedSubtitlePath := filepath.ToSlash(o.subtitleFile)
+	vfFilter := fmt.Sprintf("subtitles='%s'", escapedSubtitlePath)
+
+	args := []string{
+		"-i", inputFile,
+		"-nostdin",
+		"-y",
+		"-c:v", "libx264", // Re-encode the video to apply the filter
+		"-c:a", "copy", // Copy the audio stream without re-encoding
+		"-vf", vfFilter,
+		o.outputVideoFile,
+	}
+
+	// 3. Execute command
+	cmd := exec.CommandContext(o.ctx, ffmpegBinaryPath, args...)
+	if o.debug {
+		cmd.Stderr = log.NewLogWriter(log.DebugLevel)
+		log.Debugf("executing subtitle burn-in: %s", cmd.String())
+	}
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("ffmpeg execution failed during subtitle burn-in: %w", err)
+	}
+
+	return nil
 }
