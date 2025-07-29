@@ -51,10 +51,6 @@ func (v *BaseCParserVisitor) VisitAssignmentOperator(ctx *AssignmentOperatorCont
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseCParserVisitor) VisitConditionalExpression(ctx *ConditionalExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseCParserVisitor) VisitExpressionList(ctx *ExpressionListContext) interface{} {
 	return v.VisitChildren(ctx)
 }

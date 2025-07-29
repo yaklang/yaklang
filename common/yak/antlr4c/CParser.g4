@@ -118,8 +118,8 @@ castExpression
 
 // --- Binary Expressions ---
 assignmentExpression
-    : unaryExpression assignmentOperator? expression?
-    | postfixExpression assignmentOperator? expression?
+    : unaryExpression assignmentOperator? initializer?
+    | postfixExpression assignmentOperator? initializer?
     | DigitSequence
     ;
 
@@ -135,10 +135,6 @@ assignmentOperator
     | '&='
     | '^='
     | '|='
-    ;
-
-conditionalExpression
-    : expression ('?' expression ':' conditionalExpression)
     ;
 
 expressionList
@@ -157,6 +153,7 @@ expression
     | expression AndAnd expression
     | expression OrOr expression
     | '(' expression ')'
+    | expression ('?' expression ':' expression)
     | primaryExpression
     | assignmentExpression
     | statementsExpression
@@ -191,7 +188,7 @@ initDeclaratorList
     ;
 
 initDeclarator
-    : declarator ('=' expression)?
+    : declarator ('=' initializer)?
     ;
 
 storageClassSpecifier
@@ -397,8 +394,8 @@ typedefName
     ;
 
 initializer
-    : assignmentExpression
-    | '{' initializerList ','? '}'
+    : expression
+    | '{' initializerList? ','? '}'
     ;
 
 initializerList

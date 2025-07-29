@@ -207,3 +207,33 @@ func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
 		return b.EmitConstInst(0)
 	}
 }
+
+func (b *astbuilder) coverType(ityp, iwantTyp ssa.Type) {
+	typ, ok := ityp.(*ssa.ObjectType)
+	if !ok {
+		return
+	}
+	wantTyp, ok := iwantTyp.(*ssa.ObjectType)
+	if !ok {
+		return
+	}
+
+	typ.SetTypeKind(wantTyp.GetTypeKind())
+	switch wantTyp.GetTypeKind() {
+	case ssa.SliceTypeKind:
+		typ.FieldType = wantTyp.FieldType
+	case ssa.MapTypeKind:
+		typ.FieldType = wantTyp.FieldType
+		typ.KeyTyp = wantTyp.KeyTyp
+	case ssa.StructTypeKind:
+		typ.FieldType = wantTyp.FieldType
+		typ.KeyTyp = wantTyp.KeyTyp
+		wantTyp.RangeMethod(func(s string, f *ssa.Function) {
+			typ.AddMethod(s, f)
+		})
+	}
+	for n, a := range wantTyp.AnonymousField {
+		// TODO: 匿名结构体应该是一个指针，修改时应该要连带父类一起修改
+		typ.AnonymousField[n] = a
+	}
+}

@@ -180,10 +180,7 @@ func (b *astbuilder) buildDirectDeclarator(ast *cparser.DirectDeclaratorContext,
 		// 2. directDeclarator '[' 'static' typeQualifierList? assignmentExpression ']'
 		// 3. directDeclarator '[' typeQualifierList 'static' assignmentExpression ']'
 		// 4. directDeclarator '[' typeQualifierList? '*' ']'
-		// 这里只做结构递归，具体类型推断和 SSA 类型生成可后续完善
-		_, base, _ = b.buildDirectDeclarator(dd.(*cparser.DirectDeclaratorContext), kinds...)
-		// 可递归处理 typeQualifierList/assignmentExpression
-		return nil, base, nil
+		return b.buildDirectDeclarator(dd.(*cparser.DirectDeclaratorContext), kinds...)
 	}
 
 	// directDeclarator: directDeclarator '(' parameterTypeList ')'
@@ -350,7 +347,7 @@ func (b *astbuilder) buildStaticAssertDeclaration(ast *cparser.StaticAssertDecla
 	defer recoverRange()
 
 	if c := ast.Expression(); c != nil {
-		right := b.buildExpression(c.(*cparser.ExpressionContext))
+		right, _ := b.buildExpression(c.(*cparser.ExpressionContext), false)
 		_ = right
 	}
 }
@@ -372,8 +369,8 @@ func (b *astbuilder) buildInitDeclarator(ast *cparser.InitDeclaratorContext) *ss
 
 	if d := ast.Declarator(); d != nil {
 		left, _, _ := b.buildDeclarator(d.(*cparser.DeclaratorContext), VARIABLE_KIND)
-		if e := ast.Expression(); e != nil {
-			right := b.buildExpression(e.(*cparser.ExpressionContext))
+		if e := ast.Initializer(); e != nil {
+			right := b.buildInitializer(e.(*cparser.InitializerContext))
 			b.AssignVariable(left, right)
 		}
 		return left
@@ -429,6 +426,14 @@ func (b *astbuilder) buildTypeName(ast *cparser.TypeNameContext) ssa.Type {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
+	if s := ast.SpecifierQualifierList(); s != nil {
+		ssatype := b.buildSpecifierQualifierList(s.(*cparser.SpecifierQualifierListContext))
+		if a := ast.AbstractDeclarator(); a != nil {
+			_ = a
+		}
+		return ssatype
+	}
+
 	return ssa.CreateAnyType()
 }
 
@@ -456,11 +461,113 @@ func (b *astbuilder) buildTypeSpecifier(ast *cparser.TypeSpecifierContext) ssa.T
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
-	name := ast.GetText()
-	if ssatyp := ssa.GetTypeByStr(name); ssatyp != nil {
-		return ssatyp
+	if a := ast.AtomicTypeSpecifier(); a != nil {
+
+	} else if s := ast.StructOrUnionSpecifier(); s != nil {
+		return b.buildStructOrUnionSpecifier(s.(*cparser.StructOrUnionSpecifierContext))
+	} else if e := ast.EnumSpecifier(); e != nil {
+
+	} else if t := ast.TypedefName(); t != nil {
+
+	} else {
+		name := ast.GetText()
+		if ssatyp := ssa.GetTypeByStr(name); ssatyp != nil {
+			return ssatyp
+		}
 	}
 	return ssa.CreateAnyType()
+}
+
+func (b *astbuilder) buildStructOrUnionSpecifier(ast *cparser.StructOrUnionSpecifierContext) ssa.Type {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	if id := ast.Identifier(); id != nil {
+		if s := ast.StructDeclarationList(); s != nil {
+			structTyp := ssa.NewStructType()
+			bp := b.CreateBlueprintAndSetConstruct(id.GetText())
+			_ = bp
+			b.buildStructDeclarationList(s.(*cparser.StructDeclarationListContext), structTyp)
+		}
+		if bp := b.GetBluePrint(id.GetText()); bp != nil {
+			container := bp.Container()
+			return container.GetType()
+		}
+	}
+
+	return ssa.CreateAnyType()
+}
+
+func (b *astbuilder) buildStructDeclarationList(ast *cparser.StructDeclarationListContext, structTyp *ssa.ObjectType) {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	for _, s := range ast.AllStructDeclaration() {
+		b.buildStructDeclaration(s.(*cparser.StructDeclarationContext), structTyp)
+	}
+}
+
+func (b *astbuilder) buildStructDeclaration(ast *cparser.StructDeclarationContext, structTyp *ssa.ObjectType) {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	if sq := ast.SpecifierQualifierList(); sq != nil {
+		ssatype := b.buildSpecifierQualifierList(sq.(*cparser.SpecifierQualifierListContext))
+		if sd := ast.StructDeclaratorList(); sd != nil {
+			lefts := b.buildStructDeclaratorList(sd.(*cparser.StructDeclaratorListContext))
+			for _, l := range lefts {
+				structTyp.AddField(b.EmitConstInst(l.GetName()), ssatype)
+			}
+		}
+	} else if sa := ast.StaticAssertDeclaration(); sa != nil {
+		b.buildStaticAssertDeclaration(sa.(*cparser.StaticAssertDeclarationContext))
+	}
+}
+
+func (b *astbuilder) buildSpecifierQualifierList(ast *cparser.SpecifierQualifierListContext) ssa.Type {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	var ssatype ssa.Type
+	if t := ast.TypeSpecifier(); t != nil {
+		ssatype = b.buildTypeSpecifier(t.(*cparser.TypeSpecifierContext))
+	} else if t := ast.TypeQualifier(); t != nil {
+		ssatype = b.buildTypeQualifier(t.(*cparser.TypeQualifierContext))
+	}
+
+	if s := ast.SpecifierQualifierList(); s != nil {
+		b.buildSpecifierQualifierList(s.(*cparser.SpecifierQualifierListContext))
+	}
+	return ssatype
+}
+
+func (b *astbuilder) buildStructDeclaratorList(ast *cparser.StructDeclaratorListContext) []*ssa.Variable {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	var ret []*ssa.Variable
+	for _, s := range ast.AllStructDeclarator() {
+		ret = append(ret, b.buildStructDeclarator(s.(*cparser.StructDeclaratorContext)))
+	}
+	return ret
+}
+
+func (b *astbuilder) buildStructDeclarator(ast *cparser.StructDeclaratorContext) *ssa.Variable {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	var ret *ssa.Variable
+	if d := ast.Declarator(); d != nil {
+		left, _, _ := b.buildDeclarator(d.(*cparser.DeclaratorContext), VARIABLE_KIND)
+		ret = left
+	}
+	if e := ast.Expression(); e != nil {
+		right, _ := b.buildExpression(e.(*cparser.ExpressionContext), false)
+		if ret != nil {
+			b.AssignVariable(ret, right)
+		}
+	}
+	return ret
 }
 
 func (b *astbuilder) buildDeclarationList(ast *cparser.DeclarationListContext) {
@@ -548,7 +655,7 @@ func (b *astbuilder) buildIterationStatement(ast *cparser.IterationStatementCont
 			} else {
 				// recoverRange := b.SetRange(cond.BaseParserRuleContext)
 				// defer recoverRange()
-				condition = b.buildExpression(cond.(*cparser.ExpressionContext))
+				condition, _ = b.buildExpression(cond.(*cparser.ExpressionContext), false)
 				if condition == nil {
 					condition = b.EmitConstInst(true)
 					// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
@@ -643,7 +750,8 @@ func (b *astbuilder) buildForExpression(ast *cparser.ForExpressionContext) ssa.V
 
 	var ret ssa.Values
 	for _, e := range ast.AllExpression() {
-		ret = append(ret, b.buildExpression(e.(*cparser.ExpressionContext)))
+		value, _ := b.buildExpression(e.(*cparser.ExpressionContext), false)
+		ret = append(ret, value)
 	}
 	return ret
 }
@@ -653,7 +761,7 @@ func (b *astbuilder) buildJumpStatement(ast *cparser.JumpStatementContext) {
 	defer recoverRange()
 
 	if e := ast.Expression(); e != nil {
-		right := b.buildExpression(e.(*cparser.ExpressionContext))
+		right, _ := b.buildExpression(e.(*cparser.ExpressionContext), false)
 		b.EmitReturn(ssa.Values{right})
 	}
 	if ast.Continue() != nil {
@@ -678,7 +786,7 @@ func (b *astbuilder) buildIfStatement(ast *cparser.SelectionStatementContext) {
 					b.AppendBlockRange()
 					recoverRange()
 
-					right := b.buildExpression(expression.(*cparser.ExpressionContext))
+					right, _ := b.buildExpression(expression.(*cparser.ExpressionContext), false)
 					return right
 				},
 				func() {
@@ -728,7 +836,7 @@ func (b *astbuilder) buildSwitchStatement(ast *cparser.SelectionStatementContext
 	Switchbuilder.SetCase(func(i int) []ssa.Value {
 		var value ssa.Value
 		if e := casepList[i].Expression(); e != nil {
-			value = b.buildExpression(e.(*cparser.ExpressionContext))
+			value, _ = b.buildExpression(e.(*cparser.ExpressionContext), false)
 		}
 		return ssa.Values{value}
 	})

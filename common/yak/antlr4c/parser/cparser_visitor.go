@@ -40,9 +40,6 @@ type CParserVisitor interface {
 	// Visit a parse tree produced by CParser#assignmentOperator.
 	VisitAssignmentOperator(ctx *AssignmentOperatorContext) interface{}
 
-	// Visit a parse tree produced by CParser#conditionalExpression.
-	VisitConditionalExpression(ctx *ConditionalExpressionContext) interface{}
-
 	// Visit a parse tree produced by CParser#expressionList.
 	VisitExpressionList(ctx *ExpressionListContext) interface{}
 

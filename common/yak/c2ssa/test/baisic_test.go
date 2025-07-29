@@ -23,13 +23,11 @@ int main(int a,int b) {
 // 	t.Run("build", func(t *testing.T) {
 // 		test.CheckPrintlnValue(`
 // #include <stdio.h>
-
 // int main() {
-// 	int a;
-// 	if (a > 1) {
-// 		a = 7;
-// 	}
-// 	println(a);
+//     int a = 10;
+//     int *p = &a;
+//     println(*p);
+//     return 0;
 // }
 // 		`, []string{``}, t)
 // 	})
@@ -108,6 +106,111 @@ int main() {
 }
 
 		`, []string{"Function-add"}, t)
+	})
+
+	// TODO
+	t.Skip()
+	t.Run("simple return", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+int add(int a, int b) { return a + b; }
+int main() {
+    int c = add(2, 3);
+    println(c);
+    return 0;
+}
+`, []string{"5"}, t)
+	})
+
+	t.Run("void function", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+void print_hello() { println("hello"); }
+int main() {
+    print_hello();
+    return 0;
+}
+`, []string{"hello"}, t)
+	})
+
+	t.Run("recursive", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+int fact(int n) { if (n <= 1) return 1; return n * fact(n-1); }
+int main() {
+    println(fact(5));
+    return 0;
+}
+`, []string{"120"}, t)
+	})
+
+	t.Run("pointer param", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+void set42(int *p) { *p = 42; }
+int main() {
+    int a = 0;
+    set42(&a);
+    println(a);
+    return 0;
+}
+`, []string{"42"}, t)
+	})
+
+	t.Run("struct param", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+struct S { int x; };
+void setx(struct S *s, int v) { s->x = v; }
+int main() {
+    struct S s; setx(&s, 99);
+    println(s.x);
+    return 0;
+}
+`, []string{"99"}, t)
+	})
+
+	t.Run("nested call", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+int f(int x) { return x + 1; }
+int g(int y) { return f(y) * 2; }
+int main() {
+    println(g(10));
+    return 0;
+}
+`, []string{"22"}, t)
+	})
+
+	t.Run("function pointer", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+int add(int a, int b) { return a + b; }
+int main() {
+    int (*fp)(int, int) = add;
+    println(fp(7, 8));
+    return 0;
+}
+`, []string{"15"}, t)
+	})
+
+	t.Run("variadic", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+#include <stdarg.h>
+int sum(int n, ...) {
+    va_list args;
+    va_start(args, n);
+    int s = 0;
+    for (int i = 0; i < n; ++i) s += va_arg(args, int);
+    va_end(args);
+    return s;
+}
+int main() {
+    println(sum(3, 1, 2, 3));
+    return 0;
+}
+`, []string{"6"}, t)
 	})
 }
 
@@ -208,5 +311,119 @@ int main() {
 	println(i);
 }
 		`, []string{"phi(i)[1,add(i, 1)]"}, t)
+	})
+}
+
+func TestType_normol(t *testing.T) {
+	t.Run("string concat", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+int main() {
+    println("foo" "bar");
+    println("hello, " "world!\n");
+    return 0;
+}
+`, []string{`"foobar"`, `"hello, world!\n"`}, t)
+	})
+
+	t.Run("compound literal", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+struct S { int x; int y; };
+int main() {
+    struct S s = (struct S){.x=1, .y=2};
+    println(s.x);
+    println(s.y);
+    return 0;
+}
+`, []string{"1", "2"}, t)
+	})
+
+	t.Run("conditional expr", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+int main() {
+    int a = 1, b = 2;
+    int c = a > b ? a : b;
+    println(c);
+    return 0;
+}
+`, []string{"phi(c)[1,2]"}, t)
+	})
+
+	t.Run("bitwise and shift", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+int main() {
+    int a = 6 & 3;
+    int b = 6 | 3;
+    int c = 6 ^ 3;
+    int d = 1 << 3;
+    int e = 8 >> 2;
+    println(a); println(b); println(c); println(d); println(e);
+    return 0;
+}
+`, []string{"2", "7", "5", "8", "2"}, t)
+	})
+
+	t.Run("compound assign", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+int main() {
+    int a = 1; a += 2; a *= 3; a -= 1; a /= 2; a %= 2;
+    println(a);
+    return 0;
+}
+`, []string{"0"}, t)
+	})
+
+	t.Run("inc dec", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+int main() {
+    int a = 1; a++; ++a; a--; --a;
+    println(a);
+    return 0;
+}
+`, []string{"1"}, t)
+	})
+
+	t.Run("array", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+int main() {
+    int arr[3] = {1,2,3};
+    println(arr[0]);
+    println(arr[1]);
+    println(arr[2]);
+    return 0;
+}
+`, []string{"1", "2", "3"}, t)
+	})
+
+	t.Run("pointer", func(t *testing.T) {
+		t.Skip()
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+int main() {
+    int a = 10;
+    int *p = &a;
+    println(*p);
+    return 0;
+}
+`, []string{"10"}, t)
+	})
+
+	t.Run("struct", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+struct S { int x; int y; };
+int main() {
+    struct S s; s.x = 5; s.y = 6;
+    println(s.x);
+    println(s.y);
+    return 0;
+}
+`, []string{"5", "6"}, t)
 	})
 }

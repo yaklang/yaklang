@@ -57,23 +57,11 @@ type Container []struct {
 // func TestExample_Tmp(t *testing.T) {
 // 	code := `
 // #include <stdio.h>
-
 // int main() {
-// 	int a;
-// 	switch (a) {
-// 		case 1:
-// 			a = 1;
-// 			break;
-// 		case 2:
-// 			a = 2;
-// 			break;
-// 		case 3:
-// 			a = 3;
-// 			break;
-// 		default:
-// 			a = 0;
-// 	}
-// 	println(a)
+//     int a = 10;
+//     int *p = &a;
+//     println(*p);
+//     return 0;
 // }
 // `
 // 	_, err := SyntaxBase(code, true)
