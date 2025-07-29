@@ -16,6 +16,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mimetype"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // formatDuration converts a time.Duration to ffmpeg's HH:MM:SS.ms format.
@@ -135,7 +136,7 @@ func ExtractImageFramesFromVideo(inputFile string, opts ...Option) (<-chan *Ffmp
 
 		if o.debug {
 			cmd.Stderr = log.NewLogWriter(log.DebugLevel)
-			log.Debugf("executing ffmpeg frame extraction: %s", cmd.String())
+			log.Infof("executing ffmpeg frame extraction: %s", cmd.String())
 		} else {
 			// Even if not in debug, we need to consume stderr to prevent the pipe from filling up
 			cmd.Stderr = ioutil.Discard
@@ -251,7 +252,7 @@ func BurnInSubtitles(inputFile string, opts ...Option) error {
 	cmd := exec.CommandContext(o.ctx, ffmpegBinaryPath, args...)
 	if o.debug {
 		cmd.Stderr = log.NewLogWriter(log.DebugLevel)
-		log.Debugf("executing subtitle burn-in: %s", cmd.String())
+		log.Infof("executing subtitle burn-in: %s", cmd.String())
 	}
 
 	if err := cmd.Run(); err != nil {
@@ -286,6 +287,8 @@ func StartScreenRecording(outputFile string, opts ...Option) (*exec.Cmd, error) 
 		"-i", o.recordInput,
 		"-c:v", "libx264",
 		"-preset", "ultrafast",
+		"-an",                                    // No audio
+		"-movflags", "+frag_keyframe+empty_moov", // Make the mp4 streamable and fix moov atom not found error
 	}
 	if o.captureCursor {
 		// This option is specific to certain formats like avfoundation
@@ -295,10 +298,15 @@ func StartScreenRecording(outputFile string, opts ...Option) (*exec.Cmd, error) 
 	}
 	args = append(args, outputFile)
 
+	if utils.FileExists(outputFile) {
+		os.RemoveAll(outputFile)
+	}
+
 	cmd := exec.CommandContext(o.ctx, ffmpegBinaryPath, args...)
 	if o.debug {
-		cmd.Stderr = log.NewLogWriter(log.DebugLevel)
-		log.Debugf("starting ffmpeg screen recording: %s", cmd.String())
+		cmd.Stdout = log.NewLogWriter(log.InfoLevel)
+		cmd.Stderr = log.NewLogWriter(log.InfoLevel)
+		log.Infof("starting ffmpeg screen recording: %s", cmd.String())
 	}
 
 	if err := cmd.Start(); err != nil {
@@ -334,6 +342,7 @@ func ExtractSpecificFrame(inputFile string, frameNum int) ([]byte, error) {
 	}
 
 	cmd := exec.CommandContext(context.Background(), ffmpegBinaryPath, args...)
+	log.Infof("executing ffmpeg to extract specific frame: %s", cmd.String())
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
 
