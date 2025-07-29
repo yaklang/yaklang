@@ -1,7 +1,6 @@
 package whisperutils
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -10,58 +9,66 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func TestWhisperServerTDDUseCase(t *testing.T) {
-	if utils.InGithubActions() {
-		t.Skip("skipping test in github actions")
-		return
+func TestWhisperManager(t *testing.T) {
+	// This test requires a local whisper-server setup and models.
+	// You need to set environment variables:
+	// YAK_WHISPER_SERVER_PATH
+	// YAK_WHISPER_MODEL_PATH
+	serverPath := consts.GetWhisperServerBinaryPath()
+	if serverPath == "" {
+		t.Skip("skipping test: YAK_WHISPER_SERVER_PATH not set")
+	}
+	modelPath := consts.GetWhisperModelMediumPath()
+	if modelPath == "" {
+		t.Skip("skipping test: YAK_WHISPER_MODEL_PATH not set")
 	}
 
-	/*
-		whisper-server -p 9000 -m /path/to/model.bin
-	*/
-	binaryPath := consts.GetWhisperServerBinaryPath()
-	if binaryPath == "" {
-		t.Fatal("whisper-server binary not found")
-	}
-
-	randport := utils.GetRandomAvailableTCPPort()
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-	defer cancel()
-	manager, err := NewWhisperManagerFromBinaryPath(
-		binaryPath,
-		WithPort(randport),
-		WithModelPath(consts.GetWhisperModelMediumPath()),
-		WithContext(ctx),
+	port := utils.GetRandomAvailableTCPPort()
+	manager, err := NewWhisperManagerFromBinaryPath(serverPath,
+		WithModelPath(modelPath),
 		WithDebug(true),
-		WithLanguage("zh"),
+		WithPort(port),
 	)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("failed to create whisper manager: %v", err)
 	}
-
-	err = manager.Start() // run server until port is ready
-	if err != nil {
-		t.Fatal(err)
+	if err := manager.Start(); err != nil {
+		t.Fatalf("failed to start whisper manager: %v", err)
 	}
-
-	ins, err := manager.TranscribeLocally(`/Users/v1ll4n/yakit-projects/projects/libs/output.mp3`)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	srt := ins.ToSRT()
-	if srt == "" {
-		t.Fatal("srt is empty")
-	}
-
-	srtbysec := ins.ToSRTTeleprompter(30)
-	if srtbysec == "" {
-		t.Fatal("srtbysec is empty")
-	}
-
-	t.Logf("srt file content: \n%s", srt)
-	fmt.Println("========================================================================")
-	t.Logf("srt file content: \n%s", srtbysec)
-
 	defer manager.Stop()
+}
+
+func TestInvokeWhisperCli(t *testing.T) {
+	// This test requires a local whisper-cli setup and models.
+	// 1. Download whisper-cli binary and place it in a searchable path or set YAK_WHISPER_CLI_PATH.
+	// 2. Download a whisper model (e.g., ggml-medium-q5.gguf) and set YAK_WHISPER_MODEL_PATH.
+	// 3. Download the silero VAD model and set YAK_WHISPER_VAD_MODEL_PATH if using VAD.
+	modelPath := consts.GetWhisperModelMediumPath()
+	if modelPath == "" || !utils.FileExists(modelPath) {
+		t.Skip("skipping test: YAK_WHISPER_MODEL_PATH is not set or model file not found")
+	}
+
+	vadModelPath := consts.GetWhisperSileroVADPath()
+	if vadModelPath == "" || !utils.FileExists(vadModelPath) {
+		t.Skip("skipping test: YAK_WHISPER_VAD_MODEL_PATH is not set or VAD model file not found")
+	}
+
+	audioFile := "../../../vtestdata/demo1.mp3"
+	if !utils.FileExists(audioFile) {
+		t.Fatalf("test audio file not found: %s", audioFile)
+	}
+
+	results, err := InvokeWhisperCli(audioFile,
+		CliWithModelPath(modelPath),
+		CliWithVAD(true),
+		CliWithVADModelPath(vadModelPath),
+		CliWithDebug(true),
+	)
+	if err != nil {
+		t.Fatalf("InvokeWhisperCli failed: %v", err)
+	}
+
+	for res := range results {
+		fmt.Printf("%v [%s -> %s] %s\n", time.Now(), res.StartTime, res.EndTime, res.Text)
+	}
 }
