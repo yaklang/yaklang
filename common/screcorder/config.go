@@ -3,10 +3,11 @@ package screcorder
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type Config struct {
