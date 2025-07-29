@@ -118,4 +118,113 @@ CODE
     $filtered = strip_tags($trace[0]['file']);
     var_dump($filtered);
 CODE
+	"safefile://SafeErrorLogging.php": <<<CODE
+<?php
+// 生产环境下关闭错误显示，并记录到日志文件
+error_reporting(E_ALL);
+ini_set('display_errors', 'Off');
+ini_set('log_errors', 'On');
+ini_set('error_log', '/var/log/php_errors.log');
+
+$result = preg_match('/[a-z]+/', 'abc', $matches);
+if ($result === false) {
+    // 将PCRE错误信息记录到日志而不是直接输出
+    error_log("PCRE error: " . preg_last_error_msg() . ", " . preg_last_error());
+    // 向用户显示通用友好信息
+    echo "An unexpected error occurred. Please try again later.";
+}
+
+// 永远不直接输出敏感的调试信息到用户界面
+function my_safe_debug($data) {
+    if (defined('DEBUG_MODE') && DEBUG_MODE === true && current_user_has_admin_privileges()) {
+        // 仅在明确的调试模式下且用户有权限时才输出到特殊的调试日志或非公开接口
+        error_log("Debug Info: " . print_r($data, true));
+    }
+}
+
+// 模拟一个函数，只允许特定用户访问敏感信息
+function current_user_has_admin_privileges() {
+    // 实际应用中会检查session、token或数据库权限
+    return false; // 默认不让普通用户访问
+}
+
+// 确保debug_backtrace等函数在生产环境中不会被滥用
+if (isset($_GET['debug']) && $_GET['debug'] == 'true') {
+    // 仅在开发环境且有严格权限控制下才可能触发，否则不应该触发
+    if (current_user_has_admin_privileges()) {
+        // do_debug_output(debug_backtrace()); // 仅作为示例，实际应避免直接输出
+    } else {
+        echo "Debug mode is not allowed for your access level.";
+    }
+}
+
+// apd_* 系列函数通常用于开发和调试，生产环境应禁用或不使用
+// 下面的代码块仅用于演示这些函数不会被不当使用，而是在安全的环境中处理
+// if (function_exists('apd_callstack')) {
+//     // apd_callstack()等函数的结果不应直接暴露
+//     // process_apd_info(apd_callstack());
+// }
+?>
+CODE
+	"safefile://SecureUnifiedErrorHandling.php": <<<CODE
+<?php
+// 设置自定义错误处理函数
+function customErrorHandler($errno, $errstr, $errfile, $errline) {
+    // 根据错误类型或环境决定是否记录或显示
+    if (!(error_reporting() & $errno)) {
+        // This error code is not included in error_reporting
+        return false;
+    }
+
+    switch ($errno) {
+        case E_USER_ERROR:
+            error_log("FATAL ERROR [$errno] $errstr in $errfile on line $errline\n", 3, "/var/log/app_errors.log");
+            break;
+        case E_USER_WARNING:
+            error_log("WARNING [$errno] $errstr in $errfile on line $errline\n", 3, "/var/log/app_warnings.log");
+            break;
+        case E_USER_NOTICE:
+            error_log("NOTICE [$errno] $errstr in $errfile on line $errline\n", 3, "/var/log/app_notices.log");
+            break;
+        default:
+            error_log("UNKNOWN ERROR [$errno] $errstr in $errfile on line $errline\n", 3, "/var/log/app_other.log");
+            break;
+    }
+
+    // 对于用户，统一显示友好信息
+    if (ini_get('display_errors') == 'Off') {
+        // 非开发环境，显示通用错误页
+        // header("Location: /error.php");
+        // exit();
+        echo "An error occurred. We apologize for the inconvenience.";
+    } else {
+        // 开发环境，显示详细信息
+        echo "<b>My ERROR</b>: [$errno] $errstr<br />\n";
+        echo "Fatal error on line $errline in file $errfile";
+        echo ", PHP " . PHP_VERSION . " (" . PHP_OS . ")<br />\n";
+        echo "Aborting...<br />\n";
+    }
+
+    /* Don't execute PHP internal error handler */
+    return true;
+}
+
+set_error_handler("customErrorHandler");
+
+// 触发一个警告来测试自定义错误处理器
+$numerator = 10;
+$denominator = 0;
+@($result = $numerator / $denominator); // 故意触发一个警告，使用@抑制PHP默认警告
+
+// 确保不直接输出任何敏感系统信息
+$some_data = ['key' => 'value'];
+if (isset($_GET['debug_info']) && $_GET['debug_info'] === 'true') {
+    // 安全地处理调试信息，不直接输出
+    // 例如，仅将调试信息传递给一个安全的内部API，或者写入只有管理员才能访问的日志。
+    // var_dump($some_data); // Bad! Avoid this in production
+    error_log("Attempted debug info request: " . json_encode($some_data));
+}
+
+?>
+CODE
 )

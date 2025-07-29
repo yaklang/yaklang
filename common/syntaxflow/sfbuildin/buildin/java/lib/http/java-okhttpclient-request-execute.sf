@@ -143,6 +143,65 @@ public class OkHttpClientExample {
     }
 }
 CODE
+	"safefile://SafeHttpUrlConnectionExample.java": <<<CODE
+// 使用标准的Java HttpURLConnection代替OkHttpClient
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
+public class SafeHttpUrlConnectionExample {
+    public static void main(String[] args) {
+        try {
+            URL url = new URL("https://www.example.com"); // 使用固定安全URL
+            HttpURLConnection con = (HttpURLConnection) url.openConnection();
+            con.setRequestMethod("GET");
+
+            int status = con.getResponseCode();
+            System.out.println("Response Code: " + status);
+
+            BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+            String inputLine;
+            StringBuffer content = new StringBuffer();
+            while ((inputLine = in.readLine()) != null) {
+                content.append(inputLine);
+            }
+            in.close();
+            con.disconnect();
+            System.out.println("Response Content: " + content.toString());
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://SafeRestTemplateExample.java": <<<CODE
+// 使用Spring Framework的RestTemplate代替OkHttpClient
+import org.springframework.web.client.RestTemplate;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpMethod;
+
+public class SafeRestTemplateExample {
+    public static void main(String[] args) {
+        RestTemplate restTemplate = new RestTemplate();
+        String url = "https://api.github.com/users/github"; // 目标URL可以是固定的或经过严格验证的
+        
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                url, 
+                HttpMethod.GET, 
+                null, 
+                String.class
+            );
+            System.out.println("Response Status Code: " + response.getStatusCodeValue());
+            System.out.println("Response Body: " + response.getBody());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
 )
 
 desc(
@@ -164,6 +223,65 @@ public class OkHttpClientExample {
                 return "Hello";
             }
         }
+}
+CODE
+	"safefile://SafeHttpUrlConnectionExample.java": <<<CODE
+// 使用标准的Java HttpURLConnection代替OkHttpClient
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
+public class SafeHttpUrlConnectionExample {
+    public static void main(String[] args) {
+        try {
+            URL url = new URL("https://www.example.com"); // 使用固定安全URL
+            HttpURLConnection con = (HttpURLConnection) url.openConnection();
+            con.setRequestMethod("GET");
+
+            int status = con.getResponseCode();
+            System.out.println("Response Code: " + status);
+
+            BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+            String inputLine;
+            StringBuffer content = new StringBuffer();
+            while ((inputLine = in.readLine()) != null) {
+                content.append(inputLine);
+            }
+            in.close();
+            con.disconnect();
+            System.out.println("Response Content: " + content.toString());
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://SafeRestTemplateExample.java": <<<CODE
+// 使用Spring Framework的RestTemplate代替OkHttpClient
+import org.springframework.web.client.RestTemplate;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpMethod;
+
+public class SafeRestTemplateExample {
+    public static void main(String[] args) {
+        RestTemplate restTemplate = new RestTemplate();
+        String url = "https://api.github.com/users/github"; // 目标URL可以是固定的或经过严格验证的
+        
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                url, 
+                HttpMethod.GET, 
+                null, 
+                String.class
+            );
+            System.out.println("Response Status Code: " + response.getStatusCodeValue());
+            System.out.println("Response Body: " + response.getBody());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 }
 CODE
 )

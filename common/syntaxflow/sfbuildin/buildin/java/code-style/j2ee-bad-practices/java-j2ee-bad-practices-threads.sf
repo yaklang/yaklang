@@ -135,6 +135,66 @@ desc(
         }
     }
 CODE
+	"safefile://SafeWorkManagerExample.java": <<<CODE
+// 示例：通过 WorkManager 提交任务，这是 J2EE 标准推荐的异步任务执行方式。
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.resource.spi.work.Work;
+import javax.resource.spi.work.WorkException;
+import javax.resource.spi.work.WorkManager;
+
+public class SafeWorkManagerExample extends HttpServlet {
+    @Resource(lookup = "java:comp/env/wm/MyWorkManager") // 查找容器管理的 WorkManager
+    private WorkManager workManager;
+
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+        try {
+            Work task = new MyWork(); // 实现javax.resource.spi.work.Work接口
+            workManager.scheduleWork(task); // 提交任务给容器管理的线程池，安全地执行异步操作
+            resp.getWriter().println("Task scheduled via WorkManager.");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+class MyWork implements Work {
+    @Override
+    public void run() {
+        // 在容器管理的线程中执行任务逻辑，避免直接创建和管理线程
+        System.out.println("Executing task in WorkManager thread safely.");
+    }
+
+    @Override
+    public void release() {
+        // 清理资源，由容器管理
+        System.out.println("WorkManager task released.");
+    }
+}
+CODE
+	"safefile://SafeManagedExecutorServiceExample.java": <<<CODE
+// 示例：使用 Java EE Concurrency Utilities (ManagedExecutorService) 执行异步任务。
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.enterprise.concurrent.ManagedExecutorService;
+
+public class SafeManagedExecutorServiceExample extends HttpServlet {
+    @Resource // 注入容器管理的 ManagedExecutorService
+    private ManagedExecutorService executorService;
+
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+         executorService.submit(() -> {
+             // 在容器管理的线程中执行异步任务，这是Java EE 7+推荐的做法
+             System.out.println("Executing task in ManagedExecutorService thread safely.");
+         });
+         resp.getWriter().println("Task submitted via ManagedExecutorService.");
+    }
+}
+CODE
 )
 
 desc(
@@ -156,5 +216,65 @@ desc(
           t.start(); // 直接启动线程，J2EE 不推荐
       }
   }
+CODE
+	"safefile://SafeWorkManagerExample.java": <<<CODE
+// 示例：通过 WorkManager 提交任务，这是 J2EE 标准推荐的异步任务执行方式。
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.resource.spi.work.Work;
+import javax.resource.spi.work.WorkException;
+import javax.resource.spi.work.WorkManager;
+
+public class SafeWorkManagerExample extends HttpServlet {
+    @Resource(lookup = "java:comp/env/wm/MyWorkManager") // 查找容器管理的 WorkManager
+    private WorkManager workManager;
+
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+        try {
+            Work task = new MyWork(); // 实现javax.resource.spi.work.Work接口
+            workManager.scheduleWork(task); // 提交任务给容器管理的线程池，安全地执行异步操作
+            resp.getWriter().println("Task scheduled via WorkManager.");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+class MyWork implements Work {
+    @Override
+    public void run() {
+        // 在容器管理的线程中执行任务逻辑，避免直接创建和管理线程
+        System.out.println("Executing task in WorkManager thread safely.");
+    }
+
+    @Override
+    public void release() {
+        // 清理资源，由容器管理
+        System.out.println("WorkManager task released.");
+    }
+}
+CODE
+	"safefile://SafeManagedExecutorServiceExample.java": <<<CODE
+// 示例：使用 Java EE Concurrency Utilities (ManagedExecutorService) 执行异步任务。
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.enterprise.concurrent.ManagedExecutorService;
+
+public class SafeManagedExecutorServiceExample extends HttpServlet {
+    @Resource // 注入容器管理的 ManagedExecutorService
+    private ManagedExecutorService executorService;
+
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+         executorService.submit(() -> {
+             // 在容器管理的线程中执行异步任务，这是Java EE 7+推荐的做法
+             System.out.println("Executing task in ManagedExecutorService thread safely.");
+         });
+         resp.getWriter().println("Task submitted via ManagedExecutorService.");
+    }
+}
 CODE
 )

@@ -167,4 +167,162 @@ func main() {
 	}
 }
 UNSAFE
+	"safefile://SafeHTTPClient.go": <<<CODE
+// 1. 白名单机制：只允许访问特定安全域名
+// 2. 解析URL并检查协议和主机
+// 3. 禁用重定向
+// 4. 使用 http.Client 自定义 Transport，更精细化控制
+package main
+
+import (
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
+	"net"
+)
+
+// isSafeURL 检查URL的安全性，使用白名单和黑名单组合
+func isSafeURL(inputURL string) bool {
+	p, err := url.Parse(inputURL)
+	if err != nil {
+		return false // 解析错误
+	}
+
+	// 1. 协议白名单
+	if p.Scheme != "http" && p.Scheme != "https" {
+		fmt.Printf("Unsafe scheme: %s\n", p.Scheme)
+		return false
+	}
+
+	// 2. 主机白名单 (示例：只允许访问 example.com 和 api.service.com)
+	safeDomains := map[string]bool{
+		"example.com":     true,
+		"api.service.com": true,
+	}
+
+	if !strings.Contains(p.Host, ":") {
+		p.Host = p.Host + ":" + p.Scheme + "port_placeholder"
+	}
+
+	hostname, _, err := net.SplitHostPort(p.Host)
+	if err != nil {
+		hostname = p.Host // No port, assume host is just the hostname
+	}
+
+	if !safeDomains[hostname] {
+		// 如果不是白名单域名，进一步检查是否为私有/回环IP
+		addrs, err := net.LookupIP(hostname)
+		if err != nil {
+			fmt.Printf("Failed to lookup IP for %s: %v\n", hostname, err)
+			return false // 无法解析的域名认为不安全
+		}
+		for _, addr := range addrs {
+			if addr.IsLoopback() || addr.IsPrivate() {
+				fmt.Printf("Blocked loopback or private IP: %s\n", addr.String())
+				return false // 私有或回环IP
+			}
+		}
+		// 如果不是白名单域名且解析到的IP非私有/回环，还需判断是否允许访问所有公网
+		// 这里为了安全，如果不在白名单就不允许。
+		fmt.Printf("Blocked non-whitelisted domain: %s\n", hostname)
+		return false
+	}
+
+	return true
+}
+
+func safeHandler(w http.ResponseWriter, r *http.Request) {
+	urlParam := r.URL.Query().Get("url")
+	if urlParam == "" {
+		http.Error(w, "URL parameter is missing", http.StatusBadRequest)
+		return
+	}
+
+	// 校验 URL 的安全性
+	if !isSafeURL(urlParam) {
+		http.Error(w, "Unsafe URL provided.", http.StatusBadRequest)
+		return
+	}
+
+	// 创建自定义 HTTP 客户端，禁用重定向，设置超时
+	client := &http.Client{
+		Transport: &http.Transport{
+			DisableKeepAlives:   true,
+			MaxIdleConns:        100,
+			IdleConnTimeout:     90 * time.Second,
+			TLSHandshakeTimeout: 10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+		Timeout:   10 * time.Second, // 设置请求超时
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse // 禁用重定向
+		},
+	}
+
+	// 发起请求
+	req, err := http.NewRequest("GET", urlParam, nil)
+	if err != nil {
+		http.Error(w, "Error creating request", http.StatusInternalServerError)
+		return
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error fetching URL: %v", err), http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		http.Error(w, "Error reading response", http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(body)
+}
+
+func main() {
+	http.HandleFunc("/safe", safeHandler)
+	fmt.Println("Safe server running on :8081")
+	http.ListenAndServe(":8081", nil)
+}
+
+CODE
+	"safefile://HardcodedSafeURL.go": <<<CODE
+// 直接请求硬编码的、安全的URL，不接受用户输入
+package main
+
+import (
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"os"
+)
+
+func main() {
+	// 硬编码一个已知的安全URL，不从用户输入获取
+	// 避免了规则中 $input 变量的匹配，从而不会触发SSRF告警
+	safeURL := "https://www.example.com/api/data"
+
+	resp, err := http.Get(safeURL)
+	if err != nil {
+		fmt.Printf("Error fetching URL: %v\n", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("Error reading response: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Response from %s:\n%s\n", safeURL, string(body))
+}
+
+CODE
 )

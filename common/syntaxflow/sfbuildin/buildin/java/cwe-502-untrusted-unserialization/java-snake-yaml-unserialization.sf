@@ -247,5 +247,66 @@ public class SnakeYamlController {
 
 }
 TEXT
+	"safefile://SafeYamlDeserialization.java": <<<CODE
+// 使用SafeConstructor安全反序列化
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
+
+public class SafeYamlDeserialization {
+    public static void main(String[] args) {
+        // 模拟接收到的YAML数据，这里是一个安全的YAML
+        String safeYamlData = "name: John Doe\nage: 30";
+
+        // 使用SafeConstructor，只允许反序列化基本的Java类型
+        // 推荐的做法是总是使用SafeConstructor来处理不可信来源的YAML数据
+        Yaml yaml = new Yaml(new SafeConstructor());
+        Object data = yaml.load(safeYamlData);
+
+        System.out.println("Safely loaded YAML data: " + data);
+    }
+
+    // 模拟一个从外部接收输入的方法
+    public String receiveInput() {
+        return "dummy_input";
+    }
+}
+CODE
+	"safefile://StrictClassLoadingYaml.java": <<<CODE
+// 限制可反序列化的类
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.Constructor;
+import org.yaml.snakeyaml.TypeDescription;
+
+public class StrictClassLoadingYaml {
+
+    public static class User {
+        public String name;
+        public int age;
+    }
+
+    public static void main(String[] args) {
+        String userYaml = "!!StrictClassLoadingYaml$User {name: Alice, age: 25}";
+        
+        // 创建一个构造器，并显式为允许加载的类型注册TypeDescription
+        Constructor constructor = new Constructor(User.class);
+        TypeDescription userDescription = new TypeDescription(User.class);
+        // 可以设置更细粒度的属性限制，例如只允许反序列化特定字段
+        constructor.addTypeDescription(userDescription);
+
+        Yaml yaml = new Yaml(constructor);
+        User user = yaml.load(userYaml);
+
+        System.out.println("User: " + user.name + ", Age: " + user.age);
+
+        // 尝试加载一个未注册的或恶意的类，此时会抛出异常
+        try {
+            String maliciousYaml = "!!java.net.URL {protocol: http}"; // 恶意类
+            yaml.load(maliciousYaml);
+        } catch (Exception e) {
+            System.out.println("Successfully blocked malicious class deserialization: " + e.getMessage());
+        }
+    }
+}
+CODE
 )
 

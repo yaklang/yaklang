@@ -198,4 +198,54 @@ func (c *CRLFSafe1Controller) Get() {
 }
 	
 UNSAFE
+	"safefile://SafeInputValidation.go": <<<CODE
+// 方式一：对用户输入进行严格的校验和过滤，移除CRLF字符
+package main
+
+import (
+	"net/http"
+	"strings"
+	beego "github.com/beego/beego/v2/server/web"
+)
+
+type SafeInputValidationController struct {
+	beego.Controller
+}
+
+// sanitizeInput 移除输入中的CRLF字符
+func sanitizeInput(input string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(input, "\r", ""), "\n", "")
+}
+
+func (c *SafeInputValidationController) Get() {
+	header := c.GetString("header")
+	// 严格校验和清理用户输入，确保不包含CRLF字符
+	sanitizedHeader := sanitizeInput(header)
+
+	// 只有清理后的输入才被用于设置HTTP头部
+	c.Ctx.ResponseWriter.Header().Set("X-Custom-Header", sanitizedHeader)
+	c.Ctx.ResponseWriter.Write([]byte(""))
+}
+
+CODE
+	"safefile://UseFixedHeaderValue.go": <<<CODE
+// 方式二：使用固定、预定义或内部生成的安全头部值，不接受用户输入作为header值
+package main
+
+import (
+	beego "github.com/beego/beego/v2/server/web"
+)
+
+type FixedHeaderController struct {
+	beego.Controller
+}
+
+func (c *FixedHeaderController) Get() {
+	// 使用固定、安全的HTTP头部值，不从用户请求中获取
+	const safeHeaderValue = "SafeApplicationIdentifier"
+	c.Ctx.ResponseWriter.Header().Set("X-Application-ID", safeHeaderValue)
+	c.Ctx.ResponseWriter.Write([]byte(""))
+}
+
+CODE
 )

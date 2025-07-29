@@ -307,4 +307,170 @@ desc(
         }
     }
 CODE
+	"safefile://SafeConnectionManagement.java": <<<CODE
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import javax.sql.DataSource;
+
+public class SafeConnectionManagement {
+
+    private DataSource dataSource; // Assuming this is properly injected
+
+    /**
+     * Scenario 1: Using try-with-resources statement for automatic resource closing.
+     * This is the recommended approach for Java 7+.
+     */
+    public void safeTryWithResourcesExample(String username) throws SQLException {
+        String sql = "SELECT * FROM users WHERE username = ?";
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, username);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    // Process the result set
+                    System.out.println("User: " + rs.getString("username"));
+                }
+            } // ResultSet 'rs' is automatically closed here
+        } catch (SQLException e) {
+            System.err.println("Database error: " + e.getMessage());
+            throw e;
+        } // PreparedStatement 'pstmt' and Connection 'conn' are automatically closed here
+    }
+
+    /**
+     * Scenario 2: Using try-finally block for manual resource closing.
+     * This is a robust way to ensure resources are closed even if exceptions occur.
+     */
+    public void safeManualCloseExample() throws SQLException {
+        Connection conn = null;
+        Statement stmt = null;
+        ResultSet rs = null;
+        try {
+            conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/testdb", "user", "password");
+            stmt = conn.createStatement();
+            rs = stmt.executeQuery("SELECT * FROM products");
+            while (rs.next()) {
+                // Process the result set
+                System.out.println("Product: " + rs.getString("name"));
+            }
+        } catch (SQLException e) {
+            System.err.println("Database error: " + e.getMessage());
+            throw e;
+        } finally {
+            // Close resources in reverse order of acquisition
+            if (rs != null) {
+                try { rs.close(); } catch (SQLException e) { System.err.println("Error closing ResultSet: " + e.getMessage()); }
+            }
+            if (stmt != null) {
+                try { stmt.close(); } catch (SQLException e) { System.err.println("Error closing Statement: " + e.getMessage()); }
+            }
+            if (conn != null) {
+                try { conn.close(); } catch (SQLException e) { System.err.println("Error closing Connection: " + e.getMessage()); }
+            }
+        }
+    }
+
+    /**
+     * Scenario 3: Utilizing a utility class for streamlined resource closing.
+     * This reduces code duplication and centralizes error handling for closing.
+     */
+    public void safeUtilityCloseExample() throws SQLException {
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        try {
+            conn = dataSource.getConnection();
+            pstmt = conn.prepareStatement("INSERT INTO logs (message) VALUES (?)");
+            pstmt.setString(1, "Data inserted successfully.");
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("Database error: " + e.getMessage());
+            throw e;
+        } finally {
+            DbUtil.close(rs, pstmt, conn); // Using a custom utility method to close resources
+        }
+    }
+
+    /**
+     * Utility class for closing database resources securely.
+     */
+    static class DbUtil {
+        public static void close(Connection conn) {
+            if (conn != null) {
+                try { conn.close(); } catch (SQLException e) { System.err.println("Error closing Connection: " + e.getMessage()); }
+            }
+        }
+
+        public static void close(Statement stmt) {
+            if (stmt != null) {
+                try { stmt.close(); } catch (SQLException e) { System.err.println("Error closing Statement: " + e.getMessage()); }
+            }
+        }
+
+        public static void close(ResultSet rs) {
+            if (rs != null) {
+                try { rs.close(); } catch (SQLException e) { System.err.println("Error closing ResultSet: " + e.getMessage()); }
+            }
+        }
+
+        public static void close(ResultSet rs, Statement stmt, Connection conn) {
+            close(rs);
+            close(stmt);
+            close(conn);
+        }
+    }
+
+    /**
+     * Scenario 4: Connection used within a framework that handles resource management (e.g., Spring JdbcTemplate).
+     * This code snippet demonstrates how frameworks abstract resource handling.
+     * Note: This example assumes Spring framework is setup and 'jdbcTemplate' is an instance of JdbcTemplate.
+     */
+    // public void safeFrameworkExample(JdbcTemplate jdbcTemplate) {
+    //     String name = jdbcTemplate.queryForObject("SELECT name FROM users WHERE id = ?", String.class, 1);
+    //     System.out.println("User name from framework: " + name);
+    //     // JdbcTemplate handles connection/statement/resultset closing internally.
+    // }
+
+    /**
+     * Scenario 5: Connection is passed to another method that is responsible for closing it.
+     * This pattern can be safe if the responsibility for closing is clearly defined and followed.
+     */
+    public void safeDelegatedCloseExample() throws SQLException {
+        Connection conn = null;
+        try {
+            conn = dataSource.getConnection();
+            performDatabaseOperations(conn); // Delegate the connection to another method
+        } catch (SQLException e) {
+            System.err.println("Database error during delegation: " + e.getMessage());
+            throw e;
+        } finally {
+            // The outer method is responsible for closing the connection it acquired.
+            DbUtil.close(conn);
+        }
+    }
+
+    private void performDatabaseOperations(Connection conn) throws SQLException {
+        // This method uses the passed connection but does not close it.
+        // It closes its own Statement and ResultSet.
+        Statement stmt = null;
+        ResultSet rs = null;
+        try {
+            stmt = conn.createStatement();
+            rs = stmt.executeQuery("SELECT COUNT(*) FROM orders");
+            if (rs.next()) {
+                System.out.println("Total orders: " + rs.getInt(1));
+            }
+        } finally {
+            DbUtil.close(rs);
+            DbUtil.close(stmt);
+            // DO NOT close 'conn' here, as it was passed in and needs to be closed by the calling method.
+        }
+    }
+}
+
+CODE
 )

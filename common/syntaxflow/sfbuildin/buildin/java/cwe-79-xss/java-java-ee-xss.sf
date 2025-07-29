@@ -122,6 +122,40 @@ public class XSSVulnerableServlet extends HttpServlet {
     }
 }
 EOF
+	"safefile://SecureJSPWithJSTL.jsp": <<<CODE
+<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+<html>
+<head>
+    <title>Secure JSP with JSTL</title>
+</head>
+<body>
+    <h2>User Input (JSTL Escaped):</h2>
+    <div><c:out value="${sessionScope.userInput}"/></div> <!-- 使用JSTL c:out标签，默认进行HTML转义，安全 -->
+</body>
+</html>
+CODE
+	"safefile://SecureServletWithESAPI.java": <<<CODE
+import java.io.IOException;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import org.owasp.esapi.ESAPI;
+import org.owasp.esapi.Encoder;
+
+public class SecureServletWithESAPI extends HttpServlet {
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        String userInput = request.getParameter("input");
+        Encoder encoder = ESAPI.encoder();
+        // 在Servlet中对用户输入进行HTML转义，然后传递给JSP
+        String escapedInput = encoder.encodeForHTML(userInput);
+        request.setAttribute("safeUserInput", escapedInput);
+        request.getRequestDispatcher("/secure-output.jsp").forward(request, response);
+    }
+}
+
+CODE
 )
 
 
@@ -220,5 +254,39 @@ EOF
      }
  }
 EOF
+	"safefile://SecureJSPWithJSTL.jsp": <<<CODE
+<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+<html>
+<head>
+    <title>Secure JSP with JSTL</title>
+</head>
+<body>
+    <h2>User Input (JSTL Escaped):</h2>
+    <div><c:out value="${sessionScope.userInput}"/></div> <!-- 使用JSTL c:out标签，默认进行HTML转义，安全 -->
+</body>
+</html>
+CODE
+	"safefile://SecureServletWithESAPI.java": <<<CODE
+import java.io.IOException;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import org.owasp.esapi.ESAPI;
+import org.owasp.esapi.Encoder;
+
+public class SecureServletWithESAPI extends HttpServlet {
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        String userInput = request.getParameter("input");
+        Encoder encoder = ESAPI.encoder();
+        // 在Servlet中对用户输入进行HTML转义，然后传递给JSP
+        String escapedInput = encoder.encodeForHTML(userInput);
+        request.setAttribute("safeUserInput", escapedInput);
+        request.getRequestDispatcher("/secure-output.jsp").forward(request, response);
+    }
+}
+
+CODE
 )
 

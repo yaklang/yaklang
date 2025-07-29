@@ -302,5 +302,70 @@ public class XMLDecoderController {
     }
 }
 TEXT
+	"safefile://SafeXMLProcessing.java": <<<CODE
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.xml.sax.SAXException;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
+public class SafeXMLProcessing {
+    public static void main(String[] args) {
+        // 使用 DOM Parser 安全地处理 XML，而不是 XMLDecoder
+        String safeXml = "<data><user>safeUser</user><value>123</value></data>";
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            // 禁用DTD加载，防止XXE
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            factory.setXIncludeAware(false);
+            factory.setExpandEntityReferences(false);
+
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document document = builder.parse(new ByteArrayInputStream(safeXml.getBytes(StandardCharsets.UTF_8)));
+            document.normalizeDocument();
+
+            // 安全地从XML中提取数据
+            Element root = document.getDocumentElement();
+            System.out.println("Root element: " + root.getNodeName());
+            System.out.println("User: " + root.getElementsByTagName("user").item(0).getTextContent());
+            System.out.println("Value: " + root.getElementsByTagName("value").item(0).getTextContent());
+
+        } catch (ParserConfigurationException | IOException | SAXException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://XMLDecoderWithTrustedInput.java": <<<CODE
+import java.beans.XMLDecoder;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+
+public class XMLDecoderWithTrustedInput {
+    public static void main(String[] args) {
+        // 假设这里是来自受信任内部源的XML数据
+        // 在实际应用中，这意味着XML内容是硬编码的、来自安全配置或经过严格验证的
+        String trustedXml = "<java><string>Hello, World!</string></java>";
+
+        try (InputStream is = new ByteArrayInputStream(trustedXml.getBytes(StandardCharsets.UTF_8));
+             XMLDecoder decoder = new XMLDecoder(is)) {
+            // 仅当XML数据来源完全可信且内容已知时才使用XMLDecoder
+            Object obj = decoder.readObject();
+            System.out.println("Deserialized object: " + obj);
+        } catch (Exception e) {
+            // 即使是受信任的输入也应该有错误处理
+            e.printStackTrace();
+        }
+    }
+}
+CODE
 )
 

@@ -279,4 +279,82 @@ public class DataScopeAspect
     }
 }
 TEXT
+	"safefile://SafePreparedStatement.java": <<<CODE
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+public class SafePreparedStatement {
+
+    public static void main(String[] args) {
+        String userId = "123"; // 模拟用户输入
+        String username = "john_doe"; // 模拟用户输入
+
+        try (Connection connection = DriverManager.getConnection("jdbc:h2:mem:testdb", "sa", "")) {
+            // 1. 使用PreparedStatement防止SQL注入
+            String sqlSelect = "SELECT * FROM users WHERE id = ? AND username = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(sqlSelect)) {
+                pstmt.setInt(1, Integer.parseInt(userId)); // 整数类型直接设置
+                pstmt.setString(2, username); // 字符串类型直接设置
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    System.out.println("Query result for prepared statement:");
+                    while (rs.next()) {
+                        System.out.println("ID: " + rs.getInt("id") + ", Name: " + rs.getString("username"));
+                    }
+                }
+            }
+
+            // 2. 更新操作也使用PreparedStatement
+            String sqlUpdate = "UPDATE users SET email = ? WHERE id = ?";
+            String newEmail = "new.email@example.com";
+            try (PreparedStatement pstmtUpdate = connection.prepareStatement(sqlUpdate)) {
+                pstmtUpdate.setString(1, newEmail);
+                pstmtUpdate.setInt(2, Integer.parseInt(userId));
+                int affectedRows = pstmtUpdate.executeUpdate();
+                System.out.println("Affected rows for update: " + affectedRows);
+            }
+            
+            // 3. 插入操作也使用PreparedStatement
+            String sqlInsert = "INSERT INTO users (id, username, email) VALUES (?, ?, ?)";
+            int newId = 456;
+            String newUsername = "jane_doe";
+            String janeEmail = "jane.doe@example.com";
+            try (PreparedStatement pstmtInsert = connection.prepareStatement(sqlInsert)) {
+                pstmtInsert.setInt(1, newId);
+                pstmtInsert.setString(2, newUsername);
+                pstmtInsert.setString(3, janeEmail);
+                int affectedRows = pstmtInsert.executeUpdate();
+                System.out.println("Affected rows for insert: " + affectedRows);
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } catch (NumberFormatException e) {
+            System.err.println("Invalid user ID format: " + e.getMessage());
+        }
+    }
+
+    // 辅助方法，用于模拟数据库连接和表创建
+    static {
+        try (Connection connection = DriverManager.getConnection("jdbc:h2:mem:testdb;INIT=RUNSCRIPT FROM 'classpath:init.sql'", "sa", "")) {
+            // Database is initialized via init.sql
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://init.sql": <<<CODE
+CREATE TABLE IF NOT EXISTS users (
+    id INT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL,
+    email VARCHAR(255)
+);
+
+INSERT INTO users (id, username, email) VALUES (123, 'john_doe', 'john.doe@example.com');
+INSERT INTO users (id, username, email) VALUES (789, 'alice', 'alice@example.com');
+
+CODE
 )

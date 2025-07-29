@@ -95,4 +95,40 @@ desc(
         }
     }
 CODE
+	"safefile://SecureAESAlgorithmParameters.java": <<<CODE
+// 安全的代码示例：使用AES算法作为推荐加密算法
+import java.security.AlgorithmParameters;
+import java.security.NoSuchAlgorithmException;
+
+public class SecureAESAlgorithmParameters {
+    public static void main(String[] args) {
+        try {
+            // 使用更安全的 AES 算法。此方式不会触发告警，因为AES是公认的强加密算法。
+            AlgorithmParameters params = AlgorithmParameters.getInstance("AES");
+            System.out.println("Successfully initialized AlgorithmParameters with: " + params.getAlgorithm());
+        } catch (NoSuchAlgorithmException e) {
+            System.err.println("Error: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://SHA256WithRSAAlgorithmParameters.java": <<<CODE
+// 安全的代码示例：使用SHA256WithRSA算法，通常用于数字签名，不涉及加密模式
+import java.security.AlgorithmParameters;
+import java.security.NoSuchAlgorithmException;
+
+public class SHA256WithRSAAlgorithmParameters {
+    public static void main(String[] args) {
+        try {
+            // 使用 SHA256WithRSA，这是一种用于签名而非通用数据加密的算法，不属于弱加密算法。
+            AlgorithmParameters params = AlgorithmParameters.getInstance("SHA256WithRSA");
+            System.out.println("Successfully initialized AlgorithmParameters with: " + params.getAlgorithm());
+        } catch (NoSuchAlgorithmException e) {
+            System.err.println("Error: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+}
+CODE
 )

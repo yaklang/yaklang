@@ -163,4 +163,134 @@ desc(
         }
     }
 CODE
+	"safefile://SafeJndiDataSource.java": <<<CODE
+// 推荐做法：通过JNDI获取DataSource，由应用服务器管理连接
+import javax.naming.InitialContext;
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.SQLException;
+
+public class SafeJndiDataSource {
+    private static final String DATA_SOURCE_JNDI_NAME = "java:comp/env/jdbc/MyDataSource"; // 示例JNDI名称
+
+    public void useDataSource() {
+        Connection conn = null;
+        try {
+            // 从JNDI查找DataSource
+            InitialContext ctx = new InitialContext();
+            DataSource dataSource = (DataSource) ctx.lookup(DATA_SOURCE_JNDI_NAME);
+            
+            // 从DataSource获取连接
+            conn = dataSource.getConnection();
+            System.out.println("Connection obtained via JNDI DataSource.");
+            // 执行数据库操作...
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.close();
+                    System.out.println("Connection closed.");
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    // 模拟应用服务器配置的DataSource启动方法
+    public static void main(String[] args) {
+        // 实际场景中，DataSource由应用服务器如Tomcat, JBoss等配置和提供
+        // 这里只是为了示例编译通过，不代表真正的JNDI实现
+        // 通常不需要在main方法中手动注册JNDI
+        // System.setProperty(Context.INITIAL_CONTEXT_FACTORY, "org.apache.naming.java.javaURLContextFactory");
+        // System.setProperty(Context.URL_PKG_PREFIXES, "org.apache.naming");
+        // InitialContext ic = new InitialContext();
+        // ic.createSubcontext("java:");
+        // ic.createSubcontext("java:comp");
+        // ic.createSubcontext("java:comp/env");
+        // ic.createSubcontext("java:comp/env/jdbc");
+        // BasicDataSource ds = new BasicDataSource();
+        // ds.setDriverClassName("com.mysql.cj.jdbc.Driver");
+        // ds.setUrl("jdbc:mysql://localhost:3306/testdb");
+        // ds.setUsername("user");
+        // ds.setPassword("password");
+        // ic.bind("java:comp/env/jdbc/MyDataSource", ds);
+
+        SafeJndiDataSource app = new SafeJndiDataSource();
+        app.useDataSource();
+    }
+}
+CODE
+	"safefile://SafeSpringDataSource.java": <<<CODE
+// 推荐做法：使用Spring框架管理DataSource，通过依赖注入获取连接
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.SQLException;
+
+public class SafeSpringDataSource {
+    private DataSource dataSource;
+
+    // 由Spring自动注入dataSource
+    public void setDataSource(DataSource dataSource) {
+        this.dataSource = dataSource;
+    }
+
+    public void useDataSource() {
+        Connection conn = null;
+        if (dataSource == null) {
+            System.err.println("DataSource not injected. Check Spring configuration.");
+            return;
+        }
+        try {
+            conn = dataSource.getConnection();
+            System.out.println("Connection obtained via Spring managed DataSource.");
+            // 执行数据库操作...
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.close();
+                    System.out.println("Connection closed.");
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+        // 加载Spring配置
+        // 假设有一个 applicationContext.xml 文件在 classpath 中
+        // 定义了一个名为 'dataSource' 的bean和名为 'springBean' 的 SafeSpringDataSource Bean
+        /*
+         * applicationContext.xml 示例内容:
+         * <?xml version="1.0" encoding="UTF-8"?>
+         * <beans xmlns="http://www.springframework.org/schema/beans"
+         *        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         *        xsi:schemaLocation="http://www.springframework.org/schema/beans
+         *        http://www.springframework.org/schema/beans/spring-beans.xsd">
+         *
+         *     <bean id="dataSource" class="org.apache.commons.dbcp2.BasicDataSource">
+         *         <property name="driverClassName" value="com.mysql.cj.jdbc.Driver"/>
+         *         <property name="url" value="jdbc:mysql://localhost:3306/testdb"/>
+         *         <property name="username" value="user"/>
+         *         <property name="password" value="password"/>
+         *     </bean>
+         *
+         *     <bean id="springBean" class="SafeSpringDataSource">
+         *         <property name="dataSource" ref="dataSource"/>
+         *     </bean>
+         *
+         * </beans>
+         */
+        ApplicationContext context = new ClassPathXmlApplicationContext("applicationContext.xml");
+        SafeSpringDataSource springBean = (SafeSpringDataSource) context.getBean("springBean");
+        springBean.useDataSource();
+    }
+}
+CODE
 )

@@ -76,4 +76,42 @@ public class HttpClientUtilsExample {
     }
 }
 CODE
+	"safefile://SafeHttpClientUsage.java": <<<CODE
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+
+// 推荐使用Apache HttpClient或其他更健壮的HTTP客户端库
+public class SafeHttpClientUsage {
+    public static void main(String[] args) throws Exception {
+        String url = "https://example.com/api/data";
+        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+            HttpGet request = new HttpGet(url);
+            try (CloseableHttpResponse response = httpClient.execute(request)) {
+                // 确保正确处理响应流
+                BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent(), StandardCharsets.UTF_8));
+                StringBuilder result = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    result.append(line);
+                }
+                System.out.println("Apache HttpClient GET Response: " + result.toString());
+            }
+        }
+    }
+}
+CODE
+	"safefile://NoHttpClientUtilsImport.java": <<<CODE
+// 该文件不导入或使用 com.alibaba.druid.util.HttpClientUtils
+// 因此不会触发规则告警
+public class NoHttpClientUtilsImport {
+    public static void main(String[] args) {
+        System.out.println("This class does not use HttpClientUtils.");
+    }
+}
+CODE
 )

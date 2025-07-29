@@ -332,4 +332,89 @@ desc(
         }
     }
 CODE
+	"safefile://SafeHibernateUsage1.java": <<<CODE
+import net.sf.hibernate.Session;
+import net.sf.hibernate.SessionFactory;
+import net.sf.hibernate.HibernateException;
+import net.sf.hibernate.cfg.Configuration;
+import java.util.List;
+
+// 推荐使用 try-finally 块确保 Session 资源在任何情况下都被释放
+public class SafeHibernateUsage1 {
+    private static SessionFactory sessionFactory;
+
+    static {
+        try {
+            Configuration config = new Configuration().configure();
+            sessionFactory = config.buildSessionFactory();
+        } catch (HibernateException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
+
+    public List<?> getUsersSafely() {
+        Session session = null;
+        try {
+            session = sessionFactory.openSession();
+            List<?> users = session.createQuery("from User").list();
+            return users;
+        } catch (HibernateException e) {
+            System.err.println("HibernateException: " + e.getMessage());
+            return null;
+        } finally {
+            if (session != null) {
+                try {
+                    session.close(); // 确保 close() 方法被调用
+                } catch (HibernateException e) {
+                    System.err.println("Error closing session: " + e.getMessage());
+                }
+            }
+        }
+    }
+
+    public static void shutdown() {
+        if (sessionFactory != null) {
+            sessionFactory.close();
+        }
+    }
+}
+CODE
+	"safefile://SafeHibernateUsage2.java": <<<CODE
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.cfg.Configuration;
+import java.util.List;
+
+// 现代 Hibernate 及 Java 7+ 环境下的推荐做法：使用 try-with-resources
+// 注意：org.hibernate.Session 从 Hibernate 5.x 开始实现了 AutoCloseable 接口
+public class SafeHibernateUsage2 {
+    private static SessionFactory sessionFactory;
+
+    static {
+        try {
+            // 假设 hibernate.cfg.xml 存在于 classpath 中
+            sessionFactory = new Configuration().configure().buildSessionFactory();
+        } catch (Exception e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
+
+    public List<?> getAllProducts() {
+        // try-with-resources 会自动关闭 session，即使发生异常
+        try (Session session = sessionFactory.openSession()) {
+            List<?> products = session.createQuery("from Product").list();
+            return products;
+        } catch (Exception e) {
+            System.err.println("Exception during product retrieval: " + e.getMessage());
+            return null;
+        }
+    }
+
+    public static void shutdown() {
+        if (sessionFactory != null) {
+            sessionFactory.close();
+        }
+    }
+}
+CODE
 )

@@ -383,4 +383,95 @@ AAA
     </dependencies>
 </project>
 AAA
+	"safefile://SafeFastjsonUsage.java": <<<CODE
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.parser.ParserConfig;
+import com.alibaba.fastjson.serializer.SerializerFeature;
+
+public class SafeFastjsonUsage {
+
+    static {
+        // 推荐：在应用程序启动时全局启用 Safemode
+        // 此配置在 Fastjson 1.2.68 及更高版本中可用，可以有效防御大多数反序列化攻击。
+        ParserConfig.getGlobalInstance().setSafeMode(true);
+    }
+
+    public static void main(String[] args) {
+        // 示例：使用安全版本的 Fastjson (1.2.83+)
+        // 该版本已修复已知反序列化漏洞
+        String safeJsonString = "{\"name\":\"test\", \"age\":18}";
+        User user = JSON.parseObject(safeJsonString, User.class);
+        System.out.println("Parsed user (safe version): " + user.getName() + ", " + user.getAge());
+
+        // 示例：仅使用 JSONObject 处理简单JSON结构，不涉及@type
+        // 这种使用方式相对更安全，但仍建议升级Fastjson版本。
+        String simpleJson = "{\"key\":\"value\"}";
+        com.alibaba.fastjson.JSONObject jsonObject = JSON.parseObject(simpleJson);
+        System.out.println("Parsed JSONObject: " + jsonObject.getString("key"));
+
+        // 示例：使用Fastjson序列化，通常不会引入反序列化漏洞
+        User newUser = new User("Alice", 25);
+        String serializedUser = JSON.toJSONString(newUser, SerializerFeature.WriteMapNullValue);
+        System.out.println("Serialized user: " + serializedUser);
+
+        // 示例：Fastjson反序列化到明确的JavaBean，而不是泛型Object
+        // 且仅处理来自可信来源的JSON
+        String trustedJson = "{\"name\":\"Bob\", \"age\":30}";
+        User trustedUser = JSON.parseObject(trustedJson, User.class);
+        System.out.println("Parsed trusted user: " + trustedUser.getName() + ", " + trustedUser.getAge());
+
+        System.out.println("Fastjson safemode status: " + ParserConfig.getGlobalInstance().isSafeMode());
+    }
+
+    // 示例用户类
+    public static class User {
+        private String name;
+        private int age;
+
+        public User() {}
+
+        public User(String name, int age) {
+            this.name = name;
+            this.age = age;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public int getAge() {
+            return age;
+        }
+
+        public void setAge(int age) {
+            this.age = age;
+        }
+    }
+}
+CODE
+	"safefile://SafeFastjsonMavenConfig.xml": <<<CODE
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>secure-fastjson-app</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <dependencies>
+        <!-- Fastjson dependency, upgraded to a safe version (e.g., 1.2.83 or higher) -->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <version>1.2.83</version> <!-- 这是推荐的安全版本，或更高版本 -->
+        </dependency>
+    </dependencies>
+</project>
+CODE
 )

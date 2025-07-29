@@ -263,4 +263,85 @@ func (c *XXEVuln1Controller) Post() {
 }
 
 UNSAFE
+	"safefile://SafeXMLProcessingUsingEncodingXML.go": <<<CODE
+package main
+
+import (
+	"encoding/xml"
+	"fmt"
+)
+
+func main() {
+	// Go的标准库encoding/xml默认不支持外部实体解析，因此是安全的
+	data := `<?xml version="1.0"?>
+	<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+	<foo>&xxe;</foo>`
+
+	var result map[string]string
+	// Unmarshal会忽略外部实体，不会触发XXE
+	err := xml.Unmarshal([]byte(data), &result)
+	if err != nil {
+		fmt.Println("Error parsing XML (expected for malformed XML, but not XXE):", err)
+		// 对于包含DOCTYPE的这种格式，Unmarshal可能会报错，但关键是它不会去解析SYSTEM实体
+	} else {
+		fmt.Println("Parsed XML:", result)
+	}
+
+	// 示例：解析一个简单的、不含外部实体的XML
+	safeData := `<root><item>Hello</item></root>`
+	var safeResult struct{ Item string `xml:"item"` }
+	err = xml.Unmarshal([]byte(safeData), &safeResult)
+	if err != nil {
+		fmt.Println("Error parsing safe XML:", err)
+	} else {
+		fmt.Println("Parsed safe XML:", safeResult.Item)
+	}
+}
+CODE
+	"safefile://SafeXMLProcessingWithLibxml2DisabledDTDLoad.go": <<<CODE
+package main
+
+import (
+	"bytes"
+	"fmt"
+	"github.com/lestrrat-go/libxml2/parser"
+)
+
+func main() {
+	// 攻击者提供的恶意XML数据
+	maliciousXML := `<?xml version="1.0"?>
+	<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+	<foo>&xxe;</foo>`
+
+	// 使用libxml2/parser，但明确禁用XMLParseDTDLoad和XMLParseNoEnt
+	// XMLParseNoEnt 意为不扩展实体，这对于防止XXE至关重要
+	// XMLParseDTDLoad 意为不加载外部DTD，这也是防止XXE的关键
+	// 注意：规则中触发点是parser.XMLParseNoEnt，但为了彻底安全，应该禁用DTD加载
+	// 在这里，我们故意不设置XMLParseNoEnt，而是使用安全的XMLParseDTDLoad
+	// 因为规则是针对 'parser.XMLParseNoEnt' 的存在而告警，所以这里不包含它以示安全
+	p := parser.New(parser.XMLParseDTDNoLoad) // 禁用DTD加载
+	doc, err := p.ParseReader(bytes.NewReader([]byte(maliciousXML)))
+	if err != nil {
+		fmt.Println("Error parsing XML (expected or normal):", err)
+		// 在禁用DTD加载和实体扩展的情况下，解析包含引用的DTD可能会报错，这是正常且安全的行为
+	} else {
+		defer doc.Free()
+		root, _ := doc.DocumentElement()
+		fmt.Println("Parsed content (should not contain /etc/passwd):", root.TextContent())
+		// 确认安全，不会输出/etc/passwd内容
+	}
+
+	// 示例：解析一个简单的、不含外部实体的XML
+	safeData := `<root><item>Safe Content</item></root>`
+	safeParser := parser.New()
+	docSafe, errSafe := safeParser.ParseReader(bytes.NewReader([]byte(safeData)))
+	if errSafe != nil {
+		fmt.Println("Error parsing safe XML:", errSafe)
+	} else {
+		defer docSafe.Free()
+		rootSafe, _ := docSafe.DocumentElement()
+		fmt.Println("Parsed safe content:", rootSafe.TextContent())
+	}
+}
+CODE
 )

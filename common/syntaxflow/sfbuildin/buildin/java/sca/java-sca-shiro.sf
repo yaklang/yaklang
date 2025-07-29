@@ -182,4 +182,48 @@ desc(
     </dependencies>
 </project>
 CODE
+	"safefile://pom_shiro_safe_version.xml": <<<CODE
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>secure-shiro-app</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <dependencies>
+        <!-- shiro-core 升级到 1.10.2 或更高版本，修复已知漏洞 -->
+        <dependency>
+            <groupId>org.apache.shiro</groupId>
+            <artifactId>shiro-core</artifactId>
+            <version>1.10.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.shiro</groupId>
+            <artifactId>shiro-spring</artifactId>
+            <version>1.10.2</version>
+        </dependency>
+        <!-- 其他依赖 -->
+    </dependencies>
+</project>
+CODE
+	"safefile://build_gradle_shiro_safe_version.gradle": <<<CODE
+plugins {
+    id 'java'
+}
+
+group 'com.example'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // shiro-core 升级到 1.10.2 或更高版本，修复已知漏洞
+    implementation 'org.apache.shiro:shiro-core:1.10.2'
+    implementation 'org.apache.shiro:shiro-spring:1.10.2'
+    // 其他依赖
+}
+CODE
 )

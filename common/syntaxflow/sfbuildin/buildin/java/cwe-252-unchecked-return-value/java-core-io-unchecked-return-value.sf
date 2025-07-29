@@ -157,6 +157,58 @@ public class Demo {
     }
 }
 TEXT
+	"safefile://SafeFileOperation.java": <<<CODE
+import java.io.File;
+import java.io.IOException;
+
+public class SafeFileOperation {
+    public static void main(String[] args) {
+        File file = new File("safe_temp.txt");
+
+        // 检查并处理 delete() 方法的返回值
+        if (file.exists()) {
+            if (file.delete()) {
+                System.out.println("文件删除成功: " + file.getName());
+            } else {
+                System.err.println("文件删除失败: " + file.getName());
+                // 可以添加更详细的错误处理逻辑，如日志记录或重试
+            }
+        } else {
+            System.out.println("文件不存在，无需删除: " + file.getName());
+        }
+
+        // 检查 canWrite() 方法的返回值
+        if (file.canWrite()) {
+            System.out.println("文件可写: " + file.getName());
+        } else {
+            System.out.println("文件不可写: " + file.getName());
+        }
+    }
+}
+CODE
+	"safefile://SafeStreamRead.java": <<<CODE
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.io.IOException;
+
+public class SafeStreamRead {
+    public static void main(String[] args) {
+        String filename = "data.bin";
+        try (InputStream is = new FileInputStream(filename)) { // 使用 try-with-resources 确保流关闭
+            int data;
+            // 循环读取数据，直到 read() 返回 -1 (流结束)
+            while ((data = is.read()) != -1) {
+                // 处理读取到的数据
+                System.out.print((char) data);
+            }
+            System.out.println("\n数据读取完毕。");
+        } catch (IOException e) {
+            System.err.println("读取文件时发生错误: " + e.getMessage());
+            // 进一步的异常处理，如记录日志或向上抛出
+        }
+    }
+}
+CODE
 )
 
 

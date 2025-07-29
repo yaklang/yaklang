@@ -107,4 +107,66 @@ public class FluentGetExample {
     }
 }
 TEXT
+	"safefile://SafeHttpClientUsage.java": <<<CODE
+// 这是一个没有使用Apache HttpClient Fluent API的示例
+// 该代码使用标准的HttpURLConnection来发起HTTP请求，不会触发该规则。
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+
+public class SafeHttpClientUsage {
+    public static void main(String[] args) {
+        try {
+            URL url = new URL("https://www.example.com");
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+
+            int responseCode = connection.getResponseCode();
+            System.out.println("Response Code: " + responseCode);
+
+            BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+            String inputLine;
+            StringBuilder content = new StringBuilder();
+            while ((inputLine = in.readLine()) != null) {
+                content.append(inputLine);
+            }
+            in.close();
+            connection.disconnect();
+            System.out.println("Response: " + content.toString());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://NonFluentHttpClient.java": <<<CODE
+// 这是一个使用Apache HttpClient，但未使用其Fluent API的示例。
+// 该规则仅针对Fluent API的使用进行审计。
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
+
+public class NonFluentHttpClient {
+    public static void main(String[] args) {
+        CloseableHttpClient httpClient = HttpClients.createDefault();
+        HttpGet httpGet = new HttpGet("https://www.google.com");
+
+        try (CloseableHttpResponse response = httpClient.execute(httpGet)) {
+            System.out.println("Response Status: " + response.getStatusLine().getStatusCode());
+            System.out.println("Response Body: " + EntityUtils.toString(response.getEntity()));
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                httpClient.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+CODE
 )

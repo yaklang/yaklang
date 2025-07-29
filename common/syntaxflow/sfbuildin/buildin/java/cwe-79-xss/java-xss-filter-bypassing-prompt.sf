@@ -135,4 +135,42 @@ public class MCmsAction extends net.demo.cms.action.BaseAction {
     }
 }
 UNSAFE
+	"safefile://SafeHtmlOutput.java": <<<CODE
+// SafeHtmlOutput.java
+import org.owasp.encoder.Encode;
+
+public class SafeHtmlOutput {
+    public String processAndOutputHtml(String userInput) {
+        // 使用OWASP ESAPI或其他成熟库进行HTML编码
+        // 这是一个安全的HTML输出示例，不应触发XSS告警
+        String encodedInput = Encode.forHtml(userInput);
+        return "<div>User input: " + encodedInput + "</div>";
+    }
+
+    public String processAndOutputHtmlAttribute(String userInput) {
+        // 对HTML属性值进行编码
+        String encodedInput = Encode.forHtmlAttribute(userInput);
+        return "<a href=\"#\" title=\"" + encodedInput + "\">Link</a>";
+    }
+}
+CODE
+	"safefile://SafeJavaScriptOutput.java": <<<CODE
+// SafeJavaScriptOutput.java
+import org.owasp.encoder.Encode;
+
+public class SafeJavaScriptOutput {
+    public String processAndOutputJs(String userInput) {
+        // 使用OWASP ESAPI或其他成熟库进行JavaScript编码
+        // 这是一个安全的JavaScript输出示例，不应触发XSS告警
+        String encodedInput = Encode.forJavaScriptBlock(userInput);
+        return "<script>var data = '" + encodedInput + "';</script>";
+    }
+
+    public String processAndOutputJsAttribute(String userInput) {
+         // 对JavaScript事件属性值进行编码
+        String encodedInput = Encode.forJavaScriptAttribute(userInput);
+        return "<button onclick=\"alert('" + encodedInput + "');\">Click me</button>";
+    }
+}
+CODE
 )

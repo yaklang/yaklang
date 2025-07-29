@@ -372,4 +372,111 @@ desc(
         }
     }
 CODE
+	"safefile://SafeHibernateConnectionWithTryFinally.java": <<<CODE
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.List;
+
+import net.sf.hibernate.SessionFactory;
+import net.sf.hibernate.HibernateException;
+import net.sf.hibernate.connection.ConnectionProvider;
+import net.sf.hibernate.cfg.Configuration;
+
+public class SafeHibernateConnectionWithTryFinally {
+    private SessionFactory sessionFactory;
+
+    public SafeHibernateConnectionWithTryFinally() {
+        try {
+            Configuration config = new Configuration().configure();
+            sessionFactory = config.buildSessionFactory();
+        } catch (HibernateException e) {
+            throw new RuntimeException("初始化SessionFactory失败", e);
+        }
+    }
+
+    /**
+     * 正确示例1：使用try-finally确保连接关闭
+     * 确保即使在处理过程中发生异常，数据库连接、Statement和ResultSet等资源也能被可靠关闭。
+     */
+    public List<String> safeConnectionWithTryFinally() throws HibernateException, SQLException {
+        List<String> results = new ArrayList<>();
+        ConnectionProvider provider = sessionFactory.getConnectionProvider();
+
+        Connection conn = null;
+        Statement stmt = null;
+        ResultSet rs = null;
+
+        try {
+            // 获取连接
+            conn = provider.getConnection();
+
+            // 使用连接
+            stmt = conn.createStatement();
+            rs = stmt.executeQuery("SELECT username FROM users");
+
+            while (rs.next()) {
+                results.add(rs.getString("username"));
+            }
+        } finally {
+            // 按照获取顺序的逆序关闭资源，这是最佳实践
+            if (rs != null) { try { rs.close(); } catch (SQLException e) { /* 记录日志 */ } }
+            if (stmt != null) { try { stmt.close(); } catch (SQLException e) { /* 记录日志 */ } }
+            if (conn != null) { try { conn.close(); } catch (SQLException e) { /* 记录日志 */ } }
+        }
+
+        return results;
+    }
+}
+CODE
+	"safefile://SafeHibernateConnectionWithTryWithResources.java": <<<CODE
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.List;
+
+import net.sf.hibernate.SessionFactory;
+import net.sf.hibernate.HibernateException;
+import net.sf.hibernate.connection.ConnectionProvider;
+import net.sf.hibernate.cfg.Configuration;
+
+public class SafeHibernateConnectionWithTryWithResources {
+    private SessionFactory sessionFactory;
+
+    public SafeHibernateConnectionWithTryWithResources() {
+        try {
+            Configuration config = new Configuration().configure();
+            sessionFactory = config.buildSessionFactory();
+        } catch (HibernateException e) {
+            throw new RuntimeException("初始化SessionFactory失败", e);
+        }
+    }
+
+    /**
+     * 正确示例2：使用try-with-resources自动关闭资源（Java 7+）
+     * try-with-resources 语法可以确保所有可自动关闭的资源在块结束时自动关闭，
+     * 极大简化了资源管理代码，并降低了资源泄漏的风险。
+     */
+    public List<String> safeConnectionWithTryWithResources() throws HibernateException, SQLException {
+        List<String> results = new ArrayList<>();
+        ConnectionProvider provider = sessionFactory.getConnectionProvider();
+
+        try (
+            Connection conn = provider.getConnection();
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery("SELECT username FROM users")
+        ) {
+            while (rs.next()) {
+                results.add(rs.getString("username"));
+            }
+        } // 所有资源在此处自动关闭，无需显式调用 close()
+
+        return results;
+    }
+}
+CODE
 )

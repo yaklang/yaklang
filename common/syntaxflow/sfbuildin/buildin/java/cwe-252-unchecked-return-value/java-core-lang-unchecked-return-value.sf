@@ -86,4 +86,70 @@ public class Main {
     }
 }
 TEXT
+	"safefile://CorrectStringUsage.java": <<<CODE
+// 安全的代码示例：正确使用String方法返回值
+package org.example;
+
+public class CorrectStringUsage {
+    public static void main(String[] args) {
+        String originalString = "Hello World!";
+        // 确保接收并使用toLowerCase()的返回值
+        String lowerCaseString = originalString.toLowerCase(); 
+        System.out.println("Original: " + originalString); // 原始字符串未改变
+        System.out.println("Lowercase: " + lowerCaseString); // 使用了新的字符串
+
+        String modifiedString = originalString.replace('o', 'X'); // 接收并使用replace()返回值
+        System.out.println("Modified: " + modifiedString);
+
+        String subString = originalString.substring(6); // 接收并使用substring()返回值
+        System.out.println("Substring: " + subString);
+    }
+}
+CODE
+	"safefile://SafeRuntimeExec.java": <<<CODE
+// 安全的代码示例：正确处理Runtime.exec()的返回值
+package org.example;
+
+import java.io.IOException;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+
+public class SafeRuntimeExec {
+    public static void main(String[] args) {
+        Process process = null;
+        try {
+            // 接收并处理exec()返回的Process对象
+            process = Runtime.getRuntime().exec("ls -l"); // Unix/Linux示例
+            // For Windows: process = Runtime.getRuntime().exec("cmd /c dir");
+
+            // 获取命令的输出流
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                System.out.println(line);
+            }
+            
+            // 等待进程执行完毕，并获取退出码
+            int exitCode = process.waitFor(); 
+            System.out.println("Command exited with code: " + exitCode);
+
+            if (exitCode != 0) {
+                // 处理非零退出码，表明命令执行失败
+                System.err.println("Command execution failed.");
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.err.println("IOException during command execution.");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt(); // 重新设置中断状态
+            System.err.println("Command execution interrupted.");
+        } finally {
+            if (process != null) {
+                process.destroy(); // 确保进程被销毁，释放资源
+            }
+        }
+    }
+}
+CODE
 )

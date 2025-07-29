@@ -236,4 +236,107 @@ public class VulnerableXPathController {
     }
 }
 EOF
+	"safefile://SecureXPathSearchBooks.java": <<<CODE
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpression;
+import javax.xml.xpath.XPathFactory;
+import java.io.InputStream;
+import org.springframework.core.io.ClassPathResource;
+import java.util.regex.Pattern;
+
+@RestController
+public class SecureXPathSearchBooks {
+
+    private static final Pattern SAFE_INPUT_PATTERN = Pattern.compile("^[a-zA-Z0-9 ]+$");
+
+    @GetMapping("/secureSearchBooks")
+    public String secureSearchBooks(@RequestParam String bookAuthor) throws Exception {
+        // 1. 输入验证和过滤：仅允许字母、数字和空格
+        if (!SAFE_INPUT_PATTERN.matcher(bookAuthor).matches()) {
+            // 记录日志并返回错误，避免直接暴露给用户具体的错误信息
+            System.err.println("Invalid book author input detected: " + bookAuthor);
+            return "Invalid input. Please provide a valid author name (alphanumeric and spaces only).";
+        }
+
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        // 建议禁用外部实体，防止XXE
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        factory.setXIncludeAware(false);
+        factory.setExpandEntityReferences(false);
+
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        InputStream inputStream = new ClassPathResource("books.xml").getInputStream();
+        Document document = builder.parse(inputStream);
+
+        XPathFactory xPathfactory = XPathFactory.newInstance();
+        XPath xpath = xPathfactory.newXPath();
+
+        // 2. 将单引号转义为两个单引号，防止单引号注入
+        String escapedAuthor = bookAuthor.replace("'", "''");
+
+        // 使用过滤后的安全输入构建XPath表达式
+        String expression = "/books/book[author='" + escapedAuthor + "']";
+        XPathExpression compiledExpression = xpath.compile(expression);
+
+        NodeList nodeList = (NodeList) compiledExpression.evaluate(document, XPathConstants.NODESET);
+
+        StringBuilder result = new StringBuilder();
+        if (nodeList.getLength() == 0) {
+            result.append("No books found for author: ").append(bookAuthor);
+        } else {
+            for (int i = 0; i < nodeList.getLength(); i++) {
+                result.append(nodeList.item(i).getTextContent()).append("\n");
+            }
+        }
+        return result.toString();
+    }
+}
+
+CODE
+	"safefile://StaticXPathQuery.java": <<<CODE
+import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpression;
+import javax.xml.xpath.XPathFactory;
+
+// 这个示例展示了不接受任何用户输入的安全XPath查询
+public class StaticXPathQuery {
+
+    public static void main(String[] args) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        // 假设这里直接从文件加载一个已知的XML文档
+        Document document = builder.parse("src/main/resources/books.xml");
+
+        XPathFactory xPathfactory = XPathFactory.newInstance();
+        XPath xpath = xPathfactory.newXPath();
+
+        // XPath表达式是硬编码的，不包含任何用户输入
+        String expression = "/books/book[price > 50]";
+        XPathExpression compiledExpression = xpath.compile(expression);
+
+        NodeList nodeList = (NodeList) compiledExpression.evaluate(document, XPathConstants.NODESET);
+
+        System.out.println("Books with price > 50:");
+        for (int i = 0; i < nodeList.getLength(); i++) {
+            System.out.println(nodeList.item(i).getTextContent());
+        }
+    }
+}
+
+CODE
 )

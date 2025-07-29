@@ -224,4 +224,65 @@ public class HttpClientExample {
     }
 }
 TEXT
+	"safefile://SafeHttpURLConnectionExample.java": <<<CODE
+// 使用标准的Java HttpURLConnection代替Apache HttpClient
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.IOException;
+
+public class SafeHttpURLConnectionExample {
+
+    public static void main(String[] args) {
+        try {
+            // 安全：使用HttpURLConnection，不使用Apache HttpClient
+            URL url = new URL("https://api.example.com/safe_data");
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+
+            int responseCode = connection.getResponseCode();
+            System.out.println("Response Code: " + responseCode);
+
+            BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+            String inputLine;
+            StringBuilder content = new StringBuilder();
+            while ((inputLine = in.readLine()) != null) {
+                content.append(inputLine);
+            }
+            in.close();
+            System.out.println("Response Content: " + content.toString());
+
+            connection.disconnect();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://SafeRestTemplateExample.java": <<<CODE
+// 使用Spring Framework的RestTemplate代替Apache HttpClient
+// 注意：这个例子假设Spring Web依赖已引入
+import org.springframework.web.client.RestTemplate;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpMethod;
+
+public class SafeRestTemplateExample {
+
+    public static void main(String[] args) {
+        // 安全：使用RestTemplate，不使用Apache HttpClient的execute方法
+        RestTemplate restTemplate = new RestTemplate();
+        String url = "https://api.example.com/spring_data";
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, null, String.class);
+            System.out.println("Response Status Code: " + response.getStatusCodeValue());
+            System.out.println("Response Body: " + response.getBody());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
 )

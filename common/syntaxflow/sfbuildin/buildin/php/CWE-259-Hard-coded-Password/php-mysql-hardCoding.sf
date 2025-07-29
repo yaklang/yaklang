@@ -98,4 +98,58 @@ desc(
     $password = "password"; // 硬编码的密码
     $conn = mysql_connect($servername, $username, $password);
 CODE
+	"safefile://SecureConfigExample.php": <<<CODE
+<?php
+// 修复示例1: 从配置文件中加载凭据
+// 假设config.ini文件内容如下：
+// [database]
+// servername = "localhost"
+// username = "dbuser"
+// password = "secure_password_from_config"
+
+$config = parse_ini_file(__DIR__ . '/config.ini', true);
+
+$servername = $config['database']['servername'];
+$username = $config['database']['username'];
+$password = $config['database']['password'];
+
+// 模拟数据库连接，这里使用mysqli代替mysql_connect以示正确的现代化实践
+// 在实际应用中，应使用PDO或MySQLi
+$conn = new mysqli($servername, $username, $password);
+
+if ($conn->connect_error) {
+    die("连接失败: " . $conn->connect_error);
+}
+echo "数据库连接成功 (通过配置文件)!";
+$conn->close();
+?>
+CODE
+	"safefile://SecureEnvExample.php": <<<CODE
+<?php
+// 修复示例2: 从环境变量中加载凭据 (推荐使用Dotenv库)
+// 假设根目录下有一个.env文件，内容如下：
+// DB_SERVER="localhost"
+// DB_USERNAME="envuser"
+// DB_PASSWORD="secure_password_from_env"
+
+// 引入Dotenv库，生产环境通常通过Composer autoload
+// require __DIR__ . '/vendor/autoload.php';
+// $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+// $dotenv->load();
+
+// 假设getenv()或$_ENV已经加载了环境变量
+$servername = getenv('DB_SERVER') ?: $_ENV['DB_SERVER'];
+$username = getenv('DB_USERNAME') ?: $_ENV['DB_USERNAME'];
+$password = getenv('DB_PASSWORD') ?: $_ENV['DB_PASSWORD'];
+
+// 模拟数据库连接，使用MySQLi
+$conn = new mysqli($servername, $username, $password);
+
+if ($conn->connect_error) {
+    die("连接失败: " . $conn->connect_error);
+}
+echo "数据库连接成功 (通过环境变量)!";
+$conn->close();
+?>
+CODE
 )

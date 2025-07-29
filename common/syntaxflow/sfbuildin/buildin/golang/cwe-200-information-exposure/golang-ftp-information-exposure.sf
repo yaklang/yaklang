@@ -276,4 +276,151 @@ func getSystemType(conn *ftp.ServerConn) {
 }
 
 UNSAFE
+	"safefile://SafeFtpClient.go": <<<CODE
+// SafeFtpClient.go
+package main
+
+import (
+	"fmt"
+	"github.com/jlaffaye/ftp"
+	"log"
+	"strings"
+	"time"
+)
+
+func main() {
+	// 示例：连接到 FTP 服务器，但并不执行任何可能泄露信息的函数
+	conn, err := ftp.Dial("ftp.example.com:21", ftp.DialWithTimeout(5*time.Second))
+	if err != nil {
+		log.Fatalf("Failed to connect: %v", err)
+		return
+	}
+	defer conn.Quit()
+
+	err = conn.Login("username", "password")
+	if err != nil {
+		log.Fatalf("Failed to login: %v", err)
+		return
+	}
+	defer conn.Logout()
+
+	// 不执行 List(), CurrentDir(), SystemType() 等可能泄露信息的函数
+	fmt.Println("FTP connection established securely without information exposure.")
+
+	// 示例：仅用于上传文件，不执行列表或查询操作
+	// uploadFile(conn, "local_file.txt", "remote_path/file.txt")
+}
+
+// uploadFile 辅助函数，不包含信息泄露风险
+func uploadFile(conn *ftp.ServerConn, localPath, remotePath string) {
+	// 实现文件上传逻辑
+	fmt.Printf("Uploading %s to %s... (placeholder)
+", localPath, remotePath)
+}
+
+CODE
+	"safefile://SafeFilteredOutput.go": <<<CODE
+// SafeFilteredOutput.go
+package main
+
+import (
+	"fmt"
+	"github.com/jlaffaye/ftp"
+	"log"
+	"strings"
+	"time"
+)
+
+func main() {
+	conn, err := ftp.Dial("ftp.example.com:21", ftp.DialWithTimeout(5*time.Second))
+	if err != nil {
+		log.Fatalf("Failed to connect: %v", err)
+		return
+	}
+	defer conn.Quit()
+
+	err = conn.Login("username", "password")
+	if err != nil {
+		log.Fatalf("Failed to login: %v", err)
+		return
+	}
+	defer conn.Logout()
+
+	// 获取系统类型并进行脱敏处理
+	getSystemTypeSafely(conn)
+
+	// 尝试列出文件，但限制范围且过滤输出
+	listFilesSafely(conn, "/var/www/uploads")
+
+	// 获取当前目录，但仅在安全范围内才展示，否则脱敏
+	getCurrentDirSafely(conn)
+}
+
+// getSystemTypeSafely 获取系统类型并进行脱敏处理
+func getSystemTypeSafely(conn *ftp.ServerConn) {
+	systemType, err := conn.SystemType()
+	if err != nil {
+		fmt.Println("INFO: Failed to get system type, potentially not supported or connection issue.", err)
+		return
+	}
+
+	// 对敏感关键词进行脱敏
+	if strings.Contains(strings.ToLower(systemType), "unix") || strings.Contains(strings.ToLower(systemType), "windows") {
+		fmt.Println("System type: [REDACTED_OS]") // 脱敏输出
+	} else {
+		// 对于其他非特定OS信息，或者通用信息，可以考虑输出
+		fmt.Printf("System type: %s (non-sensitive or general info)
+", systemType) 
+	}
+}
+
+// listFilesSafely 限制列出目录范围并过滤敏感文件
+func listFilesSafely(conn *ftp.ServerConn, requestedDir string) {
+	// 严格限制允许列出的目录前缀
+	allowedPrefix := "/safe_data/" 
+
+	// 确保请求的目录在允许范围内，防止路径遍历
+	if !strings.HasPrefix(requestedDir, allowedPrefix) {
+		fmt.Printf("ERROR: Access denied for directory: %s. Only directories under %s are allowed.
+", requestedDir, allowedPrefix)
+		return
+	}
+
+	entries, err := conn.List(requestedDir)
+	if err != nil {
+		fmt.Printf("ERROR: Failed to list files in %s: %v
+", requestedDir, err)
+		return
+	}
+
+	fmt.Printf("Listing files in %s (filtered):
+", requestedDir)
+	for _, entry := range entries {
+		// 过滤掉隐藏文件和潜在敏感文件（如配置文件或特定扩展名）
+		if !strings.HasPrefix(entry.Name, ".") &&
+			!strings.HasSuffix(entry.Name, ".env") &&
+			!strings.HasSuffix(entry.Name, ".conf") {
+			fmt.Println(" - ", entry.Name)
+		}
+	}
+}
+
+// getCurrentDirSafely 获取当前目录并进行安全检查和脱敏
+func getCurrentDirSafely(conn *ftp.ServerConn) {
+	dir, err := conn.CurrentDir()
+	if err != nil {
+		fmt.Println("ERROR: Failed to get current directory:", err)
+		return
+	}
+
+	// 仅在当前目录是预设的安全目录时才显示，否则脱敏
+	if strings.HasPrefix(dir, "/var/www/safe_temp") {
+		fmt.Printf("Current directory: %s
+", dir)
+	} else {
+		fmt.Println("Current directory: [REDACTED_PATH]")
+	}
+}
+
+CODE
 )

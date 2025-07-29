@@ -349,6 +349,30 @@ desc(
 
     }
 CODE
+	"safefile://SafeSystemGetPropertyIfCheck.java": <<<CODE
+public class SafeSystemGetPropertyIfCheck {
+    public void safeMethod() {
+        String homeDir = System.getProperty("user.home.custom");
+        // 使用 if 检查 null，是推荐的安全实现方式
+        if (homeDir != null) {
+            int length = homeDir.length();
+            System.out.println("Home directory length: " + length);
+        } else {
+            System.out.println("Home directory not set");
+        }
+    }
+}
+CODE
+	"safefile://SafeSystemGetPropertyTernaryOperator.java": <<<CODE
+public class SafeSystemGetPropertyTernaryOperator {
+    public void safeMethod() {
+        String configPath = System.getProperty("config.path");
+        // 使用三元运算符为可能为null的值提供默认替代
+        configPath = (configPath != null) ? configPath : "default/path";
+        System.out.println("Configuration path: " + configPath);
+    }
+}
+CODE
 )
 
 desc(
@@ -388,5 +412,29 @@ desc(
            return property.contains("windows");
        }
    }
+CODE
+	"safefile://SafeSystemGetPropertyIfCheck.java": <<<CODE
+public class SafeSystemGetPropertyIfCheck {
+    public void safeMethod() {
+        String homeDir = System.getProperty("user.home.custom");
+        // 使用 if 检查 null，是推荐的安全实现方式
+        if (homeDir != null) {
+            int length = homeDir.length();
+            System.out.println("Home directory length: " + length);
+        } else {
+            System.out.println("Home directory not set");
+        }
+    }
+}
+CODE
+	"safefile://SafeSystemGetPropertyTernaryOperator.java": <<<CODE
+public class SafeSystemGetPropertyTernaryOperator {
+    public void safeMethod() {
+        String configPath = System.getProperty("config.path");
+        // 使用三元运算符为可能为null的值提供默认替代
+        configPath = (configPath != null) ? configPath : "default/path";
+        System.out.println("Configuration path: " + configPath);
+    }
+}
 CODE
 )

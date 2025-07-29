@@ -349,4 +349,131 @@ public class FileSystemContorller {
    }
 }
 CODE
+	"safefile://SafeFileUploadController.java": <<<CODE
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
+
+public class SafeFileUploadController {
+
+    private static final String UPLOAD_DIR = "/opt/app/uploads/"; // 非web可访问的安全目录
+
+    @PostMapping("/safeUpload")
+    public String handleFileUpload(@RequestParam("file") MultipartFile file) throws IOException {
+        if (file.isEmpty()) {
+            return "Upload failed: File is empty.";
+        }
+
+        // 1. 严格的文件类型校验 - 白名单与MIME类型双重校验
+        String originalFilename = file.getOriginalFilename();
+        String fileExtension = "";
+        if (originalFilename != null && originalFilename.lastIndexOf(".") != -1) {
+            fileExtension = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
+        }
+
+        Set<String> allowedExtensions = new HashSet<>(Arrays.asList("jpg", "jpeg", "png", "gif", "pdf"));
+        if (!allowedExtensions.contains(fileExtension)) {
+            return "Upload failed: Disallowed file extension '" + fileExtension + "'.";
+        }
+
+        String contentType = file.getContentType();
+        Set<String> allowedContentTypes = new HashSet<>(Arrays.asList("image/jpeg", "image/png", "image/gif", "application/pdf"));
+        if (!allowedContentTypes.contains(contentType)) {
+            return "Upload failed: Disallowed content type '" + contentType + "'.";
+        }
+
+        // TODO: 更安全的做法是读取文件头部魔数进行校验
+
+        // 2. 限制文件大小 (在Spring配置中已设置，代码中可再次检查)
+        final long MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+        if (file.getSize() > MAX_FILE_SIZE) {
+            return "Upload failed: File size exceeds limit (5MB).";
+        }
+
+        // 3. 安全的文件保存路径 - 生成UUID避免文件名冲突和路径穿越
+        // 对原始文件名进行清理，防止意外字符，但主要还是依靠UUID保障安全
+        String safeOriginalFilename  = Paths.get(originalFilename).getFileName().toString();
+        String uniqueFileName = UUID.randomUUID().toString() + "_" + safeOriginalFilename;
+        Path uploadPath = Paths.get(UPLOAD_DIR);
+        Path filepath = uploadPath.resolve(uniqueFileName);
+
+        try {
+            Files.createDirectories(uploadPath); // 确保目录存在
+            file.transferTo(filepath); // 安全地保存文件
+
+            // 4. 对文件内容进行安全扫描 (此处仅为占位符，实际需集成安全扫描服务)
+            // scanFileForMaliciousContent(filepath);
+
+            return "Upload successful: " + uniqueFileName;
+        } catch (IOException e) {
+            return "Upload failed: Could not save file. " + e.getMessage();
+        }
+    }
+    
+    // 示例：不触发规则的其他文件操作，不涉及InputStream到保存操作
+    public String deleteFile(String fileName) {
+        // ... 删除文件的逻辑，不涉及敏感操作
+        return "File deleted: " + fileName;
+    }
+}
+
+CODE
+	"safefile://ImageUploadService.java": <<<CODE
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.UUID;
+
+@Service
+public class ImageUploadService {
+
+    private static final String IMAGE_UPLOAD_DIR = "/var/images/"; // 图片文件专用存储目录
+
+    public boolean uploadImage(MultipartFile file) throws IOException {
+        if (file.isEmpty()) {
+            return false;
+        }
+
+        // 1. 严格校验文件MIME类型
+        String contentType = file.getContentType();
+        if (contentType == null || !(contentType.equals("image/jpeg") || contentType.equals("image/png") || contentType.equals("image/gif"))) {
+            throw new IllegalArgumentException("Invalid image type: " + contentType);
+        }
+
+        // 2. 检查是否真的是图片文件（通过尝试读取图片）
+        try (var is = file.getInputStream()) {
+            BufferedImage image = ImageIO.read(is);
+            if (image == null) {
+                throw new IllegalArgumentException("File is not a valid image.");
+            } 
+            is.reset(); // 重置输入流以便后续写入文件
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Failed to read image content.", e);
+        }
+
+        // 3. 生成安全文件名并保存到指定目录
+        String uniqueFileName = UUID.randomUUID().toString() + "." + contentType.substring(contentType.indexOf('/') + 1);
+        Path targetLocation = Paths.get(IMAGE_UPLOAD_DIR).resolve(uniqueFileName);
+        Files.createDirectories(targetLocation.getParent());
+
+        // 使用Files.copy而非transferTo，更能控制IO过程
+        Files.copy(file.getInputStream(), targetLocation);
+        return true;
+    }
+}
+
+CODE
 )

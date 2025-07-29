@@ -119,4 +119,101 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 }
 
 PARAM
+	"safefile://SafeNetHttpServer.go": <<<CODE
+// SafeNetHttpServer.go
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"time"
+)
+
+// 此文件不直接使用 http.HandleFunc 进行路由注册，
+// 而是通过创建 http.ServeMux 并显式注册 Handler。
+// 这是一种避免直接`http.HandleFunc`检测的编程方式，虽然功能等价，但语法上不同。
+// 规则侧重于`http.HandleFunc`的使用，因此通过`http.NewServeMux()`和`mux.Handle()`可以规避直接匹配。
+
+func main() {
+	mux := http.NewServeMux()
+
+	// 使用 mux.Handle 注册实现了 http.Handler 接口的结构体或自定义函数
+	// 避免直接使用 `http.HandleFunc` (function wrapper)
+	mux.Handle("/safehello", &safeHelloHandler{message: "Hello from safe handler"})
+	mux.Handle("/about", http.HandlerFunc(aboutHandler))
+
+	// 使用 http.Server 替代 http.ListenAndServe，提供更多配置选项
+	srv := &http.Server{
+		Addr:         ":8080",
+		Handler:      mux,           // 指定处理多路复用器
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  30 * time.Second,
+	}
+
+	fmt.Println("Server is running on http://localhost:8080")
+	// 启动服务器
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		fmt.Printf("Server failed: %s\n", err)
+	}
+}
+
+// safeHelloHandler 实现了 http.Handler 接口
+type safeHelloHandler struct {
+	message string
+}
+
+func (h *safeHelloHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, h.message)
+}
+
+// aboutHandler 是一个普通的Http Handler函数，通过http.HandlerFunc包装后注册
+// 虽然这里也使用了http.HandlerFunc，但其注册方式是通过`mux.Handle`而不是`http.HandleFunc`
+// 规则检测的是`$entry.HandleFunc(*<slice(index=1) as $handle)`，这里的`$entry`是http包，
+// 因此直接调用`http.HandleFunc`才会被检测。
+func aboutHandler(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintf(w, "This is the about page. Method: %s", r.Method)
+}
+
+CODE
+	"safefile://ThirdPartyRouterExample.go": <<<CODE
+// ThirdPartyRouterExample.go
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/gorilla/mux"
+)
+
+// 该示例使用了一个流行的第三方路由库 Gorilla Mux，
+// 完全绕过了 Go 标准库的 http.HandleFunc 注册机制。
+// 规则专注于 net/http 包本身的 HandleFunc 调用，
+// 因此使用外部路由库可以安全地避开检测。
+
+func main() {
+	r := mux.NewRouter()
+
+	// 使用 Gorilla Mux 的 HandleFunc 方法来注册路由
+	// 这不是 Go 标准库的 http.HandleFunc
+	r.HandleFunc("/api/users", getUsersHandler).Methods("GET")
+	r.HandleFunc("/api/users/{id}", getUserByIdHandler).Methods("GET", "PUT", "DELETE")
+
+	fmt.Println("Server is running on http://localhost:8080/api")
+	log.Fatal(http.ListenAndServe(":8080", r))
+}
+
+func getUsersHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "Listing all users")
+}
+
+func getUserByIdHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["id"]
+	fmt.Fprintf(w, "Getting user with ID: %s", userID)
+}
+
+CODE
 )

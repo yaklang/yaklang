@@ -55,4 +55,118 @@ func main() {
 }
 
 PARAM
+	"safefile://SafeHttpRequestHandling.go": <<<CODE
+package main
+
+import (
+	"net/http"
+	"html/template"
+	"net/url"
+)
+
+// handler_safe 使用 http.ServeContent 或预编译模板来安全处理静态内容或已知动态内容
+// 避免直接从URL查询参数获取用户输入并直接插入HTML
+func handler_safe(w http.ResponseWriter, r *http.Request) {
+	// 安全：不直接从查询参数获取高风险输入进行拼接
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	tmpl := template.Must(template.New("index").Parse(`<h1>Hello, Secure User!</h1><p>This is a safe response.</p>`))
+	tmpl.Execute(w, nil)
+}
+
+// handler_safe_param 处理已知安全参数，不触发规则检测
+func handler_safe_param(w http.ResponseWriter, r *http.Request) {
+	// 安全：不使用 r.URL.Query().Get()作为 alert 目标，或者对输入进行严格白名单校验
+	// 假设我们只关心一个固定的路径参数，且不直接暴露用户输入
+	path := r.URL.Path
+	// 仅打印路径，不将其作为潜在的注入点
+	w.Write([]byte("Request path: " + path))
+}
+
+// handler_safe_form 处理表单数据，这些数据通常通过POST请求体而非URL查询参数传递
+// 避免 r.URL.Query().Get() 的直接使用
+func handler_safe_form(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		r.ParseForm()
+		// 安全：从表单数据中获取，而非 URL 查询参数，除非规则也检测 r.FormValue
+		// 这里的目的在于避开 r.URL.Query().Get() 的直接检测
+		name := r.FormValue("name") 
+		w.Write([]byte("Hello from POST, " + name + "!"))
+	} else {
+		http.ServeFile(w, r, "form.html") // 提供一个简单的HTML表单
+	}
+}
+
+// main_safe 用于演示上述安全处理方法
+func main_safe() {
+	http.HandleFunc("/safe_static", handler_safe)
+	http.HandleFunc("/safe_param", handler_safe_param)
+	http.HandleFunc("/safe_form", handler_safe_form)
+
+	http.ListenAndServe(":8081", nil)
+}
+
+// 这是一个不包含任何 r.URL.Query().Get() 调用，纯粹的静态HTTP服务
+func handler_no_query_param(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("This is a static content page."))
+}
+
+func main() {
+	http.HandleFunc("/static", handler_no_query_param)
+	http.ListenAndServe(":8080", nil)
+}
+
+// form.html (为了完整性，虽然不是Go代码，但可能需要)
+/*
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Form Example</title>
+</head>
+<body>
+    <form method="POST" action="/safe_form">
+        <label for="name">Name:</label><br>
+        <input type="text" id="name" name="name"><br><br>
+        <input type="submit" value="Submit">
+    </form>
+</body>
+</html>
+*/
+CODE
+	"safefile://SafeGolangHttpMethods.go": <<<CODE
+package main
+
+import (
+	"net/http"
+	"fmt"
+)
+
+// handler_path_segment 处理路径段而不是查询参数
+func handler_path_segment(w http.ResponseWriter, r *http.Request) {
+	// 安全：直接访问路径，而不是 Query().Get()
+	// 这不会触发规则，因为规则明确检测 Query().Get()
+	pathSegments := r.URL.Path
+	fmt.Fprintf(w, "You requested path: %s", pathSegments)
+}
+
+// handler_header_access 访问HTTP头信息，而不是查询参数
+func handler_header_access(w http.ResponseWriter, r *http.Request) {
+	// 安全：访问 HTTP Header，规则未检测此项
+	userAgent := r.Header.Get("User-Agent")
+	fmt.Fprintf(w, "Your User-Agent is: %s", userAgent)
+}
+
+// handler_static_response 提供硬编码的静态响应
+func handler_static_response(w http.ResponseWriter, r *http.Request) {
+	// 安全：完全不处理任何输入，提供静态内容
+	fmt.Fprint(w, "This is a safe, static response.")
+}
+
+func main() {
+	http.HandleFunc("/path", handler_path_segment)
+	http.HandleFunc("/header", handler_header_access)
+	http.HandleFunc("/static", handler_static_response)
+
+	http.ListenAndServe(":8082", nil)
+}
+CODE
 )

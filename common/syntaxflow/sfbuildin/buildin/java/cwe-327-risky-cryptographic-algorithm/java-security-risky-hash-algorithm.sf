@@ -161,4 +161,137 @@ desc(
 
      }
 EOF
+	"safefile://SafeHashExample.java": <<<CODE
+// 导入必要的安全API
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
+
+public class SafeHashExample {
+
+    /**
+     * 使用安全的SHA-256算法对输入字符串进行哈希。
+     * 这是推荐的哈希算法之一，用于确保数据的完整性或安全的密码存储。
+     * @param input 需要哈希的字符串
+     * @return 哈希后的Base64编码字符串
+     * @throws NoSuchAlgorithmException 如果JCA提供者不支持SHA-256算法
+     */
+    public static String hashWithSHA256(String input) throws NoSuchAlgorithmException {
+        // 使用GetInstanve()方法初始化一个MessageDigest实例
+        // 指定“SHA-256”，这是一个被认为是安全的哈希算法
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] hashedBytes = digest.digest(input.getBytes());
+        // 将字节数组转换为Base64编码的字符串以便于存储和传输
+        return Base64.getEncoder().encodeToString(hashedBytes);
+    }
+
+    /**
+     * 使用推荐的SHA-512算法进行哈希计算。
+     * SHA-512提供了比SHA-256更长的哈希输出，进一步增强了安全性。
+     * @param input 需要哈希的字符串
+     * @return 哈希后的Base64编码字符串
+     * @throws NoSuchAlgorithmException 如果JCA提供者不支持SHA-512算法
+     */
+    public static String hashWithSHA512(String input) throws NoSuchAlgorithmException {
+        // 使用“SHA-512”，提供更强的碰撞抵抗能力
+        MessageDigest digest = MessageDigest.getInstance("SHA-512");
+        byte[] hashedBytes = digest.digest(input.getBytes());
+        return Base64.getEncoder().encodeToString(hashedBytes);
+    }
+
+    /**
+     * 这是一个使用安全哈希算法并结合“盐值（salt）”和“迭代（iterations）”进行密码存储的示例。
+     * 这种方法可以有效抵御彩虹表攻击和暴力破解。
+     * @param password 明文密码
+     * @param salt 随机生成的盐值
+     * @param iterations 哈希迭代次数
+     * @return 哈希后的Base64编码密码
+     * @throws NoSuchAlgorithmException 如果算法不可用
+     */
+    public static String hashPasswordWithSaltAndIterations(String password, byte[] salt, int iterations) throws NoSuchAlgorithmException {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        digest.reset();
+        digest.update(salt);
+        // 首次哈希
+        byte[] hashedBytes = digest.digest(password.getBytes());
+        // 执行多次哈希迭代
+        for (int i = 0; i < iterations; i++) {
+            digest.reset();
+            hashedBytes = digest.digest(hashedBytes);
+        }
+        return Base64.getEncoder().encodeToString(hashedBytes);
+    }
+
+    public static void main(String[] args) {
+        try {
+            String data = "This is a secret message.";
+            System.out.println("SHA-256 Hash: " + hashWithSHA256(data));
+            System.out.println("SHA-512 Hash: " + hashWithSHA512(data));
+
+            String password = "mySecretPassword123";
+            // 模拟生成随机盐值
+            byte[] salt = new byte[16];
+            new java.security.SecureRandom().nextBytes(salt);
+            int iterations = 10000; // 设置足够高的迭代次数
+            System.out.println("Password Hash with Salt & Iterations (SHA-256): " + hashPasswordWithSaltAndIterations(password, salt, iterations));
+
+        } catch (NoSuchAlgorithmException e) {
+            System.err.println("Error: " + e.getMessage() + ". Please ensure the JCA provider supports the algorithms.");
+        }
+    }
+}
+CODE
+	"safefile://SafeHashEnum.java": <<<CODE
+// 导入必要的安全API
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
+
+public class SafeHashEnum {
+
+    // 定义一个枚举来管理安全的哈希算法，避免直接使用字符串
+    public enum SecureHashAlgorithm {
+        SHA256("SHA-256"),
+        SHA384("SHA-384"),
+        SHA512("SHA-512");
+
+        private final String algorithmName;
+
+        SecureHashAlgorithm(String algorithmName) {
+            this.algorithmName = algorithmName;
+        }
+
+        public String getAlgorithmName() {
+            return algorithmName;
+        }
+    }
+
+    /**
+     * 封装哈希逻辑，只接受安全的算法枚举。
+     * @param algorithm SecureHashAlgorithm 枚举值
+     * @param input 需要哈希的字符串
+     * @return 哈希后的Base64编码字符串
+     * @throws NoSuchAlgorithmException 如果算法名称无效（尽管这里通过枚举确保了有效性）
+     */
+    public static String generateHash(SecureHashAlgorithm algorithm, String input) throws NoSuchAlgorithmException {
+        // 从枚举中获取算法名称
+        MessageDigest digest = MessageDigest.getInstance(algorithm.getAlgorithmName());
+        byte[] hashedBytes = digest.digest(input.getBytes());
+        return Base64.getEncoder().encodeToString(hashedBytes);
+    }
+
+    public static void main(String[] args) {
+        try {
+            String data = "Yet another secure data string.";
+
+            // 通过枚举调用安全的哈希算法
+            System.out.println("SHA-384 Hash: " + generateHash(SecureHashAlgorithm.SHA384, data));
+            System.out.println("SHA-512 Hash (from enum): " + generateHash(SecureHashAlgorithm.SHA512, data));
+
+        } catch (NoSuchAlgorithmException e) {
+            System.err.println("Error: " + e.getMessage() + ". Ensure algorithms are supported.");
+        }
+    }
+}
+CODE
 )

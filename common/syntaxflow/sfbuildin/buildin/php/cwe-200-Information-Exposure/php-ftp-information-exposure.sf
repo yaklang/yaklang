@@ -143,4 +143,80 @@ desc(
     echo "System type: " . ftp_systype($conn);
 ?>
 TEXT
+	"safefile://SecureFtpLogging.php": <<<CODE
+<?php
+    // 场景1: 将FTP操作信息记录到日志文件，不直接输出到用户前端
+    $ftp_server = 'ftp.example.com';
+    $ftp_user = 'user';
+    $ftp_pass = 'password';
+
+    $conn_id = ftp_connect($ftp_server);
+    if ($conn_id && ftp_login($conn_id, $ftp_user, $ftp_pass)) {
+        // 获取当前工作目录，仅用于内部处理，不输出给用户
+        $current_dir = ftp_pwd($conn_id);
+        error_log("FTP Current Directory: " . $current_dir); // 通过日志记录，而不是echo
+
+        // 列出服务器文件列表，仅用于内部处理，不输出给用户
+        $files = ftp_nlist($conn_id, ".");
+        if ($files) {
+            error_log("FTP Files listed: " . implode(", ", $files)); // 记录到日志
+        }
+
+        // 获取服务器类型，仅用于内部处理，不输出给用户
+        $system_type = ftp_systype($conn_id);
+        error_log("FTP System Type: " . $system_type); // 记录到日志
+
+        echo "FTP operation completed successfully."; // 只输出非敏感的业务成功信息
+
+        ftp_close($conn_id);
+    } else {
+        error_log("FTP connection or authentication failed."); // 错误信息记录到日志
+        echo "FTP operation failed. Please contact administrator."; // 统一错误提示
+    }
+?>
+CODE
+	"safefile://SFtpPreferred.php": <<<CODE
+<?php
+    // 场景2: 优先使用SFTP或FTPS等安全协议进行文件传输，而非传统FTP
+    // 本示例为SFTP连接
+    $sftp_host = 'sftp.example.com';
+    $sftp_port = 22;
+    $sftp_user = 'user';
+    $sftp_pwd = 'password';
+
+    try {
+        $connection = ssh2_connect($sftp_host, $sftp_port);
+        if (!$connection) {
+            throw new Exception('Could not connect to SFTP server.');
+        }
+
+        if (!ssh2_auth_password($connection, $sftp_user, $sftp_pwd)) {
+            throw new Exception('SFTP authentication failed.');
+        }
+
+        $sftp = ssh2_sftp($connection);
+        if (!$sftp) {
+            throw new Exception('Could not initialize SFTP subsystem.');
+        }
+
+        // SFTP操作，如果需要获取目录或文件信息，进行严格的权限控制和输出过滤
+        // 例如，只获取文件名列表，不直接暴露完整路径
+        $dir_handle = opendir("ssh2.sftp://{$sftp}/remote/path");
+        if ($dir_handle) {
+            echo "Files in remote path:\n";
+            while (false !== ($file = readdir($dir_handle))) {
+                if ($file != "." && $file != "..") {
+                    echo htmlspecialchars($file) . "\n"; // 对输出进行HTML实体编码，防止XSS
+                }
+            }
+            closedir($dir_handle);
+        }
+        echo "SFTP operation successful.";
+
+    } catch (Exception $e) {
+        error_log("SFTP Error: " . $e->getMessage());
+        echo "SFTP operation failed. Reason: " . htmlspecialchars($e->getMessage()); // 错误信息也应处理
+    }
+?>
+CODE
 )

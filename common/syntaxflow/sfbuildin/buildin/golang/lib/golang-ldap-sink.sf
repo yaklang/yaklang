@@ -182,4 +182,66 @@ func authenticate(username, password string) bool {
 }
 
 PARAM
+	"safefile://SafeNoLdapDialExample.go": <<<CODE
+// SafeNoLdapDialExample.go
+package main
+
+import (
+	"fmt"
+)
+
+func main() {
+	fmt.Println("This Go application does not import or use any LDAP libraries.")
+	fmt.Println("Therefore, it does not call any Dial() methods from common LDAP packages.")
+}
+
+// 场景一：完全不使用LDAP库
+// 这种方式直接避免了所有LDAP相关的检测点，是最直接的反向测试用例。
+// 代码不引入 'gopkg.in/ldap.v2', 'github.com/nmcclain/ldap' 或 'github.com/go-ldap/ldap' 任何一个包，
+// 自然也就不会调用它们的 Dial () 方法。
+
+CODE
+	"safefile://SafeCustomNetDialer.go": <<<CODE
+// SafeCustomNetDialer.go
+package main
+
+import (
+	"net"
+	"log"
+	"time"
+)
+
+// 场景二：使用Go标准库的net.Dialer进行网络连接，不涉及LDAP协议
+// 规则特异性地检测是几个特定LDAP库的Dial()方法。
+// 而这里使用的是Go标准库 `net` 包的 `Dialer`，它返回的是一个 `net.Conn` 接口，
+// 不会与规则中匹配的 `$entry.Dial()` (其中 $entry 是特定的LDAP包类型) 模式冲突。
+func main() {
+	// 使用Go标准库的net.Dial，而不是LDAP库的Dial
+	conn, err := net.DialTimeout("tcp", "example.com:80", 5*time.Second)
+	if err != nil {
+		log.Printf("Failed to connect: %v\n", err)
+		return
+	}
+	defer conn.Close()
+
+	fmt.Printf("Successfully connected to %s\n", conn.RemoteAddr().String())
+	// 进行一些非LDAP相关的网络通信
+
+	// 或者使用更底层的net.Dialer
+	dialer := &net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+
+	conn2, err := dialer.Dial("tcp", "another.example.com:443")
+	if err != nil {
+		log.Printf("Failed to connect with Dialer: %v\n", err)
+		return
+	}
+	defer conn2.Close()
+	fmt.Printf("Successfully connected to %s using Dialer\n", conn2.RemoteAddr().String())
+}
+
+
+CODE
 )

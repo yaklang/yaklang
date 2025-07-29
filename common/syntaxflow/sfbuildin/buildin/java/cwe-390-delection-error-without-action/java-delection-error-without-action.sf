@@ -351,6 +351,166 @@ class SocketHookUtils {
     }
 }
 CODE
+	"safefile://SafeExceptionHandling.java": <<<CODE
+import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+public class SafeExceptionHandling {
+    private static final Logger logger = Logger.getLogger(SafeExceptionHandling.class.getName());
+
+    public void performOperationSafe() {
+        try {
+            // 模拟一个可能抛出异常的操作
+            int result = 10 / 0; // 这会抛出ArithmeticException
+            System.out.println("Result: " + result);
+        } catch (ArithmeticException e) {
+            // 捕获特定异常并记录详细信息
+            logger.log(Level.SEVERE, "Arithmetic error occurred during division:", e);
+            // 可以选择进行一些恢复操作，或者向上层抛出新异常
+            // throw new CustomAppException("Failed to perform arithmetic operation", e);
+        } catch (Exception e) {
+            // 捕获更广泛的异常，作为最后的处理，并记录
+            logger.log(Level.SEVERE, "An unexpected error occurred:", e);
+            // 同样，可以执行恢复或告知用户
+        }
+    }
+
+    public void fileReadExample(String filePath) throws IOException {
+        try {
+            // 尝试读取文件，可能抛出IOException
+            java.io.FileInputStream fis = new java.io.FileInputStream(filePath);
+            fis.close();
+        } catch (IOException e) {
+            // 记录异常并重新抛出，让调用者处理
+            logger.log(Level.WARNING, "Error reading file: " + filePath, e);
+            throw e; // 将异常向上层抛出
+        }
+    }
+
+    static class SocketHookUtils {
+        static java.lang.reflect.Method findMethod(Class<?> clazz, String findName, Class<?>[] args) {
+            while (clazz != null) {
+                try {
+                    java.lang.reflect.Method method = clazz.getDeclaredMethod(findName, args);
+                    method.setAccessible(true);
+                    return method;
+                } catch (NoSuchMethodException e) {
+                    // 记录异常信息，而不是忽略
+                    Logger.getLogger(SocketHookUtils.class.getName()).log(Level.WARNING, "Method not found: " + findName + " in class " + clazz.getName(), e);
+                    clazz = clazz.getSuperclass(); // 继续向上查找
+                }
+            }
+            return null;
+        }
+    }
+
+    public static void main(String[] args) {
+        SafeExceptionHandling safeHandler = new SafeExceptionHandling();
+        safeHandler.performOperationSafe();
+
+        try {
+            safeHandler.fileReadExample("nonexistent_file.txt");
+        } catch (IOException e) {
+            System.out.println("Caught IOException in main: " + e.getMessage());
+        }
+
+        // 示例：使用finally块确保资源关闭
+        java.io.BufferedReader reader = null;
+        try {
+            reader = new java.io.BufferedReader(new java.io.FileReader("some_file.txt"));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                System.out.println(line);
+            }
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, "Error reading file in finally example:", e);
+        } finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (IOException e) {
+                    logger.log(Level.SEVERE, "Error closing reader:", e); // 即使在finally中也处理异常
+                }
+            }
+        }
+    }
+}
+CODE
+	"safefile://NoEmptyCatchLogAndThrow.java": <<<CODE
+import java.io.IOException;
+import java.net.Socket;
+import java.net.SocketException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+public class NoEmptyCatchLogAndThrow {
+
+    private static final Logger LOGGER = Logger.getLogger(NoEmptyCatchLogAndThrow.class.getName());
+
+    public static void startHook() throws IOException {
+        try {
+            // 模拟设置Socket工厂的操作
+            // Socket.setSocketImplFactory(new SocketHookFactory());
+            throw new SocketException("Simulated Socket Exception");
+        } catch (SocketException e) {
+            // 捕获SocketException，记录详细日志并重新抛出
+            LOGGER.log(Level.SEVERE, "Failed to set SocketImplFactory due to SocketException", e);
+            throw e; // 将原始异常重新抛出
+        } catch (IOException e) {
+            // 捕获更通用的IOException，记录并封装为自定义异常抛出
+            LOGGER.log(Level.SEVERE, "An I/O error occurred during socket operation", e);
+            throw new RuntimeException("Critical I/O Failure", e); // 封装为运行时异常抛出
+        }
+    }
+
+    public static void processData() throws MyBusinessException {
+        try {
+            // 模拟一些数据处理，可能抛出异常
+            if (System.currentTimeMillis() % 2 == 0) {
+                throw new IllegalArgumentException("Invalid input data");
+            }
+            System.out.println("Data processed successfully.");
+        } catch (IllegalArgumentException e) {
+            LOGGER.log(Level.WARNING, "Invalid argument for data processing", e);
+            // 可以选择恢复，或者转换为业务异常
+            throw new MyBusinessException("Input validation failed", e);
+        } catch (Exception e) {
+            // 捕获所有未处理的异常，记录并转化为业务异常
+            LOGGER.log(Level.SEVERE, "An unexpected error occurred during data processing", e);
+            throw new MyBusinessException("General processing error", e);
+        }
+    }
+
+    public static void main(String[] args) {
+        try {
+            startHook();
+        } catch (IOException e) {
+            System.out.println("Caught IOException in main: " + e.getMessage());
+        }
+
+        try {
+            processData();
+        } catch (MyBusinessException e) {
+            System.out.println("Caught MyBusinessException in main: " + e.getMessage());
+            if (e.getCause() != null) {
+                System.out.println("  Caused by: " + e.getCause().getClass().getSimpleName() + ": " + e.getCause().getMessage());
+            }
+        }
+    }
+}
+
+// 自定义业务异常类
+class MyBusinessException extends Exception {
+    public MyBusinessException(String message) {
+        super(message);
+    }
+
+    public MyBusinessException(String message, Throwable cause) {
+        super(message, cause);
+    }
+}
+CODE
 )
 
 desc(
@@ -368,6 +528,166 @@ public class SocketHook {
             Socket.setSocketImplFactory(new SocketHookFactory());
         }catch (SocketException ignored){
         }
+    }
+}
+CODE
+	"safefile://SafeExceptionHandling.java": <<<CODE
+import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+public class SafeExceptionHandling {
+    private static final Logger logger = Logger.getLogger(SafeExceptionHandling.class.getName());
+
+    public void performOperationSafe() {
+        try {
+            // 模拟一个可能抛出异常的操作
+            int result = 10 / 0; // 这会抛出ArithmeticException
+            System.out.println("Result: " + result);
+        } catch (ArithmeticException e) {
+            // 捕获特定异常并记录详细信息
+            logger.log(Level.SEVERE, "Arithmetic error occurred during division:", e);
+            // 可以选择进行一些恢复操作，或者向上层抛出新异常
+            // throw new CustomAppException("Failed to perform arithmetic operation", e);
+        } catch (Exception e) {
+            // 捕获更广泛的异常，作为最后的处理，并记录
+            logger.log(Level.SEVERE, "An unexpected error occurred:", e);
+            // 同样，可以执行恢复或告知用户
+        }
+    }
+
+    public void fileReadExample(String filePath) throws IOException {
+        try {
+            // 尝试读取文件，可能抛出IOException
+            java.io.FileInputStream fis = new java.io.FileInputStream(filePath);
+            fis.close();
+        } catch (IOException e) {
+            // 记录异常并重新抛出，让调用者处理
+            logger.log(Level.WARNING, "Error reading file: " + filePath, e);
+            throw e; // 将异常向上层抛出
+        }
+    }
+
+    static class SocketHookUtils {
+        static java.lang.reflect.Method findMethod(Class<?> clazz, String findName, Class<?>[] args) {
+            while (clazz != null) {
+                try {
+                    java.lang.reflect.Method method = clazz.getDeclaredMethod(findName, args);
+                    method.setAccessible(true);
+                    return method;
+                } catch (NoSuchMethodException e) {
+                    // 记录异常信息，而不是忽略
+                    Logger.getLogger(SocketHookUtils.class.getName()).log(Level.WARNING, "Method not found: " + findName + " in class " + clazz.getName(), e);
+                    clazz = clazz.getSuperclass(); // 继续向上查找
+                }
+            }
+            return null;
+        }
+    }
+
+    public static void main(String[] args) {
+        SafeExceptionHandling safeHandler = new SafeExceptionHandling();
+        safeHandler.performOperationSafe();
+
+        try {
+            safeHandler.fileReadExample("nonexistent_file.txt");
+        } catch (IOException e) {
+            System.out.println("Caught IOException in main: " + e.getMessage());
+        }
+
+        // 示例：使用finally块确保资源关闭
+        java.io.BufferedReader reader = null;
+        try {
+            reader = new java.io.BufferedReader(new java.io.FileReader("some_file.txt"));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                System.out.println(line);
+            }
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, "Error reading file in finally example:", e);
+        } finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (IOException e) {
+                    logger.log(Level.SEVERE, "Error closing reader:", e); // 即使在finally中也处理异常
+                }
+            }
+        }
+    }
+}
+CODE
+	"safefile://NoEmptyCatchLogAndThrow.java": <<<CODE
+import java.io.IOException;
+import java.net.Socket;
+import java.net.SocketException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+public class NoEmptyCatchLogAndThrow {
+
+    private static final Logger LOGGER = Logger.getLogger(NoEmptyCatchLogAndThrow.class.getName());
+
+    public static void startHook() throws IOException {
+        try {
+            // 模拟设置Socket工厂的操作
+            // Socket.setSocketImplFactory(new SocketHookFactory());
+            throw new SocketException("Simulated Socket Exception");
+        } catch (SocketException e) {
+            // 捕获SocketException，记录详细日志并重新抛出
+            LOGGER.log(Level.SEVERE, "Failed to set SocketImplFactory due to SocketException", e);
+            throw e; // 将原始异常重新抛出
+        } catch (IOException e) {
+            // 捕获更通用的IOException，记录并封装为自定义异常抛出
+            LOGGER.log(Level.SEVERE, "An I/O error occurred during socket operation", e);
+            throw new RuntimeException("Critical I/O Failure", e); // 封装为运行时异常抛出
+        }
+    }
+
+    public static void processData() throws MyBusinessException {
+        try {
+            // 模拟一些数据处理，可能抛出异常
+            if (System.currentTimeMillis() % 2 == 0) {
+                throw new IllegalArgumentException("Invalid input data");
+            }
+            System.out.println("Data processed successfully.");
+        } catch (IllegalArgumentException e) {
+            LOGGER.log(Level.WARNING, "Invalid argument for data processing", e);
+            // 可以选择恢复，或者转换为业务异常
+            throw new MyBusinessException("Input validation failed", e);
+        } catch (Exception e) {
+            // 捕获所有未处理的异常，记录并转化为业务异常
+            LOGGER.log(Level.SEVERE, "An unexpected error occurred during data processing", e);
+            throw new MyBusinessException("General processing error", e);
+        }
+    }
+
+    public static void main(String[] args) {
+        try {
+            startHook();
+        } catch (IOException e) {
+            System.out.println("Caught IOException in main: " + e.getMessage());
+        }
+
+        try {
+            processData();
+        } catch (MyBusinessException e) {
+            System.out.println("Caught MyBusinessException in main: " + e.getMessage());
+            if (e.getCause() != null) {
+                System.out.println("  Caused by: " + e.getCause().getClass().getSimpleName() + ": " + e.getCause().getMessage());
+            }
+        }
+    }
+}
+
+// 自定义业务异常类
+class MyBusinessException extends Exception {
+    public MyBusinessException(String message) {
+        super(message);
+    }
+
+    public MyBusinessException(String message, Throwable cause) {
+        super(message, cause);
     }
 }
 CODE

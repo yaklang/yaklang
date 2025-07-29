@@ -124,4 +124,69 @@ func readFromFile(filename string) {
     }
 }
 PARAM
+	"safefile://SafeFileReadOs.go": <<<CODE
+// 使用 os.ReadFile 函数进行文件读取，避免直接使用 bufio.NewReader
+// os.ReadFile 是 Go 标准库提供的安全便捷的文件读取方式，不需要手动创建带缓冲的读取器。
+// 规则主要检测 bufio.NewReader 的调用，因此使用 os.ReadFile 可以有效规避。
+package main
+
+import (
+	"fmt"
+	"os"
+)
+
+func main() {
+	// 创建一个测试文件
+	err := os.WriteFile("test_safe_os_read.txt", []byte("Hello from os.ReadFile!"), 0644)
+	if err != nil {
+		fmt.Println("Error creating test file:", err)
+		return
+	}
+
+	// 安全：使用 os.ReadFile 进行文件读取
+	data, err := os.ReadFile("test_safe_os_read.txt")
+	if err != nil {
+		fmt.Println("Error reading file:", err)
+		return
+	}
+	fmt.Printf("Content read securely with os.ReadFile:\n%s\n", data)
+
+	// 清理测试文件
+	os.Remove("test_safe_os_read.txt")
+}
+
+CODE
+	"safefile://SafeFileReadIoutil.go": <<<CODE
+// 使用 ioutil.ReadFile 函数进行文件读取（在 Go 1.16+ 中，ioutil 多数功能已迁移到 os 包）。
+// 即使在 Go 1.16+，为了向后兼容，ioutil.ReadFile 仍然存在且可用，它不直接实例化 bufio.NewReader。
+// 此示例旨在展示另一种不触发规则的内置安全读取方式。
+package main
+
+import (
+	"fmt"
+	"io/ioutil" // 在 Go 1.16+ 中，通常推荐使用 os.ReadFile
+	"os"
+)
+
+func main() {
+	// 创建一个测试文件
+	err := os.WriteFile("test_safe_ioutil_read.txt", []byte("Hello from ioutil.ReadFile!"), 0644)
+	if err != nil {
+		fmt.Println("Error creating test file:", err)
+		return
+	}
+
+	// 安全：使用 ioutil.ReadFile 进行文件读取
+	data, err := ioutil.ReadFile("test_safe_ioutil_read.txt")
+	if err != nil {
+		fmt.Println("Error reading file:", err)
+		return
+	}
+	fmt.Printf("Content read securely with ioutil.ReadFile:\n%s\n", data)
+
+	// 清理测试文件
+	os.Remove("test_safe_ioutil_read.txt")
+}
+
+CODE
 )

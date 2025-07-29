@@ -104,4 +104,47 @@ func main() {
 }
 
 PARAM
+	"safefile://SafeUsageNoFtp.go": <<<CODE
+// SafeUsageNoFtp.go
+package main
+
+import (
+	"fmt"
+)
+
+func main() {
+	// 此代码不使用github.com/jlaffaye/ftp库，因此不会触发FTP相关的规则告警。
+	fmt.Println("This is a safe program that does not interact with FTP.")
+}
+CODE
+	"safefile://SafeUsageOtherLibrary.go": <<<CODE
+// SafeUsageOtherLibrary.go
+package main
+
+import (
+	"fmt"
+	"github.com/dutchcoders/goftp"
+	"time"
+)
+
+func main() {
+	// 使用其他FTP库（例如github.com/dutchcoders/goftp）而不是github.com/jlaffaye/ftp，
+	// 避免触发针对特定库的规则。
+
+	config := goftp.Config{
+		User:     "username",
+		Password: "password",
+		Timeout:  5 * time.Second,
+	}
+
+	client, err := goftp.Dial("ftp.example.com:21", &config)
+	if err != nil {
+		fmt.Println("Failed to connect using goftp:", err)
+		return
+	}
+	defer client.Close()
+
+	fmt.Println("Connected and logged in successfully using goftp")
+}
+CODE
 )

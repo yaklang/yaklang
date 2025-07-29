@@ -52,5 +52,45 @@ desc(
         }
     }
 EOF
+	"safefile://SafeStringOperation.java": <<<CODE
+// 该代码不包含任何名为'contain'或包含'contain'子串的方法调用。
+// 这是一个安全的字符串操作示例，不会触发规则告警。
+public class SafeStringOperation {
+    public static void main(String[] args) {
+        String text = "Hello, World!";
+        // 使用equals方法比较字符串，不含'contain'关键字
+        if (text.equals("Hello, World!")) {
+            System.out.println("String matches.");
+        }
+        // 使用indexOf方法查找子串，不含'contain'关键字
+        if (text.indexOf("World") != -1) {
+            System.out.println("Substring found.");
+        }
+    }
+}
+CODE
+	"safefile://NoContainMethod.java": <<<CODE
+// 此类中定义的方法名称都不包含'contain'字样，因此不会被规则匹配。
+public class NoContainMethod {
+
+    public boolean checkIfValid(String input) {
+        // 这是一个通用的验证方法，不涉及'contain'关键字
+        return input != null && input.length() > 0;
+    }
+
+    public String processData(byte[] data) {
+        // 这是一个数据处理方法，不包含'contain'关键字
+        return new String(data);
+    }
+
+    public static void main(String[] args) {
+        NoContainMethod obj = new NoContainMethod();
+        String testString = "sample data";
+        if (obj.checkIfValid(testString)) {
+            System.out.println("Input is valid.");
+        }
+    }
+}
+CODE
 )
 

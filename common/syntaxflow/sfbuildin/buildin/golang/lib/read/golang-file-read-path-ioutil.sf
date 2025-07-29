@@ -66,4 +66,67 @@ func main() {
 }
 
 PARAM
+	"safefile://SecureFileReader.go": <<<CODE
+package main
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+)
+
+func main() {
+	fileName := "safe_example.txt"
+	data := []byte("This is safe content.\n")
+
+	// 使用os包写入文件，这不是规则关注点，但完整示例需要
+	err := os.WriteFile(fileName, data, 0644)
+	if err != nil {
+		fmt.Printf("Error writing file: %v\n", err)
+		return
+	}
+
+	// 反向测试用例1: 使用os.ReadFile，这是推荐的安全做法，不会触发ioutil告警
+	content, err := os.ReadFile(fileName)
+	if err != nil {
+		fmt.Printf("Error reading file with os.ReadFile: %v\n", err)
+		return
+	}
+	fmt.Printf("Content read with os.ReadFile: %s\n", string(content))
+
+	// 反向测试用例2: 使用os.Open和io.ReadAll，绕过ioutil
+	f, err := os.Open(fileName)
+	if err != nil {
+		fmt.Printf("Error opening file with os.Open: %v\n", err)
+		return
+	}
+	defer f.Close()
+
+	// 创建一个字节切片来存储文件内容
+	fileContent := make([]byte, 1024)
+	n, err := f.Read(fileContent)
+	if err != nil && err.Error() != "EOF" {
+		fmt.Printf("Error reading file with f.Read: %v\n", err)
+		return
+	}
+	fmt.Printf("Content read with f.Read: %s\n", string(fileContent[:n]))
+
+	// 反向测试用例3: 从网络或其他安全源读取数据，不涉及文件系统
+	// 例如：从一个安全的API读取数据，与文件读取无关
+	// contentFromNetwork := "This is data from network API"
+	// fmt.Println(contentFromNetwork)
+
+	// 反向测试用例4: 使用filepath.Join构建绝对安全路径并使用os.ReadFile
+	safePath := filepath.Join("/tmp", "secure_data.txt")
+	os.WriteFile(safePath, []byte("Secure data here"), 0644)
+
+	secureContent, err := os.ReadFile(safePath)
+	if err != nil {
+		fmt.Printf("Error reading secure path with os.ReadFile: %v\n", err)
+		return	
+	}
+	fmt.Printf("Secure content read from %s: %s\n", safePath, string(secureContent))
+}
+
+CODE
 )

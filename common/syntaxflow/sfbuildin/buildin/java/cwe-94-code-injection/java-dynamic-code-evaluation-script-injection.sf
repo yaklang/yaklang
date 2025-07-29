@@ -129,6 +129,124 @@ desc(
         }
     }
 TEXT
+	"safefile://SafeMathCalculator.java": <<<CODE
+package org.example;
+
+public class SafeMathCalculator {
+
+    // 场景一：使用Java内置的API进行安全的数学计算，不涉及脚本引擎
+    // 此方法仅处理数字计算，不允许注入任何代码
+    public double calculateSum(double a, double b) {
+        return a + b;
+    }
+
+    // 场景二：处理固定、已知且安全的字符串，不接受用户输入作为执行代码
+    // 字符串内容是硬编码的，不可被外部篡改
+    public String getAppVersion() {
+        return "Application Version 1.0.0";
+    }
+
+    // 场景三：将用户输入作为数据，而非可执行代码，并进行严格的类型转换和验证
+    // 用户输入被视为普通的字符串数据，而非表达式，并转换为整数
+    public int processUserId(String userIdStr) {
+        try {
+            return Integer.parseInt(userIdStr);
+        } catch (NumberFormatException e) {
+            // 适当的错误处理，例如抛出异常或返回默认值
+            System.err.println("Invalid user ID format: " + userIdStr);
+            return -1;
+        }
+    }
+
+    // 场景四：如果必须处理表达式，使用专门的、安全的表达式解析库
+    // 例如，使用JEP (Java Expression Parser) 或 exp4j 等库，这些库通常更注重安全性
+    // 本示例仅为概念性说明，实际使用需要引入相应的库
+    /*
+    public double evaluateSecureExpression(String expression) {
+        // 假设这里使用了安全的表达式解析库，对输入进行严格校验
+        // ExpressionParser parser = new SafeExpressionParser();
+        // return parser.parse(expression);
+        return 0; // 占位符
+    }
+    */
+}
+CODE
+	"safefile://SecureScriptInvocation.java": <<<CODE
+package org.example;
+
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptEngine;
+import javax.script.ScriptException;
+import java.io.Reader;
+import java.io.StringReader;
+
+public class SecureScriptInvocation {
+
+    private static final String SAFE_FUNCTION = "function add(a, b) { return a + b; }";
+
+    // 场景一：执行硬编码的、已知安全的脚本代码，不接受任何用户输入参与脚本内容
+    // 脚本内容是固定的，不可被用户控制
+    public int performSafeOperation(int val1, int val2) {
+        ScriptEngineManager manager = new ScriptEngineManager();
+        ScriptEngine engine = manager.getEngineByName("JavaScript");
+        try {
+            // 预加载安全的函数
+            engine.eval(SAFE_FUNCTION);
+            // 调用预加载的安全函数，并传入参数作为数据
+            Object result = engine.eval("add(" + val1 + ", " + val2 + ");");
+            if (result instanceof Number) {
+                return ((Number) result).intValue();
+            }
+        } catch (ScriptException e) {
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+    // 场景二：从受信任的资源（如文件系统中的固定路径或classpath）加载脚本，而非用户输入
+    // 确保脚本来源可信且不可被篡改
+    public String executeTrustedScript() {
+        ScriptEngineManager manager = new ScriptEngineManager();
+        ScriptEngine engine = manager.getEngineByName("JavaScript");
+        try (
+            // 假设'trusted_script.js'是一个位于classpath或固定安全位置的脚本文件
+            // 实际应用中应使用ClassLoader或FileInputStream安全加载
+            Reader reader = new StringReader("var date = new Date(); date.getFullYear();")
+        ) {
+            Object result = engine.eval(reader);
+            return "Current year: " + result;
+        } catch (ScriptException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "Error";
+    }
+
+    // 场景三：如果用户输入作为数据传入脚本，而非脚本本身，且脚本逻辑是硬编码的
+    public String greetUserSecurely(String userName) {
+        ScriptEngineManager manager = new ScriptEngineManager();
+        ScriptEngine engine = manager.getEngineByName("JavaScript");
+        try {
+            // 将用户输入作为参数绑定到脚本上下文中，而不是直接拼接进脚本代码
+            engine.put("username", userName);
+            Object result = engine.eval("" +
+                    "function safeGreet() { " +
+                    "  if (username && username.length > 0) { " +
+                    "    return 'Hello, ' + username + '!'; " +
+                    "  } else { " +
+                    "    return 'Hello, Guest!'; " +
+                    "  } " +
+                    "}; " +
+                    "safeGreet();");
+            return result.toString();
+        } catch (ScriptException e) {
+            e.printStackTrace();
+        }
+        return "Error";
+    }
+}
+CODE
 )
 
 desc(
@@ -162,4 +280,122 @@ desc(
         }
     }
 TEXT
+	"safefile://SafeMathCalculator.java": <<<CODE
+package org.example;
+
+public class SafeMathCalculator {
+
+    // 场景一：使用Java内置的API进行安全的数学计算，不涉及脚本引擎
+    // 此方法仅处理数字计算，不允许注入任何代码
+    public double calculateSum(double a, double b) {
+        return a + b;
+    }
+
+    // 场景二：处理固定、已知且安全的字符串，不接受用户输入作为执行代码
+    // 字符串内容是硬编码的，不可被外部篡改
+    public String getAppVersion() {
+        return "Application Version 1.0.0";
+    }
+
+    // 场景三：将用户输入作为数据，而非可执行代码，并进行严格的类型转换和验证
+    // 用户输入被视为普通的字符串数据，而非表达式，并转换为整数
+    public int processUserId(String userIdStr) {
+        try {
+            return Integer.parseInt(userIdStr);
+        } catch (NumberFormatException e) {
+            // 适当的错误处理，例如抛出异常或返回默认值
+            System.err.println("Invalid user ID format: " + userIdStr);
+            return -1;
+        }
+    }
+
+    // 场景四：如果必须处理表达式，使用专门的、安全的表达式解析库
+    // 例如，使用JEP (Java Expression Parser) 或 exp4j 等库，这些库通常更注重安全性
+    // 本示例仅为概念性说明，实际使用需要引入相应的库
+    /*
+    public double evaluateSecureExpression(String expression) {
+        // 假设这里使用了安全的表达式解析库，对输入进行严格校验
+        // ExpressionParser parser = new SafeExpressionParser();
+        // return parser.parse(expression);
+        return 0; // 占位符
+    }
+    */
+}
+CODE
+	"safefile://SecureScriptInvocation.java": <<<CODE
+package org.example;
+
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptEngine;
+import javax.script.ScriptException;
+import java.io.Reader;
+import java.io.StringReader;
+
+public class SecureScriptInvocation {
+
+    private static final String SAFE_FUNCTION = "function add(a, b) { return a + b; }";
+
+    // 场景一：执行硬编码的、已知安全的脚本代码，不接受任何用户输入参与脚本内容
+    // 脚本内容是固定的，不可被用户控制
+    public int performSafeOperation(int val1, int val2) {
+        ScriptEngineManager manager = new ScriptEngineManager();
+        ScriptEngine engine = manager.getEngineByName("JavaScript");
+        try {
+            // 预加载安全的函数
+            engine.eval(SAFE_FUNCTION);
+            // 调用预加载的安全函数，并传入参数作为数据
+            Object result = engine.eval("add(" + val1 + ", " + val2 + ");");
+            if (result instanceof Number) {
+                return ((Number) result).intValue();
+            }
+        } catch (ScriptException e) {
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+    // 场景二：从受信任的资源（如文件系统中的固定路径或classpath）加载脚本，而非用户输入
+    // 确保脚本来源可信且不可被篡改
+    public String executeTrustedScript() {
+        ScriptEngineManager manager = new ScriptEngineManager();
+        ScriptEngine engine = manager.getEngineByName("JavaScript");
+        try (
+            // 假设'trusted_script.js'是一个位于classpath或固定安全位置的脚本文件
+            // 实际应用中应使用ClassLoader或FileInputStream安全加载
+            Reader reader = new StringReader("var date = new Date(); date.getFullYear();")
+        ) {
+            Object result = engine.eval(reader);
+            return "Current year: " + result;
+        } catch (ScriptException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "Error";
+    }
+
+    // 场景三：如果用户输入作为数据传入脚本，而非脚本本身，且脚本逻辑是硬编码的
+    public String greetUserSecurely(String userName) {
+        ScriptEngineManager manager = new ScriptEngineManager();
+        ScriptEngine engine = manager.getEngineByName("JavaScript");
+        try {
+            // 将用户输入作为参数绑定到脚本上下文中，而不是直接拼接进脚本代码
+            engine.put("username", userName);
+            Object result = engine.eval("" +
+                    "function safeGreet() { " +
+                    "  if (username && username.length > 0) { " +
+                    "    return 'Hello, ' + username + '!'; " +
+                    "  } else { " +
+                    "    return 'Hello, Guest!'; " +
+                    "  } " +
+                    "}; " +
+                    "safeGreet();");
+            return result.toString();
+        } catch (ScriptException e) {
+            e.printStackTrace();
+        }
+        return "Error";
+    }
+}
+CODE
 )

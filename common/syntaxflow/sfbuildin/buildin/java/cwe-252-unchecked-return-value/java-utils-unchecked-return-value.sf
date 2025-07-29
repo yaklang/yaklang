@@ -145,4 +145,51 @@ public class CustomHostnameVerifier   {
     }
 }
 TEXT
+	"safefile://SafeLockUsageChecked.java": <<<CODE
+package org.example;
+
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
+public class SafeLockUsageChecked {
+    public static void main(String[] args) {
+        Lock lock = new ReentrantLock();
+        boolean acquired = lock.tryLock(); // 检查tryLock的返回值
+        if (acquired) {
+            System.out.println("Lock acquired successfully.");
+            try {
+                // Critical section begins
+                System.out.println("Executing protected code...");
+            } finally {
+                lock.unlock(); // 确保在finally块中释放锁
+                System.out.println("Lock released.");
+            }
+        } else {
+            System.out.println("Could not acquire lock immediately. Handling alternative logic...");
+            // Implement retry, wait, or alternative non-locked logic
+        }
+    }
+}
+CODE
+	"safefile://SafeLockUsageBlocking.java": <<<CODE
+package org.example;
+
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
+public class SafeLockUsageBlocking {
+    public static void main(String[] args) {
+        Lock lock = new ReentrantLock();
+        lock.lock(); // 使用lock()方法，它会阻塞直到获取到锁，因此无需检查返回值（除非考虑中断）
+        System.out.println("Lock acquired successfully (blocking)...");
+        try {
+            // Critical section begins
+            System.out.println("Executing protected code...");
+        } finally {
+            lock.unlock(); // 确保在finally块中释放锁
+            System.out.println("Lock released.");
+        }
+    }
+}
+CODE
 )

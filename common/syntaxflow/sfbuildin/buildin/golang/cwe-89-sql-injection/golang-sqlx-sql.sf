@@ -226,4 +226,105 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 UNSAFE
+	"safefile://SafeSqlxSelectNamedParam.go": <<<CODE
+// SafeSqlxSelectNamedParam.go
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/jmoiron/sqlx"
+)
+
+type User struct {
+	ID   uint
+	Name string
+	Age  int
+}
+
+func getUserByNameNamedParam(w http.ResponseWriter, r *http.Request) {
+	username := r.FormValue("username")
+
+	dsn := "user:password@tcp(localhost:3306)/dbname"
+	db, err := sqlx.Connect("mysql", dsn)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	var users []User
+	// 使用命名参数安全地进行查询
+	query := "SELECT * FROM users WHERE name = :username"
+	nargs := map[string]interface{}{"username": username}
+	err = db.Select(&users, query, nargs)
+
+	if err != nil {
+		log.Printf("Error querying database: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	for _, user := range users {
+		fmt.Fprintf(w, "User: %s, Age: %d\n", user.Name, user.Age)
+	}
+}
+
+func main() {
+	http.HandleFunc("/getUserByNameNamedParam", getUserByNameNamedParam)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+CODE
+	"safefile://SafeSqlxSelectPositionalParam.go": <<<CODE
+// SafeSqlxSelectPositionalParam.go
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/jmoiron/sqlx"
+)
+
+type User struct {
+	ID   uint
+	Name string
+	Age  int
+}
+
+func getUserByNamePositionalParam(w http.ResponseWriter, r *http.Request) {
+	username := r.FormValue("username")
+
+	dsn := "user:password@tcp(localhost:3306)/dbname"
+	db, err := sqlx.Connect("mysql", dsn)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	var users []User
+	// 使用位置占位符参数化查询，防止SQL注入
+	query := "SELECT * FROM users WHERE name = ?"
+	err = db.Select(&users, query, username)
+
+	if err != nil {
+		log.Printf("Error querying database: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	for _, user := range users {
+		fmt.Fprintf(w, "User: %s, Age: %d\n", user.Name, user.Age)
+	}
+}
+
+func main() {
+	http.HandleFunc("/getUserByNamePositionalParam", getUserByNamePositionalParam)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+CODE
 )

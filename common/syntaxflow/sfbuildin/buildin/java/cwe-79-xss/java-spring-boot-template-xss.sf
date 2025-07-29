@@ -119,4 +119,38 @@ public class GreetingController {
        }
 }
 EOF
+	"safefile://SafeFreeMarkerController.java": <<<CODE
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+@Controller
+public class SafeFreeMarkerController {
+
+    @GetMapping("/safeGreetingFreeMarker")
+    public String safeGreeting(@RequestParam("name") String name, Model model) {
+        // FreeMarker在spring.freemarker.settings.auto_escaping=true时默认进行HTML转义
+        // 因此直接将用户输入放入model是安全的
+        model.addAttribute("userName", name);
+        return "safeGreetingFreeMarker";
+    }
+}
+
+CODE
+	"safefile://SafeFreeMarkerTemplate.ftl": <<<CODE
+<#ftl auto_escaping=true>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Safe FreeMarker Greeting</title>
+</head>
+<body>
+    <h1>Hello, ${userName}!</h1>
+    <p>This content is supposed to be safe: ${safeContent}.</p>
+    <p>Using no-escape interpolation for known safe content: <#noescape>${userHtml}</#noescape></p>
+</body>
+</html>
+
+CODE
 )

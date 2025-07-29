@@ -59,4 +59,163 @@ func main() {
 }
 
 PARAM
+	"safefile://SafeFilePathHandling.go": <<<CODE
+// 使用内置的io/ioutil.ReadFile函数读取明确的白名单文件，而不是用户输入
+package main
+
+import (
+    "fmt"
+    "io/ioutil"
+    "net/http"
+    "path/filepath"
+)
+
+func readSafeFile(w http.ResponseWriter, r *http.Request) {
+    // 安全方式1: 读取硬编码的、已知安全的文件路径
+    safeFilePath := "./data/config.txt"
+    data, err := ioutil.ReadFile(safeFilePath)
+    if err != nil {
+        fmt.Fprintf(w, "Error reading config file: %v", err)
+        return
+    }
+    fmt.Fprintf(w, "Config content: %s", data)
+}
+
+func readValidatedFile(w http.ResponseWriter, r *http.Request) {
+    requestedFile := r.URL.Query().Get("file")
+    // 安全方式2: 对用户输入进行严格验证，只允许特定文件名且不包含路径分隔符
+    // 结合 filepath.Base, 即使输入包含路径，也只会取文件名部分
+    // 并在预设的安全目录下查找
+    filename := filepath.Base(requestedFile)
+    
+    // 假设我们有一个白名单文件列表或一个专门存放用户可访问文件的目录
+    // 这里仅作为示例，实际应用中需要更严格的白名单或沙箱机制
+    allowedFiles := map[string]bool{
+        "document.txt": true,
+        "report.pdf": true,
+    }
+
+    if !allowedFiles[filename] {
+        http.Error(w, "Invalid or denied file request.", http.StatusForbidden)
+        return
+    }
+
+    safeDirPath := "./users_documents/"
+    fullPath := filepath.Join(safeDirPath, filename)
+    
+    // 确保最终路径在预期的安全目录内，并防止路径穿越
+    // Clean()可以去除冗余路径分隔符，但不能防止`../`穿越
+    // EvalSymlinks, Abs, 或更高级的沙箱机制才是彻底的方法
+    cleanedPath := filepath.Clean(fullPath)
+
+    // 进一步检查 cleanedPath 是否依然在 safeDirPath 目录下
+    // 否则攻击者可以通过输入 '../' 绕过
+    if !isPathInDir(cleanedPath, safeDirPath) {
+        http.Error(w, "Path traversal attempt detected.", http.StatusForbidden)
+        return
+    }
+
+    data, err := ioutil.ReadFile(cleanedPath)
+    if err != nil {
+        fmt.Fprintf(w, "Error reading requested file: %v", err)
+        return
+    }
+    fmt.Fprintf(w, "Requested file content: %s", data)
+}
+
+// Helper function to check if a path is within a given directory
+func isPathInDir(path, dir string) bool {
+    rel, err := filepath.Rel(dir, path)
+    if err != nil {
+        return false
+    }
+    // If rel starts with '..' or contains '..', it's outside the dir
+    return !filepath.IsAbs(rel) && !strings.HasPrefix(rel, "..")
+}
+
+// 为了使用 isPathInDir，需要引入 strings 包
+import "strings"
+
+func main() {
+    // 创建一些示例文件和目录以供测试
+    os.MkdirAll("./data", 0755)
+    ioutil.WriteFile("./data/config.txt", []byte("This is a safe configuration content."), 0644)
+    os.MkdirAll("./users_documents", 0755)
+    ioutil.WriteFile("./users_documents/document.txt", []byte("User document content."), 0644)
+    ioutil.WriteFile("./users_documents/report.pdf", []byte("%PDF-1.4..."), 0644)
+
+    http.HandleFunc("/readConfig", readSafeFile)
+    http.HandleFunc("/readFile", readValidatedFile)
+    http.ListenAndServe(":8080", nil)
+}
+
+CODE
+	"safefile://ConfigLoader.go": <<<CODE
+// 这是一个假想的配置文件加载器，它不会直接读取任意文件，而是从已知位置加载
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"path/filepath"
+)
+
+type Config struct {
+	AppName    string `json:"app_name"`
+	Version    string `json:"version"`
+	DatabaseURL string `json:"database_url"`
+}
+
+// LoadConfig 从硬编码的配置文件路径加载配置
+func LoadConfig() (*Config, error) {
+	// 硬编码的配置文件路径，而非用户输入
+	configPath := filepath.Join(".", "config", "application.json") 
+
+	data, err := ioutil.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file %s: %w", configPath, err)
+	}
+
+	var cfg Config
+	err = json.Unmarshal(data, &cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	return &cfg, nil
+}
+
+func main() {
+	// 示例：创建配置文件
+	configDir := filepath.Join(".", "config")
+	err := os.MkdirAll(configDir, 0755)
+	if err != nil {
+		fmt.Println("Failed to create config directory:", err)
+		return
+	}
+	
+	exampleConfig := Config{
+		AppName:    "MyApp",
+		Version:    "1.0.0",
+		DatabaseURL: "jdbc:mysql://localhost:3306/mydb",
+	}
+	
+	configBytes, _ := json.MarshalIndent(exampleConfig, "", "  ")
+	ioutil.WriteFile(filepath.Join(configDir, "application.json"), configBytes, 0644)
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		fmt.Println("Error loading config:", err)
+		return
+	}
+
+	fmt.Printf("Application Name: %s\n", cfg.AppName)
+	fmt.Printf("Version: %s\n", cfg.Version)
+	fmt.Printf("Database URL: %s\n", cfg.DatabaseURL)
+}
+
+import "os" // Add os import for MkdirAll and creating example config file
+
+CODE
 )

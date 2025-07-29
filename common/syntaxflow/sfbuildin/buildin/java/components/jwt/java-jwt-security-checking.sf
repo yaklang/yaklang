@@ -402,6 +402,95 @@ public class JWTVotesEndpoint extends AssignmentEndpoint {
     }
 }
 EOF
+	"safefile://SecureJwtParser.java": <<<CODE
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
+
+import java.security.Key;
+import java.util.Date;
+
+public class SecureJwtParser {
+    private final Key signingKey;
+    private final String expectedIssuer = "your_secure_issuer";
+    private final String expectedAudience = "your_secure_audience";
+
+    public SecureJwtParser(String base64Secret) {
+        // 密钥应从安全配置中加载，不应硬编码
+        this.signingKey = Keys.hmacShaKeyFor(base64Secret.getBytes());
+    }
+
+    public Claims parseAndValidateJwt(String token) throws JwtException {
+        Claims claims = Jwts.parserBuilder()
+                           .setSigningKey(signingKey)
+                           .requireSignatureAlgorithm(SignatureAlgorithm.HS256) // 强制指定安全算法，避免None算法攻击
+                           .build()
+                           .parseClaimsJws(token)
+                           .getBody();
+
+        // 校验JWT过期时间
+        if (claims.getExpiration() != null && claims.getExpiration().before(new Date())) {
+            throw new JwtException("JWT has expired");
+        }
+        // 校验发行者
+        if (!expectedIssuer.equals(claims.getIssuer())) {
+            throw new JwtException("Invalid JWT issuer");
+        }
+        // 校验受众
+        if (!claims.getAudience().contains(expectedAudience)) {
+             throw new JwtException("Invalid JWT audience");
+        }
+
+        return claims;
+    }
+}
+CODE
+	"safefile://SecureJwtServiceWithEnvKey.java": <<<CODE
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
+import java.security.Key;
+import java.util.Date;
+import javax.crypto.spec.SecretKeySpec;
+import java.util.Base64;
+
+public class SecureJwtServiceWithEnvKey {
+
+    private static final String JWT_SECRET_ENV_VAR = "JWT_SECRET_KEY";
+    private final Key signingKey;
+
+    public SecureJwtServiceWithEnvKey() {
+        String secret = System.getenv(JWT_SECRET_ENV_VAR);
+        if (secret == null || secret.isEmpty()) {
+            throw new IllegalArgumentException("JWT secret key is not set in environment variable: " + JWT_SECRET_ENV_VAR);
+        }
+        // 推荐使用Keys.hmacShaKeyFor，但这里为了演示从环境变量读取字符串并转换为Key
+        // 确保密钥是足够长度，且经过适当编码
+        this.signingKey = Keys.hmacShaKeyFor(secret.getBytes());
+    }
+
+    public String createJwtToken(String subject, String audience, long expirationMillis) {
+        return Jwts.builder()
+                .setSubject(subject)
+                .setAudience(audience)
+                .setIssuedAt(new Date(System.currentTimeMillis()))
+                .setExpiration(new Date(System.currentTimeMillis() + expirationMillis))
+                .signWith(signingKey, SignatureAlgorithm.HS256) // 使用从环境变量加载的安全密钥
+                .compact();
+    }
+
+    public Claims parseJwtToken(String token) {
+        // 在实际应用中，还需要更多验证，例如Algorithm强制指定等
+        return Jwts.parserBuilder()
+                .setSigningKey(signingKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+    }
+}
+CODE
 )
 
 

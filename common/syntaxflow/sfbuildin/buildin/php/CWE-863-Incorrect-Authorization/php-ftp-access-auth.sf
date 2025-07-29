@@ -409,4 +409,124 @@ function sanitizeInput($input) {
 }
 ?>
 TEXT
+	"safefile://SafeFtpPathValidation.php": <<<CODE
+<?php
+// 连接FTP服务器的示例
+$ftp_conn = ftp_connect("ftp.example.com");
+ftp_login($ftp_conn, "username", "password");
+
+/**
+ * 严格验证FTP路径的函数，采用白名单或严格过滤策略
+ * 确保路径不包含恶意字符，并限制在特定目录内
+ */
+function isValidFtpPath($path) {
+    // 1. 检查是否包含路径穿越字符 '..' 或 './'
+    if (strpos($path, '..') !== false || strpos($path, './') !== false) {
+        return false;
+    }
+    // 2. 检查路径是否以斜杠开头，暗示绝对路径，否则进一步限制
+    // 假设只允许操作 /web_data/ 目录下的文件或子目录，路径必须以 /web_data/ 开头
+    if (!preg_match('/^\/[a-zA-Z0-9_\/\-]+\/?$/', $path)) { // 更严格的字符集匹配
+        return false;
+    }
+    // 3. 检查路径是否包含非法字符
+    if (preg_match('/[^a-zA-Z0-9_\/\-.]/', $path)) { // 允许有限的字符
+        return false;
+    }
+    // 4. 可以添加更多业务逻辑，例如限制文件扩展名等
+    return true;
+}
+
+// 场景一：安全的文件删除操作
+// 用户输入经过严格验证，避免路径穿越
+function safeDeleteFile($ftp_conn_param, $file) {
+    // 严格验证用户输入的文件路径
+    if (isValidFtpPath($file)) {
+        // 使用绝对路径或已知安全路径
+        $full_path = "/var/www/html/ftp_data/safe_files/" . basename($file); // basename用于获取文件名，避免目录穿越
+        // 确保文件确实存在于预期目录，避免删除意外文件
+        // (实际应用中，还需要更多检查，例如文件是否属于当前用户等)
+        if (ftp_delete($ftp_conn_param, $full_path)) {
+            echo "File deleted safely: " . $full_path . "\n";
+        } else {
+            echo "Failed to delete file: " . $full_path . "\n";
+        }
+    } else {
+        error_log("Attempted invalid FTP path for deletion: " . $file);
+        echo "Error: Invalid file path specified.\n";
+    }
+}
+
+// 场景二：安全的文件上传操作 (ftp_fput)
+// 使用白名单或预定义路径，避免路径穿越
+function safeUploadFile($ftp_conn_param, $local_file, $remote_path) {
+    if (isValidFtpPath($remote_path) && file_exists($local_file)) {
+        $remote_full_path = "/var/www/html/ftp_uploads/" . basename($remote_path); // 确保上传到指定目录
+        if (ftp_fput($ftp_conn_param, $remote_full_path, fopen($local_file, 'r'), FTP_ASCII)) {
+            echo "File uploaded safely to: " . $remote_full_path . "\n";
+        } else {
+            echo "Failed to upload file to: " . $remote_full_path . "\n";
+        }
+    } else {
+        error_log("Attempted invalid FTP path for upload or local file not found.");
+        echo "Error: Invalid remote path or local file not found.\n";
+    }
+}
+
+// 场景三：安全创建目录 (ftp_mkdir)
+// 使用硬编码或严格验证的目录名
+function safeCreateDirectory($ftp_conn_param, $dir_name) {
+    // 严格验证目录名，不允许特殊字符或路径分隔符
+    if (preg_match('/^[a-zA-Z0-9_\-]+$/', $dir_name)) {
+        $full_dir_path = "/usr/local/ftp_dirs/" . $dir_name; // 硬编码父目录
+        if (ftp_mkdir($ftp_conn_param, $full_dir_path)) {
+            echo "Directory created safely: " . $full_dir_path . "\n";
+        } else {
+            echo "Failed to create directory: " . $full_dir_path . "\n";
+        }
+    } else {
+        error_log("Attempted to create directory with invalid name: " . $dir_name);
+        echo "Error: Invalid directory name.\n";
+    }
+}
+
+// 示例调用 - 避免直接使用用户输入
+// 假设 $conn 是已连接的FTP资源
+$conn = $ftp_conn; 
+
+safeDeleteFile($conn,"report.txt"); // hardcoded filename
+safeUploadFile($conn, "./localfile.txt", "data/image.jpg"); // hardcoded remote path, local file assumed safe
+safeCreateDirectory($conn, "new_project"); // hardcoded directory name
+
+// 使用已验证的变量，而不是 $_GET, $_POST
+$safe_user_input_file = "user_data/docs/clean_doc.pdf";
+if (isValidFtpPath($safe_user_input_file)) {
+    safeDeleteFile($conn, $safe_user_input_file);
+}
+
+// 关闭FTP连接
+ftp_close($ftp_conn);
+?>
+CODE
+	"safefile://NoFtpOperations.php": <<<CODE
+<?php
+// 此文件不执行任何FTP操作
+// 该文件仅包含普通的PHP代码，不涉及任何FTP函数。
+
+function processData($input) {
+    // 模拟数据处理
+    $result = strtolower($input);
+    return $result;
+}
+
+$data = "Some User Input";
+$processed_data = processData($data);
+echo "Processed data: " . $processed_data . "\n";
+
+// 即使有用户输入，也没有传递给任何FTP函数，因此不会触发告警
+$user_query = $_GET['search'] ?? 'default';
+echo "Search query: " . htmlspecialchars($user_query) . "\n";
+
+?>
+CODE
 )
