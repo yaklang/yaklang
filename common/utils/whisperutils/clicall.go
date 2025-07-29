@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"regexp"
@@ -25,21 +26,26 @@ type CliResult struct {
 
 // WhisperCli manages the configuration for a whisper-cli process.
 type WhisperCli struct {
-	binaryPath      string
-	modelPath       string
-	ctx             context.Context
-	cancel          context.CancelFunc
-	debug           bool
-	language        string
-	threads         int
-	processors      int
-	vad             bool
-	vadModelPath    string
-	vadThreshold    float64
-	vadSpeechDetect int // in ms
-	outputSRT       bool
-	enableGPU       bool
-	filePath        string
+	binaryPath           string
+	modelPath            string
+	ctx                  context.Context
+	cancel               context.CancelFunc
+	debug                bool
+	language             string
+	threads              int
+	processors           int
+	vad                  bool
+	vadModelPath         string
+	vadThreshold         float64
+	vadSpeechDetect      int // in ms
+	outputSRT            bool
+	enableGPU            bool
+	filePath             string
+	vadPadding           int
+	splitOnWord          bool
+	vadMinSpeechDuration int
+	beamSize             int
+	logWriter            io.Writer
 }
 
 // CliOption is a functional option for configuring WhisperCli.
@@ -115,6 +121,41 @@ func CliWithVADSpeechDetect(duration int) CliOption {
 	}
 }
 
+// CliWithVADPadding sets the VAD padding.
+func CliWithVADPadding(padding int) CliOption {
+	return func(c *WhisperCli) {
+		c.vadPadding = padding
+	}
+}
+
+// CliWithSplitOnWord enables splitting on word.
+func CliWithSplitOnWord(enable bool) CliOption {
+	return func(c *WhisperCli) {
+		c.splitOnWord = enable
+	}
+}
+
+// CliWithVADMinSpeechDuration sets the VAD min speech duration.
+func CliWithVADMinSpeechDuration(duration int) CliOption {
+	return func(c *WhisperCli) {
+		c.vadMinSpeechDuration = duration
+	}
+}
+
+// CliWithBeamSize sets the beam size.
+func CliWithBeamSize(size int) CliOption {
+	return func(c *WhisperCli) {
+		c.beamSize = size
+	}
+}
+
+// CliWithLogWriter sets the writer for non-result log lines.
+func CliWithLogWriter(writer io.Writer) CliOption {
+	return func(c *WhisperCli) {
+		c.logWriter = writer
+	}
+}
+
 // CliWithOutputSRT enables SRT file output.
 func CliWithOutputSRT(enable bool) CliOption {
 	return func(c *WhisperCli) {
@@ -132,19 +173,27 @@ func CliWithEnableGPU(enable bool) CliOption {
 // NewWhisperCli creates a new WhisperCli instance with the given file path and options.
 func NewWhisperCli(filePath string, opts ...CliOption) (*WhisperCli, error) {
 	cli := &WhisperCli{
-		binaryPath:      consts.GetWhisperCliBinaryPath(),
-		filePath:        filePath,
-		language:        "zh",
-		threads:         4,
-		processors:      1,
-		vadThreshold:    0.5,
-		vadSpeechDetect: 1000,
-		enableGPU:       true,
-		outputSRT:       true,
+		binaryPath:           consts.GetWhisperCliBinaryPath(),
+		filePath:             filePath,
+		language:             "auto",
+		threads:              8,
+		processors:           1,
+		vadThreshold:         0.5,
+		vadSpeechDetect:      300,
+		enableGPU:            true,
+		outputSRT:            true,
+		vadPadding:           200,
+		splitOnWord:          true,
+		vadMinSpeechDuration: 15,
+		beamSize:             2,
 	}
 
 	for _, opt := range opts {
 		opt(cli)
+	}
+
+	if cli.debug && cli.logWriter == nil {
+		cli.logWriter = os.Stdout
 	}
 
 	if cli.modelPath == "" {
@@ -190,6 +239,18 @@ func (c *WhisperCli) Invoke() (<-chan *CliResult, error) {
 		}
 		args = append(args, "-vt", fmt.Sprintf("%.2f", c.vadThreshold))
 		args = append(args, "-vsd", strconv.Itoa(c.vadSpeechDetect))
+	}
+	if c.beamSize > 0 {
+		args = append(args, "--beam-size", strconv.Itoa(c.beamSize))
+	}
+	if c.vadPadding > 0 {
+		args = append(args, "-vp", strconv.Itoa(c.vadPadding))
+	}
+	if c.splitOnWord {
+		args = append(args, "-sow")
+	}
+	if c.vadMinSpeechDuration > 0 {
+		args = append(args, "-vmsd", strconv.Itoa(c.vadMinSpeechDuration))
 	}
 	if !c.enableGPU {
 		args = append(args, "--no-gpu")
@@ -244,6 +305,10 @@ func (c *WhisperCli) Invoke() (<-chan *CliResult, error) {
 				case results <- &CliResult{StartTime: startTime, EndTime: endTime, Text: text}:
 				case <-c.ctx.Done():
 					return
+				}
+			} else {
+				if c.logWriter != nil {
+					_, _ = fmt.Fprintln(c.logWriter, line)
 				}
 			}
 		}
