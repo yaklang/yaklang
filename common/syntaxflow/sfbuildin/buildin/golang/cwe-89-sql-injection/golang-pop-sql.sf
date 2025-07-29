@@ -280,4 +280,132 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 UNSAFE
+	"safefile://SecurePopParametrizedQuery.go": <<<CODE
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/gobuffalo/pop"
+)
+
+type User struct {
+	ID   uint
+	Name string
+	Age  int
+}
+
+// connectDB 辅助函数，用于连接数据库
+func connectDB() *pop.Connection {
+	db, err := pop.Connect("development")
+	if err != nil {
+		log.Fatal(err)
+	}
+	return db
+}
+
+// secureLogin 使用 Pop 的 Where 方法进行参数化查询，防止 SQL 注入
+func secureLoginParametrized(w http.ResponseWriter, r *http.Request) {
+	username := r.FormValue("username")
+
+	db := connectDB()
+	defer db.Close()
+
+	var users []User
+	// 安全：使用 Pop 的 Where 方法和参数化查询，Pop 会自动处理参数转义
+	q := db.Where("name = ?", username)
+	if err := q.All(&users); err != nil {
+		log.Printf("Error querying database: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// 打印结果
+	for _, user := range users {
+		fmt.Fprintf(w, "User: %s, Age: %d\n", user.Name, user.Age)
+	}
+	fmt.Fprintf(w, "Login attempt for user: %s (securely handled)\n", username)
+}
+
+// secureLoginRawQueryParametrized 如果必须使用 RawQuery，则使用参数化占位符
+func secureLoginRawQueryParametrized(w http.ResponseWriter, r *http.Request) {
+	username := r.FormValue("username")
+
+	db := connectDB()
+	defer db.Close()
+
+	var user User
+	// 安全：使用 ? 作为占位符，并将用户输入作为参数传递给 RawQuery。Pop 会处理转义。
+	if err := db.RawQuery("SELECT * FROM users WHERE name = ?", username).First(&user); err != nil {
+		log.Printf("Error querying database: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprintf(w, "User found: %s, Age: %d\n", user.Name, user.Age)
+	fmt.Fprintf(w, "Login attempt for user: %s (securely handled with RawQuery)\n", username)
+}
+
+func main() {
+	http.HandleFunc("/secureLogin", secureLoginParametrized)
+	http.HandleFunc("/secureRawQueryLogin", secureLoginRawQueryParametrized)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+CODE
+	"safefile://SecurePopFixedQuery.go": <<<CODE
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/gobuffalo/pop"
+)
+
+type User struct {
+	ID   uint
+	Name string
+	Age  int
+}
+
+// connectDB 辅助函数，用于连接数据库
+func connectDB() *pop.Connection {
+	db, err := pop.Connect("development")
+	if err != nil {
+		log.Fatal(err)
+	}
+	return db
+}
+
+// secureLoginFixedQuery 不包含任何用户输入，执行预定义的查询
+func secureLoginFixedQuery(w http.ResponseWriter, r *http.Request) {
+	db := connectDB()
+	defer db.Close()
+
+	var users []User
+	// 安全：不涉及用户输入的固定查询，无法被注入
+	query := "SELECT * FROM users WHERE id = 1 AND name = 'admin'"
+	if err := db.RawQuery(query).Scan(&users); err != nil {
+		log.Printf("Error querying database: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// 打印结果
+	for _, user := range users {
+		fmt.Fprintf(w, "User: %s, Age: %d\n", user.Name, user.Age)
+	}
+	fmt.Fprintf(w, "Executed fixed query securely.\n")
+}
+
+func main() {
+	http.HandleFunc("/secureFixedQuery", secureLoginFixedQuery)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+CODE
 )

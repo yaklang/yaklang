@@ -247,4 +247,103 @@ func (c *SSTIVuln1Controller) Get() {
 	c.TplName = "ssti.tpl"
 }
 UNSAFE
+	"safefile://SafeTemplateUsage.go": <<<CODE
+// 推荐做法：对所有用户输入的数据进行严格的校验和过滤，避免直接将用户输入传递给模板解析引擎。
+package main
+
+import (
+	"html/template"
+	"net/http"
+	"regexp"
+)
+
+func validateAndExecuteTemplate(w http.ResponseWriter, r *http.Request) {
+	input := r.FormValue("template")
+
+	// 禁止包含模板语法符号，避免直接传递给模板引擎
+	matched, _ := regexp.MatchString(`\{\{.*\}\}`, input)
+	if matched {
+		http.Error(w, "Invalid template input - contains disallowed characters", http.StatusBadRequest)
+		return
+	}
+
+	// 使用固定的、硬编码的模板，或者只允许用户选择预定义的模板名称
+	// 此处为示例，实际应根据业务需求选择安全处理方式
+	data := struct {
+		Message string
+	}{
+		Message: "Hello, " + input + "! This is safe content."
+	}
+	
+t, err := template.New("message").Parse("<h1>{{.Message}}</h1>")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	err = t.Execute(w, data)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+}
+
+func main() {
+	http.HandleFunc("/", validateAndExecuteTemplate)
+	http.ListenAndServe(":8080", nil)
+}
+
+CODE
+	"safefile://SafeFuncMap.go": <<<CODE
+// 推荐做法：配置模板引擎以限制其功能集，仅允许安全的函数。
+package main
+
+import (
+	"fmt"
+	"html/template"
+	"net/http"
+)
+
+// 定义一个安全的函数映射，只包含明确允许的函数
+func createSafeFuncMap() template.FuncMap {
+	return template.FuncMap{
+		"upper": func(s string) string {
+			return fmt.Sprintf("SAFE_UPPER: %s", s)
+		},
+		"add": func(a, b int) int {
+			return a + b
+		},
+		// 不包含任何来自sprig或其他可能导致命令执行或文件操作的危险函数
+	}
+}
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	userProvidedTemplate := r.FormValue("template")
+	
+	// 始终使用内部定义的安全 FuncMap，而不是用户提供的或包含危险函数的Map
+	t, err := template.New("safe").Funcs(createSafeFuncMap()).Parse(userProvidedTemplate)
+	if err != nil {
+		http.Error(w, "Template parsing error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	data := struct{
+		Name string
+	}{
+		Name: "World"
+	}
+
+	err = t.Execute(w, data)
+	if err != nil {
+		http.Error(w, "Template execution error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func main() {
+	http.HandleFunc("/", handler)
+	http.ListenAndServe(":8080", nil)
+}
+
+CODE
 )

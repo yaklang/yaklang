@@ -375,4 +375,41 @@ desc(
     $destination = $_GET["destination"];
     copy($origin,$destination);
 TEXT
+	"safefile://SafeFileOperationWhiteList.php": <<<CODE
+<?php
+    $allowed_dirs = ['/var/www/data/', '/var/www/uploads/']; // 允许操作的目录白名单
+    $filename = $_GET["filename"];
+
+    // 使用realpath解析路径，检查是否在允许的目录内
+    $real_filepath = realpath($allowed_dirs[0] . $filename);
+
+    if ($real_filepath && strpos($real_filepath, $allowed_dirs[0]) === 0) {
+        // 路径合法，执行文件操作
+        echo "Reading file safely from: " . $real_filepath;
+        // readfile($real_filepath); // 实际的文件读取操作，此处仅为示例
+    } else {
+        // 路径非法，拒绝请求
+        die("Invalid file path!");
+    }
+?>
+CODE
+	"safefile://SafeFileOperationFilterTraversal.php": <<<CODE
+<?php
+    $filename = $_GET["filename"];
+
+    // 过滤目录穿越符，移除 '..' 和 '.'
+    $filtered_filename = str_replace(['../', './', '\\', '/'], '', $filename); // 也需考虑Windows路径分隔符
+
+    // 将过滤后的文件名与安全目录结合，避免用户直接控制路径
+    $safe_filepath = '/var/www/data/' . $filtered_filename . '.log'; // 示例：限制文件类型或后缀
+
+    // 确保文件存在且在预期目录，并执行文件操作
+    if (file_exists($safe_filepath) && is_file($safe_filepath) && strpos(realpath($safe_filepath), '/var/www/data/') === 0) {
+        echo "Attempting to read safely from: " . $safe_filepath;
+        // readfile($safe_filepath); // 实际的文件读取操作，此处仅为示例
+    } else {
+        die("Invalid file access attempt!");
+    }
+?>
+CODE
 )

@@ -236,4 +236,108 @@ func main() {
 }
 
 UNSAFE
+	"safefile://SafeLogin1.go": <<<CODE
+package main
+
+import (
+	"database/sql"
+	"fmt"
+	"log"
+	"net/http"
+
+	_ "github.com/go-sql-driver/mysql"
+)
+
+func loginSafe(w http.ResponseWriter, r *http.Request) {
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+
+	db, err := sql.Open("mysql", "user:password@/dbname")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	// 使用参数化查询，这是防止SQL注入的最佳实践
+	query := "SELECT * FROM users WHERE username = ? AND password = ?"
+	stmt, err := db.Prepare(query)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stmt.Close()
+
+	var userID int
+	err = stmt.QueryRow(username, password).Scan(&userID)
+	if err == sql.ErrNoRows {
+		http.Error(w, "Invalid login", http.StatusUnauthorized)
+		return
+	} else if err != nil {
+		log.Print(err) // 记录错误但避免向用户暴露敏感信息
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprintf(w, "User ID: %d", userID)
+}
+
+func main() {
+	http.HandleFunc("/login", loginSafe)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+CODE
+	"safefile://SafeQuery2.go": <<<CODE
+package main
+
+import (
+	"database/sql"
+	"fmt"
+	"log"
+	"strconv"
+
+	_ "github.com/go-sql-driver/mysql"
+)
+
+func getUserByIDSafe(db *sql.DB, id string) (string, error) {
+	// 假设id必然是数字，这里进行严格的输入验证
+	parsedID, err := strconv.Atoi(id)
+	if err != nil {
+		return "", fmt.Errorf("invalid ID format: %w", err)
+	}
+
+	// 即使是数字，也推荐使用参数化查询来增强安全性
+	query := "SELECT username FROM users WHERE id = ?"
+	var username string
+	err = db.QueryRow(query, parsedID).Scan(&username)
+	if err == sql.ErrNoRows {
+		return "", fmt.Errorf("user not found")
+	} else if err != nil {
+		return "", fmt.Errorf("query failed: %w", err)
+	}
+	return username, nil
+}
+
+// 示例用法（非HTTP请求）
+func main() {
+	db, err := sql.Open("mysql", "user:password@/dbname")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	username, err := getUserByIDSafe(db, "123")
+	if err != nil {
+		fmt.Println("Error:", err)
+	} else {
+		fmt.Println("Username:", username)
+	}
+
+	// 尝试一个非数字的输入，验证输入检查是否有效
+	_, err = getUserByIDSafe(db, "123a")
+	if err != nil {
+		fmt.Println("Error:", err) // 预期会输出错误信息
+	}
+}
+
+CODE
 )

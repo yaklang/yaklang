@@ -114,4 +114,58 @@ func readFromFile(filename string) {
     }
 }
 PARAM
+	"safefile://SafeFileReadNoBufio.go": <<<CODE
+// SafeFileReadNoBufio.go
+package main
+
+import (
+	"fmt"
+	"io/ioutil"
+	"os"
+)
+
+func main() {
+	// 直接使用ioutil.ReadFile读取文件，不使用bufio包中的任何函数
+	data, err := ioutil.ReadFile("example_no_bufio.txt")
+	if err != nil {
+		fmt.Println("Error reading file:", err)
+		return
+	}
+	fmt.Println("Content read without bufio:", string(data))
+}
+
+CODE
+	"safefile://SafeFileReadBufioOtherMethod.go": <<<CODE
+// SafeFileReadBufioOtherMethod.go
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	file, err := os.Open("example_bufio_other.txt")
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return
+	}
+	defer file.Close()
+
+	reader := bufio.NewReader(file)
+
+	// 使用ReadByte方法，不使用ReadString，不会触发规则。
+	var content []byte
+	for {
+		byteRead, err := reader.ReadByte()
+		if err != nil {
+			break // EOF or other error
+		}
+		content = append(content, byteRead)
+	}
+	fmt.Println("Content read with ReadByte:", string(content))
+}
+
+CODE
 )

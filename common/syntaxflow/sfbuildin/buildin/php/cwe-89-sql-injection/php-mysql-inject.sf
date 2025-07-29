@@ -292,4 +292,76 @@ CODE
     $result = mysql_query($query) or die('SQL语句有误：'.mysql_error());
     $navs = mysql_fetch_array($result);
 UNSAFE
+	"safefile://SecureMySQLiPreparedStmt.php": <<<CODE
+<?php
+// 使用mysqli预处理语句防止SQL注入
+// 这是防御SQL注入的最佳实践
+$mysqli = new mysqli("localhost", "user", "password", "database");
+
+// 检查连接
+if ($mysqli->connect_errno) {
+    printf("Connect failed: %s\n", $mysqli->connect_error);
+    exit();
+}
+
+$id = $_GET['id']; // 用户输入
+
+// 准备SQL语句，使用占位符 '?'
+$stmt = $mysqli->prepare("SELECT * FROM users WHERE id = ?");
+
+// 绑定参数，'i' 表示 integer 类型
+$stmt->bind_param("i", $id);
+
+// 执行查询
+$stmt->execute();
+
+// 获取结果
+$result = $stmt->get_result();
+
+// 处理结果...
+while ($row = $result->fetch_assoc()) {
+    echo "ID: " . $row['id'] . ", Name: " . $row['name'] . "<br>";
+}
+
+$stmt->close();
+$mysqli->close();
+?>
+CODE
+	"safefile://SecurePDIOPreparedStmt.php": <<<CODE
+<?php
+// 使用PDO预处理语句防止SQL注入
+// 这是另一种推荐的参数化查询方法
+$dsn = 'mysql:host=localhost;dbname=database';
+$username = 'user';
+$password = 'password';
+
+try {
+    $pdo = new PDO($dsn, $username, $password);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+    $username_input = $_POST['username']; // 用户输入
+
+    // 准备SQL语句，使用命名占位符或问号占位符
+    $stmt = $pdo->prepare("SELECT * FROM members WHERE username = :username");
+
+    // 绑定参数
+    $stmt->bindParam(':username', $username_input);
+
+    // 执行查询
+    $stmt->execute();
+
+    // 获取结果
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($user) {
+        echo "Welcome, " . $user['username'];
+    } else {
+        echo "User not found.";
+    }
+
+} catch (PDOException $e) {
+    echo 'Connection failed: ' . $e->getMessage();
+}
+?>
+CODE
 )

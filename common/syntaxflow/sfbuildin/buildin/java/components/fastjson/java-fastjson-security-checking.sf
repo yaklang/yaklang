@@ -254,4 +254,51 @@ public class UserController {
     }
 }
 CONTROLLER
+	"safefile://SafeFastjsonUpgrade.java": <<<CODE
+// 使用最新版本的FastJson
+import com.alibaba.fastjson.JSON;
+
+public class SafeFastjsonUpgrade {
+    public static void main(String[] args) {
+        // 假设已经升级Fastjson到安全版本（例如1.2.83及以上或2.0.x）
+        String jsonString = "{\"name\":\"test\",\"age\":18}";
+        // 即使使用parse方法，由于版本安全，此时风险大大降低
+        // 但仍推荐使用指定类型的方法
+        Object obj = JSON.parse(jsonString);
+        System.out.println(obj);
+
+        // 推荐的使用方式：指定目标类型反序列化
+        User user = JSON.parseObject(jsonString, User.class);
+        System.out.println("Parsed User: " + user.name + ", " + user.age);
+    }
+}
+
+class User {
+    public String name;
+    public int age;
+}
+CODE
+	"safefile://SafeFastjsonTypedParse.java": <<<CODE
+// 始终使用带有明确目标类型的方法进行反序列化
+import com.alibaba.fastjson.JSON;
+
+public class SafeFastjsonTypedParse {
+    public static void main(String[] args) {
+        String jsonString = "{\"name\":\"John Doe\",\"age\":30}";
+        // 明确指定目标类型，即使旧版本Fastjson也更能规避风险
+        MyObject obj = JSON.parseObject(jsonString, MyObject.class);
+        System.out.println("Name: " + obj.name + ", Age: " + obj.age);
+
+        // 另一个示例：解析到List<String>
+        String jsonListString = "[\"item1\",\"item2\"]";
+        java.util.List<String> list = JSON.parseObject(jsonListString, new com.alibaba.fastjson.TypeReference<java.util.List<String>>() {}.getType());
+        System.out.println("List: " + list);
+    }
+}
+
+class MyObject {
+    public String name;
+    public int age;
+}
+CODE
 )

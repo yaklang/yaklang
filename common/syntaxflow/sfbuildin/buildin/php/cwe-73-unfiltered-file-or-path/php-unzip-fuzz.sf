@@ -292,4 +292,145 @@ desc(
     unzip($_GET["path"]);
     UnZip($_POST["path"]);
 CODE
+	"safefile://SafeZipArchiveExtraction.php": <<<CODE
+<?php
+
+require_once 'vendor/autoload.php'; // 假设使用了composer，引入相关库，例如使用ZipArchive
+
+use Symfony\Component\Finder\Finder; // 示例：一个可能用于辅助文件路径检查的库
+
+function isValidPath($filePath, $targetDir) {
+    $targetDir = realpath($targetDir);
+    if ($targetDir === false) {
+        return false; // 目标目录无效
+    }
+
+    // 拼接路径并标准化，确保不会逃逸
+    $resolvedPath = realpath($targetDir . DIRECTORY_SEPARATOR . $filePath);
+
+    // 检查标准化后的路径是否以目标目录开头，并且目标目录是其父目录
+    // 并且确保没有路径穿越序列如 '../' (realpath本身处理了一部分，但显式检查更安全)
+    if ($resolvedPath === false || strpos($resolvedPath, $targetDir) !== 0 || !is_dir($targetDir) || strpos($filePath, '..'.DIRECTORY_SEPARATOR) !== false) {
+        return false;
+    }
+
+    // 进一步检查文件名本身是否包含不允许的字符或路径分隔符
+    $filenameOnly = basename($filePath);
+    if ($filenameOnly !== $filePath && strpos($filePath, DIRECTORY_SEPARATOR) !== false) {
+        // 如果文件名中包含目录分隔符，则说明是子目录文件，需要确保子目录也合法
+        $dirname = dirname($filePath);
+        if ($dirname === '.' || $dirname === '..') { // 避免解压到非法目录
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// 模拟用户上传的文件
+$_FILES['file']['tmp_name'] = '/tmp/example_safe.zip'; // 假设这是一个合法的临时文件路径
+$_FILES['file']['name'] = 'example_safe.zip';
+
+$uploadDir = '/app/uploads/'; // 合法的目标上传目录
+if (!is_dir($uploadDir)) {
+    mkdir($uploadDir, 0755, true); // 确保目录存在
+}
+
+$zipFile = $_FILES['file']['tmp_name'];
+
+// 模拟创建一个不会触发告警的安全压缩包
+// 该压缩包只包含正常文件和符合命名规范的子目录文件
+$zip = new ZipArchive();
+if ($zip->open($zipFile, ZipArchive::CREATE | ZipArchive::OVERWRITE) === TRUE) {
+    $zip->addFromString('safe_file.txt', 'This is a safe file content.');
+    $zip->addFromString('sub_dir/another_safe_file.txt', 'Content for file in sub_dir.');
+    $zip->addFromString('image/avatar.jpg', 'Binary image data.'); // 模拟图片文件
+    $zip->close();
+} else {
+    die('Failed to create dummy zip file.');
+}
+
+// 使用 ZipArchive 类进行解压，并进行严格的路径校验
+$zip = new ZipArchive;
+if ($zip->open($zipFile) === TRUE) {
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $entryName = $zip->getNameIndex($i);
+        
+        // 检查是否是目录项（对于目录，ZipArchive::extractTo 默认是安全的，但如果手动处理需要注意）
+        // 对于目录，如果需要解压，应确保目录路径也符合安全规范
+        if (substr($entryName, -1) === '/') {
+            // 这是一个目录条目，我们确保其路径也是安全的，并创建目录
+            $targetPath = $uploadDir . $entryName;
+            if (!isValidPath($entryName, $uploadDir)) {
+                echo "Skipping unsafe directory: {$entryName}\n";
+                continue;
+            }
+            if (!is_dir($targetPath)) {
+                mkdir($targetPath, 0755, true);
+            }
+            continue; // 跳过目录条目，因为 extractTo 会创建目录
+        }
+
+        // 校验文件路径的合法性
+        if (!isValidPath($entryName, $uploadDir)) {
+            echo "Skipping unsafe file: {$entryName}\n";
+            // 跳过或拒绝处理非法路径文件
+            continue;
+        }
+        
+        // 限制文件类型（示例：只允许txt和jpg）
+        $fileExtension = pathinfo($entryName, PATHINFO_EXTENSION);
+        $allowedExtensions = ['txt', 'jpg', 'png'];
+        if (!in_array(strtolower($fileExtension), $allowedExtensions)) {
+            echo "Skipping disallowed file type: {$entryName}\n";
+            continue;
+        }
+
+        // 解压文件到目标目录，使用数组指定要解压的单个文件以确保精确控制
+        $zip->extractTo($uploadDir, [$entryName]);
+        echo "Successfully extracted: {$entryName} to {$uploadDir}\n";
+    }
+    $zip->close();
+    echo "Zip file '{$_FILES['file']['name']}' processed securely.\n";
+} else {
+    echo "Error opening zip file: {$zipFile}\n";
+}
+
+// ====== 另一个安全用例：只解压zip中的指定文件或不含../文件名
+// 假设我们只关心解压一个名为 'document.txt' 的文件
+$safeZipFile = '/tmp/document_archive.zip';
+$zip2 = new ZipArchive();
+if ($zip2->open($safeZipFile, ZipArchive::CREATE | ZipArchive::OVERWRITE) === TRUE) {
+    $zip2->addFromString('document.txt', 'This is a document.');
+    $zip2->addFromString('malicious/../../badfile.exe', 'This file should not be extracted.');
+    $zip2->close();
+}
+
+$zip3 = new ZipArchive();
+if ($zip3->open($safeZipFile) === TRUE) {
+    $targetFilename = 'document.txt';
+    $entryIndex = $zip3->locateName($targetFilename, ZipArchive::FL_NOCASE);
+    
+    if ($entryIndex !== false) {
+        $actualFilename = $zip3->getNameIndex($entryIndex);
+        if (isValidPath($actualFilename, $uploadDir)) {
+            $zip3->extractTo($uploadDir, $actualFilename);
+            echo "Extracted specific file '{$actualFilename}' securely.\n";
+        } else {
+             echo "Skipped specific file '{$actualFilename}' due to unsafe path.\n";
+        }
+    } else {
+        echo "Specific file '{$targetFilename}' not found in archive.\n";
+    }
+    $zip3->close();
+} else {
+    echo "Error opening zip file for specific extraction.\n";
+}
+
+// 清理临时文件
+unlink($zipFile);
+unlink($safeZipFile);
+
+?>
+CODE
 )

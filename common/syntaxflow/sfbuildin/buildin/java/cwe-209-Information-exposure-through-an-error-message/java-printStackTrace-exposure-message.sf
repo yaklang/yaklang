@@ -98,4 +98,88 @@ public class GlobalExceptionHandler {
     }
 }
 UNSAFE
+	"safefile://SafeGlobalExceptionHandler.java": <<<CODE
+// 修复代码示例：使用日志框架记录异常，不直接暴露printStackTrace
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+@RestControllerAdvice
+public class SafeGlobalExceptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(SafeGlobalExceptionHandler.class);
+
+    @ExceptionHandler(MyException.class)
+    public Result error(MyException e) {
+        // 使用日志框架记录异常，将异常对象作为最后一个参数传递，日志框架会自动记录堆栈，但不会直接输出到用户可见的界面
+        log.error("An application error occurred: {}. Error code: {}", e.getMessage(), e.getCode(), e);
+        // 向用户返回一个友好的错误信息，不包含内部异常细节
+        return Result.error().code(e.getCode()).message("服务器内部错误，请稍后再试。");
+    }
+
+    // 模拟的Result类，用于示例
+    static class Result {
+        private int code;
+        private String message;
+
+        public static Result error() {
+            return new Result();
+        }
+
+        public Result code(int code) {
+            this.code = code;
+            return this;
+        }
+
+        public Result message(String message) {
+            this.message = message;
+            return this;
+        }
+    }
+
+    // 模拟的MyException类，用于示例
+    static class MyException extends RuntimeException {
+        private int code;
+
+        public MyException(String message, int code) {
+            super(message);
+            this.code = code;
+        }
+
+        public int getCode() {
+            return code;
+        }
+    }
+}
+CODE
+	"safefile://SafeTryCatchBlock.java": <<<CODE
+// 安全的try-catch块：只记录错误到日志，不进行printStackTrace()
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class SafeTryCatchBlock {
+    private static final Logger log = LoggerFactory.getLogger(SafeTryCatchBlock.class);
+
+    public void performOperation() {
+        try {
+            // 模拟可能抛出异常的操作
+            int result = 10 / 0; // 这将导致ArithmeticException
+            System.out.println(result);
+        } catch (ArithmeticException e) {
+            // 使用日志框架记录异常，而不是直接printStackTrace()
+            log.error("Arithmetic error occurred: {}", e.getMessage(), e);
+            // 可以选择抛出自定义业务异常或进行其他安全处理
+            // throw new CustomBusinessException("Calculation failed", e);
+        } catch (Exception e) {
+            // 捕获更广泛的异常，同样使用日志记录
+            log.error("An unexpected error occurred: {}", e.getMessage(), e);
+        }
+    }
+
+    public static void main(String[] args) {
+        SafeTryCatchBlock example = new SafeTryCatchBlock();
+        example.performOperation();
+    }
+}
+CODE
 )

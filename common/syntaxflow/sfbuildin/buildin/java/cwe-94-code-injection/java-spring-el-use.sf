@@ -112,4 +112,88 @@ public class SpringElExample {
     }
 }
 USE
+	"safefile://SafeSpringELUse.java": <<<CODE
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.expression.EvaluationContext;
+import org.springframework.expression.TypedValue;
+import org.springframework.expression.spel.support.SimpleEvaluationContext;
+
+public class SafeSpringELUse {
+    public static void main(String[] args) {
+        // 1. 使用 SimpleEvaluationContext 限制表达式能力
+        // 仅允许访问属性和方法，禁止创建新对象或调用静态方法
+        ExpressionParser parser = new SpelExpressionParser();
+        EvaluationContext simpleContext = SimpleEvaluationContext.forReadOnlyDataBinding().build();
+
+        // 示例：安全地访问属性
+        User user = new User("Alice", 30);
+        String userName = parser.parseExpression("name").getValue(simpleContext, user, String.class);
+        System.out.println("User Name (safe): " + userName);
+
+        // 示例：尝试执行不允许的操作 (这会报错或无法执行，取决于Spring EL版本和上下文配置)
+        try {
+            parser.parseExpression("T(java.lang.System).exit(1)").getValue(simpleContext);
+        } catch (Exception e) {
+            System.out.println("Attempted dangerous EL (as expected, failed): " + e.getMessage());
+        }
+
+        // 2. 将表达式硬编码或来自可信来源，不包含用户输入
+        // 确保表达式内容在编译时确定，或仅从安全的配置文件中读取
+        String fixedExpression = "'Hello, ' + 'World!'";
+        String greeting = parser.parseExpression(fixedExpression).getValue(String.class);
+        System.out.println("Greeting (fixed): " + greeting);
+
+        // 3. 对所有用户输入进行严格的白名单校验，仅允许特定的、无害的语法结构
+        // 这是一个抽象概念，需要根据具体业务规则实现一个输入校验器
+        String userInputRaw = "user.name"; // 假设这是从用户获取的表达式片段
+        if (isAllowedExpressionFragment(userInputRaw)) { // 假设存在一个白名单校验方法
+            String finalExpression = "#user." + userInputRaw; // 组合成完整的EL，#user 需在上下文中定义
+            // 例如，如果上下文有一个User对象，且只允许访问其公开属性
+            // ... (需要一个完整的上下文和对象来演示，此处仅为概念示意)
+        }
+    }
+
+    private static boolean isAllowedExpressionFragment(String input) {
+        // 这是一个占位符，实际需要实现复杂的白名单逻辑
+        // 例如，只允许字母、数字和特定点号，禁止括号、引号、T()等
+        return input.matches("[a-zA-Z0-9\.]+");
+    }
+
+    static class User {
+        private String name;
+        private int age;
+
+        public User(String name, int age) {
+            this.name = name;
+            this.age = age;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public int getAge() {
+            return age;
+        }
+    }
+}
+CODE
+	"safefile://NoSpELParseExpression.java": <<<CODE
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+
+public class NoSpELParseExpression {
+    public static void main(String[] args) {
+        // 故意不使用 SpelExpressionParser 或其 parseExpression 方法
+        // 以确保即使代码中存在 Spring 相关的库，也不会误报
+        String data = "some safe string data";
+        System.out.println("Processing data: " + data);
+
+        // 这是一个普通的字符串操作，不涉及EL解析
+        String transformedData = data.toUpperCase();
+        System.out.println("Transformed data: " + transformedData);
+    }
+}
+CODE
 )

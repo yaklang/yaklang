@@ -125,4 +125,113 @@ public class OrgConsoleController {
     }
 }
 CODE
+	"safefile://SafeModelAndViewHandling.java": <<<CODE
+package com.ibeetl.admin.console.web;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.servlet.ModelAndView;
+import com.ibeetl.admin.core.entity.CoreOrg;
+import com.ibeetl.admin.core.service.CoreOrgService;
+
+@Controller
+public class SafeOrgConsoleController {
+
+    private CoreOrgService orgConsoleService;
+
+    // 修复代码示例：将String转换为Long类型并进行业务校验，避免SSTI
+    @GetMapping("/org/edit.do")
+    // @Function("org.edit") // 假设这个注解不影响核心逻辑
+    public ModelAndView editSafe(String id) {
+        ModelAndView view = new ModelAndView("/admin/org/edit.html");
+        try {
+            Long orgId = Long.parseLong(id); // 尝试转换为数字类型
+            // 进行进一步的业务逻辑校验，如是否存在此ID对应的组织
+            CoreOrg org = orgConsoleService.queryById(orgId); // 假设queryById接受Long
+            if (org != null) {
+                view.addObject("org", org); // 添加的是对象，而不是原始用户输入String
+            } else {
+                // 处理ID不存在的情况，返回错误或重定向
+                view.addObject("error", "Organization not found");
+            }
+        } catch (NumberFormatException e) {
+            // 处理ID不是数字的情况，返回错误或重定向
+            view.addObject("error", "Invalid ID format");
+        }
+        return view;
+    }
+
+    // 安全示例：传入非用户输入的固定字符串或枚举值
+    @GetMapping("/admin/dashboard")
+    public ModelAndView showDashboard() {
+        ModelAndView view = new ModelAndView("/admin/dashboard.html");
+        view.addObject("title", "Admin Dashboard"); // 固定字符串，不来源于用户输入
+        return view;
+    }
+
+    // 安全示例：传入复杂对象，而非原始String类型输入
+    @GetMapping("/user/profile")
+    public ModelAndView viewUserProfile(String userId) {
+        ModelAndView view = new ModelAndView("/user/profile.html");
+        try {
+            Long id = Long.parseLong(userId);
+            User user = userService.getUserById(id); // 假设userService存在
+            if (user != null) {
+                view.addObject("user", user); // addObject的是一个User对象
+            } else {
+                view.addObject("message", "User not found");
+            }
+        } catch (NumberFormatException e) {
+            view.addObject("message", "Invalid User ID");
+        }
+        return view;
+    }
+
+    // 安全示例：ModelAndView的参数是基本类型或封装类型，非String用户输入
+    @GetMapping("/settings")
+    public ModelAndView showSettings(int page) {
+        ModelAndView view = new ModelAndView("/settings.html");
+        view.addObject("currentPage", page); // int类型参数，非String用户输入，更安全
+        return view;
+    }
+
+    // 另一个安全示例：即便接收String，也确保addObject的值来源于内部处理或已转义
+    @GetMapping("/report")
+    public ModelAndView generateReport(String reportType) {
+        ModelAndView view = new ModelAndView("/report.html");
+        // 假设reportType是有限的枚举，经过了严格校验
+        if ("monthly".equals(reportType) || "yearly".equals(reportType)) {
+            String safeReport = getSafeReportData(reportType); // 内部生成或安全处理
+            view.addObject("reportContent", safeReport);
+        } else {
+            view.addObject("error", "Invalid report type");
+        }
+        return view;
+    }
+
+    private String getSafeReportData(String type) {
+        // 模拟从数据库或其他安全来源获取数据，并确保编码
+        return "Report data for " + type + " generated successfully.";
+    }
+
+    // 假设存在这些服务类，使其代码可编译
+    interface CoreOrgService {
+        CoreOrg queryById(Long id);
+    }
+
+    class CoreOrg { /*...*/ }
+
+    interface UserService {
+        User getUserById(Long id);
+    }
+
+    class User { /*...*/ }
+
+    // Placeholder for MODEL constant
+    private static final String MODEL = "/model";
+    private UserService userService;
+
+}
+
+CODE
 )

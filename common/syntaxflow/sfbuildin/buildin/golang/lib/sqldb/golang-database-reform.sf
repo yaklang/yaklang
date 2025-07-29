@@ -167,4 +167,74 @@ func main() {
 }
 
 PARAM
+	"safefile://SafeReformDBUsage.go": <<<CODE
+// SafeReformDBUsage.go
+package main
+
+import (
+    "database/sql"
+    "fmt"
+    "log"
+
+    "github.com/hedonist/reform"
+    _ "modernc.org/sqlite"
+)
+
+func main() {
+    // 规则主要检测NewDB()的调用，本用例避免直接调用NewDB方法，而是使用原生的sql.DB
+    // 理论上，虽然NewDB()是为了初始化reform库，但如果完全不使用reform的功能，
+    // 则不会触发reform.NewDB()的alert。
+    // 实际业务中，可能因为各种原因，会使用原生的database/sql，而不通过reform封装。
+
+    db, err := sql.Open("sqlite", "safe_example.db")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer db.Close()
+
+    // 避免使用 reform.NewDB()
+    // reformDB := reform.NewDB(db, reform.NewDialect("sqlite"))
+
+    // 使用原生的database/sql操作，不会触发reform库相关的检测点
+    _, err = db.Exec(`CREATE TABLE IF NOT EXISTS safe_users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        age INTEGER
+    );`)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    name := "John Doe"
+    age := 25
+    // 使用参数化查询，防止SQL注入，这是最佳实践
+    stmt, err := db.Prepare("INSERT INTO safe_users(name, age) VALUES(?, ?)")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer stmt.Close()
+
+    _, err = stmt.Exec(name, age)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    rows, err := db.Query("SELECT id, name, age FROM safe_users WHERE name = ?", "John Doe")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer rows.Close()
+
+    for rows.Next() {
+        var id int
+        var n string
+        var a int
+        if err := rows.Scan(&id, &n, &a); err != nil {
+            log.Fatal(err)
+        }
+        fmt.Printf("ID: %d, Name: %s, Age: %d\n", id, n, a);
+    }
+    fmt.Println("Safe database operations completed.")
+}
+CODE
 )

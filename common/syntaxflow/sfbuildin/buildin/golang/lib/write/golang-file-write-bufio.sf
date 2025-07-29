@@ -281,4 +281,176 @@ func readFromFile(filename string) {
     }
 }
 PARAM
+	"safefile://SafeFileWriteWithValidation.go": <<<CODE
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+)
+
+// isValidFilename 校验文件名是否安全，防止任意路径和非法字符
+func isValidFilename(filename string) bool {
+	// 避免使用绝对路径和路径穿越
+	if filepath.IsAbs(filename) || containsPathTraversal(filename) {
+		return false
+	}
+
+	// 仅允许字母、数字、下划线、短横线和点号，且不能以点号开头（防止隐藏文件）
+	// 此外，限制文件名长度
+	validNameRegex := regexp.MustCompile(`^[a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)*$`)
+	if !validNameRegex.MatchString(filename) || len(filename) > 255 {
+		return false
+	}
+
+	// 检查文件名是否包含禁用字符
+	forbiddenChars := `\/:*?"<>|`
+	for _, char := range forbiddenChars {
+		if (
+				strings.ContainsRune(filename, char)
+			) {
+			return false
+		}
+	}
+	return true
+}
+
+// containsPathTraversal 检查字符串是否包含路径穿越模式
+func containsPathTraversal(path string) bool {
+	cleanedPath := filepath.Clean(path)
+	return cleanedPath != path && (strings.Contains(cleanedPath, "../") || strings.Contains(cleanedPath, `..\`))
+}
+
+// secureWriteNonBufio 示例：不使用bufio进行文件写入，或者只使用bufio但严格校验路径，避免alert
+func secureWriteNonBufio(baseDir, filename string, content string) error {
+	// 关键：对文件路径进行严格的验证和规范化处理，确保文件写入在预期目录内
+	if !isValidFilename(filename) {
+		return fmt.Errorf("invalid filename: %s", filename)
+	}
+	fullPath := filepath.Join(baseDir, filename)
+
+	// 确保写入路径在预期安全的目录下
+	// 否则，即使文件名本身安全，攻击者也可能通过更改baseDir进行路径穿越
+	// 这里假设baseDir已经是一个安全且经过验证的目录
+
+	file, err := os.OpenFile(fullPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open file %s: %w", fullPath, err)
+	}
+	defer file.Close()
+
+	// 直接写入，不使用 bufio.NewWriter().WriteString()
+	_, err = file.WriteString(content)
+	if err != nil {
+		return fmt.Errorf("failed to write to file: %w", err)
+	}
+
+	fmt.Printf("Successfully wrote to %s (non-bufio method)\n", fullPath)
+	return nil
+}
+
+// secureBufioWriteWithValidation 示例：使用 bufio 写入，但对路径和内容进行安全处理
+func secureBufioWriteWithValidation(baseDir, filename string, content string) error {
+	// 步骤1: 严格校验用户控制的文件路径
+	if !isValidFilename(filename) {
+		return fmt.Errorf("invalid filename: %s", filename)
+	}
+	fullPath := filepath.Join(baseDir, filename)
+
+	// 步骤2: 避免向公共可写目录写入敏感信息 (此处假设baseDir是安全控制的)
+
+	// 步骤3: 创建或打开文件，设置合适的权限 (例如: 0644)
+	file, err := os.OpenFile(fullPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open file %s: %w", fullPath, err)
+	}
+	defer file.Close()
+
+	// 步骤4: 使用bufio进行写入
+	writer := bufio.NewWriter(file)
+
+	// 步骤5: 对写入内容进行敏感信息过滤或加密 (示例：去除潜在的敏感词)
+	cleanContent := strings.ReplaceAll(content, "敏感数据", "[已过滤]")
+	_, err = writer.WriteString(cleanContent)
+	if err != nil {
+		return fmt.Errorf("failed to write to file: %w", err)
+	}
+
+	// 确保刷新缓冲区
+	if err := writer.Flush(); err != nil {
+		return fmt.Errorf("failed to flush writer: %w", err)
+	}
+
+	fmt.Printf("Successfully wrote to %s (bufio method with validation)\n", fullPath)
+	return nil
+}
+
+func main() {
+	// 示例1: 使用非bufio方式安全写入，避开 'bufio.NewWriter().WriteString' 检测
+	err := secureWriteNonBufio(os.TempDir(), "my_safe_log.txt", "This is a safe log entry.")
+	if err != nil {
+		fmt.Println("Error non-bufio write:", err)
+	}
+
+	// 示例2: 使用bufio方式安全写入，但是对路径和内容进行了严格校验和处理，避免触发告警
+	err = secureBufioWriteWithValidation(os.TempDir(), "another_safe_data.txt", "This content is safe. No sensitive data here.")
+	if err != nil {
+		fmt.Println("Error bufio write with validation:", err)
+	}
+
+	// 示例3: 写入固定、非用户控制的内容到固定路径，规则无从告警
+	file, err := os.OpenFile("fixed_output.txt", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		fmt.Println("Error opening fixed file:", err)
+		return
+	}
+	defer file.Close()
+
+	writer := bufio.NewWriter(file)
+	_, err = writer.WriteString("Fixed string content, always safe.\n")
+	if err != nil {
+		fmt.Println("Error writing fixed content:", err)
+		return
+	}
+	_ = writer.Flush()
+
+	// 示例4: 使用bufio.NewWriter，但后续操作不使用 WriteString，或使用Write等其他方法
+	file2, err := os.OpenFile("safe_bytes_data.bin", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		fmt.Println("Error opening safe bytes file:", err)
+		return
+	}
+	defer file2.Close()
+
+	writer2 := bufio.NewWriter(file2)
+	_, err = writer2.Write([]byte("Binary data that won't be caught by WriteString."))
+	if err != nil {
+		fmt.Println("Error writing binary data:", err)
+		return
+	}
+	_ = writer2.Flush()
+
+	// 示例5: content 来自安全信源，且文件路径固定
+	var secureSourceContent = "This content comes from a trusted, internal source and thus is safe."
+	file3, err := os.OpenFile("trusted_data.txt", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		fmt.Println("Error opening trusted file:", err)
+		return
+	}
+	defer file3.Close()
+
+	writer3 := bufio.NewWriter(file3)
+	_, err = writer3.WriteString(secureSourceContent)
+	if err != nil {
+		fmt.Println("Error writing trusted content:\n", err)
+		return	
+	}
+	_ = writer3.Flush()
+
+}
+
+CODE
 )

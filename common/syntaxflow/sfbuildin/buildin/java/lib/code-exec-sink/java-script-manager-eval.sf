@@ -141,6 +141,59 @@ public class JavaScriptExample {
     }
 }
 SCRIPT
+	"safefile://SafeScriptExecution.java": <<<CODE
+// 场景一：不使用ScriptEngineManager进行动态脚本执行，而是使用Java原生API进行固定操作。
+import java.util.Set;
+
+public class SafeScriptExecution {
+    private static final Set<String> ALLOWED_OPERATIONS = Set.of("add", "subtract", "multiply", "divide");
+
+    // 安全：通过白名单和预定义逻辑处理操作，不使用eval。
+    public double calculate(String operation, double a, double b) {
+        if (!ALLOWED_OPERATIONS.contains(operation)) {
+            throw new IllegalArgumentException("Invalid operation: " + operation);
+        }
+
+        switch (operation) {
+            case "add":
+                return a + b;
+            case "subtract":
+                return a - b;
+            case "multiply":
+                return a * b;
+            case "divide":
+                if (b == 0) throw new IllegalArgumentException("Cannot divide by zero");
+                return a / b;
+            default:
+                throw new UnsupportedOperationException("Operation not supported.");
+        }
+    }
+
+    public static void main(String[] args) {
+        SafeScriptExecution calculator = new SafeScriptExecution();
+        System.out.println("4 + 2 = " + calculator.calculate("add", 4, 2));
+        System.out.println("4 / 2 = " + calculator.calculate("divide", 4, 2));
+        // 以下会抛出异常，因为"evil"不在白名单中
+        // calculator.calculate("evil", 1, 1);
+    }
+}
+CODE
+	"safefile://NonScriptEngineUsage.java": <<<CODE
+// 场景二：完全不引入javax.script包的类，不使用ScriptEngineManager。
+// 这确保了任何依赖于ScriptEngineManager的eval、put、compile调用都不会发生。
+
+public class NonScriptEngineUsage {
+    public String processData(String input) {
+        // 安全：直接字符串拼接，不涉及动态代码执行
+        return "Processed input: [" + input + "]";
+    }
+
+    public static void main(String[] args) {
+        NonScriptEngineUsage processor = new NonScriptEngineUsage();
+        System.out.println(processor.processData("some_safe_data"));
+    }
+}
+CODE
 )
 
 desc(
@@ -162,5 +215,58 @@ public class CalculatorServlet {
     }
 }
 SCRIPT
+	"safefile://SafeScriptExecution.java": <<<CODE
+// 场景一：不使用ScriptEngineManager进行动态脚本执行，而是使用Java原生API进行固定操作。
+import java.util.Set;
+
+public class SafeScriptExecution {
+    private static final Set<String> ALLOWED_OPERATIONS = Set.of("add", "subtract", "multiply", "divide");
+
+    // 安全：通过白名单和预定义逻辑处理操作，不使用eval。
+    public double calculate(String operation, double a, double b) {
+        if (!ALLOWED_OPERATIONS.contains(operation)) {
+            throw new IllegalArgumentException("Invalid operation: " + operation);
+        }
+
+        switch (operation) {
+            case "add":
+                return a + b;
+            case "subtract":
+                return a - b;
+            case "multiply":
+                return a * b;
+            case "divide":
+                if (b == 0) throw new IllegalArgumentException("Cannot divide by zero");
+                return a / b;
+            default:
+                throw new UnsupportedOperationException("Operation not supported.");
+        }
+    }
+
+    public static void main(String[] args) {
+        SafeScriptExecution calculator = new SafeScriptExecution();
+        System.out.println("4 + 2 = " + calculator.calculate("add", 4, 2));
+        System.out.println("4 / 2 = " + calculator.calculate("divide", 4, 2));
+        // 以下会抛出异常，因为"evil"不在白名单中
+        // calculator.calculate("evil", 1, 1);
+    }
+}
+CODE
+	"safefile://NonScriptEngineUsage.java": <<<CODE
+// 场景二：完全不引入javax.script包的类，不使用ScriptEngineManager。
+// 这确保了任何依赖于ScriptEngineManager的eval、put、compile调用都不会发生。
+
+public class NonScriptEngineUsage {
+    public String processData(String input) {
+        // 安全：直接字符串拼接，不涉及动态代码执行
+        return "Processed input: [" + input + "]";
+    }
+
+    public static void main(String[] args) {
+        NonScriptEngineUsage processor = new NonScriptEngineUsage();
+        System.out.println(processor.processData("some_safe_data"));
+    }
+}
+CODE
 )
 

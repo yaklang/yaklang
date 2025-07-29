@@ -722,6 +722,168 @@ var syntaxflowCompletion = &cli.Command{
 	},
 }
 
+var syntaxflowTestCasesCompletion = &cli.Command{
+	Name:    "syntaxflow-test-cases-completion",
+	Aliases: []string{"sf-test-cases", "sf-tc"},
+	Usage:   "SyntaxFlow Rule Test Cases Completion By AI (Both Positive and Negative)",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "ai-type,type",
+			Usage: "type of AI type",
+		},
+		cli.StringFlag{
+			Name:  "target,t",
+			Usage: "the file or directory to process, if it is a directory, all .sf files will be processed",
+		},
+		cli.StringFlag{
+			Name:  "api-key,key,k",
+			Usage: "api key of AI",
+		},
+		cli.StringFlag{
+			Name:  "ai-model,model,m",
+			Usage: "model of AI",
+		},
+		cli.StringFlag{
+			Name:  "proxy,p",
+			Usage: "proxy of AI",
+		},
+		cli.StringFlag{
+			Name:  "domain,ai-domain",
+			Usage: "domain of ai",
+		},
+		cli.StringFlag{
+			Name:  "baseUrl,url",
+			Usage: "baseUrl of ai",
+		},
+		cli.StringSliceFlag{
+			Name:  "files,fs",
+			Usage: "files to process, if it is a directory, all .sf files will be processed",
+		},
+		cli.IntFlag{
+			Name:  "concurrency,c",
+			Usage: "concurrency of AI completion, default is 3",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		target := c.String("target")
+		typ := c.String("ai-type")
+		key := c.String("api-key")
+		model := c.String("ai-model")
+		proxy := c.String("proxy")
+		concurrency := c.Int("concurrency")
+		domain := c.String("domain")
+		baseUrl := c.String("url")
+		files := c.StringSlice("fs")
+		if concurrency == 0 {
+			concurrency = 1 // default concurrency, lower than desc completion
+		}
+
+		var aiOpts []aispec.AIConfigOption
+		if model != "" {
+			aiOpts = append(aiOpts, aispec.WithModel(model))
+		}
+		if domain != "" {
+			aiOpts = append(aiOpts, aispec.WithDomain(domain))
+		}
+		if typ != "" {
+			aiOpts = append(aiOpts, aispec.WithType(typ))
+		}
+		if key != "" {
+			aiOpts = append(aiOpts, aispec.WithAPIKey(key))
+		}
+		if proxy != "" {
+			aiOpts = append(aiOpts, aispec.WithProxy(proxy))
+		}
+		if baseUrl != "" {
+			aiOpts = append(aiOpts, aispec.WithBaseURL(baseUrl))
+		}
+
+		swg := new(sync.WaitGroup)
+		errChan := make(chan error, 1)
+		taskChannel := make(chan string, 1)
+		var errors error
+		errorDone := make(chan struct{}, 1)
+		go func() {
+			for err := range errChan {
+				errors = utils.JoinErrors(errors, err)
+			}
+			errorDone <- struct{}{}
+			close(errorDone)
+		}()
+		var taskCount atomic.Int64
+		for i := 0; i < concurrency; i++ {
+			swg.Add(1)
+			go func() {
+				defer swg.Done()
+				for fileName := range taskChannel {
+					if !strings.HasSuffix(fileName, ".sf") {
+						log.Infof("syntaxflow-test-cases-completion: skipping file %s (not a .sf file)", fileName)
+						continue
+					}
+					raw, err := os.ReadFile(fileName)
+					if err != nil {
+						log.Errorf("failed to read file %s: %v", fileName, err)
+						continue
+					}
+					rule, err := sfcompletion.CompleteTestCases(fileName, string(raw), aiOpts...)
+					if err != nil {
+						err = utils.Errorf("failed to complete test cases for file %s: %v", fileName, err)
+						errChan <- err
+						log.Errorf("%v", err)
+						continue
+					}
+					// check format rule
+					if _, err := sfvm.CompileRule(rule); err != nil {
+						err = utils.Errorf("failed to validate completed rule for file %s: %v\nrule content: \n%s", fileName, err, rule)
+						errChan <- err
+						log.Errorf("%v", err)
+						continue
+					}
+
+					err = os.WriteFile(fileName, []byte(rule), 0o666)
+					if err != nil {
+						log.Errorf("failed to write file %s: %v", fileName, err)
+						errChan <- utils.Errorf("failed to write file %s: %v", fileName, err)
+						continue
+					}
+					sleepTime := rand.Intn(3) + 2 // 2-4 seconds sleep
+					log.Infof("syntaxflow-test-cases-completion: completed file %s, sleep for %d seconds", fileName, sleepTime)
+					time.Sleep(time.Second * time.Duration(sleepTime))
+				}
+			}()
+		}
+		addTask := func(target string) {
+			if utils.IsFile(target) {
+				log.Infof("syntaxflow-test-cases-completion: processing file %s", target)
+				taskChannel <- target
+				taskCount.Add(1)
+			} else if utils.IsDir(target) {
+				log.Infof("syntaxflow-test-cases-completion: processing directory %s", target)
+				filesys.Recursive(target, filesys.WithFileSystem(filesys.NewLocalFs()), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+					log.Infof("syntaxflow-test-cases-completion: processing file %s", s)
+					taskChannel <- s
+					taskCount.Add(1)
+					return nil
+				}))
+			} else {
+				log.Errorf("syntaxflow-test-cases-completion: file %s not found", target)
+			}
+		}
+
+		if target != "" {
+			addTask(target)
+		}
+		for _, f := range files {
+			addTask(f)
+		}
+		close(taskChannel)
+		swg.Wait()
+		close(errChan)
+		<-errorDone
+		return errors
+	},
+}
+
 var syntaxFlowSave = &cli.Command{
 	Name:    "syntaxflow-save",
 	Aliases: []string{"save-syntaxflow", "ssf", "sfs"},
@@ -1428,14 +1590,15 @@ var SSACompilerCommands = []*cli.Command{
 	ssaCompile, // compile program
 
 	// rule manage
-	syntaxFlowCreate,     // create rule template
-	syntaxflowFormat,     //  format syntaxflow rule
-	syntaxflowCompletion, // complete syntaxflow rule with AI
-	syntaxFlowSave,       // save rule to database
-	syntaxFlowEvaluate,   // evaluate rule quality
-	syntaxFlowExport,     // export rule to file
-	syntaxFlowImport,     // import rule from file
-	syncRule,             // sync rule from embed to database
+	syntaxFlowCreate,              // create rule template
+	syntaxflowFormat,              //  format syntaxflow rule
+	syntaxflowCompletion,          // complete syntaxflow rule with AI
+	syntaxflowTestCasesCompletion, // complete test cases with AI
+	syntaxFlowSave,                // save rule to database
+	syntaxFlowEvaluate,            // evaluate rule quality
+	syntaxFlowExport,              // export rule to file
+	syntaxFlowImport,              // import rule from file
+	syncRule,                      // sync rule from embed to database
 	// risk manage
 	ssaRisk, // export risk report
 

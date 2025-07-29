@@ -223,4 +223,117 @@ func (c *JsonpVuln1Controller) Get() {
 }
 
 UNSAFE
+	"safefile://SafeUserSerialization.go": <<<CODE
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+// User represents a user with sensitive fields tagged to be ignored.
+type User struct {
+	Username string `json:"username"`
+	Password string `json:"-"` // The `json:"-"` tag ignores this field during JSON marshaling
+	Email    string `json:"email"`
+}
+
+// MaskedUser represents a user with sensitive fields explicitly masked.
+type MaskedUser struct {
+	Username string `json:"username"`	
+	Password string `json:"password"` // Password will be masked manually
+	Email    string `json:"email"`
+}
+
+func safeHandler(w http.ResponseWriter, r *http.Request) {
+	// Case 1: Using struct tags to explicitly ignore sensitive fields
+	user := User{
+		Username: "safe_user",
+		Password: "very_secret_password",
+		Email:    "safe@example.com",
+	}
+	jsonData, err := json.Marshal(user)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsonData)
+	fmt.Println("SafeUserSerialization (ignored field): ", string(jsonData))
+
+	// Case 2: Manually removing sensitive fields from a map before marshaling
+	dataMap := map[string]interface{}{
+		"username": "another_safe_user",
+		"password": "another_secret",
+		"email":    "another_safe@example.com",
+	}
+	// Delete the sensitive field before marshaling
+	delete(dataMap, "password") 
+	jsonDataMap, err := json.Marshal(dataMap)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Write(jsonDataMap)
+	fmt.Println("SafeUserSerialization (map delete): ", string(jsonDataMap))
+
+	// Case 3: Masking sensitive fields before marshaling
+	maskedUserData := MaskedUser{
+		Username: "masked_user",
+		Password: "********", // Masked password
+		Email:    "masked@example.com",
+	}
+	jsonDataMasked, err := json.Marshal(maskedUserData)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Write(jsonDataMasked)
+	fmt.Println("SafeUserSerialization (masked field): ", string(jsonDataMasked))
+}
+
+func main() {
+	http.HandleFunc("/api/safe", safeHandler)
+	http.ListenAndServe(":8081", nil)
+}
+CODE
+	"safefile://SafeStructWithoutPassword.go": <<<CODE
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+// UserProfile struct only contains non-sensitive information
+type UserProfile struct {
+	Username string `json:"username"`
+	Email    string `json:"email"`
+}
+
+func userProfileHandler(w http.ResponseWriter, r *http.Request) {
+	// Create a user profile without the password field
+	profile := UserProfile{
+		Username: "test_user",
+		Email:    "test@example.com",
+	}
+
+	jsonData, err := json.Marshal(profile)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsonData)
+	fmt.Println("SafeStructWithoutPassword: ", string(jsonData))
+}
+
+func main() {
+	http.HandleFunc("/api/userprofile", userProfileHandler)
+	http.ListenAndServe(":8082", nil)
+}
+CODE
 )

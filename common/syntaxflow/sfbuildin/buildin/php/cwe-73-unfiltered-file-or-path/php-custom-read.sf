@@ -98,4 +98,97 @@ function readDir($path){
 }
 readDir($_GET["path"]);
 CODE
+	"safefile://SafeDirectoryListing.php": <<<CODE
+<?php
+// Test Case 1: 使用realpath()规范化路径并检查是否在安全根目录下
+function readDirSafe($path) {
+    $baseDir = '/var/www/html/safe_files/'; // 定义安全根目录
+    // 确保目录存在，如果不存在则创建
+    if (!is_dir($baseDir)) {
+        mkdir($baseDir, 0755, true);
+    }
+
+    // 构造完整的潜在路径，并规范化
+    $fullPath = realpath($baseDir . '/' . $path);
+
+    // 验证规范化后的路径是否仍然在安全根目录内
+    if ($fullPath === false || strpos($fullPath, $baseDir) !== 0) {
+        echo "Invalid path or path outside allowed directory.\n";
+        return;
+    }
+    
+    // 确保是一个目录，而不是文件
+    if (!is_dir($fullPath)) {
+        echo "Path is not a directory.\n";
+        return;
+    }
+
+    if ($dh = opendir($fullPath)) {
+        while (($file = readdir($dh)) !== false) {
+            if ($file != "." && $file != "..") {
+                echo $file . "\n";
+            }
+        }
+        closedir($dh);
+    } else {
+        echo "Could not open directory.\n";
+    }
+}
+
+// 安全输入示例
+readDirSafe('user_uploads'); // 假设/var/www/html/safe_files/user_uploads 是一个存在的目录
+readDirSafe('.'); // 读取安全根目录下的内容
+readDirSafe('subdir/images'); // 读取子目录，只要在baseDir内
+
+// 模拟潜在的恶意输入，但被安全函数阻止
+// readDirSafe('../../../etc/passwd'); // 会被realPath和strpos检查阻止
+// readDirSafe('/etc/passwd'); // 会被realPath和strpos检查阻止
+?>
+CODE
+	"safefile://WhitelistedDirectoryAccess.php": <<<CODE
+<?php
+// Test Case 2: 使用白名单来限制允许访问的目录
+function readWhitelistedDir($dirName) {
+    $allowedDirs = [
+        'invoices' => '/var/www/html/data/invoices',
+        'reports' => '/var/www/html/data/reports',
+        'temp' => '/tmp/app_data'
+    ];
+
+    // 检查请求的目录名是否在白名单中
+    if (!isset($allowedDirs[$dirName])) {
+        echo "Directory '" . htmlspecialchars($dirName) . "' is not allowed.\n";
+        return;
+    }
+
+    $path = $allowedDirs[$dirName];
+    
+    // 确认路径是真实存在的目录
+    if (!is_dir($path)) {
+        echo "Configured directory '" . htmlspecialchars($dirName) . "' does not exist or is not a directory.\n";
+        return;
+    }
+
+    if ($dh = opendir($path)) {
+        echo "Listing contents of: " . htmlspecialchars($dirName) . "\n";
+        while (($file = readdir($dh)) !== false) {
+            if ($file != "." && $file != "..") {
+                echo $file . "\n";
+            }
+        }
+        closedir($dh);
+    } else {
+        echo "Could not open directory '" . htmlspecialchars($dirName) . "'.\n";
+    }
+}
+
+// 安全输入示例
+readWhitelistedDir('invoices');
+readWhitelistedDir('reports');
+
+// 模拟非法输入，会被白名单检查阻止
+// readWhitelistedDir('../../../etc'); 
+// readWhitelistedDir('config'); 
+?>
+CODE
 )

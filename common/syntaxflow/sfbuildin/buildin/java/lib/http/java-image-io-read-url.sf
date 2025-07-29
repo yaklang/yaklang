@@ -136,4 +136,45 @@ public class ImageDownloadExample {
     }
 }
 TEXT
+	"safefile://SafeImageLoadFromFile.java": <<<CODE
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.File;
+
+public class SafeImageLoadFromFile {
+    public static void main(String[] args) {
+        try {
+            // 从本地文件系统读取图像，不涉及URL，因此不会触发规则。
+            File imageFile = new File("localimage.jpg");
+            BufferedImage image = ImageIO.read(imageFile);
+            System.out.println("Image loaded successfully from file.");
+        } catch (IOException e) {
+            System.err.println("Error loading image from file: " + e.getMessage());
+        }
+    }
+}
+CODE
+	"safefile://SafeImageLoadFromInputStream.java": <<<CODE
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.FileInputStream;
+
+public class SafeImageLoadFromInputStream {
+    public static void main(String[] args) {
+        try {
+            // 通过InputStream读取图像。如果InputStream来自本地文件或已验证的源，则该操作是安全的。
+            // 此处模拟从一个安全且受控的本地InputStream读取。
+            InputStream is = new FileInputStream("safe_local_image.png");
+            BufferedImage image = ImageIO.read(is);
+            is.close();
+            System.out.println("Image loaded successfully from InputStream.");
+        } catch (IOException e) {
+            System.err.println("Error loading image from InputStream: " + e.getMessage());
+        }
+    }
+}
+CODE
 )

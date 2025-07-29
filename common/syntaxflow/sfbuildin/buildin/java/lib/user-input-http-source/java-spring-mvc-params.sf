@@ -170,6 +170,60 @@ public class ParameterBindingExamples {
 
 }
 TEXT
+	"safefile://SafeControllerNoUserInput.java": <<<CODE
+// 安全的代码示例：不接收任何用户输入参数的Controller方法
+package org.example.moudels.userinput;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+@Controller
+@RequestMapping("/safe-no-input")
+public class SafeControllerNoUserInput {
+
+    // 该方法不接收任何来自HTTP请求的用户输入，因此是安全的
+    @GetMapping("/status")
+    @ResponseBody
+    public String getStatus() {
+        return "Application is running smoothly.";
+    }
+
+    // 该方法使用硬编码值，不依赖用户输入
+    @GetMapping("/fixed-message")
+    @ResponseBody
+    public String getFixedMessage() {
+        String message = "This is a fixed, non-user-controllable message.";
+        return message;
+    }
+}
+
+CODE
+	"safefile://SafeServiceNoDirectRequest.java": <<<CODE
+// 安全的代码示例：Service层或不直接处理HttpServletRequest的方法
+package org.example.service;
+
+import org.springframework.stereotype.Service;
+
+@Service
+public class SafeServiceNoDirectRequest {
+
+    // 该方法接收一个由Controller层经过严格验证和净化后的参数，而不是直接来自HTTP请求
+    public String processSafeInput(String cleanData) {
+        // 假设cleanData已经被Controller层或拦截器净化，不包含恶意内容
+        return "Processed safe data: " + cleanData;
+    }
+
+    // 该方法只进行内部计算，不涉及任何用户输入
+    public int calculateFixedValue() {
+        int a = 10;
+        int b = 20;
+        return a + b;
+    }
+}
+
+CODE
 )
 
 desc(
@@ -289,4 +343,58 @@ public class ServletParamsExamples {
 
 }
 TEXT
+	"safefile://SafeControllerNoUserInput.java": <<<CODE
+// 安全的代码示例：不接收任何用户输入参数的Controller方法
+package org.example.moudels.userinput;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+@Controller
+@RequestMapping("/safe-no-input")
+public class SafeControllerNoUserInput {
+
+    // 该方法不接收任何来自HTTP请求的用户输入，因此是安全的
+    @GetMapping("/status")
+    @ResponseBody
+    public String getStatus() {
+        return "Application is running smoothly.";
+    }
+
+    // 该方法使用硬编码值，不依赖用户输入
+    @GetMapping("/fixed-message")
+    @ResponseBody
+    public String getFixedMessage() {
+        String message = "This is a fixed, non-user-controllable message.";
+        return message;
+    }
+}
+
+CODE
+	"safefile://SafeServiceNoDirectRequest.java": <<<CODE
+// 安全的代码示例：Service层或不直接处理HttpServletRequest的方法
+package org.example.service;
+
+import org.springframework.stereotype.Service;
+
+@Service
+public class SafeServiceNoDirectRequest {
+
+    // 该方法接收一个由Controller层经过严格验证和净化后的参数，而不是直接来自HTTP请求
+    public String processSafeInput(String cleanData) {
+        // 假设cleanData已经被Controller层或拦截器净化，不包含恶意内容
+        return "Processed safe data: " + cleanData;
+    }
+
+    // 该方法只进行内部计算，不涉及任何用户输入
+    public int calculateFixedValue() {
+        int a = 10;
+        int b = 20;
+        return a + b;
+    }
+}
+
+CODE
 )

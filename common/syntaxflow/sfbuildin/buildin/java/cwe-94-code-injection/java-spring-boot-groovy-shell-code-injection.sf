@@ -342,4 +342,83 @@ public class CodeController {
     }
 }
 TEXT
+	"safefile://SafeGroovyControllerFiltered.java": <<<CODE
+package com.example.safegroovy;
+
+import groovy.lang.GroovyShell;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class SafeGroovyControllerFiltered {
+
+    // 模拟一个严格的输入验证方法，只允许安全的字符，并禁止可能构成Groovy代码的特殊字符
+    private boolean isValidGroovyInput(String input) {
+        // 检查是否包含任何Groovy代码执行相关的关键字或特殊字符
+        // 这是一个白名单示例，实际应用中可能需要更复杂的正则表达式
+        if (input == null || input.isEmpty()) {
+            return true;
+        }
+        // 允许数字、字母、空格和基本算术符号，排除"'", "`", ";", "(", ")", "{", "}", "]", "[", "\", "$", "!", "@", "#", "&", "|", ".", ":", "?", "<", ">"
+        // 确保 GroovyShell.evaluate() 接收到的只是数据而非可执行代码
+        return input.matches("^[a-zA-Z0-9+\-*/%=\s,]+" +
+                             "$|^$"); // 允许空字符串或只包含数字、字母、基本数学符号、空格和逗号
+    }
+
+    @GetMapping("/safeExecuteFiltered")
+    public String safeExecuteGroovyFiltered(@RequestParam String payload) {
+        // 强制对用户输入进行严格验证，只允许安全的、非代码的输入
+        if (!isValidGroovyInput(payload)) {
+            return "Error: Unsafe characters or potential code detected in payload. Input rejected.";
+        }
+        // 即使进行了过滤，出于安全考虑，最好也避免直接使用 GroovyShell.evaluate() 处理用户输入。
+        // 此处为示范，展示在强烈过滤下的使用场景。实际应考虑替代方案。
+        GroovyShell shell = new GroovyShell();
+        try {
+            // 如果payload是纯数据（比如一个简单的数学表达式，如"1+2"），evaluate可能仍然返回结果。
+            // 但如果payload因为过滤而变得无意义，可能会抛出异常或返回意外结果。
+            Object result = shell.evaluate(payload);
+            return "Result: " + (result != null ? result.toString() : "null (filtered)");
+        } catch (Exception e) {
+            // 捕获Groovy执行时的异常，防止因为无效输入导致应用崩溃
+            return "Error executing Groovy (possibly due to filtered input making it invalid): " + e.getMessage();
+        }
+    }
+}
+CODE
+	"safefile://SafeGroovyControllerSpEL.java": <<<CODE
+package com.example.safegroovy;
+
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * 使用Spring Expression Language (SpEL) 作为更安全的替代方案，避免直接使用GroovyShell执行用户输入。
+ * SpEL本身有其安全性考量，但通常比直接的GroovyShell在沙箱化方面有更多控制和限制。
+ */
+@RestController
+public class SafeGroovyControllerSpEL {
+
+    @GetMapping("/safeEvaluateSpEL")
+    public String safeEvaluateSpel(@RequestParam String expression) {
+        // 推荐使用SpEL等表达式语言，而不是Groovy Shell，来处理有限逻辑的动态表达式。
+        // SpEL虽然强大，但在处理用户输入时仍需注意避免高危操作，例如 T(java.lang.Runtime).getRuntime().exec(...)
+        try {
+            ExpressionParser parser = new SpelExpressionParser();
+            // 这里的"expression"假定为用户输入的表达式，例如 "'Hello ' + #name"
+            // 为了安全，应限制允许的SpEL功能，例如不允许访问反射、静态方法等。
+            // 在实际应用中，通常会结合SpEL的StandardEvaluationContext，限制可调用的方法和类型。
+            // 示例：Object result = parser.parseExpression(expression).getValue(new StandardEvaluationContext(new MyContextObject()), Object.class);
+            Object result = parser.parseExpression(expression).getValue();
+            return "Result from SpEL: " + result.toString();
+        } catch (Exception e) {
+            return "Error evaluating SpEL expression: " + e.getMessage();
+        }
+    }
+}
+CODE
 )

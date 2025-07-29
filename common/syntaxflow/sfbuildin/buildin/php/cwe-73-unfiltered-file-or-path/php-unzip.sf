@@ -198,4 +198,105 @@ desc(
     $zip->extractTo("$path");
     $zip->close();
 PARAM
+	"safefile://SafeZipExtraction.php": <<<CODE
+<?php
+// 定义一个安全的解压目录，与web根目录分离
+$baseExtractPath = '/var/www/uploads/extracted_files/'; 
+
+// 确保目标路径存在且可写
+if (!is_dir($baseExtractPath)) {
+    mkdir($baseExtractPath, 0755, true);
+}
+
+// 模拟用户输入，但这里不直接使用，而是用于构造安全路径的片段
+$userSuppliedPath = isset($_POST['filename']) ? $_POST['filename'] : 'default_upload.zip';
+$zipFile = '/var/www/uploads/' . basename($userSuppliedPath); // 确保文件名不包含路径穿越
+
+$zip = new ZipArchive();
+if ($zip->open($zipFile) === TRUE) {
+    $safeExtractionDir = realpath($baseExtractPath) . DIRECTORY_SEPARATOR; // 规范化安全路径
+
+    $isValidZip = true;
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $filename = $zip->getNameIndex($i);
+        // 检查压缩包内文件名是否包含路径穿越字符
+        if (strpos($filename, '../') !== false || strpos($filename, '..\\') !== false || substr($filename, 0, 1) === '/') {
+            $isValidZip = false;
+            break;
+        }
+
+        // 构造完整的安全目标路径并确保不会跳出基准目录
+        $destination = $safeExtractionDir . $filename;
+        if (strpos(realpath(dirname($destination)), $safeExtractionDir) !== 0) {
+            $isValidZip = false;
+            break;
+        }
+    }
+
+    if ($isValidZip) {
+        // 使用固定的、安全的目录进行解压，不接受用户输入作为目标路径
+        $zip->extractTo($safeExtractionDir); 
+        echo "文件解压成功！";
+    } else {
+        echo "检测到恶意内容或路径穿越尝试，解压失败！";
+    }
+    $zip->close();
+} else {
+    echo "无法打开压缩包：" . $zipFile;
+}
+?>
+CODE
+	"safefile://ZipExtractWithSanitization.php": <<<CODE
+<?php
+// 安全的解压目录
+$targetDir = '/var/www/html/safe_uploads/';
+if (!is_dir($targetDir)) {
+    mkdir($targetDir, 0755, true);
+}
+
+// 假设上传了一个zip文件
+$uploadedZipFile = 'uploaded_safe.zip'; // 假设这是经过安全处理的文件名
+
+$zip = new ZipArchive;
+$res = $zip->open($uploadedZipFile);
+if ($res === TRUE) {
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $entryName = $zip->getNameIndex($i);
+        $absolutePath = $targetDir . $entryName;
+
+        // 1. 过滤掉路径穿越字符
+        if (strpos($entryName, '../') !== false || strpos($entryName, '..\\') !== false) {
+            error_log("恶意文件路径 detected: " . $entryName);
+            continue;
+        }
+        
+        // 2. 规范化路径，确保文件解压到指定目录内
+        $realTargetPath = realpath($targetDir . dirname($entryName));
+        if ($realTargetPath === false || strpos($realTargetPath, realpath($targetDir)) !== 0) {
+            error_log("目标路径不在允许的范围内: " . $entryName);
+            continue;
+        }
+
+        // 3. 只解压到安全的根目录，不使用压缩包内的相对路径
+        // 如果需要创建子目录，应手动创建且遵循安全规则
+        if (basename($entryName) != $entryName) { // 如果是带有路径的文件
+            $subDir = dirname($entryName);
+            $fullSubDirPath = $targetDir . $subDir; 
+            if (!is_dir($fullSubDirPath)) {
+                mkdir($fullSubDirPath, 0755, true); // 安全地创建子目录
+            }
+        }
+
+        // 每次解压一个文件，并确保目标路径是安全的
+        $zip->extractTo($targetDir, array($entryName));
+        echo "解压文件: " . $entryName . " 到 " . $targetDir . "\n";
+    }
+    $zip->close();
+    echo "所有安全文件已解压。\n";
+} else {
+    echo "无法打开ZIP文件。\n";
+}
+
+?>
+CODE
 )

@@ -152,4 +152,46 @@ public class JdbcExample {
     }
 }
 UNSAFE
+	"safefile://SafePreparedStatementExample.java": <<<CODE
+import java.sql.*;
+import jakarta.servlet.http.HttpServletRequest;
+
+public class SafePreparedStatementExample {
+    public void getUserDataSafe(HttpServletRequest request, Connection connection) {
+        String userId = request.getParameter("id");
+        String query = "SELECT * FROM users WHERE id = ?"; // 使用参数占位符
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            // 对用户输入进行适当的类型转换（如Integer.parseInt）并绑定参数
+            // 确保用户输入是数字，防止NumberFormatException
+            int id = Integer.parseInt(userId);
+            pstmt.setInt(1, id);
+            ResultSet rs = pstmt.executeQuery();
+            // ... 处理结果
+        } catch (NumberFormatException e) {
+            // 处理用户输入不是数字的情况
+            System.err.println("Invalid user ID format: " + userId);
+        } catch (SQLException e) {
+            // 处理数据库操作异常
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://SafePreparedStatementNoReqParamExample.java": <<<CODE
+import java.sql.*;
+
+public class SafePreparedStatementNoReqParamExample {
+    public void getUserDataFromDatabase(int userId, Connection connection) {
+        String query = "SELECT * FROM products WHERE product_id = ?"; // 使用参数占位符
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, userId); // 直接绑定已验证的整数参数
+            ResultSet rs = pstmt.executeQuery();
+            // ... 处理结果
+        } catch (SQLException e) {
+            // 处理数据库操作异常
+            e.printStackTrace();
+        }
+    }
+}
+CODE
 )
