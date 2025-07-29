@@ -1,6 +1,7 @@
 package rag
 
 import (
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/embedding"
 	"github.com/yaklang/yaklang/common/consts"
@@ -12,8 +13,6 @@ type KnowledgeBaseConfig struct {
 	// embedding 配置
 	ModelName string
 	Dimension int
-	Endpoint  string
-	APIKey    string
 
 	// hnsw 配置
 	DistanceFuncType      string
@@ -24,14 +23,14 @@ type KnowledgeBaseConfig struct {
 
 	// ai 配置
 	AIOptions []aispec.AIConfigOption
+
+	EmbeddingClient aispec.EmbeddingCaller
 }
 
 func NewKnowledgeBaseConfig(options ...any) *KnowledgeBaseConfig {
 	defaultConfig := &KnowledgeBaseConfig{
 		ModelName:             "Qwen3-Embedding-0.6B-Q8_0",
 		Dimension:             1024,
-		Endpoint:              "http://127.0.0.1:11434/embeddings",
-		APIKey:                "",
 		DistanceFuncType:      "cosine",
 		MaxNeighbors:          16,
 		LayerGenerationFactor: 0.25,
@@ -55,10 +54,10 @@ func NewKnowledgeBaseConfig(options ...any) *KnowledgeBaseConfig {
 
 type RAGOption func(config *KnowledgeBaseConfig)
 
-// WithEmbeddingEndpoint 设置embedding端点
-func WithEmbeddingEndpoint(endpoint string) RAGOption {
+// WithEmbeddingClient 设置embedding客户端
+func WithEmbeddingClient(client aispec.EmbeddingCaller) RAGOption {
 	return func(config *KnowledgeBaseConfig) {
-		config.Endpoint = endpoint
+		config.EmbeddingClient = client
 	}
 }
 
@@ -66,13 +65,6 @@ func WithEmbeddingEndpoint(endpoint string) RAGOption {
 func WithEmbeddingModel(model string) RAGOption {
 	return func(config *KnowledgeBaseConfig) {
 		config.ModelName = model
-	}
-}
-
-// WithEmbeddingAPIKey 设置embedding API密钥
-func WithEmbeddingAPIKey(apiKey string) RAGOption {
-	return func(config *KnowledgeBaseConfig) {
-		config.APIKey = apiKey
 	}
 }
 
@@ -109,16 +101,15 @@ func WithHNSWParameters(m int, ml float64, efSearch, efConstruct int) RAGOption 
 	}
 }
 
-// KnowledgeBaseIsExists 检查知识库是否存在
-func KnowledgeBaseIsExists(name string) bool {
-	db := consts.GetGormProfileDatabase()
+// CollectionIsExists 检查知识库是否存在
+func CollectionIsExists(db *gorm.DB, name string) bool {
 	collections := []*schema.VectorStoreCollection{}
 	db.Model(&schema.VectorStoreCollection{}).Where("name = ?", name).Find(&collections)
 	return len(collections) > 0
 }
 
-// CreateKnowledgeBase 创建知识库
-func CreateKnowledgeBase(name string, description string, opts ...any) (*RAGSystem, error) {
+// CreateCollection 创建知识库
+func CreateCollection(db *gorm.DB, name string, description string, opts ...any) (*RAGSystem, error) {
 	// 创建知识库配置
 	cfg := NewKnowledgeBaseConfig(opts...)
 
@@ -136,51 +127,57 @@ func CreateKnowledgeBase(name string, description string, opts ...any) (*RAGSyst
 	}
 
 	// 检查集合是否存在
-	if KnowledgeBaseIsExists(name) {
+	if CollectionIsExists(db, name) {
 		return nil, utils.Errorf("集合 %s 已存在", name)
 	}
 
-	db := consts.GetGormProfileDatabase()
 	// 创建集合
 	db.Create(&collection)
-	return LoadKnowledgeBase(name, cfg.AIOptions...)
+	if cfg.EmbeddingClient != nil {
+		return LoadCollectionWithEmbeddingClient(db, name, cfg.EmbeddingClient, cfg.AIOptions...)
+	}
+	return LoadCollection(db, name, cfg.AIOptions...)
 }
-
-// LoadKnowledgeBase 加载知识库
-func LoadKnowledgeBase(name string, opts ...aispec.AIConfigOption) (*RAGSystem, error) {
-	// 创建嵌入客户端适配器
-	embedder := embedding.NewOpenaiEmbeddingClient(opts...)
-	db := consts.GetGormProfileDatabase()
+func LoadCollectionWithEmbeddingClient(db *gorm.DB, name string, client aispec.EmbeddingCaller, opts ...aispec.AIConfigOption) (*RAGSystem, error) {
 	// 创建 SQLite 向量存储
-	store, err := LoadSQLiteVectorStoreHNSW(db, name, embedder)
+	store, err := LoadSQLiteVectorStoreHNSW(db, name, client)
 	if err != nil {
 		return nil, utils.Errorf("创建 SQLite 向量存储失败: %v", err)
 	}
 	// 创建 RAG 系统
-	ragSystem := NewRAGSystem(embedder, store)
+	ragSystem := NewRAGSystem(client, store)
 
 	return ragSystem, nil
 }
 
-// CreateOrLoadKnowledgeBase 创建或加载知识库
-func CreateOrLoadKnowledgeBase(name string, description string, opts ...any) (*RAGSystem, error) {
-	cfg := NewKnowledgeBaseConfig(opts...)
-	if KnowledgeBaseIsExists(name) {
-		return LoadKnowledgeBase(name, cfg.AIOptions...)
-	}
-	return CreateKnowledgeBase(name, description, opts...)
+// LoadCollection 加载知识库
+func LoadCollection(db *gorm.DB, name string, opts ...aispec.AIConfigOption) (*RAGSystem, error) {
+	// 创建嵌入客户端适配器
+	embedder := embedding.NewOpenaiEmbeddingClient(opts...)
+	return LoadCollectionWithEmbeddingClient(db, name, embedder, opts...)
 }
 
-// DeleteKnowledgeBase 删除知识库
-func DeleteKnowledgeBase(name string) error {
-	db := consts.GetGormProfileDatabase()
+// CreateOrLoadCollection 创建或加载知识库
+func CreateOrLoadCollection(db *gorm.DB, name string, description string, opts ...any) (*RAGSystem, error) {
+	cfg := NewKnowledgeBaseConfig(opts...)
+	if CollectionIsExists(db, name) {
+		if cfg.EmbeddingClient != nil {
+			return LoadCollectionWithEmbeddingClient(db, name, cfg.EmbeddingClient, cfg.AIOptions...)
+		}
+		return LoadCollection(db, name, cfg.AIOptions...)
+	} else {
+		return CreateCollection(db, name, description, opts...)
+	}
+}
+
+// DeleteCollection 删除知识库
+func DeleteCollection(db *gorm.DB, name string) error {
 	db.Model(&schema.VectorStoreCollection{}).Where("name = ?", name).Unscoped().Delete(&schema.VectorStoreCollection{})
 	return nil
 }
 
-// ListKnowledgeBases 获取所有知识库列表
-func ListKnowledgeBases() []string {
-	db := consts.GetGormProfileDatabase()
+// ListCollections 获取所有知识库列表
+func ListCollections(db *gorm.DB) []string {
 	collections := []*schema.VectorStoreCollection{}
 	db.Model(&schema.VectorStoreCollection{}).Find(&collections)
 	names := []string{}
@@ -190,7 +187,7 @@ func ListKnowledgeBases() []string {
 	return names
 }
 
-type KnowledgeBaseInfo struct {
+type CollectionInfo struct {
 	Name        string
 	Description string
 	ModelName   string
@@ -210,9 +207,8 @@ type KnowledgeBaseInfo struct {
 	ConnectionCount   int         // 总连接数
 }
 
-// GetKnowledgeBaseInfo 获取知识库信息
-func GetKnowledgeBaseInfo(name string) (*KnowledgeBaseInfo, error) {
-	db := consts.GetGormProfileDatabase()
+// GetCollectionInfo 获取知识库信息
+func GetCollectionInfo(db *gorm.DB, name string) (*CollectionInfo, error) {
 	var collections []*schema.VectorStoreCollection
 	dbErr := db.Model(&schema.VectorStoreCollection{}).Where("name = ?", name).Find(&collections)
 	if dbErr.Error != nil {
@@ -268,7 +264,7 @@ func GetKnowledgeBaseInfo(name string) (*KnowledgeBaseInfo, error) {
 		minNeighbors = 0
 	}
 
-	return &KnowledgeBaseInfo{
+	return &CollectionInfo{
 		Name:        collection.Name,
 		Description: collection.Description,
 		ModelName:   collection.ModelName,
@@ -290,10 +286,10 @@ func GetKnowledgeBaseInfo(name string) (*KnowledgeBaseInfo, error) {
 }
 
 // AddDocument 添加文档
-func AddDocument(knowledgeBaseName, documentName string, document string, metadata map[string]any, opts ...any) error {
+func AddDocument(db *gorm.DB, knowledgeBaseName, documentName string, document string, metadata map[string]any, opts ...any) error {
 	cfg := NewKnowledgeBaseConfig(opts...)
 
-	ragSystem, err := LoadKnowledgeBase(knowledgeBaseName, cfg.AIOptions...)
+	ragSystem, err := LoadCollection(db, knowledgeBaseName, cfg.AIOptions...)
 	if err != nil {
 		return utils.Errorf("加载知识库失败: %v", err)
 	}
@@ -306,9 +302,9 @@ func AddDocument(knowledgeBaseName, documentName string, document string, metada
 }
 
 // DeleteDocument 删除文档
-func DeleteDocument(knowledgeBaseName, documentName string, opts ...any) error {
+func DeleteDocument(db *gorm.DB, knowledgeBaseName, documentName string, opts ...any) error {
 	cfg := NewKnowledgeBaseConfig(opts...)
-	ragSystem, err := LoadKnowledgeBase(knowledgeBaseName, cfg.AIOptions...)
+	ragSystem, err := LoadCollection(db, knowledgeBaseName, cfg.AIOptions...)
 	if err != nil {
 		return utils.Errorf("加载知识库失败: %v", err)
 	}
@@ -316,10 +312,10 @@ func DeleteDocument(knowledgeBaseName, documentName string, opts ...any) error {
 }
 
 // QueryDocuments 查询文档
-func QueryDocuments(knowledgeBaseName, query string, limit int, opts ...any) ([]SearchResult, error) {
+func QueryDocuments(db *gorm.DB, knowledgeBaseName, query string, limit int, opts ...any) ([]SearchResult, error) {
 	cfg := NewKnowledgeBaseConfig(opts...)
 
-	ragSystem, err := LoadKnowledgeBase(knowledgeBaseName, cfg.AIOptions...)
+	ragSystem, err := LoadCollection(db, knowledgeBaseName, cfg.AIOptions...)
 	if err != nil {
 		return nil, utils.Errorf("加载知识库失败: %v", err)
 	}
@@ -327,28 +323,43 @@ func QueryDocuments(knowledgeBaseName, query string, limit int, opts ...any) ([]
 }
 
 // QueryDocumentsWithAISummary 查询文档并生成摘要
-func QueryDocumentsWithAISummary(knowledgeBaseName, query string, limit int, opts ...any) (string, error) {
+func QueryDocumentsWithAISummary(db *gorm.DB, knowledgeBaseName, query string, limit int, opts ...any) (string, error) {
 	// TODO: 实现查询文档并生成摘要
 	return "", nil
 }
 
 // 导出的公共函数
 var Exports = map[string]interface{}{
-	"CreateKnowledgeBase":  CreateKnowledgeBase,
-	"LoadKnowledgeBase":    LoadKnowledgeBase,
-	"DeleteKnowledgeBase":  DeleteKnowledgeBase,
-	"ListKnowledgeBases":   ListKnowledgeBases,
-	"GetKnowledgeBaseInfo": GetKnowledgeBaseInfo,
+	"CreateCollection": func(name string, description string, opts ...any) (*RAGSystem, error) {
+		return CreateCollection(consts.GetGormProfileDatabase(), name, description, opts...)
+	},
+	"LoadCollection": func(name string, opts ...aispec.AIConfigOption) (*RAGSystem, error) {
+		return LoadCollection(consts.GetGormProfileDatabase(), name, opts...)
+	},
+	"DeleteCollection": func(name string) error {
+		return DeleteCollection(consts.GetGormProfileDatabase(), name)
+	},
+	"ListCollections": func() []string {
+		return ListCollections(consts.GetGormProfileDatabase())
+	},
+	"GetCollectionInfo": func(name string) (*CollectionInfo, error) {
+		return GetCollectionInfo(consts.GetGormProfileDatabase(), name)
+	},
 
-	"AddDocument":                 AddDocument,
-	"DeleteDocument":              DeleteDocument,
-	"QueryDocuments":              QueryDocuments,
-	"QueryDocumentsWithAISummary": QueryDocumentsWithAISummary,
-
-	"embeddingEndpoint": WithEmbeddingEndpoint,
-	"embeddingModel":    WithEmbeddingModel,
-	"embeddingAPIKey":   WithEmbeddingAPIKey,
-	"modelDimension":    WithModelDimension,
-	"cosineDistance":    WithCosineDistance,
-	"hnswParameters":    WithHNSWParameters,
+	"AddDocument": func(knowledgeBaseName, documentName string, document string, metadata map[string]any, opts ...any) error {
+		return AddDocument(consts.GetGormProfileDatabase(), knowledgeBaseName, documentName, document, metadata, opts...)
+	},
+	"DeleteDocument": func(knowledgeBaseName, documentName string, opts ...any) error {
+		return DeleteDocument(consts.GetGormProfileDatabase(), knowledgeBaseName, documentName, opts...)
+	},
+	"QueryDocuments": func(knowledgeBaseName, query string, limit int, opts ...any) ([]SearchResult, error) {
+		return QueryDocuments(consts.GetGormProfileDatabase(), knowledgeBaseName, query, limit, opts...)
+	},
+	"QueryDocumentsWithAISummary": func(knowledgeBaseName, query string, limit int, opts ...any) (string, error) {
+		return QueryDocumentsWithAISummary(consts.GetGormProfileDatabase(), knowledgeBaseName, query, limit, opts...)
+	},
+	"embeddingModel": WithEmbeddingModel,
+	"modelDimension": WithModelDimension,
+	"cosineDistance": WithCosineDistance,
+	"hnswParameters": WithHNSWParameters,
 }

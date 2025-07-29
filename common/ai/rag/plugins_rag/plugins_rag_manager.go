@@ -55,7 +55,7 @@ func NewSQLitePluginsRagManager(db *gorm.DB, collectionName string, modelName st
 		ragOptions = append(ragOptions, opt)
 	}
 
-	ragSystem, err := rag.CreateOrLoadKnowledgeBase(collectionName, "用于储存 Yaklang 插件的 RAG 系统", ragOptions...)
+	ragSystem, err := rag.CreateOrLoadCollection(db, collectionName, "用于储存 Yaklang 插件的 RAG 系统", ragOptions...)
 	if err != nil {
 		return nil, utils.Errorf("创建基于 SQLite 的 RAG 系统失败: %v", err)
 	}

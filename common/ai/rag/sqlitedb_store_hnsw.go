@@ -164,6 +164,7 @@ func (s *SQLiteVectorStoreHNSW) toDocument(doc *schema.VectorStoreDocument) Docu
 		ID:        doc.DocumentID,
 		Metadata:  map[string]any(doc.Metadata),
 		Embedding: []float32(doc.Embedding),
+		Content:   doc.Content,
 	}
 }
 
@@ -174,6 +175,7 @@ func (s *SQLiteVectorStoreHNSW) toSchemaDocument(doc Document) *schema.VectorSto
 		CollectionID: s.collection.ID,
 		Metadata:     schema.MetadataMap(doc.Metadata),
 		Embedding:    schema.FloatArray(doc.Embedding),
+		Content:      doc.Content,
 	}
 }
 
@@ -213,6 +215,7 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 			// 更新现有文档
 			existingDoc.Metadata = schemaDoc.Metadata
 			existingDoc.Embedding = schemaDoc.Embedding
+			existingDoc.Content = schemaDoc.Content
 
 			if err := tx.Save(&existingDoc).Error; err != nil {
 				tx.Rollback()
@@ -268,7 +271,7 @@ func (s *SQLiteVectorStoreHNSW) Search(query string, page, limit int) ([]SearchR
 	}
 
 	var docs []schema.VectorStoreDocument
-	if err := s.db.Where("collection_id = ?", s.collection.ID).Where("document_id IN (?)", resultIds).Find(&docs).Error; err != nil {
+	if err := s.db.Model(&schema.VectorStoreDocument{}).Find(&docs).Error; err != nil {
 		return nil, utils.Errorf("查询文档失败: %v", err)
 	}
 
@@ -325,7 +328,7 @@ func (s *SQLiteVectorStoreHNSW) Delete(ids ...string) error {
 	}()
 
 	for _, id := range ids {
-		if err := tx.Where("document_id = ?", id).Delete(&schema.VectorStoreDocument{}).Error; err != nil {
+		if err := tx.Where("document_id = ?", id).Unscoped().Delete(&schema.VectorStoreDocument{}).Error; err != nil {
 			tx.Rollback()
 			return utils.Errorf("删除文档 %s 失败: %v", id, err)
 		}
