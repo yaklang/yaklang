@@ -24,6 +24,7 @@ type options struct {
 	outputAudioFile string
 	audioSampleRate int
 	audioChannels   int
+	audioBitrate    string // e.g., "128k"
 
 	// Frame-specific options
 	outputDir          string
@@ -35,6 +36,13 @@ type options struct {
 	sceneThreshold     float64
 	framesPerSecond    float64
 	frameQuality       int
+
+	// Image-specific options
+	targetImageSize int64 // Target size in bytes
+
+	// Subtitle-specific options
+	subtitleFile    string
+	outputVideoFile string
 }
 
 // frameExtractionMode defines the method for frame extraction.
@@ -59,6 +67,7 @@ func newDefaultOptions() *options {
 		frameQuality:       2,
 		sceneThreshold:     0.4, // A sensible default
 		framesPerSecond:    1,
+		targetImageSize:    200 * 1024, // Default 200KB
 	}
 }
 
@@ -111,6 +120,13 @@ func WithChannels(channels int) Option {
 		if channels > 0 {
 			o.audioChannels = channels
 		}
+	}
+}
+
+// WithAudioBitrate sets the target bitrate for audio compression (e.g., "128k").
+func WithAudioBitrate(bitrate string) Option {
+	return func(o *options) {
+		o.audioBitrate = bitrate
 	}
 }
 
@@ -184,5 +200,32 @@ func WithFrameQuality(quality int) Option {
 func WithCustomVideoFilter(filter string) Option {
 	return func(o *options) {
 		o.customVideoFilter = filter
+	}
+}
+
+// --- Image Options ---
+
+// WithTargetImageSize sets the target file size in bytes for image compression.
+func WithTargetImageSize(sizeInBytes int64) Option {
+	return func(o *options) {
+		if sizeInBytes > 0 {
+			o.targetImageSize = sizeInBytes
+		}
+	}
+}
+
+// --- Subtitle/Video Options ---
+
+// WithSubtitleFile specifies the path to the SRT subtitle file to burn in.
+func WithSubtitleFile(filepath string) Option {
+	return func(o *options) {
+		o.subtitleFile = filepath
+	}
+}
+
+// WithOutputVideoFile specifies the path for the final output video.
+func WithOutputVideoFile(filepath string) Option {
+	return func(o *options) {
+		o.outputVideoFile = filepath
 	}
 }
