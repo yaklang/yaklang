@@ -224,7 +224,7 @@ func (s *SQLiteVectorStore) Delete(ids ...string) error {
 	}()
 
 	for _, id := range ids {
-		if err := tx.Where("document_id = ?", id).Delete(&schema.VectorStoreDocument{}).Error; err != nil {
+		if err := tx.Where("document_id = ?", id).Unscoped().Delete(&schema.VectorStoreDocument{}).Error; err != nil {
 			tx.Rollback()
 			return utils.Errorf("删除文档 %s 失败: %v", id, err)
 		}

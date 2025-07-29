@@ -283,6 +283,10 @@ jobs:
             run: |
               go test -timeout 1m ./common/ai/rag
               go test -timeout 1m -run TestMUSTPASS ./common/ai/rag/plugins_rag/...
+              
+          - name: Test Knowledge Base
+            run: |
+              go test -timeout 1m -run TestMUSTPASS ./common/yakgrpc/yakit
 
     steps:
       - name: "Checkout"
