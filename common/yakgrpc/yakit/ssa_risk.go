@@ -172,6 +172,10 @@ func FilterSSARisk(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
 				allHashes := append(filter.GetHash(), hashes...)
 				db = bizhelper.ExactOrQueryStringArrayOr(db, "hash", allHashes)
 			}
+		} else {
+			// 如果不存在新增risk, 则不会返回任何值
+			db = db.Where("1 = 0")
+			return db
 		}
 	}
 

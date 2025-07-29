@@ -487,6 +487,94 @@ alert $high for {
 		})
 	}()
 
+	t.Run("test scan task risk count raw", func(t *testing.T) {
+		taskID1 := uuid.NewString() // 旧的扫描结果
+		taskID2 := uuid.NewString() // 新的扫描结果
+		defer func() {
+			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormDefaultSSADataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
+			yakit.DeleteSSADiffResultByCompare(consts.GetGormDefaultSSADataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
+		}()
+
+		yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
+			Title:       "AA",
+			FromRule:    "AA",
+			RuntimeId:   taskID1,
+			ProgramName: progID,
+		})
+		yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
+			Title:       "BB",
+			FromRule:    "BB",
+			RuntimeId:   taskID2,
+			ProgramName: progID,
+		})
+		yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
+			Title:       "CC",
+			FromRule:    "CC",
+			RuntimeId:   taskID2,
+			ProgramName: progID,
+		})
+
+		res, _ := yakit.DoRiskDiff(context.Background(), &ypb.SSARiskDiffItem{
+			RiskRuntimeId: taskID2,
+		}, &ypb.SSARiskDiffItem{
+			RiskRuntimeId: taskID1,
+		})
+		for re := range res {
+			_ = re
+		}
+
+		rsp, err := yakit.GetSSADiffResult(ssadb.GetDB(), taskID2, taskID1)
+		require.NoError(t, err)
+		require.Equal(t, len(rsp), 3)
+
+		for _, r := range rsp {
+			if r.RuleName == "AA" {
+				require.Equal(t, string(yakit.Del), r.Status)
+				require.Equal(t, taskID2, r.BaseLine)
+				require.Equal(t, taskID1, r.Compare)
+			}
+			if r.RuleName == "BB" {
+				require.Equal(t, string(yakit.Add), r.Status)
+				require.Equal(t, taskID2, r.BaseLine)
+				require.Equal(t, taskID1, r.Compare)
+			}
+			if r.RuleName == "CC" {
+				require.Equal(t, string(yakit.Add), r.Status)
+				require.Equal(t, taskID2, r.BaseLine)
+				require.Equal(t, taskID1, r.Compare)
+			}
+		}
+	})
+
+	t.Run("test scan task equal risk count raw", func(t *testing.T) {
+		taskID1 := uuid.NewString() // 旧的扫描结果
+		taskID2 := uuid.NewString() // 新的扫描结果
+		defer func() {
+			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormDefaultSSADataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
+			yakit.DeleteSSADiffResultByCompare(consts.GetGormDefaultSSADataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
+		}()
+
+		yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
+			Title:       "AA",
+			FromRule:    "AA",
+			RuntimeId:   taskID1,
+			ProgramName: progID,
+		})
+
+		res, _ := yakit.DoRiskDiff(context.Background(), &ypb.SSARiskDiffItem{
+			RiskRuntimeId: taskID1,
+		}, &ypb.SSARiskDiffItem{
+			RiskRuntimeId: taskID1,
+		})
+		for re := range res {
+			_ = re
+		}
+
+		rsp, err := yakit.GetSSADiffResult(ssadb.GetDB(), taskID2, taskID1)
+		require.NoError(t, err)
+		require.Equal(t, len(rsp), 0)
+	})
+
 	t.Run("test scan task risk count", func(t *testing.T) {
 		defer func() {
 			err = schema.DeleteSyntaxFlowScanTask(ssadb.GetDB(), taskID1)
