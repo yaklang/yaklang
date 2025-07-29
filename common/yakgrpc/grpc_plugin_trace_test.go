@@ -704,6 +704,7 @@ func TestGRPCMUSTPASS_PluginTraceWithoutMITM(t *testing.T) {
 	// 不设置MixPluginCaller，模拟MITM未启动
 	traceCtx, traceCancel := context.WithCancel(context.Background())
 	defer traceCancel()
+	UnsetMixPluginCaller()
 
 	traceStream, err := client.PluginTrace(traceCtx)
 	require.NoError(t, err)

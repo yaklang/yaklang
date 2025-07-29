@@ -291,7 +291,6 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 	mitmPluginCaller.SetFeedback(execFeedback)
 	mitmPluginCaller.SetDividedContext(true)
-	mitmPluginCaller.EnableExecutionTracing(true)
 	mitmPluginCaller.SetConcurrent(20)
 	mitmPluginCaller.SetLoadPluginTimeout(10)
 	mitmPluginCaller.SetCallPluginTimeout(consts.GetGlobalCallerCallPluginTimeout())
@@ -1564,7 +1563,8 @@ func (s *Server) PluginTrace(stream ypb.Yak_PluginTraceServer) error {
 		}
 	}()
 
-	ctx := stream.Context()
+	ctx, cancel := context.WithCancel(stream.Context())
+	defer cancel()
 	log.Info("插件跟踪流连接建立")
 
 	emptyResp := &ypb.PluginTraceResponse{
