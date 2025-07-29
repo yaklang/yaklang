@@ -133,7 +133,8 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	}
 
 	if codeRange == nil {
-		log.Errorf("Range not found for %s", inst.GetName())
+		// TODO:解决没有codeRange的问题
+		//log.Errorf("Range not found for %s", inst.GetName())
 	}
 
 	// inst.SetRange(codeRange)
