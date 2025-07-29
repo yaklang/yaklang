@@ -1,10 +1,12 @@
 package screcorder
 
 import (
-	"github.com/davecgh/go-spew/spew"
+	"context"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 func TestFFmpeg_List(t *testing.T) {
@@ -24,14 +26,31 @@ func TestFFmpeg_List(t *testing.T) {
 }
 
 func TestRecorder_Start(t *testing.T) {
-	os.Remove("/tmp/abc.mp4")
-	recorder := NewRecorder()
-	err := recorder.Start("/tmp/abc.mp4")
-	if err != nil {
-		panic(err)
+	devices := GetDarwinAvailableAVFoundationScreenDevices()
+	if len(devices) == 0 {
+		t.Skip("no screen device found")
+		return
 	}
+	device := devices[0]
+
+	recorder, err := NewScreenRecorder(nil, device)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer recorder.Close()
+
+	err = recorder.Start(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	time.Sleep(3 * time.Second)
+
 	recorder.Stop()
-	time.Sleep(2 * time.Second)
-	spew.Dump(recorder.OutputFiles())
+
+	t.Log("record file:", recorder.Filename())
+	_, err = os.Stat(recorder.Filename())
+	if err != nil {
+		t.Fatal(err)
+	}
 }

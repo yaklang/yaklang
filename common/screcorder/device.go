@@ -1,9 +1,10 @@
 package screcorder
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 /*
@@ -19,6 +20,7 @@ type ScreenDevice struct {
 	// in darwin: "1" "2" "3" is ok
 	// linux: ":0.1" ":0.2" ":0.3"
 	FfmpegInputName string
+	PlatformDemuxer string
 }
 
 var darwinAVFoundationStripper = regexp.MustCompile(`\[AVFoundation indev @ 0x[0-9a-fA-F]{12}]\s+`)
@@ -49,6 +51,7 @@ func parseDarwinAVFoundationListDevices(raw string) []*ScreenDevice {
 					picked = append(picked, &ScreenDevice{
 						DeviceName:      deviceNameVerbose,
 						FfmpegInputName: deviceName,
+						PlatformDemuxer: "avfoundation",
 					})
 				}
 			}
