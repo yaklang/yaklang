@@ -3,6 +3,7 @@ package schema
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"strings"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -185,11 +186,104 @@ type VectorStoreDocument struct {
 	// 文档的嵌入向量，以 JSON 格式存储
 	Embedding FloatArray `gorm:"type:text;not null" json:"embedding"`
 
+	// 文档的原始文本
+	Content string `gorm:"type:text" json:"content"`
+
 	// HNSW 算法中节点存在的最高层级
 	MaxLayer int `gorm:"default:0" json:"max_layer"`
 }
 
+// StringArray 用于存储字符串数组的自定义类型
+// 实现了 driver.Valuer 和 sql.Scanner 接口，支持数据库存储和读取
+type StringArray []string
+
+// Value 实现 driver.Valuer 接口，用于将 []string 转换为数据库可以存储的值
+func (s StringArray) Value() (driver.Value, error) {
+	if s == nil {
+		return nil, nil
+	}
+	// 使用逗号分隔的字符串格式存储
+	return strings.Join(s, ","), nil
+}
+
+// Scan 实现 sql.Scanner 接口，用于将数据库存储的值转换回 []string
+func (s *StringArray) Scan(value interface{}) error {
+	if value == nil {
+		*s = nil
+		return nil
+	}
+	var str string
+	switch v := value.(type) {
+	case []byte:
+		str = string(v)
+	case string:
+		str = v
+	default:
+		return utils.Errorf("不支持的类型: %T", value)
+	}
+
+	// 处理空字符串的情况
+	if str == "" {
+		*s = StringArray{}
+		return nil
+	}
+
+	// 使用逗号分隔字符串并去除空白
+	parts := utils.StringSplitAndStrip(str, ",")
+	*s = StringArray(parts)
+	return nil
+}
+
+type KnowledgeBaseInfo struct {
+	gorm.Model
+
+	// 知识库名称(唯一)
+	KnowledgeBaseName string `gorm:"unique_index;not null" json:"knowledge_base_name"`
+
+	// 知识库描述
+	KnowledgeBaseDescription string `gorm:"type:text" json:"knowledge_base_description"`
+
+	// 知识库类型
+	KnowledgeBaseType string `gorm:"index:idx_knowledge_base_type;not null" json:"knowledge_base_type"`
+}
+
+// KnowledgeBase 表示知识库条目
+// 用于存储各种标准、指南等知识库信息
+type KnowledgeBaseEntry struct {
+	gorm.Model
+
+	// 知识库名称
+	KnowledgeBaseID int64 `gorm:"unique_index:idx_knowledge_title_knowledge_base_id;index:idx_knowledge_base_id;not null" json:"knowledge_base_id"`
+
+	// 知识标题(和知识库名称应该是联合唯一索引)
+	KnowledgeTitle string `gorm:"unique_index:idx_knowledge_title_knowledge_base_id;index:idx_knowledge_title;not null" json:"knowledge_title"`
+
+	// 知识类型（如：CoreConcept、Standard、Guideline等）
+	KnowledgeType string `gorm:"index:idx_knowledge_type;not null" json:"knowledge_type"`
+
+	// 重要性评分（1-10）
+	ImportanceScore int `gorm:"index:idx_importance_score" json:"importance_score"`
+
+	// 关键词列表，用于快速搜索和分类
+	Keywords StringArray `gorm:"type:text" json:"keywords"`
+
+	// 知识详细信息，包含具体内容描述
+	KnowledgeDetails string `gorm:"type:text" json:"knowledge_details"`
+
+	// 知识摘要，简要概述
+	Summary string `gorm:"type:text" json:"summary"`
+
+	// 来源页码或章节编号
+	SourcePage int `gorm:"index:idx_source_page" json:"source_page"`
+
+	// 潜在问题列表，这些问题可能与该知识条目相关
+	PotentialQuestions StringArray `gorm:"type:text" json:"potential_questions"`
+
+	// 潜在问题向量，用于快速搜索潜在问题
+	PotentialQuestionsVector FloatArray `gorm:"type:text" json:"potential_questions_vector"`
+}
+
 func init() {
 	// 注册数据库表结构到系统中
-	RegisterDatabaseSchema(KEY_SCHEMA_PROFILE_DATABASE, &VectorStoreCollection{}, &VectorStoreDocument{})
+	RegisterDatabaseSchema(KEY_SCHEMA_PROFILE_DATABASE, &VectorStoreCollection{}, &VectorStoreDocument{}, &KnowledgeBaseInfo{}, &KnowledgeBaseEntry{})
 }
