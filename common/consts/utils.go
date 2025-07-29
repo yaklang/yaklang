@@ -253,3 +253,42 @@ func GetWhisperServerBinaryPath() string {
 	}
 	return utils.GetFirstExistedFile(paths...)
 }
+
+func GetWhisperSileroVADPath() string {
+	defaultPath := GetDefaultYakitProjectsDir()
+	var paths []string
+	paths = append(paths, filepath.Join(defaultPath, "libs", "whisper.cpp", "silero-vad-v5.1.2.bin"))
+	paths = append(paths, filepath.Join(defaultPath, "libs", "silero-vad-v5.1.2.bin"))
+	paths = append(paths, filepath.Join(defaultPath, "base", "whisper.cpp", "silero-vad-v5.1.2.bin"))
+	paths = append(paths, filepath.Join(defaultPath, "base", "silero-vad-v5.1.2.bin"))
+	paths = append(paths, filepath.Join(defaultPath, "engine", "whisper.cpp", "silero-vad-v5.1.2.bin"))
+	paths = append(paths, filepath.Join(defaultPath, "engine", "silero-vad-v5.1.2.bin"))
+	paths = append(paths, filepath.Join(defaultPath, "silero-vad-v5.1.2.bin"))
+	paths = append(paths, "silero-vad-v5.1.2.bin")
+	return utils.GetFirstExistedFile(paths...)
+}
+
+func GetWhisperCliBinaryPath() string {
+	defaultPath := GetDefaultYakitProjectsDir()
+	var paths []string
+	if runtime.GOOS == "windows" {
+		paths = append(paths, filepath.Join(defaultPath, "libs", "whisper.cpp", "whisper-cli.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "libs", "whisper-cli.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "base", "whisper.cpp", "whisper-cli.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "base", "whisper-cli.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "whisper.cpp", "whisper-cli.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "whisper-cli.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "whisper-cli.exe"))
+		paths = append(paths, "whisper-cli.exe")
+	} else {
+		paths = append(paths, filepath.Join(defaultPath, "libs", "whisper.cpp", "whisper-cli"))
+		paths = append(paths, filepath.Join(defaultPath, "libs", "whisper-cli"))
+		paths = append(paths, filepath.Join(defaultPath, "base", "whisper.cpp", "whisper-cli"))
+		paths = append(paths, filepath.Join(defaultPath, "base", "whisper-cli"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "whisper.cpp", "whisper-cli"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "whisper-cli"))
+		paths = append(paths, filepath.Join(defaultPath, "whisper-cli"))
+		paths = append(paths, "whisper-cli")
+	}
+	return utils.GetFirstExistedFile(paths...)
+}
