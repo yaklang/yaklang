@@ -91,11 +91,13 @@ func TestSmoke_ExtractFrames_SceneChange(t *testing.T) {
 	assert.NotNil(t, resultsChan)
 
 	// 3. Assertion: Ensure at least one frame was extracted
-	var extractedFrames []string
+	var extractedFrames [][]byte
 	for res := range resultsChan {
 		assert.NoError(t, res.Error)
-		if res.FilePath != "" {
-			extractedFrames = append(extractedFrames, res.FilePath)
+		if len(res.RawData) > 0 {
+			extractedFrames = append(extractedFrames, res.RawData)
+			// For smoke test, just check the first one is a valid image
+			assert.NotEmpty(t, res.MIMEType)
 		}
 	}
 	assert.NotEmpty(t, extractedFrames, "should extract at least one frame for scene change")
@@ -122,11 +124,11 @@ func TestSmoke_ExtractKeyframes_TimeRange(t *testing.T) {
 	assert.NotNil(t, resultsChan)
 
 	// 3. Assertion: Ensure at least one frame was extracted in the time range
-	var extractedFrames []string
+	var extractedFrames [][]byte
 	for res := range resultsChan {
 		assert.NoError(t, res.Error)
-		if res.FilePath != "" {
-			extractedFrames = append(extractedFrames, res.FilePath)
+		if len(res.RawData) > 0 {
+			extractedFrames = append(extractedFrames, res.RawData)
 		}
 	}
 	assert.NotEmpty(t, extractedFrames, "should extract at least one frame in the 10s-14s time range")
@@ -176,11 +178,11 @@ func TestCustomVideoFilter(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, resultsChan)
 
-	var extractedFrames []string
+	var extractedFrames [][]byte
 	for res := range resultsChan {
 		assert.NoError(t, res.Error)
-		if res.FilePath != "" {
-			extractedFrames = append(extractedFrames, res.FilePath)
+		if len(res.RawData) > 0 {
+			extractedFrames = append(extractedFrames, res.RawData)
 		}
 	}
 	assert.Len(t, extractedFrames, 10, "should extract exactly 10 frames with custom filter")
@@ -214,11 +216,11 @@ func TestFrameExtractionIncludingFirstAndLast(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, resultsChan)
 
-	var extractedFrames []string
+	var extractedFrames [][]byte
 	for res := range resultsChan {
 		assert.NoError(t, res.Error)
-		if res.FilePath != "" {
-			extractedFrames = append(extractedFrames, res.FilePath)
+		if len(res.RawData) > 0 {
+			extractedFrames = append(extractedFrames, res.RawData)
 		}
 	}
 	// 5s clip at 1fps should give ~5 frames.
@@ -267,7 +269,14 @@ func TestSmoke_CompressImage(t *testing.T) {
 	assert.NoError(t, err)
 	frame := <-frameChan
 	assert.NoError(t, frame.Error)
-	defer os.Remove(frame.FilePath)
+
+	// To compress, we need a file on disk. Write the raw data to a temp file.
+	tempInputImage, err := ioutil.TempFile("", "temp-frame-*.jpg")
+	assert.NoError(t, err)
+	_, err = tempInputImage.Write(frame.RawData)
+	assert.NoError(t, err)
+	tempInputImage.Close()
+	defer os.Remove(tempInputImage.Name())
 
 	// Now, compress the image to be under 20KB
 	outputCompressed, err := ioutil.TempFile("", "compressed-*.jpg")
@@ -276,7 +285,7 @@ func TestSmoke_CompressImage(t *testing.T) {
 	defer os.Remove(outputCompressed.Name())
 
 	targetSize := int64(20 * 1024)
-	err = CompressImage(frame.FilePath, outputCompressed.Name(),
+	err = CompressImage(tempInputImage.Name(), outputCompressed.Name(),
 		WithDebug(true),
 		WithTargetImageSize(targetSize),
 	)
