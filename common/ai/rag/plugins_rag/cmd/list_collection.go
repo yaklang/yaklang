@@ -32,7 +32,7 @@ func listCollection(c *cli.Context) error {
 	fmt.Println(strings.Repeat("=", 80))
 
 	for i, collection := range collections {
-		info, err := rag.GetKnowledgeBaseInfo(collection.Name)
+		info, err := rag.GetCollectionInfo(db, collection.Name)
 		if err != nil {
 			fmt.Printf("获取知识库 %s 信息失败: %v\n", collection.Name, err)
 			continue

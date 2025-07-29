@@ -48,9 +48,10 @@ func getIndexPluginCommand() *cli.Command {
 	}
 }
 func indexPlugins(c *cli.Context) error {
+	db := consts.GetGormProfileDatabase()
 	if c.Bool("reset") {
 		log.Infof("重置并重新生成索引...")
-		rag.DeleteKnowledgeBase(plugins_rag.PLUGIN_RAG_COLLECTION_NAME)
+		rag.DeleteCollection(db, plugins_rag.PLUGIN_RAG_COLLECTION_NAME)
 	}
 
 	model := c.String("model")
@@ -67,7 +68,6 @@ func indexPlugins(c *cli.Context) error {
 	if baseURL != "" {
 		opts = append(opts, aispec.WithBaseURL(baseURL))
 	}
-	db := consts.GetGormProfileDatabase()
 	manager, err := plugins_rag.NewSQLitePluginsRagManager(db, plugins_rag.PLUGIN_RAG_COLLECTION_NAME, model, dimension, metadataFile, opts...)
 	if err != nil {
 		log.Errorf("创建插件 RAG 管理器失败: %v", err)

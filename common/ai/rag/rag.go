@@ -83,6 +83,23 @@ func (r *RAGSystem) DeleteDocuments(ids ...string) error {
 	return r.VectorStore.Delete(ids...)
 }
 
+// ClearDocuments 清空所有文档
+func (r *RAGSystem) ClearDocuments() error {
+	docs, err := r.ListDocuments()
+	if err != nil {
+		return err
+	}
+	ids := []string{}
+	for _, doc := range docs {
+		ids = append(ids, doc.ID)
+	}
+	err = r.VectorStore.Delete(ids...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // GetDocument 获取指定 ID 的文档
 func (r *RAGSystem) GetDocument(id string) (Document, bool, error) {
 	return r.VectorStore.Get(id)
