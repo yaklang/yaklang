@@ -135,7 +135,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			obj := i.NewValue(value.GetObject())
 			key := i.NewValue(value.GetKey())
 			if err := actx.pushObject(obj, key, i); err != nil {
-				log.Errorf("%v", err)
+				//log.Errorf("%v", err)
 				return i.visitedDefs(actx, opt...)
 			}
 			// obj.AppendDependOn(apiValue)
@@ -514,7 +514,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		for key, member := range inst.GetAllMember() {
 			value := i.NewValue(member)
 			if err := actx.pushObject(i, i.NewValue(key), value); err != nil {
-				log.Errorf("push object failed: %v", err)
+				//log.Errorf("push object failed: %v", err)
 				continue
 			}
 			values = append(values, value.getTopDefs(actx, opt...)...)
