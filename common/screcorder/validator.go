@@ -3,13 +3,14 @@ package screcorder
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"os/exec"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func GetDarwinAvailableAVFoundationScreenDevices() []*ScreenDevice {
@@ -42,6 +43,11 @@ func IsAvailable() (bool, error) {
 	consts.GetGormCVEDatabase()
 	switch runtime.GOOS {
 	case "darwin":
+		// On macOS, we must request screen recording permission first.
+		if !RequestScreenRecordingPermission() {
+			return false, utils.Error("screen recording permission was denied by the user")
+		}
+
 		path, err := exec.LookPath(path)
 		if err != nil {
 			return false, utils.Errorf("cannot find executable item[%s] failed: %v", path, err)

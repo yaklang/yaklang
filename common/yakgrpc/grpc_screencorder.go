@@ -2,11 +2,17 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"time"
+
+	"bytes"
+	"os/exec"
+	"strconv"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/schema"
 
@@ -16,11 +22,41 @@ import (
 	"github.com/yaklang/yaklang/common/screcorder"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/utils/ffmpegutils"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc"
 )
+
+func getVideoDuration(videoPath string) (time.Duration, error) {
+	ffprobePath, err := exec.LookPath("ffprobe")
+	if err != nil {
+		return 0, fmt.Errorf("ffprobe not found in PATH")
+	}
+
+	cmd := exec.Command(ffprobePath,
+		"-v", "error",
+		"-show_entries", "format=duration",
+		"-of", "default=noprint_wrappers=1:nokey=1",
+		videoPath,
+	)
+
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err = cmd.Run()
+	if err != nil {
+		return 0, err
+	}
+
+	durationStr := strings.TrimSpace(out.String())
+	durationFloat, err := strconv.ParseFloat(durationStr, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return time.Duration(durationFloat * float64(time.Second)), nil
+}
 
 func (s *Server) QueryScreenRecorders(ctx context.Context, req *ypb.QueryScreenRecorderRequest) (*ypb.QueryScreenRecorderResponse, error) {
 	p, data, err := yakit.QueryScreenRecorder(consts.GetGormProjectDatabase(), req)
@@ -121,31 +157,28 @@ func (s *Server) StartScrecorder(req *ypb.StartScrecorderRequest, stream ypb.Yak
 	if req.GetResolutionSize() != "" {
 		opts = append(opts, screcorder.WithResolutionSize(req.GetResolutionSize()))
 	}
-	recorder := screcorder.NewRecorder(opts...)
+
+	cfg := screcorder.NewDefaultConfig()
+	for _, opt := range opts {
+		opt(cfg)
+	}
+	// TODO: support other platforms
+	devices := screcorder.GetDarwinAvailableAVFoundationScreenDevices()
+	if len(devices) == 0 {
+		return utils.Errorf("no screen device found")
+	}
+	dev := devices[0]
+
+	recorder, err := screcorder.NewScreenRecorder(cfg, dev)
+	if err != nil {
+		return err
+	}
 	go func() {
 		select {
 		case <-stream.Context().Done():
 			recorder.Stop()
 		}
 	}()
-	recorder.OnFileAppended(func(r string) {
-		duration := screcorder.VideoDuration(r)
-		base64Images, err := screcorder.VideoCoverBase64(r)
-		if err != nil {
-			log.Errorf("convert video to base64 failed: %v, use default(empty)", err)
-		}
-		record := &schema.ScreenRecorder{
-			Filename:  r,
-			Project:   proj.ProjectName,
-			Cover:     base64Images,
-			VideoName: filepath.Base(r),
-			Duration:  duration,
-		}
-		err = yakit.CreateOrUpdateScreenRecorder(consts.GetGormProjectDatabase(), record.CalcHash(), record)
-		if err != nil {
-			log.Errorf("save screen recorder failed: %v", err)
-		}
-	})
 
 	projectPath := filepath.Join(consts.GetDefaultYakitProjectsDir(), "records")
 	if utils.GetFirstExistedFile(projectPath) == "" {
@@ -153,7 +186,7 @@ func (s *Server) StartScrecorder(req *ypb.StartScrecorderRequest, stream ypb.Yak
 	}
 
 	var recordName = filepath.Join(projectPath, fmt.Sprintf("screen_records_%v.mp4", utils.DatetimePretty2()))
-	err = recorder.Start(recordName)
+	err = recorder.Start(context.Background())
 	if err != nil {
 		return utils.Errorf("start to execute screen recorder failed: %s", err)
 	}
@@ -164,11 +197,45 @@ func (s *Server) StartScrecorder(req *ypb.StartScrecorderRequest, stream ypb.Yak
 	}
 
 	for {
-		if !recorder.IsRunning() {
+		if !recorder.IsRecording() {
 			break
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
+
+	// move file
+	tmpFilename := recorder.Filename()
+	defer os.Remove(tmpFilename)
+
+	err = utils.CopyFile(tmpFilename, recordName)
+	if err != nil {
+		return err
+	}
+
+	duration, err := getVideoDuration(recordName)
+	if err != nil {
+		log.Warnf("get video duration failed: %v", err)
+	}
+	frameData, err := ffmpegutils.ExtractSpecificFrame(recordName, 1)
+	if err != nil {
+		log.Errorf("convert video to base64 failed: %v, use default(empty)", err)
+	}
+	var base64Images string
+	if frameData != nil {
+		base64Images = base64.StdEncoding.EncodeToString(frameData)
+	}
+	record := &schema.ScreenRecorder{
+		Filename:  recordName,
+		Project:   proj.ProjectName,
+		Cover:     base64Images,
+		VideoName: filepath.Base(recordName),
+		Duration:  fmt.Sprintf("%d", duration.Milliseconds()),
+	}
+	err = yakit.CreateOrUpdateScreenRecorder(consts.GetGormProjectDatabase(), record.CalcHash(), record)
+	if err != nil {
+		log.Errorf("save screen recorder failed: %v", err)
+	}
+
 	return nil
 }
 

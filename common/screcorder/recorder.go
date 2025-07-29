@@ -55,6 +55,7 @@ func (r *ScreenRecorder) startRecordProcess(procCtx context.Context) {
 		ffmpegutils.WithScreenRecordInput(r.device.FfmpegInputName),
 		ffmpegutils.WithScreenRecordFramerate(24),
 		ffmpegutils.WithScreenRecordCaptureCursor(r.config.MouseCapture),
+		ffmpegutils.WithDebug(true),
 	)
 	if err != nil {
 		r.setError(err)
@@ -69,11 +70,20 @@ func (r *ScreenRecorder) startRecordProcess(procCtx context.Context) {
 		err := r.cmd.Wait()
 		r.stopRecord()
 		if err != nil {
-			// Non-zero exit code is expected when we kill the process,
-			// so we only log other errors.
-			if exitErr, ok := err.(*exec.ExitError); !ok || !strings.Contains(exitErr.Error(), "signal: killed") {
-				log.Errorf("screen recording process finished with error: %v", err)
+			// A non-zero exit code is expected when we stop the process.
+			// We log only unexpected errors.
+			if exitErr, ok := err.(*exec.ExitError); !ok {
+				// Not an ExitError, this is an unexpected kind of error.
+				log.Errorf("screen recording process finished with unexpected error: %v", err)
 				r.setError(err)
+			} else {
+				// It is an ExitError, check if it's one of the expected signals from graceful/forceful stop.
+				errMsg := exitErr.Error()
+				if !strings.Contains(errMsg, "signal: killed") && !strings.Contains(errMsg, "signal: interrupt") && !strings.Contains(errMsg, "exit status 255") {
+					log.Errorf("screen recording process finished with error: %v", err)
+					r.setError(err)
+				}
+				// Otherwise, it's an expected shutdown signal, so we don't log it as an error.
 			}
 		}
 	}()
@@ -110,9 +120,17 @@ func (r *ScreenRecorder) stopRecord() {
 
 func (r *ScreenRecorder) Stop() {
 	if r.cmd != nil && r.cmd.Process != nil {
-		_ = r.cmd.Process.Kill()
+		// Send SIGINT to ffmpeg to allow it to shut down gracefully
+		// This is important for it to finalize the video file (e.g., write the moov atom)
+		if err := r.cmd.Process.Signal(os.Interrupt); err != nil {
+			log.Warnf("failed to send SIGINT to ffmpeg, falling back to killing the process: %v", err)
+			// If sending a graceful signal fails, force kill it
+			_ = r.cmd.Process.Kill()
+		}
 	}
-	r.stopRecord()
+	// DO NOT call r.stopRecord() here.
+	// The goroutine that waits on the command will handle the cleanup
+	// after the process has fully exited, preventing a race condition.
 }
 
 func (r *ScreenRecorder) IsRecording() bool {
