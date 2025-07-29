@@ -1,15 +1,19 @@
 package ffmpegutils
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mimetype"
 )
 
 // formatDuration converts a time.Duration to ffmpeg's HH:MM:SS.ms format.
@@ -25,19 +29,9 @@ func formatDuration(d time.Duration) string {
 	return fmt.Sprintf("%02d:%02d:%02d.%03d", h, m, s, ms)
 }
 
-// FrameExtractionResult holds information about a single extracted frame.
-type FrameExtractionResult struct {
-	// FilePath is the path to the extracted image file.
-	FilePath string
-	// Timestamp is the exact time of the frame in the video.
-	Timestamp time.Duration
-	// Error captures any issue that occurred while processing this specific frame.
-	Error error
-}
-
 // ExtractImageFramesFromVideo extracts frames from a video and streams the results.
-// It returns a channel that provides FrameExtractionResult for each frame created.
-func ExtractImageFramesFromVideo(inputFile string, opts ...Option) (<-chan *FrameExtractionResult, error) {
+// It returns a channel that provides FfmpegStreamResult for each frame created.
+func ExtractImageFramesFromVideo(inputFile string, opts ...Option) (<-chan *FfmpegStreamResult, error) {
 	// 1. Validate input file
 	if _, err := os.Stat(inputFile); os.IsNotExist(err) {
 		return nil, fmt.Errorf("input file does not exist: %s", inputFile)
@@ -54,6 +48,11 @@ func ExtractImageFramesFromVideo(inputFile string, opts ...Option) (<-chan *Fram
 
 	if o.mode == modeUnset && o.customVideoFilter == "" {
 		return nil, fmt.Errorf("frame extraction mode not set; use WithSceneThreshold(), WithFramesPerSecond(), or WithCustomVideoFilter()")
+	}
+	if o.fontFile != "" {
+		if _, err := os.Stat(o.fontFile); os.IsNotExist(err) {
+			return nil, fmt.Errorf("font file does not exist: %s", o.fontFile)
+		}
 	}
 
 	// Ensure output directory exists and is safe
@@ -92,11 +91,30 @@ func ExtractImageFramesFromVideo(inputFile string, opts ...Option) (<-chan *Fram
 		args = append(args, "-vf", o.customVideoFilter)
 		// custom filter might need vsync settings, user should specify if needed
 	} else {
+		var vfParts []string
+		// Frame selection part
 		switch o.mode {
 		case modeSceneChange:
-			// select='eq(n,0)+gt(scene,THRESHOLD)' ensures the very first frame is always included,
-			// preventing loss of context for segments that have no other major scene changes.
-			args = append(args, "-vf", fmt.Sprintf("select='eq(n,0)+gt(scene,%.2f)'", o.sceneThreshold), "-vsync", "vfr")
+			vfParts = append(vfParts, fmt.Sprintf("select='eq(n,0)+gt(scene,%.2f)'", o.sceneThreshold))
+		case modeFixedRate:
+			// -r option is used instead of a select filter for fixed rate
+		}
+
+		// Text drawing part
+		if o.fontFile != "" {
+			escapedFontPath := filepath.ToSlash(o.fontFile)
+			drawtext := fmt.Sprintf("drawtext=fontfile='%s':text='timestamp: %%{pts\\:hms}':fontcolor=white:fontsize=24:box=1:boxcolor=black@0.5:x=(w-tw)/2:y=h-th-10", escapedFontPath)
+			vfParts = append(vfParts, drawtext)
+		}
+
+		if len(vfParts) > 0 {
+			args = append(args, "-vf", strings.Join(vfParts, ","))
+		}
+
+		// Add other necessary flags based on mode
+		switch o.mode {
+		case modeSceneChange:
+			args = append(args, "-vsync", "vfr")
 		case modeFixedRate:
 			args = append(args, "-r", fmt.Sprintf("%f", o.framesPerSecond))
 		}
@@ -106,10 +124,13 @@ func ExtractImageFramesFromVideo(inputFile string, opts ...Option) (<-chan *Fram
 
 	// 4. Execute and stream results
 	cmd := exec.CommandContext(o.ctx, ffmpegBinaryPath, args...)
-	resultsChan := make(chan *FrameExtractionResult)
+	resultsChan := make(chan *FfmpegStreamResult)
 
 	go func() {
 		defer close(resultsChan)
+		cmdCtx, cancel := context.WithCancel(o.ctx)
+		defer cancel()
+
 		if o.debug {
 			cmd.Stderr = log.NewLogWriter(log.DebugLevel)
 			log.Debugf("executing ffmpeg frame extraction: %s", cmd.String())
@@ -118,32 +139,68 @@ func ExtractImageFramesFromVideo(inputFile string, opts ...Option) (<-chan *Fram
 			cmd.Stderr = ioutil.Discard
 		}
 
-		if err := cmd.Run(); err != nil {
-			resultsChan <- &FrameExtractionResult{Error: fmt.Errorf("ffmpeg execution failed: %w", err)}
-			return
-		}
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			processedFiles := make(map[string]bool)
+			ticker := time.NewTicker(200 * time.Millisecond)
+			defer ticker.Stop()
 
-		// After successful execution, list files and create results
-		// This is a simplified approach. A better one would parse ffmpeg output.
-		files, err := ioutil.ReadDir(o.outputDir)
-		if err != nil {
-			resultsChan <- &FrameExtractionResult{Error: fmt.Errorf("failed to read output directory: %w", err)}
-			return
-		}
-
-		for _, file := range files {
-			if !file.IsDir() {
-				// We don't have timestamp info here, which is a limitation of this approach.
-				// A more advanced solution would be needed to parse timestamps.
-				resultsChan <- &FrameExtractionResult{
-					FilePath:  filepath.Join(o.outputDir, file.Name()),
-					Timestamp: -1, // Placeholder
+			for {
+				select {
+				case <-cmdCtx.Done():
+					// Final check after command finishes
+					files, _ := ioutil.ReadDir(o.outputDir)
+					for _, file := range files {
+						if !file.IsDir() && !processedFiles[file.Name()] {
+							sendFrame(file.Name(), o.outputDir, resultsChan)
+						}
+					}
+					return
+				case <-ticker.C:
+					files, err := ioutil.ReadDir(o.outputDir)
+					if err != nil {
+						continue // Ignore transient errors
+					}
+					for _, file := range files {
+						if !file.IsDir() && !processedFiles[file.Name()] {
+							processedFiles[file.Name()] = true
+							sendFrame(file.Name(), o.outputDir, resultsChan)
+						}
+					}
 				}
 			}
+		}()
+
+		err := cmd.Run()
+		cancel()  // Signal the poller to finish
+		wg.Wait() // Wait for the poller to do its final read
+
+		if err != nil {
+			resultsChan <- &FfmpegStreamResult{Error: fmt.Errorf("ffmpeg execution failed: %w", err)}
+			return
 		}
 	}()
 
 	return resultsChan, nil
+}
+
+func sendFrame(filename, dir string, ch chan<- *FfmpegStreamResult) {
+	filePath := filepath.Join(dir, filename)
+	data, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		ch <- &FfmpegStreamResult{Error: fmt.Errorf("failed to read frame file %s: %w", filename, err)}
+		return
+	}
+
+	mimeObj := mimetype.Detect(data)
+	ch <- &FfmpegStreamResult{
+		RawData:     data,
+		MIMEType:    mimeObj.String(),
+		MIMETypeObj: mimeObj,
+	}
+	os.Remove(filePath) // Clean up immediately
 }
 
 // BurnInSubtitles hard-codes subtitles from an SRT file into a video.

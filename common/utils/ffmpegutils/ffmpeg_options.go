@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mimetype"
 )
 
 // --- General Options ---
@@ -43,6 +44,7 @@ type options struct {
 	// Subtitle-specific options
 	subtitleFile    string
 	outputVideoFile string
+	fontFile        string // Path to a font file for drawtext filter
 }
 
 // frameExtractionMode defines the method for frame extraction.
@@ -228,4 +230,27 @@ func WithOutputVideoFile(filepath string) Option {
 	return func(o *options) {
 		o.outputVideoFile = filepath
 	}
+}
+
+// WithFontFile specifies the path to a TTF font file for text overlays.
+func WithFontFile(filepath string) Option {
+	return func(o *options) {
+		o.fontFile = filepath
+	}
+}
+
+// --- Result Types ---
+
+// FfmpegStreamResult holds the result of a single data unit from a stream,
+// typically an image frame.
+type FfmpegStreamResult struct {
+	// MIMEType is the detected MIME type of the raw data.
+	MIMEType    string
+	MIMETypeObj *mimetype.MIME
+	// RawData is the raw byte content of the result.
+	RawData []byte
+	// Timestamp is the exact time of the frame in the video.
+	Timestamp time.Duration
+	// Error captures any issue that occurred while processing this specific result.
+	Error error
 }
