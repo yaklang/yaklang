@@ -2,7 +2,6 @@ package imageutils
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/consts"
 	"image"
 	"image/gif"
 	"os"
@@ -10,6 +9,8 @@ import (
 	"regexp"
 	"strings"
 	"sync/atomic"
+
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
@@ -355,4 +356,37 @@ func ExtractWildStringImage(i any) chan *ImageResult {
 		}
 	}()
 	return ch
+}
+
+type orderedFile struct {
+	idx      int
+	filename string
+}
+
+func sortOrderedFile(ofs []*orderedFile) []*orderedFile {
+	sorted := make([]*orderedFile, len(ofs))
+	copy(sorted, ofs)
+	for i := 0; i < len(sorted)-1; i++ {
+		for j := i + 1; j < len(sorted); j++ {
+			if sorted[i].idx > sorted[j].idx {
+				sorted[i], sorted[j] = sorted[j], sorted[i]
+			}
+		}
+	}
+	return sorted
+}
+
+// GetImageDimensionFromFile return image width and height
+func GetImageDimensionFromFile(path string) (int, int, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer file.Close()
+
+	img, _, err := image.DecodeConfig(file)
+	if err != nil {
+		return 0, 0, err
+	}
+	return img.Width, img.Height, nil
 }
