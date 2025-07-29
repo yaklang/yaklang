@@ -2,6 +2,7 @@ package whisperutils
 
 import (
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -53,7 +54,7 @@ func TestInvokeWhisperCli(t *testing.T) {
 		t.Skip("skipping test: YAK_WHISPER_VAD_MODEL_PATH is not set or VAD model file not found")
 	}
 
-	audioFile := "../../../vtestdata/demo1.mp3"
+	audioFile := "/Users/v1ll4n/yakit-projects/projects/libs/output.mp3"
 	if !utils.FileExists(audioFile) {
 		t.Fatalf("test audio file not found: %s", audioFile)
 	}
@@ -63,6 +64,7 @@ func TestInvokeWhisperCli(t *testing.T) {
 		CliWithVAD(true),
 		CliWithVADModelPath(vadModelPath),
 		CliWithDebug(true),
+		CliWithLogWriter(os.Stdout),
 	)
 	if err != nil {
 		t.Fatalf("InvokeWhisperCli failed: %v", err)
