@@ -54,4 +54,47 @@ func unsafeTemplate(html string, params map[string]any) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 PARAM
+	"safefile://SafeTemplateUsage.go": <<<CODE
+package main
+
+import (
+	"html/template" // 使用html/template进行安全输出
+	"net/http"
+)
+
+func main() {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// 假设name是用户输入，但通过模板引擎的自动转义进行处理
+		name := r.URL.Query().Get("name")
+
+		// 定义模板，使用Go模板的内置转义功能
+		tmpl := template.Must(template.New("hello").Parse("<h1>Hello, {{.Name}}!</h1>"))
+
+		// 执行模板
+		err := tmpl.Execute(w, struct{ Name string }{Name: name})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+	http.ListenAndServe(":8080", nil)
+}
+
+CODE
+	"safefile://NoTemplateUsage.go": <<<CODE
+package main
+
+import (
+	"fmt"
+	"net/http"
+)
+
+func main() {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// 直接输出字符串，不涉及任何模板渲染
+		fmt.Fprintf(w, "Hello, world!")
+	})
+	http.ListenAndServe(":8080", nil)
+}
+
+CODE
 )

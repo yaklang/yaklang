@@ -253,4 +253,110 @@ func main() {
 }
 
 PARAM
+	"safefile://SafeOsWriteFile.go": <<<CODE
+package main
+
+import (
+	"fmt"
+	"log"
+	"os"
+)
+
+func main() {
+	// 使用os.WriteFile替代ioutil.WriteFile，这是Go推荐的现代API
+	fileName := "safe_os_file.txt"
+	data := []byte("This is safe content written using os.WriteFile.")
+
+	err := os.WriteFile(fileName, data, 0644)
+	if err != nil {
+		log.Fatalf("Error writing to file using os.WriteFile: %s", err)
+		return
+	}
+	fmt.Println("Data written safely to file using os.WriteFile.")
+
+	// 读取文件内容以验证
+	content, err := os.ReadFile(fileName)
+	if err != nil {
+		log.Fatalf("Error reading file: %s", err)
+		return
+	}
+	fmt.Printf("Content read: %s\n", string(content))
+}
+CODE
+	"safefile://SafeOsOpenFileAppend.go": <<<CODE
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"regexp"
+)
+
+// appendToFile 函数用于安全地追加内容到指定文件
+func appendToFile(fileName string, data []byte) error {
+	// 1. 严格校验文件名，防止路径遍历
+	// 限制文件名只能是字母、数字、下划线、中划线和英文句点，且不能以句点开头或结尾，不能包含路径分隔符
+	if matched, _ := regexp.MatchString(`^[a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)?$`, fileName); !matched {
+		return fmt.Errorf("invalid filename: %s", fileName)
+	}
+
+	// 构造安全的文件路径，限制在当前目录或特定安全目录下
+	filePath := filepath.Join("./safe_data", fileName)
+
+	// 2. 使用os.OpenFile进行文件操作，并指定追加模式和创建模式
+	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open file %s: %w", filePath, err)
+	}
+	defer file.Close()
+
+	// 3. 使用bufio.NewWriter进行缓冲写入，提高效率
+	writer := bufio.NewWriter(file)
+	_, err = writer.Write(data)
+	if err != nil {
+		return fmt.Errorf("failed to write data: %w", err)
+	}
+
+	err = writer.Flush()
+	if err != nil {
+		return fmt.Errorf("failed to flush writer: %w", err)
+	}
+
+	return nil
+}
+
+func main() {
+	// 创建一个用于存放安全文件的目录 (权限为0755)
+	if err := os.MkdirAll("./safe_data", 0755); err != nil {
+		log.Fatalf("Failed to create directory: %v", err)
+	}
+
+	// 测试安全的文件操作
+	fileName := "app_log.txt"
+	dataToAppend := []byte("\n[INFO] User logged in at 2024-07-29.")
+
+	// 第一次写入
+	if err := appendToFile(fileName, []byte("[INFO] Application started.\n")); err != nil {
+		log.Printf("Error initial write: %v", err)
+	}
+
+	// 第二次追加写入
+	if err := appendToFile(fileName, dataToAppend); err != nil {
+		log.Printf("Error appending to file: %v", err)
+	}
+
+	// 尝试写入一个非法文件名
+	illegalFileName := "../../etc/passwd"
+	if err := appendToFile(illegalFileName, []byte("Malicious content")); err != nil {
+		fmt.Printf("Successfully blocked writing to illegal file: %v\n", err)
+	} else {
+		log.Println("ERROR: Writing to illegal file was not blocked!")
+	}
+
+	fmt.Println("File operations completed. Check 'safe_data/app_log.txt'.")
+}
+CODE
 )

@@ -296,4 +296,77 @@ public class UserManager {
     }
 }
 CODE
+	"safefile://SafeUserSearch.java": <<<CODE
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.cfg.Configuration;
+import org.hibernate.query.Query;
+import java.util.List;
+
+public class SafeUserSearch {
+    private SessionFactory sessionFactory;
+
+    public SafeUserSearch() {
+        sessionFactory = new Configuration().configure().buildSessionFactory();
+    }
+
+    public static class User {
+        private int id;
+        private String username;
+        private String email;
+        private String role;
+    }
+
+    // 安全的用户搜索方法 - 使用命名参数绑定
+    public List<User> searchUsersSafe(String searchTerm) {
+        Session session = sessionFactory.openSession();
+        try {
+            // 安全：使用命名参数进行查询，避免直接拼接用户输入
+            String hql = "FROM User WHERE username LIKE :searchTerm1 OR email LIKE :searchTerm2";
+            Query<User> query = session.createQuery(hql, User.class);
+            query.setParameter("searchTerm1", "%" + searchTerm + "%");
+            query.setParameter("searchTerm2", "%" + searchTerm + "%");
+            return query.list();
+        } finally {
+            session.close();
+        }
+    }
+}
+CODE
+	"safefile://SafeUserRoleUpdate.java": <<<CODE
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.cfg.Configuration;
+import org.hibernate.query.Query;
+
+public class SafeUserRoleUpdate {
+    private SessionFactory sessionFactory;
+
+    public SafeUserRoleUpdate() {
+        sessionFactory = new Configuration().configure().buildSessionFactory();
+    }
+
+    // 安全的用户角色更新方法 - 使用原生SQL的位置参数绑定
+    public void updateUserRoleSafe(int userId, String newRole) {
+        Session session = sessionFactory.openSession();
+        try {
+            session.beginTransaction();
+            // 安全：使用原生SQL的位置参数进行更新，避免直接拼接用户输入
+            String sql = "UPDATE User SET role = ? WHERE id = ?";
+            session.createNativeQuery(sql)
+                   .setParameter(1, newRole) // 参数索引从1开始
+                   .setParameter(2, userId)
+                   .executeUpdate();
+            session.getTransaction().commit();
+        } catch (Exception e) {
+            if (session.getTransaction() != null) {
+                session.getTransaction().rollback();
+            }
+            e.printStackTrace();
+        } finally {
+            session.close();
+        }
+    }
+}
+CODE
 )

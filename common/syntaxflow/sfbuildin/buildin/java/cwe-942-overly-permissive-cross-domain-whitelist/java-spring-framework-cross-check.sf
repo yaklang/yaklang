@@ -119,6 +119,42 @@ public class BackUpController {
     }
 }
 USE
+	"safefile://SafeSpecificOriginController.java": <<<CODE
+package org.example.moudels.file.controller;
+
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api")
+// 明确指定允许的源，而不是使用通用通配符"*"
+@CrossOrigin(origins = "https://trusted-domain.com") 
+public class SafeSpecificOriginController {
+    @RequestMapping("/data")
+    public String getData() {
+        return "Sensitive data";
+    }
+}
+CODE
+	"safefile://SafeMultipleOriginsController.java": <<<CODE
+package org.example.moudels.file.controller;
+
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/v2/api")
+// 明确指定多个允许的源
+@CrossOrigin(origins = {"https://trusted-domain1.com", "https://trusted-domain2.org"})
+public class SafeMultipleOriginsController {
+    @RequestMapping("/info")
+    public String getInfo() {
+        return "Some information";
+    }
+}
+CODE
 )
 
 

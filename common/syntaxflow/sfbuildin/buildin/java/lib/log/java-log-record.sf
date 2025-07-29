@@ -42,6 +42,45 @@ desc(
         }
     }
 CODE
+	"safefile://SafeLoggingMethods.java": <<<CODE
+// 安全的代码示例：避免使用被规则直接匹配的日志方法名进行自定义方法命名
+public class SafeLoggingMethods {
+    // 定义一个不会被规则直接捕获的方法名，例如 useInfo 而非 info
+    public void useInfo(String message) {
+        // 实际的日志记录可以通过一个私有辅助方法或其他库进行
+        System.out.println("Info message: " + message); // 这是一个示例，实际中应使用日志库
+    }
+
+    // 定义一个类似但不会直接匹配规则中 'error' 系列的方法
+    public void logErrorDetails(String details) {
+        System.err.println("Error details: " + details);
+    }
+
+    // 使用日志框架时，避免硬编码直接匹配规则中的方法，而是通过参数化或更复杂的结构
+    public void logWithLevel(String level, String message) {
+        if ("INFO".equalsIgnoreCase(level)) {
+            // logger.info(message); // 假设此处使用了实际的Logger实例
+            System.out.println("INFO: " + message);
+        } else if ("ERROR".equalsIgnoreCase(level)) {
+            // logger.error(message); // 假设此处使用了实际的Logger实例
+            System.err.println("ERROR: " + message);
+        }
+    }
+}
+CODE
+	"safefile://NonLoggerClass.java": <<<CODE
+// 这是一个不涉及日志操作的普通类，不应触发日志规则。
+public class NonLoggerClass {
+    public void doSomething(String data) {
+        String result = data.toUpperCase();
+        System.out.println("Processed data: " + result);
+    }
+
+    public int calculateSum(int a, int b) {
+        return a + b;
+    }
+}
+CODE
 )
 
 desc(
@@ -53,5 +92,44 @@ desc(
             log.warn(message);
         }
     }
+CODE
+	"safefile://SafeLoggingMethods.java": <<<CODE
+// 安全的代码示例：避免使用被规则直接匹配的日志方法名进行自定义方法命名
+public class SafeLoggingMethods {
+    // 定义一个不会被规则直接捕获的方法名，例如 useInfo 而非 info
+    public void useInfo(String message) {
+        // 实际的日志记录可以通过一个私有辅助方法或其他库进行
+        System.out.println("Info message: " + message); // 这是一个示例，实际中应使用日志库
+    }
+
+    // 定义一个类似但不会直接匹配规则中 'error' 系列的方法
+    public void logErrorDetails(String details) {
+        System.err.println("Error details: " + details);
+    }
+
+    // 使用日志框架时，避免硬编码直接匹配规则中的方法，而是通过参数化或更复杂的结构
+    public void logWithLevel(String level, String message) {
+        if ("INFO".equalsIgnoreCase(level)) {
+            // logger.info(message); // 假设此处使用了实际的Logger实例
+            System.out.println("INFO: " + message);
+        } else if ("ERROR".equalsIgnoreCase(level)) {
+            // logger.error(message); // 假设此处使用了实际的Logger实例
+            System.err.println("ERROR: " + message);
+        }
+    }
+}
+CODE
+	"safefile://NonLoggerClass.java": <<<CODE
+// 这是一个不涉及日志操作的普通类，不应触发日志规则。
+public class NonLoggerClass {
+    public void doSomething(String data) {
+        String result = data.toUpperCase();
+        System.out.println("Processed data: " + result);
+    }
+
+    public int calculateSum(int a, int b) {
+        return a + b;
+    }
+}
 CODE
 )

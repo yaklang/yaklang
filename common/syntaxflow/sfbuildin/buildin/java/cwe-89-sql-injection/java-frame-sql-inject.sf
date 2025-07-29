@@ -283,4 +283,104 @@ public class DataScopeAspect
     }
 }
 TEXT
+	"safefile://SafePreparedStatementExample.java": <<<CODE
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+public class SafePreparedStatementExample {
+
+    public ResultSet getUserById(Connection connection, String userId) throws SQLException {
+        // 使用PreparedStatement进行参数化查询，防止SQL注入
+        String sql = "SELECT * FROM users WHERE id = ?"; 
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            // 将用户输入作为参数绑定，而不是直接拼接到SQL字符串中
+            // 强制转换为整型以确保类型安全，如果userId不是有效数字会抛出NumberFormatException，从而阻止注入
+            pstmt.setInt(1, Integer.parseInt(userId)); 
+            return pstmt.executeQuery();
+        }
+    }
+
+    public ResultSet getUserByUsername(Connection connection, String username) throws SQLException {
+        // 另一个使用PreparedStatement的示例
+        String sql = "SELECT * FROM users WHERE username = ? AND active = true";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, username); 
+            return pstmt.executeQuery();
+        }
+    }
+
+    public void insertUser(Connection connection, String name, int age) throws SQLException {
+        String sql = "INSERT INTO users (name, age) VALUES (?, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, name);
+            pstmt.setInt(2, age);
+            pstmt.executeUpdate();
+        }
+    }
+}
+CODE
+	"safefile://SafeMyBatisExample.java": <<<CODE
+// 假设以下是MyBatis Mapper接口和XML配置
+
+// UserMapper.java
+public interface UserMapper {
+    User getUserById(@Param("id") int id);
+    List<User> searchUsers(@Param("username") String username, @Param("status") String status);
+}
+
+// UserMapper.xml
+/*
+<mapper namespace="com.example.mapper.UserMapper">
+    <select id="getUserById" resultType="com.example.model.User">
+        SELECT * FROM users WHERE id = #{id}
+    </select>
+
+    <select id="searchUsers" resultType="com.example.model.User">
+        SELECT * FROM users
+        <where>
+            <if test="username != null and username != ''">
+                username LIKE CONCAT('%', #{username}, '%')
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+        </where>
+    </select>
+
+    <insert id="insertUser">
+        INSERT INTO users (name, email) VALUES (#{name}, #{email})
+    </insert>
+</mapper>
+*/
+
+// MainApplication.java (示例如何调用)
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
+import com.example.mapper.UserMapper;
+import com.example.model.User;
+
+public class SafeMyBatisExample {
+
+    private SqlSessionFactory sqlSessionFactory; // 假设已初始化
+
+    public User findUser(String idParam) {
+        try (SqlSession session = sqlSessionFactory.openSession()) {
+            UserMapper mapper = session.getMapper(UserMapper.class);
+            // MyBatis会自动处理#{id}的参数绑定，避免SQL注入
+            // 这里将字符串转换为int，进一步保证类型安全
+            return mapper.getUserById(Integer.parseInt(idParam));
+        }
+    }
+
+    public List<User> queryUsers(String username, String status) {
+        try (SqlSession session = sqlSessionFactory.openSession()) {
+            UserMapper mapper = session.getMapper(UserMapper.class);
+            // MyBatis动态SQL中的参数绑定
+            return mapper.searchUsers(username, status);
+        }
+    }
+}
+CODE
 )

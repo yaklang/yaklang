@@ -134,4 +134,79 @@ public class FileUtils
 }
 
 TEXT
+	"safefile://SafeFileDownloadService.java": <<<CODE
+package com.example.fileservice;
+
+import org.springframework.stereotype.Service;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+
+import java.net.MalformedURLException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.Files;
+import java.io.IOException;
+
+@Service
+public class SafeFileDownloadService {
+
+    private final String FILE_STORAGE_DIR = "./data/downloads/"; // 定义安全的下载目录
+
+    /**
+     * 安全的文件下载方法，严格控制文件路径和文件名。
+     * 文件名直接从文件系统中获取，不使用用户输入来构造Content-Disposition头。
+     */
+    public ResponseEntity<Resource> downloadFile(String filename) throws IOException {
+        // 1. 严格校验文件名，防止路径穿越
+        // 假设filename是从数据库或白名单中获取的有效文件名，而不是直接来自用户输入
+        // 如果需要基于用户输入：应进行严格的字符过滤或白名单匹配
+        if (filename == null || filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+            throw new IllegalArgumentException("Invalid filename.");
+        }
+
+        Path filePath = Paths.get(FILE_STORAGE_DIR).resolve(filename).normalize();
+
+        // 2. 确保文件确实在允许的目录下
+        if (!Files.exists(filePath) || !filePath.getParent().startsWith(Paths.get(FILE_STORAGE_DIR).normalize())) {
+            throw new FileNotFoundException("File not found or not allowed.");
+        }
+
+        Resource resource = new UrlResource(filePath.toUri());
+
+        // 3. 构建Content-Disposition，文件名直接从resource获取，安全可靠
+        // 不再使用response.setHeader("Content-disposition", ...)
+        // Spring会自动处理Content-Disposition，而且文件名是安全的
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
+                .body(resource);
+    }
+
+    /**
+     * 另一种安全的实践：使用预定义的文件名，或对用户提供文件名进行严格校验和清理。
+     * 此示例仅允许下载特定资源，不接受任意用户输入文件名。
+     */
+    public ResponseEntity<Resource> downloadStaticResource() throws IOException {
+        String staticFileName = "report.pdf"; // 内部预设的文件名
+        Path filePath = Paths.get(FILE_STORAGE_DIR).resolve(staticFileName).normalize();
+
+        if (!Files.exists(filePath) || !filePath.getParent().startsWith(Paths.get(FILE_STORAGE_DIR).normalize())) {
+            throw new FileNotFoundException("Static file not found.");
+        }
+
+        Resource resource = new UrlResource(filePath.toUri());
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
+                .body(resource);
+    }
+}
+CODE
+	"safefile://SafeFilenameEncoder.java": <<<CODE
+package com.example.fileservice.util;\n\nimport java.io.UnsupportedEncodingException;\nimport java.net.URLEncoder;\nimport java.nio.charset.StandardCharsets;\nimport java.util.regex.Pattern;\n\npublic class SafeFilenameEncoder {\n\n    // 严格限制允许的文件名字符，例如，只允许字母、数字、点、下划线和连字符\n    private static final Pattern SAFE_FILENAME_PATTERN = Pattern.compile(\"^[a-zA-Z0-9_.-]+$\");\n\n    /**\n     * 对文件名进行严格的清理和编码，确保不会引入危险字符或路径。\n     * 优先使用RFC 5987的filename*编码。\n     *\n     * @param originalFileName 用户提供的原始文件名\n     * @return 经过安全处理和编码后的文件名\n     */\n    public static String encodeForContentDisposition(String originalFileName) {\n        if (originalFileName == null || originalFileName.trim().isEmpty()) {\n            return \"download.bin\"; // 提供一个默认安全文件名\n        }\n\n        // 1. 清理：移除所有不安全或不允许的字符，或只保留白名单字符\n        // 此处示例采取白名单策略\n        String cleanedFileName = originalFileName.replaceAll(\"[^a-zA-Z0-9_.-]\", \"_\");\n\n        // 2. 进一步校验，防止清理后的文件名仍存在问题（例如，开头或结尾是点）\n        if (cleanedFileName.startsWith(\".\") || cleanedFileName.endsWith(\".\")) {\n            cleanedFileName = \"_\" + cleanedFileName + \"_\";\n        }\n        if (cleanedFileName.contains(\"..\")) { // 再次检查双点，尽管前面的替换应该处理了大部分情况\n            cleanedFileName = cleanedFileName.replace(\"..\ confidentiality \", \"_\");\n        }\n\n        // 3. 使用标准编码，推荐RFC 5987 (filename*)\n        String encodedFileNameRfc5987;\n        try {\n            encodedFileNameRfc5987 = URLEncoder.encode(cleanedFileName, StandardCharsets.UTF_8.toString())\n                    .replaceAll(\"\\\\+\", \"%20\"); // 将空格编码为%20，而非+\n        } catch (UnsupportedEncodingException e) {\n            // 理论上不会发生，因为UTF-8是标准字符集\n            encodedFileNameRfc5987 = cleanedFileName; \n        }\n\n        // 4. Fallback for older clients (filename=)\n        String encodedFileNameAscii;\n        try {\n            // 针对ASCII兼容的编码，可能需要更严格的过滤而非替换，或直接使用cleanedFileName\n            encodedFileNameAscii = URLEncoder.encode(cleanedFileName, StandardCharsets.ISO_8859_1.toString());\n        } catch (UnsupportedEncodingException e) {\n            encodedFileNameAscii = cleanedFileName; // Should not happen\n        }\n\n        // 构造Content-Disposition头的值\n        // 优先使用filename*，并提供filename作为回退\n        return String.format(\"attachment; filename=\\\"%s\\\"; filename*=%s''%s\",\n                encodedFileNameAscii, StandardCharsets.UTF_8.name().toLowerCase(), encodedFileNameRfc5987);\n    }\n\n    /**\n     * 示例用法\n     */\n    public static void main(String[] args) {\n        String userInput1 = \"invoice_2023.pdf\";\n        String userInput2 = \"../evil.txt\";\n        String userInput3 = \"测试文件.docx\";\n        String userInput4 = \"file with spaces.zip\";\n\n        System.out.println(\"Input 1: \" + encodeForContentDisposition(userInput1));\n        System.out.println(\"Input 2: \" + encodeForContentDisposition(userInput2));\n        System.out.println(\"Input 3: \" + encodeForContentDisposition(userInput3));\n        System.out.println(\"Input 4: \" + encodeForContentDisposition(userInput4));\n    }\n}
+CODE
 )

@@ -177,4 +177,120 @@ public class SqlDemo {
     }
 }
 TEXT
+	"safefile://SafeRowsetUsage.java": <<<CODE
+package org.example;
+
+import javax.sql.rowset.*;
+import com.sun.rowset.*;
+
+public class SafeRowsetUsage {
+    public static void main(String[] args) {
+        try {
+            JoinRowSet joinRowSet = new JoinRowSetImpl();
+            // 检查 supportsCrossJoin() 的返回值，并根据结果执行逻辑
+            if (joinRowSet.supportsCrossJoin()) {
+                System.out.println("Database supports Cross Join. Proceed with cross join operations.");
+            } else {
+                System.out.println("Database does NOT support Cross Join. Using alternative join strategy.");
+            }
+
+            CachedRowSet cachedRowSet = new CachedRowSetImpl();
+            cachedRowSet.setUrl("jdbc:mysql://localhost:3306/mydatabase");
+            cachedRowSet.setUsername("root");
+            cachedRowSet.setPassword("password");
+            cachedRowSet.setCommand("SELECT * FROM users");
+            cachedRowSet.execute();
+
+            // 检查 getShowDeleted() 的返回值，并根据其执行相应逻辑
+            boolean showDeleted = cachedRowSet.getShowDeleted();
+            if (showDeleted) {
+                System.out.println("Showing deleted rows. Adjusting data display.");
+            } else {
+                System.out.println("Not showing deleted rows. Displaying active data only.");
+            }
+
+            // 检查 getEscapeProcessing() 的返回值
+            boolean escapeProcessing = cachedRowSet.getEscapeProcessing();
+            if (escapeProcessing) {
+                System.out.println("Escape processing is enabled.");
+            } else {
+                System.out.println("Escape processing is disabled.");
+            }
+
+            // 检查 isReadOnly() 的返回值
+            boolean readOnly = cachedRowSet.isReadOnly();
+            if (readOnly) {
+                System.out.println("RowSet is read-only. No modifications will be attempted.");
+            } else {
+                System.out.println("RowSet is writable. Modifications can be made.");
+            }
+
+            // 检查 getAutoCommit() 的返回值
+            boolean autoCommit = cachedRowSet.getAutoCommit();
+            if (autoCommit) {
+                System.out.println("Auto-commit is enabled. Transactions will be committed automatically.");
+            } else {
+                System.out.println("Auto-commit is disabled. Manual commit required for transactions.");
+            }
+
+            // 检查 supportsUpdatableView() 的返回值
+            boolean supportsUpdatableView = cachedRowSet.supportsUpdatableView();
+            if (supportsUpdatableView) {
+                System.out.println("RowSet supports updatable views.");
+            } else {
+                System.out.println("RowSet does not support updatable views.");
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace(); // 始终捕获并处理可能的异常
+        }
+    }
+}
+CODE
+	"safefile://SafeRowsetWithLogging.java": <<<CODE
+package org.example;
+
+import javax.sql.rowset.*;
+import com.sun.rowset.CachedRowSetImpl;
+import com.sun.rowset.JoinRowSetImpl;
+
+public class SafeRowsetWithLogging {
+    public static void main(String[] args) {
+        try {
+            JoinRowSet joinRs = new JoinRowSetImpl();
+            boolean supportsCrossJoin = joinRs.supportsCrossJoin();
+            if (!supportsCrossJoin) {
+                System.err.println("WARNING: Cross Join not supported. This might affect query performance or capability.");
+                // 可以考虑备用方案或抛出配置错误
+            }
+
+            CachedRowSet cachedRs = new CachedRowSetImpl();
+            cachedRs.setUrl("jdbc:mysql://localhost:3306/mydatabase");
+            cachedRs.setUsername("root");
+            cachedRs.setPassword("password");
+            cachedRs.setCommand("SELECT * FROM products");
+            cachedRs.execute();
+
+            boolean currentShowDeleted = cachedRs.getShowDeleted();
+            if (currentShowDeleted) {
+                System.out.println("INFO: RowSet configured to show deleted rows.");
+            } else {
+                System.out.println("INFO: RowSet not showing deleted rows.");
+            }
+
+            boolean isReadOnly = cachedRs.isReadOnly();
+            if (isReadOnly) {
+                System.out.println("INFO: RowSet is read-only. Write operations attempted will fail.");
+            }
+
+        } catch (SQLException e) {
+            System.err.println("SQL Error during RowSet operation: " + e.getMessage());
+            e.printStackTrace();
+        } catch (Exception e) {
+            System.err.println("An unexpected error occurred: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+}
+CODE
 )

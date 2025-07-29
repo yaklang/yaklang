@@ -224,4 +224,182 @@ TEXT
         }
     }
 TEXT
+	"safefile://SecureFileUploadController.java": <<<CODE
+package org.example.controller;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+public class SecureFileUploadController {
+
+    // 允许的文件类型白名单（非可执行文件）
+    private static final List<String> ALLOWED_EXTENSIONS = Arrays.asList("jpg", "jpeg", "png", "gif", "pdf");
+    private static final long MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    private static final String UPLOAD_DIR = "/tmp/safeuploads/"; // 保存到Web根目录之外的非可执行目录
+
+    @PostMapping("/secureUpload")
+    public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile file) {
+        // 1. 检查文件是否为空
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body("文件不能为空。");
+        }
+
+        // 2. 限制文件大小，防止DoS攻击
+        if (file.getSize() > MAX_FILE_SIZE) {
+            return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body("文件大小超出限制，最大允许 " + MAX_FILE_SIZE / (1024 * 1024) + "MB。");
+        }
+
+        // 3. 严格校验文件类型和扩展名（白名单机制）
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || originalFilename.isBlank()) {
+            return ResponseEntity.badRequest().body("文件名无效。");
+        }
+
+        String fileExtension = "";
+        int dotIndex = originalFilename.lastIndexOf('.');
+        if (dotIndex > 0 && dotIndex < originalFilename.length() - 1) {
+            fileExtension = originalFilename.substring(dotIndex + 1).toLowerCase();
+        } else {
+            return ResponseEntity.badRequest().body("文件缺少扩展名或文件名无效。");
+        }
+
+        if (!ALLOWED_EXTENSIONS.contains(fileExtension)) {
+            return ResponseEntity.badRequest().body("不允许的文件类型。");
+        }
+
+        // 4. 进一步校验MIME类型，防止通过修改扩展名绕过
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/") && !contentType.equals("application/pdf")) {
+             // 检查是否是预期之外的MIME类型
+             // 更严格的应该根据fileExtension来判断ContentType是否匹配，例如PNG文件ContentType必须为image/png
+             return ResponseEntity.badRequest().body("文件MIME类型不匹配或不允许。");
+        }
+
+        // 5. 文件内容校验（例如图片文件可以尝试读取其尺寸来验证是否是有效的图片）
+        if (contentType.startsWith("image/")) {
+            try (InputStream is = file.getInputStream()) {
+                BufferedImage image = ImageIO.read(is);
+                if (image == null) {
+                    return ResponseEntity.badRequest().body("文件内容不是有效的图片。");
+                }
+            } catch (IOException e) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("读取图片内容失败。");
+            }
+        }
+
+        // 6. 生成随机文件名，避免使用用户提供的文件名导致路径遍历或覆盖现有文件
+        String uniqueFileName = UUID.randomUUID().toString() + "." + fileExtension;
+        Path targetLocation = Paths.get(UPLOAD_DIR).resolve(uniqueFileName);
+
+        try {
+            // 确保上传目录存在
+            Files.createDirectories(targetLocation.getParent());
+            // 保存文件
+            Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
+            return ResponseEntity.ok("文件上传成功。文件名: " + uniqueFileName);
+        } catch (IOException ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("文件上传失败: " + ex.getMessage());
+        }
+    }
+
+    // 另一种安全示例：直接将MultipartFile保存到安全位置，但仍需文件名和类型校验
+    @PostMapping("/safeUploadAlternative")
+    public ResponseEntity<String> uploadSafe(@RequestParam("file") MultipartFile file) {
+        // 假设这里已经通过其他方法对文件类型和大小进行了严格校验
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body("文件为空。");
+        }
+
+        String originalFilename = file.getOriginalFilename();
+        String fileExtension = "";
+        int dotIndex = originalFilename.lastIndexOf('.');
+        if (dotIndex > 0 && dotIndex < originalFilename.length() - 1) {
+            fileExtension = originalFilename.substring(dotIndex + 1).toLowerCase();
+        }
+
+        // 强制使用固定的安全扩展名，并生成随机文件名
+        String safeFileName = UUID.randomUUID().toString() + ".dat"; //即使是图片也存储为.dat
+        Path targetLocation = Paths.get(UPLOAD_DIR + safeFileName);
+
+        try {
+            Files.createDirectories(targetLocation.getParent());
+            file.transferTo(targetLocation.toFile()); // 使用transferTo进行文件保存
+            return ResponseEntity.ok("文件安全上传成功。文件名: " + safeFileName);
+        } catch (IOException ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("文件安全上传失败: " + ex.getMessage());
+        }
+    }
+}
+CODE
+	"safefile://SafeUploadService.java": <<<CODE
+package org.example.service;
+
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+public class SafeUploadService {
+
+    private static final List<String> ALLOWED_EXTENSIONS = Arrays.asList("doc", "docx", "xls", "xlsx", "ppt", "pptx"); 
+    private static final String SAFE_UPLOAD_PATH = "/opt/appdata/documents/"; // 数据文件安全存储路径
+
+    public String uploadDocument(MultipartFile file) throws IOException {
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("上传文件不能为空。");
+        }
+
+        String originalFilename = file.getOriginalFilename();
+        String fileExtension = "";
+        int dotIndex = originalFilename.lastIndexOf('.');
+        if (dotIndex > 0 && dotIndex < originalFilename.length() - 1) {
+            fileExtension = originalFilename.substring(dotIndex + 1).toLowerCase();
+        } else {
+             throw new IllegalArgumentException("文件缺少扩展名或文件名无效。");
+        }
+
+        // 严格的白名单校验，只允许文档类型，避免其他可执行文件
+        if (!ALLOWED_EXTENSIONS.contains(fileExtension)) {
+            throw new IllegalArgumentException("不允许的文件类型: " + fileExtension);
+        }
+
+        // 生成随机文件名，并确保新的文件路径是安全的且不能被Web直接访问
+        String newFileName = UUID.randomUUID().toString() + "." + fileExtension;
+        Path targetPath = Paths.get(SAFE_UPLOAD_PATH, newFileName);
+
+        // 创建目标目录（如果不存在）
+        Files.createDirectories(targetPath.getParent());
+
+        // 将文件内容复制到目标路径
+        Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+
+        return newFileName; // 返回新生成的文件名或文件路径，但不包含敏感的服务器路径
+    }
+}
+CODE
 )

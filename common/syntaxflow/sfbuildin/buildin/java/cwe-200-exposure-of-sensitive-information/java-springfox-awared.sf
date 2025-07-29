@@ -152,4 +152,57 @@ public class SwaggerAutoConfiguration
     }
 }
 TEXT
+	"safefile://SecureSwaggerConfig.java": <<<CODE
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import springfox.documentation.builders.RequestHandlerSelectors;
+import springfox.documentation.spi.DocumentationType;
+import springfox.documentation.spring.web.plugins.Docket;
+import springfox.documentation.swagger2.annotations.EnableSwagger2;
+import springfox.documentation.builders.PathSelectors;
+
+@Configuration
+@EnableSwagger2
+@EnableWebSecurity
+public class SecureSwaggerConfig extends WebSecurityConfigurerAdapter {
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        // 通过Spring Security保护Swagger UI和API文档路径，只允许认证用户访问
+        http
+            .authorizeRequests()
+            .antMatchers("/swagger-ui.html", "/swagger-resources/**", "/v2/api-docs", "/webjars/**").authenticated()
+            .anyRequest().permitAll()
+            .and()
+            .formLogin();
+    }
+
+    @Bean
+    public Docket api() {
+        // 限制暴露的API范围，只扫描com.yourcompany.api.public包下的API
+        // 并只暴露/api/public/**开头的路径，避免暴露敏感接口
+        return new Docket(DocumentationType.SWAGGER_2)
+            .select()
+            .apis(RequestHandlerSelectors.basePackage("com.yourcompany.api.public")) // 只扫描公开API所在的包
+            .paths(PathSelectors.ant("/api/public/**")) // 只暴露/api/public/开头的路径
+            .build();
+    }
+}
+CODE
+	"safefile://SwaggerDisabledInProd.java": <<<CODE
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+import springfox.documentation.swagger2.annotations.EnableSwagger2;
+
+@Configuration
+@EnableSwagger2
+@Profile("!prod") // 在非生产环境下开启Swagger，生产环境自动关闭
+public class SwaggerConfigDevelopment {
+    // 此配置仅在非生产环境下生效，生产环境不开启Swagger，从而避免敏感信息泄露
+    // 生产环境中应通过配置文件 spring.profiles.active=prod 来激活此配置
+}
+CODE
 )

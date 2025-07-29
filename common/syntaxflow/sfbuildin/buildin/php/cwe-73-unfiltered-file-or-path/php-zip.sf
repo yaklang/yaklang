@@ -388,6 +388,97 @@ desc(
     $zip->open($path);
     $zip->close();
 CODE
+	"safefile://SecureZipExtract.php": <<<CODE
+<?php
+// 修复代码示例 - 解压时过滤文件名
+function isValidFilename($filename) {
+    // 检查文件名是否包含路径穿越符
+    if (strpos($filename, '../') !== false || strpos($filename, '..\\') !== false) {
+        return false;
+    }
+    // 确保文件名是安全的，这里仅允许字母、数字、下划线、破折号和点
+    // 更严格的验证可以根据具体业务需求进行调整
+    if (!preg_match('/^[a-zA-Z0-9_\-.\/\\]+$/', $filename)) {
+        return false;
+    }
+    // 确保相对路径不会跳出指定目录
+    // 假设 $safe_dir 为 '/tmp/extracted/'
+    $safe_dir = '/tmp/extracted/';
+    $target_path = realpath($safe_dir . '/' . $filename);
+    if ($target_path === false || strpos($target_path, realpath($safe_dir)) !== 0) {
+        return false;
+    }
+    return true;
+}
+
+$path = 'safe_archive.zip'; // 假设这是一个非用户控制的固定文件名
+$zip = new ZipArchive();
+if ($zip->open($path) === TRUE) {
+    $safe_extract_dir = '/tmp/extracted/';
+    // 确保解压目录存在且可写
+    if (!is_dir($safe_extract_dir)) {
+        mkdir($safe_extract_dir, 0755, true);
+    }
+
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $filename = $zip->getNameIndex($i);
+        if (isValidFilename($filename)) {
+            // 解压单个文件到安全目录
+            if (!$zip->extractTo($safe_extract_dir, array($filename))) {
+                 error_log("无法解压文件: " . $filename);
+            }
+        } else {
+            // 发现非法文件名，记录日志或抛出异常，并跳过此文件
+            error_log("发现非法ZIP文件路径: " . $filename);
+            // 采取进一步措施，例如删除已解压的文件或终止操作
+        }
+    }
+    $zip->close();
+    echo "ZIP文件处理完成";
+} else {
+    echo "无法打开ZIP文件";
+}
+?>
+CODE
+	"safefile://SecureZipAddFile.php": <<<CODE
+<?php
+// 修复代码示例 - 添加文件时过滤文件名
+function isValidAddFilename($filename) {
+    // 检查文件名是否包含路径穿越符
+    if (strpos($filename, '../') !== false || strpos($filename, '..\\') !== false) {
+        return false;
+    }
+    // 确保文件名是安全的，这里仅允许字母、数字、下划线、破折号和点
+    if (!preg_match('/^[a-zA-Z0-9_\-.\/\\]+$/', $filename)) {
+        return false;
+    }
+    // 对于addFile，通常是添加一个文件到ZIP的根目录或指定子目录。
+    // 如果允许子目录，需要确保路径是相对且安全的。
+    return true;
+}
+
+$user_filename = $_POST["filename"] ?? 'default_file.txt'; // 从用户输入获取，并提供默认值
+$source_file = '/path/to/safe_source/file.txt'; // 要添加的源文件，路径固定且安全
+
+$zip = new ZipArchive();
+if ($zip->open('safe_archive_create.zip', ZipArchive::CREATE) === TRUE) {
+    if (isValidAddFilename($user_filename)) {
+        // 使用过滤后的文件名添加到ZIP包
+        if ($zip->addFile($source_file, $user_filename)) {
+            echo "文件添加成功到ZIP";
+        } else {
+            echo "无法添加文件到ZIP";
+        }
+    } else {
+        echo "提供的文件名不安全，拒绝添加";
+        error_log("用户尝试添加不安全文件名: " . $user_filename);
+    }
+    $zip->close();
+} else {
+    echo "无法创建或打开ZIP文件";
+}
+?>
+CODE
 )
 desc(
 	lang: 'php'
@@ -398,5 +489,96 @@ desc(
     $zip = new ZipArchive();
     $zip->addFile($path);
     $zip->close();
+CODE
+	"safefile://SecureZipExtract.php": <<<CODE
+<?php
+// 修复代码示例 - 解压时过滤文件名
+function isValidFilename($filename) {
+    // 检查文件名是否包含路径穿越符
+    if (strpos($filename, '../') !== false || strpos($filename, '..\\') !== false) {
+        return false;
+    }
+    // 确保文件名是安全的，这里仅允许字母、数字、下划线、破折号和点
+    // 更严格的验证可以根据具体业务需求进行调整
+    if (!preg_match('/^[a-zA-Z0-9_\-.\/\\]+$/', $filename)) {
+        return false;
+    }
+    // 确保相对路径不会跳出指定目录
+    // 假设 $safe_dir 为 '/tmp/extracted/'
+    $safe_dir = '/tmp/extracted/';
+    $target_path = realpath($safe_dir . '/' . $filename);
+    if ($target_path === false || strpos($target_path, realpath($safe_dir)) !== 0) {
+        return false;
+    }
+    return true;
+}
+
+$path = 'safe_archive.zip'; // 假设这是一个非用户控制的固定文件名
+$zip = new ZipArchive();
+if ($zip->open($path) === TRUE) {
+    $safe_extract_dir = '/tmp/extracted/';
+    // 确保解压目录存在且可写
+    if (!is_dir($safe_extract_dir)) {
+        mkdir($safe_extract_dir, 0755, true);
+    }
+
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $filename = $zip->getNameIndex($i);
+        if (isValidFilename($filename)) {
+            // 解压单个文件到安全目录
+            if (!$zip->extractTo($safe_extract_dir, array($filename))) {
+                 error_log("无法解压文件: " . $filename);
+            }
+        } else {
+            // 发现非法文件名，记录日志或抛出异常，并跳过此文件
+            error_log("发现非法ZIP文件路径: " . $filename);
+            // 采取进一步措施，例如删除已解压的文件或终止操作
+        }
+    }
+    $zip->close();
+    echo "ZIP文件处理完成";
+} else {
+    echo "无法打开ZIP文件";
+}
+?>
+CODE
+	"safefile://SecureZipAddFile.php": <<<CODE
+<?php
+// 修复代码示例 - 添加文件时过滤文件名
+function isValidAddFilename($filename) {
+    // 检查文件名是否包含路径穿越符
+    if (strpos($filename, '../') !== false || strpos($filename, '..\\') !== false) {
+        return false;
+    }
+    // 确保文件名是安全的，这里仅允许字母、数字、下划线、破折号和点
+    if (!preg_match('/^[a-zA-Z0-9_\-.\/\\]+$/', $filename)) {
+        return false;
+    }
+    // 对于addFile，通常是添加一个文件到ZIP的根目录或指定子目录。
+    // 如果允许子目录，需要确保路径是相对且安全的。
+    return true;
+}
+
+$user_filename = $_POST["filename"] ?? 'default_file.txt'; // 从用户输入获取，并提供默认值
+$source_file = '/path/to/safe_source/file.txt'; // 要添加的源文件，路径固定且安全
+
+$zip = new ZipArchive();
+if ($zip->open('safe_archive_create.zip', ZipArchive::CREATE) === TRUE) {
+    if (isValidAddFilename($user_filename)) {
+        // 使用过滤后的文件名添加到ZIP包
+        if ($zip->addFile($source_file, $user_filename)) {
+            echo "文件添加成功到ZIP";
+        } else {
+            echo "无法添加文件到ZIP";
+        }
+    } else {
+        echo "提供的文件名不安全，拒绝添加";
+        error_log("用户尝试添加不安全文件名: " . $user_filename);
+    }
+    $zip->close();
+} else {
+    echo "无法创建或打开ZIP文件";
+}
+?>
 CODE
 )

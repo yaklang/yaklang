@@ -266,4 +266,63 @@ class Login {
   }
 }
 FILE
+	"safefile://SecurePreparedStatement.java": <<<CODE
+// 推荐做法：使用PreparedStatement进行参数化查询，防止SQL注入。
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+public class SecurePreparedStatement {
+    public void getUserData(Connection connection, int userId) throws SQLException {
+        String sql = "SELECT * FROM users WHERE id = ?"; // 使用问号作为占位符
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setInt(1, userId); // 将用户输入作为参数绑定，而不是直接拼接
+            ResultSet rs = pstmt.executeQuery();
+            // 处理结果集
+            while (rs.next()) {
+                System.out.println("User: " + rs.getString("name"));
+            }
+        }
+    }
+}
+CODE
+	"safefile://SecureMyBatisExample.java": <<<CODE
+// 推荐做法：使用MyBatis等ORM框架，框架内部会自动处理参数化，避免直接SQL拼接。
+// 这是一个调用示例，实际的SQL定义在XML映射文件中
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
+
+public class SecureMyBatisExample {
+    private SqlSessionFactory sqlSessionFactory;
+
+    public SecureMyBatisExample(SqlSessionFactory sqlSessionFactory) {
+        this.sqlSessionFactory = sqlSessionFactory;
+    }
+
+    public User getUserById(Long userId) {
+        try (SqlSession session = sqlSessionFactory.openSession()) {
+            // MyBatis会自动处理参数化，SQL定义在Mapper XML文件中，例如：
+            // <select id="getUserById" resultType="User"> SELECT * FROM users WHERE id = #{userId} </select>
+            return session.selectOne("userMapper.getUserById", userId);
+        }
+    }
+}
+
+// 假设的User类和userMapper.xml (片段)
+/*
+public class User {
+    private Long id;
+    private String name;
+    // getters and setters
+}
+
+// userMapper.xml (部分)
+<mapper namespace="userMapper">
+    <select id="getUserById" parameterType="long" resultType="User">
+        SELECT id, name FROM users WHERE id = #{userId}
+    </select>
+</mapper>
+*/
+CODE
 )

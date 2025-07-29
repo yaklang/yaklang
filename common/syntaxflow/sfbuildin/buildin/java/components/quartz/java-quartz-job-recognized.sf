@@ -91,4 +91,25 @@ public class ChickenJob implements Job, Serializable {
     }
 }
 EOF
+	"safefile://SafeNonQuartzJobClass.java": <<<CODE
+// 这是一个普通的Java类，未实现org.quartz.Job接口
+package com.example.app;
+
+public class SafeNonQuartzJobClass {
+    public void doSomethingSafe() {
+        System.out.println("This is a regular method, not a Quartz job.");
+    }
+}
+CODE
+	"safefile://SafeServiceImpl.java": <<<CODE
+// 这是一个普通的Service实现类，不涉及Quartz调度
+package com.example.service;
+
+public class SafeServiceImpl {
+    public void performBusinessLogic() {
+        // 业务逻辑
+        System.out.println("Executing some safe business logic.");
+    }
+}
+CODE
 )

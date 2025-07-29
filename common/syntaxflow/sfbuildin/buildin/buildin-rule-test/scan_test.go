@@ -25,6 +25,7 @@ func TestVerifiedRule(t *testing.T) {
 	yakit.InitialDatabase()
 	db := consts.GetGormProfileDatabase()
 	db = db.Where("is_build_in_rule = ? ", true)
+	failedRules := make([]string, 0)
 	for rule := range sfdb.YieldSyntaxFlowRules(db, context.Background()) {
 		f, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(rule.Content)
 		if err != nil {
@@ -35,11 +36,15 @@ func TestVerifiedRule(t *testing.T) {
 		}
 		t.Run(strings.Join(append(strings.Split(rule.Tag, "|"), rule.RuleName), "/"), func(t *testing.T) {
 			t.Log("Start to verify: " + rule.RuleName)
-			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, false)
+			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, true)
 			if err != nil {
+				failedRules = append(failedRules, strings.Join(append(strings.Split(rule.Tag, "|"), rule.RuleName), "/"))
 				t.Fatal(err)
 			}
 		})
+	}
+	for _, name := range failedRules {
+		println(name)
 	}
 }
 

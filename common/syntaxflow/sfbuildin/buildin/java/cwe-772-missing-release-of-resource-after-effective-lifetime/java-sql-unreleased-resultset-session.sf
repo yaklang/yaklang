@@ -262,4 +262,78 @@ desc(
         }
     }
 CODE
+	"safefile://SafePreparedStatementResultSet.java": <<<CODE
+import java.sql.*;
+import javax.sql.DataSource;
+
+public class SafePreparedStatementResultSet {
+
+    private DataSource dataSource;
+
+    /**
+     * 使用 PreparedStatement 和 try-with-resources 自动管理 ResultSet、PreparedStatement 和 Connection。
+     * 这是最推荐的实践，简洁且避免资源泄漏。
+     */
+    public void safePreparedStatementWithResources() throws SQLException {
+        String sql = "SELECT id, name FROM users WHERE age > ?";
+        try (Connection conn = dataSource.getConnection()) {
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setInt(1, 25);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        // 处理用户数据
+                        System.out.println("User: " + rs.getString("name"));
+                    }
+                } // ResultSet 会在这里自动关闭
+            } // PreparedStatement 会在这里自动关闭
+        } // Connection 会在这里自动关闭
+    }
+}
+
+CODE
+	"safefile://SafeManualCloseWithLogging.java": <<<CODE
+import java.sql.*;
+import javax.sql.DataSource;
+import java.util.logging.Logger;
+
+public class SafeManualCloseWithLogging {
+
+    private static final Logger LOGGER = Logger.getLogger(SafeManualCloseWithLogging.class.getName());
+    private DataSource dataSource;
+
+    /**
+     * 使用 try-finally 结构手动关闭 ResultSet、Statement 和 Connection，并处理关闭时可能出现的 SQLException。
+     * 遵循资源获取的反向顺序关闭资源，并在每个关闭操作中捕获异常并记录日志，避免异常屏蔽。
+     */
+    public void safeManualCloseResultSet() {
+        Connection conn = null;
+        Statement stmt = null;
+        ResultSet rs = null;
+        try {
+            conn = dataSource.getConnection();
+            stmt = conn.createStatement();
+            rs = stmt.executeQuery("SELECT product_id, product_name FROM products");
+
+            while (rs.next()) {
+                // 处理产品数据
+                System.out.println("Product: " + rs.getString("product_name"));
+            }
+        } catch (SQLException e) {
+            LOGGER.severe("Database error: " + e.getMessage());
+        } finally {
+            // 按照获取的逆序关闭资源
+            if (rs != null) {
+                try { rs.close(); } catch (SQLException e) { LOGGER.warning("Error closing ResultSet: " + e.getMessage()); }
+            }
+            if (stmt != null) {
+                try { stmt.close(); } catch (SQLException e) { LOGGER.warning("Error closing Statement: " + e.getMessage()); }
+            }
+            if (conn != null) {
+                try { conn.close(); } catch (SQLException e) { LOGGER.warning("Error closing Connection: " + e.getMessage()); }
+            }
+        }
+    }
+}
+
+CODE
 )

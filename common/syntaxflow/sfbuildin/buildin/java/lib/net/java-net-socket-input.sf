@@ -125,4 +125,80 @@ EOF
         }
     }
 EOF
+	"safefile://SafeNetworkCommunication.java": <<<CODE
+// 这是一个安全的网络通信示例
+// 此代码模拟了数据发送而非接收，不应触发TCP数据接收点的审计规则。
+// 它展示了如何通过SocketChannel写入数据，而不是读取数据。
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
+import java.nio.charset.StandardCharsets;
+
+public class SafeNetworkCommunication {
+
+    public static void main(String[] args) {
+        try (SocketChannel client = SocketChannel.open(new InetSocketAddress("localhost", 8080))) {
+            String message = "Hello, server!";
+            ByteBuffer buffer = ByteBuffer.wrap(message.getBytes(StandardCharsets.UTF_8));
+            System.out.println("Sending message: " + message);
+            // 写入数据到通道，而不是从通道读取数据
+            while (buffer.hasRemaining()) {
+                client.write(buffer);
+            }
+            System.out.println("Message sent. Shutting down output for graceful close.");
+            // 关闭了输出，表明客户端不再发送数据
+            // Java 7+ try-with-resources 会自动关闭client
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://SecureFileUpload.java": <<<CODE
+// 这是一个文件上传的示例，数据来源于文件，而非直接通过网络SocketInputStream或SocketChannel.read()
+// 此处模拟的是从本地文件系统读取数据，而非通过网络Socket接收数据，因此不应触发告警。
+// 尽管文件流可能被用于上传到网络服务，但数据的原始来源点不是TCP接收。
+
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+public class SecureFileUpload {
+
+    public static void main(String[] args) {
+        Path filePath = Paths.get("example.txt");
+
+        // 检查文件是否存在并创建
+        if (!Files.exists(filePath)) {
+            try {
+                Files.write(filePath, "This is some test content for the file.\nMore lines here.".getBytes());
+                System.out.println("Created example.txt for testing.");
+            } catch (IOException e) {
+                e.printStackTrace();
+                return;
+            }
+        }
+
+        try (InputStream fis = new FileInputStream(filePath)) {
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+            System.out.println("Reading from local file: " + filePath.toAbsolutePath());
+            while ((bytesRead = fis.read(buffer)) != -1) {
+                // 打印读取到的内容，这里模拟处理文件数据
+                String content = new String(buffer, 0, bytesRead);
+                System.out.print(content);
+            }
+            System.out.println("\nFinished reading from file.");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
 )

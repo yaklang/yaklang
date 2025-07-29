@@ -134,6 +134,179 @@ public class NioDeleteFileExample {
     }
 }
 TEXT
+	"safefile://SafeFileDeletionExample.java": <<<CODE
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+public class SafeFileDeletionExample {
+
+    private static final String BASE_DIR = "/safe/appdata/"; // 定义安全的根目录
+
+    public static void main(String[] args) {
+        // 示例1: 仅删除硬编码的、已知安全路径下的文件
+        safeDeleteHardcodedFile();
+
+        // 示例2: 根据用户输入删除文件，但严格限制在特定目录下，并进行路径规范化和验证
+        String userProvidedFileName = "report.txt"; // 模拟用户输入
+        safeDeleteUserManagedFile(userProvidedFileName);
+
+        // 示例3: 清理临时文件，使用deleteOnExit确保关闭时自动删除
+        cleanUpTemporaryFiles();
+    }
+
+    private static void safeDeleteHardcodedFile() {
+        // 确保要删除的文件是在应用的固定安全目录内，或是一个硬编码的路径
+        // 这里的路径是应用程序开发者预设的，不接受外部输入。
+        Path fixedPath = Paths.get(BASE_DIR, "application_log.txt");
+
+        // 在删除前进行权限检查或其他业务逻辑检查，确保只有授权能删除
+        if (Files.exists(fixedPath)) {
+            try {
+                Files.delete(fixedPath);
+                System.out.println("Safely deleted hardcoded file: " + fixedPath);
+            } catch (IOException e) {
+                System.err.println("Error deleting fixed file: " + e.getMessage());
+            }
+        } else {
+            System.out.println("Hardcoded file does not exist: " + fixedPath);
+        }
+    }
+
+    private static void safeDeleteUserManagedFile(String fileName) {
+        // 使用Paths.get拼接路径，并确保路径规范化，防止路径遍历攻击
+        // 强制文件路径保持在预定义的 BASE_DIR 下
+        Path filePath = Paths.get(BASE_DIR, fileName);
+
+        // 强制检查规范化后的路径是否仍然在 BASE_DIR 下方
+        // 这是防止路径遍历攻击的关键一步：确保文件不是../之类的跳出安全目录
+        try {
+            if (!filePath.normalize().startsWith(Paths.get(BASE_DIR).normalize())) {
+                System.err.println("非法文件删除尝试: Path traversal detected for " + filePath);
+                return;
+            }
+        } catch (Exception e) {
+            System.err.println("路径规范化错误: " + e.getMessage());
+            return;
+        }
+
+        // 额外的输入校验：例如，限制文件名只包含字母数字和下划线
+        if (!fileName.matches("^[a-zA-Z0-9_\\-.]+\.txt$")) { // 示例：只允许特定后缀的文本文件
+            System.err.println("非法文件名格式: " + fileName);
+            return;
+        }
+
+        // 在删除前，可以添加更严格的业务逻辑验证，例如用户是否有权限删除此文件
+        if (userHasPermissionToDelete(filePath)) { // 模拟权限检查
+            try {
+                if (Files.deleteIfExists(filePath)) { // 使用deleteIfExists防止文件不存在时抛异常
+                    System.out.println("Safely deleted user-managed file: " + filePath);
+                } else {
+                    System.out.println("User-managed file not found or already deleted: " + filePath);
+                }
+            } catch (IOException e) {
+                System.err.println("Error deleting user-managed file: " + e.getMessage());
+            }
+        } else {
+            System.err.println("用户无权删除文件: " + filePath);
+        }
+    }
+
+    private static void cleanUpTemporaryFiles() {
+        try {
+            // 创建一个临时文件，并在程序退出时自动删除它
+            // 这种用法通常是安全的，因为文件是程序自己创建和管理的。
+            File tempFile = File.createTempFile("temp", ".tmp");
+            tempFile.deleteOnExit();
+            System.out.println("Created temporary file: " + tempFile.getAbsolutePath() + ", will delete on exit.");
+            // 模拟一些操作
+            Files.write(tempFile.toPath(), "This is temporary data.".getBytes());
+        } catch (IOException e) {
+            System.err.println("Error creating or managing temporary file: " + e.getMessage());
+        }
+    }
+
+    // 模拟的用户权限检查方法
+    private static boolean userHasPermissionToDelete(Path filePath) {
+        // 在实际应用中，这里会集成用户认证和授权系统
+        // 简单示例：只有特定用户（例如管理员）才能删除文件
+        // return CurrentUser.getRole().equals("ADMIN");
+        return true; // 示例用途，总是返回true
+    }
+
+    // 模拟文件创建，这里不直接进行文件删除，而是创建文件作为辅助
+    private static void createFileForTest(String path) {
+        try {
+            Path filePath = Paths.get(path);
+            if (Files.notExists(filePath.getParent())) {
+                Files.createDirectories(filePath.getParent());
+            }
+            Files.createFile(filePath);
+            System.out.println("Created file for test: " + path);
+        } catch (IOException e) {
+            System.err.println("Error creating file for test: " + e.getMessage());
+        }
+    }
+}
+
+CODE
+	"safefile://NoDeleteOperations.java": <<<CODE
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.io.IOException;
+
+public class NoDeleteOperations {
+
+    public static void main(String[] args) {
+        // 此文件不执行任何文件删除操作。
+        // 用于演示完全没有触发规则的情况。
+
+        System.out.println("This program does not perform any file deletion operations.");
+
+        // 示例：仅创建文件，不进行删除
+        createOnlyFile("created_file_1.txt");
+        createOnlyFile("data/reports/report_2.txt");
+    }
+
+    private static void createOnlyFile(String fileName) {
+        Path filePath = Paths.get(fileName);
+        try {
+            // 确保父目录存在
+            if (filePath.getParent() != null) {
+                Files.createDirectories(filePath.getParent());
+            }
+            Files.writeString(filePath, "This is some content for " + fileName);
+            System.out.println("Successfully created: " + filePath.toAbsolutePath());
+        } catch (IOException e) {
+            System.err.println("Failed to create file " + fileName + ": " + e.getMessage());
+        }
+    }
+
+    // 模拟处理其他文件操作，但没有删除
+    public void readFileContent(String filePath) {
+        try {
+            String content = Files.readString(Paths.get(filePath));
+            System.out.println("Content of " + filePath + ":\n" + content);
+        } catch (IOException e) {
+            System.err.println("Error reading file: " + e.getMessage());
+        }
+    }
+
+    public void listDirectory(String directoryPath) {
+        try {
+            System.out.println("Listing files in: " + directoryPath);
+            Files.list(Paths.get(directoryPath))
+                 .forEach(path -> System.out.println("- " + path.getFileName()));
+        } catch (IOException e) {
+            System.err.println("Error listing directory: " + e.getMessage());
+        }
+    }
+}
+CODE
 )
 
 desc(
@@ -171,6 +344,179 @@ public class IoDeleteFileExample {
     }
 }
 TEXT
+	"safefile://SafeFileDeletionExample.java": <<<CODE
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+public class SafeFileDeletionExample {
+
+    private static final String BASE_DIR = "/safe/appdata/"; // 定义安全的根目录
+
+    public static void main(String[] args) {
+        // 示例1: 仅删除硬编码的、已知安全路径下的文件
+        safeDeleteHardcodedFile();
+
+        // 示例2: 根据用户输入删除文件，但严格限制在特定目录下，并进行路径规范化和验证
+        String userProvidedFileName = "report.txt"; // 模拟用户输入
+        safeDeleteUserManagedFile(userProvidedFileName);
+
+        // 示例3: 清理临时文件，使用deleteOnExit确保关闭时自动删除
+        cleanUpTemporaryFiles();
+    }
+
+    private static void safeDeleteHardcodedFile() {
+        // 确保要删除的文件是在应用的固定安全目录内，或是一个硬编码的路径
+        // 这里的路径是应用程序开发者预设的，不接受外部输入。
+        Path fixedPath = Paths.get(BASE_DIR, "application_log.txt");
+
+        // 在删除前进行权限检查或其他业务逻辑检查，确保只有授权能删除
+        if (Files.exists(fixedPath)) {
+            try {
+                Files.delete(fixedPath);
+                System.out.println("Safely deleted hardcoded file: " + fixedPath);
+            } catch (IOException e) {
+                System.err.println("Error deleting fixed file: " + e.getMessage());
+            }
+        } else {
+            System.out.println("Hardcoded file does not exist: " + fixedPath);
+        }
+    }
+
+    private static void safeDeleteUserManagedFile(String fileName) {
+        // 使用Paths.get拼接路径，并确保路径规范化，防止路径遍历攻击
+        // 强制文件路径保持在预定义的 BASE_DIR 下
+        Path filePath = Paths.get(BASE_DIR, fileName);
+
+        // 强制检查规范化后的路径是否仍然在 BASE_DIR 下方
+        // 这是防止路径遍历攻击的关键一步：确保文件不是../之类的跳出安全目录
+        try {
+            if (!filePath.normalize().startsWith(Paths.get(BASE_DIR).normalize())) {
+                System.err.println("非法文件删除尝试: Path traversal detected for " + filePath);
+                return;
+            }
+        } catch (Exception e) {
+            System.err.println("路径规范化错误: " + e.getMessage());
+            return;
+        }
+
+        // 额外的输入校验：例如，限制文件名只包含字母数字和下划线
+        if (!fileName.matches("^[a-zA-Z0-9_\\-.]+\.txt$")) { // 示例：只允许特定后缀的文本文件
+            System.err.println("非法文件名格式: " + fileName);
+            return;
+        }
+
+        // 在删除前，可以添加更严格的业务逻辑验证，例如用户是否有权限删除此文件
+        if (userHasPermissionToDelete(filePath)) { // 模拟权限检查
+            try {
+                if (Files.deleteIfExists(filePath)) { // 使用deleteIfExists防止文件不存在时抛异常
+                    System.out.println("Safely deleted user-managed file: " + filePath);
+                } else {
+                    System.out.println("User-managed file not found or already deleted: " + filePath);
+                }
+            } catch (IOException e) {
+                System.err.println("Error deleting user-managed file: " + e.getMessage());
+            }
+        } else {
+            System.err.println("用户无权删除文件: " + filePath);
+        }
+    }
+
+    private static void cleanUpTemporaryFiles() {
+        try {
+            // 创建一个临时文件，并在程序退出时自动删除它
+            // 这种用法通常是安全的，因为文件是程序自己创建和管理的。
+            File tempFile = File.createTempFile("temp", ".tmp");
+            tempFile.deleteOnExit();
+            System.out.println("Created temporary file: " + tempFile.getAbsolutePath() + ", will delete on exit.");
+            // 模拟一些操作
+            Files.write(tempFile.toPath(), "This is temporary data.".getBytes());
+        } catch (IOException e) {
+            System.err.println("Error creating or managing temporary file: " + e.getMessage());
+        }
+    }
+
+    // 模拟的用户权限检查方法
+    private static boolean userHasPermissionToDelete(Path filePath) {
+        // 在实际应用中，这里会集成用户认证和授权系统
+        // 简单示例：只有特定用户（例如管理员）才能删除文件
+        // return CurrentUser.getRole().equals("ADMIN");
+        return true; // 示例用途，总是返回true
+    }
+
+    // 模拟文件创建，这里不直接进行文件删除，而是创建文件作为辅助
+    private static void createFileForTest(String path) {
+        try {
+            Path filePath = Paths.get(path);
+            if (Files.notExists(filePath.getParent())) {
+                Files.createDirectories(filePath.getParent());
+            }
+            Files.createFile(filePath);
+            System.out.println("Created file for test: " + path);
+        } catch (IOException e) {
+            System.err.println("Error creating file for test: " + e.getMessage());
+        }
+    }
+}
+
+CODE
+	"safefile://NoDeleteOperations.java": <<<CODE
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.io.IOException;
+
+public class NoDeleteOperations {
+
+    public static void main(String[] args) {
+        // 此文件不执行任何文件删除操作。
+        // 用于演示完全没有触发规则的情况。
+
+        System.out.println("This program does not perform any file deletion operations.");
+
+        // 示例：仅创建文件，不进行删除
+        createOnlyFile("created_file_1.txt");
+        createOnlyFile("data/reports/report_2.txt");
+    }
+
+    private static void createOnlyFile(String fileName) {
+        Path filePath = Paths.get(fileName);
+        try {
+            // 确保父目录存在
+            if (filePath.getParent() != null) {
+                Files.createDirectories(filePath.getParent());
+            }
+            Files.writeString(filePath, "This is some content for " + fileName);
+            System.out.println("Successfully created: " + filePath.toAbsolutePath());
+        } catch (IOException e) {
+            System.err.println("Failed to create file " + fileName + ": " + e.getMessage());
+        }
+    }
+
+    // 模拟处理其他文件操作，但没有删除
+    public void readFileContent(String filePath) {
+        try {
+            String content = Files.readString(Paths.get(filePath));
+            System.out.println("Content of " + filePath + ":\n" + content);
+        } catch (IOException e) {
+            System.err.println("Error reading file: " + e.getMessage());
+        }
+    }
+
+    public void listDirectory(String directoryPath) {
+        try {
+            System.out.println("Listing files in: " + directoryPath);
+            Files.list(Paths.get(directoryPath))
+                 .forEach(path -> System.out.println("- " + path.getFileName()));
+        } catch (IOException e) {
+            System.err.println("Error listing directory: " + e.getMessage());
+        }
+    }
+}
+CODE
 )
 
 

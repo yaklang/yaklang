@@ -142,4 +142,57 @@ public class TomcatFilterMemShell implements Filter {
    }
 }
 CODE
+	"safefile://SafeReflectionUse.java": <<<CODE
+// Safe and controlled reflection use. setAccessible(true) is immediately followed by setAccessible(false).
+import java.lang.reflect.Field;
+
+public class SafeReflectionUse {
+    private String secret = "my_secret_data";
+
+    public String getSecretWithControlledReflection() {
+        Field field = null;
+        try {
+            field = SafeReflectionUse.class.getDeclaredField("secret");
+            field.setAccessible(true); // Temporarily allow access
+            String value = (String) field.get(this);
+            return value;
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            e.printStackTrace();
+            return null;
+        } finally {
+            if (field != null) {
+                field.setAccessible(false); // Restore access control immediately
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+        SafeReflectionUse instance = new SafeReflectionUse();
+        System.out.println("Secret: " + instance.getSecretWithControlledReflection());
+    }
+}
+CODE
+	"safefile://StandardAPIUsage.java": <<<CODE
+// Illustrates using standard Java APIs instead of reflection for common tasks.
+// This class has no reflection usage that bypasses access control.
+public class StandardAPIUsage {
+    private String privateData = "accessible_via_method";
+
+    // Public getter method is the standard and safe way to expose private data.
+    public String getPrivateData() {
+        return privateData;
+    }
+
+    public void setPrivateData(String data) {
+        this.privateData = data;
+    }
+
+    public static void main(String[] args) {
+        StandardAPIUsage obj = new StandardAPIUsage();
+        System.out.println("Data accessed via public method: " + obj.getPrivateData());
+        obj.setPrivateData("new_data");
+        System.out.println("Data updated via public method: " + obj.getPrivateData());
+    }
+}
+CODE
 )

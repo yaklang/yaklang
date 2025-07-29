@@ -121,4 +121,70 @@ desc(
         }
     }
 CODE
+	"safefile://SecureKEMAlgorithm.java": <<<CODE
+import javax.crypto.KEM;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.PublicKey;
+import java.security.SecureRandom;
+
+public class SecureKEMAlgorithm {
+    public static void main(String[] args) {
+        try {
+            // 使用高强度的KEM算法，例如基于AES的KEM或未来PQC算法
+            // KEM.getInstance("AES/GCM/NoPadding") 是一个示例，实际需要根据JRE和标准选择KEM算法
+            // 注意：JavaSE 17中KEM.getInstance()仅支持"DiffieHellman"和"EC"作为算法名称
+            // 如果需要特定KEM模式(如KEM/AES/GCM)，通常是通过其他库或更高版本JDK实现
+            // 此处示例为了符合规则逻辑，模拟使用"AESKEM"，假设未来JDK或框架支持更明确的算法字符串
+            KEM kem = KEM.getInstance("DiffieHellman"); // Or "EC" for Elliptic Curve
+
+            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("DH"); // Or "EC"
+            keyPairGenerator.initialize(2048); // Recommended key size for DH
+            KeyPair keyPair = keyPairGenerator.generateKeyPair();
+            PublicKey publicKey = keyPair.getPublic();
+
+            KEM.Encapsulator encapsulator = kem.newEncapsulator(publicKey);
+            KEM.Encapsulated encapsulated = encapsulator.encapsulate();
+
+            byte[] encapsulatedKey = encapsulated.key();
+            byte[] encapsulatedSecret = encapsulated.encapsulation();
+
+            System.out.println("KEM operation successful with secure algorithm.");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://KEMWithOtherAlgorithms.java": <<<CODE
+import javax.crypto.KEM;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.PublicKey;
+
+public class KEMWithOtherAlgorithms {
+    public static void main(String[] args) {
+        try {
+            // KEM.getInstance(""algo"")仅检查其参数，并非实际执行加密算法
+            // 如果传入的算法名不包含弱算法关键字 (DES, 3DES, RC4, RC2), 则判定为安全
+            // 例如，这里使用了一个非加密算法或将来可能的算法名称，只要不包含特定弱关键字，就不会告警。
+            KEM kem = KEM.getInstance("FutureSecureKEMAlgo"); // 使用一个假设的、不含弱算法关键字的算法名
+
+            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+            keyPairGenerator.initialize(2048);
+            KeyPair keyPair = keyPairGenerator.generateKeyPair();
+            PublicKey publicKey = keyPair.getPublic();
+
+            KEM.Encapsulator encapsulator = kem.newEncapsulator(publicKey);
+            KEM.Encapsulated encapsulated = encapsulator.encapsulate();
+
+            System.out.println("KEM operation successful with a non-weak algorithm name.");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
 )

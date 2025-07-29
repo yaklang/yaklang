@@ -656,9 +656,6 @@ func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t require.Tes
 	if err != nil {
 		return err
 	}
-	if strings.Contains(rule.RuleName, "SAXBuilder") {
-		log.Infof("hit")
-	}
 	verifyFs, err := frame.ExtractVerifyFilesystemAndLanguage()
 	if err != nil {
 		return err
@@ -708,13 +705,13 @@ func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t require.Tes
 		return nil
 	}
 
-	verifyFs, _ = frame.ExtractNegativeFilesystemAndLanguage()
-	if verifyFs == nil && isStrict {
-		return utils.Errorf("no positive filesystem found in rule: %s", rule.RuleName)
+	negativeFs, _ := frame.ExtractNegativeFilesystemAndLanguage()
+	if negativeFs == nil && isStrict {
+		return utils.Errorf("no negative filesystem found in rule: %s", rule.RuleName)
 	}
 	log.Infof("safe filesystem start")
 	if isStrict {
-		for _, f := range verifyFs {
+		for _, f := range negativeFs {
 			CheckWithFS(f.GetVirtualFs(), t, func(programs ssaapi.Programs) error {
 				result, err := programs.SyntaxFlowWithError(rule.Content, ssaapi.QueryWithEnableDebug(), ssaapi.QueryWithInitInputVar(programs[0]))
 				if err != nil {

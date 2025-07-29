@@ -197,4 +197,66 @@ public class MailSender {
     }
 }
 UNSAFE
+	"safefile://SecureMailSender.java": <<<CODE
+package org.example;
+
+import org.apache.commons.mail.DefaultAuthenticator;
+import org.apache.commons.mail.Email;
+import org.apache.commons.mail.EmailException;
+import org.apache.commons.mail.SimpleEmail;
+
+public class SecureMailSender {
+    public static void main(String[] args) {
+        Email email = new SimpleEmail();
+        email.setHostName("smtp.example.com");
+        email.setSmtpPort(587);
+        email.setAuthenticator(new DefaultAuthenticator("your-email@example.com", "your-password"));
+        email.setTLS(true);
+        // 关键修复：启用证书身份校验，确保安全
+        email.setSSLCheckServerIdentity(true);
+        try {
+            email.setFrom("your-email@example.com");
+            email.addTo("recipient-email@example.com");
+            email.setSubject("安全邮件主题");
+            email.setMsg("这是安全邮件的正文内容，已启用证书校验。");
+
+            email.send();
+            System.out.println("邮件发送成功且已校验服务器身份！");
+        } catch (EmailException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://NonTLSMailSender.java": <<<CODE
+package org.example;
+
+import org.apache.commons.mail.DefaultAuthenticator;
+import org.apache.commons.mail.Email;
+import org.apache.commons.mail.EmailException;
+import org.apache.commons.mail.SimpleEmail;
+
+public class NonTLSMailSender {
+    public static void main(String[] args) {
+        Email email = new SimpleEmail();
+        email.setHostName("smtp.example.com");
+        email.setSmtpPort(25); // 使用非TLS/SSL端口，不涉及到证书校验
+        email.setAuthenticator(new DefaultAuthenticator("your-email@example.com", "your-password"));
+        // 不启用TLS，因此规则不适用，不会触发告警
+        // email.setTLS(true); 
+        try {
+            email.setFrom("your-email@example.com");
+            email.addTo("recipient-email@example.com");
+            email.setSubject("非加密邮件主题");
+            email.setMsg("这是非加密邮件的正文内容。");
+
+            email.send();
+            System.out.println("邮件发送成功 (非加密)！
+");
+        } catch (EmailException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
 )

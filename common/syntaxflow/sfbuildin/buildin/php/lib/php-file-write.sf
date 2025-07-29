@@ -126,4 +126,38 @@ $tpl_name = !empty($_POST['tpl_name']) ? trim($_POST['tpl_name']) : '';
  	showmsg('编辑模板成功', 'tpl_manage.php');
  	file_put_contents("");
 PARAM
+	"safefile://SafeFileReadExample.php": <<<CODE
+<?php
+// 这是一个文件读取操作，不涉及文件写入，因此不会触发fwrite或file_put_contents检测
+$filePath = './data/config.txt';
+if (file_exists($filePath)) {
+    $content = file_get_contents($filePath);
+    echo "File content: " . $content;
+} else {
+    echo "File does not exist.";
+}
+?>
+CODE
+	"safefile://SafeDatabaseWriteExample.php": <<<CODE
+<?php
+// 数据写入数据库，不涉及文件写入操作，不会触发规则告警
+$conn = new mysqli("localhost", "user", "password", "database");
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+$username = $conn->real_escape_string($_POST['username']);
+$email = $conn->real_escape_string($_POST['email']);
+
+$sql = "INSERT INTO users (username, email) VALUES ('$username', '$email')";
+
+if ($conn->query($sql) === TRUE) {
+    echo "New record created successfully";
+} else {
+    echo "Error: " . $sql . "<br>" . $conn->error;
+}
+
+$conn->close();
+?>
+CODE
 )

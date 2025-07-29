@@ -69,4 +69,55 @@ func main() {
 }
 
 PARAM
+	"safefile://SafeFilePathHandling.go": <<<CODE
+// NoIoutilWriteCall.go
+package main
+
+import (
+	"fmt"
+	"os"
+	// "io/ioutil" // 不导入 ioutil 包，或者只用于 ReadFile 等安全操作
+)
+
+func main() {
+	// 此示例不使用 ioutil.WriteFile 或 ioutil.WriteAll
+	// 而是使用 os.Create 或 os.OpenFile 来进行文件写入，
+	// 从而避免触发针对 ioutil 写入函数的规则。
+
+	fileName := "custom_file.txt"
+	data := []byte("This content is written using os package.")
+
+	file, err := os.Create(fileName) // 使用 os.Create 创建文件
+	if err != nil {
+		fmt.Printf("Error creating file: %s\n", err)
+		return
+	}
+	defer file.Close() // 确保文件关闭
+
+	_, err = file.Write(data) // 使用文件对象的 Write 方法写入数据
+	if err != nil {
+		fmt.Printf("Error writing to file: %s\n", err)
+		return
+	}
+	fmt.Println("Data written to file successfully using os.Create and file.Write.")
+
+	// 另一个例子：使用 os.OpenFile 实现追加写入
+	appendFileName := "append_log.txt"
+	appendData := []byte("\nAppended log entry.")
+	appendFile, err := os.OpenFile(appendFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Printf("Error opening file for append: %s\n", err)
+		return
+	}
+	defer appendFile.Close()
+
+	_, err = appendFile.Write(appendData)
+	if err != nil {
+		fmt.Printf("Error appending to file: %s\n", err)
+		return
+	}
+	fmt.Println("Data appended to file successfully using os.OpenFile.")
+}
+
+CODE
 )

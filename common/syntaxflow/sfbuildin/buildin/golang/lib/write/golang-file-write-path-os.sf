@@ -77,4 +77,127 @@ func main() {
 }
 
 PARAM
+	"safefile://SafeFileWriteWithValidation.go": <<<CODE
+package main
+
+import (
+	"fmt"
+	"io/ioutil"
+	"path/filepath"
+	"regexp"
+)
+
+// cleanPath 确保路径只包含预期的字符，并移除多余的斜杠
+func cleanPath(p string) string {
+	// 移除路径开头和结尾的所有斜杠
+	p = filepath.Clean(p)
+	// 确保没有跨目录访问的尝试 (e.g., ../)
+	re, _ := regexp.Compile(`(?:\.{2}[\\/]|\\)`)
+	p = re.ReplaceAllString(p, "")
+	return p
+}
+
+// safeWriteFile 确保文件写入是在允许的目录下，避免路径穿越
+func safeWriteFile(baseDir, filename string, data []byte) error {
+	if filepath.IsAbs(filename) { // 禁止绝对路径
+		return fmt.Errorf("absolute path not allowed")
+	}
+
+	cleanedFilename := cleanPath(filename)
+	if cleanedFilename == "" || cleanedFilename == "." || cleanedFilename == ".." {
+		return fmt.Errorf("invalid filename")
+	}
+
+	finalPath := filepath.Join(baseDir, cleanedFilename)
+	// 再次验证最终路径是否仍在baseDir下
+	// This is crucial to prevent cases where cleanPath might be bypassed or incomplete
+	resolvedPath, err := filepath.Abs(finalPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve path: %w", err)
+	}
+	resolvedBaseDir, err := filepath.Abs(baseDir)
+	if err != nil {
+		return fmt.Errorf("failed to resolve base directory: %w", err)
+	}
+
+	if !strings.HasPrefix(resolvedPath, resolvedBaseDir) {
+		return fmt.Errorf("attempted path traversal detected")
+	}
+
+	return os.WriteFile(finalPath, data, 0644) // 使用os.WriteFile但路径经过严格验证
+}
+
+func main() {
+	baseDirectory := "/tmp/uploads"
+	// 确保目录存在
+	_ = os.MkdirAll(baseDirectory, 0755)
+
+	// 示例1: 安全的写入操作
+	err := safeWriteFile(baseDirectory, "my_safe_file.txt", []byte("This is safe content."))
+	if err != nil {
+		fmt.Printf("Error writing safe file: %v\n", err)
+	} else {
+		fmt.Println("Safe file written successfully.")
+	}
+
+	// 示例2: 尝试路径穿越 (应该被阻止)
+	err = safeWriteFile(baseDirectory, "../secret/passwd.txt", []byte("trying to write passwd"))
+	if err != nil {
+		fmt.Printf("Error writing malicious file (expected): %v\n", err)
+	} else {
+		fmt.Println("Malicious file written (unexpected)!")
+	}
+
+	// 示例3: 尝试写入绝对路径 (应该被阻止)
+	err = safeWriteFile(baseDirectory, "/etc/passwd", []byte("trying to write absolute path"))
+	if err != nil {
+		fmt.Printf("Error writing absolute path file (expected): %v\n", err)
+	} else {
+		fmt.Println("Absolute path file written (unexpected)!")
+	}
+}
+
+CODE
+	"safefile://SafeFileWriteToTemp.go": <<<CODE
+package main
+
+import (
+	"fmt"
+	"io/ioutil"
+	"os"
+)
+
+func main() {
+	// 直接使用 ioutil.TempFile 创建临时文件，由系统生成安全的文件名和路径
+	// 这种方式是最安全的，因为它完全避免了用户控制的文件名和路径，
+	// 从而杜绝了路径穿越和任意文件写入的风险。
+	file, err := ioutil.TempFile("", "prefix-")
+	if err != nil {
+		fmt.Printf("Error creating temp file: %v\n", err)
+		return
+	}
+	defer file.Close()
+	defer os.Remove(file.Name()) // 使用完后清理临时文件
+
+	fmt.Printf("Created temporary file: %s\n", file.Name())
+
+	_, err = file.WriteString("This is temporary and safe content.")
+	if err != nil {
+		fmt.Printf("Error writing to temp file: %v\n", err)
+		return
+	}
+	fmt.Println("Content written to temp file successfully.")
+
+	// 同样可以使用 os.CreateTemp
+	file2, err := os.CreateTemp("", "another-prefix-")
+	if err != nil {
+		fmt.Printf("Error creating another temp file: %v\n", err)
+		return
+	}
+	defer file2.Close()
+	defer os.Remove(file2.Name()) // 使用完后清理临时文件
+	fmt.Printf("Created another temporary file: %s\n", file2.Name())
+}
+
+CODE
 )

@@ -169,4 +169,117 @@ func listTables(db *sql.DB) {
     }
 }
 UNSAFE
+	"safefile://SafeSQLQuery.go": <<<CODE
+// 使用参数化查询避免SQL注入 (Prepared Statements)
+package main
+
+import (
+	"database/sql"
+	"fmt"
+	_ "github.com/lib/pq"
+)
+
+func main() {
+	db, err := sql.Open("postgres", "user=test dbname=test sslmode=disable")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+
+	userID := 123
+	username := "John Doe"
+
+	// 查询，使用参数化查询
+	rows, err := db.Query("SELECT name, email FROM users WHERE id = $1", userID)
+	if err != nil {
+		fmt.Println("Error querying user by ID:", err)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var name, email string
+		if err := rows.Scan(&name, &email); err != nil {
+			fmt.Println("Error scanning row:", err)
+			return
+		}
+		fmt.Printf("User: %s, Email: %s\n", name, email)
+	}
+
+	// 插入，使用参数化查询
+	stmt, err := db.Prepare("INSERT INTO users(name, email) VALUES($1, $2)")
+	if err != nil {
+		fmt.Println("Error preparing statement:", err)
+		return
+	}
+	defer stmt.Close()
+
+	res, err := stmt.Exec(username, "john.doe@example.com")
+	if err != nil {
+		fmt.Println("Error inserting user:", err)
+		return
+	}
+	rowsAffected, _ := res.RowsAffected()
+	fmt.Printf("Inserted %d row(s)\n", rowsAffected)
+
+
+
+	// 使用QueryRow进行单行查询，同样参数化
+	var email string
+	err = db.QueryRow("SELECT email FROM users WHERE name = $1", "Jane Doe").Scan(&email)
+	if err != nil {
+		fmt.Println("Error querying row:", err)
+		return
+	}
+	fmt.Printf("Jane Doe's email: %s\n", email)
+}
+
+CODE
+	"safefile://InputValidationAndSanitization.go": <<<CODE
+// 在执行SQL查询前进行严格的输入验证和清理
+package main
+
+import (
+	"database/sql"
+	"fmt"
+	"regexp"
+)
+
+// isValidUsername 检查用户名是否只包含字母和数字
+func isValidUsername(username string) bool {
+	// 允许字母、数字和下划线
+	match, _ := regexp.MatchString("^[a-zA-Z0-9_]+$", username)
+	return match
+}
+
+// sanitizeInput 移除可能导致SQL注入的特殊字符，但更推荐使用参数化查询
+func sanitizeInput(input string) string {
+	// 这是一个简单的示例，不推荐作为主要的防御措施。
+	// 更好的方式是使用参数化查询。
+	input = regexp.MustCompile("['\";\\-]+").ReplaceAllString(input, "")
+	return input
+}
+
+func main() {
+	// 假设db已初始化
+	var db *sql.DB // 实际应用中 db 会被正确初始化
+
+	userInput := "john_doe'; DROP TABLE users; --"
+
+	// 强烈演示：输入验证
+	if !isValidUsername(userInput) {
+		fmt.Println("Error: Invalid username characters. Please use only letters, numbers, and underscores.")
+		return
+	}
+
+	// 通常与参数化查询结合使用，此处的输入清理仅作演示，参数化查询是首选
+	cleanedInput := sanitizeInput(userInput)
+
+
+	// 即使进行了输入验证和清理，仍然推荐使用参数化查询
+	// 例如：db.Query("SELECT * FROM users WHERE username = $1", cleanedInput)
+	fmt.Printf("Processed input for query: %s\n", cleanedInput)
+}
+
+CODE
 )

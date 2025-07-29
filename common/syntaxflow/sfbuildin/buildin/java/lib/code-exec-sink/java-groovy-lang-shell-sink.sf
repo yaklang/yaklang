@@ -274,4 +274,116 @@ public class CodeController {
 
 }
 CODE
+	"safefile://SafeGroovyExpressionExecution.java": <<<CODE
+import org.codehaus.groovy.control.CompilerConfiguration;
+import groovy.lang.GroovyShell;
+import groovy.lang.Script;
+
+public class SafeGroovyExpressionExecution {
+
+    public static void main(String[] args) {
+        // 规则检测 GroovyShell 的 evaluate/parse/run 方法，尤其是当输入源是外部时。
+        // 这里我们使用一个硬编码的、安全的Groovy表达式，并且不涉及文件或外部输入。
+        String safeExpression = "2 + 2";
+        
+        try {
+            GroovyShell shell = new GroovyShell();
+            Object result = shell.evaluate(safeExpression);
+            System.out.println("Safe expression result: " + result);
+
+            // 另一个安全的场景：执行预编译的、内部定义的脚本
+            String anotherSafeScript = "println 'Hello from safe script!'";
+            Script script = shell.parse(anotherSafeScript);
+            script.run();
+
+            // 避免run方法接收外部输入的File, Reader, String
+            // 这里的run方法是Script对象的run方法，且Script内容是内部定义的
+            // shell.run()方法如果参数不是GroovyCodeSource，则会触发
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void executeKnownGroovyScript(String scriptContent) {
+        // 假设scriptContent是经过严格白名单验证的，不含恶意的Groovy代码。
+        // 这种情况下，如果能确保输入安全，也可以避免触发规则。
+        // 但更安全的做法是避免动态执行。
+        if (isScriptContentSafe(scriptContent)) {
+            GroovyShell shell = new GroovyShell();
+            shell.evaluate(scriptContent);
+        }
+    }
+
+    private boolean isScriptContentSafe(String content) {
+        // 这是防止规则触发的关键点：这里需要实现严格的白名单或沙箱校验逻辑。
+        // 实际应用中，这通常非常复杂，且容易出错。
+        // 简单示例：只允许纯数学表达式
+        return content.matches("^[0-9+\-*/() .\\s]*$");
+    }
+
+    public void useLimitedGroovyShell() {
+        // 通过CompilerConfiguration限制Groovyshell的功能
+        CompilerConfiguration config = new CompilerConfiguration();
+        // 例如，禁止某些操作，如System.exit(), File I/O等
+        // config.setScriptBaseClass(SecureScriptDelegating.class.getName()); // 需要自定义安全基类
+        // config.addCompilationCustomizers(new SecureASTCustomizer()); // 更多AST转换安全限制
+
+        GroovyShell secureShell = new GroovyShell(config);
+        try {
+            // 即使执行外部内容，也因为配置了严格限制而相对安全
+            // 但这通常无法完全避免所有风险，只是提高了攻击门槛
+            secureShell.evaluate("println 'This is executed in a more secure shell.'");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+CODE
+	"safefile://NonGroovyShellEvaluation.java": <<<CODE
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptException;
+
+public class NonGroovyShellEvaluation {
+
+    public static void main(String[] args) {
+        // 规则专门检测groovy.lang.GroovyShell，因此改用其他脚本引擎。
+        // 使用JavaScript引擎作为替代，因为它不属于GroovyShell的检测范围。
+        ScriptEngineManager manager = new ScriptEngineManager();
+        ScriptEngine engine = manager.getEngineByName("JavaScript");
+
+        if (engine != null) {
+            String userInput = "console.log('Hello from JavaScript!');"; // 假设这是经过验证的用户输入
+            try {
+                engine.eval(userInput);
+                System.out.println("JavaScript executed safely.");
+            } catch (ScriptException e) {
+                System.err.println("Script execution error: " + e.getMessage());
+            }
+        } else {
+            System.err.println("JavaScript engine not found.");
+        }
+    }
+
+    public void executeSafeExpressionUsingJEXL(String expression) {
+        // 使用Apache JEXL等专门设计用于安全表达式评估的库。
+        // 这种库通常不具备完整的图灵完备性，难以执行任意代码。
+        // 例如： org.apache.commons.jexl3.JexlBuilder().create().createExpression(expression).evaluate(null);
+        // (示例代码因为依赖未引入而注释，但说明了理念)
+        System.out.println("Using a safe expression library like JEXL (conceptual). Expression: " + expression);
+    }
+
+    public void executePredefinedBusinessLogic() {
+        // 避免动态执行用户输入。所有业务逻辑都应预先定义在代码中。
+        System.out.println("Executing predefined business logic, no dynamic script execution.");
+        int a = 10;
+        int b = 20;
+        int sum = a + b;
+        System.out.println("Sum: " + sum);
+    }
+}
+
+CODE
 )

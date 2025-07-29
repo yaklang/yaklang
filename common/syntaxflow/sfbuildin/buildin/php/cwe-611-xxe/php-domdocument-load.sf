@@ -153,4 +153,79 @@ $doc = new DOMDocument();
 $doc->load('xxe.xml', LIBXML_NOENT); // Noncompliant
 
 CODE
+	"safefile://SafeXMLParseNoEnt.php": <<<CODE
+<?php
+// 推荐的修复方法：禁用LIBXML_NOENT或不传递任何可能导致XXE的选项。
+// 在现代PHP版本中，LIBXML_NOENT默认是关闭的，但显式地不对其赋值是更安全的做法。
+$xml = '<root><data>hello</data></root>'; // 假设这是经过验证的输入
+$doc = new DOMDocument();
+
+// 情况1: 不使用LIBXML_NOENT，这是默认且安全的方式
+try {
+    $doc->loadXML($xml);
+    echo "XML processed safely without LIBXML_NOENT.\n";
+} catch (Exception $e) {
+    echo "Error processing XML: " . $e->getMessage() . "\n";
+}
+
+// 情况2: 明确传递0作为选项，禁用所有特殊选项，包括LIBXML_NOENT
+// 这是一个更清晰的表示，表明没有启用任何可能引起XXE的选项
+try {
+    $doc->loadXML($xml, 0);
+    echo "XML processed safely with 0 options.\n";
+} catch (Exception $e) {
+    echo "Error processing XML: " . $e->getMessage() . "\n";
+}
+
+// 情况3: 使用 libxml_disable_entity_loader (适用于PHP 8 之前，PHP 8+ 已弃用此函数)
+// 在解析前全局禁用外部实体加载
+// libxml_disable_entity_loader(true); // 如果在旧版本PHP中可用且需要全局禁用
+// try {
+//     $doc->loadXML($xml);
+//     echo "XML processed safely with libxml_disable_entity_loader.\n";
+// } catch (Exception $e) {
+//     echo "Error processing XML: " . $e->getMessage() . "\n";
+// }
+
+// 情况4: 加载本地文件，但不启用LIBXML_NOENT。
+// 即使是本地文件，如果内容本身安全，不包含恶意实体引用，且没有启用实体扩展也是安全的。
+// 假设 'safe.xml' 是一个不含外部实体引用的安全XML文件
+// file_put_contents('safe.xml', '<config><setting>value</setting></config>');
+// try {
+//     $doc->load('safe.xml');
+//     echo "Safe local XML file loaded without LIBXML_NOENT.\n";
+// } catch (Exception $e) {
+//     echo "Error loading safe XML: " . $e->getMessage() . "\n";
+// }
+
+// 进一步的安全实践：对用户输入进行严格验证和过滤，防止恶意XML结构。
+// 最好不要直接接收和解析未经充分验证的用户提供的完整XML文档。
+
+?>
+CODE
+	"safefile://SafeXMLLoadLocalFile.php": <<<CODE
+<?php
+// 假设有一个不包含外部实体引用的安全本地XML文件
+// safe_local.xml 文件的内容应为：
+// <data><item>example</item></data>
+
+// 创建一个安全的本地XML文件用于测试
+file_put_contents('safe_local.xml', '<config><setting>local_value</setting></config>');
+
+$doc = new DOMDocument();
+
+// 从本地文件中加载XML，但不启用LIBXML_NOENT。这是安全实践。
+// 即使是文件加载操作，只要不启用外部实体加载，就不会有XXE风险。
+try {
+    $doc->load('safe_local.xml');
+    echo "Successfully loaded safe_local.xml without LIBXML_NOENT.\n";
+    echo "Loaded XML content: " . $doc->saveXML() . "\n";
+} catch (Exception $e) {
+    echo "Error loading XML file: " . $e->getMessage() . "\n";
+}
+
+// 清理测试文件
+unlink('safe_local.xml');
+?>
+CODE
 )

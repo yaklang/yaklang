@@ -343,6 +343,91 @@ public class ZipFileExample {
     }
 }
 TEXT
+	"safefile://SafeJavaZipInputStreamHandling.java": <<<CODE
+package org.example;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+import java.io.InputStream;
+import java.io.IOException;
+import java.io.FileOutputStream;
+
+public class SafeJavaZipInputStreamHandling {
+    public static void main(String[] args) {
+        String zipFilePath = "safe_example.zip";
+        String outputFilePath = "extracted_content.txt";
+
+        try (ZipFile zipFile = new ZipFile(zipFilePath)) {
+            java.util.Enumeration<? extends ZipEntry> entries = zipFile.entries();
+
+            // 确保创建至少一个条目用于测试
+            // (实际测试中zipFilePath需要指向一个真实的zip文件)
+            if (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                // 安全的反向测试用例：使用try-with-resources确保InputStream被正确关闭。
+                // 并显式地处理了返回值，例如读取内容并写入文件。
+                try (InputStream entryInputStream = zipFile.getInputStream(entry);
+                     FileOutputStream fos = new FileOutputStream(outputFilePath)) {
+                    byte[] buffer = new byte[1024];
+                    int bytesRead;
+                    while ((bytesRead = entryInputStream.read(buffer)) != -1) {
+                        fos.write(buffer, 0, bytesRead);
+                    }
+                    System.out.println("Content from " + entry.getName() + " extracted to " + outputFilePath);
+                } catch (IOException e) {
+                    System.err.println("Error processing entry: " + e.getMessage());
+                }
+            } else {
+                System.out.println("No entries found in the zip file.");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://SafeApacheCommonsZipInputStreamHandling.java": <<<CODE
+package org.example;
+import org.apache.commons.compress.archivers.zip.ZipFile;
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import java.io.InputStream;
+import java.io.IOException;
+import java.io.FileOutputStream;
+import java.util.Enumeration;
+
+public class SafeApacheCommonsZipInputStreamHandling {
+    public static void main(String[] args) {
+        String zipFilePath = "safe_another.zip";
+        String outputFilePath = "extracted_commons_content.txt";
+
+        try (ZipFile commonsZipFile = new ZipFile(zipFilePath)) {
+            Enumeration<ZipArchiveEntry> entries = commonsZipFile.getEntries();
+
+            // 确保创建至少一个条目用于测试
+            // (实际测试中zipFilePath需要指向一个真实的zip文件)
+            if (entries.hasMoreElements()) {
+                ZipArchiveEntry entry = entries.nextElement();
+                // 安全的反向测试用例：使用try-with-resources确保InputStream被正确关闭。
+                // 并显式地处理了返回值，例如读取内容并写入文件。
+                try (InputStream entryInputStream = commonsZipFile.getInputStream(entry);
+                     FileOutputStream fos = new FileOutputStream(outputFilePath)) {
+                    byte[] buffer = new byte[1024];
+                    int bytesRead;
+                    while ((bytesRead = entryInputStream.read(buffer)) != -1) {
+                        fos.write(buffer, 0, bytesRead);
+                    }
+                    System.out.println("Content from " + entry.getName() + " extracted to " + outputFilePath);
+                } catch (IOException e) {
+                    System.err.println("Error processing entry in commons-compress: " + e.getMessage());
+                }
+            } else {
+                System.out.println("No entries found in the commons-compress zip file.");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
 )
 
 desc(
@@ -367,5 +452,90 @@ public class ApacheCommonsZipFileExample {
     }
 }
 TEXT
+	"safefile://SafeJavaZipInputStreamHandling.java": <<<CODE
+package org.example;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+import java.io.InputStream;
+import java.io.IOException;
+import java.io.FileOutputStream;
+
+public class SafeJavaZipInputStreamHandling {
+    public static void main(String[] args) {
+        String zipFilePath = "safe_example.zip";
+        String outputFilePath = "extracted_content.txt";
+
+        try (ZipFile zipFile = new ZipFile(zipFilePath)) {
+            java.util.Enumeration<? extends ZipEntry> entries = zipFile.entries();
+
+            // 确保创建至少一个条目用于测试
+            // (实际测试中zipFilePath需要指向一个真实的zip文件)
+            if (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                // 安全的反向测试用例：使用try-with-resources确保InputStream被正确关闭。
+                // 并显式地处理了返回值，例如读取内容并写入文件。
+                try (InputStream entryInputStream = zipFile.getInputStream(entry);
+                     FileOutputStream fos = new FileOutputStream(outputFilePath)) {
+                    byte[] buffer = new byte[1024];
+                    int bytesRead;
+                    while ((bytesRead = entryInputStream.read(buffer)) != -1) {
+                        fos.write(buffer, 0, bytesRead);
+                    }
+                    System.out.println("Content from " + entry.getName() + " extracted to " + outputFilePath);
+                } catch (IOException e) {
+                    System.err.println("Error processing entry: " + e.getMessage());
+                }
+            } else {
+                System.out.println("No entries found in the zip file.");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://SafeApacheCommonsZipInputStreamHandling.java": <<<CODE
+package org.example;
+import org.apache.commons.compress.archivers.zip.ZipFile;
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import java.io.InputStream;
+import java.io.IOException;
+import java.io.FileOutputStream;
+import java.util.Enumeration;
+
+public class SafeApacheCommonsZipInputStreamHandling {
+    public static void main(String[] args) {
+        String zipFilePath = "safe_another.zip";
+        String outputFilePath = "extracted_commons_content.txt";
+
+        try (ZipFile commonsZipFile = new ZipFile(zipFilePath)) {
+            Enumeration<ZipArchiveEntry> entries = commonsZipFile.getEntries();
+
+            // 确保创建至少一个条目用于测试
+            // (实际测试中zipFilePath需要指向一个真实的zip文件)
+            if (entries.hasMoreElements()) {
+                ZipArchiveEntry entry = entries.nextElement();
+                // 安全的反向测试用例：使用try-with-resources确保InputStream被正确关闭。
+                // 并显式地处理了返回值，例如读取内容并写入文件。
+                try (InputStream entryInputStream = commonsZipFile.getInputStream(entry);
+                     FileOutputStream fos = new FileOutputStream(outputFilePath)) {
+                    byte[] buffer = new byte[1024];
+                    int bytesRead;
+                    while ((bytesRead = entryInputStream.read(buffer)) != -1) {
+                        fos.write(buffer, 0, bytesRead);
+                    }
+                    System.out.println("Content from " + entry.getName() + " extracted to " + outputFilePath);
+                } catch (IOException e) {
+                    System.err.println("Error processing entry in commons-compress: " + e.getMessage());
+                }
+            } else {
+                System.out.println("No entries found in the commons-compress zip file.");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
 )
 

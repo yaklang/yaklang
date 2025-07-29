@@ -332,9 +332,14 @@ func (f *RuleFormat) VisitInfoDescription(desc sf.IDescriptionStatementContext) 
 		}
 	}
 
-	// 补充没有的字段
+	// 补充没有的字段（但不包括测试用例，测试用例应该在第二个desc中）
 	if toAdd := f.getDescKeyTypesToAdd(); toAdd != nil {
 		for _, keyType := range toAdd {
+			// 跳过测试用例，测试用例应该在第二个desc中处理
+			if IsTestCaseKey(string(keyType)) {
+				continue
+			}
+
 			if keyType == SFDescKeyType_Rule_Id {
 				f.Write("\t%s: \"%s\"\n", string(keyType), f.ruleID)
 				continue
@@ -375,6 +380,19 @@ func (f *RuleFormat) VisitDescription(desc sf.IDescriptionStatementContext) {
 			f.Write("\t%s\n", f.GetTextFromToken(item))
 		}
 	}
+	// 补充测试用例（针对后续desc）
+	if testCasesToAdd := f.getTestCasesToAdd(); testCasesToAdd != nil {
+		for _, testCaseKey := range testCasesToAdd {
+			if f.descHandler != nil {
+				value := f.descHandler(testCaseKey, "")
+				upperKey := "CODE"
+				f.Write("\t\"%s\": <<<%s\n", testCaseKey, upperKey)
+				f.Write("%s\n", value)
+				f.Write("%s\n", upperKey)
+			}
+		}
+	}
+
 	f.Write(")\n")
 }
 
@@ -461,6 +479,47 @@ func (f *RuleFormat) getDescKeyTypesToAdd() []SFDescKeyType {
 	f.requireDescKeyType.ForEach(func(i SFDescKeyType, v bool) bool {
 		if !v {
 			ret = append(ret, i)
+		}
+		return true
+	})
+	return ret
+}
+
+// IsTestCaseKey 判断是否是测试用例key
+func IsTestCaseKey(key string) bool {
+	return strings.Contains(key, "://") && (strings.HasPrefix(key, "file://") ||
+		strings.HasPrefix(key, "fs://") ||
+		strings.HasPrefix(key, "filesystem://") ||
+		strings.HasPrefix(key, "safefile://") ||
+		strings.HasPrefix(key, "safe-file://") ||
+		strings.HasPrefix(key, "negative-file://") ||
+		strings.HasPrefix(key, "negativefs://") ||
+		strings.HasPrefix(key, "safe-fs://") ||
+		strings.HasPrefix(key, "safefilesystem://") ||
+		strings.HasPrefix(key, "safe-filesystem://") ||
+		strings.HasPrefix(key, "safe://") ||
+		strings.HasPrefix(key, "safefs://") ||
+		strings.HasPrefix(key, "nfs://"))
+}
+
+// needTestCaseCompletion 检查是否需要补全测试用例
+func (f *RuleFormat) needTestCaseCompletion(key string) bool {
+	if f == nil || f.requireDescKeyType == nil {
+		return false
+	}
+	_, ok := f.requireDescKeyType.Get(SFDescKeyType(key))
+	return ok
+}
+
+// getTestCasesToAdd 获取需要添加的测试用例
+func (f *RuleFormat) getTestCasesToAdd() []string {
+	if f.requireDescKeyType == nil {
+		return nil
+	}
+	var ret []string
+	f.requireDescKeyType.ForEach(func(i SFDescKeyType, v bool) bool {
+		if !v && IsTestCaseKey(string(i)) {
+			ret = append(ret, string(i))
 		}
 		return true
 	})

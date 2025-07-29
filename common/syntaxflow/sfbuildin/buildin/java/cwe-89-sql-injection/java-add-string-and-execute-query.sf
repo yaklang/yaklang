@@ -208,4 +208,108 @@ public class JobServiceImpl implements IJobService {
     }
 }
 FILE
+	"safefile://SafePreparedStatement.java": <<<CODE
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+public class SafePreparedStatement {
+
+    public void getUserById(Connection connection, String userIdInput) throws SQLException {
+        // 使用PreparedStatement，将用户输入作为参数绑定，而不是直接拼接
+        String sql = "SELECT * FROM users WHERE id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            // 对用户输入进行类型校验和转换，确保是数字
+            int id = -1;
+            try {
+                id = Integer.parseInt(userIdInput);
+            } catch (NumberFormatException e) {
+                // 处理非数字输入，例如抛出异常或记录错误
+                System.err.println("Error: Invalid user ID format. Must be an integer.");
+                return;
+            }
+            pstmt.setInt(1, id); // 绑定参数
+            ResultSet rs = pstmt.executeQuery();
+            // 处理结果集
+            while (rs.next()) {
+                System.out.println("User: " + rs.getString("name"));
+            }
+        }
+    }
+
+    public void searchProducts(Connection connection, String keyword) throws SQLException {
+        // PreparedStatement 支持 LIKE 条件下的参数绑定
+        String sql = "SELECT * FROM products WHERE name LIKE ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, "%" + keyword + "%"); // 绑定参数，而不是直接拼接
+            ResultSet rs = pstmt.executeQuery();
+            // 处理结果集
+            while (rs.next()) {
+                System.out.println("Product: " + rs.getString("product_name"));
+            }
+        }
+    }
+}
+CODE
+	"safefile://SafeMyBatisExample.java": <<<CODE
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
+// 假设有 User 和 UserMapper 相关的类
+// public class User { private Long id; private String name; /* getters/setters */ }
+// public interface UserMapper { User getUserById(@Param("userId") Long userId); List<User> searchUsers(@Param("keyword") String keyword); }
+
+public class SafeMyBatisExample {
+
+    private final SqlSessionFactory sqlSessionFactory;
+
+    public SafeMyBatisExample(SqlSessionFactory sqlSessionFactory) {
+        this.sqlSessionFactory = sqlSessionFactory;
+    }
+
+    public User getUser(String userIdInput) {
+        try (SqlSession session = sqlSessionFactory.openSession()) {
+            UserMapper mapper = session.getMapper(UserMapper.class);
+            Long userId = null;
+            try {
+                userId = Long.parseLong(userIdInput); // 对输入进行校验和转换
+            } catch (NumberFormatException e) {
+                System.err.println("Error: Invalid user ID format. Must be a long integer.");
+                return null;
+            }
+            // MyBatis使用#{} 或 ${}，推荐使用#{}进行参数化，MyBatis会自动处理PreparedStatement
+            return mapper.getUserById(userId);
+        }
+    }
+
+    public void findUsersByKeyword(String keyword) {
+        try (SqlSession session = sqlSessionFactory.openSession()) {
+            UserMapper mapper = session.getMapper(UserMapper.class);
+            // 对于模糊查询，MyBatis也会正确处理
+            mapper.searchUsers(keyword); // 这里的keyword会作为参数传递
+        }
+    }
+
+    // 模拟UserMapper接口
+    public interface UserMapper {
+        // 假设对应的XML或注解映射文件使用 #{userId} 作为参数
+        User getUserById(Long userId);
+
+        // 假设对应的XML或注解映射文件使用 like CONCAT('%', #{keyword}, '%')
+        // 或者 SQL 中直接使用 like #{keyword}，并在Java代码中添加通配符
+        java.util.List<User> searchUsers(String keyword);
+    }
+
+    // 模拟User类
+    public static class User {
+        private Long id;
+        private String name;
+
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+    }
+}
+CODE
 )

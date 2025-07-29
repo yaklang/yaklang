@@ -213,6 +213,26 @@ public class InsecureSecurityConfig extends WebSecurityConfigurerAdapter {
     }
 }
 TEXT
+	"safefile://SecureApplicationProperties.properties": <<<CODE
+# application.properties
+spring.application.name=secure-app
+# 默认情况下 management.security.enabled 为 true，无需显式设置
+# management.endpoints.web.exposure.include 默认只暴露 health 和 info，是安全的默认配置
+management.endpoints.web.exposure.include=health,info
+
+CODE
+	"safefile://SecureApplicationYml.yml": <<<CODE
+# application.yml
+spring:
+  application:
+    name: secure-app
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info"
+
+CODE
 )
 
 desc(
@@ -256,4 +276,24 @@ public class InsecureSecurityConfig extends WebSecurityConfigurerAdapter {
     }
 }
 TEXT
+	"safefile://SecureApplicationProperties.properties": <<<CODE
+# application.properties
+spring.application.name=secure-app
+# 默认情况下 management.security.enabled 为 true，无需显式设置
+# management.endpoints.web.exposure.include 默认只暴露 health 和 info，是安全的默认配置
+management.endpoints.web.exposure.include=health,info
+
+CODE
+	"safefile://SecureApplicationYml.yml": <<<CODE
+# application.yml
+spring:
+  application:
+    name: secure-app
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info"
+
+CODE
 )

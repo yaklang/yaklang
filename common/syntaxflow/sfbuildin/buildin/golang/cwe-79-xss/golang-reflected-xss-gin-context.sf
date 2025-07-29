@@ -78,4 +78,43 @@ func XSSReflectedHandler(c *gin.Context) {
 	})
 }
 SAFE
+	"safefile://SafeHtmlNoXSS.go": <<<CODE
+package api
+
+import (
+	"html/template"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+// SafeHtmlNoXSSHandler 演示了如何安全地处理HTML输出，避免XSS，使用HTMLEscapeString
+func SafeHtmlNoXSSHandler(c *gin.Context) {
+	query := c.Query("q")
+	// 使用 template.HTMLEscapeString 对用户输入进行转义，确保安全性
+	c.HTML(http.StatusOK, "index.tmpl", gin.H{
+		"Query": template.HTMLEscapeString(query),
+	})
+}
+
+CODE
+	"safefile://SafeHtmlConstant.go": <<<CODE
+package api
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+// SafeHtmlConstantHandler 演示了不包含用户输入的硬编码HTML输出，本身就是安全的
+func SafeHtmlConstantHandler(c *gin.Context) {
+	// 没有用户输入，直接输出硬编码的HTML内容，不会触发XSS
+	c.HTML(http.StatusOK, "static.tmpl", gin.H{
+		"Title": "Welcome",
+		"Content": "This is a safe and static page.",
+	})
+}
+
+CODE
 )

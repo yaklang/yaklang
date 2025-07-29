@@ -295,4 +295,182 @@ desc(
         }
     }
 CODE
+	"safefile://SafeResourceManagement.java": <<<CODE
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
+public class SafeResourceManagement {
+
+    /**
+     * 推荐做法：使用 try-with-resources 确保流自动关闭。
+     * 这是Java 7及以上版本管理资源的最佳实践。
+     */
+    public static void readFileWithTryWithResources(String filePath) {
+        try (FileInputStream fis = new FileInputStream(filePath);
+             InputStreamReader isr = new InputStreamReader(fis, StandardCharsets.UTF_8);
+             BufferedReader br = new BufferedReader(isr)) {
+
+            String line;
+            System.out.println("Reading file with try-with-resources:");
+            while ((line = br.readLine()) != null) {
+                System.out.println(line);
+            }
+        } catch (IOException e) {
+            System.err.println("Error reading file (try-with-resources): " + e.getMessage());
+        }
+    }
+
+    /**
+     * 备用做法：使用 try-finally 块手动关闭资源。
+     * 适用于Java旧版本或不 implements AutoCloseable 的资源。
+     */
+    public static void readFileWithTryFinally(String filePath) {
+        FileInputStream fis = null;
+        InputStreamReader isr = null;
+        BufferedReader br = null;
+        try {
+            fis = new FileInputStream(filePath);
+            isr = new InputStreamReader(fis, StandardCharsets.UTF_8);
+            br = new BufferedReader(isr);
+
+            String line;
+            System.out.println("Reading file with try-finally:");
+            while ((line = br.readLine()) != null) {
+                System.out.println(line);
+            }
+        } catch (IOException e) {
+            System.err.println("Error reading file (try-finally): " + e.getMessage());
+        } finally {
+            // 按照资源创建的逆序关闭，确保每个流都被关闭
+            try {
+                if (br != null) br.close();
+            } catch (IOException e) {
+                System.err.println("Error closing BufferedReader: " + e.getMessage());
+            }
+            try {
+                // 通常关闭 BufferedReader 会自动关闭其底层的 Reader，但显式关闭更安全
+                if (isr != null) isr.close();
+            } catch (IOException e) {
+                System.err.println("Error closing InputStreamReader: " + e.getMessage());
+            }
+            try {
+                // 通常关闭 InputStreamReader 会自动关闭其底层的 InputStream，但显式关闭更安全
+                if (fis != null) fis.close();
+            } catch (IOException e) {
+                System.err.println("Error closing FileInputStream: " + e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * 使用Files.readAllLines，该方法内部已处理资源关闭。
+     * 这是Java 7+处理文件内容的一种非常简洁和安全的方式。
+     */
+    public static void readFileWithNIO2(String filePath) {
+        try {
+            System.out.println("Reading file with Files.readAllLines:");
+            List<String> lines = Files.readAllLines(Paths.get(filePath), StandardCharsets.UTF_8);
+            for (String line : lines) {
+                System.out.println(line);
+            }
+        } catch (IOException e) {
+            System.err.println("Error reading file (NIO.2): " + e.getMessage());
+        }
+    }
+
+    /**
+     * 边界情况：流在构造后立即关闭，或在其他已正确管理的流中被封装。
+     * 确保即使流被创建，只要最终被关闭，就不会触发告警。
+     */
+    public static void boundaryCaseClosedImmediately(String filePath) {
+        try (FileInputStream fis = new FileInputStream(filePath)) {
+            // 流在try-with-resources块结束时自动关闭
+            System.out.println("FileInputStream created and closed automatically.");
+            // 不进行任何读取操作，但流仍然被正确管理
+        } catch (IOException e) {
+            System.err.println("Error in boundary case: " + e.getMessage());
+        }
+    }
+
+    public static void main(String[] args) throws IOException {
+        String testFilePath = "testfile.txt";
+
+        // Create a dummy file for testing
+        try (FileWriter writer = new FileWriter(testFilePath)) {
+            writer.write("Hello, world!\nThis is a test file.\n");
+        } catch (IOException e) {
+            System.err.println("Failed to create test file: " + e.getMessage());
+            return;
+        }
+
+        System.out.println("--- Running safe examples ---");
+        readFileWithTryWithResources(testFilePath);
+        readFileWithTryFinally(testFilePath);
+        readFileWithNIO2(testFilePath);
+        boundaryCaseClosedImmediately(testFilePath);
+
+        // Clean up the dummy file
+        Files.deleteIfExists(Paths.get(testFilePath));
+        System.out.println("Test file cleaned up.");
+    }
+}
+
+CODE
+	"safefile://SafeFileOutputStream.java": <<<CODE
+import java.io.FileOutputStream;
+import java.io.IOException;
+
+public class SafeFileOutputStream {
+
+    /**
+     * 使用 try-with-resources 确保 FileOutputStream 正确关闭。
+     */
+    public static void writeToFileSafely(String filePath, String content) {
+        try (FileOutputStream fos = new FileOutputStream(filePath)) {
+            fos.write(content.getBytes());
+            System.out.println("Content written to " + filePath + " successfully using try-with-resources.");
+        } catch (IOException e) {
+            System.err.println("Error writing to file: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 使用 try-finally 确保 FileOutputStream 正确关闭，用于兼容旧版本。
+     */
+    public static void writeToFileWithFinally(String filePath, String content) {
+        FileOutputStream fos = null;
+        try {
+            fos = new FileOutputStream(filePath);
+            fos.write(content.getBytes());
+            System.out.println("Content written to " + filePath + " successfully using try-finally.");
+        } catch (IOException e) {
+            System.err.println("Error writing to file (try-finally): " + e.getMessage());
+        } finally {
+            if (fos != null) {
+                try {
+                    fos.close();
+                } catch (IOException e) {
+                    System.err.println("Error closing FileOutputStream: " + e.getMessage());
+                }
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+        String filename = "output.txt";
+        String data = "This is a safe test for FileOutputStream.";
+
+        writeToFileSafely(filename, data);
+        writeToFileWithFinally("output_finally.txt", "Another safe test.");
+
+        // 清理测试文件 (如果存在)
+        new java.io.File(filename).delete();
+        new java.io.File("output_finally.txt").delete();
+    }
+}
+
+CODE
 )

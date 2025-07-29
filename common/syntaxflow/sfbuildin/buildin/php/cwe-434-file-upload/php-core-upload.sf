@@ -322,4 +322,99 @@ TEXT
         }
     }
 TEXT
+	"safefile://SafeFileUploadController.php": <<<CODE
+<?php
+
+class SafeFileUploadController
+{
+    public function uploadSecuredFile()
+    {
+        $file = $_FILES['file'];
+        $uploadDir = 'secure_uploads/'; // 上传到Web不可访问的目录
+
+        // 1. 严格校验文件是否存在且无上传错误
+        if (!isset($file['error']) || is_array($file['error'])) {
+            throw new RuntimeException('Invalid parameters.');
+        }
+        switch ($file['error']) {
+            case UPLOAD_ERR_OK:
+                break;
+            case UPLOAD_ERR_NO_FILE:
+                throw new RuntimeException('No file sent.');
+            case UPLOAD_ERR_INI_SIZE:
+            case UPLOAD_ERR_FORM_SIZE:
+                throw new RuntimeException('Exceeded filesize limit.');
+            default:
+                throw new RuntimeException('Unknown errors.');
+        }
+
+        // 2. 限制文件大小
+        if ($file['size'] > 1000000) { // 限制1MB
+            throw new RuntimeException('Exceeded filesize limit.');
+        }
+
+        // 3. 白名单校验文件类型和文件头 (使用finfo进行文件头检测)
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mimeType = $finfo->file($file['tmp_name']);
+        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
+
+        if (!in_array($mimeType, $allowedTypes)) {
+            throw new RuntimeException('Invalid file format: ' . $mimeType . '.');
+        }
+
+        // 4. 生成安全的文件名，而不是使用原始文件名，并通过finfo获取正确的扩展名
+        $extension = '';
+        switch ($mimeType) {
+            case 'image/jpeg': $extension = 'jpg'; break;
+            case 'image/png': $extension = 'png'; break;
+            case 'image/gif': $extension = 'gif'; break;
+            case 'application/pdf': $extension = 'pdf'; break;
+            default: throw new RuntimeException('Unknown file type for extension mapping.');
+        }
+
+        $newName = sprintf('%s.%s', sha1_file($file['tmp_name']), $extension);
+        // 确保上传目录存在且有权限，或者进行创建
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+        }
+        $targetPath = $uploadDir . $newName;
+
+        // 5. 移动上传的文件
+        if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
+            throw new RuntimeException('Failed to move uploaded file.');
+        }
+
+        echo "文件上传成功！新的文件名为: " . htmlspecialchars($newName);
+    }
+
+    // 另一个上传函数，使用框架中更安全的API（如果存在）
+    public function uploadViaFramework(\$request)
+    {
+        // 假设这是一个Laravel或其它框架的Request对象
+        if (\$request->hasFile('document')) {
+            \$file = \$request->file('document');
+
+            // 框架通常会提供更安全的文件处理方法，例如自动生成文件名和存储路径
+            // 这通常会包含MIME类型和文件头校验、文件大小限制以及文件名安全处理
+            \$path = \$file->store('documents', 'local_secure'); // 'local_secure'是一个不在web根目录的disk配置
+            echo "文件上传成功，存储路径: " . htmlspecialchars(\$path);
+        } else {
+            throw new RuntimeException('No file uploaded.');
+        }
+    }
+
+    // 仅用于演示，不处理文件上传，避开所有move_uploaded_file/putFile检测
+    public function processFormData() {
+        if (isset($_POST['data'])) {
+            // 这是一个不涉及文件上传的安全表单处理
+            $data = json_decode($_POST['data'], true);
+            echo 'Received data: ' . htmlspecialchars(json_encode($data));
+        } else {
+            echo 'No data received.';
+        }
+    }
+}
+
+?>
+CODE
 )
