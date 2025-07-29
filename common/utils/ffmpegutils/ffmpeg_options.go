@@ -45,6 +45,12 @@ type options struct {
 	subtitleFile    string
 	outputVideoFile string
 	fontFile        string // Path to a font file for drawtext filter
+
+	// Screen recording options
+	recordFormat    string // e.g., "avfoundation" on macOS, "gdigrab" on Windows
+	recordInput     string // e.g., "1" for screen, "desktop", "video=Integrated Camera"
+	recordFramerate int
+	captureCursor   bool
 }
 
 // frameExtractionMode defines the method for frame extraction.
@@ -70,6 +76,8 @@ func newDefaultOptions() *options {
 		sceneThreshold:     0.4, // A sensible default
 		framesPerSecond:    1,
 		targetImageSize:    200 * 1024, // Default 200KB
+		recordFramerate:    10,
+		captureCursor:      true,
 	}
 }
 
@@ -236,6 +244,40 @@ func WithOutputVideoFile(filepath string) Option {
 func WithFontFile(filepath string) Option {
 	return func(o *options) {
 		o.fontFile = filepath
+	}
+}
+
+// --- Screen Recording Options ---
+
+// WithScreenRecordFormat sets the input format for screen recording.
+// Common values: "avfoundation" (macOS), "gdigrab" (Windows), "x11grab" (Linux).
+func WithScreenRecordFormat(format string) Option {
+	return func(o *options) {
+		o.recordFormat = format
+	}
+}
+
+// WithScreenRecordInput specifies the input source for recording.
+// e.g., "1" (screen), "desktop", "video=Integrated Camera:audio=Built-in Microphone".
+func WithScreenRecordInput(input string) Option {
+	return func(o *options) {
+		o.recordInput = input
+	}
+}
+
+// WithScreenRecordFramerate sets the capture framerate.
+func WithScreenRecordFramerate(rate int) Option {
+	return func(o *options) {
+		if rate > 0 {
+			o.recordFramerate = rate
+		}
+	}
+}
+
+// WithScreenRecordCaptureCursor enables or disables capturing the mouse cursor.
+func WithScreenRecordCaptureCursor(capture bool) Option {
+	return func(o *options) {
+		o.captureCursor = capture
 	}
 }
 

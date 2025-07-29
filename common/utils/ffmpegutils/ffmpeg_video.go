@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"bytes"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mimetype"
 )
@@ -257,4 +259,94 @@ func BurnInSubtitles(inputFile string, opts ...Option) error {
 	}
 
 	return nil
+}
+
+// StartScreenRecording starts a non-blocking ffmpeg process for screen recording.
+// It returns the command instance, allowing the caller to manage its lifecycle (e.g., wait or kill).
+func StartScreenRecording(outputFile string, opts ...Option) (*exec.Cmd, error) {
+	if ffmpegBinaryPath == "" {
+		return nil, fmt.Errorf("ffmpeg binary path is not configured")
+	}
+
+	o := newDefaultOptions()
+	for _, opt := range opts {
+		opt(o)
+	}
+
+	if o.recordFormat == "" {
+		return nil, fmt.Errorf("screen recording format is required; use WithScreenRecordFormat()")
+	}
+	if o.recordInput == "" {
+		return nil, fmt.Errorf("screen recording input is required; use WithScreenRecordInput()")
+	}
+
+	args := []string{
+		"-f", o.recordFormat,
+		"-r", strconv.Itoa(o.recordFramerate),
+		"-i", o.recordInput,
+		"-c:v", "libx264",
+		"-preset", "ultrafast",
+	}
+	if o.captureCursor {
+		// This option is specific to certain formats like avfoundation
+		if o.recordFormat == "avfoundation" {
+			args = append(args, "-capture_cursor", "1")
+		}
+	}
+	args = append(args, outputFile)
+
+	cmd := exec.CommandContext(o.ctx, ffmpegBinaryPath, args...)
+	if o.debug {
+		cmd.Stderr = log.NewLogWriter(log.DebugLevel)
+		log.Debugf("starting ffmpeg screen recording: %s", cmd.String())
+	}
+
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start ffmpeg screen recording: %w", err)
+	}
+
+	return cmd, nil
+}
+
+// ExtractSpecificFrame extracts a single frame at a specific frame number from a video.
+func ExtractSpecificFrame(inputFile string, frameNum int) ([]byte, error) {
+	if ffmpegBinaryPath == "" {
+		return nil, fmt.Errorf("ffmpeg binary path is not configured")
+	}
+
+	if frameNum < 0 {
+		return nil, fmt.Errorf("frame number must be non-negative")
+	}
+
+	// Using a pipe to get the output directly into a buffer
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+
+	// -vf select filter is 0-indexed, so we use the number directly
+	// scale=-1:600 resizes the height to 600px, keeping aspect ratio
+	args := []string{
+		"-i", inputFile,
+		"-vf", fmt.Sprintf("select=gte(n\\,%d),scale=-1:600", frameNum),
+		"-frames:v", "1",
+		"-f", "image2",
+		"-codec:v", "mjpeg",
+		"pipe:1", // Output to stdout
+	}
+
+	cmd := exec.CommandContext(context.Background(), ffmpegBinaryPath, args...)
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		log.Warnf("ffmpeg exec failed, reason(stdout): \n%s", out.String())
+		log.Warnf("ffmpeg exec failed, reason(stderr): \n%s", stderr.String())
+		return nil, fmt.Errorf("ffmpeg execution failed when extracting specific frame: %w", err)
+	}
+
+	if out.Len() == 0 {
+		return nil, fmt.Errorf("ffmpeg produced no output; the video may be too short or the frame number too high")
+	}
+
+	return out.Bytes(), nil
 }

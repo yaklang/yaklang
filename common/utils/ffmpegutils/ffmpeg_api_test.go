@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mimetype"
 
 	_ "embed"
 )
@@ -226,6 +227,21 @@ func TestFrameExtractionIncludingFirstAndLast(t *testing.T) {
 	// 5s clip at 1fps should give ~5 frames.
 	assert.InDelta(t, 5, len(extractedFrames), 1, "should extract ~5 frames for 5s at 1fps")
 	assert.NotEmpty(t, extractedFrames, "should include first and subsequent frames")
+}
+
+func TestSmoke_ExtractSpecificFrame(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
+	videoPath, cleanup := setupTestWithEmbeddedData(t)
+	defer cleanup()
+
+	// Extract the 50th frame (around the 5-second mark for a 10fps video)
+	frameData, err := ExtractSpecificFrame(videoPath, 50)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, frameData, "extracted frame data should not be empty")
+
+	// Verify it's a valid image
+	mime := mimetype.Detect(frameData)
+	assert.Contains(t, mime.String(), "image/", "extracted data should be an image")
 }
 
 func TestSmoke_CompressAudio(t *testing.T) {
