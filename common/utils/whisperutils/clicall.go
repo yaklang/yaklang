@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"os"
 	"os/exec"
@@ -46,125 +47,126 @@ type WhisperCli struct {
 	vadMinSpeechDuration int
 	beamSize             int
 	logWriter            io.Writer
+	srtTargetPath        string
 }
 
 // CliOption is a functional option for configuring WhisperCli.
 type CliOption func(*WhisperCli)
 
-// CliWithModelPath sets the model path for transcription.
-func CliWithModelPath(path string) CliOption {
+// WithModelPath sets the model path for transcription.
+func WithModelPath(path string) CliOption {
 	return func(c *WhisperCli) {
 		c.modelPath = path
 	}
 }
 
-// CliWithContext sets the context for the command.
-func CliWithContext(ctx context.Context) CliOption {
+// WithContext sets the context for the command.
+func WithContext(ctx context.Context) CliOption {
 	return func(c *WhisperCli) {
 		c.ctx = ctx
 	}
 }
 
-// CliWithDebug enables or disables debug logging for the command's output.
-func CliWithDebug(debug bool) CliOption {
+// WithDebug enables or disables debug logging for the command's output.
+func WithDebug(debug bool) CliOption {
 	return func(c *WhisperCli) {
 		c.debug = debug
 	}
 }
 
-// CliWithLanguage sets the language for transcription.
-func CliWithLanguage(lang string) CliOption {
+// WithLanguage sets the language for transcription.
+func WithLanguage(lang string) CliOption {
 	return func(c *WhisperCli) {
 		c.language = lang
 	}
 }
 
-// CliWithThreads sets the number of CPU threads to use.
-func CliWithThreads(threads int) CliOption {
+// WithThreads sets the number of CPU threads to use.
+func WithThreads(threads int) CliOption {
 	return func(c *WhisperCli) {
 		c.threads = threads
 	}
 }
 
-// CliWithProcessors sets the number of parallel processors.
-func CliWithProcessors(processors int) CliOption {
+// WithProcessors sets the number of parallel processors.
+func WithProcessors(processors int) CliOption {
 	return func(c *WhisperCli) {
 		c.processors = processors
 	}
 }
 
-// CliWithVAD enables or disables Voice Activity Detection.
-func CliWithVAD(enable bool) CliOption {
+// WithVAD enables or disables Voice Activity Detection.
+func WithVAD(enable bool) CliOption {
 	return func(c *WhisperCli) {
 		c.vad = enable
 	}
 }
 
-// CliWithVADModelPath sets the path to the VAD model.
-func CliWithVADModelPath(path string) CliOption {
+// WithVADModelPath sets the path to the VAD model.
+func WithVADModelPath(path string) CliOption {
 	return func(c *WhisperCli) {
 		c.vadModelPath = path
 	}
 }
 
-// CliWithVADThreshold sets the VAD threshold.
-func CliWithVADThreshold(threshold float64) CliOption {
+// WithVADThreshold sets the VAD threshold.
+func WithVADThreshold(threshold float64) CliOption {
 	return func(c *WhisperCli) {
 		c.vadThreshold = threshold
 	}
 }
 
-// CliWithVADSpeechDetect sets the VAD speech detection duration in milliseconds.
-func CliWithVADSpeechDetect(duration int) CliOption {
+// WithVADSpeechDetect sets the VAD speech detection duration in milliseconds.
+func WithVADSpeechDetect(duration int) CliOption {
 	return func(c *WhisperCli) {
 		c.vadSpeechDetect = duration
 	}
 }
 
-// CliWithVADPadding sets the VAD padding.
-func CliWithVADPadding(padding int) CliOption {
+// WithVADPadding sets the VAD padding.
+func WithVADPadding(padding int) CliOption {
 	return func(c *WhisperCli) {
 		c.vadPadding = padding
 	}
 }
 
-// CliWithSplitOnWord enables splitting on word.
-func CliWithSplitOnWord(enable bool) CliOption {
+// WithSplitOnWord enables splitting on word.
+func WithSplitOnWord(enable bool) CliOption {
 	return func(c *WhisperCli) {
 		c.splitOnWord = enable
 	}
 }
 
-// CliWithVADMinSpeechDuration sets the VAD min speech duration.
-func CliWithVADMinSpeechDuration(duration int) CliOption {
+// WithVADMinSpeechDuration sets the VAD min speech duration.
+func WithVADMinSpeechDuration(duration int) CliOption {
 	return func(c *WhisperCli) {
 		c.vadMinSpeechDuration = duration
 	}
 }
 
-// CliWithBeamSize sets the beam size.
-func CliWithBeamSize(size int) CliOption {
+// WithBeamSize sets the beam size.
+func WithBeamSize(size int) CliOption {
 	return func(c *WhisperCli) {
 		c.beamSize = size
 	}
 }
 
-// CliWithLogWriter sets the writer for non-result log lines.
-func CliWithLogWriter(writer io.Writer) CliOption {
+// WithLogWriter sets the writer for non-result log lines.
+func WithLogWriter(writer io.Writer) CliOption {
 	return func(c *WhisperCli) {
 		c.logWriter = writer
 	}
 }
 
-// CliWithOutputSRT enables SRT file output.
-func CliWithOutputSRT(enable bool) CliOption {
+// WithOutputSRT enables SRT file output.
+func WithOutputSRT(enable bool) CliOption {
 	return func(c *WhisperCli) {
 		c.outputSRT = enable
 	}
 }
 
-// CliWithEnableGPU enables or disables GPU support.
-func CliWithEnableGPU(enable bool) CliOption {
+// WithEnableGPU enables or disables GPU support.
+func WithEnableGPU(enable bool) CliOption {
 	return func(c *WhisperCli) {
 		c.enableGPU = enable
 	}
@@ -320,8 +322,26 @@ func (c *WhisperCli) Invoke() (<-chan *CliResult, error) {
 
 	go func() {
 		wg.Wait()
-		close(results)
-		if err := cmd.Wait(); err != nil {
+		err := cmd.Wait()
+		defer close(results)
+		defer func() {
+			log.Info("start to checking srtTargetPath")
+			if c.srtTargetPath != "" && c.outputSRT {
+				// mv the generated SRT file to the target path
+				// check if the SRT file exists
+				outputSRT := c.filePath + ".srt"
+				if !utils.FileExists(outputSRT) {
+					log.Infof("cannot output srt file in %v", outputSRT)
+					return
+				}
+				if err := os.Rename(outputSRT, c.srtTargetPath); err != nil {
+					log.Warnf("failed to move SRT file to target path %s: %v", c.srtTargetPath, err)
+				} else {
+					log.Infof("SRT file successfully moved to: %s", c.srtTargetPath)
+				}
+			}
+		}()
+		if err != nil {
 			if c.ctx.Err() == nil {
 				log.Warnf("whisper-cli command finished with error: %v", err)
 			}
@@ -335,10 +355,29 @@ func (c *WhisperCli) Invoke() (<-chan *CliResult, error) {
 }
 
 // InvokeWhisperCli is a convenience wrapper to create and run a WhisperCli command.
-func InvokeWhisperCli(filePath string, opts ...CliOption) (<-chan *CliResult, error) {
-	cli, err := NewWhisperCli(filePath, opts...)
+// It requires both the audio file path and the target SRT file path.
+// The SRT file will be generated automatically by whisper-cli with the -osrt flag.
+func InvokeWhisperCli(audioPath, srtTargetPath string, opts ...CliOption) (<-chan *CliResult, error) {
+	// Ensure SRT output is enabled
+	opts = append(opts, WithOutputSRT(true))
+
+	if srtTargetPath == "" {
+		return nil, utils.Errorf("srt target path cannot be empty")
+	}
+
+	cli, err := NewWhisperCli(audioPath, opts...)
 	if err != nil {
 		return nil, err
 	}
+
+	// Set the SRT target path for later use
+	cli.srtTargetPath = srtTargetPath
+	if cli.outputSRT {
+		// check audioPath + ".srt"
+		if _, err := os.Stat(audioPath + ".srt"); err == nil {
+			return nil, fmt.Errorf("srt target file already exists: %s", srtTargetPath)
+		}
+	}
+
 	return cli.Invoke()
 }

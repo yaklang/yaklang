@@ -4,14 +4,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/mimetype"
-	"github.com/yaklang/yaklang/common/utils/imageutils"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/mediautils"
+	"github.com/yaklang/yaklang/common/mimetype"
+	"github.com/yaklang/yaklang/common/utils/imageutils"
 
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/fp/fingerprint"
@@ -366,6 +368,8 @@ func initYaklangLib() {
 	// mimetype
 	yaklang.Import("mimetype", mimetype.Exports)
 	yaklang.Import("imageutils", imageutils.Exports)
+	yaklang.Import("ffmpeg", mediautils.FfmpegExports)
+	yaklang.Import("whisper", mediautils.WhisperExports)
 }
 
 type ScriptEngine struct {
