@@ -13,7 +13,7 @@ func TestChunkMakerWithSepTrigger(t *testing.T) {
 		pr, pw := utils.NewPipe()
 		chunkSize := int64(100) // Large chunk size
 
-		cm, err := NewChunkMaker(pr, WithChunkSize(chunkSize), WithSeparatorTrigger("\n"))
+		cm, err := NewTextChunkMaker(pr, WithChunkSize(chunkSize), WithSeparatorTrigger("\n"))
 		assert.NoError(t, err)
 		assert.NotNil(t, cm)
 
@@ -49,7 +49,7 @@ func TestChunkMakerWithSepTrigger(t *testing.T) {
 		pr, pw := utils.NewPipe()
 		chunkSize := int64(5)
 
-		cm, err := NewChunkMaker(pr, WithChunkSize(chunkSize), WithSeparatorTrigger("\n"))
+		cm, err := NewTextChunkMaker(pr, WithChunkSize(chunkSize), WithSeparatorTrigger("\n"))
 		assert.NoError(t, err)
 		assert.NotNil(t, cm)
 
@@ -90,7 +90,7 @@ func TestChunkMakerWithSepTrigger(t *testing.T) {
 		pr, pw := utils.NewPipe()
 		chunkSize := int64(100)
 
-		cm, err := NewChunkMaker(pr, WithChunkSize(chunkSize), WithSeparatorTrigger("\n\n"))
+		cm, err := NewTextChunkMaker(pr, WithChunkSize(chunkSize), WithSeparatorTrigger("\n\n"))
 		assert.NoError(t, err)
 		assert.NotNil(t, cm)
 
