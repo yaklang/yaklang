@@ -31,6 +31,9 @@ func CallAITransaction(
 	var postHandlerErr error
 
 	for i := int64(0); i < trcRetry; i++ {
+		if c.IsCtxDone() {
+			return utils.Errorf("context is done, cannot continue transaction")
+		}
 		rsp, err := callAi(
 			NewAIRequest(
 				c.RetryPromptBuilder(prompt, postHandlerErr),
@@ -51,6 +54,9 @@ func CallAITransaction(
 				c.EmitWarning("call ai transaction retry")
 				continue
 			}
+		}
+		if c.IsCtxDone() {
+			return utils.Errorf("context is done, cannot continue transaction")
 		}
 		postHandlerErr = postHandler(rsp)
 		if postHandlerErr != nil {
