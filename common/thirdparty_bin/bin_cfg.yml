@@ -1,0 +1,22 @@
+version: "1.0"
+description: "Third-party binary tools configuration"
+
+binaries:
+  - name: "vulinbox"
+    description: "Yaklang Vulnerability Testing Box - A comprehensive vulnerability testing platform"
+    version: "latest"
+    install_type: "bin"
+    download_info_map:
+      linux-amd64:
+        url: "https://yaklang.oss-cn-beijing.aliyuncs.com/vulinbox/latest/vulinbox_linux_amd64"
+        checksums: ""
+        pick: ""  # 单个可执行文件，不需要从压缩包提取
+      "darwin-*":  # 使用glob模式匹配所有macOS平台 (darwin-amd64, darwin-arm64等)
+        url: "https://yaklang.oss-cn-beijing.aliyuncs.com/vulinbox/latest/vulinbox_darwin_amd64"
+        checksums: ""
+        pick: ""  # 单个可执行文件，不需要从压缩包提取
+      windows-amd64:
+        url: "https://yaklang.oss-cn-beijing.aliyuncs.com/vulinbox/latest/vulinbox_windows_amd64.exe"
+        checksums: ""
+        pick: ""  # 单个可执行文件，不需要从压缩包提取
+    dependencies: []
