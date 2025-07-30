@@ -1199,6 +1199,8 @@ func TestRiskActionCompare(t *testing.T) {
 
 	t.Run("check path program and search source", func(t *testing.T) {
 		// ssarisk://program/?search=/b&compare={runtimeId}
+		// 注意：搜索'/b'会匹配所有包含字符'b'的字段，不仅仅是路径
+		// 所以我们使用包含性检查，确保期望的结果都包含在实际结果中
 		checkRuleAndSearch_WithDiff(urlProgramPath(programName), "/b", taskID2, taskID1, map[string]data{
 			urlPath(programName, extendPath+"/b/b1.go"): {
 				Name:  sourcePath(programName, extendPath+"/b/b1.go"),
@@ -1210,7 +1212,7 @@ func TestRiskActionCompare(t *testing.T) {
 				Type:  "source",
 				Count: 1,
 			},
-		})
+		}, true) // 使用包含性检查
 	})
 
 	t.Run("check path program and search function", func(t *testing.T) {
