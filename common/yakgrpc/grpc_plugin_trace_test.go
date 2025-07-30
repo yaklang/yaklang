@@ -27,7 +27,7 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 		Type: "mitm",
 	}
 	// 创建测试服务器
-	client, err := NewLocalClient()
+	client, err := NewLocalClient(true)
 	require.NoError(t, err)
 
 	// 设置测试用MixPluginCaller
@@ -197,7 +197,7 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 		Type: "mitm",
 	}
 
-	client, err := NewLocalClient()
+	client, err := NewLocalClient(true)
 	require.NoError(t, err)
 
 	testCaller, err := yak.NewMixPluginCaller()
@@ -296,7 +296,7 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 		Type: "mitm",
 	}
 
-	client, err := NewLocalClient()
+	client, err := NewLocalClient(true)
 	require.NoError(t, err)
 
 	testCaller, err := yak.NewMixPluginCaller()
@@ -401,7 +401,7 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 		Type: "mitm",
 	}
 
-	client, err := NewLocalClient()
+	client, err := NewLocalClient(true)
 	require.NoError(t, err)
 
 	testCaller, err := yak.NewMixPluginCaller()
@@ -533,7 +533,7 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 		Type: "mitm",
 	}
 
-	client, err := NewLocalClient()
+	client, err := NewLocalClient(true)
 	require.NoError(t, err)
 
 	testCaller, err := yak.NewMixPluginCaller()
@@ -632,7 +632,7 @@ testComplete:
 
 // 测试无效的取消请求 模拟用户手动取消Running的Trace时后端接收到的时候Trace已经完成或者取消/失败
 func TestGRPCMUSTPASS_PluginTraceInvalidCancelRequest(t *testing.T) {
-	client, err := NewLocalClient()
+	client, err := NewLocalClient(true)
 	require.NoError(t, err)
 
 	testCaller, err := yak.NewMixPluginCaller()
@@ -698,7 +698,7 @@ func TestGRPCMUSTPASS_PluginTraceInvalidCancelRequest(t *testing.T) {
 
 // 测试MITM未启动时的行为
 func TestGRPCMUSTPASS_PluginTraceWithoutMITM(t *testing.T) {
-	client, err := NewLocalClient()
+	client, err := NewLocalClient(true)
 	require.NoError(t, err)
 
 	// 不设置MixPluginCaller，模拟MITM未启动
@@ -763,7 +763,7 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 		Type: "mitm",
 	}
 
-	client, err := NewLocalClient()
+	client, err := NewLocalClient(true)
 	require.NoError(t, err)
 
 	testCaller, err := yak.NewMixPluginCaller()
@@ -890,7 +890,7 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 		Type: "mitm",
 	}
 
-	client, err := NewLocalClient()
+	client, err := NewLocalClient(true)
 	require.NoError(t, err)
 
 	testCaller, err := yak.NewMixPluginCaller()

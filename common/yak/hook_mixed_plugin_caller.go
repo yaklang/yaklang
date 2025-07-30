@@ -1021,10 +1021,11 @@ func (m *MixPluginCaller) GetExecutionTracker() *PluginExecutionTracker {
 }
 
 // AddExecutionTraceCallback 添加执行跟踪回调
-func (m *MixPluginCaller) AddExecutionTraceCallback(callback func(*PluginExecutionTrace)) {
+func (m *MixPluginCaller) AddExecutionTraceCallback(callback func(*PluginExecutionTrace)) (callbackID string, remove func()) {
 	if m.callers != nil {
-		m.callers.AddExecutionTraceCallback(callback)
+		return m.callers.AddExecutionTraceCallback(callback)
 	}
+	return "", nil
 }
 
 // GetAllExecutionTraces 获取所有执行跟踪

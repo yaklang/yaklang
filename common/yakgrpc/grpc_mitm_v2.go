@@ -1568,8 +1568,8 @@ func (s *Server) PluginTrace(stream ypb.Yak_PluginTraceServer) error {
 	log.Info("插件跟踪流连接建立")
 
 	emptyResp := &ypb.PluginTraceResponse{
-		ResponseType: "trace_update",
-		Traces:       []*ypb.PluginExecutionTrace{},
+		ResponseType: "control_result",
+		Success:      false,
 	}
 
 	// 检测MixPluginCaller是否可用，不可用则定期检测
@@ -1583,6 +1583,7 @@ func (s *Server) PluginTrace(stream ypb.Yak_PluginTraceServer) error {
 			case <-time.After(time.Second):
 				continue
 			case <-ctx.Done():
+				log.Info("client close the plugin trace stream during plugin caller check loop")
 				return nil
 			}
 		} else {
@@ -1605,7 +1606,7 @@ func (s *Server) PluginTrace(stream ypb.Yak_PluginTraceServer) error {
 	debouncedLog, _ := lo.NewDebounce(time.Second*5, func() { log.Warn("trace update channel is full, dropping trace update") })
 
 	// 设置callback，推送状态变更（不包括running状态的时间检测）
-	manager.AddExecutionTraceCallback(func(trace *yak.PluginExecutionTrace) {
+	_, removeCallback := manager.AddExecutionTraceCallback(func(trace *yak.PluginExecutionTrace) {
 		pushedTracesMutex.Lock()
 		defer pushedTracesMutex.Unlock()
 
@@ -1634,6 +1635,9 @@ func (s *Server) PluginTrace(stream ypb.Yak_PluginTraceServer) error {
 
 			select {
 			case traceUpdateChan <- trace:
+			case <-ctx.Done():
+				log.Info("trace won't sent to client due to stream close")
+				return
 			default:
 				debouncedLog()
 			}
@@ -1643,13 +1647,19 @@ func (s *Server) PluginTrace(stream ypb.Yak_PluginTraceServer) error {
 			}
 		}
 	})
-
+	if removeCallback != nil {
+		defer func() {
+			removeCallback()
+			log.Info("plugin trace callback removed")
+		}()
+	}
 	// 启动goroutine处理trace批量更新推送和定时stats推送
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
 				log.Errorf("trace update goroutine panic: %v", err)
 			}
+			log.Info("trace push goroutine exit")
 		}()
 
 		// 批量处理的缓冲区
@@ -1672,7 +1682,10 @@ func (s *Server) PluginTrace(stream ypb.Yak_PluginTraceServer) error {
 			case <-ctx.Done():
 				return
 
-			case trace := <-traceUpdateChan:
+			case trace, ok := <-traceUpdateChan:
+				if !ok {
+					return
+				}
 				// 收集trace到批处理缓冲区
 				traceBatch = append(traceBatch, trace)
 
@@ -1715,20 +1728,11 @@ func (s *Server) PluginTrace(stream ypb.Yak_PluginTraceServer) error {
 		req, err := stream.Recv()
 		if err != nil {
 			if err == io.EOF {
+				log.Info("plugin trace stream closed")
 				return nil
 			}
 			log.Warnf("PluginTrace Recv error: %v", err)
 			return nil
-		}
-
-		if req.ControlMode == "set_tracing" {
-			mitmPluginCaller.EnableExecutionTracing(req.EnableTracing)
-			resp := &ypb.PluginTraceResponse{
-				ResponseType: "tracing_status",
-				Success:      true,
-			}
-			_ = stream.Send(resp)
-			continue
 		}
 
 		response := s.handlePluginTraceRequest(manager, req)
@@ -1740,12 +1744,9 @@ func (s *Server) PluginTrace(stream ypb.Yak_PluginTraceServer) error {
 func (s *Server) handlePluginTraceRequest(manager *yak.YakToCallerManager, req *ypb.PluginTraceRequest) *ypb.PluginTraceResponse {
 	switch req.ControlMode {
 	case "start_stream":
-		// 返回空的trace列表，实际推送由callback处理
-		stats := s.getPluginTraceStats(manager)
+		manager.EnableExecutionTracing(req.EnableTracing)
 		return &ypb.PluginTraceResponse{
-			ResponseType: "trace_list",
-			Traces:       []*ypb.PluginExecutionTrace{},
-			Stats:        stats,
+			ResponseType: "control_result",
 			Success:      true,
 		}
 
@@ -1773,13 +1774,18 @@ func (s *Server) handlePluginTraceRequest(manager *yak.YakToCallerManager, req *
 
 	case "stop_stream":
 		// 客户端请求停止流
-		mitmPluginCallerMutex.Lock()
-		defer mitmPluginCallerMutex.Unlock()
 		mitmPluginCallerGlobal.EnableExecutionTracing(false)
 		return &ypb.PluginTraceResponse{
 			ResponseType: "control_result",
 			Success:      true,
 			Message:      "流已停止",
+		}
+
+	case "set_tracing":
+		manager.EnableExecutionTracing(req.EnableTracing)
+		return &ypb.PluginTraceResponse{
+			ResponseType: "control_result",
+			Success:      true,
 		}
 
 	default:
@@ -1796,17 +1802,12 @@ func (s *Server) checkLongRunningTraces(manager *yak.YakToCallerManager, traceUp
 	pushedTracesMutex.Lock()
 	defer pushedTracesMutex.Unlock()
 
-	// 获取所有trace
-	allTraces := manager.GetAllExecutionTraces()
+	// 获取所有Running状态的trace
+	allTraces := manager.GetRunningExecutionTraces()
 
 	for _, trace := range allTraces {
 		// 只检查running状态的trace
 		if trace.Status != yak.PluginStatusRunning {
-			continue
-		}
-
-		// 检查是否已经推送过
-		if (*pushedTraces)[trace.TraceID] {
 			continue
 		}
 
@@ -1867,7 +1868,6 @@ func (s *Server) sendTraceBatch(stream ypb.Yak_PluginTraceServer, traces []*yak.
 	resp := &ypb.PluginTraceResponse{
 		ResponseType: "trace_update",
 		Traces:       pbTraces,
-		Success:      true,
 	}
 
 	if err := stream.Send(resp); err != nil {

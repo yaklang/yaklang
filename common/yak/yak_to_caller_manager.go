@@ -118,14 +118,6 @@ var HooksExports = map[string]interface{}{
 	"LoadYakitPlugin":              loadScript,
 	"LoadYakitPluginByName":        loadScriptByName,
 	"CallYakitPluginFunc":          CallYakitPluginFunc,
-
-	// 插件执行跟踪相关导出
-	"NewPluginExecutionTracker": NewPluginExecutionTracker,
-	"PluginStatusPending":       PluginStatusPending,
-	"PluginStatusRunning":       PluginStatusRunning,
-	"PluginStatusCompleted":     PluginStatusCompleted,
-	"PluginStatusFailed":        PluginStatusFailed,
-	"PluginStatusCancelled":     PluginStatusCancelled,
 }
 
 var (
@@ -1122,8 +1114,8 @@ func (y *YakToCallerManager) GetExecutionTracker() *PluginExecutionTracker {
 }
 
 // AddExecutionTraceCallback 添加执行跟踪回调
-func (y *YakToCallerManager) AddExecutionTraceCallback(callback func(*PluginExecutionTrace)) {
-	y.executionTracker.AddCallback(callback)
+func (y *YakToCallerManager) AddExecutionTraceCallback(callback func(*PluginExecutionTrace)) (callbackID string, remove func()) {
+	return y.executionTracker.AddCallback(callback)
 }
 
 // GetAllExecutionTraces 获取所有执行跟踪
