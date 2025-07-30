@@ -52,6 +52,7 @@ func TestAIAnalysis(t *testing.T) {
 		Content:        scanFileContent,
 		Lang:           `java`,
 		ControlMessage: `start`,
+		TimeoutSecond:  15, // 将超时从默认的180秒减少到15秒
 	})
 	require.NoError(t, err)
 

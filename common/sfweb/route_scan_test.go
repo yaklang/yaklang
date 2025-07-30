@@ -82,6 +82,7 @@ func scanContent(t *testing.T, lang, content string) {
 		Content:        content,
 		Lang:           lang,
 		ControlMessage: `start`,
+		TimeoutSecond:  15, // 将超时从默认的180秒减少到15秒
 	})
 	require.NoError(t, err)
 
