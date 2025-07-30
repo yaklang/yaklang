@@ -3,6 +3,14 @@ package tools
 import (
 	"context"
 	"fmt"
+	"math/rand"
+	"net"
+	_ "net/http/pprof"
+	"os"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/pcap"
@@ -11,16 +19,11 @@ import (
 	"github.com/yaklang/yaklang/common/synscanx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
-	"math/rand"
-	"net"
-	_ "net/http/pprof"
-	"os"
-	"sync"
-	"testing"
-	"time"
 )
 
 func Test__scanx(t *testing.T) {
+	t.Skip("跳过测试：依赖外部IP 172.22.166.244，不符合测试不外连的原则")
+
 	log.SetLevel(log.DebugLevel)
 	synPacketCounter := 0
 	addSynPacketCounter := func() {
@@ -65,6 +68,8 @@ func Test__scanx(t *testing.T) {
 }
 
 func Test__scanx2(t *testing.T) {
+	t.Skip("跳过测试：依赖外部IP 124.222.42.210/24，不符合测试不外连的原则")
+
 	synPacketCounter := 0
 	addSynPacketCounter := func() {
 		synPacketCounter++
@@ -110,6 +115,8 @@ func Test__scanx2(t *testing.T) {
 }
 
 func Test___scanxFromPingUtils(t *testing.T) {
+	t.Skip("跳过测试：依赖内网IP 192.168.3.3/24，不符合测试不外连的原则")
+
 	synPacketCounter := 0
 	addSynPacketCounter := func() {
 		synPacketCounter++
@@ -149,6 +156,8 @@ func Test___scanxFromPingUtils(t *testing.T) {
 }
 
 func Test___scanxFromPingUtilsCancel(t *testing.T) {
+	t.Skip("跳过测试：依赖内网IP 192.168.3.3/24，不符合测试不外连的原则")
+
 	ctx, cancel := context.WithCancel(context.Background())
 	synPacketCounter := 0
 	addSynPacketCounter := func() {
@@ -195,6 +204,8 @@ func Test___scanxFromPingUtilsCancel(t *testing.T) {
 }
 
 func Test___scanxFromPingUtils_NoAliveHosts(t *testing.T) {
+	t.Skip("跳过测试：依赖内网IP 192.168.3.3/24，不符合测试不外连的原则")
+
 	list := utils.ParseStringToHosts("192.168.3.3/24")
 	c := make(chan *pingutil.PingResult)
 	go func() {
@@ -226,6 +237,7 @@ func Test___scanxFromPingUtils_NoAliveHosts(t *testing.T) {
 }
 
 func Test___filter(t *testing.T) {
+	t.Skip("跳过测试：存在无限循环的竞态条件测试，会导致测试永远不结束")
 
 	wg := sync.WaitGroup{}
 	for {
@@ -253,6 +265,8 @@ func Test___filter(t *testing.T) {
 }
 
 func Test___Loopback(t *testing.T) {
+	t.Skip("跳过测试：需要特殊网络权限和网络接口，在某些环境中会失败")
+
 	// 打开环回设备
 	handle, err := pcap.OpenLive("lo", 1600, true, pcap.BlockForever)
 	if err != nil {
