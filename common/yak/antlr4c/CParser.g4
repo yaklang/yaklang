@@ -89,25 +89,15 @@ postfixExpression
     ;
 
 argumentExpressionList
-    : assignmentExpression (',' assignmentExpression)*
+    : expression (',' expression)*
     ;
 
 unaryExpression
-    : ('++' | '--' | 'sizeof')* (
+    : ('++' | '--' | 'sizeof' | '*')* (
         postfixExpression
-        | unaryOperator castExpression
         | ('sizeof' | '_Alignof') '(' typeName ')'
         | '&&' Identifier
     )
-    ;
-
-unaryOperator
-    : '&'
-    | '*'
-    | '+'
-    | '-'
-    | '~'
-    | '!'
     ;
 
 castExpression
@@ -118,8 +108,7 @@ castExpression
 
 // --- Binary Expressions ---
 assignmentExpression
-    : unaryExpression assignmentOperator? initializer?
-    | postfixExpression assignmentOperator? initializer?
+    : castExpression assignmentOperator? initializer?
     | DigitSequence
     ;
 
@@ -154,10 +143,9 @@ expression
     | expression OrOr expression
     | '(' expression ')'
     | expression ('?' expression ':' expression)
-    | primaryExpression
+    | castExpression
     | assignmentExpression
     | statementsExpression
-    | castExpression
     ;
 
 // --- Declarations ---

@@ -28,9 +28,6 @@ type CParserVisitor interface {
 	// Visit a parse tree produced by CParser#unaryExpression.
 	VisitUnaryExpression(ctx *UnaryExpressionContext) interface{}
 
-	// Visit a parse tree produced by CParser#unaryOperator.
-	VisitUnaryOperator(ctx *UnaryOperatorContext) interface{}
-
 	// Visit a parse tree produced by CParser#castExpression.
 	VisitCastExpression(ctx *CastExpressionContext) interface{}
 

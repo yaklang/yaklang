@@ -4,6 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/c2ssa"
 	"github.com/yaklang/yaklang/common/yak/typescript/js2ssa"
 
 	//js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
@@ -22,6 +23,7 @@ const (
 	PHP  = consts.PHP
 	JAVA = consts.JAVA
 	GO   = consts.GO
+	C    = consts.C
 )
 
 var LanguageBuilders = map[consts.Language]ssa.Builder{
@@ -30,6 +32,7 @@ var LanguageBuilders = map[consts.Language]ssa.Builder{
 	PHP:  php2ssa.Builder,
 	JAVA: java2ssa.Builder,
 	GO:   go2ssa.Builder,
+	C:    c2ssa.Builder,
 }
 
 var AllLanguageBuilders = []ssa.Builder{
