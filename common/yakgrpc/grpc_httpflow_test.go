@@ -1107,8 +1107,9 @@ func TestHTTPFlowFieldGroup(t *testing.T) {
 	require.NoError(t, err)
 
 	// create httpflow
+	originTag := uuid.NewString()
 	url1 := fmt.Sprintf("http://%s.com", utils.RandStringBytes(5))
-	flow, err := yakit.CreateHTTPFlow(yakit.CreateHTTPFlowWithURL(url1))
+	flow, err := yakit.CreateHTTPFlow(yakit.CreateHTTPFlowWithURL(url1), yakit.CreateHTTPFlowWithTags(originTag))
 	require.NoError(t, err)
 	err = yakit.InsertHTTPFlow(consts.GetGormProjectDatabase(), flow)
 	require.NoError(t, err)
@@ -1125,6 +1126,18 @@ func TestHTTPFlowFieldGroup(t *testing.T) {
 	// set uuidTag and check
 	uuidTag := uuid.NewString()
 	{
+		// test set empty for tag
+		_, err = client.SetTagForHTTPFlow(context.Background(), &ypb.SetTagForHTTPFlowRequest{
+			Id:   int64(flow.ID),
+			Tags: nil,
+		})
+		require.NoError(t, err)
+
+		// query from db
+		flow, err = yakit.GetHTTPFlow(consts.GetGormProjectDatabase(), int64(flow.ID))
+		require.NoError(t, err)
+		require.Empty(t, flow.Tags)
+
 		_, err = client.SetTagForHTTPFlow(context.Background(), &ypb.SetTagForHTTPFlowRequest{
 			Id:   int64(flow.ID),
 			Tags: []string{uuidTag},
