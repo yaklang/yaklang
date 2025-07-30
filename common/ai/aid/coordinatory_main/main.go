@@ -12,6 +12,8 @@ func main() {
 		return
 	}
 
+	// if u want to debug it, remove skip
+
 	//keyPath := filepath.Join(consts.GetDefaultYakitBaseDir(), "tongyi-apikey.txt")
 	//apikey, err := os.ReadFile(keyPath)
 	//if err != nil {

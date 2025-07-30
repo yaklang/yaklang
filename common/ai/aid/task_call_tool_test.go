@@ -3,13 +3,14 @@ package aid
 import (
 	"bytes"
 	"fmt"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestAITaskCallToolStdOut(t *testing.T) {
@@ -32,11 +33,24 @@ func TestAITaskCallToolStdOut(t *testing.T) {
 				rsp.Close()
 			}()
 
+			// 处理工具调用参数生成阶段
 			if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: print`, `"call-tool"`, "const") {
 				rsp.EmitOutputStream(strings.NewReader(fmt.Sprintf(`{"@action": "call-tool", "tool": "print", "params": {"output": "%s","err":"%s"}}`, outputToken, errToken)))
 				return rsp, nil
-			} else if utils.MatchAllOfSubString(request.GetPrompt(), `当前任务: "扫描目录结构"`) {
+			}
+			// 处理任务执行阶段
+			if utils.MatchAllOfSubString(request.GetPrompt(), `当前任务: "扫描目录结构"`) {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-tool", "tool": "print"}`))
+				return rsp, nil
+			}
+			// 处理决策阶段 - 检查更多的决策阶段特征
+			if utils.MatchAllOfSubString(request.GetPrompt(), `review当前任务的执行情况`, `决策`) ||
+				utils.MatchAllOfSubString(request.GetPrompt(), `刚使用了一个工具来帮助你完成任务`) ||
+				utils.MatchAllOfSubString(request.GetPrompt(), `continue-current-task`, `proceed-next-task`) ||
+				utils.MatchAllOfSubString(request.GetPrompt(), `task-failed`, `task-skipped`) ||
+				utils.MatchAllOfSubString(request.GetPrompt(), `"enum": ["continue-current-task"`) ||
+				utils.MatchAllOfSubString(request.GetPrompt(), `工具的结果如下，产生结果时间为`) {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "proceed-next-task"}`))
 				return rsp, nil
 			}
 
@@ -74,7 +88,7 @@ func TestAITaskCallToolStdOut(t *testing.T) {
 LOOP:
 	for {
 		select {
-		case <-time.After(30 * time.Second):
+		case <-time.After(5 * time.Second): // 优化：从30秒减少到5秒
 			break LOOP
 		case result := <-outputChan:
 			count++

@@ -3,12 +3,13 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func testRecoveryToolUseReview(t *testing.T, uid string) {
@@ -45,7 +46,7 @@ func testRecoveryToolUseReview(t *testing.T, uid string) {
 LOOP:
 	for {
 		select {
-		case <-time.After(5 * time.Second):
+		case <-time.After(3 * time.Second): // 优化：从5秒减少到3秒
 			break LOOP
 		case result := <-outputChan:
 			count++
@@ -119,6 +120,16 @@ func TestCoordinator_Recovery_ToolUseReview(t *testing.T) {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-tool", "tool": "ls"}`))
 				return rsp, nil
 			}
+			// 处理决策阶段 - 检查更多的决策阶段特征
+			if utils.MatchAllOfSubString(request.GetPrompt(), `review当前任务的执行情况`, `决策`) ||
+				utils.MatchAllOfSubString(request.GetPrompt(), `刚使用了一个工具来帮助你完成任务`) ||
+				utils.MatchAllOfSubString(request.GetPrompt(), `continue-current-task`, `proceed-next-task`) ||
+				utils.MatchAllOfSubString(request.GetPrompt(), `task-failed`, `task-skipped`) ||
+				utils.MatchAllOfSubString(request.GetPrompt(), `"enum": ["continue-current-task"`) ||
+				utils.MatchAllOfSubString(request.GetPrompt(), `工具的结果如下，产生结果时间为`) {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "proceed-next-task"}`))
+				return rsp, nil
+			}
 
 			fmt.Println("===========" + "request:" + "===========\n" + request.GetPrompt())
 			rsp.EmitOutputStream(strings.NewReader(`
@@ -153,7 +164,7 @@ func TestCoordinator_Recovery_ToolUseReview(t *testing.T) {
 LOOP:
 	for {
 		select {
-		case <-time.After(30 * time.Second):
+		case <-time.After(5 * time.Second): // 优化：从30秒减少到5秒
 			break LOOP
 		case result := <-outputChan:
 			count++
