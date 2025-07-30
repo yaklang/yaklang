@@ -21,8 +21,15 @@ func ExtractImage(i any) chan *ImageResult {
 
 // ExtractImageFromFile extract images from a file path,
 // we can handle some video formats, PDF, and other files that may contain images.
-func ExtractImageFromFile(filePath string) (chan *ImageResult, error) {
-	ctx := context.Background()
+func ExtractImageFromFile(filePath string, options ...ImageExtractorOption) (chan *ImageResult, error) {
+	config := &ImageExtractorConfig{
+		ctx: context.Background(),
+	}
+	for _, option := range options {
+		if option != nil {
+			option(config)
+		}
+	}
 
 	mt, mtErr := mimetype.DetectFile(filePath)
 	if mtErr != nil {
@@ -33,17 +40,29 @@ func ExtractImageFromFile(filePath string) (chan *ImageResult, error) {
 	var err error
 
 	if mt.IsVideo() {
-		result, err = ExtractVideoFrameContext(ctx, filePath)
+		result, err = ExtractVideoFrameContext(config.ctx, filePath)
 		if err != nil {
 			return nil, utils.Errorf("cannot extract video frames for file %s: %v", filePath, err)
 		}
 		return result, nil
 	} else {
-		result, err = ExtractDocumentPagesContext(ctx, filePath)
+		result, err = ExtractDocumentPagesContext(config.ctx, filePath)
 		if err != nil {
 			return nil, utils.Errorf("cannot extract document pages for file %s: %v", filePath, err)
 		}
 		return result, nil
+	}
+}
+
+type ImageExtractorConfig struct {
+	ctx context.Context
+}
+
+type ImageExtractorOption func(*ImageExtractorConfig)
+
+func WithCtx(ctx context.Context) ImageExtractorOption {
+	return func(o *ImageExtractorConfig) {
+		o.ctx = ctx
 	}
 }
 
