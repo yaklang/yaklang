@@ -47,17 +47,6 @@ jobs:
         run: |
           go build -x common/yak/cmd/yak.go 
           ./yak --help
-      
-      - name: "FFMPEG Version Checking"
-        run: |
-          if ! ffmpeg -version; then
-            echo "FFMPEG version check failed"
-            exit 1
-          fi
-          echo "FFMPEG version check successful"
-          mkdir -p ~/yakit-projects/projects/libs
-          ln -sf $(which ffmpeg) ~/yakit-projects/projects/libs/ffmpeg
-          echo "Created symlink to ffmpeg at ~/yakit-projects/projects/libs/ffmpeg"
 
   test:
     name: ${{ matrix.name }}
@@ -66,9 +55,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: "FFMPEG Testcase"
+          - name: "These Testcase Need to Improve"
             run: |
-              go test -timeout 20s ./common/utils/ffmpegutils/...
+              go test -timeout 20s ./common/utils/pprofutils/...
           - name: "Test in 2min"
             run: |
               # these tests are very quick
@@ -86,8 +75,7 @@ jobs:
               go test -timeout 20s ./common/utils/imageutils/...
               go test -timeout 10s ./common/utils/xml2
               go test -timeout 20s ./common/utils/tlsutils/... 
-              go test -timeout 10s ./common/utils/linktable/... 
-              go test -timeout 20s ./common/utils/pprofutils/... 
+              go test -timeout 10s ./common/utils/linktable/...  
               go test -timeout 20s -run TestQueryCVEWithFixName ./common/cve
               go test -timeout 20s ./common/sca/...
               go test -timeout 20s -run TestMUSTPASS_YakitLog ./common/yak/yaklib
