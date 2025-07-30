@@ -534,6 +534,7 @@ const (
 	Yak_UpdateKnowledgeBaseEntry_FullMethodName                   = "/ypb.Yak/UpdateKnowledgeBaseEntry"
 	Yak_SearchKnowledgeBaseEntry_FullMethodName                   = "/ypb.Yak/SearchKnowledgeBaseEntry"
 	Yak_BuildVectorIndexForKnowledgeBase_FullMethodName           = "/ypb.Yak/BuildVectorIndexForKnowledgeBase"
+	Yak_BuildVectorIndexForKnowledgeBaseEntry_FullMethodName      = "/ypb.Yak/BuildVectorIndexForKnowledgeBaseEntry"
 )
 
 // YakClient is the client API for Yak service.
@@ -1196,6 +1197,7 @@ type YakClient interface {
 	UpdateKnowledgeBaseEntry(ctx context.Context, in *UpdateKnowledgeBaseEntryRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 	SearchKnowledgeBaseEntry(ctx context.Context, in *SearchKnowledgeBaseEntryRequest, opts ...grpc.CallOption) (*SearchKnowledgeBaseEntryResponse, error)
 	BuildVectorIndexForKnowledgeBase(ctx context.Context, in *BuildVectorIndexForKnowledgeBaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	BuildVectorIndexForKnowledgeBaseEntry(ctx context.Context, in *BuildVectorIndexForKnowledgeBaseEntryRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 }
 
 type yakClient struct {
@@ -7112,6 +7114,16 @@ func (c *yakClient) BuildVectorIndexForKnowledgeBase(ctx context.Context, in *Bu
 	return out, nil
 }
 
+func (c *yakClient) BuildVectorIndexForKnowledgeBaseEntry(ctx context.Context, in *BuildVectorIndexForKnowledgeBaseEntryRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_BuildVectorIndexForKnowledgeBaseEntry_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility.
@@ -7772,6 +7784,7 @@ type YakServer interface {
 	UpdateKnowledgeBaseEntry(context.Context, *UpdateKnowledgeBaseEntryRequest) (*GeneralResponse, error)
 	SearchKnowledgeBaseEntry(context.Context, *SearchKnowledgeBaseEntryRequest) (*SearchKnowledgeBaseEntryResponse, error)
 	BuildVectorIndexForKnowledgeBase(context.Context, *BuildVectorIndexForKnowledgeBaseRequest) (*GeneralResponse, error)
+	BuildVectorIndexForKnowledgeBaseEntry(context.Context, *BuildVectorIndexForKnowledgeBaseEntryRequest) (*GeneralResponse, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -9326,6 +9339,9 @@ func (UnimplementedYakServer) SearchKnowledgeBaseEntry(context.Context, *SearchK
 }
 func (UnimplementedYakServer) BuildVectorIndexForKnowledgeBase(context.Context, *BuildVectorIndexForKnowledgeBaseRequest) (*GeneralResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BuildVectorIndexForKnowledgeBase not implemented")
+}
+func (UnimplementedYakServer) BuildVectorIndexForKnowledgeBaseEntry(context.Context, *BuildVectorIndexForKnowledgeBaseEntryRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BuildVectorIndexForKnowledgeBaseEntry not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 func (UnimplementedYakServer) testEmbeddedByValue()             {}
@@ -17900,6 +17916,24 @@ func _Yak_BuildVectorIndexForKnowledgeBase_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_BuildVectorIndexForKnowledgeBaseEntry_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BuildVectorIndexForKnowledgeBaseEntryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).BuildVectorIndexForKnowledgeBaseEntry(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_BuildVectorIndexForKnowledgeBaseEntry_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).BuildVectorIndexForKnowledgeBaseEntry(ctx, req.(*BuildVectorIndexForKnowledgeBaseEntryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -19590,6 +19624,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "BuildVectorIndexForKnowledgeBase",
 			Handler:    _Yak_BuildVectorIndexForKnowledgeBase_Handler,
+		},
+		{
+			MethodName: "BuildVectorIndexForKnowledgeBaseEntry",
+			Handler:    _Yak_BuildVectorIndexForKnowledgeBaseEntry_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

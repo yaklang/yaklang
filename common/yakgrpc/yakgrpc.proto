@@ -912,6 +912,7 @@ service Yak {
   rpc SearchKnowledgeBaseEntry(SearchKnowledgeBaseEntryRequest) returns(SearchKnowledgeBaseEntryResponse);
 
   rpc BuildVectorIndexForKnowledgeBase(BuildVectorIndexForKnowledgeBaseRequest) returns(GeneralResponse);
+  rpc BuildVectorIndexForKnowledgeBaseEntry(BuildVectorIndexForKnowledgeBaseEntryRequest) returns(GeneralResponse);
 }
 
 message ThirdPartyBinary {
@@ -950,14 +951,22 @@ message StartThirdPartyBinaryRequest {
   repeated string Args = 2;
 }
 
+message BuildVectorIndexForKnowledgeBaseEntryRequest {
+  int64 KnowledgeBaseEntryId = 1;
 
-// ModelName:        cfg.ModelName,
-// 		Dimension:        cfg.Dimension,
-// 		M:                cfg.MaxNeighbors,
-// 		Ml:               cfg.LayerGenerationFactor,
-// 		EfSearch:         cfg.EfSearch,
-// 		EfConstruct:      cfg.EfConstruct,
-// 		DistanceFuncType: cfg.DistanceFuncType,
+  string BaseUrl = 2;
+  string ApiKey = 3;
+  string Proxy = 4;
+
+  string ModelName = 5;
+  int32 Dimension = 6;
+  int32 M = 7;
+  float Ml = 8;
+  int32 EfSearch = 9;
+  int32 EfConstruct = 10;
+  string DistanceFuncType = 11;
+}
+
 message BuildVectorIndexForKnowledgeBaseRequest {
   int64 KnowledgeBaseId = 1;
 
