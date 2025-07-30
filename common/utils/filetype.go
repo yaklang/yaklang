@@ -1,8 +1,10 @@
 package utils
 
 import (
+	"fmt"
 	"github.com/h2non/filetype/matchers"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mimetype"
 )
 
 func IsImage(i []byte) bool {
@@ -20,4 +22,18 @@ func IsImage(i []byte) bool {
 		}
 	}
 	return false
+}
+
+func IsGenericTextFile(filePath string) (bool, error) {
+	mime, err := mimetype.DetectFile(filePath)
+	if err != nil {
+		return false, fmt.Errorf("无法检测文件 '%s': %w", filePath, err)
+	}
+
+	for m := mime; m != nil; m = m.Parent() {
+		if m.Is("text/plain") {
+			return true, nil
+		}
+	}
+	return false, nil
 }

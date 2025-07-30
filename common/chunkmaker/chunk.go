@@ -2,6 +2,7 @@ package chunkmaker
 
 import (
 	"bytes"
+	"github.com/yaklang/yaklang/common/mimetype"
 	"github.com/yaklang/yaklang/common/utils"
 	"sync"
 	"unicode/utf8"
@@ -17,6 +18,7 @@ type Chunk interface {
 	HaveLastChunk() bool
 	LastChunk() Chunk
 	PrevNBytes(n int) []byte
+	MIMEType() *mimetype.MIME
 }
 
 type BufferChunk struct {
@@ -27,17 +29,23 @@ type BufferChunk struct {
 	bytesize int64
 	runesize int64
 	prev     Chunk // 指向前一个 Chunk
+	mimeType *mimetype.MIME
 }
 
 var _ Chunk = (*BufferChunk)(nil)
 
 func NewBufferChunk(buffer []byte) *BufferChunk {
+	return NewBufferChunkWithMIMEType(buffer, nil)
+}
+
+func NewBufferChunkWithMIMEType(buffer []byte, mimeType *mimetype.MIME) *BufferChunk {
 	bc := &BufferChunk{
 		mu:       new(sync.RWMutex),
 		isUTF8:   utf8.Valid(buffer),
 		buffer:   bytes.NewBuffer(buffer),
 		bytesize: int64(len(buffer)),
 		prev:     nil, // 新创建的 chunk 默认没有前一个 chunk
+		mimeType: mimeType,
 	}
 	if bc.isUTF8 {
 		bc.runesize = int64(len([]rune(string(buffer))))
@@ -266,4 +274,8 @@ func (c *BufferChunk) PrevNBytes(n int) []byte {
 	}
 
 	return finalBuffer.Bytes()
+}
+
+func (c *BufferChunk) MIMEType() *mimetype.MIME {
+	return c.mimeType
 }
