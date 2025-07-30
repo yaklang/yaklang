@@ -3,12 +3,13 @@ package aid
 import (
 	"bytes"
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestPlanRetry(t *testing.T) {
@@ -70,7 +71,7 @@ func TestPlanRetry(t *testing.T) {
 LOOP:
 	for {
 		select {
-		case <-time.After(time.Second * 3):
+		case <-time.After(time.Second * 2): // 优化：从3秒减少到2秒
 			t.Fatal("timeout")
 		case output := <-outputChan:
 			msg := output.String()
