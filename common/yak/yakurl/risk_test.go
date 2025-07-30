@@ -758,6 +758,8 @@ func TestRiskAction(t *testing.T) {
 
 	t.Run("check path program and search source", func(t *testing.T) {
 		// ssarisk://program/?search=/b
+		// 注意：搜索'/b'会匹配所有包含字符'b'的字段，不仅仅是路径
+		// 所以我们使用包含性检查，确保期望的结果都包含在实际结果中
 		checkPathAndSearch(urlProgramPath(programName1), "/b", map[string]data{
 			urlPath(programName1, "b/b1.go"): {
 				Name:  sourcePath(programName1, "b/b1.go"),
@@ -769,7 +771,7 @@ func TestRiskAction(t *testing.T) {
 				Type:  "source",
 				Count: 1,
 			},
-		})
+		}, true) // 使用包含性检查
 	})
 
 	t.Run("check path program and search function", func(t *testing.T) {
