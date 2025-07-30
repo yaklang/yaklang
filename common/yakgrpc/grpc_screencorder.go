@@ -9,11 +9,6 @@ import (
 	"runtime"
 	"time"
 
-	"bytes"
-	"os/exec"
-	"strconv"
-	"strings"
-
 	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -28,35 +23,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc"
 )
-
-func getVideoDuration(videoPath string) (time.Duration, error) {
-	ffprobePath, err := exec.LookPath("ffprobe")
-	if err != nil {
-		return 0, fmt.Errorf("ffprobe not found in PATH")
-	}
-
-	cmd := exec.Command(ffprobePath,
-		"-v", "error",
-		"-show_entries", "format=duration",
-		"-of", "default=noprint_wrappers=1:nokey=1",
-		videoPath,
-	)
-
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	err = cmd.Run()
-	if err != nil {
-		return 0, err
-	}
-
-	durationStr := strings.TrimSpace(out.String())
-	durationFloat, err := strconv.ParseFloat(durationStr, 64)
-	if err != nil {
-		return 0, err
-	}
-
-	return time.Duration(durationFloat * float64(time.Second)), nil
-}
 
 func (s *Server) QueryScreenRecorders(ctx context.Context, req *ypb.QueryScreenRecorderRequest) (*ypb.QueryScreenRecorderResponse, error) {
 	p, data, err := yakit.QueryScreenRecorder(consts.GetGormProjectDatabase(), req)
@@ -212,7 +178,7 @@ func (s *Server) StartScrecorder(req *ypb.StartScrecorderRequest, stream ypb.Yak
 		return err
 	}
 
-	duration, err := getVideoDuration(recordName)
+	duration, err := ffmpegutils.GetVideoDuration(recordName)
 	if err != nil {
 		log.Warnf("get video duration failed: %v", err)
 	}

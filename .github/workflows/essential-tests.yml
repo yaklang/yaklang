@@ -47,6 +47,17 @@ jobs:
         run: |
           go build -x common/yak/cmd/yak.go 
           ./yak --help
+      
+      - name: "FFMPEG Version Checking"
+        run: |
+          if ! ffmpeg -version; then
+            echo "FFMPEG version check failed"
+            exit 1
+          fi
+          echo "FFMPEG version check successful"
+          mkdir -p ~/yakit-projects/projects/libs
+          ln -sf $(which ffmpeg) ~/yakit-projects/projects/libs/ffmpeg
+          echo "Created symlink to ffmpeg at ~/yakit-projects/projects/libs/ffmpeg"
 
   test:
     name: ${{ matrix.name }}
@@ -55,6 +66,9 @@ jobs:
     strategy:
       matrix:
         include:
+          - name: "FFMPEG Testcase"
+            run: |
+              go test -timeout 20s ./common/utils/ffmpegutils/...
           - name: "Test in 2min"
             run: |
               # these tests are very quick
@@ -115,6 +129,7 @@ jobs:
               go test -timeout 20s ./common/fuzztagx 
               go test -timeout 30s ./common/mutate
               go test -timeout 30s ./common/fuzzx
+              go test -timeout 20s ./common/utils/bizhelper/...
 
           - name: Test SSA / SSAAPI
             run: |
@@ -262,10 +277,6 @@ jobs:
               go test --timeout 5m ./common/crawlerx/...
               # crawler
               go test -timeout 20s -run TestMUSTPASS ./common/crawler
-
-          - name: Test Bizhelper
-            run: |
-              go test -timeout 20s ./common/utils/bizhelper/...
 
           - name: Test Other
             run: |
