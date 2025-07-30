@@ -7,7 +7,6 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 	"golang.org/x/exp/slices"
 )
@@ -449,10 +448,6 @@ func (f *FunctionBuilder) EmitConstInst(i any) *ConstInst {
 }
 
 func (f *FunctionBuilder) emitConstInst(i any, isPlaceholder bool) *ConstInst {
-	safeString := memedit.NewSafeString(i)
-	if safeString.Len() > 1024*5 {
-		i = safeString.SliceBeforeStart(1024 * 5)
-	}
 	ci := NewConst(i, isPlaceholder)
 	f.emit(ci)
 	if ci.IsNormalConst() {
