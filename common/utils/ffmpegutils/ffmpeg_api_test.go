@@ -3,6 +3,7 @@ package ffmpegutils
 import (
 	"io/ioutil"
 	"os"
+	"regexp"
 	"testing"
 	"time"
 
@@ -345,4 +346,102 @@ func TestSmoke_BurnInSubtitles(t *testing.T) {
 	info, err := os.Stat(outputVideo.Name())
 	assert.NoError(t, err)
 	assert.Greater(t, info.Size(), int64(0), "subtitled video should not be empty")
+}
+
+func TestSmoke_GetVideoDuration(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
+	videoPath, cleanup := setupTestWithEmbeddedData(t)
+	defer cleanup()
+
+	// Execute GetVideoDuration
+	duration, err := GetVideoDuration(videoPath)
+	assert.NoError(t, err)
+	assert.Greater(t, duration, time.Duration(0), "video duration should be greater than 0")
+
+	// The test video should have a reasonable duration (assuming it's a few seconds to a few minutes)
+	// We'll check that it's between 1 second and 10 minutes as a sanity check
+	assert.GreaterOrEqual(t, duration, 1*time.Second, "video duration should be at least 1 second")
+	assert.LessOrEqual(t, duration, 10*time.Minute, "video duration should be less than 10 minutes")
+
+	log.Infof("Video duration: %v", duration)
+}
+
+func TestGetVideoDuration_NonExistentFile(t *testing.T) {
+	// Test with a file that doesn't exist
+	_, err := GetVideoDuration("/path/to/nonexistent/video.mp4")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "input file does not exist")
+}
+
+func TestFormatDuration_LongHours(t *testing.T) {
+	// Test formatDuration with various hour lengths
+	testCases := []struct {
+		duration time.Duration
+		expected string
+	}{
+		{1*time.Hour + 23*time.Minute + 45*time.Second + 678*time.Millisecond, "01:23:45.678"},
+		{12*time.Hour + 34*time.Minute + 56*time.Second + 789*time.Millisecond, "12:34:56.789"},
+		{99*time.Hour + 59*time.Minute + 59*time.Second + 999*time.Millisecond, "99:59:59.999"},
+		{100*time.Hour + 0*time.Minute + 0*time.Second + 0*time.Millisecond, "100:00:00.000"},
+		{123*time.Hour + 45*time.Minute + 30*time.Second + 890*time.Millisecond, "123:45:30.890"},
+		{1000*time.Hour + 1*time.Minute + 1*time.Second + 1*time.Millisecond, "1000:01:01.001"},
+	}
+
+	for _, tc := range testCases {
+		result := formatDuration(tc.duration)
+		assert.Equal(t, tc.expected, result, "formatDuration(%v) should return %s, got %s", tc.duration, tc.expected, result)
+	}
+}
+
+func TestGetVideoDuration_RegexPatternLongHours(t *testing.T) {
+	// Test the regex pattern used in GetVideoDuration to ensure it handles long hours
+
+	re := regexp.MustCompile(`Duration: (\d+):(\d{2}):(\d{2})\.(\d{2})`)
+
+	testCases := []struct {
+		input           string
+		expectedMatches []string
+		shouldMatch     bool
+	}{
+		{
+			"Duration: 01:23:45.67",
+			[]string{"Duration: 01:23:45.67", "01", "23", "45", "67"},
+			true,
+		},
+		{
+			"Duration: 99:59:59.99",
+			[]string{"Duration: 99:59:59.99", "99", "59", "59", "99"},
+			true,
+		},
+		{
+			"Duration: 100:00:00.00",
+			[]string{"Duration: 100:00:00.00", "100", "00", "00", "00"},
+			true,
+		},
+		{
+			"Duration: 1234:56:78.90", // Note: 78 seconds is invalid but tests the regex
+			[]string{"Duration: 1234:56:78.90", "1234", "56", "78", "90"},
+			true,
+		},
+		{
+			"Duration: 1:23:45.67", // Single digit hours should still work
+			[]string{"Duration: 1:23:45.67", "1", "23", "45", "67"},
+			true,
+		},
+		{
+			"Invalid Duration format",
+			nil,
+			false,
+		},
+	}
+
+	for _, tc := range testCases {
+		matches := re.FindStringSubmatch(tc.input)
+		if tc.shouldMatch {
+			assert.NotNil(t, matches, "Input %q should match the regex", tc.input)
+			assert.Equal(t, tc.expectedMatches, matches, "Regex matches for %q should be %v, got %v", tc.input, tc.expectedMatches, matches)
+		} else {
+			assert.Nil(t, matches, "Input %q should not match the regex", tc.input)
+		}
+	}
 }

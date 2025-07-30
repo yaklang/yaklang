@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,6 +21,7 @@ import (
 )
 
 // formatDuration converts a time.Duration to ffmpeg's HH:MM:SS.ms format.
+// For hours >= 100, it will use more digits as needed.
 func formatDuration(d time.Duration) string {
 	d = d.Round(time.Millisecond)
 	h := d / time.Hour
@@ -29,6 +31,11 @@ func formatDuration(d time.Duration) string {
 	s := d / time.Second
 	d -= s * time.Second
 	ms := d / time.Millisecond
+
+	// Use at least 2 digits for hours, but allow more if needed
+	if h >= 100 {
+		return fmt.Sprintf("%d:%02d:%02d.%03d", h, m, s, ms)
+	}
 	return fmt.Sprintf("%02d:%02d:%02d.%03d", h, m, s, ms)
 }
 
@@ -358,4 +365,50 @@ func ExtractSpecificFrame(inputFile string, frameNum int) ([]byte, error) {
 	}
 
 	return out.Bytes(), nil
+}
+
+// GetVideoDuration extracts the duration of a video file using ffmpeg.
+// It parses the ffmpeg output to find the duration.
+func GetVideoDuration(inputFile string) (time.Duration, error) {
+	if ffmpegBinaryPath == "" {
+		return 0, fmt.Errorf("ffmpeg binary path is not configured")
+	}
+
+	if _, err := os.Stat(inputFile); os.IsNotExist(err) {
+		return 0, fmt.Errorf("input file does not exist: %s", inputFile)
+	}
+
+	cmd := exec.Command(ffmpegBinaryPath, "-i", inputFile)
+	var out bytes.Buffer
+	cmd.Stderr = &out
+
+	// ffmpeg -i returns exit status 1 if there is no output file specified,
+	// which is expected behavior here. We just need to parse the stderr.
+	// We run the command and expect it to fail, but we capture the stderr.
+	_ = cmd.Run()
+
+	output := out.String()
+	if output == "" {
+		return 0, fmt.Errorf("ffmpeg produced no output for file: %s", inputFile)
+	}
+
+	// Duration: 00:01:12.38 or 100:01:12.38 for longer videos
+	re := regexp.MustCompile(`Duration: (\d+):(\d{2}):(\d{2})\.(\d{2})`)
+	matches := re.FindStringSubmatch(output)
+
+	if len(matches) != 5 {
+		return 0, fmt.Errorf("could not parse duration from ffmpeg output: %s", output)
+	}
+
+	hours, _ := strconv.Atoi(matches[1])
+	minutes, _ := strconv.Atoi(matches[2])
+	seconds, _ := strconv.Atoi(matches[3])
+	centiseconds, _ := strconv.Atoi(matches[4])
+
+	duration := time.Duration(hours)*time.Hour +
+		time.Duration(minutes)*time.Minute +
+		time.Duration(seconds)*time.Second +
+		time.Duration(centiseconds)*10*time.Millisecond
+
+	return duration, nil
 }
