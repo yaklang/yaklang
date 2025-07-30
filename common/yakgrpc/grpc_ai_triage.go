@@ -147,7 +147,7 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 			Content:  utils.InterfaceToBytes(content),
 		})
 	}
-	reducer, err := aireducer.NewReducerEx(
+	reducer, err := aireducer.NewReducerFromInputChunk(
 		freeInputChan,
 		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.Memory, chunk chunkmaker.Chunk) error {
 			query := strings.TrimSpace(string(chunk.Data()))

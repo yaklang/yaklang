@@ -134,3 +134,12 @@ func NewConfig(opts ...Option) *Config {
 	}
 	return c
 }
+
+func (c *Config) ChunkMakerOption() []chunkmaker.Option {
+	return []chunkmaker.Option{
+		chunkmaker.WithTimeTrigger(c.TimeTriggerInterval),
+		chunkmaker.WithChunkSize(c.ChunkSize),
+		chunkmaker.WithSeparatorTrigger(c.SeparatorTrigger),
+		chunkmaker.WithCtx(c.ctx),
+	}
+}
