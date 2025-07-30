@@ -1,27 +1,39 @@
 package whisperutils
 
-// WhisperResponse is the top-level structure for the entire JSON output.
-type WhisperResponse struct {
-	Task     string    `json:"task"`
-	Language string    `json:"language"`
-	Duration float64   `json:"duration"`
-	Text     string    `json:"text"`
-	Segments []Segment `json:"segments"`
+import (
+	"fmt"
+	"strings"
+	"time"
+)
+
+// SRTEntry represents a single SRT subtitle entry
+type SRTEntry struct {
+	Index     int           `json:"index"`
+	StartTime time.Duration `json:"start_time"`
+	EndTime   time.Duration `json:"end_time"`
+	Text      string        `json:"text"`
 }
 
-// Segment represents a continuous chunk of speech. Natural for subtitle entries.
-type Segment struct {
-	ID    int     `json:"id"`
-	Text  string  `json:"text"`
-	Start float64 `json:"start"`
-	End   float64 `json:"end"`
-	Words []Word  `json:"words"`
+// SRTContext represents the context around a specific time point
+type SRTContext struct {
+	TargetTime     time.Duration `json:"target_time"`
+	Interval       time.Duration `json:"interval"`
+	ContextText    string        `json:"context_text"`
+	ContextEntries []SRTEntry    `json:"context_entries"`
 }
 
-// Word contains the precise timing and text for a single word.
-type Word struct {
-	Word        string  `json:"word"`
-	Start       float64 `json:"start"`
-	End         float64 `json:"end"`
-	Probability float64 `json:"probability"`
+func (s *SRTContext) String() string {
+	if len(s.ContextEntries) == 0 {
+		return ""
+	}
+
+	var lines []string
+	for _, entry := range s.ContextEntries {
+		startSeconds := entry.StartTime.Seconds()
+		endSeconds := entry.EndTime.Seconds()
+		line := fmt.Sprintf("[%.2f --> %.2f]: %s", startSeconds, endSeconds, entry.Text)
+		lines = append(lines, line)
+	}
+
+	return strings.Join(lines, "\n")
 }
