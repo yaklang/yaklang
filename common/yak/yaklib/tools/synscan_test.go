@@ -1,9 +1,10 @@
 package tools
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestHostPortFilter(t *testing.T) {
@@ -23,6 +24,8 @@ func TestHostPortFilter(t *testing.T) {
 }
 
 func TestBasicSynScanIntegrate(t *testing.T) {
+	t.Skip("跳过测试：依赖外部IP 124.222.42.210，不符合测试不外连的原则")
+
 	//log.SetLevel(log.DebugLevel)
 	config := &_yakPortScanConfig{
 		waiting:           10 * time.Second,
