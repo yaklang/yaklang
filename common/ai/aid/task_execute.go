@@ -20,6 +20,9 @@ var (
 )
 
 func (t *aiTask) execute() error {
+	if t.config.IsCtxDone() {
+		return utils.Errorf("context is done")
+	}
 	t.config.memory.StoreCurrentTask(t)
 	// 生成初始执行任务的prompt
 	prompt, err := t.generateTaskPrompt()

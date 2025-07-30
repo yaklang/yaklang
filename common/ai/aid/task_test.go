@@ -1,7 +1,14 @@
 package aid
 
 import (
+	"context"
+	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -131,4 +138,99 @@ func TestAiTask_GenerateIndex(t *testing.T) {
 		assert.Equal(t, "1-2", sB.Index, "SB")
 		assert.Equal(t, "1-2-1", sB1.Index, "SB1")
 	})
+}
+
+func TestTaskCancel(t *testing.T) {
+	inputChan := make(chan *InputEvent, 3)
+	outputChan := make(chan *schema.AiOutputEvent)
+	ctx, cancel := context.WithCancel(context.Background())
+	coordinator, err := NewCoordinatorContext(
+		ctx,
+		"test",
+		WithEventInputChan(inputChan),
+		WithSystemFileOperator(),
+		WithEventHandler(func(event *schema.AiOutputEvent) {
+			outputChan <- event
+		}),
+		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+			rsp := config.NewAIResponse()
+			defer func() {
+				time.Sleep(100 * time.Millisecond)
+				rsp.Close()
+			}()
+			fmt.Println("===========" + "request:" + "===========\n" + request.GetPrompt())
+
+			if utils.MatchAllOfSubString(request.GetPrompt(), `["short_summary", "long_summary"]`) {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "short_summary": "short", "long_summary": "long"}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(request.GetPrompt(), `"@action"`, `"plan"`) {
+				rsp.EmitOutputStream(strings.NewReader(`
+{
+    "@action": "plan",
+    "query": "找出 /Users/v1ll4n/Projects/yaklang 目录中最大的文件",
+    "main_task": "在给定路径下寻找体积最大的文件",
+    "main_task_goal": "识别 /Users/v1ll4n/Projects/yaklang 目录中占用存储空间最多的文件，并展示其完整路径与大小信息",
+    "tasks": [
+        {
+            "subtask_name": "扫描目录结构",
+            "subtask_goal": "递归遍历 /Users/v1ll4n/Projects/yaklang 目录下所有文件，记录每个文件的位置和占用空间"
+        },
+        {
+            "subtask_name": "计算文件大小",
+            "subtask_goal": "遍历所有文件，计算每个文件的大小"
+        }
+    ]
+}
+			`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: now`, `"call-tool"`) {
+				t.Fatal("Unexpected tool call in test") // not allowed to this case after cancel
+				return rsp, nil
+			} else if utils.MatchAllOfSubString(request.GetPrompt(), `当前任务: "扫描目录结构"`) {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-tool", "tool": "now"}`))
+				cancel() // 模拟用户取消
+				return rsp, nil
+			}
+			rsp.EmitOutputStream(strings.NewReader(`TODO`))
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("NewCoordinator failed: %v", err)
+	}
+	go func() {
+		count := 0
+	LOOP:
+		for {
+			select {
+			case <-time.After(30 * time.Second):
+				break LOOP
+			case result := <-outputChan:
+				count++
+				if count > 100 {
+					break LOOP
+				}
+
+				if result.Type == schema.EVENT_TYPE_CONSUMPTION {
+					continue
+				}
+
+				fmt.Println("result:" + result.String())
+				if result.IsInteractive() {
+					inputChan <- &InputEvent{
+						Id: result.GetInteractiveId(),
+						Params: aitool.InvokeParams{
+							"suggestion": "continue",
+						},
+					}
+					continue
+				}
+			}
+		}
+	}()
+	_ = coordinator.Run()
 }

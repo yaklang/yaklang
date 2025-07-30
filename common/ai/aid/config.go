@@ -299,6 +299,15 @@ func (c *Config) GetOutputConsumption() int64 {
 	return atomic.LoadInt64(c.outputConsumption)
 }
 
+func (c *Config) IsCtxDone() bool {
+	select {
+	case <-c.ctx.Done():
+		return true
+	default:
+		return false
+	}
+}
+
 func (c *Config) SetSyncCallback(i SyncType, callback func() any) {
 	c.syncMutex.Lock()
 	defer c.syncMutex.Unlock()
