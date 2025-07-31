@@ -73,38 +73,6 @@ func lastIndex(s, sep string) int {
 	return -1
 }
 
-// IsValidPlatform 检查平台标识符是否有效
-func IsValidPlatform(platform string) bool {
-	validPlatforms := map[string]bool{
-		"windows-amd64": true,
-		"windows-386":   true,
-		"windows-arm64": true,
-		"linux-amd64":   true,
-		"linux-386":     true,
-		"linux-arm64":   true,
-		"linux-arm":     true,
-		"darwin-amd64":  true,
-		"darwin-arm64":  true,
-	}
-
-	return validPlatforms[platform]
-}
-
-// GetSupportedPlatforms 获取支持的平台列表
-func GetSupportedPlatforms() []string {
-	return []string{
-		"windows-amd64",
-		"windows-386",
-		"windows-arm64",
-		"linux-amd64",
-		"linux-386",
-		"linux-arm64",
-		"linux-arm",
-		"darwin-amd64",
-		"darwin-arm64",
-	}
-}
-
 // CleanupTempFiles 清理临时文件
 func CleanupTempFiles(patterns ...string) error {
 	for _, pattern := range patterns {
