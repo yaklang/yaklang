@@ -19,4 +19,51 @@ binaries:
         url: "https://yaklang.oss-cn-beijing.aliyuncs.com/vulinbox/latest/vulinbox_windows_amd64.exe"
         checksums: ""
         pick: ""  # 单个可执行文件，不需要从压缩包提取
-    dependencies: []
+  - name: "ffmpeg"
+    description: "FFmpeg - A complete, cross-platform solution to record, convert and stream audio and video"
+    version: "latest"
+    install_type: "bin"
+    download_info_map:
+      darwin-*:
+        url: "https://yaklang.oss-accelerate.aliyuncs.com/ffmpeg/ffmpeg-v6.0-darwin-amd64"
+        checksums: ""
+        pick: ""  # 单个可执行文件，不需要从压缩包提取
+      windows-*:
+        url: "https://yaklang.oss-accelerate.aliyuncs.com/ffmpeg/ffmpeg-v6.0-windows-amd64.exe"
+        checksums: ""
+        pick: ""  # 单个可执行文件，不需要从压缩包提取
+  - name: "llama-server"
+    description: "Llama Server - A server for running Llama models"
+    version: "latest"
+    install_type: "bin"
+    download_info_map:
+      darwin-amd64:
+        url: "https://github.com/ggml-org/llama.cpp/releases/download/b5702/llama-b5702-bin-macos-x64.zip"
+        pick: "build/bin/llama-server"
+        bin_path: "llama-server/llama-server"
+      darwin-arm64:
+        url: "https://github.com/ggml-org/llama.cpp/releases/download/b5712/llama-b5712-bin-macos-arm64.zip"
+        pick: "build/bin/llama-server"
+        bin_path: "llama-server/llama-server"
+      windows-amd64:
+        url: "https://github.com/ggml-org/llama.cpp/releases/download/b5702/llama-b5702-bin-win-cpu-x64.zip"
+        pick: "build/bin/llama-server.exe"
+      linux-amd64:
+        url: "https://github.com/ggml-org/llama.cpp/releases/download/b5702/llama-b5702-bin-ubuntu-x64.zip"
+        pick: "build/bin/llama-server"
+  - name: "model-Qwen3-Embedding-0.6B-Q8"
+    description: "Qwen3 Embedding model Q8_K_M"
+    version: "latest"
+    install_type: "bin"
+    download_info_map:
+      "*":
+        url: "https://oss-qn.yaklang.com/gguf/Qwen3-Embedding-0.6B-Q8_K_M.gguf"
+        bin_path: "aimodel/Qwen3-Embedding-0.6B-Q8_0.gguf"
+  - name: "model-Qwen3-Embedding-0.6B-Q4"
+    description: "Qwen3 Embedding model Q4_K_M"
+    version: "latest"
+    install_type: "bin"
+    download_info_map:
+      "*":
+        url: "https://oss-qn.yaklang.com/gguf/Qwen3-Embedding-0.6B-Q4_K_M.gguf"
+        bin_path: "aimodel/Qwen3-Embedding-0.6B-Q4_K_M.gguf"
