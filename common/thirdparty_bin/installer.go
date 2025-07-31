@@ -22,11 +22,11 @@ type Installer interface {
 	// Install 安装二进制文件（包含下载）
 	Install(descriptor *BinaryDescriptor, options *InstallOptions) error
 	// Uninstall 卸载二进制文件
-	Uninstall(name string) error
+	Uninstall(descriptor *BinaryDescriptor) error
 	// GetInstallPath 获取安装路径
-	GetInstallPath(name string) string
+	GetInstallPath(descriptor *BinaryDescriptor) string
 	// IsInstalled 检查是否已安装
-	IsInstalled(name string) bool
+	IsInstalled(descriptor *BinaryDescriptor) bool
 }
 
 // BaseInstaller 基础安装器
@@ -45,8 +45,8 @@ func NewInstaller(defaultInstallDir, downloadDir string) Installer {
 	}
 }
 
-func (bi *BaseInstaller) Uninstall(name string) error {
-	installPath := bi.GetInstallPath(name)
+func (bi *BaseInstaller) Uninstall(descriptor *BinaryDescriptor) error {
+	installPath := bi.GetInstallPath(descriptor)
 	return os.Remove(installPath)
 }
 
@@ -76,44 +76,44 @@ func (bi *BaseInstaller) findMatchingPlatform(downloadInfoMap map[string]*Downlo
 
 	return nil, "", utils.Errorf("no download info for platform %s", platformKey)
 }
+func (bi *BaseInstaller) GetDownloadInfo(descriptor *BinaryDescriptor) (*DownloadInfo, error) {
+	sysInfo := GetCurrentSystemInfo()
+	platformKey := sysInfo.GetPlatformKey()
+	downloadInfo, _, err := bi.findMatchingPlatform(descriptor.DownloadInfoMap, platformKey)
+	if err != nil {
+		return nil, err
+	}
+	return downloadInfo, nil
+}
 
 // Install 安装二进制文件
 func (bi *BaseInstaller) Install(descriptor *BinaryDescriptor, options *InstallOptions) error {
-	// 获取当前系统信息
-	sysInfo := GetCurrentSystemInfo()
-	platformKey := sysInfo.GetPlatformKey()
-
-	// 查找匹配的平台下载信息
-	downloadInfo, matchedPattern, err := bi.findMatchingPlatform(descriptor.DownloadInfoMap, platformKey)
+	downloadInfo, err := bi.GetDownloadInfo(descriptor)
 	if err != nil {
 		return err
 	}
 
-	log.Debugf("Using download info for platform pattern '%s' (matched '%s')", matchedPattern, platformKey)
-
 	// 判断是否安装
-	installed := bi.IsInstalled(descriptor.Name)
+	installed := bi.IsInstalled(descriptor)
 	if installed {
 		if options.Force {
-			err := bi.Uninstall(descriptor.Name)
+			err := bi.Uninstall(descriptor)
 			if err != nil {
 				return utils.Errorf("uninstall failed: %v", err)
 			}
 		} else {
-			log.Infof("binary %s already installed at %s", descriptor.Name, bi.GetInstallPath(descriptor.Name))
+			log.Infof("binary %s already installed at %s", descriptor.Name, bi.GetInstallPath(descriptor))
 			return nil
 		}
 	}
 
-	installPath := bi.GetInstallPath(descriptor.Name)
+	installPath := bi.GetInstallPath(descriptor)
 
 	// 确保安装目录存在
 	installDir := filepath.Dir(installPath)
 	if err := os.MkdirAll(installDir, 0755); err != nil {
 		return utils.Errorf("create install directory failed: %v", err)
 	}
-
-	log.Infof("installing binary %s for platform %s (using pattern %s)", descriptor.Name, platformKey, matchedPattern)
 
 	// 下载文件
 	downloadInfoURL := downloadInfo.URL
@@ -140,6 +140,8 @@ func (bi *BaseInstaller) Install(descriptor *BinaryDescriptor, options *InstallO
 	switch descriptor.InstallType {
 	case "archive":
 		return ExtractFile(filePath, installPath, descriptor.ArchiveType, pick)
+	case "bin":
+		return os.Rename(filePath, installPath)
 	default:
 		return utils.Errorf("unknown install type: %s", descriptor.InstallType)
 	}
@@ -147,13 +149,20 @@ func (bi *BaseInstaller) Install(descriptor *BinaryDescriptor, options *InstallO
 }
 
 // GetInstallPath 获取安装路径
-func (bi *BaseInstaller) GetInstallPath(name string) string {
-	return filepath.Join(bi.defaultInstallDir, name)
+func (bi *BaseInstaller) GetInstallPath(descriptor *BinaryDescriptor) string {
+	downloadInfo, err := bi.GetDownloadInfo(descriptor)
+	if err != nil {
+		return ""
+	}
+	if downloadInfo.BinPath != "" {
+		return filepath.Join(bi.defaultInstallDir, downloadInfo.BinPath)
+	}
+	return filepath.Join(bi.defaultInstallDir, descriptor.Name)
 }
 
 // IsInstalled 检查是否已安装
-func (bi *BaseInstaller) IsInstalled(name string) bool {
-	_, err := os.Stat(bi.GetInstallPath(name))
+func (bi *BaseInstaller) IsInstalled(descriptor *BinaryDescriptor) bool {
+	_, err := os.Stat(bi.GetInstallPath(descriptor))
 	return err == nil
 }
 
@@ -234,10 +243,10 @@ func (bi *BaseInstaller) downloadFile(url, filename string, options *InstallOpti
 			for {
 				select {
 				case <-ctx.Done():
-					options.Progress(prog.GetPercent(), int64(prog.Count), totalSize, "下载已取消")
+					options.Progress(prog.GetPercent(), int64(prog.Count), totalSize, "download cancelled")
 					return
 				case <-ticker.C:
-					options.Progress(prog.GetPercent(), int64(prog.Count), totalSize, "下载中...")
+					options.Progress(prog.GetPercent(), int64(prog.Count), totalSize, "downloading...")
 					if prog.GetPercent() >= 1 {
 						return
 					}
@@ -258,6 +267,8 @@ func (bi *BaseInstaller) downloadFile(url, filename string, options *InstallOpti
 		lowhttp.WithPacketBytes([]byte(getRequest)),
 		lowhttp.WithHttps(isHttps),
 		lowhttp.WithContext(ctx),
+		lowhttp.WithTryReadMultiResponse(false),
+		lowhttp.WithNoFixContentLength(true),
 	}
 
 	// 如果提供了代理，添加代理配置
@@ -289,7 +300,7 @@ func (bi *BaseInstaller) downloadFile(url, filename string, options *InstallOpti
 	}))
 
 	// 发送GET请求
-	_, err = lowhttp.HTTPWithoutRedirect(opts...)
+	_, err = lowhttp.HTTP(opts...)
 	if err != nil && downloadError == nil {
 		downloadError = utils.Errorf("HTTP request failed: %v", err)
 	}
@@ -322,7 +333,7 @@ func (bi *BaseInstaller) downloadFile(url, filename string, options *InstallOpti
 	}
 
 	if options != nil && options.Progress != nil {
-		options.Progress(1.0, totalSize, totalSize, "下载完成")
+		options.Progress(1.0, totalSize, totalSize, "download completed")
 	}
 
 	log.Infof("file downloaded successfully: %s", filePath)
@@ -342,11 +353,15 @@ func (bi *BaseInstaller) getFileSize(url string, options *InstallOptions) (int64
 		return 0, utils.Errorf("parse URL failed: %v", err)
 	}
 
+	headRequest = lowhttp.ReplaceHTTPPacketHeader([]byte(headRequest), "Accept", "*/*")
+
 	// 配置lowhttp选项
 	opts := []lowhttp.LowhttpOpt{
 		lowhttp.WithPacketBytes([]byte(headRequest)),
 		lowhttp.WithHttps(isHttps),
 		lowhttp.WithContext(ctx),
+		lowhttp.WithTryReadMultiResponse(false),
+		lowhttp.WithNoFixContentLength(true),
 	}
 
 	// 如果提供了代理，添加代理配置
@@ -355,7 +370,7 @@ func (bi *BaseInstaller) getFileSize(url string, options *InstallOptions) (int64
 	}
 
 	// 发送HEAD请求
-	rsp, err := lowhttp.HTTPWithoutRedirect(opts...)
+	rsp, err := lowhttp.HTTP(opts...)
 	if err != nil {
 		return 0, utils.Errorf("HEAD request failed: %v", err)
 	}

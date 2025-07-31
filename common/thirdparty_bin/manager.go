@@ -2,7 +2,9 @@ package thirdparty_bin
 
 import (
 	"context"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
 
@@ -10,12 +12,25 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// ProcessCallback 进程回调函数类型
+type ProcessCallback func(reader io.Reader)
+
+// RunningProcess 运行中的进程信息
+type RunningProcess struct {
+	Name     string
+	Cmd      *exec.Cmd
+	Cancel   context.CancelFunc
+	Callback ProcessCallback
+}
+
 // Manager 二进制文件管理器
 type Manager struct {
 	// 注册的二进制文件描述符
 	registry map[string]*BinaryDescriptor
 	// 安装器
 	installer Installer
+	// 运行中的进程
+	runningProcesses map[string]*RunningProcess
 	// 读写锁
 	mutex sync.RWMutex
 }
@@ -38,8 +53,9 @@ func NewManager(installDir string) (*Manager, error) {
 	}
 
 	manager := &Manager{
-		registry:  make(map[string]*BinaryDescriptor),
-		installer: NewInstaller(installDir, downloadDir),
+		registry:         make(map[string]*BinaryDescriptor),
+		installer:        NewInstaller(installDir, downloadDir),
+		runningProcesses: make(map[string]*RunningProcess),
 	}
 
 	return manager, nil
@@ -111,7 +127,7 @@ func (m *Manager) Install(name string, options *InstallOptions) error {
 	}
 
 	// 确保文件具有执行权限
-	installPath := m.installer.GetInstallPath(name)
+	installPath := m.installer.GetInstallPath(descriptor)
 	if err := EnsureExecutable(installPath); err != nil {
 		log.Warnf("set executable permission failed: %v", err)
 	}
@@ -123,14 +139,14 @@ func (m *Manager) Install(name string, options *InstallOptions) error {
 // Uninstall 卸载二进制文件
 func (m *Manager) Uninstall(name string, installPath ...string) error {
 	m.mutex.RLock()
-	_, exists := m.registry[name]
+	descriptor, exists := m.registry[name]
 	m.mutex.RUnlock()
 
 	if !exists {
 		return utils.Errorf("binary %s not registered", name)
 	}
 
-	return m.installer.Uninstall(name)
+	return m.installer.Uninstall(descriptor)
 }
 
 // List 列出所有注册的二进制文件
@@ -161,6 +177,26 @@ func (m *Manager) GetBinary(name string) (*BinaryDescriptor, error) {
 	return &descriptorCopy, nil
 }
 
+// GetBinaryPath 获取二进制文件的安装路径
+func (m *Manager) GetBinaryPath(name string) (string, error) {
+	m.mutex.RLock()
+	descriptor, exists := m.registry[name]
+	m.mutex.RUnlock()
+
+	if !exists {
+		return "", utils.Errorf("binary %s not registered", name)
+	}
+
+	// 检查是否已安装
+	if !m.installer.IsInstalled(descriptor) {
+		return "", utils.Errorf("binary %s not installed", name)
+	}
+
+	// 返回安装路径
+	installPath := m.installer.GetInstallPath(descriptor)
+	return installPath, nil
+}
+
 // GetStatus 获取二进制文件状态
 func (m *Manager) GetStatus(name string) (*BinaryStatus, error) {
 	m.mutex.RLock()
@@ -171,8 +207,8 @@ func (m *Manager) GetStatus(name string) (*BinaryStatus, error) {
 		return nil, utils.Errorf("binary %s not registered", name)
 	}
 
-	installPath := m.installer.GetInstallPath(name)
-	installed := m.installer.IsInstalled(name)
+	installPath := m.installer.GetInstallPath(descriptor)
+	installed := m.installer.IsInstalled(descriptor)
 
 	status := &BinaryStatus{
 		Name:             name,
@@ -227,8 +263,183 @@ func (m *Manager) InstallDependencies(name string, options *InstallOptions) erro
 	return nil
 }
 
+// Start 启动二进制程序
+func (m *Manager) Start(ctx context.Context, name string, args []string, callback ProcessCallback) error {
+	// 检查是否已注册
+	m.mutex.RLock()
+	descriptor, exists := m.registry[name]
+	m.mutex.RUnlock()
+
+	if !exists {
+		return utils.Errorf("binary %s not registered", name)
+	}
+
+	// 检查是否已安装
+	if !m.installer.IsInstalled(descriptor) {
+		return utils.Errorf("binary %s not installed", name)
+	}
+
+	// 检查是否已在运行
+	m.mutex.Lock()
+	if _, running := m.runningProcesses[name]; running {
+		m.mutex.Unlock()
+		return utils.Errorf("binary %s is already running", name)
+	}
+	m.mutex.Unlock()
+
+	// 获取可执行文件路径
+	execPath := m.installer.GetInstallPath(descriptor)
+
+	// 创建带取消功能的上下文
+	processCtx, cancel := context.WithCancel(ctx)
+
+	// 创建命令
+	cmd := exec.CommandContext(processCtx, execPath, args...)
+
+	// 设置输出管道
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		cancel()
+		return utils.Errorf("create stdout pipe failed: %v", err)
+	}
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		cancel()
+		return utils.Errorf("create stderr pipe failed: %v", err)
+	}
+
+	// 启动进程
+	if err := cmd.Start(); err != nil {
+		cancel()
+		return utils.Errorf("start process failed: %v", err)
+	}
+
+	// 创建运行进程信息
+	runningProcess := &RunningProcess{
+		Name:     name,
+		Cmd:      cmd,
+		Cancel:   cancel,
+		Callback: callback,
+	}
+
+	// 添加到运行列表
+	m.mutex.Lock()
+	m.runningProcesses[name] = runningProcess
+	m.mutex.Unlock()
+
+	// 启动输出处理goroutine
+	go func() {
+		defer func() {
+			// 进程结束时清理
+			m.mutex.Lock()
+			delete(m.runningProcesses, name)
+			m.mutex.Unlock()
+			cancel()
+		}()
+
+		// 合并stdout和stderr
+		if callback != nil {
+			// 创建多路复用Reader
+			multiReader := io.MultiReader(stdout, stderr)
+			callback(multiReader)
+		}
+
+		// 等待进程结束
+		if err := cmd.Wait(); err != nil {
+			log.Warnf("process %s exited with error: %v", name, err)
+		} else {
+			log.Infof("process %s exited successfully", name)
+		}
+	}()
+
+	log.Infof("binary %s started with PID %d", name, cmd.Process.Pid)
+	return nil
+}
+
+// Stop 停止二进制程序
+func (m *Manager) Stop(name string) error {
+	m.mutex.Lock()
+	runningProcess, exists := m.runningProcesses[name]
+	if !exists {
+		m.mutex.Unlock()
+		return utils.Errorf("binary %s is not running", name)
+	}
+	delete(m.runningProcesses, name)
+	m.mutex.Unlock()
+
+	// 取消上下文，这会发送SIGTERM信号
+	runningProcess.Cancel()
+
+	// 等待进程结束
+	if runningProcess.Cmd.Process != nil {
+		if err := runningProcess.Cmd.Wait(); err != nil {
+			log.Warnf("process %s stopped with error: %v", name, err)
+		}
+	}
+
+	log.Infof("binary %s stopped", name)
+	return nil
+}
+
+// StopAll 停止所有运行中的二进制程序
+func (m *Manager) StopAll() {
+	m.mutex.RLock()
+	runningNames := make([]string, 0, len(m.runningProcesses))
+	for name := range m.runningProcesses {
+		runningNames = append(runningNames, name)
+	}
+	m.mutex.RUnlock()
+
+	for _, name := range runningNames {
+		if err := m.Stop(name); err != nil {
+			log.Warnf("stop %s failed: %v", name, err)
+		}
+	}
+}
+
+// GetRunningBinaries 获取所有运行中的二进制程序名称
+func (m *Manager) GetRunningBinaries() []string {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	names := make([]string, 0, len(m.runningProcesses))
+	for name := range m.runningProcesses {
+		names = append(names, name)
+	}
+
+	return names
+}
+
+// IsRunning 检查指定的二进制程序是否正在运行
+func (m *Manager) IsRunning(name string) bool {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	_, exists := m.runningProcesses[name]
+	return exists
+}
+
+// GetRunningProcess 获取运行中的进程信息
+func (m *Manager) GetRunningProcess(name string) (*RunningProcess, error) {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	process, exists := m.runningProcesses[name]
+	if !exists {
+		return nil, utils.Errorf("binary %s is not running", name)
+	}
+
+	// 返回副本以避免并发修改
+	processCopy := *process
+	return &processCopy, nil
+}
+
 // Close 关闭管理器，清理资源
 func (m *Manager) Close() error {
+	// 停止所有运行中的进程
+	m.StopAll()
+
 	// 获取下载目录并清理临时文件
 	downloadDir, err := GetDefaultDownloadDir()
 	if err != nil {
@@ -277,4 +488,59 @@ func GetStatus(name string) (*BinaryStatus, error) {
 		return nil, utils.Error("default manager not initialized")
 	}
 	return DefaultManager.GetStatus(name)
+}
+
+// Start 使用默认管理器启动二进制程序
+func Start(ctx context.Context, name string, args []string, callback ProcessCallback) error {
+	if DefaultManager == nil {
+		return utils.Error("default manager not initialized")
+	}
+	return DefaultManager.Start(ctx, name, args, callback)
+}
+
+// Stop 使用默认管理器停止二进制程序
+func Stop(name string) error {
+	if DefaultManager == nil {
+		return utils.Error("default manager not initialized")
+	}
+	return DefaultManager.Stop(name)
+}
+
+// StopAll 使用默认管理器停止所有运行中的二进制程序
+func StopAll() {
+	if DefaultManager != nil {
+		DefaultManager.StopAll()
+	}
+}
+
+// GetRunningBinaries 使用默认管理器获取所有运行中的二进制程序名称
+func GetRunningBinaries() []string {
+	if DefaultManager == nil {
+		return []string{}
+	}
+	return DefaultManager.GetRunningBinaries()
+}
+
+// IsRunning 使用默认管理器检查指定的二进制程序是否正在运行
+func IsRunning(name string) bool {
+	if DefaultManager == nil {
+		return false
+	}
+	return DefaultManager.IsRunning(name)
+}
+
+// GetRunningProcess 使用默认管理器获取运行中的进程信息
+func GetRunningProcess(name string) (*RunningProcess, error) {
+	if DefaultManager == nil {
+		return nil, utils.Error("default manager not initialized")
+	}
+	return DefaultManager.GetRunningProcess(name)
+}
+
+// GetBinaryPath 使用默认管理器获取二进制文件的安装路径
+func GetBinaryPath(name string) (string, error) {
+	if DefaultManager == nil {
+		return "", utils.Error("default manager not initialized")
+	}
+	return DefaultManager.GetBinaryPath(name)
 }
