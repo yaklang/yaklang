@@ -1795,12 +1795,12 @@ func MatchColor(m []*YakFuzzerMatcher, rsp *httptpl.RespForMatch, vars map[strin
 
 		if CheckShouldDiscard(flowMatcher.Action, res) { // if should discard, return directly
 			matched = res
-			if res && flowMatcher.Color != "" {
+			if res {
 				hitColor = append(hitColor, flowMatcher.Color)
 			}
 			discard = true
 			return
-		} else if res && flowMatcher.Color != "" { // has not action and match success ,update match info
+		} else if res { // has not action and match success ,update match info
 			matched = true
 			hitColor = append(hitColor, flowMatcher.Color)
 		}
