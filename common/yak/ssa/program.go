@@ -300,6 +300,10 @@ func (prog *Program) GetFrontValueByOffset(searchOffset int) (offset int, value 
 	return offset, value
 }
 
+func (p *Program) ShouldVisit(path string) bool {
+	return p.editorMap.Have(path)
+}
+
 func (p *Program) GetEditor(url string) (*memedit.MemEditor, bool) {
 	return p.editorMap.Get(url)
 }

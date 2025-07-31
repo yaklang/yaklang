@@ -54,13 +54,14 @@ func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 	if err != nil {
 		return utils.Errorf("parse file %s error: %v", filename, err)
 	}
+	mainProgram.SetEditor(filename, editor)
 	languageBuilder.PreHandlerFile(ast, editor, builder)
 	program.SetPreHandler(false)
 	err = mainProgram.Build(ast, editor, builder)
 	if err != nil {
 		return err
 	}
-	mainProgram.LazyBuild()
+	program.LazyBuild()
 	builder.Finish()
 	b.includeStack.Push(program)
 	return nil
