@@ -63,16 +63,10 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 		}
 	}()
 
-	// 启用tracing
-	err = traceStream.Send(&ypb.PluginTraceRequest{
-		ControlMode:   "set_tracing",
-		EnableTracing: true,
-	})
-	require.NoError(t, err)
-
 	// 启动stream
 	err = traceStream.Send(&ypb.PluginTraceRequest{
-		ControlMode: "start_stream",
+		ControlMode:   "start_stream",
+		EnableTracing: true,
 	})
 	require.NoError(t, err)
 
@@ -89,9 +83,7 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	}
 
 	// 等待第一个响应
-	waitForResponse("tracing_status")
-	// 等待第二个响应
-	waitForResponse("trace_list")
+	waitForResponse("control_result")
 
 	err = testCaller.LoadPluginEx(traceCtx, testScript)
 	require.NoError(t, err)
@@ -226,19 +218,13 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 
 	// 启用tracing和stream
 	err = traceStream.Send(&ypb.PluginTraceRequest{
-		ControlMode:   "set_tracing",
+		ControlMode:   "start_stream",
 		EnableTracing: true,
 	})
 	require.NoError(t, err)
 
-	err = traceStream.Send(&ypb.PluginTraceRequest{
-		ControlMode: "start_stream",
-	})
-	require.NoError(t, err)
-
 	// 等待初始响应
-	<-traceResponses // tracing_status
-	<-traceResponses // trace_list
+	<-traceResponses // control_result
 
 	err = testCaller.LoadPluginEx(traceCtx, testScript)
 	require.NoError(t, err)
@@ -325,19 +311,13 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 
 	// 启用tracing和stream
 	err = traceStream.Send(&ypb.PluginTraceRequest{
-		ControlMode:   "set_tracing",
+		ControlMode:   "start_stream",
 		EnableTracing: true,
 	})
 	require.NoError(t, err)
 
-	err = traceStream.Send(&ypb.PluginTraceRequest{
-		ControlMode: "start_stream",
-	})
-	require.NoError(t, err)
-
 	// 等待初始响应
-	<-traceResponses // tracing_status
-	<-traceResponses // trace_list
+	<-traceResponses // control_result
 
 	err = testCaller.LoadPluginEx(traceCtx, testScript)
 	require.NoError(t, err)
@@ -432,19 +412,13 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 
 	// 启用tracing和stream
 	err = traceStream.Send(&ypb.PluginTraceRequest{
-		ControlMode:   "set_tracing",
+		ControlMode:   "start_stream",
 		EnableTracing: true,
 	})
 	require.NoError(t, err)
 
-	err = traceStream.Send(&ypb.PluginTraceRequest{
-		ControlMode: "start_stream",
-	})
-	require.NoError(t, err)
-
 	// 等待初始响应
-	<-traceResponses // tracing_status
-	<-traceResponses // trace_list
+	<-traceResponses // control_result
 
 	// 加载插件
 	err = testCaller.LoadPluginEx(traceCtx, longPlugin)
@@ -560,21 +534,15 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 		}
 	}()
 
-	// 启用tracing和stream
+	// 启用stream
 	err = traceStream.Send(&ypb.PluginTraceRequest{
-		ControlMode:   "set_tracing",
+		ControlMode:   "start_stream",
 		EnableTracing: true,
 	})
 	require.NoError(t, err)
 
-	err = traceStream.Send(&ypb.PluginTraceRequest{
-		ControlMode: "start_stream",
-	})
-	require.NoError(t, err)
-
 	// 等待初始响应
-	<-traceResponses // tracing_status
-	<-traceResponses // trace_list
+	<-traceResponses // control_result
 
 	err = testCaller.LoadPluginEx(traceCtx, testScript)
 	require.NoError(t, err)
@@ -660,19 +628,13 @@ func TestGRPCMUSTPASS_PluginTraceInvalidCancelRequest(t *testing.T) {
 
 	// 启用tracing和stream
 	err = traceStream.Send(&ypb.PluginTraceRequest{
-		ControlMode:   "set_tracing",
+		ControlMode:   "start_stream",
 		EnableTracing: true,
 	})
 	require.NoError(t, err)
 
-	err = traceStream.Send(&ypb.PluginTraceRequest{
-		ControlMode: "start_stream",
-	})
-	require.NoError(t, err)
-
 	// 等待初始响应
-	<-traceResponses // tracing_status
-	<-traceResponses // trace_list
+	<-traceResponses // control_result
 
 	// 发送无效的取消请求
 	err = traceStream.Send(&ypb.PluginTraceRequest{
@@ -724,8 +686,8 @@ func TestGRPCMUSTPASS_PluginTraceWithoutMITM(t *testing.T) {
 	// 应该收到空的trace列表
 	select {
 	case resp := <-traceResponses:
-		assert.Equal(t, "trace_update", resp.ResponseType)
-		assert.Len(t, resp.Traces, 0, "未启动MITM时应该返回空trace列表")
+		assert.Equal(t, "control_result", resp.ResponseType)
+		assert.Equal(t, resp.Success, false, "未启动MITM时应该返回control_result且success为false")
 	case <-time.After(3 * time.Second):
 		t.Fatal("未收到初始响应")
 	}
@@ -792,13 +754,8 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 
 	// 启用tracing和stream
 	err = traceStream.Send(&ypb.PluginTraceRequest{
-		ControlMode:   "set_tracing",
+		ControlMode:   "start_stream",
 		EnableTracing: true,
-	})
-	require.NoError(t, err)
-
-	err = traceStream.Send(&ypb.PluginTraceRequest{
-		ControlMode: "start_stream",
 	})
 	require.NoError(t, err)
 
@@ -919,13 +876,8 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 
 	// 启用tracing和stream
 	err = traceStream.Send(&ypb.PluginTraceRequest{
-		ControlMode:   "set_tracing",
+		ControlMode:   "start_stream",
 		EnableTracing: true,
-	})
-	require.NoError(t, err)
-
-	err = traceStream.Send(&ypb.PluginTraceRequest{
-		ControlMode: "start_stream",
 	})
 	require.NoError(t, err)
 
