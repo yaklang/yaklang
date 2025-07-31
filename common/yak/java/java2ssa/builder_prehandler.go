@@ -14,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"golang.org/x/exp/slices"
 )
 
@@ -39,10 +38,10 @@ func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 }
 
 func (s *SSABuilder) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	builder.GetProgram().GetApplication().Build(ast, "", editor, builder)
+	builder.GetProgram().GetApplication().Build(ast, editor, builder)
 }
 
-func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST, fb *ssa.FunctionBuilder, path string) error {
+func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST, fb *ssa.FunctionBuilder, editor *memedit.MemEditor) error {
 	prog := fb.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")
@@ -52,18 +51,12 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 		prog.ExtraFile = make(map[string]string)
 	}
 
-	dirname, filename := fileSystem.PathSplit(path)
+	filename := editor.GetFilename()
 	// pom.xml
 	if strings.TrimLeft(filename, string(fileSystem.GetSeparators())) == "pom.xml" {
-		raw, err := fileSystem.ReadFile(path)
-		if err != nil {
-			log.Warnf("read pom.xml error: %v", err)
-			return nil
-		}
-		editor := memedit.NewMemEditorWithFileUrl(string(raw), path)
 		fb.SetEditor(editor)
 		vfs := filesys.NewVirtualFs()
-		vfs.AddFile(filename, string(raw))
+		vfs.AddFile(filename, editor.GetSourceCode())
 		pkgs, err := sca.ScanFilesystem(vfs)
 		if err != nil {
 			log.Warnf("scan pom.xml error: %v", err)
@@ -73,114 +66,68 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 		fb.GenerateDependence(pkgs, filename)
 	}
 
-	saveExtraFile := func(path string, raw []byte) {
+	saveExtraFile := func(path string) {
 		if prog.GetProgramName() == "" {
-			prog.ExtraFile[path] = string(raw)
+			prog.ExtraFile[path] = editor.GetIrSourceHash()
 		} else {
-			folders := strings.Split(dirname, string(fileSystem.GetSeparators()))
-			content := string(raw)
-			prog.ExtraFile[path] = ssadb.SaveFile(filename, content, prog.GetProgramName(), folders)
+			prog.ExtraFile[path] = editor.GetIrSourceHash()
 		}
 	}
-
+	path := editor.GetUrl()
 	switch strings.ToLower(fileSystem.Ext(path)) {
 	case ".java":
-		raw, err := fileSystem.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		data := string(raw)
-
-		prog.Build(ast, path, memedit.NewMemEditor(data), fb)
+		prog.Build(ast, editor, fb)
 	case ".jpg", ".png", ".gif", ".jpeg", ".css", ".js", ".avi", ".mp4", ".mp3", ".pdf", ".doc":
 		return nil
-	case ".jsp":
-		raw, err := fileSystem.ReadFile(path)
-		if err != nil {
+
+	case ".properties":
+		saveExtraFile(path)
+		if err := prog.ParseProjectConfig([]byte(editor.GetSourceCode()), path, ssa.PROJECT_CONFIG_PROPERTIES); err != nil {
 			return err
 		}
-		saveExtraFile(path, raw)
-		var info tl.TemplateGeneratedInfo
-		info, err = tj.ConvertTemplateToJava(tj.JSP, string(raw), path)
+	case ".yaml", ".yml":
+		saveExtraFile(path)
+		if err := prog.ParseProjectConfig([]byte(editor.GetSourceCode()), path, ssa.PROJECT_CONFIG_YAML); err != nil {
+			return err
+		}
+	case ".jsp":
+		info, err := tj.ConvertTemplateToJava(tj.JSP, editor.GetSourceCode(), path)
 		if err != nil {
 			return utils.Errorf("convert jsp to java error: %v", err)
 		}
 		prog.SetTemplate(path, info)
-		saveExtraFile(path, raw)
 		ast, err := s.ParseAST(info.GetContent())
 		if err != nil {
 			return err
 		}
-		err = prog.Build(ast, path, memedit.NewMemEditor(info.GetContent()), fb)
-		if err != nil {
-			return err
-		}
-	case ".properties":
-		raw, err := fileSystem.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		saveExtraFile(path, raw)
-		err = prog.ParseProjectConfig(raw, path, ssa.PROJECT_CONFIG_PROPERTIES)
-		if err != nil {
-			return err
-		}
-	case ".yaml", ".yml":
-		raw, err := fileSystem.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		saveExtraFile(path, raw)
-		err = prog.ParseProjectConfig(raw, path, ssa.PROJECT_CONFIG_YAML)
+		editor := memedit.NewMemEditor(info.GetContent())
+		err = prog.Build(ast, editor, fb)
 		if err != nil {
 			return err
 		}
 	default:
-		fs, err := fileSystem.Open(path)
-		if err != nil {
-			log.Warnf("open file %s error: %v", path, err)
-			return nil
-		}
-
 		if isFreemarkerFile(prog, path) {
-			raw, err := fileSystem.ReadFile(path)
-			if err != nil {
-				return err
-			}
-			saveExtraFile(path, raw)
 			var info tl.TemplateGeneratedInfo
-			info, err = tj.ConvertTemplateToJava(tj.Freemarker, string(raw), path)
+			info, err := tj.ConvertTemplateToJava(tj.Freemarker, editor.GetSourceCode(), path)
 			if err != nil {
 				return utils.Errorf("convert freemarker to java error: %v", err)
 			}
 			prog.SetTemplate(path, info)
-			saveExtraFile(path, raw)
+			saveExtraFile(path)
 			ast, err := s.ParseAST(info.GetContent())
 			if err != nil {
 				return err
 			}
 
-			err = prog.Build(ast, path, memedit.NewMemEditor(info.GetContent()), fb)
+			err = prog.Build(ast, memedit.NewMemEditor(info.GetContent()), fb)
 			if err != nil {
 				return err
 			}
 			return nil
 		}
-
-		info, err := fs.Stat()
-		if err != nil {
-			return nil
-		}
-		if info.Size() > 10*1024*1024 {
-			log.Warnf("too large file: %s, skip it.", path)
-		}
-
-		raw, err := fileSystem.ReadFile(path)
-		if err != nil {
-			log.Warnf("read file %s error: %v", path, err)
-			return nil
-		}
-		saveExtraFile(path, raw)
+		saveExtraFile(path)
 	}
 	return nil
 }
+
+const maxFileSize = 10 * 1024 * 1024 // 10MB

@@ -82,7 +82,7 @@ func languageServerAnalyzeFromDatabase(req *ypb.YaklangLanguageSuggestionRequest
 	ret.Word = SSARange.GetText()
 
 	// value
-	valueID, err := ssadb.GetValueBeforeEndOffset(ssadb.GetDB(), SSARange, programName)
+	valueID, err := ssadb.GetValueBeforeEndOffset(ssadb.GetDB(), SSARange)
 	if err != nil {
 		return ret, err
 	}

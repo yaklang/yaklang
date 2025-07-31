@@ -13,7 +13,7 @@ type PreHandlerAnalyzer interface {
 	FilterPreHandlerFile(string) bool
 
 	ParseAST(string) (FrontAST, error)
-	PreHandlerProject(fi.FileSystem, FrontAST, *FunctionBuilder, string) error
+	PreHandlerProject(fi.FileSystem, FrontAST, *FunctionBuilder, *memedit.MemEditor) error
 	PreHandlerFile(FrontAST, *memedit.MemEditor, *FunctionBuilder)
 
 	AfterPreHandlerProject(builder *FunctionBuilder)
@@ -91,6 +91,6 @@ func (d *PreHandlerInit) FilterPreHandlerFile(string) bool {
 	return false
 }
 
-func (d *PreHandlerInit) PreHandlerProject(fi.FileSystem, FrontAST, *FunctionBuilder, string) error {
+func (d *PreHandlerInit) PreHandlerProject(fi.FileSystem, FrontAST, *FunctionBuilder, *memedit.MemEditor) error {
 	return nil
 }

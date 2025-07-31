@@ -8,7 +8,6 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/databasex"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -25,11 +24,14 @@ type ProgramCache struct {
 	InstructionCache Cache[Instruction]
 	TypeCache        Cache[Type]
 
-	VariableIndex InstructionsIndex
-	MemberIndex   InstructionsIndex
-	ClassIndex    InstructionsIndex
-	ConstCache    InstructionsIndex
-	OffsetCache   *databasex.Save[*ssadb.IrOffset]
+	VariableIndex SimpleCache[Instruction]
+	MemberIndex   SimpleCache[Instruction]
+	ClassIndex    SimpleCache[Instruction]
+	ConstCache    SimpleCache[Instruction]
+
+	indexCache  SimpleCache[*ssadb.IrIndex]
+	offsetCache SimpleCache[*ssadb.IrOffset]
+	editorCache SimpleCache[*ssadb.IrSource]
 
 	afterSaveNotify func(int)
 
@@ -90,7 +92,9 @@ func (c *ProgramCache) SetInstruction(inst Instruction) {
 		log.Errorf("BUG: SetInstruction called with nil instruction")
 		return
 	}
-	c.OffsetCache.Save(ConvertValue2Offset(inst))
+	if !utils.IsNil(c.offsetCache) {
+		c.offsetCache.Add("", ConvertValue2Offset(inst))
+	}
 	c.InstructionCache.Set(inst)
 }
 
@@ -192,7 +196,9 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) {
 		c.ConstCache.Close()
 	}
 	f8 := func() {
-		c.OffsetCache.Close()
+		c.offsetCache.Close()
+		c.editorCache.Close()
+		c.indexCache.Close()
 	}
 	f9 := func() {
 		log.Info("wait for type and instruction save...")

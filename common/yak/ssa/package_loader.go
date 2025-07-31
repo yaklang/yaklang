@@ -56,7 +56,7 @@ func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 	}
 	languageBuilder.PreHandlerFile(ast, editor, builder)
 	program.SetPreHandler(false)
-	err = mainProgram.Build(ast, filename, editor, builder)
+	err = mainProgram.Build(ast, editor, builder)
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name []string, once bool) (*Prog
 		// var build
 		build := app.Build
 		if build != nil {
-			err = build(ast, v.FileName, memedit.NewMemEditor(string(raw)), b)
+			err = build(ast, memedit.NewMemEditor(string(raw)), b)
 		} else {
 			log.Errorf("BUG: Build function is nil in package %s", p.Name)
 		}

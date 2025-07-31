@@ -7,77 +7,77 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-type InstructionsIndex interface {
-	Delete(string, Instruction)
-	Add(string, Instruction)
-	ForEach(func(string, []Instruction))
+type SimpleCache[T comparable] interface {
+	Delete(string, T)
+	Add(string, T)
+	ForEach(func(string, []T))
 	Close()
 }
 
-var _ InstructionsIndex = (*InstructionsIndexMem)(nil)
-var _ InstructionsIndex = (*InstructionsIndexDB)(nil)
+var _ SimpleCache[any] = (*simpleCacheMemory[any])(nil)
+var _ SimpleCache[any] = (*simpleCacheDB[any])(nil)
 
-type InstructionsIndexMem struct {
-	name         string
-	instructions *utils.SafeMapWithKey[string, []Instruction]
+type simpleCacheMemory[T comparable] struct {
+	name  string
+	cache *utils.SafeMapWithKey[string, []T]
 }
 
-func NewInstructionsIndexMem(name string) *InstructionsIndexMem {
-	return &InstructionsIndexMem{
-		name:         name,
-		instructions: utils.NewSafeMapWithKey[string, []Instruction](),
+func NewSimpleCacheMemory[T comparable](name string) *simpleCacheMemory[T] {
+	return &simpleCacheMemory[T]{
+		name:  name,
+		cache: utils.NewSafeMapWithKey[string, []T](),
 	}
 }
 
-func (c *InstructionsIndexMem) Delete(key string, inst Instruction) {
-	data, ok := c.instructions.Get(key)
+func (c *simpleCacheMemory[T]) Delete(key string, inst T) {
+	data, ok := c.cache.Get(key)
 	if !ok {
 		return
 	}
 	data = utils.RemoveSliceItem(data, inst)
-	c.instructions.Set(key, data)
+	c.cache.Set(key, data)
 	return
 }
 
-func (c *InstructionsIndexMem) Add(key string, inst Instruction) {
-	data, ok := c.instructions.Get(key)
+func (c *simpleCacheMemory[T]) Add(key string, inst T) {
+	data, ok := c.cache.Get(key)
 	if !ok {
-		data = make([]Instruction, 0)
+		data = make([]T, 0)
 	}
 	data = append(data, inst)
-	c.instructions.Set(key, data)
+	c.cache.Set(key, data)
 }
 
-func (c *InstructionsIndexMem) ForEach(f func(string, []Instruction)) {
-	c.instructions.ForEach(func(key string, value []Instruction) bool {
+func (c *simpleCacheMemory[T]) ForEach(f func(string, []T)) {
+	c.cache.ForEach(func(key string, value []T) bool {
 		f(key, value)
 		return true
 	})
 }
 
-func (c *InstructionsIndexMem) Close() {}
+func (c *simpleCacheMemory[T]) Close() {}
 
-type InstructionsIndexItem struct {
-	Name string
-	Inst Instruction
+type simpleCacheItem[T comparable] struct {
+	Name  string
+	Value T
 }
-type InstructionsIndexDB struct {
-	save *databasex.Save[InstructionsIndexItem]
+type simpleCacheDB[T comparable] struct {
+	save *databasex.Save[simpleCacheItem[T]]
 }
 
 const (
 	IndexSaveSize = 2000
 )
 
-func NewInstructionsIndexDB(
+func NewSimpleCacheDB[T comparable](
 	name string,
 	saveSize int,
-	save func([]InstructionsIndexItem),
-) *InstructionsIndexDB {
+	save func([]simpleCacheItem[T]),
+) *simpleCacheDB[T] {
 	if saveSize < IndexSaveSize {
 		saveSize = IndexSaveSize // Ensure minimum save size
 	}
-	return &InstructionsIndexDB{
+	return &simpleCacheDB[T]{
 		save: databasex.NewSave(
 			save,
 			databasex.WithName(name),
@@ -87,104 +87,121 @@ func NewInstructionsIndexDB(
 	}
 }
 
-func (c *InstructionsIndexDB) Delete(key string, inst Instruction) {
+func (c *simpleCacheDB[T]) Delete(key string, inst T) {
 	// Implement database deletion logic here
 	return
 }
 
-func (c *InstructionsIndexDB) Add(key string, inst Instruction) {
-	// return c.save(key, inst)
-	c.save.Save(InstructionsIndexItem{
-		Name: key,
-		Inst: inst,
+func (c *simpleCacheDB[T]) Add(key string, value T) {
+	if utils.IsNil(value) {
+		return
+	}
+	c.save.Save(simpleCacheItem[T]{
+		Name:  key,
+		Value: value,
 	})
 }
 
-func (c *InstructionsIndexDB) ForEach(f func(string, []Instruction)) {
+func (c *simpleCacheDB[T]) ForEach(f func(string, []T)) {
 	// Implement database iteration logic here
 	return
 }
 
-func (c *InstructionsIndexDB) Close() {
+func (c *simpleCacheDB[T]) Close() {
 	c.save.Close()
 }
 
-func NewInstructionIndex(kind ProgramCacheKind, name string, saveSize int, saveFunc func([]InstructionsIndexItem)) InstructionsIndex {
+func NewSimpleCache[T comparable](kind ProgramCacheKind, name string, saveSize int, saveFunc func([]simpleCacheItem[T])) SimpleCache[T] {
 	if kind != ProgramCacheMemory {
-		return NewInstructionsIndexDB(name, saveSize, saveFunc)
+		return NewSimpleCacheDB[T](name, saveSize, saveFunc)
 	} else {
-		return NewInstructionsIndexMem(name)
+		return NewSimpleCacheMemory[T](name)
 	}
 }
 
 func (c *ProgramCache) initIndex(databaseKind ProgramCacheKind, saveSize int) {
-	offsetSaver := databasex.NewSave(func(t []*ssadb.IrOffset) {
-		utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
-			for _, item := range t {
-				ssadb.SaveIrOffset(tx, item)
-			}
-			return nil
-		})
-	}, databasex.WithSaveSize(saveSize), databasex.WithName("OffsetCache"))
 
-	saveIndex := func(db *gorm.DB, items []*ssadb.IrIndex) {
-		utils.GormTransaction(db, func(tx *gorm.DB) error {
-			for _, item := range items {
-				ssadb.SaveIrIndex(tx, item)
-			}
-			return nil
-		})
-	}
+	c.editorCache = NewSimpleCache[*ssadb.IrSource](
+		databaseKind, "EditorCache", saveSize,
+		func(iii []simpleCacheItem[*ssadb.IrSource]) {
+			utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
+				for _, item := range iii {
+					item.Value.Save(tx)
+				}
+				return nil
+			})
+			return
+		},
+	)
 
-	c.VariableIndex = NewInstructionIndex(
+	c.offsetCache = NewSimpleCache[*ssadb.IrOffset](
+		databaseKind, "OffsetCache", saveSize,
+		func(iii []simpleCacheItem[*ssadb.IrOffset]) {
+			utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
+				for _, item := range iii {
+					ssadb.SaveIrOffset(tx, item.Value)
+				}
+				return nil
+			})
+			return
+		},
+	)
+
+	c.indexCache = NewSimpleCache[*ssadb.IrIndex](
+		databaseKind, "IndexCache", saveSize,
+		func(iii []simpleCacheItem[*ssadb.IrIndex]) {
+			utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
+				for _, item := range iii {
+					ssadb.SaveIrIndex(tx, item.Value)
+				}
+				return nil
+			})
+			return
+		},
+	)
+
+	c.VariableIndex = NewSimpleCache[Instruction](
 		databaseKind, "VariableIndex", saveSize,
-		func(items []InstructionsIndexItem) {
-			rets := make([]*ssadb.IrIndex, 0, len(items))
+		func(items []simpleCacheItem[Instruction]) {
 			for _, item := range items {
-				ret := SaveVariableIndexByName(item.Name, item.Inst)
-				rets = append(rets, ret)
+				ret := SaveVariableIndexByName(item.Name, item.Value)
+				c.indexCache.Add("", ret)
 
 				// save to offset
-				if value, ok := item.Inst.(Value); ok {
+				if value, ok := item.Value.(Value); ok {
 					variable := value.GetVariable(item.Name)
-					for _, offset := range ConvertVariable2Offset(variable, item.Name, int64(value.GetId())) {
-						offsetSaver.Save(offset)
+					if !utils.IsNil(c.offsetCache) && !utils.IsNil(variable) {
+						for _, offset := range ConvertVariable2Offset(variable, item.Name, int64(value.GetId())) {
+							c.offsetCache.Add("", offset)
+						}
 					}
 				}
 			}
-			saveIndex(c.DB, rets)
 		},
 	)
-	c.MemberIndex = NewInstructionIndex(
+	c.MemberIndex = NewSimpleCache[Instruction](
 		databaseKind, "MemberIndex", saveSize,
-		func(items []InstructionsIndexItem) {
-			ret := make([]*ssadb.IrIndex, 0, len(items))
+		func(items []simpleCacheItem[Instruction]) {
 			for _, item := range items {
-				item := SaveVariableIndexByMember(item.Name, item.Inst)
-				ret = append(ret, item)
+				item := SaveVariableIndexByMember(item.Name, item.Value)
+				c.indexCache.Add("", item)
 			}
-			saveIndex(c.DB, ret)
-
 		},
 	)
 
-	c.ClassIndex = NewInstructionIndex(
+	c.ClassIndex = NewSimpleCache[Instruction](
 		databaseKind, "ClassIndex", saveSize,
-		func(items []InstructionsIndexItem) {
-			ret := make([]*ssadb.IrIndex, 0, len(items))
+		func(items []simpleCacheItem[Instruction]) {
 			for _, item := range items {
-				item := SaveClassIndex(item.Name, item.Inst)
-				ret = append(ret, item)
+				item := SaveClassIndex(item.Name, item.Value)
+				c.indexCache.Add("", item)
 			}
-			saveIndex(c.DB, ret)
 		},
 	)
 
-	c.OffsetCache = offsetSaver
-
-	c.ConstCache = NewInstructionIndex(
+	c.ConstCache = NewSimpleCache[Instruction](
 		databaseKind, "ConstCache", saveSize,
-		func(ii []InstructionsIndexItem) {
+		func(ii []simpleCacheItem[Instruction]) {
 		},
 	)
 

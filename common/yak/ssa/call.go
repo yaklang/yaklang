@@ -49,6 +49,7 @@ func (f *FunctionBuilder) EmitCall(c *Call) *Call {
 	c.handlerReturnType()
 	c.handleCalleeFunction()
 	c.handleMethod()
+	fixupUseChain(c)
 	return c
 }
 

@@ -308,13 +308,6 @@ func (p *Program) SetEditor(url string, me *memedit.MemEditor) {
 	p.editorMap.Set(url, me)
 }
 
-func (p *Program) PushEditor(e *memedit.MemEditor) {
-	p.editorStack.Push(e)
-	if !p.PreHandler() {
-		p.SetEditor(e.GetFilename(), e)
-	}
-}
-
 func (p *Program) GetIncludeFiles() []string {
 	return p.editorMap.Keys()
 }
@@ -322,6 +315,12 @@ func (p *Program) GetIncludeFileNum() int {
 	return p.editorMap.Len()
 }
 
+func (p *Program) PushEditor(e *memedit.MemEditor) {
+	p.editorStack.Push(e)
+	if !p.PreHandler() {
+		p.SetEditor(e.GetFilename(), e)
+	}
+}
 func (p *Program) GetCurrentEditor() *memedit.MemEditor {
 	if p.editorStack == nil || p.editorStack.Len() <= 0 {
 		return nil

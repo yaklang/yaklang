@@ -56,7 +56,9 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 			actx.popObject()
 		}
 	}
+	log.Infof("current Value: %s", v)
 	v.GetUsers().ForEach(func(value *Value) {
+		log.Infof("value %s", value)
 		if ret := value.AppendDependOn(v).getBottomUses(actx, opt...); len(ret) > 0 {
 			vals = append(vals, ret...)
 		}

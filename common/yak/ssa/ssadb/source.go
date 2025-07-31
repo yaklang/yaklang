@@ -9,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/databasex"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
@@ -60,101 +59,10 @@ func GetEditorByFileName(fileName string) (*memedit.MemEditor, error) {
 	ret := memedit.NewMemEditor(code)
 	_, filePath := splitProjectPath(fileName)
 	ret.SetUrl(filePath)
+	ret.SetFolderPath(source.FolderPath)
+	ret.SetFileName(source.FileName)
+	ret.SetProgramName(source.ProgramName)
 	return ret, nil
-}
-
-func SaveSource() {
-	sourceSave.Close()
-}
-
-var sourceSave = databasex.NewSave[*IrSource](func(is []*IrSource) {
-	db := GetDB()
-	utils.GormTransaction(db, func(tx *gorm.DB) error {
-		for _, irSource := range is {
-			if len(irSource.FolderPath) > 0 && irSource.FolderPath[0] != '/' {
-				irSource.FolderPath = "/" + irSource.FolderPath
-			}
-			if err := irSource.save(tx); err != nil {
-				log.Errorf("save source %v failed: %v", irSource, err)
-			}
-		}
-		return nil
-	})
-})
-
-func SaveFile(filename, content string, programName string, folderPaths []string) string {
-	start := time.Now()
-	defer func() {
-		atomic.AddUint64(&_SSASourceCodeCost, uint64(time.Now().Sub(start).Nanoseconds()))
-	}()
-	if programName == "" {
-		// only use memory
-		return ""
-	}
-	// append program name with folder path as full path
-	fullPathParts := []string{programName}
-	fullPathParts = append(fullPathParts, folderPaths...)
-	fullPath := irSourceJoin(fullPathParts...)
-	// calc file hash
-	folderPath := irSourceJoin(folderPaths...)
-	fileUrl := irSourceJoin(folderPath, filename)
-	editor := memedit.NewMemEditorWithFileUrl(content, fileUrl)
-	hash := editor.GetIrSourceHash(programName)
-
-	irSource := &IrSource{
-		ProgramName:    programName,
-		SourceCodeHash: hash,
-		QuotedCode:     strconv.Quote(content),
-		FileName:       filename,
-		FolderPath:     fullPath,
-		IsBigFile:      false,
-	}
-	// go irSource.save(db)
-	sourceSave.Save(irSource)
-	return irSource.SourceCodeHash
-}
-
-func SaveFolder(folderName string, folderPaths []string) error {
-	start := time.Now()
-	defer func() {
-		atomic.AddUint64(&_SSASourceCodeCost, uint64(time.Now().Sub(start).Nanoseconds()))
-	}()
-
-	if len(folderPaths) == 0 || folderPaths[0] == "" {
-		return utils.Errorf("folder path is empty")
-	}
-	programName := folderPaths[0]
-	folderPath := irSourceJoin(folderPaths...)
-
-	irSource := &IrSource{
-		ProgramName:    programName,
-		SourceCodeHash: codec.Md5(programName + folderPath + folderName),
-		QuotedCode:     "",
-		FileName:       folderName,
-		FolderPath:     folderPath,
-		IsBigFile:      false,
-	}
-	// irSource.save(db)
-	sourceSave.Save(irSource)
-	return nil
-}
-
-func (irSource *IrSource) save(db *gorm.DB) error {
-	if len(irSource.FolderPath) > 0 && irSource.FolderPath[0] != '/' {
-		irSource.FolderPath = "/" + irSource.FolderPath
-	}
-	// log.Infof("save source: %v", irSource)
-	// check existed
-	if err := db.Save(irSource).Error; err != nil {
-		return utils.Wrapf(err, "save ir source failed")
-	}
-	// var existed IrSource
-	// if db.Where("source_code_hash = ?", irSource.SourceCodeHash).First(&existed).RecordNotFound() {
-	// 	if err := db.Create(irSource).Error; err != nil {
-	// 		return utils.Wrapf(err, "save ir source failed")
-	// 	}
-	// }
-	return nil
 }
 
 // GetIrSourceFromHash fetch editor from cache by hash(md5)
@@ -181,4 +89,53 @@ func GetIrSourceFromHash(hash string) (*memedit.MemEditor, error) {
 	_, fileUrl := splitProjectPath(irSourceJoin(source.FolderPath, source.FileName))
 	editor := memedit.NewMemEditorWithFileUrl(code, fileUrl)
 	return editor, nil
+}
+
+func MarshalFile(editor *memedit.MemEditor) *IrSource {
+	irSource := &IrSource{
+		ProgramName:    editor.GetProgramName(),
+		SourceCodeHash: editor.GetIrSourceHash(),
+		QuotedCode:     strconv.Quote(editor.GetSourceCode()),
+		FileName:       editor.GetFilename(),
+		FolderPath:     editor.GetFolderPath(),
+		IsBigFile:      false,
+	}
+	return irSource
+}
+
+func MarshalFolder(folderName string, folderPaths []string) *IrSource {
+	start := time.Now()
+	defer func() {
+		atomic.AddUint64(&_SSASourceCodeCost, uint64(time.Now().Sub(start).Nanoseconds()))
+	}()
+
+	if len(folderPaths) == 0 || folderPaths[0] == "" {
+		return nil
+	}
+	programName := folderPaths[0]
+	folderPath := irSourceJoin(folderPaths...)
+
+	irSource := &IrSource{
+		ProgramName:    programName,
+		SourceCodeHash: codec.Md5(programName + folderPath + folderName),
+		QuotedCode:     "",
+		FileName:       folderName,
+		FolderPath:     folderPath,
+		IsBigFile:      false,
+	}
+	return irSource
+}
+
+func (irSource *IrSource) Save(db *gorm.DB) error {
+	if len(irSource.FolderPath) > 0 && irSource.FolderPath[0] != '/' {
+		irSource.FolderPath = "/" + irSource.FolderPath
+	}
+
+	// log.Infof("save source: %v", irSource.SourceCodeHash)
+	// check existed
+	if err := db.Save(irSource).Error; err != nil {
+		log.Errorf("save ir source failed: %v", err)
+		return utils.Wrapf(err, "save ir source failed")
+	}
+	return nil
 }
