@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
@@ -93,6 +94,10 @@ func NewLiteForge(i string, opts ...LiteForgeOption) (*LiteForge, error) {
 }
 
 func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, opts ...aid.Option) (*ForgeResult, error) {
+	return l.ExecuteEx(ctx, params, nil, opts...)
+}
+
+func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, imageData []*aid.ImageData, opts ...aid.Option) (*ForgeResult, error) {
 	if l.OutputSchema == "" {
 		return nil, fmt.Errorf("liteforge output schema is required")
 	}
@@ -150,23 +155,28 @@ func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, op
 		return nil, utils.Errorf("template execute failed: %v", err)
 	}
 	var action *aid.Action
-	transactionErr := cod.CallAITransaction(buf.String(), func(response *aid.AIResponse) error {
-		if l.ForgeName == "" {
-			l.ForgeName = "unknown"
-		}
-		raw, err := io.ReadAll(response.GetOutputStreamReader(fmt.Sprintf(`liteforge[%v]`, l.ForgeName), true, cod.GetConfig()))
-		if err != nil {
-			return err
-		}
-		action, err = aid.ExtractAction(string(raw), l.OutputActionName)
-		if err != nil {
-			return utils.Errorf("extract action failed: %v", err)
-		}
-		if action == nil {
-			return utils.Errorf("action is nil(unknown reason): \n%v", string(raw))
-		}
-		return nil
-	})
+	transactionErr := cod.CallAITransaction(buf.String(),
+		func(response *aid.AIResponse) error {
+			if l.ForgeName == "" {
+				l.ForgeName = "unknown"
+			}
+			raw, err := io.ReadAll(response.GetOutputStreamReader(fmt.Sprintf(`liteforge[%v]`, l.ForgeName), true, cod.GetConfig()))
+			if err != nil {
+				return err
+			}
+			action, err = aid.ExtractAction(string(raw), l.OutputActionName)
+			if err != nil {
+				return utils.Errorf("extract action failed: %v", err)
+			}
+			if action == nil {
+				return utils.Errorf("action is nil(unknown reason): \n%v", string(raw))
+			}
+			return nil
+		},
+		lo.Map(imageData, func(item *aid.ImageData, _ int) aid.AIRequestOption {
+			return aid.WithImageData(item)
+		})...,
+	)
 	if transactionErr != nil {
 		return nil, utils.Errorf("liteforge execute failed: %v", transactionErr)
 	}

@@ -92,6 +92,13 @@ func getTestSuiteAICallback(fileName string, opts []aispec.AIConfigOption, typeN
 		go func() {
 			defer rsp.Close()
 			//fmt.Println(req.GetPrompt())
+			for _, data := range req.GetImageList() {
+				if data.IsBase64 {
+					opts = append(opts, aispec.WithImageBase64(string(data.Data)))
+				} else {
+					opts = append(opts, aispec.WithImageRaw(data.Data))
+				}
+			}
 			opts = append(opts, aispec.WithStreamHandler(func(c io.Reader) {
 				rsp.EmitOutputStream(c)
 			}),

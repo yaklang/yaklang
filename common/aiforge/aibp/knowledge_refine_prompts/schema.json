@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": [
+    "@action",
+    "knowledge-collection"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "@action": {
+      "const": "refine",
+      "description": "标识当前操作的具体类型"
+    },
+    "knowledge-collection": {
+      "title": "知识切片集合 (Knowledge Snippet Collection)",
+      "description": "从单页文档内容中提取出的一个或多个高密度、带元数据的原子化知识切片的集合。这个集合必须是一个数组。",
+      "type": "array",
+      "items": {
+        "title": "高密度知识切片 (High-Density Knowledge Snippet)",
+        "description": "一个独立的、上下文丰富的知识单元。每个切片应围绕一个核心主题，并包含所有必要的支持性细节、代码或专有名词。",
+        "type": "object",
+        "properties": {
+          "source_page": {
+            "description": "该知识切片主要信息来源的页码。",
+            "type": "integer"
+          },
+          "importanceScore": {
+            "description": "【关键任务】请严格遵循以下打分标准，为该知识切片给出一个1-10分的重要性分数：\n[10] 首次定义核心方法论/框架。\n[9] 描述核心方法论的关键步骤或实现细节。\n[8] 定义核心概念或提供关键案例分析。\n[7] 解释次要概念或对核心内容进行补充。\n[6] 包含有用的数据/图表支撑论点。\n[5] 总结性内容，重申旧观点。\n[4] 一般性引言或背景介绍。\n[3] 简单的例子或轶事。\n[2] 参考文献/目录/致谢。\n[1] 空白或无信息量的页面。",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "knowledge_title": {
+            "description": "对这个知识点内容的精炼标题，应高度概括其核心主题。这个标题将用于后续的知识点合并与聚合。",
+            "type": "string",
+            "maxLength": 50
+          },
+          "summary": {
+            "description": "用一到两句话（不超过100字）精炼概括`knowledge_details`的核心内容，用于搜索结果的快速预览。",
+            "type": "string",
+            "maxLength": 100
+          },
+          "keywords": {
+            "description": "提取3-5个最能代表该知识点核心内容的关键词或专有名词，用于标签化和分类搜索。",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "potential_questions": {
+            "description": "基于此知识点的内容，生成2-3个最可能被问到的问题。这些问题将用于构建问答系统或增强语义搜索。",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "knowledge_details": {
+            "description": "知识点的详细内容，总长度上限调整为1000字。必须忠实于原文，完整保留代码块、公式、关键定义和专有名词。只有当话题发生明显转变时才考虑切分。如果内容引用了文档其他页面的概念或数据，请使用 [描述文字]^[页码] 的格式进行角标引用。可以在保留原文语句的情况下，对格式进行精简，提高信息密度",
+            "type": "string",
+            "maxLength": 1000
+          },
+          "knowledge_type": {
+            "description": "该知识点的类型标识符。",
+            "type": "string",
+            "enum": [
+              "Methodology",
+              "CoreConcept",
+              "CaseStudy",
+              "DataOrChart",
+              "SupportingInfo",
+              "Reference",
+              "IntroOrConclusion",
+              "Metadata"
+            ]
+          }
+        },
+        "required": [
+          "source_page",
+          "importanceScore",
+          "knowledge_title",
+          "summary",
+          "keywords",
+          "potential_questions",
+          "knowledge_details",
+          "knowledge_type"
+        ]
+      }
+    }
+  }
+}
