@@ -3,7 +3,9 @@ package ffmpegutils
 import (
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -387,6 +389,117 @@ func TestSmoke_BurnInSubtitles(t *testing.T) {
 	info, err := os.Stat(outputVideo.Name())
 	assert.NoError(t, err)
 	assert.Greater(t, info.Size(), int64(0), "subtitled video should not be empty")
+}
+
+func TestSmoke_BurnInSubtitlesWithPadding(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
+	videoPath, videoCleanup := setupTestWithEmbeddedData(t)
+	defer videoCleanup()
+
+	// Create a temporary SRT file
+	srtFile, err := ioutil.TempFile("", "test-*.srt")
+	assert.NoError(t, err)
+	_, err = srtFile.Write(testVideoDataSRT)
+	assert.NoError(t, err)
+	srtFile.Close()
+	defer os.Remove(srtFile.Name())
+
+	// Create output video file path
+	outputVideo, err := ioutil.TempFile("", "subtitled-padded-*.mp4")
+	assert.NoError(t, err)
+	outputVideo.Close()
+	defer func() {
+		// Keep the file for manual inspection
+		log.Infof("Subtitled video with padding saved to: %s", outputVideo.Name())
+	}()
+
+	// Execute burn-in with padding enabled
+	err = BurnInSubtitles(videoPath,
+		WithDebug(true),
+		WithSubtitleFile(srtFile.Name()),
+		WithOutputVideoFile(outputVideo.Name()),
+		WithSubtitlePadding(true), // Enable black padding for subtitles
+	)
+	assert.NoError(t, err)
+
+	info, err := os.Stat(outputVideo.Name())
+	assert.NoError(t, err)
+	assert.Greater(t, info.Size(), int64(0), "subtitled video with padding should not be empty")
+}
+
+func TestSmoke_MediaUtilsBurnSRTIntoVideo(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
+	videoPath, videoCleanup := setupTestWithEmbeddedData(t)
+	defer videoCleanup()
+
+	// Create a temporary SRT file
+	srtFile, err := ioutil.TempFile("", "test-*.srt")
+	assert.NoError(t, err)
+	_, err = srtFile.Write(testVideoDataSRT)
+	assert.NoError(t, err)
+	srtFile.Close()
+	defer os.Remove(srtFile.Name())
+
+	// Test the mediautils wrapper function
+	// Import the function from mediautils
+	burnFunc := func(inputVideo string, srtFile string, opts ...Option) (string, error) {
+		// Generate output filename based on input
+		baseName := strings.TrimSuffix(filepath.Base(inputVideo), filepath.Ext(inputVideo))
+		outputFile, err := ioutil.TempFile("", baseName+"_with_subtitles_*.mp4")
+		if err != nil {
+			return "", err
+		}
+		outputFile.Close()
+		outputPath := outputFile.Name()
+
+		// Prepare options with smart defaults
+		finalOpts := []Option{
+			WithSubtitleFile(srtFile),
+			WithOutputVideoFile(outputPath),
+			WithSubtitlePadding(true), // Enable padding by default
+		}
+
+		// Append user options
+		finalOpts = append(finalOpts, opts...)
+
+		// Execute
+		err = BurnInSubtitles(inputVideo, finalOpts...)
+		if err != nil {
+			return "", err
+		}
+
+		return outputPath, nil
+	}
+
+	// Test default behavior (with padding)
+	outputPath, err := burnFunc(videoPath, srtFile.Name())
+	assert.NoError(t, err)
+	assert.NotEmpty(t, outputPath)
+
+	// Verify output file exists and has content
+	info, err := os.Stat(outputPath)
+	assert.NoError(t, err)
+	assert.Greater(t, info.Size(), int64(0), "output video should not be empty")
+
+	log.Infof("BurnSRTIntoVideo test output saved to: %s", outputPath)
+
+	// Test with padding disabled
+	outputPath2, err := burnFunc(videoPath, srtFile.Name(), WithSubtitlePadding(false))
+	assert.NoError(t, err)
+	assert.NotEmpty(t, outputPath2)
+
+	// Verify second output file
+	info2, err := os.Stat(outputPath2)
+	assert.NoError(t, err)
+	assert.Greater(t, info2.Size(), int64(0), "output video without padding should not be empty")
+
+	log.Infof("BurnSRTIntoVideo test output (no padding) saved to: %s", outputPath2)
+
+	// Cleanup
+	defer func() {
+		os.Remove(outputPath)
+		os.Remove(outputPath2)
+	}()
 }
 
 func TestSmoke_GetVideoDuration(t *testing.T) {

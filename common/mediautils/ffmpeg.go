@@ -1,6 +1,12 @@
 package mediautils
 
 import (
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/ffmpegutils"
 )
 
@@ -58,10 +64,57 @@ func _extractBroadGrainedFramesFromVideo(i string, opts ...ffmpegutils.Option) (
 	return ffmpegutils.ExtractImageFramesFromVideo(i, opts...)
 }
 
+// BurnSRTIntoVideo can burn subtitles into a video
+//
+// example:
+// ```
+// outputFile, err = ffmpeg.BurnSRTIntoVideo("video.mp4", "subtitles.srt")
+// die(err)
+// println(outputFile)
+//
+// // With simple mode (wavy calling)
+// outputFile = ffmpeg.BurnSRTIntoVideo("video.mp4", "subtitles.srt")~
+//
+// ```
+func _burnInSubtitles(inputVideo string, srtFile string, opts ...ffmpegutils.Option) (string, error) {
+	// Generate output filename based on input
+	baseName := strings.TrimSuffix(filepath.Base(inputVideo), filepath.Ext(inputVideo))
+	outputFile, err := consts.TempFile(baseName + "_with_subtitles_*.mp4")
+	if err != nil {
+		// Fallback to ioutil.TempFile if consts.TempFile is not available
+		outputFile, err = ioutil.TempFile("", baseName+"_with_subtitles_*.mp4")
+		if err != nil {
+			return "", err
+		}
+	}
+	outputFile.Close() // Close the file, ffmpeg will write to the path
+	outputPath := outputFile.Name()
+	os.Remove(outputPath) // Remove the temp file before ffmpeg creates it
+
+	// Prepare options with smart defaults
+	finalOpts := []ffmpegutils.Option{
+		ffmpegutils.WithSubtitleFile(srtFile),
+		ffmpegutils.WithOutputVideoFile(outputPath),
+		ffmpegutils.WithSubtitlePadding(true), // Enable padding by default for better UX
+	}
+
+	// Append user options (they can override defaults)
+	finalOpts = append(finalOpts, opts...)
+
+	// Execute the subtitle burning
+	err = ffmpegutils.BurnInSubtitles(inputVideo, finalOpts...)
+	if err != nil {
+		return "", err
+	}
+
+	return outputPath, nil
+}
+
 var FfmpegExports = map[string]any{
 	"ExtractAudioFromVideo":              _extractAudioFromVideo,
 	"ExtractFineGrainedFramesFromVideo":  _extractFineGrainedFramesFromVideo,
 	"ExtractBroadGrainedFramesFromVideo": _extractBroadGrainedFramesFromVideo,
+	"BurnSRTIntoVideo":                   _burnInSubtitles,
 
 	"withStartEnd":         ffmpegutils.WithStartEndSeconds,
 	"withTimestampOverlay": ffmpegutils.WithTimestampOverlay,
