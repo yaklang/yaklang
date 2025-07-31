@@ -148,7 +148,7 @@ func (s *saveValueCtx) SaveNode(value *Value) (*ssadb.AuditNode, error) {
 				log.Errorf("%v: CreateOffset: rng or editor is nil", value.GetVerboseName())
 				return an, nil
 			}
-			hash := editor.GetIrSourceHash(value.GetProgramName())
+			hash := editor.GetIrSourceHash()
 			an.TmpValueFileHash = hash
 			an.TmpStartOffset = R.GetStartOffset()
 			an.TmpEndOffset = R.GetEndOffset()

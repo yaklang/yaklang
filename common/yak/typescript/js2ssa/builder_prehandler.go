@@ -27,20 +27,15 @@ func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 }
 
 func (s *SSABuilder) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	builder.GetProgram().GetApplication().Build(ast, "", editor, builder)
+	builder.GetProgram().GetApplication().Build(ast, editor, builder)
 }
 
-func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST, fb *ssa.FunctionBuilder, path string) error {
+func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST, fb *ssa.FunctionBuilder, editor *memedit.MemEditor) error {
 	prog := fb.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")
 		return nil
 	}
-	file, err := fileSystem.ReadFile(path)
-	if err != nil {
-		log.Errorf("read file %s error: %v", path, err)
-		return nil
-	}
-	prog.Build(ast, path, memedit.NewMemEditor(string(file)), fb)
+	prog.Build(ast, editor, fb)
 	return nil
 }

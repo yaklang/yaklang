@@ -157,6 +157,12 @@ func batchSave[T any](data []T, handler func([]T), wg *sync.WaitGroup) {
 
 	wg.Add(1)
 	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("Databasex Channel: batchSave panic: %v", err)
+				utils.PrintCurrentGoroutineRuntimeStack()
+			}
+		}()
 		defer wg.Done()
 		handler(data)
 	}()

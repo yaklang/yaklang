@@ -26,7 +26,12 @@ type MemEditor struct {
 	sourceCodeSha256 string
 
 	// fileUrl and source
-	fileUrl        string
+	fileUrl string
+
+	programName string
+	folderPath  string
+	fileName    string
+
 	safeSourceCode *SafeString
 
 	// editor
@@ -69,13 +74,38 @@ func (ve *MemEditor) SetUrl(url string) {
 	ve.fileUrl = url
 }
 
+func (ve *MemEditor) GetUrl() string {
+	return ve.fileUrl
+}
+
+func (ve *MemEditor) SetProgramName(programName string) {
+	ve.programName = programName
+}
+
+func (ve *MemEditor) GetProgramName() string {
+	return ve.programName
+}
+
+func (ve *MemEditor) SetFolderPath(folderPath string) {
+	ve.folderPath = folderPath
+}
+
+func (ve *MemEditor) GetFolderPath() string {
+	return ve.folderPath
+}
+
+func (ve *MemEditor) SetFileName(fileName string) {
+	ve.fileName = fileName
+}
+
 // GetIrSourceHash 使用程序名称、路径和源代码计算哈希值
-func (ve *MemEditor) GetIrSourceHash(programName string) string {
-	return codec.Md5(programName + ve.GetFilename() + ve.GetSourceCode())
+func (ve *MemEditor) GetIrSourceHash() string {
+	// return codec.Md5(programName + ve.GetFilename() + ve.GetSourceCode())
+	return (ve.programName + ve.folderPath + ve.fileName + ve.GetSourceCode())
 }
 
 func (ve *MemEditor) GetFilename() string {
-	return ve.fileUrl
+	return ve.fileName
 }
 
 func (ve *MemEditor) GetLength() int {

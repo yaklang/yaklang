@@ -160,7 +160,12 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 					ret += fmt.Sprintf("\t<nil inst:%d>\n", id)
 					continue
 				}
-				if _, ok := ToConstInst(i); ok {
+				if c, ok := ToConstInst(i); ok {
+					if c.Origin > 0 {
+						ret += fmt.Sprintf("\tt%d = %s by t%d \n", id, getStr(c), c.Origin)
+					} else {
+						ret += fmt.Sprintf("\tt%d = %s\n", id, getStr(c))
+					}
 					continue
 				} else if _, ok := ToUndefined(i); ok {
 					continue

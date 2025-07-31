@@ -63,7 +63,7 @@ func initHandler(fb *ssa.FunctionBuilder) {
 	fb.GetProgram().GlobalScope = container
 }
 
-func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST, builder *ssa.FunctionBuilder, path string) error {
+func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST, builder *ssa.FunctionBuilder, editor *memedit.MemEditor) error {
 	prog := builder.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")
@@ -72,23 +72,15 @@ func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST,
 	if prog.ExtraFile == nil {
 		prog.ExtraFile = make(map[string]string)
 	}
+	path := editor.GetUrl()
 	if !s.FilterPreHandlerFile(path) {
 		return nil
 	}
-	dirname, filename := fileSystem.PathSplit(path)
-	_ = dirname
-	_ = filename
+	filename := editor.GetFilename()
 	if filepath.Ext(filename) == ".lock" && filename == "composer.lock" {
-		raw, err := fileSystem.ReadFile(path)
-		if err != nil {
-			log.Warnf("read pom.xml error: %v", err)
-			return nil
-		}
-		editor := memedit.NewMemEditor(string(raw))
-		editor.SetUrl(path)
 		builder.SetEditor(editor)
 		vfs := filesys.NewVirtualFs()
-		vfs.AddFile(filename, string(raw))
+		vfs.AddFile(filename, editor.GetSourceCode())
 		pkgs, err := sca.ScanFilesystem(vfs)
 		if err != nil {
 			log.Warnf("scan pom.xml error: %v", err)
@@ -97,19 +89,13 @@ func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST,
 		prog.SCAPackages = append(prog.SCAPackages, pkgs...)
 		builder.GenerateDependence(pkgs, filename)
 	} else {
-		raw, err := fileSystem.ReadFile(path)
-		if err != nil {
-			log.Errorf("read file %s error: %v", path, err)
-			return nil
-		}
-		data := string(raw)
-		prog.Build(ast, path, memedit.NewMemEditor(data), builder)
+		prog.Build(ast, editor, builder)
 	}
 	return nil
 }
 
 func (s *SSABuild) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	builder.GetProgram().GetApplication().Build(ast, "", editor, builder)
+	builder.GetProgram().GetApplication().Build(ast, editor, builder)
 }
 func (s *SSABuild) ParseAST(src string) (ssa.FrontAST, error) {
 	return FrondEnd(src)

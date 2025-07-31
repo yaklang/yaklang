@@ -10,9 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 )
@@ -58,8 +56,10 @@ func (c *config) parseProjectWithFS(
 	processCallback(0.0, fmt.Sprintf("parse project in fs: %v, path: %v", filesystem, c.info))
 	processCallback(0.0, "calculate total size of project")
 
+	folder2Save := make([][]string, 0)
 	if c.ProgramName != "" {
-		ssadb.SaveFolder(c.ProgramName, []string{"/"})
+		folder2Save = append(folder2Save, []string{"/"})
+		// ssadb.SaveFolder(c.ProgramName, []string{"/"})
 	}
 	// get total size
 	err = filesys.Recursive(programPath,
@@ -75,7 +75,8 @@ func (c *config) parseProjectWithFS(
 				strings.Split(folder, string(c.fs.GetSeparators()))...,
 			)
 			if c.enableDatabase != ssa.ProgramCacheMemory {
-				ssadb.SaveFolder(c.ProgramName, folders)
+				folder2Save = append(folder2Save, folders)
+				// ssadb.SaveFolder(c.ProgramName, folders)
 			}
 			return nil
 		}),
@@ -90,11 +91,11 @@ func (c *config) parseProjectWithFS(
 			if c.checkLanguage(path) == nil {
 				handlerTotal++
 				handlerFiles = append(handlerFiles, path)
-				handlerFilesMap[path] = struct{}{}
 			}
 			if c.checkLanguagePreHandler(path) == nil {
 				preHandlerTotal++
 				preHandlerFiles = append(preHandlerFiles, path)
+				handlerFilesMap[path] = struct{}{}
 			}
 			return nil
 		}),
@@ -108,6 +109,15 @@ func (c *config) parseProjectWithFS(
 	if err != nil {
 		return nil, err
 	}
+
+	wg.Add(1)
+	go func() {
+		wg.Done()
+		for _, folder := range folder2Save {
+			_ = folder
+			prog.SaveFolder(folder)
+		}
+	}()
 
 	process := 0.0
 	prog.ProcessInfof = func(s string, v ...any) {
@@ -144,6 +154,9 @@ func (c *config) parseProjectWithFS(
 		for fileContent := range c.getFileHandler(
 			filesystem, preHandlerFiles, handlerFilesMap,
 		) {
+			editor := prog.CreateEditor(fileContent.Content, fileContent.Path)
+
+			fileContent.Editor = editor
 			fileContents = append(fileContents, fileContent)
 			if fileContent.Err != nil {
 				AstErr = utils.JoinErrors(AstErr,
@@ -155,7 +168,7 @@ func (c *config) parseProjectWithFS(
 			// handler
 			if language := c.LanguageBuilder; language != nil {
 				language.InitHandler(builder)
-				language.PreHandlerProject(filesystem, fileContent.AST, builder, fileContent.Path)
+				language.PreHandlerProject(filesystem, fileContent.AST, builder, editor)
 			}
 		}
 		preHandlerTime = time.Since(start)
@@ -196,7 +209,6 @@ func (c *config) parseProjectWithFS(
 				continue // skip if not in handlerFilesMap
 			}
 			path := fileContent.Path
-			content := fileContent.Content
 			ast := fileContent.AST
 			defer func() {
 				if r := recover(); r != nil {
@@ -208,7 +220,7 @@ func (c *config) parseProjectWithFS(
 			handlerProcess()
 
 			// build
-			if err := prog.Build(ast, path, memedit.NewMemEditorByBytes(content), builder); err != nil {
+			if err := prog.Build(ast, fileContent.Editor, builder); err != nil {
 				log.Errorf("parse %#v failed: %v", path, err)
 				continue
 			}
@@ -257,7 +269,6 @@ func (c *config) parseProjectWithFS(
 	}
 	f6 := func() error {
 		wg.Wait()
-		ssadb.SaveSource()
 		return nil
 	}
 	ssaprofile.ProfileAddWithError(true, "ParseProjectWithFS", f1, f2, f3, f4, f5, f6)
