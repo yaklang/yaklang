@@ -313,6 +313,47 @@ func TestSmoke_CompressImage(t *testing.T) {
 	assert.LessOrEqual(t, compressedInfo.Size(), targetSize, "compressed image should be under the target size")
 }
 
+func TestSmoke_TimestampOverlay(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
+	videoPath, cleanup := setupTestWithEmbeddedData(t)
+	defer cleanup()
+
+	// 1. Setup: Create a temporary directory for frames with timestamp overlay
+	outputDir, err := ioutil.TempDir("", "test-frames-timestamp-*")
+	assert.NoError(t, err)
+	defer os.RemoveAll(outputDir)
+
+	// 2. Extract frames with timestamp overlay enabled
+	resultsChan, err := ExtractImageFramesFromVideo(videoPath,
+		WithDebug(true),
+		WithOutputDir(outputDir),
+		WithFramesPerSecond(0.5), // Extract one frame every 2 seconds
+		WithTimestampOverlay(true),
+		WithStartEnd(1*time.Second, 5*time.Second),
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, resultsChan)
+
+	// 3. Verify that frames are extracted with timestamps
+	var extractedFrames [][]byte
+	for res := range resultsChan {
+		assert.NoError(t, res.Error)
+		if len(res.RawData) > 0 {
+			extractedFrames = append(extractedFrames, res.RawData)
+			// Verify the frame is a valid image
+			assert.NotEmpty(t, res.MIMEType)
+			assert.Contains(t, res.MIMEType, "image")
+
+			// Save frame to verify visually (optional)
+			filename, err := res.SaveToFile()
+			if err == nil {
+				log.Infof("Frame with timestamp saved to: %s", filename)
+			}
+		}
+	}
+	assert.NotEmpty(t, extractedFrames, "should extract at least one frame with timestamp overlay")
+}
+
 func TestSmoke_BurnInSubtitles(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 	videoPath, videoCleanup := setupTestWithEmbeddedData(t)
