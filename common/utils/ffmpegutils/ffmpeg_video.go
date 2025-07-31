@@ -314,8 +314,8 @@ func StartScreenRecording(outputFile string, opts ...Option) (*exec.Cmd, error) 
 			"-c:v", "libx264",
 			"-preset", "ultrafast", // Original Windows setting for speed
 			"-pix_fmt", "yuv420p", // Keep yuv420p for compatibility
-			"-an",                                              // No audio
-			"-movflags", "+faststart+frag_keyframe+empty_moov", // Optimize for short recordings
+			"-an",                     // No audio
+			"-movflags", "+faststart", // Standard MP4 with metadata at beginning for Windows compatibility
 		}
 	} else {
 		// Generic fallback
