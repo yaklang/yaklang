@@ -2,8 +2,6 @@ package ssadb
 
 import (
 	"strconv"
-	"sync/atomic"
-	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -104,10 +102,6 @@ func MarshalFile(editor *memedit.MemEditor) *IrSource {
 }
 
 func MarshalFolder(folderName string, folderPaths []string) *IrSource {
-	start := time.Now()
-	defer func() {
-		atomic.AddUint64(&_SSASourceCodeCost, uint64(time.Now().Sub(start).Nanoseconds()))
-	}()
 
 	if len(folderPaths) == 0 || folderPaths[0] == "" {
 		return nil

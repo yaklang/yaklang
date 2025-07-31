@@ -190,7 +190,7 @@ func showValueMap(buf *bytes.Buffer, varName string, value ValueOperator, cfg *s
 		}
 		start, end := ssaRange.GetStart(), ssaRange.GetEnd()
 		editor := ssaRange.GetEditor()
-		fileName := editor.GetFilename()
+		fileName := editor.GetUrl()
 		if fileName == "" {
 			var err error
 			editor, err = ssadb.GetIrSourceFromHash(editor.SourceCodeMd5())
