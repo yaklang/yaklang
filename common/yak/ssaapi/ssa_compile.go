@@ -59,6 +59,8 @@ func (c *config) parseFile() (ret *Program, err error) {
 	if err != nil {
 		return nil, err
 	}
+	c.originEditor.SetProgramName(prog.GetProgramName())
+	prog.SaveEditor(c.originEditor)
 	prog.Finish()
 	wait := func() {}
 	if prog.DatabaseKind != ssa.ProgramCacheMemory { // save program
@@ -114,7 +116,7 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 	c.LanguageBuilder.PreHandlerFile(ast, r, builder)
 	// parse code
 	prog.SetPreHandler(false)
-	if err := prog.Build(ast, "", r, builder); err != nil {
+	if err := prog.Build(ast, r, builder); err != nil {
 		return nil, err
 	}
 	builder.Finish()

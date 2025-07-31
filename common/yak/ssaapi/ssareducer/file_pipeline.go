@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/pipeline"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -15,6 +16,7 @@ type FileContent struct {
 	Content []byte
 	AST     ssa.FrontAST
 	Err     error
+	Editor  *memedit.MemEditor
 }
 
 func FilesHandler(

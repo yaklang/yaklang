@@ -149,6 +149,12 @@ func batchFetch[T any](
 		}
 		wg.Add(1)
 		go func(size int) {
+			defer func() {
+				if err := recover(); err != nil {
+					log.Errorf("Databasex Channel: batchSave panic: %v", err)
+					utils.PrintCurrentGoroutineRuntimeStack()
+				}
+			}()
 			defer wg.Done()
 			for item := range fetch(ctx, size) {
 				ch <- item

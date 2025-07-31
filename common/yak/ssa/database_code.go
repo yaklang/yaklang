@@ -73,7 +73,7 @@ func fitRange(c *ssadb.IrCode, rangeIns memedit.RangeIf) {
 		return
 	}
 	editor := rangeIns.GetEditor()
-	c.SourceCodeHash = editor.GetIrSourceHash(c.ProgramName)
+	c.SourceCodeHash = editor.GetIrSourceHash()
 	// start, end := rangeIns.GetOffsetRange()
 	c.SourceCodeStartOffset = int64(rangeIns.GetStartOffset())
 	c.SourceCodeEndOffset = int64(rangeIns.GetEndOffset())
@@ -198,7 +198,7 @@ func value2IrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
 
 	if typ := value.GetType(); !utils.IsNil(typ) && typ.GetId() <= 0 {
 		log.Errorf("BUG: value2IrCode called with nil type: %s %s", value.GetOpcode().String(), value.GetName())
-		return
+		// return
 	}
 	// ir.String = value.String()
 	ir.HasDefs = value.HasValues()

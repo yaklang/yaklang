@@ -31,7 +31,7 @@ func ConvertValue2Offset(inst Instruction) *ssadb.IrOffset {
 }
 
 func ConvertVariable2Offset(v *Variable, variableName string, valueID int64) []*ssadb.IrOffset {
-	if v.GetId() == -1 {
+	if utils.IsNil(v) || v.GetId() == -1 {
 		return nil
 	}
 	ret := make([]*ssadb.IrOffset, 0, 10)

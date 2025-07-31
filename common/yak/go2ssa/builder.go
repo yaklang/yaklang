@@ -45,10 +45,10 @@ func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 }
 
 func (s *SSABuilder) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	builder.GetProgram().GetApplication().Build(ast, "", editor, builder)
+	builder.GetProgram().GetApplication().Build(ast, editor, builder)
 }
 
-func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST, functionBuilder *ssa.FunctionBuilder, path string) error {
+func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST, functionBuilder *ssa.FunctionBuilder, editor *memedit.MemEditor) error {
 	prog := functionBuilder.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")
@@ -58,23 +58,10 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 		prog.ExtraFile = make(map[string]string)
 	}
 
-	dirname, filename := fileSystem.PathSplit(path)
-	_ = dirname
-	_ = filename
-	raw, err := fileSystem.ReadFile(path)
-	if err != nil {
-		log.Errorf("read file %s error: %v", path, err)
-		return nil
-	}
-
+	filename := editor.GetFilename()
 	// go.mod
 	if strings.TrimLeft(filename, string(fileSystem.GetSeparators())) == "go.mod" {
-		raw, err := fileSystem.ReadFile(path)
-		if err != nil {
-			log.Warnf("read go.mod error: %v", err)
-			return nil
-		}
-		text := string(raw)
+		text := editor.GetSourceCode()
 		pattern := `module(.*?)\n`
 		re, err := regexp.Compile(pattern)
 		if err != nil {
@@ -88,8 +75,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 			prog.ExtraFile["go.mod"] = path[:len(path)-1]
 		}
 	}
-	data := string(raw)
-	prog.Build(ast, path, memedit.NewMemEditor(data), functionBuilder)
+	prog.Build(ast, editor, functionBuilder)
 	prog.GetIncludeFiles()
 	return nil
 }
