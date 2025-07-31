@@ -100,8 +100,8 @@ func (ve *MemEditor) SetFileName(fileName string) {
 
 // GetIrSourceHash 使用程序名称、路径和源代码计算哈希值
 func (ve *MemEditor) GetIrSourceHash() string {
-	// return codec.Md5(programName + ve.GetFilename() + ve.GetSourceCode())
-	return (ve.programName + ve.folderPath + ve.fileName + ve.GetSourceCode())
+	return codec.Md5(ve.programName + ve.GetFilename() + ve.GetSourceCode())
+	// return (ve.programName + ve.folderPath + ve.fileName + ve.GetSourceCode())
 }
 
 func (ve *MemEditor) GetFilename() string {

@@ -9,6 +9,7 @@ import (
 
 func (p *Program) CreateEditor(raw []byte, filepath string) *memedit.MemEditor {
 	edit := memedit.NewMemEditorByBytes(raw)
+	filepath = path.Join(p.GetProgramName(), filepath)
 	edit.SetUrl(filepath)
 	folder, file := path.Split(filepath)
 	edit.SetFolderPath(folder)
