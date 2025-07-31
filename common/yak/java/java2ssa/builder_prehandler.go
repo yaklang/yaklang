@@ -91,7 +91,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 			return err
 		}
 	case ".jsp":
-		info, err := tj.ConvertTemplateToJava(tj.JSP, editor.GetSourceCode(), path)
+		info, err := tj.ConvertTemplateToJavaWithEditor(tj.JSP, editor)
 		if err != nil {
 			return utils.Errorf("convert jsp to java error: %v", err)
 		}
@@ -100,7 +100,8 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 		if err != nil {
 			return err
 		}
-		editor := memedit.NewMemEditor(info.GetContent())
+		editor := prog.CreateEditor([]byte(info.GetContent()), path)
+		// editor := memedit.NewMemEditor(info.GetContent())
 		err = prog.Build(ast, editor, fb)
 		if err != nil {
 			return err
@@ -108,7 +109,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 	default:
 		if isFreemarkerFile(prog, path) {
 			var info tl.TemplateGeneratedInfo
-			info, err := tj.ConvertTemplateToJava(tj.Freemarker, editor.GetSourceCode(), path)
+			info, err := tj.ConvertTemplateToJavaWithEditor(tj.Freemarker, editor)
 			if err != nil {
 				return utils.Errorf("convert freemarker to java error: %v", err)
 			}

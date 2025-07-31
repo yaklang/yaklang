@@ -63,22 +63,28 @@ func ConvertTemplateToJava(typ JavaTemplateType, content, filePath string) (tl.T
 	if content == "" || filePath == "" {
 		return nil, utils.Errorf("content or filePath is empty")
 	}
+	editor := memedit.NewMemEditorWithFileUrl(content, filePath)
+	return ConvertTemplateToJavaWithEditor(typ, editor)
+}
+
+func ConvertTemplateToJavaWithEditor(typ JavaTemplateType, editor *memedit.MemEditor) (tl.TemplateGeneratedInfo, error) {
 	var visitor tl.TemplateVisitor
 	var err error
 	switch typ {
 	case JSP:
-		visitor, err = NewTemplateVisitor(memedit.NewMemEditorWithFileUrl(content, filePath), tl.TEMPLATE_JAVA_JSP)
+		visitor, err = NewTemplateVisitor(editor, tl.TEMPLATE_JAVA_JSP)
 		if err != nil {
 			return nil, err
 		}
 	case Freemarker:
-		visitor, err = NewTemplateVisitor(memedit.NewMemEditorWithFileUrl(content, filePath), tl.TEMPLATE_JAVA_FREEMARKER)
+		visitor, err = NewTemplateVisitor(editor, tl.TEMPLATE_JAVA_FREEMARKER)
 		if err != nil {
 			return nil, err
 		}
 	default:
 		return nil, utils.Errorf("not support java template type: %v", typ)
 	}
+	filePath := editor.GetUrl()
 	t, err := CreateJavaTemplate(filePath)
 	if err != nil {
 		return nil, err
