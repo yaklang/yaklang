@@ -110,10 +110,23 @@ func ExtractImageFramesFromVideo(inputFile string, opts ...Option) (<-chan *Ffmp
 			// -r option is used instead of a select filter for fixed rate
 		}
 
-		// Text drawing part
-		if o.fontFile != "" {
-			escapedFontPath := filepath.ToSlash(o.fontFile)
-			drawtext := fmt.Sprintf("drawtext=fontfile='%s':text='timestamp: %%{pts\\:hms}':fontcolor=white:fontsize=24:box=1:boxcolor=black@0.5:x=(w-tw)/2:y=h-th-10", escapedFontPath)
+		// Timestamp overlay part
+		if o.showTimestamp {
+			// Add padding to the bottom of the image to create space for timestamp
+			// This ensures the timestamp doesn't cover the original content
+			padFilter := "pad=iw:ih+40:0:0:black"
+			vfParts = append(vfParts, padFilter)
+
+			// Create drawtext filter for timestamp display
+			var drawtext string
+			if o.fontFile != "" {
+				// Use custom font file if provided
+				escapedFontPath := filepath.ToSlash(o.fontFile)
+				drawtext = fmt.Sprintf("drawtext=fontfile='%s':text='%%{pts\\:hms}':fontcolor=white:fontsize=20:x=(w-tw)/2:y=h-30", escapedFontPath)
+			} else {
+				// Use default font (sans-serif) when no font file is specified
+				drawtext = "drawtext=text='%{pts\\:hms}':fontcolor=white:fontsize=20:x=(w-tw)/2:y=h-30"
+			}
 			vfParts = append(vfParts, drawtext)
 		}
 
@@ -143,7 +156,6 @@ func ExtractImageFramesFromVideo(inputFile string, opts ...Option) (<-chan *Ffmp
 
 		if o.debug {
 			cmd.Stderr = log.NewLogWriter(log.DebugLevel)
-			log.Infof("executing ffmpeg frame extraction: %s", cmd.String())
 		} else {
 			// Even if not in debug, we need to consume stderr to prevent the pipe from filling up
 			cmd.Stderr = ioutil.Discard
@@ -183,6 +195,7 @@ func ExtractImageFramesFromVideo(inputFile string, opts ...Option) (<-chan *Ffmp
 			}
 		}()
 
+		log.Infof("executing ffmpeg frame extraction: %s", cmd.String())
 		err := cmd.Run()
 		cancel()  // Signal the poller to finish
 		wg.Wait() // Wait for the poller to do its final read
@@ -259,9 +272,9 @@ func BurnInSubtitles(inputFile string, opts ...Option) error {
 	cmd := exec.CommandContext(o.ctx, ffmpegBinaryPath, args...)
 	if o.debug {
 		cmd.Stderr = log.NewLogWriter(log.DebugLevel)
-		log.Infof("executing subtitle burn-in: %s", cmd.String())
 	}
 
+	log.Infof("executing subtitle burn-in: %s", cmd.String())
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("ffmpeg execution failed during subtitle burn-in: %w", err)
 	}
@@ -313,8 +326,8 @@ func StartScreenRecording(outputFile string, opts ...Option) (*exec.Cmd, error) 
 	if o.debug {
 		cmd.Stdout = log.NewLogWriter(log.InfoLevel)
 		cmd.Stderr = log.NewLogWriter(log.InfoLevel)
-		log.Infof("starting ffmpeg screen recording: %s", cmd.String())
 	}
+	log.Infof("starting ffmpeg screen recording: %s", cmd.String())
 
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start ffmpeg screen recording: %w", err)

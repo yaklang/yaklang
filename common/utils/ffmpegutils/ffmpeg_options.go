@@ -2,7 +2,12 @@ package ffmpegutils
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mimetype"
@@ -45,6 +50,7 @@ type options struct {
 	subtitleFile    string
 	outputVideoFile string
 	fontFile        string // Path to a font file for drawtext filter
+	showTimestamp   bool   // Whether to show timestamp overlay on frames
 
 	// Screen recording options
 	recordFormat    string // e.g., "avfoundation" on macOS, "gdigrab" on Windows
@@ -165,6 +171,14 @@ func WithStartEnd(start, end time.Duration) Option {
 	}
 }
 
+// WithStartEndSeconds specifies the time range for extraction in seconds.
+func WithStartEndSeconds(start, end float64) Option {
+	return func(o *options) {
+		o.startTime = time.Duration(start * float64(time.Second))
+		o.endTime = time.Duration(end * float64(time.Second))
+	}
+}
+
 // WithSceneThreshold sets the scene change detection sensitivity (0.0 to 1.0).
 // Using this option sets the extraction mode to scene change detection.
 // It is mutually exclusive with WithFramesPerSecond.
@@ -247,6 +261,14 @@ func WithFontFile(filepath string) Option {
 	}
 }
 
+// WithTimestampOverlay enables or disables timestamp overlay on extracted frames.
+// When enabled, a black bar will be added at the bottom of each frame displaying the timestamp.
+func WithTimestampOverlay(show bool) Option {
+	return func(o *options) {
+		o.showTimestamp = show
+	}
+}
+
 // --- Screen Recording Options ---
 
 // WithScreenRecordFormat sets the input format for screen recording.
@@ -295,4 +317,28 @@ type FfmpegStreamResult struct {
 	Timestamp time.Duration
 	// Error captures any issue that occurred while processing this specific result.
 	Error error
+}
+
+var frameCounter = new(int64)
+
+func getFrameCounter() int64 {
+	// Increment the frame counter atomically
+	return atomic.AddInt64(frameCounter, 1)
+}
+
+func (f *FfmpegStreamResult) SaveToFile() (string, error) {
+	if f.RawData == nil || len(f.RawData) == 0 {
+		return "", utils.Errorf("no data to save for frame at %s", f.Timestamp)
+	}
+
+	filefp, err := consts.TempFile("ffmpeg_frame_" + fmt.Sprint(getFrameCounter()) + "_*" + f.MIMETypeObj.Extension())
+	if err != nil {
+		return "", utils.Errorf("failed to save frame data to temporary file: %w", err)
+	}
+	defer filefp.Close()
+	_, err = filefp.Write(f.RawData)
+	if err != nil {
+		return "", err
+	}
+	return filefp.Name(), nil
 }
