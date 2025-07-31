@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -33,6 +34,23 @@ func (s *Server) QueryScreenRecorders(ctx context.Context, req *ypb.QueryScreenR
 		Pagination: req.GetPagination(),
 		Data: funk.Map(data, func(i *schema.ScreenRecorder) *ypb.ScreenRecorder {
 			before, after := AfterAndBeforeIsExit(int64(i.ID))
+
+			// Format duration from milliseconds to HH:MM:SS format
+			var formattedDuration string
+			if i.Duration != "" {
+				if durationMs, err := strconv.ParseInt(i.Duration, 10, 64); err == nil {
+					seconds := durationMs / 1000
+					hours := seconds / 3600
+					minutes := (seconds % 3600) / 60
+					secs := seconds % 60
+					formattedDuration = fmt.Sprintf("%02d:%02d:%02d", hours, minutes, secs)
+				} else {
+					formattedDuration = "00:00:00" // fallback
+				}
+			} else {
+				formattedDuration = "00:00:00"
+			}
+
 			return &ypb.ScreenRecorder{
 				Id:        int64(i.ID),
 				Filename:  i.Filename,
@@ -42,7 +60,7 @@ func (s *Server) QueryScreenRecorders(ctx context.Context, req *ypb.QueryScreenR
 				UpdatedAt: i.UpdatedAt.Unix(),
 				VideoName: i.VideoName,
 				Cover:     i.Cover,
-				Duration:  i.Duration,
+				Duration:  formattedDuration,
 				Before:    before,
 				After:     after,
 			}
@@ -272,6 +290,23 @@ func (s *Server) GetOneScreenRecorders(ctx context.Context, req *ypb.GetOneScree
 	}
 	var before, after bool
 	before, after = AfterAndBeforeIsExit(int64(data.ID))
+
+	// Format duration from milliseconds to HH:MM:SS format
+	var formattedDuration string
+	if data.Duration != "" {
+		if durationMs, err := strconv.ParseInt(data.Duration, 10, 64); err == nil {
+			seconds := durationMs / 1000
+			hours := seconds / 3600
+			minutes := (seconds % 3600) / 60
+			secs := seconds % 60
+			formattedDuration = fmt.Sprintf("%02d:%02d:%02d", hours, minutes, secs)
+		} else {
+			formattedDuration = "00:00:00" // fallback
+		}
+	} else {
+		formattedDuration = "00:00:00"
+	}
+
 	return &ypb.ScreenRecorder{
 		Id:        int64(data.ID),
 		Filename:  data.Filename,
@@ -281,6 +316,7 @@ func (s *Server) GetOneScreenRecorders(ctx context.Context, req *ypb.GetOneScree
 		UpdatedAt: data.UpdatedAt.Unix(),
 		VideoName: data.VideoName,
 		Cover:     data.Cover,
+		Duration:  formattedDuration,
 		Before:    before,
 		After:     after,
 	}, nil
