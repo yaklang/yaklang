@@ -324,7 +324,7 @@ func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 		SkipSaveHTTPFlow:  false,
 		AuthInfos:         make([]*ypb.AuthInfo, 0),
 		DbSaveSync:        false,
-		CallPluginTimeout: 60,
+		CallPluginTimeout: float32(consts.GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT.Load()),
 		MaxTlsVersion:     tls.VersionTLS13,
 		MinTlsVersion:     tls.VersionSSL30,
 		MaxContentLength:  1024 * 1024 * 10,
