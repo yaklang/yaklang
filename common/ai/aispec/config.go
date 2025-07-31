@@ -266,6 +266,51 @@ func WithImageFile(i string) AIConfigOption {
 	}
 }
 
+func WithImageBase64(b64 string) AIConfigOption {
+	return func(config *AIConfig) {
+		raw, err := codec.DecodeBase64(b64)
+		if err != nil {
+			log.Warnf("decode error: %v", err)
+			return
+		}
+		name, err := filetype.Image(raw)
+		if err != nil {
+			log.Warnf("input is not image: %v", err)
+			return
+		}
+
+		var buf bytes.Buffer
+		buf.WriteString("data:")
+		buf.WriteString(name.MIME.Value)
+		buf.WriteString(";")
+		buf.WriteString("base64,")
+		buf.WriteString(b64)
+		config.Images = append(config.Images, &ImageDescription{
+			Url: buf.String(),
+		})
+	}
+}
+
+func WithImageRaw(raw []byte) AIConfigOption {
+	return func(config *AIConfig) {
+		name, err := filetype.Image(raw)
+		if err != nil {
+			log.Warnf("input is not image: %v", err)
+			return
+		}
+
+		var buf bytes.Buffer
+		buf.WriteString("data:")
+		buf.WriteString(name.MIME.Value)
+		buf.WriteString(";")
+		buf.WriteString("base64,")
+		buf.WriteString(codec.EncodeBase64(raw))
+		config.Images = append(config.Images, &ImageDescription{
+			Url: buf.String(),
+		})
+	}
+}
+
 func WithNoHttps(b bool) AIConfigOption {
 	return func(c *AIConfig) {
 		c.NoHttps = b
