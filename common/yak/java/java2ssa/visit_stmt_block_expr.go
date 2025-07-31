@@ -29,9 +29,7 @@ func (y *builder) VisitBlock(raw javaparser.IBlockContext) interface{} {
 		return nil
 	}
 	if ret := i.BlockStatementList(); ret != nil {
-		y.BuildSyntaxBlock(func() {
-			y.VisitBlockStatementList(ret)
-		})
+		y.VisitBlockStatementList(ret)
 	}
 
 	return nil
