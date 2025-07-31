@@ -47,11 +47,13 @@ type options struct {
 	targetImageSize int64 // Target size in bytes
 
 	// Subtitle-specific options
-	subtitleFile    string
-	outputVideoFile string
-	fontFile        string // Path to a font file for drawtext filter
-	showTimestamp   bool   // Whether to show timestamp overlay on frames
-	subtitlePadding bool   // Whether to add black padding for subtitles instead of overlaying on content
+	subtitleFile                        string
+	outputVideoFile                     string
+	fontFile                            string // Path to a font file for drawtext filter
+	showTimestamp                       bool   // Whether to show timestamp overlay on frames
+	subtitlePadding                     bool   // Whether to add black padding for subtitles instead of overlaying on content
+	ignoreBottomPaddingInSceneDetection bool   // Whether to ignore bottom padding area when doing scene detection
+	showSubtitleTimestamp               bool   // Whether to show timestamp information within subtitle text
 
 	// Screen recording options
 	recordFormat    string // e.g., "avfoundation" on macOS, "gdigrab" on Windows
@@ -276,6 +278,23 @@ func WithTimestampOverlay(show bool) Option {
 func WithSubtitlePadding(enable bool) Option {
 	return func(o *options) {
 		o.subtitlePadding = enable
+	}
+}
+
+// WithIgnoreBottomPaddingInSceneDetection controls whether scene detection should ignore the bottom padding area.
+// When enabled, scene detection will only analyze the original video content, ignoring changes in timestamp/subtitle areas.
+// This is particularly useful when extracting frames with timestamps or subtitles to avoid false scene changes.
+func WithIgnoreBottomPaddingInSceneDetection(enable bool) Option {
+	return func(o *options) {
+		o.ignoreBottomPaddingInSceneDetection = enable
+	}
+}
+
+// WithSubtitleTimestamp sets whether to show timestamp information within subtitle text.
+// When enabled, each subtitle line will include timing information like "(start: 00:01:23 ---> end: 00:01:26)".
+func WithSubtitleTimestamp(enable bool) Option {
+	return func(o *options) {
+		o.showSubtitleTimestamp = enable
 	}
 }
 

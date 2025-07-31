@@ -168,6 +168,94 @@ func (s *SRTManager) ToSRT() string {
 	return builder.String()
 }
 
+// RewriteWithTimestamp converts the entries to SRT format with timestamp information included in the text
+func (s *SRTManager) RewriteWithTimestamp() string {
+	var builder strings.Builder
+
+	for _, entry := range s.entries {
+		builder.WriteString(fmt.Sprintf("%d\n", entry.Index))
+		builder.WriteString(fmt.Sprintf("%s --> %s\n",
+			formatSRTTimeFromDuration(entry.StartTime),
+			formatSRTTimeFromDuration(entry.EndTime)))
+
+		// Add timestamp info to the text in the same line
+		startStr := formatSRTTimeFromDuration(entry.StartTime)
+		endStr := formatSRTTimeFromDuration(entry.EndTime)
+		timestampInfo := fmt.Sprintf("(start: %s ---> end: %s)", startStr, endStr)
+
+		// Combine original text with timestamp info on the same line
+		if strings.TrimSpace(entry.Text) != "" {
+			// Remove any existing newlines in the original text and combine with timestamp
+			cleanText := strings.ReplaceAll(strings.TrimSpace(entry.Text), "\n", " ")
+			builder.WriteString(fmt.Sprintf("%s %s", cleanText, timestampInfo))
+		} else {
+			builder.WriteString(timestampInfo)
+		}
+		builder.WriteString("\n\n")
+	}
+
+	return builder.String()
+}
+
+// CreateTempSRTWithTimestamp creates a temporary SRT file with timestamp information included
+func (s *SRTManager) CreateTempSRTWithTimestamp() (string, error) {
+	// Generate SRT content with timestamps
+	srtContent := s.RewriteWithTimestamp()
+
+	// Create temporary file
+	tempFile, err := os.CreateTemp("", "srt_with_timestamp_*.srt")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temporary SRT file: %w", err)
+	}
+	defer tempFile.Close()
+
+	// Write content to temporary file
+	_, err = tempFile.WriteString(srtContent)
+	if err != nil {
+		// Clean up the file if writing fails
+		os.Remove(tempFile.Name())
+		return "", fmt.Errorf("failed to write SRT content to temporary file: %w", err)
+	}
+
+	return tempFile.Name(), nil
+}
+
+// PreviewWithTimestamp returns a preview of how the SRT content will look with timestamps
+func (s *SRTManager) PreviewWithTimestamp() string {
+	if len(s.entries) == 0 {
+		return "No SRT entries to preview"
+	}
+
+	var preview strings.Builder
+	preview.WriteString("Preview of SRT with timestamps (first 3 entries):\n")
+	preview.WriteString("=" + strings.Repeat("=", 60) + "\n")
+
+	maxEntries := len(s.entries)
+	if maxEntries > 3 {
+		maxEntries = 3
+	}
+
+	for i := 0; i < maxEntries; i++ {
+		entry := s.entries[i]
+		startStr := formatSRTTimeFromDuration(entry.StartTime)
+		endStr := formatSRTTimeFromDuration(entry.EndTime)
+		timestampInfo := fmt.Sprintf("(start: %s ---> end: %s)", startStr, endStr)
+
+		if strings.TrimSpace(entry.Text) != "" {
+			cleanText := strings.ReplaceAll(strings.TrimSpace(entry.Text), "\n", " ")
+			preview.WriteString(fmt.Sprintf("%d. %s %s\n", entry.Index, cleanText, timestampInfo))
+		} else {
+			preview.WriteString(fmt.Sprintf("%d. %s\n", entry.Index, timestampInfo))
+		}
+	}
+
+	if len(s.entries) > 3 {
+		preview.WriteString(fmt.Sprintf("... and %d more entries\n", len(s.entries)-3))
+	}
+
+	return preview.String()
+}
+
 // UpdateEntry updates a specific SRT entry
 func (s *SRTManager) UpdateEntry(index int, newText string) error {
 	for i := range s.entries {
