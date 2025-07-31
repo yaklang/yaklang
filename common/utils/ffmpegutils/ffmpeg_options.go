@@ -51,6 +51,7 @@ type options struct {
 	outputVideoFile string
 	fontFile        string // Path to a font file for drawtext filter
 	showTimestamp   bool   // Whether to show timestamp overlay on frames
+	subtitlePadding bool   // Whether to add black padding for subtitles instead of overlaying on content
 
 	// Screen recording options
 	recordFormat    string // e.g., "avfoundation" on macOS, "gdigrab" on Windows
@@ -266,6 +267,15 @@ func WithFontFile(filepath string) Option {
 func WithTimestampOverlay(show bool) Option {
 	return func(o *options) {
 		o.showTimestamp = show
+	}
+}
+
+// WithSubtitlePadding enables or disables adding black padding for subtitles.
+// When enabled, black padding will be added to the bottom of the video where subtitles are displayed,
+// ensuring subtitles don't cover the original video content.
+func WithSubtitlePadding(enable bool) Option {
+	return func(o *options) {
+		o.subtitlePadding = enable
 	}
 }
 

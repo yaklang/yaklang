@@ -256,7 +256,16 @@ func BurnInSubtitles(inputFile string, opts ...Option) error {
 	// NOTE: This requires ffmpeg to be compiled with --enable-libass.
 	// The paths in the filter need to be escaped for ffmpeg.
 	escapedSubtitlePath := filepath.ToSlash(o.subtitleFile)
-	vfFilter := fmt.Sprintf("subtitles='%s'", escapedSubtitlePath)
+
+	var vfFilter string
+	if o.subtitlePadding {
+		// Add black padding to the bottom and position subtitles in the padding area
+		// First add 80px of black padding at the bottom, then apply subtitles with custom positioning
+		vfFilter = fmt.Sprintf("pad=iw:ih+80:0:0:black,subtitles='%s':force_style='Alignment=2,MarginV=10'", escapedSubtitlePath)
+	} else {
+		// Default behavior: overlay subtitles directly on video content
+		vfFilter = fmt.Sprintf("subtitles='%s'", escapedSubtitlePath)
+	}
 
 	args := []string{
 		"-i", inputFile,
