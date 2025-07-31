@@ -208,6 +208,11 @@ func (c *config) parseProjectWithFS(
 			if _, needBuild := handlerFilesMap[fileContent.Path]; !needBuild {
 				continue // skip if not in handlerFilesMap
 			}
+			// log.Infof("visited file: ", prog.GetIncludeFiles())
+			if prog.ShouldVisit(fileContent.Path) {
+				log.Infof("parse file %s done skip in main build", fileContent.Path)
+				continue
+			}
 			path := fileContent.Path
 			ast := fileContent.AST
 			defer func() {
