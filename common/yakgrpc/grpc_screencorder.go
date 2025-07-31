@@ -114,11 +114,13 @@ func (s *Server) StartScrecorder(req *ypb.StartScrecorderRequest, stream ypb.Yak
 
 	if req.GetCoefficientPTS() > 0 {
 		opts = append(opts, screcorder.WithCoefficientPTS(req.GetCoefficientPTS()))
+	} else {
+		// Default to 1x speed if not specified
+		opts = append(opts, screcorder.WithCoefficientPTS(1.0))
 	}
 
-	if req.GetDisableMouse() {
-		opts = append(opts, screcorder.WithMouseCapture(req.GetDisableMouse()))
-	}
+	// Fix mouse capture logic: DisableMouse should disable mouse capture
+	opts = append(opts, screcorder.WithMouseCapture(!req.GetDisableMouse()))
 
 	if req.GetResolutionSize() != "" {
 		opts = append(opts, screcorder.WithResolutionSize(req.GetResolutionSize()))
@@ -128,8 +130,8 @@ func (s *Server) StartScrecorder(req *ypb.StartScrecorderRequest, stream ypb.Yak
 	for _, opt := range opts {
 		opt(cfg)
 	}
-	// TODO: support other platforms
-	devices := screcorder.GetDarwinAvailableAVFoundationScreenDevices()
+
+	devices := screcorder.GetAvailableScreenDevices()
 	if len(devices) == 0 {
 		return utils.Errorf("no screen device found")
 	}
@@ -139,12 +141,6 @@ func (s *Server) StartScrecorder(req *ypb.StartScrecorderRequest, stream ypb.Yak
 	if err != nil {
 		return err
 	}
-	go func() {
-		select {
-		case <-stream.Context().Done():
-			recorder.Stop()
-		}
-	}()
 
 	projectPath := filepath.Join(consts.GetDefaultYakitProjectsDir(), "records")
 	if utils.GetFirstExistedFile(projectPath) == "" {
@@ -157,10 +153,9 @@ func (s *Server) StartScrecorder(req *ypb.StartScrecorderRequest, stream ypb.Yak
 		return utils.Errorf("start to execute screen recorder failed: %s", err)
 	}
 
-	select {
-	case <-stream.Context().Done():
-		recorder.Stop()
-	}
+	// Wait for context cancellation and stop recording
+	<-stream.Context().Done()
+	recorder.Stop()
 
 	for {
 		if !recorder.IsRecording() {
@@ -181,6 +176,8 @@ func (s *Server) StartScrecorder(req *ypb.StartScrecorderRequest, stream ypb.Yak
 	duration, err := ffmpegutils.GetVideoDuration(recordName)
 	if err != nil {
 		log.Warnf("get video duration failed: %v", err)
+		// Set duration to 0 if failed to parse
+		duration = 0
 	}
 	frameData, err := ffmpegutils.ExtractSpecificFrame(recordName, 1)
 	if err != nil {

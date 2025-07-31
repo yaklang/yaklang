@@ -34,6 +34,29 @@ func GetDarwinAvailableAVFoundationScreenDevices() []*ScreenDevice {
 	return nil
 }
 
+func GetWindowsAvailableGDIGrabScreenDevices() []*ScreenDevice {
+	// Windows uses gdigrab with desktop as the input device
+	// No need to enumerate devices as "desktop" is the standard input for screen capture
+	return []*ScreenDevice{
+		{
+			DeviceName:      "Desktop Screen Capture",
+			FfmpegInputName: "desktop",
+			PlatformDemuxer: "gdigrab",
+		},
+	}
+}
+
+func GetAvailableScreenDevices() []*ScreenDevice {
+	switch runtime.GOOS {
+	case "darwin":
+		return GetDarwinAvailableAVFoundationScreenDevices()
+	case "windows", "win32":
+		return GetWindowsAvailableGDIGrabScreenDevices()
+	default:
+		return nil
+	}
+}
+
 func IsAvailable() (bool, error) {
 	path := consts.GetFfmpegPath()
 	if path == "" {
