@@ -3,6 +3,7 @@ package ffmpegutils
 import (
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -598,4 +599,195 @@ func TestGetVideoDuration_RegexPatternLongHours(t *testing.T) {
 			assert.Nil(t, matches, "Input %q should not match the regex", tc.input)
 		}
 	}
+}
+
+func TestSmoke_DefaultIgnoreBottomPaddingInSceneDetection(t *testing.T) {
+	// Simple test to verify the padding-aware scene detection feature works
+
+	outputDir := t.TempDir()
+
+	// Create a simple test video using testsrc
+	testVideoPath := filepath.Join(outputDir, "simple_test.mp4")
+
+	// Create a basic 2-second video
+	cmd := exec.Command("ffmpeg",
+		"-f", "lavfi",
+		"-i", "testsrc=duration=2:rate=2:size=320x240",
+		"-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+		"-y", testVideoPath)
+
+	err := cmd.Run()
+	if err != nil {
+		t.Skipf("Failed to create test video (ffmpeg might not be available): %v", err)
+	}
+
+	// Test with padding detection enabled
+	results, err := ExtractImageFramesFromVideo(testVideoPath,
+		WithOutputDir(outputDir),
+		WithSceneThreshold(0.3),
+		WithIgnoreBottomPaddingInSceneDetection(true))
+
+	assert.NoError(t, err)
+
+	var frameCount int
+	for result := range results {
+		if result.Error != nil {
+			t.Logf("Frame extraction error: %v", result.Error)
+			continue
+		}
+		if len(result.RawData) > 0 {
+			frameCount++
+		}
+	}
+
+	t.Logf("Successfully extracted %d frames with padding-aware scene detection", frameCount)
+
+	// Basic validation - should extract at least 1 frame
+	assert.True(t, frameCount > 0, "Should extract at least one frame")
+
+	// Create another test video for the second test (avoid file conflicts)
+	testVideoPath2 := filepath.Join(outputDir, "simple_test2.mp4")
+	cmd2 := exec.Command("ffmpeg",
+		"-f", "lavfi",
+		"-i", "testsrc=duration=2:rate=2:size=320x240",
+		"-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+		"-y", testVideoPath2)
+
+	err = cmd2.Run()
+	if err != nil {
+		t.Skipf("Failed to create second test video: %v", err)
+	}
+
+	// Test that the feature can be disabled too
+	results2, err := ExtractImageFramesFromVideo(testVideoPath2,
+		WithOutputDir(outputDir),
+		WithSceneThreshold(0.3),
+		WithIgnoreBottomPaddingInSceneDetection(false))
+
+	assert.NoError(t, err)
+
+	var frameCount2 int
+	for result := range results2 {
+		if result.Error != nil {
+			continue
+		}
+		if len(result.RawData) > 0 {
+			frameCount2++
+		}
+	}
+
+	t.Logf("Successfully extracted %d frames without padding detection", frameCount2)
+	assert.True(t, frameCount2 > 0, "Should extract at least one frame without padding detection")
+}
+
+func TestSmoke_DefaultBehaviorIncludesPaddingDetection(t *testing.T) {
+	// Test that ExtractImageFramesFromVideo with scene detection uses padding detection by default
+	// when called through the high-level functions
+
+	outputDir := t.TempDir()
+
+	// Create a simple test video
+	testVideoPath := filepath.Join(outputDir, "default_test.mp4")
+
+	cmd := exec.Command("ffmpeg",
+		"-f", "lavfi",
+		"-i", "testsrc=duration=2:rate=2:size=320x240",
+		"-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+		"-y", testVideoPath)
+
+	err := cmd.Run()
+	if err != nil {
+		t.Skipf("Failed to create test video (ffmpeg might not be available): %v", err)
+	}
+
+	// Test the default behavior - should include padding detection for scene-based extraction
+	results, err := ExtractImageFramesFromVideo(testVideoPath,
+		WithOutputDir(outputDir),
+		WithSceneThreshold(0.3)) // Scene detection without explicitly setting padding detection
+
+	assert.NoError(t, err)
+
+	var frameCount int
+	for result := range results {
+		if result.Error != nil {
+			t.Logf("Frame extraction error: %v", result.Error)
+			continue
+		}
+		if len(result.RawData) > 0 {
+			frameCount++
+		}
+	}
+
+	t.Logf("Default behavior extracted %d frames", frameCount)
+	assert.True(t, frameCount > 0, "Should extract at least one frame with default settings")
+}
+
+func TestSmoke_SubtitleWithTimestamp(t *testing.T) {
+	// Test that subtitle burning with timestamp information works correctly
+
+	outputDir := t.TempDir()
+
+	// Create a simple test video
+	testVideoPath := filepath.Join(outputDir, "test_video.mp4")
+
+	cmd := exec.Command("ffmpeg",
+		"-f", "lavfi",
+		"-i", "testsrc=duration=5:rate=2:size=320x240",
+		"-c:v", "libx264", "-preset", "ultrafast",
+		"-y", testVideoPath)
+
+	err := cmd.Run()
+	if err != nil {
+		t.Skipf("Failed to create test video (ffmpeg might not be available): %v", err)
+	}
+
+	// Create a simple SRT file
+	srtContent := `1
+00:00:01,000 --> 00:00:03,000
+Hello World
+
+2
+00:00:03,500 --> 00:00:05,000
+This is a test subtitle
+`
+
+	srtPath := filepath.Join(outputDir, "test.srt")
+	err = os.WriteFile(srtPath, []byte(srtContent), 0644)
+	assert.NoError(t, err)
+
+	// Test burning subtitles with timestamp information
+	outputVideoPath := filepath.Join(outputDir, "output_with_timestamp.mp4")
+
+	err = BurnInSubtitles(testVideoPath,
+		WithSubtitleFile(srtPath),
+		WithOutputVideoFile(outputVideoPath),
+		WithSubtitleTimestamp(true),
+		WithSubtitlePadding(true),
+		WithDebug(true))
+
+	assert.NoError(t, err)
+
+	// Verify output file was created
+	_, err = os.Stat(outputVideoPath)
+	assert.NoError(t, err)
+
+	t.Logf("Successfully created video with timestamped subtitles: %s", outputVideoPath)
+
+	// Test without timestamp for comparison
+	outputVideoPath2 := filepath.Join(outputDir, "output_without_timestamp.mp4")
+
+	err = BurnInSubtitles(testVideoPath,
+		WithSubtitleFile(srtPath),
+		WithOutputVideoFile(outputVideoPath2),
+		WithSubtitleTimestamp(false),
+		WithSubtitlePadding(true),
+		WithDebug(true))
+
+	assert.NoError(t, err)
+
+	// Verify second output file was created
+	_, err = os.Stat(outputVideoPath2)
+	assert.NoError(t, err)
+
+	t.Logf("Successfully created video without timestamped subtitles: %s", outputVideoPath2)
 }

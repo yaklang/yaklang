@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/ffmpegutils"
 )
 
@@ -42,6 +44,7 @@ func _extractAudioFromVideo(i string, opts ...ffmpegutils.Option) (*ffmpegutils.
 func _extractFineGrainedFramesFromVideo(i string, opts ...ffmpegutils.Option) (<-chan *ffmpegutils.FfmpegStreamResult, error) {
 	opts = append(opts, ffmpegutils.WithSceneThreshold(0.05))
 	opts = append(opts, ffmpegutils.WithTimestampOverlay(true))
+	opts = append(opts, ffmpegutils.WithIgnoreBottomPaddingInSceneDetection(true)) // 默认启用智能场景检测
 	return ffmpegutils.ExtractImageFramesFromVideo(i, opts...)
 }
 
@@ -61,6 +64,7 @@ func _extractFineGrainedFramesFromVideo(i string, opts ...ffmpegutils.Option) (<
 func _extractBroadGrainedFramesFromVideo(i string, opts ...ffmpegutils.Option) (<-chan *ffmpegutils.FfmpegStreamResult, error) {
 	opts = append(opts, ffmpegutils.WithSceneThreshold(0.2))
 	opts = append(opts, ffmpegutils.WithTimestampOverlay(true))
+	opts = append(opts, ffmpegutils.WithIgnoreBottomPaddingInSceneDetection(true)) // 默认启用智能场景检测
 	return ffmpegutils.ExtractImageFramesFromVideo(i, opts...)
 }
 
@@ -78,6 +82,7 @@ func _extractBroadGrainedFramesFromVideo(i string, opts ...ffmpegutils.Option) (
 // ```
 func _burnInSubtitles(inputVideo string, srtFile string, opts ...ffmpegutils.Option) (string, error) {
 	// Generate output filename based on input
+	// go run common/yak/cmd/yak.go -c 'result = ffmpeg.BurnSRTIntoVideo("vtestdata/demo1.mp4", "vtestdata/demo1.mp3.srt"); println(result)'
 	baseName := strings.TrimSuffix(filepath.Base(inputVideo), filepath.Ext(inputVideo))
 	outputFile, err := consts.TempFile(baseName + "_with_subtitles_*.mp4")
 	if err != nil {
@@ -96,6 +101,7 @@ func _burnInSubtitles(inputVideo string, srtFile string, opts ...ffmpegutils.Opt
 		ffmpegutils.WithSubtitleFile(srtFile),
 		ffmpegutils.WithOutputVideoFile(outputPath),
 		ffmpegutils.WithSubtitlePadding(true), // Enable padding by default for better UX
+		ffmpegutils.WithSubtitleTimestamp(true),
 	}
 
 	// Append user options (they can override defaults)
@@ -107,6 +113,20 @@ func _burnInSubtitles(inputVideo string, srtFile string, opts ...ffmpegutils.Opt
 		return "", err
 	}
 
+	if !utils.FileExists(outputPath) {
+		return "", utils.Error("failed to burn subtitles into video")
+	}
+
+	// Check file size to ensure the output is reasonable
+	if fileInfo, err := os.Stat(outputPath); err == nil {
+		if fileInfo.Size() <= 0 {
+			return "", utils.Error("generated video file is empty or invalid")
+		}
+		log.Infof("Successfully burned subtitles into video: %s (size: %d bytes)", outputPath, fileInfo.Size())
+	} else {
+		log.Infof("Successfully burned subtitles into video: %s", outputPath)
+	}
+
 	return outputPath, nil
 }
 
@@ -116,6 +136,9 @@ var FfmpegExports = map[string]any{
 	"ExtractBroadGrainedFramesFromVideo": _extractBroadGrainedFramesFromVideo,
 	"BurnSRTIntoVideo":                   _burnInSubtitles,
 
-	"withStartEnd":         ffmpegutils.WithStartEndSeconds,
-	"withTimestampOverlay": ffmpegutils.WithTimestampOverlay,
+	"withStartEnd":                            ffmpegutils.WithStartEndSeconds,
+	"withTimestampOverlay":                    ffmpegutils.WithTimestampOverlay,
+	"withSubtitlePadding":                     ffmpegutils.WithSubtitlePadding,
+	"withOutputFile":                          ffmpegutils.WithOutputVideoFile,
+	"withIgnoreBottomPaddingInSceneDetection": ffmpegutils.WithIgnoreBottomPaddingInSceneDetection,
 }

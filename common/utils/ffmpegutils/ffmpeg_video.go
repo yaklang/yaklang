@@ -18,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mimetype"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/whisperutils"
 )
 
 // formatDuration converts a time.Duration to ffmpeg's HH:MM:SS.ms format.
@@ -102,15 +103,41 @@ func ExtractImageFramesFromVideo(inputFile string, opts ...Option) (<-chan *Ffmp
 		// custom filter might need vsync settings, user should specify if needed
 	} else {
 		var vfParts []string
+
 		// Frame selection part
 		switch o.mode {
 		case modeSceneChange:
-			vfParts = append(vfParts, fmt.Sprintf("select='eq(n,0)+gt(scene,%.2f)'", o.sceneThreshold))
+			if o.ignoreBottomPaddingInSceneDetection {
+				// Advanced scene detection: analyze only main content but output full frames
+				// This prevents subtitle/timestamp changes from being detected as scene changes
+				// while preserving the complete frame (including subtitles) in the output
+
+				bottomCropHeight := 80 // Common subtitle area height
+
+				// Advanced solution: Split stream, crop one for scene detection, overlay result back
+				// This approach preserves the original content while doing scene detection on cropped area
+				// Based on: https://superuser.com/questions/1440682/ffmpeg-crop-select-then-uncrop-for-the-output
+				//
+				// Strategy:
+				// 1. Split video stream into two identical streams
+				// 2. Crop one stream for scene detection analysis only
+				// 3. Use the scene detection results to select frames from the original uncropped stream
+				// 4. Use scale2ref and overlay to synchronize and output the full frames
+
+				complexFilter := fmt.Sprintf("split=2[roi][full];[roi]crop=iw:ih-%d:0:0,select='eq(n,0)+gt(scene,%.2f)'[roi];[roi][full]scale2ref[roi][full];[roi][full]overlay=shortest=1",
+					bottomCropHeight, o.sceneThreshold)
+				vfParts = append(vfParts, complexFilter)
+				log.Debugf("Using split-crop-overlay scene detection (analyze cropped %dpx, output full frames) with threshold %.2f", bottomCropHeight, o.sceneThreshold)
+			} else {
+				// Standard scene detection on full frame
+				sceneFilter := fmt.Sprintf("select='eq(n,0)+gt(scene,%.2f)'", o.sceneThreshold)
+				vfParts = append(vfParts, sceneFilter)
+			}
 		case modeFixedRate:
 			// -r option is used instead of a select filter for fixed rate
 		}
 
-		// Timestamp overlay part
+		// Timestamp overlay part (applied AFTER scene detection)
 		if o.showTimestamp {
 			// Add padding to the bottom of the image to create space for timestamp
 			// This ensures the timestamp doesn't cover the original content
@@ -251,20 +278,65 @@ func BurnInSubtitles(inputFile string, opts ...Option) error {
 		return fmt.Errorf("output video file is required; use WithOutputVideoFile()")
 	}
 
-	// 2. Construct command.
+	// 2. Handle subtitle timestamp display if requested
+	var actualSubtitleFile string
+	var tempSRTFile string
+	var shouldCleanupTemp bool
+
+	if o.showSubtitleTimestamp {
+		// Load SRT file and create a version with timestamp information
+		srtManager, err := whisperutils.NewSRTManagerFromFile(o.subtitleFile)
+		if err != nil {
+			return fmt.Errorf("failed to load SRT file for timestamp processing: %w", err)
+		}
+
+		tempSRTFile, err = srtManager.CreateTempSRTWithTimestamp()
+		if err != nil {
+			return fmt.Errorf("failed to create temporary SRT file with timestamps: %w", err)
+		}
+
+		actualSubtitleFile = tempSRTFile
+		shouldCleanupTemp = true
+		log.Debugf("Created temporary SRT with timestamps: %s", tempSRTFile)
+	} else {
+		actualSubtitleFile = o.subtitleFile
+	}
+
+	// Ensure cleanup of temporary file
+	if shouldCleanupTemp {
+		defer func() {
+			if err := os.Remove(tempSRTFile); err != nil {
+				log.Warnf("Failed to cleanup temporary SRT file %s: %v", tempSRTFile, err)
+			} else {
+				log.Debugf("Cleaned up temporary SRT file: %s", tempSRTFile)
+			}
+		}()
+	}
+
+	// 3. Construct command.
 	// The filter `subtitles=FILENAME` will burn the SRT file onto the video.
 	// NOTE: This requires ffmpeg to be compiled with --enable-libass.
 	// The paths in the filter need to be escaped for ffmpeg.
-	escapedSubtitlePath := filepath.ToSlash(o.subtitleFile)
+	escapedSubtitlePath := filepath.ToSlash(actualSubtitleFile)
 
 	var vfFilter string
 	if o.subtitlePadding {
 		// Add black padding to the bottom and position subtitles in the padding area
 		// First add 80px of black padding at the bottom, then apply subtitles with custom positioning
-		vfFilter = fmt.Sprintf("pad=iw:ih+80:0:0:black,subtitles='%s':force_style='Alignment=2,MarginV=10'", escapedSubtitlePath)
+		if o.showSubtitleTimestamp {
+			// Use smaller font size when showing timestamp to fit more content in one line
+			vfFilter = fmt.Sprintf("pad=iw:ih+80:0:0:black,subtitles='%s':force_style='Alignment=2,MarginV=10,FontSize=14'", escapedSubtitlePath)
+		} else {
+			vfFilter = fmt.Sprintf("pad=iw:ih+80:0:0:black,subtitles='%s':force_style='Alignment=2,MarginV=10'", escapedSubtitlePath)
+		}
 	} else {
 		// Default behavior: overlay subtitles directly on video content
-		vfFilter = fmt.Sprintf("subtitles='%s'", escapedSubtitlePath)
+		if o.showSubtitleTimestamp {
+			// Use smaller font size when showing timestamp
+			vfFilter = fmt.Sprintf("subtitles='%s':force_style='FontSize=14'", escapedSubtitlePath)
+		} else {
+			vfFilter = fmt.Sprintf("subtitles='%s'", escapedSubtitlePath)
+		}
 	}
 
 	args := []string{
@@ -277,7 +349,7 @@ func BurnInSubtitles(inputFile string, opts ...Option) error {
 		o.outputVideoFile,
 	}
 
-	// 3. Execute command
+	// 4. Execute command
 	cmd := exec.CommandContext(o.ctx, ffmpegBinaryPath, args...)
 	if o.debug {
 		cmd.Stderr = log.NewLogWriter(log.DebugLevel)
