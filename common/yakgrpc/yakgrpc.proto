@@ -889,6 +889,49 @@ service Yak {
   rpc InitSearchVectorDatabase(InitSearchVectorDatabaseRequest) returns (stream ExecResult);
   rpc GetAllVectorStoreCollections(Empty) returns (GetAllVectorStoreCollectionsResponse);
   rpc DeleteSearchVectorDatabase(DeleteSearchVectorDatabaseRequest) returns (GeneralResponse);
+
+  // 第三方应用管理
+  rpc ListThirdPartyBinary(Empty) returns (ListThirdPartyBinaryResponse);
+  rpc InstallThirdPartyBinary(InstallThirdPartyBinaryRequest) returns (stream ExecResult);
+  rpc UninstallThirdPartyBinary(UninstallThirdPartyBinaryRequest) returns (GeneralResponse);
+  rpc IsThirdPartyBinaryReady(IsThirdPartyBinaryReadyRequest) returns (IsThirdPartyBinaryReadyResponse);
+  rpc StartThirdPartyBinary(StartThirdPartyBinaryRequest) returns (stream ExecResult);
+}
+
+message ThirdPartyBinary {
+  string Name = 1;
+  bool SupportCurrentPlatform = 2;
+  string Description = 3;
+  string InstallPath = 4;
+  string DownloadURL = 5;
+}
+
+message ListThirdPartyBinaryResponse {
+  repeated ThirdPartyBinary Binaries = 1;
+}
+
+message InstallThirdPartyBinaryRequest {
+  string Name = 1;
+  string Proxy = 2;
+  bool Force = 3;
+}
+
+message UninstallThirdPartyBinaryRequest {
+  string Name = 1;
+}
+
+message IsThirdPartyBinaryReadyRequest {
+  string Name = 1;
+}
+
+message IsThirdPartyBinaryReadyResponse {
+  bool IsReady = 1;
+  string Error = 2;
+}
+
+message StartThirdPartyBinaryRequest {
+  string Name = 1;
+  repeated string Args = 2;
 }
 
 message DeleteSearchVectorDatabaseRequest {

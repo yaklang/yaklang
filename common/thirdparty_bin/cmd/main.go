@@ -78,7 +78,7 @@ func clearProgressLine() {
 func showAllRegisteredTools() error {
 	fmt.Println("=== Registered Binary Tools ===")
 
-	binaries := thirdparty_bin.List()
+	binaries := thirdparty_bin.ListRegisteredNames()
 	if len(binaries) == 0 {
 		fmt.Println("   No tools registered")
 		fmt.Println("   Use 'reinit' to reload builtin tools")
@@ -398,7 +398,7 @@ func realMain() {
 				},
 			},
 			Action: func(c *cli.Context) error {
-				binaries := thirdparty_bin.List()
+				binaries := thirdparty_bin.ListRegisteredNames()
 				if len(binaries) == 0 {
 					fmt.Println("No registered tools to update")
 					return nil
@@ -477,7 +477,7 @@ func realMain() {
 				fmt.Println("Reinitialization successful")
 
 				// Show registered tools
-				binaries := thirdparty_bin.List()
+				binaries := thirdparty_bin.ListRegisteredNames()
 				fmt.Printf("Registered %d tools: %s\n", len(binaries), strings.Join(binaries, ", "))
 
 				return nil
