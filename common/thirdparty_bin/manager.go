@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -149,6 +150,19 @@ func (m *Manager) Uninstall(name string, installPath ...string) error {
 	return m.installer.Uninstall(descriptor)
 }
 
+// ListRegistered 列出所有注册的二进制文件
+func (m *Manager) ListRegistered() []*BinaryDescriptor {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	descriptors := make([]*BinaryDescriptor, 0, len(m.registry))
+	for _, descriptor := range m.registry {
+		descriptors = append(descriptors, descriptor)
+	}
+
+	return descriptors
+}
+
 // List 列出所有注册的二进制文件
 func (m *Manager) List() []string {
 	m.mutex.RLock()
@@ -159,11 +173,12 @@ func (m *Manager) List() []string {
 		names = append(names, name)
 	}
 
+	sort.Strings(names)
 	return names
 }
 
 // GetBinary 获取二进制文件描述符
-func (m *Manager) GetBinary(name string) (*BinaryDescriptor, error) {
+func (m *Manager) GetBinaryDescriptor(name string) (*BinaryDescriptor, error) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
@@ -420,6 +435,19 @@ func (m *Manager) IsRunning(name string) bool {
 	return exists
 }
 
+// GetDownloadInfo 获取下载信息
+func (m *Manager) GetDownloadInfo(name string) (*DownloadInfo, error) {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	descriptor, exists := m.registry[name]
+	if !exists {
+		return nil, utils.Errorf("binary %s not registered", name)
+	}
+
+	return m.installer.GetDownloadInfo(descriptor)
+}
+
 // GetRunningProcess 获取运行中的进程信息
 func (m *Manager) GetRunningProcess(name string) (*RunningProcess, error) {
 	m.mutex.RLock()
@@ -474,12 +502,19 @@ func Uninstall(name string, installPath ...string) error {
 	return DefaultManager.Uninstall(name, installPath...)
 }
 
-// List 使用默认管理器列出所有注册的二进制文件
-func List() []string {
+// ListRegisteredNames 使用默认管理器列出所有注册的二进制文件
+func ListRegisteredNames() []string {
 	if DefaultManager == nil {
 		return []string{}
 	}
 	return DefaultManager.List()
+}
+
+func ListRegistered() []*BinaryDescriptor {
+	if DefaultManager == nil {
+		return []*BinaryDescriptor{}
+	}
+	return DefaultManager.ListRegistered()
 }
 
 // GetStatus 使用默认管理器获取二进制文件状态
@@ -543,4 +578,12 @@ func GetBinaryPath(name string) (string, error) {
 		return "", utils.Error("default manager not initialized")
 	}
 	return DefaultManager.GetBinaryPath(name)
+}
+
+// GetDownloadInfo 使用默认管理器获取下载信息
+func GetDownloadInfo(name string) (*DownloadInfo, error) {
+	if DefaultManager == nil {
+		return nil, utils.Error("default manager not initialized")
+	}
+	return DefaultManager.GetDownloadInfo(name)
 }

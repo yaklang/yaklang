@@ -27,6 +27,8 @@ type Installer interface {
 	GetInstallPath(descriptor *BinaryDescriptor) string
 	// IsInstalled 检查是否已安装
 	IsInstalled(descriptor *BinaryDescriptor) bool
+	// GetDownloadInfo 获取下载信息
+	GetDownloadInfo(descriptor *BinaryDescriptor) (*DownloadInfo, error)
 }
 
 // BaseInstaller 基础安装器
