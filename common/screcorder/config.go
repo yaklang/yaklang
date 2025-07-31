@@ -47,6 +47,10 @@ func (c *Config) ToParams(input, output string) ([]string, error) {
 		if c.MouseCapture {
 			params = append(params, "-draw_mouse", "1")
 		}
+		// Set video size for Windows if specified
+		if c.Width > 0 && c.Height > 0 {
+			params = append(params, "-video_size", fmt.Sprintf("%vx%v", c.Width, c.Height))
+		}
 	default:
 		return nil, utils.Errorf("unsupported os: %v", runtime.GOOS)
 	}
@@ -102,13 +106,8 @@ func WithFramerate(i int) ConfigOpt {
 
 func WithMouseCapture(i bool) ConfigOpt {
 	return func(config *Config) {
-		if i {
-			config.MouseCapture = false
-			config.MouseClickCapture = true
-		} else {
-			config.MouseCapture = true
-			config.MouseClickCapture = false
-		}
+		config.MouseCapture = i
+		config.MouseClickCapture = i
 	}
 }
 
