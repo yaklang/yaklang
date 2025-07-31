@@ -1052,7 +1052,7 @@ RECONNECT:
 			firstResponse.Request = reqIns
 
 			// handle response
-			for noFixContentLength { // 尝试读取pipeline/smuggle响应包
+			for noFixContentLength && option.TryReadMultiResponse { // 尝试读取pipeline/smuggle响应包
 				// log.Infof("checking next(pipeline/smuggle) response...")
 				nextResponse, err := utils.ReadHTTPResponseFromBufioReaderConn(httpResponseReader, conn, nil)
 				var nextRespClose bool

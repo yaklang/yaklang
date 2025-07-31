@@ -13,10 +13,139 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func main() {
+// renderProgressBar 渲染一个美观的进度条
+func renderProgressBar(progress float64, downloaded, total int64, message string) string {
+	const (
+		barWidth  = 40
+		fullChar  = "█"
+		emptyChar = "░"
+	)
+
+	// 确保进度在0-1之间
+	if progress < 0 {
+		progress = 0
+	}
+	if progress > 1 {
+		progress = 1
+	}
+
+	// 计算填充的字符数
+	filled := int(progress * barWidth)
+
+	// 构建进度条
+	bar := strings.Repeat(fullChar, filled) + strings.Repeat(emptyChar, barWidth-filled)
+
+	// 格式化显示
+	var result strings.Builder
+
+	if total > 0 {
+		percentage := progress * 100
+		downloadedSize := utils.ByteSize(uint64(downloaded))
+		totalSize := utils.ByteSize(uint64(total))
+
+		// 彩色进度条（使用ANSI颜色代码）
+		var barColor string
+		if percentage < 30 {
+			barColor = "\033[31m" // 红色
+		} else if percentage < 70 {
+			barColor = "\033[33m" // 黄色
+		} else {
+			barColor = "\033[32m" // 绿色
+		}
+
+		result.WriteString(fmt.Sprintf("%s[%s]\033[0m %6.1f%% %s/%s",
+			barColor,
+			bar,
+			percentage,
+			downloadedSize,
+			totalSize))
+
+		if message != "" && message != "下载中" {
+			result.WriteString(fmt.Sprintf(" - %s", message))
+		}
+	}
+
+	return result.String()
+}
+
+// clearProgressLine 清除进度条行
+func clearProgressLine() {
+	// 使用ANSI转义序列清除整行
+	fmt.Print("\033[2K\r")
+}
+
+// showAllRegisteredTools 显示所有注册工具的状态和描述信息
+func showAllRegisteredTools() error {
+	fmt.Println("=== Registered Binary Tools ===")
+
+	binaries := thirdparty_bin.List()
+	if len(binaries) == 0 {
+		fmt.Println("   No tools registered")
+		fmt.Println("   Use 'reinit' to reload builtin tools")
+		return nil
+	}
+
+	fmt.Printf("Total tools: %d\n\n", len(binaries))
+
+	for i, name := range binaries {
+		status, err := thirdparty_bin.GetStatus(name)
+		if err != nil {
+			fmt.Printf("   %d. %s (Error: %v)\n", i+1, name, err)
+			continue
+		}
+
+		// 获取工具描述
+		var description string
+		var version string
+		if binary, err := thirdparty_bin.GetBuiltinBinaryByName(name); err == nil {
+			description = binary.Description
+			version = binary.Version
+		}
+
+		// 显示工具名称和状态
+		fmt.Printf("   %d. %s", i+1, name)
+		if status.Installed {
+			fmt.Printf(" [INSTALLED]")
+			if status.NeedsUpdate {
+				fmt.Printf(" (Update available)")
+			}
+		} else {
+			fmt.Printf(" [NOT INSTALLED]")
+		}
+
+		// 显示版本信息
+		if version != "" {
+			fmt.Printf(" - %s", version)
+		}
+		fmt.Println()
+
+		// 显示描述
+		if description != "" {
+			fmt.Printf("      %s\n", description)
+		}
+
+		// 显示安装信息
+		if status.Installed {
+			fmt.Printf("      Install path: %s", status.InstallPath)
+			if status.InstalledVersion != "" && status.InstalledVersion != version {
+				fmt.Printf(" (version: %s)", status.InstalledVersion)
+			}
+			fmt.Println()
+
+			if status.AvailableVersion != "" && status.NeedsUpdate {
+				fmt.Printf("      Update to %s available\n", status.AvailableVersion)
+			}
+		}
+		fmt.Println()
+	}
+
+	return nil
+}
+
+func realMain() {
 	app := cli.NewApp()
 	app.Name = "thirdparty-bin-manager"
-	app.Usage = "Yaklang 第三方二进制工具管理器：安装、卸载和管理第三方工具"
+	app.Usage = "Yaklang Third-party Binary Tool Manager: Install, uninstall and manage third-party tools"
 	app.Version = "1.0.0"
 
 	var (
@@ -30,7 +159,7 @@ func main() {
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
 			Name:        "verbose",
-			Usage:       "启用详细输出",
+			Usage:       "Enable verbose output",
 			Destination: &verbose,
 		},
 	}
@@ -45,95 +174,59 @@ func main() {
 	app.Commands = []cli.Command{
 		{
 			Name:  "list",
-			Usage: "列出所有可用的二进制工具",
+			Usage: "List all registered tools with installation status and descriptions",
 			Flags: []cli.Flag{
 				cli.BoolFlag{
-					Name:  "builtin, b",
-					Usage: "只显示内置工具",
-				},
-				cli.BoolFlag{
-					Name:  "registered, r",
-					Usage: "只显示已注册的工具",
-				},
-				cli.BoolFlag{
-					Name:  "installed, i",
-					Usage: "只显示已安装的工具",
+					Name:  "details, d",
+					Usage: "Show detailed builtin configuration (platform support, URLs, etc.)",
 				},
 			},
 			Action: func(c *cli.Context) error {
-				showBuiltin := c.Bool("builtin")
-				showRegistered := c.Bool("registered")
-				showInstalled := c.Bool("installed")
+				showDetails := c.Bool("details")
 
-				if !showBuiltin && !showRegistered && !showInstalled {
-					// 默认显示所有
-					showBuiltin = true
-					showRegistered = true
-				}
-
-				if showBuiltin {
-					fmt.Println("=== 内置二进制工具 ===")
+				if showDetails {
+					fmt.Println("=== Builtin Binary Tools (Detailed Configuration) ===")
 					if err := thirdparty_bin.PrintBuiltinBinaries(); err != nil {
-						log.Errorf("获取内置工具失败: %v", err)
+						log.Errorf("Failed to get builtin tools: %v", err)
+						return err
 					}
-					fmt.Println()
+					return nil
 				}
 
-				if showRegistered {
-					fmt.Println("=== 已注册的二进制工具 ===")
-					binaries := thirdparty_bin.List()
-					if len(binaries) == 0 {
-						fmt.Println("没有已注册的工具")
-					} else {
-						for i, name := range binaries {
-							fmt.Printf("%d. %s", i+1, name)
-							if showInstalled {
-								status, err := thirdparty_bin.GetStatus(name)
-								if err == nil && status.Installed {
-									fmt.Printf(" (已安装: %s)", status.InstallPath)
-								} else {
-									fmt.Printf(" (未安装)")
-								}
-							}
-							fmt.Println()
-						}
-					}
-					fmt.Println()
-				}
-
-				return nil
+				// 默认显示所有注册工具的状态和描述
+				return showAllRegisteredTools()
 			},
 		},
 		{
 			Name:      "install",
-			Usage:     "安装指定的二进制工具",
+			Usage:     "Install specified binary tool",
 			ArgsUsage: "<tool-name>",
 			Flags: []cli.Flag{
 				cli.BoolFlag{
 					Name:        "force, f",
-					Usage:       "强制重新安装（覆盖已存在的文件）",
+					Usage:       "Force reinstall (overwrite existing files)",
 					Destination: &force,
 				},
 				cli.StringFlag{
 					Name:        "proxy, p",
-					Usage:       "使用代理下载 (http://proxy:port)",
+					Usage:       "Use proxy for download (http://proxy:port)",
 					Destination: &proxy,
 				},
 				cli.IntFlag{
 					Name:        "timeout, t",
-					Usage:       "下载超时时间（秒）",
+					Usage:       "Download timeout in seconds",
 					Value:       300,
 					Destination: &timeout,
 				},
 				cli.StringFlag{
 					Name:        "install-dir, d",
-					Usage:       "自定义安装目录",
+					Usage:       "Custom installation directory",
 					Destination: &installDir,
 				},
 			},
 			Action: func(c *cli.Context) error {
 				if c.NArg() < 1 {
-					return fmt.Errorf("请指定要安装的工具名称")
+					return fmt.Errorf("please specify the tool name to install")
 				}
 
 				toolName := c.Args().First()
@@ -154,38 +247,54 @@ func main() {
 				}
 
 				// 设置进度回调
+				var lastProgress float64 = -1
+				var progressStarted bool = false
 				options.Progress = func(progress float64, downloaded, total int64, message string) {
+					// 特殊处理开始下载消息
 					if message == "开始下载" {
-						log.Infof("安装包大小: %s", utils.ByteSize(uint64(total)))
+						fmt.Printf("Package size: %s\n", utils.ByteSize(uint64(total)))
+						fmt.Printf("Starting download...\n")
+						progressStarted = true
 						return
 					}
-					if total > 0 {
-						fmt.Printf("\r下载进度: %.1f%% (%s/%s) - %s",
-							progress*100,
-							utils.ByteSize(uint64(downloaded)),
-							utils.ByteSize(uint64(total)),
-							message)
-					} else {
-						fmt.Printf("\r%s", message)
+
+					// 只在进度有明显变化时更新显示（避免闪烁）
+					if progress-lastProgress >= 0.01 || progress >= 1.0 || message != "下载中" {
+						// 清除之前的进度条输出
+						if progressStarted {
+							clearProgressLine()
+						}
+
+						progressLine := renderProgressBar(progress, downloaded, total, message)
+						fmt.Printf("\r%s", progressLine)
+						lastProgress = progress
+
+						// 下载完成时换行
+						if progress >= 1.0 {
+							fmt.Println()
+							progressStarted = false
+						}
 					}
 				}
 
-				fmt.Printf("正在安装 %s...\n", toolName)
+				fmt.Printf("Installing %s...\n", toolName)
 
 				err := thirdparty_bin.Install(toolName, options)
 				if err != nil {
-					fmt.Printf("\n安装失败: %v\n", err)
+					clearProgressLine()
+					fmt.Printf("Installation failed: %v\n", err)
 					return err
 				}
 
-				fmt.Printf("\n✓ %s 安装成功\n", toolName)
+				clearProgressLine()
+				fmt.Printf("%s installed successfully!\n", toolName)
 
 				// 显示安装状态
 				status, err := thirdparty_bin.GetStatus(toolName)
 				if err == nil {
-					fmt.Printf("安装路径: %s\n", status.InstallPath)
+					fmt.Printf("Install path: %s\n", status.InstallPath)
 					if status.InstalledVersion != "" {
-						fmt.Printf("版本: %s\n", status.InstalledVersion)
+						fmt.Printf("Version: %s\n", status.InstalledVersion)
 					}
 				}
 
@@ -194,58 +303,58 @@ func main() {
 		},
 		{
 			Name:      "uninstall",
-			Usage:     "卸载指定的二进制工具",
+			Usage:     "Uninstall specified binary tool",
 			ArgsUsage: "<tool-name>",
 			Action: func(c *cli.Context) error {
 				if c.NArg() < 1 {
-					return fmt.Errorf("请指定要卸载的工具名称")
+					return fmt.Errorf("please specify the tool name to uninstall")
 				}
 
 				toolName := c.Args().First()
 
-				fmt.Printf("正在卸载 %s...\n", toolName)
+				fmt.Printf("Uninstalling %s...\n", toolName)
 
 				err := thirdparty_bin.Uninstall(toolName)
 				if err != nil {
-					fmt.Printf("卸载失败: %v\n", err)
+					fmt.Printf("Uninstallation failed: %v\n", err)
 					return err
 				}
 
-				fmt.Printf("✓ %s 卸载成功\n", toolName)
+				fmt.Printf("%s uninstalled successfully!\n", toolName)
 				return nil
 			},
 		},
 		{
 			Name:      "status",
-			Usage:     "查看指定工具的状态",
+			Usage:     "Show status of specified tool",
 			ArgsUsage: "<tool-name>",
 			Action: func(c *cli.Context) error {
 				if c.NArg() < 1 {
-					return fmt.Errorf("请指定要查看的工具名称")
+					return fmt.Errorf("please specify the tool name to check status")
 				}
 
 				toolName := c.Args().First()
 
 				status, err := thirdparty_bin.GetStatus(toolName)
 				if err != nil {
-					fmt.Printf("获取状态失败: %v\n", err)
+					fmt.Printf("Failed to get status: %v\n", err)
 					return err
 				}
 
-				fmt.Printf("=== %s 状态 ===\n", toolName)
-				fmt.Printf("名称: %s\n", status.Name)
-				fmt.Printf("已安装: %v\n", status.Installed)
+				fmt.Printf("=== %s Status ===\n", toolName)
+				fmt.Printf("Name: %s\n", status.Name)
+				fmt.Printf("Installed: %v\n", status.Installed)
 				if status.Installed {
-					fmt.Printf("安装路径: %s\n", status.InstallPath)
+					fmt.Printf("Install path: %s\n", status.InstallPath)
 					if status.InstalledVersion != "" {
-						fmt.Printf("已安装版本: %s\n", status.InstalledVersion)
+						fmt.Printf("Installed version: %s\n", status.InstalledVersion)
 					}
 				}
 				if status.AvailableVersion != "" {
-					fmt.Printf("可用版本: %s\n", status.AvailableVersion)
+					fmt.Printf("Available version: %s\n", status.AvailableVersion)
 				}
 				if status.NeedsUpdate {
-					fmt.Printf("需要更新: 是\n")
+					fmt.Printf("Needs update: Yes\n")
 				}
 
 				return nil
@@ -253,37 +362,37 @@ func main() {
 		},
 		{
 			Name:  "info",
-			Usage: "显示系统和包信息",
+			Usage: "Show system and package information",
 			Action: func(c *cli.Context) error {
 				// 显示包信息
 				info := thirdparty_bin.GetPackageInfo()
-				fmt.Println("=== 系统信息 ===")
+				fmt.Println("=== Package Information ===")
 				for key, value := range info {
 					fmt.Printf("%s: %v\n", strings.ReplaceAll(key, "_", " "), value)
 				}
 
 				// 显示当前系统信息
 				sysInfo := thirdparty_bin.GetCurrentSystemInfo()
-				fmt.Printf("\n=== 当前系统 ===\n")
-				fmt.Printf("操作系统: %s\n", sysInfo.OS)
-				fmt.Printf("架构: %s\n", sysInfo.Arch)
-				fmt.Printf("平台标识: %s\n", sysInfo.GetPlatformKey())
+				fmt.Printf("\n=== Current System ===\n")
+				fmt.Printf("Operating System: %s\n", sysInfo.OS)
+				fmt.Printf("Architecture: %s\n", sysInfo.Arch)
+				fmt.Printf("Platform Key: %s\n", sysInfo.GetPlatformKey())
 
 				return nil
 			},
 		},
 		{
 			Name:  "update",
-			Usage: "更新所有已安装的工具",
+			Usage: "Update all installed tools",
 			Flags: []cli.Flag{
 				cli.StringFlag{
 					Name:        "proxy, p",
-					Usage:       "使用代理下载 (http://proxy:port)",
+					Usage:       "Use proxy for download (http://proxy:port)",
 					Destination: &proxy,
 				},
 				cli.IntFlag{
 					Name:        "timeout, t",
-					Usage:       "下载超时时间（秒）",
+					Usage:       "Download timeout in seconds",
 					Value:       300,
 					Destination: &timeout,
 				},
@@ -291,17 +400,17 @@ func main() {
 			Action: func(c *cli.Context) error {
 				binaries := thirdparty_bin.List()
 				if len(binaries) == 0 {
-					fmt.Println("没有已注册的工具需要更新")
+					fmt.Println("No registered tools to update")
 					return nil
 				}
 
-				fmt.Printf("检查 %d 个工具的更新...\n", len(binaries))
+				fmt.Printf("Checking updates for %d tools...\n", len(binaries))
 
 				updated := 0
 				for _, name := range binaries {
 					status, err := thirdparty_bin.GetStatus(name)
 					if err != nil {
-						log.Warnf("获取 %s 状态失败: %v", name, err)
+						log.Warnf("Failed to get status for %s: %v", name, err)
 						continue
 					}
 
@@ -310,10 +419,10 @@ func main() {
 					}
 
 					if status.NeedsUpdate {
-						fmt.Printf("更新 %s...\n", name)
+						fmt.Printf("Updating %s...\n", name)
 
 						options := &thirdparty_bin.InstallOptions{
-							Force: true, // 强制更新
+							Force: true, // Force update
 							Proxy: proxy,
 						}
 
@@ -327,7 +436,7 @@ func main() {
 
 						options.Progress = func(progress float64, downloaded, total int64, message string) {
 							if total > 0 {
-								fmt.Printf("\r  进度: %.1f%% (%s/%s)",
+								fmt.Printf("\r  Progress: %.1f%% (%s/%s)",
 									progress*100,
 									utils.ByteSize(uint64(downloaded)),
 									utils.ByteSize(uint64(total)))
@@ -336,35 +445,40 @@ func main() {
 
 						err = thirdparty_bin.Install(name, options)
 						if err != nil {
-							fmt.Printf("\n  更新 %s 失败: %v\n", name, err)
+							fmt.Printf("\n  Failed to update %s: %v\n", name, err)
 						} else {
-							fmt.Printf("\n  ✓ %s 更新成功\n", name)
+							fmt.Printf("\n  ✓ %s updated successfully\n", name)
 							updated++
 						}
 					}
 				}
 
-				fmt.Printf("\n更新完成，共更新了 %d 个工具\n", updated)
+				if updated == 0 {
+					fmt.Println("All tools are up to date")
+				} else {
+					fmt.Printf("Successfully updated %d tools\n", updated)
+				}
+
 				return nil
 			},
 		},
 		{
 			Name:  "reinit",
-			Usage: "重新初始化内置二进制工具注册表",
+			Usage: "Reinitialize builtin binary tool registry",
 			Action: func(c *cli.Context) error {
-				fmt.Println("重新初始化内置二进制工具...")
+				fmt.Println("Reinitializing builtin binary tools...")
 
 				err := thirdparty_bin.ReinitializeBuiltinBinaries()
 				if err != nil {
-					fmt.Printf("重新初始化失败: %v\n", err)
+					fmt.Printf("Reinitialization failed: %v\n", err)
 					return err
 				}
 
-				fmt.Println("✓ 重新初始化成功")
+				fmt.Println("Reinitialization successful")
 
-				// 显示注册的工具
+				// Show registered tools
 				binaries := thirdparty_bin.List()
-				fmt.Printf("已注册 %d 个工具: %s\n", len(binaries), strings.Join(binaries, ", "))
+				fmt.Printf("Registered %d tools: %s\n", len(binaries), strings.Join(binaries, ", "))
 
 				return nil
 			},
@@ -373,7 +487,11 @@ func main() {
 
 	err := app.Run(os.Args)
 	if err != nil {
-		log.Errorf("运行失败: %v", err)
+		log.Errorf("Program execution failed: %v", err)
 		os.Exit(1)
 	}
+}
+
+func main() {
+	realMain()
 }
