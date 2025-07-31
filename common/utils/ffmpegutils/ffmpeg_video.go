@@ -288,14 +288,48 @@ func StartScreenRecording(outputFile string, opts ...Option) (*exec.Cmd, error) 
 		return nil, fmt.Errorf("screen recording input is required; use WithScreenRecordInput()")
 	}
 
-	args := []string{
-		"-f", o.recordFormat,
-		"-r", strconv.Itoa(o.recordFramerate),
-		"-i", o.recordInput,
-		"-c:v", "libx264",
-		"-preset", "ultrafast",
-		"-an",                                    // No audio
-		"-movflags", "+frag_keyframe+empty_moov", // Make the mp4 streamable and fix moov atom not found error
+	// Build ffmpeg arguments based on platform
+	var args []string
+
+	if o.recordFormat == "avfoundation" {
+		// macOS parameters - use original fast settings
+		args = []string{
+			"-y", // Automatically overwrite output files
+			"-f", "avfoundation",
+			"-r", strconv.Itoa(o.recordFramerate),
+			"-i", o.recordInput,
+			"-c:v", "libx264",
+			"-preset", "ultrafast",
+			"-an",                                    // No audio
+			"-movflags", "+frag_keyframe+empty_moov", // Make the mp4 streamable
+		}
+	} else if o.recordFormat == "gdigrab" {
+		// Windows parameters - restore original ultrafast preset for speed
+		args = []string{
+			"-y", // Automatically overwrite output files
+			"-f", "gdigrab",
+			"-r", strconv.Itoa(o.recordFramerate),
+			"-i", o.recordInput,
+			"-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2,setpts=1*PTS", // Fix odd dimensions + original PTS
+			"-c:v", "libx264",
+			"-preset", "ultrafast", // Original Windows setting for speed
+			"-pix_fmt", "yuv420p", // Keep yuv420p for compatibility
+			"-an",                                              // No audio
+			"-movflags", "+faststart+frag_keyframe+empty_moov", // Optimize for short recordings
+		}
+	} else {
+		// Generic fallback
+		args = []string{
+			"-y", // Automatically overwrite output files
+			"-f", o.recordFormat,
+			"-r", strconv.Itoa(o.recordFramerate),
+			"-i", o.recordInput,
+			"-c:v", "libx264",
+			"-preset", "medium",
+			"-pix_fmt", "yuv420p",
+			"-an",                                    // No audio
+			"-movflags", "+frag_keyframe+empty_moov", // Make the mp4 streamable
+		}
 	}
 	if o.captureCursor {
 		// This option is specific to certain formats like avfoundation
@@ -392,23 +426,49 @@ func GetVideoDuration(inputFile string) (time.Duration, error) {
 		return 0, fmt.Errorf("ffmpeg produced no output for file: %s", inputFile)
 	}
 
-	// Duration: 00:01:12.38 or 100:01:12.38 for longer videos
-	re := regexp.MustCompile(`Duration: (\d+):(\d{2}):(\d{2})\.(\d{2})`)
-	matches := re.FindStringSubmatch(output)
-
-	if len(matches) != 5 {
-		return 0, fmt.Errorf("could not parse duration from ffmpeg output: %s", output)
+	// Try multiple duration patterns
+	patterns := []string{
+		`Duration: (\d+):(\d{2}):(\d{2})\.(\d{2})`, // Duration: 00:01:12.38
+		`Duration: (\d+):(\d{2}):(\d{2})\.(\d{3})`, // Duration: 00:01:12.380
+		`Duration: (\d+):(\d{2}):(\d{2})\.(\d{1})`, // Duration: 00:01:12.3
+		`time=(\d+):(\d{2}):(\d{2})\.(\d{2})`,      // time=00:01:12.38
+		`time=(\d+):(\d{2}):(\d{2})\.(\d{3})`,      // time=00:01:12.380
+		`time=(\d+):(\d{2}):(\d{2})\.(\d{1})`,      // time=00:01:12.3
 	}
 
-	hours, _ := strconv.Atoi(matches[1])
-	minutes, _ := strconv.Atoi(matches[2])
-	seconds, _ := strconv.Atoi(matches[3])
-	centiseconds, _ := strconv.Atoi(matches[4])
+	for _, pattern := range patterns {
+		re := regexp.MustCompile(pattern)
+		matches := re.FindStringSubmatch(output)
 
-	duration := time.Duration(hours)*time.Hour +
-		time.Duration(minutes)*time.Minute +
-		time.Duration(seconds)*time.Second +
-		time.Duration(centiseconds)*10*time.Millisecond
+		if len(matches) >= 5 {
+			hours, _ := strconv.Atoi(matches[1])
+			minutes, _ := strconv.Atoi(matches[2])
+			seconds, _ := strconv.Atoi(matches[3])
 
-	return duration, nil
+			// Handle different decimal precision
+			var milliseconds int64
+			if len(matches[4]) == 1 {
+				// 1 digit: multiply by 100 (e.g., 3 -> 300ms)
+				val, _ := strconv.Atoi(matches[4])
+				milliseconds = int64(val * 100)
+			} else if len(matches[4]) == 2 {
+				// 2 digits: multiply by 10 (e.g., 38 -> 380ms)
+				val, _ := strconv.Atoi(matches[4])
+				milliseconds = int64(val * 10)
+			} else if len(matches[4]) == 3 {
+				// 3 digits: use as is (e.g., 380 -> 380ms)
+				val, _ := strconv.Atoi(matches[4])
+				milliseconds = int64(val)
+			}
+
+			duration := time.Duration(hours)*time.Hour +
+				time.Duration(minutes)*time.Minute +
+				time.Duration(seconds)*time.Second +
+				time.Duration(milliseconds)*time.Millisecond
+
+			return duration, nil
+		}
+	}
+
+	return 0, fmt.Errorf("could not parse duration from ffmpeg output (tried multiple patterns): %s", output)
 }
