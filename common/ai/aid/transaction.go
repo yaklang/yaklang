@@ -9,8 +9,9 @@ func CallAITransactionWithoutConfig(
 	prompt string,
 	callAi func(*AIRequest) (*AIResponse, error),
 	postHandler func(rsp *AIResponse) error,
+	requestOpts ...AIRequestOption,
 ) error {
-	return CallAITransaction(nil, prompt, callAi, postHandler)
+	return CallAITransaction(nil, prompt, callAi, postHandler, requestOpts...)
 }
 
 func CallAITransaction(
@@ -18,6 +19,7 @@ func CallAITransaction(
 	prompt string,
 	callAi func(*AIRequest) (*AIResponse, error),
 	postHandler func(rsp *AIResponse) error,
+	requestOpts ...AIRequestOption,
 ) error {
 	var seq int64
 	var saver CheckpointCommitHandler
@@ -30,6 +32,15 @@ func CallAITransaction(
 	}
 	var postHandlerErr error
 
+	requestOpts = append(requestOpts,
+		WithAIRequest_SeqId(seq),
+		WithAIRequest_OnAcquireSeq(func(i int64) {
+			seq = i
+		}),
+		WithAIRequest_SaveCheckpointCallback(func(handler CheckpointCommitHandler) {
+			saver = handler
+		}))
+
 	for i := int64(0); i < trcRetry; i++ {
 		if c.IsCtxDone() {
 			return utils.Errorf("context is done, cannot continue transaction")
@@ -37,13 +48,7 @@ func CallAITransaction(
 		rsp, err := callAi(
 			NewAIRequest(
 				c.RetryPromptBuilder(prompt, postHandlerErr),
-				WithAIRequest_SeqId(seq),
-				WithAIRequest_OnAcquireSeq(func(i int64) {
-					seq = i
-				}),
-				WithAIRequest_SaveCheckpointCallback(func(handler CheckpointCommitHandler) {
-					saver = handler
-				}),
+				requestOpts...,
 			))
 		if err != nil {
 			c.EmitError("call ai api error: %v, retry and block it", err)
@@ -87,8 +92,9 @@ func (c *Config) callAiTransaction(
 	prompt string,
 	callAi func(*AIRequest) (*AIResponse, error),
 	postHandler func(rsp *AIResponse) error,
+	requestOpts ...AIRequestOption,
 ) error {
-	return CallAITransaction(c, prompt, callAi, postHandler)
+	return CallAITransaction(c, prompt, callAi, postHandler, requestOpts...)
 }
 
 var retryPromptTemplate = `

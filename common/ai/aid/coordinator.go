@@ -70,13 +70,13 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...Opt
 	return c, nil
 }
 
-func (c *Coordinator) CallAITransaction(prompt string, postHandler func(response *AIResponse) error) error {
+func (c *Coordinator) CallAITransaction(prompt string, postHandler func(response *AIResponse) error, requestOpts ...AIRequestOption) error {
 	return c.config.callAiTransaction(prompt, c.callAI, func(rsp *AIResponse) error {
 		if postHandler == nil {
 			return nil
 		}
 		return postHandler(rsp)
-	})
+	}, requestOpts...)
 }
 
 func (c *Coordinator) GetConfig() *Config {
