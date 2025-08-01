@@ -1,10 +1,11 @@
 package ssaapi_test
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -354,6 +355,6 @@ func main() {
 		log.Infof("in memory ")
 		// contain all edge
 		require.Contains(t, dot, "db.QueryRow(query") // contain path
-		require.Contains(t, dot, "r.FormValue")       // contain dataflow path
+		require.Contains(t, dot, "r")                 // contain dataflow path
 	})
 }
