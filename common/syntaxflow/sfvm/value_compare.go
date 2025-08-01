@@ -43,6 +43,27 @@ func (c *StringComparator) AddCondition(pattern string, filterMode ConditionFilt
 	})
 }
 
+func (c *StringComparator) String() string {
+	if c == nil {
+		return ""
+	}
+	var s strings.Builder
+	for i, condition := range c.Conditions {
+		s.WriteString(condition.Pattern)
+		s.WriteString(" ")
+		if i > 0 {
+			switch c.MatchMode {
+			case MatchHave:
+				s.WriteString("AND")
+			case MatchHaveAny:
+				s.WriteString("OR")
+			}
+			s.WriteString(" ")
+		}
+	}
+	return s.String()
+}
+
 func (c *StringComparator) Matches(targets ...string) bool {
 	if c == nil {
 		return false
