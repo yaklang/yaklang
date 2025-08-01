@@ -74,14 +74,14 @@ func (v *Value) IsList() bool {
 
 func (v *Value) ExactMatch(ctx context.Context, mod int, want string) (bool, sfvm.ValueOperator, error) {
 	value := _SearchValue(v, mod, func(s string) bool { return s == want }, sfvm.WithAnalysisContext_Label("search-exact:"+want))
-	return value != nil, value, nil
+	return value.Len() != 0, value, nil
 }
 
 func (v *Value) GlobMatch(ctx context.Context, mod int, g string) (bool, sfvm.ValueOperator, error) {
 	value := _SearchValue(v, mod, func(s string) bool {
 		return glob.MustCompile(g).Match(s)
 	}, sfvm.WithAnalysisContext_Label("search-glob:"+g))
-	return value != nil, value, nil
+	return value.Len() != 0, value, nil
 }
 
 func (v *Value) Merge(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
@@ -94,7 +94,7 @@ func (v *Value) RegexpMatch(ctx context.Context, mod int, re string) (bool, sfvm
 	value := _SearchValue(v, mod, func(s string) bool {
 		return regexp.MustCompile(re).MatchString(s)
 	}, sfvm.WithAnalysisContext_Label("search-regexp:"+re))
-	return value != nil, value, nil
+	return value.Len() != 0, value, nil
 }
 
 func (v *Value) CompareString(items *sfvm.StringComparator) (sfvm.ValueOperator, []bool) {
