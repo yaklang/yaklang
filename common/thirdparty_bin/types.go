@@ -12,6 +12,8 @@ type DownloadInfo struct {
 	Checksums string `json:"checksums,omitempty"`
 	// BinPath
 	BinPath string `json:"bin_path,omitempty"`
+	// 二进制文件目录
+	BinDir string `json:"bin_dir,omitempty"`
 	// 提取文件
 	Pick string `json:"pick,omitempty"`
 }

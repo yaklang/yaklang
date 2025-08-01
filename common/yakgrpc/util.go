@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yaklang/yaklang/common/thirdparty_bin"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 
 	"github.com/jinzhu/gorm"
@@ -536,4 +537,14 @@ func (m *YamlMapBuilder) MarshalToString() (string, error) {
 		res += line + "\n"
 	}
 	return res, err
+}
+
+func NewGrpcProgressCallback(stream ypb.Yak_InstallThirdPartyBinaryServer) thirdparty_bin.ProgressCallback {
+	return func(progress float64, downloaded, total int64, message string) {
+		stream.Send(&ypb.ExecResult{
+			IsMessage: true,
+			Message:   []byte(message),
+			Progress:  float32(progress * 100),
+		})
+	}
 }

@@ -8,49 +8,100 @@ binaries:
     install_type: "bin"
     download_info_map:
       linux-amd64:
-        url: "https://yaklang.oss-cn-beijing.aliyuncs.com/vulinbox/latest/vulinbox_linux_amd64"
-        checksums: ""
-        pick: ""  # 单个可执行文件，不需要从压缩包提取
+        url: "https://oss-qn.yaklang.com/vulinbox/latest/vulinbox_linux_amd64"
+        bin_path: "vulinbox"
       "darwin-*":  # 使用glob模式匹配所有macOS平台 (darwin-amd64, darwin-arm64等)
-        url: "https://yaklang.oss-cn-beijing.aliyuncs.com/vulinbox/latest/vulinbox_darwin_amd64"
-        checksums: ""
-        pick: ""  # 单个可执行文件，不需要从压缩包提取
+        url: "https://oss-qn.yaklang.com/vulinbox/latest/vulinbox_darwin_amd64"
+        bin_path: "vulinbox"
       windows-amd64:
-        url: "https://yaklang.oss-cn-beijing.aliyuncs.com/vulinbox/latest/vulinbox_windows_amd64.exe"
-        checksums: ""
-        pick: ""  # 单个可执行文件，不需要从压缩包提取
+        url: "https://oss-qn.yaklang.com/vulinbox/latest/vulinbox_windows_amd64.exe"
+        bin_path: "vulinbox.exe"
   - name: "ffmpeg"
     description: "FFmpeg - A complete, cross-platform solution to record, convert and stream audio and video"
     version: "latest"
     install_type: "bin"
     download_info_map:
       darwin-*:
-        url: "https://yaklang.oss-accelerate.aliyuncs.com/ffmpeg/ffmpeg-v6.0-darwin-amd64"
-        checksums: ""
-        pick: ""  # 单个可执行文件，不需要从压缩包提取
+        url: "https://oss-qn.yaklang.com/ffmpeg/ffmpeg-v6.0-darwin-amd64"
+        bin_path: "ffmpeg"
       windows-*:
-        url: "https://yaklang.oss-accelerate.aliyuncs.com/ffmpeg/ffmpeg-v6.0-windows-amd64.exe"
-        checksums: ""
-        pick: ""  # 单个可执行文件，不需要从压缩包提取
+        url: "https://oss-qn.yaklang.com/ffmpeg/ffmpeg-v6.0-windows-amd64.exe"
+        bin_path: "ffmpeg.exe"
   - name: "llama-server"
     description: "Llama Server - A server for running Llama models"
     version: "latest"
-    install_type: "bin"
+    install_type: "archive"
     download_info_map:
       darwin-amd64:
-        url: "https://github.com/ggml-org/llama.cpp/releases/download/b5702/llama-b5702-bin-macos-x64.zip"
+        url: "https://yaklang.oss-cn-beijing.aliyuncs.com/llama.cpp/llama-b5702-bin-macos-x64.zip"
         pick: "build/bin/llama-server"
+        bin_dir: "llama-server"
         bin_path: "llama-server/llama-server"
       darwin-arm64:
-        url: "https://github.com/ggml-org/llama.cpp/releases/download/b5712/llama-b5712-bin-macos-arm64.zip"
+        url: "https://yaklang.oss-cn-beijing.aliyuncs.com/llama.cpp/llama-b5712-bin-macos-arm64.zip"
         pick: "build/bin/llama-server"
+        bin_dir: "llama-server"
         bin_path: "llama-server/llama-server"
       windows-amd64:
-        url: "https://github.com/ggml-org/llama.cpp/releases/download/b5702/llama-b5702-bin-win-cpu-x64.zip"
-        pick: "build/bin/llama-server.exe"
+        url: "https://yaklang.oss-cn-beijing.aliyuncs.com/llama.cpp/llama-b5702-bin-win-cpu-x64.zip"
+        pick: "*"
+        bin_dir: "llama-server"
+        bin_path: "llama-server/llama-server.exe"
       linux-amd64:
-        url: "https://github.com/ggml-org/llama.cpp/releases/download/b5702/llama-b5702-bin-ubuntu-x64.zip"
-        pick: "build/bin/llama-server"
+        url: "https://yaklang.oss-cn-beijing.aliyuncs.com/llama.cpp/llama-b5702-bin-ubuntu-x64.zip"
+        pick: "*"
+        bin_dir: "llama-server"
+        bin_path: "llama-server/llama-server"
+  - name: "page2image"
+    description: "Page2Image - A tool for converting web pages to images"
+    version: "latest"
+    install_type: "bin"
+    download_info_map:
+      "darwin-amd64":
+        url: "https://oss-qn.yaklang.com/page2img/2025-07-21/page2img-darwin-amd64"
+        bin_path: "page2img"
+      "darwin-arm64":
+        url: "https://oss-qn.yaklang.com/page2img/2025-07-21/page2img-darwin-arm64"
+        bin_path: "page2img"
+      "windows-amd64":
+        url: "http://oss-qn.yaklang.com/page2img/2025-07-21/page2img-windows-amd64.exe"
+        bin_path: "page2img.exe"
+      "linux-amd64":
+        url: "http://oss-qn.yaklang.com/page2img/2025-07-21/page2img-linux-amd64"
+        bin_path: "page2img"
+  - name: "whisper.cpp" 
+    description: "Whisper.cpp - A fast and accurate speech-to-text model"
+    version: "latest"
+    install_type: "archive"
+    download_info_map:
+      "darwin-amd64":
+        url: "https://oss-qn.yaklang.com/whisper.cpp/20250729/whisper.cpp-macos-amd64.zip"
+        pick: "whisper-server"
+        bin_dir: "whisper-server"
+        bin_path: "whisper-server/whisper-server"
+      "darwin-arm64":
+        url: "https://oss-qn.yaklang.com/whisper.cpp/20250729/whisper.cpp-macos-arm64.zip"
+        pick: "*"
+        bin_dir: "whisper-server"
+        bin_path: "whisper-server/whisper-server"
+      "windows-amd64":
+        url: "https://oss-qn.yaklang.com//whisper.cpp/20250729/whisper.cpp-windows-amd64.zip"
+        pick: "*"
+        bin_dir: "whisper-server"
+        bin_path: "whisper-server/whisper-server.exe"
+      "linux-amd64":
+        url: "https://oss-qn.yaklang.com/whisper.cpp/20250729/whisper.cpp-linux-amd64.zip"
+        pick: "*"
+        bin_dir: "whisper-server"
+        bin_path: "whisper-server/whisper-server"
+  - name: "model-whisper-medium-q5"
+    description: "Whisper Medium Q5 model"
+    version: "latest"
+    install_type: "bin"
+    download_info_map:
+      "*":
+        url: "https://oss-qn.yaklang.com/gguf/whisper-medium-q5.gguf"
+        bin_path: "aimodel/whisper-medium-q5.gguf"
   - name: "model-Qwen3-Embedding-0.6B-Q8"
     description: "Qwen3 Embedding model Q8_K_M"
     version: "latest"
