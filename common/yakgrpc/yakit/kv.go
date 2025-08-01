@@ -302,7 +302,7 @@ func InitNetworkConfig(config *ypb.GlobalNetworkConfig) { // init some network c
 		config.MinTlsVersion = tls.VersionSSL30
 	}
 	if config.CallPluginTimeout == 0 {
-		config.CallPluginTimeout = 60 // default 60s
+		config.CallPluginTimeout = float32(consts.GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT.Load()) // use global default instead of previous 60s
 	}
 	if config.MaxContentLength == 0 {
 		config.MaxContentLength = 1024 * 1024 * 10 // default 10M
@@ -324,7 +324,7 @@ func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 		SkipSaveHTTPFlow:  false,
 		AuthInfos:         make([]*ypb.AuthInfo, 0),
 		DbSaveSync:        false,
-		CallPluginTimeout: 60,
+		CallPluginTimeout: float32(consts.GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT.Load()),
 		MaxTlsVersion:     tls.VersionTLS13,
 		MinTlsVersion:     tls.VersionSSL30,
 		MaxContentLength:  1024 * 1024 * 10,
