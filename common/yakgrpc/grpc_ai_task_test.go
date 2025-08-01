@@ -545,22 +545,39 @@ func TestRefine_Smoke(t *testing.T) {
 	db = db.AutoMigrate(&schema.KnowledgeBaseEntry{}, &schema.KnowledgeBaseInfo{}, &schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
 	defer db.Close()
 
+	baseUrl := "http://127.0.0.1:8080"
+	apikey := "none"
+	modelName := "Qwen3-Embedding-0.6B-Q4_K_M.gguf"
+
 	ka := knowledgalchemist.NewKnowledgeAlchemist(
 		knowledgalchemist.WithTimeTriggerInterval(10),
 		knowledgalchemist.WithChunkSize(32),
 		knowledgalchemist.WithConcurrent(20),
 		knowledgalchemist.WithExtendVectorEmbeddingOptions([]any{
-			rag.WithEmbeddingClient(embedding.NewOpenaiEmbeddingClient(aispec.WithBaseURL("http://127.0.0.1:8080"), aispec.WithAPIKey("abc"), aispec.WithModel("Qwen3-Embedding-0.6B-Q4_K_M.gguf"))),
+			rag.WithEmbeddingClient(
+				embedding.NewOpenaiEmbeddingClient(
+					aispec.WithBaseURL(baseUrl),
+					aispec.WithAPIKey(apikey),
+					aispec.WithModel(modelName))),
 		}),
 	)
 
 	ctx := context.Background()
 
-	ragSys, err := ka.Refine(ctx, db, "/Users/rookie/Downloads/zwb.pdf")
+	ragSys, err := ka.Refine(ctx, db, "./vtestdata/zwb.pdf")
 	if err != nil {
-		t.Logf("Refine returned error (acceptable in smoke test): %v", err)
+		t.Fatal(err)
 	} else {
 		t.Log("Refine completed successfully")
 	}
 	_ = ragSys
+
+	results, err := ragSys.Query("第三方管理", 1, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, result := range results {
+		fmt.Println(result.Document.Metadata["title"])
+	}
 }
