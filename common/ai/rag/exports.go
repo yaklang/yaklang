@@ -1,12 +1,14 @@
 package rag
 
 import (
+	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/embedding"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"path/filepath"
 )
 
 type KnowledgeBaseConfig struct {
@@ -328,6 +330,16 @@ func QueryDocumentsWithAISummary(db *gorm.DB, knowledgeBaseName, query string, l
 	return "", nil
 }
 
+func NewRagDatabase(path string) (*gorm.DB, error) {
+	db, err := gorm.Open("sqlite3", path)
+	if err != nil {
+		return db, err
+	}
+	db = db.AutoMigrate(&schema.KnowledgeBaseEntry{}, &schema.KnowledgeBaseInfo{}, &schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
+
+	return db, nil
+}
+
 // 导出的公共函数
 var Exports = map[string]interface{}{
 	"CreateCollection": func(name string, description string, opts ...any) (*RAGSystem, error) {
@@ -362,4 +374,9 @@ var Exports = map[string]interface{}{
 	"modelDimension": WithModelDimension,
 	"cosineDistance": WithCosineDistance,
 	"hnswParameters": WithHNSWParameters,
+	"NewRagDatabase": NewRagDatabase,
+	"NewTempRagDatabase": func() (*gorm.DB, error) {
+		path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
+		return NewRagDatabase(path)
+	},
 }

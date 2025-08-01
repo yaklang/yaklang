@@ -38,6 +38,7 @@ func NewImageChunkMakerFromFileEx(targetFile string, cfg *Config) (*ImageChunkMa
 	}
 	dst := chanx.NewUnlimitedChan[Chunk](ctx, 1000)
 	go func() {
+		defer dst.Close()
 		var preChunk *BufferChunk
 		for {
 			select {
@@ -58,5 +59,6 @@ func NewImageChunkMakerFromFileEx(targetFile string, cfg *Config) (*ImageChunkMa
 	return &ImageChunkMaker{
 		ctx:    ctx,
 		cancel: cancel,
+		dst:    dst,
 	}, nil
 }
