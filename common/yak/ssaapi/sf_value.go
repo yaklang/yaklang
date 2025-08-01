@@ -201,8 +201,10 @@ func (v *Value) GetFields() (sfvm.ValueOperator, error) {
 
 func (v *Value) GetMembersByString(key string) (sfvm.ValueOperator, bool) {
 	if v.IsMap() || v.IsList() || v.IsObject() {
-		if m := v.GetMember(v.NewValue(ssa.NewConst(key))); m != nil {
-			return m, true
+		for _, m := range v.GetMember(v.NewValue(ssa.NewConst(key))) {
+			if m != nil {
+				return m, true
+			}
 		}
 		return nil, false
 	}
@@ -231,9 +233,11 @@ func (v *Value) ListIndex(i int) (sfvm.ValueOperator, error) {
 	if !v.IsList() {
 		return nil, utils.Error("ssa.Value is not a list")
 	}
-	member := v.GetMember(v.NewValue(ssa.NewConst(i)))
-	if member != nil {
-		return member, nil
+	members := v.GetMember(v.NewValue(ssa.NewConst(i)))
+	for _, member := range members {
+		if member != nil {
+			return member, nil
+		}
 	}
 	return nil, utils.Errorf("ssa.Value %v cannot call by slice, like v[%v]", v.String(), i)
 }

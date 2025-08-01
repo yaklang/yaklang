@@ -106,17 +106,19 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 	}
 
 	checkObject := func() Values {
+		var ret Values
 		obj, key, member := actx.getCurrentObject()
-		_ = obj
-		_ = key
-		_ = member
 		if obj != nil && i.IsObject() && i != obj {
-			if m := i.GetMember(key); m != nil && !ValueCompare(m, member) {
-				actx.popObject()
-				return m.getTopDefs(actx, opt...)
+			for i, m := range i.GetMember(key) {
+				if i == 0 {
+					actx.popObject()
+				}
+				if m != nil && !ValueCompare(m, member) {
+					ret = append(ret, m.getTopDefs(actx, opt...)...)
+				}
 			}
 		}
-		return nil
+		return ret
 	}
 	vals := checkObject()
 	if vals != nil {
