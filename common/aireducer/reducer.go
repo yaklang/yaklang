@@ -4,20 +4,16 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/chanx"
-	"github.com/yaklang/yaklang/common/utils/filesys"
-	"io"
-	"os"
-
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/chunkmaker"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+	"io"
 )
 
 type Reducer struct {
 	config *Config
-	input  *chunkmaker.ChunkMaker
+	input  chunkmaker.ChunkMaker
 }
 
 func (r *Reducer) Run() error {
@@ -43,12 +39,27 @@ func (r *Reducer) Run() error {
 	}
 }
 
-func NewReducerEx(chunk *chanx.UnlimitedChan[chunkmaker.Chunk], opts ...Option) (*Reducer, error) {
+func NewReducerEx(maker chunkmaker.ChunkMaker, opts ...Option) (*Reducer, error) {
+	config := NewConfig(opts...)
+	if maker == nil {
+		return nil, errors.New("input chunk maker is nil, not right")
+	}
+
+	if config.callback == nil {
+		return nil, errors.New("reducer callback is nil, not right")
+	}
+	return &Reducer{
+		input:  maker,
+		config: config,
+	}, nil
+}
+
+func NewReducerFromInputChunk(chunk *chanx.UnlimitedChan[chunkmaker.Chunk], opts ...Option) (*Reducer, error) {
 	config := NewConfig(opts...)
 	if chunk == nil {
 		return nil, errors.New("failed to create chunk channel from reader")
 	}
-	cm, err := chunkmaker.NewChunkMakerEx(chunk, chunkmaker.NewConfig(
+	cm, err := chunkmaker.NewTextChunkMakerEx(chunk, chunkmaker.NewConfig(
 		chunkmaker.WithTimeTrigger(config.TimeTriggerInterval),
 		chunkmaker.WithChunkSize(config.ChunkSize),
 		chunkmaker.WithSeparatorTrigger(config.SeparatorTrigger),
@@ -56,45 +67,27 @@ func NewReducerEx(chunk *chanx.UnlimitedChan[chunkmaker.Chunk], opts ...Option) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chunk maker: %w", err)
 	}
-
-	if config.callback == nil {
-		return nil, errors.New("reducer callback is nil, not right")
-	}
-
-	return &Reducer{
-		input:  cm,
-		config: config,
-	}, nil
+	return NewReducerEx(cm, opts...)
 }
 
 func NewReducerFromReader(r io.Reader, opts ...Option) (*Reducer, error) {
 	config := NewConfig(opts...)
-	return NewReducerEx(chunkmaker.NewChunkChannelFromReader(config.ctx, r), opts...)
-}
-
-func NewReducerFromFile(filename string, opts ...Option) (*Reducer, error) {
-	if ok, err := filesys.NewLocalFs().Exists(filename); err != nil {
-		return nil, utils.Errorf("failed to check if file[%v] exists", err)
-	} else if !ok {
-		return nil, utils.Errorf("file [%s] does not exist", filename)
-	}
-
-	fp, err := os.Open(filename)
+	cm, err := chunkmaker.NewTextChunkMaker(r, config.ChunkMakerOption()...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open file %s: %w", filename, err)
+		return nil, fmt.Errorf("failed to create chunk maker: %w", err)
 	}
-
-	pr, pw := utils.NewPipe()
-	go func() {
-		defer func() {
-			pw.Close()
-			fp.Close()
-		}()
-		io.Copy(pw, fp)
-	}()
-	return NewReducerFromReader(pr, opts...)
+	return NewReducerEx(cm, opts...)
 }
 
 func NewReducerFromString(i string, opts ...Option) (*Reducer, error) {
 	return NewReducerFromReader(bytes.NewReader([]byte(i)), opts...)
+}
+
+func NewReducerFromFile(filename string, opts ...Option) (*Reducer, error) {
+	config := NewConfig(opts...)
+	cm, err := chunkmaker.NewChunkMakerFromPath(filename, config.ChunkMakerOption()...)
+	if err != nil {
+		return nil, err
+	}
+	return NewReducerEx(cm, opts...)
 }

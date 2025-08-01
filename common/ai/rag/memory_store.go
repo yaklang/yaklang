@@ -7,7 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// MemoryVectorStore 是一个基于内存的向量存储实现
+// MemoryVectorStore 是一个基于内存的向量存储实现适合储存临时数据，不适合储存大量数据
 type MemoryVectorStore struct {
 	documents map[string]Document // 文档存储，以 ID 为键
 	embedder  EmbeddingClient     // 用于生成查询的嵌入向量

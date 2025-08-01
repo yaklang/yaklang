@@ -18,6 +18,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
+type ImageData struct {
+	Data     []byte
+	IsBase64 bool
+}
+
 type AIRequest struct {
 	taskIndex              string
 	detachCheckpoint       bool
@@ -26,6 +31,14 @@ type AIRequest struct {
 	seqId                  int64
 	saveCheckpointCallback func(CheckpointCommitHandler)
 	onAcquireSeq           func(int64)
+	imageDataList          []*ImageData
+}
+
+func (a *AIRequest) GetImageList() []*ImageData {
+	if a == nil {
+		return nil
+	}
+	return a.imageDataList
 }
 
 func (a *AIRequest) GetTaskIndex() string {
@@ -65,6 +78,15 @@ func WithAIRequest_OnAcquireSeq(callback func(int64)) AIRequestOption {
 func WithAIRequest_SeqId(i int64) AIRequestOption {
 	return func(req *AIRequest) {
 		req.seqId = i
+	}
+}
+
+func WithImageData(data *ImageData) AIRequestOption {
+	return func(req *AIRequest) {
+		if req.imageDataList == nil {
+			req.imageDataList = make([]*ImageData, 0, 1)
+		}
+		req.imageDataList = append(req.imageDataList, data)
 	}
 }
 
@@ -309,8 +331,9 @@ type AIRequestOption func(req *AIRequest)
 
 func NewAIRequest(prompt string, opt ...AIRequestOption) *AIRequest {
 	req := &AIRequest{
-		prompt:    prompt,
-		startTime: time.Now(),
+		prompt:        prompt,
+		startTime:     time.Now(),
+		imageDataList: make([]*ImageData, 0),
 	}
 	for _, i := range opt {
 		i(req)
@@ -383,10 +406,8 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 		resp := config.NewAIResponse()
 		go func() {
 			defer resp.Close()
-
 			isStream := false
-			output, err := cb(
-				req.GetPrompt(),
+			optList := []aispec.AIConfigOption{
 				aispec.WithStreamHandler(func(reader io.Reader) {
 					isStream = true
 					resp.EmitOutputStream(reader)
@@ -394,7 +415,17 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 				aispec.WithReasonStreamHandler(func(reader io.Reader) {
 					isStream = true
 					resp.EmitReasonStream(reader)
-				}),
+				})}
+			for _, data := range req.GetImageList() {
+				if data.IsBase64 {
+					optList = append(optList, aispec.WithImageBase64(string(data.Data)))
+				} else {
+					optList = append(optList, aispec.WithImageRaw(data.Data))
+				}
+			}
+			output, err := cb(
+				req.GetPrompt(),
+				optList...,
 			)
 			if err != nil {
 				log.Errorf("chat error: %v", err)

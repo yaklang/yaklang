@@ -82,7 +82,7 @@ func (s *SQLiteVectorStore) toDocument(doc *schema.VectorStoreDocument) Document
 	return Document{
 		ID:        doc.DocumentID,
 		Metadata:  map[string]any(doc.Metadata),
-		Embedding: []float64(doc.Embedding),
+		Embedding: []float32(doc.Embedding),
 	}
 }
 
@@ -178,7 +178,7 @@ func (s *SQLiteVectorStore) Search(query string, page, limit int) ([]SearchResul
 	// 计算相似度并排序
 	var results []SearchResult
 	for _, doc := range docs {
-		embedding := []float64(doc.Embedding)
+		embedding := []float32(doc.Embedding)
 
 		// 计算余弦相似度
 		similarity, err := utils.CosineSimilarity(queryEmbedding, embedding)
@@ -224,7 +224,7 @@ func (s *SQLiteVectorStore) Delete(ids ...string) error {
 	}()
 
 	for _, id := range ids {
-		if err := tx.Where("document_id = ?", id).Delete(&schema.VectorStoreDocument{}).Error; err != nil {
+		if err := tx.Where("document_id = ?", id).Unscoped().Delete(&schema.VectorStoreDocument{}).Error; err != nil {
 			tx.Rollback()
 			return utils.Errorf("删除文档 %s 失败: %v", id, err)
 		}

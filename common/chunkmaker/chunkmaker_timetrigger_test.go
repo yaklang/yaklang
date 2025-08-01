@@ -16,7 +16,7 @@ func TestChunkMakerWithTimeTrigger(t *testing.T) {
 		chunkSize := int64(100) // Large chunk size
 		triggerSeconds := 0.1   // Short time trigger
 
-		cm, err := NewChunkMaker(pr, WithChunkSize(chunkSize), WithTimeTriggerSeconds(triggerSeconds))
+		cm, err := NewTextChunkMaker(pr, WithChunkSize(chunkSize), WithTimeTriggerSeconds(triggerSeconds))
 		assert.NoError(t, err)
 		assert.NotNil(t, cm)
 
@@ -56,7 +56,7 @@ func TestChunkMakerWithTimeTrigger(t *testing.T) {
 		chunkSize := int64(10) // Small chunk size
 		triggerSeconds := 1.0  // Relatively long time trigger
 
-		cm, err := NewChunkMaker(pr, WithChunkSize(chunkSize), WithTimeTriggerSeconds(triggerSeconds))
+		cm, err := NewTextChunkMaker(pr, WithChunkSize(chunkSize), WithTimeTriggerSeconds(triggerSeconds))
 		assert.NoError(t, err)
 		assert.NotNil(t, cm)
 
@@ -136,7 +136,7 @@ func TestChunkMakerWithTimeTrigger(t *testing.T) {
 		chunkSize := int64(100) // Large chunk size
 		triggerSeconds := 0.1   // Short time trigger, 100ms
 
-		cm, err := NewChunkMaker(pr, WithChunkSize(chunkSize), WithTimeTriggerSeconds(triggerSeconds))
+		cm, err := NewTextChunkMaker(pr, WithChunkSize(chunkSize), WithTimeTriggerSeconds(triggerSeconds))
 		assert.NoError(t, err)
 		assert.NotNil(t, cm)
 
@@ -187,7 +187,7 @@ func TestChunkMakerWithTimeTrigger(t *testing.T) {
 
 	t.Run("error_on_zero_time_trigger_interval", func(t *testing.T) {
 		pr, _ := utils.NewPipe()
-		_, err := NewChunkMaker(pr, WithChunkSize(10), WithTimeTriggerSeconds(0))
+		_, err := NewTextChunkMaker(pr, WithChunkSize(10), WithTimeTriggerSeconds(0))
 		assert.Error(t, err, "Expected error for zero time trigger interval")
 		if err != nil {
 			assert.Contains(t, err.Error(), "timeTriggerInterval must be positive", "Error message mismatch")
@@ -196,7 +196,7 @@ func TestChunkMakerWithTimeTrigger(t *testing.T) {
 
 	t.Run("error_on_negative_time_trigger_interval", func(t *testing.T) {
 		pr, _ := utils.NewPipe()
-		_, err := NewChunkMaker(pr, WithChunkSize(10), WithTimeTriggerSeconds(-0.5))
+		_, err := NewTextChunkMaker(pr, WithChunkSize(10), WithTimeTriggerSeconds(-0.5))
 		assert.Error(t, err, "Expected error for negative time trigger interval")
 		if err != nil {
 			assert.Contains(t, err.Error(), "timeTriggerInterval must be positive", "Error message mismatch")
@@ -208,7 +208,7 @@ func TestChunkMakerWithTimeTrigger(t *testing.T) {
 		chunkSize := int64(100)
 		triggerSeconds := 1.0 // Long time trigger
 
-		cm, err := NewChunkMaker(pr, WithChunkSize(chunkSize), WithTimeTriggerSeconds(triggerSeconds))
+		cm, err := NewTextChunkMaker(pr, WithChunkSize(chunkSize), WithTimeTriggerSeconds(triggerSeconds))
 		assert.NoError(t, err)
 		assert.NotNil(t, cm)
 
@@ -245,7 +245,7 @@ func TestChunkMakerWithTimeTrigger(t *testing.T) {
 		chunkSize := int64(10)
 		triggerSeconds := 0.1 // Short time trigger
 
-		cm, err := NewChunkMaker(pr, WithChunkSize(chunkSize), WithTimeTriggerSeconds(triggerSeconds))
+		cm, err := NewTextChunkMaker(pr, WithChunkSize(chunkSize), WithTimeTriggerSeconds(triggerSeconds))
 		assert.NoError(t, err)
 		assert.NotNil(t, cm)
 
@@ -275,7 +275,7 @@ func TestChunkMakerWithTimeTrigger(t *testing.T) {
 		chunkSize := int64(5)
 		triggerSeconds := 0.5 // Time trigger is present but should mostly be superseded by chunkSize
 
-		cm, err := NewChunkMaker(pr, WithChunkSize(chunkSize), WithTimeTriggerSeconds(triggerSeconds))
+		cm, err := NewTextChunkMaker(pr, WithChunkSize(chunkSize), WithTimeTriggerSeconds(triggerSeconds))
 		assert.NoError(t, err)
 
 		var chunks [][]byte
@@ -333,7 +333,7 @@ func TestChunkMakerWithTimeTrigger(t *testing.T) {
 		chunkSize := int64(100) // Large chunk size
 		triggerSeconds := 0.1   // Short time trigger (100ms)
 
-		cm, err := NewChunkMaker(pr, WithChunkSize(chunkSize), WithTimeTriggerSeconds(triggerSeconds))
+		cm, err := NewTextChunkMaker(pr, WithChunkSize(chunkSize), WithTimeTriggerSeconds(triggerSeconds))
 		assert.NoError(t, err)
 
 		var chunks [][]byte

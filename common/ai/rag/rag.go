@@ -9,18 +9,18 @@ type Document struct {
 	ID        string         `json:"id"`       // 文档唯一标识符
 	Content   string         `json:"content"`  // 文档内容
 	Metadata  map[string]any `json:"metadata"` // 文档元数据
-	Embedding []float64      `json:"-"`        // 文档的嵌入向量，不参与 JSON 序列化
+	Embedding []float32      `json:"-"`        // 文档的嵌入向量，不参与 JSON 序列化
 }
 
 // SearchResult 表示检索结果
 type SearchResult struct {
 	Document Document `json:"document"` // 检索到的文档
-	Score    float64  `json:"score"`    // 相似度得分 (-1 到 1 之间)
+	Score    float32  `json:"score"`    // 相似度得分 (-1 到 1 之间)
 }
 
 // EmbeddingClient 接口定义了嵌入向量生成的操作
 type EmbeddingClient interface {
-	Embedding(text string) ([]float64, error)
+	Embedding(text string) ([]float32, error)
 }
 
 // VectorStore 接口定义了向量存储的基本操作
@@ -81,6 +81,23 @@ func (r *RAGSystem) Query(query string, page, limit int) ([]SearchResult, error)
 // DeleteDocuments 删除文档
 func (r *RAGSystem) DeleteDocuments(ids ...string) error {
 	return r.VectorStore.Delete(ids...)
+}
+
+// ClearDocuments 清空所有文档
+func (r *RAGSystem) ClearDocuments() error {
+	docs, err := r.ListDocuments()
+	if err != nil {
+		return err
+	}
+	ids := []string{}
+	for _, doc := range docs {
+		ids = append(ids, doc.ID)
+	}
+	err = r.VectorStore.Delete(ids...)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // GetDocument 获取指定 ID 的文档

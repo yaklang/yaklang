@@ -1,14 +1,79 @@
 package chunkmaker
 
 import (
+	"fmt"
+	"io"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/yaklang/yaklang/common/utils/chanx" // Import chanx
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
-func (cm *ChunkMaker) loop(i chan struct{}) {
+type TextChunkMaker struct {
+	_loopOnce sync.Once
+
+	config *Config
+	src    *chanx.UnlimitedChan[Chunk]
+	dst    *chanx.UnlimitedChan[Chunk]
+}
+
+func NewTextChunkMakerEx(
+	input *chanx.UnlimitedChan[Chunk],
+	c *Config,
+) (*TextChunkMaker, error) {
+	cm := &TextChunkMaker{
+		src:    input,
+		dst:    chanx.NewUnlimitedChan[Chunk](c.ctx, 1000),
+		config: c,
+	}
+
+	syncChan := make(chan struct{})
+	cm._loopOnce.Do(func() {
+		go cm.loop(syncChan)
+	})
+	select {
+	case _, ok := <-syncChan:
+		if !ok {
+			log.Debug("syncChan passed")
+		}
+	}
+	return cm, nil
+}
+
+func NewTextChunkMaker(dst io.Reader, opts ...Option) (*TextChunkMaker, error) {
+	c := NewConfig(opts...)
+	if c.chunkSize <= 0 {
+		return nil, fmt.Errorf("NewTextChunkMaker: ChunkSize must be positive, got %d", c.chunkSize)
+	}
+	if c.enableTimeTrigger && c.timeTriggerInterval <= 0 {
+		return nil, fmt.Errorf("NewTextChunkMaker: timeTriggerInterval must be positive when time trigger is enabled, got %v", c.timeTriggerInterval)
+	}
+
+	if c.chunkSize <= 0 && !c.enableTimeTrigger {
+		return nil, fmt.Errorf("NewTextChunkMaker: ChunkSize must be positive or time trigger must be enabled")
+	}
+
+	inputSrc := NewChunkChannelFromReader(c.ctx, dst)
+	return NewTextChunkMakerEx(inputSrc, c)
+}
+
+func (cm *TextChunkMaker) Write(p []byte) (n int, err error) {
+	cm.src.SafeFeed(NewBufferChunk(p))
+	return len(p), nil
+}
+
+func (cm *TextChunkMaker) Close() error {
+	cm.src.Close()
+	return nil
+}
+
+func (cm *TextChunkMaker) OutputChannel() <-chan Chunk {
+	return cm.dst.OutputChannel()
+}
+
+func (cm *TextChunkMaker) loop(i chan struct{}) {
 	closeOnce := sync.Once{}
 	src := cm.src
 	inputChan := src.OutputChannel()

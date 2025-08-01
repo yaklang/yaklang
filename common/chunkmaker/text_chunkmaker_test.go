@@ -60,7 +60,7 @@ func TestChunkerWithChunkSize_Basic(t *testing.T) {
 			}()
 
 			// 创建 ChunkMaker
-			cm, err := NewChunkMaker(pr, WithChunkSize(tc.chunkSize))
+			cm, err := NewTextChunkMaker(pr, WithChunkSize(tc.chunkSize))
 			if err != nil {
 				t.Fatalf("Failed to create ChunkMaker: %v", err)
 			}
@@ -190,7 +190,7 @@ func TestChunkerWithChunkSize_Advanced(t *testing.T) {
 			}()
 
 			// 创建 ChunkMaker
-			cm, err := NewChunkMaker(pr, WithChunkSize(tc.chunkSize))
+			cm, err := NewTextChunkMaker(pr, WithChunkSize(tc.chunkSize))
 
 			if tc.expectError {
 				if err == nil {
@@ -377,7 +377,7 @@ func TestChunkMaker_ChunkLinkingAndPrevNBytes(t *testing.T) {
 				pw.Close()
 			}()
 
-			cm, err := NewChunkMaker(pr, WithChunkSize(tc.chunkSize))
+			cm, err := NewTextChunkMaker(pr, WithChunkSize(tc.chunkSize))
 			if err != nil {
 				t.Fatalf("Failed to create ChunkMaker: %v", err)
 			}
