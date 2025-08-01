@@ -84,7 +84,7 @@ func TestBuildVectorIndexForKnowledgeBase(t *testing.T) {
 
 	// 5. 构建向量索引（核心测试功能）
 	// 使用模拟嵌入器配置
-	err = BuildVectorIndexForKnowledgeBase(db, knowledgeBaseID, WithEmbeddingModel("mock-model"), WithModelDimension(3), WithEmbeddingClient(&MockEmbedder{}))
+	_, err = BuildVectorIndexForKnowledgeBase(db, knowledgeBaseID, WithEmbeddingModel("mock-model"), WithModelDimension(3), WithEmbeddingClient(&MockEmbedder{}))
 	assert.NoError(t, err)
 
 	// 6. 验证索引构建结果
@@ -148,7 +148,7 @@ func TestBuildVectorIndexForKnowledgeBase(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 重新构建索引
-	err = BuildVectorIndexForKnowledgeBase(db, knowledgeBaseID, WithEmbeddingModel("mock-model"), WithModelDimension(3), WithEmbeddingClient(&MockEmbedder{}))
+	_, err = BuildVectorIndexForKnowledgeBase(db, knowledgeBaseID, WithEmbeddingModel("mock-model"), WithModelDimension(3), WithEmbeddingClient(&MockEmbedder{}))
 	assert.NoError(t, err)
 
 	// 验证文档数量减少
@@ -195,7 +195,7 @@ func TestBuildVectorIndexEmptyKnowledgeBase(t *testing.T) {
 	knowledgeBaseID := int64(savedKnowledgeBase.ID)
 
 	// 构建空知识库的向量索引（应该成功但不创建任何文档）
-	err = BuildVectorIndexForKnowledgeBase(db, knowledgeBaseID, WithEmbeddingModel("mock-model"), WithModelDimension(3), WithEmbeddingClient(&MockEmbedder{}))
+	_, err = BuildVectorIndexForKnowledgeBase(db, knowledgeBaseID, WithEmbeddingModel("mock-model"), WithModelDimension(3), WithEmbeddingClient(&MockEmbedder{}))
 	assert.NoError(t, err)
 
 	// 验证空索引
@@ -235,7 +235,7 @@ func TestBuildVectorIndexNonExistentKnowledgeBase(t *testing.T) {
 
 	// 尝试为不存在的知识库构建索引
 	nonExistentID := int64(99999)
-	err = BuildVectorIndexForKnowledgeBase(db, nonExistentID, WithEmbeddingModel("mock-model"), WithModelDimension(3), WithEmbeddingClient(&MockEmbedder{}))
+	_, err = BuildVectorIndexForKnowledgeBase(db, nonExistentID, WithEmbeddingModel("mock-model"), WithModelDimension(3), WithEmbeddingClient(&MockEmbedder{}))
 	assert.Error(t, err) // 应该返回错误
 	assert.Contains(t, err.Error(), "record not found")
 }
@@ -294,7 +294,7 @@ func TestBuildVectorIndexForKnowledgeBaseEntry(t *testing.T) {
 	entryID := int64(savedEntry.ID)
 
 	// 5. 构建单个条目的向量索引（核心测试功能）
-	err = BuildVectorIndexForKnowledgeBaseEntry(db, entryID, WithEmbeddingModel("mock-model"), WithModelDimension(3), WithEmbeddingClient(&MockEmbedder{}))
+	_, err = BuildVectorIndexForKnowledgeBaseEntry(db, entryID, WithEmbeddingModel("mock-model"), WithModelDimension(3), WithEmbeddingClient(&MockEmbedder{}))
 	assert.NoError(t, err)
 
 	// 6. 验证索引构建结果
@@ -345,7 +345,7 @@ func TestBuildVectorIndexForKnowledgeBaseEntry(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 重新为该条目构建索引
-	err = BuildVectorIndexForKnowledgeBaseEntry(db, entryID, WithEmbeddingModel("mock-model"), WithModelDimension(3), WithEmbeddingClient(&MockEmbedder{}))
+	_, err = BuildVectorIndexForKnowledgeBaseEntry(db, entryID, WithEmbeddingModel("mock-model"), WithModelDimension(3), WithEmbeddingClient(&MockEmbedder{}))
 	assert.NoError(t, err)
 
 	// 验证更新后的内容
@@ -389,7 +389,7 @@ func TestBuildVectorIndexForNonExistentEntry(t *testing.T) {
 
 	// 尝试为不存在的知识库条目构建索引
 	nonExistentEntryID := int64(99999)
-	err = BuildVectorIndexForKnowledgeBaseEntry(db, nonExistentEntryID, WithEmbeddingModel("mock-model"), WithModelDimension(3), WithEmbeddingClient(&MockEmbedder{}))
+	_, err = BuildVectorIndexForKnowledgeBaseEntry(db, nonExistentEntryID, WithEmbeddingModel("mock-model"), WithModelDimension(3), WithEmbeddingClient(&MockEmbedder{}))
 	assert.Error(t, err) // 应该返回错误
 	assert.Contains(t, err.Error(), "record not found")
 }

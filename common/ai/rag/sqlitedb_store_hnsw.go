@@ -302,6 +302,9 @@ func (s *SQLiteVectorStoreHNSW) Search(query string, page, limit int) ([]SearchR
 		return results[i].Score > results[j].Score
 	})
 
+	if page < 1 {
+		page = 1
+	}
 	// 计算分页
 	offset := (page - 1) * limit
 	if offset >= len(results) {

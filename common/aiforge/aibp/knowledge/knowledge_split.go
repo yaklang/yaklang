@@ -1,4 +1,4 @@
-package aibp
+package knowledge
 
 import (
 	_ "embed"
@@ -6,18 +6,16 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
-//go:embed knowledge_refine_prompts/lite_prompt.txt
-var refinePrompt string
+//go:embed knowledge_split_prompts/lite_prompt.txt
+var splitPrompt string
 
-//go:embed knowledge_refine_prompts/schema.json
-var refineSchema string
-
-var KnowledgeRefine = "knowledge-refine"
+//go:embed knowledge_split_prompts/schema.json
+var splitSchema string
 
 func init() {
 	lfopts := []aiforge.LiteForgeOption{
-		aiforge.WithLiteForge_Prompt(refinePrompt),
-		aiforge.WithLiteForge_OutputSchemaRaw("refine", refineSchema),
+		aiforge.WithLiteForge_Prompt(splitPrompt),
+		aiforge.WithLiteForge_OutputSchemaRaw("split", splitSchema),
 	}
 
 	err := aiforge.RegisterAIDBuildInForge(KnowledgeRefine, lfopts...)
@@ -30,10 +28,10 @@ func init() {
 	}
 }
 
-func NewKnowledgeRefineForge() (*aiforge.LiteForge, error) {
+func NewKnowledgeSplitForge() (*aiforge.LiteForge, error) {
 	lfopts := []aiforge.LiteForgeOption{
-		aiforge.WithLiteForge_Prompt(refinePrompt),
-		aiforge.WithLiteForge_OutputSchemaRaw("refine", refineSchema),
+		aiforge.WithLiteForge_Prompt(splitPrompt),
+		aiforge.WithLiteForge_OutputSchemaRaw("split", splitSchema),
 	}
 	return aiforge.NewLiteForge(KnowledgeRefine, lfopts...)
 }
