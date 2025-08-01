@@ -11,13 +11,11 @@ import (
 	"sync"
 	"time"
 
-<<<<<<< HEAD
+	"github.com/pkg/errors"
+	"github.com/tevino/abool"
 	"github.com/yaklang/yaklang/common/mediautils"
 	"github.com/yaklang/yaklang/common/mimetype"
-=======
-	"github.com/yaklang/yaklang/common/mimetype"
 	"github.com/yaklang/yaklang/common/thirdparty_bin"
->>>>>>> 7fc481e28 (feat: enhance unified third-party binary manager)
 	"github.com/yaklang/yaklang/common/utils/imageutils"
 
 	"github.com/yaklang/yaklang/common/aireducer"
@@ -72,7 +70,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
-	"github.com/yaklang/yaklang/common/yak/yaklang/lib/builtin"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/container"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
@@ -81,12 +78,10 @@ import (
 	"github.com/yaklang/yaklang/common/yso"
 
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
-	"github.com/tevino/abool"
 
 	"github.com/yaklang/yaklang/common/omnisearch"
 
-	_ "github.com/yaklang/yaklang/common/yak/yaklang/lib/builtin" // 导入 builtin 包
+	"github.com/yaklang/yaklang/common/yak/yaklang/lib/builtin"
 )
 
 var (
