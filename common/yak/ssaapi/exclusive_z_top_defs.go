@@ -108,7 +108,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 	checkObject := func() Values {
 		var ret Values
 		obj, key, member := actx.getCurrentObject()
-		if obj != nil && i.IsObject() && i != obj {
+		if obj != nil && i.IsObject() && i.GetId() != obj.GetId() {
 			for i, m := range i.GetMember(key) {
 				if i == 0 {
 					actx.popObject()
