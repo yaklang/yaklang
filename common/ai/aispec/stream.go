@@ -60,12 +60,19 @@ func processStreamResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, 
 		chunked = true
 	}
 
+	var mirrorResponse bytes.Buffer
 	if lowhttp.GetStatusCodeFromResponse(r) > 299 {
 		log.Warnf("response status code: %v", lowhttp.GetStatusCodeFromResponse(r))
+		defer func() {
+			if mirrorResponse.Len() > 0 {
+				log.Infof("response body: %v", utils.ShrinkString(mirrorResponse.String(), 400))
+			}
+		}()
 	}
 
 	var reader io.Reader = closer
 	ioReader := reader
+	ioReader = io.TeeReader(ioReader, &mirrorResponse)
 
 	start := time.Now()
 	var firstbuf = make([]byte, 1)
