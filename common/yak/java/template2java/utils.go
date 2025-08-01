@@ -11,7 +11,7 @@ func validatePackagePath(path string) string {
 	pkgPath := regexp.MustCompile(`[^a-zA-Z0-9_/.]`).ReplaceAllString(slash, "_")
 	pkgPath = strings.Replace(pkgPath, "/", ".", -1)
 	pkgPath = strings.Trim(pkgPath, ".")
-	return pkgPath
+	return "tmp2java_" + pkgPath
 }
 
 func validateClassName(fileName string) string {
