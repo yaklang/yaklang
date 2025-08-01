@@ -56,26 +56,9 @@ var (
 
 var (
 	mitmPluginCallerGlobal *yak.MixPluginCaller
-	mitmPluginCallerMutex  sync.Mutex
+	// 添加生命周期通知机制
+	mitmPluginCallerNotifyChan chan struct{}
 )
-
-func SetMixPluginCaller(caller *yak.MixPluginCaller) {
-	mitmPluginCallerMutex.Lock()
-	defer mitmPluginCallerMutex.Unlock()
-	mitmPluginCallerGlobal = caller
-}
-
-func UnsetMixPluginCaller() {
-	mitmPluginCallerMutex.Lock()
-	defer mitmPluginCallerMutex.Unlock()
-	mitmPluginCallerGlobal = nil
-}
-
-func GetMixPluginCaller() *yak.MixPluginCaller {
-	mitmPluginCallerMutex.Lock()
-	defer mitmPluginCallerMutex.Unlock()
-	return mitmPluginCallerGlobal
-}
 
 func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	defer func() {
@@ -295,8 +278,12 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	mitmPluginCaller.SetLoadPluginTimeout(10)
 	mitmPluginCaller.SetCallPluginTimeout(consts.GetGlobalCallerCallPluginTimeout())
 
-	SetMixPluginCaller(mitmPluginCaller)
-	defer UnsetMixPluginCaller()
+	mitmPluginCallerGlobal = mitmPluginCaller
+	mitmPluginCallerNotifyChan = make(chan struct{})
+	defer func() {
+		close(mitmPluginCallerNotifyChan)
+		mitmPluginCallerGlobal = nil
+	}()
 
 	if downstreamProxy != nil {
 		mitmPluginCaller.SetProxy(downstreamProxy...)
@@ -1572,10 +1559,12 @@ func (s *Server) PluginTrace(stream ypb.Yak_PluginTraceServer) error {
 		Success:      false,
 	}
 
+	var mitmPluginCaller *yak.MixPluginCaller
+
 	// 检测MixPluginCaller是否可用，不可用则定期检测
 	for {
-		mitmPluginCaller := GetMixPluginCaller()
-		if mitmPluginCaller == nil {
+		mitmPluginCaller = mitmPluginCallerGlobal
+		if mitmPluginCaller == nil || mitmPluginCallerNotifyChan == nil {
 			log.Debug("MITM 插件管理器未初始化，返回空trace列表，等待后端启动MITMv2...")
 			_ = stream.Send(emptyResp)
 			// 等待1秒后重试，或响应set_tracing指令
@@ -1592,8 +1581,15 @@ func (s *Server) PluginTrace(stream ypb.Yak_PluginTraceServer) error {
 		}
 	}
 
+	go func() {
+		select {
+		case <-mitmPluginCallerNotifyChan:
+			log.Info("plugin trace shutdown due to MITM closed")
+			cancel()
+		}
+	}()
+
 	// 进入正常trace推送逻辑
-	mitmPluginCaller := GetMixPluginCaller()
 	manager := mitmPluginCaller.GetNativeCaller()
 
 	// 创建trace更新通道，增大容量以处理高并发
@@ -1774,7 +1770,7 @@ func (s *Server) handlePluginTraceRequest(manager *yak.YakToCallerManager, req *
 
 	case "stop_stream":
 		// 客户端请求停止流
-		mitmPluginCallerGlobal.EnableExecutionTracing(false)
+		manager.EnableExecutionTracing(false)
 		return &ypb.PluginTraceResponse{
 			ResponseType: "control_result",
 			Success:      true,

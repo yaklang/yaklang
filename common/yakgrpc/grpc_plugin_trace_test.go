@@ -34,8 +34,12 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	testCaller, err := yak.NewMixPluginCaller()
 	require.NoError(t, err)
 	testCaller.SetCallPluginTimeout(60)
-	SetMixPluginCaller(testCaller)
-	defer UnsetMixPluginCaller()
+	mitmPluginCallerGlobal = testCaller
+	mitmPluginCallerNotifyChan = make(chan struct{})
+	defer func() {
+		mitmPluginCallerGlobal = nil
+		mitmPluginCallerNotifyChan = nil
+	}()
 
 	// 启动PluginTrace流
 	traceCtx, traceCancel := context.WithCancel(context.Background())
@@ -195,8 +199,12 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	testCaller, err := yak.NewMixPluginCaller()
 	require.NoError(t, err)
 	testCaller.SetCallPluginTimeout(60)
-	SetMixPluginCaller(testCaller)
-	defer UnsetMixPluginCaller()
+	mitmPluginCallerGlobal = testCaller
+	mitmPluginCallerNotifyChan = make(chan struct{})
+	defer func() {
+		mitmPluginCallerGlobal = nil
+		mitmPluginCallerNotifyChan = nil
+	}()
 
 	traceCtx, traceCancel := context.WithCancel(context.Background())
 	defer traceCancel()
@@ -288,8 +296,12 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	testCaller, err := yak.NewMixPluginCaller()
 	require.NoError(t, err)
 	testCaller.SetCallPluginTimeout(60)
-	SetMixPluginCaller(testCaller)
-	defer UnsetMixPluginCaller()
+	mitmPluginCallerGlobal = testCaller
+	mitmPluginCallerNotifyChan = make(chan struct{})
+	defer func() {
+		mitmPluginCallerGlobal = nil
+		mitmPluginCallerNotifyChan = nil
+	}()
 
 	traceCtx, traceCancel := context.WithCancel(context.Background())
 	defer traceCancel()
@@ -389,8 +401,12 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	testCaller.SetCallPluginTimeout(60)
 	err = testCaller.SetConcurrent(20)
 	require.NoError(t, err)
-	SetMixPluginCaller(testCaller)
-	defer UnsetMixPluginCaller()
+	mitmPluginCallerGlobal = testCaller
+	mitmPluginCallerNotifyChan = make(chan struct{})
+	defer func() {
+		mitmPluginCallerGlobal = nil
+		mitmPluginCallerNotifyChan = nil
+	}()
 
 	traceCtx, traceCancel := context.WithCancel(context.Background())
 	defer traceCancel()
@@ -513,8 +529,12 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	testCaller, err := yak.NewMixPluginCaller()
 	require.NoError(t, err)
 	testCaller.SetCallPluginTimeout(60)
-	SetMixPluginCaller(testCaller)
-	defer UnsetMixPluginCaller()
+	mitmPluginCallerGlobal = testCaller
+	mitmPluginCallerNotifyChan = make(chan struct{})
+	defer func() {
+		mitmPluginCallerGlobal = nil
+		mitmPluginCallerNotifyChan = nil
+	}()
 
 	traceCtx, traceCancel := context.WithCancel(context.Background())
 	defer traceCancel()
@@ -605,8 +625,12 @@ func TestGRPCMUSTPASS_PluginTraceInvalidCancelRequest(t *testing.T) {
 
 	testCaller, err := yak.NewMixPluginCaller()
 	require.NoError(t, err)
-	SetMixPluginCaller(testCaller)
-	defer UnsetMixPluginCaller()
+	mitmPluginCallerGlobal = testCaller
+	mitmPluginCallerNotifyChan = make(chan struct{})
+	defer func() {
+		mitmPluginCallerGlobal = nil
+		mitmPluginCallerNotifyChan = nil
+	}()
 
 	traceCtx, traceCancel := context.WithCancel(context.Background())
 	defer traceCancel()
@@ -666,7 +690,6 @@ func TestGRPCMUSTPASS_PluginTraceWithoutMITM(t *testing.T) {
 	// 不设置MixPluginCaller，模拟MITM未启动
 	traceCtx, traceCancel := context.WithCancel(context.Background())
 	defer traceCancel()
-	UnsetMixPluginCaller()
 
 	traceStream, err := client.PluginTrace(traceCtx)
 	require.NoError(t, err)
@@ -731,8 +754,12 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	testCaller, err := yak.NewMixPluginCaller()
 	require.NoError(t, err)
 	testCaller.SetCallPluginTimeout(60)
-	SetMixPluginCaller(testCaller)
-	defer UnsetMixPluginCaller()
+	mitmPluginCallerGlobal = testCaller
+	mitmPluginCallerNotifyChan = make(chan struct{})
+	defer func() {
+		mitmPluginCallerGlobal = nil
+		mitmPluginCallerNotifyChan = nil
+	}()
 
 	traceCtx, traceCancel := context.WithCancel(context.Background())
 	defer traceCancel()
@@ -853,8 +880,12 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	testCaller, err := yak.NewMixPluginCaller()
 	require.NoError(t, err)
 	testCaller.SetCallPluginTimeout(60)
-	SetMixPluginCaller(testCaller)
-	defer UnsetMixPluginCaller()
+	mitmPluginCallerGlobal = testCaller
+	mitmPluginCallerNotifyChan = make(chan struct{})
+	defer func() {
+		mitmPluginCallerGlobal = nil
+		mitmPluginCallerNotifyChan = nil
+	}()
 
 	traceCtx, traceCancel := context.WithCancel(context.Background())
 	defer traceCancel()
