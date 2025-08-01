@@ -76,24 +76,24 @@ binaries:
     download_info_map:
       "darwin-amd64":
         url: "https://oss-qn.yaklang.com/whisper.cpp/20250729/whisper.cpp-macos-amd64.zip"
-        pick: "whisper-server"
-        bin_dir: "whisper-server"
-        bin_path: "whisper-server/whisper-server"
+        pick: "*"
+        bin_dir: "whisper.cpp"
+        bin_path: "whisper.cpp/whisper-cli"
       "darwin-arm64":
         url: "https://oss-qn.yaklang.com/whisper.cpp/20250729/whisper.cpp-macos-arm64.zip"
         pick: "*"
-        bin_dir: "whisper-server"
-        bin_path: "whisper-server/whisper-server"
+        bin_dir: "whisper.cpp"
+        bin_path: "whisper.cpp/whisper-cli"
       "windows-amd64":
         url: "https://oss-qn.yaklang.com//whisper.cpp/20250729/whisper.cpp-windows-amd64.zip"
         pick: "*"
-        bin_dir: "whisper-server"
-        bin_path: "whisper-server/whisper-server.exe"
+        bin_dir: "whisper.cpp"
+        bin_path: "whisper.cpp/whisper-cli.exe"
       "linux-amd64":
         url: "https://oss-qn.yaklang.com/whisper.cpp/20250729/whisper.cpp-linux-amd64.zip"
         pick: "*"
-        bin_dir: "whisper-server"
-        bin_path: "whisper-server/whisper-server"
+        bin_dir: "whisper.cpp"
+        bin_path: "whisper.cpp/whisper-cli"
   - name: "model-whisper-medium-q5"
     description: "Whisper Medium Q5 model"
     version: "latest"

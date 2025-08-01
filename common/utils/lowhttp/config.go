@@ -58,7 +58,7 @@ type LowhttpExecConfig struct {
 	Proxy                            []string
 	ForceLegacyProxy                 bool
 	NoFixContentLength               bool
-	TryReadMultiResponse             bool
+	NoReadMultiResponse              bool
 	RedirectHandler                  func(bool, []byte, []byte) bool
 	Session                          interface{}
 	BeforeDoRequest                  func([]byte) []byte
@@ -368,7 +368,6 @@ func NewLowhttpOption() *LowhttpExecConfig {
 		RedirectTimes:        5,
 		Proxy:                nil,
 		RedirectHandler:      nil,
-		TryReadMultiResponse: true,
 		SaveHTTPFlow:         consts.GLOBAL_HTTP_FLOW_SAVE.IsSet(),
 		MaxContentLength:     10 * 1024 * 1024, // 10MB roughly
 	}
@@ -376,9 +375,9 @@ func NewLowhttpOption() *LowhttpExecConfig {
 
 type LowhttpOpt func(o *LowhttpExecConfig)
 
-func WithTryReadMultiResponse(b bool) LowhttpOpt {
+func WithNoReadMultiResponse(b bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
-		o.TryReadMultiResponse = b
+		o.NoReadMultiResponse = b
 	}
 }
 
