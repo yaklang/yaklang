@@ -322,7 +322,7 @@ func (p *Program) GetIncludeFileNum() int {
 func (p *Program) PushEditor(e *memedit.MemEditor) {
 	p.editorStack.Push(e)
 	if !p.PreHandler() {
-		p.SetEditor(e.GetFilename(), e)
+		p.SetEditor(e.GetUrl(), e)
 	}
 }
 func (p *Program) GetCurrentEditor() *memedit.MemEditor {
@@ -342,7 +342,7 @@ func (p *Program) PopEditor(save bool) {
 	}
 	e := p.editorStack.Pop()
 	if save && e != nil {
-		p.FileList[e.GetFilename()] = e.SourceCodeMd5()
+		p.FileList[e.GetUrl()] = e.SourceCodeMd5()
 	}
 }
 

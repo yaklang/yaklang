@@ -2,6 +2,9 @@ package ssaapi
 
 import (
 	"encoding/xml"
+	"sort"
+	"strings"
+
 	regexp "github.com/dlclark/regexp2"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -9,8 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/xml2"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"sort"
-	"strings"
 )
 
 var mybatisVarExtractor = regexp.MustCompile(`\$\{\s*([^}]+)\s*}`, regexp.None)
@@ -139,10 +140,12 @@ var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 	var res []sfvm.ValueOperator
 
 	offset := 0
-	for name, content := range prog.Program.ExtraFile {
-		log.Debugf("start to handling: %v len: %v", name, len(content))
+	prog.ForEachFile(func(s string, me *memedit.MemEditor) {
+		name := me.GetFilename()
+		content := me.GetSourceCode()
+		log.Warnf("start to handling: %v len: %v", name, len(content))
 		if !strings.HasSuffix(name, ".xml") {
-			continue
+			return
 		}
 		var editor *memedit.MemEditor
 		if len(content) <= 128 {
@@ -264,7 +267,8 @@ var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 			})
 		})
 		xml2.Handle(content, onDirective, onStartElement, onEndElement, onCharData)
-	}
+	})
+
 	if len(res) > 0 {
 		return true, sfvm.NewValues(res), nil
 	}

@@ -23,10 +23,10 @@ func (p *Program) SaveEditor(e *memedit.MemEditor) {
 	ir := ssadb.MarshalFile(e)
 
 	// 	ssadb.MarshalFile(e, folderPath)
-	p.Cache.editorCache.Add("", ir)
+	p.Cache.editorCache.Add(e.GetIrSourceHash(), ir)
 }
 
 func (p *Program) SaveFolder(folderPath []string) {
 	ir := ssadb.MarshalFolder(p.GetProgramName(), folderPath)
-	p.Cache.editorCache.Add("", ir)
+	p.Cache.editorCache.Add(ir.SourceCodeHash, ir)
 }

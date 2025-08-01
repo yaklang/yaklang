@@ -83,9 +83,8 @@ func GetIrSourceFromHash(hash string) (*memedit.MemEditor, error) {
 	if code == "" {
 		code = source.QuotedCode
 	}
-	//_, folder, _ := strings.Cut(source.FolderPath, source.ProgramName)
-	_, fileUrl := splitProjectPath(irSourceJoin(source.FolderPath, source.FileName))
-	editor := memedit.NewMemEditorWithFileUrl(code, fileUrl)
+	filePath := irSourceJoin(source.FolderPath, source.FileName)
+	editor := memedit.NewMemEditorWithFileUrl(code, filePath)
 	return editor, nil
 }
 
