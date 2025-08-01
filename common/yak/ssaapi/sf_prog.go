@@ -372,29 +372,31 @@ func NewFileFilter(file, matchType string, match []string) *FileFilter {
 	}
 }
 
+func (p *Program) getEditor(filename, hash string) (*memedit.MemEditor, bool) {
+	if editor, ok := p.Program.GetEditor(filename); ok {
+		return editor, true
+	}
+
+	if p.Program.DatabaseKind == ssa.ProgramCacheMemory {
+		return nil, false
+	}
+	// if have database, get source code from database
+	if editor, err := ssadb.GetIrSourceFromHash(hash); err != nil {
+		log.Errorf("get ir source from hash error: %s", err)
+		return nil, false
+	} else {
+		p.Program.SetEditor(filename, editor)
+		return editor, true
+	}
+}
+
 func (p *Program) ForEachFile(callBack func(string, *memedit.MemEditor)) {
-	for filename, data := range p.Program.ExtraFile {
-		if e, ok := p.Program.GetEditor(filename); ok {
-			editor := e
-			callBack(filename, editor)
+	for filename, hash := range p.Program.ExtraFile {
+		editor, ok := p.getEditor(filename, hash)
+		if !ok {
+			log.Errorf("get editor by filename %s not found", filename)
 			continue
 		}
-
-		var err error
-		var editor *memedit.MemEditor
-		if p.Program.DatabaseKind != ssa.ProgramCacheMemory {
-			// if have database, get source code from database
-			editor, err = ssadb.GetIrSourceFromHash(data)
-			if err != nil {
-				log.Errorf("get ir source from hash error: %s", err)
-				// continue
-			}
-		} else {
-			// if no database, get source code from memory
-			editor = memedit.NewMemEditor(data)
-			editor.SetUrl(filename)
-		}
-		p.Program.SetEditor(filename, editor)
 		callBack(filename, editor)
 	}
 }

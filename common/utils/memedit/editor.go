@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"path"
 	"strings"
 	"unicode/utf8"
 
@@ -91,6 +92,10 @@ func (ve *MemEditor) SetFolderPath(folderPath string) {
 }
 
 func (ve *MemEditor) GetFolderPath() string {
+	if ve.folderPath == "" {
+		// split from ve.GetUrl
+		ve.folderPath, ve.fileName = path.Split(ve.fileUrl)
+	}
 	return ve.folderPath
 }
 
@@ -105,6 +110,10 @@ func (ve *MemEditor) GetIrSourceHash() string {
 }
 
 func (ve *MemEditor) GetFilename() string {
+	if ve.fileName == "" {
+		// split from ve.GetUrl
+		ve.folderPath, ve.fileName = path.Split(ve.fileUrl)
+	}
 	return ve.fileName
 }
 
