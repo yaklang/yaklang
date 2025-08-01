@@ -2,8 +2,9 @@ package ssaapi
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"regexp"
+
+	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/gobwas/glob"
 
@@ -149,7 +150,7 @@ func (value Values) GetMembersByString(key string) (sfvm.ValueOperator, error) {
 		}
 		if v.IsMap() || v.IsList() || v.IsObject() {
 			res := v.GetMember(v.NewValue(ssa.NewConst(key)))
-			vals = append(vals, res)
+			vals = append(vals, res...)
 		}
 	}
 	return vals, nil

@@ -259,13 +259,17 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 			}
 		}
 		if getReturnIndex != -1 {
-			member := call.GetMember(v.NewValue(ssa.NewConst(getReturnIndex)))
-			if member == nil {
+			members := call.GetMember(v.NewValue(ssa.NewConst(getReturnIndex)))
+			if members == nil {
 				log.Errorf("BUG: (return instruction 's member is nil),check it")
 			} else {
-				actx.pushObject(call, member.GetKey(), member)
-				vals = append(vals, member.AppendDependOn(v).getBottomUses(actx, opt...)...)
-				actx.popObject()
+				for i, member := range members {
+					if i == 0 {
+						actx.pushObject(call, member.GetKey(), member)
+					}
+					vals = append(vals, member.AppendDependOn(v).getBottomUses(actx, opt...)...)
+					actx.popObject()
+				}
 			}
 		}
 		if vals.Len() == 0 {
