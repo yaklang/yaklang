@@ -353,6 +353,9 @@ func StructuredStream(input string, opts ...aispec.AIConfigOption) (chan *aispec
 func ListModels(opts ...aispec.AIConfigOption) ([]*aispec.ModelMeta, error) {
 	config := aispec.NewDefaultAIConfig(opts...)
 	client := GetAI(config.Type, opts...)
+	if utils.IsNil(client) {
+		return nil, utils.Error("List AI model failed:unknown AI type")
+	}
 	return client.GetModelList()
 }
 
