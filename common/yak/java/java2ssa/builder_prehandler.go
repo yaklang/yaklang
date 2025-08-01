@@ -98,6 +98,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 		prog.SetTemplate(path, info)
 		ast, err := s.ParseAST(info.GetContent())
 		if err != nil {
+			log.Infof("parse jsp file %s error: %v", path, err)
 			return err
 		}
 		editor := prog.CreateEditor([]byte(info.GetContent()), path)
