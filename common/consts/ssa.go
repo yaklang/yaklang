@@ -46,6 +46,8 @@ func ValidateLanguage(language string) (Language, error) {
 		return JS, nil
 	case "go", "golang":
 		return GO, nil
+	case "c", "clang":
+		return C, nil
 	}
 	return "", errors.Errorf("unsupported language: %s", language)
 }

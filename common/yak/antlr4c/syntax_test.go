@@ -56,13 +56,12 @@ type Container []struct {
 
 // func TestExample_Tmp(t *testing.T) {
 // 	code := `
-// #include <stdio.h>
-// int main() {
-//     int a = 10;
-//     int *p = &a;
-//     println(*p);
-//     return 0;
+
+// void insert(node ** tree, node * item) {
+// 	if ((err = foo (a)) != 0)
+// 		return;
 // }
+
 // `
 // 	_, err := SyntaxBase(code, true)
 // 	if err != nil {
