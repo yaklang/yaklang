@@ -133,6 +133,10 @@ func (ka *KnowledgeAlchemist) Refine(ctx context.Context, db *gorm.DB, path stri
 
 				for _, entry := range entries {
 					for _, e := range splitEntry(entry) {
+						if len(e.KnowledgeDetails) <= 0 {
+							log.Infof("chunk index [%d]: skipping entry [%s]", currentIndex, entry)
+							continue
+						}
 						err := yakit.CreateKnowledgeBaseEntry(db, e)
 						if err != nil {
 							log.Errorf("chunk index [%d]: failed to create knowledgeDatabase: %v", currentIndex, err)
