@@ -7,7 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/aiforge"
-	"github.com/yaklang/yaklang/common/aiforge/aibp"
+	"github.com/yaklang/yaklang/common/aiforge/aibp/knowledge"
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/log"
@@ -24,8 +24,10 @@ type KnowledgeAlchemist struct {
 	ChunkSize           int64
 	SeparatorTrigger    string
 
-	ExtendAIDOption []aid.Option
-	Concurrent      int
+	Concurrent int
+
+	ExtendAIDOption              []aid.Option
+	ExtendVectorEmbeddingOptions []any
 }
 
 type Option func(*KnowledgeAlchemist)
@@ -43,10 +45,16 @@ func NewKnowledgeAlchemist(opts ...Option) *KnowledgeAlchemist {
 }
 
 func (ka *KnowledgeAlchemist) Refine(ctx context.Context, db *gorm.DB, path string) (*rag.RAGSystem, error) {
-	refineForge, err := aibp.NewKnowledgeRefineForge()
+	refineForge, err := knowledge.NewKnowledgeRefineForge()
 	if err != nil {
 		return nil, err
 	}
+
+	splitForge, err := knowledge.NewKnowledgeSplitForge()
+	if err != nil {
+		return nil, err
+	}
+
 	knowledgeDatabaseName := path + uuid.New().String()
 	newKnowledgeBase := &schema.KnowledgeBaseInfo{
 		KnowledgeBaseName: knowledgeDatabaseName,
@@ -92,14 +100,47 @@ func (ka *KnowledgeAlchemist) Refine(ctx context.Context, db *gorm.DB, path stri
 					return
 				}
 
+				var splitEntry func(entry *schema.KnowledgeBaseEntry) []*schema.KnowledgeBaseEntry
+
+				splitEntry = func(entry *schema.KnowledgeBaseEntry) []*schema.KnowledgeBaseEntry {
+					if len(entry.KnowledgeDetails) <= 1000 {
+						return []*schema.KnowledgeBaseEntry{entry}
+					}
+
+					log.Infof("chunk index [%d]: start to split knowledge type: %s, entry: %s", currentIndex, chunk.MIMEType().String(), entry.KnowledgeTitle)
+					var resultEntries []*schema.KnowledgeBaseEntry
+					splitRes, splitErr := splitForge.Execute(ctx, []*ypb.ExecParamItem{{
+						Key:   "knowledge",
+						Value: string(utils.Jsonify(entry)),
+					}}, ka.ExtendAIDOption...)
+					if splitErr != nil {
+						log.Errorf("chunk index [%d]: failed to execute split for knowledge: %v", currentIndex, splitErr)
+						return nil
+					}
+
+					splitEntries, err := ResultAction2KnowledgeBaseEntries(splitRes.Action, int64(newKnowledgeBase.ID))
+					if err != nil {
+						log.Errorf("chunk index [%d]: failed to convert result action to knowledge base entries: %v in split step", currentIndex, err)
+						return nil
+					}
+					for _, e := range splitEntries {
+						resultEntries = append(resultEntries, splitEntry(e)...)
+					}
+					return resultEntries
+				}
+
 				log.Infof("chunk index [%d]: successfully refined knowledge type: %s, entries count: %d", currentIndex, chunk.MIMEType().String(), len(entries))
 
 				for _, entry := range entries {
-					err := yakit.CreateKnowledgeBaseEntry(db, entry)
-					if err != nil {
-						log.Errorf("chunk index [%d]: failed to create knowledgeDatabase: %v", currentIndex, err)
+					for _, e := range splitEntry(entry) {
+						err := yakit.CreateKnowledgeBaseEntry(db, e)
+						if err != nil {
+							log.Errorf("chunk index [%d]: failed to create knowledgeDatabase: %v", currentIndex, err)
+						}
 					}
 				}
+
+				log.Infof("chunk index [%d]: successfully created knowledge base entries for knowledge type: %s", currentIndex, chunk.MIMEType().String())
 			}()
 			index++
 			return nil
@@ -113,14 +154,17 @@ func (ka *KnowledgeAlchemist) Refine(ctx context.Context, db *gorm.DB, path stri
 	if err != nil {
 		return nil, utils.Errorf("fial to create knowledgDatabase: %v", err)
 	}
-
 	err = rd.Run()
 	if err != nil {
 		return nil, err
 	}
+	log.Infof("wait for all knowledge refinement tasks to complete, total: %d", index)
+	swg.Wait()
+	log.Infof("successfully refined knowledge base: %s, chunk count: %d", newKnowledgeBase.KnowledgeBaseName, index)
 
-	yakit.CreateCollection
-	return nil, nil
+	log.Infof("start to build vector index for knowledge base: %s", newKnowledgeBase.KnowledgeBaseName)
+
+	return rag.BuildVectorIndexForKnowledgeBase(db, int64(newKnowledgeBase.ID), ka.ExtendVectorEmbeddingOptions...)
 }
 
 func ResultAction2KnowledgeBaseEntries(
@@ -153,4 +197,46 @@ func ResultAction2KnowledgeBaseEntries(
 		entries = append(entries, entry)
 	}
 	return entries, nil
+}
+
+func WithStandards(standards string) Option {
+	return func(ka *KnowledgeAlchemist) {
+		ka.standards = standards
+	}
+}
+
+func WithTimeTriggerInterval(interval time.Duration) Option {
+	return func(ka *KnowledgeAlchemist) {
+		ka.TimeTriggerInterval = interval
+	}
+}
+
+func WithChunkSize(size int64) Option {
+	return func(ka *KnowledgeAlchemist) {
+		ka.ChunkSize = size
+	}
+}
+
+func WithSeparatorTrigger(separator string) Option {
+	return func(ka *KnowledgeAlchemist) {
+		ka.SeparatorTrigger = separator
+	}
+}
+
+func WithConcurrent(concurrent int) Option {
+	return func(ka *KnowledgeAlchemist) {
+		ka.Concurrent = concurrent
+	}
+}
+
+func WithExtendAIDOption(opts ...aid.Option) Option {
+	return func(ka *KnowledgeAlchemist) {
+		ka.ExtendAIDOption = opts
+	}
+}
+
+func WithExtendVectorEmbeddingOptions(opts ...any) Option {
+	return func(ka *KnowledgeAlchemist) {
+		ka.ExtendVectorEmbeddingOptions = opts
+	}
 }

@@ -253,10 +253,10 @@ type KnowledgeBaseEntry struct {
 	gorm.Model
 
 	// 知识库名称
-	KnowledgeBaseID int64 `gorm:"unique_index:idx_knowledge_title_knowledge_base_id;index:idx_knowledge_base_id;not null" json:"knowledge_base_id"`
+	KnowledgeBaseID int64 `gorm:"not null" json:"knowledge_base_id"`
 
 	// 知识标题(和知识库名称应该是联合唯一索引)
-	KnowledgeTitle string `gorm:"unique_index:idx_knowledge_title_knowledge_base_id;index:idx_knowledge_title;not null" json:"knowledge_title"`
+	KnowledgeTitle string `gorm:";not null" json:"knowledge_title"`
 
 	// 知识类型（如：CoreConcept、Standard、Guideline等）
 	KnowledgeType string `gorm:"index:idx_knowledge_type;not null" json:"knowledge_type"`

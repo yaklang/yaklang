@@ -2,26 +2,27 @@ package rag
 
 import (
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func BuildVectorIndexForKnowledgeBaseEntry(db *gorm.DB, id int64, opts ...any) error {
+func BuildVectorIndexForKnowledgeBaseEntry(db *gorm.DB, id int64, opts ...any) (*RAGSystem, error) {
 
 	knowledgeBase, err := yakit.GetKnowledgeBase(db, id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	rag, err := CreateOrLoadCollection(db, knowledgeBase.KnowledgeBaseName, knowledgeBase.KnowledgeBaseDescription, opts...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	entry, err := yakit.GetKnowledgeBaseEntryById(db, id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	content := entry.KnowledgeTitle
@@ -57,33 +58,36 @@ func BuildVectorIndexForKnowledgeBaseEntry(db *gorm.DB, id int64, opts ...any) e
 	if err != nil {
 		count, err := rag.CountDocuments()
 		if err != nil {
-			return utils.Errorf("获取文档数量失败: %v", err)
+			return nil, utils.Errorf("获取文档数量失败: %v", err)
 		}
 		println(count)
-		return utils.Errorf("添加文档到RAG系统失败 (ID: %s): %v", documentID, err)
+		return nil, utils.Errorf("添加文档到RAG系统失败 (ID: %s): %v", documentID, err)
 	}
-	return nil
+	return rag, nil
 }
 
 // BuildVectorIndexForKnowledgeBase 构建向量索引
-func BuildVectorIndexForKnowledgeBase(db *gorm.DB, id int64, opts ...any) error {
+func BuildVectorIndexForKnowledgeBase(db *gorm.DB, id int64, opts ...any) (*RAGSystem, error) {
 
 	knowledgeBase, err := yakit.GetKnowledgeBase(db, id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	rag, err := CreateOrLoadCollection(db, knowledgeBase.KnowledgeBaseName, knowledgeBase.KnowledgeBaseDescription, opts...)
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	log.Infof("loaded knowledge base: %s, id: %d", knowledgeBase.KnowledgeBaseName, id)
 
 	// 清空所有索引并重建索引
 	err = rag.ClearDocuments()
 	if err != nil {
-		return utils.Errorf("清空索引失败: %v", err)
+		return nil, utils.Errorf("清空索引失败: %v", err)
 	}
 
+	log.Infof("start to build vector index for knowledge base: %s", knowledgeBase.KnowledgeBaseName)
 	// 通过SearchKnowledgeBaseEntry函数，翻页去调用AddDocument函数，将知识项添加到知识库中
 	page := 1
 	limit := 100 // 每页处理100条记录
@@ -97,9 +101,10 @@ func BuildVectorIndexForKnowledgeBase(db *gorm.DB, id int64, opts ...any) error 
 
 		_, entries, err := yakit.GetKnowledgeBaseEntryByFilter(db, id, "", paging)
 		if err != nil {
-			return utils.Errorf("搜索知识库条目失败: %v", err)
+			return nil, utils.Errorf("搜索知识库条目失败: %v", err)
 		}
 
+		log.Infof("page %d: found %d entries in knowledge base: %s", page, len(entries), knowledgeBase.KnowledgeBaseName)
 		// 如果没有更多条目，退出循环
 		if len(entries) == 0 {
 			break
@@ -139,12 +144,12 @@ func BuildVectorIndexForKnowledgeBase(db *gorm.DB, id int64, opts ...any) error 
 
 			err = rag.AddDocuments(doc)
 			if err != nil {
-				count, err := rag.CountDocuments()
-				if err != nil {
-					return utils.Errorf("获取文档数量失败: %v", err)
+				count, coutnErr := rag.CountDocuments()
+				if coutnErr != nil {
+					return nil, utils.Errorf("获取文档数量失败: %v", coutnErr)
 				}
 				println(count)
-				return utils.Errorf("添加文档到RAG系统失败 (ID: %s): %v", documentID, err)
+				return nil, utils.Errorf("添加文档到RAG系统失败 (ID: %s): %v", documentID, err)
 			}
 		}
 
@@ -157,5 +162,5 @@ func BuildVectorIndexForKnowledgeBase(db *gorm.DB, id int64, opts ...any) error 
 		page++
 	}
 
-	return nil
+	return rag, nil
 }

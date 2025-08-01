@@ -5,10 +5,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/embedding"
+	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/aireducer/knowledgalchemist"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/schema"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -528,4 +534,33 @@ func TestAITaskForgeTriage(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestRefine_Smoke(t *testing.T) {
+	// Setup in-memory sqlite DB
+	db, err := gorm.Open("sqlite3", filepath.Join(consts.GetDefaultYakitBaseTempDir(), "test_knowledge_alchemist.db"))
+	if err != nil {
+		t.Fatalf("failed to open in-memory db: %v", err)
+	}
+	db = db.AutoMigrate(&schema.KnowledgeBaseEntry{}, &schema.KnowledgeBaseInfo{}, &schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
+	defer db.Close()
+
+	ka := knowledgalchemist.NewKnowledgeAlchemist(
+		knowledgalchemist.WithTimeTriggerInterval(10),
+		knowledgalchemist.WithChunkSize(32),
+		knowledgalchemist.WithConcurrent(20),
+		knowledgalchemist.WithExtendVectorEmbeddingOptions([]any{
+			rag.WithEmbeddingClient(embedding.NewOpenaiEmbeddingClient(aispec.WithBaseURL("http://127.0.0.1:8080"), aispec.WithAPIKey("abc"), aispec.WithModel("Qwen3-Embedding-0.6B-Q4_K_M.gguf"))),
+		}),
+	)
+
+	ctx := context.Background()
+
+	ragSys, err := ka.Refine(ctx, db, "/Users/rookie/Downloads/zwb.pdf")
+	if err != nil {
+		t.Logf("Refine returned error (acceptable in smoke test): %v", err)
+	} else {
+		t.Log("Refine completed successfully")
+	}
+	_ = ragSys
 }

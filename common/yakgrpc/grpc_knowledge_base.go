@@ -195,7 +195,7 @@ func (s *Server) BuildVectorIndexForKnowledgeBase(ctx context.Context, req *ypb.
 	for _, opt := range ragOpts {
 		opts = append(opts, opt)
 	}
-	err := rag.BuildVectorIndexForKnowledgeBase(consts.GetGormProfileDatabase(), req.GetKnowledgeBaseId(), opts...)
+	_, err := rag.BuildVectorIndexForKnowledgeBase(consts.GetGormProfileDatabase(), req.GetKnowledgeBaseId(), opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -230,7 +230,7 @@ func (s *Server) BuildVectorIndexForKnowledgeBaseEntry(ctx context.Context, req 
 	for _, opt := range ragOpts {
 		opts = append(opts, opt)
 	}
-	err := rag.BuildVectorIndexForKnowledgeBaseEntry(consts.GetGormProfileDatabase(), req.GetKnowledgeBaseEntryId(), opts...)
+	_, err := rag.BuildVectorIndexForKnowledgeBaseEntry(consts.GetGormProfileDatabase(), req.GetKnowledgeBaseEntryId(), opts...)
 	if err != nil {
 		return nil, err
 	}

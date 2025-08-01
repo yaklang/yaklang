@@ -406,10 +406,8 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 		resp := config.NewAIResponse()
 		go func() {
 			defer resp.Close()
-
 			isStream := false
-			output, err := cb(
-				req.GetPrompt(),
+			optList := []aispec.AIConfigOption{
 				aispec.WithStreamHandler(func(reader io.Reader) {
 					isStream = true
 					resp.EmitOutputStream(reader)
@@ -417,7 +415,17 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 				aispec.WithReasonStreamHandler(func(reader io.Reader) {
 					isStream = true
 					resp.EmitReasonStream(reader)
-				}),
+				})}
+			for _, data := range req.GetImageList() {
+				if data.IsBase64 {
+					optList = append(optList, aispec.WithImageBase64(string(data.Data)))
+				} else {
+					optList = append(optList, aispec.WithImageRaw(data.Data))
+				}
+			}
+			output, err := cb(
+				req.GetPrompt(),
+				optList...,
 			)
 			if err != nil {
 				log.Errorf("chat error: %v", err)

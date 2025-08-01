@@ -8,12 +8,12 @@
   "additionalProperties": false,
   "properties": {
     "@action": {
-      "const": "refine",
+      "const": "split",
       "description": "标识当前操作的具体类型"
     },
     "knowledge-collection": {
       "title": "知识切片集合 (Knowledge Snippet Collection)",
-      "description": "从单页文档内容中提取出的一个或多个高密度、带元数据的原子化知识切片的集合。这个集合必须是一个数组。",
+      "description": "从一条大的知识切片中切割出多个符合长度限制的知识单元。这个集合必须是一个数组。",
       "type": "array",
       "items": {
         "title": "高密度知识切片 (High-Density Knowledge Snippet)",
@@ -55,7 +55,7 @@
             }
           },
           "knowledge_details": {
-            "description": "知识点的详细内容，总长度上限调整为1000字。必须忠实于原文，完整保留代码块、公式、关键定义和专有名词。只有当话题发生明显转变时才考虑切分。如果内容引用了文档其他页面的概念或数据，请使用 [描述文字]^[页码] 的格式进行角标引用。可以在保留原文语句的情况下，对格式进行精简，提高信息密度",
+            "description": "知识点的详细内容，总长度上限为1000字。必须忠实于原文，完整保留代码块、公式、关键定义和专有名词。只有当话题发生明显转变时才考虑切分。如果内容引用了文档其他页面的概念或数据，请使用 [描述文字]^[页码] 的格式进行角标引用。可以在保留原文语句的情况下，对格式进行精简，提高信息密度",
             "type": "string",
             "maxLength": 1000
           },
