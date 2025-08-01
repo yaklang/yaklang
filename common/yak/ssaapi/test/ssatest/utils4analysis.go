@@ -748,3 +748,42 @@ func EvaluateVerifyFilesystem(i string, t require.TestingT, isStrict bool) error
 
 	return EvaluateVerifyFilesystemWithRule(frame.GetRule(), t, isStrict)
 }
+
+// EdgeInfo represents information about an edge in dot graph
+type EdgeInfo struct {
+	VariableName string
+	From         string
+	To           string
+	Label        string
+}
+
+// CheckSyntaxFlowDotGraph checks if the SyntaxFlow result contains dot graphs with specified edges
+func CheckSyntaxFlowDotGraph(
+	t *testing.T,
+	code string,
+	sfRule string,
+	showDot bool,
+	expectedEdges []EdgeInfo,
+	opt ...ssaapi.Option,
+) {
+	Check(t, code, func(prog *ssaapi.Program) error {
+		values, err := prog.SyntaxFlowWithError(sfRule)
+		require.NoError(t, err)
+
+		for _, expectedEdge := range expectedEdges {
+			result := values.GetValues(expectedEdge.VariableName)
+			require.Len(t, result, 1, "Result len should be 1")
+
+			dotGraph := ssaapi.NewValueGraph(result[0])
+			if showDot {
+				fmt.Printf("VariableName:%s\n", expectedEdge.VariableName)
+				dotGraph.ShowDot()
+			}
+			hasEdge := dotGraph.HasEdgeContainLabel(expectedEdge.From, expectedEdge.To, expectedEdge.Label)
+			require.True(t, hasEdge,
+				"Should find edge from '%s' to '%s' with label '%s' in at least one dot graph",
+				expectedEdge.From, expectedEdge.To, expectedEdge.Label)
+		}
+		return nil
+	}, opt...)
+}
