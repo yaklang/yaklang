@@ -138,7 +138,7 @@ func (m *Manager) Install(name string, options *InstallOptions) error {
 }
 
 // Uninstall 卸载二进制文件
-func (m *Manager) Uninstall(name string, installPath ...string) error {
+func (m *Manager) Uninstall(name string) error {
 	m.mutex.RLock()
 	descriptor, exists := m.registry[name]
 	m.mutex.RUnlock()
@@ -495,11 +495,11 @@ func Install(name string, options *InstallOptions) error {
 }
 
 // Uninstall 使用默认管理器卸载二进制文件
-func Uninstall(name string, installPath ...string) error {
+func Uninstall(name string) error {
 	if DefaultManager == nil {
 		return utils.Error("default manager not initialized")
 	}
-	return DefaultManager.Uninstall(name, installPath...)
+	return DefaultManager.Uninstall(name)
 }
 
 // ListRegisteredNames 使用默认管理器列出所有注册的二进制文件
@@ -586,4 +586,11 @@ func GetDownloadInfo(name string) (*DownloadInfo, error) {
 		return nil, utils.Error("default manager not initialized")
 	}
 	return DefaultManager.GetDownloadInfo(name)
+}
+
+func GetAllStatus() ([]*BinaryStatus, error) {
+	if DefaultManager == nil {
+		return nil, utils.Error("default manager not initialized")
+	}
+	return DefaultManager.GetAllStatus()
 }

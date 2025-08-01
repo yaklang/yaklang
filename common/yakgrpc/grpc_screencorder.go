@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"time"
 
@@ -70,15 +69,25 @@ func (s *Server) QueryScreenRecorders(ctx context.Context, req *ypb.QueryScreenR
 }
 
 func (s *Server) IsScrecorderReady(ctx context.Context, req *ypb.IsScrecorderReadyRequest) (*ypb.IsScrecorderReadyResponse, error) {
-	ok, reason := screcorder.IsAvailable()
-	if reason != nil {
+	rsp, err := s.IsThirdPartyBinaryReady(ctx, &ypb.IsThirdPartyBinaryReadyRequest{
+		Name: "ffmpeg",
+	})
+	if err != nil {
+		return &ypb.IsScrecorderReadyResponse{Ok: false, Reason: err.Error()}, nil
+	}
+	if rsp.GetError() != "" {
 		return &ypb.IsScrecorderReadyResponse{
-			Ok: ok, Reason: fmt.Sprint(reason),
+			Ok:     rsp.GetIsReady(),
+			Reason: rsp.GetError(),
 		}, nil
 	}
-	return &ypb.IsScrecorderReadyResponse{
-		Ok: ok,
-	}, nil
+	if !rsp.GetIsReady() {
+		return &ypb.IsScrecorderReadyResponse{
+			Ok:     false,
+			Reason: "ffmpeg is not installed",
+		}, nil
+	}
+	return &ypb.IsScrecorderReadyResponse{Ok: true}, nil
 }
 
 type DownloadStream interface {
@@ -87,20 +96,10 @@ type DownloadStream interface {
 }
 
 func (s *Server) InstallScrecorder(req *ypb.InstallScrecorderRequest, stream ypb.Yak_InstallScrecorderServer) error {
-	return s.DownloadWithStream(req.GetProxy(), func() (urlStr string, name string, err error) {
-		var targetUrl string
-		var filename string
-		switch runtime.GOOS {
-		case "darwin":
-			targetUrl = "https://yaklang.oss-accelerate.aliyuncs.com/ffmpeg/ffmpeg-v6.0-darwin-amd64"
-			filename = "ffmpeg"
-		case "windows":
-			targetUrl = "https://yaklang.oss-accelerate.aliyuncs.com/ffmpeg/ffmpeg-v6.0-windows-amd64.exe"
-			filename = "ffmpeg.exe"
-		default:
-			return "", "", utils.Error("unsupported os: " + runtime.GOOS)
-		}
-		return targetUrl, filename, nil
+	return s.InstallThirdPartyBinary(&ypb.InstallThirdPartyBinaryRequest{
+		Name:  "ffmpeg",
+		Proxy: req.GetProxy(),
+		Force: true,
 	}, stream)
 }
 

@@ -99,7 +99,7 @@ func TestExtractFile_PickModes(t *testing.T) {
 						targetPath = filepath.Join(tempDir, archiveTest.name+"_"+pickTest.expectDir)
 					}
 
-					err := ExtractFile(archivePath, targetPath, "", pickTest.pick)
+					err := ExtractFile(archivePath, targetPath, "", pickTest.pick, true)
 					if err != nil {
 						t.Errorf("ExtractFile failed for %s with pick '%s': %v", archiveTest.name, pickTest.pick, err)
 						return
@@ -279,7 +279,7 @@ func TestExtractFile_ErrorCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ExtractFile(tt.archivePath, tt.targetPath, tt.archiveType, tt.pick)
+			err := ExtractFile(tt.archivePath, tt.targetPath, tt.archiveType, tt.pick, true)
 			if tt.expectError && err == nil {
 				t.Errorf("Expected error but got none")
 			}
@@ -305,13 +305,13 @@ func TestExtractFile_ArchiveTypeSpecified(t *testing.T) {
 	targetPath := filepath.Join(tempDir, "extracted")
 
 	// 不指定类型应该失败
-	err = ExtractFile(archivePath, targetPath, "", "executable")
+	err = ExtractFile(archivePath, targetPath, "", "executable", true)
 	if err == nil {
 		t.Errorf("Expected error when archive type cannot be determined")
 	}
 
 	// 显式指定ZIP类型应该成功
-	err = ExtractFile(archivePath, targetPath, ".zip", "executable")
+	err = ExtractFile(archivePath, targetPath, ".zip", "executable", true)
 	if err != nil {
 		t.Errorf("Failed to extract with explicit archive type: %v", err)
 	}
@@ -365,7 +365,7 @@ func TestExtractFile_DirectoryExtraction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ExtractFile(zipPath, tt.targetPath, "", tt.pick)
+			err := ExtractFile(zipPath, tt.targetPath, "", tt.pick, true)
 			if err != nil {
 				t.Errorf("Failed to extract: %v", err)
 				return
