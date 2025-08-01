@@ -11,8 +11,13 @@ import (
 	"sync"
 	"time"
 
+<<<<<<< HEAD
 	"github.com/yaklang/yaklang/common/mediautils"
 	"github.com/yaklang/yaklang/common/mimetype"
+=======
+	"github.com/yaklang/yaklang/common/mimetype"
+	"github.com/yaklang/yaklang/common/thirdparty_bin"
+>>>>>>> 7fc481e28 (feat: enhance unified third-party binary manager)
 	"github.com/yaklang/yaklang/common/utils/imageutils"
 
 	"github.com/yaklang/yaklang/common/aireducer"
@@ -370,6 +375,8 @@ func initYaklangLib() {
 	yaklang.Import("imageutils", imageutils.Exports)
 	yaklang.Import("ffmpeg", mediautils.FfmpegExports)
 	yaklang.Import("whisper", mediautils.WhisperExports)
+
+	yaklang.Import("toolbox", thirdparty_bin.Exports)
 }
 
 type ScriptEngine struct {

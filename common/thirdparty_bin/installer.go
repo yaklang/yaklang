@@ -110,11 +110,18 @@ func (bi *BaseInstaller) Install(descriptor *BinaryDescriptor, options *InstallO
 	}
 
 	installPath := bi.GetInstallPath(descriptor)
-
+	installDir := bi.GetInstallDir(descriptor)
+	isDir := installDir != ""
 	// 确保安装目录存在
-	installDir := filepath.Dir(installPath)
-	if err := os.MkdirAll(installDir, 0755); err != nil {
-		return utils.Errorf("create install directory failed: %v", err)
+	if installDir != "" {
+		if err := os.MkdirAll(installDir, 0755); err != nil {
+			return utils.Errorf("create install directory failed: %v", err)
+		}
+	} else {
+		installDir = filepath.Dir(installPath)
+		if err := os.MkdirAll(installDir, 0755); err != nil {
+			return utils.Errorf("create install directory failed: %v", err)
+		}
 	}
 
 	// 下载文件
@@ -141,7 +148,10 @@ func (bi *BaseInstaller) Install(descriptor *BinaryDescriptor, options *InstallO
 
 	switch descriptor.InstallType {
 	case "archive":
-		return ExtractFile(filePath, installPath, descriptor.ArchiveType, pick)
+		if isDir {
+			return ExtractFile(filePath, installDir, descriptor.ArchiveType, pick, true)
+		}
+		return ExtractFile(filePath, installPath, descriptor.ArchiveType, pick, false)
 	case "bin":
 		return os.Rename(filePath, installPath)
 	default:
@@ -160,6 +170,18 @@ func (bi *BaseInstaller) GetInstallPath(descriptor *BinaryDescriptor) string {
 		return filepath.Join(bi.defaultInstallDir, downloadInfo.BinPath)
 	}
 	return filepath.Join(bi.defaultInstallDir, descriptor.Name)
+}
+
+// GetInstallDir 获取安装目录
+func (bi *BaseInstaller) GetInstallDir(descriptor *BinaryDescriptor) string {
+	downloadInfo, err := bi.GetDownloadInfo(descriptor)
+	if err != nil {
+		return ""
+	}
+	if downloadInfo.BinDir != "" {
+		return filepath.Join(bi.defaultInstallDir, downloadInfo.BinDir)
+	}
+	return ""
 }
 
 // IsInstalled 检查是否已安装
@@ -204,7 +226,7 @@ func (bi *BaseInstaller) downloadFile(url, filename string, options *InstallOpti
 	}
 
 	if options != nil && options.Progress != nil {
-		options.Progress(0, 0, totalSize, "开始下载")
+		options.Progress(0, 0, totalSize, "开始下载, 文件大小: "+utils.ByteSize(uint64(totalSize)))
 	}
 
 	// 检查上下文是否已取消
@@ -248,7 +270,7 @@ func (bi *BaseInstaller) downloadFile(url, filename string, options *InstallOpti
 					options.Progress(prog.GetPercent(), int64(prog.Count), totalSize, "download cancelled")
 					return
 				case <-ticker.C:
-					options.Progress(prog.GetPercent(), int64(prog.Count), totalSize, "downloading...")
+					options.Progress(prog.GetPercent(), int64(prog.Count), totalSize, "")
 					if prog.GetPercent() >= 1 {
 						return
 					}

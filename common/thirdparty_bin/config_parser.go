@@ -24,6 +24,7 @@ type ConfigDownloadInfo struct {
 	URL       string `yaml:"url"`
 	Checksums string `yaml:"checksums,omitempty"`
 	BinPath   string `yaml:"bin_path,omitempty"`
+	BinDir    string `yaml:"bin_dir,omitempty"`
 	Pick      string `yaml:"pick,omitempty"`
 }
 
@@ -78,11 +79,21 @@ func ParseConfig(data []byte) (*ConfigFile, error) {
 			Dependencies:    configBinary.Dependencies,
 		}
 
-		// 转换下载信息
+		// 转换下载信息并验证pick和BinDir的一致性
 		for platform, configDownloadInfo := range configBinary.DownloadInfoMap {
+			// 验证pick和BinDir必须同时存在或同时不存在
+			hasPick := configDownloadInfo.Pick != ""
+			hasBinDir := configDownloadInfo.BinDir != ""
+
+			if hasPick != hasBinDir {
+				return nil, utils.Errorf("binary %s platform %s: pick and bin_dir must both be present or both be absent",
+					configBinary.Name, platform)
+			}
+
 			binary.DownloadInfoMap[platform] = &DownloadInfo{
 				URL:       configDownloadInfo.URL,
 				Checksums: configDownloadInfo.Checksums,
+				BinDir:    configDownloadInfo.BinDir,
 				BinPath:   configDownloadInfo.BinPath,
 				Pick:      configDownloadInfo.Pick,
 			}

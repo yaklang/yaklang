@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"sync"
 	"time"
@@ -16,7 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/ziputil"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -127,71 +125,11 @@ func (s *Server) IsLocalModelReady(ctx context.Context, req *ypb.IsLocalModelRea
 
 // InstallLocalModel 安装本地模型（主要是下载llama-server）
 func (s *Server) InstallLlamaServer(req *ypb.InstallLlamaServerRequest, stream ypb.Yak_InstallLlamaServerServer) error {
-	tempFileName := "llama-b5702.zip"
-	err := s.DownloadWithStream(req.GetProxy(), func() (urlStr string, name string, err error) {
-		if utils.IsWindows() {
-			return "https://github.com/ggml-org/llama.cpp/releases/download/b5702/llama-b5702-bin-win-cpu-x64.zip", tempFileName, nil
-		}
-
-		if utils.IsLinux() {
-			return "https://github.com/ggml-org/llama.cpp/releases/download/b5702/llama-b5702-bin-ubuntu-x64.zip", tempFileName, nil
-		}
-
-		if utils.IsMac() {
-			if runtime.GOARCH == "arm64" {
-				return "https://github.com/ggml-org/llama.cpp/releases/download/b5712/llama-b5712-bin-macos-arm64.zip", tempFileName, nil
-			} else {
-				return "https://github.com/ggml-org/llama.cpp/releases/download/b5702/llama-b5702-bin-macos-x64.zip", tempFileName, nil
-			}
-		}
-		return "", "", utils.Error("unsupported os: " + runtime.GOOS)
+	return s.InstallThirdPartyBinary(&ypb.InstallThirdPartyBinaryRequest{
+		Name:  "llama-server",
+		Proxy: req.GetProxy(),
+		Force: true,
 	}, stream)
-
-	if err != nil {
-		return err
-	}
-
-	dirPath := filepath.Join(
-		consts.GetDefaultYakitProjectsDir(),
-		"libs",
-	)
-
-	tempFilePath := filepath.Join(dirPath, tempFileName)
-
-	exists, err := utils.PathExists(tempFilePath)
-	if err != nil || !exists {
-		return utils.Errorf("下载失败: %v", err)
-	}
-
-	// 解压文件到目标目录
-	stream.Send(&ypb.ExecResult{
-		IsMessage: true,
-		Message:   []byte("正在解压文件..."),
-	})
-
-	targetPath := filepath.Join(dirPath, "llama-server")
-	os.MkdirAll(targetPath, 0755)
-	err = ziputil.DeCompress(tempFilePath, targetPath)
-	if err != nil {
-		return utils.Errorf("解压文件失败: %v", err)
-	}
-
-	stream.Send(&ypb.ExecResult{
-		IsMessage: true,
-		Message:   []byte("解压完成"),
-	})
-
-	os.Remove(tempFilePath)
-	// 验证安装是否成功
-	llamaServerPath := consts.GetLlamaServerPath()
-	if llamaServerPath == "" {
-		return utils.Errorf("下载完成，但llama-server不可用")
-	}
-
-	// chmod +x llama-server
-	os.Chmod(llamaServerPath, 0755)
-
-	return nil
 }
 
 // DownloadLocalModel 下载本地模型
