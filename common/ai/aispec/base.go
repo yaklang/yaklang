@@ -229,7 +229,7 @@ func WithChatBase_ImageRawInstance(images ...*ImageDescription) ChatBaseOption {
 
 func NewChatBaseContext(opts ...ChatBaseOption) *ChatBaseContext {
 	ctx := &ChatBaseContext{
-		EnableThinking: true,
+		EnableThinking: false,
 	}
 	for _, i := range opts {
 		i(ctx)
@@ -276,6 +276,7 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 	opts = append(opts, poc.WithReplaceHttpPacketBody(raw, false))
 	opts = append(opts, poc.WithConnectTimeout(5))
 	opts = append(opts, poc.WithRetryTimes(3))
+	opts = append(opts, poc.WithSave(true))
 
 	var pr, reasonPr io.Reader
 	var cancel context.CancelFunc
@@ -460,13 +461,13 @@ func ChatBasedExtractData(
 	return ExtractFromResult(result, fields)
 }
 
-func ChatExBase(url string, model string, details []ChatDetail, function []any, opt func() ([]poc.PocConfigOption, error), streamHandler func(closer io.Reader)) ([]ChatChoice, error) {
+func ChatExBase(url string, model string, details []ChatDetail, dummyParam []any, opt func() ([]poc.PocConfigOption, error), streamHandler func(closer io.Reader)) ([]ChatChoice, error) {
 	handleStream := streamHandler != nil
 	opts, err := opt()
 	if err != nil {
 		return nil, err
 	}
-	msg := NewChatMessage(model, details, function...)
+	msg := NewChatMessage(model, details)
 	if handleStream {
 		msg.Stream = true
 	}
@@ -493,6 +494,7 @@ func ChatExBase(url string, model string, details []ChatDetail, function []any, 
 			}()
 			streamHandler(io.TeeReader(pr, body))
 		}()
+		opts = append(opts, poc.WithSave(true))
 		_, _, err := poc.DoPOST(url, opts...)
 		if err != nil {
 			return nil, utils.Errorf("request post to %v：%v", url, err)
