@@ -291,7 +291,7 @@ func (bi *BaseInstaller) downloadFile(url, filename string, options *InstallOpti
 		lowhttp.WithPacketBytes([]byte(getRequest)),
 		lowhttp.WithHttps(isHttps),
 		lowhttp.WithContext(ctx),
-		lowhttp.WithTryReadMultiResponse(false),
+		lowhttp.WithNoReadMultiResponse(true),
 		lowhttp.WithNoFixContentLength(true),
 	}
 
@@ -384,7 +384,7 @@ func (bi *BaseInstaller) getFileSize(url string, options *InstallOptions) (int64
 		lowhttp.WithPacketBytes([]byte(headRequest)),
 		lowhttp.WithHttps(isHttps),
 		lowhttp.WithContext(ctx),
-		lowhttp.WithTryReadMultiResponse(false),
+		lowhttp.WithNoReadMultiResponse(false),
 		lowhttp.WithNoFixContentLength(true),
 	}
 
