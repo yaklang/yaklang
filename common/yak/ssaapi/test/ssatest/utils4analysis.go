@@ -751,10 +751,9 @@ func EvaluateVerifyFilesystem(i string, t require.TestingT, isStrict bool) error
 
 // EdgeInfo represents information about an edge in dot graph
 type EdgeInfo struct {
-	VariableName string
-	From         string
-	To           string
-	Label        string
+	From  string
+	To    string
+	Label string
 }
 
 // CheckSyntaxFlowDotGraph checks if the SyntaxFlow result contains dot graphs with specified edges
@@ -763,26 +762,28 @@ func CheckSyntaxFlowDotGraph(
 	code string,
 	sfRule string,
 	showDot bool,
-	expectedEdges []EdgeInfo,
+	wants map[string][]EdgeInfo,
 	opt ...ssaapi.Option,
 ) {
 	Check(t, code, func(prog *ssaapi.Program) error {
 		values, err := prog.SyntaxFlowWithError(sfRule)
 		require.NoError(t, err)
 
-		for _, expectedEdge := range expectedEdges {
-			result := values.GetValues(expectedEdge.VariableName)
-			require.Len(t, result, 1, "Result len should be 1")
-
+		for variableName, expectedEdges := range wants {
+			result := values.GetValues(variableName)
+			result.Show()
 			dotGraph := ssaapi.NewValueGraph(result[0])
 			if showDot {
-				fmt.Printf("VariableName:%s\n", expectedEdge.VariableName)
+				fmt.Printf("------VariableName:%s-------\n", variableName)
 				dotGraph.ShowDot()
 			}
-			hasEdge := dotGraph.HasEdgeContainLabel(expectedEdge.From, expectedEdge.To, expectedEdge.Label)
-			require.True(t, hasEdge,
-				"Should find edge from '%s' to '%s' with label '%s' in at least one dot graph",
-				expectedEdge.From, expectedEdge.To, expectedEdge.Label)
+
+			for _, expectedEdge := range expectedEdges {
+				hasEdge := dotGraph.HasEdgeContainLabel(expectedEdge.From, expectedEdge.To, expectedEdge.Label)
+				require.True(t, hasEdge,
+					"Should find edge from '%s' to '%s' with label '%s' in at least one dot graph",
+					expectedEdge.From, expectedEdge.To, expectedEdge.Label)
+			}
 		}
 		return nil
 	}, opt...)

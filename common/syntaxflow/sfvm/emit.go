@@ -181,6 +181,16 @@ func ValidStringMatchMode(mode int) StringMatchMode {
 	return -1
 }
 
+func (m StringMatchMode) String() string {
+	switch m {
+	case MatchHave:
+		return "have"
+	case MatchHaveAny:
+		return "any"
+	}
+	return "have"
+}
+
 type ConditionFilterMode int
 
 const (
