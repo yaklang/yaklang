@@ -516,7 +516,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 					}
 					return nil
 				})
-				results.AppendPredecessor(operator, s.WithPredecessorContext("recursive search "+i.UnaryStr))
+				results.AppendPredecessor(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
 				next = append(next, results)
 				if have {
 					return true
