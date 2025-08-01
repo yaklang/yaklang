@@ -666,7 +666,8 @@ func (v *Value) IsFreeValue() bool {
 }
 
 // GetMember get member of object by key
-func (v *Value) GetMember(value *Value) *Value {
+func (v *Value) GetMember(value *Value) []*Value {
+	var ret []*Value
 	if v.IsNil() {
 		return nil
 	}
@@ -676,10 +677,10 @@ func (v *Value) GetMember(value *Value) *Value {
 	node := v.innerValue
 	for name, member := range node.GetAllMember() {
 		if name.String() == key {
-			return v.NewValue(member)
+			ret = append(ret, v.NewValue(member))
 		}
 	}
-	return nil
+	return ret
 }
 
 // GetAllMember get all member of object
