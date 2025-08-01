@@ -75,7 +75,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 	//		}
 	//	}
 	//}()
-
+	log.Error("aaaa  " + v.String())
 	if v == nil {
 		return nil
 	}
@@ -241,7 +241,8 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 		}
 		call := actx.getLastCauseCall(BottomUseAnalysis)
 		if call == nil {
-			called := v.NewBottomUseValue(function).GetCalledBy()
+			callee := v.NewBottomUseValue(function)
+			called := callee.GetCalledBy().AppendDependOn(callee)
 			called.ForEach(func(value *Value) {
 				vals = append(vals, value.getBottomUses(actx, opt...)...)
 			})
