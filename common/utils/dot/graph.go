@@ -6,6 +6,36 @@ import (
 	"strings"
 )
 
+// EdgeDirection represents the direction of an edge between two nodes
+type EdgeDirection int
+
+const (
+	// EdgeDirectionNone indicates no edge exists between the nodes
+	EdgeDirectionNone EdgeDirection = iota
+	// EdgeDirectionForward indicates an edge from the first node to the second node
+	EdgeDirectionForward
+	// EdgeDirectionBackward indicates an edge from the second node to the first node
+	EdgeDirectionBackward
+	// EdgeDirectionBidirectional indicates edges in both directions
+	EdgeDirectionBidirectional
+)
+
+// String returns the string representation of the edge direction
+func (d EdgeDirection) String() string {
+	switch d {
+	case EdgeDirectionNone:
+		return "none"
+	case EdgeDirectionForward:
+		return "forward"
+	case EdgeDirectionBackward:
+		return "backward"
+	case EdgeDirectionBidirectional:
+		return "bidirectional"
+	default:
+		return "unknown"
+	}
+}
+
 // Graph represents a set of nodes, edges and attributes that can be
 // translated to DOT language.
 type Graph struct {
@@ -470,4 +500,293 @@ func (e Edge) generateDOT(w io.Writer, directed bool) {
 
 func (e Edge) Attribute(name string) string {
 	return e.attributes.get(name)
+}
+
+// IsConnected checks if there is a path from node 'from' to node 'to'
+// Uses depth-first search to find connectivity
+func (g *Graph) IsConnected(fromLabel, toLabel string) bool {
+	fromID, fromExists := g.NodeExisted(fromLabel)
+	toID, toExists := g.NodeExisted(toLabel)
+
+	if !fromExists || !toExists {
+		return false
+	}
+
+	visited := make(map[int]bool)
+	return g.dfs(fromID, toID, visited)
+}
+
+// dfs performs depth-first search to find path from start to target
+func (g *Graph) dfs(start, target int, visited map[int]bool) bool {
+	if start == target {
+		return true
+	}
+
+	visited[start] = true
+	startNode := g.registeredNodes[start]
+
+	// Check direct connections
+	for _, nextID := range startNode.nexts {
+		if !visited[nextID] {
+			if g.dfs(nextID, target, visited) {
+				return true
+			}
+		}
+	}
+
+	// For undirected graphs, also check previous connections
+	if !g.directed {
+		for _, prevID := range startNode.prevs {
+			if !visited[prevID] {
+				if g.dfs(prevID, target, visited) {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+// GetEdgeDirection returns the direction of edge between two nodes
+// Returns: EdgeDirectionForward (from->to), EdgeDirectionBackward (to->from),
+// EdgeDirectionBidirectional, or EdgeDirectionNone
+func (g *Graph) GetEdgeDirection(fromLabel, toLabel string) EdgeDirection {
+	fromID, fromExists := g.NodeExisted(fromLabel)
+	toID, toExists := g.NodeExisted(toLabel)
+
+	if !fromExists || !toExists {
+		return EdgeDirectionNone
+	}
+
+	hasForward := false
+	hasBackward := false
+
+	// Check for forward edge (from -> to)
+	for _, edge := range g.edges {
+		if edge.from.id == fromID && edge.to.id == toID {
+			hasForward = true
+		}
+		if edge.from.id == toID && edge.to.id == fromID {
+			hasBackward = true
+		}
+	}
+
+	// For undirected graphs, if there's any connection, it's considered bidirectional
+	if !g.directed && (hasForward || hasBackward) {
+		return EdgeDirectionBidirectional
+	}
+
+	// For directed graphs, only consider actual edges, not the prevs/nexts relationships
+	if g.directed {
+		if hasForward {
+			return EdgeDirectionForward
+		} else if hasBackward {
+			return EdgeDirectionBackward
+		}
+		return EdgeDirectionNone
+	}
+
+	// For undirected graphs with both directions
+	if hasForward && hasBackward {
+		return EdgeDirectionBidirectional
+	} else if hasForward {
+		return EdgeDirectionForward
+	} else if hasBackward {
+		return EdgeDirectionBackward
+	}
+
+	return EdgeDirectionNone
+}
+
+// GetEdgeLabel returns the label of the edge between two nodes
+// If multiple edges exist, returns the first one found
+func (g *Graph) GetEdgeLabel(fromLabel, toLabel string) string {
+	fromID, fromExists := g.NodeExisted(fromLabel)
+	toID, toExists := g.NodeExisted(toLabel)
+
+	if !fromExists || !toExists {
+		return ""
+	}
+
+	for _, edge := range g.edges {
+		if edge.from.id == fromID && edge.to.id == toID {
+			return edge.Label
+		}
+	}
+
+	return ""
+}
+
+// GetAllEdgeLabels returns all labels of edges between two nodes
+func (g *Graph) GetAllEdgeLabels(fromLabel, toLabel string) []string {
+	fromID, fromExists := g.NodeExisted(fromLabel)
+	toID, toExists := g.NodeExisted(toLabel)
+
+	if !fromExists || !toExists {
+		return nil
+	}
+
+	var labels []string
+	for _, edge := range g.edges {
+		if edge.from.id == fromID && edge.to.id == toID {
+			labels = append(labels, edge.Label)
+		}
+	}
+
+	return labels
+}
+
+// HasEdgeWithLabel checks if there is an edge between two nodes with the specified label
+func (g *Graph) HasEdgeWithLabel(fromLabel, toLabel, expectedLabel string) bool {
+	fromID, fromExists := g.NodeExisted(fromLabel)
+	toID, toExists := g.NodeExisted(toLabel)
+
+	if !fromExists || !toExists {
+		return false
+	}
+
+	for _, edge := range g.edges {
+		if edge.from.id == fromID && edge.to.id == toID && edge.Label == expectedLabel {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (g *Graph) HasEdgeContainLabel(fromLabel, toLabel, expectedLabel string) bool {
+	fromID, fromExists := g.NodeExisted(fromLabel)
+	toID, toExists := g.NodeExisted(toLabel)
+
+	if !fromExists || !toExists {
+		return false
+	}
+
+	for _, edge := range g.edges {
+		if edge.from.id == fromID && edge.to.id == toID && strings.Contains(edge.Label, expectedLabel) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// GetNodeLabel returns the label of a node by its label name
+func (g *Graph) GetNodeLabel(nodeLabel string) string {
+	id, exists := g.NodeExisted(nodeLabel)
+	if !exists {
+		return ""
+	}
+
+	node := g.registeredNodes[id]
+	return node.label
+}
+
+// GetAllNodes returns all node labels in the graph
+func (g *Graph) GetAllNodes() []string {
+	var labels []string
+	for _, node := range g.nodes {
+		labels = append(labels, node.label)
+	}
+	return labels
+}
+
+// GetAllEdges returns all edges in the graph as a slice of edge info
+func (g *Graph) GetAllEdges() []EdgeInfo {
+	var edges []EdgeInfo
+	for _, edge := range g.edges {
+		edges = append(edges, EdgeInfo{
+			From:  edge.from.label,
+			To:    edge.to.label,
+			Label: edge.Label,
+		})
+	}
+	return edges
+}
+
+// EdgeInfo represents information about an edge
+type EdgeInfo struct {
+	From  string
+	To    string
+	Label string
+}
+
+// GetShortestPath returns the shortest path between two nodes
+// Returns nil if no path exists
+func (g *Graph) GetShortestPath(fromLabel, toLabel string) []string {
+	fromID, fromExists := g.NodeExisted(fromLabel)
+	toID, toExists := g.NodeExisted(toLabel)
+
+	if !fromExists || !toExists {
+		return nil
+	}
+
+	// Use BFS to find shortest path
+	queue := [][]int{{fromID}}
+	visited := make(map[int]bool)
+	visited[fromID] = true
+
+	for len(queue) > 0 {
+		path := queue[0]
+		queue = queue[1:]
+		current := path[len(path)-1]
+
+		if current == toID {
+			// Convert IDs to labels
+			var result []string
+			for _, id := range path {
+				node := g.registeredNodes[id]
+				result = append(result, node.label)
+			}
+			return result
+		}
+
+		currentNode := g.registeredNodes[current]
+		for _, nextID := range currentNode.nexts {
+			if !visited[nextID] {
+				visited[nextID] = true
+				newPath := make([]int, len(path))
+				copy(newPath, path)
+				newPath = append(newPath, nextID)
+				queue = append(queue, newPath)
+			}
+		}
+
+		// For undirected graphs, also check previous connections
+		if !g.directed {
+			for _, prevID := range currentNode.prevs {
+				if !visited[prevID] {
+					visited[prevID] = true
+					newPath := make([]int, len(path))
+					copy(newPath, path)
+					newPath = append(newPath, prevID)
+					queue = append(queue, newPath)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// IsNeighbor checks if two nodes are directly connected (neighbors)
+// Returns true if there is a direct edge between the two nodes, false otherwise
+func (g *Graph) IsNeighbor(node1, node2 string) bool {
+	fromID, fromExists := g.NodeExisted(node1)
+	toID, toExists := g.NodeExisted(node2)
+
+	if !fromExists || !toExists {
+		return false
+	}
+
+	// Check for direct edge between the nodes
+	for _, edge := range g.edges {
+		if (edge.from.id == fromID && edge.to.id == toID) ||
+			(edge.from.id == toID && edge.to.id == fromID) {
+			return true
+		}
+	}
+
+	return false
 }
