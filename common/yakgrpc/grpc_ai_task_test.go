@@ -564,7 +564,7 @@ func TestRefine_Smoke(t *testing.T) {
 
 	ctx := context.Background()
 
-	ragSys, err := ka.Refine(ctx, db, "./vtestdata/zwb.pdf")
+	ragSys, err := ka.Refine(ctx, db, "../../vtestdata/zwb.pdf")
 	if err != nil {
 		t.Fatal(err)
 	} else {
@@ -578,6 +578,6 @@ func TestRefine_Smoke(t *testing.T) {
 	}
 
 	for _, result := range results {
-		fmt.Println(result.Document.Metadata["title"])
+		fmt.Println(result.Document.Metadata["knowledge_title"])
 	}
 }
