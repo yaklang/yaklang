@@ -323,6 +323,8 @@ func (bi *BaseInstaller) downloadFile(url, filename string, options *InstallOpti
 		}
 	}))
 
+	opts = append(opts, lowhttp.WithConnectTimeoutFloat(15.0)) // 设置连接超时
+	opts = append(opts, lowhttp.WithTimeout(1800*time.Second)) // 设置读取超时
 	// 发送GET请求
 	_, err = lowhttp.HTTP(opts...)
 	if err != nil && downloadError == nil {
