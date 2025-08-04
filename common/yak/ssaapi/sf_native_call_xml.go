@@ -11,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/xml2"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
 var mybatisVarExtractor = regexp.MustCompile(`\$\{\s*([^}]+)\s*}`, regexp.None)
@@ -140,22 +139,12 @@ var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 	var res []sfvm.ValueOperator
 
 	offset := 0
-	prog.ForEachFile(func(s string, me *memedit.MemEditor) {
+	prog.ForEachExtraFile(func(s string, me *memedit.MemEditor) bool {
 		name := me.GetFilename()
 		content := me.GetSourceCode()
 		log.Warnf("start to handling: %v len: %v", name, len(content))
 		if !strings.HasSuffix(name, ".xml") {
-			return
-		}
-		var editor *memedit.MemEditor
-		if len(content) <= 128 {
-			hash := content
-			editor, _ = ssadb.GetIrSourceFromHash(hash)
-			if editor != nil {
-				content = editor.GetSourceCode()
-			}
-		} else {
-			editor = memedit.NewMemEditorWithFileUrl(content, name)
+			return true
 		}
 
 		mapperStack := utils.NewStack[*mybatisXMLMapper]()
@@ -249,9 +238,9 @@ var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 				matchStart := match.Index + runeIndex
 				matchEnd := matchStart + match.Length
 				param := match.String()
-				startPos := editor.GetPositionByOffset(matchStart)
-				endPos := editor.GetPositionByOffset(matchEnd)
-				rng := editor.GetRangeByPosition(startPos, endPos)
+				startPos := me.GetPositionByOffset(matchStart)
+				endPos := me.GetPositionByOffset(matchEnd)
+				rng := me.GetRangeByPosition(startPos, endPos)
 				query.AddCheckParam(param, rng)
 				match, err = mybatisVarExtractor.FindNextMatch(match)
 				if err != nil {
@@ -267,6 +256,7 @@ var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 			})
 		})
 		xml2.Handle(content, onDirective, onStartElement, onEndElement, onCharData)
+		return true
 	})
 
 	if len(res) > 0 {

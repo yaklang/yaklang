@@ -193,14 +193,14 @@ func showValueMap(buf *bytes.Buffer, varName string, value ValueOperator, cfg *s
 		fileName := editor.GetUrl()
 		if fileName == "" {
 			var err error
-			editor, err = ssadb.GetIrSourceFromHash(editor.SourceCodeMd5())
+			editor, err = ssadb.GetIrSourceFromHash(editor.GetIrSourceHash())
 			if err != nil {
 				log.Warn(err)
 			}
 			if editor != nil {
 				fileName = editor.GetFilename()
 				if fileName == "" {
-					fileName = `[md5:` + editor.SourceCodeMd5() + `]`
+					fileName = `[md5:` + editor.GetIrSourceHash() + `]`
 				}
 			}
 		}

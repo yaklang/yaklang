@@ -50,17 +50,20 @@ func GetEditorByFileName(fileName string) (*memedit.MemEditor, error) {
 	if err != nil {
 		return nil, err
 	}
+	return irSource2Editor(source), nil
+}
+
+func irSource2Editor(source *IrSource) *memedit.MemEditor {
 	code := source.QuotedCode
 	if s, err := strconv.Unquote(code); err == nil {
 		code = s
 	}
+	_, folder := splitProjectPath(source.FolderPath)
 	ret := memedit.NewMemEditor(code)
-	_, filePath := splitProjectPath(fileName)
-	ret.SetUrl(filePath)
-	ret.SetFolderPath(source.FolderPath)
+	ret.SetFolderPath(folder)
 	ret.SetFileName(source.FileName)
 	ret.SetProgramName(source.ProgramName)
-	return ret, nil
+	return ret
 }
 
 // GetIrSourceFromHash fetch editor from cache by hash(md5)
@@ -79,38 +82,33 @@ func GetIrSourceFromHash(hash string) (*memedit.MemEditor, error) {
 	if err := db.Where("source_code_hash = ?", hash).First(&source).Error; err != nil {
 		return nil, utils.Wrapf(err, "query source via hash: %v failed", hash)
 	}
-	code, _ := strconv.Unquote(source.QuotedCode)
-	if code == "" {
-		code = source.QuotedCode
-	}
-	filePath := irSourceJoin(source.FolderPath, source.FileName)
-	editor := memedit.NewMemEditorWithFileUrl(code, filePath)
-	return editor, nil
+
+	return irSource2Editor(&source), nil
 }
 
 func MarshalFile(editor *memedit.MemEditor) *IrSource {
+	folderPath := irSourceJoin(editor.GetProgramName(), editor.GetFolderPath())
 	irSource := &IrSource{
 		ProgramName:    editor.GetProgramName(),
 		SourceCodeHash: editor.GetIrSourceHash(),
 		QuotedCode:     strconv.Quote(editor.GetSourceCode()),
 		FileName:       editor.GetFilename(),
-		FolderPath:     editor.GetFolderPath(),
+		FolderPath:     folderPath,
 		IsBigFile:      false,
 	}
 	return irSource
 }
 
-func MarshalFolder(folderName string, folderPaths []string) *IrSource {
-
-	if len(folderPaths) == 0 || folderPaths[0] == "" {
+func MarshalFolder(folderPaths []string) *IrSource {
+	if len(folderPaths) < 1 {
 		return nil
 	}
+	folderName := folderPaths[len(folderPaths)-1]
+	folderPath := irSourceJoin(folderPaths[:len(folderPaths)-1]...)
 	programName := folderPaths[0]
-	folderPath := irSourceJoin(folderPaths...)
-
 	irSource := &IrSource{
 		ProgramName:    programName,
-		SourceCodeHash: codec.Md5(programName + folderPath + folderName),
+		SourceCodeHash: codec.Md5(folderPaths),
 		QuotedCode:     "",
 		FileName:       folderName,
 		FolderPath:     folderPath,

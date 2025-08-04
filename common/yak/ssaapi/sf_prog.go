@@ -372,32 +372,43 @@ func NewFileFilter(file, matchType string, match []string) *FileFilter {
 	}
 }
 
-func (p *Program) getEditor(filename, hash string) (*memedit.MemEditor, bool) {
+func (p *Program) getEditor(filename, hash string) (*memedit.MemEditor, error) {
 	if editor, ok := p.Program.GetEditor(filename); ok {
-		return editor, true
+		return editor, nil
 	}
 
 	if p.Program.DatabaseKind == ssa.ProgramCacheMemory {
-		return nil, false
+		return nil, utils.Errorf("get editor by filename %s not found", filename)
 	}
 	// if have database, get source code from database
 	if editor, err := ssadb.GetIrSourceFromHash(hash); err != nil {
-		log.Errorf("get ir source from hash error: %s", err)
-		return nil, false
+		return nil, utils.Errorf("get ir source from hash error: %s", err)
 	} else {
 		p.Program.SetEditor(filename, editor)
-		return editor, true
+		return editor, nil
 	}
 }
 
-func (p *Program) ForEachFile(callBack func(string, *memedit.MemEditor)) {
-	for filename, hash := range p.Program.ExtraFile {
-		editor, ok := p.getEditor(filename, hash)
-		if !ok {
-			log.Errorf("get editor by filename %s not found", filename)
-			continue
+func (p *Program) ForEachExtraFile(callBack func(string, *memedit.MemEditor) bool) {
+	p.foreach(p.Program.ExtraFile, callBack)
+}
+
+func (p *Program) ForEachAllFile(callBack func(string, *memedit.MemEditor) bool) {
+	p.foreach(p.Program.FileList, callBack)
+}
+func (p *Program) foreach(file2Hash map[string]string, callBack func(string, *memedit.MemEditor) bool) {
+	handler := func(filename, hash string) bool {
+		editor, err := p.getEditor(filename, hash)
+		if err != nil {
+			log.Errorf("get editor [%s] not found: %v", filename, err)
+			return true
 		}
-		callBack(filename, editor)
+		return callBack(filename, editor)
+	}
+	for filename, hash := range file2Hash {
+		if !handler(filename, hash) {
+			break
+		}
 	}
 }
 
@@ -422,9 +433,9 @@ func (p *Program) FileFilter(path string, match string, rule map[string]string, 
 	}
 
 	matchFile := false
-	p.ForEachFile(func(s string, me *memedit.MemEditor) {
+	p.ForEachAllFile(func(s string, me *memedit.MemEditor) bool {
 		if me == nil {
-			return
+			return true
 		}
 		offsetMap := memedit.NewRuneOffsetMap(me.GetSourceCode())
 		if filter.matchFile(s) {
@@ -436,6 +447,7 @@ func (p *Program) FileFilter(path string, match string, rule map[string]string, 
 				}
 			}
 		}
+		return true
 	})
 	if len(res) == 0 {
 		if matchFile {
