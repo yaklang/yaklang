@@ -177,6 +177,16 @@ func (g *Graph) NodeExisted(label string) (int, bool) {
 	return -1, false
 }
 
+func (g *Graph) GetNodesByLabel(label string) []*node {
+	var ret []*node
+	for _, node := range g.nodes {
+		if node.label == label {
+			ret = append(ret, node)
+		}
+	}
+	return ret
+}
+
 // MakeSameRank causes the specified nodes to be drawn on the same rank.
 // Only effective when using the dot tool.
 func (g *Graph) MakeSameRank(node1, node2 int, others ...int) {
@@ -505,15 +515,25 @@ func (e Edge) Attribute(name string) string {
 // IsConnected checks if there is a path from node 'from' to node 'to'
 // Uses depth-first search to find connectivity
 func (g *Graph) IsConnected(fromLabel, toLabel string) bool {
-	fromID, fromExists := g.NodeExisted(fromLabel)
-	toID, toExists := g.NodeExisted(toLabel)
+	fromNodes := g.GetNodesByLabel(fromLabel)
+	toNodes := g.GetNodesByLabel(toLabel)
 
-	if !fromExists || !toExists {
+	if len(fromNodes) == 0 || len(toNodes) == 0 {
 		return false
 	}
 
 	visited := make(map[int]bool)
-	return g.dfs(fromID, toID, visited)
+
+	// Check if any fromNode can reach any toNode
+	for _, fromNode := range fromNodes {
+		for _, toNode := range toNodes {
+			if g.dfs(fromNode.id, toNode.id, visited) {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // dfs performs depth-first search to find path from start to target
@@ -552,23 +572,27 @@ func (g *Graph) dfs(start, target int, visited map[int]bool) bool {
 // Returns: EdgeDirectionForward (from->to), EdgeDirectionBackward (to->from),
 // EdgeDirectionBidirectional, or EdgeDirectionNone
 func (g *Graph) GetEdgeDirection(fromLabel, toLabel string) EdgeDirection {
-	fromID, fromExists := g.NodeExisted(fromLabel)
-	toID, toExists := g.NodeExisted(toLabel)
+	fromNodes := g.GetNodesByLabel(fromLabel)
+	toNodes := g.GetNodesByLabel(toLabel)
 
-	if !fromExists || !toExists {
+	if len(fromNodes) == 0 || len(toNodes) == 0 {
 		return EdgeDirectionNone
 	}
 
 	hasForward := false
 	hasBackward := false
 
-	// Check for forward edge (from -> to)
-	for _, edge := range g.edges {
-		if edge.from.id == fromID && edge.to.id == toID {
-			hasForward = true
-		}
-		if edge.from.id == toID && edge.to.id == fromID {
-			hasBackward = true
+	// Check for edges between any fromNode and any toNode
+	for _, fromNode := range fromNodes {
+		for _, toNode := range toNodes {
+			for _, edge := range g.edges {
+				if edge.from.id == fromNode.id && edge.to.id == toNode.id {
+					hasForward = true
+				}
+				if edge.from.id == toNode.id && edge.to.id == fromNode.id {
+					hasBackward = true
+				}
+			}
 		}
 	}
 
@@ -602,16 +626,20 @@ func (g *Graph) GetEdgeDirection(fromLabel, toLabel string) EdgeDirection {
 // GetEdgeLabel returns the label of the edge between two nodes
 // If multiple edges exist, returns the first one found
 func (g *Graph) GetEdgeLabel(fromLabel, toLabel string) string {
-	fromID, fromExists := g.NodeExisted(fromLabel)
-	toID, toExists := g.NodeExisted(toLabel)
+	fromNodes := g.GetNodesByLabel(fromLabel)
+	toNodes := g.GetNodesByLabel(toLabel)
 
-	if !fromExists || !toExists {
+	if len(fromNodes) == 0 || len(toNodes) == 0 {
 		return ""
 	}
 
-	for _, edge := range g.edges {
-		if edge.from.id == fromID && edge.to.id == toID {
-			return edge.Label
+	for _, fromNode := range fromNodes {
+		for _, toNode := range toNodes {
+			for _, edge := range g.edges {
+				if edge.from.id == fromNode.id && edge.to.id == toNode.id {
+					return edge.Label
+				}
+			}
 		}
 	}
 
@@ -620,17 +648,21 @@ func (g *Graph) GetEdgeLabel(fromLabel, toLabel string) string {
 
 // GetAllEdgeLabels returns all labels of edges between two nodes
 func (g *Graph) GetAllEdgeLabels(fromLabel, toLabel string) []string {
-	fromID, fromExists := g.NodeExisted(fromLabel)
-	toID, toExists := g.NodeExisted(toLabel)
+	fromNodes := g.GetNodesByLabel(fromLabel)
+	toNodes := g.GetNodesByLabel(toLabel)
 
-	if !fromExists || !toExists {
+	if len(fromNodes) == 0 || len(toNodes) == 0 {
 		return nil
 	}
 
 	var labels []string
-	for _, edge := range g.edges {
-		if edge.from.id == fromID && edge.to.id == toID {
-			labels = append(labels, edge.Label)
+	for _, fromNode := range fromNodes {
+		for _, toNode := range toNodes {
+			for _, edge := range g.edges {
+				if edge.from.id == fromNode.id && edge.to.id == toNode.id {
+					labels = append(labels, edge.Label)
+				}
+			}
 		}
 	}
 
@@ -639,16 +671,20 @@ func (g *Graph) GetAllEdgeLabels(fromLabel, toLabel string) []string {
 
 // HasEdgeWithLabel checks if there is an edge between two nodes with the specified label
 func (g *Graph) HasEdgeWithLabel(fromLabel, toLabel, expectedLabel string) bool {
-	fromID, fromExists := g.NodeExisted(fromLabel)
-	toID, toExists := g.NodeExisted(toLabel)
+	fromNodes := g.GetNodesByLabel(fromLabel)
+	toNodes := g.GetNodesByLabel(toLabel)
 
-	if !fromExists || !toExists {
+	if len(fromNodes) == 0 || len(toNodes) == 0 {
 		return false
 	}
 
-	for _, edge := range g.edges {
-		if edge.from.id == fromID && edge.to.id == toID && edge.Label == expectedLabel {
-			return true
+	for _, fromNode := range fromNodes {
+		for _, toNode := range toNodes {
+			for _, edge := range g.edges {
+				if edge.from.id == fromNode.id && edge.to.id == toNode.id && edge.Label == expectedLabel {
+					return true
+				}
+			}
 		}
 	}
 
@@ -656,19 +692,19 @@ func (g *Graph) HasEdgeWithLabel(fromLabel, toLabel, expectedLabel string) bool 
 }
 
 func (g *Graph) HasEdgeContainLabel(fromLabel, toLabel, expectedLabel string) bool {
-	fromID, fromExists := g.NodeExisted(fromLabel)
-	toID, toExists := g.NodeExisted(toLabel)
+	fromNodes := g.GetNodesByLabel(fromLabel)
 
-	if !fromExists || !toExists {
+	if len(fromNodes) == 0 {
 		return false
 	}
-
-	for _, edge := range g.edges {
-		if edge.from.id == fromID && edge.to.id == toID && strings.Contains(edge.Label, expectedLabel) {
-			return true
+	for _, fromNode := range fromNodes {
+		for _, next := range fromNode.nexts {
+			toNode := g.GetNodeByID(next)
+			if toNode.label == toLabel {
+				return true
+			}
 		}
 	}
-
 	return false
 }
 
@@ -773,18 +809,22 @@ func (g *Graph) GetShortestPath(fromLabel, toLabel string) []string {
 // IsNeighbor checks if two nodes are directly connected (neighbors)
 // Returns true if there is a direct edge between the two nodes, false otherwise
 func (g *Graph) IsNeighbor(node1, node2 string) bool {
-	fromID, fromExists := g.NodeExisted(node1)
-	toID, toExists := g.NodeExisted(node2)
+	fromNodes := g.GetNodesByLabel(node1)
+	toNodes := g.GetNodesByLabel(node2)
 
-	if !fromExists || !toExists {
+	if len(fromNodes) == 0 || len(toNodes) == 0 {
 		return false
 	}
 
-	// Check for direct edge between the nodes
-	for _, edge := range g.edges {
-		if (edge.from.id == fromID && edge.to.id == toID) ||
-			(edge.from.id == toID && edge.to.id == fromID) {
-			return true
+	// Check for direct edge between any fromNode and any toNode
+	for _, fromNode := range fromNodes {
+		for _, toNode := range toNodes {
+			for _, edge := range g.edges {
+				if (edge.from.id == fromNode.id && edge.to.id == toNode.id) ||
+					(edge.from.id == toNode.id && edge.to.id == fromNode.id) {
+					return true
+				}
+			}
 		}
 	}
 
