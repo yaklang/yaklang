@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/pandocutils"
 	"io"
 	"os"
 	"path/filepath"
@@ -370,6 +371,7 @@ func initYaklangLib() {
 	yaklang.Import("imageutils", imageutils.Exports)
 	yaklang.Import("ffmpeg", mediautils.FfmpegExports)
 	yaklang.Import("whisper", mediautils.WhisperExports)
+	yaklang.Import("pandoc", pandocutils.Exports)
 
 	yaklang.Import("toolbox", thirdparty_bin.Exports)
 }

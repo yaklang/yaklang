@@ -107,50 +107,42 @@ func TempFileFast(datas ...any) string {
 	f.Write(data)
 	return f.Name()
 }
-func GetFfmpegPath() string {
+
+func GetThirdPartyApp(appName string) string {
 	defaultPath := GetDefaultYakitProjectsDir()
 	var paths []string
 	if runtime.GOOS == "darwin" {
-		paths = append(paths, filepath.Join(defaultPath, "libs", "ffmpeg"))
-		paths = append(paths, filepath.Join(defaultPath, "base", "ffmpeg"))
-		paths = append(paths, filepath.Join(defaultPath, "engine", "ffmpeg"))
-		paths = append(paths, filepath.Join(defaultPath, "ffmpeg"))
-		paths = append(paths, "ffmpeg")
-		paths = append(paths, filepath.Join("/", "usr", "local", "bin", "ffmpeg"))
-		paths = append(paths, filepath.Join("/", "bin", "ffmpeg"))
-		paths = append(paths, filepath.Join("/", "usr", "bin", "ffmpeg"))
+		paths = append(paths, filepath.Join(defaultPath, "libs", appName))
+		paths = append(paths, filepath.Join(defaultPath, "base", appName))
+		paths = append(paths, filepath.Join(defaultPath, "engine", appName))
+		paths = append(paths, filepath.Join(defaultPath, appName))
+		paths = append(paths, appName)
+		paths = append(paths, filepath.Join("/", "usr", "local", "bin", appName))
+		paths = append(paths, filepath.Join("/", "bin", appName))
+		paths = append(paths, filepath.Join("/", "usr", "bin", appName))
 	}
 
+	windowsName := appName + ".exe"
 	if runtime.GOOS == "windows" {
-		paths = append(paths, filepath.Join(defaultPath, "base", "ffmpeg.exe"))
-		paths = append(paths, filepath.Join(defaultPath, "libs", "ffmpeg.exe"))
-		paths = append(paths, filepath.Join(defaultPath, "engine", "ffmpeg.exe"))
-		paths = append(paths, filepath.Join(defaultPath, "ffmpeg.exe"))
-		paths = append(paths, "ffmpeg.exe")
+		paths = append(paths, filepath.Join(defaultPath, "base", windowsName))
+		paths = append(paths, filepath.Join(defaultPath, "libs", windowsName))
+		paths = append(paths, filepath.Join(defaultPath, "engine", windowsName))
+		paths = append(paths, filepath.Join(defaultPath, windowsName))
+		paths = append(paths, windowsName)
 	}
 	return utils.GetFirstExistedFile(paths...)
 }
 
+func GetFfmpegPath() string {
+	return GetThirdPartyApp("ffmpeg")
+}
+
+func GetPandocPath() string {
+	return GetThirdPartyApp("pandoc")
+}
+
 func GetVulinboxPath() string {
-	defaultPath := GetDefaultYakitProjectsDir()
-	var paths []string
-	if runtime.GOOS == "windows" {
-		paths = append(paths, filepath.Join(defaultPath, "base", "vulinbox.exe"))
-		paths = append(paths, filepath.Join(defaultPath, "libs", "vulinbox.exe"))
-		paths = append(paths, filepath.Join(defaultPath, "engine", "vulinbox.exe"))
-		paths = append(paths, filepath.Join(defaultPath, "vulinbox.exe"))
-		paths = append(paths, "vulinbox.exe")
-	} else {
-		paths = append(paths, filepath.Join(defaultPath, "libs", "vulinbox"))
-		paths = append(paths, filepath.Join(defaultPath, "base", "vulinbox"))
-		paths = append(paths, filepath.Join(defaultPath, "engine", "vulinbox"))
-		paths = append(paths, filepath.Join(defaultPath, "vulinbox"))
-		paths = append(paths, "vulinbox")
-		paths = append(paths, filepath.Join("/", "usr", "local", "bin", "vulinbox"))
-		paths = append(paths, filepath.Join("/", "bin", "vulinbox"))
-		paths = append(paths, filepath.Join("/", "usr", "bin", "vulinbox"))
-	}
-	return utils.GetFirstExistedFile(paths...)
+	return GetThirdPartyApp("vulinbox")
 }
 
 func GetLlamaServerPath() string {

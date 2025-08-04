@@ -1,0 +1,149 @@
+__DESC__ = "该forge根据提供的流量文本，利用AI模型生成详细的WEB告警分析报告。报告内容包括告警概述、初步分析、真实性判断、攻击原理分析、潜在影响评估、解决方案建议和应急策略。生成的报告为Markdown格式，并可选择转换为Word文档，方便用户查阅和分享，解决网络安全分析中告警报告生成和管理效率低下的问题。"
+
+__KEYWORDS__ = "告警分析,安全报告,流量分析,web告警,markdown转word,安全审计"
+
+flowtext = cli.Text("flowText", cli.setRequired(true), cli.setHelp("需要分析的流量文本"))
+outputPath = cli.String("outputPath", cli.setRequired(true), cli.setHelp("word文档的导出路径, 可以是目录也可以是文件名"))
+cli.check()
+
+
+prompt = <<<prompt
+你是一个专业的网络安全分析师，负责分析WEB告警的攻击流量。你需要根据给你的攻击请求数据报文和返回报文生成一个详细的Markdown报告
+报告具体内容包括以下部分：
+1. **告警概述**
+   - 告警类型（例如SQL注入、XSS、DDoS等）
+   - 受影响的URL或IP地址
+
+2. **初步分析**
+   - 描述告警的基本信息和背景
+   - 提供相关的告警关键证据，如关键请求参数的分析（不要复述全部数据包）
+
+3. **真实性判断**
+   - 分析该告警是否为真实攻击，还是误报，亦或是一次攻击尝试但未成功
+   - 提供判断依据和证据
+
+4. **攻击原理分析**
+   - 详细解释攻击的技术细节
+   - 描述攻击者可能使用的工具或方法
+
+5. **潜在影响评估**
+   - 分析该攻击对系统的潜在影响
+   - 评估可能的数据泄露、服务中断或其他后果
+
+6. **解决方案建议**
+   - 提供具体的技术解决方案，包括配置更改、代码修复等
+   - 建议使用的安全工具或插件
+
+7. **应急策略**
+   - 详细描述应对该类攻击的紧急措施
+   - 提供步骤指南，帮助快速响应和缓解攻击
+
+
+请确保报告内容清晰、结构化，并包含所有必要的技术细节。使用Markdown格式编写，便于阅读和分享。
+
+---
+
+**示例输出格式：**
+
+```markdown
+# WEB告警分析报告
+
+## 告警概述
+- **告警时间**: 2023-10-05 14:30:00
+- **告警类型**: SQL注入
+- **受影响的URL**: `http://example.com/login`
+
+## 初步分析
+该告警检测到针对192.168.0.1的SQL注入尝试。流量显示该请求报文中存在'or 1=1的典型SQL注入尝试
+
+## 真实性判断
+经过分析，该告警为真实攻击。攻击者通过输入特殊字符尝试绕过数据库安全机制。
+
+## 攻击原理分析
+攻击者利用了应用程序中存在的SQL注入漏洞，通过在URL参数中插入恶意SQL代码，企图获取敏感信息或破坏数据库。
+
+## 潜在影响评估
+如果成功，攻击者可能会：
+- 访问和窃取用户数据
+- 修改或删除数据库记录
+- 获得系统管理权限
+
+## 解决方案建议
+1. 立即修复SQL注入漏洞，使用参数化查询代替直接拼接SQL语句。
+2. 调整Web应用防火墙（WAF）策略以过滤恶意请求。
+
+## 应急策略
+1. 封锁攻击者IP地址
+2. 检查并备份受影响的数据库
+3. 通知相关团队进行进一步调查
+
+## 长期防护建议
+1. 定期进行安全审计和渗透测试
+2. 实施安全编码规范，培训开发人员
+3. 部署入侵检测系统（IDS）以及时发现异常行为
+prompt
+
+schema = <<<schema
+{
+"$schema": "http://json-schema.org/draft-07/schema#",
+"type": "object",
+"required": ["@action", "report-content"],
+"additionalProperties": false,
+"properties": {
+    "@action": {
+    "const": "report",
+    "description": "标识当前操作的具体类型"
+    },
+    "report-content": {
+    "type": "string",
+    "description": "分析生成出来的Mark Down 格式报告"
+    }
+}
+}
+schema
+
+
+forgeHandle = func(params) {
+    bp,err = aiagent.CreateLiteForge("flow-report",
+        aiagent.liteForgePrompt(prompt),
+        aiagent.liteForgeOutputSchemaRaw("report",schema)
+    )
+    if err != nil {
+        return err
+    }
+    yakit.StatusCard("执行进度", "正在分析生成md格式报告")
+    res,err = bp.Execute(context.Background(),params)
+    if err != nil {
+		return nil
+	}
+    yakit.StatusCard("执行进度", "生成md格式报告成功")
+
+	reportString = res.GetString("report-content")
+    yakit.Markdown(reportString)
+
+    name := str.RandStr(10) + ".md"
+    path = file.Join(yakit.GetHomeTempDir(),name)
+    err = file.Save(path, reportString)
+    if err != nil {
+        yakit.Error("save file fail :%v",err)
+        return err
+    }
+    yakit.StatusCard("md报告保存路径", path)
+
+
+
+    if file.IsDir(outputPath) {
+        name = str.RandStr(10) + ".docx"
+        outputPath = file.Join(outputPath,name)
+    }
+
+    yakit.StatusCard("执行进度", "开始转化格式成 word 文档")
+    err := pandoc.SimpleCoverMD2Word(context.Background(), path, outputPath)
+    if err != nil {
+        yakit.Error("pandoc convert file fail :%v",err)
+        return err
+    }
+    yakit.StatusCard("执行进度", sprintf("word文档转化成功: [path:%s]", outputPath))
+
+    return outputPath
+}
