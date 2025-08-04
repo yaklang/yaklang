@@ -58,25 +58,25 @@ func (c *config) parseProjectWithFS(
 
 	folder2Save := make([][]string, 0)
 	if c.ProgramName != "" {
-		folder2Save = append(folder2Save, []string{"/"})
-		// ssadb.SaveFolder(c.ProgramName, []string{"/"})
+		folder2Save = append(folder2Save, []string{"/", c.ProgramName})
 	}
 	// get total size
 	err = filesys.Recursive(programPath,
 		filesys.WithFileSystem(filesystem),
 		filesys.WithContext(c.ctx),
-		filesys.WithDirStat(func(s string, fi fs.FileInfo) error {
-			folder, name := filesystem.PathSplit(s)
-			if name == "test" || name == ".git" {
+		filesys.WithDirStat(func(fullPath string, fi fs.FileInfo) error {
+			// check folder folderName
+			_, folderName := filesystem.PathSplit(fullPath)
+			if folderName == "test" || folderName == ".git" {
 				return filesys.SkipDir
 			}
+
 			folders := []string{c.ProgramName}
 			folders = append(folders,
-				strings.Split(folder, string(c.fs.GetSeparators()))...,
+				strings.Split(fullPath, string(c.fs.GetSeparators()))...,
 			)
 			if c.enableDatabase != ssa.ProgramCacheMemory {
 				folder2Save = append(folder2Save, folders)
-				// ssadb.SaveFolder(c.ProgramName, folders)
 			}
 			return nil
 		}),
@@ -209,7 +209,7 @@ func (c *config) parseProjectWithFS(
 				continue // skip if not in handlerFilesMap
 			}
 			// log.Infof("visited file: ", prog.GetIncludeFiles())
-			if prog.ShouldVisit(fileContent.Path) {
+			if prog.ShouldVisit(fileContent.Editor.GetUrl()) {
 				log.Infof("parse file %s done skip in main build", fileContent.Path)
 				continue
 			}

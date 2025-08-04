@@ -197,11 +197,11 @@ func TestFileName_muti_package(t *testing.T) {
 			b := target[1].GetSSAInst()
 			if ca, ok := ssa.ToConstInst(a); ok {
 				ea := ca.GetRange().GetEditor()
-				as = ea.GetFilename()
+				as = ea.GetUrl()
 			}
 			if cb, ok := ssa.ToConstInst(b); ok {
 				eb := cb.GetRange().GetEditor()
-				bs = eb.GetFilename()
+				bs = eb.GetUrl()
 			}
 			require.NotEqual(t, as, bs)
 		}

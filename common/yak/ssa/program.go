@@ -133,8 +133,8 @@ func (prog *Program) GetLibrary(name string) (*Program, bool) {
 	currentEditor := prog.GetCurrentEditor()
 	// this program has current file
 	hasFile := func(p *Program) bool {
-		if hash, ok := p.FileList[currentEditor.GetFilename()]; ok {
-			if hash == currentEditor.SourceCodeMd5() {
+		if hash, ok := p.FileList[currentEditor.GetUrl()]; ok {
+			if hash == currentEditor.GetIrSourceHash() {
 				return true
 			}
 		}
@@ -342,7 +342,7 @@ func (p *Program) PopEditor(save bool) {
 	}
 	e := p.editorStack.Pop()
 	if save && e != nil {
-		p.FileList[e.GetUrl()] = e.SourceCodeMd5()
+		p.FileList[e.GetUrl()] = e.GetIrSourceHash()
 	}
 }
 

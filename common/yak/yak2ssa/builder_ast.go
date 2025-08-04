@@ -35,7 +35,7 @@ func (b *astbuilder) build(raw ssa.FrontAST) {
 	currentEditor := prog.GetCurrentEditor()
 	hasFile := func(p *ssa.Program) bool {
 		if hash, ok := p.FileList[currentEditor.GetFilename()]; ok {
-			if hash == currentEditor.SourceCodeMd5() {
+			if hash == currentEditor.GetIrSourceHash() {
 				return true
 			}
 		}

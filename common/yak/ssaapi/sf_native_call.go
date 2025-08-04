@@ -2,7 +2,6 @@ package ssaapi
 
 import (
 	"fmt"
-	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -491,9 +490,8 @@ func init() {
 	// <getFullFileName(filename="xxx")>
 	registerNativeCall(NativeCall_GetFullFileName, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var rs []sfvm.ValueOperator
-		fileMap := make(map[string]struct{})
-		fname := params.GetString("filename")
-		if fname == "" {
+		targetName := params.GetString("filename")
+		if targetName == "" {
 			return false, nil, utils.Errorf("filename is empty")
 		}
 		program, err := fetchProgram(v)
@@ -505,46 +503,26 @@ func init() {
 			return false, nil, utils.Errorf("program is nil")
 		}
 		matchFilename := func(f func(filename string) bool) {
-			for name, _ := range p.FileList {
-				if f(name) {
-					_, ok := fileMap[name]
-					if !ok {
-						memeditor := &memedit.MemEditor{}
-						fileMap[name] = struct{}{}
-						if program.enableDatabase {
-							memeditor, err = ssadb.GetEditorByFileName(path.Join("/", program.GetProgramName(), name))
-							if err != nil {
-								log.Errorf("get ir source from hash failed: %v", err)
-								continue
-							}
-						} else {
-							editor, b := program.Program.GetEditor(name)
-							if b {
-								memeditor = editor
-							} else {
-								log.Errorf("get editor failed")
-								continue
-							}
-						}
-						rs = append(rs, program.NewConstValue(name, memeditor.GetFullRange()))
-					}
+			program.ForEachAllFile(func(s string, me *memedit.MemEditor) bool {
+				if !f(s) {
+					return true
 				}
-			}
+				rs = append(rs, program.NewConstValue(s, me.GetFullRange()))
+				return true
+			})
 		}
-		compile, err := glob.Compile(fname)
-		if err == nil {
+		if compile, err := glob.Compile(targetName); err == nil {
 			matchFilename(func(filename string) bool {
 				return compile.Match(filename)
 			})
 		}
-		r, err := regexp.Compile(fname)
-		if err == nil {
+		if r, err := regexp.Compile(targetName); err == nil {
 			matchFilename(func(filename string) bool {
 				return r.MatchString(filename)
 			})
 		}
 		matchFilename(func(filename string) bool {
-			return strings.ToLower(filename) == strings.ToLower(fname)
+			return strings.EqualFold(filename, targetName)
 		})
 		return true, sfvm.NewValues(rs), nil
 	}))
@@ -570,7 +548,7 @@ func init() {
 				if editor == nil {
 					log.Errorf("node editor is nil")
 				}
-				_, exist := prog.FileList[editor.GetFilename()]
+				_, exist := prog.FileList[editor.GetUrl()]
 				if exist {
 					rs = append(rs, program.NewConstValue(editor.GetFilename(), editor.GetFullRange()))
 				} else {
