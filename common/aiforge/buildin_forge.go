@@ -120,6 +120,7 @@ func init() {
 		registerBuildInForge("web_log_monitor")
 		registerBuildInForge("vulscan")
 		registerBuildInForge("hostscan")
+		registerBuildInForge("flow_report")
 		//registerBuildInForge("mock_forge")
 		return nil
 	})
