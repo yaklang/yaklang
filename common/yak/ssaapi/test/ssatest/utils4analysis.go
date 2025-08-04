@@ -771,8 +771,9 @@ func CheckSyntaxFlowDotGraph(
 
 		for variableName, expectedEdges := range wants {
 			result := values.GetValues(variableName)
+			require.Greater(t, result.Len(), 0)
 			result.Show()
-			dotGraph := ssaapi.NewValueGraph(result[0])
+			dotGraph := ssaapi.NewValuesGraph(result)
 			if showDot {
 				fmt.Printf("------VariableName:%s-------\n", variableName)
 				dotGraph.ShowDot()

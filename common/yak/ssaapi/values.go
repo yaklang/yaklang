@@ -1151,6 +1151,6 @@ func (v Values) GetOperands() Values {
 }
 
 func (v Values) DotGraph() string {
-	vg := NewValueGraph(v...)
+	vg := NewValuesGraph(v)
 	return vg.Dot()
 }

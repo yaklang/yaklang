@@ -1,6 +1,8 @@
 package graph
 
-import "context"
+import (
+	"context"
+)
 
 // DFSGraphBuilder is a utility struct to construct a graph using Depth-First Search (DFS) traversal.
 type DFSGraphBuilder[K, T comparable] struct {
