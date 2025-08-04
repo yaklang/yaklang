@@ -75,7 +75,6 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 	//		}
 	//	}
 	//}()
-	log.Error("aaaa  " + v.String())
 	if v == nil {
 		return nil
 	}

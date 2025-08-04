@@ -31,6 +31,17 @@ func ValidEdgeType(edge string) EdgeType {
 	return ""
 }
 
+type EdgeMode string
+
+const (
+	// OnlyDependOn EffectOn的边会变转化为DependOn的边，FromNode和ToNode方向换一下
+	OnlyDependOn EdgeMode = "only_depend_on"
+	// OnlyEffectOn DependOn的边会变转化为EffectOn的边，FromNode和ToNode方向换一下
+	OnlyEffectOn EdgeMode = "only_effect_on"
+	// Default 遇到DependOn的边或者EffectOn直接生成，有随机性
+	Default EdgeMode = "default" // 遇到DependOn的边或者EffectOn直接生成，有随机性
+)
+
 type ValueGraph struct {
 	*dot.Graph
 
@@ -41,9 +52,51 @@ type ValueGraph struct {
 	// hash(from-to) -> edge-type
 	// hash(to-from) -> edge-type
 	EdgeCache map[string]string
+	EntryNode map[*Value]struct{}
+
+	// config
+	EdgeMode              EdgeMode
+	NotHighLightEntryNode bool
 }
 
-func NewValueGraph(v ...*Value) *ValueGraph {
+type ValueGraphOption func(*ValueGraph)
+
+func WithValueGraphEdgeMode(mode EdgeMode) ValueGraphOption {
+	return func(valueGraph *ValueGraph) {
+		valueGraph.EdgeMode = mode
+	}
+}
+
+func WithValueGraphNotHighLightEntryNode(b bool) ValueGraphOption {
+	return func(valueGraph *ValueGraph) {
+		valueGraph.NotHighLightEntryNode = b
+	}
+}
+
+// highlightEntryNodes 为起始点添加高亮样式
+func (g *ValueGraph) highlightEntryNodes(startPoints Values) {
+	g.highlightEntryNodesWithStyle(startPoints, "filled", "lightyellow", "orange", "3.0", "darkorange")
+}
+
+// highlightEntryNodesWithStyle 为起始点添加自定义高亮样式
+func (g *ValueGraph) highlightEntryNodesWithStyle(startPoints Values, style, fillColor, borderColor, penWidth, fontColor string) {
+	for _, startPoint := range startPoints {
+		if nodeId, exists := g.Value2Node[startPoint]; exists {
+			// 设置起始点的高亮样式
+			g.NodeAttribute(nodeId, "style", style)
+			g.NodeAttribute(nodeId, "fillcolor", fillColor)
+			g.NodeAttribute(nodeId, "color", borderColor)
+			g.NodeAttribute(nodeId, "penwidth", penWidth)
+			g.NodeAttribute(nodeId, "fontcolor", fontColor)
+		}
+	}
+}
+
+func NewValueGraph(v *Value, opts ...ValueGraphOption) *ValueGraph {
+	return NewValuesGraph(Values{v}, opts...)
+}
+
+func NewValuesGraph(v Values, opts ...ValueGraphOption) *ValueGraph {
 	graphGraph := dot.New()
 	graphGraph.MakeDirected()
 	graphGraph.GraphAttribute("rankdir", "BT")
@@ -53,15 +106,30 @@ func NewValueGraph(v ...*Value) *ValueGraph {
 		marshaledValue: make(map[int]struct{}),
 		Node2Value:     make(map[int]*Value),
 		EdgeCache:      make(map[string]string),
+		EntryNode:      make(map[*Value]struct{}),
+		EdgeMode:       OnlyDependOn,
 	}
+
+	for _, opt := range opts {
+		opt(g)
+	}
+	builder := graph.NewDFSGraphBuilder[int, *Value](
+		context.Background(),
+		g.createNode,
+		g.getNeighbors,
+		g.handleEdge,
+	)
 	for _, value := range v {
-		graph.BuildGraphWithDFS[int, *Value](
-			context.Background(),
-			value,
-			g.createNode,
-			g.getNeighbors,
-			g.handleEdge,
-		)
+		g.EntryNode[value] = struct{}{}
+		builder.BuildGraph(value)
+	}
+
+	var entryNodes Values
+	for value := range g.EntryNode {
+		entryNodes = append(entryNodes, value)
+	}
+	if !g.NotHighLightEntryNode {
+		g.highlightEntryNodes(entryNodes)
 	}
 	return g
 }
@@ -140,8 +208,8 @@ func IsDataFlowType(typ string) bool {
 
 func (g *ValueGraph) handleEdge(fromNode int, toNode int, edgeType string, extraMsg map[string]any) {
 	if IsDataFlowType(edgeType) {
-		// avoid duplicate  dataflow edge
-		hash := codec.Sha256(fromNode + toNode)
+		// avoid duplicate dataflow edge - 使用边类型作为哈希键的一部分
+		hash := codec.Sha256(fmt.Sprintf("%d-%d-%s", fromNode, toNode, edgeType))
 		if typ, ok := g.EdgeCache[hash]; ok && IsDataFlowType(typ) {
 			return
 		}
@@ -150,9 +218,17 @@ func (g *ValueGraph) handleEdge(fromNode int, toNode int, edgeType string, extra
 
 	switch ValidEdgeType(edgeType) {
 	case EdgeTypeDependOn:
-		g.AddEdge(toNode, fromNode, edgeType)
+		if g.EdgeMode == Default || g.EdgeMode == OnlyDependOn {
+			g.AddEdge(toNode, fromNode, edgeType)
+		} else if g.EdgeMode == OnlyEffectOn {
+			g.AddEdge(fromNode, toNode, EdgeTypeEffectOn)
+		}
 	case EdgeTypeEffectOn:
-		g.AddEdge(toNode, fromNode, edgeType)
+		if g.EdgeMode == Default || g.EdgeMode == OnlyEffectOn {
+			g.AddEdge(toNode, fromNode, edgeType)
+		} else if g.EdgeMode == OnlyDependOn {
+			g.AddEdge(fromNode, toNode, EdgeTypeDependOn)
+		}
 	case EdgeTypePredecessor:
 		edges := g.GetEdges(toNode, fromNode)
 		var (
