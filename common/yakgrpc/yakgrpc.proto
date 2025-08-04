@@ -327,7 +327,8 @@ service Yak {
   // 迁移旧的payload
   rpc MigratePayloads(Empty) returns (stream SavePayloadProgress);
 
-  rpc UploadPayloadToOnline(UploadPayloadToOnlineRequest) returns (Empty);
+  rpc ExportPayload(ExportPayloadRequest) returns (stream GetAllPayloadResponse);
+  rpc UploadPayloadToOnline(UploadPayloadToOnlineRequest) returns (stream DownloadProgress);
   rpc DownloadPayload(DownloadPayloadRequest) returns (stream DownloadProgress);
 
 
@@ -2882,6 +2883,11 @@ message SavePayloadProgress {
   string Speed = 8;// 速度
   string RestDurationVerbose = 9;// 剩余时间
   string Message = 10;
+}
+
+message ExportPayloadRequest {
+  string Group = 1;
+  string SavePath = 2;
 }
 
 message UploadPayloadToOnlineRequest {

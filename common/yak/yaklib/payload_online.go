@@ -12,6 +12,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"os"
+	"path/filepath"
 )
 
 type UploadPayloadsToOnlineRequest struct {
@@ -118,7 +120,7 @@ func (s *OnlineClient) DownloadBatchPayloads(
 
 			// 设置超时处理的问题
 		RETRYDOWNLOAD:
-			payloads, paging, err := s.downloadOnlinePayload(group, folder, page, 30)
+			payloads, paging, err := s.downloadOnlinePayload(token, group, folder, page, 30)
 			if err != nil {
 				retry++
 				if retry <= 5 {
@@ -158,7 +160,7 @@ func (s *OnlineClient) DownloadBatchPayloads(
 }
 
 func (s *OnlineClient) downloadOnlinePayload(
-	group, folder string,
+	token, group, folder string,
 	page int, limit int64,
 ) ([]*OnlinePayload, *OnlinePaging, error) {
 	raw, err := json.Marshal(DownloadBatchPayloadsRequest{
@@ -174,7 +176,7 @@ func (s *OnlineClient) downloadOnlinePayload(
 	}
 	rsp, _, err := poc.DoPOST(
 		fmt.Sprintf("%v/%v", consts.GetOnlineBaseUrl(), "api/download/payload"),
-		//poc.WithReplaceHttpPacketHeader("Authorization", token),
+		poc.WithReplaceHttpPacketHeader("Authorization", token),
 		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
 		poc.WithReplaceHttpPacketBody(raw, false),
 		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
@@ -212,24 +214,42 @@ func (s *OnlineClient) SavePayload(db *gorm.DB, payload ...*OnlinePayload) error
 		return utils.Error("empty database")
 	}
 	for _, p := range payload {
-		if p.IsFile {
-			// 文件需要单独写入
-
+		content, err := SavePayloadWriteFile(p)
+		if err != nil {
+			return err
 		}
-		p := &schema.Payload{
+		data := &schema.Payload{
 			Group:    p.Group,
 			Folder:   &p.Folder,
-			Content:  &p.Content,
+			Content:  &content,
 			HitCount: &p.HitCount,
 			IsFile:   &p.IsFile,
 			Hash:     p.Hash,
 		}
 
-		err := yakit.CreateOrUpdatePayload(db, *p.Content, p.Group, *p.Folder, *p.HitCount, *p.IsFile)
+		err = yakit.CreateOrUpdatePayload(db, *data.Content, data.Group, *data.Folder, *data.HitCount, *data.IsFile)
 		if err != nil {
 			log.Errorf("save [%s] to local failed: %s", p.Group, err)
 			return err
 		}
 	}
 	return nil
+}
+
+func SavePayloadWriteFile(payload *OnlinePayload) (string, error) {
+	content := payload.Content
+	if payload.IsFile {
+		payloadFolder := consts.GetDefaultYakitPayloadsDir()
+		dstFileName := filepath.Join(payloadFolder, fmt.Sprintf("%s_%s.txt", payload.Folder, payload.Group))
+		dstFD, err := os.OpenFile(dstFileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o666)
+		defer dstFD.Close()
+		if err != nil {
+			return "", utils.Wrap(err, "open file for write payload error")
+		}
+		if _, err := dstFD.WriteString(string(payload.ContentFile)); err != nil {
+			return "", utils.Wrap(err, "write data to file error")
+		}
+		content = dstFileName
+	}
+	return content, nil
 }
