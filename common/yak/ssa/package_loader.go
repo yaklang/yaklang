@@ -15,8 +15,7 @@ func (b *FunctionBuilder) AddIncludePath(path string) {
 func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 	p := b.GetProgram()
 	includePaths := p.GetIncludeFiles()
-	fs := p.Loader.GetFilesysFileSystem()
-	dir, _ := fs.PathSplit(b.GetEditor().GetFilename())
+	dir := b.GetEditor().GetFolderPath()
 	p.Loader.AddIncludePath(dir)
 	currentMode := b.Included
 	defer func() {
@@ -28,6 +27,7 @@ func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 		return err
 	}
 	mainProgram := b.GetProgram().GetApplication()
+	editor = mainProgram.CreateEditor([]byte(editor.GetSourceCode()), filename)
 	subProg, exist := mainProgram.UpStream.Get(editor.GetPureSourceHash())
 	if exist {
 		subProg.LazyBuild()
@@ -54,7 +54,8 @@ func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 	if err != nil {
 		return utils.Errorf("parse file %s error: %v", filename, err)
 	}
-	mainProgram.SetEditor(filename, editor)
+	// mainProgram.SetEditor(filename, editor)
+	// program.cre
 	languageBuilder.PreHandlerFile(ast, editor, builder)
 	program.SetPreHandler(false)
 	err = mainProgram.Build(ast, editor, builder)

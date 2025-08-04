@@ -273,12 +273,12 @@ func (p *Program) NewValueFromAuditNode(nodeID uint) *Value {
 			memEditor, err = ssadb.GetIrSourceFromHash(auditNode.TmpValueFileHash)
 			if err != nil {
 				log.Errorf("NewValueFromDB: get ir source from hash failed: %v", err)
-				return nil
-			}
-			if auditNode.TmpStartOffset == -1 || auditNode.TmpEndOffset == -1 {
-				rangeIf = memEditor.GetRangeOffset(0, memEditor.CodeLength())
 			} else {
-				rangeIf = memEditor.GetRangeOffset(auditNode.TmpStartOffset, auditNode.TmpEndOffset)
+				if auditNode.TmpStartOffset == -1 || auditNode.TmpEndOffset == -1 {
+					rangeIf = memEditor.GetRangeOffset(0, memEditor.CodeLength())
+				} else {
+					rangeIf = memEditor.GetRangeOffset(auditNode.TmpStartOffset, auditNode.TmpEndOffset)
+				}
 			}
 		}
 		val := p.NewConstValue(auditNode.TmpValue, rangeIf)

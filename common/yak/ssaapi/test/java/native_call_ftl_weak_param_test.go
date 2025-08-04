@@ -3,6 +3,7 @@ package java
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -46,12 +47,21 @@ spring.freemarker.suffix=.ftl
 </body>
 </html>
 `)
-	ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
-		prog := programs[0]
-		sink := prog.SyntaxFlowChain("*Mapping.__ref__<getFunc><getReturns>?{<typeName>?{have:'String'}}<freeMarkerSink>  as  $a")
-		assert.Equal(t, 1, sink.Len())
-		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	t.Run("FreeMarkerXSS", func(t *testing.T) {
+		ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
+			prog := programs[0]
+			sink, err := prog.SyntaxFlowWithError(`
+		*Mapping.__ref__ as $ref 
+		$ref <getFunc><getReturns> as $ret 
+		$ret ?{<typeName>?{have:'String'}} as $target 
+		$target <freeMarkerSink>  as  $a
+		`)
+			sink.Show()
+			require.NoError(t, err)
+			assert.Equal(t, 1, sink.GetValues("a").Len())
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
 }
 
 func TestNativeCall_FreeMarkerXSS_WithNoSuffixConfig(t *testing.T) {

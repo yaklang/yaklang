@@ -57,13 +57,8 @@ func NewMemEditor(sourceCode string) *MemEditor {
 }
 
 func NewMemEditorWithFileUrl(sourceCode string, fileUrl string) *MemEditor {
-	editor := &MemEditor{
-		safeSourceCode:     NewSafeString(sourceCode),
-		lineLensMap:        make(map[int]int),
-		lineStartOffsetMap: make(map[int]int),
-		fileUrl:            fileUrl,
-	}
-	editor.recalculateLineMappings()
+	editor := NewMemEditor(sourceCode)
+	editor.SetUrl(fileUrl)
 	return editor
 }
 
@@ -76,7 +71,7 @@ func (ve *MemEditor) SetUrl(url string) {
 }
 
 func (ve *MemEditor) GetUrl() string {
-	return ve.fileUrl
+	return path.Join("/", ve.GetProgramName(), ve.GetFolderPath(), ve.GetFilename())
 }
 
 func (ve *MemEditor) SetProgramName(programName string) {
@@ -92,7 +87,7 @@ func (ve *MemEditor) SetFolderPath(folderPath string) {
 }
 
 func (ve *MemEditor) GetFolderPath() string {
-	if ve.folderPath == "" {
+	if ve.folderPath == "" && ve.fileUrl != "" {
 		// split from ve.GetUrl
 		ve.folderPath, ve.fileName = path.Split(ve.fileUrl)
 	}
@@ -105,8 +100,9 @@ func (ve *MemEditor) SetFileName(fileName string) {
 
 // GetIrSourceHash 使用程序名称、路径和源代码计算哈希值
 func (ve *MemEditor) GetIrSourceHash() string {
-	return codec.Md5(ve.programName + ve.GetFilename() + ve.GetSourceCode())
-	// return (ve.programName + ve.folderPath + ve.fileName + ve.GetSourceCode())
+	data := ve.GetProgramName() + ve.GetFolderPath() + ve.GetFilename() + ve.GetSourceCode()
+	hash := codec.Md5(data)
+	return hash
 }
 
 func (ve *MemEditor) GetFilename() string {
