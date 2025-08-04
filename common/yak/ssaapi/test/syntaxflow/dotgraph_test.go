@@ -134,7 +134,7 @@ func TestFilterRuleDotGraphEdgeLabel(t *testing.T) {
 	}
 }
 
-func TestDataFlowGraphEdgeLabel(t *testing.T) {
+func TestBottomUseGraphEdgeLabel(t *testing.T) {
 	tests := []struct {
 		name          string
 		code          string
@@ -149,8 +149,8 @@ func TestDataFlowGraphEdgeLabel(t *testing.T) {
 			`c --> as $result`,
 			map[string][]ssatest.EdgeInfo{
 				"result": {
-					{From: "funcA(a)", To: "55 + c", Label: "effect_on"},
-					{From: "55 + c", To: "bbb", Label: "effect_on"},
+					{From: "bbb", To: "55 + c", Label: "depend_on"},
+					{From: "55 + c", To: "funcA(a)", Label: "depend_on"},
 				},
 			},
 		},
@@ -167,10 +167,10 @@ func TestDataFlowGraphEdgeLabel(t *testing.T) {
 			`a --> as $result`,
 			map[string][]ssatest.EdgeInfo{
 				"result": {
-					{From: "return a", To: "11", Label: "effect_on"},
-					{From: "() => {\na = 11\nreturn a\n}", To: "return a", Label: "effect_on"},
-					{From: "f()", To: "() => {\na = 11\nreturn a\n}", Label: "effect_on"},
-					{From: "println(t)", To: "f()", Label: "effect_on"},
+					{From: "11", To: "return a", Label: "depend_on"},
+					{From: "return a", To: "() => {\na = 11\nreturn a\n}", Label: "depend_on"},
+					{From: "() => {\na = 11\nreturn a\n}", To: "f()", Label: "depend_on"},
+					{From: "f()", To: "println(t)", Label: "depend_on"},
 				},
 			},
 		},
@@ -190,12 +190,12 @@ func TestDataFlowGraphEdgeLabel(t *testing.T) {
 			`a --> as $result`,
 			map[string][]ssatest.EdgeInfo{
 				"result": {
-					{From: "return a", To: "11", Label: "effect_on"},
-					{From: "() =>{\na = 11\nreturn a\n}", To: "return a", Label: "effect_on"},
-					{From: "f()", To: "() =>{\na = 11\nreturn a\n}", Label: "effect_on"},
-					{From: "f2(t)", To: "f()", Label: "effect_on"},
-					{From: "i", To: "f2(t)", Label: "effect_on"},
-					{From: "println(i)", To: "i", Label: "effect_on"},
+					{From: "11", To: "return a", Label: "depend_on"},
+					{From: "return a", To: "() =>{\na = 11\nreturn a\n}", Label: "depend_on"},
+					{From: "() =>{\na = 11\nreturn a\n}", To: "f()", Label: "depend_on"},
+					{From: "f()", To: "f2(t)", Label: "depend_on"},
+					{From: "f2(t)", To: "i", Label: "depend_on"},
+					{From: "i", To: "println(i)", Label: "depend_on"},
 				},
 			},
 		},
@@ -209,15 +209,66 @@ func TestDataFlowGraphEdgeLabel(t *testing.T) {
 		b()
 		println(a)
 		`,
-			`a--> as $result`,
+			`a?{=11}-->  as $result`,
 			map[string][]ssatest.EdgeInfo{
 				"result": {
-					{From: "return a", To: "11", Label: "effect_on"},
-					{From: "() =>{\na = 11\nreturn a\n}", To: "return a", Label: "effect_on"},
-					{From: "f()", To: "() =>{\na = 11\nreturn a\n}", Label: "effect_on"},
-					{From: "f2(t)", To: "f()", Label: "effect_on"},
-					{From: "i", To: "f2(t)", Label: "effect_on"},
-					{From: "println(i)", To: "i", Label: "effect_on"},
+					{From: "11", To: "a = 22", Label: "depend_on"},
+					{From: "11", To: "b()", Label: "depend_on"},
+					{From: "b()", To: "println(a)", Label: "depend_on"},
+				},
+			},
+		},
+		{
+			"bottom-use:side effect 2",
+			`
+		o = 5
+		a = o
+		b = () => {
+			a = 2
+		}
+		if e {b()}
+		c = a+1;
+		`,
+			`o?{=5}-->  as $result`,
+			map[string][]ssatest.EdgeInfo{
+				"result": {
+					// phi
+					{From: "if e {b()}", To: "a+1", Label: "depend_on"},
+					{From: "if e {b()}", To: "a+1", Label: "depend_on"},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ssatest.CheckSyntaxFlowDotGraph(
+				t,
+				tt.code,
+				tt.sfRule,
+				true,
+				tt.expectedEdges,
+			)
+		})
+	}
+}
+
+func TestTopDefbGraphEdgeLabel(t *testing.T) {
+	tests := []struct {
+		name          string
+		code          string
+		sfRule        string
+		expectedEdges map[string][]ssatest.EdgeInfo
+	}{
+		{
+			"basic bottom use",
+			`var c = bbb
+	var a = 55 + c
+	funcA(a)`,
+			`c --> as $result`,
+			map[string][]ssatest.EdgeInfo{
+				"result": {
+					{From: "bbb", To: "55 + c", Label: "depend_on"},
+					{From: "55 + c", To: "funcA(a)", Label: "depend_on"},
 				},
 			},
 		},
