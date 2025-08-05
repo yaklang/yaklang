@@ -120,10 +120,8 @@ REFERENCE
 
 <include('golang-user-input')> as $input;
 <include('golang-http-sink')> as $output;
-$output.Write(* as $sink)
-$sink #{
-	until: "* & $input",
-}-> as $high 
+$output.Write(<slice(index=1)>* #-> as $sink)
+$sink & $input as $high 
 
 alert $high for {
 	title: "Reflected XSS detected",
@@ -243,7 +241,7 @@ CODE
 desc(
 	lang: golang
 	alert_high: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
@@ -265,4 +263,26 @@ func main() {
 	http.ListenAndServe(":8080", nil)
 }
 UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import (
+	"net/http"
+	"html/template"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	// 从查询参数中获取用户输入
+	name := "name"
+
+	// 直接将用户输入插入到 HTML 中
+	tmpl := `<h1>Hello, ` + name + `!</h1>`
+	w.Write([]byte(tmpl))
+}
+
+func main() {
+	http.HandleFunc("/", handler)
+	http.ListenAndServe(":8080", nil)
+}
+SAFE
 )

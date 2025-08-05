@@ -20,12 +20,16 @@ SOLUTION
 )
 
 <include('golang-gin-context')> as $sink 
+<include('golang-user-input')> as $input
+
 $sink.Header()?{have: "Access-Control-Allow-Origin"} as $header
-$header<getCallee>(,,* #-> as $output)
+$header<getCallee>(<slice(index=2)>* #-> as $output)
 
 $output?{opcode: const} as $safe
-$output - $safe as $high
-$output?{have: "parameterMember"} as $high
+$output & $input as $target
+$target - $safe as $high
+
+$header<getCallee>(<slice(index=2)>*?{have: "\*"} as $high)
 
 alert $high for {
 	type: "vuln",
@@ -37,7 +41,7 @@ alert $high for {
 desc(
 	lang: golang
 	alert_high: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package unAuth
 
 import "github.com/gin-gonic/gin"
@@ -55,11 +59,17 @@ func Cors2(c *gin.Context) {
 	c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 }
 
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package unAuth
+
+import "github.com/gin-gonic/gin"
+
 func Corssafe(c *gin.Context) {
 	allowedOrigin := "https://test.com"
 
 	c.Header("Access-Control-Allow-Origin", allowedOrigin)
 	c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 }
-UNSAFE
+SAFE
 )

@@ -61,6 +61,9 @@ http?{<fullTypeName>?{have: 'net/http'}} as $entry;
 $entry.HandleFunc(*<slice(index=1)> as $handle);
 $handle<getFormalParams> as $output
 
+$entry.ResponseWriter as $output
+$entry.Request as $output
+
 alert $output for {
 	title: "Audit Golang net/http Handlers",
 	title_zh: "审计Golang net/http请求处理函数",

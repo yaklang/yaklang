@@ -209,7 +209,7 @@ CODE
 desc(
 	lang: golang
 	alert_low: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
@@ -288,4 +288,61 @@ func getServerVersion(db *sql.DB) {
 }
 
 UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import (
+    "database/sql"
+    "fmt"
+    _ "github.com/lib/pq"
+    "strings"
+)
+
+func main() {
+    // 连接到 PostgreSQL 数据库
+    connStr := "user=username dbname=mydb sslmode=disable"
+    db, err := sql.Open("postgres", connStr)
+    if err != nil {
+        fmt.Println("Failed to connect to database:", err)
+        return
+    }
+    defer db.Close()
+
+    // 列出表（防止目录结构暴露）
+    listTables(db)
+
+    // 获取当前数据库（防止路径泄露）
+    getCurrentDatabase(db)
+
+    // 获取服务器版本（防止系统类型识别）
+    getServerVersion(db)
+}
+
+func listTables(db *sql.DB) {
+    rows, err := db.Query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name NOT LIKE 'pg_%'")
+    if err != nil {
+        fmt.Println("Failed to list tables:", err)
+        return
+    }
+    defer rows.Close()
+
+    for rows.Next() {
+        var tableName string
+        if err := rows.Scan(&tableName); err != nil {
+            fmt.Println("Failed to scan table name:", err)
+            return
+        }
+        fmt.Println("Table:", tableName)
+    }
+}
+
+func getCurrentDatabase(db *sql.DB) {
+  
+}
+
+func getServerVersion(db *sql.DB) {
+    
+}
+
+SAFE
 )

@@ -201,7 +201,7 @@ CODE
 desc(
 	lang: golang
 	alert_high: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package test
 
 import (
@@ -252,4 +252,55 @@ func main() {
 }
 
 UNSAFE
+	'file://safe.go': <<<SAFE
+package test
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"net/http"
+
+	"entgo.io/ent"
+	_ "github.com/go-sql-driver/mysql"
+)
+
+type User struct {
+	ID   uint
+	Name string
+	Age  int
+}
+
+func login(w http.ResponseWriter, r *http.Request) {
+	username := "username"
+	password := "password"
+
+	// 连接到数据库
+	client, err := ent.Open("mysql", "user:password@tcp(localhost:3306)/dbname")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	// 不安全的查询
+	input := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
+	ctx := context.Background()
+
+	users, err := client.User.Query().Where(user.Name(input)).All(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 打印结果
+	for _, user := range users {
+		fmt.Printf("User: %s, Age: %d\n", user.Name, user.Age)
+	}
+}
+
+func main() {
+	http.HandleFunc("/login", login)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+SAFE
 )

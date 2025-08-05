@@ -52,7 +52,7 @@ alert $high for {
 desc(
 	lang: golang
 	alert_high: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package unAuth
 
 import "github.com/gin-gonic/gin"
@@ -68,11 +68,16 @@ func Redirect(c *gin.Context) {
 	c.Redirect(302, loc)
 }
 
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package unAuth
+
+import "github.com/gin-gonic/gin"
+
 func SafeRedirect(c *gin.Context) {
 	baseUrl := "https://baidu.com/path?q="
-	loc := c.Query("redirect")
-	c.Redirect(302, baseUrl+loc)
+	c.Redirect(302, baseUrl)
 }
 
-UNSAFE
+SAFE
 )

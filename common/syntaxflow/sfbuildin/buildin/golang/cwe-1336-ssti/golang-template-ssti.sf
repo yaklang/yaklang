@@ -228,7 +228,7 @@ func main() {
     http.ListenAndServe(":8080", nil)
 }
 UNSAFE
-	'safe://main.go': <<<SAFE
+	'safefile://main.go': <<<SAFE
 package main
 
 import (
