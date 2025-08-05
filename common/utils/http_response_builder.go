@@ -212,6 +212,9 @@ HandleExpect100Continue:
 		headerBytes = rawPacket.Bytes()
 		_, _ = ret.Write(rawPacket.Bytes())
 	}
+
+	noBodyBuffer := httpctx.GetNoBodyBuffer(req)
+
 	var bodyReader io.Reader = originReader
 	if ret := httpctx.GetResponseHeaderCallback(req); ret != nil {
 		if len(headerBytes) <= 0 {
@@ -232,7 +235,12 @@ HandleExpect100Continue:
 	if fixContentLength {
 		// just for bytes condition
 		// by reader
-		raw, _ := io.ReadAll(io.NopCloser(bodyReader))
+		raw := []byte{}
+		if noBodyBuffer {
+			io.Copy(io.Discard, bodyReader)
+		} else {
+			raw, _ = io.ReadAll(io.NopCloser(bodyReader))
+		}
 		rawPacket.Write(raw)
 		if useContentLength && !useTransferEncodingChunked {
 			rsp.ContentLength = int64(len(raw))
@@ -247,7 +255,12 @@ HandleExpect100Continue:
 			log.Debug("content-length and transfer-encoding chunked both exist, try smuggle? use content-length first!")
 			if contentLengthInt > 0 {
 				// smuggle
-				bodyRaw, _ := io.ReadAll(io.NopCloser(io.LimitReader(bodyReader, int64(contentLengthInt))))
+				bodyRaw := []byte{}
+				if noBodyBuffer {
+					io.Copy(io.Discard, io.LimitReader(bodyReader, int64(contentLengthInt)))
+				} else {
+					bodyRaw, _ = io.ReadAll(io.NopCloser(io.LimitReader(bodyReader, int64(contentLengthInt))))
+				}
 				rawPacket.Write(bodyRaw)
 				bodyRawBuf.Write(bodyRaw)
 				if ret := contentLengthInt - len(bodyRaw); ret > 0 {
@@ -255,7 +268,13 @@ HandleExpect100Continue:
 				}
 			} else {
 				// chunked
-				_, fixed, _, err := codec.HTTPChunkedDecoderWithRestBytes(bodyReader)
+				var fixed []byte
+				var err error
+				if noBodyBuffer {
+					_, _, _, err = codec.HTTPChunkedDecoderWithRestBytes(bodyReader)
+				} else {
+					_, fixed, _, err = codec.HTTPChunkedDecoderWithRestBytes(bodyReader)
+				}
 				rawPacket.Write(fixed)
 				if err != nil {
 					return nil, errors.Wrap(err, "chunked decoder error")
@@ -264,7 +283,13 @@ HandleExpect100Continue:
 			}
 		} else if !useContentLength && useTransferEncodingChunked {
 			// handle chunked
-			_, fixed, _, err := codec.HTTPChunkedDecoderWithRestBytes(bodyReader)
+			var fixed []byte
+			var err error
+			if noBodyBuffer {
+				_, _, _, err = codec.HTTPChunkedDecoderWithRestBytes(bodyReader)
+			} else {
+				_, fixed, _, err = codec.HTTPChunkedDecoderWithRestBytes(bodyReader)
+			}
 			rawPacket.Write(fixed)
 			if err != nil {
 				return nil, errors.Wrap(err, "chunked decoder error")
@@ -279,7 +304,12 @@ HandleExpect100Continue:
 					contentLengthInt = 100 * 1000 // no cl ,but maybe has body ,give 100k
 				}
 				if contentLengthInt > 0 {
-					bodyRaw, err := io.ReadAll(io.NopCloser(io.LimitReader(bodyReader, int64(contentLengthInt))))
+					bodyRaw := []byte{}
+					if noBodyBuffer {
+						io.Copy(io.Discard, io.LimitReader(bodyReader, int64(contentLengthInt)))
+					} else {
+						bodyRaw, err = io.ReadAll(io.NopCloser(io.LimitReader(bodyReader, int64(contentLengthInt))))
+					}
 					rawPacket.Write(bodyRaw)
 					if err != nil && err != io.EOF {
 						return nil, errors.Wrap(err, "read body error")

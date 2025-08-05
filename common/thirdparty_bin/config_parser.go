@@ -3,6 +3,7 @@ package thirdparty_bin
 import (
 	"embed"
 	"fmt"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -16,22 +17,25 @@ var configFS embed.FS
 type ConfigFile struct {
 	Version     string              `yaml:"version"`
 	Description string              `yaml:"description"`
+	BaseURL     string              `yaml:"baseurl,omitempty"`
 	Binaries    []*BinaryDescriptor `yaml:"binaries"`
 }
 
 // ConfigDownloadInfo YAML中的下载信息结构
 type ConfigDownloadInfo struct {
-	URL       string `yaml:"url"`
-	Checksums string `yaml:"checksums,omitempty"`
-	BinPath   string `yaml:"bin_path,omitempty"`
-	BinDir    string `yaml:"bin_dir,omitempty"`
-	Pick      string `yaml:"pick,omitempty"`
+	URL     string `yaml:"url"`
+	MD5     string `yaml:"md5,omitempty"`
+	SHA256  string `yaml:"sha256,omitempty"`
+	BinPath string `yaml:"bin_path,omitempty"`
+	BinDir  string `yaml:"bin_dir,omitempty"`
+	Pick    string `yaml:"pick,omitempty"`
 }
 
 // ConfigBinaryDescriptor YAML中的二进制描述符结构
 type ConfigBinaryDescriptor struct {
 	Name            string                         `yaml:"name"`
 	Description     string                         `yaml:"description"`
+	Tags            string                         `yaml:"tags,omitempty"`
 	Version         string                         `yaml:"version"`
 	InstallType     string                         `yaml:"install_type"`
 	ArchiveType     string                         `yaml:"archive_type,omitempty"`
@@ -49,11 +53,34 @@ func LoadConfigFromEmbedded() (*ConfigFile, error) {
 	return ParseConfig(data)
 }
 
+// isAbsoluteURL 检查URL是否为绝对URL
+func isAbsoluteURL(url string) bool {
+	return strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")
+}
+
+// buildFullURL 构建完整的URL，如果是相对URL则拼接baseurl
+func buildFullURL(baseURL, url string) string {
+	if isAbsoluteURL(url) {
+		return url
+	}
+
+	// 如果是相对URL且有baseurl，则拼接
+	if baseURL != "" {
+		// 确保baseURL以斜杠结尾，url不以斜杠开头时的连接
+		baseURL = strings.TrimSuffix(baseURL, "/")
+		url = strings.TrimPrefix(url, "/")
+		return baseURL + "/" + url
+	}
+
+	return url
+}
+
 // ParseConfig 解析配置文件内容
 func ParseConfig(data []byte) (*ConfigFile, error) {
 	var configFile struct {
 		Version     string                    `yaml:"version"`
 		Description string                    `yaml:"description"`
+		BaseURL     string                    `yaml:"baseurl,omitempty"`
 		Binaries    []*ConfigBinaryDescriptor `yaml:"binaries"`
 	}
 
@@ -65,13 +92,22 @@ func ParseConfig(data []byte) (*ConfigFile, error) {
 	result := &ConfigFile{
 		Version:     configFile.Version,
 		Description: configFile.Description,
+		BaseURL:     configFile.BaseURL,
 		Binaries:    make([]*BinaryDescriptor, len(configFile.Binaries)),
 	}
 
 	for i, configBinary := range configFile.Binaries {
+		tags := []string{}
+		if len(configBinary.Tags) > 0 {
+			tags = strings.Split(configBinary.Tags, ",")
+			for i, tag := range tags {
+				tags[i] = strings.TrimSpace(tag)
+			}
+		}
 		binary := &BinaryDescriptor{
 			Name:            configBinary.Name,
 			Description:     configBinary.Description,
+			Tags:            tags,
 			Version:         configBinary.Version,
 			InstallType:     configBinary.InstallType,
 			ArchiveType:     configBinary.ArchiveType,
@@ -90,12 +126,16 @@ func ParseConfig(data []byte) (*ConfigFile, error) {
 					configBinary.Name, platform)
 			}
 
+			// 构建完整的URL，如果是相对URL则拼接baseurl
+			fullURL := buildFullURL(configFile.BaseURL, configDownloadInfo.URL)
+
 			binary.DownloadInfoMap[platform] = &DownloadInfo{
-				URL:       configDownloadInfo.URL,
-				Checksums: configDownloadInfo.Checksums,
-				BinDir:    configDownloadInfo.BinDir,
-				BinPath:   configDownloadInfo.BinPath,
-				Pick:      configDownloadInfo.Pick,
+				URL:     fullURL,
+				MD5:     configDownloadInfo.MD5,
+				SHA256:  configDownloadInfo.SHA256,
+				BinDir:  configDownloadInfo.BinDir,
+				BinPath: configDownloadInfo.BinPath,
+				Pick:    configDownloadInfo.Pick,
 			}
 		}
 
@@ -177,6 +217,9 @@ func PrintBuiltinBinaries() error {
 	for i, binary := range config.Binaries {
 		fmt.Printf("%d. %s (v%s)\n", i+1, binary.Name, binary.Version)
 		fmt.Printf("   Description: %s\n", binary.Description)
+		if len(binary.Tags) > 0 {
+			fmt.Printf("   Tags: %v\n", binary.Tags)
+		}
 		fmt.Printf("   Install Type: %s\n", binary.InstallType)
 		if binary.ArchiveType != "" {
 			fmt.Printf("   Archive Type: %s\n", binary.ArchiveType)
