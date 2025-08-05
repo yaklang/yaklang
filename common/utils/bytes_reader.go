@@ -399,6 +399,19 @@ func ReadConnWithTimeout(r net.Conn, timeout time.Duration) ([]byte, error) {
 	return nil, errors.Wrap(err, "read empty")
 }
 
+func ReadTimeout(r io.Reader, timeout time.Duration) ([]byte, error) {
+	if IsNil(r) {
+		return nil, Error("nil reader")
+	}
+	if timeout <= 0 {
+		return io.ReadAll(r)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	r = ctxio.NewReader(ctx, r)
+	return io.ReadAll(r)
+}
+
 func ConnExpect(c net.Conn, timeout time.Duration, callback func([]byte) bool) (bool, error) {
 	err := c.SetReadDeadline(time.Now().Add(timeout))
 	if err != nil {

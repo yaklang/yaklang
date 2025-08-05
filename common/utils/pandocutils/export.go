@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 // pandoc.SimpleConvertMarkdownFileToDocxContext can convert markdown to docx file
@@ -46,8 +48,15 @@ func _simpleConvertMarkdownFileToDocx(md string) (string, error) {
 	return _simpleConvertMarkdownFileToDocxContext(context.Background(), md)
 }
 
+var deprecatedWarning = new(sync.Once)
+
 var Exports = map[string]any{
 	"SimpleConvertMarkdownFileToDocxContext": _simpleConvertMarkdownFileToDocxContext,
 	"SimpleConvertMarkdownFileToDocx":        _simpleConvertMarkdownFileToDocx,
-	"SimpleCoverMD2Word":                     SimpleCovertMarkdownToDocx,
+	"SimpleCoverMD2Word": func(ctx context.Context, inputFile string, outputFile string) error {
+		deprecatedWarning.Do(func() {
+			log.Warn("pandoc.SimpleCoverMD2Word is an alpha pandoc api, please use pandoc.SimpleConvertMarkdownToDocxContext or SimpleConvertMarkdownTo instead for best experience.")
+		})
+		return SimpleCovertMarkdownToDocx(ctx, inputFile, outputFile)
+	},
 }
