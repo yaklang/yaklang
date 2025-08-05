@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,9 +15,21 @@ import (
 	"github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/thirdparty_bin"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+var USER_CUSTOM_LOCAL_MODEL_KEY = "USER_CUSTOM_LOCAL_MODEL"
+
+// CustomLocalModel 自定义本地模型结构
+type CustomLocalModel struct {
+	Name        string `json:"name"`
+	ModelType   string `json:"model_type"`
+	Description string `json:"description"`
+	Path        string `json:"path"`
+}
 
 // LocalModelManager 本地模型管理器
 type LocalModelManager struct {
@@ -28,23 +41,105 @@ var localModelManager = &LocalModelManager{
 	runningModels: make(map[string]*exec.Cmd),
 }
 
-// getSupportedModels 获取支持的模型列表
-func getSupportedModels() []*ypb.LocalModelConfig {
-	return []*ypb.LocalModelConfig{
-		{
-			Name:        "Qwen3-Embedding-0.6B-Q4_K_M",
-			Type:        "embedding",
-			FileName:    "Qwen3-Embedding-0.6B-Q4_K_M.gguf",
-			DownloadURL: "https://oss-qn.yaklang.com/gguf/Qwen3-Embedding-0.6B-Q4_K_M.gguf",
-			Description: "Qwen3 Embedding 0.6B Q4_K_M - 文本嵌入模型",
-			DefaultPort: 8080,
-		},
+// getCustomModelsFromDB 从数据库获取自定义模型列表
+func getCustomModelsFromDB() ([]*ypb.LocalModelConfig, error) {
+	modelsJSON := yakit.GetKey(consts.GetGormProfileDatabase(), USER_CUSTOM_LOCAL_MODEL_KEY)
+	if modelsJSON == "" {
+		return []*ypb.LocalModelConfig{}, nil
 	}
+
+	var customModels []CustomLocalModel
+	err := json.Unmarshal([]byte(modelsJSON), &customModels)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []*ypb.LocalModelConfig
+	for _, model := range customModels {
+		result = append(result, &ypb.LocalModelConfig{
+			Name:        model.Name,
+			Type:        model.ModelType,
+			FileName:    filepath.Base(model.Path), // 从路径中提取文件名
+			DownloadURL: "",                        // 自定义模型没有下载链接
+			Description: model.Description,
+			IsLocal:     true,
+			DefaultPort: 8080, // 默认端口
+		})
+	}
+
+	return result, nil
+}
+func getModelTypeByTags(tags ...string) string {
+	typeMap := map[string]string{
+		"embedding":      "embedding",
+		"aichat":         "aichat",
+		"speech-to-text": "speech-to-text",
+	}
+
+	for _, tag := range tags {
+		if _, ok := typeMap[tag]; ok {
+			return typeMap[tag]
+		}
+	}
+	return ""
+}
+
+// getSupportedModels 获取支持的模型列表（包括内置和自定义）
+func getSupportedModels() []*ypb.LocalModelConfig {
+	// 内置模型
+	aimodelNames := thirdparty_bin.GetBinaryNamesByTags("aimodel")
+	allBins := thirdparty_bin.GetRegisteredBinaries()
+
+	builtinModels := []*ypb.LocalModelConfig{}
+
+	for _, name := range aimodelNames {
+		bin, ok := allBins[name]
+		if !ok {
+			continue
+		}
+		downloadUrl, err := thirdparty_bin.GetDownloadInfo(name)
+		if err != nil {
+			log.Errorf("获取模型下载信息失败: %v", err)
+			continue
+		}
+		builtinModels = append(builtinModels, &ypb.LocalModelConfig{
+			Name:        bin.Name,
+			Type:        getModelTypeByTags(bin.Tags...),
+			DownloadURL: downloadUrl.URL,
+			Description: bin.Description,
+			IsLocal:     false,
+			DefaultPort: 8080,
+		})
+	}
+
+	// 获取自定义模型
+	customModels, err := getCustomModelsFromDB()
+	if err != nil {
+		log.Errorf("获取自定义模型失败: %v", err)
+		return builtinModels
+	}
+
+	// 合并内置模型和自定义模型
+	allModels := append(builtinModels, customModels...)
+	return allModels
 }
 
 // GetSupportedLocalModels 获取支持的本地模型列表
 func (s *Server) GetSupportedLocalModels(ctx context.Context, req *ypb.Empty) (*ypb.GetSupportedLocalModelsResponse, error) {
 	models := getSupportedModels()
+	// 检查模型是否ready
+	for _, model := range models {
+		if model.IsLocal {
+			model.IsReady = utils.FileExists(model.Path)
+		} else {
+			status, err := thirdparty_bin.GetStatus(model.Name)
+			if err != nil {
+				model.IsReady = false
+			} else {
+				model.IsReady = status.Installed
+			}
+		}
+	}
 	return &ypb.GetSupportedLocalModelsResponse{
 		Models: models,
 	}, nil
@@ -101,18 +196,40 @@ func (s *Server) IsLocalModelReady(ctx context.Context, req *ypb.IsLocalModelRea
 		}, nil
 	}
 
-	// 检查模型文件是否存在
-	modelPath := consts.GetAIModelFilePath(targetModel.FileName)
-	if modelPath == "" {
-		return &ypb.IsLocalModelReadyResponse{
-			Ok:     false,
-			Reason: fmt.Sprintf("模型文件不存在: %s", targetModel.FileName),
-		}, nil
+	// 检查模型是否就绪
+	if targetModel.IsLocal {
+		if utils.FileExists(targetModel.Path) {
+			return &ypb.IsLocalModelReadyResponse{
+				Ok:     true,
+				Reason: "",
+			}, nil
+		} else {
+			return &ypb.IsLocalModelReadyResponse{
+				Ok:     false,
+				Reason: fmt.Sprintf("模型文件不存在: %s", targetModel.Path),
+			}, nil
+		}
+	} else {
+		status, err := thirdparty_bin.GetStatus(targetModel.Name)
+		if err != nil {
+			return &ypb.IsLocalModelReadyResponse{
+				Ok:     false,
+				Reason: fmt.Sprintf("获取模型安装状态错误: %s", err.Error()),
+			}, nil
+		} else {
+			if status.Installed {
+				return &ypb.IsLocalModelReadyResponse{
+					Ok:     true,
+					Reason: "",
+				}, nil
+			} else {
+				return &ypb.IsLocalModelReadyResponse{
+					Ok:     false,
+					Reason: fmt.Sprintf("模型未安装: %s", targetModel.Name),
+				}, nil
+			}
+		}
 	}
-
-	return &ypb.IsLocalModelReadyResponse{
-		Ok: true,
-	}, nil
 }
 
 // InstallLocalModel 安装本地模型（主要是下载llama-server）
@@ -126,51 +243,11 @@ func (s *Server) InstallLlamaServer(req *ypb.InstallLlamaServerRequest, stream y
 
 // DownloadLocalModel 下载本地模型
 func (s *Server) DownloadLocalModel(req *ypb.DownloadLocalModelRequest, stream ypb.Yak_DownloadLocalModelServer) error {
-	modelName := req.GetModelName()
-	if modelName == "" {
-		return utils.Error("模型名称不能为空")
-	}
-
-	// 查找模型配置
-	var targetModel *ypb.LocalModelConfig
-	models := getSupportedModels()
-	for _, model := range models {
-		if model.Name == modelName {
-			targetModel = model
-			break
-		}
-	}
-
-	if targetModel == nil {
-		return utils.Errorf("不支持的模型: %s", modelName)
-	}
-
-	modelsDir := consts.GetDefaultAIModelDir()
-	// 确保目录存在
-	if err := os.MkdirAll(modelsDir, os.ModePerm); err != nil {
-		return utils.Errorf("无法创建模型目录: %v", err)
-	}
-
-	stream.Send(&ypb.ExecResult{
-		IsMessage: true,
-		Message:   []byte(fmt.Sprintf("开始下载模型: %s", modelName)),
-	})
-
-	// 使用DownloadWithStream下载模型
-	err := s.DownloadWithStream(req.GetProxy(), func() (urlStr string, name string, err error) {
-		return targetModel.DownloadURL, filepath.Join("models", targetModel.FileName), nil
+	return s.InstallThirdPartyBinary(&ypb.InstallThirdPartyBinaryRequest{
+		Name:  req.GetModelName(),
+		Proxy: req.GetProxy(),
+		Force: true,
 	}, stream)
-
-	if err != nil {
-		return utils.Errorf("下载模型失败: %v", err)
-	}
-
-	stream.Send(&ypb.ExecResult{
-		IsMessage: true,
-		Message:   []byte(fmt.Sprintf("模型 %s 下载完成", modelName)),
-	})
-
-	return nil
 }
 
 // StartLocalModel 启动本地模型
@@ -426,4 +503,250 @@ func (s *Server) InitSearchVectorDatabase(req *ypb.InitSearchVectorDatabaseReque
 	}
 
 	return nil
+}
+
+func (s *Server) AddLocalModel(ctx context.Context, req *ypb.AddLocalModelRequest) (*ypb.GeneralResponse, error) {
+	// 参数验证
+	if req.GetName() == "" {
+		return &ypb.GeneralResponse{
+			Ok: false,
+		}, utils.Error("模型名称不能为空")
+	}
+
+	if req.GetPath() == "" {
+		return &ypb.GeneralResponse{
+			Ok: false,
+		}, utils.Error("模型路径不能为空")
+	}
+
+	// 检查模型文件是否存在
+	if exists, _ := utils.PathExists(req.GetPath()); !exists {
+		return &ypb.GeneralResponse{
+			Ok: false,
+		}, utils.Errorf("模型文件不存在: %s", req.GetPath())
+	}
+
+	// 获取现有模型列表
+	modelsJSON := yakit.GetKey(consts.GetGormProfileDatabase(), USER_CUSTOM_LOCAL_MODEL_KEY)
+	var existingModels []CustomLocalModel
+	if modelsJSON != "" {
+		err := json.Unmarshal([]byte(modelsJSON), &existingModels)
+		if err != nil {
+			return &ypb.GeneralResponse{
+				Ok: false,
+			}, utils.Errorf("解析现有模型列表失败: %v", err)
+		}
+	}
+
+	// 检查模型名称是否已存在
+	for _, model := range existingModels {
+		if model.Name == req.GetName() {
+			return &ypb.GeneralResponse{
+				Ok: false,
+			}, utils.Errorf("模型名称已存在: %s", req.GetName())
+		}
+	}
+
+	// 创建新模型
+	newModel := CustomLocalModel{
+		Name:        req.GetName(),
+		ModelType:   req.GetModelType(),
+		Description: req.GetDescription(),
+		Path:        req.GetPath(),
+	}
+
+	// 添加到现有列表
+	existingModels = append(existingModels, newModel)
+
+	// 序列化并保存
+	updatedJSON, err := json.Marshal(existingModels)
+	if err != nil {
+		return &ypb.GeneralResponse{
+			Ok: false,
+		}, utils.Errorf("序列化模型列表失败: %v", err)
+	}
+
+	yakit.SetKey(consts.GetGormProfileDatabase(), USER_CUSTOM_LOCAL_MODEL_KEY, string(updatedJSON))
+
+	return &ypb.GeneralResponse{
+		Ok: true,
+	}, nil
+}
+
+func (s *Server) DeleteLocalModel(ctx context.Context, req *ypb.DeleteLocalModelRequest) (*ypb.GeneralResponse, error) {
+	// 参数验证
+	if req.GetName() == "" {
+		return &ypb.GeneralResponse{
+			Ok: false,
+		}, utils.Error("模型名称不能为空")
+	}
+
+	// 获取现有模型列表
+	modelsJSON := yakit.GetKey(consts.GetGormProfileDatabase(), USER_CUSTOM_LOCAL_MODEL_KEY)
+	if modelsJSON == "" {
+		return &ypb.GeneralResponse{
+			Ok: false,
+		}, utils.Errorf("模型不存在: %s", req.GetName())
+	}
+
+	var existingModels []CustomLocalModel
+	err := json.Unmarshal([]byte(modelsJSON), &existingModels)
+	if err != nil {
+		return &ypb.GeneralResponse{
+			Ok: false,
+		}, utils.Errorf("解析现有模型列表失败: %v", err)
+	}
+
+	// 查找并删除指定模型
+	var updatedModels []CustomLocalModel
+	var deletedModel *CustomLocalModel
+	found := false
+
+	for _, model := range existingModels {
+		if model.Name == req.GetName() {
+			deletedModel = &model
+			found = true
+			continue // 跳过这个模型，相当于删除
+		}
+		updatedModels = append(updatedModels, model)
+	}
+
+	if !found {
+		return &ypb.GeneralResponse{
+			Ok: false,
+		}, utils.Errorf("模型不存在: %s", req.GetName())
+	}
+
+	// 如果请求删除源文件
+	if req.GetDeleteSourceFile() == "true" && deletedModel != nil {
+		if exists, _ := utils.PathExists(deletedModel.Path); exists {
+			err := os.Remove(deletedModel.Path)
+			if err != nil {
+				log.Warnf("删除模型文件失败: %v", err)
+				// 不要因为文件删除失败而返回错误，继续删除数据库记录
+			}
+		}
+	}
+
+	// 序列化并保存更新后的列表
+	updatedJSON, err := json.Marshal(updatedModels)
+	if err != nil {
+		return &ypb.GeneralResponse{
+			Ok: false,
+		}, utils.Errorf("序列化模型列表失败: %v", err)
+	}
+
+	yakit.SetKey(consts.GetGormProfileDatabase(), USER_CUSTOM_LOCAL_MODEL_KEY, string(updatedJSON))
+
+	return &ypb.GeneralResponse{
+		Ok: true,
+	}, nil
+}
+
+func (s *Server) UpdateLocalModel(ctx context.Context, req *ypb.UpdateLocalModelRequest) (*ypb.GeneralResponse, error) {
+	// 参数验证
+	if req.GetName() == "" {
+		return &ypb.GeneralResponse{
+			Ok: false,
+		}, utils.Error("模型名称不能为空")
+	}
+
+	// 获取现有模型列表
+	modelsJSON := yakit.GetKey(consts.GetGormProfileDatabase(), USER_CUSTOM_LOCAL_MODEL_KEY)
+	if modelsJSON == "" {
+		return &ypb.GeneralResponse{
+			Ok: false,
+		}, utils.Errorf("模型不存在: %s", req.GetName())
+	}
+
+	var existingModels []CustomLocalModel
+	err := json.Unmarshal([]byte(modelsJSON), &existingModels)
+	if err != nil {
+		return &ypb.GeneralResponse{
+			Ok: false,
+		}, utils.Errorf("解析现有模型列表失败: %v", err)
+	}
+
+	// 查找指定模型
+	var updatedModels []CustomLocalModel
+	found := false
+
+	for _, model := range existingModels {
+		if model.Name == req.GetName() {
+			found = true
+			// 更新模型信息，只更新非空字段
+			updatedModel := model
+
+			if req.GetModelType() != "" {
+				updatedModel.ModelType = req.GetModelType()
+			}
+
+			if req.GetDescription() != "" {
+				updatedModel.Description = req.GetDescription()
+			}
+
+			if req.GetPath() != "" {
+				// 验证新路径是否存在
+				if exists, _ := utils.PathExists(req.GetPath()); !exists {
+					return &ypb.GeneralResponse{
+						Ok: false,
+					}, utils.Errorf("模型文件不存在: %s", req.GetPath())
+				}
+				updatedModel.Path = req.GetPath()
+			}
+
+			updatedModels = append(updatedModels, updatedModel)
+		} else {
+			updatedModels = append(updatedModels, model)
+		}
+	}
+
+	if !found {
+		return &ypb.GeneralResponse{
+			Ok: false,
+		}, utils.Errorf("模型不存在: %s", req.GetName())
+	}
+
+	// 序列化并保存更新后的列表
+	updatedJSON, err := json.Marshal(updatedModels)
+	if err != nil {
+		return &ypb.GeneralResponse{
+			Ok: false,
+		}, utils.Errorf("序列化模型列表失败: %v", err)
+	}
+
+	yakit.SetKey(consts.GetGormProfileDatabase(), USER_CUSTOM_LOCAL_MODEL_KEY, string(updatedJSON))
+
+	return &ypb.GeneralResponse{
+		Ok: true,
+	}, nil
+}
+
+func (s *Server) GetAllStartedLocalModels(ctx context.Context, req *ypb.Empty) (*ypb.GetAllStartedLocalModelsResponse, error) {
+	localModelManager.mutex.RLock()
+	defer localModelManager.mutex.RUnlock()
+
+	var aichatModelNames []string
+
+	// 获取所有支持的模型配置，用于检查模型类型
+	allModels := getSupportedModels()
+	modelTypeMap := make(map[string]string)
+	for _, model := range allModels {
+		modelTypeMap[model.Name] = model.Type
+	}
+
+	// 遍历所有运行中的模型
+	for modelName, cmd := range localModelManager.runningModels {
+		// 检查进程是否还在运行
+		if cmd.ProcessState == nil || !cmd.ProcessState.Exited() {
+			// 检查模型类型是否为aichat
+			if modelType, exists := modelTypeMap[modelName]; exists && modelType == "aichat" {
+				aichatModelNames = append(aichatModelNames, modelName)
+			}
+		}
+	}
+
+	return &ypb.GetAllStartedLocalModelsResponse{
+		ModelNames: aichatModelNames,
+	}, nil
 }
