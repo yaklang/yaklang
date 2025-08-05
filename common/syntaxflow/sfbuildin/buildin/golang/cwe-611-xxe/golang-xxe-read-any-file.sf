@@ -263,7 +263,7 @@ CODE
 desc(
 	lang: golang
 	alert_high: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
@@ -307,4 +307,44 @@ func main() {
 }
 
 UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import (
+    "encoding/xml"
+    "fmt"
+    "os"
+)
+
+type Person struct {
+    Name string `xml:"name"`
+    Age  int    `xml:"age"`
+}
+
+func main() {
+    // 模拟恶意 XML 输入
+    xmlData := `<?xml version="1.0"?>
+<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<person>
+    <name>&xxe;</name>
+    <age>30</age>
+</person>`
+
+    var person Person
+    decoder := xml.NewDecoder(strings.NewReader(xmlData))
+
+    // 启用非严格模式
+    decoder.Strict = true
+
+    err := decoder.Decode(&person)
+    if err != nil {
+        fmt.Println("Error unmarshalling XML:", err)
+        return
+    }
+
+    fmt.Println("Name:", person.Name)
+    fmt.Println("Age:", person.Age)
+}
+
+SAFE
 )

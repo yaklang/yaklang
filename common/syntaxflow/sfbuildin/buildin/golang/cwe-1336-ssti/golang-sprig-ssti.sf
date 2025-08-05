@@ -118,8 +118,8 @@ REFERENCE
 <include('golang-template-html')> as $sink;
 
 $sink.New as $new;
-$new().Funcs(* as $param);
-$param?{have: 'sprig'} as $low;
+$new().Funcs(* #-> as $param);
+$param?{<fullTypeName>?{have: 'sprig'}} as $low;
 
 alert $low for {
 	solution: <<<CODE

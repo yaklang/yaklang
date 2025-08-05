@@ -188,7 +188,7 @@ CODE
 desc(
 	lang: golang
 	alert_low: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (

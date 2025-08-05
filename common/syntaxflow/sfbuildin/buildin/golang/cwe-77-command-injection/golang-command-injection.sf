@@ -258,7 +258,7 @@ CODE
 desc(
 	lang: golang
 	alert_high: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
@@ -287,7 +287,7 @@ func main() {
 	http.HandleFunc("/", handler)
 }
 UNSAFE
-	'safe://main.go': <<<SAFE
+	'safefile://safe.go': <<<SAFE
 package main
 
 import (

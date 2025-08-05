@@ -24,6 +24,7 @@ REFERENCE
 <include('golang-gin-context')> as $output;
 
 .GetString(*<slice(index=0)> #-> as $beego);
+.Ctx.Request.Header.Get #-> as $beego 
 $beego?{<fullTypeName>?{have: 'github.com/beego/beego/v2/server/web'}} as $output;
 
 alert $output for {

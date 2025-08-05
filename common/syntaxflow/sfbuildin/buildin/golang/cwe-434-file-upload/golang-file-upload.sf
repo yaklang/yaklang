@@ -135,6 +135,7 @@ REFERENCE
 strings.HasPrefix(* #-> as $check);
 $path.Clean(* #-> as $check);
 $path.IsAbs(* #-> as $check);
+$path.Join(* #-> as $check);
 
 $sink #{include: `$check`}-> as $safe;
 $sink - $safe as $data;
@@ -298,7 +299,7 @@ func main() {
 	})
 }
 UNSAFE
-	'safe://main.go': <<<SAFE
+	'safefile://main.go': <<<SAFE
 package main
 
 import (

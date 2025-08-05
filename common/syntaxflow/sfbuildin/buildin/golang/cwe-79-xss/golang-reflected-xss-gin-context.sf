@@ -61,7 +61,7 @@ func XSSReflectedHandler(c *gin.Context) {
 	})
 }
 UNSAFE
-	'file://safe.go': <<<SAFE
+	'safefile://safe.go': <<<SAFE
 package api
 
 import (
@@ -78,7 +78,7 @@ func XSSReflectedHandler(c *gin.Context) {
 	})
 }
 SAFE
-	"safefile://SafeHtmlNoXSS.go": <<<CODE
+	"safefile://SafeHtmlNoXSS.go": <<<SAFE
 package api
 
 import (
@@ -97,8 +97,8 @@ func SafeHtmlNoXSSHandler(c *gin.Context) {
 	})
 }
 
-CODE
-	"safefile://SafeHtmlConstant.go": <<<CODE
+SAFE
+	"safefile://SafeHtmlConstant.go": <<<SAFE
 package api
 
 import (
@@ -116,5 +116,5 @@ func SafeHtmlConstantHandler(c *gin.Context) {
 	})
 }
 
-CODE
+SAFE
 )
