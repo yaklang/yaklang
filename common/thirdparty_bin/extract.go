@@ -146,7 +146,7 @@ func extractZipAll(reader *zip.ReadCloser, targetPath string, isDir bool) error 
 				log.Infof("create file directory failed: %v", err)
 				return utils.Errorf("create file directory failed: %v", err)
 			}
-			if err := extractZipFile(file, itemTargetPath, true); err != nil {
+			if err := extractZipFile(file, itemTargetPath, false); err != nil {
 				log.Infof("extract file failed: %v", err)
 				return err
 			}
@@ -240,7 +240,7 @@ func extractZipDirectory(reader *zip.ReadCloser, targetPath, dirPath string, con
 				log.Infof("create file directory failed: %v", err)
 				return utils.Errorf("create file directory failed: %v", err)
 			}
-			if err := extractZipFile(item.zipFile, itemTargetPath, true); err != nil {
+			if err := extractZipFile(item.zipFile, itemTargetPath, false); err != nil {
 				log.Infof("extract file failed: %v", err)
 				return err
 			}
@@ -260,8 +260,8 @@ type extractItem struct {
 }
 
 // extractZipFile 提取ZIP中的单个文件
-func extractZipFile(file *zip.File, targetPath string, createDir bool) error {
-	log.Infof("extractZipFile called, file: %s, targetPath: %s, createDir: %v", file.Name, targetPath, createDir)
+func extractZipFile(file *zip.File, targetPath string, isDir bool) error {
+	log.Infof("extractZipFile called, file: %s, targetPath: %s, isDir: %v", file.Name, targetPath, isDir)
 
 	// 检查 targetPath 是否为目录
 	targetInfo, err := os.Stat(targetPath)
@@ -281,18 +281,26 @@ func extractZipFile(file *zip.File, targetPath string, createDir bool) error {
 	}
 	defer reader.Close()
 
-	// 如果需要创建目录，确保父目录存在
-	if createDir {
+	var finalTargetPath string
+	if isDir {
+		// targetPath是目录，需要将文件提取到该目录中，使用原文件名
+		if err := os.MkdirAll(targetPath, 0755); err != nil {
+			return utils.Errorf("create target directory failed: %v", err)
+		}
+		finalTargetPath = filepath.Join(targetPath, filepath.Base(file.Name))
+	} else {
+		// targetPath是完整的文件路径，确保父目录存在
 		parentDir := filepath.Dir(targetPath)
 		log.Infof("ensuring parent directory exists: %s", parentDir)
 		if err := os.MkdirAll(parentDir, 0755); err != nil {
 			log.Infof("create parent directory failed: %v", err)
 			return utils.Errorf("create parent directory failed: %v", err)
 		}
+		finalTargetPath = targetPath
 	}
 
 	log.Infof("creating file: %s with mode: %v", targetPath, file.FileInfo().Mode())
-	targetFile, err := os.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.FileInfo().Mode())
+	targetFile, err := os.OpenFile(finalTargetPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.FileInfo().Mode())
 	if err != nil {
 		log.Infof("failed to create file: %s, error: %v", targetPath, err)
 		return err
@@ -386,13 +394,13 @@ func extractFromTar(tarReader *tar.Reader, targetPath, pick string, isDir bool) 
 			} else {
 				// 单个文件
 				if header.Name == pick || strings.HasSuffix(header.Name, pick) {
-					return extractTarFile(tarReader, targetPath, header.FileInfo().Mode(), isDir)
+					return extractTarFile(tarReader, targetPath, header.FileInfo().Mode(), isDir, header.Name)
 				}
 			}
 		} else {
 			// 查找可执行文件
 			if (header.FileInfo().Mode() & 0111) != 0 {
-				return extractTarFile(tarReader, targetPath, header.FileInfo().Mode(), isDir)
+				return extractTarFile(tarReader, targetPath, header.FileInfo().Mode(), isDir, header.Name)
 			}
 		}
 
@@ -418,7 +426,7 @@ func extractFromTar(tarReader *tar.Reader, targetPath, pick string, isDir bool) 
 			if err := os.MkdirAll(filepath.Dir(itemTargetPath), 0755); err != nil {
 				return utils.Errorf("create file directory failed: %v", err)
 			}
-			if err := extractTarFile(tarReader, itemTargetPath, header.FileInfo().Mode(), true); err != nil {
+			if err := extractTarFile(tarReader, itemTargetPath, header.FileInfo().Mode(), false, header.Name); err != nil {
 				return err
 			}
 			extracted = true
@@ -438,15 +446,23 @@ func extractFromTar(tarReader *tar.Reader, targetPath, pick string, isDir bool) 
 }
 
 // extractTarFile 提取tar中的单个文件
-func extractTarFile(tarReader *tar.Reader, targetPath string, mode os.FileMode, createDir bool) error {
-	// 如果需要创建目录，确保父目录存在
-	if createDir {
+func extractTarFile(tarReader *tar.Reader, targetPath string, mode os.FileMode, isDir bool, fileName string) error {
+	var finalTargetPath string
+	if isDir {
+		// targetPath是目录，需要将文件提取到该目录中，使用原文件名
+		if err := os.MkdirAll(targetPath, 0755); err != nil {
+			return utils.Errorf("create target directory failed: %v", err)
+		}
+		finalTargetPath = filepath.Join(targetPath, filepath.Base(fileName))
+	} else {
+		// targetPath是完整的文件路径，确保父目录存在
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
 			return utils.Errorf("create parent directory failed: %v", err)
 		}
+		finalTargetPath = targetPath
 	}
 
-	targetFile, err := os.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
+	targetFile, err := os.OpenFile(finalTargetPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
 	if err != nil {
 		return err
 	}

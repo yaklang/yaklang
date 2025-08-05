@@ -121,6 +121,8 @@ binaries:
         url: "https://example.com/test-tool.tar.gz"
         checksums: "abc123"
         pick: "bin/test-tool"
+        bin_dir: "test-tool"
+        bin_path: "test-tool/test-tool"
     dependencies: []
 `
 
