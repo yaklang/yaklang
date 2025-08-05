@@ -25,7 +25,7 @@ func EveryCommit(localRepos string, opt ...Option) error {
 			return err
 		}
 	}
-	r, err := git.PlainOpen(localRepos)
+	r, err := GitOpenRepositoryWithCache(localRepos)
 	if err != nil {
 		return utils.Errorf("open repository failed: %s", err)
 	}

@@ -20,9 +20,9 @@ func fetch(localPath string, opts ...Option) error {
 		}
 	}
 
-	repos, err := git.PlainOpen(localPath)
+	repos, err := GitOpenRepositoryWithCache(localPath)
 	if err != nil {
-		return utils.Errorf("git.PlainOpen failed: %s", err)
+		return utils.Errorf("GitOpenRepositoryWithCache failed: %s", err)
 	}
 
 	var tag git.TagMode
