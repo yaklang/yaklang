@@ -5,22 +5,19 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"os"
 	"os/exec"
-	"sync"
 )
 
 var (
 	// ffmpegBinaryPath holds the path to the ffmpeg executable.
 	// It is initialized by checking the system's configuration.
-	pandocBinaryPath  = consts.GetPandocPath()
-	deprecatedWarning = new(sync.Once)
+	pandocBinaryPath = consts.GetPandocPath()
 )
 
 func SimpleCovertMarkdownToDocx(ctx context.Context, inputFile string, outputFile string) error {
-	deprecatedWarning.Do(func() {
-		log.Warnf("SimpleCovertMarkdownToDocx is deprecated, please use pandoc.SimpleConvertMarkdownToDocxContext or SimpleConvertMarkdownTo instead")
-	})
+
 	if _, err := os.Stat(inputFile); os.IsNotExist(err) {
 		return fmt.Errorf("input file does not exist: %s", inputFile)
 	}
@@ -34,12 +31,24 @@ func SimpleCovertMarkdownToDocx(ctx context.Context, inputFile string, outputFil
 		outputFile,
 	}
 
+	r, w := utils.NewPipe()
+	defer func() {
+		w.Close()
+	}()
 	cmd := exec.CommandContext(ctx, pandocBinaryPath, args...)
-	cmd.Stderr = log.NewLogWriter(log.DebugLevel)
+	cmd.Stderr = w
+	cmd.Stdout = w
 	log.Infof("executing audio extraction: %s", cmd.String())
+	err := cmd.Run()
+	if err != nil {
+		output, _ := utils.ReadTimeout(r, 5)
+		return fmt.Errorf("pandoc execution failed: %w, combined output: \n%v", err, string(output))
+	}
 
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("pandoc execution failed: %w", err)
+	if !utils.FileExists(outputFile) {
+		output, _ := utils.ReadTimeout(r, 5)
+		log.Errorf("output file does not exist after conversion: %s, combined output: \n%v", outputFile, string(output))
+		return fmt.Errorf("output file does not exist after conversion: %s", outputFile)
 	}
 
 	return nil
