@@ -7,15 +7,20 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"os"
 	"os/exec"
+	"sync"
 )
 
 var (
 	// ffmpegBinaryPath holds the path to the ffmpeg executable.
 	// It is initialized by checking the system's configuration.
-	pandocBinaryPath = consts.GetPandocPath()
+	pandocBinaryPath  = consts.GetPandocPath()
+	deprecatedWarning = new(sync.Once)
 )
 
-func SimpleCoverMD2Word(ctx context.Context, inputFile string, outputFile string) error {
+func SimpleCovertMarkdownToDocx(ctx context.Context, inputFile string, outputFile string) error {
+	deprecatedWarning.Do(func() {
+		log.Warnf("SimpleCovertMarkdownToDocx is deprecated, please use pandoc.SimpleConvertMarkdownToDocxContext or SimpleConvertMarkdownTo instead")
+	})
 	if _, err := os.Stat(inputFile); os.IsNotExist(err) {
 		return fmt.Errorf("input file does not exist: %s", inputFile)
 	}
