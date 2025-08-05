@@ -252,7 +252,7 @@ func TestBottomUseGraphEdgeLabel(t *testing.T) {
 	}
 }
 
-func TestTopDefbGraphEdgeLabel(t *testing.T) {
+func TestTopDefGraphEdgeLabel(t *testing.T) {
 	tests := []struct {
 		name          string
 		code          string
@@ -260,15 +260,49 @@ func TestTopDefbGraphEdgeLabel(t *testing.T) {
 		expectedEdges map[string][]ssatest.EdgeInfo
 	}{
 		{
-			"basic bottom use",
-			`var c = bbb
-	var a = 55 + c
-	funcA(a)`,
-			`c --> as $result`,
+			"basic topdef",
+			`f = (i) => {return i}
+				a = f(333333)`,
+			`a #-> as $result`,
 			map[string][]ssatest.EdgeInfo{
 				"result": {
-					{From: "bbb", To: "55 + c", Label: "depend_on"},
-					{From: "55 + c", To: "funcA(a)", Label: "depend_on"},
+					{From: "333333", To: "i", Label: "depend_on"},
+					{From: "i", To: "(i) => {return i}", Label: "depend_on"},
+					{From: "(i) => {return i}", To: "f(333333)", Label: "depend_on"},
+				},
+			},
+		},
+		{
+			"test topdef:test level1 object",
+			`f = () => {return {"key":"value"}}
+		obj = f()
+		a = obj.key`,
+			`a #-> as $result`,
+			map[string][]ssatest.EdgeInfo{
+				"result": {
+					{From: "f()", To: ".key", Label: "depend_on"},
+					{From: "\"value\"", To: ".key", Label: "depend_on"},
+					{From: "() => {return {\"key\":\"value\"}}", To: "f()", Label: "depend_on"},
+					{From: "{\"key\":\"value\"}", To: "() => {return {\"key\":\"value\"}}", Label: "depend_on"},
+				},
+			},
+		},
+		{
+			"test topdef: test level2 simple",
+			`
+		f = (i) => {
+			return () => {return i} 
+		}
+		f1 = f(333333)
+		a = f1()
+		`,
+			`a #-> as $result`,
+			map[string][]ssatest.EdgeInfo{
+				"result": {
+					{From: "f()", To: ".key", Label: "depend_on"},
+					{From: "\"value\"", To: ".key", Label: "depend_on"},
+					{From: "() => {return {\"key\":\"value\"}}", To: "f()", Label: "depend_on"},
+					{From: "{\"key\":\"value\"}", To: "() => {return {\"key\":\"value\"}}", Label: "depend_on"},
 				},
 			},
 		},

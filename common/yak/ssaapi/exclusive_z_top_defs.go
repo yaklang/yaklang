@@ -135,16 +135,19 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			obj := i.NewValue(value.GetObject())
 			key := i.NewValue(value.GetKey())
 			if err := actx.pushObject(obj, key, i); err != nil {
-				//log.Errorf("%v", err)
 				return i.visitedDefs(actx, opt...)
 			}
-			// obj.AppendDependOn(apiValue)
-			apiValue.AppendDependOn(obj)
-			ret := obj.getTopDefs(actx, opt...)
-			if len(ret) == 0 && !ValueCompare(i, actx.Self) {
-				ret = append(ret, i)
+
+			obj.AppendEffectOn(apiValue)
+			results := obj.getTopDefs(actx, opt...)
+			if len(results) == 0 && !ValueCompare(i, actx.Self) {
+				results = append(results, i)
 			}
-			return ret
+			// 拼接数据流关系
+			for _, ret := range results {
+				ret.AppendEffectOn(i)
+			}
+			return results
 		}
 		return i.visitedDefs(actx, opt...)
 	}
