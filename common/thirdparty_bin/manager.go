@@ -128,7 +128,7 @@ func (m *Manager) Install(name string, options *InstallOptions) error {
 	}
 
 	// 确保文件具有执行权限
-	installPath := m.installer.GetInstallPath(descriptor)
+	installPath := m.installer.GetTargetPath(descriptor)
 	if err := EnsureExecutable(installPath); err != nil {
 		log.Warnf("set executable permission failed: %v", err)
 	}
@@ -255,6 +255,80 @@ func (m *Manager) GetAllStatus() ([]*BinaryStatus, error) {
 	}
 
 	return statuses, nil
+}
+
+// GetBinaryNamesByTags 根据tags获取二进制文件名称列表
+// tags参数为需要匹配的标签列表，binary必须包含所有指定的标签才会被返回
+func (m *Manager) GetBinaryNamesByTags(tags []string) []string {
+	if len(tags) == 0 {
+		return []string{}
+	}
+
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	var result []string
+	for name, descriptor := range m.registry {
+		if m.containsAllTags(descriptor.Tags, tags) {
+			result = append(result, name)
+		}
+	}
+
+	sort.Strings(result)
+	return result
+}
+
+// GetBinaryNamesByAnyTag 根据tags获取二进制文件名称列表
+// tags参数为需要匹配的标签列表，binary只要包含任意一个指定的标签就会被返回
+func (m *Manager) GetBinaryNamesByAnyTag(tags []string) []string {
+	if len(tags) == 0 {
+		return []string{}
+	}
+
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	var result []string
+	for name, descriptor := range m.registry {
+		if m.containsAnyTag(descriptor.Tags, tags) {
+			result = append(result, name)
+		}
+	}
+
+	sort.Strings(result)
+	return result
+}
+
+// containsAllTags 检查binaryTags是否包含requiredTags中的所有标签
+func (m *Manager) containsAllTags(binaryTags, requiredTags []string) bool {
+	tagSet := make(map[string]bool)
+	for _, tag := range binaryTags {
+		tagSet[tag] = true
+	}
+
+	for _, requiredTag := range requiredTags {
+		if !tagSet[requiredTag] {
+			return false
+		}
+	}
+
+	return true
+}
+
+// containsAnyTag 检查binaryTags是否包含requiredTags中的任意一个标签
+func (m *Manager) containsAnyTag(binaryTags, requiredTags []string) bool {
+	tagSet := make(map[string]bool)
+	for _, tag := range binaryTags {
+		tagSet[tag] = true
+	}
+
+	for _, requiredTag := range requiredTags {
+		if tagSet[requiredTag] {
+			return true
+		}
+	}
+
+	return false
 }
 
 // InstallDependencies 安装依赖
@@ -593,4 +667,22 @@ func GetAllStatus() ([]*BinaryStatus, error) {
 		return nil, utils.Error("default manager not initialized")
 	}
 	return DefaultManager.GetAllStatus()
+}
+
+// GetBinaryNamesByTags 使用默认管理器根据tags获取二进制文件名称列表
+// tags参数为需要匹配的标签列表，binary必须包含所有指定的标签才会被返回
+func GetBinaryNamesByTags(tags []string) []string {
+	if DefaultManager == nil {
+		return []string{}
+	}
+	return DefaultManager.GetBinaryNamesByTags(tags)
+}
+
+// GetBinaryNamesByAnyTag 使用默认管理器根据tags获取二进制文件名称列表
+// tags参数为需要匹配的标签列表，binary只要包含任意一个指定的标签就会被返回
+func GetBinaryNamesByAnyTag(tags []string) []string {
+	if DefaultManager == nil {
+		return []string{}
+	}
+	return DefaultManager.GetBinaryNamesByAnyTag(tags)
 }

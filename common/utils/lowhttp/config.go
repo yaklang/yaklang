@@ -46,6 +46,7 @@ type LowhttpExecConfig struct {
 	EnableSystemProxyFromEnv         bool
 	ConnectTimeout                   time.Duration
 	Timeout                          time.Duration
+	NoBodyBuffer                     bool
 	RedirectTimes                    int
 	RetryTimes                       int
 	RetryInStatusCode                []int
@@ -374,6 +375,12 @@ func NewLowhttpOption() *LowhttpExecConfig {
 }
 
 type LowhttpOpt func(o *LowhttpExecConfig)
+
+func WithNoBodyBuffer(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.NoBodyBuffer = b
+	}
+}
 
 func WithNoReadMultiResponse(b bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
