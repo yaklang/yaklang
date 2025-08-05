@@ -139,6 +139,7 @@ REFERENCE
 
 <include('golang-database-reform')> as $sink;
 $sink.Select(*<slice(index=2)> as $param)
+$sink.Where(*<slice(index=2)> #-> as $param);
 $param #{
     include: <<<CODE
 <self>?{have: 'Parameter'}
@@ -280,7 +281,7 @@ CODE
 desc(
 	lang: golang
 	alert_high: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
@@ -331,6 +332,57 @@ func main() {
 	http.HandleFunc("/login", login)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
-
 UNSAFE
+	'file://safe.go': <<<SAFE
+package main
+
+import (
+	"database/sql"
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/hedonist/reform"
+	_ "github.com/lib/pq" // 使用 PostgreSQL 驱动
+)
+
+type User struct {
+	ID   uint
+	Name string
+	Age  int
+}
+
+func login(w http.ResponseWriter, r *http.Request) {
+	username := "username"
+	password := "password"
+
+	// 连接到数据库
+	db, err := sql.Open("postgres", "user=youruser dbname=yourdb sslmode=disable")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	// 创建 Reform 实例
+	reformDB := reform.NewDB(db, reform.Postgres)
+
+	// 不安全的查询
+	var users []User
+	query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
+	_, err = reformDB.Select(&users, query)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 打印结果
+	for _, user := range users {
+		fmt.Printf("User: %s, Age: %d\n", user.Name, user.Age)
+	}
+}
+
+func main() {
+	http.HandleFunc("/login", login)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+SAFE
 )

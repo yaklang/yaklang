@@ -162,6 +162,8 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 				}
 				if _, ok := ToConstInst(i); ok {
 					continue
+				} else if _, ok := ToUndefined(i); ok {
+					continue
 				}
 				ret += fmt.Sprintf("\t%s\n", i)
 			}

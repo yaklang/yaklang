@@ -79,7 +79,7 @@ SOLUTION
 REFERENCE
 )
 
-.GetString(* as $sink)
+.GetString?{<fullTypeName>?{have: "github.com/beego/beego/v2/server/web/Controller"}}(* as $sink)
 $sink -{ 
 	include:`*?{opcode:const}?{have: "header"}`,
 }-> as $data;
@@ -180,7 +180,7 @@ CODE
 desc(
 	lang: golang
 	alert_high: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (

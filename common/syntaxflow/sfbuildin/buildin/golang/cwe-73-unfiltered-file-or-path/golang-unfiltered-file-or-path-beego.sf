@@ -20,6 +20,10 @@ import (
 	"io/ioutil"
 )
 
+type PathTraversalVuln1Controller struct {
+	beego.Controller
+}
+
 func (c *PathTraversalVuln1Controller) Get() {
 	file := c.GetString("file")
 	output, err := ioutil.ReadFile(file)
@@ -96,13 +100,13 @@ SOLUTION
 REFERENCE
 )
 
-<include('golang-file-read-sink')> as $sink;
-<include('golang-file-write-sink')> as $sink;
+<include('golang-file-read-path-sink')> as $sink;
+<include('golang-file-write-path-sink')> as $sink;
 
 .SaveToFile(* #-> as $sink)
 
-$sink?{have: "GetString"} as $low;
-$sink?{have: "GetFile"} as $low;
+$sink.GetString?{<fullTypeName>?{have: "github.com/beego/beego/v2/server/web"}} as $low;
+$sink.GetFile?{<fullTypeName>?{have: "github.com/beego/beego/v2/server/web"}} as $low;
 
 alert $low for {
 	solution: <<<CODE
@@ -184,7 +188,7 @@ CODE
 desc(
 	lang: golang
 	alert_low: 1
-	'unsafe://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
@@ -196,6 +200,10 @@ import (
 	beego "github.com/beego/beego/v2/server/web"
 )
 
+type PathTraversalVuln1Controller struct {
+	beego.Controller
+}
+
 func (c *PathTraversalVuln1Controller) Get() {
 	file := c.GetString("file")
 	output, err := ioutil.ReadFile(file)
@@ -205,5 +213,30 @@ func (c *PathTraversalVuln1Controller) Get() {
 	c.Ctx.ResponseWriter.Write(output)
 }
 UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import (
+	"go-sec-code/utils"
+	"io/ioutil"
+	"path/filepath"
+	"strings"
+
+	beego "github.com/beego/beego/v2/server/web"
+)
+
+type PathTraversalVuln1Controller struct {
+	beego.Controller
+}
+
+func (c *PathTraversalVuln1Controller) Get() {
+	file := "file"
+	output, err := ioutil.ReadFile(file)
+	if err != nil {
+		panic(err)
+	}
+	c.Ctx.ResponseWriter.Write(output)
+}
+SAFE
 )
 

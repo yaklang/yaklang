@@ -259,7 +259,37 @@ CODE
 desc(
 	lang: golang
 	alert_high: 1
-	'file://main.go': <<<UNSAFE
+	'safefile://unsafe.go': <<<UNSAFE
+package main
+
+import (
+    "net/http"
+    "net/url"
+    "strings"
+)
+
+func redirectHandler(w http.ResponseWriter, r *http.Request) {
+    // 从查询参数中获取重定向目标
+    target := r.URL.Query().Get("url")
+
+    // 验证目标 URL 是否合法
+    // if !isValidRedirectTarget(target) {
+    //     http.Error(w, "Invalid redirect target", http.StatusBadRequest)
+    //     return
+    // }
+
+    // 重定向到目标 URL
+    http.Redirect(w, r, target, http.StatusFound)
+}
+
+
+func main() {
+    http.HandleFunc("/redirect", redirectHandler)
+    http.ListenAndServe(":8080", nil)
+}
+
+UNSAFE
+	'file://safe.go': <<<SAFE
 package main
 
 import (
@@ -308,5 +338,5 @@ func main() {
     http.ListenAndServe(":8080", nil)
 }
 
-UNSAFE
+SAFE
 )

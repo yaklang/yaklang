@@ -120,7 +120,7 @@ func XXEParseHandler(c *gin.Context) {
 	})
 }
 UNSAFE
-	'file://safe.go': <<<SAFE
+	'safefile://safe.go': <<<SAFE
 package api
 
 import (

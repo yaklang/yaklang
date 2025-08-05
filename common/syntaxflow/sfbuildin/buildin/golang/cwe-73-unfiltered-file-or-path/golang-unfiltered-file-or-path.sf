@@ -263,7 +263,7 @@ CODE
 desc(
 	lang: golang
 	alert_low: 1
-	'unsafe://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
@@ -297,7 +297,7 @@ func main() {
     http.ListenAndServe(":8080", nil)
 }
 UNSAFE
-	'safe://main.go': <<<SAFE
+	'safefile://safe.go': <<<SAFE
 package main
 
 import (

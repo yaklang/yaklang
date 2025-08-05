@@ -16,15 +16,19 @@ desc(
    ```go
    package main
 
-   import (
-       "github.com/beego/beego/v2/server/web"
-   )
+    import (
+        "github.com/beego/beego/v2/server/web"
+    )
 
-   func (c *XSSVuln1Controller) Get() {
-       xss := c.GetString("xss", "hello")
-       c.Ctx.ResponseWriter.Header().Set("Content-Type", "text/html")
-       c.Ctx.ResponseWriter.Write([]byte(xss))
-   }
+    type XSSVuln1Controller struct {
+        beego.Controller
+    }
+
+    func (c *XSSVuln1Controller) Get() {
+        xss := c.GetString("xss", "hello")
+        c.Ctx.ResponseWriter.Header().Set("Content-Type", "text/html")
+        c.Ctx.ResponseWriter.Write([]byte(xss))
+    }
    ```
    攻击者可以通过访问类似以下URL来触发漏洞：`http://example.com/path?xss=<script>alert('XSS')</script>`，这会导致恶意脚本在用户的浏览器中执行。
 
@@ -105,7 +109,13 @@ REFERENCE
 )
 
 .Ctx.ResponseWriter.Write(* #-> as $sink);
-$sink.GetString as $mid;
+html.EscapeString(* #-> as $safeOutput);
+
+$sink<dataflow(
+    exclude: $safeOutput,
+)> as $target;
+
+$target.GetString?{<fullTypeName>?{have: "github.com/beego/beego/v2/server/web"}} as $mid;
 
 alert $mid for {
 	title: "Reflected XSS detected",
@@ -117,7 +127,7 @@ alert $mid for {
 desc(
 	lang: golang
 	alert_mid: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
@@ -128,12 +138,37 @@ import (
 	beego "github.com/beego/beego/v2/server/web"
 )
 
+type XSSVuln1Controller struct {
+	beego.Controller
+}
+
 func (c *XSSVuln1Controller) Get() {
 	xss := c.GetString("xss", "hello")
 	c.Ctx.ResponseWriter.Header().Set("Content-Type", "text/html")
 	c.Ctx.ResponseWriter.Write([]byte(xss))
 }
-
-
 UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import (
+    "html"
+	"go-sec-code/utils"
+	"html/template"
+	"io/ioutil"
+
+	beego "github.com/beego/beego/v2/server/web"
+)
+
+type XSSVuln1Controller struct {
+	beego.Controller
+}
+
+func (c *XSSVuln1Controller) Get() {
+	xss := c.GetString("xss", "hello")
+	c.Ctx.ResponseWriter.Header().Set("Content-Type", "text/html")
+	safeOutput := html.EscapeString(xss)  // 关键修复
+	c.Ctx.ResponseWriter.Write([]byte(safeOutput))
+}
+SAFE
 )
