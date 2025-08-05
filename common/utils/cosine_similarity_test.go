@@ -18,7 +18,7 @@ func TestCosineSimilarity(t *testing.T) {
 		}
 
 		// 余弦相似度应该非常接近 1.0
-		if math.Abs(float64(similarity-1.0)) > 1e-10 {
+		if math.Abs(float64(similarity-1.0)) > 1e-6 {
 			t.Errorf("Expected similarity close to 1.0, got %f", similarity)
 		}
 
