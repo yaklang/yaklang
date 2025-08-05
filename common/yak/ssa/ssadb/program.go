@@ -72,6 +72,10 @@ func GetLibrary(name, version string) (*IrProgram, error) {
 	return &p, nil
 }
 
+func GetApplicationProgram(name string) (*IrProgram, error) {
+	return GetProgram(name, Application)
+}
+
 func GetProgram(name string, kind ProgramKind) (*IrProgram, error) {
 	var p IrProgram
 	db := GetDB().Model(&IrProgram{})
