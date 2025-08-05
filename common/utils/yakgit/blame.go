@@ -79,7 +79,7 @@ func BlameWithCommit(repos string, fileName string, rev string) (BlameLines, err
 		return nil, utils.Errorf("file %v is not in repository %v", fileName, repos)
 	}
 
-	r, err := git.PlainOpen(absRepo)
+	r, err := GitOpenRepositoryWithCache(absRepo)
 	if err != nil {
 		return nil, err
 	}
