@@ -2,11 +2,14 @@ package thirdparty_bin
 
 import (
 	"context"
+	"crypto/md5"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -25,6 +28,8 @@ type Installer interface {
 	Uninstall(descriptor *BinaryDescriptor) error
 	// GetInstallPath 获取安装路径
 	GetInstallPath(descriptor *BinaryDescriptor) string
+	// GetTargetPath 获取目标路径
+	GetTargetPath(descriptor *BinaryDescriptor) string
 	// IsInstalled 检查是否已安装
 	IsInstalled(descriptor *BinaryDescriptor) bool
 	// GetDownloadInfo 获取下载信息
@@ -47,8 +52,30 @@ func NewInstaller(defaultInstallDir, downloadDir string) Installer {
 	}
 }
 
+// Uninstall 卸载二进制文件
 func (bi *BaseInstaller) Uninstall(descriptor *BinaryDescriptor) error {
 	installPath := bi.GetInstallPath(descriptor)
+
+	// 未安装
+	if installPath == "" {
+		return errors.New("not installed")
+	}
+
+	// 不是通过bin manager安装的，报错
+	targetPath := bi.GetTargetPath(descriptor)
+	if targetPath != installPath {
+		return errors.New("not installed via yakit, cannot uninstall")
+	}
+
+	// 如果是目录安装，删除目录
+	downloadInfo, err := bi.GetDownloadInfo(descriptor)
+	if err != nil {
+		return err
+	}
+	if downloadInfo.BinDir != "" {
+		return os.RemoveAll(filepath.Join(bi.defaultInstallDir, downloadInfo.BinDir))
+	}
+
 	return os.Remove(installPath)
 }
 
@@ -96,7 +123,7 @@ func (bi *BaseInstaller) Install(descriptor *BinaryDescriptor, options *InstallO
 		log.Infof("failed to get download info for binary: %s, error: %v", descriptor.Name, err)
 		return err
 	}
-	log.Infof("download info for binary %s: url=%s, bin_path=%s, bin_dir=%s, pick=%s, checksum=%s", descriptor.Name, downloadInfo.URL, downloadInfo.BinPath, downloadInfo.BinDir, downloadInfo.Pick, downloadInfo.Checksums)
+	log.Infof("download info for binary %s: url=%s, bin_path=%s, bin_dir=%s, pick=%s, md5=%s, sha256=%s", descriptor.Name, downloadInfo.URL, downloadInfo.BinPath, downloadInfo.BinDir, downloadInfo.Pick, downloadInfo.MD5, downloadInfo.SHA256)
 
 	// 判断是否安装
 	log.Infof("checking if binary %s is already installed", descriptor.Name)
@@ -117,7 +144,7 @@ func (bi *BaseInstaller) Install(descriptor *BinaryDescriptor, options *InstallO
 		}
 	}
 
-	installPath := bi.GetInstallPath(descriptor)
+	installPath := bi.GetTargetPath(descriptor)
 	installDir := bi.GetInstallDir(descriptor)
 	isDir := installDir != ""
 	log.Infof("install path for binary %s: %s", descriptor.Name, installPath)
@@ -142,7 +169,8 @@ func (bi *BaseInstaller) Install(descriptor *BinaryDescriptor, options *InstallO
 
 	// 下载文件
 	downloadInfoURL := downloadInfo.URL
-	fileChecksum := downloadInfo.Checksums
+	fileMD5 := downloadInfo.MD5
+	fileSHA256 := downloadInfo.SHA256
 	pick := downloadInfo.Pick
 	filename := GetFilenameFromURL(downloadInfoURL)
 	if filename == "" {
@@ -158,9 +186,9 @@ func (bi *BaseInstaller) Install(descriptor *BinaryDescriptor, options *InstallO
 	log.Infof("file downloaded for binary %s: %s", descriptor.Name, filePath)
 
 	// 验证文件校验和
-	if fileChecksum != "" {
-		log.Infof("verifying file checksum for %s, expected: %s", filePath, fileChecksum)
-		if err := bi.verifyFile(filePath, fileChecksum); err != nil {
+	if fileMD5 != "" || fileSHA256 != "" {
+		log.Infof("verifying file checksum for md5: %s, sha256: %s, file: %s", fileMD5, fileSHA256, filePath)
+		if err := bi.verifyFileChecksums(filePath, fileMD5, fileSHA256); err != nil {
 			log.Infof("file checksum verification failed for %s: %v", filePath, err)
 			return utils.Errorf("file verification failed: %v", err)
 		}
@@ -201,18 +229,7 @@ func (bi *BaseInstaller) Install(descriptor *BinaryDescriptor, options *InstallO
 		log.Infof("unknown install type: %s", descriptor.InstallType)
 		return utils.Errorf("unknown install type: %s", descriptor.InstallType)
 	}
-}
 
-// GetInstallPath 获取安装路径
-func (bi *BaseInstaller) GetInstallPath(descriptor *BinaryDescriptor) string {
-	downloadInfo, err := bi.GetDownloadInfo(descriptor)
-	if err != nil {
-		return ""
-	}
-	if downloadInfo.BinPath != "" {
-		return filepath.Join(bi.defaultInstallDir, downloadInfo.BinPath)
-	}
-	return filepath.Join(bi.defaultInstallDir, descriptor.Name)
 }
 
 // GetInstallDir 获取安装目录
@@ -229,8 +246,37 @@ func (bi *BaseInstaller) GetInstallDir(descriptor *BinaryDescriptor) string {
 
 // IsInstalled 检查是否已安装
 func (bi *BaseInstaller) IsInstalled(descriptor *BinaryDescriptor) bool {
-	_, err := os.Stat(bi.GetInstallPath(descriptor))
-	return err == nil
+	return bi.GetInstallPath(descriptor) != ""
+}
+
+// GetTargetPath 获取目标路径
+func (bi *BaseInstaller) GetTargetPath(descriptor *BinaryDescriptor) string {
+	downloadInfo, err := bi.GetDownloadInfo(descriptor)
+	if err != nil {
+		return ""
+	}
+	var targetPath string
+	if downloadInfo.BinPath != "" {
+		targetPath = filepath.Join(bi.defaultInstallDir, downloadInfo.BinPath)
+	} else {
+		targetPath = filepath.Join(bi.defaultInstallDir, descriptor.Name)
+	}
+	return targetPath
+}
+
+// GetInstalledPath 获取安装路径
+func (bi *BaseInstaller) GetInstallPath(descriptor *BinaryDescriptor) string {
+	allPaths := []string{}
+
+	targetPath := bi.GetTargetPath(descriptor)
+
+	allPaths = append(allPaths, targetPath)
+	if runtime.GOOS == "darwin" {
+		allPaths = append(allPaths, filepath.Join("/", "usr", "local", "bin", descriptor.Name))
+		allPaths = append(allPaths, filepath.Join("/", "bin", descriptor.Name))
+		allPaths = append(allPaths, filepath.Join("/", "usr", "bin", descriptor.Name))
+	}
+	return utils.GetFirstExistedFile(allPaths...)
 }
 
 // downloadFile 下载文件
@@ -366,6 +412,7 @@ func (bi *BaseInstaller) downloadFile(url, filename string, options *InstallOpti
 		}
 	}))
 
+	opts = append(opts, lowhttp.WithNoBodyBuffer(true))
 	opts = append(opts, lowhttp.WithConnectTimeoutFloat(15.0)) // 设置连接超时
 	opts = append(opts, lowhttp.WithTimeout(1800*time.Second)) // 设置读取超时
 	// 发送GET请求
@@ -429,7 +476,7 @@ func (bi *BaseInstaller) getFileSize(url string, options *InstallOptions) (int64
 		lowhttp.WithPacketBytes([]byte(headRequest)),
 		lowhttp.WithHttps(isHttps),
 		lowhttp.WithContext(ctx),
-		lowhttp.WithNoReadMultiResponse(false),
+		lowhttp.WithNoReadMultiResponse(true),
 		lowhttp.WithNoFixContentLength(true),
 	}
 
@@ -458,9 +505,9 @@ func (bi *BaseInstaller) getFileSize(url string, options *InstallOptions) (int64
 	return size, nil
 }
 
-// verifyFile 验证文件校验和
-func (bi *BaseInstaller) verifyFile(filePath, expectedChecksum string) error {
-	if expectedChecksum == "" {
+// verifyFileChecksums 验证文件校验和（支持SHA256和MD5）
+func (bi *BaseInstaller) verifyFileChecksums(filePath, md5Hash, sha256Hash string) error {
+	if md5Hash == "" && sha256Hash == "" {
 		return nil // 没有提供校验和，跳过验证
 	}
 
@@ -470,14 +517,32 @@ func (bi *BaseInstaller) verifyFile(filePath, expectedChecksum string) error {
 	}
 	defer file.Close()
 
-	hasher := sha256.New()
-	if _, err := io.Copy(hasher, file); err != nil {
-		return utils.Errorf("calculate checksum failed: %v", err)
+	// 验证SHA256
+	if sha256Hash != "" {
+		file.Seek(0, 0) // 重置文件指针
+		sha256Hasher := sha256.New()
+		if _, err := io.CopyBuffer(sha256Hasher, file, make([]byte, sha256.BlockSize)); err != nil {
+			return utils.Errorf("calculate SHA256 checksum failed: %v", err)
+		}
+		actualSHA256 := fmt.Sprintf("%x", sha256Hasher.Sum(nil))
+		if actualSHA256 != sha256Hash {
+			return utils.Errorf("SHA256 checksum mismatch: expected %s, got %s", sha256Hash, actualSHA256)
+		}
+		log.Infof("SHA256 checksum verified: %s", actualSHA256)
 	}
 
-	actualChecksum := fmt.Sprintf("%x", hasher.Sum(nil))
-	if actualChecksum != expectedChecksum {
-		return utils.Errorf("checksum mismatch: expected %s, got %s", expectedChecksum, actualChecksum)
+	// 验证MD5
+	if md5Hash != "" {
+		file.Seek(0, 0) // 重置文件指针
+		md5Hasher := md5.New()
+		if _, err := io.CopyBuffer(md5Hasher, file, make([]byte, md5.BlockSize)); err != nil {
+			return utils.Errorf("calculate MD5 checksum failed: %v", err)
+		}
+		actualMD5 := fmt.Sprintf("%x", md5Hasher.Sum(nil))
+		if actualMD5 != md5Hash {
+			return utils.Errorf("MD5 checksum mismatch: expected %s, got %s", md5Hash, actualMD5)
+		}
+		log.Infof("MD5 checksum verified: %s", actualMD5)
 	}
 
 	return nil

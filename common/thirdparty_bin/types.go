@@ -8,8 +8,10 @@ import (
 type DownloadInfo struct {
 	// URL
 	URL string `json:"url"`
-	// 校验和
-	Checksums string `json:"checksums,omitempty"`
+	// MD5 校验和
+	MD5 string `json:"md5,omitempty"`
+	// SHA256 校验和
+	SHA256 string `json:"sha256,omitempty"`
 	// BinPath
 	BinPath string `json:"bin_path,omitempty"`
 	// 二进制文件目录
@@ -24,6 +26,8 @@ type BinaryDescriptor struct {
 	Name string `json:"name"`
 	// 描述
 	Description string `json:"description"`
+	// 标签
+	Tags []string `json:"tags,omitempty"`
 	// 版本
 	Version string `json:"version"`
 	// 各个平台的下载信息

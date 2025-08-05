@@ -325,6 +325,10 @@ RETRY:
 		httpctx.SetResponseMaxContentLength(reqIns, maxContentLength)
 	}
 
+	if option.NoBodyBuffer {
+		httpctx.SetNoBodyBuffer(reqIns, true)
+	}
+
 	/*
 		save http flow defer
 	*/
@@ -939,6 +943,11 @@ RECONNECT:
 
 				packetReader := bufio.NewReader(reader)
 				responseHeader := bytes.NewBufferString("")
+				var responseHeaderWriter io.Writer = responseHeader
+				if option.NoBodyBuffer {
+					responseHeaderWriter = io.MultiWriter(responseHeaderWriter, &responseRaw)
+				}
+
 				for {
 					line, err := utils.BufioReadLine(packetReader)
 					if err != nil {
@@ -952,7 +961,8 @@ RECONNECT:
 					//	log.Infof("stream handler start to handle header: %v", time.Since(startHandlerStream))
 					//})
 
-					responseHeader.WriteString(string(line) + "\r\n")
+					responseHeaderWriter.Write(line)
+					responseHeaderWriter.Write([]byte("\r\n"))
 					if len(line) == 0 {
 						go func() {
 							io.Copy(bodyWriter, packetReader)
@@ -973,7 +983,11 @@ RECONNECT:
 					option.BodyStreamReaderHandler(responseHeader.Bytes(), bodyReader)
 				}
 			}()
-			mirrorWriter = io.MultiWriter(&responseRaw, writer)
+			if option.NoBodyBuffer {
+				mirrorWriter = writer
+			} else {
+				mirrorWriter = io.MultiWriter(&responseRaw, writer)
+			}
 		}
 
 		httpResponseReader := bufio.NewReaderSize(io.TeeReader(conn, mirrorWriter), option.DefaultBufferSize)
