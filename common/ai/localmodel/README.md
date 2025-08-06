@@ -33,7 +33,9 @@ err := manager.StartEmbeddingService(
     localmodel.WithDebug(true),
     localmodel.WithModelPath("/path/to/model.gguf"),
     localmodel.WithContextSize(4096),
-    localmodel.WithParallelism(5),
+    localmodel.WithContBatching(true),
+    localmodel.WithBatchSize(1024),
+    localmodel.WithThreads(8),
 )
 if err != nil {
     log.Fatal(err)
@@ -98,7 +100,9 @@ if err != nil {
 - `WithEmbeddingModel(model string)`: 设置嵌入模型名称
 - `WithModelPath(path string)`: 设置模型文件路径
 - `WithContextSize(size int)`: 设置上下文大小
-- `WithParallelism(parallelism int)`: 设置并行度
+- `WithContBatching(enabled bool)`: 设置是否启用连续批处理
+- `WithBatchSize(size int)`: 设置批处理大小
+- `WithThreads(threads int)`: 设置线程数
 - `WithDetached(detached bool)`: 设置是否分离模式
 - `WithDebug(debug bool)`: 设置调试模式
 - `WithStartupTimeout(timeout time.Duration)`: 设置启动超时时间
@@ -111,7 +115,9 @@ config := localmodel.DefaultServiceConfig()
 // Host: "127.0.0.1"
 // Port: 8080
 // ContextSize: 4096
-// Parallelism: 1
+// ContBatching: true
+// BatchSize: 1024
+// Threads: 8
 // Detached: false
 // Debug: false
 // StartupTimeout: 30 * time.Second
@@ -239,7 +245,9 @@ func main() {
         "127.0.0.1:8080",
         localmodel.WithEmbeddingModel("Qwen3-Embedding-0.6B-Q8_0"),
         localmodel.WithContextSize(4096),
-        localmodel.WithParallelism(2),
+        localmodel.WithContBatching(true),
+        localmodel.WithBatchSize(1024),
+        localmodel.WithThreads(8),
         localmodel.WithDebug(true),
     )
     if err != nil {
@@ -309,7 +317,9 @@ go build -o localmodel-cli ./common/ai/localmodel/cmd
 - `-model`: 模型名称 (默认: Qwen3-Embedding-0.6B-Q8_0)
 - `-model-path`: 模型文件路径 (可选)
 - `-context-size`: 上下文大小 (默认: 4096)
-- `-parallelism`: 并行度 (默认: 1)
+- `-cont-batching`: 启用连续批处理 (默认: true)
+- `-batch-size`: 批处理大小 (默认: 1024)
+- `-threads`: 线程数 (默认: 8)
 - `-detached`: 分离模式
 - `-debug`: 调试模式
 - `-timeout`: 启动超时时间 (默认: 30秒)
