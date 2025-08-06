@@ -276,7 +276,9 @@ func (c *config) parseProjectWithFS(
 		wg.Wait()
 		return nil
 	}
-	ssaprofile.ProfileAddWithError(true, "ParseProjectWithFS", f1, f2, f3, f4, f5, f6)
+	if err := ssaprofile.ProfileAddWithError(true, "ParseProjectWithFS", f1, f2, f3, f4, f5, f6); err != nil {
+		return nil, err
+	}
 
 	return NewProgram(prog, c), nil
 }
