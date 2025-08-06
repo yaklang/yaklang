@@ -292,6 +292,7 @@ func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, config *C
 			config.ProcessExtendedActionCallback(cbBuffer.String())
 		}()
 		defer pw.Close()
+		wg := new(sync.WaitGroup)
 		for i := range a.ch.OutputChannel() {
 			if i == nil {
 				continue
@@ -302,21 +303,33 @@ func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, config *C
 			}
 			if i.IsReason {
 				if system {
-					config.EmitSystemReasonStreamEvent(nodeId, a.respStartTime, targetStream, a.GetTaskIndex())
+					wg.Add(1)
+					config.EmitSystemReasonStreamEvent(nodeId, a.respStartTime, targetStream, a.GetTaskIndex(), func() {
+						wg.Done()
+					})
 				} else {
-					config.EmitReasonStreamEvent(nodeId, a.respStartTime, targetStream, a.GetTaskIndex())
+					wg.Add(1)
+					config.EmitReasonStreamEvent(nodeId, a.respStartTime, targetStream, a.GetTaskIndex(), func() {
+						wg.Done()
+					})
 				}
 				continue
 			}
 
 			targetStream = io.TeeReader(targetStream, pw)
 			if system {
-				config.EmitSystemStreamEvent(nodeId, a.respStartTime, targetStream, a.GetTaskIndex())
+				wg.Add(1)
+				config.EmitSystemStreamEvent(nodeId, a.respStartTime, targetStream, a.GetTaskIndex(), func() {
+					wg.Done()
+				})
 			} else {
-				config.EmitStreamEvent(nodeId, a.respStartTime, targetStream, a.GetTaskIndex())
+				wg.Add(1)
+				config.EmitStreamEvent(nodeId, a.respStartTime, targetStream, a.GetTaskIndex(), func() {
+					wg.Done()
+				})
 			}
 		}
-		config.WaitForStream()
+		wg.Wait()
 	}()
 	return pr
 }
