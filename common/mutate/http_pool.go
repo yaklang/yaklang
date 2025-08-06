@@ -60,12 +60,12 @@ type httpPoolConfig struct {
 
 	// beforeRequest
 	// afterRequest
-	HookBeforeRequest func(https bool, originReq []byte, req []byte) []byte
-	HookAfterRequest  func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte
-	MirrorHTTPFlow    func([]byte, []byte, map[string]string) map[string]string
-	RetryHandler      func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte))
+	HookBeforeRequest    func(https bool, originReq []byte, req []byte) []byte
+	HookAfterRequest     func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte
+	MirrorHTTPFlow       func([]byte, []byte, map[string]string) map[string]string
+	RetryHandler         func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte))
 	CustomFailureChecker func(https bool, req []byte, rsp []byte, fail func(string))
-	MutateHook        func([]byte) [][]byte
+	MutateHook           func([]byte) [][]byte
 
 	// 请求来源
 	Source string
@@ -119,6 +119,8 @@ type httpPoolConfig struct {
 	MaxChunkedLength    int
 	MinChunkDelayTime   time.Duration
 	MaxChunkDelayTime   time.Duration
+
+	NoReadMultiResponse bool
 }
 
 // WithPoolOpt_DNSNoCache is not effective
@@ -598,6 +600,12 @@ func _httpPool_RandomChunkDelayTime(min, max time.Duration) HttpPoolConfigOption
 	}
 }
 
+func _httpPool_NoReadMultiResponse(b bool) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.NoReadMultiResponse = b
+	}
+}
+
 type HttpPoolConfigOption func(config *httpPoolConfig)
 
 type HttpResult struct {
@@ -940,6 +948,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttp.WithConnPool(config.WithConnPool),
 							lowhttp.WithDebugCount(beforeCount, afterCount),
 							lowhttp.WithSaveHTTPFlow(config.SaveHTTPFlow),
+							lowhttp.WithNoReadMultiResponse(config.NoReadMultiResponse),
 						}
 
 						if config.RetryHandler != nil {
@@ -1311,4 +1320,5 @@ var (
 	WithPoolOpt_EnableRandomChunked        = _httpPool_enableRandomChunked
 	WithPoolOpt_RandomChunkedLength        = _httpPool_RandomChunkedLength
 	WithPoolOpt_RandomChunkDelayTime       = _httpPool_RandomChunkDelayTime
+	WithPoolOpt_NoReadMultiResponse        = _httpPool_NoReadMultiResponse
 )
