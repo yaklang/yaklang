@@ -5293,6 +5293,8 @@ message FuzzerRequest {// last index 68
   int64 RandomChunkedMaxLength = 66;
   int64 RandomChunkedMinDelay = 67;
   int64 RandomChunkedMaxDelay = 68;
+
+  bool NoReadMultiResponse = 69;
 }
 
 message MutateMethod {
