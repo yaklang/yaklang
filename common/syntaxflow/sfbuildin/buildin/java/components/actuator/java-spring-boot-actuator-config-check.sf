@@ -2,7 +2,7 @@ desc(
 	title: "Check Java Spring Boot Actuator Config"
 	title_zh: "检查Java Spring Boot Actuator配置"
 	type:config
-	desc: <<<DESC
+  desc: <<<DESC
 ### 风险描述
 
 1. **风险原理**
@@ -83,8 +83,8 @@ SOLUTION
 REFERENCE
 )
 
-__projectConfig__."management.security.enabled"?{have:'false'} as $weak;
-__projectConfig__."endpoints.health.sensitive"?{have:'false'} as $weak;
+${*.properties}.re(/management\.security\.enabled=false/) as $weak;
+${*.properties}.re(/endpoints\.health\.sensitive=false/) as $weak;
 check $weak then "Java Spring Boot Actuator配置存在安全风险"
 
 alert $weak for {
@@ -213,6 +213,9 @@ public class InsecureSecurityConfig extends WebSecurityConfigurerAdapter {
     }
 }
 TEXT
+)
+
+desc (
 	"safefile://SecureApplicationProperties.properties": <<<CODE
 # application.properties
 spring.application.name=secure-app
@@ -235,47 +238,51 @@ management:
 CODE
 )
 
+// 
+// TODO: query project config with yml file 
+// desc(
+// 	lang:java
+// 	alert_num:3
+// 	"file://application.yml":<<<TEXT
+//     spring:
+//       application:
+//         name: springsecuritydemo
+//     management:
+//       security:
+//         enabled: false
+//     endpoints:
+//       health:
+//         sensitive: false
+// TEXT
+// 	"file://springSecurity.java":<<<TEXT
+// package org.example.springsecuritydemo;// 
+
+// import org.springframework.context.annotation.Configuration;
+// import org.springframework.security.config.annotation.web.builders.WebSecurity;
+// import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+// import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;// 
+
+// @Configuration
+// @EnableWebSecurity
+// public class InsecureSecurityConfig extends WebSecurityConfigurerAdapter {
+//     @Override
+//     public void configure(WebSecurity web) throws Exception {
+//         web
+//             .ignoring()
+//             .antMatchers("/actuator/**"); // Ignore Actuator endpoints for security checks
+//     }
+//     @Override
+//     protected void configure(HttpSecurity http) throws Exception {
+//         http
+//             .authorizeRequests()
+//                 .anyRequest().authenticated() // Any other request must be authenticated
+//             .and()
+//             .httpBasic(); // Use HTTP Basic authentication
+//     }
+// }
+// TEXT
+// )
 desc(
-	lang:java
-	alert_num:3
-	"file://application.yml":<<<TEXT
-    spring:
-      application:
-        name: springsecuritydemo
-    management:
-      security:
-        enabled: false
-    endpoints:
-      health:
-        sensitive: false
-TEXT
-	"file://springSecurity.java":<<<TEXT
-package org.example.springsecuritydemo;
-
-import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.web.builders.WebSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-
-@Configuration
-@EnableWebSecurity
-public class InsecureSecurityConfig extends WebSecurityConfigurerAdapter {
-    @Override
-    public void configure(WebSecurity web) throws Exception {
-        web
-            .ignoring()
-            .antMatchers("/actuator/**"); // Ignore Actuator endpoints for security checks
-    }
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
-        http
-            .authorizeRequests()
-                .anyRequest().authenticated() // Any other request must be authenticated
-            .and()
-            .httpBasic(); // Use HTTP Basic authentication
-    }
-}
-TEXT
 	"safefile://SecureApplicationProperties.properties": <<<CODE
 # application.properties
 spring.application.name=secure-app
