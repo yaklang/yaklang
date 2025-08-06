@@ -2,10 +2,11 @@ package ssaapi
 
 import (
 	"context"
-	"github.com/google/uuid"
 	"runtime"
 	"sort"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
@@ -201,8 +202,8 @@ func (p *Program) NewValue(inst ssa.Instruction) (*Value, error) {
 		runtimeCtx:    omap.NewEmptyOrderedMap[ContextID, *Value](),
 		ParentProgram: p,
 		uuid:          uuid.NewString(),
-		effectOnSet:   utils.NewSafeMapWithKey[string, struct{}](),
-		dependOnSet:   utils.NewSafeMapWithKey[string, struct{}](),
+		EffectOn:      utils.NewSafeMapWithKey[string, *Value](),
+		DependOn:      utils.NewSafeMapWithKey[string, *Value](),
 	}
 
 	// if lazy, get the real inst

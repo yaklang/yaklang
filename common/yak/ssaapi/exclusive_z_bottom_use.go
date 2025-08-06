@@ -122,7 +122,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 		}
 		existed := map[int64]struct{}{}
 		var vals Values
-		v.DependOn.ForEach(func(value *Value) {
+		v.ForEachDependOn(func(value *Value) {
 			existed[value.GetId()] = struct{}{}
 		})
 		checkVal := func(vs []int64, get func(index int, arg int64)) {
@@ -248,7 +248,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 			return vals
 		}
 		exists := make(map[int64]struct{})
-		v.DependOn.ForEach(func(value *Value) {
+		v.ForEachDependOn(func(value *Value) {
 			exists[value.GetId()] = struct{}{}
 		})
 
@@ -261,7 +261,8 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 		if getReturnIndex != -1 {
 			members := call.GetMember(v.NewValue(ssa.NewConst(getReturnIndex)))
 			if members == nil {
-				log.Errorf("BUG: (return instruction 's member is nil),check it")
+				// TODO:这个日志报太多了，先注释了，后面遇到问题再修一下
+				//log.Errorf("BUG: (return instruction 's member is nil),check it")
 			} else {
 				for i, member := range members {
 					if i == 0 {
