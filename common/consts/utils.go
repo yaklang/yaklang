@@ -212,6 +212,12 @@ func GetWhisperModelMediumPath() string {
 	return whisperModelPath
 }
 
+func GetQwen3Embedding0_6BQ8_0ModelPath() string {
+	modelPath := GetAIModelPath()
+	embeddingModelPath := filepath.Join(modelPath, "Qwen3-Embedding-0.6B-Q8_0.gguf")
+	return embeddingModelPath
+}
+
 func GetWhisperModelBasePath() string {
 	modelPath := GetAIModelPath()
 	whisperModelPath := filepath.Join(modelPath, "whisper-base-q8.gguf")
