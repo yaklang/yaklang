@@ -52,11 +52,27 @@ func WithContextSize(size int) Option {
 	}
 }
 
-// WithParallelism 设置并行度
-func WithParallelism(parallelism int) Option {
+// WithContBatching 设置是否启用连续批处理
+func WithContBatching(enabled bool) Option {
 	return func(c *ServiceConfig) {
-		if parallelism > 0 {
-			c.Parallelism = parallelism
+		c.ContBatching = enabled
+	}
+}
+
+// WithBatchSize 设置批处理大小
+func WithBatchSize(size int) Option {
+	return func(c *ServiceConfig) {
+		if size > 0 {
+			c.BatchSize = size
+		}
+	}
+}
+
+// WithThreads 设置线程数
+func WithThreads(threads int) Option {
+	return func(c *ServiceConfig) {
+		if threads > 0 {
+			c.Threads = threads
 		}
 	}
 }
