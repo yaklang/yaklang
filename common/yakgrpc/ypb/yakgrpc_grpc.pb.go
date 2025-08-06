@@ -524,6 +524,7 @@ const (
 	Yak_DeleteLocalModel_FullMethodName                           = "/ypb.Yak/DeleteLocalModel"
 	Yak_UpdateLocalModel_FullMethodName                           = "/ypb.Yak/UpdateLocalModel"
 	Yak_GetAllStartedLocalModels_FullMethodName                   = "/ypb.Yak/GetAllStartedLocalModels"
+	Yak_ClearAllModels_FullMethodName                             = "/ypb.Yak/ClearAllModels"
 	Yak_IsSearchVectorDatabaseReady_FullMethodName                = "/ypb.Yak/IsSearchVectorDatabaseReady"
 	Yak_InitSearchVectorDatabase_FullMethodName                   = "/ypb.Yak/InitSearchVectorDatabase"
 	Yak_GetAllVectorStoreCollections_FullMethodName               = "/ypb.Yak/GetAllVectorStoreCollections"
@@ -1193,6 +1194,7 @@ type YakClient interface {
 	DeleteLocalModel(ctx context.Context, in *DeleteLocalModelRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 	UpdateLocalModel(ctx context.Context, in *UpdateLocalModelRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 	GetAllStartedLocalModels(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetAllStartedLocalModelsResponse, error)
+	ClearAllModels(ctx context.Context, in *ClearAllModelsRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 	IsSearchVectorDatabaseReady(ctx context.Context, in *IsSearchVectorDatabaseReadyRequest, opts ...grpc.CallOption) (*IsSearchVectorDatabaseReadyResponse, error)
 	InitSearchVectorDatabase(ctx context.Context, in *InitSearchVectorDatabaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
 	GetAllVectorStoreCollections(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetAllVectorStoreCollectionsResponse, error)
@@ -7032,6 +7034,16 @@ func (c *yakClient) GetAllStartedLocalModels(ctx context.Context, in *Empty, opt
 	return out, nil
 }
 
+func (c *yakClient) ClearAllModels(ctx context.Context, in *ClearAllModelsRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_ClearAllModels_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) IsSearchVectorDatabaseReady(ctx context.Context, in *IsSearchVectorDatabaseReadyRequest, opts ...grpc.CallOption) (*IsSearchVectorDatabaseReadyResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(IsSearchVectorDatabaseReadyResponse)
@@ -7909,6 +7921,7 @@ type YakServer interface {
 	DeleteLocalModel(context.Context, *DeleteLocalModelRequest) (*GeneralResponse, error)
 	UpdateLocalModel(context.Context, *UpdateLocalModelRequest) (*GeneralResponse, error)
 	GetAllStartedLocalModels(context.Context, *Empty) (*GetAllStartedLocalModelsResponse, error)
+	ClearAllModels(context.Context, *ClearAllModelsRequest) (*GeneralResponse, error)
 	IsSearchVectorDatabaseReady(context.Context, *IsSearchVectorDatabaseReadyRequest) (*IsSearchVectorDatabaseReadyResponse, error)
 	InitSearchVectorDatabase(*InitSearchVectorDatabaseRequest, grpc.ServerStreamingServer[ExecResult]) error
 	GetAllVectorStoreCollections(context.Context, *Empty) (*GetAllVectorStoreCollectionsResponse, error)
@@ -9456,6 +9469,9 @@ func (UnimplementedYakServer) UpdateLocalModel(context.Context, *UpdateLocalMode
 }
 func (UnimplementedYakServer) GetAllStartedLocalModels(context.Context, *Empty) (*GetAllStartedLocalModelsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAllStartedLocalModels not implemented")
+}
+func (UnimplementedYakServer) ClearAllModels(context.Context, *ClearAllModelsRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ClearAllModels not implemented")
 }
 func (UnimplementedYakServer) IsSearchVectorDatabaseReady(context.Context, *IsSearchVectorDatabaseReadyRequest) (*IsSearchVectorDatabaseReadyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method IsSearchVectorDatabaseReady not implemented")
@@ -17910,6 +17926,24 @@ func _Yak_GetAllStartedLocalModels_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_ClearAllModels_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClearAllModelsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ClearAllModels(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_ClearAllModels_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ClearAllModels(ctx, req.(*ClearAllModelsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_IsSearchVectorDatabaseReady_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(IsSearchVectorDatabaseReadyRequest)
 	if err := dec(in); err != nil {
@@ -19888,6 +19922,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAllStartedLocalModels",
 			Handler:    _Yak_GetAllStartedLocalModels_Handler,
+		},
+		{
+			MethodName: "ClearAllModels",
+			Handler:    _Yak_ClearAllModels_Handler,
 		},
 		{
 			MethodName: "IsSearchVectorDatabaseReady",
