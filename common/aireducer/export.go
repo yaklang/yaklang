@@ -13,4 +13,5 @@ var Exports = map[string]any{
 	"memory":                     WithMemory,
 
 	"separator": WithSeparatorTrigger,
+	"chunkSize": WithChunkSize,
 }
