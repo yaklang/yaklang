@@ -41,7 +41,9 @@ func DefaultServiceConfig() *ServiceConfig {
 		Host:           "127.0.0.1",
 		Port:           8080,
 		ContextSize:    4096,
-		Parallelism:    1,
+		ContBatching:   true,  // 默认开启连续批处理
+		BatchSize:      1024,  // 默认批处理大小
+		Threads:        8,     // 默认线程数
 		Detached:       false,
 		Debug:          false,
 		StartupTimeout: 30 * time.Second,

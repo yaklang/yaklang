@@ -289,9 +289,23 @@ func (m *Manager) buildArgs(config *ServiceConfig) []string {
 		"--host", config.Host,
 		"--port", fmt.Sprintf("%d", config.Port),
 		"--ctx-size", fmt.Sprintf("%d", config.ContextSize),
-		"--parallel", fmt.Sprintf("%d", config.Parallelism),
 		"--embedding", // 嵌入模式
 		"--verbose-prompt",
+	}
+
+	// 连续批处理
+	if config.ContBatching {
+		args = append(args, "--cont-batching")
+	}
+
+	// 批处理大小
+	if config.BatchSize > 0 {
+		args = append(args, "--batch-size", fmt.Sprintf("%d", config.BatchSize))
+	}
+
+	// 线程数
+	if config.Threads > 0 {
+		args = append(args, "--threads", fmt.Sprintf("%d", config.Threads))
 	}
 
 	// 添加额外参数
