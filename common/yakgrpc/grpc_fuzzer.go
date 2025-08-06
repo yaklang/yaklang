@@ -766,6 +766,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_RandomSession(true),
 			mutate.WithPoolOpt_UseConnPool(!req.GetDisableUseConnPool()),
 			mutate.WithPoolOpt_SaveHTTPFlow(false),
+			mutate.WithPoolOpt_NoReadMultiResponse(req.GetNoReadMultiResponse()),
 			//mutate.WithPoolOpt_ConnPool(true),
 		}
 

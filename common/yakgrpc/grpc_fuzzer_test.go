@@ -1599,3 +1599,49 @@ X-Content-Type-Options: nosniff
 	require.True(t, "application/pdf" == fixedContentType)
 	require.True(t, isSetContentTypeOptions)
 }
+
+func TestWebFuzzerNoReadMultiResp(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+Content-Type: text/html
+Content-Length: 1
+
+2HTTP/1.1 200 OK
+Content-Type: text/html
+Content-Length: 10000000` + "\r\n\r\n" + strings.Repeat("a", 10*1024)))
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d", host, port), nil)
+	require.NoError(t, err)
+	dumpRequest, err := httputil.DumpRequest(req, false)
+	require.NoError(t, err)
+	fuzzer, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		RequestRaw:         dumpRequest,
+		NoFixContentLength: true,
+		DisableUseConnPool: true,
+	})
+	require.NoError(t, err)
+	for {
+		recv, err := fuzzer.Recv()
+		if err != nil {
+			break
+		}
+		// lowhttp bufio read 4096 bytes, so the response raw should be less than 4096+100 bytes
+		require.GreaterOrEqual(t, len(recv.ResponseRaw), 10*1024, "response raw is too large, got: "+utils.ByteSize(uint64(len(recv.ResponseRaw))))
+	}
+
+	fuzzer, err = client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		RequestRaw:          dumpRequest,
+		NoFixContentLength:  true,
+		DisableUseConnPool:  true,
+		NoReadMultiResponse: true,
+	})
+	require.NoError(t, err)
+	for {
+		recv, err := fuzzer.Recv()
+		if err != nil {
+			break
+		}
+		// lowhttp bufio read 4096 bytes, so the response raw should be less than 4096+100 bytes
+		require.Less(t, len(recv.ResponseRaw), 4096+100, "response raw is too large, got: "+utils.ByteSize(uint64(len(recv.ResponseRaw))))
+	}
+}
