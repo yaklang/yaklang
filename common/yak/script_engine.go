@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils/pandocutils"
 	"io"
 	"os"
@@ -325,6 +326,7 @@ func initYaklangLib() {
 	yaklang.Import("ai", ai.Exports)
 
 	yaklang.Import("aiagent", AIAgentExport)
+	yaklang.Import("jsonschema", aitool.SchemaGeneratorExports)
 
 	yaklang.Import("aireducer", aireducer.Exports)
 
