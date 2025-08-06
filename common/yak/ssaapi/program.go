@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"context"
+	"github.com/google/uuid"
 	"runtime"
 	"sort"
 	"time"
@@ -195,9 +196,13 @@ func (p *Program) NewValue(inst ssa.Instruction) (*Value, error) {
 		runtime.Stack(raw, false)
 		return nil, utils.Errorf("instruction is nil: %s", string(raw))
 	}
+
 	v := &Value{
 		runtimeCtx:    omap.NewEmptyOrderedMap[ContextID, *Value](),
 		ParentProgram: p,
+		uuid:          uuid.NewString(),
+		effectOnSet:   utils.NewSafeMapWithKey[string, struct{}](),
+		dependOnSet:   utils.NewSafeMapWithKey[string, struct{}](),
 	}
 
 	// if lazy, get the real inst
