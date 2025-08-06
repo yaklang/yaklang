@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 	"time"
 
@@ -41,8 +41,8 @@ type RiskExportItem struct {
 	CVEInformation CVEInformation `json:"cve_information"`
 	// 审计规则信息
 	AuditRuleInformation AuditRuleInformation `json:"audit_rule"`
-	// 代码位置信息
-	CodeRangeInformation CodeRangeInformation `json:"code_range_information"`
+	// 风险触发点代码范围
+	RiskTriggerCodeRange RiskTriggerCodeRange `json:"risk_trigger_code_range"`
 	// 处置状态
 	LatestDisposalStatus string `json:"latest_disposal_status"`
 	// 数据流路径信息
@@ -70,7 +70,6 @@ type DetailInformation struct {
 	RiskTypeVerbose string `json:"risk_type_verbose"`
 	Details         string `json:"details"`
 	Severity        string `json:"severity"`
-	IsPotential     bool   `json:"is_potential"`
 	Tags            string `json:"tags"`
 }
 
@@ -84,7 +83,7 @@ type AuditRuleInformation struct {
 	RuleName string `json:"rule_name"`
 }
 
-type CodeRangeInformation struct {
+type RiskTriggerCodeRange struct {
 	CodeSourceUrl string `json:"code_source_url"`
 	CodeRange     string `json:"code_range"`
 	CodeFragment  string `json:"code_fragment"`
@@ -98,7 +97,7 @@ type DataFlowPath struct {
 	Description string      `json:"description"`
 	Nodes       []*NodeInfo `json:"nodes"`
 	Edges       []*EdgeInfo `json:"edges"`
-	DotGraph    string      `json:"dot_graph,omitempty"` // 保留作为可选的可视化格式
+	DotGraph    string      `json:"dot_graph,omitempty"`
 }
 
 type NodeInfo struct {
@@ -107,9 +106,8 @@ type NodeInfo struct {
 	SourceCode      string            `json:"source_code"`
 	SourceCodeStart int               `json:"source_code_start"`
 	CodeRange       *ssaapi.CodeRange `json:"code_range"`
-	NodeType        string            `json:"node_type"`   // 节点类型：source, sink, transform, etc.
-	RiskLevel       string            `json:"risk_level"`  // 风险等级：high, medium, low, safe
-	Description     string            `json:"description"` // 节点描述，便于AI理解
+	NodeType        string            `json:"node_type"`   // 节点类型
+	Description     string            `json:"description"` // 节点描述
 }
 
 type EdgeInfo struct {
@@ -120,14 +118,13 @@ type EdgeInfo struct {
 	Description string `json:"description"` // 边描述，便于AI理解
 }
 
-// ExportSSARisksToJSON 导出风险到JSON文件
-func ExportSSARisksToJSON(risks []*schema.SSARisk, outputPath string) error {
+// ExportSSARisksToJSON 导出风险为json格式
+func ExportSSARisksToJSON(risks []*schema.SSARisk) ([]byte, error) {
 	exportData := &RiskExportData{
 		ExportTime: time.Now(),
 		TotalRisks: len(risks),
 		Risks:      make([]*RiskExportItem, 0, len(risks)),
 	}
-
 	for _, risk := range risks {
 		exportItem, err := buildRiskExportItem(risk)
 		if err != nil {
@@ -139,14 +136,9 @@ func ExportSSARisksToJSON(risks []*schema.SSARisk, outputPath string) error {
 
 	jsonData, err := json.MarshalIndent(exportData, "", "  ")
 	if err != nil {
-		return utils.Errorf("marshal json failed: %v", err)
+		return nil, utils.Errorf("marshal json failed: %v", err)
 	}
-
-	err = os.WriteFile(outputPath, jsonData, 0644)
-	if err != nil {
-		return utils.Errorf("write file failed: %v", err)
-	}
-	return nil
+	return jsonData, nil
 }
 
 func buildRiskExportItem(risk *schema.SSARisk) (*RiskExportItem, error) {
@@ -184,7 +176,7 @@ func buildRiskExportItem(risk *schema.SSARisk) (*RiskExportItem, error) {
 		AuditRuleInformation: AuditRuleInformation{
 			RuleName: risk.FromRule,
 		},
-		CodeRangeInformation: CodeRangeInformation{
+		RiskTriggerCodeRange: RiskTriggerCodeRange{
 			CodeSourceUrl: risk.CodeSourceUrl,
 			CodeRange:     risk.CodeRange,
 			CodeFragment:  risk.CodeFragment,
@@ -216,13 +208,12 @@ func getIRProgramByRisk(risk *schema.SSARisk) (*ssadb.IrProgram, error) {
 func getDataFlowPathsForRisk(risk *schema.SSARisk) ([]*DataFlowPath, error) {
 	path := &DataFlowPath{
 		PathID:      fmt.Sprintf("path_%d", risk.ID),
-		Description: "", // Placeholder, will be filled later
+		Description: "",
 		Nodes:       []*NodeInfo{},
 		Edges:       []*EdgeInfo{},
-		DotGraph:    "", // Placeholder, will be filled later
+		DotGraph:    "",
 	}
 
-	// 尝试从风险信息中生成ValueGraph
 	if risk.CodeFragment != "" {
 		nodes, edges, dotGraph, err := generateGraphInfoFromRisk(risk)
 		if err != nil {
@@ -276,47 +267,46 @@ func coverNodeAndEdgeInfos(graph *ssaapi.ValueGraph, programName string, risk *s
 			SourceCodeStart: 0,
 			CodeRange:       codeRange,
 			NodeType:        determineNodeType(node, risk),
-			RiskLevel:       determineRiskLevel(node, risk),
 			Description:     generateNodeDescription(node, risk),
 		}
 		nodes = append(nodes, nodeInfo)
 		nodeMap[id] = nodeInfo
 	}
 
-	edgeID := 1
-	for _, edge := range graph.Graph.GetAllEdges() {
-		fromNodeLabel := edge.From
-		toNodeLabel := edge.To
-
-		var fromNode, toNode *NodeInfo
-		for _, node := range nodes {
-			if strings.Contains(node.SourceCode, fromNodeLabel) || strings.Contains(node.IRCode, fromNodeLabel) {
-				fromNode = node
-			}
-			if strings.Contains(node.SourceCode, toNodeLabel) || strings.Contains(node.IRCode, toNodeLabel) {
-				toNode = node
-			}
+	edgeCache := make(map[string]struct{})
+	for edgeID, edge := range graph.Graph.GetAllEdges() {
+		if edge == nil {
+			continue
 		}
 
-		if fromNode != nil && toNode != nil {
-			edgeInfo := &EdgeInfo{
-				EdgeID:      fmt.Sprintf("e%d", edgeID),
-				FromNodeID:  fromNode.NodeID,
-				ToNodeID:    toNode.NodeID,
-				EdgeType:    determineEdgeType(edge.Label),
-				Description: generateEdgeDescription(edge.Label),
-			}
-			edges = append(edges, edgeInfo)
-			edgeID++
+		fromNode := edge.From()
+		toNode := edge.To()
+		if fromNode == nil || toNode == nil {
+			continue
 		}
+
+		hash := codec.Sha256(fmt.Sprintf(
+			"%d-%d-%s",
+			fromNode.ID(),
+			toNode.ID(),
+			edge.Label,
+		))
+		if _, ok := edgeCache[hash]; ok {
+			continue
+		}
+		edgeCache[hash] = struct{}{}
+
+		edgeInfo := &EdgeInfo{
+			EdgeID:      fmt.Sprintf("e%d", edgeID),
+			FromNodeID:  nodeId(fromNode.ID()),
+			ToNodeID:    nodeId(toNode.ID()),
+			EdgeType:    edge.Label,
+			Description: generateEdgeDescription(edge.Label),
+		}
+		edges = append(edges, edgeInfo)
 	}
 
 	return nodes, edges
-}
-
-func determineEdgeType(edgeLabel string) string {
-	// 直接使用原始的边标签作为边类型
-	return edgeLabel
 }
 
 func generateEdgeDescription(edgeLabel string) string {
@@ -335,6 +325,7 @@ func generateEdgeDescription(edgeLabel string) string {
 	}
 }
 
+// todo:need more check
 func determineNodeType(node *ssaapi.Value, risk *schema.SSARisk) string {
 	// 根据节点类型和风险类型判断节点类型
 	irCode := node.String()
@@ -374,4 +365,8 @@ func generateNodeDescription(node *ssaapi.Value, risk *schema.SSARisk) string {
 	default:
 		return fmt.Sprintf("Data processing node: %s", irCode)
 	}
+}
+
+func nodeId(i int) string {
+	return fmt.Sprintf("n%d", i)
 }

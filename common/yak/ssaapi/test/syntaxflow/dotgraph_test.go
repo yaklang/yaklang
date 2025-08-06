@@ -299,10 +299,10 @@ func TestTopDefGraphEdgeLabel(t *testing.T) {
 			`a #-> as $result`,
 			map[string][]ssatest.EdgeInfo{
 				"result": {
-					{From: "f()", To: ".key", Label: "depend_on"},
-					{From: "\"value\"", To: ".key", Label: "depend_on"},
-					{From: "() => {return {\"key\":\"value\"}}", To: "f()", Label: "depend_on"},
-					{From: "{\"key\":\"value\"}", To: "() => {return {\"key\":\"value\"}}", Label: "depend_on"},
+					{From: "333333", To: "i", Label: "depend_on"},
+					{From: "i", To: "() => {return i}", Label: "depend_on"},
+					{From: "() => {return i}", To: "f1()", Label: "depend_on"},
+					{From: "f(333333)", To: "() => {return i}", Label: "depend_on"},
 				},
 			},
 		},

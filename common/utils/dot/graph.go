@@ -2,6 +2,7 @@ package dot
 
 import (
 	"fmt"
+	"github.com/samber/lo"
 	"io"
 	"strings"
 )
@@ -512,6 +513,14 @@ func (e Edge) Attribute(name string) string {
 	return e.attributes.get(name)
 }
 
+func (e Edge) From() *node {
+	return e.from
+}
+
+func (e Edge) To() *node {
+	return e.to
+}
+
 // IsConnected checks if there is a path from node 'from' to node 'to'
 // Uses depth-first search to find connectivity
 func (g *Graph) IsConnected(fromLabel, toLabel string) bool {
@@ -566,61 +575,6 @@ func (g *Graph) dfs(start, target int, visited map[int]bool) bool {
 	}
 
 	return false
-}
-
-// GetEdgeDirection returns the direction of edge between two nodes
-// Returns: EdgeDirectionForward (from->to), EdgeDirectionBackward (to->from),
-// EdgeDirectionBidirectional, or EdgeDirectionNone
-func (g *Graph) GetEdgeDirection(fromLabel, toLabel string) EdgeDirection {
-	fromNodes := g.GetNodesByLabel(fromLabel)
-	toNodes := g.GetNodesByLabel(toLabel)
-
-	if len(fromNodes) == 0 || len(toNodes) == 0 {
-		return EdgeDirectionNone
-	}
-
-	hasForward := false
-	hasBackward := false
-
-	// Check for edges between any fromNode and any toNode
-	for _, fromNode := range fromNodes {
-		for _, toNode := range toNodes {
-			for _, edge := range g.edges {
-				if edge.from.id == fromNode.id && edge.to.id == toNode.id {
-					hasForward = true
-				}
-				if edge.from.id == toNode.id && edge.to.id == fromNode.id {
-					hasBackward = true
-				}
-			}
-		}
-	}
-
-	// For undirected graphs, if there's any connection, it's considered bidirectional
-	if !g.directed && (hasForward || hasBackward) {
-		return EdgeDirectionBidirectional
-	}
-
-	// For directed graphs, only consider actual edges, not the prevs/nexts relationships
-	if g.directed {
-		if hasForward {
-			return EdgeDirectionForward
-		} else if hasBackward {
-			return EdgeDirectionBackward
-		}
-		return EdgeDirectionNone
-	}
-
-	// For undirected graphs with both directions
-	if hasForward && hasBackward {
-		return EdgeDirectionBidirectional
-	} else if hasForward {
-		return EdgeDirectionForward
-	} else if hasBackward {
-		return EdgeDirectionBackward
-	}
-
-	return EdgeDirectionNone
 }
 
 // GetEdgeLabel returns the label of the edge between two nodes
@@ -729,81 +683,10 @@ func (g *Graph) GetAllNodes() []string {
 }
 
 // GetAllEdges returns all edges in the graph as a slice of edge info
-func (g *Graph) GetAllEdges() []EdgeInfo {
-	var edges []EdgeInfo
-	for _, edge := range g.edges {
-		edges = append(edges, EdgeInfo{
-			From:  edge.from.label,
-			To:    edge.to.label,
-			Label: edge.Label,
-		})
-	}
-	return edges
-}
-
-// EdgeInfo represents information about an edge
-type EdgeInfo struct {
-	From  string
-	To    string
-	Label string
-}
-
-// GetShortestPath returns the shortest path between two nodes
-// Returns nil if no path exists
-func (g *Graph) GetShortestPath(fromLabel, toLabel string) []string {
-	fromID, fromExists := g.NodeExisted(fromLabel)
-	toID, toExists := g.NodeExisted(toLabel)
-
-	if !fromExists || !toExists {
-		return nil
-	}
-
-	// Use BFS to find shortest path
-	queue := [][]int{{fromID}}
-	visited := make(map[int]bool)
-	visited[fromID] = true
-
-	for len(queue) > 0 {
-		path := queue[0]
-		queue = queue[1:]
-		current := path[len(path)-1]
-
-		if current == toID {
-			// Convert IDs to labels
-			var result []string
-			for _, id := range path {
-				node := g.registeredNodes[id]
-				result = append(result, node.label)
-			}
-			return result
-		}
-
-		currentNode := g.registeredNodes[current]
-		for _, nextID := range currentNode.nexts {
-			if !visited[nextID] {
-				visited[nextID] = true
-				newPath := make([]int, len(path))
-				copy(newPath, path)
-				newPath = append(newPath, nextID)
-				queue = append(queue, newPath)
-			}
-		}
-
-		// For undirected graphs, also check previous connections
-		if !g.directed {
-			for _, prevID := range currentNode.prevs {
-				if !visited[prevID] {
-					visited[prevID] = true
-					newPath := make([]int, len(path))
-					copy(newPath, path)
-					newPath = append(newPath, prevID)
-					queue = append(queue, newPath)
-				}
-			}
-		}
-	}
-
-	return nil
+func (g *Graph) GetAllEdges() []*Edge {
+	return lo.MapToSlice(g.edges, func(key int, value *Edge) *Edge {
+		return value
+	})
 }
 
 // IsNeighbor checks if two nodes are directly connected (neighbors)

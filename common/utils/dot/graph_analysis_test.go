@@ -30,36 +30,6 @@ func TestGraphAnalysisConnectivity(t *testing.T) {
 	}
 }
 
-func TestGraphAnalysisDirection(t *testing.T) {
-	g := New()
-	g.MakeDirected()
-
-	// Create edges
-	g.AddEdgeByLabel("A", "B", "forward")
-	g.AddEdgeByLabel("B", "C", "forward")
-
-	// Debug: Print all edges
-	edges := g.GetAllEdges()
-	t.Logf("All edges: %+v", edges)
-
-	// Test direction
-	if g.GetEdgeDirection("A", "B") != EdgeDirectionForward {
-		t.Errorf("Expected forward direction, got %s", g.GetEdgeDirection("A", "B"))
-	}
-
-	if g.GetEdgeDirection("B", "A") != EdgeDirectionBackward {
-		t.Errorf("Expected backward direction (since A->B exists), got %s", g.GetEdgeDirection("B", "A"))
-	}
-
-	// Test undirected graph
-	g2 := New() // Undirected by default
-	g2.AddEdgeByLabel("X", "Y", "bidirectional")
-
-	if g2.GetEdgeDirection("X", "Y") != EdgeDirectionBidirectional {
-		t.Errorf("Expected bidirectional direction in undirected graph, got %s", g2.GetEdgeDirection("X", "Y"))
-	}
-}
-
 func TestGraphAnalysisEdgeLabels(t *testing.T) {
 	g := New()
 	g.MakeDirected()
@@ -101,36 +71,6 @@ func TestGraphAnalysisEdgeLabels(t *testing.T) {
 	}
 }
 
-func TestGraphAnalysisShortestPath(t *testing.T) {
-	g := New()
-	g.MakeDirected()
-
-	// Create a path: A -> B -> C -> D
-	g.AddEdgeByLabel("A", "B", "edge1")
-	g.AddEdgeByLabel("B", "C", "edge2")
-	g.AddEdgeByLabel("C", "D", "edge3")
-
-	// Test shortest path
-	path := g.GetShortestPath("A", "D")
-	expected := []string{"A", "B", "C", "D"}
-
-	if len(path) != len(expected) {
-		t.Errorf("Expected path length %d, got %d", len(expected), len(path))
-	}
-
-	for i, node := range path {
-		if node != expected[i] {
-			t.Errorf("Expected %s at position %d, got %s", expected[i], i, node)
-		}
-	}
-
-	// Test no path
-	noPath := g.GetShortestPath("D", "A")
-	if noPath != nil {
-		t.Error("Should not have path from D to A")
-	}
-}
-
 func TestGraphAnalysisGetAllNodesAndEdges(t *testing.T) {
 	g := New()
 	g.MakeDirected()
@@ -165,81 +105,10 @@ func TestGraphAnalysisGetAllNodesAndEdges(t *testing.T) {
 	}
 
 	for _, edge := range edges {
-		edgeStr := edge.From + "->" + edge.To + ":" + edge.Label
+		edgeStr := edge.from.label + "->" + edge.to.label + ":" + edge.Label
 		if !expectedEdges[edgeStr] {
 			t.Errorf("Unexpected edge: %s", edgeStr)
 		}
-	}
-}
-
-func TestGraphAnalysisComplexGraph(t *testing.T) {
-	g := New()
-	g.MakeDirected()
-
-	// Create a more complex graph
-	// A -> B -> D
-	// A -> C -> D
-	// B -> C
-	g.AddEdgeByLabel("A", "B", "edge1")
-	g.AddEdgeByLabel("A", "C", "edge2")
-	g.AddEdgeByLabel("B", "C", "edge3")
-	g.AddEdgeByLabel("B", "D", "edge4")
-	g.AddEdgeByLabel("C", "D", "edge5")
-
-	// Test connectivity
-	if !g.IsConnected("A", "D") {
-		t.Error("A should be connected to D")
-	}
-
-	if !g.IsConnected("A", "C") {
-		t.Error("A should be connected to C")
-	}
-
-	if !g.IsConnected("B", "D") {
-		t.Error("B should be connected to D")
-	}
-
-	// Test multiple paths
-	path1 := g.GetShortestPath("A", "D")
-	if len(path1) != 3 { // A -> B -> D or A -> C -> D
-		t.Errorf("Expected path length 3, got %d", len(path1))
-	}
-
-	// Test edge labels
-	if g.GetEdgeLabel("A", "B") != "edge1" {
-		t.Errorf("Expected edge1, got %s", g.GetEdgeLabel("A", "B"))
-	}
-
-	if g.GetEdgeLabel("B", "C") != "edge3" {
-		t.Errorf("Expected edge3, got %s", g.GetEdgeLabel("B", "C"))
-	}
-}
-
-func TestGraphAnalysisUndirectedGraph(t *testing.T) {
-	g := New() // Undirected by default
-
-	// Create undirected graph
-	g.AddEdgeByLabel("A", "B", "edge1")
-	g.AddEdgeByLabel("B", "C", "edge2")
-
-	// Test connectivity in undirected graph
-	if !g.IsConnected("A", "C") {
-		t.Error("A should be connected to C in undirected graph")
-	}
-
-	if !g.IsConnected("C", "A") {
-		t.Error("C should be connected to A in undirected graph")
-	}
-
-	// Test direction in undirected graph
-	if g.GetEdgeDirection("A", "B") != EdgeDirectionBidirectional {
-		t.Errorf("Expected bidirectional direction, got %s", g.GetEdgeDirection("A", "B"))
-	}
-
-	// Test shortest path in undirected graph
-	path := g.GetShortestPath("A", "C")
-	if len(path) != 3 {
-		t.Errorf("Expected path length 3, got %d", len(path))
 	}
 }
 
