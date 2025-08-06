@@ -189,6 +189,14 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, d
 		handleResultUserCancel, handleResultErr,
 		stdoutWriter, stderrWriter)
 	if err != nil {
+		if toolResult == nil {
+			toolResult = &aitool.ToolResult{
+				Name:        targetTool.Name,
+				Description: targetTool.Description,
+				Param:       callToolParams,
+				ToolCallID:  callToolId,
+			}
+		}
 		toolResult.Error = fmt.Sprintf("error invoking tool[%v]: %v", targetTool.Name, err)
 		toolResult.Success = false
 	}
