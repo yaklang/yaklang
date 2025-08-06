@@ -31,14 +31,22 @@ type CustomLocalModel struct {
 	Path        string `json:"path"`
 }
 
+// RunningModelInfo 运行中模型的信息
+type RunningModelInfo struct {
+	Cmd       *exec.Cmd
+	Host      string
+	Port      int32
+	ModelType string
+}
+
 // LocalModelManager 本地模型管理器
 type LocalModelManager struct {
 	mutex         sync.RWMutex
-	runningModels map[string]*exec.Cmd
+	runningModels map[string]*RunningModelInfo
 }
 
 var localModelManager = &LocalModelManager{
-	runningModels: make(map[string]*exec.Cmd),
+	runningModels: make(map[string]*RunningModelInfo),
 }
 
 // getCustomModelsFromDB 从数据库获取自定义模型列表
@@ -63,6 +71,8 @@ func getCustomModelsFromDB() ([]*ypb.LocalModelConfig, error) {
 			DownloadURL: "",                        // 自定义模型没有下载链接
 			Description: model.Description,
 			IsLocal:     true,
+			IsReady:     utils.FileExists(model.Path),
+			Path:        model.Path,
 			DefaultPort: 8080, // 默认端口
 		})
 	}
@@ -102,11 +112,31 @@ func getSupportedModels() []*ypb.LocalModelConfig {
 			log.Errorf("获取模型下载信息失败: %v", err)
 			continue
 		}
+
+		var binPath string
+
+		isInstalled := false
+		status, err := thirdparty_bin.GetStatus(name)
+		if err != nil {
+			isInstalled = false
+		} else {
+			isInstalled = status.Installed
+		}
+
+		if isInstalled {
+			binPath, err = thirdparty_bin.GetBinaryPath(name)
+			if err != nil {
+				binPath = ""
+			}
+		}
+
 		builtinModels = append(builtinModels, &ypb.LocalModelConfig{
 			Name:        bin.Name,
 			Type:        getModelTypeByTags(bin.Tags...),
 			DownloadURL: downloadUrl.URL,
 			Description: bin.Description,
+			Path:        binPath,
+			IsReady:     isInstalled,
 			IsLocal:     false,
 			DefaultPort: 8080,
 		})
@@ -126,22 +156,8 @@ func getSupportedModels() []*ypb.LocalModelConfig {
 
 // GetSupportedLocalModels 获取支持的本地模型列表
 func (s *Server) GetSupportedLocalModels(ctx context.Context, req *ypb.Empty) (*ypb.GetSupportedLocalModelsResponse, error) {
-	models := getSupportedModels()
-	// 检查模型是否ready
-	for _, model := range models {
-		if model.IsLocal {
-			model.IsReady = utils.FileExists(model.Path)
-		} else {
-			status, err := thirdparty_bin.GetStatus(model.Name)
-			if err != nil {
-				model.IsReady = false
-			} else {
-				model.IsReady = status.Installed
-			}
-		}
-	}
 	return &ypb.GetSupportedLocalModelsResponse{
-		Models: models,
+		Models: getSupportedModels(),
 	}, nil
 }
 
@@ -259,7 +275,7 @@ func (s *Server) StartLocalModel(req *ypb.StartLocalModelRequest, stream ypb.Yak
 
 	// 检查模型是否已在运行
 	localModelManager.mutex.RLock()
-	if cmd, exists := localModelManager.runningModels[modelName]; exists && cmd.ProcessState == nil {
+	if cmd, exists := localModelManager.runningModels[modelName]; exists && cmd.Cmd.ProcessState == nil {
 		localModelManager.mutex.RUnlock()
 		return utils.Errorf("模型 %s 已在运行中", modelName)
 	}
@@ -334,7 +350,12 @@ func (s *Server) StartLocalModel(req *ypb.StartLocalModelRequest, stream ypb.Yak
 
 	// 保存运行中的模型
 	localModelManager.mutex.Lock()
-	localModelManager.runningModels[modelName] = cmd
+	localModelManager.runningModels[modelName] = &RunningModelInfo{
+		Cmd:       cmd,
+		Host:      host,
+		Port:      port,
+		ModelType: targetModel.Type,
+	}
 	localModelManager.mutex.Unlock()
 
 	stream.Send(&ypb.ExecResult{
@@ -581,6 +602,25 @@ func (s *Server) DeleteLocalModel(ctx context.Context, req *ypb.DeleteLocalModel
 		}, utils.Error("模型名称不能为空")
 	}
 
+	// 判断是否是通过 Yakit 安装的模型
+	status, err := thirdparty_bin.GetStatus(req.GetName())
+	if err == nil {
+		if !status.Installed {
+			return &ypb.GeneralResponse{
+				Ok: false,
+			}, utils.Errorf("模型 %s 未下载，请先下载", req.GetName())
+		}
+		err = thirdparty_bin.Uninstall(req.GetName())
+		if err != nil {
+			return &ypb.GeneralResponse{
+				Ok: false,
+			}, utils.Errorf("卸载模型 %s 失败: %v", req.GetName(), err)
+		}
+		return &ypb.GeneralResponse{
+			Ok: true,
+		}, nil
+	}
+
 	// 获取现有模型列表
 	modelsJSON := yakit.GetKey(consts.GetGormProfileDatabase(), USER_CUSTOM_LOCAL_MODEL_KEY)
 	if modelsJSON == "" {
@@ -590,7 +630,7 @@ func (s *Server) DeleteLocalModel(ctx context.Context, req *ypb.DeleteLocalModel
 	}
 
 	var existingModels []CustomLocalModel
-	err := json.Unmarshal([]byte(modelsJSON), &existingModels)
+	err = json.Unmarshal([]byte(modelsJSON), &existingModels)
 	if err != nil {
 		return &ypb.GeneralResponse{
 			Ok: false,
@@ -618,7 +658,7 @@ func (s *Server) DeleteLocalModel(ctx context.Context, req *ypb.DeleteLocalModel
 	}
 
 	// 如果请求删除源文件
-	if req.GetDeleteSourceFile() == "true" && deletedModel != nil {
+	if req.GetDeleteSourceFile() && deletedModel != nil {
 		if exists, _ := utils.PathExists(deletedModel.Path); exists {
 			err := os.Remove(deletedModel.Path)
 			if err != nil {
@@ -726,27 +766,48 @@ func (s *Server) GetAllStartedLocalModels(ctx context.Context, req *ypb.Empty) (
 	localModelManager.mutex.RLock()
 	defer localModelManager.mutex.RUnlock()
 
-	var aichatModelNames []string
-
-	// 获取所有支持的模型配置，用于检查模型类型
-	allModels := getSupportedModels()
-	modelTypeMap := make(map[string]string)
-	for _, model := range allModels {
-		modelTypeMap[model.Name] = model.Type
-	}
+	var models []*ypb.StartedLocalModelInfo
 
 	// 遍历所有运行中的模型
-	for modelName, cmd := range localModelManager.runningModels {
+	for modelName, cmdInfo := range localModelManager.runningModels {
 		// 检查进程是否还在运行
-		if cmd.ProcessState == nil || !cmd.ProcessState.Exited() {
+		if cmdInfo.Cmd.ProcessState == nil || !cmdInfo.Cmd.ProcessState.Exited() {
 			// 检查模型类型是否为aichat
-			if modelType, exists := modelTypeMap[modelName]; exists && modelType == "aichat" {
-				aichatModelNames = append(aichatModelNames, modelName)
+			if cmdInfo.ModelType == "aichat" {
+				// 创建StartedLocalModelInfo结构体
+				modelInfo := &ypb.StartedLocalModelInfo{
+					Name:      modelName,
+					ModelType: cmdInfo.ModelType,
+					Host:      cmdInfo.Host, // 从RunningModelInfo获取主机
+					Port:      cmdInfo.Port, // 从RunningModelInfo获取端口
+				}
+				models = append(models, modelInfo)
 			}
 		}
 	}
 
 	return &ypb.GetAllStartedLocalModelsResponse{
-		ModelNames: aichatModelNames,
+		Models: models,
 	}, nil
+}
+
+// 清除所有本地模型
+func (s *Server) ClearAllModels(ctx context.Context, req *ypb.ClearAllModelsRequest) (*ypb.GeneralResponse, error) {
+	allModels := getSupportedModels()
+	errors := []error{}
+	for _, model := range allModels {
+		resp, err := s.DeleteLocalModel(ctx, &ypb.DeleteLocalModelRequest{
+			Name:             model.Name,
+			DeleteSourceFile: req.GetDeleteSourceFile(),
+		})
+		if err != nil {
+			errors = append(errors, err)
+		}
+		if !resp.GetOk() {
+			errors = append(errors, utils.Errorf("删除模型 %s 失败", model.Name))
+		}
+	}
+	return &ypb.GeneralResponse{
+		Ok: len(errors) == 0,
+	}, utils.JoinErrors(errors...)
 }
