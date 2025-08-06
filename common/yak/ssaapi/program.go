@@ -2,11 +2,10 @@ package ssaapi
 
 import (
 	"context"
+	"github.com/google/uuid"
 	"runtime"
 	"sort"
 	"time"
-
-	"github.com/google/uuid"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
 

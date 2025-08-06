@@ -148,11 +148,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				ret.AppendEffectOn(i)
 			}
 			return results
-			// TODO:这个拼接数据流关系会导致速度很慢
-			//for _, ret := range results {
-			//	ret.AppendEffectOn(i)
-			//}
-			return results
 		}
 		return i.visitedDefs(actx, opt...)
 	}
