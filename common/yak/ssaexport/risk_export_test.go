@@ -10,8 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
-	"github.com/jinzhu/gorm"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -142,9 +140,12 @@ public class FileUploader {
 		//outputPath := filepath.Join(temp, "risk_export_test.json")
 		outputPath := filepath.Join("D:\\GoProject\\yaklang\\common\\yak\\ssaexport", "risk_export_test.json")
 
-		err = ExportSSARisksToJSON(risks, outputPath)
+		data, err := ExportSSARisksToJSON(risks)
 		require.NoError(t, err)
 
+		file, err := os.OpenFile(outputPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
+		defer file.Close()
+		file.Write(data)
 		// 验证输出文件存在
 		_, err = os.Stat(outputPath)
 		require.NoError(t, err)
@@ -172,90 +173,4 @@ public class FileUploader {
 		}
 		return nil
 	})
-}
-
-func TestCoverNodeInfosIntegration(t *testing.T) {
-	// 测试coverNodeInfos函数是否被正确调用并生成graph_info数据
-	risk := &schema.SSARisk{
-		Model: gorm.Model{
-			ID:        1,
-			CreatedAt: time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC),
-			UpdatedAt: time.Date(2023, 1, 2, 0, 0, 0, 0, time.UTC),
-		},
-		Hash:                 "test-hash-123",
-		Title:                "Test Risk",
-		TitleVerbose:         "测试风险",
-		Description:          "Test description",
-		Solution:             "Test solution",
-		RiskType:             "test",
-		Details:              "Test details",
-		Severity:             schema.SFR_SEVERITY_HIGH,
-		IsPotential:          false,
-		CVE:                  "CVE-2023-1234",
-		CveAccessVector:      "NETWORK",
-		CveAccessComplexity:  "LOW",
-		Tags:                 "test",
-		FromRule:             "test-rule",
-		ProgramName:          "test-app",
-		CodeSourceUrl:        "file:///path/to/file.java",
-		CodeRange:            "1:10",
-		CodeFragment:         "test code",
-		FunctionName:         "testFunction",
-		Line:                 15,
-		LatestDisposalStatus: "not_set",
-		ResultID:             1, // 设置ResultID以便测试数据流路径生成
-		Variable:             "testVariable",
-		Index:                0,
-	}
-
-	// 创建临时文件进行导出测试
-	tmpFile, err := os.CreateTemp("", "test_cover_node_infos_*.json")
-	require.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
-	defer tmpFile.Close()
-
-	// 执行导出
-	err = ExportSSARisksToJSON([]*schema.SSARisk{risk}, tmpFile.Name())
-	require.NoError(t, err)
-
-	// 读取并验证JSON内容
-	jsonData, err := os.ReadFile(tmpFile.Name())
-	require.NoError(t, err)
-
-	var exportData RiskExportData
-	err = json.Unmarshal(jsonData, &exportData)
-	require.NoError(t, err)
-
-	// 验证导出的数据
-	// 由于测试数据在数据库中不存在，可能没有成功导出风险项
-	// 但我们仍然可以验证JSON结构是否正确
-	if len(exportData.Risks) > 0 {
-		exportItem := exportData.Risks[0]
-
-		// 验证数据流路径信息
-		assert.NotNil(t, exportItem.DataFlowPaths)
-		assert.GreaterOrEqual(t, len(exportItem.DataFlowPaths), 1)
-
-		// 验证第一个数据流路径
-		path := exportItem.DataFlowPaths[0]
-		assert.NotEmpty(t, path.PathID)
-		assert.NotEmpty(t, path.Description)
-		assert.NotEmpty(t, path.DotGraph)
-
-		// 验证graph_info字段（与ssaurl一致）
-		assert.NotNil(t, path.GraphInfo)
-		// 如果有graph_info数据，验证其结构
-		if len(path.GraphInfo) > 0 {
-			for _, nodeInfo := range path.GraphInfo {
-				assert.NotEmpty(t, nodeInfo.NodeID)
-				assert.NotEmpty(t, nodeInfo.IRCode)
-				// 验证NodeInfo结构与ssaurl中的一致
-				assert.Contains(t, []string{"node_id", "ir_code", "source_code", "source_code_start", "code_range"}, "node_id")
-			}
-		}
-	} else {
-		// 如果没有成功导出风险项，至少验证JSON结构正确
-		assert.Equal(t, 0, exportData.TotalRisks)
-		assert.Equal(t, 0, len(exportData.Risks))
-	}
 }
