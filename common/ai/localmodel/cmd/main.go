@@ -138,7 +138,9 @@ func startEmbeddingService(manager *localmodel.Manager) {
 		fmt.Printf("  模型路径: %s (默认)\n", defaultPath)
 	}
 	fmt.Printf("  上下文大小: %d\n", *contextSize)
-	fmt.Printf("  并行度: %d\n", *parallelism)
+	fmt.Printf("  连续批处理: %t\n", *contBatching)
+	fmt.Printf("  批处理大小: %d\n", *batchSize)
+	fmt.Printf("  线程数: %d\n", *threads)
 	fmt.Printf("  分离模式: %t\n", *detached)
 	fmt.Printf("  调试模式: %t\n", *debug)
 	fmt.Printf("  启动超时: %d秒\n", *timeout)
@@ -169,7 +171,9 @@ func startEmbeddingService(manager *localmodel.Manager) {
 
 	options = append(options,
 		localmodel.WithContextSize(*contextSize),
-		localmodel.WithParallelism(*parallelism),
+		localmodel.WithContBatching(*contBatching),
+		localmodel.WithBatchSize(*batchSize),
+		localmodel.WithThreads(*threads),
 		localmodel.WithDetached(*detached),
 		localmodel.WithDebug(*debug),
 		localmodel.WithStartupTimeout(time.Duration(*timeout)*time.Second),
@@ -235,7 +239,7 @@ func init() {
 		fmt.Fprintf(os.Stderr, "  # 启动默认嵌入服务\n")
 		fmt.Fprintf(os.Stderr, "  %s\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  # 启动自定义配置的服务\n")
-		fmt.Fprintf(os.Stderr, "  %s -host 0.0.0.0 -port 9090 -debug -parallelism 4\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -host 0.0.0.0 -port 9090 -debug -threads 4 -batch-size 2048\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  # 使用自定义模型路径\n")
 		fmt.Fprintf(os.Stderr, "  %s -model-path /path/to/model.gguf -debug\n\n", os.Args[0])
 	}

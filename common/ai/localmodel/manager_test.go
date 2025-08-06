@@ -56,6 +56,18 @@ func TestDefaultServiceConfig(t *testing.T) {
 		t.Errorf("Expected default context size 4096, got %d", config.ContextSize)
 	}
 
+	if !config.ContBatching {
+		t.Errorf("Expected default cont batching true, got %t", config.ContBatching)
+	}
+
+	if config.BatchSize != 1024 {
+		t.Errorf("Expected default batch size 1024, got %d", config.BatchSize)
+	}
+
+	if config.Threads != 8 {
+		t.Errorf("Expected default threads 8, got %d", config.Threads)
+	}
+
 	if config.StartupTimeout != 30*time.Second {
 		t.Errorf("Expected default timeout 30s, got %v", config.StartupTimeout)
 	}
@@ -88,10 +100,22 @@ func TestOptions(t *testing.T) {
 		t.Errorf("WithContextSize failed, expected 8192, got %d", config.ContextSize)
 	}
 
-	// Test WithParallelism
-	WithParallelism(4)(config)
-	if config.Parallelism != 4 {
-		t.Errorf("WithParallelism failed, expected 4, got %d", config.Parallelism)
+	// Test WithContBatching
+	WithContBatching(false)(config)
+	if config.ContBatching {
+		t.Error("WithContBatching failed, expected false")
+	}
+
+	// Test WithBatchSize
+	WithBatchSize(2048)(config)
+	if config.BatchSize != 2048 {
+		t.Errorf("WithBatchSize failed, expected 2048, got %d", config.BatchSize)
+	}
+
+	// Test WithThreads
+	WithThreads(16)(config)
+	if config.Threads != 16 {
+		t.Errorf("WithThreads failed, expected 16, got %d", config.Threads)
 	}
 
 	// Test WithDetached
