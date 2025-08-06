@@ -66,7 +66,8 @@ type LowhttpExecConfig struct {
 	Ctx                              context.Context
 	SaveHTTPFlow                     bool
 	SaveHTTPFlowSync                 bool
-	SaveHTTPFlowHandler              func(*LowhttpResponse)
+	SaveHTTPFlowHandler              []func(*LowhttpResponse)
+	UseMITMRule                      bool
 	RequestSource                    string
 	EtcHosts                         map[string]string
 	DNSServers                       []string
@@ -176,6 +177,10 @@ func yakitColor(i string) string {
 
 func (r *LowhttpResponse) AddTag(i string) {
 	r.Tags = append(r.Tags, i)
+}
+
+func (r *LowhttpResponse) AddTags(i ...string) {
+	r.Tags = append(r.Tags, i...)
 }
 
 func (r *LowhttpResponse) Red() {
@@ -701,9 +706,18 @@ func WithSaveHTTPFlowSync(b bool) LowhttpOpt {
 	}
 }
 
-func WithSaveHTTPFlowHandler(f func(*LowhttpResponse)) LowhttpOpt {
+func WithSaveHTTPFlowHandler(f ...func(*LowhttpResponse)) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
-		o.SaveHTTPFlowHandler = f
+		if o.SaveHTTPFlowHandler == nil {
+			o.SaveHTTPFlowHandler = make([]func(*LowhttpResponse), 0, 1)
+		}
+		o.SaveHTTPFlowHandler = append(o.SaveHTTPFlowHandler, f...)
+	}
+}
+
+func WithUseMITMRule(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.UseMITMRule = b
 	}
 }
 

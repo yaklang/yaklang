@@ -28,6 +28,7 @@ import (
 func init() {
 	RegisterPostInitDatabaseFunction(func() error {
 		RegisterLowHTTPSaveCallback()
+		RegisterLowHTTPLabelingCallback()
 		return nil
 	})
 }

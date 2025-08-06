@@ -185,48 +185,48 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		init option config
 	*/
 	var (
-		https                = option.Https
-		forceHttp2           = option.Http2
-		forceHttp3           = option.Http3
-		gmTLS                = option.GmTLS
-		onlyGMTLS            = option.GmTLSOnly
-		preferGMTLS          = option.GmTLSPrefer
-		host                 = option.Host
-		port                 = option.Port
-		requestPacket        = option.Packet
-		timeout              = option.Timeout
-		connectTimeout       = option.ConnectTimeout
-		maxRetryTimes        = option.RetryTimes
-		retryInStatusCode    = option.RetryInStatusCode
-		retryNotInStatusCode = option.RetryNotInStatusCode
-		retryHandler         = option.RetryHandler
-		customFailureChecker = option.CustomFailureChecker
-		retryWaitTime        = option.RetryWaitTime
-		retryMaxWaitTime     = option.RetryMaxWaitTime
-		noFixContentLength   = option.NoFixContentLength
-		proxy                = option.Proxy
-		saveHTTPFlow         = option.SaveHTTPFlow
-		saveHTTPFlowSync     = option.SaveHTTPFlowSync
-		saveHTTPFlowHandler  = option.SaveHTTPFlowHandler
-		session              = option.Session
-		ctx                  = option.Ctx
-		traceInfo            = newLowhttpTraceInfo()
-		response             = newLowhttpResponse(traceInfo)
-		source               = option.RequestSource
-		dnsServers           = option.DNSServers
-		dnsHosts             = option.EtcHosts
-		connPool             = option.ConnPool
-		withConnPool         = option.WithConnPool
-		sni                  = option.SNI
-		payloads             = option.Payloads
-		tags                 = option.Tags
-		firstAuth            = true
-		reqIns               = option.NativeHTTPRequestInstance
-		maxContentLength     = option.MaxContentLength
-		randomJA3FingerPrint = option.RandomJA3FingerPrint
-		clientHelloSpec      = option.ClientHelloSpec
-		dialer               = option.Dialer
-		retryTimes           = 0
+		https                   = option.Https
+		forceHttp2              = option.Http2
+		forceHttp3              = option.Http3
+		gmTLS                   = option.GmTLS
+		onlyGMTLS               = option.GmTLSOnly
+		preferGMTLS             = option.GmTLSPrefer
+		host                    = option.Host
+		port                    = option.Port
+		requestPacket           = option.Packet
+		timeout                 = option.Timeout
+		connectTimeout          = option.ConnectTimeout
+		maxRetryTimes           = option.RetryTimes
+		retryInStatusCode       = option.RetryInStatusCode
+		retryNotInStatusCode    = option.RetryNotInStatusCode
+		retryHandler            = option.RetryHandler
+		customFailureChecker    = option.CustomFailureChecker
+		retryWaitTime           = option.RetryWaitTime
+		retryMaxWaitTime        = option.RetryMaxWaitTime
+		noFixContentLength      = option.NoFixContentLength
+		proxy                   = option.Proxy
+		saveHTTPFlow            = option.SaveHTTPFlow
+		saveHTTPFlowSync        = option.SaveHTTPFlowSync
+		saveHTTPFlowHandlerList = option.SaveHTTPFlowHandler
+		session                 = option.Session
+		ctx                     = option.Ctx
+		traceInfo               = newLowhttpTraceInfo()
+		response                = newLowhttpResponse(traceInfo)
+		source                  = option.RequestSource
+		dnsServers              = option.DNSServers
+		dnsHosts                = option.EtcHosts
+		connPool                = option.ConnPool
+		withConnPool            = option.WithConnPool
+		sni                     = option.SNI
+		payloads                = option.Payloads
+		tags                    = option.Tags
+		firstAuth               = true
+		reqIns                  = option.NativeHTTPRequestInstance
+		maxContentLength        = option.MaxContentLength
+		randomJA3FingerPrint    = option.RandomJA3FingerPrint
+		clientHelloSpec         = option.ClientHelloSpec
+		dialer                  = option.Dialer
+		retryTimes              = 0
 	)
 
 	retry := func(rsp *LowhttpResponse, rawBytes []byte, retryTimes int) bool {
@@ -329,6 +329,9 @@ RETRY:
 		httpctx.SetNoBodyBuffer(reqIns, true)
 	}
 
+	if option.UseMITMRule && mitmReplacerLabelingHTTPFlowFunc != nil {
+		saveHTTPFlowHandlerList = append(saveHTTPFlowHandlerList, mitmReplacerLabelingHTTPFlowFunc)
+	}
 	/*
 		save http flow defer
 	*/
@@ -338,8 +341,10 @@ RETRY:
 			response.TooLargeLimit = int64(maxContentLength)
 		}
 
-		if saveHTTPFlowHandler != nil {
-			saveHTTPFlowHandler(response)
+		if saveHTTPFlowHandlerList != nil {
+			for _, f := range saveHTTPFlowHandlerList {
+				f(response)
+			}
 		}
 
 		if response == nil || !saveHTTPFlow {
