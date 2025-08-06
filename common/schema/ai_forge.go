@@ -9,6 +9,8 @@ import (
 
 type AIForge struct {
 	gorm.Model
+
+	ForgeVerboseName   string
 	ForgeName          string `gorm:"unique_index"`
 	ForgeContent       string
 	ForgeType          string // "yak" or "json"

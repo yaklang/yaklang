@@ -180,6 +180,20 @@ func WithParam_Title(title string) PropertyOption {
 	}
 }
 
+// WithParam_Example adds an example value for a property in the JSON Schema.
+func WithParam_Example(i any) PropertyOption {
+	return func(schema map[string]any) {
+		schema["example"] = i
+	}
+}
+
+// WithParam_Raw adds a raw JSON schema object to the tool's input schema.
+func WithParam_Raw(name string, v any) PropertyOption {
+	return func(m map[string]any) {
+		m[name] = v
+	}
+}
+
 //
 // String Property Options
 //

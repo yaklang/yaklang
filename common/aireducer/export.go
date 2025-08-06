@@ -6,10 +6,11 @@ var Exports = map[string]any{
 	"NewReducerFromString": NewReducerFromString,
 
 	"reducerCallback":            WithReducerCallback,
+	"callback":                   WithReducerCallback,
 	"timeTriggerInterval":        WithTimeTriggerInterval,
 	"timeTriggerIntervalSeconds": WithTimeTriggerIntervalSeconds,
+	"chunkSize":                  WithChunkSize,
 	"context":                    WithContext,
 	"memory":                     WithMemory,
-
-	"separator": WithSeparatorTrigger,
+	"separator":                  WithSeparatorTrigger,
 }
