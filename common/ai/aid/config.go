@@ -242,6 +242,7 @@ func (c *Config) Done() {
 
 func (c *Config) Wait() {
 	c.wg.Wait()
+	c.WaitForStream()
 	return
 }
 
