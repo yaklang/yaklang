@@ -18,6 +18,12 @@ type Value struct {
 	EffectOn      Values // this value effect current value     [effectOn -> self]
 	DependOn      Values // this value depend on current value  [self -> dependOn]
 
+	// 唯一标识符
+	uuid string
+	// 用于快速去重
+	effectOnSet *utils.SafeMapWithKey[string, struct{}]
+	dependOnSet *utils.SafeMapWithKey[string, struct{}]
+
 	// inner data for ssa
 	innerValue ssa.Value
 	innerUser  ssa.User
@@ -55,6 +61,62 @@ func (v *Value) getInstruction() ssa.Instruction {
 		return v.innerUser
 	}
 	return nil
+}
+
+func (v *Value) hasDependOn(target *Value) bool {
+	if v == nil {
+		return false
+	}
+	if v.dependOnSet == nil {
+		return false
+	}
+	_, b := v.dependOnSet.Get(target.GetUUID())
+	return b
+}
+
+func (v *Value) setDependOn(target *Value) {
+	if v == nil {
+		return
+	}
+	if v.dependOnSet == nil {
+		v.dependOnSet = utils.NewSafeMapWithKey[string, struct{}]()
+	}
+	v.dependOnSet.Set(target.GetUUID(), struct{}{})
+}
+
+func (v *Value) deleteDependOn(target *Value) {
+	if v == nil || v.dependOnSet == nil {
+		return
+	}
+	v.dependOnSet.Delete(target.GetUUID())
+}
+
+func (v *Value) hasEffectOn(target *Value) bool {
+	if v == nil {
+		return false
+	}
+	if v.effectOnSet == nil {
+		return false
+	}
+	_, b := v.effectOnSet.Get(target.GetUUID())
+	return b
+}
+
+func (v *Value) setEffectOn(target *Value) {
+	if v == nil {
+		return
+	}
+	if v.effectOnSet == nil {
+		v.effectOnSet = utils.NewSafeMapWithKey[string, struct{}]()
+	}
+	v.effectOnSet.Set(target.GetUUID(), struct{}{})
+}
+
+func (v *Value) deleteEffectOn(target *Value) {
+	if v == nil || v.effectOnSet == nil {
+		return
+	}
+	v.effectOnSet.Delete(target.GetUUID())
 }
 
 func (v *Value) GetAuditNodeId() uint {
@@ -151,6 +213,14 @@ func (v *Value) GetId() int64 {
 		return -1
 	}
 	return v.getInstruction().GetId()
+}
+
+// GetUUID 返回Value的唯一标识符
+func (v *Value) GetUUID() string {
+	if v.IsNil() {
+		return ""
+	}
+	return v.uuid
 }
 
 func (v *Value) GetSSAInst() ssa.Instruction {
