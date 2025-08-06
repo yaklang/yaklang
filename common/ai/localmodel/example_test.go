@@ -18,7 +18,9 @@ func ExampleManager_StartEmbeddingService() {
 		WithDebug(true),
 		WithModelPath("/tmp/Qwen3-Embedding-0.6B-Q8_0.gguf"),
 		WithContextSize(4096),
-		WithParallelism(5),
+		WithContBatching(true),
+		WithBatchSize(1024),
+		WithThreads(8),
 	)
 	if err != nil {
 		fmt.Printf("Failed to start embedding service: %v\n", err)
@@ -81,14 +83,17 @@ func Example_withOptions() {
 
 	fmt.Printf("Default config:\n")
 	fmt.Printf("Host: %s, Port: %d\n", config.Host, config.Port)
-	fmt.Printf("Context Size: %d, Parallelism: %d\n", config.ContextSize, config.Parallelism)
+	fmt.Printf("Context Size: %d, Cont Batching: %t\n", config.ContextSize, config.ContBatching)
+	fmt.Printf("Batch Size: %d, Threads: %d\n", config.BatchSize, config.Threads)
 
 	// 应用选项
 	options := []Option{
 		WithHost("0.0.0.0"),
 		WithPort(9090),
 		WithContextSize(8192),
-		WithParallelism(8),
+		WithContBatching(false),
+		WithBatchSize(2048),
+		WithThreads(16),
 		WithDetached(true),
 		WithDebug(true),
 	}
@@ -99,7 +104,8 @@ func Example_withOptions() {
 
 	fmt.Printf("\nAfter applying options:\n")
 	fmt.Printf("Host: %s, Port: %d\n", config.Host, config.Port)
-	fmt.Printf("Context Size: %d, Parallelism: %d\n", config.ContextSize, config.Parallelism)
+	fmt.Printf("Context Size: %d, Cont Batching: %t\n", config.ContextSize, config.ContBatching)
+	fmt.Printf("Batch Size: %d, Threads: %d\n", config.BatchSize, config.Threads)
 	fmt.Printf("Detached: %t, Debug: %t\n", config.Detached, config.Debug)
 }
 
