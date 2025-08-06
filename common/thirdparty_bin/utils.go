@@ -4,40 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-
-	"github.com/yaklang/yaklang/common/utils"
 )
-
-// GetDefaultDownloadDir 获取默认下载目录
-func GetDefaultDownloadDir() (string, error) {
-	homeDir, err := utils.GetHomeDir()
-	if err != nil {
-		return "", err
-	}
-
-	downloadDir := filepath.Join(homeDir, ".yaklang", "thirdparty_bin", "downloads")
-	return downloadDir, nil
-}
-
-// GetDefaultInstallDir 获取默认安装目录
-func GetDefaultInstallDir() (string, error) {
-	homeDir, err := utils.GetHomeDir()
-	if err != nil {
-		return "", err
-	}
-
-	var installDir string
-	switch runtime.GOOS {
-	case "windows":
-		installDir = filepath.Join(homeDir, ".yaklang", "thirdparty_bin", "bin")
-	case "darwin":
-		installDir = filepath.Join(homeDir, ".yaklang", "thirdparty_bin", "bin")
-	default: // linux
-		installDir = filepath.Join(homeDir, ".yaklang", "thirdparty_bin", "bin")
-	}
-
-	return installDir, nil
-}
 
 // EnsureExecutable 确保文件具有执行权限
 func EnsureExecutable(filePath string) error {
