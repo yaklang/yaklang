@@ -33,7 +33,6 @@ func CallAITransaction(
 	var postHandlerErr error
 
 	requestOpts = append(requestOpts,
-		WithAIRequest_SeqId(seq),
 		WithAIRequest_OnAcquireSeq(func(i int64) {
 			seq = i
 		}),
@@ -48,7 +47,7 @@ func CallAITransaction(
 		rsp, err := callAi(
 			NewAIRequest(
 				c.RetryPromptBuilder(prompt, postHandlerErr),
-				requestOpts...,
+				append(requestOpts, WithAIRequest_SeqId(seq))...,
 			))
 		if err != nil {
 			c.EmitError("call ai api error: %v, retry and block it", err)
