@@ -2,14 +2,9 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-)
-
-const (
-	MITMReplacerKeyRecords     = "R1oHf8xca6CobwVg2_MITMReplacerKeyRecords"
-	MITMFilterKeyRecords       = "uWokegBnCQdnxezJtMVo_MITMFilterKeyRecords"
-	MITMHijackFilterKeyRecords = "XcCPLRElWMVjnCNT_MITMHijackFilterKeyRecords"
 )
 
 func (s *Server) SetMITMFilter(ctx context.Context, req *ypb.SetMITMFilterRequest) (*ypb.SetMITMFilterResponse, error) {
@@ -42,7 +37,7 @@ func (s *Server) SetMITMHijackFilter(ctx context.Context, req *ypb.SetMITMFilter
 	filterManager := GetMITMHijackFilterManager(projectDB)
 	filterManager.Update(req.GetFilterData())
 	filterManager.db = projectDB
-	filterManager.Save(MITMHijackFilterKeyRecords)
+	filterManager.Save(yakit.MITMHijackFilterKeyRecords)
 	return &ypb.SetMITMFilterResponse{}, nil
 }
 

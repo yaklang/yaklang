@@ -239,8 +239,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	/*
 		设置内容替换模块，通过正则驱动
 	*/
-	replacer := NewMITMReplacer(func() []*ypb.MITMContentReplacer {
-		result := yakit.GetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords)
+	replacer := yakit.NewMITMReplacer(func() []*ypb.MITMContentReplacer {
+		result := yakit.GetKey(s.GetProfileDatabase(), yakit.MITMReplacerKeyRecords)
 		if result != "" {
 			var rules []*ypb.MITMContentReplacer
 			_ = json.Unmarshal([]byte(result), &rules)
@@ -251,16 +251,16 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		return nil
 	})
 
-	replacer.AutoSaveCallback(func(items ...*MITMReplaceRule) {
+	replacer.AutoSaveCallback(func(items ...*yakit.MITMReplaceRule) {
 		if len(items) <= 0 {
-			yakit.SetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords, "[]")
+			yakit.SetKey(s.GetProfileDatabase(), yakit.MITMReplacerKeyRecords, "[]")
 			return
 		}
 		raw, err := json.Marshal(items)
 		if err != nil {
 			return
 		}
-		yakit.SetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords, string(raw))
+		yakit.SetKey(s.GetProfileDatabase(), yakit.MITMReplacerKeyRecords, string(raw))
 	})
 
 	recoverFilterAndReplacerSend := func() {
@@ -593,7 +593,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 		defer func() {
 			wsFlow := yakit.BuildWebsocketFlow(true, wshash, requireWsFrameIndexByWSHash(wshash), finalResult[:])
-			replacer.hookColorWs(finalResult, wsFlow)
+			replacer.HookColorWs(finalResult, wsFlow)
 			yakit.SaveWebsocketFlowEx(s.GetProjectDatabase(), wsFlow, func(err error) {
 				if err != nil {
 					log.Warnf("save websocket flow(from server) failed: %s", err)
@@ -739,8 +739,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		*/
 
 		// 处理响应规则
-		if replacer.haveHijackingRules() {
-			rules, rspHooked, dropped := replacer.hook(false, true, httpctx.GetRequestURL(req), rsp)
+		if replacer.HaveHijackingRules() {
+			rules, rspHooked, dropped := replacer.Hook(false, true, httpctx.GetRequestURL(req), rsp)
 			if dropped {
 				httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
 				log.Warn("response should be dropped(VIA replacer.hook)")
@@ -860,7 +860,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 		defer func() {
 			wsFlow := yakit.BuildWebsocketFlow(false, wshash, requireWsFrameIndexByWSHash(wshash), finalResult[:])
-			replacer.hookColorWs(finalResult, wsFlow)
+			replacer.HookColorWs(finalResult, wsFlow)
 			yakit.SaveWebsocketFlowEx(s.GetProjectDatabase(), wsFlow, func(err error) {
 				if err != nil {
 					log.Warnf("save websocket flow(from server) failed: %s", err)
@@ -1004,7 +1004,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			}
 		}()
 
-		rules, req1, shouldBeDropped := replacer.hook(true, false, httpctx.GetRequestURL(originReqIns), req, isHttps)
+		rules, req1, shouldBeDropped := replacer.Hook(true, false, httpctx.GetRequestURL(originReqIns), req, isHttps)
 		if shouldBeDropped {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped, true)
 			log.Warn("MITM: request dropped by hook (VIA replacer.hook)")
@@ -1326,7 +1326,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		// replacer hook color
 		if replacer != nil {
 			go func() {
-				extracted = replacer.hookColor(plainRequest, plainResponse, req, flow)
+				extracted = replacer.HookColor(plainRequest, plainResponse, req, flow)
 				close(colorCh)
 				for _, e := range extracted {
 					err = yakit.CreateOrUpdateExtractedDataEx(-1, e)

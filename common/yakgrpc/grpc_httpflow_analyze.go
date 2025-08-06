@@ -136,7 +136,7 @@ func (s *Server) AnalyzeHTTPFlow(request *ypb.AnalyzeHTTPFlowRequest, stream ypb
 }
 
 type HTTPFlowAnalyzeManger struct {
-	*mitmReplacer
+	*yakit.MitmReplacer
 	analyzeId    string
 	client       *yaklib.YakitClient
 	stream       HTTPFlowAnalyzeRequestStream
@@ -206,7 +206,7 @@ func NewHTTPFlowAnalyzeManger(
 ) (*HTTPFlowAnalyzeManger, error) {
 	m := &HTTPFlowAnalyzeManger{
 		analyzeId:    analyzeId,
-		mitmReplacer: NewMITMReplacerFromDB(MITMReplacerConfigDb),
+		MitmReplacer: yakit.NewMITMReplacerFromDB(MITMReplacerConfigDb),
 		client:       client,
 		stream:       stream,
 		ctx:          ctx,
@@ -340,7 +340,7 @@ func (m *HTTPFlowAnalyzeManger) handleWebsocket(db *gorm.DB, flow *schema.HTTPFl
 	if err != nil {
 		return err
 	}
-	handleColorAndTag := func(rule *MITMReplaceRule, wsFlow *schema.WebsocketFlow) {
+	handleColorAndTag := func(rule *yakit.MITMReplaceRule, wsFlow *schema.WebsocketFlow) {
 		err := yakit.HandleAnalyzedHTTPFlowsColorAndTag(
 			db,
 			flow,
@@ -353,7 +353,7 @@ func (m *HTTPFlowAnalyzeManger) handleWebsocket(db *gorm.DB, flow *schema.HTTPFl
 		yakit.HandleAnalyzedWebsocketFlowsColorAndTag(db, wsFlow, rule.GetColor(), rule.GetExtraTag()...)
 	}
 	for _, wsFlow := range wsFlows {
-		for _, rule := range m._mirrorRules {
+		for _, rule := range m.GetRawMirrorRules() {
 			if !rule.EnableForRequest && !rule.EnableForResponse {
 				continue
 			}
@@ -362,7 +362,7 @@ func (m *HTTPFlowAnalyzeManger) handleWebsocket(db *gorm.DB, flow *schema.HTTPFl
 				log.Errorf("unquote websocket data failed: %v", err)
 				continue
 			}
-			match, err := rule.matchRawSimple([]byte(data))
+			match, err := rule.MatchRawSimple([]byte(data))
 			if err != nil {
 				log.Errorf("match package failed: %v", err)
 				continue
@@ -413,10 +413,10 @@ func (m *HTTPFlowAnalyzeManger) ExecHotPatch(db *gorm.DB, flow *schema.HTTPFlow)
 }
 
 func (m *HTTPFlowAnalyzeManger) ExecReplacerRule(db *gorm.DB, flow *schema.HTTPFlow) error {
-	if !m.haveRules() {
+	if !m.HaveRules() {
 		return nil
 	}
-	extractData := func(pattern string, rule *MITMReplaceRule, flow *schema.HTTPFlow, isReq bool) []schema.ExtractedData {
+	extractData := func(pattern string, rule *yakit.MITMReplaceRule, flow *schema.HTTPFlow, isReq bool) []schema.ExtractedData {
 		modelFull, err := model.ToHTTPFlowGRPCModelFull(flow)
 		if err != nil {
 			return nil
@@ -461,7 +461,7 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRule(db *gorm.DB, flow *schema.HTTPF
 		}
 		return extractedData
 	}
-	getAnalyzedHTTPFlow := func(rule *MITMReplaceRule, flow *schema.HTTPFlow) *schema.AnalyzedHTTPFlow {
+	getAnalyzedHTTPFlow := func(rule *yakit.MITMReplaceRule, flow *schema.HTTPFlow) *schema.AnalyzedHTTPFlow {
 		atomic.AddInt64(&m.matchedHTTPFlowCount, 1)
 		m.notifyMatchedHTTPFlowNum()
 		analyzeResult := &schema.AnalyzedHTTPFlow{
@@ -478,7 +478,7 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRule(db *gorm.DB, flow *schema.HTTPF
 			log.Infof("save analyze result failed: %s", err)
 		}
 	}
-	handleColorAndTag := func(rule *MITMReplaceRule, flow *schema.HTTPFlow) {
+	handleColorAndTag := func(rule *yakit.MITMReplaceRule, flow *schema.HTTPFlow) {
 		err := yakit.HandleAnalyzedHTTPFlowsColorAndTag(
 			db,
 			flow,
@@ -489,8 +489,8 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRule(db *gorm.DB, flow *schema.HTTPF
 			log.Infof("handle analyzed http flows color and tag failed: %s", err)
 		}
 	}
-	for _, rule := range m._mirrorRules {
-		re, err := rule.compile()
+	for _, rule := range m.GetRawMirrorRules() {
+		re, err := rule.Compile()
 		if err != nil {
 			continue
 		}
