@@ -2,7 +2,7 @@ desc(
 	title: "Check Java Spring Boot Actuator Config"
 	title_zh: "检查Java Spring Boot Actuator配置"
 	type:config
-  desc: <<<DESC
+	desc: <<<DESC
 ### 风险描述
 
 1. **风险原理**
@@ -215,7 +215,7 @@ public class InsecureSecurityConfig extends WebSecurityConfigurerAdapter {
 TEXT
 )
 
-desc (
+desc(
 	"safefile://SecureApplicationProperties.properties": <<<CODE
 # application.properties
 spring.application.name=secure-app
