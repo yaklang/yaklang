@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"sort"
 	"sync"
 
@@ -37,13 +36,7 @@ type Manager struct {
 }
 
 // NewManager 创建新的二进制文件管理器
-func NewManager(installDir string) (*Manager, error) {
-	// 获取默认目录
-	downloadDir, err := GetDefaultDownloadDir()
-	if err != nil {
-		return nil, utils.Errorf("get default download directory failed: %v", err)
-	}
-
+func NewManager(downloadDir, installDir string) (*Manager, error) {
 	// 确保目录存在
 	if err := os.MkdirAll(downloadDir, 0755); err != nil {
 		return nil, utils.Errorf("create download directory failed: %v", err)
@@ -52,13 +45,11 @@ func NewManager(installDir string) (*Manager, error) {
 	if err := os.MkdirAll(installDir, 0755); err != nil {
 		return nil, utils.Errorf("create install directory failed: %v", err)
 	}
-
 	manager := &Manager{
 		registry:         make(map[string]*BinaryDescriptor),
 		installer:        NewInstaller(installDir, downloadDir),
 		runningProcesses: make(map[string]*RunningProcess),
 	}
-
 	return manager, nil
 }
 
@@ -541,15 +532,7 @@ func (m *Manager) GetRunningProcess(name string) (*RunningProcess, error) {
 func (m *Manager) Close() error {
 	// 停止所有运行中的进程
 	m.StopAll()
-
-	// 获取下载目录并清理临时文件
-	downloadDir, err := GetDefaultDownloadDir()
-	if err != nil {
-		return err
-	}
-
-	tempPattern := filepath.Join(downloadDir, "*.tmp")
-	return CleanupTempFiles(tempPattern)
+	return nil
 }
 
 // Register 注册二进制文件到默认管理器

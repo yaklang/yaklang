@@ -174,18 +174,32 @@ func (bi *BaseInstaller) Install(descriptor *BinaryDescriptor, options *InstallO
 		log.Infof("file checksum verified successfully")
 	}
 
+	var installErr error
 	switch descriptor.InstallType {
 	case "archive":
 		if isDir {
-			return ExtractFile(filePath, installDir, descriptor.ArchiveType, pick, true)
+			installErr = ExtractFile(filePath, installDir, descriptor.ArchiveType, pick, true)
+		} else {
+			installErr = ExtractFile(filePath, installPath, descriptor.ArchiveType, pick, false)
 		}
-		return ExtractFile(filePath, installPath, descriptor.ArchiveType, pick, false)
 	case "bin":
-		return os.Rename(filePath, installPath)
+		installErr = os.Rename(filePath, installPath)
 	default:
-		return utils.Errorf("unknown install type: %s", descriptor.InstallType)
+		installErr = utils.Errorf("unknown install type: %s", descriptor.InstallType)
 	}
 
+	// 安装完成后删除下载的文件（无论成功还是失败）
+	if descriptor.InstallType == "archive" {
+		// 对于archive类型，安装后删除下载的压缩包
+		if removeErr := os.Remove(filePath); removeErr != nil {
+			log.Warnf("failed to remove downloaded file %s: %v", filePath, removeErr)
+		} else {
+			log.Infof("downloaded file %s removed successfully", filePath)
+		}
+	}
+	// 对于bin类型，文件已经通过os.Rename移动到目标位置，无需额外删除
+
+	return installErr
 }
 
 // GetInstallDir 获取安装目录

@@ -1,7 +1,6 @@
 package thirdparty_bin
 
 import (
-	"path/filepath"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -25,12 +24,10 @@ var (
 // init 包初始化函数，自动注册内置的二进制工具
 func init() {
 	initOnce.Do(func() {
-		dirPath := filepath.Join(
-			consts.GetDefaultYakitProjectsDir(),
-			"libs",
-		)
+		installDir := consts.GetDefaultLibsDir()
+		downloadDir := consts.GetDefaultDownloadTempDir()
 		var err error
-		DefaultManager, err = NewManager(dirPath)
+		DefaultManager, err = NewManager(downloadDir, installDir)
 		if err != nil {
 			log.Errorf("create default binary manager failed: %v", err)
 		}

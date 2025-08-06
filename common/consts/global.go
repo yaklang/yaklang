@@ -286,3 +286,19 @@ func GetDefaultYakitPprofDir() string {
 	}
 	return pt
 }
+
+func GetDefaultLibsDir() string {
+	pt := filepath.Join(GetDefaultYakitProjectsDir(), "libs")
+	if !utils.IsDir(pt) {
+		os.MkdirAll(pt, 0o777)
+	}
+	return pt
+}
+
+func GetDefaultDownloadTempDir() string {
+	pt := filepath.Join(GetDefaultYakitBaseTempDir(), "download")
+	if !utils.IsDir(pt) {
+		os.MkdirAll(pt, 0o777)
+	}
+	return pt
+}
