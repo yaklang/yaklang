@@ -28,7 +28,7 @@ func (v *Value) recursive(visited map[*Value]struct{}, itemGetter func(value *Va
 func (v *Value) RecursiveDepends(h func(value *Value) error) {
 	visited := make(map[*Value]struct{})
 	v.recursive(visited, func(value *Value) []*Value {
-		return value.DependOn
+		return value.GetDependOn()
 	}, h)
 }
 
@@ -36,14 +36,14 @@ func (v *Value) RecursiveDepends(h func(value *Value) error) {
 func (v *Value) RecursiveEffects(h func(value *Value) error) {
 	visited := make(map[*Value]struct{})
 	v.recursive(visited, func(value *Value) []*Value {
-		return value.EffectOn
+		return value.GetEffectOn()
 	}, h)
 }
 
 func (v *Value) RecursiveDependsAndEffects(h func(value *Value) error) {
 	visited := make(map[*Value]struct{})
 	v.recursive(visited, func(value *Value) []*Value {
-		return append(value.DependOn, value.EffectOn...)
+		return append(value.GetDependOn(), value.GetEffectOn()...)
 	}, h)
 }
 
@@ -65,7 +65,7 @@ func (v *Value) RecursiveDependsAndEffects(h func(value *Value) error) {
 // strict common dependencies.
 func FindStrictCommonDepends(val Values) Values {
 	for _, v := range val {
-		if len(v.DependOn) == 0 && len(v.EffectOn) == 0 {
+		if v.DependOn.Count() == 0 && v.EffectOn.Count() == 0 {
 			v.GetTopDefs()
 		}
 	}
@@ -109,7 +109,7 @@ func FindStrictCommonDepends(val Values) Values {
 // dependencies by rebuilding the top-level definition.
 func FindFlexibleCommonDepends(val Values) Values {
 	for _, v := range val {
-		if len(v.DependOn) == 0 && len(v.EffectOn) == 0 {
+		if v.DependOn.Count() == 0 && v.EffectOn.Count() == 0 {
 			v.GetTopDefs()
 		}
 	}
@@ -162,14 +162,15 @@ func (v *Value) Backtrack() *omap.OrderedMap[string, *Value] {
 	for current != nil {
 		deps := current.DependOn
 		var p *Value
-		if len(deps) > 0 {
-			for _, result := range deps {
+		if deps != nil && deps.Count() > 0 {
+			deps.ForEach(func(key string, result *Value) bool {
 				if _, ok := visited[result.GetId()]; !ok {
 					visited[result.GetId()] = true
 					p = result
-					break
+					return false // break
 				}
-			}
+				return true // continue
+			})
 		} else {
 			break
 		}

@@ -81,7 +81,7 @@ func (i *Value) AppendDependOn(vs ...*Value) *Value {
 			continue
 		} else {
 			i.setDependOn(v)
-			v.AppendEffectOn(i)
+			v.setEffectOn(i)
 		}
 	}
 	return i
@@ -102,7 +102,7 @@ func (i *Value) AppendEffectOn(vs ...*Value) *Value {
 			continue
 		} else {
 			i.setEffectOn(v)
-			v.AppendDependOn(i)
+			v.setDependOn(i)
 		}
 	}
 	return i
@@ -121,7 +121,6 @@ func (i *Value) RemoveDependOn(vs ...*Value) {
 		}
 		if i.hasDependOn(v) {
 			i.deleteDependOn(v)
-			i.DependOn = utils.RemoveSliceItem(i.DependOn, v)
 		} else {
 			continue
 		}
@@ -142,7 +141,6 @@ func (i *Value) RemoveEffectOn(vs ...*Value) {
 		}
 		if i.hasEffectOn(v) {
 			i.deleteEffectOn(v)
-			i.EffectOn = utils.RemoveSliceItem(i.EffectOn, v)
 		} else {
 			continue
 		}
@@ -164,14 +162,20 @@ func MergeValues(allVs ...Values) Values {
 		}
 		if val, exist := tmp.Get(v.GetId()); exist {
 			// merge v to existValue
-			for _, effect := range v.EffectOn {
-				effect.RemoveDependOn(v)
-				val.AppendEffectOn(effect)
+			if v.EffectOn != nil {
+				v.EffectOn.ForEach(func(key string, effect *Value) bool {
+					effect.RemoveDependOn(v)
+					val.AppendEffectOn(effect)
+					return true
+				})
 			}
 
-			for _, depend := range v.DependOn {
-				depend.RemoveEffectOn(v)
-				val.AppendDependOn(depend)
+			if v.DependOn != nil {
+				v.DependOn.ForEach(func(key string, depend *Value) bool {
+					depend.RemoveEffectOn(v)
+					val.AppendDependOn(depend)
+					return true
+				})
 			}
 			for _, pred := range v.Predecessors {
 				val.Predecessors = utils.AppendSliceItemWhenNotExists(val.Predecessors, pred)

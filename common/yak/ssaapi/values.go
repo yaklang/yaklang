@@ -15,14 +15,11 @@ import (
 type Value struct {
 	runtimeCtx    *omap.OrderedMap[ContextID, *Value]
 	ParentProgram *Program
-	EffectOn      Values // this value effect current value     [effectOn -> self]
-	DependOn      Values // this value depend on current value  [self -> dependOn]
+	EffectOn      *utils.SafeMapWithKey[string, *Value]
+	DependOn      *utils.SafeMapWithKey[string, *Value]
 
 	// 唯一标识符
 	uuid string
-	// 用于快速去重
-	effectOnSet *utils.SafeMapWithKey[string, struct{}]
-	dependOnSet *utils.SafeMapWithKey[string, struct{}]
 
 	// inner data for ssa
 	innerValue ssa.Value
@@ -67,10 +64,10 @@ func (v *Value) hasDependOn(target *Value) bool {
 	if v == nil {
 		return false
 	}
-	if v.dependOnSet == nil {
+	if v.DependOn == nil {
 		return false
 	}
-	_, b := v.dependOnSet.Get(target.GetUUID())
+	_, b := v.DependOn.Get(target.GetUUID())
 	return b
 }
 
@@ -78,27 +75,27 @@ func (v *Value) setDependOn(target *Value) {
 	if v == nil {
 		return
 	}
-	if v.dependOnSet == nil {
-		v.dependOnSet = utils.NewSafeMapWithKey[string, struct{}]()
+	if v.DependOn == nil {
+		v.DependOn = utils.NewSafeMapWithKey[string, *Value]()
 	}
-	v.dependOnSet.Set(target.GetUUID(), struct{}{})
+	v.DependOn.Set(target.GetUUID(), target)
 }
 
 func (v *Value) deleteDependOn(target *Value) {
-	if v == nil || v.dependOnSet == nil {
+	if v == nil || v.DependOn == nil {
 		return
 	}
-	v.dependOnSet.Delete(target.GetUUID())
+	v.DependOn.Delete(target.GetUUID())
 }
 
 func (v *Value) hasEffectOn(target *Value) bool {
 	if v == nil {
 		return false
 	}
-	if v.effectOnSet == nil {
+	if v.EffectOn == nil {
 		return false
 	}
-	_, b := v.effectOnSet.Get(target.GetUUID())
+	_, b := v.EffectOn.Get(target.GetUUID())
 	return b
 }
 
@@ -106,17 +103,31 @@ func (v *Value) setEffectOn(target *Value) {
 	if v == nil {
 		return
 	}
-	if v.effectOnSet == nil {
-		v.effectOnSet = utils.NewSafeMapWithKey[string, struct{}]()
+	if v.EffectOn == nil {
+		v.EffectOn = utils.NewSafeMapWithKey[string, *Value]()
 	}
-	v.effectOnSet.Set(target.GetUUID(), struct{}{})
+	v.EffectOn.Set(target.GetUUID(), target)
 }
 
 func (v *Value) deleteEffectOn(target *Value) {
-	if v == nil || v.effectOnSet == nil {
+	if v == nil || v.EffectOn == nil {
 		return
 	}
-	v.effectOnSet.Delete(target.GetUUID())
+	v.EffectOn.Delete(target.GetUUID())
+}
+
+func (v *Value) GetDependOnCount() int {
+	if v == nil || v.DependOn == nil {
+		return 0
+	}
+	return v.DependOn.Count()
+}
+
+func (v *Value) EffectOnCount() int {
+	if v == nil || v.EffectOn == nil {
+		return 0
+	}
+	return v.EffectOn.Count()
 }
 
 func (v *Value) GetAuditNodeId() uint {
@@ -1049,37 +1060,72 @@ func (v *Value) GetPredecessors() []*PredecessorValue {
 }
 
 func (v *Value) GetDependOn() Values {
-	if len(v.DependOn) == 0 {
+	if v.DependOn == nil || v.DependOn.Count() == 0 {
 		if auditNode := v.auditNode; auditNode != nil {
 			nodeIds := ssadb.GetDependEdgeOnByFromNodeId(auditNode.ID)
-			var dependOn Values
+			if v.DependOn == nil {
+				v.DependOn = utils.NewSafeMapWithKey[string, *Value]()
+			}
 			for _, id := range nodeIds {
 				d := v.NewValueFromAuditNode(id)
 				if d != nil {
-					dependOn = append(dependOn, d)
+					v.DependOn.Set(d.GetUUID(), d)
 				}
 			}
-			v.DependOn = dependOn
 		}
 	}
-	return v.DependOn
+	return v.safeMapToValues(v.DependOn)
 }
 
 func (v *Value) GetEffectOn() Values {
-	if len(v.EffectOn) == 0 {
+	if v.EffectOn == nil || v.EffectOn.Count() == 0 {
 		if auditNode := v.auditNode; auditNode != nil {
 			nodeIds := ssadb.GetEffectOnEdgeByFromNodeId(auditNode.ID)
-			var effectOn Values
+			if v.EffectOn == nil {
+				v.EffectOn = utils.NewSafeMapWithKey[string, *Value]()
+			}
 			for _, id := range nodeIds {
 				e := v.NewValueFromAuditNode(id)
 				if e != nil {
-					effectOn = append(effectOn, e)
+					v.EffectOn.Set(e.GetUUID(), e)
 				}
 			}
-			v.EffectOn = effectOn
 		}
 	}
-	return v.EffectOn
+	return v.safeMapToValues(v.EffectOn)
+}
+
+func (v *Value) safeMapToValues(safeMap *utils.SafeMapWithKey[string, *Value]) Values {
+	if safeMap == nil {
+		return Values{}
+	}
+
+	var result Values
+	safeMap.ForEach(func(key string, value *Value) bool {
+		result = append(result, value)
+		return true
+	})
+	return result
+}
+
+func (v *Value) ForEachDependOn(f func(value *Value)) {
+	if v == nil || v.DependOn == nil {
+		return
+	}
+	v.DependOn.ForEach(func(key string, value *Value) bool {
+		f(value)
+		return true
+	})
+}
+
+func (v *Value) ForEachEffectOn(f func(value *Value)) {
+	if v == nil || v.EffectOn == nil {
+		return
+	}
+	v.EffectOn.ForEach(func(key string, value *Value) bool {
+		f(value)
+		return true
+	})
 }
 
 func (v *Value) AnalyzeDepth() int {
