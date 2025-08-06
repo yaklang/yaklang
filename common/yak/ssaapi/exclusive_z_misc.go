@@ -74,11 +74,15 @@ func (i *Value) AppendDependOn(vs ...*Value) *Value {
 		if v == nil {
 			continue
 		}
-		if i.GetId() == v.GetId() {
-			return i
+		if i.GetUUID() == v.GetUUID() {
+			continue
 		}
-		i.DependOn = utils.AppendSliceItemWhenNotExists(i.DependOn, v)
-		v.EffectOn = utils.AppendSliceItemWhenNotExists(v.EffectOn, i)
+		if i.hasDependOn(v) {
+			continue
+		} else {
+			i.setDependOn(v)
+			v.AppendEffectOn(i)
+		}
 	}
 	return i
 }
@@ -91,16 +95,62 @@ func (i *Value) AppendEffectOn(vs ...*Value) *Value {
 		if v == nil {
 			continue
 		}
-		if i.GetId() == v.GetId() {
-			return i
+		if i.GetUUID() == v.GetUUID() {
+			continue
 		}
-		i.EffectOn = utils.AppendSliceItemWhenNotExists(i.EffectOn, v)
-		v.DependOn = utils.AppendSliceItemWhenNotExists(v.DependOn, i)
+		if i.hasEffectOn(v) {
+			continue
+		} else {
+			i.setEffectOn(v)
+			v.AppendDependOn(i)
+		}
 	}
 	return i
 }
 
-func MergeValues(vs ...Values) Values {
+func (i *Value) RemoveDependOn(vs ...*Value) {
+	if i == nil {
+		return
+	}
+	for _, v := range vs {
+		if v == nil {
+			continue
+		}
+		if i.GetUUID() == v.GetUUID() {
+			continue
+		}
+		if i.hasDependOn(v) {
+			i.deleteDependOn(v)
+			i.DependOn = utils.RemoveSliceItem(i.DependOn, v)
+		} else {
+			continue
+		}
+	}
+	return
+}
+
+func (i *Value) RemoveEffectOn(vs ...*Value) {
+	if i == nil {
+		return
+	}
+	for _, v := range vs {
+		if v == nil {
+			continue
+		}
+		if i.GetUUID() == v.GetUUID() {
+			continue
+		}
+		if i.hasEffectOn(v) {
+			i.deleteEffectOn(v)
+			i.EffectOn = utils.RemoveSliceItem(i.EffectOn, v)
+		} else {
+			continue
+		}
+	}
+	return
+}
+
+func MergeValues(allVs ...Values) Values {
 	tmp := omap.NewEmptyOrderedMap[int64, *Value]()
 	templateValue := make(Values, 0)
 	checkAndMerge := func(v *Value) {
@@ -115,15 +165,14 @@ func MergeValues(vs ...Values) Values {
 		if val, exist := tmp.Get(v.GetId()); exist {
 			// merge v to existValue
 			for _, effect := range v.EffectOn {
-				effect.DependOn = utils.RemoveSliceItem(effect.DependOn, v)
+				effect.RemoveDependOn(v)
 				val.AppendEffectOn(effect)
 			}
 
 			for _, depend := range v.DependOn {
-				depend.EffectOn = utils.RemoveSliceItem(depend.EffectOn, v)
+				depend.RemoveEffectOn(v)
 				val.AppendDependOn(depend)
 			}
-
 			for _, pred := range v.Predecessors {
 				val.Predecessors = utils.AppendSliceItemWhenNotExists(val.Predecessors, pred)
 			}
@@ -132,7 +181,8 @@ func MergeValues(vs ...Values) Values {
 			tmp.Set(v.GetId(), v)
 		}
 	}
-	for _, vs := range vs {
+
+	for _, vs := range allVs {
 		for _, v := range vs {
 			checkAndMerge(v)
 		}
