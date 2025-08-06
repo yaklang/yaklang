@@ -9,8 +9,8 @@ var Exports = map[string]any{
 	"callback":                   WithReducerCallback,
 	"timeTriggerInterval":        WithTimeTriggerInterval,
 	"timeTriggerIntervalSeconds": WithTimeTriggerIntervalSeconds,
-	"chunkSize":                  WithChunkSize,
 	"context":                    WithContext,
 	"memory":                     WithMemory,
-	"separator":                  WithSeparatorTrigger,
+
+	"separator": WithSeparatorTrigger,
 }
