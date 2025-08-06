@@ -276,52 +276,56 @@ func (r *Config) EmitToolCallStd(toolName string, stdOut, stdErr io.Reader, task
 	r.EmitStreamEventEx(fmt.Sprintf("tool-%v-stderr", toolName), startTime, stdErr, taskIndex, true)
 }
 
-func (r *Config) EmitStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string) {
-	r.EmitStreamEventEx(nodeId, startTime, reader, taskIndex, false)
+func (r *Config) EmitStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, finishCallback ...func()) {
+	r.EmitStreamEventEx(nodeId, startTime, reader, taskIndex, false, finishCallback...)
 }
 
-func (r *Config) EmitStreamEventEx(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, disableMarkdown bool) {
+func (r *Config) EmitStreamEventEx(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, disableMarkdown bool, finishCallback ...func()) {
 	r.emitExStreamEvent(&streamEvent{
-		disableMarkdown: disableMarkdown,
-		startTime:       startTime,
-		isSystem:        false,
-		isReason:        false,
-		reader:          reader,
-		nodeId:          nodeId,
-		taskIndex:       taskIndex,
+		disableMarkdown:    disableMarkdown,
+		startTime:          startTime,
+		isSystem:           false,
+		isReason:           false,
+		reader:             reader,
+		nodeId:             nodeId,
+		taskIndex:          taskIndex,
+		emitFinishCallback: finishCallback,
 	})
 }
 
-func (r *Config) EmitSystemStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string) {
+func (r *Config) EmitSystemStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, finishCallback ...func()) {
 	r.emitExStreamEvent(&streamEvent{
-		startTime: startTime,
-		isSystem:  true,
-		isReason:  false,
-		reader:    reader,
-		nodeId:    nodeId,
-		taskIndex: taskIndex,
+		startTime:          startTime,
+		isSystem:           true,
+		isReason:           false,
+		reader:             reader,
+		nodeId:             nodeId,
+		taskIndex:          taskIndex,
+		emitFinishCallback: finishCallback,
 	})
 }
 
-func (r *Config) EmitReasonStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string) {
+func (r *Config) EmitReasonStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, finishCallback ...func()) {
 	r.emitExStreamEvent(&streamEvent{
-		startTime: startTime,
-		isSystem:  false,
-		isReason:  true,
-		reader:    reader,
-		nodeId:    nodeId,
-		taskIndex: taskIndex,
+		startTime:          startTime,
+		isSystem:           false,
+		isReason:           true,
+		reader:             reader,
+		nodeId:             nodeId,
+		taskIndex:          taskIndex,
+		emitFinishCallback: finishCallback,
 	})
 }
 
-func (r *Config) EmitSystemReasonStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string) {
+func (r *Config) EmitSystemReasonStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, finishCallback ...func()) {
 	r.emitExStreamEvent(&streamEvent{
-		startTime: startTime,
-		isSystem:  true,
-		isReason:  true,
-		reader:    reader,
-		nodeId:    nodeId,
-		taskIndex: taskIndex,
+		startTime:          startTime,
+		isSystem:           true,
+		isReason:           true,
+		reader:             reader,
+		nodeId:             nodeId,
+		taskIndex:          taskIndex,
+		emitFinishCallback: finishCallback,
 	})
 }
 
@@ -403,19 +407,25 @@ func (r *Config) EmitSystemPrompt(step string, prompt string) {
 }
 
 type streamEvent struct {
-	startTime       time.Time
-	isSystem        bool
-	isReason        bool
-	reader          io.Reader
-	nodeId          string
-	taskIndex       string
-	disableMarkdown bool
+	startTime          time.Time
+	isSystem           bool
+	isReason           bool
+	reader             io.Reader
+	nodeId             string
+	taskIndex          string
+	disableMarkdown    bool
+	emitFinishCallback []func()
 }
 
 func (r *Config) emitExStreamEvent(e *streamEvent) {
 	r.streamWaitGroup.Add(1)
 	go func() {
 		defer r.streamWaitGroup.Done()
+		defer func() {
+			for _, f := range e.emitFinishCallback {
+				f()
+			}
+		}()
 
 		io.Copy(&eventWriteProducer{
 			coordinatorId:   r.id,
