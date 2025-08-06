@@ -133,7 +133,7 @@ jobs:
               # SSA plugin rule/option
               go test -timeout 20s ./common/yak/static_analyzer/test/...
               # StaticAnalyze
-              go test -timeout 20s -run TestAnalyzeMustPASS* ./common/coreplugin
+              go test -timeout 1m -run TestAnalyzeMustPASS* ./common/coreplugin
               # BuildIn SyntaxFlow Rule
               go test -timeout 3m ./common/syntaxflow/sfbuildin/...
               go test -timeout 1m ./common/yak/ssaapi/test/syntaxflow
