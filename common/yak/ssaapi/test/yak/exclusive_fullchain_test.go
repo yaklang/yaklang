@@ -45,14 +45,14 @@ func TestChain_Basic(t *testing.T) {
 	d.GetTopDefs()
 
 	test := assert.New(t)
-	test.Equal(2, len(d.DependOn))
-	for _, n := range d.DependOn {
+	test.Equal(2, d.GetDependOnCount())
+	d.ForEachDependOn(func(n *ssaapi.Value) {
 		if n.GetName() == "e" {
-			test.Equal(0, len(n.DependOn))
+			test.Equal(0, n.GetDependOnCount())
 		} else {
-			test.Equal(2, len(n.DependOn))
+			test.Equal(2, n.GetDependOnCount())
 		}
-	}
+	})
 }
 
 func TestChain_Basic2(t *testing.T) {
@@ -64,14 +64,14 @@ func TestChain_Basic2(t *testing.T) {
 	d.GetTopDefs()
 
 	test := assert.New(t)
-	test.Equal(2, len(d.DependOn))
-	for _, n := range d.DependOn {
+	test.Equal(2, d.GetDependOnCount())
+	d.ForEachDependOn(func(n *ssaapi.Value) {
 		if n.GetName() == "e" {
-			test.Equal(0, len(n.DependOn))
+			test.Equal(0, n.GetDependOnCount())
 		} else {
-			test.Equal(2, len(n.DependOn))
+			test.Equal(2, n.GetDependOnCount())
 		}
-	}
+	})
 }
 
 func TestChain_Phi_If(t *testing.T) {
@@ -93,7 +93,7 @@ g=d+a;`)
 	// checkDotPhi := false
 	prog.Show()
 	prog.Ref("g").FullUseDefChain(func(value *ssaapi.Value) {
-		value.DependOn.ForEach(func(value *ssaapi.Value) {
+		value.ForEachDependOn(func(value *ssaapi.Value) {
 			if value.IsPhi() {
 				checkPhi = true
 			}
@@ -143,7 +143,7 @@ g=d+a;`)
 	checkDotPhi := false
 	prog.Show()
 	prog.Ref("g").FullUseDefChain(func(value *ssaapi.Value) {
-		value.DependOn.ForEach(func(value *ssaapi.Value) {
+		value.ForEachDependOn(func(value *ssaapi.Value) {
 			if value.IsPhi() {
 				checkPhi = true
 			}
@@ -181,10 +181,10 @@ f = b(2,3,4)`
 		dot.ShowDotGraphToAsciiArt(value.DotGraph())
 		value.GetTopDefs().ForEach(func(value *ssaapi.Value) {
 			ret := value.GetConstValue()
-			if ret == 2 && len(value.EffectOn) == 1 {
+			if ret == 2 && value.EffectOn.Count() == 1 {
 				check2 = true
 			}
-			if ret == 3 && len(value.EffectOn) == 1 {
+			if ret == 3 && value.EffectOn.Count() == 1 {
 				check3 = true
 			}
 		})
