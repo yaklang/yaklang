@@ -34,12 +34,12 @@ binaries:
     download_info_map:
       darwin-amd64:
         url: "https://yaklang.oss-cn-beijing.aliyuncs.com/llama.cpp/llama-b5702-bin-macos-x64.zip"
-        pick: "build/bin/llama-server"
+        pick: "build/bin/*"
         bin_dir: "llama-server"
         bin_path: "llama-server/llama-server"
       darwin-arm64:
         url: "https://yaklang.oss-cn-beijing.aliyuncs.com/llama.cpp/llama-b5712-bin-macos-arm64.zip"
-        pick: "build/bin/llama-server"
+        pick: "build/bin/*"
         bin_dir: "llama-server"
         bin_path: "llama-server/llama-server"
       windows-amd64:

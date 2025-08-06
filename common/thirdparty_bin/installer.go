@@ -90,21 +90,29 @@ func (bi *BaseInstaller) GetDownloadInfo(descriptor *BinaryDescriptor) (*Downloa
 
 // Install 安装二进制文件
 func (bi *BaseInstaller) Install(descriptor *BinaryDescriptor, options *InstallOptions) error {
+	log.Infof("start to get download info for binary: %s", descriptor.Name)
 	downloadInfo, err := bi.GetDownloadInfo(descriptor)
 	if err != nil {
+		log.Infof("failed to get download info for binary: %s, error: %v", descriptor.Name, err)
 		return err
 	}
+	log.Infof("download info for binary %s: url=%s, bin_path=%s, bin_dir=%s, pick=%s, checksum=%s", descriptor.Name, downloadInfo.URL, downloadInfo.BinPath, downloadInfo.BinDir, downloadInfo.Pick, downloadInfo.Checksums)
 
 	// 判断是否安装
+	log.Infof("checking if binary %s is already installed", descriptor.Name)
 	installed := bi.IsInstalled(descriptor)
 	if installed {
+		log.Infof("binary %s is already installed", descriptor.Name)
 		if options.Force {
+			log.Infof("force option is set, uninstalling binary %s", descriptor.Name)
 			err := bi.Uninstall(descriptor)
 			if err != nil {
+				log.Infof("failed to uninstall binary %s: %v", descriptor.Name, err)
 				return utils.Errorf("uninstall failed: %v", err)
 			}
+			log.Infof("uninstall binary %s success", descriptor.Name)
 		} else {
-			log.Infof("binary %s already installed at %s", descriptor.Name, bi.GetInstallPath(descriptor))
+			log.Infof("binary %s already installed at %s, skipping install", descriptor.Name, bi.GetInstallPath(descriptor))
 			return nil
 		}
 	}
@@ -112,16 +120,24 @@ func (bi *BaseInstaller) Install(descriptor *BinaryDescriptor, options *InstallO
 	installPath := bi.GetInstallPath(descriptor)
 	installDir := bi.GetInstallDir(descriptor)
 	isDir := installDir != ""
+	log.Infof("install path for binary %s: %s", descriptor.Name, installPath)
+	log.Infof("install dir for binary %s: %s", descriptor.Name, installDir)
 	// 确保安装目录存在
 	if installDir != "" {
+		log.Infof("ensuring install directory exists: %s", installDir)
 		if err := os.MkdirAll(installDir, 0755); err != nil {
+			log.Infof("failed to create install directory %s: %v", installDir, err)
 			return utils.Errorf("create install directory failed: %v", err)
 		}
+		log.Infof("install directory %s created or already exists", installDir)
 	} else {
 		installDir = filepath.Dir(installPath)
+		log.Infof("ensuring install directory exists: %s", installDir)
 		if err := os.MkdirAll(installDir, 0755); err != nil {
+			log.Infof("failed to create install directory %s: %v", installDir, err)
 			return utils.Errorf("create install directory failed: %v", err)
 		}
+		log.Infof("install directory %s created or already exists", installDir)
 	}
 
 	// 下载文件
@@ -132,32 +148,59 @@ func (bi *BaseInstaller) Install(descriptor *BinaryDescriptor, options *InstallO
 	if filename == "" {
 		filename = descriptor.Name
 	}
+	log.Infof("downloading file for binary %s from url: %s, filename: %s", descriptor.Name, downloadInfoURL, filename)
 
 	filePath, err := bi.downloadFile(downloadInfoURL, filename, options)
 	if err != nil {
+		log.Infof("failed to download file for binary %s: %v", descriptor.Name, err)
 		return utils.Errorf("download failed: %v", err)
 	}
+	log.Infof("file downloaded for binary %s: %s", descriptor.Name, filePath)
 
 	// 验证文件校验和
 	if fileChecksum != "" {
+		log.Infof("verifying file checksum for %s, expected: %s", filePath, fileChecksum)
 		if err := bi.verifyFile(filePath, fileChecksum); err != nil {
+			log.Infof("file checksum verification failed for %s: %v", filePath, err)
 			return utils.Errorf("file verification failed: %v", err)
 		}
-		log.Infof("file checksum verified successfully")
+		log.Infof("file checksum verified successfully for %s", filePath)
 	}
 
+	log.Infof("start install process, install type: %s, file: %s", descriptor.InstallType, filePath)
 	switch descriptor.InstallType {
 	case "archive":
 		if isDir {
-			return ExtractFile(filePath, installDir, descriptor.ArchiveType, pick, true)
+			log.Infof("extracting archive to directory: %s, archive type: %s, pick: %s", installDir, descriptor.ArchiveType, pick)
+			err := ExtractFile(filePath, installDir, descriptor.ArchiveType, pick, true)
+			if err != nil {
+				log.Infof("extract archive failed: %v", err)
+			} else {
+				log.Infof("extract archive to directory %s success", installDir)
+			}
+			return err
 		}
-		return ExtractFile(filePath, installPath, descriptor.ArchiveType, pick, false)
+		log.Infof("extracting archive to file: %s, archive type: %s, pick: %s", installPath, descriptor.ArchiveType, pick)
+		err := ExtractFile(filePath, installPath, descriptor.ArchiveType, pick, false)
+		if err != nil {
+			log.Infof("extract archive failed: %v", err)
+		} else {
+			log.Infof("extract archive to file %s success", installPath)
+		}
+		return err
 	case "bin":
-		return os.Rename(filePath, installPath)
+		log.Infof("moving binary file from %s to %s", filePath, installPath)
+		err := os.Rename(filePath, installPath)
+		if err != nil {
+			log.Infof("move binary file failed: %v", err)
+		} else {
+			log.Infof("move binary file to %s success", installPath)
+		}
+		return err
 	default:
+		log.Infof("unknown install type: %s", descriptor.InstallType)
 		return utils.Errorf("unknown install type: %s", descriptor.InstallType)
 	}
-
 }
 
 // GetInstallPath 获取安装路径
