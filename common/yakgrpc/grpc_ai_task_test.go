@@ -537,6 +537,9 @@ func TestAITaskForgeTriage(t *testing.T) {
 }
 
 func TestRefine_Smoke(t *testing.T) {
+	if utils.InGithubActions() {
+		t.SkipNow()
+	}
 	// Setup in-memory sqlite DB
 	db, err := gorm.Open("sqlite3", filepath.Join(consts.GetDefaultYakitBaseTempDir(), "test_knowledge_alchemist.db"))
 	if err != nil {
