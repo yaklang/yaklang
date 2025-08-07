@@ -1,6 +1,7 @@
 package rag
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -59,31 +60,50 @@ func NewRAGSystem(embedder EmbeddingClient, store VectorStore) *RAGSystem {
 }
 
 func (r *RAGSystem) Add(docId string, content string, opts ...DocumentOption) error {
+	log.Infof("adding document with id: %s, content length: %d", docId, len(content))
 	doc := &Document{
 		ID:        docId,
 		Content:   content,
 		Metadata:  make(map[string]any),
 		Embedding: nil,
 	}
-	for _, opt := range opts {
+	log.Infof("applying %d document options", len(opts))
+	for i, opt := range opts {
+		log.Infof("applying document option %d", i+1)
 		opt(doc)
 	}
+	log.Infof("document metadata after options: %+v", doc.Metadata)
 	return r.addDocuments(*doc)
 }
 
 // AddDocuments 添加文档到 RAG 系统
 func (r *RAGSystem) addDocuments(docs ...Document) error {
+	log.Infof("adding %d documents to RAG system", len(docs))
 	// 为每个文档生成嵌入向量
 	for i := range docs {
+		log.Infof("generating embedding for document %s (index %d)", docs[i].ID, i)
 		embedding, err := r.Embedder.Embedding(docs[i].Content)
 		if err != nil {
+			log.Errorf("failed to generate embedding for document %s: %v", docs[i].ID, err)
 			return utils.Errorf("failed to generate embedding for document %s: %v", docs[i].ID, err)
 		}
+		if len(embedding) <= 0 {
+			log.Errorf("empty embedding generated for document %s", docs[i].ID)
+			return utils.Errorf("failed to generate embedding for document (empty embedding) %s", docs[i].ID)
+		}
+		log.Infof("successfully generated embedding for document %s, dimension: %d", docs[i].ID, len(embedding))
 		docs[i].Embedding = embedding
 	}
 
+	log.Infof("adding %d documents with embeddings to vector store", len(docs))
 	// 添加到向量存储
-	return r.VectorStore.Add(docs...)
+	err := r.VectorStore.Add(docs...)
+	if err != nil {
+		log.Errorf("failed to add documents to vector store: %v", err)
+		return err
+	}
+	log.Infof("successfully added %d documents to vector store", len(docs))
+	return nil
 }
 
 // Query 根据查询文本检索相关文档并返回结果
