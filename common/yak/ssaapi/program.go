@@ -29,7 +29,7 @@ type Program struct {
 	// come from database will affect search operation
 	comeFromDatabase bool
 	//value cache
-	nodeId2ValueCache *utils.CacheWithKey[uint, *Value]
+	nodeUUId2ValueCache *utils.CacheWithKey[string, *Value]
 }
 
 type Programs []*Program
@@ -76,10 +76,10 @@ func (p *Program) Hash() (string, bool) {
 
 func NewProgram(prog *ssa.Program, config *config) *Program {
 	p := &Program{
-		Program:           prog,
-		config:            config,
-		enableDatabase:    config.enableDatabase != ssa.ProgramCacheMemory,
-		nodeId2ValueCache: utils.NewTTLCacheWithKey[uint, *Value](8 * time.Second),
+		Program:             prog,
+		config:              config,
+		enableDatabase:      config.enableDatabase,
+		nodeUUId2ValueCache: utils.NewTTLCacheWithKey[string, *Value](8 * time.Second),
 	}
 
 	// if config.DatabaseProgramName == "" {
@@ -244,24 +244,24 @@ func (p *Program) GetValueByIdMust(id int64) *Value {
 }
 
 // from audit node id
-func (v *Value) NewValueFromAuditNode(nodeID uint) *Value {
-	value := v.ParentProgram.NewValueFromAuditNode(nodeID)
+func (v *Value) NewValueFromAuditNode(nodeUUID string) *Value {
+	value := v.ParentProgram.NewValueFromAuditNode(nodeUUID)
 	return value
 }
 
-func (p *Program) NewValueFromAuditNode(nodeID uint) *Value {
-	if nodeID == 0 {
+func (p *Program) NewValueFromAuditNode(nodeUUID string) *Value {
+	if nodeUUID == "" {
 		return nil
 	}
 
 	// check cache
-	if val, ok := p.nodeId2ValueCache.Get(nodeID); ok {
+	if val, ok := p.nodeUUId2ValueCache.Get(nodeUUID); ok {
 		return val
 	}
 
-	auditNode, err := ssadb.GetAuditNodeById(nodeID)
+	auditNode, err := ssadb.GetAuditNodeById(nodeUUID)
 	if err != nil {
-		log.Errorf("NewValueFromDB: audit node not found: %d", nodeID)
+		log.Errorf("NewValueFromDB: audit node not found: %s", nodeUUID)
 		return nil
 	}
 	// if auditNode is -1,check it.
@@ -292,7 +292,7 @@ func (p *Program) NewValueFromAuditNode(nodeID uint) *Value {
 	val.auditNode = auditNode
 
 	// save cache
-	p.nodeId2ValueCache.Set(nodeID, val)
+	p.nodeUUId2ValueCache.Set(nodeUUID, val)
 
 	return val
 }

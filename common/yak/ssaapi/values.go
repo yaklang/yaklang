@@ -1039,10 +1039,10 @@ func (v *Value) GetCallee() *Value {
 func (v *Value) GetPredecessors() []*PredecessorValue {
 	if len(v.Predecessors) == 0 {
 		if auditNode := v.auditNode; auditNode != nil {
-			edges := ssadb.GetPredecessorEdgeByFromID(auditNode.ID)
+			edges := ssadb.GetPredecessorEdgeByFromUUID(auditNode.UUID)
 			var preds []*PredecessorValue
 			for _, edge := range edges {
-				p := v.NewValueFromAuditNode(uint(edge.ToNode))
+				p := v.NewValueFromAuditNode(edge.ToNode)
 				if p != nil {
 					preds = append(preds, &PredecessorValue{
 						Node: p,

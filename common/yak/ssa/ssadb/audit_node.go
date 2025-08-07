@@ -27,6 +27,8 @@ type AuditNode struct {
 	gorm.Model
 
 	AuditNodeStatus
+
+	UUID string `json:"uuid" gorm:"unique_index"`
 	// is entry node
 	IsEntryNode bool `json:"is_entry_node" gorm:"index"`
 	// value
@@ -84,59 +86,59 @@ func GetResultValueByVariable(db *gorm.DB, resultID uint, resultVariable string)
 	return items, nil
 }
 
-func GetResultNodeByVariableIndex(db *gorm.DB, resultID uint, resultVariable string, resultIndex uint) (uint, error) {
+func GetResultNodeByVariableIndex(db *gorm.DB, resultID uint, resultVariable string, resultIndex uint) (string, error) {
 	var node AuditNode
 	if err := db.Model(&AuditNode{}).
 		Where("result_id = ? and result_variable = ? and result_index = ? and is_entry_node = true ",
 			resultID, resultVariable, resultIndex).First(&node).Error; err != nil {
-		return 0, err
+		return "", err
 	}
-	return uint(node.ID), nil
+	return node.UUID, nil
 }
 
-func GetResultNodeByVariable(db *gorm.DB, resultID uint, resultVariable string) ([]uint, error) {
+func GetResultNodeByVariable(db *gorm.DB, resultID uint, resultVariable string) ([]string, error) {
 	// db = db.Debug()
 	// get andit node by result_id, unique by result_variable, and get number of result_variable
-	var items []uint
+	var items []string
 	if err := db.Model(&AuditNode{}).Order("result_index ASC, id ASC").
 		Where("result_id = ? and result_variable = ? and is_entry_node = true", resultID, resultVariable).
-		Pluck("id", &items).Error; err != nil {
+		Pluck("uuid", &items).Error; err != nil {
 		return nil, err
 	}
 	return items, nil
 }
 
-func GetEffectOnEdgeByFromNodeId(id uint) []uint {
+func GetEffectOnEdgeByFromNodeId(id uint) []string {
 	db := GetDB()
-	var effectOns []uint
+	var effectOns []string
 	db.Model(&AuditEdge{}).
 		Where(" from_node = ? AND edge_type = ? ", id, EdgeType_EffectsOn).
 		Pluck("to_node", &effectOns)
 	return effectOns
 }
 
-func GetDependEdgeOnByFromNodeId(id uint) []uint {
+func GetDependEdgeOnByFromNodeId(id uint) []string {
 	db := GetDB()
-	var dependOns []uint
+	var dependOns []string
 	db.Model(&AuditEdge{}).
 		Where("from_node =? AND edge_type = ? ", id, EdgeType_DependsOn).
 		Pluck("to_node", &dependOns)
 	return dependOns
 }
 
-func GetPredecessorEdgeByFromID(fromId uint) []*AuditEdge {
+func GetPredecessorEdgeByFromUUID(fromUUID string) []*AuditEdge {
 	db := GetDB()
 	var edges []*AuditEdge
 	db.Model(&AuditEdge{}).
-		Where("from_node = ? AND edge_type = ?", fromId, EdgeType_Predecessor).
+		Where("from_node = ? AND edge_type = ?", fromUUID, EdgeType_Predecessor).
 		Scan(&edges)
 	return edges
 }
 
-func GetAuditNodeById(id uint) (*AuditNode, error) {
+func GetAuditNodeById(nodeId string) (*AuditNode, error) {
 	db := GetDB()
 	var an AuditNode
-	if err := db.Model(&AuditNode{}).Where("id = ?", id).First(&an).Error; err != nil {
+	if err := db.Model(&AuditNode{}).Where("uuid = ?", nodeId).First(&an).Error; err != nil {
 		return nil, err
 	} else {
 		return &an, nil
@@ -162,8 +164,8 @@ type AuditEdge struct {
 	ResultId uint `json:"result_id" gorm:"index"`
 
 	// edge
-	FromNode uint `json:"from_node" gorm:"index"`
-	ToNode   uint `json:"to_node" gorm:"index"`
+	FromNode string `json:"from_node" gorm:"index"`
+	ToNode   string `json:"to_node" gorm:"index"`
 
 	// program
 	ProgramName string `json:"program_name"`
@@ -176,11 +178,11 @@ type AuditEdge struct {
 	AnalysisLabel string
 }
 
-func (n *AuditNode) CreateDependsOnEdge(progName string, to uint) *AuditEdge {
+func (n *AuditNode) CreateDependsOnEdge(progName string, toUUID string) *AuditEdge {
 	ae := &AuditEdge{
 		ProgramName: progName,
-		FromNode:    n.ID,
-		ToNode:      to,
+		FromNode:    n.UUID,
+		ToNode:      toUUID,
 		EdgeType:    EdgeType_DependsOn,
 		TaskId:      n.TaskId,
 		ResultId:    n.ResultId,
@@ -188,10 +190,10 @@ func (n *AuditNode) CreateDependsOnEdge(progName string, to uint) *AuditEdge {
 	return ae
 }
 
-func (n *AuditNode) CreateEffectsOnEdge(progName string, to uint) *AuditEdge {
+func (n *AuditNode) CreateEffectsOnEdge(progName string, to string) *AuditEdge {
 	ae := &AuditEdge{
 		ProgramName: progName,
-		FromNode:    n.ID,
+		FromNode:    n.UUID,
 		ToNode:      to,
 		EdgeType:    EdgeType_EffectsOn,
 		TaskId:      n.TaskId,
@@ -200,10 +202,10 @@ func (n *AuditNode) CreateEffectsOnEdge(progName string, to uint) *AuditEdge {
 	return ae
 }
 
-func (n *AuditNode) CreatePredecessorEdge(progName string, to uint, step int64, label string) *AuditEdge {
+func (n *AuditNode) CreatePredecessorEdge(progName string, to string, step int64, label string) *AuditEdge {
 	ae := &AuditEdge{
 		ProgramName:   progName,
-		FromNode:      n.ID,
+		FromNode:      n.UUID,
 		ToNode:        to,
 		EdgeType:      EdgeType_Predecessor,
 		AnalysisStep:  step,

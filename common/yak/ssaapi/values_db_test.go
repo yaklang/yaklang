@@ -108,11 +108,11 @@ func TestValuesDB_Save_Audit_Node(t *testing.T) {
 		require.Equal(t, len(values), len(entryNodes))
 
 		// check Edge
-		getNodeByIrCodeId := func(irCodeId int64) []int64 {
+		getNodeByIrCodeId := func(irCodeId int64) []string {
 			var nodes []*ssadb.AuditNode
 			db.Model(&ssadb.AuditNode{}).Where("program_name = ? AND ir_code_id = ?", progName, irCodeId).Find(&nodes)
-			ids := lo.Map(nodes, func(item *ssadb.AuditNode, index int) int64 {
-				return int64(item.ID)
+			ids := lo.Map(nodes, func(item *ssadb.AuditNode, index int) string {
+				return item.UUID
 			})
 			return ids
 		}
@@ -124,8 +124,8 @@ func TestValuesDB_Save_Audit_Node(t *testing.T) {
 			node3 := getNodeByIrCodeId(3)
 
 			var (
-				edge3a []uint
-				edge3b []uint
+				edge3a []string
+				edge3b []string
 			)
 
 			var edge3_1 []*ssadb.AuditEdge
