@@ -773,7 +773,10 @@ func CheckSyntaxFlowDotGraph(
 			result := values.GetValues(variableName)
 			require.Greater(t, result.Len(), 0)
 			result.Show()
-			dotGraph := ssaapi.NewValuesGraph(result)
+			dotGraph := ssaapi.NewValuesGraph(
+				result,
+				ssaapi.WithValueGraphEdgeMode(ssaapi.EdgeModeOnlyDependOn), // 为了方便测试，路径统一了方向
+			)
 			if showDot {
 				fmt.Printf("------VariableName:%s-------\n", variableName)
 				dotGraph.ShowDot()
