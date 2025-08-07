@@ -4,14 +4,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/utils/pandocutils"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/utils/pandocutils"
 
 	"github.com/pkg/errors"
 	"github.com/tevino/abool"
@@ -376,6 +378,8 @@ func initYaklangLib() {
 	yaklang.Import("pandoc", pandocutils.Exports)
 
 	yaklang.Import("toolbox", thirdparty_bin.Exports)
+
+	yaklang.Import("rag", rag.Exports)
 }
 
 type ScriptEngine struct {

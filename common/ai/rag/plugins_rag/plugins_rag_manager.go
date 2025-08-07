@@ -342,15 +342,8 @@ func (m *PluginsRagManager) indexSinglePlugin(meta *PluginMetadata) error {
 }
 
 func (m *PluginsRagManager) indexSinglePluginOnce(meta *PluginMetadata) error {
-	// 创建文档
-	doc := rag.Document{
-		ID:       meta.DocID,
-		Content:  meta.DocumentContent,
-		Metadata: meta.Metadata,
-	}
-
 	// 添加到 RAG 系统
-	err := m.RagSystem.AddDocuments(doc)
+	err := m.RagSystem.Add(meta.DocID, meta.DocumentContent, rag.WithDocumentRawMetadata(meta.Metadata))
 	if err != nil {
 		return utils.Errorf("添加插件文档到 RAG 系统失败: %v", err)
 	}

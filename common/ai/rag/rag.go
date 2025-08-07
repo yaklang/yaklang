@@ -58,8 +58,21 @@ func NewRAGSystem(embedder EmbeddingClient, store VectorStore) *RAGSystem {
 	}
 }
 
+func (r *RAGSystem) Add(docId string, content string, opts ...DocumentOption) error {
+	doc := &Document{
+		ID:        docId,
+		Content:   content,
+		Metadata:  make(map[string]any),
+		Embedding: nil,
+	}
+	for _, opt := range opts {
+		opt(doc)
+	}
+	return r.addDocuments(*doc)
+}
+
 // AddDocuments 添加文档到 RAG 系统
-func (r *RAGSystem) AddDocuments(docs ...Document) error {
+func (r *RAGSystem) addDocuments(docs ...Document) error {
 	// 为每个文档生成嵌入向量
 	for i := range docs {
 		embedding, err := r.Embedder.Embedding(docs[i].Content)

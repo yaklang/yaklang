@@ -54,7 +54,7 @@ func BuildVectorIndexForKnowledgeBaseEntry(db *gorm.DB, id int64, opts ...any) (
 		Metadata: metadata,
 	}
 
-	err = rag.AddDocuments(doc)
+	err = rag.addDocuments(doc)
 	if err != nil {
 		count, err := rag.CountDocuments()
 		if err != nil {
@@ -142,7 +142,7 @@ func BuildVectorIndexForKnowledgeBase(db *gorm.DB, id int64, opts ...any) (*RAGS
 				Metadata: metadata,
 			}
 
-			err = rag.AddDocuments(doc)
+			err = rag.addDocuments(doc)
 			if err != nil {
 				count, coutnErr := rag.CountDocuments()
 				if coutnErr != nil {
