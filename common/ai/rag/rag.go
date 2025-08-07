@@ -59,6 +59,44 @@ func NewRAGSystem(embedder EmbeddingClient, store VectorStore) *RAGSystem {
 	}
 }
 
+// NewRAGSystemWithLocalEmbedding 创建使用本地模型嵌入的 RAG 系统
+// 自动启动本地嵌入服务，如果无法启动则报错
+func NewRAGSystemWithLocalEmbedding(store VectorStore) (*RAGSystem, error) {
+	log.Infof("creating RAG system with local embedding service")
+
+	// 获取本地嵌入服务单例
+	embeddingService, err := GetLocalEmbeddingService()
+	if err != nil {
+		log.Errorf("failed to get local embedding service: %v", err)
+		return nil, utils.Errorf("failed to initialize local embedding service: %v", err)
+	}
+
+	log.Infof("successfully initialized RAG system with local embedding at %s", embeddingService.GetAddress())
+
+	return &RAGSystem{
+		Embedder:    embeddingService,
+		VectorStore: store,
+	}, nil
+}
+
+// NewDefaultRAGSystem 创建默认的 RAG 系统（使用本地嵌入服务）
+// 这是推荐的创建方式，会自动使用本地模型嵌入服务
+func NewDefaultRAGSystem(store VectorStore) (*RAGSystem, error) {
+	return NewRAGSystemWithLocalEmbedding(store)
+}
+
+// NewRAGSystemWithOptionalEmbedding 创建 RAG 系统，支持可选的嵌入服务
+// 如果 embedder 为 nil，则使用默认的本地嵌入服务
+func NewRAGSystemWithOptionalEmbedding(store VectorStore, embedder EmbeddingClient) (*RAGSystem, error) {
+	if embedder == nil {
+		log.Infof("no embedder provided, using default local embedding service")
+		return NewRAGSystemWithLocalEmbedding(store)
+	}
+
+	log.Infof("using provided embedder for RAG system")
+	return NewRAGSystem(embedder, store), nil
+}
+
 func (r *RAGSystem) Add(docId string, content string, opts ...DocumentOption) error {
 	log.Infof("adding document with id: %s, content length: %d", docId, len(content))
 	doc := &Document{
@@ -146,4 +184,15 @@ func (r *RAGSystem) ListDocuments() ([]Document, error) {
 // CountDocuments 获取文档总数
 func (r *RAGSystem) CountDocuments() (int, error) {
 	return r.VectorStore.Count()
+}
+
+// GetDefaultEmbedder 获取默认的嵌入服务客户端
+// 返回本地模型嵌入服务的单例实例
+func GetDefaultEmbedder() (EmbeddingClient, error) {
+	return GetLocalEmbeddingService()
+}
+
+// IsDefaultEmbedderReady 检查默认嵌入服务是否已准备就绪
+func IsDefaultEmbedderReady() bool {
+	return IsServiceRunning()
 }

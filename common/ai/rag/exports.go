@@ -177,7 +177,24 @@ func LoadCollectionWithEmbeddingClient(db *gorm.DB, name string, client aispec.E
 
 // LoadCollection 加载知识库
 func LoadCollection(db *gorm.DB, name string, opts ...aispec.AIConfigOption) (*RAGSystem, error) {
-	// 创建嵌入客户端适配器
+	log.Infof("loading collection '%s' with local embedding service", name)
+
+	// 使用本地嵌入服务
+	localEmbedder, err := GetLocalEmbeddingService()
+	if err != nil {
+		log.Errorf("failed to get local embedding service: %v", err)
+		return nil, utils.Errorf("failed to initialize local embedding service: %v", err)
+	}
+
+	log.Infof("using local embedding service at %s for collection '%s'", localEmbedder.GetAddress(), name)
+	return LoadCollectionWithEmbeddingClient(db, name, localEmbedder, opts...)
+}
+
+// LoadCollectionWithCustomEmbedding 使用自定义嵌入服务加载知识库
+func LoadCollectionWithCustomEmbedding(db *gorm.DB, name string, opts ...aispec.AIConfigOption) (*RAGSystem, error) {
+	log.Infof("loading collection '%s' with custom embedding client", name)
+
+	// 创建自定义嵌入客户端适配器
 	embedder := embedding.NewOpenaiEmbeddingClient(opts...)
 	return LoadCollectionWithEmbeddingClient(db, name, embedder, opts...)
 }
@@ -186,11 +203,15 @@ func LoadCollection(db *gorm.DB, name string, opts ...aispec.AIConfigOption) (*R
 func CreateOrLoadCollection(db *gorm.DB, name string, description string, opts ...any) (*RAGSystem, error) {
 	cfg := NewKnowledgeBaseConfig(opts...)
 	if CollectionIsExists(db, name) {
+		log.Infof("collection '%s' exists, loading it", name)
 		if cfg.EmbeddingClient != nil {
+			log.Infof("using provided embedding client for collection '%s'", name)
 			return LoadCollectionWithEmbeddingClient(db, name, cfg.EmbeddingClient, cfg.AIOptions...)
 		}
+		log.Infof("using default local embedding service for collection '%s'", name)
 		return LoadCollection(db, name, cfg.AIOptions...)
 	} else {
+		log.Infof("collection '%s' does not exist, creating it", name)
 		return CreateCollection(db, name, description, opts...)
 	}
 }
@@ -364,18 +385,23 @@ func NewRagDatabase(path string) (*gorm.DB, error) {
 }
 
 func _get(name string, i ...any) (*RAGSystem, error) {
+	log.Infof("getting RAG collection '%s' with local embedding service", name)
+
 	config := NewKnowledgeBaseConfig(i)
 	if config.ForceNew {
-		log.Infof("force new rag collection for name: %v", name)
+		log.Infof("force creating new RAG collection for name: %s", name)
 		return CreateCollection(consts.GetGormProfileDatabase(), name, config.Description, i...)
 	}
 
 	// load existed first
+	log.Infof("attempting to load existing RAG collection '%s'", name)
 	ragSystem, err := LoadCollection(consts.GetGormProfileDatabase(), name)
 	if err != nil {
-		log.Errorf("load rag collection failed: %v, create new once next", err)
+		log.Errorf("failed to load existing RAG collection '%s': %v, creating new one", name, err)
 		return CreateCollection(consts.GetGormProfileDatabase(), name, config.Description, i...)
 	}
+
+	log.Infof("successfully loaded RAG collection '%s'", name)
 	return ragSystem, nil
 }
 

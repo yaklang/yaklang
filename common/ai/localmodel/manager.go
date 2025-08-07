@@ -316,33 +316,36 @@ func (m *Manager) buildArgs(config *ServiceConfig) []string {
 
 // waitForService 等待服务启动完成
 func (m *Manager) waitForService(service *ServiceInfo) error {
-	timeout := time.After(service.Config.StartupTimeout)
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
+	address := fmt.Sprintf("%s:%d", service.Config.Host, service.Config.Port)
+	timeoutSeconds := service.Config.StartupTimeout.Seconds()
 
-	for {
-		select {
-		case <-timeout:
-			return fmt.Errorf("service startup timeout after %v", service.Config.StartupTimeout)
-		case <-ticker.C:
-			// 检查端口是否可用
-			conn, err := net.DialTimeout("tcp",
-				fmt.Sprintf("%s:%d", service.Config.Host, service.Config.Port),
-				2*time.Second)
-			if err == nil {
-				conn.Close()
-				log.Infof("Service %s is ready on %s:%d", service.Name, service.Config.Host, service.Config.Port)
-				return nil
-			}
+	log.Infof("waiting for service %s to be ready on %s (timeout: %.1fs)", service.Name, address, timeoutSeconds)
 
-			// 检查进程是否还在运行
-			if service.Process != nil && service.Process.ProcessState != nil {
-				return fmt.Errorf("process exited during startup")
-			}
-		case <-service.ctx.Done():
-			return fmt.Errorf("service startup cancelled")
+	// 使用 utils.WaitConnect 等待连接
+	err := utils.WaitConnect(address, timeoutSeconds)
+	if err != nil {
+		// 检查进程是否还在运行
+		if service.Process != nil && service.Process.ProcessState != nil && service.Process.ProcessState.Exited() {
+			return fmt.Errorf("process exited during startup: %v", err)
 		}
+		return fmt.Errorf("service startup timeout after %v: %v", service.Config.StartupTimeout, err)
 	}
+
+	log.Infof("service %s is ready on %s", service.Name, address)
+	return nil
+}
+
+// WaitForEmbeddingService 等待嵌入服务完全启动并可用
+func (m *Manager) WaitForEmbeddingService(address string, timeoutSeconds float64) error {
+	log.Infof("waiting for embedding service to be ready on %s (timeout: %.1fs)", address, timeoutSeconds)
+
+	err := utils.WaitConnect(address, timeoutSeconds)
+	if err != nil {
+		return fmt.Errorf("embedding service not ready: %v", err)
+	}
+
+	log.Infof("embedding service is ready on %s", address)
+	return nil
 }
 
 // updateServiceStatus 更新服务状态
