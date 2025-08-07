@@ -86,7 +86,7 @@ func startEmbeddingServiceInternal() (*LocalModelEmbedding, error) {
 
 	// 首先检查服务是否已经在运行
 	log.Infof("checking if embedding service is already running on %s", address)
-	if testEmbeddingService(address) {
+	if testEmbeddingService(address, 3) {
 		log.Infof("embedding service is already running and responding on %s, reusing existing service", address)
 
 		// 获取默认模型配置
@@ -140,7 +140,7 @@ func startEmbeddingServiceInternal() (*LocalModelEmbedding, error) {
 			// 使用 WaitConnect 等待服务完全启动
 			manager := localmodel.GetManager()
 			if waitErr := manager.WaitForEmbeddingService(address, 15.0); waitErr == nil {
-				if testEmbeddingService(address) {
+				if testEmbeddingService(address, 15.0) {
 					log.Infof("found working service on %s after startup failure", address)
 					// 获取默认模型配置并返回
 					model, _ := localmodel.FindModelConfig("Qwen3-Embedding-0.6B-Q4_K_M")
@@ -239,10 +239,10 @@ func isPortAvailable(address string) bool {
 }
 
 // testEmbeddingService 测试嵌入服务是否正常工作
-func testEmbeddingService(address string) bool {
+func testEmbeddingService(address string, timeoutSeconds float64) bool {
 	// 首先使用 WaitConnect 等待端口可用
 	manager := localmodel.GetManager()
-	err := manager.WaitForEmbeddingService(address, 15.0) // 等待15秒
+	err := manager.WaitForEmbeddingService(address, timeoutSeconds) // 等待15秒
 	if err != nil {
 		log.Infof("embedding service not available on %s: %v", address, err)
 		return false
@@ -274,7 +274,7 @@ func CleanupRedundantServices() error {
 	address := "127.0.0.1:11435"
 
 	// 如果当前有正常工作的服务，就不需要清理
-	if testEmbeddingService(address) {
+	if testEmbeddingService(address, 10) {
 		log.Infof("found working embedding service, no cleanup needed")
 		return nil
 	}

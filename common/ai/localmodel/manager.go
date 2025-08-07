@@ -3,6 +3,8 @@ package localmodel
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -208,18 +210,43 @@ func (m *Manager) StartEmbeddingService(address string, options ...Option) error
 	m.mutex.Unlock()
 
 	// 异步启动服务
-	go m.startService(service, llamaServerPath)
-
+	done := make(chan error, 3)
+	go m.startService(service, llamaServerPath, done)
 	log.Infof("Starting embedding service: %s", serviceName)
 	return nil
 }
 
 // startService 启动服务的内部方法
-func (m *Manager) startService(service *ServiceInfo, llamaServerPath string) {
+func (m *Manager) startService(service *ServiceInfo, llamaServerPath string, done chan error) {
+	doneOnce := new(sync.Once)
+	finished := func(err error) {
+		doneOnce.Do(func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Errorf("Service %s panic: %v", service.Name, r)
+					m.updateServiceStatus(service.Name, StatusError, fmt.Sprintf("panic: %v", r))
+				}
+			}()
+
+			if err != nil {
+				log.Errorf("Service %s failed to start: %v", service.Name, err)
+				m.updateServiceStatus(service.Name, StatusError, err.Error())
+			} else {
+				log.Infof("Service %s started successfully", service.Name)
+				m.updateServiceStatus(service.Name, StatusRunning, "")
+			}
+			done <- err
+			close(done)
+		})
+	}
+
 	defer func() {
 		if r := recover(); r != nil {
+			finished(fmt.Errorf("panic: %v", r))
 			log.Errorf("Service %s panic: %v", service.Name, r)
 			m.updateServiceStatus(service.Name, StatusError, fmt.Sprintf("panic: %v", r))
+		} else {
+			finished(nil)
 		}
 	}()
 
@@ -230,20 +257,23 @@ func (m *Manager) startService(service *ServiceInfo, llamaServerPath string) {
 	log.Infof("Starting command: %s %s", llamaServerPath, strings.Join(args, " "))
 	cmd := exec.CommandContext(service.ctx, llamaServerPath, args...)
 
-	// 设置输出
+	var reader, combinedOutput = utils.NewPipe()
+	defer func() {
+		combinedOutput.Close()
+	}()
+	var stdout io.Writer = combinedOutput
+	var stderr io.Writer = combinedOutput
 	if service.Config.Debug {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-	} else if !service.Config.Detached {
-		// 如果不是分离模式且不是调试模式，仍然显示错误输出
-		cmd.Stderr = os.Stderr
+		stdout = io.MultiWriter(stdout, os.Stdout)
+		stderr = io.MultiWriter(stderr, os.Stderr)
 	}
-
-	log.Infof("Starting command: %s %s", llamaServerPath, strings.Join(args, " "))
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
 
 	// 启动进程
 	if err := cmd.Start(); err != nil {
 		log.Errorf("Failed to start service %s: %v", service.Name, err)
+		finished(err)
 		m.updateServiceStatus(service.Name, StatusError, err.Error())
 		return
 	}
@@ -255,6 +285,17 @@ func (m *Manager) startService(service *ServiceInfo, llamaServerPath string) {
 	m.mutex.Unlock()
 
 	log.Infof("Service %s started with PID: %d", service.Name, cmd.Process.Pid)
+	for {
+		line, n, err := utils.ReadLineEx(ctxio.NewReader(utils.TimeoutContextSeconds(15), reader))
+		if n > 0 && strings.HasPrefix(line, "main: server is listening on http://") && strings.Contains(line, "starting the main loop") {
+			log.Infof("Starting main loop for service %s", service.Name)
+			finished(nil)
+			break
+		}
+		if err != nil {
+			finished(nil)
+		}
+	}
 
 	// 等待启动完成或超时
 	if err := m.waitForService(service); err != nil {

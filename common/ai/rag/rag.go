@@ -1,6 +1,7 @@
 package rag
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -146,6 +147,12 @@ func (r *RAGSystem) addDocuments(docs ...Document) error {
 
 // Query 根据查询文本检索相关文档并返回结果
 func (r *RAGSystem) Query(query string, page, limit int) ([]SearchResult, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("failed to query %s: %v", query, err)
+			fmt.Println(utils.ErrorStack(err))
+		}
+	}()
 	return r.VectorStore.Search(query, page, limit)
 }
 
