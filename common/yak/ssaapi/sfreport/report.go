@@ -16,7 +16,7 @@ type Report struct {
 
 	ProgramName string `json:"program_name"`
 	// ProgramVersion string `json:"program_version"`
-
+	RiskNums int
 	// Program Program
 	Rules []*Rule
 	Risks map[string]*Risk // hash -> risk
@@ -58,11 +58,11 @@ func (r *Report) AddRisks(risk ...*Risk) {
 	}
 	for _, risk := range risk {
 		// set program from risk if not set in report
-		if r.ProgramName == "" && risk.ProgramName != "" {
-			r.ProgramName = risk.ProgramName
+		if r.ProgramName == "" && risk.GetProgramName() != "" {
+			r.ProgramName = risk.GetProgramName()
 		}
 
-		r.Risks[risk.Hash] = risk
+		r.Risks[risk.GetHash()] = risk
 	}
 }
 

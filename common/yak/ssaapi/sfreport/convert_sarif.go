@@ -17,6 +17,10 @@ type SarifReport struct {
 	report *sarif.Report
 }
 
+func (r *SarifReport) AddSyntaxFlowRisks(risks []*schema.SSARisk) {
+	log.Errorf("The sarif format cannot specify only a single risk for generation")
+}
+
 func NewSarifReport() (*SarifReport, error) {
 	sarifReport, err := sarif.New(sarif.Version210, false)
 	if err != nil {

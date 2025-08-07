@@ -29,8 +29,8 @@ func NewRule(rule *schema.SyntaxFlowRule) *Rule {
 }
 
 func (r *Rule) AddRisk(risk *Risk) {
-	if slices.Contains(r.Risks, risk.Hash) {
+	if slices.Contains(r.Risks, risk.GetHash()) {
 		return
 	}
-	r.Risks = append(r.Risks, risk.Hash)
+	r.Risks = append(r.Risks, risk.GetHash())
 }
