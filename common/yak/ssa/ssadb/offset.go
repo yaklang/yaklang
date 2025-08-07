@@ -46,7 +46,8 @@ func GetOffsetByVariable(name string, valueID int64) []*IrOffset {
 func GetValueBeforeEndOffset(DB *gorm.DB, rng memedit.RangeIf) (int64, error) {
 	// get the last ir code before the end offset, and the source code hash must be the same
 	hash := rng.GetEditor().GetIrSourceHash()
-	db := DB.Model(&IrOffset{}).Where("end_offset <= ? and  file_hash = ?", rng.GetEndOffset(), hash)
+	db := DB.Model(&IrOffset{})
+	db = db.Where("end_offset <= ? and  file_hash = ?", rng.GetEndOffset(), hash)
 	var ir IrOffset
 	if err := db.Order("end_offset desc").First(&ir).Error; err != nil {
 		return -1, err

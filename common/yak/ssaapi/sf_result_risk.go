@@ -56,7 +56,7 @@ func CoverCodeRange(programName string, r memedit.RangeIf) (*CodeRange, string) 
 
 	if editor := r.GetEditor(); editor != nil {
 		// if codeSourceProto is empty, url is pure path
-		ret.URL = fmt.Sprintf("/%s/%s", programName, editor.GetFilename())
+		ret.URL = editor.GetUrl()
 		source = editor.GetTextFromRangeContext(r, CodeContextLine)
 	}
 	if start := r.GetStart(); start != nil {

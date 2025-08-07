@@ -625,7 +625,7 @@ println(PLUGIN_RUNTIME_ID)
 			func(suggestions []*ypb.SuggestionDescription) {
 				item := getExactSuggestion(t, suggestions, "append")
 				require.Equal(t, "Function", item.Kind)
-				require.Equal(t, "append", item.InsertText)
+				require.Equal(t, "append(${1:a}, ${2:vals...})", item.InsertText)
 			},
 		)
 	})
