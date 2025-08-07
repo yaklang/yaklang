@@ -31,15 +31,24 @@ func ValidEdgeType(edge string) EdgeType {
 	return ""
 }
 
+func (e EdgeType) GetReverseEdge() EdgeType {
+	switch e {
+	case EdgeTypeDependOn:
+		return EdgeTypeEffectOn
+	case EdgeTypeEffectOn:
+		return EdgeTypeDependOn
+	}
+	return ""
+}
+
 type EdgeMode string
 
 const (
-	// OnlyDependOn EffectOn的边会变转化为DependOn的边，FromNode和ToNode方向换一下
-	OnlyDependOn EdgeMode = "only_depend_on"
-	// OnlyEffectOn DependOn的边会变转化为EffectOn的边，FromNode和ToNode方向换一下
-	OnlyEffectOn EdgeMode = "only_effect_on"
-	// Default 遇到DependOn的边或者EffectOn直接生成，有随机性
-	Default EdgeMode = "default" // 遇到DependOn的边或者EffectOn直接生成，有随机性
+	// EdgeModeOnlyDependOn EffectOn的边会变转化为DependOn的边，FromNode和ToNode方向换一下
+	EdgeModeOnlyDependOn EdgeMode = "only_depend_on"
+	// EdgeModeOnlyEffectOn DependOn的边会变转化为EffectOn的边，FromNode和ToNode方向换一下
+	EdgeModeOnlyEffectOn EdgeMode = "only_effect_on"
+	EdgeModeDefault      EdgeMode = "default"
 )
 
 type ValueGraph struct {
@@ -107,7 +116,7 @@ func NewValuesGraph(v Values, opts ...ValueGraphOption) *ValueGraph {
 		Node2Value:     make(map[int]*Value),
 		EdgeCache:      make(map[string]string),
 		EntryNode:      make(map[*Value]struct{}),
-		EdgeMode:       OnlyDependOn,
+		EdgeMode:       EdgeModeDefault,
 	}
 
 	for _, opt := range opts {
@@ -207,26 +216,21 @@ func IsDataFlowType(typ string) bool {
 }
 
 func (g *ValueGraph) handleEdge(fromNode int, toNode int, edgeType string, extraMsg map[string]any) {
-	if IsDataFlowType(edgeType) {
-		// avoid duplicate dataflow edge - 使用边类型作为哈希键的一部分
-		hash := codec.Sha256(fmt.Sprintf("%d-%d-%s", fromNode, toNode, edgeType))
-		if typ, ok := g.EdgeCache[hash]; ok && IsDataFlowType(typ) {
-			return
-		}
-		g.EdgeCache[hash] = edgeType
+	if g.hasVisitedDataFlowEdge(fromNode, toNode, edgeType) {
+		return
 	}
 
 	switch ValidEdgeType(edgeType) {
 	case EdgeTypeDependOn:
-		if g.EdgeMode == Default || g.EdgeMode == OnlyDependOn {
+		if g.EdgeMode == EdgeModeDefault || g.EdgeMode == EdgeModeOnlyDependOn {
 			g.AddEdge(toNode, fromNode, edgeType)
-		} else if g.EdgeMode == OnlyEffectOn {
+		} else if g.EdgeMode == EdgeModeOnlyEffectOn {
 			g.AddEdge(fromNode, toNode, EdgeTypeEffectOn)
 		}
 	case EdgeTypeEffectOn:
-		if g.EdgeMode == Default || g.EdgeMode == OnlyEffectOn {
+		if g.EdgeMode == EdgeModeDefault || g.EdgeMode == EdgeModeOnlyEffectOn {
 			g.AddEdge(toNode, fromNode, edgeType)
-		} else if g.EdgeMode == OnlyDependOn {
+		} else if g.EdgeMode == EdgeModeOnlyDependOn {
 			g.AddEdge(fromNode, toNode, EdgeTypeDependOn)
 		}
 	case EdgeTypePredecessor:
@@ -275,6 +279,27 @@ func (g *ValueGraph) DeepFirstGraphNext(value *Value) [][]string {
 		return nil
 	}
 	return dot.GraphPathNext(g.Graph, nodeID)
+}
+
+func (g *ValueGraph) hasVisitedDataFlowEdge(fromNode int, toNode int, edgeType string) bool {
+	if IsDataFlowType(edgeType) {
+		hash := codec.Sha256(fmt.Sprintf("%d-%d-%s", fromNode, toNode, edgeType))
+		if typ, ok := g.EdgeCache[hash]; ok && IsDataFlowType(typ) {
+			return true
+		}
+		g.EdgeCache[hash] = edgeType
+		reverseHash := codec.Sha256(fmt.Sprintf(
+			"%d-%d-%s",
+			toNode,
+			fromNode,
+			ValidEdgeType(edgeType).GetReverseEdge(),
+		))
+		if typ, ok := g.EdgeCache[reverseHash]; ok && IsDataFlowType(typ) {
+			return true
+		}
+		g.EdgeCache[reverseHash] = edgeType
+	}
+	return false
 }
 
 func (V Values) ShowDot() Values {

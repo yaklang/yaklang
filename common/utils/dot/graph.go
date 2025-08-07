@@ -7,36 +7,6 @@ import (
 	"strings"
 )
 
-// EdgeDirection represents the direction of an edge between two nodes
-type EdgeDirection int
-
-const (
-	// EdgeDirectionNone indicates no edge exists between the nodes
-	EdgeDirectionNone EdgeDirection = iota
-	// EdgeDirectionForward indicates an edge from the first node to the second node
-	EdgeDirectionForward
-	// EdgeDirectionBackward indicates an edge from the second node to the first node
-	EdgeDirectionBackward
-	// EdgeDirectionBidirectional indicates edges in both directions
-	EdgeDirectionBidirectional
-)
-
-// String returns the string representation of the edge direction
-func (d EdgeDirection) String() string {
-	switch d {
-	case EdgeDirectionNone:
-		return "none"
-	case EdgeDirectionForward:
-		return "forward"
-	case EdgeDirectionBackward:
-		return "backward"
-	case EdgeDirectionBidirectional:
-		return "bidirectional"
-	default:
-		return "unknown"
-	}
-}
-
 // Graph represents a set of nodes, edges and attributes that can be
 // translated to DOT language.
 type Graph struct {
