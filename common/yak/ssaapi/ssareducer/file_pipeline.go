@@ -2,6 +2,7 @@ package ssareducer
 
 import (
 	"context"
+	"slices"
 
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -50,5 +51,34 @@ func FilesHandler(
 	)
 	parseASTPipe.FeedChannel(readFilePipe.Out())
 
-	return parseASTPipe.Out()
+	out := make([]*FileContent, 0, len(paths))
+	for fc := range parseASTPipe.Out() {
+		out = append(out, fc)
+	}
+
+	pathIndex := make(map[string]int, len(paths))
+	for i, p := range paths {
+		pathIndex[p] = i
+	}
+
+	slices.SortFunc(out, func(a, b *FileContent) int {
+		indexA := pathIndex[a.Path]
+		indexB := pathIndex[b.Path]
+		if indexA < indexB {
+			return -1
+		}
+		if indexA > indexB {
+			return 1
+		}
+		return 0
+	})
+	ch := make(chan *FileContent, bufSize)
+	go func() {
+		defer close(ch)
+		for _, fc := range out {
+			ch <- fc
+		}
+	}()
+	return ch
+	// return parseASTPipe.Out()
 }

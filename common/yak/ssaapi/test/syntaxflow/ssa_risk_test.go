@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -39,23 +40,34 @@ hook:<<<CODE
 CODE
 }->  
 alert $dangerous for {
-	Desc: "this is an alert message"
+	desc: "this is an alert message"
 	Title:"this is a title"
+	level:"low"
 }
 	`
 	ssatest.CheckProfileWithFS(vf, t, func(p ssatest.ParseStage, prog ssaapi.Programs, start time.Time) error {
-		if p != ssatest.OnlyDatabase {
-			return nil
-		}
+		prog.Show()
 		result, err := prog.SyntaxFlowWithError(
 			rule,
 			ssaapi.QueryWithEnableDebug(true),
 		)
 		require.NoError(t, err)
+		result.Show()
+
+		dangerous := result.GetValues("dangerous")
+		require.Len(t, dangerous, 1)
+		log.Infof("data: %v", dangerous[0])
+
+		// check risk database when database compile
+		if p == ssatest.OnlyMemory {
+			return nil
+		}
 		resultId, err := result.Save(schema.SFResultKindDebug)
+		defer yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{
+			ProgramName: []string{result.GetProgramName()},
+		})
 		_ = resultId
 		require.NoError(t, err)
-		result.Show()
 		_, datas, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{ProgramName: []string{result.GetProgramName()}}, nil)
 		require.NoError(t, err)
 		require.Len(t, datas, 1)
@@ -67,5 +79,5 @@ alert $dangerous for {
 		require.NotEqual(t, data.Line, 0)
 
 		return nil
-	})
+	}, ssaapi.WithLanguage(consts.Yak))
 }
