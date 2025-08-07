@@ -63,7 +63,7 @@ func ExampleGetSupportedModels() {
 
 // ExampleFindModelConfig 演示如何查找模型配置
 func ExampleFindModelConfig() {
-	modelName := "Qwen3-Embedding-0.6B-Q8_0"
+	modelName := "Qwen3-Embedding-0.6B-Q4_K_M"
 
 	model, err := FindModelConfig(modelName)
 	if err != nil {
