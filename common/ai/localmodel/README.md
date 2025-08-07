@@ -28,7 +28,7 @@ manager := localmodel.GetManager()
 ```go
 err := manager.StartEmbeddingService(
     "127.0.0.1:11434",
-    localmodel.WithEmbeddingModel("Qwen3-Embedding-0.6B-Q8_0"),
+    localmodel.WithEmbeddingModel("Qwen3-Embedding-0.6B-Q4_K_M"),
     localmodel.WithDetached(true),
     localmodel.WithDebug(true),
     localmodel.WithModelPath("/path/to/model.gguf"),
@@ -54,7 +54,7 @@ if manager.IsDefaultModelAvailable() {
 }
 
 // 检查特定模型是否存在
-if manager.IsLocalModelExists("Qwen3-Embedding-0.6B-Q8_0") {
+if manager.IsLocalModelExists("Qwen3-Embedding-0.6B-Q4_K_M") {
     fmt.Println("Qwen3 模型可用")
 }
 
@@ -71,7 +71,7 @@ defaultPath := manager.GetDefaultEmbeddingModelPath()
 fmt.Printf("默认模型路径: %s\n", defaultPath)
 
 // 获取特定模型的本地路径
-modelPath, err := manager.GetLocalModelPath("Qwen3-Embedding-0.6B-Q8_0")
+modelPath, err := manager.GetLocalModelPath("Qwen3-Embedding-0.6B-Q4_K_M")
 if err != nil {
     log.Printf("获取模型路径失败: %v", err)
 } else {
@@ -186,7 +186,7 @@ for _, model := range models {
 ### 查找特定模型
 
 ```go
-model, err := localmodel.FindModelConfig("Qwen3-Embedding-0.6B-Q8_0")
+model, err := localmodel.FindModelConfig("Qwen3-Embedding-0.6B-Q4_K_M")
 if err != nil {
     log.Printf("Model not supported: %v", err)
 } else {
@@ -197,7 +197,7 @@ if err != nil {
 ### 检查模型支持
 
 ```go
-if localmodel.IsModelSupported("Qwen3-Embedding-0.6B-Q8_0") {
+if localmodel.IsModelSupported("Qwen3-Embedding-0.6B-Q4_K_M") {
     fmt.Println("Model is supported")
 } else {
     fmt.Println("Model is not supported")
@@ -243,7 +243,7 @@ func main() {
     // 启动嵌入服务
     err := manager.StartEmbeddingService(
         "127.0.0.1:8080",
-        localmodel.WithEmbeddingModel("Qwen3-Embedding-0.6B-Q8_0"),
+        localmodel.WithEmbeddingModel("Qwen3-Embedding-0.6B-Q4_K_M"),
         localmodel.WithContextSize(4096),
         localmodel.WithContBatching(true),
         localmodel.WithBatchSize(1024),
@@ -314,7 +314,7 @@ go build -o localmodel-cli ./common/ai/localmodel/cmd
 
 - `-host`: 服务主机地址 (默认: 127.0.0.1)
 - `-port`: 服务端口 (默认: 8080)
-- `-model`: 模型名称 (默认: Qwen3-Embedding-0.6B-Q8_0)
+- `-model`: 模型名称 (默认: Qwen3-Embedding-0.6B-Q4_K_M)
 - `-model-path`: 模型文件路径 (可选)
 - `-context-size`: 上下文大小 (默认: 4096)
 - `-cont-batching`: 启用连续批处理 (默认: true)
@@ -333,8 +333,8 @@ $ ./localmodel-cli -check-model
 === Yaklang Local Model Manager ===
 
 检查本地模型:
-1. 默认嵌入模型 (Qwen3-Embedding-0.6B-Q8_0):
-   路径: /Users/user/yakit-projects/libs/models/Qwen3-Embedding-0.6B-Q8_0.gguf
+1. 默认嵌入模型 (Qwen3-Embedding-0.6B-Q4_K_M):
+   路径: /Users/user/yakit-projects/libs/models/Qwen3-Embedding-0.6B-Q4_K_M.gguf
    可用: true
 
 2. llama-server:
@@ -342,5 +342,5 @@ $ ./localmodel-cli -check-model
    状态: 可用
 
 3. 所有支持的模型:
-   Qwen3-Embedding-0.6B-Q8_0: 可用
+   Qwen3-Embedding-0.6B-Q4_K_M: 可用
 ```

@@ -97,8 +97,8 @@ func (m *Manager) IsLocalModelExists(modelName string) bool {
 // GetLocalModelPath 获取本地模型路径
 func (m *Manager) GetLocalModelPath(modelName string) (string, error) {
 	// 如果是默认的 Qwen3 模型，直接使用 consts 中的路径
-	if modelName == "Qwen3-Embedding-0.6B-Q8_0" || modelName == "" {
-		return consts.GetQwen3Embedding0_6BQ8_0ModelPath(), nil
+	if modelName == "Qwen3-Embedding-0.6B-Q4_K_M" || modelName == "" {
+		return consts.GetQwen3Embedding0_6BQ4_0ModelPath(), nil
 	}
 
 	// 其他模型使用原来的逻辑
@@ -107,7 +107,7 @@ func (m *Manager) GetLocalModelPath(modelName string) (string, error) {
 
 // GetDefaultEmbeddingModelPath 获取默认嵌入模型路径
 func (m *Manager) GetDefaultEmbeddingModelPath() string {
-	return consts.GetQwen3Embedding0_6BQ8_0ModelPath()
+	return consts.GetQwen3Embedding0_6BQ4_0ModelPath()
 }
 
 // IsDefaultModelAvailable 检查默认模型是否可用
@@ -166,13 +166,13 @@ func (m *Manager) StartEmbeddingService(address string, options ...Option) error
 		} else {
 			// 没有指定模型，使用默认模型
 			config.ModelPath = m.GetDefaultEmbeddingModelPath()
-			config.Model = "Qwen3-Embedding-0.6B-Q8_0" // 设置默认模型名称
+			config.Model = "Qwen3-Embedding-0.6B-Q4_K_M" // 设置默认模型名称
 		}
 	}
 
 	// 验证模型路径
 	if err := ValidateModelPath(config.ModelPath); err != nil {
-		return fmt.Errorf("model validation failed: %v", err)
+		return fmt.Errorf("model validation failed: %v, for model: %v", err, config.ModelPath)
 	}
 
 	// 检查 llama-server 是否可用
@@ -476,10 +476,10 @@ if err != nil {
 // StartEmbeddingService
 err = manager.StartEmbeddingService(
 	"127.0.0.1:11434",
-	localmodel.WithEmbeddingModel("Qwen3-Embedding-0.6B-Q8_0"),
+	localmodel.WithEmbeddingModel("Qwen3-Embedding-0.6B-Q4_K_M"),
 	localmodel.WithDetached(true),
 	localmodel.WithDebug(true),
-	localmodel.WithModelPath("/tmp/Qwen3-Embedding-0.6B-Q8_0.gguf"),
+	localmodel.WithModelPath("/tmp/Qwen3-Embedding-0.6B-Q4_K_M.gguf"),
 	localmodel.WithContextSize(4096),
 	localmodel.WithParallelism(5),
 )
