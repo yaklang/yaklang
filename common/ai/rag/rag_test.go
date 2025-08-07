@@ -121,7 +121,7 @@ func TestRAGSystem(t *testing.T) {
 	}
 
 	// 添加文档到RAG系统
-	err := ragSystem.AddDocuments(docs...)
+	err := ragSystem.addDocuments(docs...)
 	assert.NoError(t, err)
 
 	// 测试查询
