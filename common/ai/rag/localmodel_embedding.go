@@ -111,11 +111,19 @@ func startEmbeddingServiceInternal() (*LocalModelEmbedding, error) {
 	// 获取管理器单例
 	manager := localmodel.GetManager()
 
+	modelName := "Qwen3-Embedding-0.6B-Q4_K_M"
+	modelPath, err := localmodel.GetModelPath(modelName)
+	if err != nil {
+		log.Errorf("failed to get model path: %v", err)
+		return nil, fmt.Errorf("failed to get model path: %v", err)
+	}
+	log.Infof("model path: %s", modelPath)
+
 	// 启动嵌入服务，使用端口 11435，开启 Detach
-	err := manager.StartEmbeddingService(
+	err = manager.StartEmbeddingService(
 		address,
-		localmodel.WithDetached(true), // 开启分离模式
-		localmodel.WithEmbeddingModel("Qwen3-Embedding-0.6B-Q4_K_M"), // 使用默认嵌入模型
+		localmodel.WithDetached(true),            // 开启分离模式
+		localmodel.WithEmbeddingModel(modelName), // 使用默认嵌入模型
 		localmodel.WithContextSize(4096),
 		localmodel.WithContBatching(true),
 		localmodel.WithBatchSize(1024),
