@@ -15,7 +15,7 @@ import (
 var (
 	host         = flag.String("host", "127.0.0.1", "服务主机地址")
 	port         = flag.Int("port", 8080, "服务端口")
-	model        = flag.String("model", "", "模型名称 (默认使用 Qwen3-Embedding-0.6B-Q8_0)")
+	model        = flag.String("model", "", "模型名称 (默认使用 Qwen3-Embedding-0.6B-Q4_K_M)")
 	modelPath    = flag.String("model-path", "", "模型文件路径 (如果不指定，将使用默认路径)")
 	contextSize  = flag.Int("context-size", 4096, "上下文大小")
 	contBatching = flag.Bool("cont-batching", true, "启用连续批处理")
@@ -87,7 +87,7 @@ func checkLocalModels(manager *localmodel.Manager) {
 	fmt.Println("\n检查本地模型:")
 
 	// 检查默认模型
-	fmt.Println("1. 默认嵌入模型 (Qwen3-Embedding-0.6B-Q8_0):")
+	fmt.Println("1. 默认嵌入模型 (Qwen3-Embedding-0.6B-Q4_K_M):")
 	defaultPath := manager.GetDefaultEmbeddingModelPath()
 	fmt.Printf("   路径: %s\n", defaultPath)
 
@@ -129,7 +129,7 @@ func startEmbeddingService(manager *localmodel.Manager) {
 	if *model != "" {
 		fmt.Printf("  模型: %s\n", *model)
 	} else {
-		fmt.Printf("  模型: Qwen3-Embedding-0.6B-Q8_0 (默认)\n")
+		fmt.Printf("  模型: Qwen3-Embedding-0.6B-Q4_K_M (默认)\n")
 	}
 	if *modelPath != "" {
 		fmt.Printf("  模型路径: %s\n", *modelPath)
@@ -148,7 +148,7 @@ func startEmbeddingService(manager *localmodel.Manager) {
 	// 检查模型是否可用
 	modelName := *model
 	if modelName == "" {
-		modelName = "Qwen3-Embedding-0.6B-Q8_0"
+		modelName = "Qwen3-Embedding-0.6B-Q4_K_M"
 	}
 
 	if !manager.IsLocalModelExists(modelName) {

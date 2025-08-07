@@ -102,19 +102,11 @@ func (s *Server) IsLocalModelReady(ctx context.Context, req *ypb.IsLocalModelRea
 	}
 
 	// 检查模型文件是否存在
-	modelsDir := consts.GetAIModelPath()
-	if modelsDir == "" {
+	modelPath := consts.GetAIModelFilePath(targetModel.FileName)
+	if modelPath == "" {
 		return &ypb.IsLocalModelReadyResponse{
 			Ok:     false,
-			Reason: "无法获取AI模型存储路径",
-		}, nil
-	}
-
-	modelPath := filepath.Join(modelsDir, targetModel.FileName)
-	if exists, _ := utils.PathExists(modelPath); !exists {
-		return &ypb.IsLocalModelReadyResponse{
-			Ok:     false,
-			Reason: fmt.Sprintf("模型文件不存在: %s", modelPath),
+			Reason: fmt.Sprintf("模型文件不存在: %s", targetModel.FileName),
 		}, nil
 	}
 
@@ -153,9 +145,10 @@ func (s *Server) DownloadLocalModel(req *ypb.DownloadLocalModelRequest, stream y
 		return utils.Errorf("不支持的模型: %s", modelName)
 	}
 
-	modelsDir := consts.GetAIModelPath()
-	if modelsDir == "" {
-		return utils.Error("无法获取AI模型存储路径")
+	modelsDir := consts.GetDefaultAIModelDir()
+	// 确保目录存在
+	if err := os.MkdirAll(modelsDir, os.ModePerm); err != nil {
+		return utils.Errorf("无法创建模型目录: %v", err)
 	}
 
 	stream.Send(&ypb.ExecResult{
@@ -221,8 +214,10 @@ func (s *Server) StartLocalModel(req *ypb.StartLocalModelRequest, stream ypb.Yak
 
 	// 构建启动命令
 	llamaServerPath := consts.GetLlamaServerPath()
-	modelsDir := consts.GetAIModelPath()
-	modelPath := filepath.Join(modelsDir, targetModel.FileName)
+	modelPath := consts.GetAIModelFilePath(targetModel.FileName)
+	if modelPath == "" {
+		return utils.Errorf("模型文件不存在: %s", targetModel.FileName)
+	}
 
 	host := req.GetHost()
 	if host == "" {

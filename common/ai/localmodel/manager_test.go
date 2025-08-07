@@ -141,7 +141,7 @@ func TestGetSupportedModels(t *testing.T) {
 	// Check if Qwen3 model exists
 	found := false
 	for _, model := range models {
-		if model.Name == "Qwen3-Embedding-0.6B-Q8_0" {
+		if model.Name == "Qwen3-Embedding-0.6B-Q4_K_M" {
 			found = true
 			if model.Type != "embedding" {
 				t.Errorf("Expected model type 'embedding', got '%s'", model.Type)
@@ -154,19 +154,19 @@ func TestGetSupportedModels(t *testing.T) {
 	}
 
 	if !found {
-		t.Error("Qwen3-Embedding-0.6B-Q8_0 model not found in supported models")
+		t.Error("Qwen3-Embedding-0.6B-Q4_K_M model not found in supported models")
 	}
 }
 
 func TestFindModelConfig(t *testing.T) {
 	// Test finding existing model
-	model, err := FindModelConfig("Qwen3-Embedding-0.6B-Q8_0")
+	model, err := FindModelConfig("Qwen3-Embedding-0.6B-Q4_K_M")
 	if err != nil {
 		t.Fatalf("Failed to find model: %v", err)
 	}
 
-	if model.Name != "Qwen3-Embedding-0.6B-Q8_0" {
-		t.Errorf("Expected model name 'Qwen3-Embedding-0.6B-Q8_0', got '%s'", model.Name)
+	if model.Name != "Qwen3-Embedding-0.6B-Q4_K_M" {
+		t.Errorf("Expected model name 'Qwen3-Embedding-0.6B-Q4_K_M', got '%s'", model.Name)
 	}
 
 	// Test finding non-existing model
@@ -197,8 +197,8 @@ func TestServiceStatus(t *testing.T) {
 }
 
 func TestIsModelSupported(t *testing.T) {
-	if !IsModelSupported("Qwen3-Embedding-0.6B-Q8_0") {
-		t.Error("Expected Qwen3-Embedding-0.6B-Q8_0 to be supported")
+	if !IsModelSupported("Qwen3-Embedding-0.6B-Q4_K_M") {
+		t.Error("Expected Qwen3-Embedding-0.6B-Q4_K_M to be supported")
 	}
 
 	if IsModelSupported("non-existing-model") {
@@ -215,14 +215,14 @@ func TestGetSupportedModelNames(t *testing.T) {
 
 	found := false
 	for _, name := range names {
-		if name == "Qwen3-Embedding-0.6B-Q8_0" {
+		if name == "Qwen3-Embedding-0.6B-Q4_K_M" {
 			found = true
 			break
 		}
 	}
 
 	if !found {
-		t.Error("Expected to find Qwen3-Embedding-0.6B-Q8_0 in model names")
+		t.Error("Expected to find Qwen3-Embedding-0.6B-Q4_K_M in model names")
 	}
 }
 
@@ -236,7 +236,7 @@ func TestManagerModelAPIs(t *testing.T) {
 	}
 
 	// 测试获取本地模型路径
-	modelPath, err := manager.GetLocalModelPath("Qwen3-Embedding-0.6B-Q8_0")
+	modelPath, err := manager.GetLocalModelPath("Qwen3-Embedding-0.6B-Q4_K_M")
 	if err != nil {
 		t.Errorf("Failed to get local model path: %v", err)
 	}
@@ -260,7 +260,7 @@ func TestManagerModelAPIs(t *testing.T) {
 	t.Logf("Local models found: %v", localModels)
 
 	// 测试模型存在性检查
-	exists := manager.IsLocalModelExists("Qwen3-Embedding-0.6B-Q8_0")
+	exists := manager.IsLocalModelExists("Qwen3-Embedding-0.6B-Q4_K_M")
 	t.Logf("Qwen3 model exists: %t", exists)
 
 	// 测试默认模型可用性

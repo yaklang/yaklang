@@ -2,7 +2,6 @@ package localmodel
 
 import (
 	"fmt"
-	"path/filepath"
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -101,12 +100,10 @@ func GetModelPath(modelName string) (string, error) {
 		return "", err
 	}
 
-	modelsDir := consts.GetAIModelPath()
-	if modelsDir == "" {
-		return "", fmt.Errorf("unable to get AI model storage path")
+	modelPath := consts.GetAIModelFilePath(model.FileName)
+	if modelPath == "" {
+		return "", fmt.Errorf("model file not found: %s", model.FileName)
 	}
-
-	modelPath := filepath.Join(modelsDir, model.FileName)
 	return modelPath, nil
 }
 

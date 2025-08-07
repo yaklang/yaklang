@@ -13,10 +13,10 @@ func ExampleManager_StartEmbeddingService() {
 	// 启动嵌入服务
 	err := manager.StartEmbeddingService(
 		"127.0.0.1:11434",
-		WithEmbeddingModel("Qwen3-Embedding-0.6B-Q8_0"),
+		WithEmbeddingModel("Qwen3-Embedding-0.6B-Q4_K_M"),
 		WithDetached(true),
 		WithDebug(true),
-		WithModelPath("/tmp/Qwen3-Embedding-0.6B-Q8_0.gguf"),
+		WithModelPath("/tmp/Qwen3-Embedding-0.6B-Q4_K_M.gguf"),
 		WithContextSize(4096),
 		WithContBatching(true),
 		WithBatchSize(1024),
