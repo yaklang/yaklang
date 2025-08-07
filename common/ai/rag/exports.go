@@ -6,12 +6,18 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/embedding"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"path/filepath"
 )
 
 type KnowledgeBaseConfig struct {
+	Description string
+
+	// 是否强制创建新的知识库，如果已经存在，会返回错误
+	ForceNew bool
+
 	// embedding 配置
 	ModelName string
 	Dimension int
@@ -60,6 +66,22 @@ type RAGOption func(config *KnowledgeBaseConfig)
 func WithEmbeddingClient(client aispec.EmbeddingCaller) RAGOption {
 	return func(config *KnowledgeBaseConfig) {
 		config.EmbeddingClient = client
+	}
+}
+
+func WithDescription(description string) RAGOption {
+	return func(config *KnowledgeBaseConfig) {
+		config.Description = description
+	}
+}
+
+func WithForceNew(i ...bool) RAGOption {
+	return func(config *KnowledgeBaseConfig) {
+		if len(i) > 0 {
+			config.ForceNew = i[0]
+		} else {
+			config.ForceNew = true
+		}
 	}
 }
 
@@ -140,6 +162,7 @@ func CreateCollection(db *gorm.DB, name string, description string, opts ...any)
 	}
 	return LoadCollection(db, name, cfg.AIOptions...)
 }
+
 func LoadCollectionWithEmbeddingClient(db *gorm.DB, name string, client aispec.EmbeddingCaller, opts ...aispec.AIConfigOption) (*RAGSystem, error) {
 	// 创建 SQLite 向量存储
 	store, err := LoadSQLiteVectorStoreHNSW(db, name, client)
@@ -295,7 +318,7 @@ func AddDocument(db *gorm.DB, knowledgeBaseName, documentName string, document s
 	if err != nil {
 		return utils.Errorf("加载知识库失败: %v", err)
 	}
-	return ragSystem.AddDocuments(Document{
+	return ragSystem.addDocuments(Document{
 		ID:        documentName,
 		Content:   document,
 		Metadata:  metadata,
@@ -340,18 +363,49 @@ func NewRagDatabase(path string) (*gorm.DB, error) {
 	return db, nil
 }
 
+func _get(name string, i ...any) (*RAGSystem, error) {
+	config := NewKnowledgeBaseConfig(i)
+	if config.ForceNew {
+		log.Infof("force new rag collection for name: %v", name)
+		return CreateCollection(consts.GetGormProfileDatabase(), name, config.Description, i...)
+	}
+
+	// load existed first
+	ragSystem, err := LoadCollection(consts.GetGormProfileDatabase(), name)
+	if err != nil {
+		log.Errorf("load rag collection failed: %v, create new once next", err)
+		return CreateCollection(consts.GetGormProfileDatabase(), name, config.Description, i...)
+	}
+	return ragSystem, nil
+}
+
+type DocumentOption func(document *Document)
+
+func WithDocumentMetadataKeyValue(key string, value any) DocumentOption {
+	return func(document *Document) {
+		if utils.IsNil(document.Metadata) {
+			document.Metadata = make(map[string]any)
+		}
+		document.Metadata[key] = value
+	}
+}
+
+func WithDocumentRawMetadata(i map[string]any) DocumentOption {
+	return func(document *Document) {
+		document.Metadata = i
+		if utils.IsNil(document.Metadata) {
+			document.Metadata = make(map[string]any)
+		}
+	}
+}
+
 // 导出的公共函数
 var Exports = map[string]interface{}{
-	"CreateCollection": func(name string, description string, opts ...any) (*RAGSystem, error) {
-		return CreateCollection(consts.GetGormProfileDatabase(), name, description, opts...)
-	},
-	"LoadCollection": func(name string, opts ...aispec.AIConfigOption) (*RAGSystem, error) {
-		return LoadCollection(consts.GetGormProfileDatabase(), name, opts...)
-	},
+	"GetCollection": _get,
 	"DeleteCollection": func(name string) error {
 		return DeleteCollection(consts.GetGormProfileDatabase(), name)
 	},
-	"ListCollections": func() []string {
+	"ListCollection": func() []string {
 		return ListCollections(consts.GetGormProfileDatabase())
 	},
 	"GetCollectionInfo": func(name string) (*CollectionInfo, error) {
@@ -370,10 +424,16 @@ var Exports = map[string]interface{}{
 	"QueryDocumentsWithAISummary": func(knowledgeBaseName, query string, limit int, opts ...any) (string, error) {
 		return QueryDocumentsWithAISummary(consts.GetGormProfileDatabase(), knowledgeBaseName, query, limit, opts...)
 	},
-	"embeddingModel": WithEmbeddingModel,
-	"modelDimension": WithModelDimension,
-	"cosineDistance": WithCosineDistance,
-	"hnswParameters": WithHNSWParameters,
+
+	"ragForceNew":       WithForceNew,
+	"ragDescription":    WithDescription,
+	"ragEmbeddingModel": WithEmbeddingModel,
+	"ragModelDimension": WithModelDimension,
+	"ragCosineDistance": WithCosineDistance,
+	"ragHNSWParameters": WithHNSWParameters,
+
+	"docMetadata":    WithDocumentMetadataKeyValue,
+	"docRawMetadata": WithDocumentRawMetadata,
 	"NewRagDatabase": NewRagDatabase,
 	"NewTempRagDatabase": func() (*gorm.DB, error) {
 		path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
