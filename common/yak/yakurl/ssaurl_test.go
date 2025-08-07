@@ -367,11 +367,12 @@ func TestSFURL(t *testing.T) {
 		})
 	})
 
-	t.Run("check _", func(t *testing.T) {
+	t.Run("check _ variable ", func(t *testing.T) {
 		s.CheckVariable(t, `target*`, []variableResult{
 			{variable: "_", number: 2},
 		})
-
+	})
+	t.Run("check _ value ", func(t *testing.T) {
 		s.CheckValue(t, `target*`, "_", []valueResult{
 			{riskHash: false, url: "/example/src/main/java/com/example/apackage/a.java:8"},
 			{riskHash: false, url: "/example/src/main/java/com/example/bpackage/sub/b.java:8"},
