@@ -2,6 +2,7 @@ package ssadb
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -29,28 +30,40 @@ type IrSource struct {
 func GetIrSourceByPath(path string) ([]*IrSource, error) {
 	db := GetDB()
 	var sources []*IrSource
-	if err := db.Where("folder_path = ?", path).Find(&sources).Error; err != nil {
-		return nil, utils.Wrapf(err, "query source via path: %v failed", path)
+	if !strings.HasSuffix(path, "/") {
+		path = path + "/"
 	}
-	return sources, nil
+	err := db.Where("folder_path = ?", path).Find(&sources).Error
+	if err == nil {
+		return sources, nil
+	}
+	return nil, utils.Wrapf(err, "query source via path: %v failed", path)
 }
 
 func GetIrSourceByPathAndName(path, name string) (*IrSource, error) {
 	db := GetDB()
 	var source IrSource
-	if err := db.Where("folder_path = ? and file_name = ?", path, name).First(&source).Error; err != nil {
-		return nil, utils.Wrapf(err, "query source via path: %v failed", path)
+	if !strings.HasSuffix(path, "/") {
+		path = path + "/"
 	}
-	return &source, nil
+	err := db.Where("folder_path = ? and file_name = ?", path, name).First(&source).Error
+	if err == nil {
+		return &source, nil
+	}
+	return nil, utils.Wrapf(err, "query source via path: %v failed", path)
+
 }
 
 func GetEditorByFileName(fileName string) (*memedit.MemEditor, error) {
 	dir, name := pathSplit(fileName)
-	source, err := GetIrSourceByPathAndName(dir, name)
-	if err != nil {
-		return nil, err
+	if !strings.HasSuffix(dir, "/") {
+		dir = dir + "/"
 	}
-	return irSource2Editor(source), nil
+	source, err := GetIrSourceByPathAndName(dir, name)
+	if err == nil {
+		return irSource2Editor(source), nil
+	}
+	return nil, utils.Wrapf(err, "get editor by file name: %s failed", fileName)
 }
 
 func irSource2Editor(source *IrSource) *memedit.MemEditor {
@@ -58,11 +71,26 @@ func irSource2Editor(source *IrSource) *memedit.MemEditor {
 	if s, err := strconv.Unquote(code); err == nil {
 		code = s
 	}
-	_, folder := splitProjectPath(source.FolderPath)
+	folderPath := source.FolderPath
+	prefix := "/" + source.ProgramName + "/"
+	if strings.HasPrefix(folderPath, prefix) {
+		folderPath = folderPath[len(prefix):]
+	}
+	if !strings.HasSuffix(folderPath, "/") {
+		folderPath = folderPath + "/"
+	}
+	// _, folder := splitProjectPath(source.FolderPath)
 	ret := memedit.NewMemEditor(code)
-	ret.SetFolderPath(folder)
+	ret.SetFolderPath(folderPath)
 	ret.SetFileName(source.FileName)
 	ret.SetProgramName(source.ProgramName)
+	if ret.GetIrSourceHash() != source.SourceCodeHash {
+		log.Errorf(
+			`ir source hash not match: [%s] != [%s]`,
+			ret.GetIrSourceHash(),
+			source.SourceCodeHash,
+		)
+	}
 	return ret
 }
 
@@ -87,7 +115,20 @@ func GetIrSourceFromHash(hash string) (*memedit.MemEditor, error) {
 }
 
 func MarshalFile(editor *memedit.MemEditor) *IrSource {
-	folderPath := irSourceJoin(editor.GetProgramName(), editor.GetFolderPath())
+	prefix := "/" + editor.GetProgramName() + "/"
+	folderPath := editor.GetFolderPath()
+	if !strings.HasPrefix(folderPath, prefix) {
+		folderPath = prefix + folderPath
+	}
+	path := editor.GetFolderPath()
+	if !strings.HasSuffix(path, "/") {
+		path = path + "/"
+	}
+	editor.SetFolderPath(path)
+
+	if !strings.HasSuffix(folderPath, "/") {
+		folderPath = folderPath + "/"
+	}
 	irSource := &IrSource{
 		ProgramName:    editor.GetProgramName(),
 		SourceCodeHash: editor.GetIrSourceHash(),
@@ -105,6 +146,9 @@ func MarshalFolder(folderPaths []string) *IrSource {
 	}
 	folderName := folderPaths[len(folderPaths)-1]
 	folderPath := irSourceJoin(folderPaths[:len(folderPaths)-1]...)
+	if !strings.HasSuffix(folderPath, "/") {
+		folderPath = folderPath + "/"
+	}
 	programName := folderPaths[0]
 	irSource := &IrSource{
 		ProgramName:    programName,
