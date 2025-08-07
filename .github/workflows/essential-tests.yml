@@ -118,6 +118,31 @@ jobs:
               go test -timeout 30s ./common/mutate
               go test -timeout 30s ./common/fuzzx
               go test -timeout 20s ./common/utils/bizhelper/...
+              
+               # cli
+              go test --timeout 1m ./common/utils/cli
+              # mcp
+              go test --timeout 1m ./common/mcp/yakcliconvert
+              # doc
+              go test --timeout 3m  ./common/yak/yakdoc/...
+              # jwt
+              go test --timeout 1m ./common/authhack/...
+
+          - name: Test AI Infra
+            run: |
+              go test -timeout 2m ./common/ai/aid/...
+              go test -timeout 60s ./common/ai/tests/...
+              go test -timeout 60s ./common/ai/aispec/...
+              go test -timeout 60s ./common/aireducer/...
+              go test -timeout 40s ./common/aiforge/aibp/forge_builder_test.go
+
+          - name: Test AI RAG | Knowledge Base
+            run: |
+              # AI RAG
+              go test -timeout 1m ./common/ai/rag
+              go test -timeout 1m -run TestMUSTPASS ./common/ai/rag/plugins_rag/...
+              # Knowledge Base
+              go test -timeout 1m -run TestMUSTPASS ./common/yakgrpc/yakit
 
           - name: Test SSA / SSAAPI
             run: |
@@ -148,14 +173,6 @@ jobs:
               # Test js
               go test -timeout 60s ./common/yak/JS2ssa/...
               go test -timeout 1m ./common/yak/ssaapi/test/javascript
-
-          - name: Test AI Infra
-            run: |
-              go test -timeout 2m ./common/ai/aid/...
-              go test -timeout 60s ./common/ai/tests/...
-              go test -timeout 60s ./common/ai/aispec/...
-              go test -timeout 60s ./common/aireducer/...
-              go test -timeout 40s ./common/aiforge/aibp/forge_builder_test.go
 
           - name: Test SSA Frontend TypeScript
             run: |
@@ -211,23 +228,10 @@ jobs:
           - name: Test gRPC MUSTPASS Language
             run: go test -timeout 5m -run TestGRPCMUSTPASS_LANGUAGE* ./common/yakgrpc/...
 
-          - name: Test gRPC MUSTPASS SyntaxFlow
-            run: go test -timeout 5m -run TestGRPCMUSTPASS_SyntaxFlow* ./common/yakgrpc/...
-
-          - name: Test gRPC MUSTPASS SSA
-            run: go test -timeout 5m -run TestGRPCMUSTPASS_SSA* ./common/yakgrpc/...
-
-          - name: Test gRPC MUSTPASS COMMON
-            run: go test -timeout 5m -run TestGRPCMUSTPASS_COMMON* ./common/yakgrpc/...
-
-          - name: Test gRPC(LARGE)MUSTPASS
-            run: go test -timeout 2m -run TestLARGEGRPCMUSTPASS* ./common/yakgrpc/...
-
-          - name: Test gRPC MUSTPASS HTTPFlow Analyzer
-            run: go test -timeout 2m -run TestGRPCMUSTPASS_AnalyzeHTTPFlow* ./common/yakgrpc/...
-
-          - name: Test gRPC MUSTPASSFingerprint
-            run: go test -timeout 2m -run TestGRPCMUSTPASS_Fingerprint* ./common/yakgrpc/...
+          - name: Test gRPC MUSTPASS SyntaxFlow | SSA
+            run: |
+              go test -timeout 5m -run TestGRPCMUSTPASS_SyntaxFlow* ./common/yakgrpc/...
+              go test -timeout 5m -run TestGRPCMUSTPASS_SSA* ./common/yakgrpc/...
 
           - name: Test gRPC MUSTPASS PluginTrace
             run: go test -timeout 5m -run TestGRPCMUSTPASS_PluginTrace* ./common/yakgrpc/...
@@ -235,11 +239,20 @@ jobs:
           - name: Test AI Task
             run: go test -timeout 1m -run TestAITaskWith ./common/yakgrpc/...
 
-          - name: Test gRPC Other
-            run: go test -v -timeout 10m -skip "^(TestGRPCMUSTPASS_AnalyzeHTTPFlow*|TestGRPCMUSTPASS_Fingerprint*|TestGRPC_Ai_List_Model|TestGRPCMUSTPASS_HTTP_*|TestAITaskWith*|TestGRPCMUSTPASS_MITM_*|TestGRPCMUSTPASS_HTTPFuzzer*|TestGRPCMUSTPASS_LANGUAGE*|TestGRPCMUSTPASS_COMMON*|TestLARGEGRPCMUSTPASS*|TestGRPCMUSTPASS_SyntaxFlow*|TestGRPCMUSTPASS_SSA*)" ./common/yakgrpc/...
+          - name: Test gRPC In 2m
+            run: |
+              # Test gRPC MUSTPASS AnalyzeHTTPFlow
+              go test -timeout 2m -run TestGRPCMUSTPASS_AnalyzeHTTPFlow* ./common/yakgrpc/...
+              # Test gRPC MUSTPASS Fingerprint
+              go test -timeout 2m -run TestGRPCMUSTPASS_Fingerprint* ./common/yakgrpc/...
+              # Test gRPC gRPC(LIST)MUSTPASS
+              go test -timeout 2m -run TestLARGEGRPCMUSTPASS* ./common/yakgrpc/...
+              # Test gRPC MUSTPASS COMMON
+              go test -timeout 5m -run TestGRPCMUSTPASS_COMMON* ./common/yakgrpc/...
 
-          - name: Test Vulinbox SQL Injection
-            run: go test -timeout 5m -run TestGRPCMUSTPASS_SQL ./common/coreplugin
+          - name: Test gRPC Other
+            run:  |
+              go test -v -timeout 10m -skip "^(TestGRPCMUSTPASS_PluginTrace*|TestGRPCMUSTPASS_AnalyzeHTTPFlow*|TestGRPCMUSTPASS_Fingerprint*|TestGRPC_Ai_List_Model|TestGRPCMUSTPASS_HTTP_*|TestAITaskWith*|TestGRPCMUSTPASS_MITM_*|TestGRPCMUSTPASS_HTTPFuzzer*|TestGRPCMUSTPASS_LANGUAGE*|TestGRPCMUSTPASS_COMMON*|TestLARGEGRPCMUSTPASS*|TestGRPCMUSTPASS_SyntaxFlow*|TestGRPCMUSTPASS_SSA*)" ./common/yakgrpc/...
 
           - name: Test Integration MITM / SyntaxFlow
             run: |
@@ -250,14 +263,17 @@ jobs:
               go test -timeout 20s  ./common/syntaxflow/sfdb/...
               go test -timeout 20s  ./common/syntaxflow/sfvm/...
 
-          - name: Test Vulinbox(XSS/Shiro/SSRF/SSTI/SMUGGLE/CSRF/OPEN_REDIRECT)
+          - name: Test Vulinbox Coreplugin Fastjson
+            run: go test -timeout 3m -run TestGRPCMUSTPASS_Fastjson ./common/coreplugin
+
+          - name: Test Vulinbox Coreplugin SQL Injection
+            run: go test -timeout 5m -run TestGRPCMUSTPASS_SQL ./common/coreplugin
+
+          - name: Test Vulinbox Coreplugin (XSS/Shiro/SSRF/SSTI/SMUGGLE/CSRF/OPEN_REDIRECT)
             run: |
               go test -timeout 5m -run "^(TestGRPCMUSTPASS_XSS|TestGRPCMUSTPASS_Shiro|TestGRPCMUSTPASS_SSRF|TestGRPCMUSTPASS_SSTI|TestGRPCMUSTPASS_Smuggle|TestGRPCMUSTPASS_CSRF|TestGRPCMUSTPASS_OPEN_REDIRECT)$" ./common/coreplugin
 
-          - name: Test gRPC MUSTPASS-PLUGIN-Fastjson
-            run: go test -timeout 3m -run TestGRPCMUSTPASS_Fastjson ./common/coreplugin
-
-          - name: Test Vulinbox agent client / yso
+          - name: Test Vulinbox agent client
             run: |
               # vulinbox agent client
               go test -timeout 1m -run TestMUSTPASS* ./common/vulinboxagentclient
@@ -268,25 +284,6 @@ jobs:
               go test --timeout 5m ./common/crawlerx/...
               # crawler
               go test -timeout 20s -run TestMUSTPASS ./common/crawler
-
-          - name: Test Other
-            run: |
-              # cli
-              go test --timeout 1m ./common/utils/cli
-              # mcp
-              go test --timeout 1m ./common/mcp/yakcliconvert
-              # doc
-              go test --timeout 3m  ./common/yak/yakdoc/...
-              # jwt
-              go test --timeout 1m ./common/authhack/...
-          - name: Test AI RAG
-            run: |
-              go test -timeout 1m ./common/ai/rag
-              go test -timeout 1m -run TestMUSTPASS ./common/ai/rag/plugins_rag/...
-              
-          - name: Test Knowledge Base
-            run: |
-              go test -timeout 1m -run TestMUSTPASS ./common/yakgrpc/yakit
 
     steps:
       - name: "Checkout"
