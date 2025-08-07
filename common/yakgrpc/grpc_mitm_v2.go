@@ -186,7 +186,13 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		disableWebsocketCompression = firstReq.GetDisableWebsocketCompression()
 		randomJA3                   = firstReq.GetRandomJA3()
 		filterWebSocket             = utils.NewBool(firstReq.GetFilterWebsocket())
+		pluginConcurrency           = firstReq.GetPluginConcurrency()
 	)
+
+	if pluginConcurrency <= 0 {
+		pluginConcurrency = 20
+	}
+
 	downstreamProxy, err := getDownstreamProxy(firstReq)
 	if err != nil {
 		return err
@@ -274,7 +280,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 	mitmPluginCaller.SetFeedback(execFeedback)
 	mitmPluginCaller.SetDividedContext(true)
-	mitmPluginCaller.SetConcurrent(20)
+	mitmPluginCaller.SetConcurrent(int(pluginConcurrency))
 	mitmPluginCaller.SetLoadPluginTimeout(10)
 	mitmPluginCaller.SetCallPluginTimeout(consts.GetGlobalCallerCallPluginTimeout())
 
