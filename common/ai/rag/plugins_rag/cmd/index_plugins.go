@@ -22,7 +22,7 @@ func getIndexPluginCommand() *cli.Command {
 			cli.StringFlag{
 				Name:  "model,m",
 				Usage: "OpenAI 嵌入模型名称",
-				Value: "Qwen3-Embedding-0.6B-Q8_0",
+				Value: "Qwen3-Embedding-0.6B-Q4_K_M",
 			},
 			cli.StringFlag{
 				Name:  "baseurl,u",

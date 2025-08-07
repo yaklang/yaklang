@@ -31,7 +31,7 @@ type KnowledgeBaseConfig struct {
 
 func NewKnowledgeBaseConfig(options ...any) *KnowledgeBaseConfig {
 	defaultConfig := &KnowledgeBaseConfig{
-		ModelName:             "Qwen3-Embedding-0.6B-Q8_0",
+		ModelName:             "Qwen3-Embedding-0.6B-Q4_K_M",
 		Dimension:             1024,
 		DistanceFuncType:      "cosine",
 		MaxNeighbors:          16,

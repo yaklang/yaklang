@@ -54,11 +54,11 @@ func DefaultServiceConfig() *ServiceConfig {
 func GetSupportedModels() []*ModelConfig {
 	return []*ModelConfig{
 		{
-			Name:        "Qwen3-Embedding-0.6B-Q8_0",
+			Name:        "Qwen3-Embedding-0.6B-Q4_K_M",
 			Type:        "embedding",
-			FileName:    "Qwen3-Embedding-0.6B-Q8_0.gguf",
-			DownloadURL: "https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF/resolve/main/Qwen3-Embedding-0.6B-Q8_0.gguf?download=true",
-			Description: "Qwen3 Embedding 0.6B Q8_0 - 文本嵌入模型",
+			FileName:    "Qwen3-Embedding-0.6B-Q4_K_M.gguf",
+			DownloadURL: "https://oss-qn.yaklang.com/gguf/Qwen3-Embedding-0.6B-Q4_K_M.gguf",
+			Description: "Qwen3 Embedding 0.6B Q4_K_M - 文本嵌入模型",
 			DefaultPort: 8080,
 		},
 	}
