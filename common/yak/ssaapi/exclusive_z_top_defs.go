@@ -143,10 +143,10 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			if len(results) == 0 && !ValueCompare(i, actx.Self) {
 				results = append(results, i)
 			}
-			// 拼接数据流关系
-			for _, ret := range results {
-				ret.AppendEffectOn(i)
-			}
+			// TODO:这个拼接数据流关系会导致速度很慢
+			//for _, ret := range results {
+			//	ret.AppendEffectOn(i)
+			//}
 			return results
 		}
 		return i.visitedDefs(actx, opt...)
