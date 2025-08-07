@@ -1,12 +1,12 @@
 package sfreport
 
 import (
+	"bytes"
 	"encoding/json"
-	"io"
-
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"io"
 )
 
 var _ IReport = (*Report)(nil)
@@ -30,16 +30,23 @@ func (r *Report) AddSyntaxFlowResult(result *ssaapi.SyntaxFlowResult) bool {
 	return true
 }
 
+func (r *Report) AddSyntaxFlowRisks(risks []*schema.SSARisk) {
+	for _, risk := range risks {
+		r.ConvertSSARiskToReport(risk)
+	}
+}
+
 func (r *Report) ConvertSSARiskToReport(ssarisk *schema.SSARisk) {
 	if r.GetRisk(ssarisk.Hash) != nil {
 		// already exists
 		return
 	}
 
-	// create risk
+	// create risk with detailed structure
 	risk := NewRisk(ssarisk)
 	r.AddRisks(risk)
 
+	r.RiskNums = len(r.Risks)
 	// get result
 	result, err := ssaapi.LoadResultByID(uint(ssarisk.ResultID))
 	if err != nil {
@@ -55,7 +62,8 @@ func (r *Report) ConvertSSARiskToReport(ssarisk *schema.SSARisk) {
 	}
 
 	// {{ analyze graph
-	// TODO: implement analyze graph save to report.risk.AnalyzeGraph
+	// Data flow information is now automatically generated in NewRisk() function
+	// The DataFlowPaths field will contain the complete data flow analysis
 	// }}
 
 	// {{ file
@@ -96,4 +104,15 @@ func (r *Report) FirstOrCreateFile(editor *memedit.MemEditor) *File {
 	ret := NewFile(r.ReportType, editor)
 	r.File = append(r.File, ret)
 	return ret
+}
+
+func ConvertRisksToJson(risks []*schema.SSARisk) ([]byte, error) {
+	reporter := NewReport(IRifyReportType)
+	reporter.AddSyntaxFlowRisks(risks)
+	var writer bytes.Buffer
+	err := reporter.PrettyWrite(&writer)
+	if err != nil {
+		return nil, err
+	}
+	return writer.Bytes(), nil
 }
