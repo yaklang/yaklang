@@ -187,41 +187,55 @@ func GetPage2ImgBinaryPath() string {
 	return utils.GetFirstExistedFile(paths...)
 }
 
-func GetAIModelPath() string {
+func GetAIModelPath() []string {
 	defaultPath := GetDefaultYakitProjectsDir()
+	var paths []string
+	paths = append(paths, filepath.Join(defaultPath, "libs", "models"))
+	paths = append(paths, filepath.Join(defaultPath, "libs", "aimodel"))
+	paths = append(paths, filepath.Join(defaultPath, "models"))
+	paths = append(paths, filepath.Join(defaultPath, "aimodel"))
+
+	// 确保至少有一个目录存在，优先创建 libs/models
 	modelsDir := filepath.Join(defaultPath, "libs", "models")
 	_ = os.MkdirAll(modelsDir, os.ModePerm)
-	return modelsDir
+
+	return paths
+}
+
+// GetAIModelFilePath 是一个辅助函数，用于查找指定的模型文件
+func GetAIModelFilePath(filename string) string {
+	modelPaths := GetAIModelPath()
+	var filePaths []string
+	for _, basePath := range modelPaths {
+		filePaths = append(filePaths, filepath.Join(basePath, filename))
+	}
+	return utils.GetFirstExistedFile(filePaths...)
+}
+
+// GetDefaultAIModelDir 获取默认的AI模型目录（用于下载等操作）
+func GetDefaultAIModelDir() string {
+	defaultPath := GetDefaultYakitProjectsDir()
+	return filepath.Join(defaultPath, "libs", "models")
 }
 
 func GetWhisperModelSmallPath() string {
-	modelPath := GetAIModelPath()
-	whisperModelPath := filepath.Join(modelPath, "whisper-small-q8.gguf")
-	return whisperModelPath
+	return GetAIModelFilePath("whisper-small-q8.gguf")
 }
 
 func GetWhisperModelTinyPath() string {
-	modelPath := GetAIModelPath()
-	whisperModelPath := filepath.Join(modelPath, "whisper-tiny-q5.gguf")
-	return whisperModelPath
+	return GetAIModelFilePath("whisper-tiny-q5.gguf")
 }
 
 func GetWhisperModelMediumPath() string {
-	modelPath := GetAIModelPath()
-	whisperModelPath := filepath.Join(modelPath, "whisper-medium-q5.gguf")
-	return whisperModelPath
+	return GetAIModelFilePath("whisper-medium-q5.gguf")
 }
 
-func GetQwen3Embedding0_6BQ8_0ModelPath() string {
-	modelPath := GetAIModelPath()
-	embeddingModelPath := filepath.Join(modelPath, "Qwen3-Embedding-0.6B-Q8_0.gguf")
-	return embeddingModelPath
+func GetQwen3Embedding0_6BQ4_0ModelPath() string {
+	return GetAIModelFilePath("Qwen3-Embedding-0.6B-Q4_K_M.gguf")
 }
 
 func GetWhisperModelBasePath() string {
-	modelPath := GetAIModelPath()
-	whisperModelPath := filepath.Join(modelPath, "whisper-base-q8.gguf")
-	return whisperModelPath
+	return GetAIModelFilePath("whisper-base-q8.gguf")
 }
 
 func GetWhisperServerBinaryPath() string {
