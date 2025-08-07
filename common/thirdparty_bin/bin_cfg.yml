@@ -73,13 +73,15 @@ binaries:
   - name: "pandoc"
     description: "pandoc - A tool for file covert"
     version: "latest"
-    install_type: "bin"
+    install_type: "archive"
     download_info_map:
       "darwin-arm64":
         url: "https://yaklang.oss-cn-beijing.aliyuncs.com/pandoc/pandoc-darwin-arm64.zip"
+        pick: "pandoc"
         bin_path: "pandoc"
       "windows-amd64":
         url: "https://yaklang.oss-cn-beijing.aliyuncs.com/pandoc/pandoc-windows-amd64.zip"
+        pick: "pandoc.exe"
         bin_path: "pandoc.exe"
   - name: "whisper.cpp"
     description: "Whisper.cpp - A fast and accurate speech-to-text model"

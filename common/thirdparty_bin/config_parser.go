@@ -118,13 +118,13 @@ func ParseConfig(data []byte) (*ConfigFile, error) {
 		// 转换下载信息并验证pick和BinDir的一致性
 		for platform, configDownloadInfo := range configBinary.DownloadInfoMap {
 			// 验证pick和BinDir必须同时存在或同时不存在
-			hasPick := configDownloadInfo.Pick != ""
-			hasBinDir := configDownloadInfo.BinDir != ""
+			// hasPick := configDownloadInfo.Pick != ""
+			// hasBinDir := configDownloadInfo.BinDir != ""
 
-			if hasPick != hasBinDir {
-				return nil, utils.Errorf("binary %s platform %s: pick and bin_dir must both be present or both be absent",
-					configBinary.Name, platform)
-			}
+			// if hasPick != hasBinDir {
+			// 	return nil, utils.Errorf("binary %s platform %s: pick and bin_dir must both be present or both be absent",
+			// 		configBinary.Name, platform)
+			// }
 
 			// 构建完整的URL，如果是相对URL则拼接baseurl
 			fullURL := buildFullURL(configFile.BaseURL, configDownloadInfo.URL)
