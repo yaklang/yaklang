@@ -39,8 +39,8 @@ func NewFile(reportType ReportType, editor *memedit.MemEditor) *File {
 }
 
 func (f *File) AddRisk(risk *Risk) {
-	if slices.Contains(f.Risks, risk.Hash) {
+	if slices.Contains(f.Risks, risk.GetHash()) {
 		return
 	}
-	f.Risks = append(f.Risks, risk.Hash)
+	f.Risks = append(f.Risks, risk.GetHash())
 }

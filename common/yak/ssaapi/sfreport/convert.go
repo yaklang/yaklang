@@ -1,6 +1,7 @@
 package sfreport
 
 import (
+	"github.com/yaklang/yaklang/common/schema"
 	"io"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -10,6 +11,7 @@ import (
 type IReport interface {
 	AddSyntaxFlowResult(result *ssaapi.SyntaxFlowResult) bool
 	PrettyWrite(writer io.Writer) error
+	AddSyntaxFlowRisks(risks []*schema.SSARisk)
 }
 
 func ConvertSyntaxFlowResultToReport(format ReportType) (IReport, error) {
