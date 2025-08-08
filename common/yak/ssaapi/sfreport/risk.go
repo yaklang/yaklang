@@ -1,7 +1,6 @@
 package sfreport
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -9,69 +8,35 @@ import (
 )
 
 type Risk struct {
-	// 项目信息
-	ProjectInfo ProjectInfo `json:"project_info"`
-	// 风险基本信息
-	BaseInfo BaseInfo `json:"base_info"`
-	// 风险详情
-	DetailInfo DetailInfo `json:"detail_info"`
-	// CVE信息
-	CVEInfo CVEInfo `json:"cve_info"`
-	// 审计规则信息
-	AuditRuleInfo AuditRuleInfo `json:"audit_rule"`
-	// 风险触发点代码范围
-	RiskTriggerCodeRange RiskTriggerCodeRange `json:"risk_trigger_code_range"`
+	// index
+	ID   uint   `json:"id"`
+	Hash string `json:"hash"`
+
+	// info
+	Title        string    `json:"title"`
+	TitleVerbose string    `json:"title_verbose"`
+	Description  string    `json:"description"`
+	Solution     string    `json:"solution"`
+	Severity     string    `json:"severity"`
+	RiskType     string    `json:"risk_type"`
+	Details      string    `json:"details"`
+	CVE          string    `json:"cve"`
+	Time         time.Time `json:"time"`
+	Language     string    `json:"language"`
+	// code info
+	CodeSourceURL string `json:"code_source_url"`
+	Line          int64  `json:"line"`
+	// for select code range
+	CodeRange string `json:"code_range"`
+
+	// rule
+	RuleName string `json:"rule_name"`
+	// program
+	ProgramName string `json:"program_name"`
 	// 处置状态
 	LatestDisposalStatus string `json:"latest_disposal_status"`
 	// 数据流路径信息
 	DataFlowPaths []*DataFlowPath `json:"data_flow_paths,omitempty"`
-}
-
-// ProjectInfo 项目信息
-type ProjectInfo struct {
-	ProgramName string `json:"program_name"`
-	Language    string `json:"language"`
-}
-
-// BaseInfo 风险基本信息
-type BaseInfo struct {
-	ID        uint      `json:"id"`
-	Hash      string    `json:"hash"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// DetailInfo 风险详情
-type DetailInfo struct {
-	Title        string `json:"title"`
-	TitleVerbose string `json:"title_verbose"`
-	Description  string `json:"description"`
-	Solution     string `json:"solution"`
-	RiskType     string `json:"risk_type"`
-	Details      string `json:"details"`
-	Severity     string `json:"severity"`
-	Tags         string `json:"tags"`
-}
-
-// CVEInfo CVE信息
-type CVEInfo struct {
-	CVE                 string `json:"cve"`
-	CveAccessVector     string `json:"cve_access_vector"`
-	CveAccessComplexity string `json:"cve_access_complexity"`
-}
-
-// AuditRuleInfo 审计规则信息
-type AuditRuleInfo struct {
-	RuleName string `json:"rule_name"`
-}
-
-// RiskTriggerCodeRange 风险触发点代码范围
-type RiskTriggerCodeRange struct {
-	CodeSourceUrl string `json:"code_source_url"`
-	CodeRange     string `json:"code_range"`
-	CodeFragment  string `json:"code_fragment"`
-	FunctionName  string `json:"function_name"`
-	Line          int64  `json:"line"`
 }
 
 // DataFlowPath 数据流路径
@@ -106,59 +71,29 @@ func NewRisk(risk *schema.SSARisk) *Risk {
 		return &Risk{}
 	}
 
-	projectInfo := ProjectInfo{
-		ProgramName: risk.ProgramName,
-		Language:    getLanguageByRisk(risk),
+	if risk == nil {
+		return &Risk{}
 	}
 
-	// 构建基本信息
-	baseInfo := BaseInfo{
-		ID:        risk.ID,
-		Hash:      risk.Hash,
-		CreatedAt: risk.CreatedAt,
-		UpdatedAt: risk.UpdatedAt,
-	}
+	ret := &Risk{
+		ID:   risk.ID,
+		Hash: risk.Hash,
+		Time: risk.CreatedAt,
 
-	// 构建风险详情
-	detailInfo := DetailInfo{
 		Title:        risk.Title,
 		TitleVerbose: risk.TitleVerbose,
 		Description:  risk.Description,
 		Solution:     risk.Solution,
+		Severity:     string(risk.Severity),
 		RiskType:     risk.RiskType,
 		Details:      risk.Details,
-		Severity:     string(risk.Severity),
-		Tags:         risk.Tags,
-	}
+		CVE:          risk.CVE,
+		Language:     risk.Language,
 
-	// 构建CVE信息
-	cveInfo := CVEInfo{
-		CVE:                 risk.CVE,
-		CveAccessVector:     risk.CveAccessVector,
-		CveAccessComplexity: risk.CveAccessComplexity,
-	}
+		CodeRange: risk.CodeRange,
+		Line:      risk.Line,
 
-	// 构建审计规则信息
-	auditRuleInfo := AuditRuleInfo{
-		RuleName: risk.FromRule,
-	}
-
-	// 构建风险触发点代码范围
-	riskTriggerInfo := RiskTriggerCodeRange{
-		CodeSourceUrl: risk.CodeSourceUrl,
-		CodeRange:     risk.CodeRange,
-		CodeFragment:  risk.CodeFragment,
-		FunctionName:  risk.FunctionName,
-		Line:          risk.Line,
-	}
-
-	ret := &Risk{
-		ProjectInfo:          projectInfo,
-		BaseInfo:             baseInfo,
-		DetailInfo:           detailInfo,
-		CVEInfo:              cveInfo,
-		AuditRuleInfo:        auditRuleInfo,
-		RiskTriggerCodeRange: riskTriggerInfo,
+		ProgramName:          risk.ProgramName,
 		LatestDisposalStatus: risk.LatestDisposalStatus,
 	}
 
@@ -176,81 +111,69 @@ func NewRisk(risk *schema.SSARisk) *Risk {
 }
 
 func (r *Risk) GetHash() string {
-	return r.BaseInfo.Hash
+	return r.Hash
 }
 
 func (r *Risk) GetTitle() string {
-	return r.DetailInfo.Title
+	return r.Title
 }
 
 func (r *Risk) GetTitleVerbose() string {
-	return r.DetailInfo.TitleVerbose
+	return r.TitleVerbose
 }
 
 func (r *Risk) GetDescription() string {
-	return r.DetailInfo.Description
+	return r.Description
 }
 
 func (r *Risk) GetSolution() string {
-	return r.DetailInfo.Solution
+	return r.Solution
 }
 
 func (r *Risk) GetSeverity() string {
-	return r.DetailInfo.Severity
+	return r.Severity
 }
 
 func (r *Risk) GetRiskType() string {
-	return r.DetailInfo.RiskType
+	return r.RiskType
 }
 
 func (r *Risk) GetDetails() string {
-	return r.DetailInfo.Details
+	return r.Details
 }
 
 func (r *Risk) GetCVE() string {
-	return r.CVEInfo.CVE
-}
-
-func (r *Risk) GetTime() time.Time {
-	return r.BaseInfo.CreatedAt
+	return r.CVE
 }
 
 func (r *Risk) GetCodeSourceURL() string {
-	return r.RiskTriggerCodeRange.CodeSourceUrl
+	return r.CodeSourceURL
 }
 
 func (r *Risk) GetLine() int64 {
-	return r.RiskTriggerCodeRange.Line
+	return r.Line
 }
 
 func (r *Risk) GetCodeRange() string {
-	return r.RiskTriggerCodeRange.CodeRange
+	return r.CodeRange
 }
 
 func (r *Risk) GetProgramName() string {
-	return r.ProjectInfo.ProgramName
+	return r.ProgramName
 }
 
 func (r *Risk) GetLanguage() string {
-	return r.ProjectInfo.Language
+	return r.Language
 }
 
 func (r *Risk) GetRuleName() string {
-	return r.AuditRuleInfo.RuleName
+	return r.RuleName
 }
 
 func (r *Risk) SetRule(rule *Rule) {
-	r.AuditRuleInfo.RuleName = rule.RuleName
+	r.RuleName = rule.RuleName
 }
 
 func (r *Risk) SetFile(file *File) {
-	r.RiskTriggerCodeRange.CodeSourceUrl = file.Path
-}
-
-func getLanguageByRisk(risk *schema.SSARisk) string {
-	program, err := ssadb.GetApplicationProgram(risk.ProgramName)
-	if err != nil {
-		log.Errorf("get language by risk failed:%v", err)
-	}
-	return program.Language
+	r.CodeSourceURL = file.Path
 }
