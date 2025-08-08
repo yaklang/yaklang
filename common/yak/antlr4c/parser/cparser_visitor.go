@@ -28,9 +28,6 @@ type CParserVisitor interface {
 	// Visit a parse tree produced by CParser#unaryExpression.
 	VisitUnaryExpression(ctx *UnaryExpressionContext) interface{}
 
-	// Visit a parse tree produced by CParser#unaryOperator.
-	VisitUnaryOperator(ctx *UnaryOperatorContext) interface{}
-
 	// Visit a parse tree produced by CParser#castExpression.
 	VisitCastExpression(ctx *CastExpressionContext) interface{}
 
@@ -102,9 +99,6 @@ type CParserVisitor interface {
 
 	// Visit a parse tree produced by CParser#enumerator.
 	VisitEnumerator(ctx *EnumeratorContext) interface{}
-
-	// Visit a parse tree produced by CParser#enumerationConstant.
-	VisitEnumerationConstant(ctx *EnumerationConstantContext) interface{}
 
 	// Visit a parse tree produced by CParser#atomicTypeSpecifier.
 	VisitAtomicTypeSpecifier(ctx *AtomicTypeSpecifierContext) interface{}

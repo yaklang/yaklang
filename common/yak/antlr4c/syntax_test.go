@@ -57,12 +57,14 @@ type Container []struct {
 // func TestExample_Tmp(t *testing.T) {
 // 	code := `
 // #include <stdio.h>
+// static inline int square(int x) {
+//     return x * x;
+// }
 // int main() {
-//     int a = 10;
-//     int *p = &a;
-//     println(*p);
+//     println(square(5));
 //     return 0;
 // }
+
 // `
 // 	_, err := SyntaxBase(code, true)
 // 	if err != nil {

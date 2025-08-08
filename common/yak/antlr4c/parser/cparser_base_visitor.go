@@ -35,10 +35,6 @@ func (v *BaseCParserVisitor) VisitUnaryExpression(ctx *UnaryExpressionContext) i
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseCParserVisitor) VisitUnaryOperator(ctx *UnaryOperatorContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseCParserVisitor) VisitCastExpression(ctx *CastExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -132,10 +128,6 @@ func (v *BaseCParserVisitor) VisitEnumeratorList(ctx *EnumeratorListContext) int
 }
 
 func (v *BaseCParserVisitor) VisitEnumerator(ctx *EnumeratorContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseCParserVisitor) VisitEnumerationConstant(ctx *EnumerationConstantContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
