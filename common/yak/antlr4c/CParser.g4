@@ -92,11 +92,10 @@ argumentExpressionList
     ;
 
 unaryExpression
-    : ('++' | '--' | 'sizeof' | '*')* (
-        postfixExpression
-        | ('sizeof' | '_Alignof') '(' typeName ')'
-        | '&&' Identifier
-    )
+    : ('++' | '--' | '*') unaryExpression
+    | ('sizeof' | '_Alignof') '(' typeName ')'
+    | '&&' unaryExpression
+    | postfixExpression
     ;
 
 castExpression
@@ -163,7 +162,10 @@ declarationSpecifiers2
     ;
 
 declarationSpecifier
-    : (storageClassSpecifier | typeQualifier | functionSpecifier)* (typeSpecifier | Identifier) '*'?
+    : (storageClassSpecifier | typeQualifier | functionSpecifier)* structOrUnion? (
+        typeSpecifier
+        | Identifier
+    ) '*'?
     | alignmentSpecifier
     ;
 
@@ -206,8 +208,7 @@ typeSpecifier
     ;
 
 structOrUnionSpecifier
-    : structOrUnion Identifier? '{' structDeclarationList '}'
-    | structOrUnion Identifier
+    : structOrUnion Identifier? '{' structDeclarationList '}' Identifier?
     ;
 
 structOrUnion
@@ -370,7 +371,7 @@ directAbstractDeclarator
     ;
 
 typedefName
-    : Identifier
+    : structOrUnion? Identifier
     ;
 
 initializer
@@ -480,7 +481,8 @@ translationUnit
     ;
 
 externalDeclaration
-    : functionDefinition
+    : declarationSpecifier
+    | functionDefinition
     | declaration
     | ';'
     ;

@@ -753,7 +753,7 @@ func TestFuntion_normol(t *testing.T) {
 		func main(){
 			mapt := make(map[string]string)
 			println(mapt)
-		}`, []string{"Function-make(typeValue(map[string]string))"}, t)
+		}`, []string{"make(map[string]string)"}, t)
 	})
 
 	t.Run("member-call method", func(t *testing.T) {

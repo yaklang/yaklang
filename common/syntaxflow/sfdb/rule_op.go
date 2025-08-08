@@ -233,6 +233,8 @@ func CheckSyntaxFlowLanguage(languageRaw string) (consts.Language, error) {
 		return consts.JS, nil
 	case "golang", "go":
 		return consts.GO, nil
+	case "clang", "c":
+		return consts.C, nil
 	case "general":
 		return consts.General, nil
 	}

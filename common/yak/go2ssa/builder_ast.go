@@ -1350,11 +1350,6 @@ func (b *astbuilder) buildLabeledStmt(stmt *gol.LabeledStmtContext) {
 	}
 
 	LabelBuilder := b.GetLabelByName(text)
-	if LabelBuilder == nil {
-		LabelBuilder = b.BuildLabel(text)
-		b.labels[text] = LabelBuilder
-	}
-
 	block := LabelBuilder.GetBlock()
 	LabelBuilder.Build()
 	b.AddLabel(text, block)

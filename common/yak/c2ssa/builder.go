@@ -81,11 +81,7 @@ func (s *SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder)
 		"bool":    ssa.CreateBooleanType(),
 		"complex": ssa.CreateAnyType(),
 	}
-	SpecialValue := map[string]interface{}{
-		"NULL":  nil,
-		"true":  true,
-		"false": false,
-	}
+	SpecialValue := map[string]ssa.Value{}
 
 	builder.SupportClosure = false
 	astBuilder := &astbuilder{
@@ -120,7 +116,7 @@ type astbuilder struct {
 	result         map[string][]string
 	tpHandler      map[string]func()
 	labels         map[string]*ssa.LabelBuilder
-	specialValues  map[string]interface{}
+	specialValues  map[string]ssa.Value
 	specialTypes   map[string]ssa.Type
 	pkgNameCurrent string
 	SetGlobal      bool
@@ -208,32 +204,23 @@ func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
 	}
 }
 
-func (b *astbuilder) coverType(ityp, iwantTyp ssa.Type) {
-	typ, ok := ityp.(*ssa.ObjectType)
-	if !ok {
-		return
+func (b *astbuilder) addSpecialValue(n string, v ssa.Value) {
+	if _, ok := b.specialValues[n]; !ok {
+		b.specialValues[n] = v
 	}
-	wantTyp, ok := iwantTyp.(*ssa.ObjectType)
-	if !ok {
-		return
+}
+
+func (b *astbuilder) getSpecialValue(n string) (ssa.Value, bool) {
+	if v, ok := b.specialValues[n]; ok {
+		return v, true
+	}
+	return nil, false
+}
+
+func (b *astbuilder) GetLabelByName(name string) *ssa.LabelBuilder {
+	if b.labels[name] == nil {
+		b.labels[name] = b.BuildLabel(name)
 	}
 
-	typ.SetTypeKind(wantTyp.GetTypeKind())
-	switch wantTyp.GetTypeKind() {
-	case ssa.SliceTypeKind:
-		typ.FieldType = wantTyp.FieldType
-	case ssa.MapTypeKind:
-		typ.FieldType = wantTyp.FieldType
-		typ.KeyTyp = wantTyp.KeyTyp
-	case ssa.StructTypeKind:
-		typ.FieldType = wantTyp.FieldType
-		typ.KeyTyp = wantTyp.KeyTyp
-		wantTyp.RangeMethod(func(s string, f *ssa.Function) {
-			typ.AddMethod(s, f)
-		})
-	}
-	for n, a := range wantTyp.AnonymousField {
-		// TODO: 匿名结构体应该是一个指针，修改时应该要连带父类一起修改
-		typ.AnonymousField[n] = a
-	}
+	return b.labels[name]
 }
