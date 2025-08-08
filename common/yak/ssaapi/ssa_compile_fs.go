@@ -147,6 +147,9 @@ func (c *config) parseProjectWithFS(
 		preHandlerProcess := func() {
 			preHandlerNum++
 			process = 0 + (float64(preHandlerNum)/float64(preHandlerTotal))*0.4
+			if process > 0.4 {
+				process = 0.4
+			}
 		}
 		prog.SetPreHandler(true)
 		prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", filesystem, c.info)
@@ -158,6 +161,7 @@ func (c *config) parseProjectWithFS(
 
 			fileContent.Editor = editor
 			fileContents = append(fileContents, fileContent)
+
 			if fileContent.Err != nil {
 				AstErr = utils.JoinErrors(AstErr,
 					utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err),
@@ -196,7 +200,10 @@ func (c *config) parseProjectWithFS(
 		handlerNum := 0
 		handlerProcess := func() {
 			handlerNum++
-			process = 0.4 + (float64(handlerNum)/float64(handlerTotal))*0.5
+			process = 0.4 + (float64(handlerNum)/float64(len(handlerFilesMap)))*0.5
+			if process > 0.9 {
+				process = 0.9 // limit to 90%
+			}
 		}
 		prog.SetPreHandler(false)
 		start = time.Now()
@@ -208,6 +215,7 @@ func (c *config) parseProjectWithFS(
 			if _, needBuild := handlerFilesMap[fileContent.Path]; !needBuild {
 				continue // skip if not in handlerFilesMap
 			}
+			handlerProcess()
 			// log.Infof("visited file: ", prog.GetIncludeFiles())
 			if prog.ShouldVisit(fileContent.Editor.GetUrl()) {
 				log.Infof("parse file %s done skip in main build", fileContent.Path)
@@ -221,8 +229,6 @@ func (c *config) parseProjectWithFS(
 					utils.PrintCurrentGoroutineRuntimeStack()
 				}
 			}()
-
-			handlerProcess()
 
 			// build
 			if err := prog.Build(ast, fileContent.Editor, builder); err != nil {
