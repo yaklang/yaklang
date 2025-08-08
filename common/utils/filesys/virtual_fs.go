@@ -211,6 +211,31 @@ func (f *VirtualFS) getDir(create bool, dirs ...string) (*VirtualFS, error) {
 	return fs, nil
 }
 
+func (f *VirtualFS) String() string {
+	if f == nil {
+		return "<nil>"
+	}
+
+	var builder strings.Builder
+	builder.WriteString("VirtualFS{")
+
+	f.files.ForEach(func(name string, file *VirtualFile) bool {
+		if builder.Len() > 10 {
+			builder.WriteString(", ")
+		}
+
+		if file.fs != nil {
+			builder.WriteString(fmt.Sprintf("%s/", name))
+		} else {
+			builder.WriteString(fmt.Sprintf("%s(%d bytes)", name, len(file.content)))
+		}
+		return true
+	})
+
+	builder.WriteString("}")
+	return builder.String()
+}
+
 type VirtualFile struct {
 	name    string
 	content string

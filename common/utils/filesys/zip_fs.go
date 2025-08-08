@@ -191,6 +191,11 @@ func (z *ZipFS) ReadFile(name string) ([]byte, error) {
 	return io.ReadAll(rc)
 }
 
+func (f *ZipFS) String() string {
+	// TODO
+	return ""
+}
+
 type ZipDirEntry struct {
 	name string
 	info fs.FileInfo
