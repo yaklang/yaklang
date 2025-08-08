@@ -1,6 +1,7 @@
 package filesys
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"strings"
@@ -215,6 +216,10 @@ func (u *UnifiedFS) convertToVirtualPath(name string) string {
 		virtualPath = strings.TrimSuffix(virtualPath, ext) + virtualExt
 	}
 	return virtualPath
+}
+
+func (f *UnifiedFS) String() string {
+	return fmt.Sprintf("%s",f.fs)
 }
 
 type UnifiedDirEntry struct {
