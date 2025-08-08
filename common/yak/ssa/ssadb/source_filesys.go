@@ -1,6 +1,7 @@
 package ssadb
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -179,6 +180,27 @@ func (f *irSourceFS) Rel(string, string) (string, error)          { return "", u
 func (f *irSourceFS) WriteFile(string, []byte, os.FileMode) error { return utils.Error("implement me") }
 func (f *irSourceFS) MkdirAll(string, os.FileMode) error          { return utils.Error("implement me") }
 func (f *irSourceFS) Base(p string) string                        { return path.Base(p) }
+
+func (f *irSourceFS) String() string {
+	if f == nil {
+		return "<nil>"
+	}
+
+	var builder strings.Builder
+	builder.WriteString("irSourceFS{")
+
+	first := true
+	for programName, virtualFS := range f.virtual {
+		if !first {
+			builder.WriteString(", ")
+		}
+		first = false
+		builder.WriteString(fmt.Sprintf("%s: %s", programName, virtualFS.String()))
+	}
+
+	builder.WriteString("}")
+	return builder.String()
+}
 
 func (fs *irSourceFS) checkPath(path string, isDirs ...bool) (*filesys.VirtualFS, error) {
 	progName, isProgram := fs.getProgram(path)
