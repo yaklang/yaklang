@@ -134,6 +134,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		if value.IsMember() {
 			obj := i.NewValue(value.GetObject())
 			key := i.NewValue(value.GetKey())
+			if utils.IsNil(obj) || utils.IsNil(key) {
+				return nil
+			}
 			if err := actx.pushObject(obj, key, i); err != nil {
 				return i.visitedDefs(actx, opt...)
 			}
