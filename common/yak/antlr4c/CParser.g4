@@ -79,35 +79,24 @@ genericAssociation
 
 // --- Postfix/Unary/Cast Expressions ---
 postfixExpression
-    : (primaryExpression | '__extension__'? '(' typeName ')' '{' initializerList ','? '}') (
-        '[' expression ']'
-        | '(' argumentExpressionList? ')'
-        | ('.' | '->') Identifier
-        | '++'
-        | '--'
-    )*
+    : (primaryExpression | '__extension__'? '(' typeName ')' '{' initializerList ','? '}')
+    | postfixExpression '[' expression ']'
+    | postfixExpression '(' argumentExpressionList? ')'
+    | postfixExpression ('.' | '->') Identifier
+    | postfixExpression '++'
+    | postfixExpression '--'
     ;
 
 argumentExpressionList
-    : assignmentExpression (',' assignmentExpression)*
+    : expression (',' expression)*
     ;
 
 unaryExpression
-    : ('++' | '--' | 'sizeof')* (
+    : ('++' | '--' | 'sizeof' | '*')* (
         postfixExpression
-        | unaryOperator castExpression
         | ('sizeof' | '_Alignof') '(' typeName ')'
         | '&&' Identifier
     )
-    ;
-
-unaryOperator
-    : '&'
-    | '*'
-    | '+'
-    | '-'
-    | '~'
-    | '!'
     ;
 
 castExpression
@@ -118,8 +107,7 @@ castExpression
 
 // --- Binary Expressions ---
 assignmentExpression
-    : unaryExpression assignmentOperator? initializer?
-    | postfixExpression assignmentOperator? initializer?
+    : castExpression (assignmentOperator initializer)?
     | DigitSequence
     ;
 
@@ -154,15 +142,15 @@ expression
     | expression OrOr expression
     | '(' expression ')'
     | expression ('?' expression ':' expression)
-    | primaryExpression
+    | castExpression
     | assignmentExpression
     | statementsExpression
-    | castExpression
+    | declarationSpecifier
     ;
 
 // --- Declarations ---
 declaration
-    : declarationSpecifiers initDeclaratorList? ';'
+    : declarationSpecifier initDeclaratorList? ';'
     | staticAssertDeclaration
     ;
 
@@ -175,11 +163,7 @@ declarationSpecifiers2
     ;
 
 declarationSpecifier
-    : storageClassSpecifier '*'?
-    | (storageClassSpecifier | typeQualifier) typeSpecifier '*'?
-    | typeSpecifier '*'?
-    | typeQualifier '*'?
-    | functionSpecifier
+    : (storageClassSpecifier | typeQualifier | functionSpecifier)* (typeSpecifier | Identifier) '*'?
     | alignmentSpecifier
     ;
 
@@ -264,11 +248,7 @@ enumeratorList
     ;
 
 enumerator
-    : enumerationConstant ('=' expression)?
-    ;
-
-enumerationConstant
-    : Identifier
+    : Identifier ('=' expression)?
     ;
 
 atomicTypeSpecifier
@@ -461,7 +441,7 @@ blockItem
     ;
 
 expressionStatement
-    : assignmentExpression (',' assignmentExpression)* ';'?
+    : assignmentExpression (',' assignmentExpression)* ';'
     ;
 
 selectionStatement
@@ -480,7 +460,7 @@ forCondition
     ;
 
 forDeclaration
-    : declarationSpecifiers initDeclaratorList?
+    : declarationSpecifier initDeclaratorList?
     ;
 
 forExpression
@@ -488,7 +468,7 @@ forExpression
     ;
 
 jumpStatement
-    : ('goto' Identifier | 'continue' | 'break' | 'return' expression? | 'goto' unaryExpression) ';'
+    : ('goto' '*'* Identifier | 'continue' | 'break' | 'return' expression?) ';'
     ;
 
 compilationUnit
