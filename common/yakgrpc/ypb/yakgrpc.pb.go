@@ -37274,6 +37274,7 @@ type FuzzerRequest struct {
 	RandomChunkedMaxLength int64 `protobuf:"varint,66,opt,name=RandomChunkedMaxLength,proto3" json:"RandomChunkedMaxLength,omitempty"`
 	RandomChunkedMinDelay  int64 `protobuf:"varint,67,opt,name=RandomChunkedMinDelay,proto3" json:"RandomChunkedMinDelay,omitempty"`
 	RandomChunkedMaxDelay  int64 `protobuf:"varint,68,opt,name=RandomChunkedMaxDelay,proto3" json:"RandomChunkedMaxDelay,omitempty"`
+	NoReadMultiResponse    bool  `protobuf:"varint,69,opt,name=NoReadMultiResponse,proto3" json:"NoReadMultiResponse,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -37782,6 +37783,13 @@ func (x *FuzzerRequest) GetRandomChunkedMaxDelay() int64 {
 		return x.RandomChunkedMaxDelay
 	}
 	return 0
+}
+
+func (x *FuzzerRequest) GetNoReadMultiResponse() bool {
+	if x != nil {
+		return x.NoReadMultiResponse
+	}
+	return false
 }
 
 type MutateMethod struct {
@@ -59712,7 +59720,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bRequests\x18\x01 \x03(\v2\x12.ypb.FuzzerRequestR\bRequests\x12\x1e\n" +
 	"\n" +
 	"Concurrent\x18\x02 \x01(\x03R\n" +
-	"Concurrent\"\xfa\x15\n" +
+	"Concurrent\"\xac\x16\n" +
 	"\rFuzzerRequest\x12\x18\n" +
 	"\aRequest\x18\x01 \x01(\tR\aRequest\x12\x1e\n" +
 	"\n" +
@@ -59792,7 +59800,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x16RandomChunkedMinLength\x18A \x01(\x03R\x16RandomChunkedMinLength\x126\n" +
 	"\x16RandomChunkedMaxLength\x18B \x01(\x03R\x16RandomChunkedMaxLength\x124\n" +
 	"\x15RandomChunkedMinDelay\x18C \x01(\x03R\x15RandomChunkedMinDelay\x124\n" +
-	"\x15RandomChunkedMaxDelay\x18D \x01(\x03R\x15RandomChunkedMaxDelay\"E\n" +
+	"\x15RandomChunkedMaxDelay\x18D \x01(\x03R\x15RandomChunkedMaxDelay\x120\n" +
+	"\x13NoReadMultiResponse\x18E \x01(\bR\x13NoReadMultiResponse\"E\n" +
 	"\fMutateMethod\x12\x12\n" +
 	"\x04Type\x18\x01 \x01(\tR\x04Type\x12!\n" +
 	"\x05Value\x18\x02 \x03(\v2\v.ypb.KVPairR\x05Value\"T\n" +
