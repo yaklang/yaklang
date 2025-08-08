@@ -265,6 +265,17 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 		if ret := exp.Arguments(); ret != nil {
 			rv, _ := b.buildPrimaryExpression(exp.PrimaryExpr().(*gol.PrimaryExprContext), false, true)
 			args := b.buildArgumentsExpression(ret.(*gol.ArgumentsContext))
+			if rv.GetName() == "make" {
+				rightv = b.InterfaceAddFieldBuild(0, func(i int) ssa.Value {
+					return b.EmitConstInst(0)
+				}, func(i int) ssa.Value {
+					return b.EmitConstInst(0)
+				})
+				if len(args) > 0 {
+					rightv.SetType(args[0].GetType())
+				}
+				return rightv, nil
+			}
 			rightv = b.EmitCall(b.NewCall(rv, args))
 			return rightv, leftv
 		}

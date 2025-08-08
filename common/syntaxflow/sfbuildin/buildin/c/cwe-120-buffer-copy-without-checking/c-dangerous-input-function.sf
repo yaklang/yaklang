@@ -1,0 +1,80 @@
+desc(
+	title: "Auditing dangerous input functions in C"
+	title_zh: "审计C语言中的危险的输入函数"
+	type: audit
+	severity: high
+	risk: ""
+	desc: <<<DESC
+
+DESC
+	rule_id: "49b36a64-d6d1-4a78-a5a7-c97fbb9c8bfa"
+	solution: <<<SOLUTION
+
+SOLUTION
+	reference: <<<REFERENCE
+
+REFERENCE
+)
+
+gets()    as $high;
+scanf()   as $high;
+vscanf()  as $high;
+fscanf()  as $high;
+vfscanf() as $high;
+sscanf()  as $high;
+vsscanf() as $high;
+
+alert $high for {
+	solution: <<<CODE
+
+CODE
+	desc: <<<CODE
+
+CODE
+	level: "high",
+	type: "vuln",
+	title: "Auditing dangerous input functions in C",
+	title_zh: "审计C语言中的危险的输入函数",
+}
+
+desc(
+	lang: c
+	alert_high: 1
+	'file://unsafe.c': <<<UNSAFE
+#include <stdio.h>
+
+void vulnerable_function() {
+    char buffer[64];
+    
+    printf("Enter your input: ");
+    scanf("%s", buffer);
+    
+    printf("Buffer contents: %s\n", buffer);
+}
+
+int main() {
+    vulnerable_function();
+    return 0;
+}
+UNSAFE
+	'safefile://safe.c': <<<SAFE
+#include <stdio.h>
+#include <string.h>
+
+void safer_function() {
+    char buffer[64];
+    
+    printf("Enter your input: ");
+    fgets(buffer, sizeof(buffer), stdin); 
+    
+    buffer[strcspn(buffer, "\n")] = '\0';
+    printf("Buffer contents: %s\n", buffer);
+}
+
+int main() {
+    safer_function();
+    return 0;
+}
+SAFE
+)
+

@@ -4,8 +4,9 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
 	"strings"
+
+	"github.com/google/uuid"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -42,6 +43,7 @@ func GetAllSFSupportLanguage() []string {
 		"javaScript",
 		"php",
 		"golang",
+		"c",
 		"general", // 通用规则
 	}
 }

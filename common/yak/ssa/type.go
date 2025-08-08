@@ -606,6 +606,8 @@ func GetTypeByStr(typ string) Type {
 		return CreateStringType()
 	case "bool":
 		return CreateBooleanType()
+	case "char":
+		return CreateByteType()
 	case "bytes", "[]uint8", "[]byte":
 		return CreateBytesType()
 	case "interface {}", "var", "any":
