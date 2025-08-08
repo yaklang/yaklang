@@ -846,6 +846,7 @@ func main() {
 
 		if len(args) > 0 {
 			// args 被解析到了，说明后面跟着文件，去读文件出来吧
+			consts.SimpleYakGlobalConfig()
 			file := args[0]
 			if file != "" {
 				absFile := file
