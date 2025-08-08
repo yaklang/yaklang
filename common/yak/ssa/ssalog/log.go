@@ -5,5 +5,5 @@ import (
 )
 
 var (
-	Log = log.GetLogger("ssaLog")
+	Log = log.GetLogger("ssaLog").SetLevel("error")
 )

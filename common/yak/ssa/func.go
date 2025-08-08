@@ -45,7 +45,7 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 	} else {
 		// p.Funcs[name] = f
 		if _, ok := p.Funcs.Get(name); ok {
-			log.Errorf("function %s already exists", name)
+			log.Debugf("function %s already exists", name)
 			name = fmt.Sprintf("%s$%d", name, index)
 		}
 		p.Funcs.Set(name, f)
