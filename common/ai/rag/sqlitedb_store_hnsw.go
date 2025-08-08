@@ -258,24 +258,30 @@ func (s *SQLiteVectorStoreHNSW) Search(query string, page, limit int) ([]SearchR
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
+	log.Infof("starting search for query with length: %d, page: %d, limit: %d", len(query), page, limit)
+
 	// 生成查询的嵌入向量
 	queryEmbedding, err := s.embedder.Embedding(query)
 	if err != nil {
 		return nil, utils.Errorf("为查询生成嵌入向量失败: %v", err)
 	}
+	log.Infof("generated query embedding with dimension: %d", len(queryEmbedding))
 
 	resultNodes := s.hnsw.Search(queryEmbedding, limit)
 	resultIds := make([]string, len(resultNodes))
 	for i, result := range resultNodes {
 		resultIds[i] = result.Key
 	}
+	log.Infof("hnsw search returned %d candidate documents", len(resultNodes))
 
 	var docs []schema.VectorStoreDocument
 	if err := s.db.Model(&schema.VectorStoreDocument{}).Find(&docs).Error; err != nil {
 		return nil, utils.Errorf("查询文档失败: %v", err)
 	}
+	log.Infof("loaded %d documents from database", len(docs))
 
 	if len(docs) == 0 {
+		log.Infof("no documents found, returning empty results")
 		return []SearchResult{}, nil
 	}
 
@@ -296,11 +302,13 @@ func (s *SQLiteVectorStoreHNSW) Search(query string, page, limit int) ([]SearchR
 			Score:    similarity,
 		})
 	}
+	log.Infof("calculated similarity scores for %d documents", len(results))
 
 	// 按相似度降序排序
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].Score > results[j].Score
 	})
+	log.Infof("sorted results by similarity score")
 
 	if page < 1 {
 		page = 1
@@ -308,12 +316,14 @@ func (s *SQLiteVectorStoreHNSW) Search(query string, page, limit int) ([]SearchR
 	// 计算分页
 	offset := (page - 1) * limit
 	if offset >= len(results) {
+		log.Infof("page offset %d exceeds total results %d, returning empty", offset, len(results))
 		return []SearchResult{}, nil
 	}
 	if offset+limit > len(results) {
 		limit = len(results) - offset
 	}
 	results = results[offset : offset+limit]
+	log.Infof("returning %d results after pagination (offset: %d)", len(results), offset)
 
 	return results, nil
 }

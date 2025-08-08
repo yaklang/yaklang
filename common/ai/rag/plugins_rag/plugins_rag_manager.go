@@ -360,7 +360,7 @@ func (m *PluginsRagManager) SearchPluginsIds(query string, page, limit int) (int
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	results, err := m.RagSystem.Query(query, page, limit)
+	results, err := m.RagSystem.QueryWithPage(query, page, limit)
 	if err != nil {
 		return 0, nil, utils.Errorf("搜索 RAG 系统失败: %v", err)
 	}
@@ -383,7 +383,7 @@ func (m *PluginsRagManager) SearchPlugins(query string, limit int) ([]*PluginSea
 	defer m.mu.RUnlock()
 
 	// 搜索 RAG 系统
-	results, err := m.RagSystem.Query(query, 1, limit)
+	results, err := m.RagSystem.QueryWithPage(query, 1, limit)
 	if err != nil {
 		return nil, utils.Errorf("搜索 RAG 系统失败: %v", err)
 	}

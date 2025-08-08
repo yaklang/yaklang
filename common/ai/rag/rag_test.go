@@ -125,7 +125,7 @@ func TestRAGSystem(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 测试查询
-	results, err := ragSystem.Query("什么是RAG", 1, 5)
+	results, err := ragSystem.QueryWithPage("什么是RAG", 1, 5)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(results))
 	assert.Equal(t, "doc2", results[0].Document.ID) // 第一个结果应该是RAG文档
