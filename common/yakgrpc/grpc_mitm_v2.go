@@ -1810,7 +1810,7 @@ func (s *Server) checkLongRunningTraces(manager *yak.YakToCallerManager, traceUp
 		// 检查运行时间是否超过阈值（5秒）
 		if !trace.StartTime.IsZero() {
 			elapsed := time.Since(trace.StartTime)
-			if elapsed > 5*time.Second {
+			if elapsed > time.Duration(consts.PluginCallDurationThresholdSeconds)*time.Second {
 				// 标记为已推送
 				(*pushedTraces)[trace.TraceID] = true
 
@@ -1864,6 +1864,7 @@ func (s *Server) sendTraceBatch(stream ypb.Yak_PluginTraceServer, traces []*yak.
 	resp := &ypb.PluginTraceResponse{
 		ResponseType: "trace_update",
 		Traces:       pbTraces,
+		Success:      true,
 	}
 
 	if err := stream.Send(resp); err != nil {

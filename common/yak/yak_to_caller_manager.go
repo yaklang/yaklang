@@ -541,13 +541,13 @@ func (y *YakToCallerManager) Remove(params *ypb.RemoveHookParams) {
 				}
 
 				// 如果启用了执行跟踪，清理相关的跟踪记录
-				if y.enableTracing {
-					// 删除该插件和Hook的所有跟踪记录
-					removed := y.executionTracker.RemoveTracesByPluginAndHook(l.Id, k)
-					if removed > 0 {
-						log.Debugf("清理插件执行跟踪: 插件[%s], Hook[%s], 删除了%d个跟踪记录", l.Id, k, removed)
-					}
-				}
+				//if y.enableTracing {
+				// 删除该插件和Hook的所有跟踪记录
+				//removed := y.executionTracker.RemoveTracesByPluginAndHook(l.Id, k)
+				//if removed > 0 {
+				//	log.Debugf("清理插件执行跟踪: 插件[%s], Hook[%s], 删除了%d个跟踪记录", l.Id, k, removed)
+				//}
+				//}
 
 				continue
 			}
