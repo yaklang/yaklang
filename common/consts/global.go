@@ -58,6 +58,10 @@ var (
 	GLOBAL_TLS_MAX_VERSION uint16 = gmtls.VersionTLS13
 )
 
+func SimpleYakGlobalConfig() {
+	GLOBAL_DB_SAVE_SYNC.SetTo(true)
+}
+
 const (
 	YAK_PROJECT_DATA_DB_NAME_RECOVERED   = "default-yakit.db"
 	YAK_PROFILE_PLUGIN_DB_NAME_RECOVERED = "yakit-profile-plugin.db"
