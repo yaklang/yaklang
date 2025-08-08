@@ -211,6 +211,38 @@ func (f *VirtualFS) getDir(create bool, dirs ...string) (*VirtualFS, error) {
 	return fs, nil
 }
 
+func (f *VirtualFS) String() string {
+	if f == nil {
+		return "<nil>"
+	}
+
+	var builder strings.Builder
+	builder.WriteString("VirtualFS{")
+
+	var handFunc func(string, *VirtualFS)
+	handFunc = func(n string, fs *VirtualFS) {
+		if n == "." {
+			return
+		}
+		fs.files.ForEach(func(name string, file *VirtualFile) bool {
+			if name == "." {
+				return true
+			}
+			if file.fs != nil {
+				builder.WriteString(fmt.Sprintf("%s/", name))
+				handFunc(name, file.fs)
+			} else {
+				builder.WriteString(fmt.Sprintf("%s(%d bytes)", name, len(file.content)))
+			}
+			return true
+		})
+	}
+	handFunc("", f)
+
+	builder.WriteString("}")
+	return builder.String()
+}
+
 type VirtualFile struct {
 	name    string
 	content string
