@@ -167,15 +167,15 @@ func coverNodeAndEdgeInfos(graph *ssaapi.ValueGraph, programName string, risk *s
 func generateEdgeDescription(edgeLabel string) string {
 	switch {
 	case strings.Contains(edgeLabel, "depend_on"):
-		return "Data dependency flow"
+		return "The dependency edge in the dataflow, DependOn indicates which other values the current value depends on. For example, A DependOn B means Value A depends on Value B."
 	case strings.Contains(edgeLabel, "effect_on"):
-		return "Data effect flow"
+		return "Dependency edge in the dataflow, EffectOn indicates which other values the current value affects. For example, A EffectOn B means Value A affects Value B."
 	case strings.Contains(edgeLabel, "call"):
-		return "Function call relationship"
+		return "Function call"
 	case strings.Contains(edgeLabel, "search-exact"):
-		return "Exact search relationship"
+		return "Search value from database exactly"
 	default:
-		return "Data flows from source to destination"
+		return ""
 	}
 }
 

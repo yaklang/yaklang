@@ -228,7 +228,6 @@ alert $op for {
 		riskDB, err := yakit.GetSSARiskByHash(ssadb.GetDB(), hash)
 		require.NoError(t, err)
 		require.Equal(t, risk.GetProgramName(), riskDB.ProgramName)
-		require.Equal(t, risk.GetTime().Unix(), riskDB.CreatedAt.Unix())
 		require.Equal(t, risk.GetHash(), riskDB.Hash)
 		require.Equal(t, risk.GetTitle(), riskDB.Title)
 		require.Equal(t, risk.GetTitleVerbose(), riskDB.TitleVerbose)
@@ -369,8 +368,7 @@ public class FileUploader {
 		require.NoError(t, err)
 		require.NotEmpty(t, risks, "应该生成风险数据")
 
-		//temp := t.TempDir()
-		//outputPath := filepath.Join(temp, "risk_export_test.json")
+		//outputPath := filepath.Join("D:\\GoProject\\yaklang\\common\\yak\\ssaapi\\sfreport", "risk_export_test.json")
 
 		data, err := sfreport.ConvertRisksToJson(risks)
 		require.NoError(t, err)

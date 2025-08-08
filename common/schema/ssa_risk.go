@@ -25,6 +25,7 @@ type SSARisk struct {
 	RiskType     string             `json:"risk_type"`
 	Details      string             `json:"details"`
 	Severity     SyntaxFlowSeverity `json:"severity" gorm:"index"`
+	Language     string             `json:"language"`
 	// 潜在威胁：用于输出合规性质的漏洞内容
 	IsPotential bool `json:"is_potential"`
 
