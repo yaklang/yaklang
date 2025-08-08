@@ -107,7 +107,7 @@ func TestBuildVectorIndexForKnowledgeBase(t *testing.T) {
 	assert.Equal(t, 3, docCount) // 应该有3个文档
 
 	// 测试搜索Yaklang相关内容
-	searchResults, err := ragSystem.Query("什么是Yaklang", 1, 5)
+	searchResults, err := ragSystem.QueryWithPage("什么是Yaklang", 1, 5)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, searchResults)
 
@@ -123,7 +123,7 @@ func TestBuildVectorIndexForKnowledgeBase(t *testing.T) {
 	assert.True(t, found, "应该能够找到Yaklang相关的知识条目")
 
 	// 测试搜索RAG相关内容
-	ragSearchResults, err := ragSystem.Query("RAG技术", 1, 5)
+	ragSearchResults, err := ragSystem.QueryWithPage("RAG技术", 1, 5)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, ragSearchResults)
 
@@ -317,7 +317,7 @@ func TestBuildVectorIndexForKnowledgeBaseEntry(t *testing.T) {
 	assert.Equal(t, 1, docCount) // 应该有1个文档
 
 	// 测试搜索功能
-	searchResults, err := ragSystem.Query("什么是Go语言", 1, 5)
+	searchResults, err := ragSystem.QueryWithPage("什么是Go语言", 1, 5)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, searchResults)
 
@@ -349,7 +349,7 @@ func TestBuildVectorIndexForKnowledgeBaseEntry(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 验证更新后的内容
-	updatedSearchResults, err := ragSystem.Query("Go语言微服务", 1, 5)
+	updatedSearchResults, err := ragSystem.QueryWithPage("Go语言微服务", 1, 5)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, updatedSearchResults)
 

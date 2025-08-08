@@ -365,7 +365,7 @@ func QueryDocuments(db *gorm.DB, knowledgeBaseName, query string, limit int, opt
 	if err != nil {
 		return nil, utils.Errorf("加载知识库失败: %v", err)
 	}
-	return ragSystem.Query(query, 1, limit)
+	return ragSystem.QueryWithPage(query, 1, limit)
 }
 
 // QueryDocumentsWithAISummary 查询文档并生成摘要
