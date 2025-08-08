@@ -1,6 +1,8 @@
 package c2ssa
 
 import (
+	"strconv"
+
 	"github.com/yaklang/yaklang/common/log"
 	cparser "github.com/yaklang/yaklang/common/yak/antlr4c/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -58,6 +60,8 @@ func (b *astbuilder) buildExternalDeclaration(ast *cparser.ExternalDeclarationCo
 		b.buildFunctionDefinition(f.(*cparser.FunctionDefinitionContext))
 	} else if d := ast.Declaration(); d != nil {
 		b.buildDeclaration(d.(*cparser.DeclarationContext))
+	} else if ds := ast.DeclarationSpecifier(); ds != nil {
+		b.buildDeclarationSpecifier(ds.(*cparser.DeclarationSpecifierContext))
 	}
 }
 
@@ -180,18 +184,32 @@ func (b *astbuilder) buildDirectDeclarator(ast *cparser.DirectDeclaratorContext,
 		// 2. directDeclarator '[' 'static' typeQualifierList? assignmentExpression ']'
 		// 3. directDeclarator '[' typeQualifierList 'static' assignmentExpression ']'
 		// 4. directDeclarator '[' typeQualifierList? '*' ']'
-		return b.buildDirectDeclarator(dd.(*cparser.DirectDeclaratorContext), kinds...)
+
+		if a := ast.AssignmentExpression(); a != nil {
+			base = b.buildAssignmentExpression(a.(*cparser.AssignmentExpressionContext))
+		}
+		variable, index, _ := b.buildDirectDeclarator(dd.(*cparser.DirectDeclaratorContext), kinds...)
+		if c1, ok := ssa.ToConstInst(index); ok {
+			if c2, ok := ssa.ToConstInst(base); ok {
+				i1, _ := strconv.Atoi(c1.String())
+				i2, _ := strconv.Atoi(c2.String())
+				base = b.EmitConstInst(i1 * i2)
+			}
+		}
+		return variable, base, nil
 	}
 
 	// directDeclarator: directDeclarator '(' parameterTypeList ')'
 	if dd := ast.DirectDeclarator(); dd != nil && ast.LeftParen() != nil && ast.ParameterTypeList() != nil {
 		switch kind {
+		case VARIABLE_KIND:
+			_, base, _ = b.buildDirectDeclarator(dd.(*cparser.DirectDeclaratorContext), FUNC_KIND)
+			return b.CreateLocalVariable(base.GetName()), nil, nil
 		case FUNC_KIND:
 			_, base, _ = b.buildDirectDeclarator(dd.(*cparser.DirectDeclaratorContext), kinds...)
 		case PARAM_KIND:
 			_, ssatypes = b.buildParameterTypeList(ast.ParameterTypeList().(*cparser.ParameterTypeListContext))
 		}
-
 		return nil, base, ssatypes
 	}
 
@@ -319,21 +337,19 @@ func (b *astbuilder) buildDeclaration(ast *cparser.DeclarationContext) {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
-	if d := ast.DeclarationSpecifiers(); d != nil {
-		ssatypes := b.buildDeclarationSpecifiers(d.(*cparser.DeclarationSpecifiersContext))
+	if d := ast.DeclarationSpecifier(); d != nil {
+		ssatype := b.buildDeclarationSpecifier(d.(*cparser.DeclarationSpecifierContext))
 		if init := ast.InitDeclaratorList(); init != nil {
-			lefts := b.buildInitDeclaratorList(init.(*cparser.InitDeclaratorListContext))
+			lefts, indexs := b.buildInitDeclaratorList(init.(*cparser.InitDeclaratorListContext))
 			for i, l := range lefts {
 				if l.GetValue() == nil {
-					right := b.GetDefaultValue(ssatypes[i])
+					right := b.GetDefaultValue(ssatype)
+					if indexs[i] != -1 {
+						newtype := ssa.NewSliceType(ssatype)
+						newtype.Len = indexs[i]
+						right = b.GetDefaultValue(newtype)
+					}
 					b.AssignVariable(l, right)
-				}
-				if ssatypes == nil {
-					break
-				}
-				if ssatypes.String() != l.GetValue().GetType().String() {
-					b.NewError(ssa.Error, TAG, TypeMismatch(ssatypes.String(), l.GetValue().GetType().String()))
-					break
 				}
 			}
 		}
@@ -352,30 +368,38 @@ func (b *astbuilder) buildStaticAssertDeclaration(ast *cparser.StaticAssertDecla
 	}
 }
 
-func (b *astbuilder) buildInitDeclaratorList(ast *cparser.InitDeclaratorListContext) []*ssa.Variable {
+func (b *astbuilder) buildInitDeclaratorList(ast *cparser.InitDeclaratorListContext) ([]*ssa.Variable, []int) {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
-	var ret []*ssa.Variable
+	var lefts []*ssa.Variable
+	var indexs []int
 	for _, i := range ast.AllInitDeclarator() {
-		ret = append(ret, b.buildInitDeclarator(i.(*cparser.InitDeclaratorContext)))
+		left, index := b.buildInitDeclarator(i.(*cparser.InitDeclaratorContext))
+		lefts = append(lefts, left)
+		indexs = append(indexs, index)
 	}
-	return ret
+	return lefts, indexs
 }
 
-func (b *astbuilder) buildInitDeclarator(ast *cparser.InitDeclaratorContext) *ssa.Variable {
+func (b *astbuilder) buildInitDeclarator(ast *cparser.InitDeclaratorContext) (*ssa.Variable, int) {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if d := ast.Declarator(); d != nil {
-		left, _, _ := b.buildDeclarator(d.(*cparser.DeclaratorContext), VARIABLE_KIND)
+		left, right, _ := b.buildDeclarator(d.(*cparser.DeclaratorContext), VARIABLE_KIND)
 		if e := ast.Initializer(); e != nil {
-			right := b.buildInitializer(e.(*cparser.InitializerContext))
-			b.AssignVariable(left, right)
+			initial := b.buildInitializer(e.(*cparser.InitializerContext))
+			b.AssignVariable(left, initial)
+			return left, -1
 		}
-		return left
+		if right != nil {
+			index, _ := strconv.Atoi(right.String())
+			return left, index
+		}
+		return left, -1
 	}
-	return nil
+	return nil, -1
 }
 
 func (b *astbuilder) buildDeclarationSpecifiers(ast *cparser.DeclarationSpecifiersContext) ssa.Types {
@@ -394,18 +418,26 @@ func (b *astbuilder) buildDeclarationSpecifier(ast *cparser.DeclarationSpecifier
 	defer recoverRange()
 	var ret ssa.Type
 
-	if s := ast.StorageClassSpecifier(); s != nil {
-		ret = b.buildStorageClassSpecifier(s.(*cparser.StorageClassSpecifierContext))
-	} else if ts := ast.TypeSpecifier(); ts != nil {
+	if s := ast.StorageClassSpecifier(0); s != nil {
+		// TODO
+		// ret = b.buildStorageClassSpecifier(s.(*cparser.StorageClassSpecifierContext))
+	}
+	if t := ast.TypeQualifier(0); t != nil {
+		// TODO
+		// ret = b.buildTypeQualifier(t.(*cparser.TypeQualifierContext))
+	}
+	if f := ast.FunctionSpecifier(0); f != nil {
+		// TODO
+		// ret = b.buildFunctionSpecifier(f.(*cparser.FunctionSpecifierContext))
+	}
+
+	if ts := ast.TypeSpecifier(); ts != nil {
 		ret = b.buildTypeSpecifier(ts.(*cparser.TypeSpecifierContext))
 		// if tq := ast.TypeQualifier(); tq != nil {
 		// 	ret = b.buildTypeQualifier(tq.(*cparser.TypeQualifierContext))
 		// }
-	} else if f := ast.FunctionSpecifier(); f != nil {
-		ret = b.buildFunctionSpecifier(f.(*cparser.FunctionSpecifierContext))
-	} else if a := ast.AlignmentSpecifier(); a != nil {
-		ret = b.buildAlignmentSpecifier(a.(*cparser.AlignmentSpecifierContext))
 	}
+
 	if ret == nil {
 		ret = ssa.CreateAnyType()
 	}
@@ -466,9 +498,9 @@ func (b *astbuilder) buildTypeSpecifier(ast *cparser.TypeSpecifierContext) ssa.T
 	} else if s := ast.StructOrUnionSpecifier(); s != nil {
 		return b.buildStructOrUnionSpecifier(s.(*cparser.StructOrUnionSpecifierContext))
 	} else if e := ast.EnumSpecifier(); e != nil {
-
+		b.buildEnumSpecifier(e.(*cparser.EnumSpecifierContext))
 	} else if t := ast.TypedefName(); t != nil {
-
+		return b.buildTypedefName(t.(*cparser.TypedefNameContext))
 	} else {
 		name := ast.GetText()
 		if ssatyp := ssa.GetTypeByStr(name); ssatyp != nil {
@@ -478,16 +510,62 @@ func (b *astbuilder) buildTypeSpecifier(ast *cparser.TypeSpecifierContext) ssa.T
 	return ssa.CreateAnyType()
 }
 
-func (b *astbuilder) buildStructOrUnionSpecifier(ast *cparser.StructOrUnionSpecifierContext) ssa.Type {
+func (b *astbuilder) buildTypedefName(ast *cparser.TypedefNameContext) ssa.Type {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if id := ast.Identifier(); id != nil {
+		name := id.GetText()
+		if bp := b.GetBluePrint(name); bp != nil {
+			container := bp.Container()
+			return container.GetType()
+		}
+	}
+	return ssa.CreateAnyType()
+}
+
+func (b *astbuilder) buildEnumSpecifier(ast *cparser.EnumSpecifierContext) {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	// TODO
+	if e := ast.EnumeratorList(); e != nil {
+		b.buildEnumeratorList(e.(*cparser.EnumeratorListContext))
+	}
+}
+
+func (b *astbuilder) buildEnumeratorList(ast *cparser.EnumeratorListContext) {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	for _, e := range ast.AllEnumerator() {
+		b.buildEnumerator(e.(*cparser.EnumeratorContext))
+	}
+}
+
+func (b *astbuilder) buildEnumerator(ast *cparser.EnumeratorContext) {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	if id := ast.Identifier(); id != nil {
+		if e := ast.Expression(); e != nil {
+			right, _ := b.buildExpression(e.(*cparser.ExpressionContext), false)
+			b.addSpecialValue(id.GetText(), right)
+		}
+	}
+}
+
+func (b *astbuilder) buildStructOrUnionSpecifier(ast *cparser.StructOrUnionSpecifierContext) ssa.Type {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	if id := ast.Identifier(0); id != nil {
 		if s := ast.StructDeclarationList(); s != nil {
 			structTyp := ssa.NewStructType()
 			bp := b.CreateBlueprintAndSetConstruct(id.GetText())
-			_ = bp
 			b.buildStructDeclarationList(s.(*cparser.StructDeclarationListContext), structTyp)
+			c := bp.Container()
+			c.SetType(structTyp)
 		}
 		if bp := b.GetBluePrint(id.GetText()); bp != nil {
 			container := bp.Container()
@@ -579,12 +657,20 @@ func (b *astbuilder) buildDeclarationList(ast *cparser.DeclarationListContext) {
 	}
 }
 
-func (b *astbuilder) buildCompoundStatement(ast *cparser.CompoundStatementContext) {
+func (b *astbuilder) buildCompoundStatement(ast *cparser.CompoundStatementContext, isBlock ...bool) {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
-	if block := ast.BlockItemList(); block != nil {
-		b.buildBlockItemList(block.(*cparser.BlockItemListContext))
+	if len(isBlock) > 0 && isBlock[0] {
+		b.BuildSyntaxBlock(func() {
+			if block := ast.BlockItemList(); block != nil {
+				b.buildBlockItemList(block.(*cparser.BlockItemListContext))
+			}
+		})
+	} else {
+		if block := ast.BlockItemList(); block != nil {
+			b.buildBlockItemList(block.(*cparser.BlockItemListContext))
+		}
 	}
 }
 
@@ -617,7 +703,7 @@ func (b *astbuilder) buildStatement(ast *cparser.StatementContext) {
 	} else if j := ast.JumpStatement(); j != nil {
 		b.buildJumpStatement(j.(*cparser.JumpStatementContext))
 	} else if c := ast.CompoundStatement(); c != nil {
-		b.buildCompoundStatement(c.(*cparser.CompoundStatementContext))
+		b.buildCompoundStatement(c.(*cparser.CompoundStatementContext), true)
 	} else if s := ast.SelectionStatement(); s != nil {
 		b.buildSelectionStatement(s.(*cparser.SelectionStatementContext))
 	} else if s := ast.StatementsExpression(); s != nil {
@@ -626,6 +712,29 @@ func (b *astbuilder) buildStatement(ast *cparser.StatementContext) {
 		b.buildIterationStatement(i.(*cparser.IterationStatementContext))
 	} else if a := ast.AsmStatement(); a != nil {
 		b.buildAsmStatement(a.(*cparser.AsmStatementContext))
+	} else if id := ast.Identifier(); id != nil {
+		b.buildLabeledStatement(ast, id.GetText())
+	}
+}
+
+func (b *astbuilder) buildLabeledStatement(ast *cparser.StatementContext, text string) {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	LabelBuilder := b.GetLabelByName(text)
+	block := LabelBuilder.GetBlock()
+	LabelBuilder.Build()
+	b.AddLabel(text, block)
+	for _, f := range LabelBuilder.GetGotoHandlers() {
+		f(block)
+	}
+
+	b.EmitJump(block)
+	b.CurrentBlock = block
+	LabelBuilder.Finish()
+
+	if s, ok := ast.Statement().(*cparser.StatementContext); ok {
+		b.buildStatement(s)
 	}
 }
 
@@ -723,20 +832,18 @@ func (b *astbuilder) buildForDeclaration(ast *cparser.ForDeclarationContext) ssa
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
-	if d := ast.DeclarationSpecifiers(); d != nil {
-		ssatypes := b.buildDeclarationSpecifiers(d.(*cparser.DeclarationSpecifiersContext))
-		lefts := b.buildInitDeclaratorList(ast.InitDeclaratorList().(*cparser.InitDeclaratorListContext))
+	if d := ast.DeclarationSpecifier(); d != nil {
+		ssatype := b.buildDeclarationSpecifier(d.(*cparser.DeclarationSpecifierContext))
+		lefts, indexs := b.buildInitDeclaratorList(ast.InitDeclaratorList().(*cparser.InitDeclaratorListContext))
 		for i, l := range lefts {
 			if l.GetValue() == nil {
-				right := b.GetDefaultValue(ssatypes[i])
+				right := b.GetDefaultValue(ssatype)
+				if indexs[i] != -1 {
+					newtype := ssa.NewSliceType(ssatype)
+					newtype.Len = indexs[i]
+					right = b.GetDefaultValue(newtype)
+				}
 				b.AssignVariable(l, right)
-			}
-			if ssatypes == nil {
-				break
-			}
-			if ssatypes.String() != l.GetValue().GetType().String() {
-				b.NewError(ssa.Error, TAG, TypeMismatch(ssatypes.String(), l.GetValue().GetType().String()))
-				break
 			}
 		}
 	}
@@ -760,11 +867,16 @@ func (b *astbuilder) buildJumpStatement(ast *cparser.JumpStatementContext) {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
-	if e := ast.Expression(); e != nil {
-		right, _ := b.buildExpression(e.(*cparser.ExpressionContext), false)
-		b.EmitReturn(ssa.Values{right})
-	}
-	if ast.Continue() != nil {
+	if ast.Return() != nil {
+		if e := ast.Expression(); e != nil {
+			right, _ := b.buildExpression(e.(*cparser.ExpressionContext), false)
+			b.EmitReturn(ssa.Values{right})
+		}
+	} else if ast.Goto() != nil {
+		if id := ast.Identifier(); id != nil {
+			b.handlerGoto(id.GetText())
+		}
+	} else if ast.Continue() != nil {
 		if !b.Continue() {
 			b.NewError(ssa.Error, TAG, UnexpectedContinueStmt())
 		}
@@ -876,5 +988,29 @@ func (b *astbuilder) buildExpressionStatement(ast *cparser.ExpressionStatementCo
 
 	for _, a := range ast.AllAssignmentExpression() {
 		b.buildAssignmentExpression(a.(*cparser.AssignmentExpressionContext))
+	}
+}
+
+func (b *astbuilder) handlerGoto(labelName string, isBreak ...bool) {
+	gotoBuilder := b.BuildGoto(labelName)
+	if len(isBreak) > 0 {
+		gotoBuilder.SetBreak(isBreak[0])
+	}
+	if targetBlock := b.GetLabel(labelName); targetBlock != nil {
+		// target label exist, just set it
+		LabelBuilder := b.GetLabelByName(labelName)
+		gotoBuilder.SetLabel(targetBlock)
+		f := gotoBuilder.Finish()
+		LabelBuilder.SetGotoFinish(f)
+	} else {
+		// target label not exist, create it
+		LabelBuilder := b.BuildLabel(labelName)
+		// use handler function
+		LabelBuilder.SetGotoHandler(func(_goto *ssa.BasicBlock) {
+			gotoBuilder.SetLabel(_goto)
+			f := gotoBuilder.Finish()
+			LabelBuilder.SetGotoFinish(f)
+		})
+		b.labels[labelName] = LabelBuilder
 	}
 }

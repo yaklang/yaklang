@@ -274,8 +274,9 @@ func (b *astbuilder) GetImportPackageUser(n string) (*ssa.Program, string) {
 
 func (b *astbuilder) GetLabelByName(name string) *ssa.LabelBuilder {
 	if b.labels[name] == nil {
-		return nil
+		b.labels[name] = b.BuildLabel(name)
 	}
+
 	return b.labels[name]
 }
 
