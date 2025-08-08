@@ -463,7 +463,20 @@ func (b *builder) VisitForStatement(node *ast.ForStatement) interface{} {
 			case ast.KindVariableDeclarationList:
 				// 变量声明初始化：for(let i = 0; ...)
 				b.VisitVariableDeclarationList(node.Initializer.AsVariableDeclarationList().AsNode())
-				// 变量声明可能不会返回值，这里不追加到results
+				for _, varDecl := range node.Initializer.AsVariableDeclarationList().Declarations.Nodes {
+					name := varDecl.AsVariableDeclaration().Name()
+					switch {
+					case ast.IsIdentifier(name): // 简单变量: let x = value
+						results = append(results, b.ReadValue(name.AsIdentifier().Text))
+					case ast.IsBindingPattern(name): // 解构模式: let {a, b} = obj 或 let [x, y] = arr
+						bindingPattern := name.AsBindingPattern()
+						for _, element := range bindingPattern.Elements.Nodes {
+							if ast.IsIdentifier(element) {
+								results = append(results, b.ReadValue(element.AsIdentifier().Text))
+							}
+						}
+					}
+				}
 			default:
 				// 表达式初始化：for(i = 0; ...)
 				result := b.VisitRightValueExpression(node.Initializer)

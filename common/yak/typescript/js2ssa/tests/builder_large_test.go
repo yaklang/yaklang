@@ -2,6 +2,7 @@ package tests
 
 import (
 	_ "embed"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"testing"
 	"time"
 
@@ -13,6 +14,9 @@ import (
 
 //go:embed test.js
 var largeJS string
+
+//go:embed member_nil.js
+var nilMemberJS string
 
 func TestJS_ASTLargeText(t *testing.T) {
 	t.Skip("skip large js test, it is too slow to run in CI")
@@ -34,4 +38,34 @@ func TestJS_ASTLargeText(t *testing.T) {
 	dot := ssaapi.FunctionDotGraph(prog.Program.Funcs.Values()[0])
 	log.Infof("finish parse+ast2ssa cost: %v", time.Now().Sub(start))
 	log.Infof("函数控制流图DOT: \n%s", dot)
+}
+
+func TestJS_Nil_Member(t *testing.T) {
+	prog, err := ssaapi.Parse(nilMemberJS,
+		ssaapi.WithLanguage("js"),
+	)
+	require.NoError(t, err)
+	prog.Show()
+	prog.Program.EachFunction(func(function *ssa.Function) {
+		dot := ssaapi.FunctionDotGraph(function)
+		log.Infof("函数控制流图DOT: \n%s", dot)
+	})
+	result, err := prog.SyntaxFlowWithError(`
+    .ajax(* #-> as $ajax_info)
+    .open(* as $openParams)
+    $openParams<slice(start=0)> #-> as $xml_http_method
+    $openParams<slice(start=1)> #-> as $xml_http_url
+
+    /(?i)([axios\.](get)|(post)|(patch)|(delete)|(put)|)/(* as $axiosparams)
+    $axiosparams<slice(start=0)> #-> as $ajax_get_url
+    $axiosparams<slice(start=1)> #-> *?{!opcode: call,function}<getMembers> as $dollar_get_member
+    axios(* #-> *<getMembers> as $_axios_info)
+    fetch(* #-> * as $fetch_url)
+    `)
+	require.NoError(t, err)
+	t.Log(result.GetValues("ajax_info"))
+	t.Log(result.GetValues("xml_http_url"))
+	t.Log(result.GetValues("ajax_get_url"))
+	t.Log(result.GetValues("_axios_info"))
+	t.Log(result.GetValues("fetch_url"))
 }
