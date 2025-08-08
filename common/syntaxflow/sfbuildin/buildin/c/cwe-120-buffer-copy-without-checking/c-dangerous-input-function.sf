@@ -25,12 +25,6 @@ sscanf()  as $high;
 vsscanf() as $high;
 
 alert $high for {
-	solution: <<<CODE
-
-CODE
-	desc: <<<CODE
-
-CODE
 	level: "high",
 	type: "vuln",
 	title: "Auditing dangerous input functions in C",
