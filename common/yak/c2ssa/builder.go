@@ -20,7 +20,7 @@ type SSABuilder struct {
 	*ssa.PreHandlerInit
 }
 
-var Builder = &SSABuilder{}
+var Builder ssa.Builder = &SSABuilder{}
 
 func (s *SSABuilder) Create() ssa.Builder {
 	return &SSABuilder{
@@ -42,11 +42,11 @@ func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	return extension == ".c" || extension == ".h"
 }
 
-func (s *SSABuilder) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	builder.GetProgram().GetApplication().Build("", editor, builder)
+func (s *SSABuilder) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
+	builder.GetProgram().GetApplication().Build(ast, editor, builder)
 }
 
-func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder *ssa.FunctionBuilder, path string) error {
+func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST, functionBuilder *ssa.FunctionBuilder, editor *memedit.MemEditor) error {
 	prog := functionBuilder.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")
@@ -55,27 +55,16 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 	if prog.ExtraFile == nil {
 		prog.ExtraFile = make(map[string]string)
 	}
-
-	dirname, filename := fileSystem.PathSplit(path)
-	_ = dirname
-	_ = filename
-	file, err := fileSystem.ReadFile(path)
-	if err != nil {
-		log.Errorf("read file %s error: %v", path, err)
-		return nil
-	}
-
-	prog.Build(path, memedit.NewMemEditor(string(file)), functionBuilder)
+	prog.Build(ast, editor, functionBuilder)
 	prog.GetIncludeFiles()
 	return nil
 }
 
-func (s *SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
-	ast, err := Frontend(src, force)
-	if err != nil {
-		return err
+func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, builder *ssa.FunctionBuilder) error {
+	ast, ok := raw.(*cparser.CompilationUnitContext)
+	if !ok {
+		return utils.Errorf("invalid AST type")
 	}
-
 	SpecialTypes := map[string]ssa.Type{
 		"void":    ssa.CreateAnyType(),
 		"bool":    ssa.CreateBooleanType(),
@@ -95,7 +84,7 @@ func (s *SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder)
 		specialTypes:    SpecialTypes,
 		pkgNameCurrent:  "",
 	}
-	log.Infof("ast: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
+	// log.Infof("ast: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	astBuilder.build(ast)
 	fmt.Printf("Program: %v done\n", astBuilder.pkgNameCurrent)
 	return nil
@@ -107,6 +96,9 @@ func (*SSABuilder) FilterFile(path string) bool {
 
 func (*SSABuilder) GetLanguage() consts.Language {
 	return consts.C
+}
+func (*SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
+	return Frontend(src)
 }
 
 type astbuilder struct {
@@ -122,7 +114,7 @@ type astbuilder struct {
 	SetGlobal      bool
 }
 
-func Frontend(src string, must bool) (*cparser.CompilationUnitContext, error) {
+func Frontend(src string) (*cparser.CompilationUnitContext, error) {
 	errListener := antlr4util.NewErrorListener()
 	lexer := cparser.NewCLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
@@ -133,10 +125,10 @@ func Frontend(src string, must bool) (*cparser.CompilationUnitContext, error) {
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.CompilationUnit().(*cparser.CompilationUnitContext)
-	if must || len(errListener.GetErrors()) == 0 {
+	if len(errListener.GetErrors()) == 0 {
 		return ast, nil
 	}
-	return nil, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrorString())
+	return ast, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrorString())
 }
 
 type PackageInfo struct {
