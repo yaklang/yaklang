@@ -55,7 +55,7 @@ func (p *Program) VisitAst(ast ASTIF) {
 		p.astMap[hash] = struct{}{}
 	} else {
 		if _, ok := p.astMap[hash]; !ok {
-			log.Errorf("ast[%s] is not found in ast map", ast.GetText())
+			log.Errorf("ast[%v] is not found in ast map", p.GetProgramName())
 			return
 		}
 		delete(p.astMap, hash)
