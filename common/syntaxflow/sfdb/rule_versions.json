@@ -1,5 +1,17 @@
 [
   {
+    "rule_id": "49b36a64-d6d1-4a78-a5a7-c97fbb9c8bfa",
+    "rule_name": "审计C语言中的危险的输入函数",
+    "hash": "cc2a9178da868d7f394b1a1b5ccc6b22c204db359a522d25361b216ade1be753",
+    "version": "20250808.0001"
+  },
+  {
+    "rule_id": "c79f91bf-773d-493a-ad14-e7d815e1bd32",
+    "rule_name": "审计C语言中的格式化字符串漏洞",
+    "hash": "fb887f89118bedefb1bcff7987499495bb7f723bd15beb66ee348ea0bb2c4e8d",
+    "version": "20250808.0001"
+  },
+  {
     "rule_id": "48c2c107-024f-4abc-a940-ed637847f22c",
     "rule_name": "检测通用硬编码凭据",
     "hash": "8e1fb16df34d7fae208cb918e67af90345549c0baa1c1b479e4dde555b26a02b",
