@@ -575,7 +575,7 @@ func TestRefine_Smoke(t *testing.T) {
 	}
 	_ = ragSys
 
-	results, err := ragSys.Query("第三方管理", 1, 1000)
+	results, err := ragSys.QueryWithPage("第三方管理", 1, 1000)
 	if err != nil {
 		t.Fatal(err)
 	}

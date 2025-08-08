@@ -145,15 +145,59 @@ func (r *RAGSystem) addDocuments(docs ...Document) error {
 	return nil
 }
 
-// Query 根据查询文本检索相关文档并返回结果
-func (r *RAGSystem) Query(query string, page, limit int) ([]SearchResult, error) {
+// QueryWithPage 根据查询文本检索相关文档并返回结果
+func (r *RAGSystem) QueryWithPage(query string, page, limit int) ([]SearchResult, error) {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Errorf("failed to query %s: %v", query, err)
+			log.Errorf("failed to query with page query: %s: %v", query, err)
 			fmt.Println(utils.ErrorStack(err))
 		}
 	}()
 	return r.VectorStore.Search(query, page, limit)
+}
+
+// Query is short for QueryTopN
+func (r *RAGSystem) Query(query string, topN int, limits ...float64) ([]SearchResult, error) {
+	return r.QueryTopN(query, topN, limits...)
+}
+
+// QueryTopN 根据查询文本检索相关文档并返回结果
+func (r *RAGSystem) QueryTopN(query string, topN int, limits ...float64) ([]SearchResult, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("failed to query top_n %s: %v", query, err)
+			fmt.Println(utils.ErrorStack(err))
+		}
+	}()
+	if topN <= 0 {
+		topN = 20
+	}
+
+	var page = 1
+	var limit float64 = -1
+	if len(limits) > 0 {
+		limit = limits[0]
+	}
+
+	if limit >= 1 {
+		topN = utils.Max(topN, int(limit))
+		log.Warnf("limit should be less than 1, got %f, using -1 instead, use topN: %v (Max(topN, int(limit:%v)))", limit, topN, limit)
+		limit = -1
+	}
+
+	results, err := r.VectorStore.Search(query, page, topN)
+	if err != nil {
+		return nil, err
+	}
+
+	var filteredResults []SearchResult
+	for _, result := range results {
+		if limit < 0 || result.Score >= float32(limit) {
+			filteredResults = append(filteredResults, result)
+		}
+	}
+
+	return filteredResults, nil
 }
 
 // DeleteDocuments 删除文档
