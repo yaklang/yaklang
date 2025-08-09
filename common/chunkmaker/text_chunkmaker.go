@@ -54,8 +54,14 @@ func NewTextChunkMaker(dst io.Reader, opts ...Option) (*TextChunkMaker, error) {
 	if c.chunkSize <= 0 && !c.enableTimeTrigger {
 		return nil, fmt.Errorf("NewTextChunkMaker: ChunkSize must be positive or time trigger must be enabled")
 	}
-
-	inputSrc := NewChunkChannelFromReader(c.ctx, dst)
+	var rc io.ReadCloser
+	r, ok := dst.(io.ReadCloser)
+	if ok {
+		rc = r
+	} else {
+		rc = io.NopCloser(dst)
+	}
+	inputSrc := NewChunkChannelFromReader(c.ctx, rc)
 	return NewTextChunkMakerEx(inputSrc, c)
 }
 

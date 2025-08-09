@@ -158,18 +158,16 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 	transactionErr := cod.CallAITransaction(buf.String(),
 		func(response *aid.AIResponse) error {
 			if l.ForgeName == "" {
-				l.ForgeName = "unknown"
+				l.ForgeName = "LiteForge"
 			}
-			raw, err := io.ReadAll(response.GetOutputStreamReader(fmt.Sprintf(`liteforge[%v]`, l.ForgeName), true, cod.GetConfig()))
-			if err != nil {
-				return err
-			}
-			action, err = aid.ExtractAction(string(raw), l.OutputActionName)
+			result := response.GetOutputStreamReader(fmt.Sprintf(`liteforge[%v]`, l.ForgeName), true, cod.GetConfig())
+			var mirrored bytes.Buffer
+			action, err = aid.ExtractActionFromStream(io.TeeReader(result, &mirrored), l.OutputActionName)
 			if err != nil {
 				return utils.Errorf("extract action failed: %v", err)
 			}
 			if action == nil {
-				return utils.Errorf("action is nil(unknown reason): \n%v", string(raw))
+				return utils.Errorf("action is nil(unknown reason): \n%v", mirrored.String())
 			}
 			return nil
 		},

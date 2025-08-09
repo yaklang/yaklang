@@ -186,3 +186,10 @@ assert `"minimum": 1` in result // 检查 roles 的 minItems(假设 min 映射�
 
 
 println(result)
+
+
+a = jsonschema.NewObjectSchema(jsonschema.paramString("key"), jsonschema.paramString("@action", jsonschema.raw("const", "aaa"), jsonschema.required(true)))
+println(a)
+
+result = json.FindPath(a, "$..properties..const")
+assert result == "aaa"

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"github.com/yaklang/yaklang/common/utils/imageutils"
 	"io"
 	"os"
 	"strings"
@@ -268,6 +269,12 @@ func WithImageFile(i string) AIConfigOption {
 
 func WithImageBase64(b64 string) AIConfigOption {
 	return func(config *AIConfig) {
+		if strings.HasPrefix(b64, "data:image/") {
+			for img := range imageutils.ExtractImage(b64) {
+				b64 = img.Base64()
+			}
+		}
+
 		raw, err := codec.DecodeBase64(b64)
 		if err != nil {
 			log.Warnf("decode error: %v", err)

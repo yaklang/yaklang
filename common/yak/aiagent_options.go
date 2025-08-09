@@ -137,7 +137,6 @@ var (
 	WithDisableOutputType            = aid.WithDisableOutputEvent
 
 	// aiforge options
-	WithAIDOptions           = aiforge.WithAIDOptions
 	WithForgePlanMocker      = aiforge.WithPlanMocker
 	WithInitializePrompt     = aiforge.WithInitializePrompt
 	WithResultPrompt         = aiforge.WithResultPrompt

@@ -328,6 +328,7 @@ func initYaklangLib() {
 	yaklang.Import("ai", ai.Exports)
 
 	yaklang.Import("aiagent", AIAgentExport)
+	yaklang.Import("liteforge", LiteForgeExport)
 	yaklang.Import("jsonschema", aitool.SchemaGeneratorExports)
 
 	yaklang.Import("aireducer", aireducer.Exports)

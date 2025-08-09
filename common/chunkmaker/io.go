@@ -31,11 +31,12 @@ func (w *SimpleChunkWriter) Close() error {
 	return nil
 }
 
-func NewChunkChannelFromReader(ctx context.Context, r io.Reader) *chanx.UnlimitedChan[Chunk] {
+func NewChunkChannelFromReader(ctx context.Context, r io.ReadCloser) *chanx.UnlimitedChan[Chunk] {
 	dst := chanx.NewUnlimitedChan[Chunk](ctx, 1000)
 	writer := NewSimpleChunkWriter(dst)
 	go func() {
 		defer writer.Close()
+		defer r.Close()
 		io.Copy(writer, r)
 	}()
 	return dst
