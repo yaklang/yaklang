@@ -25,6 +25,13 @@ func _withParamObject(objectName string, opts ...any) ToolOption {
 	return WithStructParam(objectName, currentProperties, params...)
 }
 
+func newObjectSchemaWithAction(opts ...any) string {
+	var params []any
+	params = append(params, WithAction("object"))
+	params = append(params, opts...)
+	return newObjectSchema(params...)
+}
+
 func newObjectSchema(opts ...any) string {
 	var params []ToolOption
 	var props []PropertyOption
@@ -114,10 +121,23 @@ func newObjectArraySchema(opts ...any) string {
 	return string(results)
 }
 
+func WithAction(action string) ToolOption {
+	return WithStringParam(
+		"@action",
+		WithParam_Description(`set '@action' can help the AI identify the output json object`),
+		WithParam_Raw("const", action),
+		WithParam_Required(true),
+	)
+}
+
 var SchemaGeneratorExports = map[string]any{
+	"ActionObject":         newObjectSchemaWithAction,
+	"Object":               newObjectSchema,
+	"ObjectArray":          newObjectArraySchema,
 	"NewObjectSchema":      newObjectSchema,
 	"NewObjectArraySchema": newObjectArraySchema,
 
+	"action":                  WithAction,
 	"paramString":             WithStringParam,
 	"paramInt":                WithIntegerParam,
 	"paramBool":               WithBoolParam,

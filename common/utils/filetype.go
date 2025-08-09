@@ -27,7 +27,7 @@ func IsImage(i []byte) bool {
 func IsGenericTextFile(filePath string) (bool, error) {
 	mime, err := mimetype.DetectFile(filePath)
 	if err != nil {
-		return false, fmt.Errorf("无法检测文件 '%s': %w", filePath, err)
+		return false, fmt.Errorf("connot detect mime type '%s': %w", filePath, err)
 	}
 
 	for m := mime; m != nil; m = m.Parent() {
