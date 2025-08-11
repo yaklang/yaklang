@@ -11,58 +11,17 @@ prompt = <<<prompt
     - 用户目前的意图断言 这一断言要求必须是简洁干净的，不要对上下文信息的总结，直接对用户的意图进行断言。意图断言是对用户当前意图的直接描述，避免使用模糊或冗长的表达。此断言会交给关键词搜索工具使用，多余的描述会污染语义。注意用户输入的转折，如果是“还”这样的追加意图，则需要在意图断言中体现出来。如果表现出来意图转变则应在此项中省略之前的意图过程。
 prompt
 
-schema = <<<schema
-{
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "type": "object",
-    "required": [
-        "@action",
-        "intention"
-    ],
-    "additionalProperties": false,
-    "properties": {
-        "@action": {
-            "const": "recognite",
-            "description": "标识当前操作的具体类型"
-        },
-        "intention": {
-            "type": "object",
-            "description": "识别结果",
-            "required": [
-                "assertion",
-                "detail_intention"
-            ],
-            "properties": {
-                "assertion": {
-                    "type": "string",
-                    "description": "直接的断言*现在*用户的意图是什么：要做什么，禁止做什么。不描述之前的行为或历史，只关注综合起来当前意图结论。"
-                },
-                "detail_intention": {
-                    "type": "string",
-                    "description": "详细的识别结果"
-                },
-                "keywords": {
-                    "type": "string",
-                    "description": "意图关键词，使用逗号分割",
-                }
-            }
-        }
-    }
-}
-schema
+
+schema = jsonschema.ActionObject(
+    jsonschema.paramObject("intention",
+        jsonschema.paramString("assertion", jsonschema.description("直接的断言*现在*用户的意图是什么：要做什么，禁止做什么。不描述之前的行为或历史，只关注综合起来当前意图结论。")),
+        jsonschema.paramString("detail_intention", jsonschema.description("详细的识别结果")),
+        jsonschema.paramString("keywords", jsonschema.description("意图关键词，使用逗号分割"))
+    )
+)
 
 
 forgeHandle = func(params) {
-    bp,err = aiagent.CreateLiteForge("intent-recognition",
-        aiagent.liteForgePrompt(prompt),
-        aiagent.liteForgeOutputSchemaRaw("recognite",schema)
-    )
-    if err != nil {
-        return err
-    }
-    res,err = bp.Execute(context.Background(),params)
-    if err != nil {
-		return nil
-	}
+    res = liteforge.Execute(sprintf("%s \n input:\n %v", prompt,params), liteforge.output(schema))~
     return res.GetInvokeParams("intention")
 }

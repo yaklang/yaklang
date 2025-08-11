@@ -42,80 +42,52 @@ prompt = <<<prompt
 
 prompt
 
-schema = <<<schema
-{
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "type": "object",
-    "required": [
-        "@action",
-        "report"
-    ],
-    "additionalProperties": false,
-    "properties": {
-        "@action": {
-            "const": "analysis",
-            "description": "标识当前操作的具体类型"
-        },
-        "report": {
-            "title": "IP实体恶意行为分析报告",
-            "type": "object",
-            "properties": {
-                "is_malicious": {
-                    "description": "最终裁决：该 IP 的行为是否是恶意的。",
-                    "type": "boolean"
-                },
-                "confidence_score": {
-                    "description": "你对裁决的置信度，从 0.0 (完全不确定) 到 1.0 (完全确定)。",
-                    "type": "number",
-                    "minimum": 0.0,
-                    "maximum": 1.0
-                },
-                "behavior_summary": {
-                    "description": "用一两句中文总结该 IP 的核心行为模式和你的判断依据。",
-                    "type": "string"
-                },
-                "attack_type": {
-                    "description": "如果行为是恶意的，请归类其最主要的攻击类型。",
-                    "type": "string",
-                    "enum": [
-                        "WEB_SCANNING",
-                        "BRUTE_FORCE",
-                        "SQL_INJECTION",
-                        "XSS_ATTACK",
-                        "COMMAND_INJECTION",
-                        "BENIGN",
-                        "UNKNOWN"
-                    ]
-                },
-                "key_evidence": {
-                    "description": "提供1到3条最能支撑你判断的原始日志 (`raw_log`) 作为关键佐证。",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            },
-            "required": [
-                "is_malicious",
 
-            ]
-        }
-    }
-}
-schema
+# 假设存在一个与你示例中类似的 jsonschema 助手库
+# from your_library import jsonschema
+
+schema = jsonschema.ActionObject(
+    jsonschema.paramObject("report",
+
+        jsonschema.title("IP实体恶意行为分析报告"),
+
+        jsonschema.required(),
+
+
+        jsonschema.paramBool("is_malicious",
+            jsonschema.description("最终裁决：该 IP 的行为是否是恶意的。"),
+            jsonschema.required()
+        ),
+        # paramNumber 用于创建数字类型属性
+        jsonschema.paramNumber("confidence_score",
+            jsonschema.description("你对裁决的置信度，从 0.0 (完全不确定) 到 1.0 (完全确定)。"),
+            jsonschema.min(0),
+            jsonschema.max(1),
+        ),
+        jsonschema.paramString("behavior_summary",
+            jsonschema.description("用一两句中文总结该 IP 的核心行为模式和你的判断依据。")
+        ),
+        jsonschema.paramString("attack_type",
+            jsonschema.description("如果行为是恶意的，请归类其最主要的攻击类型。"),
+            jsonschema.enum([
+                "WEB_SCANNING",
+                "BRUTE_FORCE",
+                "SQL_INJECTION",
+                "XSS_ATTACK",
+                "COMMAND_INJECTION",
+                "BENIGN",
+                "UNKNOWN"
+            ])
+        ),
+        jsonschema.paramStringArray("key_evidence",
+            jsonschema.description("提供1到3条最能支撑你判断的原始日志 (`raw_log`) 作为关键佐证。")
+        )
+    )
+)
+
 
 
 forgeHandle = func(params) {
-    bp,err = aiagent.CreateLiteForge("event_analyzer",
-        aiagent.liteForgePrompt(prompt),
-        aiagent.liteForgeOutputSchemaRaw("analysis",schema)
-    )
-    if err != nil {
-        return err
-    }
-    res,err = bp.Execute(context.Background(),params)
-    if err != nil {
-		return nil
-	}
+    res = liteforge.Execute(sprintf("%s \n input:\n %v", prompt,params), liteforge.output(schema))~
     return res.GetInvokeParams("report")
 }

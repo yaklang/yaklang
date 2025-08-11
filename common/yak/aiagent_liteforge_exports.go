@@ -34,11 +34,7 @@ var LiteForgeExport = map[string]interface{}{
 			cfg.id = id
 		}
 	},
-	"context": func(ctx context.Context) liteForgeOption {
-		return func(cfg *liteforgeConfig) {
-			cfg.ctx = ctx
-		}
-	},
+	"context": _withLiteForgeCtx,
 	"verboseName": func(opts ...aid.Option) liteForgeOption {
 		return func(cfg *liteforgeConfig) {
 			cfg.aidOptions = append(cfg.aidOptions, opts...)
@@ -59,6 +55,12 @@ type liteforgeConfig struct {
 }
 
 type liteForgeOption func(*liteforgeConfig)
+
+func _withLiteForgeCtx(ctx context.Context) liteForgeOption {
+	return func(cfg *liteforgeConfig) {
+		cfg.ctx = ctx
+	}
+}
 
 func _withOutputJSONSchema(output string) liteForgeOption {
 	return func(cfg *liteforgeConfig) {

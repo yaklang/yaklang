@@ -14,6 +14,32 @@ includes:
     dir: ./common
 
 tasks:
+  yak_build:
+    desc: Build Yaklang
+    vars:
+      binary: '{{if eq OS "windows"}}yak.exe{{else}}yak{{end}}'
+    cmds:
+      - |
+        go build -ldflags "-s -w" -o {{ .binary }} ./common/yak/cmd/yak.go
+    generates:
+      - '{{ .binary }}'
+    aliases: [yb]
+  yak_grpc:
+    desc: Run the gRPC server on port 8087
+    cmds:
+      - go run common/yak/cmd/yak.go grpc
+    aliases: [yg]
+  vulinbox_build:
+    desc: Build vulinbox
+    cmds:
+      - go build -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)'" -o "./vulinbox_$(go env "GOOS")_$( go env "GOARCH"){{if eq OS "windows"}}.exe{{end}}" common/vulinboxrunner/vulinbox.go
+    aliases: [vb]
+  gen_proto:
+    silent: true
+    desc: Generate protobuf files
+    cmds:
+      - ./scripts/gen-yakgrpc.sh
+    aliases: [gp,proto]
   install_dep:
     silent: true
     desc: Install golang dependencies and protoc
