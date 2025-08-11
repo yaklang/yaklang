@@ -10,17 +10,12 @@ import (
 	"os/exec"
 )
 
-var (
-	// ffmpegBinaryPath holds the path to the ffmpeg executable.
-	// It is initialized by checking the system's configuration.
-	pandocBinaryPath = consts.GetPandocPath()
-)
-
 func SimpleCovertMarkdownToDocx(ctx context.Context, inputFile string, outputFile string) error {
 
 	if _, err := os.Stat(inputFile); os.IsNotExist(err) {
 		return fmt.Errorf("input file does not exist: %s", inputFile)
 	}
+	pandocBinaryPath := consts.GetPandocPath()
 	if pandocBinaryPath == "" {
 		return fmt.Errorf("pandoc binary path is not configured")
 	}

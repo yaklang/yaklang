@@ -21,18 +21,16 @@ prompt := <<<prompt
     一句话总结： 用一句话概括该人物在该片段中呈现的形象。
 prompt
 
-forgeHandle = func(params) {
 
-    bp,err = aiagent.CreateLiteForge("biography",
-        aiagent.liteForgeOutputMemoryOP(),
-        aiagent.liteForgePrompt(prompt)
+schema = jsonschema.ActionObject(
+    jsonschema.paramObjectArray("memory_op",
+        jsonschema.paramString("op", jsonschema.description("the operation type, can be 'set', 'delete'"), jsonschema.enum("set", "delete"), jsonschema.required(true)),
+		jsonschema.paramString("key", jsonschema.description("the key of the persistent memory, if you set op to 'set', this is required"), jsonschema.required(true)),
+		jsonschema.paramString("value", jsonschema.description("the value of the persistent memory, if you set op to 'set', this is required"), jsonschema.required(false)),
     )
-     if err != nil {
-		return nil
-	}
-    res,err = bp.Execute(context.Background(),params)
-    if err != nil {
-		return nil
-	}
+)
+
+forgeHandle = func(params) {
+    res = liteforge.Execute(sprintf("%s\n input:\n%v", params), liteforge.output(schema))~
     return res
 }
