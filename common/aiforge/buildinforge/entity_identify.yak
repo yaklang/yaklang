@@ -20,74 +20,37 @@ prompt = <<<prompt
 
 prompt
 
-schema = <<<schema
-{
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "type": "object",
-    "required": [
-        "@action",
-        "intention"
-    ],
-    "additionalProperties": false,
-    "properties": {
-        "@action": {
-            "const": "identify",
-            "description": "标识当前操作的具体类型"
-        },
-        "entities":{
-            "title": "扁平化实体列表",
-            "description": "一个从一批日志中提取出的所有实体的扁平化列表。",
-            "type": "array",
-            "items": {
-                "title": "已识别的实体",
-                "description": "一个具体的、被识别出的实体，包含其类型和值。",
-                "type": "object",
-                "properties": {
-                    "entity_type": {
-                        "description": "被提取实体的类别。",
-                        "type": "string",
-                        "enum": [
-                            "ip_address",
-                            "username",
-                            "hostname",
-                            "process_name",
-                            "file_path",
-                            "file_name",
-                            "url",
-                            "domain_name",
-                            "error_code",
-                            "event_id",
-                            "port_number"
-                        ]
-                    },
-                    "entity_value": {
-                        "description": "被提取实体的具体值。",
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "entity_type",
-                    "entity_value"
-                ]
-            }
-        }
-    }
-}
 
-schema
+schema = jsonschema.ActionObject(
+    jsonschema.paramObjectArray("entities",
+        jsonschema.title("一批日志中提取出的所有实体的扁平化列表。"),
+        jsonschema.required(),
+        jsonschema.paramString("entity_type",
+            jsonschema.description("被提取实体的类别。"),
+            jsonschema.enum([
+                "ip_address",
+                "username",
+                "hostname",
+                "process_name",
+                "file_path",
+                "file_name",
+                "url",
+                "domain_name",
+                "error_code",
+                "event_id",
+                "port_number"
+            ]),
+            jsonschema.required()
+        ),
+        jsonschema.paramString("entity_value",
+            jsonschema.description("被提取实体的具体值。"),
+            jsonschema.required()
+        )
+    )
+)
 
 
 forgeHandle = func(params) {
-    bp,err = aiagent.CreateLiteForge("entity_identify",
-        aiagent.liteForgePrompt(prompt),
-        aiagent.liteForgeOutputSchemaRaw("identify",schema)
-    )
-    if err != nil {
-        return err
-    }
-    res,err = bp.Execute(context.Background(),params)
-    if err != nil {
-		return nil
-	}
+    res = liteforge.Execute(sprintf("%s\n input:\n%v", params), liteforge.output(schema))~
     return res.GetInvokeParamsArray("entities")
 }
