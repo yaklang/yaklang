@@ -103,7 +103,7 @@ func TestDownloadPayload(t *testing.T) {
 			Group:       "test-group",
 			Folder:      "test-folder",
 			Content:     "test content",
-			ContentFile: nil,
+			FileContent: nil,
 			IsFile:      false,
 			Hash:        "mockhash",
 		}

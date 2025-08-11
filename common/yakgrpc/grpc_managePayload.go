@@ -1337,7 +1337,7 @@ func GetPayloadFile(ctx context.Context, fileName string) ([]byte, bool, error) 
 	return bytes.TrimRight(buf.Bytes(), "\n"), false, nil
 }
 
-func (s *Server) ExportPayload(req *ypb.ExportPayloadRequest, stream ypb.Yak_ExportAllPayloadServer) error {
+func (s *Server) ExportPayloadBatch(req *ypb.ExportPayloadBatchRequest, stream ypb.Yak_ExportAllPayloadServer) error {
 	groups := strings.Split(req.GetGroup(), ",")
 	savePath := req.GetSavePath()
 	if len(groups) == 0 {
@@ -1437,7 +1437,6 @@ func (s *Server) ExportPayload(req *ypb.ExportPayloadRequest, stream ypb.Yak_Exp
 		})
 	}
 
-	// 最终确保进度是 1
 	stream.Send(&ypb.GetAllPayloadResponse{Progress: 1})
 
 	return nil
