@@ -19,17 +19,32 @@ type Chunk interface {
 	LastChunk() Chunk
 	PrevNBytes(n int) []byte
 	MIMEType() *mimetype.MIME
+	IsTheLastChunk() bool // 是否是最后一个 chunk
+	SetIsTheLastChunk(bool)
 }
 
 type BufferChunk struct {
 	mu *sync.RWMutex
 
-	isUTF8   bool
-	buffer   *bytes.Buffer
-	bytesize int64
-	runesize int64
-	prev     Chunk // 指向前一个 Chunk
-	mimeType *mimetype.MIME
+	isUTF8         bool
+	buffer         *bytes.Buffer
+	bytesize       int64
+	runesize       int64
+	prev           Chunk // 指向前一个 Chunk
+	mimeType       *mimetype.MIME
+	isTheLastChunk bool
+}
+
+func (c *BufferChunk) IsTheLastChunk() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.isTheLastChunk
+}
+
+func (c *BufferChunk) SetIsTheLastChunk(isLast bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.isTheLastChunk = isLast
 }
 
 var _ Chunk = (*BufferChunk)(nil)
@@ -128,19 +143,25 @@ func (c *BufferChunk) FlushFullChunkSizeTo(dst *chanx.UnlimitedChan[Chunk], chun
 	}
 }
 
-func (c *BufferChunk) FlushAllChunkSizeTo(dst *chanx.UnlimitedChan[Chunk], chunkSize int64, sep string) {
+func (c *BufferChunk) FlushAllChunkSizeTo(dst *chanx.UnlimitedChan[Chunk], chunkSize int64, sep string, haveTheLastChunk bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	var chunks []Chunk
+	emitChunk := func(chunk Chunk) {
+		chunks = append(chunks, chunk)
+	}
+
 	if c.isUTF8 {
 		// use runes size
-		remainingData := RuneHandler([]rune(c.buffer.String()), chunkSize, []rune(sep), func(runes []rune) {
+		totalRunes := []rune(c.buffer.String())
+		remainingData := RuneHandler(totalRunes, chunkSize, []rune(sep), func(runes []rune) {
 			chunk := NewBufferChunk([]byte(string(runes)))
-			dst.SafeFeed(chunk)
+			emitChunk(chunk)
 		})
 		if len(remainingData) > 0 {
 			chunk := NewBufferChunk([]byte(string(remainingData)))
-			dst.SafeFeed(chunk)
+			emitChunk(chunk)
 		}
 		// 完全重置buffer
 		c.buffer.Reset()
@@ -151,11 +172,11 @@ func (c *BufferChunk) FlushAllChunkSizeTo(dst *chanx.UnlimitedChan[Chunk], chunk
 		// use bytes size
 		remainingData := BytesHandler(c.buffer.Bytes(), chunkSize, []byte(sep), func(dataBytes []byte) {
 			chunk := NewBufferChunk(dataBytes)
-			dst.SafeFeed(chunk)
+			emitChunk(chunk)
 		})
 		if len(remainingData) > 0 {
 			chunk := NewBufferChunk(remainingData)
-			dst.SafeFeed(chunk)
+			emitChunk(chunk)
 		}
 
 		// 完全重置buffer
@@ -164,7 +185,14 @@ func (c *BufferChunk) FlushAllChunkSizeTo(dst *chanx.UnlimitedChan[Chunk], chunk
 		c.bytesize = 0
 		c.runesize = 0
 	}
+	for idx, chunkInstance := range chunks {
+		if idx == len(chunks)-1 && haveTheLastChunk {
+			chunkInstance.SetIsTheLastChunk(true)
+		}
+		dst.SafeFeed(chunkInstance)
+	}
 }
+
 func (c *BufferChunk) Write(i []byte) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

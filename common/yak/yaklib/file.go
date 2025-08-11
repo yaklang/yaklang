@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/mimetype"
 	"io"
 	"io/ioutil"
 	"os"
@@ -774,4 +775,7 @@ var FileExport = map[string]interface{}{
 	"ReadDirInfoInDirectory":  _readDirInfoInDirectory,
 	"NewMultiFileLineReader":  _newMultiFileLineReader,
 	"Walk":                    _walk,
+
+	"DetectMIMETypeFromRaw":  mimetype.Detect,
+	"DetectMIMETypeFromFile": mimetype.DetectFile,
 }
