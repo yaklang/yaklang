@@ -225,14 +225,14 @@ func (f *VirtualFS) String() string {
 			return
 		}
 		fs.files.ForEach(func(name string, file *VirtualFile) bool {
-			if name == "." {
+			if name == "." || name == "" {
 				return true
 			}
 			if file.fs != nil {
 				builder.WriteString(fmt.Sprintf("%s/", name))
 				handFunc(name, file.fs)
 			} else {
-				builder.WriteString(fmt.Sprintf("%s(%d bytes)", name, len(file.content)))
+				builder.WriteString(name)
 			}
 			return true
 		})
