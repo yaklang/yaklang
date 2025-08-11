@@ -130,8 +130,19 @@ func WithAction(action string) ToolOption {
 	)
 }
 
-func _withObjectArrayEx(name string, arrayProps []PropertyOption, opts ...any) ToolOption {
+func _withObjectArrayEx(name string, arrayPropsRaw []any, opts ...any) ToolOption {
 	var params []ToolOption
+
+	var arrayProps []PropertyOption
+	for _, ap := range arrayPropsRaw {
+		switch ret := ap.(type) {
+		case PropertyOption:
+			arrayProps = append(arrayProps, ret)
+		default:
+			log.Warnf("with object array ex unknown array prop type: %T", ret)
+		}
+	}
+
 	var currentProperties []PropertyOption
 	for _, i := range opts {
 		switch ret := i.(type) {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/aiforge"
 	"io"
 	"os"
 	"path/filepath"
@@ -328,7 +329,7 @@ func initYaklangLib() {
 	yaklang.Import("ai", ai.Exports)
 
 	yaklang.Import("aiagent", AIAgentExport)
-	yaklang.Import("liteforge", LiteForgeExport)
+	yaklang.Import("liteforge", aiforge.LiteForgeExport)
 	yaklang.Import("jsonschema", aitool.SchemaGeneratorExports)
 
 	yaklang.Import("aireducer", aireducer.Exports)
