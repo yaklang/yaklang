@@ -1,11 +1,13 @@
 package ssaapi
 
 import (
+	"fmt"
+	"testing"
+
 	"github.com/gobwas/glob"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"testing"
 )
 
 func TestExclude(t *testing.T) {
@@ -48,4 +50,35 @@ func main(){
 	require.NoError(t, err)
 	prog.Show()
 	check(prog, 1)
+}
+
+func TestFsString(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	// VirtualFS{src/main/go/A/test1.go}
+	vf.AddFile("src/main/go/A/test1.go", `
+package main
+
+import (
+    "html"
+	"go-sec-code/utils"
+	"html/template"
+	"io/ioutil"
+
+	beego "github.com/beego/beego/v2/server/web"
+)
+
+type XSSVuln1Controller struct {
+	beego.Controller
+}
+
+func (c *XSSVuln1Controller) Get() {
+	xss := c.GetString("xss", "hello")
+	c.Ctx.ResponseWriter.Header().Set("Content-Type", "text/html")
+	safeOutput := html.EscapeString(xss)
+	c.Ctx.ResponseWriter.Write([]byte(safeOutput))
+}
+	`)
+
+	str := fmt.Sprintf("%v", vf)
+	require.Equal(t, str, "VirtualFS{src/main/go/A/test1.go}")
 }
