@@ -81,7 +81,9 @@ func processStreamResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, 
 		log.Errorf("no body read")
 		return
 	}
-	log.Infof("read first byte [%#v] delay: %v", string(firstbuf), time.Since(start))
+	utils.Debug(func() {
+		log.Infof("read first byte [%#v] delay: %v", string(firstbuf), time.Since(start))
+	})
 
 	var chunkedErrorMirror bytes.Buffer
 	if chunked {
