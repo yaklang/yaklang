@@ -130,6 +130,36 @@ func WithAction(action string) ToolOption {
 	)
 }
 
+func _withObjectArrayEx(name string, arrayProps []PropertyOption, opts ...any) ToolOption {
+	var params []ToolOption
+	var currentProperties []PropertyOption
+	for _, i := range opts {
+		switch ret := i.(type) {
+		case ToolOption:
+			params = append(params, ret)
+		case PropertyOption:
+			currentProperties = append(currentProperties, ret)
+		default:
+			log.Warnf("with object array unknown opt type: %T", ret)
+		}
+	}
+	return WithStructArrayParam(name, arrayProps, currentProperties, params...)
+}
+
+func _withObjectArray(name string, opts ...any) ToolOption {
+	var params []ToolOption
+	var currentProperties []PropertyOption
+	for _, i := range opts {
+		switch ret := i.(type) {
+		case ToolOption:
+			params = append(params, ret)
+		case PropertyOption:
+			currentProperties = append(currentProperties, ret)
+		}
+	}
+	return WithStructArrayParam(name, nil, currentProperties, params...)
+}
+
 var SchemaGeneratorExports = map[string]any{
 	"ActionObject":         newObjectSchemaWithAction,
 	"Object":               newObjectSchema,
@@ -145,6 +175,8 @@ var SchemaGeneratorExports = map[string]any{
 	"paramStringArray":        WithStringArrayParam,
 	"paramNumberArray":        WithNumberArrayParam,
 	"paramKeyValuePairsArray": WithKVPairsParam,
+	"paramObjectArray":        _withObjectArray,
+	"paramObjectArrayEx":      _withObjectArrayEx,
 	"paramObject":             _withParamObject,
 	"paramRaw":                WithRawParam,
 

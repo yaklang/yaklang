@@ -88,6 +88,7 @@ func WithContext(ctx context.Context) Option {
 	}
 }
 
+// aireducer.reducer
 func WithReducerCallback(callback ReducerCallbackType) Option {
 	return func(c *Config) {
 		c.callback = callback

@@ -110,7 +110,7 @@ func (cm *TextChunkMaker) loop(i chan struct{}) {
 	}
 
 	// Helper function to process and link chunks from a temporary channel
-	processAndLinkChunks := func(tempOutputChan *chanx.UnlimitedChan[Chunk]) {
+	processAndLinkChunks := func(tempOutputChan *chanx.UnlimitedChan[Chunk], haveTheLastChunk bool) {
 		for chunkToLink := range tempOutputChan.OutputChannel() {
 			if bc, ok := chunkToLink.(*BufferChunk); ok {
 				bc.prev = lastSentChunk
@@ -125,7 +125,7 @@ func (cm *TextChunkMaker) loop(i chan struct{}) {
 		}
 	}
 
-	flushBufferToTempChannel := func(flushAllData bool) {
+	flushBufferToTempChannelEx := func(flushAllData bool, haveTheLastChunk bool) {
 		// Create a temporary channel for Flush...To methods
 		// The context for this temp channel should ideally be derived from cm.config.ctx
 		// or a new one if appropriate for its lifecycle.
@@ -134,12 +134,15 @@ func (cm *TextChunkMaker) loop(i chan struct{}) {
 		go func() { // Run flushing in a new goroutine to avoid deadlocks
 			defer tempDst.Close() // Close tempDst when flushing is done
 			if flushAllData {
-				bufferChunk.FlushAllChunkSizeTo(tempDst, cm.config.chunkSize, cm.config.separator)
+				bufferChunk.FlushAllChunkSizeTo(tempDst, cm.config.chunkSize, cm.config.separator, haveTheLastChunk)
 			} else {
 				bufferChunk.FlushFullChunkSizeTo(tempDst, cm.config.chunkSize, cm.config.separator)
 			}
 		}()
-		processAndLinkChunks(tempDst)
+		processAndLinkChunks(tempDst, haveTheLastChunk)
+	}
+	flushBufferToTempChannel := func(flushAllData bool) {
+		flushBufferToTempChannelEx(flushAllData, false)
 	}
 
 	for {
@@ -154,7 +157,7 @@ func (cm *TextChunkMaker) loop(i chan struct{}) {
 		case result, ok := <-inputChan:
 			if !ok {
 				if bufferChunk.BytesSize() > 0 { // Flush any remaining data on close
-					flushBufferToTempChannel(true)
+					flushBufferToTempChannelEx(true, true)
 				}
 				return
 			}

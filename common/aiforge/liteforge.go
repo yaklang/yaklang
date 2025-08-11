@@ -108,7 +108,19 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 	}
 
 	nonce := strings.ToLower(utils.RandStringBytes(6))
-	call := utils.Jsonify(params)
+	var callBuffer bytes.Buffer
+	for _, i := range params {
+		if strings.Contains(i.Value, "\n") {
+			callBuffer.WriteString(i.Key + ": \\\n")
+			for _, line := range utils.ParseStringToLines(i.Value) {
+				callBuffer.WriteString("  ")
+				callBuffer.WriteString(line + " \\\n")
+			}
+		} else {
+			callBuffer.WriteString(fmt.Sprintf("%v: %v\n", i.Key, i.Value))
+		}
+	}
+	call := callBuffer.String()
 
 	temp := `# Preset
 你现在在一个任务引擎中，是一个输出JSON的数据处理和总结提示小助手，我会为你提供一些基本信息和输入材料，你需要按照我的Schema生成一个JSON数据直接返回。
