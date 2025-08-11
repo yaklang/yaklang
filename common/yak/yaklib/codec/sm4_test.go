@@ -216,3 +216,86 @@ func TestSM4GCMStreamZero(t *testing.T) {
 		require.NotEqual(t, T, T_, "authentication tag should not equal")
 	}
 }
+
+// TestSM4APIConsistency 测试 SM4 API 的一致性
+func TestSM4APIConsistency(t *testing.T) {
+	// 测试基本的 SM4 加密解密功能
+	key := []byte("1234123412341234")
+	data := []byte("hello world")
+	iv := []byte("1234123412341234")
+
+	// 测试 CBC 模式
+	encrypted, err := SM4EncryptCBCWithPKCSPadding(key, data, iv)
+	if err != nil {
+		t.Fatalf("SM4CBCEncrypt failed: %v", err)
+	}
+
+	decrypted, err := SM4DecryptCBCWithPKCSPadding(key, encrypted, iv)
+	if err != nil {
+		t.Fatalf("SM4CBCDecrypt failed: %v", err)
+	}
+
+	if string(decrypted) != string(data) {
+		t.Errorf("CBC mode: decrypted data doesn't match original data")
+	}
+
+	// 测试 ECB 模式
+	encrypted, err = SM4EncryptECBWithPKCSPadding(key, data, nil)
+	if err != nil {
+		t.Fatalf("SM4ECBEncrypt failed: %v", err)
+	}
+
+	decrypted, err = SM4DecryptECBWithPKCSPadding(key, encrypted, nil)
+	if err != nil {
+		t.Fatalf("SM4ECBDecrypt failed: %v", err)
+	}
+
+	if string(decrypted) != string(data) {
+		t.Errorf("ECB mode: decrypted data doesn't match original data")
+	}
+
+	// 测试 CFB 模式
+	encrypted, err = SM4EncryptCFBWithPKCSPadding(key, data, iv)
+	if err != nil {
+		t.Fatalf("SM4CFBEncrypt failed: %v", err)
+	}
+
+	decrypted, err = SM4DecryptCFBWithPKCSPadding(key, encrypted, iv)
+	if err != nil {
+		t.Fatalf("SM4CFBDecrypt failed: %v", err)
+	}
+
+	if string(decrypted) != string(data) {
+		t.Errorf("CFB mode: decrypted data doesn't match original data")
+	}
+
+	// 测试 OFB 模式
+	encrypted, err = SM4EncryptOFBWithPKCSPadding(key, data, iv)
+	if err != nil {
+		t.Fatalf("SM4OFBEncrypt failed: %v", err)
+	}
+
+	decrypted, err = SM4DecryptOFBWithPKCSPadding(key, encrypted, iv)
+	if err != nil {
+		t.Fatalf("SM4OFBDecrypt failed: %v", err)
+	}
+
+	if string(decrypted) != string(data) {
+		t.Errorf("OFB mode: decrypted data doesn't match original data")
+	}
+
+	// 测试 GCM 模式
+	encrypted, err = SM4GCMEncrypt(key, data, iv)
+	if err != nil {
+		t.Fatalf("SM4GCMEncrypt failed: %v", err)
+	}
+
+	decrypted, err = SM4GCMDecrypt(key, encrypted, iv)
+	if err != nil {
+		t.Fatalf("SM4GCMDecrypt failed: %v", err)
+	}
+
+	if string(decrypted) != string(data) {
+		t.Errorf("GCM mode: decrypted data doesn't match original data")
+	}
+}

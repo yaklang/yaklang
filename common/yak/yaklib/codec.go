@@ -105,19 +105,50 @@ var CodecExports = map[string]interface{}{
 	"TripleDESECBDecrypt": codec.TripleDES_ECBDec,
 
 	// sm
-	"Sm3":           codec.SM3,
-	"Sm4CBCEncrypt": codec.SM4EncryptCBCWithPKCSPadding,
-	"Sm4CBCDecrypt": codec.SM4DecryptCBCWithPKCSPadding,
-	"Sm4CFBEncrypt": codec.SM4EncryptCFBWithPKCSPadding,
-	"Sm4CFBDecrypt": codec.SM4DecryptCFBWithPKCSPadding,
-	"Sm4ECBEncrypt": codec.SM4EncryptECBWithPKCSPadding,
-	"Sm4ECBDecrypt": codec.SM4DecryptECBWithPKCSPadding,
-	"Sm4EBCEncrypt": codec.SM4EncryptECBWithPKCSPadding,
-	"Sm4EBCDecrypt": codec.SM4DecryptECBWithPKCSPadding,
-	"Sm4OFBEncrypt": codec.SM4EncryptOFBWithPKCSPadding,
-	"Sm4OFBDecrypt": codec.SM4DecryptOFBWithPKCSPadding,
-	"Sm4GCMEncrypt": codec.SM4GCMEnc,
-	"Sm4GCMDecrypt": codec.SM4GCMDec,
+	"Sm3":                          codec.SM3,
+	"Sm4Encrypt":                   codec.SM4EncryptCBCWithPKCSPadding,
+	"Sm4Decrypt":                   codec.SM4DecryptCBCWithPKCSPadding,
+	"Sm4CBCEncrypt":                codec.SM4EncryptCBCWithPKCSPadding,
+	"Sm4CBCDecrypt":                codec.SM4DecryptCBCWithPKCSPadding,
+	"Sm4CBCEncryptWithZeroPadding": codec.SM4EncryptCBCWithZeroPadding,
+	"Sm4CBCDecryptWithZeroPadding": codec.SM4DecryptCBCWithZeroPadding,
+	"Sm4CBCEncryptWithPKCSPadding": codec.SM4EncryptCBCWithPKCSPadding,
+	"Sm4CBCDecryptWithPKCSPadding": codec.SM4DecryptCBCWithPKCSPadding,
+
+	"Sm4ECBEncrypt":                codec.SM4EncryptECBWithPKCSPadding,
+	"Sm4ECBDecrypt":                codec.SM4DecryptECBWithPKCSPadding,
+	"Sm4ECBEncryptWithZeroPadding": codec.SM4EncryptECBWithZeroPadding,
+	"Sm4ECBDecryptWithZeroPadding": codec.SM4DecryptECBWithZeroPadding,
+	"Sm4ECBEncryptWithPKCSPadding": codec.SM4EncryptECBWithPKCSPadding,
+	"Sm4ECBDecryptWithPKCSPadding": codec.SM4DecryptECBWithPKCSPadding,
+
+	"Sm4CFBEncrypt":                codec.SM4EncryptCFBWithPKCSPadding,
+	"Sm4CFBDecrypt":                codec.SM4DecryptCFBWithPKCSPadding,
+	"Sm4CFBEncryptWithZeroPadding": codec.SM4EncryptCFBWithZeroPadding,
+	"Sm4CFBDecryptWithZeroPadding": codec.SM4DecryptCFBWithZeroPadding,
+	"Sm4CFBEncryptWithPKCSPadding": codec.SM4EncryptCFBWithPKCSPadding,
+	"Sm4CFBDecryptWithPKCSPadding": codec.SM4DecryptCFBWithPKCSPadding,
+
+	"Sm4OFBEncrypt":                codec.SM4EncryptOFBWithPKCSPadding,
+	"Sm4OFBDecrypt":                codec.SM4DecryptOFBWithPKCSPadding,
+	"Sm4OFBEncryptWithZeroPadding": codec.SM4EncryptOFBWithZeroPadding,
+	"Sm4OFBDecryptWithZeroPadding": codec.SM4DecryptOFBWithZeroPadding,
+	"Sm4OFBEncryptWithPKCSPadding": codec.SM4EncryptOFBWithPKCSPadding,
+	"Sm4OFBDecryptWithPKCSPadding": codec.SM4DecryptOFBWithPKCSPadding,
+
+	"Sm4CTREncrypt":                codec.SM4EncryptCTRWithPKCSPadding,
+	"Sm4CTRDecrypt":                codec.SM4DecryptCTRWithPKCSPadding,
+	"Sm4CTREncryptWithZeroPadding": codec.SM4EncryptCTRWithZeroPadding,
+	"Sm4CTRDecryptWithZeroPadding": codec.SM4DecryptCTRWithZeroPadding,
+	"Sm4CTREncryptWithPKCSPadding": codec.SM4EncryptCTRWithPKCSPadding,
+	"Sm4CTRDecryptWithPKCSPadding": codec.SM4DecryptCTRWithPKCSPadding,
+
+	"Sm4GCMEncrypt": codec.SM4GCMEncrypt,
+	"Sm4GCMDecrypt": codec.SM4GCMDecrypt,
+
+	// 保持向后兼容性的拼写错误函数（已废弃）
+	"Sm4EBCEncrypt": codec.SM4EncryptEBCWithPKCSPadding,
+	"Sm4EBCDecrypt": codec.SM4DecryptEBCWithPKCSPadding,
 
 	// rc4
 	"RC4Encrypt": codec.RC4Encrypt,
