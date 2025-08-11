@@ -2,9 +2,15 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "required": [
+    "@action",
     "cumulative_summary"
   ],
   "properties": {
+    "@action": {
+      "const": "object",
+      "description": "set '@action' can help the AI identify the output json object",
+      "type": "string"
+    },
     "cumulative_summary": {
       "description": "A rich, human-readable summary synthesizing all the structured information. It should incorporate the scene context, key elements, and their primary relationships to tell a coherent story.",
       "type": "string"
