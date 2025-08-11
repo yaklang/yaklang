@@ -1573,7 +1573,7 @@ func (s *Server) PluginTrace(stream ypb.Yak_PluginTraceServer) error {
 		if mitmPluginCaller == nil || mitmPluginCallerNotifyChan == nil {
 			log.Debug("MITM 插件管理器未初始化，返回空trace列表，等待后端启动MITMv2...")
 			_ = stream.Send(emptyResp)
-			// 等待1秒后重试，或响应set_tracing指令
+			// 等待1秒后重试
 			select {
 			case <-time.After(time.Second):
 				continue
