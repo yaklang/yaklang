@@ -163,7 +163,7 @@ const (
 	Yak_CoverPayloadGroupToDatabase_FullMethodName                = "/ypb.Yak/CoverPayloadGroupToDatabase"
 	Yak_ConvertPayloadGroupToDatabase_FullMethodName              = "/ypb.Yak/ConvertPayloadGroupToDatabase"
 	Yak_MigratePayloads_FullMethodName                            = "/ypb.Yak/MigratePayloads"
-	Yak_ExportPayload_FullMethodName                              = "/ypb.Yak/ExportPayload"
+	Yak_ExportPayloadBatch_FullMethodName                         = "/ypb.Yak/ExportPayloadBatch"
 	Yak_UploadPayloadToOnline_FullMethodName                      = "/ypb.Yak/UploadPayloadToOnline"
 	Yak_DownloadPayload_FullMethodName                            = "/ypb.Yak/DownloadPayload"
 	Yak_GetYakitCompletionRaw_FullMethodName                      = "/ypb.Yak/GetYakitCompletionRaw"
@@ -724,7 +724,7 @@ type YakClient interface {
 	ConvertPayloadGroupToDatabase(ctx context.Context, in *NameRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SavePayloadProgress], error)
 	// 迁移旧的payload
 	MigratePayloads(ctx context.Context, in *Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SavePayloadProgress], error)
-	ExportPayload(ctx context.Context, in *ExportPayloadRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GetAllPayloadResponse], error)
+	ExportPayloadBatch(ctx context.Context, in *ExportPayloadBatchRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GetAllPayloadResponse], error)
 	UploadPayloadToOnline(ctx context.Context, in *UploadPayloadToOnlineRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadProgress], error)
 	DownloadPayload(ctx context.Context, in *DownloadPayloadRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadProgress], error)
 	// 自动生成补全
@@ -2912,13 +2912,13 @@ func (c *yakClient) MigratePayloads(ctx context.Context, in *Empty, opts ...grpc
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_MigratePayloadsClient = grpc.ServerStreamingClient[SavePayloadProgress]
 
-func (c *yakClient) ExportPayload(ctx context.Context, in *ExportPayloadRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GetAllPayloadResponse], error) {
+func (c *yakClient) ExportPayloadBatch(ctx context.Context, in *ExportPayloadBatchRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GetAllPayloadResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[32], Yak_ExportPayload_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[32], Yak_ExportPayloadBatch_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[ExportPayloadRequest, GetAllPayloadResponse]{ClientStream: stream}
+	x := &grpc.GenericClientStream[ExportPayloadBatchRequest, GetAllPayloadResponse]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -2929,7 +2929,7 @@ func (c *yakClient) ExportPayload(ctx context.Context, in *ExportPayloadRequest,
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type Yak_ExportPayloadClient = grpc.ServerStreamingClient[GetAllPayloadResponse]
+type Yak_ExportPayloadBatchClient = grpc.ServerStreamingClient[GetAllPayloadResponse]
 
 func (c *yakClient) UploadPayloadToOnline(ctx context.Context, in *UploadPayloadToOnlineRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -7371,7 +7371,7 @@ type YakServer interface {
 	ConvertPayloadGroupToDatabase(*NameRequest, grpc.ServerStreamingServer[SavePayloadProgress]) error
 	// 迁移旧的payload
 	MigratePayloads(*Empty, grpc.ServerStreamingServer[SavePayloadProgress]) error
-	ExportPayload(*ExportPayloadRequest, grpc.ServerStreamingServer[GetAllPayloadResponse]) error
+	ExportPayloadBatch(*ExportPayloadBatchRequest, grpc.ServerStreamingServer[GetAllPayloadResponse]) error
 	UploadPayloadToOnline(*UploadPayloadToOnlineRequest, grpc.ServerStreamingServer[DownloadProgress]) error
 	DownloadPayload(*DownloadPayloadRequest, grpc.ServerStreamingServer[DownloadProgress]) error
 	// 自动生成补全
@@ -8293,8 +8293,8 @@ func (UnimplementedYakServer) ConvertPayloadGroupToDatabase(*NameRequest, grpc.S
 func (UnimplementedYakServer) MigratePayloads(*Empty, grpc.ServerStreamingServer[SavePayloadProgress]) error {
 	return status.Errorf(codes.Unimplemented, "method MigratePayloads not implemented")
 }
-func (UnimplementedYakServer) ExportPayload(*ExportPayloadRequest, grpc.ServerStreamingServer[GetAllPayloadResponse]) error {
-	return status.Errorf(codes.Unimplemented, "method ExportPayload not implemented")
+func (UnimplementedYakServer) ExportPayloadBatch(*ExportPayloadBatchRequest, grpc.ServerStreamingServer[GetAllPayloadResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method ExportPayloadBatch not implemented")
 }
 func (UnimplementedYakServer) UploadPayloadToOnline(*UploadPayloadToOnlineRequest, grpc.ServerStreamingServer[DownloadProgress]) error {
 	return status.Errorf(codes.Unimplemented, "method UploadPayloadToOnline not implemented")
@@ -11787,16 +11787,16 @@ func _Yak_MigratePayloads_Handler(srv interface{}, stream grpc.ServerStream) err
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_MigratePayloadsServer = grpc.ServerStreamingServer[SavePayloadProgress]
 
-func _Yak_ExportPayload_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(ExportPayloadRequest)
+func _Yak_ExportPayloadBatch_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ExportPayloadBatchRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(YakServer).ExportPayload(m, &grpc.GenericServerStream[ExportPayloadRequest, GetAllPayloadResponse]{ServerStream: stream})
+	return srv.(YakServer).ExportPayloadBatch(m, &grpc.GenericServerStream[ExportPayloadBatchRequest, GetAllPayloadResponse]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type Yak_ExportPayloadServer = grpc.ServerStreamingServer[GetAllPayloadResponse]
+type Yak_ExportPayloadBatchServer = grpc.ServerStreamingServer[GetAllPayloadResponse]
 
 func _Yak_UploadPayloadToOnline_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(UploadPayloadToOnlineRequest)
@@ -19905,8 +19905,8 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 		{
-			StreamName:    "ExportPayload",
-			Handler:       _Yak_ExportPayload_Handler,
+			StreamName:    "ExportPayloadBatch",
+			Handler:       _Yak_ExportPayloadBatch_Handler,
 			ServerStreams: true,
 		},
 		{

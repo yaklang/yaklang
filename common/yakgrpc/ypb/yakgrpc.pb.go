@@ -16949,7 +16949,7 @@ func (x *SavePayloadProgress) GetMessage() string {
 	return ""
 }
 
-type ExportPayloadRequest struct {
+type ExportPayloadBatchRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Group         string                 `protobuf:"bytes,1,opt,name=Group,proto3" json:"Group,omitempty"`
 	SavePath      string                 `protobuf:"bytes,2,opt,name=SavePath,proto3" json:"SavePath,omitempty"`
@@ -16957,20 +16957,20 @@ type ExportPayloadRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ExportPayloadRequest) Reset() {
-	*x = ExportPayloadRequest{}
+func (x *ExportPayloadBatchRequest) Reset() {
+	*x = ExportPayloadBatchRequest{}
 	mi := &file_yakgrpc_proto_msgTypes[233]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ExportPayloadRequest) String() string {
+func (x *ExportPayloadBatchRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ExportPayloadRequest) ProtoMessage() {}
+func (*ExportPayloadBatchRequest) ProtoMessage() {}
 
-func (x *ExportPayloadRequest) ProtoReflect() protoreflect.Message {
+func (x *ExportPayloadBatchRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_yakgrpc_proto_msgTypes[233]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -16982,19 +16982,19 @@ func (x *ExportPayloadRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ExportPayloadRequest.ProtoReflect.Descriptor instead.
-func (*ExportPayloadRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use ExportPayloadBatchRequest.ProtoReflect.Descriptor instead.
+func (*ExportPayloadBatchRequest) Descriptor() ([]byte, []int) {
 	return file_yakgrpc_proto_rawDescGZIP(), []int{233}
 }
 
-func (x *ExportPayloadRequest) GetGroup() string {
+func (x *ExportPayloadBatchRequest) GetGroup() string {
 	if x != nil {
 		return x.Group
 	}
 	return ""
 }
 
-func (x *ExportPayloadRequest) GetSavePath() string {
+func (x *ExportPayloadBatchRequest) GetSavePath() string {
 	if x != nil {
 		return x.SavePath
 	}
@@ -58263,8 +58263,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x05Speed\x18\b \x01(\tR\x05Speed\x120\n" +
 	"\x13RestDurationVerbose\x18\t \x01(\tR\x13RestDurationVerbose\x12\x18\n" +
 	"\aMessage\x18\n" +
-	" \x01(\tR\aMessage\"H\n" +
-	"\x14ExportPayloadRequest\x12\x14\n" +
+	" \x01(\tR\aMessage\"M\n" +
+	"\x19ExportPayloadBatchRequest\x12\x14\n" +
 	"\x05Group\x18\x01 \x01(\tR\x05Group\x12\x1a\n" +
 	"\bSavePath\x18\x02 \x01(\tR\bSavePath\"b\n" +
 	"\x1cUploadPayloadToOnlineRequest\x12\x14\n" +
@@ -61741,7 +61741,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tAesBase64\x10\x03\x12\n" +
 	"\n" +
 	"\x06XorRaw\x10\x04\x12\r\n" +
-	"\tXorBase64\x10\x052Գ\x02\n" +
+	"\tXorBase64\x10\x052\u07b3\x02\n" +
 	"\x03Yak\x12+\n" +
 	"\aVersion\x12\n" +
 	".ypb.Empty\x1a\x14.ypb.VersionResponse\x12H\n" +
@@ -61943,8 +61943,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x1bCoverPayloadGroupToDatabase\x12\x10.ypb.NameRequest\x1a\x18.ypb.SavePayloadProgress0\x01\x12M\n" +
 	"\x1dConvertPayloadGroupToDatabase\x12\x10.ypb.NameRequest\x1a\x18.ypb.SavePayloadProgress0\x01\x129\n" +
 	"\x0fMigratePayloads\x12\n" +
-	".ypb.Empty\x1a\x18.ypb.SavePayloadProgress0\x01\x12H\n" +
-	"\rExportPayload\x12\x19.ypb.ExportPayloadRequest\x1a\x1a.ypb.GetAllPayloadResponse0\x01\x12S\n" +
+	".ypb.Empty\x1a\x18.ypb.SavePayloadProgress0\x01\x12R\n" +
+	"\x12ExportPayloadBatch\x12\x1e.ypb.ExportPayloadBatchRequest\x1a\x1a.ypb.GetAllPayloadResponse0\x01\x12S\n" +
 	"\x15UploadPayloadToOnline\x12!.ypb.UploadPayloadToOnlineRequest\x1a\x15.ypb.DownloadProgress0\x01\x12G\n" +
 	"\x0fDownloadPayload\x12\x1b.ypb.DownloadPayloadRequest\x1a\x15.ypb.DownloadProgress0\x01\x12D\n" +
 	"\x15GetYakitCompletionRaw\x12\n" +
@@ -62724,7 +62724,7 @@ var file_yakgrpc_proto_goTypes = []any{
 	(*StaticAnalyzeErrorResult)(nil),                          // 234: ypb.StaticAnalyzeErrorResult
 	(*StaticAnalyzeErrorResponse)(nil),                        // 235: ypb.StaticAnalyzeErrorResponse
 	(*SavePayloadProgress)(nil),                               // 236: ypb.SavePayloadProgress
-	(*ExportPayloadRequest)(nil),                              // 237: ypb.ExportPayloadRequest
+	(*ExportPayloadBatchRequest)(nil),                         // 237: ypb.ExportPayloadBatchRequest
 	(*UploadPayloadToOnlineRequest)(nil),                      // 238: ypb.UploadPayloadToOnlineRequest
 	(*DownloadPayloadRequest)(nil),                            // 239: ypb.DownloadPayloadRequest
 	(*DownloadProgress)(nil),                                  // 240: ypb.DownloadProgress
@@ -63947,7 +63947,7 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	463,  // 645: ypb.Yak.CoverPayloadGroupToDatabase:input_type -> ypb.NameRequest
 	463,  // 646: ypb.Yak.ConvertPayloadGroupToDatabase:input_type -> ypb.NameRequest
 	4,    // 647: ypb.Yak.MigratePayloads:input_type -> ypb.Empty
-	237,  // 648: ypb.Yak.ExportPayload:input_type -> ypb.ExportPayloadRequest
+	237,  // 648: ypb.Yak.ExportPayloadBatch:input_type -> ypb.ExportPayloadBatchRequest
 	238,  // 649: ypb.Yak.UploadPayloadToOnline:input_type -> ypb.UploadPayloadToOnlineRequest
 	239,  // 650: ypb.Yak.DownloadPayload:input_type -> ypb.DownloadPayloadRequest
 	4,    // 651: ypb.Yak.GetYakitCompletionRaw:input_type -> ypb.Empty
@@ -64466,7 +64466,7 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	236,  // 1164: ypb.Yak.CoverPayloadGroupToDatabase:output_type -> ypb.SavePayloadProgress
 	236,  // 1165: ypb.Yak.ConvertPayloadGroupToDatabase:output_type -> ypb.SavePayloadProgress
 	236,  // 1166: ypb.Yak.MigratePayloads:output_type -> ypb.SavePayloadProgress
-	479,  // 1167: ypb.Yak.ExportPayload:output_type -> ypb.GetAllPayloadResponse
+	479,  // 1167: ypb.Yak.ExportPayloadBatch:output_type -> ypb.GetAllPayloadResponse
 	240,  // 1168: ypb.Yak.UploadPayloadToOnline:output_type -> ypb.DownloadProgress
 	240,  // 1169: ypb.Yak.DownloadPayload:output_type -> ypb.DownloadProgress
 	457,  // 1170: ypb.Yak.GetYakitCompletionRaw:output_type -> ypb.YakitCompletionRawResponse
