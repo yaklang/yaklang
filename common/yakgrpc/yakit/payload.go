@@ -108,7 +108,7 @@ func CheckExistGroup(db *gorm.DB, group string) (*schema.Payload, error) {
 	var (
 		payload schema.Payload
 	)
-	if db := db.Model(&schema.Payload{}).Select("folder").Where("`group` = ?", group).First(&payload); db.Error != nil {
+	if db := db.Model(&schema.Payload{}).Select("folder, is_file").Where("`group` = ?", group).First(&payload); db.Error != nil {
 		return nil, db.Error
 	}
 	return &payload, nil

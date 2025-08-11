@@ -31,14 +31,14 @@ type DownloadBatchPayloadsRequest struct {
 }
 
 type OnlinePayload struct {
-	ID          int64
-	Group       string
-	Content     string
-	ContentFile []byte
-	Folder      string
-	HitCount    int64
-	IsFile      bool
-	Hash        string
+	ID          int64  `json:"id"`
+	Group       string `json:"group"`
+	Content     string `json:"content"`
+	FileContent []byte `json:"fileContent"`
+	Folder      string `json:"folder"`
+	HitCount    int64  `json:"hitCount"`
+	IsFile      bool   `json:"isFile"`
+	Hash        string `json:"hash"`
 }
 
 type OnlinePayloadItem struct {
@@ -218,7 +218,7 @@ func (s *OnlineClient) SavePayload(db *gorm.DB, payload ...*OnlinePayload) error
 		if err != nil {
 			return err
 		}
-		data := &schema.Payload{
+		data := schema.Payload{
 			Group:    p.Group,
 			Folder:   &p.Folder,
 			Content:  &content,
@@ -227,6 +227,14 @@ func (s *OnlineClient) SavePayload(db *gorm.DB, payload ...*OnlinePayload) error
 			Hash:     p.Hash,
 		}
 
+		// 重名不同类型抛错, 同一类型进行覆盖追加
+		getPayload, err := yakit.CheckExistGroup(db, p.Group)
+		if getPayload != nil {
+			if *getPayload.IsFile != p.IsFile {
+				return utils.Errorf("group[%s] exist", p.Group)
+			}
+			p.Folder = *getPayload.Folder
+		}
 		err = yakit.CreateOrUpdatePayload(db, *data.Content, data.Group, *data.Folder, *data.HitCount, *data.IsFile)
 		if err != nil {
 			log.Errorf("save [%s] to local failed: %s", p.Group, err)
@@ -246,7 +254,7 @@ func SavePayloadWriteFile(payload *OnlinePayload) (string, error) {
 		if err != nil {
 			return "", utils.Wrap(err, "open file for write payload error")
 		}
-		if _, err := dstFD.WriteString(string(payload.ContentFile)); err != nil {
+		if _, err := dstFD.WriteString(string(payload.FileContent)); err != nil {
 			return "", utils.Wrap(err, "write data to file error")
 		}
 		content = dstFileName
