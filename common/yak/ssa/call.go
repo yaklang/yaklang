@@ -38,7 +38,7 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value) *Call {
 	targetFuncCallee := target.GetFunc()
 
 	fixCallVariadic := func(args []Value, callee *Function) []Value {
-		if utils.IsNil(callee) || !callee.hasEllipsis {
+		if utils.IsNil(callee) || !callee.hasEllipsis || callee.ParamLength <= 0 {
 			return args
 		}
 
