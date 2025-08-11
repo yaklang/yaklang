@@ -35,6 +35,41 @@ func NewCall(target Value, args Values, binding map[string]Value, block *BasicBl
 }
 
 func (f *FunctionBuilder) NewCall(target Value, args []Value) *Call {
+	targetFuncCallee := target.GetFunc()
+
+	fixCallVariadic := func(args []Value, callee *Function) []Value {
+		if utils.IsNil(callee) || !callee.hasEllipsis {
+			return args
+		}
+
+		fixedCount := callee.ParamLength - 1 // 最后一个是 variadic
+		if fixedCount > len(args) {
+			fixedCount = len(args)
+		}
+
+		// 固定参数部分
+		newArgs := append([]Value{}, args[:fixedCount]...)
+
+		// variadic 部分
+		variadicArgs := make([]Value, 0)
+		for i := fixedCount; i < len(args); i++ {
+			variadicArgs = append(variadicArgs, args[i])
+		}
+
+		// 打包成 slice
+		obj := f.InterfaceAddFieldBuild(len(variadicArgs),
+			func(i int) Value { return f.EmitConstInstPlaceholder(i) },
+			func(i int) Value { return variadicArgs[i] },
+		)
+		obj.GetType().(*ObjectType).Kind = SliceTypeKind
+		newArgs = append(newArgs, obj)
+
+		return newArgs
+	}
+
+	args = fixCallVariadic(args, targetFuncCallee)
+
+	// 创建 Call 指令
 	call := NewCall(target, args, nil, f.CurrentBlock)
 	return call
 }
