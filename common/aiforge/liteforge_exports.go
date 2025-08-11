@@ -24,9 +24,9 @@ action.Get("obj")
 
 var LiteForgeExport = map[string]interface{}{
 	"Execute":          _executeLiteForgeTemp,
-	"AnalyzeImage":     analyzeImage,
-	"AnalyzeImageFile": analyzeImageFile,
-	"imageExtraPrompt": _imgWithExtraPrompt, // use for analyzeImage and analyzeImageFile
+	"AnalyzeImage":     AnalyzeImage,
+	"AnalyzeImageFile": AnalyzeImageFile,
+	"imageExtraPrompt": ImageWithExtraPrompt, // use for analyzeImage and analyzeImageFile
 
 	"output":      _withOutputJSONSchema,
 	"action":      _withOutputAction,

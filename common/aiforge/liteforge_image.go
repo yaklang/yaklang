@@ -3,6 +3,7 @@ package aiforge
 import (
 	_ "embed"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -441,20 +442,25 @@ type imageAnalysisConfig struct {
 
 type imageAnalysisOption func(config *imageAnalysisConfig)
 
-func _imgWithExtraPrompt(prompt string) imageAnalysisOption {
+func ImageWithExtraPrompt(prompt string) imageAnalysisOption {
 	return func(config *imageAnalysisConfig) {
 		config.ExtraPrompt = prompt
 	}
 }
 
-func analyzeImageFile(image string, opts ...any) (*ImageAnalysisResult, error) {
+func AnalyzeImageFile(image string, opts ...any) (*ImageAnalysisResult, error) {
 	if !utils.FileExists(image) {
 		return nil, fmt.Errorf("image file not found: %s", image)
 	}
-	return analyzeImage(image, opts...)
+
+	raw, err := os.ReadFile(image)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read image file %s: %w", image, err)
+	}
+	return AnalyzeImage(raw, opts...)
 }
 
-func analyzeImage(image any, opts ...any) (*ImageAnalysisResult, error) {
+func AnalyzeImage(image any, opts ...any) (*ImageAnalysisResult, error) {
 	var imgCfg = &imageAnalysisConfig{}
 	for _, opt := range opts {
 		if optFunc, ok := opt.(imageAnalysisOption); ok {
@@ -465,7 +471,33 @@ func analyzeImage(image any, opts ...any) (*ImageAnalysisResult, error) {
 	}
 	imgCfg.fallbackOptions = append(imgCfg.fallbackOptions, _withImage(image), _withForceImage(true))
 	imgCfg.fallbackOptions = append(imgCfg.fallbackOptions, _withOutputJSONSchema(IMAGE_OUTPUT_SCHEMA))
-	forgeResult, err := _executeLiteForgeTemp(`Analyze the image\n`+imgCfg.ExtraPrompt, imgCfg.fallbackOptions...)
+
+	// 构建详细的分析提示
+	prompt := `Analyze the image and extract comprehensive information including:
+
+1. **Visual Elements**: Identify and describe all objects, people, animals, or items visible in the image
+2. **Text Elements**: Extract all text content using OCR (Optical Character Recognition) 
+3. **Relationships**: Describe how elements relate to each other spatially and contextually
+4. **Scene Context**: Determine the location type, time of day, overall mood, and inferred purpose
+
+**Important Instructions:**
+- Provide unique IDs for each element (v_1, v_2, etc. for visual elements; t_1, t_2, etc. for text elements)
+- Include confidence scores for all detections
+- Use descriptive labels and detailed descriptions
+- Extract ALL visible text, even if partially obscured
+- Establish relationships between identified elements
+- Ensure the cumulative_summary synthesizes all findings into a coherent narrative
+
+**Output Requirements:**
+- Must include "@action": "object" field
+- All required fields must be populated
+- Follow the provided JSON schema exactly
+- Return valid JSON without additional commentary
+- Ensure cumulative_summary is comprehensive and descriptive
+
+` + imgCfg.ExtraPrompt
+
+	forgeResult, err := _executeLiteForgeTemp(prompt, imgCfg.fallbackOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -473,16 +505,37 @@ func analyzeImage(image any, opts ...any) (*ImageAnalysisResult, error) {
 		return nil, fmt.Errorf("invalid forge result")
 	}
 
+	// 添加调试信息
+	log.Infof("ForgeResult Action Name: %s", forgeResult.Action.Name())
+	log.Infof("ForgeResult Action Type: %s", forgeResult.Action.ActionType())
+	// 添加调试信息 - 输出是否检测到图像相关内容
+	if forgeResult.GetString("cumulative_summary") == "" {
+		log.Warnf("No cumulative_summary found in action result")
+	}
+	if len(forgeResult.GetInvokeParamsArray("visual_elements")) == 0 {
+		log.Warnf("No visual_elements found in action result")
+	}
+	if len(forgeResult.GetInvokeParamsArray("text_elements")) == 0 {
+		log.Warnf("No text_elements found in action result")
+	}
+
+	// 检查具体的字段内容用于调试
+	log.Infof("Raw cumulative_summary: %q", forgeResult.GetString("cumulative_summary"))
+	log.Infof("Visual elements count: %d", len(forgeResult.GetInvokeParamsArray("visual_elements")))
+	log.Infof("Text elements count: %d", len(forgeResult.GetInvokeParamsArray("text_elements")))
+
 	result := &ImageAnalysisResult{}
 	/*
 		handle forgeResult.Action -> *ImageAnalysisResult
 	*/
-	result.CumulativeSummary = forgeResult.Action.GetString("cumulative_summary", "")
-	sceneContext := forgeResult.Action.GetInvokeParams("scene_context")
+	// 修复累积摘要提取问题 - 直接从ForgeResult中提取
+	result.CumulativeSummary = forgeResult.GetString("cumulative_summary")
+	log.Infof("Extracted cumulative_summary: %q", result.CumulativeSummary)
+	sceneContext := forgeResult.GetInvokeParams("scene_context")
 	if sceneContext != nil {
 		// 安全处理场景上下文
-		locationType := sceneContext.GetString("location_type", "")
-		timeOfDay := sceneContext.GetString("time_of_day", "")
+		locationType := sceneContext.GetString("location_type")
+		timeOfDay := sceneContext.GetString("time_of_day")
 
 		// 验证TimeOfDay的有效性
 		validTimeOfDay := TimeOfDay(timeOfDay)
@@ -500,14 +553,14 @@ func analyzeImage(image any, opts ...any) (*ImageAnalysisResult, error) {
 			InferredIntent: sceneContext.GetString("inferred_intent", ""),
 		}
 	}
-	for _, relationship := range forgeResult.Action.GetInvokeParamsArray("relationships") {
+	for _, relationship := range forgeResult.GetInvokeParamsArray("relationships") {
 		if relationship == nil {
 			continue // 跳过空的relationship元素
 		}
 
-		subjectID := relationship.GetString("subject_id", "")
-		predicate := relationship.GetString("predicate", "")
-		objectID := relationship.GetString("object_id", "")
+		subjectID := relationship.GetString("subject_id")
+		predicate := relationship.GetString("predicate")
+		objectID := relationship.GetString("object_id")
 
 		// 只添加有效的关系（必须有主语、谓语、宾语）
 		if subjectID != "" && predicate != "" && objectID != "" {
@@ -515,24 +568,26 @@ func analyzeImage(image any, opts ...any) (*ImageAnalysisResult, error) {
 				SubjectID:         subjectID,
 				Predicate:         predicate,
 				ObjectID:          objectID,
-				SpatialQualifier:  relationship.GetString("spatial_qualifier", ""),
-				TemporalQualifier: TemporalQualifier(relationship.GetString("temporal_qualifier", "")),
-				Confidence:        relationship.GetFloat("confidence", 0.0),
+				SpatialQualifier:  relationship.GetString("spatial_qualifier"),
+				TemporalQualifier: TemporalQualifier(relationship.GetString("temporal_qualifier")),
+				Confidence:        relationship.GetFloat("confidence"),
 			}
 			result.Relationships = append(result.Relationships, rel)
 		}
 	}
-	for _, visual := range forgeResult.Action.GetInvokeParamsArray("visual_elements") {
+	for idx, visual := range forgeResult.GetInvokeParamsArray("visual_elements") {
 		if visual == nil {
 			continue // 跳过空的visual元素
 		}
 
+		log.Infof("Processing visual element %d: id=%q, label=%q", idx, visual.GetString("id"), visual.GetString("label"))
+
 		element := VisualElement{
-			ID:          visual.GetString("id", "unknown"),
-			Label:       visual.GetString("label", "unknown"),
-			Description: visual.GetString("description", ""),
-			Confidence:  visual.GetFloat("confidence", 0.0),
-			Role:        ElementRole(visual.GetString("role", "background")),
+			ID:          visual.GetString("id"),
+			Label:       visual.GetString("label"),
+			Description: visual.GetString("description"),
+			Confidence:  visual.GetFloat("confidence"),
+			Role:        ElementRole(visual.GetString("role")),
 		}
 
 		// 安全处理边界框
@@ -562,16 +617,18 @@ func analyzeImage(image any, opts ...any) (*ImageAnalysisResult, error) {
 	}
 
 	// 处理文本元素
-	for _, text := range forgeResult.Action.GetInvokeParamsArray("text_elements") {
+	for idx, text := range forgeResult.GetInvokeParamsArray("text_elements") {
 		if text == nil {
 			continue // 跳过空的text元素
 		}
 
+		log.Infof("Processing text element %d: id=%q, text=%q", idx, text.GetString("id"), text.GetString("text"))
+
 		textElement := TextElement{
-			ID:         text.GetString("id", "unknown"),
-			Text:       text.GetString("text", ""),
-			Role:       TextRole(text.GetString("role", "paragraph")),
-			Confidence: text.GetFloat("confidence", 0.0),
+			ID:         text.GetString("id"),
+			Text:       text.GetString("text"),
+			Role:       TextRole(text.GetString("role")),
+			Confidence: text.GetFloat("confidence"),
 		}
 
 		// 安全处理边界框
