@@ -33,7 +33,7 @@ var LiteForgeExport = map[string]interface{}{
 	"image":       _withImage,
 	"imageFile":   _withImageFile,
 	"id":          _withID,
-	"context":     _withContext,
+	"context":     LiteForgeExecWithContext,
 	"verboseName": _withVerboseName,
 	"forceImage":  _withForceImage,
 }
@@ -50,7 +50,7 @@ type liteforgeConfig struct {
 	aidOptions []aid.Option
 }
 
-type liteForgeOption func(*liteforgeConfig)
+type LiteForgeExecOption func(*liteforgeConfig)
 
 // liteforge.output is an option for liteforge.Execute
 // it can limit the output of the liteforge.Execute
@@ -62,7 +62,7 @@ type liteForgeOption func(*liteforgeConfig)
 // SOME_CONTENTN
 // PROMPT, liteforge.output(jsonschema.ActionObject(jsonschema.paramString("value"))),
 // ```
-func _withOutputJSONSchema(output string) liteForgeOption {
+func _withOutputJSONSchema(output string) LiteForgeExecOption {
 	return func(cfg *liteforgeConfig) {
 		cfg.output = output
 	}
@@ -77,7 +77,7 @@ func _withOutputJSONSchema(output string) liteForgeOption {
 // SOME_CONTENT
 // PROMPT, liteforge.forceImage(true))
 // ```
-func _withForceImage(force ...bool) liteForgeOption {
+func _withForceImage(force ...bool) LiteForgeExecOption {
 	return func(cfg *liteforgeConfig) {
 		if len(force) > 0 {
 			cfg.forceImage = force[0]
@@ -96,7 +96,7 @@ func _withForceImage(force ...bool) liteForgeOption {
 // SOME_CONTENT
 // PROMPT, liteforge.action("analyze"))
 // ```
-func _withOutputAction(action string) liteForgeOption {
+func _withOutputAction(action string) LiteForgeExecOption {
 	return func(cfg *liteforgeConfig) {
 		cfg.action = action
 	}
@@ -111,7 +111,7 @@ func _withOutputAction(action string) liteForgeOption {
 // SOME_CONTENT
 // PROMPT, liteforge.imageFile("path/to/image.jpg"))
 // ```
-func _withImageFile(filename ...string) liteForgeOption {
+func _withImageFile(filename ...string) LiteForgeExecOption {
 	return func(cfg *liteforgeConfig) {
 		for _, file := range filename {
 			imgC, err := imageutils.ExtractImageFromFile(file)
@@ -139,7 +139,7 @@ func _withImageFile(filename ...string) liteForgeOption {
 // SOME_CONTENT
 // PROMPT, liteforge.image(imageData))
 // ```
-func _withImage(anyImageInput ...any) liteForgeOption {
+func _withImage(anyImageInput ...any) LiteForgeExecOption {
 	return func(cfg *liteforgeConfig) {
 		for _, anyImg := range anyImageInput {
 			for img := range imageutils.ExtractImage(anyImg) {
@@ -167,7 +167,7 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 	}
 	for _, optRaw := range opts {
 		switch opt := optRaw.(type) {
-		case liteForgeOption:
+		case LiteForgeExecOption:
 			opt(cfg)
 		case aid.Option:
 			cfg.aidOptions = append(cfg.aidOptions, opt)
@@ -208,7 +208,7 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 // SOME_CONTENT
 // PROMPT, liteforge.id("my-forge-instance"))
 // ```
-func _withID(id string) liteForgeOption {
+func _withID(id string) LiteForgeExecOption {
 	return func(cfg *liteforgeConfig) {
 		cfg.id = id
 	}
@@ -223,7 +223,7 @@ func _withID(id string) liteForgeOption {
 // SOME_CONTENT
 // PROMPT, liteforge.context(ctx))
 // ```
-func _withContext(ctx context.Context) liteForgeOption {
+func LiteForgeExecWithContext(ctx context.Context) LiteForgeExecOption {
 	return func(cfg *liteforgeConfig) {
 		cfg.ctx = ctx
 	}
@@ -238,7 +238,7 @@ func _withContext(ctx context.Context) liteForgeOption {
 // SOME_CONTENT
 // PROMPT, liteforge.verboseName("my-forge-instance"))
 // ```
-func _withVerboseName(opts ...aid.Option) liteForgeOption {
+func _withVerboseName(opts ...aid.Option) LiteForgeExecOption {
 	return func(cfg *liteforgeConfig) {
 		cfg.aidOptions = append(cfg.aidOptions, opts...)
 	}

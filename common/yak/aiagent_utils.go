@@ -69,7 +69,7 @@ func BuildLiteForgeExecOption(anyOptions ...any) []any {
 	var ag = NewAgent()
 	for _, opt := range anyOptions {
 		switch o := opt.(type) {
-		case liteForgeOption:
+		case aiforge.LiteForgeExecOption:
 			liteForgeExecOpts = append(liteForgeExecOpts, o)
 		case aid.Option:
 			extendAIDOptions = append(extendAIDOptions, o)
@@ -81,7 +81,7 @@ func BuildLiteForgeExecOption(anyOptions ...any) []any {
 		}
 	}
 	extendAIDOptions = append(ag.AIDOptions(), extendAIDOptions...)
-	liteForgeExecOpts = append(liteForgeExecOpts, _withLiteForgeCtx(ag.ctx))
+	liteForgeExecOpts = append(liteForgeExecOpts, aiforge.LiteForgeExecWithContext(ag.ctx))
 	for _, opt := range extendAIDOptions {
 		liteForgeExecOpts = append(liteForgeExecOpts, opt)
 	}
