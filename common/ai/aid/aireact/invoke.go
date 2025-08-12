@@ -49,18 +49,23 @@ func (r *ReAct) generateMainLoopPrompt(userQuery string, conversationHistory []s
 	}
 	prompt.WriteString("\n")
 
-	// Available tools
+	// Tool capabilities overview (don't list specific tools)
 	if len(tools) > 0 {
-		prompt.WriteString("# Available Tools\n")
-		for _, tool := range tools {
-			prompt.WriteString(fmt.Sprintf("- %s: %s\n", tool.Name, tool.Description))
-		}
-		prompt.WriteString("\n")
+		prompt.WriteString("# Tool System\n")
+		prompt.WriteString(fmt.Sprintf("You have access to %d built-in tools through the tool search system.\n", len(tools)))
+		prompt.WriteString("Use 'tools_search' to discover tools for any specific task you need to accomplish.\n")
+		prompt.WriteString("Tool categories include: file operations, network utilities, security testing, data processing, system commands, and more.\n\n")
+	}
+
+	// Cumulative summary (conversation memory)
+	if r.config.cumulativeSummary != "" {
+		prompt.WriteString("# Conversation Memory\n")
+		prompt.WriteString(r.config.cumulativeSummary + "\n\n")
 	}
 
 	// Conversation history
 	if len(conversationHistory) > 0 {
-		prompt.WriteString("# Conversation History\n")
+		prompt.WriteString("# Recent Conversation History\n")
 		for _, entry := range conversationHistory {
 			prompt.WriteString(entry + "\n")
 		}
@@ -80,11 +85,15 @@ func (r *ReAct) generateMainLoopPrompt(userQuery string, conversationHistory []s
 	prompt.WriteString("You are a ReAct (Reasoning and Acting) AI agent. Analyze the user query and decide what action to take.\n")
 	prompt.WriteString("IMPORTANT GUIDELINES:\n")
 	prompt.WriteString("- Check if the user's request matches any available tool names or functionality\n")
-	prompt.WriteString("- If a tool can fulfill the request (e.g., 'echo' for echoing text, 'calculator' for math), use 'require_tool'\n")
+	prompt.WriteString("- If you need to find tools for a specific task, use 'tools_search' to search available tools\n")
+	prompt.WriteString("- If a tool can fulfill the request, use 'require_tool' with the exact tool name\n")
 	prompt.WriteString("- For simple greetings like 'hello' or 'hi', use 'directly_answer'\n")
 	prompt.WriteString("- For complex multi-step tasks, use 'request_plan_and_execution'\n")
 	prompt.WriteString("- When providing direct answers, always set 'is_final_step' to true\n")
-	prompt.WriteString("- Prefer using tools when they match the user's intent\n\n")
+	prompt.WriteString("- TOOL SEARCH: You have access to 'tools_search' tool to find appropriate tools for any task\n")
+	prompt.WriteString("- Available tool categories include: file operations, network tools, security testing, data processing, and more\n")
+	prompt.WriteString("- MEMORY: Update 'cumulative_summary' to include key information from this interaction\n")
+	prompt.WriteString("- The cumulative_summary should help you remember important context for future interactions\n\n")
 	prompt.WriteString("Respond with a JSON object following the schema below:\n\n")
 
 	// Schema
@@ -239,6 +248,15 @@ func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputE
 		// Emit human readable thought
 		r.emitThought(outputChan, action.GetString("human_readable_thought"))
 
+		// Update cumulative summary for memory
+		newSummary := action.GetString("cumulative_summary")
+		if newSummary != "" {
+			r.config.cumulativeSummary = newSummary
+			if r.config.debugEvent {
+				log.Infof("Updated cumulative summary: %s", newSummary)
+			}
+		}
+
 		// Execute action based on type
 		actionType := ActionType(action.GetInvokeParams("action").GetString("type"))
 		switch actionType {
@@ -259,9 +277,15 @@ func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputE
 			r.emitInfo(outputChan, fmt.Sprintf("Requesting tool: %s", toolPayload))
 			if err := r.handleRequireTool(toolPayload, outputChan); err != nil {
 				r.emitError(outputChan, fmt.Sprintf("Tool execution failed: %v", err))
+			} else {
+				// Tool executed successfully, emit result and finish
+				r.emitResult(outputChan, fmt.Sprintf("Tool %s executed successfully", toolPayload))
+				r.config.finished = true
 			}
-			// Check if this should be the final step after tool execution
-			r.config.finished = action.GetBool("is_final_step")
+			// Also check if explicitly marked as final step
+			if action.GetBool("is_final_step") {
+				r.config.finished = true
+			}
 
 		case ActionRequestPlanExecution:
 			planPayload := action.GetInvokeParams("action").GetString("plan_request_payload")
@@ -302,7 +326,7 @@ func (r *ReAct) handleRequireTool(toolName string, outputChan chan *ypb.AIOutput
 		return utils.Errorf("tool '%s' not found: %v", toolName, err)
 	}
 
-	r.emitInfo(outputChan, fmt.Sprintf("正在准备工具: %s - %s", tool.Name, tool.Description))
+	r.emitInfo(outputChan, fmt.Sprintf("preparing tool: %s - %s", tool.Name, tool.Description))
 
 	// Generate tool call ID for tracking
 	_ = ksuid.New().String() // callToolId for future use
@@ -320,7 +344,7 @@ func (r *ReAct) handleRequireTool(toolName string, outputChan chan *ypb.AIOutput
 	var paramsErr error
 	toolConfig := aid.NewConfig(r.config.ctx)
 
-	r.emitInfo(outputChan, "正在生成工具参数...")
+	r.emitInfo(outputChan, "generating tool parameters...")
 
 	err = aid.CallAITransaction(toolConfig, paramsPrompt,
 		func(req *aid.AIRequest) (*aid.AIResponse, error) {
@@ -351,19 +375,19 @@ func (r *ReAct) handleRequireTool(toolName string, outputChan chan *ypb.AIOutput
 	}
 	paramsStr := strings.Join(paramsList, ", ")
 
-	r.emitInfo(outputChan, fmt.Sprintf("参数已生成: %s", paramsStr))
+	r.emitInfo(outputChan, fmt.Sprintf("parameters generated: %s", paramsStr))
 
 	// Execute the tool
-	r.emitInfo(outputChan, fmt.Sprintf("正在执行工具: %s", tool.Name))
+	r.emitInfo(outputChan, fmt.Sprintf("executing tool: %s", tool.Name))
 
 	result, err := tool.InvokeWithParams(toolParams)
 	if err != nil {
-		r.emitError(outputChan, fmt.Sprintf("工具执行失败: %v", err))
+		r.emitError(outputChan, fmt.Sprintf("tool execution failed: %v", err))
 		return utils.Errorf("tool execution failed: %v", err)
 	}
 
 	// Emit tool result
-	r.emitObservation(outputChan, fmt.Sprintf("工具 %s 执行完成，结果: %s", tool.Name, result.String()))
+	r.emitObservation(outputChan, fmt.Sprintf("tool %s completed, result: %s", tool.Name, result.String()))
 
 	// Add tool call to conversation history
 	r.config.conversationHistory = append(r.config.conversationHistory,

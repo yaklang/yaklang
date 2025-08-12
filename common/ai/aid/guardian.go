@@ -2,8 +2,9 @@ package aid
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/schema"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -111,7 +112,8 @@ func (a *asyncGuardian) eventloop(ch chan struct{}) {
 			}
 			a.emitEvent(result)
 		case <-a.ctx.Done():
-			log.Warn("AsyncGuardian context closed")
+
+			log.Debug("AsyncGuardian context closed")
 			return
 		}
 	}
