@@ -45,6 +45,8 @@ type ReActConfig struct {
 	cumulativeSummary   string // Cumulative summary for conversation memory
 	currentIteration    int
 	finished            bool
+	language            string // Response language preference
+	topToolsCount       int    // Number of top tools to display in prompt
 
 	// Synchronization
 	mu sync.RWMutex
@@ -161,6 +163,22 @@ func WithSystemFileOperator() Option {
 	}
 }
 
+// WithLanguage sets the response language preference
+func WithLanguage(lang string) Option {
+	return func(cfg *ReActConfig) {
+		cfg.language = lang
+	}
+}
+
+// WithTopToolsCount sets the number of top tools to display in prompt
+func WithTopToolsCount(count int) Option {
+	return func(cfg *ReActConfig) {
+		if count > 0 {
+			cfg.topToolsCount = count
+		}
+	}
+}
+
 // WithBuiltinTools adds all builtin AI tools including search capabilities
 func WithBuiltinTools() Option {
 	return func(cfg *ReActConfig) {
@@ -213,6 +231,8 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		conversationHistory: make([]string, 0),
 		currentIteration:    0,
 		finished:            false,
+		language:            "zh", // Default to Chinese
+		topToolsCount:       20,   // Default to show top 20 tools
 		outputChan:          make(chan *ypb.AIOutputEvent, 100),
 		aiToolManagerOption: make([]buildinaitools.ToolManagerOption, 0),
 	}
