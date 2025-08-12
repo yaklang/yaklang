@@ -219,6 +219,30 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 			ret.typ = member.GetType()
 			return
 		}
+	case OrTypeKind:
+		// 拆开 OrType
+		orTyp, _ := value.GetType().(*OrType)
+		var mergedTypes []Type
+		var found bool
+		for _, subTyp := range orTyp.GetTypes() {
+			// 构造一个假的 Value 但类型替换成子类型
+			fakeVal := value
+			fakeVal.SetType(subTyp)
+			subRes := checkCanMemberCallExist(fakeVal, key, function...)
+			if subRes.exist {
+				found = true
+			}
+			if !utils.IsNil(subRes.typ) {
+				mergedTypes = append(mergedTypes, subRes.typ)
+			}
+		}
+		ret.exist = found
+		if len(mergedTypes) == 1 {
+			ret.typ = mergedTypes[0]
+		} else if len(mergedTypes) > 1 {
+			ret.typ = NewOrType(mergedTypes...)
+		}
+		return ret
 	case NullTypeKind:
 	default:
 	}
