@@ -55,7 +55,7 @@ func (g *GetawayClient) ExtractData(data string, desc string, fields map[string]
 func (g *GetawayClient) newLoadOption(opt ...aispec.AIConfigOption) {
 	config := aispec.NewDefaultAIConfig(opt...)
 
-	log.Info("load option for tongyi ai")
+	log.Debug("load option for tongyi ai")
 	g.config = config
 
 	if g.config.Model == "" {
@@ -71,7 +71,7 @@ func (g *GetawayClient) LoadOption(opt ...aispec.AIConfigOption) {
 	}
 	config := aispec.NewDefaultAIConfig(opt...)
 
-	log.Info("load option for tongyi ai")
+	log.Debug("load option for tongyi ai")
 	g.config = config
 
 	if g.config.Model == "" {

@@ -2,9 +2,10 @@ package ai
 
 import (
 	"errors"
-	"github.com/yaklang/yaklang/common/ai/aibalance"
 	"io"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aibalance"
 
 	"github.com/yaklang/yaklang/common/ai/dashscopebase"
 	"github.com/yaklang/yaklang/common/ai/deepseek"
@@ -308,7 +309,7 @@ func ChatEx(details []aispec.ChatDetail, opts ...aispec.AIConfigOption) (respons
 		}
 		responseChoice, err = gateway.ChatEx(details)
 		if err != nil {
-			log.Warnf("chat by %s failed: %s", typ, err)
+			log.Debugf("chat by %s failed: %s", typ, err)
 			return false
 		}
 		return true
@@ -325,7 +326,7 @@ func StructuredStream(input string, opts ...aispec.AIConfigOption) (chan *aispec
 	tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIClient) bool {
 		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
 		if err := gateway.CheckValid(); err != nil {
-			log.Warnf("check valid by %s failed: %s", typ, err)
+			log.Debugf("check valid by %s failed: %s", typ, err)
 			return false
 		}
 
@@ -373,7 +374,7 @@ func FunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[s
 	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIClient) bool {
 		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
 		if err := gateway.CheckValid(); err != nil {
-			log.Warnf("check valid by %s failed: %s", typ, err)
+			log.Debugf("check valid by %s failed: %s", typ, err)
 			return false
 		}
 		var ok bool

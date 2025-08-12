@@ -78,7 +78,7 @@ func processStreamResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, 
 	var firstbuf = make([]byte, 1)
 	n, err := io.ReadFull(ioReader, firstbuf)
 	if n <= 0 && err != nil {
-		log.Errorf("no body read")
+		log.Debugf("no body read")
 		return
 	}
 	log.Infof("read first byte [%#v] delay: %v", string(firstbuf), time.Since(start))
@@ -187,7 +187,7 @@ func processNonStreamResponse(r []byte, closer io.ReadCloser, outWriter io.Write
 	}
 
 	if len(bodyBytes) == 0 {
-		log.Errorf("no body read")
+		log.Debugf("no body read")
 		return
 	}
 

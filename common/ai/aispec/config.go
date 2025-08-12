@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"github.com/yaklang/yaklang/common/utils/imageutils"
 	"io"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/imageutils"
 
 	"github.com/h2non/filetype"
 	"github.com/yaklang/yaklang/common/utils"
@@ -69,7 +70,7 @@ func NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
 		Timeout:                120,
 		FunctionCallRetryTimes: 5,
 		HTTPErrorHandler: func(err error) {
-			log.Errorf("ai request failed: %s", err)
+			log.Debugf("ai request failed: %s", err)
 		},
 	}
 	// 加载Type参数
