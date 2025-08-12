@@ -2,8 +2,9 @@ package aid
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/schema"
 	"io"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -37,7 +38,7 @@ func NewCoordinator(userInput string, options ...Option) (*Coordinator, error) {
 
 // NewCoordinator 创建一个新的 Coordinator
 func NewCoordinatorContext(ctx context.Context, userInput string, options ...Option) (*Coordinator, error) {
-	config := newConfig(ctx)
+	config := NewConfig(ctx)
 	for _, opt := range options {
 		err := opt(config)
 		if err != nil {

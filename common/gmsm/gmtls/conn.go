@@ -21,12 +21,13 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"net"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/gmsm/x509"
 )
@@ -1457,7 +1458,7 @@ func (c *Conn) handshakeContext(ctx context.Context) (ret error) {
 		// alert that might be left in the buffer.
 		c.flush()
 		if c.handshakeErr != io.EOF {
-			log.Warnf("gmtls-handshake error: %v", c.handshakeErr)
+			log.Debugf("gmtls-handshake error: %v", c.handshakeErr)
 		}
 	}
 

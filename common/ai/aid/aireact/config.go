@@ -100,6 +100,12 @@ func WithDebug(enabled ...bool) Option {
 		}
 		cfg.debugEvent = debugEnabled
 		cfg.debugPrompt = debugEnabled
+		// Also control global debug mode for system logs
+		if debugEnabled {
+			log.SetLevel(log.DebugLevel)
+		} else {
+			log.SetLevel(log.InfoLevel)
+		}
 	}
 }
 

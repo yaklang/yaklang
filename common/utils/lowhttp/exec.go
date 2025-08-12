@@ -928,7 +928,9 @@ RECONNECT:
 		if option != nil && option.BodyStreamReaderHandler != nil {
 			reader, writer := utils.NewBufPipe(nil)
 			defer func() {
-				log.Infof("close reader and writer")
+				utils.Debug(func() {
+					log.Infof("close reader and writer")
+				})
 				writer.Close()
 			}()
 			waitBodyStreamReaderHandledCallEnd.Add(1)

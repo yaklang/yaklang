@@ -184,19 +184,14 @@ func (r *ReAct) EmitStreamReader(nodeId string, reader io.Reader, outputChan cha
 
 // getCoordinatorId returns the coordinator ID for the ReAct instance
 func (r *ReAct) getCoordinatorId() string {
-	r.config.mu.RLock()
-	defer r.config.mu.RUnlock()
-
-	// For now, generate a simple ID. In a full implementation,
-	// this would be integrated with the coordinator system
+	// No need for lock here as we're just generating a static ID based on pointer
 	return fmt.Sprintf("react-%p", r)
 }
 
 // getTaskIndex returns the task index for the ReAct instance
 func (r *ReAct) getTaskIndex() string {
-	r.config.mu.RLock()
-	defer r.config.mu.RUnlock()
-
+	// Read currentIteration without lock since it's an atomic read of an int
+	// and we're not modifying it here
 	return fmt.Sprintf("react-task-%d", r.config.currentIteration)
 }
 

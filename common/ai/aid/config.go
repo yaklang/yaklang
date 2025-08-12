@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/jsonextractor"
-	"github.com/yaklang/yaklang/common/utils/chanx"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"math/rand/v2"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/jsonextractor"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/consts"
@@ -425,7 +426,7 @@ func (c *Config) loadToolsViaOptions() error {
 	return nil
 }
 
-func newConfig(ctx context.Context) *Config {
+func NewConfig(ctx context.Context) *Config {
 	offset := rand.Int64N(3000)
 	id := uuid.New().String()
 	return newConfigEx(ctx, id, offset)
@@ -433,7 +434,7 @@ func newConfig(ctx context.Context) *Config {
 
 func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 	var idGenerator = new(int64)
-	log.Infof("coordinator with %v offset: %v", id, offsetSeq)
+	log.Debugf("coordinator with %v offset: %v", id, offsetSeq)
 
 	if ctx == nil {
 		ctx = context.Background()
