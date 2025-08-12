@@ -280,4 +280,45 @@ if bb{
 }`
 		check(t, code, []string{"Error Unhandled ", "Error Unhandled "})
 	})
+	t.Run("map member access in complex situation", func(t *testing.T) {
+		code := `
+	# input your yak code
+println("Hello Yak World!")
+func getWays(){
+    w = infoMap["Include_Key_Word"][0]
+    results := {}
+    if w.Way {
+        if !results.Has("discard") {
+            results.discard = make(map[string][]string)
+        }
+        return results
+    }else{
+        w.Include_Key_Word_Way = w.Has("Include_Key_Word_Way") ? w.Include_Key_Word_Way : ""
+        if w.Include_Key_Word_Way == ""{
+            return results
+        }
+        if  w.Include_Key_Word_Way!="" {
+            if !results.Has("discard") {
+                results.discard = make(map[string][]string)
+            }
+            results.discard.Header = make([]string, 0)
+        }
+    }
+    
+    return results
+}
+`
+		check(t, code, []string{"Can't find definition of this variable infoMap both inside and outside the function.", "map literal not have map pairs"})
+	})
+	t.Run("simple map member access", func(t *testing.T) {
+		code := `
+results := {}
+if !results.Has("discard") {
+     results.discard = make(map[string][]string)
+}
+results.discard.Header = make([]string, 0)
+results.discard.Header = append(results.discard.Header, "1")
+`
+		check(t, code, []string{"map literal not have map pairs"})
+	})
 }
