@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -28,6 +29,13 @@ import (
 var debugMode = false
 
 func main() {
+	// Command line flags
+	var (
+		language = flag.String("lang", "zh", "Response language (zh for Chinese, en for English)")
+		query    = flag.String("query", "", "One-time query mode (exits after response)")
+	)
+	flag.Parse()
+
 	log.Info("Starting ReAct CLI Demo")
 
 	// Initialize database and configurations
@@ -99,6 +107,8 @@ func main() {
 		aireact.WithMaxThoughts(3),
 		aireact.WithMaxActions(3),
 		aireact.WithTemperature(0.7, 0.3),
+		aireact.WithLanguage(*language),
+		aireact.WithTopToolsCount(20), // Show top 20 tools
 		aireact.WithEventHandler(func(event *ypb.AIOutputEvent) {
 			// Handle output events with simplified display
 			switch event.Type {
@@ -180,6 +190,12 @@ func main() {
 		}
 	}()
 
+	// Handle one-time query mode
+	if *query != "" {
+		handleSingleQuery(*query, inputChan, responseCompleteChan, ctx)
+		return
+	}
+
 	// Interactive CLI loop
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Println("ReAct CLI ready. Enter your question (type 'exit' to quit, '/debug' to toggle debug mode):")
@@ -254,6 +270,25 @@ func main() {
 	if err := scanner.Err(); err != nil {
 		log.Errorf("Scanner error: %v", err)
 	}
+}
+
+// handleSingleQuery handles one-time query mode
+func handleSingleQuery(query string, inputChan *chanx.UnlimitedChan[*ypb.AITriageInputEvent], responseCompleteChan chan struct{}, ctx context.Context) {
+	event := &ypb.AITriageInputEvent{
+		IsFreeInput: true,
+		FreeInput:   query,
+	}
+
+	log.Infof("Processing query: %s", query)
+	inputChan.SafeFeed(event)
+
+	// Wait for response completion
+	waitForResponseCompletion(responseCompleteChan, ctx)
+
+	log.Info("Query completed, exiting...")
+
+	// Force exit after single query
+	os.Exit(0)
 }
 
 // waitForResponseCompletion waits for the AI response to complete
