@@ -49,12 +49,23 @@ func (r *ReAct) generateMainLoopPrompt(userQuery string, conversationHistory []s
 	}
 	prompt.WriteString("\n")
 
-	// Tool capabilities overview (don't list specific tools)
+	// Available tools with top N display
 	if len(tools) > 0 {
-		prompt.WriteString("# Tool System\n")
-		prompt.WriteString(fmt.Sprintf("You have access to %d built-in tools through the tool search system.\n", len(tools)))
-		prompt.WriteString("Use 'tools_search' to discover tools for any specific task you need to accomplish.\n")
-		prompt.WriteString("Tool categories include: file operations, network utilities, security testing, data processing, system commands, and more.\n\n")
+		prompt.WriteString("# Available Tools\n")
+		prompt.WriteString(fmt.Sprintf("You have access to %d built-in tools. Here are the top %d most important tools:\n\n", len(tools), r.config.topToolsCount))
+
+		// Get prioritized tool list
+		topTools := r.getPrioritizedTools(tools, r.config.topToolsCount)
+
+		for _, tool := range topTools {
+			prompt.WriteString(fmt.Sprintf("* `%s`: %s\n", tool.Name, tool.Description))
+		}
+
+		if len(tools) > len(topTools) {
+			prompt.WriteString("...\n")
+		}
+
+		prompt.WriteString("\nUse 'tools_search' to discover additional tools for specific tasks.\n\n")
 	}
 
 	// Cumulative summary (conversation memory)
@@ -80,8 +91,16 @@ func (r *ReAct) generateMainLoopPrompt(userQuery string, conversationHistory []s
 	prompt.WriteString(fmt.Sprintf("<|USER_QUERY_NONCE_%s|>\n", nonce))
 	prompt.WriteString("\n")
 
-	// Instructions
+	// Instructions with language preference
 	prompt.WriteString("# Instructions\n")
+
+	// Language instruction
+	if r.config.language == "zh" {
+		prompt.WriteString("LANGUAGE: Please respond in Chinese (中文) unless specifically asked otherwise.\n")
+	} else {
+		prompt.WriteString("LANGUAGE: Please respond in English unless specifically asked otherwise.\n")
+	}
+
 	prompt.WriteString("You are a ReAct (Reasoning and Acting) AI agent. Analyze the user query and decide what action to take.\n")
 	prompt.WriteString("IMPORTANT GUIDELINES:\n")
 	prompt.WriteString("- Check if the user's request matches any available tool names or functionality\n")
@@ -432,6 +451,61 @@ func (r *ReAct) generateToolParamsPrompt(tool *aitool.Tool) string {
 	prompt.WriteString("Example: {\"param1\": \"value1\", \"param2\": \"value2\"}\n")
 
 	return prompt.String()
+}
+
+// getPrioritizedTools returns a prioritized list of tools, with search tools first
+func (r *ReAct) getPrioritizedTools(tools []*aitool.Tool, maxCount int) []*aitool.Tool {
+	if len(tools) == 0 {
+		return tools
+	}
+
+	// Priority tool names (tools_search should be first)
+	priorityNames := []string{
+		"tools_search",
+		"now",
+		"bash",
+		"read_file_lines",
+		"grep",
+		"find_file",
+		"send_http_request_by_url",
+		"whois",
+		"dig",
+		"scan_tcp_port",
+		"encode",
+		"decode",
+		"auto_decode",
+		"current_time",
+		"echo",
+	}
+
+	// Create map for quick lookup
+	toolMap := make(map[string]*aitool.Tool)
+	for _, tool := range tools {
+		toolMap[tool.Name] = tool
+	}
+
+	var result []*aitool.Tool
+	usedNames := make(map[string]bool)
+
+	// Add priority tools first
+	for _, name := range priorityNames {
+		if tool, exists := toolMap[name]; exists && len(result) < maxCount {
+			result = append(result, tool)
+			usedNames[name] = true
+		}
+	}
+
+	// Add remaining tools if we haven't reached maxCount
+	for _, tool := range tools {
+		if len(result) >= maxCount {
+			break
+		}
+		if !usedNames[tool.Name] {
+			result = append(result, tool)
+		}
+	}
+
+	return result
 }
 
 // parseToolParams parses tool parameters from AI response
