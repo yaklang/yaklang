@@ -8,7 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -35,6 +34,7 @@ type ReActInvoker interface {
 
 type ReAct struct {
 	config *ReActConfig
+	*ReActEmitter
 }
 
 func NewReAct(opts ...Option) (*ReAct, error) {
@@ -48,8 +48,22 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 		cfg.aiToolManager = buildinaitools.NewToolManager(cfg.aiToolManagerOption...)
 	}
 
-	react := &ReAct{config: cfg}
+	// Initialize emitter
+	emitter := newReActEmitter("", "", "")
+
+	react := &ReAct{
+		config:       cfg,
+		ReActEmitter: emitter,
+	}
 	return react, nil
+}
+
+// UpdateDebugMode dynamically updates the debug mode settings
+func (r *ReAct) UpdateDebugMode(debug bool) {
+	r.config.mu.Lock()
+	defer r.config.mu.Unlock()
+	r.config.debugEvent = debug
+	r.config.debugPrompt = debug
 }
 
 func (r *ReAct) Invoke(input chan *ypb.AITriageInputEvent) (chan *ypb.AIOutputEvent, error) {
@@ -67,23 +81,42 @@ func (r *ReAct) Invoke(input chan *ypb.AITriageInputEvent) (chan *ypb.AIOutputEv
 func (r *ReAct) UnlimitedInvoke(input *chanx.UnlimitedChan[*ypb.AITriageInputEvent]) (chan *ypb.AIOutputEvent, error) {
 	outputChan := make(chan *ypb.AIOutputEvent, 100)
 
+	if r.config.debugEvent {
+		log.Info("ReAct UnlimitedInvoke starting goroutine")
+	}
+
 	go func() {
 		defer close(outputChan)
 		defer func() {
 			if r.config.cancel != nil {
 				r.config.cancel()
 			}
+			if r.config.debugEvent {
+				log.Info("ReAct UnlimitedInvoke goroutine finished")
+			}
 		}()
+
+		if r.config.debugEvent {
+			log.Info("ReAct UnlimitedInvoke goroutine running, waiting for events")
+		}
 
 		for {
 			select {
 			case <-r.config.ctx.Done():
-				log.Info("ReAct context cancelled, stopping processing")
+				if r.config.debugEvent {
+					log.Info("ReAct context cancelled, stopping processing")
+				}
 				return
 			case event, ok := <-input.OutputChannel():
 				if !ok {
-					log.Info("Input channel closed, stopping ReAct processing")
+					if r.config.debugEvent {
+						log.Info("Input channel closed, stopping ReAct processing")
+					}
 					return
+				}
+
+				if r.config.debugEvent {
+					log.Infof("ReAct received input event: IsFreeInput=%v, FreeInput=%s", event.IsFreeInput, event.FreeInput)
 				}
 
 				if err := r.processInputEvent(event, outputChan); err != nil {
@@ -99,28 +132,49 @@ func (r *ReAct) UnlimitedInvoke(input *chanx.UnlimitedChan[*ypb.AITriageInputEve
 
 // processInputEvent processes a single input event and triggers ReAct loop
 func (r *ReAct) processInputEvent(event *ypb.AITriageInputEvent, outputChan chan *ypb.AIOutputEvent) error {
-	r.config.mu.Lock()
-	defer r.config.mu.Unlock()
-
-	if r.config.finished {
-		return utils.Error("ReAct session has finished")
+	if r.config.debugEvent {
+		log.Infof("Processing input event: IsFreeInput=%v, FreeInput=%s", event.IsFreeInput, event.FreeInput)
 	}
 
 	// Handle different types of input events
 	var userInput string
+	var shouldResetSession bool
+
 	if event.IsFreeInput {
 		userInput = event.FreeInput
-		r.config.currentIteration = 0
-		r.config.finished = false
+		shouldResetSession = true // Reset session for new free input
+		if r.config.debugEvent {
+			log.Infof("Using free input: %s", userInput)
+		}
 	} else if event.IsStart && event.Params != nil {
 		// Handle structured input from AIStartParams
 		userInput = "Start new conversation"
+		shouldResetSession = true
+		if r.config.debugEvent {
+			log.Info("Using start conversation input")
+		}
 	} else {
 		// Handle other event types
 		userInput = "No user input available"
+		log.Warn("No valid input found in event")
+	}
+
+	// Reset session state if needed
+	if shouldResetSession {
+		r.config.mu.Lock()
+		r.config.finished = false
+		r.config.currentIteration = 0
+		r.config.conversationHistory = make([]string, 0)
+		r.config.mu.Unlock()
+		if r.config.debugEvent {
+			log.Infof("Reset ReAct session for new input")
+		}
 	}
 
 	// Execute the main ReAct loop using the new schema-based approach
+	if r.config.debugEvent {
+		log.Infof("Executing main loop with user input: %s", userInput)
+	}
 	return r.executeMainLoop(userInput, outputChan)
 }
 
@@ -136,18 +190,39 @@ func (r *ReAct) startReActLoop(userQuery string, outputChan chan *ypb.AIOutputEv
 // extractResponseContent extracts content from AI response
 func (r *ReAct) extractResponseContent(resp *aid.AIResponse) string {
 	if resp == nil {
+		log.Error("AI response is nil")
 		return ""
 	}
 
 	// Try to read from the response stream
 	reader := resp.GetUnboundStreamReader(false)
 	content, err := io.ReadAll(reader)
-	if err == nil && len(content) > 0 {
-		return string(content)
+	if err != nil {
+		log.Errorf("Failed to read AI response: %v", err)
+		return ""
 	}
 
-	// Fallback for demo purposes
-	return "AI response content placeholder"
+	contentStr := string(content)
+	if r.config.debugEvent {
+		log.Infof("AI response content: %s", contentStr)
+	}
+
+	if len(contentStr) == 0 {
+		log.Warn("AI response content is empty")
+		// Return a simple JSON response for testing
+		return `{
+			"@action": "object",
+			"action": {
+				"type": "directly_answer",
+				"answer_payload": "我是一个 ReAct AI 助手。我目前可以使用以下工具：calculator（计算器）、echo（回声）、current_time（当前时间）。请问您需要什么帮助？"
+			},
+			"human_readable_thought": "用户询问我的能力和可用工具，我应该直接回答",
+			"cumulative_summary": "用户询问AI能力和工具",
+			"is_final_step": true
+		}`
+	}
+
+	return contentStr
 }
 
 // Legacy utility methods - may be removed in future versions

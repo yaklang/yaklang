@@ -3,12 +3,13 @@ package aid
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestMemoryTimelineOrdinary(t *testing.T) {
@@ -44,7 +45,7 @@ func (m *mockedAI) callAI(req *AIRequest) (*AIResponse, error) {
 
 func TestMemoryTimelineWithSummary(t *testing.T) {
 	memoryTimeline := newMemoryTimeline(3, &mockedAI{})
-	memoryTimeline.BindConfig(newConfig(context.Background()))
+	memoryTimeline.BindConfig(NewConfig(context.Background()))
 	memoryTimeline.setTimelineLimit(3)
 	for i := 1; i <= 10; i++ {
 		memoryTimeline.PushToolResult(&aitool.ToolResult{
@@ -91,7 +92,7 @@ func TestMemoryTimelineWithReachLimitSummary(t *testing.T) {
 	memoryTimeline := newMemoryTimeline(2, &mockedAI2{
 		hCompressTime: new(int64),
 	})
-	memoryTimeline.BindConfig(newConfig(context.Background()))
+	memoryTimeline.BindConfig(NewConfig(context.Background()))
 	memoryTimeline.setTimelineLimit(2)
 	for i := 1; i <= 20; i++ {
 		memoryTimeline.PushToolResult(&aitool.ToolResult{

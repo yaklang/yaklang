@@ -179,7 +179,7 @@ func (c *Client) ExtractData(data string, desc string, fields map[string]any) (m
 func (c *Client) LoadOption(opt ...aispec.AIConfigOption) {
 	config := aispec.NewDefaultAIConfig(opt...)
 
-	log.Info("load option for comate ai")
+	log.Debug("load option for comate ai")
 	c.config = config
 
 	if c.config.Model == "" {
