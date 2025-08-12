@@ -11,15 +11,16 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/chanx"
+	_ "github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -66,6 +67,8 @@ func main() {
 
 		// The database initialization has already loaded API keys into environment variables
 		// so ai.Chat will automatically find and use them
+		// Add a longer timeout for complex ReAct processing
+		opts = append(opts, aispec.WithTimeout(180)) // 3 minutes timeout for AI requests
 		return ai.Chat(msg, opts...)
 	})
 
@@ -97,44 +100,43 @@ func main() {
 		aireact.WithMaxActions(3),
 		aireact.WithTemperature(0.7, 0.3),
 		aireact.WithEventHandler(func(event *ypb.AIOutputEvent) {
-			// Handle output events with enhanced streaming display
+			// Handle output events with simplified display
 			switch event.Type {
 			case "react_thought":
-				// Display thinking process with typewriter effect
-				fmt.Print("💭 ")
-				typewriterPrint(string(event.Content))
-				fmt.Println()
+				// Display thinking process
+				fmt.Printf("[think]: %s\n", string(event.Content))
 			case "react_action":
-				fmt.Printf("🔧 %s\n", string(event.Content))
+				fmt.Printf("[action]: %s\n", string(event.Content))
 			case "react_observation":
-				fmt.Printf("👀 %s\n", string(event.Content))
+				fmt.Printf("[observe]: %s\n", string(event.Content))
 			case "react_result":
-				fmt.Printf("✅ 完成: %s\n", extractResultContent(string(event.Content)))
+				fmt.Printf("[result]: %s\n", extractResultContent(string(event.Content)))
+				fmt.Printf("[ai]: final message for current loop\n")
 			case "react_error":
-				fmt.Printf("❌ 错误: %s\n", string(event.Content))
+				fmt.Printf("[error]: %s\n", string(event.Content))
 			case "react_info":
 				if debugMode {
-					fmt.Printf("ℹ️  %s\n", string(event.Content))
+					fmt.Printf("[info]: %s\n", string(event.Content))
 				} else {
 					// Show important info messages even in non-debug mode
 					content := string(event.Content)
-					if strings.Contains(content, "正在") || strings.Contains(content, "准备") ||
-						strings.Contains(content, "生成") || strings.Contains(content, "执行") {
-						fmt.Printf("ℹ️  %s\n", content)
+					if strings.Contains(content, "preparing") || strings.Contains(content, "generating") ||
+						strings.Contains(content, "executing") || strings.Contains(content, "tool") {
+						fmt.Printf("[info]: %s\n", content)
 					}
 				}
 			case "react_iteration":
 				if debugMode {
-					fmt.Printf("🔄 %s\n", string(event.Content))
+					fmt.Printf("[iteration]: %s\n", string(event.Content))
 				}
 			default:
 				if debugMode {
-					fmt.Printf("[%s] %s\n", strings.ToUpper(event.Type), string(event.Content))
+					fmt.Printf("[%s]: %s\n", strings.ToLower(event.Type), string(event.Content))
 				}
 			}
 		}),
-		// Add some basic tools
-		aireact.WithTools(createBasicTools()...),
+		// Use buildinaitools system instead of hardcoded tools
+		aireact.WithBuiltinTools(),
 	)
 	if err != nil {
 		log.Errorf("Failed to create ReAct instance: %v", err)
@@ -151,7 +153,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Start output handler that properly drains the channel
+	// Channel for signaling response completion
+	responseCompleteChan := make(chan struct{}, 1)
+
+	// Start output handler that properly drains the channel and detects completion
 	outputDone := make(chan struct{})
 	go func() {
 		defer close(outputDone)
@@ -161,7 +166,14 @@ func main() {
 				if !ok {
 					return
 				}
-				_ = event // Events are handled by the event handler
+				// Check for completion events before they're processed by event handler
+				if event.Type == "react_result" || event.Type == "react_error" {
+					select {
+					case responseCompleteChan <- struct{}{}:
+					default: // Don't block if channel is full
+					}
+				}
+				// Events are handled by the event handler configured in ReAct
 			case <-ctx.Done():
 				return
 			}
@@ -170,7 +182,7 @@ func main() {
 
 	// Interactive CLI loop
 	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Println("ReAct CLI 已就绪。输入您的问题 (输入 'exit' 退出，'/debug' 切换调试模式):")
+	fmt.Println("ReAct CLI ready. Enter your question (type 'exit' to quit, '/debug' to toggle debug mode):")
 	fmt.Print("> ")
 
 	for scanner.Scan() {
@@ -201,10 +213,10 @@ func main() {
 		if input == "/debug" {
 			debugMode = !debugMode
 			if debugMode {
-				fmt.Println("🐛 调试模式已开启")
+				fmt.Println("[debug]: enabled")
 				log.SetLevel(log.DebugLevel)
 			} else {
-				fmt.Println("🐛 调试模式已关闭")
+				fmt.Println("[debug]: disabled")
 				log.SetLevel(log.InfoLevel)
 			}
 			// Update ReAct debug settings
@@ -224,7 +236,7 @@ func main() {
 			FreeInput:   input,
 		}
 
-		fmt.Print("🤔 处理中")
+		fmt.Print("[processing]")
 
 		// Show activity spinner while waiting
 		go showActivitySpinner()
@@ -232,7 +244,7 @@ func main() {
 		inputChan.SafeFeed(event)
 
 		// Wait for the response to complete before showing next prompt
-		waitForResponseCompletion(outputChan, ctx)
+		waitForResponseCompletion(responseCompleteChan, ctx)
 
 		// Stop spinner and show next prompt
 		stopActivitySpinner()
@@ -245,29 +257,16 @@ func main() {
 }
 
 // waitForResponseCompletion waits for the AI response to complete
-func waitForResponseCompletion(outputChan chan *ypb.AIOutputEvent, ctx context.Context) {
-	responseCompleted := false
-
-	for !responseCompleted {
-		select {
-		case <-ctx.Done():
-			return
-		case event, ok := <-outputChan:
-			if !ok {
-				return // Channel closed
-			}
-
-			// Check if this indicates the response is complete
-			switch event.Type {
-			case "react_result":
-				responseCompleted = true
-			case "react_error":
-				responseCompleted = true
-			}
-		case <-time.After(30 * time.Second): // Timeout after 30 seconds
-			fmt.Println("\n⚠️  响应超时，请重试")
-			responseCompleted = true
-		}
+func waitForResponseCompletion(responseCompleteChan chan struct{}, ctx context.Context) {
+	select {
+	case <-ctx.Done():
+		return
+	case <-responseCompleteChan:
+		// Response completed successfully
+		return
+	case <-time.After(200 * time.Second): // Timeout after 200 seconds (longer than AI timeout of 180s)
+		fmt.Println("\n[timeout]: response timeout, please retry")
+		return
 	}
 }
 
@@ -321,27 +320,64 @@ func showRawStreamOutput(reader io.Reader) {
 		streamDisplayed = true
 		streamStartTime = time.Now()
 		streamCharCount = 0
-		fmt.Print("【流式输出】")
+		fmt.Print("[stream]: ")
 	}
 	streamingMutex.Unlock()
 
-	buffer := make([]byte, 1)
+	const maxDisplayWidth = 60 // Maximum display width
+	var displayBuffer []rune   // Buffer to store display content
+	var byteBuffer []byte      // Buffer to accumulate bytes for UTF-8 decoding
+
+	buffer := make([]byte, 1024) // Read larger chunks for better UTF-8 handling
 	for {
 		n, err := reader.Read(buffer)
 		if n > 0 {
-			char := string(buffer[:n])
 			streamingMutex.Lock()
-			streamCharCount++
+			streamCharCount += n
 
-			// Control display: only show first 80 chars, then show dots
-			if streamCharCount <= 80 {
-				// Filter out newlines and control characters for compact display
-				if char != "\n" && char != "\r" && char != "\t" {
-					fmt.Print(char)
+			// Append to byte buffer
+			byteBuffer = append(byteBuffer, buffer[:n]...)
+
+			// Find the last complete UTF-8 character boundary
+			validEnd := len(byteBuffer)
+			for validEnd > 0 {
+				if utf8.ValidString(string(byteBuffer[:validEnd])) {
+					break
 				}
-			} else if streamCharCount == 81 {
-				fmt.Print("...")
+				validEnd--
 			}
+
+			if validEnd > 0 {
+				// Convert valid UTF-8 bytes to string
+				text := string(byteBuffer[:validEnd])
+
+				// Filter out control characters and add to display buffer
+				for _, r := range text {
+					if r != '\n' && r != '\r' && r != '\t' && r != '\x00' {
+						displayBuffer = append(displayBuffer, r)
+					}
+				}
+
+				// Keep remaining incomplete bytes for next iteration
+				byteBuffer = byteBuffer[validEnd:]
+
+				// Implement scrolling marquee effect
+				if len(displayBuffer) > maxDisplayWidth {
+					// Keep only the last maxDisplayWidth characters
+					displayBuffer = displayBuffer[len(displayBuffer)-maxDisplayWidth:]
+				}
+
+				// Clear current line and redraw
+				fmt.Print("\r[stream]: ")
+				fmt.Print(string(displayBuffer))
+
+				// Add padding to clear any remaining characters
+				padding := maxDisplayWidth - len(displayBuffer)
+				if padding > 0 {
+					fmt.Print(strings.Repeat(" ", padding))
+				}
+			}
+
 			streamingMutex.Unlock()
 		}
 		if err != nil {
@@ -352,16 +388,18 @@ func showRawStreamOutput(reader io.Reader) {
 	streamingMutex.Lock()
 	streamingActive = false
 	elapsed := time.Since(streamStartTime)
-	fmt.Printf(" [%d字符, %.1fs] ✓\n", streamCharCount, elapsed.Seconds())
+	// Clear the line completely before showing final message
+	fmt.Print("\r" + strings.Repeat(" ", maxDisplayWidth+20) + "\r")
+	fmt.Printf("[stream]: [%d chars, %.1fs] done\n", streamCharCount, elapsed.Seconds())
 	streamingMutex.Unlock()
 }
 
 // showReasonStreamOutput displays reasoning stream
 func showReasonStreamOutput(reader io.Reader) {
 	if debugMode {
-		fmt.Print("\n【推理流】")
+		fmt.Print("\n[reasoning]: ")
 		io.Copy(os.Stdout, reader)
-		fmt.Print(" ✓\n")
+		fmt.Print(" done\n")
 	}
 }
 
@@ -386,7 +424,7 @@ func showActivitySpinner() {
 			spinnerMutex.Unlock()
 			return
 		default:
-			fmt.Printf("\r🤔 处理中 %s", spinners[i%len(spinners)])
+			fmt.Printf("\r[processing] %s", spinners[i%len(spinners)])
 			i++
 			time.Sleep(100 * time.Millisecond)
 		}
@@ -424,74 +462,6 @@ func typewriterPrint(text string) {
 	}
 }
 
-// createBasicTools creates some basic tools for demonstration
-func createBasicTools() []*aitool.Tool {
-	tools := make([]*aitool.Tool, 0)
-
-	// Simple calculator tool
-	calculatorTool, err := aitool.New(
-		"calculator",
-		aitool.WithDescription("Performs basic arithmetic calculations"),
-		aitool.WithStringParam("input",
-			aitool.WithParam_Description("Mathematical expression to calculate"),
-			aitool.WithParam_Required(true),
-		),
-		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
-			expression := params.GetString("input")
-			if expression == "" {
-				return "Please provide a mathematical expression", nil
-			}
-
-			// Simple calculator logic (for demo purposes)
-			// In a real implementation, you'd use a proper expression evaluator
-			log.Infof("Calculator received: %s", expression)
-			return fmt.Sprintf("Calculated result for '%s': [This is a demo response]", expression), nil
-		}),
-	)
-	if err == nil {
-		tools = append(tools, calculatorTool)
-	}
-
-	// Echo tool for testing
-	echoTool, err := aitool.New(
-		"echo",
-		aitool.WithDescription("Echoes back the input text"),
-		aitool.WithStringParam("input",
-			aitool.WithParam_Description("Text to echo back"),
-			aitool.WithParam_Required(true),
-		),
-		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
-			input := params.GetString("input")
-			return fmt.Sprintf("Echo: %s", input), nil
-		}),
-	)
-	if err == nil {
-		tools = append(tools, echoTool)
-	}
-
-	// Time tool
-	timeTool, err := aitool.New(
-		"current_time",
-		aitool.WithDescription("Gets the current date and time"),
-		aitool.WithStringParam("format",
-			aitool.WithParam_Description("Time format (optional)"),
-			aitool.WithParam_Required(false),
-		),
-		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
-			format := params.GetString("format")
-			if format == "" {
-				format = "2006-01-02 15:04:05"
-			}
-			return fmt.Sprintf("Current time: %s", time.Now().Format(format)), nil
-		}),
-	)
-	if err == nil {
-		tools = append(tools, timeTool)
-	}
-
-	return tools
-}
-
 // initializeDatabase initializes the Yakit database and configurations
 func initializeDatabase() error {
 	log.Info("Initializing Yakit database and configurations...")
@@ -512,22 +482,6 @@ func initializeDatabase() error {
 		return err
 	}
 
-	// Load AI provider configurations from database
-	err = loadAIProvidersFromDatabase()
-	if err != nil {
-		log.Warnf("Failed to load AI providers from database: %v", err)
-		// Don't return error, continue with default AI configuration
-	}
-
 	log.Info("Database and configurations initialized successfully")
-	return nil
-}
-
-// loadAIProvidersFromDatabase loads AI provider configurations from yakit database
-func loadAIProvidersFromDatabase() error {
-	log.Info("AI provider configurations will be loaded automatically from database")
-	// The yakit.CallPostInitDatabase() function has already loaded API keys
-	// and other configurations into environment variables
-	// AI gateways will automatically pick them up when making requests
 	return nil
 }

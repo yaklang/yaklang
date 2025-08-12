@@ -2,11 +2,15 @@ package aireact
 
 import (
 	"context"
+	"io"
+	"strings"
 	"sync"
 
+	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -38,6 +42,7 @@ type ReActConfig struct {
 
 	// Memory and state
 	conversationHistory []string
+	cumulativeSummary   string // Cumulative summary for conversation memory
 	currentIteration    int
 	finished            bool
 
@@ -153,6 +158,39 @@ func WithSystemFileOperator() Option {
 	return func(cfg *ReActConfig) {
 		// This will be populated when we import the necessary tools
 		log.Info("System file operator tools will be added")
+	}
+}
+
+// WithBuiltinTools adds all builtin AI tools including search capabilities
+func WithBuiltinTools() Option {
+	return func(cfg *ReActConfig) {
+		if cfg.aiToolManagerOption == nil {
+			cfg.aiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
+		}
+
+		// Get all builtin tools
+		allTools := buildinaitools.GetAllTools()
+
+		// Create a simple AI chat function for the searcher
+		aiChatFunc := func(prompt string) (io.Reader, error) {
+			response, err := ai.Chat(prompt)
+			if err != nil {
+				return nil, err
+			}
+			return strings.NewReader(response), nil
+		}
+
+		// Create keyword searcher
+		keywordSearcher := searchtools.NewKeyWordSearcher[*aitool.Tool](aiChatFunc)
+
+		// Enable tool search functionality
+		cfg.aiToolManagerOption = append(cfg.aiToolManagerOption,
+			buildinaitools.WithExtendTools(allTools, true),
+			buildinaitools.WithSearchEnabled(true),
+			buildinaitools.WithSearcher(keywordSearcher),
+		)
+
+		log.Infof("Added %d builtin AI tools with search capability", len(allTools))
 	}
 }
 

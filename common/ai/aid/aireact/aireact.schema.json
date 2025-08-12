@@ -42,7 +42,7 @@
         "type": "object"
       },
       "cumulative_summary": {
-        "description": "This is an evolving summary of what has already happened in the conversation. Use this provided information to understand the full context. You should treat this as a read-only reference from the system.",
+        "description": "An evolving summary of the conversation. Update this field to include key information from the current interaction that should be remembered for future responses. Include topics discussed, user preferences, important context, and relevant details. If this is the first interaction, create a new summary. If there's existing context, build upon it.",
         "type": "string"
       },
       "human_readable_thought": {
