@@ -50019,14 +50019,19 @@ type SyntaxFlowScanTask struct {
 	Config     *SyntaxFlowScanRequest `protobuf:"bytes,14,opt,name=Config,proto3" json:"Config,omitempty"`
 	Kind       string                 `protobuf:"bytes,15,opt,name=Kind,proto3" json:"Kind,omitempty"` // "debug" | "scan"
 	// diff
-	NewRiskCount  int64 `protobuf:"varint,16,opt,name=NewRiskCount,proto3" json:"NewRiskCount,omitempty"`
-	InfoCount     int64 `protobuf:"varint,17,opt,name=InfoCount,proto3" json:"InfoCount,omitempty"`
-	LowCount      int64 `protobuf:"varint,18,opt,name=LowCount,proto3" json:"LowCount,omitempty"`
-	WarningCount  int64 `protobuf:"varint,19,opt,name=WarningCount,proto3" json:"WarningCount,omitempty"`
-	CriticalCount int64 `protobuf:"varint,20,opt,name=CriticalCount,proto3" json:"CriticalCount,omitempty"`
-	HighCount     int64 `protobuf:"varint,21,opt,name=HighCount,proto3" json:"HighCount,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	NewRiskCount     int64 `protobuf:"varint,16,opt,name=NewRiskCount,proto3" json:"NewRiskCount,omitempty"`
+	InfoCount        int64 `protobuf:"varint,17,opt,name=InfoCount,proto3" json:"InfoCount,omitempty"`
+	LowCount         int64 `protobuf:"varint,18,opt,name=LowCount,proto3" json:"LowCount,omitempty"`
+	WarningCount     int64 `protobuf:"varint,19,opt,name=WarningCount,proto3" json:"WarningCount,omitempty"`
+	CriticalCount    int64 `protobuf:"varint,20,opt,name=CriticalCount,proto3" json:"CriticalCount,omitempty"`
+	HighCount        int64 `protobuf:"varint,21,opt,name=HighCount,proto3" json:"HighCount,omitempty"`
+	NewInfoCount     int64 `protobuf:"varint,22,opt,name=NewInfoCount,proto3" json:"NewInfoCount,omitempty"`
+	NewLowCount      int64 `protobuf:"varint,23,opt,name=NewLowCount,proto3" json:"NewLowCount,omitempty"`
+	NewWarningCount  int64 `protobuf:"varint,24,opt,name=NewWarningCount,proto3" json:"NewWarningCount,omitempty"`
+	NewCriticalCount int64 `protobuf:"varint,25,opt,name=NewCriticalCount,proto3" json:"NewCriticalCount,omitempty"`
+	NewHighCount     int64 `protobuf:"varint,26,opt,name=NewHighCount,proto3" json:"NewHighCount,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *SyntaxFlowScanTask) Reset() {
@@ -50202,6 +50207,41 @@ func (x *SyntaxFlowScanTask) GetCriticalCount() int64 {
 func (x *SyntaxFlowScanTask) GetHighCount() int64 {
 	if x != nil {
 		return x.HighCount
+	}
+	return 0
+}
+
+func (x *SyntaxFlowScanTask) GetNewInfoCount() int64 {
+	if x != nil {
+		return x.NewInfoCount
+	}
+	return 0
+}
+
+func (x *SyntaxFlowScanTask) GetNewLowCount() int64 {
+	if x != nil {
+		return x.NewLowCount
+	}
+	return 0
+}
+
+func (x *SyntaxFlowScanTask) GetNewWarningCount() int64 {
+	if x != nil {
+		return x.NewWarningCount
+	}
+	return 0
+}
+
+func (x *SyntaxFlowScanTask) GetNewCriticalCount() int64 {
+	if x != nil {
+		return x.NewCriticalCount
+	}
+	return 0
+}
+
+func (x *SyntaxFlowScanTask) GetNewHighCount() int64 {
+	if x != nil {
+		return x.NewHighCount
 	}
 	return 0
 }
@@ -61151,7 +61191,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12+\n" +
 	"\x04Data\x18\x02 \x03(\v2\x17.ypb.SyntaxFlowScanTaskR\x04Data\x12\x14\n" +
-	"\x05Total\x18\x03 \x01(\x03R\x05Total\"\x92\x05\n" +
+	"\x05Total\x18\x03 \x01(\x03R\x05Total\"\xd2\x06\n" +
 	"\x12SyntaxFlowScanTask\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x04R\x02Id\x12\x1c\n" +
 	"\tCreatedAt\x18\x02 \x01(\x03R\tCreatedAt\x12\x1c\n" +
@@ -61176,7 +61216,12 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bLowCount\x18\x12 \x01(\x03R\bLowCount\x12\"\n" +
 	"\fWarningCount\x18\x13 \x01(\x03R\fWarningCount\x12$\n" +
 	"\rCriticalCount\x18\x14 \x01(\x03R\rCriticalCount\x12\x1c\n" +
-	"\tHighCount\x18\x15 \x01(\x03R\tHighCount\"v\n" +
+	"\tHighCount\x18\x15 \x01(\x03R\tHighCount\x12\"\n" +
+	"\fNewInfoCount\x18\x16 \x01(\x03R\fNewInfoCount\x12 \n" +
+	"\vNewLowCount\x18\x17 \x01(\x03R\vNewLowCount\x12(\n" +
+	"\x0fNewWarningCount\x18\x18 \x01(\x03R\x0fNewWarningCount\x12*\n" +
+	"\x10NewCriticalCount\x18\x19 \x01(\x03R\x10NewCriticalCount\x12\"\n" +
+	"\fNewHighCount\x18\x1a \x01(\x03R\fNewHighCount\"v\n" +
 	"\x1fDeleteSyntaxFlowScanTaskRequest\x12\x1c\n" +
 	"\tDeleteAll\x18\x01 \x01(\bR\tDeleteAll\x125\n" +
 	"\x06Filter\x18\x02 \x01(\v2\x1d.ypb.SyntaxFlowScanTaskFilterR\x06Filter\"\xf3\x01\n" +
