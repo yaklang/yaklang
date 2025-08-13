@@ -6,7 +6,7 @@ import (
 
 func TestTagsSupport(t *testing.T) {
 	// 创建一个Manager进行测试
-	manager, err := NewManager("/tmp/test_install")
+	manager, err := NewManager("", "/tmp/test_install")
 	if err != nil {
 		t.Fatalf("创建manager失败: %v", err)
 	}
