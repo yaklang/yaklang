@@ -115,7 +115,7 @@ func (r *ReAct) parseToolParamsWithValidation(response string, tool *aitool.Tool
 	if err == nil {
 		// If we found a proper @action structure, extract params from it
 		params := action.GetInvokeParams("params")
-		if params != nil && len(params) > 0 {
+		if len(params) > 0 {
 			// Validate parameters against tool schema if available
 			if validationErr := r.validateToolParams(params, tool); validationErr != nil {
 				return nil, utils.Errorf("parameter validation failed: %v", validationErr)
@@ -203,12 +203,38 @@ func (r *ReAct) generateToolParamsPrompt(tool *aitool.Tool) string {
 		prompt.WriteString("\n```\n\n")
 	}
 
+	// Extract context data - NOTE: This method should be called when the caller already holds the lock
+	// or when lock is not needed (data is passed as parameters)
+	originalQuery := r.extractOriginalUserQueryUnsafe()
+	cumulativeSummary := r.config.cumulativeSummary
+	currentIteration := r.config.currentIteration
+	maxIterations := r.config.maxIterations
+	conversationHistory := make([]string, len(r.config.conversationHistory))
+	copy(conversationHistory, r.config.conversationHistory)
+
+	// Original user query for context
+	if originalQuery != "" {
+		prompt.WriteString("# Original User Query\n")
+		prompt.WriteString(fmt.Sprintf("User's original request: %s\n\n", originalQuery))
+	}
+
+	// Cumulative summary for overall context and memory
+	if cumulativeSummary != "" {
+		prompt.WriteString("# Task Context & Memory\n")
+		prompt.WriteString(fmt.Sprintf("Overall task context: %s\n\n", cumulativeSummary))
+	}
+
+	// Current task progress
+	prompt.WriteString("# Task Progress\n")
+	prompt.WriteString(fmt.Sprintf("Current iteration: %d/%d\n", currentIteration, maxIterations))
+	prompt.WriteString("This tool call is part of a multi-step ReAct process. Consider how this tool execution contributes to completing the overall user task.\n\n")
+
 	// Recent conversation context
-	if len(r.config.conversationHistory) > 0 {
-		prompt.WriteString("Recent Conversation:\n")
-		recentHistory := r.config.conversationHistory
-		if len(recentHistory) > 5 {
-			recentHistory = recentHistory[len(recentHistory)-5:]
+	if len(conversationHistory) > 0 {
+		prompt.WriteString("# Recent Conversation\n")
+		recentHistory := conversationHistory
+		if len(recentHistory) > 8 {
+			recentHistory = recentHistory[len(recentHistory)-8:]
 		}
 		for _, entry := range recentHistory {
 			prompt.WriteString(entry + "\n")
@@ -216,9 +242,16 @@ func (r *ReAct) generateToolParamsPrompt(tool *aitool.Tool) string {
 		prompt.WriteString("\n")
 	}
 
-	// Enhanced instructions for parameter generation
-	prompt.WriteString("Generate appropriate parameters for this tool call.\n")
-	prompt.WriteString("IMPORTANT: Respond with a JSON object following the @action pattern:\n\n")
+	// Enhanced instructions for parameter generation with task completion context
+	prompt.WriteString("# Instructions\n")
+	prompt.WriteString("Generate appropriate parameters for this tool call based on the context above.\n\n")
+	prompt.WriteString("IMPORTANT CONSIDERATIONS:\n")
+	prompt.WriteString("- Consider the original user query and overall task context when generating parameters\n")
+	prompt.WriteString("- This tool execution should contribute to completing the user's original request\n")
+	prompt.WriteString("- The cumulative summary contains the evolving context - use this to understand what has been accomplished so far\n")
+	prompt.WriteString("- After this tool execution, the ReAct loop will determine if the task is complete or if further actions are needed\n")
+	prompt.WriteString("- Generate parameters that will produce meaningful results toward task completion\n\n")
+	prompt.WriteString("RESPONSE FORMAT: Respond with a JSON object following the @action pattern:\n\n")
 	prompt.WriteString("```json\n")
 	prompt.WriteString("{\n")
 	prompt.WriteString("  \"@action\": \"call-tool\",\n")
@@ -228,13 +261,30 @@ func (r *ReAct) generateToolParamsPrompt(tool *aitool.Tool) string {
 	prompt.WriteString("  }\n")
 	prompt.WriteString("}\n")
 	prompt.WriteString("```\n\n")
-	prompt.WriteString("Alternative format (direct JSON object):\n")
-	prompt.WriteString("```json\n")
-	prompt.WriteString("{\n")
-	prompt.WriteString("  \"param1\": \"value1\",\n")
-	prompt.WriteString("  \"param2\": \"value2\"\n")
-	prompt.WriteString("}\n")
-	prompt.WriteString("```\n")
 
 	return prompt.String()
+}
+
+// extractOriginalUserQuery extracts the original user query from conversation history (thread-safe)
+func (r *ReAct) extractOriginalUserQuery() string {
+	r.config.mu.RLock()
+	defer r.config.mu.RUnlock()
+	return r.extractOriginalUserQueryUnsafe()
+}
+
+// extractOriginalUserQueryUnsafe extracts the original user query from conversation history (NOT thread-safe)
+// This method should only be called when the caller already holds the lock
+func (r *ReAct) extractOriginalUserQueryUnsafe() string {
+	if len(r.config.conversationHistory) == 0 {
+		return ""
+	}
+
+	// Look for the first "User:" entry in conversation history
+	for _, entry := range r.config.conversationHistory {
+		if strings.HasPrefix(entry, "User: ") {
+			return strings.TrimPrefix(entry, "User: ")
+		}
+	}
+
+	return ""
 }
