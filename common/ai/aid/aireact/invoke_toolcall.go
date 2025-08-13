@@ -193,10 +193,3 @@ func (r *ReAct) generateToolParamsPrompt(tool *aitool.Tool) string {
 	}
 	return prompt
 }
-
-// extractOriginalUserQuery extracts the original user query from memory (thread-safe)
-func (r *ReAct) extractOriginalUserQuery() string {
-	r.config.mu.RLock()
-	defer r.config.mu.RUnlock()
-	return r.config.memory.Query
-}
