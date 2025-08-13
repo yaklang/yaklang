@@ -87,3 +87,32 @@ func _whisperConvertAudioToSRTFile(i string) (string, error) {
 	}
 	return outputFilename, nil
 }
+
+func ConvertMediaToSRTString(path string) (string, error) {
+	isVideo, err := utils.IsVideo(path)
+	if err != nil {
+		return "", err
+	}
+	audioPath := path
+	if isVideo {
+		ffmpegRes, err := _extractAudioFromVideo(path)
+		if err != nil {
+			return "", err
+		}
+		audioPath = ffmpegRes.FilePath
+	}
+
+	if ok,err := utils.IsAudio(audioPath);!ok || err != nil {
+		return "", utils.Errorf("check audio file failed: %v", err)
+	}
+
+	srtFile, err := _whisperConvertAudioToSRTFile(audioPath)
+	if err != nil {
+		return "", utils.Errorf("convert audio to srt file failed: %v", err)
+	}
+	srtContent, err := os.ReadFile(srtFile)
+	if err != nil {
+		return "", utils.Errorf("read srt file failed: %v", err)
+	}
+	return string(srtContent), nil
+}

@@ -2,6 +2,7 @@ package ffmpegutils
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -37,7 +38,7 @@ func ExtractAudioFromVideo(inputFile string, opts ...Option) (*AudioExtractionRe
 
 	// If no output file is specified, create a temporary one.
 	if o.outputAudioFile == "" {
-		tmpFile, err := ioutil.TempFile("", "extracted-audio-*.wav")
+		tmpFile, err := ioutil.TempFile(consts.GetDefaultYakitBaseTempDir(), "extracted-audio-*.wav")
 		if err != nil {
 			return nil, fmt.Errorf("failed to create temporary audio file: %w", err)
 		}
