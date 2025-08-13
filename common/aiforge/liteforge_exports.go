@@ -27,6 +27,7 @@ var LiteForgeExport = map[string]interface{}{
 	"Execute":          _executeLiteForgeTemp,
 	"AnalyzeImage":     AnalyzeImage,
 	"AnalyzeImageFile": AnalyzeImageFile,
+	"AnalyzeAudioFile": AnalyzeAudioFile,
 	"imageExtraPrompt": ImageWithExtraPrompt, // use for analyzeImage and analyzeImageFile
 
 	"output":      _withOutputJSONSchema,
