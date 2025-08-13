@@ -1,0 +1,84 @@
+desc(
+	title: "Check C Memory Leak Vulnerability"
+	type: audit
+	severity: low
+	desc: <<<DESC
+
+DESC
+	rule_id: "de072dec-8c2a-4b81-9b84-0ce75c3158ab"
+	title_zh: "检测C语言内存泄漏漏洞"
+	risk: ""
+	solution: <<<SOLUTION
+
+SOLUTION
+	reference: <<<REFERENCE
+
+REFERENCE
+)
+
+malloc as $alloc;
+calloc as $alloc;
+realloc as $alloc;
+
+free(* #-> as $safe);
+$alloc - $safe as $low
+
+alert $low for {
+	level: "low",
+	type: "vuln",
+	title: "C Memory Leak Vulnerability",
+	title_zh: "C语言内存泄漏漏洞",
+	desc: "检测到内存分配但未释放，可能存在内存泄漏风险",
+}
+
+desc(
+	lang: c
+	alert_min: 1
+	'file://unsafe_memory.c': <<<UNSAFE
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+char* vulnerable_function(const char *input) {
+    char *buffer = malloc(strlen(input) + 1);
+    if (buffer == NULL) {
+        return NULL;
+    }
+    
+    strcpy(buffer, input);
+    return buffer;
+}
+
+int main() {
+    char *result = vulnerable_function("test");
+    if (result) {
+        printf("Result: %s\n", result);
+    }
+    return 0;
+}
+UNSAFE
+	'safefile://safe_memory.c': <<<SAFE
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+char* vulnerable_function(const char *input) {
+    char *buffer = malloc(strlen(input) + 1);
+    if (buffer == NULL) {
+        return NULL;
+    }
+    
+    strcpy(buffer, input);
+    return buffer;
+}
+
+int main() {
+    char *result = vulnerable_function("test");
+    if (result) {
+        printf("Result: %s\n", result);
+    }
+    free(result);
+    return 0;
+}
+SAFE
+)

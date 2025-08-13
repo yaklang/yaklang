@@ -31,7 +31,7 @@ const (
 )
 
 func GetAllSupportedLanguages() []Language {
-	return []Language{Yak, JS, PHP, JAVA, GO}
+	return []Language{Yak, JS, PHP, JAVA, GO, C}
 }
 
 func ValidateLanguage(language string) (Language, error) {

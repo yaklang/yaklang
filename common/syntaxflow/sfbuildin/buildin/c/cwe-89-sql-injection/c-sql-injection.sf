@@ -1,0 +1,162 @@
+desc(
+	title: "Check C SQL Injection Vulnerability"
+	type: audit
+	severity: high
+	desc: <<<DESC
+
+DESC
+	rule_id: "a83edb46-428e-481d-af2b-e5ac45db032e"
+	title_zh: "检测C语言SQL注入漏洞"
+	risk: "sqli"
+	solution: <<<SOLUTION
+
+SOLUTION
+	reference: <<<REFERENCE
+
+REFERENCE
+)
+
+mysql_query(*<slice(index=1)> #-> as $sink);
+mysql_real_query(*<slice(index=1)> #-> as $sink);
+sqlite3_exec(*<slice(index=1)> #-> as $sink);
+sqlite3_prepare_v2(*<slice(index=1)> #-> as $sink);
+
+<include('c-user-input')> as $user_input;
+$sink?{!opcode:const} as $sql_exec;
+
+$user_input & $sql_exec as $high;
+
+alert $high for {
+	level: "high",
+	type: "vuln",
+	title: "C SQL Injection Vulnerability",
+	title_zh: "C语言SQL注入漏洞",
+	desc: "检测到用户输入直接用于SQL查询构建或执行，可能存在SQL注入风险",
+}
+
+desc(
+	lang: c
+	alert_min: 1
+	'file://unsafe_sql.c': <<<UNSAFE
+#include <stdio.h>
+#include <string.h>
+#include <mysql/mysql.h>
+
+void vulnerable_login(MYSQL *conn, const char *username, const char *password) {
+    char query[1024];
+    
+    // 不安全的 SQL 查询 - 直接拼接用户输入
+    sprintf(query, "SELECT * FROM users WHERE username='%s' AND password='%s'", 
+            username, password);
+    
+    if (mysql_query(conn, query) != 0) {
+        printf("Query failed: %s\n", mysql_error(conn));
+        return;
+    }
+    
+    MYSQL_RES *result = mysql_store_result(conn);
+    if (result) {
+        MYSQL_ROW row = mysql_fetch_row(result);
+        if (row) {
+            printf("Login successful for user: %s\n", username);
+        } else {
+            printf("Login failed\n");
+        }
+        mysql_free_result(result);
+    }
+}
+
+int main(int argc, char **argv) {
+    if (argc != 3) {
+        printf("Usage: %s <username> <password>\n", argv[0]);
+        return 1;
+    }
+    
+    MYSQL *conn = mysql_init(NULL);
+    if (!conn) {
+        printf("Failed to initialize MySQL\n");
+        return 1;
+    }
+    
+    if (mysql_real_connect(conn, "localhost", "user", "pass", "db", 0, NULL, 0) == NULL) {
+        printf("Failed to connect to MySQL: %s\n", mysql_error(conn));
+        mysql_close(conn);
+        return 1;
+    }
+    
+    vulnerable_login(conn, argv[1], argv[2]);
+    
+    mysql_close(conn);
+    return 0;
+}
+UNSAFE
+	'safefile://safe_sql.c': <<<SAFE
+#include <stdio.h>
+#include <string.h>
+#include <mysql/mysql.h>
+
+void safe_login(MYSQL *conn, const char *username, const char *password) {
+    MYSQL_STMT *stmt;
+    MYSQL_BIND bind[2];
+    
+    // 使用参数化查询
+    const char *query = "SELECT * FROM users WHERE username=? AND password=?";
+    
+    stmt = mysql_stmt_init(conn);
+    if (!stmt) {
+        printf("Could not initialize statement\n");
+        return;
+    }
+    
+    if (mysql_stmt_prepare(stmt, query, strlen(query)) != 0) {
+        printf("Could not prepare statement\n");
+        mysql_stmt_close(stmt);
+        return;
+    }
+    
+    // 绑定参数
+    memset(bind, 0, sizeof(bind));
+    bind[0].buffer_type = MYSQL_TYPE_STRING;
+    bind[0].buffer = (void *)username;
+    bind[0].buffer_length = strlen(username);
+    
+    bind[1].buffer_type = MYSQL_TYPE_STRING;
+    bind[1].buffer = (void *)password;
+    bind[1].buffer_length = strlen(password);
+    
+    mysql_stmt_bind_param(stmt, bind);
+    
+    if (mysql_stmt_execute(stmt) != 0) {
+        printf("Statement execution failed: %s\n", mysql_stmt_error(stmt));
+    } else {
+        printf("Query executed successfully\n");
+    }
+    
+    mysql_stmt_close(stmt);
+}
+
+int main(int argc, char **argv) {
+    if (argc != 3) {
+        printf("Usage: %s <username> <password>\n", argv[0]);
+        return 1;
+    }
+    
+    MYSQL *conn = mysql_init(NULL);
+    if (!conn) {
+        printf("Failed to initialize MySQL\n");
+        return 1;
+    }
+    
+    if (mysql_real_connect(conn, "localhost", "user", "pass", "db", 0, NULL, 0) == NULL) {
+        printf("Failed to connect to MySQL: %s\n", mysql_error(conn));
+        mysql_close(conn);
+        return 1;
+    }
+    
+    safe_login(conn, argv[1], argv[2]);
+    
+    mysql_close(conn);
+    return 0;
+}
+SAFE
+)

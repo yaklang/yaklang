@@ -1,0 +1,86 @@
+desc(
+	title: "Audit C language file operation functions"
+	type: audit
+	level: info
+	lib: 'c-file-path'
+	desc: <<<DESC
+
+DESC
+	rule_id: "5b44af50-f3c8-4a40-b411-86cf65ee656b"
+	title_zh: "审计C语言文件操作函数"
+	solution: <<<SOLUTION
+
+SOLUTION
+	reference: <<<REFERENCE
+
+REFERENCE
+)
+
+fopen(* #-> as $file_sink);
+open(* #-> as $file_sink);
+creat(* #-> as $file_sink);
+access(* #-> as $file_sink);
+stat(* #-> as $file_sink);
+lstat(* #-> as $file_sink);
+chmod(* #-> as $file_sink);
+chown(* #-> as $file_sink);
+unlink(* #-> as $file_sink);
+rename(* #-> as $file_sink);
+link(* #-> as $file_sink);
+symlink(* #-> as $file_sink);
+readlink(* #-> as $file_sink);
+utime(* #-> as $file_sink);
+
+
+alert $output for {
+	level: "info",
+	title: "Audit C language file operation functions",
+	title_zh: "审计C语言文件操作函数",
+}
+
+desc(
+	lang: c
+	alert_min: 1
+	'file://user_input.c': <<<PARAM
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+
+int main(int argc, char **argv) {
+    char buffer[1024];
+    char *env_var;
+    
+    // 命令行参数输入
+    if (argc > 1) {
+        strcpy(buffer, argv[1]);
+    }
+    
+    // 环境变量输入
+    env_var = getenv("USER_INPUT");
+    if (env_var) {
+        strcat(buffer, env_var);
+    }
+    
+    // 标准输入
+    fgets(buffer, sizeof(buffer), stdin);
+    
+    // 文件输入
+    FILE *file = fopen("input.txt", "r");
+    if (file) {
+        fgets(buffer, sizeof(buffer), file);
+        fclose(file);
+    }
+    
+    // 网络输入
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock >= 0) {
+        recv(sock, buffer, sizeof(buffer), 0);
+        close(sock);
+    }
+    
+    return 0;
+}
+PARAM
+)

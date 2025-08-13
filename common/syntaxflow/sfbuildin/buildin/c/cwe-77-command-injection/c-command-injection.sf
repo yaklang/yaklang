@@ -1,0 +1,159 @@
+desc(
+	title: "Check C Command Injection Vulnerability"
+	type: audit
+	severity: high
+	desc: <<<DESC
+
+DESC
+	rule_id: "e02361da-8cd0-4c3d-bcce-db14caabe70e"
+	title_zh: "检测C语言命令注入漏洞"
+	risk: ""
+	solution: <<<SOLUTION
+
+SOLUTION
+	reference: <<<REFERENCE
+
+REFERENCE
+)
+
+system(* #-> as $cmd_sink);
+syscall(* #-> as $cmd_sink);
+popen(* #-> as $cmd_sink);
+execl(* #-> as $cmd_sink);
+execlp(* #-> as $cmd_sink);
+execle(* #-> as $cmd_sink);
+execv(* #-> as $cmd_sink);
+execvp(* #-> as $cmd_sink);
+execvpe(* #-> as $cmd_sink);
+spawnl(* #-> as $cmd_sink);
+spawnlp(* #-> as $cmd_sink);
+spawnle(* #-> as $cmd_sink);
+spawnv(* #-> as $cmd_sink);
+spawnvp(* #-> as $cmd_sink);
+spawnvpe(* #-> as $cmd_sink);
+
+<include('c-user-input')> as $user_input;
+
+$cmd_sink & $user_input as $high;
+
+alert $high for {
+	level: "high",
+	type: "vuln",
+	title: "C Command Injection Vulnerability",
+	title_zh: "C语言命令注入漏洞",
+	desc: "检测到用户输入直接用于系统命令构建或执行，可能存在命令注入风险",
+}
+
+desc(
+	lang: c
+	alert_min: 1
+	'file://unsafe_command.c': <<<UNSAFE
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+void vulnerable_file_list(const char *directory) {
+    char command[256];
+    
+    // 不安全的命令构建 - 直接拼接用户输入
+    sprintf(command, "ls -la %s", directory);
+    
+    // 执行系统命令
+    system(command);
+}
+
+void vulnerable_process_kill(const char *process_name) {
+    char command[256];
+    
+    // 不安全的命令构建
+    sprintf(command, "pkill %s", process_name);
+    system(command);
+}
+
+int main(int argc, char **argv) {
+    if (argc != 2) {
+        printf("Usage: %s <directory>\n", argv[0]);
+        return 1;
+    }
+    
+    // 直接使用命令行参数，没有验证
+    vulnerable_file_list(argv[1]);
+    
+    // 从环境变量获取进程名
+    char *process = getenv("PROCESS_NAME");
+    if (process) {
+        vulnerable_process_kill(process);
+    }
+    
+    return 0;
+}
+UNSAFE
+	'safefile://safe_command.c': <<<SAFE
+#include <stdio.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <ctype.h>
+
+// 安全的路径验证函数
+int is_safe_path(const char *path) {
+    if (!path) return 0;
+    
+    // 检查是否包含危险字符
+    const char *dangerous_chars = "..;|&`$(){}[]<>\"'\\";
+    for (int i = 0; path[i]; i++) {
+        if (strchr(dangerous_chars, path[i])) {
+            return 0;
+        }
+    }
+    
+    // 检查路径长度
+    if (strlen(path) > 100) {
+        return 0;
+    }
+    
+    return 1;
+}
+
+void safe_file_list(const char *directory) {
+    // 验证输入路径
+    if (!is_safe_path(directory)) {
+        printf("Invalid directory path\n");
+        return;
+    }
+    
+    DIR *dir;
+    struct dirent *entry;
+    struct stat file_stat;
+    
+    dir = opendir(directory);
+    if (dir == NULL) {
+        perror("opendir");
+        return;
+    }
+    
+    while ((entry = readdir(dir)) != NULL) {
+        char full_path[512];
+        snprintf(full_path, sizeof(full_path), "%s/%s", directory, entry->d_name);
+        
+        if (stat(full_path, &file_stat) == 0) {
+            printf("%s\t%ld bytes\n", entry->d_name, file_stat.st_size);
+        }
+    }
+    
+    closedir(dir);
+}
+
+int main(int argc, char **argv) {
+    if (argc != 2) {
+        printf("Usage: %s <directory>\n", argv[0]);
+        return 1;
+    }
+    
+    // 使用安全的文件列表函数
+    safe_file_list(argv[1]);
+    
+    return 0;
+}
+SAFE
+)

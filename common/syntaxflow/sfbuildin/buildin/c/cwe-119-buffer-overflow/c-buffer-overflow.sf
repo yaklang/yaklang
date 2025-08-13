@@ -1,0 +1,146 @@
+desc(
+	title: "Check C Buffer Overflow Vulnerability"
+	type: audit
+	severity: high
+	desc: <<<DESC
+
+DESC
+	rule_id: "a33761dc-f27a-40ae-848e-53018b598758"
+	title_zh: "检测C语言缓冲区溢出漏洞"
+	risk: ""
+	solution: <<<SOLUTION
+
+SOLUTION
+	reference: <<<REFERENCE
+
+REFERENCE
+)
+
+strcpy(*<slice(index=1)> #-> as $unsafe_str);
+strcat(*<slice(index=1)> #-> as $unsafe_str);
+sprintf(*<slice(index=2)> #-> as $unsafe_str);
+
+<include('c-user-input')> as $user_input;
+
+$user_input & $unsafe_str as $high;
+$user_input & $unsafe_str as $high;
+$user_input & $unsafe_str as $high;
+
+alert $high for {
+	level: "high",
+	type: "vuln",
+	title: "C Buffer Overflow Vulnerability",
+	title_zh: "C语言缓冲区溢出漏洞",
+	desc: "检测到用户输入直接用于不安全的字符串操作或输入函数，可能存在缓冲区溢出风险",
+}
+
+desc(
+	lang: c
+	alert_min: 1
+	'file://unsafe_buffer.c': <<<UNSAFE
+#include <stdio.h>
+#include <string.h>
+
+void vulnerable_function(const char *input) {
+    char buffer[64];
+    
+    strcpy(buffer, input);
+    
+    printf("Buffer content: %s\n", buffer);
+}
+
+void vulnerable_concatenation(const char *str1, const char *str2) {
+    char buffer[128];
+    
+    strcpy(buffer, str1);
+    strcat(buffer, str2);
+    
+    printf("Concatenated: %s\n", buffer);
+}
+
+void vulnerable_formatting(const char *format, const char *value) {
+    char buffer[64];
+    
+    sprintf(buffer, format, value);
+    
+    printf("Formatted: %s\n", buffer);
+}
+
+int main(int argc, char **argv) {
+    if (argc != 2) {
+        printf("Usage: %s <input_string>\n", argv[0]);
+        return 1;
+    }
+    
+    vulnerable_function(argv[1]);
+    
+    char *env_str = getenv("TEST_STRING");
+    if (env_str) {
+        vulnerable_concatenation(argv[1], env_str);
+    }
+    
+    vulnerable_formatting("%s", argv[1]);
+    
+    return 0;
+}
+UNSAFE
+	'safefile://safe_buffer.c': <<<SAFE
+#include <stdio.h>
+#include <string.h>
+
+void safe_function(const char *input) {
+    char buffer[64];
+    
+    strncpy(buffer, input, sizeof(buffer) - 1);
+    buffer[sizeof(buffer) - 1] = '\0';  // 确保字符串结束
+    
+    printf("Buffer content: %s\n", buffer);
+}
+
+void safe_concatenation(const char *str1, const char *str2) {
+    char buffer[128];
+    size_t remaining = sizeof(buffer);
+    
+    strncpy(buffer, str1, remaining - 1);
+    buffer[remaining - 1] = '\0';
+    
+    remaining -= strlen(buffer);
+    if (remaining > 1) {
+        strncat(buffer, str2, remaining - 1);
+    }
+    
+    printf("Concatenated: %s\n", buffer);
+}
+
+void safe_formatting(const char *value) {
+    char buffer[64];
+    
+    snprintf(buffer, sizeof(buffer), "Value: %s", value);
+    
+    printf("Formatted: %s\n", buffer);
+}
+
+int main(int argc, char **argv) {
+    if (argc != 2) {
+        printf("Usage: %s <input_string>\n", argv[0]);
+        return 1;
+    }
+    
+    if (strlen(argv[1]) > 63) {
+        printf("Input too long, maximum 63 characters allowed\n");
+        return 1;
+    }
+    
+    safe_function(argv[1]);
+    
+    char *env_str = getenv("TEST_STRING");
+    if (env_str) {
+        safe_concatenation(argv[1], env_str);
+    }
+    
+    safe_formatting(argv[1]);
+    
+    return 0;
+}
+SAFE
+)

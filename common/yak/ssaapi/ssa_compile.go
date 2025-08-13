@@ -42,6 +42,7 @@ var AllLanguageBuilders = []ssa.Builder{
 	yak2ssa.Builder,
 	js2ssa.Builder,
 	go2ssa.Builder,
+	c2ssa.Builder,
 }
 
 func (c *config) isStop() bool {
