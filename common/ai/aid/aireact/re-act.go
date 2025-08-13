@@ -249,15 +249,6 @@ func (r *ReAct) processInputEvent(event *ypb.AITriageInputEvent, outputChan chan
 	return r.executeMainLoop(userInput, outputChan)
 }
 
-// Legacy method - replaced by executeMainLoop in invoke.go
-// Kept for backward compatibility, but redirects to new implementation
-func (r *ReAct) startReActLoop(userQuery string, outputChan chan *ypb.AIOutputEvent) error {
-	return r.executeMainLoop(userQuery, outputChan)
-}
-
-// Legacy methods - replaced by new schema-based implementation in invoke.go
-// These are kept for potential compatibility but may be removed in future versions
-
 // extractResponseContent extracts content from AI response
 func (r *ReAct) extractResponseContent(resp *aid.AIResponse) string {
 	if resp == nil {
