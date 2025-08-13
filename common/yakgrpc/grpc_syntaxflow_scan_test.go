@@ -406,7 +406,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan_With_Group(t *testing.T) {
 	log.Infof("wait for task %v", taskID)
 }
 
-func TestGRPCMUSTPASS_SyntaxFlow_Scan_With_Diff(t *testing.T) {
+func TestGRPCMUSTPASS_SyntaxFlow_Scan_With_DiffRule(t *testing.T) {
 	client, err := NewLocalClient(true)
 	require.NoError(t, err)
 
@@ -417,9 +417,6 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan_With_Diff(t *testing.T) {
 	taskID2 := ""
 	ruleName3 := uuid.NewString()
 	taskID3 := ""
-	_ = taskID1
-	_ = taskID2
-	_ = taskID3
 
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("example/src/main/a.go", `
@@ -660,7 +657,7 @@ alert $high for {
 			stream.Send(&ypb.SyntaxFlowScanRequest{
 				ControlMode: "start",
 				Filter: &ypb.SyntaxFlowRuleFilter{
-					RuleNames: []string{ruleName1},
+					RuleNames: []string{ruleName2},
 				},
 				ProgramName: []string{
 					progID,
@@ -691,7 +688,7 @@ alert $high for {
 			stream.Send(&ypb.SyntaxFlowScanRequest{
 				ControlMode: "start",
 				Filter: &ypb.SyntaxFlowRuleFilter{
-					RuleNames: []string{ruleName2},
+					RuleNames: []string{ruleName1},
 				},
 				ProgramName: []string{
 					progID,
@@ -728,13 +725,13 @@ alert $high for {
 		task := rsp.Data[0]
 		require.Equal(t, task.Programs, []string{progID})
 		require.Equal(t, task.Status, "done")
-		require.Equal(t, task.NewRiskCount, int64(0))
-		require.Equal(t, task.HighCount, int64(2))
+		require.Equal(t, task.RiskCount, int64(11))
+		require.Equal(t, task.NewRiskCount, int64(11)) // 规则更新会导致所有的risk为新增值
 		task = rsp.Data[1]
 		require.Equal(t, task.Programs, []string{progID})
 		require.Equal(t, task.Status, "done")
-		require.Equal(t, task.NewRiskCount, int64(9))
-		// require.Equal(t, task.HighCount, int64(12))
+		require.Equal(t, task.RiskCount, int64(2))
+		require.Equal(t, task.NewRiskCount, int64(0))
 	})
 
 	t.Run("test scan task risk count with muti diff", func(t *testing.T) {
@@ -796,7 +793,7 @@ alert $high for {
 			stream.Send(&ypb.SyntaxFlowScanRequest{
 				ControlMode: "start",
 				Filter: &ypb.SyntaxFlowRuleFilter{
-					RuleNames: []string{ruleName1},
+					RuleNames: []string{ruleName3},
 				},
 				ProgramName: []string{
 					progID,
@@ -858,7 +855,7 @@ alert $high for {
 			stream.Send(&ypb.SyntaxFlowScanRequest{
 				ControlMode: "start",
 				Filter: &ypb.SyntaxFlowRuleFilter{
-					RuleNames: []string{ruleName3},
+					RuleNames: []string{ruleName1},
 				},
 				ProgramName: []string{
 					progID,
@@ -895,17 +892,279 @@ alert $high for {
 		task := rsp.Data[0]
 		require.Equal(t, task.Programs, []string{progID})
 		require.Equal(t, task.Status, "done")
-		require.Equal(t, task.NewRiskCount, int64(0))
-		require.Equal(t, task.HighCount, int64(1))
+		require.Equal(t, task.RiskCount, int64(11))
+		require.Equal(t, task.NewRiskCount, int64(11))
 		task = rsp.Data[1]
 		require.Equal(t, task.Programs, []string{progID})
 		require.Equal(t, task.Status, "done")
-		require.Equal(t, task.NewRiskCount, int64(1))
-		require.Equal(t, task.HighCount, int64(2))
+		require.Equal(t, task.RiskCount, int64(2))
+		require.Equal(t, task.NewRiskCount, int64(2))
 		task = rsp.Data[2]
 		require.Equal(t, task.Programs, []string{progID})
 		require.Equal(t, task.Status, "done")
-		require.Equal(t, task.NewRiskCount, int64(9))
-		// require.Equal(t, task.HighCount, int64(12))
+		require.Equal(t, task.RiskCount, int64(1))
+		require.Equal(t, task.NewRiskCount, int64(0))
+	})
+}
+
+func TestGRPCMUSTPASS_SyntaxFlow_Scan_With_DiffProg(t *testing.T) {
+	progID := uuid.NewString()
+	ruleName1 := uuid.NewString()
+	ruleName2 := uuid.NewString()
+	taskID1 := ""
+	taskID2 := ""
+	taskID3 := ""
+	_ = taskID1
+	_ = taskID2
+	_ = taskID3
+
+	client, err := NewLocalClient(true)
+	require.NoError(t, err)
+
+	code1 := `
+package main
+
+func cmd(c *gin.Context){
+	exec("/bin/sh")
+}
+	`
+	code2 := `
+package main
+
+func cmd(c *gin.Context){
+	sh := c.Query("sh")
+	exec(sh)
+}
+	`
+	code3 := `
+package unAuth
+
+func cmd(c *gin.Context){
+	sh1 := c.Query("sh")
+	sh2 := c.Query("sh")
+
+	sh := fmt.Sprintf("%s-%s", sh1, sh2)
+	exec(sh)
+}
+	`
+
+	client.CreateSyntaxFlowRule(context.Background(), &ypb.CreateSyntaxFlowRuleRequest{
+		SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
+			Content: `
+desc(
+	title: "high"
+	level: high
+)
+
+exec(* #-> as $high)
+
+alert $high for {
+	type: "vuln",
+	level: "high",
+}`,
+			GroupNames: []string{"golang"},
+			RuleName:   ruleName1,
+			Language:   "golang",
+			Tags:       []string{"golang"},
+		},
+	})
+	client.CreateSyntaxFlowRule(context.Background(), &ypb.CreateSyntaxFlowRuleRequest{
+		SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
+			Content: `
+desc(
+	title: "low"
+	level: low
+)
+
+exec(*?{opcode:const} #-> as $low)
+
+alert $low for {
+	type: "vuln",
+	level: "low",
+}`,
+			GroupNames: []string{"golang"},
+			RuleName:   ruleName2,
+			Language:   "golang",
+			Tags:       []string{"golang"},
+		},
+	})
+	defer func() {
+		client.DeleteSyntaxFlowRule(context.Background(), &ypb.DeleteSyntaxFlowRuleRequest{
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				RuleNames: []string{ruleName1, ruleName2},
+			},
+		})
+
+	}()
+
+	t.Run("test scan task risk level count with muti diff", func(t *testing.T) {
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), progID)
+			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormDefaultSSADataBase(), []string{taskID1, taskID2, taskID3}, schema.RuntimeId)
+			yakit.DeleteSSADiffResultByCompare(consts.GetGormDefaultSSADataBase(), []string{taskID1, taskID2, taskID3}, schema.RuntimeId)
+		}()
+		{
+			vf := filesys.NewVirtualFs()
+			vf.AddFile("example/src/main/a.go", code1)
+			prog, err := ssaapi.ParseProjectWithFS(vf,
+				ssaapi.WithLanguage(consts.GO),
+				ssaapi.WithProgramPath("example"),
+				ssaapi.WithProgramName(progID),
+			)
+			require.NoError(t, err)
+			require.NotNil(t, prog)
+
+			stream, err := client.SyntaxFlowScan(context.Background())
+			require.NoError(t, err)
+
+			stream.Send(&ypb.SyntaxFlowScanRequest{
+				ControlMode: "start",
+				Filter: &ypb.SyntaxFlowRuleFilter{
+					RuleNames: []string{ruleName1, ruleName2},
+				},
+				ProgramName: []string{
+					progID,
+				},
+			})
+
+			resp, err := stream.Recv()
+			taskID1 = resp.TaskID
+			require.NoError(t, err)
+			log.Infof("resp: %v", resp)
+			require.NoError(t, err)
+
+			finishProcess := 0.0
+			var finishStatus string
+			checkSfScanRecvMsg(t, stream, func(status string) {
+				finishStatus = status
+			}, func(process float64) {
+				finishProcess = process
+			})
+			require.Equal(t, 1.0, finishProcess)
+			require.Equal(t, "done", finishStatus)
+		}
+		{
+			vf := filesys.NewVirtualFs()
+			vf.AddFile("example/src/main/b.go", code2)
+			prog, err := ssaapi.ParseProjectWithFS(vf,
+				ssaapi.WithLanguage(consts.GO),
+				ssaapi.WithProgramPath("example"),
+				ssaapi.WithProgramName(progID),
+			)
+			require.NoError(t, err)
+			require.NotNil(t, prog)
+
+			stream, err := client.SyntaxFlowScan(context.Background())
+			require.NoError(t, err)
+
+			stream.Send(&ypb.SyntaxFlowScanRequest{
+				ControlMode: "start",
+				Filter: &ypb.SyntaxFlowRuleFilter{
+					RuleNames: []string{ruleName1, ruleName2},
+				},
+				ProgramName: []string{
+					progID,
+				},
+			})
+
+			resp, err := stream.Recv()
+			taskID2 = resp.TaskID
+			require.NoError(t, err)
+			log.Infof("resp: %v", resp)
+			require.NoError(t, err)
+
+			finishProcess := 0.0
+			var finishStatus string
+			checkSfScanRecvMsg(t, stream, func(status string) {
+				finishStatus = status
+			}, func(process float64) {
+				finishProcess = process
+			})
+			require.Equal(t, 1.0, finishProcess)
+			require.Equal(t, "done", finishStatus)
+		}
+		{
+			vf := filesys.NewVirtualFs()
+			vf.AddFile("example/src/main/c.go", code3)
+			prog, err := ssaapi.ParseProjectWithFS(vf,
+				ssaapi.WithLanguage(consts.GO),
+				ssaapi.WithProgramPath("example"),
+				ssaapi.WithProgramName(progID),
+			)
+			require.NoError(t, err)
+			require.NotNil(t, prog)
+
+			stream, err := client.SyntaxFlowScan(context.Background())
+			require.NoError(t, err)
+
+			stream.Send(&ypb.SyntaxFlowScanRequest{
+				ControlMode: "start",
+				Filter: &ypb.SyntaxFlowRuleFilter{
+					RuleNames: []string{ruleName1, ruleName2},
+				},
+				ProgramName: []string{
+					progID,
+				},
+			})
+
+			resp, err := stream.Recv()
+			taskID3 = resp.TaskID
+			require.NoError(t, err)
+			log.Infof("resp: %v", resp)
+			require.NoError(t, err)
+
+			finishProcess := 0.0
+			var finishStatus string
+			checkSfScanRecvMsg(t, stream, func(status string) {
+				finishStatus = status
+			}, func(process float64) {
+				finishProcess = process
+			})
+			require.Equal(t, 1.0, finishProcess)
+			require.Equal(t, "done", finishStatus)
+		}
+
+		rsp, err := client.QuerySyntaxFlowScanTask(context.Background(), &ypb.QuerySyntaxFlowScanTaskRequest{
+			Filter: &ypb.SyntaxFlowScanTaskFilter{
+				Programs: []string{progID},
+			},
+			ShowDiffRisk: true,
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, len(rsp.Data), 3)
+
+		task := rsp.Data[0]
+		require.Equal(t, task.Programs, []string{progID})
+		require.Equal(t, task.TaskId, taskID3)
+		require.Equal(t, task.Status, "done")
+		require.Equal(t, task.LowCount, int64(1))
+		require.Equal(t, task.HighCount, int64(8))
+		require.Equal(t, task.RiskCount, int64(9))
+		require.Equal(t, task.NewLowCount, int64(0))
+		require.Equal(t, task.NewHighCount, int64(5))
+		require.Equal(t, task.NewRiskCount, int64(5))
+
+		task = rsp.Data[1]
+		require.Equal(t, task.Programs, []string{progID})
+		require.Equal(t, task.TaskId, taskID2)
+		require.Equal(t, task.Status, "done")
+		require.Equal(t, task.LowCount, int64(1))
+		require.Equal(t, task.HighCount, int64(3))
+		require.Equal(t, task.RiskCount, int64(4))
+		require.Equal(t, task.NewLowCount, int64(0))
+		require.Equal(t, task.NewHighCount, int64(2))
+		require.Equal(t, task.NewRiskCount, int64(2))
+
+		task = rsp.Data[2]
+		require.Equal(t, task.Programs, []string{progID})
+		require.Equal(t, task.TaskId, taskID1)
+		require.Equal(t, task.Status, "done")
+		require.Equal(t, task.LowCount, int64(1))
+		require.Equal(t, task.HighCount, int64(1))
+		require.Equal(t, task.RiskCount, int64(2))
+		require.Equal(t, task.NewLowCount, int64(0))
+		require.Equal(t, task.NewHighCount, int64(0))
+		require.Equal(t, task.NewRiskCount, int64(0))
 	})
 }

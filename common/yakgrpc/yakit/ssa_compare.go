@@ -235,17 +235,16 @@ func (s *SSAComparator[T]) Compare(
 		}
 		diffHashMap[diffHash]++
 	}
-
 	for t := range item.GetComparisonValue(ctx) {
-		rule, hash, diffHash := s.config.getComparisonBasisInfo(t)
+		sfRule, riskHash, diffHash := s.config.getComparisonBasisInfo(t)
 		string2CompareItemValue[diffHash] = &ComparisonResultItem[T]{
 			Val:  t,
-			Hash: hash,
-
-			rule: rule,
+			Hash: riskHash,
+			rule: sfRule,
 		}
 		diffHashMap[diffHash]--
 	}
+
 	wg := new(sync.WaitGroup)
 	taskChan := make(chan *ComparisonResult[T], 1)
 	processor := utils.NewBatchProcessor[*ComparisonResult[T]](
@@ -291,35 +290,39 @@ func (s *SSAComparator[T]) Compare(
 			switch {
 			case i < 0:
 				//只在compareItem中存在
-				compareValue, ok := string2CompareItemValue[s]
-				if !ok {
-					continue
-				}
-				if !addChannel(&ComparisonResult[T]{
-					BaseValue:   compareValue.Val,
-					NewValue:    zeroValue,
-					FromRule:    compareValue.rule,
-					BaseValHash: compareValue.Hash,
-					NewValHash:  "",
-					Status:      Del,
-				}) {
-					return
+				for y := i; y < 0; y++ {
+					compareValue, ok := string2CompareItemValue[s]
+					if !ok {
+						continue
+					}
+					if !addChannel(&ComparisonResult[T]{
+						BaseValue:   compareValue.Val,
+						NewValue:    zeroValue,
+						FromRule:    compareValue.rule,
+						BaseValHash: compareValue.Hash,
+						NewValHash:  "",
+						Status:      Del,
+					}) {
+						return
+					}
 				}
 			case i > 0:
 				//只在BaseItem中存在
-				baseValue, ok := string2BaseItemValue[s]
-				if !ok {
-					continue
-				}
-				if !addChannel(&ComparisonResult[T]{
-					BaseValue:   zeroValue,
-					NewValue:    baseValue.Val,
-					FromRule:    baseValue.rule,
-					BaseValHash: "",
-					NewValHash:  baseValue.Hash,
-					Status:      Add,
-				}) {
-					return
+				for y := i; y > 0; y-- {
+					baseValue, ok := string2BaseItemValue[s]
+					if !ok {
+						continue
+					}
+					if !addChannel(&ComparisonResult[T]{
+						BaseValue:   zeroValue,
+						NewValue:    baseValue.Val,
+						FromRule:    baseValue.rule,
+						BaseValHash: "",
+						NewValHash:  baseValue.Hash,
+						Status:      Add,
+					}) {
+						return
+					}
 				}
 			default:
 				baseValue, ok1 := string2BaseItemValue[s]
