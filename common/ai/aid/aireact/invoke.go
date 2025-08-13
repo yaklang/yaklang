@@ -1,12 +1,7 @@
 package aireact
 
 import (
-	"bytes"
-	_ "embed"
 	"fmt"
-	"os"
-	"runtime"
-	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -15,141 +10,18 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-//go:embed aireact.schema.json
-var loopSchema string
-
-// ActionType represents the type of action to take
-type ActionType string
-
-const (
-	ActionDirectlyAnswer       ActionType = "directly_answer"
-	ActionRequireTool          ActionType = "require_tool"
-	ActionRequestPlanExecution ActionType = "request_plan_and_execution"
-)
-
-// ReAct actions available
-const (
-	ReActActionObject = "object"
-)
+// Schema and action types are now managed by the prompt manager
 
 // generateMainLoopPrompt generates the prompt for the main ReAct loop
 func (r *ReAct) generateMainLoopPrompt(userQuery string, tools []*aitool.Tool) string {
-	var prompt bytes.Buffer
-
-	// Background information
-	prompt.WriteString("# Background\n")
-	prompt.WriteString(fmt.Sprintf("Current Time: %s\n", time.Now().Format("2006-01-02 15:04:05")))
-	prompt.WriteString(fmt.Sprintf("OS/Arch: %s/%s\n", runtime.GOOS, runtime.GOARCH))
-	if cwd, err := os.Getwd(); err == nil {
-		prompt.WriteString(fmt.Sprintf("Getwd: %s\n", cwd))
-	}
-	prompt.WriteString("\n")
-
-	// Available tools with top N display
-	if len(tools) > 0 {
-		prompt.WriteString("# Available Tools\n")
-		prompt.WriteString(fmt.Sprintf("You have access to %d built-in tools. Here are the top %d most important tools:\n\n", len(tools), r.config.topToolsCount))
-
-		// Get prioritized tool list
-		topTools := r.getPrioritizedTools(tools, r.config.topToolsCount)
-
-		for _, tool := range topTools {
-			prompt.WriteString(fmt.Sprintf("* `%s`: %s\n", tool.Name, tool.Description))
-		}
-
-		if len(tools) > len(topTools) {
-			prompt.WriteString("...\n")
-		}
-
-		prompt.WriteString("\nUse 'tools_search' to discover additional tools for specific tasks.\n\n")
-	}
-
-	// Cumulative summary (conversation memory)
-	if r.config.cumulativeSummary != "" {
-		prompt.WriteString("# Conversation Memory\n")
-		prompt.WriteString(r.config.cumulativeSummary + "\n\n")
-	}
-
-	// Timeline memory (replaces conversation history)
-	timeline := r.config.memory.Timeline()
-	if timeline != "" {
-		prompt.WriteString("# Timeline Memory\n")
-		prompt.WriteString(timeline)
-		prompt.WriteString("\n")
-	}
-
-	// User query with nonce to prevent injection
-	nonce := utils.RandStringBytes(8)
-	prompt.WriteString("# User Query\n")
-	prompt.WriteString(fmt.Sprintf("<|USER_QUERY_NONCE_%s|>\n", nonce))
-	prompt.WriteString(userQuery + "\n")
-	prompt.WriteString(fmt.Sprintf("<|USER_QUERY_NONCE_%s|>\n", nonce))
-	prompt.WriteString("\n")
-
-	// Instructions with language preference
-	prompt.WriteString("# Instructions\n")
-
-	// Language instruction
-	if r.config.language == "zh" {
-		prompt.WriteString("LANGUAGE: Please respond in Chinese (中文) unless specifically asked otherwise.\n")
-	} else {
-		prompt.WriteString("LANGUAGE: Please respond in English unless specifically asked otherwise.\n")
-	}
-
-	prompt.WriteString("You are a ReAct (Reasoning and Acting) AI agent. Analyze the user query and decide what action to take.\n")
-	prompt.WriteString("IMPORTANT GUIDELINES:\n")
-	prompt.WriteString("- Check if the user's request matches any available tool names or functionality\n")
-	prompt.WriteString("- If you need to find tools for a specific task, use 'tools_search' to search available tools\n")
-	prompt.WriteString("- If a tool can fulfill the request, use 'require_tool' with the exact tool name\n")
-	prompt.WriteString("- For simple greetings like 'hello' or 'hi', use 'directly_answer'\n")
-	prompt.WriteString("- For complex multi-step tasks, use 'request_plan_and_execution'\n")
-	prompt.WriteString("- When providing direct answers, always set 'is_final_step' to true\n")
-	prompt.WriteString("- TOOL SEARCH: You have access to 'tools_search' tool to find appropriate tools for any task\n")
-	prompt.WriteString("- Available tool categories include: file operations, network tools, security testing, data processing, and more\n")
-	prompt.WriteString("- MEMORY: Update 'cumulative_summary' to include key information from this interaction\n")
-	prompt.WriteString("- The cumulative_summary should help you remember important context for future interactions\n\n")
-	prompt.WriteString("Respond with a JSON object following the schema below:\n\n")
-
-	// Schema
-	prompt.WriteString("```json\n")
-	prompt.WriteString(loopSchema)
-	prompt.WriteString("\n```\n")
-
-	return prompt.String()
-}
-
-// parseReActAction parses the AI response to extract the ReAct action using aid.ExtractAction
-func (r *ReAct) parseReActAction(response string) (*aid.Action, error) {
-	// Use aid.ExtractAction for more robust parsing
-	action, err := aid.ExtractAction(response, ReActActionObject)
+	// Use the prompt manager to generate the prompt
+	prompt, err := r.promptManager.GenerateLoopPrompt(userQuery, tools)
 	if err != nil {
-		return nil, utils.Errorf("failed to extract ReAct action: %v", err)
+		// Fallback to basic prompt if template fails
+		log.Errorf("Failed to generate loop prompt from template: %v", err)
+		return fmt.Sprintf("User Query: %s\nPlease respond with a JSON object for ReAct action.", userQuery)
 	}
-
-	// Validate required fields
-	if action.GetString("human_readable_thought") == "" {
-		return nil, utils.Error("human_readable_thought is required but empty")
-	}
-
-	actionType := action.GetInvokeParams("next_action").GetString("type")
-	if actionType == "" {
-		log.Errorf("response: %s, cannot parse $..next_action.type", response)
-		return nil, utils.Error("action.type is required but empty")
-	}
-
-	if !utils.StringSliceContain([]string{
-		string(ActionDirectlyAnswer),
-		string(ActionRequireTool),
-		string(ActionRequestPlanExecution),
-	}, actionType) {
-		log.Errorf("response: %s, cannot parse $..next_action.type", response)
-		return nil, utils.Errorf("invalid action type '%s', must be one of: %v", actionType, []any{
-			ActionDirectlyAnswer,
-			ActionRequireTool,
-			ActionRequestPlanExecution,
-		})
-	}
-	return action, nil
+	return prompt
 }
 
 // executeMainLoop executes the main ReAct loop
@@ -360,58 +232,3 @@ func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputE
 // handleRequireTool is now implemented in invoke_toolcall.go
 
 // generateToolParamsPrompt is now implemented in invoke_toolcall.go
-
-// getPrioritizedTools returns a prioritized list of tools, with search tools first
-func (r *ReAct) getPrioritizedTools(tools []*aitool.Tool, maxCount int) []*aitool.Tool {
-	if len(tools) == 0 {
-		return tools
-	}
-
-	// Priority tool names (tools_search should be first)
-	priorityNames := []string{
-		"tools_search",
-		"now",
-		"bash",
-		"read_file_lines",
-		"grep",
-		"find_file",
-		"send_http_request_by_url",
-		"whois",
-		"dig",
-		"scan_tcp_port",
-		"encode",
-		"decode",
-		"auto_decode",
-		"current_time",
-		"echo",
-	}
-
-	// Create map for quick lookup
-	toolMap := make(map[string]*aitool.Tool)
-	for _, tool := range tools {
-		toolMap[tool.Name] = tool
-	}
-
-	var result []*aitool.Tool
-	usedNames := make(map[string]bool)
-
-	// Add priority tools first
-	for _, name := range priorityNames {
-		if tool, exists := toolMap[name]; exists && len(result) < maxCount {
-			result = append(result, tool)
-			usedNames[name] = true
-		}
-	}
-
-	// Add remaining tools if we haven't reached maxCount
-	for _, tool := range tools {
-		if len(result) >= maxCount {
-			break
-		}
-		if !usedNames[tool.Name] {
-			result = append(result, tool)
-		}
-	}
-
-	return result
-}
