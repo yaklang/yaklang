@@ -128,8 +128,10 @@ func main() {
 			case "react_observation":
 				fmt.Printf("[observe]: %s\n", string(event.Content))
 			case "react_result":
-				fmt.Printf("[result]: %s\n", extractResultContent(string(event.Content)))
+				result := extractResultContent(string(event.Content))
+				fmt.Printf("[result]: %s\n", result)
 				fmt.Printf("[ai]: final message for current loop\n")
+				log.Infof("Query completed, exiting...")
 			case "react_error":
 				fmt.Printf("[error]: %s\n", string(event.Content))
 			case "react_info":
@@ -313,7 +315,7 @@ func waitForResponseCompletion(responseCompleteChan chan struct{}, ctx context.C
 	}
 }
 
-// extractResultContent extracts the actual result from the JSON result
+// extractResultContent extracts the actual result from the JSON result and formats it for better readability
 func extractResultContent(content string) string {
 	// Try to extract "result" field from JSON
 	if strings.Contains(content, `"result"`) {
@@ -322,10 +324,18 @@ func extractResultContent(content string) string {
 			start += 10 // length of `"result":"`
 			end := strings.Index(content[start:], `"`)
 			if end != -1 {
-				return content[start : start+end]
+				result := content[start : start+end]
+				// Unescape JSON string
+				result = strings.ReplaceAll(result, `\"`, `"`)
+				result = strings.ReplaceAll(result, `\\`, `\`)
+				result = strings.ReplaceAll(result, `\n`, "\n")
+				result = strings.ReplaceAll(result, `\t`, "\t")
+				return result
 			}
 		}
 	}
+
+	// If it's already human-readable text, return as-is
 	return content
 }
 
