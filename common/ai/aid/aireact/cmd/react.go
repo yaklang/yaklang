@@ -33,8 +33,16 @@ func main() {
 	var (
 		language = flag.String("lang", "zh", "Response language (zh for Chinese, en for English)")
 		query    = flag.String("query", "", "One-time query mode (exits after response)")
+		debug    = flag.Bool("debug", false, "Enable debug mode")
 	)
 	flag.Parse()
+
+	// Set debug mode from command line flag
+	debugMode = *debug
+	if debugMode {
+		log.SetLevel(log.DebugLevel)
+		log.Debug("Debug mode enabled")
+	}
 
 	log.Info("Starting ReAct CLI Demo")
 
@@ -102,7 +110,7 @@ func main() {
 	react, err := aireact.NewReAct(
 		aireact.WithContext(ctx),
 		aireact.WithAICallback(debugAICallback),
-		aireact.WithDebug(false), // Default to false, can be toggled
+		aireact.WithDebug(debugMode), // Use debug mode from command line flag
 		aireact.WithMaxIterations(5),
 		aireact.WithMaxThoughts(3),
 		aireact.WithMaxActions(3),
