@@ -307,9 +307,23 @@ func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputE
 			if err := r.handleRequireTool(toolPayload, outputChan); err != nil {
 				r.emitError(outputChan, fmt.Sprintf("Tool execution failed: %v", err))
 			} else {
-				// Tool executed successfully, emit result and finish
-				r.emitResult(outputChan, fmt.Sprintf("Tool %s executed successfully", toolPayload))
-				r.config.finished = true
+				// Tool executed successfully, now verify if user needs are satisfied
+				// Temporarily release the lock before calling verification to avoid deadlock
+				r.config.mu.Unlock()
+				satisfied, finalResult, err := r.verifyUserSatisfaction(userQuery, toolPayload, outputChan)
+				r.config.mu.Lock()
+
+				if err != nil {
+					r.emitError(outputChan, fmt.Sprintf("Verification failed: %v", err))
+					r.config.finished = true
+				} else if satisfied {
+					// User needs are satisfied, emit final result and finish
+					r.emitResult(outputChan, finalResult)
+					r.config.finished = true
+				} else {
+					// User needs not satisfied, continue loop
+					r.emitInfo(outputChan, "User needs not fully satisfied, continuing analysis...")
+				}
 			}
 			// Also check if explicitly marked as final step
 			if action.GetBool("is_final_step") {

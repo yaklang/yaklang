@@ -288,3 +288,140 @@ func (r *ReAct) extractOriginalUserQueryUnsafe() string {
 
 	return ""
 }
+
+// verifyUserSatisfaction verifies if the tool execution satisfied the user's needs and provides human-readable output
+func (r *ReAct) verifyUserSatisfaction(originalQuery, toolName string, outputChan chan *ypb.AIOutputEvent) (bool, string, error) {
+	// Generate verification prompt
+	verificationPrompt := r.generateVerificationPrompt(originalQuery, toolName)
+
+	if r.config.debugPrompt {
+		log.Infof("Verification prompt: %s", verificationPrompt)
+	}
+
+	var satisfied bool
+	var finalResult string
+	var verificationErr error
+
+	// Use aid.CallAITransaction for verification
+	toolConfig := aid.NewConfig(r.config.ctx)
+
+	r.emitInfo(outputChan, "Verifying if user needs are satisfied and formatting results...")
+
+	err := aid.CallAITransaction(toolConfig, verificationPrompt,
+		func(req *aid.AIRequest) (*aid.AIResponse, error) {
+			return r.config.aiCallback(toolConfig, req)
+		},
+		func(resp *aid.AIResponse) error {
+			// Extract verification response
+			responseContent := r.extractResponseContent(resp)
+
+			// Parse verification result
+			satisfied, finalResult, verificationErr = r.parseVerificationResponse(responseContent)
+			if verificationErr != nil {
+				return utils.Errorf("failed to parse verification response: %v", verificationErr)
+			}
+			return nil
+		})
+
+	if err != nil {
+		return false, "", utils.Errorf("failed to verify user satisfaction: %v", err)
+	}
+
+	if verificationErr != nil {
+		return false, "", utils.Errorf("failed to parse verification response: %v", verificationErr)
+	}
+
+	return satisfied, finalResult, nil
+}
+
+// generateVerificationPrompt generates a prompt for verifying user satisfaction
+func (r *ReAct) generateVerificationPrompt(originalQuery, toolName string) string {
+	var prompt bytes.Buffer
+
+	prompt.WriteString("# Task Verification and Result Formatting\n\n")
+	prompt.WriteString("You are tasked with verifying if a tool execution has satisfied the user's original request and providing a human-readable summary.\n\n")
+
+	// Original user query
+	prompt.WriteString("# Original User Query\n")
+	prompt.WriteString(fmt.Sprintf("User's request: %s\n\n", originalQuery))
+
+	// Tool execution context
+	prompt.WriteString("# Tool Execution Context\n")
+	prompt.WriteString(fmt.Sprintf("Tool executed: %s\n", toolName))
+
+	// Recent conversation history for context
+	r.config.mu.RLock()
+	conversationHistory := make([]string, len(r.config.conversationHistory))
+	copy(conversationHistory, r.config.conversationHistory)
+	r.config.mu.RUnlock()
+
+	if len(conversationHistory) > 0 {
+		prompt.WriteString("# Recent Conversation History\n")
+		// Show last few entries for context
+		recentHistory := conversationHistory
+		if len(recentHistory) > 6 {
+			recentHistory = recentHistory[len(recentHistory)-6:]
+		}
+		for _, entry := range recentHistory {
+			prompt.WriteString(entry + "\n")
+		}
+		prompt.WriteString("\n")
+	}
+
+	// Language preference
+	if r.config.language == "zh" {
+		prompt.WriteString("LANGUAGE: Please respond in Chinese (中文).\n\n")
+	} else {
+		prompt.WriteString("LANGUAGE: Please respond in English.\n\n")
+	}
+
+	// Instructions
+	prompt.WriteString("# Instructions\n")
+	prompt.WriteString("Based on the tool execution results and conversation history, determine:\n")
+	prompt.WriteString("1. Whether the user's original request has been satisfied\n")
+	prompt.WriteString("2. Provide a human-readable summary of the results\n\n")
+
+	prompt.WriteString("RESPONSE FORMAT: Respond with a JSON object:\n\n")
+	prompt.WriteString("```json\n")
+	prompt.WriteString("{\n")
+	prompt.WriteString("  \"@action\": \"verify-satisfaction\",\n")
+	prompt.WriteString("  \"user_satisfied\": true/false,\n")
+	prompt.WriteString("  \"human_readable_result\": \"Clear, concise summary of what was accomplished and any key findings\",\n")
+	prompt.WriteString("  \"reasoning\": \"Brief explanation of why the user's needs are/aren't satisfied\"\n")
+	prompt.WriteString("}\n")
+	prompt.WriteString("```\n\n")
+
+	prompt.WriteString("IMPORTANT GUIDELINES:\n")
+	prompt.WriteString("- Set user_satisfied to true only if the original request was genuinely fulfilled\n")
+	prompt.WriteString("- If the tool failed or produced unclear results, set user_satisfied to false\n")
+	prompt.WriteString("- Make the human_readable_result clear and informative for the user\n")
+	prompt.WriteString("- Focus on what the user actually wanted to know or accomplish\n")
+
+	return prompt.String()
+}
+
+// parseVerificationResponse parses the verification response to extract satisfaction status and human-readable result
+func (r *ReAct) parseVerificationResponse(response string) (bool, string, error) {
+	// Try to extract @action first for validation
+	action, err := aid.ExtractAction(response, "verify-satisfaction")
+	if err != nil {
+		return false, "", utils.Errorf("failed to extract verification action: %v", err)
+	}
+
+	// Extract satisfaction status
+	satisfied := action.GetBool("user_satisfied")
+
+	// Extract human-readable result
+	humanReadableResult := action.GetString("human_readable_result")
+	if humanReadableResult == "" {
+		return false, "", utils.Error("human_readable_result is required but empty")
+	}
+
+	// Optional: extract reasoning for debugging
+	reasoning := action.GetString("reasoning")
+	if r.config.debugEvent && reasoning != "" {
+		log.Infof("Verification reasoning: %s", reasoning)
+	}
+
+	return satisfied, humanReadableResult, nil
+}
