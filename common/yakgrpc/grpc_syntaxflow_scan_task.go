@@ -28,18 +28,19 @@ func (s *Server) QuerySyntaxFlowScanTask(ctx context.Context, request *ypb.Query
 	if progNames := request.GetFilter().GetPrograms(); len(progNames) == 1 && request.ShowDiffRisk {
 		var lastTask *schema.SyntaxFlowScanTask
 		for i, task := range tasks {
-			risks := []*schema.SSARisk{}
+			// lastTask为较新的扫描
+			// fmt.Printf("task time: %v\n", task.Model)
 			if i == 0 {
 				lastTask = task
 				continue
 			}
 			baseline := &ypb.SSARiskDiffItem{
 				ProgramName:   progNames[0],
-				RiskRuntimeId: task.TaskId,
+				RiskRuntimeId: lastTask.TaskId,
 			}
 			compare := &ypb.SSARiskDiffItem{
 				ProgramName:   progNames[0],
-				RiskRuntimeId: lastTask.TaskId,
+				RiskRuntimeId: task.TaskId,
 			}
 			res, err := yakit.DoRiskDiff(ctx, baseline, compare)
 			if err != nil {
@@ -47,10 +48,21 @@ func (s *Server) QuerySyntaxFlowScanTask(ctx context.Context, request *ypb.Query
 			}
 			for re := range res {
 				if re.Status == yakit.Add {
-					risks = append(risks, re.NewValue)
+					lastTask.NewRiskCount++
+					switch schema.ValidSeverityType(re.NewValue.Severity) {
+					case schema.SFR_SEVERITY_INFO:
+						lastTask.NewInfoCount++
+					case schema.SFR_SEVERITY_WARNING:
+						lastTask.NewWarningCount++
+					case schema.SFR_SEVERITY_CRITICAL:
+						lastTask.NewCriticalCount++
+					case schema.SFR_SEVERITY_HIGH:
+						lastTask.NewHighCount++
+					case schema.SFR_SEVERITY_LOW:
+						lastTask.NewLowCount++
+					}
 				}
 			}
-			task.NewRiskCount = int64(len(risks))
 			lastTask = task
 		}
 	}
