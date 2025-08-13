@@ -194,8 +194,15 @@ func (r *ReAct) extractResponseContent(resp *aid.AIResponse) string {
 		return ""
 	}
 
-	// Try to read from the response stream
-	reader := resp.GetUnboundStreamReader(false)
+	// Use the same method as other parts of the system
+	// Create a temporary aid.Config for the response reader
+	tempConfig := aid.NewConfig(r.config.ctx)
+	reader := resp.GetOutputStreamReader("react-response", false, tempConfig)
+	if reader == nil {
+		log.Error("Failed to get output stream reader")
+		return ""
+	}
+
 	content, err := io.ReadAll(reader)
 	if err != nil {
 		log.Errorf("Failed to read AI response: %v", err)
@@ -208,18 +215,9 @@ func (r *ReAct) extractResponseContent(resp *aid.AIResponse) string {
 	}
 
 	if len(contentStr) == 0 {
-		log.Warn("AI response content is empty")
-		// Return a simple JSON response for testing
-		return `{
-			"@action": "object",
-			"action": {
-				"type": "directly_answer",
-				"answer_payload": "我是一个 ReAct AI 助手。我目前可以使用以下工具：calculator（计算器）、echo（回声）、current_time（当前时间）。请问您需要什么帮助？"
-			},
-			"human_readable_thought": "用户询问我的能力和可用工具，我应该直接回答",
-			"cumulative_summary": "用户询问AI能力和工具",
-			"is_final_step": true
-		}`
+		log.Warn("AI response content is empty - this should trigger error learning")
+		// Don't return a hardcoded response - let the error propagate so error learning can work
+		return ""
 	}
 
 	return contentStr

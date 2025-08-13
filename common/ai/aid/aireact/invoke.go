@@ -3,17 +3,13 @@ package aireact
 import (
 	"bytes"
 	_ "embed"
-	"encoding/json"
 	"fmt"
 	"os"
 	"runtime"
-	"strings"
 	"time"
 
-	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -136,11 +132,24 @@ func (r *ReAct) parseReActAction(response string) (*aid.Action, error) {
 		return nil, utils.Error("human_readable_thought is required but empty")
 	}
 
-	actionType := action.GetInvokeParams("action").GetString("type")
+	actionType := action.GetInvokeParams("next_action").GetString("type")
 	if actionType == "" {
+		log.Errorf("response: %s, cannot parse $..next_action.type", response)
 		return nil, utils.Error("action.type is required but empty")
 	}
 
+	if !utils.StringSliceContain([]string{
+		string(ActionDirectlyAnswer),
+		string(ActionRequireTool),
+		string(ActionRequestPlanExecution),
+	}, actionType) {
+		log.Errorf("response: %s, cannot parse $..next_action.type", response)
+		return nil, utils.Errorf("invalid action type '%s', must be one of: %v", actionType, []any{
+			ActionDirectlyAnswer,
+			ActionRequireTool,
+			ActionRequestPlanExecution,
+		})
+	}
 	return action, nil
 }
 
@@ -148,6 +157,7 @@ func (r *ReAct) parseReActAction(response string) (*aid.Action, error) {
 func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputEvent) error {
 	if r.config.debugEvent {
 		log.Infof("executeMainLoop started with query: %s", userQuery)
+		log.Infof("ReAct AI Error Learning: 已启用增强的AI错误学习功能，AI将自动从失败中学习并改进响应质量")
 	}
 
 	r.config.mu.Lock()
@@ -247,8 +257,8 @@ func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputE
 		r.config.mu.Lock()
 
 		if transactionErr != nil {
-			r.emitError(outputChan, fmt.Sprintf("AI transaction failed: %v", transactionErr))
-			log.Errorf("AI transaction failed: %v", transactionErr)
+			r.emitError(outputChan, fmt.Sprintf("AI transaction failed (内置错误学习功能): %v", transactionErr))
+			log.Errorf("AI transaction failed with error learning: %v", transactionErr)
 			continue
 		}
 
@@ -259,7 +269,7 @@ func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputE
 		}
 
 		if r.config.debugEvent {
-			actionType := action.GetInvokeParams("action").GetString("type")
+			actionType := action.GetInvokeParams("next_action").GetString("type")
 			thought := action.GetString("human_readable_thought")
 			log.Infof("Parsed action: type=%s, thought=%s", actionType, thought)
 		}
@@ -277,11 +287,11 @@ func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputE
 		}
 
 		// Execute action based on type
-		actionType := ActionType(action.GetInvokeParams("action").GetString("type"))
-		switch actionType {
+		actionType := ActionType(action.GetInvokeParams("next_action").GetString("type"))
+		switch ActionType(actionType) {
 		case ActionDirectlyAnswer:
 			r.emitInfo(outputChan, "Providing direct answer")
-			answerPayload := action.GetInvokeParams("action").GetString("answer_payload")
+			answerPayload := action.GetInvokeParams("next_action").GetString("answer_payload")
 			r.emitAction(outputChan, fmt.Sprintf("Answer: %s", answerPayload))
 			r.emitResult(outputChan, answerPayload)
 			// Always mark as finished for direct answers to avoid loops
@@ -292,7 +302,7 @@ func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputE
 				fmt.Sprintf("Assistant: %s", answerPayload))
 
 		case ActionRequireTool:
-			toolPayload := action.GetInvokeParams("action").GetString("tool_request_payload")
+			toolPayload := action.GetInvokeParams("next_action").GetString("tool_request_payload")
 			r.emitInfo(outputChan, fmt.Sprintf("Requesting tool: %s", toolPayload))
 			if err := r.handleRequireTool(toolPayload, outputChan); err != nil {
 				r.emitError(outputChan, fmt.Sprintf("Tool execution failed: %v", err))
@@ -307,7 +317,7 @@ func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputE
 			}
 
 		case ActionRequestPlanExecution:
-			planPayload := action.GetInvokeParams("action").GetString("plan_request_payload")
+			planPayload := action.GetInvokeParams("next_action").GetString("plan_request_payload")
 			r.emitInfo(outputChan, fmt.Sprintf("Requesting plan execution: %s", planPayload))
 			r.emitAction(outputChan, fmt.Sprintf("Plan request: %s", planPayload))
 			// TODO: Implement plan execution logic
@@ -337,121 +347,9 @@ func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputE
 	return nil
 }
 
-// handleRequireTool handles tool requirement action, inspired by task_call_tool.go
-func (r *ReAct) handleRequireTool(toolName string, outputChan chan *ypb.AIOutputEvent) error {
-	// Find the required tool
-	tool, err := r.config.aiToolManager.GetToolByName(toolName)
-	if err != nil {
-		return utils.Errorf("tool '%s' not found: %v", toolName, err)
-	}
+// handleRequireTool is now implemented in invoke_toolcall.go
 
-	r.emitInfo(outputChan, fmt.Sprintf("preparing tool: %s - %s", tool.Name, tool.Description))
-
-	// Generate tool call ID for tracking
-	_ = ksuid.New().String() // callToolId for future use
-
-	// Generate parameters for the tool
-	paramsPrompt := r.generateToolParamsPrompt(tool)
-
-	if r.config.debugPrompt {
-		log.Infof("Tool params prompt: %s", paramsPrompt)
-	}
-
-	var toolParams aitool.InvokeParams
-
-	// Use aid.CallAITransaction for tool parameter generation
-	var paramsErr error
-	toolConfig := aid.NewConfig(r.config.ctx)
-
-	r.emitInfo(outputChan, "generating tool parameters...")
-
-	err = aid.CallAITransaction(toolConfig, paramsPrompt,
-		func(req *aid.AIRequest) (*aid.AIResponse, error) {
-			return r.config.aiCallback(toolConfig, req)
-		},
-		func(resp *aid.AIResponse) error {
-			// Extract parameters from response
-			paramsContent := r.extractResponseContent(resp)
-			toolParams, paramsErr = r.parseToolParams(paramsContent)
-			if paramsErr != nil {
-				return utils.Errorf("failed to parse tool parameters: %v", paramsErr)
-			}
-			return nil
-		})
-
-	if err != nil {
-		return utils.Errorf("failed to generate tool parameters: %v", err)
-	}
-
-	if paramsErr != nil {
-		return utils.Errorf("failed to parse tool parameters: %v", paramsErr)
-	}
-
-	// Format parameters for human-readable display
-	var paramsList []string
-	for key, value := range toolParams {
-		paramsList = append(paramsList, fmt.Sprintf("%s=%v", key, value))
-	}
-	paramsStr := strings.Join(paramsList, ", ")
-
-	r.emitInfo(outputChan, fmt.Sprintf("parameters generated: %s", paramsStr))
-
-	// Execute the tool
-	r.emitInfo(outputChan, fmt.Sprintf("executing tool: %s", tool.Name))
-
-	result, err := tool.InvokeWithParams(toolParams)
-	if err != nil {
-		r.emitError(outputChan, fmt.Sprintf("tool execution failed: %v", err))
-		return utils.Errorf("tool execution failed: %v", err)
-	}
-
-	// Emit tool result
-	r.emitObservation(outputChan, fmt.Sprintf("tool %s completed, result: %s", tool.Name, result.String()))
-
-	// Add tool call to conversation history
-	r.config.conversationHistory = append(r.config.conversationHistory,
-		fmt.Sprintf("Tool Call: %s with params %v", tool.Name, toolParams),
-		fmt.Sprintf("Tool Result: %s", result.String()),
-	)
-
-	return nil
-}
-
-// generateToolParamsPrompt generates prompt for tool parameter generation
-func (r *ReAct) generateToolParamsPrompt(tool *aitool.Tool) string {
-	var prompt bytes.Buffer
-
-	prompt.WriteString("# Tool Parameter Generation\n\n")
-	prompt.WriteString(fmt.Sprintf("You need to generate parameters for the tool '%s'.\n\n", tool.Name))
-	prompt.WriteString(fmt.Sprintf("Tool Description: %s\n\n", tool.Description))
-
-	// Tool schema (if available)
-	if tool.Tool != nil && tool.Tool.InputSchema.Properties != nil {
-		schemaJson, _ := json.MarshalIndent(tool.Tool.InputSchema, "", "  ")
-		prompt.WriteString("Tool Schema:\n")
-		prompt.WriteString("```json\n")
-		prompt.WriteString(string(schemaJson))
-		prompt.WriteString("\n```\n\n")
-	}
-
-	// Recent conversation context
-	if len(r.config.conversationHistory) > 0 {
-		prompt.WriteString("Recent Conversation:\n")
-		recentHistory := r.config.conversationHistory
-		if len(recentHistory) > 5 {
-			recentHistory = recentHistory[len(recentHistory)-5:]
-		}
-		for _, entry := range recentHistory {
-			prompt.WriteString(entry + "\n")
-		}
-		prompt.WriteString("\n")
-	}
-
-	prompt.WriteString("Generate appropriate parameters for this tool call and respond with a JSON object containing the parameters.\n")
-	prompt.WriteString("Example: {\"param1\": \"value1\", \"param2\": \"value2\"}\n")
-
-	return prompt.String()
-}
+// generateToolParamsPrompt is now implemented in invoke_toolcall.go
 
 // getPrioritizedTools returns a prioritized list of tools, with search tools first
 func (r *ReAct) getPrioritizedTools(tools []*aitool.Tool, maxCount int) []*aitool.Tool {
@@ -506,22 +404,4 @@ func (r *ReAct) getPrioritizedTools(tools []*aitool.Tool, maxCount int) []*aitoo
 	}
 
 	return result
-}
-
-// parseToolParams parses tool parameters from AI response
-func (r *ReAct) parseToolParams(response string) (aitool.InvokeParams, error) {
-	// Extract JSON objects from response
-	for _, pairs := range jsonextractor.ExtractObjectIndexes(response) {
-		start, end := pairs[0], pairs[1]
-		jsonStr := response[start:end]
-
-		var params map[string]interface{}
-		if err := json.Unmarshal([]byte(jsonStr), &params); err != nil {
-			continue
-		}
-
-		return aitool.InvokeParams(params), nil
-	}
-
-	return nil, utils.Error("no valid parameters found in response")
 }
