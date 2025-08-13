@@ -5,6 +5,7 @@ import (
 	"archive/zip"
 	"compress/gzip"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -133,14 +134,29 @@ func extractZipAll(reader *zip.ReadCloser, targetPath string, isDir bool) error 
 	for _, file := range reader.File {
 		itemTargetPath := filepath.Join(targetPath, file.Name)
 		log.Infof("processing file: %s, target: %s", file.Name, itemTargetPath)
-
-		if file.FileInfo().IsDir() {
+		mode := file.Mode()
+		switch {
+		case mode&fs.ModeSymlink != 0:
+			log.Infof("creating sym link: %s", itemTargetPath)
+			rc, err := file.Open()
+			if err != nil {
+				return err
+			}
+			linkTarget, err := io.ReadAll(rc)
+			rc.Close()
+			if err != nil {
+				return err
+			}
+			if err := os.Symlink(string(linkTarget), itemTargetPath); err != nil {
+				return err
+			}
+		case mode.IsDir():
 			log.Infof("creating directory: %s", itemTargetPath)
 			if err := os.MkdirAll(itemTargetPath, file.FileInfo().Mode()); err != nil {
 				log.Infof("create directory failed: %v", err)
 				return utils.Errorf("create directory failed: %v", err)
 			}
-		} else {
+		case mode.IsRegular():
 			log.Infof("extracting file: %s to %s", file.Name, itemTargetPath)
 			if err := os.MkdirAll(filepath.Dir(itemTargetPath), 0755); err != nil {
 				log.Infof("create file directory failed: %v", err)
@@ -150,6 +166,8 @@ func extractZipAll(reader *zip.ReadCloser, targetPath string, isDir bool) error 
 				log.Infof("extract file failed: %v", err)
 				return err
 			}
+		default:
+			log.Errorf("  -> Unsupported file mode: %v\n", mode)
 		}
 	}
 
