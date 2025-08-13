@@ -41,12 +41,12 @@ type ReActConfig struct {
 	temperatureAction float32
 
 	// Memory and state
-	conversationHistory []string
-	cumulativeSummary   string // Cumulative summary for conversation memory
-	currentIteration    int
-	finished            bool
-	language            string // Response language preference
-	topToolsCount       int    // Number of top tools to display in prompt
+	memory            *aid.Memory // Replace conversationHistory with Memory/Timeline
+	cumulativeSummary string      // Cumulative summary for conversation memory
+	currentIteration  int
+	finished          bool
+	language          string // Response language preference
+	topToolsCount     int    // Number of top tools to display in prompt
 
 	// Synchronization
 	mu sync.RWMutex
@@ -228,7 +228,7 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		maxActions:          5,
 		temperatureThink:    0.7,
 		temperatureAction:   0.3,
-		conversationHistory: make([]string, 0),
+		memory:              aid.GetDefaultMemory(), // Initialize with default memory
 		currentIteration:    0,
 		finished:            false,
 		language:            "zh", // Default to Chinese

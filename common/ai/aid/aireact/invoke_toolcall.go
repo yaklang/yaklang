@@ -55,11 +55,8 @@ func (r *ReAct) handleRequireTool(toolName string, outputChan chan *ypb.AIOutput
 	// Emit tool result
 	r.emitObservation(outputChan, fmt.Sprintf("tool %s completed, result: %s", tool.Name, result.String()))
 
-	// Add tool call to conversation history
-	r.config.conversationHistory = append(r.config.conversationHistory,
-		fmt.Sprintf("Tool Call: %s with params %v", tool.Name, toolParams),
-		fmt.Sprintf("Tool Result: %s", result.String()),
-	)
+	// Store tool result in timeline memory
+	r.config.memory.PushToolCallResults(result)
 
 	return nil
 }
@@ -203,14 +200,12 @@ func (r *ReAct) generateToolParamsPrompt(tool *aitool.Tool) string {
 		prompt.WriteString("\n```\n\n")
 	}
 
-	// Extract context data - NOTE: This method should be called when the caller already holds the lock
-	// or when lock is not needed (data is passed as parameters)
-	originalQuery := r.extractOriginalUserQueryUnsafe()
+	// Extract context data from memory
+	originalQuery := r.config.memory.Query
 	cumulativeSummary := r.config.cumulativeSummary
 	currentIteration := r.config.currentIteration
 	maxIterations := r.config.maxIterations
-	conversationHistory := make([]string, len(r.config.conversationHistory))
-	copy(conversationHistory, r.config.conversationHistory)
+	timeline := r.config.memory.Timeline()
 
 	// Original user query for context
 	if originalQuery != "" {
@@ -229,16 +224,10 @@ func (r *ReAct) generateToolParamsPrompt(tool *aitool.Tool) string {
 	prompt.WriteString(fmt.Sprintf("Current iteration: %d/%d\n", currentIteration, maxIterations))
 	prompt.WriteString("This tool call is part of a multi-step ReAct process. Consider how this tool execution contributes to completing the overall user task.\n\n")
 
-	// Recent conversation context
-	if len(conversationHistory) > 0 {
-		prompt.WriteString("# Recent Conversation\n")
-		recentHistory := conversationHistory
-		if len(recentHistory) > 8 {
-			recentHistory = recentHistory[len(recentHistory)-8:]
-		}
-		for _, entry := range recentHistory {
-			prompt.WriteString(entry + "\n")
-		}
+	// Recent timeline context
+	if timeline != "" {
+		prompt.WriteString("# Recent Timeline\n")
+		prompt.WriteString(timeline)
 		prompt.WriteString("\n")
 	}
 
@@ -265,28 +254,11 @@ func (r *ReAct) generateToolParamsPrompt(tool *aitool.Tool) string {
 	return prompt.String()
 }
 
-// extractOriginalUserQuery extracts the original user query from conversation history (thread-safe)
+// extractOriginalUserQuery extracts the original user query from memory (thread-safe)
 func (r *ReAct) extractOriginalUserQuery() string {
 	r.config.mu.RLock()
 	defer r.config.mu.RUnlock()
-	return r.extractOriginalUserQueryUnsafe()
-}
-
-// extractOriginalUserQueryUnsafe extracts the original user query from conversation history (NOT thread-safe)
-// This method should only be called when the caller already holds the lock
-func (r *ReAct) extractOriginalUserQueryUnsafe() string {
-	if len(r.config.conversationHistory) == 0 {
-		return ""
-	}
-
-	// Look for the first "User:" entry in conversation history
-	for _, entry := range r.config.conversationHistory {
-		if strings.HasPrefix(entry, "User: ") {
-			return strings.TrimPrefix(entry, "User: ")
-		}
-	}
-
-	return ""
+	return r.config.memory.Query
 }
 
 // verifyUserSatisfaction verifies if the tool execution satisfied the user's needs and provides human-readable output
@@ -349,22 +321,14 @@ func (r *ReAct) generateVerificationPrompt(originalQuery, toolName string) strin
 	prompt.WriteString("# Tool Execution Context\n")
 	prompt.WriteString(fmt.Sprintf("Tool executed: %s\n", toolName))
 
-	// Recent conversation history for context
+	// Recent timeline for context
 	r.config.mu.RLock()
-	conversationHistory := make([]string, len(r.config.conversationHistory))
-	copy(conversationHistory, r.config.conversationHistory)
+	timeline := r.config.memory.Timeline()
 	r.config.mu.RUnlock()
 
-	if len(conversationHistory) > 0 {
-		prompt.WriteString("# Recent Conversation History\n")
-		// Show last few entries for context
-		recentHistory := conversationHistory
-		if len(recentHistory) > 6 {
-			recentHistory = recentHistory[len(recentHistory)-6:]
-		}
-		for _, entry := range recentHistory {
-			prompt.WriteString(entry + "\n")
-		}
+	if timeline != "" {
+		prompt.WriteString("# Recent Timeline\n")
+		prompt.WriteString(timeline)
 		prompt.WriteString("\n")
 	}
 

@@ -33,7 +33,7 @@ const (
 )
 
 // generateMainLoopPrompt generates the prompt for the main ReAct loop
-func (r *ReAct) generateMainLoopPrompt(userQuery string, conversationHistory []string, tools []*aitool.Tool) string {
+func (r *ReAct) generateMainLoopPrompt(userQuery string, tools []*aitool.Tool) string {
 	var prompt bytes.Buffer
 
 	// Background information
@@ -70,12 +70,11 @@ func (r *ReAct) generateMainLoopPrompt(userQuery string, conversationHistory []s
 		prompt.WriteString(r.config.cumulativeSummary + "\n\n")
 	}
 
-	// Conversation history
-	if len(conversationHistory) > 0 {
-		prompt.WriteString("# Recent Conversation History\n")
-		for _, entry := range conversationHistory {
-			prompt.WriteString(entry + "\n")
-		}
+	// Timeline memory (replaces conversation history)
+	timeline := r.config.memory.Timeline()
+	if timeline != "" {
+		prompt.WriteString("# Timeline Memory\n")
+		prompt.WriteString(timeline)
 		prompt.WriteString("\n")
 	}
 
@@ -174,15 +173,19 @@ func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputE
 		log.Infof("executeMainLoop: session not finished, continuing")
 	}
 
-	// Initialize conversation if needed
-	if len(r.config.conversationHistory) == 0 {
-		r.config.conversationHistory = append(r.config.conversationHistory,
-			fmt.Sprintf("User: %s", userQuery))
-		r.config.currentIteration = 0
-		r.config.finished = false
-		if r.config.debugEvent {
-			log.Infof("Initialized conversation history with: %s", userQuery)
-		}
+	// Initialize memory if needed
+	if r.config.memory == nil {
+		r.config.memory = aid.GetDefaultMemory()
+	}
+
+	// Store the user query in memory
+	r.config.memory.StoreQuery(userQuery)
+
+	// Reset iteration state for new conversation
+	r.config.currentIteration = 0
+	r.config.finished = false
+	if r.config.debugEvent {
+		log.Infof("Initialized memory with user query: %s", userQuery)
 	}
 
 	if r.config.debugEvent {
@@ -213,9 +216,7 @@ func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputE
 		}
 
 		// Generate prompt for main loop
-		conversationHistoryCopy := make([]string, len(r.config.conversationHistory))
-		copy(conversationHistoryCopy, r.config.conversationHistory)
-		prompt := r.generateMainLoopPrompt(userQuery, conversationHistoryCopy, tools)
+		prompt := r.generateMainLoopPrompt(userQuery, tools)
 
 		if r.config.debugPrompt {
 			log.Infof("ReAct main loop prompt: %s", prompt)
@@ -297,9 +298,7 @@ func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputE
 			// Always mark as finished for direct answers to avoid loops
 			r.config.finished = true
 
-			// Add to conversation history
-			r.config.conversationHistory = append(r.config.conversationHistory,
-				fmt.Sprintf("Assistant: %s", answerPayload))
+			// Store interaction in memory (no tool call result for direct answers)
 
 		case ActionRequireTool:
 			toolPayload := action.GetInvokeParams("next_action").GetString("tool_request_payload")
@@ -340,11 +339,8 @@ func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputE
 			r.emitError(outputChan, fmt.Sprintf("Unknown action type: %s", actionType))
 		}
 
-		// Update conversation history
-		r.config.conversationHistory = append(r.config.conversationHistory,
-			fmt.Sprintf("AI Thought: %s", action.GetString("human_readable_thought")),
-			fmt.Sprintf("AI Action: %s", actionType),
-		)
+		// Timeline will automatically store tool results via handleRequireTool
+		// No need to manually update conversation history as timeline handles this
 
 		// Check if final step
 		if action.GetBool("is_final_step") {
