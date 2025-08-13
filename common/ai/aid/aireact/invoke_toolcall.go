@@ -1,7 +1,6 @@
 package aireact
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -185,73 +184,14 @@ func (r *ReAct) executeToolWithParams(tool *aitool.Tool, params aitool.InvokePar
 
 // generateToolParamsPrompt generates prompt for tool parameter generation with enhanced schema information
 func (r *ReAct) generateToolParamsPrompt(tool *aitool.Tool) string {
-	var prompt bytes.Buffer
-
-	prompt.WriteString("# Tool Parameter Generation\n\n")
-	prompt.WriteString(fmt.Sprintf("You need to generate parameters for the tool '%s'.\n\n", tool.Name))
-	prompt.WriteString(fmt.Sprintf("Tool Description: %s\n\n", tool.Description))
-
-	// Tool schema (if available)
-	if tool.Tool != nil && tool.Tool.InputSchema.Properties != nil {
-		schemaJson, _ := json.MarshalIndent(tool.Tool.InputSchema, "", "  ")
-		prompt.WriteString("Tool Schema:\n")
-		prompt.WriteString("```json\n")
-		prompt.WriteString(string(schemaJson))
-		prompt.WriteString("\n```\n\n")
+	// Use the prompt manager to generate the prompt
+	prompt, err := r.promptManager.GenerateToolParamsPrompt(tool)
+	if err != nil {
+		// Fallback to basic prompt if template fails
+		log.Errorf("Failed to generate tool params prompt from template: %v", err)
+		return fmt.Sprintf("Generate parameters for tool '%s': %s", tool.Name, tool.Description)
 	}
-
-	// Extract context data from memory
-	originalQuery := r.config.memory.Query
-	cumulativeSummary := r.config.cumulativeSummary
-	currentIteration := r.config.currentIteration
-	maxIterations := r.config.maxIterations
-	timeline := r.config.memory.Timeline()
-
-	// Original user query for context
-	if originalQuery != "" {
-		prompt.WriteString("# Original User Query\n")
-		prompt.WriteString(fmt.Sprintf("User's original request: %s\n\n", originalQuery))
-	}
-
-	// Cumulative summary for overall context and memory
-	if cumulativeSummary != "" {
-		prompt.WriteString("# Task Context & Memory\n")
-		prompt.WriteString(fmt.Sprintf("Overall task context: %s\n\n", cumulativeSummary))
-	}
-
-	// Current task progress
-	prompt.WriteString("# Task Progress\n")
-	prompt.WriteString(fmt.Sprintf("Current iteration: %d/%d\n", currentIteration, maxIterations))
-	prompt.WriteString("This tool call is part of a multi-step ReAct process. Consider how this tool execution contributes to completing the overall user task.\n\n")
-
-	// Recent timeline context
-	if timeline != "" {
-		prompt.WriteString("# Recent Timeline\n")
-		prompt.WriteString(timeline)
-		prompt.WriteString("\n")
-	}
-
-	// Enhanced instructions for parameter generation with task completion context
-	prompt.WriteString("# Instructions\n")
-	prompt.WriteString("Generate appropriate parameters for this tool call based on the context above.\n\n")
-	prompt.WriteString("IMPORTANT CONSIDERATIONS:\n")
-	prompt.WriteString("- Consider the original user query and overall task context when generating parameters\n")
-	prompt.WriteString("- This tool execution should contribute to completing the user's original request\n")
-	prompt.WriteString("- The cumulative summary contains the evolving context - use this to understand what has been accomplished so far\n")
-	prompt.WriteString("- After this tool execution, the ReAct loop will determine if the task is complete or if further actions are needed\n")
-	prompt.WriteString("- Generate parameters that will produce meaningful results toward task completion\n\n")
-	prompt.WriteString("RESPONSE FORMAT: Respond with a JSON object following the @action pattern:\n\n")
-	prompt.WriteString("```json\n")
-	prompt.WriteString("{\n")
-	prompt.WriteString("  \"@action\": \"call-tool\",\n")
-	prompt.WriteString("  \"params\": {\n")
-	prompt.WriteString("    \"param1\": \"value1\",\n")
-	prompt.WriteString("    \"param2\": \"value2\"\n")
-	prompt.WriteString("  }\n")
-	prompt.WriteString("}\n")
-	prompt.WriteString("```\n\n")
-
-	return prompt.String()
+	return prompt
 }
 
 // extractOriginalUserQuery extracts the original user query from memory (thread-safe)
@@ -259,133 +199,4 @@ func (r *ReAct) extractOriginalUserQuery() string {
 	r.config.mu.RLock()
 	defer r.config.mu.RUnlock()
 	return r.config.memory.Query
-}
-
-// verifyUserSatisfaction verifies if the tool execution satisfied the user's needs and provides human-readable output
-func (r *ReAct) verifyUserSatisfaction(originalQuery, toolName string, outputChan chan *ypb.AIOutputEvent) (bool, string, error) {
-	// Generate verification prompt
-	verificationPrompt := r.generateVerificationPrompt(originalQuery, toolName)
-
-	if r.config.debugPrompt {
-		log.Infof("Verification prompt: %s", verificationPrompt)
-	}
-
-	var satisfied bool
-	var finalResult string
-	var verificationErr error
-
-	// Use aid.CallAITransaction for verification
-	toolConfig := aid.NewConfig(r.config.ctx)
-
-	r.emitInfo(outputChan, "Verifying if user needs are satisfied and formatting results...")
-
-	err := aid.CallAITransaction(toolConfig, verificationPrompt,
-		func(req *aid.AIRequest) (*aid.AIResponse, error) {
-			return r.config.aiCallback(toolConfig, req)
-		},
-		func(resp *aid.AIResponse) error {
-			// Extract verification response
-			responseContent := r.extractResponseContent(resp)
-
-			// Parse verification result
-			satisfied, finalResult, verificationErr = r.parseVerificationResponse(responseContent)
-			if verificationErr != nil {
-				return utils.Errorf("failed to parse verification response: %v", verificationErr)
-			}
-			return nil
-		})
-
-	if err != nil {
-		return false, "", utils.Errorf("failed to verify user satisfaction: %v", err)
-	}
-
-	if verificationErr != nil {
-		return false, "", utils.Errorf("failed to parse verification response: %v", verificationErr)
-	}
-
-	return satisfied, finalResult, nil
-}
-
-// generateVerificationPrompt generates a prompt for verifying user satisfaction
-func (r *ReAct) generateVerificationPrompt(originalQuery, toolName string) string {
-	var prompt bytes.Buffer
-
-	prompt.WriteString("# Task Verification and Result Formatting\n\n")
-	prompt.WriteString("You are tasked with verifying if a tool execution has satisfied the user's original request and providing a human-readable summary.\n\n")
-
-	// Original user query
-	prompt.WriteString("# Original User Query\n")
-	prompt.WriteString(fmt.Sprintf("User's request: %s\n\n", originalQuery))
-
-	// Tool execution context
-	prompt.WriteString("# Tool Execution Context\n")
-	prompt.WriteString(fmt.Sprintf("Tool executed: %s\n", toolName))
-
-	// Recent timeline for context
-	r.config.mu.RLock()
-	timeline := r.config.memory.Timeline()
-	r.config.mu.RUnlock()
-
-	if timeline != "" {
-		prompt.WriteString("# Recent Timeline\n")
-		prompt.WriteString(timeline)
-		prompt.WriteString("\n")
-	}
-
-	// Language preference
-	if r.config.language == "zh" {
-		prompt.WriteString("LANGUAGE: Please respond in Chinese (中文).\n\n")
-	} else {
-		prompt.WriteString("LANGUAGE: Please respond in English.\n\n")
-	}
-
-	// Instructions
-	prompt.WriteString("# Instructions\n")
-	prompt.WriteString("Based on the tool execution results and conversation history, determine:\n")
-	prompt.WriteString("1. Whether the user's original request has been satisfied\n")
-	prompt.WriteString("2. Provide a human-readable summary of the results\n\n")
-
-	prompt.WriteString("RESPONSE FORMAT: Respond with a JSON object:\n\n")
-	prompt.WriteString("```json\n")
-	prompt.WriteString("{\n")
-	prompt.WriteString("  \"@action\": \"verify-satisfaction\",\n")
-	prompt.WriteString("  \"user_satisfied\": true/false,\n")
-	prompt.WriteString("  \"human_readable_result\": \"Clear, concise summary of what was accomplished and any key findings\",\n")
-	prompt.WriteString("  \"reasoning\": \"Brief explanation of why the user's needs are/aren't satisfied\"\n")
-	prompt.WriteString("}\n")
-	prompt.WriteString("```\n\n")
-
-	prompt.WriteString("IMPORTANT GUIDELINES:\n")
-	prompt.WriteString("- Set user_satisfied to true only if the original request was genuinely fulfilled\n")
-	prompt.WriteString("- If the tool failed or produced unclear results, set user_satisfied to false\n")
-	prompt.WriteString("- Make the human_readable_result clear and informative for the user\n")
-	prompt.WriteString("- Focus on what the user actually wanted to know or accomplish\n")
-
-	return prompt.String()
-}
-
-// parseVerificationResponse parses the verification response to extract satisfaction status and human-readable result
-func (r *ReAct) parseVerificationResponse(response string) (bool, string, error) {
-	// Try to extract @action first for validation
-	action, err := aid.ExtractAction(response, "verify-satisfaction")
-	if err != nil {
-		return false, "", utils.Errorf("failed to extract verification action: %v", err)
-	}
-
-	// Extract satisfaction status
-	satisfied := action.GetBool("user_satisfied")
-
-	// Extract human-readable result
-	humanReadableResult := action.GetString("human_readable_result")
-	if humanReadableResult == "" {
-		return false, "", utils.Error("human_readable_result is required but empty")
-	}
-
-	// Optional: extract reasoning for debugging
-	reasoning := action.GetString("reasoning")
-	if r.config.debugEvent && reasoning != "" {
-		log.Infof("Verification reasoning: %s", reasoning)
-	}
-
-	return satisfied, humanReadableResult, nil
 }

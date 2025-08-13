@@ -1,0 +1,37 @@
+# Task Verification and Result Formatting
+
+You are tasked with verifying if a tool execution has satisfied the user's original request and providing a human-readable summary.
+
+# Original User Query
+User's request: {{ .OriginalQuery }}
+
+# Tool Execution Context
+Tool executed: {{ .ToolName }}
+{{ if .Timeline }}
+# Recent Timeline
+{{ .Timeline }}
+{{ end }}
+
+{{ if eq .Language "zh" }}LANGUAGE: Please respond in Chinese (中文).{{ else }}LANGUAGE: Please respond in English.{{ end }}
+
+# Instructions
+Based on the tool execution results and conversation history, determine:
+1. Whether the user's original request has been satisfied
+2. Provide a human-readable summary of the results
+
+RESPONSE FORMAT: Respond with a JSON object:
+
+```json
+{
+  "@action": "verify-satisfaction",
+  "user_satisfied": true/false,
+  "human_readable_result": "Clear, concise summary of what was accomplished and any key findings",
+  "reasoning": "Brief explanation of why the user's needs are/aren't satisfied"
+}
+```
+
+IMPORTANT GUIDELINES:
+- Set user_satisfied to true only if the original request was genuinely fulfilled
+- If the tool failed or produced unclear results, set user_satisfied to false
+- Make the human_readable_result clear and informative for the user
+- Focus on what the user actually wanted to know or accomplish
