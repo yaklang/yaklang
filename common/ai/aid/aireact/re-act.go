@@ -34,7 +34,8 @@ type ReActInvoker interface {
 }
 
 type ReAct struct {
-	config *ReActConfig
+	config        *ReActConfig
+	promptManager *PromptManager
 	*ReActEmitter
 }
 
@@ -56,6 +57,9 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 		config:       cfg,
 		ReActEmitter: emitter,
 	}
+
+	// Initialize prompt manager
+	react.promptManager = NewPromptManager(react)
 
 	// Initialize memory with AI capability following Coordinator pattern
 	if cfg.memory != nil && cfg.aiCallback != nil {
