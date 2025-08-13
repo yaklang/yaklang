@@ -1,8 +1,9 @@
 package aid
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func CallAITransactionWithoutConfig(
