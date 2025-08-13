@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/chanx"
@@ -55,6 +56,49 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 		config:       cfg,
 		ReActEmitter: emitter,
 	}
+
+	// Initialize memory with AI capability following Coordinator pattern
+	if cfg.memory != nil && cfg.aiCallback != nil {
+		// Create aid.Config to bind timeline - this is the key!
+		aidConfig := aid.NewConfig(cfg.ctx)
+
+		// Set AI callback on aidConfig so it can act as AICaller (like Coordinator)
+		// Apply options to set the callback
+		err := aid.WithTaskAICallback(cfg.aiCallback)(aidConfig)
+		if err != nil {
+			log.Errorf("Failed to set AI callback on aid config: %v", err)
+		}
+
+		// Memory will be set via the coordinator options below
+
+		// Follow the exact same pattern as NewCoordinatorContext:
+		// Line 51-53: if utils.IsNil(config.memory.timeline.ai) { config.memory.timeline.setAICaller(config) }
+		// We need to access timeline through reflection or find another way
+
+		// Create a dummy coordinator just to get proper initialization
+		dummyCoordinator, err := aid.NewCoordinatorContext(cfg.ctx, "",
+			aid.WithMemory(cfg.memory),
+			aid.WithTaskAICallback(cfg.aiCallback))
+		if err != nil {
+			log.Errorf("Failed to create coordinator for memory initialization: %v", err)
+		} else {
+			// The coordinator should have properly initialized everything
+			_ = dummyCoordinator
+		}
+
+		// Store tools function
+		cfg.memory.StoreTools(func() []*aitool.Tool {
+			if cfg.aiToolManager == nil {
+				return []*aitool.Tool{}
+			}
+			tools, err := cfg.aiToolManager.GetEnableTools()
+			if err != nil {
+				return []*aitool.Tool{}
+			}
+			return tools
+		})
+	}
+
 	return react, nil
 }
 
@@ -164,7 +208,30 @@ func (r *ReAct) processInputEvent(event *ypb.AITriageInputEvent, outputChan chan
 		r.config.mu.Lock()
 		r.config.finished = false
 		r.config.currentIteration = 0
-		r.config.conversationHistory = make([]string, 0)
+		// Reset memory for new session
+		r.config.memory = aid.GetDefaultMemory()
+		// Re-initialize memory with tools and AI capability
+		if r.config.memory != nil && r.config.aiCallback != nil {
+			// Create a temporary coordinator to bind memory properly
+			tempCoordinator, err := aid.NewCoordinatorContext(r.config.ctx, "reset",
+				aid.WithMemory(r.config.memory))
+			if err != nil {
+				log.Errorf("Failed to create temporary coordinator for memory reset: %v", err)
+			} else {
+				_ = tempCoordinator // Use to avoid unused variable error
+			}
+
+			r.config.memory.StoreTools(func() []*aitool.Tool {
+				if r.config.aiToolManager == nil {
+					return []*aitool.Tool{}
+				}
+				tools, err := r.config.aiToolManager.GetEnableTools()
+				if err != nil {
+					return []*aitool.Tool{}
+				}
+				return tools
+			})
+		}
 		r.config.mu.Unlock()
 		if r.config.debugEvent {
 			log.Infof("Reset ReAct session for new input")
@@ -198,10 +265,6 @@ func (r *ReAct) extractResponseContent(resp *aid.AIResponse) string {
 	// Create a temporary aid.Config for the response reader
 	tempConfig := aid.NewConfig(r.config.ctx)
 	reader := resp.GetOutputStreamReader("react-response", false, tempConfig)
-	if reader == nil {
-		log.Error("Failed to get output stream reader")
-		return ""
-	}
 
 	content, err := io.ReadAll(reader)
 	if err != nil {
