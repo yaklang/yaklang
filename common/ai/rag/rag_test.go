@@ -27,7 +27,7 @@ func (m *MockEmbedder) Embedding(text string) ([]float32, error) {
 }
 
 // 测试文本分块功能
-func TestChunkText(t *testing.T) {
+func TestMUSTPASS_ChunkText(t *testing.T) {
 	text := "这是一个测试文本 用于测试文本分块功能 我们需要确保它可以正确地分割成多个块 每个块的大小应该在指定范围内"
 
 	// 测试没有重叠的情况
@@ -44,7 +44,7 @@ func TestChunkText(t *testing.T) {
 }
 
 // 测试内存向量存储
-func TestMemoryVectorStore(t *testing.T) {
+func TestMUSTPASS_MemoryVectorStore(t *testing.T) {
 	// 创建模拟嵌入器
 	mockEmbed := &MockEmbedder{}
 
@@ -99,7 +99,7 @@ func TestMemoryVectorStore(t *testing.T) {
 }
 
 // 测试RAG系统
-func TestRAGSystem(t *testing.T) {
+func TestMUSTPASS_RAGSystem(t *testing.T) {
 	// 创建模拟嵌入器
 	mockEmbed := &MockEmbedder{}
 
@@ -140,7 +140,7 @@ func TestRAGSystem(t *testing.T) {
 }
 
 // 测试TextToDocuments
-func TestTextToDocuments(t *testing.T) {
+func TestMUSTPASS_TextToDocuments(t *testing.T) {
 	text := "这是一个长文本 需要被分割成多个文档 这样我们可以测试文本到文档的转换功能"
 	metadata := map[string]any{"source": "测试文档"}
 
@@ -158,7 +158,7 @@ func TestTextToDocuments(t *testing.T) {
 }
 
 // 测试FilterResults
-func TestFilterResults(t *testing.T) {
+func TestMUSTPASS_FilterResults(t *testing.T) {
 	results := []SearchResult{
 		{Score: 0.9},
 		{Score: 0.7},
