@@ -254,7 +254,7 @@ func (r *AIResponse) Close() {
 	if r == nil {
 		return
 	}
-	if r.ch != nil {
+	if r.ch == nil {
 		return
 	}
 
@@ -277,6 +277,12 @@ func NewAIResponse(caller AICallerConfigIf) *AIResponse {
 				return
 			}
 			caller.CallAIResponseConsumptionCallback(current)
+		},
+		onOutputFinished: func(s string) {
+			if utils.IsNil(caller) {
+				return
+			}
+			caller.CallAIResponseOutputFinishedCallback(s)
 		},
 	}
 }
@@ -357,5 +363,6 @@ func newUnboundAIResponse() *AIResponse {
 	return &AIResponse{
 		ch:                  chanx.NewUnlimitedChan[*AIResponseOutputStream](context.TODO(), 2),
 		consumptionCallback: func(current int) {},
+		onOutputFinished:    func(s string) {},
 	}
 }

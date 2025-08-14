@@ -43,7 +43,8 @@ func (t *AiTask) execute() error {
 		request.SetTaskIndex(t.Index)
 		return t.CallAI(request)
 	}, func(rsp *aicommon.AIResponse) error {
-		responseBytes, err := io.ReadAll(rsp.GetOutputStreamReader("execute", false, t.config.GetEmitter()))
+		stream := rsp.GetOutputStreamReader("execute", false, t.config.Emitter)
+		responseBytes, err := io.ReadAll(stream)
 		if err != nil {
 			return fmt.Errorf("error reading AI response: %w", err)
 		}

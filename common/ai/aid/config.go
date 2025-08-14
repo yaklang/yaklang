@@ -143,6 +143,10 @@ type Config struct {
 	disableOutputEventType []string
 }
 
+func (c *Config) CallAIResponseOutputFinishedCallback(s string) {
+	c.ProcessExtendedActionCallback(s)
+}
+
 func (c *Config) NewAIResponse() *aicommon.AIResponse {
 	return aicommon.NewAIResponse(c)
 }
