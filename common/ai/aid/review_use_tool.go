@@ -15,7 +15,7 @@ type ToolUseReviewSuggestion struct {
 	AllowExtraPrompt        bool   `json:"allow_extra_prompt"`
 	AllowParamsModification bool   `json:"allow_params_modification"`
 
-	PromptBuilder    func(task *aiTask, rt *runtime) `json:"-"`
+	PromptBuilder    func(task *AiTask, rt *runtime) `json:"-"`
 	ResponseCallback func(reader io.Reader)          `json:"-"`
 	ParamSchema      string                          `json:"param_schema"`
 }
@@ -57,7 +57,7 @@ const (
 	HandleToolUseNext_Default        HandleToolUseNext = ""
 )
 
-func (t *aiTask) handleToolUseReview(
+func (t *AiTask) handleToolUseReview(
 	targetTool *aitool.Tool, param aitool.InvokeParams, userInput aitool.InvokeParams,
 	userCancelHandler func(reason any),
 ) (*aitool.Tool, aitool.InvokeParams, *aitool.ToolResult, HandleToolUseNext, error) {
@@ -106,7 +106,7 @@ func (t *aiTask) handleToolUseReview(
 	}
 }
 
-func (t *aiTask) toolReviewPolicy_wrongTool(oldTool *aitool.Tool, suggestionToolName string, suggestionKeyword string) (*aitool.Tool, error) {
+func (t *AiTask) toolReviewPolicy_wrongTool(oldTool *aitool.Tool, suggestionToolName string, suggestionKeyword string) (*aitool.Tool, error) {
 	var tools []*aitool.Tool
 	if suggestionToolName != "" {
 		for _, item := range utils.PrettifyListFromStringSplited(suggestionToolName, ",") {
@@ -176,7 +176,7 @@ func (t *aiTask) toolReviewPolicy_wrongTool(oldTool *aitool.Tool, suggestionTool
 	return selecteddTool, nil
 }
 
-func (t *aiTask) toolReviewPolicy_wrongParam(oldTool *aitool.Tool, suggestionToolName string, suggestionKeyword string) (*aitool.Tool, error) {
+func (t *AiTask) toolReviewPolicy_wrongParam(oldTool *aitool.Tool, suggestionToolName string, suggestionKeyword string) (*aitool.Tool, error) {
 	var tools []*aitool.Tool
 	if suggestionToolName != "" {
 		for _, item := range utils.PrettifyListFromStringSplited(suggestionToolName, ",") {
