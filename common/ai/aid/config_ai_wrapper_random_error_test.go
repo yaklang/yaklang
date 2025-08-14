@@ -3,14 +3,15 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestCoordinator_RandomAICallbackError(t *testing.T) {
@@ -81,15 +82,28 @@ LOOP:
 		select {
 		case result := <-outputChan:
 			fmt.Println("result:" + result.String())
-			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
-				parsedTask = true
-				inputChan <- &InputEvent{
-					Id: result.GetInteractiveId(),
-					Params: aitool.InvokeParams{
-						"suggestion": "continue",
-					},
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+				// 解析JSON数据
+				var data = map[string]any{}
+				err := json.Unmarshal([]byte(result.Content), &data)
+				if err != nil {
+					t.Fatal(err)
 				}
-				continue
+
+				// 检查是否包含预期的任务描述
+				if plansRaw, ok := data["plans"]; ok {
+					plansJson, _ := json.Marshal(plansRaw)
+					if strings.Contains(string(plansJson), `将最大文件的路径和大小以可读格式输出`) {
+						parsedTask = true
+						inputChan <- &InputEvent{
+							Id: result.GetInteractiveId(),
+							Params: aitool.InvokeParams{
+								"suggestion": "continue",
+							},
+						}
+						continue
+					}
+				}
 			}
 			if result.Type == schema.EVENT_TYPE_CONSUMPTION {
 				var data = map[string]any{}

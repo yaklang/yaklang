@@ -173,7 +173,7 @@ func (e *AiOutputEvent) String() string {
 		parts = append(parts, fmt.Sprintf("[node:%v]", e.NodeId))
 	}
 	if e.TaskIndex != "" {
-		parts = append(parts, fmt.Sprintf("[task:%s]", utils.ShrinkString(e.TaskIndex, 8)))
+		parts = append(parts, fmt.Sprintf("[task:%s]", e.TaskIndex))
 	}
 	if e.IsSystem {
 		parts = append(parts, "system:true")
@@ -185,7 +185,7 @@ func (e *AiOutputEvent) String() string {
 		parts = append(parts, "reason:true")
 	}
 	if len(e.StreamDelta) > 0 {
-		parts = append(parts, fmt.Sprintf("delta:%v", utils.ShrinkString(string(e.StreamDelta), 50)))
+		parts = append(parts, fmt.Sprintf("delta:%v", e.StreamDelta))
 	}
 	if e.IsJson {
 		parts = append(parts, "json:true")
