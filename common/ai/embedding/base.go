@@ -119,5 +119,7 @@ func (c *OpenaiEmbeddingClient) Embedding(text string) ([]float32, error) {
 	if len(response[0].Embedding) == 0 {
 		return nil, utils.Errorf("no embedding data returned")
 	}
-	return response[0].Embedding[0], nil
+	last := utils.GetLastElement(response[0].Embedding)
+	last = NormalizeVector(last, 2, 1e-6)
+	return last, nil
 }

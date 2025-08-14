@@ -3,7 +3,6 @@ package localmodel
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"io"
 	"net"
 	"os"
@@ -12,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -332,6 +333,10 @@ func (m *Manager) buildArgs(config *ServiceConfig) []string {
 		"--ctx-size", fmt.Sprintf("%d", config.ContextSize),
 		"--embedding", // 嵌入模式
 		"--verbose-prompt",
+	}
+
+	if config.Pooling != "" {
+		args = append(args, "--pooling", config.Pooling)
 	}
 
 	// 连续批处理

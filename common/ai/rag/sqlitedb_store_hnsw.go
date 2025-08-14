@@ -1,6 +1,7 @@
 package rag
 
 import (
+	"math/rand"
 	"sort"
 	"sync"
 
@@ -39,6 +40,7 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder Embe
 	hnswGraph := hnsw.NewGraph(
 		hnsw.WithHNSWParameters[string](config.M, config.Ml, config.EfSearch),
 		hnsw.WithDistance[string](hnsw.GetDistanceFunc(config.DistanceFuncType)),
+		hnsw.WithDeterministicRng[string](0), // 使用固定的随机数生成器，便于调试，不影响结果
 	)
 
 	hnswGraph.Layers = ParseLayersInfo(&collections[0].GroupInfos, func(key string) []float32 {
@@ -107,7 +109,7 @@ func NewSQLiteVectorStoreHNSW(name string, description string, modelName string,
 		EnableAutoUpdateGraphInfos: true,
 		embedder:                   embedder,
 		collection:                 collection,
-		hnsw:                       hnsw.NewGraph[string](),
+		hnsw:                       hnsw.NewGraph(hnsw.WithRng[string](rand.New(rand.NewSource(0)))), // 使用固定的随机数生成器，便于调试，不影响结果
 	}
 	vectorStore.hnsw.OnLayersChange = func(layers []*hnsw.Layer[string]) {
 		if vectorStore.EnableAutoUpdateGraphInfos {
@@ -207,7 +209,7 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 
 		// 检查文档是否已存在
 		var existingDoc schema.VectorStoreDocument
-		result := tx.Where("document_id = ?", doc.ID).First(&existingDoc)
+		result := tx.Where("document_id = ? and collection_id = ?", doc.ID, s.collection.ID).First(&existingDoc)
 
 		schemaDoc := s.toSchemaDocument(doc)
 
@@ -255,6 +257,7 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 
 // Search 根据查询文本检索相关文档
 func (s *SQLiteVectorStoreHNSW) Search(query string, page, limit int) ([]SearchResult, error) {
+	pageSize := 10
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -267,44 +270,54 @@ func (s *SQLiteVectorStoreHNSW) Search(query string, page, limit int) ([]SearchR
 	}
 	log.Infof("generated query embedding with dimension: %d", len(queryEmbedding))
 
-	resultNodes := s.hnsw.Search(queryEmbedding, limit)
+	resultNodes := s.hnsw.SearchWithDistance(queryEmbedding, (page-1)*pageSize+limit)
 	resultIds := make([]string, len(resultNodes))
 	for i, result := range resultNodes {
 		resultIds[i] = result.Key
 	}
 	log.Infof("hnsw search returned %d candidate documents", len(resultNodes))
 
-	var docs []schema.VectorStoreDocument
-	if err := s.db.Model(&schema.VectorStoreDocument{}).Find(&docs).Error; err != nil {
-		return nil, utils.Errorf("查询文档失败: %v", err)
-	}
-	log.Infof("loaded %d documents from database", len(docs))
+	// 分批查询文档 (10个一组)
+	batchSize := 10
+	var allDocs []schema.VectorStoreDocument
 
-	if len(docs) == 0 {
-		log.Infof("no documents found, returning empty results")
-		return []SearchResult{}, nil
-	}
-
-	// 计算相似度并排序
-	var results []SearchResult
-	for _, doc := range docs {
-		embedding := []float32(doc.Embedding)
-
-		// 计算余弦相似度
-		similarity, err := utils.CosineSimilarity(queryEmbedding, embedding)
-		if err != nil {
-			log.Warnf("计算文档 %s 的相似度失败: %v", doc.DocumentID, err)
-			continue
+	for i := 0; i < len(resultIds); i += batchSize {
+		end := i + batchSize
+		if end > len(resultIds) {
+			end = len(resultIds)
 		}
 
-		results = append(results, SearchResult{
-			Document: s.toDocument(&doc),
-			Score:    similarity,
-		})
+		batchIds := resultIds[i:end]
+		var batchDocs []schema.VectorStoreDocument
+
+		err := s.db.Where("document_id IN (?) AND collection_id = ?", batchIds, s.collection.ID).Find(&batchDocs).Error
+		if err != nil {
+			return nil, utils.Errorf("批量查询文档失败: %v", err)
+		}
+
+		allDocs = append(allDocs, batchDocs...)
 	}
+
+	// 创建文档ID到文档的映射，以便快速查找
+	docMap := make(map[string]*schema.VectorStoreDocument)
+	for i := range allDocs {
+		docMap[allDocs[i].DocumentID] = &allDocs[i]
+	}
+
+	// 根据resultNodes的顺序和距离构建SearchResult
+	var results []SearchResult
+	for _, resultNode := range resultNodes {
+		if doc, exists := docMap[resultNode.Key]; exists {
+			results = append(results, SearchResult{
+				Document: s.toDocument(doc),
+				Score:    1 - resultNode.Distance,
+			})
+		}
+	}
+
 	log.Infof("calculated similarity scores for %d documents", len(results))
 
-	// 按相似度降序排序
+	// 按相似度分数降序排序
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].Score > results[j].Score
 	})
@@ -313,8 +326,11 @@ func (s *SQLiteVectorStoreHNSW) Search(query string, page, limit int) ([]SearchR
 	if page < 1 {
 		page = 1
 	}
+	if len(results) == 0 {
+		return []SearchResult{}, nil
+	}
 	// 计算分页
-	offset := (page - 1) * limit
+	offset := (page - 1) * pageSize
 	if offset >= len(results) {
 		log.Infof("page offset %d exceeds total results %d, returning empty", offset, len(results))
 		return []SearchResult{}, nil
@@ -324,7 +340,6 @@ func (s *SQLiteVectorStoreHNSW) Search(query string, page, limit int) ([]SearchR
 	}
 	results = results[offset : offset+limit]
 	log.Infof("returning %d results after pagination (offset: %d)", len(results), offset)
-
 	return results, nil
 }
 
