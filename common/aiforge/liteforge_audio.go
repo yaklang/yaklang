@@ -1,22 +1,31 @@
 package aiforge
 
 import (
-	"bytes"
 	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/aireducer"
+	"github.com/yaklang/yaklang/common/chunkmaker"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mediautils"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/whisperutils"
+	"os"
+	"strings"
 )
 
 //go:embed liteforge_audio.schema.json
 var AUDIO_OUTPUT_SCHEMA string
 
 type TimelineSegment struct {
-	StartSeconds   int64  `json:"start_seconds"`
-	EndSeconds     int64  `json:"end_seconds"`
-	ProcessingType string `json:"processing_type"`
+	StartSeconds   float64 `json:"start_seconds"`
+	EndSeconds     float64 `json:"end_seconds"`
+	ProcessingType string  `json:"processing_type"`
+	Text           string  `json:"text"`
+}
+
+func (t *TimelineSegment) String() string {
+	return fmt.Sprintf("start_seconds: %f, end_seconds: %f, processing_type: %s, text: %s", t.StartSeconds, t.EndSeconds, t.ProcessingType, utils.ShrinkString(t.Text, 100))
 }
 
 func (t *TimelineSegment) Ignored() bool {
@@ -27,44 +36,83 @@ func (t *TimelineSegment) FineGrained() bool {
 	return t.ProcessingType == "fine"
 }
 
+type AudioProcessingStats struct {
+	FineDuration   float64 `json:"fine_duration"`   // Total duration of "fine" segments in seconds
+	IgnoreDuration float64 `json:"ignore_duration"` // Total duration of "ignore" segments in seconds
+	FinePercentage float64 `json:"fine_percentage"`
+}
 type AudioAnalysisResult struct {
-	CumulativeSummary string             `json:"cumulative_summary"`
-	TimelineSegments  []*TimelineSegment `json:"timeline_segments"`
+	CumulativeSummary string                `json:"cumulative_summary"`
+	TimelineSegments  []*TimelineSegment    `json:"timeline_segments"`
+	ProcessingStats   *AudioProcessingStats `json:"processing_stats"`
 }
 
-func AnalyzeAudioFile(video string, opts ...any) (*AudioAnalysisResult, error) {
-	if !utils.FileExists(video) {
-		return nil, fmt.Errorf("video file not found: %s", video)
-	}
-
-	log.Infof("covert audio[%s] to srt string", video)
-	srtContent, err := mediautils.ConvertMediaToSRTString(video)
-	if err != nil {
-		return nil, err
-	}
-	log.Infof("srt content size: %d", len(srtContent))
-	srtManager, err := whisperutils.NewSRTManagerFromContent(srtContent)
-	if err != nil {
-		return nil, err
-	}
-
-	var config = &imageAnalysisConfig{}
-	for _, opt := range opts {
-		if optFunc, ok := opt.(imageAnalysisOption); ok {
-			optFunc(config)
-		} else {
-			config.fallbackOptions = append(config.fallbackOptions, opt)
+func (a *AudioAnalysisResult) GenerateProcessingStats() *AudioProcessingStats {
+	// 从timeline segments中生成
+	var fineDuration float64
+	var ignoreDuration float64
+	for _, segment := range a.TimelineSegments {
+		if segment.FineGrained() {
+			fineDuration += segment.EndSeconds - segment.StartSeconds
+		} else if segment.Ignored() {
+			ignoreDuration += segment.EndSeconds - segment.StartSeconds
 		}
 	}
-	config.fallbackOptions = append(config.fallbackOptions, _withOutputJSONSchema(AUDIO_OUTPUT_SCHEMA))
+	a.ProcessingStats = &AudioProcessingStats{
+		FineDuration:   fineDuration,
+		IgnoreDuration: ignoreDuration,
+		FinePercentage: fineDuration / (fineDuration + ignoreDuration),
+	}
+	return a.ProcessingStats
+}
 
-	prompt := `# Role: Expert Content Analyst
+func (a *AudioAnalysisResult) GetProcessingStats() *AudioProcessingStats {
+	if a.ProcessingStats != nil {
+		return a.ProcessingStats
+	}
+	return a.GenerateProcessingStats()
+}
 
-You are an expert AI assistant specializing in analyzing transcribed video content to identify its core message and structure. Your task is to process the text from an SRT file, segment it based on information density, and generate a structured JSON output.
+func AnalyzeAudioFileEx(audio string, streamHandler func(segment *TimelineSegment) error, opts ...any) (*AudioAnalysisResult, error) {
+	if !utils.FileExists(audio) {
+		return nil, fmt.Errorf("video file not found: %s", audio)
+	}
+
+	var analyzeConfig = NewAnalysisConfig(opts...)
+	analyzeConfig.fallbackOptions = append(analyzeConfig.fallbackOptions, _withOutputJSONSchema(AUDIO_OUTPUT_SCHEMA))
+	if analyzeConfig.AnalyzeLog == nil {
+		analyzeConfig.AnalyzeLog = func(format string, args ...interface{}) {
+			log.Infof(format, args...)
+		}
+	}
+
+	analyzeConfig.AnalyzeLog("start to analyze audio file: %s", audio)
+	srtPath, err := mediautils.ConvertMediaToSRT(audio)
+	if err != nil {
+		return nil, err
+	}
+	analyzeConfig.AnalyzeLog("srt file generated: %s", srtPath)
+	fp, err := os.Open(srtPath)
+	if err != nil {
+		return nil, utils.Errorf("failed to open srt: %s", err)
+	}
+	srtReader := utils.NewCRLFtoLFReader(fp)
+
+	prompt := `# Role: Expert Iterative Content Analyst
+
+You are an expert AI assistant designed to work within an iterative processing loop. Your specialty is analyzing sequential fragments of a transcribed video, progressively building a summary, and identifying the informational value of each time segment.
+
+## Operational Context
+
+You will be invoked repeatedly in a loop. In each iteration, you will receive two inputs:
+1.  **"current_srt_chunk"**: A small, continuous fragment of a larger SRT transcript.
+2.  **"previous_cumulative_summary"**: The summary generated from all preceding chunks. For the very first chunk, this will be an empty string.
+
+Your task is to analyze the "current_srt_chunk" in the context of the "previous_cumulative_summary" and generate an updated JSON output.
 
 ## Task
 
-Analyze the provided SRT transcript content. Based on the substance and informational value of the text, classify time segments as either "fine" (high-value, key information) or "ignore" (low-value, filler content). Then, generate a JSON object that includes a summary and a complete timeline of these segments.
+Analyze the provided "current_srt_chunk". Classify its time segments as either "fine" (high-value) or "ignore" (low-value) based on the substance of the text. Then, generate a JSON object containing an updated cumulative summary and a timeline for **only the current chunk**.
 
 ## Rules for Classification
 
@@ -85,60 +133,97 @@ Analyze the provided SRT transcript content. Based on the substance and informat
 
 ## Output Format Requirements
 
-Your output **MUST** be a single, valid JSON object. Do not add any explanatory text before or after the JSON.
-
-The JSON object must contain exactly two top-level keys: "cumulative_summary" and "timeline_segments".
-
 1.  **"cumulative_summary" (string):**
-    *   A concise, high-level summary.
-    *   This summary must be distilled **exclusively** from the text content of the segments you marked as "fine".
+    *   This is an **updated** summary.
+    *   Synthesize the key information from the "fine" segments of the "srt_chunk" and **integrate it** with the provided "cumulative_summary".
+    *   The result should be a single, coherent, and progressively refined summary. Avoid simple concatenation; aim for a true synthesis that merges new insights with existing knowledge without becoming redundant.
 
 2.  **"timeline_segments" (array of objects):**
-    *   This must be a seamless and continuous timeline from "0.0" seconds to the end of the last subtitle.
-    *   The "end_seconds" of one segment **must** equal the "start_seconds" of the next segment.
-    *   The first segment **must** start at "start_seconds: 0.0".
-    *   Each object in the array must contain three keys:
-        *   "start_seconds" (number): The start time of the segment.
-        *   "end_seconds" (number): The end time of the segment.
-        *   "processing_type" (string): The value can **ONLY** be ""fine"" or ""ignore"".
+    *   This array represents **only the segments from the "srt_chunk"**.
+    *   **Crucially, the "start_seconds" and "end_seconds" for each segment MUST directly correspond to the literal timestamps found in the provided "srt_chunk". Do not re-normalize, re-index, or start the timeline from 0.0.**
+    *   The segments within this chunk's timeline should be continuous and cover the entire duration of the chunk (the "end_seconds" of one segment must equal the "start_seconds" of the next).
 
-**IMPORTANT:** **DO NOT** include the "processing_stats" object in your output. I will calculate those statistics myself.
+` + analyzeConfig.ExtraPrompt
 
+	var result = &AudioAnalysisResult{
+		CumulativeSummary: "",
+		TimelineSegments:  make([]*TimelineSegment, 0),
+	}
 
-` + config.ExtraPrompt
-
-	basicRSTCache := bytes.NewBuffer(make([]byte, 0))
-	cacheCount := 0
-	var result = &AudioAnalysisResult{}
-	for _, entry := range srtManager.GetEntries() {
-		if cacheCount < 10 {
-			basicRSTCache.WriteString(entry.String() + "\n")
-			cacheCount++
-			continue
-		}
-		log.Infof("current cache count: %d, processing %d entries", cacheCount, len(srtManager.GetEntries()))
-		log.Infof("analyzing %d entries in srt: %s", cacheCount, utils.ShrinkString(basicRSTCache.String(), 200))
-		forgeResult, err := _executeLiteForgeTemp(prompt+"\n"+basicRSTCache.String()+"\n"+result.CumulativeSummary, config.fallbackOptions...)
+	analyze := func(query string) error {
+		forgeResult, err := _executeLiteForgeTemp(prompt+"\n"+query+"\n"+result.CumulativeSummary, analyzeConfig.fallbackOptions...)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if forgeResult == nil || forgeResult.Action == nil {
-			return nil, fmt.Errorf("invalid forge result")
+			return fmt.Errorf("invalid forge result")
 		}
 		result.CumulativeSummary = forgeResult.GetString("cumulative_summary")
 		for _, params := range forgeResult.GetInvokeParamsArray("timeline_segments") {
-			if result.TimelineSegments == nil {
-				result.TimelineSegments = make([]*TimelineSegment, 0)
-			}
-			result.TimelineSegments = append(result.TimelineSegments, &TimelineSegment{
-				StartSeconds:   params.GetInt("start_seconds"),
-				EndSeconds:     params.GetInt("end_seconds"),
+			segment := &TimelineSegment{
+				StartSeconds:   params.GetFloat("start_seconds"),
+				EndSeconds:     params.GetFloat("end_seconds"),
 				ProcessingType: params.GetString("processing_type"),
-			})
+				Text:           params.GetString("text_content"),
+			}
+			if streamHandler != nil {
+				err := streamHandler(segment)
+				if err != nil {
+					return err
+				}
+			}
+			result.TimelineSegments = append(result.TimelineSegments, segment)
 		}
-		basicRSTCache.Reset()
-		cacheCount = 0
+		return nil
 	}
 
+	processedCount := 0
+	legacyData := ""
+
+	reducerOpts := append(analyzeConfig.ReducerOptions(),
+		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.Memory, chunk chunkmaker.Chunk) error {
+			srtData := string(chunk.Data())
+			index := strings.LastIndex(srtData, "\n\n")
+			if index != -1 {
+				srtData = srtData[:index]
+				legacyData = srtData[index:]
+			}
+			overlap, ok := chunk.PrevNBytesUntil([]byte("\n\n"), 200)
+			if ok {
+				srtData = string(overlap) + srtData
+			}
+			err := analyze(srtData)
+			if err != nil {
+				return err
+			}
+			processedCount++
+			analyzeConfig.AnalyzeLog("audio analysis processed chunk %d, cumulative summary length: %d, timeline segments: %d", processedCount, len(result.CumulativeSummary), len(result.TimelineSegments))
+			return nil
+		}),
+		aireducer.WithFinishCallback(func(config *aireducer.Config, memory *aid.Memory) error {
+			if !funk.IsEmpty(legacyData) {
+				err := analyze(legacyData)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		}),
+	)
+
+	srtReducer, err := aireducer.NewReducerFromReader(srtReader, reducerOpts...)
+	if err != nil {
+		return nil, utils.Errorf("build srt reducer fail: %s", err.Error())
+	}
+	analyzeConfig.AnalyzeLog("start analyzing srt file: %s", srtPath)
+	err = srtReducer.Run()
+	if err != nil {
+		return nil, utils.Errorf("srt reducer run fail: %s", err.Error())
+	}
+	analyzeConfig.AnalyzeLog("analyzing srt file finish")
 	return result, nil
+}
+
+func AnalyzeAudioFile(video string, opts ...any) (*AudioAnalysisResult, error) {
+	return AnalyzeAudioFileEx(video, nil, opts...)
 }

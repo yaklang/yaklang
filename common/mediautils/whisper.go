@@ -89,6 +89,18 @@ func _whisperConvertAudioToSRTFile(i string) (string, error) {
 }
 
 func ConvertMediaToSRTString(path string) (string, error) {
+	srtFile, err := ConvertMediaToSRT(path)
+	if err != nil {
+		return "", err
+	}
+	srtContent, err := os.ReadFile(srtFile)
+	if err != nil {
+		return "", utils.Errorf("read srt file failed: %v", err)
+	}
+	return string(srtContent), nil
+}
+
+func ConvertMediaToSRT(path string) (string, error) {
 	isVideo, err := utils.IsVideo(path)
 	if err != nil {
 		return "", err
@@ -102,7 +114,7 @@ func ConvertMediaToSRTString(path string) (string, error) {
 		audioPath = ffmpegRes.FilePath
 	}
 
-	if ok,err := utils.IsAudio(audioPath);!ok || err != nil {
+	if ok, err := utils.IsAudio(audioPath); !ok || err != nil {
 		return "", utils.Errorf("check audio file failed: %v", err)
 	}
 
@@ -110,9 +122,5 @@ func ConvertMediaToSRTString(path string) (string, error) {
 	if err != nil {
 		return "", utils.Errorf("convert audio to srt file failed: %v", err)
 	}
-	srtContent, err := os.ReadFile(srtFile)
-	if err != nil {
-		return "", utils.Errorf("read srt file failed: %v", err)
-	}
-	return string(srtContent), nil
+	return srtFile, nil
 }
