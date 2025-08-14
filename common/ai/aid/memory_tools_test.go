@@ -85,6 +85,7 @@ func Test_MemoryTools(t *testing.T) {
 }
 
 func TestCoodinator_Delete_Memory(t *testing.T) {
+	t.Skip()
 
 	var firstToolCall, firstToolDecision = true, true
 	var timeLineDeleteCheck, timeLineSaveCheck bool

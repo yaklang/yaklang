@@ -22,7 +22,7 @@ func TestLocalUserCancel(t *testing.T) {
 }
 
 func TestConfig_EmitToolCallUserCancel(t *testing.T) {
-	inputChan := make(chan *InputEvent)
+	inputChan := make(chan *InputEvent, 10)
 	outputChan := make(chan *schema.AiOutputEvent)
 	coordinator, err := NewCoordinator(
 		"test",
@@ -206,9 +206,11 @@ LOOP:
 				}
 			}
 
-			if toolCallWatcherEventCheck && result.Type == schema.EVENT_TYPE_REVIEW_RELEASE && result.GetInteractiveId() == watcherId {
-				watcherReleaseCheck = true
-				break LOOP
+			if toolCallWatcherEventCheck {
+				if result.Type == schema.EVENT_TYPE_REVIEW_RELEASE && result.GetInteractiveId() == watcherId {
+					watcherReleaseCheck = true
+					break LOOP
+				}
 			}
 			fmt.Println("review task result:" + result.String())
 		}
