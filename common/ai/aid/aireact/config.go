@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -248,6 +249,36 @@ func WithBuiltinTools() Option {
 
 		log.Infof("Added %d builtin AI tools with search capability", len(allTools))
 	}
+}
+
+// callAI is the unified AI call wrapper for ReAct, similar to aid.wrapperAICall
+// This function centralizes all AI interactions and applies breakpoints, debugging, etc.
+func (cfg *ReActConfig) callAI(prompt string, opts ...aid.AIRequestOption) (*aid.AIResponse, error) {
+	if cfg.aiCallback == nil {
+		return nil, utils.Error("AI callback is not configured")
+	}
+
+	// Create a minimal aid.Config for the callback to avoid nil pointer issues
+	aidConfig := aid.NewConfig(cfg.ctx)
+
+	// Create AI request with options
+	req := aid.NewAIRequest(prompt, opts...)
+
+	// Call the configured AI callback with the aid config
+	return cfg.aiCallback(aidConfig, req)
+}
+
+// callAIWithConfig is a variant that accepts a specific config
+func (cfg *ReActConfig) callAIWithConfig(config *aid.Config, prompt string, opts ...aid.AIRequestOption) (*aid.AIResponse, error) {
+	if cfg.aiCallback == nil {
+		return nil, utils.Error("AI callback is not configured")
+	}
+
+	// Create AI request with options
+	req := aid.NewAIRequest(prompt, opts...)
+
+	// Call the configured AI callback with specific config
+	return cfg.aiCallback(config, req)
 }
 
 // newReActConfig creates a new ReActConfig with default values

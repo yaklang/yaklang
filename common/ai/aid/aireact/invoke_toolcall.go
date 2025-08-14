@@ -103,9 +103,8 @@ func (r *ReAct) generateToolParams(tool *aitool.Tool, outputChan chan *ypb.AIOut
 
 	r.emitInfo(outputChan, "generating tool parameters...")
 
-	// Create a simple AI request and call the ReAct's aiCallback directly to use breakpoint functionality
-	req := aid.NewAIRequest(paramsPrompt)
-	resp, err := r.config.aiCallback(nil, req)
+	// Use unified AI call wrapper - this centralizes breakpoint and debug functionality
+	resp, err := r.config.callAI(paramsPrompt)
 	if err != nil {
 		return nil, utils.Errorf("failed to generate tool parameters: %v", err)
 	}
