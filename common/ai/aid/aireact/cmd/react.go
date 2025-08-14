@@ -5,6 +5,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"io"
 	"os"
 	"os/signal"
@@ -15,7 +16,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/ai"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
