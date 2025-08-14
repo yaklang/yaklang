@@ -1,0 +1,43 @@
+=== RUN   TestCoodinator_Delete_Memory
+[36m[INFO][0m 2025-08-14 22:26:49 [config_inputevent_loop:20] config e890b02d-ca89-4f7c-86f2-a0ce27174911 started, start to handle receiving loop
+[36m[INFO][0m 2025-08-14 22:26:49 [config_inputevent_loop:61] coordinator validator working, (e890b02d-ca89-4f7c-86f2-a0ce27174911) start
+=== AI CALLBACK CALLED (call #1) ===
+>>> Unknown request type
+[36m[INFO][0m 2025-08-14 22:26:49 [config_inputevent_loop:72] event received, (e890b02d-ca89-4f7c-86f2-a0ce27174911) start: &{31HWj1wsMjCkoXz9rRmYeCcgwFE false  false map[suggestion:continue]}
+[31m[ERRO][0m 2025-08-14 22:26:49 [memory:209] error getting review record for event ID 31HWj1wsMjCkoXz9rRmYeCcgwFE
+[36m[INFO][0m 2025-08-14 22:26:49 [coordinator:136] create aiTask pipeline: 在给定路径下寻找体积最大的文件
+[36m[INFO][0m 2025-08-14 22:26:49 [coordinator:138] step 0: 扫描目录结构
+[36m[INFO][0m 2025-08-14 22:26:49 [coordinator:138] step 1: 计算文件大小
+=== AI CALLBACK CALLED (call #2) ===
+>>> This is a TASK EXECUTION request
+>>> Requesting NOW tool
+=== AI CALLBACK CALLED (call #3) ===
+>>> This is a TOOL EXECUTION request
+>>> Executing NOW tool
+[36m[INFO][0m 2025-08-14 22:26:49 [config_inputevent_loop:72] event received, (e890b02d-ca89-4f7c-86f2-a0ce27174911) start: &{31HWj3ud8M5kysq63xaBUYe9r4W false  false map[suggestion:continue]}
+[31m[ERRO][0m 2025-08-14 22:26:49 [memory:209] error getting review record for event ID 31HWj3ud8M5kysq63xaBUYe9r4W
+[31m[ERRO][0m 2025-08-14 22:26:49 [memory:209] error getting review record for event ID 31HWj223yj4ARNewDd5P8XFpKID
+=== AI CALLBACK CALLED (call #4) ===
+>>> This is a TASK EXECUTION request
+=== AI CALLBACK CALLED (call #5) ===
+>>> This is a TASK EXECUTION request
+=== AI CALLBACK CALLED (call #6) ===
+>>> This is a TASK EXECUTION request
+=== AI CALLBACK CALLED (call #7) ===
+>>> This is a TASK EXECUTION request
+=== AI CALLBACK CALLED (call #8) ===
+>>> This is a TASK EXECUTION request
+    memory_tools_test.go:253: 
+        	Error Trace:	/Users/v1ll4n/Projects/yaklang/common/ai/aid/memory_tools_test.go:253
+        	Error:      	Should be true
+        	Test:       	TestCoodinator_Delete_Memory
+        	Messages:   	 timeline delete check failed
+    memory_tools_test.go:254: 
+        	Error Trace:	/Users/v1ll4n/Projects/yaklang/common/ai/aid/memory_tools_test.go:254
+        	Error:      	Should be true
+        	Test:       	TestCoodinator_Delete_Memory
+        	Messages:   	 timeline delete check failed
+--- FAIL: TestCoodinator_Delete_Memory (0.59s)
+FAIL
+FAIL	github.com/yaklang/yaklang/common/ai/aid	1.655s
+FAIL
