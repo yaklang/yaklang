@@ -1,6 +1,8 @@
 package rag
 
 import (
+	"path/filepath"
+
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -9,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"path/filepath"
 )
 
 type KnowledgeBaseConfig struct {
@@ -156,7 +157,10 @@ func CreateCollection(db *gorm.DB, name string, description string, opts ...any)
 	}
 
 	// 创建集合
-	db.Create(&collection)
+	res := db.Create(&collection)
+	if res.Error != nil {
+		return nil, utils.Errorf("创建集合失败: %v", res.Error)
+	}
 	if cfg.EmbeddingClient != nil {
 		return LoadCollectionWithEmbeddingClient(db, name, cfg.EmbeddingClient, cfg.AIOptions...)
 	}

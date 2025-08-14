@@ -175,10 +175,10 @@ type VectorStoreDocument struct {
 	gorm.Model
 
 	// 文档唯一标识符，在整个系统中唯一
-	DocumentID string `gorm:"unique_index;not null" json:"document_id"`
+	DocumentID string `gorm:"uniqueIndex:idx_document_id_collection_id;not null" json:"document_id"`
 
 	// 所属集合的ID，建立外键关系
-	CollectionID uint `gorm:"index:idx_collection_id;not null" json:"collection_id"`
+	CollectionID uint `gorm:"uniqueIndex:idx_document_id_collection_id;not null" json:"collection_id"`
 
 	// 文档元数据，以 JSON 格式存储，包含原始文本、来源等信息
 	Metadata MetadataMap `gorm:"type:text" json:"metadata"`
@@ -256,7 +256,7 @@ type KnowledgeBaseEntry struct {
 	KnowledgeBaseID int64 `gorm:"not null" json:"knowledge_base_id"`
 
 	// 知识标题(和知识库名称应该是联合唯一索引)
-	KnowledgeTitle string `gorm:";not null" json:"knowledge_title"`
+	KnowledgeTitle string `gorm:"not null" json:"knowledge_title"`
 
 	// 知识类型（如：CoreConcept、Standard、Guideline等）
 	KnowledgeType string `gorm:"index:idx_knowledge_type;not null" json:"knowledge_type"`

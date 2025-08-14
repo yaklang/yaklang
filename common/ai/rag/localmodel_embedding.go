@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/embedding"
 	"github.com/yaklang/yaklang/common/ai/localmodel"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // LocalModelEmbedding 基于本地模型的嵌入服务客户端
@@ -77,6 +78,12 @@ func GetLocalEmbeddingService() (*LocalModelEmbedding, error) {
 		return nil, embeddingServiceError
 	}
 
+	if embeddingServiceInstance != nil {
+		err := utils.WaitConnect(embeddingServiceInstance.address, 30)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return embeddingServiceInstance, nil
 }
 

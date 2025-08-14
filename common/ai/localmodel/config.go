@@ -30,6 +30,7 @@ type ServiceConfig struct {
 	Threads        int           `json:"threads"`      // 线程数
 	Detached       bool          `json:"detached"`
 	Debug          bool          `json:"debug"`
+	Pooling        string        `json:"pooling"` // 池化方式
 	StartupTimeout time.Duration `json:"startupTimeout"`
 	Args           []string      `json:"args"`
 }
@@ -45,6 +46,7 @@ func DefaultServiceConfig() *ServiceConfig {
 		Threads:        8,    // 默认线程数
 		Detached:       false,
 		Debug:          false,
+		Pooling:        "last",
 		StartupTimeout: 30 * time.Second,
 		Args:           []string{},
 	}
