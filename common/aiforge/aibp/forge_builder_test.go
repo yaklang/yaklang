@@ -41,9 +41,9 @@ var finishJson = `{
 
 var summaryJson = `result is 2`
 
-func MockAICallback(t *testing.T, initFlag, persistentFlag, planFlag string) aid.AICallbackType {
+func MockAICallback(t *testing.T, initFlag, persistentFlag, planFlag string) aicommon.AICallbackType {
 	step := 0
-	return func(config *aid.Config, req *aid.AIRequest) (*aid.AIResponse, error) {
+	return func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		rsp := config.NewAIResponse()
 		defer rsp.Close()
 		switch step {
