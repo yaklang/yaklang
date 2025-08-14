@@ -3,7 +3,6 @@
   "title": "SRT 分析与处理指令 (SRT Analysis and Processing Instructions)",
   "description": "定义了对SRT文件进行重要性分析后的结果结构。包含一个核心摘要、处理统计数据以及一个完整的、按时间排序的处理指令时间轴。",
   "type": "object",
-
   "properties": {
     "@action": {
       "const": "object",
@@ -37,6 +36,11 @@
               "fine",
               "ignore"
             ]
+          },
+          "text_content": {
+            "type": "string",
+            "description": "该时间片段的文本内容，仅在处理类型为 'fine' 时提供。",
+            "minLength": 1
           }
         }
       }
@@ -44,7 +48,7 @@
   },
   "required": [
     "cumulative_summary",
-    "processing_stats",
-    "timeline_segments"
+    "timeline_segments",
+    "@action"
   ]
 }
