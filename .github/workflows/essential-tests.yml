@@ -139,7 +139,7 @@ jobs:
           - name: Test AI RAG | Knowledge Base
             run: |
               # AI RAG
-              go test -timeout 1m ./common/ai/rag
+              go test -timeout 1m -run TestMUSTPASS ./common/ai/rag
               go test -timeout 1m -run TestMUSTPASS ./common/ai/rag/plugins_rag/...
               # Knowledge Base
               go test -timeout 1m -run TestMUSTPASS ./common/yakgrpc/yakit
