@@ -39,6 +39,7 @@ func NewProgram(
 		editorStack:             omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
 		editorMap:               omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
 		FileList:                make(map[string]string),
+		LineCount:               0,
 		cacheExternInstance:     make(map[string]Value),
 		externType:              make(map[string]Type),
 		externBuildValueHandler: make(map[string]func(b *FunctionBuilder, id string, v any) (value Value)),
@@ -76,6 +77,7 @@ func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path 
 
 	subProg.LibraryFile = prog.LibraryFile
 	subProg.FileList = prog.FileList
+	subProg.LineCount = prog.LineCount
 	subProg.editorStack = prog.editorStack.Copy()
 	// subProg.editorStack = prog.editorStack
 	subProg.externType = prog.externType
@@ -343,6 +345,7 @@ func (p *Program) PopEditor(save bool) {
 	e := p.editorStack.Pop()
 	if save && e != nil {
 		p.FileList[e.GetUrl()] = e.GetIrSourceHash()
+		p.LineCount += e.GetLineCount()
 	}
 }
 

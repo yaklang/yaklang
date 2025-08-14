@@ -29,6 +29,7 @@ func NewProgramFromDB(p *ssadb.IrProgram) *Program {
 	prog.irProgram = p
 	prog.Language = p.Language
 	prog.FileList = p.FileList
+	prog.LineCount = p.LineCount
 	prog.ExtraFile = p.ExtraFile
 	// TODO: handler up and down stream
 	return prog
@@ -54,6 +55,7 @@ func (prog *Program) UpdateToDatabaseWithWG(wg *sync.WaitGroup) {
 		ir.ProgramName = prog.Name
 		ir.Version = prog.Version
 		ir.FileList = prog.FileList
+		ir.LineCount = prog.LineCount
 		ir.ExtraFile = prog.ExtraFile
 		ssadb.UpdateProgram(ir)
 	}()

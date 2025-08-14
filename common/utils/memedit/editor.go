@@ -66,6 +66,10 @@ func (ve *MemEditor) CodeLength() int {
 	return ve.safeSourceCode.Len()
 }
 
+func (ve *MemEditor) GetLineCount() int {
+	return len(ve.lineLensMap)
+}
+
 func (ve *MemEditor) SetUrl(url string) {
 	ve.fileUrl = url
 }

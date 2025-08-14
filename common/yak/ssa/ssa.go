@@ -232,8 +232,10 @@ type Program struct {
 	irProgram    *ssadb.IrProgram // from database program
 
 	// TODO: this four map should need????!
-	editorStack           *omap.OrderedMap[string, *memedit.MemEditor]
-	FileList              map[string]string   // file-name and file hash
+	editorStack *omap.OrderedMap[string, *memedit.MemEditor]
+	FileList    map[string]string // file-name and file hash
+	LineCount   int
+
 	LibraryFile           map[string][]string //library and file relation
 	editorMap             *omap.OrderedMap[string, *memedit.MemEditor]
 	CurrentIncludingStack *utils.Stack[string]
