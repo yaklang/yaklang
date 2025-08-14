@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -61,6 +62,16 @@ type AiTask struct {
 	// task continue count
 	TaskContinueCount int64 `json:"task_continue_count"` // 任务继续执行的次数
 }
+
+func (t *AiTask) GetIndex() string {
+	return t.Index
+}
+
+func (t *AiTask) GetName() string {
+	return t.Name
+}
+
+var _ aicommon.AITask = (*AiTask)(nil)
 
 func (t *AiTask) callAI(request *AIRequest) (*AIResponse, error) {
 	for _, cb := range []AICallbackType{
