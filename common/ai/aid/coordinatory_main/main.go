@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/aiforge"
 	_ "github.com/yaklang/yaklang/common/aiforge/aibp"
 	"github.com/yaklang/yaklang/common/utils"
