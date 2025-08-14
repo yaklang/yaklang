@@ -4,6 +4,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 // MockEmbedder 是一个模拟的嵌入客户端，用于测试
@@ -167,4 +170,67 @@ func TestFilterResults(t *testing.T) {
 	assert.Equal(t, 2, len(filtered))
 	assert.Equal(t, float32(0.9), filtered[0].Score)
 	assert.Equal(t, float32(0.7), filtered[1].Score)
+}
+
+func TestRequestLocalEmbedding(t *testing.T) {
+	// 创建本地模型嵌入客户端，连接到127.0.0.1:11435
+	client := NewLocalModelEmbedding(nil, "127.0.0.1:11435")
+
+	text1 := "The capital of China is Beijing."
+	text2 := "Gravity is a force that attracts two bodies towards each other. It gives weight to physical objects and is responsible for the movement of planets around the sun."
+	text3 := "What is the capital of China?"
+
+	// 获取三个文本的嵌入向量
+	embedding1, err := client.Embedding(text1)
+	if err != nil {
+		t.Fatalf("Failed to get embedding for text1: %v", err)
+	}
+	log.Infof("Text1 embedding dimension: %d", len(embedding1))
+
+	embedding2, err := client.Embedding(text2)
+	if err != nil {
+		t.Fatalf("Failed to get embedding for text2: %v", err)
+	}
+	log.Infof("Text2 embedding dimension: %d", len(embedding2))
+
+	embedding3, err := client.Embedding(text3)
+	if err != nil {
+		t.Fatalf("Failed to get embedding for text3: %v", err)
+	}
+	log.Infof("Text3 embedding dimension: %d", len(embedding3))
+
+	// 使用hnsw.CosineDistance计算余弦距离
+	// 计算text3与text1的距离
+	distance3to1 := hnsw.CosineDistance(func() []float32 {
+		return embedding3
+	}, func() []float32 {
+		return embedding1
+	})
+
+	// 计算text3与text2的距离
+	distance3to2 := hnsw.CosineDistance(func() []float32 {
+		return embedding3
+	}, func() []float32 {
+		return embedding2
+	})
+
+	// 输出结果
+	log.Infof("Text1: %s", text1)
+	log.Infof("Text2: %s", text2)
+	log.Infof("Text3: %s", text3)
+	log.Infof("Text1 embedding equal Text2: %t", codec.EncodeBase64(embedding1) == codec.EncodeBase64(embedding2))
+	log.Infof("Distance between Text3 and Text1: %.6f", distance3to1)
+	log.Infof("Distance between Text3 and Text2: %.6f", distance3to2)
+
+	// 验证距离值在合理范围内（0-2之间）
+	assert.True(t, distance3to1 >= 0 && distance3to1 <= 2, "Distance3to1 should be between 0 and 2")
+	assert.True(t, distance3to2 >= 0 && distance3to2 <= 2, "Distance3to2 should be between 0 and 2")
+
+	// 由于Text3 "Visionary AI Suite" 在Text2中出现，理论上distance3to2应该小于distance3to1
+	log.Infof("Text3 should be more similar to Text2 (contains 'Visionary AI Suite') than to Text1")
+	if distance3to2 < distance3to1 {
+		log.Infof("✓ Confirmed: Text3 is closer to Text2 (distance: %.6f) than to Text1 (distance: %.6f)", distance3to2, distance3to1)
+	} else {
+		log.Infof("Note: Text3 is closer to Text1 (distance: %.6f) than to Text2 (distance: %.6f)", distance3to1, distance3to2)
+	}
 }
