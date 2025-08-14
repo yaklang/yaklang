@@ -86,7 +86,7 @@ func ExtractImageFramesFromVideo(inputFile string, opts ...Option) (<-chan *Ffmp
 
 	var args []string
 	if o.startTime > 0 {
-		args = append(args, "-ss", formatDuration(o.startTime)) // should use -ss before -i for faster seeking
+		args = append(args, "-ss", formatDuration(o.startTime))
 	}
 	if o.endTime > 0 {
 		args = append(args, "-t", formatDuration(o.endTime-o.startTime))
