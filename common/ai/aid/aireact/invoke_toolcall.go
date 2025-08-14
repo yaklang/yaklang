@@ -104,7 +104,7 @@ func (r *ReAct) generateToolParams(tool *aitool.Tool) (aitool.InvokeParams, erro
 	log.Infof("generating tool parameters...")
 
 	// Use unified AI call wrapper - this centralizes breakpoint and debug functionality
-	resp, err := r.config.callAI(paramsPrompt)
+	resp, err := r.config.CallAI(paramsPrompt)
 	if err != nil {
 		return nil, utils.Errorf("failed to generate tool parameters: %v", err)
 	}

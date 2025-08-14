@@ -253,7 +253,7 @@ func WithBuiltinTools() Option {
 
 // callAI is the unified AI call wrapper for ReAct, similar to aid.wrapperAICall
 // This function centralizes all AI interactions and applies breakpoints, debugging, etc.
-func (cfg *ReActConfig) callAI(prompt string, opts ...aid.AIRequestOption) (*aid.AIResponse, error) {
+func (cfg *ReActConfig) CallAI(prompt string, opts ...aid.AIRequestOption) (*aid.AIResponse, error) {
 	if cfg.aiCallback == nil {
 		return nil, utils.Error("AI callback is not configured")
 	}

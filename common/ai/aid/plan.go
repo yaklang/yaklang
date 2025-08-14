@@ -3,6 +3,7 @@ package aid
 import (
 	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -33,8 +34,8 @@ func (pr *planRequest) GetInteractCount() int64 {
 	return atomic.LoadInt64(pr.interactCount)
 }
 
-func (pr *planRequest) callAI(request *AIRequest) (*AIResponse, error) {
-	for _, cb := range []AICallbackType{
+func (pr *planRequest) CallAI(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	for _, cb := range []aicommon.AICallbackType{
 		pr.config.planAICallback,
 		pr.config.coordinatorAICallback,
 		pr.config.taskAICallback,
@@ -155,9 +156,9 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 	}
 
 	err = pr.config.callAiTransaction(
-		prompt, pr.callAI,
-		func(rsp *AIResponse) error {
-			action, err := ExtractActionFromStream(rsp.GetOutputStreamReader("plan", false, pr.config), "plan", "require-user-interact")
+		prompt, pr.CallAI,
+		func(rsp *aicommon.AIResponse) error {
+			action, err := ExtractActionFromStream(rsp.GetOutputStreamReader("plan", false, pr.config.GetEmitter()), "plan", "require-user-interact")
 			if err != nil {
 				return utils.Error("parse @action field from AI response failed: " + err.Error())
 			}

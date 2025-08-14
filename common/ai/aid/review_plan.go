@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"io"
 	"strings"
 	"text/template"
@@ -253,8 +254,8 @@ func (p *planRequest) generateCreateSubtaskPlan(extraPrompt string, rsp *PlanRes
 	if err != nil {
 		return nil, err
 	}
-	err = p.config.callAiTransaction(buf.String(), p.callAI, func(response *AIResponse) error {
-		reader := response.GetOutputStreamReader("create-subtasks", false, p.config)
+	err = p.config.callAiTransaction(buf.String(), p.CallAI, func(response *aicommon.AIResponse) error {
+		reader := response.GetOutputStreamReader("create-subtasks", false, p.config.GetEmitter())
 		if reader == nil {
 			return utils.Error("get output stream failed")
 		}
@@ -311,8 +312,8 @@ func (p *planRequest) freedomReviewGenerateNewPlan(extraPrompt string, rsp *Plan
 	prompt := planPrompt.String()
 
 	var task *AiTask
-	err = p.config.callAiTransaction(prompt, p.callAI, func(response *AIResponse) error {
-		responseReader := response.GetOutputStreamReader("freedom-plan-review", false, p.config)
+	err = p.config.callAiTransaction(prompt, p.CallAI, func(response *aicommon.AIResponse) error {
+		responseReader := response.GetOutputStreamReader("freedom-plan-review", false, p.config.Emitter)
 		taskResponse, err := io.ReadAll(responseReader)
 		if err != nil {
 			return utils.Errorf("error reading AI response: %v", err)
@@ -357,9 +358,9 @@ func (p *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp
 	prompt := planPrompt.String()
 
 	var task *AiTask
-	err = p.config.callAiTransaction(prompt, p.callAI, func(response *AIResponse) error {
+	err = p.config.callAiTransaction(prompt, p.CallAI, func(response *aicommon.AIResponse) error {
 		// 读取 AI 的响应
-		responseReader := response.GetOutputStreamReader("dynamic-plan", false, p.config)
+		responseReader := response.GetOutputStreamReader("dynamic-plan", false, p.config.Emitter)
 		taskResponse, err := io.ReadAll(responseReader)
 		if err != nil {
 			return utils.Errorf("error reading AI response: %v", err)

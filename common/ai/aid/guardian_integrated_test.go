@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"strings"
@@ -61,7 +62,7 @@ func TestCoordinator_GUARDIAN_OUTPUT_SMOKING_ToolUseReview(t *testing.T) {
 			outputChan <- event
 		}),
 		WithRiskControlForgeName(riskControlForgeName, nil),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -97,7 +98,7 @@ func TestCoordinator_GUARDIAN_OUTPUT_SMOKING_ToolUseReview(t *testing.T) {
 			return rsp, nil
 		}),
 		WithAIAgree(),
-		WithGuardianEventTrigger(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller AICaller) {
+		WithGuardianEventTrigger(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller aicommon.AICaller) {
 			if event.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				guardianSmokingTestPassed = true
 			} else {
@@ -235,7 +236,7 @@ func TestCoordinator_GUARDIAN_SMOKING_ToolUseReview(t *testing.T) {
 			outputChan <- event
 		}),
 		WithRiskControlForgeName(riskControlForgeName, nil),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -271,7 +272,7 @@ func TestCoordinator_GUARDIAN_SMOKING_ToolUseReview(t *testing.T) {
 			return rsp, nil
 		}),
 		WithAIAgree(),
-		WithGuardianEventTrigger(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller AICaller) {
+		WithGuardianEventTrigger(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller aicommon.AICaller) {
 			if event.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				guardianSmokingTestPassed = true
 			} else {
@@ -398,7 +399,7 @@ func TestCoordinator_GUARDIAN_StreamSmocking_ToolUseReview(t *testing.T) {
 			outputChan <- event
 		}),
 		WithRiskControlForgeName(riskControlForgeName, nil),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()

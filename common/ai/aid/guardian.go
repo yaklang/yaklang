@@ -2,6 +2,7 @@ package aid
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -11,7 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
-type GuardianEventTrigger func(event *schema.AiOutputEvent, emitter GuardianEmitter, aicaller AICaller)
+type GuardianEventTrigger func(event *schema.AiOutputEvent, emitter GuardianEmitter, aicaller aicommon.AICaller)
 
 type GuardianMirrorStreamTrigger func(unlimitedChan *chanx.UnlimitedChan[*schema.AiOutputEvent], emitter GuardianEmitter)
 
@@ -22,7 +23,7 @@ type asyncGuardian struct {
 	outputEmitter        GuardianEmitter
 	mirrorCallback       map[string]*mirrorEventStream
 	eventTriggerCallback map[schema.EventType][]GuardianEventTrigger
-	aiCaller             AICaller
+	aiCaller             aicommon.AICaller
 }
 
 type mirrorEventStream struct {
@@ -59,7 +60,7 @@ func (a *asyncGuardian) setOutputEmitter(coordinatorId string, emitter func(*sch
 	a.outputEmitter = newGuardianEmitter(coordinatorId, emitter)
 }
 
-func (a *asyncGuardian) setAiCaller(caller AICaller) {
+func (a *asyncGuardian) setAiCaller(caller aicommon.AICaller) {
 	a.callbackMutex.Lock()
 	defer a.callbackMutex.Unlock()
 	a.aiCaller = caller

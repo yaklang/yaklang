@@ -3,6 +3,7 @@ package aid
 import (
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -27,7 +28,7 @@ func TestCoordinator_ConfigHotpatch(t *testing.T) {
 		}),
 		WithToolKeywords(keywordsToken),
 		WithHotpatchOptionChan(hotpatchOptionChan),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			rsp.EmitOutputStream(strings.NewReader(`
 {
