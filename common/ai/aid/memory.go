@@ -3,14 +3,15 @@ package aid
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	osRuntime "runtime"
 	"strings"
 	"text/template"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -40,8 +41,8 @@ type Memory struct {
 	PersistentData *omap.OrderedMap[string, *PersistentDataRecord]
 
 	// task info
-	CurrentTask *aiTask
-	RootTask    *aiTask
+	CurrentTask *AiTask
+	RootTask    *AiTask
 
 	// todo
 	PlanHistory []*PlanRecord
@@ -183,7 +184,7 @@ func (m *Memory) StoreQuery(query string) {
 }
 
 // task info memory
-func (m *Memory) StoreRootTask(t *aiTask) {
+func (m *Memory) StoreRootTask(t *AiTask) {
 	m.RootTask = t
 }
 
@@ -191,7 +192,7 @@ func (m *Memory) Progress() string {
 	return m.RootTask.Progress()
 }
 
-func (m *Memory) StoreCurrentTask(task *aiTask) {
+func (m *Memory) StoreCurrentTask(task *AiTask) {
 	m.CurrentTask = task
 }
 

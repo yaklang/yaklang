@@ -3,7 +3,6 @@ package aid
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"math/rand/v2"
 	"strings"
 	"sync"
@@ -23,6 +22,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
@@ -37,7 +37,7 @@ type AICaller interface {
 
 var _ AICaller = &Coordinator{}
 var _ AICaller = &planRequest{}
-var _ AICaller = &aiTask{}
+var _ AICaller = &AiTask{}
 
 type AgreePolicyType string
 
@@ -54,6 +54,8 @@ const (
 )
 
 type Config struct {
+	*aicommon.Emitter
+
 	ctx    context.Context
 	cancel context.CancelFunc
 
@@ -106,9 +108,6 @@ type Config struct {
 	timelineContentSizeLimit  int
 	timelineTotalContentLimit int
 	keywords                  []string // task keywords, maybe tools name ,help ai to plan
-
-	// stream waitgroup
-	streamWaitGroup *sync.WaitGroup
 
 	debugPrompt bool
 	debugEvent  bool
@@ -255,7 +254,7 @@ func (c *Config) GetSequenceStart() int64 {
 	return c.idSequence
 }
 
-func (c *Config) getCurrentTaskPlan() *aiTask {
+func (c *Config) getCurrentTaskPlan() *AiTask {
 	return c.aiTaskRuntime.RootTask
 }
 
@@ -316,58 +315,6 @@ func (c *Config) SetSyncCallback(i SyncType, callback func() any) {
 	c.syncMap[string(i)] = callback
 }
 
-func (c *Config) emit(e *schema.AiOutputEvent) {
-	select {
-	case <-c.ctx.Done():
-		return
-	default:
-	}
-	c.m.Lock()
-	defer c.m.Unlock()
-
-	if c.eventProcessHandler != nil {
-		e = c.callEventBeforeSave(e)
-	}
-
-	if c.saveEvent && e.ShouldSave() { // not save system and sync
-		err := yakit.CreateAIEvent(consts.GetGormProjectDatabase(), e)
-		if err != nil {
-			log.Errorf("create AI event failed: %v", err)
-		}
-	}
-
-	if c.guardian != nil {
-		c.guardian.feed(e)
-	}
-
-	if utils.StringArrayContains(c.disableOutputEventType, string(e.Type)) {
-		return
-	}
-
-	if c.eventHandler == nil {
-		if e.IsStream {
-			if c.debugEvent {
-				fmt.Print(string(e.StreamDelta))
-			}
-			return
-		}
-
-		if e.Type == schema.EVENT_TYPE_CONSUMPTION {
-			if c.debugEvent {
-				log.Info(e.String())
-			}
-			return
-		}
-		if c.debugEvent {
-			log.Info(e.String())
-		} else {
-			//log.Info(utils.ShrinkString(e.String(), 200))
-		}
-		return
-	}
-	c.eventHandler(e)
-}
-
 func (c *Config) ProcessExtendedActionCallback(resp string) {
 	actions := ExtractAllAction(resp)
 	for _, action := range actions {
@@ -378,7 +325,7 @@ func (c *Config) ProcessExtendedActionCallback(resp string) {
 }
 
 func (c *Config) ReleaseInteractiveEvent(eventID string, invoke aitool.InvokeParams) {
-	c.emitInteractiveRelease(eventID, invoke)
+	c.EmitInteractiveRelease(eventID, invoke)
 	c.memory.StoreInteractiveUserInput(eventID, invoke)
 }
 
@@ -455,7 +402,6 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		m:                           new(sync.Mutex),
 		id:                          id,
 		epm:                         newEndpointManagerContext(ctx),
-		streamWaitGroup:             new(sync.WaitGroup),
 		memory:                      nil, // default mem cannot create in config
 		guardian:                    newAsyncGuardian(ctx, id),
 		syncMutex:                   new(sync.RWMutex),
@@ -480,6 +426,12 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 	if err := initDefaultAICallback(c); err != nil {
 		log.Errorf("init default ai callback: %v", err)
 	}
+
+	c.Emitter = aicommon.NewEmitter(c.id, func(e *schema.AiOutputEvent) error {
+		c.emitBaseHandler(e)
+		return nil
+	})
+
 	return c
 }
 

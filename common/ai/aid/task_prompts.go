@@ -2,12 +2,13 @@ package aid
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"io"
 	"slices"
 	"strings"
 	"text/template"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 
@@ -15,7 +16,7 @@ import (
 )
 
 // generate task prompt just can direct answer.
-func (t *aiTask) generateDirectAnswerPrompt() (string, error) {
+func (t *AiTask) generateDirectAnswerPrompt() (string, error) {
 	templateData := map[string]interface{}{
 		"Memory": t.config.memory,
 	}
@@ -37,7 +38,7 @@ func (t *aiTask) generateDirectAnswerPrompt() (string, error) {
 }
 
 // generateTaskPrompt 生成执行任务的prompt
-func (t *aiTask) generateTaskPrompt() (string, error) {
+func (t *AiTask) generateTaskPrompt() (string, error) {
 	// 创建模板数据
 	alltools, err := t.config.aiToolManager.GetEnableTools()
 	if err != nil {
@@ -65,7 +66,7 @@ func (t *aiTask) generateTaskPrompt() (string, error) {
 }
 
 // generateRequireToolResponsePrompt 生成描述工具参数的 Prompt
-func (t *aiTask) generateRequireToolResponsePrompt(targetTool *aitool.Tool, toolName string) (string, error) {
+func (t *AiTask) generateRequireToolResponsePrompt(targetTool *aitool.Tool, toolName string) (string, error) {
 	if targetTool == nil {
 		return "", fmt.Errorf("找不到名为 '%s' 的工具", toolName)
 	}
@@ -96,7 +97,7 @@ func (t *aiTask) generateRequireToolResponsePrompt(targetTool *aitool.Tool, tool
 }
 
 // generateToolCallResponsePrompt 生成描述工具调用结果的 Prompt
-func (t *aiTask) generateToolCallResponsePrompt(result *aitool.ToolResult, targetTool *aitool.Tool) (string, error) {
+func (t *AiTask) generateToolCallResponsePrompt(result *aitool.ToolResult, targetTool *aitool.Tool) (string, error) {
 	templatedata := map[string]any{
 		"Memory": t.config.memory,
 		"Tool":   targetTool,
@@ -114,7 +115,7 @@ func (t *aiTask) generateToolCallResponsePrompt(result *aitool.ToolResult, targe
 	return promptBuilder.String(), nil
 }
 
-func (t *aiTask) generateToolCallResultsPrompt() (string, error) {
+func (t *AiTask) generateToolCallResultsPrompt() (string, error) {
 	templatedata := map[string]interface{}{
 		"ToolCallResults": t.toolCallResultIds.Values(),
 	}
@@ -130,7 +131,7 @@ func (t *aiTask) generateToolCallResultsPrompt() (string, error) {
 	return promptBuilder.String(), nil
 }
 
-func (t *aiTask) generateDynamicPlanPrompt(userInput string) (string, error) {
+func (t *AiTask) generateDynamicPlanPrompt(userInput string) (string, error) {
 	// 创建模板数据
 	templateData := map[string]interface{}{
 		"Memory":    t.config.memory,
@@ -153,14 +154,14 @@ func (t *aiTask) generateDynamicPlanPrompt(userInput string) (string, error) {
 	return promptBuilder.String(), nil
 }
 
-func (t *aiTask) GenerateDeepThinkPlanPrompt(suggestion string) (string, error) {
+func (t *AiTask) GenerateDeepThinkPlanPrompt(suggestion string) (string, error) {
 	return t.config.quickBuildPrompt(__prompt_DeepthinkTaskListPrompt, map[string]any{
 		"Memory":    t.config.memory,
 		"UserInput": suggestion,
 	})
 }
 
-func (t *aiTask) DeepThink(suggestion string) error {
+func (t *AiTask) DeepThink(suggestion string) error {
 	prompt, err := t.GenerateDeepThinkPlanPrompt(suggestion)
 	if err != nil {
 		return fmt.Errorf("生成深入思考划分子任务 prompt 失败: %v", err)
@@ -168,8 +169,8 @@ func (t *aiTask) DeepThink(suggestion string) error {
 
 	defer func() {
 		// Ensure config is propagated to the new task and its subtasks
-		var propagateConfig func(task *aiTask)
-		propagateConfig = func(task *aiTask) {
+		var propagateConfig func(task *AiTask)
+		propagateConfig = func(task *AiTask) {
 			if task == nil {
 				return
 			}
@@ -199,7 +200,7 @@ func (t *aiTask) DeepThink(suggestion string) error {
 					if subtask.GetAnyToString("subtask_name") == "" {
 						continue
 					}
-					t.Subtasks = append(t.Subtasks, &aiTask{
+					t.Subtasks = append(t.Subtasks, &AiTask{
 						config: t.config,
 						Name:   subtask.GetAnyToString("subtask_name"),
 						Goal:   subtask.GetAnyToString("subtask_goal"),
@@ -221,7 +222,7 @@ func (t *aiTask) DeepThink(suggestion string) error {
 	return nil
 }
 
-func (t *aiTask) AdjustPlan(suggestion string) error {
+func (t *AiTask) AdjustPlan(suggestion string) error {
 	planPrompt, err := t.generateDynamicPlanPrompt(suggestion)
 	if err != nil {
 		t.config.EmitError("error generating dynamic plan prompt: %v", err)
@@ -229,8 +230,8 @@ func (t *aiTask) AdjustPlan(suggestion string) error {
 	}
 	defer func() {
 		// Ensure config is propagated to the new task and its subtasks
-		var propagateConfig func(task *aiTask)
-		propagateConfig = func(task *aiTask) {
+		var propagateConfig func(task *AiTask)
+		propagateConfig = func(task *AiTask) {
 			if task == nil {
 				return
 			}

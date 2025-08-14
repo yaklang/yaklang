@@ -1,0 +1,349 @@
+package aicommon
+
+import (
+	"fmt"
+	"io"
+	"sync"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/segmentio/ksuid"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+)
+
+type BaseEmitter func(e *schema.AiOutputEvent) error
+
+type Emitter struct {
+	streamWG              *sync.WaitGroup
+	id                    string
+	emit                  BaseEmitter
+	interactiveEventSaver func(string, *schema.AiOutputEvent)
+}
+
+func (i *Emitter) Emit(e *schema.AiOutputEvent) error {
+	return i.emit(e)
+}
+
+func (i *Emitter) StoreInteractiveEvent(id string, e *schema.AiOutputEvent) {
+	if i.interactiveEventSaver != nil {
+		i.interactiveEventSaver(id, e)
+	}
+}
+
+func (i *Emitter) WaitForStream() {
+	i.streamWG.Wait()
+}
+
+func (r *Emitter) SetInteractiveEventSaver(saver func(string, *schema.AiOutputEvent)) {
+	r.interactiveEventSaver = saver
+}
+
+func NewEmitter(id string, emitter BaseEmitter) *Emitter {
+	return &Emitter{
+		streamWG: &sync.WaitGroup{},
+		id:       id,
+		emit: func(e *schema.AiOutputEvent) (retErr error) {
+			if err := recover(); err != nil {
+				retErr = utils.Errorf("Emitter panic: %v", err)
+				_ = retErr
+			}
+			retErr = emitter(e)
+			return retErr
+		},
+	}
+}
+
+// NewDummyEmitter emit sends an AI output event using the emitter's function
+func NewDummyEmitter() *Emitter {
+	return NewEmitter(uuid.New().String(), nil)
+}
+
+func (r *Emitter) EmitJSON(typeName schema.EventType, id string, i any) {
+	event := &schema.AiOutputEvent{
+		CoordinatorId: r.id,
+		Type:          typeName,
+		NodeId:        id,
+		IsJson:        true,
+		Content:       utils.Jsonify(i),
+		Timestamp:     time.Now().Unix(),
+	}
+	r.emit(event)
+}
+
+func (r *Emitter) EmitYakitExecResult(exec *ypb.ExecResult) {
+	if exec == nil {
+		return
+	}
+	r.EmitJSON(schema.EVENT_TYPE_YAKIT_EXEC_RESULT, "yakit", exec)
+}
+
+func (r *Emitter) EmitSchema(nodeId string, i any) {
+	r.EmitJSON(schema.EVENT_TYPE_STRUCTURED, nodeId, i)
+}
+
+func (r *Emitter) EmitStatus(key string, value any) {
+	r.EmitStructured("status", map[string]any{
+		"key":   key,
+		"value": value,
+	})
+}
+
+func (r *Emitter) EmitStream(nodeId string, content string) {
+	r.emit(&schema.AiOutputEvent{
+		CoordinatorId: r.id,
+		Type:          schema.EVENT_TYPE_STREAM,
+		NodeId:        nodeId,
+		IsJson:        true,
+		IsStream:      true,
+		StreamDelta:   []byte(content),
+		Timestamp:     time.Now().Unix(),
+	})
+}
+
+func (r *Emitter) EmitStructured(id string, i any) {
+	r.EmitJSON(schema.EVENT_TYPE_STRUCTURED, id, i)
+}
+
+func (r *Emitter) EmitRequirePermission(title string, description ...string) {
+	reqs := map[string]any{
+		"title":       title,
+		"description": description,
+	}
+	r.EmitJSON(schema.EVENT_TYPE_PERMISSION_REQUIRE, "permission", reqs)
+}
+
+func (r *Emitter) EmitInteractiveJSON(id string, typeName schema.EventType, nodeId string, i any) {
+	event := &schema.AiOutputEvent{
+		CoordinatorId: r.id,
+		Type:          typeName,
+		NodeId:        nodeId,
+		IsJson:        true,
+		Content:       utils.Jsonify(i),
+		Timestamp:     time.Now().Unix(),
+	}
+	r.StoreInteractiveEvent(id, event)
+	r.emit(event)
+}
+
+func (r *Emitter) EmitInteractiveRelease(id string, invokeParams aitool.InvokeParams) {
+	release := map[string]any{
+		"id":     id,
+		"params": invokeParams,
+	}
+	event := &schema.AiOutputEvent{
+		CoordinatorId: r.id,
+		Type:          schema.EVENT_TYPE_REVIEW_RELEASE,
+		NodeId:        "review-release",
+		IsJson:        true,
+		Content:       utils.Jsonify(release),
+	}
+	r.emit(event)
+}
+
+func (r *Emitter) EmitLogWithLevel(level, name, fmtlog string, items ...any) {
+	message := fmtlog
+	if len(items) > 0 {
+		message = fmt.Sprintf(fmtlog, items...)
+	}
+
+	nodeName := name
+	if name == "" {
+		nodeName = level
+	}
+
+	r.EmitStructured(nodeName, map[string]any{
+		"level":   level,
+		"message": message,
+	})
+}
+
+func (r *Emitter) EmitWarningWithName(name string, fmtlog string, items ...any) {
+	r.EmitLogWithLevel("warning", name, fmtlog, items...)
+}
+
+func (r *Emitter) EmitInfoWithName(name string, fmtlog string, items ...any) {
+	r.EmitLogWithLevel("info", name, fmtlog, items...)
+}
+
+func (r *Emitter) EmitErrorWithName(name string, fmtlog string, items ...any) {
+	r.EmitLogWithLevel("error", name, fmtlog, items...)
+}
+
+var ToolCallWatcher = []map[string]any{
+	{
+		"value":              "enough-cancel",
+		"suggestion":         "跳过",
+		"suggestion_english": "Tool output is sufficient, can cancel tool execution and continue with the next task",
+	},
+}
+
+func (r *Emitter) EmitToolCallWatcher(toolCallID string, id string, tool *aitool.Tool, params aitool.InvokeParams) {
+	reqs := map[string]any{
+		"call_tool_id":     toolCallID,
+		"id":               id,
+		"tool":             tool.Name,
+		"tool_description": tool.Description,
+		"params":           params,
+		"selectors":        ToolCallWatcher,
+	}
+	r.EmitInteractiveJSON(id, schema.EVENT_TYPE_TOOL_CALL_WATCHER, "review-require", reqs)
+}
+
+func (r *Emitter) EmitToolCallStart(callToolId string, tool *aitool.Tool) {
+	r.EmitJSON(schema.EVENT_TOOL_CALL_START, callToolId, map[string]any{
+		"call_tool_id": callToolId,
+		"tool": map[string]any{
+			"name":        tool.Name,
+			"description": tool.Description,
+		},
+	})
+}
+
+func (r *Emitter) EmitToolCallStatus(callToolId string, status string) {
+	r.EmitJSON(schema.EVENT_TOOL_CALL_STATUS, callToolId, map[string]any{
+		"call_tool_id": callToolId,
+		"status":       status,
+	})
+}
+
+func (r *Emitter) EmitToolCallDone(callToolId string) {
+	r.EmitJSON(schema.EVENT_TOOL_CALL_DONE, callToolId, map[string]any{
+		"call_tool_id": callToolId,
+	})
+}
+
+func (r *Emitter) EmitToolCallError(callToolId string, err any) {
+	r.EmitJSON(schema.EVENT_TOOL_CALL_ERROR, callToolId, map[string]any{
+		"call_tool_id": callToolId,
+		"error":        fmt.Sprintf("%v", err),
+	})
+}
+
+func (r *Emitter) EmitToolCallUserCancel(callToolId string) {
+	r.EmitJSON(schema.EVENT_TOOL_CALL_USER_CANCEL, callToolId, map[string]any{
+		"call_tool_id": callToolId,
+	})
+}
+
+func (r *Emitter) EmitToolCallSummary(callToolId string, summary string) {
+	r.EmitJSON(schema.EVENT_TOOL_CALL_SUMMARY, callToolId, map[string]any{
+		"call_tool_id": callToolId,
+		"summary":      summary,
+	})
+}
+
+func (r *Emitter) EmitToolCallStd(toolName string, stdOut, stdErr io.Reader, taskIndex string) {
+	startTime := time.Now()
+	r.EmitStreamEventEx(fmt.Sprintf("tool-%v-stdout", toolName), startTime, stdOut, taskIndex, true)
+	r.EmitStreamEventEx(fmt.Sprintf("tool-%v-stderr", toolName), startTime, stdErr, taskIndex, true)
+}
+
+func (r *Emitter) EmitStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, finishCallback ...func()) {
+	r.EmitStreamEventEx(nodeId, startTime, reader, taskIndex, false, finishCallback...)
+}
+
+func (r *Emitter) EmitStreamEventEx(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, disableMarkdown bool, finishCallback ...func()) {
+	r.emitStreamEvent(&streamEvent{
+		disableMarkdown:    disableMarkdown,
+		startTime:          startTime,
+		isSystem:           false,
+		isReason:           false,
+		reader:             reader,
+		nodeId:             nodeId,
+		taskIndex:          taskIndex,
+		emitFinishCallback: finishCallback,
+	})
+}
+
+func (r *Emitter) EmitSystemStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, finishCallback ...func()) {
+	r.emitStreamEvent(&streamEvent{
+		startTime:          startTime,
+		isSystem:           true,
+		isReason:           false,
+		reader:             reader,
+		nodeId:             nodeId,
+		taskIndex:          taskIndex,
+		emitFinishCallback: finishCallback,
+	})
+}
+
+func (r *Emitter) EmitSystemReasonStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, finishCallback ...func()) {
+	r.emitStreamEvent(&streamEvent{
+		startTime:          startTime,
+		isSystem:           true,
+		isReason:           true,
+		reader:             reader,
+		nodeId:             nodeId,
+		taskIndex:          taskIndex,
+		emitFinishCallback: finishCallback,
+	})
+}
+
+func (r *Emitter) EmitReasonStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, finishCallback ...func()) {
+	r.emitStreamEvent(&streamEvent{
+		startTime:          startTime,
+		isSystem:           false,
+		isReason:           true,
+		reader:             reader,
+		nodeId:             nodeId,
+		taskIndex:          taskIndex,
+		emitFinishCallback: finishCallback,
+	})
+}
+
+func (r *Emitter) emitStreamEvent(e *streamEvent) {
+	r.streamWG.Add(1)
+
+	producer := newStreamAIOutputEventWriter(
+		r.id,
+		e.nodeId,
+		e.disableMarkdown,
+		e.isSystem,
+		e.isReason,
+		r.emit,
+		e.startTime.Unix(),
+		ksuid.New().String(),
+		e.taskIndex,
+	)
+
+	go func() {
+		defer r.streamWG.Done()
+		defer func() {
+			for _, f := range e.emitFinishCallback {
+				f()
+			}
+		}()
+		io.Copy(producer, e.reader)
+	}()
+}
+
+func (e *Emitter) EmitInfo(fmtlog string, items ...any) {
+	e.EmitLogWithLevel("info", "system", fmtlog, items...)
+}
+
+func (e *Emitter) EmitWarning(fmtlog string, items ...any) {
+	e.EmitLogWithLevel("warning", "system", fmtlog, items...)
+}
+
+func (e *Emitter) EmitError(fmtlog string, items ...any) {
+	e.EmitLogWithLevel("error", "system", fmtlog, items...)
+}
+
+func (e *Emitter) EmitPrompt(step string, prompt string) {
+	e.EmitStructured("prompt", map[string]any{
+		"system": false,
+		"step":   step,
+		"prompt": prompt,
+	})
+}
+
+func (e *Emitter) EmitSystemPrompt(step string, prompt string) {
+	e.EmitStructured("prompt", map[string]any{
+		"system": true,
+		"step":   step,
+		"prompt": prompt,
+	})
+}

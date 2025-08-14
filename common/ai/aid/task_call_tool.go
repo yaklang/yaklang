@@ -3,9 +3,10 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/segmentio/ksuid"
 	"github.com/tidwall/gjson"
@@ -15,7 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (t *aiTask) getToolRequired(response string) []*aitool.Tool {
+func (t *AiTask) getToolRequired(response string) []*aitool.Tool {
 	var toolRequired []*aitool.Tool
 	for _, pairs := range jsonextractor.ExtractObjectIndexes(response) {
 		start, end := pairs[0], pairs[1]
@@ -47,7 +48,7 @@ func (t *aiTask) getToolRequired(response string) []*aitool.Tool {
 	return toolRequired
 }
 
-func (t *aiTask) getToolResultAction(response string) string {
+func (t *AiTask) getToolResultAction(response string) string {
 	for _, pairs := range jsonextractor.ExtractObjectIndexes(response) {
 		start, end := pairs[0], pairs[1]
 		toolRequiredJSON := response[start:end]
@@ -61,7 +62,7 @@ func (t *aiTask) getToolResultAction(response string) string {
 	return "unknown"
 }
 
-func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, directlyAnswer bool, err error) {
+func (t *AiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, directlyAnswer bool, err error) {
 	t.config.EmitInfo("start to generate tool[%v] params in task:%#v", targetTool.Name, t.Name)
 
 	callToolId := ksuid.New().String()
@@ -207,7 +208,7 @@ func (t *aiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, d
 	return toolResult, false, nil
 }
 
-func (t *aiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitool.Tool) (string, error) {
+func (t *AiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitool.Tool) (string, error) {
 	decisionPrompt, err := t.generateToolCallResponsePrompt(result, targetTool)
 	if err != nil {
 		err = utils.Errorf("error generating tool call response prompt: %v", err)
