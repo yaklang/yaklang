@@ -3,13 +3,14 @@ package aid
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"sync/atomic"
+	"text/template"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"io"
-	"sync/atomic"
-	"text/template"
 )
 
 var (
@@ -19,7 +20,7 @@ var (
 	taskSkipped     = "task-skipped"
 )
 
-func (t *aiTask) execute() error {
+func (t *AiTask) execute() error {
 	if t.config.IsCtxDone() {
 		return utils.Errorf("context is done")
 	}
@@ -245,7 +246,7 @@ TOOLREQUIRED:
 	return nil
 }
 
-func (t *aiTask) executeTaskPushTaskIndex() error {
+func (t *AiTask) executeTaskPushTaskIndex() error {
 	// 在执行任务之前，推送事件到事件栈
 	t.config = t.config.pushEventBeforeSave(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
 		if event.TaskIndex == "" {
@@ -263,7 +264,7 @@ func (t *aiTask) executeTaskPushTaskIndex() error {
 }
 
 // executeTask 实际执行任务并返回结果
-func (t *aiTask) executeTask() error {
+func (t *AiTask) executeTask() error {
 	if err := t.execute(); err != nil {
 		return err
 	}
@@ -286,7 +287,7 @@ func (t *aiTask) executeTask() error {
 	return nil
 }
 
-func (t *aiTask) GenerateTaskSummaryPrompt() (string, error) {
+func (t *AiTask) GenerateTaskSummaryPrompt() (string, error) {
 	summaryTemplate := template.Must(template.New("summary").Parse(__prompt_TaskSummary))
 	var buf bytes.Buffer
 	err := summaryTemplate.Execute(&buf, map[string]any{
@@ -298,7 +299,7 @@ func (t *aiTask) GenerateTaskSummaryPrompt() (string, error) {
 	return buf.String(), nil
 }
 
-func SelectSummary(task *aiTask, callResult *aitool.ToolResult) string {
+func SelectSummary(task *AiTask, callResult *aitool.ToolResult) string {
 	if callResult.ShrinkResult != "" {
 		return callResult.ShrinkResult
 	}

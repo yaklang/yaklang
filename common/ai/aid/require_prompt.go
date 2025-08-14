@@ -2,11 +2,12 @@ package aid
 
 import (
 	"context"
+	"io"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
-	"io"
-	"strings"
 )
 
 // CreateRequireUserInteract 创建一个需要用户输入的提示工具
@@ -117,5 +118,5 @@ func (c *Config) EmitRequireUserInteractive(i *RequireInteractiveRequest, id str
 		}
 	}
 
-	c.emitInteractiveJson(id, schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE, "require-user-interact", i)
+	c.EmitInteractiveJSON(id, schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE, "require-user-interact", i)
 }

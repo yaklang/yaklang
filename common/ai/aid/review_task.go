@@ -2,10 +2,11 @@ package aid
 
 import (
 	_ "embed"
+	"io"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"io"
 )
 
 //go:embed jsonschema/plan-review/re-plan-suggestion.json
@@ -17,7 +18,7 @@ type ReviewSuggestion struct {
 	SuggestionEnglish string `json:"prompt_english"`
 	AllowExtraPrompt  bool   `json:"allow_extra_prompt"`
 
-	PromptBuilder    func(task *aiTask, rt *runtime) `json:"-"`
+	PromptBuilder    func(task *AiTask, rt *runtime) `json:"-"`
 	ResponseCallback func(reader io.Reader)          `json:"-"`
 	ParamSchema      string                          `json:"param_schema"`
 }
@@ -58,7 +59,7 @@ var TaskReviewSuggestions = []*ReviewSuggestion{
 	},
 }
 
-func (t *aiTask) handleReviewResult(param aitool.InvokeParams) error {
+func (t *AiTask) handleReviewResult(param aitool.InvokeParams) error {
 	// 1. 获取审查建议
 	suggestion := param.GetString("suggestion")
 	if suggestion == "" {
@@ -74,7 +75,7 @@ func (t *aiTask) handleReviewResult(param aitool.InvokeParams) error {
 			t.config.EmitError("invoke planRequest failed: %v", err)
 			return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
 		}
-		t.config.emitJson(schema.EVENT_TYPE_PLAN, "system", map[string]any{
+		t.config.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
 			"root_task": t.config.getCurrentTaskPlan(),
 		})
 		return t.config.aiTaskRuntime.executeSubTask(1, t)
@@ -100,7 +101,7 @@ func (t *aiTask) handleReviewResult(param aitool.InvokeParams) error {
 			return utils.Error("current task not found in parent task")
 		}
 		parentTask.Subtasks = parentTask.Subtasks[:index+1]
-		t.config.emitJson(schema.EVENT_TYPE_PLAN, "system", map[string]any{
+		t.config.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
 			"root_task": t.config.getCurrentTaskPlan(),
 		})
 	case "adjust_plan":
@@ -115,7 +116,7 @@ func (t *aiTask) handleReviewResult(param aitool.InvokeParams) error {
 			t.config.EmitError("invoke planRequest failed: %v", err)
 			return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
 		}
-		t.config.emitJson(schema.EVENT_TYPE_PLAN, "system", map[string]any{
+		t.config.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
 			"root_task": t.config.getCurrentTaskPlan(),
 		})
 	default:

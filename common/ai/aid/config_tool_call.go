@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
 )
 
 var ToolCallWatcher = []*ToolUseReviewSuggestion{
@@ -25,7 +26,7 @@ var (
 	ToolCallAction_Finish        = "finish"
 )
 
-func (t *aiTask) InvokeTool(targetTool *aitool.Tool, callToolParams aitool.InvokeParams, callToolId string, handleResultUserCancel, handleResultErr func(any), stdoutWriter, stderrWriter io.Writer) (*aitool.ToolResult, error) {
+func (t *AiTask) InvokeTool(targetTool *aitool.Tool, callToolParams aitool.InvokeParams, callToolId string, handleResultUserCancel, handleResultErr func(any), stdoutWriter, stderrWriter io.Writer) (*aitool.ToolResult, error) {
 	c := t.config
 	seq := c.AcquireId()
 	if ret, ok := yakit.GetToolCallCheckpoint(c.GetDB(), c.id, seq); ok { // todo rerun

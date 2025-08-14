@@ -5,11 +5,12 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"strings"
 	"text/template"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
@@ -309,7 +310,7 @@ func (p *planRequest) freedomReviewGenerateNewPlan(extraPrompt string, rsp *Plan
 	p.config.EmitInfo("freedom plan review prompt: %s", planPrompt.String())
 	prompt := planPrompt.String()
 
-	var task *aiTask
+	var task *AiTask
 	err = p.config.callAiTransaction(prompt, p.callAI, func(response *AIResponse) error {
 		responseReader := response.GetOutputStreamReader("freedom-plan-review", false, p.config)
 		taskResponse, err := io.ReadAll(responseReader)
@@ -355,7 +356,7 @@ func (p *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp
 	// 调用 AI 生成新的任务计划
 	prompt := planPrompt.String()
 
-	var task *aiTask
+	var task *AiTask
 	err = p.config.callAiTransaction(prompt, p.callAI, func(response *AIResponse) error {
 		// 读取 AI 的响应
 		responseReader := response.GetOutputStreamReader("dynamic-plan", false, p.config)

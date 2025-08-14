@@ -3,10 +3,11 @@ package aid
 import (
 	_ "embed"
 	"fmt"
+	"sync/atomic"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"sync/atomic"
 )
 
 type planRequest struct {
@@ -47,10 +48,10 @@ func (pr *planRequest) callAI(request *AIRequest) (*AIResponse, error) {
 }
 
 type PlanResponse struct {
-	RootTask *aiTask `json:"root_task"`
+	RootTask *AiTask `json:"root_task"`
 }
 
-func (p *PlanResponse) recursiveMergeSubtask(subtask *aiTask, callback func(i *aiTask) error, stopped *utils.AtomicBool) {
+func (p *PlanResponse) recursiveMergeSubtask(subtask *AiTask, callback func(i *AiTask) error, stopped *utils.AtomicBool) {
 	if subtask == nil || (stopped != nil && stopped.IsSet()) {
 		return
 	}
@@ -74,12 +75,12 @@ func (p *PlanResponse) MergeSubtask(parentIndex string, name string, goal string
 	}
 	p.RootTask.GenerateIndex()
 
-	p.recursiveMergeSubtask(p.RootTask, func(i *aiTask) error {
+	p.recursiveMergeSubtask(p.RootTask, func(i *AiTask) error {
 		if i.Index != parentIndex {
 			return nil
 		}
 
-		i.Subtasks = append(i.Subtasks, &aiTask{
+		i.Subtasks = append(i.Subtasks, &AiTask{
 			config:     p.RootTask.config,
 			Name:       name,
 			Goal:       goal,
@@ -102,7 +103,7 @@ func (pr *planRequest) GenerateFirstPlanPrompt() (string, error) {
 	}
 }
 
-func (c *Config) newPlanResponse(rootTask *aiTask) *PlanResponse {
+func (c *Config) newPlanResponse(rootTask *AiTask) *PlanResponse {
 	c.SetSyncCallback(SYNC_TYPE_PLAN, func() any {
 		return rootTask
 	})
@@ -126,11 +127,11 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 		return nil, fmt.Errorf("生成规划 prompt 失败: %v", err)
 	}
 
-	var rootTask = &aiTask{}
+	var rootTask = &AiTask{}
 	defer func() {
 		// Ensure config is propagated to the new task and its subtasks
-		var propagateConfig func(task *aiTask)
-		propagateConfig = func(task *aiTask) {
+		var propagateConfig func(task *AiTask)
+		propagateConfig = func(task *AiTask) {
 			if task == nil {
 				return
 			}
@@ -168,7 +169,7 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 					if subtask.GetAnyToString("subtask_name") == "" {
 						continue
 					}
-					rootTask.Subtasks = append(rootTask.Subtasks, &aiTask{
+					rootTask.Subtasks = append(rootTask.Subtasks, &AiTask{
 						config: pr.config,
 						Name:   subtask.GetAnyToString("subtask_name"),
 						Goal:   subtask.GetAnyToString("subtask_goal"),
