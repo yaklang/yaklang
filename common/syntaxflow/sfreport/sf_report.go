@@ -678,11 +678,11 @@ func (r *RiskTypeOverview) ToEChartsStackedBar() *EChartsOption {
 					Color: config.color,
 				},
 				Label: echartsLabel{
-					Show:      true,
-					Position:  "inside",
-					Formatter: "function(params) { return params.value > 0 ? (params.value * 100).toFixed(1) + '%' : ''; }",
-					FontSize:  10,
-					Color:     "white",
+					Show:     true,
+					Position: "inside",
+					//Formatter: "function(params) { return params.value > 0 ? (params.value * 100).toFixed(1) + '%' : ''; }",
+					FontSize: 10,
+					Color:    "white",
 				},
 			})
 			legendData = append(legendData, config.name)
@@ -869,6 +869,9 @@ func generateRiskOverview(reportInstance *schema.Report, ssaReport *SSAProjectRe
 	// 注意：ssaReport.Risks 已经在 processRisksAndStats 中进行了稳定排序
 	// 按风险类型(RiskType)排序为主要排序机制，相同风险类型按严重程度进行次要排序，确保输出一致性
 	for _, risk := range ssaReport.Risks {
+		if risk.CodeSourceUrl == "" {
+			continue
+		}
 		// 构建位置信息
 		location := risk.CodeSourceUrl
 		if risk.Line > 0 {
