@@ -83,17 +83,20 @@ func ExtractImageFramesFromVideo(inputFile string, opts ...Option) (<-chan *Ffmp
 	}
 
 	// 3. Construct command
-	args := []string{
+
+	var args []string
+	if o.startTime > 0 {
+		args = append(args, "-ss", formatDuration(o.startTime)) // should use -ss before -i for faster seeking
+	}
+	if o.endTime > 0 {
+		args = append(args, "-t", formatDuration(o.endTime-o.startTime))
+	}
+
+	args = append(args, []string{
 		"-i", inputFile,
 		"-nostdin",
 		"-threads", strconv.Itoa(o.threads),
-	}
-	if o.startTime > 0 {
-		args = append(args, "-ss", formatDuration(o.startTime))
-	}
-	if o.endTime > 0 {
-		args = append(args, "-to", formatDuration(o.endTime))
-	}
+	}...)
 
 	outputPattern := filepath.Join(o.outputDir, o.outputFramePattern)
 
@@ -250,7 +253,7 @@ func sendFrame(filename, dir string, ch chan<- *FfmpegStreamResult) {
 		MIMEType:    mimeObj.String(),
 		MIMETypeObj: mimeObj,
 	}
-	os.Remove(filePath) // Clean up immediately
+	//os.Remove(filePath) // Clean up immediately
 }
 
 // BurnInSubtitles hard-codes subtitles from an SRT file into a video.
