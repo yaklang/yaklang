@@ -75,7 +75,7 @@ func (ka *KnowledgeAlchemist) Refine(ctx context.Context, db *gorm.DB, path stri
 				defer swg.Done()
 				var res *aiforge.ForgeResult
 				if chunk.MIMEType().IsImage() {
-					res, err = refineForge.ExecuteEx(ctx, nil, []*aid.ImageData{{
+					res, err = refineForge.ExecuteEx(ctx, nil, []*aicommon.ImageData{{
 						Data:     chunk.Data(),
 						IsBase64: false,
 					}}, ka.ExtendAIDOption...)

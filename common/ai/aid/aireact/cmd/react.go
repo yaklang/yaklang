@@ -84,7 +84,7 @@ func main() {
 	}()
 
 	// Create AI callback with real-time streaming display
-	aiCallback := aid.AIChatToAICallbackType(func(msg string, opts ...aispec.AIConfigOption) (string, error) {
+	aiCallback := aicommon.AIChatToAICallbackType(func(msg string, opts ...aispec.AIConfigOption) (string, error) {
 		// Add stream handlers to show real-time output
 		opts = append(opts,
 			aispec.WithStreamHandler(func(reader io.Reader) {
@@ -105,7 +105,7 @@ func main() {
 	})
 
 	// For debugging, let's create a wrapper to see what's happening
-	debugAICallback := func(config *aid.Config, req *aid.AIRequest) (*aid.AIResponse, error) {
+	debugAICallback := func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		if debugMode {
 			log.Infof("AI Request: %s", req.GetPrompt())
 		}
@@ -379,7 +379,7 @@ var (
 	spinnerMutex  sync.Mutex
 
 	// Pending response for breakpoint
-	pendingResponse *aid.AIResponse
+	pendingResponse *aicommon.AIResponse
 )
 
 // showRawStreamOutput displays the raw AI stream in real-time (or buffered in breakpoint mode)
@@ -667,7 +667,7 @@ func handleRequestBreakpoint(prompt string) {
 }
 
 // handleResponseBreakpoint handles breakpoint functionality - pauses after AI interaction to inspect response
-func handleResponseBreakpoint(resp *aid.AIResponse) {
+func handleResponseBreakpoint(resp *aicommon.AIResponse) {
 	fmt.Printf("\n" + strings.Repeat("=", 80) + "\n")
 	fmt.Printf("🛑 RESPONSE BREAKPOINT: AI Response Received\n")
 	fmt.Printf(strings.Repeat("=", 80) + "\n")

@@ -67,7 +67,7 @@ func TestSheepTest(t *testing.T) {
 			},
 		},
 		aid.WithPlanAICallback(aiforge.GetOpenRouterAICallback()),
-		aid.WithAICallback(func(config *aid.Config, req *aid.AIRequest) (*aid.AIResponse, error) {
+		aid.WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return aiforge.GetOpenRouterAICallback()(config, req)
 		}),
 		aid.WithAgreeYOLO(),
@@ -97,7 +97,7 @@ func TestSheepTest2(t *testing.T) {
 			},
 		},
 		aid.WithPlanAICallback(aiforge.GetOpenRouterAICallback()),
-		aid.WithAICallback(func(config *aid.Config, req *aid.AIRequest) (*aid.AIResponse, error) {
+		aid.WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return aiforge.GetOpenRouterAICallback()(config, req)
 		}),
 		aid.WithAgreeYOLO(),

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"sync"
 	"time"
 
@@ -245,8 +246,8 @@ func buildAIDOption(startParams *ypb.AIStartParams) []aid.Option {
 	}
 
 	if startParams.GetUseDefaultAIConfig() {
-		wrapperChat := aid.AIChatToAICallbackType(ai.Chat)
-		aidOption = append(aidOption, aid.WithAICallback(func(config *aid.Config, req *aid.AIRequest) (*aid.AIResponse, error) {
+		wrapperChat := aicommon.AIChatToAICallbackType(ai.Chat)
+		aidOption = append(aidOption, aid.WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			//fmt.Println(req.GetPrompt())
 			//time.Sleep(100 * time.Millisecond)
 			return wrapperChat(config, req)
@@ -254,7 +255,7 @@ func buildAIDOption(startParams *ypb.AIStartParams) []aid.Option {
 	}
 
 	if mockedAIChat != nil {
-		aidOption = append(aidOption, aid.WithAICallback(aid.AIChatToAICallbackType(mockedAIChat)))
+		aidOption = append(aidOption, aid.WithAICallback(aicommon.AIChatToAICallbackType(mockedAIChat)))
 	}
 
 	if startParams.GetDisallowRequireForUserPrompt() {

@@ -3,6 +3,7 @@ package sfcompletion
 import (
 	"context"
 	_ "embed"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strconv"
 
 	"io"
@@ -23,7 +24,7 @@ func CompleteRuleDesc(
 	fileName, ruleContent string,
 	aiConfig ...aispec.AIConfigOption,
 ) (string, error) {
-	aiCallback := func(config *aid.Config, req *aid.AIRequest) (*aid.AIResponse, error) {
+	aiCallback := func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		rsp := config.NewAIResponse()
 		go func() {
 			defer rsp.Close()

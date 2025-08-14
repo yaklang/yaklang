@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -97,7 +98,7 @@ func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, op
 	return l.ExecuteEx(ctx, params, nil, opts...)
 }
 
-func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, imageData []*aid.ImageData, opts ...aid.Option) (*ForgeResult, error) {
+func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, imageData []*aicommon.ImageData, opts ...aid.Option) (*ForgeResult, error) {
 	if l.OutputSchema == "" {
 		return nil, fmt.Errorf("liteforge output schema is required")
 	}
@@ -168,11 +169,11 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 	}
 	var action *aid.Action
 	transactionErr := cod.CallAITransaction(buf.String(),
-		func(response *aid.AIResponse) error {
+		func(response *aicommon.AIResponse) error {
 			if l.ForgeName == "" {
 				l.ForgeName = "LiteForge"
 			}
-			result := response.GetOutputStreamReader(fmt.Sprintf(`liteforge[%v]`, l.ForgeName), true, cod.GetConfig())
+			result := response.GetOutputStreamReader(fmt.Sprintf(`liteforge[%v]`, l.ForgeName), true, cod.GetConfig().GetEmitter())
 			var mirrored bytes.Buffer
 			action, err = aid.ExtractActionFromStream(io.TeeReader(result, &mirrored), l.OutputActionName)
 			if err != nil {
@@ -183,8 +184,8 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 			}
 			return nil
 		},
-		lo.Map(imageData, func(item *aid.ImageData, _ int) aid.AIRequestOption {
-			return aid.WithImageData(item)
+		lo.Map(imageData, func(item *aicommon.ImageData, _ int) aicommon.AIRequestOption {
+			return aicommon.WithAIRequest_ImageData(item)
 		})...,
 	)
 	if transactionErr != nil {

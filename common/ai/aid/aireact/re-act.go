@@ -220,7 +220,7 @@ func (r *ReAct) processInputEvent(event *ypb.AITriageInputEvent) error {
 }
 
 // extractResponseContent extracts content from AI response
-func (r *ReAct) extractResponseContent(resp *aid.AIResponse) string {
+func (r *ReAct) extractResponseContent(resp *aicommon.AIResponse) string {
 	if resp == nil {
 		log.Error("AI response is nil")
 		return ""

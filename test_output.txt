@@ -1,0 +1,610 @@
+=== RUN   TestCoodinator_Delete_Memory
+[36m[INFO][0m 2025-08-14 22:13:55 [config_inputevent_loop:20] config 8eebba46-0d34-45a8-8f22-3621d8bf3594 started, start to handle receiving loop
+[36m[INFO][0m 2025-08-14 22:13:55 [config_inputevent_loop:61] coordinator validator working, (8eebba46-0d34-45a8-8f22-3621d8bf3594) start
+# 角色设定
+
+你是一个输出JSON的任务规划的工具，用户会给你基础材料和他想要完成的任务，你需要为任务一步一步规划信息，规划好后，输出任务列表，需要根据Schema来输出JSON格式，我将会构建任务队列来辅助你调整。
+
+在任务规划的时候要注意背景：
+*. 任务规划时可能会通过搜索或者内置工具来补充设计任务“感知”工具。**工具会影响任务的设计**，充分利用工具来设计任务
+*. 在一次任务执行的过程中，需要多种工具配合完成，一步一步来，每一步都需要设计成一个任务，任务之间需要有衔接
+*. 任务设计需要注意几个基本原则
+    1. 任务必须具体（Specific），如果在任务设计的时候，需要包含工具，则需要写明在任务中需要使用的工具，以免遗漏
+    2. 任务必须可衡量（Measurable）执行是否成功，任务中需要增加检查步骤来决定任务是否成功
+    3. 任务制定需要考虑可实现性（Achievable），结合现有工具或搜索新的工具，理性制定任务，避免过于复杂任务导致无法实现。
+    4. 任务需要相关性（Relevant），任务需要有主次关系，避免无关任务的干扰
+
+
+<<<PLAN_HELP START>>>
+## 规划任务帮助信息
+以下信息可以帮助你进行任务的规划和执行。
+
+## 可用工具
+以下工具可能有助于完成任务，但它们的使用完全是可选的。如果你认为无需使用工具即可完成任务，请直接提供解决方案。
+
+- `now`: get current time
+- `ls`: list files in directory or get file info
+- `read_file`: read file content, considering the context size, adjust chunk and offset size
+- `remove_file`: remove file
+- `write_file`: write file content
+- `copy_file`: copy file
+- `tree`: list files in directory recursively
+- `delete_memory`: delete ai task memory from timeline by id
+- `add_persistent_memory`: add persistent memory, which will be appended to every prompt
+- `require-user-interact`: require user input some prompt or selection to continue
+
+
+
+
+
+<<<PLAN_HELP END>>>
+
+
+<<<USER_INPUT_MATERIAL START>>>
+test
+<<<USER_INPUT_MATERIAL END>>>
+
+
+
+# 任务设计输出要求：
+*. 根据后续任务计划的schema构造JSON
+*. 任务规划只能输出JSON，禁止输出非JSON的内容，注意JSON的格式，避免出现语法错误
+*. **易错点**：时刻记住输出JSON时注意string使用"闭合，string内的内容合理转义，不转义会造成解析结构数据失败
+*. 在任务输出时，任务目标或者详情中只允许出现工具名和简要说明，不允许出现特殊符号，尤其是"避免破坏JSON结构
+*. 为了减少用户理解成本，子任务尽量不超过5个
+
+```schema
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["@action", "tasks", "main_task", "main_task_goal"],
+  "properties": {
+    "@action": {
+      "const": "plan",
+      "description": "标识当前操作为**任务规划 (plan)**。此操作的核心是将用户提出的一个相对宏观或初步的需求，系统性地转化为一个结构清晰、目标明确、可执行的主任务，并进一步将其分解为一系列具体的、可操作的子任务。"
+    },
+    "main_task": {
+      "type": "string",
+      "description": "根据用户原始输入提炼并**优化表达的核心任务名称**。此名称应作为整个规划的总纲领，简洁、明确地概括用户的主要意图。**强烈推荐采用‘动词+名词’的格式**，以清晰指示核心行动和对象（例如：‘构建电商平台用户认证系统’而非‘用户系统’）。"
+    },
+    "main_task_goal": {
+      "type": "string",
+      "description": "为 `main_task` 设定的**总体目标和最终成功标准**。**必须清晰、无歧义地阐述以下三点**：1）**明确的完成边界**：整个主任务在何种状态或达到何种程度可被视为完全成功结束？2）**关键的成功衡量指标**：通过哪些具体的、可量化的指标来评判主任务的完成质量和效果？3）**预期的核心交付成果或最终状态**：主任务完成后，期望产出哪些核心的、有形的交付物或达成的关键业务状态？此目标应避免模糊不清的表述，确保提供一个可验证的、宏观的完成基准。"
+    },
+    "tasks": {
+      "type": "array",
+      "description": "将 `main_task` **进一步细化分解后产生的一系列具体的、可独立执行的子任务列表**。每个子任务都是实现 `main_task_goal` 的一个必要步骤或组成部分。",
+      "items": {
+        "type": "object",
+        "required": ["subtask_name", "subtask_goal"],
+        "properties": {
+          "subtask_name": {
+            "type": "string",
+            "description": "新创建的子任务的简洁、概括性名称。**强烈推荐采用‘动词+名词’的格式**（例如：'设计数据库ER图'、'编写API接口文档'），以便清晰表达子任务的核心动作和对象。**长度建议控制在25个汉字（或等效字符数）以内**，确保其易于理解和在后续流程中引用。",
+            "minLength": 1
+          },
+          "subtask_goal": {
+            "type": "string",
+            "description": "为当前子任务设定的具体目标和衡量其完成的明确标准。**必须清晰、无歧义地阐述以下三点**：1）**明确的完成条件**：在什么具体情况下可以认定此子任务已完成？（例如：‘代码通过所有单元测试并合并到主分支’）2）**具体的输出要求或交付物**：此子任务完成后，应产出哪些具体的成果或达到哪些明确的输出标准？（例如：‘一份包含A记录和AAAA记录的IP地址列表报告.csv’）3）**可量化的成功指标（若适用）**：如果可能，提供可量化的指标来衡量子任务的完成质量（例如：‘API响应时间低于200ms’）。**坚决避免使用如‘进一步分析’、‘补充相关信息’、‘进行一些研究’等模糊、不可验证的表述。** 目标是确保每个子任务都有一个明确、可验证的终点。" ,
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "example": {
+    "@action": "plan",
+    "main_task": "优化用户输入的任务描述",
+    "main_task_goal": "确保任务描述清晰、具体，便于后续执行和跟踪，最终输出一份经过优化的任务描述文档。",
+    "tasks": [
+      {
+        "subtask_name": "分析用户原始输入",
+        "subtask_goal": "完整提取用户输入文本中的所有关键信息点、显性需求和隐性期望，输出一份包含这些内容的分析摘要。"
+      },
+      {
+        "subtask_name": "重构任务核心描述",
+        "subtask_goal": "基于分析摘要，使用‘动词+名词’的格式，将用户输入改写为单一、清晰、无歧义的核心任务描述，不超过30字。"
+      },
+      {
+        "subtask_name": "定义任务完成标准",
+        "subtask_goal": "为重构后的核心任务描述，制定至少3条明确、可衡量的完成标准，并说明预期的交付成果。"
+      }
+    ]
+  }
+}
+
+```
+[36m[INFO][0m 2025-08-14 22:13:55 [config_inputevent_loop:72] event received, (8eebba46-0d34-45a8-8f22-3621d8bf3594) start: &{31HV9nK4PCroThFF0wdSDEVCYEB false  false map[suggestion:continue]}
+[31m[ERRO][0m 2025-08-14 22:13:55 [memory:209] error getting review record for event ID 31HV9nK4PCroThFF0wdSDEVCYEB
+[36m[INFO][0m 2025-08-14 22:13:55 [coordinator:136] create aiTask pipeline: 在给定路径下寻找体积最大的文件
+[36m[INFO][0m 2025-08-14 22:13:55 [coordinator:138] step 0: 扫描目录结构
+[36m[INFO][0m 2025-08-14 22:13:55 [coordinator:138] step 1: 计算文件大小
+# 角色设定
+
+你是一个任务执行助手，根据既定的任务清单和系统提供的工具，执行任务并提供结果。
+
+# 牢记
+# Now 2025-08-14 22:13:55.968786 +0800 CST m=+0.122801918
+<persistent_memory>
+</persistent_memory>
+
+
+如果你决定使用工具，**必须要**先申请获取工具的详细参数信息(根据Schema构建JSON对象)。请注意，每次只能申请一个工具。你的回答应该是详细和全面的，确保解决任务目标中的所有要求，工具申请一定要严格遵守下方的json schema。
+特别说明：列表中仅包含部分可用工具。若 `可用工具` 环节中的工具列表无法满足任务需求，你可以通过调用`tools_search`工具来查询更多适用的工具。
+## 可用工具
+以下工具可能有助于完成任务，但它们的使用完全是可选的。如果你认为无需使用工具即可完成任务，请直接提供解决方案。
+
+- `now`: get current time
+- `ls`: list files in directory or get file info
+- `read_file`: read file content, considering the context size, adjust chunk and offset size
+- `remove_file`: remove file
+- `write_file`: write file content
+- `copy_file`: copy file
+- `tree`: list files in directory recursively
+- `delete_memory`: delete ai task memory from timeline by id
+- `add_persistent_memory`: add persistent memory, which will be appended to every prompt
+- `require-user-interact`: require user input some prompt or selection to continue
+
+
+## 任务执行进度和状态
+ -[-] "在给定路径下寻找体积最大的文件"  (执行中)
+  -[-] "扫描目录结构"  (执行中)
+  -[ ] "计算文件大小" (未开始)
+
+当前任务: "扫描目录结构"
+目标："递归遍历 /Users/v1ll4n/Projects/yaklang 目录下所有文件，记录每个文件的位置和占用空间"
+任务次数执行信息：
+- 调用了0 次工具。
+- 决策继续执行了0 次。（系统限制为10次）
+
+
+
+
+Schema如下：
+```schema help="申请工具详情"
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["tool", "@action"],
+  "additionalProperties": false,
+  "properties": {
+    "@action": {
+      "type": "string",
+      "enum": ["require-tool", "direct-answer"],
+      "description": "标识当前操作的具体类型",
+      "x-enum-rules": [
+        "如果当前操作是需要请求工具，则使用require-tool",
+        "如果当前操作是没有工具可用，则使用direct-answer"
+      ]
+    },
+    "tool": {
+      "type": "string",
+      "description": "您需要请求使用的工具名称，如果你的@action不是require-tool,设置tool为空字符串",
+      "enum": ["now", "ls", "read_file", "remove_file", "write_file", "copy_file", "tree", "delete_memory", "add_persistent_memory", "require-user-interact"]
+    },
+    "direct_answer": {
+      "type": "string",
+      "description": "无需工具时直接给出针对当前任务的终结性答案，需简洁、完整且一次性满足用户需求（如：\"Python反转字符串：'hello'[::-1]\"）"
+    },
+    "direct_answer_long": {
+      "type": "string",
+      "description": "direct_answer的长文本版本，包含更多的细节和解释，适用于需要更详细信息的场景"
+    }
+  },
+  "example": {
+    "@action": "require-tool",
+    "tool": "example_tool"
+  }
+}
+
+注意：如果你打算调用工具，一定要严格遵守Schema返回一个json数据，不要多余的解释或修饰信息。
+结合之前的工具调用历史和记录，关注不要重复使用类似参数调用同样的工具。
+```
+## 任务状态与进度
+ -[-] "在给定路径下寻找体积最大的文件"  (执行中)
+  -[-] "扫描目录结构"  (执行中)
+  -[ ] "计算文件大小" (未开始)
+
+当前任务: "扫描目录结构"
+目标："递归遍历 /Users/v1ll4n/Projects/yaklang 目录下所有文件，记录每个文件的位置和占用空间"
+任务次数执行信息：
+- 调用了0 次工具。
+- 决策继续执行了0 次。（系统限制为10次）
+
+
+
+# 牢记
+# Now 2025-08-14 22:13:55.97906 +0800 CST m=+0.133075835
+<persistent_memory>
+</persistent_memory>
+
+
+
+## 工具详情
+工具名称: now
+工具描述: get current time
+
+## 工具参数Schema
+
+作为JSON工具调用引擎，请依据以下原则生成符合Schema的参数：
+
+# 核心原则
+1. **参数完整性**
+   - 确保参数结构、数据类型、字段名称与Schema定义完全一致
+   - 对格式敏感字段（如URL/日期）进行有效性验证
+
+2. **生成策略**
+   - 动态分析历史参数特征，建立差异化生成模式
+   - 对枚举类参数采用分布式选择策略
+   - 数值参数应体现合理波动范围
+
+3. **质量保障**
+   - 执行参数生成前后双重校验机制
+   - 发现Schema冲突时自动中止并记录异常
+   - 建立参数相似度预警机制
+
+# 输出要求
+• 严格生成标准JSON对象
+• 禁止包含Schema未定义的字段
+• 嵌套对象保持合理深度层级
+• 仅输出JSON对象即可，不需要输出解释/执行流程/注意事项等
+
+# History
+
+
+```schema
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "get current time",
+  "properties": {
+    "@action": {
+      "const": "call-tool",
+      "description": "标识当前操作的具体类型"
+    },
+    "params": {
+      "description": "工具的参数",
+      "properties": {
+        "timezone": {
+          "description": "timezone for now, like 'Asia/Shanghai' or 'UTC' ... ",
+          "required": false,
+          "type": "string"
+        }
+      },
+      "required": null,
+      "type": "object"
+    },
+    "tool": {
+      "const": "now",
+      "description": "你想要选择的工具名",
+      "type": "string"
+    }
+  },
+  "required": [
+    "tool",
+    "@action",
+    "params"
+  ],
+  "type": "object"
+}
+```
+请根据Schema描述构造有效JSON对象来调用此工具，系统会执行工具内容。
+
+一般来说，你应该生成数据类似于：`{"@action": "call-tool", "tool": ..., "params": ... }`。
+
+注意观察历史记录中已有的参数，不要重复使用相似参数执行工具，已经执行过的结果不要重复执行
+
+[36m[INFO][0m 2025-08-14 22:13:55 [config_inputevent_loop:72] event received, (8eebba46-0d34-45a8-8f22-3621d8bf3594) start: &{31HV9mJUAwC1qOXNKPPIyk4YKcZ false  false map[suggestion:continue]}
+[31m[ERRO][0m 2025-08-14 22:13:55 [memory:209] error getting review record for event ID 31HV9mJUAwC1qOXNKPPIyk4YKcZ
+[31m[ERRO][0m 2025-08-14 22:13:56 [memory:209] error getting review record for event ID 31HV9psV0cVRWl93SjvAYr3xcNX
+# 角色设定
+
+你是一个任务执行引擎，在执行之前制定的任务中的子任务，当前任务列表如下：
+
+## 任务状态
+ -[-] "在给定路径下寻找体积最大的文件"  (执行中)
+  -[-] "扫描目录结构"  (执行中)
+  -[ ] "计算文件大小" (未开始)
+
+当前任务: "扫描目录结构"
+目标："递归遍历 /Users/v1ll4n/Projects/yaklang 目录下所有文件，记录每个文件的位置和占用空间"
+任务次数执行信息：
+- 调用了1 次工具。
+- 决策继续执行了0 次。（系统限制为10次）
+
+
+
+# 牢记
+# Now 2025-08-14 22:13:56.012738 +0800 CST m=+0.166754085
+<persistent_memory>
+</persistent_memory>
+
+
+
+## 当前需要做什么
+
+在执行完一个工具的时候，你需要重新review当前任务的执行情况，并且做出相应决策：
+
+## 任务状态
+ -[-] "在给定路径下寻找体积最大的文件"  (执行中)
+  -[-] "扫描目录结构"  (执行中)
+  -[ ] "计算文件大小" (未开始)
+
+当前任务: "扫描目录结构"
+目标："递归遍历 /Users/v1ll4n/Projects/yaklang 目录下所有文件，记录每个文件的位置和占用空间"
+任务次数执行信息：
+- 调用了1 次工具。
+- 决策继续执行了0 次。（系统限制为10次）
+
+
+
+你在执行任务的过程中，刚使用了一个工具来帮助你完成任务，工具的结果如下，产生结果时间为：2025-08-14 22:13:56
+
+id: 1223; tool_name: "now"
+param: {}
+result: 
+2025-08-14 22:13:56.012347 +0800 CST m=+0.166363126
+
+
+在此之前，你使用过如下工具：
+
+no-toolcall, so not timeline
+
+
+当前任务可以继续，你需要判断是否需要继续执行当前任务，并输出符合Schema的JSON数据实例。
+1. 根据上下文判断如果当前任务已经完成，则需要将当前任务标记为完成，并且输出符合Schema的JSON数据实例，并给出相应的总结
+2. 如果当前任务的上下文你认为无法判定为结束，请你根据下面Schema，使用"continue-current-task"来进一步执行任务。
+3. 你可以在 continue-current-task 中通过 status_summary 更新任务状态。
+4. 注意：你必须专注当前任务是否满足需要即可，其他的任务会有别的办法完成。
+
+
+## 任务状态如下
+ -[-] "在给定路径下寻找体积最大的文件"  (执行中)
+  -[-] "扫描目录结构"  (执行中)
+  -[ ] "计算文件大小" (未开始)
+
+当前任务: "扫描目录结构"
+目标："递归遍历 /Users/v1ll4n/Projects/yaklang 目录下所有文件，记录每个文件的位置和占用空间"
+任务次数执行信息：
+- 调用了1 次工具。
+- 决策继续执行了0 次。（系统限制为10次）
+
+
+
+# 注意
+在你执行完任务后，需要生成符合下方Schema的JSON数据实例，禁止返回Schema结构。在这次回答中，尤其要注意检查任务状态
+```schema
+
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["@action"],
+  "properties": {
+    "@action": {
+      "type": "string",
+      "enum": ["continue-current-task", "proceed-next-task", "task-failed", "task-skipped"],
+      "description": "基于对当前执行中子任务（在任务树中标记为“执行中”状态）的**退出条件评估**，决定任务流的下一步行动。此字段用于指示AI在评估当前子任务状态后应采取的四种预定义操作之一。",
+      "enumDescriptions": {
+        "continue-current-task": "当评估后认为当前子任务**尚未满足其既定完成条件（即退出条件未达成）**时选择此项。AI应通过此操作**申请必要的工具调用或执行进一步的内部处理**，以继续推进当前子任务的执行。",
+        "proceed-next-task": "当评估后确认当前子任务**已成功完成并满足其所有退出条件**时选择此项。此操作将**正式结束当前子任务**，并使任务流**前进到计划中的下一个子任务**。",
+        "task-failed": "当当前子任务在执行过程中遭遇**无法恢复的致命错误或关键性障碍**，导致其无法继续或无法达成目标时选择此项。此操作将**标记当前任务为失败状态，并通常会导致整个任务规划的终止或进入错误处理流程**。",
+        "task-skipped": "当AI判断当前子任务因**多次尝试失败、执行成本过高、与整体目标关联性减弱或变得不再必要**时选择此项。此操作将**显式放弃当前子任务的执行，并允许任务流跳过此任务，继续处理后续子任务**。"
+      }
+    },
+    "status_summary": {
+      "type": "string",
+      "description": "当 `@action` 为 `continue-current-task` 时**必需提供**。此字段用于**记录和总结当前子任务在本次执行迭代中的具体进展、遇到的问题、已尝试的解决步骤、以及任何需要传递给下一次迭代（针对同一子任务）的关键上下文信息**。其核心目的是确保任务在多次尝试中能够持续推进，并为AI后续的决策（例如，调整策略、选择不同工具或参数）提供充分的、结构化的信息依据。也可用于追踪如重试次数、累积的部分成果等中间状态数据。"
+    },
+    "task_long_summary": {
+      "type": "string",
+      "description": "当子任务通过 `proceed-next-task` 成功完成时**可选提供**。这是一个**详尽的任务完成总结**，旨在全面记录该子任务的完整执行过程、最终取得的成果、关键的发现与洞察、执行期间遇到的挑战及其对应的解决方案等。**建议将长度控制在300个Token左右**。此总结主要用于支持后续的详细复盘、知识库构建，或在复杂项目中对特定阶段性成果进行详细的归档和说明。"
+    },
+    "task_short_summary": {
+      "type": "string",
+      "description": "当子任务通过 `proceed-next-task` 成功完成时**强烈建议提供**；当通过 `task-skipped` 或 `task-failed` 结束时也**可以提供**（用于简要记录跳过或失败的核心原因与状态）。这是一个**高度凝练的任务成果或最终状态摘要**，务必确保**只包含最核心、不可删减的关键信息**（例如，主要产出物的引用、关键性能指标的达成情况）。此短摘要将**持久化并用于后续所有相关的进度展示、上下文回顾以及传递给后续任务的必要信息**。若需向后续任务传递具有直接影响的建议、前置条件变更或潜在风险提示，也应在此字段中明确扼要地指出。"
+    },
+    "shrink_similar_tool_call_result": {
+      "type": "string",
+      "x-generation-rules": [
+        "如果当前时间线上没有其他工具调用，则不需要压缩，设置为空",
+        "这个规则只在你觉得工具调用结果会干扰到后续的工具调用时才需要使用，不必每次都使用"
+      ],
+      "description": "用于**优化和压缩内容高度相似的连续工具调用结果**。当AI检测到当前工具调用的输出与先前某次工具调用（需通过其唯一ID进行引用）的结果存在大量重复内容时，应在此字段中**仅明确呈现本次调用结果中与被引用结果有差异的部分或新增信息**，并将重复内容以标准化占位符（例如：`...[内容与工具调用ID:xx相似]...` 或 `...[大部分内容与工具调用ID:yy的输出一致，新增/修改部分如下：...]...`）表示。**此机制旨在显著减少传递给模型的上下文长度，缓解token压力，提升后续处理效率**。请严格参考 `x-generation-rules` 中列出的具体应用条件与判断逻辑。"
+    },
+    "summary_tool_call_result": {
+      "type": "string",
+      "description": "用于**对单个特定工具调用的完整输出进行结构化、信息化的摘要**。当原始工具调用结果非常冗长（例如，大段的日志、HTML源码或API响应），或者随着任务的推进，某些旧的工具调用完整结果不再需要逐字保留时，可以使用此字段来记录该工具调用的**核心输入参数、关键执行步骤（如果适用且重要）、以及最重要的输出结果、结论或提取的关键数据点**。其目的是在有效压缩上下文信息量的同时，**保留该工具调用的核心价值和可追溯信息**，以便在后续分析或决策中仍能理解其在该时间点的作用和具体产出，避免信息丢失。"
+    }
+  }
+}
+
+
+```
+
+
+# 角色设定
+
+你是一个任务执行引擎，在执行之前制定的任务中的子任务，当前任务列表如下：
+
+## 任务状态
+ -[-] "在给定路径下寻找体积最大的文件"  (执行中)
+  -[-] "扫描目录结构"  (执行中)
+  -[ ] "计算文件大小" (未开始)
+
+当前任务: "扫描目录结构"
+目标："递归遍历 /Users/v1ll4n/Projects/yaklang 目录下所有文件，记录每个文件的位置和占用空间"
+任务次数执行信息：
+- 调用了1 次工具。
+- 决策继续执行了0 次。（系统限制为10次）
+
+
+
+# 牢记
+# Now 2025-08-14 22:13:56.012738 +0800 CST m=+0.166754085
+<persistent_memory>
+</persistent_memory>
+
+
+
+## 当前需要做什么
+
+在执行完一个工具的时候，你需要重新review当前任务的执行情况，并且做出相应决策：
+
+## 任务状态
+ -[-] "在给定路径下寻找体积最大的文件"  (执行中)
+  -[-] "扫描目录结构"  (执行中)
+  -[ ] "计算文件大小" (未开始)
+
+当前任务: "扫描目录结构"
+目标："递归遍历 /Users/v1ll4n/Projects/yaklang 目录下所有文件，记录每个文件的位置和占用空间"
+任务次数执行信息：
+- 调用了1 次工具。
+- 决策继续执行了0 次。（系统限制为10次）
+
+
+
+你在执行任务的过程中，刚使用了一个工具来帮助你完成任务，工具的结果如下，产生结果时间为：2025-08-14 22:13:56
+
+id: 1223; tool_name: "now"
+param: {}
+result: 
+2025-08-14 22:13:56.012347 +0800 CST m=+0.166363126
+
+
+在此之前，你使用过如下工具：
+
+no-toolcall, so not timeline
+
+
+当前任务可以继续，你需要判断是否需要继续执行当前任务，并输出符合Schema的JSON数据实例。
+1. 根据上下文判断如果当前任务已经完成，则需要将当前任务标记为完成，并且输出符合Schema的JSON数据实例，并给出相应的总结
+2. 如果当前任务的上下文你认为无法判定为结束，请你根据下面Schema，使用"continue-current-task"来进一步执行任务。
+3. 你可以在 continue-current-task 中通过 status_summary 更新任务状态。
+4. 注意：你必须专注当前任务是否满足需要即可，其他的任务会有别的办法完成。
+
+
+## 任务状态如下
+ -[-] "在给定路径下寻找体积最大的文件"  (执行中)
+  -[-] "扫描目录结构"  (执行中)
+  -[ ] "计算文件大小" (未开始)
+
+当前任务: "扫描目录结构"
+目标："递归遍历 /Users/v1ll4n/Projects/yaklang 目录下所有文件，记录每个文件的位置和占用空间"
+任务次数执行信息：
+- 调用了1 次工具。
+- 决策继续执行了0 次。（系统限制为10次）
+
+
+
+# 注意
+在你执行完任务后，需要生成符合下方Schema的JSON数据实例，禁止返回Schema结构。在这次回答中，尤其要注意检查任务状态
+```schema
+
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["@action"],
+  "properties": {
+    "@action": {
+      "type": "string",
+      "enum": ["continue-current-task", "proceed-next-task", "task-failed", "task-skipped"],
+      "description": "基于对当前执行中子任务（在任务树中标记为“执行中”状态）的**退出条件评估**，决定任务流的下一步行动。此字段用于指示AI在评估当前子任务状态后应采取的四种预定义操作之一。",
+      "enumDescriptions": {
+        "continue-current-task": "当评估后认为当前子任务**尚未满足其既定完成条件（即退出条件未达成）**时选择此项。AI应通过此操作**申请必要的工具调用或执行进一步的内部处理**，以继续推进当前子任务的执行。",
+        "proceed-next-task": "当评估后确认当前子任务**已成功完成并满足其所有退出条件**时选择此项。此操作将**正式结束当前子任务**，并使任务流**前进到计划中的下一个子任务**。",
+        "task-failed": "当当前子任务在执行过程中遭遇**无法恢复的致命错误或关键性障碍**，导致其无法继续或无法达成目标时选择此项。此操作将**标记当前任务为失败状态，并通常会导致整个任务规划的终止或进入错误处理流程**。",
+        "task-skipped": "当AI判断当前子任务因**多次尝试失败、执行成本过高、与整体目标关联性减弱或变得不再必要**时选择此项。此操作将**显式放弃当前子任务的执行，并允许任务流跳过此任务，继续处理后续子任务**。"
+      }
+    },
+    "status_summary": {
+      "type": "string",
+      "description": "当 `@action` 为 `continue-current-task` 时**必需提供**。此字段用于**记录和总结当前子任务在本次执行迭代中的具体进展、遇到的问题、已尝试的解决步骤、以及任何需要传递给下一次迭代（针对同一子任务）的关键上下文信息**。其核心目的是确保任务在多次尝试中能够持续推进，并为AI后续的决策（例如，调整策略、选择不同工具或参数）提供充分的、结构化的信息依据。也可用于追踪如重试次数、累积的部分成果等中间状态数据。"
+    },
+    "task_long_summary": {
+      "type": "string",
+      "description": "当子任务通过 `proceed-next-task` 成功完成时**可选提供**。这是一个**详尽的任务完成总结**，旨在全面记录该子任务的完整执行过程、最终取得的成果、关键的发现与洞察、执行期间遇到的挑战及其对应的解决方案等。**建议将长度控制在300个Token左右**。此总结主要用于支持后续的详细复盘、知识库构建，或在复杂项目中对特定阶段性成果进行详细的归档和说明。"
+    },
+    "task_short_summary": {
+      "type": "string",
+      "description": "当子任务通过 `proceed-next-task` 成功完成时**强烈建议提供**；当通过 `task-skipped` 或 `task-failed` 结束时也**可以提供**（用于简要记录跳过或失败的核心原因与状态）。这是一个**高度凝练的任务成果或最终状态摘要**，务必确保**只包含最核心、不可删减的关键信息**（例如，主要产出物的引用、关键性能指标的达成情况）。此短摘要将**持久化并用于后续所有相关的进度展示、上下文回顾以及传递给后续任务的必要信息**。若需向后续任务传递具有直接影响的建议、前置条件变更或潜在风险提示，也应在此字段中明确扼要地指出。"
+    },
+    "shrink_similar_tool_call_result": {
+      "type": "string",
+      "x-generation-rules": [
+        "如果当前时间线上没有其他工具调用，则不需要压缩，设置为空",
+        "这个规则只在你觉得工具调用结果会干扰到后续的工具调用时才需要使用，不必每次都使用"
+      ],
+      "description": "用于**优化和压缩内容高度相似的连续工具调用结果**。当AI检测到当前工具调用的输出与先前某次工具调用（需通过其唯一ID进行引用）的结果存在大量重复内容时，应在此字段中**仅明确呈现本次调用结果中与被引用结果有差异的部分或新增信息**，并将重复内容以标准化占位符（例如：`...[内容与工具调用ID:xx相似]...` 或 `...[大部分内容与工具调用ID:yy的输出一致，新增/修改部分如下：...]...`）表示。**此机制旨在显著减少传递给模型的上下文长度，缓解token压力，提升后续处理效率**。请严格参考 `x-generation-rules` 中列出的具体应用条件与判断逻辑。"
+    },
+    "summary_tool_call_result": {
+      "type": "string",
+      "description": "用于**对单个特定工具调用的完整输出进行结构化、信息化的摘要**。当原始工具调用结果非常冗长（例如，大段的日志、HTML源码或API响应），或者随着任务的推进，某些旧的工具调用完整结果不再需要逐字保留时，可以使用此字段来记录该工具调用的**核心输入参数、关键执行步骤（如果适用且重要）、以及最重要的输出结果、结论或提取的关键数据点**。其目的是在有效压缩上下文信息量的同时，**保留该工具调用的核心价值和可追溯信息**，以便在后续分析或决策中仍能理解其在该时间点的作用和具体产出，避免信息丢失。"
+    }
+  }
+}
+
+
+```
+
+
+# 错误处理：
+注意，你生成的结果在之前已经犯过错误，这是上次失败的原因：
+error extracting action: cannot extract action[[continue-current-task proceed-next-task task-skipped task-failed]] from: 
+请你在生成结果时，注意不要再犯同样的错误。
+# 如何修正？
+如果要生成 action/@action JSON 可以参考后面的案例，注意格式遵守：{"@action": "...", ... }
+
+===== TIMELINE DUMP =====
+timeline:
+├─[2025/08/14 22:13:56]
+│    id: 1223; tool_name: "now"
+│    param: {}
+│    result: 
+│    2025-08-14 22:13:56.012347 +0800 CST m=+0.166363126
+
+==========================
+Timeline item ID: 1223, deleted: false
+Total items: 1, Deleted items: 0
+panic: timeline.summary fail - dump: timeline:
+├─[2025/08/14 22:13:56]
+│    id: 1223; tool_name: "now"
+│    param: {}
+│    result: 
+│    2025-08-14 22:13:56.012347 +0800 CST m=+0.166363126
+
+
+goroutine 29 [running]:
+github.com/yaklang/yaklang/common/ai/aid.TestCoodinator_Delete_Memory.func2({0x105e6ad98?, 0x14001f90d88?}, 0x14001039420)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/memory_tools_test.go:161 +0x7d0
+github.com/yaklang/yaklang/common/ai/aid.(*Config).wrapper.func1({0x105e6ad98, 0x14001f90d88}, 0x14001039420)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/config_ai_wrapper.go:105 +0x870
+github.com/yaklang/yaklang/common/ai/aid.(*AiTask).CallAI(0x14001039420?, 0x109273e00?)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/task.go:85 +0x80
+github.com/yaklang/yaklang/common/ai/aid.(*AiTask).toolResultDecision.func1(0x1400224ea00?)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/task_call_tool.go:222 +0x54
+github.com/yaklang/yaklang/common/ai/aid/aicommon.CallAITransaction({0x105e6ad98, 0x14001f90d88}, {0x14002136000, 0x20f3}, 0x14001d955c8, 0x14001d955a0, {0x0, 0x0, 0x0})
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/aicommon/transaction.go:40 +0x384
+github.com/yaklang/yaklang/common/ai/aid.(*Config).callAiTransaction(...)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/transaction.go:22
+github.com/yaklang/yaklang/common/ai/aid.(*AiTask).toolResultDecision(0x14000c5c5b0, 0x1400222c6c0, 0x14001523530)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/task_call_tool.go:220 +0x140
+github.com/yaklang/yaklang/common/ai/aid.(*AiTask).execute(0x14000c5c5b0)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/task_execute.go:145 +0x3f8
+github.com/yaklang/yaklang/common/ai/aid.(*AiTask).executeTask(0x14000c5c5b0)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/task_execute.go:270 +0x28
+github.com/yaklang/yaklang/common/ai/aid.(*AiTask).executeTaskPushTaskIndex(0x14000c5c5b0)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/task_execute.go:265 +0x1dc
+github.com/yaklang/yaklang/common/ai/aid.(*runtime).invokeSubtask(0x14000595da0, 0x2, 0x14000c5c5b0)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/runtime.go:154 +0x290
+github.com/yaklang/yaklang/common/ai/aid.(*runtime).executeSubTask(0x14000595da0, 0x1, 0x14001bf1450)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/runtime.go:165 +0x12c
+github.com/yaklang/yaklang/common/ai/aid.(*runtime).invokeSubtask(0x14000595da0, 0x1, 0x14001bf1450)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/runtime.go:151 +0x25c
+github.com/yaklang/yaklang/common/ai/aid.(*runtime).Invoke(0x14000595da0, 0x103ddda6e?)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/runtime.go:178 +0x28
+github.com/yaklang/yaklang/common/ai/aid.(*Coordinator).Run(0x14001538348)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/coordinator.go:150 +0x830
+created by github.com/yaklang/yaklang/common/ai/aid.TestCoodinator_Delete_Memory in goroutine 622
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/memory_tools_test.go:201 +0x2e0
+FAIL	github.com/yaklang/yaklang/common/ai/aid	1.305s
+FAIL

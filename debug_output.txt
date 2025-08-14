@@ -1,0 +1,92 @@
+=== RUN   TestCoodinator_Delete_Memory
+[36m[INFO][0m 2025-08-14 22:21:43 [config_inputevent_loop:20] config a9bd78be-a407-4f7a-a5b3-1a8e9f244300 started, start to handle receiving loop
+[36m[INFO][0m 2025-08-14 22:21:43 [config_inputevent_loop:61] coordinator validator working, (a9bd78be-a407-4f7a-a5b3-1a8e9f244300) start
+=== AI CALLBACK CALLED ===
+firstToolCall: true, firstToolDecision: true, testCallKey: 0
+Request prompt contains:
+[36m[INFO][0m 2025-08-14 22:21:43 [config_inputevent_loop:72] event received, (a9bd78be-a407-4f7a-a5b3-1a8e9f244300) start: &{31HW6ZDoADjllObkmuuMkX8zQg1 false  false map[suggestion:continue]}
+[31m[ERRO][0m 2025-08-14 22:21:43 [memory:209] error getting review record for event ID 31HW6ZDoADjllObkmuuMkX8zQg1
+[36m[INFO][0m 2025-08-14 22:21:43 [coordinator:136] create aiTask pipeline: 在给定路径下寻找体积最大的文件
+[36m[INFO][0m 2025-08-14 22:21:43 [coordinator:138] step 0: 扫描目录结构
+[36m[INFO][0m 2025-08-14 22:21:43 [coordinator:138] step 1: 计算文件大小
+=== AI CALLBACK CALLED ===
+firstToolCall: true, firstToolDecision: true, testCallKey: 0
+Request prompt contains:
+  - 当前任务: 扫描目录结构
+>>> FIRST TOOL CALL - requesting NOW
+=== AI CALLBACK CALLED ===
+firstToolCall: false, firstToolDecision: true, testCallKey: 0
+Request prompt contains:
+  - 工具名称: now
+  - 当前任务: 扫描目录结构
+>>> Calling NOW tool
+[36m[INFO][0m 2025-08-14 22:21:43 [config_inputevent_loop:72] event received, (a9bd78be-a407-4f7a-a5b3-1a8e9f244300) start: &{31HW6XUqQqJwu2stZTBlPqD3QTf false  false map[suggestion:continue]}
+[31m[ERRO][0m 2025-08-14 22:21:43 [memory:209] error getting review record for event ID 31HW6XUqQqJwu2stZTBlPqD3QTf
+[31m[ERRO][0m 2025-08-14 22:21:43 [memory:209] error getting review record for event ID 31HW6blsk2QHRPQcJx0k6V9Xiq8
+=== AI CALLBACK CALLED ===
+firstToolCall: false, firstToolDecision: true, testCallKey: 0
+Request prompt contains:
+  - 当前任务: 扫描目录结构
+  - continue-current-task
+>>> FIRST TOOL DECISION
+>>> Set testCallKey to: 327
+=== AI CALLBACK CALLED ===
+firstToolCall: false, firstToolDecision: false, testCallKey: 327
+Request prompt contains:
+  - 当前任务: 扫描目录结构
+  - continue-current-task
+>>> SECOND TOOL DECISION - checking deletion
+===== TIMELINE DUMP =====
+timeline:
+├─[2025/08/14 22:21:43]
+│    id: 327; tool_name: "now"
+│    param: {}
+│    result: 
+│    2025-08-14 22:21:43.314584 +0800 CST m=+0.167806834
+
+==========================
+Timeline item ID: 327, deleted: false
+Total items: 1, Deleted items: 0
+panic: timeline.summary fail - dump: timeline:
+├─[2025/08/14 22:21:43]
+│    id: 327; tool_name: "now"
+│    param: {}
+│    result: 
+│    2025-08-14 22:21:43.314584 +0800 CST m=+0.167806834
+
+
+goroutine 584 [running]:
+github.com/yaklang/yaklang/common/ai/aid.TestCoodinator_Delete_Memory.func2({0x108046d98?, 0x1400207e488?}, 0x1400177d1f0)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/memory_tools_test.go:181 +0xb48
+github.com/yaklang/yaklang/common/ai/aid.(*Config).wrapper.func1({0x108046d98, 0x1400207e488}, 0x1400177d1f0)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/config_ai_wrapper.go:105 +0x870
+github.com/yaklang/yaklang/common/ai/aid.(*AiTask).CallAI(0x1400177d1f0?, 0x10b44fe00?)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/task.go:85 +0x80
+github.com/yaklang/yaklang/common/ai/aid.(*AiTask).toolResultDecision.func1(0x14002384a00?)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/task_call_tool.go:222 +0x54
+github.com/yaklang/yaklang/common/ai/aid/aicommon.CallAITransaction({0x108046d98, 0x1400207e488}, {0x14002300000, 0x20f2}, 0x14001f675c8, 0x14001f675a0, {0x0, 0x0, 0x0})
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/aicommon/transaction.go:40 +0x384
+github.com/yaklang/yaklang/common/ai/aid.(*Config).callAiTransaction(...)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/transaction.go:22
+github.com/yaklang/yaklang/common/ai/aid.(*AiTask).toolResultDecision(0x1400033d2b0, 0x14002268e10, 0x14001902360)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/task_call_tool.go:220 +0x140
+github.com/yaklang/yaklang/common/ai/aid.(*AiTask).execute(0x1400033d2b0)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/task_execute.go:145 +0x3f8
+github.com/yaklang/yaklang/common/ai/aid.(*AiTask).executeTask(0x1400033d2b0)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/task_execute.go:270 +0x28
+github.com/yaklang/yaklang/common/ai/aid.(*AiTask).executeTaskPushTaskIndex(0x1400033d2b0)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/task_execute.go:265 +0x1dc
+github.com/yaklang/yaklang/common/ai/aid.(*runtime).invokeSubtask(0x14001182820, 0x2, 0x1400033d2b0)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/runtime.go:154 +0x290
+github.com/yaklang/yaklang/common/ai/aid.(*runtime).executeSubTask(0x14001182820, 0x1, 0x14001f724e0)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/runtime.go:165 +0x12c
+github.com/yaklang/yaklang/common/ai/aid.(*runtime).invokeSubtask(0x14001182820, 0x1, 0x14001f724e0)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/runtime.go:151 +0x25c
+github.com/yaklang/yaklang/common/ai/aid.(*runtime).Invoke(0x14001182820, 0x105fb970e?)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/runtime.go:178 +0x28
+github.com/yaklang/yaklang/common/ai/aid.(*Coordinator).Run(0x14001767770)
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/coordinator.go:150 +0x830
+created by github.com/yaklang/yaklang/common/ai/aid.TestCoodinator_Delete_Memory in goroutine 569
+	/Users/v1ll4n/Projects/yaklang/common/ai/aid/memory_tools_test.go:223 +0x2e0
+FAIL	github.com/yaklang/yaklang/common/ai/aid	1.282s
+FAIL
