@@ -229,7 +229,7 @@ func (r *ReAct) extractResponseContent(resp *aicommon.AIResponse) string {
 	// Use the same method as other parts of the system
 	// Create a temporary aid.Config for the response reader
 	tempConfig := aid.NewConfig(r.config.ctx)
-	reader := resp.GetOutputStreamReader("react-response", false, tempConfig)
+	reader := resp.GetOutputStreamReader("react-response", false, tempConfig.GetEmitter())
 
 	content, err := io.ReadAll(reader)
 	if err != nil {

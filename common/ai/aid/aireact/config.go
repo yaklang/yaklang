@@ -8,6 +8,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
@@ -262,7 +263,7 @@ func (cfg *ReActConfig) CallAI(prompt string, opts ...aicommon.AIRequestOption) 
 	aidConfig := aid.NewConfig(cfg.ctx)
 
 	// Create AI request with options
-	req := aid.NewAIRequest(prompt, opts...)
+	req := aicommon.NewAIRequest(prompt, opts...)
 
 	// Call the configured AI callback with the aid config
 	return cfg.aiCallback(aidConfig, req)
@@ -275,7 +276,7 @@ func (cfg *ReActConfig) callAIWithConfig(config *aid.Config, prompt string, opts
 	}
 
 	// Create AI request with options
-	req := aid.NewAIRequest(prompt, opts...)
+	req := aicommon.NewAIRequest(prompt, opts...)
 
 	// Call the configured AI callback with specific config
 	return cfg.aiCallback(config, req)
