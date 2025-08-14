@@ -19,6 +19,7 @@ type AICallerConfigIf interface {
 	RetryPromptBuilder(string, error) string
 	GetEmitter() *Emitter
 	NewAIResponse() *AIResponse
+	CallAIResponseOutputFinishedCallback(string)
 }
 
 func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption) (string, error)) AICallbackType {
