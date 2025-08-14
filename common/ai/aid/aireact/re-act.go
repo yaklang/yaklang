@@ -6,9 +6,11 @@ import (
 	"io"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -29,14 +31,14 @@ react.FeedUserImage()
 */
 
 type ReActInvoker interface {
-	Invoke(input chan *ypb.AITriageInputEvent) (chan *ypb.AIOutputEvent, error)
-	UnlimitedInvoke(input *chanx.UnlimitedChan[*ypb.AITriageInputEvent]) (chan *ypb.AIOutputEvent, error)
+	Invoke(input chan *ypb.AITriageInputEvent) (chan *schema.AiOutputEvent, error)
+	UnlimitedInvoke(input *chanx.UnlimitedChan[*ypb.AITriageInputEvent]) (chan *schema.AiOutputEvent, error)
 }
 
 type ReAct struct {
 	config        *ReActConfig
 	promptManager *PromptManager
-	*ReActEmitter
+	*aicommon.Emitter
 }
 
 func NewReAct(opts ...Option) (*ReAct, error) {
@@ -50,12 +52,20 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 		cfg.aiToolManager = buildinaitools.NewToolManager(cfg.aiToolManagerOption...)
 	}
 
-	// Initialize emitter
-	emitter := newReActEmitter("", "", "")
+	// Create a base emitter function that handles events through the config's event handler
+	baseEmitter := func(event *schema.AiOutputEvent) error {
+		if cfg.eventHandler != nil && event != nil {
+			cfg.eventHandler(event)
+		}
+		return nil
+	}
+
+	// Create unique coordinator ID for this ReAct instance
+	coordinatorId := fmt.Sprintf("react-%p", cfg)
 
 	react := &ReAct{
-		config:       cfg,
-		ReActEmitter: emitter,
+		config:  cfg,
+		Emitter: aicommon.NewEmitter(coordinatorId, baseEmitter),
 	}
 
 	// Initialize prompt manager
@@ -114,72 +124,32 @@ func (r *ReAct) UpdateDebugMode(debug bool) {
 	r.config.debugPrompt = debug
 }
 
-func (r *ReAct) Invoke(input chan *ypb.AITriageInputEvent) (chan *ypb.AIOutputEvent, error) {
-	ulc := chanx.NewUnlimitedChan[*ypb.AITriageInputEvent](r.config.ctx, 100)
-	go func() {
-		defer ulc.Close()
-		for i := range input {
-			ulc.SafeFeed(i)
-		}
-	}()
-
-	return r.UnlimitedInvoke(ulc)
-}
-
-func (r *ReAct) UnlimitedInvoke(input *chanx.UnlimitedChan[*ypb.AITriageInputEvent]) (chan *ypb.AIOutputEvent, error) {
-	outputChan := make(chan *ypb.AIOutputEvent, 100)
-
+// ProcessQuery processes a query string directly and emits events via the configured event handler
+func (r *ReAct) ProcessQuery(query string) error {
 	if r.config.debugEvent {
-		log.Info("ReAct UnlimitedInvoke starting goroutine")
+		log.Infof("ReAct processing query: %s", query)
 	}
 
-	go func() {
-		defer close(outputChan)
-		defer func() {
-			if r.config.cancel != nil {
-				r.config.cancel()
-			}
-			if r.config.debugEvent {
-				log.Info("ReAct UnlimitedInvoke goroutine finished")
-			}
-		}()
+	// Create a mock input event for compatibility
+	event := &ypb.AITriageInputEvent{
+		IsFreeInput: true,
+		FreeInput:   query,
+	}
 
-		if r.config.debugEvent {
-			log.Info("ReAct UnlimitedInvoke goroutine running, waiting for events")
-		}
+	return r.processInputEvent(event)
+}
 
-		for {
-			select {
-			case <-r.config.ctx.Done():
-				if r.config.debugEvent {
-					log.Info("ReAct context cancelled, stopping processing")
-				}
-				return
-			case event, ok := <-input.OutputChannel():
-				if !ok {
-					if r.config.debugEvent {
-						log.Info("Input channel closed, stopping ReAct processing")
-					}
-					return
-				}
+// ProcessInputEvent processes a single input event directly
+func (r *ReAct) ProcessInputEvent(event *ypb.AITriageInputEvent) error {
+	if r.config.debugEvent {
+		log.Infof("ReAct received input event: IsFreeInput=%v, FreeInput=%s", event.IsFreeInput, event.FreeInput)
+	}
 
-				if r.config.debugEvent {
-					log.Infof("ReAct received input event: IsFreeInput=%v, FreeInput=%s", event.IsFreeInput, event.FreeInput)
-				}
-
-				if err := r.processInputEvent(event, outputChan); err != nil {
-					log.Errorf("process input event failed: %v", err)
-					r.emitError(outputChan, fmt.Sprintf("Process input event failed: %v", err))
-				}
-			}
-		}
-	}()
-
-	return outputChan, nil
+	return r.processInputEvent(event)
 }
 
 // processInputEvent processes a single input event and triggers ReAct loop
-func (r *ReAct) processInputEvent(event *ypb.AITriageInputEvent, outputChan chan *ypb.AIOutputEvent) error {
+func (r *ReAct) processInputEvent(event *ypb.AITriageInputEvent) error {
 	if r.config.debugEvent {
 		log.Infof("Processing input event: IsFreeInput=%v, FreeInput=%s", event.IsFreeInput, event.FreeInput)
 	}
@@ -246,7 +216,7 @@ func (r *ReAct) processInputEvent(event *ypb.AITriageInputEvent, outputChan chan
 	if r.config.debugEvent {
 		log.Infof("Executing main loop with user input: %s", userInput)
 	}
-	return r.executeMainLoop(userInput, outputChan)
+	return r.executeMainLoop(userInput)
 }
 
 // extractResponseContent extracts content from AI response
@@ -280,8 +250,3 @@ func (r *ReAct) extractResponseContent(resp *aid.AIResponse) string {
 
 	return contentStr
 }
-
-// Legacy utility methods - may be removed in future versions
-
-// Legacy event emission methods - redirected to emit.go implementation
-// These are kept for backward compatibility

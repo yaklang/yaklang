@@ -12,8 +12,8 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type AICallbackType = aid.AICallbackType
@@ -50,7 +50,7 @@ type ReActConfig struct {
 	aiToolManagerOption []buildinaitools.ToolManagerOption
 
 	// Event handling
-	eventHandler func(e *ypb.AIOutputEvent)
+	eventHandler func(e *schema.AiOutputEvent)
 	debugEvent   bool
 	debugPrompt  bool
 
@@ -77,7 +77,7 @@ type ReActConfig struct {
 	mu sync.RWMutex
 
 	// Output channel
-	outputChan chan *ypb.AIOutputEvent
+	outputChan chan *schema.AiOutputEvent
 }
 
 type Option func(*ReActConfig)
@@ -99,7 +99,7 @@ func WithAICallback(callback aid.AICallbackType) Option {
 }
 
 // WithEventHandler sets the event handler for output events
-func WithEventHandler(handler func(e *ypb.AIOutputEvent)) Option {
+func WithEventHandler(handler func(e *schema.AiOutputEvent)) Option {
 	return func(cfg *ReActConfig) {
 		cfg.eventHandler = handler
 	}
@@ -302,7 +302,7 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		finished:            false,
 		language:            "zh", // Default to Chinese
 		topToolsCount:       20,   // Default to show top 20 tools
-		outputChan:          make(chan *ypb.AIOutputEvent, 100),
+		outputChan:          make(chan *schema.AiOutputEvent, 100),
 		aiToolManagerOption: make([]buildinaitools.ToolManagerOption, 0),
 	}
 }

@@ -3,10 +3,11 @@ package schema
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
 type EventType string
@@ -59,6 +60,13 @@ const (
 	EVENT_TYPE_AID_CONFIG = "aid_config" // aid config event, used to emit the current config information
 
 	EVENT_TYPE_YAKIT_EXEC_RESULT = "yak_exec_result" // yakit exec result event, used to emit the yakit exec result information
+
+	// AI 推理过程通用事件类型
+	EVENT_TYPE_THOUGHT     EventType = "thought"     // AI 思考过程（适用于 ReAct、CoT 等推理模式）
+	EVENT_TYPE_ACTION      EventType = "action"      // AI 行动执行（工具调用、函数执行等）
+	EVENT_TYPE_OBSERVATION EventType = "observation" // AI 观察结果（工具执行结果、环境反馈等）
+	EVENT_TYPE_ITERATION   EventType = "iteration"   // AI 迭代信息（循环推理、多轮对话等）
+	EVENT_TYPE_RESULT      EventType = "result"      // AI 最终结果（推理结论、任务完成等）
 )
 
 type AiOutputEvent struct {
@@ -141,10 +149,31 @@ func (e *AiOutputEvent) String() string {
 		parts = append(parts, fmt.Sprintf("id: %s", utils.ShrinkString(e.CoordinatorId, 10)))
 	}
 	if e.Type != "" {
-		parts = append(parts, fmt.Sprintf("[type:%s]", e.Type))
+		// 为不同事件类型添加特殊展示
+		typeStr := string(e.Type)
+		switch e.Type {
+		case EVENT_TYPE_THOUGHT:
+			typeStr = "[thought]"
+		case EVENT_TYPE_ACTION:
+			typeStr = "[action]"
+		case EVENT_TYPE_OBSERVATION:
+			typeStr = "[observation]"
+		case EVENT_TYPE_ITERATION:
+			typeStr = "[iteration]"
+		case EVENT_TYPE_RESULT:
+			typeStr = "[result]"
+		case EVENT_TYPE_STREAM:
+			typeStr = "[stream]"
+		case EVENT_TYPE_STRUCTURED:
+			typeStr = "[structured]"
+		}
+		parts = append(parts, fmt.Sprintf("[type:%s]", typeStr))
 	}
 	if e.NodeId != "" {
 		parts = append(parts, fmt.Sprintf("[node:%v]", e.NodeId))
+	}
+	if e.TaskIndex != "" {
+		parts = append(parts, fmt.Sprintf("[task:%s]", utils.ShrinkString(e.TaskIndex, 8)))
 	}
 	if e.IsSystem {
 		parts = append(parts, "system:true")
@@ -156,13 +185,53 @@ func (e *AiOutputEvent) String() string {
 		parts = append(parts, "reason:true")
 	}
 	if len(e.StreamDelta) > 0 {
-		parts = append(parts, fmt.Sprintf("delta:%v", string(e.StreamDelta)))
+		parts = append(parts, fmt.Sprintf("delta:%v", utils.ShrinkString(string(e.StreamDelta), 50)))
 	}
 	if e.IsJson {
 		parts = append(parts, "json:true")
 	}
 	if len(e.Content) > 0 {
-		parts = append(parts, fmt.Sprintf("data:%s", string(e.Content)))
+		contentStr := utils.ShrinkString(string(e.Content), 100)
+		// 对特定事件类型的内容进行解析和美化
+		if e.IsJson && (e.Type == EVENT_TYPE_THOUGHT || e.Type == EVENT_TYPE_ACTION ||
+			e.Type == EVENT_TYPE_OBSERVATION || e.Type == EVENT_TYPE_ITERATION || e.Type == EVENT_TYPE_RESULT) {
+			var data map[string]interface{}
+			if err := json.Unmarshal(e.Content, &data); err == nil {
+				switch e.Type {
+				case EVENT_TYPE_THOUGHT:
+					if thought, ok := data["thought"].(string); ok {
+						contentStr = fmt.Sprintf("thought: %s", utils.ShrinkString(thought, 80))
+					}
+				case EVENT_TYPE_ACTION:
+					if action, ok := data["action"].(string); ok {
+						actionType := data["action_type"]
+						contentStr = fmt.Sprintf("action[%v]: %s", actionType, utils.ShrinkString(action, 60))
+					}
+				case EVENT_TYPE_OBSERVATION:
+					if obs, ok := data["observation"].(string); ok {
+						source := data["source"]
+						contentStr = fmt.Sprintf("observe[%v]: %s", source, utils.ShrinkString(obs, 60))
+					}
+				case EVENT_TYPE_ITERATION:
+					if current, ok := data["current"].(float64); ok {
+						if max, ok := data["max"].(float64); ok {
+							contentStr = fmt.Sprintf("iter: %v/%v", int(current), int(max))
+						}
+					}
+				case EVENT_TYPE_RESULT:
+					if success, ok := data["success"].(bool); ok {
+						status := "[failed]"
+						if success {
+							status = "[success]"
+						}
+						contentStr = fmt.Sprintf("result: %s", status)
+					}
+				}
+			}
+		} else {
+			contentStr = fmt.Sprintf("data:%s", contentStr)
+		}
+		parts = append(parts, contentStr)
 	}
 
 	return fmt.Sprintf("event: %s", strings.Join(parts, ", "))

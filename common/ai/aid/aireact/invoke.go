@@ -7,7 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 // Schema and action types are now managed by the prompt manager
@@ -25,7 +24,7 @@ func (r *ReAct) generateMainLoopPrompt(userQuery string, tools []*aitool.Tool) s
 }
 
 // executeMainLoop executes the main ReAct loop
-func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputEvent) error {
+func (r *ReAct) executeMainLoop(userQuery string) error {
 	if r.config.debugEvent {
 		log.Infof("executeMainLoop started with query: %s", userQuery)
 		log.Infof("ReAct AI Error Learning: 已启用增强的AI错误学习功能，AI将自动从失败中学习并改进响应质量")
@@ -75,7 +74,7 @@ func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputE
 		if r.config.debugEvent {
 			log.Infof("Starting ReAct iteration %d/%d", r.config.currentIteration, r.config.maxIterations)
 		}
-		r.emitIteration(outputChan, r.config.currentIteration, r.config.maxIterations)
+		r.EmitIteration(r.config.currentIteration, r.config.maxIterations)
 
 		// Get available tools
 		tools, err := r.config.aiToolManager.GetEnableTools()
@@ -130,13 +129,11 @@ func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputE
 		r.config.mu.Lock()
 
 		if transactionErr != nil {
-			r.emitError(outputChan, fmt.Sprintf("AI transaction failed (内置错误学习功能): %v", transactionErr))
-			log.Errorf("AI transaction failed with error learning: %v", transactionErr)
+			log.Errorf("AI transaction failed (内置错误学习功能): %v", transactionErr)
 			continue
 		}
 
 		if actionErr != nil {
-			r.emitError(outputChan, fmt.Sprintf("Failed to parse action: %v", actionErr))
 			log.Errorf("Failed to parse action: %v", actionErr)
 			continue
 		}
@@ -148,7 +145,7 @@ func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputE
 		}
 
 		// Emit human readable thought
-		r.emitThought(outputChan, action.GetString("human_readable_thought"))
+		r.EmitThought(action.GetString("human_readable_thought"))
 
 		// Update cumulative summary for memory
 		newSummary := action.GetString("cumulative_summary")
@@ -163,35 +160,35 @@ func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputE
 		actionType := ActionType(action.GetInvokeParams("next_action").GetString("type"))
 		switch ActionType(actionType) {
 		case ActionDirectlyAnswer:
-			r.emitInfo(outputChan, "Providing direct answer")
+			log.Infof("Providing direct answer")
 			answerPayload := action.GetInvokeParams("next_action").GetString("answer_payload")
-			r.emitAction(outputChan, fmt.Sprintf("Answer: %s", answerPayload))
-			r.emitResult(outputChan, answerPayload)
+			r.EmitAction(fmt.Sprintf("Answer: %s", answerPayload))
+			r.EmitResult(answerPayload)
 			// Always mark as finished for direct answers to avoid loops
 			r.config.finished = true
 			// Store interaction in memory (no tool call result for direct answers)
 		case ActionRequireTool:
 			toolPayload := action.GetInvokeParams("next_action").GetString("tool_request_payload")
-			r.emitInfo(outputChan, fmt.Sprintf("Requesting tool: %s", toolPayload))
-			if err := r.handleRequireTool(toolPayload, outputChan); err != nil {
-				r.emitError(outputChan, fmt.Sprintf("Tool execution failed: %v", err))
+			log.Infof("Requesting tool: %s", toolPayload)
+			if err := r.handleRequireTool(toolPayload); err != nil {
+				log.Errorf("Tool execution failed: %v", err)
 			} else {
 				// Tool executed successfully, now verify if user needs are satisfied
 				// Temporarily release the lock before calling verification to avoid deadlock
 				r.config.mu.Unlock()
-				satisfied, finalResult, err := r.verifyUserSatisfaction(userQuery, toolPayload, outputChan)
+				satisfied, finalResult, err := r.verifyUserSatisfaction(userQuery, toolPayload)
 				r.config.mu.Lock()
 
 				if err != nil {
-					r.emitError(outputChan, fmt.Sprintf("Verification failed: %v", err))
+					log.Errorf("Verification failed: %v", err)
 					r.config.finished = true
 				} else if satisfied {
 					// User needs are satisfied, emit final result and finish
-					r.emitResult(outputChan, finalResult)
+					r.EmitResult(finalResult)
 					r.config.finished = true
 				} else {
 					// User needs not satisfied, continue loop
-					r.emitInfo(outputChan, "User needs not fully satisfied, continuing analysis...")
+					log.Infof("User needs not fully satisfied, continuing analysis...")
 				}
 			}
 			// Also check if explicitly marked as final step
@@ -201,12 +198,12 @@ func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputE
 
 		case ActionRequestPlanExecution:
 			planPayload := action.GetInvokeParams("next_action").GetString("plan_request_payload")
-			r.emitInfo(outputChan, fmt.Sprintf("Requesting plan execution: %s", planPayload))
-			r.emitAction(outputChan, fmt.Sprintf("Plan request: %s", planPayload))
+			log.Infof("Requesting plan execution: %s", planPayload)
+			r.EmitAction(fmt.Sprintf("Plan request: %s", planPayload))
 			// TODO: Implement plan execution logic
 
 		default:
-			r.emitError(outputChan, fmt.Sprintf("Unknown action type: %s", actionType))
+			log.Errorf("Unknown action type: %s", actionType)
 		}
 
 		// Timeline will automatically store tool results via handleRequireTool
@@ -215,18 +212,14 @@ func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputE
 		// Check if final step
 		if action.GetBool("is_final_step") {
 			r.config.finished = true
-			r.emitInfo(outputChan, "ReAct main loop completed")
+			log.Infof("ReAct main loop completed")
 			break
 		}
 	}
 
 	if r.config.currentIteration >= r.config.maxIterations {
-		r.emitInfo(outputChan, "ReAct loop reached maximum iterations")
+		log.Infof("ReAct loop reached maximum iterations")
 	}
 
 	return nil
 }
-
-// handleRequireTool is now implemented in invoke_toolcall.go
-
-// generateToolParamsPrompt is now implemented in invoke_toolcall.go

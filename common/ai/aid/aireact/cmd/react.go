@@ -20,7 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/schema"
 	_ "github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -138,6 +138,8 @@ func main() {
 		return resp, nil
 	}
 
+	outputChan := make(chan *schema.AiOutputEvent, 100) // Buffered channel for output events
+
 	// Create tool review handler if interactive mode is enabled
 	var reactOptions []aireact.Option
 	reactOptions = append(reactOptions,
@@ -150,6 +152,9 @@ func main() {
 		aireact.WithTemperature(0.7, 0.3),
 		aireact.WithLanguage(*language),
 		aireact.WithTopToolsCount(20), // Show top 20 tools
+		aireact.WithEventHandler(func(e *schema.AiOutputEvent) {
+			outputChan <- e
+		}),
 	)
 
 	// Add interactive tool review if enabled
@@ -161,51 +166,48 @@ func main() {
 		)
 	}
 
+	// Define event handler function that can be reused
+	eventHandler := func(event *schema.AiOutputEvent) {
+		// Handle output events with simplified display
+		switch event.Type {
+		case schema.EVENT_TYPE_THOUGHT:
+			// Display thinking process
+			fmt.Printf("[think]: %s\n", string(event.Content))
+		case schema.EVENT_TYPE_ACTION:
+			fmt.Printf("[action]: %s\n", string(event.Content))
+		case schema.EVENT_TYPE_OBSERVATION:
+			fmt.Printf("[observe]: %s\n", string(event.Content))
+		case schema.EVENT_TYPE_RESULT:
+			result := extractResultContent(string(event.Content))
+			fmt.Printf("[result]: %s\n", result)
+			fmt.Printf("[ai]: final message for current loop\n")
+		case schema.EVENT_TYPE_ITERATION:
+			if debugMode {
+				fmt.Printf("[iteration]: %s\n", string(event.Content))
+			}
+		case schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE:
+			// Handle tool review events in interactive mode
+			if debugMode {
+				fmt.Printf("[tool_review]: %s\n", string(event.Content))
+			}
+		case schema.EVENT_TYPE_STREAM:
+			if debugMode {
+				fmt.Printf("[stream]: %s\n", string(event.Content))
+			}
+		case schema.EVENT_TYPE_STRUCTURED:
+			if debugMode {
+				fmt.Printf("[structured]: %s\n", string(event.Content))
+			}
+		default:
+			if debugMode {
+				fmt.Printf("[%s]: %s\n", strings.ToLower(string(event.Type)), string(event.Content))
+			}
+		}
+	}
+
 	// Add event handler
 	reactOptions = append(reactOptions,
-		aireact.WithEventHandler(func(event *ypb.AIOutputEvent) {
-			// Handle output events with simplified display
-			switch event.Type {
-			case "react_thought":
-				// Display thinking process
-				fmt.Printf("[think]: %s\n", string(event.Content))
-			case "react_action":
-				fmt.Printf("[action]: %s\n", string(event.Content))
-			case "react_observation":
-				fmt.Printf("[observe]: %s\n", string(event.Content))
-			case "react_result":
-				result := extractResultContent(string(event.Content))
-				fmt.Printf("[result]: %s\n", result)
-				fmt.Printf("[ai]: final message for current loop\n")
-				log.Infof("Query completed, exiting...")
-			case "react_error":
-				fmt.Printf("[error]: %s\n", string(event.Content))
-			case "react_info":
-				if debugMode {
-					fmt.Printf("[info]: %s\n", string(event.Content))
-				} else {
-					// Show important info messages even in non-debug mode
-					content := string(event.Content)
-					if strings.Contains(content, "preparing") || strings.Contains(content, "generating") ||
-						strings.Contains(content, "executing") || strings.Contains(content, "tool") {
-						fmt.Printf("[info]: %s\n", content)
-					}
-				}
-			case "react_iteration":
-				if debugMode {
-					fmt.Printf("[iteration]: %s\n", string(event.Content))
-				}
-			case "tool_use_review_require":
-				// Handle tool review events in interactive mode
-				if debugMode {
-					fmt.Printf("[tool_review]: %s\n", string(event.Content))
-				}
-			default:
-				if debugMode {
-					fmt.Printf("[%s]: %s\n", strings.ToLower(event.Type), string(event.Content))
-				}
-			}
-		}),
+		aireact.WithEventHandler(eventHandler),
 		// Use buildinaitools system instead of hardcoded tools
 		aireact.WithBuiltinTools(),
 	)
@@ -217,19 +219,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create input and output channels
-	inputChan := chanx.NewUnlimitedChan[*ypb.AITriageInputEvent](ctx, 10)
-	defer inputChan.Close()
-
-	outputChan, err := react.UnlimitedInvoke(inputChan)
-	if err != nil {
-		log.Errorf("Failed to start ReAct: %v", err)
-		os.Exit(1)
-	}
-
-	// Channel for signaling response completion
-	responseCompleteChan := make(chan struct{}, 1)
-
 	// Start output handler that properly drains the channel and detects completion
 	outputDone := make(chan struct{})
 	go func() {
@@ -240,14 +229,10 @@ func main() {
 				if !ok {
 					return
 				}
-				// Check for completion events before they're processed by event handler
-				if event.Type == "react_result" || event.Type == "react_error" {
-					select {
-					case responseCompleteChan <- struct{}{}:
-					default: // Don't block if channel is full
-					}
+				// Handle the event using the configured event handler
+				if event != nil {
+					eventHandler(event)
 				}
-				// Events are handled by the event handler configured in ReAct
 			case <-ctx.Done():
 				return
 			}
@@ -256,7 +241,7 @@ func main() {
 
 	// Handle one-time query mode
 	if *query != "" {
-		handleSingleQuery(*query, inputChan, responseCompleteChan, ctx)
+		handleSingleQuery(react, *query, ctx)
 		return
 	}
 
@@ -323,10 +308,7 @@ func main() {
 		// Show activity spinner while waiting
 		go showActivitySpinner()
 
-		inputChan.SafeFeed(event)
-
-		// Wait for the response to complete before showing next prompt
-		waitForResponseCompletion(responseCompleteChan, ctx)
+		react.ProcessInputEvent(event)
 
 		// Stop spinner and show next prompt
 		stopActivitySpinner()
@@ -339,36 +321,22 @@ func main() {
 }
 
 // handleSingleQuery handles one-time query mode
-func handleSingleQuery(query string, inputChan *chanx.UnlimitedChan[*ypb.AITriageInputEvent], responseCompleteChan chan struct{}, ctx context.Context) {
+func handleSingleQuery(reactChan *aireact.ReAct, query string, ctx context.Context) {
 	event := &ypb.AITriageInputEvent{
 		IsFreeInput: true,
 		FreeInput:   query,
 	}
 
 	log.Infof("Processing query: %s", query)
-	inputChan.SafeFeed(event)
-
-	// Wait for response completion
-	waitForResponseCompletion(responseCompleteChan, ctx)
+	err := reactChan.ProcessInputEvent(event)
+	if err != nil {
+		log.Errorf("Failed to process input: %v", err)
+	}
 
 	log.Info("Query completed, exiting...")
 
 	// Force exit after single query
 	os.Exit(0)
-}
-
-// waitForResponseCompletion waits for the AI response to complete
-func waitForResponseCompletion(responseCompleteChan chan struct{}, ctx context.Context) {
-	select {
-	case <-ctx.Done():
-		return
-	case <-responseCompleteChan:
-		// Response completed successfully
-		return
-	case <-time.After(200 * time.Second): // Timeout after 200 seconds (longer than AI timeout of 180s)
-		fmt.Println("\n[timeout]: response timeout, please retry")
-		return
-	}
 }
 
 // extractResultContent extracts the actual result from the JSON result and formats it for better readability
