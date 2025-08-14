@@ -8,11 +8,10 @@ import (
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 // verifyUserSatisfaction verifies if the tool execution satisfied the user's needs and provides human-readable output
-func (r *ReAct) verifyUserSatisfaction(originalQuery, toolName string, outputChan chan *ypb.AIOutputEvent) (bool, string, error) {
+func (r *ReAct) verifyUserSatisfaction(originalQuery, toolName string) (bool, string, error) {
 	verificationPrompt := r.generateVerificationPrompt(originalQuery, toolName)
 
 	if r.config.debugPrompt {
@@ -23,31 +22,19 @@ func (r *ReAct) verifyUserSatisfaction(originalQuery, toolName string, outputCha
 	var finalResult string
 	var verificationErr error
 
-	// Use aid.CallAITransaction for verification
-	toolConfig := aid.NewConfig(r.config.ctx)
+	log.Infof("Verifying if user needs are satisfied and formatting results...")
 
-	r.emitInfo(outputChan, "Verifying if user needs are satisfied and formatting results...")
-
-	err := aid.CallAITransaction(toolConfig, verificationPrompt,
-		func(req *aid.AIRequest) (*aid.AIResponse, error) {
-			return r.config.aiCallback(toolConfig, req)
-		},
-		func(resp *aid.AIResponse) error {
-			// Extract verification response
-			responseContent := r.extractResponseContent(resp)
-
-			// Parse verification result
-			satisfied, finalResult, verificationErr = r.parseVerificationResponse(responseContent)
-			if verificationErr != nil {
-				return utils.Errorf("failed to parse verification response: %v", verificationErr)
-			}
-			return nil
-		})
-
+	// Use the unified AI call wrapper instead of aid.CallAITransaction to ensure consistency
+	resp, err := r.config.callAI(verificationPrompt)
 	if err != nil {
-		return false, "", utils.Errorf("failed to verify user satisfaction: %v", err)
+		return false, "", utils.Errorf("failed to call AI for verification: %v", err)
 	}
 
+	// Extract verification response
+	responseContent := r.extractResponseContent(resp)
+
+	// Parse verification result
+	satisfied, finalResult, verificationErr = r.parseVerificationResponse(responseContent)
 	if verificationErr != nil {
 		return false, "", utils.Errorf("failed to parse verification response: %v", verificationErr)
 	}
