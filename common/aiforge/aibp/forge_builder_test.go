@@ -2,13 +2,13 @@ package aibp
 
 import (
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/go-rod/rod/lib/utils"
 	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"

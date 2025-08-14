@@ -2,6 +2,7 @@ package aibp
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"os"
 	"testing"
 
