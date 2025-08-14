@@ -3,7 +3,6 @@ package aireact
 import (
 	"bytes"
 	_ "embed"
-	"encoding/json"
 	"fmt"
 	"os"
 	"runtime"
@@ -123,9 +122,8 @@ func (pm *PromptManager) GenerateToolParamsPrompt(tool *aitool.Tool) (string, er
 	}
 
 	// Set tool schema if available
-	if tool.Tool != nil && tool.Tool.InputSchema.Properties != nil {
-		schemaJson, _ := json.MarshalIndent(tool.Tool.InputSchema, "", "  ")
-		data.ToolSchema = string(schemaJson)
+	if tool.Tool != nil {
+		data.ToolSchema = tool.ToJSONSchemaString()
 	}
 
 	// Extract context data from memory without lock (assume caller already holds lock)

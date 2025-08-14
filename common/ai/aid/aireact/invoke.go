@@ -169,9 +169,7 @@ func (r *ReAct) executeMainLoop(userQuery string, outputChan chan *ypb.AIOutputE
 			r.emitResult(outputChan, answerPayload)
 			// Always mark as finished for direct answers to avoid loops
 			r.config.finished = true
-
 			// Store interaction in memory (no tool call result for direct answers)
-
 		case ActionRequireTool:
 			toolPayload := action.GetInvokeParams("next_action").GetString("tool_request_payload")
 			r.emitInfo(outputChan, fmt.Sprintf("Requesting tool: %s", toolPayload))
