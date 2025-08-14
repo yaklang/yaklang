@@ -3,6 +3,7 @@ package aid
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
@@ -29,7 +30,7 @@ func TestCoordinator_PlanInteraction_Timeline(t *testing.T) {
 		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 
 			prompts := request.GetPrompt()
@@ -132,7 +133,7 @@ func TestCoordinator_PlanInteraction(t *testing.T) {
 		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 
 			prompts := request.GetPrompt()

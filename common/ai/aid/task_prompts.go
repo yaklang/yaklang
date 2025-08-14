@@ -2,6 +2,7 @@ package aid
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"io"
 	"slices"
 	"strings"
@@ -188,9 +189,9 @@ func (t *AiTask) DeepThink(suggestion string) error {
 	}()
 
 	err = t.config.callAiTransaction(
-		prompt, t.callAI,
-		func(rsp *AIResponse) error {
-			action, err := ExtractActionFromStream(rsp.GetOutputStreamReader("plan", false, t.config), "plan", "require-user-interact")
+		prompt, t.CallAI,
+		func(rsp *aicommon.AIResponse) error {
+			action, err := ExtractActionFromStream(rsp.GetOutputStreamReader("plan", false, t.config.GetEmitter()), "plan", "require-user-interact")
 			if err != nil {
 				return utils.Error("parse @action field from AI response failed: " + err.Error())
 			}
@@ -250,10 +251,10 @@ func (t *AiTask) AdjustPlan(suggestion string) error {
 
 	err = t.config.callAiTransaction(
 		planPrompt,
-		t.callAI,
-		func(response *AIResponse) error {
+		t.CallAI,
+		func(response *aicommon.AIResponse) error {
 			// 读取 AI 的响应
-			responseReader := response.GetOutputStreamReader("dynamic-plan", false, t.config)
+			responseReader := response.GetOutputStreamReader("dynamic-plan", false, t.config.GetEmitter())
 			taskResponse, err := io.ReadAll(responseReader)
 			if err != nil {
 				t.config.EmitError("error reading AI response: %v", err)

@@ -2,6 +2,7 @@ package aid
 
 import (
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
@@ -59,7 +60,7 @@ func (c *Config) submitCheckpointResponse(t *schema.AiCheckpoint, rsp any) error
 	return yakit.CreateOrUpdateCheckpoint(c.GetDB(), t)
 }
 
-func (c *Config) submitAIRequestCheckpoint(t *schema.AiCheckpoint, data *AIRequest) error {
+func (c *Config) submitAIRequestCheckpoint(t *schema.AiCheckpoint, data *aicommon.AIRequest) error {
 	return c.submitCheckpointRequest(t, map[string]string{
 		"prompt": string(data.GetPrompt()),
 	})

@@ -3,6 +3,7 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"io"
 	"sync"
 
@@ -117,11 +118,11 @@ func (t *AiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, d
 
 	var callToolParams = t.config.MakeInvokeParams()
 	// transaction for generate params
-	err = t.config.callAiTransaction(paramsPrompt, func(request *AIRequest) (*AIResponse, error) {
+	err = t.config.callAiTransaction(paramsPrompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		request.SetTaskIndex(t.Index)
-		return t.callAI(request)
-	}, func(rsp *AIResponse) error {
-		callParamsString, _ := io.ReadAll(rsp.GetOutputStreamReader("call-tools", true, t.config))
+		return t.CallAI(request)
+	}, func(rsp *aicommon.AIResponse) error {
+		callParamsString, _ := io.ReadAll(rsp.GetOutputStreamReader("call-tools", true, t.config.GetEmitter()))
 
 		// extract action
 		callToolAction, err := ExtractAction(string(callParamsString), "call-tool")
@@ -216,11 +217,11 @@ func (t *AiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitoo
 	}
 
 	var action *Action
-	err = t.config.callAiTransaction(decisionPrompt, func(request *AIRequest) (*AIResponse, error) {
+	err = t.config.callAiTransaction(decisionPrompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		request.SetTaskIndex(t.Index)
-		return t.callAI(request)
-	}, func(continueResult *AIResponse) error {
-		nextResponse, err := io.ReadAll(continueResult.GetOutputStreamReader("decision", true, t.config))
+		return t.CallAI(request)
+	}, func(continueResult *aicommon.AIResponse) error {
+		nextResponse, err := io.ReadAll(continueResult.GetOutputStreamReader("decision", true, t.config.GetEmitter()))
 		if err != nil {
 			err = utils.Errorf("error reading AI response: %v", err)
 			return utils.Errorf("error reading AI response: %v", err)

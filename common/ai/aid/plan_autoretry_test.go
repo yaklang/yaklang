@@ -3,6 +3,7 @@ package aid
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strings"
 	"testing"
 	"time"
@@ -23,7 +24,7 @@ func TestPlanRetry(t *testing.T) {
 			outputChan <- e
 		}),
 		WithAIAutoRetry(2),
-		WithAICallback(func(config *Config, req *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			count++
 			if count > 2 {
 				rsp := config.NewAIResponse()
@@ -124,7 +125,7 @@ func testRecoverPlanRetry(t *testing.T, uid string) {
 			outputChan <- e
 		}),
 		WithAIAutoRetry(2),
-		WithAICallback(func(config *Config, req *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			count++
 			// 修复：让恢复测试能够成功，而不是总是失败
 			rsp := config.NewAIResponse()

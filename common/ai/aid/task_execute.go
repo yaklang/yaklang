@@ -3,6 +3,7 @@ package aid
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"io"
 	"sync/atomic"
 	"text/template"
@@ -38,11 +39,11 @@ func (t *AiTask) execute() error {
 	var action *Action
 	var directlyAnswer string
 	var directlyAnswerLong string
-	err = t.config.callAiTransaction(prompt, func(request *AIRequest) (*AIResponse, error) {
+	err = t.config.callAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		request.SetTaskIndex(t.Index)
-		return t.callAI(request)
-	}, func(rsp *AIResponse) error {
-		responseBytes, err := io.ReadAll(rsp.GetOutputStreamReader("execute", false, t.config))
+		return t.CallAI(request)
+	}, func(rsp *aicommon.AIResponse) error {
+		responseBytes, err := io.ReadAll(rsp.GetOutputStreamReader("execute", false, t.config.GetEmitter()))
 		if err != nil {
 			return fmt.Errorf("error reading AI response: %w", err)
 		}
@@ -100,11 +101,11 @@ TOOLREQUIRED:
 			if err != nil {
 				return fmt.Errorf("error generating aiTask prompt: %w", err)
 			}
-			err = t.config.callAiTransaction(prompt, func(request *AIRequest) (*AIResponse, error) {
+			err = t.config.callAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 				request.SetTaskIndex(t.Index)
-				return t.callAI(request)
-			}, func(rsp *AIResponse) error {
-				responseBytes, err := io.ReadAll(rsp.GetOutputStreamReader("execute", false, t.config))
+				return t.CallAI(request)
+			}, func(rsp *aicommon.AIResponse) error {
+				responseBytes, err := io.ReadAll(rsp.GetOutputStreamReader("execute", false, t.config.GetEmitter()))
 				if err != nil {
 					return fmt.Errorf("error reading AI response: %w", err)
 				}
@@ -157,11 +158,11 @@ TOOLREQUIRED:
 				log.Errorf("error generating aiTask prompt: %v", err)
 				break TOOLREQUIRED
 			}
-			err = t.config.callAiTransaction(moreToolPrompt, func(request *AIRequest) (*AIResponse, error) {
+			err = t.config.callAiTransaction(moreToolPrompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 				request.SetTaskIndex(t.Index)
-				return t.callAI(request)
-			}, func(responseReader *AIResponse) error {
-				responseBytes, err := io.ReadAll(responseReader.GetOutputStreamReader("execute", false, t.config))
+				return t.CallAI(request)
+			}, func(responseReader *aicommon.AIResponse) error {
+				responseBytes, err := io.ReadAll(responseReader.GetOutputStreamReader("execute", false, t.config.GetEmitter()))
 				if err != nil {
 					return fmt.Errorf("error reading AI response: %w", err)
 				}
@@ -209,8 +210,8 @@ TOOLREQUIRED:
 			return fmt.Errorf("error generating summary prompt: %w", err)
 		}
 
-		err = t.config.callAiTransaction(summaryPromptWellFormed, t.callAI, func(summaryReader *AIResponse) error {
-			summaryBytes, err := io.ReadAll(summaryReader.GetOutputStreamReader("summary", false, t.config))
+		err = t.config.callAiTransaction(summaryPromptWellFormed, t.CallAI, func(summaryReader *aicommon.AIResponse) error {
+			summaryBytes, err := io.ReadAll(summaryReader.GetOutputStreamReader("summary", false, t.config.GetEmitter()))
 			if err != nil {
 				t.config.EmitError("error reading summary: %v", err)
 				return fmt.Errorf("error reading summary: %w", err)

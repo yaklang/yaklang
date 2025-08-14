@@ -3,6 +3,7 @@ package aid
 import (
 	"fmt"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -30,7 +31,7 @@ func TestConfig_EmitToolCallUserCancel(t *testing.T) {
 		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -132,7 +133,7 @@ func TestConfig_EmitToolCallOK(t *testing.T) {
 		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()

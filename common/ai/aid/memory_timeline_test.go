@@ -3,6 +3,7 @@ package aid
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -34,8 +35,8 @@ func TestMemoryTimelineOrdinary(t *testing.T) {
 type mockedAI struct {
 }
 
-func (m *mockedAI) callAI(req *AIRequest) (*AIResponse, error) {
-	rsp := newUnboundAIResponse()
+func (m *mockedAI) CallAI(req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	rsp := aicommon.NewUnboundAIResponse()
 	defer rsp.Close()
 	rsp.EmitOutputStream(strings.NewReader(`
 {"@action": "timeline-shrink", "persistent": "summary via ai"}
@@ -71,8 +72,8 @@ type mockedAI2 struct {
 	hCompressTime *int64
 }
 
-func (m *mockedAI2) callAI(req *AIRequest) (*AIResponse, error) {
-	rsp := newUnboundAIResponse()
+func (m *mockedAI2) CallAI(req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	rsp := aicommon.NewUnboundAIResponse()
 	defer rsp.Close()
 
 	if utils.MatchAllOfRegexp(req.GetPrompt(), `const"\s*:\s*"timeline-reducer"`) {

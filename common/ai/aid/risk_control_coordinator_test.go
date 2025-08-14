@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -54,7 +55,7 @@ func TestCoordinator_PIMatrix_ToolUseReview_NEG(t *testing.T) {
 			outputChan <- event
 		}),
 		WithRiskControlForgeName(utils.RandStringBytes(100), nil), // bad not right risk control
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -199,7 +200,7 @@ func TestCoordinator_PIMatrix_ToolUseReview(t *testing.T) {
 			outputChan <- event
 		}),
 		WithRiskControlForgeName(riskControlForgeName, nil),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
