@@ -33,6 +33,8 @@ var SSAProjectTables = []any{
 
 	//diff result
 	&schema.SSADiffResult{},
+
+	&schema.ProjectGeneralStorage{},
 }
 
 func init() {
