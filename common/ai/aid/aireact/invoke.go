@@ -104,11 +104,11 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 		r.config.mu.Unlock()
 
 		transactionErr := aid.CallAITransaction(aiConfig, prompt,
-			func(req *aid.AIRequest) (*aid.AIResponse, error) {
+			func(req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 				// Use the stored callback
 				return r.config.aiCallback(aiConfig, req)
 			},
-			func(resp *aid.AIResponse) error {
+			func(resp *aicommon.AIResponse) error {
 				// Extract response content
 				responseContent := r.extractResponseContent(resp)
 

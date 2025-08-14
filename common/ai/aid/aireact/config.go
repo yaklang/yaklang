@@ -16,7 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type AICallbackType = aid.AICallbackType
+type AICallbackType = aicommon.AICallbackType
 
 // ToolReviewInfo contains information needed for tool use review
 type ToolReviewInfo struct {
@@ -92,7 +92,7 @@ func WithContext(ctx context.Context) Option {
 }
 
 // WithAICallback sets the AI callback for LLM interactions
-func WithAICallback(callback aid.AICallbackType) Option {
+func WithAICallback(callback aicommon.AICallbackType) Option {
 	return func(cfg *ReActConfig) {
 		cfg.aiCallback = callback
 	}
@@ -253,7 +253,7 @@ func WithBuiltinTools() Option {
 
 // callAI is the unified AI call wrapper for ReAct, similar to aid.wrapperAICall
 // This function centralizes all AI interactions and applies breakpoints, debugging, etc.
-func (cfg *ReActConfig) CallAI(prompt string, opts ...aid.AIRequestOption) (*aid.AIResponse, error) {
+func (cfg *ReActConfig) CallAI(prompt string, opts ...aicommon.AIRequestOption) (*aicommon.AIResponse, error) {
 	if cfg.aiCallback == nil {
 		return nil, utils.Error("AI callback is not configured")
 	}
@@ -269,7 +269,7 @@ func (cfg *ReActConfig) CallAI(prompt string, opts ...aid.AIRequestOption) (*aid
 }
 
 // callAIWithConfig is a variant that accepts a specific config
-func (cfg *ReActConfig) callAIWithConfig(config *aid.Config, prompt string, opts ...aid.AIRequestOption) (*aid.AIResponse, error) {
+func (cfg *ReActConfig) callAIWithConfig(config *aid.Config, prompt string, opts ...aicommon.AIRequestOption) (*aicommon.AIResponse, error) {
 	if cfg.aiCallback == nil {
 		return nil, utils.Error("AI callback is not configured")
 	}

@@ -25,7 +25,7 @@ func main() {
 	//consts.InitializeYakitDatabase("", "")
 	//log.Infof("apikey for tongyi: %v", string(apikey))
 	//log.Infof("primary ai engien: %v", consts.GetAIPrimaryType())
-	//aiCallback := func(config *aid.Config, req *aid.AIRequest) (*aid.AIResponse, error) {
+	//aiCallback := func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 	//	rsp := config.NewAIResponse()
 	//	go func() {
 	//		defer rsp.Close()
@@ -52,7 +52,7 @@ func main() {
 
 	coordinator, err := aid.NewCoordinator(
 		"帮我规划一个一家三口北京三日游，先查询天气，再查询旅游景点，再根据景点规划路程",
-		aid.WithAICallback(func(config *aid.Config, req *aid.AIRequest) (*aid.AIResponse, error) {
+		aid.WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return aiforge.GetOpenRouterAICallback()(config, req)
 		}),
 		aid.WithTools(aid.GetAllMockTools()...),

@@ -2,6 +2,7 @@ package aiforge
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/jsonpath"
@@ -44,7 +45,7 @@ type liteforgeConfig struct {
 	action     string
 	id         string
 	ctx        context.Context
-	images     []*aid.ImageData
+	images     []*aicommon.ImageData
 	forceImage bool
 
 	aidOptions []aid.Option
@@ -121,7 +122,7 @@ func _withImageFile(filename ...string) LiteForgeExecOption {
 			}
 			for img := range imgC {
 				log.Info("Extracted image from file:", file, "MIMEType:", img.MIMEType)
-				cfg.images = append(cfg.images, &aid.ImageData{
+				cfg.images = append(cfg.images, &aicommon.ImageData{
 					IsBase64: true,
 					Data:     []byte(img.Base64()),
 				})
@@ -143,7 +144,7 @@ func _withImage(anyImageInput ...any) LiteForgeExecOption {
 	return func(cfg *liteforgeConfig) {
 		for _, anyImg := range anyImageInput {
 			for img := range imageutils.ExtractImage(anyImg) {
-				cfg.images = append(cfg.images, &aid.ImageData{
+				cfg.images = append(cfg.images, &aicommon.ImageData{
 					IsBase64: true,
 					Data:     []byte(img.Base64()),
 				})
