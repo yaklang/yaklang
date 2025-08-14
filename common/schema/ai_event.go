@@ -146,7 +146,7 @@ func (e *AiOutputEvent) String() string {
 	var parts []string
 
 	if e.CoordinatorId != "" {
-		parts = append(parts, fmt.Sprintf("id: %s", utils.ShrinkString(e.CoordinatorId, 10)))
+		parts = append(parts, fmt.Sprintf("id: %s", utils.ShrinkString(e.CoordinatorId, 4096)))
 	}
 	if e.Type != "" {
 		// 为不同事件类型添加特殊展示
@@ -185,13 +185,13 @@ func (e *AiOutputEvent) String() string {
 		parts = append(parts, "reason:true")
 	}
 	if len(e.StreamDelta) > 0 {
-		parts = append(parts, fmt.Sprintf("delta:%v", e.StreamDelta))
+		parts = append(parts, fmt.Sprintf("delta:%v", string(e.StreamDelta)))
 	}
 	if e.IsJson {
 		parts = append(parts, "json:true")
 	}
 	if len(e.Content) > 0 {
-		contentStr := utils.ShrinkString(string(e.Content), 100)
+		contentStr := utils.ShrinkString(string(e.Content), 4096)
 		// 对特定事件类型的内容进行解析和美化
 		if e.IsJson && (e.Type == EVENT_TYPE_THOUGHT || e.Type == EVENT_TYPE_ACTION ||
 			e.Type == EVENT_TYPE_OBSERVATION || e.Type == EVENT_TYPE_ITERATION || e.Type == EVENT_TYPE_RESULT) {
@@ -200,17 +200,17 @@ func (e *AiOutputEvent) String() string {
 				switch e.Type {
 				case EVENT_TYPE_THOUGHT:
 					if thought, ok := data["thought"].(string); ok {
-						contentStr = fmt.Sprintf("thought: %s", utils.ShrinkString(thought, 80))
+						contentStr = fmt.Sprintf("thought: %s", utils.ShrinkString(thought, 4096))
 					}
 				case EVENT_TYPE_ACTION:
 					if action, ok := data["action"].(string); ok {
 						actionType := data["action_type"]
-						contentStr = fmt.Sprintf("action[%v]: %s", actionType, utils.ShrinkString(action, 60))
+						contentStr = fmt.Sprintf("action[%v]: %s", actionType, utils.ShrinkString(action, 4096))
 					}
 				case EVENT_TYPE_OBSERVATION:
 					if obs, ok := data["observation"].(string); ok {
 						source := data["source"]
-						contentStr = fmt.Sprintf("observe[%v]: %s", source, utils.ShrinkString(obs, 60))
+						contentStr = fmt.Sprintf("observe[%v]: %s", source, utils.ShrinkString(obs, 4096))
 					}
 				case EVENT_TYPE_ITERATION:
 					if current, ok := data["current"].(float64); ok {
