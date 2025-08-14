@@ -41,6 +41,7 @@ RESPONSE FORMAT: Respond with a JSON object following the @action pattern:
 ```json
 {
   "@action": "call-tool",
+  "tool": "toolname_yet",
   "params": {
     "param1": "value1",
     "param2": "value2"
