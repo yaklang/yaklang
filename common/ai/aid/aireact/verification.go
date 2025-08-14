@@ -25,7 +25,7 @@ func (r *ReAct) verifyUserSatisfaction(originalQuery, toolName string) (bool, st
 	log.Infof("Verifying if user needs are satisfied and formatting results...")
 
 	// Use the unified AI call wrapper instead of aid.CallAITransaction to ensure consistency
-	resp, err := r.config.callAI(verificationPrompt)
+	resp, err := r.config.CallAI(verificationPrompt)
 	if err != nil {
 		return false, "", utils.Errorf("failed to call AI for verification: %v", err)
 	}

@@ -73,8 +73,8 @@ func (t *AiTask) GetName() string {
 
 var _ aicommon.AITask = (*AiTask)(nil)
 
-func (t *AiTask) callAI(request *AIRequest) (*AIResponse, error) {
-	for _, cb := range []AICallbackType{
+func (t *AiTask) CallAI(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	for _, cb := range []aicommon.AICallbackType{
 		t.config.taskAICallback,
 		t.config.coordinatorAICallback,
 		t.config.planAICallback,

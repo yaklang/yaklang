@@ -4,6 +4,7 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"strings"
@@ -53,7 +54,7 @@ type memoryTimeline struct {
 	memory *Memory
 	config *Config
 
-	ai AICaller
+	ai aicommon.AICaller
 
 	idToTs           *omap.OrderedMap[int64, int64]
 	tsToTimelineItem *omap.OrderedMap[int64, *timelineItem]
@@ -148,7 +149,7 @@ func (m *memoryTimeline) BindConfig(config *Config) {
 	}
 }
 
-func newMemoryTimeline(clearCount int, ai AICaller) *memoryTimeline {
+func newMemoryTimeline(clearCount int, ai aicommon.AICaller) *memoryTimeline {
 	return &memoryTimeline{
 		ai:               ai,
 		fullMemoryCount:  clearCount,
@@ -170,7 +171,7 @@ func (m *memoryTimeline) setTimelineContentLimit(contentSize int) {
 	m.totalDumpContentLimit = contentSize
 }
 
-func (m *memoryTimeline) setAICaller(ai AICaller) {
+func (m *memoryTimeline) setAICaller(ai aicommon.AICaller) {
 	m.ai = ai
 }
 
@@ -296,7 +297,7 @@ func (m *memoryTimeline) reducer(beforeId int64) {
 	}
 
 	if m.config == nil {
-		CallAITransactionWithoutConfig(pmt, m.ai.callAI, func(response *AIResponse) error {
+		CallAITransactionWithoutConfig(pmt, m.ai.CallAI, func(response *aicommon.AIResponse) error {
 			action, err := ExtractActionFromStream(response.GetUnboundStreamReader(false), "timeline-reducer")
 			if err != nil {
 				log.Errorf("extract timeline action failed: %v", err)
@@ -313,9 +314,9 @@ func (m *memoryTimeline) reducer(beforeId int64) {
 			return nil
 		})
 	} else {
-		m.config.callAiTransaction(pmt, m.ai.callAI, func(response *AIResponse) error {
+		m.config.callAiTransaction(pmt, m.ai.CallAI, func(response *aicommon.AIResponse) error {
 			action, err := ExtractActionFromStream(
-				response.GetOutputStreamReader("memory-reducer", true, m.config),
+				response.GetOutputStreamReader("memory-reducer", true, m.config.GetEmitter()),
 				"timeline-reducer",
 			)
 			if err != nil {
@@ -340,7 +341,7 @@ func (m *memoryTimeline) shrink(currentItem *timelineItem) {
 		return
 	}
 
-	response, err := m.ai.callAI(NewAIRequest(m.renderSummaryPrompt(currentItem)))
+	response, err := m.ai.CallAI(aicommon.NewAIRequest(m.renderSummaryPrompt(currentItem)))
 	if err != nil {
 		log.Errorf("shrink call ai failed: %v", err)
 		return
@@ -349,7 +350,7 @@ func (m *memoryTimeline) shrink(currentItem *timelineItem) {
 	if m.config == nil {
 		r = response.GetUnboundStreamReader(false)
 	} else {
-		r = response.GetOutputStreamReader("memory-timeline", true, m.config)
+		r = response.GetOutputStreamReader("memory-timeline", true, m.config.GetEmitter())
 	}
 	output, err := io.ReadAll(r)
 	if err != nil {

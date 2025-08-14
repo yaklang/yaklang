@@ -3,6 +3,7 @@ package aid
 import (
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 	"sync"
 	"testing"
@@ -49,7 +50,7 @@ func TestAsyncGuardian_SetOutputEmitterAndFeed(t *testing.T) {
 
 	testEvent := &schema.AiOutputEvent{Type: "test_event_type", Content: []byte("test_data")}
 
-	err := g.registerEventTrigger(testEvent.Type, func(evt *schema.AiOutputEvent, e GuardianEmitter, caller AICaller) {
+	err := g.registerEventTrigger(testEvent.Type, func(evt *schema.AiOutputEvent, e GuardianEmitter, caller aicommon.AICaller) {
 		e.EmitStructured(string(evt.Type), evt)
 	})
 	assert.NoError(t, err, "Failed to register event trigger for test")
@@ -99,7 +100,7 @@ func TestAsyncGuardian_RegisterEventTrigger(t *testing.T) {
 	testEventType := schema.EventType("specific_event")
 	triggerNodeId := "node_from_specific_trigger"
 
-	trigger := func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller AICaller) {
+	trigger := func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller aicommon.AICaller) {
 		triggerCalled = true
 		receivedEventInTrigger = event
 		emitter.EmitStructured(triggerNodeId, &schema.AiOutputEvent{Type: "event_from_trigger", Content: []byte("trigger_data")})
@@ -236,7 +237,7 @@ func TestAsyncGuardian_EventLoop_ContextCancellation(t *testing.T) {
 	})
 
 	initialEventType := schema.EventType("initial_event_type_for_cancel_test")
-	g.registerEventTrigger(initialEventType, func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller AICaller) {
+	g.registerEventTrigger(initialEventType, func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller aicommon.AICaller) {
 		emitter.EmitStructured(string(event.Type), event)
 	})
 
@@ -283,10 +284,10 @@ func TestAsyncGuardian_MultipleEventTriggers(t *testing.T) {
 	var trigger1Called, trigger2Called bool
 	eventType := schema.EventType("multi_trigger_event")
 
-	g.registerEventTrigger(eventType, func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller AICaller) {
+	g.registerEventTrigger(eventType, func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller aicommon.AICaller) {
 		trigger1Called = true
 	})
-	g.registerEventTrigger(eventType, func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller AICaller) {
+	g.registerEventTrigger(eventType, func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller aicommon.AICaller) {
 		trigger2Called = true
 	})
 
@@ -325,7 +326,7 @@ func TestAsyncGuardian_EventAndMirrorTriggers(t *testing.T) {
 		}
 	})
 
-	g.registerEventTrigger(specificEventType, func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller AICaller) {
+	g.registerEventTrigger(specificEventType, func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller aicommon.AICaller) {
 		eventTriggerCalled = true
 		emitter.EmitStructured("event_trigger_node", &schema.AiOutputEvent{Type: "from_event_trigger"})
 	})

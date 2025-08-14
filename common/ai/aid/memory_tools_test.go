@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -105,7 +106,8 @@ func TestCoodinator_Delete_Memory(t *testing.T) {
 		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(rawConfig aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			config := rawConfig.(*Config)
 			timeline := config.memory.timeline
 			rsp := config.NewAIResponse()
 			defer func() {
@@ -244,7 +246,8 @@ func TestCoodinator_Add_Persistent_Memory(t *testing.T) {
 		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(raw aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			config := raw.(*Config)
 			timeline := config.memory.timeline
 			rsp := config.NewAIResponse()
 			defer func() {

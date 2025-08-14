@@ -2,6 +2,7 @@ package aid
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"io"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -18,8 +19,8 @@ type Coordinator struct {
 	config    *Config
 }
 
-func (c *Coordinator) callAI(request *AIRequest) (*AIResponse, error) {
-	for _, cb := range []AICallbackType{
+func (c *Coordinator) CallAI(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	for _, cb := range []aicommon.AICallbackType{
 		c.config.coordinatorAICallback,
 		c.config.planAICallback,
 		c.config.taskAICallback,
@@ -58,8 +59,8 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...Opt
 	config.startEventLoop(ctx)
 	config.startHotpatchLoop(ctx)
 	config.guardian.setOutputEmitter(config.id, config.eventHandler)
-	config.guardian.setAiCaller(CreateProxyAICaller(config, func(request *AIRequest) *AIRequest {
-		request.detachCheckpoint = true
+	config.guardian.setAiCaller(aicommon.CreateProxyAICaller(config, func(request *aicommon.AIRequest) *aicommon.AIRequest {
+		request.SetDetachCheckpoint(true)
 		return request
 	}))
 	c := &Coordinator{
@@ -71,8 +72,8 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...Opt
 	return c, nil
 }
 
-func (c *Coordinator) CallAITransaction(prompt string, postHandler func(response *AIResponse) error, requestOpts ...AIRequestOption) error {
-	return c.config.callAiTransaction(prompt, c.callAI, func(rsp *AIResponse) error {
+func (c *Coordinator) CallAITransaction(prompt string, postHandler func(response *aicommon.AIResponse) error, requestOpts ...aicommon.AIRequestOption) error {
+	return c.config.callAiTransaction(prompt, c.CallAI, func(rsp *aicommon.AIResponse) error {
 		if postHandler == nil {
 			return nil
 		}
@@ -162,12 +163,12 @@ func (c *Coordinator) Run() error {
 			c.config.EmitError("generate report failed: %v", err)
 			return utils.Error("coordinator: generate report failed")
 		}
-		aiRsp, err := c.callAI(NewAIRequest(prompt))
+		aiRsp, err := c.CallAI(aicommon.NewAIRequest(prompt))
 		if err != nil {
 			c.config.EmitError("AICallback failed: %v", err)
 			return utils.Errorf("coordinator: AICallback failed: %v", err)
 		}
-		output, err := io.ReadAll(aiRsp.GetOutputStreamReader("result", false, c.config))
+		output, err := io.ReadAll(aiRsp.GetOutputStreamReader("result", false, c.config.GetEmitter()))
 		if err != nil {
 			c.config.EmitError("read AICallback response failed: %v", err)
 			return utils.Errorf("coordinator: read AICallback response failed: %v", err)

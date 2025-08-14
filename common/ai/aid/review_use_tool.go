@@ -1,6 +1,7 @@
 package aid
 
 import (
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"io"
 	"strings"
 
@@ -144,12 +145,12 @@ func (t *AiTask) toolReviewPolicy_wrongTool(oldTool *aitool.Tool, suggestionTool
 	}
 
 	var selecteddTool *aitool.Tool
-	transErr := t.config.callAiTransaction(prompt, func(request *AIRequest) (*AIResponse, error) {
+	transErr := t.config.callAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		request.SetTaskIndex(t.Index)
-		return t.callAI(request)
-	}, func(rsp *AIResponse) error {
+		return t.CallAI(request)
+	}, func(rsp *aicommon.AIResponse) error {
 		action, err := ExtractActionFromStream(
-			rsp.GetOutputStreamReader("call-tools", true, t.config),
+			rsp.GetOutputStreamReader("call-tools", true, t.config.GetEmitter()),
 			"require-tool", "abandon")
 		if err != nil {
 			return err
@@ -214,12 +215,12 @@ func (t *AiTask) toolReviewPolicy_wrongParam(oldTool *aitool.Tool, suggestionToo
 	}
 
 	var selecteddTool *aitool.Tool
-	transErr := t.config.callAiTransaction(prompt, func(request *AIRequest) (*AIResponse, error) {
+	transErr := t.config.callAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		request.SetTaskIndex(t.Index)
-		return t.callAI(request)
-	}, func(rsp *AIResponse) error {
+		return t.CallAI(request)
+	}, func(rsp *aicommon.AIResponse) error {
 		action, err := ExtractActionFromStream(
-			rsp.GetOutputStreamReader("call-tools", true, t.config),
+			rsp.GetOutputStreamReader("call-tools", true, t.config.GetEmitter()),
 			"require-tool", "abandon")
 		if err != nil {
 			return err

@@ -3,6 +3,7 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -28,7 +29,7 @@ func TestCoordinator_RandomAICallbackError(t *testing.T) {
 		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			m.Lock()
 			defer m.Unlock()
 
@@ -39,7 +40,7 @@ func TestCoordinator_RandomAICallbackError(t *testing.T) {
 				count = new(int64)
 			}
 
-			rsp := config.NewAIResponse()
+			rsp := aicommon.NewAIResponse(config)
 			rsp.EmitOutputStream(strings.NewReader(`
 {
     "@action": "plan",

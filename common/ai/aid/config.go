@@ -31,13 +31,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type AICaller interface {
-	callAI(*AIRequest) (*AIResponse, error)
-}
-
-var _ AICaller = &Coordinator{}
-var _ AICaller = &planRequest{}
-var _ AICaller = &AiTask{}
+var _ aicommon.AICaller = &Coordinator{}
+var _ aicommon.AICaller = &planRequest{}
+var _ aicommon.AICaller = &AiTask{}
+var _ aicommon.AICallerConfigIf = &Config{}
 
 type AgreePolicyType string
 
@@ -80,14 +77,10 @@ type Config struct {
 	planUserInteractMaxCount int64 // max user interact count before planning, default is 3
 
 	// origin ai callback
-	originalAICallback AICallbackType //!!!! provide branch tasks
-
-	// need to think
-	coordinatorAICallback AICallbackType
-	planAICallback        AICallbackType
-
-	// no need to think, low level
-	taskAICallback AICallbackType
+	originalAICallback    aicommon.AICallbackType //!!!! provide branch tasks
+	coordinatorAICallback aicommon.AICallbackType // need to think
+	planAICallback        aicommon.AICallbackType
+	taskAICallback        aicommon.AICallbackType // no need to think, low level
 
 	// asyncGuardian can auto collect event handler data
 	guardian     *asyncGuardian
@@ -150,6 +143,22 @@ type Config struct {
 	disableOutputEventType []string
 }
 
+func (c *Config) NewAIResponse() *aicommon.AIResponse {
+	return aicommon.NewAIResponse(c)
+}
+
+func (c *Config) GetAITransactionAutoRetryCount() int64 {
+	return c.aiTransactionAutoRetry
+}
+
+func (c *Config) GetContext() context.Context {
+	return c.ctx
+}
+
+func (c *Config) GetEmitter() *aicommon.Emitter {
+	return c.Emitter
+}
+
 func (c *Config) HandleSearch(query string, items *omap.OrderedMap[string, []string]) ([]*searchtools.KeywordSearchResult, error) {
 	type ToolWithKeywords struct {
 		Name     string `json:"Name"`
@@ -176,7 +185,7 @@ func (c *Config) HandleSearch(query string, items *omap.OrderedMap[string, []str
 	}
 	var callResults []*searchtools.KeywordSearchResult
 
-	err = c.callAiTransaction(prompt, c.callAI, func(response *AIResponse) error {
+	err = c.callAiTransaction(prompt, c.CallAI, func(response *aicommon.AIResponse) error {
 		action, err := ExtractActionFromStream(response.GetUnboundStreamReader(false), "keyword_search")
 		if err != nil {
 			log.Errorf("extract aitool-keyword-search action failed: %v", err)
@@ -258,12 +267,8 @@ func (c *Config) getCurrentTaskPlan() *AiTask {
 	return c.aiTaskRuntime.RootTask
 }
 
-func (c *Config) CallAI(request *AIRequest) (*AIResponse, error) {
-	return c.callAI(request)
-}
-
-func (c *Config) callAI(request *AIRequest) (*AIResponse, error) {
-	for _, cb := range []AICallbackType{
+func (c *Config) CallAI(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	for _, cb := range []aicommon.AICallbackType{
 		c.taskAICallback,
 		c.coordinatorAICallback,
 		c.planAICallback,
@@ -280,7 +285,7 @@ func (c *Config) setAgreePolicy(policy AgreePolicyType) {
 	c.agreePolicy = policy
 }
 
-func (c *Config) outputConsumptionCallback(current int) {
+func (c *Config) CallAIResponseConsumptionCallback(current int) {
 	atomic.AddInt64(c.outputConsumption, int64(current))
 }
 
@@ -338,7 +343,7 @@ func initDefaultTools(c *Config) error { // set config default tools
 }
 
 func initDefaultAICallback(c *Config) error { // set config default tools
-	defaultAICallback := AIChatToAICallbackType(ai.Chat)
+	defaultAICallback := aicommon.AIChatToAICallbackType(ai.Chat)
 	if defaultAICallback == nil {
 		return nil
 	}
@@ -560,7 +565,7 @@ func WithAllowRequireForUserInteract(opts ...bool) Option {
 	}
 }
 
-func WithAICallback(cb AICallbackType) Option {
+func WithAICallback(cb aicommon.AICallbackType) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -592,7 +597,7 @@ func WithMemory(m *Memory) Option {
 	}
 }
 
-func WithTaskAICallback(cb AICallbackType) Option {
+func WithTaskAICallback(cb aicommon.AICallbackType) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -601,7 +606,7 @@ func WithTaskAICallback(cb AICallbackType) Option {
 	}
 }
 
-func WithCoordinatorAICallback(cb AICallbackType) Option {
+func WithCoordinatorAICallback(cb aicommon.AICallbackType) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -610,7 +615,7 @@ func WithCoordinatorAICallback(cb AICallbackType) Option {
 	}
 }
 
-func WithPlanAICallback(cb AICallbackType) Option {
+func WithPlanAICallback(cb aicommon.AICallbackType) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -911,7 +916,7 @@ func WithAITransactionRetry(t int) Option {
 	}
 }
 
-func WithRiskControlForgeName(forgeName string, callbackType AICallbackType) Option {
+func WithRiskControlForgeName(forgeName string, callbackType aicommon.AICallbackType) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -978,7 +983,7 @@ func WithForgeName(forgeName string) Option {
 
 func WithTaskAnalysis(b bool) Option {
 	return func(config *Config) error {
-		return WithGuardianEventTrigger(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller AICaller) {
+		return WithGuardianEventTrigger(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller aicommon.AICaller) {
 			var plansUUID string
 			var planTree string
 			type analyzeItem struct {
