@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -103,7 +104,7 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 		// Temporarily release lock for AI transaction to prevent deadlocks
 		r.config.mu.Unlock()
 
-		transactionErr := aid.CallAITransaction(aiConfig, prompt,
+		transactionErr := aicommon.CallAITransaction(aiConfig, prompt,
 			func(req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 				// Use the stored callback
 				return r.config.aiCallback(aiConfig, req)
