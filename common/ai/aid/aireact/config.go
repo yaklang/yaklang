@@ -17,6 +17,26 @@ import (
 
 type AICallbackType = aid.AICallbackType
 
+// ToolReviewInfo contains information needed for tool use review
+type ToolReviewInfo struct {
+	Tool            *aitool.Tool
+	Params          aitool.InvokeParams
+	ID              string
+	ResponseChannel chan *ToolReviewResponse
+}
+
+// ToolReviewResponse contains the user's review decision
+type ToolReviewResponse struct {
+	Suggestion        string              // continue, wrong_tool, wrong_params, direct_answer
+	ExtraPrompt       string              // Additional user prompt
+	SuggestionTool    string              // Suggested tool name for wrong_tool
+	SuggestionKeyword string              // Suggested keyword for tool search
+	ModifiedParams    aitool.InvokeParams // Modified parameters for wrong_params
+	OverrideResult    *aitool.ToolResult  // Override result
+	DirectlyAnswer    bool                // Skip tool and answer directly
+	Cancel            bool                // Cancel the operation
+}
+
 type ReActConfig struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -32,6 +52,10 @@ type ReActConfig struct {
 	eventHandler func(e *ypb.AIOutputEvent)
 	debugEvent   bool
 	debugPrompt  bool
+
+	// Tool review and interaction
+	enableToolReview bool                             // Enable tool use review
+	reviewHandler    func(reviewInfo *ToolReviewInfo) // Custom review handler
 
 	// ReAct specific settings
 	maxIterations     int
@@ -176,6 +200,20 @@ func WithTopToolsCount(count int) Option {
 		if count > 0 {
 			cfg.topToolsCount = count
 		}
+	}
+}
+
+// WithToolReview enables tool use review functionality
+func WithToolReview(enabled bool) Option {
+	return func(cfg *ReActConfig) {
+		cfg.enableToolReview = enabled
+	}
+}
+
+// WithReviewHandler sets a custom review handler for tool use review
+func WithReviewHandler(handler func(reviewInfo *ToolReviewInfo)) Option {
+	return func(cfg *ReActConfig) {
+		cfg.reviewHandler = handler
 	}
 }
 
