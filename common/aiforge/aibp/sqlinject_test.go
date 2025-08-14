@@ -2,6 +2,7 @@ package aibp
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai"
