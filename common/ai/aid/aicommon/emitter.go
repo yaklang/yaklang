@@ -347,3 +347,51 @@ func (e *Emitter) EmitSystemPrompt(step string, prompt string) {
 		"prompt": prompt,
 	})
 }
+
+// AI 推理过程通用方法
+
+// EmitThought emits a thought event for AI reasoning process
+func (e *Emitter) EmitThought(nodeId string, thought string) {
+	e.EmitJSON(schema.EVENT_TYPE_THOUGHT, nodeId, map[string]any{
+		"thought":   thought,
+		"timestamp": time.Now().Unix(),
+	})
+}
+
+// EmitAction emits an action event for AI execution
+func (e *Emitter) EmitAction(nodeId string, action string, actionType string) {
+	e.EmitJSON(schema.EVENT_TYPE_ACTION, nodeId, map[string]any{
+		"action":      action,
+		"action_type": actionType,
+		"timestamp":   time.Now().Unix(),
+	})
+}
+
+// EmitObservation emits an observation event for AI feedback
+func (e *Emitter) EmitObservation(nodeId string, observation string, source string) {
+	e.EmitJSON(schema.EVENT_TYPE_OBSERVATION, nodeId, map[string]any{
+		"observation": observation,
+		"source":      source, // "tool", "environment", "user", etc.
+		"timestamp":   time.Now().Unix(),
+	})
+}
+
+// EmitIteration emits an iteration event for AI reasoning loops
+func (e *Emitter) EmitIteration(nodeId string, current int, max int, description string) {
+	e.EmitJSON(schema.EVENT_TYPE_ITERATION, nodeId, map[string]any{
+		"current":     current,
+		"max":         max,
+		"description": description,
+		"timestamp":   time.Now().Unix(),
+	})
+}
+
+// EmitResult emits a result event for AI final output
+func (e *Emitter) EmitResult(nodeId string, result interface{}, success bool) {
+	e.EmitJSON(schema.EVENT_TYPE_RESULT, nodeId, map[string]any{
+		"result":    result,
+		"success":   success,
+		"finished":  true,
+		"timestamp": time.Now().Unix(),
+	})
+}
