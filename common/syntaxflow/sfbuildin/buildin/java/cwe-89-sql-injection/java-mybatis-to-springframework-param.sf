@@ -96,7 +96,17 @@ REFERENCE
 
 <include('java-spring-mvc-param')> as $source;
 <include("java-common-filter")>() as $filter
-<mybatisSink>#{
+<mybatisSink> as $sink
+check $sink then "发现不安全的Mybatis用法" else "未发现不安全的Mybatis用法"
+
+alert $sink for {
+    title: "Detect Java MyBatis/iBatis XML Weak ('${...}') Params to Spring Params",
+    title_zh: "检测 Java MyBatis/iBatis XML Mapper 不安全(${...})参数",
+    level: "low",
+    solution:"检测到Java MyBatis/iBatis XML Mapper 不安全(${...})参数，请检测是否安全的使用"
+}
+
+$sink#{
     until: `* &  $source`,
 }-> as $result
 $result?{<typeName>?{!any: Long,Integer, Boolean,Double}} as $all
@@ -543,4 +553,46 @@ public class UserService {
     }
 }
 CODE
+)
+
+desc(
+   language: java
+   	alert_num:1
+   	'file://Controller.java': <<<TEXT
+     <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+        <mapper namespace="org.joychou.mapper.UserMapper">
+
+            <resultMap type="org.joychou.dao.User" id="User">
+                <id column="id" property="id" javaType="java.lang.Integer" jdbcType="NUMERIC"/>
+                <id column="username" property="username" javaType="java.lang.String" jdbcType="VARCHAR"/>
+                <id column="password" property="password" javaType="java.lang.String" jdbcType="VARCHAR"/>
+            </resultMap>
+
+            <!--<select id="findByUserName" resultMap="User">-->
+        	    <!--select * from users where username = #{username}-->
+            <!--</select>-->
+
+            <select id="findByUserNameVuln02" parameterType="String" resultMap="User">
+                select * from users where username like '%${_parameter}%'
+            </select>
+
+            <select id="findByUserNameVuln03" parameterType="String" resultMap="User">
+                select * from users
+                <if test="order != null">
+                    order by ${order} asc
+                </if>
+            </select>
+
+            <select id="findById" resultMap="User">
+                select * from users where id = #{id}
+            </select>
+
+
+            <select id="OrderByUsername" resultMap="User">
+                select * from users order by id asc limit 1
+            </select>
+        </mapper>
+TEXT
 )
