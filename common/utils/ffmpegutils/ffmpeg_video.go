@@ -253,7 +253,7 @@ func sendFrame(filename, dir string, ch chan<- *FfmpegStreamResult) {
 		MIMEType:    mimeObj.String(),
 		MIMETypeObj: mimeObj,
 	}
-	//os.Remove(filePath) // Clean up immediately
+	os.Remove(filePath) // Clean up immediately
 }
 
 // BurnInSubtitles hard-codes subtitles from an SRT file into a video.
