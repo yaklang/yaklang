@@ -5,11 +5,9 @@ import (
 	"io"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -22,16 +20,8 @@ type Interactivable interface {
 	CallAfterInteractiveEventReleased(string, aitool.InvokeParams)
 }
 
-type Checkpointable interface {
-	CreateReviewCheckpoint(int64) *schema.AiCheckpoint
-	CreateToolCallCheckpoint(int64) *schema.AiCheckpoint
-	SubmitCheckpointRequest(checkpoint *schema.AiCheckpoint, i any) error
-	SubmitCheckpointResponse(*schema.AiCheckpoint, any) error
-}
-
 type AICallerConfigIf interface {
 	AcquireId() int64
-	GetDB() *gorm.DB
 	GetRuntimeId() string
 	IsCtxDone() bool
 	GetContext() context.Context
@@ -46,7 +36,7 @@ type AICallerConfigIf interface {
 	Interactivable
 
 	// Checkpointable
-	Checkpointable
+	CheckpointableStorage
 }
 
 func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption) (string, error)) AICallbackType {
