@@ -25,9 +25,14 @@ func (s *Server) QuerySyntaxFlowScanTask(ctx context.Context, request *ypb.Query
 		return nil, err
 	}
 
+	datas := lo.Map(tasks, func(task *schema.SyntaxFlowScanTask, index int) *ypb.SyntaxFlowScanTask {
+		data := task.ToGRPCModel()
+		return data
+	})
+
 	if progNames := request.GetFilter().GetPrograms(); len(progNames) == 1 && request.ShowDiffRisk {
-		var lastTask *schema.SyntaxFlowScanTask
-		for i, task := range tasks {
+		var lastTask *ypb.SyntaxFlowScanTask
+		for i, task := range datas {
 			// lastTask为较新的扫描
 			// fmt.Printf("task time: %v\n", task.Model)
 			if i == 0 {
@@ -67,10 +72,6 @@ func (s *Server) QuerySyntaxFlowScanTask(ctx context.Context, request *ypb.Query
 		}
 	}
 
-	datas := lo.Map(tasks, func(task *schema.SyntaxFlowScanTask, index int) *ypb.SyntaxFlowScanTask {
-		data := task.ToGRPCModel()
-		return data
-	})
 	return &ypb.QuerySyntaxFlowScanTaskResponse{
 		Pagination: &ypb.Paging{
 			Page:     int64(p.Page),
