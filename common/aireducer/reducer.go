@@ -25,6 +25,9 @@ func (r *Reducer) Run() error {
 		select {
 		case chunk, ok := <-ch:
 			if !ok {
+				if r.config.finishCallback != nil {
+					return r.config.finishCallback(r.config, r.config.Memory)
+				}
 				return nil
 			}
 			if r.config.callback != nil {
