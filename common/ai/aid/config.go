@@ -147,6 +147,10 @@ func (c *Config) GetRuntimeId() string {
 	return c.id
 }
 
+func (c *Config) CallAfterInteractiveEventReleased(eventID string, invoke aitool.InvokeParams) {
+	c.memory.StoreInteractiveUserInput(eventID, invoke)
+}
+
 func (c *Config) CallAIResponseOutputFinishedCallback(s string) {
 	c.ProcessExtendedActionCallback(s)
 }
@@ -345,7 +349,7 @@ func (c *Config) ProcessExtendedActionCallback(resp string) {
 
 func (c *Config) ReleaseInteractiveEvent(eventID string, invoke aitool.InvokeParams) {
 	c.EmitInteractiveRelease(eventID, invoke)
-	c.memory.StoreInteractiveUserInput(eventID, invoke)
+	c.CallAfterInteractiveEventReleased(eventID, invoke)
 }
 
 func initDefaultTools(c *Config) error { // set config default tools

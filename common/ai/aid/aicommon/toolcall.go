@@ -2,10 +2,11 @@ package aicommon
 
 import (
 	"fmt"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"sync"
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -246,7 +247,8 @@ func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, dir
 		// wait for agree
 		config.DoWaitAgree(nil, ep)
 		params := ep.GetParams()
-		config.ReleaseInteractiveEvent(ep.GetId(), params)
+		emitter.EmitInteractiveRelease(ep.GetId(), params)
+		config.CallAfterInteractiveEventReleased(ep.GetId(), params)
 		if params == nil {
 			emitter.EmitError("tool use [%v] review params is nil, user may cancel the review", tool.Name)
 			handleError(fmt.Sprintf("tool use [%v] review params is nil, user may cancel the review", tool.Name))
