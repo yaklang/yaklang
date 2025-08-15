@@ -131,8 +131,11 @@ func buildSSARisk(
 		if alertInfo.Title != "" {
 			newSSARisk.Title = alertInfo.Title
 		}
-		if alertInfo.Description != "" {
+		if alertInfo.TitleZh != "" {
 			newSSARisk.TitleVerbose = alertInfo.TitleZh
+		}
+		if alertInfo.Description != "" {
+			newSSARisk.Description = alertInfo.Description
 		}
 		if alertInfo.Solution != "" {
 			newSSARisk.Solution = alertInfo.Solution
