@@ -1,59 +1,59 @@
-package aid
+package aicommon
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"io"
 )
-
-var ToolCallWatcher = []*ToolUseReviewSuggestion{
-	{
-		Value:             "enough-cancel",
-		Suggestion:        "跳过",
-		SuggestionEnglish: "Tool output is sufficient, can cancel tool execution and continue with the next task",
-	},
-}
 
 const (
 	ToolCallAction_Enough_Cancel = "enough-cancel"
 	ToolCallAction_Finish        = "finish"
 )
 
-func (t *AiTask) InvokeTool(targetTool *aitool.Tool, callToolParams aitool.InvokeParams, callToolId string, handleResultUserCancel, handleResultErr func(any), stdoutWriter, stderrWriter io.Writer) (*aitool.ToolResult, error) {
-	c := t.config
+func (a *ToolCaller) invoke(
+	tool *aitool.Tool,
+	params aitool.InvokeParams,
+	userCancel func(reason any),
+	reportError func(err any),
+	stdoutWriter, stderrWriter io.Writer,
+) (*aitool.ToolResult, error) {
+	c := a.config
+	e := a.emitter
+
 	seq := c.AcquireId()
-	if ret, ok := yakit.GetToolCallCheckpoint(c.GetDB(), c.id, seq); ok { // todo rerun
+	if ret, ok := yakit.GetToolCallCheckpoint(c.GetDB(), c.GetRuntimeId(), seq); ok {
 		if ret.Finished {
 			return aiddb.AiCheckPointGetToolResult(ret), nil
 		}
 	}
 	toolCheckpoint := c.CreateToolCallCheckpoint(seq)
 	err := c.SubmitCheckpointRequest(toolCheckpoint, map[string]any{
-		"tool_name": targetTool.Name,
-		"param":     callToolParams,
+		"tool_name": tool.Name,
+		"param":     params,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	ep := c.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TOOL_CALL_WATCHER)
-	c.EmitToolCallWatcher(callToolId, ep.GetId(), targetTool, callToolParams)
-	ctx, cancel := context.WithCancel(c.ctx)
+	epm := c.GetEndpointManager()
+	ep := epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TOOL_CALL_WATCHER)
+	e.EmitToolCallWatcher(a.callToolId, ep.GetId(), tool, params)
+	ctx, cancel := context.WithCancel(c.GetContext())
 	defer cancel()
 
 	newToolCallRes := func() *aitool.ToolResult {
 		return &aitool.ToolResult{
-			Param:       callToolParams,
-			Name:        targetTool.Name,
-			Description: targetTool.Description,
-			ToolCallID:  callToolId,
+			Param:       params,
+			Name:        tool.Name,
+			Description: tool.Description,
+			ToolCallID:  a.callToolId,
 		}
 	}
 
@@ -69,9 +69,9 @@ func (t *AiTask) InvokeTool(targetTool *aitool.Tool, callToolParams aitool.Invok
 	}
 
 	toolCallErr := func(err error) (*aitool.ToolResult, error) {
-		handleResultErr(err)
+		reportError(err)
 		res := newToolCallRes()
-		res.Error = fmt.Sprintf("工具执行失败: %v", err)
+		res.Error = fmt.Sprintf("tool execution failed: %v", err)
 		return res, err
 	}
 
@@ -81,20 +81,22 @@ func (t *AiTask) InvokeTool(targetTool *aitool.Tool, callToolParams aitool.Invok
 		}
 		return result, err
 	}
+
 	go func() {
 		ep.WaitContext(ctx)
 		userSuggestion := ep.GetParams()
 		switch userSuggestion.GetString("suggestion") {
-		case ToolCallAction_Enough_Cancel:
+		case string(ToolCallAction_Enough_Cancel):
 			cancel()
-			handleResultUserCancel("用户取消工具调用，继续后续任务")
+			userCancel("user cancelled the tool call, continuing with the next task")
 		case ToolCallAction_Finish:
 		default:
-			handleResultErr(fmt.Sprintf("用户未选择有效的操作，无法继续工具调用: %v", userSuggestion))
+			reportError(fmt.Sprintf("user did not select a valid action, cannot continue tool call: %v", userSuggestion))
 		}
 	}()
 
-	execResult, execErr := targetTool.InvokeWithParams(callToolParams,
+	execResult, execErr := tool.InvokeWithParams(
+		params,
 		aitool.WithStdout(stdoutWriter),
 		aitool.WithStderr(stderrWriter),
 		aitool.WithContext(ctx),
@@ -102,15 +104,14 @@ func (t *AiTask) InvokeTool(targetTool *aitool.Tool, callToolParams aitool.Invok
 		aitool.WithResultCallback(toolCallSuccess),
 		aitool.WithCancelCallback(toolCallCancel),
 		aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{
-			RuntimeID: c.id,
+			RuntimeID: c.GetRuntimeId(),
 			FeedBacker: func(result *ypb.ExecResult) error {
-				c.EmitYakitExecResult(result)
+				e.EmitYakitExecResult(result)
 				return nil
 			},
 		}),
 	)
 	ep.ActiveWithParams(ctx, map[string]any{"suggestion": "finish"})
 	c.ReleaseInteractiveEvent(ep.GetId(), map[string]any{"suggestion": "finish"})
-
 	return execResult, execErr
 }

@@ -3,6 +3,7 @@ package aicommon
 import (
 	"context"
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -25,7 +26,15 @@ type AICallerConfigIf interface {
 	GetEmitter() *Emitter
 	NewAIResponse() *AIResponse
 	CallAIResponseOutputFinishedCallback(string)
+
+	// review and checkppint
 	CreateReviewCheckpoint(int64) *schema.AiCheckpoint
+	CreateToolCallCheckpoint(int64) *schema.AiCheckpoint
+	GetEndpointManager() *EndpointManager
+	SubmitCheckpointRequest(checkpoint *schema.AiCheckpoint, i any) error
+	SubmitCheckpointResponse(*schema.AiCheckpoint, any) error
+	DoWaitAgree(ctx context.Context, endpoint *Endpoint)
+	ReleaseInteractiveEvent(string, aitool.InvokeParams)
 }
 
 func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption) (string, error)) AICallbackType {

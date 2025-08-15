@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/segmentio/ksuid"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
@@ -375,7 +374,6 @@ func (r *ReAct) emitToolUseReviewRequire(tool *aitool.Tool, params aitool.Invoke
 	// Create review information
 	reviewInfo := map[string]interface{}{
 		"id":               reviewID,
-		"selectors":        aid.ToolUseReviewSuggestions, // Use aid's review suggestions
 		"tool":             tool.Name,
 		"tool_description": tool.Description,
 		"params":           params,

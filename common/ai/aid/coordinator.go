@@ -107,7 +107,7 @@ func (c *Coordinator) Run() error {
 	ep.SetDefaultSuggestionContinue()
 
 	c.config.EmitRequireReviewForPlan(rsp, ep.GetId())
-	c.config.doWaitAgree(nil, ep)
+	c.config.DoWaitAgree(nil, ep)
 	params := ep.GetParams()
 	c.config.ReleaseInteractiveEvent(ep.GetId(), params)
 	if params == nil {

@@ -13,8 +13,8 @@ import (
 )
 
 func TestCoordinator_ToolUseReview_WrongTool_SuggestionTools(t *testing.T) {
-	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *schema.AiOutputEvent)
+	inputChan := make(chan *InputEvent, 10)
+	outputChan := make(chan *schema.AiOutputEvent, 10)
 
 	lsReviewed := false
 	nowReviewed := false
@@ -84,7 +84,7 @@ LOOP:
 			break LOOP
 		case result := <-outputChan:
 			count++
-			if count > 100 {
+			if count > 1000 {
 				break LOOP
 			}
 			fmt.Println("result:" + result.String())
@@ -127,7 +127,7 @@ LOOP:
 				}
 			}
 
-			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to execute tool:", "now") {
+			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to invoke tool:", "now") {
 				useToolReviewPass = true
 				break LOOP
 			}
