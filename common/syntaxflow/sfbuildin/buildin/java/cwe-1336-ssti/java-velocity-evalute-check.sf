@@ -1,0 +1,32 @@
+desc(
+  title_zh: "检查 Velocity Evaluate 模板是否可控",
+  title: "Check if Velocity Evaluate template is controllable",
+  type: vuln,
+  level: high,
+  risk: ssti,
+  harm_zh: "模版注入、如果 Velocity.evaluate 方法的模板参数可被用户控制，将导致服务端模板注入（SSTI）漏洞。攻击者可构造恶意模板指令，在服务端执行任意代码或访问敏感数据，造成严重的安全风险。",
+  harm: "If the template parameter in Velocity.evaluate is user-controllable, it may lead to Server-Side Template Injection (SSTI) vulnerabilities. Attackers can inject malicious template directives to execute arbitrary code or access sensitive data on the server.",
+  fix_zh: "建议在调用 Velocity.evaluate 方法前，对模板内容进行严格的输入校验与过滤，并使用安全的模板加载方式，避免直接处理用户输入的模板内容。",
+  fix: <<<FIX
+修复建议：
+1. 禁止直接使用用户输入作为 Velocity.evaluate 的模板内容。
+2. 使用白名单或固定模板文件，避免运行动态构造的模板。
+3. 对输入内容进行严格转义，移除 Velocity 特殊指令（如 #set、#foreach）。
+4. 限制模板引擎的执行权限，避免访问敏感系统资源。
+FIX
+)
+
+<include('java-spring-mvc-param')> as $entry;
+<include('java-servlet-param')> as $entry;
+
+Velocity.evaluate?{<typeName()> ?{have: "org.apache.velocity.app.Velocity"}} as $evaluate
+$evaluate(, , ,, * as $tmplate)
+
+$tmplate #{
+    include: "* & $entry"
+}-> as $controledTmplate
+
+alert $controledTmplate for {
+  level: "high",
+  desc: "检测到 Velocity.evaluate 模板内容可被用户控制，可能导致服务端模板注入（SSTI）漏洞。"
+}
