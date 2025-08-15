@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"sync"
 
 	"github.com/segmentio/ksuid"
@@ -9,10 +10,11 @@ import (
 )
 
 type ToolCaller struct {
-	*Emitter
-
 	runtimeId  string
 	task       AITask
+	config     AICallerConfigIf
+	emitter    *Emitter // specific, backup for config.GetEmitter()
+	ai         AICaller
 	done       *sync.Once
 	callToolId string
 
@@ -23,16 +25,56 @@ type ToolCaller struct {
 	onCallToolEnd   func()
 }
 
-func NewToolCaller(
-	runtimeId string,
-	task AITask,
-	emitter *Emitter,
-) *ToolCaller {
+type ToolCallerOption func(tc *ToolCaller)
+
+func WithToolCaller_Task(task AITask) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.task = task
+	}
+}
+
+func WithToolCaller_AICaller(ai AICaller) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.ai = ai
+	}
+}
+
+func WithToolCaller_Emitter(e *Emitter) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.emitter = e
+	}
+}
+
+func WithToolCaller_AICallerConfig(config AICallerConfigIf) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.config = config
+	}
+}
+
+func WithToolCaller_OnStart(i func()) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.onCallToolStart = i
+	}
+}
+
+func WithToolCaller_OnEnd(i func()) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.onCallToolEnd = i
+	}
+}
+
+func WithToolCaller_GenerateToolParamsBuilder(
+	builder func(tool *aitool.Tool, toolName string) (string, error),
+) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.generateToolParamsBuilder = builder
+	}
+}
+
+func NewToolCaller(runtimeId string) *ToolCaller {
 	return &ToolCaller{
 		runtimeId:  runtimeId,
-		task:       task,
 		callToolId: ksuid.New().String(),
-		Emitter:    emitter,
 		done:       &sync.Once{},
 		m:          &sync.Mutex{},
 	}
@@ -47,16 +89,27 @@ func (t *ToolCaller) GetParamGeneratingPrompt(tool *aitool.Tool, toolName string
 }
 
 func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, directlyAnswer bool, err error) {
-	t.EmitInfo("start to generate tool[%v] params in task: %v", tool.Name, t.task.GetName())
+	emitter := t.emitter
+	if emitter == nil {
+		emitter = t.config.GetEmitter()
+		if emitter == nil {
+			return nil, false, fmt.Errorf("no emitter found in ToolCaller")
+		}
+		t.emitter = emitter
+	}
 
+	emitter.EmitInfo("start to generate tool[%v] params in task: %v", tool.Name, t.task.GetName())
 	callToolId := t.callToolId
 
-	t.EmitToolCallStart(callToolId, tool)
+	emitter.EmitToolCallStart(callToolId, tool)
+	if t.onCallToolStart != nil {
+		t.onCallToolStart()
+	}
 
 	handleDone := func() {
 		t.done.Do(func() {
-			t.EmitToolCallStatus(t.callToolId, "done")
-			t.EmitToolCallDone(callToolId)
+			emitter.EmitToolCallStatus(t.callToolId, "done")
+			emitter.EmitToolCallDone(callToolId)
 			t.m.Lock()
 			defer t.m.Unlock()
 
@@ -68,8 +121,8 @@ func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, dir
 
 	handleUserCancel := func(reason any) {
 		t.done.Do(func() {
-			t.EmitToolCallStatus(t.callToolId, fmt.Sprintf("cancelled by reason: %v", reason))
-			t.EmitToolCallUserCancel(callToolId)
+			emitter.EmitToolCallStatus(t.callToolId, fmt.Sprintf("cancelled by reason: %v", reason))
+			emitter.EmitToolCallUserCancel(callToolId)
 			t.m.Lock()
 			defer t.m.Unlock()
 
@@ -81,7 +134,7 @@ func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, dir
 
 	handleError := func(err any) {
 		t.done.Do(func() {
-			t.EmitToolCallError(callToolId, err)
+			emitter.EmitToolCallError(callToolId, err)
 			t.m.Lock()
 			defer t.m.Unlock()
 
@@ -99,15 +152,46 @@ func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, dir
 
 	defer handleDone()
 
-	// paramsPrompt, err := t.GetParamGeneratingPrompt(tool, tool.Name)
-	// if err != nil {
-	// 	t.EmitError("error generate tool[%v] params in task: %v", tool.Name, t.task.GetName())
-	// 	handleError(fmt.Sprintf("error generate tool[%v] params in task: %v", tool.Name, t.task.GetName()))
-	// 	return nil, false, err
-	// }
+	paramsPrompt, err := t.GetParamGeneratingPrompt(tool, tool.Name)
+	if err != nil {
+		emitter.EmitError("error generate tool[%v] params in task: %v", tool.Name, t.task.GetName())
+		handleError(fmt.Sprintf("error generate tool[%v] params in task: %v", tool.Name, t.task.GetName()))
+		return nil, false, err
+	}
 
-	// invokeParams := new(aitool.InvokeParams)
-	// invokeParams["runtime_id"] = t.runtimeId
+	invokeParams := new(aitool.InvokeParams)
+	invokeParams.Set("runtime_id", t.runtimeId)
+
+	err = CallAITransaction(t.config, paramsPrompt, func(request *AIRequest) (*AIResponse, error) {
+		request.SetTaskIndex(t.task.GetIndex())
+		return t.ai.CallAI(request)
+	}, func(rsp *AIResponse) error {
+		stream := rsp.GetOutputStreamReader("call-tools", true, emitter)
+		callToolAction, err := ExtractActionFromStream(stream, "call-tool")
+		if err != nil {
+			emitter.EmitError("error extract tool params: %v", err)
+			return utils.Errorf("error extracting action params: %v", err)
+		}
+		for k, v := range callToolAction.GetInvokeParams("params") {
+			invokeParams.Set(k, v)
+		}
+		return nil
+	})
+	if err != nil {
+		emitter.EmitError("error calling AI for tool[%v] params: %v", tool.Name, err)
+		handleError(fmt.Sprintf("error calling AI for tool[%v] params: %v", tool.Name, err))
+		return nil, false, err
+	}
+
+	emitter.EmitInfo("start to invoke tool:%v 's callback function", tool.Name)
+
+	// DANGER: NoNeedUserReview
+	if tool.NoNeedUserReview {
+		emitter.EmitInfo("tool[%v] (internal helper tool) no need user review, skip review", tool.Name)
+	} else {
+		emitter.EmitInfo("start to require review for tool use: %v", tool.Name)
+
+	}
 
 	// _ = paramsPrompt
 	// _ = invokeParams

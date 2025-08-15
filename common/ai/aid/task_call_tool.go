@@ -113,7 +113,7 @@ func (t *AiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, d
 		err = utils.Errorf("error generate require tool response prompt: %v", err)
 		t.config.EmitError("error generate require tool response prompt: %v", err)
 		handleResultErr(fmt.Sprintf("error generate require tool response prompt: %v", err))
-		return nil, false, NewNonRetryableTaskStackError(err)
+		return nil, false, err
 	}
 
 	var callToolParams = t.config.MakeInvokeParams()
@@ -125,7 +125,7 @@ func (t *AiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, d
 		callParamsString, _ := io.ReadAll(rsp.GetOutputStreamReader("call-tools", true, t.config.GetEmitter()))
 
 		// extract action
-		callToolAction, err := ExtractAction(string(callParamsString), "call-tool")
+		callToolAction, err := aicommon.ExtractAction(string(callParamsString), "call-tool")
 		if err != nil {
 			t.config.EmitError("error extract tool params: %v", err)
 			err = utils.Errorf("error extracting action params: %v", err)
@@ -138,7 +138,7 @@ func (t *AiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, d
 		err = utils.Errorf("calling AI transaction failed: %v", err)
 		t.config.EmitError("critical err: %v", err)
 		handleResultErr(err)
-		return nil, false, NewNonRetryableTaskStackError(err)
+		return nil, false, err
 	}
 
 	t.config.EmitInfo("start to invoke tool:%v 's callback function", targetTool.Name)
@@ -147,16 +147,16 @@ func (t *AiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, d
 		t.config.EmitInfo("tool[%v] (internal helper tool) no need user review, skip review", targetTool.Name)
 	} else {
 		t.config.EmitInfo("start to require review for tool use")
-		ep := t.config.epm.createEndpointWithEventType(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE)
+		ep := t.config.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
-		t.config.EmitRequireReviewForToolUse(targetTool, callToolParams, ep.id)
+		t.config.EmitRequireReviewForToolUse(targetTool, callToolParams, ep.GetId())
 		t.config.doWaitAgree(nil, ep)
 		params := ep.GetParams()
-		t.config.ReleaseInteractiveEvent(ep.id, params)
+		t.config.ReleaseInteractiveEvent(ep.GetId(), params)
 		if params == nil {
 			t.config.EmitError("user review params is nil, tool use failed")
 			handleResultErr("user review params is nil, tool use failed")
-			return nil, false, NewNonRetryableTaskStackError(utils.Errorf("user review params is nil"))
+			return nil, false, utils.Error("user review params is nil")
 		}
 		var overrideResult *aitool.ToolResult
 		var next HandleToolUseNext
@@ -166,7 +166,7 @@ func (t *AiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, d
 		if err != nil {
 			t.config.EmitError("error handling tool use review: %v", err)
 			handleResultErr(fmt.Sprintf("error handling tool use review: %v", err))
-			return nil, false, NewNonRetryableTaskStackError(err)
+			return nil, false, err
 		}
 		switch next {
 		case HandleToolUseNext_Override:
@@ -213,10 +213,10 @@ func (t *AiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitoo
 	decisionPrompt, err := t.generateToolCallResponsePrompt(result, targetTool)
 	if err != nil {
 		err = utils.Errorf("error generating tool call response prompt: %v", err)
-		return "", NewNonRetryableTaskStackError(err)
+		return "", err
 	}
 
-	var action *Action
+	var action *aicommon.Action
 	err = t.config.callAiTransaction(decisionPrompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		request.SetTaskIndex(t.Index)
 		return t.CallAI(request)
@@ -228,7 +228,7 @@ func (t *AiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitoo
 		}
 
 		// 获取下一步决策
-		action, err = ExtractAction(string(nextResponse), taskContinue, taskProceedNext, taskSkipped, taskFailed)
+		action, err = aicommon.ExtractAction(string(nextResponse), taskContinue, taskProceedNext, taskSkipped, taskFailed)
 		if err != nil {
 			return utils.Errorf("error extracting action: %v", err)
 		}
@@ -260,7 +260,7 @@ func (t *AiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitoo
 	})
 	if err != nil {
 		t.config.EmitWarning("no action found, using default action, finished")
-		return "", NewNonRetryableTaskStackError(err)
+		return "", err
 	}
 	return action.Name(), nil
 }

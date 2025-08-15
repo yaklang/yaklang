@@ -149,7 +149,7 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 		rootTask.GenerateIndex()
 	}()
 
-	var interactAction *Action
+	var interactAction *aicommon.Action
 
 	needInteract := func() bool {
 		return interactAction != nil && interactAction.ActionType() == "require-user-interact"
@@ -162,7 +162,7 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 			//stream = io.TeeReader(stream, os.Stdout)
 			//raw, err := io.ReadAll(stream)
 			//action, err := ExtractAction(string(raw), "plan", "require-user-interact")
-			action, err := ExtractActionFromStream(stream, "plan", "require-user-interact")
+			action, err := aicommon.ExtractActionFromStream(stream, "plan", "require-user-interact")
 			if err != nil {
 				return utils.Error("parse @action field from AI response failed: " + err.Error())
 			}

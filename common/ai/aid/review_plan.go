@@ -106,13 +106,13 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 			return nil, utils.Errorf("generate new plan failed: %v", err)
 		}
 
-		ep := p.config.epm.createEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
+		ep := p.config.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
 
-		p.config.EmitRequireReviewForPlan(newPlan, ep.id)
+		p.config.EmitRequireReviewForPlan(newPlan, ep.GetId())
 		p.config.doWaitAgree(nil, ep)
 		params := ep.GetParams()
-		p.config.ReleaseInteractiveEvent(ep.id, params)
+		p.config.ReleaseInteractiveEvent(ep.GetId(), params)
 		if params == nil {
 			p.config.EmitError("user review params is nil, plan failed")
 			return newPlan, nil
@@ -131,13 +131,13 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 			return nil, utils.Errorf("generate new plan failed: %v", err)
 		}
 
-		ep := p.config.epm.createEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
+		ep := p.config.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
 
-		p.config.EmitRequireReviewForPlan(newPlan, ep.id)
+		p.config.EmitRequireReviewForPlan(newPlan, ep.GetId())
 		p.config.doWaitAgree(nil, ep)
 		params := ep.GetParams()
-		p.config.ReleaseInteractiveEvent(ep.id, params)
+		p.config.ReleaseInteractiveEvent(ep.GetId(), params)
 		if params == nil {
 			p.config.EmitError("user review params is nil, plan failed")
 			return newPlan, nil
@@ -167,13 +167,13 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 			return nil, utils.Errorf("generate new plan failed: %v", err)
 		}
 
-		ep := p.config.epm.createEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
+		ep := p.config.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
 
-		p.config.EmitRequireReviewForPlan(newPlan, ep.id)
+		p.config.EmitRequireReviewForPlan(newPlan, ep.GetId())
 		p.config.doWaitAgree(nil, ep)
 		params := ep.GetParams()
-		p.config.ReleaseInteractiveEvent(ep.id, params)
+		p.config.ReleaseInteractiveEvent(ep.GetId(), params)
 		if params == nil {
 			p.config.EmitError("user review params is nil, plan failed")
 			return newPlan, nil
@@ -194,13 +194,13 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 			return nil, utils.Errorf("generate new plan failed: %v", err)
 		}
 
-		ep := p.config.epm.createEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
+		ep := p.config.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
 
-		p.config.EmitRequireReviewForPlan(newPlan, ep.id)
+		p.config.EmitRequireReviewForPlan(newPlan, ep.GetId())
 		p.config.doWaitAgree(nil, ep)
 		params := ep.GetParams()
-		p.config.ReleaseInteractiveEvent(ep.id, params)
+		p.config.ReleaseInteractiveEvent(ep.GetId(), params)
 		if params == nil {
 			p.config.EmitError("user review params is nil, plan failed")
 			return newPlan, nil
@@ -263,7 +263,7 @@ func (p *planRequest) generateCreateSubtaskPlan(extraPrompt string, rsp *PlanRes
 		if err != nil && len(raw) <= 0 {
 			return utils.Errorf("read create-subtask stream failed: %v", err)
 		}
-		action, err := ExtractAction(string(raw), "plan-create-subtask")
+		action, err := aicommon.ExtractAction(string(raw), "plan-create-subtask")
 		if err != nil {
 			return utils.Errorf("extract create-subtask action failed: %v", err)
 		}

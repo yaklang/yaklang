@@ -72,7 +72,7 @@ func (c *Config) startEventLoop(ctx context.Context) {
 					log.Infof("event received, (%v) start: %v", c.id, event)
 
 					if event.IsInteractive || event.Id != "" {
-						c.epm.feed(event.Id, event.Params)
+						c.epm.Feed(event.Id, event.Params)
 						continue
 					}
 

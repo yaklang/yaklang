@@ -95,7 +95,7 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 		}
 
 		// Use aid.CallAITransaction for robust AI calling with retry and error handling
-		var action *aid.Action
+		var action *aicommon.Action
 		var actionErr error
 
 		// Create a proper aid.Config using the public NewConfig function
@@ -117,7 +117,7 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 					log.Infof("Attempting to parse response: %s", responseContent)
 				}
 
-				// Parse action from response using aid.ExtractAction
+				// Parse action from response using aicommon.ExtractAction
 				action, actionErr = r.parseReActAction(responseContent)
 				if actionErr != nil {
 					return utils.Errorf("Failed to parse action: %v", actionErr)

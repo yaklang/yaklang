@@ -2,6 +2,7 @@ package aid
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"math/rand"
 	"sync"
 	"testing"
@@ -14,8 +15,8 @@ import (
 
 func TestEndpoint_Basic(t *testing.T) {
 	t.Run("基本等待和激活测试", func(t *testing.T) {
-		manager := newEndpointManager()
-		endpoint := manager.createEndpoint()
+		manager := aicommon.NewEndpointManager()
+		endpoint := manager.CreateEndpoint()
 
 		// 启动一个 goroutine 来等待
 		var wg sync.WaitGroup
@@ -30,7 +31,7 @@ func TestEndpoint_Basic(t *testing.T) {
 
 		// 激活 endpoint
 		params := aitool.InvokeParams{"test": "value"}
-		manager.feed(endpoint.id, params)
+		manager.Feed(endpoint.GetId(), params)
 
 		// 等待 goroutine 完成
 		wg.Wait()
@@ -41,8 +42,8 @@ func TestEndpoint_Basic(t *testing.T) {
 	})
 
 	t.Run("超时等待测试", func(t *testing.T) {
-		manager := newEndpointManager()
-		endpoint := manager.createEndpoint()
+		manager := aicommon.NewEndpointManager()
+		endpoint := manager.CreateEndpoint()
 
 		// 测试超时情况
 		timeout := 100 * time.Millisecond
@@ -50,13 +51,13 @@ func TestEndpoint_Basic(t *testing.T) {
 		assert.False(t, success, "应该超时返回")
 
 		// 测试在超时前收到信号
-		endpoint = manager.createEndpoint()
+		endpoint = manager.CreateEndpoint()
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			time.Sleep(50 * time.Millisecond)
-			manager.feed(endpoint.id, aitool.InvokeParams{"test": "value"})
+			manager.Feed(endpoint.GetId(), aitool.InvokeParams{"test": "value"})
 		}()
 
 		success = endpoint.WaitTimeout(200 * time.Millisecond)
@@ -65,8 +66,8 @@ func TestEndpoint_Basic(t *testing.T) {
 	})
 
 	//t.Run("多个等待者测试", func(t *testing.T) {
-	//	manager := newEndpointManager()
-	//	endpoint := manager.createEndpoint()
+	//	manager := aicommon.NewEndpointManager()
+	//	endpoint := manager.CreateEndpoint()
 	//
 	//	const waiters = 5
 	//	var wg sync.WaitGroup
@@ -85,32 +86,32 @@ func TestEndpoint_Basic(t *testing.T) {
 	//
 	//	// 激活一次，应该唤醒所有等待者
 	//	params := aitool.InvokeParams{"test": "value"}
-	//	manager.feed(endpoint.id, params)
+	//	manager.Feed(endpoint.GetId(), params)
 	//
 	//	// 等待所有 goroutine 完成
 	//	wg.Wait()
 	//})
 
 	t.Run("参数更新测试", func(t *testing.T) {
-		manager := newEndpointManager()
-		endpoint := manager.createEndpoint()
+		manager := aicommon.NewEndpointManager()
+		endpoint := manager.CreateEndpoint()
 
 		// 测试参数更新
 		params1 := aitool.InvokeParams{"key1": "value1"}
 		params2 := aitool.InvokeParams{"key2": "value2"}
 
-		manager.feed(endpoint.id, params1)
+		manager.Feed(endpoint.GetId(), params1)
 		receivedParams := endpoint.GetParams()
 		assert.Equal(t, params1, receivedParams)
 
-		manager.feed(endpoint.id, params2)
+		manager.Feed(endpoint.GetId(), params2)
 		receivedParams = endpoint.GetParams()
 		assert.Equal(t, params2, receivedParams)
 	})
 
 	t.Run("并发安全测试", func(t *testing.T) {
-		manager := newEndpointManager()
-		endpoint := manager.createEndpoint()
+		manager := aicommon.NewEndpointManager()
+		endpoint := manager.CreateEndpoint()
 
 		const goroutines = 10
 		var wg sync.WaitGroup
@@ -124,7 +125,7 @@ func TestEndpoint_Basic(t *testing.T) {
 				params := aitool.InvokeParams{
 					"key": i,
 				}
-				manager.feed(endpoint.id, params)
+				manager.Feed(endpoint.GetId(), params)
 			}(i)
 
 			// 读取者
@@ -138,38 +139,38 @@ func TestEndpoint_Basic(t *testing.T) {
 	})
 
 	t.Run("无效 endpoint ID 测试", func(t *testing.T) {
-		manager := newEndpointManager()
+		manager := aicommon.NewEndpointManager()
 
 		// 测试使用不存在的 ID
-		manager.feed("non-existent-id", aitool.InvokeParams{"test": "value"})
+		manager.Feed("non-existent-id", aitool.InvokeParams{"test": "value"})
 
 		// 测试使用空 ID
-		manager.feed("", aitool.InvokeParams{"test": "value"})
+		manager.Feed("", aitool.InvokeParams{"test": "value"})
 	})
 
 	t.Run("空参数测试", func(t *testing.T) {
-		manager := newEndpointManager()
-		endpoint := manager.createEndpoint()
+		manager := aicommon.NewEndpointManager()
+		endpoint := manager.CreateEndpoint()
 
 		// 测试传入空参数
-		manager.feed(endpoint.id, nil)
+		manager.Feed(endpoint.GetId(), nil)
 		params := endpoint.GetParams()
 		assert.Empty(t, params)
 
 		// 测试传入空 map
-		manager.feed(endpoint.id, make(aitool.InvokeParams))
+		manager.Feed(endpoint.GetId(), make(aitool.InvokeParams))
 		params = endpoint.GetParams()
 		assert.Empty(t, params)
 	})
 
 	t.Run("重复激活测试", func(t *testing.T) {
-		manager := newEndpointManager()
-		endpoint := manager.createEndpoint()
+		manager := aicommon.NewEndpointManager()
+		endpoint := manager.CreateEndpoint()
 
 		// 连续多次激活同一个 endpoint
 		for i := 0; i < 100; i++ {
 			params := aitool.InvokeParams{"count": i}
-			manager.feed(endpoint.id, params)
+			manager.Feed(endpoint.GetId(), params)
 
 			// 验证最新的参数
 			receivedParams := endpoint.GetParams()
@@ -178,8 +179,8 @@ func TestEndpoint_Basic(t *testing.T) {
 	})
 
 	t.Run("参数竞争条件测试", func(t *testing.T) {
-		manager := newEndpointManager()
-		endpoint := manager.createEndpoint()
+		manager := aicommon.NewEndpointManager()
+		endpoint := manager.CreateEndpoint()
 
 		const (
 			goroutines = 100
@@ -204,7 +205,7 @@ func TestEndpoint_Basic(t *testing.T) {
 						"writer_id": id,
 						"value":     j,
 					}
-					manager.feed(endpoint.id, params)
+					manager.Feed(endpoint.GetId(), params)
 
 					// 立即读取参数
 					received := endpoint.GetParams()
@@ -227,8 +228,8 @@ func TestEndpoint_Basic(t *testing.T) {
 			t.Skip("跳过长时间测试")
 		}
 
-		manager := newEndpointManager()
-		endpoint := manager.createEndpoint()
+		manager := aicommon.NewEndpointManager()
+		endpoint := manager.CreateEndpoint()
 
 		// 测试较短的超时时间
 		success := endpoint.WaitTimeout(500 * time.Millisecond)
@@ -253,7 +254,7 @@ func TestEndpoint_Basic(t *testing.T) {
 				delay := 50 + rand.Intn(200)
 				time.Sleep(time.Duration(delay) * time.Millisecond)
 
-				manager.feed(endpoint.id, aitool.InvokeParams{
+				manager.Feed(endpoint.GetId(), aitool.InvokeParams{
 					"test": fmt.Sprintf("value-%d", id),
 					"id":   id,
 					"time": time.Now().UnixNano(),
@@ -280,8 +281,8 @@ func TestEndpoint_Basic(t *testing.T) {
 	})
 
 	t.Run("随机延迟激活测试", func(t *testing.T) {
-		manager := newEndpointManager()
-		endpoint := manager.createEndpoint()
+		manager := aicommon.NewEndpointManager()
+		endpoint := manager.CreateEndpoint()
 
 		const iterations = 50
 		var wg sync.WaitGroup
@@ -293,7 +294,7 @@ func TestEndpoint_Basic(t *testing.T) {
 				defer wg.Done()
 				// 随机延迟 0-100ms
 				time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)
-				manager.feed(endpoint.id, aitool.InvokeParams{
+				manager.Feed(endpoint.GetId(), aitool.InvokeParams{
 					"iteration": i,
 					"time":      time.Now().UnixNano(),
 				})

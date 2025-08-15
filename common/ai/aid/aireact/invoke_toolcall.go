@@ -3,6 +3,7 @@ package aireact
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strings"
 	"time"
 
@@ -127,7 +128,7 @@ func (r *ReAct) generateToolParams(tool *aitool.Tool) (aitool.InvokeParams, erro
 // parseToolParamsWithValidation parses tool parameters with enhanced validation based on aid patterns
 func (r *ReAct) parseToolParamsWithValidation(response string, tool *aitool.Tool) (aitool.InvokeParams, error) {
 	// Try to extract @action first for validation
-	action, err := aid.ExtractAction(response, "call-tool")
+	action, err := aicommon.ExtractAction(response, "call-tool")
 	if err == nil {
 		// If we found a proper @action structure, extract params from it
 		params := action.GetInvokeParams("params")

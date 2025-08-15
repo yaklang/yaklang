@@ -45,7 +45,7 @@ func (c *Config) createToolCallCheckpoint(id int64) *schema.AiCheckpoint {
 	return c.createCheckpoint(schema.AiCheckpointType_ToolCall, id)
 }
 
-func (c *Config) createReviewCheckpoint(id int64) *schema.AiCheckpoint {
+func (c *Config) CreateReviewCheckpoint(id int64) *schema.AiCheckpoint {
 	return c.createCheckpoint(schema.AiCheckpointType_Review, id)
 }
 

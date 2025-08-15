@@ -40,8 +40,8 @@ func (t *AiTask) InvokeTool(targetTool *aitool.Tool, callToolParams aitool.Invok
 		return nil, err
 	}
 
-	ep := c.epm.createEndpointWithEventType(schema.EVENT_TYPE_TOOL_CALL_WATCHER)
-	c.EmitToolCallWatcher(callToolId, ep.id, targetTool, callToolParams)
+	ep := c.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TOOL_CALL_WATCHER)
+	c.EmitToolCallWatcher(callToolId, ep.GetId(), targetTool, callToolParams)
 	ctx, cancel := context.WithCancel(c.ctx)
 	defer cancel()
 
@@ -107,7 +107,7 @@ func (t *AiTask) InvokeTool(targetTool *aitool.Tool, callToolParams aitool.Invok
 		}),
 	)
 	ep.ActiveWithParams(ctx, map[string]any{"suggestion": "finish"})
-	c.ReleaseInteractiveEvent(ep.id, map[string]any{"suggestion": "finish"})
+	c.ReleaseInteractiveEvent(ep.GetId(), map[string]any{"suggestion": "finish"})
 
 	return execResult, execErr
 }

@@ -23,7 +23,7 @@ func TestCoordinator_GUARDIAN_OUTPUT_SMOKING_ToolUseReview(t *testing.T) {
 	riskControlCalled := false
 	guardianSmokingTestPassed := false
 	var id []string
-	err := RegisterAIDBuildinForge(riskControlForgeName, func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*Action, error) {
+	err := RegisterAIDBuildinForge(riskControlForgeName, func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*aicommon.Action, error) {
 		if !riskControlCalled {
 			riskControlCalled = true
 		}
@@ -41,10 +41,7 @@ func TestCoordinator_GUARDIAN_OUTPUT_SMOKING_ToolUseReview(t *testing.T) {
 		rawParams["impact"] = 0.5
 		rawParams["reason"] = "test reason"
 		p["params"] = rawParams
-		return &Action{
-			name:   "",
-			params: p,
-		}, nil
+		return aicommon.NewAction("", p), nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -201,7 +198,7 @@ func TestCoordinator_GUARDIAN_SMOKING_ToolUseReview(t *testing.T) {
 	riskControlCalled := false
 	guardianSmokingTestPassed := false
 	var id []string
-	err := RegisterAIDBuildinForge(riskControlForgeName, func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*Action, error) {
+	err := RegisterAIDBuildinForge(riskControlForgeName, func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*aicommon.Action, error) {
 		if !riskControlCalled {
 			riskControlCalled = true
 		}
@@ -217,10 +214,7 @@ func TestCoordinator_GUARDIAN_SMOKING_ToolUseReview(t *testing.T) {
 		p["probability"] = 0.5
 		p["impact"] = 0.5
 		p["reason"] = "test reason"
-		return &Action{
-			name:   "",
-			params: p,
-		}, nil
+		return aicommon.NewAction("", p), nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -364,7 +358,7 @@ func TestCoordinator_GUARDIAN_StreamSmocking_ToolUseReview(t *testing.T) {
 	riskControlCalled := false
 	guardianSmokingTestPassed := false
 	var id []string
-	err := RegisterAIDBuildinForge(riskControlForgeName, func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*Action, error) {
+	err := RegisterAIDBuildinForge(riskControlForgeName, func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*aicommon.Action, error) {
 		if !riskControlCalled {
 			riskControlCalled = true
 		}
@@ -380,10 +374,7 @@ func TestCoordinator_GUARDIAN_StreamSmocking_ToolUseReview(t *testing.T) {
 		p["probability"] = 0.5
 		p["impact"] = 0.5
 		p["reason"] = "test reason"
-		return &Action{
-			name:   "",
-			params: p,
-		}, nil
+		return aicommon.NewAction("", p), nil
 	})
 	if err != nil {
 		t.Fatal(err)
