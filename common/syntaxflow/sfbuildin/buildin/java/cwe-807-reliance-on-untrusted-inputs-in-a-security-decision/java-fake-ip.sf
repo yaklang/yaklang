@@ -1,0 +1,31 @@
+desc(
+  title_zh: "IP 伪造漏洞检查",
+  title: "IP Spoofing Vulnerability Detection",
+  type: vuln,
+  level: middle,
+  risk: ipspoofing,
+  harm_zh: "如果应用直接信任来自 `X-Real-IP` 或 `X-Forwarded-For` 等请求头的值来判断客户端真实 IP，而没有进行严格的验证或结合服务器端获取的 IP 进行校验，攻击者可以伪造这些请求头，实现 IP 欺骗。这可能导致绕过访问控制、日志追踪错误、安全策略失效等风险。",
+  harm: "If the application directly trusts values from headers such as `X-Real-IP` or `X-Forwarded-For` to determine the client's real IP without strict validation or cross-checking with the server's IP, attackers can spoof these headers to perform IP spoofing. This may lead to access control bypass, incorrect logging, and failure of security policies.",
+  fix_zh: "建议在获取客户端真实 IP 时，结合服务器端获取的远程地址进行比对，并在可信任的反向代理或负载均衡器处统一设置真实 IP 信息，防止攻击者直接伪造请求头。",
+  fix: <<<FIX
+修复建议：
+1. 不要直接信任 `X-Real-IP` 和 `X-Forwarded-For` 请求头的值。
+2. 在获取客户端 IP 时，优先使用服务器端的 `request.getRemoteAddr()`。
+3. 仅在已知可信的反向代理或负载均衡器后，才解析并信任相关请求头。
+4. 对 IP 地址进行格式和来源的严格验证。
+FIX
+)
+
+<include('java-spring-mvc-param')> as $entry;
+<include('java-servlet-param')> as $entry;
+
+HttpServletRequest?{opcode: param}?{<typeName>?{have: 'javax.servlet.http.HttpServletRequest'}} as $req
+/(do(Get|Post|Delete|Filter|[A-Z]\w+))|(service)/<getFormalParams>?{!have: this && opcode: param} as $req;
+
+$req.getHeader(, * as $headerKey)
+$headerKey ?{have: "X-Real-IP" || have: "X-Forwarded-For"} as $fakeIp
+
+alert $fakeIp for {
+  level: "middle",
+  desc: "检测到代码直接获取 `X-Real-IP` 或 `X-Forwarded-For` 请求头，可能导致 IP 伪造漏洞。"
+}
