@@ -20,8 +20,8 @@ type SSARisk struct {
 	// risk info
 	Title        string             `json:"title"`
 	TitleVerbose string             `json:"title_verbose"`
-	Description  string             `json:"description"`
-	Solution     string             `json:"solution"`
+	Description  string             `json:"description" gorm:"type:longtext"`
+	Solution     string             `json:"solution" gorm:"type:longtext"`
 	RiskType     string             `json:"risk_type"`
 	Details      string             `json:"details"`
 	Severity     SyntaxFlowSeverity `json:"severity" gorm:"index"`
