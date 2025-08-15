@@ -52,6 +52,7 @@ const (
 
 type Config struct {
 	*aicommon.Emitter
+	*aicommon.BaseCheckpointableStorage
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -454,6 +455,7 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		c.emitBaseHandler(e)
 		return nil
 	})
+	c.BaseCheckpointableStorage = aicommon.NewCheckpointableStorageWithDB(consts.GetGormProjectDatabase())
 
 	return c
 }

@@ -2,10 +2,11 @@ package aid
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"io"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -76,7 +77,7 @@ func (c *Config) wrapper(i aicommon.AICallbackType) aicommon.AICallbackType {
 		}
 
 		// create or update a new checkpoint
-		cp := c.createAIInteractiveCheckpoint(seq)
+		cp := c.CreateAIInteractiveCheckpoint(seq)
 		if err := c.submitAIRequestCheckpoint(cp, request); err != nil {
 			log.Errorf("submit ai request checkpoint failed: %v", err)
 		}
