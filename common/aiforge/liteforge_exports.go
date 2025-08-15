@@ -28,6 +28,7 @@ var LiteForgeExport = map[string]interface{}{
 	"AnalyzeImage":     AnalyzeImage,
 	"AnalyzeImageFile": AnalyzeImageFile,
 	"AnalyzeAudioFile": AnalyzeAudioFile,
+	"AnalyzeVideo":     AnalyzeVideo,
 	"imageExtraPrompt": WithExtraPrompt, // use for analyzeImage and analyzeImageFile
 
 	"analyzeCtx":  WithAnalyzeContext, // use for analyzeContext

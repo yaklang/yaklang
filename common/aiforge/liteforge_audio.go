@@ -7,7 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mediautils"
 	"github.com/yaklang/yaklang/common/utils"
 	"os"
@@ -80,12 +79,6 @@ func AnalyzeAudioFileEx(audio string, streamHandler func(segment *TimelineSegmen
 
 	var analyzeConfig = NewAnalysisConfig(opts...)
 	analyzeConfig.fallbackOptions = append(analyzeConfig.fallbackOptions, _withOutputJSONSchema(AUDIO_OUTPUT_SCHEMA))
-	if analyzeConfig.AnalyzeLog == nil {
-		analyzeConfig.AnalyzeLog = func(format string, args ...interface{}) {
-			log.Infof(format, args...)
-		}
-	}
-
 	analyzeConfig.AnalyzeLog("start to analyze audio file: %s", audio)
 	srtPath, err := mediautils.ConvertMediaToSRT(audio)
 	if err != nil {
