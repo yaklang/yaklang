@@ -43,12 +43,12 @@ type SyntaxFlowScanTask struct {
 	SuccessQuery int64
 	// risk
 	RiskCount     int64
-	NewRiskCount  int64
 	InfoCount     int64
 	LowCount      int64
 	WarningCount  int64
 	CriticalCount int64
 	HighCount     int64
+
 	// query process
 	TotalQuery int64
 
@@ -70,7 +70,6 @@ func (s *SyntaxFlowScanTask) ToGRPCModel() *ypb.SyntaxFlowScanTask {
 		SkipQuery:     s.SkipQuery,
 		SuccessQuery:  s.SuccessQuery,
 		RiskCount:     s.RiskCount,
-		NewRiskCount:  s.NewRiskCount,
 		InfoCount:     s.InfoCount,
 		LowCount:      s.LowCount,
 		WarningCount:  s.WarningCount,

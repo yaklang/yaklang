@@ -17,6 +17,8 @@ import (
 )
 
 func TestGRPCMUSTPASS_SyntaxFlow_SSAReusltDiff(t *testing.T) {
+	// 已弃用：现在不使用ProgramName进行diff对比
+	t.Skip()
 	code := `<?php
 $a = $_GET[1];
 eval($a);

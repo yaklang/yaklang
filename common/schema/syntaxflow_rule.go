@@ -92,7 +92,7 @@ func ValidSeverityType(i any) SyntaxFlowSeverity {
 		return SFR_SEVERITY_CRITICAL
 	case "high", "h", "error":
 		return SFR_SEVERITY_HIGH
-	case "low":
+	case "low", "l":
 		return SFR_SEVERITY_LOW
 	default:
 		return SFR_SEVERITY_INFO
