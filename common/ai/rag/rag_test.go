@@ -6,14 +6,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-// MockEmbedder 是一个模拟的嵌入客户端，用于测试
-type MockEmbedder struct{}
-
-// Embedding 模拟实现 EmbeddingClient 接口
-func (m *MockEmbedder) Embedding(text string) ([]float32, error) {
+func testEmbedder(text string) ([]float32, error) {
 	// 简单地生成一个固定的向量作为嵌入
 	// 在实际测试中，我们可以根据文本内容生成不同的向量
 	if text == "Yaklang介绍" || text == "什么是Yaklang" || text == "Yaklang是一种安全研究编程语言" {
@@ -46,7 +43,7 @@ func TestMUSTPASS_ChunkText(t *testing.T) {
 // 测试内存向量存储
 func TestMUSTPASS_MemoryVectorStore(t *testing.T) {
 	// 创建模拟嵌入器
-	mockEmbed := &MockEmbedder{}
+	mockEmbed := NewMockEmbedder(testEmbedder)
 
 	// 创建内存向量存储
 	store := NewMemoryVectorStore(mockEmbed)
@@ -101,7 +98,7 @@ func TestMUSTPASS_MemoryVectorStore(t *testing.T) {
 // 测试RAG系统
 func TestMUSTPASS_RAGSystem(t *testing.T) {
 	// 创建模拟嵌入器
-	mockEmbed := &MockEmbedder{}
+	mockEmbed := NewMockEmbedder(testEmbedder)
 
 	// 创建内存向量存储
 	store := NewMemoryVectorStore(mockEmbed)
@@ -170,6 +167,29 @@ func TestMUSTPASS_FilterResults(t *testing.T) {
 	assert.Equal(t, 2, len(filtered))
 	assert.Equal(t, float32(0.9), filtered[0].Score)
 	assert.Equal(t, float32(0.7), filtered[1].Score)
+}
+
+type VectorStoreDocument struct {
+	// 文档唯一标识符，在整个系统中唯一
+	DocumentID string `gorm:"uniqueIndex;not null" json:"document_id"`
+}
+
+func TestMUSTPASS_AutoAutomigrateVectorStoreDocument(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	assert.NoError(t, err)
+	defer db.Close()
+
+	db.AutoMigrate(&VectorStoreDocument{})
+
+	err = autoAutomigrateVectorStoreDocument(db)
+	assert.NoError(t, err)
+
+	// 测试添加两个id相同的文档
+	err = db.Create(&VectorStoreDocument{DocumentID: "test"}).Error
+	assert.NoError(t, err)
+
+	err = db.Create(&VectorStoreDocument{DocumentID: "test"}).Error
+	assert.NoError(t, err)
 }
 
 func TestRequestLocalEmbedding(t *testing.T) {
