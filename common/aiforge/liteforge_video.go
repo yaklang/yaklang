@@ -19,6 +19,8 @@ type VideoAnalysisResult struct {
 
 func AnalyzeVideo(video string, options ...any) (*VideoAnalysisResult, error) {
 	analyzeConfig := NewAnalysisConfig(options...)
+
+	analyzeConfig.AnalyzeStatusCard("Video Analysis", "analyzing audio")
 	audioResult, err := AnalyzeAudioFile(video, options...)
 	if err != nil {
 		return nil, err
@@ -30,6 +32,7 @@ func AnalyzeVideo(video string, options ...any) (*VideoAnalysisResult, error) {
 	ffmpegOptions = append(ffmpegOptions, ffmpegutils.WithTimestampOverlay(true))
 	ffmpegOptions = append(ffmpegOptions, ffmpegutils.WithIgnoreBottomPaddingInSceneDetection(true)) // 默认启用智能场景检测
 
+	analyzeConfig.AnalyzeStatusCard("Video Analysis", "ffmpeg extract image")
 	var videoAnalysisChan = chanx.NewUnlimitedChan[chunkmaker.Chunk](analyzeConfig.Ctx, 100)
 	if len(audioResult.TimelineSegments) <= 0 {
 		analyzeConfig.AnalyzeLog("No audio segments found in video, use broad grained to analyze video frames")
@@ -40,10 +43,14 @@ func AnalyzeVideo(video string, options ...any) (*VideoAnalysisResult, error) {
 		}
 		go func() {
 			defer videoAnalysisChan.Close()
+			count := 0
 			for fResult := range ffmpegResult {
+				count++
+				analyzeConfig.AnalyzeStatusCard("extract frames", count)
 				data := fResult.RawData
 				mimeObj := fResult.MIMETypeObj
 				videoAnalysisChan.SafeFeed(chunkmaker.NewBufferChunkEx(data, mimeObj, ""))
+
 			}
 		}()
 	} else {
@@ -51,6 +58,7 @@ func AnalyzeVideo(video string, options ...any) (*VideoAnalysisResult, error) {
 		ffmpegOptions = append(ffmpegOptions, ffmpegutils.WithSceneThreshold(0.05))
 		go func() {
 			defer videoAnalysisChan.Close()
+			totalCount := 0
 			for _, segment := range audioResult.TimelineSegments {
 				if segment.Ignored() {
 					analyzeConfig.AnalyzeLog("Skip ignored segment: %s", segment.String())
@@ -66,6 +74,8 @@ func AnalyzeVideo(video string, options ...any) (*VideoAnalysisResult, error) {
 				count := 0
 				for fResult := range ffmpegResult {
 					count++
+					totalCount++
+					analyzeConfig.AnalyzeStatusCard("extract frames", totalCount)
 					data := fResult.RawData
 					mimeObj := fResult.MIMETypeObj
 					verbose := segment.String()
@@ -87,27 +97,32 @@ func AnalyzeVideo(video string, options ...any) (*VideoAnalysisResult, error) {
 		CumulativeSummary: "",
 	}
 	frameCount := 0
-	extraPromptFormat := "verbose message: %s\n cumulative summary: %s\n"
+	extraPromptFormat := "**Supplementary Information**: %s\n cumulative summary: %s\n %s"
 	ar, err := aireducer.NewReducerEx(cm, aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.Memory, chunk chunkmaker.Chunk) error {
-		analyzeConfig.AnalyzeLog("Start to analyze video frame %d, verbose: %s", frameCount, chunk.VerboseMessage())
-		imageResult, err := AnalyzeImage(chunk.Data(), WithExtraPrompt(fmt.Sprintf(extraPromptFormat, chunk.VerboseMessage(), videoAnalysisResult.CumulativeSummary)))
+		analyzeConfig.AnalyzeLog("Start to analyze video frame %d, Supplementary Information: %s", frameCount, chunk.VerboseMessage())
+		imageResult, err := AnalyzeImage(chunk.Data(), WithExtraPrompt(fmt.Sprintf(extraPromptFormat, chunk.VerboseMessage(), videoAnalysisResult.CumulativeSummary, analyzeConfig.ExtraPrompt)))
 		if err != nil {
 			return err
 		}
 		videoAnalysisResult.ImageSegments = append(videoAnalysisResult.ImageSegments, imageResult)
+		if analyzeConfig.AnalyzeStreamChunkCallback != nil {
+			analyzeConfig.AnalyzeStreamChunkCallback(chunkmaker.NewBufferChunk([]byte(imageResult.Dump())))
+		}
 		videoAnalysisResult.CumulativeSummary = imageResult.CumulativeSummary
 		analyzeConfig.AnalyzeLog("Finish to analyze video frame %d, current CumulativeSummary is [%s] ", frameCount, utils.ShrinkString(videoAnalysisResult.CumulativeSummary, 100))
 		frameCount++
+		analyzeConfig.AnalyzeStatusCard("processed frames", frameCount)
 		return nil
 	}))
 	if err != nil {
 		return nil, err
 	}
 	analyzeConfig.AnalyzeLog("Finish to analyze video frames; total %d", frameCount)
-
+	analyzeConfig.AnalyzeStatusCard("Video Analysis", "analyzing video frame")
 	err = ar.Run()
 	if err != nil {
 		return nil, err
 	}
+	analyzeConfig.AnalyzeStatusCard("Video Analysis", "finish")
 	return videoAnalysisResult, nil
 }

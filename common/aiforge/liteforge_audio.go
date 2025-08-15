@@ -79,6 +79,8 @@ func AnalyzeAudioFileEx(audio string, streamHandler func(segment *TimelineSegmen
 
 	var analyzeConfig = NewAnalysisConfig(opts...)
 	analyzeConfig.fallbackOptions = append(analyzeConfig.fallbackOptions, _withOutputJSONSchema(AUDIO_OUTPUT_SCHEMA))
+
+	analyzeConfig.AnalyzeStatusCard("Audio Analysis", "cover audio file to srt")
 	analyzeConfig.AnalyzeLog("start to analyze audio file: %s", audio)
 	srtPath, err := mediautils.ConvertMediaToSRT(audio)
 	if err != nil {
@@ -208,11 +210,13 @@ Analyze the provided "current_srt_chunk". Classify its time segments as either "
 	if err != nil {
 		return nil, utils.Errorf("build srt reducer fail: %s", err.Error())
 	}
+	analyzeConfig.AnalyzeStatusCard("Audio Analysis", "analyzing rst file")
 	analyzeConfig.AnalyzeLog("start analyzing srt file: %s", srtPath)
 	err = srtReducer.Run()
 	if err != nil {
 		return nil, utils.Errorf("srt reducer run fail: %s", err.Error())
 	}
+	analyzeConfig.AnalyzeStatusCard("Audio Analysis", "finish")
 	analyzeConfig.AnalyzeLog("analyzing srt file finish")
 	return result, nil
 }
