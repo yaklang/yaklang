@@ -3,7 +3,6 @@ package aid
 import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -41,7 +40,7 @@ func (c *Config) createAIInteractiveCheckpoint(id int64) *schema.AiCheckpoint {
 	return c.createCheckpoint(schema.AiCheckpointType_AIInteractive, id)
 }
 
-func (c *Config) createToolCallCheckpoint(id int64) *schema.AiCheckpoint {
+func (c *Config) CreateToolCallCheckpoint(id int64) *schema.AiCheckpoint {
 	return c.createCheckpoint(schema.AiCheckpointType_ToolCall, id)
 }
 
@@ -49,32 +48,21 @@ func (c *Config) CreateReviewCheckpoint(id int64) *schema.AiCheckpoint {
 	return c.createCheckpoint(schema.AiCheckpointType_Review, id)
 }
 
-func (c *Config) submitCheckpointRequest(t *schema.AiCheckpoint, req any) error {
+func (c *Config) SubmitCheckpointRequest(t *schema.AiCheckpoint, req any) error {
 	t.RequestQuotedJson = codec.StrConvQuote(string(utils.Jsonify(req)))
 	return yakit.CreateOrUpdateCheckpoint(c.GetDB(), t)
 }
 
-func (c *Config) submitCheckpointResponse(t *schema.AiCheckpoint, rsp any) error {
+func (c *Config) SubmitCheckpointResponse(t *schema.AiCheckpoint, rsp any) error {
 	t.ResponseQuotedJson = codec.StrConvQuote(string(utils.Jsonify(rsp)))
 	t.Finished = true
 	return yakit.CreateOrUpdateCheckpoint(c.GetDB(), t)
 }
 
 func (c *Config) submitAIRequestCheckpoint(t *schema.AiCheckpoint, data *aicommon.AIRequest) error {
-	return c.submitCheckpointRequest(t, map[string]string{
+	return c.SubmitCheckpointRequest(t, map[string]string{
 		"prompt": string(data.GetPrompt()),
 	})
-}
-
-func (c *Config) submitToolCallRequestCheckpoint(t *schema.AiCheckpoint, data *aitool.Tool, param map[string]any) error {
-	return c.submitCheckpointRequest(t, map[string]any{
-		"tool_name": data.Name,
-		"param":     param,
-	})
-}
-
-func (c *Config) submitToolCallResponse(t *schema.AiCheckpoint, result *aitool.ToolResult) error {
-	return c.submitCheckpointResponse(t, result)
 }
 
 type AIResponseSimple struct {
@@ -83,5 +71,5 @@ type AIResponseSimple struct {
 }
 
 func (c *Config) submitAIResponseCheckpoint(t *schema.AiCheckpoint, data *AIResponseSimple) error {
-	return c.submitCheckpointResponse(t, data)
+	return c.SubmitCheckpointResponse(t, data)
 }

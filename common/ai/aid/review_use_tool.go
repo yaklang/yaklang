@@ -2,7 +2,6 @@ package aid
 
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"io"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -15,10 +14,6 @@ type ToolUseReviewSuggestion struct {
 	SuggestionEnglish       string `json:"prompt_english"`
 	AllowExtraPrompt        bool   `json:"allow_extra_prompt"`
 	AllowParamsModification bool   `json:"allow_params_modification"`
-
-	PromptBuilder    func(task *AiTask, rt *runtime) `json:"-"`
-	ResponseCallback func(reader io.Reader)          `json:"-"`
-	ParamSchema      string                          `json:"param_schema"`
 }
 
 // ToolUseReviewSuggestions 是工具使用审查时的建议(内置一些常见选项)

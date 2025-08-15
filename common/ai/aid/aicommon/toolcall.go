@@ -2,6 +2,8 @@ package aicommon
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"sync"
 
@@ -21,15 +23,31 @@ type ToolCaller struct {
 	generateToolParamsBuilder func(tool *aitool.Tool, toolName string) (string, error)
 
 	m               *sync.Mutex
-	onCallToolStart func()
-	onCallToolEnd   func()
+	onCallToolStart func(callToolId string)
+	onCallToolEnd   func(callToolId string)
+
+	reviewWrongToolHandler func(tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, error)
 }
 
 type ToolCallerOption func(tc *ToolCaller)
 
+func WithToolCaller_ReviewWrongTool(
+	handler func(tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, error),
+) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.reviewWrongToolHandler = handler
+	}
+}
+
 func WithToolCaller_Task(task AITask) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.task = task
+	}
+}
+
+func WithToolCaller_RuntimeId(runtimeId string) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.runtimeId = runtimeId
 	}
 }
 
@@ -51,13 +69,13 @@ func WithToolCaller_AICallerConfig(config AICallerConfigIf) ToolCallerOption {
 	}
 }
 
-func WithToolCaller_OnStart(i func()) ToolCallerOption {
+func WithToolCaller_OnStart(i func(callToolId string)) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.onCallToolStart = i
 	}
 }
 
-func WithToolCaller_OnEnd(i func()) ToolCallerOption {
+func WithToolCaller_OnEnd(i func(callToolId string)) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.onCallToolEnd = i
 	}
@@ -71,13 +89,28 @@ func WithToolCaller_GenerateToolParamsBuilder(
 	}
 }
 
-func NewToolCaller(runtimeId string) *ToolCaller {
-	return &ToolCaller{
-		runtimeId:  runtimeId,
+func NewToolCaller(opts ...ToolCallerOption) (*ToolCaller, error) {
+	caller := &ToolCaller{
 		callToolId: ksuid.New().String(),
 		done:       &sync.Once{},
 		m:          &sync.Mutex{},
 	}
+	for _, opt := range opts {
+		opt(caller)
+	}
+	if caller.runtimeId == "" {
+		caller.runtimeId = caller.config.GetRuntimeId()
+	}
+
+	if caller.config == nil || utils.IsNil(caller.config) {
+		return nil, fmt.Errorf("config is nil in ToolCaller")
+	}
+
+	if caller.ai == nil || utils.IsNil(caller.ai) {
+		return nil, fmt.Errorf("ai caller is nil in ToolCaller")
+	}
+
+	return caller, nil
 }
 
 func (t *ToolCaller) GetParamGeneratingPrompt(tool *aitool.Tool, toolName string) (string, error) {
@@ -102,9 +135,11 @@ func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, dir
 	callToolId := t.callToolId
 
 	emitter.EmitToolCallStart(callToolId, tool)
+	t.m.Lock()
 	if t.onCallToolStart != nil {
-		t.onCallToolStart()
+		t.onCallToolStart(callToolId)
 	}
+	t.m.Unlock()
 
 	handleDone := func() {
 		t.done.Do(func() {
@@ -114,7 +149,7 @@ func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, dir
 			defer t.m.Unlock()
 
 			if t.onCallToolEnd != nil {
-				t.onCallToolEnd()
+				t.onCallToolEnd(callToolId)
 			}
 		})
 	}
@@ -127,7 +162,7 @@ func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, dir
 			defer t.m.Unlock()
 
 			if t.onCallToolEnd != nil {
-				t.onCallToolEnd()
+				t.onCallToolEnd(callToolId)
 			}
 		})
 	}
@@ -139,7 +174,7 @@ func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, dir
 			defer t.m.Unlock()
 
 			if t.onCallToolEnd != nil {
-				t.onCallToolEnd()
+				t.onCallToolEnd(callToolId)
 			}
 		})
 	}
@@ -159,7 +194,7 @@ func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, dir
 		return nil, false, err
 	}
 
-	invokeParams := new(aitool.InvokeParams)
+	invokeParams := aitool.InvokeParams{}
 	invokeParams.Set("runtime_id", t.runtimeId)
 
 	err = CallAITransaction(t.config, paramsPrompt, func(request *AIRequest) (*AIResponse, error) {
@@ -183,18 +218,83 @@ func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, dir
 		return nil, false, err
 	}
 
-	emitter.EmitInfo("start to invoke tool:%v 's callback function", tool.Name)
+	emitter.EmitInfo("start to invoke callback function for tool:%v", tool.Name)
 
+	epm := t.config.GetEndpointManager()
+	config := t.config
 	// DANGER: NoNeedUserReview
 	if tool.NoNeedUserReview {
 		emitter.EmitInfo("tool[%v] (internal helper tool) no need user review, skip review", tool.Name)
 	} else {
 		emitter.EmitInfo("start to require review for tool use: %v", tool.Name)
+		ep := epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE)
+		ep.SetDefaultSuggestionContinue()
+		reqs := map[string]any{
+			"id":               ep.GetId(),
+			"selectors":        ToolUseReviewSuggestions,
+			"tool":             tool.Name,
+			"tool_description": tool.Description,
+			"params":           invokeParams,
+		}
+		ep.SetReviewMaterials(reqs)
+		err := t.config.SubmitCheckpointRequest(ep.GetCheckpoint(), reqs)
+		if err != nil {
+			log.Errorf("submit request review to db for tool use failed: %v", err)
+		}
+		emitter.EmitInteractiveJSON(ep.GetId(), schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, "review-require", reqs)
 
+		// wait for agree
+		config.DoWaitAgree(nil, ep)
+		params := ep.GetParams()
+		config.ReleaseInteractiveEvent(ep.GetId(), params)
+		if params == nil {
+			emitter.EmitError("tool use [%v] review params is nil, user may cancel the review", tool.Name)
+			handleError(fmt.Sprintf("tool use [%v] review params is nil, user may cancel the review", tool.Name))
+			return nil, false, fmt.Errorf("tool use [%v] review params is nil", tool.Name)
+		}
+		var overrideResult *aitool.ToolResult
+		var next HandleToolUseNext
+		tool, invokeParams, overrideResult, next, err = t.review(
+			tool, invokeParams, params, handleUserCancel,
+		)
+		if err != nil {
+			emitter.EmitError("error handling tool use review: %v", err)
+			handleError(fmt.Sprintf("error handling tool use review: %v", err))
+			return nil, false, err
+		}
+
+		switch next {
+		case HandleToolUseNext_Override:
+			return overrideResult, false, nil
+		case HandleToolUseNext_DirectlyAnswer:
+			return nil, true, nil
+		case HandleToolUseNext_Default:
+		default:
+			return nil, false, utils.Errorf("unknown handle tool use next action: %v", next)
+		}
 	}
 
-	// _ = paramsPrompt
-	// _ = invokeParams
+	stdoutReader, stdoutWriter := utils.NewPipe()
+	defer stdoutWriter.Close()
+	stderrReader, stderrWriter := utils.NewPipe()
+	defer stderrWriter.Close()
 
-	return nil, false, nil
+	emitter.EmitToolCallStd(tool.Name, stdoutReader, stderrReader, t.task.GetIndex())
+	emitter.EmitInfo("start to invoke tool: %v", tool.Name)
+
+	toolResult, err := t.invoke(tool, invokeParams, handleUserCancel, handleError, stdoutWriter, stderrWriter)
+	if err != nil {
+		if toolResult == nil {
+			toolResult = &aitool.ToolResult{
+				Param:       invokeParams,
+				Name:        tool.Name,
+				Description: tool.Description,
+				ToolCallID:  callToolId,
+			}
+		}
+		toolResult.Error = fmt.Sprintf("error invoking tool[%v]: %v", tool.Name, err)
+		toolResult.Success = false
+	}
+	emitter.EmitInfo("start to generate and feedback tool[%v] result in task: %#v", tool.Name, t.task.GetName())
+	return toolResult, false, nil
 }

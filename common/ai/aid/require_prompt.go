@@ -113,7 +113,7 @@ func (c *Config) EmitRequireUserInteractive(i *RequireInteractiveRequest, id str
 			"prompt":  i.Prompt,
 			"options": i.Options,
 		})
-		err := c.submitCheckpointRequest(ep.GetCheckpoint(), i)
+		err := c.SubmitCheckpointRequest(ep.GetCheckpoint(), i)
 		if err != nil {
 			log.Errorf("Failed to submit checkpoint request: %v", err)
 		}

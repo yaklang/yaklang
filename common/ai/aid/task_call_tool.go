@@ -64,6 +64,31 @@ func (t *AiTask) getToolResultAction(response string) string {
 }
 
 func (t *AiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, directlyAnswer bool, err error) {
+	caller, err := aicommon.NewToolCaller(
+		aicommon.WithToolCaller_RuntimeId(t.config.GetRuntimeId()),
+		aicommon.WithToolCaller_Task(t),
+		aicommon.WithToolCaller_AICallerConfig(t.config),
+		aicommon.WithToolCaller_Emitter(t.config.GetEmitter()),
+		aicommon.WithToolCaller_AICaller(t.config),
+		aicommon.WithToolCaller_GenerateToolParamsBuilder(t.generateRequireToolResponsePrompt),
+		aicommon.WithToolCaller_OnStart(func(callToolId string) {
+			t.config = t.config.pushProcess(&schema.AiProcess{
+				ProcessId:   callToolId,
+				ProcessType: schema.AI_Call_Tool,
+			})
+		}),
+		aicommon.WithToolCaller_OnEnd(func(callToolId string) {
+			t.config = t.config.popEventBeforeSave()
+		}),
+		aicommon.WithToolCaller_ReviewWrongTool(t.toolReviewPolicy_wrongTool),
+	)
+	if err != nil {
+		return nil, false, utils.Errorf("error creating tool caller: %v", err)
+	}
+	return caller.CallTool(targetTool)
+}
+
+func (t *AiTask) _callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, directlyAnswer bool, err error) {
 	t.config.EmitInfo("start to generate tool[%v] params in task:%#v", targetTool.Name, t.Name)
 
 	callToolId := ksuid.New().String()
@@ -149,8 +174,24 @@ func (t *AiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, d
 		t.config.EmitInfo("start to require review for tool use")
 		ep := t.config.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
-		t.config.EmitRequireReviewForToolUse(targetTool, callToolParams, ep.GetId())
-		t.config.doWaitAgree(nil, ep)
+
+		reqs := map[string]any{
+			"id":               ep.GetId(),
+			"selectors":        ToolUseReviewSuggestions,
+			"tool":             targetTool.Name,
+			"tool_description": targetTool.Description,
+			"params":           callToolParams,
+		}
+		if ep, ok := t.config.epm.LoadEndpoint(ep.GetId()); ok {
+			ep.SetReviewMaterials(reqs)
+			err := t.config.SubmitCheckpointRequest(ep.GetCheckpoint(), reqs)
+			if err != nil {
+				log.Errorf("submit request reivew to db for task failed: %v", err)
+			}
+		}
+		t.config.EmitInteractiveJSON(ep.GetId(), schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, "review-require", reqs)
+
+		t.config.DoWaitAgree(nil, ep)
 		params := ep.GetParams()
 		t.config.ReleaseInteractiveEvent(ep.GetId(), params)
 		if params == nil {
@@ -184,7 +225,7 @@ func (t *AiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, d
 	defer stderrWriter.Close()
 
 	t.config.EmitToolCallStd(targetTool.Name, stdoutReader, stderrReader, t.Index)
-	t.config.EmitInfo("start to execute tool:%v", targetTool.Name)
+	t.config.EmitInfo("start to invoke tool:%v", targetTool.Name)
 	toolResult, err := t.InvokeTool(targetTool,
 		callToolParams,
 		callToolId,

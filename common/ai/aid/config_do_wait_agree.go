@@ -19,7 +19,7 @@ func (c *Config) doWaitAgreeWithPolicy(ctx context.Context, doWaitAgreeWithPolic
 	}
 	defer func() {
 		if ep.GetCheckpoint() != nil {
-			if err := c.submitCheckpointResponse(ep.GetCheckpoint(), ep.GetParams()); err != nil {
+			if err := c.SubmitCheckpointResponse(ep.GetCheckpoint(), ep.GetParams()); err != nil {
 				log.Errorf("submit review checkpoint to db response err: %v", err)
 			}
 		}
@@ -136,6 +136,6 @@ func (c *Config) doWaitAgreeWithPolicy(ctx context.Context, doWaitAgreeWithPolic
 	}
 }
 
-func (c *Config) doWaitAgree(ctx context.Context, ep *aicommon.Endpoint) {
+func (c *Config) DoWaitAgree(ctx context.Context, ep *aicommon.Endpoint) {
 	c.doWaitAgreeWithPolicy(ctx, c.agreePolicy, ep)
 }

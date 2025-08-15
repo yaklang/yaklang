@@ -126,7 +126,7 @@ LOOP:
 				}
 			}
 
-			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to execute tool:", "now") {
+			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to invoke tool:", "now") {
 				useToolReviewPass = true
 			}
 
