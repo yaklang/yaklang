@@ -179,23 +179,25 @@ func (y *SyntaxFlowVisitor) VisitAlertStatement(raw sf.IAlertStatementContext) {
 					}
 				}
 				if value != "" {
-					switch keyLower := strings.ToLower(key); keyLower {
-					case "title":
+					switch keyType := ValidDescItemKeyType(strings.ToLower(key)); keyType {
+					case SFDescKeyType_Title:
 						extra.Title = value
-					case "title_zh":
+					case SFDescKeyType_Title_ZH:
 						extra.TitleZh = value
-					case "description", "desc", "note":
+					case SFDescKeyType_Desc:
 						extra.Description = value
-					case "type", "purpose":
+					case SFDescKeyType_Type:
 						extra.Purpose = schema.ValidPurpose(value)
-					case "level", "severity", "sev":
+					case SFDescKeyType_Level:
 						extra.Severity = schema.ValidSeverityType(value)
-					case "message", "msg":
+					case SFDescKeyType_Message:
 						extra.Msg = value
-					case "cve":
+					case SFDescKeyType_CVE:
 						extra.CVE = value
-					case "risk_type", "risk":
+					case SFDescKeyType_Risk:
 						extra.RiskType = value
+					case SFDescKeyType_Solution:
+						extra.Solution = value
 					default:
 						extra.ExtraInfo[key] = value
 					}

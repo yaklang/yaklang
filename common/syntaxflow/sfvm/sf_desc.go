@@ -20,6 +20,7 @@ const (
 	SFDescKeyType_Solution  SFDescKeyType = "solution"
 	SFDescKeyType_Rule_Id   SFDescKeyType = "rule_id"
 	SFDescKeyType_Reference SFDescKeyType = "reference"
+	SFDescKeyType_Message   SFDescKeyType = "message"
 )
 
 func ValidDescItemKeyType(key string) SFDescKeyType {
@@ -48,6 +49,8 @@ func ValidDescItemKeyType(key string) SFDescKeyType {
 		return SFDescKeyType_Rule_Id
 	case "reference", "ref":
 		return SFDescKeyType_Reference
+	case "message", "msg":
+		return SFDescKeyType_Message
 	default:
 		return SFDescKeyType_Unknown
 	}
