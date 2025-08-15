@@ -1,0 +1,63 @@
+desc(
+  title_zh: "检测Java CRLF注入漏洞",
+  title: "Detect Java CRLF Injection Vulnerability",
+  cwe: 93,
+  type: vuln,
+  level: mid,
+  risk: "CRLF注入",
+  harm_zh: "CRLF（回车换行）注入漏洞允许攻击者通过控制 HTTP 响应头的内容插入额外的响应头或响应体，从而实施 HTTP 响应分割攻击。这可能导致跨站脚本攻击（XSS）、缓存投毒、会话劫持等安全问题。",
+  harm: "CRLF (Carriage Return Line Feed) injection vulnerabilities allow attackers to inject additional HTTP headers or body content by controlling parts of the HTTP response header. This can lead to HTTP response splitting, XSS, cache poisoning, and session hijacking.",
+  fix: <<<FIX
+修复建议：
+1. 对响应头参数进行严格的输入验证与过滤，禁止包含 `\r` 和 `\n`。
+2. 使用框架安全 API（如 Spring 的 ResponseEntity）设置响应头。
+3. 对外部输入的数据进行 URL 编码或其他必要的转义处理。
+4. 对关键响应头使用固定值或白名单控制。
+FIX
+)
+
+<include('java-spring-mvc-param')> as $entry;
+<include('java-servlet-param')> as $entry;
+
+./addHeader|setHeader/(, , * as $headerContent)
+$headerContent #{
+    include: "* & $entry"
+}-> ?{opcode: param } as $canControlHeader
+
+$canControlHeader<dataflow(
+    exclude: "*?{opcode: phi}"
+)> as $nocheckControledHeader
+
+alert $nocheckControledHeader for {
+  level: "mid",
+  desc: <<<DESC
+  在应用中发现，用户输入的参数未经合法化处理，直接拼接到 HTTP 响应头（HttpServletResponse.addHeader()、setHeader()、sendRedirect() 等方法）中，攻击者可通过注入 回车符 \r 和 换行符 \n 来中断原有的 HTTP 头并插入额外的头部或响应内容，从而实现 HTTP 响应拆分 攻击。
+DESC
+  fix:<<<FIX
+1. 代码层修复
+禁止直接拼接用户输入到 HTTP 头
+对参数做严格的 CRLF 过滤：
+```java
+String safeValue = request.getParameter("url").replaceAll("[\r\n]", "");
+response.addHeader("Location", safeValue);
+```
+更安全的方式是使用白名单校验：
+```java
+
+String url = request.getParameter("url");
+if (!url.matches("^[a-zA-Z0-9:/._-]+$")) {
+    throw new IllegalArgumentException("Invalid URL");
+}
+response.addHeader("Location", url);
+```
+
+2. 环境层修复
+
+确保使用 JDK ≥ 1.7
+确保 Servlet 容器版本无已知 CRLF 漏洞：
+Tomcat ≥ 7.0.6
+Jetty ≥ 8
+Undertow ≥ 1.x
+如果业务必须运行在老版本 Java/容器，需在代码层手动过滤 CRLF
+FIX
+}
