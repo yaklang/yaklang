@@ -404,7 +404,7 @@ func NewRagDatabase(path string) (*gorm.DB, error) {
 	return db, nil
 }
 
-func _get(name string, i ...any) (*RAGSystem, error) {
+func Get(name string, i ...any) (*RAGSystem, error) {
 	log.Infof("getting RAG collection '%s' with local embedding service", name)
 
 	config := NewKnowledgeBaseConfig(i)
@@ -447,7 +447,7 @@ func WithDocumentRawMetadata(i map[string]any) DocumentOption {
 
 // 导出的公共函数
 var Exports = map[string]interface{}{
-	"GetCollection": _get,
+	"GetCollection": Get,
 	"DeleteCollection": func(name string) error {
 		return DeleteCollection(consts.GetGormProfileDatabase(), name)
 	},
