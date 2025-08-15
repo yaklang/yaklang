@@ -1,8 +1,6 @@
 package aicommon
 
 import (
-	"sync"
-
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -28,32 +26,28 @@ var _ CheckpointableStorage = &BaseCheckpointableStorage{}
 type BaseCheckpointableStorage struct {
 	runtimeId string // coordinator runtime ID
 	db        *gorm.DB
-	mutex     *sync.RWMutex
 }
 
 // NewBaseCheckpointableStorage 创建新的基础检查点存储
 func NewBaseCheckpointableStorage() *BaseCheckpointableStorage {
 	return &BaseCheckpointableStorage{
-		db:    consts.GetGormProjectDatabase(),
-		mutex: &sync.RWMutex{},
+		db: consts.GetGormProjectDatabase(),
 	}
 }
 
 // NewCheckpointableStorageWithDB 使用指定数据库创建检查点存储
-func NewCheckpointableStorageWithDB(db *gorm.DB) *BaseCheckpointableStorage {
+func NewCheckpointableStorageWithDB(runtimeUuid string, db *gorm.DB) *BaseCheckpointableStorage {
 	if db == nil {
 		db = consts.GetGormProjectDatabase()
 	}
 	return &BaseCheckpointableStorage{
-		db:    db,
-		mutex: &sync.RWMutex{},
+		runtimeId: runtimeUuid,
+		db:        db,
 	}
 }
 
 // GetDB 获取数据库连接
 func (s *BaseCheckpointableStorage) GetDB() *gorm.DB {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
 	return s.db
 }
 
@@ -101,9 +95,6 @@ func (s *BaseCheckpointableStorage) SubmitCheckpointRequest(checkpoint *schema.A
 		return utils.Error("checkpoint is nil")
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	checkpoint.RequestQuotedJson = codec.StrConvQuote(string(utils.Jsonify(req)))
 
 	db := s.GetDB()
@@ -125,9 +116,6 @@ func (s *BaseCheckpointableStorage) SubmitCheckpointResponse(checkpoint *schema.
 	if checkpoint == nil {
 		return utils.Error("checkpoint is nil")
 	}
-
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
 
 	checkpoint.ResponseQuotedJson = codec.StrConvQuote(string(utils.Jsonify(rsp)))
 	checkpoint.Finished = true

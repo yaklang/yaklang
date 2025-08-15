@@ -455,7 +455,7 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		c.emitBaseHandler(e)
 		return nil
 	})
-	c.BaseCheckpointableStorage = aicommon.NewCheckpointableStorageWithDB(consts.GetGormProjectDatabase())
+	c.BaseCheckpointableStorage = aicommon.NewCheckpointableStorageWithDB(c.id, consts.GetGormProjectDatabase())
 
 	return c
 }
