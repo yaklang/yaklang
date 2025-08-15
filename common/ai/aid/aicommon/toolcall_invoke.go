@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
 )
 
 const (
@@ -112,6 +113,8 @@ func (a *ToolCaller) invoke(
 		}),
 	)
 	ep.ActiveWithParams(ctx, map[string]any{"suggestion": "finish"})
-	c.ReleaseInteractiveEvent(ep.GetId(), map[string]any{"suggestion": "finish"})
+	reqs := map[string]any{"suggestion": "finish"}
+	e.EmitInteractiveRelease(ep.GetId(), reqs)
+	c.CallAfterInteractiveEventReleased(ep.GetId(), reqs)
 	return execResult, execErr
 }

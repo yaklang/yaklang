@@ -11,29 +11,8 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
-
-/*
-TDD:
-
-react, err = NewReAct(WithTool(...), WithContext(...)) //
-if err != nil {
-	return
-}
-react.Start()
-
-react.Feed(ypb.AIInputEvent{}) // ...
-react.FeedUserQuery()
-react.FeedUserImage()
-
-*/
-
-type ReActInvoker interface {
-	Invoke(input chan *ypb.AITriageInputEvent) (chan *schema.AiOutputEvent, error)
-	UnlimitedInvoke(input *chanx.UnlimitedChan[*ypb.AITriageInputEvent]) (chan *schema.AiOutputEvent, error)
-}
 
 type ReAct struct {
 	config        *ReActConfig

@@ -54,21 +54,3 @@ func (r *ReAct) EmitStreamReader(nodeId string, reader io.Reader) {
 		}
 	}()
 }
-
-// Utility methods for ReAct instances
-
-// getCoordinatorId returns the coordinator ID for the ReAct instance
-func (r *ReAct) getCoordinatorId() string {
-	if r.Emitter != nil {
-		// Use the embedded Emitter's coordinator ID
-		return fmt.Sprintf("react-%p", r.config)
-	}
-	return fmt.Sprintf("react-%p", r)
-}
-
-// getTaskIndex returns the task index for the ReAct instance
-func (r *ReAct) getTaskIndex() string {
-	// Read currentIteration without lock since it's an atomic read of an int
-	// and we're not modifying it here
-	return fmt.Sprintf("react-task-%d", r.config.currentIteration)
-}
