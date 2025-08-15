@@ -75,7 +75,7 @@ func (r *Config) EmitRequireReviewForTask(task *AiTask, id string) {
 	}
 	if ep, ok := r.epm.LoadEndpoint(id); ok {
 		ep.SetReviewMaterials(reqs)
-		err := r.submitCheckpointRequest(ep.GetCheckpoint(), reqs)
+		err := r.SubmitCheckpointRequest(ep.GetCheckpoint(), reqs)
 		if err != nil {
 			log.Errorf("submit request reivew to db for task failed: %v", err)
 		}
@@ -92,30 +92,12 @@ func (r *Config) EmitRequireReviewForPlan(rsp *PlanResponse, id string) {
 	}
 	if ep, ok := r.epm.LoadEndpoint(id); ok {
 		ep.SetReviewMaterials(reqs)
-		err := r.submitCheckpointRequest(ep.GetCheckpoint(), reqs)
+		err := r.SubmitCheckpointRequest(ep.GetCheckpoint(), reqs)
 		if err != nil {
 			log.Errorf("submit request reivew to db for task failed: %v", err)
 		}
 	}
 	r.EmitInteractiveJSON(id, schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, "review-require", reqs)
-}
-
-func (r *Config) EmitRequireReviewForToolUse(tool *aitool.Tool, params aitool.InvokeParams, id string) {
-	reqs := map[string]any{
-		"id":               id,
-		"selectors":        ToolUseReviewSuggestions,
-		"tool":             tool.Name,
-		"tool_description": tool.Description,
-		"params":           params,
-	}
-	if ep, ok := r.epm.LoadEndpoint(id); ok {
-		ep.SetReviewMaterials(reqs)
-		err := r.submitCheckpointRequest(ep.GetCheckpoint(), reqs)
-		if err != nil {
-			log.Errorf("submit request reivew to db for task failed: %v", err)
-		}
-	}
-	r.EmitInteractiveJSON(id, schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, "review-require", reqs)
 }
 
 func (r *Config) EmitCurrentConfigInfo() {

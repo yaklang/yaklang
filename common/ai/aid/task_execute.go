@@ -276,7 +276,7 @@ func (t *AiTask) executeTask() error {
 	t.config.EmitInfo("start to wait for user review current task")
 
 	t.config.EmitRequireReviewForTask(t, ep.GetId())
-	t.config.doWaitAgree(nil, ep)
+	t.config.DoWaitAgree(nil, ep)
 	// user review finished, find params
 	reviewResult := ep.GetParams()
 	t.config.ReleaseInteractiveEvent(ep.GetId(), reviewResult)

@@ -134,7 +134,7 @@ LOOP:
 				}
 			}
 
-			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to execute tool:", "ls") {
+			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to invoke tool:", "ls") {
 				useToolReviewPass = true
 				break LOOP
 			}
@@ -282,7 +282,7 @@ LOOP:
 				continue
 			}
 
-			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to execute tool:", "ls") && riskControlMsg >= 2 {
+			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to invoke tool:", "ls") && riskControlMsg >= 2 {
 				useToolReviewPass = true
 				break LOOP
 			}

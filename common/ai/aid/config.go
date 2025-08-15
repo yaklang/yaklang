@@ -167,6 +167,10 @@ func (c *Config) GetEmitter() *aicommon.Emitter {
 	return c.Emitter
 }
 
+func (c *Config) GetEndpointManager() *aicommon.EndpointManager {
+	return c.epm
+}
+
 func (c *Config) HandleSearch(query string, items *omap.OrderedMap[string, []string]) ([]*searchtools.KeywordSearchResult, error) {
 	type ToolWithKeywords struct {
 		Name     string `json:"Name"`
@@ -259,7 +263,9 @@ func (c *Config) Done() {
 
 func (c *Config) Wait() {
 	c.wg.Wait()
+	log.Info("aid.Config 's wg is waiting done, all tasks finished, start to check stream...")
 	c.WaitForStream()
+	log.Info("aid.Config 's all stream waitgroup is done, all tasks finished")
 	return
 }
 
