@@ -133,6 +133,20 @@ func init() {
 	Import("getNumber", func(i int) Number {
 		return Number(i)
 	})
+	Import("getAnyTypeSliceCallbackFunc", func() func() {
+		return func(d []any) {
+
+		}
+	})
+}
+
+func TestAnyTypeSliceInCallback(t *testing.T) {
+	code := `
+getAnyTypeSliceCallbackFunc()(1,2,3)
+`
+	if err := NewExecutor(code).VM.SafeExec(); err != nil {
+		panic(err)
+	}
 }
 
 func TestRangeString(t *testing.T) {
