@@ -69,7 +69,7 @@ type Config struct {
 	hotpatchOptionChan *chanx.UnlimitedChan[Option]
 
 	eventInputChan chan *InputEvent
-	epm            *endpointManager
+	epm            *aicommon.EndpointManager
 
 	// plan mocker
 	planMocker               func(*Config) *PlanResponse
@@ -129,7 +129,7 @@ type Config struct {
 	aiTransactionAutoRetry int64
 
 	resultHandler          func(*Config)
-	extendedActionCallback map[string]func(config *Config, action *Action)
+	extendedActionCallback map[string]func(config *Config, action *aicommon.Action)
 
 	promptHook     func(string) string
 	generateReport bool
@@ -141,6 +141,10 @@ type Config struct {
 	aiTaskRuntime *runtime
 
 	disableOutputEventType []string
+}
+
+func (c *Config) GetRuntimeId() string {
+	return c.id
 }
 
 func (c *Config) CallAIResponseOutputFinishedCallback(s string) {
@@ -190,7 +194,7 @@ func (c *Config) HandleSearch(query string, items *omap.OrderedMap[string, []str
 	var callResults []*searchtools.KeywordSearchResult
 
 	err = c.callAiTransaction(prompt, c.CallAI, func(response *aicommon.AIResponse) error {
-		action, err := ExtractActionFromStream(response.GetUnboundStreamReader(false), "keyword_search")
+		action, err := aicommon.ExtractActionFromStream(response.GetUnboundStreamReader(false), "keyword_search")
 		if err != nil {
 			log.Errorf("extract aitool-keyword-search action failed: %v", err)
 			return utils.Errorf("extract aitool-keyword-search failed: %v", err)
@@ -325,7 +329,7 @@ func (c *Config) SetSyncCallback(i SyncType, callback func() any) {
 }
 
 func (c *Config) ProcessExtendedActionCallback(resp string) {
-	actions := ExtractAllAction(resp)
+	actions := aicommon.ExtractAllAction(resp)
 	for _, action := range actions {
 		if cb, ok := c.extendedActionCallback[action.Name()]; ok {
 			cb(c, action)
@@ -410,7 +414,7 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		agreeInterval:               10 * time.Second,
 		m:                           new(sync.Mutex),
 		id:                          id,
-		epm:                         newEndpointManagerContext(ctx),
+		epm:                         aicommon.NewEndpointManagerContext(ctx),
 		memory:                      nil, // default mem cannot create in config
 		guardian:                    newAsyncGuardian(ctx, id),
 		syncMutex:                   new(sync.RWMutex),
@@ -427,7 +431,7 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		planUserInteractMaxCount:    3,
 		maxTaskContinue:             10,
 	}
-	c.epm.config = c // review
+	c.epm.SetConfig(c)
 	if err := initDefaultTools(c); err != nil {
 		log.Errorf("init default tools: %v", err)
 	}
@@ -468,12 +472,12 @@ func WithSequence(seq int64) Option {
 	}
 }
 
-func WithExtendedActionCallback(name string, cb func(config *Config, action *Action)) Option {
+func WithExtendedActionCallback(name string, cb func(config *Config, action *aicommon.Action)) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
 		if config.extendedActionCallback == nil {
-			config.extendedActionCallback = make(map[string]func(config *Config, action *Action))
+			config.extendedActionCallback = make(map[string]func(config *Config, action *aicommon.Action))
 		}
 		config.extendedActionCallback[name] = cb
 		return nil

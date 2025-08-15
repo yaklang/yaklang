@@ -73,9 +73,9 @@ func (r *Config) EmitRequireReviewForTask(task *AiTask, id string) {
 		"short_summary": task.ShortSummary,
 		"long_summary":  task.LongSummary,
 	}
-	if ep, ok := r.epm.loadEndpoint(id); ok {
+	if ep, ok := r.epm.LoadEndpoint(id); ok {
 		ep.SetReviewMaterials(reqs)
-		err := r.submitCheckpointRequest(ep.checkpoint, reqs)
+		err := r.submitCheckpointRequest(ep.GetCheckpoint(), reqs)
 		if err != nil {
 			log.Errorf("submit request reivew to db for task failed: %v", err)
 		}
@@ -90,9 +90,9 @@ func (r *Config) EmitRequireReviewForPlan(rsp *PlanResponse, id string) {
 		"plans":     rsp,
 		"plans_id":  uuid.New().String(),
 	}
-	if ep, ok := r.epm.loadEndpoint(id); ok {
+	if ep, ok := r.epm.LoadEndpoint(id); ok {
 		ep.SetReviewMaterials(reqs)
-		err := r.submitCheckpointRequest(ep.checkpoint, reqs)
+		err := r.submitCheckpointRequest(ep.GetCheckpoint(), reqs)
 		if err != nil {
 			log.Errorf("submit request reivew to db for task failed: %v", err)
 		}
@@ -108,9 +108,9 @@ func (r *Config) EmitRequireReviewForToolUse(tool *aitool.Tool, params aitool.In
 		"tool_description": tool.Description,
 		"params":           params,
 	}
-	if ep, ok := r.epm.loadEndpoint(id); ok {
+	if ep, ok := r.epm.LoadEndpoint(id); ok {
 		ep.SetReviewMaterials(reqs)
-		err := r.submitCheckpointRequest(ep.checkpoint, reqs)
+		err := r.submitCheckpointRequest(ep.GetCheckpoint(), reqs)
 		if err != nil {
 			log.Errorf("submit request reivew to db for task failed: %v", err)
 		}

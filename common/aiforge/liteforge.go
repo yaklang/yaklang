@@ -167,7 +167,7 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 	if err != nil {
 		return nil, utils.Errorf("template execute failed: %v", err)
 	}
-	var action *aid.Action
+	var action *aicommon.Action
 	transactionErr := cod.CallAITransaction(buf.String(),
 		func(response *aicommon.AIResponse) error {
 			if l.ForgeName == "" {
@@ -175,7 +175,7 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 			}
 			result := response.GetOutputStreamReader(fmt.Sprintf(`liteforge[%v]`, l.ForgeName), true, cod.GetConfig().GetEmitter())
 			var mirrored bytes.Buffer
-			action, err = aid.ExtractActionFromStream(io.TeeReader(result, &mirrored), l.OutputActionName)
+			action, err = aicommon.ExtractActionFromStream(io.TeeReader(result, &mirrored), l.OutputActionName)
 			if err != nil {
 				return utils.Errorf("extract action failed: %v", err)
 			}

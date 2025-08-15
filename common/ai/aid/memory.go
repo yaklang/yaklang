@@ -3,6 +3,7 @@ package aid
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	osRuntime "runtime"
 	"strings"
 	"text/template"
@@ -416,7 +417,7 @@ var MemoryOpSchemaOption = []aitool.ToolOption{
 }
 
 // ApplyOp applies a list of operations to the memory.
-func (m *Memory) ApplyOp(memoryOpAction *Action) {
+func (m *Memory) ApplyOp(memoryOpAction *aicommon.Action) {
 	if memoryOpAction.ActionType() != MemoryOpAction {
 		return
 	}

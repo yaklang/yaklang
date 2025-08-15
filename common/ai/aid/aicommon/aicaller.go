@@ -2,8 +2,10 @@ package aicommon
 
 import (
 	"context"
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"strings"
@@ -12,14 +14,18 @@ import (
 type AICallbackType func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error)
 
 type AICallerConfigIf interface {
-	CallAIResponseConsumptionCallback(int)
+	AcquireId() int64
+	GetDB() *gorm.DB
+	GetRuntimeId() string
 	IsCtxDone() bool
 	GetContext() context.Context
+	CallAIResponseConsumptionCallback(int)
 	GetAITransactionAutoRetryCount() int64
 	RetryPromptBuilder(string, error) string
 	GetEmitter() *Emitter
 	NewAIResponse() *AIResponse
 	CallAIResponseOutputFinishedCallback(string)
+	CreateReviewCheckpoint(int64) *schema.AiCheckpoint
 }
 
 func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption) (string, error)) AICallbackType {

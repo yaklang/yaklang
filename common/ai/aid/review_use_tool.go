@@ -149,7 +149,7 @@ func (t *AiTask) toolReviewPolicy_wrongTool(oldTool *aitool.Tool, suggestionTool
 		request.SetTaskIndex(t.Index)
 		return t.CallAI(request)
 	}, func(rsp *aicommon.AIResponse) error {
-		action, err := ExtractActionFromStream(
+		action, err := aicommon.ExtractActionFromStream(
 			rsp.GetOutputStreamReader("call-tools", true, t.config.GetEmitter()),
 			"require-tool", "abandon")
 		if err != nil {
@@ -219,7 +219,7 @@ func (t *AiTask) toolReviewPolicy_wrongParam(oldTool *aitool.Tool, suggestionToo
 		request.SetTaskIndex(t.Index)
 		return t.CallAI(request)
 	}, func(rsp *aicommon.AIResponse) error {
-		action, err := ExtractActionFromStream(
+		action, err := aicommon.ExtractActionFromStream(
 			rsp.GetOutputStreamReader("call-tools", true, t.config.GetEmitter()),
 			"require-tool", "abandon")
 		if err != nil {

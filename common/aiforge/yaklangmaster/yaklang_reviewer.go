@@ -71,7 +71,7 @@ cli.check()
 				code, _ := config.GetMemory().GetPersistentData("code")
 				callback(code)
 			}),
-			aid.WithExtendedActionCallback("set-code", func(config *aid.Config, action *aid.Action) {
+			aid.WithExtendedActionCallback("set-code", func(config *aid.Config, action *aicommon.Action) {
 				codeContent := action.GetString("content")
 				config.GetMemory().SetPersistentData(magicCode, codeContent)
 			}),

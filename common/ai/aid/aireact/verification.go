@@ -2,9 +2,9 @@ package aireact
 
 import (
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -57,7 +57,7 @@ func (r *ReAct) generateVerificationPrompt(originalQuery, toolName string) strin
 // parseVerificationResponse parses the verification response to extract satisfaction status and human-readable result
 func (r *ReAct) parseVerificationResponse(response string) (bool, string, error) {
 	// Try to extract @action first for validation
-	action, err := aid.ExtractAction(response, "verify-satisfaction")
+	action, err := aicommon.ExtractAction(response, "verify-satisfaction")
 	if err == nil {
 		// If we found a proper @action structure, extract data from it
 		satisfied := action.GetBool("user_satisfied")

@@ -36,7 +36,7 @@ func (t *AiTask) execute() error {
 	t.config.EmitPrompt("task_execute", prompt)
 
 	var response string
-	var action *Action
+	var action *aicommon.Action
 	var directlyAnswer string
 	var directlyAnswerLong string
 	err = t.config.callAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -53,7 +53,7 @@ func (t *AiTask) execute() error {
 			return utils.Errorf("AI response is empty, retry it or check your AI model")
 		}
 
-		action, err = ExtractAction(response, "direct-answer", `require-tool`)
+		action, err = aicommon.ExtractAction(response, "direct-answer", `require-tool`)
 		if err != nil {
 			return utils.Errorf("error extracting @action (direct-answer/require-tool): %w， check miss \"@action\" field in object or @action bad str value", err)
 		}
@@ -115,7 +115,7 @@ TOOLREQUIRED:
 					return utils.Errorf("AI response is empty, retry it or check your AI model")
 				}
 
-				action, err = ExtractAction(response, "direct-answer")
+				action, err = aicommon.ExtractAction(response, "direct-answer")
 				if err != nil {
 					return utils.Errorf("error extracting @action (direct-answer): %w， check miss \"@action\" field in object or @action bad str value", err)
 				}
@@ -218,7 +218,7 @@ TOOLREQUIRED:
 				return fmt.Errorf("error reading summary: %w", err)
 			}
 
-			action, err := ExtractAction(string(summaryBytes), "summary")
+			action, err := aicommon.ExtractAction(string(summaryBytes), "summary")
 			if err != nil {
 				t.config.EmitError("error extracting action: %v", err)
 			}
@@ -271,16 +271,16 @@ func (t *AiTask) executeTask() error {
 		return err
 	}
 	// start to wait for user review
-	ep := t.config.epm.createEndpointWithEventType(schema.EVENT_TYPE_TASK_REVIEW_REQUIRE)
+	ep := t.config.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TASK_REVIEW_REQUIRE)
 	ep.SetDefaultSuggestionContinue()
 	t.config.EmitInfo("start to wait for user review current task")
 
-	t.config.EmitRequireReviewForTask(t, ep.id)
+	t.config.EmitRequireReviewForTask(t, ep.GetId())
 	t.config.doWaitAgree(nil, ep)
 	// user review finished, find params
 	reviewResult := ep.GetParams()
-	t.config.ReleaseInteractiveEvent(ep.id, reviewResult)
-	t.config.EmitInfo("start to handle review task event: %v", ep.id)
+	t.config.ReleaseInteractiveEvent(ep.GetId(), reviewResult)
+	t.config.EmitInfo("start to handle review task event: %v", ep.GetId())
 	err := t.handleReviewResult(reviewResult)
 	if err != nil {
 		log.Warnf("error handling review result: %v", err)
