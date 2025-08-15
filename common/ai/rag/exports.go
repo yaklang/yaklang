@@ -179,19 +179,35 @@ func LoadCollectionWithEmbeddingClient(db *gorm.DB, name string, client aispec.E
 	return ragSystem, nil
 }
 
+var IsMockMode = false
+
 // LoadCollection 加载知识库
 func LoadCollection(db *gorm.DB, name string, opts ...aispec.AIConfigOption) (*RAGSystem, error) {
 	log.Infof("loading collection '%s' with local embedding service", name)
 
 	// 使用本地嵌入服务
-	localEmbedder, err := GetLocalEmbeddingService()
-	if err != nil {
-		log.Errorf("failed to get local embedding service: %v", err)
-		return nil, utils.Errorf("failed to initialize local embedding service: %v", err)
+	var embeddingService EmbeddingClient
+	if IsMockMode {
+		// 使用模拟的嵌入服务
+		mockRagDataForTest, err := getMockRagDataForTest()
+		if err != nil {
+			log.Errorf("failed to get mock rag data for test: %v", err)
+			return nil, utils.Errorf("failed to get mock rag data for test: %v", err)
+		}
+		embeddingService = NewMockEmbedder(mockRagDataForTest)
+		log.Infof("successfully initialized RAG system with mock embedding service")
+	} else {
+		localEmbedder, err := GetLocalEmbeddingService()
+		if err != nil {
+			log.Errorf("failed to get local embedding service: %v", err)
+			return nil, utils.Errorf("failed to initialize local embedding service: %v", err)
+		}
+
+		log.Infof("using local embedding service at %s for collection '%s'", localEmbedder.GetAddress(), name)
+		embeddingService = localEmbedder
 	}
 
-	log.Infof("using local embedding service at %s for collection '%s'", localEmbedder.GetAddress(), name)
-	return LoadCollectionWithEmbeddingClient(db, name, localEmbedder, opts...)
+	return LoadCollectionWithEmbeddingClient(db, name, embeddingService, opts...)
 }
 
 // LoadCollectionWithCustomEmbedding 使用自定义嵌入服务加载知识库
@@ -468,5 +484,8 @@ var Exports = map[string]interface{}{
 	"NewTempRagDatabase": func() (*gorm.DB, error) {
 		path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
 		return NewRagDatabase(path)
+	},
+	"EnableMockMode": func() {
+		IsMockMode = true
 	},
 }

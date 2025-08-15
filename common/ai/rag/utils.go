@@ -212,3 +212,19 @@ func ParseLayersInfo(graphInfos *schema.GroupInfos, loadVectorByKey func(string)
 	}
 	return layers
 }
+
+// MockEmbedder 是一个模拟的嵌入客户端，用于测试
+type MockEmbedder struct {
+	MockEmbedderFunc func(text string) ([]float32, error)
+}
+
+func NewMockEmbedder(f func(text string) ([]float32, error)) EmbeddingClient {
+	return &MockEmbedder{
+		MockEmbedderFunc: f,
+	}
+}
+
+// Embedding 模拟实现 EmbeddingClient 接口
+func (m *MockEmbedder) Embedding(text string) ([]float32, error) {
+	return m.MockEmbedderFunc(text)
+}

@@ -8,7 +8,7 @@ import (
 )
 
 // 测试 SQLiteVectorStore
-func TestSQLiteVectorStoreHNSW(t *testing.T) {
+func TestMUSTPASS_SQLiteVectorStoreHNSW(t *testing.T) {
 	mockEmbed := &MockEmbedder{}
 
 	db := consts.GetGormProfileDatabase()
