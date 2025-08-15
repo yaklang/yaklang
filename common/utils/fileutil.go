@@ -576,3 +576,53 @@ func FileExists(filename string) bool {
 	}
 	return !info.IsDir()
 }
+
+type CRLFtoLFReader struct {
+	// source 是底层的原始 reader
+	source io.Reader
+	// sawCR 用于记录上一次 Read 操作的最后一个字节是否是 '\r'
+	sawCR bool
+}
+
+// NewCRLFtoLFReader 是 CRLFtoLFReader 的构造函数。
+func NewCRLFtoLFReader(source io.Reader) *CRLFtoLFReader {
+	return &CRLFtoLFReader{source: source}
+}
+
+// Read 实现了 io.Reader 接口。
+// 这是实现转换逻辑的核心。
+func (r *CRLFtoLFReader) Read(p []byte) (n int, err error) {
+	rawN, rawErr := r.source.Read(p)
+	if rawN == 0 {
+		return 0, rawErr
+	}
+
+	if r.sawCR && p[0] == '\n' {
+		copy(p, p[1:rawN])
+		rawN--
+		if rawN == 0 {
+			return 0, rawErr
+		}
+	}
+	r.sawCR = false
+
+	writePos := 0
+	for readPos := 0; readPos < rawN; readPos++ {
+		if p[readPos] == '\r' {
+			if readPos+1 == rawN {
+				r.sawCR = true // 设置状态，留到下一次 Read 时处理
+				continue       // 跳过这个 \r，不把它写入
+			}
+
+			// 如果 \r 后面跟着 \n
+			if p[readPos+1] == '\n' {
+				continue // 同样跳过这个 \r，\n 会在下一次循环中被正常写入
+			}
+		}
+
+		p[writePos] = p[readPos]
+		writePos++
+	}
+
+	return writePos, rawErr
+}

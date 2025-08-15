@@ -27,16 +27,22 @@ var LiteForgeExport = map[string]interface{}{
 	"Execute":          _executeLiteForgeTemp,
 	"AnalyzeImage":     AnalyzeImage,
 	"AnalyzeImageFile": AnalyzeImageFile,
-	"imageExtraPrompt": ImageWithExtraPrompt, // use for analyzeImage and analyzeImageFile
+	"AnalyzeAudioFile": AnalyzeAudioFile,
+	"AnalyzeVideo":     AnalyzeVideo,
+	"RefineVideo":      RefineVideo,
+	"imageExtraPrompt": WithExtraPrompt, // use for analyzeImage and analyzeImageFile
 
-	"output":      _withOutputJSONSchema,
-	"action":      _withOutputAction,
-	"image":       _withImage,
-	"imageFile":   _withImageFile,
-	"id":          _withID,
-	"context":     LiteForgeExecWithContext,
-	"verboseName": _withVerboseName,
-	"forceImage":  _withForceImage,
+	"analyzeCtx":        WithAnalyzeContext,    // use for analyzeContext
+	"analyzeLog":        WithAnalyzeLog,        // use for analyzeLog
+	"analyzeStatusCard": WithAnalyzeStatusCard, // use for analyzeStatusCard
+	"output":            _withOutputJSONSchema,
+	"action":            _withOutputAction,
+	"image":             _withImage,
+	"imageFile":         _withImageFile,
+	"id":                _withID,
+	"context":           LiteForgeExecWithContext,
+	"verboseName":       _withVerboseName,
+	"forceImage":        _withForceImage,
 }
 
 type liteforgeConfig struct {

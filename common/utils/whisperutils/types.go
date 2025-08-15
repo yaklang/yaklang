@@ -29,11 +29,14 @@ func (s *SRTContext) String() string {
 
 	var lines []string
 	for _, entry := range s.ContextEntries {
-		startSeconds := entry.StartTime.Seconds()
-		endSeconds := entry.EndTime.Seconds()
-		line := fmt.Sprintf("[%.2f --> %.2f]: %s", startSeconds, endSeconds, entry.Text)
-		lines = append(lines, line)
+		lines = append(lines, entry.String())
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+func (s *SRTEntry) String() string {
+	startSeconds := s.StartTime.Seconds()
+	endSeconds := s.EndTime.Seconds()
+	return fmt.Sprintf("[%.2f --> %.2f]: %s", startSeconds, endSeconds, s.Text)
 }

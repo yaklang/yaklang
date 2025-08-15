@@ -435,19 +435,6 @@ func (i *ImageAnalysisResult) Stats() map[string]interface{} {
 	return stats
 }
 
-type imageAnalysisConfig struct {
-	ExtraPrompt     string
-	fallbackOptions []any
-}
-
-type imageAnalysisOption func(config *imageAnalysisConfig)
-
-func ImageWithExtraPrompt(prompt string) imageAnalysisOption {
-	return func(config *imageAnalysisConfig) {
-		config.ExtraPrompt = prompt
-	}
-}
-
 func AnalyzeImageFile(image string, opts ...any) (*ImageAnalysisResult, error) {
 	if !utils.FileExists(image) {
 		return nil, fmt.Errorf("image file not found: %s", image)
@@ -461,19 +448,25 @@ func AnalyzeImageFile(image string, opts ...any) (*ImageAnalysisResult, error) {
 }
 
 func AnalyzeImage(image any, opts ...any) (*ImageAnalysisResult, error) {
-	var imgCfg = &imageAnalysisConfig{}
-	for _, opt := range opts {
-		if optFunc, ok := opt.(imageAnalysisOption); ok {
-			optFunc(imgCfg)
-		} else {
-			imgCfg.fallbackOptions = append(imgCfg.fallbackOptions, opt)
-		}
-	}
+	var imgCfg = NewAnalysisConfig(opts...)
 	imgCfg.fallbackOptions = append(imgCfg.fallbackOptions, _withImage(image), _withForceImage(true))
 	imgCfg.fallbackOptions = append(imgCfg.fallbackOptions, _withOutputJSONSchema(IMAGE_OUTPUT_SCHEMA))
-
 	// 构建详细的分析提示
-	prompt := `Analyze the image and extract comprehensive information including:
+	prompt := `Your primary task is to perform a comprehensive, multi-modal analysis of the provided inputs. You will receive an **image** and, optionally, **supplementary text** (such as a title, user description, or speech-to-text transcript). Your analysis must holistically synthesize information from both sources to generate a detailed JSON output.
+
+**Core Mandate: Synthesize Information**
+
+Do not treat the image and the text as separate items. You must **integrate** the supplementary information to **enrich, confirm, and disambiguate** your visual analysis.
+
+*   Use the text to clarify ambiguous objects, locations, or relationships.
+*   Allow the text to guide your interpretation of the scene's context, mood, and purpose.
+*   Your final summary must explicitly weave together insights from both the visual evidence and the provided text.
+
+**Inputs**
+
+1.  **Image:** The primary visual content for analysis.
+2.  **Supplementary Information:** (Optional, may be "null") A string of text that provides additional context about the image.
+
 
 1. **Visual Elements**: Identify and describe all objects, people, animals, or items visible in the image
 2. **Text Elements**: Extract all text content using OCR (Optical Character Recognition) 

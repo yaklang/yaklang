@@ -65,7 +65,8 @@ type Config struct {
 	SeparatorTrigger    string
 
 	// Reducer Worker Callback
-	callback ReducerCallbackType
+	callback       ReducerCallbackType
+	finishCallback func(config *Config, memory *aid.Memory) error
 }
 
 type Option func(*Config)
@@ -92,6 +93,12 @@ func WithContext(ctx context.Context) Option {
 func WithReducerCallback(callback ReducerCallbackType) Option {
 	return func(c *Config) {
 		c.callback = callback
+	}
+}
+
+func WithFinishCallback(callback func(config *Config, memory *aid.Memory) error) Option {
+	return func(c *Config) {
+		c.finishCallback = callback
 	}
 }
 
