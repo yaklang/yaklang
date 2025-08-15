@@ -53,7 +53,10 @@ func WithExtraPrompt(prompt string) AnalysisOption {
 
 func WithAnalysisLog(handler func(format string, args ...interface{})) AnalysisOption {
 	return func(config *AnalysisConfig) {
-		config.AnalyzeLog = handler
+		config.AnalyzeLog = func(format string, args ...interface{}) {
+			log.Infof(format, args...)
+			handler(format, args...)
+		}
 	}
 }
 

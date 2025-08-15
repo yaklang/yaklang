@@ -18,9 +18,12 @@ type Chunk interface {
 	HaveLastChunk() bool
 	LastChunk() Chunk
 	PrevNBytes(n int) []byte
+	PrevNBytesUntil(sep []byte, n int) ([]byte, bool)
 	MIMEType() *mimetype.MIME
 	IsTheLastChunk() bool // 是否是最后一个 chunk
 	SetIsTheLastChunk(bool)
+	VerboseMessage() string
+	SetPreviousChunk(Chunk)
 }
 
 type BufferChunk struct {
@@ -33,6 +36,17 @@ type BufferChunk struct {
 	prev           Chunk // 指向前一个 Chunk
 	mimeType       *mimetype.MIME
 	isTheLastChunk bool
+	verboseMessage string // 附加消息
+}
+
+func (c *BufferChunk) SetPreviousChunk(prev Chunk) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.prev = prev
+}
+
+func (c *BufferChunk) VerboseMessage() string {
+	return c.verboseMessage
 }
 
 func (c *BufferChunk) IsTheLastChunk() bool {
@@ -50,10 +64,10 @@ func (c *BufferChunk) SetIsTheLastChunk(isLast bool) {
 var _ Chunk = (*BufferChunk)(nil)
 
 func NewBufferChunk(buffer []byte) *BufferChunk {
-	return NewBufferChunkWithMIMEType(buffer, nil)
+	return NewBufferChunkEx(buffer, nil, "")
 }
 
-func NewBufferChunkWithMIMEType(buffer []byte, mimeType *mimetype.MIME) *BufferChunk {
+func NewBufferChunkEx(buffer []byte, mimeType *mimetype.MIME, verbose string) *BufferChunk {
 	bc := &BufferChunk{
 		mu:       new(sync.RWMutex),
 		isUTF8:   utf8.Valid(buffer),
@@ -67,6 +81,7 @@ func NewBufferChunkWithMIMEType(buffer []byte, mimeType *mimetype.MIME) *BufferC
 	} else {
 		bc.runesize = bc.bytesize
 	}
+	bc.verboseMessage = verbose
 	return bc
 }
 
@@ -304,6 +319,17 @@ func (c *BufferChunk) PrevNBytes(n int) []byte {
 	return finalBuffer.Bytes()
 }
 
+func (c *BufferChunk) PrevNBytesUntil(sep []byte, n int) ([]byte, bool) {
+	buffer := c.PrevNBytes(n)
+	if len(sep) == 0 {
+		return buffer, true
+	}
+	if index := bytes.LastIndex(buffer, sep); index != -1 {
+		return buffer[index:], true
+	}
+	// 遍历完所有 chunk
+	return nil, false
+}
 func (c *BufferChunk) MIMEType() *mimetype.MIME {
 	return c.mimeType
 }

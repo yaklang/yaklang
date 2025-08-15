@@ -1,35 +1,17 @@
 package chunkmaker
 
 import (
-	"context"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/utils/imageutils"
 )
 
-type ImageChunkMaker struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-	dst    *chanx.UnlimitedChan[Chunk]
-}
-
-func (i *ImageChunkMaker) Close() error {
-	if i.cancel != nil {
-		i.cancel()
-	}
-	return nil
-}
-
-func (i *ImageChunkMaker) OutputChannel() <-chan Chunk {
-	return i.dst.OutputChannel()
-}
-
-func NewImageChunkMakerFromFile(targetFile string, opts ...Option) (*ImageChunkMaker, error) {
+func NewImageChunkMakerFromFile(targetFile string, opts ...Option) (*SimpleChunkMaker, error) {
 	cfg := NewConfig(opts...)
 	return NewImageChunkMakerFromFileEx(targetFile, cfg)
 }
 
-func NewImageChunkMakerFromFileEx(targetFile string, cfg *Config) (*ImageChunkMaker, error) {
+func NewImageChunkMakerFromFileEx(targetFile string, cfg *Config) (*SimpleChunkMaker, error) {
 	ctx, cancel := cfg.ctx, cfg.cancel
 	imageChan, err := imageutils.ExtractImageFromFile(targetFile, imageutils.WithCtx(ctx))
 	if err != nil {
@@ -47,7 +29,7 @@ func NewImageChunkMakerFromFileEx(targetFile string, cfg *Config) (*ImageChunkMa
 					log.Info("ImageChunkMaker closed")
 					return
 				}
-				currentChunk := NewBufferChunkWithMIMEType(img.RawImage, img.MIMEType)
+				currentChunk := NewBufferChunkEx(img.RawImage, img.MIMEType, "")
 				currentChunk.prev = preChunk
 				dst.SafeFeed(currentChunk)
 				preChunk = currentChunk
@@ -56,7 +38,7 @@ func NewImageChunkMakerFromFileEx(targetFile string, cfg *Config) (*ImageChunkMa
 			}
 		}
 	}()
-	return &ImageChunkMaker{
+	return &SimpleChunkMaker{
 		ctx:    ctx,
 		cancel: cancel,
 		dst:    dst,
