@@ -2,17 +2,32 @@ package aicommon
 
 import (
 	"context"
+	"io"
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"io"
-	"strings"
 )
 
 type AICallbackType func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error)
+
+type Interactivable interface {
+	// wait and review
+	GetEndpointManager() *EndpointManager
+	DoWaitAgree(ctx context.Context, endpoint *Endpoint)
+	CallAfterInteractiveEventReleased(string, aitool.InvokeParams)
+}
+
+type Checkpointable interface {
+	CreateReviewCheckpoint(int64) *schema.AiCheckpoint
+	CreateToolCallCheckpoint(int64) *schema.AiCheckpoint
+	SubmitCheckpointRequest(checkpoint *schema.AiCheckpoint, i any) error
+	SubmitCheckpointResponse(*schema.AiCheckpoint, any) error
+}
 
 type AICallerConfigIf interface {
 	AcquireId() int64
@@ -27,14 +42,11 @@ type AICallerConfigIf interface {
 	NewAIResponse() *AIResponse
 	CallAIResponseOutputFinishedCallback(string)
 
-	// review and checkppint
-	CreateReviewCheckpoint(int64) *schema.AiCheckpoint
-	CreateToolCallCheckpoint(int64) *schema.AiCheckpoint
-	GetEndpointManager() *EndpointManager
-	SubmitCheckpointRequest(checkpoint *schema.AiCheckpoint, i any) error
-	SubmitCheckpointResponse(*schema.AiCheckpoint, any) error
-	DoWaitAgree(ctx context.Context, endpoint *Endpoint)
-	ReleaseInteractiveEvent(string, aitool.InvokeParams)
+	// Interactivable
+	Interactivable
+
+	// Checkpointable
+	Checkpointable
 }
 
 func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption) (string, error)) AICallbackType {
