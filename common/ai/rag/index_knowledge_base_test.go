@@ -10,7 +10,7 @@ import (
 )
 
 // TestBuildVectorIndexForKnowledgeBase 测试知识库向量索引构建功能
-func TestBuildVectorIndexForKnowledgeBase(t *testing.T) {
+func TestMUSTPASS_BuildVectorIndexForKnowledgeBase(t *testing.T) {
 	// 1. 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
@@ -165,7 +165,7 @@ func TestBuildVectorIndexForKnowledgeBase(t *testing.T) {
 }
 
 // TestBuildVectorIndexEmptyKnowledgeBase 测试空知识库的索引构建
-func TestBuildVectorIndexEmptyKnowledgeBase(t *testing.T) {
+func TestMUSTPASS_BuildVectorIndexEmptyKnowledgeBase(t *testing.T) {
 	// 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
@@ -219,7 +219,7 @@ func TestBuildVectorIndexEmptyKnowledgeBase(t *testing.T) {
 }
 
 // TestBuildVectorIndexNonExistentKnowledgeBase 测试不存在的知识库
-func TestBuildVectorIndexNonExistentKnowledgeBase(t *testing.T) {
+func TestMUSTPASS_BuildVectorIndexNonExistentKnowledgeBase(t *testing.T) {
 	// 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
@@ -241,7 +241,7 @@ func TestBuildVectorIndexNonExistentKnowledgeBase(t *testing.T) {
 }
 
 // TestBuildVectorIndexForKnowledgeBaseEntry 测试单个知识库条目的向量索引构建功能
-func TestBuildVectorIndexForKnowledgeBaseEntry(t *testing.T) {
+func TestMUSTPASS_BuildVectorIndexForKnowledgeBaseEntry(t *testing.T) {
 	// 1. 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
@@ -373,7 +373,7 @@ func TestBuildVectorIndexForKnowledgeBaseEntry(t *testing.T) {
 }
 
 // TestBuildVectorIndexForNonExistentEntry 测试不存在的知识库条目
-func TestBuildVectorIndexForNonExistentEntry(t *testing.T) {
+func TestMUSTPASS_BuildVectorIndexForNonExistentEntry(t *testing.T) {
 	// 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)

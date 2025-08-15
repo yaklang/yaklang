@@ -67,6 +67,10 @@ func (l *LocalModelEmbedding) Embedding(text string) ([]float32, error) {
 	return result, nil
 }
 
+var (
+	ciMockMode = utils.NewAtomicBool()
+)
+
 // GetLocalEmbeddingService 获取本地嵌入服务单例
 // 使用单例模式，确保只有一个 Embedding 服务实例
 func GetLocalEmbeddingService() (*LocalModelEmbedding, error) {
