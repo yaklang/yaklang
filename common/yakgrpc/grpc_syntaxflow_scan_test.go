@@ -1127,6 +1127,7 @@ alert $low for {
 		rsp, err := client.QuerySyntaxFlowScanTask(context.Background(), &ypb.QuerySyntaxFlowScanTaskRequest{
 			Filter: &ypb.SyntaxFlowScanTaskFilter{
 				Programs: []string{progID},
+				Kind:     []string{"scan"},
 			},
 			ShowDiffRisk: true,
 		})
