@@ -19,7 +19,7 @@ import (
 func (r *ReAct) handleRequireTool(toolName string) error {
 	// Find the required tool
 	tool, err := r.config.aiToolManager.GetToolByName(toolName)
-	
+
 	if err != nil {
 		return utils.Errorf("tool '%s' not found: %v", toolName, err)
 	}
