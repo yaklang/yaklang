@@ -158,7 +158,11 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 	err = pr.config.callAiTransaction(
 		prompt, pr.CallAI,
 		func(rsp *aicommon.AIResponse) error {
-			action, err := ExtractActionFromStream(rsp.GetOutputStreamReader("plan", false, pr.config.GetEmitter()), "plan", "require-user-interact")
+			stream := rsp.GetOutputStreamReader("plan", false, pr.config.GetEmitter())
+			//stream = io.TeeReader(stream, os.Stdout)
+			//raw, err := io.ReadAll(stream)
+			//action, err := ExtractAction(string(raw), "plan", "require-user-interact")
+			action, err := ExtractActionFromStream(stream, "plan", "require-user-interact")
 			if err != nil {
 				return utils.Error("parse @action field from AI response failed: " + err.Error())
 			}
