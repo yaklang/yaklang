@@ -3,14 +3,18 @@ package aiforge
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/aireducer"
+	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/log"
 )
 
 type AnalysisConfig struct {
-	Ctx             context.Context
-	ExtraPrompt     string
-	AnalyzeLog      func(format string, args ...interface{})
-	fallbackOptions []any
+	Ctx               context.Context
+	ExtraPrompt       string
+	AnalyzeLog        func(format string, args ...interface{})
+	AnalyzeStatusCard func(id string, data interface{}, tags ...string)
+
+	AnalyzeStreamChunkCallback func(chunk chunkmaker.Chunk)
+	fallbackOptions            []any
 }
 
 func NewAnalysisConfig(opts ...any) *AnalysisConfig {
@@ -18,6 +22,9 @@ func NewAnalysisConfig(opts ...any) *AnalysisConfig {
 		ExtraPrompt: "",
 		AnalyzeLog: func(format string, args ...interface{}) {
 			log.Infof(format, args...)
+		},
+		AnalyzeStatusCard: func(id string, data interface{}, tags ...string) {
+			log.Infof("Status card [%s]: %v tag: %v", id, data, tags)
 		},
 		fallbackOptions: []any{},
 		Ctx:             context.Background(),
@@ -51,7 +58,7 @@ func WithExtraPrompt(prompt string) AnalysisOption {
 	}
 }
 
-func WithAnalysisLog(handler func(format string, args ...interface{})) AnalysisOption {
+func WithAnalyzeLog(handler func(format string, args ...interface{})) AnalysisOption {
 	return func(config *AnalysisConfig) {
 		config.AnalyzeLog = func(format string, args ...interface{}) {
 			log.Infof(format, args...)
@@ -63,5 +70,20 @@ func WithAnalysisLog(handler func(format string, args ...interface{})) AnalysisO
 func WithAnalyzeContext(ctx context.Context) AnalysisOption {
 	return func(config *AnalysisConfig) {
 		config.Ctx = ctx
+	}
+}
+
+func WithAnalyzeStatusCard(handler func(id string, data interface{}, tags ...string)) AnalysisOption {
+	return func(config *AnalysisConfig) {
+		config.AnalyzeStatusCard = func(id string, data interface{}, tags ...string) {
+			log.Infof("Status card [%s]: %v tag: %v", id, data, tags)
+			handler(id, data, tags...)
+		}
+	}
+}
+
+func WithAnalyzeStreamChunkCallback(handler func(chunk chunkmaker.Chunk)) AnalysisOption {
+	return func(config *AnalysisConfig) {
+		config.AnalyzeStreamChunkCallback = handler
 	}
 }
