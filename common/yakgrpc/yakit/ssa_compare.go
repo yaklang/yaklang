@@ -452,7 +452,7 @@ func DoRiskDiff(context context.Context, base, compare *ypb.SSARiskDiffItem) (<-
 			// 使用规则、代码片段和变量名作为对比的依据
 			return risk.FromRule, risk.Hash, utils.CalcMd5(
 				risk.FromRule,
-				risk.CodeFragment,
+				risk.CodeRange,
 				risk.Variable,
 			)
 		}),
