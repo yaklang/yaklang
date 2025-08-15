@@ -2,6 +2,7 @@ package aid
 
 import (
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strings"
 	"testing"
 )
@@ -32,10 +33,10 @@ func TestAction_Extractor(t *testing.T) {
 }
 `
 
-	action, err := ExtractActionFromStream(strings.NewReader(raw), "plan")
+	action, err := aicommon.ExtractActionFromStream(strings.NewReader(raw), "plan")
 	require.NoError(t, err)
 	require.Equal(t, "plan", action.ActionType())
-	params := action.params
+	params := action.GetParams()
 	require.True(t, params.Has("main_task"))
 	require.True(t, params.Has("main_task_goal"))
 	require.True(t, params.Has("tasks"))

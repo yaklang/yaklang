@@ -1,4 +1,4 @@
-package aid
+package aicommon
 
 import (
 	"bytes"
@@ -16,6 +16,16 @@ import (
 type Action struct {
 	name   string
 	params aitool.InvokeParams
+}
+
+func NewAction(name string, params aitool.InvokeParams) *Action {
+	if params == nil {
+		params = make(aitool.InvokeParams)
+	}
+	return &Action{
+		name:   name,
+		params: params,
+	}
 }
 
 func (q *Action) Name() string {
@@ -50,6 +60,13 @@ func (q *Action) GetStringSlice(key string, defaults ...[]string) []string {
 
 func (q *Action) ActionType() string {
 	return q.params.GetString("@action")
+}
+
+func (a *Action) GetParams() aitool.InvokeParams {
+	if a == nil {
+		return make(aitool.InvokeParams)
+	}
+	return a.params
 }
 
 func (q *Action) GetBool(key string, defaults ...bool) bool {

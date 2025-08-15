@@ -103,13 +103,13 @@ func (c *Coordinator) Run() error {
 	}
 
 	// 审查
-	ep := c.config.epm.createEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
+	ep := c.config.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
 	ep.SetDefaultSuggestionContinue()
 
-	c.config.EmitRequireReviewForPlan(rsp, ep.id)
+	c.config.EmitRequireReviewForPlan(rsp, ep.GetId())
 	c.config.doWaitAgree(nil, ep)
 	params := ep.GetParams()
-	c.config.ReleaseInteractiveEvent(ep.id, params)
+	c.config.ReleaseInteractiveEvent(ep.GetId(), params)
 	if params == nil {
 		c.config.EmitError("user review params is nil, plan failed")
 		return utils.Errorf("coordinator: user review params is nil")

@@ -20,7 +20,7 @@ func TestCoordinator_PIMatrix_ToolUseReview_NEG(t *testing.T) {
 	riskControlForgeName := utils.RandStringBytes(10)
 	riskControlCalled := false
 	var id []string
-	err := RegisterAIDBuildinForge(riskControlForgeName, func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*Action, error) {
+	err := RegisterAIDBuildinForge(riskControlForgeName, func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*aicommon.Action, error) {
 		if !riskControlCalled {
 			riskControlCalled = true
 		}
@@ -36,10 +36,7 @@ func TestCoordinator_PIMatrix_ToolUseReview_NEG(t *testing.T) {
 		p["probability"] = 0.5
 		p["impact"] = 0.5
 		p["reason"] = "test reason"
-		return &Action{
-			name:   "",
-			params: p,
-		}, nil
+		return aicommon.NewAction("", p), nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -165,7 +162,7 @@ func TestCoordinator_PIMatrix_ToolUseReview(t *testing.T) {
 	riskControlForgeName := utils.RandStringBytes(10)
 	riskControlCalled := false
 	var id []string
-	err := RegisterAIDBuildinForge(riskControlForgeName, func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*Action, error) {
+	err := RegisterAIDBuildinForge(riskControlForgeName, func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*aicommon.Action, error) {
 		if !riskControlCalled {
 			riskControlCalled = true
 		}
@@ -181,10 +178,7 @@ func TestCoordinator_PIMatrix_ToolUseReview(t *testing.T) {
 		p["probability"] = 0.5
 		p["impact"] = 0.5
 		p["reason"] = "test reason"
-		return &Action{
-			name:   "",
-			params: p,
-		}, nil
+		return aicommon.NewAction("", p), nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -314,13 +308,10 @@ LOOP:
 
 func TestPIM_Basic(t *testing.T) {
 	UnregisterAIDBuildinForge("pimatrix-mock")
-	err := RegisterAIDBuildinForge("pimatrix-mock", func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*Action, error) {
-		a := &Action{
-			name:   "",
-			params: make(aitool.InvokeParams),
-		}
-		a.params["probability"] = 0.5
-		a.params["impact"] = 0.5
+	err := RegisterAIDBuildinForge("pimatrix-mock", func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*aicommon.Action, error) {
+		a := aicommon.NewAction("", nil)
+		a.GetParams().Set("probability", 0.5)
+		a.GetParams().Set("impact", 0.5)
 		return a, nil
 	})
 	if err != nil {

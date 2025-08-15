@@ -173,7 +173,7 @@ func (ka *KnowledgeAlchemist) Refine(ctx context.Context, db *gorm.DB, path stri
 }
 
 func ResultAction2KnowledgeBaseEntries(
-	result *aid.Action,
+	result *aicommon.Action,
 	knowledgeBaseID int64,
 ) ([]*schema.KnowledgeBaseEntry, error) {
 	if result == nil {

@@ -1,7 +1,7 @@
 package aireact
 
 import (
-	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -19,10 +19,10 @@ const (
 	ReActActionObject = "object"
 )
 
-// parseReActAction parses the AI response to extract the ReAct action using aid.ExtractAction
-func (r *ReAct) parseReActAction(response string) (*aid.Action, error) {
-	// Use aid.ExtractAction for more robust parsing
-	action, err := aid.ExtractAction(response, ReActActionObject)
+// parseReActAction parses the AI response to extract the ReAct action using aicommon.ExtractAction
+func (r *ReAct) parseReActAction(response string) (*aicommon.Action, error) {
+	// Use aicommon.ExtractAction for more robust parsing
+	action, err := aicommon.ExtractAction(response, ReActActionObject)
 	if err != nil {
 		return nil, utils.Errorf("failed to extract ReAct action: %v", err)
 	}

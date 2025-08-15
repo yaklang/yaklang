@@ -298,7 +298,7 @@ func (m *memoryTimeline) reducer(beforeId int64) {
 
 	if m.config == nil {
 		CallAITransactionWithoutConfig(pmt, m.ai.CallAI, func(response *aicommon.AIResponse) error {
-			action, err := ExtractActionFromStream(response.GetUnboundStreamReader(false), "timeline-reducer")
+			action, err := aicommon.ExtractActionFromStream(response.GetUnboundStreamReader(false), "timeline-reducer")
 			if err != nil {
 				log.Errorf("extract timeline action failed: %v", err)
 				return utils.Errorf("extract timeline-reducer failed: %v", err)
@@ -315,7 +315,7 @@ func (m *memoryTimeline) reducer(beforeId int64) {
 		})
 	} else {
 		m.config.callAiTransaction(pmt, m.ai.CallAI, func(response *aicommon.AIResponse) error {
-			action, err := ExtractActionFromStream(
+			action, err := aicommon.ExtractActionFromStream(
 				response.GetOutputStreamReader("memory-reducer", true, m.config.GetEmitter()),
 				"timeline-reducer",
 			)
@@ -357,7 +357,7 @@ func (m *memoryTimeline) shrink(currentItem *timelineItem) {
 		log.Errorf("read ai output failed: %v", err)
 		return
 	}
-	action, err := ExtractAction(string(output), "timeline-shrink")
+	action, err := aicommon.ExtractAction(string(output), "timeline-shrink")
 	if err != nil {
 		log.Errorf("extract timeline action failed: %v", err)
 		return

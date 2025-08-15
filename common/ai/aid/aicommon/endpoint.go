@@ -1,98 +1,17 @@
-package aid
+package aicommon
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"sync"
-	"time"
-
-	"github.com/segmentio/ksuid"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
+	"time"
 )
-
-type endpointManager struct {
-	config  *Config
-	ctx     context.Context
-	cancel  context.CancelFunc
-	results *sync.Map
-}
-
-func newEndpointManagerContext(ctx context.Context) *endpointManager {
-	if utils.IsNil(ctx) {
-		ctx = context.Background()
-	}
-	ctx, cancel := context.WithCancel(ctx)
-	epm := &endpointManager{
-		ctx:     ctx,
-		cancel:  cancel,
-		results: &sync.Map{},
-	}
-	go func() {
-		<-ctx.Done()
-		epm.results.Range(func(key, value interface{}) bool {
-			if raw, ok := value.(*Endpoint); ok {
-				raw.ActiveWithParams(ctx, make(aitool.InvokeParams))
-			}
-			return true
-		})
-	}()
-	return epm
-}
-
-func newEndpointManager() *endpointManager {
-	return newEndpointManagerContext(context.Background())
-}
-
-func (e *endpointManager) feed(id string, params aitool.InvokeParams) {
-	if ep, ok := e.loadEndpoint(id); ok {
-		ep.ActiveWithParams(e.ctx, params)
-	}
-}
-
-func (e *endpointManager) createEndpointWithEventType(typeName schema.EventType) *Endpoint {
-	id := ksuid.New().String()
-	endpoint := &Endpoint{
-		id:              id,
-		sig:             newSignal(), // sync.NewCond(&sync.Mutex{}), // 正确初始化 Cond
-		activeParams:    make(aitool.InvokeParams),
-		reviewMaterials: make(aitool.InvokeParams),
-	}
-	e.results.Store(id, endpoint)
-	if c := e.config; c != nil {
-		endpoint.seq = c.AcquireId()
-		if ret, ok := yakit.GetReviewCheckpoint(c.GetDB(), c.id, endpoint.seq); ok {
-			endpoint.SetParams(aiddb.AiCheckPointGetResponseParams(ret))
-			endpoint.checkpoint = ret
-		} else {
-			endpoint.checkpoint = e.config.createReviewCheckpoint(endpoint.seq)
-		}
-	}
-	return endpoint
-}
-
-func (e *endpointManager) createEndpoint() *Endpoint {
-	return e.createEndpointWithEventType("")
-}
-
-func (e *endpointManager) loadEndpoint(id string) (*Endpoint, bool) {
-	raw, ok := e.results.Load(id)
-	if !ok {
-		return nil, false
-	}
-	ep, typeOk := raw.(*Endpoint)
-	if !typeOk {
-		return nil, false
-	}
-	return ep, true
-}
 
 type Endpoint struct {
 	id              string
-	sig             *signal
+	sig             *EndpointSignal
 	reviewType      schema.EventType
 	activeParams    aitool.InvokeParams
 	reviewMaterials aitool.InvokeParams
@@ -100,6 +19,19 @@ type Endpoint struct {
 	// seq and checkpoint for recovering
 	seq        int64
 	checkpoint *schema.AiCheckpoint
+}
+
+func (e *Endpoint) GetSeq() int64 {
+	return e.seq
+}
+
+func (e *Endpoint) GetCheckpoint() *schema.AiCheckpoint {
+	if e.checkpoint == nil {
+		e.checkpoint = &schema.AiCheckpoint{
+			Seq: e.seq,
+		}
+	}
+	return e.checkpoint
 }
 
 func (e *Endpoint) SetReviewMaterials(
@@ -186,4 +118,8 @@ func (e *Endpoint) ActiveWithParams(ctx context.Context, params aitool.InvokePar
 
 func (e *Endpoint) Release() {
 	e.sig.ActiveAsyncContext(context.Background())
+}
+
+func (e *Endpoint) GetId() string {
+	return e.id
 }

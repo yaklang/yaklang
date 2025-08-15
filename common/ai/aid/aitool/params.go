@@ -15,6 +15,14 @@ func (p InvokeParams) GetObject(key string) InvokeParams {
 	return make(InvokeParams)
 }
 
+func (p InvokeParams) Set(k string, v any) InvokeParams {
+	if utils.IsNil(p) {
+		p = make(InvokeParams)
+	}
+	p[k] = v
+	return p
+}
+
 func (p InvokeParams) GetObjectArray(key string) []InvokeParams {
 	result := make([]InvokeParams, 0)
 	if !utils.IsNil(p) {

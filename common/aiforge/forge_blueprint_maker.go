@@ -3,6 +3,7 @@ package aiforge
 import (
 	"encoding/json"
 	"errors"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
@@ -214,7 +215,7 @@ func (c *YakForgeBlueprintConfig) Build() (*ForgeBlueprint, error) {
 				actionName = actions[0]
 				alias = actions[1:]
 			}
-			action, err := aid.ExtractAction(s, actionName, alias...)
+			action, err := aicommon.ExtractAction(s, actionName, alias...)
 			if err != nil {
 				log.Errorf("Failed to extract action from smart: %s", err)
 				return
