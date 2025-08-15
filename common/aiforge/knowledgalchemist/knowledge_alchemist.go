@@ -55,7 +55,6 @@ func (ka *KnowledgeAlchemist) Refine(ctx context.Context, db *gorm.DB, path stri
 	if err != nil {
 		return nil, err
 	}
-
 	knowledgeDatabaseName := path + uuid.New().String()
 	newKnowledgeBase := &schema.KnowledgeBaseInfo{
 		KnowledgeBaseName: knowledgeDatabaseName,
