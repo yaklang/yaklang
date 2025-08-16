@@ -84,49 +84,42 @@ func (r *ReAct) generateToolParamsPrompt(tool *aitool.Tool, toolName string) (st
 	// 生成工具的JSONSchema描述
 	toolJSONSchema := tool.ToJSONSchemaString()
 
+	// 获取原始用户查询
+	originalQuery := ""
+	if r.config.memory != nil {
+		originalQuery = r.config.memory.Query
+	}
+
 	// Build the parameter generation prompt with schema information
-	prompt := fmt.Sprintf(`## 任务状态与进度
-%s
+	prompt := fmt.Sprintf(`# 用户原始请求
+用户的明确要求: %s
+
+## 重要说明
+请严格按照用户的原始请求生成工具参数。用户要求什么就执行什么，不要过度解释或偏离用户的直接意图。
 
 ## 工具详情
 工具名称: %s
 工具描述: %s
 
+## 参数生成规则
+1. **直接执行用户请求** - 如果用户要求执行"ls current"，就生成参数执行"ls"命令（不带路径表示当前目录）
+2. **避免过度复杂化** - 不要因为历史失败而偏离用户的直接请求
+3. **参数准确性** - 确保参数结构、数据类型与Schema完全一致
+
 ## 工具参数Schema
+`+"```schema\n%s\n```"+`
 
-作为JSON工具调用引擎，请依据以下原则生成符合Schema的参数：
-
-# 核心原则
-1. **参数完整性**
-   - 确保参数结构、数据类型、字段名称与Schema定义完全一致
-   - 对格式敏感字段（如URL/日期）进行有效性验证
-
-2. **生成策略**
-   - 动态分析历史参数特征，建立差异化生成模式
-   - 对枚举类参数采用分布式选择策略
-   - 数值参数应体现合理波动范围
-
-3. **质量保障**
-   - 执行参数生成前后双重校验机制
-   - 发现Schema冲突时自动中止并记录异常
-   - 建立参数相似度预警机制
-
-# 输出要求
-• 严格生成标准JSON对象
-• 禁止包含Schema未定义的字段
-• 嵌套对象保持合理深度层级
-• 仅输出JSON对象即可，不需要输出解释/执行流程/注意事项等
-
-# History
+## 任务上下文
 %s
 
-`+"```schema\n%s\n```"+`
-请根据Schema描述构造有效JSON对象来调用此工具，系统会执行工具内容。
+## 历史记录（仅供参考，不要被失败记录误导）
+%s
 
-一般来说，你应该生成数据类似于：`+"`{\"@action\": \"call-tool\", \"tool\": ..., \"params\": ... }`"+`。
+# 输出要求
+严格生成标准JSON对象，格式：`+"`{\"@action\": \"call-tool\", \"tool\": \"%s\", \"params\": {...}}`"+`
 
-注意观察历史记录中已有的参数，不要重复使用相似参数执行工具，已经执行过的结果不要重复执行
-`, r.config.memory.CurrentTaskInfo(), tool.Name, tool.Description, r.config.memory.Timeline(), toolJSONSchema)
+重要：直接按照用户的原始请求"%s"生成对应的工具参数，不要偏离用户意图。
+`, originalQuery, tool.Name, tool.Description, toolJSONSchema, r.config.memory.CurrentTaskInfo(), r.config.memory.Timeline(), tool.Name, originalQuery)
 
 	if r.config.debugPrompt {
 		log.Infof("Tool params prompt: %s", prompt)
