@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -36,9 +37,7 @@ func main() {
 		language    = flag.String("lang", "zh", "Response language (zh for Chinese, en for English)")
 		query       = flag.String("query", "", "One-time query mode (exits after response)")
 		debug       = flag.Bool("debug", false, "Enable debug mode")
-		interactive = flag.Bool("i", false, "Enable interactive tool review mode (requires user approval for each tool use)")
-		autoAllow   = flag.Bool("auto-allow", false, "Automatically approve all tool usage without review")
-		autoAllowY  = flag.Bool("y", false, "Automatically approve all tool usage without review (shorthand for --auto-allow)")
+		noInteract  = flag.Bool("no-interact", false, "Disable interactive tool review mode (auto-approve all tools)")
 		breakpoint  = flag.Bool("breakpoint", false, "Enable breakpoint mode (pause before/after each AI interaction for inspection)")
 		breakpointB = flag.Bool("b", false, "Enable breakpoint mode (shorthand for --breakpoint)")
 	)
@@ -47,8 +46,8 @@ func main() {
 	// Combine breakpoint flags and set global variable
 	breakpointEnabled = *breakpoint || *breakpointB
 
-	// Combine auto-allow flags
-	autoApprove := *autoAllow || *autoAllowY
+	// Interactive mode is enabled by default unless --no-interact is specified
+	interactiveMode := !*noInteract
 
 	// Set debug mode from command line flag (independent of breakpoint mode)
 	debugMode = *debug
@@ -63,12 +62,10 @@ func main() {
 	}
 
 	// Display mode information
-	if *interactive {
+	if interactiveMode {
 		log.Info("Interactive tool review mode enabled - will require user approval for each tool use")
-	} else if autoApprove {
-		log.Info("Auto-approve mode enabled - all tool usage will be automatically approved")
 	} else {
-		log.Info("Default tool review mode enabled - will show tool usage but auto-approve in CLI mode")
+		log.Info("Non-interactive mode enabled - all tool usage will be automatically approved")
 	}
 
 	log.Info("Starting ReAct CLI Demo")
@@ -149,102 +146,66 @@ func main() {
 		return resp, nil
 	}
 
-	outputChan := make(chan *schema.AiOutputEvent, 100) // Buffered channel for output events
+	// Create input and output channels for client-server mode
+	inputChan := make(chan *ypb.AIInputEvent, 100)
+	outputChan := make(chan *schema.AiOutputEvent, 100)
 
-	// Create tool review handler if interactive mode is enabled
+	// Create ReAct client using aid.Config style
 	var reactOptions []aireact.Option
 	reactOptions = append(reactOptions,
 		aireact.WithContext(ctx),
 		aireact.WithAICallback(debugAICallback),
-		aireact.WithDebug(debugMode), // Use debug mode from command line flag (independent of breakpoint)
+		aireact.WithDebug(debugMode),
 		aireact.WithMaxIterations(5),
 		aireact.WithMaxThoughts(3),
 		aireact.WithMaxActions(3),
 		aireact.WithTemperature(0.7, 0.3),
 		aireact.WithLanguage(*language),
-		aireact.WithTopToolsCount(20), // Show top 20 tools
+		aireact.WithTopToolsCount(20),
 		aireact.WithEventHandler(func(e *schema.AiOutputEvent) {
 			outputChan <- e
 		}),
-	)
-
-	// Configure tool review based on command line options
-	if *interactive {
-		// Full interactive mode - require user approval for each tool
-		log.Info("Configuring interactive tool review mode")
-		reactOptions = append(reactOptions,
-			aireact.WithToolReview(true),
-			aireact.WithReviewHandler(createInteractiveReviewHandler()),
-		)
-	} else if autoApprove {
-		// Auto-approve mode - skip all reviews
-		log.Info("Configuring auto-approve mode")
-		reactOptions = append(reactOptions,
-			aireact.WithAutoApproveTools(),
-		)
-	} else {
-		// Default mode - show tool usage but auto-approve for CLI
-		log.Info("Configuring default tool review mode")
-		reactOptions = append(reactOptions,
-			aireact.WithToolReview(true),
-			aireact.WithReviewHandler(createDefaultReviewHandler()),
-		)
-	}
-
-	// Define event handler function that can be reused
-	eventHandler := func(event *schema.AiOutputEvent) {
-		// Handle output events with simplified display
-		switch event.Type {
-		case schema.EVENT_TYPE_THOUGHT:
-			// Display thinking process
-			fmt.Printf("[think]: %s\n", string(event.Content))
-		case schema.EVENT_TYPE_ACTION:
-			fmt.Printf("[action]: %s\n", string(event.Content))
-		case schema.EVENT_TYPE_OBSERVATION:
-			fmt.Printf("[observe]: %s\n", string(event.Content))
-		case schema.EVENT_TYPE_RESULT:
-			result := extractResultContent(string(event.Content))
-			fmt.Printf("[result]: %s\n", result)
-			fmt.Printf("[ai]: final message for current loop\n")
-		case schema.EVENT_TYPE_ITERATION:
-			if debugMode {
-				fmt.Printf("[iteration]: %s\n", string(event.Content))
-			}
-		case schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE:
-			// Handle tool review events in interactive mode
-			if debugMode {
-				fmt.Printf("[tool_review]: %s\n", string(event.Content))
-			}
-		case schema.EVENT_TYPE_STREAM:
-			if debugMode {
-				fmt.Printf("[stream]: %s\n", string(event.Content))
-			}
-		case schema.EVENT_TYPE_STRUCTURED:
-			if debugMode {
-				fmt.Printf("[structured]: %s\n", string(event.Content))
-			}
-		default:
-			if debugMode {
-				fmt.Printf("[%s]: %s\n", strings.ToLower(string(event.Type)), string(event.Content))
-			}
-		}
-	}
-
-	// Add event handler
-	reactOptions = append(reactOptions,
-		aireact.WithEventHandler(eventHandler),
-		// Use buildinaitools system instead of hardcoded tools
+		// Use buildinaitools system
 		aireact.WithBuiltinTools(),
 	)
 
-	// Create ReAct instance with all options
+	// Configure tool review based on command line options
+	if interactiveMode {
+		// Interactive mode - require user approval for each tool
+		log.Info("Configuring interactive tool review mode")
+		reactOptions = append(reactOptions,
+			aireact.WithToolReview(true),
+		)
+	} else {
+		// Non-interactive mode - auto-approve all tools
+		log.Info("Configuring non-interactive mode")
+		reactOptions = append(reactOptions,
+			aireact.WithAutoApproveTools(),
+		)
+	}
+
+	// Create ReAct instance
 	react, err := aireact.NewReAct(reactOptions...)
 	if err != nil {
 		log.Errorf("Failed to create ReAct instance: %v", err)
 		os.Exit(1)
 	}
 
-	// Start output handler that properly drains the channel and detects completion
+	// Start input handler to process input events
+	go func() {
+		for {
+			select {
+			case inputEvent := <-inputChan:
+				if err := react.ProcessInputEvent(inputEvent); err != nil {
+					log.Errorf("Failed to process input event: %v", err)
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	// Start output handler with client-side event processing
 	outputDone := make(chan struct{})
 	go func() {
 		defer close(outputDone)
@@ -254,9 +215,9 @@ func main() {
 				if !ok {
 					return
 				}
-				// Handle the event using the configured event handler
+				// Handle the event using client-side event handler
 				if event != nil {
-					eventHandler(event)
+					handleClientEvent(event, inputChan, interactiveMode)
 				}
 			case <-ctx.Done():
 				return
@@ -323,7 +284,7 @@ func main() {
 		streamingMutex.Unlock()
 
 		// Send user input to ReAct
-		event := &ypb.AITriageInputEvent{
+		event := &ypb.AIInputEvent{
 			IsFreeInput: true,
 			FreeInput:   input,
 		}
@@ -347,7 +308,7 @@ func main() {
 
 // handleSingleQuery handles one-time query mode
 func handleSingleQuery(reactChan *aireact.ReAct, query string, ctx context.Context) {
-	event := &ypb.AITriageInputEvent{
+	event := &ypb.AIInputEvent{
 		IsFreeInput: true,
 		FreeInput:   query,
 	}
@@ -760,116 +721,193 @@ func handleResponseBreakpoint(resp *aicommon.AIResponse) {
 	signal.Stop(sigChan)
 }
 
-// createDefaultReviewHandler creates a default tool review handler that shows info but auto-approves
-func createDefaultReviewHandler() func(reviewInfo *aireact.ToolReviewInfo) {
-	return func(reviewInfo *aireact.ToolReviewInfo) {
-		// Display tool information but auto-approve
-		fmt.Printf("\n[TOOL REVIEW] Auto-approving tool usage:\n")
-		fmt.Printf("Tool: %s\n", reviewInfo.Tool.Name)
-		fmt.Printf("Description: %s\n", reviewInfo.Tool.Description)
+// parseSelectionIndex parses user input as a selection index (1-based) and returns 0-based index, or -1 if invalid
+func parseSelectionIndex(input string, maxOptions int) int {
+	if len(input) == 1 && input[0] >= '1' && input[0] <= '9' {
+		idx := int(input[0] - '1')
+		if idx < maxOptions {
+			return idx
+		}
+	}
+	return -1
+}
+
+// handleClientEvent handles events in client mode using input channel
+func handleClientEvent(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInputEvent, interactiveMode bool) {
+	// Handle output events with simplified display
+	switch event.Type {
+	case schema.EVENT_TYPE_THOUGHT:
+		// Display thinking process
+		fmt.Printf("[think]: %s\n", string(event.Content))
+	case schema.EVENT_TYPE_ACTION:
+		fmt.Printf("[action]: %s\n", string(event.Content))
+	case schema.EVENT_TYPE_OBSERVATION:
+		fmt.Printf("[observe]: %s\n", string(event.Content))
+	case schema.EVENT_TYPE_RESULT:
+		result := extractResultContent(string(event.Content))
+		fmt.Printf("[result]: %s\n", result)
+		fmt.Printf("[ai]: final message for current loop\n")
+	case schema.EVENT_TYPE_ITERATION:
 		if debugMode {
-			fmt.Printf("Parameters: %v\n", reviewInfo.Params)
+			fmt.Printf("[iteration]: %s\n", string(event.Content))
 		}
-		fmt.Printf("Status: Auto-approved\n\n")
-
-		// Auto-approve
-		response := &aireact.ToolReviewResponse{
-			Suggestion: "continue",
+	case schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE:
+		// Handle tool review events
+		if debugMode {
+			fmt.Printf("[tool_review]: %s\n", string(event.Content))
 		}
 
-		// Send response back
-		select {
-		case reviewInfo.ResponseChannel <- response:
-			log.Infof("Tool review auto-approved: %s", reviewInfo.Tool.Name)
-		default:
-			log.Warnf("Failed to send tool review response - channel may be closed")
+		// In interactive mode, handle user interaction
+		if interactiveMode {
+			handleReviewRequireClient(event, inputChan)
+		}
+		// In non-interactive mode, this event will be handled by DoWaitAgree auto-approval
+	case schema.EVENT_TYPE_STREAM:
+		if debugMode {
+			fmt.Printf("[stream]: %s\n", string(event.Content))
+		}
+	case schema.EVENT_TYPE_STRUCTURED:
+		if debugMode {
+			fmt.Printf("[structured]: %s\n", string(event.Content))
+		}
+	default:
+		if debugMode {
+			fmt.Printf("[%s]: %s\n", strings.ToLower(string(event.Type)), string(event.Content))
 		}
 	}
 }
 
-// createInteractiveReviewHandler creates an interactive tool review handler
-func createInteractiveReviewHandler() func(reviewInfo *aireact.ToolReviewInfo) {
-	return func(reviewInfo *aireact.ToolReviewInfo) {
-		// Display tool information to user
-		fmt.Printf("\n[TOOL REVIEW REQUIRED]\n")
-		fmt.Printf("Tool: %s\n", reviewInfo.Tool.Name)
-		fmt.Printf("Description: %s\n", reviewInfo.Tool.Description)
-		fmt.Printf("Parameters: %v\n", reviewInfo.Params)
-		fmt.Printf("\nPlease choose an action:\n")
-		fmt.Printf("  1. continue    - Approve tool use\n")
-		fmt.Printf("  2. wrong_tool  - Tool selection is wrong\n")
-		fmt.Printf("  3. wrong_params - Parameters are wrong\n")
-		fmt.Printf("  4. direct_answer - Skip tool and answer directly\n")
-		fmt.Printf("  5. cancel      - Cancel operation\n")
-		fmt.Print("Your choice (1-5): ")
-
-		// Read user input
-		scanner := bufio.NewScanner(os.Stdin)
-		var response *aireact.ToolReviewResponse
-
-		if scanner.Scan() {
-			input := strings.TrimSpace(scanner.Text())
-			switch input {
-			case "1", "continue":
-				response = &aireact.ToolReviewResponse{
-					Suggestion: "continue",
-				}
-				fmt.Println("[REVIEW]: Tool use approved")
-			case "2", "wrong_tool":
-				fmt.Print("Enter suggested tool name (optional): ")
-				scanner.Scan()
-				suggestedTool := strings.TrimSpace(scanner.Text())
-				fmt.Print("Enter search keyword (optional): ")
-				scanner.Scan()
-				keyword := strings.TrimSpace(scanner.Text())
-
-				response = &aireact.ToolReviewResponse{
-					Suggestion:        "wrong_tool",
-					SuggestionTool:    suggestedTool,
-					SuggestionKeyword: keyword,
-				}
-				fmt.Println("[REVIEW]: Tool reselection requested")
-			case "3", "wrong_params":
-				response = &aireact.ToolReviewResponse{
-					Suggestion: "wrong_params",
-				}
-				fmt.Println("[REVIEW]: Parameter modification requested")
-			case "4", "direct_answer":
-				response = &aireact.ToolReviewResponse{
-					Suggestion:     "direct_answer",
-					DirectlyAnswer: true,
-				}
-				fmt.Println("[REVIEW]: Direct answer requested")
-			case "5", "cancel":
-				response = &aireact.ToolReviewResponse{
-					Cancel: true,
-				}
-				fmt.Println("[REVIEW]: Operation cancelled")
-			default:
-				// Default to continue if invalid input
-				response = &aireact.ToolReviewResponse{
-					Suggestion: "continue",
-				}
-				fmt.Printf("[REVIEW]: Invalid input '%s', defaulting to continue\n", input)
-			}
-		} else {
-			// Default to continue if unable to read
-			response = &aireact.ToolReviewResponse{
-				Suggestion: "continue",
-			}
-			fmt.Println("[REVIEW]: Unable to read input, defaulting to continue")
-		}
-
-		// Send response back
-		select {
-		case reviewInfo.ResponseChannel <- response:
-			log.Infof("Tool review response sent: %s", response.Suggestion)
-		default:
-			log.Warnf("Failed to send tool review response - channel may be closed")
-		}
-
-		fmt.Print("Continuing with ReAct processing...\n\n")
+// handleReviewRequireClient handles TOOL_USE_REVIEW_REQUIRE events using input channel
+func handleReviewRequireClient(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInputEvent) {
+	// Parse the review event content
+	var reviewData map[string]interface{}
+	if err := json.Unmarshal(event.Content, &reviewData); err != nil {
+		log.Errorf("Failed to parse review event: %v", err)
+		return
 	}
+
+	// Extract information from the event
+	eventID := event.GetInteractiveId()
+	if eventID == "" {
+		log.Errorf("No interactive ID found in review event")
+		return
+	}
+
+	toolName, _ := reviewData["tool"].(string)
+	toolDesc, _ := reviewData["tool_description"].(string)
+	selectors, _ := reviewData["selectors"].([]interface{})
+
+	// Display tool information
+	fmt.Printf("\n[TOOL REVIEW REQUIRED]\n")
+	fmt.Printf("Tool: %s\n", toolName)
+	if toolDesc != "" {
+		fmt.Printf("Description: %s\n", toolDesc)
+	}
+	if debugMode {
+		if params, ok := reviewData["params"]; ok {
+			fmt.Printf("Parameters: %v\n", params)
+		}
+	}
+
+	// Display selectors if available
+	var options []reviewOption
+	if len(selectors) > 0 {
+		for _, sel := range selectors {
+			if selMap, ok := sel.(map[string]interface{}); ok {
+				option := reviewOption{
+					value:  getString(selMap, "value"),
+					prompt: getString(selMap, "prompt"),
+				}
+				if option.prompt == "" {
+					option.prompt = getString(selMap, "prompt_english")
+				}
+				options = append(options, option)
+			}
+		}
+	}
+
+	// Use default options if none provided
+	if len(options) == 0 {
+		options = []reviewOption{
+			{value: "continue", prompt: "同意工具使用"},
+			{value: "wrong_tool", prompt: "工具选择不当"},
+			{value: "wrong_params", prompt: "参数不合理"},
+			{value: "direct_answer", prompt: "要求AI直接回答"},
+		}
+	}
+
+	// Display options
+	fmt.Printf("\nPlease choose an action:\n")
+	for i, option := range options {
+		fmt.Printf("  %d. %s - %s\n", i+1, option.value, option.prompt)
+	}
+	fmt.Printf("Your choice (1-%d): ", len(options))
+
+	// Read user input
+	scanner := bufio.NewScanner(os.Stdin)
+	var selectedValue string
+
+	if scanner.Scan() {
+		input := strings.TrimSpace(scanner.Text())
+
+		// Try to parse as number first
+		if idx := parseSelectionIndex(input, len(options)); idx >= 0 {
+			selectedValue = options[idx].value
+		} else {
+			// Try to match by value
+			for _, option := range options {
+				if strings.EqualFold(input, option.value) {
+					selectedValue = option.value
+					break
+				}
+			}
+		}
+
+		// Default to first option if invalid input
+		if selectedValue == "" {
+			selectedValue = options[0].value
+			fmt.Printf("[REVIEW]: Invalid input '%s', defaulting to %s\n", input, selectedValue)
+		} else {
+			fmt.Printf("[REVIEW]: Selected action: %s\n", selectedValue)
+		}
+	} else {
+		// Default to first option if unable to read
+		selectedValue = options[0].value
+		fmt.Printf("[REVIEW]: Unable to read input, defaulting to %s\n", selectedValue)
+	}
+
+	// Create and send input event through channel
+	inputEvent := &ypb.AIInputEvent{
+		IsInteractiveMessage: true,
+		InteractiveId:        eventID,
+		InteractiveJSONInput: fmt.Sprintf(`{"suggestion": "%s"}`, selectedValue),
+	}
+
+	// Send the input event through channel
+	select {
+	case inputChan <- inputEvent:
+		// Successfully sent
+	default:
+		log.Errorf("Failed to send input event: channel may be full")
+	}
+
+	fmt.Print("Continuing with ReAct processing...\n\n")
+}
+
+// reviewOption represents a review choice option
+type reviewOption struct {
+	value  string
+	prompt string
+}
+
+// getString safely extracts a string value from a map
+func getString(m map[string]interface{}, key string) string {
+	if val, ok := m[key]; ok {
+		if str, ok := val.(string); ok {
+			return str
+		}
+	}
+	return ""
 }
 
 // initializeDatabase initializes the Yakit database and configurations
