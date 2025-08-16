@@ -482,16 +482,9 @@ func processTask(task *TaskItem, inputChan chan<- *ypb.AIInputEvent) {
 		}
 
 	case "review_response":
-		// Handle review response
-		reviewMutex.Lock()
-		if waitingForReview && currentReviewInputChan != nil {
-			processReviewInput(task.Content, currentReviewInputChan)
-			updateTaskStatus(task.ID, "completed")
-		} else {
-			log.Warnf("Review response task but no review waiting: %s", task.ID)
-			updateTaskStatus(task.ID, "failed")
-		}
-		reviewMutex.Unlock()
+		// This case should not happen anymore since review responses are processed immediately
+		log.Warnf("Unexpected review_response task in queue: %s", task.ID)
+		updateTaskStatus(task.ID, "failed")
 
 		queueMutex.Lock()
 		currentProcessingTask = nil
@@ -564,14 +557,8 @@ func handleInteractiveLoop(inputChan chan<- *ypb.AIInputEvent, ctx context.Conte
 			// Check if we're waiting for review input
 			reviewMutex.Lock()
 			if waitingForReview {
-				// Add review response to queue if currently processing
-				if currentProcessingTask != nil {
-					addToQueue("review_response", input)
-					fmt.Printf("Added review response to queue (task currently processing)\n")
-				} else {
-					// Process as review input immediately
-					processReviewInput(input, inputChan)
-				}
+				// Always process review input immediately when waiting for review
+				processReviewInput(input, inputChan)
 				reviewMutex.Unlock()
 				fmt.Print("> ")
 				continue
