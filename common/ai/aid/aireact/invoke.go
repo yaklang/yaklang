@@ -49,6 +49,10 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 	// Initialize memory if needed
 	if r.config.memory == nil {
 		r.config.memory = aid.GetDefaultMemory()
+		// Set AI instance for newly created memory
+		if r.config.aiCallback != nil {
+			r.config.memory.SetTimelineAI(r.config)
+		}
 	}
 
 	// Store the user query in memory

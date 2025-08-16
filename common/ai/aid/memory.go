@@ -197,18 +197,53 @@ func (m *Memory) StoreCurrentTask(task *AiTask) {
 
 // interactive history memory
 func (m *Memory) StoreInteractiveEvent(eventID string, e *schema.AiOutputEvent) {
-	m.InteractiveHistory.Set(eventID, &InteractiveEventRecord{
-		InteractiveEvent: e,
-	})
+	// Check if there's already a placeholder record with user input
+	if existing, ok := m.InteractiveHistory.Get(eventID); ok && existing.InteractiveEvent == nil {
+		// Update the existing placeholder with the event
+		existing.InteractiveEvent = e
+		log.Debugf("updated placeholder interactive event record for ID %s", eventID)
+	} else {
+		// Create new record
+		m.InteractiveHistory.Set(eventID, &InteractiveEventRecord{
+			InteractiveEvent: e,
+		})
+	}
 }
 
 func (m *Memory) StoreInteractiveUserInput(eventID string, invoke aitool.InvokeParams) {
 	record, ok := m.InteractiveHistory.Get(eventID)
 	if !ok {
-		log.Errorf("error getting review record for event ID %s", eventID)
+		log.Debugf("interactive event record not found for ID %s, creating placeholder", eventID)
+		// Create a placeholder record if it doesn't exist
+		// This is normal in some timing scenarios
+		m.InteractiveHistory.Set(eventID, &InteractiveEventRecord{
+			InteractiveEvent: nil, // Will be set later if the event arrives
+			UserInput:        invoke,
+		})
 		return
 	}
 	record.UserInput = invoke
+}
+
+// SafeStoreInteractiveUserInput safely stores interactive user input with better error handling
+func (m *Memory) SafeStoreInteractiveUserInput(eventID string, invoke aitool.InvokeParams) {
+	if eventID == "" {
+		log.Warn("attempted to store interactive user input with empty event ID")
+		return
+	}
+
+	record, ok := m.InteractiveHistory.Get(eventID)
+	if !ok {
+		// Create a new record if it doesn't exist
+		log.Infof("creating new interactive event record for ID %s", eventID)
+		m.InteractiveHistory.Set(eventID, &InteractiveEventRecord{
+			InteractiveEvent: nil, // Will be set when the event arrives
+			UserInput:        invoke,
+		})
+		return
+	}
+	record.UserInput = invoke
+	log.Debugf("updated interactive user input for event ID %s", eventID)
 }
 
 func (m *Memory) GetInteractiveEventLast() (string, *InteractiveEventRecord, bool) {
@@ -217,6 +252,21 @@ func (m *Memory) GetInteractiveEventLast() (string, *InteractiveEventRecord, boo
 
 func (m *Memory) GetInteractiveEvent(eventID string) (*InteractiveEventRecord, bool) {
 	return m.InteractiveHistory.Get(eventID)
+}
+
+// SetTimelineAI safely sets the AI instance for memory timeline
+func (m *Memory) SetTimelineAI(ai aicommon.AICaller) {
+	if m.timeline != nil {
+		m.timeline.ai = ai
+	}
+}
+
+// GetTimelineAI returns the AI instance from memory timeline
+func (m *Memory) GetTimelineAI() aicommon.AICaller {
+	if m.timeline != nil {
+		return m.timeline.ai
+	}
+	return nil
 }
 
 // tool results memory

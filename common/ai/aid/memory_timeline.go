@@ -4,13 +4,14 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"strings"
 	"sync"
 	"text/template"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/linktable"
