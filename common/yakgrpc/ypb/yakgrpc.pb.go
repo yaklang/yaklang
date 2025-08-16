@@ -3487,6 +3487,8 @@ type AIInputEvent struct {
 	IsSyncMessage        bool           `protobuf:"varint,6,opt,name=IsSyncMessage,proto3" json:"IsSyncMessage,omitempty"`
 	SyncType             string         `protobuf:"bytes,7,opt,name=SyncType,proto3" json:"SyncType,omitempty"`
 	SyncJsonInput        string         `protobuf:"bytes,10,opt,name=SyncJsonInput,proto3" json:"SyncJsonInput,omitempty"`
+	IsFreeInput          bool           `protobuf:"varint,11,opt,name=IsFreeInput,proto3" json:"IsFreeInput,omitempty"`
+	FreeInput            string         `protobuf:"bytes,12,opt,name=FreeInput,proto3" json:"FreeInput,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -3587,6 +3589,20 @@ func (x *AIInputEvent) GetSyncType() string {
 func (x *AIInputEvent) GetSyncJsonInput() string {
 	if x != nil {
 		return x.SyncJsonInput
+	}
+	return ""
+}
+
+func (x *AIInputEvent) GetIsFreeInput() bool {
+	if x != nil {
+		return x.IsFreeInput
+	}
+	return false
+}
+
+func (x *AIInputEvent) GetFreeInput() string {
+	if x != nil {
+		return x.FreeInput
 	}
 	return ""
 }
@@ -57073,7 +57089,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tTaskIndex\x18\v \x01(\tR\tTaskIndex\x12(\n" +
 	"\x0fDisableMarkdown\x18\r \x01(\bR\x0fDisableMarkdown\x12\x16\n" +
 	"\x06IsSync\x18\f \x01(\bR\x06IsSync\x12\x16\n" +
-	"\x06SyncID\x18\x0e \x01(\tR\x06SyncID\"\x9a\x03\n" +
+	"\x06SyncID\x18\x0e \x01(\tR\x06SyncID\"\xda\x03\n" +
 	"\fAIInputEvent\x12\x18\n" +
 	"\aIsStart\x18\x01 \x01(\bR\aIsStart\x12*\n" +
 	"\x10IsConfigHotpatch\x18\b \x01(\bR\x10IsConfigHotpatch\x12\"\n" +
@@ -57085,7 +57101,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\rIsSyncMessage\x18\x06 \x01(\bR\rIsSyncMessage\x12\x1a\n" +
 	"\bSyncType\x18\a \x01(\tR\bSyncType\x12$\n" +
 	"\rSyncJsonInput\x18\n" +
-	" \x01(\tR\rSyncJsonInput\"\xa8\x02\n" +
+	" \x01(\tR\rSyncJsonInput\x12 \n" +
+	"\vIsFreeInput\x18\v \x01(\bR\vIsFreeInput\x12\x1c\n" +
+	"\tFreeInput\x18\f \x01(\tR\tFreeInput\"\xa8\x02\n" +
 	"\x12AITriageInputEvent\x12\x18\n" +
 	"\aIsStart\x18\x01 \x01(\bR\aIsStart\x12*\n" +
 	"\x06Params\x18\x02 \x01(\v2\x12.ypb.AIStartParamsR\x06Params\x122\n" +

@@ -62,8 +62,8 @@ func (r *ReAct) ProcessQuery(query string) error {
 		log.Infof("ReAct processing query: %s", query)
 	}
 
-	// Create a mock input event for compatibility
-	event := &ypb.AITriageInputEvent{
+	// Create an input event for the query
+	event := &ypb.AIInputEvent{
 		IsFreeInput: true,
 		FreeInput:   query,
 	}
@@ -72,7 +72,7 @@ func (r *ReAct) ProcessQuery(query string) error {
 }
 
 // ProcessInputEvent processes a single input event directly
-func (r *ReAct) ProcessInputEvent(event *ypb.AITriageInputEvent) error {
+func (r *ReAct) ProcessInputEvent(event *ypb.AIInputEvent) error {
 	if r.config.debugEvent {
 		log.Infof("ReAct received input event: IsFreeInput=%v, FreeInput=%s", event.IsFreeInput, event.FreeInput)
 	}
@@ -81,9 +81,9 @@ func (r *ReAct) ProcessInputEvent(event *ypb.AITriageInputEvent) error {
 }
 
 // processInputEvent processes a single input event and triggers ReAct loop
-func (r *ReAct) processInputEvent(event *ypb.AITriageInputEvent) error {
+func (r *ReAct) processInputEvent(event *ypb.AIInputEvent) error {
 	if r.config.debugEvent {
-		log.Infof("Processing input event: IsFreeInput=%v, FreeInput=%s", event.IsFreeInput, event.FreeInput)
+		log.Infof("Processing input event: IsFreeInput=%v, IsInteractive=%v", event.IsFreeInput, event.IsInteractiveMessage)
 	}
 
 	// Handle different types of input events
@@ -96,17 +96,17 @@ func (r *ReAct) processInputEvent(event *ypb.AITriageInputEvent) error {
 		if r.config.debugEvent {
 			log.Infof("Using free input: %s", userInput)
 		}
-	} else if event.IsStart && event.Params != nil {
-		// Handle structured input from AIStartParams
-		userInput = "Start new conversation"
-		shouldResetSession = true
+	} else if event.IsInteractiveMessage {
+		// Handle interactive messages (tool review responses)
+		// This is handled by the event input channel in the ReAct configuration
 		if r.config.debugEvent {
-			log.Info("Using start conversation input")
+			log.Infof("Processing interactive message: ID=%s", event.InteractiveId)
 		}
+		// The actual processing is handled by the underlying coordinator through event channels
+		return nil
 	} else {
-		// Handle other event types
-		userInput = "No user input available"
-		log.Warn("No valid input found in event")
+		log.Warnf("No valid input found in event")
+		return nil
 	}
 
 	// Reset session state if needed
