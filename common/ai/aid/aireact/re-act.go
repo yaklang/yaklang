@@ -31,8 +31,8 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 
 	// Initialize memory with AI capability
 	if cfg.memory != nil && cfg.aiCallback != nil {
-		// Note: Timeline AI caller will be set automatically when tools are used
-		// No need to manually set it here
+		// Set the AI instance for memory timeline
+		cfg.memory.SetTimelineAI(cfg)
 
 		// Store tools function
 		cfg.memory.StoreTools(func() []*aitool.Tool {
@@ -134,7 +134,10 @@ func (r *ReAct) processInputEvent(event *ypb.AIInputEvent) error {
 		// Re-initialize memory with tools and AI capability
 		if r.config.memory != nil && r.config.aiCallback != nil {
 			// Reset memory state for new session
-			// No need to create a coordinator - just reset the memory
+			// Set the AI instance for memory timeline
+			r.config.memory.SetTimelineAI(r.config)
+
+			// Store tools function
 			r.config.memory.StoreTools(func() []*aitool.Tool {
 				if r.config.aiToolManager == nil {
 					return []*aitool.Tool{}
