@@ -15,9 +15,15 @@ Tool executed: {{ .ToolName }}
 {{ if eq .Language "zh" }}LANGUAGE: Please respond in Chinese (中文).{{ else }}LANGUAGE: Please respond in English.{{ end }}
 
 # Instructions
-Based on the tool execution results and conversation history, determine:
-1. Whether the user's original request has been satisfied
-2. Provide a human-readable summary of the results
+基于工具执行结果和对话历史，判断：
+1. 用户的原始请求是否已经得到满足
+2. 提供执行结果的可读摘要
+
+**重要判断标准：**
+- 如果用户要求执行bash命令（如"bash exec ls current"），只要bash工具成功执行了相关命令并有输出，就认为需求已满足
+- 如果最新的工具执行成功并产生了有意义的结果，通常表示任务完成
+- 不要因为历史中的失败尝试而认为当前成功的执行无效
+- 关注最新的工具执行结果，而不是过往的失败历史
 
 RESPONSE FORMAT: Respond with a JSON object:
 
@@ -31,7 +37,6 @@ RESPONSE FORMAT: Respond with a JSON object:
 ```
 
 IMPORTANT GUIDELINES:
-- Set user_satisfied to true only if the original request was genuinely fulfilled
-- If the tool failed or produced unclear results, set user_satisfied to false
-- Make the human_readable_result clear and informative for the user
-- Focus on what the user actually wanted to know or accomplish
+- 如果最新的工具执行成功且产生了相关输出，通常应该设置user_satisfied为true
+- 只有当工具执行完全失败或没有任何相关输出时，才设置user_satisfied为false
+- 重点关注用户的核心需求是否得到满足，而不是执行过程的细节
