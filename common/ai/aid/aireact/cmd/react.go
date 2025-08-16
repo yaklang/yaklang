@@ -464,6 +464,12 @@ func processTask(task *TaskItem, inputChan chan<- *ypb.AIInputEvent) {
 
 	switch task.Type {
 	case "query":
+		// Reset stream display state for new query
+		streamingMutex.Lock()
+		streamDisplayed = false
+		streamingActive = false
+		streamingMutex.Unlock()
+
 		// Send query to ReAct
 		event := &ypb.AIInputEvent{
 			IsFreeInput: true,
@@ -1078,9 +1084,8 @@ func handleClientEvent(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInpu
 		}
 		// In non-interactive mode, this event will be handled by DoWaitAgree auto-approval
 	case schema.EVENT_TYPE_STREAM:
-		if debugMode {
-			fmt.Printf("[stream]: %s\n", string(event.Content))
-		}
+		// Always show stream events with scrolling effect
+		fmt.Printf("[stream]: %s\n", string(event.Content))
 	case schema.EVENT_TYPE_STRUCTURED:
 		if debugMode {
 			fmt.Printf("[structured]: %s\n", string(event.Content))
