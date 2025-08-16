@@ -2,8 +2,9 @@ package aireact
 
 import (
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
@@ -25,7 +26,7 @@ func (r *ReAct) verifyUserSatisfaction(originalQuery, toolName string) (bool, st
 	log.Infof("Verifying if user needs are satisfied and formatting results...")
 
 	// Use the unified AI call wrapper instead of aid.CallAITransaction to ensure consistency
-	resp, err := r.config.CallAI(verificationPrompt)
+	resp, err := r.config.callAI(verificationPrompt)
 	if err != nil {
 		return false, "", utils.Errorf("failed to call AI for verification: %v", err)
 	}

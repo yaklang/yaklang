@@ -5,20 +5,12 @@ import (
 	"io"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 type AICallbackType func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error)
-
-type Interactivable interface {
-	// wait and review
-	GetEndpointManager() *EndpointManager
-	DoWaitAgree(ctx context.Context, endpoint *Endpoint)
-	CallAfterInteractiveEventReleased(string, aitool.InvokeParams)
-}
 
 type AICallerConfigIf interface {
 	AcquireId() int64

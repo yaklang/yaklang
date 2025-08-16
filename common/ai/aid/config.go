@@ -148,6 +148,12 @@ func (c *Config) GetRuntimeId() string {
 	return c.id
 }
 
+func (c *Config) Feed(endpointId string, params aitool.InvokeParams) {
+	if c.epm != nil {
+		c.epm.Feed(endpointId, params)
+	}
+}
+
 func (c *Config) CallAfterInteractiveEventReleased(eventID string, invoke aitool.InvokeParams) {
 	c.memory.StoreInteractiveUserInput(eventID, invoke)
 }

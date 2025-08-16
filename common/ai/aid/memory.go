@@ -3,11 +3,12 @@ package aid
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	osRuntime "runtime"
 	"strings"
 	"text/template"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -52,9 +53,6 @@ type Memory struct {
 	DisableTools          bool
 	Tools                 func() []*aitool.Tool
 	toolsKeywordsCallback func() []string
-
-	// tool call results
-	//toolCallResults []*aitool.ToolResult
 
 	// interactive history
 	InteractiveHistory *omap.OrderedMap[string, *InteractiveEventRecord]
