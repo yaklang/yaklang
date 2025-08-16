@@ -5,7 +5,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"io"
 	"os"
 	"os/signal"
@@ -14,6 +13,8 @@ import (
 	"syscall"
 	"time"
 	"unicode/utf8"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
@@ -36,6 +37,8 @@ func main() {
 		query       = flag.String("query", "", "One-time query mode (exits after response)")
 		debug       = flag.Bool("debug", false, "Enable debug mode")
 		interactive = flag.Bool("i", false, "Enable interactive tool review mode (requires user approval for each tool use)")
+		autoAllow   = flag.Bool("auto-allow", false, "Automatically approve all tool usage without review")
+		autoAllowY  = flag.Bool("y", false, "Automatically approve all tool usage without review (shorthand for --auto-allow)")
 		breakpoint  = flag.Bool("breakpoint", false, "Enable breakpoint mode (pause before/after each AI interaction for inspection)")
 		breakpointB = flag.Bool("b", false, "Enable breakpoint mode (shorthand for --breakpoint)")
 	)
@@ -43,6 +46,9 @@ func main() {
 
 	// Combine breakpoint flags and set global variable
 	breakpointEnabled = *breakpoint || *breakpointB
+
+	// Combine auto-allow flags
+	autoApprove := *autoAllow || *autoAllowY
 
 	// Set debug mode from command line flag (independent of breakpoint mode)
 	debugMode = *debug
@@ -56,8 +62,13 @@ func main() {
 		log.Info("In breakpoint mode, press Enter/y to continue, e/q to exit, or Ctrl+C to terminate")
 	}
 
+	// Display mode information
 	if *interactive {
 		log.Info("Interactive tool review mode enabled - will require user approval for each tool use")
+	} else if autoApprove {
+		log.Info("Auto-approve mode enabled - all tool usage will be automatically approved")
+	} else {
+		log.Info("Default tool review mode enabled - will show tool usage but auto-approve in CLI mode")
 	}
 
 	log.Info("Starting ReAct CLI Demo")
@@ -157,12 +168,26 @@ func main() {
 		}),
 	)
 
-	// Add interactive tool review if enabled
+	// Configure tool review based on command line options
 	if *interactive {
-		log.Info("Interactive tool review mode enabled")
+		// Full interactive mode - require user approval for each tool
+		log.Info("Configuring interactive tool review mode")
 		reactOptions = append(reactOptions,
 			aireact.WithToolReview(true),
 			aireact.WithReviewHandler(createInteractiveReviewHandler()),
+		)
+	} else if autoApprove {
+		// Auto-approve mode - skip all reviews
+		log.Info("Configuring auto-approve mode")
+		reactOptions = append(reactOptions,
+			aireact.WithAutoApproveTools(),
+		)
+	} else {
+		// Default mode - show tool usage but auto-approve for CLI
+		log.Info("Configuring default tool review mode")
+		reactOptions = append(reactOptions,
+			aireact.WithToolReview(true),
+			aireact.WithReviewHandler(createDefaultReviewHandler()),
 		)
 	}
 
@@ -733,6 +758,33 @@ func handleResponseBreakpoint(resp *aicommon.AIResponse) {
 
 	// Clean up signal handler
 	signal.Stop(sigChan)
+}
+
+// createDefaultReviewHandler creates a default tool review handler that shows info but auto-approves
+func createDefaultReviewHandler() func(reviewInfo *aireact.ToolReviewInfo) {
+	return func(reviewInfo *aireact.ToolReviewInfo) {
+		// Display tool information but auto-approve
+		fmt.Printf("\n[TOOL REVIEW] Auto-approving tool usage:\n")
+		fmt.Printf("Tool: %s\n", reviewInfo.Tool.Name)
+		fmt.Printf("Description: %s\n", reviewInfo.Tool.Description)
+		if debugMode {
+			fmt.Printf("Parameters: %v\n", reviewInfo.Params)
+		}
+		fmt.Printf("Status: Auto-approved\n\n")
+
+		// Auto-approve
+		response := &aireact.ToolReviewResponse{
+			Suggestion: "continue",
+		}
+
+		// Send response back
+		select {
+		case reviewInfo.ResponseChannel <- response:
+			log.Infof("Tool review auto-approved: %s", reviewInfo.Tool.Name)
+		default:
+			log.Warnf("Failed to send tool review response - channel may be closed")
+		}
+	}
 }
 
 // createInteractiveReviewHandler creates an interactive tool review handler
