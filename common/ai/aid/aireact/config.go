@@ -18,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type AICallbackType = aicommon.AICallbackType
@@ -62,6 +63,10 @@ type ReActConfig struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	// Event loop management
+	startInputEventOnce sync.Once
+	eventInputChan      chan *ypb.AIInputEvent
 
 	// ID management
 	id          string
@@ -144,6 +149,13 @@ func WithAICallback(callback aicommon.AICallbackType) Option {
 func WithEventHandler(handler func(e *schema.AiOutputEvent)) Option {
 	return func(cfg *ReActConfig) {
 		cfg.eventHandler = handler
+	}
+}
+
+// WithEventInputChan sets the event input channel for ReAct
+func WithEventInputChan(ch chan *ypb.AIInputEvent) Option {
+	return func(cfg *ReActConfig) {
+		cfg.eventInputChan = ch
 	}
 }
 
@@ -432,6 +444,7 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 			return atomic.AddInt64(idGenerator, 1)
 		},
 		task:                   task,
+		eventInputChan:         make(chan *ypb.AIInputEvent, 100), // Initialize event input channel
 		maxIterations:          10,
 		maxThoughts:            3,
 		maxActions:             5,

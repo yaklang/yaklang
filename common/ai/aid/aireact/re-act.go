@@ -2,7 +2,9 @@ package aireact
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -45,6 +47,9 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 		})
 	}
 
+	// Start the event loop in background
+	react.startEventLoop(cfg.ctx)
+
 	return react, nil
 }
 
@@ -56,28 +61,22 @@ func (r *ReAct) UpdateDebugMode(debug bool) {
 	r.config.debugPrompt = debug
 }
 
-// ProcessQuery processes a query string directly and emits events via the configured event handler
-func (r *ReAct) ProcessQuery(query string) error {
-	if r.config.debugEvent {
-		log.Infof("ReAct processing query: %s", query)
+// SendInputEvent sends an input event to the event loop (non-blocking)
+// This is the only public API for external clients to send input to ReAct
+func (r *ReAct) SendInputEvent(event *ypb.AIInputEvent) error {
+	if r.config.eventInputChan == nil {
+		return fmt.Errorf("event input channel is not initialized")
 	}
 
-	// Create an input event for the query
-	event := &ypb.AIInputEvent{
-		IsFreeInput: true,
-		FreeInput:   query,
+	select {
+	case r.config.eventInputChan <- event:
+		if r.config.debugEvent {
+			log.Infof("ReAct event sent to channel: IsFreeInput=%v, IsInteractive=%v", event.IsFreeInput, event.IsInteractiveMessage)
+		}
+		return nil
+	default:
+		return fmt.Errorf("event input channel is full, event dropped")
 	}
-
-	return r.processInputEvent(event)
-}
-
-// ProcessInputEvent processes a single input event directly
-func (r *ReAct) ProcessInputEvent(event *ypb.AIInputEvent) error {
-	if r.config.debugEvent {
-		log.Infof("ReAct received input event: IsFreeInput=%v, FreeInput=%s", event.IsFreeInput, event.FreeInput)
-	}
-
-	return r.processInputEvent(event)
 }
 
 // processInputEvent processes a single input event and triggers ReAct loop
@@ -98,11 +97,27 @@ func (r *ReAct) processInputEvent(event *ypb.AIInputEvent) error {
 		}
 	} else if event.IsInteractiveMessage {
 		// Handle interactive messages (tool review responses)
-		// This is handled by the event input channel in the ReAct configuration
 		if r.config.debugEvent {
 			log.Infof("Processing interactive message: ID=%s", event.InteractiveId)
 		}
-		// The actual processing is handled by the underlying coordinator through event channels
+
+		// Parse the interactive JSON input to get the suggestion
+		suggestion := gjson.Get(event.InteractiveJSONInput, "suggestion").String()
+		if suggestion == "" {
+			suggestion = "continue" // Default fallback
+		}
+
+		// Feed the response to the endpoint manager
+		if r.config.epm != nil {
+			params := aitool.InvokeParams{
+				"suggestion": suggestion,
+			}
+			r.config.epm.Feed(event.InteractiveId, params)
+			if r.config.debugEvent {
+				log.Infof("Fed interactive response to endpoint: ID=%s, suggestion=%s", event.InteractiveId, suggestion)
+			}
+		}
+
 		return nil
 	} else {
 		log.Warnf("No valid input found in event")
@@ -142,4 +157,54 @@ func (r *ReAct) processInputEvent(event *ypb.AIInputEvent) error {
 		log.Infof("Executing main loop with user input: %s", userInput)
 	}
 	return r.executeMainLoop(userInput)
+}
+
+// startEventLoop starts the background event processing loop
+func (r *ReAct) startEventLoop(ctx context.Context) {
+	r.config.startInputEventOnce.Do(func() {
+		go func() {
+			if r.config.debugEvent {
+				log.Infof("ReAct event loop started for instance: %s", r.config.id)
+			}
+
+			for {
+				if r.config.eventInputChan == nil {
+					if r.config.debugEvent {
+						log.Warnf("ReAct event input channel is nil, will retry...")
+					}
+					<-ctx.Done()
+					return
+				}
+
+				select {
+				case event, ok := <-r.config.eventInputChan:
+					if !ok {
+						log.Errorf("ReAct event input channel closed for instance: %s", r.config.id)
+						return
+					}
+					if event == nil {
+						continue
+					}
+
+					if r.config.debugEvent {
+						log.Infof("ReAct event loop processing event: IsFreeInput=%v, IsInteractive=%v",
+							event.IsFreeInput, event.IsInteractiveMessage)
+					}
+
+					// Process the event in the background (non-blocking)
+					go func(event *ypb.AIInputEvent) {
+						if err := r.processInputEvent(event); err != nil {
+							log.Errorf("ReAct event processing failed: %v", err)
+						}
+					}(event)
+
+				case <-ctx.Done():
+					if r.config.debugEvent {
+						log.Infof("ReAct event loop stopped for instance: %s", r.config.id)
+					}
+					return
+				}
+			}
+		}()
+	})
 }
