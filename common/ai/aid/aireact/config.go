@@ -367,27 +367,6 @@ func (cfg *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endp
 		return
 	}
 
-	// If tool review is enabled and we have a custom handler (non-interactive), auto-approve with logging
-	if cfg.enableToolReview && cfg.reviewHandler != nil {
-		log.Infof("Using custom review handler - auto-approving tool usage")
-
-		// Extract tool information from endpoint if available
-		materials := endpoint.GetReviewMaterials()
-		if materials != nil {
-			if toolName, ok := materials["tool"].(string); ok {
-				log.Infof("Auto-approving tool: %s", toolName)
-			}
-			if toolDesc, ok := materials["tool_description"].(string); ok {
-				log.Infof("Tool description: %s", toolDesc)
-			}
-		}
-
-		// Auto-approve in CLI mode
-		endpoint.SetParams(aitool.InvokeParams{"suggestion": "continue"})
-		endpoint.Release()
-		return
-	}
-
 	// Default behavior: wait for user interaction
 	endpoint.Wait()
 }
