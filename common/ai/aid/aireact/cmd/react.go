@@ -29,37 +29,14 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// Task queue and timeline structures
-type TaskItem struct {
-	ID          string     `json:"id"`
-	Type        string     `json:"type"` // "query", "review_response"
-	Content     string     `json:"content"`
-	Status      string     `json:"status"` // "pending", "processing", "completed", "failed"
-	CreatedAt   time.Time  `json:"created_at"`
-	ProcessedAt *time.Time `json:"processed_at,omitempty"`
-	CompletedAt *time.Time `json:"completed_at,omitempty"`
-}
-
-type TimelineEntry struct {
-	Timestamp time.Time `json:"timestamp"`
-	Type      string    `json:"type"` // "input", "thought", "action", "observation", "result"
-	Content   string    `json:"content"`
-	TaskID    string    `json:"task_id,omitempty"`
-}
-
-// Global state management
+// Global state management (simplified - most queue logic moved to ReAct)
 var (
-	globalUserInput        = make(chan string, 10)     // Channel for all user input
-	taskQueue              = make([]*TaskItem, 0)      // Queue for pending tasks
-	timeline               = make([]*TimelineEntry, 0) // Timeline of all events
-	queueMutex             sync.RWMutex                // Mutex to protect queue and timeline
-	waitingForReview       = false                     // Flag to indicate if we're waiting for review input
-	reviewOptions          []reviewOption              // Current review options
-	reviewMutex            sync.Mutex                  // Mutex to protect review state
-	currentReviewEventID   string                      // Current review event ID
-	currentReviewInputChan chan<- *ypb.AIInputEvent    // Current review input channel
-	currentProcessingTask  *TaskItem                   // Currently processing task
-	taskIDCounter          int64                       // Counter for generating unique task IDs
+	globalUserInput      = make(chan string, 10) // Channel for all user input
+	waitingForReview     = false                 // Flag to indicate if we're waiting for review input
+	reviewOptions        []reviewOption          // Current review options
+	reviewMutex          sync.Mutex              // Mutex to protect review state
+	currentReviewEventID string                  // Current review event ID
+
 )
 
 // reviewOption represents a review choice option
@@ -71,142 +48,31 @@ type reviewOption struct {
 var debugMode = false
 var breakpointEnabled = false
 
-// Queue management functions
-func generateTaskID() string {
-	taskIDCounter++
-	return fmt.Sprintf("task_%d_%d", time.Now().Unix(), taskIDCounter)
-}
-
-func addToQueue(taskType, content string) *TaskItem {
-	queueMutex.Lock()
-	defer queueMutex.Unlock()
-
-	task := &TaskItem{
-		ID:        generateTaskID(),
-		Type:      taskType,
-		Content:   content,
-		Status:    "pending",
-		CreatedAt: time.Now(),
-	}
-
-	taskQueue = append(taskQueue, task)
-
-	// Add to timeline
-	timeline = append(timeline, &TimelineEntry{
-		Timestamp: time.Now(),
-		Type:      "input",
-		Content:   fmt.Sprintf("Added %s to queue: %s", taskType, content),
-		TaskID:    task.ID,
-	})
-
-	log.Infof("Added task to queue: %s (%s)", task.ID, taskType)
-	return task
-}
-
-func getNextTask() *TaskItem {
-	queueMutex.Lock()
-	defer queueMutex.Unlock()
-
-	for _, task := range taskQueue {
-		if task.Status == "pending" {
-			return task
-		}
-	}
-	return nil
-}
-
-func updateTaskStatus(taskID, status string) {
-	queueMutex.Lock()
-	defer queueMutex.Unlock()
-
-	for _, task := range taskQueue {
-		if task.ID == taskID {
-			task.Status = status
-			now := time.Now()
-
-			switch status {
-			case "processing":
-				task.ProcessedAt = &now
-			case "completed", "failed":
-				task.CompletedAt = &now
-			}
-
-			// Add to timeline
-			timeline = append(timeline, &TimelineEntry{
-				Timestamp: now,
-				Type:      "status",
-				Content:   fmt.Sprintf("Task %s: %s", taskID, status),
-				TaskID:    taskID,
-			})
-
-			log.Infof("Task %s status updated to: %s", taskID, status)
-			break
-		}
-	}
-}
-
-func addToTimeline(entryType, content, taskID string) {
-	queueMutex.Lock()
-	defer queueMutex.Unlock()
-
-	timeline = append(timeline, &TimelineEntry{
-		Timestamp: time.Now(),
-		Type:      entryType,
-		Content:   content,
-		TaskID:    taskID,
-	})
-}
-
-func displayQueue() {
-	queueMutex.RLock()
-	defer queueMutex.RUnlock()
-
-	fmt.Printf("\n=== TASK QUEUE ===\n")
-	if len(taskQueue) == 0 {
-		fmt.Println("Queue is empty")
+// displayQueueInfo 显示 ReAct 队列信息
+func displayQueueInfo(reactInstance *aireact.ReAct) {
+	// 使用 ReAct 的队列信息获取方法
+	err := reactInstance.SendReActSyncRequest(aireact.REACT_SYNC_TYPE_QUEUE_INFO, nil)
+	if err != nil {
+		fmt.Printf("Failed to get queue info: %v\n", err)
 		return
 	}
-
-	for i, task := range taskQueue {
-		fmt.Printf("%d. [%s] %s (%s)\n", i+1, task.Status, task.Content, task.Type)
-		fmt.Printf("   ID: %s | Created: %s\n", task.ID, task.CreatedAt.Format("15:04:05"))
-		if task.ProcessedAt != nil {
-			fmt.Printf("   Processed: %s\n", task.ProcessedAt.Format("15:04:05"))
-		}
-		if task.CompletedAt != nil {
-			fmt.Printf("   Completed: %s\n", task.CompletedAt.Format("15:04:05"))
-		}
-		fmt.Println()
-	}
-	fmt.Printf("===================\n\n")
+	fmt.Println("Queue info request sent - check output events for details")
 }
 
-func displayTimeline(limit int) {
-	queueMutex.RLock()
-	defer queueMutex.RUnlock()
+// displayTimelineInfo 显示 ReAct 时间线信息
+func displayTimelineInfo(reactInstance *aireact.ReAct, limit int) {
+	// 使用 ReAct 的时间线信息获取方法
+	params := make(map[string]interface{})
+	if limit > 0 {
+		params["limit"] = limit
+	}
 
-	fmt.Printf("\n=== TIMELINE ===\n")
-	if len(timeline) == 0 {
-		fmt.Println("Timeline is empty")
+	err := reactInstance.SendReActSyncRequest(aireact.REACT_SYNC_TYPE_TIMELINE, params)
+	if err != nil {
+		fmt.Printf("Failed to get timeline info: %v\n", err)
 		return
 	}
-
-	start := 0
-	if limit > 0 && len(timeline) > limit {
-		start = len(timeline) - limit
-	}
-
-	for i := start; i < len(timeline); i++ {
-		entry := timeline[i]
-		fmt.Printf("[%s] %s: %s\n",
-			entry.Timestamp.Format("15:04:05"),
-			strings.ToUpper(entry.Type),
-			entry.Content)
-		if entry.TaskID != "" {
-			fmt.Printf("        Task: %s\n", entry.TaskID)
-		}
-	}
-	fmt.Printf("===============\n\n")
+	fmt.Printf("Timeline info request sent (limit: %d) - check output events for details\n", limit)
 }
 
 func main() {
@@ -405,108 +271,35 @@ func main() {
 
 	// Handle one-time query mode
 	if *query != "" {
-		handleInitialQuery(inputChan, *query)
+		handleInitialQuery(reactInstance, *query)
 		// Give a moment for the query to be processed before starting interactive mode
 		time.Sleep(100 * time.Millisecond)
 	}
 
 	// Start interactive CLI loop in background
-	go handleInteractiveLoop(inputChan, ctx)
-
-	// Start queue processor
-	go taskQueueProcessor(inputChan, ctx)
+	go handleInteractiveLoop(reactInstance, ctx)
 
 	// Wait for tasks to complete and keep main thread alive
 	waitForTasksAndContinue(ctx)
 }
 
-// handleInitialQuery sends the initial query through input channel
-func handleInitialQuery(inputChan chan<- *ypb.AIInputEvent, query string) {
-	// Add initial query to queue
-	task := addToQueue("query", query)
-	log.Infof("Added initial query to queue: %s", task.ID)
-}
-
-// taskQueueProcessor processes tasks from the queue sequentially
-func taskQueueProcessor(inputChan chan<- *ypb.AIInputEvent, ctx context.Context) {
-	log.Infof("Task queue processor started")
-
-	ticker := time.NewTicker(500 * time.Millisecond) // Check every 500ms
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			// Get next pending task if no task is currently processing
-			if currentProcessingTask == nil {
-				task := getNextTask()
-				if task != nil {
-					processTask(task, inputChan)
-				}
-			}
-		case <-ctx.Done():
-			log.Info("Task queue processor shutting down")
-			return
-		}
+// handleInitialQuery sends the initial query directly to ReAct
+func handleInitialQuery(reactInstance *aireact.ReAct, query string) {
+	event := &ypb.AIInputEvent{
+		IsFreeInput: true,
+		FreeInput:   query,
 	}
-}
 
-// processTask processes a single task
-func processTask(task *TaskItem, inputChan chan<- *ypb.AIInputEvent) {
-	queueMutex.Lock()
-	currentProcessingTask = task
-	queueMutex.Unlock()
-
-	updateTaskStatus(task.ID, "processing")
-	addToTimeline("processing", fmt.Sprintf("Started processing task: %s", task.Content), task.ID)
-
-	log.Infof("Processing task: %s (%s)", task.ID, task.Type)
-
-	switch task.Type {
-	case "query":
-		// Reset stream display state for new query
-		streamingMutex.Lock()
-		streamDisplayed = false
-		streamingActive = false
-		streamingMutex.Unlock()
-
-		// Send query to ReAct
-		event := &ypb.AIInputEvent{
-			IsFreeInput: true,
-			FreeInput:   task.Content,
-		}
-
-		select {
-		case inputChan <- event:
-			log.Infof("Sent query to ReAct: %s", task.Content)
-		default:
-			log.Errorf("Failed to send query to ReAct: channel may be full")
-			updateTaskStatus(task.ID, "failed")
-			queueMutex.Lock()
-			currentProcessingTask = nil
-			queueMutex.Unlock()
-		}
-
-	case "review_response":
-		// This case should not happen anymore since review responses are processed immediately
-		log.Warnf("Unexpected review_response task in queue: %s", task.ID)
-		updateTaskStatus(task.ID, "failed")
-
-		queueMutex.Lock()
-		currentProcessingTask = nil
-		queueMutex.Unlock()
-
-	default:
-		log.Errorf("Unknown task type: %s", task.Type)
-		updateTaskStatus(task.ID, "failed")
-		queueMutex.Lock()
-		currentProcessingTask = nil
-		queueMutex.Unlock()
+	err := reactInstance.SendInputEvent(event)
+	if err != nil {
+		log.Errorf("Failed to send initial query: %v", err)
+	} else {
+		log.Infof("Initial query sent to ReAct: %s", query)
 	}
 }
 
 // handleInteractiveLoop handles continuous user interaction
-func handleInteractiveLoop(inputChan chan<- *ypb.AIInputEvent, ctx context.Context) {
+func handleInteractiveLoop(reactInstance *aireact.ReAct, ctx context.Context) {
 	// Start global input reader in background
 	go globalInputReader(ctx)
 
@@ -541,7 +334,7 @@ func handleInteractiveLoop(inputChan chan<- *ypb.AIInputEvent, ctx context.Conte
 			}
 
 			if input == "/queue" {
-				displayQueue()
+				displayQueueInfo(reactInstance)
 				fmt.Print("> ")
 				continue
 			}
@@ -555,7 +348,7 @@ func handleInteractiveLoop(inputChan chan<- *ypb.AIInputEvent, ctx context.Conte
 						limit = parsedLimit
 					}
 				}
-				displayTimeline(limit)
+				displayTimelineInfo(reactInstance, limit)
 				fmt.Print("> ")
 				continue
 			}
@@ -564,7 +357,7 @@ func handleInteractiveLoop(inputChan chan<- *ypb.AIInputEvent, ctx context.Conte
 			reviewMutex.Lock()
 			if waitingForReview {
 				// Always process review input immediately when waiting for review
-				processReviewInput(input, inputChan)
+				processReviewInput(input, reactInstance)
 				reviewMutex.Unlock()
 				fmt.Print("> ")
 				continue
@@ -577,9 +370,18 @@ func handleInteractiveLoop(inputChan chan<- *ypb.AIInputEvent, ctx context.Conte
 				firstInput = false
 			}
 
-			// Add query to queue
-			task := addToQueue("query", input)
-			fmt.Printf("Added query to queue: %s\n", task.ID)
+			// Send query directly to ReAct
+			event := &ypb.AIInputEvent{
+				IsFreeInput: true,
+				FreeInput:   input,
+			}
+
+			err := reactInstance.SendInputEvent(event)
+			if err != nil {
+				fmt.Printf("Failed to send query: %v\n", err)
+			} else {
+				fmt.Printf("Query sent to ReAct: %s\n", input)
+			}
 			fmt.Print("> ")
 
 		case <-ctx.Done():
@@ -1027,37 +829,20 @@ func parseSelectionIndex(input string, maxOptions int) int {
 
 // handleClientEvent handles events in client mode using input channel
 func handleClientEvent(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInputEvent, interactiveMode bool) {
-	// Add events to timeline
-	var taskID string
-	if currentProcessingTask != nil {
-		taskID = currentProcessingTask.ID
-	}
 
 	// Handle output events with simplified display
 	switch event.Type {
 	case schema.EVENT_TYPE_THOUGHT:
 		// Display thinking process
 		fmt.Printf("[think]: %s\n", string(event.Content))
-		addToTimeline("thought", string(event.Content), taskID)
 	case schema.EVENT_TYPE_ACTION:
 		fmt.Printf("[action]: %s\n", string(event.Content))
-		addToTimeline("action", string(event.Content), taskID)
 	case schema.EVENT_TYPE_OBSERVATION:
 		fmt.Printf("[observe]: %s\n", string(event.Content))
-		addToTimeline("observation", string(event.Content), taskID)
 	case schema.EVENT_TYPE_RESULT:
 		result := extractResultContent(string(event.Content))
 		fmt.Printf("[result]: %s\n", result)
 		fmt.Printf("[ai]: final message for current loop\n")
-		addToTimeline("result", result, taskID)
-
-		// Mark current task as completed
-		if currentProcessingTask != nil {
-			updateTaskStatus(currentProcessingTask.ID, "completed")
-			queueMutex.Lock()
-			currentProcessingTask = nil
-			queueMutex.Unlock()
-		}
 
 		// Reset review state when ReAct loop completes
 		reviewMutex.Lock()
@@ -1065,9 +850,23 @@ func handleClientEvent(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInpu
 			waitingForReview = false
 			reviewOptions = nil
 			currentReviewEventID = ""
-			currentReviewInputChan = nil
+
 		}
 		reviewMutex.Unlock()
+	case schema.EVENT_TYPE_STRUCTURED:
+		// Handle queue info and timeline events
+		content := string(event.Content)
+		if strings.Contains(content, "queue_name") {
+			fmt.Printf("\n=== REACT QUEUE INFO ===\n")
+			fmt.Printf("%s\n", content)
+			fmt.Printf("========================\n\n")
+		} else if strings.Contains(content, "total_entries") {
+			fmt.Printf("\n=== REACT TIMELINE ===\n")
+			fmt.Printf("%s\n", content)
+			fmt.Printf("======================\n\n")
+		} else if debugMode {
+			fmt.Printf("[structured]: %s\n", content)
+		}
 	case schema.EVENT_TYPE_ITERATION:
 		if debugMode {
 			fmt.Printf("[iteration]: %s\n", string(event.Content))
@@ -1086,10 +885,6 @@ func handleClientEvent(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInpu
 	case schema.EVENT_TYPE_STREAM:
 		// Always show stream events with scrolling effect
 		fmt.Printf("[stream]: %s\n", string(event.Content))
-	case schema.EVENT_TYPE_STRUCTURED:
-		if debugMode {
-			fmt.Printf("[structured]: %s\n", string(event.Content))
-		}
 	default:
 		if debugMode {
 			fmt.Printf("[%s]: %s\n", strings.ToLower(string(event.Type)), string(event.Content))
@@ -1168,14 +963,14 @@ func handleReviewRequireClient(event *schema.AiOutputEvent, inputChan chan<- *yp
 	waitingForReview = true
 	reviewOptions = options
 	currentReviewEventID = eventID
-	currentReviewInputChan = inputChan
+
 	reviewMutex.Unlock()
 
 	// The processReviewInput function will handle the actual input when it arrives
 }
 
 // processReviewInput processes user input for review selection
-func processReviewInput(input string, inputChan chan<- *ypb.AIInputEvent) {
+func processReviewInput(input string, reactInstance *aireact.ReAct) {
 	var selectedValue string
 
 	// Try to parse as number first
@@ -1199,19 +994,17 @@ func processReviewInput(input string, inputChan chan<- *ypb.AIInputEvent) {
 		fmt.Printf("[REVIEW]: Selected action: %s\n", selectedValue)
 	}
 
-	// Create and send input event through channel
+	// Create and send input event to ReAct
 	inputEvent := &ypb.AIInputEvent{
 		IsInteractiveMessage: true,
 		InteractiveId:        currentReviewEventID,
 		InteractiveJSONInput: fmt.Sprintf(`{"suggestion": "%s"}`, selectedValue),
 	}
 
-	// Send the input event through channel
-	select {
-	case currentReviewInputChan <- inputEvent:
-		// Successfully sent
-	default:
-		log.Errorf("Failed to send input event: channel may be full")
+	// Send the input event through ReAct
+	err := reactInstance.SendInputEvent(inputEvent)
+	if err != nil {
+		log.Errorf("Failed to send input event: %v", err)
 	}
 
 	fmt.Print("Continuing with ReAct processing...\n\n")
