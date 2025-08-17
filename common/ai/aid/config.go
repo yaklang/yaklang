@@ -144,6 +144,14 @@ type Config struct {
 	disableOutputEventType []string
 }
 
+func (c *Config) GetTimelineRecordLimit() int64 {
+	return int64(c.timelineRecordLimit)
+}
+
+func (c *Config) GetTimelineContentSizeLimit() int64 {
+	return int64(c.timelineContentSizeLimit)
+}
+
 func (c *Config) GetRuntimeId() string {
 	return c.id
 }

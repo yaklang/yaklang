@@ -1,0 +1,6 @@
+{{ if .ToolCallResults }}## 工具调用历史（从旧到新排序）
+{{ range .ToolCallResults }}
+- 工具: {{ .QuoteName }}
+- 调用参数: {{ .QuoteParams }}
+- 结果：{{ .QuoteResult }}{{ .QuoteError }}
+{{ end }}{{end}}
