@@ -31,12 +31,11 @@ import (
 
 // Global state management (simplified - most queue logic moved to ReAct)
 var (
-	globalUserInput      = make(chan string, 10) // Channel for all user input
-	waitingForReview     = false                 // Flag to indicate if we're waiting for review input
-	reviewOptions        []reviewOption          // Current review options
-	reviewMutex          sync.Mutex              // Mutex to protect review state
-	currentReviewEventID string                  // Current review event ID
-
+	globalUserInput      = make(chan string, 100) // Channel for all user input (increased buffer)
+	waitingForReview     = false                  // Flag to indicate if we're waiting for review input
+	reviewOptions        []reviewOption           // Current review options
+	reviewMutex          sync.Mutex               // Mutex to protect review state
+	currentReviewEventID string                   // Current review event ID
 )
 
 // reviewOption represents a review choice option
@@ -324,8 +323,31 @@ func handleInteractiveLoop(reactInstance *aireact.ReAct, ctx context.Context) {
 	firstInput := true
 
 	for {
+		if debugMode {
+			log.Debugf("Interactive loop: waiting for input...")
+		}
 		select {
 		case input := <-globalUserInput:
+			if debugMode {
+				log.Debugf("Interactive loop received input: '%s'", input)
+			}
+
+			// Check if we're waiting for review input first (before filtering empty input)
+			reviewMutex.Lock()
+			if waitingForReview {
+				if debugMode {
+					log.Debugf("Processing review input: '%s'", input)
+				}
+				// Always process review input immediately when waiting for review
+				// Allow empty input for review (to select default continue)
+				processReviewInput(input, reactInstance)
+				reviewMutex.Unlock()
+				fmt.Print("> ")
+				continue
+			}
+			reviewMutex.Unlock()
+
+			// For non-review input, filter empty input
 			if input == "" {
 				fmt.Print("> ")
 				continue
@@ -355,6 +377,23 @@ func handleInteractiveLoop(reactInstance *aireact.ReAct, ctx context.Context) {
 				continue
 			}
 
+			if strings.HasSuffix(input, "???") || input == "/status" {
+				fmt.Printf("\n=== SYSTEM STATUS ===\n")
+				fmt.Printf("Debug mode: %v\n", debugMode)
+				reviewMutex.Lock()
+				fmt.Printf("Waiting for review: %v\n", waitingForReview)
+				fmt.Printf("Review options count: %d\n", len(reviewOptions))
+				reviewMutex.Unlock()
+				fmt.Printf("====================\n")
+
+				// Force show prompt
+				fmt.Printf("\n" + strings.Repeat("=", 60) + "\n")
+				fmt.Printf("🎯 Manual prompt trigger! Ready for next question.\n")
+				fmt.Printf("ReAct CLI ready. Enter your question (type 'exit' to quit, '/debug' to toggle debug mode, '/queue' to view queue, '/timeline [limit]' to view timeline):\n")
+				fmt.Print("> ")
+				continue
+			}
+
 			if strings.HasPrefix(input, "/timeline") {
 				// Parse optional limit parameter
 				parts := strings.Fields(input)
@@ -369,24 +408,17 @@ func handleInteractiveLoop(reactInstance *aireact.ReAct, ctx context.Context) {
 				continue
 			}
 
-			// Check if we're waiting for review input
-			reviewMutex.Lock()
-			if waitingForReview {
-				// Always process review input immediately when waiting for review
-				processReviewInput(input, reactInstance)
-				reviewMutex.Unlock()
-				fmt.Print("> ")
-				continue
-			}
-			reviewMutex.Unlock()
-
-			// Show the interactive prompt if this is the first regular input
+			// Show the interactive prompt if this is the first regular input or if needed after task completion
 			if firstInput {
 				fmt.Println("ReAct CLI ready. Enter your question (type 'exit' to quit, '/debug' to toggle debug mode, '/queue' to view queue, '/timeline [limit]' to view timeline):")
 				firstInput = false
 			}
 
 			// Send query directly to ReAct
+			if debugMode {
+				log.Debugf("Sending regular input to ReAct: '%s'", input)
+			}
+
 			event := &ypb.AIInputEvent{
 				IsFreeInput: true,
 				FreeInput:   input,
@@ -410,7 +442,6 @@ func handleInteractiveLoop(reactInstance *aireact.ReAct, ctx context.Context) {
 // globalInputReader reads from stdin and sends to global channel
 func globalInputReader(ctx context.Context) {
 	scanner := bufio.NewScanner(os.Stdin)
-
 	for scanner.Scan() {
 		select {
 		case <-ctx.Done():
@@ -419,10 +450,19 @@ func globalInputReader(ctx context.Context) {
 		}
 
 		input := strings.TrimSpace(scanner.Text())
+		if debugMode {
+			log.Debugf("Input reader got: '%s'", input)
+		}
 
+		if debugMode {
+			log.Infof("start to put input into globalUserInput")
+		}
 		select {
 		case globalUserInput <- input:
 			// Successfully sent
+			if debugMode {
+				log.Debugf("Input sent to channel: '%s'", input)
+			}
 		case <-ctx.Done():
 			return
 		}
@@ -801,6 +841,14 @@ func parseSelectionIndex(input string, maxOptions int) int {
 
 // handleClientEvent handles events in client mode using input channel
 func handleClientEvent(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInputEvent, interactiveMode bool) {
+	if debugMode {
+		content := string(event.Content)
+		preview := content
+		if len(content) > 100 {
+			preview = content[:100] + "..."
+		}
+		log.Debugf("Handling client event: type=%s, content_preview=%s", event.Type, preview)
+	}
 
 	// Handle output events with simplified display
 	switch event.Type {
@@ -812,6 +860,9 @@ func handleClientEvent(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInpu
 	case schema.EVENT_TYPE_OBSERVATION:
 		fmt.Printf("[observe]: %s\n", string(event.Content))
 	case schema.EVENT_TYPE_RESULT:
+		if debugMode {
+			log.Debugf("Processing EVENT_TYPE_RESULT case")
+		}
 		result := extractResultContent(string(event.Content))
 		fmt.Printf("[result]: %s\n", result)
 		fmt.Printf("[ai]: final message for current loop\n")
@@ -822,9 +873,36 @@ func handleClientEvent(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInpu
 			waitingForReview = false
 			reviewOptions = nil
 			currentReviewEventID = ""
-
 		}
 		reviewMutex.Unlock()
+
+		// Show prompt for next interaction after task completion
+		if debugMode {
+			log.Debugf("Task completed, showing prompt after delay...")
+		}
+
+		go func() {
+			// Add a longer delay to ensure all output is flushed
+			time.Sleep(500 * time.Millisecond)
+
+			if debugMode {
+				log.Debugf("Displaying task completion prompt now")
+			}
+
+			// Add some visual separation
+			fmt.Printf("\n" + strings.Repeat("=", 60) + "\n")
+			fmt.Printf("🎯 Task completed! Ready for next question.\n")
+			fmt.Printf("ReAct CLI ready. Enter your question (type 'exit' to quit, '/debug' to toggle debug mode, '/queue' to view queue, '/timeline [limit]' to view timeline):\n")
+			fmt.Print("> ")
+
+			// Force flush the output multiple times
+			os.Stdout.Sync()
+			os.Stderr.Sync()
+
+			if debugMode {
+				log.Debugf("Task completion prompt displayed and flushed")
+			}
+		}()
 	case schema.EVENT_TYPE_STRUCTURED:
 		// Handle queue info and timeline events
 		content := string(event.Content)
@@ -861,6 +939,21 @@ func handleClientEvent(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInpu
 		if debugMode {
 			fmt.Printf("[%s]: %s\n", strings.ToLower(string(event.Type)), string(event.Content))
 		}
+	}
+
+	// Force trigger prompt if the event type suggests task completion
+	if event.Type == schema.EVENT_TYPE_RESULT || strings.Contains(string(event.Content), "final message") {
+		if debugMode {
+			log.Debugf("Force triggering completion prompt due to event type: %s", event.Type)
+		}
+		go func() {
+			time.Sleep(1 * time.Second) // Longer delay
+			fmt.Printf("\n" + strings.Repeat("=", 60) + "\n")
+			fmt.Printf("🎯 Force triggered! Task appears completed. Ready for next question.\n")
+			fmt.Printf("ReAct CLI ready. Enter your question (type 'exit' to quit, '/debug' to toggle debug mode, '/queue' to view queue, '/timeline [limit]' to view timeline):\n")
+			fmt.Print("> ")
+			os.Stdout.Sync()
+		}()
 	}
 }
 
@@ -926,17 +1019,64 @@ func handleReviewRequireClient(event *schema.AiOutputEvent, inputChan chan<- *yp
 	// Display options
 	fmt.Printf("\nPlease choose an action:\n")
 	for i, option := range options {
-		fmt.Printf("  %d. %s - %s\n", i+1, option.value, option.prompt)
+		if option.value == "continue" {
+			fmt.Printf("  %d. %s - %s (default, press Enter)\n", i+1, option.value, option.prompt)
+		} else {
+			fmt.Printf("  %d. %s - %s\n", i+1, option.value, option.prompt)
+		}
 	}
-	fmt.Printf("Your choice (1-%d): ", len(options))
+
+	// Check if continue option exists for prompt message
+	hasContinue := false
+	for _, option := range options {
+		if option.value == "continue" {
+			hasContinue = true
+			break
+		}
+	}
+
+	if hasContinue {
+		fmt.Printf("Your choice (1-%d, Enter for continue): ", len(options))
+	} else {
+		fmt.Printf("Your choice (1-%d): ", len(options))
+	}
 
 	// Set up review state and wait for global input
 	reviewMutex.Lock()
 	waitingForReview = true
 	reviewOptions = options
 	currentReviewEventID = eventID
-
 	reviewMutex.Unlock()
+
+	// Add a timeout mechanism to auto-continue if no input received
+	go func(eventID string) {
+		time.Sleep(60 * time.Second) // 60 second timeout
+		reviewMutex.Lock()
+		if waitingForReview && currentReviewEventID == eventID {
+			log.Warnf("Review timeout reached, auto-selecting continue")
+			waitingForReview = false
+			reviewOptions = nil
+			currentReviewEventID = ""
+			reviewMutex.Unlock()
+
+			// Send continue response directly
+			inputEvent := &ypb.AIInputEvent{
+				IsInteractiveMessage: true,
+				InteractiveId:        eventID,
+				InteractiveJSONInput: `{"suggestion": "continue"}`,
+			}
+
+			// Try to send via inputChan
+			select {
+			case inputChan <- inputEvent:
+				fmt.Printf("\n[TIMEOUT]: Auto-selected continue after 60 seconds\n> ")
+			default:
+				log.Errorf("Failed to send timeout input event")
+			}
+		} else {
+			reviewMutex.Unlock()
+		}
+	}(eventID)
 
 	// The processReviewInput function will handle the actual input when it arrives
 }
@@ -945,25 +1085,53 @@ func handleReviewRequireClient(event *schema.AiOutputEvent, inputChan chan<- *yp
 func processReviewInput(input string, reactInstance *aireact.ReAct) {
 	var selectedValue string
 
-	// Try to parse as number first
-	if idx := parseSelectionIndex(input, len(reviewOptions)); idx >= 0 {
-		selectedValue = reviewOptions[idx].value
-	} else {
-		// Try to match by value
+	// Handle empty input (just pressing Enter)
+	if strings.TrimSpace(input) == "" {
+		// Look for "continue" option first
 		for _, option := range reviewOptions {
-			if strings.EqualFold(input, option.value) {
-				selectedValue = option.value
+			if option.value == "continue" {
+				selectedValue = "continue"
+				fmt.Printf("[REVIEW]: Empty input detected, selecting default: %s\n", selectedValue)
 				break
 			}
 		}
-	}
-
-	// Default to first option if invalid input
-	if selectedValue == "" {
-		selectedValue = reviewOptions[0].value
-		fmt.Printf("[REVIEW]: Invalid input '%s', defaulting to %s\n", input, selectedValue)
+		// If no "continue" option found, use first option
+		if selectedValue == "" {
+			selectedValue = reviewOptions[0].value
+			fmt.Printf("[REVIEW]: Empty input detected, selecting first option: %s\n", selectedValue)
+		}
 	} else {
-		fmt.Printf("[REVIEW]: Selected action: %s\n", selectedValue)
+		// Try to parse as number first
+		if idx := parseSelectionIndex(input, len(reviewOptions)); idx >= 0 {
+			selectedValue = reviewOptions[idx].value
+		} else {
+			// Try to match by value
+			for _, option := range reviewOptions {
+				if strings.EqualFold(input, option.value) {
+					selectedValue = option.value
+					break
+				}
+			}
+		}
+
+		// Default to continue if available, otherwise first option
+		if selectedValue == "" {
+			// Look for "continue" option first
+			for _, option := range reviewOptions {
+				if option.value == "continue" {
+					selectedValue = "continue"
+					fmt.Printf("[REVIEW]: Invalid input '%s', defaulting to %s\n", input, selectedValue)
+					break
+				}
+			}
+			// If no "continue" option found, use first option
+			if selectedValue == "" {
+				selectedValue = reviewOptions[0].value
+				fmt.Printf("[REVIEW]: Invalid input '%s', defaulting to %s\n", input, selectedValue)
+			}
+		} else {
+			fmt.Printf("[REVIEW]: Selected action: %s\n", selectedValue)
+		}
 	}
 
 	// Create and send input event to ReAct
@@ -981,8 +1149,9 @@ func processReviewInput(input string, reactInstance *aireact.ReAct) {
 
 	fmt.Print("Continuing with ReAct processing...\n\n")
 
-	// Note: Review state will be reset by the ReAct system after processing the input
-	// Don't reset here to allow multiple review responses to be processed
+	waitingForReview = false
+	reviewOptions = nil
+	currentReviewEventID = ""
 }
 
 // getString safely extracts a string value from a map
