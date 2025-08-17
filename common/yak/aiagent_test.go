@@ -222,7 +222,7 @@ func TestReducerIntentRecognition(t *testing.T) {
 					//spew.Dump(param)
 				}
 			}()
-			memory.PushUserInteraction(aid.UserInteractionStage_FreeInput, cod.GetConfig().AcquireId(), "", query) // push user input timeline
+			memory.PushUserInteraction(aid.aicommon.UserInteractionStage_FreeInput, cod.GetConfig().AcquireId(), "", query) // push user input timeline
 			return nil
 		}),
 		aireducer.WithSeparatorTrigger("\n\n"),

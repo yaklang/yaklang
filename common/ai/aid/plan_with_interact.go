@@ -27,7 +27,7 @@ func (pr *planRequest) handlePlanWithUserInteract(interactAction *aicommon.Actio
 	_ = params
 
 	pr.config.memory.timeline.PushUserInteraction(
-		UserInteractionStage_BeforePlan,
+		aicommon.UserInteractionStage_BeforePlan,
 		ep.GetSeq(),
 		q,
 		string(utils.Jsonify(params)),

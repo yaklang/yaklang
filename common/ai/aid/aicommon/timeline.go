@@ -27,36 +27,44 @@ type TimelineItemValue interface {
 	SetShrinkResult(string)
 }
 
-type timelineItem struct {
+type TimelineItem struct {
 	deleted bool
 
 	value TimelineItemValue // *aitool.ToolResult
 }
 
-func (item *timelineItem) GetShrinkResult() string {
+func (item *TimelineItem) GetValue() TimelineItemValue {
+	return item.value
+}
+
+func (item *TimelineItem) IsDeleted() bool {
+	return item.deleted
+}
+
+func (item *TimelineItem) GetShrinkResult() string {
 	return item.value.GetShrinkResult()
 }
 
-func (item *timelineItem) GetShrinkSimilarResult() string {
+func (item *TimelineItem) GetShrinkSimilarResult() string {
 	return item.value.GetShrinkSimilarResult()
 }
 
-func (item *timelineItem) String() string {
+func (item *TimelineItem) String() string {
 	return item.value.String()
 }
 
-func (item *timelineItem) SetShrinkResult(pers string) {
+func (item *TimelineItem) SetShrinkResult(pers string) {
 	item.value.SetShrinkResult(pers)
 }
 
-func (item *timelineItem) GetID() int64 {
+func (item *TimelineItem) GetID() int64 {
 	if item.value == nil {
 		return 0
 	}
 	return item.value.GetID()
 }
 
-var _ TimelineItemValue = (*timelineItem)(nil)
+var _ TimelineItemValue = (*TimelineItem)(nil)
 
 type Timeline struct {
 	extraMetaInfo func() string // extra meta info for timeline, like runtime id, etc.
@@ -64,9 +72,9 @@ type Timeline struct {
 	ai            AICaller
 
 	idToTs           *omap.OrderedMap[int64, int64]
-	tsToTimelineItem *omap.OrderedMap[int64, *timelineItem]
-	idToTimelineItem *omap.OrderedMap[int64, *timelineItem]
-	summary          *omap.OrderedMap[int64, *linktable.LinkTable[*timelineItem]]
+	tsToTimelineItem *omap.OrderedMap[int64, *TimelineItem]
+	idToTimelineItem *omap.OrderedMap[int64, *TimelineItem]
+	summary          *omap.OrderedMap[int64, *linktable.LinkTable[*TimelineItem]]
 	reducers         *omap.OrderedMap[int64, *linktable.LinkTable[string]]
 
 	// this limit is used to limit the number of timeline items.
@@ -76,6 +84,35 @@ type Timeline struct {
 	// this limit is used to limit the timeline dump string size.
 	perDumpContentLimit   int64
 	totalDumpContentLimit int64
+}
+
+func (m *Timeline) GetIdToTimelineItem() *omap.OrderedMap[int64, *TimelineItem] {
+	return m.idToTimelineItem
+}
+
+func (m *Timeline) GetTimelineItemIDs() []int64 {
+	return m.idToTimelineItem.Keys()
+}
+
+func (m *Timeline) ClearRuntimeConfig() {
+	m.ai = nil
+	m.config = nil
+}
+
+func (m *Timeline) SetAICaller(ai AICaller) {
+	if ai == nil {
+		log.Error("set ai caller is nil")
+		return
+	}
+	m.ai = ai
+}
+
+func (m *Timeline) GetAICaller() AICaller {
+	if m.ai == nil {
+		log.Error("get ai caller is nil")
+		return nil
+	}
+	return m.ai
 }
 
 func (m *Timeline) CopyReducibleTimelineWithMemory() *Timeline {
@@ -100,7 +137,7 @@ func (m *Timeline) SoftDelete(id ...int64) {
 			v.deleted = true
 		}
 		if v, ok := m.summary.Get(i); ok {
-			v.Push(&timelineItem{
+			v.Push(&TimelineItem{
 				value:   v.Value().value,
 				deleted: true,
 			})
@@ -141,8 +178,8 @@ func (m *Timeline) CreateSubTimeline(ids ...int64) *Timeline {
 
 func (m *Timeline) BindConfig(config AICallerConfigIf, aiCaller AICaller) {
 	m.config = config
-	m.setTimelineLimit(config.GetTimelineRecordLimit())
-	m.setTimelineContentLimit(config.GetTimelineContentSizeLimit())
+	m.SetTimelineLimit(config.GetTimelineRecordLimit())
+	m.SetTimelineContentLimit(config.GetTimelineContentSizeLimit())
 	if utils.IsNil(m.ai) {
 		m.setAICaller(aiCaller)
 	}
@@ -154,10 +191,10 @@ func NewTimeline(clearCount int64, ai AICaller, extraMetaInfo func() string) *Ti
 		ai:               ai,
 		fullMemoryCount:  clearCount,
 		maxTimelineLimit: 3 * clearCount,
-		tsToTimelineItem: omap.NewOrderedMap(map[int64]*timelineItem{}),
-		idToTimelineItem: omap.NewOrderedMap(map[int64]*timelineItem{}),
+		tsToTimelineItem: omap.NewOrderedMap(map[int64]*TimelineItem{}),
+		idToTimelineItem: omap.NewOrderedMap(map[int64]*TimelineItem{}),
 		idToTs:           omap.NewOrderedMap(map[int64]int64{}),
-		summary:          omap.NewOrderedMap(map[int64]*linktable.LinkTable[*timelineItem]{}),
+		summary:          omap.NewOrderedMap(map[int64]*linktable.LinkTable[*TimelineItem]{}),
 		reducers:         omap.NewOrderedMap(map[int64]*linktable.LinkTable[string]{}),
 	}
 }
@@ -169,12 +206,12 @@ func (m *Timeline) ExtraMetaInfo() string {
 	return m.extraMetaInfo()
 }
 
-func (m *Timeline) setTimelineLimit(clearCount int64) {
+func (m *Timeline) SetTimelineLimit(clearCount int64) {
 	m.fullMemoryCount = clearCount
 	m.maxTimelineLimit = 3 * clearCount
 }
 
-func (m *Timeline) setTimelineContentLimit(contentSize int64) {
+func (m *Timeline) SetTimelineContentLimit(contentSize int64) {
 	m.totalDumpContentLimit = contentSize
 }
 
@@ -190,7 +227,7 @@ func (m *Timeline) PushToolResult(toolResult *aitool.ToolResult) {
 	}
 	m.idToTs.Set(toolResult.GetID(), ts)
 
-	item := &timelineItem{
+	item := &TimelineItem{
 		value: toolResult,
 	}
 
@@ -213,7 +250,7 @@ func (m *Timeline) PushUserInteraction(stage UserInteractionStage, id int64, sys
 	}
 	m.idToTs.Set(id, ts)
 
-	item := &timelineItem{
+	item := &TimelineItem{
 		value: &UserInteraction{
 			ID:              id,
 			SystemPrompt:    systemPrompt,
@@ -269,7 +306,7 @@ func (m *Timeline) dumpSizeCheck() {
 
 	// check everyone timeline item was shrunk
 	if totalLastID > summaryLastID {
-		m.idToTimelineItem.ForEach(func(k int64, v *timelineItem) bool {
+		m.idToTimelineItem.ForEach(func(k int64, v *TimelineItem) bool {
 			if k > summaryLastID {
 				log.Infof("start to shrink memory timeline id: %v", v.value.GetID())
 				m.shrink(v)
@@ -282,7 +319,7 @@ func (m *Timeline) dumpSizeCheck() {
 		if m.reducers.Len() > 0 { // has reducer, reducer index should be current reducer next
 			reducerID, _, _ = m.reducers.Last()
 		}
-		m.idToTimelineItem.ForEach(func(k int64, v *timelineItem) bool {
+		m.idToTimelineItem.ForEach(func(k int64, v *TimelineItem) bool {
 			if k > reducerID {
 				log.Infof("start to shrink memory timeline id: %v", v.value.GetID())
 				m.reducer(k)
@@ -350,7 +387,7 @@ func (m *Timeline) reducer(beforeId int64) {
 	}
 }
 
-func (m *Timeline) shrink(currentItem *timelineItem) {
+func (m *Timeline) shrink(currentItem *TimelineItem) {
 	if m.ai == nil {
 		log.Error("ai is nil, memory cannot emit memory shrink")
 		return
@@ -421,7 +458,7 @@ func (m *Timeline) renderReducerPrompt(beforeId int64) string {
 //go:embed prompts/timeline/shrink_tool_result.txt
 var timelineSummary string
 
-func (m *Timeline) renderSummaryPrompt(result *timelineItem) string {
+func (m *Timeline) renderSummaryPrompt(result *TimelineItem) string {
 	ins, err := template.New("timeline-tool-result").Parse(timelineSummary)
 	if err != nil {
 		log.Warnf("BUG: dump summary prompt failed: %v", err)
@@ -458,7 +495,7 @@ func (m *Timeline) DumpBefore(id int64) string {
 
 	shrinkStartId, _, _ := m.summary.Last()
 	reduceredStartId, _, _ := m.reducers.Last()
-	m.tsToTimelineItem.ForEach(func(key int64, item *timelineItem) bool {
+	m.tsToTimelineItem.ForEach(func(key int64, item *TimelineItem) bool {
 		initOnce.Do(func() {
 			buf.WriteString("timeline:\n")
 		})
