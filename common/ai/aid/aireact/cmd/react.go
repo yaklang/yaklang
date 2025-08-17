@@ -889,10 +889,6 @@ func handleClientEvent(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInpu
 				log.Debugf("Displaying task completion prompt now")
 			}
 
-			// Add some visual separation
-			fmt.Printf("\n" + strings.Repeat("=", 60) + "\n")
-			fmt.Printf("🎯 Task completed! Ready for next question.\n")
-			fmt.Printf("ReAct CLI ready. Enter your question (type 'exit' to quit, '/debug' to toggle debug mode, '/queue' to view queue, '/timeline [limit]' to view timeline):\n")
 			fmt.Print("> ")
 
 			// Force flush the output multiple times
@@ -948,10 +944,6 @@ func handleClientEvent(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInpu
 		}
 		go func() {
 			time.Sleep(1 * time.Second) // Longer delay
-			fmt.Printf("\n" + strings.Repeat("=", 60) + "\n")
-			fmt.Printf("🎯 Force triggered! Task appears completed. Ready for next question.\n")
-			fmt.Printf("ReAct CLI ready. Enter your question (type 'exit' to quit, '/debug' to toggle debug mode, '/queue' to view queue, '/timeline [limit]' to view timeline):\n")
-			fmt.Print("> ")
 			os.Stdout.Sync()
 		}()
 	}
