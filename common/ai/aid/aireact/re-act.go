@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -15,27 +16,11 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// ReAct 队列同步类型
-type ReactSyncType string
-
+// 同步类型常量
 const (
-	REACT_SYNC_TYPE_QUEUE_INFO ReactSyncType = "queue_info"
-	REACT_SYNC_TYPE_TIMELINE   ReactSyncType = "timeline"
+	SYNC_TYPE_QUEUE_INFO = "queue_info"
+	SYNC_TYPE_TIMELINE   = "timeline"
 )
-
-// ReactInputEvent ReAct 专用的输入事件结构
-type ReactInputEvent struct {
-	Id string
-
-	// 是否是 ReAct 同步信息
-	IsReActSyncInfo bool
-	// ReAct 同步类型
-	ReactSyncType ReactSyncType
-
-	// 兼容原有的交互和参数
-	IsInteractive bool
-	Params        aitool.InvokeParams
-}
 
 // ReactTaskItem 表示ReAct任务队列中的单个任务
 type ReactTaskItem struct {
@@ -148,6 +133,11 @@ func (r *ReAct) SendInputEvent(event *ypb.AIInputEvent) error {
 		}
 	}
 
+	// 对于同步消息，处理同步请求
+	if event.IsSyncMessage {
+		return r.handleSyncMessage(event)
+	}
+
 	// 对于普通输入，创建任务并添加到队列
 	if event.IsFreeInput {
 		return r.enqueueTask(event)
@@ -156,10 +146,10 @@ func (r *ReAct) SendInputEvent(event *ypb.AIInputEvent) error {
 	return fmt.Errorf("unsupported event type")
 }
 
-// SendReActSyncRequest 发送 ReAct 专用的同步请求
-func (r *ReAct) SendReActSyncRequest(syncType ReactSyncType, params aitool.InvokeParams) error {
-	switch syncType {
-	case REACT_SYNC_TYPE_QUEUE_INFO:
+// handleSyncMessage 处理同步消息
+func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
+	switch event.SyncType {
+	case SYNC_TYPE_QUEUE_INFO:
 		// 获取队列信息并通过事件发送
 		queueInfo := r.GetQueueInfo()
 
@@ -167,12 +157,17 @@ func (r *ReAct) SendReActSyncRequest(syncType ReactSyncType, params aitool.Invok
 		r.EmitJSON(schema.EVENT_TYPE_STRUCTURED, "queue_info", queueInfo)
 		return nil
 
-	case REACT_SYNC_TYPE_TIMELINE:
+	case SYNC_TYPE_TIMELINE:
 		// 获取时间线信息
 		limit := 20 // 默认限制
-		if params != nil {
-			if l, ok := params["limit"].(int); ok && l > 0 {
-				limit = l
+
+		// 从 SyncJsonInput 中解析参数
+		if event.SyncJsonInput != "" {
+			var params map[string]interface{}
+			if err := json.Unmarshal([]byte(event.SyncJsonInput), &params); err == nil {
+				if l, ok := params["limit"].(float64); ok && l > 0 {
+					limit = int(l)
+				}
 			}
 		}
 
@@ -188,7 +183,7 @@ func (r *ReAct) SendReActSyncRequest(syncType ReactSyncType, params aitool.Invok
 		return nil
 
 	default:
-		return fmt.Errorf("unsupported ReAct sync type: %s", string(syncType))
+		return fmt.Errorf("unsupported sync type: %s", event.SyncType)
 	}
 }
 

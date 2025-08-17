@@ -50,8 +50,13 @@ var breakpointEnabled = false
 
 // displayQueueInfo 显示 ReAct 队列信息
 func displayQueueInfo(reactInstance *aireact.ReAct) {
-	// 使用 ReAct 的队列信息获取方法
-	err := reactInstance.SendReActSyncRequest(aireact.REACT_SYNC_TYPE_QUEUE_INFO, nil)
+	// 使用标准的 AIInputEvent 发送同步请求
+	event := &ypb.AIInputEvent{
+		IsSyncMessage: true,
+		SyncType:      aireact.SYNC_TYPE_QUEUE_INFO,
+	}
+
+	err := reactInstance.SendInputEvent(event)
 	if err != nil {
 		fmt.Printf("Failed to get queue info: %v\n", err)
 		return
@@ -61,13 +66,24 @@ func displayQueueInfo(reactInstance *aireact.ReAct) {
 
 // displayTimelineInfo 显示 ReAct 时间线信息
 func displayTimelineInfo(reactInstance *aireact.ReAct, limit int) {
-	// 使用 ReAct 的时间线信息获取方法
-	params := make(map[string]interface{})
+	// 使用标准的 AIInputEvent 发送同步请求
+	var syncJsonInput string
 	if limit > 0 {
-		params["limit"] = limit
+		params := map[string]interface{}{
+			"limit": limit,
+		}
+		if paramsJson, err := json.Marshal(params); err == nil {
+			syncJsonInput = string(paramsJson)
+		}
 	}
 
-	err := reactInstance.SendReActSyncRequest(aireact.REACT_SYNC_TYPE_TIMELINE, params)
+	event := &ypb.AIInputEvent{
+		IsSyncMessage: true,
+		SyncType:      aireact.SYNC_TYPE_TIMELINE,
+		SyncJsonInput: syncJsonInput,
+	}
+
+	err := reactInstance.SendInputEvent(event)
 	if err != nil {
 		fmt.Printf("Failed to get timeline info: %v\n", err)
 		return
@@ -449,12 +465,11 @@ func extractResultContent(content string) string {
 
 // streamingState tracks the current streaming state
 var (
-	streamingActive   = false
-	streamingMutex    sync.Mutex
-	currentStreamLine = ""
-	streamStartTime   time.Time
-	streamCharCount   = 0
-	streamDisplayed   = false // Track if we've already shown streaming output for this request
+	streamingActive = false
+	streamingMutex  sync.Mutex
+	streamStartTime time.Time
+	streamCharCount = 0
+	streamDisplayed = false // Track if we've already shown streaming output for this request
 
 	// Activity spinner state
 	spinnerActive = false
@@ -630,34 +645,6 @@ func showReasonStreamOutput(reader io.Reader) {
 	}
 }
 
-// showActivitySpinner shows a spinning activity indicator
-func showActivitySpinner() {
-	spinnerMutex.Lock()
-	if spinnerActive {
-		spinnerMutex.Unlock()
-		return
-	}
-	spinnerActive = true
-	spinnerMutex.Unlock()
-
-	spinners := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-	i := 0
-
-	for {
-		select {
-		case <-spinnerStop:
-			spinnerMutex.Lock()
-			spinnerActive = false
-			spinnerMutex.Unlock()
-			return
-		default:
-			fmt.Printf("\r[processing] %s", spinners[i%len(spinners)])
-			i++
-			time.Sleep(100 * time.Millisecond)
-		}
-	}
-}
-
 // stopActivitySpinner stops the activity spinner
 func stopActivitySpinner() {
 	spinnerMutex.Lock()
@@ -672,21 +659,6 @@ func stopActivitySpinner() {
 	// Wait a bit for spinner to stop
 	time.Sleep(50 * time.Millisecond)
 	fmt.Print("\r                    \r") // Clear the spinner line
-}
-
-// typewriterPrint prints text with a typewriter effect
-func typewriterPrint(text string) {
-	// Skip typewriter effect in debug mode to avoid cluttering logs
-	if debugMode {
-		fmt.Print(text)
-		return
-	}
-
-	// Print characters one by one with small delay
-	for _, char := range text {
-		fmt.Print(string(char))
-		time.Sleep(20 * time.Millisecond) // Adjust speed as needed
-	}
 }
 
 // handleRequestBreakpoint handles breakpoint functionality - pauses before AI interaction
