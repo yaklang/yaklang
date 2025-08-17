@@ -14,7 +14,7 @@ import (
 )
 
 func TestMemoryTimelineOrdinary(t *testing.T) {
-	memoryTimeline := newMemoryTimeline(10, nil)
+	memoryTimeline := aicommon.NewTimeline(10, nil, nil)
 	for i := 1; i <= 5; i++ {
 		memoryTimeline.PushToolResult(&aitool.ToolResult{
 			ID:          int64(100 + i),
@@ -45,9 +45,9 @@ func (m *mockedAI) CallAI(req *aicommon.AIRequest) (*aicommon.AIResponse, error)
 }
 
 func TestMemoryTimelineWithSummary(t *testing.T) {
-	memoryTimeline := newMemoryTimeline(3, &mockedAI{})
-	memoryTimeline.BindConfig(NewConfig(context.Background()))
-	memoryTimeline.setTimelineLimit(3)
+	memoryTimeline := aicommon.NewTimeline(3, &mockedAI{}, nil)
+	memoryTimeline.BindConfig(NewConfig(context.Background()), &mockedAI{})
+	memoryTimeline.SetTimelineLimit(3)
 	for i := 1; i <= 10; i++ {
 		memoryTimeline.PushToolResult(&aitool.ToolResult{
 			ID:          int64(i + 100),
@@ -90,11 +90,11 @@ func (m *mockedAI2) CallAI(req *aicommon.AIRequest) (*aicommon.AIResponse, error
 }
 
 func TestMemoryTimelineWithReachLimitSummary(t *testing.T) {
-	memoryTimeline := newMemoryTimeline(2, &mockedAI2{
+	memoryTimeline := aicommon.NewTimeline(2, &mockedAI2{
 		hCompressTime: new(int64),
-	})
-	memoryTimeline.BindConfig(NewConfig(context.Background()))
-	memoryTimeline.setTimelineLimit(2)
+	}, nil)
+	memoryTimeline.BindConfig(NewConfig(context.Background()), &mockedAI2{})
+	memoryTimeline.SetTimelineLimit(2)
 	for i := 1; i <= 20; i++ {
 		memoryTimeline.PushToolResult(&aitool.ToolResult{
 			ID:          int64(i + 100),

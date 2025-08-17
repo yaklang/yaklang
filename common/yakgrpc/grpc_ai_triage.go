@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
@@ -151,7 +152,7 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 		freeInputChan,
 		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.Memory, chunk chunkmaker.Chunk) error {
 			query := strings.TrimSpace(string(chunk.Data()))
-			memory.PushUserInteraction(aid.UserInteractionStage_FreeInput, cod.GetConfig().AcquireId(), "", query) // push user input timeline
+			memory.PushUserInteraction(aicommon.UserInteractionStage_FreeInput, cod.GetConfig().AcquireId(), "", query) // push user input timeline
 			defer emitEvent(Triage_Event_Finish, []byte("意图识别完成"))
 			emitEvent(Triage_Event_Log, []byte(fmt.Sprintf("正在识别意图：%s", query)))
 			res, err := yak.ExecuteForge("intent_recognition",

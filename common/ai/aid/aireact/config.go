@@ -125,6 +125,17 @@ type ReActConfig struct {
 
 	// Output channel
 	outputChan chan *schema.AiOutputEvent
+
+	timelineLimit            int64 // Limit for timeline records
+	timelineContentSizeLimit int64 // Limit for timeline content size
+}
+
+func (cfg *ReActConfig) GetTimelineRecordLimit() int64 {
+	return cfg.timelineLimit
+}
+
+func (cfg *ReActConfig) GetTimelineContentSizeLimit() int64 {
+	return cfg.timelineContentSizeLimit
 }
 
 type Option func(*ReActConfig)

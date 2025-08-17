@@ -124,33 +124,33 @@ func TestCoodinator_Delete_Memory(t *testing.T) {
 			} else if utils.MatchAllOfSubString(request.GetPrompt(), `"continue-current-task"`, `"proceed-next-task"`, `"status_summary"`) {
 				if firstToolDecision {
 					firstToolDecision = false
-					keys := timeline.idToTimelineItem.Keys()
+					keys := timeline.GetIdToTimelineItem().Keys()
 					if keys == nil || len(keys) == 0 {
 						panic("timeline.summary.GetByIndex fail")
 					}
-					callResult, _ := timeline.idToTimelineItem.Get(keys[0])
-					result := callResult.value.(*aitool.ToolResult)
+					callResult, _ := timeline.GetIdToTimelineItem().Get(keys[0])
+					result := callResult.GetValue().(*aitool.ToolResult)
 					if result.Name != "now" {
 						panic("timeline.idToToolResult.Get now fail")
 					}
 					testCallKey = keys[0]
 					timeLineSaveCheck = true
-					
+
 					// 直接调用delete_memory工具模拟其执行
 					config.memory.SoftDeleteTimeline(testCallKey)
-					
+
 					rsp.EmitReasonStream(strings.NewReader(`{"@action": "continue-current-task"}`))
 				} else {
 					// 检查timeline中的所有项是否被删除
 					deletedCount := 0
-					totalCount := timeline.idToTimelineItem.Len()
-					timeline.idToTimelineItem.ForEach(func(id int64, item *timelineItem) bool {
-						if item.deleted {
+					totalCount := timeline.GetIdToTimelineItem().Len()
+					timeline.GetIdToTimelineItem().ForEach(func(id int64, item *aicommon.TimelineItem) bool {
+						if item.IsDeleted() {
 							deletedCount++
 						}
 						return true
 					})
-					
+
 					timelineDump := timeline.Dump()
 					// 如果所有项目都被标记为删除，或者dump显示"no timeline generated"，则测试通过
 					if strings.Contains(timelineDump, "no timeline generated in DumpBefore") || deletedCount == totalCount {
@@ -269,7 +269,7 @@ func TestCoodinator_Add_Persistent_Memory(t *testing.T) {
 				return rsp, nil
 			} else if utils.MatchAllOfSubString(request.GetPrompt(), `"continue-current-task"`, `"proceed-next-task"`, `"status_summary"`) {
 				config.memory.PushPersistentData(persistentMemory)
-				if timeline.idToTimelineItem.Len() > 0 {
+				if timeline.GetIdToTimelineItem().Len() > 0 {
 					panic("skip add persistent memory to timeline fail")
 				}
 				memoryPersistentCheck = true

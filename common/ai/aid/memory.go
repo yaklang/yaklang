@@ -57,7 +57,7 @@ type Memory struct {
 	// interactive history
 	InteractiveHistory *omap.OrderedMap[string, *InteractiveEventRecord]
 
-	timeline *memoryTimeline // timeline with tool call results, will reduce the memory size
+	timeline *aicommon.Timeline
 }
 
 func (m *Memory) CopyReducibleMemory() *Memory {
@@ -73,20 +73,21 @@ func (m *Memory) CopyReducibleMemory() *Memory {
 		RootTask:    nil,
 		PlanHistory: nil,
 	}
-	mem.timeline = m.timeline.CopyReducibleTimelineWithMemory(mem)
+	mem.timeline = m.timeline.CopyReducibleTimelineWithMemory()
 	return m
 }
 
 func GetDefaultMemory() *Memory {
-	return &Memory{
+	mem := &Memory{
 		PlanHistory:        make([]*PlanRecord, 0),
 		PersistentData:     omap.NewOrderedMap[string, *PersistentDataRecord](make(map[string]*PersistentDataRecord)),
 		InteractiveHistory: omap.NewOrderedMap[string, *InteractiveEventRecord](make(map[string]*InteractiveEventRecord)),
 		Tools: func() []*aitool.Tool {
 			return make([]*aitool.Tool, 0)
 		},
-		timeline: newMemoryTimeline(10, nil),
 	}
+	mem.timeline = aicommon.NewTimeline(10, nil, mem.CurrentTaskInfo)
+	return mem
 }
 
 func (m *Memory) BindCoordinator(c *Coordinator) {
@@ -104,7 +105,7 @@ func (m *Memory) BindCoordinator(c *Coordinator) {
 		return config.keywords
 	})
 	m.PushPersistentData(config.persistentMemory...)
-	m.timeline.BindConfig(config)
+	m.timeline.BindConfig(config, config)
 }
 
 // user data memory api, user or ai can set and get
@@ -164,8 +165,7 @@ func (m *Memory) StoreTools(toolList func() []*aitool.Tool) {
 }
 
 func (m *Memory) ClearRuntimeConfig() {
-	m.timeline.ai = nil
-	m.timeline.config = nil
+	m.timeline.ClearRuntimeConfig()
 }
 
 // set tools list
@@ -257,14 +257,14 @@ func (m *Memory) GetInteractiveEvent(eventID string) (*InteractiveEventRecord, b
 // SetTimelineAI safely sets the AI instance for memory timeline
 func (m *Memory) SetTimelineAI(ai aicommon.AICaller) {
 	if m.timeline != nil {
-		m.timeline.ai = ai
+		m.timeline.SetAICaller(ai)
 	}
 }
 
 // GetTimelineAI returns the AI instance from memory timeline
 func (m *Memory) GetTimelineAI() aicommon.AICaller {
 	if m.timeline != nil {
-		return m.timeline.ai
+		return m.timeline.GetAICaller()
 	}
 	return nil
 }
@@ -274,7 +274,7 @@ func (m *Memory) PushToolCallResults(t *aitool.ToolResult) {
 	m.timeline.PushToolResult(t)
 }
 
-func (m *Memory) PushUserInteraction(stage UserInteractionStage, seq int64, question, userInput string) {
+func (m *Memory) PushUserInteraction(stage aicommon.UserInteractionStage, seq int64, question, userInput string) {
 	m.timeline.PushUserInteraction(stage, seq, question, userInput)
 }
 
@@ -289,7 +289,7 @@ func (m *Memory) TimelineWithout(n ...any) string {
 			fmt.Println(utils.ErrorStack(r))
 		}
 	}()
-	origin := m.timeline.idToTimelineItem.Keys()
+	origin := m.timeline.GetTimelineItemIDs()
 	removed := make(map[int64]struct{})
 	for _, i := range n {
 		removed[int64(utils.InterfaceToInt(i))] = struct{}{}
@@ -330,25 +330,12 @@ func (m *Memory) TaskMaxContinue() int64 {
 
 // timeline limit set
 func (m *Memory) SetTimelineLimit(i int) {
-	m.timeline.setTimelineLimit(i)
+	m.timeline.SetTimelineLimit(int64(i))
 }
 
 func (m *Memory) PromptForToolCallResultsForLastN(n int) string {
 	return m.timeline.PromptForToolCallResultsForLastN(n)
 }
-
-//
-//func (m *Memory) PromptForToolCallResultsForLast5() string {
-//	return m.PromptForToolCallResultsForLastN(5)
-//}
-//
-//func (m *Memory) PromptForToolCallResultsForLast10() string {
-//	return m.PromptForToolCallResultsForLastN(10)
-//}
-//
-//func (m *Memory) PromptForToolCallResultsForLast20() string {
-//	return m.PromptForToolCallResultsForLastN(20)
-//}
 
 // memory tools current task info
 func (m *Memory) CurrentTaskInfo() string {

@@ -49,8 +49,8 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...Opt
 	if config.memory == nil {
 		config.memory = GetDefaultMemory()
 	}
-	if utils.IsNil(config.memory.timeline.ai) {
-		config.memory.timeline.setAICaller(config)
+	if utils.IsNil(config.memory.timeline.GetAICaller()) {
+		config.memory.timeline.SetAICaller(config)
 	}
 
 	if err := config.loadToolsViaOptions(); err != nil {
