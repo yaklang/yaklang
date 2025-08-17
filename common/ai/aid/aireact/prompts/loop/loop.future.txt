@@ -33,7 +33,7 @@ IMPORTANT GUIDELINES:
 - If you need to find tools for a specific task, use 'tools_search' to search available tools
 - If a tool can fulfill the request, use 'require_tool' with the exact tool name
 - For simple greetings like 'hello' or 'hi', use 'directly_answer'
-- For complex multi-step tasks, use 'tool' step by step
+- For complex multi-step tasks, use 'request_plan_and_execution'
 - When providing direct answers, always set 'is_final_step' to true
 - TOOL SEARCH: You have access to 'tools_search' tool to find appropriate tools for any task
 - Available tool categories include: file operations, network tools, security testing, data processing, and more

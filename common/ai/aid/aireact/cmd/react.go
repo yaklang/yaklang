@@ -36,6 +36,10 @@ var (
 	reviewOptions        []reviewOption           // Current review options
 	reviewMutex          sync.Mutex               // Mutex to protect review state
 	currentReviewEventID string                   // Current review event ID
+
+	// Breakpoint state management
+	waitingForBreakpoint = false    // Flag to indicate if we're waiting for breakpoint input
+	breakpointMutex      sync.Mutex // Mutex to protect breakpoint state
 )
 
 // reviewOption represents a review choice option
@@ -332,7 +336,20 @@ func handleInteractiveLoop(reactInstance *aireact.ReAct, ctx context.Context) {
 				log.Debugf("Interactive loop received input: '%s'", input)
 			}
 
-			// Check if we're waiting for review input first (before filtering empty input)
+			// Check if we're waiting for breakpoint input first
+			breakpointMutex.Lock()
+			if waitingForBreakpoint {
+				if debugMode {
+					log.Debugf("Processing breakpoint input: '%s'", input)
+				}
+				// Signal that breakpoint input was received - the breakpoint function will handle it
+				waitingForBreakpoint = false
+				breakpointMutex.Unlock()
+				continue
+			}
+			breakpointMutex.Unlock()
+
+			// Check if we're waiting for review input (before filtering empty input)
 			reviewMutex.Lock()
 			if waitingForReview {
 				if debugMode {
@@ -716,26 +733,21 @@ func handleRequestBreakpoint(prompt string) {
 	fmt.Printf("  Ctrl+C     - Exit program\n")
 	fmt.Print("\nPress Enter to continue or type command: ")
 
-	// Create scanner for user input
-	scanner := bufio.NewScanner(os.Stdin)
+	// Set breakpoint state to indicate we're waiting for breakpoint input
+	breakpointMutex.Lock()
+	waitingForBreakpoint = true
+	breakpointMutex.Unlock()
 
 	// Set up signal handler for Ctrl+C
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigChan)
 
-	// Use goroutine to handle input and signals
-	inputChan := make(chan string, 1)
-	go func() {
-		if scanner.Scan() {
-			inputChan <- strings.TrimSpace(strings.ToLower(scanner.Text()))
-		} else {
-			inputChan <- "continue" // Default to continue if scan fails
-		}
-	}()
-
-	// Wait for either user input or signal
+	// Wait for input from the global input channel instead of creating a new scanner
+	// This avoids the conflict with globalInputReader
 	select {
-	case input := <-inputChan:
+	case input := <-globalUserInput:
+		input = strings.TrimSpace(strings.ToLower(input))
 		switch input {
 		case "", "y", "yes", "continue":
 			fmt.Printf("✅ Continuing with AI request...\n")
@@ -755,8 +767,10 @@ func handleRequestBreakpoint(prompt string) {
 		fmt.Printf(strings.Repeat("=", 80) + "\n\n")
 	}
 
-	// Clean up signal handler
-	signal.Stop(sigChan)
+	// Clear breakpoint state when done
+	breakpointMutex.Lock()
+	waitingForBreakpoint = false
+	breakpointMutex.Unlock()
 }
 
 // handleResponseBreakpoint handles breakpoint functionality - pauses after AI interaction to inspect response
@@ -785,26 +799,21 @@ func handleResponseBreakpoint(resp *aicommon.AIResponse) {
 	fmt.Printf("  Ctrl+C     - Exit program\n")
 	fmt.Print("\nPress Enter to continue or type command: ")
 
-	// Create scanner for user input
-	scanner := bufio.NewScanner(os.Stdin)
+	// Set breakpoint state to indicate we're waiting for breakpoint input
+	breakpointMutex.Lock()
+	waitingForBreakpoint = true
+	breakpointMutex.Unlock()
 
 	// Set up signal handler for Ctrl+C
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigChan)
 
-	// Use goroutine to handle input and signals
-	inputChan := make(chan string, 1)
-	go func() {
-		if scanner.Scan() {
-			inputChan <- strings.TrimSpace(strings.ToLower(scanner.Text()))
-		} else {
-			inputChan <- "continue" // Default to continue if scan fails
-		}
-	}()
-
-	// Wait for either user input or signal
+	// Wait for input from the global input channel instead of creating a new scanner
+	// This avoids the conflict with globalInputReader
 	select {
-	case input := <-inputChan:
+	case input := <-globalUserInput:
+		input = strings.TrimSpace(strings.ToLower(input))
 		switch input {
 		case "", "y", "yes", "continue":
 			fmt.Printf("✅ Continuing with response processing...\n")
@@ -824,8 +833,10 @@ func handleResponseBreakpoint(resp *aicommon.AIResponse) {
 		fmt.Printf(strings.Repeat("=", 80) + "\n\n")
 	}
 
-	// Clean up signal handler
-	signal.Stop(sigChan)
+	// Clear breakpoint state when done
+	breakpointMutex.Lock()
+	waitingForBreakpoint = false
+	breakpointMutex.Unlock()
 }
 
 // parseSelectionIndex parses user input as a selection index (1-based) and returns 0-based index, or -1 if invalid
