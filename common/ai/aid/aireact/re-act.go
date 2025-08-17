@@ -383,9 +383,10 @@ func (r *ReAct) processTask(task *Task) {
 	r.config.finished = false
 	r.config.currentIteration = 0
 	// 为新任务重置内存
-	r.config.memory = aid.GetDefaultMemory()
+
 	// 重新初始化内存
-	if r.config.memory != nil && r.config.aiCallback != nil {
+	if r.config.memory == nil {
+		r.config.memory = aid.GetDefaultMemory()
 		r.config.memory.SetTimelineAI(r.config)
 		r.config.memory.StoreTools(func() []*aitool.Tool {
 			if r.config.aiToolManager == nil {
@@ -500,26 +501,6 @@ func (r *ReAct) processInputEvent(event *ypb.AIInputEvent) error {
 		r.config.mu.Lock()
 		r.config.finished = false
 		r.config.currentIteration = 0
-		// Reset memory for new session
-		r.config.memory = aid.GetDefaultMemory()
-		// Re-initialize memory with tools and AI capability
-		if r.config.memory != nil && r.config.aiCallback != nil {
-			// Reset memory state for new session
-			// Set the AI instance for memory timeline
-			r.config.memory.SetTimelineAI(r.config)
-
-			// Store tools function
-			r.config.memory.StoreTools(func() []*aitool.Tool {
-				if r.config.aiToolManager == nil {
-					return []*aitool.Tool{}
-				}
-				tools, err := r.config.aiToolManager.GetEnableTools()
-				if err != nil {
-					return []*aitool.Tool{}
-				}
-				return tools
-			})
-		}
 		r.config.mu.Unlock()
 		if r.config.debugEvent {
 			log.Infof("Reset ReAct session for new input")
