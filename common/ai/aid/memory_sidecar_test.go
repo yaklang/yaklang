@@ -34,8 +34,8 @@ func TestCoordinator_SidecarMemory_Timeline_ToolUse_TooMany_TimelineShrink(t *te
 	tokenPersistent := utils.RandStringBytes(100)
 	token1 := "memory-timeline-sidecar+" + utils.RandStringBytes(100)
 	token2 := "memory-timeline-sidecar+" + utils.RandStringBytes(100)
-	m.timeline.PushUserInteraction(UserInteractionStage_FreeInput, 1, token1, token1)
-	m.timeline.PushUserInteraction(UserInteractionStage_FreeInput, 2, token2, token2)
+	m.timeline.PushUserInteraction(aicommon.UserInteractionStage_FreeInput, 1, token1, token1)
+	m.timeline.PushUserInteraction(aicommon.UserInteractionStage_FreeInput, 2, token2, token2)
 	result := m.timeline.Dump()
 	fmt.Println(result)
 	fmt.Println("token1", token1)
@@ -193,8 +193,8 @@ func memoryTestBasic(t *testing.T) *Memory {
 	m := GetDefaultMemory()
 	token1 := "memory-timeline-sidecar+" + utils.RandStringBytes(100)
 	token2 := "memory-timeline-sidecar+" + utils.RandStringBytes(100)
-	m.timeline.PushUserInteraction(UserInteractionStage_FreeInput, 1, token1, token1)
-	m.timeline.PushUserInteraction(UserInteractionStage_FreeInput, 2, token2, token2)
+	m.timeline.PushUserInteraction(aicommon.UserInteractionStage_FreeInput, 1, token1, token1)
+	m.timeline.PushUserInteraction(aicommon.UserInteractionStage_FreeInput, 2, token2, token2)
 
 	noexistedfileToken := utils.RandStringBytes(100)
 
