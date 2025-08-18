@@ -2,29 +2,49 @@ desc(
 	title_zh: "检测Java java.io 流资源未释放"
 	title: "Check Java java.io Unreleased Stream Resource"
 	risk:"资源泄漏",
-	level:high
+	level:mid
 	reference: <<<REFERENCE
 ### 参考资料
 [Oracle Java 8 API Documentation - java.io Package](https://docs.oracle.com/javase/8/docs/api/java/io/package-summary.html)
 [CWE-772: Missing Release of Resource after Effective Lifetime](https://cwe.mitre.org/data/definitions/772.html)
 [The try-with-resources Statement - Oracle Documentation](https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceKem.html)
 REFERENCE
-	desc: <<<DESCRIPTION
-应用程序创建 `InputStreamReader`、`FileInputStream`、`FileOutputStream` 等 I/O 流资源后，未在使用完毕时通过调用 `close()` 方法正确关闭这些资源。这属于 CWE-772（有效生命周期后未释放资源）漏洞，会导致文件句柄泄漏和系统资源耗尽。
+	desc: <<<DESC
+### 漏洞描述
 
-即使 Java 垃圾回收机制最终会回收这些对象，但关联的底层系统资源（如文件描述符）可能不会被及时释放，直到垃圾回收发生，这种行为既不可预测也不可靠。
+1. **漏洞原理**
+   应用程序创建 `InputStreamReader`、`FileInputStream`、`FileOutputStream` 等 I/O 流资源后，未在使用完毕时通过调用 `close()` 方法正确关闭这些资源。这属于 CWE-772（有效生命周期后未释放资源）漏洞，会导致文件句柄泄漏和系统资源耗尽。
+   即使 Java 垃圾回收机制最终会回收这些对象，但关联的底层系统资源（如文件描述符）可能不会被及时释放，直到垃圾回收发生，这种行为既不可预测也不可靠。
 
-## 风险影响
+2. **触发场景**
+   ```java
+   public void unsafeReadFile(String filePath) {
+       try {
+           FileInputStream fileStream = new FileInputStream(filePath);
+           InputStreamReader reader = new InputStreamReader(fileStream, StandardCharsets.UTF_8);
+           char[] buffer = new char[1024];
+           int charsRead;
+           while ((charsRead = reader.read(buffer)) != -1) {
+               System.out.print(new String(buffer, 0, charsRead));
+           }
+       } catch (IOException e) {
+           System.err.println("读取文件时出错: " + e.getMessage());
+       }
+       // 错误：未关闭 reader 和 fileStream
+   }
+   ```
+   上述代码中，`InputStreamReader` 和 `FileInputStream` 被创建并使用，但未被显式关闭，导致潜在的资源泄漏问题。
 
-- 文件句柄泄漏，导致"Too many open files"错误
-- 长时间运行的应用性能逐渐下降
-- 文件可能被锁定，无法被其他进程访问或修改
-- 在高并发环境下，资源消耗会迅速增加
-- 可能导致系统稳定性问题和应用程序崩溃
-DESCRIPTION
+3. **潜在影响**
+   - 文件句柄泄漏，导致“Too many open files”错误。
+   - 长时间运行的应用性能逐渐下降。
+   - 文件可能被锁定，无法被其他进程访问或修改。
+   - 在高并发环境下，资源消耗会迅速增加。
+   - 可能导致系统稳定性问题和应用程序崩溃。
+
+DESC
 	solution: <<<SOLUTION
 ### 修复建议
-
 资源管理的核心原则是在使用完毕后及时、可靠地释放资源。以下是几种推荐的修复方法：
 
 #### 1. 使用 try-with-resources 自动关闭资源 (Java 7+，强烈推荐)
@@ -55,7 +75,6 @@ public void safeReadFileWithTryFinally(String filePath) {
     try {
         fileStream = new FileInputStream(filePath);
         reader = new InputStreamReader(fileStream, StandardCharsets.UTF_8);
-
         char[] buffer = new char[1024];
         int charsRead;
         while ((charsRead = reader.read(buffer)) != -1) {
@@ -101,7 +120,6 @@ public void safeReadFileWithCommonsIO(String filePath) {
     }
 }
 ```
-
 **总结**: 优先使用 `try-with-resources` 或 Java NIO.2 (`Files` 类)。如果必须在旧版本 Java 或处理未实现 `AutoCloseable` 的资源，使用 `try-finally` 结构。
 SOLUTION
 	rule_id: "1c9a0032-1723-49f1-a0c2-047069ec7a21"
@@ -123,7 +141,90 @@ $stream -{
 $safe<getPredecessors()> as $safeStream;
 $stream - $safeStream as $weak;
 alert $weak for {
-	message: "检测到java.io未释放的资源",
+	message: "检测到java.io未释放的资源，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	name: "weak",
+	title: "Java Unreleased Resource Vulnerability Was Detected",
+	title_zh: "检测到Java未释放的资源漏洞",
+	solution: <<<SOLUTION
+### 修复建议
+资源管理的核心原则是在使用完毕后及时、可靠地释放资源。以下是几种推荐的修复方法：
+
+#### 1. 使用 try-with-resources 自动关闭资源 (Java 7+，强烈推荐)
+这是 Java 7 及更高版本提供的最安全、简洁的资源管理方式。它适用于实现了 `AutoCloseable` 接口的类。I/O 流类大多实现了此接口。
+```java
+public void safeReadFileWithTryWithResources(String filePath) {
+try (
+FileInputStream fileStream = new FileInputStream(filePath);
+InputStreamReader reader = new InputStreamReader(fileStream, StandardCharsets.UTF_8);
+BufferedReader bufferedReader = new BufferedReader(reader)
+) {
+String line;
+while ((line = bufferedReader.readLine()) != null) {
+System.out.println(line);
+}
+} catch (IOException e) {
+System.err.println("读取文件时发生错误: " + e.getMessage());
+}
+}
+```
+
+#### 2. 使用 try-finally 手动关闭资源 (兼容旧版本 Java)
+在 Java 7 之前，或者当资源未实现 `AutoCloseable` 接口时，需要使用 `try-finally` 块来确保资源被关闭。
+```java
+public void safeReadFileWithTryFinally(String filePath) {
+FileInputStream fileStream = null;
+InputStreamReader reader = null;
+try {
+fileStream = new FileInputStream(filePath);
+reader = new InputStreamReader(fileStream, StandardCharsets.UTF_8);
+char[] buffer = new char[1024];
+int charsRead;
+while ((charsRead = reader.read(buffer)) != -1) {
+System.out.print(new String(buffer, 0, charsRead));
+}
+} catch (IOException e) {
+System.err.println("读取文件时出错: " + e.getMessage());
+} finally {
+if (reader != null) {
+try { reader.close(); } catch (IOException e) { System.err.println("关闭InputStreamReader时错误: " + e.getMessage()); }
+}
+if (fileStream != null) {
+try { fileStream.close(); } catch (IOException e) { System.err.println("关闭FileInputStream时错误: " + e.getMessage()); }
+}
+}
+}
+```
+
+#### 3. 使用 Java NIO.2 (Files 类) (Java 7+)
+Java NIO.2 提供了更高级的文件操作 API，其中一些方法本身就处理了资源的管理。
+```java
+public void safeReadFileWithNIO(String filePath) {
+try {
+List<String> lines = Files.readAllLines(Paths.get(filePath), StandardCharsets.UTF_8);
+for (String line : lines) {
+System.out.println(line);
+}
+} catch (IOException e) {
+System.err.println("读取文件时发生错误: " + e.getMessage());
+}
+}
+```
+
+#### 4. 使用外部库或工具类
+许多流行的 Java 库（如 Apache Commons IO, Guava）提供了简化文件和流操作的工具类，这些类内部会负责资源的正确关闭。
+```java
+public void safeReadFileWithCommonsIO(String filePath) {
+try {
+String content = FileUtils.readFileToString(new File(filePath), StandardCharsets.UTF_8);
+System.out.println(content);
+} catch (IOException e) {
+System.err.println("读取文件时发生错误: " + e.getMessage());
+}
+}
+```
+**总结**: 优先使用 `try-with-resources` 或 Java NIO.2 (`Files` 类)。如果必须在旧版本 Java 或处理未实现 `AutoCloseable` 的资源，使用 `try-finally` 结构。
+SOLUTION
+	risk: "资源泄漏",
 }
 
 desc(
