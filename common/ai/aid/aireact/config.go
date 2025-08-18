@@ -100,6 +100,7 @@ type ReActConfig struct {
 
 	// Auto approve tool usage in non-interactive mode
 	autoApproveTools bool
+	autoAIReview     bool // Enable automatic AI review for tool usage
 
 	// ReAct specific settings
 	maxIterations int
@@ -138,6 +139,12 @@ func WithContext(ctx context.Context) Option {
 		if ctx != nil {
 			cfg.ctx = ctx
 		}
+	}
+}
+
+func WithAutoAIReview(enabled bool) Option {
+	return func(cfg *ReActConfig) {
+		cfg.autoAIReview = enabled
 	}
 }
 
@@ -345,6 +352,11 @@ func (cfg *ReActConfig) GetEndpointManager() *aicommon.EndpointManager {
 }
 
 func (cfg *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoint) {
+	if cfg.autoAIReview {
+		// In auto-review mode, automatically approve the request
+
+	}
+
 	// In auto-approve mode, automatically approve the request
 	if cfg.autoApproveTools {
 		log.Infof("Auto-approving tool usage (non-interactive mode)")
