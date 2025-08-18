@@ -93,8 +93,7 @@ type ReActConfig struct {
 	debugPrompt  bool
 
 	// Tool review and interaction
-	enableToolReview bool                             // Enable tool use review
-	reviewHandler    func(reviewInfo *ToolReviewInfo) // Custom review handler
+	enableToolReview bool // Enable tool use review
 
 	// Interactive features
 	epm *aicommon.EndpointManager
@@ -412,25 +411,30 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 	}
 
 	config := &ReActConfig{
-		ctx:        ctx,
-		cancel:     cancel,
-		id:         id,
-		idSequence: atomic.AddInt64(idGenerator, 1000), // Start with offset
+		task:                task,
+		ctx:                 ctx,
+		cancel:              cancel,
+		mu:                  sync.RWMutex{},
+		startInputEventOnce: sync.Once{},
+		eventInputChan:      chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 2),
+		id:                  id,
+		idSequence:          atomic.AddInt64(idGenerator, 1000), // Start with offset
 		idGenerator: func() int64 {
 			return atomic.AddInt64(idGenerator, 1)
 		},
-		task:                   task,
-		eventInputChan:         chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 2),
-		maxIterations:          10,
-		memory:                 aid.GetDefaultMemory(), // Initialize with default memory
-		currentIteration:       0,
-		finished:               false,
-		language:               "zh", // Default to Chinese
-		topToolsCount:          20,   // Default to show top 20 tools
-		aiToolManagerOption:    make([]buildinaitools.ToolManagerOption, 0),
-		inputConsumption:       new(int64),
-		outputConsumption:      new(int64),
-		aiTransactionAutoRetry: 5,
+		autoApproveTools:         false,
+		maxIterations:            10,
+		memory:                   aid.GetDefaultMemory(), // Initialize with default memory
+		cumulativeSummary:        "",
+		currentIteration:         0,
+		finished:                 false,
+		language:                 "zh", // Default to Chinese
+		topToolsCount:            20,   // Default to show top 20 tools
+		inputConsumption:         new(int64),
+		outputConsumption:        new(int64),
+		aiTransactionAutoRetry:   5,
+		timelineLimit:            100,       // Default limit for timeline records
+		timelineContentSizeLimit: 50 * 1024, // Default limit for 50k
 	}
 
 	// Initialize emitter

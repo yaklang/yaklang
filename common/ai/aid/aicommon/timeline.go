@@ -19,53 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
-type TimelineItemValue interface {
-	String() string
-	GetID() int64
-	GetShrinkResult() string
-	GetShrinkSimilarResult() string
-	SetShrinkResult(string)
-}
-
-type TimelineItem struct {
-	deleted bool
-
-	value TimelineItemValue // *aitool.ToolResult
-}
-
-func (item *TimelineItem) GetValue() TimelineItemValue {
-	return item.value
-}
-
-func (item *TimelineItem) IsDeleted() bool {
-	return item.deleted
-}
-
-func (item *TimelineItem) GetShrinkResult() string {
-	return item.value.GetShrinkResult()
-}
-
-func (item *TimelineItem) GetShrinkSimilarResult() string {
-	return item.value.GetShrinkSimilarResult()
-}
-
-func (item *TimelineItem) String() string {
-	return item.value.String()
-}
-
-func (item *TimelineItem) SetShrinkResult(pers string) {
-	item.value.SetShrinkResult(pers)
-}
-
-func (item *TimelineItem) GetID() int64 {
-	if item.value == nil {
-		return 0
-	}
-	return item.value.GetID()
-}
-
-var _ TimelineItemValue = (*TimelineItem)(nil)
-
 type Timeline struct {
 	extraMetaInfo func() string // extra meta info for timeline, like runtime id, etc.
 	config        AICallerConfigIf
@@ -138,8 +91,9 @@ func (m *Timeline) SoftDelete(id ...int64) {
 		}
 		if v, ok := m.summary.Get(i); ok {
 			v.Push(&TimelineItem{
-				value:   v.Value().value,
-				deleted: true,
+				createdAt: v.Value().createdAt,
+				deleted:   true,
+				value:     v.Value().value,
 			})
 		}
 	}
@@ -220,15 +174,18 @@ func (m *Timeline) setAICaller(ai AICaller) {
 }
 
 func (m *Timeline) PushToolResult(toolResult *aitool.ToolResult) {
-	ts := time.Now().UnixMilli()
+	now := time.Now()
+	ts := now.UnixMilli()
 	if m.tsToTimelineItem.Have(ts) {
 		time.Sleep(time.Millisecond * 10)
-		ts = time.Now().UnixMilli()
+		now = time.Now()
+		ts = now.UnixMilli()
 	}
 	m.idToTs.Set(toolResult.GetID(), ts)
 
 	item := &TimelineItem{
-		value: toolResult,
+		createdAt: now,
+		value:     toolResult,
 	}
 
 	// if item dump string > perDumpContentLimit should shrink this item
@@ -243,14 +200,17 @@ func (m *Timeline) PushToolResult(toolResult *aitool.ToolResult) {
 }
 
 func (m *Timeline) PushUserInteraction(stage UserInteractionStage, id int64, systemPrompt string, userExtraPrompt string) {
-	ts := time.Now().UnixMilli()
+	now := time.Now()
+	ts := now.UnixMilli()
 	if m.tsToTimelineItem.Have(ts) {
 		time.Sleep(time.Millisecond * 10)
-		ts = time.Now().UnixMilli()
+		now = time.Now()
+		ts = now.UnixMilli()
 	}
 	m.idToTs.Set(id, ts)
 
 	item := &TimelineItem{
+		createdAt: now,
 		value: &UserInteraction{
 			ID:              id,
 			SystemPrompt:    systemPrompt,
@@ -512,7 +472,7 @@ func (m *Timeline) DumpBefore(id int64) string {
 				val, ok := m.reducers.Get(reduceredStartId)
 				if ok {
 					reducerOnce.Do(func() {
-						buf.WriteString(fmt.Sprintf("├─...\n"))
+						buf.WriteString(fmt.Sprint("├─...\n"))
 						buf.WriteString(fmt.Sprintf("├─[%s] id: %v reducer-memory: %v\n", timeStr, item.GetID(), val.Value()))
 					})
 					return true
@@ -579,50 +539,79 @@ func (m *Timeline) PromptForToolCallResultsForLastN(n int) string {
 	return promptBuilder.String()
 }
 
-var _ TimelineItemValue = (*UserInteraction)(nil)
-
-type UserInteractionStage string
-
-const (
-	UserInteractionStage_BeforePlan UserInteractionStage = "before_plan"
-	UserInteractionStage_Review     UserInteractionStage = "review"
-	UserInteractionStage_FreeInput  UserInteractionStage = "free_input"
-)
-
-type UserInteraction struct {
-	ID              int64                `json:"id"`
-	SystemPrompt    string               `json:"prompt"`
-	UserExtraPrompt string               `json:"extra_prompt"`
-	Stage           UserInteractionStage `json:"stage"` // Stage
-	ShrinkResult    string               `json:"shrink_result,omitempty"`
-}
-
-func (u *UserInteraction) String() string {
-	if u.Stage == "" {
-		u.Stage = UserInteractionStage_FreeInput
+func (m *Timeline) PushText(id int64, fmtText string, items ...any) {
+	now := time.Now()
+	ts := now.UnixMilli()
+	if m.tsToTimelineItem.Have(ts) {
+		time.Sleep(time.Millisecond * 10)
+		now = time.Now()
+		ts = now.UnixMilli()
 	}
-	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf(" <- [id:%v] when %v\n", u.ID, u.Stage))
-	buf.WriteString("   system-question: " + u.SystemPrompt + "\n")
-	buf.WriteString("       user-answer: " + u.UserExtraPrompt + "\n")
-	return buf.String()
-}
+	m.idToTs.Set(id, ts)
 
-func (u *UserInteraction) GetID() int64 {
-	return u.ID
-}
-
-func (u *UserInteraction) GetShrinkResult() string {
-	return u.ShrinkResult
-}
-
-func (u *UserInteraction) GetShrinkSimilarResult() string {
-	if u.ShrinkResult != "" {
-		return u.ShrinkResult
+	var result string
+	if len(items) > 0 {
+		result = fmt.Sprintf(fmtText, items...)
+	} else {
+		result = fmtText
 	}
-	return ""
+
+	item := &TimelineItem{
+		createdAt: now,
+		value: &TextTimelineItem{
+			ID:   id,
+			Text: result,
+		},
+	}
+
+	if m.perDumpContentLimit > 0 && int64(len(fmtText)) > m.perDumpContentLimit {
+		m.shrink(item)
+	}
+
+	m.tsToTimelineItem.Set(ts, item)
+	m.idToTimelineItem.Set(id, item)
+	m.timelineLengthCheck()
+	m.dumpSizeCheck()
 }
 
-func (u *UserInteraction) SetShrinkResult(s string) {
-	u.ShrinkResult = s
+// TimelineEntry 时间线条目
+type TimelineItemOutput struct {
+	Timestamp time.Time `json:"timestamp"`
+	Type      string    `json:"type"` // "input", "thought", "action", "observation", "result"
+	Content   string    `json:"content"`
+}
+
+func (m *TimelineItemOutput) String() string {
+	return fmt.Sprintf("[%v][%s] %s", m.Timestamp, m.Type, m.Content)
+}
+
+func (m *Timeline) GetTimelineOutput() []*TimelineItemOutput {
+	l := m.idToTimelineItem.Len()
+	if l == 0 {
+		return nil
+	}
+	return m.ToTimelineItemOutputLastN(l)
+}
+
+func (m *Timeline) ToTimelineItemOutputLastN(n int) []*TimelineItemOutput {
+	l := m.tsToTimelineItem.Len()
+	if l == 0 {
+		return nil
+	}
+
+	var result []*TimelineItemOutput
+	start := l - n
+	if start < 0 {
+		start = 0
+	}
+
+	for i := start; i < l; i++ {
+		item, ok := m.tsToTimelineItem.GetByIndex(i)
+		if !ok {
+			continue
+		}
+		result = append(result, item.ToTimelineItemOutput())
+	}
+
+	return result
 }
