@@ -220,9 +220,6 @@ func main() {
 		aireact.WithAICallback(debugAICallback),
 		aireact.WithDebug(debugMode),
 		aireact.WithMaxIterations(5),
-		aireact.WithMaxThoughts(3),
-		aireact.WithMaxActions(3),
-		aireact.WithTemperature(0.7, 0.3),
 		aireact.WithLanguage(*language),
 		aireact.WithTopToolsCount(20),
 		aireact.WithEventHandler(func(e *schema.AiOutputEvent) {

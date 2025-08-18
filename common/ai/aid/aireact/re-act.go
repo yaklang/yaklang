@@ -2,17 +2,14 @@ package aireact
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
 
-	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -49,8 +46,8 @@ type ReAct struct {
 	*aicommon.Emitter
 
 	// 任务队列相关
-	taskQueue      *TaskQueue   // 任务队列
 	currentTask    *Task        // 当前正在处理的任务
+	taskQueue      *TaskQueue   // 任务队列
 	queueProcessor sync.Once    // 确保队列处理器只启动一次
 	queueMutex     sync.RWMutex // 保护队列相关状态
 	isProcessing   bool         // 是否正在处理任务
@@ -117,74 +114,18 @@ func (r *ReAct) SendInputEvent(event *ypb.AIInputEvent) error {
 	}
 
 	// 对于交互式消息，直接发送到事件通道处理
-	if event.IsInteractiveMessage {
+	if event.IsInteractiveMessage || event.IsSyncMessage {
 		if r.config.eventInputChan == nil {
 			return fmt.Errorf("event input channel is not initialized")
 		}
-
-		select {
-		case r.config.eventInputChan <- event:
-			if r.config.debugEvent {
-				log.Infof("Interactive event sent to channel: ID=%s", event.InteractiveId)
-			}
-			return nil
-		default:
-			return fmt.Errorf("event input channel is full, interactive event dropped")
-		}
+		r.config.eventInputChan.SafeFeed(event)
 	}
-
-	// 对于同步消息，处理同步请求
-	if event.IsSyncMessage {
-		return r.handleSyncMessage(event)
-	}
-
 	// 对于普通输入，创建任务并添加到队列
 	if event.IsFreeInput {
 		return r.enqueueTask(event)
 	}
 
 	return fmt.Errorf("unsupported event type")
-}
-
-// handleSyncMessage 处理同步消息
-func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
-	switch event.SyncType {
-	case SYNC_TYPE_QUEUE_INFO:
-		// 获取队列信息并通过事件发送
-		queueInfo := r.GetQueueInfo()
-
-		// 通过 Emitter 发送队列信息事件
-		r.EmitJSON(schema.EVENT_TYPE_STRUCTURED, "queue_info", queueInfo)
-		return nil
-
-	case SYNC_TYPE_TIMELINE:
-		// 获取时间线信息
-		limit := 20 // 默认限制
-
-		// 从 SyncJsonInput 中解析参数
-		if event.SyncJsonInput != "" {
-			var params map[string]interface{}
-			if err := json.Unmarshal([]byte(event.SyncJsonInput), &params); err == nil {
-				if l, ok := params["limit"].(float64); ok && l > 0 {
-					limit = int(l)
-				}
-			}
-		}
-
-		timeline := r.getTimeline(limit)
-		timelineInfo := map[string]interface{}{
-			"total_entries": len(r.timeline),
-			"limit":         limit,
-			"entries":       timeline,
-		}
-
-		// 通过 Emitter 发送时间线信息事件
-		r.EmitJSON(schema.EVENT_TYPE_STRUCTURED, "timeline", timelineInfo)
-		return nil
-
-	default:
-		return fmt.Errorf("unsupported sync type: %s", event.SyncType)
-	}
 }
 
 // enqueueTask 将输入事件转换为任务并添加到队列
@@ -457,61 +398,16 @@ func (r *ReAct) processInputEvent(event *ypb.AIInputEvent) error {
 		log.Infof("Processing input event: IsFreeInput=%v, IsInteractive=%v", event.IsFreeInput, event.IsInteractiveMessage)
 	}
 
-	// Handle different types of input events
-	var userInput string
-	var shouldResetSession bool
-
 	if event.IsFreeInput {
-		userInput = event.FreeInput
-		shouldResetSession = true // Reset session for new free input
-		if r.config.debugEvent {
-			log.Infof("Using free input: %s", userInput)
-		}
+		return r.handleFreeValue(event.FreeInput)
 	} else if event.IsInteractiveMessage {
-		// Handle interactive messages (tool review responses)
-		if r.config.debugEvent {
-			log.Infof("Processing interactive message: ID=%s", event.InteractiveId)
-		}
-
-		// Parse the interactive JSON input to get the suggestion
-		suggestion := gjson.Get(event.InteractiveJSONInput, "suggestion").String()
-		if suggestion == "" {
-			suggestion = "continue" // Default fallback
-		}
-
-		// Feed the response to the endpoint manager
-		if r.config.epm != nil {
-			params := aitool.InvokeParams{
-				"suggestion": suggestion,
-			}
-			r.config.epm.Feed(event.InteractiveId, params)
-			if r.config.debugEvent {
-				log.Infof("Fed interactive response to endpoint: ID=%s, suggestion=%s", event.InteractiveId, suggestion)
-			}
-		}
-
-		return nil
-	} else {
-		log.Warnf("No valid input found in event")
-		return nil
+		return r.handleInteractiveEvent(event)
+	} else if event.IsSyncMessage {
+		return r.handleSyncMessage(event)
 	}
 
-	// Reset session state if needed
-	if shouldResetSession {
-		r.config.mu.Lock()
-		r.config.finished = false
-		r.config.currentIteration = 0
-		r.config.mu.Unlock()
-		if r.config.debugEvent {
-			log.Infof("Reset ReAct session for new input")
-		}
-	}
-
-	// Execute the main ReAct loop using the new schema-based approach
-	if r.config.debugEvent {
-		log.Infof("Executing main loop with user input: %s", userInput)
-	}
-	return r.executeMainLoop(userInput)
+	log.Warnf("No valid input found in event: %v", event)
+	return nil
 }
 
 // startEventLoop starts the background event processing loop
@@ -523,16 +419,8 @@ func (r *ReAct) startEventLoop(ctx context.Context) {
 			}
 
 			for {
-				if r.config.eventInputChan == nil {
-					if r.config.debugEvent {
-						log.Warnf("ReAct event input channel is nil, will retry...")
-					}
-					<-ctx.Done()
-					return
-				}
-
 				select {
-				case event, ok := <-r.config.eventInputChan:
+				case event, ok := <-r.config.eventInputChan.OutputChannel():
 					if !ok {
 						log.Errorf("ReAct event input channel closed for instance: %s", r.config.id)
 						return
