@@ -2,11 +2,12 @@ package aireact
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils/chanx"
 	"io"
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/yaklang/yaklang/common/utils/chanx"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai"
@@ -61,6 +62,8 @@ func (t *ReactTask) GetName() string {
 type ReActConfig struct {
 	*aicommon.Emitter
 	*aicommon.BaseCheckpointableStorage
+
+	promptManager *PromptManager // Prompt manager for ReAct
 
 	// Task interface
 	task aicommon.AITask // prepared for toolcall
@@ -349,25 +352,6 @@ func (cfg *ReActConfig) GetEndpointManager() *aicommon.EndpointManager {
 		cfg.epm = aicommon.NewEndpointManager()
 	}
 	return cfg.epm
-}
-
-func (cfg *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoint) {
-	if cfg.autoAIReview {
-		// In auto-review mode, automatically approve the request
-
-	}
-
-	// In auto-approve mode, automatically approve the request
-	if cfg.autoApproveTools {
-		log.Infof("Auto-approving tool usage (non-interactive mode)")
-		// Set default continue response
-		endpoint.SetParams(aitool.InvokeParams{"suggestion": "continue"})
-		endpoint.Release()
-		return
-	}
-
-	// Default behavior: wait for user interaction
-	endpoint.Wait()
 }
 
 func (cfg *ReActConfig) CallAfterInteractiveEventReleased(eventID string, invoke aitool.InvokeParams) {

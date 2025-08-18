@@ -62,6 +62,7 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 
 	// Initialize prompt manager
 	react.promptManager = NewPromptManager(react)
+	cfg.promptManager = react.promptManager
 
 	// Initialize memory with AI capability
 	if cfg.memory != nil && cfg.aiCallback != nil {
