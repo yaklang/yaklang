@@ -17,6 +17,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
@@ -915,9 +916,7 @@ func handleClientEvent(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInpu
 			fmt.Printf("%s\n", content)
 			fmt.Printf("========================\n\n")
 		} else if strings.Contains(content, "total_entries") {
-			fmt.Printf("\n=== REACT TIMELINE ===\n")
-			fmt.Printf("%s\n", content)
-			fmt.Printf("======================\n\n")
+			displayFormattedTimeline(content)
 		} else if debugMode {
 			fmt.Printf("[structured]: %s\n", content)
 		}
@@ -1186,4 +1185,126 @@ func initializeDatabase() error {
 
 	log.Info("Database and configurations initialized successfully")
 	return nil
+}
+
+// displayFormattedTimeline 显示格式化的时间线信息
+func displayFormattedTimeline(jsonContent string) {
+	// 解析JSON内容
+	var timelineData map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonContent), &timelineData); err != nil {
+		log.Errorf("Failed to parse timeline JSON: %v", err)
+		fmt.Printf("\n=== REACT TIMELINE ===\n")
+		fmt.Printf("%s\n", jsonContent)
+		fmt.Printf("======================\n\n")
+		return
+	}
+
+	// 提取基本信息
+	totalEntries, _ := timelineData["total_entries"].(float64)
+	limit, _ := timelineData["limit"].(float64)
+	entriesData, _ := timelineData["entries"].([]interface{})
+
+	// 显示标题和统计信息
+	fmt.Printf("\n")
+	fmt.Printf("╔══════════════════════════════════════════════════════════════════════════════╗\n")
+	fmt.Printf("║                                🕐 REACT TIMELINE                             ║\n")
+	fmt.Printf("╠══════════════════════════════════════════════════════════════════════════════╣\n")
+	fmt.Printf("║ Total Entries: %-3.0f │ Showing: %-3.0f │ Timeline Activity Overview         ║\n", totalEntries, limit)
+	fmt.Printf("╚══════════════════════════════════════════════════════════════════════════════╝\n")
+
+	if len(entriesData) == 0 {
+		fmt.Printf("┌─ No timeline entries available\n")
+		fmt.Printf("└─ Timeline is empty\n\n")
+		return
+	}
+
+	// 显示时间线条目
+	for i, entryData := range entriesData {
+		entryMap, ok := entryData.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		// 解析时间戳
+		timestampStr, _ := entryMap["timestamp"].(string)
+		entryType, _ := entryMap["type"].(string)
+		content, _ := entryMap["content"].(string)
+
+		// 解析时间
+		var timeStr string
+		if timestamp, err := time.Parse(time.RFC3339Nano, timestampStr); err == nil {
+			timeStr = timestamp.Format("15:04:05.000")
+		} else {
+			timeStr = "unknown"
+		}
+
+		// 根据类型选择图标和颜色前缀
+		var icon, typeDisplay string
+		switch entryType {
+		case "tool_result":
+			icon = "🔧"
+			typeDisplay = "TOOL"
+		case "user_interaction":
+			icon = "👤"
+			typeDisplay = "USER"
+		case "text":
+			icon = "📝"
+			typeDisplay = "TEXT"
+		default:
+			icon = "❓"
+			typeDisplay = strings.ToUpper(entryType)
+		}
+
+		// 显示连接线
+		isLast := i == len(entriesData)-1
+		connector := "├─"
+		if isLast {
+			connector = "└─"
+		}
+
+		// 显示主要条目信息
+		fmt.Printf("%s[%s] %s %s\n", connector, timeStr, icon, typeDisplay)
+
+		// 处理内容显示
+		if content != "" {
+			contentLines := utils.ParseStringToRawLines(content)
+			for j, line := range contentLines {
+				// 限制每行长度避免过宽显示
+				if len(line) > 100 {
+					line = line[:97] + "..."
+				}
+
+				linePrefix := "│    "
+				if isLast {
+					linePrefix = "     "
+				}
+
+				// 对于第一行，显示内容标题
+				if j == 0 && len(contentLines) > 1 {
+					fmt.Printf("%s┌─ Content:\n", linePrefix)
+					fmt.Printf("%s│  %s\n", linePrefix, line)
+				} else if j == 0 {
+					fmt.Printf("%s━━ %s\n", linePrefix, line)
+				} else if j == len(contentLines)-1 && len(contentLines) > 1 {
+					fmt.Printf("%s└─ %s\n", linePrefix, line)
+				} else {
+					fmt.Printf("%s│  %s\n", linePrefix, line)
+				}
+
+				// 限制显示行数避免过长输出
+				if j >= 8 && len(contentLines) > 10 {
+					remaining := len(contentLines) - j - 1
+					fmt.Printf("%s└─ ... (%d more lines)\n", linePrefix, remaining)
+					break
+				}
+			}
+		}
+
+		// 添加条目间的分隔
+		if !isLast {
+			fmt.Printf("│\n")
+		}
+	}
+
+	fmt.Printf("\n")
 }
