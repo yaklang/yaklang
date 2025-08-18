@@ -222,7 +222,7 @@ func main() {
 		aireact.WithDebug(debugMode),
 		aireact.WithMaxIterations(5),
 		aireact.WithLanguage(*language),
-		aireact.WithTopToolsCount(20),
+		aireact.WithTopToolsCount(100),
 		aireact.WithEventHandler(func(e *schema.AiOutputEvent) {
 			outputChan <- e
 		}),
