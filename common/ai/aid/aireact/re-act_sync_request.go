@@ -3,6 +3,7 @@ package aireact
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -19,9 +20,8 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 		return nil
 
 	case SYNC_TYPE_TIMELINE:
-		// 获取时间线信息
-		limit := 20 // 默认限制
 
+		var limit = -1
 		// 从 SyncJsonInput 中解析参数
 		if event.SyncJsonInput != "" {
 			var params map[string]interface{}
@@ -32,15 +32,17 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 			}
 		}
 
-		timeline := r.getTimeline(limit)
-		timelineInfo := map[string]interface{}{
-			"total_entries": len(r.timeline),
-			"limit":         limit,
-			"entries":       timeline,
+		total := r.getTimelineTotal()
+		if limit <= 0 {
+			limit = total
 		}
 
 		// 通过 Emitter 发送时间线信息事件
-		r.EmitJSON(schema.EVENT_TYPE_STRUCTURED, "timeline", timelineInfo)
+		r.EmitJSON(schema.EVENT_TYPE_STRUCTURED, "timeline", map[string]interface{}{
+			"total_entries": total,
+			"limit":         limit,
+			"entries":       r.getTimeline(limit),
+		})
 		return nil
 
 	default:
