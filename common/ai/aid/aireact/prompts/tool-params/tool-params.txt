@@ -36,7 +36,7 @@ IMPORTANT CONSIDERATIONS:
 - After this tool execution, the ReAct loop will determine if the task is complete or if further actions are needed
 - Generate parameters that will produce meaningful results toward task completion
 
-RESPONSE FORMAT: Respond with a JSON object following the @action pattern:
+RESPONSE FORMAT: Respond with a JSON object following the @action pattern(Example):
 
 ```json
 {

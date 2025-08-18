@@ -81,45 +81,12 @@ func (r *ReAct) generateToolParamsPrompt(tool *aitool.Tool, toolName string) (st
 		return "", utils.Error("memory is not initialized")
 	}
 
-	// 生成工具的JSONSchema描述
-	toolJSONSchema := tool.ToJSONSchemaString()
-
-	// 获取原始用户查询
-	originalQuery := ""
-	if r.config.memory != nil {
-		originalQuery = r.config.memory.Query
+	// Use PromptManager to generate the prompt
+	promptManager := NewPromptManager(r)
+	prompt, err := promptManager.GenerateToolParamsPrompt(tool)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate tool params prompt: %w", err)
 	}
-
-	// Build the parameter generation prompt with schema information
-	prompt := fmt.Sprintf(`# 用户原始请求
-用户的明确要求: %s
-
-## 重要说明
-请严格按照用户的原始请求生成工具参数。用户要求什么就执行什么，不要过度解释或偏离用户的直接意图。
-
-## 工具详情
-工具名称: %s
-工具描述: %s
-
-## 参数生成规则
-1. **直接执行用户请求** - 如果用户要求执行"ls current"，就生成参数执行"ls"命令（不带路径表示当前目录）
-2. **避免过度复杂化** - 不要因为历史失败而偏离用户的直接请求
-3. **参数准确性** - 确保参数结构、数据类型与Schema完全一致
-
-## 工具参数Schema
-`+"```schema\n%s\n```"+`
-
-## 任务上下文
-%s
-
-## 历史记录（仅供参考，不要被失败记录误导）
-%s
-
-# 输出要求
-严格生成标准JSON对象，格式：`+"`{\"@action\": \"call-tool\", \"tool\": \"%s\", \"params\": {...}}`"+`
-
-重要：直接按照用户的原始请求"%s"生成对应的工具参数，不要偏离用户意图。
-`, originalQuery, tool.Name, tool.Description, toolJSONSchema, r.config.memory.CurrentTaskInfo(), r.config.memory.Timeline(), tool.Name, originalQuery)
 
 	if r.config.debugPrompt {
 		log.Infof("Tool params prompt: %s", prompt)

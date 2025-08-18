@@ -25,15 +25,10 @@ Tool executed: {{ .ToolName }}
 - 不要因为历史中的失败尝试而认为当前成功的执行无效
 - 关注最新的工具执行结果，而不是过往的失败历史
 
-RESPONSE FORMAT: Respond with a JSON object:
+RESPONSE FORMAT: Respond with a JSON object following the schema below:
 
 ```json
-{
-  "@action": "verify-satisfaction",
-  "user_satisfied": true/false,
-  "human_readable_result": "Clear, concise summary of what was accomplished and any key findings",
-  "reasoning": "Brief explanation of why the user's needs are/aren't satisfied"
-}
+{{ .Schema }}
 ```
 
 IMPORTANT GUIDELINES:

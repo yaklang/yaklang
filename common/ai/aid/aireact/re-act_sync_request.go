@@ -1,0 +1,49 @@
+package aireact
+
+import (
+	"encoding/json"
+	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+)
+
+// handleSyncMessage 处理同步消息
+func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
+	switch event.SyncType {
+	case SYNC_TYPE_QUEUE_INFO:
+		// 获取队列信息并通过事件发送
+		queueInfo := r.GetQueueInfo()
+
+		// 通过 Emitter 发送队列信息事件
+		r.EmitJSON(schema.EVENT_TYPE_STRUCTURED, "queue_info", queueInfo)
+		return nil
+
+	case SYNC_TYPE_TIMELINE:
+		// 获取时间线信息
+		limit := 20 // 默认限制
+
+		// 从 SyncJsonInput 中解析参数
+		if event.SyncJsonInput != "" {
+			var params map[string]interface{}
+			if err := json.Unmarshal([]byte(event.SyncJsonInput), &params); err == nil {
+				if l, ok := params["limit"].(float64); ok && l > 0 {
+					limit = int(l)
+				}
+			}
+		}
+
+		timeline := r.getTimeline(limit)
+		timelineInfo := map[string]interface{}{
+			"total_entries": len(r.timeline),
+			"limit":         limit,
+			"entries":       timeline,
+		}
+
+		// 通过 Emitter 发送时间线信息事件
+		r.EmitJSON(schema.EVENT_TYPE_STRUCTURED, "timeline", timelineInfo)
+		return nil
+
+	default:
+		return fmt.Errorf("unsupported sync type: %s", event.SyncType)
+	}
+}
