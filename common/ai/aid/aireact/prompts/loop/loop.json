@@ -21,7 +21,7 @@
             "description": "USE THIS FIELD ONLY IF type is 'directly_answer'. Provide the final, complete answer for the user here. The content should be self-contained and ready to be displayed.",
             "type": "string"
           },
-          "tool_request_payload": {
+          "tool_require_payload": {
             "description": "USE THIS FIELD ONLY IF type is 'require_tool'. Provide the exact name of the tool you need to use (e.g., 'web_search', 'database_query'). Another system will handle the parameter generation based on this name. Do NOT include tool arguments here.",
             "type": "string"
           },

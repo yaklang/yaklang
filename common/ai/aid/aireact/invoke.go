@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
@@ -171,10 +172,11 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			r.config.finished = true
 			// Store interaction in memory (no tool call result for direct answers)
 		case ActionRequireTool:
-			toolPayload := action.GetInvokeParams("next_action").GetString("tool_request_payload")
+			toolPayload := action.GetInvokeParams("next_action").GetString("tool_require_payload")
 			log.Infof("Requesting tool: %s", toolPayload)
 			if err := r.handleRequireTool(toolPayload); err != nil {
 				log.Errorf("Tool execution failed: %v", err)
+				spew.Dump(action)
 			} else {
 				// Tool executed successfully, now verify if user needs are satisfied
 				// Temporarily release the lock before calling verification to avoid deadlock

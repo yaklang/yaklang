@@ -4,6 +4,7 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"os"
 	"runtime"
 	"text/template"
@@ -45,6 +46,7 @@ type LoopPromptData struct {
 	CurrentTime        string
 	OSArch             string
 	WorkingDir         string
+	WorkingDirGlance   string
 	Tools              []*aitool.Tool
 	ToolsCount         int
 	TopTools           []*aitool.Tool
@@ -97,6 +99,7 @@ func (pm *PromptManager) GenerateLoopPrompt(userQuery string, tools []*aitool.To
 	// Set working directory
 	if cwd, err := os.Getwd(); err == nil {
 		data.WorkingDir = cwd
+		data.WorkingDirGlance = filesys.Glance(data.WorkingDir)
 	}
 
 	// Get prioritized tools

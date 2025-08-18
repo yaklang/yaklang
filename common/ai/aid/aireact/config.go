@@ -423,7 +423,7 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 			return atomic.AddInt64(idGenerator, 1)
 		},
 		autoApproveTools:         false,
-		maxIterations:            10,
+		maxIterations:            100,
 		memory:                   aid.GetDefaultMemory(), // Initialize with default memory
 		cumulativeSummary:        "",
 		currentIteration:         0,
