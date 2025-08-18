@@ -185,6 +185,7 @@ func (s *SyntaxFlowAnalyzer) checkTestData(result *SyntaxFlowRuleAnalyzeResult, 
 	}
 	if (positiveTests != nil && len(positiveTests) > 0) || (negativeTests != nil && len(negativeTests) > 0) {
 		err = evaluateVerifyFilesystemWithRule(frame.GetRule())
+		log.Info(err)
 		if err != nil {
 			result.Problems = append(result.Problems, SyntaxFlowRuleProblem{
 				Type:        ProblemTypeTestCaseNotPass,
