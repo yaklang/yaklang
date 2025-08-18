@@ -409,6 +409,11 @@ func handleInteractiveLoop(reactInstance *aireact.ReAct, ctx context.Context) {
 				continue
 			}
 
+			if strings.HasPrefix(input, "/breakpoint") || strings.HasPrefix(input, "/bp") {
+				breakpointEnabled = true
+				continue
+			}
+
 			if strings.HasPrefix(input, "/timeline") {
 				// Parse optional limit parameter
 				parts := strings.Fields(input)
