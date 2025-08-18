@@ -31,12 +31,16 @@ func IsGenericTextFile(filePath string) (bool, error) {
 		return false, fmt.Errorf("connot detect mime type '%s': %w", filePath, err)
 	}
 
-	for m := mime; m != nil; m = m.Parent() {
+	return IsGenericTextType(mime), nil
+}
+
+func IsGenericTextType(fileType *mimetype.MIME) bool {
+	for m := fileType; m != nil; m = m.Parent() {
 		if m.Is("text/plain") {
-			return true, nil
+			return true
 		}
 	}
-	return false, nil
+	return false
 }
 
 func IsMedia(filePath string) (bool, error) {
