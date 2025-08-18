@@ -102,6 +102,26 @@ func TimeoutContext(d time.Duration) context.Context {
 	return ctx
 }
 
+func GetContextKeyString(ctx context.Context, key string) string {
+	if ctx == nil {
+		return ""
+	}
+	if v := ctx.Value(key); v != nil {
+		return InterfaceToString(v)
+	}
+	return ""
+}
+
+func SetContextKey(ctx context.Context, key string, value any) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if value == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, key, value)
+}
+
 func FloatSecondDuration(f float64) time.Duration {
 	return time.Duration(float64(time.Second) * f)
 }

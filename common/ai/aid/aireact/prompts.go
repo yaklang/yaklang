@@ -4,11 +4,12 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"os"
 	"runtime"
 	"text/template"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/filesys"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
@@ -30,6 +31,12 @@ var verificationPromptTemplate string
 
 //go:embed prompts/verification/verification.json
 var verificationSchemaJSON string
+
+//go:embed prompts/review/ai-review-tool-call.txt
+var aiReviewPromptTemplate string
+
+//go:embed prompts/review/ai-review-tool-call.json
+var aiReviewSchemaJSON string
 
 // PromptManager manages ReAct prompt templates
 type PromptManager struct {
@@ -81,6 +88,22 @@ type VerificationPromptData struct {
 	Schema        string
 }
 
+// AIReviewPromptData contains data for AI tool call review prompt
+type AIReviewPromptData struct {
+	CurrentTime        string
+	OSArch             string
+	WorkingDir         string
+	WorkingDirGlance   string
+	ConversationMemory string
+	Timeline           string
+	Nonce              string
+	UserQuery          string
+	ToolToCall         string
+	ToolParams         string
+	Language           string
+	Schema             string
+}
+
 // GenerateLoopPrompt generates the main ReAct loop prompt using template
 func (pm *PromptManager) GenerateLoopPrompt(userQuery string, tools []*aitool.Tool) (string, error) {
 	// Build template data
@@ -88,7 +111,7 @@ func (pm *PromptManager) GenerateLoopPrompt(userQuery string, tools []*aitool.To
 		CurrentTime:   time.Now().Format("2006-01-02 15:04:05"),
 		OSArch:        fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
 		UserQuery:     userQuery,
-		Nonce:         utils.RandStringBytes(8),
+		Nonce:         utils.RandStringBytes(4),
 		Language:      pm.react.config.language,
 		Schema:        loopSchemaJSON,
 		Tools:         tools,
@@ -160,6 +183,38 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery, toolName stri
 	}
 
 	return pm.executeTemplate("verification", verificationPromptTemplate, data)
+}
+
+// GenerateAIReviewPrompt generates AI tool call review prompt using template
+func (pm *PromptManager) GenerateAIReviewPrompt(userQuery, toolName, toolParams string) (string, error) {
+	data := &AIReviewPromptData{
+		CurrentTime: time.Now().Format("2006-01-02 15:04:05"),
+		OSArch:      fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+		UserQuery:   userQuery,
+		ToolToCall:  toolName,
+		ToolParams:  toolParams,
+		Nonce:       utils.RandStringBytes(4),
+		Language:    pm.react.config.language,
+		Schema:      aiReviewSchemaJSON,
+	}
+
+	// Set working directory
+	if cwd, err := os.Getwd(); err == nil {
+		data.WorkingDir = cwd
+		data.WorkingDirGlance = filesys.Glance(data.WorkingDir)
+	}
+
+	// Set conversation memory
+	if pm.react.config.cumulativeSummary != "" {
+		data.ConversationMemory = pm.react.config.cumulativeSummary
+	}
+
+	// Set timeline memory
+	if pm.react.config.memory != nil {
+		data.Timeline = pm.react.config.memory.Timeline()
+	}
+
+	return pm.executeTemplate("ai-review", aiReviewPromptTemplate, data)
 }
 
 // executeTemplate executes a template with the given data
