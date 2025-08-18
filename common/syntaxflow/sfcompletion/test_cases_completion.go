@@ -176,7 +176,7 @@ func formatRuleWithTestCases(ruleContent string, negativeTestCases []TestCase) (
 	// 使用格式化选项补全规则
 	var opts []sfvm.RuleFormatOption
 	opts = append(opts,
-		sfvm.RuleFormatWithRequireDescKeyType(requiredDescKeys...),
+		sfvm.RuleFormatWithRequireInfoDescKeyType(requiredDescKeys...),
 		sfvm.RuleFormatWithDescHandler(testCaseHandler),
 	)
 
