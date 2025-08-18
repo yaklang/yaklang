@@ -4,16 +4,13 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/ai/aid"
-	"github.com/yaklang/yaklang/common/ai/rag"
-	"github.com/yaklang/yaklang/common/aireducer"
-	"github.com/yaklang/yaklang/common/chunkmaker"
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/chanx"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"sync"
 )
 
@@ -23,113 +20,99 @@ var refineSchema string
 //go:embed liteforge_refine_prompt.txt
 var refinePrompt string
 
-func RefineVideo(path string, option ...any) (*rag.RAGSystem, error) {
+func Refine(path string, option ...any) (*knowledgebase.KnowledgeBase, error) {
 	refineConfig := NewAnalysisConfig(option...)
 
-	knowledgeDatabaseName := path + uuid.New().String()
-	newKnowledgeBase := &schema.KnowledgeBaseInfo{
-		KnowledgeBaseName: knowledgeDatabaseName,
+	refineConfig.AnalyzeLog("analyze video: %s", path)
+	analyzeResult, err := AnalyzeFile(path, option...)
+	if err != nil {
+		return nil, utils.Errorf("failed to start analyze video: %v", err)
 	}
 
-	db := consts.GetGormProfileDatabase()
+	return RefineEx(analyzeResult, consts.GetGormProfileDatabase(), option...)
+}
 
-	refineConfig.AnalyzeStatusCard("Video Refine", "creating knowledge base")
-	err := yakit.CreateKnowledgeBase(db, newKnowledgeBase)
+func RefineEx(input <-chan AnalysisResult, db *gorm.DB, options ...any) (*knowledgebase.KnowledgeBase, error) {
+	refineConfig := NewAnalysisConfig(options...)
+	knowledgeDatabaseName := uuid.New().String()
+
+	refineConfig.AnalyzeStatusCard("Refine", "creating knowledge base")
+	kb, err := knowledgebase.NewKnowledgeBase(db, knowledgeDatabaseName, "refine-kb", "")
 	if err != nil {
 		return nil, utils.Errorf("fial to create knowledgDatabase: %v", err)
 	}
+	baseInfo, err := kb.GetInfo()
+	if err != nil {
+		return nil, utils.Errorf("failed to get knowledge base info: %v", err)
+	}
 
 	refineConfig.AnalyzeLog("knowledge base created: %s", knowledgeDatabaseName)
-	refineConfig.AnalyzeStatusCard("Video Refine", "creating knowledge base collection")
-	collection, err := rag.CreateCollection(db, newKnowledgeBase.KnowledgeBaseName, "video_refine")
-	if err != nil {
-		return nil, err
-	}
-
-	chunkChan := chanx.NewUnlimitedChan[chunkmaker.Chunk](refineConfig.Ctx, 100)
-	cm, err := chunkmaker.NewSimpleChunkMaker(chunkChan, chunkmaker.WithCtx(refineConfig.Ctx))
-	if err != nil {
-		return nil, err
-	}
-	analyzeOption := append(option, WithAnalyzeStreamChunkCallback(func(chunk chunkmaker.Chunk) {
-		chunkChan.SafeFeed(chunk)
-	}))
-
-	go func() {
-		defer chunkChan.Close()
-		refineConfig.AnalyzeLog("analyze video: %s", path)
-		videoResult, err := AnalyzeVideo(path, analyzeOption...)
-		if err != nil {
-			log.Errorf(err.Error())
-		}
-		refineConfig.AnalyzeStatusCard("refine chunk total", len(videoResult.ImageSegments))
-	}()
-
-	wg := sync.WaitGroup{}
+	refineConfig.AnalyzeStatusCard("Refine", "creating knowledge base collection")
 
 	count := 0
+	wg := sync.WaitGroup{}
+	startOnce := &sync.Once{}
+	for v := range input {
+		startOnce.Do(func() {
+			refineConfig.AnalyzeStatusCard("Refine", "refining chunks")
+		})
+		count++
+		refineConfig.AnalyzeStatusCard("refine chunk count", count)
 
-	ar, err := aireducer.NewReducerEx(cm,
-		aireducer.WithContext(refineConfig.Ctx),
-		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.Memory, chunk chunkmaker.Chunk) error {
-			count++
-			refineConfig.AnalyzeStatusCard("refine chunk count", count)
+		knowledgeRawData := v.Dump()
+		query := fmt.Sprintf("%s\n ```main_analysis\n%s\n``` ", refinePrompt, knowledgeRawData)
 
-			knowledgeRawData := chunk.Data()
-			query := fmt.Sprintf("%s\n ```main_analysis\n%s\n``` ", refinePrompt, knowledgeRawData)
-
-			refineResult, err := _executeLiteForgeTemp(query, append(refineConfig.fallbackOptions, _withOutputJSONSchema(refineSchema))...)
+		refineResult, err := _executeLiteForgeTemp(query, append(refineConfig.fallbackOptions, _withOutputJSONSchema(refineSchema))...)
+		if err != nil {
+			return nil, utils.Errorf("failed to convert knowledge base to knowledge: %v", err)
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			entries, err := Action2RagKnowledgeEntries(refineResult.Action, int64(baseInfo.ID))
 			if err != nil {
-				return err
+				log.Errorf("failed to convert action to knowledge base entries: %v", err)
+				return
 			}
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				entries, err := Action2RagKnowledgeEntries(refineResult.Action, int64(newKnowledgeBase.ID))
-				if err != nil {
-					log.Errorf("failed to convert action to knowledge base entries: %v", err)
-					return
+			for _, entry := range entries {
+				if len(entry.KnowledgeDetails) <= 0 {
+					continue
 				}
-				for _, entry := range entries {
-					if len(entry.KnowledgeDetails) <= 0 {
-						continue
+				if len(entry.KnowledgeDetails) > 1500 {
+					detailList, err := SplitTextSafe(entry.KnowledgeDetails, 1000, options...)
+					if err != nil {
+						return
 					}
-					if len(entry.KnowledgeDetails) > 1200 {
-						entry.KnowledgeDetails = utils.ShrinkString(entry.KnowledgeDetails, 1200)
+					for _, detail := range detailList {
+						err := kb.AddKnowledgeEntry(&schema.KnowledgeBaseEntry{
+							KnowledgeBaseID:  entry.KnowledgeBaseID,
+							KnowledgeTitle:   entry.KnowledgeTitle,
+							KnowledgeType:    entry.KnowledgeType,
+							KnowledgeDetails: detail,
+							Summary:          entry.Summary,
+							Keywords:         entry.Keywords,
+						})
+						if err != nil {
+							log.Errorf("failed to create knowledge base entry: %v", err)
+							return
+						}
 					}
-					err := yakit.CreateKnowledgeBaseEntry(db, entry)
+				} else {
+					err := kb.AddKnowledgeEntry(entry)
 					if err != nil {
 						log.Errorf("failed to create knowledge base entry: %v", err)
 						return
 					}
-
-					err = collection.Add(entry.KnowledgeTitle, entry.KnowledgeDetails)
-					if err != nil {
-						log.Errorf("failed to add knowledge title to knowledge: %v", err)
-						return
-					}
 				}
-				refineConfig.AnalyzeLog("analyze chunk [%d]", count)
-			}()
-			return nil
-		}),
-	)
-	if err != nil {
-		return nil, err
+			}
+		}()
 	}
-	refineConfig.AnalyzeStatusCard("Video Refine", "refining video chunks")
-	err = ar.Run()
-	if err != nil {
-		return nil, err
-	}
-
 	wg.Wait()
-
-	return collection, nil
+	return kb, nil
 }
 
 func Action2RagKnowledgeEntries(
-	action *aid.Action,
+	action *aicommon.Action,
 	knowledgeBaseID int64,
 ) ([]*schema.KnowledgeBaseEntry, error) {
 	if action == nil {

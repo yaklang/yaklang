@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/mediautils"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 	"os"
 	"strings"
 )
@@ -27,6 +28,10 @@ func (t *TimelineSegment) String() string {
 	return fmt.Sprintf("start_seconds: %f, end_seconds: %f, processing_type: %s, text: %s", t.StartSeconds, t.EndSeconds, t.ProcessingType, utils.ShrinkString(t.Text, 100))
 }
 
+func (t *TimelineSegment) Dump() string {
+	return t.String()
+}
+
 func (t *TimelineSegment) Ignored() bool {
 	return t.ProcessingType == "ignore"
 }
@@ -40,39 +45,32 @@ type AudioProcessingStats struct {
 	IgnoreDuration float64 `json:"ignore_duration"` // Total duration of "ignore" segments in seconds
 	FinePercentage float64 `json:"fine_percentage"`
 }
+type AudioAnalysisResultList []*AudioAnalysisResult
+
 type AudioAnalysisResult struct {
-	CumulativeSummary string                `json:"cumulative_summary"`
-	TimelineSegments  []*TimelineSegment    `json:"timeline_segments"`
-	ProcessingStats   *AudioProcessingStats `json:"processing_stats"`
+	CumulativeSummary string           `json:"cumulative_summary"`
+	TimelineSegment   *TimelineSegment `json:"timeline_segment"`
 }
 
-func (a *AudioAnalysisResult) GenerateProcessingStats() *AudioProcessingStats {
-	// 从timeline segments中生成
+func (a AudioAnalysisResultList) GetProcessingStats() *AudioProcessingStats {
 	var fineDuration float64
 	var ignoreDuration float64
-	for _, segment := range a.TimelineSegments {
+	for _, item := range a {
+		segment := item.TimelineSegment
 		if segment.FineGrained() {
 			fineDuration += segment.EndSeconds - segment.StartSeconds
 		} else if segment.Ignored() {
 			ignoreDuration += segment.EndSeconds - segment.StartSeconds
 		}
 	}
-	a.ProcessingStats = &AudioProcessingStats{
+	return &AudioProcessingStats{
 		FineDuration:   fineDuration,
 		IgnoreDuration: ignoreDuration,
 		FinePercentage: fineDuration / (fineDuration + ignoreDuration),
 	}
-	return a.ProcessingStats
 }
 
-func (a *AudioAnalysisResult) GetProcessingStats() *AudioProcessingStats {
-	if a.ProcessingStats != nil {
-		return a.ProcessingStats
-	}
-	return a.GenerateProcessingStats()
-}
-
-func AnalyzeAudioFileEx(audio string, streamHandler func(segment *TimelineSegment) error, opts ...any) (*AudioAnalysisResult, error) {
+func AnalyzeAudioFile(audio string, opts ...any) (<-chan *AudioAnalysisResult, error) {
 	if !utils.FileExists(audio) {
 		return nil, fmt.Errorf("video file not found: %s", audio)
 	}
@@ -140,20 +138,20 @@ Analyze the provided "current_srt_chunk". Classify its time segments as either "
 
 ` + analyzeConfig.ExtraPrompt
 
-	var result = &AudioAnalysisResult{
-		CumulativeSummary: "",
-		TimelineSegments:  make([]*TimelineSegment, 0),
-	}
+	allResult := make([]*AudioAnalysisResult, 0)
+	resultChan := chanx.NewUnlimitedChan[*AudioAnalysisResult](analyzeConfig.Ctx, 100)
+
+	cumulativeSummary := ""
 
 	analyze := func(query string) error {
-		forgeResult, err := _executeLiteForgeTemp(prompt+"\n"+query+"\n"+result.CumulativeSummary, analyzeConfig.fallbackOptions...)
+		forgeResult, err := _executeLiteForgeTemp(prompt+"\n"+query+"\n"+cumulativeSummary, analyzeConfig.fallbackOptions...)
 		if err != nil {
 			return err
 		}
 		if forgeResult == nil || forgeResult.Action == nil {
 			return fmt.Errorf("invalid forge result")
 		}
-		result.CumulativeSummary = forgeResult.GetString("cumulative_summary")
+		cumulativeSummary = forgeResult.GetString("cumulative_summary")
 		for _, params := range forgeResult.GetInvokeParamsArray("timeline_segments") {
 			segment := &TimelineSegment{
 				StartSeconds:   params.GetFloat("start_seconds"),
@@ -161,13 +159,12 @@ Analyze the provided "current_srt_chunk". Classify its time segments as either "
 				ProcessingType: params.GetString("processing_type"),
 				Text:           params.GetString("text_content"),
 			}
-			if streamHandler != nil {
-				err := streamHandler(segment)
-				if err != nil {
-					return err
-				}
+			item := &AudioAnalysisResult{
+				CumulativeSummary: cumulativeSummary,
+				TimelineSegment:   segment,
 			}
-			result.TimelineSegments = append(result.TimelineSegments, segment)
+			resultChan.SafeFeed(item)
+			allResult = append(allResult, item)
 		}
 		return nil
 	}
@@ -192,7 +189,7 @@ Analyze the provided "current_srt_chunk". Classify its time segments as either "
 				return err
 			}
 			processedCount++
-			analyzeConfig.AnalyzeLog("audio analysis processed chunk %d, cumulative summary length: %d, timeline segments: %d", processedCount, len(result.CumulativeSummary), len(result.TimelineSegments))
+			analyzeConfig.AnalyzeLog("audio analysis processed chunk %d, cumulative summary length: %d, timeline segments: %d", processedCount, len(cumulativeSummary), len(allResult))
 			return nil
 		}),
 		aireducer.WithFinishCallback(func(config *aireducer.Config, memory *aid.Memory) error {
@@ -210,17 +207,18 @@ Analyze the provided "current_srt_chunk". Classify its time segments as either "
 	if err != nil {
 		return nil, utils.Errorf("build srt reducer fail: %s", err.Error())
 	}
-	analyzeConfig.AnalyzeStatusCard("Audio Analysis", "analyzing rst file")
-	analyzeConfig.AnalyzeLog("start analyzing srt file: %s", srtPath)
-	err = srtReducer.Run()
-	if err != nil {
-		return nil, utils.Errorf("srt reducer run fail: %s", err.Error())
-	}
-	analyzeConfig.AnalyzeStatusCard("Audio Analysis", "finish")
-	analyzeConfig.AnalyzeLog("analyzing srt file finish")
-	return result, nil
-}
 
-func AnalyzeAudioFile(video string, opts ...any) (*AudioAnalysisResult, error) {
-	return AnalyzeAudioFileEx(video, nil, opts...)
+	go func() {
+		defer resultChan.Close()
+		analyzeConfig.AnalyzeStatusCard("Audio Analysis", "analyzing rst file")
+		analyzeConfig.AnalyzeLog("start analyzing srt file: %s", srtPath)
+		err = srtReducer.Run()
+		if err != nil {
+			analyzeConfig.AnalyzeLog("analyze srt file error: %s", err.Error())
+			return
+		}
+		analyzeConfig.AnalyzeStatusCard("Audio Analysis", "finish")
+		analyzeConfig.AnalyzeLog("analyzing srt file finish")
+	}()
+	return resultChan.OutputChannel(), nil
 }

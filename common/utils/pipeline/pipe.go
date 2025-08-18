@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/log"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/utils/chanx"
@@ -14,6 +15,34 @@ type Pipe[T, U any] struct {
 	feedWG  sync.WaitGroup
 	wg      sync.WaitGroup
 	handler func(item T) (U, error)
+}
+
+func NewSimplePipe[T, U any](ctx context.Context, in <-chan T, handler func(item T) (U, error)) *Pipe[T, U] {
+	ret := &Pipe[T, U]{
+		ctx:     ctx,
+		out:     chanx.NewUnlimitedChan[U](ctx, defaultPipeSize),
+		handler: handler,
+	}
+	go func() {
+		defer ret.out.Close()
+		for {
+			select {
+			case <-ret.ctx.Done():
+				return
+			case item, ok := <-in:
+				if !ok {
+					return
+				}
+				outResult, err := ret.handler(item)
+				if err != nil {
+					log.Errorf("failed to handle item '%s': %v", item, err)
+					return
+				}
+				ret.out.SafeFeed(outResult)
+			}
+		}
+	}()
+	return ret
 }
 
 const defaultPipeSize = 200
