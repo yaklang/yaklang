@@ -3,6 +3,10 @@ package aiforge
 import (
 	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/aireducer"
+	"github.com/yaklang/yaklang/common/chunkmaker"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 	"os"
 	"strings"
 
@@ -123,6 +127,10 @@ func (i *ImageAnalysisResult) OCRList() []string {
 		}
 	}
 	return ocrList
+}
+
+func (i *ImageAnalysisResult) GetCumulativeSummary() string {
+	return i.CumulativeSummary
 }
 
 func (i *ImageAnalysisResult) Dump() string {
@@ -643,4 +651,53 @@ Do not treat the image and the text as separate items. You must **integrate** th
 
 	log.Infof("Image analysis completed successfully: %v", result.Stats())
 	return result, nil
+}
+
+func AnalyzeSingleMedia(mediaPath string, opts ...any) (<-chan AnalysisResult, error) {
+	if !utils.FileExists(mediaPath) {
+		return nil, fmt.Errorf("media file not found: %s", mediaPath)
+	}
+
+	analyzeConfig := NewAnalysisConfig(opts...)
+	analyzeConfig.AnalyzeStatusCard("Media Analysis", "extracting images from media")
+	chunkOption := []chunkmaker.Option{chunkmaker.WithCtx(analyzeConfig.Ctx)}
+	chunkOption = append(chunkOption, analyzeConfig.chunkOption...)
+
+	cm, err := chunkmaker.NewChunkMakerFromFile(mediaPath, chunkmaker.WithCtx(analyzeConfig.Ctx))
+	if err != nil {
+		return nil, err
+	}
+
+	var resultChan = chanx.NewUnlimitedChan[AnalysisResult](analyzeConfig.Ctx, 100)
+
+	count := 0
+	ar, err := aireducer.NewReducerEx(cm,
+		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.Memory, chunk chunkmaker.Chunk) error {
+			count++
+			if chunk.MIMEType().IsImage() {
+				analyzeConfig.AnalyzeLog("chunk index[%d] Analyzing media image type [%s]", count, chunk.MIMEType().String())
+				imageResult, err := AnalyzeImage(chunk.Data(), opts)
+				if err != nil {
+					return fmt.Errorf("failed to analyze media image: %w", err)
+				}
+				resultChan.SafeFeed(imageResult)
+			} else {
+				analyzeConfig.AnalyzeLog("chunk index[%d] Analyzing media text type [%s]", count, chunk.MIMEType().String())
+				resultChan.SafeFeed(&TextAnalysisResult{Text: chunk.MIMEType().String()})
+			}
+			return nil
+		}),
+		aireducer.WithContext(analyzeConfig.Ctx),
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to analyze media image: %w", err)
+	}
+
+	err = ar.Run()
+	if err != nil {
+		return nil, fmt.Errorf("failed to run analyze media image: %w", err)
+	}
+
+	return resultChan.OutputChannel(), fmt.Errorf("no images found in media file: %s", mediaPath)
 }

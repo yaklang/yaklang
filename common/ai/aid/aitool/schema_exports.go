@@ -25,14 +25,14 @@ func _withParamObject(objectName string, opts ...any) ToolOption {
 	return WithStructParam(objectName, currentProperties, params...)
 }
 
-func newObjectSchemaWithAction(opts ...any) string {
+func NewObjectSchemaWithAction(opts ...any) string {
 	var params []any
 	params = append(params, WithAction("object"))
 	params = append(params, opts...)
-	return newObjectSchema(params...)
+	return NewObjectSchema(params...)
 }
 
-func newObjectSchema(opts ...any) string {
+func NewObjectSchema(opts ...any) string {
 	var params []ToolOption
 	var props []PropertyOption
 	for _, i := range opts {
@@ -172,10 +172,10 @@ func _withObjectArray(name string, opts ...any) ToolOption {
 }
 
 var SchemaGeneratorExports = map[string]any{
-	"ActionObject":         newObjectSchemaWithAction,
-	"Object":               newObjectSchema,
+	"ActionObject":         NewObjectSchemaWithAction,
+	"Object":               NewObjectSchema,
 	"ObjectArray":          newObjectArraySchema,
-	"NewObjectSchema":      newObjectSchema,
+	"NewObjectSchema":      NewObjectSchema,
 	"NewObjectArraySchema": newObjectArraySchema,
 
 	"action":                  WithAction,

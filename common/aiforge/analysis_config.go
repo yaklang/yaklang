@@ -14,6 +14,7 @@ type AnalysisConfig struct {
 	AnalyzeStatusCard func(id string, data interface{}, tags ...string)
 
 	AnalyzeStreamChunkCallback func(chunk chunkmaker.Chunk)
+	chunkOption                []chunkmaker.Option
 	fallbackOptions            []any
 }
 
@@ -34,6 +35,9 @@ func NewAnalysisConfig(opts ...any) *AnalysisConfig {
 		if optFunc, ok := opt.(AnalysisOption); ok {
 			optFunc(cfg)
 		} else {
+			if chunkOpt, ok := opt.(*chunkmaker.Option); ok {
+				cfg.chunkOption = append(cfg.chunkOption, *chunkOpt)
+			}
 			cfg.fallbackOptions = append(cfg.fallbackOptions, opt)
 		}
 	}
