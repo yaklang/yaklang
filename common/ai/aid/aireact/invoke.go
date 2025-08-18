@@ -3,6 +3,7 @@ package aireact
 import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
@@ -203,10 +204,34 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 
 		case ActionRequestPlanExecution:
 			planPayload := action.GetInvokeParams("next_action").GetString("plan_request_payload")
-			log.Infof("Requesting plan execution: %s", planPayload)
+			log.Infof("Requesting plan execution: %s, start to create p-e coordinator", planPayload)
 			r.EmitAction(fmt.Sprintf("Plan request: %s", planPayload))
 			// TODO: Implement plan execution logic
-
+			cod, err := aid.NewCoordinator(
+				planPayload,
+				aid.WithAICallback(r.config.aiCallback),
+				aid.WithAllowPlanUserInteract(false),
+				aid.WithAgreeYOLO(true),
+				aid.WithEventHandler(func(e *schema.AiOutputEvent) {
+					emitErr := r.config.Emit(e)
+					if emitErr != nil {
+						log.Errorf("Failed to emit event: %v", emitErr)
+					}
+				}),
+				aid.WithDisallowRequireForUserPrompt(),
+			)
+			if err != nil {
+				r.config.finished = true
+				log.Errorf("Failed to create coordinator for plan execution: %v", err)
+				return utils.Errorf("failed to create coordinator for plan execution: %v", err)
+			}
+			if err := cod.Run(); err != nil {
+				r.config.finished = true
+				log.Errorf("Plan execution failed: %v", err)
+				return utils.Errorf("plan execution failed: %v", err)
+			}
+			// Emit the final result from the coordinator
+			r.config.finished = true
 		default:
 			log.Errorf("Unknown action type: %s", actionType)
 		}
