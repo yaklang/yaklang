@@ -27,6 +27,9 @@ var toolParamsPromptTemplate string
 //go:embed prompts/verification/verification.txt
 var verificationPromptTemplate string
 
+//go:embed prompts/verification/verification.json
+var verificationSchemaJSON string
+
 // PromptManager manages ReAct prompt templates
 type PromptManager struct {
 	react *ReAct
@@ -73,6 +76,7 @@ type VerificationPromptData struct {
 	ToolName      string
 	Timeline      string
 	Language      string
+	Schema        string
 }
 
 // GenerateLoopPrompt generates the main ReAct loop prompt using template
@@ -144,6 +148,7 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery, toolName stri
 		OriginalQuery: originalQuery,
 		ToolName:      toolName,
 		Language:      pm.react.config.language,
+		Schema:        verificationSchemaJSON,
 	}
 
 	// Get timeline for context (without lock, assume caller handles it)

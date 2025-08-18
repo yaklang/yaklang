@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 	"io"
 	"strings"
 	"sync"
@@ -61,20 +62,23 @@ type ReActConfig struct {
 	*aicommon.Emitter
 	*aicommon.BaseCheckpointableStorage
 
+	// Task interface
+	task aicommon.AITask // prepared for toolcall
+
 	ctx    context.Context
 	cancel context.CancelFunc
 
+	// Synchronization
+	mu sync.RWMutex
+
 	// Event loop management
 	startInputEventOnce sync.Once
-	eventInputChan      chan *ypb.AIInputEvent
+	eventInputChan      *chanx.UnlimitedChan[*ypb.AIInputEvent]
 
 	// ID management
 	id          string
 	idSequence  int64
 	idGenerator func() int64
-
-	// Task interface
-	task aicommon.AITask
 
 	// AI callback for handling LLM calls
 	aiCallback AICallbackType
@@ -99,11 +103,7 @@ type ReActConfig struct {
 	autoApproveTools bool
 
 	// ReAct specific settings
-	maxIterations     int
-	maxThoughts       int
-	maxActions        int
-	temperatureThink  float32
-	temperatureAction float32
+	maxIterations int
 
 	// Memory and state
 	memory            *aid.Memory // Replace conversationHistory with Memory/Timeline
@@ -117,15 +117,8 @@ type ReActConfig struct {
 	inputConsumption  *int64
 	outputConsumption *int64
 
-	// Retry settings
-	aiTransactionAutoRetry int64
-
-	// Synchronization
-	mu sync.RWMutex
-
-	// Output channel
-	outputChan chan *schema.AiOutputEvent
-
+	// field config
+	aiTransactionAutoRetry   int64
 	timelineLimit            int64 // Limit for timeline records
 	timelineContentSizeLimit int64 // Limit for timeline content size
 }
@@ -166,7 +159,16 @@ func WithEventHandler(handler func(e *schema.AiOutputEvent)) Option {
 // WithEventInputChan sets the event input channel for ReAct
 func WithEventInputChan(ch chan *ypb.AIInputEvent) Option {
 	return func(cfg *ReActConfig) {
-		cfg.eventInputChan = ch
+		if ch != nil {
+			go func() {
+				for event := range ch {
+					if cfg.debugEvent {
+						log.Debugf("Received event: %s", event)
+					}
+					cfg.eventInputChan.SafeFeed(event)
+				}
+			}()
+		}
 	}
 }
 
@@ -215,36 +217,6 @@ func WithMaxIterations(max int) Option {
 	}
 }
 
-// WithMaxThoughts sets the maximum number of thoughts per iteration
-func WithMaxThoughts(max int) Option {
-	return func(cfg *ReActConfig) {
-		if max > 0 {
-			cfg.maxThoughts = max
-		}
-	}
-}
-
-// WithMaxActions sets the maximum number of actions per iteration
-func WithMaxActions(max int) Option {
-	return func(cfg *ReActConfig) {
-		if max > 0 {
-			cfg.maxActions = max
-		}
-	}
-}
-
-// WithTemperature sets the temperature for thinking and action phases
-func WithTemperature(think, action float32) Option {
-	return func(cfg *ReActConfig) {
-		if think >= 0 && think <= 2.0 {
-			cfg.temperatureThink = think
-		}
-		if action >= 0 && action <= 2.0 {
-			cfg.temperatureAction = action
-		}
-	}
-}
-
 // WithSystemFileOperator adds system file operation tools
 func WithSystemFileOperator() Option {
 	return func(cfg *ReActConfig) {
@@ -273,13 +245,6 @@ func WithTopToolsCount(count int) Option {
 func WithToolReview(enabled bool) Option {
 	return func(cfg *ReActConfig) {
 		cfg.enableToolReview = enabled
-	}
-}
-
-// WithReviewHandler sets a custom review handler for tool use review
-func WithReviewHandler(handler func(reviewInfo *ToolReviewInfo)) Option {
-	return func(cfg *ReActConfig) {
-		cfg.reviewHandler = handler
 	}
 }
 
@@ -455,18 +420,13 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 			return atomic.AddInt64(idGenerator, 1)
 		},
 		task:                   task,
-		eventInputChan:         make(chan *ypb.AIInputEvent, 100), // Initialize event input channel
+		eventInputChan:         chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 2),
 		maxIterations:          10,
-		maxThoughts:            3,
-		maxActions:             5,
-		temperatureThink:       0.7,
-		temperatureAction:      0.3,
 		memory:                 aid.GetDefaultMemory(), // Initialize with default memory
 		currentIteration:       0,
 		finished:               false,
 		language:               "zh", // Default to Chinese
 		topToolsCount:          20,   // Default to show top 20 tools
-		outputChan:             make(chan *schema.AiOutputEvent, 100),
 		aiToolManagerOption:    make([]buildinaitools.ToolManagerOption, 0),
 		inputConsumption:       new(int64),
 		outputConsumption:      new(int64),

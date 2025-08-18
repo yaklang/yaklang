@@ -1,0 +1,30 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": [
+        "@action",
+        "user_satisfied",
+        "human_readable_result",
+        "reasoning"
+    ],
+    "properties": {
+        "@action": {
+            "const": "verify-satisfaction",
+            "description": "Action identifier for verification result",
+            "type": "string"
+        },
+        "user_satisfied": {
+            "description": "Boolean indicating whether the user's original request has been satisfied by the tool execution",
+            "type": "boolean"
+        },
+        "human_readable_result": {
+            "description": "Clear, concise summary of what was accomplished and any key findings from the tool execution",
+            "type": "string"
+        },
+        "reasoning": {
+            "description": "Brief explanation of why the user's needs are or aren't satisfied, based on the tool execution results",
+            "type": "string"
+        }
+    },
+    "additionalProperties": false
+}
