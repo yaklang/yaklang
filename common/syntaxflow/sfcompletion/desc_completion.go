@@ -89,7 +89,7 @@ func CompleteRuleDesc(
 	}
 	var opts []sfvm.RuleFormatOption
 	opts = append(opts,
-		sfvm.RuleFormatWithRequireDescKeyType(sfvm.GetSupplyInfoDescKeyType()...),
+		sfvm.RuleFormatWithRequireInfoDescKeyType(sfvm.GetSupplyInfoDescKeyType()...),
 		sfvm.RuleFormatWithDescHandler(handler),
 		sfvm.RuleFormatWithAlertHandler(func(name, key, value string) string {
 			array := alertParams.GetObjectArray("alert")
@@ -108,6 +108,7 @@ func CompleteRuleDesc(
 			}
 			return value
 		}),
+		sfvm.RuleFormatWithRequireAlertDescKeyType(sfvm.GetAlertDescKeyType()...),
 	)
 	content, err := sfvm.FormatRule(ruleContent, opts...)
 	if err != nil {

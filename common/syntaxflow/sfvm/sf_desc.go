@@ -21,6 +21,7 @@ const (
 	SFDescKeyType_Rule_Id   SFDescKeyType = "rule_id"
 	SFDescKeyType_Reference SFDescKeyType = "reference"
 	SFDescKeyType_Message   SFDescKeyType = "message"
+	SFDescKeyType_Name      SFDescKeyType = "name"
 )
 
 func ValidDescItemKeyType(key string) SFDescKeyType {
@@ -68,7 +69,18 @@ func GetSupplyInfoDescKeyType() []SFDescKeyType {
 	}
 }
 
-func IsComplexInfoDescType(typ SFDescKeyType) bool {
+func GetAlertDescKeyType() []SFDescKeyType {
+	return []SFDescKeyType{
+		SFDescKeyType_Name,
+		SFDescKeyType_Title,
+		SFDescKeyType_Title_ZH,
+		SFDescKeyType_Message,
+		SFDescKeyType_Solution,
+		SFDescKeyType_Risk,
+	}
+}
+
+func IsComplexDescType(typ SFDescKeyType) bool {
 	switch typ {
 	case SFDescKeyType_Desc, SFDescKeyType_Solution, SFDescKeyType_Reference:
 		return true
