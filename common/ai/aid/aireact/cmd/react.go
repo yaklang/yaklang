@@ -220,7 +220,7 @@ func main() {
 		aireact.WithContext(ctx),
 		aireact.WithAICallback(debugAICallback),
 		aireact.WithDebug(debugMode),
-		aireact.WithMaxIterations(5),
+		aireact.WithMaxIterations(25),
 		aireact.WithLanguage(*language),
 		aireact.WithTopToolsCount(100),
 		aireact.WithAutoAIReview(true),

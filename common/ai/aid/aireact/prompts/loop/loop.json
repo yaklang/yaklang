@@ -25,10 +25,15 @@
             "description": "USE THIS FIELD ONLY IF type is 'require_tool'. Provide the exact name of the tool you need to use (e.g., 'web_search', 'database_query'). Another system will handle the parameter generation based on this name. Do NOT include tool arguments here.",
             "type": "string"
           },
+          "plan_request_payload": {
+            "description": "USE THIS FIELD ONLY IF type is 'request_plan_and_execution'. Provide a one-sentence summary of the complex task that needs a multi-step plan. This summary will trigger a more advanced planning system. Example: 'Create a marketing plan for a new product launch.'",
+            "type": "string"
+          },
           "type": {
             "description": "You MUST choose one of these three action types. The value you select here determines which of the other fields in this 'action' object you should populate.",
             "enum": [
               "directly_answer",
+              "request_plan_and_execution",
               "require_tool"
             ],
             "type": "string"
