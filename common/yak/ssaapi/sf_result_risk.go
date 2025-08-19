@@ -76,7 +76,6 @@ func CoverCodeRange(programName string, r memedit.RangeIf) (*CodeRange, string) 
 func buildSSARisk(
 	result *SyntaxFlowResult,
 	variable string, index int, value *Value,
-	resultID uint64, runtimeId string,
 ) *schema.SSARisk {
 	progName := result.GetProgramName()
 	if progName == "" {
@@ -97,11 +96,9 @@ func buildSSARisk(
 		CVE:           rule.CVE,
 
 		FromRule:    rule.RuleName,
-		RuntimeId:   runtimeId,
 		IsPotential: false,
 		ProgramName: progName,
 		// result
-		ResultID: resultID,
 		Variable: variable,
 		Index:    int64(index),
 
@@ -151,19 +148,23 @@ func ssaRiskName(variable string, index int) string {
 	return fmt.Sprintf("%s-%d", variable, index)
 }
 
-func (r *SyntaxFlowResult) SaveRisk(variable string, index int, value *Value, result *ssadb.AuditResult) string {
+func (r *SyntaxFlowResult) SaveRisk(variable string, index int, value *Value, save bool) string {
 	_, ok := r.GetAlertInfo(variable)
 	if !ok {
 		return ""
 	}
-	ssaRisk := buildSSARisk(r, variable, index, value, uint64(result.ID), result.TaskID)
+	ssaRisk := buildSSARisk(r, variable, index, value)
 	if ssaRisk == nil {
 		return ""
 	}
-	err := yakit.CreateSSARisk(consts.GetGormDefaultSSADataBase(), ssaRisk)
-	if err != nil {
-		log.Errorf("save risk failed: %s", err)
-		return ""
+	ssaRisk.RuntimeId = r.TaskID
+	ssaRisk.ResultID = uint64(r.GetResultID())
+	if save {
+		err := yakit.CreateSSARisk(consts.GetGormDefaultSSADataBase(), ssaRisk)
+		if err != nil {
+			log.Errorf("save risk failed: %s", err)
+			return ""
+		}
 	}
 	r.riskMap[ssaRiskName(variable, index)] = ssaRisk
 	return ssaRisk.Hash
@@ -194,7 +195,26 @@ func (r *SyntaxFlowResult) GetRiskByValue(variable string, i int) *schema.SSARis
 	if r == nil {
 		return nil
 	}
-	return r.getRisk(ssaRiskName(variable, i))
+	name := ssaRiskName(variable, i)
+	if r, ok := r.riskMap[name]; ok {
+		return r
+	}
+	if _, ok := r.GetAlertInfo(variable); ok {
+		r.CreateRisk()
+	}
+	// from db
+	if r.dbResult != nil {
+		if hash, ok := r.dbResult.RiskHashs[name]; ok {
+			risk, err := yakit.GetSSARiskByHash(ssadb.GetDB(), hash)
+			if err != nil {
+				log.Errorf("get risk by hash failed: %s", err)
+				return nil
+			}
+			r.riskMap[name] = risk
+			return risk
+		}
+	}
+	return nil
 }
 
 func (r *SyntaxFlowResult) GetRiskHash(variable string, i int) string {
@@ -251,4 +271,8 @@ func (r *SyntaxFlowResult) YieldRisk() chan *schema.SSARisk {
 		})
 	}()
 	return ch
+}
+
+func (r *SyntaxFlowResult) RiskCount() int {
+	return len(r.riskMap)
 }

@@ -49814,7 +49814,9 @@ type SyntaxFlowScanRequest struct {
 	// for new rule scan task
 	RuleInput *SyntaxFlowRuleInput `protobuf:"bytes,6,opt,name=RuleInput,proto3" json:"RuleInput,omitempty"` // 用于新建规则时的调试功能
 	// 并发，默认5
-	Concurrency   uint32 `protobuf:"varint,7,opt,name=Concurrency,proto3" json:"Concurrency,omitempty"`
+	Concurrency uint32 `protobuf:"varint,7,opt,name=Concurrency,proto3" json:"Concurrency,omitempty"`
+	// compile data only in memory
+	Memory        bool `protobuf:"varint,8,opt,name=Memory,proto3" json:"Memory,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -49896,6 +49898,13 @@ func (x *SyntaxFlowScanRequest) GetConcurrency() uint32 {
 		return x.Concurrency
 	}
 	return 0
+}
+
+func (x *SyntaxFlowScanRequest) GetMemory() bool {
+	if x != nil {
+		return x.Memory
+	}
+	return false
 }
 
 type QuerySyntaxFlowScanTaskRequest struct {
@@ -50758,7 +50767,8 @@ type SyntaxFlowResult struct {
 	// runtime info
 	RiskCount     uint64 `protobuf:"varint,11,opt,name=RiskCount,proto3" json:"RiskCount,omitempty"`
 	RuleContent   string `protobuf:"bytes,12,opt,name=RuleContent,proto3" json:"RuleContent,omitempty"`
-	Kind          string `protobuf:"bytes,13,opt,name=Kind,proto3" json:"Kind,omitempty"` // "query" | "debug" | "scan"
+	Kind          string `protobuf:"bytes,13,opt,name=Kind,proto3" json:"Kind,omitempty"`         // "query" | "debug" | "scan"
+	SaveKind      string `protobuf:"bytes,14,opt,name=SaveKind,proto3" json:"SaveKind,omitempty"` // "memory" | "database"
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -50880,6 +50890,13 @@ func (x *SyntaxFlowResult) GetRuleContent() string {
 func (x *SyntaxFlowResult) GetKind() string {
 	if x != nil {
 		return x.Kind
+	}
+	return ""
+}
+
+func (x *SyntaxFlowResult) GetSaveKind() string {
+	if x != nil {
+		return x.SaveKind
 	}
 	return ""
 }
@@ -61290,7 +61307,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vMessageType\x18\x03 \x01(\tR\vMessageType\"h\n" +
 	"\x1dDownloadSyntaxFlowRuleRequest\x12\x14\n" +
 	"\x05Token\x18\x01 \x01(\tR\x05Token\x121\n" +
-	"\x06Filter\x18\x02 \x01(\v2\x19.ypb.SyntaxFlowRuleFilterR\x06Filter\"\xb4\x02\n" +
+	"\x06Filter\x18\x02 \x01(\v2\x19.ypb.SyntaxFlowRuleFilterR\x06Filter\"\xcc\x02\n" +
 	"\x15SyntaxFlowScanRequest\x12 \n" +
 	"\vControlMode\x18\x01 \x01(\tR\vControlMode\x121\n" +
 	"\x06Filter\x18\x02 \x01(\v2\x19.ypb.SyntaxFlowRuleFilterR\x06Filter\x12 \n" +
@@ -61298,7 +61315,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\fResumeTaskId\x18\x05 \x01(\tR\fResumeTaskId\x12&\n" +
 	"\x0eIgnoreLanguage\x18\x04 \x01(\bR\x0eIgnoreLanguage\x126\n" +
 	"\tRuleInput\x18\x06 \x01(\v2\x18.ypb.SyntaxFlowRuleInputR\tRuleInput\x12 \n" +
-	"\vConcurrency\x18\a \x01(\rR\vConcurrency\"\xa8\x01\n" +
+	"\vConcurrency\x18\a \x01(\rR\vConcurrency\x12\x16\n" +
+	"\x06Memory\x18\b \x01(\bR\x06Memory\"\xa8\x01\n" +
 	"\x1eQuerySyntaxFlowScanTaskRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
@@ -61385,7 +61403,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"Pagination\x123\n" +
 	"\tDbMessage\x18\x02 \x01(\v2\x15.ypb.DbOperateMessageR\tDbMessage\x12/\n" +
 	"\aResults\x18\x03 \x03(\v2\x15.ypb.SyntaxFlowResultR\aResults\x12\x14\n" +
-	"\x05Total\x18\x04 \x01(\x04R\x05Total\"\xfc\x02\n" +
+	"\x05Total\x18\x04 \x01(\x04R\x05Total\"\x98\x03\n" +
 	"\x10SyntaxFlowResult\x12\x1a\n" +
 	"\bResultID\x18\x01 \x01(\x04R\bResultID\x12\x16\n" +
 	"\x06TaskID\x18\x02 \x01(\tR\x06TaskID\x12\x1a\n" +
@@ -61400,7 +61418,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	" \x01(\tR\bLanguage\x12\x1c\n" +
 	"\tRiskCount\x18\v \x01(\x04R\tRiskCount\x12 \n" +
 	"\vRuleContent\x18\f \x01(\tR\vRuleContent\x12\x12\n" +
-	"\x04Kind\x18\r \x01(\tR\x04Kind\"\xa0\x01\n" +
+	"\x04Kind\x18\r \x01(\tR\x04Kind\x12\x1a\n" +
+	"\bSaveKind\x18\x0e \x01(\tR\bSaveKind\"\xa0\x01\n" +
 	"\x1dDeleteSyntaxFlowResultRequest\x12,\n" +
 	"\x11DeleteContainRisk\x18\x01 \x01(\bR\x11DeleteContainRisk\x12\x1c\n" +
 	"\tDeleteAll\x18\x02 \x01(\bR\tDeleteAll\x123\n" +

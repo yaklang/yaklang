@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -50,19 +51,6 @@ func (m *SyntaxFlowScanManager) StartQuerySF(startIndex ...int64) error {
 		return utils.Errorf("SyntaxFlow scan start with a wrong task index")
 	}
 
-	cache := utils.NewSafeMap[*ssaapi.Program]()
-	getProgram := func(name string) (*ssaapi.Program, error) {
-		if prog, ok := cache.Get(name); ok {
-			return prog, nil
-		}
-		prog, err := ssaapi.FromDatabase(name)
-		if err != nil {
-			return nil, err
-		}
-		cache.Set(name, prog)
-		return prog, nil
-	}
-
 	var errs error
 	var taskIndex atomic.Int64
 
@@ -89,12 +77,15 @@ func (m *SyntaxFlowScanManager) StartQuerySF(startIndex ...int64) error {
 					swg.Done()
 				}()
 
-				prog, err := getProgram(progName)
+				prog, err := ssaapi.FromDatabase(progName)
 				if err != nil {
 					m.markRuleSkipped()
 					return
 				}
-				m.Query(rule, prog)
+				f1 := func() {
+					m.Query(rule, prog)
+				}
+				ssaprofile.ProfileAdd(true, "manager.query", f1)
 			}(rule, progName)
 		}
 	}
@@ -114,14 +105,21 @@ func (m *SyntaxFlowScanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.
 			return
 		}
 	}
-
-	// if language match or ignore language
-	if res, err := prog.SyntaxFlowRule(rule, ssaapi.QueryWithContext(m.ctx),
-		ssaapi.QueryWithTaskID(m.taskID), ssaapi.QueryWithSave(m.kind),
+	option := []ssaapi.QueryOption{}
+	option = append(option,
+		ssaapi.QueryWithContext(m.ctx),
+		ssaapi.QueryWithTaskID(m.taskID),
 		ssaapi.QueryWithProcessCallback(func(f float64, s string) {
 			m.client.StatusCard("当前执行规则进度", fmt.Sprintf("%.2f%%", f*100), "规则执行进度")
 		}),
-	); err == nil {
+		ssaapi.QueryWithSave(m.kind),
+	)
+	if m.memory {
+		option = append(option, ssaapi.QueryWithMemory())
+	}
+
+	// if language match or ignore language
+	if res, err := prog.SyntaxFlowRule(rule, option...); err == nil {
 		m.markRuleSuccess()
 		m.notifyResult(res)
 	} else {

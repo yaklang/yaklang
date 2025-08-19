@@ -1,7 +1,11 @@
 package ssaapi
 
 import (
+	"fmt"
 	"sort"
+	"time"
+
+	"go.uber.org/atomic"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -12,6 +16,9 @@ import (
 )
 
 type SyntaxFlowResult struct {
+	id       uint
+	saveKind ResultSaveKind
+	TaskID   string
 	// result
 	memResult *sfvm.SFFrameResult
 	dbResult  *ssadb.AuditResult
@@ -45,12 +52,45 @@ func createEmptyResult() *SyntaxFlowResult {
 	}
 }
 
+var resultCacheId = atomic.NewInt64(1)
+
+func getResultCacheId() uint {
+	return uint(resultCacheId.Inc())
+}
+
+var resultCache = utils.NewTTLCache[*SyntaxFlowResult](10 * time.Minute)
+
+func CreateResultFromCache(kind ResultSaveKind, id uint64) *SyntaxFlowResult {
+	if kind == resultSaveNone {
+		return nil
+	}
+	name := fmt.Sprintf("%s-%d", kind, id)
+	if res, ok := resultCache.Get(name); ok {
+		res.saveKind = kind
+		return res
+	}
+	return nil
+}
+
+func setResultToCache(kind ResultSaveKind, res *SyntaxFlowResult) {
+	// resultCache.Set(res.GetResultID(), res)
+	if kind == resultSaveNone {
+		return
+	}
+	res.saveKind = kind
+	name := fmt.Sprintf("%s-%d", kind, res.GetResultID())
+	if name != "" {
+		resultCache.Set(name, res)
+	}
+}
+
 func CreateResultFromQuery(res *sfvm.SFFrameResult) *SyntaxFlowResult {
 	ret := createEmptyResult()
 	ret.setMemoryResult(res)
 	ret.rule = res.GetRule()
 	return ret
 }
+
 func CreateResultWithProg(prog *Program, res *sfvm.SFFrameResult) *SyntaxFlowResult {
 	ret := createEmptyResult()
 	ret.program = prog

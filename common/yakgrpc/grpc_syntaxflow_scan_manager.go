@@ -27,6 +27,7 @@ type SyntaxFlowScanManager struct {
 	isPaused     *utils.AtomicBool
 	cancel       context.CancelFunc
 
+	memory bool
 	// record {{
 	// task record
 	taskRecorder *schema.SyntaxFlowScanTask
@@ -228,6 +229,7 @@ func (m *SyntaxFlowScanManager) initByConfig(stream SyntaxFlowScanStream) error 
 	}
 	m.programs = config.GetProgramName()
 	m.ignoreLanguage = config.GetIgnoreLanguage()
+	m.memory = config.GetMemory()
 	// init by stream
 	taskId := m.TaskId()
 	if config.GetConcurrency() != 0 {
@@ -281,7 +283,7 @@ func (m *SyntaxFlowScanManager) initByConfig(stream SyntaxFlowScanStream) error 
 		}
 		m.ruleChan = sfdb.YieldSyntaxFlowRules(
 			yakit.FilterSyntaxFlowRule(consts.GetGormProfileDatabase(),
-				nil, yakit.WithSyntaxFlowRuleName(config.RuleNames...),
+				config.GetFilter(), yakit.WithSyntaxFlowRuleName(config.RuleNames...),
 			),
 			m.ctx,
 		)

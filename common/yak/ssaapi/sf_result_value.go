@@ -187,11 +187,31 @@ func (r *SyntaxFlowResult) GetUnNameValues() Values {
 	return r.unName
 }
 
+func (r *SyntaxFlowResult) GetResultSaveKind() ResultSaveKind {
+	if r == nil {
+		return resultSaveNone
+	}
+	return r.saveKind
+}
+
+func (r *SyntaxFlowResult) SetResultID(id uint) {
+	if r == nil {
+		return
+	}
+	r.id = id
+}
+
 func (r *SyntaxFlowResult) GetResultID() uint {
-	if r == nil || r.dbResult == nil {
+	if r == nil {
 		return 0
 	}
-	return r.dbResult.ID
+	if r.id != 0 {
+		return r.id
+	}
+	if r.dbResult != nil {
+		return r.dbResult.ID
+	}
+	return 0
 }
 
 func (r *SyntaxFlowResult) getValueFromDB(name string) Values {
