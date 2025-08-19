@@ -172,13 +172,13 @@ func (s *syntaxFlowScanStreamImpl) Context() context.Context {
 }
 
 func (s *syntaxFlowScanStreamImpl) Send(resp *ypb.SyntaxFlowScanResponse) error {
+	// log.Infof("resp : %v", resp)
 	select {
 	case <-s.ctx.Done():
+		// log.Infof("context canceled")
 		return utils.Error("context canceled")
 	default:
 		if s.stream != nil {
-			s.sendMutex.Lock()
-			defer s.sendMutex.Unlock()
 			return s.stream(resp)
 		}
 	}

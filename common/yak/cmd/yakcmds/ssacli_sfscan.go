@@ -11,11 +11,10 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yakgrpc"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -40,6 +39,7 @@ type ssaCliConfig struct {
 	targetPath string
 
 	language string
+	memory   bool
 	// }}
 
 	// {{ should result
@@ -90,6 +90,7 @@ func parseSFScanConfig(c *cli.Context) (res *ssaCliConfig, err error) {
 		config.targetPath = targetPath
 	}
 	config.language = c.String("language")
+	config.memory = c.Bool("memory")
 
 	// result  writer
 	// var writer io.Writer
@@ -153,7 +154,7 @@ func getProgram(ctx context.Context, config *ssaCliConfig) (*ssaapi.Program, err
 	return nil, utils.Errorf("get program by parameter fail, please check your command")
 }
 
-func scan(ctx context.Context, progName string, ruleFilter *ypb.SyntaxFlowRuleFilter) (id string, e error) {
+func scan(ctx context.Context, progName string, ruleFilter *ypb.SyntaxFlowRuleFilter, memory bool) (ch chan *ssaapi.SyntaxFlowResult, e error) {
 	log.Infof("================= start code scan ================")
 	defer func() {
 		log.Infof("syntaxflow scan done")
@@ -164,22 +165,45 @@ func scan(ctx context.Context, progName string, ruleFilter *ypb.SyntaxFlowRuleFi
 		}
 	}()
 	// start code scan
-	var taskId string
-	yakgrpc.SyntaxFlowScan(ctx, &ypb.SyntaxFlowScanRequest{
-		ControlMode:    "start",
-		Filter:         ruleFilter,
-		ProgramName:    []string{progName},
-		IgnoreLanguage: true,
-	}, func(res *ypb.SyntaxFlowScanResponse) error {
-		taskId = res.GetTaskID()
-		return nil
-	})
-	return taskId, nil
+	ch = make(chan *ssaapi.SyntaxFlowResult, 10)
+	go func() {
+		defer close(ch)
+		yakgrpc.SyntaxFlowScan(ctx, &ypb.SyntaxFlowScanRequest{
+			ControlMode: "start",
+			Filter:      ruleFilter,
+			ProgramName: []string{progName},
+			Memory:      memory,
+		}, func(res *ypb.SyntaxFlowScanResponse) error {
+			// taskId = res.GetTaskID()
+			// for _, risk := range res.GetResult() {
+			// ch <- schema.SSARiskFromGRPCModel(risk)
+			// }
+			ypbResult := res.GetResult()
+			if ypbResult == nil {
+				return nil
+			}
+			id := ypbResult.ResultID
+			_ = id
+			kind := ypbResult.SaveKind
+			// ch <-
+			result := ssaapi.CreateResultFromCache(ssaapi.ResultSaveKind(kind), id)
+			if result == nil {
+				return nil
+			}
+			if result.RiskCount() > 0 {
+				ch <- result
+			} else {
+				log.Infof("no risk skip ")
+			}
+			return nil
+		})
+	}()
+	return ch, nil
 }
 
-// ShowResult displays scan results based on the provided configuration
+// ShowRisk displays scan results based on the provided configuration
 // TODO: should use `showRisk` not result
-func ShowResult(format sfreport.ReportType, filter *ypb.SyntaxFlowResultFilter, writer io.Writer) {
+func ShowRisk(format sfreport.ReportType, ch chan *ssaapi.SyntaxFlowResult, writer io.Writer) {
 	log.Infof("================= show result ================")
 	defer func() {
 		log.Infof("show sarif result done")
@@ -189,18 +213,7 @@ func ShowResult(format sfreport.ReportType, filter *ypb.SyntaxFlowResultFilter, 
 		}
 	}()
 
-	db := yakit.FilterSyntaxFlowResult(ssadb.GetDB(), filter)
-
-	// count total result
-	total, err := ssaapi.CountSyntaxFlowResult(db)
-	if err != nil {
-		log.Errorf("count syntax flow result failed: %s", err)
-		return
-	}
-	log.Infof("total syntax flow result have risk: %d", total)
-
 	// convert result to report
-	results := ssaapi.YieldSyntaxFlowResult(db)
 	reportInstance, err := sfreport.ConvertSyntaxFlowResultToReport(format)
 	if err != nil {
 		log.Errorf("convert syntax flow result to report failed: %s", err)
@@ -208,12 +221,14 @@ func ShowResult(format sfreport.ReportType, filter *ypb.SyntaxFlowResultFilter, 
 	}
 
 	count := 0
-	for result := range results {
+	for result := range ch {
 		count++
-		log.Infof("cover result[%d] to sarif run %d/%d: ", result.GetResultID(), count, total)
-		if reportInstance.AddSyntaxFlowResult(result) {
-			log.Infof("cover result[%d] add run to report %d/%d done", result.GetResultID(), count, total)
+		log.Infof("cover result[%d] to sarif run %d: ", result.GetResultID(), count)
+		f1 := func() {
+			reportInstance.AddSyntaxFlowResult(result)
 		}
+		ssaprofile.ProfileAdd(true, "convert result to report", f1)
+		log.Infof("cover result[%d] add run to report %d done", result.GetResultID(), count)
 	}
 	log.Infof("write report ... ")
 	reportInstance.PrettyWrite(writer)

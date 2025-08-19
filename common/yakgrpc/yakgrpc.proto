@@ -6788,6 +6788,9 @@ message SyntaxFlowScanRequest{
   SyntaxFlowRuleInput RuleInput = 6; // 用于新建规则时的调试功能
   // 并发，默认5
   uint32  Concurrency =7;
+
+  // compile data only in memory 
+  bool Memory = 8;
 }
 
 message QuerySyntaxFlowScanTaskRequest{
@@ -6920,6 +6923,7 @@ message SyntaxFlowResult {
 
   string RuleContent = 12;
   string Kind = 13; // "query" | "debug" | "scan"
+  string SaveKind = 14; // "memory" | "database"  
 }
 
 message DeleteSyntaxFlowResultRequest{

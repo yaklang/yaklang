@@ -40,6 +40,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
@@ -1079,12 +1080,13 @@ var ssaRisk = &cli.Command{
 			log.Errorf("get program failed: %s", err)
 			return err
 		}
+		_ = taskIds
+		_ = prog
 
-		ShowResult(config.Format, &ypb.SyntaxFlowResultFilter{
-			ProgramNames: []string{prog.GetProgramName()},
-			TaskIDs:      taskIds,
-			OnlyRisk:     true,
-		}, config.OutputWriter)
+		// ShowRisk(config.Format, &ypb.SSARisksFilter{
+		// 	ProgramName: []string{prog.GetProgramName()},
+		// 	RuntimeID:   taskIds,
+		// }, config.OutputWriter)
 		return nil
 
 	},
@@ -1111,6 +1113,10 @@ var ssaCodeScan = &cli.Command{
 			Usage: "language for ssa compiler",
 		},
 
+		cli.BoolFlag{
+			Name:  "memory,mem",
+			Usage: "enable memory mode",
+		},
 		// }}}
 
 		// result show option
@@ -1160,7 +1166,7 @@ var ssaCodeScan = &cli.Command{
 		log.Infof("============= start to scan code ==============")
 		ruleTimeStart := time.Now()
 		SyncEmbedRule()
-		ruleTime := time.Now().Sub(ruleTimeStart)
+		ruleTime := time.Since(ruleTimeStart)
 		_ = ruleTime
 		log.Infof("sync rule from embed to database success, cost %v", ruleTime)
 
@@ -1179,32 +1185,30 @@ var ssaCodeScan = &cli.Command{
 			log.Errorf("get program failed: %s", err)
 			return err
 		}
-		compileTime := time.Now().Sub(compileTimeStart)
+		compileTime := time.Since(compileTimeStart)
 		log.Infof("get or parse rule success, cost %v", compileTime)
 
 		log.Infof("================= get or parse rule ================")
 		scanTimeStart := time.Now()
 		ruleFilter := &ypb.SyntaxFlowRuleFilter{
 			Language:          []string{prog.GetLanguage()},
+			Keyword:           c.String("rule-keyword"),
 			FilterLibRuleKind: yakit.FilterLibRuleFalse,
 		}
 		ruleFilter.Keyword = c.String("rule-keyword")
 
-		taskId, err := scan(ctx, prog.GetProgramName(), ruleFilter)
+		riskCh, err := scan(ctx, prog.GetProgramName(), ruleFilter, c.Bool("memory"))
 		if err != nil {
 			log.Errorf("scan failed: %s", err)
-			log.Infof("you can use `yak ssa-risk -p %s --task-id \"%s\" -o xxx`", prog.GetProgramName(), taskId)
+			// log.Infof("you can use `yak ssa-risk -p %s --task-id \"%s\" -o xxx`", prog.GetProgramName(), taskId)
 			return err
 		}
-		scanTime := time.Now().Sub(scanTimeStart)
-		log.Infof("scan success, task id: %s with program: %s, cost %v", taskId, prog.GetProgramName(), scanTime)
+		scanTime := time.Since(scanTimeStart)
+		// log.Infof("scan success, task id: %s with program: %s, cost %v", taskId, prog.GetProgramName(), scanTime)
 
 		exportTimeStart := time.Now()
-		ShowResult(config.Format, &ypb.SyntaxFlowResultFilter{
-			TaskIDs:  []string{taskId},
-			OnlyRisk: true,
-		}, config.OutputWriter)
-		exportTime := time.Now().Sub(exportTimeStart)
+		ShowRisk(config.Format, riskCh, config.OutputWriter)
+		exportTime := time.Since(exportTimeStart)
 		log.Infof("show result success, cost %v", exportTime)
 		// show echo  time
 		log.Infof("finish all time cost:")
@@ -1212,6 +1216,7 @@ var ssaCodeScan = &cli.Command{
 		log.Infof("compile: %v", compileTime)
 		log.Infof("scan: %v", scanTime)
 		log.Infof("export: %v", exportTime)
+		ssaprofile.ShowCacheCost()
 		return nil
 	},
 }
