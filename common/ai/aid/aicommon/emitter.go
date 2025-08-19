@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"sync"
 	"time"
@@ -152,6 +153,15 @@ func (r *Emitter) EmitLogWithLevel(level, name, fmtlog string, items ...any) {
 	nodeName := name
 	if name == "" {
 		nodeName = level
+	}
+
+	switch level {
+	case "info":
+		log.Info(message)
+	case "warning":
+		log.Warn(message)
+	case "error":
+		log.Error(message)
 	}
 
 	r.EmitStructured(nodeName, map[string]any{
