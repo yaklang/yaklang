@@ -151,6 +151,14 @@ func AESDecFactory(unpaddingFunc func([]byte) []byte, mode string) SymmetricCryp
 	}
 }
 
+// AESEncryptBasic 使用 AES 算法对数据进行加密，支持多种模式（CBC、CFB、ECB、OFB、CTR） 。
+// 注意：此函数是底层的高级用法，需要外部自行处理 padding，key，iv 等问题。
+// example：
+// ```
+//
+//	codec.AESEncryptBasic("1234567890123456", codec.PKCS5Padding("hello world",16), "1234567890123456", codec.CBC)
+//
+// ```
 func AESEnc(key []byte, data []byte, iv []byte, mode string) ([]byte, error) {
 	data = ZeroPadding(data, aes.BlockSize) // 交给外部处理 padding问题，内部自动 zero padding避免外部传入padding后的数据后多次padding的同时，保证数据块正常
 	c, err := aes.NewCipher(key)
@@ -173,6 +181,14 @@ func AESEnc(key []byte, data []byte, iv []byte, mode string) ([]byte, error) {
 	}
 }
 
+// AESDecryptBasic 使用 AES 算法对数据进行解密，支持多种模式（CBC、CFB、ECB、OFB、CTR）。
+// 注意：此函数是底层的高级用法，需要外部自行处理 padding，key，iv 等问题。
+// example：
+// ```
+//
+//	codec.AESDecryptBasic("1234567890123456", cipertext, "1234567890123456", codec.CBC)
+//
+// ```
 func AESDec(key []byte, data []byte, iv []byte, mode string) ([]byte, error) {
 	c, err := aes.NewCipher(key)
 	if err != nil {
