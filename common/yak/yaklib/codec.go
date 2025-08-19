@@ -65,6 +65,15 @@ var CodecExports = map[string]interface{}{
 	"ZeroPadding":          codec.ZeroPadding,
 	"ZeroUnPadding":        codec.ZeroUnPadding,
 
+	// AES
+	"AESEncryptBasic": codec.AESEnc,
+	"AESDecryptBasic": codec.AESDec,
+	"CBC":             codec.CBC,
+	"ECB":             codec.ECB,
+	"CFB":             codec.CFB,
+	"OFB":             codec.OFB,
+	"CTR":             codec.CTR,
+
 	// aes
 	"AESEncrypt":                    codec.AESEncryptCBCWithPKCSPadding,
 	"AESDecrypt":                    codec.AESDecryptCBCWithPKCSPadding,
@@ -88,6 +97,14 @@ var CodecExports = map[string]interface{}{
 	"AESGCMDecryptWithNonceSize16": codec.AESGCMDecryptWithNonceSize16,
 	"AESGCMEncryptWithNonceSize12": codec.AESGCMEncryptWithNonceSize12,
 	"AESGCMDecryptWithNonceSize12": codec.AESGCMDecryptWithNonceSize12,
+
+	// CFB
+	"AESCFBEncrypt":                codec.AESEncryptCFBWithPKCSPadding,
+	"AESCFBDecrypt":                codec.AESDecryptCFBWithPKCSPadding,
+	"AESEncryptCFBWithPKCSPadding": codec.AESEncryptCFBWithPKCSPadding,
+	"AESDecryptCFBWithPKCSPadding": codec.AESDecryptCFBWithPKCSPadding,
+	"AESEncryptCFBWithZeroPadding": codec.AESEncryptCFBWithZeroPadding,
+	"AESDecryptCFBWithZeroPadding": codec.AESDecryptCFBWithZeroPadding,
 
 	// DES
 	"DESEncrypt":    codec.DESEncryptCBCWithZeroPadding,
