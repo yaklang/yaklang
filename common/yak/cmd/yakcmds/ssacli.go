@@ -602,6 +602,10 @@ var syntaxflowCompletion = &cli.Command{
 			Name:  "concurrency,c",
 			Usage: "concurrency of AI completion, default is 5",
 		},
+		cli.DurationFlag{
+			Name:  "skip-recent,recent",
+			Usage: "skip files modified within this duration (e.g., 30m, 1h, 2h30m), default is 0 (no skip)",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		target := c.String("target")
@@ -613,6 +617,7 @@ var syntaxflowCompletion = &cli.Command{
 		domain := c.String("domain")
 		baseUrl := c.String("url")
 		files := c.StringSlice("fs")
+		skipRecent := c.Duration("skip-recent")
 		if concurrency == 0 {
 			concurrency = 5 // default concurrency
 		}
@@ -650,6 +655,9 @@ var syntaxflowCompletion = &cli.Command{
 			close(errorDone)
 		}()
 		var taskCount atomic.Int64
+		var processedCount atomic.Int64 // 成功处理的文件数
+		var skippedCount atomic.Int64   // 跳过的文件数
+		var errorCount atomic.Int64     // 处理失败的文件数
 		for i := 0; i < concurrency; i++ {
 			swg.Add(1)
 			go func() {
@@ -661,11 +669,13 @@ var syntaxflowCompletion = &cli.Command{
 					}
 					raw, err := os.ReadFile(fileName)
 					if err != nil {
+						errorCount.Add(1)
 						log.Errorf("failed to read file %s: %v", fileName, err)
 						continue
 					}
 					rule, err := sfcompletion.CompleteRuleDesc(fileName, string(raw), aiOpts...)
 					if err != nil {
+						errorCount.Add(1)
 						err = utils.Errorf("failed parse complete file %s: %v", fileName, err)
 						errChan <- utils.JoinErrors(err, err)
 						log.Errorf("%v", err)
@@ -673,6 +683,7 @@ var syntaxflowCompletion = &cli.Command{
 					}
 					// check format rule
 					if _, err := sfvm.CompileRule(rule); err != nil {
+						errorCount.Add(1)
 						err = utils.Errorf("failed completion sf rule %s: %v\nsf rule: \n%s", fileName, err, rule)
 						errChan <- utils.JoinErrors(err, err)
 						log.Errorf("%v", err)
@@ -680,24 +691,57 @@ var syntaxflowCompletion = &cli.Command{
 					}
 					err = os.WriteFile(fileName, []byte(rule), 0o666)
 					if err != nil {
+						errorCount.Add(1)
 						log.Errorf("failed to write file %s: %v", fileName, err)
 						errChan <- utils.Errorf("failed to write file %s: %v", fileName, err)
 						continue
 					}
+					processedCount.Add(1)
 					sleepTime := rand.Intn(5)
 					log.Infof("syntaxflow-completion: completed file %s, sleep for %d seconds", fileName, sleepTime)
 					time.Sleep(time.Second * time.Duration(sleepTime))
 				}
 			}()
 		}
+		// 检查文件是否应该被跳过（最近修改过）
+		shouldSkipFile := func(filePath string) bool {
+			if skipRecent == 0 {
+				return false // 如果没有设置跳过时间，不跳过任何文件
+			}
+
+			fileInfo, err := os.Stat(filePath)
+			if err != nil {
+				log.Errorf("syntaxflow-completion: failed to get file info for %s: %v", filePath, err)
+				return false // 如果无法获取文件信息，不跳过
+			}
+
+			modTime := fileInfo.ModTime()
+			timeSinceModification := time.Since(modTime)
+
+			if timeSinceModification < skipRecent {
+				skippedCount.Add(1)
+				log.Infof("syntaxflow-completion: skipping file %s (modified %v ago, within %v threshold)",
+					filePath, timeSinceModification.Round(time.Second), skipRecent)
+				return true
+			}
+
+			return false
+		}
+
 		addTask := func(target string) {
 			if utils.IsFile(target) {
+				if shouldSkipFile(target) {
+					return
+				}
 				log.Infof("syntaxflow-completion: processing file %s", target)
 				taskChannel <- target
 				taskCount.Add(1)
 			} else if utils.IsDir(target) {
 				log.Infof("syntaxflow-completion: processing directory %s", target)
 				filesys.Recursive(target, filesys.WithFileSystem(filesys.NewLocalFs()), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+					if shouldSkipFile(s) {
+						return nil
+					}
 					log.Infof("syntaxflow-completion: processing file %s", s)
 					taskChannel <- s
 					taskCount.Add(1)
@@ -718,6 +762,19 @@ var syntaxflowCompletion = &cli.Command{
 		swg.Wait()
 		close(errChan)
 		<-errorDone
+
+		// 打印统计报告
+		totalFiles := processedCount.Load() + skippedCount.Load() + errorCount.Load()
+		log.Infof("==================== SyntaxFlow Completion Report ====================")
+		log.Infof("Total files found: %d", totalFiles)
+		log.Infof("Successfully processed: %d", processedCount.Load())
+		log.Infof("Skipped (recently modified): %d", skippedCount.Load())
+		log.Infof("Failed with errors: %d", errorCount.Load())
+		if skipRecent > 0 {
+			log.Infof("Skip threshold: files modified within %v", skipRecent)
+		}
+		log.Infof("=====================================================================")
+
 		return errors
 	},
 }

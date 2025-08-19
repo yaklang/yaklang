@@ -10,36 +10,32 @@ desc(
 REFERENCE
 	desc: <<<DESC
 ### 1. 规则目的
-
 该审计规则旨在识别 Java 代码中与文件写入相关的潜在操作接收点（sinks）。这些接收点指的是应用程序中直接将数据写入文件系统的特定方法或构造函数调用。识别这些接收点至关重要，因为它们可能成为各种文件相关漏洞（如目录遍历、任意文件写入、文件内容篡改等）的利用点。通过定位这些接收点，安全审计人员可以进一步分析数据源是否可控（特别关注是否来源于用户输入或不可信外部源），以及是否在写入操作前进行了充分的安全验证和过滤，从而评估潜在的安全风险。
 
 ### 2. 规则详细
-
 1. **作为基础检测库**
-   属于 `java-write-filename-sink` 库规则 (`lib` 类型)，主要用于识别 Java 标准库中负责文件写入的核心 API 调用。这些 API 调用是构建更复杂的污点跟踪或安全规则的基础组件。
+属于 `java-write-filename-sink` 库规则 (`lib` 类型)，主要用于识别 Java 标准库中负责文件写入的核心 API 调用。这些 API 调用是构建更复杂的污点跟踪或安全规则的基础组件。
 
 2. **覆盖的关键 API**
-   该规则识别以下可能涉及到文件写入操作的 Java API 调用：
-   - `java.io.File` 的各种构造函数和方法，尤其关注那些接受文件路径作为参数的方法。
-   - `java.io.PrintWriter` 的构造函数和方法，用于将格式化数据写入文件。
-   - `java.io.FileOutputStream` 的构造函数和方法，用于向文件写入字节流。
-   - `java.io.FileWriter` 的构造函数和方法，用于向文件写入字符流。
-   - `java.nio.file.Files` 类中的各种 `write*` 方法，例如 `Files.write()`、`Files.writeString()` 等，这些是 Java NIO.2 提供的文件写入方式。
-   - `java.io.RandomAccessFile` 的构造函数和 `write*` 方法，用于随机读写文件。
-
-   规则通过匹配这些特定类及其相关方法的调用，将这些文件写入操作标记为潜在的接收点，为后续的安全分析提供定位信息。
+该规则识别以下可能涉及到文件写入操作的 Java API 调用：
+- `java.io.File` 的各种构造函数和方法，尤其关注那些接受文件路径作为参数的方法。
+- `java.io.PrintWriter` 的构造函数和方法，用于将格式化数据写入文件。
+- `java.io.FileOutputStream` 的构造函数和方法，用于向文件写入字节流。
+- `java.io.FileWriter` 的构造函数和方法，用于向文件写入字符流。
+- `java.nio.file.Files` 类中的各种 `write*` 方法，例如 `Files.write()`、`Files.writeString()` 等，这些是 Java NIO.2 提供的文件写入方式。
+- `java.io.RandomAccessFile` 的构造函数和 `write*` 方法，用于随机读写文件。
+规则通过匹配这些特定类及其相关方法的调用，将这些文件写入操作标记为潜在的接收点，为后续的安全分析提供定位信息。
 DESC
 	rule_id: "6e39de24-d79a-4475-98b8-f1842417bca1"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 验证用户输入
 确保所有用户输入都经过严格的验证，包括检查路径合法性、限制允许的字符集以及避免危险符号（如 `../` 或绝对路径）。
 ```java
 // 示例：验证文件名是否合法
 String userInput = request.getParameter("filename");
 if (!userInput.matches("^[a-zA-Z0-9_-]+\\.[a-zA-Z]{3}$")) {
-    throw new IllegalArgumentException("非法文件名");
+throw new IllegalArgumentException("非法文件名");
 }
 ```
 
@@ -50,7 +46,7 @@ if (!userInput.matches("^[a-zA-Z0-9_-]+\\.[a-zA-Z]{3}$")) {
 Path basePath = Paths.get("/safe/directory/");
 Path filePath = basePath.resolve(userInput).normalize();
 if (!filePath.startsWith(basePath)) {
-    throw new SecurityException("访问越界");
+throw new SecurityException("访问越界");
 }
 ```
 
@@ -60,7 +56,7 @@ if (!filePath.startsWith(basePath)) {
 // 示例：限制文件操作范围
 List<String> allowedDirectories = Arrays.asList("/uploads", "/data");
 if (!allowedDirectories.stream().anyMatch(filePath::startsWith)) {
-    throw new SecurityException("禁止访问此目录");
+throw new SecurityException("禁止访问此目录");
 }
 ```
 
@@ -91,5 +87,57 @@ alert $output for {
 	title: "Audit Java File Write Operation Sinks",
 	title_zh: "审计 Java 文件写入操作接收点",
 	level: "mid",
+	risk: "路径遍历",
+	desc: <<<DESC
+### 1. 规则目的
+该审计规则旨在识别 Java 代码中与文件写入相关的潜在操作接收点（sinks）。这些接收点指的是应用程序中直接将数据写入文件系统的特定方法或构造函数调用。识别这些接收点至关重要，因为它们可能成为各种文件相关漏洞（如目录遍历、任意文件写入、文件内容篡改等）的利用点。通过定位这些接收点，安全审计人员可以进一步分析数据源是否可控（特别关注是否来源于用户输入或不可信外部源），以及是否在写入操作前进行了充分的安全验证和过滤，从而评估潜在的安全风险。
+### 2. 规则详细
+1. **作为基础检测库**
+属于 `java-write-filename-sink` 库规则 (`lib` 类型)，主要用于识别 Java 标准库中负责文件写入的核心 API 调用。这些 API 调用是构建更复杂的污点跟踪或安全规则的基础组件。
+2. **覆盖的关键 API**
+该规则识别以下可能涉及到文件写入操作的 Java API 调用：
+- `java.io.File` 的各种构造函数和方法，尤其关注那些接受文件路径作为参数的方法。
+- `java.io.PrintWriter` 的构造函数和方法，用于将格式化数据写入文件。
+- `java.io.FileOutputStream` 的构造函数和方法，用于向文件写入字节流。
+- `java.io.FileWriter` 的构造函数和方法，用于向文件写入字符流。
+- `java.nio.file.Files` 类中的各种 `write*` 方法，例如 `Files.write()`、`Files.writeString()` 等，这些是 Java NIO.2 提供的文件写入方式。
+- `java.io.RandomAccessFile` 的构造函数和 `write*` 方法，用于随机读写文件。
+规则通过匹配这些特定类及其相关方法的调用，将这些文件写入操作标记为潜在的接收点，为后续的安全分析提供定位信息。
+DESC
+	name: "output",
+	message: "检测到Java文件写入操作的潜在风险点，可能存在路径遍历或任意文件写入的风险。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 验证用户输入
+确保所有用户输入都经过严格的验证，包括检查路径合法性、限制允许的字符集以及避免危险符号（如 `../` 或绝对路径）。
+```java
+// 示例：验证文件名是否合法
+String userInput = request.getParameter("filename");
+if (!userInput.matches("^[a-zA-Z0-9_-]+\.[a-zA-Z]{3}$")) {
+throw new IllegalArgumentException("非法文件名");
+}
+```
+#### 2. 使用标准化路径
+在处理文件路径时，尽量使用标准库提供的功能来规范化路径，防止路径拼接被攻击者利用。
+```java
+// 示例：规范化并限制文件路径
+Path basePath = Paths.get("/safe/directory/");
+Path filePath = basePath.resolve(userInput).normalize();
+if (!filePath.startsWith(basePath)) {
+throw new SecurityException("访问越界");
+}
+```
+#### 3. 限制文件操作范围
+创建一个白名单机制，仅允许访问预定义的文件夹或文件类型，并拒绝其他所有请求。
+```java
+// 示例：限制文件操作范围
+List<String> allowedDirectories = Arrays.asList("/uploads", "/data");
+if (!allowedDirectories.stream().anyMatch(filePath::startsWith)) {
+throw new SecurityException("禁止访问此目录");
+}
+```
+#### 4. 最小权限原则
+运行文件写入操作的应用程序应以最小权限执行，避免因权限过高导致系统被攻陷后造成更大损失。
+SOLUTION
 }
 

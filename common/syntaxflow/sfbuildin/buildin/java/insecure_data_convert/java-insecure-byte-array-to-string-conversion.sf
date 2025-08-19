@@ -12,14 +12,11 @@ desc(
 
 2. **触发场景**
 当程序读取文件内容、网络数据或接收其他形式的字节数据，并在未指定字符集或未判断数据类型的情况下，直接通过 `new String(byte[])` 构造字符串时，就会触发该问题。
-
 例如，读取一个二进制文件或一个使用非默认字符集编码的文本文件，然后直接转换为字符串：
-
 ```java
 FileInputStream fis = new FileInputStream("binary_file.dat");
 byte[] byteArr = new byte[1024];
 int count = fis.read(byteArr);
-
 String fileString = new String(byteArr); // 存在风险，未指定字符集，可能处理二进制数据
 String fileSHA256Hex = DigestUtils.sha256Hex(fileString); // 基于损坏数据的哈希
 ```
@@ -35,13 +32,13 @@ String jdbcUrl = new String(b); // 存在风险，解码的是二进制数据，
 - **哈希校验失败/冲突：** 基于损坏字符串计算的哈希值不正确，影响数据完整性验证，甚至可能在特定情况下增加哈希冲突的风险。
 - **安全功能绕过：** 在依赖于正确数据解析的安全检查（如文件类型魔术字节检查、输入格式验证）中，错误的字符串转换可能导致安全功能被绕过。
 - **调试困难：** 错误隐藏在数据转换过程中，难以快速定位问题根源。
+
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
 
 #### 1. 明确数据类型，避免不必要的字符串转换
 首先确定你处理的是文本数据还是二进制数据。如果数据本身是二进制的（如图片、音频、加密内容），则应直接以字节数组形式进行处理，避免转换为字符串。
-
 ```java
 // 对于二进制数据，直接使用字节数组进行操作
 byte[] binaryData = getBinaryData();
@@ -51,12 +48,10 @@ processBinaryData(binaryData);
 
 #### 2. 指定明确的字符集进行文本转换
 如果确定字节数据是文本，**必须**显式指定正确的字符集进行转换，而不是依赖平台的默认字符集。常用的字符集包括 UTF-8、GBK 等。
-
 ```java
 FileInputStream fis = new FileInputStream("text_file.txt");
 byte[] byteArr = new byte[1024];
 int count = fis.read(byteArr);
-
 // 修复代码示例：显式指定字符集（例如 UTF-8）
 String fileString = new String(byteArr, StandardCharsets.UTF_8);
 String fileSHA256Hex = DigestUtils.sha256Hex(fileString);
@@ -64,14 +59,11 @@ String fileSHA256Hex = DigestUtils.sha256Hex(fileString);
 
 #### 3. 对二进制数据使用 Base64 等编码
 如果确实需要将二进制数据以文本形式存储或传输，应使用 Base64 或其他适当的编码方式将其转换为字符串，并在使用时首先进行解码，获取原始字节数组。
-
 ```java
 // 原始二进制数据
 byte[] binaryData = getBinaryData();
-
 // 使用 Base64 编码为字符串进行存储或传输
 String encodedData = Base64.getEncoder().encodeToString(binaryData);
-
 // 在使用时，先解码回字节数组
 byte[] decodedData = Base64.getDecoder().decode(encodedData);
 processBinaryData(decodedData);

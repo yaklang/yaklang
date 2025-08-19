@@ -228,10 +228,6 @@ func (f *RuleFormat) VisitAlertStatement(alert sf.IAlertStatementContext) {
 				log.Warnf("desc item %s value is missing, please check the rule: %s", key, f.ruleID)
 			}
 			descType := ValidDescItemKeyType(key)
-			// alert 就不要重复写desc了 太冗余了
-			if descType == SFDescKeyType_Desc {
-				continue
-			}
 			if descType == SFDescKeyType_Unknown {
 				alertMsg.Set(key, value)
 			} else {
@@ -490,14 +486,6 @@ func (f *RuleFormat) infoDescNeedCompletion(descType SFDescKeyType) bool {
 		return false
 	}
 	_, ok := f.requireDescKeyType.Get(descType)
-	return ok
-}
-
-func (f *RuleFormat) alertDescNeedCompletion(descType SFDescKeyType) bool {
-	if f == nil || f.requireAlertDescKeyType == nil {
-		return false
-	}
-	_, ok := f.requireAlertDescKeyType.Get(descType)
 	return ok
 }
 

@@ -6,14 +6,37 @@ desc(
 	reference: <<<REFERENCE
 [Java NIO Files API](https://docs.oracle.com/javase/8/docs/api/java/nio/file/Files.html)
 [Java IO RandomAccessFile API](https://docs.oracle.com/javase/8/docs/api/java/io/RandomAccessFile.html)
+[CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')](https://cwe.mitre.org/data/definitions/22.html)
 REFERENCE
 	desc: <<<DESC
-### 1.规则目的
+### 漏洞描述
+
+1. **漏洞原理**
+   Java 应用程序在处理文件读取操作时，如果直接使用外部输入（如用户提供的文件路径）而未进行验证或过滤，则可能遭受路径遍历攻击。这种攻击允许攻击者通过构造特殊路径访问系统上的任意文件，包括敏感配置、密码文件等，从而导致信息泄露或进一步的权限提升。
+
+2. **触发场景**
+   ```java
+   String fileName = request.getParameter("file");
+   FileReader reader = new FileReader(fileName); // 直接使用用户输入作为文件路径
+   BufferedReader bufferedReader = new BufferedReader(reader);
+   String line;
+   while ((line = bufferedReader.readLine()) != null) {
+       System.out.println(line);
+   }
+   bufferedReader.close();
+   ```
+   攻击者可以提供 `../../etc/passwd` 类似路径，绕过预期目录限制，访问系统关键文件。
+
+3. **潜在影响**
+   - 敏感数据（例如配置文件、数据库凭证、私钥）被窃取。
+   - 系统文件内容暴露，可能为后续攻击提供基础。
+   - 可能导致权限升级或其他更严重后果。
+
+### 规则目的
 该规则旨在识别 Java 代码中潜在的文件读取接收点（sinks），这些接收点可能会导致敏感文件泄露或未经授权的文件访问。
 
-### 2.规则详细
+### 规则详细
 属于`java-read-filename-sink`库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测文件读取漏洞，提供核心函数识别能力。通过检查 `FileReader`、`FileInputStream`、`java.nio.file.Files` 以及 `RandomAccessFile` 类中的文件读取方法，可以识别出那些直接从不可信源（如用户输入或外部配置）获取文件名并用于文件读取操作的代码路径。这种不安全的做法可能会使应用程序容易受到路径遍历攻击或任意文件读取漏洞的攻击，从而暴露敏感信息或允许攻击者读取系统上的任意文件。具体检测以下方法：
-
 - `java.io.FileReader` 构造函数
 - `java.io.FileInputStream` 构造函数
 - `java.nio.file.Files` 类中所有以 `read` 开头的方法 (如 `readAllBytes`, `readString`)
@@ -24,6 +47,7 @@ DESC
 	rule_id: "b6bad1ee-f94a-4a92-a060-90c10b5de529"
 	solution: <<<SOLUTION
 ### 修复建议
+
 #### 1. 验证文件路径
 在使用文件路径之前，应先验证其合法性，确保路径不是来自不受信任的来源，并且不会指向敏感文件。
 ```java
@@ -40,12 +64,11 @@ public boolean isValidFilePath(String filePath) {
 }
 ```
 
-#### 2. 使用安全的文件读取方法
-尽量使用具有安全特性的方法或库，例如使用安全的文件路径解析器来确保路径的安全性。
+#### 2. 使用白名单机制
+尽量使用白名单机制限制文件路径，避免动态解析路径。
 ```java
 // 示例：使用白名单机制限制文件路径
 private static final List<String> ALLOWED_PATHS = Arrays.asList("/safe/path1", "/safe/path2");
-
 public boolean isAllowedPath(String filePath) {
     return ALLOWED_PATHS.stream().anyMatch(filePath::startsWith);
 }
@@ -55,6 +78,17 @@ public boolean isAllowedPath(String filePath) {
 确保文件访问权限设置适当，避免不必要的读取权限。例如，在Linux环境中，可以通过chmod命令限制文件权限。
 ```bash
 chmod 600 /path/to/sensitive/file
+```
+
+#### 4. 使用安全的文件解析库
+利用成熟的第三方库或框架提供的安全文件解析功能，例如 Apache Commons IO 中的 FileUtils 类，以减少手动实现的风险。
+```java
+// 示例：使用 Apache Commons IO 安全读取文件
+File file = new File(filePath);
+if (isAllowedPath(file.getAbsolutePath())) {
+    List<String> lines = FileUtils.readLines(file, StandardCharsets.UTF_8);
+    lines.forEach(System.out::println);
+}
 ```
 SOLUTION
 )
@@ -84,22 +118,55 @@ $nioFileRead as $output;
 $nioBufferedReader as $output;
 $nioInputStream as $output;
 alert $output for {
-	desc: <<<CODE
+	desc: <<<DESC
 ### 1.规则目的
 该规则旨在识别 Java 代码中潜在的文件读取接收点（sinks），这些接收点可能会导致敏感文件泄露或未经授权的文件访问。
-
 ### 2.规则详细
 属于`java-read-filename-sink`库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测文件读取漏洞，提供核心函数识别能力。通过检查 `FileReader`、`FileInputStream`、`java.nio.file.Files` 以及 `RandomAccessFile` 类中的文件读取方法，可以识别出那些直接从不可信源（如用户输入或外部配置）获取文件名并用于文件读取操作的代码路径。这种不安全的做法可能会使应用程序容易受到路径遍历攻击或任意文件读取漏洞的攻击，从而暴露敏感信息或允许攻击者读取系统上的任意文件。具体检测以下方法：
-
 - `java.io.FileReader` 构造函数
 - `java.io.FileInputStream` 构造函数
 - `java.nio.file.Files` 类中所有以 `read` 开头的方法 (如 `readAllBytes`, `readString`)
 - `java.nio.file.Files` 类中的 `newBufferedReader` 方法
 - `java.nio.file.Files` 类中的 `newInputStream` 方法
 - `java.io.RandomAccessFile` 构造函数
-CODE
+DESC
 	level: "info",
 	title: "Detect Java File Read Sinks",
 	title_zh: "检测 Java 文件读取接收点",
+	message: "发现Java文件读取接收点的相关信息。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 验证文件路径
+在使用文件路径之前，应先验证其合法性，确保路径不是来自不受信任的来源，并且不会指向敏感文件。
+```java
+// 示例：验证文件路径是否合法
+public boolean isValidFilePath(String filePath) {
+File file = new File(filePath);
+String canonicalPath;
+try {
+canonicalPath = file.getCanonicalPath();
+return canonicalPath.startsWith("/safe/directory/");
+} catch (IOException e) {
+return false;
+}
+}
+```
+#### 2. 使用安全的文件读取方法
+尽量使用具有安全特性的方法或库，例如使用安全的文件路径解析器来确保路径的安全性。
+```java
+// 示例：使用白名单机制限制文件路径
+private static final List<String> ALLOWED_PATHS = Arrays.asList("/safe/path1", "/safe/path2");
+public boolean isAllowedPath(String filePath) {
+return ALLOWED_PATHS.stream().anyMatch(filePath::startsWith);
+}
+```
+#### 3. 限制文件访问权限
+确保文件访问权限设置适当，避免不必要的读取权限。例如，在Linux环境中，可以通过chmod命令限制文件权限。
+```bash
+chmod 600 /path/to/sensitive/file
+```
+SOLUTION
+	risk: "信息",
+	name: "output",
 }
 

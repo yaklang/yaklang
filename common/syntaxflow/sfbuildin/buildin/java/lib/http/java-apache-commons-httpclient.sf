@@ -6,95 +6,81 @@ desc(
 	title_zh: "审计 Java Apache Commons HttpClient 使用"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Apache Commons HttpClient 是一个广泛使用的 HTTP 客户端库，用于发送 HTTP 请求。然而，如果未正确验证或过滤用户输入的 URL 或其他请求参数，攻击者可能通过构造恶意请求触发 SSRF（服务器端请求伪造）漏洞。SSRF 攻击允许攻击者访问内部网络资源、扫描内部服务或与内部系统交互，从而导致信息泄露或其他安全问题。
-
+Apache Commons HttpClient 是一个广泛使用的 HTTP 客户端库，用于发送 HTTP 请求。然而，如果未正确验证或过滤用户输入的 URL 或其他请求参数，攻击者可能通过构造恶意请求触发 SSRF（服务器端请求伪造）漏洞。SSRF 攻击允许攻击者访问内部网络资源、扫描内部服务或与内部系统交互，从而导致信息泄露或其他安全问题。
 2. **触发场景**
-   // 存在漏洞的代码示例
-   ```java
-   import org.apache.commons.httpclient.HttpClient;
-   import org.apache.commons.httpclient.methods.GetMethod;
-
-   public class VulnerableHttpClient {
-       public static void main(String[] args) throws Exception {
-           String userInput = request.getParameter("url"); // 用户可控的 URL
-           HttpClient client = new HttpClient();
-           GetMethod method = new GetMethod(userInput); // 直接使用用户输入作为目标地址
-           int statusCode = client.executeMethod(method);
-           if (statusCode == 200) {
-               System.out.println(method.getResponseBodyAsString());
-           }
-       }
-   }
-   ```
-   在上述代码中，攻击者可以通过提交 `http://internal-service/admin` 等内部服务地址来利用该漏洞。
-
+// 存在漏洞的代码示例
+```java
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.GetMethod;
+public class VulnerableHttpClient {
+public static void main(String[] args) throws Exception {
+String userInput = request.getParameter("url"); // 用户可控的 URL
+HttpClient client = new HttpClient();
+GetMethod method = new GetMethod(userInput); // 直接使用用户输入作为目标地址
+int statusCode = client.executeMethod(method);
+if (statusCode == 200) {
+System.out.println(method.getResponseBodyAsString());
+}
+}
+}
+```
+在上述代码中，攻击者可以通过提交 `http://internal-service/admin` 等内部服务地址来利用该漏洞。
 3. **潜在影响**
-   - 访问内部网络资源（如内部 API、数据库、文件共享等）。
-   - 扫描或探测内网中的敏感服务。
-   - 与其他内部系统进行交互，可能导致进一步的安全风险（如远程代码执行）。
-
+- 访问内部网络资源（如内部 API、数据库、文件共享等）。
+- 扫描或探测内网中的敏感服务。
+- 与其他内部系统进行交互，可能导致进一步的安全风险（如远程代码执行）。
 ### 规则目的
 该规则用于审计 Java 代码中对 Apache Commons HttpClient 库的使用情况，特别是识别 `executeMethod` 方法调用及其参数。它能够帮助开发者发现潜在的安全隐患，例如未经过滤的用户输入直接传递到 HTTP 请求中。
-
 ### 规则详细
 1. **作为基础检测库**
-   属于 `java-apache-commons-httpclient` 库规则（`lib` 类型），用于识别 `executeMethod` 方法的调用点。
-
+属于 `java-apache-commons-httpclient` 库规则（`lib` 类型），用于识别 `executeMethod` 方法的调用点。
 2. **覆盖方法类型**
-   检测以下 HTTP 方法类型：
-   `GetMethod`, `PostMethod`, `PutMethod`, `DeleteMethod`, `PatchMethod`, `OptionsMethod`, `HeadMethod`, `TraceMethod`。
-
+检测以下 HTTP 方法类型：
+`GetMethod`, `PostMethod`, `PutMethod`, `DeleteMethod`, `PatchMethod`, `OptionsMethod`, `HeadMethod`, `TraceMethod`。
 3. **规则作用**
-   主要用于辅助其他规则，通过识别 HttpClient 方法的调用来进一步进行数据流分析或安全审计，例如检测 SSRF（服务器端请求伪造）漏洞时，此规则可作为识别请求发送点的基础。
+主要用于辅助其他规则，通过识别 HttpClient 方法的调用来进一步进行数据流分析或安全审计，例如检测 SSRF（服务器端请求伪造）漏洞时，此规则可作为识别请求发送点的基础。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 验证和限制目标 URL
-   对所有用户提供的 URL 进行严格的验证和白名单限制，确保只能访问预期的目标资源。
-   ```java
-   private boolean isValidUrl(String url) {
-       try {
-           URI uri = new URI(url);
-           String host = uri.getHost();
-           return "example.com".equals(host); // 白名单限制
-       } catch (URISyntaxException e) {
-           return false;
-       }
-   }
-
-   String userInput = request.getParameter("url");
-   if (!isValidUrl(userInput)) {
-       throw new IllegalArgumentException("非法 URL");
-   }
-   ```
-
+对所有用户提供的 URL 进行严格的验证和白名单限制，确保只能访问预期的目标资源。
+```java
+private boolean isValidUrl(String url) {
+try {
+URI uri = new URI(url);
+String host = uri.getHost();
+return "example.com".equals(host); // 白名单限制
+} catch (URISyntaxException e) {
+return false;
+}
+}
+String userInput = request.getParameter("url");
+if (!isValidUrl(userInput)) {
+throw new IllegalArgumentException("非法 URL");
+}
+```
 #### 2. 避免直接使用用户输入
-   将用户输入映射到预定义的安全值，而不是直接将其用作目标地址。
-   ```java
-   Map<String, String> safeUrls = new HashMap<>();
-   safeUrls.put("safe", "http://example.com/safe-endpoint");
-
-   String userInput = request.getParameter("urlKey");
-   String targetUrl = safeUrls.get(userInput);
-   if (targetUrl == null) {
-       throw new IllegalArgumentException("非法 URL 键");
-   }
-
-   GetMethod method = new GetMethod(targetUrl);
-   ```
-
+将用户输入映射到预定义的安全值，而不是直接将其用作目标地址。
+```java
+Map<String, String> safeUrls = new HashMap<>();
+safeUrls.put("safe", "http://example.com/safe-endpoint");
+String userInput = request.getParameter("urlKey");
+String targetUrl = safeUrls.get(userInput);
+if (targetUrl == null) {
+throw new IllegalArgumentException("非法 URL 键");
+}
+GetMethod method = new GetMethod(targetUrl);
+```
 #### 3. 使用现代替代方案
-   Apache Commons HttpClient 已被弃用，推荐迁移到更现代化的 HTTP 客户端库（如 Apache HttpComponents 或 OkHttp），这些库提供了更好的安全性和功能支持。
-   ```java
-   OkHttpClient client = new OkHttpClient();
-   Request request = new Request.Builder()
-       .url("https://example.com")
-       .build();
-   Response response = client.newCall(request).execute();
-   ```
+Apache Commons HttpClient 已被弃用，推荐迁移到更现代化的 HTTP 客户端库（如 Apache HttpComponents 或 OkHttp），这些库提供了更好的安全性和功能支持。
+```java
+OkHttpClient client = new OkHttpClient();
+Request request = new Request.Builder()
+.url("https://example.com")
+.build();
+Response response = client.newCall(request).execute();
+```
 SOLUTION
 	reference: <<<REFERENCE
 [Apache Commons HttpClient documentation](https://hc.apache.org/httpclient-3.x/)

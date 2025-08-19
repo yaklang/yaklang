@@ -7,10 +7,10 @@ desc(
 ### 漏洞描述
 
 1. **漏洞原理**
-Spring Framework 默认对用户输入的SPEL表达式进行解析，因此当应用程序没有对用户输入的表达式进行严格的限制时，可能产生SPEL表达式注入，从而导致远程代码执行，进而威胁系统安全。
+   Spring Framework 默认对用户输入的SPEL表达式进行解析，因此当应用程序没有对用户输入的表达式进行严格的限制时，可能产生SPEL表达式注入，从而导致远程代码执行，进而威胁系统安全。
 
 2. **触发场景**
-当应用程序使用`SpelExpressionParser().parseExpression(ex)`等方法直接解析用户可控变量时，例如通过 `@RequestParam` 或 `@ResponseBody` 获取用户输入，攻击者可以构造恶意的SPEL表达式，例如 `T(java.lang.Runtime).getRuntime().exec("calc.exe")` 来执行任意命令。
+   当应用程序使用`SpelExpressionParser().parseExpression(ex)`等方法直接解析用户可控变量时，例如通过 `@RequestParam` 或 `@ResponseBody` 获取用户输入，攻击者可以构造恶意的SPEL表达式，例如 `T(java.lang.Runtime).getRuntime().exec("calc.exe")` 来执行任意命令。
 
 ```java
 import org.springframework.expression.ExpressionParser;
@@ -21,7 +21,6 @@ import org.springframework.web.bind.annotation.*;
 @Controller
 @RequestMapping("/spel")
 public class SPELController {
-
     @GetMapping("/vul")
     @ResponseBody
     public String vul(@RequestParam String ex) {
@@ -33,16 +32,16 @@ public class SPELController {
 ```
 
 3. **潜在影响**
-- 敏感数据泄露
-- 执行任意系统命令，实现远程代码执行 (RCE)
-- 控制受影响的服务器，导致更广泛的安全漏洞
+   - 敏感数据泄露
+   - 执行任意系统命令，实现远程代码执行 (RCE)
+   - 控制受影响的服务器，导致更广泛的安全漏洞
 DESC
 	rule_id: "92f18dd1-d726-4c0a-abbc-fb36ede1db4d"
 	solution: <<<SOLUTION
 ### 修复建议
 
 #### 1. 限制SPEL表达式功能
-在允许用户输入表达式的场景中，尽量限制SPEL表达式的功能，例如通过 `SimpleEvaluationContext` 来限制可访问的类和方法，仅暴露必要的变量和函数。
+   在允许用户输入表达式的场景中，尽量限制SPEL表达式的功能，例如通过 `SimpleEvaluationContext` 来限制可访问的类和方法，仅暴露必要的变量和函数。
 
 ```java
 // 修复代码示例
@@ -56,7 +55,6 @@ import org.springframework.web.bind.annotation.*;
 @Controller
 @RequestMapping("/spel")
 public class SPELController {
-
     @GetMapping("/safe")
     @ResponseBody
     public String safe(@RequestParam String ex) {
@@ -70,10 +68,10 @@ public class SPELController {
 ```
 
 #### 2. 对用户输入进行严格过滤和校验
-在解析用户输入的SPEL表达式之前，对输入进行严格的过滤和校验，阻止包含恶意代码的表达式。
+   在解析用户输入的SPEL表达式之前，对输入进行严格的过滤和校验，阻止包含恶意代码的表达式。
 
 #### 3. 避免在可控输入中直接解析复杂表达式
-如果业务逻辑允许，尽量避免直接解析用户输入的完整和复杂的SPEL表达式。考虑使用更安全的机制，例如预定义的模板或简单的表达式语言。
+   如果业务逻辑允许，尽量避免直接解析用户输入的完整和复杂的SPEL表达式。考虑使用更安全的机制，例如预定义的模板或简单的表达式语言。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-94: Improper Control of Generation of Code ('Code Injection')](https://cwe.mitre.org/data/definitions/94.html)
@@ -93,12 +91,10 @@ $sink #{
 alert $mid for {
 	title: "Check Java Spring SPEL Parser Injection",
 	title_zh: "检测Java Spring SPEL Parser表达式注入漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 限制SPEL表达式功能
 在允许用户输入表达式的场景中，尽量限制SPEL表达式的功能，例如通过 `SimpleEvaluationContext` 来限制可访问的类和方法，仅暴露必要的变量和函数。
-
 ```java
 // 修复代码示例
 import org.springframework.expression.EvaluationContext;
@@ -107,65 +103,57 @@ import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.SimpleEvaluationContext;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
-
 @Controller
 @RequestMapping("/spel")
 public class SPELController {
-
-    @GetMapping("/safe")
-    @ResponseBody
-    public String safe(@RequestParam String ex) {
-        ExpressionParser parser = new SpelExpressionParser();
-        // 使用SimpleEvaluationContext限制功能
-        EvaluationContext simpleContext = SimpleEvaluationContext.forReadOnlyDataBinding().build();
-        String result = parser.parseExpression(ex).getValue(simpleContext).toString();
-        return "Result: " + result;
-    }
+@GetMapping("/safe")
+@ResponseBody
+public String safe(@RequestParam String ex) {
+ExpressionParser parser = new SpelExpressionParser();
+// 使用SimpleEvaluationContext限制功能
+EvaluationContext simpleContext = SimpleEvaluationContext.forReadOnlyDataBinding().build();
+String result = parser.parseExpression(ex).getValue(simpleContext).toString();
+return "Result: " + result;
+}
 }
 ```
-
 #### 2. 对用户输入进行严格过滤和校验
 在解析用户输入的SPEL表达式之前，对输入进行严格的过滤和校验，阻止包含恶意代码的表达式。
-
 #### 3. 避免在可控输入中直接解析复杂表达式
 如果业务逻辑允许，尽量避免直接解析用户输入的完整和复杂的SPEL表达式。考虑使用更安全的机制，例如预定义的模板或简单的表达式语言。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 Spring Framework 默认对用户输入的SPEL表达式进行解析，因此当应用程序没有对用户输入的表达式进行严格的限制时，可能产生SPEL表达式注入，从而导致远程代码执行，进而威胁系统安全。
-
 2. **触发场景**
 当应用程序使用`SpelExpressionParser().parseExpression(ex)`等方法直接解析用户可控变量时，例如通过 `@RequestParam` 或 `@ResponseBody` 获取用户输入，攻击者可以构造恶意的SPEL表达式，例如 `T(java.lang.Runtime).getRuntime().exec("calc.exe")` 来执行任意命令。
-
 ```java
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
-
 @Controller
 @RequestMapping("/spel")
 public class SPELController {
-
-    @GetMapping("/vul")
-    @ResponseBody
-    public String vul(@RequestParam String ex) {
-        ExpressionParser parser = new SpelExpressionParser();
-        String result = parser.parseExpression(ex).getValue().toString();
-        return "Result: " + result;
-    }
+@GetMapping("/vul")
+@ResponseBody
+public String vul(@RequestParam String ex) {
+ExpressionParser parser = new SpelExpressionParser();
+String result = parser.parseExpression(ex).getValue().toString();
+return "Result: " + result;
+}
 }
 ```
-
 3. **潜在影响**
 - 敏感数据泄露
 - 执行任意系统命令，实现远程代码执行 (RCE)
 - 控制受影响的服务器，导致更广泛的安全漏洞
-CODE
+DESC
 	level: "middle",
 	message: "发现Java Framework SPEL表达式注入漏洞",
+	risk: "SPEL表达式注入",
+	name: "mid",
 }
 
 $sink #{
@@ -175,50 +163,42 @@ $sink #{
 $result - $mid as $low;
 
 alert $low for {
-	desc: <<<CODE
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 Spring Framework 默认对用户输入的SPEL表达式进行解析，因此当应用程序没有对用户输入的表达式进行严格的限制时，可能产生SPEL表达式注入，从而导致远程代码执行，进而威胁系统安全。
-
 2. **触发场景**
 当应用程序使用`SpelExpressionParser().parseExpression(ex)`等方法直接解析用户可控变量时，例如通过 `@RequestParam` 或 `@ResponseBody` 获取用户输入，攻击者可以构造恶意的SPEL表达式，例如 `T(java.lang.Runtime).getRuntime().exec("calc.exe")` 来执行任意命令。
-
 ```java
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
-
 @Controller
 @RequestMapping("/spel")
 public class SPELController {
-
-    @GetMapping("/vul")
-    @ResponseBody
-    public String vul(@RequestParam String ex) {
-        ExpressionParser parser = new SpelExpressionParser();
-        String result = parser.parseExpression(ex).getValue().toString();
-        return "Result: " + result;
-    }
+@GetMapping("/vul")
+@ResponseBody
+public String vul(@RequestParam String ex) {
+ExpressionParser parser = new SpelExpressionParser();
+String result = parser.parseExpression(ex).getValue().toString();
+return "Result: " + result;
+}
 }
 ```
-
 3. **潜在影响**
 - 敏感数据泄露
 - 执行任意系统命令，实现远程代码执行 (RCE)
 - 控制受影响的服务器，导致更广泛的安全漏洞
-CODE
+DESC
 	level: "low",
 	message: "发现Java 可能存在Framework SPEL表达式注入漏洞",
 	title: "Check Java Spring SPEL Parser Injection",
 	title_zh: "检测Java Spring SPEL Parser表达式注入漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 限制SPEL表达式功能
 在允许用户输入表达式的场景中，尽量限制SPEL表达式的功能，例如通过 `SimpleEvaluationContext` 来限制可访问的类和方法，仅暴露必要的变量和函数。
-
 ```java
 // 修复代码示例
 import org.springframework.expression.EvaluationContext;
@@ -227,29 +207,27 @@ import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.SimpleEvaluationContext;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
-
 @Controller
 @RequestMapping("/spel")
 public class SPELController {
-
-    @GetMapping("/safe")
-    @ResponseBody
-    public String safe(@RequestParam String ex) {
-        ExpressionParser parser = new SpelExpressionParser();
-        // 使用SimpleEvaluationContext限制功能
-        EvaluationContext simpleContext = SimpleEvaluationContext.forReadOnlyDataBinding().build();
-        String result = parser.parseExpression(ex).getValue(simpleContext).toString();
-        return "Result: " + result;
-    }
+@GetMapping("/safe")
+@ResponseBody
+public String safe(@RequestParam String ex) {
+ExpressionParser parser = new SpelExpressionParser();
+// 使用SimpleEvaluationContext限制功能
+EvaluationContext simpleContext = SimpleEvaluationContext.forReadOnlyDataBinding().build();
+String result = parser.parseExpression(ex).getValue(simpleContext).toString();
+return "Result: " + result;
+}
 }
 ```
-
 #### 2. 对用户输入进行严格过滤和校验
 在解析用户输入的SPEL表达式之前，对输入进行严格的过滤和校验，阻止包含恶意代码的表达式。
-
 #### 3. 避免在可控输入中直接解析复杂表达式
 如果业务逻辑允许，尽量避免直接解析用户输入的完整和复杂的SPEL表达式。考虑使用更安全的机制，例如预定义的模板或简单的表达式语言。
-CODE
+SOLUTION
+	name: "low",
+	risk: "SPEL表达式注入",
 }
 
 desc(

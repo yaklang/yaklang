@@ -7,43 +7,40 @@ desc(
 ### 漏洞描述
 
 1. **漏洞原理**
-   当Java应用程序使用`javax.xml.transform.TransformerFactory`处理用户提供的或不受信任的XML/XSLT输入时，如果未采取适当的安全措施，如禁用外部实体解析，攻击者可以利用XML External Entity (XXE) 漏洞。攻击者可以在恶意构造的XML/XSLT文档中引用外部实体，诱使解析器访问服务器上的敏感文件、发起内部网络请求（SSRF），或导致拒绝服务（DoS）攻击。
+当Java应用程序使用`javax.xml.transform.TransformerFactory`处理用户提供的或不受信任的XML/XSLT输入时，如果未采取适当的安全措施，如禁用外部实体解析，攻击者可以利用XML External Entity (XXE) 漏洞。攻击者可以在恶意构造的XML/XSLT文档中引用外部实体，诱使解析器访问服务器上的敏感文件、发起内部网络请求（SSRF），或导致拒绝服务（DoS）攻击。
 
 2. **触发场景**
-   当程序通过`TransformerFactory`加载并转换包含外部实体引用的XML或XSLT文档，且`TransformerFactory`未禁用外部实体访问时，漏洞可能被触发。这通常发生在处理用户上传的或来自外部源的XML/XSLT文件时。
-
-   例如，以下代码片段直接使用`TransformerFactory.newInstance().newTransformer()`处理外部文件，未进行额外的安全配置：
-
-   ```java
-   import javax.xml.transform.Transformer;
-   import javax.xml.transform.TransformerException;
-   import javax.xml.transform.TransformerFactory;
-   import javax.xml.transform.stream.StreamResult;
-   import javax.xml.transform.stream.StreamSource;
-   import java.io.File;
-   import java.io.IOException;
-
-   public class XXEVulnerableExample {
-       public static void main(String[] args) {
-           try {
-               TransformerFactory transformerFactory = TransformerFactory.newInstance();
-               Transformer transformer = transformerFactory.newTransformer(
-                       new StreamSource(new File("vulnerable.xsl"))); // XSLT文件可控
-               transformer.transform(
-                       new StreamSource(new File("input.xml")), // XML文件可控
-                       new StreamResult(new File("output.xml")));
-           } catch (TransformerException | IOException e) {
-               e.printStackTrace();
-           }
-       }
-   }
-   ```
+当程序通过`TransformerFactory`加载并转换包含外部实体引用的XML或XSLT文档，且`TransformerFactory`未禁用外部实体访问时，漏洞可能被触发。这通常发生在处理用户上传的或来自外部源的XML/XSLT文件时。
+例如，以下代码片段直接使用`TransformerFactory.newInstance().newTransformer()`处理外部文件，未进行额外的安全配置：
+```java
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.stream.StreamResult;
+import javax.xml.transform.stream.StreamSource;
+import java.io.File;
+import java.io.IOException;
+public class XXEVulnerableExample {
+    public static void main(String[] args) {
+        try {
+            TransformerFactory transformerFactory = TransformerFactory.newInstance();
+            Transformer transformer = transformerFactory.newTransformer(
+                new StreamSource(new File("vulnerable.xsl")));
+            transformer.transform(
+                new StreamSource(new File("input.xml")),
+                new StreamResult(new File("output.xml")));
+        } catch (TransformerException | IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
 
 3. **潜在影响**
-   - 敏感文件泄露（如 `/etc/passwd`）。
-   - 发起服务器端请求伪造（SSRF），探测内部网络或攻击内网服务。
-   - 拒绝服务（DoS）攻击，通过加载大量嵌套实体或远程资源耗尽服务器资源。
-   - 远程代码执行（在特定配置下）。
+- 敏感文件泄露（如 `/etc/passwd`）。
+- 发起服务器端请求伪造（SSRF），探测内部网络或攻击内网服务。
+- 拒绝服务（DoS）攻击，通过加载大量嵌套实体或远程资源耗尽服务器资源。
+- 远程代码执行（在特定配置下）。
 DESC
 	rule_id: "b139c1f5-00ba-415d-ad4f-0f6c4df9b344"
 	reference: <<<REFERENCE
@@ -51,12 +48,10 @@ DESC
 REFERENCE
 	solution: <<<SOLUTION
 ### 修复建议
-
 禁用`TransformerFactory`对外部实体和样式表的访问。
 
 #### 1. 设置属性禁用外部访问
 通过设置`javax.xml.XMLConstants.ACCESS_EXTERNAL_DTD`和`javax.xml.XMLConstants.ACCESS_EXTERNAL_STYLESHEET`属性为空字符串 `""` 来严格限制外部资源的加载。
-
 ```java
 import javax.xml.XMLConstants;
 import javax.xml.transform.Transformer;
@@ -68,20 +63,17 @@ import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.stream.StreamSource;
 import java.io.File;
 import java.io.IOException;
-
 public class XXESecureExample {
     public static void main(String[] args) {
         try {
-            // 强烈建议使用SAXTransformerFactory并设置属性
             SAXTransformerFactory transformerFactory = (SAXTransformerFactory) TransformerFactory.newInstance();
-            transformerFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, ""); // 禁用外部DTD访问
-            transformerFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, ""); // 禁用外部样式表访问
-
+            transformerFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+            transformerFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
             Transformer transformer = transformerFactory.newTransformer(
-                    new StreamSource(new File("secure.xsl")));
+                new StreamSource(new File("secure.xsl")));
             transformer.transform(
-                    new StreamSource(new File("input.xml")),
-                    new StreamResult(new File("output.xml")));
+                new StreamSource(new File("input.xml")),
+                new StreamResult(new File("output.xml")));
         } catch (TransformerConfigurationException | TransformerException | IOException e) {
             e.printStackTrace();
         }
@@ -112,14 +104,11 @@ alert $vuln for {
 	message: "Transformer Unsafe Use in Context Sink",
 	title: "Detect Java TransformerFactory Unsafe Use",
 	title_zh: "检测 Java TransformerFactory 不安全使用",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 禁用`TransformerFactory`对外部实体和样式表的访问。
-
 #### 1. 设置属性禁用外部访问
 通过设置`javax.xml.XMLConstants.ACCESS_EXTERNAL_DTD`和`javax.xml.XMLConstants.ACCESS_EXTERNAL_STYLESHEET`属性为空字符串 `""` 来严格限制外部资源的加载。
-
 ```java
 import javax.xml.XMLConstants;
 import javax.xml.transform.Transformer;
@@ -131,76 +120,68 @@ import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.stream.StreamSource;
 import java.io.File;
 import java.io.IOException;
-
 public class XXESecureExample {
-    public static void main(String[] args) {
-        try {
-            // 强烈建议使用SAXTransformerFactory并设置属性
-            SAXTransformerFactory transformerFactory = (SAXTransformerFactory) TransformerFactory.newInstance();
-            transformerFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, ""); // 禁用外部DTD访问
-            transformerFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, ""); // 禁用外部样式表访问
-
-            Transformer transformer = transformerFactory.newTransformer(
-                    new StreamSource(new File("secure.xsl")));
-            transformer.transform(
-                    new StreamSource(new File("input.xml")),
-                    new StreamResult(new File("output.xml")));
-        } catch (TransformerConfigurationException | TransformerException | IOException e) {
-            e.printStackTrace();
-        }
-    }
+public static void main(String[] args) {
+try {
+// 强烈建议使用SAXTransformerFactory并设置属性
+SAXTransformerFactory transformerFactory = (SAXTransformerFactory) TransformerFactory.newInstance();
+transformerFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, ""); // 禁用外部DTD访问
+transformerFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, ""); // 禁用外部样式表访问
+Transformer transformer = transformerFactory.newTransformer(
+new StreamSource(new File("secure.xsl")));
+transformer.transform(
+new StreamSource(new File("input.xml")),
+new StreamResult(new File("output.xml")));
+} catch (TransformerConfigurationException | TransformerException | IOException e) {
+e.printStackTrace();
+}
+}
 }
 ```
-
 #### 2. 仅处理受信任的输入
 如果无法完全禁用外部实体，请确保只处理来自受信任来源的XML/XSLT数据。
-
 #### 3. 输入校验
 对XML/XSLT文件的内容进行严格校验，拒绝包含DOCTYPE声明或外部实体引用的文件。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   当Java应用程序使用`javax.xml.transform.TransformerFactory`处理用户提供的或不受信任的XML/XSLT输入时，如果未采取适当的安全措施，如禁用外部实体解析，攻击者可以利用XML External Entity (XXE) 漏洞。攻击者可以在恶意构造的XML/XSLT文档中引用外部实体，诱使解析器访问服务器上的敏感文件、发起内部网络请求（SSRF），或导致拒绝服务（DoS）攻击。
-
+当Java应用程序使用`javax.xml.transform.TransformerFactory`处理用户提供的或不受信任的XML/XSLT输入时，如果未采取适当的安全措施，如禁用外部实体解析，攻击者可以利用XML External Entity (XXE) 漏洞。攻击者可以在恶意构造的XML/XSLT文档中引用外部实体，诱使解析器访问服务器上的敏感文件、发起内部网络请求（SSRF），或导致拒绝服务（DoS）攻击。
 2. **触发场景**
-   当程序通过`TransformerFactory`加载并转换包含外部实体引用的XML或XSLT文档，且`TransformerFactory`未禁用外部实体访问时，漏洞可能被触发。这通常发生在处理用户上传的或来自外部源的XML/XSLT文件时。
-
-   例如，以下代码片段直接使用`TransformerFactory.newInstance().newTransformer()`处理外部文件，未进行额外的安全配置：
-
-   ```java
-   import javax.xml.transform.Transformer;
-   import javax.xml.transform.TransformerException;
-   import javax.xml.transform.TransformerFactory;
-   import javax.xml.transform.stream.StreamResult;
-   import javax.xml.transform.stream.StreamSource;
-   import java.io.File;
-   import java.io.IOException;
-
-   public class XXEVulnerableExample {
-       public static void main(String[] args) {
-           try {
-               TransformerFactory transformerFactory = TransformerFactory.newInstance();
-               Transformer transformer = transformerFactory.newTransformer(
-                       new StreamSource(new File("vulnerable.xsl"))); // XSLT文件可控
-               transformer.transform(
-                       new StreamSource(new File("input.xml")), // XML文件可控
-                       new StreamResult(new File("output.xml")));
-           } catch (TransformerException | IOException e) {
-               e.printStackTrace();
-           }
-       }
-   }
-   ```
-
+当程序通过`TransformerFactory`加载并转换包含外部实体引用的XML或XSLT文档，且`TransformerFactory`未禁用外部实体访问时，漏洞可能被触发。这通常发生在处理用户上传的或来自外部源的XML/XSLT文件时。
+例如，以下代码片段直接使用`TransformerFactory.newInstance().newTransformer()`处理外部文件，未进行额外的安全配置：
+```java
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.stream.StreamResult;
+import javax.xml.transform.stream.StreamSource;
+import java.io.File;
+import java.io.IOException;
+public class XXEVulnerableExample {
+public static void main(String[] args) {
+try {
+TransformerFactory transformerFactory = TransformerFactory.newInstance();
+Transformer transformer = transformerFactory.newTransformer(
+new StreamSource(new File("vulnerable.xsl")));
+transformer.transform(
+new StreamSource(new File("input.xml")),
+new StreamResult(new File("output.xml")));
+} catch (TransformerException | IOException e) {
+e.printStackTrace();
+}
+}
+}
+```
 3. **潜在影响**
-   - 敏感文件泄露（如 `/etc/passwd`）。
-   - 发起服务器端请求伪造（SSRF），探测内部网络或攻击内网服务。
-   - 拒绝服务（DoS）攻击，通过加载大量嵌套实体或远程资源耗尽服务器资源。
-   - 远程代码执行（在特定配置下）。
-CODE
+- 敏感文件泄露（如 `/etc/passwd`）。
+- 发起服务器端请求伪造（SSRF），探测内部网络或攻击内网服务。
+- 拒绝服务（DoS）攻击，通过加载大量嵌套实体或远程资源耗尽服务器资源。
+- 远程代码执行（在特定配置下）。
+DESC
 	level: "high",
+	risk: "XXE",
+	name: "vuln",
 }
 
 // ---------------------------------------CODE----------------------------------------------

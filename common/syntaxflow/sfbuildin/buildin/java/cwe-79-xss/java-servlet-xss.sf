@@ -8,41 +8,41 @@ desc(
 ### 漏洞描述
 
 1. **漏洞原理**
-   跨站脚本（XSS）漏洞发生在Web应用程序将不可信的用户输入直接或间接输出到网页中，而未进行适当的过滤或转义时。攻击者可以向应用程序注入恶意脚本，当其他用户访问包含恶意脚本的页面时，浏览器会执行这些脚本。在Java Servlet中，如果通过`HttpServletResponse`的`getWriter()`获取的`PrintWriter`对象未经安全处理（如 HTML 转义）就输出用户通过`HttpServletRequest`获取的参数，就会引入XSS风险。
+跨站脚本（XSS）漏洞发生在Web应用程序将不可信的用户输入直接或间接输出到网页中，而未进行适当的过滤或转义时。攻击者可以向应用程序注入恶意脚本，当其他用户访问包含恶意脚本的页面时，浏览器会执行这些脚本。在Java Servlet中，如果通过`HttpServletResponse`的`getWriter()`获取的`PrintWriter`对象未经安全处理（如HTML转义）就输出用户通过`HttpServletRequest`获取的参数，就会引入XSS风险。
 
 2. **触发场景**
-   - 从请求参数、请求头、Cookie等获取用户输入。
-   - 将获取到的用户输入直接或拼接到HTML、JavaScript、CSS等内容中，通过`response.getWriter().print()`、`.println()`、`.write()`或`.append()`等方法输出到客户端浏览器。
-   - 用户输入的恶意内容被浏览器解析并执行，例如注入`<script>`标签、事件处理器等。
+- 从请求参数、请求头、Cookie等获取用户输入。
+- 将获取到的用户输入直接或拼接到HTML、JavaScript、CSS等内容中，通过`response.getWriter().print()`、`.println()`、`.write()`或`.append()`等方法输出到客户端浏览器。
+- 用户输入的恶意内容被浏览器解析并执行，例如注入`<script>`标签、事件处理器等。
 
-   // 存在漏洞的代码示例:
-   ```java
-   // 示例1: 直接输出请求参数
-   protected void doGet(HttpServletRequest request, HttpServletResponse response)
-           throws IOException {
-       response.setContentType("text/html");
-       PrintWriter out = response.getWriter();
-       String name = request.getParameter("name");
-       out.println("<h1>Welcome, " + name + "!</h1>"); // 未对name进行转义
-   }
+// 存在漏洞的代码示例:
+```java
+// 示例1: 直接输出请求参数
+protected void doGet(HttpServletRequest request, HttpServletResponse response)
+throws IOException {
+response.setContentType("text/html");
+PrintWriter out = response.getWriter();
+String name = request.getParameter("name");
+out.println("<h1>Welcome, " + name + "!</h1>"); // 未对name进行转义
+}
 
-   // 示例2: 在JS中输出请求参数
-   protected void doPost(HttpServletRequest request, HttpServletResponse response)
-           throws IOException {
-       response.setContentType("text/html");
-       PrintWriter out = response.getWriter();
-       String data = request.getParameter("data");
-       out.println("<script>var userInput = '" + data + "'; eval(userInput);</script>"); // 将data嵌入到JS字符串中并执行，未转义
-   }
-   ```
+// 示例2: 在JS中输出请求参数
+protected void doPost(HttpServletRequest request, HttpServletResponse response)
+throws IOException {
+response.setContentType("text/html");
+PrintWriter out = response.getWriter();
+String data = request.getParameter("data");
+out.println("<script>var userInput = '" + data + "'; eval(userInput);</script>"); // 将data嵌入到JS字符串中并执行，未转义
+}
+```
 
 3. **潜在影响**
-   - **会话劫持:** 攻击者可以通过窃取用户的Cookie信息，冒充用户身份进行操作。
-   - **信息泄露:** 攻击者可以获取用户的敏感信息，如账号密码、银行卡号等。
-   - **网页篡改:** 攻击者可以修改网页内容，进行钓鱼或传播恶意信息。
-   - **植入恶意软件:** 攻击者可能诱导用户下载并安装恶意软件。
-   - **客户端重定向:** 将用户重定向到恶意网站。
-   - **进一步攻击:** XSS可能是攻击链中的一环，用于绕过CSRF防护、配合其他漏洞发起更复杂的攻击。
+- **会话劫持:** 攻击者可以通过窃取用户的Cookie信息，冒充用户身份进行操作。
+- **信息泄露:** 攻击者可以获取用户的敏感信息，如账号密码、银行卡号等。
+- **网页篡改:** 攻击者可以修改网页内容，进行钓鱼或传播恶意信息。
+- **植入恶意软件:** 攻击者可能诱导用户下载并安装恶意软件。
+- **客户端重定向:** 将用户重定向到恶意网站。
+- **进一步攻击:** XSS可能是攻击链中的一环，用于绕过CSRF防护、配合其他漏洞发起更复杂的攻击。
 DESC
 	rule_id: "91441632-5409-4bfe-8c54-cb49e21c870d"
 	solution: <<<SOLUTION
@@ -50,39 +50,34 @@ DESC
 
 #### 1. 对用户输入进行严格的上下文相关的转义
 根据输出内容的上下文（HTML元素内容、HTML属性、JavaScript、CSS、URL等），使用相应的转义函数对用户输入进行处理，使其不再被浏览器误解析为代码。
-
 *   **HTML上下文转义:** 使用HTML实体编码，例如将`<`转义为`&lt;`，`>`转义为`&gt;`，`"`转义为`&quot;`，`'`转义为`&#x27;`，`&`转义为`&amp;`等。可以使用OWASP出品的[OWASP Java Encoder Project](https://github.com/OWASP/java-encoder)这样的安全编码库。
-
-    ```java
-    // 修复代码示例：使用OWASP Java Encoder进行HTML转义
-    import org.owasp.encoder.Encode;
-    // ...
-
-    protected void doGet(HttpServletRequest request, HttpServletResponse response)
-            throws IOException {
-        response.setContentType("text/html");
-        PrintWriter out = response.getWriter();
-        String name = request.getParameter("name");
-        // 对name进行HTML转义，确保即使包含恶意HTML标签也不会被执行
-        String safeName = Encode.forHtml(name);
-        out.println("<h1>Welcome, " + safeName + "!</h1>");
-    }
-    ```
-
-*   **JavaScript上下文转义:** 如果用户输入要嵌入到JavaScript代码中，需要进行JavaScript字符串转义，例如将单引号`(`)`、双引号`(")`、反斜杠`\`、换行符`\n`、回车符`\r`等特殊字符转义为`\'`、`\"`、`\\`、`\n`、`\r`。同样推荐使用安全编码库。
-
-    ```java
-    // 修复代码示例：使用OWASP Java Encoder进行JavaScript转义
-    protected void doPost(HttpServletRequest request, HttpServletResponse response)
-            throws IOException {
-        response.setContentType("text/html");
-        PrintWriter out = response.getWriter();
-        String data = request.getParameter("data");
-        // 对data进行JavaScript转义，确保嵌入到JS字符串中不会改变代码结构
-        String safeData = Encode.forJavaScriptString(data);
-        out.println("<script>var userInput = \"" + safeData + "\"; eval(userInput);</script>");
-    }
-    ```
+```java
+// 修复代码示例：使用OWASP Java Encoder进行HTML转义
+import org.owasp.encoder.Encode;
+// ...
+protected void doGet(HttpServletRequest request, HttpServletResponse response)
+throws IOException {
+response.setContentType("text/html");
+PrintWriter out = response.getWriter();
+String name = request.getParameter("name");
+// 对name进行HTML转义，确保即使包含恶意HTML标签也不会被执行
+String safeName = Encode.forHtml(name);
+out.println("<h1>Welcome, " + safeName + "!</h1>");
+}
+```
+*   **JavaScript上下文转义:** 如果用户输入要嵌入到JavaScript代码中，需要进行JavaScript字符串转义，例如将单引号`(')`、双引号`(")`、反斜杠`\`、换行符`\n`、回车符`\r`等特殊字符转义为`\'`、`\"`、`\\`、`\n`、`\r`。同样推荐使用安全编码库。
+```java
+// 修复代码示例：使用OWASP Java Encoder进行JavaScript转义
+protected void doPost(HttpServletRequest request, HttpServletResponse response)
+throws IOException {
+response.setContentType("text/html");
+PrintWriter out = response.getWriter();
+String data = request.getParameter("data");
+// 对data进行JavaScript转义，确保嵌入到JS字符串中不会改变代码结构
+String safeData = Encode.forJavaScriptString(data);
+out.println("<script>var userInput = \"" + safeData + "\"; eval(userInput);</script>");
+}
+```
 
 #### 2. 使用安全的模板引擎
 许多现代的Web模板引擎（如Thymeleaf, FreeMarker等）默认对输出进行HTML转义，可以有效防止XSS漏洞。优先考虑使用这些模板引擎来生成动态HTML内容而非手动拼接字符串。
@@ -117,11 +112,90 @@ $sink#{
     exclude:` *<getCallee> & $filter`
 }-> as $mid;
 alert $mid for {
-	title: "Check Java Servlet XSS Vulnerability",
-	title_zh: "检测Java Servlet XSS漏洞",
+	title: "Java Servlet XSS Vulnerability Was Detected",
+	title_zh: "检测到Java Servlet XSS漏洞",
 	level: "mid",
 	type: "vuln",
 	message: "发现Java Servlet的XSS漏洞，并且数据流没有使用任何转义方法。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 对用户输入进行严格的上下文相关的转义
+根据输出内容的上下文（HTML元素内容、HTML属性、JavaScript、CSS、URL等），使用相应的转义函数对用户输入进行处理，使其不再被浏览器误解析为代码。
+*   **HTML上下文转义:** 使用HTML实体编码，例如将`<`转义为`&lt;`，`>`转义为`&gt;`，`"`转义为`&quot;`，`'`转义为`&#x27;`，`&`转义为`&amp;`等。可以使用OWASP出品的[OWASP Java Encoder Project](https://github.com/OWASP/java-encoder)这样的安全编码库。
+```java
+// 修复代码示例：使用OWASP Java Encoder进行HTML转义
+import org.owasp.encoder.Encode;
+// ...
+protected void doGet(HttpServletRequest request, HttpServletResponse response)
+throws IOException {
+response.setContentType("text/html");
+PrintWriter out = response.getWriter();
+String name = request.getParameter("name");
+// 对name进行HTML转义，确保即使包含恶意HTML标签也不会被执行
+String safeName = Encode.forHtml(name);
+out.println("<h1>Welcome, " + safeName + "!</h1>");
+}
+```
+*   **JavaScript上下文转义:** 如果用户输入要嵌入到JavaScript代码中，需要进行JavaScript字符串转义，例如将单引号`(`)`、双引号`(")`、反斜杠`\`、换行符`\n`、回车符`\r`等特殊字符转义为`\'`、`\"`、`\\`、`\n`、`\r`。同样推荐使用安全编码库。
+```java
+// 修复代码示例：使用OWASP Java Encoder进行JavaScript转义
+protected void doPost(HttpServletRequest request, HttpServletResponse response)
+throws IOException {
+response.setContentType("text/html");
+PrintWriter out = response.getWriter();
+String data = request.getParameter("data");
+// 对data进行JavaScript转义，确保嵌入到JS字符串中不会改变代码结构
+String safeData = Encode.forJavaScriptString(data);
+out.println("<script>var userInput = \"" + safeData + "\"; eval(userInput);</script>");
+}
+```
+#### 2. 使用安全的模板引擎
+许多现代的Web模板引擎（如Thymeleaf, FreeMarker等）默认对输出进行HTML转义，可以有效防止XSS漏洞。优先考虑使用这些模板引擎来生成动态HTML内容而非手动拼接字符串。
+#### 3. 设置HTTP Header
+- **Content-Security-Policy (CSP):** 配置CSP策略，限制浏览器加载和执行脚本、样式等资源的来源，可以减轻XSS攻击的影响。
+- **X-XSS-Protection:** 这是一个HTTP响应头，用于开启浏览器内置的XSS过滤器。虽然不能完全依赖，但可以作为额外的防护措施（注意在现代浏览器中CSP已是更推荐的方式）。
+#### 4. 输入验证与过滤 (作为辅助手段)
+虽然不能完全依赖输入过滤来防止XSS，但对输入进行合法性验证和过滤（例如，移除或禁用潜在有害的字符和标签）可以作为防御的辅助手段。
+#### 5. 审查已有的代码
+对现有的Java Servlet代码进行安全审计，查找所有获取用户输入并输出到响应的地方（例如调用`request.getParameter`后紧接着调用`response.getWriter().print`等），确保所有输出都经过了适当的转义处理。
+SOLUTION
+	risk: "XSS",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+跨站脚本（XSS）漏洞发生在Web应用程序将不可信的用户输入直接或间接输出到网页中，而未进行适当的过滤或转义时。攻击者可以向应用程序注入恶意脚本，当其他用户访问包含恶意脚本的页面时，浏览器会执行这些脚本。在Java Servlet中，如果通过`HttpServletResponse`的`getWriter()`获取的`PrintWriter`对象未经安全处理（如 HTML 转义）就输出用户通过`HttpServletRequest`获取的参数，就会引入XSS风险。
+2. **触发场景**
+- 从请求参数、请求头、Cookie等获取用户输入。
+- 将获取到的用户输入直接或拼接到HTML、JavaScript、CSS等内容中，通过`response.getWriter().print()`、`.println()`、`.write()`或`.append()`等方法输出到客户端浏览器。
+- 用户输入的恶意内容被浏览器解析并执行，例如注入`<script>`标签、事件处理器等。
+// 存在漏洞的代码示例:
+```java
+// 示例1: 直接输出请求参数
+protected void doGet(HttpServletRequest request, HttpServletResponse response)
+throws IOException {
+response.setContentType("text/html");
+PrintWriter out = response.getWriter();
+String name = request.getParameter("name");
+out.println("<h1>Welcome, " + name + "!</h1>"); // 未对name进行转义
+}
+// 示例2: 在JS中输出请求参数
+protected void doPost(HttpServletRequest request, HttpServletResponse response)
+throws IOException {
+response.setContentType("text/html");
+PrintWriter out = response.getWriter();
+String data = request.getParameter("data");
+out.println("<script>var userInput = '" + data + "'; eval(userInput);</script>"); // 将data嵌入到JS字符串中并执行，未转义
+}
+```
+3. **潜在影响**
+- **会话劫持:** 攻击者可以通过窃取用户的Cookie信息，冒充用户身份进行操作。
+- **信息泄露:** 攻击者可以获取用户的敏感信息，如账号密码、银行卡号等。
+- **网页篡改:** 攻击者可以修改网页内容，进行钓鱼或传播恶意信息。
+- **植入恶意软件:** 攻击者可能诱导用户下载并安装恶意软件。
+- **客户端重定向:** 将用户重定向到恶意网站。
+- **进一步攻击:** XSS可能是攻击链中的一环，用于绕过CSRF防护、配合其他漏洞发起更复杂的攻击。
+DESC
+	name: "mid",
 }
 
 
@@ -132,10 +206,89 @@ $all - $mid as $low;
 
 alert $low for {
 	message: "发现Java Servlet的XSS漏洞,并且数据流中使用了转义方法。",
-	title: "Check Java Servlet XSS Vulnerability",
-	title_zh: "检测Java Servlet XSS漏洞",
+	title: "Java Servlet XSS Vulnerability Was Detected",
+	title_zh: "检测到Java Servlet XSS漏洞",
 	level: "low",
 	type: "vuln",
+	name: "low",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 对用户输入进行严格的上下文相关的转义
+根据输出内容的上下文（HTML元素内容、HTML属性、JavaScript、CSS、URL等），使用相应的转义函数对用户输入进行处理，使其不再被浏览器误解析为代码。
+*   **HTML上下文转义:** 使用HTML实体编码，例如将`<`转义为`&lt;`，`>`转义为`&gt;`，`"`转义为`&quot;`，`'`转义为`&#x27;`，`&`转义为`&amp;`等。可以使用OWASP出品的[OWASP Java Encoder Project](https://github.com/OWASP/java-encoder)这样的安全编码库。
+```java
+// 修复代码示例：使用OWASP Java Encoder进行HTML转义
+import org.owasp.encoder.Encode;
+// ...
+protected void doGet(HttpServletRequest request, HttpServletResponse response)
+throws IOException {
+response.setContentType("text/html");
+PrintWriter out = response.getWriter();
+String name = request.getParameter("name");
+// 对name进行HTML转义，确保即使包含恶意HTML标签也不会被执行
+String safeName = Encode.forHtml(name);
+out.println("<h1>Welcome, " + safeName + "!</h1>");
+}
+```
+*   **JavaScript上下文转义:** 如果用户输入要嵌入到JavaScript代码中，需要进行JavaScript字符串转义，例如将单引号`(`)`、双引号`(")`、反斜杠`\`、换行符`\n`、回车符`\r`等特殊字符转义为`\'`、`\"`、`\\`、`\n`、`\r`。同样推荐使用安全编码库。
+```java
+// 修复代码示例：使用OWASP Java Encoder进行JavaScript转义
+protected void doPost(HttpServletRequest request, HttpServletResponse response)
+throws IOException {
+response.setContentType("text/html");
+PrintWriter out = response.getWriter();
+String data = request.getParameter("data");
+// 对data进行JavaScript转义，确保嵌入到JS字符串中不会改变代码结构
+String safeData = Encode.forJavaScriptString(data);
+out.println("<script>var userInput = \"" + safeData + "\"; eval(userInput);</script>");
+}
+```
+#### 2. 使用安全的模板引擎
+许多现代的Web模板引擎（如Thymeleaf, FreeMarker等）默认对输出进行HTML转义，可以有效防止XSS漏洞。优先考虑使用这些模板引擎来生成动态HTML内容而非手动拼接字符串。
+#### 3. 设置HTTP Header
+- **Content-Security-Policy (CSP):** 配置CSP策略，限制浏览器加载和执行脚本、样式等资源的来源，可以减轻XSS攻击的影响。
+- **X-XSS-Protection:** 这是一个HTTP响应头，用于开启浏览器内置的XSS过滤器。虽然不能完全依赖，但可以作为额外的防护措施（注意在现代浏览器中CSP已是更推荐的方式）。
+#### 4. 输入验证与过滤 (作为辅助手段)
+虽然不能完全依赖输入过滤来防止XSS，但对输入进行合法性验证和过滤（例如，移除或禁用潜在有害的字符和标签）可以作为防御的辅助手段。
+#### 5. 审查已有的代码
+对现有的Java Servlet代码进行安全审计，查找所有获取用户输入并输出到响应的地方（例如调用`request.getParameter`后紧接着调用`response.getWriter().print`等），确保所有输出都经过了适当的转义处理。
+SOLUTION
+	risk: "XSS",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+跨站脚本（XSS）漏洞发生在Web应用程序将不可信的用户输入直接或间接输出到网页中，而未进行适当的过滤或转义时。攻击者可以向应用程序注入恶意脚本，当其他用户访问包含恶意脚本的页面时，浏览器会执行这些脚本。在Java Servlet中，如果通过`HttpServletResponse`的`getWriter()`获取的`PrintWriter`对象未经安全处理（如 HTML 转义）就输出用户通过`HttpServletRequest`获取的参数，就会引入XSS风险。
+2. **触发场景**
+- 从请求参数、请求头、Cookie等获取用户输入。
+- 将获取到的用户输入直接或拼接到HTML、JavaScript、CSS等内容中，通过`response.getWriter().print()`、`.println()`、`.write()`或`.append()`等方法输出到客户端浏览器。
+- 用户输入的恶意内容被浏览器解析并执行，例如注入`<script>`标签、事件处理器等。
+// 存在漏洞的代码示例:
+```java
+// 示例1: 直接输出请求参数
+protected void doGet(HttpServletRequest request, HttpServletResponse response)
+throws IOException {
+response.setContentType("text/html");
+PrintWriter out = response.getWriter();
+String name = request.getParameter("name");
+out.println("<h1>Welcome, " + name + "!</h1>"); // 未对name进行转义
+}
+// 示例2: 在JS中输出请求参数
+protected void doPost(HttpServletRequest request, HttpServletResponse response)
+throws IOException {
+response.setContentType("text/html");
+PrintWriter out = response.getWriter();
+String data = request.getParameter("data");
+out.println("<script>var userInput = '" + data + "'; eval(userInput);</script>"); // 将data嵌入到JS字符串中并执行，未转义
+}
+```
+3. **潜在影响**
+- **会话劫持:** 攻击者可以通过窃取用户的Cookie信息，冒充用户身份进行操作。
+- **信息泄露:** 攻击者可以获取用户的敏感信息，如账号密码、银行卡号等。
+- **网页篡改:** 攻击者可以修改网页内容，进行钓鱼或传播恶意信息。
+- **植入恶意软件:** 攻击者可能诱导用户下载并安装恶意软件。
+- **客户端重定向:** 将用户重定向到恶意网站。
+- **进一步攻击:** XSS可能是攻击链中的一环，用于绕过CSRF防护、配合其他漏洞发起更复杂的攻击。
+DESC
 }
 
 

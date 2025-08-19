@@ -4,83 +4,66 @@ desc(
 	level: low
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   当在Java应用中使用 `Class.forName(...)` 方法动态加载类时，如果传入的类名参数来源于不受信任、未经严格过滤或验证的用户输入，攻击者可以构造恶意的类名。如果应用程序随后对加载的类进行了实例化或者调用了其方法，可能导致执行攻击者控制的代码，从而引发远程代码执行（RCE）漏洞。
-   这种风险在于反射机制本身允许在运行时进行灵活的类和方法调用，但如果输入源不可信，攻击者就能利用这种灵活性注入并执行恶意逻辑。
-
+当在Java应用中使用 `Class.forName(...)` 方法动态加载类时，如果传入的类名参数来源于不受信任、未经严格过滤或验证的用户输入，攻击者可以构造恶意的类名。如果应用程序随后对加载的类进行了实例化或者调用了其方法，可能导致执行攻击者控制的代码，从而引发远程代码执行（RCE）漏洞。
+这种风险在于反射机制本身允许在运行时进行灵活的类和方法调用，但如果输入源不可信，攻击者就能利用这种灵活性注入并执行恶意逻辑。
 2. **触发场景**
-   当应用程序直接或间接地将用户输入（如请求参数、配置文件内容、数据库数据、消息队列数据等）作为 `Class.forName()` 方法的参数，并且后续代码对加载的类进行了危险操作（如 `newInstance()` 实例化、调用特定方法等）。常见的触发场景包括：
-   - 基于用户提供的类名动态加载插件。
-   - 根据用户输入执行不同的业务逻辑类。
-   - 反序列化过程中使用用户控制的类名。
-   - Web框架中通过请求参数指定要调用的Service或Controller类。
-   
-   ```java
-   package org.learn;
-   import java.util.ArrayList;
-   public class DemoForClassName {
-       private static void demoCreateThread(String userInput) throws ClassNotFoundException,
-               IllegalAccessException, InstantiationException, InterruptedException {
-           Class<?> loadClass = Class.forName(userInput + "MyThread"); // userInput来自外部不可信源
-
-           Thread thread = (Thread) loadClass.newInstance(); // 对加载的类进行实例化
-           thread.start();
-           thread.join();
-       }
-   }
-   ```
-   攻击者可能构造 `userInput` 为 `com.example.MaliciousClass`，如果 `com.example.MaliciousClass` 存在于类路径中且其构造函数或初始化块包含恶意代码，当调用 `newInstance()` 时，恶意代码将被执行。
-
+当应用程序直接或间接地将用户输入（如请求参数、配置文件内容、数据库数据、消息队列数据等）作为 `Class.forName()` 方法的参数，并且后续代码对加载的类进行了危险操作（如 `newInstance()` 实例化、调用特定方法等）。常见的触发场景包括：
+- 基于用户提供的类名动态加载插件。
+- 根据用户输入执行不同的业务逻辑类。
+- 反序列化过程中使用用户控制的类名。
+- Web框架中通过请求参数指定要调用的Service或Controller类。
+```java
+package org.learn;
+import java.util.ArrayList;
+public class DemoForClassName {
+private static void demoCreateThread(String userInput) throws ClassNotFoundException, IllegalAccessException, InstantiationException, InterruptedException {
+Class<?> loadClass = Class.forName(userInput + "MyThread"); // userInput来自外部不可信源
+Thread thread = (Thread) loadClass.newInstance(); // 对加载的类进行实例化
+thread.start();
+thread.join();
+}
+}
+```
+攻击者可能构造 `userInput` 为 `com.example.MaliciousClass`，如果 `com.example.MaliciousClass` 存在于类路径中且其构造函数或初始化块包含恶意代码，当调用 `newInstance()` 时，恶意代码将被执行。
 3. **潜在影响**
-   - **远程代码执行 (RCE)**：攻击者能够在服务器上执行任意代码，完全控制受影响的系统。
-   - **任意文件读写**：如果加载的恶意类执行文件操作，可能导致敏感信息泄露或系统文件被破坏。
-   - **权限提升**：攻击者可能利用执行代码的能力获取更高的系统权限。
-   - **拒绝服务 (DoS)**：加载不存在或恶意的类可能导致应用程序崩溃。
+- **远程代码执行 (RCE)**：攻击者能够在服务器上执行任意代码，完全控制受影响的系统。
+- **任意文件读写**：如果加载的恶意类执行文件操作，可能导致敏感信息泄露或系统文件被破坏。
+- **权限提升**：攻击者可能利用执行代码的能力获取更高的系统权限。
+- **拒绝服务 (DoS)**：加载不存在或恶意的类可能导致应用程序崩溃。
 DESC
 	rule_id: "ed4ad93d-071c-467f-b688-259938c261d9"
 	title_zh: "审计Java中Class.forName的不安全反射调用"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免使用用户输入作为 `Class.forName()` 的直接参数
-   如果必须动态加载类，确保类名参数来源于应用程序内部硬编码的有限集合，或者经过严格的白名单验证，绝不直接使用来自外部未经校验的输入。
-
+如果必须动态加载类，确保类名参数来源于应用程序内部硬编码的有限集合，或者经过严格的白名单验证，绝不直接使用来自外部未经校验的输入。
 #### 2. 实现严格的白名单校验
-   如果业务需要根据用户输入动态选择类，维护一个允许加载的类名白名单列表。在调用 `Class.forName()` 之前，验证用户提供的类名是否在白名单中。
-   ```java
-   // 修复代码示例 (白名单校验)
-   import java.util.Arrays;
-   import java.util.List;
-
-   private static final List<String> ALLOWED_CLASSES = Arrays.asList("org.learn.MyThread1", "org.learn.MyThread2"); // 定义允许加载的类白名单
-
-   private static void demoCreateThreadSafe(String userInput) throws ClassNotFoundException,
-           IllegalAccessException, InstantiationException, InterruptedException {
-       String classNameToLoad = userInput + "MyThread"; // 假设 userInput 可能影响最终类名
-
-       if (!ALLOWED_CLASSES.contains(classNameToLoad)) {
-           throw new IllegalArgumentException("不允许加载此类: " + classNameToLoad);
-       }
-
-       Class<?> loadClass = Class.forName(classNameToLoad);
-
-       // 验证加载的类是否实现或继承了预期的安全接口/基类
-       if (!Thread.class.isAssignableFrom(loadClass)) {
-           throw new IllegalArgumentException("加载的类不是 Thread 的子类");
-       }
-
-       Thread thread = (Thread) loadClass.newInstance();
-       thread.start();
-       thread.join();
-   }
-   ```
-
+如果业务需要根据用户输入动态选择类，维护一个允许加载的类名白名单列表。在调用 `Class.forName()` 之前，验证用户提供的类名是否在白名单中。
+```java
+// 修复代码示例 (白名单校验)
+import java.util.Arrays;
+import java.util.List;
+private static final List<String> ALLOWED_CLASSES = Arrays.asList("org.learn.MyThread1", "org.learn.MyThread2"); // 定义允许加载的类白名单
+private static void demoCreateThreadSafe(String userInput) throws ClassNotFoundException, IllegalAccessException, InstantiationException, InterruptedException {
+String classNameToLoad = userInput + "MyThread"; // 假设 userInput 可能影响最终类名
+if (!ALLOWED_CLASSES.contains(classNameToLoad)) {
+throw new IllegalArgumentException("不允许加载此类: " + classNameToLoad);
+}
+Class<?> loadClass = Class.forName(classNameToLoad);
+// 验证加载的类是否实现或继承了预期的安全接口/基类
+if (!Thread.class.isAssignableFrom(loadClass)) {
+throw new IllegalArgumentException("加载的类不是 Thread 的子类");
+}
+Thread thread = (Thread) loadClass.newInstance();
+thread.start();
+thread.join();
+}
+```
 #### 3. 限制加载类的权限或操作
-   即使加载了类，也要限制对其实例能够执行的操作。例如，可以使用安全管理器（SecurityManager）限制特定类的权限，或者确保只调用已知安全的方法，避免调用可能导致危险操作（如 `exec()`、文件操作等）的方法。
-
+即使加载了类，也要限制对其实例能够执行的操作。例如，可以使用安全管理器（SecurityManager）限制特定类的权限，或者确保只调用已知安全的方法，避免调用可能导致危险操作（如 `exec()`、文件操作等）的方法。
 #### 4. 代码重构
-   考虑是否可以将动态加载类的需求通过其他更安全的设计模式实现，例如使用工厂模式、策略模式等，避免直接使用反射和用户输入。
+考虑是否可以将动态加载类的需求通过其他更安全的设计模式实现，例如使用工厂模式、策略模式等，避免直接使用反射和用户输入。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-470: Use of Externally-Controlled Input to Select Classes or Code ('Unsafe Reflection')](https://cwe.mitre.org/data/definitions/470.html)
@@ -97,6 +80,72 @@ alert $calc for {
 	level: "low",
 	title: "Audit Java Unsafe Reflection for Class.forName",
 	title_zh: "审计Java中Class.forName的不安全反射调用",
+	message: "检测到Java中不安全的反射调用，传入的类名参数可能来源于外部不可信的用户输入，建议进一步审计以确认是否存在远程代码执行的风险。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 避免使用用户输入作为 `Class.forName()` 的直接参数
+如果必须动态加载类，确保类名参数来源于应用程序内部硬编码的有限集合，或者经过严格的白名单验证，绝不直接使用来自外部未经校验的输入。
+#### 2. 实现严格的白名单校验
+如果业务需要根据用户输入动态选择类，维护一个允许加载的类名白名单列表。在调用 `Class.forName()` 之前，验证用户提供的类名是否在白名单中。
+```java
+// 修复代码示例 (白名单校验)
+import java.util.Arrays;
+import java.util.List;
+private static final List<String> ALLOWED_CLASSES = Arrays.asList("org.learn.MyThread1", "org.learn.MyThread2"); // 定义允许加载的类白名单
+private static void demoCreateThreadSafe(String userInput) throws ClassNotFoundException,
+IllegalAccessException, InstantiationException, InterruptedException {
+String classNameToLoad = userInput + "MyThread"; // 假设 userInput 可能影响最终类名
+if (!ALLOWED_CLASSES.contains(classNameToLoad)) {
+throw new IllegalArgumentException("不允许加载此类: " + classNameToLoad);
+}
+Class<?> loadClass = Class.forName(classNameToLoad);
+// 验证加载的类是否实现或继承了预期的安全接口/基类
+if (!Thread.class.isAssignableFrom(loadClass)) {
+throw new IllegalArgumentException("加载的类不是 Thread 的子类");
+}
+Thread thread = (Thread) loadClass.newInstance();
+thread.start();
+thread.join();
+}
+```
+#### 3. 限制加载类的权限或操作
+即使加载了类，也要限制对其实例能够执行的操作。例如，可以使用安全管理器（SecurityManager）限制特定类的权限，或者确保只调用已知安全的方法，避免调用可能导致危险操作（如 `exec()`、文件操作等）的方法。
+#### 4. 代码重构
+考虑是否可以将动态加载类的需求通过其他更安全的设计模式实现，例如使用工厂模式、策略模式等，避免直接使用反射和用户输入。
+SOLUTION
+	risk: "远程代码执行",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+当在Java应用中使用 `Class.forName(...)` 方法动态加载类时，如果传入的类名参数来源于不受信任、未经严格过滤或验证的用户输入，攻击者可以构造恶意的类名。如果应用程序随后对加载的类进行了实例化或者调用了其方法，可能导致执行攻击者控制的代码，从而引发远程代码执行（RCE）漏洞。
+这种风险在于反射机制本身允许在运行时进行灵活的类和方法调用，但如果输入源不可信，攻击者就能利用这种灵活性注入并执行恶意逻辑。
+2. **触发场景**
+当应用程序直接或间接地将用户输入（如请求参数、配置文件内容、数据库数据、消息队列数据等）作为 `Class.forName()` 方法的参数，并且后续代码对加载的类进行了危险操作（如 `newInstance()` 实例化、调用特定方法等）。常见的触发场景包括：
+- 基于用户提供的类名动态加载插件。
+- 根据用户输入执行不同的业务逻辑类。
+- 反序列化过程中使用用户控制的类名。
+- Web框架中通过请求参数指定要调用的Service或Controller类。
+```java
+package org.learn;
+import java.util.ArrayList;
+public class DemoForClassName {
+private static void demoCreateThread(String userInput) throws ClassNotFoundException,
+IllegalAccessException, InstantiationException, InterruptedException {
+Class<?> loadClass = Class.forName(userInput + "MyThread"); // userInput来自外部不可信源
+Thread thread = (Thread) loadClass.newInstance(); // 对加载的类进行实例化
+thread.start();
+thread.join();
+}
+}
+```
+攻击者可能构造 `userInput` 为 `com.example.MaliciousClass`，如果 `com.example.MaliciousClass` 存在于类路径中且其构造函数或初始化块包含恶意代码，当调用 `newInstance()` 时，恶意代码将被执行。
+3. **潜在影响**
+- **远程代码执行 (RCE)**：攻击者能够在服务器上执行任意代码，完全控制受影响的系统。
+- **任意文件读写**：如果加载的恶意类执行文件操作，可能导致敏感信息泄露或系统文件被破坏。
+- **权限提升**：攻击者可能利用执行代码的能力获取更高的系统权限。
+- **拒绝服务 (DoS)**：加载不存在或恶意的类可能导致应用程序崩溃。
+DESC
+	name: "calc",
 }
 
 

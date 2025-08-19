@@ -25,14 +25,14 @@ REFERENCE
 ```java
 @PostMapping("/upload")
 public String uploadFile(@RequestParam("file") MultipartFile file) {
-    try {
-        // 潜在危险的目标路径
-        File dest = new File("/var/www/uploads/" + file.getOriginalFilename());
-        file.transferTo(dest);  // 直接使用原始文件名可能导致路径污染漏洞
-        return "File uploaded successfully";
-    } catch (IOException e) {
-        return "File upload failed";
-    }
+try {
+// 潜在危险的目标路径
+File dest = new File("/var/www/uploads/" + file.getOriginalFilename());
+file.transferTo(dest);  // 直接使用原始文件名可能导致路径污染漏洞
+return "File uploaded successfully";
+} catch (IOException e) {
+return "File upload failed";
+}
 }
 ```
 在此示例中，攻击者可以通过构造恶意文件名（如 `../../etc/passwd`）覆盖系统关键文件。
@@ -40,23 +40,22 @@ DESC
 	rule_id: "8577b8ff-aeab-4830-a21c-b5a342f0cbe3"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 验证目标路径的安全性
 在调用 `transferTo` 方法之前，必须对目标路径进行严格验证，以确保不会出现路径穿越或其他非法操作。例如，禁止路径中包含 `../` 等特殊字符。
 ```java
 @PostMapping("/upload")
 public String uploadFile(@RequestParam("file") MultipartFile file) {
-    String fileName = file.getOriginalFilename();
-    if (fileName == null || fileName.contains("..")) {
-        return "Invalid file name";
-    }
-    try {
-        File dest = new File("/var/www/uploads/" + fileName);
-        file.transferTo(dest);
-        return "File uploaded successfully";
-    } catch (IOException e) {
-        return "File upload failed";
-    }
+String fileName = file.getOriginalFilename();
+if (fileName == null || fileName.contains("..")) {
+return "Invalid file name";
+}
+try {
+File dest = new File("/var/www/uploads/" + fileName);
+file.transferTo(dest);
+return "File uploaded successfully";
+} catch (IOException e) {
+return "File upload failed";
+}
 }
 ```
 
@@ -65,14 +64,14 @@ public String uploadFile(@RequestParam("file") MultipartFile file) {
 ```java
 @PostMapping("/upload")
 public String uploadFile(@RequestParam("file") MultipartFile file) {
-    String uniqueFileName = UUID.randomUUID().toString() + ".tmp";
-    try {
-        File dest = new File("/var/www/uploads/" + uniqueFileName);
-        file.transferTo(dest);
-        return "File uploaded successfully";
-    } catch (IOException e) {
-        return "File upload failed";
-    }
+String uniqueFileName = UUID.randomUUID().toString() + ".tmp";
+try {
+File dest = new File("/var/www/uploads/" + uniqueFileName);
+file.transferTo(dest);
+return "File uploaded successfully";
+} catch (IOException e) {
+return "File upload failed";
+}
 }
 ```
 
@@ -92,4 +91,71 @@ alert $output for {
 	level: "mid",
 	title: "Audit Spring MultipartFile TransferTo Target",
 	title_zh: "审计 Spring MultipartFile TransferTo 目标",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 验证目标路径的安全性
+在调用 `transferTo` 方法之前，必须对目标路径进行严格验证，以确保不会出现路径穿越或其他非法操作。例如，禁止路径中包含 `../` 等特殊字符。
+```java
+@PostMapping("/upload")
+public String uploadFile(@RequestParam("file") MultipartFile file) {
+    String fileName = file.getOriginalFilename();
+    if (fileName == null || fileName.contains("..")) {
+        return "Invalid file name";
+    }
+    try {
+        File dest = new File("/var/www/uploads/" + fileName);
+        file.transferTo(dest);
+        return "File uploaded successfully";
+    } catch (IOException e) {
+        return "File upload failed";
+    }
+}
+```
+#### 2. 使用安全的文件存储机制
+避免直接使用用户提供的文件名作为存储目标，应生成随机唯一标识符作为文件名。
+```java
+@PostMapping("/upload")
+public String uploadFile(@RequestParam("file") MultipartFile file) {
+    String uniqueFileName = UUID.randomUUID().toString() + ".tmp";
+    try {
+        File dest = new File("/var/www/uploads/" + uniqueFileName);
+        file.transferTo(dest);
+        return "File uploaded successfully";
+    } catch (IOException e) {
+        return "File upload failed";
+    }
+}
+```
+#### 3. 设置文件上传目录权限
+限制上传目录的写入权限，确保只有应用程序运行用户能够修改其中的内容。同时，定期清理过期文件以减少潜在风险。
+#### 4. 日志记录与监控
+对文件上传行为进行日志记录，并实时监控异常事件（如大文件上传、频繁上传等），以便快速响应潜在威胁。
+SOLUTION
+	risk: "任意文件上传",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+   Spring Framework 中 `MultipartFile` 的 `transferTo` 方法用于将上传的文件传输到指定的目标位置。如果未对目标路径或文件名进行严格的校验，攻击者可能通过构造恶意文件名（如包含路径穿越字符 `../`）覆盖系统关键文件，从而导致任意文件上传漏洞。
+2. **触发场景**
+   ```java
+   @PostMapping("/upload")
+   public String uploadFile(@RequestParam("file") MultipartFile file) {
+       try {
+           // 潜在危险的目标路径
+           File dest = new File("/var/www/uploads/" + file.getOriginalFilename());
+           file.transferTo(dest);  // 直接使用原始文件名可能导致路径污染漏洞
+           return "File uploaded successfully";
+       } catch (IOException e) {
+           return "File upload failed";
+       }
+   }
+   ```
+   在此示例中，攻击者可以通过构造恶意文件名（如 `../../etc/passwd`）覆盖系统关键文件。
+3. **潜在影响**
+   - 攻击者可能上传恶意文件，例如 WebShell、病毒等，进一步控制服务器。
+   - 覆盖系统关键文件（如 `/etc/passwd`）可能导致系统崩溃或权限提升。
+   - 未经授权的文件操作可能导致数据泄露或服务中断。
+DESC
+	name: "output",
+	message: "检测到 Java Spring MultipartFile TransferTo 方法调用，可能存在未授权访问或路径穿越风险。",
 }

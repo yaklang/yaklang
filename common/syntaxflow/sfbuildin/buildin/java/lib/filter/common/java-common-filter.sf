@@ -6,25 +6,21 @@ desc(
 	rule_id: "ec23bb9d-7756-4c8a-86ff-ce140f205209"
 	desc: <<<DESC
 ### 1. 规则目的
-
 该规则旨在识别 Java 代码中可能的安全过滤、验证或净化方法。通过匹配常见的方法命名模式（如 sanitize、filter、escape 等），该规则可以帮助安全审计人员或自动化工具快速定位可能处理用户输入或敏感数据的代码点。
 
 ### 2. 规则详细
-
 1. **作为基础检测库**
-
-   属于 `java-common-filter` 库规则 (`lib` 类型)，通常需要与其他规则（如污点跟踪规则）结合使用，以确定这些方法是否被用于有效防御常见的 Web 安全漏洞，例如跨站脚本 (XSS) 或 SQL 注入。
+属于 `java-common-filter` 库规则 (`lib` 类型)，通常需要与其他规则（如污点跟踪规则）结合使用，以确定这些方法是否被用于有效防御常见的 Web 安全漏洞，例如跨站脚本 (XSS) 或 SQL 注入。
 
 2. **覆盖常见方法命名模式**
+规则通过正则表达式 `/ (?i).*(sanitize|filter|escape|clean|validate|check|secure|scrub|strip|encode|decode|prevent|safe|block|remove|replace|purge|whitelist|blacklist|neutralize|defense|harden|mitigate).*/` 匹配方法名称，覆盖了大量表示过滤、验证或安全处理操作的英文单词。不区分大小写，提高了匹配范围。
 
-   规则通过正则表达式 `/ (?i).*(sanitize|filter|escape|clean|validate|check|secure|scrub|strip|encode|decode|prevent|safe|block|remove|replace|purge|whitelist|blacklist|neutralize|defense|harden|mitigate).*/` 匹配方法名称，覆盖了大量表示过滤、验证或安全处理操作的英文单词。不区分大小写，提高了匹配范围。
-
-   ```java
-   // 示例代码：可能被规则识别的方法名
-   String safeInput = SecurityUtil.sanitizeHtml(userInput);
-   boolean isValid = InputValidator.validateEmail(email);
-   String encodedUrl = URLEncoder.encode(rawUrl, "UTF-8");
-   ```
+```java
+// 示例代码：可能被规则识别的方法名
+String safeInput = SecurityUtil.sanitizeHtml(userInput);
+boolean isValid = InputValidator.validateEmail(email);
+String encodedUrl = URLEncoder.encode(rawUrl, "UTF-8");
+```
 
 通过识别这些潜在的安全处理方法，可以进一步分析其实现是否健壮，以及它们是否在关键位置被正确调用。
 DESC
@@ -40,5 +36,45 @@ REFERENCE
 alert $output for {
 	title: "Find Java Common Filter Methods",
 	title_zh: "查找Java过滤方法",
-	level: "mid",
+	level: "info",
+	message: "发现Java代码中可能的安全过滤、验证或净化方法。",
+	solution: <<<SOLUTION
+### 安全建议
+目前该规则仅用于识别潜在的过滤、验证或安全处理方法，无需直接修复。但需进一步分析这些方法的实现是否健壮，以及它们是否在关键位置被正确调用。
+
+#### 分析建议
+1. **检查方法实现**
+   确保这些方法对用户输入进行了足够的验证和清理。例如：
+   ```java
+   public static String sanitizeHtml(String input) {
+       if (input == null) return "";
+       return input.replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+   }
+   ```
+2. **结合上下文审计**
+   结合污点跟踪规则，确认这些方法是否有效防御了常见的Web安全漏洞（如XSS或SQL注入）。
+3. **关注命名模式**
+   检查是否有其他未被规则覆盖的过滤方法，并将其添加到规则中以扩展覆盖率。
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 1. 规则目的
+该规则旨在识别 Java 代码中可能的安全过滤、验证或净化方法。通过匹配常见的方法命名模式（如 sanitize、filter、escape 等），该规则可以帮助安全审计人员或自动化工具快速定位可能处理用户输入或敏感数据的代码点。
+
+### 2. 规则详细
+1. **作为基础检测库**
+属于 `java-common-filter` 库规则 (`lib` 类型)，通常需要与其他规则（如污点跟踪规则）结合使用，以确定这些方法是否被用于有效防御常见的 Web 安全漏洞，例如跨站脚本 (XSS) 或 SQL 注入。
+
+2. **覆盖常见方法命名模式**
+规则通过正则表达式 `/ (?i).*(sanitize|filter|escape|clean|validate|check|secure|scrub|strip|encode|decode|prevent|safe|block|remove|replace|purge|whitelist|blacklist|neutralize|defense|harden|mitigate).*/` 匹配方法名称，覆盖了大量表示过滤、验证或安全处理操作的英文单词。不区分大小写，提高了匹配范围。
+
+```java
+// 示例代码：可能被规则识别的方法名
+String safeInput = SecurityUtil.sanitizeHtml(userInput);
+boolean isValid = InputValidator.validateEmail(email);
+String encodedUrl = URLEncoder.encode(rawUrl, "UTF-8");
+```
+通过识别这些潜在的安全处理方法，可以进一步分析其实现是否健壮，以及它们是否在关键位置被正确调用。
+DESC
+	name: "output",
 }

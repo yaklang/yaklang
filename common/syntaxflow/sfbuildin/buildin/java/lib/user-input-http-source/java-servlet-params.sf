@@ -4,68 +4,53 @@ desc(
 	lib: 'java-servlet-param'
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   在Java Servlet应用程序中，用户输入通过`HttpServletRequest`对象的各种方法（如`getParameter()`、`getInputStream()`等）被获取。如果这些输入未经严格验证或清理，可能成为污点源，导致安全风险，例如SQL注入、跨站脚本攻击（XSS）、命令注入等。
-
+在Java Servlet应用程序中，用户输入通过`HttpServletRequest`对象的各种方法（如`getParameter()`、`getInputStream()`等）被获取。如果这些输入未经严格验证或清理，可能成为污点源，导致安全风险，例如SQL注入、跨站脚本攻击（XSS）、命令注入等。
 2. **触发场景**
-   ```java
-   import javax.servlet.http.HttpServletRequest;
-
-   class Demo {
-      public void vulnerableMethod(HttpServletRequest request) {
-          String userInput = request.getParameter("input"); // 用户控制的输入
-          String sql = "SELECT * FROM users WHERE username = '" + userInput + "'"; // 直接拼接用户输入
-          // 执行SQL语句 (潜在SQL注入风险)
-      }
-   }
-   ```
-   攻击者可以提供恶意输入，如 `'; DROP TABLE users; --`，从而篡改SQL语句逻辑，导致数据泄露或破坏。
-
+```java
+import javax.servlet.http.HttpServletRequest;
+class Demo {
+    public void vulnerableMethod(HttpServletRequest request) {
+        String userInput = request.getParameter("input"); // 用户控制的输入
+        String sql = "SELECT * FROM users WHERE username = '" + userInput + "'"; // 直接拼接用户输入
+        // 执行SQL语句 (潜在SQL注入风险)
+    }
+}
+```
+攻击者可以提供恶意输入，如 `'; DROP TABLE users; --`，从而篡改SQL语句逻辑，导致数据泄露或破坏。
 3. **潜在影响**
-   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
-   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
-   - 通过跨站脚本攻击（XSS）窃取用户会话或执行恶意脚本。
-   - 命令注入可能导致服务器被完全控制。
-
+- 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+- 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+- 通过跨站脚本攻击（XSS）窃取用户会话或执行恶意脚本。
+- 命令注入可能导致服务器被完全控制。
 ### 规则目的
 此规则旨在审计Java Servlet应用程序中获取用户输入的关键API，识别潜在的未经验证/未清理的数据来源。通过检测`HttpServletRequest`对象的参数获取方法，帮助安全分析人员快速定位用户控制的数据输入点，为后续的数据流分析和漏洞挖掘提供基础。
-
 ### 规则详细
 1. **定位HTTP请求参数**
-   该规则主要关注以下两种获取HTTP请求参数的方式：
-   - 直接调用`HttpServletRequest.getParameter()`系列方法，获取URL查询参数、表单参数等。
-   - 通过`HttpServletRequest.getInputStream()`方法读取HTTP请求体原始数据，常用于处理POST请求中的非表单数据（如JSON、XML等）。
-
+该规则主要关注以下两种获取HTTP请求参数的方式：
+- 直接调用`HttpServletRequest.getParameter()`系列方法，获取URL查询参数、表单参数等。
+- 通过`HttpServletRequest.getInputStream()`方法读取HTTP请求体原始数据，常用于处理POST请求中的非表单数据（如JSON、XML等）。
 2. **识别会话信息**
-   虽然会话信息（通过`HttpServletRequest.getSession()`获取）通常被认为是服务器端管理的，但其内容可能依赖于用户输入（如会话ID来自Cookie、URL参数等），且敏感数据可能存储在会话中。因此，识别`getSession()`调用有助于全面理解用户相关数据的来源和流向。
-
+虽然会话信息（通过`HttpServletRequest.getSession()`获取）通常被认为是服务器端管理的，但其内容可能依赖于用户输入（如会话ID来自Cookie、URL参数等），且敏感数据可能存储在会话中。因此，识别`getSession()`调用有助于全面理解用户相关数据的来源和流向。
 3. **作为基础输入库**
-   此规则属于`java-servlet-param`库规则（`lib`类型）。它本身不直接报告漏洞，而是作为数据流分析的起点。其检测到的输入源（如`getParameter`、`getInputStream`的返回值）会被标记为“taint source”（污点源），供后续的“污点传播”规则使用，以判断这些用户输入是否未经恰当处理就流入敏感操作（如数据库查询、命令执行、输出到页面等），从而检测SQL注入、XSS、命令注入等漏洞。
-
+此规则属于`java-servlet-param`库规则（`lib`类型）。它本身不直接报告漏洞，而是作为数据流分析的起点。其检测到的输入源（如`getParameter`、`getInputStream`的返回值）会被标记为“taint source”（污点源），供后续的“污点传播”规则使用，以判断这些用户输入是否未经恰当处理就流入敏感操作（如数据库查询、命令执行、输出到页面等），从而检测SQL注入、XSS、命令注入等漏洞。
 4. **覆盖范围**
-   规则覆盖了`HttpServletRequest`对象在其各种请求处理方法（如`doGet`, `doPost`, `doPut`, `doDelete`, `doFilter`, `service`）中获取请求参数的常见方式。
-
+规则覆盖了`HttpServletRequest`对象在其各种请求处理方法（如`doGet`, `doPost`, `doPut`, `doDelete`, `doFilter`, `service`）中获取请求参数的常见方式。
 5. **示例代码说明**
-   在提供的示例代码 `file://demo.java` 中，`request.getParameter("ip")` 调用被规则识别为一个用户输入点。这个返回值 `ip` 将被标记为污点源，后续如果 `ip` 在没有经过安全处理（如输入校验、转义）的情况下被用于执行数据库查询或系统命令等危险操作，则会被更高级的漏洞规则检测出来。
+在提供的示例代码 `file://demo.java` 中，`request.getParameter("ip")` 调用被规则识别为一个用户输入点。这个返回值 `ip` 将被标记为污点源，后续如果 `ip` 在没有经过安全处理（如输入校验、转义）的情况下被用于执行数据库查询或系统命令等危险操作，则会被更高级的漏洞规则检测出来。
 DESC
 	rule_id: "a258e671-339e-4d8f-af91-e2493a4e91dd"
 	title_zh: "审计Java Servlet用户输入"
 	solution: <<<SOLUTION
 ### 修复建议
-
 此规则用于审计用户输入源，本身不指示具体漏洞，因此无直接的漏洞修复建议。然而，为了**安全地处理检测到的用户输入**，针对后续可能发现的漏洞，提供以下通用的安全建议：
-
 #### 1. 对用户输入进行严格的输入验证（Input Validation）
-
 在接收到用户的任何输入后，都应该首先对其进行严格验证。验证应包括：
-
 - **类型验证**：确保输入数据符合预期的类型（如数字、字符串、日期等）。
 - **格式验证**：使用正则表达式或其他方式检查输入数据的特定格式（如邮箱格式、电话号码格式、文件上传时文件名/类型格式等）。
 - **长度验证**：限制输入字符串的长度，防止缓冲区溢出或拒绝服务攻击。
 - **范围验证**：对于数值或日期等输入，检查其值是否在允许的范围内。
 - **字符集验证**：限制允许的字符集，过滤掉潜在的恶意字符（如控制字符、特殊符号）。
-
 ```java
 // 示例：验证输入是否为数字且在特定范围内
 String userIdStr = request.getParameter("userId");
@@ -81,48 +66,34 @@ try {
     throw new IllegalArgumentException("Invalid user ID format.");
 }
 ```
-
 #### 2. 对用户输入进行适当的编码或转义（Output Encoding/Escaping）
-
 在将用户输入输出到HTML页面、SQL查询、操作系统命令、日志文件等位置之前，必须根据输出的上下文进行适当的编码或转义，以确保输入中的特殊字符不会被解释为代码。
-
 - **HTML输出**：使用HTML实体编码库（如OWASP ESAPI、Apache Commons Text的StringEscapeUtils）对 `<>&"'` 等字符进行编码，防止XSS。
-
-    ```java
-    // 示例：HTML输出编码
-    String userInput = request.getParameter("comment");
-    // 在输出到HTML页面之前进行编码
-    String safeComment = org.owasp.esapi.ESAPI.encoder().encodeForHTML(userInput);
-    response.getWriter().write("<div>" + safeComment + "</div>");
-    ```
-
+```java
+// 示例：HTML输出编码
+String userInput = request.getParameter("comment");
+// 在输出到HTML页面之前进行编码
+String safeComment = org.owasp.esapi.ESAPI.encoder().encodeForHTML(userInput);
+response.getWriter().write("<div>" + safeComment + "</div>");
+```
 - **SQL查询**：**强烈推荐**使用参数化查询（PreparedStatement或ORM框架），而非手动拼接带有用户输入的SQL字符串。这是防御SQL注入最有效的方式。
-
-    ```java
-    // 示例：使用PreparedStatement防止SQL注入
-    String username = request.getParameter("username");
-    String sql = "SELECT * FROM users WHERE username = ?";
-    try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-        pstmt.setString(1, username); // 参数化设置用户输入
-        ResultSet rs = pstmt.executeQuery();
-        // 处理结果
-    }
-    ```
-
+```java
+// 示例：使用PreparedStatement防止SQL注入
+String username = request.getParameter("username");
+String sql = "SELECT * FROM users WHERE username = ?";
+try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+    pstmt.setString(1, username); // 参数化设置用户输入
+    ResultSet rs = pstmt.executeQuery();
+    // 处理结果
+}
+```
 - **命令执行**：避免直接将用户输入拼接到操作系统命令。如果必须执行外部命令，应使用安全的API（如`ProcessBuilder`）并通过参数列表而非单一字符串传递用户输入，并对输入进行严格白名单限制。
-
 - **LDAP查询**：对用于LDAP查询的用户输入进行适当的LDAP转义。
-
 - **日志输出**：对用户输入进行日志格式的转义，防止日志注入。
-
 #### 3. 采用白名单过滤机制
-
 在某些情况下，相比于复杂的黑名单过滤，采用白名单机制更为安全可靠。即只允许输入符合预定义安全列表的值，拒绝所有其他输入。
-
 例如，对于用户选择的国家、省份等，应提供下拉列表，后端只接受预设列表中的值。
-
 #### 4. 最小权限原则
-
 确保数据库连接、文件操作、系统命令执行等操作使用的账户或进程只拥有完成其功能所需的最小权限。
 SOLUTION
 	reference: <<<REFERENCE
@@ -145,7 +116,102 @@ $directParam + $indirectParam + $getInputStream +$getSession as $output;
 alert $output for {
 	title: "Audit Java Servlet User Input",
 	title_zh: "审计Java Servlet用户输入",
-	level: "mid",
+	level: "info",
+	risk: "信息",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+在Java Servlet应用程序中，用户输入通过`HttpServletRequest`对象的各种方法（如`getParameter()`、`getInputStream()`等）被获取。如果这些输入未经严格验证或清理，可能成为污点源，导致安全风险，例如SQL注入、跨站脚本攻击（XSS）、命令注入等。
+2. **触发场景**
+```java
+import javax.servlet.http.HttpServletRequest;
+class Demo {
+public void vulnerableMethod(HttpServletRequest request) {
+String userInput = request.getParameter("input"); // 用户控制的输入
+String sql = "SELECT * FROM users WHERE username = '" + userInput + "'"; // 直接拼接用户输入
+// 执行SQL语句 (潜在SQL注入风险)
+}
+}
+```
+攻击者可以提供恶意输入，如 `'; DROP TABLE users; --`，从而篡改SQL语句逻辑，导致数据泄露或破坏。
+3. **潜在影响**
+- 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+- 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+- 通过跨站脚本攻击（XSS）窃取用户会话或执行恶意脚本。
+- 命令注入可能导致服务器被完全控制。
+### 规则目的
+此规则旨在审计Java Servlet应用程序中获取用户输入的关键API，识别潜在的未经验证/未清理的数据来源。通过检测`HttpServletRequest`对象的参数获取方法，帮助安全分析人员快速定位用户控制的数据输入点，为后续的数据流分析和漏洞挖掘提供基础。
+### 规则详细
+1. **定位HTTP请求参数**
+该规则主要关注以下两种获取HTTP请求参数的方式：
+- 直接调用`HttpServletRequest.getParameter()`系列方法，获取URL查询参数、表单参数等。
+- 通过`HttpServletRequest.getInputStream()`方法读取HTTP请求体原始数据，常用于处理POST请求中的非表单数据（如JSON、XML等）。
+2. **识别会话信息**
+虽然会话信息（通过`HttpServletRequest.getSession()`获取）通常被认为是服务器端管理的，但其内容可能依赖于用户输入（如会话ID来自Cookie、URL参数等），且敏感数据可能存储在会话中。因此，识别`getSession()`调用有助于全面理解用户相关数据的来源和流向。
+3. **作为基础输入库**
+此规则属于`java-servlet-param`库规则（`lib`类型）。它本身不直接报告漏洞，而是作为数据流分析的起点。其检测到的输入源（如`getParameter`、`getInputStream`的返回值）会被标记为“taint source”（污点源），供后续的“污点传播”规则使用，以判断这些用户输入是否未经恰当处理就流入敏感操作（如数据库查询、命令执行、输出到页面等），从而检测SQL注入、XSS、命令注入等漏洞。
+4. **覆盖范围**
+规则覆盖了`HttpServletRequest`对象在其各种请求处理方法（如`doGet`, `doPost`, `doPut`, `doDelete`, `doFilter`, `service`）中获取请求参数的常见方式。
+5. **示例代码说明**
+在提供的示例代码 `file://demo.java` 中，`request.getParameter("ip")` 调用被规则识别为一个用户输入点。这个返回值 `ip` 将被标记为污点源，后续如果 `ip` 在没有经过安全处理（如输入校验、转义）的情况下被用于执行数据库查询或系统命令等危险操作，则会被更高级的漏洞规则检测出来。
+DESC
+	name: "output",
+	message: "发现Java Servlet用户输入的审计规则，用于识别未经验证/未清理的数据来源。",
+	solution: <<<SOLUTION
+### 修复建议
+此规则用于审计用户输入源，本身不指示具体漏洞，因此无直接的漏洞修复建议。然而，为了**安全地处理检测到的用户输入**，针对后续可能发现的漏洞，提供以下通用的安全建议：
+#### 1. 对用户输入进行严格的输入验证（Input Validation）
+在接收到用户的任何输入后，都应该首先对其进行严格验证。验证应包括：
+- **类型验证**：确保输入数据符合预期的类型（如数字、字符串、日期等）。
+- **格式验证**：使用正则表达式或其他方式检查输入数据的特定格式（如邮箱格式、电话号码格式、文件上传时文件名/类型格式等）。
+- **长度验证**：限制输入字符串的长度，防止缓冲区溢出或拒绝服务攻击。
+- **范围验证**：对于数值或日期等输入，检查其值是否在允许的范围内。
+- **字符集验证**：限制允许的字符集，过滤掉潜在的恶意字符（如控制字符、特殊符号）。
+```java
+// 示例：验证输入是否为数字且在特定范围内
+String userIdStr = request.getParameter("userId");
+try {
+int userId = Integer.parseInt(userIdStr);
+if (userId < 1 || userId > 1000) {
+// 处理非法范围错误
+throw new IllegalArgumentException("User ID out of valid range.");
+}
+// 使用合法的 userId 进行后续操作
+} catch (NumberFormatException e) {
+// 处理非数字格式错误
+throw new IllegalArgumentException("Invalid user ID format.");
+}
+```
+#### 2. 对用户输入进行适当的编码或转义（Output Encoding/Escaping）
+在将用户输入输出到HTML页面、SQL查询、操作系统命令、日志文件等位置之前，必须根据输出的上下文进行适当的编码或转义，以确保输入中的特殊字符不会被解释为代码。
+- **HTML输出**：使用HTML实体编码库（如OWASP ESAPI、Apache Commons Text的StringEscapeUtils）对 `<>&"'` 等字符进行编码，防止XSS。
+```java
+// 示例：HTML输出编码
+String userInput = request.getParameter("comment");
+// 在输出到HTML页面之前进行编码
+String safeComment = org.owasp.esapi.ESAPI.encoder().encodeForHTML(userInput);
+response.getWriter().write("<div>" + safeComment + "</div>");
+```
+- **SQL查询**：**强烈推荐**使用参数化查询（PreparedStatement或ORM框架），而非手动拼接带有用户输入的SQL字符串。这是防御SQL注入最有效的方式。
+```java
+// 示例：使用PreparedStatement防止SQL注入
+String username = request.getParameter("username");
+String sql = "SELECT * FROM users WHERE username = ?";
+try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+pstmt.setString(1, username); // 参数化设置用户输入
+ResultSet rs = pstmt.executeQuery();
+// 处理结果
+}
+```
+- **命令执行**：避免直接将用户输入拼接到操作系统命令。如果必须执行外部命令，应使用安全的API（如`ProcessBuilder`）并通过参数列表而非单一字符串传递用户输入，并对输入进行严格白名单限制。
+- **LDAP查询**：对用于LDAP查询的用户输入进行适当的LDAP转义。
+- **日志输出**：对用户输入进行日志格式的转义，防止日志注入。
+#### 3. 采用白名单过滤机制
+在某些情况下，相比于复杂的黑名单过滤，采用白名单机制更为安全可靠。即只允许输入符合预定义安全列表的值，拒绝所有其他输入。
+例如，对于用户选择的国家、省份等，应提供下拉列表，后端只接受预设列表中的值。
+#### 4. 最小权限原则
+确保数据库连接、文件操作、系统命令执行等操作使用的账户或进程只拥有完成其功能所需的最小权限。
+SOLUTION
 }
 
 

@@ -5,58 +5,72 @@ desc(
 	level: low
 	risk: "file-upload"
 	desc: <<<DESC
-该规则用于审计Beego框架中Golang文件上传功能的安全性。它通过检查文件上传功能是否对用户上传的文件类型进行了限制，以防止上传可执行文件或其他危险类型的文件。未授权的文件上传可能导致服务器被攻击者上传恶意文件，从而被用于进一步的攻击，如远程代码执行、信息泄露等。规则详细如下：
+### 漏洞描述
 
-### 1. 规则目的
-该规则用于审计Beego框架中Golang文件上传功能的安全性。它通过检查文件上传功能是否对用户上传的文件类型进行了限制，以防止上传可执行文件或其他危险类型的文件。未授权的文件上传可能导致服务器被攻击者上传恶意文件，从而被用于进一步的攻击，如远程代码执行、信息泄露等。
+1. **漏洞原理**
+   文件上传漏洞（CWE-434）是指应用程序未能限制用户上传的文件类型，导致攻击者能够上传恶意文件（如可执行脚本、病毒等）。一旦这些文件被服务器处理或执行，可能导致远程代码执行、信息泄露或其他进一步的安全威胁。
 
-### 2. 规则详细
+2. **触发场景**
+   在Beego框架中，如果开发者未对上传的文件进行严格的类型验证，攻击者可以利用文件上传功能上传危险类型的文件。例如，以下存在漏洞的代码示例展示了未验证文件类型导致的潜在风险：
+   ```go
+   func (c *FileUploadController) Post() {
+       _, h, err := c.GetFile("file")
+       if err != nil {
+           panic(err)
+       }
+       savePath := "static/upload/" + h.Filename
+       c.SaveToFile("file", savePath)
+   }
+   ```
+   攻击者可以上传包含恶意脚本的文件（如`.php`、`.exe`），从而危害系统安全。
+
+3. **潜在影响**
+   - 攻击者可能通过上传恶意文件实现远程代码执行，控制服务器。
+   - 敏感数据可能被窃取或篡改。
+   - 系统性能可能因恶意文件而降低，甚至崩溃。
+
+### 规则目的
+该规则用于审计Beego框架中Golang文件上传功能的安全性，确保开发者对上传的文件类型进行了严格限制，防止上传危险类型的文件。
+
+### 规则详细
 1. **作为基础检测库**
-属于`golang-file-upload-beego`库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测文件上传漏洞，提供核心函数识别能力。
+   属于`golang-file-upload-beego`库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测文件上传漏洞，提供核心函数识别能力。
+
 2. **覆盖高危输出函数**
-检测以下函数：`GetFile`, `SaveToFile`。
+   检测以下函数：`GetFile`, `SaveToFile`。
 DESC
 	rule_id: "97bfc6e2-1e57-4329-87f7-5d61ca92b26b"
 	solution: <<<SOLUTION
 为了避免文件上传漏洞，应该对上传的文件类型进行严格的限制。可以在上传文件之前，检查文件的MIME类型或文件扩展名，确保它们不在危险类型的列表中。此外，还可以设置一个允许上传的文件类型白名单，只允许用户上传特定类型的文件。例如，可以使用以下代码对上传的文件类型进行限制：
-
 ```go
-// 修复代码示例
 func (c *FileUploadController) Post() {
-	// 获取文件
-	_, h, err := c.GetFile("file")
-	if err != nil {
-		// 错误处理
-		return
-	}
-
-	// 检查文件类型
-	if !isValidFileType(h.Filename) {
-		// 文件类型不合法，拒绝上传
-		return
-	}
-
-	// 保存文件
-	c.SaveToFile("file", savePath)
+    _, h, err := c.GetFile("file")
+    if err != nil {
+        return
+    }
+    if !isValidFileType(h.Filename) {
+        return
+    }
+    c.SaveToFile("file", savePath)
 }
 
-// 检查文件类型是否合法
 func isValidFileType(filename string) bool {
-	// 设置允许上传的文件类型白名单
-	allowedTypes := []string{.pdf", "image/jpeg", "image/png"}
-	// 获取文件MIME类型
-	contentType := mime.TypeByExtension(path.Ext(filename))
-	// 检查MIME类型是否在白名单中
-	for _, allowedType := range allowedTypes {
-		if contentType == allowedType {
-			return true
-		}
-	}
-	return false
+    allowedTypes := []string{"application/pdf", "image/jpeg", "image/png"}
+    contentType := mime.TypeByExtension(path.Ext(filename))
+    for _, allowedType := range allowedTypes {
+        if contentType == allowedType {
+            return true
+        }
+    }
+    return false
 }
 ```
+此外，建议对上传的文件进行存储隔离，并在必要时使用专业的安全工具扫描文件，以检测是否存在恶意代码或病毒。
+#### 其他修复建议
+- 避免直接将用户输入拼接到文件路径中，防止路径穿越攻击。
+- 对上传文件的大小进行限制，避免上传超大文件耗尽服务器资源。
+- 将上传的文件保存到非Web可访问目录，或对文件下载进行权限控制。
 
-此外，还可以使用专业的安全工具对上传的文件进行扫描，以检测是否存在恶意代码或病毒。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-434: Unrestricted Upload of File with Dangerous Type](https://cwe.mitre.org/data/definitions/434.html)
@@ -74,6 +88,70 @@ alert $low for {
 	level: "low",
 	type: "vuln",
 	title: "Check Golang File Upload Vulnerability",
+	solution: <<<SOLUTION
+### 修复建议
+为了避免文件上传漏洞，应该对上传的文件类型进行严格的限制。可以在上传文件之前，检查文件的MIME类型或文件扩展名，确保它们不在危险类型的列表中。此外，还可以设置一个允许上传的文件类型白名单，只允许用户上传特定类型的文件。例如，可以使用以下代码对上传的文件类型进行限制：
+```go
+// 修复代码示例
+func (c *FileUploadController) Post() {
+// 获取文件
+_, h, err := c.GetFile("file")
+if err != nil {
+// 错误处理
+return
+}
+// 检查文件类型
+if !isValidFileType(h.Filename) {
+// 文件类型不合法，拒绝上传
+return
+}
+// 保存文件
+c.SaveToFile("file", savePath)
+}
+// 检查文件类型是否合法
+func isValidFileType(filename string) bool {
+// 设置允许上传的文件类型白名单
+allowedTypes := []string{".pdf", "image/jpeg", "image/png"}
+// 获取文件MIME类型
+contentType := mime.TypeByExtension(path.Ext(filename))
+// 检查MIME类型是否在白名单中
+for _, allowedType := range allowedTypes {
+if contentType == allowedType {
+return true
+}
+}
+return false
+}
+```
+此外，还可以使用专业的安全工具对上传的文件进行扫描，以检测是否存在恶意代码或病毒。
+SOLUTION
+	risk: "文件上传",
+	desc: <<<DESC
+### 规则描述
+1. **规则原理**
+该规则用于审计Beego框架中Golang文件上传功能的安全性。它通过检查文件上传功能是否对用户上传的文件类型进行了限制，以防止上传可执行文件或其他危险类型的文件。未授权的文件上传可能导致服务器被攻击者上传恶意文件，从而被用于进一步的攻击，如远程代码执行、信息泄露等。
+2. **触发场景**
+示例代码如下：
+```go
+func (c *FileUploadVuln1Controller) Post() {
+userid := c.GetString("userid")
+_, h, err := c.GetFile("file")
+if err != nil {
+panic(err)
+}
+savePath := "static/upload/" + userid + fmt.Sprint(time.Now().Unix()) + h.Filename
+c.SaveToFile("file", savePath)
+c.Data["savePath"] = savePath
+c.TplName = "fileUpload.tpl"
+}
+```
+在此代码中，未对上传的文件类型进行验证，攻击者可能上传恶意可执行文件，造成安全隐患。
+3. **潜在影响**
+- 攻击者可能利用上传功能上传恶意文件（如WebShell）并执行远程代码。
+- 可能导致敏感信息泄露或服务器权限被完全控制。
+DESC
+	name: "low",
+	message: "检测到Beego框架中Golang文件上传功能未对用户上传的文件类型进行限制，可能导致未授权文件上传风险。",
 }
 
 desc(

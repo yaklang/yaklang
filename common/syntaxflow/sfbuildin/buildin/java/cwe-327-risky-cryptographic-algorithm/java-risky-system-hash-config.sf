@@ -6,29 +6,23 @@ desc(
 	risk:'risky_crypt'
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 应用程序通过 `System.setProperty()` 方法配置了过时、已知存在漏洞或计算效率低下的哈希算法（如 MD5, SHA-1 等），而不是使用当前推荐的安全哈希算法（如 SHA-256, SHA-384, SHA-512）。这些弱哈希算法容易受到碰撞攻击，攻击者可能通过构造与合法数据具有相同哈希值的恶意数据，从而绕过安全检查、篡改数据完整性或破坏认证机制。此外，对于存储密码等敏感信息，使用弱哈希算法会增加彩虹表攻击和暴力破解的风险。
-
 2. **触发场景**
 当 Java 应用程序使用了 `System.setProperty()` 方法，并且将 `jasypt.encryptor.algorithm` 等与加密算法相关的系统属性值设置为不安全的哈希算法名称时，就会触发此风险。常见的触发位置可能在应用程序的初始化阶段或配置加载模块。
-
 **示例代码：**
 ```java
 import java.util.HashMap;
 import java.util.Map;
-
 public class InsecureHashConfig {
-    public static void main(String[] args) {
-        // 使用 System.setProperty() 方法配置不安全的哈希函数 (MD5)
-        System.setProperty("jasypt.encryptor.algorithm", "MD5"); // -- 风险点
-
-        String password = "mysecretpassword";
-        // ... 使用哈希算法处理password ... 
-    }
+public static void main(String[] args) {
+// 使用 System.setProperty() 方法配置不安全的哈希函数 (MD5)
+System.setProperty("jasypt.encryptor.algorithm", "MD5"); // -- 风险点
+String password = "mysecretpassword";
+// ... 使用哈希算法处理password ...
+}
 }
 ```
-
 3. **潜在影响**
 * **数据完整性被破坏：** 攻击者可以制造与合法文件或数据具有相同哈希值的恶意版本，从而绕过完整性检查。
 * **认证绕过：** 在依赖哈希进行认证的场景下（例如密码哈希比较），弱哈希算法可能导致攻击者通过碰撞攻击伪造认证凭据。
@@ -38,10 +32,8 @@ DESC
 	rule_id: "5cecf8dd-4ba1-4de2-9b7c-2cb55bc7b0cd"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用强哈希算法
 将系统属性或配置中指定的哈希算法更换为当前业界推荐的安全算法，例如 SHA-256、SHA-384 或 SHA-512。
-
 **修复代码示例：**
 将不安全的配置行：
 ```java
@@ -51,25 +43,19 @@ System.setProperty("jasypt.encryptor.algorithm", "MD5");
 ```java
 System.setProperty("jasypt.encryptor.algorithm", "SHA-256");
 ```
-
 #### 2. 结合 Salt 使用密码哈希
 对存储密码等敏感信息时，除了使用强哈希算法外，还应引入随机生成的 Salt。Salt 应该与哈希值一起存储，并在验证时使用。这可以防御彩虹表攻击，并使得攻击者必须为每个密码单独进行暴力破解。
-
 **修复代码示例（概念性）：**
 对于 Jasypt，确保使用了 Salt：
 ```java
 import org.jasypt.util.password.StrongPasswordEncryptor;
-
 // 使用 StrongPasswordEncryptor 或其他支持 Salt 的实现
 StrongPasswordEncryptor passwordEncryptor = new StrongPasswordEncryptor();
-
 // 哈希密码（会自动生成 Salt）
 String hashedPassword = passwordEncryptor.encryptPassword("mysecretpassword");
-
 // 验证密码
 boolean success = passwordEncryptor.checkPassword("inputpassword", hashedPassword);
 ```
-
 #### 3. 移除不必要的系统属性配置
 审查代码，确认是否确实需要通过 `System.setProperty()` 来动态配置哈希算法。如果可能，优先通过框架或库提供的标准配置方式来指定算法，这些方式通常提供了更好的安全默认值或更明确的配置选项。
 SOLUTION

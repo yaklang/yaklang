@@ -6,59 +6,51 @@ desc(
 	risk: 'ldap-injection'
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   LDAP注入攻击是一种利用应用程序未对用户输入进行适当过滤或转义的缺陷，通过构造恶意的LDAP查询来非法访问或操纵目录服务器数据的行为。在PHP应用中，如果开发者直接将未经验证的用户输入拼接到LDAP查询语句中，则可能导致LDAP注入漏洞。这种漏洞与SQL注入类似，但其危害范围集中在LDAP服务上。
-
+LDAP注入攻击是一种利用应用程序未对用户输入进行适当过滤或转义的缺陷，通过构造恶意的LDAP查询来非法访问或操纵目录服务器数据的行为。在PHP应用中，如果开发者直接将未经验证的用户输入拼接到LDAP查询语句中，则可能导致LDAP注入漏洞。这种漏洞与SQL注入类似，但其危害范围集中在LDAP服务上。
 2. **触发场景**
-   当应用程序从用户接收输入，并将其用于构建LDAP查询时，若未对输入进行有效过滤或转义，就可能发生LDAP注入。例如，用户输入 `*)(cn=*` 可能导致生成如下查询：
-   ```php
-   <?php
-   $ldapconn = ldap_connect("localhost");
-   if ($ldapconn) {
-       $user = $_GET["user"];
-       $filter = "(&(objectClass=user)(uid=" . $user . "))"; // 直接拼接用户输入
-       $dn = "dc=example,dc=org";
-       $result = ldap_search($ldapconn, $dn, $filter);
-   }
-   ?>
-   ```
-   在上述代码中，如果用户输入 `$user` 为 `*)(cn=*`，最终的 `$filter` 将变为 `(&(objectClass=user)(uid=*)(cn=*))`，从而绕过认证逻辑并获取所有用户信息。
-
+当应用程序从用户接收输入，并将其用于构建LDAP查询时，若未对输入进行有效过滤或转义，就可能发生LDAP注入。例如，用户输入 `*)(cn=*` 可能导致生成如下查询：
+```php
+<?php
+$ldapconn = ldap_connect("localhost");
+if ($ldapconn) {
+$user = $_GET["user"];
+$filter = "(&(objectClass=user)(uid=" . $user . "))"; // 直接拼接用户输入
+$dn = "dc=example,dc=org";
+$result = ldap_search($ldapconn, $dn, $filter);
+}
+?>
+```
+在上述代码中，如果用户输入 `$user` 为 `*)(cn=*`，最终的 `$filter` 将变为 `(&(objectClass=user)(uid=*)(cn=*))`，从而绕过认证逻辑并获取所有用户信息。
 3. **潜在影响**
-   - 未授权访问LDAP目录中的敏感信息（如用户名、组、证书等）。
-   - 修改或删除LDAP目录中的数据。
-   - 绕过认证机制，甚至提升权限。
-   - 在某些情况下，可能导致拒绝服务（DoS）。
-
+- 未授权访问LDAP目录中的敏感信息（如用户名、组、证书等）。
+- 修改或删除LDAP目录中的数据。
+- 绕过认证机制，甚至提升权限。
+- 在某些情况下，可能导致拒绝服务（DoS）。
 DESC
 	rule_id: "c773c9e1-71f1-4aed-b71f-68b8e468786f"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **使用 `ldap_escape` 函数对用户输入进行转义**
-   在将用户输入用于构建LDAP查询之前，使用PHP内置的 `ldap_escape` 函数对特殊字符进行转义，以防止它们被解释为LDAP查询语法。
-   ```php
-   <?php
-   $ldapconn = ldap_connect("localhost");
-   if ($ldapconn) {
-       $user = $_GET["user"];
-       $escaped_user = ldap_escape($user, "", LDAP_ESCAPE_FILTER); // 转义用户输入
-       $filter = "(&(objectClass=user)(uid=" . $escaped_user . "))";
-       $dn = "dc=example,dc=org";
-       $result = ldap_search($ldapconn, $dn, $filter);
-   }
-   ?>
-   ```
-
+在将用户输入用于构建LDAP查询之前，使用PHP内置的 `ldap_escape` 函数对特殊字符进行转义，以防止它们被解释为LDAP查询语法。
+```php
+<?php
+$ldapconn = ldap_connect("localhost");
+if ($ldapconn) {
+$user = $_GET["user"];
+$escaped_user = ldap_escape($user, "", LDAP_ESCAPE_FILTER); // 转义用户输入
+$filter = "(&(objectClass=user)(uid=" . $escaped_user . "))";
+$dn = "dc=example,dc=org";
+$result = ldap_search($ldapconn, $dn, $filter);
+}
+?>
+```
 2. **实施严格的用户输入验证和过滤**
-   根据预期的输入类型和格式对用户输入进行验证，例如限制允许的字符集、长度等。
-
+根据预期的输入类型和格式对用户输入进行验证，例如限制允许的字符集、长度等。
 3. **使用参数化查询或ORM**
-   如果可能，考虑使用支持参数化查询或对象关系映射（ORM）的库来与LDAP交互。这些工具通常会自带防注入机制，可以更有效地隔离用户输入和查询逻辑。
-
+如果可能，考虑使用支持参数化查询或对象关系映射（ORM）的库来与LDAP交互。这些工具通常会自带安全机制自动处理参数化，避免手动拼接SQL。
 4. **最小化LDAP服务权限**
-   遵循最小权限原则，仅授予应用程序完成必要操作所需的权限，以降低注入攻击的影响范围。
+遵循最小权限原则，仅授予应用程序完成必要操作所需的权限，以降低注入攻击的影响范围。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-90: Improper Neutralization of Special Elements used in an LDAP Query ('LDAP Injection')](https://cwe.mitre.org/data/definitions/90.html)
@@ -91,67 +83,60 @@ alert $high for {
 	type: "vuln",
 	title: "Check PHP LDAP Direct Injection Vulnerability (No Filter)",
 	title_zh: "检测PHP LDAP无过滤直接注入漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **使用 `ldap_escape` 函数对用户输入进行转义**
-   在将用户输入用于构建LDAP查询之前，使用PHP内置的 `ldap_escape` 函数对潜在的特殊字符进行转义，以防止它们被解释为LDAP查询语法。
-
-   ```php
-   <?php
-   $ldapconn = ldap_connect("localhost");
-   if($ldapconn){
-       $user = $_GET["user"];
-       $escaped_user = ldap_escape($user, "", LDAP_ESCAPE_FILTER); // 使用ldap_escape进行过滤
-       $filter = "(&(objectClass=user)(uid=" . $escaped_user . "))";
-       $dn = "dc=example,dc=org";
-       $result = ldap_search($ldapconn, $dn, $filter);
-       // ...
-   }
-   ?>
-   ```
-
+在将用户输入用于构建LDAP查询之前，使用PHP内置的 `ldap_escape` 函数对潜在的特殊字符进行转义，以防止它们被解释为LDAP查询语法。
+```php
+<?php
+$ldapconn = ldap_connect("localhost");
+if($ldapconn){
+$user = $_GET["user"];
+$escaped_user = ldap_escape($user, "", LDAP_ESCAPE_FILTER); // 使用ldap_escape进行过滤
+$filter = "(&(objectClass=user)(uid=" . $escaped_user . "))";
+$dn = "dc=example,dc=org";
+$result = ldap_search($ldapconn, $dn, $filter);
+// ...
+}
+?>
+```
 2. **实施严格的用户输入验证和过滤**
-   除了使用 `ldap_escape` 外，还应该根据预期的输入类型和格式对用户输入进行严格的验证和过滤，例如限制允许的字符、长度等。
-
+除了使用 `ldap_escape` 外，还应该根据预期的输入类型和格式对用户输入进行严格的验证和过滤，例如限制允许的字符、长度等。
 3. **使用参数化查询或ORM**
-   如果可能，考虑使用支持参数化查询或提供的ORM（对象关系映射）库来与LDAP进行交互。这些工具或方法通常会自带防注入的机制，可以更有效地隔离用户输入和查询逻辑。
-
+如果可能，考虑使用支持参数化查询或提供的ORM（对象关系映射）库来与LDAP进行交互。这些工具或方法通常会自带防注入的机制，可以更有效地隔离用户输入和查询逻辑。
 4. **最小化LDAP服务权限**
-   限制应用程序用于连接LDAP服务的账户权限，遵循最小权限原则，只赋予应用程序完成必要操作的权限，以限制即使发生注入攻击的影响范围。
-CODE
-	desc: <<<CODE
+限制应用程序用于连接LDAP服务的账户权限，遵循最小权限原则，只赋予应用程序完成必要操作的权限，以限制即使发生注入攻击的影响范围。
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   LDAP注入攻击是一种通过操纵LDAP（轻量目录访问协议）查询来未授权访问或操纵目录服务器数据的攻击方式。在PHP应用中，如果开发者没有正确地对用户输入进行过滤和转义，攻击者可能会构造恶意的LDAP查询，绕过认证机制或获取敏感信息。
-
+LDAP注入攻击是一种通过操纵LDAP（轻量目录访问协议）查询来未授权访问或操纵目录服务器数据的攻击方式。在PHP应用中，如果开发者没有正确地对用户输入进行过滤和转义，攻击者可能会构造恶意的LDAP查询，绕过认证机制或获取敏感信息。
 2. **触发场景**
-   当应用程序从用户接收输入，并在构建LDAP查询时直接将其拼接到查询字符串中，而未对输入进行适当的过滤或转义时，就可能发生LDAP注入。
-
-   例如，用户输入的用户名 `*)(cn=*` 会导致 `(&(objectClass=user)(uid=*)(cn=*))` 的查询，这可能导致列出所有用户。
-
-   ```php
-   <?php
-   $ldapconn = ldap_connect("localhost");
-   if($ldapconn){
-       $user = $_GET["user"];
-       $filter = "(&(objectClass=user)(uid=" . $user . "))"; // 未过滤用户输入直接拼接
-       $dn = "dc=example,dc=org";
-       $result = ldap_search($ldapconn, $dn, $filter);
-       // ...
-   }
-   ?>
-   ```
-   在上述示例中，如果用户输入 `$user` 为 `*)(cn=*`，最终的 `$filter` 将变为 `(&(objectClass=user)(uid=*)(cn=*))`，这会改变查询的逻辑。
-
+当应用程序从用户接收输入，并在构建LDAP查询时直接将其拼接到查询字符串中，而未对输入进行适当的过滤或转义时，就可能发生LDAP注入。
+例如，用户输入的用户名 `*)(cn=*` 会导致 `(&(objectClass=user)(uid=*)(cn=*))` 的查询，这可能导致列出所有用户。
+```php
+<?php
+$ldapconn = ldap_connect("localhost");
+if($ldapconn){
+$user = $_GET["user"];
+$filter = "(&(objectClass=user)(uid=" . $user . "))"; // 未过滤用户输入直接拼接
+$dn = "dc=example,dc=org";
+$result = ldap_search($ldapconn, $dn, $filter);
+// ...
+}
+?>
+```
+在上述示例中，如果用户输入 `$user` 为 `*)(cn=*`，最终的 `$filter` 将变为 `(&(objectClass=user)(uid=*)(cn=*))`，这会改变查询的逻辑。
 3. **潜在影响**
-   - 未授权访问LDAP目录中的敏感信息（如用户名、组、证书等）。
-   - 修改或删除LDAP目录数据。
-   - 绕过认证机制。
-   - 在某些情况下，可能导致拒绝服务。
-CODE
+- 未授权访问LDAP目录中的敏感信息（如用户名、组、证书等）。
+- 修改或删除LDAP目录数据。
+- 绕过认证机制。
+- 在某些情况下，可能导致拒绝服务。
+DESC
 	level: "high",
+	name: "high",
+	message: "检测到PHP LDAP无过滤直接注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	risk: "LDAP注入",
 }
 
 
@@ -163,53 +148,48 @@ CODE)> as $highAndMid;
 $highAndMid - $high as $mid
 alert $mid for {
 	title_zh: "审计PHP LDAP注入带无效过滤",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **使用 `ldap_escape` 函数对用户输入进行转义**
-   在将用户输入用于构建LDAP查询之前，使用PHP内置的 `ldap_escape` 函数对潜在的特殊字符进行转义，以防止它们被解释为LDAP查询语法。
-
-   ```php
-   <?php
-   $ldapconn = ldap_connect("localhost");
-   if($ldapconn){
-       $user = $_GET["user"];
-       $escaped_user = ldap_escape($user, "", LDAP_ESCAPE_FILTER); // 使用ldap_escape进行过滤
-       $filter = "(&(objectClass=user)(uid=" . $escaped_user . "))";
-       $dn = "dc=example,dc=org";
-       $result = ldap_search($ldapconn, $dn, $filter);
-       // ...
-   }
-   ?>
-   ```
-
+在将用户输入用于构建LDAP查询之前，使用PHP内置的 `ldap_escape` 函数对潜在的特殊字符进行转义，以防止它们被解释为LDAP查询语法。
+```php
+<?php
+$ldapconn = ldap_connect("localhost");
+if($ldapconn){
+$user = $_GET["user"];
+$escaped_user = ldap_escape($user, "", LDAP_ESCAPE_FILTER); // 使用ldap_escape进行过滤
+$filter = "(&(objectClass=user)(uid=" . $escaped_user . "))";
+$dn = "dc=example,dc=org";
+$result = ldap_search($ldapconn, $dn, $filter);
+// ...
+}
+?>
+```
 2. **实施严格的用户输入验证和过滤**
-   除了使用 `ldap_escape` 外，还应该根据预期的输入类型和格式对用户输入进行严格的验证和过滤，例如限制允许的字符、长度等。
-
+除了使用 `ldap_escape` 外，还应该根据预期的输入类型和格式对用户输入进行严格的验证和过滤，例如限制允许的字符、长度等。
 3. **使用参数化查询或ORM**
-   如果可能，考虑使用支持参数化查询或提供的ORM（对象关系映射）库来与LDAP进行交互。这些工具或方法通常会自带防注入的机制，可以更有效地隔离用户输入和查询逻辑。
-
+如果可能，考虑使用支持参数化查询或提供的ORM（对象关系映射）库来与LDAP进行交互。这些工具或方法通常会自带防注入的机制，可以更有效地隔离用户输入和查询逻辑。
 4. **最小化LDAP服务权限**
-   限制应用程序用于连接LDAP服务的账户权限，遵循最小权限原则，只赋予应用程序完成必要操作的权限，以限制即使发生注入攻击的影响范围。
-CODE
-	desc: <<<CODE
+限制应用程序用于连接LDAP服务的账户权限，遵循最小权限原则，只赋予应用程序完成必要操作的权限，以限制即使发生注入攻击的影响范围。
+SOLUTION
+	desc: <<<DESC
 ### 审计描述
-
 1. **风险原理**
-   LDAP注入攻击是一种通过操纵LDAP（轻量目录访问协议）查询来未授权访问或操纵目录服务器数据的攻击方式。在PHP应用中，尽管可能对用户输入进行了部分过滤，但如果过滤不完全或无效，攻击者仍可能构造恶意的LDAP查询，绕过认证机制或获取敏感信息。
-
+LDAP注入攻击是一种通过操纵LDAP（轻量目录访问协议）查询来未授权访问或操纵目录服务器数据的攻击方式。在PHP应用中，尽管可能对用户输入进行了部分过滤，但如果过滤不完全或无效，攻击者仍可能构造恶意的LDAP查询，绕过认证机制或获取敏感信息。
 2. **触发场景**
-   即使开发人员尝试对用户输入进行过滤，但若过滤函数存在缺陷或并未覆盖所有可能的攻击向量，则仍然可能存在LDAP注入的风险。
-
+即使开发人员尝试对用户输入进行过滤，但若过滤函数存在缺陷或并未覆盖所有可能的攻击向量，则仍然可能存在LDAP注入的风险。
 3. **潜在影响**
-   - 未授权访问LDAP目录中的敏感信息（如用户名、组、证书等）。
-   - 修改或删除LDAP目录数据。
-   - 绕过认证机制。
-   - 在某些情况下，可能导致拒绝服务。
-CODE
+- 未授权访问LDAP目录中的敏感信息（如用户名、组、证书等）。
+- 修改或删除LDAP目录数据。
+- 绕过认证机制。
+- 在某些情况下，可能导致拒绝服务。
+DESC
 	level: "mid",
 	type: "mid",
 	title: "Audit PHP LDAP Injection with Ineffective Filter",
+	message: "检测到PHP LDAP注入漏洞，但可能存在无效的过滤函数，需进一步审计确认。",
+	risk: "LDAP注入",
+	name: "mid",
 }
 
 
@@ -219,19 +199,26 @@ alert $low for {
 	type: "info",
 	title: "Audit PHP LDAP Injection with Effective Filter",
 	title_zh: "审计PHP LDAP注入带有效过滤",
-	desc: <<<CODE
+	desc: <<<DESC
 ### 规则目的
 该规则用于审计PHP代码中已实现有效过滤的LDAP注入情况，用于确认过滤机制是否足够安全。它通过识别LDAP查询相关的关键PHP函数（如`ldap_search`、`ldap_list`等），定位经过过滤的数据处理点，防止攻击者注入恶意脚本。
-
 ### 规则详细
 1. **作为基础检测库**
-   属于`php-ldap-injection`库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测LDAP注入漏洞，提供核心函数识别能力。
-
+属于`php-ldap-injection`库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测LDAP注入漏洞，提供核心函数识别能力。
 2. **覆盖高危查询函数**
-   检测以下多个PHP查询函数：
-   `ldap_search`, `ldap_list`, `ldap_read`, `ldap_add`, `ldap_delete`, `ldap_mod_add`, `ldap_mod_del`, `ldap_mod_replace`, `ldap_compare`。
-CODE
+检测以下多个PHP查询函数：
+`ldap_search`, `ldap_list`, `ldap_read`, `ldap_add`, `ldap_delete`, `ldap_mod_add`, `ldap_mod_del`, `ldap_mod_replace`, `ldap_compare`。
+DESC
 	level: "low",
+	message: "检测到PHP LDAP注入规则已实现有效过滤，需进一步确认过滤机制是否足够安全。",
+	solution: <<<SOLUTION
+该规则主要用于审计代码中是否存在足够的过滤机制，请参考以下文档：
+1. 确保所有LDAP查询均使用了有效的过滤函数，例如 `ldap_escape`。
+2. 对于复杂的过滤逻辑，确保其安全性并检查是否有遗漏的攻击向量。
+3. 建议结合其他规则（如用户输入跟踪规则）共同确认过滤是否全面。
+SOLUTION
+	risk: "信息",
+	name: "low",
 }
 
 

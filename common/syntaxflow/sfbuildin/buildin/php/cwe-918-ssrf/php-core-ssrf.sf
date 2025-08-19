@@ -5,58 +5,148 @@ desc(
 	risk: "ssrf"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   服务器端请求伪造（SSRF）漏洞的产生是由于应用程序未能对用户提供的URL进行充分的有效性检查，导致攻击者能够使服务器端应用程序向任意目标发起请求。攻击者可以利用这一漏洞探测内网服务、访问内部系统、获取敏感信息，甚至可能进一步利用其他漏洞进行攻击。
-
+服务器端请求伪造（SSRF）漏洞的产生是由于应用程序未能对用户提供的URL进行充分的有效性检查，导致攻击者能够使服务器端应用程序向任意目标发起请求。攻击者可以利用这一漏洞探测内网服务、访问内部系统、获取敏感信息，甚至可能进一步利用其他漏洞进行攻击。
 2. **触发场景**
-   当应用程序使用了 `curl_init`, `curl_setopt`, `fsockopen`, `file_get_contents`, `fopen` 等函数从用户提供的或可控的URL加载资源，且未对URL进行严格的校验和限制时，就可能存在SSRF漏洞。
-
-   **存在漏洞的代码示例**
-   ```php
-   <?php
-   function curl($url){
-       $ch = curl_init();
-       curl_setopt($ch,CURLOPT_URL,$url);
-       #curl_setopt($ch,CUPLOPT_HEADER,1);
-       curl_exec($ch);
-       curl_close($ch);
-   }
-   $url = $_GET['url']; // 用户可控的URL输入
-   curl($url);
-   ?>
-   ```
-
-   ```php
-   <?php
-   $host=$_GET['url']; // 用户可控的URL输入
-   $fp = fsockopen("$host", 80, $errno, $errstr, 30);
-   if (!$fp) {
-       echo "$errstr ($errno)<br />
-";
-   } else {
-       $out = "GET / HTTP/1.1\r\n";
-       $out .= "Host: $host\r\n";
-       $out .= "Connection: Close\r\n\r\n";
-       fwrite($fp, $out);
-       while (!feof($fp)) {
-           echo fgets($fp, 128);
-       }
-       fclose($fp);
-   }
-   ?>
-   ```
-
-   攻击者可以通过构造恶意URL（如 `http://localhost:8080/admin` 或 `file:///etc/passwd`）来访问非预期的资源。
-
+当应用程序使用了 `curl_init`, `curl_setopt`, `fsockopen`, `file_get_contents`, `fopen` 等函数从用户提供的或可控的URL加载资源，且未对URL进行严格的校验和限制时，就可能存在SSRF漏洞。
+**存在漏洞的代码示例**
+```php
+<?php
+function curl($url){
+$ch = curl_init();
+curl_setopt($ch,CURLOPT_URL,$url);
+#curl_setopt($ch,CUPLOPT_HEADER,1);
+curl_exec($ch);
+curl_close($ch);
+}
+$url = $_GET['url']; // 用户可控的URL输入
+curl($url);
+?>
+```
+```php
+<?php
+$host=$_GET['url']; // 用户可控的URL输入
+$fp = fsockopen("$host", 80, $errno, $errstr, 30);
+if (!$fp) {
+echo "$errstr ($errno)<br />\n";
+} else {
+$out = "GET / HTTP/1.1\r\n";
+$out .= "Host: $host\r\n";
+$out .= "Connection: Close\r\n\r\n";
+fwrite($fp, $out);
+while (!feof($fp)) {
+echo fgets($fp, 128);
+}
+fclose($fp);
+}
+?>
+```
+攻击者可以通过构造恶意URL（如 `http://localhost:8080/admin` 或 `file:///etc/passwd`）来访问非预期的资源。
 3. **潜在影响**
-   - 探测内网网络结构和开放服务。
-   - 访问内网敏感系统或接口。
-   - 读取服务器本地文件。
-   - 攻击者利用服务请求作为跳板与其他服务器进行通信，隐藏攻击来源。
-   - 端口扫描。
+- 探测内网网络结构和开放服务。
+- 访问内网敏感系统或接口。
+- 读取服务器本地文件。
+- 攻击者利用服务请求作为跳板与其他服务器进行通信，隐藏攻击来源。
+- 端口扫描。
 DESC
 	rule_id: "61cd3ee5-20d0-4457-8e5f-f442e36296f6"
+	solution: <<<SOLUTION
+### 修复建议
+1. **严格过滤和校验URL**
+- **白名单机制**: 仅允许访问预定义的安全域或协议。对于允许外部访问的服务，只允许访问特定的域名或IP地址，并限制端口。
+- **禁用不安全的协议**: 禁用`file:///`, `gopher://`, `dict://` 等可能导致敏感信息泄露或攻击的协议。
+- **URL解析和校验**: 使用内置的URL解析函数（如`parse_url`）对URL进行解析，并对解析后的各个部分（scheme, host, port等）进行严格校验。避免直接使用字符串匹配或正则表达式进行简单的过滤。
+**修复代码示例 (以curl为例)**
+```php
+<?php
+function curl_safe($url){
+$parsed_url = parse_url($url);
+// 1. 校验协议白名单
+$allowed_schemes = ['http', 'https'];
+if (!isset($parsed_url['scheme']) || !in_array(strtolower($parsed_url['scheme']), $allowed_schemes)) {
+die("Error: Invalid URL scheme.");
+}
+// 2. 校验域名/IP白名单或黑名单
+// 示例：仅允许访问 example.com
+$allowed_hosts = ['example.com'];
+if (!isset($parsed_url['host']) || !in_array(strtolower($parsed_url['host']), $allowed_hosts)) {
+die("Error: Access to the requested host is not allowed.");
+}
+// 3. 校验端口（可选，如果需要限制端口）
+// $allowed_ports = [80, 443];
+// if (isset($parsed_url['port']) && !in_array($parsed_url['port'], $allowed_ports)) {
+//     die("Error: Access to the requested port is not allowed.");
+// }
+// 4. 阻止内网IP和特殊地址
+$host = $parsed_url['host'];
+if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false &&
+(filter_var($host, FILTER_VALIDATE_IP) === false && gethostbyname($host) !== $host && filter_var(gethostbyname($host), FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false)) {
+die("Error: Access to internal/private IP is not allowed.");
+}
+$ch = curl_init();
+curl_setopt($ch, CURLOPT_URL, $url);
+// 设置超时，防止慢速请求攻击
+curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+// 防止重定向到外部不安全地址
+curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+curl_exec($ch);
+curl_close($ch);
+}
+$url = $_GET['url'];
+curl_safe($url);
+?>
+```
+2. **限制请求发起的端口**
+如果可能，只允许发起请求到特定的、已知的安全端口。
+3. **对返回结果进行严格限制**
+不返回原始的、未经处理的响应数据给用户，避免泄露敏感信息。
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP SSRF](https://owasp.org/www-community/attacks/Server-Side_Request_Forgery_(SSRF))
+[CWE-918](https://cwe.mitre.org/data/definitions/918.html)
+REFERENCE
+)
+
+/^curl_init|curl_setopt|curl_exec|curl_close|fsockopen|file_get_contents|fopen$/ as $curlFunction;
+
+check $curlFunction;
+alert $curlFunction for {
+	title: "ssrf function detected, please pay attention",
+	title_zh: "检测到为ssrf函数，请注意关注",
+	desc: <<<DESC
+该规则用于识别可能与SSRF漏洞相关的PHP函数，例如`curl_init`, `curl_setopt`, `curl_exec`, `curl_close`, `fsockopen`, `file_get_contents`, `fopen`等。这些函数如果未对用户提供的URL进行严格校验和限制，可能会被攻击者利用，导致服务器端请求伪造（SSRF）漏洞。
+
+### 规则详细
+1. **作为基础检测库**
+   属于`php-ssrf-function`库规则（`lib`类型），需配合其他规则（如数据流跟踪规则）共同检测SSRF漏洞，提供核心函数识别能力。
+
+2. **覆盖高危函数**
+   检测以下7个PHP函数：
+   `curl_init`, `curl_setopt`, `curl_exec`, `curl_close`, `fsockopen`, `file_get_contents`, `fopen`。
+DESC
+	level: "info",
+}
+
+/$curl_setopt|fsockopen|file_get_contents^/as $ssrfFunction
+
+<include('php-param')> as $params;
+<include('php-tp-all-extern-variable-param-source')> as $params
+
+$ssrfFunction(* as $allParams)
+$allParams?{<self> #{include: <<<CODE
+* & $params
+CODE}->} as $sink
+
+$sink<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
+*?{opcode: call} as $__next__
+CODE)> as $high
+
+alert $high for {
+	title: "Unvalidated SSRF Parameter Injection",
+	title_zh: "SSRF未验证参数注入风险",
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -120,115 +210,7 @@ DESC
 3. **对返回结果进行严格限制**
    不返回原始的、未经处理的响应数据给用户，避免泄露敏感信息。
 SOLUTION
-	reference: <<<REFERENCE
-[OWASP SSRF](https://owasp.org/www-community/attacks/Server-Side_Request_Forgery_(SSRF))
-[CWE-918](https://cwe.mitre.org/data/definitions/918.html)
-REFERENCE
-)
-
-/^curl_init|curl_setopt|curl_exec|curl_close|fsockopen|file_get_contents|fopen$/ as $curlFunction;
-
-check $curlFunction;
-alert $curlFunction for {
-	title: "ssrf function detected, please pay attention",
-	title_zh: "检测到为ssrf函数，请注意关注",
-	desc: <<<CODE
-该规则用于识别可能与SSRF漏洞相关的PHP函数，例如`curl_init`, `curl_setopt`, `curl_exec`, `curl_close`, `fsockopen`, `file_get_contents`, `fopen`等。这些函数如果未对用户提供的URL进行严格校验和限制，可能会被攻击者利用，导致服务器端请求伪造（SSRF）漏洞。
-
-### 规则详细
-1. **作为基础检测库**
-   属于`php-ssrf-function`库规则（`lib`类型），需配合其他规则（如数据流跟踪规则）共同检测SSRF漏洞，提供核心函数识别能力。
-
-2. **覆盖高危函数**
-   检测以下7个PHP函数：
-   `curl_init`, `curl_setopt`, `curl_exec`, `curl_close`, `fsockopen`, `file_get_contents`, `fopen`。
-CODE
-	level: "info",
-}
-
-/$curl_setopt|fsockopen|file_get_contents^/as $ssrfFunction
-
-<include('php-param')> as $params;
-<include('php-tp-all-extern-variable-param-source')> as $params
-
-$ssrfFunction(* as $allParams)
-$allParams?{<self> #{include: <<<CODE
-* & $params
-CODE}->} as $sink
-
-$sink<dataflow(include=<<<CODE
-* & $params as $__next__
-CODE,exclude=<<<CODE
-*?{opcode: call} as $__next__
-CODE)> as $high
-
-alert $high for {
-	title: "Unvalidated SSRF Parameter Injection",
-	title_zh: "SSRF未验证参数注入风险",
-	solution: <<<CODE
-### 修复建议
-
-1. **严格过滤和校验URL**
-   - **白名单机制**: 仅允许访问预定义的安全域或协议。对于允许外部访问的服务，只允许访问特定的域名或IP地址，并限制端口。
-   - **禁用不安全的协议**: 禁用`file:///`, `gopher://`, `dict://` 等可能导致敏感信息泄露或攻击的协议。
-   - **URL解析和校验**: 使用内置的URL解析函数（如`parse_url`）对URL进行解析，并对解析后的各个部分（scheme, host, port等）进行严格校验。避免直接使用字符串匹配或正则表达式进行简单的过滤。
-
-   **修复代码示例 (以curl为例)**
-   ```php
-   <?php
-   function curl_safe($url){
-       $parsed_url = parse_url($url);
-
-       // 1. 校验协议白名单
-       $allowed_schemes = ['http', 'https'];
-       if (!isset($parsed_url['scheme']) || !in_array(strtolower($parsed_url['scheme']), $allowed_schemes)) {
-           die("Error: Invalid URL scheme.");
-       }
-
-       // 2. 校验域名/IP白名单或黑名单
-       // 示例：仅允许访问 example.com
-       $allowed_hosts = ['example.com'];
-       if (!isset($parsed_url['host']) || !in_array(strtolower($parsed_url['host']), $allowed_hosts)) {
-           die("Error: Access to the requested host is not allowed.");
-       }
-
-       // 3. 校验端口（可选，如果需要限制端口）
-       // $allowed_ports = [80, 443];
-       // if (isset($parsed_url['port']) && !in_array($parsed_url['port'], $allowed_ports)) {
-       //     die("Error: Access to the requested port is not allowed.");
-       // }
-
-       // 4. 阻止内网IP和特殊地址
-       $host = $parsed_url['host'];
-       if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false &&
-           (filter_var($host, FILTER_VALIDATE_IP) === false && gethostbyname($host) !== $host && filter_var(gethostbyname($host), FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false)) {
-           die("Error: Access to internal/private IP is not allowed.");
-       }
-
-       $ch = curl_init();
-       curl_setopt($ch, CURLOPT_URL, $url);
-       // 设置超时，防止慢速请求攻击
-       curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-       curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-       // 防止重定向到外部不安全地址
-       curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
-
-       curl_exec($ch);
-       curl_close($ch);
-   }
-
-   $url = $_GET['url'];
-   curl_safe($url);
-   ?>
-   ```
-
-2. **限制请求发起的端口**
-   如果可能，只允许发起请求到特定的、已知的安全端口。
-
-3. **对返回结果进行严格限制**
-   不返回原始的、未经处理的响应数据给用户，避免泄露敏感信息。
-CODE
-	desc: <<<CODE
+	desc: <<<DESC
 ### 漏洞描述
 
 1. **漏洞原理**
@@ -280,7 +262,7 @@ CODE
    - 读取服务器本地文件。
    - 攻击者利用服务请求作为跳板与其他服务器进行通信，隐藏攻击来源。
    - 端口扫描。
-CODE
+DESC
 	level: "high",
 }
 
@@ -294,7 +276,7 @@ $highAndMid - $high as $mid
 
 alert $mid for {
 	title_zh: "SSRF参数过滤不充分",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
 
 1. **增强过滤逻辑**
@@ -338,8 +320,8 @@ alert $mid for {
    - 限制请求的端口范围，只允许访问常用的安全端口。
    - 设置超时时间，防止慢速请求攻击。
    - 阻止重定向到外部不安全地址。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 风险描述
 
 1. **风险原理**
@@ -372,14 +354,14 @@ CODE
 3. **潜在影响**
    - 可能导致攻击者访问非预期的内部资源。
    - 存在一定的信息泄露风险。
-CODE
+DESC
 	level: "mid",
 	title: "Insufficient SSRF Parameter Filtering",
 }
 
 $sink - $high - $mid  as $low
 alert $low for {
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
 
 1. **完善过滤机制**
@@ -421,8 +403,8 @@ alert $low for {
 
 2. **定期审查代码**
    定期审查代码中的过滤逻辑，确保其能够抵御最新的攻击手段。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 风险描述
 
 1. **风险原理**
@@ -455,7 +437,7 @@ CODE
 3. **潜在影响**
    - 存在较低概率的访问控制绕过风险。
    - 可能导致信息泄露或其他非预期行为。
-CODE
+DESC
 	level: "low",
 	title: "Potential SSRF Access Control Bypass",
 	title_zh: "SSRF访问控制潜在绕过风险",

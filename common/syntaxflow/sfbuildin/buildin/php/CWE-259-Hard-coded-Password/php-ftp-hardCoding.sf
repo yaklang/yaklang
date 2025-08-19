@@ -5,10 +5,8 @@ desc(
 	level: "low"
 	desc: <<<DESC
 ### 风险描述
-
 1. **风险原理**
 硬编码密码是指将敏感信息（如数据库连接密码、FTP密码、API密钥等）直接写入源代码中。这不仅违反了安全最佳实践，也带来了严重的安全风险。攻击者一旦获取到源代码（例如通过代码泄露、弱点扫描或内部威胁），即可直接获取到硬编码的敏感凭证，从而访问受保护的系统或资源。
-
 2. **触发场景**
 在PHP代码中调用`ftp_login`等函数时，将FTP服务器的密码作为一个常量字符串直接写在代码中，而不是从配置文件、环境变量或密钥管理服务中读取。例如:
 ```php
@@ -19,12 +17,10 @@ $ftp_user_pass = "password"; // 硬编码的密码
 ftp_login($ftp_server, $ftp_user_name, $ftp_user_pass);
 ?>
 ```
-
 3. **潜在影响**
 - 攻击者获取硬编码凭证后，可以直接登录到FTP服务器，窃取、篡改或删除存储的文件。
 - 如果硬编码的是其他服务的凭证（如数据库、API），可能导致更广泛的数据泄露、系统被控或业务中断。
 - 难以进行密码轮换和管理，一旦凭证泄露，需要修改并重新部署代码，增加了运维成本和复杂性。
-
 DESC
 	rule_id: "2161eeef-aab5-486a-a94e-e8750d37f332"
 	reference: <<<REFERENCE
@@ -32,7 +28,6 @@ DESC
 REFERENCE
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用配置文件或环境变量
 将敏感信息存储在应用程序外部的配置文件或环境变量中，并在应用程序启动时读取。确保配置文件有适当的访问权限控制，并且不被包含在版本控制系统中（例如使用`.gitignore`）。
 ```php
@@ -40,29 +35,24 @@ REFERENCE
 // 从环境变量中读取密码
 $ftp_password = getenv('FTP_PASSWORD');
 if ($ftp_password === false) {
-    // 或者从配置文件中读取
-    $config = parse_ini_file('config.ini');
-    if ($config === false || !isset($config['ftp_password'])) {
-        die("FTP password not configured.");
-    }
-    $ftp_password = $config['ftp_password'];
+// 或者从配置文件中读取
+$config = parse_ini_file('config.ini');
+if ($config === false || !isset($config['ftp_password'])) {
+die("FTP password not configured.");
 }
-
+$ftp_password = $config['ftp_password'];
+}
 $ftp_server = "ftp.example.com";
 $ftp_user_name = "user";
 ftp_login($ftp_server, $ftp_user_name, $ftp_password);
 ?>
 ```
-
 #### 2. 使用密钥管理服务（KMS）
 对于敏感程度更高的凭证，考虑使用专业的密钥管理服务（如AWS Secrets Manager, Azure Key Vault, HashiCorp Vault）进行存储和管理。应用程序通过安全的API动态获取凭证，避免凭证在任何地方以明文形式存储。
-
 #### 3. 遵循零信任原则
 即使使用配置文件或KMS，也要确保应用程序只拥有必要的权限，并定期轮换凭证。
-
 #### 4. 代码审查和自动化扫描
 定期进行代码审查，并利用静态应用安全测试（SAST）工具如IRify，自动化检测源代码中硬编码的凭证。
-
 SOLUTION
 )
 
@@ -72,6 +62,56 @@ alert $sink for {
 	level: "low",
 	title: "Hard-coded FTP Password Detected",
 	title_zh: "检测到硬编码的FTP密码",
+	name: "sink",
+	message: "检测到PHP FTP登录中可能包含硬编码的密码，建议进一步审计确认。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 使用配置文件或环境变量
+将敏感信息存储在应用程序外部的配置文件或环境变量中，并在应用程序启动时读取。确保配置文件有适当的访问权限控制，并且不被包含在版本控制系统中（例如使用`.gitignore`）。
+```php
+<?php
+// 从环境变量中读取密码
+$ftp_password = getenv('FTP_PASSWORD');
+if ($ftp_password === false) {
+// 或者从配置文件中读取
+$config = parse_ini_file('config.ini');
+if ($config === false || !isset($config['ftp_password'])) {
+die("FTP password not configured.");
+}
+$ftp_password = $config['ftp_password'];
+}
+$ftp_server = "ftp.example.com";
+$ftp_user_name = "user";
+ftp_login($ftp_server, $ftp_user_name, $ftp_password);
+?>
+```
+#### 2. 使用密钥管理服务（KMS）
+对于敏感程度更高的凭证，考虑使用专业的密钥管理服务（如AWS Secrets Manager, Azure Key Vault, HashiCorp Vault）进行存储和管理。应用程序通过安全的API动态获取凭证，避免凭证在任何地方以明文形式存储。
+#### 3. 遵循零信任原则
+即使使用配置文件或KMS，也要确保应用程序只拥有必要的权限，并定期轮换凭证。
+#### 4. 代码审查和自动化扫描
+定期进行代码审查，并利用静态应用安全测试（SAST）工具如IRify，自动化检测源代码中硬编码的凭证。
+SOLUTION
+	risk: "硬编码密码",
+	desc: <<<DESC
+### 风险描述
+1. **风险原理**
+硬编码密码是指将敏感信息（如数据库连接密码、FTP密码、API密钥等）直接写入源代码中。这不仅违反了安全最佳实践，也带来了严重的安全风险。攻击者一旦获取到源代码（例如通过代码泄露、弱点扫描或内部威胁），即可直接获取到硬编码的敏感凭证，从而访问受保护的系统或资源。
+2. **触发场景**
+在PHP代码中调用`ftp_login`等函数时，将FTP服务器的密码作为一个常量字符串直接写在代码中，而不是从配置文件、环境变量或密钥管理服务中读取。例如:
+```php
+<?php
+$ftp_server = "ftp.example.com";
+$ftp_user_name = "user";
+$ftp_user_pass = "password"; // 硬编码的密码
+ftp_login($ftp_server, $ftp_user_name, $ftp_user_pass);
+?>
+```
+3. **潜在影响**
+- 攻击者获取硬编码凭证后，可以直接登录到FTP服务器，窃取、篡改或删除存储的文件。
+- 如果硬编码的是其他服务的凭证（如数据库、API），可能导致更广泛的数据泄露、系统被控或业务中断。
+- 难以进行密码轮换和管理，一旦凭证泄露，需要修改并重新部署代码，增加了运维成本和复杂性。
+DESC
 }
 desc(
 	lang: "php"
