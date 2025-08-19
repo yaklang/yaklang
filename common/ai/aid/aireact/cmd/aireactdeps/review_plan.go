@@ -3,6 +3,7 @@ package aireactdeps
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/aireactdeps/promptui"
@@ -33,7 +34,7 @@ type TaskSelector struct {
 
 // handlePlanReviewRequireClient 使用 promptui 处理 PLAN_REVIEW_REQUIRE 事件
 func handlePlanReviewRequireClient(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInputEvent) {
-	NewStdinManager().PreventDefault()
+	stdin := NewStdinManager().PreventDefault()
 	defer NewStdinManager().RecoverDefault()
 
 	// 解析审核事件内容
@@ -122,6 +123,7 @@ func handlePlanReviewRequireClient(event *schema.AiOutputEvent, inputChan chan<-
 		Templates: templates,
 		Size:      4,
 		Searcher:  searcher,
+		Stdin:     io.NopCloser(stdin),
 	}
 
 	fmt.Printf("\n[PLAN REVIEW REQUIRED]\n")
