@@ -1,9 +1,11 @@
 package yakit
 
 import (
-	"github.com/yaklang/yaklang/common/schema"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -42,7 +44,10 @@ func GetProjectKey(db *gorm.DB, key interface{}) string {
 	v, err := strconv.Unquote(kv.Value)
 	if err != nil {
 		log.Errorf("unquote(general storage) value failed: %s", err)
-		return kv.Value
+		cleaned := strings.ReplaceAll(kv.Value, `\"`, `"`)
+		cleaned = strings.ReplaceAll(cleaned, `\\`, `\`)
+		cleaned = strings.Trim(cleaned, `"`)
+		return cleaned
 	}
 	return v
 }
@@ -58,7 +63,10 @@ func GetProjectKeyWithError(db *gorm.DB, key interface{}) (string, error) {
 	v, err := strconv.Unquote(kv.Value)
 	if err != nil {
 		log.Errorf("unquote(general storage) value failed: %s", err)
-		return kv.Value, nil
+		cleaned := strings.ReplaceAll(kv.Value, `\"`, `"`)
+		cleaned = strings.ReplaceAll(cleaned, `\\`, `\`)
+		cleaned = strings.Trim(cleaned, `"`)
+		return cleaned, nil
 	}
 	return v, nil
 }
