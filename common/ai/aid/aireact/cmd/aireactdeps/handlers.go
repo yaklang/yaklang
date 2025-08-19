@@ -176,9 +176,14 @@ func SetupSignalHandler(ctx context.Context, config *CLIConfig) {
 							time.Sleep(50 * time.Millisecond)
 							continue
 						}
+					} else {
+						// 对于其他错误，只在不是"file already closed"时记录日志
+						if err.Error() != "file already closed" {
+							log.Errorf("Failed to read line from stdin: %v", err)
+						}
+						time.Sleep(100 * time.Millisecond)
+						continue
 					}
-					log.Errorf("Failed to read line from stdin: %v", err)
-					continue
 				}
 
 				// 处理正常输入

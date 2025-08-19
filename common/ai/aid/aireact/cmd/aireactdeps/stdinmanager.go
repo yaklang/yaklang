@@ -1,10 +1,11 @@
 package aireactdeps
 
 import (
-	"bufio"
 	"io"
 	"os"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 /*
@@ -35,11 +36,8 @@ type StdinManager struct {
 	divertedPipe   *os.File
 	divertedWriter *os.File
 
-	// 同步信号
-	paused        bool                   // 是否暂停状态
-	pauseCond     *sync.Cond             // 暂停条件变量
-	activeReaders int                    // 活跃的reader数量
-	bufioReaders  []*ClosableBufioReader // 所有活跃的bufio readers
+	// 活跃的reader管道列表，用于在Prevent时关闭
+	activeReaders []*os.File
 }
 
 var (
@@ -53,9 +51,7 @@ func NewStdinManager() *StdinManager {
 		stdinManagerInstance = &StdinManager{
 			originalStdin: os.Stdin,
 			prevented:     false,
-			paused:        false,
 		}
-		stdinManagerInstance.pauseCond = sync.NewCond(&stdinManagerInstance.mu)
 	})
 	return stdinManagerInstance
 }
@@ -64,10 +60,12 @@ func NewStdinManager() *StdinManager {
 func (sm *StdinManager) GetDefaultReader() io.Reader {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
+
 	if sm.prevented {
 		// 如果被阻止，返回空的reader
 		return &emptyReader{}
 	}
+
 	return sm.originalStdin
 }
 
@@ -76,36 +74,45 @@ func (sm *StdinManager) PreventDefault() io.Reader {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
+	log.Info("start to fetch stdin in prevent default stdin manager")
+	defer log.Info("end to fetch stdin in prevent default stdin manager")
+
 	if sm.prevented {
 		// 如果已经被阻止，返回现有的分流reader
+		log.Info("stdin already prevented, returning existing diverted reader")
 		return sm.divertedReader
 	}
 
-	// 暂停所有活跃的reader并立即替换它们的stdin源
-	if sm.activeReaders > 0 {
-		sm.paused = true
-		// 创建一个立即返回EOF的空文件作为新的stdin源
-		emptyPipe, _, _ := os.Pipe()
-		emptyPipe.Close() // 立即关闭，使其返回EOF
+	log.Info("preventing stdin access")
 
-		// 强制替换所有bufio readers的源为空管道
-		sm.replaceAllBufioReadersSource(emptyPipe)
+	// 关闭所有活跃的reader管道，强制中断正在阻塞的读取
+	log.Info("closing all active reader pipes")
+	for _, pipe := range sm.activeReaders {
+		if pipe != nil {
+			pipe.Close()
+		}
 	}
+	sm.activeReaders = nil
 
+	log.Info("creating pipe for stdin data diversion")
 	// 创建管道用于分流stdin数据
 	r, w, err := os.Pipe()
 	if err != nil {
+		log.Info("failed to create pipe, returning original stdin")
 		// 如果创建管道失败，返回原始stdin
 		return sm.originalStdin
 	}
 
+	log.Info("setting up diverted pipe and reader")
 	sm.divertedPipe = r
 	sm.divertedWriter = w
 	sm.divertedReader = r
 
+	log.Info("starting data forwarding goroutine")
 	// 启动数据转发goroutine
 	go sm.forwardStdinData()
 
+	log.Info("replacing os.Stdin with write end of pipe")
 	// 替换os.Stdin为写入端，这样其他读取os.Stdin的代码会被阻塞
 	os.Stdin = w
 	sm.prevented = true
@@ -137,247 +144,193 @@ func (sm *StdinManager) RecoverDefault() {
 	}
 	sm.divertedReader = nil
 
-	// 恢复所有活跃的reader
-	if sm.activeReaders > 0 {
-		sm.paused = false
-		// 重新创建所有bufio readers
-		sm.recreateAllBufioReaders()
-		sm.pauseCond.Broadcast() // 唤醒所有等待的reader
-	}
+	log.Info("stdin access recovered")
 }
 
 // forwardStdinData 将原始stdin的数据转发到分流reader
 func (sm *StdinManager) forwardStdinData() {
 	buffer := make([]byte, 1)
 	for {
-		sm.mu.RLock()
-		if !sm.prevented || sm.divertedWriter == nil {
-			sm.mu.RUnlock()
-			return
+		n, err := sm.originalStdin.Read(buffer)
+		if err != nil {
+			break
 		}
-		writer := sm.divertedWriter
+		if n > 0 {
+			sm.divertedWriter.Write(buffer[:n])
+		}
+	}
+}
+
+// forwardToReaderPipe 将原始stdin的数据转发到指定的reader管道
+func (sm *StdinManager) forwardToReaderPipe(writer *os.File) {
+	defer writer.Close()
+
+	buffer := make([]byte, 1)
+	for {
+		// 检查是否被阻止
+		sm.mu.RLock()
+		prevented := sm.prevented
 		sm.mu.RUnlock()
+
+		if prevented {
+			// 如果被阻止，停止转发
+			break
+		}
 
 		n, err := sm.originalStdin.Read(buffer)
 		if err != nil {
-			return
+			break
 		}
-
 		if n > 0 {
 			_, writeErr := writer.Write(buffer[:n])
 			if writeErr != nil {
-				return
+				// 写入失败，可能管道被关闭了
+				break
 			}
 		}
 	}
 }
 
-// IsPrevented 检查是否已经阻止了默认读取
+// IsPrevented 检查是否被阻止
 func (sm *StdinManager) IsPrevented() bool {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 	return sm.prevented
 }
 
-// emptyReader 空读取器，用于在被阻止时返回EOF
+// emptyReader 空的reader，总是返回EOF
 type emptyReader struct{}
 
-func (er *emptyReader) Read(p []byte) (n int, err error) {
+func (e *emptyReader) Read(p []byte) (n int, err error) {
 	return 0, io.EOF
 }
 
-// ClosableBufioReader 可关闭的bufio Reader
-type ClosableBufioReader struct {
-	reader   *bufio.Reader
-	closer   io.Closer
-	closed   bool
-	closedMu sync.RWMutex
-}
-
-// NewClosableBufioReader 创建可关闭的bufio Reader
-func NewClosableBufioReader(r io.ReadCloser) *ClosableBufioReader {
-	return &ClosableBufioReader{
-		reader: bufio.NewReader(r),
-		closer: r,
-		closed: false,
-	}
-}
-
-// NewClosableBufioReaderFromFile 从*os.File创建可关闭的bufio Reader
-func NewClosableBufioReaderFromFile(f *os.File) *ClosableBufioReader {
-	return &ClosableBufioReader{
-		reader: bufio.NewReader(f),
-		closer: nil, // 不关闭原始文件
-		closed: false,
-	}
-}
-
-// ReadLine 读取一行，支持主动关闭中断
-func (cbr *ClosableBufioReader) ReadLine() ([]byte, error) {
-	cbr.closedMu.RLock()
-	if cbr.closed {
-		cbr.closedMu.RUnlock()
-		return nil, io.EOF
-	}
-	cbr.closedMu.RUnlock()
-
-	return cbr.reader.ReadBytes('\n')
-}
-
-// Close 关闭reader，中断正在进行的读取操作
-func (cbr *ClosableBufioReader) Close() error {
-	cbr.closedMu.Lock()
-	defer cbr.closedMu.Unlock()
-
-	if cbr.closed {
-		return nil
-	}
-
-	cbr.closed = true
-	if cbr.closer != nil {
-		return cbr.closer.Close()
-	}
-	return nil
-}
-
-// IsClosed 检查是否已关闭
-func (cbr *ClosableBufioReader) IsClosed() bool {
-	cbr.closedMu.RLock()
-	defer cbr.closedMu.RUnlock()
-	return cbr.closed
-}
-
-// RegisterReader 注册一个背景reader，返回一个同步控制器
+// RegisterReader 注册一个背景reader，返回一个基于管道的控制器
 func (sm *StdinManager) RegisterReader() *ReaderController {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
-	sm.activeReaders++
 
-	// 创建可关闭的bufio reader
-	bufioReader := NewClosableBufioReaderFromFile(sm.originalStdin)
+	// 创建一个管道用于该reader
+	r, w, err := os.Pipe()
+	if err != nil {
+		log.Errorf("Failed to create pipe for reader: %v", err)
+		// 如果创建管道失败，返回一个使用原始stdin的控制器
+		return &ReaderController{
+			manager:    sm,
+			readerPipe: sm.originalStdin,
+		}
+	}
 
-	// 添加到跟踪列表
-	sm.bufioReaders = append(sm.bufioReaders, bufioReader)
+	// 如果当前已经被阻止，直接返回一个被阻止的控制器
+	if sm.prevented {
+		r.Close()
+		w.Close()
+		return &ReaderController{
+			manager:    sm,
+			readerPipe: nil, // nil表示被阻止
+		}
+	}
+
+	// 添加到活跃reader列表
+	sm.activeReaders = append(sm.activeReaders, r)
+
+	// 启动数据转发goroutine
+	go sm.forwardToReaderPipe(w)
 
 	return &ReaderController{
-		manager:     sm,
-		bufioReader: bufioReader,
+		manager:    sm,
+		readerPipe: r,
 	}
 }
 
-// ReaderController 背景reader的同步控制器
+// ReaderController 背景reader的同步控制器（基于管道）
 type ReaderController struct {
-	manager     *StdinManager
-	bufioReader *ClosableBufioReader
+	manager    *StdinManager
+	readerPipe *os.File // 该reader专用的管道
 }
 
-// WaitForSignals 等待暂停/恢复信号，返回true表示应该继续，false表示应该暂停
+// WaitForSignals 检查是否应该继续处理数据
 func (rc *ReaderController) WaitForSignals() bool {
-	rc.manager.pauseCond.L.Lock()
-	defer rc.manager.pauseCond.L.Unlock()
+	rc.manager.mu.RLock()
+	prevented := rc.manager.prevented
+	rc.manager.mu.RUnlock()
 
-	// 如果被暂停，等待恢复信号
-	for rc.manager.paused {
-		rc.manager.pauseCond.Wait()
-	}
-
-	return true
+	// 如果被阻止，返回false表示应该暂停
+	return !prevented
 }
 
-// ReadLine 使用bufio读取一行，支持主动关闭中断（包含强制同步检查）
+// ReadLine 从专用管道逐字节读取一行数据
 func (rc *ReaderController) ReadLine() ([]byte, error) {
-	// 强制检查是否被暂停，如果被暂停立即返回EOF
-	rc.manager.pauseCond.L.Lock()
-	if rc.manager.paused {
-		rc.manager.pauseCond.L.Unlock()
+	// 如果管道为nil，说明被阻止了
+	if rc.readerPipe == nil {
 		return nil, io.EOF
 	}
-	rc.manager.pauseCond.L.Unlock()
 
-	// 使用bufio读取
-	line, err := rc.bufioReader.ReadLine()
-	if err != nil {
-		return nil, err
-	}
+	var line []byte
+	buffer := make([]byte, 1)
 
-	// 去掉换行符
-	if len(line) > 0 && line[len(line)-1] == '\n' {
-		line = line[:len(line)-1]
-	}
-	if len(line) > 0 && line[len(line)-1] == '\r' {
-		line = line[:len(line)-1]
+	for {
+		n, err := rc.readerPipe.Read(buffer)
+		if err != nil {
+			// 如果是管道关闭错误，静默返回EOF，避免大量错误日志
+			if err == io.EOF || err.Error() == "file already closed" {
+				return nil, io.EOF
+			}
+			return nil, err
+		}
+
+		if n > 0 {
+			// 如果遇到换行符，结束读取
+			if buffer[0] == '\n' {
+				break
+			}
+			// 跳过回车符
+			if buffer[0] != '\r' {
+				line = append(line, buffer[0])
+			}
+		}
 	}
 
 	return line, nil
 }
 
-// ReadLineWithSync 使用bufio读取一行，包含同步检查
-func (rc *ReaderController) ReadLineWithSync() ([]byte, error) {
-	// 检查是否被暂停
-	rc.manager.pauseCond.L.Lock()
-	for rc.manager.paused {
-		rc.manager.pauseCond.Wait()
-	}
-	rc.manager.pauseCond.L.Unlock()
-
-	return rc.ReadLine()
-}
-
-// Close 关闭bufio reader，中断正在进行的读取
+// Close 关闭操作（简化版无需操作）
 func (rc *ReaderController) Close() error {
-	if rc.bufioReader != nil {
-		return rc.bufioReader.Close()
-	}
 	return nil
 }
 
-// closeAllBufioReaders 关闭所有活跃的bufio readers
-func (sm *StdinManager) closeAllBufioReaders() {
-	for _, reader := range sm.bufioReaders {
-		if reader != nil {
-			reader.Close()
-		}
-	}
-}
-
-// replaceAllBufioReadersSource 替换所有bufio readers的数据源
-func (sm *StdinManager) replaceAllBufioReadersSource(newSource *os.File) {
-	for _, reader := range sm.bufioReaders {
-		if reader != nil {
-			// 强制设置新的数据源
-			reader.reader = bufio.NewReader(newSource)
-		}
-	}
-}
-
-// recreateAllBufioReaders 重新创建所有bufio readers
-func (sm *StdinManager) recreateAllBufioReaders() {
-	for i, reader := range sm.bufioReaders {
-		if reader != nil {
-			// 关闭旧的reader
-			reader.Close()
-			// 创建新的reader
-			sm.bufioReaders[i] = NewClosableBufioReaderFromFile(sm.originalStdin)
-		}
-	}
-}
-
-// Unregister 注销reader
+// Unregister 注销reader（简化版无需操作）
 func (rc *ReaderController) Unregister() {
+	// 简化版无需操作
+}
+
+// Reactivate 重新激活被阻止的ReaderController（在RecoverDefault后调用）
+func (rc *ReaderController) Reactivate() error {
 	rc.manager.mu.Lock()
 	defer rc.manager.mu.Unlock()
-	rc.manager.activeReaders--
 
-	// 从跟踪列表中移除
-	for i, reader := range rc.manager.bufioReaders {
-		if reader == rc.bufioReader {
-			rc.manager.bufioReaders = append(rc.manager.bufioReaders[:i], rc.manager.bufioReaders[i+1:]...)
-			break
-		}
+	// 如果已经有活跃的管道，无需重新激活
+	if rc.readerPipe != nil {
+		return nil
 	}
 
-	// 关闭bufio reader
-	if rc.bufioReader != nil {
-		rc.bufioReader.Close()
+	// 如果仍然被阻止，无法重新激活
+	if rc.manager.prevented {
+		return nil
 	}
+
+	// 创建新的管道
+	r, w, err := os.Pipe()
+	if err != nil {
+		return err
+	}
+
+	// 设置新的管道
+	rc.readerPipe = r
+	rc.manager.activeReaders = append(rc.manager.activeReaders, r)
+
+	// 启动数据转发goroutine
+	go rc.manager.forwardToReaderPipe(w)
+
+	return nil
 }
