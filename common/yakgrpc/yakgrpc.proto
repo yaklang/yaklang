@@ -222,6 +222,7 @@ service Yak {
   rpc ExportHTTPFlows(ExportHTTPFlowsRequest) returns(QueryHTTPFlowResponse);
   rpc HTTPFlowsToOnline(HTTPFlowsToOnlineRequest) returns (Empty);
   rpc QueryHTTPFlowsProcessNames(QueryHTTPFlowRequest) returns (QueryHTTPFlowsProcessNamesResponse);
+  rpc HTTPFlowsToOnlineBatch(HTTPFlowsToOnlineBatchRequest) returns (HTTPFlowsToOnlineBatchResponse);
 
   // 流量分析器
   rpc AnalyzeHTTPFlow(AnalyzeHTTPFlowRequest) returns (stream AnalyzeHTTPFlowResponse);
@@ -5571,6 +5572,16 @@ message HTTPFlowsToOnlineRequest {
   string ProjectDescription = 3;
   string ExternalModule = 4;
   string ExternalProjectCode = 5;
+}
+
+message HTTPFlowsToOnlineBatchRequest {
+  HTTPFlowsToOnlineRequest ToOnlineWhere = 1;
+  QueryHTTPFlowRequest UploadHTTPFlowsWhere = 2;
+}
+
+message HTTPFlowsToOnlineBatchResponse {
+    int64 SuccessCount = 1;
+    int64 FailedCount = 2;
 }
 
 message AnalyzeHTTPFlowRequest{
