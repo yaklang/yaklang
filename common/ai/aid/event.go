@@ -1,12 +1,14 @@
 package aid
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -225,4 +227,38 @@ type InputEvent struct {
 
 	IsInteractive bool
 	Params        aitool.InvokeParams
+}
+
+func ConvertAIInputEventToAIDInputEvent(event *ypb.AIInputEvent) (*InputEvent, error) {
+	if event.IsSyncMessage {
+		t, ok := ParseSyncType(event.GetSyncType())
+		if !ok {
+			return nil, utils.Errorf("parse sync type failed, got: %v", event.GetSyncType())
+		}
+		var params = make(aitool.InvokeParams)
+		err := json.Unmarshal([]byte(event.GetSyncJsonInput()), &params)
+		if err != nil {
+			log.Errorf("unmarshal interactive json input failed: %v", err)
+		}
+		return &InputEvent{
+			IsSyncInfo: true,
+			SyncType:   t,
+			Params:     params,
+		}, nil
+	}
+
+	if event.IsInteractiveMessage {
+		var params = make(aitool.InvokeParams)
+		err := json.Unmarshal([]byte(event.InteractiveJSONInput), &params)
+		if err != nil {
+			return nil, utils.Errorf("unmarshal interactive json input failed: %v", err)
+		}
+		return &InputEvent{
+			IsInteractive: true,
+			Id:            event.InteractiveId,
+			Params:        params,
+		}, nil
+	}
+
+	return nil, utils.Errorf("unknown input event type: %v", event)
 }
