@@ -174,29 +174,25 @@ jobs:
               # go test -timeout 60s ./common/yak/JS2ssa/... // remove this frontend 
               go test -timeout 1m ./common/yak/ssaapi/test/javascript
 
-          - name: Test SSA Frontend TypeScript
-            run: |
-              go test -timeout 1m ./common/yak/typescript/frontend/tests/...
-              go test -timeout 1m ./common/yak/typescript/js2ssa/tests/...
-
           - name: Test SSA Frontend Java
             run: |
               go test -timeout 5m ./common/yak/java/...
               go test -timeout 3m ./common/yak/ssaapi/test/java
 
-          - name: Test SSA Frontend PHP
+          - name: Test SSA Frontend TypeScript | PHP
             run: |
+              go test -timeout 1m ./common/yak/typescript/frontend/tests/...
+              go test -timeout 1m ./common/yak/typescript/js2ssa/tests/...
+              
               go test -timeout 2m ./common/yak/php/...
               go test -timeout 2m ./common/yak/ssaapi/test/php
 
-          - name: Test SSA Frontend Golang
+          - name: Test SSA Frontend Golang | C
             run: |
               go test -timeout 30s ./common/yak/go2ssa/...
               go test -timeout 30s ./common/yak/antlr4go/...
               go test -timeout 2m ./common/yak/ssaapi/test/golang
-
-          - name: Test SSA Frontend C
-            run: |
+              
               go test -timeout 30s ./common/yak/c2ssa/...
               go test -timeout 30s ./common/yak/antlr4c/...
               go test -timeout 2m ./common/yak/ssaapi/test/c
