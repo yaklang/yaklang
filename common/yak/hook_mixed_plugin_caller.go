@@ -322,6 +322,21 @@ func (c *MixPluginCaller) SetConcurrent(i int) error {
 	return c.GetNativeCaller().SetConcurrent(i)
 }
 
+// SetLongRunningThreshold 设置插件长时间运行阈值（秒）
+func (c *MixPluginCaller) SetLongRunningThreshold(seconds int) {
+	if c.callers != nil {
+		c.callers.SetLongRunningThreshold(seconds)
+	}
+}
+
+// GetLongRunningThreshold 获取插件长时间运行阈值（秒）
+func (c *MixPluginCaller) GetLongRunningThreshold() int {
+	if c.callers != nil {
+		return c.callers.GetLongRunningThreshold()
+	}
+	return consts.PluginCallDurationThresholdSeconds
+}
+
 func (c *MixPluginCaller) Wait() {
 	defer c.websiteFilter.Close()
 
