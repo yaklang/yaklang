@@ -2,15 +2,14 @@ package yakgrpc
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -84,48 +83,6 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 				log.Errorf("receive event failed (for sync messages): %v", err)
 				return
 			}
-			if event.IsSyncMessage {
-				t, ok := aid.ParseSyncType(event.GetSyncType())
-				if !ok {
-					log.Errorf("parse sync type failed, got: %v", event.GetSyncType())
-					continue
-				}
-				var params = make(aitool.InvokeParams)
-				err := json.Unmarshal([]byte(event.GetSyncJsonInput()), &params)
-				if err != nil {
-					log.Errorf("unmarshal interactive json input failed: %v", err)
-				}
-				select {
-				case inputEvent <- &aid.InputEvent{
-					IsSyncInfo: true,
-					SyncType:   t,
-					Params:     params,
-				}:
-					continue
-				case <-baseCtx.Done():
-					return
-				}
-			}
-
-			if event.IsInteractiveMessage {
-				var params = make(aitool.InvokeParams)
-				err := json.Unmarshal([]byte(event.InteractiveJSONInput), &params)
-				if err != nil {
-					log.Errorf("unmarshal interactive json input failed: %v", err)
-					continue
-				}
-				inEvent := &aid.InputEvent{
-					IsInteractive: true,
-					Id:            event.InteractiveId,
-					Params:        params,
-				}
-				select {
-				case inputEvent <- inEvent:
-					continue
-				case <-baseCtx.Done():
-					return
-				}
-			}
 
 			if event.IsConfigHotpatch {
 				params := event.GetParams()
@@ -147,6 +104,19 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 				if updateOption == nil {
 					hotpatchBroadcaster.Submit(updateOption)
 				}
+			}
+
+			result, err := aid.ConvertAIInputEventToAIDInputEvent(event)
+			if err != nil {
+				log.Errorf("Failed to convert AI input event to AID input event: %v", err)
+				continue
+			}
+
+			select {
+			case inputEvent <- result:
+				continue
+			case <-baseCtx.Done():
+				return
 			}
 		}
 	}()

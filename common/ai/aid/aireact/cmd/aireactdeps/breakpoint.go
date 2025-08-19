@@ -3,68 +3,101 @@ package aireactdeps
 import (
 	"fmt"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/aireactdeps/promptui"
 )
 
-// handleRequestBreakpoint 处理断点功能 - 在AI交互前暂停
+// BreakpointOption 定义断点选项
+type BreakpointOption struct {
+	Value       string
+	Description string
+}
+
+// handleRequestBreakpoint 处理断点功能 - 在AI交互前暂停，使用 promptui
 func handleRequestBreakpoint(prompt string) {
+	// 关闭主菜单IO，避免冲突
+	if globalEventMonitor := GetGlobalEventMonitor(); globalEventMonitor != nil {
+		globalEventMonitor.CloseMenu()
+	}
+
 	fmt.Printf("\n" + strings.Repeat("=", 80) + "\n")
 	fmt.Printf("🛑 BREAKPOINT: AI Interaction Paused\n")
 	fmt.Printf(strings.Repeat("=", 80) + "\n")
 	fmt.Printf("PROMPT TO BE SENT:\n")
 	fmt.Printf(strings.Repeat("-", 40) + "\n")
 	fmt.Printf("%s\n", prompt)
-	fmt.Printf(strings.Repeat("-", 40) + "\n")
-	fmt.Printf("\nControls:\n")
-	fmt.Printf("  y/Y/Enter  - Continue with AI request\n")
-	fmt.Printf("  e/q/Q      - Exit program\n")
-	fmt.Printf("  Ctrl+C     - Exit program\n")
-	fmt.Print("\nPress Enter to continue or type command: ")
+	fmt.Printf(strings.Repeat("-", 40) + "\n\n")
 
-	// 设置断点状态以指示我们正在等待断点输入
-	gs := GetGlobalState()
-	gs.SetBreakpointWaiting(true)
-
-	// 为Ctrl+C设置信号处理器
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	defer signal.Stop(sigChan)
-
-	// 等待来自全局输入通道的输入而不是创建新的扫描器
-	// 这避免了与globalInputReader的冲突
-	select {
-	case input := <-gs.UserInput:
-		input = strings.TrimSpace(strings.ToLower(input))
-		switch input {
-		case "", "y", "yes", "continue":
-			fmt.Printf("✅ Continuing with AI request...\n")
-			fmt.Printf(strings.Repeat("=", 80) + "\n\n")
-		case "e", "q", "exit", "quit":
-			fmt.Printf("🚪 Exiting as requested by user\n")
-			os.Exit(0)
-		default:
-			fmt.Printf("🤷 Unknown command '%s', continuing with AI request...\n", input)
-			fmt.Printf(strings.Repeat("=", 80) + "\n\n")
-		}
-	case sig := <-sigChan:
-		fmt.Printf("\n🚪 Received signal %v, exiting...\n", sig)
-		os.Exit(0)
-	case <-time.After(60 * time.Second): // 60秒超时
-		fmt.Printf("\n⏰ Timeout after 60 seconds, continuing with AI request...\n")
-		fmt.Printf(strings.Repeat("=", 80) + "\n\n")
+	// 定义选项
+	options := []BreakpointOption{
+		{Value: "continue", Description: "继续执行 AI 请求"},
+		{Value: "exit", Description: "退出程序"},
 	}
 
-	// 完成时清除断点状态
-	gs.SetBreakpointWaiting(false)
+	// 创建 promptui 选择器
+	templates := &promptui.SelectTemplates{
+		Label:    "{{ . }}?",
+		Active:   "▶ {{ .Description | cyan }}",
+		Inactive: "  {{ .Description }}",
+		Selected: "✓ {{ .Description | green }}",
+	}
+
+	promptSelect := promptui.Select{
+		Label:     "请选择操作",
+		Items:     options,
+		Templates: templates,
+		Size:      4,
+	}
+
+	// 创建一个通道来接收选择结果
+	resultChan := make(chan int, 1)
+	errChan := make(chan error, 1)
+
+	// 在goroutine中运行prompt
+	go func() {
+		selectedIndex, _, err := promptSelect.Run()
+		if err != nil {
+			errChan <- err
+		} else {
+			resultChan <- selectedIndex
+		}
+	}()
+
+	// 等待结果（全局信号处理器会处理Ctrl+C）
+	select {
+	case selectedIndex := <-resultChan:
+		selectedOption := options[selectedIndex]
+		switch selectedOption.Value {
+		case "continue":
+			fmt.Printf("✅ 继续执行 AI 请求...\n")
+			fmt.Printf(strings.Repeat("=", 80) + "\n\n")
+		case "exit":
+			fmt.Printf("🚪 用户请求退出\n")
+			os.Exit(0)
+		}
+	case err := <-errChan:
+		if err == promptui.ErrInterrupt {
+			fmt.Printf("\n🚪 用户中断，正在退出...\n")
+			os.Exit(0)
+		}
+		fmt.Printf("🤷 输入错误，继续执行 AI 请求...\n")
+		fmt.Printf(strings.Repeat("=", 80) + "\n\n")
+	case <-time.After(60 * time.Second): // 60秒超时
+		fmt.Printf("\n⏰ 60秒超时，继续执行 AI 请求...\n")
+		fmt.Printf(strings.Repeat("=", 80) + "\n\n")
+	}
 }
 
-// handleResponseBreakpoint 处理断点功能 - 在AI交互后暂停以检查响应
+// handleResponseBreakpoint 处理断点功能 - 在AI交互后暂停以检查响应，使用 promptui
 func handleResponseBreakpoint(resp *aicommon.AIResponse) {
+	// 关闭主菜单IO，避免冲突
+	if globalEventMonitor := GetGlobalEventMonitor(); globalEventMonitor != nil {
+		globalEventMonitor.CloseMenu()
+	}
+
 	fmt.Printf("\n" + strings.Repeat("=", 80) + "\n")
 	fmt.Printf("🛑 RESPONSE BREAKPOINT: AI Response Received\n")
 	fmt.Printf(strings.Repeat("=", 80) + "\n")
@@ -82,46 +115,64 @@ func handleResponseBreakpoint(resp *aicommon.AIResponse) {
 		fmt.Printf("❌ Response is nil\n")
 	}
 
-	fmt.Printf(strings.Repeat("-", 40) + "\n")
-	fmt.Printf("\nControls:\n")
-	fmt.Printf("  y/Y/Enter  - Continue processing\n")
-	fmt.Printf("  e/q/Q      - Exit program\n")
-	fmt.Printf("  Ctrl+C     - Exit program\n")
-	fmt.Print("\nPress Enter to continue or type command: ")
+	fmt.Printf(strings.Repeat("-", 40) + "\n\n")
 
-	// 设置断点状态以指示我们正在等待断点输入
-	gs := GetGlobalState()
-	gs.SetBreakpointWaiting(true)
-
-	// 为Ctrl+C设置信号处理器
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	defer signal.Stop(sigChan)
-
-	// 等待来自全局输入通道的输入而不是创建新的扫描器
-	// 这避免了与globalInputReader的冲突
-	select {
-	case input := <-gs.UserInput:
-		input = strings.TrimSpace(strings.ToLower(input))
-		switch input {
-		case "", "y", "yes", "continue":
-			fmt.Printf("✅ Continuing with response processing...\n")
-			fmt.Printf(strings.Repeat("=", 80) + "\n\n")
-		case "e", "q", "exit", "quit":
-			fmt.Printf("🚪 Exiting as requested by user\n")
-			os.Exit(0)
-		default:
-			fmt.Printf("🤷 Unknown command '%s', continuing with response processing...\n", input)
-			fmt.Printf(strings.Repeat("=", 80) + "\n\n")
-		}
-	case sig := <-sigChan:
-		fmt.Printf("\n🚪 Received signal %v, exiting...\n", sig)
-		os.Exit(0)
-	case <-time.After(60 * time.Second): // 60秒超时
-		fmt.Printf("\n⏰ Timeout after 60 seconds, continuing with response processing...\n")
-		fmt.Printf(strings.Repeat("=", 80) + "\n\n")
+	// 定义选项
+	options := []BreakpointOption{
+		{Value: "continue", Description: "继续处理响应"},
+		{Value: "exit", Description: "退出程序"},
 	}
 
-	// 完成时清除断点状态
-	gs.SetBreakpointWaiting(false)
+	// 创建 promptui 选择器
+	templates := &promptui.SelectTemplates{
+		Label:    "{{ . }}?",
+		Active:   "▶ {{ .Description | cyan }}",
+		Inactive: "  {{ .Description }}",
+		Selected: "✓ {{ .Description | green }}",
+	}
+
+	promptSelect := promptui.Select{
+		Label:     "请选择操作",
+		Items:     options,
+		Templates: templates,
+		Size:      4,
+	}
+
+	// 创建一个通道来接收选择结果
+	resultChan := make(chan int, 1)
+	errChan := make(chan error, 1)
+
+	// 在goroutine中运行prompt
+	go func() {
+		selectedIndex, _, err := promptSelect.Run()
+		if err != nil {
+			errChan <- err
+		} else {
+			resultChan <- selectedIndex
+		}
+	}()
+
+	// 等待结果（全局信号处理器会处理Ctrl+C）
+	select {
+	case selectedIndex := <-resultChan:
+		selectedOption := options[selectedIndex]
+		switch selectedOption.Value {
+		case "continue":
+			fmt.Printf("✅ 继续处理响应...\n")
+			fmt.Printf(strings.Repeat("=", 80) + "\n\n")
+		case "exit":
+			fmt.Printf("🚪 用户请求退出\n")
+			os.Exit(0)
+		}
+	case err := <-errChan:
+		if err == promptui.ErrInterrupt {
+			fmt.Printf("\n🚪 用户中断，正在退出...\n")
+			os.Exit(0)
+		}
+		fmt.Printf("🤷 输入错误，继续处理响应...\n")
+		fmt.Printf(strings.Repeat("=", 80) + "\n\n")
+	case <-time.After(60 * time.Second): // 60秒超时
+		fmt.Printf("\n⏰ 60秒超时，继续处理响应...\n")
+		fmt.Printf(strings.Repeat("=", 80) + "\n\n")
+	}
 }
