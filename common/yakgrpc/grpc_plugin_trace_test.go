@@ -18,7 +18,7 @@ import (
 
 // 测试插件执行超过一定时间被推送到客户端后被用户手动取消
 func TestGRPCMUSTPASS_PluginTraceLongRunningAndCancel(t *testing.T) {
-	timeThreshold := consts.PluginCallDurationThresholdSecondsForTest + 5
+	timeThreshold := 3 // 使用3秒，确保有足够时间被检测为长时间运行
 	testScript := &schema.YakScript{
 		ScriptName: "time-exhausted-hook-call",
 		Content: fmt.Sprintf(`
@@ -37,6 +37,8 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	testCaller, err := yak.NewMixPluginCaller()
 	require.NoError(t, err)
 	testCaller.SetCallPluginTimeout(60)
+	// 设置较短的长时间运行阈值，加速测试
+	testCaller.SetLongRunningThreshold(consts.PluginCallDurationThresholdSecondsForTest)
 	mitmPluginCallerGlobal = testCaller
 	mitmPluginCallerNotifyChan = make(chan struct{})
 	defer func() {
@@ -106,7 +108,7 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	var statsReceived bool
 
 	// 等待并验证trace响应
-	timeout := time.After(30 * time.Second)
+	timeout := time.After(10 * time.Second)
 	for {
 		select {
 		case resp := <-traceResponses:
@@ -122,7 +124,7 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 						assert.NotEmpty(t, trace.TraceID)
 						assert.Equal(t, "mirrorHTTPFlow", trace.HookName)
 						assert.Equal(t, "running", trace.Status)
-						assert.Greater(t, trace.DurationMs, int64(4000)) // 应该超过5秒
+						assert.Greater(t, trace.DurationMs, int64(consts.PluginCallDurationThresholdSecondsForTest*1000)) // 应该超过1秒阈值
 
 						log.Infof("检测到长时间运行的trace: %s，准备取消", longRunningTraceID)
 
@@ -169,9 +171,9 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 
 		case <-timeout:
 			if longRunningTraceID == "" {
-				t.Fatal("30秒内未检测到长时间运行的trace")
+				t.Fatal("10秒内未检测到长时间运行的trace")
 			} else {
-				t.Fatal("30秒内未收到取消确认")
+				t.Fatal("10秒内未收到取消确认")
 			}
 		}
 	}
@@ -182,8 +184,8 @@ testComplete:
 
 // 测试插件执行失败的情况 先因长时间调用推送给前端后执行失败
 func TestGRPCMUSTPASS_PluginTraceExecutionFailed(t *testing.T) {
-	timeThreshold := consts.PluginCallDurationThresholdSecondsForTest + 5
-	maxNotifyTime := consts.PluginCallDurationThresholdSecondsForTest + 10
+	timeThreshold := 3  // 使用2秒，超过1秒阈值
+	maxNotifyTime := 10 // 总等待时间
 	testScript := &schema.YakScript{
 		ScriptName: "error-plugin",
 		Content: fmt.Sprintf(`
@@ -202,6 +204,8 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	testCaller, err := yak.NewMixPluginCaller()
 	require.NoError(t, err)
 	testCaller.SetCallPluginTimeout(60)
+	// 设置较短的长时间运行阈值，加速测试
+	testCaller.SetLongRunningThreshold(consts.PluginCallDurationThresholdSecondsForTest)
 	mitmPluginCallerGlobal = testCaller
 	mitmPluginCallerNotifyChan = make(chan struct{})
 	defer func() {
@@ -268,7 +272,7 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 				}
 			}
 		case <-timeout:
-			t.Fatal("15秒内未收到failed状态")
+			t.Fatal("10秒内未收到failed状态")
 		}
 	}
 
@@ -298,6 +302,8 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	testCaller, err := yak.NewMixPluginCaller()
 	require.NoError(t, err)
 	testCaller.SetCallPluginTimeout(60)
+	// 设置较短的长时间运行阈值，加速测试
+	testCaller.SetLongRunningThreshold(1)
 	mitmPluginCallerGlobal = testCaller
 	mitmPluginCallerNotifyChan = make(chan struct{})
 	defer func() {
@@ -343,7 +349,7 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	}()
 
 	// 等待足够时间，确保如果有trace会被推送
-	timeout := time.After(8 * time.Second)
+	timeout := time.After(3 * time.Second) // 快速插件应该在1秒内完成
 	receivedFastPluginTrace := false
 
 	for {
@@ -370,7 +376,7 @@ testComplete:
 
 // 测试多个并发插件执行
 func TestGRPCMUSTPASS_PluginTraceConcurrentPlugins(t *testing.T) {
-	timeThreshold := consts.PluginCallDurationThresholdSecondsForTest + 5
+	timeThreshold := 3 // 使用3秒，超过1秒阈值
 	// 创建多个不同的插件
 	longPlugin := &schema.YakScript{
 		ScriptName: "long-plugin-1",
@@ -402,6 +408,8 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	testCaller, err := yak.NewMixPluginCaller()
 	require.NoError(t, err)
 	testCaller.SetCallPluginTimeout(60)
+	// 设置较短的长时间运行阈值，加速测试
+	testCaller.SetLongRunningThreshold(consts.PluginCallDurationThresholdSecondsForTest)
 	err = testCaller.SetConcurrent(20)
 	require.NoError(t, err)
 	mitmPluginCallerGlobal = testCaller
@@ -453,7 +461,7 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	}()
 
 	receivedTraces := make(map[string][]string) // pluginID -> statuses
-	timeout := time.After(30 * time.Second)
+	timeout := time.After(10 * time.Second)     // 基于2秒插件执行时间
 	expectedPlugins := map[string]bool{"long-plugin-1": false, "error-plugin-2": false}
 
 	for {
@@ -532,6 +540,8 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	testCaller, err := yak.NewMixPluginCaller()
 	require.NoError(t, err)
 	testCaller.SetCallPluginTimeout(60)
+	// 设置较短的长时间运行阈值，加速测试
+	testCaller.SetLongRunningThreshold(consts.PluginCallDurationThresholdSecondsForTest)
 	mitmPluginCallerGlobal = testCaller
 	mitmPluginCallerNotifyChan = make(chan struct{})
 	defer func() {
@@ -739,9 +749,9 @@ func TestGRPCMUSTPASS_PluginTraceWithoutMITM(t *testing.T) {
 
 // 测试客户端取消时插件已经失败的竞态条件
 func TestGRPCMUSTPASS_PluginTraceCancelRaceCondition_AlreadyFailed(t *testing.T) {
-	timeThreshold := consts.PluginCallDurationThresholdSecondsForTest + 5 // make sure client received this running trace
+	timeThreshold := 3 // make sure client received this running trace
 	// after received running trace client try to cancel the trace whereas the trace failed before actually cancel been called
-	cancelTiming := 10
+	cancelTiming := 6
 	testScript := &schema.YakScript{
 		ScriptName: "race-condition-fail-plugin",
 		Content: fmt.Sprintf(`
@@ -760,6 +770,8 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	testCaller, err := yak.NewMixPluginCaller()
 	require.NoError(t, err)
 	testCaller.SetCallPluginTimeout(60)
+	// 设置较短的长时间运行阈值，加速测试
+	testCaller.SetLongRunningThreshold(consts.PluginCallDurationThresholdSecondsForTest)
 	mitmPluginCallerGlobal = testCaller
 	mitmPluginCallerNotifyChan = make(chan struct{})
 	defer func() {
@@ -867,7 +879,7 @@ testComplete:
 
 // 测试客户端取消时插件已经正常完成的竞态条件
 func TestGRPCMUSTPASS_PluginTraceCancelRaceCondition_AlreadyCompleted(t *testing.T) {
-	timeThreshold := consts.PluginCallDurationThresholdSecondsForTest + 5 // make sure client received this running trace
+	timeThreshold := 3 // make sure client received this running trace
 	// after received running trace client try to cancel the trace whereas the trace complete before actually cancel been called
 	cancelTiming := 10
 	testScript := &schema.YakScript{
@@ -888,6 +900,8 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	testCaller, err := yak.NewMixPluginCaller()
 	require.NoError(t, err)
 	testCaller.SetCallPluginTimeout(60)
+	// 设置较短的长时间运行阈值，加速测试
+	testCaller.SetLongRunningThreshold(consts.PluginCallDurationThresholdSecondsForTest)
 	mitmPluginCallerGlobal = testCaller
 	mitmPluginCallerNotifyChan = make(chan struct{})
 	defer func() {
@@ -995,7 +1009,7 @@ testComplete:
 
 // 测试 grpc 插件取消加载时的 trace 状态更新
 func TestGRPCMUSTPASS_PluginTraceUnloadPluginCancelTraces(t *testing.T) {
-	timeThreshold := consts.PluginCallDurationThresholdSecondsForTest * 10 // make sure we block long enough
+	timeThreshold := 3 // make sure we block long enough
 	log.SetLevel(log.DebugLevel)
 	// 创建自定义插件脚本，包含多个mirror函数
 	customPluginScript := fmt.Sprintf(`
@@ -1036,6 +1050,7 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
 		t.Fatal(err)
 	}
 	testCaller.SetCallPluginTimeout(300)
+	testCaller.SetLongRunningThreshold(consts.PluginCallDurationThresholdSecondsForTest)
 	testCaller.SetDividedContext(true)
 	mitmPluginCallerGlobal = testCaller
 	mitmPluginCallerNotifyChan = make(chan struct{})
