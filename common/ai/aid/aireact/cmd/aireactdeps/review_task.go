@@ -3,6 +3,7 @@ package aireactdeps
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/aireactdeps/promptui"
@@ -13,7 +14,7 @@ import (
 
 // handleTaskReviewRequireClient 使用 promptui 处理 TASK_REVIEW_REQUIRE 事件
 func handleTaskReviewRequireClient(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInputEvent) {
-	NewStdinManager().PreventDefault()
+	stdin := NewStdinManager().PreventDefault()
 	defer NewStdinManager().RecoverDefault()
 
 	// 解析审核事件内容
@@ -131,6 +132,7 @@ func handleTaskReviewRequireClient(event *schema.AiOutputEvent, inputChan chan<-
 		Templates: templates,
 		Size:      4,
 		Searcher:  searcher,
+		Stdin:     io.NopCloser(stdin),
 	}
 
 	var selectedIndex int

@@ -3,6 +3,7 @@ package aireactdeps
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/jsonpath"
-	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/log"
@@ -147,14 +147,43 @@ func handleInteractiveLoop(reactInstance *aireact.ReAct, ctx context.Context, co
 // SetupSignalHandler 设置全局信号处理器
 func SetupSignalHandler(ctx context.Context, config *CLIConfig) {
 	go func() {
-		defaultReader := NewStdinManager().GetDefaultReader()
+		manager := NewStdinManager()
+		controller := manager.RegisterReader()
+		defer controller.Unregister()
+
 		for {
-			buffer, err := utils.ReadLine(defaultReader)
-			if err != nil {
-				log.Errorf("Failed to read line from stdin: %v", err)
-				continue
+			select {
+			case <-ctx.Done():
+				// 主动关闭bufio reader以中断阻塞的读取
+				controller.Close()
+				return
+			default:
+				// 检查暂停/恢复信号
+				if !controller.WaitForSignals() {
+					time.Sleep(50 * time.Millisecond)
+					continue
+				}
+
+				// 使用新的bufio ReadLine，支持主动关闭中断
+				buffer, err := controller.ReadLine()
+				if err != nil {
+					if err == io.EOF {
+						// 如果是EOF（被阻止或关闭），检查是否是正常退出
+						select {
+						case <-ctx.Done():
+							return
+						default:
+							time.Sleep(50 * time.Millisecond)
+							continue
+						}
+					}
+					log.Errorf("Failed to read line from stdin: %v", err)
+					continue
+				}
+
+				// 处理正常输入
+				handleFreeInput(string(buffer)+"\n", config)
 			}
-			handleFreeInput(string(buffer)+"\n", config)
 		}
 	}()
 }

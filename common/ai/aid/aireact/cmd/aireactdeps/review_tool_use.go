@@ -3,6 +3,7 @@ package aireactdeps
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/aireactdeps/promptui"
@@ -23,7 +24,7 @@ func getString(m map[string]interface{}, key string) string {
 
 // handleReviewRequireClient 使用 promptui 处理 TOOL_USE_REVIEW_REQUIRE 事件
 func handleReviewRequireClient(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInputEvent) {
-	NewStdinManager().PreventDefault()
+	stdin := NewStdinManager().PreventDefault()
 	defer NewStdinManager().RecoverDefault()
 
 	// 解析审核事件内容
@@ -125,7 +126,7 @@ func handleReviewRequireClient(event *schema.AiOutputEvent, inputChan chan<- *yp
 		Templates: templates,
 		Size:      4,
 		Searcher:  searcher,
-		// 直接使用 os.Stdin，不通过会话管理器
+		Stdin:     io.NopCloser(stdin),
 	}
 
 	fmt.Printf("\n请审核AI要使用的工具，选择您的操作：\n\n")
