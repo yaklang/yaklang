@@ -315,61 +315,8 @@ func TestStdinManagerSynchronizedControl(t *testing.T) {
 
 // TestClosableBufioReader 测试可关闭的bufio Reader
 func TestClosableBufioReader(t *testing.T) {
-	t.Log("=== 测试可关闭的bufio Reader ===")
-
-	// 创建一个管道来模拟stdin
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("Failed to create pipe: %v", err)
-	}
-	defer r.Close()
-	defer w.Close()
-
-	// 创建可关闭的bufio reader
-	cbr := NewClosableBufioReader(r)
-	defer cbr.Close()
-
-	var wg sync.WaitGroup
-	var readError error
-	var mu sync.Mutex
-
-	// 启动读取goroutine
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		_, err := cbr.ReadLine()
-		mu.Lock()
-		readError = err
-		mu.Unlock()
-	}()
-
-	// 等待一小段时间确保读取开始
-	time.Sleep(100 * time.Millisecond)
-
-	// 主动关闭reader
-	t.Log("主动关闭bufio reader...")
-	err = cbr.Close()
-	if err != nil {
-		t.Errorf("Failed to close reader: %v", err)
-	}
-
-	// 等待读取goroutine完成
-	wg.Wait()
-
-	// 验证结果
-	mu.Lock()
-	defer mu.Unlock()
-
-	// 关闭管道可能返回EOF或"file already closed"错误
-	if readError == nil {
-		t.Error("Expected an error after close")
-	} else if readError != io.EOF && !strings.Contains(readError.Error(), "closed") {
-		t.Errorf("Expected EOF or close error after close, got: %v", readError)
-	}
-
-	t.Log("✓ 可关闭的bufio Reader测试通过")
-	t.Log("✓ 主动关闭成功中断了阻塞的读取操作")
+	t.Log("=== ClosableBufioReader已被移除，跳过测试 ===")
+	t.Skip("ClosableBufioReader functionality has been removed in simplified version")
 }
 
 // TestReaderControllerBufioReadLine 测试ReaderController的bufio ReadLine功能
@@ -485,9 +432,10 @@ func TestSetupSignalHandlerWithBufioReadLine(t *testing.T) {
 	}
 	defer w.Close()
 
-	// 替换原始stdin
+	// 替换原始stdin（简化版）
 	originalStdin := manager.originalStdin
 	manager.originalStdin = r
+
 	defer func() {
 		manager.originalStdin = originalStdin
 		r.Close()
@@ -508,13 +456,14 @@ func TestSetupSignalHandlerWithBufioReadLine(t *testing.T) {
 		t.Logf("Handled input: %q", strings.TrimSpace(input))
 	}
 
+	// 创建controller在外部，这样可以在RecoverDefault后调用Reactivate
+	controller := manager.RegisterReader()
+	defer controller.Unregister()
+
 	// 启动模拟的SetupSignalHandler
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-
-		controller := manager.RegisterReader()
-		defer controller.Unregister()
 
 		for {
 			select {
@@ -524,6 +473,11 @@ func TestSetupSignalHandlerWithBufioReadLine(t *testing.T) {
 			default:
 				// 检查暂停/恢复信号
 				if !controller.WaitForSignals() {
+					continue
+				}
+
+				if manager.IsPrevented() {
+					time.Sleep(50 * time.Millisecond)
 					continue
 				}
 
@@ -538,9 +492,14 @@ func TestSetupSignalHandlerWithBufioReadLine(t *testing.T) {
 							time.Sleep(50 * time.Millisecond)
 							continue
 						}
+					} else {
+						// 对于其他错误（如管道关闭），只在不是"file already closed"时记录日志
+						if err.Error() != "file already closed" {
+							t.Logf("Read error: %v", err)
+						}
+						time.Sleep(100 * time.Millisecond)
+						continue
 					}
-					t.Logf("Read error: %v", err)
-					continue
 				}
 
 				// 处理正常输入
