@@ -13,12 +13,26 @@ desc(
 2. **覆盖高危输出函数**
    检测以下10个PHP输出函数：
    `echo`, `print`, `print_r`, `exit`, `die`, `sprint`, `var_dump`, `var_export`, `show_source`, `highlight_file`。
+
+3. **触发场景示例**
+   ```php
+   <?php
+   $userInput = $_GET['input']; // 用户可控输入
+   echo $userInput; // 直接输出未过滤的用户输入
+   ?>
+   ```
+   攻击者可以传入恶意HTML或JavaScript代码（如`<script>alert('XSS')</script>`），导致其在页面上执行。
+
+4. **潜在影响**
+   - 攻击者可以通过注入恶意脚本窃取用户的敏感信息（如Cookie、Session ID）。
+   - 可能导致用户被重定向至钓鱼站点或下载恶意软件。
+   - 在某些情况下，攻击者甚至可能利用XSS漏洞进一步实施CSRF或其他复杂攻击。
+
 DESC
 	rule_id: "83111614-77e4-4376-996f-734c017a6e0a"
 	title_zh: "审计PHP XSS相关方法"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用HTML实体编码
 对所有用户可控的输出进行HTML实体编码，防止恶意脚本执行。
 ```php
@@ -39,7 +53,7 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self'");
 ```php
 // 示例：验证输入为合法的URL
 if (!filter_var($userInput, FILTER_VALIDATE_URL)) {
-    throw new InvalidArgumentException("Invalid URL");
+throw new InvalidArgumentException("Invalid URL");
 }
 ```
 
@@ -52,6 +66,7 @@ if (!filter_var($userInput, FILTER_VALIDATE_URL)) {
 SOLUTION
 	reference: <<<REFERENCE
 [PHP: 核心 PHP（或其他）扩展手册](https://www.php.net/manual/zh/funcref.php)
+[CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')](https://cwe.mitre.org/data/definitions/79.html)
 REFERENCE
 )
 

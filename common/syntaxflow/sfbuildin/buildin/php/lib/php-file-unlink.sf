@@ -4,39 +4,33 @@ desc(
 	lib: 'php-file-unlink'
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   使用`unlink`或`rmdir`等文件操作函数时，如果路径参数未经过严格的验证和过滤，可能导致任意文件删除或目录删除的风险。攻击者可通过构造恶意输入实现路径遍历，删除关键系统文件或敏感数据。
-
+使用`unlink`或`rmdir`等文件操作函数时，如果路径参数未经过严格的验证和过滤，可能导致任意文件删除或目录删除的风险。攻击者可通过构造恶意输入实现路径遍历，删除关键系统文件或敏感数据。
 2. **触发场景**
-   ```php
+```php
 <?php
-    // 存在风险的代码示例：删除路径直接来自用户输入（未经验证）
-    $user_supplied_path = $_GET['filepath'];
-    if (!empty($user_supplied_path)) {
-        // 潜在的任意文件删除风险
-        @unlink($user_supplied_path);
-        echo "尝试删除文件: " . htmlspecialchars($user_supplied_path) . "<br>";
-    }
-
-    // 存在风险的代码示例：删除目录路径来自用户输入（未经验证）
-    $user_supplied_dir = $_POST['dirname'];
-    if (!empty($user_supplied_dir)) {
-        // 潜在的任意目录删除风险
-        @rmdir($user_supplied_dir);
-        echo "尝试删除目录: " . htmlspecialchars($user_supplied_dir) . "<br>";
-    }
+// 存在风险的代码示例：删除路径直接来自用户输入（未经验证）
+$user_supplied_path = $_GET['filepath'];
+if (!empty($user_supplied_path)) {
+// 潜在的任意文件删除风险
+@unlink($user_supplied_path);
+echo "尝试删除文件: " . htmlspecialchars($user_supplied_path) . "<br>";
+}
+// 存在风险的代码示例：删除目录路径来自用户输入（未经验证）
+$user_supplied_dir = $_POST['dirname'];
+if (!empty($user_supplied_dir)) {
+// 潜在的任意目录删除风险
+@rmdir($user_supplied_dir);
+echo "尝试删除目录: " . htmlspecialchars($user_supplied_dir) . "<br>";
+}
 ?>
-   ```
-
+```
 3. **潜在影响**
-   - **任意文件删除**: 攻击者可利用路径遍历漏洞删除应用根目录之外的关键文件，如配置文件、日志文件或系统文件，导致拒绝服务或其他严重后果。
-   - **数据丢失**: 如果误用这些函数，可能造成用户上传文件或业务关键数据被意外删除。
-   - **权限提升**: 删除某些保护性文件后，可能为后续攻击提供便利条件。
-
+- **任意文件删除**: 攻击者可利用路径遍历漏洞删除应用根目录之外的关键文件，如配置文件、日志文件或系统文件，导致拒绝服务或其他严重后果。
+- **数据丢失**: 如果误用这些函数，可能造成用户上传文件或业务关键数据被意外删除。
+- **权限提升**: 删除某些保护性文件后，可能为后续攻击提供便利条件。
 ### 规则目的
 该规则用于审计PHP代码中调用`unlink`和`rmdir`函数的情况，定位所有使用这些函数的代码点以评估其安全性，防止因外部不可信输入引发的安全问题。
-
 ### 规则详细
 该规则属于`php-file-unlink`库规则（`lib`类型），需配合其他规则共同检测潜在的文件操作漏洞，提供核心函数识别能力。
 DESC
@@ -44,43 +38,35 @@ DESC
 	title_zh: "检测PHP文件删除函数"
 	solution: <<<SOLUTION
 ### 安全建议
-
 该规则属于审计规则，主要目的是标记出可能存在风险的关键函数使用点。针对`unlink`和`rmdir`函数的使用，以下是具体的修复和预防措施：
-
 #### 1. 避免直接使用用户输入作为路径参数
 - 对用户输入进行严格的白名单校验，仅允许操作预定义或预期的文件/目录。
 - 示例代码：
 ```php
 <?php
-    $allowed_files = ["log.txt", "temp.log"];
-    $requested_file = basename($_GET['file']); // 剥离目录信息
-    if (in_array($requested_file, $allowed_files)) {
-        unlink("/safe/directory/$requested_file");
-        echo "文件删除成功";
-    } else {
-        echo "无效的文件名";
-    }
+$allowed_files = ["log.txt", "temp.log"];
+$requested_file = basename($_GET['file']); // 剥离目录信息
+if (in_array($requested_file, $allowed_files)) {
+unlink("/safe/directory/$requested_file");
+echo "文件删除成功";
+} else {
+echo "无效的文件名";
+}
 ?>
 ```
-
 #### 2. 限制文件操作的根目录
 - 配置 `open_basedir` 或通过编程方式将文件操作限制在特定安全目录内，防止访问系统其他区域。
-
 #### 3. 权限控制
 - 确保运行PHP的系统用户只拥有最低必要权限。
 - 在应用层面实现细粒度权限控制，只有经过身份验证且授权的用户才能执行文件删除操作。
-
 #### 4. 文件名和路径验证与过滤
 - 使用安全函数（如`basename()`）处理文件名，剥离目录信息。
 - 对输入路径进行规范化，去除相对路径和特殊字符。
 - 校验最终路径是否位于允许操作的安全目录内。
-
 #### 5. 使用唯一文件名
 - 对于用户上传文件或临时文件，采用随机生成或加密哈希作为文件名，降低猜测风险。
-
 #### 6. 日志记录与错误处理
 - 记录文件删除操作的详细信息，包括执行用户、文件路径等，便于审计和追踪。
-
 #### 7. 备份机制
 - 建立完善的数据备份和恢复机制，即使发生意外删除，也能及时恢复数据。
 SOLUTION
@@ -93,55 +79,86 @@ REFERENCE
 /^(unlink|rmdir)$/ as $output
 
 alert $output for {
-	desc: <<<CODE
+	desc: <<<DESC
 ### 1.规则目的
 该规则用于审计PHP代码中用于文件或目录删除的关键函数`unlink`和`rmdir`的使用情况。目的是识别出代码中所有调用这些函数的地方，以便人工审计其输入源是否经过充分的验证和过滤，防止因用户输入或外部不可信数据直接或间接影响删除路径，从而导致路径遍历、任意文件删除等安全问题，或因误用导致非预期的数据丢失。
-
 ### 2.规则详细
 1. **作为基础检测库**
-   属于`php-file-unlink`库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测潜在的文件操作漏洞，提供核心函数识别能力。
-
+属于`php-file-unlink`库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测潜在的文件操作漏洞，提供核心函数识别能力。
 2. **覆盖关键文件/目录删除函数**
-   检测以下两个PHP文件/目录删除函数：
-   - `unlink()`: 用于删除文件。
-   - `rmdir()`: 用于删除空目录。
-
+检测以下两个PHP文件/目录删除函数：
+- `unlink()`: 用于删除文件。
+- `rmdir()`: 用于删除空目录。
 3. **潜在风险**
-   - **任意文件删除**: 如果删除路径受用户控制且未经严格过滤，攻击者可以删除敏感文件（如配置文件、日志文件）或系统文件，导致拒绝服务或进一步攻击。
-   - **数据丢失**: 在业务逻辑中不当使用这些函数，可能导致用户数据、上传文件等被意外删除。
-   - **路径遍历**: 结合路径遍历漏洞，攻击者可以删除应用根目录之外的文件。
-
+- **任意文件删除**: 如果删除路径受用户控制且未经严格过滤，攻击者可以删除敏感文件（如配置文件、日志文件）或系统文件，导致拒绝服务或进一步攻击。
+- **数据丢失**: 在业务逻辑中不当使用这些函数，可能导致用户数据、上传文件等被意外删除。
+- **路径遍历**: 结合路径遍历漏洞，攻击者可以删除应用根目录之外的文件。
 ### 示例代码
 ```php
 <?php
-    // 存在风险的代码示例：删除路径直接来自用户输入（未经验证）
-    $user_supplied_path = $_GET['filepath'];
-    if (!empty($user_supplied_path)) {
-        // 潜在的任意文件删除风险
-        @unlink($user_supplied_path);
-        echo "尝试删除文件: " . htmlspecialchars($user_supplied_path) . "<br>";
-    }
-
-    // 存在风险的代码示例：删除目录路径来自用户输入（未经验证）
-    $user_supplied_dir = $_POST['dirname'];
-    if (!empty($user_supplied_dir)) {
-        // 潜在的任意目录删除风险
-        @rmdir($user_supplied_dir);
-        echo "尝试删除目录: " . htmlspecialchars($user_supplied_dir) . "<br>";
-    }
-
-    // 安全的代码示例：删除固定路径的文件
-    $fixed_file = '/path/to/temporary_file.log';
-    if (file_exists($fixed_file)) {
-        @unlink($fixed_file);
-        echo "已删除临时文件: " . $fixed_file . "<br>";
-    }
+// 存在风险的代码示例：删除路径直接来自用户输入（未经验证）
+$user_supplied_path = $_GET['filepath'];
+if (!empty($user_supplied_path)) {
+// 潜在的任意文件删除风险
+@unlink($user_supplied_path);
+echo "尝试删除文件: " . htmlspecialchars($user_supplied_path) . "<br>";
+}
+// 存在风险的代码示例：删除目录路径来自用户输入（未经验证）
+$user_supplied_dir = $_POST['dirname'];
+if (!empty($user_supplied_dir)) {
+// 潜在的任意目录删除风险
+@rmdir($user_supplied_dir);
+echo "尝试删除目录: " . htmlspecialchars($user_supplied_dir) . "<br>";
+}
+// 安全的代码示例：删除固定路径的文件
+$fixed_file = '/path/to/temporary_file.log';
+if (file_exists($fixed_file)) {
+@unlink($fixed_file);
+echo "已删除临时文件: " . $fixed_file . "<br>";
+}
 ?>
 ```
-CODE
+DESC
 	level: "info",
 	title: "Detect PHP File Deletion Functions",
 	title_zh: "检测PHP文件删除函数",
+	message: "发现PHP代码中调用了文件删除函数`unlink`或`rmdir`，需要审计输入源是否经过充分验证和过滤。",
+	solution: <<<SOLUTION
+### 安全建议
+该规则属于审计规则，主要目的是标记出可能存在风险的关键函数使用点。针对`unlink`和`rmdir`函数的使用，以下是具体的修复和预防措施：
+#### 1. 避免直接使用用户输入作为路径参数
+- 对用户输入进行严格的白名单校验，仅允许操作预定义或预期的文件/目录。
+- 示例代码：
+```php
+<?php
+$allowed_files = ["log.txt", "temp.log"];
+$requested_file = basename($_GET['file']); // 剥离目录信息
+if (in_array($requested_file, $allowed_files)) {
+unlink("/safe/directory/$requested_file");
+echo "文件删除成功";
+} else {
+echo "无效的文件名";
+}
+?>
+```
+#### 2. 限制文件操作的根目录
+- 配置 `open_basedir` 或通过编程方式将文件操作限制在特定安全目录内，防止访问系统其他区域。
+#### 3. 权限控制
+- 确保运行PHP的系统用户只拥有最低必要权限。
+- 在应用层面实现细粒度权限控制，只有经过身份验证且授权的用户才能执行文件删除操作。
+#### 4. 文件名和路径验证与过滤
+- 使用安全函数（如`basename()`）处理文件名，剥离目录信息。
+- 对输入路径进行规范化，去除相对路径和特殊字符。
+- 校验最终路径是否位于允许操作的安全目录内。
+#### 5. 使用唯一文件名
+- 对于用户上传文件或临时文件，采用随机生成或加密哈希作为文件名，降低猜测风险。
+#### 6. 日志记录与错误处理
+- 记录文件删除操作的详细信息，包括执行用户、文件路径等，便于审计和追踪。
+#### 7. 备份机制
+- 建立完善的数据备份和恢复机制，即使发生意外删除，也能及时恢复数据。
+SOLUTION
+	risk: "信息",
+	name: "output",
 }
 
 desc(

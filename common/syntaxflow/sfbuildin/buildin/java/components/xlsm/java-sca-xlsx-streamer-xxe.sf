@@ -1,6 +1,6 @@
 desc(
-	title_zh: "检测Java xlsx-streamer依赖漏洞"
-	title: "Check Java xlsx-streamer Vulnerability"
+	title_zh: "SCA: 检测Java xlsx-streamer依赖漏洞"
+	title: "SCA: Check Java xlsx-streamer Vulnerability"
 	type: vuln
 	level: high
 	harm_zh: "此漏洞可能导致 XML 外部实体注入（XXE）、内存溢出（OOM）或拒绝服务（DoS）攻击。如果直接使用 xlsx-streamer 库的 StreamingReader.builder().open() 方法解析来自用户的不可信输入流，且未进行安全过滤，攻击者可以构造恶意 XLSX 文件触发安全缺陷。同时，使用低于 1.2.0 的 xlsx-streamer 版本存在已知漏洞，可能被恶意文件利用。",
@@ -74,6 +74,24 @@ alert $result for {
 SOLUTION
 	risk: "XXE",
 	name: "result",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+XML外部实体注入（XXE）是由于应用程序在解析XML文件时未禁用外部实体的加载，攻击者可以通过构造恶意的XML文档访问服务器上的敏感文件、执行远程代码或导致拒绝服务。xlsx-streamer库作为处理Excel XLSX文件的工具，如果直接解析不受信任的输入流且缺乏安全过滤机制，则可能成为XXE攻击的目标。
+2. **触发场景**
+```java
+import com.monitorjbl.xlsx.StreamingReader;
+import java.io.InputStream;
+InputStream untrustedInput = request.getInputStream();
+StreamingReader.builder().open(untrustedInput); // 直接解析用户输入流
+```
+在上述代码中，如果用户上传了一个包含恶意DTD声明的XLSX文件，可能导致XXE漏洞，进而泄露系统敏感信息或引发其他安全问题。
+3. **潜在影响**
+- 攻击者可以读取服务器上的任意文件（例如`/etc/passwd`）。
+- 可能被利用进行服务器端请求伪造（SSRF）。
+- 引发内存溢出（OOM）或拒绝服务（DoS），影响系统稳定性。
+- 使用低于1.2.0版本的xlsx-streamer还存在已知漏洞，进一步扩大风险面。
+DESC
 }
 
 __dependency__.*xlsx*streamer*.version as $ver;
@@ -101,12 +119,15 @@ SOLUTION
 	message: "检测到使用的 xlsx-streamer 版本低于 1.2.0，存在已知安全漏洞，请尽快升级。",
 	risk: "SCA",
 	name: "vuln_xlsx",
+	desc: <<<DESC
+该规则用于检测xlsx-streamer依赖是否低于1.2.0版本，若低于1.2.0则可能存在已知的安全缺陷，包括但不限于XXE、内存溢出（OOM）、拒绝服务（DoS）等风险。建议升级至最新稳定版本以消除隐患。
+DESC
 }
 
 desc(
-    lang:java,
-    alert_num:2,
-    "file://demo.java":<<<CODE
+	lang:java
+	alert_num:2
+	"file://demo.java":<<<CODE
     package org.joychou.controller.othervulns;
 
     import com.monitorjbl.xlsx.StreamingReader;
@@ -142,7 +163,7 @@ desc(
         }
     }
 CODE
-    "file://pom.xml":<<<TEXT
+	"file://pom.xml":<<<TEXT
     <?xml version="1.0" encoding="UTF-8"?>
     <project xmlns="http://maven.apache.org/POM/4.0.0"
              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -204,7 +225,7 @@ CODE
         </build>
     </project>
 TEXT
-"safefile://demo2.java":<<<CODE
+	"safefile://demo2.java":<<<CODE
     package org.joychou.controller.othervulns;
 
     import com.monitorjbl.xlsx.StreamingReader;
@@ -233,7 +254,7 @@ TEXT
         }
     }
 CODE
-    "file://pom.xml":<<<TEXT
+	"file://pom.xml":<<<TEXT
     <?xml version="1.0" encoding="UTF-8"?>
     <project xmlns="http://maven.apache.org/POM/4.0.0"
              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"

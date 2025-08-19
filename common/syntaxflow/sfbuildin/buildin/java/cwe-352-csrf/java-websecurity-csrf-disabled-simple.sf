@@ -4,33 +4,28 @@ desc(
 	level: low
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-CSRF（跨站请求伪造，Cross-Site Request Forgery）是一种网络攻击技术，攻击者通过诱导用户（已认证）访问恶意网页，利用用户在浏览器中对目标网站的会话凭证，执行用户非自愿的操作（如修改密码、转账等）。攻击的关键在于受害者已经登录目标网站，因此恶意请求会携带合法的会话信息（如Cookie）。当应用程序禁用CSRF保护时，服务器不会验证请求的来源是否合法（例如通过检查Referer或Token），从而使得攻击者伪造的请求能够成功执行。
-
+   CSRF（跨站请求伪造，Cross-Site Request Forgery）是一种网络攻击技术，攻击者通过诱导用户（已认证）访问恶意网页，利用用户在浏览器中对目标网站的会话凭证，执行用户非自愿的操作（如修改密码、转账等）。攻击的关键在于受害者已经登录目标网站，因此恶意请求会携带合法的会话信息（如Cookie）。当应用程序禁用CSRF保护时，服务器不会验证请求的来源是否合法（例如通过检查Referer或Token），从而使得攻击者伪造的请求能够成功执行。
 2. **触发场景**
-当应用程序在Spring Security等安全框架中，通过配置明确调用`.csrf().disable()`方法时，就禁用了内置的CSRF防护机制。这通常发生在安全配置文件中，例如Spring Security的`SecurityFilterChain`配置。如果该应用程序是面向用户的Web应用，并且存在敏感操作（如账户设置、订单提交等），则这些操作将容易受到CSRF攻击。
-
-```java
-@Bean
-public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception
-{
-    // ... 其他配置
-    return httpSecurity
-            // ... 其他设置
-            .csrf()
-            .disable() // 禁用CSRF保护
-            .build();
-}
-```
-
+   当应用程序在Spring Security等安全框架中，通过配置明确调用`.csrf().disable()`方法时，就禁用了内置的CSRF防护机制。这通常发生在安全配置文件中，例如Spring Security的`SecurityFilterChain`配置。如果该应用程序是面向用户的Web应用，并且存在敏感操作（如账户设置、订单提交等），则这些操作将容易受到CSRF攻击。
+   ```java
+   @Bean
+   public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception
+   {
+       // ... 其他配置
+       return httpSecurity
+               // ... 其他设置
+               .csrf()
+               .disable() // 禁用CSRF保护
+               .build();
+   }
+   ```
 3. **潜在影响**
-- **非授权操作**: 攻击者可以迫使受害者执行删除账户、修改联系方式、发布恶意内容等操作。
-- **数据泄露**: 如果禁用CSRF的应用同时存在其他漏洞（如XSS），攻击者可能结合使用攻击手段，窃取用户敏感数据。
-- **账户劫持**: 在某些情况下，CSRF攻击可能导致 Session Fixation 或 Session Hijacking，虽然不直接是CSRF的原理，但在禁用CSRF保护的环境下风险更高。
-- **信任链破坏**: 攻击者利用受害者的身份进行恶意操作，会损害用户对该应用的信任。
-虽然在某些非交互式场景（如纯API服务）可以考虑禁用CSRF，但在大多数Web应用中，禁用CSRF会引入严重的安全风险。
-
+   - **非授权操作**: 攻击者可以迫使受害者执行删除账户、修改联系方式、发布恶意内容等操作。
+   - **数据泄露**: 如果禁用CSRF的应用同时存在其他漏洞（如XSS），攻击者可能结合使用攻击手段，窃取用户敏感数据。
+   - **账户劫持**: 在某些情况下，CSRF攻击可能导致 Session Fixation 或 Session Hijacking，虽然不直接是CSRF的原理，但在禁用CSRF保护的环境下风险更高。
+   - **信任链破坏**: 攻击者利用受害者的身份进行恶意操作，会损害用户对该应用的信任。
+   虽然在某些非交互式场景（如纯API服务）可以考虑禁用CSRF，但在大多数Web应用中，禁用CSRF会引入严重的安全风险。
 DESC
 	rule_id: "08636dc3-aa6e-473f-ad31-3fac651af77d"
 	reference: <<<REFERENCE
@@ -39,10 +34,8 @@ REFERENCE
 	title_zh: "检测Java中CSRF保护被禁用的痕迹"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 启用并正确配置CSRF防护
 对于大多数Web应用程序，应启用Spring Security等框架提供的CSRF防护功能。默认情况下，Spring Security是启用CSRF保护的。确保没有显式调用`.csrf().disable()`。
-
 ```java
 @Bean
 public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception
@@ -52,22 +45,18 @@ public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Excepti
             // ... 其他设置
             .csrf() // 默认启用，无需调用 .disable()
             // 可选：针对特定URL路径进行例外配置，但慎用
-            // .ignoringAntMatchers("/api/**") 
+            // .ignoringAntMatchers("/api/**")
             .and()
             .build();
 }
 ```
 Spring Security的CSRF防护机制通常基于同步器Token模式，要求在表单或 AJAX 请求中包含一个随机生成的CSRF Token，服务器端会验证该Token的有效性。
-
 #### 2. 使用同步器 Token 模式 (Synchronizer Token Pattern)
 如果未使用Spring Security等框架，可以手动实现CSRF Token机制。在用户访问页面时生成一个唯一的Token，将其嵌入到HTML表单的隐藏字段或HTTP头的自定义字段中，并在服务器端验证接收到的请求中是否包含合法的Token。
-
 #### 3. 检查Referer头部
 虽然 Referer 头部可以被伪造或被浏览器隐私设置阻止，但可以作为辅助手段，验证请求是否来源于同源网站。
-
 #### 4. 验证SameSite Cookie属性
 现代浏览器支持 SameSite Cookie 属性，可以限制第三方网站发送带有该Cookie的请求。将Session Cookie设置为 `SameSite=Strict` 或 `SameSite=Lax` 可以有效防御部分CSRF攻击。
-
 #### 5. 针对敏感操作进行二次验证
 对于修改密码、绑定邮箱等高风险操作，要求用户重新输入一次密码或使用其他多因素认证（MFA）方式进行确认。
 SOLUTION
@@ -76,72 +65,65 @@ SOLUTION
 .csrf().disable() as $vuln;
 check $vuln;
 alert $vuln for {
-	title: "Check Java Simple Trail of CSRF Disabled",
-	title_zh: "检测Java简单CSRF禁用痕迹",
-	solution: <<<CODE
+	title: "Java CSRF Protection Disabled Vulnerability Was Detected",
+	title_zh: "检测到Java中CSRF保护被禁用的漏洞",
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 启用并正确配置CSRF防护
 对于大多数Web应用程序，应启用Spring Security等框架提供的CSRF防护功能。默认情况下，Spring Security是启用CSRF保护的。确保没有显式调用`.csrf().disable()`。
-
 ```java
 @Bean
 public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception
 {
-    // ... 其他配置
-    return httpSecurity
-            // ... 其他设置
-            .csrf() // 默认启用，无需调用 .disable()
-            // 可选：针对特定URL路径进行例外配置，但慎用
-            // .ignoringAntMatchers("/api/**") 
-            .and()
-            .build();
+// ... 其他配置
+return httpSecurity
+// ... 其他设置
+.csrf() // 默认启用，无需调用 .disable()
+// 可选：针对特定URL路径进行例外配置，但慎用
+// .ignoringAntMatchers("/api/**")
+.and()
+.build();
 }
 ```
 Spring Security的CSRF防护机制通常基于同步器Token模式，要求在表单或 AJAX 请求中包含一个随机生成的CSRF Token，服务器端会验证该Token的有效性。
-
 #### 2. 使用同步器 Token 模式 (Synchronizer Token Pattern)
 如果未使用Spring Security等框架，可以手动实现CSRF Token机制。在用户访问页面时生成一个唯一的Token，将其嵌入到HTML表单的隐藏字段或HTTP头的自定义字段中，并在服务器端验证接收到的请求中是否包含合法的Token。
-
 #### 3. 检查Referer头部
 虽然 Referer 头部可以被伪造或被浏览器隐私设置阻止，但可以作为辅助手段，验证请求是否来源于同源网站。
-
 #### 4. 验证SameSite Cookie属性
 现代浏览器支持 SameSite Cookie 属性，可以限制第三方网站发送带有该Cookie的请求。将Session Cookie设置为 `SameSite=Strict` 或 `SameSite=Lax` 可以有效防御部分CSRF攻击。
-
 #### 5. 针对敏感操作进行二次验证
 对于修改密码、绑定邮箱等高风险操作，要求用户重新输入一次密码或使用其他多因素认证（MFA）方式进行确认。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 CSRF（跨站请求伪造，Cross-Site Request Forgery）是一种网络攻击技术，攻击者通过诱导用户（已认证）访问恶意网页，利用用户在浏览器中对目标网站的会话凭证，执行用户非自愿的操作（如修改密码、转账等）。攻击的关键在于受害者已经登录目标网站，因此恶意请求会携带合法的会话信息（如Cookie）。当应用程序禁用CSRF保护时，服务器不会验证请求的来源是否合法（例如通过检查Referer或Token），从而使得攻击者伪造的请求能够成功执行。
-
 2. **触发场景**
 当应用程序在Spring Security等安全框架中，通过配置明确调用`.csrf().disable()`方法时，就禁用了内置的CSRF防护机制。这通常发生在安全配置文件中，例如Spring Security的`SecurityFilterChain`配置。如果该应用程序是面向用户的Web应用，并且存在敏感操作（如账户设置、订单提交等），则这些操作将容易受到CSRF攻击。
-
 ```java
 @Bean
 public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception
 {
-    // ... 其他配置
-    return httpSecurity
-            // ... 其他设置
-            .csrf()
-            .disable() // 禁用CSRF保护
-            .build();
+// ... 其他配置
+return httpSecurity
+// ... 其他设置
+.csrf()
+.disable() // 禁用CSRF保护
+.build();
 }
 ```
-
 3. **潜在影响**
 - **非授权操作**: 攻击者可以迫使受害者执行删除账户、修改联系方式、发布恶意内容等操作。
 - **数据泄露**: 如果禁用CSRF的应用同时存在其他漏洞（如XSS），攻击者可能结合使用攻击手段，窃取用户敏感数据。
 - **账户劫持**: 在某些情况下，CSRF攻击可能导致 Session Fixation 或 Session Hijacking，虽然不直接是CSRF的原理，但在禁用CSRF保护的环境下风险更高。
 - **信任链破坏**: 攻击者利用受害者的身份进行恶意操作，会损害用户对该应用的信任。
 虽然在某些非交互式场景（如纯API服务）可以考虑禁用CSRF，但在大多数Web应用中，禁用CSRF会引入严重的安全风险。
-CODE
+DESC
 	level: "low",
+	name: "vuln",
+	message: "检测到Java中CSRF保护被禁用，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	risk: "CSRF",
 }
 
 

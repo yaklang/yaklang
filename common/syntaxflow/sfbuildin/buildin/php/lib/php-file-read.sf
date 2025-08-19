@@ -4,39 +4,31 @@ desc(
 	level: info
 	lib: 'php-file-read'
 	desc: <<<DESC
-### 规则目的
-该规则用于审计PHP代码中是否存在不安全的文件读取函数使用。文件读取函数如`file_get_contents`、`file`、`readfile`、`fgetss`、`fgets`、`fread`、`fgetc`、`stream_get_line`、`fscanf`和`fopen`等，如果未对输入进行严格的验证和过滤，可能会被恶意用户利用来读取服务器上的敏感文件，导致信息泄露。
+### 规则描述
 
-### 规则详细
-1. **作为基础审计库**
-   属于`php-file-read`库规则（`lib`类型），主要用于识别PHP代码中可能导致敏感信息泄露的文件读取函数调用。这些函数本身不构成漏洞，但作为用户输入不当处理的后门，可能被利用进行目录遍历或文件读取攻击。
-2. **覆盖高危文件读取函数**
-   规则覆盖了PHP中常见的文件读取以及文件打开函数，包括但不限于：
-   - `file_get_contents()`: 读取文件内容到字符串。
-   - `file()`: 将整个文件读入一个数组。
-   - `readfile()`: 读取文件并写入输出缓冲。
-   - `fgetss()`: 从文件指针中读取一行并过滤掉HTML和PHP标记。
-   - `fgets()`: 从文件指针中读取一行。
-   - `fread()`: 从文件指针中读取指定长度。
-   - `fgetc()`: 从文件指针中读取单个字符。
-   - `stream_get_line()`: 从资源中获取一行直到达到终止符。
-   - `fscanf()`: 从文件中根据指定的格式进行解析。
-   - `fopen()`: 打开文件或 URL。打开文件后，后续的读取操作（如`fread`）也可能存在风险。
+1. **规则原理**
+   文件读取操作是PHP应用程序中常见的功能，但如果未对用户输入进行严格的验证和过滤，可能会被攻击者利用来访问服务器上的敏感文件（如配置文件、密码文件等）。这种漏洞通常被称为路径遍历或任意文件读取漏洞。攻击者可以通过操纵文件路径参数（如使用`../`序列），访问系统上未经授权的文件。
 
-#### 示例代码
-```php
-<?php
-$tpl_name = !empty($_POST['tpl_name']) ? trim($_POST['tpl_name']) : '';
-$tpl_content = !empty($_POST['tpl_content']) ? deep_stripslashes($_POST['tpl_content']) : '';
-if (empty($tpl_name)) {
-    return false;
-}
-$tpl = BLUE_ROOT . 'templates/default/' . $tpl_name;
-$handle = @fopen($tpl, "rb");
-$content = @fread($handle, 1024);
-fclose($handle);
-```
-在此示例中，如果`$_POST['tpl_name']`包含路径遍历序列（如`../`），攻击者可以读取任意敏感文件。
+2. **触发场景**
+   ```php
+   <?php
+   $tpl_name = !empty($_POST['tpl_name']) ? trim($_POST['tpl_name']) : '';
+   $tpl_content = !empty($_POST['tpl_content']) ? deep_stripslashes($_POST['tpl_content']) : '';
+   if (empty($tpl_name)) {
+       return false;
+   }
+   $tpl = BLUE_ROOT . 'templates/default/' . $tpl_name;
+   $handle = @fopen($tpl, "rb");
+   $content = @fread($handle, 1024);
+   fclose($handle);
+   ```
+   在此示例中，如果`$_POST['tpl_name']`包含路径遍历序列（如`../../etc/passwd`），攻击者可以读取服务器上的敏感文件。
+
+3. **潜在影响**
+   - 泄露服务器上的敏感信息，例如配置文件、数据库凭证、私钥等。
+   - 攻击者可能获取到更多权限，进一步渗透至服务器或其他内部系统。
+   - 如果目标文件包含其他用户的隐私数据，可能导致严重的数据泄露问题。
+
 DESC
 	rule_id: "7d0ddbae-c283-456e-94d3-2ede4b4865ac"
 	title_zh: "审计PHP文件读取函数"
@@ -44,54 +36,51 @@ DESC
 ### 修复建议
 
 #### 1. 严格验证和过滤用户输入
-对传递给文件操作函数的任何用户提供的输入进行严格的合法性验证和过滤。不允许用户输入包含特殊字符，特别是用于目录遍历的字符序列（如`../`或`.\`）。可以采用白名单机制，只允许访问特定类型或特定路径的文件。
-
-##### 示例代码
-```php
-<?php
-$tpl_name = !empty($_POST['tpl_name']) ? trim($_POST['tpl_name']) : '';
-// 白名单方式验证
-$allowed_templates = ['default.php', 'header.php', 'footer.php'];
-if (!in_array($tpl_name, $allowed_templates)) {
-    die('非法模板名称');
-}
-$tpl = BLUE_ROOT . 'templates/default/' . $tpl_name;
-$handle = fopen($tpl, 'rb');
-$content = fread($handle, 1024);
-fclose($handle);
-```
+   对传递给文件操作函数的任何用户提供的输入进行严格的合法性验证和过滤。不允许用户输入包含特殊字符，特别是用于目录遍历的字符序列（如`../`或`./`）。可以采用白名单机制，只允许访问特定类型或特定路径的文件。
+   ##### 示例代码
+   ```php
+   <?php
+   $tpl_name = !empty($_POST['tpl_name']) ? trim($_POST['tpl_name']) : '';
+   // 白名单方式验证
+   $allowed_templates = ['default.php', 'header.php', 'footer.php'];
+   if (!in_array($tpl_name, $allowed_templates)) {
+       die('非法模板名称');
+   }
+   $tpl = BLUE_ROOT . 'templates/default/' . $tpl_name;
+   $handle = fopen($tpl, 'rb');
+   $content = fread($handle, 1024);
+   fclose($handle);
+   ```
 
 #### 2. 使用安全的文件操作函数
-考虑使用更安全或限制性更强的函数，或者在调用文件操作函数前，对文件路径进行规范化处理，确保路径不会超出预期目录范围。
-
-##### 示例代码
-```php
-<?php
-$tpl_name = !empty($_POST['tpl_name']) ? trim($_POST['tpl_name']) : '';
-// 文件路径规范化
-$tpl = realpath(BLUE_ROOT . 'templates/default/' . $tpl_name);
-if (!$tpl || strpos($tpl, BLUE_ROOT) !== 0) {
-    die('非法路径');
-}
-$handle = fopen($tpl, 'rb');
-$content = fread($handle, 1024);
-fclose($handle);
-```
+   考虑使用更安全或限制性更强的函数，或者在调用文件操作函数前，对文件路径进行规范化处理，确保路径不会超出预期目录范围。
+   ##### 示例代码
+   ```php
+   <?php
+   $tpl_name = !empty($_POST['tpl_name']) ? trim($_POST['tpl_name']) : '';
+   // 文件路径规范化
+   $tpl = realpath(BLUE_ROOT . 'templates/default/' . $tpl_name);
+   if (!$tpl || strpos($tpl, BLUE_ROOT) !== 0) {
+       die('非法路径');
+   }
+   $handle = fopen($tpl, 'rb');
+   $content = fread($handle, 1024);
+   fclose($handle);
+   ```
 
 #### 3. 权限控制
-限制PHP脚本的执行权限，确保即使发生了文件读取漏洞，也无法访问系统敏感文件。
+   限制PHP脚本的执行权限，确保即使发生了文件读取漏洞，也无法访问系统敏感文件。
 
 #### 4. 文件路径的硬编码或配置
-对于需要读取的配置文件或其他固定文件，尽量避免直接将用户输入用于构造文件路径，而是采用硬编码或从配置文件中读取路径。
-
-##### 示例代码
-```php
-<?php
-$config_file = '/var/www/html/configs/app_config.json'; // 硬编码路径
-$handle = fopen($config_file, 'rb');
-$content = fread($handle, filesize($config_file));
-fclose($handle);
-```
+   对于需要读取的配置文件或其他固定文件，尽量避免直接将用户输入用于构造文件路径，而是采用硬编码或从配置文件中读取路径。
+   ##### 示例代码
+   ```php
+   <?php
+   $config_file = '/var/www/html/configs/app_config.json'; // 硬编码路径
+   $handle = fopen($config_file, 'rb');
+   $content = fread($handle, filesize($config_file));
+   fclose($handle);
+   ```
 SOLUTION
 	reference: <<<REFERENCE
 [PHP文件系统函数](https://www.php.net/manual/zh/book.filesystem.php)
@@ -105,6 +94,47 @@ alert $output for {
 	level: "info",
 	title: "Audit PHP File Read Functions",
 	title_zh: "审计PHP文件读取函数",
+	message: "发现PHP文件读取函数调用信息，需进一步确认输入是否经过严格验证。",
+	solution: <<<SOLUTION
+### 修复建议\n#### 1. 严格验证和过滤用户输入\n对传递给文件操作函数的任何用户提供的输入进行严格的合法性验证和过滤。不允许用户输入包含特殊字符，特别是用于目录遍历的字符序列（如`../`或`.\`）。可以采用白名单机制，只允许访问特定类型或特定路径的文件。\n##### 示例代码\n```php\n<?php\n$tpl_name = !empty($_POST['tpl_name']) ? trim($_POST['tpl_name']) : '';\n// 白名单方式验证\n$allowed_templates = ['default.php', 'header.php', 'footer.php'];\nif (!in_array($tpl_name, $allowed_templates)) {\ndie('非法模板名称');\n}\n$tpl = BLUE_ROOT . 'templates/default/' . $tpl_name;\n$handle = fopen($tpl, 'rb');\n$content = fread($handle, 1024);\nfclose($handle);\n```\n#### 2. 使用安全的文件操作函数\n考虑使用更安全或限制性更强的函数，或者在调用文件操作函数前，对文件路径进行规范化处理，确保路径不会超出预期目录范围。\n##### 示例代码\n```php\n<?php\n$tpl_name = !empty($_POST['tpl_name']) ? trim($_POST['tpl_name']) : '';\n// 文件路径规范化\n$tpl = realpath(BLUE_ROOT . 'templates/default/' . $tpl_name);\nif (!$tpl || strpos($tpl, BLUE_ROOT) !== 0) {\ndie('非法路径');\n}\n$handle = fopen($tpl, 'rb');\n$content = fread($handle, 1024);\nfclose($handle);\n```\n#### 3. 权限控制\n限制PHP脚本的执行权限，确保即使发生了文件读取漏洞，也无法访问系统敏感文件。\n#### 4. 文件路径的硬编码或配置\n对于需要读取的配置文件或其他固定文件，尽量避免直接将用户输入用于构造文件路径，而是采用硬编码或从配置文件中读取路径。\n##### 示例代码\n```php\n<?php\n$config_file = '/var/www/html/configs/app_config.json'; // 硬编码路径\n$handle = fopen($config_file, 'rb');\n$content = fread($handle, filesize($config_file));\nfclose($handle);\n```
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 规则目的
+该规则用于审计PHP代码中是否存在不安全的文件读取函数使用。文件读取函数如`file_get_contents`、`file`、`readfile`、`fgetss`、`fgets`、`fread`、`fgetc`、`stream_get_line`、`fscanf`和`fopen`等，如果未对输入进行严格的验证和过滤，可能会被恶意用户利用来读取服务器上的敏感文件，导致信息泄露。
+
+### 规则详细
+1. **作为基础审计库**
+属于`php-file-read`库规则（`lib`类型），主要用于识别PHP代码中可能导致敏感信息泄露的文件读取函数调用。这些函数本身不构成漏洞，但作为用户输入不当处理的后门，可能被利用进行目录遍历或文件读取攻击。
+2. **覆盖高危文件读取函数**
+规则覆盖了PHP中常见的文件读取以及文件打开函数，包括但不限于：
+- `file_get_contents()`: 读取文件内容到字符串。
+- `file()`: 将整个文件读入一个数组。
+- `readfile()`: 读取文件并写入输出缓冲。
+- `fgetss()`: 从文件指针中读取一行并过滤掉HTML和PHP标记。
+- `fgets()`: 从文件指针中读取一行。
+- `fread()`: 从文件指针中读取指定长度。
+- `fgetc()`: 从文件指针中读取单个字符。
+- `stream_get_line()`: 从资源中获取一行直到达到终止符。
+- `fscanf()`: 从文件中根据指定的格式进行解析。
+- `fopen()`: 打开文件或 URL。打开文件后，后续的读取操作（如`fread`）也可能存在风险。
+
+#### 示例代码
+```php
+<?php
+$tpl_name = !empty($_POST['tpl_name']) ? trim($_POST['tpl_name']) : '';
+$tpl_content = !empty($_POST['tpl_content']) ? deep_stripslashes($_POST['tpl_content']) : '';
+if (empty($tpl_name)) {
+return false;
+}
+$tpl = BLUE_ROOT . 'templates/default/' . $tpl_name;
+$handle = @fopen($tpl, "rb");
+$content = @fread($handle, 1024);
+fclose($handle);
+```
+在此示例中，如果`$_POST['tpl_name']`包含路径遍历序列（如`../`），攻击者可以读取任意敏感文件。
+DESC
+	name: "output",
 }
 
 desc(

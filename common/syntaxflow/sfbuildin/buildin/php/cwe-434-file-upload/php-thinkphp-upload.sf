@@ -4,35 +4,30 @@ desc(
 	type: vul
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   文件上传漏洞是指应用程序未对用户上传的文件进行严格的验证、过滤和处理，导致攻击者可以上传精心构造的恶意文件（如Webshell），并在服务器上执行任意代码。在ThinkPHP框架中，尽管提供了文件上传处理功能（如`Filesystem::disk()->putFile()`），但如果开发者未正确使用其提供的安全机制或自行实现上传逻辑时存在缺陷，仍可能引入上传漏洞。
-
+文件上传漏洞是指应用程序未对用户上传的文件进行严格的验证、过滤和处理，导致攻击者可以上传精心构造的恶意文件（如Webshell），并在服务器上执行任意代码。在ThinkPHP框架中，尽管提供了文件上传处理功能（如`Filesystem::disk()->putFile()`），但如果开发者未正确使用其提供的安全机制或自行实现上传逻辑时存在缺陷，仍可能引入上传漏洞。
 2. **触发场景**
-   当Web应用允许用户上传文件，且未对文件的类型（MIME Type、后缀名）、内容（是否包含恶意代码）、大小等进行充分的安全检查时，攻击者可以上传恶意脚本文件（如`.php`文件）。若服务器配置允许执行上传目录下的脚本，攻击者即可通过访问该文件来执行任意服务器端命令。
-
-   **存在漏洞的代码示例**
-   ```php
-   namespace app\controller;
-   use think\facade\Filesystem;
-   class UploadController {
-       public function upload() {
-           $file = request()->file('file');
-           // 这里假设未对文件类型和内容进行充分验证
-           $savename = Filesystem::disk('public')->putFile('uploads', $file);
-           return json(['savename' => $savename]);
-       }
-   }
-   ```
-   攻击者可以通过发送恶意请求，上传一个名为`shell.php`的文件到`public/uploads`目录，文件内容为`<?php system($_GET['cmd']); ?>`，然后访问`/uploads/shell.php?cmd=whoami`来执行系统命令。
-
+当Web应用允许用户上传文件，且未对文件的类型（MIME Type、后缀名）、内容（是否包含恶意代码）、大小等进行充分的安全检查时，攻击者可以上传恶意脚本文件（如`.php`文件）。若服务器配置允许执行上传目录下的脚本，攻击者即可通过访问该文件来执行任意服务器端命令。
+**存在漏洞的代码示例**
+```php
+namespace app\controller;
+use think\facade\Filesystem;
+class UploadController {
+public function upload() {
+$file = request()->file('file');
+// 这里假设未对文件类型和内容进行充分验证
+$savename = Filesystem::disk('public')->putFile('uploads', $file);
+return json(['savename' => $savename]);
+}
+}
+```
+攻击者可以通过发送恶意请求，上传一个名为`shell.php`的文件到`public/uploads`目录，文件内容为`<?php system($_GET['cmd']); ?>`，然后访问`/uploads/shell.php?cmd=whoami`来执行系统命令。
 3. **潜在影响**
-    - 服务器端任意代码执行，完全控制服务器。
-    - 敏感数据泄露、篡改或删除。
-    - 网站或系统被植入后门，成为"肉鸡"。
-    - 进一步渗透内网或其他关联系统。
-    - 拒绝服务攻击。
-
+- 服务器端任意代码执行，完全控制服务器。
+- 敏感数据泄露、篡改或删除。
+- 网站或系统被植入后门，成为"肉鸡"。
+- 进一步渗透内网或其他关联系统。
+- 拒绝服务攻击。
 DESC
 	rule_id: "1265a300-b3a3-4f8f-acac-731ec80c5906"
 	reference: <<<REFERENCE
@@ -41,60 +36,47 @@ DESC
 REFERENCE
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 严格校验文件类型
 结合MIME Type、文件扩展名和文件头部信息对文件类型进行综合判断，拒绝不合法的文件类型。不要仅仅依赖用户提交的文件名中的扩展名。
-
 #### 2. 限制上传目录及权限
 将上传文件存储在非Web可执行的目录。如果必须存储在Web目录，确保该目录禁止脚本执行权限（如Apache配置`Options -Indexes -ExecCGI`，Nginx配置`location ~ \.php$ { deny all; }`，IIS移除脚本映射）。
-
 #### 3. 对上传文件进行安全处理
 *   **随机化文件名和路径**：避免攻击者猜测上传文件的路径。
 *   **对图片文件进行二次处理**：对于图片文件，可以对其进行压缩、缩放或重新生成，这可以在一定程度上清除图片中可能隐藏的恶意代码（如GD库处理）。
 *   **检测文件内容**：对于特定文件类型，可以尝试检测文件内容是否包含可疑代码（如对上传的文本文件或脚本文件进行关键词扫描）。
-
 #### 4. 框架内置安全上传功能
 优先使用ThinkPHP框架提供的安全文件处理方法，并充分理解其参数和配置。
-
 **修复代码示例 (基于ThinkPHP 6.x)**
-
 ```php
 namespace app\controller;
-
 use think\facade\Filesystem;
 use think\exception\ValidateException;
-
 class UploadController
 {
-    public function upload()
-    {
-        $file = request()->file('file');
-
-        // 严格验证文件
-        try {
-            $savename = Filesystem::disk('public')->putFile(
-                // 指定上传路径
-                'uploads',
-                $file,
-                // 配置上传规则：图片类型，大小限制，后缀限制
-                [ 'fileExt' => ['jpg', 'jpeg', 'png', 'gif'], 'fileMime' => ['image/jpeg', 'image/png', 'image/gif'], 'fileSize' => 1024 * 1024 ] // 1MB
-            );
-
-        } catch (ValidateException $e) {
-            // 验证失败，返回错误信息
-            return json(['code' => 0, 'msg' => $e->getMessage()]);
-        }
-
-        if (false === $savename) {
-            // 文件保存失败，处理错误
-             return json(['code' => 0, 'msg' => '文件上传失败！']);
-        }
-
-        return json(['code' => 1, 'savename' => $savename]);
-    }
+public function upload()
+{
+$file = request()->file('file');
+// 严格验证文件
+try {
+$savename = Filesystem::disk('public')->putFile(
+// 指定上传路径
+'uploads',
+$file,
+// 配置上传规则：图片类型，大小限制，后缀限制
+[ 'fileExt' => ['jpg', 'jpeg', 'png', 'gif'], 'fileMime' => ['image/jpeg', 'image/png', 'image/gif'], 'fileSize' => 1024 * 1024 ] // 1MB
+);
+} catch (ValidateException $e) {
+// 验证失败，返回错误信息
+return json(['code' => 0, 'msg' => $e->getMessage()]);
+}
+if (false === $savename) {
+// 文件保存失败，处理错误
+return json(['code' => 0, 'msg' => '文件上传失败！']);
+}
+return json(['code' => 1, 'savename' => $savename]);
+}
 }
 ```
-
 #### 5. 加强日志监控与审计
 记录详细的文件上传日志，包括源IP、文件名、文件大小、操作结果等，以便及时发现异常上传行为。
 SOLUTION
@@ -120,97 +102,83 @@ CODE)> as $high
 alert $high for {
 	title: "Unsafe File Upload Without Validation in ThinkPHP",
 	title_zh: "ThinkPHP中未经验证的高危文件上传",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 严格校验文件类型
 结合MIME Type、文件扩展名和文件头部信息对文件类型进行综合判断，拒绝不合法的文件类型。不要仅仅依赖用户提交的文件名中的扩展名。
-
 #### 2. 限制上传目录及权限
 将上传文件存储在非Web可执行的目录。如果必须存储在Web目录，确保该目录禁止脚本执行权限（如Apache配置`Options -Indexes -ExecCGI`，Nginx配置`location ~ \.php$ { deny all; }`，IIS移除脚本映射）。
-
 #### 3. 对上传文件进行安全处理
 *   **随机化文件名和路径**：避免攻击者猜测上传文件的路径。
 *   **对图片文件进行二次处理**：对于图片文件，可以对其进行压缩、缩放或重新生成，这可以在一定程度上清除图片中可能隐藏的恶意代码（如GD库处理）。
 *   **检测文件内容**：对于特定文件类型，可以尝试检测文件内容是否包含可疑代码（如对上传的文本文件或脚本文件进行关键词扫描）。
-
 #### 4. 框架内置安全上传功能
 优先使用ThinkPHP框架提供的安全文件处理方法，并充分理解其参数和配置。
-
 **修复代码示例 (基于ThinkPHP 6.x)**
-
 ```php
 namespace app\controller;
-
 use think\facade\Filesystem;
 use think\exception\ValidateException;
-
 class UploadController
 {
-    public function upload()
-    {
-        $file = request()->file('file');
-
-        // 严格验证文件
-        try {
-            $savename = Filesystem::disk('public')->putFile(
-                // 指定上传路径
-                'uploads',
-                $file,
-                // 配置上传规则：图片类型，大小限制，后缀限制
-                [ 'fileExt' => ['jpg', 'jpeg', 'png', 'gif'], 'fileMime' => ['image/jpeg', 'image/png', 'image/gif'], 'fileSize' => 1024 * 1024 ] // 1MB
-            );
-
-        } catch (ValidateException $e) {
-            // 验证失败，返回错误信息
-            return json(['code' => 0, 'msg' => $e->getMessage()]);
-        }
-
-        if (false === $savename) {
-            // 文件保存失败，处理错误
-             return json(['code' => 0, 'msg' => '文件上传失败！']);
-        }
-
-        return json(['code' => 1, 'savename' => $savename]);
-    }
+public function upload()
+{
+$file = request()->file('file');
+// 严格验证文件
+try {
+$savename = Filesystem::disk('public')->putFile(
+// 指定上传路径
+'uploads',
+$file,
+// 配置上传规则：图片类型，大小限制，后缀限制
+[ 'fileExt' => ['jpg', 'jpeg', 'png', 'gif'], 'fileMime' => ['image/jpeg', 'image/png', 'image/gif'], 'fileSize' => 1024 * 1024 ] // 1MB
+);
+} catch (ValidateException $e) {
+// 验证失败，返回错误信息
+return json(['code' => 0, 'msg' => $e->getMessage()]);
+}
+if (false === $savename) {
+// 文件保存失败，处理错误
+return json(['code' => 0, 'msg' => '文件上传失败！']);
+}
+return json(['code' => 1, 'savename' => $savename]);
+}
 }
 ```
-
 #### 5. 加强日志监控与审计
 记录详细的文件上传日志，包括源IP、文件名、文件大小、操作结果等，以便及时发现异常上传行为。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   文件上传漏洞是指应用程序未对用户上传的文件进行严格的验证、过滤和处理，导致攻击者可以上传精心构造的恶意文件（如Webshell），并在服务器上执行任意代码。在ThinkPHP框架中，尽管提供了文件上传处理功能（如`Filesystem::disk()->putFile()`），但如果开发者未正确使用其提供的安全机制或自行实现上传逻辑时存在缺陷，仍可能引入上传漏洞。
-
+文件上传漏洞是指应用程序未对用户上传的文件进行严格的验证、过滤和处理，导致攻击者可以上传精心构造的恶意文件（如Webshell），并在服务器上执行任意代码。在ThinkPHP框架中，尽管提供了文件上传处理功能（如`Filesystem::disk()->putFile()`），但如果开发者未正确使用其提供的安全机制或自行实现上传逻辑时存在缺陷，仍可能引入上传漏洞。
 2. **触发场景**
-   当Web应用允许用户上传文件，且未对文件的类型（MIME Type、后缀名）、内容（是否包含恶意代码）、大小等进行充分的安全检查时，攻击者可以上传恶意脚本文件（如`.php`文件）。若服务器配置允许执行上传目录下的脚本，攻击者即可通过访问该文件来执行任意服务器端命令。
-
-   **存在漏洞的代码示例**
-   ```php
-   namespace app\controller;
-   use think\facade\Filesystem;
-   class UploadController {
-       public function upload() {
-           $file = request()->file('file');
-           // 这里假设未对文件类型和内容进行充分验证
-           $savename = Filesystem::disk('public')->putFile('uploads', $file);
-           return json(['savename' => $savename]);
-       }
-   }
-   ```
-   攻击者可以通过发送恶意请求，上传一个名为`shell.php`的文件到`public/uploads`目录，文件内容为`<?php system($_GET['cmd']); ?>`，然后访问`/uploads/shell.php?cmd=whoami`来执行系统命令。
-
+当Web应用允许用户上传文件，且未对文件的类型（MIME Type、后缀名）、内容（是否包含恶意代码）、大小等进行充分的安全检查时，攻击者可以上传恶意脚本文件（如`.php`文件）。若服务器配置允许执行上传目录下的脚本，攻击者即可通过访问该文件来执行任意服务器端命令。
+**存在漏洞的代码示例**
+```php
+namespace app\controller;
+use think\facade\Filesystem;
+class UploadController {
+public function upload() {
+$file = request()->file('file');
+// 这里假设未对文件类型和内容进行充分验证
+$savename = Filesystem::disk('public')->putFile('uploads', $file);
+return json(['savename' => $savename]);
+}
+}
+```
+攻击者可以通过发送恶意请求，上传一个名为`shell.php`的文件到`public/uploads`目录，文件内容为`<?php system($_GET['cmd']); ?>`，然后访问`/uploads/shell.php?cmd=whoami`来执行系统命令。
 3. **潜在影响**
-    - 服务器端任意代码执行，完全控制服务器。
-    - 敏感数据泄露、篡改或删除。
-    - 网站或系统被植入后门，成为"肉鸡"。
-    - 进一步渗透内网或其他关联系统。
-    - 拒绝服务攻击。
-CODE
+- 服务器端任意代码执行，完全控制服务器。
+- 敏感数据泄露、篡改或删除。
+- 网站或系统被植入后门，成为"肉鸡"。
+- 进一步渗透内网或其他关联系统。
+- 拒绝服务攻击。
+DESC
 	level: "high",
+	message: "检测到PHP ThinkPHP框架未对上传文件进行严格校验，攻击者可以上传恶意脚本文件，可能导致服务器端任意代码执行。",
+	risk: "文件上传漏洞",
+	name: "high",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -222,98 +190,84 @@ $highAndMid - $high as $mid
 
 alert $mid for {
 	title_zh: "ThinkPHP中不安全的文件类型检测",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 严格校验文件类型
 结合MIME Type、文件扩展名和文件头部信息对文件类型进行综合判断，拒绝不合法的文件类型。不要仅仅依赖用户提交的文件名中的扩展名。
-
 #### 2. 限制上传目录及权限
 将上传文件存储在非Web可执行的目录。如果必须存储在Web目录，确保该目录禁止脚本执行权限（如Apache配置`Options -Indexes -ExecCGI`，Nginx配置`location ~ \.php$ { deny all; }`，IIS移除脚本映射）。
-
 #### 3. 对上传文件进行安全处理
 *   **随机化文件名和路径**：避免攻击者猜测上传文件的路径。
 *   **对图片文件进行二次处理**：对于图片文件，可以对其进行压缩、缩放或重新生成，这可以在一定程度上清除图片中可能隐藏的恶意代码（如GD库处理）。
 *   **检测文件内容**：对于特定文件类型，可以尝试检测文件内容是否包含可疑代码（如对上传的文本文件或脚本文件进行关键词扫描）。
-
 #### 4. 框架内置安全上传功能
 优先使用ThinkPHP框架提供的安全文件处理方法，并充分理解其参数和配置。
-
 **修复代码示例 (基于ThinkPHP 6.x)**
-
 ```php
 namespace app\controller;
-
 use think\facade\Filesystem;
 use think\exception\ValidateException;
-
 class UploadController
 {
-    public function upload()
-    {
-        $file = request()->file('file');
-
-        // 严格验证文件
-        try {
-            $savename = Filesystem::disk('public')->putFile(
-                // 指定上传路径
-                'uploads',
-                $file,
-                // 配置上传规则：图片类型，大小限制，后缀限制
-                [ 'fileExt' => ['jpg', 'jpeg', 'png', 'gif'], 'fileMime' => ['image/jpeg', 'image/png', 'image/gif'], 'fileSize' => 1024 * 1024 ] // 1MB
-            );
-
-        } catch (ValidateException $e) {
-            // 验证失败，返回错误信息
-            return json(['code' => 0, 'msg' => $e->getMessage()]);
-        }
-
-        if (false === $savename) {
-            // 文件保存失败，处理错误
-             return json(['code' => 0, 'msg' => '文件上传失败！']);
-        }
-
-        return json(['code' => 1, 'savename' => $savename]);
-    }
+public function upload()
+{
+$file = request()->file('file');
+// 严格验证文件
+try {
+$savename = Filesystem::disk('public')->putFile(
+// 指定上传路径
+'uploads',
+$file,
+// 配置上传规则：图片类型，大小限制，后缀限制
+[ 'fileExt' => ['jpg', 'jpeg', 'png', 'gif'], 'fileMime' => ['image/jpeg', 'image/png', 'image/gif'], 'fileSize' => 1024 * 1024 ] // 1MB
+);
+} catch (ValidateException $e) {
+// 验证失败，返回错误信息
+return json(['code' => 0, 'msg' => $e->getMessage()]);
+}
+if (false === $savename) {
+// 文件保存失败，处理错误
+return json(['code' => 0, 'msg' => '文件上传失败！']);
+}
+return json(['code' => 1, 'savename' => $savename]);
+}
 }
 ```
-
 #### 5. 加强日志监控与审计
 记录详细的文件上传日志，包括源IP、文件名、文件大小、操作结果等，以便及时发现异常上传行为。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   文件上传漏洞是指应用程序未对用户上传的文件进行严格的验证、过滤和处理，导致攻击者可以上传精心构造的恶意文件（如Webshell），并在服务器上执行任意代码。在ThinkPHP框架中，尽管提供了文件上传处理功能（如`Filesystem::disk()->putFile()`），但如果开发者未正确使用其提供的安全机制或自行实现上传逻辑时存在缺陷，仍可能引入上传漏洞。
-
+文件上传漏洞是指应用程序未对用户上传的文件进行严格的验证、过滤和处理，导致攻击者可以上传精心构造的恶意文件（如Webshell），并在服务器上执行任意代码。在ThinkPHP框架中，尽管提供了文件上传处理功能（如`Filesystem::disk()->putFile()`），但如果开发者未正确使用其提供的安全机制或自行实现上传逻辑时存在缺陷，仍可能引入上传漏洞。
 2. **触发场景**
-   当Web应用允许用户上传文件，且未对文件的类型（MIME Type、后缀名）、内容（是否包含恶意代码）、大小等进行充分的安全检查时，攻击者可以上传恶意脚本文件（如`.php`文件）。若服务器配置允许执行上传目录下的脚本，攻击者即可通过访问该文件来执行任意服务器端命令。
-
-   **存在漏洞的代码示例**
-   ```php
-   namespace app\controller;
-   use think\facade\Filesystem;
-   class UploadController {
-       public function upload() {
-           $file = request()->file('file');
-           // 这里假设未对文件类型和内容进行充分验证
-           $savename = Filesystem::disk('public')->putFile('uploads', $file);
-           return json(['savename' => $savename]);
-       }
-   }
-   ```
-   攻击者可以通过发送恶意请求，上传一个名为`shell.php`的文件到`public/uploads`目录，文件内容为`<?php system($_GET['cmd']); ?>`，然后访问`/uploads/shell.php?cmd=whoami`来执行系统命令。
-
+当Web应用允许用户上传文件，且未对文件的类型（MIME Type、后缀名）、内容（是否包含恶意代码）、大小等进行充分的安全检查时，攻击者可以上传恶意脚本文件（如`.php`文件）。若服务器配置允许执行上传目录下的脚本，攻击者即可通过访问该文件来执行任意服务器端命令。
+**存在漏洞的代码示例**
+```php
+namespace app\controller;
+use think\facade\Filesystem;
+class UploadController {
+public function upload() {
+$file = request()->file('file');
+// 这里假设未对文件类型和内容进行充分验证
+$savename = Filesystem::disk('public')->putFile('uploads', $file);
+return json(['savename' => $savename]);
+}
+}
+```
+攻击者可以通过发送恶意请求，上传一个名为`shell.php`的文件到`public/uploads`目录，文件内容为`<?php system($_GET['cmd']); ?>`，然后访问`/uploads/shell.php?cmd=whoami`来执行系统命令。
 3. **潜在影响**
-    - 服务器端任意代码执行，完全控制服务器。
-    - 敏感数据泄露、篡改或删除。
-    - 网站或系统被植入后门，成为"肉鸡"。
-    - 进一步渗透内网或其他关联系统。
-    - 拒绝服务攻击。
-CODE
+- 服务器端任意代码执行，完全控制服务器。
+- 敏感数据泄露、篡改或删除。
+- 网站或系统被植入后门，成为"肉鸡"。
+- 进一步渗透内网或其他关联系统。
+- 拒绝服务攻击。
+DESC
 	level: "mid",
 	title: "Insecure File Type Detection in ThinkPHP",
+	name: "mid",
+	message: "检测到PHP ThinkPHP框架未对上传文件类型进行严格校验，可能存在绕过风险，请进一步审查代码安全性。",
+	risk: "文件上传漏洞",
 }
 
 // 低风险：潜在的文件存储路径配置问题（这里假设ThinkPHP的putFile也可能涉及路径问题）
@@ -322,22 +276,33 @@ $sink - $high - $mid as $low
 alert $low for {
 	title: "Potential File Storage Path Misconfiguration in ThinkPHP",
 	title_zh: "ThinkPHP中潜在的文件存储路径配置问题",
-	desc: <<<CODE
+	desc: <<<DESC
 ### 规则目的
 该规则用于识别ThinkPHP框架中潜在的文件存储路径配置问题。尽管ThinkPHP的`putFile`函数本身是安全的，但不当的路径配置可能会引发潜在风险。
-
 ### 规则详细
 1. **路径风险**
-   如果开发者未正确设置上传路径，可能导致文件存储在不安全的位置，例如Web可直接访问的公共目录。
-
+如果开发者未正确设置上传路径，可能导致文件存储在不安全的位置，例如Web可直接访问的公共目录。
 2. **触发条件**
-   开发者使用了默认路径或未遵循最佳实践配置上传路径。
-
+开发者使用了默认路径或未遵循最佳实践配置上传路径。
 3. **潜在影响**
-   - 公共目录暴露：敏感文件可能被未经授权的用户访问。
-   - 权限滥用：错误配置可能导致文件被覆盖或篡改。
-CODE
+- 公共目录暴露：敏感文件可能被未经授权的用户访问。
+- 权限滥用：错误配置可能导致文件被覆盖或篡改。
+DESC
 	level: "low",
+	solution: <<<SOLUTION
+### 安全建议
+#### 1. 避免使用默认路径
+开发者应避免直接使用默认上传路径，以防止敏感文件暴露于公共目录。
+#### 2. 设置明确的上传目录
+为上传文件指定明确的专用目录，并确保该目录不可直接被Web访问。
+#### 3. 权限控制
+确保上传目录仅具有最低必要权限，例如禁止执行脚本权限。
+#### 4. 日志与监控
+记录上传路径相关日志并定期审核，及时发现异常配置或行为。
+SOLUTION
+	risk: "信息",
+	name: "low",
+	message: "检测到ThinkPHP框架中可能存在的文件存储路径配置问题，建议确认路径设置是否符合安全规范。",
 }
 
 desc(

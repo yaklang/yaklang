@@ -35,30 +35,55 @@ DESCRIPTION
 ### 修复建议
 
 #### 1. 使用安全的URL构造方法
-通过使用`UriComponentsBuilder`或其他安全的URL构造方法，避免直接拼接URL参数。
+避免直接拼接用户输入到URL中，推荐使用`UriComponentsBuilder`等安全工具构建URL。例如：
 ```java
-UriComponentsBuilder.fromHttpUrl("http://example.com/api").queryParam("param", userInput).build().toUriString();
+String safeUrl = UriComponentsBuilder.fromHttpUrl("http://example.com/api")
+    .queryParam("param", userInput)
+    .build()
+    .toUriString();
+restTemplate.getForObject(safeUrl, String.class);
 ```
 
 #### 2. 对用户输入进行验证和过滤
-在将用户输入用于URL构造之前，进行严格的验证和过滤，确保输入符合预期格式。
+在将用户输入插入URL之前，应实施严格的验证逻辑，确保输入符合预期格式。例如：
 ```java
+private boolean isValidUserInput(String input) {
+    return input != null && input.matches("^[a-zA-Z0-9_\-]+$"); // 验证仅包含字母数字及部分符号
+}
 if (!isValidUserInput(userInput)) {
     throw new IllegalArgumentException("Invalid input");
 }
 ```
 
-#### 3. 使用Whitelist机制限制请求目标
-通过配置白名单机制，限制`RestTemplate`发起请求的目标域名或IP地址，防止向非预期的目标发起请求。
+#### 3. 使用白名单机制限制请求目标
+通过配置白名单机制，限定RestTemplate只能向预定义的域名或IP地址发起请求。例如：
 ```java
+private static final Set<String> WHITELISTED_DOMAINS = new HashSet<>(Arrays.asList("example.com", "api.example.org"));
+
+private boolean isWhitelisted(String url) {
+    try {
+        URI uri = new URI(url);
+        return WHITELISTED_DOMAINS.contains(uri.getHost());
+    } catch (URISyntaxException e) {
+        throw new IllegalArgumentException("Malformed URL", e);
+    }
+}
 if (!isWhitelisted(url)) {
     throw new SecurityException("URL is not whitelisted");
 }
 ```
 
 #### 4. 考虑使用更安全的HTTP客户端库
-如Apache HttpClient或OkHttp，这些库提供了更丰富的安全特性和配置选项。
+虽然RestTemplate功能强大，但其设计较为灵活，容易引入安全隐患。可以选择其他更安全的HTTP客户端库（如Apache HttpClient或OkHttp），这些库通常提供了更多的内置安全特性，例如默认启用SSL/TLS验证等。
+```java
+CloseableHttpClient httpClient = HttpClients.createDefault();
+HttpGet httpGet = new HttpGet("https://example.com/api");
+CloseableHttpResponse response = httpClient.execute(httpGet);
+// 处理响应...
+```
 
+#### 5. 定期更新依赖库
+保持Spring Framework及相关依赖库的版本为最新状态，及时修复已知的安全问题。请参考官方文档以了解最新的安全补丁信息。
 SOLUTION
 )
 
@@ -107,4 +132,59 @@ alert $output for {
 	level: "info",
 	title: "Java Spring RestTemplate Request Sink Param",
 	title_zh: "Java Spring RestTemplate 请求Sink参数",
+	desc: <<<DESC
+### 规则目的
+此规则旨在查找Java代码中SpringBoot RestTemplate库中网络发包方法的Url参数。
+
+### 规则详细
+1. **覆盖方法**
+   - `delete(String url, Object... uriVariables)`
+   - `delete(String url, Map<String,?> uriVariables)`
+   - `delete(URI url)`
+   - `put(String url, Object request, Object... uriVariables)`
+   - `put(String url, Object request, Map<String,?> uriVariables)`
+   - `put(URI url, Object request)`
+   - `exchange(String url, HttpMethod method, HttpEntity<?> requestEntity, Class<T> responseType, Object... uriVariables)`
+   - `exchange(String url, HttpMethod method, HttpEntity<?> requestEntity, Class<T> responseType, Map<String,?> uriVariables)`
+   - `exchange(URI url, HttpMethod method, HttpEntity<?> requestEntity, Class<T> responseType)`
+   - `getForEntity(String url, Class<T> responseType, Object... uriVariables)`
+   - `getForObject(String url, Class<T> responseType, Object... uriVariables)`
+   - `headForHeaders(String url, Object... uriVariables)`
+   - `patchForObject(String url, Object request, Class<T> responseType, Object... uriVariables)`
+   - `postForEntity(String url, Object request, Class<T> responseType, Object... uriVariables)`
+   - `postForObject(String url, Object request, Class<T> responseType, Object... uriVariables)`
+   - `postForLocation(String url, Object request, Object... uriVariables)`
+
+该规则主要用于辅助审计SSRF(Server-Side Request Forgery)漏洞。
+DESC
+	name: "output",
+	message: "发现Java Spring Framework RestTemplate请求API的Sink参数，用于辅助审计SSRF漏洞。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 使用安全的URL构造方法
+通过使用`UriComponentsBuilder`或其他安全的URL构造方法，避免直接拼接URL参数。
+```java
+UriComponentsBuilder.fromHttpUrl("http://example.com/api").queryParam("param", userInput).build().toUriString();
+```
+
+#### 2. 对用户输入进行验证和过滤
+在将用户输入用于URL构造之前，进行严格的验证和过滤，确保输入符合预期格式。
+```java
+if (!isValidUserInput(userInput)) {
+throw new IllegalArgumentException("Invalid input");
+}
+```
+
+#### 3. 使用Whitelist机制限制请求目标
+通过配置白名单机制，限制`RestTemplate`发起请求的目标域名或IP地址，防止向非预期的目标发起请求。
+```java
+if (!isWhitelisted(url)) {
+throw new SecurityException("URL is not whitelisted");
+}
+```
+
+#### 4. 考虑使用更安全的HTTP客户端库
+如Apache HttpClient或OkHttp，这些库提供了更丰富的安全特性和配置选项。
+SOLUTION
+	risk: "信息",
 }

@@ -74,7 +74,6 @@ public class XMLReaderFactorySafe {
             reader.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
             // 禁用 DTD 声明，这是最严格的防护措施
             reader.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-
             reader.setContentHandler(new DefaultHandler());
             reader.parse(xml);
         } catch (SAXException | ParserConfigurationException | IOException e) {
@@ -113,7 +112,7 @@ public class SecureEntityResolver implements EntityResolver {
             }
         } else if (systemId != null && systemId.startsWith("http://")){
             // 拒绝解析外部 HTTP/HTTPS 资源
-             throw new SAXException("Forbidden http entity: " + systemId);
+            throw new SAXException("Forbidden http entity: " + systemId);
         }
         // 对于其他未处理的实体，返回空InputSource或者抛出异常
         return new InputSource(new StringReader("")); // 返回空InputSource以避免解析
@@ -154,14 +153,11 @@ $toCheckCall - $excludeCall as $vulCall;
 alert $vulCall for {
 	title: "Check Java XMLReaderFactory Unsafe Use",
 	title_zh: "检测 Java XMLReaderFactory 不安全使用",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 为了防止 `XMLReaderFactory.createXMLReader()` 引起的 XXE 漏洞，需要在解析 XML 之前设置适当的安全特性和属性来禁用外部实体和参数实体。
-
 #### 1. 禁用外部实体和参数实体
 最推荐的方法是禁用外部实体和参数实体的处理。对于 SAX 解析器，可以使用 `setFeature` 方法设置相关的特性。
-
 ```java
 import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
@@ -169,30 +165,26 @@ import org.xml.sax.helpers.XMLReaderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
 import org.xml.sax.helpers.DefaultHandler;
-
 public class XMLReaderFactorySafe {
-    public void parseXml(String xml) {
-        try {
-            XMLReader reader = XMLReaderFactory.createXMLReader();
-            // 禁用外部通用实体
-            reader.setFeature("http://xml.org/sax/features/external-general-entities", false);
-            // 禁用外部参数实体
-            reader.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-            // 禁用 DTD 声明，这是最严格的防护措施
-            reader.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-
-            reader.setContentHandler(new DefaultHandler());
-            reader.parse(xml);
-        } catch (SAXException | ParserConfigurationException | IOException e) {
-            e.printStackTrace();
-        }
-    }
+public void parseXml(String xml) {
+try {
+XMLReader reader = XMLReaderFactory.createXMLReader();
+// 禁用外部通用实体
+reader.setFeature("http://xml.org/sax/features/external-general-entities", false);
+// 禁用外部参数实体
+reader.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+// 禁用 DTD 声明，这是最严格的防护措施
+reader.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+reader.setContentHandler(new DefaultHandler());
+reader.parse(xml);
+} catch (SAXException | ParserConfigurationException | IOException e) {
+e.printStackTrace();
+}
+}
 }
 ```
-
 #### 2. 使用安全配置的 EntityResolver
 如果需要处理实体（例如，在网络隔离环境中使用内部 DTD），请确保使用一个安全的 `EntityResolver` 实现，该实现限制对外部资源的访问，例如只允许解析本地文件或特定的 URL。
-
 ```java
 // 示例（非完整，仅为阐述思路）
 import org.xml.sax.EntityResolver;
@@ -204,85 +196,78 @@ import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
 import java.io.StringReader;
 import org.xml.sax.helpers.DefaultHandler;
-
 public class SecureEntityResolver implements EntityResolver {
-    @Override
-    public InputSource resolveEntity(String publicId, String systemId) throws SAXException, IOException {
-        // 仅允许解析本地文件或特定的安全资源
-        if (systemId != null && systemId.startsWith("file://")) {
-            // 检查文件路径是否安全，例如在允许的目录中
-            if (isAllowedFilePath(systemId)) {
-                return new InputSource(systemId);
-            } else {
-                // 拒绝解析不安全的文件路径
-                throw new SAXException("Forbidden file path: " + systemId);
-            }
-        } else if (systemId != null && systemId.startsWith("http://")){
-            // 拒绝解析外部 HTTP/HTTPS 资源
-             throw new SAXException("Forbidden http entity: " + systemId);
-        }
-        // 对于其他未处理的实体，返回空InputSource或者抛出异常
-        return new InputSource(new StringReader("")); // 返回空InputSource以避免解析
-    }
-
-    private boolean isAllowedFilePath(String systemId) {
-        // 实现文件路径白名单或沙箱检查逻辑
-        // 示例：只允许解析 /safe_dtd/ 目录下的文件
-        return systemId.startsWith("file:///safe_dtd/");
-    }
+@Override
+public InputSource resolveEntity(String publicId, String systemId) throws SAXException, IOException {
+// 仅允许解析本地文件或特定的安全资源
+if (systemId != null && systemId.startsWith("file://")) {
+// 检查文件路径是否安全，例如在允许的目录中
+if (isAllowedFilePath(systemId)) {
+return new InputSource(systemId);
+} else {
+// 拒绝解析不安全的文件路径
+throw new SAXException("Forbidden file path: " + systemId);
 }
-
+} else if (systemId != null && systemId.startsWith("http://")){
+// 拒绝解析外部 HTTP/HTTPS 资源
+throw new SAXException("Forbidden http entity: " + systemId);
+}
+// 对于其他未处理的实体，返回空InputSource或者抛出异常
+return new InputSource(new StringReader("")); // 返回空InputSource以避免解析
+}
+private boolean isAllowedFilePath(String systemId) {
+// 实现文件路径白名单或沙箱检查逻辑
+// 示例：只允许解析 /safe_dtd/ 目录下的文件
+return systemId.startsWith("file:///safe_dtd/");
+}
+}
 // 在解析代码中使用 SecureEntityResolver
 XMLReader reader = XMLReaderFactory.createXMLReader();
 reader.setEntityResolver(new SecureEntityResolver());
 reader.parse(xml);
 ```
-
 #### 3. 输入验证
 在解析 XML 之前，对输入的 XML 数据进行基本的验证，例如检查是否存在 `<DOCTYPE>` 声明或外部实体引用。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   XML 外部实体注入（XXE）是一种安全漏洞，它允许攻击者通过在 XML 文档中包含外部实体的引用来攻击解析 XML 的应用程序。当 `XMLReaderFactory.createXMLReader()` 创建的解析器在未禁用外部实体和参数实体的情况下处理包含恶意的外部实体的 XML 输入时，攻击者可以利用此漏洞。这可能使应用程序容易受到各种攻击，包括：
-   - **文件读取**：攻击者可以使用外部实体从服务器读取任意本地文件，例如敏感配置文件、源代码或操作系统的 passwd 文件。
-   - **服务拒绝（DoS）**：通过引用包含大量嵌套实体的 XML，攻击者可以消耗服务器的大量系统资源（内存、CPU），导致服务不可用。
-   - **内网端口扫描**：攻击者可以使用外部实体尝试连接到内部网络中的端口，从而探测内部服务的开放情况。
-   - **远程代码执行**：在某些配置下，通过结合其他漏洞或利用特定的协议（如 Expect），攻击者甚至可能触发远程代码执行。
-
+XML 外部实体注入（XXE）是一种安全漏洞，它允许攻击者通过在 XML 文档中包含外部实体的引用来攻击解析 XML 的应用程序。当 `XMLReaderFactory.createXMLReader()` 创建的解析器在未禁用外部实体和参数实体的情况下处理包含恶意的外部实体的 XML 输入时，攻击者可以利用此漏洞。这可能使应用程序容易受到各种攻击，包括：
+- **文件读取**：攻击者可以使用外部实体从服务器读取任意本地文件，例如敏感配置文件、源代码或操作系统的 passwd 文件。
+- **服务拒绝（DoS）**：通过引用包含大量嵌套实体的 XML，攻击者可以消耗服务器的大量系统资源（内存、CPU），导致服务不可用。
+- **内网端口扫描**：攻击者可以使用外部实体尝试连接到内部网络中的端口，从而探测内部服务的开放情况。
+- **远程代码执行**：在某些配置下，通过结合其他漏洞或利用特定的协议（如 Expect），攻击者甚至可能触发远程代码执行。
 2. **触发场景**
-   当应用程序使用 `XMLReaderFactory.createXMLReader()` 创建 XMLReader 实例来解析用户提供的 XML 数据，并且没有正确配置安全特性（如禁用外部实体和参数实体）时，就可能存在 XXE 漏洞。例如，未设置 `http://xml.org/sax/features/external-general-entities` 和 `http://xml.org/sax/features/external-parameter-entities` 为 `false`，或者未设置 `http://apache.org/xml/features/disallow-doctype-decl` 为 `true`，或者未使用安全的 `EntityResolver`。攻击者可以构造包含 `<DOCTYPE>` 声明和外部实体引用的恶意 XML 输入来触发漏洞。
-
-   ```java
-   import org.xml.sax.SAXException;
-   import org.xml.sax.XMLReader;
-   import org.xml.sax.helpers.XMLReaderFactory;
-   import javax.xml.parsers.ParserConfigurationException;
-   import java.io.IOException;
-   import org.xml.sax.helpers.DefaultHandler;
-
-   public class XMLReaderFactoryUnsafe {
-       public void parseXml(String xml) {
-           try {
-               XMLReader reader = XMLReaderFactory.createXMLReader();
-               reader.setContentHandler(new DefaultHandler());
-               reader.parse(xml); // 未设置安全特性，存在 XXE 风险
-           } catch (SAXException | ParserConfigurationException | IOException e) {
-               e.printStackTrace();
-           }
-       }
-   }
-   ```
-
+当应用程序使用 `XMLReaderFactory.createXMLReader()` 创建 XMLReader 实例来解析用户提供的 XML 数据，并且没有正确配置安全特性（如禁用外部实体和参数实体）时，就可能存在 XXE 漏洞。例如，未设置 `http://xml.org/sax/features/external-general-entities` 和 `http://xml.org/sax/features/external-parameter-entities` 为 `false`，或者未设置 `http://apache.org/xml/features/disallow-doctype-decl` 为 `true`，或者未使用安全的 `EntityResolver`。攻击者可以构造包含 `<DOCTYPE>` 声明和外部实体引用的恶意 XML 输入来触发漏洞。
+```java
+import org.xml.sax.SAXException;
+import org.xml.sax.XMLReader;
+import org.xml.sax.helpers.XMLReaderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import java.io.IOException;
+import org.xml.sax.helpers.DefaultHandler;
+public class XMLReaderFactoryUnsafe {
+public void parseXml(String xml) {
+try {
+XMLReader reader = XMLReaderFactory.createXMLReader();
+reader.setContentHandler(new DefaultHandler());
+reader.parse(xml); // 未设置安全特性，存在 XXE 风险
+} catch (SAXException | ParserConfigurationException | IOException e) {
+e.printStackTrace();
+}
+}
+}
+```
 3. **潜在影响**
-   - 敏感信息泄露（用户凭证、配置文件、系统信息等）。
-   - 应用程序服务拒绝，影响业务可用性。
-   - 内网环境被攻击者进一步探测和攻击。
-   - 在特定条件下，可能导致远程代码执行。
-CODE
+- 敏感信息泄露（用户凭证、配置文件、系统信息等）。
+- 应用程序服务拒绝，影响业务可用性。
+- 内网环境被攻击者进一步探测和攻击。
+- 在特定条件下，可能导致远程代码执行。
+DESC
 	level: "high",
 	message: "检测到不安全的 XMLReaderFactory.createXMLReader() 使用，可能导致 XXE 漏洞。",
+	risk: "XXE",
+	name: "vulCall",
 }
 
 desc(

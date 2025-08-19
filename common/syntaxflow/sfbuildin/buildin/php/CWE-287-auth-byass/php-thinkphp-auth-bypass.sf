@@ -15,25 +15,25 @@ desc(
    - 直接从请求参数获取用户标识而未验证其合法性
    - 认证逻辑存在缺陷，如可预测的令牌或可绕过的条件检查
 
-   ```php
-   // 存在漏洞的代码示例
-   namespace app\index\controller;
-   use think\Controller;
-
-   class User extends Controller {
-       public function deleteUser() {
-           $userId = input('user_id'); // 未经验证的用户输入
-           // 直接执行删除操作，未检查当前用户权限
-           $this->model->where('id', $userId)->delete();
-       }
-   }
-   ```
+```php
+// 存在漏洞的代码示例
+namespace app\index\controller;
+use think\Controller;
+class User extends Controller {
+    public function deleteUser() {
+        $userId = input('user_id'); // 未经验证的用户输入
+        // 直接执行删除操作，未检查当前用户权限
+        $this->model->where('id', $userId)->delete();
+    }
+}
+```
 
 3. **潜在影响**
    - 未授权访问敏感功能或数据
    - 恶意用户可提升自身权限
    - 系统关键功能被未授权操纵
    - 可能导致数据泄露或系统完整性破坏
+
 DESC
 	rule_id: "f0c086d0-c004-4367-abd7-d16ca50de3d9"
 	solution: <<<SOLUTION
@@ -41,6 +41,7 @@ DESC
 
 #### 1. 实施严格的中间件验证
 在ThinkPHP中应当为所有需要认证的路由应用认证中间件：
+
 ```php
 // 定义认证中间件
 class AuthMiddleware {
@@ -58,6 +59,7 @@ Route::rule('user/profile', 'user/profile')->middleware(AuthMiddleware::class);
 
 #### 2. 实现权限控制系统
 对于敏感操作应当实现细粒度的权限控制：
+
 ```php
 // 在控制器中检查权限
 public function deleteUser() {
@@ -70,6 +72,7 @@ public function deleteUser() {
 
 #### 3. 参数安全处理
 对所有的用户输入进行严格验证：
+
 ```php
 // 使用验证器确保参数安全
 $validate = Validate::rule('user_id', 'require|number|gt:0');

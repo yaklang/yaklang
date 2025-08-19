@@ -3,18 +3,83 @@ desc(
 	type: audit
 	severity: high
 	desc: <<<DESC
-SQL注入是一种常见的漏洞，当应用程序未对用户输入进行适当的验证或转义时，攻击者可以构造特殊的输入来篡改SQL语句的逻辑。在Golang中，使用`models`库进行数据库操作时，如果直接将用户输入拼接到SQL语句中，就可能发生SQL注入攻击。攻击者可以利用这种漏洞窃取、修改或删除数据库中的数据，甚至执行任意SQL命令。例如，在Golang代码中，如果使用`fmt.Sprintf`将用户输入直接拼接到SQL语句中，就存在SQL注入风险。
+### 漏洞描述
 
-为了防止SQL注入，应使用参数化查询或预编译的SQL语句。参数化查询可以确保用户输入作为参数传递，而不是SQL语句的一部分，从而避免SQL注入攻击。此外，还应确保对用户输入进行适当的验证和转义，以防止恶意输入。
+1. **漏洞原理**
+SQL注入是由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。在Golang中，使用`models`库进行数据库操作时，如果直接将用户输入拼接到SQL语句中，就可能发生SQL注入攻击。
+
+2. **触发场景**
+以下代码展示了SQL注入的典型场景：
+```go
+func SQLILoginHandler(c *gin.Context) {
+    username := c.PostForm("username")
+    password := c.PostForm("password")
+    // 故意使用字符串拼接构造SQL语句，易受SQL注入攻击
+    query := fmt.Sprintf("SELECT id, name FROM users WHERE name = '%s' AND password = '%s'", username, password)
+    var user models.Users
+    row := models.DB.Raw(query).Row()
+    err := row.Scan(&user.ID, &user.Name)
+}
+```
+攻击者通过输入 `admin' --` 可绕过密码验证，或者通过输入 `1; DROP TABLE users` 删除数据表。
+
+3. **潜在影响**
+- 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+- 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+- 通过数据库提权进一步渗透至服务器或其他系统组件。
+
 DESC
 	rule_id: "b89f27b3-35ee-48ae-ba75-415da669f60d"
 	title_zh: "检测Golang SQL注入漏洞(Models)"
 	risk: "sqli"
 	solution: <<<SOLUTION
-为了防止SQL注入，应使用参数化查询或预编译的SQL语句。参数化查询可以确保用户输入作为参数传递，而不是SQL语句的一部分，从而避免SQL注入攻击。此外，还应确保对用户输入进行适当的验证和转义，以防止恶意输入。例如，使用`database/sql`包中的`PreparedStatement`进行数据库操作，而不是直接拼接SQL语句。此外，可以使用Golang的`text/template`包对用户输入进行转义，以防止恶意脚本注入。在代码中，应该始终对用户输入进行严格的检查和验证，以确保其符合预期的格式和类型。
+### 修复建议
+
+#### 1. 使用预编译查询
+通过预编译SQL语句并绑定用户输入，隔离代码与数据，避免恶意输入篡改逻辑。
+```go
+func SQLILoginHandler(c *gin.Context) {
+    username := c.PostForm("username")
+    password := c.PostForm("password")
+    query := "SELECT id, name FROM users WHERE name = ? AND password = ?"
+    var user models.Users
+    err := models.DB.Raw(query, username, password).Scan(&user).Error
+    if err != nil {
+        c.HTML(http.StatusOK, "vulns/sqli.tmpl", gin.H{"error": "用户名或密码错误"})
+        return
+    }
+    c.HTML(http.StatusOK, "vulns/sqli.tmpl", gin.H{"success": true, "message": fmt.Sprintf("欢迎回来，%s!", user.Name)})
+}
+```
+
+#### 2. 输入合法性校验
+对用户输入实施类型、格式或范围限制，拒绝非法输入。
+```go
+if !regexp.MustCompile(`^[a-zA-Z0-9_]+$`).MatchString(username) {
+    c.HTML(http.StatusOK, "vulns/sqli.tmpl", gin.H{"error": "用户名包含非法字符"})
+    return
+}
+```
+
+#### 3. 使用ORM框架
+通过ORM（如GORM）内置的安全机制自动处理参数化，避免手动拼接SQL。
+```go
+func SQLILoginHandler(c *gin.Context) {
+    username := c.PostForm("username")
+    password := c.PostForm("password")
+    var user models.Users
+    err := models.DB.Where("name = ? AND password = ?", username, password).First(&user).Error
+    if err != nil {
+        c.HTML(http.StatusOK, "vulns/sqli.tmpl", gin.H{"error": "用户名或密码错误"})
+        return
+    }
+    c.HTML(http.StatusOK, "vulns/sqli.tmpl", gin.H{"success": true, "message": fmt.Sprintf("欢迎回来，%s!", user.Name)})
+}
+```
 SOLUTION
 	reference: <<<REFERENCE
-https://owasp.org/www-community/vulnerabilities/SQL_Injection
+[SQL注入漏洞](https://owasp.org/www-community/vulnerabilities/SQL_Injection)
+[CWE-89](https://cwe.mitre.org/data/definitions/89.html)
 REFERENCE
 )
 
@@ -27,9 +92,53 @@ $param & $input as $high;
 
 alert $high for {
 	type: "vuln",
-	title: "SQL Injection detected",
-	title_zh: "检测到SQL注入",
+	title: "Golang SQL Injection Vulnerability Was Detected",
+	title_zh: "检测到Golang SQL注入漏洞",
 	level: "high",
+	name: "high",
+	message: "检测到Golang代码中存在SQL注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 使用参数化查询
+通过预编译SQL语句并绑定用户输入，隔离代码与数据，避免恶意输入篡改逻辑。
+```go
+username := c.PostForm("username")
+password := c.PostForm("password")
+query := "SELECT id, name FROM users WHERE name = ? AND password = ?"
+models.DB.Raw(query, username, password).Row()
+```
+#### 2. 输入合法性校验
+对用户输入实施类型、格式或范围限制，拒绝非法输入。
+```go
+if !isValidUsername(username) || !isValidPassword(password) {
+    c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+    return
+}
+```
+#### 3. 使用ORM框架
+通过GORM等ORM框架内置的安全机制自动处理参数化，避免手动拼接SQL。
+```go
+models.DB.Where("name = ? AND password = ?", username, password).First(&user)
+```
+SOLUTION
+	risk: "SQL注入",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+   SQL注入是由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
+2. **触发场景**
+   ```go
+   username := c.PostForm("username")
+   password := c.PostForm("password")
+   query := fmt.Sprintf("SELECT id, name FROM users WHERE name = '%s' AND password = '%s'", username, password)
+   models.DB.Raw(query).Row()
+   ```
+   攻击者可以输入 `' OR '1'='1` 绕过登录验证逻辑，或者输入 `'; DROP TABLE users--` 删除数据库表。
+3. **潜在影响**
+   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+   - 通过数据库提权进一步渗透至服务器或其他系统组件。
+DESC
 }
 
 desc(

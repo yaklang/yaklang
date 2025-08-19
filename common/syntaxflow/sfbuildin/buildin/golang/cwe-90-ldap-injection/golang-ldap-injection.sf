@@ -3,62 +3,108 @@ desc(
 	type: audit
 	severity: high
 	desc: <<<DESC
-LDAP注入攻击发生在应用程序通过用户输入直接构造LDAP查询时。如果用户输入未被正确过滤或转义，攻击者可以注入恶意的LDAP语句，导致未授权访问、数据泄露或其他安全风险。此规则旨在检测Go语言代码中可能存在LDAP注入漏洞的点，并提供相应的修复建议。
+### 漏洞描述
+
+1. **漏洞原理**
+   LDAP注入攻击是一种常见的安全漏洞，当应用程序通过用户输入直接构造LDAP查询时可能发生。如果未对用户输入进行严格的过滤或转义，攻击者可通过构造恶意的输入篡改LDAP查询逻辑，从而实现非授权访问、数据泄露或其他安全风险。
+
+2. **触发场景**
+   // 存在漏洞的代码示例
+   ```go
+   username := r.URL.Query().Get("username")
+   searchRequest := ldap.NewSearchRequest(
+       "ou=users,dc=example,dc=com",
+       ldap.ScopeWholeSubtree,
+       ldap.NeverDerefAliases,
+       0, 0, false,
+       fmt.Sprintf("(uid=%s)", username), // 用户输入直接拼接，存在注入点
+       []string{"dn"},
+       nil,
+   )
+   ```
+   攻击者可以通过提交`*))(|(uid=*))`这样的恶意输入来破坏LDAP查询逻辑，绕过认证或获取未经授权的数据。
+
+3. **潜在影响**
+   - 敏感数据（如用户凭证、隐私信息）被窃取。
+   - 未授权访问系统资源。
+   - 数据完整性受损，甚至可能引发连锁攻击。
+
+### 规则目的
+该规则用于审计Go语言代码中可能导致LDAP注入漏洞的安全问题。通过识别危险的LDAP查询构造方式，帮助开发者定位并修复潜在的注入点，提升程序安全性。
+
+### 规则详细
+- 覆盖了常见的`ldap.NewSearchRequest`方法调用。
+- 检测直接拼接用户输入到LDAP查询中的行为。
+- 提供参考代码样例以指导如何使用参数化或转义机制避免注入。
 DESC
 	rule_id: "2b4b5d82-965c-4e2c-ac36-72d950f9143e"
 	title_zh: "检测Golang LDAP注入漏洞"
 	solution: <<<SOLUTION
-为了防止LDAP注入，应该对用户输入进行适当的验证和转义。使用参数化的LDAP查询可以有效地防止注入攻击。例如，可以使用Go的ldap包中的SearchRequest结构来构建安全的查询。此外，避免直接将用户输入插入到LDAP查询中，而是使用参数化的方式来传递用户输入。以下是一个修复示例代码：
+### 修复建议
+
+#### 1. 使用转义函数处理用户输入
+Go的`gopkg.in/ldap.v2`库提供了`ldap.EscapeFilter`函数，可以用来转义LDAP查询中的特殊字符，避免注入攻击。
 ```go
-package main
-
 import (
-	"fmt"
-	"log"
-
-	"net/http"
-	ldap "gopkg.in/ldap.v2"
+    "fmt"
+    "net/http"
+    ldap "gopkg.in/ldap.v2"
 )
 
 func authenticate(w http.ResponseWriter, r *http.Request) bool {
-	username := r.URL.Query().Get("username")
-	password := r.URL.Query().Get("password")
+    username := r.URL.Query().Get("username")
+    escapedUsername := ldap.EscapeFilter(username) // 转义用户输入
 
-	l, err := ldap.Dial("tcp", "ldap.example.com:389")
-	if err != nil {
-		log.Fatalf("Failed to connect to LDAP server: %s", err)
-	}
-	defer l.Close()
-
-	// 绑定到 LDAP 服务器
-	err = l.Bind("cn=admin,dc=example,dc=com", password)
-	if err != nil {
-		log.Fatalf("Failed to bind: %s", err)
-	}
-
-	// LDAP 查询构造
-	searchRequest := ldap.NewSearchRequest(
-		"ou=users,dc=example,dc=com",
-		ldap.ScopeWholeSubtree,
-		ldap.NeverDerefAliases,
-		0, 0, false,
-		fmt.Sprintf("(uid=%s)", ldap.EscapeFilter(username)), // 使用转义函数
-		[]string{"dn"},
-		nil,
-	)
-
-	// 执行查询
-	_, err = l.Search(searchRequest)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// 这里省略了密码验证的具体实现
-	return true
+    searchRequest := ldap.NewSearchRequest(
+        "ou=users,dc=example,dc=com",
+        ldap.ScopeWholeSubtree,
+        ldap.NeverDerefAliases,
+        0, 0, false,
+        fmt.Sprintf("(uid=%s)", escapedUsername), // 使用转义后的值
+        []string{"dn"},
+        nil,
+    )
+    // 执行查询...
 }
+```
+
+#### 2. 实施严格的输入验证
+在将用户输入传递给LDAP查询之前，应对其进行严格的验证，例如限定为字母数字字符。
+```go
+func isValidUsername(username string) bool {
+    for _, r := range username {
+        if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')) {
+            return false
+        }
+    }
+    return true
+}
+
+if !isValidUsername(username) {
+    log.Printf("Invalid username format: %s", username)
+    return false
+}
+```
+
+#### 3. 避免动态拼接查询条件
+尽量使用静态过滤器或构建安全的查询结构，减少手动字符串拼接的风险。
+```go
+searchRequest := ldap.NewSearchRequest(
+    "ou=users,dc=example,dc=com",
+    ldap.ScopeWholeSubtree,
+    ldap.NeverDerefAliases,
+    0, 0, false,
+    "(uid=testuser)", // 固定查询条件
+    []string{"dn"},
+    nil,
+)
+```
+
+以上方法能够有效防止LDAP注入攻击，提升应用安全性。
 SOLUTION
 	reference: <<<REFERENCE
 https://cheatsheetseries.owasp.org/cheatsheets/LDAP_Injection_Prevention_Cheat_Sheet.html
+https://cwe.mitre.org/data/definitions/90.html
 REFERENCE
 )
 
@@ -74,8 +120,87 @@ $param & $input as $high
 alert $high for {
 	level: "high",
 	type: "vuln",
-	title: "Check Golang LDAP Injection Vulnerability",
-	title_zh: "检测Golang LDAP注入漏洞",
+	title: "Golang LDAP Injection Vulnerability Was Detected",
+	title_zh: "检测到Go语言LDAP注入漏洞",
+	name: "high",
+	message: "检测到Go语言LDAP注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 使用转义函数
+   在构建LDAP查询时，对用户输入进行转义以防止恶意输入篡改逻辑。
+   ```go
+   import "gopkg.in/ldap.v2"
+
+   escapedUsername := ldap.EscapeFilter(username)
+   searchRequest := ldap.NewSearchRequest(
+       "ou=users,dc=example,dc=com",
+       ldap.ScopeWholeSubtree,
+       ldap.NeverDerefAliases,
+       0, 0, false,
+       fmt.Sprintf("(uid=%s)", escapedUsername),
+       []string{"dn"},
+       nil,
+   )
+   ```
+#### 2. 输入合法性校验
+   对用户输入实施类型、格式或范围限制，拒绝非法输入。
+   ```go
+   func isValidUsername(username string) bool {
+       for _, r := range username {
+           if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_') {
+               return false
+           }
+       }
+       return true
+   }
+   if !isValidUsername(username) {
+       return errors.New("用户名包含非法字符")
+   }
+   ```
+#### 3. 使用参数化或构建器模式
+   尽量避免直接拼接字符串，而是通过程序化方式构建LDAP过滤器。
+   ```go
+   func escapeLDAPFilterForBuilder(filter string) string {
+       runes := []rune(filter)
+       var b strings.Builder
+       for _, r := range runes {
+           switch r {
+           case '(', ')', '\\', '*', '\u0000':
+               fmt.Fprintf(&b, "\\%02x", r)
+           default:
+               b.WriteRune(r)
+           }
+       }
+       return b.String()
+   }
+   escapedUsername := escapeLDAPFilterForBuilder(username)
+   ```
+SOLUTION
+	risk: "LDAP注入",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+   LDAP注入攻击发生在应用程序通过用户输入直接构造LDAP查询时。如果用户输入未被正确过滤或转义，攻击者可以注入恶意的LDAP语句，导致未授权访问、数据泄露或其他安全风险。
+2. **触发场景**
+   // 存在漏洞的代码示例
+   ```go
+   username := r.URL.Query().Get("username")
+   searchRequest := ldap.NewSearchRequest(
+       "ou=users,dc=example,dc=com",
+       ldap.ScopeWholeSubtree,
+       ldap.NeverDerefAliases,
+       0, 0, false,
+       fmt.Sprintf("(uid=%s)", username), // 潜在的注入点
+       []string{"dn"},
+       nil,
+   )
+   ```
+   攻击者可以通过输入特殊字符（如 `*` 或 `)`）绕过逻辑，获取敏感信息或执行非预期操作。
+3. **潜在影响**
+   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+   - 执行任意LDAP语句（如搜索、修改数据或权限提升）。
+   - 通过LDAP提权进一步渗透至服务器或其他系统组件。
+DESC
 }
 
 desc(

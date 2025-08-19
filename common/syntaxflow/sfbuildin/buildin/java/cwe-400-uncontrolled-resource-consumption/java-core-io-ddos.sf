@@ -11,17 +11,14 @@ desc(
 
 2. **触发场景**
    当应用程序使用`java.io`包中的类（如`BufferedReader`, `InputStream`, `Reader`等）读取来自外部不受信任来源（如网络连接、用户上传文件）的数据时，如果没有对读取的数据设置明确的大小或时间限制，就可能存在此漏洞。
-
-   // 存在漏洞的代码示例
    ```java
    package org.example.Dos;
    import java.io.*;
    import java.net.Socket;
-
    public class DOSDemo {
        public static void readSocketData(Socket socket) throws IOException {
            BufferedReader reader = new BufferedReader(
-                   new InputStreamReader(socket.getInputStream())
+               new InputStreamReader(socket.getInputStream())
            );
            String line;
            // 没有对读取的行设置长度限制
@@ -40,24 +37,23 @@ desc(
    - **服务不可用**: 持续的资源消耗导致应用服务器性能急剧下降，甚至崩溃，无法响应正常用户的请求。
    - **资源耗尽**: 大量内存、CPU、磁盘IO或网络带宽被恶意占用，影响同一物理机或虚拟机上的其他服务。
    - **系统不稳定**: 极端情况下可能影响操作系统稳定性。
+
 DESC
 	rule_id: "be6b4a42-40ed-42c9-9f8e-9ad6e41820d3"
 	solution: <<<SOLUTION
 ### 修复建议
 
 #### 1. 对输入数据设置长度或大小限制
-在使用Java IO读取外部数据时，务必对数据的总大小、单行长度或读取次数设置明确的上限。超过限制的数据应被拒绝或截断。
-
-```java
-// 修复代码示例 (对单行设置最大长度)
-package org.example.Dos;
-import java.io.*;
-import java.net.Socket;
-
-public class SecurityDOSDemo {
-   public static void readSocketData(Socket socket) throws IOException {
+   在使用Java IO读取外部数据时，务必对数据的总大小、单行长度或读取次数设置明确的上限。超过限制的数据应被拒绝或截断。
+   ```java
+   // 修复代码示例 (对单行设置最大长度)
+   package org.example.Dos;
+   import java.io.*;
+   import java.net.Socket;
+   public class SecurityDOSDemo {
+       public static void readSocketData(Socket socket) throws IOException {
            BufferedReader reader = new BufferedReader(
-                   new InputStreamReader(socket.getInputStream())
+               new InputStreamReader(socket.getInputStream())
            );
            // 限制单行的最大长度
            String line;
@@ -72,17 +68,17 @@ public class SecurityDOSDemo {
                processLine(line);
            }
        }
-   private static void processLine(String line) {
-       // 业务逻辑处理
+       private static void processLine(String line) {
+           // 业务逻辑处理
+       }
    }
-}
-```
+   ```
 
 #### 2. 设置读取超时时间
-对于网络IO，考虑设置socket的读取超时时间，避免因慢速或恶意连接导致线程长时间阻塞。
+   对于网络IO，考虑设置socket的读取超时时间，避免因慢速或恶意连接导致线程长时间阻塞。
 
 #### 3. 使用更安全的库或框架
-考虑使用提供了内置安全控制的库或框架来处理文件上传、网络通信等，它们通常包含了对大小、类型的校验和限制。
+   考虑使用提供了内置安全控制的库或框架来处理文件上传、网络通信等，它们通常包含了对大小、类型的校验和限制。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-400: Uncontrolled Resource Consumption](https://cwe.mitre.org/data/definitions/400.html)
@@ -107,6 +103,78 @@ alert $vul for {
 	type: "vuln",
 	title: "Detect Java Core IO Denial of Service Vulnerability",
 	title_zh: "检测Java IO库拒绝服务漏洞",
+	name: "vul",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 对输入数据设置长度或大小限制
+在使用Java IO读取外部数据时，务必对数据的总大小、单行长度或读取次数设置明确的上限。超过限制的数据应被拒绝或截断。
+```java
+// 修复代码示例 (对单行设置最大长度)
+package org.example.Dos;
+import java.io.*;
+import java.net.Socket;
+public class SecurityDOSDemo {
+public static void readSocketData(Socket socket) throws IOException {
+BufferedReader reader = new BufferedReader(
+new InputStreamReader(socket.getInputStream())
+);
+// 限制单行的最大长度
+String line;
+final int MAX_LINE_LENGTH = 1024; // 最大行长度为1024个字符
+while ((line = reader.readLine()) != null) {
+if (line.length() > MAX_LINE_LENGTH) {
+// 超过最大长度，可以选择跳过当前行、断开连接或抛出异常
+System.err.println("Line exceeds maximum length, skipping...");
+// break; // 或者选择断开连接
+continue; // 或者跳过当前行
+}
+processLine(line);
+}
+}
+private static void processLine(String line) {
+// 业务逻辑处理
+}
+}
+```
+#### 2. 设置读取超时时间
+对于网络IO，考虑设置socket的读取超时时间，避免因慢速或恶意连接导致线程长时间阻塞。
+#### 3. 使用更安全的库或框架
+考虑使用提供了内置安全控制的库或框架来处理文件上传、网络通信等，它们通常包含了对大小、类型的校验和限制。
+SOLUTION
+	risk: "DDOS",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+Java IO库提供了许多便捷的文件和网络数据读取功能。然而，如果在处理不受信任的输入数据时，没有对读取操作设置长度限制或超时限制，攻击者可能通过发送特制的、非常大的或无限长度的数据流，导致应用程序持续读取这些数据，消耗大量的内存、CPU或其他系统资源，最终引发拒绝服务（Denial of Service, DoS）。例如，`BufferedReader.readLine()`方法在没有读取长度限制的情况下，如果接收到超长的行数据，可能导致内存溢出或其他资源耗尽。
+2. **触发场景**
+当应用程序使用`java.io`包中的类（如`BufferedReader`, `InputStream`, `Reader`等）读取来自外部不受信任来源（如网络连接、用户上传文件）的数据时，如果没有对读取的数据设置明确的大小或时间限制，就可能存在此漏洞。
+// 存在漏洞的代码示例
+```java
+package org.example.Dos;
+import java.io.*;
+import java.net.Socket;
+public class DOSDemo {
+public static void readSocketData(Socket socket) throws IOException {
+BufferedReader reader = new BufferedReader(
+new InputStreamReader(socket.getInputStream())
+);
+String line;
+// 没有对读取的行设置长度限制
+while ((line = reader.readLine()) != null) {
+processLine(line);
+}
+}
+private static void processLine(String line) {
+// 业务逻辑处理
+}
+}
+```
+攻击者向应用程序发送大量数据，`readLine()`会尝试读取完整的一行，如果单行数据过大，可能导致内存占用过高。
+3. **潜在影响**
+- **服务不可用**: 持续的资源消耗导致应用服务器性能急剧下降，甚至崩溃，无法响应正常用户的请求。
+- **资源耗尽**: 大量内存、CPU、磁盘IO或网络带宽被恶意占用，影响同一物理机或虚拟机上的其他服务。
+- **系统不稳定**: 极端情况下可能影响操作系统稳定性。
+DESC
 }
 
 desc(

@@ -1,21 +1,97 @@
 desc(
-	title: "Detect Golang Service SQL Injection Vulnerability"
+	title: "Detect Golang SQL Injection Vulnerability"
 	type: audit
 	severity: high
 	desc: <<<DESC
-SQL注入是一种常见的攻击手段，攻击者通过在SQL查询中注入恶意SQL代码片段，以欺骗数据库执行非预期的操作。在本规则中，我们检测Golang服务中可能存在的SQL注入漏洞。该漏洞通常是由于未对用户输入进行适当的过滤和转义导致的。漏洞触发场景包括但不限于用户输入被直接拼接到SQL查询中。潜在影响包括数据泄露、数据损坏或数据库操作权限的提升。
+### 漏洞描述
+
+1. **漏洞原理**
+   SQL注入是由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
+
+2. **触发场景**
+   // 存在漏洞的代码示例
+   ```go
+   package main
+   import (
+       "github.com/gin-gonic/gin"
+       service "github.com/godzeo/go-gin-vul/service/vul_service"
+   )
+   func Sqlli(c *gin.Context) {
+       var User string
+       if c.Request.Method == "GET" {
+           User = c.Query("username")
+       }
+       loginService := service.LogData{Username: User}
+       isExist, _ := loginService.LoginCheck()
+       if !isExist {
+           c.JSON(403, gin.H{"success": "login fail"})
+           return
+       }
+       c.JSON(200, gin.H{"success": "login succeed " + User})
+   }
+   ```
+   攻击者通过拼接恶意SQL片段（如`' OR '1'='1`）可以绕过认证逻辑，从而非法访问系统。
+
+3. **潜在影响**
+   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+   - 通过数据库提权进一步渗透至服务器或其他系统组件。
+
 DESC
 	rule_id: "278c2a17-1b81-49d1-a4a9-d881fba1a0e9"
-	title_zh: "检测Golang Service SQL注入漏洞"
+	title_zh: "检测Golang SQL注入漏洞"
 	risk: "sqli"
 	solution: <<<SOLUTION
-为防止SQL注入漏洞，建议采取以下措施：
-1. 使用参数化查询（Prepared Statements）代替拼接SQL查询。
-2. 对用户输入进行严格的验证和过滤。
-3. 实施最小权限原则，确保应用程序只拥有执行必要数据库操作的最小权限。
+### 修复建议
+
+#### 1. 使用参数化查询（Prepared Statements）
+通过预编译SQL语句并绑定用户输入，隔离代码与数据，避免恶意输入篡改逻辑。
+```go
+// 修复代码示例
+func LoginCheck(username, password string) (bool, error) {
+    db, err := sql.Open("mysql", "user:password@tcp(127.0.0.1:3306)/database")
+    if err != nil {
+        return false, fmt.Errorf("failed to connect to database: %w", err)
+    }
+    defer db.Close()
+    query := "SELECT COUNT(*) FROM users WHERE username = ? AND password = ?"
+    stmt, err := db.Prepare(query)
+    if err != nil {
+        return false, fmt.Errorf("failed to prepare statement: %w", err)
+    }
+    defer stmt.Close()
+    var count int
+    err = stmt.QueryRow(username, password).Scan(&count)
+    if err != nil && err != sql.ErrNoRows {
+        return false, fmt.Errorf("query execution failed: %w", err)
+    }
+    return count > 0, nil
+}
+```
+
+#### 2. 输入合法性校验
+对用户输入实施类型、格式或范围限制，拒绝非法输入。
+```go
+// 示例：校验输入为数字且范围合法
+idStr := c.Param("id")
+id, err := strconv.Atoi(idStr)
+if err != nil {
+    c.JSON(400, gin.H{"error": "Invalid user ID"})
+    return
+}
+```
+
+#### 3. 实施最小权限原则
+确保应用程序只拥有执行必要数据库操作的最小权限。
+```sql
+-- 示例：创建仅具有读取权限的数据库用户
+CREATE USER 'readonly_user'@'localhost' IDENTIFIED BY 'password';
+GRANT SELECT ON database.* TO 'readonly_user'@'localhost';
+FLUSH PRIVILEGES;
+```
 SOLUTION
 	reference: <<<REFERENCE
-https://cwe.mitre.org/data/definitions/89.html
+[CWE-89](https://cwe.mitre.org/data/definitions/89.html)
 REFERENCE
 )
 
@@ -28,8 +104,69 @@ $param & $input as $high;
 alert $high for {
 	level: "high",
 	type: "vuln",
-	title: "SQL Injection detected",
-	title_zh: "检测到SQL注入",
+	title: "Golang SQL Injection Vulnerability Was Detected",
+	title_zh: "检测到Golang SQL注入漏洞",
+	name: "high",
+	message: "检测到Golang服务中的SQL注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 使用参数化查询（Prepared Statements）
+通过预编译SQL语句并绑定用户输入，隔离代码与数据，避免恶意输入篡改逻辑。
+```go
+query := "SELECT COUNT(*) FROM users WHERE username = ? AND password = ?"
+stmt, err := db.Prepare(query)
+if err != nil {
+    return false, fmt.Errorf("failed to prepare statement: %w", err)
+}
+defer stmt.Close()
+var count int
+err = stmt.QueryRow(username, password).Scan(&count)
+```
+#### 2. 输入合法性校验
+对用户输入实施类型、格式或范围限制，拒绝非法输入。
+```go
+idStr := c.Param("id")
+id, err := strconv.Atoi(idStr) // 强制转换为整数
+if err != nil {
+    c.JSON(400, gin.H{"error": "Invalid user ID"})
+    return
+}
+```
+#### 3. 实施最小权限原则
+确保应用程序只拥有执行必要数据库操作的最小权限。
+```go
+// 示例：使用最小权限账号连接数据库
+db, err := sql.Open("mysql", "limited_user:password@tcp(127.0.0.1:3306)/database")
+```
+SOLUTION
+	risk: "SQL注入",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+   SQL注入是由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
+2. **触发场景**
+   ```go
+   func Sqlli(c *gin.Context) {
+       var User string
+       var Password string
+       if c.Request.Method == "GET" {
+           User = c.Query("username")
+           Password = c.Query("password")
+       } else if c.Request.Method == "POST" {
+           User = c.PostForm("username")
+           Password = c.PostForm("password")
+       }
+       loginService := service.LogData{Username: User, Password: Password}
+       isExist, err := loginService.LoginCheck()
+       // ...省略其他逻辑
+   }
+   ```
+   在上述代码中，未经验证的`User`和`Password`被直接传递给`LoginCheck`方法，如果该方法内部直接拼接SQL查询，则可能造成SQL注入。
+3. **潜在影响**
+   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+   - 通过数据库提权进一步渗透至服务器或其他系统组件。
+DESC
 }
 
 desc(

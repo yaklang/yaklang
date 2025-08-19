@@ -5,97 +5,78 @@ desc(
 	risk: "zip operator"
 	desc: <<<DESC
 ### 风险描述
-
 1. **风险原理**
-   PHP中与文件解压相关的函数（如`unzip`，尽管`unzip`并非内置函数，此处泛指类似的第三方库或自定义函数）在处理用户可控的压缩文件时，如果未对压缩包内的文件名、文件路径以及目标解压路径进行严格校验和过滤，则存在文件路径穿越、覆盖现有文件或将恶意文件写入系统关键位置的风险。攻击者可以构造包含如`../`、绝对路径或特殊字符的文件名，诱使程序将文件解压到非预期目录，甚至覆盖敏感系统文件。
-
+PHP中与文件解压相关的函数（如`unzip`，尽管`unzip`并非内置函数，此处泛指类似的第三方库或自定义函数）在处理用户可控的压缩文件时，如果未对压缩包内的文件名、文件路径以及目标解压路径进行严格校验和过滤，则存在文件路径穿越、覆盖现有文件或将恶意文件写入系统关键位置的风险。攻击者可以构造包含如`../`、绝对路径或特殊字符的文件名，诱使程序将文件解压到非预期目录，甚至覆盖敏感系统文件。
 2. **触发场景**
-   当应用程序解压用户上传的压缩文件时，如果直接使用压缩包内包含的路径信息而未进行校验，就会触发此风险。例如，一个处理用户头像上传并自动解压压缩包的场景。
-   
-   // 存在风险的功能示例
-   ```php
-   <?php
-       $uploadDir = '/app/uploads/';
-       $zipFile = $_FILES['file']['tmp_name'];
-       
-       // 假设第三方库或自定义函数 unzip() 存在且直接使用文件名进行解压
-       unzip($zipFile, $uploadDir);
-   ?>
-   ```
-   攻击者上传一个压缩包，其中包含一个名为`../../../../etc/passwd`的文件，解压后该文件可能会被写入`/etc/passwd`，导致系统文件被覆盖。
-
+当应用程序解压用户上传的压缩文件时，如果直接使用压缩包内包含的路径信息而未进行校验，就会触发此风险。例如，一个处理用户头像上传并自动解压压缩包的场景。
+// 存在风险的功能示例
+```php
+<?php
+$uploadDir = '/app/uploads/';
+$zipFile = $_FILES['file']['tmp_name'];
+// 假设第三方库或自定义函数 unzip() 存在且直接使用文件名进行解压
+unzip($zipFile, $uploadDir);
+?>
+```
+攻击者上传一个压缩包，其中包含一个名为`../../../../etc/passwd`的文件，解压后该文件可能会被写入`/etc/passwd`，导致系统文件被覆盖。
 3. **潜在影响**
-   - 攻击者可以将恶意文件写入Web目录，执行恶意脚本（WebShell）。
-   - 攻击者可以覆盖或篡改系统关键配置或程序文件。
-   - 攻击者可以实现任意文件写入或删除，导致数据丢失或系统破坏。
-   - 攻击者可能通过解压超大文件或大量小文件造成拒绝服务。
-
+- 攻击者可以将恶意文件写入Web目录，执行恶意脚本（WebShell）。
+- 攻击者可以覆盖或篡改系统关键配置或程序文件。
+- 攻击者可以实现任意文件写入或删除，导致数据丢失或系统破坏。
+- 攻击者可能通过解压超大文件或大量小文件造成拒绝服务。
 DESC
 	rule_id: "7962164f-28ca-4570-9660-07a2a274a0c7"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **严格校验解压目标路径**
-   确保文件只能被解压到预期的目标目录下，不能通过相对路径或绝对路径逃逸。在构建目标文件路径时，应先将目标目录和文件名进行拼接，然后标准化路径，最后检查标准化后的路径是否仍在目标目录内。
-   ```php
-   <?php
-   function isValidPath($filePath, $targetDir) {
-       $targetDir = realpath($targetDir);
-       $resolvedPath = realpath($targetDir . '/' . $filePath);
-       
-       // 检查标准化后的路径是否以目标目录开头且目标目录是其父目录
-       if ($resolvedPath === false || strpos($resolvedPath, $targetDir) !== 0) {
-           return false;
-       }
-       // 进一步检查解压的条目是否是文件（避免目录遍历）
-       // 并且确保其不包含 "../" 等路径穿越标识符 (尽管 realpath 已部分处理，仍建议显式检查)
-       if (strpos($filePath, '../') !== false || strpos($filePath, '\..\') !== false) {
-           return false;
-       }
-       
-       return true;
-   }
-   
-   $targetDir = '/app/uploads/';
-   $zipFile = $_FILES['file']['tmp_name'];
-   
-   // 假设使用 ZipArchive 类进行解压
-   $zip = new ZipArchive;
-   if ($zip->open($zipFile) === TRUE) {
-       for ($i = 0; $i < $zip->numFiles; $i++) {
-           $filename = $zip->getNameIndex($i);
-           
-           // 校验文件路径的合法性
-           if (!isValidPath($filename, $targetDir)) {
-               // 跳过或拒绝处理非法路径文件
-               continue;
-           }
-           
-           // 解压文件到目标目录
-           $zip->extractTo($targetDir, array($filename));
-       }
-       $zip->close();
-   } else {
-       // 处理zip文件打开失败
-   }
-   ?>
-   ```
-
+确保文件只能被解压到预期的目标目录下，不能通过相对路径或绝对路径逃逸。在构建目标文件路径时，应先将目标目录和文件名进行拼接，然后标准化路径，最后检查标准化后的路径是否仍在目标目录内。
+```php
+<?php
+function isValidPath($filePath, $targetDir) {
+$targetDir = realpath($targetDir);
+$resolvedPath = realpath($targetDir . '/' . $filePath);
+// 检查标准化后的路径是否以目标目录开头且目标目录是其父目录
+if ($resolvedPath === false || strpos($resolvedPath, $targetDir) !== 0) {
+return false;
+}
+// 进一步检查解压的条目是否是文件（避免目录遍历）
+// 并且确保其不包含 "../" 等路径穿越标识符 (尽管 realpath 已部分处理，仍建议显式检查)
+if (strpos($filePath, '../') !== false || strpos($filePath, '\..\') !== false) {
+return false;
+}
+return true;
+}
+$targetDir = '/app/uploads/';
+$zipFile = $_FILES['file']['tmp_name'];
+// 假设使用 ZipArchive 类进行解压
+$zip = new ZipArchive;
+if ($zip->open($zipFile) === TRUE) {
+for ($i = 0; $i < $zip->numFiles; $i++) {
+$filename = $zip->getNameIndex($i);
+// 校验文件路径的合法性
+if (!isValidPath($filename, $targetDir)) {
+// 跳过或拒绝处理非法路径文件
+continue;
+}
+// 解压文件到目标目录
+$zip->extractTo($targetDir, array($filename));
+}
+$zip->close();
+} else {
+// 处理zip文件打开失败
+}
+?>
+```
 2. **过滤压缩包内文件名**
-   在获取压缩包内文件列表时，对文件名进行严格过滤，移除所有路径相关字符（如`../`、`\`、`/`等）或只允许特定的文件名字符集。
-
+在获取压缩包内文件列表时，对文件名进行严格过滤，移除所有路径相关字符（如`../`、`\`、`/`等）或只允许特定的文件名字符集。
 3. **限制解压的文件类型**
-   如果业务需求仅允许解压特定类型的文件（如图片），则应在解压前或解压后对文件扩展名或文件内容进行校验，拒绝解压非白名单类型的文件。
-
+如果业务需求仅允许解压特定类型的文件（如图片），则应在解压前或解压后对文件扩展名或文件内容进行校验，拒绝解压非白名单类型的文件。
 4. **使用安全的解压库及方法**
-   优先使用PHP内置的`ZipArchive`类，并配合其提供的方法（如`extractTo`）以更安全的方式处理文件解压。对于第三方库，应仔细阅读其文档，了解其安全特性和建议用法。
-
+优先使用PHP内置的`ZipArchive`类，并配合其提供的方法（如`extractTo`）以更安全的方式处理文件解压。对于第三方库，应仔细阅读其文档，了解其安全特性和建议用法。
 5. **校验文件大小和数量**
-   设置合理的总解压大小和文件数量限制，防止因解压巨大的恶意压缩包而导致磁盘空间耗尽或拒绝服务。
-
+设置合理的总解压大小和文件数量限制，防止因解压巨大的恶意压缩包而导致磁盘空间耗尽或拒绝服务。
 6. **使用独立的沙箱环境解压**
-   对于高风险场景，考虑在独立的沙箱环境中进行文件解压，完成后再安全地将所需文件移动到目标位置。
-
+对于高风险场景，考虑在独立的沙箱环境中进行文件解压，完成后再安全地将所需文件移动到目标位置。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-73](https://cwe.mitre.org/data/definitions/73.html)
@@ -124,95 +105,82 @@ alert $high for {
 	level: "high",
 	title: "Detect PHP Unsafe File Unzip Without Validation",
 	title_zh: "检测PHP未经验证的高危文件解压",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **严格校验解压目标路径**
-   确保文件只能被解压到预期的目标目录下，不能通过相对路径或绝对路径逃逸。在构建目标文件路径时，应先将目标目录和文件名进行拼接，然后标准化路径，最后检查标准化后的路径是否仍在目标目录内。
-   ```php
-   <?php
-   function isValidPath($filePath, $targetDir) {
-       $targetDir = realpath($targetDir);
-       $resolvedPath = realpath($targetDir . '/' . $filePath);
-       
-       // 检查标准化后的路径是否以目标目录开头且目标目录是其父目录
-       if ($resolvedPath === false || strpos($resolvedPath, $targetDir) !== 0) {
-           return false;
-       }
-       // 进一步检查解压的条目是否是文件（避免目录遍历）
-       // 并且确保其不包含 "../" 等路径穿越标识符 (尽管 realpath 已部分处理，仍建议显式检查)
-       if (strpos($filePath, '../') !== false || strpos($filePath, '\..\') !== false) {
-           return false;
-       }
-       
-       return true;
-   }
-   
-   $targetDir = '/app/uploads/';
-   $zipFile = $_FILES['file']['tmp_name'];
-   
-   // 假设使用 ZipArchive 类进行解压
-   $zip = new ZipArchive;
-   if ($zip->open($zipFile) === TRUE) {
-       for ($i = 0; $i < $zip->numFiles; $i++) {
-           $filename = $zip->getNameIndex($i);
-           
-           // 校验文件路径的合法性
-           if (!isValidPath($filename, $targetDir)) {
-               // 跳过或拒绝处理非法路径文件
-               continue;
-           }
-           
-           // 解压文件到目标目录
-           $zip->extractTo($targetDir, array($filename));
-       }
-       $zip->close();
-   } else {
-       // 处理zip文件打开失败
-   }
-   ?>
-   ```
-
+确保文件只能被解压到预期的目标目录下，不能通过相对路径或绝对路径逃逸。在构建目标文件路径时，应先将目标目录和文件名进行拼接，然后标准化路径，最后检查标准化后的路径是否仍在目标目录内。
+```php
+<?php
+function isValidPath($filePath, $targetDir) {
+    $targetDir = realpath($targetDir);
+    $resolvedPath = realpath($targetDir . '/' . $filePath);
+    // 检查标准化后的路径是否以目标目录开头且目标目录是其父目录
+    if ($resolvedPath === false || strpos($resolvedPath, $targetDir) !== 0) {
+        return false;
+    }
+    // 进一步检查解压的条目是否是文件（避免目录遍历）
+    // 并且确保其不包含 "../" 等路径穿越标识符 (尽管 realpath 已部分处理，仍建议显式检查)
+    if (strpos($filePath, '../') !== false || strpos($filePath, '\..\') !== false) {
+        return false;
+    }
+    return true;
+}
+$targetDir = '/app/uploads/';
+$zipFile = $_FILES['file']['tmp_name'];
+// 假设使用 ZipArchive 类进行解压
+$zip = new ZipArchive;
+if ($zip->open($zipFile) === TRUE) {
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $filename = $zip->getNameIndex($i);
+        // 校验文件路径的合法性
+        if (!isValidPath($filename, $targetDir)) {
+            // 跳过或拒绝处理非法路径文件
+            continue;
+        }
+        // 解压文件到目标目录
+        $zip->extractTo($targetDir, array($filename));
+    }
+    $zip->close();
+} else {
+    // 处理zip文件打开失败
+}
+?>
+```
 2. **过滤压缩包内文件名**
-   在获取压缩包内文件列表时，对文件名进行严格过滤，移除所有路径相关字符（如`../`、`\`、`/`等）或只允许特定的文件名字符集。
-
+在获取压缩包内文件列表时，对文件名进行严格过滤，移除所有路径相关字符（如`../`、`\`、`/`等）或只允许特定的文件名字符集。
 3. **限制解压的文件类型**
-   如果业务需求仅允许解压特定类型的文件（如图片），则应在解压前或解压后对文件扩展名或文件内容进行校验，拒绝解压非白名单类型的文件。
-
+如果业务需求仅允许解压特定类型的文件（如图片），则应在解压前或解压后对文件扩展名或文件内容进行校验，拒绝解压非白名单类型的文件。
 4. **使用安全的解压库及方法**
-   优先使用PHP内置的`ZipArchive`类，并配合其提供的方法（如`extractTo`）以更安全的方式处理文件解压。对于第三方库，应仔细阅读其文档，了解其安全特性和建议用法。
-
+优先使用PHP内置的`ZipArchive`类，并配合其提供的方法（如`extractTo`）以更安全的方式处理文件解压。对于第三方库，应仔细阅读其文档，了解其安全特性和建议用法。
 5. **校验文件大小和数量**
-   设置合理的总解压大小和文件数量限制，防止因解压巨大的恶意压缩包而导致磁盘空间耗尽或拒绝服务。
-
+设置合理的总解压大小和文件数量限制，防止因解压巨大的恶意压缩包而导致磁盘空间耗尽或拒绝服务。
 6. **使用独立的沙箱环境解压**
-   对于高风险场景，考虑在独立的沙箱环境中进行文件解压，完成后再安全地将所需文件移动到目标位置。
-CODE
-	desc: <<<CODE
+对于高风险场景，考虑在独立的沙箱环境中进行文件解压，完成后再安全地将所需文件移动到目标位置。
+SOLUTION
+	desc: <<<DESC
 ### 风险描述
-
 1. **风险原理**
-   PHP中与文件解压相关的函数（如`unzip`，尽管`unzip`并非内置函数，此处泛指类似的第三方库或自定义函数）在处理用户可控的压缩文件时，如果未对压缩包内的文件名、文件路径以及目标解压路径进行严格校验和过滤，则存在文件路径穿越、覆盖现有文件或将恶意文件写入系统关键位置的风险。攻击者可以构造包含如`../`、绝对路径或特殊字符的文件名，诱使程序将文件解压到非预期目录，甚至覆盖敏感系统文件。
-
+PHP中与文件解压相关的函数（如`unzip`，尽管`unzip`并非内置函数，此处泛指类似的第三方库或自定义函数）在处理用户可控的压缩文件时，如果未对压缩包内的文件名、文件路径以及目标解压路径进行严格校验和过滤，则存在文件路径穿越、覆盖现有文件或将恶意文件写入系统关键位置的风险。攻击者可以构造包含如`../`、绝对路径或特殊字符的文件名，诱使程序将文件解压到非预期目录，甚至覆盖敏感系统文件。
 2. **触发场景**
-   当应用程序解压用户上传的压缩文件时，如果直接使用压缩包内包含的路径信息而未进行校验，就会触发此风险。例如，一个处理用户头像上传并自动解压压缩包的场景。
-   
-   // 存在风险的功能示例
-   ```php
-   <?php
-       $uploadDir = '/app/uploads/';
-       $zipFile = $_FILES['file']['tmp_name'];
-       
-       // 假设第三方库或自定义函数 unzip() 存在且直接使用文件名进行解压
-       unzip($zipFile, $uploadDir);
-   ?>
-   ```
-   攻击者上传一个压缩包，其中包含一个名为`../../../../etc/passwd`的文件，解压后该文件可能会被写入`/etc/passwd`，导致系统文件被覆盖。
-
+当应用程序解压用户上传的压缩文件时，如果直接使用压缩包内包含的路径信息而未进行校验，就会触发此风险。例如，一个处理用户头像上传并自动解压压缩包的场景。
+```php
+<?php
+$uploadDir = '/app/uploads/';
+$zipFile = $_FILES['file']['tmp_name'];
+// 假设第三方库或自定义函数 unzip() 存在且直接使用文件名进行解压
+unzip($zipFile, $uploadDir);
+?>
+```
+攻击者上传一个压缩包，其中包含一个名为`../../../../etc/passwd`的文件，解压后该文件可能会被写入`/etc/passwd`，导致系统文件被覆盖。
 3. **潜在影响**
-   - 攻击者可以将恶意文件写入Web目录，执行恶意脚本（WebShell）。
-   - 攻击者可以覆盖或篡改系统关键配置或程序文件。   - 攻击者可以实现任意文件写入或删除，导致数据丢失或系统破坏。   - 攻击者可能通过解压超大文件或大量小文件造成拒绝服务。
-CODE
+- 攻击者可以将恶意文件写入Web目录，执行恶意脚本（WebShell）。
+- 攻击者可以覆盖或篡改系统关键配置或程序文件。
+- 攻击者可以实现任意文件写入或删除，导致数据丢失或系统破坏。
+- 攻击者可能通过解压超大文件或大量小文件造成拒绝服务。
+DESC
+	risk: "文件路径穿越",
+	name: "high",
+	message: "检测到PHP未经验证的高危文件解压漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -225,64 +193,166 @@ $highAndMid - $high as $mid
 alert $mid for {
 	title: "Detect PHP Insecure File Type Detection",
 	title_zh: "检测PHP文件解压类型检测不安全",
-	desc: <<<CODE
+	desc: <<<DESC
 ### 风险描述
-
 1. **风险原理**
-   PHP中与文件解压相关的函数（如`unzip`，尽管`unzip`并非内置函数，此处泛指类似的第三方库或自定义函数）在处理用户可控的压缩文件时，如果未对压缩包内的文件名、文件路径以及目标解压路径进行严格校验和过滤，则存在文件路径穿越、覆盖现有文件或将恶意文件写入系统关键位置的风险。攻击者可以构造包含如`../`、绝对路径或特殊字符的文件名，诱使程序将文件解压到非预期目录，甚至覆盖敏感系统文件。
-
+PHP中与文件解压相关的函数（如`unzip`，尽管`unzip`并非内置函数，此处泛指类似的第三方库或自定义函数）在处理用户可控的压缩文件时，如果未对压缩包内的文件名、文件路径以及目标解压路径进行严格校验和过滤，则存在文件路径穿越、覆盖现有文件或将恶意文件写入系统关键位置的风险。攻击者可以构造包含如`../`、绝对路径或特殊字符的文件名，诱使程序将文件解压到非预期目录，甚至覆盖敏感系统文件。
 2. **触发场景**
-   当应用程序解压用户上传的压缩文件时，如果直接使用压缩包内包含的路径信息而未进行校验，就会触发此风险。例如，一个处理用户头像上传并自动解压压缩包的场景。
-   
-   // 存在风险的功能示例
-   ```php
-   <?php
-       $uploadDir = '/app/uploads/';
-       $zipFile = $_FILES['file']['tmp_name'];
-       
-       // 假设第三方库或自定义函数 unzip() 存在且直接使用文件名进行解压
-       unzip($zipFile, $uploadDir);
-   ?>
-   ```
-   攻击者上传一个压缩包，其中包含一个名为`../../../../etc/passwd`的文件，解压后该文件可能会被写入`/etc/passwd`，导致系统文件被覆盖。
-
+当应用程序解压用户上传的压缩文件时，如果直接使用压缩包内包含的路径信息而未进行校验，就会触发此风险。例如，一个处理用户头像上传并自动解压压缩包的场景。
+```php
+<?php
+$uploadDir = '/app/uploads/';
+$zipFile = $_FILES['file']['tmp_name'];
+// 假设第三方库或自定义函数 unzip() 存在且直接使用文件名进行解压
+unzip($zipFile, $uploadDir);
+?>
+```
+攻击者上传一个压缩包，其中包含一个名为`../../../../etc/passwd`的文件，解压后该文件可能会被写入`/etc/passwd`，导致系统文件被覆盖。
 3. **潜在影响**
-   - 攻击者可以将恶意文件写入Web目录，执行恶意脚本（WebShell）。
-   - 攻击者可以覆盖或篡改系统关键配置或程序文件。   - 攻击者可以实现任意文件写入或删除，导致数据丢失或系统破坏。   - 攻击者可能通过解压超大文件或大量小文件造成拒绝服务。
-CODE
+- 攻击者可以将恶意文件写入Web目录，执行恶意脚本（WebShell）。
+- 攻击者可以覆盖或篡改系统关键配置或程序文件。
+- 攻击者可以实现任意文件写入或删除，导致数据丢失或系统破坏。
+- 攻击者可能通过解压超大文件或大量小文件造成拒绝服务。
+DESC
 	level: "mid",
+	message: "检测到PHP文件解压类型检测不安全漏洞，并且从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计进行确认。",
+	solution: <<<SOLUTION
+### 修复建议
+1. **严格校验解压目标路径**
+确保文件只能被解压到预期的目标目录下，不能通过相对路径或绝对路径逃逸。在构建目标文件路径时，应先将目标目录和文件名进行拼接，然后标准化路径，最后检查标准化后的路径是否仍在目标目录内。
+```php
+<?php
+function isValidPath($filePath, $targetDir) {
+    $targetDir = realpath($targetDir);
+    $resolvedPath = realpath($targetDir . '/' . $filePath);
+    // 检查标准化后的路径是否以目标目录开头且目标目录是其父目录
+    if ($resolvedPath === false || strpos($resolvedPath, $targetDir) !== 0) {
+        return false;
+    }
+    // 进一步检查解压的条目是否是文件（避免目录遍历）
+    // 并且确保其不包含 "../" 等路径穿越标识符 (尽管 realpath 已部分处理，仍建议显式检查)
+    if (strpos($filePath, '../') !== false || strpos($filePath, '\..\') !== false) {
+        return false;
+    }
+    return true;
+}
+$targetDir = '/app/uploads/';
+$zipFile = $_FILES['file']['tmp_name'];
+// 假设使用 ZipArchive 类进行解压
+$zip = new ZipArchive;
+if ($zip->open($zipFile) === TRUE) {
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $filename = $zip->getNameIndex($i);
+        // 校验文件路径的合法性
+        if (!isValidPath($filename, $targetDir)) {
+            // 跳过或拒绝处理非法路径文件
+            continue;
+        }
+        // 解压文件到目标目录
+        $zip->extractTo($targetDir, array($filename));
+    }
+    $zip->close();
+} else {
+    // 处理zip文件打开失败
+}
+?>
+```
+2. **过滤压缩包内文件名**
+在获取压缩包内文件列表时，对文件名进行严格过滤，移除所有路径相关字符（如`../`、`\`、`/`等）或只允许特定的文件名字符集。
+3. **限制解压的文件类型**
+如果业务需求仅允许解压特定类型的文件（如图片），则应在解压前或解压后对文件扩展名或文件内容进行校验，拒绝解压非白名单类型的文件。
+4. **使用安全的解压库及方法**
+优先使用PHP内置的`ZipArchive`类，并配合其提供的方法（如`extractTo`）以更安全的方式处理文件解压。对于第三方库，应仔细阅读其文档，了解其安全特性和建议用法。
+5. **校验文件大小和数量**
+设置合理的总解压大小和文件数量限制，防止因解压巨大的恶意压缩包而导致磁盘空间耗尽或拒绝服务。
+6. **使用独立的沙箱环境解压**
+对于高风险场景，考虑在独立的沙箱环境中进行文件解压，完成后再安全地将所需文件移动到目标位置。
+SOLUTION
+	risk: "文件路径穿越",
+	name: "mid",
 }
 $sink - $high - $mid as $low
 
 alert $low for {
-	desc: <<<CODE
+	desc: <<<DESC
 ### 风险描述
-
 1. **风险原理**
-   PHP中与文件解压相关的函数（如`unzip`，尽管`unzip`并非内置函数，此处泛指类似的第三方库或自定义函数）在处理用户可控的压缩文件时，如果未对压缩包内的文件名、文件路径以及目标解压路径进行严格校验和过滤，则存在文件路径穿越、覆盖现有文件或将恶意文件写入系统关键位置的风险。攻击者可以构造包含如`../`、绝对路径或特殊字符的文件名，诱使程序将文件解压到非预期目录，甚至覆盖敏感系统文件。
-
+PHP中与文件解压相关的函数（如`unzip`，尽管`unzip`并非内置函数，此处泛指类似的第三方库或自定义函数）在处理用户可控的压缩文件时，如果未对压缩包内的文件名、文件路径以及目标解压路径进行严格校验和过滤，则存在文件路径穿越、覆盖现有文件或将恶意文件写入系统关键位置的风险。攻击者可以构造包含如`../`、绝对路径或特殊字符的文件名，诱使程序将文件解压到非预期目录，甚至覆盖敏感系统文件。
 2. **触发场景**
-   当应用程序解压用户上传的压缩文件时，如果直接使用压缩包内包含的路径信息而未进行校验，就会触发此风险。例如，一个处理用户头像上传并自动解压压缩包的场景。
-   
-   // 存在风险的功能示例
-   ```php
-   <?php
-       $uploadDir = '/app/uploads/';
-       $zipFile = $_FILES['file']['tmp_name'];
-       
-       // 假设第三方库或自定义函数 unzip() 存在且直接使用文件名进行解压
-       unzip($zipFile, $uploadDir);
-   ?>
-   ```
-   攻击者上传一个压缩包，其中包含一个名为`../../../../etc/passwd`的文件，解压后该文件可能会被写入`/etc/passwd`，导致系统文件被覆盖。
-
+当应用程序解压用户上传的压缩文件时，如果直接使用压缩包内包含的路径信息而未进行校验，就会触发此风险。例如，一个处理用户头像上传并自动解压压缩包的场景。
+```php
+<?php
+$uploadDir = '/app/uploads/';
+$zipFile = $_FILES['file']['tmp_name'];
+// 假设第三方库或自定义函数 unzip() 存在且直接使用文件名进行解压
+unzip($zipFile, $uploadDir);
+?>
+```
+攻击者上传一个压缩包，其中包含一个名为`../../../../etc/passwd`的文件，解压后该文件可能会被写入`/etc/passwd`，导致系统文件被覆盖。
 3. **潜在影响**
-   - 攻击者可以将恶意文件写入Web目录，执行恶意脚本（WebShell）。
-   - 攻击者可以覆盖或篡改系统关键配置或程序文件。   - 攻击者可以实现任意文件写入或删除，导致数据丢失或系统破坏。   - 攻击者可能通过解压超大文件或大量小文件造成拒绝服务。
-CODE
+- 攻击者可以将恶意文件写入Web目录，执行恶意脚本（WebShell）。
+- 攻击者可以覆盖或篡改系统关键配置或程序文件。
+- 攻击者可以实现任意文件写入或删除，导致数据丢失或系统破坏。
+- 攻击者可能通过解压超大文件或大量小文件造成拒绝服务。
+DESC
 	level: "low",
 	title: "Audit PHP Potential File Storage Path Misconfiguration",
 	title_zh: "审计PHP潜在的文件存储路径配置问题",
+	message: "发现PHP潜在的文件存储路径配置问题，需要审计人员关注审计到的信息。",
+	solution: <<<SOLUTION
+### 安全建议
+1. **严格校验解压目标路径**
+确保文件只能被解压到预期的目标目录下，不能通过相对路径或绝对路径逃逸。在构建目标文件路径时，应先将目标目录和文件名进行拼接，然后标准化路径，最后检查标准化后的路径是否仍在目标目录内。
+```php
+<?php
+function isValidPath($filePath, $targetDir) {
+    $targetDir = realpath($targetDir);
+    $resolvedPath = realpath($targetDir . '/' . $filePath);
+    // 检查标准化后的路径是否以目标目录开头且目标目录是其父目录
+    if ($resolvedPath === false || strpos($resolvedPath, $targetDir) !== 0) {
+        return false;
+    }
+    // 进一步检查解压的条目是否是文件（避免目录遍历）
+    // 并且确保其不包含 "../" 等路径穿越标识符 (尽管 realpath 已部分处理，仍建议显式检查)
+    if (strpos($filePath, '../') !== false || strpos($filePath, '\..\') !== false) {
+        return false;
+    }
+    return true;
+}
+$targetDir = '/app/uploads/';
+$zipFile = $_FILES['file']['tmp_name'];
+// 假设使用 ZipArchive 类进行解压
+$zip = new ZipArchive;
+if ($zip->open($zipFile) === TRUE) {
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $filename = $zip->getNameIndex($i);
+        // 校验文件路径的合法性
+        if (!isValidPath($filename, $targetDir)) {
+            // 跳过或拒绝处理非法路径文件
+            continue;
+        }
+        // 解压文件到目标目录
+        $zip->extractTo($targetDir, array($filename));
+    }
+    $zip->close();
+} else {
+    // 处理zip文件打开失败
+}
+?>
+```
+2. **过滤压缩包内文件名**
+在获取压缩包内文件列表时，对文件名进行严格过滤，移除所有路径相关字符（如`../`、`\`、`/`等）或只允许特定的文件名字符集。
+3. **限制解压的文件类型**
+如果业务需求仅允许解压特定类型的文件（如图片），则应在解压前或解压后对文件扩展名或文件内容进行校验，拒绝解压非白名单类型的文件。
+4. **使用安全的解压库及方法**
+优先使用PHP内置的`ZipArchive`类，并配合其提供的方法（如`extractTo`）以更安全的方式处理文件解压。对于第三方库，应仔细阅读其文档，了解其安全特性和建议用法。
+5. **校验文件大小和数量**
+设置合理的总解压大小和文件数量限制，防止因解压巨大的恶意压缩包而导致磁盘空间耗尽或拒绝服务。
+6. **使用独立的沙箱环境解压**
+对于高风险场景，考虑在独立的沙箱环境中进行文件解压，完成后再安全地将所需文件移动到目标位置。
+SOLUTION
+	risk: "信息",
+	name: "low",
 }
 desc(
 	lang: php

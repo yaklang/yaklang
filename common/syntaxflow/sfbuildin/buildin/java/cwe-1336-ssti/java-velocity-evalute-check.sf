@@ -17,21 +17,24 @@ FIX
 	rule_id: "09226a17-d449-4965-98c6-0ff02d802605"
 	desc: <<<DESC
 ### 漏洞描述
+
 1. **漏洞原理**
 Velocity 是一种基于 Java 的模板引擎，用于动态生成 HTML、XML 或其他文本格式的内容。`Velocity.evaluate` 方法允许用户传入自定义模板内容并执行。如果该方法的模板参数直接或间接来源于用户输入且未经过严格验证，则可能导致服务端模板注入（SSTI）漏洞。攻击者可通过构造恶意模板指令，在服务器端执行任意代码或者访问敏感数据，从而对系统造成严重威胁。
+
 2. **触发场景**
 ```java
 import org.apache.velocity.app.Velocity;
 import java.util.Properties;
 public class VulnerableApp {
-public static void main(String[] args) {
-String userInput = request.getParameter("template"); // 用户输入的模板内容
-Velocity.init();
-Velocity.evaluate(new org.apache.velocity.VelocityContext(), new java.io.StringWriter(), "", userInput);
-}
+    public static void main(String[] args) {
+        String userInput = request.getParameter("template"); // 用户输入的模板内容
+        Velocity.init();
+        Velocity.evaluate(new org.apache.velocity.VelocityContext(), new java.io.StringWriter(), "", userInput);
+    }
 }
 ```
 在上述代码中，`userInput` 直接作为 `Velocity.evaluate` 的模板参数使用。如果攻击者提供包含恶意指令的模板（如 `#set($cmd='id') $cmd.execute()`），将导致命令执行。
+
 3. **潜在影响**
 - 攻击者可以在服务端执行任意代码，例如读取文件、修改配置或删除数据。
 - 可以访问和窃取敏感数据，包括数据库凭证、用户信息等。
@@ -72,7 +75,7 @@ alert $mid for {
 // 避免直接使用用户输入的模板内容
 String userInput = request.getParameter("template");
 if (!isValidTemplate(userInput)) {
-    throw new IllegalArgumentException("非法模板内容");
+throw new IllegalArgumentException("非法模板内容");
 }
 Velocity.init();
 Velocity.evaluate(new org.apache.velocity.VelocityContext(), new java.io.StringWriter(), "", userInput);
@@ -98,6 +101,28 @@ props.setProperty("class.resource.loader.class", "org.apache.velocity.runtime.re
 Velocity.init(props);
 ```
 SOLUTION
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+Velocity 是一种基于 Java 的模板引擎，用于动态生成 HTML、XML 或其他文本格式的内容。`Velocity.evaluate` 方法允许用户传入自定义模板内容并执行。如果该方法的模板参数直接或间接来源于用户输入且未经过严格验证，则可能导致服务端模板注入（SSTI）漏洞。攻击者可通过构造恶意模板指令，在服务器端执行任意代码或者访问敏感数据，从而对系统造成严重威胁。
+2. **触发场景**
+```java
+import org.apache.velocity.app.Velocity;
+import java.util.Properties;
+public class VulnerableApp {
+public static void main(String[] args) {
+String userInput = request.getParameter("template"); // 用户输入的模板内容
+Velocity.init();
+Velocity.evaluate(new org.apache.velocity.VelocityContext(), new java.io.StringWriter(), "", userInput);
+}
+}
+```
+在上述代码中，`userInput` 直接作为 `Velocity.evaluate` 的模板参数使用。如果攻击者提供包含恶意指令的模板（如 `#set($cmd='id') $cmd.execute()`），将导致命令执行。
+3. **潜在影响**
+- 攻击者可以在服务端执行任意代码，例如读取文件、修改配置或删除数据。
+- 可以访问和窃取敏感数据，包括数据库凭证、用户信息等。
+- 如果应用运行在高权限环境下，攻击者可能进一步控制整个服务器。
+DESC
 }
 
 $result - $mid as $high
@@ -114,7 +139,7 @@ alert $high for {
 // 避免直接使用用户输入的模板内容
 String userInput = request.getParameter("template");
 if (!isValidTemplate(userInput)) {
-    throw new IllegalArgumentException("非法模板内容");
+throw new IllegalArgumentException("非法模板内容");
 }
 Velocity.init();
 Velocity.evaluate(new org.apache.velocity.VelocityContext(), new java.io.StringWriter(), "", userInput);
@@ -141,12 +166,34 @@ Velocity.init(props);
 ```
 SOLUTION
 	risk: "SSTI",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+Velocity 是一种基于 Java 的模板引擎，用于动态生成 HTML、XML 或其他文本格式的内容。`Velocity.evaluate` 方法允许用户传入自定义模板内容并执行。如果该方法的模板参数直接或间接来源于用户输入且未经过严格验证，则可能导致服务端模板注入（SSTI）漏洞。攻击者可通过构造恶意模板指令，在服务器端执行任意代码或者访问敏感数据，从而对系统造成严重威胁。
+2. **触发场景**
+```java
+import org.apache.velocity.app.Velocity;
+import java.util.Properties;
+public class VulnerableApp {
+public static void main(String[] args) {
+String userInput = request.getParameter("template"); // 用户输入的模板内容
+Velocity.init();
+Velocity.evaluate(new org.apache.velocity.VelocityContext(), new java.io.StringWriter(), "", userInput);
+}
+}
+```
+在上述代码中，`userInput` 直接作为 `Velocity.evaluate` 的模板参数使用。如果攻击者提供包含恶意指令的模板（如 `#set($cmd='id') $cmd.execute()`），将导致命令执行。
+3. **潜在影响**
+- 攻击者可以在服务端执行任意代码，例如读取文件、修改配置或删除数据。
+- 可以访问和窃取敏感数据，包括数据库凭证、用户信息等。
+- 如果应用运行在高权限环境下，攻击者可能进一步控制整个服务器。
+DESC
 }
 
 desc(
-    lang:java,
-    alert_num:1,
-    "file://demo.java":<<<CODE
+	lang:java
+	alert_num:1
+	"file://demo.java":<<<CODE
     package org.joychou.controller;
 
     import org.apache.velocity.VelocityContext;
@@ -177,7 +224,7 @@ desc(
         }
     }
 CODE
-"safefile://demo2.java":<<<CODE
+	"safefile://demo2.java":<<<CODE
     package org.joychou.controller;
 
     import org.apache.velocity.VelocityContext;

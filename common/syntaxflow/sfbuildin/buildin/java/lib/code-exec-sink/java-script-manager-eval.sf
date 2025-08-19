@@ -5,61 +5,50 @@ desc(
 	rule_id: "f72c0172-5edc-4436-901f-c33606c18899"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免直接使用用户输入
-   不要直接将用户输入传递给`eval`方法。引入白名单验证机制，确保只接受预定义的操作。
-
-   ```java
-   private static final Set<String> ALLOWED_OPERATIONS = Set.of("add", "subtract", "multiply", "divide");
-
-   public Object safeExecuteOperation(String operation) throws Exception {
-       if (!ALLOWED_OPERATIONS.contains(operation)) {
-           throw new IllegalArgumentException("Invalid operation");
-       }
-
-       ScriptEngineManager manager = new ScriptEngineManager();
-       ScriptEngine engine = manager.getEngineByName("JavaScript");
-       return engine.eval("function " + operation + "(a, b) { return a " + getOperator(operation) + " b; }");
-   }
-
-   private String getOperator(String operation) {
-       switch (operation) {
-           case "add": return "+";
-           case "subtract": return "-";
-           case "multiply": return "*";
-           case "divide": return "/";
-           default: throw new UnsupportedOperationException();
-       }
-   }
-   ```
-
+不要直接将用户输入传递给`eval`方法。引入白名单验证机制，确保只接受预定义的操作。
+```java
+private static final Set<String> ALLOWED_OPERATIONS = Set.of("add", "subtract", "multiply", "divide");
+public Object safeExecuteOperation(String operation) throws Exception {
+    if (!ALLOWED_OPERATIONS.contains(operation)) {
+        throw new IllegalArgumentException("Invalid operation");
+    }
+    ScriptEngineManager manager = new ScriptEngineManager();
+    ScriptEngine engine = manager.getEngineByName("JavaScript");
+    return engine.eval("function " + operation + "(a, b) { return a " + getOperator(operation) + " b; }");
+}
+private String getOperator(String operation) {
+    switch (operation) {
+        case "add": return "+";
+        case "subtract": return "-";
+        case "multiply": return "*";
+        case "divide": return "/";
+        default: throw new UnsupportedOperationException();
+    }
+}
+```
 #### 2. 使用安全替代方案
-   尽量避免使用`ScriptEngine`类动态执行代码，改用预定义函数或方法实现所需功能。
-
+尽量避免使用`ScriptEngine`类动态执行代码，改用预定义函数或方法实现所需功能。
 #### 3. 输入验证和过滤
-   对所有用户输入进行严格的验证和过滤，以防止恶意代码注入。
-
-   ```java
-   public Object validateAndExecute(String userInput) throws Exception {
-       if (!userInput.matches("^[a-zA-Z0-9_]+$")) { // 简单示例：仅允许字母、数字和下划线
-           throw new IllegalArgumentException("Invalid input");
-       }
-
-       ScriptEngineManager manager = new ScriptEngineManager();
-       ScriptEngine engine = manager.getEngineByName("JavaScript");
-       return engine.eval(userInput);
-   }
-   ```
-
+对所有用户输入进行严格的验证和过滤，以防止恶意代码注入。
+```java
+public Object validateAndExecute(String userInput) throws Exception {
+    if (!userInput.matches("^[a-zA-Z0-9_]+$")) { // 简单示例：仅允许字母、数字和下划线
+        throw new IllegalArgumentException("Invalid input");
+    }
+    ScriptEngineManager manager = new ScriptEngineManager();
+    ScriptEngine engine = manager.getEngineByName("JavaScript");
+    return engine.eval(userInput);
+}
+```
 #### 4. 使用沙箱环境
-   如果必须使用`eval`，应将其置于沙箱环境中运行，限制其执行权限。
-
-   ```java
-   System.setProperty("polyglot.engine.WarnInterpreterOnly", "false");
-   ScriptEngineManager manager = new ScriptEngineManager();
-   ScriptEngine engine = manager.getEngineByName("JavaScript");
-   ((Compilable) engine).compile("'use strict'; function add(a, b) { return a + b; } add(1, 2);").eval();
-   ```
+如果必须使用`eval`，应将其置于沙箱环境中运行，限制其执行权限。
+```java
+System.setProperty("polyglot.engine.WarnInterpreterOnly", "false");
+ScriptEngineManager manager = new ScriptEngineManager();
+ScriptEngine engine = manager.getEngineByName("JavaScript");
+((Compilable) engine).compile("'use strict'; function add(a, b) { return a + b; } add(1, 2);").eval();
+```
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-94](https://cwe.mitre.org/data/definitions/94.html)
@@ -68,32 +57,27 @@ REFERENCE
 	title_zh: "检测Java ScriptEngineManager eval 风险"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Java中的`ScriptEngineManager`类允许动态执行脚本代码（如JavaScript）。如果攻击者能够控制传递给`eval`、`put`或`compile`方法的参数，就可能导致远程代码执行（RCE）漏洞。例如，攻击者可以通过构造恶意输入来执行任意代码，从而完全控制目标系统。
-
+Java中的`ScriptEngineManager`类允许动态执行脚本代码（如JavaScript）。如果攻击者能够控制传递给`eval`、`put`或`compile`方法的参数，就可能导致远程代码执行（RCE）漏洞。例如，攻击者可以通过构造恶意输入来执行任意代码，从而完全控制目标系统。
 2. **触发场景**
-   ```java
-   import javax.script.ScriptEngineManager;
-   import javax.script.ScriptEngine;
-   import javax.servlet.http.HttpServletRequest;
-
-   public class CalculatorServlet {
-       public Object executeOperation(HttpServletRequest request) throws Exception {
-           ScriptEngineManager manager = new ScriptEngineManager();
-           ScriptEngine engine = manager.getEngineByName("JavaScript");
-           String userInput = request.getParameter("operation"); // 用户可控输入
-           return engine.eval(userInput); // 动态执行用户输入
-       }
-   }
-   ```
-   在上述代码中，如果攻击者通过HTTP请求将恶意代码传递到`operation`参数中，例如`"java.lang.Runtime.getRuntime().exec('rm -rf /')"`，则可能在服务器上执行任意命令。
-
+```java
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptEngine;
+import javax.servlet.http.HttpServletRequest;
+public class CalculatorServlet {
+    public Object executeOperation(HttpServletRequest request) throws Exception {
+        ScriptEngineManager manager = new ScriptEngineManager();
+        ScriptEngine engine = manager.getEngineByName("JavaScript");
+        String userInput = request.getParameter("operation"); // 用户可控输入
+        return engine.eval(userInput); // 动态执行用户输入
+    }
+}
+```
+在上述代码中，如果攻击者通过HTTP请求将恶意代码传递到`operation`参数中，例如`"java.lang.Runtime.getRuntime().exec('rm -rf /')"`，则可能在服务器上执行任意命令。
 3. **潜在影响**
-   - 攻击者可以执行任意代码，包括删除文件、窃取数据、安装后门等。
-   - 可能导致敏感信息泄露和系统权限被完全接管。
-   - 如果服务器运行在云环境中，还可能对其他资源造成横向扩展攻击。
-
+- 攻击者可以执行任意代码，包括删除文件、窃取数据、安装后门等。
+- 可能导致敏感信息泄露和系统权限被完全接管。
+- 如果服务器运行在云环境中，还可能对其他资源造成横向扩展攻击。
 DESC
 )
 
@@ -107,9 +91,83 @@ $engine.compile(,* as $params);
 check $params;
 $params as $output;
 alert $output for {
-	level: "high",
+	level: "info",
 	title: "Detect Java ScriptEngineManager eval Risk",
 	title_zh: "检测Java ScriptEngineManager eval 风险",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 避免直接使用用户输入
+不要直接将用户输入传递给`eval`方法。引入白名单验证机制，确保只接受预定义的操作。
+```java
+private static final Set<String> ALLOWED_OPERATIONS = Set.of("add", "subtract", "multiply", "divide");
+public Object safeExecuteOperation(String operation) throws Exception {
+    if (!ALLOWED_OPERATIONS.contains(operation)) {
+        throw new IllegalArgumentException("Invalid operation");
+    }
+    ScriptEngineManager manager = new ScriptEngineManager();
+    ScriptEngine engine = manager.getEngineByName("JavaScript");
+    return engine.eval("function " + operation + "(a, b) { return a " + getOperator(operation) + " b; }");
+}
+private String getOperator(String operation) {
+    switch (operation) {
+        case "add": return "+";
+        case "subtract": return "-";
+        case "multiply": return "*";
+        case "divide": return "/";
+        default: throw new UnsupportedOperationException();
+    }
+}
+```
+#### 2. 使用安全替代方案
+尽量避免使用`ScriptEngine`类动态执行代码，改用预定义函数或方法实现所需功能。
+#### 3. 输入验证和过滤
+对所有用户输入进行严格的验证和过滤，以防止恶意代码注入。
+```java
+public Object validateAndExecute(String userInput) throws Exception {
+    if (!userInput.matches("^[a-zA-Z0-9_]+$")) { // 简单示例：仅允许字母、数字和下划线
+        throw new IllegalArgumentException("Invalid input");
+    }
+    ScriptEngineManager manager = new ScriptEngineManager();
+    ScriptEngine engine = manager.getEngineByName("JavaScript");
+    return engine.eval(userInput);
+}
+```
+#### 4. 使用沙箱环境
+如果必须使用`eval`，应将其置于沙箱环境中运行，限制其执行权限。
+```java
+System.setProperty("polyglot.engine.WarnInterpreterOnly", "false");
+ScriptEngineManager manager = new ScriptEngineManager();
+ScriptEngine engine = manager.getEngineByName("JavaScript");
+((Compilable) engine).compile("'use strict'; function add(a, b) { return a + b; } add(1, 2);").eval();
+```
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+Java中的`ScriptEngineManager`类允许动态执行脚本代码（如JavaScript）。如果攻击者能够控制传递给`eval`、`put`或`compile`方法的参数，就可能导致远程代码执行（RCE）漏洞。例如，攻击者可以通过构造恶意输入来执行任意代码，从而完全控制目标系统。
+2. **触发场景**
+```java
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptEngine;
+import javax.servlet.http.HttpServletRequest;
+public class CalculatorServlet {
+    public Object executeOperation(HttpServletRequest request) throws Exception {
+        ScriptEngineManager manager = new ScriptEngineManager();
+        ScriptEngine engine = manager.getEngineByName("JavaScript");
+        String userInput = request.getParameter("operation"); // 用户可控输入
+        return engine.eval(userInput); // 动态执行用户输入
+    }
+}
+```
+在上述代码中，如果攻击者通过HTTP请求将恶意代码传递到`operation`参数中，例如`"java.lang.Runtime.getRuntime().exec('rm -rf /')"`，则可能在服务器上执行任意命令。
+3. **潜在影响**
+- 攻击者可以执行任意代码，包括删除文件、窃取数据、安装后门等。
+- 可能导致敏感信息泄露和系统权限被完全接管。
+- 如果服务器运行在云环境中，还可能对其他资源造成横向扩展攻击。
+DESC
+	name: "output",
+	message: "发现Java ScriptEngineManager eval风险，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 }
 
 
