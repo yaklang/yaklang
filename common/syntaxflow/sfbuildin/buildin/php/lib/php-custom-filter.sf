@@ -7,21 +7,27 @@ desc(
 ### 规则描述
 
 1. **规则目的**
-   此规则旨在审计PHP代码中自定义过滤函数的使用情况，特别是围绕 `htmlspecialchars`, `strip_tags`, `mysql_real_escape_string`, `addslashes`, `filter`, `is_numeric`, `str_replace`, `ereg`, `strpos`, `preg_replace` 和 `trim` 等函数的使用进行检查。
+此规则旨在审计PHP代码中自定义过滤函数的使用情况，特别是围绕 `htmlspecialchars`, `strip_tags`, `mysql_real_escape_string`, `addslashes`, `filter`, `is_numeric`, `str_replace`, `ereg`, `strpos`, `preg_replace` 和 `trim` 等函数的使用进行检查。
 
 2. **触发场景**
-   - **废弃函数与不推荐用法**: 例如，`mysql_real_escape_string` 已被废弃，使用时存在SQL注入风险；`ereg` 函数因性能和安全问题也已被弃用，应替换为 `preg_match`。
-   - **过度依赖与不当组合**: 即使是常用的过滤函数，如 `htmlspecialchars` 或 `strip_tags`，如果不配合完整的输入验证和上下文转义（如JavaScript或CSS上下文），仍可能存在跨站脚本（XSS）漏洞。
-   - **过滤不完整**: 某些函数（如 `addslashes`）只能防止特定类型的攻击，但并非全面的安全保障，可能被绕过。
-   - **性能问题**: 部分传统函数（如 `ereg`）相较现代函数性能较差。
-
+- **废弃函数与不推荐用法**: 例如，`mysql_real_escape_string` 已被废弃，使用时存在SQL注入风险；`ereg` 函数因性能和安全问题也已被弃用，应替换为 `preg_match`。
+- **过度依赖与不当组合**: 即使是常用的过滤函数，如 `htmlspecialchars` 或 `strip_tags`，如果不配合完整的输入验证和上下文转义（如JavaScript或CSS上下文），仍可能存在跨站脚本（XSS）漏洞。
+- **过滤不完整**: 某些函数（如 `addslashes`）只能防止特定类型的攻击，但并非全面的安全保障，可能被绕过。
+- **性能问题**: 部分传统函数（如 `ereg`）相较现代函数性能较差。
 通过审计这些函数的使用，开发者可以更好地评估代码中的数据处理方式，识别可能存在的安全隐患、不推荐的用法和性能瓶颈，并根据最佳实践进行重构。
 
 3. **潜在影响**
-   - 使用废弃或不安全的过滤函数可能导致严重的安全漏洞，如SQL注入、跨站脚本（XSS）等。
-   - 过滤不完整或不当组合会增加系统被攻击的风险。
-   - 性能问题可能导致应用响应变慢，影响用户体验。
+- 使用废弃或不安全的过滤函数可能导致严重的安全漏洞，如SQL注入、跨站脚本（XSS）等。
+- 过滤不完整或不当组合会增加系统被攻击的风险。
+- 性能问题可能导致应用响应变慢，影响用户体验。
 
+示例代码：
+```php
+<?php
+$userInput = $_GET['input'];
+echo htmlspecialchars($userInput, ENT_QUOTES, 'UTF-8'); // 可能未考虑其他上下文
+```
+如果用户输入包含恶意脚本，且没有正确转义，可能会导致XSS攻击。
 DESC
 	rule_id: "e34d9140-393e-4774-9793-118ea6cc54aa"
 	title_zh: "审计PHP自定义过滤函数使用情况"
@@ -29,26 +35,41 @@ DESC
 ### 修复建议
 
 1. **避免使用废弃或不推荐函数**
-   - 对于数据库操作中的特殊字符处理，应优先使用现代数据库扩展提供的预处理语句（如PDO或MySQLi的PreparedStatement），而非 `mysql_real_escape_string` 或 `addslashes`。
-   - 将 `ereg` 函数替换为功能更强大、性能更优的 `preg_match` 或其他 `preg_` 系列函数。
+- 对于数据库操作中的特殊字符处理，应优先使用现代数据库扩展提供的预处理语句（如PDO或MySQLi的PreparedStatement），而非 `mysql_real_escape_string` 或 `addslashes`。
+- 将 `ereg` 函数替换为功能更强大、性能更优的 `preg_match` 或其他 `preg_` 系列函数。
 
 2. **综合使用过滤与验证**
-   - **输入验证**: 在处理用户输入时，首先进行严格的类型、格式、范围校验，拒绝非法输入。
-   ```php
-   if (!is_numeric($input)) {
-       throw new InvalidArgumentException("输入必须为数字");
-   }
-   ```
-   - **输出转义**: 根据数据输出的上下文（HTML、JavaScript、URL等），使用适当的转义函数防止跨站脚本（XSS）攻击。例如，在HTML上下文中，使用 `htmlspecialchars`；在JavaScript上下文中，可能需要更专业的JavaScript转义库。
+- **输入验证**: 在处理用户输入时，首先进行严格的类型、格式、范围校验，拒绝非法输入。
+```php
+if (!is_numeric($input)) {
+    throw new InvalidArgumentException("输入必须为数字");
+}
+```
+- **输出转义**: 根据数据输出的上下文（HTML、JavaScript、URL等），使用适当的转义函数防止跨站脚本（XSS）攻击。例如，在HTML上下文中，使用 `htmlspecialchars`；在JavaScript上下文中，可能需要更专业的JavaScript转义库。
 
 3. **遵循最小权限原则**
-   - 在处理敏感数据时，确保使用的函数或方法只具备完成必要操作的权限，避免过度授权。
+- 在处理敏感数据时，确保使用的函数或方法只具备完成必要操作的权限，避免过度授权。
 
 4. **保持代码更新**
-   - 定期审查并更新代码中使用的过滤函数及相关库，了解其安全特性和潜在问题。
+- 定期审查并更新代码中使用的过滤函数及相关库，了解其安全特性和潜在问题。
 
 5. **考虑使用成熟的安全库**
-   - 针对复杂的过滤需求，可以考虑使用成熟的PHP安全库，这些库通常提供了更全面和健壮的数据处理及安全防护功能。
+- 针对复杂的过滤需求，可以考虑使用成熟的PHP安全库，这些库通常提供了更全面和健壮的数据处理及安全防护功能。
+
+修复代码示例：
+```php
+<?php
+try {
+    $input = $_GET['input'];
+    if (!is_numeric($input)) {
+        throw new InvalidArgumentException("输入必须为数字");
+    }
+    echo htmlspecialchars($input, ENT_QUOTES, 'UTF-8');
+} catch (Exception $e) {
+    error_log($e->getMessage());
+    echo "输入无效";
+}
+```
 
 SOLUTION
 	reference: <<<REFERENCE

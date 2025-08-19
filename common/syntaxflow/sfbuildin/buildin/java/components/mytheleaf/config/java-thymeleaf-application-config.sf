@@ -9,7 +9,6 @@ desc(
 ### 规则详细
 1. **检测目标**
    规则主要检测`application.properties`或其他Spring Boot配置文件中与`spring.thymeleaf.*`相关的配置项。
-
 2. **审计目的**
    审计这些配置的目的是确保Thymeleaf的使用符合安全最佳实践和性能要求，例如：
    - **缓存管理 (`spring.thymeleaf.cache`)**: 在生产环境中应启用缓存以提高性能，但在开发环境中可能需要禁用以便实时查看修改。不当的缓存配置可能导致部署后的模板更新不生效或开发阶段性能低下。
@@ -24,7 +23,6 @@ DESC
 	title_zh: "审计Java Thymeleaf应用程序配置"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 确保缓存配置正确
 在生产环境中启用缓存以提高性能，在开发环境中禁用缓存以便实时查看修改。
 ```java
@@ -60,7 +58,6 @@ spring.thymeleaf.encoding=UTF-8
 // application.properties示例
 spring.thymeleaf.content-type=text/html
 ```
-
 通过以上步骤，可以确保Thymeleaf配置的安全性和性能，预防潜在的配置错误和未来的漏洞或性能瓶颈。
 SOLUTION
 	reference: <<<REFERENCE

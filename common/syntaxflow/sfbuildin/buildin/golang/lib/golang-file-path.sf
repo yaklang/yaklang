@@ -5,71 +5,63 @@ desc(
 	lib: 'golang-file-path'
 	desc: <<<DESC
 ### 规则描述
-
 1. **规则目的**
-   该规则旨在审计Go语言代码中对`path/filepath`库的使用情况。尽管`path/filepath`库主要用于处理文件路径（如拼接、清理、匹配路径等），而非直接与文件读写交互，但在涉及文件操作时，正确和安全地处理文件路径是至关重要的。
+该规则旨在审计Go语言代码中对`path/filepath`库的使用情况。尽管`path/filepath`库主要用于处理文件路径（如拼接、清理、匹配路径等），而非直接与文件读写交互，但在涉及文件操作时，正确和安全地处理文件路径是至关重要的。
 
 2. **触发场景**
-   如果应用程序直接将用户输入用于文件路径处理（例如，将用户提供的文件名直接用于创建或访问文件）而未进行适当的清洗、校验或限制，就可能引入路径遍历（Path Traversal）漏洞。攻击者可以构造包含特殊字符（如`../`）的恶意路径，从而访问或修改服务器文件系统中的任意文件，包括敏感配置文件或数据文件。
-   ```go
-   package main
+如果应用程序直接将用户输入用于文件路径处理（例如，将用户提供的文件名直接用于创建或访问文件）而未进行适当的清洗、校验或限制，就可能引入路径遍历（Path Traversal）漏洞。攻击者可以构造包含特殊字符（如`../`）的恶意路径，从而访问或修改服务器文件系统中的任意文件，包括敏感配置文件或数据文件。
 
-   import (
-       "fmt"
-       "net/http"
-       "os"
-       "path/filepath"
-   )
-
-   func handler(w http.ResponseWriter, r *http.Request) {
-       userInput := r.URL.Query().Get("file")
-       filePath := filepath.Join("/var/www/static", userInput)
-       data, err := os.ReadFile(filePath) // 直接拼接用户输入的路径
-       if err != nil {
-           fmt.Println(err)
-           return
-       }
-       w.Write(data)
-   }
-
-   func main() {
-       http.HandleFunc("/read", handler)
-       http.ListenAndServe(":8080", nil)
-   }
-   ```
-   攻击者可通过提供形如`../../etc/passwd`的输入，绕过文件路径约束，读取服务器上的敏感文件。
+```go
+package main
+import (
+    "fmt"
+    "net/http"
+    "os"
+    "path/filepath"
+)
+func handler(w http.ResponseWriter, r *http.Request) {
+    userInput := r.URL.Query().Get("file")
+    filePath := filepath.Join("/var/www/static", userInput)
+    data, err := os.ReadFile(filePath) // 直接拼接用户输入的路径
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+    w.Write(data)
+}
+func main() {
+    http.HandleFunc("/read", handler)
+    http.ListenAndServe(":8080", nil)
+}
+```
+攻击者可通过提供形如`../../etc/passwd`的输入，绕过文件路径约束，读取服务器上的敏感文件。
 
 3. **潜在影响**
-   - 泄露服务器上任意文件内容（如配置文件、密码文件等）。
-   - 修改或删除关键系统文件，导致服务中断。
-   - 在某些情况下，结合其他漏洞进一步提升权限，危害系统安全。
+- 泄露服务器上任意文件内容（如配置文件、密码文件等）。
+- 修改或删除关键系统文件，导致服务中断。
+- 在某些情况下，结合其他漏洞进一步提升权限，危害系统安全。
 
 ### 规则详细
-
 1. **基础库规则：** 本规则属于`lib`类型的规则（`golang-file-path`），主要用于识别代码中是否使用了`path/filepath`库。它不直接检测漏洞，而是作为更高级规则（如检测路径遍历漏洞的规则）的基础，提供对核心文件路径处理库的识别能力。
-
 2. **应用场景：** 本规则适用于审计所有可能进行文件操作的Go语言应用，特别是涉及到文件上传、下载、读取、写入，或处理用户提供的文件路径的场景。
 DESC
 	rule_id: "b96da337-9ec5-41a9-9c43-fcc6a7043c45"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 用户输入校验
 在接收用户输入后，应对输入进行严格校验，确保其符合预期格式或范围。拒绝任何非法或可疑输入。
+
 ```go
 package main
-
 import (
     "fmt"
     "net/http"
     "regexp"
 )
-
 func isValidFileName(name string) bool {
     match, _ := regexp.MatchString(`^[a-zA-Z0-9_\-.]+$`, name) // 只允许字母、数字、下划线、点和连字符
     return match
 }
-
 func handler(w http.ResponseWriter, r *http.Request) {
     userInput := r.URL.Query().Get("file")
     if !isValidFileName(userInput) {
@@ -78,7 +70,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
     }
     fmt.Fprintf(w, "File requested: %s", userInput)
 }
-
 func main() {
     http.HandleFunc("/read", handler)
     http.ListenAndServe(":8080", nil)
@@ -87,27 +78,25 @@ func main() {
 
 #### 2. 使用安全函数限制路径范围
 利用`filepath.Clean`清理路径并结合白名单机制，避免路径跳转。
+
 ```go
 package main
-
 import (
     "fmt"
     "net/http"
     "path/filepath"
+    "strings"
 )
-
 func handler(w http.ResponseWriter, r *http.Request) {
     userInput := r.URL.Query().Get("file")
     basePath := "/var/www/static"
     safePath := filepath.Join(basePath, filepath.Clean("/"+userInput))
-
     if !strings.HasPrefix(safePath, basePath) {
         http.Error(w, "Access denied", http.StatusForbidden)
         return
     }
     fmt.Fprintf(w, "Safe path: %s", safePath)
 }
-
 func main() {
     http.HandleFunc("/read", handler)
     http.ListenAndServe(":8080", nil)

@@ -1,15 +1,99 @@
 desc(
-	title: "Audit Golang File Write With Path Bufio"
+	title: "Audit Golang File Write With Bufio"
 	type: audit
 	level: info
 	lib: 'golang-file-write-path-bufio'
 	desc: <<<DESC
-The rule is designed to audit Golang code that writes files using the bufio package. This includes checking for potential Path Traversal vulnerabilities, which can occur when user input is not properly sanitized before being used in file operations. The rule identifies usage of bufio.NewWriter and its WriteString method, and alerts if the output path is derived from user input. This helps prevent attackers from manipulating file paths to access or modify sensitive files outside the intended directory. Path Traversal vulnerabilities can lead to unauthorized data access, data modification, or even system compromise. It is crucial to ensure that all user inputs are validated and sanitized before being used in file operations to mitigate this risk.
+### 规则描述
+
+1. **规则目的**
+   该规则用于审计Golang代码中通过`bufio.NewWriter`方法执行文件写入操作的场景。重点检查是否存在潜在路径穿越（Path Traversal）漏洞，例如用户输入未经过适当验证或过滤直接被用作文件路径的一部分。此类漏洞可能导致攻击者绕过预期目录访问或修改敏感文件。
+
+2. **触发场景**
+   当开发人员在代码中使用`bufio.NewWriter`及其相关方法（如`WriteString`）时，如果目标路径来源于用户输入且未经过充分净化，则可能触发此规则警报。
+
+   示例代码：
+   ```go
+   package main
+   import (
+       "bufio"
+       "fmt"
+       "os"
+   )
+
+   func main() {
+       userInput := "../../etc/passwd" // 模拟恶意用户输入
+       file, err := os.Create(userInput)
+       if err != nil {
+           fmt.Println("Error creating file:", err)
+           return
+       }
+       defer file.Close()
+
+       writer := bufio.NewWriter(file)
+       _, err = writer.WriteString("Malicious Content")
+       if err != nil {
+           fmt.Println("Error writing to file:", err)
+           return
+       }
+       writer.Flush()
+   }
+   ```
+
+3. **潜在影响**
+   - 攻击者可以通过路径穿越利用技术访问系统关键文件（如`/etc/passwd`），窃取敏感数据。
+   - 可能导致未经授权的数据修改或删除。
+   - 在极端情况下，甚至可以完全控制服务器。
+
+4. **规则详细**
+   - 核心检测点为`bufio.NewWriter`方法的调用。
+   - 如果输出路径由用户输入派生，则会发出警告。
+   - 提供安全替代方案示例，建议避免使用易受攻击的方法。
 DESC
 	rule_id: "58ce930c-65fc-4045-b511-904bcddeb4ed"
 	title_zh: "审计Golang使用bufio进行文件写入的代码"
 	solution: <<<SOLUTION
-To prevent Path Traversal vulnerabilities, developers should sanitize and validate all user inputs before using them in file operations. This can be achieved by implementing input validation checks, such as verifying that the input does not contain sequences like '../' that could be used to navigate to parent directories. Additionally, using absolute paths instead of relative paths can help avoid unintended access to files outside the designated directory. It is also recommended to use secure coding practices and adhere to the principle of least privilege when handling file operations.
+### 修复建议
+
+#### 1. 输入验证与清理
+确保所有用户输入都经过严格的验证和清理，以防止路径穿越攻击。例如，拒绝包含`../`或其他特殊字符的输入。
+```go
+func sanitizePath(input string) (string, error) {
+    if strings.Contains(input, "../") || strings.HasPrefix(input, "/") {
+        return "", fmt.Errorf("invalid path: potential path traversal detected")
+    }
+    return input, nil
+}
+```
+
+#### 2. 使用绝对路径
+尽量使用绝对路径而非相对路径，并限制文件操作只能在指定的安全目录内完成。
+```go
+const baseDir = "/var/safe/directory/"
+
+func createFilePath(filename string) (string, error) {
+    fullPath := filepath.Join(baseDir, filename)
+    if !strings.HasPrefix(fullPath, baseDir) {
+        return "", fmt.Errorf("path traversal attempt detected")
+    }
+    return fullPath, nil
+}
+```
+
+#### 3. 避免危险API
+尽量避免使用容易引发问题的API（如`bufio.NewWriter`）。改用更安全的方法，例如`ioutil.WriteFile`或`os.WriteFile`。
+```go
+err := ioutil.WriteFile("safe_file.txt", []byte("Safe content"), 0644)
+if err != nil {
+    log.Fatalf("Failed to write file: %v", err)
+}
+```
+
+#### 4. 最小权限原则
+运行程序时遵循最小权限原则，仅授予必要的文件操作权限，从而减少潜在损害。
+
+#### 5. 采用现代框架
+考虑使用支持自动输入验证和参数化处理的现代框架，进一步降低风险。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-22](https://cwe.mitre.org/data/definitions/22.html)

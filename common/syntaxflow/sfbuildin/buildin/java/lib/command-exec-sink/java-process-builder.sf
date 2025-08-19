@@ -1,6 +1,6 @@
 desc(
-	title_zh: "查找Java ProcessBuilder Sink点"
-	title: "Find Java ProcessBuilder Sink Point"
+	title_zh: "审计Java ProcessBuilder命令执行风险"
+	title: "Audit Java ProcessBuilder Command Execution Risk"
 	lib: 'java-process-builder-sink'
 	type: audit
 	reference: <<<REFERENCE
@@ -14,22 +14,18 @@ REFERENCE
 ### 规则详细
 1. **作为基础检测库**
    属于 `java-process-builder-sink` 库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测命令注入漏洞。
-
 2. **覆盖的 ProcessBuilder 调用方式**
    规则旨在捕获 `ProcessBuilder` 对象的以下两种常见初始化和命令设置方式：
    - 通过构造函数直接传入命令参数列表：`new ProcessBuilder(List<String> command)` 或 `new ProcessBuilder(String... command)`。
    - 通过 `command()` 方法设置命令参数列表：`ProcessBuilder.command(List<String> command)` 或 `ProcessBuilder.command(String... command)`。
-   
 3. **识别的 ProcessBuilder 执行点**
    规则进一步识别 `ProcessBuilder` 对象的执行调用，主要关注隐式或显式调用的 `start()` 方法。由于反射调用可能绕过直接的 `pb.start()` 识别，规则还包含了对通过反射方式调用 `java.lang.ProcessImpl` 的 `start` 方法的检测，以捕获更广泛的潜在执行路径。
-
 4. **输出内容**
    本规则的重点在于识别并告警 `ProcessBuilder` 执行时所使用的具体命令参数内容。通过将这些命令参数标记为 `$output`，规则帮助安全人员直观地看到哪些用户输入或动态生成的字符串被用作了系统命令的一部分，从而更容易判断是否存在命令注入的风险。
 
 ### 漏洞描述
 1. **漏洞原理**
    命令注入漏洞是由于应用程序未对用户输入进行严格的验证或过滤，导致攻击者可以通过拼接恶意命令的方式执行非预期的操作。例如，当用户的输入被直接传递到 `ProcessBuilder` 中并执行时，攻击者可以插入分号、管道符等特殊字符，构造多条命令或利用系统命令进行提权或信息窃取。
-
 2. **触发场景**
    ```java
    @RequestMapping("/ProcessBuilder1")
@@ -49,12 +45,10 @@ REFERENCE
    }
    ```
    在上述示例中，如果用户输入 `payload="id; rm -rf /"`，不仅会执行 `id` 命令，还会删除服务器上的文件。
-
 3. **潜在影响**
    - 攻击者可任意执行系统命令，例如窃取敏感数据、破坏系统完整性或植入后门。
    - 可能导致权限提升，进一步渗透至内部网络或关键基础设施。
    - 容易引发合规性问题，尤其是涉及隐私保护的场景（如GDPR、CCPA等）。
-
 DESC
 	rule_id: "737c2b12-e8ac-4c72-a4e6-44196847059d"
 	solution: <<<SOLUTION
@@ -67,7 +61,6 @@ if (!payload.matches("^[a-zA-Z0-9_]+$")) {
     throw new IllegalArgumentException("非法输入");
 }
 ```
-
 #### 2. 避免直接拼接命令
 不要直接将用户输入拼接到命令中，而是使用安全的参数化方法构建命令。
 ```java
@@ -76,19 +69,15 @@ List<String> safeCommand = Arrays.asList("sh", "-c", "echo 'safe operation'");
 ProcessBuilder pb = new ProcessBuilder(safeCommand);
 Process process = pb.start();
 ```
-
 #### 3. 使用沙箱环境
 对于确实需要执行动态命令的场景，建议使用沙箱环境隔离执行逻辑，限制命令执行的权限。
-
 #### 4. 禁用高危方法
 如果业务中不需要使用 `ProcessBuilder` 或反射调用底层命令，应完全禁用相关功能，并在代码审查中强制执行这一约束。
-
 #### 5. 日志监控与告警
 对所有使用 `ProcessBuilder` 的场景增加日志记录，确保每条命令的来源和执行结果可追溯，并配置实时告警机制。
 ```java
 log.info("Executing command: {}", safeCommand);
 ```
-
 SOLUTION
 )
 
@@ -103,23 +92,19 @@ $invoke(,* ?{!=false && !have:"nil" }as $output)
 
 alert $output for {
 	title_zh: "未验证的命令执行",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用白名单机制验证用户输入
 通过定义允许的命令列表或正则表达式，限制用户输入只能包含预期值。
-
 ```java
 // 示例：白名单校验
 String[] allowedCommands = {"ls", "pwd", "whoami"};
 if (!Arrays.asList(allowedCommands).contains(userInput)) {
-    throw new IllegalArgumentException("非法命令");
+throw new IllegalArgumentException("非法命令");
 }
 ```
-
 #### 2. 避免直接拼接用户输入到命令中
 使用安全的方式调用外部命令，例如将命令和参数分开传递，避免直接拼接字符串。
-
 ```java
 // 安全示例：分离命令和参数
 List<String> command = Arrays.asList("sh", "-c", "echo fixed command");
@@ -127,42 +112,38 @@ ProcessBuilder pb = new ProcessBuilder(command);
 pb.redirectErrorStream(true);
 Process process = pb.start();
 ```
-
 #### 3. 使用沙箱环境隔离风险
 运行外部命令时，使用沙箱环境限制命令的权限，防止恶意命令对系统造成破坏。
-
 ```java
 // 示例：设置沙箱环境
 Map<String, String> env = pb.environment();
 env.put("PATH", "/bin:/usr/bin"); // 限制PATH变量
 pb.directory(new File("/safe/directory")); // 指定安全工作目录
 ```
-
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 规则描述
-
 1. **漏洞原理**
-   Java `ProcessBuilder` 类用于启动操作系统进程。如果攻击者能够控制传入 `ProcessBuilder` 的命令或参数，可能导致命令注入漏洞，从而执行任意系统命令。
-
+Java `ProcessBuilder` 类用于启动操作系统进程。如果攻击者能够控制传入 `ProcessBuilder` 的命令或参数，可能导致命令注入漏洞，从而执行任意系统命令。
 2. **触发场景**
-   ```java
-   // 存在漏洞的代码示例
-   String userInput = request.getParameter("payload");
-   String[] command = {"sh", "-c", userInput};
-   ProcessBuilder pb = new ProcessBuilder(command);
-   Process process = pb.start();
-   ```
-   攻击者输入 `; rm -rf /` 可能导致文件系统被删除。
-
+```java
+// 存在漏洞的代码示例
+String userInput = request.getParameter("payload");
+String[] command = {"sh", "-c", userInput};
+ProcessBuilder pb = new ProcessBuilder(command);
+Process process = pb.start();
+```
+攻击者输入 `; rm -rf /` 可能导致文件系统被删除。
 3. **潜在影响**
-   - 执行任意系统命令，可能完全控制服务器。
-   - 访问、修改或删除敏感数据。
-   - 破坏系统完整性，导致服务中断。
-
-CODE
+- 执行任意系统命令，可能完全控制服务器。
+- 访问、修改或删除敏感数据。
+- 破坏系统完整性，导致服务中断。
+DESC
 	level: "high",
 	title: "Unvalidated Command Execution",
+	name: "output",
+	message: "检测到Java代码中存在未验证的命令执行漏洞，用户输入直接传递到ProcessBuilder中。",
+	risk: "命令注入",
 }
 
 

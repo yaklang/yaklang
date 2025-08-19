@@ -4,68 +4,54 @@ desc(
 	risk: sca
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   该规则用于检测Java项目中是否使用了存在已知安全漏洞的Apache `commons-collections4` 库版本。`commons-collections4` 库版本4.x（具体受影响版本范围4.0到4.1，含4.0不含4.1）中存在一个不安全的反序列化漏洞（CVE-2015-6420）。该漏洞源于在进行Java对象反序列化时，可以使用特定的Payload构造恶意对象，当这些对象被反序列化时，会触发链式调用，最终执行任意代码。这通常发生在应用程序对不可信来源的数据进行反序列化操作时。
-
+该规则用于检测Java项目中是否使用了存在已知安全漏洞的Apache `commons-collections4` 库版本。`commons-collections4` 库版本4.x（具体受影响版本范围4.0到4.1，含4.0不含4.1）中存在一个不安全的反序列化漏洞（CVE-2015-6420）。该漏洞源于在进行Java对象反序列化时，可以使用特定的Payload构造恶意对象，当这些对象被反序列化时，会触发链式调用，最终执行任意代码。这通常发生在应用程序对不可信来源的数据进行反序列化操作时。
 2. **触发场景**
-   当应用程序接收到用户可控制的序列化数据，并使用例如 `ObjectInputStream.readObject()` 方法对其进行反序列化时，如果项目中引入了受影响版本的 `commons-collections4` 库，攻击者可以构造包含恶意对象的序列化数据，通过输入通道发送给应用程序。应用程序反序列化该数据时，恶意代码将被执行。
-   
-   ```java
-   // 存在漏洞的场景示例 (简略表示，实际Payload构造复杂)
-   try (ObjectInputStream ois = new ObjectInputStream(socket.getInputStream())) {
-       Object obj = ois.readObject(); // 对不可信来源数据进行反序列化
-       // ... 后续处理
-   } catch (Exception e) {
-       e.printStackTrace();
-   }
-   ```
-
+当应用程序接收到用户可控制的序列化数据，并使用例如 `ObjectInputStream.readObject()` 方法对其进行反序列化时，如果项目中引入了受影响版本的 `commons-collections4` 库，攻击者可以构造包含恶意对象的序列化数据，通过输入通道发送给应用程序。应用程序反序列化该数据时，恶意代码将被执行。
+```java
+// 存在漏洞的场景示例 (简略表示，实际Payload构造复杂)
+try (ObjectInputStream ois = new ObjectInputStream(socket.getInputStream())) {
+Object obj = ois.readObject(); // 对不可信来源数据进行反序列化
+// ... 后续处理
+} catch (Exception e) {
+e.printStackTrace();
+}
+```
 3. **潜在影响**
-    - **远程代码执行 (RCE):** 攻击者可以在服务器上执行任意操作系统命令，完全控制受攻击的服务器。
-    - **敏感数据泄露:** 攻击者可以访问、窃取数据库凭据、私钥、用户敏感信息等。
-    - **系统破坏:** 攻击者可以删除文件、安装恶意软件、创建后门等。
-
+- **远程代码执行 (RCE):** 攻击者可以在服务器上执行任意操作系统命令，完全控制受攻击的服务器。
+- **敏感数据泄露:** 攻击者可以访问、窃取数据库凭据、私钥、用户敏感信息等。
+- **系统破坏:** 攻击者可以删除文件、安装恶意软件、创建后门等。
 ### 规则目的
-
 该规则的具体目的是识别项目中是否引入了存在上述反序列化漏洞的 `commons-collections4` 库版本，即版本号处于 [4.0, 4.1) 范围内的依赖项。一旦检测到，将标记为高危风险，提醒开发者及时进行版本升级。
 DESC
 	rule_id: "2e9c5be0-2c5b-44fc-8928-e16d740bb0bf"
 	title_zh: "SCA: 检测Java commons-collections4 依赖漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 升级 commons-collections4 库版本
 最直接且最有效的修复方法是将 `commons-collections4` 库升级到不受CVE-2015-6420漏洞影响的安全版本。例如，升级到版本 4.1 或更高版本。请检查官方安全公告或Maven/Gradle仓库信息，确保升级到已修复该漏洞的版本。
-
 ```xml
 <!-- Maven 示例：将 commons-collections4 升级到安全版本 -->
 <dependency>
-    <groupId>org.apache.commons</groupId>
-    <artifactId>commons-collections4</artifactId>
-    <version>4.4</version> <!-- 升级到安全的版本 -->
+<groupId>org.apache.commons</groupId>
+<artifactId>commons-collections4</artifactId>
+<version>4.4</version> <!-- 升级到安全的版本 -->
 </dependency>
 ```
-
 ```gradle
 // Gradle 示例：将 commons-collections4 升级到安全版本
 implementation 'org.apache.commons:commons-collections4:4.4' // 升级到安全的版本
 ```
-
 #### 2. 避免对不可信来源的数据进行反序列化
 如果业务逻辑允许，尽量避免直接对来自网络、文件、数据库等不可信或不可控来源的数据进行Java对象反序列化。考虑使用更安全的数据交换格式（如JSON、XML配合安全解析库）或自定义的安全序列化/反序列化机制。
-
 #### 3. 实施反序列化白名单或黑名单机制
 如果在应用中确实需要进行反序列化，可以考虑实现一个反序列化过滤器，通过白名单（只允许反序列化已知安全的类）或黑名单（禁止反序列化已知危险的类）的方式来限制可被反序列化的对象类型，从而阻止恶意对象的实例化和执行。
-
 #### 4. 使用 Java 8u71 / 7u91 / 6u101 及更高版本的限制功能
 这些Java版本引入了 `jdk.serialFilter` 系统属性或 `ObjectInputFilter` 接口，允许对进入的反序列化流进行过滤。配置这些选项可以有效阻止恶意类被加载和实例化。
-
 ```bash
 # 启动 JVM 时设置系统属性过滤
 java -Djdk.serialFilter='!org.apache.commons.collections4.functors.*'
 ```
-
 通过以上任一或组合措施，可以有效缓解 `commons-collections4` 反序列化漏洞带来的风险。
 SOLUTION
 	reference: <<<REFERENCE
@@ -81,4 +67,56 @@ alert $vuln_commons_collections4 for {
 	cve: "CVE-2015-6420",
 	title: "SCA: Check Java commons-collections4 Vulnerability",
 	title_zh: "SCA: 检测Java commons-collections4 依赖漏洞",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 升级 commons-collections4 库版本
+最直接且最有效的修复方法是将 `commons-collections4` 库升级到不受CVE-2015-6420漏洞影响的安全版本。例如，升级到版本 4.1 或更高版本。请检查官方安全公告或Maven/Gradle仓库信息，确保升级到已修复该漏洞的版本。
+```xml
+<!-- Maven 示例：将 commons-collections4 升级到安全版本 -->
+<dependency>
+<groupId>org.apache.commons</groupId>
+<artifactId>commons-collections4</artifactId>
+<version>4.4</version> <!-- 升级到安全的版本 -->
+</dependency>
+```
+```gradle
+// Gradle 示例：将 commons-collections4 升级到安全版本
+implementation 'org.apache.commons:commons-collections4:4.4' // 升级到安全的版本
+```
+#### 2. 避免对不可信来源的数据进行反序列化
+如果业务逻辑允许，尽量避免直接对来自网络、文件、数据库等不可信或不可控来源的数据进行Java对象反序列化。考虑使用更安全的数据交换格式（如JSON、XML配合安全解析库）或自定义的安全序列化/反序列化机制。
+#### 3. 实施反序列化白名单或黑名单机制
+如果在应用中确实需要进行反序列化，可以考虑实现一个反序列化过滤器，通过白名单（只允许反序列化已知安全的类）或黑名单（禁止反序列化已知危险的类）的方式来限制可被反序列化的对象类型，从而阻止恶意对象的实例化和执行。
+#### 4. 使用 Java 8u71 / 7u91 / 6u101 及更高版本的限制功能
+这些Java版本引入了 `jdk.serialFilter` 系统属性或 `ObjectInputFilter` 接口，允许对进入的反序列化流进行过滤。配置这些选项可以有效阻止恶意类被加载和实例化。
+```bash
+# 启动 JVM 时设置系统属性过滤
+java -Djdk.serialFilter='!org.apache.commons.collections4.functors.*'
+```
+通过以上任一或组合措施，可以有效缓解 `commons-collections4` 反序列化漏洞带来的风险。
+SOLUTION
+	risk: "SCA",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+该规则用于检测Java项目中是否使用了存在已知安全漏洞的Apache `commons-collections4` 库版本。`commons-collections4` 库版本4.x（具体受影响版本范围4.0到4.1，含4.0不含4.1）中存在一个不安全的反序列化漏洞（CVE-2015-6420）。该漏洞源于在进行Java对象反序列化时，可以使用特定的Payload构造恶意对象，当这些对象被反序列化时，会触发链式调用，最终执行任意代码。这通常发生在应用程序对不可信来源的数据进行反序列化操作时。
+2. **触发场景**
+当应用程序接收到用户可控制的序列化数据，并使用例如 `ObjectInputStream.readObject()` 方法对其进行反序列化时，如果项目中引入了受影响版本的 `commons-collections4` 库，攻击者可以构造包含恶意对象的序列化数据，通过输入通道发送给应用程序。应用程序反序列化该数据时，恶意代码将被执行。
+```java
+// 存在漏洞的场景示例 (简略表示，实际Payload构造复杂)
+try (ObjectInputStream ois = new ObjectInputStream(socket.getInputStream())) {
+Object obj = ois.readObject(); // 对不可信来源数据进行反序列化
+// ... 后续处理
+} catch (Exception e) {
+e.printStackTrace();
+}
+```
+3. **潜在影响**
+- **远程代码执行 (RCE):** 攻击者可以在服务器上执行任意操作系统命令，完全控制受攻击的服务器。
+- **敏感数据泄露:** 攻击者可以访问、窃取数据库凭据、私钥、用户敏感信息等。
+- **系统破坏:** 攻击者可以删除文件、安装恶意软件、创建后门等。
+### 规则目的
+该规则的具体目的是识别项目中是否引入了存在上述反序列化漏洞的 `commons-collections4` 库版本，即版本号处于 [4.0, 4.1) 范围内的依赖项。一旦检测到，将标记为高危风险，提醒开发者及时进行版本升级。
+DESC
+	name: "vuln_commons_collections4",
 }

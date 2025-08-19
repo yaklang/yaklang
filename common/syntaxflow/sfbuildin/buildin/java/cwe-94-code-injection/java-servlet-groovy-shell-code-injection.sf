@@ -4,54 +4,47 @@ desc(
 	type:"vuln"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Java Servlet Groovy Shell 代码注入漏洞是指在基于 Java Servlet 的 Web 应用程序中，当应用程序直接或间接使用了 `groovy.lang.GroovyShell` 类来执行从用户输入获取的 Groovy 代码时，且未对用户输入进行充分的安全过滤和校验，攻击者可以构造恶意的 Groovy 代码并将其注入到应用程序中执行。由于 `GroovyShell` 默认在不受限的环境下执行代码，攻击者注入的代码可以执行任意的系统命令、访问敏感资源、修改数据或利用其他系统组件，从而导致严重的远程代码执行（RCE）漏洞。
-
+Java Servlet Groovy Shell 代码注入漏洞是指在基于 Java Servlet 的 Web 应用程序中，当应用程序直接或间接使用了 `groovy.lang.GroovyShell` 类来执行从用户输入获取的 Groovy 代码时，且未对用户输入进行充分的安全过滤和校验，攻击者可以构造恶意的 Groovy 代码并将其注入到应用程序中执行。由于 `GroovyShell` 默认在不受限的环境下执行代码，攻击者注入的代码可以执行任意的系统命令、访问敏感资源、修改数据或利用其他系统组件，从而导致严重的远程代码执行（RCE）漏洞。
 2. **触发场景**
-   当应用程序将用户通过 HTTP 请求（如 GET 参数、POST 数据）或其他外部输入直接或经过简单处理后传递给 `GroovyShell` 的 `evaluate()`, `parse()`, `run()` 等方法执行时，就可能存在此漏洞。例如，一个 Servlet 接收用户提交的 "script" 参数，并直接使用 `new GroovyShell().evaluate(request.getParameter("script"))` 执行。
-
-   ```java
-   // 存在漏洞的代码示例
-   import groovy.lang.GroovyShell;
-   import javax.servlet.ServletException;
-   import javax.servlet.annotation.WebServlet;
-   import javax.servlet.http.HttpServlet;
-   import javax.servlet.http.HttpServletRequest;
-   import javax.servlet.http.HttpServletResponse;
-   import java.io.IOException;
-   import java.io.PrintWriter;
-
-   @WebServlet("/groovyExec")
-   public class GroovyExecServlet extends HttpServlet {
-       protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-           response.setContentType("text/html");
-           PrintWriter out = response.getWriter();
-           String script = request.getParameter("script"); // 直接获取用户输入的脚本
-
-           if (script != null && !script.isEmpty()) {
-               try {
-                   GroovyShell shell = new GroovyShell();
-                   Object result = shell.evaluate(script); // 直接执行用户输入的脚本
-                   out.println("Result: " + result);
-               } catch (Exception e) {
-                   out.println("Error: " + e.getMessage());
-               }
-           } else {
-               out.println("Please provide a script parameter.");
-           }
-       }
-   }
-   ```
-   攻击者可以通过发送类似 `?script='calc'.execute().text` 的请求来执行系统命令。
-
+当应用程序将用户通过 HTTP 请求（如 GET 参数、POST 数据）或其他外部输入直接或经过简单处理后传递给 `GroovyShell` 的 `evaluate()`，`parse()`，`run()` 等方法执行时，就可能存在此漏洞。例如，一个 Servlet 接收用户提交的 "script" 参数，并直接使用 `new GroovyShell().evaluate(request.getParameter("script"))` 执行。
+```java
+// 存在漏洞的代码示例
+import groovy.lang.GroovyShell;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.PrintWriter;
+@WebServlet("/groovyExec")
+public class GroovyExecServlet extends HttpServlet {
+protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+response.setContentType("text/html");
+PrintWriter out = response.getWriter();
+String script = request.getParameter("script"); // 直接获取用户输入的脚本
+if (script != null && !script.isEmpty()) {
+try {
+GroovyShell shell = new GroovyShell();
+Object result = shell.evaluate(script); // 直接执行用户输入的脚本
+out.println("Result: " + result);
+} catch (Exception e) {
+out.println("Error: " + e.getMessage());
+}
+} else {
+out.println("Please provide a script parameter.");
+}
+}
+}
+```
+攻击者可以通过发送类似 `?script='calc'.execute().text` 的请求来执行系统命令。
 3. **潜在影响**
-   - **远程代码执行 (RCE):** 最严重的后果，攻击者可以在服务器上执行任意操作系统命令。
-   - **敏感数据泄露:** 攻击者可以执行代码读取服务器上的任意文件，获取数据库连接信息、私钥等敏感数据。
-   - **系统破坏:** 攻击者可以执行删除文件、格式化磁盘等破坏性操作。
-   - **权限提升:** 攻击者可能利用服务器上的其他漏洞或配置错误来提升权限。
-   - **作为攻击跳板:** 受感染的服务器可能被用于发起对内部网络或其他外部目标的攻击。
-
+- **远程代码执行 (RCE):** 最严重的后果，攻击者可以在服务器上执行任意操作系统命令。
+- **敏感数据泄露:** 攻击者可以执行代码读取服务器上的任意文件，获取数据库连接信息、私钥等敏感数据。
+- **系统破坏:** 攻击者可以执行删除文件、格式化磁盘等破坏性操作。
+- **权限提升:** 攻击者可能利用服务器上的其他漏洞或配置错误来提升权限。
+- **作为攻击跳板:** 受感染的服务器可能被用于发起对内部网络或其他外部目标的攻击。
 DESC
 	fix: <<<FIX
     在使用Groovy脚本引擎时，确保对输入进行严格的验证和过滤。避免直接执行用户输入的Groovy代码，或者使用安全的沙箱环境来限制代码的执行权限。此外，可以考虑使用其他更安全的脚本语言或框架来实现动态脚本执行的需求。
@@ -75,9 +68,8 @@ alert $high for {
 	risk: "Groovy-Shell代码执行漏洞",
 	title: "Check Java Servlet Groovy Shell Code Injection Vulnerability",
 	title_zh: "检测Java Servlet Groovy Shell代码注入漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用安全的沙箱环境
 通过使用安全的沙箱环境限制GroovyShell的执行权限，隔离恶意代码对系统的影响。
 ```java
@@ -85,58 +77,52 @@ alert $high for {
 import groovy.lang.GroovyShell;
 import groovy.lang.Binding;
 import java.security.Permission;
-
 public class SecureGroovyExecution {
-    public static void main(String[] args) {
-        Binding binding = new Binding();
-        GroovyShell shell = new GroovyShell(binding);
-
-        // 设置安全管理器以限制权限
-        System.setSecurityManager(new SecurityManager() {
-            @Override
-            public void checkPermission(Permission perm) {
-                if (perm.getName().startsWith("exitVM")) {
-                    throw new SecurityException("Exit operation not allowed.");
-                }
-            }
-        });
-
-        try {
-            String script = "println 'Hello, World!'"; // 受信任的脚本示例
-            Object result = shell.evaluate(script);
-            System.out.println(result);
-        } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
-        }
-    }
+public static void main(String[] args) {
+Binding binding = new Binding();
+GroovyShell shell = new GroovyShell(binding);
+// 设置安全管理器以限制权限
+System.setSecurityManager(new SecurityManager() {
+@Override
+public void checkPermission(Permission perm) {
+if (perm.getName().startsWith("exitVM")) {
+throw new SecurityException("Exit operation not allowed.");
+}
+}
+});
+try {
+String script = "println 'Hello, World!'"; // 受信任的脚本示例
+Object result = shell.evaluate(script);
+System.out.println(result);
+} catch (Exception e) {
+System.err.println("Error: " + e.getMessage());
+}
+}
 }
 ```
-
 #### 2. 对用户输入进行严格验证和过滤
 在将用户输入传递给GroovyShell之前，应对其内容进行严格的校验和过滤，仅允许安全的、预定义的操作。
 ```java
 // 示例：白名单验证
 private boolean isValidScript(String script) {
-    List<String> allowedScripts = Arrays.asList("println 'Hello'", "return 42");
-    return allowedScripts.contains(script);
+List<String> allowedScripts = Arrays.asList("println 'Hello'", "return 42");
+return allowedScripts.contains(script);
 }
-
 protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-    String userScript = request.getParameter("script");
-    if (userScript != null && !userScript.isEmpty()) {
-        if (isValidScript(userScript)) {
-            GroovyShell shell = new GroovyShell();
-            Object result = shell.evaluate(userScript);
-            response.getWriter().println("Result: " + result);
-        } else {
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid script input.");
-        }
-    } else {
-        response.getWriter().println("Please provide a valid script parameter.");
-    }
+String userScript = request.getParameter("script");
+if (userScript != null && !userScript.isEmpty()) {
+if (isValidScript(userScript)) {
+GroovyShell shell = new GroovyShell();
+Object result = shell.evaluate(userScript);
+response.getWriter().println("Result: " + result);
+} else {
+response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid script input.");
+}
+} else {
+response.getWriter().println("Please provide a valid script parameter.");
+}
 }
 ```
-
 #### 3. 替换危险方法或组件
 考虑使用其他更安全的脚本语言或框架来实现动态脚本执行需求，例如JavaScript引擎（如Nashorn）或其他专用的DSL语言。
 ```java
@@ -150,81 +136,74 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
-
 @WebServlet("/secureEval")
 public class SecureEvalServlet extends HttpServlet {
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        String script = request.getParameter("script");
-        response.setContentType("text/html");
-        PrintWriter out = response.getWriter();
-
-        if (script != null && !script.isEmpty()) {
-            ScriptEngine engine = new ScriptEngineManager().getEngineByName("nashorn");
-            try {
-                Object result = engine.eval(script);
-                out.println("Result: " + result);
-            } catch (Exception e) {
-                out.println("Error: " + e.getMessage());
-            }
-        } else {
-            out.println("Please provide a script parameter.");
-        }
-    }
+protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+String script = request.getParameter("script");
+response.setContentType("text/html");
+PrintWriter out = response.getWriter();
+if (script != null && !script.isEmpty()) {
+ScriptEngine engine = new ScriptEngineManager().getEngineByName("nashorn");
+try {
+Object result = engine.eval(script);
+out.println("Result: " + result);
+} catch (Exception e) {
+out.println("Error: " + e.getMessage());
+}
+} else {
+out.println("Please provide a script parameter.");
+}
+}
 }
 ```
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Java Servlet Groovy Shell 代码注入漏洞是指在基于 Java Servlet 的 Web 应用程序中，当应用程序直接或间接使用了 `groovy.lang.GroovyShell` 类来执行从用户输入获取的 Groovy 代码时，且未对用户输入进行充分的安全过滤和校验，攻击者可以构造恶意的 Groovy 代码并将其注入到应用程序中执行。由于 `GroovyShell` 默认在不受限的环境下执行代码，攻击者注入的代码可以执行任意的系统命令、访问敏感资源、修改数据或利用其他系统组件，从而导致严重的远程代码执行（RCE）漏洞。
-
+Java Servlet Groovy Shell 代码注入漏洞是指在基于 Java Servlet 的 Web 应用程序中，当应用程序直接或间接使用了 `groovy.lang.GroovyShell` 类来执行从用户输入获取的 Groovy 代码时，且未对用户输入进行充分的安全过滤和校验，攻击者可以构造恶意的 Groovy 代码并将其注入到应用程序中执行。由于 `GroovyShell` 默认在不受限的环境下执行代码，攻击者注入的代码可以执行任意的系统命令、访问敏感资源、修改数据或利用其他系统组件，从而导致严重的远程代码执行（RCE）漏洞。
 2. **触发场景**
-   当应用程序将用户通过 HTTP 请求（如 GET 参数、POST 数据）或其他外部输入直接或经过简单处理后传递给 `GroovyShell` 的 `evaluate()`，`parse()`，`run()` 等方法执行时，就可能存在此漏洞。例如，一个 Servlet 接收用户提交的 "script" 参数，并直接使用 `new GroovyShell().evaluate(request.getParameter("script"))` 执行。
-
-   ```java
-   // 存在漏洞的代码示例
-   import groovy.lang.GroovyShell;
-   import javax.servlet.ServletException;
-   import javax.servlet.annotation.WebServlet;
-   import javax.servlet.http.HttpServlet;
-   import javax.servlet.http.HttpServletRequest;
-   import javax.servlet.http.HttpServletResponse;
-   import java.io.IOException;
-   import java.io.PrintWriter;
-
-   @WebServlet("/groovyExec")
-   public class GroovyExecServlet extends HttpServlet {
-       protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-           response.setContentType("text/html");
-           PrintWriter out = response.getWriter();
-           String script = request.getParameter("script"); // 直接获取用户输入的脚本
-
-           if (script != null && !script.isEmpty()) {
-               try {
-                   GroovyShell shell = new GroovyShell();
-                   Object result = shell.evaluate(script); // 直接执行用户输入的脚本
-                   out.println("Result: " + result);
-               } catch (Exception e) {
-                   out.println("Error: " + e.getMessage());
-               }
-           } else {
-               out.println("Please provide a script parameter.");
-           }
-       }
-   }
-   ```
-   攻击者可以通过发送类似 `?script='calc'.execute().text` 的请求来执行系统命令。
-
+当应用程序将用户通过 HTTP 请求（如 GET 参数、POST 数据）或其他外部输入直接或经过简单处理后传递给 `GroovyShell` 的 `evaluate()`，`parse()`，`run()` 等方法执行时，就可能存在此漏洞。例如，一个 Servlet 接收用户提交的 "script" 参数，并直接使用 `new GroovyShell().evaluate(request.getParameter("script"))` 执行。
+```java
+// 存在漏洞的代码示例
+import groovy.lang.GroovyShell;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.PrintWriter;
+@WebServlet("/groovyExec")
+public class GroovyExecServlet extends HttpServlet {
+protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+response.setContentType("text/html");
+PrintWriter out = response.getWriter();
+String script = request.getParameter("script"); // 直接获取用户输入的脚本
+if (script != null && !script.isEmpty()) {
+try {
+GroovyShell shell = new GroovyShell();
+Object result = shell.evaluate(script); // 直接执行用户输入的脚本
+out.println("Result: " + result);
+} catch (Exception e) {
+out.println("Error: " + e.getMessage());
+}
+} else {
+out.println("Please provide a script parameter.");
+}
+}
+}
+```
+攻击者可以通过发送类似 `?script='calc'.execute().text` 的请求来执行系统命令。
 3. **潜在影响**
-   - **远程代码执行 (RCE):** 最严重的后果，攻击者可以在服务器上执行任意操作系统命令。
-   - **敏感数据泄露:** 攻击者可以执行代码读取服务器上的任意文件，获取数据库连接信息、私钥等敏感数据。
-   - **系统破坏:** 攻击者可以执行删除文件、格式化磁盘等破坏性操作。
-   - **权限提升:** 攻击者可能利用服务器上的其他漏洞或配置错误来提升权限。
-   - **作为攻击跳板:** 受感染的服务器可能被用于发起对内部网络或其他外部目标的攻击。
-CODE
+- **远程代码执行 (RCE):** 最严重的后果，攻击者可以在服务器上执行任意操作系统命令。
+- **敏感数据泄露:** 攻击者可以执行代码读取服务器上的任意文件，获取数据库连接信息、私钥等敏感数据。
+- **系统破坏:** 攻击者可以执行删除文件、格式化磁盘等破坏性操作。
+- **权限提升:** 攻击者可能利用服务器上的其他漏洞或配置错误来提升权限。
+- **作为攻击跳板:** 受感染的服务器可能被用于发起对内部网络或其他外部目标的攻击。
+DESC
 	level: "high",
 	message: "发现Java Servlet Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
+	name: "high",
 }
 
 $sink #{
@@ -233,27 +212,38 @@ $sink #{
 $result - $high as $low;
 
 alert $low for {
-	desc: <<<CODE
+	desc: <<<DESC
 ### 规则目的
 该规则旨在识别是否存在潜在的Java Servlet Groovy Shell代码注入漏洞，但与高风险级别不同的是，它适用于具有一定数据流过滤机制的场景。这些过滤机制可能包括但不限于参数清理、白名单验证或沙箱限制等。
-
 ### 规则详细
 1. **适用范围**
-   - 该规则覆盖了在Servlet中的调用点可能涉及`groovy.lang.GroovyShell`的执行场景，但要求有一定程度的过滤逻辑。
-   - 过滤逻辑可包括参数白名单、黑名单校验，或者针对特定危险函数的拦截。
-
+- 该规则覆盖了在Servlet中的调用点可能涉及`groovy.lang.GroovyShell`的执行场景，但要求有一定程度的过滤逻辑。
+- 过滤逻辑可包括参数白名单、黑名单校验，或者针对特定危险函数的拦截。
 2. **潜在场景**
-   如果开发者已经在应用中添加了一些防护措施，例如限制了GroovyShell可执行的脚本内容，但仍存在绕过可能性，则此类情况会被归类为低风险。
-
+如果开发者已经在应用中添加了一些防护措施，例如限制了GroovyShell可执行的脚本内容，但仍存在绕过可能性，则此类情况会被归类为低风险。
 3. **审计注意事项**
-   - 尽管存在一定的保护措施，仍需检查过滤是否足够强健，是否存在潜在缺陷。
-   - 建议开发团队进一步审查过滤机制的有效性，确保其能够抵御复杂的攻击手段。
-CODE
+- 尽管存在一定的保护措施，仍需检查过滤是否足够强健，是否存在潜在缺陷。
+- 建议开发团队进一步审查过滤机制的有效性，确保其能够抵御复杂的攻击手段。
+DESC
 	level: "low",
 	risk: "Groovy-Shell代码执行漏洞",
 	message: "发现Java Servlet Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
 	title: "Check Java Servlet Groovy Shell Code Injection Vulnerability with Data Flow Filtering",
 	title_zh: "检测带数据流过滤的Java Servlet Groovy Shell代码注入漏洞",
+	solution: <<<SOLUTION
+### 规则目的
+该规则旨在识别是否存在潜在的Java Servlet Groovy Shell代码注入漏洞，但与高风险级别不同的是，它适用于具有一定数据流过滤机制的场景。这些过滤机制可能包括但不限于参数清理、白名单验证或沙箱限制等。
+### 规则详细
+1. **适用范围**
+- 该规则覆盖了在Servlet中的调用点可能涉及`groovy.lang.GroovyShell`的执行场景，但要求有一定程度的过滤逻辑。
+- 过滤逻辑可包括参数白名单、黑名单校验，或者针对特定危险函数的拦截。
+2. **潜在场景**
+如果开发者已经在应用中添加了一些防护措施，例如限制了GroovyShell可执行的脚本内容，但仍存在绕过可能性，则此类情况会被归类为低风险。
+3. **审计注意事项**
+- 尽管存在一定的保护措施，仍需检查过滤是否足够强健，是否存在潜在缺陷。
+- 建议开发团队进一步审查过滤机制的有效性，确保其能够抵御复杂的攻击手段。
+SOLUTION
+	name: "low",
 }
 
 desc(

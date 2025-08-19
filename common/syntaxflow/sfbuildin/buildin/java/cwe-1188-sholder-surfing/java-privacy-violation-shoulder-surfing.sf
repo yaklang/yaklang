@@ -8,52 +8,53 @@ desc(
 ### 漏洞描述
 
 1. **漏洞原理**
-   该规则检测 Java 代码中是否存在隐私泄露的风险，特别针对 “肩窥”（Shoulder Surfing）这种安全威胁。当使用 `javax.security.auth.callback.PasswordCallback` 类实例化对象时，如果构造函数的第二个参数 `echoOn` 被设置为 `true`，则在用户输入密码时，密码会在屏幕上以明文形式显示。攻击者可以通过直接观察屏幕来获取敏感信息（如密码），从而导致用户凭据泄露。
+该规则检测 Java 代码中是否存在隐私泄露的风险，特别是针对“肩窥”（Shoulder Surfing）这种安全威胁。当使用 `javax.security.auth.callback.PasswordCallback` 类实例化对象时，如果构造函数的第二个参数 `echoOn` 被设置为 `true`，则在用户输入密码时，密码会在屏幕上以明文形式显示。攻击者可以通过直接观察屏幕来获取敏感信息（如密码），从而导致用户凭据泄露。
 
 2. **触发场景**
-   当在 Java 应用程序中需要通过 `PasswordCallback` 提示用户输入密码时，如果代码中使用了 `new PasswordCallback("Password: ", true)` 类似的方式进行实例化，即 `echoOn` 参数为 `true`，就会触发此风险。例如，在某些命令行工具或图形界面应用中，如果未正确配置此参数，攻击者在用户输入密码时即可通过肉眼观察到明文密码。
+当在 Java 应用程序中需要通过 `PasswordCallback` 提示用户输入密码时，如果代码中使用了 `new PasswordCallback("Password: ", true)` 类似的方式进行实例化，即 `echoOn` 参数为 `true`，就会触发此风险。例如，在某些命令行工具或图形界面应用中，如果未正确配置此参数，攻击者在用户输入密码时即可通过肉眼观察到明文密码。
 
-   ```java
-   // 存在隐私泄露风险的代码示例
-   import javax.security.auth.callback.PasswordCallback;
+```java
+// 存在隐私泄露风险的代码示例
+import javax.security.auth.callback.PasswordCallback;
+public class UnsafePasswordInput {
+    public static void main(String[] args) {
+        // ... 其他代码
+        PasswordCallback passwordCallback = new PasswordCallback("Password: ", true);
+        // ... 处理 callback
+    }
+}
+```
 
-   public class UnsafePasswordInput {
-       public static void main(String[] args) {
-           // ... 其他代码
-           PasswordCallback passwordCallback = new PasswordCallback("Password: ", true); 
-           // ... 处理 callback
-       }
-   }
-   ```
 3. **潜在影响**
-   - 用户输入的敏感信息（如密码）被窃取。
-   - 攻击者利用窃取的凭据进行未经授权的访问或恶意操作。
-   - 导致账户被盗用、数据泄露等更严重的安全问题。
+- 用户输入的敏感信息（如密码）被窃取。
+- 攻击者利用窃取的凭据进行未经授权的访问或恶意操作。
+- 导致账户被盗用、数据泄露等更严重的安全问题。
+
 DESC
 	rule_id: "6f1eb106-9ac3-440f-817d-3701282b74f7"
 	solution: <<<SOLUTION
 ### 修复建议
 
 #### 1. 将 `PasswordCallback` 的 `echoOn` 参数设置为 `false`
-   这是最直接且有效的修复方法。通过将 `echoOn` 参数设置为 `false`，可以在用户输入密码时，终端或界面不再显示用户输入的字符，从而防止肩窥。
+这是最直接且有效的修复方法。通过将 `echoOn` 参数设置为 `false`，可以在用户输入密码时，终端或界面不再显示用户输入的字符，从而防止肩窥。
 
-   ```java
-   // 安全的代码示例
-   import javax.security.auth.callback.PasswordCallback;
-
-   public class SafePasswordInput {
-       public static void main(String[] args) {
-           // ... 其他代码
-           PasswordCallback passwordCallback = new PasswordCallback("Password: ", false);
-           // ... 处理 callback
-       }
-   }
-   ```
+```java
+// 安全的代码示例
+import javax.security.auth.callback.PasswordCallback;
+public class SafePasswordInput {
+    public static void main(String[] args) {
+        // ... 其他代码
+        PasswordCallback passwordCallback = new PasswordCallback("Password: ", false);
+        // ... 处理 callback
+    }
+}
+```
 
 #### 2. 考虑使用更安全的密码输入方式
-   在某些场景下，可以考虑使用更安全的密码输入机制，例如：
-   - 在命令行应用中，使用 `System.console().readPassword()` 方法，它可以屏蔽用户输入。
-   - 在图形界面应用中，使用 `JPasswordField` 组件，它会自动隐藏用户输入的字符。
+在某些场景下，可以考虑使用更安全的密码输入机制，例如：
+- 在命令行应用中，使用 `System.console().readPassword()` 方法，它可以屏蔽用户输入。
+- 在图形界面应用中，使用 `JPasswordField` 组件，它会自动隐藏用户输入的字符。
+
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-1188: Shoulder Surfing](https://cwe.mitre.org/data/definitions/1188.html)
@@ -70,6 +71,50 @@ alert $risk for {
 	title: "Check Java Privacy Violation - Shoulder Surfing",
 	title_zh: "检查Java隐私泄露 - 肩窥",
 	level: "low",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+该规则检测 Java 代码中是否存在隐私泄露的风险，特别针对 “肩窥”（Shoulder Surfing）这种安全威胁。当使用 `javax.security.auth.callback.PasswordCallback` 类实例化对象时，如果构造函数的第二个参数 `echoOn` 被设置为 `true`，则在用户输入密码时，密码会在屏幕上以明文形式显示。攻击者可以通过直接观察屏幕来获取敏感信息（如密码），从而导致用户凭据泄露。
+2. **触发场景**
+当在 Java 应用程序中需要通过 `PasswordCallback` 提示用户输入密码时，如果代码中使用了 `new PasswordCallback("Password: ", true)` 类似的方式进行实例化，即 `echoOn` 参数为 `true`，就会触发此风险。例如，在某些命令行工具或图形界面应用中，如果未正确配置此参数，攻击者在用户输入密码时即可通过肉眼观察到明文密码。
+```java
+// 存在隐私泄露风险的代码示例
+import javax.security.auth.callback.PasswordCallback;
+public class UnsafePasswordInput {
+public static void main(String[] args) {
+// ... 其他代码
+PasswordCallback passwordCallback = new PasswordCallback("Password: ", true);
+// ... 处理 callback
+}
+}
+```
+3. **潜在影响**
+- 用户输入的敏感信息（如密码）被窃取。
+- 攻击者利用窃取的凭据进行未经授权的访问或恶意操作。
+- 导致账户被盗用、数据泄露等更严重的安全问题。
+DESC
+	name: "risk",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 将 `PasswordCallback` 的 `echoOn` 参数设置为 `false`
+这是最直接且有效的修复方法。通过将 `echoOn` 参数设置为 `false`，可以在用户输入密码时，终端或界面不再显示用户输入的字符，从而防止肩窥。
+```java
+// 安全的代码示例
+import javax.security.auth.callback.PasswordCallback;
+public class SafePasswordInput {
+public static void main(String[] args) {
+// ... 其他代码
+PasswordCallback passwordCallback = new PasswordCallback("Password: ", false);
+// ... 处理 callback
+}
+}
+```
+#### 2. 考虑使用更安全的密码输入方式
+在某些场景下，可以考虑使用更安全的密码输入机制，例如：
+- 在命令行应用中，使用 `System.console().readPassword()` 方法，它可以屏蔽用户输入。
+- 在图形界面应用中，使用 `JPasswordField` 组件，它会自动隐藏用户输入的字符。
+SOLUTION
+	risk: "信息泄露",
 }
 
 desc(

@@ -5,76 +5,65 @@ desc(
 	type: audit
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   XSS（跨站脚本攻击）是由于应用程序未对用户输入进行严格的过滤或转义处理，攻击者可通过注入恶意脚本代码篡改页面逻辑或窃取用户数据。这类攻击常发生于直接输出未经验证的用户输入至前端页面、HTML标签或JavaScript上下文中。
-
+XSS（跨站脚本攻击）是由于应用程序未对用户输入进行严格的过滤或转义处理，攻击者可通过注入恶意脚本代码篡改页面逻辑或窃取用户数据。这类攻击常发生于直接输出未经验证的用户输入至前端页面、HTML标签或JavaScript上下文中。
 2. **触发场景**
-   该规则用于查找Java代码中可能存在的实体转义方法，这些方法经常被用来防御XSS漏洞。例如：
-   ```java
-   public String escapeHtml(String input) {
-       return input.replaceAll("&", "&amp;")
-                   .replaceAll("<", "&lt;")
-                   .replaceAll(">", "&gt;")
-                   .replaceAll("\\", "&#39;");
-   }
-   ```
-   如果开发者未调用类似的转义方法对用户输入进行处理，攻击者可以注入恶意脚本，如`<script>alert('XSS')</script>`，从而触发XSS攻击。
-
+该规则用于查找Java代码中可能存在的实体转义方法，这些方法经常被用来防御XSS漏洞。例如：
+```java
+public String escapeHtml(String input) {
+return input.replaceAll("&", "&amp;")
+.replaceAll("<", "&lt;")
+.replaceAll(">", "&gt;")
+.replaceAll("\\", "&#39;");
+}
+```
+如果开发者未调用类似的转义方法对用户输入进行处理，攻击者可以注入恶意脚本，如`<script>alert('XSS')</script>`，从而触发XSS攻击。
 3. **潜在影响**
-   - 窃取用户的敏感信息（如Cookie、会话令牌等）。
-   - 劫持用户会话并冒充合法用户执行操作。
-   - 在受害者浏览器中植入恶意软件或重定向至钓鱼网站。
-
+- 窃取用户的敏感信息（如Cookie、会话令牌等）。
+- 劫持用户会话并冒充合法用户执行操作。
+- 在受害者浏览器中植入恶意软件或重定向至钓鱼网站。
 ### 规则目的
 此规则用于查找Java代码中可能存在的实体转义方法，覆盖高频关键词如`sanitize`、`encode`、`escape`等，以辅助审计XSS漏洞。
-
 ### 规则详细
 1. **作为基础检测库**
-   属于`java-escape-method`库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测XSS漏洞，提供核心函数识别能力。
-
+属于`java-escape-method`库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测XSS漏洞，提供核心函数识别能力。
 2. **覆盖高频转义词汇**
-   规则通过正则表达式匹配函数名称中包含以下词汇的潜在转义方法：`sanitiz`, `encod(e|ing)`, `entit(y|ies)`, `escap(e|ing)`, `replace`, `regex`, `normaliz`, `canonical`, `anti`, `safe`, `purif`, `purg`, `pure`, `validate`, `strip`, `clean`, `clear`, `special`, `convert`, `remov`。
+规则通过正则表达式匹配函数名称中包含以下词汇的潜在转义方法：`sanitiz`, `encod(e|ing)`, `entit(y|ies)`, `escap(e|ing)`, `replace`, `regex`, `normaliz`, `canonical`, `anti`, `safe`, `purif`, `purg`, `pure`, `validate`, `strip`, `clean`, `clear`, `special`, `convert`, `remov`。
 DESC
 	rule_id: "105b3dd0-6ac1-4e00-a38d-464e17e3e7fc"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用安全转义库
 推荐使用成熟的第三方安全转义库（如OWASP ESAPI、Apache Commons Text等），确保用户输入在不同上下文（HTML、JavaScript、CSS、URL）中的安全性。
 ```java
 import org.owasp.esapi.ESAPI;
-
 public String sanitizeInput(String userInput) {
-    return ESAPI.encoder().encodeForHTML(userInput);
+return ESAPI.encoder().encodeForHTML(userInput);
 }
 ```
-
 #### 2. 自定义转义方法
 如果无法引入外部库，可实现简单的自定义转义方法，确保特殊字符被正确替换。
 ```java
 public String escapeHtml(String input) {
-    if (input == null) return null;
-    return input.replaceAll("&", "&amp;")
-                .replaceAll("<", "&lt;")
-                .replaceAll(">", "&gt;")
-                .replaceAll("\\", "&#39;");
+if (input == null) return null;
+return input.replaceAll("&", "&amp;")
+.replaceAll("<", "&lt;")
+.replaceAll(">", "&gt;")
+.replaceAll("\\", "&#39;");
 }
 ```
-
 #### 3. 输入合法性校验
 对用户输入实施白名单校验，仅允许特定字符集通过。
 ```java
 public boolean isValidInput(String input) {
-    return input.matches("^[a-zA-Z0-9_@.-]+$");
+return input.matches("^[a-zA-Z0-9_@.-]+$");
 }
 ```
-
 #### 4. 输出编码
 根据输出上下文选择合适的编码方式，避免在HTML、JavaScript等环境中直接输出原始用户输入。
 ```java
 public String encodeForJavaScript(String input) {
-    return input.replaceAll("\\", "\\\\").replaceAll("'", "\\'").replaceAll("\"", "\\\"");
+return input.replaceAll("\\", "\\\\").replaceAll("'", "\\'").replaceAll("\"", "\\\"");
 }
 ```
 SOLUTION
@@ -86,9 +75,14 @@ REFERENCE
 
 /(?i)(sanitiz|encod(e|ing)|entit(y|ies)|escap(e|ing)|replace|regex|normaliz|canonical|anti|safe|purif|purg|pure|validate|strip|clean|clear|special|convert|remov)/ as $output;
 alert $output for {
-	level: "mid",
+	level: "info",
 	title: "Find Java Escape Method",
 	title_zh: "查找Java转义方法",
+	risk: "信息",
+	desc: <<<DESC
+"### 漏洞描述\n1. **漏洞原理**\nXSS（跨站脚本攻击）是由于应用程序未对用户输入进行严格的过滤或转义处理，攻击者可通过注入恶意脚本代码篡改页面逻辑或窃取用户数据。这类攻击常发生于直接输出未经验证的用户输入至前端页面、HTML标签或JavaScript上下文中。\n2. **触发场景**\n该规则用于查找Java代码中可能存在的实体转义方法，这些方法经常被用来防御XSS漏洞。例如：\n```java\npublic String escapeHtml(String input) {\nreturn input.replaceAll(\"&\", \"&amp;\")\n.replaceAll(\"<\", \"&lt;\")\n.replaceAll(\">\","\">\")\n.replaceAll(\"\\\\\", \"&#39;\");\n
+DESC
+	name: "output",
 }
 
 

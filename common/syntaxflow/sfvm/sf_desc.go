@@ -77,6 +77,7 @@ func GetAlertDescKeyType() []SFDescKeyType {
 		SFDescKeyType_Message,
 		SFDescKeyType_Solution,
 		SFDescKeyType_Risk,
+		SFDescKeyType_Desc,
 	}
 }
 
