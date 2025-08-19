@@ -3,6 +3,7 @@ package aireactdeps
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/stdinsys"
 	"io"
 	"strings"
 
@@ -23,8 +24,13 @@ type UserInteractiveOption struct {
 
 // handleUserInteractiveClient 使用 promptui 处理 EVENT_TYPE_REQUIRE_USER_INTERACTIVE 事件
 func handleUserInteractiveClient(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInputEvent) {
-	stdin := NewStdinManager().PreventDefault()
-	defer NewStdinManager().RecoverDefault()
+	ins := stdinsys.GetStdinSys()
+	ins.PreventDefaultStdinMirror()
+	defer ins.GetDefaultStdinMirror()
+	id, stdin := ins.CreateTemporaryStdinMirror()
+	defer func() {
+		ins.RemoveStdinMirror(id)
+	}()
 
 	// 解析交互事件内容
 	var interactiveData map[string]interface{}

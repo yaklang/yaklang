@@ -3,7 +3,9 @@ package aireactdeps
 import (
 	"context"
 	"fmt"
-	"io"
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/stdinsys"
+	"github.com/yaklang/yaklang/common/utils"
 	"os"
 	"strconv"
 	"strings"
@@ -71,9 +73,10 @@ func handleInteractiveLoop(reactInstance *aireact.ReAct, ctx context.Context, co
 				continue
 			}
 
+			input = strings.TrimSpace(input)
 			// 对于非审核输入，过滤空输入
 			if input == "" {
-				fmt.Print("> ")
+				printPrompt()
 				continue
 			}
 
@@ -84,32 +87,32 @@ func handleInteractiveLoop(reactInstance *aireact.ReAct, ctx context.Context, co
 
 			if input == "/debug" {
 				toggleDebugMode(config)
-				fmt.Print("> ")
+				printPrompt()
 				continue
 			}
 
 			if input == "/queue" {
 				displayQueueInfo(reactInstance)
-				fmt.Print("> ")
+				printPrompt()
 				continue
 			}
 
 			if strings.HasSuffix(input, "???") || input == "/status" {
 				displayStatus()
-				fmt.Print("> ")
+				printPrompt()
 				continue
 			}
 
 			if strings.HasPrefix(input, "/breakpoint") || strings.HasPrefix(input, "/bp") {
 				config.BreakpointMode = true
 				log.Info("Breakpoint mode enabled")
-				fmt.Print("> ")
+				printPrompt()
 				continue
 			}
 
 			if strings.HasPrefix(input, "/timeline") {
 				handleTimelineCommand(input, reactInstance)
-				fmt.Print("> ")
+				printPrompt()
 				continue
 			}
 
@@ -135,8 +138,7 @@ func handleInteractiveLoop(reactInstance *aireact.ReAct, ctx context.Context, co
 			} else {
 				fmt.Printf("Query sent to ReAct: %s\n", input)
 			}
-			fmt.Print("> ")
-
+			printPrompt()
 		case <-ctx.Done():
 			log.Info("Context cancelled, exiting interactive loop")
 			return
@@ -147,47 +149,27 @@ func handleInteractiveLoop(reactInstance *aireact.ReAct, ctx context.Context, co
 // SetupSignalHandler 设置全局信号处理器
 func SetupSignalHandler(ctx context.Context, config *CLIConfig) {
 	go func() {
-		manager := NewStdinManager()
-		controller := manager.RegisterReader()
-		defer controller.Unregister()
-
+		ins := stdinsys.GetStdinSys()
+		ins.GetDefaultStdinMirror()
+		printPrompt()
 		for {
 			select {
 			case <-ctx.Done():
-				// 主动关闭bufio reader以中断阻塞的读取
-				controller.Close()
 				return
 			default:
-				// 检查暂停/恢复信号
-				if !controller.WaitForSignals() {
+				if !ins.HaveDefaultStdinMirror() {
+					// 如果没有默认的stdin镜像，等待一段时间再继续
 					time.Sleep(50 * time.Millisecond)
 					continue
 				}
 
-				// 使用新的bufio ReadLine，支持主动关闭中断
-				buffer, err := controller.ReadLine()
+				reader := ins.GetDefaultStdinMirror()
+				line, err := utils.ReadLine(reader)
 				if err != nil {
-					if err == io.EOF {
-						// 如果是EOF（被阻止或关闭），检查是否是正常退出
-						select {
-						case <-ctx.Done():
-							return
-						default:
-							time.Sleep(50 * time.Millisecond)
-							continue
-						}
-					} else {
-						// 对于其他错误，只在不是"file already closed"时记录日志
-						if err.Error() != "file already closed" {
-							log.Errorf("Failed to read line from stdin: %v", err)
-						}
-						time.Sleep(100 * time.Millisecond)
-						continue
-					}
+					time.Sleep(50 * time.Millisecond)
+					continue
 				}
-
-				// 处理正常输入
-				handleFreeInput(string(buffer)+"\n", config)
+				handleFreeInput(string(line)+"\n", config)
 			}
 		}
 	}()
@@ -280,7 +262,10 @@ type MainCommandOption struct {
 
 // handleFreeInput 处理自由输入
 func handleFreeInput(input string, config *CLIConfig) {
+	input = strings.TrimSpace(input)
+
 	if input == "" {
+		printPrompt()
 		return
 	}
 
@@ -326,9 +311,19 @@ func handleFreeInput(input string, config *CLIConfig) {
 	}
 }
 
+var banner = "Yak AI >> "
+
+func printPrompt() {
+	fmt.Print(banner)
+}
+
+var printPromptDebounce, _ = lo.NewDebounce(2*time.Second, printPrompt)
+
 // handleClientEvent 在客户端模式下使用输入通道处理事件
 func handleClientEvent(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInputEvent, interactiveMode bool) {
 	config := &CLIConfig{} // 临时配置，应该从上下文获取
+
+	printPromptDebounce()
 
 	// 更新事件时间，用于菜单显示逻辑
 	globalEventMonitor.UpdateEventTime()
@@ -376,7 +371,7 @@ func handleClientEvent(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInpu
 				log.Debugf("Displaying task completion prompt now")
 			}
 
-			fmt.Print("> ")
+			printPrompt()
 
 			// 多次强制刷新输出
 			os.Stdout.Sync()
