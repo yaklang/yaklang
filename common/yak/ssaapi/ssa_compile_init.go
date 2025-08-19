@@ -12,7 +12,7 @@ import (
 
 func (c *config) init(filesystem filesys_interface.FileSystem, fileSize int) (*ssa.Program, *ssa.FunctionBuilder, error) {
 	programName := c.ProgramName
-	application := ssa.NewProgram(programName, c.enableDatabase, ssa.Application, filesystem, c.programPath, fileSize, c.cacheTTL...)
+	application := ssa.NewProgram(programName, c.databaseKind, ssa.Application, filesystem, c.programPath, fileSize, c.cacheTTL...)
 	application.Language = string(c.language)
 
 	application.ProcessInfof = func(s string, v ...any) {

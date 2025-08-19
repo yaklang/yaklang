@@ -143,7 +143,11 @@ func getProgram(ctx context.Context, config *ssaCliConfig) (*ssaapi.Program, err
 	}
 	if config.targetPath != "" {
 		log.Infof("get program from target path: %s", config.targetPath)
-		_, prog, err := coreplugin.ParseProjectWithAutoDetective(ctx, config.targetPath, config.language)
+		para := make(map[string]any)
+		if config.memory {
+			para["memory"] = true
+		}
+		_, prog, err := coreplugin.ParseProjectWithAutoDetective(ctx, config.targetPath, config.language, para)
 		return prog, err
 	}
 	return nil, utils.Errorf("get program by parameter fail, please check your command")

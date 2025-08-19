@@ -57,7 +57,7 @@ func (c *config) parseProject() (Programs, error) {
 		if progs, err := c.peephole(); err != nil {
 			return nil, err
 		} else {
-			c.SaveConfig()
+			SaveConfig(c, nil)
 			c.Processf(1, "programs finish")
 			return progs, nil
 		}
@@ -68,7 +68,7 @@ func (c *config) parseProject() (Programs, error) {
 		}); err != nil {
 			return nil, err
 		} else {
-			c.SaveConfig()
+			SaveConfig(c, prog)
 			c.Processf(1, "program %s finish", prog.GetProgramName())
 			return Programs{prog}, nil
 		}
