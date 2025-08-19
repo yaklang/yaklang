@@ -3,6 +3,7 @@ package aireactdeps
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/stdinsys"
 	"io"
 	"strings"
 
@@ -24,9 +25,13 @@ func getString(m map[string]interface{}, key string) string {
 
 // handleReviewRequireClient 使用 promptui 处理 TOOL_USE_REVIEW_REQUIRE 事件
 func handleReviewRequireClient(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInputEvent) {
-	stdin := NewStdinManager().PreventDefault()
-	defer NewStdinManager().RecoverDefault()
-
+	ins := stdinsys.GetStdinSys()
+	ins.PreventDefaultStdinMirror()
+	defer ins.GetDefaultStdinMirror()
+	id, stdin := ins.CreateTemporaryStdinMirror()
+	defer func() {
+		ins.RemoveStdinMirror(id)
+	}()
 	// 解析审核事件内容
 	var reviewData map[string]interface{}
 	if err := json.Unmarshal(event.Content, &reviewData); err != nil {
