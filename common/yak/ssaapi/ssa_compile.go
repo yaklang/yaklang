@@ -72,9 +72,10 @@ func (c *config) parseFile() (ret *Program, err error) {
 	total := prog.Cache.CountInstruction()
 	prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, total) // %90
 	prog.Cache.SaveToDatabase()
-	c.SaveConfig()
 	wait()
-	return NewProgram(prog, c), nil
+	p := NewProgram(prog, c)
+	SaveConfig(c, p)
+	return p, nil
 }
 
 func (c *config) feed(prog *ssa.Program, code *memedit.MemEditor) error {

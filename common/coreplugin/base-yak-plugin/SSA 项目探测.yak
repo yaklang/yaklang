@@ -11,6 +11,13 @@ languages = cli.StringSlice(
     cli.setSelectOption("Golang", "go"),
 )
 
+
+memory := cli.Bool("memory", 
+    cli.setDefault(false), 
+    cli.setVerboseName("内存编译，将会保存10分钟"),
+    cli.setCliGroup("compile"),
+)
+
 proxy = cli.String("proxy", cli.setHelp("remote url proxy"))
 timeout = 3
 
@@ -353,9 +360,9 @@ language = sprint(params.language)
 opts = [
     ssa.withProgramName(programName),
     ssa.withProcess((msg, process) => {
-    yakit.SetProgressEx("complile", process)
-    yakit.Info("%s: %f", msg, process)
-  }),
+        yakit.SetProgressEx("complile", process)
+        yakit.Info("%s: %f", msg, process)
+    }),
     ssa.withLanguage(language),
     ssa.withReCompile(reCompile),
     ssa.withStrictMode(strictMode),
@@ -363,7 +370,11 @@ opts = [
     ssa.withContext(context.Background()),
     ssa.withConfigInfo(params.info),
     ssa.withPeepholeSize(peepholeSize),
-    ssa.withDefaultExcludeFunc(str.Split(excludeFile, ","))~]
+    ssa.withDefaultExcludeFunc(str.Split(excludeFile, ","))~,
+]
+if memory{
+    opts = append(opts, ssa.withMemory())
+}
 if len(entry) != 0 {
     opts = append(opts, ssa.withEntryFile(entry...))
 }

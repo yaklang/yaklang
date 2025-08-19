@@ -1,11 +1,35 @@
 package ssaapi
 
 import (
+	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+var ProgramCache = utils.NewLRUCache[*Program](10)
+
+func SetProgramCache(program *Program, ttls ...time.Duration) {
+	ttl := 10 * time.Minute
+	if len(ttls) > 0 {
+		ttl = ttls[0]
+	}
+	ProgramCache.SetWithTTL(program.GetProgramName(), program, ttl)
+}
+
 // FromDatabase get program from database by program name
-func FromDatabase(programName string) (*Program, error) {
+func FromDatabase(programName string) (p *Program, err error) {
+
+	if prog, ok := ProgramCache.Get(programName); ok && prog != nil {
+		return prog, nil
+	}
+	defer func() {
+		if err != nil {
+			return
+		}
+		SetProgramCache(p)
+	}()
+
 	config, err := defaultConfig(WithProgramName(programName))
 	if err != nil {
 		return nil, err

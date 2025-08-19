@@ -27,7 +27,8 @@ import (
 type ProcessFunc func(msg string, process float64)
 
 type config struct {
-	enableDatabase ssa.ProgramCacheKind
+	databaseKind   ssa.ProgramCacheKind
+	programSaveTTL time.Duration
 	// program
 	ProgramName        string
 	ProgramDescription string
@@ -379,7 +380,16 @@ func WithProgramDescription(desc string) Option {
 func WithProgramName(name string) Option {
 	return func(c *config) error {
 		c.ProgramName = name
-		c.enableDatabase = ssa.ProgramCacheDBWrite
+		c.databaseKind = ssa.ProgramCacheDBWrite
+		return nil
+	}
+}
+func WithMemory(ttl ...time.Duration) Option {
+	return func(c *config) error {
+		c.databaseKind = ssa.ProgramCacheMemory
+		if len(ttl) > 0 {
+			c.programSaveTTL = ttl[0]
+		}
 		return nil
 	}
 }
@@ -527,6 +537,7 @@ var Exports = map[string]any{
 	"withPeepholeSize":       WithPeepholeSize,
 	"withExcludeFile":        WithExcludeFile,
 	"withDefaultExcludeFunc": DefaultExcludeFunc,
+	"withMemory":             WithMemory,
 
 	//diff compare
 	// "withDiffProgName":          DiffWithProgram,
