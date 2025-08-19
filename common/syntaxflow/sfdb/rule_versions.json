@@ -386,8 +386,8 @@
   {
     "rule_id": "ff1e08f0-1c18-43bb-920b-436a6bfa8dcd",
     "rule_name": "审计Golang Database Reform的使用",
-    "hash": "ec33e980a608907572b22a8c8226be214325f7ffbe7c4388ebfabac184f92cd9",
-    "version": "20250805.0001"
+    "hash": "2754066e3cee220c97bb481c2a81684e65e68933c3ca64038e93adc1a6bcd575",
+    "version": "20250819.0001"
   },
   {
     "rule_id": "0243f5ea-a5c8-4e03-a06d-78a2c9c8ff82",
@@ -404,8 +404,8 @@
   {
     "rule_id": "b7b4503b-03ff-4c54-a942-155d18621e75",
     "rule_name": "审计Golang Sqlx库使用情况",
-    "hash": "486ce85508377bd2d66dc4fe92c7ce9831f2fca1c09771473b43bcbb42d52f8a",
-    "version": "20250805.0001"
+    "hash": "446f2e147ea35a55fa2e5beef2c92f2024e8f941f7eb085908f2e8b9d0112ae7",
+    "version": "20250819.0001"
   },
   {
     "rule_id": "58ce930c-65fc-4045-b511-904bcddeb4ed",
