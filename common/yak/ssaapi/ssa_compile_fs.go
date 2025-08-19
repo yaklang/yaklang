@@ -75,7 +75,7 @@ func (c *config) parseProjectWithFS(
 			folders = append(folders,
 				strings.Split(fullPath, string(c.fs.GetSeparators()))...,
 			)
-			if c.enableDatabase != ssa.ProgramCacheMemory {
+			if c.databaseKind != ssa.ProgramCacheMemory {
 				folder2Save = append(folder2Save, folders)
 			}
 			return nil
