@@ -47,17 +47,41 @@ type ReAct struct {
 
 	// 时间线相关
 	timeline *aicommon.Timeline
+
+	mirrorMutex          sync.RWMutex
+	mirrorOfAIInputEvent map[string]func(*ypb.AIInputEvent)
+}
+
+func (r *ReAct) RegisterMirrorOfAIInputEvent(id string, f func(*ypb.AIInputEvent)) {
+	r.mirrorMutex.Lock()
+	defer r.mirrorMutex.Unlock()
+	r.mirrorOfAIInputEvent[id] = f
+}
+
+func (r *ReAct) CallMirrorOfAIInputEvent(event *ypb.AIInputEvent) {
+	r.mirrorMutex.RLock()
+	defer r.mirrorMutex.RUnlock()
+	for _, f := range r.mirrorOfAIInputEvent {
+		f(event)
+	}
+}
+
+func (r *ReAct) UnregisterMirrorOfAIInputEvent(id string) {
+	r.mirrorMutex.Lock()
+	defer r.mirrorMutex.Unlock()
+	delete(r.mirrorOfAIInputEvent, id)
 }
 
 func NewReAct(opts ...Option) (*ReAct, error) {
 	cfg := NewReActConfig(context.Background(), opts...)
 
 	react := &ReAct{
-		config:       cfg,
-		Emitter:      cfg.Emitter, // Use the emitter from config
-		taskQueue:    NewTaskQueue("react-main-queue"),
-		isProcessing: false,
-		timeline:     aicommon.NewTimeline(cfg.timelineLimit, cfg, nil),
+		config:               cfg,
+		Emitter:              cfg.Emitter, // Use the emitter from config
+		taskQueue:            NewTaskQueue("react-main-queue"),
+		isProcessing:         false,
+		timeline:             aicommon.NewTimeline(cfg.timelineLimit, cfg, nil),
+		mirrorOfAIInputEvent: make(map[string]func(*ypb.AIInputEvent)),
 	}
 
 	// Initialize prompt manager
@@ -278,6 +302,8 @@ func (r *ReAct) processInputEvent(event *ypb.AIInputEvent) error {
 	if r.config.debugEvent {
 		log.Infof("Processing input event: IsFreeInput=%v, IsInteractive=%v", event.IsFreeInput, event.IsInteractiveMessage)
 	}
+
+	r.CallMirrorOfAIInputEvent(event)
 
 	if event.IsFreeInput {
 		return r.handleFreeValue(event)

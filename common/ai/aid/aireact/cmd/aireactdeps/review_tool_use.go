@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/aireactdeps/promptui"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -24,6 +23,9 @@ func getString(m map[string]interface{}, key string) string {
 
 // handleReviewRequireClient 使用 promptui 处理 TOOL_USE_REVIEW_REQUIRE 事件
 func handleReviewRequireClient(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInputEvent) {
+	NewStdinManager().PreventDefault()
+	defer NewStdinManager().RecoverDefault()
+
 	// 解析审核事件内容
 	var reviewData map[string]interface{}
 	if err := json.Unmarshal(event.Content, &reviewData); err != nil {
@@ -71,7 +73,7 @@ func handleReviewRequireClient(event *schema.AiOutputEvent, inputChan chan<- *yp
 		}
 	}
 
-	// 如果没有提供选项，使用默认选项
+	// 如果没有提供选项，使用默认选项，默认为 continue
 	if len(options) == 0 {
 		options = []ReviewOption{
 			{Value: "continue", Prompt: "同意工具使用"},
@@ -79,6 +81,23 @@ func handleReviewRequireClient(event *schema.AiOutputEvent, inputChan chan<- *yp
 			{Value: "wrong_params", Prompt: "参数不合理"},
 			{Value: "direct_answer", Prompt: "要求AI直接回答"},
 		}
+	}
+
+	var idx int
+	for idxNow, i := range options {
+		if i.Value == "continue" {
+			idx = idxNow
+			break
+		}
+	}
+
+	// 将 continue 选项移到第一位
+	if idx > 0 {
+		continueSelector := options[idx]
+		// 移除原位置的 continue 选项
+		options = append(options[:idx], options[idx+1:]...)
+		// 将 continue 选项插入到第一位
+		options = append([]ReviewOption{continueSelector}, options...)
 	}
 
 	// 创建 promptui 选择器
@@ -106,16 +125,22 @@ func handleReviewRequireClient(event *schema.AiOutputEvent, inputChan chan<- *yp
 		Templates: templates,
 		Size:      4,
 		Searcher:  searcher,
+		// 直接使用 os.Stdin，不通过会话管理器
 	}
 
 	fmt.Printf("\n请审核AI要使用的工具，选择您的操作：\n\n")
 
-	selectedIndex, _, err := prompt.Run()
-	if err != nil {
-		log.Errorf("Prompt failed: %v", err)
-		// 发生错误时默认选择 continue
-		sendToolReviewResponse(inputChan, eventID, "continue")
-		return
+	var selectedIndex int
+	var err error
+	for {
+		selectedIndex, _, err = prompt.Run()
+		if err != nil {
+			log.Errorf("Tool Use prompt failed: %v", err)
+			// 发生错误时默认选择 continue
+			sendToolReviewResponse(inputChan, eventID, "continue")
+			continue
+		}
+		break
 	}
 
 	selectedOption := options[selectedIndex]
@@ -132,82 +157,6 @@ func handleReviewRequireClient(event *schema.AiOutputEvent, inputChan chan<- *yp
 
 	// 发送响应
 	sendToolReviewResponse(inputChan, eventID, selectedOption.Value, extraPrompt)
-}
-
-// processReviewInput 处理审核选择的用户输入
-func processReviewInput(input string, reactInstance *aireact.ReAct) {
-	waiting, options, eventID := globalState.GetReviewState()
-	if !waiting {
-		return
-	}
-
-	var selectedValue string
-
-	// 处理空输入（只是按回车）
-	if strings.TrimSpace(input) == "" {
-		// 首先寻找 "continue" 选项
-		for _, option := range options {
-			if option.Value == "continue" {
-				selectedValue = "continue"
-				fmt.Printf("[REVIEW]: Empty input detected, selecting default: %s\n", selectedValue)
-				break
-			}
-		}
-		// 如果没有找到 "continue" 选项，使用第一个选项
-		if selectedValue == "" {
-			selectedValue = options[0].Value
-			fmt.Printf("[REVIEW]: Empty input detected, selecting first option: %s\n", selectedValue)
-		}
-	} else {
-		// 首先尝试解析为数字
-		if idx := parseSelectionIndex(input, len(options)); idx >= 0 {
-			selectedValue = options[idx].Value
-		} else {
-			// 尝试按值匹配
-			for _, option := range options {
-				if strings.EqualFold(input, option.Value) {
-					selectedValue = option.Value
-					break
-				}
-			}
-		}
-
-		// 如果可用，默认为继续，否则为第一个选项
-		if selectedValue == "" {
-			// 首先寻找 "continue" 选项
-			for _, option := range options {
-				if option.Value == "continue" {
-					selectedValue = "continue"
-					fmt.Printf("[REVIEW]: Invalid input '%s', defaulting to %s\n", input, selectedValue)
-					break
-				}
-			}
-			// 如果没有找到 "continue" 选项，使用第一个选项
-			if selectedValue == "" {
-				selectedValue = options[0].Value
-				fmt.Printf("[REVIEW]: Invalid input '%s', defaulting to %s\n", input, selectedValue)
-			}
-		} else {
-			fmt.Printf("[REVIEW]: Selected action: %s\n", selectedValue)
-		}
-	}
-
-	// 创建并发送输入事件到 ReAct
-	inputEvent := &ypb.AIInputEvent{
-		IsInteractiveMessage: true,
-		InteractiveId:        eventID,
-		InteractiveJSONInput: fmt.Sprintf(`{"suggestion": "%s"}`, selectedValue),
-	}
-
-	// 通过 ReAct 发送输入事件
-	err := reactInstance.SendInputEvent(inputEvent)
-	if err != nil {
-		log.Errorf("Failed to send input event: %v", err)
-	}
-
-	fmt.Print("Continuing with ReAct processing...\n\n")
-
-	globalState.SetReviewState(false, nil, "")
 }
 
 // 辅助函数

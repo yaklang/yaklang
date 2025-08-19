@@ -24,10 +24,22 @@ var (
 	version = "1.0.0"
 )
 
+func init() {
+	// 处理中断信号
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		for sig := range sigChan {
+			log.Infof("Received interrupt signal: %v, shutting down...", sig)
+			os.Exit(0)
+		}
+	}()
+}
+
 func MainEntry() {
 	app := cli.NewApp()
 	app.Name = "aireact"
-	app.Usage = "AI ReAct 交互式命令行工具"
+	app.Usage = "AI ReAct interactive command line tool"
 	app.Version = version
 
 	app.Flags = []cli.Flag{
@@ -104,16 +116,6 @@ func runReActCLI(c *cli.Context) error {
 	// 创建上下文
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	// 处理中断信号
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sigChan
-		log.Info("Received interrupt signal, shutting down...")
-		cancel()
-		os.Exit(0)
-	}()
 
 	// 创建 ReAct 应用
 	app, err := createReActApp(ctx, config)

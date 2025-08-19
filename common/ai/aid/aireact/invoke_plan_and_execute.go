@@ -3,10 +3,13 @@ package aireact
 import (
 	"context"
 	"fmt"
+
+	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (r *ReAct) invokePlanAndExecute(planPayload string) error {
@@ -18,6 +21,23 @@ func (r *ReAct) invokePlanAndExecute(planPayload string) error {
 	planCtx, cancel := context.WithCancel(r.config.GetContext())
 	defer cancel()
 
+	inputChannel := make(chan *aid.InputEvent, 100)
+	uid := ksuid.New().String()
+	r.RegisterMirrorOfAIInputEvent(uid, func(event *ypb.AIInputEvent) {
+		go func() {
+			log.Infof("Received AI input event: %v", event)
+			result, err := aid.ConvertAIInputEventToAIDInputEvent(event)
+			if err != nil {
+				log.Errorf("Failed to convert AI input event to AID input event: %v", err)
+				return
+			}
+			inputChannel <- result
+		}()
+	})
+	defer func() {
+		r.UnregisterMirrorOfAIInputEvent(uid)
+	}()
+
 	cod, err := aid.NewCoordinatorContext(
 		planCtx,
 		planPayload,
@@ -25,6 +45,7 @@ func (r *ReAct) invokePlanAndExecute(planPayload string) error {
 		aid.WithAICallback(r.config.aiCallback),
 		aid.WithAllowPlanUserInteract(true),
 		aid.WithAgreeManual(),
+		aid.WithEventInputChan(inputChannel),
 		aid.WithEventHandler(func(e *schema.AiOutputEvent) {
 			emitErr := r.config.Emit(e)
 			if emitErr != nil {
