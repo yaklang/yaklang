@@ -93,7 +93,6 @@ import (
     "log"
 
     "github.com/jmoiron/sqlx"
-    _ "modernc.org/sqlite"
 )
 
 type User struct {
