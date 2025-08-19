@@ -94,6 +94,7 @@ const (
 	Yak_ExportHTTPFlows_FullMethodName                            = "/ypb.Yak/ExportHTTPFlows"
 	Yak_HTTPFlowsToOnline_FullMethodName                          = "/ypb.Yak/HTTPFlowsToOnline"
 	Yak_QueryHTTPFlowsProcessNames_FullMethodName                 = "/ypb.Yak/QueryHTTPFlowsProcessNames"
+	Yak_HTTPFlowsToOnlineBatch_FullMethodName                     = "/ypb.Yak/HTTPFlowsToOnlineBatch"
 	Yak_AnalyzeHTTPFlow_FullMethodName                            = "/ypb.Yak/AnalyzeHTTPFlow"
 	Yak_ExtractUrl_FullMethodName                                 = "/ypb.Yak/ExtractUrl"
 	Yak_GetHistoryHTTPFuzzerTask_FullMethodName                   = "/ypb.Yak/GetHistoryHTTPFuzzerTask"
@@ -633,6 +634,7 @@ type YakClient interface {
 	ExportHTTPFlows(ctx context.Context, in *ExportHTTPFlowsRequest, opts ...grpc.CallOption) (*QueryHTTPFlowResponse, error)
 	HTTPFlowsToOnline(ctx context.Context, in *HTTPFlowsToOnlineRequest, opts ...grpc.CallOption) (*Empty, error)
 	QueryHTTPFlowsProcessNames(ctx context.Context, in *QueryHTTPFlowRequest, opts ...grpc.CallOption) (*QueryHTTPFlowsProcessNamesResponse, error)
+	HTTPFlowsToOnlineBatch(ctx context.Context, in *HTTPFlowsToOnlineBatchRequest, opts ...grpc.CallOption) (*HTTPFlowsToOnlineBatchResponse, error)
 	// 流量分析器
 	AnalyzeHTTPFlow(ctx context.Context, in *AnalyzeHTTPFlowRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[AnalyzeHTTPFlowResponse], error)
 	// 从一个 FuzzerRequest 中提取 Url
@@ -2095,6 +2097,16 @@ func (c *yakClient) QueryHTTPFlowsProcessNames(ctx context.Context, in *QueryHTT
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(QueryHTTPFlowsProcessNamesResponse)
 	err := c.cc.Invoke(ctx, Yak_QueryHTTPFlowsProcessNames_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) HTTPFlowsToOnlineBatch(ctx context.Context, in *HTTPFlowsToOnlineBatchRequest, opts ...grpc.CallOption) (*HTTPFlowsToOnlineBatchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HTTPFlowsToOnlineBatchResponse)
+	err := c.cc.Invoke(ctx, Yak_HTTPFlowsToOnlineBatch_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7294,6 +7306,7 @@ type YakServer interface {
 	ExportHTTPFlows(context.Context, *ExportHTTPFlowsRequest) (*QueryHTTPFlowResponse, error)
 	HTTPFlowsToOnline(context.Context, *HTTPFlowsToOnlineRequest) (*Empty, error)
 	QueryHTTPFlowsProcessNames(context.Context, *QueryHTTPFlowRequest) (*QueryHTTPFlowsProcessNamesResponse, error)
+	HTTPFlowsToOnlineBatch(context.Context, *HTTPFlowsToOnlineBatchRequest) (*HTTPFlowsToOnlineBatchResponse, error)
 	// 流量分析器
 	AnalyzeHTTPFlow(*AnalyzeHTTPFlowRequest, grpc.ServerStreamingServer[AnalyzeHTTPFlowResponse]) error
 	// 从一个 FuzzerRequest 中提取 Url
@@ -8101,6 +8114,9 @@ func (UnimplementedYakServer) HTTPFlowsToOnline(context.Context, *HTTPFlowsToOnl
 }
 func (UnimplementedYakServer) QueryHTTPFlowsProcessNames(context.Context, *QueryHTTPFlowRequest) (*QueryHTTPFlowsProcessNamesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryHTTPFlowsProcessNames not implemented")
+}
+func (UnimplementedYakServer) HTTPFlowsToOnlineBatch(context.Context, *HTTPFlowsToOnlineBatchRequest) (*HTTPFlowsToOnlineBatchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HTTPFlowsToOnlineBatch not implemented")
 }
 func (UnimplementedYakServer) AnalyzeHTTPFlow(*AnalyzeHTTPFlowRequest, grpc.ServerStreamingServer[AnalyzeHTTPFlowResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method AnalyzeHTTPFlow not implemented")
@@ -10673,6 +10689,24 @@ func _Yak_QueryHTTPFlowsProcessNames_Handler(srv interface{}, ctx context.Contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).QueryHTTPFlowsProcessNames(ctx, req.(*QueryHTTPFlowRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_HTTPFlowsToOnlineBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HTTPFlowsToOnlineBatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).HTTPFlowsToOnlineBatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_HTTPFlowsToOnlineBatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).HTTPFlowsToOnlineBatch(ctx, req.(*HTTPFlowsToOnlineBatchRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -18306,6 +18340,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QueryHTTPFlowsProcessNames",
 			Handler:    _Yak_QueryHTTPFlowsProcessNames_Handler,
+		},
+		{
+			MethodName: "HTTPFlowsToOnlineBatch",
+			Handler:    _Yak_HTTPFlowsToOnlineBatch_Handler,
 		},
 		{
 			MethodName: "ExtractUrl",
